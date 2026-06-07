@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apply for design-partner program — Operator Intelligence</title>
+<meta name="description" content="Operator Intelligence is in design-partner phase. Apply to join 10 founding brands at £750/mo Managed tier. Reviewed within 48 hours.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;550;600;650;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./auth.css">
+<style>
+  /* Wider card for the application form */
+  .auth-wrap { max-width: 640px; }
+  .apply-status-pill {
+    display: inline-flex; align-items: center; gap: var(--s-2);
+    padding: 5px 11px; border-radius: var(--r-full);
+    background: var(--warn-bg); color: var(--warn);
+    font-size: 11px; font-weight: 700; letter-spacing: .05em;
+    text-transform: uppercase; margin-bottom: var(--s-3);
+  }
+  .apply-status-pill .dot { width: 5px; height: 5px; border-radius: var(--r-full); background: var(--warn); animation: applyPulse 1.6s ease-in-out infinite; }
+  @keyframes applyPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+  .field-group { display: flex; flex-direction: column; gap: var(--s-4); }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+  @media (max-width: 540px) { .field-row { grid-template-columns: 1fr; } }
+  textarea {
+    width: 100%; background: var(--bg-input);
+    border: 1px solid var(--border-default); border-radius: var(--r-sm);
+    padding: 10px 12px; font-size: 13.5px; color: var(--text-primary);
+    font-family: inherit; font-weight: 500; line-height: 1.5;
+    resize: vertical; min-height: 80px;
+  }
+  textarea:focus {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(124,140,255,0.15);
+  }
+  .stack-checks {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-2);
+  }
+  @media (max-width: 480px) { .stack-checks { grid-template-columns: repeat(2, 1fr); } }
+  .stack-check {
+    display: flex; align-items: center; gap: var(--s-2);
+    padding: 8px 10px; background: var(--bg-input);
+    border: 1px solid var(--border-default); border-radius: var(--r-sm);
+    cursor: pointer; font-size: 12.5px; font-weight: 500; color: var(--text-secondary);
+    transition: all var(--motion-fast);
+  }
+  .stack-check:hover { border-color: var(--text-muted); }
+  .stack-check input { margin: 0; accent-color: var(--accent); }
+  .stack-check input:checked + span { color: var(--text-primary); font-weight: 600; }
+  .stack-check:has(input:checked) {
+    background: var(--accent-bg); border-color: var(--accent);
+    color: var(--text-primary);
+  }
+  .what-you-get {
+    margin-top: var(--s-5); padding: var(--s-4) var(--s-5);
+    background: var(--bg-elevated); border: 1px solid var(--border-subtle);
+    border-radius: var(--r-md);
+  }
+  .what-you-get-title {
+    font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: var(--s-2);
+  }
+  .what-you-get ul {
+    list-style: none; padding: 0; margin: 0;
+    font-size: 12.5px; color: var(--text-secondary); line-height: 1.7;
+  }
+  .what-you-get li { padding: 2px 0; }
+  .what-you-get li::before { content: '✓ '; color: var(--accent); font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="auth-wrap">
+  <a href="/" class="brand">
+    <div class="brand-mark">Oi</div>
+    <div class="brand-name">Operator Intelligence</div>
+  </a>
+
+  <div class="auth-card">
+    <div id="form-state">
+      <div class="apply-status-pill"><span class="dot"></span>Design-partner phase · 10 spots</div>
+      <h1>Apply for the founding cohort</h1>
+      <p class="lead">
+        We are onboarding 10 DTC brands to the Managed tier (<b style="color:var(--text-primary);">£750/mo</b>). You get the six-specialist team, a real human reviewing each weekly brief, and direct line to the founder. We review every application personally within <b style="color:var(--text-primary);">48 hours</b>.
+      </p>
+
+      <form id="apply-form">
+        <div class="field-group">
+          <label>Work email
+            <input type="email" name="email" autocomplete="email" required placeholder="founder@yourbrand.com" autofocus/>
+          </label>
+
+          <div class="field-row">
+            <label>Brand name
+              <input type="text" name="brand_name" required placeholder="e.g. Aurora Jewellery" maxlength="100"/>
+            </label>
+            <label>Website
+              <input type="text" name="website_url" placeholder="https://yourbrand.com" maxlength="500"/>
+            </label>
+          </div>
+
+          <label>Monthly DTC revenue (roughly)
+            <select name="revenue_band">
+              <option value="">Choose a band…</option>
+              <option value="pre_revenue">Pre-revenue / launching soon</option>
+              <option value="sub_100k">Under £100k/mo</option>
+              <option value="100k_500k">£100k – £500k/mo</option>
+              <option value="500k_1m">£500k – £1m/mo</option>
+              <option value="1m_3m">£1m – £3m/mo</option>
+              <option value="3m_10m">£3m – £10m/mo</option>
+              <option value="10m_plus">£10m+/mo</option>
+            </select>
+          </label>
+
+          <div>
+            <label style="margin-bottom: var(--s-2);">Your stack <span class="meta">(check all that apply)</span></label>
+            <div class="stack-checks">
+              <label class="stack-check"><input type="checkbox" name="stack" value="shopify"/> <span>Shopify</span></label>
+              <label class="stack-check"><input type="checkbox" name="stack" value="meta"/> <span>Meta Ads</span></label>
+              <label class="stack-check"><input type="checkbox" name="stack" value="klaviyo"/> <span>Klaviyo</span></label>
+              <label class="stack-check"><input type="checkbox" name="stack" value="google_ads"/> <span>Google Ads</span></label>
+              <label class="stack-check"><input type="checkbox" name="stack" value="ga4"/> <span>GA4</span></label>
+              <label class="stack-check"><input type="checkbox" name="stack" value="tiktok_ads"/> <span>TikTok Ads</span></label>
+              <label class="stack-check"><input type="checkbox" name="stack" value="instagram"/> <span>Instagram</span></label>
+              <label class="stack-check"><input type="checkbox" name="stack" value="other"/> <span>Other</span></label>
+            </div>
+          </div>
+
+          <label>What is the #1 thing a smart specialist would do for your brand this week?
+            <textarea name="primary_pain" required minlength="10" maxlength="600" placeholder="e.g. 'Tell me which of my 23 Meta ad sets to cut. I have spend in everything but no idea what is actually working.'"></textarea>
+            <span class="meta" style="margin-top:4px;">Be specific. Helps us decide if we are the right team for you.</span>
+          </label>
+
+          <label>How did you hear about us? <span class="meta">(optional)</span>
+            <input type="text" name="referral_source" placeholder="Twitter, podcast, a friend…" maxlength="120"/>
+          </label>
+        </div>
+
+        <button type="submit" class="btn-primary" id="submit-btn" style="margin-top: var(--s-5);">
+          <span class="btn-label">Submit application</span>
+        </button>
+
+        <div id="error-box" class="error-box" hidden></div>
+
+        <p class="fine-print" style="margin-top: var(--s-4);">
+          We are not collecting card details. Approved applicants kick off after a 20-min intro call.<br/>
+          Already approved? <a href="./signup.html">Set up your workspace →</a>
+        </p>
+      </form>
+
+      <div class="what-you-get">
+        <div class="what-you-get-title">What Managed tier gets you</div>
+        <ul>
+          <li>The six-specialist team running on your data</li>
+          <li>Weekly brief reviewed personally + delivered Monday morning</li>
+          <li>£-tagged action board, refreshed daily</li>
+          <li>Direct Slack to the founder (us)</li>
+          <li>Custom calibration to your brand voice, vertical, and seasonality</li>
+          <li>30-day rolling — cancel anytime</li>
+        </ul>
+      </div>
+    </div>
+
+    <div id="success-state" hidden>
+      <div class="success-icon">✓</div>
+      <h1>Application in.</h1>
+      <p class="lead">Confirmation sent to <b id="success-email"></b>. We will reply within 48 hours either way.</p>
+      <div class="info-box">
+        <div class="info-box-title">What happens next</div>
+        <ol>
+          <li>We read every application — usually within a few hours, always within 48</li>
+          <li>If it is a fit, we book a 20-min call to walk you through the platform on real data</li>
+          <li>If approved, we get your accounts connected and your first weekly brief lands within 7 days</li>
+          <li>Reply to the confirmation email any time if you have questions</li>
+        </ol>
+      </div>
+      <p class="fine-print">In the meantime: <a href="/app/demo.html" target="_blank">see the live frkl workspace →</a></p>
+    </div>
+  </div>
+
+  <p class="auth-footer">
+    <a href="/">← Back to home</a>
+  </p>
+</div>
+
+<script>
+  const SUPABASE_FNS = 'https://awcncqvsnuhqyihpdgcx.supabase.co/functions/v1';
+  const form = document.getElementById('apply-form');
+  const submitBtn = document.getElementById('submit-btn');
+  const errorBox = document.getElementById('error-box');
+  const formState = document.getElementById('form-state');
+  const successState = document.getElementById('success-state');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errorBox.hidden = true;
+    submitBtn.disabled = true;
+    submitBtn.querySelector('.btn-label').textContent = 'Submitting…';
+
+    const formData = new FormData(form);
+    const stack = formData.getAll('stack');
+    const body = {
+      email: (formData.get('email') || '').trim().toLowerCase(),
+      brand_name: (formData.get('brand_name') || '').trim(),
+      website_url: (formData.get('website_url') || '').trim() || null,
+      revenue_band: formData.get('revenue_band') || null,
+      primary_stack: stack,
+      primary_pain: (formData.get('primary_pain') || '').trim(),
+      referral_source: (formData.get('referral_source') || '').trim() || null,
+    };
+
+    try {
+      const resp = await fetch(`${SUPABASE_FNS}/apply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        errorBox.textContent = data.message || data.error || 'Something went wrong. Try again.';
+        errorBox.hidden = false;
+        submitBtn.disabled = false;
+        submitBtn.querySelector('.btn-label').textContent = 'Submit application';
+        return;
+      }
+      document.getElementById('success-email').textContent = body.email;
+      formState.hidden = true;
+      successState.hidden = false;
+      window.scrollTo({top: 0, behavior: 'smooth'});
+    } catch (err) {
+      errorBox.textContent = `Network error: ${err.message || err}`;
+      errorBox.hidden = false;
+      submitBtn.disabled = false;
+      submitBtn.querySelector('.btn-label').textContent = 'Submit application';
+    }
+  });
+</script>
+</body>
+</html>

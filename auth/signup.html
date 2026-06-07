@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign up — Operator Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;550;600;650;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./auth.css">
+</head>
+<body>
+<div class="auth-wrap">
+  <a href="/" class="brand">
+    <div class="brand-mark">Oi</div>
+    <div class="brand-name">Operator Intelligence</div>
+  </a>
+
+  <div class="auth-card">
+    <div id="form-state">
+      <h1>Start or claim your workspace</h1>
+      <p class="lead">Two fields. No credit card. <b style="color:var(--text-primary);">First brief lands next Monday.</b> Use an existing workspace handle to claim it (if your email is on the owner list).</p>
+
+      <form id="signup-form">
+        <label>Work email
+          <input type="email" name="email" autocomplete="email" required placeholder="founder@yourbrand.com" autofocus/>
+        </label>
+
+        <label>Brand name
+          <input type="text" name="brand_name" required placeholder="e.g. Aurora Jewellery" maxlength="100"/>
+          <span class="meta" id="slug-preview" style="margin-left:0; margin-top:4px; font-size:11px;"></span>
+        </label>
+
+        <!-- Hidden — auto-derived from brand name, editable via "Advanced" -->
+        <input type="hidden" name="brand_slug" id="brand-slug-input"/>
+        <input type="hidden" name="vertical" id="vertical-input"/>
+        <input type="hidden" name="currency" id="currency-input" value="GBP"/>
+
+        <details class="advanced-details">
+          <summary>Advanced (optional)</summary>
+          <div style="display:flex; flex-direction:column; gap:var(--s-3); margin-top:var(--s-3);">
+            <label>Workspace handle <span class="meta">(used in your URL)</span>
+              <input type="text" id="advanced-slug" placeholder="auto-derived from brand name" pattern="[a-z0-9][a-z0-9\-]{2,49}" minlength="3" maxlength="50"/>
+            </label>
+            <div class="row">
+              <label style="flex:1;">Vertical
+                <input type="text" id="advanced-vertical" placeholder="jewellery, apparel, beauty…" maxlength="60"/>
+              </label>
+              <label style="width: 110px;">Currency
+                <select id="advanced-currency">
+                  <option value="GBP">GBP £</option>
+                  <option value="USD">USD $</option>
+                  <option value="EUR">EUR €</option>
+                  <option value="AUD">AUD A$</option>
+                  <option value="CAD">CAD C$</option>
+                </select>
+              </label>
+            </div>
+          </div>
+        </details>
+
+        <button type="submit" class="btn-primary" id="submit-btn">
+          <span class="btn-label">Create workspace → send me a magic link</span>
+        </button>
+
+        <div id="error-box" class="error-box" hidden></div>
+
+        <p class="fine-print">
+          Already have one? <a href="./login.html">Log in →</a>
+          <br/>By signing up you agree to our <a href="/terms">terms</a> and <a href="/privacy">privacy</a>.
+        </p>
+      </form>
+    </div>
+
+    <div id="success-state" hidden>
+      <div class="success-icon">✓</div>
+      <h1 id="success-title">Check your email</h1>
+      <p class="lead"><span id="success-action-line">We sent a magic link to</span> <b id="success-email"></b>. Click it to finish setup and land in your workspace.</p>
+      <div class="info-box">
+        <div class="info-box-title" id="success-steps-title">What happens next</div>
+        <ol id="success-steps">
+          <li>Click the magic link in the email (check spam if it's not in your inbox in 60 seconds)</li>
+          <li>You'll land in your <b><span id="success-brand"></span></b> workspace</li>
+          <li>Connect Shopify in Settings → Connections (~30 seconds via OAuth)</li>
+          <li>Your first weekly brief lands Monday morning</li>
+        </ol>
+      </div>
+      <p class="fine-print">Didn't arrive? <a href="#" id="resend-link">Resend</a> or <a href="mailto:hello@operatorintelligence.com">contact support</a>.</p>
+    </div>
+  </div>
+
+  <p class="auth-footer">
+    <span>Operator Intelligence is the accountability layer for DTC brands.</span>
+    <a href="/">← Back to home</a>
+  </p>
+</div>
+
+<script>
+  const SUPABASE_FNS = 'https://awcncqvsnuhqyihpdgcx.supabase.co/functions/v1';
+
+  const form = document.getElementById('signup-form');
+  const submitBtn = document.getElementById('submit-btn');
+  const errorBox = document.getElementById('error-box');
+  const formState = document.getElementById('form-state');
+  const successState = document.getElementById('success-state');
+
+  // Slug auto-derivation. Updates whenever brand name changes UNLESS the user
+  // has explicitly typed in the advanced slug field.
+  const nameInput = form.brand_name;
+  const hiddenSlugInput = document.getElementById('brand-slug-input');
+  const advancedSlugInput = document.getElementById('advanced-slug');
+  const slugPreview = document.getElementById('slug-preview');
+
+  function deriveSlug(name) {
+    return (name || '').toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 50);
+  }
+
+  let slugManuallyEdited = false;
+  advancedSlugInput.addEventListener('input', (e) => {
+    slugManuallyEdited = !!e.target.value;
+    hiddenSlugInput.value = e.target.value.toLowerCase();
+    updateSlugPreview();
+  });
+
+  nameInput.addEventListener('input', (e) => {
+    if (!slugManuallyEdited) {
+      const auto = deriveSlug(e.target.value);
+      hiddenSlugInput.value = auto;
+      advancedSlugInput.placeholder = auto || 'auto-derived from brand name';
+    }
+    updateSlugPreview();
+  });
+
+  function updateSlugPreview() {
+    const slug = hiddenSlugInput.value;
+    slugPreview.textContent = slug ? `Workspace URL: app.operatorintelligence.com/${slug}` : '';
+  }
+
+  // Wire the advanced vertical + currency into the hidden inputs
+  document.getElementById('advanced-vertical').addEventListener('input', (e) => {
+    document.getElementById('vertical-input').value = e.target.value.trim();
+  });
+  document.getElementById('advanced-currency').addEventListener('change', (e) => {
+    document.getElementById('currency-input').value = e.target.value;
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errorBox.hidden = true;
+    submitBtn.disabled = true;
+    submitBtn.querySelector('.btn-label').textContent = 'Creating workspace…';
+
+    const slug = hiddenSlugInput.value || deriveSlug(nameInput.value);
+    if (!slug || slug.length < 3) {
+      errorBox.textContent = 'Brand name must produce a valid handle. Try a longer name or set one manually under Advanced.';
+      errorBox.hidden = false;
+      submitBtn.disabled = false;
+      submitBtn.querySelector('.btn-label').textContent = 'Create workspace → send me a magic link';
+      return;
+    }
+
+    const body = {
+      email: form.email.value.trim().toLowerCase(),
+      brand_name: nameInput.value.trim(),
+      brand_slug: slug,
+      vertical: document.getElementById('vertical-input').value || null,
+      currency: document.getElementById('currency-input').value,
+    };
+
+    try {
+      const resp = await fetch(`${SUPABASE_FNS}/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        errorBox.textContent = data.message || data.error || 'Something went wrong. Try again.';
+        errorBox.hidden = false;
+        submitBtn.disabled = false;
+        submitBtn.querySelector('.btn-label').textContent = 'Create workspace → email me a magic link';
+        return;
+      }
+
+      document.getElementById('success-email').textContent = data.user.email;
+      document.getElementById('success-brand').textContent = data.brand.name;
+
+      // Customise success state based on whether we created or claimed
+      if (data.action === 'claimed') {
+        document.getElementById('success-title').textContent = `Workspace claimed`;
+        document.getElementById('success-action-line').textContent = `Found existing '${data.brand.name}' workspace and linked you as owner. Magic link sent to`;
+        document.getElementById('success-steps-title').textContent = 'Your existing workspace is ready';
+        document.getElementById('success-steps').innerHTML = `
+          <li>Click the magic link in the email (check spam if not in inbox in 60s)</li>
+          <li>You'll land in your existing <b>${data.brand.name}</b> workspace</li>
+          <li>All existing data, connections, and findings are immediately visible</li>
+          <li>Next Monday's brief lands as scheduled</li>
+        `;
+      } else {
+        // 'created' path — default copy applies
+      }
+      formState.hidden = true;
+      successState.hidden = false;
+    } catch (err) {
+      errorBox.textContent = `Network error: ${err.message || err}`;
+      errorBox.hidden = false;
+      submitBtn.disabled = false;
+      submitBtn.querySelector('.btn-label').textContent = 'Create workspace → email me a magic link';
+    }
+  });
+</script>
+</body>
+</html>

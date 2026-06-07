@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>Demo workspace (frkl) — Operator Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;550;600;650;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #08080b; color: #f1f1f4; min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  .demo-banner {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(124,140,255,0.12); backdrop-filter: blur(14px);
+    border-bottom: 1px solid rgba(124,140,255,0.25);
+    padding: 12px 24px;
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    font-size: 13px;
+  }
+  .demo-tag {
+    font-size: 10.5px; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; color: #7c8cff;
+    background: rgba(124,140,255,0.15); padding: 3px 9px; border-radius: 999px;
+  }
+  .demo-text { color: #b1b1bc; }
+  .demo-text b { color: #f1f1f4; font-weight: 600; }
+  .demo-cta {
+    margin-left: auto; padding: 7px 14px; background: #7c8cff; color: white;
+    text-decoration: none; font-weight: 600; font-size: 12.5px;
+    border-radius: 6px; transition: background 120ms ease;
+  }
+  .demo-cta:hover { background: #8b9aff; }
+  iframe {
+    width: 100%; height: calc(100vh - 50px); border: 0; display: block;
+    background: #08080b;
+  }
+  .demo-fallback {
+    max-width: 720px; margin: 64px auto; padding: 32px;
+    background: #111116; border: 1px solid #2a2a34; border-radius: 14px;
+    text-align: center;
+  }
+  .demo-fallback h1 { font-size: 22px; font-weight: 650; margin-bottom: 12px; letter-spacing: -.015em; }
+  .demo-fallback p { color: #b1b1bc; line-height: 1.6; margin-bottom: 16px; }
+  .demo-fallback a { color: #7c8cff; }
+</style>
+</head>
+<body>
+
+<div class="demo-banner">
+  <span class="demo-tag">Demo workspace</span>
+  <span class="demo-text">
+    This is the live <b>frkl</b> dashboard — our DTC jewellery design partner. Your workspace will look like this once Shopify is connected and the engines have run.
+  </span>
+  <a href="../auth/signup.html" class="demo-cta">Start your free trial →</a>
+</div>
+
+<!-- Live frkl dashboard loaded in iframe. Falls back gracefully if the file
+     isn't reachable (e.g. when deployed to a static host without the dashboard
+     bundled alongside). -->
+<iframe id="demo-frame"
+        src="/frkl-live-dashboard.html?v=20260605t"
+        title="frkl design-partner dashboard"
+        onerror="this.style.display='none'; document.getElementById('fallback').style.display='block';"></iframe>
+
+<div id="fallback" class="demo-fallback" style="display:none;">
+  <h1>Demo dashboard not bundled with this deploy</h1>
+  <p>
+    The frkl design-partner dashboard lives in the project root at
+    <code style="background:#0a0a10; padding:2px 6px; border-radius:4px; font-size:11px;">frkl-live-dashboard.html</code>
+    and needs to be served alongside this site for the iframe to load.
+  </p>
+  <p>
+    In production this would be a curated, sanitised demo bundled with the marketing site. For now you can view the live dashboard directly during local preview.
+  </p>
+  <p style="margin-top:24px;">
+    <a href="../auth/signup.html" style="display:inline-block; padding:10px 20px; background:#7c8cff; color:white; text-decoration:none; font-weight:600; border-radius:6px;">Start your free trial →</a>
+  </p>
+</div>
+
+</body>
+</html>

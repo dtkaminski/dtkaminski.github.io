@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Your workspace — Operator Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;550;600;650;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./auth.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  /* Workspace-specific overlays on top of auth.css */
+  .progress-card {
+    width: 100%; background: var(--bg-card);
+    border: 1px solid var(--border-subtle); border-radius: var(--r-lg);
+    padding: var(--s-7); margin-bottom: var(--s-4); position: relative; overflow: hidden;
+  }
+  .progress-card-bg {
+    position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(700px 300px at 0% 0%, rgba(124,140,255,0.10), transparent 60%);
+  }
+  .progress-card-inner { position: relative; }
+  .progress-eyebrow {
+    font-size: 10.5px; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--accent); margin-bottom: var(--s-2);
+  }
+  .progress-headline {
+    font-size: 28px; font-weight: 650; letter-spacing: -.018em;
+    line-height: 1.15; margin-bottom: var(--s-2);
+  }
+  .progress-sub {
+    font-size: 14.5px; color: var(--text-secondary); line-height: 1.5;
+    margin-bottom: var(--s-5); max-width: 540px;
+  }
+  .progress-bar {
+    width: 100%; height: 8px; background: var(--bg-input);
+    border-radius: var(--r-full); overflow: hidden; margin-bottom: var(--s-3);
+  }
+  .progress-fill {
+    height: 100%; background: linear-gradient(90deg, var(--accent) 0%, #5762cc 100%);
+    border-radius: var(--r-full); transition: width 400ms cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 12px rgba(124,140,255,0.4);
+  }
+  .progress-row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12.5px; color: var(--text-muted); gap: var(--s-3); flex-wrap: wrap;
+  }
+  .progress-row b { color: var(--text-primary); font-weight: 600; }
+
+  .next-step-cta {
+    margin-top: var(--s-5); padding: var(--s-4) var(--s-5);
+    background: var(--accent-bg); border: 1px solid rgba(124,140,255,0.3);
+    border-radius: var(--r-md); display: flex; align-items: center; gap: var(--s-4);
+  }
+  .next-step-tag {
+    font-size: 10px; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--accent);
+  }
+  .next-step-title { font-size: 14px; font-weight: 600; margin-top: 2px; }
+  .next-step-cta .btn-primary { padding: 9px 16px; font-size: 13px; flex-shrink: 0; }
+
+  /* Connection grid */
+  .conn-grid {
+    display: grid; gap: var(--s-3); grid-template-columns: 1fr;
+    margin-top: var(--s-4);
+  }
+  @media (min-width: 640px) { .conn-grid { grid-template-columns: 1fr 1fr; } }
+
+  .conn-card {
+    background: var(--bg-card); border: 1px solid var(--border-subtle);
+    border-radius: var(--r-md); padding: var(--s-4);
+    display: flex; flex-direction: column; gap: var(--s-3);
+    transition: border-color var(--motion-fast);
+  }
+  .conn-card.active { border-color: rgba(74,222,128,0.3); background: rgba(74,222,128,0.025); }
+  .conn-card.pending { border-color: rgba(245,181,68,0.3); }
+  .conn-card-head { display: flex; align-items: center; gap: var(--s-3); }
+  .conn-icon {
+    width: 36px; height: 36px; border-radius: var(--r-md);
+    background: var(--bg-elevated); border: 1px solid var(--border-default);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700; color: var(--text-muted); flex-shrink: 0;
+  }
+  .conn-card.active .conn-icon { background: var(--good-bg); color: var(--good); border-color: rgba(74,222,128,0.3); }
+  .conn-name { font-size: 14px; font-weight: 650; }
+  .conn-status {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 600;
+  }
+  .conn-status .dot { width: 6px; height: 6px; border-radius: var(--r-full); }
+  .conn-status.active { color: var(--good); }
+  .conn-status.active .dot { background: var(--good); box-shadow: 0 0 6px rgba(74,222,128,.6); }
+  .conn-status.pending { color: var(--warn); }
+  .conn-status.pending .dot { background: var(--warn); }
+  .conn-status.disconnected { color: var(--text-muted); }
+  .conn-status.disconnected .dot { background: var(--text-faint); }
+  .conn-unlocks {
+    font-size: 12px; color: var(--text-muted); line-height: 1.5;
+  }
+  .conn-action {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: auto; gap: var(--s-3);
+  }
+  .conn-action .btn-primary, .conn-action .btn-ghost {
+    padding: 6px 12px; font-size: 12px; font-weight: 600;
+  }
+  .conn-action .meta { font-size: 11px; }
+
+  /* What you'll see preview */
+  .preview-card {
+    width: 100%; background: var(--bg-card);
+    border: 1px solid var(--border-subtle); border-radius: var(--r-lg);
+    padding: var(--s-6); margin-top: var(--s-4);
+  }
+  .preview-grid {
+    display: grid; gap: var(--s-3); margin-top: var(--s-4);
+    grid-template-columns: repeat(3, 1fr);
+  }
+  @media (max-width: 720px) { .preview-grid { grid-template-columns: 1fr; } }
+  .preview-tile {
+    background: var(--bg-elevated); border: 1px solid var(--border-subtle);
+    border-radius: var(--r-md); padding: var(--s-4);
+  }
+  .preview-tile-eyebrow {
+    font-size: 9.5px; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--accent); margin-bottom: var(--s-2);
+  }
+  .preview-tile-headline { font-size: 22px; font-weight: 650; letter-spacing: -.015em; line-height: 1.1; }
+  .preview-tile-sub { font-size: 11.5px; color: var(--text-muted); margin-top: var(--s-2); line-height: 1.5; }
+
+  /* Demo banner */
+  .demo-banner {
+    display: flex; align-items: center; gap: var(--s-3);
+    padding: var(--s-3) var(--s-4); background: var(--bg-elevated);
+    border: 1px solid var(--border-default); border-radius: var(--r-md);
+    margin-top: var(--s-4); font-size: 13px;
+  }
+  .demo-banner .btn-ghost { margin-left: auto; padding: 6px 12px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="auth-wrap workspace-wrap" style="max-width: 880px;">
+  <header class="workspace-bar">
+    <a href="/" class="brand">
+      <div class="brand-mark">Oi</div>
+      <div class="brand-name">Operator Intelligence</div>
+    </a>
+    <div style="flex:1"></div>
+    <span id="user-email" class="meta"></span>
+    <button id="logout-btn" class="btn-ghost">Log out</button>
+  </header>
+
+  <div id="loading" class="auth-card centered">
+    <p class="lead">Loading your workspace…</p>
+  </div>
+
+  <div id="no-session" class="auth-card" hidden>
+    <h1>You're not logged in</h1>
+    <p class="lead">Your session has expired or this link is no longer valid.</p>
+    <a href="./login.html" class="btn-primary" style="display:inline-flex; text-decoration:none;">Log in →</a>
+  </div>
+
+  <div id="no-brands" class="auth-card" hidden>
+    <h1>No workspace yet</h1>
+    <p class="lead">You're logged in but not a member of any workspace.</p>
+
+    <!-- Surfaced if there's a brand you can claim with your email -->
+    <div id="claim-prompt" hidden style="background:var(--accent-bg); border:1px solid rgba(124,140,255,0.3); border-radius:var(--r-md); padding:var(--s-4); margin:var(--s-4) 0;">
+      <div class="micro" style="color:var(--accent); margin-bottom:6px;">An existing workspace matches your email</div>
+      <div style="font-size:14px; font-weight:600; margin-bottom:4px;" id="claim-brand-name">—</div>
+      <div class="meta" style="font-size:12px; margin-bottom:var(--s-3);">You're on the claim allowlist for this workspace. Click below to link your account as owner.</div>
+      <button id="claim-btn" class="btn-primary" style="padding:8px 14px; font-size:13px;">Claim workspace →</button>
+      <div id="claim-error" class="error-box" hidden style="margin-top: 10px;"></div>
+    </div>
+
+    <p class="meta" style="font-size:12px; margin: var(--s-4) 0 var(--s-3);">Or start fresh:</p>
+    <a href="./signup.html" class="btn-primary" style="display:inline-flex; text-decoration:none;">Create a new workspace →</a>
+  </div>
+
+  <div id="workspace-view" hidden>
+    <!-- ── PROGRESS HERO ────────────────────────────────────────────── -->
+    <div class="progress-card">
+      <div class="progress-card-bg"></div>
+      <div class="progress-card-inner">
+        <div class="progress-eyebrow">Welcome to Operator Intelligence</div>
+        <h1 class="progress-headline" id="welcome-headline">Let's get <span id="welcome-brand">your workspace</span> producing findings.</h1>
+        <p class="progress-sub" id="welcome-sub">Connect Shopify in 30 seconds and you'll have your first £-quantified findings within an hour. Everything else can wait.</p>
+
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width: 0%;"></div></div>
+        <div class="progress-row">
+          <span><b id="progress-count">0 of 1</b> required source connected</span>
+          <span id="progress-eta">First brief: <b>next Monday</b></span>
+        </div>
+
+        <div class="next-step-cta" id="next-step-cta" hidden>
+          <div>
+            <div class="next-step-tag" id="next-step-tag">Next step</div>
+            <div class="next-step-title" id="next-step-title">Connect Shopify</div>
+          </div>
+          <button class="btn-primary" id="next-step-btn">Connect →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── DEMO BANNER (only when not yet connected) ──────────────────── -->
+    <div class="demo-banner" id="demo-banner" hidden>
+      <span style="color:var(--text-secondary);">
+        Want to see what the dashboard looks like with real data first?
+      </span>
+      <a href="/app/demo.html" class="btn-ghost" target="_blank">Open frkl demo workspace →</a>
+    </div>
+
+    <!-- ── CONNECTION GRID ─────────────────────────────────────────────── -->
+    <h2 style="font-size:16px; margin: var(--s-7) 0 var(--s-3); font-weight:650;">Data sources</h2>
+    <p class="meta" style="font-size:12.5px; margin-bottom:var(--s-2);">
+      Each source unlocks more of the dashboard. <b>Only Shopify is required</b> — start there, add the rest later.
+    </p>
+    <div class="conn-grid" id="conn-grid">
+      <!-- Filled by JS -->
+    </div>
+
+    <!-- ── WHAT YOU'LL SEE ─────────────────────────────────────────────── -->
+    <div class="preview-card">
+      <h2 style="font-size:16px; margin: 0 0 var(--s-2); font-weight:650;">What your dashboard looks like when it's full</h2>
+      <p class="meta" style="font-size:12.5px;">A live example from our design partner, frkl (DTC jewellery, £16k/mo)</p>
+      <div class="preview-grid">
+        <div class="preview-tile">
+          <div class="preview-tile-eyebrow">Monday hero</div>
+          <div class="preview-tile-headline" style="color:var(--accent);">£30.7k/mo</div>
+          <div class="preview-tile-sub">in play this week. Across leaking now (£20.6k), at risk (£6.9k), opportunity (£3.2k).</div>
+        </div>
+        <div class="preview-tile">
+          <div class="preview-tile-eyebrow">Inventory finding</div>
+          <div class="preview-tile-headline" style="color:var(--bad);">£295k</div>
+          <div class="preview-tile-sub">working capital locked in 82 overstocked SKUs while 4 SKUs are stocking out.</div>
+        </div>
+        <div class="preview-tile">
+          <div class="preview-tile-eyebrow">Creative score</div>
+          <div class="preview-tile-headline" style="color:var(--good);">4.8 / 5</div>
+          <div class="preview-tile-sub">'How your email finds me' meme reel — gold-standard formula. Brief: replicate.</div>
+        </div>
+      </div>
+      <p style="text-align:center; margin-top:var(--s-5);">
+        <a href="/app/demo.html" class="btn-ghost" target="_blank" style="padding:8px 14px; font-size:13px;">Open the full frkl demo →</a>
+      </p>
+    </div>
+
+    <!-- ── WORKSPACE DETAILS ──────────────────────────────────────────── -->
+    <div class="welcome-card" style="margin-top:var(--s-4);">
+      <h2 style="font-size:14px; margin:0 0 var(--s-2); font-weight:650; color:var(--text-secondary);">Workspace details</h2>
+      <table class="kv-table">
+        <tr><td>Brand</td><td id="kv-brand">—</td></tr>
+        <tr><td>Workspace handle</td><td><code id="kv-slug">—</code></td></tr>
+        <tr><td>Vertical</td><td id="kv-vertical">—</td></tr>
+        <tr><td>Currency</td><td id="kv-currency">—</td></tr>
+        <tr><td>Your role</td><td id="kv-role">—</td></tr>
+        <tr><td>Workspace ID</td><td><code id="kv-id" style="font-size:10.5px;">—</code></td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Shopify connect modal -->
+<div id="shopify-modal" class="modal-bg" hidden>
+  <div class="modal">
+    <h3>Connect Shopify</h3>
+    <p class="lead" style="font-size:13px; margin:8px 0 16px;">
+      Enter your <code>.myshopify.com</code> domain (not your custom domain). You'll be redirected to Shopify to approve read-only access.
+    </p>
+    <label>Shop domain
+      <input type="text" id="shop-input" placeholder="e.g. aurora.myshopify.com" autofocus style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px;"/>
+    </label>
+    <p class="meta" style="margin-top:var(--s-2); font-size:11px;">
+      Read-only scopes: orders, products, inventory, customers, analytics, discounts.
+    </p>
+    <div class="row" style="margin-top: 16px;">
+      <a id="shop-approve-link" class="btn-primary" target="_top">Approve on Shopify →</a>
+      <button id="shop-cancel" class="btn-ghost" style="margin-left:auto;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Klaviyo API-key modal -->
+<div id="klaviyo-modal" class="modal-bg" hidden>
+  <div class="modal">
+    <h3>Connect Klaviyo</h3>
+    <p class="lead" style="font-size:13px; margin:8px 0 14px;">
+      Paste a <b style="color:var(--text-primary);">read-only Private API Key</b> — takes about 30 seconds:
+    </p>
+    <ol style="font-size:12.5px; color:var(--text-secondary); margin:0 0 14px; padding-left:18px; line-height:1.7;">
+      <li><a href="https://www.klaviyo.com/settings/account/api-keys" target="_blank" rel="noopener" style="color:var(--accent,#7c8cff);">Open Klaviyo → Settings → API keys ↗</a></li>
+      <li>Click <b style="color:var(--text-primary);">Create Private API Key</b>, name it “Operator Intelligence”</li>
+      <li>Choose <b style="color:var(--text-primary);">Read-only</b> access (or scopes: accounts, metrics, flows, campaigns, profiles)</li>
+      <li>Copy the key (starts with <code>pk_</code>) and paste it below</li>
+    </ol>
+    <label>Private API Key
+      <input type="text" id="klaviyo-key-input" placeholder="pk_..." autofocus style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12.5px;"/>
+    </label>
+    <p class="meta" style="margin-top:var(--s-2); font-size:11px;">
+      🔒 We validate it, then only ever <b>read</b> — we never send, edit lists, or change anything in your Klaviyo.
+    </p>
+    <div id="klaviyo-error" class="error-box" hidden style="margin-top: 12px;"></div>
+    <div class="row" style="margin-top: 16px;">
+      <button id="klaviyo-submit" class="btn-primary">Connect →</button>
+      <button id="klaviyo-cancel" class="btn-ghost" style="margin-left:auto;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const SUPABASE_URL = 'https://awcncqvsnuhqyihpdgcx.supabase.co';
+  const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_6NLIq1JL_LZIMjez3FmnVQ_JIVw3-A2';
+  const SUPABASE_FNS = `${SUPABASE_URL}/functions/v1`;
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+  // Connection definitions — required vs optional, what unlocks, auth flow type
+  const CONNECTIONS = [
+    { id:'shopify', name:'Shopify', icon:'S', required:true, authType:'oauth',
+      unlocks:'Orders, AOV, inventory cover, discount load, product mix',
+      buildInstallUrl: (b, opts) => `${SUPABASE_FNS}/oauth-shopify-install?shop=${encodeURIComponent(opts.shop)}&brand=${encodeURIComponent(b)}`,
+      promptType:'shopify_domain' },
+    { id:'meta', name:'Meta Ads', icon:'M', required:false, authType:'oauth',
+      unlocks:'Paid spend, ROAS, creative-level performance, audience health · includes Instagram',
+      buildInstallUrl: (b) => `${SUPABASE_FNS}/oauth-meta-install?brand=${encodeURIComponent(b)}`,
+      promptType:'direct' },
+    { id:'klaviyo', name:'Klaviyo', icon:'K', required:false, authType:'api_key',
+      unlocks:'True email attribution, flow gap audit, list health',
+      promptType:'api_key' },
+    { id:'google_ads', name:'Google Ads', icon:'G', required:false, authType:'oauth',
+      unlocks:'Search spend, keyword performance, Google CPA',
+      buildInstallUrl: (b) => `${SUPABASE_FNS}/oauth-google-ads-install?brand=${encodeURIComponent(b)}`,
+      promptType:'direct' },
+    { id:'ga4', name:'Google Analytics 4', icon:'A', required:false, authType:'oauth',
+      unlocks:'Sessions, funnel drop-off, channel mix, on-site conversions',
+      buildInstallUrl: (b) => `${SUPABASE_FNS}/oauth-ga4-install?brand=${encodeURIComponent(b)}`,
+      promptType:'direct' },
+    { id:'tiktok_ads', name:'TikTok Ads', icon:'T', required:false, authType:'oauth',
+      unlocks:'TikTok spend, video views, completion rates, conversions',
+      buildInstallUrl: (b) => `${SUPABASE_FNS}/oauth-tiktok-ads-install?brand=${encodeURIComponent(b)}`,
+      promptType:'direct' },
+  ];
+
+  let currentBrand = null;
+  let currentSession = null;
+
+  (async () => {
+    const { data } = await sb.auth.getSession();
+    currentSession = data?.session;
+
+    if (!currentSession && window.location.hash.includes('access_token=')) {
+      await new Promise(r => setTimeout(r, 200));
+      const retry = await sb.auth.getSession();
+      currentSession = retry.data?.session;
+    }
+
+    if (!currentSession) {
+      document.getElementById('loading').hidden = true;
+      document.getElementById('no-session').hidden = false;
+      return;
+    }
+
+    document.getElementById('user-email').textContent = currentSession.user.email;
+
+    const { data: memberships, error } = await sb
+      .from('brand_users')
+      .select('role, brand:brands(id, slug, name, vertical, currency, created_at)')
+      .eq('user_id', currentSession.user.id);
+
+    if (error) {
+      document.getElementById('loading').innerHTML = `<p class="lead">Could not load workspace: ${error.message}</p>`;
+      return;
+    }
+    if (!memberships || memberships.length === 0) {
+      document.getElementById('loading').hidden = true;
+      document.getElementById('no-brands').hidden = false;
+      // Check if there's a brand they can claim with their email.
+      // RLS hides other brands' rows so this query returns at most the ones they're whitelisted on.
+      // We use the contains operator on the claim_emails jsonb array.
+      const email = currentSession.user.email.toLowerCase();
+      try {
+        // can_email_claim_brand is a server function — we query brands and filter client-side
+        // because RLS denies broad brands access. Instead we call the function via RPC for a known slug?
+        // Simpler MVP: ask user to enter the slug. But since they came from signup with brand context,
+        // we can pull from URL or session metadata.
+        const wantSlug = new URLSearchParams(window.location.search).get('brand');
+        if (wantSlug) {
+          // Look the brand up by slug and check via RPC (function is SECURITY DEFINER)
+          const { data: brand } = await sb.from('brands').select('id, name, slug').eq('slug', wantSlug).maybeSingle();
+          if (brand) {
+            const { data: canClaim } = await sb.rpc('can_email_claim_brand', { p_brand_id: brand.id, p_email: email });
+            if (canClaim === true) {
+              document.getElementById('claim-prompt').hidden = false;
+              document.getElementById('claim-brand-name').textContent = brand.name;
+              document.getElementById('claim-btn').onclick = async () => {
+                const btn = document.getElementById('claim-btn');
+                const errEl = document.getElementById('claim-error');
+                errEl.hidden = true;
+                btn.disabled = true; btn.textContent = 'Claiming…';
+                const resp = await fetch(`${SUPABASE_FNS}/signup`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    email: currentSession.user.email,
+                    brand_name: brand.name,
+                    brand_slug: brand.slug,
+                  }),
+                });
+                const data = await resp.json();
+                if (!resp.ok || data.action !== 'claimed') {
+                  errEl.textContent = data.message || 'Claim failed.';
+                  errEl.hidden = false;
+                  btn.disabled = false; btn.textContent = 'Claim workspace →';
+                  return;
+                }
+                window.location.reload();
+              };
+            }
+          }
+        }
+      } catch (e) { console.warn('Claim detection error', e); }
+      return;
+    }
+
+    const m = memberships[0];
+    currentBrand = m.brand;
+
+    // Populate workspace details
+    document.getElementById('welcome-brand').textContent = currentBrand.name;
+    document.getElementById('kv-brand').textContent = currentBrand.name;
+    document.getElementById('kv-slug').textContent = currentBrand.slug;
+    document.getElementById('kv-vertical').textContent = currentBrand.vertical || '—';
+    document.getElementById('kv-currency').textContent = currentBrand.currency || 'GBP';
+    document.getElementById('kv-role').textContent = m.role;
+    document.getElementById('kv-id').textContent = currentBrand.id;
+
+    // Load connection status
+    const { data: connections } = await sb
+      .from('connections')
+      .select('id, provider, status, account_label, last_sync_at')
+      .eq('brand_id', currentBrand.id);
+
+    const connByProvider = Object.fromEntries((connections || []).map(c => [c.provider, c]));
+    renderConnections(connByProvider);
+    renderProgress(connByProvider);
+
+    document.getElementById('loading').hidden = true;
+    document.getElementById('workspace-view').hidden = false;
+    flashConnected(connByProvider);
+  })();
+
+  // After an OAuth return (?connected=meta etc.), show an inline success banner.
+  function flashConnected(connByProvider) {
+    const params = new URLSearchParams(window.location.search);
+    const provider = params.get('connected');
+    if (!provider) return;
+    const spec = CONNECTIONS.find(c => c.id === provider || (provider === 'meta' && c.id === 'meta'));
+    const name = spec ? spec.name : provider.charAt(0).toUpperCase() + provider.slice(1);
+    const view = document.getElementById('workspace-view');
+    if (!view) return;
+    const banner = document.createElement('div');
+    banner.setAttribute('role', 'status');
+    banner.style.cssText = 'display:flex;align-items:center;gap:10px;background:rgba(74,222,128,0.10);border:1px solid rgba(74,222,128,0.35);color:var(--good,#4ade80);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:14px;';
+    banner.innerHTML = `<span style="font-size:16px;">✓</span><span style="color:var(--text-primary,#fff);"><b>${name} connected.</b> Pulling your last 90 days now — first findings land within a few minutes.</span>`;
+    view.insertBefore(banner, view.firstChild);
+    // Clean the URL so a refresh doesn't re-flash the banner.
+    try { window.history.replaceState({}, '', window.location.pathname); } catch (_) {}
+    setTimeout(() => { banner.style.transition = 'opacity .6s'; banner.style.opacity = '0'; setTimeout(() => banner.remove(), 700); }, 8000);
+  }
+
+  function renderConnections(connByProvider) {
+    const grid = document.getElementById('conn-grid');
+    grid.innerHTML = '';
+    CONNECTIONS.forEach(spec => {
+      const conn = connByProvider[spec.id];
+      const isActive = conn && conn.status === 'active';
+      const isPending = conn && conn.status === 'pending';
+      const isError = conn && conn.status === 'error';
+
+      const card = document.createElement('div');
+      card.className = 'conn-card' + (isActive ? ' active' : isPending ? ' pending' : '');
+      const connectLabel = spec.authType === 'api_key' ? 'Add API key' : 'Connect';
+      card.innerHTML = `
+        <div class="conn-card-head">
+          <div class="conn-icon">${spec.icon}</div>
+          <div style="flex:1;">
+            <div class="conn-name">${spec.name}</div>
+            <span class="conn-status ${isActive ? 'active' : isPending ? 'pending' : isError ? 'pending' : 'disconnected'}">
+              <span class="dot"></span>
+              ${isActive ? `Connected${conn.account_label ? ` · ${conn.account_label}` : ''}` :
+                isPending ? 'Install in progress' :
+                isError ? 'Error · reconnect needed' :
+                spec.required ? 'Required · not connected' : 'Optional · not connected'}
+            </span>
+          </div>
+        </div>
+        <div class="conn-unlocks">${spec.unlocks}</div>
+        <div class="conn-trust" style="font-size:11px;color:var(--text-faint);margin-top:6px;display:flex;align-items:center;gap:5px;">
+          <span aria-hidden="true">🔒</span> Read-only — we never make changes to your ${spec.id==='shopify'?'store':spec.id==='klaviyo'?'lists or sends':'account'}.
+        </div>
+        <div class="conn-action">
+          ${isActive ? `
+            <span class="meta">Last sync: ${conn.last_sync_at ? new Date(conn.last_sync_at).toLocaleString() : 'pending first sync'}</span>
+            <button class="btn-ghost reconnect-btn" data-provider="${spec.id}">Reconnect</button>
+          ` : `
+            <span class="meta">${spec.required ? 'Start here →' : 'Add when ready'}</span>
+            <button class="btn-primary connect-btn" data-provider="${spec.id}">${connectLabel}</button>
+          `}
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+
+    grid.querySelectorAll('.connect-btn, .reconnect-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = e.currentTarget.dataset.provider;
+        const spec = CONNECTIONS.find(c => c.id === id);
+        if (!spec) return;
+        if (spec.promptType === 'shopify_domain') openShopifyModal();
+        else if (spec.promptType === 'api_key') openKlaviyoModal();
+        else if (spec.promptType === 'direct') {
+          // Direct OAuth — go through the authenticated connect-start endpoint
+          // (validates brand ownership + stamps the initiator) then redirect.
+          startConnect(spec.id);
+        }
+      });
+    });
+  }
+
+  function renderProgress(connByProvider) {
+    const activeCount = CONNECTIONS.filter(c => connByProvider[c.id]?.status === 'active').length;
+    const requiredActive = CONNECTIONS.filter(c => c.required && connByProvider[c.id]?.status === 'active').length;
+    const totalCount = CONNECTIONS.length;
+    const pct = Math.round((activeCount / totalCount) * 100);
+
+    document.getElementById('progress-fill').style.width = pct + '%';
+    document.getElementById('progress-count').textContent = `${requiredActive} of 1`;
+
+    // Next-step CTA logic
+    const cta = document.getElementById('next-step-cta');
+    const demoBanner = document.getElementById('demo-banner');
+    const shopifyActive = connByProvider['shopify']?.status === 'active';
+
+    if (!shopifyActive) {
+      // Step 1: Connect Shopify
+      cta.hidden = false;
+      document.getElementById('next-step-tag').textContent = 'Required next step';
+      document.getElementById('next-step-title').textContent = 'Connect Shopify (~30 seconds)';
+      document.getElementById('next-step-btn').textContent = 'Connect Shopify →';
+      document.getElementById('next-step-btn').onclick = openShopifyModal;
+      demoBanner.hidden = false;
+    } else {
+      // Shopify connected — push to open the dashboard
+      cta.hidden = false;
+      document.getElementById('next-step-tag').textContent = 'Your dashboard is ready';
+      document.getElementById('next-step-title').textContent = `Open the ${currentBrand.name} dashboard`;
+      document.getElementById('next-step-btn').textContent = 'Open dashboard →';
+      document.getElementById('next-step-btn').onclick = () => { window.location.href = `/app/?brand=${currentBrand.slug}`; };
+      demoBanner.hidden = true;
+
+      // Update headline + sub
+      document.getElementById('welcome-headline').innerHTML = `${currentBrand.name} is set up. <span style="color:var(--good);">First findings ready.</span>`;
+      document.getElementById('welcome-sub').textContent = 'Your weekly brief lands every Monday morning. Add more sources below to enrich the findings (Meta unlocks paid intelligence, Klaviyo unlocks email attribution).';
+    }
+
+    // Compute next brief day
+    const nextBrief = nextMonday();
+    document.getElementById('progress-eta').innerHTML = `First brief: <b>${nextBrief}</b>`;
+  }
+
+  function nextMonday() {
+    const today = new Date();
+    const daysUntil = (1 - today.getDay() + 7) % 7 || 7;  // 1 = Monday
+    const m = new Date(today);
+    m.setDate(today.getDate() + daysUntil);
+    return m.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+  }
+
+  // ── Shopify modal ──────────────────────────────────────────────────────
+  const shopifyModal = document.getElementById('shopify-modal');
+  const shopInput = document.getElementById('shop-input');
+  const shopApproveLink = document.getElementById('shop-approve-link');
+
+  function openShopifyModal() {
+    shopifyModal.hidden = false;
+    shopInput.value = '';
+    shopApproveLink.removeAttribute('href');
+    setTimeout(() => shopInput.focus(), 50);
+  }
+  shopInput.addEventListener('input', () => {
+    const v = shopInput.value.trim().toLowerCase();
+    const valid = /^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(v) && !!currentBrand;
+    // href is just a visual affordance; the real action goes through connect-start.
+    if (valid) shopApproveLink.setAttribute('href', '#'); else shopApproveLink.removeAttribute('href');
+  });
+  // Route Shopify connect through the authenticated connect-start endpoint.
+  shopApproveLink.addEventListener('click', (e) => {
+    e.preventDefault();
+    const v = shopInput.value.trim().toLowerCase();
+    if (!/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(v)) return;
+    shopifyModal.hidden = true;
+    startConnect('shopify', { shop: v });
+  });
+
+  // Authenticated connection kickoff: validates ownership server-side + stamps
+  // the initiator, then redirects the browser to the provider's consent screen.
+  async function startConnect(provider, opts = {}) {
+    if (!currentSession?.access_token || !currentBrand) { alert('Please sign in again.'); return; }
+    try {
+      const resp = await fetch(`${SUPABASE_FNS}/connect-start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
+        body: JSON.stringify({ provider, brand: currentBrand.slug, ...opts }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.authorize_url) {
+        alert(data.message || data.error || 'Could not start the connection. Please try again.');
+        return;
+      }
+      window.location.href = data.authorize_url;
+    } catch (err) {
+      alert('Connection error: ' + (err?.message || err));
+    }
+  }
+  document.getElementById('shop-cancel').addEventListener('click', () => { shopifyModal.hidden = true; });
+  shopifyModal.addEventListener('click', (e) => { if (e.target === shopifyModal) shopifyModal.hidden = true; });
+
+  // ── Klaviyo modal ──────────────────────────────────────────────────────
+  const klaviyoModal = document.getElementById('klaviyo-modal');
+  const klaviyoKeyInput = document.getElementById('klaviyo-key-input');
+  const klaviyoError = document.getElementById('klaviyo-error');
+  const klaviyoSubmit = document.getElementById('klaviyo-submit');
+
+  function openKlaviyoModal() {
+    klaviyoModal.hidden = false;
+    klaviyoKeyInput.value = '';
+    klaviyoError.hidden = true;
+    setTimeout(() => klaviyoKeyInput.focus(), 50);
+  }
+  document.getElementById('klaviyo-cancel').addEventListener('click', () => { klaviyoModal.hidden = true; });
+  klaviyoModal.addEventListener('click', (e) => { if (e.target === klaviyoModal) klaviyoModal.hidden = true; });
+  klaviyoSubmit.addEventListener('click', async () => {
+    const key = klaviyoKeyInput.value.trim();
+    if (!key || !key.startsWith('pk_')) {
+      klaviyoError.textContent = 'Private API keys start with pk_';
+      klaviyoError.hidden = false;
+      return;
+    }
+    klaviyoSubmit.disabled = true;
+    klaviyoSubmit.textContent = 'Validating…';
+    klaviyoError.hidden = true;
+    try {
+      const resp = await fetch(`${SUPABASE_FNS}/klaviyo-connect`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${currentSession.access_token}`,
+        },
+        body: JSON.stringify({ brand: currentBrand.slug, api_key: key }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        klaviyoError.textContent = data.message || data.error || 'Failed to connect.';
+        klaviyoError.hidden = false;
+        klaviyoSubmit.disabled = false;
+        klaviyoSubmit.textContent = 'Connect →';
+        return;
+      }
+      // Success — reload to show the new connection
+      klaviyoModal.hidden = true;
+      window.location.reload();
+    } catch (e) {
+      klaviyoError.textContent = `Network error: ${e.message || e}`;
+      klaviyoError.hidden = false;
+      klaviyoSubmit.disabled = false;
+      klaviyoSubmit.textContent = 'Connect →';
+    }
+  });
+
+  // Logout
+  document.getElementById('logout-btn').addEventListener('click', async () => {
+    await sb.auth.signOut();
+    window.location.href = './login.html';
+  });
+</script>
+</body>
+</html>

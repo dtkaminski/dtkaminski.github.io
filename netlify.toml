@@ -1,0 +1,47 @@
+[build]
+  publish = "."
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+
+# Always revalidate HTML so a new deploy is picked up without a hard refresh
+# (the dashboard + demo shell reference versioned assets, but the shells
+# themselves must not be stale or the old ?v keeps loading).
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+[[headers]]
+  for = "/frkl-live-dashboard.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+[[headers]]
+  for = "/app/demo.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+# Pretty URLs for the auth + app entry points
+[[redirects]]
+  from = "/signup"
+  to = "/auth/signup.html"
+  status = 301
+
+[[redirects]]
+  from = "/login"
+  to = "/auth/login.html"
+  status = 301
+
+[[redirects]]
+  from = "/workspace"
+  to = "/auth/workspace.html"
+  status = 301
+
+[[redirects]]
+  from = "/demo"
+  to = "/app/demo.html"
+  status = 301
