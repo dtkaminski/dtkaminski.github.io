@@ -339,6 +339,7 @@
       const all = await fetchAllPaged((from, to) => sb.from('tenant_ga4_daily')
         .select('date, channel, sessions, active_users, new_users, conversions, purchase_revenue, ecommerce_purchases, add_to_carts, begin_checkouts')
         .eq('brand_id', brandId)
+        .neq('channel', 'total')   // exclude GA4's daily summary row — channel groups already sum to it; including it double-counts sessions/purchases
         .order('date', { ascending: true })
         .order('channel', { ascending: true })
         .range(from, to));
