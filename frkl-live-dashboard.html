@@ -18,20 +18,20 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606081836"></script>
-<script src="./frkl-live-data.js?v=202606081836"></script>
-<script src="./frkl-agent-insights.js?v=202606081836"></script>
-<script src="./frkl-business-data.js?v=202606081836"></script>
-<script src="./frkl-action-status.js?v=202606081836"></script>
-<script src="./frkl-patterns.js?v=202606081836"></script>
-<script src="./frkl-creators.js?v=202606081836"></script>
-<script src="./frkl-creative-vision.js?v=202606081836"></script>
-<script src="./frkl-links.js?v=202606081836"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606081836"></script>
-<script src="./frkl-events.js?v=202606081836"></script>
-<script src="./frkl-products.js?v=202606081836"></script>
-<script src="./frkl-discount-codes.js?v=202606081836"></script>
-<script src="./frkl-cvr.js?v=202606081836"></script>
+<script src="./frkl-data-loader.js?v=202606081844"></script>
+<script src="./frkl-live-data.js?v=202606081844"></script>
+<script src="./frkl-agent-insights.js?v=202606081844"></script>
+<script src="./frkl-business-data.js?v=202606081844"></script>
+<script src="./frkl-action-status.js?v=202606081844"></script>
+<script src="./frkl-patterns.js?v=202606081844"></script>
+<script src="./frkl-creators.js?v=202606081844"></script>
+<script src="./frkl-creative-vision.js?v=202606081844"></script>
+<script src="./frkl-links.js?v=202606081844"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606081844"></script>
+<script src="./frkl-events.js?v=202606081844"></script>
+<script src="./frkl-products.js?v=202606081844"></script>
+<script src="./frkl-discount-codes.js?v=202606081844"></script>
+<script src="./frkl-cvr.js?v=202606081844"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -218,6 +218,16 @@
     grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   }
   .board-card { padding: var(--s-4) var(--s-4) var(--s-4) calc(var(--s-4) - 3px); }
+  .board-commentary { padding-left: calc(var(--s-5) - 3px); }
+  .board-commentary-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s-5); }
+  @media (max-width: 760px) { .board-commentary-cols { grid-template-columns: 1fr; gap: var(--s-4); } }
+  .board-comm-head { font-size: 12px; font-weight: 700; letter-spacing: .02em; margin-bottom: 8px; }
+  .board-comm-line {
+    font-size: 13px; line-height: 1.5; color: var(--text-secondary);
+    padding: 5px 0; border-top: 1px solid var(--border-subtle);
+  }
+  .board-comm-line:first-of-type { border-top: none; }
+  .board-comm-line.muted { color: var(--text-faint); }
   .board-nav-btn {
     cursor: pointer; background: var(--bg-card); color: var(--text-secondary);
     border: 1px solid var(--border-default); border-radius: var(--r-sm);
@@ -6092,15 +6102,117 @@ const BOARD_METRICS = [
   {key:'emailOpenRate', label:'Email open rate', fmt:PCT, better:'up', note:'Klaviyo opens ÷ recipients — list-engagement signal. (Attributed email revenue is shown in Channels → Email; it over-counts vs net because Klaviyo credits the same order to multiple emails/flows, so it is deliberately kept off this scorecard.)'},
 ];
 
+// Supporting metrics — a second, lighter tier for the board. Channel-level and
+// funnel detail that explains the headline KPIs above.
+const _xRoas = v => v==null ? '—' : v.toFixed(1)+'×';
+const BOARD_METRICS2 = [
+  {key:'returnRate',   label:'Return rate',     fmt:PCT, better:'down', bench:0.08, benchTip:'Refunds ÷ gross sales · watch > 8%'},
+  {key:'metaRoas',     label:'Meta ROAS',       fmt:_xRoas, better:'up', bench:2, note:'Meta-claimed purchase value ÷ Meta spend. Platform-claimed (overlaps other channels), not incremental.'},
+  {key:'googleRoas',   label:'Google ROAS',     fmt:_xRoas, better:'up', bench:2, note:'Google-claimed conversion value ÷ Google spend. Platform-claimed, not incremental.'},
+  {key:'atcRate',      label:'Add-to-cart rate',fmt:PCT, better:'up', note:'GA4 add-to-carts ÷ sessions — top-of-funnel intent.'},
+  {key:'checkoutRate', label:'Reached checkout',fmt:PCT, better:'up', note:'GA4 checkouts ÷ sessions — mid-funnel progression.'},
+  {key:'emailClickRate',label:'Email click rate',fmt:PCT, better:'up', note:'Klaviyo clicks ÷ recipients — content/offer resonance.'},
+];
+
+// Auto-generated board commentary: turns the week's numbers (vs prior week +
+// benchmarks + events) into a plain-English "what worked / what to watch /
+// context" read. Each candidate carries a severity so we surface the most
+// important few rather than a wall of bullets.
+function weekCommentary(W, prev){
+  const m = W.m, p = (prev && !prev.partial) ? prev.m : null;
+  const worked=[], watch=[], context=[];
+  const ch = (a,b) => (b!=null && b!==0 && a!=null) ? (a-b)/Math.abs(b) : null;
+  const fp = c => Math.abs(c*100).toFixed(0)+'%';
+  const lc = s => s.charAt(0).toLowerCase()+s.slice(1);
+
+  // Revenue
+  const rCh = p ? ch(m.revenue, p.revenue) : null;
+  if(rCh!=null && rCh>=0.05) worked.push({sev:3+Math.min(rCh,3), text:`Revenue grew ${fp(rCh)} WoW to ${GBP(m.revenue)}.`});
+  else if(rCh!=null && rCh<=-0.05) watch.push({sev:3+Math.min(Math.abs(rCh),3), text:`Revenue fell ${fp(rCh)} WoW to ${GBP(m.revenue)}.`});
+
+  // Spend efficiency (MER) + diminishing-return check
+  if(m.mer!=null){
+    if(m.mer>=2){ const mCh = p?ch(m.mer,p.mer):null;
+      worked.push({sev:2.2+(mCh&&mCh>0?Math.min(mCh,1):0), text:`Paid stayed efficient — MER ${m.mer.toFixed(2)}× (above the 2× line)${mCh&&mCh>=0.05?`, up ${fp(mCh)} WoW`:''}.`}); }
+    else watch.push({sev:2.6, text:`Paid efficiency thin — MER ${m.mer.toFixed(2)}×, under the 2× line.`});
+  }
+  if(p){ const sCh=ch(m.paid,p.paid), rc=ch(m.revenue,p.revenue);
+    if(sCh!=null && rc!=null && sCh>=0.15 && rc < sCh*0.5)
+      watch.push({sev:2.8, text:`Spend rose ${fp(sCh)} but revenue ${rc>=0?'only rose '+fp(rc):'fell '+fp(rc)} — diminishing return on the extra budget.`}); }
+
+  // Conversion vs 2%
+  if(m.cvr!=null){
+    if(m.cvr>=0.02){ const cCh=p?ch(m.cvr,p.cvr):null;
+      worked.push({sev:2+(cCh&&cCh>0?Math.min(cCh,1):0), text:`Conversion healthy at ${PCT(m.cvr)} (above the 2% DTC mark).`}); }
+    else { const cCh=p?ch(m.cvr,p.cvr):null;
+      watch.push({sev:2.2, text:`Conversion ${PCT(m.cvr)} — still under the 2% benchmark${cCh&&cCh>=0.05?`, though improving (${fp(cCh)} WoW)`:''}.`}); }
+  }
+
+  // Funnel leak: strong add-to-cart but weak checkout follow-through
+  if(m.atcRate!=null && m.checkoutRate!=null && m.atcRate>0){
+    const carry = m.checkoutRate/m.atcRate;
+    if(carry<0.45 && m.atcRate>=0.03) watch.push({sev:1.6, text:`Funnel leak — ${PCT(m.atcRate)} add to cart but only ${PCT(m.checkoutRate)} reach checkout (${fp(carry)} carry-through).`});
+  }
+
+  // AOV / basket
+  if(p){ const aCh=ch(m.aov,p.aov);
+    if(aCh!=null && aCh>=0.06) worked.push({sev:1.2+Math.min(Math.abs(aCh),1), text:`Basket size up — AOV ${GBP(m.aov)} (${fp(aCh)} WoW).`});
+    else if(aCh!=null && aCh<=-0.08) watch.push({sev:1.3+Math.min(Math.abs(aCh),1), text:`Basket size slipped — AOV ${GBP(m.aov)} (${fp(aCh)} WoW).`}); }
+
+  // Traffic
+  if(p){ const tCh=ch(m.sessions,p.sessions);
+    if(tCh!=null && tCh>=0.1) worked.push({sev:1+Math.min(Math.abs(tCh),1), text:`Traffic grew ${fp(tCh)} to ${NUM(m.sessions)} sessions.`});
+    else if(tCh!=null && tCh<=-0.1) watch.push({sev:1.1+Math.min(Math.abs(tCh),1), text:`Traffic dropped ${fp(tCh)} to ${NUM(m.sessions)} sessions.`}); }
+
+  // Discounting & margin
+  if(m.discountDepth!=null){
+    if(m.discountDepth>0.12) watch.push({sev:1.5, text:`Discounting ran deep — ${PCT(m.discountDepth)} of sales given away, squeezing margin.`});
+    else if(p){ const dCh=ch(m.discountDepth,p.discountDepth); if(dCh!=null && dCh<=-0.2) worked.push({sev:0.9, text:`Less reliance on discounting — depth down to ${PCT(m.discountDepth)}.`}); }
+  }
+  if(m.returnRate!=null && m.returnRate>0.08) watch.push({sev:1.2, text:`Returns elevated — ${PCT(m.returnRate)} of sales refunded.`});
+
+  // Channel ROAS
+  if(m.metaRoas!=null && W.metaSpend>=40){ if(m.metaRoas>=2.5) worked.push({sev:0.8, text:`Meta pulled its weight — ${m.metaRoas.toFixed(1)}× claimed ROAS on ${GBP(W.metaSpend)}.`}); else if(m.metaRoas<1.5) watch.push({sev:1.2, text:`Meta soft — ${m.metaRoas.toFixed(1)}× claimed ROAS on ${GBP(W.metaSpend)} spend.`}); }
+  if(m.googleRoas!=null && W.googleSpend>=40){ if(m.googleRoas>=3) worked.push({sev:0.8, text:`Google pulled its weight — ${m.googleRoas.toFixed(1)}× claimed ROAS on ${GBP(W.googleSpend)}.`}); else if(m.googleRoas<1.5) watch.push({sev:1.2, text:`Google soft — ${m.googleRoas.toFixed(1)}× claimed ROAS on ${GBP(W.googleSpend)} spend.`}); }
+
+  // Email engagement
+  if(p){ const eCh=ch(m.emailOpenRate,p.emailOpenRate); if(eCh!=null && eCh<=-0.15) watch.push({sev:0.6, text:`Email open rate softened to ${PCT(m.emailOpenRate)} (${fp(eCh)} WoW).`});
+    else if(eCh!=null && eCh>=0.15) worked.push({sev:0.6, text:`Email engagement up — open rate ${PCT(m.emailOpenRate)} (${fp(eCh)} WoW).`}); }
+
+  // Context: events, sales, data caveats
+  loadBrandEvents().forEach(e=>{ if(e.startsOn>=W.weekStart && e.startsOn<=W.weekEnding){ const mt=EVENT_META[e.type]||EVENT_META.other; context.push({sev:2, text:`${mt.icon} ${e.title||mt.label} ran (${(e.startsOn||'').slice(5)}).`}); }});
+  ((window.FRKL_DISCOUNT_CODES && window.FRKL_DISCOUNT_CODES.codes)||[]).filter(c=>c && c.pattern!=='always-on' && (c.discount||0)>=120).forEach(c=>{ let pk=null;(c.series||[]).forEach(x=>{if(!pk||x.d>pk.d)pk=x;}); if(pk && pk.w>=W.weekStart && pk.w<=W.weekEnding) context.push({sev:1.8, text:`🏷️ ${c.code} sale ran — ${c.discountRate!=null?Math.round(c.discountRate*100)+'% off':'sale'}, £${Math.round(c.discount)} given.`}); });
+  if(W.partial) context.push({sev:3, text:`Week still in progress — ${W.days}/7 days captured so far.`});
+  else if(prev && prev.partial) context.push({sev:1, text:`Prior week was partial, so week-on-week comparisons are muted.`});
+  if(!p && !W.partial) context.push({sev:1, text:`No comparable prior week — first full week in range.`});
+
+  const top = (arr,n) => arr.sort((a,b)=>b.sev-a.sev).slice(0,n).map(x=>x.text);
+
+  // Headline verdict
+  let verdict;
+  if(rCh!=null && rCh>=0.1 && (m.mer==null||m.mer>=2)) verdict='Strong week';
+  else if(rCh!=null && rCh<=-0.12) verdict='Tough week';
+  else if(m.mer!=null && m.mer<2) verdict='Mixed week';
+  else verdict='Steady week';
+  const hp=[];
+  hp.push(rCh!=null ? `revenue ${rCh>=0?'up':'down'} ${fp(rCh)} to ${GBP(m.revenue)}` : `revenue ${GBP(m.revenue)}`);
+  if(m.mer!=null) hp.push(`MER ${m.mer.toFixed(1)}×`);
+  if(m.cvr!=null) hp.push(`CVR ${PCT(m.cvr)}`);
+  const topWatch = watch.slice().sort((a,b)=>b.sev-a.sev)[0];
+  const headline = `${verdict}: ${hp.join(', ')}.` + (topWatch ? ` Main watch-out — ${lc(topWatch.text)}` : '');
+
+  return {headline, verdict, worked:top(worked,5), watch:top(watch,5), context:top(context,4)};
+}
+
 // Build the full weekly history (Mon–Sun buckets) from the daily snapshot,
 // independent of the page's period selector (uses the real data bounds).
 function boardWeeks(){
   const map = {};
-  const touch = d => (map[d] = map[d] || {date:d, metaSpend:0, googleSpend:0, revenue:0, sessions:0, emailRev:0, emailRecipients:0, emailOpens:0, emailClicks:0, orders:0, discounts:0, totalSales:0});
-  inRangeBounded(D.metaDaily, REAL_START, REAL_END).forEach(r=>{touch(r.date).metaSpend += r.cost||0;});
-  inRangeBounded(D.googleAds, REAL_START, REAL_END).forEach(r=>{touch(r.date).googleSpend += r.cost||0;});
-  inRangeBounded(D.shopify,   REAL_START, REAL_END).forEach(r=>{const m=touch(r.date); m.revenue += r.netSales||0; m.orders += r.orders||0; m.discounts += r.discounts||0; m.totalSales += r.totalSales||0;});
-  inRangeBounded(D.ga4,       REAL_START, REAL_END).forEach(r=>{touch(r.date).sessions += r.sessions||0;});
+  const touch = d => (map[d] = map[d] || {date:d, metaSpend:0, googleSpend:0, metaValue:0, googleValue:0, revenue:0, sessions:0, addToCarts:0, checkouts:0, emailRev:0, emailRecipients:0, emailOpens:0, emailClicks:0, orders:0, discounts:0, returns:0, totalSales:0});
+  inRangeBounded(D.metaDaily, REAL_START, REAL_END).forEach(r=>{const m=touch(r.date); m.metaSpend += r.cost||0; m.metaValue += r.purchaseValue||0;});
+  inRangeBounded(D.googleAds, REAL_START, REAL_END).forEach(r=>{const m=touch(r.date); m.googleSpend += r.cost||0; m.googleValue += r.convValue||0;});
+  inRangeBounded(D.shopify,   REAL_START, REAL_END).forEach(r=>{const m=touch(r.date); m.revenue += r.netSales||0; m.orders += r.orders||0; m.discounts += r.discounts||0; m.returns += r.returns||0; m.totalSales += r.totalSales||0;});
+  inRangeBounded(D.ga4,       REAL_START, REAL_END).forEach(r=>{const m=touch(r.date); m.sessions += r.sessions||0; m.addToCarts += r.addToCarts||0; m.checkouts += r.checkouts||0;});
   inRangeBounded(D.klaviyo,   REAL_START, REAL_END).forEach(r=>{const m=touch(r.date); m.emailRev += r.orderValue||0; m.emailRecipients += r.recipients||0; m.emailOpens += r.opens||0; m.emailClicks += r.clicks||0;});
   const days = Object.values(map).sort((a,b)=>a.date<b.date?-1:1);
   const iso = d => d.toISOString().slice(0,10);
@@ -6111,20 +6223,29 @@ function boardWeeks(){
   return Object.keys(buckets).sort().map(ws=>{
     const rows = buckets[ws], s = k => rows.reduce((a,r)=>a+(r[k]||0),0);
     const revenue=s('revenue'), paid=s('metaSpend')+s('googleSpend'), orders=s('orders'),
-          sessions=s('sessions'), discounts=s('discounts'), totalSales=s('totalSales'), emailRev=s('emailRev'),
-          emailRecipients=s('emailRecipients'), emailOpens=s('emailOpens'), emailClicks=s('emailClicks');
+          sessions=s('sessions'), discounts=s('discounts'), returns=s('returns'), totalSales=s('totalSales'), emailRev=s('emailRev'),
+          emailRecipients=s('emailRecipients'), emailOpens=s('emailOpens'), emailClicks=s('emailClicks'),
+          metaSpend=s('metaSpend'), googleSpend=s('googleSpend'), metaValue=s('metaValue'), googleValue=s('googleValue'),
+          addToCarts=s('addToCarts'), checkouts=s('checkouts');
     const we = addDays(ws,6);
     return {
       weekStart: ws, weekEnding: we, days: rows.length,
       partial: rows.length < 7 || we > REAL_END,
       label: ws.slice(5)+' – '+we.slice(5),
+      metaSpend, googleSpend,
       m: {
-        revenue, paid, orders, sessions, emailRev,
+        revenue, paid, orders, sessions, emailRev, returns,
         mer: paid>0 ? revenue/paid : null,
         aov: orders>0 ? revenue/orders : null,
         cvr: sessions>0 ? orders/sessions : null,
         discountDepth: totalSales>0 ? discounts/totalSales : null,
+        returnRate: totalSales>0 ? returns/totalSales : null,
+        metaRoas: metaSpend>0 ? metaValue/metaSpend : null,
+        googleRoas: googleSpend>0 ? googleValue/googleSpend : null,
+        atcRate: sessions>0 ? addToCarts/sessions : null,
+        checkoutRate: sessions>0 ? checkouts/sessions : null,
         emailOpenRate: emailRecipients>0 ? emailOpens/emailRecipients : null,
+        emailClickRate: emailRecipients>0 ? emailClicks/emailRecipients : null,
         emailShare: revenue>0 ? emailRev/revenue : null,
       },
     };
@@ -6197,29 +6318,8 @@ function WeeklyBoard(){
   const delAction = a => persistActions(actions.filter(x=>x.id!==a.id));
   const setNote = v => { const next={...notes, [W.weekEnding]:v}; setNotes(next); boardSaveNotes(next); };
 
-  // Auto-derived "what changed" for this week
-  const findings = (()=>{
-    const out=[];
-    if(prev && !prev.partial){
-      const moves = BOARD_METRICS.filter(s=>s.better!=='flat' && W.m[s.key]!=null && prev.m[s.key]!=null && prev.m[s.key]!==0)
-        .map(s=>({s, ch:(W.m[s.key]-prev.m[s.key])/Math.abs(prev.m[s.key])}))
-        .sort((a,b)=>Math.abs(b.ch)-Math.abs(a.ch));
-      moves.slice(0,2).forEach(mo=>{ const dir = mo.ch>0?'up':'down';
-        out.push({icon: (mo.ch>0===(mo.s.better!=='down'))?'▲':'▼', good:(mo.ch>0)===(mo.s.better!=='down'),
-          text:`${mo.s.label} ${dir} ${Math.abs(mo.ch*100).toFixed(0)}% WoW — now ${mo.s.fmt(W.m[mo.s.key])}.`}); });
-    }
-    BOARD_METRICS.forEach(s=>{ if(s.bench!=null && W.m[s.key]!=null){
-      const meets = s.better==='down' ? W.m[s.key]<=s.bench : W.m[s.key]>=s.bench;
-      if(!meets) out.push({icon:'⚠', good:false, text:`${s.label} below target — ${s.fmt(W.m[s.key])} (${s.benchTip}).`}); }});
-    // events + sales inside the week → context
-    loadBrandEvents().forEach(e=>{ if(e.startsOn>=W.weekStart && e.startsOn<=W.weekEnding){ const mt=EVENT_META[e.type]||EVENT_META.other;
-      out.push({icon:mt.icon, good:null, text:`${e.title||mt.label} (${(e.startsOn||'').slice(5)}).`}); }});
-    const codes=(window.FRKL_DISCOUNT_CODES&&window.FRKL_DISCOUNT_CODES.codes)||[];
-    codes.filter(c=>c && c.pattern!=='always-on' && (c.discount||0)>=120).forEach(c=>{ let pk=null;(c.series||[]).forEach(p=>{if(!pk||p.d>pk.d)pk=p;});
-      if(pk && pk.w>=W.weekStart && pk.w<=W.weekEnding) out.push({icon:'🏷️', good:null, text:`${c.code} sale ran — ${c.discountRate!=null?Math.round(c.discountRate*100)+'% off':'sale'}, £${Math.round(c.discount)} given.`}); });
-    if(!out.length) out.push({icon:'·', good:null, text:'Quiet week — no standout movements or logged events.'});
-    return out;
-  })();
+  // Auto-generated "what worked / what to watch / context" read for this week.
+  const commentary = weekCommentary(W, prev);
 
   // Trend data across all weeks (for the strip)
   const trend = weeks.map(w=>({x:w.label, date:w.weekEnding, revenue:Math.round(w.m.revenue), paid:Math.round(w.m.paid),
@@ -6253,6 +6353,26 @@ function WeeklyBoard(){
       </div>
     </div>
 
+    {/* Commentary — the report-card narrative: headline + what worked / what to watch / context */}
+    <div className="card board-commentary" style={{marginBottom:14, borderLeft:`3px solid ${commentary.verdict==='Strong week'?'var(--good)':commentary.verdict==='Tough week'?'#f87171':commentary.verdict==='Mixed week'?'var(--warn)':'var(--accent)'}`}}>
+      <div className="micro" style={{color:'var(--text-muted)', fontWeight:700, letterSpacing:'.05em', textTransform:'uppercase', marginBottom:6}}>This week in a nutshell</div>
+      <p style={{margin:'0 0 14px', fontSize:16, lineHeight:1.5, color:'var(--text-primary)', fontWeight:500}}>{commentary.headline}</p>
+      <div className="board-commentary-cols">
+        <div>
+          <div className="board-comm-head" style={{color:'var(--good)'}}>✓ What worked</div>
+          {commentary.worked.length ? commentary.worked.map((t,i)=>(<div key={i} className="board-comm-line">{t}</div>)) : <div className="board-comm-line muted">Nothing stood out as a clear win this week.</div>}
+        </div>
+        <div>
+          <div className="board-comm-head" style={{color:'#f87171'}}>⚠ What to watch</div>
+          {commentary.watch.length ? commentary.watch.map((t,i)=>(<div key={i} className="board-comm-line">{t}</div>)) : <div className="board-comm-line muted">No material concerns flagged.</div>}
+        </div>
+        <div>
+          <div className="board-comm-head" style={{color:'var(--text-muted)'}}>📌 Context</div>
+          {commentary.context.length ? commentary.context.map((t,i)=>(<div key={i} className="board-comm-line">{t}</div>)) : <div className="board-comm-line muted">No logged events or sales this week.</div>}
+        </div>
+      </div>
+    </div>
+
     {/* Scorecard grid */}
     <div className="board-grid">
       {BOARD_METRICS.map(spec=>{
@@ -6274,6 +6394,32 @@ function WeeklyBoard(){
               {ch==null?'—':(ch>0?'▲ ':'▼ ')+Math.abs(ch*100).toFixed(ch>=0.1||ch<=-0.1?0:1)+'% WoW'}
             </span>
             <BoardSpark vals={trail(spec.key, idx)} color={spec.better==='flat'?'#8b8b99':col}/>
+          </div>
+        </div>);
+      })}
+    </div>
+
+    {/* Supporting metrics — channel + funnel detail behind the headline KPIs */}
+    <div className="micro" style={{color:'var(--text-faint)', fontWeight:700, letterSpacing:'.05em', textTransform:'uppercase', margin:'18px 2px 8px'}}>Supporting metrics</div>
+    <div className="board-grid">
+      {BOARD_METRICS2.map(spec=>{
+        const val=W.m[spec.key];
+        const pv=(prev && !prev.partial) ? prev.m[spec.key] : null;
+        const rag=boardRag(spec, val, pv), col=RAG_COL[rag];
+        let ch=null; if(pv!=null && pv!==0 && val!=null) ch=(val-pv)/Math.abs(pv);
+        const good = ch==null?null:((ch>0)===(spec.better!=='down'));
+        const tip = spec.benchTip || spec.note;
+        return (<div key={spec.key} className="card board-card" style={{borderLeft:`3px solid ${col}`}}>
+          <div className="micro" style={{color:'var(--text-muted)', fontWeight:600, display:'flex', justifyContent:'space-between'}}>
+            <span>{spec.label}</span>
+            {tip && <span title={tip} style={{cursor:'help', color:'var(--text-faint)'}}>ⓘ</span>}
+          </div>
+          <div style={{fontSize:22, fontWeight:700, letterSpacing:'-.01em', margin:'4px 0 2px'}}>{spec.fmt(val)}</div>
+          <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:6}}>
+            <span style={{fontSize:12, fontWeight:600, color: good==null ? 'var(--text-faint)' : (good?'var(--good)':'#f87171')}}>
+              {ch==null?'—':(ch>0?'▲ ':'▼ ')+Math.abs(ch*100).toFixed(ch>=0.1||ch<=-0.1?0:1)+'% WoW'}
+            </span>
+            <BoardSpark vals={trail(spec.key, idx)} color={col}/>
           </div>
         </div>);
       })}
@@ -6317,16 +6463,10 @@ function WeeklyBoard(){
     {/* Decisions log */}
     <div className="row" style={{marginTop:14}}>
       <div className="card" style={{flex:'1 1 420px'}}>
-        <h2 style={{marginTop:0}}>What changed this week</h2>
-        <div style={{display:'flex', flexDirection:'column', gap:8}}>
-          {findings.map((f,i)=>(<div key={i} style={{display:'flex', gap:8, alignItems:'baseline', fontSize:13.5}}>
-            <span style={{color: f.good==null?'var(--text-faint)':(f.good?'var(--good)':'#f87171'), fontWeight:700, minWidth:14}}>{f.icon}</span>
-            <span style={{color:'var(--text-secondary)'}}>{f.text}</span>
-          </div>))}
-        </div>
-        <h3 style={{margin:'18px 0 6px', fontSize:13, color:'var(--text-muted)'}}>Meeting notes — week of {W.weekStart}</h3>
-        <textarea value={notes[W.weekEnding]||''} onChange={e=>setNote(e.target.value)} placeholder="Decisions taken, context, anything to remember for next week…"
-          style={{width:'100%', minHeight:84, background:'var(--bg-app)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--r-sm)', padding:10, fontSize:13, fontFamily:'inherit', resize:'vertical'}}/>
+        <h2 style={{marginTop:0}}>Meeting notes</h2>
+        <div className="micro" style={{color:'var(--text-faint)', marginBottom:8}}>Week of {W.weekStart} → {W.weekEnding} · decisions, context, anything to remember</div>
+        <textarea value={notes[W.weekEnding]||''} onChange={e=>setNote(e.target.value)} placeholder="What did we decide? e.g. 'Pausing the 22% sitewide code — margin too thin. Brief on mobile checkout fix by Friday. Test free-ship threshold at £75.'"
+          style={{width:'100%', minHeight:150, background:'var(--bg-app)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--r-sm)', padding:10, fontSize:13, fontFamily:'inherit', resize:'vertical'}}/>
       </div>
 
       <div className="card" style={{flex:'1 1 420px'}}>
