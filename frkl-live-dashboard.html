@@ -18,20 +18,20 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606081844"></script>
-<script src="./frkl-live-data.js?v=202606081844"></script>
-<script src="./frkl-agent-insights.js?v=202606081844"></script>
-<script src="./frkl-business-data.js?v=202606081844"></script>
-<script src="./frkl-action-status.js?v=202606081844"></script>
-<script src="./frkl-patterns.js?v=202606081844"></script>
-<script src="./frkl-creators.js?v=202606081844"></script>
-<script src="./frkl-creative-vision.js?v=202606081844"></script>
-<script src="./frkl-links.js?v=202606081844"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606081844"></script>
-<script src="./frkl-events.js?v=202606081844"></script>
-<script src="./frkl-products.js?v=202606081844"></script>
-<script src="./frkl-discount-codes.js?v=202606081844"></script>
-<script src="./frkl-cvr.js?v=202606081844"></script>
+<script src="./frkl-data-loader.js?v=202606081940"></script>
+<script src="./frkl-live-data.js?v=202606081940"></script>
+<script src="./frkl-agent-insights.js?v=202606081940"></script>
+<script src="./frkl-business-data.js?v=202606081940"></script>
+<script src="./frkl-action-status.js?v=202606081940"></script>
+<script src="./frkl-patterns.js?v=202606081940"></script>
+<script src="./frkl-creators.js?v=202606081940"></script>
+<script src="./frkl-creative-vision.js?v=202606081940"></script>
+<script src="./frkl-links.js?v=202606081940"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606081940"></script>
+<script src="./frkl-events.js?v=202606081940"></script>
+<script src="./frkl-products.js?v=202606081940"></script>
+<script src="./frkl-discount-codes.js?v=202606081940"></script>
+<script src="./frkl-cvr.js?v=202606081940"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -843,7 +843,7 @@ function inRangeBounded(rows, start, end){ return (rows||[]).filter(r => r.date 
 function dataEndOf(){ return ACTIVE_END || REAL_END; }
 function fmtDelta(d){ if(d==null) return null; const pct = Math.abs(d*100); if (pct < 0.5) return '·0%'; return (d>0?'↑':'↓') + pct.toFixed(0) + '%'; }
 
-function KPI({label, val, sub, series, current, prior, goodDirection, agent, observation, implication}){
+function KPI({label, val, sub, series, seriesLabel, current, prior, goodDirection, agent, observation, implication}){
   const delta = (prior!=null && current!=null && prior!==0) ? (current-prior)/prior : null;
   let deltaColor = 'var(--text-muted)';
   if (delta!=null && goodDirection) {
@@ -873,7 +873,7 @@ function KPI({label, val, sub, series, current, prior, goodDirection, agent, obs
     {hasPop && (
       <div className="kpi-pop">
         {hasSpark && (<div>
-          <div className="head">{series.length}-day trend · vs prior period</div>
+          <div className="head">{seriesLabel || `${series.length}-day trend · vs prior period`}</div>
           <R.ResponsiveContainer width="100%" height={132}>
             <R.LineChart data={series} margin={{top:6,right:10,left:2,bottom:4}}>
               <R.CartesianGrid stroke="#23232c" vertical={false}/>
@@ -1353,32 +1353,20 @@ function ChannelStreamPanel(){
   const dtcOrd = sum(dt,'orders'), whOrd = sum(wh30,'orders'), giOrd = sum(gi30,'orders'), otOrd = sum(ot30,'orders');
   const giDisc = sum(gi30,'discounts');
   const total = dtcRev + whRev + giRev + otRev || 1;
+  // Per-stream daily trends so each channel tile carries a hover graph.
+  const _cs = (rows,k) => rows.slice().sort((a,b)=>a.date<b.date?-1:1).map(r=>({d:(r.date||'').slice(5), v:+(r[k]||0).toFixed(0)}));
+  const sDtc=_cs(dt,'netSales'), sWh=_cs(wh30,'netSales'), sGi=_cs(gi30,'orders'), sOt=_cs(ot30,'netSales');
+  const _dot = c => (<span style={{display:'inline-block',width:6,height:6,borderRadius:'var(--r-full)',background:c,marginRight:6}}/>);
   return (<div className="card">
     <div className="card-section-title">
       <h2 style={{margin:0}}>Revenue by stream — last 30 days</h2>
       <span className="meta">Headline KPIs use <b>DTC only</b> · wholesale + gifting tracked separately</span>
     </div>
     <div className="row" style={{marginBottom:'var(--s-3)'}}>
-      <div className="card kpi">
-        <div className="label"><span style={{display:'inline-block',width:6,height:6,borderRadius:'var(--r-full)',background:'var(--good)',marginRight:6}}/>DTC (Online Store)</div>
-        <div className="val">{GBP(dtcRev)}</div>
-        <div className="sub">{NUM(dtcOrd)} orders · {PCT(dtcRev/total)} of revenue · AOV {GBP(dtcOrd?dtcRev/dtcOrd:null)}</div>
-      </div>
-      <div className="card kpi">
-        <div className="label"><span style={{display:'inline-block',width:6,height:6,borderRadius:'var(--r-full)',background:'var(--warn)',marginRight:6}}/>Wholesale (JL + Faire)</div>
-        <div className="val">{GBP(whRev)}</div>
-        <div className="sub">{NUM(whOrd)} orders · {PCT(whRev/total)} of revenue · AOV {GBP(whOrd?whRev/whOrd:null)}</div>
-      </div>
-      <div className="card kpi">
-        <div className="label"><span style={{display:'inline-block',width:6,height:6,borderRadius:'var(--r-full)',background:'var(--accent)',marginRight:6}}/>Gifting (Draft Orders)</div>
-        <div className="val">{NUM(giOrd)} drops</div>
-        <div className="sub">{GBP(giDisc)} retail value gifted · £0 revenue (100% comped)</div>
-      </div>
-      <div className="card kpi">
-        <div className="label"><span style={{display:'inline-block',width:6,height:6,borderRadius:'var(--r-full)',background:'var(--text-muted)',marginRight:6}}/>Other channels</div>
-        <div className="val">{GBP(otRev)}</div>
-        <div className="sub">{NUM(otOrd)} orders · likely IG/FB Shop / POS</div>
-      </div>
+      <KPI label={<>{_dot('var(--good)')}DTC (Online Store)</>} val={GBP(dtcRev)} sub={`${NUM(dtcOrd)} orders · ${PCT(dtcRev/total)} of revenue · AOV ${GBP(dtcOrd?dtcRev/dtcOrd:null)}`} series={sDtc} seriesLabel="DTC revenue · last 30 days" />
+      <KPI label={<>{_dot('var(--warn)')}Wholesale (JL + Faire)</>} val={GBP(whRev)} sub={`${NUM(whOrd)} orders · ${PCT(whRev/total)} of revenue · AOV ${GBP(whOrd?whRev/whOrd:null)}`} series={sWh} seriesLabel="Wholesale revenue · last 30 days" />
+      <KPI label={<>{_dot('var(--accent)')}Gifting (Draft Orders)</>} val={`${NUM(giOrd)} drops`} sub={`${GBP(giDisc)} retail value gifted · £0 revenue (100% comped)`} series={sGi} seriesLabel="Gifting drops · last 30 days" />
+      <KPI label={<>{_dot('var(--text-muted)')}Other channels</>} val={GBP(otRev)} sub={`${NUM(otOrd)} orders · likely IG/FB Shop / POS`} series={sOt} seriesLabel="Other revenue · last 30 days" />
     </div>
     <div className="note">
       <b>Important context:</b> before this segmentation, headline metrics conflated all 4 streams. Discount rate looked like 36-47% (actually 12% on real DTC); AOV looked like £63 (actually £{Math.round(dtcOrd?dtcRev/dtcOrd:0)}). Two headline "crises" were data artefacts.
@@ -1461,32 +1449,30 @@ function DailyPanel(){
 
   const projVsBudgetSev = null; // No fixed monthly budget set — placeholder for future config
 
+  // Trailing 14-day mini-trends so each pacing tile carries a hover graph.
+  const _tail = dates.slice(-14);
+  const _dm = {}; _tail.forEach(dt=>{ _dm[dt]={d:dt.slice(5), spend:0, rev:0}; });
+  meta.forEach(r=>{ if(_dm[r.date]) _dm[r.date].spend += r.cost||0; });
+  gads.forEach(r=>{ if(_dm[r.date]) _dm[r.date].spend += r.cost||0; });
+  shop.forEach(r=>{ if(_dm[r.date]) _dm[r.date].rev += r.netSales||0; });
+  const _tr = _tail.map(dt=>_dm[dt]);
+  const sSpend = _tr.map(x=>({d:x.d, v:+x.spend.toFixed(0)}));
+  const sRev   = _tr.map(x=>({d:x.d, v:+x.rev.toFixed(0)}));
+  const sMER   = _tr.map(x=>({d:x.d, v: x.spend>0 ? +(x.rev/x.spend).toFixed(2) : 0}));
+  // Cumulative MTD spend — the pacing line toward the projection.
+  const _mtdDates = [...new Set(mtdShop.map(r=>r.date))].sort();
+  let _run=0; const sMTD = _mtdDates.map(dt=>{ _run += (sumOf(mtdMeta.filter(r=>r.date===dt),'cost') + sumOf(mtdGads.filter(r=>r.date===dt),'cost')); return {d:dt.slice(5), v:+_run.toFixed(0)}; });
+
   return (<div className="card">
     <div className="card-section-title">
       <h2 style={{margin:0}}>Today's view</h2>
       <span className="meta">Latest day in data: <b style={{color:'var(--text-secondary)'}}>{latest}</b> · run <code style={{background:'var(--bg-elevated)',padding:'1px 6px',borderRadius:4,fontSize:11}}>frkl-refresh</code> to pull today</span>
     </div>
     <div className="row" style={{marginBottom:'var(--s-4)'}}>
-      <div className="card kpi">
-        <div className="label">Latest-day spend</div>
-        <div className="val">{GBP(ySpend)} <span style={{fontSize:11, color:dColor(sDelta), fontWeight:600, marginLeft:6}}>{fmtD(sDelta)}</span></div>
-        <div className="sub">7d avg {GBP(pSpendAvg)}</div>
-      </div>
-      <div className="card kpi">
-        <div className="label">Latest-day revenue</div>
-        <div className="val">{GBP(yRev)} <span style={{fontSize:11, color:dColor(delta(yRev,pRevAvg)), fontWeight:600, marginLeft:6}}>{fmtD(delta(yRev,pRevAvg))}</span></div>
-        <div className="sub">{NUM(yOrders)} orders · 7d avg {GBP(pRevAvg)}</div>
-      </div>
-      <div className="card kpi">
-        <div className="label">Latest-day MER</div>
-        <div className="val">{yMER?yMER.toFixed(2)+'×':'—'} <span style={{fontSize:11, color:dColor(merDelta), fontWeight:600, marginLeft:6}}>{fmtD(merDelta)}</span></div>
-        <div className="sub">7d avg {pMERavg?pMERavg.toFixed(2)+'×':'—'}</div>
-      </div>
-      <div className="card kpi">
-        <div className="label">MTD pacing</div>
-        <div className="val">{GBP(mtdSpend)}</div>
-        <div className="sub">Day {dayOfMonth}/{daysInMonth} · proj. EOM {GBP(projSpend)} spend · {GBP(projRev)} rev</div>
-      </div>
+      <KPI label="Latest-day spend" val={GBP(ySpend)} sub={`7d avg ${GBP(pSpendAvg)}`} series={sSpend} seriesLabel="Daily spend · last 14 days" current={ySpend} prior={pSpendAvg} />
+      <KPI label="Latest-day revenue" val={GBP(yRev)} sub={`${NUM(yOrders)} orders · 7d avg ${GBP(pRevAvg)}`} series={sRev} seriesLabel="Daily revenue · last 14 days" current={yRev} prior={pRevAvg} goodDirection="up" />
+      <KPI label="Latest-day MER" val={yMER?yMER.toFixed(2)+'×':'—'} sub={`7d avg ${pMERavg?pMERavg.toFixed(2)+'×':'—'}`} series={sMER} seriesLabel="Daily MER · last 14 days" current={yMER} prior={pMERavg} goodDirection="up" />
+      <KPI label="MTD pacing" val={GBP(mtdSpend)} sub={`Day ${dayOfMonth}/${daysInMonth} · proj. EOM ${GBP(projSpend)} spend · ${GBP(projRev)} rev`} series={sMTD} seriesLabel="Cumulative MTD spend" />
     </div>
     {anomalies.length > 0 && (<div>
       <div className="micro" style={{color:'var(--warn)', marginBottom:'var(--s-2)'}}>⚠ Flags — {anomalies.length}</div>
@@ -2838,6 +2824,26 @@ function Overview({start, period, customActive}){
   const pCac = (havePrior && pNewCust && pNewCust>0 && pPaid!=null) ? pPaid/pNewCust : null;
   const ltv = (aov!=null && ordersPerCust!=null) ? aov*gm*ordersPerCust : null;  // contribution LTV
   const ltvCac = (ltv!=null && cac) ? ltv/cac : null;
+  // ── Hover-graph trends for the remaining headline KPIs ──
+  // Real series wherever the data supports one; gross margin is a structural
+  // catalogue constant so its line is deliberately flat (stability, not a bug).
+  const seriesDiscVal = daily.map(d=>({d:d.dlabel, v:+((d.discounts||0)).toFixed(0)}));
+  const seriesGM      = (gm? daily.map(d=>({d:d.dlabel, v:+(gm*100).toFixed(1)})) : null);
+  const seriesCAC     = (ordersPerCust>0) ? daily.map(d=>({d:d.dlabel, v: d.orders>0 ? +((d.paid*ordersPerCust)/d.orders).toFixed(0) : 0})) : null;
+  const seriesLTV     = (ordersPerCust>0 && gm) ? daily.map(d=>({d:d.dlabel, v: d.orders>0 ? +((d.revenue/d.orders)*gm*ordersPerCust).toFixed(0) : 0})) : null;
+  const seriesReturn  = shop.map(r=>({d:(r.date||'').slice(5), v: r.totalSales>0 ? +(100*(r.returns||0)/r.totalSales).toFixed(2) : 0}));
+  const seriesReturning = _rbm.length>1 ? _rbm.map((m,i)=>({d:(m.month||m.label||('M'+(i+1))), v: m.total>0 ? +(100*(m.ret||0)/m.total).toFixed(1) : 0})) : null;
+  // Weekly discount penetration (orders carrying a code ÷ all orders) from the code time-series.
+  const seriesPenetration = (()=>{
+    const codes=(window.FRKL_DISCOUNT_CODES&&window.FRKL_DISCOUNT_CODES.codes)||[];
+    if(!codes.length || !daily.length) return null;
+    const monday = s => { const d=new Date(s+'T00:00:00Z'); const off=(d.getUTCDay()+6)%7; d.setUTCDate(d.getUTCDate()-off); return d.toISOString().slice(0,10); };
+    const tot={}, coded={};
+    daily.forEach(d=>{ const w=monday(d.date); tot[w]=(tot[w]||0)+(d.orders||0); });
+    codes.forEach(c=>{ (c.series||[]).forEach(p=>{ if(tot[p.w]!=null) coded[p.w]=(coded[p.w]||0)+(p.o||0); }); });
+    const wks=Object.keys(tot).sort();
+    return wks.length>1 ? wks.map(w=>({d:w.slice(5), v: tot[w]>0 ? +Math.min(100,100*(coded[w]||0)/tot[w]).toFixed(1) : 0})) : null;
+  })();
   // ── Unit economics (Atlas): break-even ROAS, allowable CAC, first-order payback ──
   // Variable cost rate from the contribution card's saved inputs (per-order + %).
   const _ci = (()=>{ try { return {packaging:'0.50',fulfilment:'2.00',shipping:'3.50',payPct:'1.5',payFixed:'0.25',refundPct:'7.4', ...(JSON.parse(localStorage.getItem('frkl-contrib-inputs')||'{}'))}; } catch(e){ return {}; } })();
@@ -2901,28 +2907,28 @@ function Overview({start, period, customActive}){
           agent="Atlas" observation={`Code + automatic discount as a share of DTC gross sales (draft/exchange orders excluded). This excludes sale-price markdowns${_mdPct?`, which add ~${_mdPct}% of value on top`:''} — the full load is on the Promotions tab.`}
           implication="Audit always-on codes + affiliate rates; protect full-price demand. The true load incl. markdowns is materially higher — see Promotions." />
         <MoreKpis count={8}>
-        <KPI label="Gross margin" val={PCT(grossMargin)} sub="COGS-based · trailing 90d"
+        <KPI label="Gross margin" val={PCT(grossMargin)} sub="COGS-based · trailing 90d" series={seriesGM} seriesLabel="Catalogue margin · structurally stable"
           agent="Atlas" observation="Blended product margin across the live catalogue, after cost of goods."
           implication="This is the contribution base for the raise — defend it by keeping discount load in check." />
-        <KPI label="Return rate" val={PCT(returnRate)} sub={`${NUM(_rets)} of ${NUM(_units)} units · 90d`} goodDirection="down"
-          agent="Lux" observation="Share of shipped units returned — watch by SKU for sizing/quality hotspots."
+        <KPI label="Return rate" val={PCT(returnRate)} sub={`${NUM(_rets)} of ${NUM(_units)} units · 90d`} series={seriesReturn} seriesLabel="Refunds ÷ sales · by day" goodDirection="down"
+          agent="Lux" observation="Share of shipped units returned — watch by SKU for sizing/quality hotspots. (Card is unit-based over 90d; trend is refund-£ share of sales by day.)"
           implication="A point of return rate is pure margin; flag any SKU materially above this blended rate." />
         <KPI label="Orders with a discount" val={_dc.fullPriceShare!=null?PCT(1-_dc.fullPriceShare):'—'} sub="share of orders using a code/auto discount — how often, not how deep · drafts excluded" goodDirection="down"
           agent="Atlas" observation={_dc.fullPriceShare!=null?`${Math.round((1-_dc.fullPriceShare)*100)}% of orders carry a discount; ${Math.round(_dc.fullPriceShare*100)}% pay full price. Read it with Discount depth: lots of orders but a shallow ~${discLoad!=null?Math.round(discLoad*100):9}% of revenue = many small codes, not deep cuts.`:'How often a discount is used across orders (draft/exchange orders excluded).'}
-          implication="If penetration and depth climb together you're training customers to wait for a code — tighten the always-on codes first." />
-        <KPI label="Discount value" val={GBP(discAmt)} sub="total £ given as code/auto discount this period — drafts excluded" goodDirection="down"
+          implication="If penetration and depth climb together you're training customers to wait for a code — tighten the always-on codes first." series={seriesPenetration} seriesLabel="Orders with a code · by week" />
+        <KPI label="Discount value" val={GBP(discAmt)} sub="total £ given as code/auto discount this period — drafts excluded" series={seriesDiscVal} seriesLabel="Discount £ given · by day" goodDirection="down"
           agent="Atlas" observation="The actual money handed back as discounts this period (code + automatic). Excludes sale-price markdowns, which are shown separately on Promotions."
           implication="Recoverable margin to the extent any of it went to buyers who'd have paid full price — start with the biggest always-on codes." />
-        <KPI label="Returning customers" val={PCT(returningPct)} sub="share of orders · trailing months" goodDirection="up"
+        <KPI label="Returning customers" val={PCT(returningPct)} sub="share of orders · trailing months" series={seriesReturning} seriesLabel="Repeat-order share · by month" goodDirection="up"
           agent="Lux" observation="Repeat-purchase share — the cheapest revenue you have and a read on brand love."
           implication="Lift with post-purchase flows + a reason to come back; it compounds faster than paid." />
         <KPI label="Contribution (pre-opex)" val={GBP(contrib)} sub="gross profit − paid media · full breakdown below" series={seriesContrib} current={contrib} prior={pContrib} goodDirection="up"
           agent="Atlas" observation="Net revenue × blended product margin, minus paid ad spend — before packaging/fulfilment/fees. The fully-loaded figure is in the Contribution margin card."
           implication="This is what the raise hinges on; hold it by balancing discount load (margin) against MER (CAC)." />
-        <KPI label="CAC (est.)" val={GBP(cac)} sub={`${NUM(newCust)} new customers · paid spend ÷ new`} current={cac} prior={pCac} goodDirection="down"
+        <KPI label="CAC (est.)" val={GBP(cac)} sub={`${NUM(newCust)} new customers · paid spend ÷ new`} series={seriesCAC} seriesLabel="Spend ÷ new customers · by day" current={cac} prior={pCac} goodDirection="down"
           agent="Pulse" observation="Paid ad spend ÷ estimated new customers (new-customer share derived from repeat-purchase data)."
           implication="Judge against contribution-LTV — keep scaling only while LTV:CAC stays at 3×+." />
-        <KPI label="LTV (est.)" val={GBP(ltv)} sub={`contribution · ${ordersPerCust?ordersPerCust.toFixed(1):'—'} orders/customer · LTV:CAC ${ltvCac?ltvCac.toFixed(1)+'×':'—'}`} goodDirection="up"
+        <KPI label="LTV (est.)" val={GBP(ltv)} sub={`contribution · ${ordersPerCust?ordersPerCust.toFixed(1):'—'} orders/customer · LTV:CAC ${ltvCac?ltvCac.toFixed(1)+'×':'—'}`} series={seriesLTV} seriesLabel="Contribution/customer · by day" goodDirection="up"
           agent="Atlas" observation="Estimated contribution per acquired customer: AOV × gross margin × repeat orders per customer."
           implication="The LTV:CAC ratio is the unit-economics headline for the raise — 3×+ is the target to defend." />
         </MoreKpis>
