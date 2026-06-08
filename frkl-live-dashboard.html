@@ -18,20 +18,20 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606081804"></script>
-<script src="./frkl-live-data.js?v=202606081804"></script>
-<script src="./frkl-agent-insights.js?v=202606081804"></script>
-<script src="./frkl-business-data.js?v=202606081804"></script>
-<script src="./frkl-action-status.js?v=202606081804"></script>
-<script src="./frkl-patterns.js?v=202606081804"></script>
-<script src="./frkl-creators.js?v=202606081804"></script>
-<script src="./frkl-creative-vision.js?v=202606081804"></script>
-<script src="./frkl-links.js?v=202606081804"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606081804"></script>
-<script src="./frkl-events.js?v=202606081804"></script>
-<script src="./frkl-products.js?v=202606081804"></script>
-<script src="./frkl-discount-codes.js?v=202606081804"></script>
-<script src="./frkl-cvr.js?v=202606081804"></script>
+<script src="./frkl-data-loader.js?v=202606081828"></script>
+<script src="./frkl-live-data.js?v=202606081828"></script>
+<script src="./frkl-agent-insights.js?v=202606081828"></script>
+<script src="./frkl-business-data.js?v=202606081828"></script>
+<script src="./frkl-action-status.js?v=202606081828"></script>
+<script src="./frkl-patterns.js?v=202606081828"></script>
+<script src="./frkl-creators.js?v=202606081828"></script>
+<script src="./frkl-creative-vision.js?v=202606081828"></script>
+<script src="./frkl-links.js?v=202606081828"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606081828"></script>
+<script src="./frkl-events.js?v=202606081828"></script>
+<script src="./frkl-products.js?v=202606081828"></script>
+<script src="./frkl-discount-codes.js?v=202606081828"></script>
+<script src="./frkl-cvr.js?v=202606081828"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -211,6 +211,26 @@
   .card.alert-warn  { border-left: 3px solid var(--warn);   border-left-width: 3px; padding-left: calc(var(--s-5) - 3px); }
   .card.alert-good  { border-left: 3px solid var(--good);   border-left-width: 3px; padding-left: calc(var(--s-5) - 3px); }
   .card.alert-info  { border-left: 3px solid var(--accent); border-left-width: 3px; padding-left: calc(var(--s-5) - 3px); }
+
+  /* ── Weekly board ────────────────────────────────────────────────────── */
+  .board-grid {
+    display: grid; gap: var(--s-3);
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  }
+  .board-card { padding: var(--s-4) var(--s-4) var(--s-4) calc(var(--s-4) - 3px); }
+  .board-nav-btn {
+    cursor: pointer; background: var(--bg-card); color: var(--text-secondary);
+    border: 1px solid var(--border-default); border-radius: var(--r-sm);
+    padding: 7px 12px; font-size: 13px; font-weight: 550;
+    transition: color var(--motion-fast), border-color var(--motion-fast);
+  }
+  .board-nav-btn:hover:not(:disabled) { color: var(--text-primary); border-color: var(--accent); }
+  .board-nav-btn:disabled { opacity: .4; cursor: default; }
+  @media print {
+    .app-bar, .sub-nav, .period-bar, .board-nav-btn, textarea, input { display: none !important; }
+    .board-card, .card { break-inside: avoid; }
+    body { background: #fff; }
+  }
 
   /* ── KPI ─────────────────────────────────────────────────────────────── */
   .kpi { flex: 1 1 180px; position: relative; cursor: default; }
@@ -6049,6 +6069,289 @@ function ConnectionHealthStrip(){
   </div>);
 }
 
+// ── Weekly Board (management report card) ───────────────────────────────────
+// A browsable, week-by-week scorecard for the Monday meeting. Each past week's
+// metrics ARE the true history — recomputed from the daily snapshot, which is
+// immutable for completed weeks — so week-on-week comparison works with no new
+// storage. Decisions/actions + per-week meeting notes persist locally (the
+// chosen local-first model), keyed by week.
+
+// The scorecard set: only metrics that are honestly derivable at weekly grain
+// from the daily snapshot. Customer-cohort metrics (returning %, CAC, LTV,
+// contribution) need period-level cohorting and are intentionally left to the
+// live dashboard rather than faked weekly here.
+const BOARD_METRICS = [
+  {key:'revenue',       label:'Net revenue',    fmt:GBP, better:'up'},
+  {key:'paid',          label:'Paid spend',     fmt:GBP, better:'flat'},
+  {key:'mer',           label:'MER',            fmt:v=>v==null?'—':v.toFixed(2)+'×', better:'up',   bench:2,    benchTip:'Target ≥ 2.0×'},
+  {key:'orders',        label:'Orders',         fmt:NUM, better:'up'},
+  {key:'aov',           label:'AOV',            fmt:GBP, better:'up'},
+  {key:'sessions',      label:'Sessions',       fmt:NUM, better:'up'},
+  {key:'cvr',           label:'CVR',            fmt:PCT, better:'up',   bench:0.02, benchTip:'Target ≥ 2% (DTC)'},
+  {key:'discountDepth', label:'Discount depth', fmt:PCT, better:'down', bench:0.10, benchTip:'Lower is better · watch > 10%'},
+  {key:'emailRev',      label:'Email rev (attr.)', fmt:GBP, better:'up', note:'Klaviyo-attributed revenue — overlaps other channels, so it is not incremental and can exceed net revenue.'},
+];
+
+// Build the full weekly history (Mon–Sun buckets) from the daily snapshot,
+// independent of the page's period selector (uses the real data bounds).
+function boardWeeks(){
+  const map = {};
+  const touch = d => (map[d] = map[d] || {date:d, metaSpend:0, googleSpend:0, revenue:0, sessions:0, emailRev:0, orders:0, discounts:0, totalSales:0});
+  inRangeBounded(D.metaDaily, REAL_START, REAL_END).forEach(r=>{touch(r.date).metaSpend += r.cost||0;});
+  inRangeBounded(D.googleAds, REAL_START, REAL_END).forEach(r=>{touch(r.date).googleSpend += r.cost||0;});
+  inRangeBounded(D.shopify,   REAL_START, REAL_END).forEach(r=>{const m=touch(r.date); m.revenue += r.netSales||0; m.orders += r.orders||0; m.discounts += r.discounts||0; m.totalSales += r.totalSales||0;});
+  inRangeBounded(D.ga4,       REAL_START, REAL_END).forEach(r=>{touch(r.date).sessions += r.sessions||0;});
+  inRangeBounded(D.klaviyo,   REAL_START, REAL_END).forEach(r=>{touch(r.date).emailRev += r.orderValue||0;});
+  const days = Object.values(map).sort((a,b)=>a.date<b.date?-1:1);
+  const iso = d => d.toISOString().slice(0,10);
+  const mondayOf = s => { const d=new Date(s+'T00:00:00Z'); const off=(d.getUTCDay()+6)%7; d.setUTCDate(d.getUTCDate()-off); return iso(d); };
+  const addDays = (s,n) => { const d=new Date(s+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()+n); return iso(d); };
+  const buckets = {};
+  days.forEach(m=>{ const ws=mondayOf(m.date); (buckets[ws]=buckets[ws]||[]).push(m); });
+  return Object.keys(buckets).sort().map(ws=>{
+    const rows = buckets[ws], s = k => rows.reduce((a,r)=>a+(r[k]||0),0);
+    const revenue=s('revenue'), paid=s('metaSpend')+s('googleSpend'), orders=s('orders'),
+          sessions=s('sessions'), discounts=s('discounts'), totalSales=s('totalSales'), emailRev=s('emailRev');
+    const we = addDays(ws,6);
+    return {
+      weekStart: ws, weekEnding: we, days: rows.length,
+      partial: rows.length < 7 || we > REAL_END,
+      label: ws.slice(5)+' – '+we.slice(5),
+      m: {
+        revenue, paid, orders, sessions, emailRev,
+        mer: paid>0 ? revenue/paid : null,
+        aov: orders>0 ? revenue/orders : null,
+        cvr: sessions>0 ? orders/sessions : null,
+        discountDepth: totalSales>0 ? discounts/totalSales : null,
+      },
+    };
+  });
+}
+
+// RAG verdict for a metric value vs the prior week. Benchmark (if any) dominates;
+// otherwise a ≥2% WoW move in the metric's "good" direction sets the colour.
+function boardRag(spec, val, prev){
+  if(spec.better==='flat' || val==null) return 'neutral';
+  let ch = (prev!=null && prev!==0) ? (val-prev)/Math.abs(prev) : null;
+  const good = ch==null ? null : (spec.better==='down' ? ch<0 : ch>0);
+  if(spec.bench!=null){
+    const meets = spec.better==='down' ? val<=spec.bench : val>=spec.bench;
+    if(meets) return 'good';
+    return good ? 'warn' : 'bad';   // below target — improving = watch, worsening = off-track
+  }
+  if(good==null || Math.abs(ch)<0.02) return 'neutral';
+  return good ? 'good' : 'bad';
+}
+const RAG_COL = {good:'var(--good)', warn:'var(--warn)', bad:'#f87171', neutral:'var(--text-faint)'};
+
+// Tiny inline sparkline of a metric's trailing weeks.
+function BoardSpark({vals, color}){
+  const v = (vals||[]).filter(x=>x!=null);
+  if(v.length < 2) return <div style={{height:30}}/>;
+  const w=132, h=30, pad=3, min=Math.min(...v), max=Math.max(...v), rng=(max-min)||1;
+  const pts = v.map((x,i)=>`${pad+(i/(v.length-1))*(w-2*pad)},${pad+(h-2*pad)-((x-min)/rng)*(h-2*pad)}`).join(' ');
+  const lastX = pad+(w-2*pad), lastY = pad+(h-2*pad)-((v[v.length-1]-min)/rng)*(h-2*pad);
+  return (<svg width={w} height={h} style={{display:'block'}}>
+    <polyline points={pts} fill="none" stroke={color} strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round"/>
+    <circle cx={lastX} cy={lastY} r={2.2} fill={color}/>
+  </svg>);
+}
+
+// localStorage-backed decisions log (local-first). Actions are a running backlog
+// carried across weeks; notes are per-week meeting minutes.
+function boardLoadActions(){ try { const a=JSON.parse(localStorage.getItem('frkl-board-actions')||'[]'); return Array.isArray(a)?a:[]; } catch(e){ return []; } }
+function boardSaveActions(a){ try { localStorage.setItem('frkl-board-actions', JSON.stringify(a)); } catch(e){} }
+function boardLoadNotes(){ try { const n=JSON.parse(localStorage.getItem('frkl-board-notes')||'{}'); return n&&typeof n==='object'?n:{}; } catch(e){ return {}; } }
+function boardSaveNotes(n){ try { localStorage.setItem('frkl-board-notes', JSON.stringify(n)); } catch(e){} }
+
+const ACTION_FLOW = {open:'actioning', actioning:'done', done:'open'};
+const ACTION_META = {
+  open:      {label:'Open',      col:'var(--warn)'},
+  actioning: {label:'Actioning', col:'var(--accent)'},
+  done:      {label:'Done',      col:'var(--good)'},
+};
+
+function WeeklyBoard(){
+  const weeks = useMemo(boardWeeks, []);
+  const lastCompleteIdx = (()=>{ for(let i=weeks.length-1;i>=0;i--){ if(!weeks[i].partial) return i; } return weeks.length-1; })();
+  const [idx, setIdx] = useState(lastCompleteIdx<0?0:lastCompleteIdx);
+  const [actions, setActions] = useState(boardLoadActions);
+  const [notes, setNotes] = useState(boardLoadNotes);
+  const [newAction, setNewAction] = useState('');
+
+  if(!weeks.length) return (<div className="card"><h2>Weekly board</h2><div className="muted">No data yet — connect a source to start logging weeks.</div></div>);
+
+  const W = weeks[idx], prev = weeks[idx-1] || null;
+  const trail = (key, upto) => weeks.slice(Math.max(0,upto-9), upto+1).map(w=>w.m[key]);
+
+  // Persisted mutations
+  const persistActions = next => { setActions(next); boardSaveActions(next); };
+  const addAction = () => { const t=newAction.trim(); if(!t) return;
+    persistActions([...actions, {id:'a'+Date.now()+Math.round(performance.now()), text:t, status:'open', raised:W.weekEnding, doneWeek:null}]);
+    setNewAction(''); };
+  const cycleAction = a => { const ns=ACTION_FLOW[a.status]||'open';
+    persistActions(actions.map(x=>x.id===a.id?{...x, status:ns, doneWeek: ns==='done'?W.weekEnding:null}:x)); };
+  const delAction = a => persistActions(actions.filter(x=>x.id!==a.id));
+  const setNote = v => { const next={...notes, [W.weekEnding]:v}; setNotes(next); boardSaveNotes(next); };
+
+  // Auto-derived "what changed" for this week
+  const findings = (()=>{
+    const out=[];
+    if(prev && !prev.partial){
+      const moves = BOARD_METRICS.filter(s=>s.better!=='flat' && W.m[s.key]!=null && prev.m[s.key]!=null && prev.m[s.key]!==0)
+        .map(s=>({s, ch:(W.m[s.key]-prev.m[s.key])/Math.abs(prev.m[s.key])}))
+        .sort((a,b)=>Math.abs(b.ch)-Math.abs(a.ch));
+      moves.slice(0,2).forEach(mo=>{ const dir = mo.ch>0?'up':'down';
+        out.push({icon: (mo.ch>0===(mo.s.better!=='down'))?'▲':'▼', good:(mo.ch>0)===(mo.s.better!=='down'),
+          text:`${mo.s.label} ${dir} ${Math.abs(mo.ch*100).toFixed(0)}% WoW — now ${mo.s.fmt(W.m[mo.s.key])}.`}); });
+    }
+    BOARD_METRICS.forEach(s=>{ if(s.bench!=null && W.m[s.key]!=null){
+      const meets = s.better==='down' ? W.m[s.key]<=s.bench : W.m[s.key]>=s.bench;
+      if(!meets) out.push({icon:'⚠', good:false, text:`${s.label} below target — ${s.fmt(W.m[s.key])} (${s.benchTip}).`}); }});
+    // events + sales inside the week → context
+    loadBrandEvents().forEach(e=>{ if(e.startsOn>=W.weekStart && e.startsOn<=W.weekEnding){ const mt=EVENT_META[e.type]||EVENT_META.other;
+      out.push({icon:mt.icon, good:null, text:`${e.title||mt.label} (${(e.startsOn||'').slice(5)}).`}); }});
+    const codes=(window.FRKL_DISCOUNT_CODES&&window.FRKL_DISCOUNT_CODES.codes)||[];
+    codes.filter(c=>c && c.pattern!=='always-on' && (c.discount||0)>=120).forEach(c=>{ let pk=null;(c.series||[]).forEach(p=>{if(!pk||p.d>pk.d)pk=p;});
+      if(pk && pk.w>=W.weekStart && pk.w<=W.weekEnding) out.push({icon:'🏷️', good:null, text:`${c.code} sale ran — ${c.discountRate!=null?Math.round(c.discountRate*100)+'% off':'sale'}, £${Math.round(c.discount)} given.`}); });
+    if(!out.length) out.push({icon:'·', good:null, text:'Quiet week — no standout movements or logged events.'});
+    return out;
+  })();
+
+  // Trend data across all weeks (for the strip)
+  const trend = weeks.map(w=>({x:w.label, date:w.weekEnding, revenue:Math.round(w.m.revenue), paid:Math.round(w.m.paid),
+    mer:w.m.mer!=null?+w.m.mer.toFixed(2):null, cvr:w.m.cvr!=null?+(w.m.cvr*100).toFixed(2):null}));
+  const pins = buildChartPins(weeks.map(w=>({x:w.label, date:w.weekEnding})));
+  const renderPins = () => pins.map((p,i)=>(<R.ReferenceLine key={'bp'+i} yAxisId="l" x={p.x} stroke="#8b8b99" strokeDasharray="3 3" strokeOpacity={0.5}
+    label={<PinMarker icon={p.icon} n={p.n} tip={p.tip}/>}/>));
+
+  const openCount = actions.filter(a=>a.status!=='done').length;
+  const doneThisWeek = actions.filter(a=>a.status==='done' && a.doneWeek===W.weekEnding);
+  const visibleActions = actions.filter(a=>a.status!=='done' || a.doneWeek===W.weekEnding);
+
+  return (<div className="board">
+    {/* Header + week selector */}
+    <div className="card" style={{marginBottom:14, display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap'}}>
+      <div>
+        <div className="micro" style={{color:'var(--accent)', fontWeight:700, letterSpacing:'.06em', textTransform:'uppercase'}}>Weekly board · report card</div>
+        <h1 style={{margin:'4px 0 2px', fontSize:24}}>Week of {W.weekStart} <span style={{color:'var(--text-muted)', fontWeight:500, fontSize:16}}>→ {W.weekEnding}</span></h1>
+        <div className="micro" style={{color:'var(--text-faint)'}}>
+          {W.partial ? <span style={{color:'var(--warn)'}}>● In progress — {W.days}/7 days so far</span> : <span>Completed week · frozen from daily data</span>}
+          {' · for the Monday 3pm review'}
+        </div>
+      </div>
+      <div style={{display:'flex', alignItems:'center', gap:8}}>
+        <button onClick={()=>setIdx(i=>Math.max(0,i-1))} disabled={idx<=0} className="board-nav-btn">◀ Prev</button>
+        <select value={idx} onChange={e=>setIdx(+e.target.value)} style={{background:'var(--bg-card)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--r-sm)', padding:'7px 10px', fontSize:13}}>
+          {weeks.map((w,i)=>(<option key={w.weekStart} value={i}>{w.label}{w.partial?' (in progress)':''}</option>))}
+        </select>
+        <button onClick={()=>setIdx(i=>Math.min(weeks.length-1,i+1))} disabled={idx>=weeks.length-1} className="board-nav-btn">Next ▶</button>
+        <button onClick={()=>window.print()} className="board-nav-btn" title="Print / save this week as a PDF board pack">⎙ Print</button>
+      </div>
+    </div>
+
+    {/* Scorecard grid */}
+    <div className="board-grid">
+      {BOARD_METRICS.map(spec=>{
+        const val=W.m[spec.key];
+        // A partial prior week is not a fair baseline — suppress WoW against it.
+        const pv=(prev && !prev.partial) ? prev.m[spec.key] : null;
+        const rag=boardRag(spec, val, pv), col=RAG_COL[rag];
+        let ch=null; if(pv!=null && pv!==0 && val!=null) ch=(val-pv)/Math.abs(pv);
+        const good = ch==null?null:((ch>0)===(spec.better!=='down'));
+        const tip = spec.benchTip || spec.note;
+        return (<div key={spec.key} className="card board-card" style={{borderLeft:`3px solid ${col}`}}>
+          <div className="micro" style={{color:'var(--text-muted)', fontWeight:600, display:'flex', justifyContent:'space-between'}}>
+            <span>{spec.label}</span>
+            {tip && <span title={tip} style={{cursor:'help', color:'var(--text-faint)'}}>ⓘ</span>}
+          </div>
+          <div style={{fontSize:24, fontWeight:700, letterSpacing:'-.01em', margin:'4px 0 2px'}}>{spec.fmt(val)}</div>
+          <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:6}}>
+            <span style={{fontSize:12, fontWeight:600, color: spec.better==='flat'||good==null ? 'var(--text-faint)' : (good?'var(--good)':'#f87171')}}>
+              {ch==null?'—':(ch>0?'▲ ':'▼ ')+Math.abs(ch*100).toFixed(ch>=0.1||ch<=-0.1?0:1)+'% WoW'}
+            </span>
+            <BoardSpark vals={trail(spec.key, idx)} color={spec.better==='flat'?'#8b8b99':col}/>
+          </div>
+        </div>);
+      })}
+    </div>
+
+    {/* Trend strip */}
+    <div className="row" style={{marginTop:14}}>
+      <div className="card" style={{flex:'1 1 520px'}}>
+        <div className="card-section-title"><h2 style={{margin:0}}>Revenue vs paid spend — weekly</h2><span className="meta">Bars = paid spend · Line = net revenue</span></div>
+        <R.ResponsiveContainer width="100%" height={230}>
+          <R.ComposedChart data={trend} margin={{top:18,right:16,left:6,bottom:6}}>
+            <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
+            <R.XAxis dataKey="x" tick={{fill:'#7e7e8a',fontSize:10}} interval={Math.ceil(trend.length/8)}/>
+            <R.YAxis yAxisId="l" tick={{fill:'#7e7e8a',fontSize:10}} tickFormatter={v=>'£'+(v/1000).toFixed(0)+'k'}/>
+            <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#7e7e8a',fontSize:10}} tickFormatter={v=>'£'+(v/1000).toFixed(0)+'k'}/>
+            <R.Tooltip contentStyle={{background:'#181820',border:'1px solid #2a2a34',borderRadius:10}} formatter={(v,n)=>[GBP(v),n]}/>
+            <R.Bar yAxisId="l" dataKey="paid" name="Paid spend" fill={COL.meta} radius={[2,2,0,0]}/>
+            <R.Line yAxisId="r" type="monotone" dataKey="revenue" name="Net revenue" stroke={COL.revenue} strokeWidth={2.4} dot={false}/>
+            {renderPins()}
+          </R.ComposedChart>
+        </R.ResponsiveContainer>
+      </div>
+      <div className="card" style={{flex:'1 1 320px'}}>
+        <div className="card-section-title"><h2 style={{margin:0}}>Efficiency — MER &amp; CVR</h2><span className="meta">MER (×) left · CVR (%) right</span></div>
+        <R.ResponsiveContainer width="100%" height={230}>
+          <R.ComposedChart data={trend} margin={{top:18,right:16,left:6,bottom:6}}>
+            <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
+            <R.XAxis dataKey="x" tick={{fill:'#7e7e8a',fontSize:10}} interval={Math.ceil(trend.length/6)}/>
+            <R.YAxis yAxisId="l" tick={{fill:'#7e7e8a',fontSize:10}} tickFormatter={v=>v+'×'}/>
+            <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#7e7e8a',fontSize:10}} tickFormatter={v=>v+'%'}/>
+            <R.Tooltip contentStyle={{background:'#181820',border:'1px solid #2a2a34',borderRadius:10}}/>
+            <R.ReferenceLine yAxisId="l" y={2} stroke="#4ade80" strokeDasharray="5 4" strokeOpacity={0.7} label={{value:'MER 2×', position:'insideTopLeft', fill:'#4ade80', fontSize:9.5}}/>
+            <R.ReferenceLine yAxisId="r" y={2} stroke="#38bdf8" strokeDasharray="5 4" strokeOpacity={0.6} label={{value:'CVR 2%', position:'insideTopRight', fill:'#38bdf8', fontSize:9.5}}/>
+            <R.Line yAxisId="l" type="monotone" dataKey="mer" name="MER" stroke="#a78bfa" strokeWidth={2.2} dot={false}/>
+            <R.Line yAxisId="r" type="monotone" dataKey="cvr" name="CVR %" stroke={COL.sessions} strokeWidth={2.2} dot={false}/>
+          </R.ComposedChart>
+        </R.ResponsiveContainer>
+      </div>
+    </div>
+
+    {/* Decisions log */}
+    <div className="row" style={{marginTop:14}}>
+      <div className="card" style={{flex:'1 1 420px'}}>
+        <h2 style={{marginTop:0}}>What changed this week</h2>
+        <div style={{display:'flex', flexDirection:'column', gap:8}}>
+          {findings.map((f,i)=>(<div key={i} style={{display:'flex', gap:8, alignItems:'baseline', fontSize:13.5}}>
+            <span style={{color: f.good==null?'var(--text-faint)':(f.good?'var(--good)':'#f87171'), fontWeight:700, minWidth:14}}>{f.icon}</span>
+            <span style={{color:'var(--text-secondary)'}}>{f.text}</span>
+          </div>))}
+        </div>
+        <h3 style={{margin:'18px 0 6px', fontSize:13, color:'var(--text-muted)'}}>Meeting notes — week of {W.weekStart}</h3>
+        <textarea value={notes[W.weekEnding]||''} onChange={e=>setNote(e.target.value)} placeholder="Decisions taken, context, anything to remember for next week…"
+          style={{width:'100%', minHeight:84, background:'var(--bg-app)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--r-sm)', padding:10, fontSize:13, fontFamily:'inherit', resize:'vertical'}}/>
+      </div>
+
+      <div className="card" style={{flex:'1 1 420px'}}>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'baseline'}}>
+          <h2 style={{marginTop:0}}>Actions</h2>
+          <span className="micro" style={{color:'var(--text-faint)'}}>{openCount} open · carried week to week</span>
+        </div>
+        <div style={{display:'flex', flexDirection:'column', gap:6, marginBottom:10}}>
+          {visibleActions.length===0 && <div className="muted" style={{fontSize:13}}>No open actions. Add one below as the meeting decides.</div>}
+          {visibleActions.map(a=>{ const meta=ACTION_META[a.status]||ACTION_META.open; return (
+            <div key={a.id} style={{display:'flex', alignItems:'center', gap:8, padding:'7px 9px', background:'var(--bg-app)', border:'1px solid var(--border-subtle)', borderRadius:'var(--r-sm)'}}>
+              <button onClick={()=>cycleAction(a)} title="Click to advance status" style={{cursor:'pointer', flexShrink:0, border:'1px solid '+meta.col, color:meta.col, background:'transparent', borderRadius:'var(--r-full)', fontSize:10.5, fontWeight:700, padding:'2px 8px'}}>{meta.label}</button>
+              <span style={{flex:1, fontSize:13, textDecoration: a.status==='done'?'line-through':'none', color: a.status==='done'?'var(--text-faint)':'var(--text-primary)'}}>{a.text}</span>
+              <span className="micro" style={{color:'var(--text-faint)', flexShrink:0}} title={'Raised week ending '+a.raised}>{(a.raised||'').slice(5)}</span>
+              <button onClick={()=>delAction(a)} title="Remove" style={{cursor:'pointer', border:'none', background:'transparent', color:'var(--text-faint)', fontSize:15, lineHeight:1}}>×</button>
+            </div>); })}
+        </div>
+        <div style={{display:'flex', gap:6}}>
+          <input value={newAction} onChange={e=>setNewAction(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addAction();}} placeholder="Add an action…"
+            style={{flex:1, background:'var(--bg-app)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--r-sm)', padding:'8px 10px', fontSize:13}}/>
+          <button onClick={addAction} className="board-nav-btn" style={{flexShrink:0}}>+ Add</button>
+        </div>
+        {doneThisWeek.length>0 && <div className="micro" style={{color:'var(--good)', marginTop:8}}>✓ {doneThisWeek.length} completed this week</div>}
+      </div>
+    </div>
+  </div>);
+}
+
 // ── Two-level navigation: section → subTab ──────────────────────────────────
 // 5 top-level sections, each with its own sub-pages. Premium SaaS pattern.
 // Sub-pages render contextual sub-nav when the section has >1 page.
@@ -6056,6 +6359,9 @@ const NAV = [
   { id:'home',    label:'Home',         subtabs:[
     { id:'overview', label:'Overview',     component: (p) => <Overview start={p.start} period={p.period} customActive={p.customActive}/> },
     { id:'ask',      label:'Ask data',     component: () => <AskPanel/> },
+  ]},
+  { id:'board',   label:'Board',        subtabs:[
+    { id:'weekly',   label:'Weekly review', component: () => <WeeklyBoard/> },
   ]},
   { id:'intel',   label:'Intelligence', subtabs:[
     { id:'intel',    label:'Findings',     component: () => <IntelligencePanel/> },
