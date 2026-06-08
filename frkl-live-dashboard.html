@@ -18,20 +18,20 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606081940"></script>
-<script src="./frkl-live-data.js?v=202606081940"></script>
-<script src="./frkl-agent-insights.js?v=202606081940"></script>
-<script src="./frkl-business-data.js?v=202606081940"></script>
-<script src="./frkl-action-status.js?v=202606081940"></script>
-<script src="./frkl-patterns.js?v=202606081940"></script>
-<script src="./frkl-creators.js?v=202606081940"></script>
-<script src="./frkl-creative-vision.js?v=202606081940"></script>
-<script src="./frkl-links.js?v=202606081940"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606081940"></script>
-<script src="./frkl-events.js?v=202606081940"></script>
-<script src="./frkl-products.js?v=202606081940"></script>
-<script src="./frkl-discount-codes.js?v=202606081940"></script>
-<script src="./frkl-cvr.js?v=202606081940"></script>
+<script src="./frkl-data-loader.js?v=202606081947"></script>
+<script src="./frkl-live-data.js?v=202606081947"></script>
+<script src="./frkl-agent-insights.js?v=202606081947"></script>
+<script src="./frkl-business-data.js?v=202606081947"></script>
+<script src="./frkl-action-status.js?v=202606081947"></script>
+<script src="./frkl-patterns.js?v=202606081947"></script>
+<script src="./frkl-creators.js?v=202606081947"></script>
+<script src="./frkl-creative-vision.js?v=202606081947"></script>
+<script src="./frkl-links.js?v=202606081947"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606081947"></script>
+<script src="./frkl-events.js?v=202606081947"></script>
+<script src="./frkl-products.js?v=202606081947"></script>
+<script src="./frkl-discount-codes.js?v=202606081947"></script>
+<script src="./frkl-cvr.js?v=202606081947"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -3618,19 +3618,23 @@ function Customers(){
   const unsubsTotal=list.reduce((a,r)=>a+(r.unsubscribed||0),0);
   // chart data: returning share per week
   const byWeek={};
-  ret.forEach(r=>{ const d=new Date(r.date+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()-d.getUTCDay()); const w=d.toISOString().slice(0,10); byWeek[w]=byWeek[w]||{week:w,new:0,ret:0}; if(r.isReturning==='true') byWeek[w].ret+=r.orders||0; else byWeek[w].new+=r.orders||0; });
-  const weeks=Object.values(byWeek).sort((a,b)=>a.week<b.week?-1:1).map(w=>({...w, retPct:w.ret/Math.max(1,w.ret+w.new)*100, label:w.week.slice(5)}));
+  ret.forEach(r=>{ const d=new Date(r.date+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()-d.getUTCDay()); const w=d.toISOString().slice(0,10); byWeek[w]=byWeek[w]||{week:w,new:0,ret:0,newRev:0,retRev:0}; if(r.isReturning==='true'){ byWeek[w].ret+=r.orders||0; byWeek[w].retRev+=r.netSales||0; } else { byWeek[w].new+=r.orders||0; byWeek[w].newRev+=r.netSales||0; } });
+  const weeks=Object.values(byWeek).sort((a,b)=>a.week<b.week?-1:1).map(w=>({...w, retPct:w.ret/Math.max(1,w.ret+w.new)*100, retRevPct:w.retRev/Math.max(1,w.retRev+w.newRev)*100, label:w.week.slice(5)}));
   // list growth chart
   const listChart=list.map(r=>({date:r.date.slice(5), net:(r.subscribed||0)-(r.unsubscribed||0)}));
+  // Hover-graph trends.
+  const retPctSeries    = weeks.map(w=>({d:w.label, v:+w.retPct.toFixed(1)}));
+  const retRevPctSeries = weeks.map(w=>({d:w.label, v:+w.retRevPct.toFixed(1)}));
+  const listNetSeries   = listChart.map(r=>({d:r.date, v:r.net}));
   return (<div>
     <div className="row" style={{marginBottom:14}}>
-      <KPI label="% orders from returning" val={PCT((totalRet)/(totalNew+totalRet))} sub={`${NUM(totalRet)} returning / ${NUM(totalNew)} new (90d)`}
+      <KPI label="% orders from returning" val={PCT((totalRet)/(totalNew+totalRet))} sub={`${NUM(totalRet)} returning / ${NUM(totalNew)} new (90d)`} series={retPctSeries} seriesLabel="Returning order share · by week"
         agent="Lux" observation="38.7% repeat is healthier than Clarity's 95% new-visitor stat suggested — buyers ARE coming back."
         implication="The repeat customer is real but undermonetised — post-purchase + restyle flows would lift LTV materially." />
-      <KPI label="Returning revenue share" val={PCT((totalRetRev)/(totalNewRev+totalRetRev))} sub={`£${NUM(totalRetRev)} of £${NUM(totalNewRev+totalRetRev)}`}
+      <KPI label="Returning revenue share" val={PCT((totalRetRev)/(totalNewRev+totalRetRev))} sub={`£${NUM(totalRetRev)} of £${NUM(totalNewRev+totalRetRev)}`} series={retRevPctSeries} seriesLabel="Returning revenue share · by week"
         agent="Atlas" observation="29.6% of revenue from returning customers comes with zero acquisition cost — highest-margin slice."
         implication="Every £1 of retention spend likely returns more than every £1 of paid acquisition right now." />
-      <KPI label="Net list growth (90d)" val={'+'+NUM(subsTotal-unsubsTotal)} sub={`${NUM(subsTotal)} new − ${NUM(unsubsTotal)} unsub`}
+      <KPI label="Net list growth (90d)" val={'+'+NUM(subsTotal-unsubsTotal)} sub={`${NUM(subsTotal)} new − ${NUM(unsubsTotal)} unsub`} series={listNetSeries} seriesLabel="Net list growth · by day"
         agent="Sage" observation="~26 new subs/day with <5 unsubs — acquisition is filling the funnel cleanly."
         implication="The list is healthy; the gap is monetisation — abandoned-cart + welcome series are the levers, not more sign-ups." />
       <KPI label="Markets" val={geo.length+'+'} sub={`UK ${PCT(geo[0]?.netSales/geo.reduce((a,b)=>a+b.netSales,0))} · IE ${PCT((geo[1]?.netSales||0)/geo.reduce((a,b)=>a+b.netSales,0))}`}
@@ -4830,7 +4834,7 @@ function EmailHub(){
         <KPI label="Flow revenue (90d)" val={GBP(summary.flows.orderValue)} sub={`${summary.flows.messages} messages · ${NUM(summary.flows.recipients)} recipients`}
           agent="Lux" observation={`Flows generate ${PCT(flowShare)} of email revenue from just ${summary.flows.messages} message templates.`}
           implication="This is the highest-margin marketing activity frkl runs. Investment in flow optimisation = direct revenue." />
-        <KPI label="Campaign revenue (90d)" val={GBP(summary.campaigns.orderValue)} sub={`${summary.campaigns.messages} sends · ${NUM(summary.campaigns.recipients)} total recipients`}
+        <KPI label="Campaign revenue (90d)" val={GBP(summary.campaigns.orderValue)} sub={`${summary.campaigns.messages} sends · ${NUM(summary.campaigns.recipients)} total recipients`} series={sendChart.map(w=>({d:w.date, v:Math.round(w.revenue)}))} seriesLabel="Campaign revenue · by send date"
           agent="Lux" observation={`${summary.campaigns.messages} broadcasts producing ${GBP(summary.campaigns.orderValue)} — less revenue than 15 flow messages.`}
           implication="Send cadence is high; revenue per send isn't. Either cut the 50% lowest-performing or differentiate angles." />
         <KPI label="Flow rev per recipient" val={'£'+(summary.flows.revPerRecip||0).toFixed(2)} sub={`vs £${(summary.campaigns.revPerRecip||0).toFixed(2)} for campaigns — ${lift}× lift`}
@@ -5043,18 +5047,22 @@ function InstagramPanel(){
   // top posts sorted by likes
   const topPosts=[...posts].sort((a,b)=>(b.likes||0)-(a.likes||0));
   const totalEng=posts.reduce((a,p)=>a+(p.likes||0)+(p.comments||0)+(p.saves||0)+(p.shares||0),0);
+  // Hover-graph trends (real daily IG data).
+  const igNewSeries   = daily.map(d=>({d:(d.date||'').slice(5), v:d.newFollowers||0}));
+  const igReachSeries = daily.map(d=>({d:(d.date||'').slice(5), v:Math.round(d.reach||0)}));
+  const igFollowerSeries = (function(){ const out=[]; let run=snap.followers||0; for(let i=daily.length-1;i>=0;i--){ out.unshift({d:(daily[i].date||'').slice(5), v:Math.round(run)}); run -= (daily[i].newFollowers||0); } return out; })();
   return (<div style={{marginTop:14}}>
     <div className="card" style={{marginBottom:14}}>
       <h2>Instagram organic — @frkl.</h2>
       <div className="muted" style={{marginBottom:10}}>Live from Instagram Insights via Supermetrics. Profile snapshot + last-30-days growth + top-20 posts (last 90 days).</div>
       <div className="row">
-        <KPI label="Followers" val={NUM(snap.followers)} sub={`${NUM(snap.mediaCount)} posts · following ${NUM(snap.follows)}`}
+        <KPI label="Followers" val={NUM(snap.followers)} sub={`${NUM(snap.mediaCount)} posts · following ${NUM(snap.follows)}`} series={igFollowerSeries} seriesLabel="Total followers · by day"
           agent="Lux" observation="37.8k followers, 974 posts — a substantial owned audience that converts at the highest ROAS when reached."
           implication="Treat this list with the same intent as your email list — content cadence, IG-native creator collabs." />
-        <KPI label="New followers (30d)" val={'+'+NUM(totalNew)} sub={`~${Math.round(totalNew/30)} /day avg`}
+        <KPI label="New followers (30d)" val={'+'+NUM(totalNew)} sub={`~${Math.round(totalNew/30)} /day avg`} series={igNewSeries} seriesLabel="New followers · by day"
           agent="Sage" observation="+613 in 30d with a May 17 outlier (+86) — proves content can break out when the topic lands."
           implication="Study what drove May 17. If repeatable, it's a recurring lever for organic acquisition." />
-        <KPI label="Avg daily reach" val={NUM(avgReach)} sub={`Profile views ${NUM(avgViews)}/day`}
+        <KPI label="Avg daily reach" val={NUM(avgReach)} sub={`Profile views ${NUM(avgViews)}/day`} series={igReachSeries} seriesLabel="Daily reach · by day"
           agent="Frame" observation="~9.5k people reached organically every day — roughly what £100/day of paid would buy you."
           implication="Organic IG is paid-equivalent reach for free. Brief 2 content pillars per week, not occasional one-offs." />
         <KPI label="Top post (90d)" val={NUM(topPosts[0]?.views)} sub={`${topPosts[0]?.likes} likes — ${(topPosts[0]?.caption||'').slice(0,32)}…`}
