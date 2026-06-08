@@ -18,20 +18,20 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606081947"></script>
-<script src="./frkl-live-data.js?v=202606081947"></script>
-<script src="./frkl-agent-insights.js?v=202606081947"></script>
-<script src="./frkl-business-data.js?v=202606081947"></script>
-<script src="./frkl-action-status.js?v=202606081947"></script>
-<script src="./frkl-patterns.js?v=202606081947"></script>
-<script src="./frkl-creators.js?v=202606081947"></script>
-<script src="./frkl-creative-vision.js?v=202606081947"></script>
-<script src="./frkl-links.js?v=202606081947"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606081947"></script>
-<script src="./frkl-events.js?v=202606081947"></script>
-<script src="./frkl-products.js?v=202606081947"></script>
-<script src="./frkl-discount-codes.js?v=202606081947"></script>
-<script src="./frkl-cvr.js?v=202606081947"></script>
+<script src="./frkl-data-loader.js?v=202606082004"></script>
+<script src="./frkl-live-data.js?v=202606082004"></script>
+<script src="./frkl-agent-insights.js?v=202606082004"></script>
+<script src="./frkl-business-data.js?v=202606082004"></script>
+<script src="./frkl-action-status.js?v=202606082004"></script>
+<script src="./frkl-patterns.js?v=202606082004"></script>
+<script src="./frkl-creators.js?v=202606082004"></script>
+<script src="./frkl-creative-vision.js?v=202606082004"></script>
+<script src="./frkl-links.js?v=202606082004"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606082004"></script>
+<script src="./frkl-events.js?v=202606082004"></script>
+<script src="./frkl-products.js?v=202606082004"></script>
+<script src="./frkl-discount-codes.js?v=202606082004"></script>
+<script src="./frkl-cvr.js?v=202606082004"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -717,6 +717,32 @@ const GBP = n => n==null ? '—' : '£' + Math.round(n).toLocaleString('en-GB');
 const GBP2 = n => n==null ? '—' : '£' + n.toLocaleString('en-GB',{minimumFractionDigits:0,maximumFractionDigits:0});
 const PCT = n => n==null ? '—' : (n*100).toFixed(1) + '%';
 const NUM = n => n==null ? '—' : Math.round(n).toLocaleString('en-GB');
+
+// ── Cost config & margin confidence ─────────────────────────────────────────
+// Every margin-derived number (gross margin, contribution, CAC payback, LTV:CAC,
+// break-even ROAS) is only as good as the costs behind it. Until the operator
+// confirms their real costs, those numbers are ESTIMATES and must be labelled as
+// such. Config lives in localStorage (frkl-contrib-inputs) — the same store the
+// Contribution card already uses — extended with a gross-margin % and a verified
+// flag. (Per-tenant server-side persistence is the v2; local-first today.)
+const COST_DEFAULTS = {gmPct:'', packaging:'0.50', fulfilment:'2.00', shipping:'3.50', payPct:'1.5', payFixed:'0.25', refundPct:'7.4'};
+function costConfig(){
+  try { return {...COST_DEFAULTS, ...(JSON.parse(localStorage.getItem('frkl-contrib-inputs')||'{}'))}; }
+  catch(e){ return {...COST_DEFAULTS}; }
+}
+function marginVerified(){ const c = costConfig(); return c.verified===true || c.verified==='true'; }
+function saveCostConfig(next){ try { localStorage.setItem('frkl-contrib-inputs', JSON.stringify(next)); window.dispatchEvent(new Event('oi-costs-updated')); } catch(e){} }
+// User-entered gross margin (fraction) when present, else null → callers fall
+// back to OI_CONFIG.grossMargin or the live catalogue margin.
+function userGrossMargin(){ const c = costConfig(); const v = parseFloat(c.gmPct); return (c.gmPct!=='' && c.gmPct!=null && isFinite(v)) ? v/100 : null; }
+// Re-render hook: any component showing a margin number can subscribe so badges
+// + figures update the instant costs are saved.
+function useCostTick(){
+  const [, force] = React.useState(0);
+  React.useEffect(()=>{ const h=()=>force(x=>x+1); window.addEventListener('oi-costs-updated', h); return ()=>window.removeEventListener('oi-costs-updated', h); }, []);
+  return marginVerified();
+}
+
 // ── Signal-quality ranking ──────────────────────────────────────────────────
 // Order findings so the HIGHEST-QUALITY signal leads, not just the biggest £:
 // confidence-weighted, actionable-weighted £. A rock-solid finding outranks a
@@ -843,7 +869,81 @@ function inRangeBounded(rows, start, end){ return (rows||[]).filter(r => r.date 
 function dataEndOf(){ return ACTIVE_END || REAL_END; }
 function fmtDelta(d){ if(d==null) return null; const pct = Math.abs(d*100); if (pct < 0.5) return '·0%'; return (d>0?'↑':'↓') + pct.toFixed(0) + '%'; }
 
-function KPI({label, val, sub, series, seriesLabel, current, prior, goodDirection, agent, observation, implication}){
+// Small inline confidence pill for any margin-derived figure. Subscribes to cost
+// updates so it flips the instant the operator verifies their costs.
+function MarginBadge({onSetup}){
+  const verified = useCostTick();
+  const tip = verified
+    ? 'Based on your entered costs — verified.'
+    : 'Estimated from catalogue defaults. Enter your real costs to make this accurate.';
+  return (<span title={tip} onClick={(!verified && onSetup) ? (e=>{e.stopPropagation(); onSetup();}) : undefined}
+    style={{display:'inline-flex', alignItems:'center', gap:3, fontSize:9, fontWeight:700, letterSpacing:'.03em', textTransform:'uppercase',
+            padding:'1px 6px', borderRadius:'var(--r-full)', cursor:(!verified && onSetup)?'pointer':'help', whiteSpace:'nowrap',
+            background: verified?'var(--good-bg)':'var(--warn-bg)', color: verified?'var(--good)':'var(--warn)',
+            border:'1px solid '+(verified?'rgba(74,222,128,.3)':'rgba(245,181,68,.3)')}}>
+    {verified ? '✓ verified' : '~ est.'}
+  </span>);
+}
+
+// Guided cost setup — makes contribution/CAC/LTV trustworthy. Pre-fills the
+// catalogue gross margin + current variable-cost assumptions; saving marks costs
+// verified so every margin number flips from "est." to "verified".
+function CostSetupModal({catalogueGm, onClose}){
+  const init = costConfig();
+  const [f, setF] = React.useState(()=>({
+    gmPct: init.gmPct!=='' && init.gmPct!=null ? init.gmPct : (catalogueGm!=null ? (catalogueGm*100).toFixed(0) : ''),
+    packaging: init.packaging, fulfilment: init.fulfilment, shipping: init.shipping,
+    payPct: init.payPct, payFixed: init.payFixed, refundPct: init.refundPct,
+  }));
+  const set = (k,v)=> setF(p=>({...p, [k]:v}));
+  const num = v => { const x=parseFloat(String(v).replace(',','.').replace(/[^0-9.]/g,'')); return isFinite(x)?x:0; };
+  const gm = num(f.gmPct)/100;
+  const aovGuess = (typeof window!=='undefined' && window.FRKL_DATA && (window.FRKL_DATA.shopify||[]).length)
+    ? (()=>{ const s=window.FRKL_DATA.shopify; const o=s.reduce((a,r)=>a+(r.orders||0),0); const rev=s.reduce((a,r)=>a+(r.netSales||0),0); return o>0?rev/o:60; })() : 60;
+  const varPerOrder = num(f.packaging)+num(f.fulfilment)+num(f.shipping)+num(f.payFixed) + aovGuess*(num(f.payPct)/100) + aovGuess*(num(f.refundPct)/100);
+  const cmRate = Math.max(0, gm - (aovGuess>0?varPerOrder/aovGuess:0));
+  const beRoas = cmRate>0 ? 1/cmRate : null;
+  const valid = f.gmPct!=='' && num(f.gmPct)>0 && num(f.gmPct)<100;
+  const save = ()=>{ saveCostConfig({...costConfig(), ...f, verified:true, verifiedAt:new Date().toISOString()}); onClose(); };
+  const Field = ({k, label, prefix, suffix, hint}) => (
+    <div style={{marginBottom:12}}>
+      <label style={{display:'block', fontSize:12, fontWeight:600, color:'var(--text-secondary)', marginBottom:4}}>{label}</label>
+      <div style={{display:'flex', alignItems:'center', gap:6}}>
+        {prefix && <span style={{color:'var(--text-faint)', fontSize:13}}>{prefix}</span>}
+        <input value={f[k]} onChange={e=>set(k, e.target.value)} inputMode="decimal"
+          style={{width:90, background:'var(--bg-app)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--r-sm)', padding:'7px 9px', fontSize:13}}/>
+        {suffix && <span style={{color:'var(--text-faint)', fontSize:13}}>{suffix}</span>}
+        {hint && <span className="micro" style={{color:'var(--text-faint)', marginLeft:4}}>{hint}</span>}
+      </div>
+    </div>);
+  return (<div className="modal-bg" onClick={onClose}>
+    <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:560}}>
+      <h3>Set up your real costs <span style={{fontWeight:400, color:'var(--text-faint)', fontSize:13}}>· ~5 min, makes margin numbers accurate</span></h3>
+      <div className="micro" style={{color:'var(--text-muted)', marginBottom:14, lineHeight:1.5}}>
+        Contribution, CAC payback and LTV:CAC are only as good as the costs behind them. Until these are confirmed they're shown as <b style={{color:'var(--warn)'}}>estimates</b>. Enter your real numbers once and every margin figure flips to <b style={{color:'var(--good)'}}>verified</b>.
+      </div>
+      <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 24px'}}>
+        <Field k="gmPct"    label="Gross margin %"        suffix="%" hint={catalogueGm!=null?`catalogue ≈ ${(catalogueGm*100).toFixed(0)}%`:''}/>
+        <Field k="refundPct" label="Refund / return rate" suffix="%"/>
+        <Field k="fulfilment" label="Fulfilment / pick-pack" prefix="£" suffix="/order"/>
+        <Field k="packaging"  label="Packaging"             prefix="£" suffix="/order"/>
+        <Field k="shipping"   label="Shipping cost"         prefix="£" suffix="/order"/>
+        <Field k="payFixed"   label="Payment fee (fixed)"   prefix="£" suffix="/order"/>
+        <Field k="payPct"     label="Payment fee (%)"       suffix="%"/>
+      </div>
+      <div style={{marginTop:8, padding:'10px 12px', background:'var(--bg-app)', borderRadius:'var(--r-sm)', border:'1px solid var(--border-subtle)', fontSize:12.5, color:'var(--text-secondary)'}}>
+        At ~{GBP(aovGuess)} AOV that's a <b style={{color:'var(--text-primary)'}}>{(cmRate*100).toFixed(0)}%</b> per-order contribution margin → break-even ROAS <b style={{color:'var(--text-primary)'}}>{beRoas?beRoas.toFixed(2)+'×':'—'}</b>. Every order needs to clear this to be profitable.
+      </div>
+      <div className="row">
+        <button className="primary" onClick={save} disabled={!valid} style={!valid?{opacity:.5,cursor:'default'}:undefined}>Save &amp; verify costs</button>
+        <button onClick={onClose} style={{marginLeft:'auto'}}>Cancel</button>
+      </div>
+      <div className="hint">Stored in this browser for now (server-side per-tenant config is coming). Edit any time from the cost badge.</div>
+    </div>
+  </div>);
+}
+
+function KPI({label, val, sub, badge, series, seriesLabel, current, prior, goodDirection, agent, observation, implication}){
   const delta = (prior!=null && current!=null && prior!==0) ? (current-prior)/prior : null;
   let deltaColor = 'var(--text-muted)';
   if (delta!=null && goodDirection) {
@@ -866,6 +966,7 @@ function KPI({label, val, sub, series, seriesLabel, current, prior, goodDirectio
   return (<div className={'card kpi' + (hasPop ? ' has-pop' : '')}>
     <div className="label">
       <span>{label}</span>
+      {badge}
       {hasPop && <span className="info-dot"/>}
     </div>
     <div className="val">{val}{delta!=null && <span className="delta" style={{color:deltaColor}}>{fmtDelta(delta)}</span>}</div>
@@ -2757,6 +2858,8 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
 
 function Overview({start, period, customActive}){
   const [evTick, setEvTick] = useState(0);   // bump to re-read the operator event log
+  const [costsOpen, setCostsOpen] = useState(false);
+  const costsVerified = useCostTick();       // re-renders margin figures/badges on save
   const daily = useMemo(()=>buildDaily(start),[start]);
   const end = dataEndOf();
   const prior = priorPeriod(start, end);
@@ -2807,7 +2910,9 @@ function Overview({start, period, customActive}){
   // margin) − paid ad spend. COGS-based; excludes shipping/payment fees/returns
   // until those inputs land. Windowed via rev/paid; prior-period comparable.
   // Per-tenant config gross margin wins when present (set by the authenticated boot); else live catalogue margin.
-  const gm = ((typeof window!=='undefined' && window.OI_CONFIG && window.OI_CONFIG.grossMargin) || grossMargin) || 0;
+  // Prefer the operator's verified gross margin; else tenant config; else live catalogue margin.
+  const gm = userGrossMargin() != null ? userGrossMargin()
+    : (((typeof window!=='undefined' && window.OI_CONFIG && window.OI_CONFIG.grossMargin) || grossMargin) || 0);
   const cogs = rev * (1 - gm);
   const grossProfit = rev * gm;
   const contrib = grossProfit - paid;
@@ -2868,6 +2973,25 @@ function Overview({start, period, customActive}){
   const dxContext = buildEvidence({mer, pMer, paid, pPaid, rev, pRev, orders, pOrders, discLoad, pDiscLoad, histDaily,
                                    events:{current:curEvents, prior:priEvents, all:brandEvents}});
   return (<div style={{display:'flex', flexDirection:'column', gap:'var(--s-5)'}}>
+    {costsOpen && <CostSetupModal catalogueGm={grossMargin} onClose={()=>setCostsOpen(false)}/>}
+
+    {/* Margin-trust gate: until real costs are confirmed, every contribution/CAC/LTV
+        figure is an estimate — say so, and make fixing it one click. */}
+    {!costsVerified && (
+      <div className="card" style={{borderLeft:'3px solid var(--warn)', display:'flex', alignItems:'center', gap:16, flexWrap:'wrap'}}>
+        <div style={{flex:'1 1 420px'}}>
+          <div style={{fontWeight:650, fontSize:14.5, marginBottom:3}}>Your margin numbers are estimates</div>
+          <div className="micro" style={{color:'var(--text-secondary)', lineHeight:1.5}}>Contribution, CAC payback and LTV:CAC are running on catalogue defaults. Enter your real costs once (~5 min) to make every margin figure accurate and trustworthy.</div>
+        </div>
+        <button onClick={()=>setCostsOpen(true)} className="btn-primary" style={{flexShrink:0}}>Set up costs →</button>
+      </div>
+    )}
+    {costsVerified && (
+      <div className="micro" style={{color:'var(--text-faint)', display:'flex', alignItems:'center', gap:8}}>
+        <MarginBadge/> margin figures are based on your entered costs · <span onClick={()=>setCostsOpen(true)} style={{color:'var(--accent)', cursor:'pointer'}}>edit costs</span>
+      </div>
+    )}
+
     {/* Per-channel data freshness — trust signal: don't act on stale channels */}
     <DataFreshness/>
 
@@ -2907,7 +3031,7 @@ function Overview({start, period, customActive}){
           agent="Atlas" observation={`Code + automatic discount as a share of DTC gross sales (draft/exchange orders excluded). This excludes sale-price markdowns${_mdPct?`, which add ~${_mdPct}% of value on top`:''} — the full load is on the Promotions tab.`}
           implication="Audit always-on codes + affiliate rates; protect full-price demand. The true load incl. markdowns is materially higher — see Promotions." />
         <MoreKpis count={8}>
-        <KPI label="Gross margin" val={PCT(grossMargin)} sub="COGS-based · trailing 90d" series={seriesGM} seriesLabel="Catalogue margin · structurally stable"
+        <KPI label="Gross margin" val={PCT(gm)} sub={costsVerified?"Your entered gross margin":"COGS-based · catalogue estimate"} badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesGM} seriesLabel="Catalogue margin · structurally stable"
           agent="Atlas" observation="Blended product margin across the live catalogue, after cost of goods."
           implication="This is the contribution base for the raise — defend it by keeping discount load in check." />
         <KPI label="Return rate" val={PCT(returnRate)} sub={`${NUM(_rets)} of ${NUM(_units)} units · 90d`} series={seriesReturn} seriesLabel="Refunds ÷ sales · by day" goodDirection="down"
@@ -2922,13 +3046,13 @@ function Overview({start, period, customActive}){
         <KPI label="Returning customers" val={PCT(returningPct)} sub="share of orders · trailing months" series={seriesReturning} seriesLabel="Repeat-order share · by month" goodDirection="up"
           agent="Lux" observation="Repeat-purchase share — the cheapest revenue you have and a read on brand love."
           implication="Lift with post-purchase flows + a reason to come back; it compounds faster than paid." />
-        <KPI label="Contribution (pre-opex)" val={GBP(contrib)} sub="gross profit − paid media · full breakdown below" series={seriesContrib} current={contrib} prior={pContrib} goodDirection="up"
+        <KPI label="Contribution (pre-opex)" val={GBP(contrib)} sub="gross profit − paid media · full breakdown below" badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesContrib} current={contrib} prior={pContrib} goodDirection="up"
           agent="Atlas" observation="Net revenue × blended product margin, minus paid ad spend — before packaging/fulfilment/fees. The fully-loaded figure is in the Contribution margin card."
           implication="This is what the raise hinges on; hold it by balancing discount load (margin) against MER (CAC)." />
-        <KPI label="CAC (est.)" val={GBP(cac)} sub={`${NUM(newCust)} new customers · paid spend ÷ new`} series={seriesCAC} seriesLabel="Spend ÷ new customers · by day" current={cac} prior={pCac} goodDirection="down"
+        <KPI label="CAC (est.)" val={GBP(cac)} sub={`${NUM(newCust)} new customers · paid spend ÷ new`} badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesCAC} seriesLabel="Spend ÷ new customers · by day" current={cac} prior={pCac} goodDirection="down"
           agent="Pulse" observation="Paid ad spend ÷ estimated new customers (new-customer share derived from repeat-purchase data)."
           implication="Judge against contribution-LTV — keep scaling only while LTV:CAC stays at 3×+." />
-        <KPI label="LTV (est.)" val={GBP(ltv)} sub={`contribution · ${ordersPerCust?ordersPerCust.toFixed(1):'—'} orders/customer · LTV:CAC ${ltvCac?ltvCac.toFixed(1)+'×':'—'}`} series={seriesLTV} seriesLabel="Contribution/customer · by day" goodDirection="up"
+        <KPI label="LTV (est.)" val={GBP(ltv)} sub={`contribution · ${ordersPerCust?ordersPerCust.toFixed(1):'—'} orders/customer · LTV:CAC ${ltvCac?ltvCac.toFixed(1)+'×':'—'}`} badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesLTV} seriesLabel="Contribution/customer · by day" goodDirection="up"
           agent="Atlas" observation="Estimated contribution per acquired customer: AOV × gross margin × repeat orders per customer."
           implication="The LTV:CAC ratio is the unit-economics headline for the raise — 3×+ is the target to defend." />
         </MoreKpis>
@@ -3884,7 +4008,8 @@ function computeProductSignals(){
   const PR = (typeof window!=='undefined' && window.FRKL_PRODUCTS) || [];
   const META = (typeof window!=='undefined' && window.FRKL_PRODUCTS_META) || {};
   if(!PR.length) return null;
-  const gm = ((typeof window!=='undefined' && window.OI_CONFIG && window.OI_CONFIG.grossMargin) || META.grossMargin || 0.6);
+  const gm = userGrossMargin() != null ? userGrossMargin()
+    : (((typeof window!=='undefined' && window.OI_CONFIG && window.OI_CONFIG.grossMargin) || META.grossMargin || 0.6));
   const monthly = 30 / (META.windowDays || 90);
   const totV = PR.reduce((a,p)=>a+p.views,0) || 1;
   const totAtc = PR.reduce((a,p)=>a+p.atc,0), totPur = PR.reduce((a,p)=>a+p.purchases,0);
