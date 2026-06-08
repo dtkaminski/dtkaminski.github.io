@@ -18,20 +18,20 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606081439"></script>
-<script src="./frkl-live-data.js?v=202606081439"></script>
-<script src="./frkl-agent-insights.js?v=202606081439"></script>
-<script src="./frkl-business-data.js?v=202606081439"></script>
-<script src="./frkl-action-status.js?v=202606081439"></script>
-<script src="./frkl-patterns.js?v=202606081439"></script>
-<script src="./frkl-creators.js?v=202606081439"></script>
-<script src="./frkl-creative-vision.js?v=202606081439"></script>
-<script src="./frkl-links.js?v=202606081439"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606081439"></script>
-<script src="./frkl-events.js?v=202606081439"></script>
-<script src="./frkl-products.js?v=202606081439"></script>
-<script src="./frkl-discount-codes.js?v=202606081439"></script>
-<script src="./frkl-cvr.js?v=202606081439"></script>
+<script src="./frkl-data-loader.js?v=202606081451"></script>
+<script src="./frkl-live-data.js?v=202606081451"></script>
+<script src="./frkl-agent-insights.js?v=202606081451"></script>
+<script src="./frkl-business-data.js?v=202606081451"></script>
+<script src="./frkl-action-status.js?v=202606081451"></script>
+<script src="./frkl-patterns.js?v=202606081451"></script>
+<script src="./frkl-creators.js?v=202606081451"></script>
+<script src="./frkl-creative-vision.js?v=202606081451"></script>
+<script src="./frkl-links.js?v=202606081451"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606081451"></script>
+<script src="./frkl-events.js?v=202606081451"></script>
+<script src="./frkl-products.js?v=202606081451"></script>
+<script src="./frkl-discount-codes.js?v=202606081451"></script>
+<script src="./frkl-cvr.js?v=202606081451"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -4031,6 +4031,9 @@ function CvrDrivers(){
           <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}}/>
           <R.Bar yAxisId="r" dataKey="sessions" name="Sessions" fill="#26262e" maxBarSize={30}/>
           <R.Line yAxisId="l" type="monotone" dataKey="cvr" name="CVR" stroke="#7c8cff" strokeWidth={2.5} dot={false}/>
+          {/* Show, don't tell: the 2% DTC benchmark drawn on the chart so the gap is visible, not described. */}
+          <R.ReferenceLine yAxisId="l" y={2} stroke="#4ade80" strokeDasharray="5 4" strokeOpacity={0.75}
+            label={{value:'2% DTC benchmark', position:'insideTopRight', fill:'#4ade80', fontSize:10.5}}/>
         </R.ComposedChart>
       </R.ResponsiveContainer>
     </div>
