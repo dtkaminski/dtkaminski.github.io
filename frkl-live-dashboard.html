@@ -18,20 +18,20 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606081455"></script>
-<script src="./frkl-live-data.js?v=202606081455"></script>
-<script src="./frkl-agent-insights.js?v=202606081455"></script>
-<script src="./frkl-business-data.js?v=202606081455"></script>
-<script src="./frkl-action-status.js?v=202606081455"></script>
-<script src="./frkl-patterns.js?v=202606081455"></script>
-<script src="./frkl-creators.js?v=202606081455"></script>
-<script src="./frkl-creative-vision.js?v=202606081455"></script>
-<script src="./frkl-links.js?v=202606081455"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606081455"></script>
-<script src="./frkl-events.js?v=202606081455"></script>
-<script src="./frkl-products.js?v=202606081455"></script>
-<script src="./frkl-discount-codes.js?v=202606081455"></script>
-<script src="./frkl-cvr.js?v=202606081455"></script>
+<script src="./frkl-data-loader.js?v=202606081459"></script>
+<script src="./frkl-live-data.js?v=202606081459"></script>
+<script src="./frkl-agent-insights.js?v=202606081459"></script>
+<script src="./frkl-business-data.js?v=202606081459"></script>
+<script src="./frkl-action-status.js?v=202606081459"></script>
+<script src="./frkl-patterns.js?v=202606081459"></script>
+<script src="./frkl-creators.js?v=202606081459"></script>
+<script src="./frkl-creative-vision.js?v=202606081459"></script>
+<script src="./frkl-links.js?v=202606081459"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606081459"></script>
+<script src="./frkl-events.js?v=202606081459"></script>
+<script src="./frkl-products.js?v=202606081459"></script>
+<script src="./frkl-discount-codes.js?v=202606081459"></script>
+<script src="./frkl-cvr.js?v=202606081459"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -4036,8 +4036,21 @@ function CvrDrivers(){
           {/* Show, don't tell: the 2% DTC benchmark drawn on the chart so the gap is visible, not described. */}
           <R.ReferenceLine yAxisId="l" y={2} stroke="#4ade80" strokeDasharray="5 4" strokeOpacity={0.75}
             label={{value:'2% DTC benchmark', position:'insideTopRight', fill:'#4ade80', fontSize:10.5}}/>
+          {/* Event pins: operator-logged events snapped to the chart's buckets — the cause sits on the chart. */}
+          {(function(){ if(!chartData.length) return null;
+            var ws=chartData.map(function(d){return d.w;}), minW=ws[0];
+            var pins=loadBrandEvents().map(function(e){ var d=e.startsOn; if(!d||d<minW) return null;
+              var pin=null; for(var k=0;k<ws.length;k++){ if(ws[k]<=d) pin=ws[k]; else break; }
+              if(pin==null) return null; var mt=EVENT_META[e.type]||EVENT_META.other;
+              return {x:pin, icon:mt.icon}; }).filter(Boolean).slice(0,8);
+            return pins.map(function(p,i){ return (
+              <R.ReferenceLine key={'ev'+i} yAxisId="l" x={p.x} stroke="#8b8b99" strokeDasharray="3 3" strokeOpacity={0.6}
+                label={{value:p.icon, position:'top', fontSize:13}}/>); });
+          })()}
         </R.ComposedChart>
       </R.ResponsiveContainer>
+      {(function(){ var evs=loadBrandEvents().filter(function(e){return chartData.length && e.startsOn>=chartData[0].w;}); if(!evs.length) return null; return (
+        <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>Markers = your logged events: {evs.slice(0,6).map(function(e){var mt=EVENT_META[e.type]||EVENT_META.other; return mt.icon+' '+(e.title||mt.label)+' ('+(e.startsOn||'').slice(5)+')';}).join('  ·  ')}</div>); })()}
     </div>
 
     <div className="card" style={{marginBottom:14}}>
