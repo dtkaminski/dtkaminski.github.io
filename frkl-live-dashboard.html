@@ -18,20 +18,20 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606081828"></script>
-<script src="./frkl-live-data.js?v=202606081828"></script>
-<script src="./frkl-agent-insights.js?v=202606081828"></script>
-<script src="./frkl-business-data.js?v=202606081828"></script>
-<script src="./frkl-action-status.js?v=202606081828"></script>
-<script src="./frkl-patterns.js?v=202606081828"></script>
-<script src="./frkl-creators.js?v=202606081828"></script>
-<script src="./frkl-creative-vision.js?v=202606081828"></script>
-<script src="./frkl-links.js?v=202606081828"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606081828"></script>
-<script src="./frkl-events.js?v=202606081828"></script>
-<script src="./frkl-products.js?v=202606081828"></script>
-<script src="./frkl-discount-codes.js?v=202606081828"></script>
-<script src="./frkl-cvr.js?v=202606081828"></script>
+<script src="./frkl-data-loader.js?v=202606081836"></script>
+<script src="./frkl-live-data.js?v=202606081836"></script>
+<script src="./frkl-agent-insights.js?v=202606081836"></script>
+<script src="./frkl-business-data.js?v=202606081836"></script>
+<script src="./frkl-action-status.js?v=202606081836"></script>
+<script src="./frkl-patterns.js?v=202606081836"></script>
+<script src="./frkl-creators.js?v=202606081836"></script>
+<script src="./frkl-creative-vision.js?v=202606081836"></script>
+<script src="./frkl-links.js?v=202606081836"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606081836"></script>
+<script src="./frkl-events.js?v=202606081836"></script>
+<script src="./frkl-products.js?v=202606081836"></script>
+<script src="./frkl-discount-codes.js?v=202606081836"></script>
+<script src="./frkl-cvr.js?v=202606081836"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -6089,19 +6089,19 @@ const BOARD_METRICS = [
   {key:'sessions',      label:'Sessions',       fmt:NUM, better:'up'},
   {key:'cvr',           label:'CVR',            fmt:PCT, better:'up',   bench:0.02, benchTip:'Target ≥ 2% (DTC)'},
   {key:'discountDepth', label:'Discount depth', fmt:PCT, better:'down', bench:0.10, benchTip:'Lower is better · watch > 10%'},
-  {key:'emailRev',      label:'Email rev (attr.)', fmt:GBP, better:'up', note:'Klaviyo-attributed revenue — overlaps other channels, so it is not incremental and can exceed net revenue.'},
+  {key:'emailOpenRate', label:'Email open rate', fmt:PCT, better:'up', note:'Klaviyo opens ÷ recipients — list-engagement signal. (Attributed email revenue is shown in Channels → Email; it over-counts vs net because Klaviyo credits the same order to multiple emails/flows, so it is deliberately kept off this scorecard.)'},
 ];
 
 // Build the full weekly history (Mon–Sun buckets) from the daily snapshot,
 // independent of the page's period selector (uses the real data bounds).
 function boardWeeks(){
   const map = {};
-  const touch = d => (map[d] = map[d] || {date:d, metaSpend:0, googleSpend:0, revenue:0, sessions:0, emailRev:0, orders:0, discounts:0, totalSales:0});
+  const touch = d => (map[d] = map[d] || {date:d, metaSpend:0, googleSpend:0, revenue:0, sessions:0, emailRev:0, emailRecipients:0, emailOpens:0, emailClicks:0, orders:0, discounts:0, totalSales:0});
   inRangeBounded(D.metaDaily, REAL_START, REAL_END).forEach(r=>{touch(r.date).metaSpend += r.cost||0;});
   inRangeBounded(D.googleAds, REAL_START, REAL_END).forEach(r=>{touch(r.date).googleSpend += r.cost||0;});
   inRangeBounded(D.shopify,   REAL_START, REAL_END).forEach(r=>{const m=touch(r.date); m.revenue += r.netSales||0; m.orders += r.orders||0; m.discounts += r.discounts||0; m.totalSales += r.totalSales||0;});
   inRangeBounded(D.ga4,       REAL_START, REAL_END).forEach(r=>{touch(r.date).sessions += r.sessions||0;});
-  inRangeBounded(D.klaviyo,   REAL_START, REAL_END).forEach(r=>{touch(r.date).emailRev += r.orderValue||0;});
+  inRangeBounded(D.klaviyo,   REAL_START, REAL_END).forEach(r=>{const m=touch(r.date); m.emailRev += r.orderValue||0; m.emailRecipients += r.recipients||0; m.emailOpens += r.opens||0; m.emailClicks += r.clicks||0;});
   const days = Object.values(map).sort((a,b)=>a.date<b.date?-1:1);
   const iso = d => d.toISOString().slice(0,10);
   const mondayOf = s => { const d=new Date(s+'T00:00:00Z'); const off=(d.getUTCDay()+6)%7; d.setUTCDate(d.getUTCDate()-off); return iso(d); };
@@ -6111,7 +6111,8 @@ function boardWeeks(){
   return Object.keys(buckets).sort().map(ws=>{
     const rows = buckets[ws], s = k => rows.reduce((a,r)=>a+(r[k]||0),0);
     const revenue=s('revenue'), paid=s('metaSpend')+s('googleSpend'), orders=s('orders'),
-          sessions=s('sessions'), discounts=s('discounts'), totalSales=s('totalSales'), emailRev=s('emailRev');
+          sessions=s('sessions'), discounts=s('discounts'), totalSales=s('totalSales'), emailRev=s('emailRev'),
+          emailRecipients=s('emailRecipients'), emailOpens=s('emailOpens'), emailClicks=s('emailClicks');
     const we = addDays(ws,6);
     return {
       weekStart: ws, weekEnding: we, days: rows.length,
@@ -6123,6 +6124,8 @@ function boardWeeks(){
         aov: orders>0 ? revenue/orders : null,
         cvr: sessions>0 ? orders/sessions : null,
         discountDepth: totalSales>0 ? discounts/totalSales : null,
+        emailOpenRate: emailRecipients>0 ? emailOpens/emailRecipients : null,
+        emailShare: revenue>0 ? emailRev/revenue : null,
       },
     };
   });
