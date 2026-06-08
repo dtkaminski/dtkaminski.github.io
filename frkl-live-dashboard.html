@@ -18,20 +18,20 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606081508"></script>
-<script src="./frkl-live-data.js?v=202606081508"></script>
-<script src="./frkl-agent-insights.js?v=202606081508"></script>
-<script src="./frkl-business-data.js?v=202606081508"></script>
-<script src="./frkl-action-status.js?v=202606081508"></script>
-<script src="./frkl-patterns.js?v=202606081508"></script>
-<script src="./frkl-creators.js?v=202606081508"></script>
-<script src="./frkl-creative-vision.js?v=202606081508"></script>
-<script src="./frkl-links.js?v=202606081508"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606081508"></script>
-<script src="./frkl-events.js?v=202606081508"></script>
-<script src="./frkl-products.js?v=202606081508"></script>
-<script src="./frkl-discount-codes.js?v=202606081508"></script>
-<script src="./frkl-cvr.js?v=202606081508"></script>
+<script src="./frkl-data-loader.js?v=202606081654"></script>
+<script src="./frkl-live-data.js?v=202606081654"></script>
+<script src="./frkl-agent-insights.js?v=202606081654"></script>
+<script src="./frkl-business-data.js?v=202606081654"></script>
+<script src="./frkl-action-status.js?v=202606081654"></script>
+<script src="./frkl-patterns.js?v=202606081654"></script>
+<script src="./frkl-creators.js?v=202606081654"></script>
+<script src="./frkl-creative-vision.js?v=202606081654"></script>
+<script src="./frkl-links.js?v=202606081654"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606081654"></script>
+<script src="./frkl-events.js?v=202606081654"></script>
+<script src="./frkl-products.js?v=202606081654"></script>
+<script src="./frkl-discount-codes.js?v=202606081654"></script>
+<script src="./frkl-cvr.js?v=202606081654"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -1722,6 +1722,58 @@ function eventOverlaps(ev, ws, we){
 function eventDateLabel(ev){
   const s = (ev.startsOn||'').slice(5), e = (ev.endsOn||'').slice(5);
   return e && e !== s ? `${s}–${e}` : s;
+}
+
+// Build the merged pin list for a trend chart: operator-logged events PLUS the
+// brand's major site-wide sales (concentrated discount campaigns — NOT always-on
+// affiliate codes). Each pin snaps to the nearest chart bucket <= its date and
+// carries a rich `tip` so the chart stays clean and the detail lives on hover.
+function buildChartPins(buckets){
+  if(!buckets || !buckets.length) return [];
+  const ws = buckets.slice(), minW = ws[0];
+  const snap = (d)=>{ if(!d || d < minW) return null; let pin=null; for(let k=0;k<ws.length;k++){ if(ws[k]<=d) pin=ws[k]; else break; } return pin; };
+  const pins = [];
+  // 1) operator-logged ground-truth events
+  loadBrandEvents().forEach(e=>{ const x = snap(e.startsOn); if(x==null) return; const mt = EVENT_META[e.type]||EVENT_META.other;
+    pins.push({x, icon:mt.icon, title:(e.title||mt.label), date:e.startsOn, detail:mt.label}); });
+  // 2) major site-wide sales derived from discount codes — exclude always-on (standing/affiliate)
+  //    codes; keep concentrated campaigns with meaningful £. Pin at each code's peak-discount week.
+  const codes = (typeof window!=='undefined' && window.FRKL_DISCOUNT_CODES && window.FRKL_DISCOUNT_CODES.codes) || [];
+  codes.filter(c=>{
+      if(!c || c.pattern==='always-on') return false;
+      const concentrated = c.pattern==='spike' || c.pattern==='one-off' || (c.pattern==='recurring' && (c.spanDays||0)<=45);
+      return concentrated && (c.discount||0) >= 120;
+    })
+    .sort((a,b)=>(b.discount||0)-(a.discount||0)).slice(0,6)
+    .forEach(c=>{
+      let pk=null; (c.series||[]).forEach(p=>{ if(!pk || p.d>pk.d) pk=p; });
+      if(!pk) return; const x = snap(pk.w); if(x==null) return;
+      const rate = c.discountRate!=null ? Math.round(c.discountRate*100)+'% off' : 'sale';
+      pins.push({x, icon:'🏷️', title:c.code, date:pk.w, sale:true,
+        detail:`${rate} · £${Math.round(c.discount)} given · ${c.orders} orders`});
+    });
+  // 3) collapse pins landing in the same bucket so markers never crowd; sale leads the badge
+  const byX = {};
+  pins.forEach(p=>{ (byX[p.x] = byX[p.x] || []).push(p); });
+  return Object.keys(byX).map(x=>{
+    const g = byX[x], head = g.find(p=>p.sale) || g[0];
+    const tip = g.map(p=> `${p.icon} ${p.title}${p.detail? ' — '+p.detail : ''}  (${(p.date||'').slice(5)})`).join('\n');
+    return {x, icon:head.icon, n:g.length, tip};
+  });
+}
+
+// Hoverable pin marker rendered as a Recharts ReferenceLine label. Native SVG <title>
+// gives an instant tooltip on hover ("what is this pin for?") with zero layout risk.
+function PinMarker(props){
+  const vb = props.viewBox || {}; const cx = vb.x || 0; const top = (vb.y || 0);
+  return (
+    <g style={{cursor:'help'}}>
+      <title>{props.tip}</title>
+      <rect x={cx-10} y={top} width={20} height={18} fill="transparent"/>
+      <text x={cx} y={top+12} textAnchor="middle" fontSize={13}>{props.icon}</text>
+      {props.n>1 ? <text x={cx+9} y={top+5} textAnchor="middle" fontSize={8} fill="var(--text-faint)" fontWeight={700}>{'+'+(props.n-1)}</text> : null}
+    </g>
+  );
 }
 
 // Build the context bundle the diagnostic reasons over.
@@ -4054,21 +4106,17 @@ function CvrDrivers(){
           {/* Show, don't tell: the 2% DTC benchmark drawn on the chart so the gap is visible, not described. */}
           <R.ReferenceLine yAxisId="l" y={2} stroke="#4ade80" strokeDasharray="5 4" strokeOpacity={0.75}
             label={{value:'2% DTC benchmark', position:'insideTopRight', fill:'#4ade80', fontSize:10.5}}/>
-          {/* Event pins: operator-logged events snapped to the chart's buckets — the cause sits on the chart. */}
-          {(function(){ if(!chartData.length) return null;
-            var ws=chartData.map(function(d){return d.w;}), minW=ws[0];
-            var pins=loadBrandEvents().map(function(e){ var d=e.startsOn; if(!d||d<minW) return null;
-              var pin=null; for(var k=0;k<ws.length;k++){ if(ws[k]<=d) pin=ws[k]; else break; }
-              if(pin==null) return null; var mt=EVENT_META[e.type]||EVENT_META.other;
-              return {x:pin, icon:mt.icon}; }).filter(Boolean).slice(0,8);
+          {/* Event & sale pins: logged events + major site-wide sales, snapped to chart buckets.
+              Icon-only on the chart; full detail lives on hover so the chart stays calm. */}
+          {(function(){ var pins=buildChartPins(chartData.map(function(d){return d.w;}));
             return pins.map(function(p,i){ return (
-              <R.ReferenceLine key={'ev'+i} yAxisId="l" x={p.x} stroke="#8b8b99" strokeDasharray="3 3" strokeOpacity={0.6}
-                label={{value:p.icon, position:'top', fontSize:13}}/>); });
+              <R.ReferenceLine key={'pin'+i} yAxisId="l" x={p.x} stroke="#8b8b99" strokeDasharray="3 3" strokeOpacity={0.55}
+                label={<PinMarker icon={p.icon} n={p.n} tip={p.tip}/>}/>); });
           })()}
         </R.ComposedChart>
       </R.ResponsiveContainer>
-      {(function(){ var evs=loadBrandEvents().filter(function(e){return chartData.length && e.startsOn>=chartData[0].w;}); if(!evs.length) return null; return (
-        <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>Markers = your logged events: {evs.slice(0,6).map(function(e){var mt=EVENT_META[e.type]||EVENT_META.other; return mt.icon+' '+(e.title||mt.label)+' ('+(e.startsOn||'').slice(5)+')';}).join('  ·  ')}</div>); })()}
+      {(function(){ var pins=buildChartPins(chartData.map(function(d){return d.w;})); if(!pins.length) return null; return (
+        <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>🏷️ sales &amp; promos · 📌 your events — <span style={{color:'var(--text-muted)'}}>hover any marker for what it was</span></div>); })()}
     </div>
 
     <div className="card" style={{marginBottom:14}}>
