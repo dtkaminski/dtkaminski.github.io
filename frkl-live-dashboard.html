@@ -18,20 +18,20 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606081433"></script>
-<script src="./frkl-live-data.js?v=202606081433"></script>
-<script src="./frkl-agent-insights.js?v=202606081433"></script>
-<script src="./frkl-business-data.js?v=202606081433"></script>
-<script src="./frkl-action-status.js?v=202606081433"></script>
-<script src="./frkl-patterns.js?v=202606081433"></script>
-<script src="./frkl-creators.js?v=202606081433"></script>
-<script src="./frkl-creative-vision.js?v=202606081433"></script>
-<script src="./frkl-links.js?v=202606081433"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606081433"></script>
-<script src="./frkl-events.js?v=202606081433"></script>
-<script src="./frkl-products.js?v=202606081433"></script>
-<script src="./frkl-discount-codes.js?v=202606081433"></script>
-<script src="./frkl-cvr.js?v=202606081433"></script>
+<script src="./frkl-data-loader.js?v=202606081439"></script>
+<script src="./frkl-live-data.js?v=202606081439"></script>
+<script src="./frkl-agent-insights.js?v=202606081439"></script>
+<script src="./frkl-business-data.js?v=202606081439"></script>
+<script src="./frkl-action-status.js?v=202606081439"></script>
+<script src="./frkl-patterns.js?v=202606081439"></script>
+<script src="./frkl-creators.js?v=202606081439"></script>
+<script src="./frkl-creative-vision.js?v=202606081439"></script>
+<script src="./frkl-links.js?v=202606081439"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606081439"></script>
+<script src="./frkl-events.js?v=202606081439"></script>
+<script src="./frkl-products.js?v=202606081439"></script>
+<script src="./frkl-discount-codes.js?v=202606081439"></script>
+<script src="./frkl-cvr.js?v=202606081439"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -2799,6 +2799,12 @@ function Overview({start, period, customActive}){
         <KPI label="Discount depth" val={PCT(discLoad)} sub="£ off ÷ £ of sales — how deep, not how many orders · drafts excluded" series={seriesDisc} current={discLoad} prior={pDiscLoad} goodDirection="down"
           agent="Atlas" observation={`Code + automatic discount as a share of DTC gross sales (draft/exchange orders excluded). This excludes sale-price markdowns${_mdPct?`, which add ~${_mdPct}% of value on top`:''} — the full load is on the Promotions tab.`}
           implication="Audit always-on codes + affiliate rates; protect full-price demand. The true load incl. markdowns is materially higher — see Promotions." />
+        <KPI label="Orders with a discount" val={_dc.fullPriceShare!=null?PCT(1-_dc.fullPriceShare):'—'} sub="share of orders using a code/auto discount — how often, not how deep · drafts excluded" goodDirection="down"
+          agent="Atlas" observation={_dc.fullPriceShare!=null?`${Math.round((1-_dc.fullPriceShare)*100)}% of orders carry a discount; ${Math.round(_dc.fullPriceShare*100)}% pay full price. Read it with Discount depth: lots of orders but a shallow ~${discLoad!=null?Math.round(discLoad*100):9}% of revenue = many small codes, not deep cuts.`:'How often a discount is used across orders (draft/exchange orders excluded).'}
+          implication="If penetration and depth climb together you're training customers to wait for a code — tighten the always-on codes first." />
+        <KPI label="Discount value" val={GBP(discAmt)} sub="total £ given as code/auto discount this period — drafts excluded" goodDirection="down"
+          agent="Atlas" observation="The actual money handed back as discounts this period (code + automatic). Excludes sale-price markdowns, which are shown separately on Promotions."
+          implication="Recoverable margin to the extent any of it went to buyers who'd have paid full price — start with the biggest always-on codes." />
         <KPI label="Returning customers" val={PCT(returningPct)} sub="share of orders · trailing months" goodDirection="up"
           agent="Lux" observation="Repeat-purchase share — the cheapest revenue you have and a read on brand love."
           implication="Lift with post-purchase flows + a reason to come back; it compounds faster than paid." />
