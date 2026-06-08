@@ -18,20 +18,20 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606081459"></script>
-<script src="./frkl-live-data.js?v=202606081459"></script>
-<script src="./frkl-agent-insights.js?v=202606081459"></script>
-<script src="./frkl-business-data.js?v=202606081459"></script>
-<script src="./frkl-action-status.js?v=202606081459"></script>
-<script src="./frkl-patterns.js?v=202606081459"></script>
-<script src="./frkl-creators.js?v=202606081459"></script>
-<script src="./frkl-creative-vision.js?v=202606081459"></script>
-<script src="./frkl-links.js?v=202606081459"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606081459"></script>
-<script src="./frkl-events.js?v=202606081459"></script>
-<script src="./frkl-products.js?v=202606081459"></script>
-<script src="./frkl-discount-codes.js?v=202606081459"></script>
-<script src="./frkl-cvr.js?v=202606081459"></script>
+<script src="./frkl-data-loader.js?v=202606081505"></script>
+<script src="./frkl-live-data.js?v=202606081505"></script>
+<script src="./frkl-agent-insights.js?v=202606081505"></script>
+<script src="./frkl-business-data.js?v=202606081505"></script>
+<script src="./frkl-action-status.js?v=202606081505"></script>
+<script src="./frkl-patterns.js?v=202606081505"></script>
+<script src="./frkl-creators.js?v=202606081505"></script>
+<script src="./frkl-creative-vision.js?v=202606081505"></script>
+<script src="./frkl-links.js?v=202606081505"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606081505"></script>
+<script src="./frkl-events.js?v=202606081505"></script>
+<script src="./frkl-products.js?v=202606081505"></script>
+<script src="./frkl-discount-codes.js?v=202606081505"></script>
+<script src="./frkl-cvr.js?v=202606081505"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -1471,6 +1471,22 @@ function DailyPanel(){
   </div>);
 }
 
+// Calm-by-default: render a curated core of KPI tiles, collapse the rest behind a
+// toggle so the page opens quiet. `children` are the secondary tiles — created in
+// the parent scope, so all their data refs resolve. Holds its own open state.
+function MoreKpis({count, children}){
+  const [open, setOpen] = React.useState(false);
+  return (<React.Fragment>
+    {open && children}
+    <button onClick={()=>setOpen(o=>!o)}
+      style={{cursor:'pointer', border:'1px dashed var(--border-default)', background:'transparent',
+        color:'var(--accent)', fontWeight:600, fontSize:13, borderRadius:'var(--r-md)',
+        padding:'0 18px', minHeight:72, minWidth:128, display:'flex', alignItems:'center', justifyContent:'center', gap:6}}>
+      {open ? '− Show fewer' : `+ ${count} more metrics`}
+    </button>
+  </React.Fragment>);
+}
+
 // Hover-explainer for each hero £ tile: what the bucket means + the top findings
 // driving it. Turns a bare colour-coded number into "here's what & why".
 function HeroStat({valK, color, label, explain, items, total, alignRight}){
@@ -2792,6 +2808,7 @@ function Overview({start, period, customActive}){
         <KPI label="Conversion rate (CVR)" val={PCT(cvr)} sub={`${NUM(orders)} orders ÷ ${NUM(sessions)} sessions`} series={seriesCVR} current={cvr} prior={pCvr} goodDirection="up"
           agent="Pulse" observation="Site CVR is the single biggest revenue lever — below the ~2% DTC benchmark, more spend just buys more bounces."
           implication="Fix the cart→checkout JS error and sticky-checkout before scaling spend further." />
+        <MoreKpis count={9}>
         <KPI label="Gross margin" val={PCT(grossMargin)} sub="COGS-based · trailing 90d"
           agent="Atlas" observation="Blended product margin across the live catalogue, after cost of goods."
           implication="This is the contribution base for the raise — defend it by keeping discount load in check." />
@@ -2819,6 +2836,7 @@ function Overview({start, period, customActive}){
         <KPI label="LTV (est.)" val={GBP(ltv)} sub={`contribution · ${ordersPerCust?ordersPerCust.toFixed(1):'—'} orders/customer · LTV:CAC ${ltvCac?ltvCac.toFixed(1)+'×':'—'}`} goodDirection="up"
           agent="Atlas" observation="Estimated contribution per acquired customer: AOV × gross margin × repeat orders per customer."
           implication="The LTV:CAC ratio is the unit-economics headline for the raise — 3×+ is the target to defend." />
+        </MoreKpis>
       </div>
     </div>
 
