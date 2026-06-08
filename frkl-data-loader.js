@@ -315,34 +315,46 @@
     } catch (e) { return []; }
   }
 
+  // Paginate past PostgREST's 1000-row cap. Without this, any table with >1000
+  // rows for a brand (GA4 daily = ~12 channel rows/day crosses it after ~80 days)
+  // silently returns only the first page — and with ascending order that drops the
+  // most RECENT days, making fresh data look stale. makeQuery must apply a stable,
+  // unique ordering (date + a tiebreaker) so pages neither overlap nor skip rows.
+  async function fetchAllPaged(makeQuery) {
+    const PAGE = 1000; let from = 0; const out = [];
+    for (;;) {
+      const { data, error } = await makeQuery(from, from + PAGE - 1);
+      if (error || !data || !data.length) break;
+      out.push(...data);
+      if (data.length < PAGE) break;
+      from += PAGE;
+    }
+    return out;
+  }
+
   async function fetchDailyGa4(sb, brandId) {
     try {
-      const { data } = await sb.from('tenant_ga4_daily')
-        .select('date, sessions, active_users, new_users, conversions, purchase_revenue, ecommerce_purchases, add_to_carts, begin_checkouts')
-        .eq('brand_id', brandId).eq('channel', '(direct)')   // aggregate-channel default may vary
-        .order('date', { ascending: true });
-      // If no '(direct)', sum across all channels by date
-      let rows = data || [];
-      if (rows.length === 0) {
-        const { data: all } = await sb.from('tenant_ga4_daily')
-          .select('date, sessions, active_users, new_users, conversions, purchase_revenue, ecommerce_purchases, add_to_carts, begin_checkouts')
-          .eq('brand_id', brandId)
-          .order('date', { ascending: true });
-        const byDate = {};
-        for (const r of (all || [])) {
-          const k = r.date;
-          const a = byDate[k] = byDate[k] || { date: r.date, sessions: 0, active_users: 0, new_users: 0, conversions: 0, purchase_revenue: 0, ecommerce_purchases: 0, add_to_carts: 0, begin_checkouts: 0 };
-          a.sessions += Number(r.sessions || 0);
-          a.active_users += Number(r.active_users || 0);
-          a.new_users += Number(r.new_users || 0);
-          a.conversions += Number(r.conversions || 0);
-          a.purchase_revenue += Number(r.purchase_revenue || 0);
-          a.ecommerce_purchases += Number(r.ecommerce_purchases || 0);
-          a.add_to_carts += Number(r.add_to_carts || 0);
-          a.begin_checkouts += Number(r.begin_checkouts || 0);
-        }
-        rows = Object.values(byDate).sort((a, b) => a.date < b.date ? -1 : 1);
+      // GA4 daily is stored per channel-group (~12 rows/day), so it crosses the
+      // 1000-row cap after ~80 days — paginate, then sum to one row per date.
+      const all = await fetchAllPaged((from, to) => sb.from('tenant_ga4_daily')
+        .select('date, channel, sessions, active_users, new_users, conversions, purchase_revenue, ecommerce_purchases, add_to_carts, begin_checkouts')
+        .eq('brand_id', brandId)
+        .order('date', { ascending: true })
+        .order('channel', { ascending: true })
+        .range(from, to));
+      const byDate = {};
+      for (const r of all) {
+        const a = byDate[r.date] = byDate[r.date] || { date: r.date, sessions: 0, active_users: 0, new_users: 0, conversions: 0, purchase_revenue: 0, ecommerce_purchases: 0, add_to_carts: 0, begin_checkouts: 0 };
+        a.sessions += Number(r.sessions || 0);
+        a.active_users += Number(r.active_users || 0);
+        a.new_users += Number(r.new_users || 0);
+        a.conversions += Number(r.conversions || 0);
+        a.purchase_revenue += Number(r.purchase_revenue || 0);
+        a.ecommerce_purchases += Number(r.ecommerce_purchases || 0);
+        a.add_to_carts += Number(r.add_to_carts || 0);
+        a.begin_checkouts += Number(r.begin_checkouts || 0);
       }
+      const rows = Object.values(byDate).sort((a, b) => a.date < b.date ? -1 : 1);
       return rows.map(r => ({
         date: r.date,
         sessions: Number(r.sessions || 0),
@@ -357,10 +369,13 @@
 
   async function fetchDailyKlaviyo(sb, brandId) {
     try {
-      const { data } = await sb.from('tenant_klaviyo_metrics_daily')
+      // Multiple metrics per day → crosses the 1000-row cap on long histories; paginate.
+      const data = await fetchAllPaged((from, to) => sb.from('tenant_klaviyo_metrics_daily')
         .select('date, metric_id, metric_name, value, unit')
         .eq('brand_id', brandId)
-        .order('date', { ascending: true });
+        .order('date', { ascending: true })
+        .order('metric_id', { ascending: true })
+        .range(from, to));
       // Pivot: one row per date with placed_order count + value
       const byDate = {};
       for (const r of (data || [])) {
