@@ -18,20 +18,20 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606081416"></script>
-<script src="./frkl-live-data.js?v=202606081416"></script>
-<script src="./frkl-agent-insights.js?v=202606081416"></script>
-<script src="./frkl-business-data.js?v=202606081416"></script>
-<script src="./frkl-action-status.js?v=202606081416"></script>
-<script src="./frkl-patterns.js?v=202606081416"></script>
-<script src="./frkl-creators.js?v=202606081416"></script>
-<script src="./frkl-creative-vision.js?v=202606081416"></script>
-<script src="./frkl-links.js?v=202606081416"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606081416"></script>
-<script src="./frkl-events.js?v=202606081416"></script>
-<script src="./frkl-products.js?v=202606081416"></script>
-<script src="./frkl-discount-codes.js?v=202606081416"></script>
-<script src="./frkl-cvr.js?v=202606081416"></script>
+<script src="./frkl-data-loader.js?v=202606081422"></script>
+<script src="./frkl-live-data.js?v=202606081422"></script>
+<script src="./frkl-agent-insights.js?v=202606081422"></script>
+<script src="./frkl-business-data.js?v=202606081422"></script>
+<script src="./frkl-action-status.js?v=202606081422"></script>
+<script src="./frkl-patterns.js?v=202606081422"></script>
+<script src="./frkl-creators.js?v=202606081422"></script>
+<script src="./frkl-creative-vision.js?v=202606081422"></script>
+<script src="./frkl-links.js?v=202606081422"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606081422"></script>
+<script src="./frkl-events.js?v=202606081422"></script>
+<script src="./frkl-products.js?v=202606081422"></script>
+<script src="./frkl-discount-codes.js?v=202606081422"></script>
+<script src="./frkl-cvr.js?v=202606081422"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -2031,23 +2031,68 @@ function computeScores(m){
     growth:{band, signals},
   };
 }
-// Compact one-line scorecard (Crux) — sits at the top of the diagnostic verdict,
-// not as its own card. Tap "why" for the drivers. Consolidated from the old ScoresCard.
+// Hover explainer for a single Crux score — plain-English so a non-expert grasps
+// what it measures, the scale, and what's driving it right now.
+function ScoreTip({valueNode, title, lines}){
+  const [show, setShow] = React.useState(false);
+  return (<span style={{position:'relative', cursor:'help', display:'inline-flex', alignItems:'center', gap:4}}
+      onMouseEnter={()=>setShow(true)} onMouseLeave={()=>setShow(false)}>
+    {valueNode}<span style={{fontSize:9, opacity:.5}} aria-hidden="true">&#9432;</span>
+    {show && <div role="tooltip" style={{position:'absolute', top:'calc(100% + 8px)', left:0, zIndex:60, width:300,
+        background:'var(--bg-elevated)', border:'1px solid var(--border-default)', borderRadius:'var(--r-md)',
+        padding:'11px 13px', boxShadow:'var(--shadow-lg)', textAlign:'left', whiteSpace:'normal', fontWeight:400,
+        color:'var(--text-secondary)', fontSize:12, lineHeight:1.5}}>
+      <div style={{fontWeight:650, color:'var(--text-primary)', marginBottom:5}}>{title}</div>
+      {lines.filter(Boolean).map((ln,i)=><div key={i} style={{marginTop:i?5:0}}>{ln}</div>)}
+    </div>}
+  </span>);
+}
+// Compact one-line scorecard (Crux) — sits at the top of the diagnostic verdict.
+// Each score hovers to a plain-English explainer; a "plain terms" line under the row
+// translates all three into one sentence a first-time user can act on.
 function ScoresStrip({metrics}){
   const s = computeScores(metrics);
   const [open, setOpen] = React.useState(false);
   const tone = v => v>=75?'var(--good)':v>=55?'var(--warn)':'var(--bad)';
   const gTone = b => (b==='Healthy growth'||b==='Efficient consolidation')?'var(--good)':(b==='Low-quality growth'||b==='Contracting')?'var(--bad)':'var(--text-muted)';
-  return (<div style={{padding:'9px 12px',borderRadius:'var(--r-md)',background:'rgba(255,255,255,0.02)',border:'1px solid var(--border-subtle)',marginBottom:12}}>
+  const w0 = s.health.weakest[0];
+  const healthWord = s.health.score>=75?'fundamentally sound':s.health.score>=55?'okay, with some soft spots':'under real strain';
+  const growthPlain = ({
+    'Healthy growth':'growing profitably',
+    'Low-quality growth':"growing on sales, but profit isn't keeping pace",
+    'Efficient consolidation':'getting more profitable without growing much',
+    'Contracting':'shrinking',
+    'Flat':'roughly flat',
+    'Insufficient history':'not yet showing enough history to judge the trend',
+  })[s.growth.band] || String(s.growth.band).toLowerCase();
+  const scaleWord = s.scale.score>=80?'the economics support spending more to grow'
+    : s.scale.score>=55?'it’s not safe to scale spend yet — clear the blockers first'
+    : 'it’s not safe to scale — the unit economics need work first';
+  return (<div style={{padding:'10px 12px',borderRadius:'var(--r-md)',background:'rgba(255,255,255,0.02)',border:'1px solid var(--border-subtle)',marginBottom:12}}>
     <div style={{display:'flex',alignItems:'center',gap:16,flexWrap:'wrap',fontSize:12,color:'var(--text-secondary)'}}>
       <span style={{textTransform:'uppercase',letterSpacing:'.05em',fontSize:10,color:'var(--text-faint)'}}>Crux scorecard</span>
-      <span>Health <b style={{color:tone(s.health.score),fontSize:14}}>{s.health.score}</b></span>
-      <span>Scale readiness <b style={{color:tone(s.scale.score),fontSize:14}}>{s.scale.score}</b> <span style={{color:'var(--text-faint)'}}>· {s.scale.band}</span></span>
-      <span>Growth <b style={{color:gTone(s.growth.band)}}>{s.growth.band}</b>{s.growth.signals.length?<span style={{color:'var(--text-faint)'}}> · {s.growth.signals.join(' · ')}</span>:''}</span>
-      <button onClick={()=>setOpen(o=>!o)} style={{marginLeft:'auto',background:'transparent',border:'none',color:'var(--accent)',cursor:'pointer',fontSize:11.5,fontWeight:600}}>{open?'Hide why':'Why'}</button>
+      <ScoreTip title="Health — is the engine sound?" lines={[
+          "A 0–100 blend of your profit margins, ad efficiency, conversion rate, returns and discount discipline. Answers: are the fundamentals healthy?",
+          "75+ strong · 55–74 okay · under 55 needs work.",
+          w0?`Weakest right now: ${w0.label} — ${w0.detail}.`:'' ]}
+        valueNode={<span>Health <b style={{color:tone(s.health.score),fontSize:14}}>{s.health.score}</b><span style={{color:'var(--text-faint)'}}>/100 · {s.health.band}</span></span>}/>
+      <ScoreTip title="Scale-readiness — safe to spend more?" lines={[
+          "The share of 'safe to scale' checks you pass — e.g. cost to win a customer (CAC) under your limit, profitable per order, fast payback, conversion not slipping.",
+          "80+ ready · 55–79 conditional (fix blockers first) · under 55 not yet.",
+          s.scale.fails.length?`Blocking: ${s.scale.fails.slice(0,3).join('; ')}.`:'All checks pass.' ]}
+        valueNode={<span>Scale-readiness <b style={{color:tone(s.scale.score),fontSize:14}}>{s.scale.score}</b><span style={{color:'var(--text-faint)'}}>/100 · {s.scale.band}</span></span>}/>
+      <ScoreTip title="Growth quality — is the growth profitable?" lines={[
+          "Whether recent revenue growth came with profit growth.",
+          "'Low-quality growth' = sales up but profit (contribution = revenue minus product + ad costs) flat or down — usually rising ad costs or heavier discounting.",
+          s.growth.signals.length?('Latest: '+s.growth.signals.join(' · ')):'' ]}
+        valueNode={<span>Growth <b style={{color:gTone(s.growth.band)}}>{s.growth.band}</b></span>}/>
+      <button onClick={()=>setOpen(o=>!o)} style={{marginLeft:'auto',background:'transparent',border:'none',color:'var(--accent)',cursor:'pointer',fontSize:11.5,fontWeight:600}}>{open?'Hide detail':'Detail'}</button>
+    </div>
+    <div style={{marginTop:8,fontSize:12.5,color:'var(--text-secondary)',lineHeight:1.55,borderTop:'1px solid var(--border-subtle)',paddingTop:8}}>
+      <b style={{color:'var(--text-primary)'}}>In plain terms:</b> the business is <b style={{color:tone(s.health.score)}}>{healthWord}</b> (Health {s.health.score}/100){s.growth.band!=='Insufficient history'?<> and right now it&rsquo;s <b style={{color:gTone(s.growth.band)}}>{growthPlain}</b></>:''}. On growing, {scaleWord}.
     </div>
     {open && (<div style={{marginTop:7,fontSize:12,color:'var(--text-secondary)',lineHeight:1.55}}>
-      <div><b style={{color:'var(--text-primary)'}}>Weakest:</b> {s.health.weakest.map(w=>`${w.label} — ${w.detail}`).join('; ')||'—'}.</div>
+      <div><b style={{color:'var(--text-primary)'}}>Weakest fundamentals:</b> {s.health.weakest.map(w=>`${w.label} — ${w.detail}`).join('; ')||'—'}.</div>
       {s.scale.fails.length>0
         ? <div style={{marginTop:3}}><b style={{color:'var(--text-primary)'}}>Scale blockers:</b> {s.scale.fails.join('; ')}.</div>
         : <div style={{marginTop:3}}>All scale gates pass — economics support gradual scaling.</div>}
