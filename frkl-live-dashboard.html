@@ -18,21 +18,21 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606082024"></script>
-<script src="./frkl-live-data.js?v=202606082024"></script>
-<script src="./frkl-agent-insights.js?v=202606082024"></script>
-<script src="./frkl-business-data.js?v=202606082024"></script>
-<script src="./frkl-action-status.js?v=202606082024"></script>
-<script src="./frkl-patterns.js?v=202606082024"></script>
-<script src="./frkl-creators.js?v=202606082024"></script>
-<script src="./frkl-creative-vision.js?v=202606082024"></script>
-<script src="./frkl-links.js?v=202606082024"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606082024"></script>
-<script src="./frkl-events.js?v=202606082024"></script>
-<script src="./frkl-products.js?v=202606082024"></script>
-<script src="./frkl-discount-codes.js?v=202606082024"></script>
-<script src="./frkl-cvr.js?v=202606082024"></script>
-<script src="./frkl-cohorts.js?v=202606082024"></script>
+<script src="./frkl-data-loader.js?v=202606082033"></script>
+<script src="./frkl-live-data.js?v=202606082033"></script>
+<script src="./frkl-agent-insights.js?v=202606082033"></script>
+<script src="./frkl-business-data.js?v=202606082033"></script>
+<script src="./frkl-action-status.js?v=202606082033"></script>
+<script src="./frkl-patterns.js?v=202606082033"></script>
+<script src="./frkl-creators.js?v=202606082033"></script>
+<script src="./frkl-creative-vision.js?v=202606082033"></script>
+<script src="./frkl-links.js?v=202606082033"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606082033"></script>
+<script src="./frkl-events.js?v=202606082033"></script>
+<script src="./frkl-products.js?v=202606082033"></script>
+<script src="./frkl-discount-codes.js?v=202606082033"></script>
+<script src="./frkl-cvr.js?v=202606082033"></script>
+<script src="./frkl-cohorts.js?v=202606082033"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -2903,6 +2903,10 @@ function Overview({start, period, customActive}){
   const pGross = havePrior ? sum(pShop,'totalSales') : 0;
   const pDiscLoad = (havePrior && pGross>0) ? sum(pShop,'discounts')/pGross : null;
   const seriesDisc = daily.map(d=>({d:d.dlabel, v: d.totalSales>0 ? +(100*d.discounts/d.totalSales).toFixed(2) : 0}));
+  // Margin-bridge inputs (current vs prior period). gross merchandise = net + discounts + returns.
+  const returnsAmt = sum(shop,'returns'), pDisc = havePrior ? sum(pShop,'discounts') : 0, pReturns = havePrior ? sum(pShop,'returns') : 0;
+  const bridgeCur = {orders, disc:discAmt, returns:returnsAmt, paid, grossMerch: rev + discAmt + returnsAmt};
+  const bridgePri = havePrior ? {orders:pOrders, disc:pDisc, returns:pReturns, paid:pPaid, grossMerch: pRev + pDisc + pReturns} : null;
   const _dc = (window.FRKL_DISCOUNT_CODES||{}).meta || {};   // OI discount context (draft-excluded, markdown-aware)
   const _mdPct = _dc.markdownShareOfValue!=null ? Math.round(_dc.markdownShareOfValue*100) : null;
   // Business-snapshot KPIs (COGS-based, trailing 90d — not period-windowed)
@@ -3076,6 +3080,10 @@ function Overview({start, period, customActive}){
 
     {/* P&L + forecast — top-down (revenue) or bottom-up (paid+organic) */}
     <ForecastCard rev={rev} orders={orders} paid={paid} gm={gm} aov={orders?rev/orders:83} cac={cac} returningPct={returningPct}/>
+
+    {/* Margin bridge — why contribution moved vs prior period (volume/price/discount/returns/paid) */}
+    <MarginBridge cur={bridgeCur} pri={bridgePri} gm={gm}
+      perOrderFixed={_cn('packaging')+_cn('fulfilment')+_cn('shipping')+_cn('payFixed')} payPct={_cn('payPct')/100}/>
 
     {/* Channel stream chart */}
     <ChannelStreamPanel/>
@@ -6759,6 +6767,62 @@ function CohortsPanel(){
     <div className="micro" style={{color:'var(--text-faint)', marginTop:12, lineHeight:1.5}}>
       {C.notes && <><b>Read carefully:</b> {C.notes.channel} {C.notes.google}</>}
     </div>
+  </div>);
+}
+
+// ── Margin bridge (Phase 1.2) ────────────────────────────────────────────────
+// Why did contribution move vs the prior period — even if MER held? A waterfall
+// that decomposes Δ(fully-loaded contribution) into volume, price, discounting,
+// returns and paid media. Built as an exactly-reconciling sequential walk (change
+// one driver prior→current at a time, recompute contribution), so the bars ALWAYS
+// sum to the real change. Uses the operator's verified costs (Phase 0.1).
+function MarginBridge({cur, pri, gm, perOrderFixed, payPct}){
+  const verified = useCostTick();
+  if(!cur || !pri || !pri.orders || !cur.orders) return null;
+  const netRev = s => s.orders * (s.grossAOV - s.discPO - s.retPO);
+  const C = s => netRev(s)*s.gm - (s.orders*perOrderFixed + netRev(s)*payPct) - s.paid;
+  const stOf = o => ({orders:o.orders, grossAOV:o.grossMerch/o.orders, discPO:o.disc/o.orders, retPO:o.returns/o.orders, gm:gm, paid:o.paid});
+  let s = stOf(pri); const C0 = C(s); const target = stOf(cur);
+  const steps = [];
+  const apply = (label, patch) => { const before=C(s); s={...s, ...patch}; steps.push({label, delta:C(s)-before}); };
+  apply('Volume',      {orders:target.orders});
+  apply('AOV / price', {grossAOV:target.grossAOV});
+  apply('Discounting', {discPO:target.discPO});
+  apply('Returns',     {retPO:target.retPO});
+  apply('Paid media',  {paid:target.paid});
+  const Cc = C(s);
+  const shown = steps.filter(x=>Math.abs(x.delta) >= Math.max(1, Math.abs(Cc-C0)*0.01));
+  let run = C0;
+  const rows = [{name:'Prior', total:C0}];
+  shown.forEach(x=>{ rows.push({name:x.label, delta:x.delta, from:run, to:run+x.delta}); run += x.delta; });
+  rows.push({name:'Now', total:Cc});
+  const data = rows.map(r=>{
+    if(r.total!=null) return {name:r.name, base:Math.min(0,r.total), pos:Math.max(0,r.total), neg:Math.max(0,-r.total), amt:r.total, isTotal:true};
+    const lo=Math.min(r.from,r.to); return {name:r.name, base:lo, pos:r.delta>=0?r.delta:0, neg:r.delta<0?-r.delta:0, amt:r.delta, isTotal:false};
+  });
+  const delta = Cc - C0, dpct = C0!==0 ? delta/Math.abs(C0) : null;
+  const Tip = ({active, payload}) => { if(!active||!payload||!payload.length) return null; const d=payload[0].payload;
+    return (<div style={{background:'#181820',border:'1px solid #2a2a34',borderRadius:10,padding:'7px 10px',fontSize:12}}>
+      <div style={{fontWeight:700}}>{d.name}</div>
+      <div style={{color: d.isTotal?'var(--text-secondary)':(d.amt>=0?'var(--good)':'#f87171')}}>{d.isTotal?GBP(d.amt):(d.amt>=0?'+':'−')+GBP(Math.abs(d.amt))}</div>
+    </div>); };
+  return (<div className="card" style={{marginBottom:14}}>
+    <div className="card-section-title">
+      <h2 style={{margin:0}}>Why contribution moved <span style={{fontWeight:400,color:'var(--text-faint)',fontSize:13}}>— vs prior period</span></h2>
+      <span className="meta" style={{display:'inline-flex',alignItems:'center',gap:6}}><MarginBadge/> {delta>=0?'+':'−'}{GBP(Math.abs(delta))}{dpct!=null?` (${(dpct>=0?'+':'')}${(dpct*100).toFixed(0)}%)`:''}</span>
+    </div>
+    <R.ResponsiveContainer width="100%" height={260}>
+      <R.BarChart data={data} margin={{top:10,right:16,left:10,bottom:6}}>
+        <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
+        <R.XAxis dataKey="name" tick={{fill:'#7e7e8a',fontSize:11}} interval={0}/>
+        <R.YAxis tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>'£'+(Math.abs(v)>=1000?(v/1000).toFixed(0)+'k':v)}/>
+        <R.Tooltip cursor={{fill:'#ffffff08'}} content={<Tip/>}/>
+        <R.Bar dataKey="base" stackId="s" fill="transparent" isAnimationActive={false}/>
+        <R.Bar dataKey="pos" stackId="s" isAnimationActive={false}>{data.map((d,i)=><R.Cell key={i} fill={d.isTotal?'#7c8cff':'#4ade80'}/>)}</R.Bar>
+        <R.Bar dataKey="neg" stackId="s" fill="#f87171" isAnimationActive={false}/>
+      </R.BarChart>
+    </R.ResponsiveContainer>
+    <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>Fully-loaded contribution = net revenue × {PCT(gm)} margin − variable costs − paid media. Bars sum exactly to the change; green helped, red hurt.</div>
   </div>);
 }
 
