@@ -18,20 +18,20 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606081654"></script>
-<script src="./frkl-live-data.js?v=202606081654"></script>
-<script src="./frkl-agent-insights.js?v=202606081654"></script>
-<script src="./frkl-business-data.js?v=202606081654"></script>
-<script src="./frkl-action-status.js?v=202606081654"></script>
-<script src="./frkl-patterns.js?v=202606081654"></script>
-<script src="./frkl-creators.js?v=202606081654"></script>
-<script src="./frkl-creative-vision.js?v=202606081654"></script>
-<script src="./frkl-links.js?v=202606081654"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606081654"></script>
-<script src="./frkl-events.js?v=202606081654"></script>
-<script src="./frkl-products.js?v=202606081654"></script>
-<script src="./frkl-discount-codes.js?v=202606081654"></script>
-<script src="./frkl-cvr.js?v=202606081654"></script>
+<script src="./frkl-data-loader.js?v=202606081804"></script>
+<script src="./frkl-live-data.js?v=202606081804"></script>
+<script src="./frkl-agent-insights.js?v=202606081804"></script>
+<script src="./frkl-business-data.js?v=202606081804"></script>
+<script src="./frkl-action-status.js?v=202606081804"></script>
+<script src="./frkl-patterns.js?v=202606081804"></script>
+<script src="./frkl-creators.js?v=202606081804"></script>
+<script src="./frkl-creative-vision.js?v=202606081804"></script>
+<script src="./frkl-links.js?v=202606081804"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606081804"></script>
+<script src="./frkl-events.js?v=202606081804"></script>
+<script src="./frkl-products.js?v=202606081804"></script>
+<script src="./frkl-discount-codes.js?v=202606081804"></script>
+<script src="./frkl-cvr.js?v=202606081804"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -1728,10 +1728,17 @@ function eventDateLabel(ev){
 // brand's major site-wide sales (concentrated discount campaigns — NOT always-on
 // affiliate codes). Each pin snaps to the nearest chart bucket <= its date and
 // carries a rich `tip` so the chart stays clean and the detail lives on hover.
+//
+// `buckets` may be either an array of YYYY-MM-DD strings (axis key == date, e.g.
+// the weekly CVR chart) OR an array of {x, date} objects where `x` is the axis
+// category value and `date` is the real YYYY-MM-DD to snap against (e.g. the
+// daily spend↔revenue chart, whose axis key is a MM-DD label). The returned
+// pin `x` is always the axis value a ReferenceLine should match.
 function buildChartPins(buckets){
   if(!buckets || !buckets.length) return [];
-  const ws = buckets.slice(), minW = ws[0];
-  const snap = (d)=>{ if(!d || d < minW) return null; let pin=null; for(let k=0;k<ws.length;k++){ if(ws[k]<=d) pin=ws[k]; else break; } return pin; };
+  const rows = buckets.map(b => (typeof b === 'string') ? {x:b, date:b} : b);
+  const minW = rows[0].date;
+  const snap = (d)=>{ if(!d || d < minW) return null; let pin=null; for(let k=0;k<rows.length;k++){ if(rows[k].date<=d) pin=rows[k].x; else break; } return pin; };
   const pins = [];
   // 1) operator-logged ground-truth events
   loadBrandEvents().forEach(e=>{ const x = snap(e.startsOn); if(x==null) return; const mt = EVENT_META[e.type]||EVENT_META.other;
@@ -2929,8 +2936,16 @@ function Overview({start, period, customActive}){
           <R.Bar yAxisId="l" dataKey="metaSpend" stackId="s" name="Meta spend" fill={COL.meta} />
           <R.Bar yAxisId="l" dataKey="googleSpend" stackId="s" name="Google spend" fill={COL.google} />
           <R.Line yAxisId="r" type="monotone" dataKey="revenue" name="Shopify net rev" stroke={COL.revenue} strokeWidth={2.4} dot={false} />
+          {/* Event & sale pins: same hoverable markers as the CVR trend so spikes have a named cause. */}
+          {(function(){ var pins=buildChartPins(daily.map(function(d){return {x:d.dlabel, date:d.date};}));
+            return pins.map(function(p,i){ return (
+              <R.ReferenceLine key={'pin'+i} yAxisId="l" x={p.x} stroke="#8b8b99" strokeDasharray="3 3" strokeOpacity={0.55}
+                label={<PinMarker icon={p.icon} n={p.n} tip={p.tip}/>}/>); });
+          })()}
         </R.ComposedChart>
       </R.ResponsiveContainer>
+      {(function(){ var pins=buildChartPins(daily.map(function(d){return {x:d.dlabel, date:d.date};})); if(!pins.length) return null; return (
+        <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>🏷️ sales &amp; promos · 📌 your events — <span style={{color:'var(--text-muted)'}}>hover any marker for what it was</span></div>); })()}
     </div>
 
     {/* Full action board at the bottom — the long-form list */}
