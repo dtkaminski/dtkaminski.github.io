@@ -18,20 +18,21 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606082004"></script>
-<script src="./frkl-live-data.js?v=202606082004"></script>
-<script src="./frkl-agent-insights.js?v=202606082004"></script>
-<script src="./frkl-business-data.js?v=202606082004"></script>
-<script src="./frkl-action-status.js?v=202606082004"></script>
-<script src="./frkl-patterns.js?v=202606082004"></script>
-<script src="./frkl-creators.js?v=202606082004"></script>
-<script src="./frkl-creative-vision.js?v=202606082004"></script>
-<script src="./frkl-links.js?v=202606082004"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606082004"></script>
-<script src="./frkl-events.js?v=202606082004"></script>
-<script src="./frkl-products.js?v=202606082004"></script>
-<script src="./frkl-discount-codes.js?v=202606082004"></script>
-<script src="./frkl-cvr.js?v=202606082004"></script>
+<script src="./frkl-data-loader.js?v=202606082017"></script>
+<script src="./frkl-live-data.js?v=202606082017"></script>
+<script src="./frkl-agent-insights.js?v=202606082017"></script>
+<script src="./frkl-business-data.js?v=202606082017"></script>
+<script src="./frkl-action-status.js?v=202606082017"></script>
+<script src="./frkl-patterns.js?v=202606082017"></script>
+<script src="./frkl-creators.js?v=202606082017"></script>
+<script src="./frkl-creative-vision.js?v=202606082017"></script>
+<script src="./frkl-links.js?v=202606082017"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606082017"></script>
+<script src="./frkl-events.js?v=202606082017"></script>
+<script src="./frkl-products.js?v=202606082017"></script>
+<script src="./frkl-discount-codes.js?v=202606082017"></script>
+<script src="./frkl-cvr.js?v=202606082017"></script>
+<script src="./frkl-cohorts.js?v=202606082017"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -735,6 +736,14 @@ function saveCostConfig(next){ try { localStorage.setItem('frkl-contrib-inputs',
 // User-entered gross margin (fraction) when present, else null → callers fall
 // back to OI_CONFIG.grossMargin or the live catalogue margin.
 function userGrossMargin(){ const c = costConfig(); const v = parseFloat(c.gmPct); return (c.gmPct!=='' && c.gmPct!=null && isFinite(v)) ? v/100 : null; }
+// Best-available gross margin: verified operator value → tenant config → catalogue → 0.6.
+function oiGrossMargin(){
+  const u = userGrossMargin(); if(u!=null) return u;
+  if(typeof window!=='undefined' && window.OI_CONFIG && window.OI_CONFIG.grossMargin) return window.OI_CONFIG.grossMargin;
+  const meta = (typeof window!=='undefined' && window.FRKL_PRODUCTS_META) || {};
+  if(meta.grossMargin) return meta.grossMargin;
+  return 0.6;
+}
 // Re-render hook: any component showing a margin number can subscribe so badges
 // + figures update the instant costs are saved.
 function useCostTick(){
@@ -6634,6 +6643,124 @@ function WeeklyBoard(){
   </div>);
 }
 
+// ── Acquisition cohorts (real CAC/LTV from customer-level orders) ────────────
+// Replaces the blended CAC/LTV *estimates* with true first-order cohorts. Revenue
+// curves come from the snapshot (FRKL_COHORTS); contribution + LTV:CAC are applied
+// here using the operator's verified gross margin, so margin stays one source.
+function CohortStat({label, val, sub, badge, accent}){
+  return (<div className="card kpi" style={accent?{borderLeft:'3px solid '+accent}:undefined}>
+    <div className="label"><span>{label}</span>{badge}</div>
+    <div className="val" style={{fontSize:24}}>{val}</div>
+    {sub && <div className="sub">{sub}</div>}
+  </div>);
+}
+function CohortsPanel(){
+  const verified = useCostTick();   // re-render + reflect verified margin
+  const C = (typeof window!=='undefined' && window.FRKL_COHORTS) || null;
+  if(!C || !C.totalCustomers){
+    return (<div className="card"><h2>Acquisition cohorts</h2><div className="muted">No customer-level order history yet — connect Shopify to build cohorts.</div></div>);
+  }
+  const gm = oiGrossMargin();
+  const lifetimeRev = C.lifetimeRevPerCust, firstOrderRev = C.firstOrderRevPerCust;
+  const firstShare = lifetimeRev>0 ? firstOrderRev/lifetimeRev : null;
+  const contribLTV = lifetimeRev * gm;
+  const paidCac = C.cac && C.cac.paid, blendedCac = C.cac && C.cac.blended;
+  const ltvCacPaid = (paidCac && paidCac>0) ? contribLTV/paidCac : null;
+  const firstContrib = firstOrderRev * gm;
+  const paybackOrders = (paidCac && firstContrib>0) ? paidCac/firstContrib : null;
+  const curve = (C.pooledCurve||[]).map(p=>({m:'m'+p.m, rev:p.cumRevPerCust, contrib:+(p.cumRevPerCust*gm).toFixed(2), n:p.customersObserved}));
+  const cacMonths = (C.cac && C.cac.byMonth || []).map(r=>({month:(r.month||'').slice(2), newCust:r.newCustomers, cac:r.cac, paid:r.spend>0}));
+  const ragRatio = ltvCacPaid==null?'var(--text-faint)':(ltvCacPaid>=3?'var(--good)':ltvCacPaid>=1?'var(--warn)':'#f87171');
+  const badge = <MarginBadge/>;
+
+  return (<div>
+    <div className="card" style={{marginBottom:14}}>
+      <div className="card-section-title">
+        <h2 style={{margin:0}}>Acquisition cohorts — what a customer is really worth</h2>
+        <span className="meta">{C.totalCustomers} DTC customers · {C.windowFirst}→{C.windowLast} · real first-order cohorts</span>
+      </div>
+      <div className="micro" style={{color:'var(--text-secondary)', lineHeight:1.55}}>
+        Each customer is bucketed by the month of their <b>first order</b>, then we track what they go on to spend. {firstShare!=null && <>frkl banks <b style={{color:'var(--text-primary)'}}>{PCT(firstShare)}</b> of a customer's lifetime value in their <b>first order</b> — so every point of repeat purchase is almost pure upside, and retention is the biggest untapped lever.</>}
+      </div>
+    </div>
+
+    <div className="row" style={{marginBottom:14}}>
+      <CohortStat label="Contribution LTV / customer" val={GBP(contribLTV)} sub={`${GBP(lifetimeRev)} revenue × ${PCT(gm)} margin · observed to date`} badge={badge} accent="var(--good)"/>
+      <CohortStat label="Paid CAC" val={paidCac!=null?GBP(paidCac):'—'} sub={`spend ÷ new customers · ${C.cac.paidMonths||0} paid month(s) · blended ${blendedCac!=null?GBP(blendedCac):'—'}`} accent="var(--accent)"/>
+      <CohortStat label="LTV : CAC (paid)" val={ltvCacPaid!=null?ltvCacPaid.toFixed(1)+'×':'—'} sub="contribution LTV ÷ paid CAC · target 3×+" badge={badge} accent={ragRatio}/>
+      <CohortStat label="First-order payback" val={paybackOrders!=null?(paybackOrders<=1?'1st order':paybackOrders.toFixed(1)+' orders'):'—'} sub="orders to recover paid CAC" badge={badge}/>
+      <CohortStat label="Repeat rate" val={PCT(C.repeatRate)} sub={`${C.ordersPerCustomer} orders / customer`}/>
+    </div>
+
+    <div className="row">
+      <div className="card" style={{flex:'2 1 480px'}}>
+        <div className="card-section-title"><h2 style={{margin:0}}>Lifetime value curve</h2><span className="meta">cumulative £ per customer by months since first order</span></div>
+        <R.ResponsiveContainer width="100%" height={260}>
+          <R.ComposedChart data={curve} margin={{top:8,right:18,left:6,bottom:6}}>
+            <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
+            <R.XAxis dataKey="m" tick={{fill:'#7e7e8a',fontSize:11}}/>
+            <R.YAxis tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>'£'+v}/>
+            <R.Tooltip contentStyle={{background:'#181820',border:'1px solid #2a2a34',borderRadius:10}} formatter={(v,n)=>[GBP(v), n==='contrib'?'Contribution':'Revenue']}
+              labelFormatter={(l,p)=> l + (p&&p[0]&&p[0].payload? ' · '+p[0].payload.n+' customers observed':'')}/>
+            <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}}/>
+            {paidCac!=null && <R.ReferenceLine y={paidCac} stroke="#f4a23b" strokeDasharray="5 4" strokeOpacity={0.8} label={{value:'paid CAC', position:'insideTopRight', fill:'#f4a23b', fontSize:10}}/>}
+            <R.Area type="monotone" dataKey="rev" name="Revenue" stroke={COL.revenue} fill={COL.revenue+'22'} strokeWidth={2}/>
+            <R.Line type="monotone" dataKey="contrib" name="Contribution" stroke="#a78bfa" strokeWidth={2.4} dot={false}/>
+          </R.ComposedChart>
+        </R.ResponsiveContainer>
+        <div className="micro" style={{color:'var(--text-faint)', marginTop:4}}>Later months average fewer, older customers (shown on hover) — the curve is observed value to date, not a projection.</div>
+      </div>
+      <div className="card" style={{flex:'1 1 300px'}}>
+        <div className="card-section-title"><h2 style={{margin:0}}>CAC by acquisition month</h2><span className="meta">new customers vs paid CAC</span></div>
+        <R.ResponsiveContainer width="100%" height={260}>
+          <R.ComposedChart data={cacMonths} margin={{top:8,right:14,left:6,bottom:6}}>
+            <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
+            <R.XAxis dataKey="month" tick={{fill:'#7e7e8a',fontSize:10}}/>
+            <R.YAxis yAxisId="l" tick={{fill:'#7e7e8a',fontSize:10}}/>
+            <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#7e7e8a',fontSize:10}} tickFormatter={v=>'£'+v}/>
+            <R.Tooltip contentStyle={{background:'#181820',border:'1px solid #2a2a34',borderRadius:10}} formatter={(v,n)=> n==='cac'?[v!=null?GBP(v):'no paid spend','Paid CAC']:[NUM(v),'New customers']}/>
+            <R.Bar yAxisId="l" dataKey="newCust" name="New customers" fill={COL.sessions} radius={[2,2,0,0]}/>
+            <R.Line yAxisId="r" type="monotone" dataKey="cac" name="cac" stroke={COL.google} strokeWidth={2.2} dot={{r:2.5}} connectNulls/>
+          </R.ComposedChart>
+        </R.ResponsiveContainer>
+        <div className="micro" style={{color:'var(--text-faint)', marginTop:4}}>Most early customers came via unpaid channels (organic/email) — paid CAC only applies where there was paid spend.</div>
+      </div>
+    </div>
+
+    <div className="row" style={{marginTop:14}}>
+      <div className="card" style={{flex:'1 1 380px'}}>
+        <h2 style={{marginTop:0}}>Discounted vs full-price acquisition</h2>
+        <table><thead><tr><th>First order</th><th>Customers</th><th>Repeat</th><th>Orders/cust</th><th>Lifetime £/cust</th></tr></thead><tbody>
+          {(C.byAcqType||[]).map((a,i)=>(<tr key={i}>
+            <td>{a.type}</td><td>{NUM(a.newCustomers)}</td><td>{PCT(a.repeatRate)}</td><td>{a.ordersPerCust}</td><td>{GBP(a.lifetimeRevPerCust)}</td>
+          </tr>))}
+        </tbody></table>
+        {(()=>{ const d=(C.byAcqType||[]).find(a=>/Discount/.test(a.type)), f=(C.byAcqType||[]).find(a=>/Full/.test(a.type));
+          if(!d||!f) return null; const better = d.repeatRate>=f.repeatRate;
+          return <div className="note" style={{marginTop:10}}>{better
+            ? `Discount-acquired customers repeat at least as well (${PCT(d.repeatRate)} vs ${PCT(f.repeatRate)}) — the usual "discount buyers churn" worry doesn't hold here, so first-order codes look like a fair acquisition cost.`
+            : `Discount-acquired customers repeat less (${PCT(d.repeatRate)} vs ${PCT(f.repeatRate)}) — those codes are buying lower-quality customers; tighten first-order discounting.`}</div>; })()}
+      </div>
+      <div className="card" style={{flex:'1 1 380px'}}>
+        <h2 style={{marginTop:0}}>Which products acquire customers that come back</h2>
+        <table><thead><tr><th>Acquisition product</th><th>New custs</th><th>Repeat</th><th>Lifetime £/cust</th></tr></thead><tbody>
+          {(C.byProduct||[]).map((p,i)=>{ const hot=p.repeatRate>=(C.repeatRate*1.3); const cold=p.repeatRate<=(C.repeatRate*0.5);
+            return (<tr key={i}>
+              <td style={{maxWidth:200}}>{p.name}</td><td>{NUM(p.newCustomers)}</td>
+              <td style={{color: hot?'var(--good)':cold?'#f87171':'var(--text-primary)', fontWeight:hot||cold?700:400}}>{PCT(p.repeatRate)}</td>
+              <td>{GBP(p.lifetimeRevPerCust)}</td>
+            </tr>); })}
+        </tbody></table>
+        <div className="note" style={{marginTop:10}}>Green = retains above the {PCT(C.repeatRate)} brand average (advertise these to acquire); red = acquires but doesn't retain (needs a follow-up flow, not more spend). Full acquisition-vs-retention matrix lands in the Products view.</div>
+      </div>
+    </div>
+
+    <div className="micro" style={{color:'var(--text-faint)', marginTop:12, lineHeight:1.5}}>
+      {C.notes && <><b>Read carefully:</b> {C.notes.channel} {C.notes.google}</>}
+    </div>
+  </div>);
+}
+
 // ── Two-level navigation: section → subTab ──────────────────────────────────
 // 5 top-level sections, each with its own sub-pages. Premium SaaS pattern.
 // Sub-pages render contextual sub-nav when the section has >1 page.
@@ -6664,6 +6791,7 @@ const NAV = [
   ]},
   { id:'audience',label:'Audience',     subtabs:[
     { id:'customers',   label:'Customers',   component: () => <Customers/> },
+    { id:'cohorts',     label:'Cohorts',     component: () => <CohortsPanel/> },
     { id:'competitors', label:'Competitors', component: () => <Competitors/> },
   ]},
   { id:'settings',label:'Settings',     subtabs:[
