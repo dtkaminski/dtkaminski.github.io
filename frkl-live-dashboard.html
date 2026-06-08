@@ -18,20 +18,20 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606081405"></script>
-<script src="./frkl-live-data.js?v=202606081405"></script>
-<script src="./frkl-agent-insights.js?v=202606081405"></script>
-<script src="./frkl-business-data.js?v=202606081405"></script>
-<script src="./frkl-action-status.js?v=202606081405"></script>
-<script src="./frkl-patterns.js?v=202606081405"></script>
-<script src="./frkl-creators.js?v=202606081405"></script>
-<script src="./frkl-creative-vision.js?v=202606081405"></script>
-<script src="./frkl-links.js?v=202606081405"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606081405"></script>
-<script src="./frkl-events.js?v=202606081405"></script>
-<script src="./frkl-products.js?v=202606081405"></script>
-<script src="./frkl-discount-codes.js?v=202606081405"></script>
-<script src="./frkl-cvr.js?v=202606081405"></script>
+<script src="./frkl-data-loader.js?v=202606081416"></script>
+<script src="./frkl-live-data.js?v=202606081416"></script>
+<script src="./frkl-agent-insights.js?v=202606081416"></script>
+<script src="./frkl-business-data.js?v=202606081416"></script>
+<script src="./frkl-action-status.js?v=202606081416"></script>
+<script src="./frkl-patterns.js?v=202606081416"></script>
+<script src="./frkl-creators.js?v=202606081416"></script>
+<script src="./frkl-creative-vision.js?v=202606081416"></script>
+<script src="./frkl-links.js?v=202606081416"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606081416"></script>
+<script src="./frkl-events.js?v=202606081416"></script>
+<script src="./frkl-products.js?v=202606081416"></script>
+<script src="./frkl-discount-codes.js?v=202606081416"></script>
+<script src="./frkl-cvr.js?v=202606081416"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -1471,10 +1471,57 @@ function DailyPanel(){
   </div>);
 }
 
+// Hover-explainer for each hero £ tile: what the bucket means + the top findings
+// driving it. Turns a bare colour-coded number into "here's what & why".
+function HeroStat({valK, color, label, explain, items, total, alignRight}){
+  const [show, setShow] = React.useState(false);
+  const money = (g)=> '£' + Math.round(Math.abs(g||0)).toLocaleString() + '/mo';
+  return (
+    <div className="hero-stat" style={{position:'relative', cursor:'help'}}
+         onMouseEnter={()=>setShow(true)} onMouseLeave={()=>setShow(false)}>
+      <div className="hero-stat-val" style={{color}}>£{valK}k</div>
+      <div className="hero-stat-label" style={{borderBottom:'1px dotted var(--text-faint)', display:'inline-block', paddingBottom:1}}>
+        {label} <span style={{fontSize:9, opacity:.55}} aria-hidden="true">&#9432;</span>
+      </div>
+      {show && (
+        <div role="tooltip" style={{position:'absolute', top:'calc(100% + 10px)',
+             left: alignRight?'auto':0, right: alignRight?0:'auto', zIndex:60, width:330,
+             background:'var(--bg-elevated)', border:'1px solid var(--border-default)',
+             borderRadius:'var(--r-md)', padding:'12px 14px', boxShadow:'var(--shadow-lg)',
+             textAlign:'left', whiteSpace:'normal', fontWeight:400}}>
+          <div style={{fontSize:12.5, color:'var(--text-secondary)', lineHeight:1.5}}>{explain}</div>
+          {total ? (
+            <div style={{marginTop:10, display:'flex', flexDirection:'column', gap:5}}>
+              {total.map((t,i)=>(<div key={i} style={{display:'flex', justifyContent:'space-between', fontSize:12.5}}>
+                <span style={{color:t.c}}>{t.k}</span><span style={{color:t.c, fontWeight:650}}>{money(t.v)}</span></div>))}
+            </div>
+          ) : (items && items.length ? (
+            <div style={{marginTop:10}}>
+              <div className="micro" style={{marginBottom:6}}>Top {items.length} driver{items.length>1?'s':''}</div>
+              {items.map((it,i)=>(
+                <div key={i} style={{padding:'5px 0', borderTop:i?'1px solid var(--border-subtle)':'none'}}>
+                  <div style={{display:'flex', justifyContent:'space-between', gap:10, fontSize:12.5}}>
+                    <span style={{color:'var(--text-primary)', fontWeight:550}}>{it.label}</span>
+                    <span style={{color, fontWeight:650, whiteSpace:'nowrap'}}>{money(it.monthly_impact_gbp)}</span>
+                  </div>
+                  {it.basis && <div className="micro" style={{color:'var(--text-faint)', marginTop:2, lineHeight:1.4}}>{it.basis}</div>}
+                </div>
+              ))}
+            </div>
+          ) : <div className="micro" style={{marginTop:8, color:'var(--text-faint)'}}>No itemised findings in this bucket yet.</div>)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── This-week hero — the one card a founder needs to see on Monday morning ──
 function ThisWeekHero(){
   const P = window.FRKL_PATTERNS;
   const r = (P && P.money_rollup) || {leakage:0, at_risk:0, opportunity:0, total:0};
+  const moneyPatterns = (P && P.money_patterns) || [];
+  const topFor = (k) => moneyPatterns.filter(m => m.kind === k)
+    .sort((a, b) => Math.abs(b.monthly_impact_gbp||0) - Math.abs(a.monthly_impact_gbp||0)).slice(0, 5);
   const diff = (P && P.diff) || {new:[], resolved:[], stronger:[], weaker:[]};
   const actionMoney = (P && P.action_money) || {};
   const phitMap = (P && P.action_phit) || {};
@@ -1531,25 +1578,21 @@ function ThisWeekHero(){
       </div>
 
       <div className="hero-stats">
-        <div className="hero-stat">
-          <div className="hero-stat-val" style={{color:'var(--bad)'}}>£{(r.leakage/1000).toFixed(1)}k</div>
-          <div className="hero-stat-label">Leaking now</div>
-        </div>
+        <HeroStat valK={(r.leakage/1000).toFixed(1)} color="var(--bad)" label="Leaking now"
+          explain="Revenue going out the door right now — broken checkout/PDP steps, JS errors, over-discounting. The most urgent bucket: fixing these recovers money you're already losing."
+          items={topFor('leakage')}/>
         <div className="hero-stat-divider"/>
-        <div className="hero-stat">
-          <div className="hero-stat-val" style={{color:'var(--warn)'}}>£{(r.at_risk/1000).toFixed(1)}k</div>
-          <div className="hero-stat-label">At risk</div>
-        </div>
+        <HeroStat valK={(r.at_risk/1000).toFixed(1)} color="var(--warn)" label="At risk"
+          explain="Revenue exposed but not yet lost — over-reliance on one channel, code or SKU, or a metric trending down. Worth de-risking before it bites."
+          items={topFor('at_risk')}/>
         <div className="hero-stat-divider"/>
-        <div className="hero-stat">
-          <div className="hero-stat-val" style={{color:'var(--good)'}}>£{(r.opportunity/1000).toFixed(1)}k</div>
-          <div className="hero-stat-label">Opportunity</div>
-        </div>
+        <HeroStat valK={(r.opportunity/1000).toFixed(1)} color="var(--good)" label="Opportunity"
+          explain="Upside you're not yet capturing — AOV, bundle attach, audience or range levers that could add revenue if pursued."
+          items={topFor('opportunity')}/>
         <div className="hero-stat-divider"/>
-        <div className="hero-stat">
-          <div className="hero-stat-val" style={{color:'var(--text-primary)'}}>£{totalK}k</div>
-          <div className="hero-stat-label">Total identified</div>
-        </div>
+        <HeroStat valK={totalK} color="var(--text-primary)" label="Total identified" alignRight
+          explain="Everything money-tagged this week — leaking + at-risk + opportunity. These are illustrative estimates that can overlap, so they're not strictly additive. Read it as where to look, not a guaranteed sum."
+          total={[{c:'var(--bad)',k:'Leaking now',v:r.leakage},{c:'var(--warn)',k:'At risk',v:r.at_risk},{c:'var(--good)',k:'Opportunity',v:r.opportunity}]}/>
       </div>
       <div className="micro" style={{color:'var(--text-faint)',marginTop:'var(--s-2)'}}>Illustrative — each line is a money-tagged <i>estimate</i>, not a guaranteed recovery, and findings can overlap so the total isn't strictly additive. Treat it as where to look, not a forecast.</div>
 
