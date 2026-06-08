@@ -422,7 +422,23 @@
       return;
     }
 
-    const m = memberships[0];
+    // A user can own more than one brand (incl. empty/duplicate workspaces created
+    // during testing). Don't grab an arbitrary first row — land on the brand that
+    // actually has data sources connected (active first), tie-broken by the oldest
+    // (original) brand. Falls back to memberships[0] if the lookup fails.
+    let m = memberships[0];
+    if (memberships.length > 1) {
+      try {
+        const ids = memberships.map(x => x.brand.id);
+        const { data: conns } = await sb.from('connections').select('brand_id, status').in('brand_id', ids);
+        const score = {};
+        for (const c of (conns || [])) score[c.brand_id] = (score[c.brand_id] || 0) + (c.status === 'active' ? 100 : 1);
+        m = memberships.slice().sort((a, b) =>
+          (score[b.brand.id] || 0) - (score[a.brand.id] || 0) ||
+          new Date(a.brand.created_at) - new Date(b.brand.created_at)
+        )[0];
+      } catch (e) { console.warn('brand pick fallback', e); }
+    }
     currentBrand = m.brand;
 
     // Populate workspace details
