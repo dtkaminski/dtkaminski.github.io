@@ -18,20 +18,20 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606081451"></script>
-<script src="./frkl-live-data.js?v=202606081451"></script>
-<script src="./frkl-agent-insights.js?v=202606081451"></script>
-<script src="./frkl-business-data.js?v=202606081451"></script>
-<script src="./frkl-action-status.js?v=202606081451"></script>
-<script src="./frkl-patterns.js?v=202606081451"></script>
-<script src="./frkl-creators.js?v=202606081451"></script>
-<script src="./frkl-creative-vision.js?v=202606081451"></script>
-<script src="./frkl-links.js?v=202606081451"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606081451"></script>
-<script src="./frkl-events.js?v=202606081451"></script>
-<script src="./frkl-products.js?v=202606081451"></script>
-<script src="./frkl-discount-codes.js?v=202606081451"></script>
-<script src="./frkl-cvr.js?v=202606081451"></script>
+<script src="./frkl-data-loader.js?v=202606081455"></script>
+<script src="./frkl-live-data.js?v=202606081455"></script>
+<script src="./frkl-agent-insights.js?v=202606081455"></script>
+<script src="./frkl-business-data.js?v=202606081455"></script>
+<script src="./frkl-action-status.js?v=202606081455"></script>
+<script src="./frkl-patterns.js?v=202606081455"></script>
+<script src="./frkl-creators.js?v=202606081455"></script>
+<script src="./frkl-creative-vision.js?v=202606081455"></script>
+<script src="./frkl-links.js?v=202606081455"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606081455"></script>
+<script src="./frkl-events.js?v=202606081455"></script>
+<script src="./frkl-products.js?v=202606081455"></script>
+<script src="./frkl-discount-codes.js?v=202606081455"></script>
+<script src="./frkl-cvr.js?v=202606081455"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -2353,6 +2353,8 @@ function LtvCacCard({daily, gm, ordersPerCust}){
         <R.Line yAxisId="l" type="monotone" dataKey="ltv" name="LTV" stroke={COL.revenue} strokeWidth={2.2} dot={single?{r:3}:false}/>
         <R.Line yAxisId="l" type="monotone" dataKey="cac" name="CAC" stroke={COL.meta} strokeWidth={2.2} dot={single?{r:3}:false}/>
         <R.Line yAxisId="r" type="monotone" dataKey="ratio" name="LTV:CAC" stroke={COL.email} strokeWidth={2} strokeDasharray="4 3" dot={single?{r:3}:false}/>
+        <R.ReferenceLine yAxisId="r" y={3} stroke="#4ade80" strokeDasharray="5 4" strokeOpacity={0.7}
+          label={{value:'3× target', position:'insideTopRight', fill:'#4ade80', fontSize:10.5}}/>
       </R.ComposedChart>
     </R.ResponsiveContainer>
     <div className="note" style={{marginTop:8}}>Weekly estimate: CAC = paid spend ÷ new customers (new-customer share from repeat data); LTV = AOV × gross margin ({PCT(gm)}) × repeat orders/customer. Healthy DTC unit economics run LTV:CAC ≥ 3×.</div>
