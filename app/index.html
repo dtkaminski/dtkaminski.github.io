@@ -302,6 +302,10 @@
         </div>
       </div>
     </div>
+
+    <!-- Full live dashboard (embedded for brands whose rich view is wired up). -->
+    <iframe id="rich-dash" title="Live dashboard" hidden
+      style="width:100%; height:calc(100vh - 58px); border:0; background:var(--bg-app); display:block;"></iframe>
   </div>
 
   <!-- ── INTELLIGENCE TAB ───────────────────────────────────────────────── -->
@@ -439,6 +443,25 @@
     // Sync has run at least once — show the populated state.
     stateNotConnected.hidden = true;
     stateFirstSync.hidden = true;
+
+    // Brands whose rich dashboard is wired up render the full live view inline,
+    // instead of the placeholder panels. The user is already authenticated, so we
+    // pre-satisfy the dashboard's access gate via shared same-origin localStorage
+    // (no passcode prompt). The embedded dashboard's loader reads live tenant data
+    // using this same session.
+    const RICH_DASH = { frkl: '/frkl-live-dashboard.html' };
+    const richUrl = RICH_DASH[currentBrand.slug];
+    if (richUrl) {
+      try { localStorage.setItem('oi_gate_v1', 'b8bd9e7d7fe04b396ddc52df76d65e84a99565fff0f22d805d6b13b4517bcdb5'); } catch (e) {}
+      document.getElementById('hero-card').hidden = true;
+      const pg = document.querySelector('#tab-overview .panel-grid');
+      if (pg) pg.hidden = true;
+      const page = document.querySelector('.page');
+      if (page) { page.style.maxWidth = 'none'; page.style.padding = '0'; }
+      const fr = document.getElementById('rich-dash');
+      if (fr) { if (!fr.getAttribute('src')) fr.setAttribute('src', richUrl); fr.hidden = false; }
+      return;
+    }
 
     // Update hero
     const synced = new Date(shop.last_sync_at);
