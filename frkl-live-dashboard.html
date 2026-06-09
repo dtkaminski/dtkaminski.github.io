@@ -18,24 +18,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606091400"></script>
-<script src="./frkl-live-data.js?v=202606091400"></script>
-<script src="./frkl-agent-insights.js?v=202606091400"></script>
-<script src="./frkl-business-data.js?v=202606091400"></script>
-<script src="./frkl-action-status.js?v=202606091400"></script>
-<script src="./frkl-patterns.js?v=202606091400"></script>
-<script src="./frkl-creators.js?v=202606091400"></script>
-<script src="./frkl-creative-vision.js?v=202606091400"></script>
-<script src="./frkl-links.js?v=202606091400"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606091400"></script>
-<script src="./frkl-events.js?v=202606091400"></script>
-<script src="./frkl-products.js?v=202606091400"></script>
-<script src="./frkl-discount-codes.js?v=202606091400"></script>
-<script src="./frkl-cvr.js?v=202606091400"></script>
-<script src="./frkl-cohorts.js?v=202606091400"></script>
-<script src="./frkl-retention.js?v=202606091400"></script>
-<script src="./frkl-clarity.js?v=202606091400"></script>
-<script src="./frkl-board-read.js?v=202606091400"></script>
+<script src="./frkl-data-loader.js?v=202606091415"></script>
+<script src="./frkl-live-data.js?v=202606091415"></script>
+<script src="./frkl-agent-insights.js?v=202606091415"></script>
+<script src="./frkl-business-data.js?v=202606091415"></script>
+<script src="./frkl-action-status.js?v=202606091415"></script>
+<script src="./frkl-patterns.js?v=202606091415"></script>
+<script src="./frkl-creators.js?v=202606091415"></script>
+<script src="./frkl-creative-vision.js?v=202606091415"></script>
+<script src="./frkl-links.js?v=202606091415"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606091415"></script>
+<script src="./frkl-events.js?v=202606091415"></script>
+<script src="./frkl-products.js?v=202606091415"></script>
+<script src="./frkl-discount-codes.js?v=202606091415"></script>
+<script src="./frkl-cvr.js?v=202606091415"></script>
+<script src="./frkl-cohorts.js?v=202606091415"></script>
+<script src="./frkl-retention.js?v=202606091415"></script>
+<script src="./frkl-clarity.js?v=202606091415"></script>
+<script src="./frkl-board-read.js?v=202606091415"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -2303,7 +2303,7 @@ function ScoreTip({valueNode, title, lines}){
 // Compact one-line scorecard (Crux) — sits at the top of the diagnostic verdict.
 // Each score hovers to a plain-English explainer; a "plain terms" line under the row
 // translates all three into one sentence a first-time user can act on.
-function ScoresStrip({metrics}){
+function ScoresStrip({metrics, windowLabel}){
   const s = computeScores(metrics);
   const [open, setOpen] = React.useState(false);
   const tone = v => v>=75?'var(--good)':v>=55?'var(--warn)':'var(--bad)';
@@ -2323,7 +2323,7 @@ function ScoresStrip({metrics}){
     : 'it’s not safe to scale — the unit economics need work first';
   return (<div style={{padding:'10px 12px',borderRadius:'var(--r-md)',background:'rgba(255,255,255,0.02)',border:'1px solid var(--border-subtle)',marginBottom:12}}>
     <div style={{display:'flex',alignItems:'center',gap:16,flexWrap:'wrap',fontSize:12,color:'var(--text-secondary)'}}>
-      <span style={{textTransform:'uppercase',letterSpacing:'.05em',fontSize:10,color:'var(--text-faint)'}}>Crux scorecard</span>
+      <span style={{textTransform:'uppercase',letterSpacing:'.05em',fontSize:10,color:'var(--text-faint)'}}>Crux scorecard{windowLabel?<span style={{textTransform:'none',letterSpacing:0,color:'var(--text-faint)',fontWeight:400}}> · {windowLabel} · independent of the date picker</span>:null}</span>
       <ScoreTip title="Health — is the engine sound?" lines={[
           "A 0–100 blend of your profit margins, ad efficiency, conversion rate, returns and discount discipline. Answers: are the fundamentals healthy?",
           "75+ strong · 55–74 okay · under 55 needs work.",
@@ -3102,6 +3102,31 @@ function Overview({start, period, customActive}){
   const dxMetrics = {rev, orders, sessions, cvr, pCvr, paid, mer, pMer, cac, pCac, ltv, ltvCac, gm, contrib, pContrib, cmPct, returnRate, discLoad, pDiscLoad, returningPct, pRev,
                      aov, breakEvenRoas, allowableCac, paybackOrders, cmRateBeforeMkt,
                      pSessions, pOrders, pPaid, havePrior};
+  // ── Crux scorecard = stable business "vitals" on a FIXED trailing window, NOT the
+  // page date picker. A health read shouldn't whipsaw 7d↔90d as you explore charts;
+  // it's pinned to the last 30 days (vs the prior 30) and labelled as such. The
+  // picker still drives every chart/KPI/diagnostic below. (gm, returnRate,
+  // ordersPerCust are catalogue/cohort constants — window-independent — and reused.)
+  const CRUX_DAYS = 30;
+  const cruxStart = (()=>{ const d=new Date(end); d.setDate(d.getDate()-(CRUX_DAYS-1)); return d.toISOString().slice(0,10); })();
+  const cruxMetrics = (()=>{
+    const cp = priorPeriod(cruxStart, end);
+    const cM=inRangeBounded(D.metaDaily,cruxStart,end), cG=inRangeBounded(D.googleAds,cruxStart,end), cS=inRangeBounded(D.shopify,cruxStart,end), cA=inRangeBounded(D.ga4,cruxStart,end);
+    const pM=inRangeBounded(D.metaDaily,cp.start,cp.end), pG=inRangeBounded(D.googleAds,cp.start,cp.end), pS=inRangeBounded(D.shopify,cp.start,cp.end), pA=inRangeBounded(D.ga4,cp.start,cp.end);
+    const r=sum(cS,'netSales'), o=sum(cS,'orders'), ses=sum(cA,'sessions'), pd=sum(cM,'cost')+sum(cG,'cost'), gs=sum(cS,'totalSales'), da=sum(cS,'discounts');
+    const pr=sum(pS,'netSales'), po=sum(pS,'orders'), pses=sum(pA,'sessions'), ppd=sum(pM,'cost')+sum(pG,'cost'), pgs=sum(pS,'totalSales'), pda=sum(pS,'discounts');
+    const _aov=o>0?r/o:null, _nc=ordersPerCust?o/ordersPerCust:null, _cac=(_nc&&_nc>0)?pd/_nc:null;
+    const _pnc=ordersPerCust&&po?po/ordersPerCust:null, _pcac=(_pnc&&_pnc>0)?ppd/_pnc:null;
+    const _ltv=(_aov!=null&&ordersPerCust!=null)?_aov*gm*ordersPerCust:null, _contrib=r*gm-pd;
+    const _vcr=_aov>0?((_cn('packaging')+_cn('fulfilment')+_cn('shipping')+_cn('payFixed'))/_aov + _cn('payPct')/100 + _cn('refundPct')/100):0;
+    const _cmr=Math.max(0.01, gm-_vcr), _beroas=1/_cmr, _foc=_aov!=null?_aov*_cmr:null;
+    return {rev:r, orders:o, sessions:ses, paid:pd, cvr:ses>0?o/ses:null, pCvr:pses>0?po/pses:null,
+            mer:pd>0?r/pd:null, cac:_cac, pCac:_pcac, ltv:_ltv, ltvCac:(_ltv!=null&&_cac)?_ltv/_cac:null,
+            gm, contrib:_contrib, pContrib:pr*gm-ppd, cmPct:r>0?_contrib/r:null, returnRate,
+            discLoad:gs>0?da/gs:null, pDiscLoad:pgs>0?pda/pgs:null, pRev:pr,
+            aov:_aov, breakEvenRoas:_beroas, allowableCac:_ltv!=null?_ltv/TARGET_LTVCAC:null,
+            paybackOrders:(_cac!=null&&_foc>0)?_cac/_foc:null, cmRateBeforeMkt:_cmr, havePrior:pS.length>0};
+  })();
   // Evidence layer: trailing-90d series for event detection + decomposition vs prior.
   const histStart = (()=>{ const d=new Date(end); d.setDate(d.getDate()-90); return d.toISOString().slice(0,10); })();
   const histDaily = buildDaily(histStart);
@@ -3127,7 +3152,7 @@ function Overview({start, period, customActive}){
     <ThisWeekHero/>
 
     {/* Crux verdict: compact scorecard strip + the diagnostic (with the £-bridge nested in its "thinking") */}
-    <ScoresStrip metrics={dxMetrics}/>
+    <ScoresStrip metrics={cruxMetrics} windowLabel={`last ${CRUX_DAYS} days`}/>
     <DiagnosticCard metrics={dxMetrics} context={dxContext} period={customActive?null:period} onLogEvent={()=>setEvTick(t=>t+1)}/>
 
     {/* Prove-value-first onboarding nudge: the read above already works on
