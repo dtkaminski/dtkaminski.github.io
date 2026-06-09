@@ -6,6 +6,7 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Operator Intelligence — frkl workspace</title>
 <script src="./gate.js"></script>
+<script>/* set theme before paint — no flash of the wrong theme */try{document.documentElement.dataset.theme=localStorage.getItem('oi_theme')||'dark';}catch(e){document.documentElement.dataset.theme='dark';}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;550;600;650;700&display=swap" rel="stylesheet">
@@ -18,24 +19,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606091438"></script>
-<script src="./frkl-live-data.js?v=202606091438"></script>
-<script src="./frkl-agent-insights.js?v=202606091438"></script>
-<script src="./frkl-business-data.js?v=202606091438"></script>
-<script src="./frkl-action-status.js?v=202606091438"></script>
-<script src="./frkl-patterns.js?v=202606091438"></script>
-<script src="./frkl-creators.js?v=202606091438"></script>
-<script src="./frkl-creative-vision.js?v=202606091438"></script>
-<script src="./frkl-links.js?v=202606091438"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606091438"></script>
-<script src="./frkl-events.js?v=202606091438"></script>
-<script src="./frkl-products.js?v=202606091438"></script>
-<script src="./frkl-discount-codes.js?v=202606091438"></script>
-<script src="./frkl-cvr.js?v=202606091438"></script>
-<script src="./frkl-cohorts.js?v=202606091438"></script>
-<script src="./frkl-retention.js?v=202606091438"></script>
-<script src="./frkl-clarity.js?v=202606091438"></script>
-<script src="./frkl-board-read.js?v=202606091438"></script>
+<script src="./frkl-data-loader.js?v=202606091500"></script>
+<script src="./frkl-live-data.js?v=202606091500"></script>
+<script src="./frkl-agent-insights.js?v=202606091500"></script>
+<script src="./frkl-business-data.js?v=202606091500"></script>
+<script src="./frkl-action-status.js?v=202606091500"></script>
+<script src="./frkl-patterns.js?v=202606091500"></script>
+<script src="./frkl-creators.js?v=202606091500"></script>
+<script src="./frkl-creative-vision.js?v=202606091500"></script>
+<script src="./frkl-links.js?v=202606091500"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606091500"></script>
+<script src="./frkl-events.js?v=202606091500"></script>
+<script src="./frkl-products.js?v=202606091500"></script>
+<script src="./frkl-discount-codes.js?v=202606091500"></script>
+<script src="./frkl-cvr.js?v=202606091500"></script>
+<script src="./frkl-cohorts.js?v=202606091500"></script>
+<script src="./frkl-retention.js?v=202606091500"></script>
+<script src="./frkl-clarity.js?v=202606091500"></script>
+<script src="./frkl-board-read.js?v=202606091500"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -93,6 +94,42 @@
     --motion-fast: 120ms ease;
     --motion-base: 180ms ease;
   }
+
+  /* ── Daylight (light) theme — token overrides; toggled via html[data-theme=light] ── */
+  html[data-theme="light"] {
+    --bg-app:        #f6f7f9;   /* soft off-white canvas */
+    --bg-card:       #ffffff;
+    --bg-card-hover: #f2f4f7;
+    --bg-input:      #ffffff;
+    --bg-elevated:   #ffffff;
+    --border-subtle:  #ebedf1;
+    --border-default: #dcdfe5;
+    --text-primary:   #181b21;
+    --text-secondary: #474d57;
+    --text-muted:     #6a707b;
+    --text-faint:     #9398a3;
+    --good:    #15a34a;   /* deeper so colour reads on white, not neon */
+    --warn:    #b9750e;
+    --bad:     #d63440;
+    --accent:  #5a62d4;
+    --accent-soft: #e7e8fb;
+    --good-bg:   rgba(21,163,74,.10);
+    --warn-bg:   rgba(185,117,14,.12);
+    --bad-bg:    rgba(214,52,64,.10);
+    --accent-bg: rgba(90,98,212,.10);
+    --shadow-sm: 0 1px 2px rgba(16,24,40,.06);
+    --shadow-md: 0 6px 18px rgba(16,24,40,.08);
+    --shadow-lg: 0 20px 44px rgba(16,24,40,.12);
+  }
+  /* Recharts SVG adapts via its generated classes (var() can't be used in SVG attrs). */
+  html[data-theme="light"] .recharts-cartesian-grid line { stroke: #edeff3; }
+  html[data-theme="light"] .recharts-text,
+  html[data-theme="light"] .recharts-cartesian-axis-tick-value tspan { fill: #6a707b; }
+  html[data-theme="light"] .recharts-cartesian-axis-line,
+  html[data-theme="light"] .recharts-cartesian-axis-tick-line { stroke: #d7dbe2; }
+  /* App-bar is a hard-coded translucent near-black; flip it for light. */
+  html[data-theme="light"] .appbar { background: rgba(255,255,255,0.82); }
+  html { transition: background-color 160ms ease; }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -2278,6 +2315,19 @@ function PlaybookHint({text}){
 // channel. Flags BOTH date-staleness AND source quality (a channel can carry recent
 // dates but be embedded/estimated rather than live-synced — e.g. Google Ads while
 // its connector is pending approval). Override via window.FRKL_SOURCES per tenant.
+// Dark/Light theme toggle — flips html[data-theme] + persists to localStorage.
+// CSS does the re-theming (token overrides + Recharts class rules), so no app re-render needed.
+function ThemeToggle(){
+  const [theme, setTheme] = React.useState(()=>{ try { return document.documentElement.dataset.theme || 'dark'; } catch(e){ return 'dark'; } });
+  const set = t => { try { document.documentElement.dataset.theme=t; localStorage.setItem('oi_theme', t); } catch(e){} setTheme(t); };
+  const next = theme==='light' ? 'dark' : 'light';
+  return (<button onClick={()=>set(next)} title={`Switch to ${next} theme`} aria-label="Toggle colour theme"
+    style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,flexShrink:0,
+      borderRadius:8, background:'var(--bg-card)', border:'1px solid var(--border-default)',
+      color:'var(--text-secondary)', cursor:'pointer', fontSize:14, lineHeight:1}}>
+    {theme==='light' ? '☾' : '☀'}
+  </button>);
+}
 function DataFreshness(){
   const today = (()=>{ try { return new Date(); } catch(e){ return null; } })();
   const maxDate = rows => (rows && rows.length) ? rows.reduce((m,r)=> (r.date && r.date>m) ? r.date : m, '') : '';
@@ -7822,6 +7872,7 @@ function App(){
           <span style={{color:'var(--text-faint)',marginLeft:'var(--s-1)'}}>workspace</span>
         </div>
         <div className="appbar-spacer"/>
+        <ThemeToggle/>
         <div className="env-badge">Design partner</div>
         <select value={customActive ? '' : period} aria-label="Time period"
                 onChange={e=>{ if(e.target.value){ setRangeStart(''); setRangeEnd(''); setPeriod(e.target.value); } }}
