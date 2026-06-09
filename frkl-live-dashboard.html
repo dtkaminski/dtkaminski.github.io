@@ -18,24 +18,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606091230"></script>
-<script src="./frkl-live-data.js?v=202606091230"></script>
-<script src="./frkl-agent-insights.js?v=202606091230"></script>
-<script src="./frkl-business-data.js?v=202606091230"></script>
-<script src="./frkl-action-status.js?v=202606091230"></script>
-<script src="./frkl-patterns.js?v=202606091230"></script>
-<script src="./frkl-creators.js?v=202606091230"></script>
-<script src="./frkl-creative-vision.js?v=202606091230"></script>
-<script src="./frkl-links.js?v=202606091230"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606091230"></script>
-<script src="./frkl-events.js?v=202606091230"></script>
-<script src="./frkl-products.js?v=202606091230"></script>
-<script src="./frkl-discount-codes.js?v=202606091230"></script>
-<script src="./frkl-cvr.js?v=202606091230"></script>
-<script src="./frkl-cohorts.js?v=202606091230"></script>
-<script src="./frkl-retention.js?v=202606091230"></script>
-<script src="./frkl-clarity.js?v=202606091230"></script>
-<script src="./frkl-board-read.js?v=202606091230"></script>
+<script src="./frkl-data-loader.js?v=202606091240"></script>
+<script src="./frkl-live-data.js?v=202606091240"></script>
+<script src="./frkl-agent-insights.js?v=202606091240"></script>
+<script src="./frkl-business-data.js?v=202606091240"></script>
+<script src="./frkl-action-status.js?v=202606091240"></script>
+<script src="./frkl-patterns.js?v=202606091240"></script>
+<script src="./frkl-creators.js?v=202606091240"></script>
+<script src="./frkl-creative-vision.js?v=202606091240"></script>
+<script src="./frkl-links.js?v=202606091240"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606091240"></script>
+<script src="./frkl-events.js?v=202606091240"></script>
+<script src="./frkl-products.js?v=202606091240"></script>
+<script src="./frkl-discount-codes.js?v=202606091240"></script>
+<script src="./frkl-cvr.js?v=202606091240"></script>
+<script src="./frkl-cohorts.js?v=202606091240"></script>
+<script src="./frkl-retention.js?v=202606091240"></script>
+<script src="./frkl-clarity.js?v=202606091240"></script>
+<script src="./frkl-board-read.js?v=202606091240"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -1007,6 +1007,8 @@ function KPI({label, val, sub, badge, series, seriesLabel, current, prior, goodD
             {agent && <div className="agent">◆ {agent}</div>}
             {observation && <div className="obs">{observation}</div>}
             {implication && <div className="imp">{implication}</div>}
+            <div onClick={(e)=>{ e.stopPropagation(); if(window.__oiAsk) window.__oiAsk(`About "${label}"${val?` (currently ${val})`:''}: what's driving this, and what should I do about it?`); }}
+              style={{marginTop:8, fontSize:11, color:'#9aa6ff', cursor:'pointer', fontWeight:600}}>✦ Ask AI about this →</div>
           </div>
         )}
       </div>
@@ -6209,9 +6211,17 @@ function AskPanel(){
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [model, setModel] = useState(()=>localStorage.getItem('frkl_ask_model')||'claude-sonnet-4-5');
+  const [savedTasks, setSavedTasks] = useState({});   // message time → saved-to-board
   const clearHistory = () => { localStorage.removeItem('frkl_ask_history'); setHistory([]); };
   React.useEffect(()=>{ localStorage.setItem('frkl_ask_history', JSON.stringify(history.slice(-30))); }, [history]);
   React.useEffect(()=>{ localStorage.setItem('frkl_ask_model', model); }, [model]);
+  // "Ask about this" — a card stashed a question via window.__oiAsk; prefill it here.
+  React.useEffect(()=>{
+    const consume = () => { try { const q = window.__oiAskPending; if(q){ window.__oiAskPending = null; setQuestion(q); } } catch(e){} };
+    consume();
+    window.addEventListener('oi-ask-prefill', consume);
+    return () => window.removeEventListener('oi-ask-prefill', consume);
+  }, []);
 
   const send = async () => {
     if (!ASK || !question.trim() || loading) return;
@@ -6278,17 +6288,19 @@ ${ctxJson}`;
     }
   };
 
+  // Action-oriented prompts first (what to do / not do / what changed), then the
+  // analytical deep-dives. These are what a busy operator actually opens with.
   const quickPrompts = [
-    'What % of Meta paid spend is reaching male vs female users?',
-    'Which 3 creatives have the worst ROAS but most spend? Should I pause them?',
+    'What should I do today? Give me the top 3 actions, ranked by £ impact.',
+    'What should I NOT do this week, and why?',
+    'What changed since last week, and does any of it actually matter?',
+    'Which single action would most improve contribution margin?',
+    'Draft a Meta creative brief from the current creative + fatigue data.',
+    'Is it safe to scale Meta spend this week? Check stock cover and MER first.',
     'How is MER trending week-over-week over the last 4 weeks?',
     'Which email flow has the best revenue per recipient and which is broken?',
-    'What % of orders come from returning customers and is that improving?',
     'Which product SKUs have a return rate above 8% and what is their combined revenue?',
-    'Has site CVR improved since 13 April when Meta scaled?',
     'Which channels are growing or declining week-over-week?',
-    'Are any Meta ads at fatigue (frequency >7×) and how much spend is on them?',
-    'Whats the GA4-attributed revenue from Email vs Meta vs Google paid?',
   ];
 
   return (<div>
@@ -6324,6 +6336,13 @@ ${ctxJson}`;
             <span>{new Date(m.time).toLocaleString()}{m.usage?` · ${m.usage.input_tokens||0} in / ${m.usage.output_tokens||0} out${m.usage.cache_read_input_tokens?` · cached ${m.usage.cache_read_input_tokens}`:''}`:''}</span>
           </div>
           <div style={{fontSize:13, whiteSpace:'pre-wrap', lineHeight:1.5, color:'#e8e8ec'}}>{m.content}</div>
+          {m.role==='assistant' && (<div style={{marginTop:8, display:'flex', gap:8, alignItems:'center'}}>
+            <button onClick={()=>{ if(aiSaveTask(m.content)) setSavedTasks(s=>({...s,[m.time]:true})); }} disabled={!!savedTasks[m.time]}
+              style={{padding:'4px 10px', background:savedTasks[m.time]?'transparent':'#1a1a22', border:'1px solid '+(savedTasks[m.time]?'var(--good)':'#30303a'), borderRadius:6, color:savedTasks[m.time]?'var(--good)':'#b6b6c0', fontSize:11, cursor:savedTasks[m.time]?'default':'pointer'}}>
+              {savedTasks[m.time]?'✓ Saved to Weekly Board':'+ Save as task'}
+            </button>
+            <span style={{fontSize:10.5, color:'#7b7b87'}}>turns this into a tracked action on the Board</span>
+          </div>)}
         </div>))}
       </div>
     </div>)}
@@ -6605,6 +6624,17 @@ function BoardSpark({vals, color}){
 // carried across weeks; notes are per-week meeting minutes.
 function boardLoadActions(){ try { const a=JSON.parse(localStorage.getItem('frkl-board-actions')||'[]'); return Array.isArray(a)?a:[]; } catch(e){ return []; } }
 function boardSaveActions(a){ try { localStorage.setItem('frkl-board-actions', JSON.stringify(a)); } catch(e){} }
+// Turn an AI answer (or any finding) into a tracked task in the Weekly Board backlog.
+function aiSaveTask(text){
+  try {
+    const a = boardLoadActions();
+    const t = String(text||'').replace(/\s+/g,' ').trim().slice(0,200);
+    if(!t) return false;
+    a.push({id:'ai'+Date.now(), text:t, status:'open', raised: (typeof REAL_END!=='undefined'?REAL_END:null), doneWeek:null, source:'ai'});
+    boardSaveActions(a);
+    return true;
+  } catch(e){ return false; }
+}
 function boardLoadNotes(){ try { const n=JSON.parse(localStorage.getItem('frkl-board-notes')||'{}'); return n&&typeof n==='object'?n:{}; } catch(e){ return {}; } }
 function boardSaveNotes(n){ try { localStorage.setItem('frkl-board-notes', JSON.stringify(n)); } catch(e){} }
 
@@ -7534,6 +7564,13 @@ function App(){
       setSection(sec);
       if (sub) setSubTabBySection(p => ({...p, [sec]: sub}));
       window.scrollTo({top: 0, behavior: 'smooth'});
+    };
+    // "Ask about this" — any card can hand a question to the AI panel: stash it,
+    // jump to Home › Ask, and let AskPanel pick it up (prefilled, ready to send).
+    window.__oiAsk = (q) => {
+      try { window.__oiAskPending = q || ''; } catch(e){}
+      window.__oiNav('home', 'ask');
+      try { window.dispatchEvent(new Event('oi-ask-prefill')); } catch(e){}
     };
   }, []);
 
