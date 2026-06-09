@@ -19,24 +19,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606092900"></script>
-<script src="./frkl-live-data.js?v=202606092900"></script>
-<script src="./frkl-agent-insights.js?v=202606092900"></script>
-<script src="./frkl-business-data.js?v=202606092900"></script>
-<script src="./frkl-action-status.js?v=202606092900"></script>
-<script src="./frkl-patterns.js?v=202606092900"></script>
-<script src="./frkl-creators.js?v=202606092900"></script>
-<script src="./frkl-creative-vision.js?v=202606092900"></script>
-<script src="./frkl-links.js?v=202606092900"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606092900"></script>
-<script src="./frkl-events.js?v=202606092900"></script>
-<script src="./frkl-products.js?v=202606092900"></script>
-<script src="./frkl-discount-codes.js?v=202606092900"></script>
-<script src="./frkl-cvr.js?v=202606092900"></script>
-<script src="./frkl-cohorts.js?v=202606092900"></script>
-<script src="./frkl-retention.js?v=202606092900"></script>
-<script src="./frkl-clarity.js?v=202606092900"></script>
-<script src="./frkl-board-read.js?v=202606092900"></script>
+<script src="./frkl-data-loader.js?v=202606093000"></script>
+<script src="./frkl-live-data.js?v=202606093000"></script>
+<script src="./frkl-agent-insights.js?v=202606093000"></script>
+<script src="./frkl-business-data.js?v=202606093000"></script>
+<script src="./frkl-action-status.js?v=202606093000"></script>
+<script src="./frkl-patterns.js?v=202606093000"></script>
+<script src="./frkl-creators.js?v=202606093000"></script>
+<script src="./frkl-creative-vision.js?v=202606093000"></script>
+<script src="./frkl-links.js?v=202606093000"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606093000"></script>
+<script src="./frkl-events.js?v=202606093000"></script>
+<script src="./frkl-products.js?v=202606093000"></script>
+<script src="./frkl-discount-codes.js?v=202606093000"></script>
+<script src="./frkl-cvr.js?v=202606093000"></script>
+<script src="./frkl-cohorts.js?v=202606093000"></script>
+<script src="./frkl-retention.js?v=202606093000"></script>
+<script src="./frkl-clarity.js?v=202606093000"></script>
+<script src="./frkl-board-read.js?v=202606093000"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -3254,6 +3254,9 @@ function LtvCacCard({daily, gm, ordersPerCust}){
       </R.ComposedChart>
     </R.ResponsiveContainer>
     <div className="note" style={{marginTop:8}}>Weekly estimate: CAC = paid spend ÷ new customers (new-customer share from repeat data); LTV = AOV × gross margin ({PCT(gm)}) × repeat orders/customer. Healthy DTC unit economics run LTV:CAC ≥ 3×.</div>
+    <ChartFooter note="Is growth profitable? Watch LTV:CAC against the 3× line week to week."
+      ask="Looking at the LTV vs CAC trend, is my growth profitable and is the LTV:CAC ratio improving or deteriorating?"
+      rows={rows} columns={[{key:'label',label:'Week'},{key:'ltv',label:'LTV',right:true,fmt:v=>GBP(v)},{key:'cac',label:'CAC',right:true,fmt:v=>GBP(v)},{key:'ratio',label:'LTV:CAC',right:true,fmt:v=>v!=null?v.toFixed(2)+'×':'—'}]}/>
   </div>);
 }
 
@@ -8043,6 +8046,9 @@ function CohortsPanel(){
           </R.ComposedChart>
         </R.ResponsiveContainer>
         <div className="micro" style={{color:'var(--text-faint)', marginTop:4}}>Later months average fewer, older customers (shown on hover) — the curve is observed value to date, not a projection.</div>
+        <ChartFooter note="What a customer is worth over time — and when they pay back CAC."
+          ask="From the lifetime-value curve, how long until an average customer pays back paid CAC, and what does that mean for how aggressively I can acquire?"
+          rows={curve} columns={[{key:'m',label:'Months since 1st order'},{key:'rev',label:'Cumulative rev/cust',right:true,fmt:v=>GBP(v)},{key:'contrib',label:'Cumulative contribution/cust',right:true,fmt:v=>GBP(v)}]}/>
       </div>
       <div className="card" style={{flex:'1 1 300px'}}>
         <div className="card-section-title"><h2 style={{margin:0}}>CAC by acquisition month</h2><span className="meta">new customers vs paid CAC</span></div>
@@ -8059,6 +8065,9 @@ function CohortsPanel(){
           </R.ComposedChart>
         </R.ResponsiveContainer>
         <div className="micro" style={{color:'var(--text-faint)', marginTop:4}}>Most early customers came via unpaid channels (organic/email) — paid CAC only applies where there was paid spend.</div>
+        <ChartFooter note="Is acquisition getting more expensive over time?"
+          ask="Looking at CAC by acquisition month, is paid CAC trending up, and what's driving it?"
+          rows={cacMonths} columns={[{key:'month',label:'Month'},{key:'newCust',label:'New customers',right:true,fmt:v=>NUM(v)},{key:'cac',label:'Paid CAC',right:true,fmt:v=>v!=null?GBP(v):'—'}]}/>
       </div>
     </div>
 
@@ -8359,6 +8368,9 @@ function MarginBridge({cur, pri, gm, perOrderFixed, payPct}){
       </R.BarChart>
     </R.ResponsiveContainer>
     <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>Fully-loaded contribution = net revenue × {PCT(gm)} margin − variable costs − paid media. Bars sum exactly to the change; green helped, red hurt.</div>
+    <ChartFooter note="Which lever moved contribution most this period — and was it volume, margin, or spend?"
+      ask="From the contribution bridge, what drove the change in contribution most, and is it something I can act on?"
+      rows={rows} columns={[{key:'name',label:'Driver'},{key:'delta',label:'Δ contribution',right:true,fmt:(v,r)=>r.total!=null?GBP(r.total):(v>=0?'+':'−')+GBP(Math.abs(v))}]}/>
   </div>);
 }
 
