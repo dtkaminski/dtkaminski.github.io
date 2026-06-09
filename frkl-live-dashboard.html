@@ -18,24 +18,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606091251"></script>
-<script src="./frkl-live-data.js?v=202606091251"></script>
-<script src="./frkl-agent-insights.js?v=202606091251"></script>
-<script src="./frkl-business-data.js?v=202606091251"></script>
-<script src="./frkl-action-status.js?v=202606091251"></script>
-<script src="./frkl-patterns.js?v=202606091251"></script>
-<script src="./frkl-creators.js?v=202606091251"></script>
-<script src="./frkl-creative-vision.js?v=202606091251"></script>
-<script src="./frkl-links.js?v=202606091251"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606091251"></script>
-<script src="./frkl-events.js?v=202606091251"></script>
-<script src="./frkl-products.js?v=202606091251"></script>
-<script src="./frkl-discount-codes.js?v=202606091251"></script>
-<script src="./frkl-cvr.js?v=202606091251"></script>
-<script src="./frkl-cohorts.js?v=202606091251"></script>
-<script src="./frkl-retention.js?v=202606091251"></script>
-<script src="./frkl-clarity.js?v=202606091251"></script>
-<script src="./frkl-board-read.js?v=202606091251"></script>
+<script src="./frkl-data-loader.js?v=202606091310"></script>
+<script src="./frkl-live-data.js?v=202606091310"></script>
+<script src="./frkl-agent-insights.js?v=202606091310"></script>
+<script src="./frkl-business-data.js?v=202606091310"></script>
+<script src="./frkl-action-status.js?v=202606091310"></script>
+<script src="./frkl-patterns.js?v=202606091310"></script>
+<script src="./frkl-creators.js?v=202606091310"></script>
+<script src="./frkl-creative-vision.js?v=202606091310"></script>
+<script src="./frkl-links.js?v=202606091310"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606091310"></script>
+<script src="./frkl-events.js?v=202606091310"></script>
+<script src="./frkl-products.js?v=202606091310"></script>
+<script src="./frkl-discount-codes.js?v=202606091310"></script>
+<script src="./frkl-cvr.js?v=202606091310"></script>
+<script src="./frkl-cohorts.js?v=202606091310"></script>
+<script src="./frkl-retention.js?v=202606091310"></script>
+<script src="./frkl-clarity.js?v=202606091310"></script>
+<script src="./frkl-board-read.js?v=202606091310"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -199,6 +199,24 @@
   }
   .seg button:hover { color: var(--text-secondary); }
   .seg button.on { background: var(--bg-elevated); color: var(--text-primary); }
+
+  /* ── Mobile responsiveness (UX Phase 4) — kill horizontal overflow ──────── */
+  @media (max-width: 760px) {
+    html, body { overflow-x: hidden; max-width: 100vw; }
+    /* App-bar controls (period select + custom date range) wrap to new lines
+       instead of pushing the header — and its bits stay reachable. */
+    .appbar-inner { flex-wrap: wrap; row-gap: 6px; }
+    .appbar-spacer { flex-basis: 100%; height: 0; }
+    /* Section tabs become a horizontally-swipeable bar rather than overflowing. */
+    .tabnav { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; }
+    /* Segmented controls wrap; data tables scroll inside their own card. */
+    .seg { flex-wrap: wrap; max-width: 100%; }
+    table { display: block; width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .card, .page { max-width: 100%; box-sizing: border-box; }
+    /* Multi-column rows stack on mobile (and stop pushing the page wide). */
+    .row { flex-wrap: wrap; }
+    .card { overflow-wrap: anywhere; }
+  }
 
   /* ── Cards — neutral by default, no coloured left-borders ────────────── */
   .card {
@@ -1604,7 +1622,7 @@ function DailyPanel(){
   return (<div className="card">
     <div className="card-section-title">
       <h2 style={{margin:0}}>Today's view</h2>
-      <span className="meta">Latest day in data: <b style={{color:'var(--text-secondary)'}}>{latest}</b> · run <code style={{background:'var(--bg-elevated)',padding:'1px 6px',borderRadius:4,fontSize:11}}>frkl-refresh</code> to pull today</span>
+      <span className="meta">Latest day in data: <b style={{color:'var(--text-secondary)'}}>{latest}</b> · data auto-updates daily</span>
     </div>
     <div className="row" style={{marginBottom:'var(--s-4)'}}>
       <KPI label="Latest-day spend" val={GBP(ySpend)} sub={`7d avg ${GBP(pSpendAvg)}`} series={sSpend} seriesLabel="Daily spend · last 14 days" current={ySpend} prior={pSpendAvg} />
@@ -6491,7 +6509,7 @@ function ConnectionHealthStrip(){
       })}
     </div>
     {critical.length > 0 && (<span style={{color:'var(--bad)', fontSize:11}}>
-      {critical.map(s=>s.name).join(', ')} hasn't refreshed in &gt;4d · run <code>frkl-refresh</code>
+      {critical.map(s=>s.name).join(', ')} hasn't updated in &gt;4d — reconnect in Settings → Connections
     </span>)}
   </div>);
 }
@@ -7726,7 +7744,7 @@ function App(){
             </div>
           ))}
           <div style={{flex:1}}/>
-          <div className="meta" style={{fontSize:11}}>{D.meta.source} · captured {D.meta.captured}</div>
+          <div className="meta" style={{fontSize:11}} title={D.meta.source}>{(D.meta.source||'').split('—')[0].trim()||'Live data'} · updated {D.meta.captured}</div>
         </div>
       )}
 
@@ -7745,13 +7763,11 @@ function App(){
         <span>Operator Intelligence</span>
       </div>
       <span className="app-footer-dot"/>
-      <span>frkl workspace · {D.meta.source}</span>
+      <span title={D.meta.source}>frkl workspace · {(D.meta.source||'').split('—')[0].trim()||'Live data'}</span>
       <span className="app-footer-dot"/>
-      <span>data captured {D.meta.captured}</span>
+      <span>data updated {D.meta.captured}</span>
       <div style={{flex:1}}/>
-      <span>Refresh: <code style={{fontFamily:'JetBrains Mono, ui-monospace, monospace', fontSize:10, color:'var(--text-muted)'}}>frkl-refresh</code></span>
-      <span className="app-footer-dot"/>
-      <span>Brief: <code style={{fontFamily:'JetBrains Mono, ui-monospace, monospace', fontSize:10, color:'var(--text-muted)'}}>frkl-brief</code></span>
+      <span>Auto-updates daily</span>
     </footer>
   </div>);
 }
