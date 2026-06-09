@@ -18,23 +18,23 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606090801"></script>
-<script src="./frkl-live-data.js?v=202606090801"></script>
-<script src="./frkl-agent-insights.js?v=202606090801"></script>
-<script src="./frkl-business-data.js?v=202606090801"></script>
-<script src="./frkl-action-status.js?v=202606090801"></script>
-<script src="./frkl-patterns.js?v=202606090801"></script>
-<script src="./frkl-creators.js?v=202606090801"></script>
-<script src="./frkl-creative-vision.js?v=202606090801"></script>
-<script src="./frkl-links.js?v=202606090801"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606090801"></script>
-<script src="./frkl-events.js?v=202606090801"></script>
-<script src="./frkl-products.js?v=202606090801"></script>
-<script src="./frkl-discount-codes.js?v=202606090801"></script>
-<script src="./frkl-cvr.js?v=202606090801"></script>
-<script src="./frkl-cohorts.js?v=202606090801"></script>
-<script src="./frkl-retention.js?v=202606090801"></script>
-<script src="./frkl-clarity.js?v=202606090801"></script>
+<script src="./frkl-data-loader.js?v=202606090803"></script>
+<script src="./frkl-live-data.js?v=202606090803"></script>
+<script src="./frkl-agent-insights.js?v=202606090803"></script>
+<script src="./frkl-business-data.js?v=202606090803"></script>
+<script src="./frkl-action-status.js?v=202606090803"></script>
+<script src="./frkl-patterns.js?v=202606090803"></script>
+<script src="./frkl-creators.js?v=202606090803"></script>
+<script src="./frkl-creative-vision.js?v=202606090803"></script>
+<script src="./frkl-links.js?v=202606090803"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606090803"></script>
+<script src="./frkl-events.js?v=202606090803"></script>
+<script src="./frkl-products.js?v=202606090803"></script>
+<script src="./frkl-discount-codes.js?v=202606090803"></script>
+<script src="./frkl-cvr.js?v=202606090803"></script>
+<script src="./frkl-cohorts.js?v=202606090803"></script>
+<script src="./frkl-retention.js?v=202606090803"></script>
+<script src="./frkl-clarity.js?v=202606090803"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -4681,6 +4681,7 @@ function Products(){
         agent="Lux" observation="12 SKUs have ≥10% return rates — 'love is pain charm' hits 22% — that's a CX signal, not a quality fluke."
         implication="Add a post-purchase survey + PDP sizing/expectation copy to the top 3 hotspots before adding any new SKUs." />
     </div>
+    <StockThrottlePanel/>
     <ProductRetentionMatrix/>
     <ProductSignal/>
     <InventoryPanel/>
@@ -6791,6 +6792,40 @@ function CohortsPanel(){
     <div className="micro" style={{color:'var(--text-faint)', marginTop:12, lineHeight:1.5}}>
       {C.notes && <><b>Read carefully:</b> {C.notes.channel} {C.notes.google}</>}
     </div>
+  </div>);
+}
+
+// ── Stock-out spend throttle (Phase 4.1) ─────────────────────────────────────
+// Joins critical stock cover to product velocity: top sellers about to run out
+// are a reason to PULL paid demand, not push it.
+function StockThrottlePanel(){
+  const inv = (B && B.inventory) || [];
+  if(!inv.length) return null;
+  const risk = inv
+    .filter(r => (r.coverTier==='critical' || r.coverTier==='low') && (r.units90d||0) >= 15 && (r.inventoryQty||0) > 0)
+    .sort((a,b)=> (a.daysOfCover||999) - (b.daysOfCover||999))
+    .slice(0, 6);
+  if(!risk.length) return null;
+  const critical = risk.filter(r=>r.coverTier==='critical');
+  return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid #f87171'}}>
+    <div className="card-section-title">
+      <h2 style={{margin:0}}>⚠ Stock-out spend risk</h2>
+      <span className="meta">top sellers running low — don't scale paid behind these</span>
+    </div>
+    <div style={{fontSize:14, lineHeight:1.5, color:'var(--text-primary)', fontWeight:500, marginBottom:10}}>
+      {critical.length>0
+        ? `${critical.length} top-selling SKU${critical.length>1?'s':''} will sell out within ~2 weeks at the current pace. Pull ${critical.length>1?'them':'it'} from featured ads & creative now — paying CAC for orders you can't fulfil burns cash and goodwill.`
+        : `${risk.length} fast-moving SKU${risk.length>1?'s are':' is'} getting low on cover. Watch before scaling paid demand behind ${risk.length>1?'them':'it'}.`}
+    </div>
+    <table><thead><tr><th>SKU</th><th>Stock</th><th>Sold 90d</th><th>Days cover</th><th>Action</th></tr></thead><tbody>
+      {risk.map((r,i)=>(<tr key={i}>
+        <td style={{maxWidth:240}}><b>{(r.title||'').slice(0,40)}</b></td>
+        <td>{NUM(r.inventoryQty)}</td>
+        <td>{NUM(r.units90d)}</td>
+        <td><span style={{color: r.coverTier==='critical'?'#f87171':'var(--warn)', fontWeight:700}}>{r.daysOfCover==null||r.daysOfCover===999?'∞':r.daysOfCover+'d'}</span></td>
+        <td className="micro" style={{color:'var(--text-secondary)'}}>{r.coverTier==='critical'?'Pull from paid · reorder now':'Reorder + watch spend'}</td>
+      </tr>))}
+    </tbody></table>
   </div>);
 }
 
