@@ -19,24 +19,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606091900"></script>
-<script src="./frkl-live-data.js?v=202606091900"></script>
-<script src="./frkl-agent-insights.js?v=202606091900"></script>
-<script src="./frkl-business-data.js?v=202606091900"></script>
-<script src="./frkl-action-status.js?v=202606091900"></script>
-<script src="./frkl-patterns.js?v=202606091900"></script>
-<script src="./frkl-creators.js?v=202606091900"></script>
-<script src="./frkl-creative-vision.js?v=202606091900"></script>
-<script src="./frkl-links.js?v=202606091900"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606091900"></script>
-<script src="./frkl-events.js?v=202606091900"></script>
-<script src="./frkl-products.js?v=202606091900"></script>
-<script src="./frkl-discount-codes.js?v=202606091900"></script>
-<script src="./frkl-cvr.js?v=202606091900"></script>
-<script src="./frkl-cohorts.js?v=202606091900"></script>
-<script src="./frkl-retention.js?v=202606091900"></script>
-<script src="./frkl-clarity.js?v=202606091900"></script>
-<script src="./frkl-board-read.js?v=202606091900"></script>
+<script src="./frkl-data-loader.js?v=202606092000"></script>
+<script src="./frkl-live-data.js?v=202606092000"></script>
+<script src="./frkl-agent-insights.js?v=202606092000"></script>
+<script src="./frkl-business-data.js?v=202606092000"></script>
+<script src="./frkl-action-status.js?v=202606092000"></script>
+<script src="./frkl-patterns.js?v=202606092000"></script>
+<script src="./frkl-creators.js?v=202606092000"></script>
+<script src="./frkl-creative-vision.js?v=202606092000"></script>
+<script src="./frkl-links.js?v=202606092000"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606092000"></script>
+<script src="./frkl-events.js?v=202606092000"></script>
+<script src="./frkl-products.js?v=202606092000"></script>
+<script src="./frkl-discount-codes.js?v=202606092000"></script>
+<script src="./frkl-cvr.js?v=202606092000"></script>
+<script src="./frkl-cohorts.js?v=202606092000"></script>
+<script src="./frkl-retention.js?v=202606092000"></script>
+<script src="./frkl-clarity.js?v=202606092000"></script>
+<script src="./frkl-board-read.js?v=202606092000"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -85,6 +85,10 @@
     --bad-bg:    rgba(233,107,115,.11);
     --accent-bg: rgba(129,140,248,.09);
 
+    /* Heatmap scale (IG cadence calendar) — poor→strong engagement */
+    --heat-empty: #1a1a22; --heat-none: #2b2b34; --heat-low: #7c2d12;
+    --heat-mid: #86870a; --heat-high: #15803d; --heat-ink: #9aa0ad;
+
     /* Shadows — softer + slightly larger spread for a lifted, premium feel */
     --shadow-sm: 0 1px 2px rgba(0,0,0,.35);
     --shadow-md: 0 6px 18px rgba(0,0,0,.40);
@@ -117,6 +121,9 @@
     --warn-bg:   rgba(185,117,14,.12);
     --bad-bg:    rgba(214,52,64,.10);
     --accent-bg: rgba(90,98,212,.10);
+    /* Heatmap scale — soft tints that read on white */
+    --heat-empty: #eef1f4; --heat-none: #dfe4ea; --heat-low: #f4cdba;
+    --heat-mid: #f0e09c; --heat-high: #b6e3c6; --heat-ink: #5a606b;
     --shadow-sm: 0 1px 2px rgba(16,24,40,.06);
     --shadow-md: 0 6px 18px rgba(16,24,40,.08);
     --shadow-lg: 0 20px 44px rgba(16,24,40,.12);
@@ -5763,10 +5770,10 @@ function ContentCalendar(){
               const carousel = items.filter(i=>i.type==='CAROUSEL_ALBUM');
               const stories = items.filter(i=>i._kind==='story');
               const maxEng = items.reduce((a,i)=>Math.max(a,i.engRate||0),0);
-              const colour = !hasContent ? '#1a1a22' : maxEng>0.06 ? '#15803d' : maxEng>0.03 ? '#86870a' : maxEng>0.01 ? '#7c2d12' : '#2b2b34';
+              const colour = !hasContent ? 'var(--heat-empty)' : maxEng>0.06 ? 'var(--heat-high)' : maxEng>0.03 ? 'var(--heat-mid)' : maxEng>0.01 ? 'var(--heat-low)' : 'var(--heat-none)';
               const tooltip = items.map(i=>`${i._kind==='story'?'STORY':i.type} · ${(i.caption||'').slice(0,40)}`).join('\n');
               return (<td key={di} style={{width:50,height:48,background:colour,borderRadius:6,verticalAlign:'top',padding:4,cursor:hasContent?'pointer':'default',position:'relative'}} title={tooltip} onClick={()=>{ if(items[0]?.permalink) window.open(items[0].permalink,'_blank'); }}>
-                <div style={{fontSize:9,color:'#9090a0',fontWeight:600}}>{parseInt(date.slice(8,10))}</div>
+                <div style={{fontSize:9,color:'var(--heat-ink)',fontWeight:600}}>{parseInt(date.slice(8,10))}</div>
                 {hasContent && (<div style={{position:'absolute',bottom:2,right:2,display:'flex',gap:2}}>
                   {reels.length>0 && <span style={{fontSize:8,background:'#5b8def',color:'#fff',padding:'1px 3px',borderRadius:3,fontWeight:700}}>R{reels.length>1?reels.length:''}</span>}
                   {carousel.length>0 && <span style={{fontSize:8,background:'#c084fc',color:'#fff',padding:'1px 3px',borderRadius:3,fontWeight:700}}>F{carousel.length>1?carousel.length:''}</span>}
@@ -5778,12 +5785,12 @@ function ContentCalendar(){
         </tbody>
       </table>
     </div>
-    <div style={{marginTop:10,display:'flex',gap:14,fontSize:11,color:'#7b7b87',flexWrap:'wrap'}}>
-      <span><span style={{display:'inline-block',width:10,height:10,background:'#15803d',borderRadius:2,marginRight:4,verticalAlign:'middle'}}/>Breakout (&gt;6% eng)</span>
-      <span><span style={{display:'inline-block',width:10,height:10,background:'#86870a',borderRadius:2,marginRight:4,verticalAlign:'middle'}}/>Strong (3-6%)</span>
-      <span><span style={{display:'inline-block',width:10,height:10,background:'#7c2d12',borderRadius:2,marginRight:4,verticalAlign:'middle'}}/>Low (1-3%)</span>
-      <span><span style={{display:'inline-block',width:10,height:10,background:'#2b2b34',borderRadius:2,marginRight:4,verticalAlign:'middle'}}/>Posted, no reach data</span>
-      <span><span style={{display:'inline-block',width:10,height:10,background:'#1a1a22',borderRadius:2,marginRight:4,verticalAlign:'middle'}}/>No content</span>
+    <div style={{marginTop:10,display:'flex',gap:14,fontSize:11,color:'var(--text-muted)',flexWrap:'wrap'}}>
+      <span><span style={{display:'inline-block',width:10,height:10,background:'var(--heat-high)',borderRadius:2,marginRight:4,verticalAlign:'middle'}}/>Breakout (&gt;6% eng)</span>
+      <span><span style={{display:'inline-block',width:10,height:10,background:'var(--heat-mid)',borderRadius:2,marginRight:4,verticalAlign:'middle'}}/>Strong (3-6%)</span>
+      <span><span style={{display:'inline-block',width:10,height:10,background:'var(--heat-low)',borderRadius:2,marginRight:4,verticalAlign:'middle'}}/>Low (1-3%)</span>
+      <span><span style={{display:'inline-block',width:10,height:10,background:'var(--heat-none)',borderRadius:2,marginRight:4,verticalAlign:'middle',border:'1px solid var(--border-subtle)'}}/>Posted, no reach data</span>
+      <span><span style={{display:'inline-block',width:10,height:10,background:'var(--heat-empty)',borderRadius:2,marginRight:4,verticalAlign:'middle',border:'1px solid var(--border-subtle)'}}/>No content</span>
     </div>
     <div className="note" style={{marginTop:14}}><b>Sage's read:</b> {avgPerWeek.toFixed(1)} posts/week is on the low side for a DTC brand fighting for organic reach — 4-5/week is the active competitor benchmark. The {storyCount === 0 ? 'complete absence of Stories' : storyCount + ' story in 60 days'} is the biggest organic blind spot — Stories are the daily-cadence touchpoint that competitors (Astrid &amp; Miyu, Abbott Lyon) use for behind-the-scenes, drops, and link-to-product. Brief Angela on a weekly Story cadence (3-5/week minimum).</div>
   </div>);
@@ -5794,7 +5801,7 @@ function StoriesPanel(){
   return (<div className="card" style={{marginTop:14, borderLeft:'3px solid #fbbf24'}}>
     <h2>Instagram Stories — last 60 days</h2>
     <div className="muted" style={{marginBottom:10,fontSize:12}}>Stories are the daily-cadence organic surface. Competitors post 5-15/week; frkl posted {stories.length} in 60 days.</div>
-    {stories.length === 0 ? (<div style={{padding:20,background:'#16161b',borderRadius:8,color:'#f87171'}}>No stories posted in the last 60 days. This is a missed daily organic touchpoint — Stories outperform Feed for product link-outs and live-feel community signals.</div>) : (
+    {stories.length === 0 ? (<div style={{padding:20,background:'var(--bad-bg)',borderRadius:8,color:'var(--bad)'}}>No stories posted in the last 60 days. This is a missed daily organic touchpoint — Stories outperform Feed for product link-outs and live-feel community signals.</div>) : (
       <table><thead><tr><th>Date</th><th>Type</th><th>Views</th><th>Reach</th><th>Exits</th><th>Replies</th><th>Shares</th><th>Tap fwd</th><th>Tap back</th><th>Completion</th></tr></thead><tbody>
       {stories.map((s,i)=>{
         const completion = s.views ? 1 - (s.exits||0)/s.views : null;
