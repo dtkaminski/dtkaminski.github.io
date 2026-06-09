@@ -23,7 +23,9 @@
 
   const SUPABASE_URL = 'https://awcncqvsnuhqyihpdgcx.supabase.co';
   const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_6NLIq1JL_LZIMjez3FmnVQ_JIVw3-A2';
-  const BRAND_SLUG = 'frkl';
+  // Brand slug for the live-data fetch. Defaults to frkl; the /app shell can inject
+  // window.OI_BRAND_SLUG to point the same loader at another tenant.
+  const BRAND_SLUG = (typeof window !== 'undefined' && window.OI_BRAND_SLUG) || 'frkl';
   const POLL_INTERVAL_MS = 60_000; // 60 seconds
 
   // Public surface — accessed by the dashboard to query liveness state
