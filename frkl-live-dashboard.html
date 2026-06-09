@@ -19,24 +19,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606092600"></script>
-<script src="./frkl-live-data.js?v=202606092600"></script>
-<script src="./frkl-agent-insights.js?v=202606092600"></script>
-<script src="./frkl-business-data.js?v=202606092600"></script>
-<script src="./frkl-action-status.js?v=202606092600"></script>
-<script src="./frkl-patterns.js?v=202606092600"></script>
-<script src="./frkl-creators.js?v=202606092600"></script>
-<script src="./frkl-creative-vision.js?v=202606092600"></script>
-<script src="./frkl-links.js?v=202606092600"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606092600"></script>
-<script src="./frkl-events.js?v=202606092600"></script>
-<script src="./frkl-products.js?v=202606092600"></script>
-<script src="./frkl-discount-codes.js?v=202606092600"></script>
-<script src="./frkl-cvr.js?v=202606092600"></script>
-<script src="./frkl-cohorts.js?v=202606092600"></script>
-<script src="./frkl-retention.js?v=202606092600"></script>
-<script src="./frkl-clarity.js?v=202606092600"></script>
-<script src="./frkl-board-read.js?v=202606092600"></script>
+<script src="./frkl-data-loader.js?v=202606092700"></script>
+<script src="./frkl-live-data.js?v=202606092700"></script>
+<script src="./frkl-agent-insights.js?v=202606092700"></script>
+<script src="./frkl-business-data.js?v=202606092700"></script>
+<script src="./frkl-action-status.js?v=202606092700"></script>
+<script src="./frkl-patterns.js?v=202606092700"></script>
+<script src="./frkl-creators.js?v=202606092700"></script>
+<script src="./frkl-creative-vision.js?v=202606092700"></script>
+<script src="./frkl-links.js?v=202606092700"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606092700"></script>
+<script src="./frkl-events.js?v=202606092700"></script>
+<script src="./frkl-products.js?v=202606092700"></script>
+<script src="./frkl-discount-codes.js?v=202606092700"></script>
+<script src="./frkl-cvr.js?v=202606092700"></script>
+<script src="./frkl-cohorts.js?v=202606092700"></script>
+<script src="./frkl-retention.js?v=202606092700"></script>
+<script src="./frkl-clarity.js?v=202606092700"></script>
+<script src="./frkl-board-read.js?v=202606092700"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -605,6 +605,33 @@
   .wc-val { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-primary); display: flex; align-items: baseline; gap: 8px; }
   .wc-ch { font-size: 12.5px; font-weight: 650; }
   .wc-item svg { margin-top: 7px; }
+
+  /* ── Skeleton loading ─────────────────────────────────────────────────── */
+  .skeleton-card { border: 1px solid var(--border-subtle); border-radius: var(--r-md); background: var(--bg-card);
+    padding: 18px 20px; position: relative; overflow: hidden; }
+  .skeleton-card::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(140,140,170,0.07), transparent); animation: shimmer 1.5s infinite; }
+  .sk-bar { background: var(--border-subtle); border-radius: 6px; }
+  @keyframes shimmer { 100% { transform: translateX(100%); } }
+
+  /* ── Empty states ─────────────────────────────────────────────────────── */
+  .empty-state { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 32px 24px; }
+  .empty-state .es-ic { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+    background: var(--accent-bg); color: var(--accent); margin-bottom: 14px; }
+  .empty-state .es-title { font-size: 15px; font-weight: 650; color: var(--text-primary); margin-bottom: 6px; }
+  .empty-state .es-body { font-size: 13px; color: var(--text-secondary); line-height: 1.55; max-width: 460px; margin-bottom: 16px; }
+  .empty-state .es-actions { display: flex; gap: 9px; flex-wrap: wrap; justify-content: center; }
+
+  /* ── Sticky health summary bar — command-centre persistence on scroll ──── */
+  .health-bar { position: fixed; top: var(--appbar-h); left: 0; right: 0; z-index: 40;
+    transform: translateY(-110%); transition: transform 200ms ease, opacity 200ms ease; opacity: 0; }
+  .health-bar.show { transform: none; opacity: 1; }
+  .health-bar-inner { display: flex; align-items: center; gap: 16px; max-width: 1460px; margin: 0 auto;
+    padding: 8px 24px; background: var(--bg-elevated); border-bottom: 1px solid var(--border-default); box-shadow: var(--shadow-sm); }
+  .health-bar .hb-metric { display: inline-flex; align-items: baseline; gap: 5px; font-size: 12.5px; color: var(--text-muted); }
+  .health-bar .hb-metric b { color: var(--text-primary); font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  .health-bar .hb-spacer { flex: 1; }
+  @media (max-width: 760px) { .health-bar { display: none; } }
 
   /* ── Agent insights ─────────────────────────────────────────────────── */
   .insight { border-left: 3px solid var(--accent); }
@@ -2722,6 +2749,58 @@ function InsightActions({title, why, recommendation, agent, askQ, caveat, confid
   </div>);
 }
 
+// Skeleton placeholder — a calm shimmer while a heavy section mounts.
+function Skeleton({height}){
+  return (<div className="skeleton-card" style={{minHeight: height||320}}>
+    <div className="sk-bar" style={{width:'34%', height:13, marginBottom:9}}/>
+    <div className="sk-bar" style={{width:'52%', height:10, marginBottom:22, opacity:.7}}/>
+    <div className="sk-bar" style={{width:'100%', height:(height||320)-110, borderRadius:8, opacity:.5}}/>
+  </div>);
+}
+
+// Premium empty state — what's missing, why it matters, the fix.
+function EmptyState({icon, title, body, cta, ctaOnClick, secondary, secondaryOnClick}){
+  return (<div className="empty-state">
+    <div className="es-ic"><Icon name={icon||'info'} size={22}/></div>
+    <div className="es-title">{title}</div>
+    {body && <div className="es-body">{body}</div>}
+    <div className="es-actions">
+      {cta && <button className="btn-primary" onClick={ctaOnClick}>{cta}</button>}
+      {secondary && <button className="btn-ghost" onClick={secondaryOnClick}>{secondary}</button>}
+    </div>
+  </div>);
+}
+
+// Sticky health summary bar — keeps the verdict + £ at stake visible on scroll.
+function StickyHealthBar(){
+  const [show, setShow] = React.useState(false);
+  React.useEffect(()=>{
+    const onScroll = ()=>setShow(window.scrollY > 280);
+    window.addEventListener('scroll', onScroll, {passive:true});
+    onScroll();
+    return ()=>window.removeEventListener('scroll', onScroll);
+  }, []);
+  const P = (typeof window!=='undefined' && window.FRKL_PATTERNS) || {};
+  const roll = P.money_rollup || {};
+  const atStake = (roll.leakage||0) + (roll.at_risk||0);
+  let openCount = 0;
+  try {
+    const st = window.FRKL_ACTION_STATUS || {};
+    const local = JSON.parse(localStorage.getItem('frkl-action-local-done')||'{}');
+    openCount = Object.keys(st).filter(id=>{ const s=(st[id]||{}).status; return s!=='verified-done' && s!=='done' && !local[id]; }).length;
+  } catch(e){}
+  const status = (roll.leakage>0) ? {kind:'action', label:'Action required'} : (roll.at_risk>0) ? {kind:'watch', label:'Watch'} : {kind:'healthy', label:'Healthy'};
+  return (<div className={'health-bar'+(show?' show':'')} aria-hidden={!show}>
+    <div className="health-bar-inner">
+      <StatusBadge kind={status.kind} label={status.label}/>
+      {atStake>0 && <span className="hb-metric"><b>{atStake>=1000?'£'+(atStake/1000).toFixed(1)+'k':'£'+Math.round(atStake)}</b>/mo at stake</span>}
+      {openCount>0 && <span className="hb-metric"><b>{openCount}</b> open action{openCount===1?'':'s'}</span>}
+      <span className="hb-spacer"/>
+      <button className="ia-btn primary" onClick={()=>window.__oiNav && window.__oiNav('actions','queue')}><Icon name="clipboard" size={13}/>Review actions</button>
+    </div>
+  </div>);
+}
+
 function DataFreshness(){
   const today = (()=>{ try { return new Date(); } catch(e){ return null; } })();
   const maxDate = rows => (rows && rows.length) ? rows.reduce((m,r)=> (r.date && r.date>m) ? r.date : m, '') : '';
@@ -3477,7 +3556,7 @@ function LazyMount({minHeight, children}){
     const t = setTimeout(()=>setShown(true), 2500);
     return ()=>{ if(io) io.disconnect(); clearTimeout(t); };
   }, [shown]);
-  return <div ref={ref} style={shown?undefined:{minHeight: minHeight||320}}>{shown ? children : null}</div>;
+  return <div ref={ref}>{shown ? children : <Skeleton height={minHeight||320}/>}</div>;
 }
 
 // Mobile "Today" — a 60-second check-in: £ in play, the health verdict, the top 3
@@ -6445,7 +6524,10 @@ function ZoneHeader({number, title, meta, accent}) {
 function IntelligencePanel(){
   const P = window.FRKL_PATTERNS;
   if (!P || !Array.isArray(P.patterns)) {
-    return (<div className="card"><h2>Intelligence</h2><div className="muted">No patterns loaded. Run <code>python scripts/oi_export_patterns.py</code> to refresh.</div></div>);
+    return (<div className="card"><EmptyState icon="spark"
+      title="Intelligence is still warming up"
+      body="No patterns have been detected yet. The intelligence engine surfaces trends, step-changes and anomalies once a few days of synced data are in — check back after the next daily refresh, or ask the analyst directly in the meantime."
+      cta="Ask the AI analyst" ctaOnClick={()=>window.__oiAsk && window.__oiAsk('What are the most important things happening in my business right now?')}/></div>);
   }
   const metrics = P.metrics || {};
   const [kindFilter, setKindFilter] = useState('all');
@@ -8733,6 +8815,7 @@ function App(){
     <ToastHost/>
     <CommandMenu/>
     <EvidenceDrawer/>
+    <StickyHealthBar/>
   </div>);
 }
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
