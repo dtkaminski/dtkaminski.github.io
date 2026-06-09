@@ -18,23 +18,23 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606090757"></script>
-<script src="./frkl-live-data.js?v=202606090757"></script>
-<script src="./frkl-agent-insights.js?v=202606090757"></script>
-<script src="./frkl-business-data.js?v=202606090757"></script>
-<script src="./frkl-action-status.js?v=202606090757"></script>
-<script src="./frkl-patterns.js?v=202606090757"></script>
-<script src="./frkl-creators.js?v=202606090757"></script>
-<script src="./frkl-creative-vision.js?v=202606090757"></script>
-<script src="./frkl-links.js?v=202606090757"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606090757"></script>
-<script src="./frkl-events.js?v=202606090757"></script>
-<script src="./frkl-products.js?v=202606090757"></script>
-<script src="./frkl-discount-codes.js?v=202606090757"></script>
-<script src="./frkl-cvr.js?v=202606090757"></script>
-<script src="./frkl-cohorts.js?v=202606090757"></script>
-<script src="./frkl-retention.js?v=202606090757"></script>
-<script src="./frkl-clarity.js?v=202606090757"></script>
+<script src="./frkl-data-loader.js?v=202606090801"></script>
+<script src="./frkl-live-data.js?v=202606090801"></script>
+<script src="./frkl-agent-insights.js?v=202606090801"></script>
+<script src="./frkl-business-data.js?v=202606090801"></script>
+<script src="./frkl-action-status.js?v=202606090801"></script>
+<script src="./frkl-patterns.js?v=202606090801"></script>
+<script src="./frkl-creators.js?v=202606090801"></script>
+<script src="./frkl-creative-vision.js?v=202606090801"></script>
+<script src="./frkl-links.js?v=202606090801"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606090801"></script>
+<script src="./frkl-events.js?v=202606090801"></script>
+<script src="./frkl-products.js?v=202606090801"></script>
+<script src="./frkl-discount-codes.js?v=202606090801"></script>
+<script src="./frkl-cvr.js?v=202606090801"></script>
+<script src="./frkl-cohorts.js?v=202606090801"></script>
+<script src="./frkl-retention.js?v=202606090801"></script>
+<script src="./frkl-clarity.js?v=202606090801"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -3462,6 +3462,7 @@ function Creatives(){
   const sortedCards=[...rows].sort((a,b)=>(b[sort]||0)-(a[sort]||0));
   return (<div>
     <CreativeVisionPanel/>
+    <CreativeFatiguePanel/>
     <div className="row" style={{marginBottom:14}}>
       <KPI label="Active ads (30d)" val={rows.length} sub={`${NUM(total.impr)} impressions · reach ${NUM(total.reach)}`}
         agent="Pulse" observation="10 active ads is a small library for this spend level — concentration risk on a couple of creatives."
@@ -6790,6 +6791,57 @@ function CohortsPanel(){
     <div className="micro" style={{color:'var(--text-faint)', marginTop:12, lineHeight:1.5}}>
       {C.notes && <><b>Read carefully:</b> {C.notes.channel} {C.notes.google}</>}
     </div>
+  </div>);
+}
+
+// ── Creative fatigue → CPA causal chain (Phase 2.2) ──────────────────────────
+// Joins frequency + CTR + CPA to answer the real question when CPA rises: is it
+// creative fatigue (CTR falling as frequency climbs) or a conversion problem?
+function CreativeFatiguePanel(){
+  const rows = ((typeof window!=='undefined' && window.FRKL_DATA && window.FRKL_DATA.creatives) || []).filter(c=>(c.cost||0) > 0);
+  if(rows.length < 4) return null;
+  const FREQ = 5;
+  const agg = grp => { const spend=grp.reduce((a,c)=>a+(c.cost||0),0), purch=grp.reduce((a,c)=>a+(c.purchases||0),0), atc=grp.reduce((a,c)=>a+(c.atc||0),0);
+    return {n:grp.length, spend, purch, cpa: purch>0?spend/purch:null,
+      ctr: spend>0 ? grp.reduce((a,c)=>a+(c.linkCtr||0)*(c.cost||0),0)/spend : null,   // spend-weighted CTR
+      atcToP: atc>0 ? purch/atc : null}; };
+  const F = agg(rows.filter(c=>(c.frequency||0)>=FREQ));
+  const R = agg(rows.filter(c=>(c.frequency||0)<FREQ));
+  if(!F.n || !R.n) return null;
+  const ctrDrop = (R.ctr&&F.ctr!=null) ? (R.ctr-F.ctr)/R.ctr : null;
+  const cpaUp = (R.cpa&&F.cpa!=null) ? (F.cpa-R.cpa)/R.cpa : null;
+  const convSimilar = (F.atcToP!=null && R.atcToP!=null) ? Math.abs(F.atcToP-R.atcToP) <= R.atcToP*0.25 : null;
+  const fatList = rows.filter(c=>(c.frequency||0)>=FREQ).sort((a,b)=>(b.cost||0)-(a.cost||0)).slice(0,5);
+  // Report what's actually true. Fatigue = CTR meaningfully LOWER on high-freq ads.
+  let headline, tone;
+  if(ctrDrop!=null && ctrDrop>=0.10 && cpaUp!=null && cpaUp>0){
+    tone='bad';
+    headline = `Fatigue signal: ads past ${FREQ}× frequency run ${(ctrDrop*100).toFixed(0)}% lower CTR and ${(cpaUp*100).toFixed(0)}% higher CPA than fresh ones${convSimilar?' — but convert checkout-to-purchase about the same':''}. The CPA gap is ${convSimilar?'creative fatigue, not the offer':'driven by fatigue'} — refresh the hook before cutting budget.`;
+  } else if(ctrDrop!=null && ctrDrop<=-0.05){
+    tone='good';
+    headline = `No fatigue signal yet — your highest-frequency ads actually hold the strongest CTR (${F.ctr!=null?(F.ctr*100).toFixed(2):'—'}% vs ${R.ctr!=null?(R.ctr*100).toFixed(2):'—'}% fresh): they're scaled because they work${cpaUp!=null&&cpaUp>0.1?`, though CPA is ${(cpaUp*100).toFixed(0)}% higher (a bidding/audience-cost effect, not creative)`:''}. Keep refreshing the rotation before frequency climbs past ~8×.`;
+  } else {
+    tone='neutral';
+    headline = `${F.n} ad${F.n>1?'s are':' is'} above ${FREQ}× frequency. CTR and CPA are broadly in line with fresh ads — no clear fatigue signal, but queue new variants so the rotation stays fresh.`;
+  }
+  const Stat = ({label, fat, fresh, fmt}) => (
+    <div className="card kpi" style={{flex:'1 1 200px'}}>
+      <div className="label">{label}</div>
+      <div style={{display:'flex', gap:14, marginTop:4}}>
+        <div><div style={{fontSize:20, fontWeight:700, color:'#f87171'}}>{fmt(fat)}</div><div className="micro" style={{color:'var(--text-faint)'}}>fatigued ≥{FREQ}×</div></div>
+        <div><div style={{fontSize:20, fontWeight:700, color:'var(--good)'}}>{fmt(fresh)}</div><div className="micro" style={{color:'var(--text-faint)'}}>fresh</div></div>
+      </div>
+    </div>);
+  const toneCol = tone==='bad'?'#f87171':tone==='good'?'var(--good)':'var(--warn)';
+  return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid '+toneCol}}>
+    <div className="card-section-title"><h2 style={{margin:0}}>Creative fatigue → CPA</h2><span className="meta">{F.n} above {FREQ}× · {R.n} fresh ads</span></div>
+    <div style={{fontSize:14, lineHeight:1.5, color:'var(--text-primary)', fontWeight:500, marginBottom:10}}>{headline}</div>
+    <div className="row" style={{marginBottom:6}}>
+      <Stat label="CTR (link)" fat={F.ctr} fresh={R.ctr} fmt={v=>v!=null?(v*100).toFixed(2)+'%':'—'}/>
+      <Stat label="CPA" fat={F.cpa} fresh={R.cpa} fmt={v=>v!=null?GBP(v):'—'}/>
+      <Stat label="Cart→purchase" fat={F.atcToP} fresh={R.atcToP} fmt={v=>v!=null?PCT(v):'—'}/>
+    </div>
+    {fatList.length>0 && <div className="micro" style={{color:'var(--text-secondary)', marginTop:6}}>Refresh first (highest spend at high frequency): {fatList.map(c=>`${(c.name||'ad').slice(0,26)} (${(c.frequency||0).toFixed(1)}×)`).join(' · ')}</div>}
   </div>);
 }
 
