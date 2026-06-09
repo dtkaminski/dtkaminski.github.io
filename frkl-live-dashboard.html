@@ -18,24 +18,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606091318"></script>
-<script src="./frkl-live-data.js?v=202606091318"></script>
-<script src="./frkl-agent-insights.js?v=202606091318"></script>
-<script src="./frkl-business-data.js?v=202606091318"></script>
-<script src="./frkl-action-status.js?v=202606091318"></script>
-<script src="./frkl-patterns.js?v=202606091318"></script>
-<script src="./frkl-creators.js?v=202606091318"></script>
-<script src="./frkl-creative-vision.js?v=202606091318"></script>
-<script src="./frkl-links.js?v=202606091318"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606091318"></script>
-<script src="./frkl-events.js?v=202606091318"></script>
-<script src="./frkl-products.js?v=202606091318"></script>
-<script src="./frkl-discount-codes.js?v=202606091318"></script>
-<script src="./frkl-cvr.js?v=202606091318"></script>
-<script src="./frkl-cohorts.js?v=202606091318"></script>
-<script src="./frkl-retention.js?v=202606091318"></script>
-<script src="./frkl-clarity.js?v=202606091318"></script>
-<script src="./frkl-board-read.js?v=202606091318"></script>
+<script src="./frkl-data-loader.js?v=202606091400"></script>
+<script src="./frkl-live-data.js?v=202606091400"></script>
+<script src="./frkl-agent-insights.js?v=202606091400"></script>
+<script src="./frkl-business-data.js?v=202606091400"></script>
+<script src="./frkl-action-status.js?v=202606091400"></script>
+<script src="./frkl-patterns.js?v=202606091400"></script>
+<script src="./frkl-creators.js?v=202606091400"></script>
+<script src="./frkl-creative-vision.js?v=202606091400"></script>
+<script src="./frkl-links.js?v=202606091400"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606091400"></script>
+<script src="./frkl-events.js?v=202606091400"></script>
+<script src="./frkl-products.js?v=202606091400"></script>
+<script src="./frkl-discount-codes.js?v=202606091400"></script>
+<script src="./frkl-cvr.js?v=202606091400"></script>
+<script src="./frkl-cohorts.js?v=202606091400"></script>
+<script src="./frkl-retention.js?v=202606091400"></script>
+<script src="./frkl-clarity.js?v=202606091400"></script>
+<script src="./frkl-board-read.js?v=202606091400"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -847,6 +847,12 @@ const REAL_START = (() => { const ds=(D.shopify||[]).map(r=>r.date).sort(); retu
 // Site CVR = Shopify orders ÷ GA4 sessions; one benchmark everywhere so the dashboard
 // never shows the same KPI against two different targets.
 const CVR_BENCH = 0.015, CVR_BENCH_LABEL = '1.5%';
+// ── Brand identity for copy + LLM prompts (multi-brand). The /app shell can inject
+// window.OI_BRAND per tenant; falls back to frkl so single-tenant copy is unchanged.
+const OI_BRAND = (typeof window!=='undefined' && window.OI_BRAND) || {
+  name: 'frkl', vertical: 'demi-fine jewellery', markets: 'UK/Ireland',
+  seasonality: "Valentine's, Mother's Day and Christmas are demand peaks; post-peak softness is normal",
+};
 let ACTIVE_END = REAL_END;
 function setActiveEnd(e){ ACTIVE_END = e || REAL_END; }
 
@@ -6329,7 +6335,7 @@ function AskPanel(){
     const q = question.trim();
     const ctx = buildAskContext();
     const ctxJson = JSON.stringify(ctx);
-    const systemPrompt = `You are a senior D2C commercial analyst, growth strategist and operator for frkl, a UK/Ireland DTC jewellery brand. You are given the brand's live marketing dataset (last ~90 days, captured ${ctx._meta.captured}). Answer using ONLY the data provided. Show the calculation when possible (e.g. "£X / £Y = Z%"). Quote specific numbers and dates. If the question cannot be answered from the data, say so clearly and state what data would be needed.
+    const systemPrompt = `You are a senior D2C commercial analyst, growth strategist and operator for ${OI_BRAND.name}, a ${OI_BRAND.markets} DTC ${OI_BRAND.vertical} brand. Seasonality to keep in mind: ${OI_BRAND.seasonality}. You are given the brand's live marketing dataset (last ~90 days, captured ${ctx._meta.captured}). Answer using ONLY the data provided. Show the calculation when possible (e.g. "£X / £Y = Z%"). Quote specific numbers and dates. If the question cannot be answered from the data, say so clearly and state what data would be needed.
 
 CORE RULE: never diagnose a performance movement until you have checked for confounding factors. Do not just describe what changed — explain what most likely CAUSED it, the evidence, the caveats, and the next action. A naive read ("revenue up = healthy", "ROAS down = pause ads", "email up = send more", "AOV up = better") is a failure. Your job is to stop the founder making the wrong call because a metric moved without context.
 
