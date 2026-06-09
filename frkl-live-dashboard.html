@@ -18,24 +18,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606091415"></script>
-<script src="./frkl-live-data.js?v=202606091415"></script>
-<script src="./frkl-agent-insights.js?v=202606091415"></script>
-<script src="./frkl-business-data.js?v=202606091415"></script>
-<script src="./frkl-action-status.js?v=202606091415"></script>
-<script src="./frkl-patterns.js?v=202606091415"></script>
-<script src="./frkl-creators.js?v=202606091415"></script>
-<script src="./frkl-creative-vision.js?v=202606091415"></script>
-<script src="./frkl-links.js?v=202606091415"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606091415"></script>
-<script src="./frkl-events.js?v=202606091415"></script>
-<script src="./frkl-products.js?v=202606091415"></script>
-<script src="./frkl-discount-codes.js?v=202606091415"></script>
-<script src="./frkl-cvr.js?v=202606091415"></script>
-<script src="./frkl-cohorts.js?v=202606091415"></script>
-<script src="./frkl-retention.js?v=202606091415"></script>
-<script src="./frkl-clarity.js?v=202606091415"></script>
-<script src="./frkl-board-read.js?v=202606091415"></script>
+<script src="./frkl-data-loader.js?v=202606091422"></script>
+<script src="./frkl-live-data.js?v=202606091422"></script>
+<script src="./frkl-agent-insights.js?v=202606091422"></script>
+<script src="./frkl-business-data.js?v=202606091422"></script>
+<script src="./frkl-action-status.js?v=202606091422"></script>
+<script src="./frkl-patterns.js?v=202606091422"></script>
+<script src="./frkl-creators.js?v=202606091422"></script>
+<script src="./frkl-creative-vision.js?v=202606091422"></script>
+<script src="./frkl-links.js?v=202606091422"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606091422"></script>
+<script src="./frkl-events.js?v=202606091422"></script>
+<script src="./frkl-products.js?v=202606091422"></script>
+<script src="./frkl-discount-codes.js?v=202606091422"></script>
+<script src="./frkl-cvr.js?v=202606091422"></script>
+<script src="./frkl-cohorts.js?v=202606091422"></script>
+<script src="./frkl-retention.js?v=202606091422"></script>
+<script src="./frkl-clarity.js?v=202606091422"></script>
+<script src="./frkl-board-read.js?v=202606091422"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -427,6 +427,35 @@
   .stat.noreg  { background: var(--border-subtle); color: var(--text-faint); }
   .actionrow .ev { font-size: var(--t-micro); color: var(--text-muted); font-style: italic; }
   .impact { font-size: var(--t-micro); color: var(--good); padding: 2px 0 0 2px; }
+
+  /* ── Live action rows — aligned 3-column grid (status · content · £ impact) ── */
+  .live-row {
+    display: grid; grid-template-columns: 124px minmax(0,1fr) 96px;
+    gap: var(--s-5); align-items: start;
+    padding: 16px var(--s-3); border-top: 1px solid var(--border-subtle);
+    transition: background 120ms ease;
+  }
+  .live-row:first-of-type { border-top: none; }
+  .live-row:hover { background: rgba(255,255,255,0.022); }
+  .live-row .lr-status { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+  .live-row .lr-pill {
+    display: inline-flex; align-items: center; max-width: 100%;
+    font-size: 9px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+    padding: 3px 9px; border-radius: var(--r-full); white-space: nowrap; line-height: 1.5;
+  }
+  .live-row .lr-conf { font-size: 9.5px; font-weight: 600; letter-spacing: .02em; text-transform: none; }
+  .live-row .lr-title { font-size: 13px; line-height: 1.5; color: var(--text-secondary); }
+  .live-row .lr-title b { color: var(--text-primary); font-weight: 650; }
+  .live-row .lr-ev { font-size: 11px; color: var(--text-faint); font-style: italic; margin-top: 4px; line-height: 1.45; }
+  .live-row .lr-cta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+  .live-row .lr-impact { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; padding-top: 1px; }
+  .live-row .lr-impact .amt { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+  .live-row .lr-impact .per { display: block; font-size: 10px; color: var(--text-faint); margin-top: 1px; }
+  @media (max-width: 760px) {
+    .live-row { grid-template-columns: 1fr auto; gap: var(--s-3); }
+    .live-row .lr-status { flex-direction: row; flex-wrap: wrap; }
+    .live-row .lr-content { grid-column: 1 / -1; order: 3; }
+  }
   .impact .label { color: var(--text-muted); font-style: italic; }
   .markbtn {
     font-size: var(--t-micro); padding: 3px 8px; border-radius: var(--r-sm);
@@ -1422,17 +1451,33 @@ function ActionBoard(){
   const contraCount = open.filter(a=>contradicts(a.text)).length;
 
   // Live actions from the diagnostic → board rows (verdict + confidence + £ + playbook).
-  const renderLive = (f, i) => { const vs=verdictStyle(f.verdict); return (
-    <div className="actionrow" key={'live'+i} style={{alignItems:'baseline'}}>
-      <span style={{fontSize:9,fontWeight:700,letterSpacing:'.05em',color:vs.fg,background:vs.bg,padding:'2px 6px',borderRadius:999,flexShrink:0}}>{vs.label}</span>
-      {confChip(f.confidence||'med')}
-      {f.gbp>0 && <MoneyBadge money={{monthly_impact_gbp:f.gbp, kind: f.gbp>0?'opportunity':'leakage', confidence:f.confidence}}/>}
-      <div className="t" style={{flex:1}}>
-        <span><b>{f.area}.</b> {f.recommendation}</span>
-        {f.metric && <div className="ev">{f.metric}</div>}
-        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginTop:2}}><PlaybookHint text={`${f.recommendation} ${f.metric} ${f.area}`}/><NavChip f={f}/></div>
-      </div>
-    </div>);
+  const renderLive = (f, i) => {
+    const vs = verdictStyle(f.verdict);
+    const CONF = {
+      high: {lbl:'High confidence',   fg:'var(--good)',       bg:'rgba(110,231,183,0.12)'},
+      med:  {lbl:'Medium confidence', fg:'var(--warn)',       bg:'rgba(245,158,11,0.12)'},
+      low:  {lbl:'Low · validate',    fg:'var(--text-muted)', bg:'rgba(255,255,255,0.06)'},
+    };
+    const cf = CONF[f.confidence || 'med'] || CONF.med;
+    // £ impact: right-aligned, magnitude only; muted for "expected" (context, not opportunity).
+    const amt = f.gbp > 0 ? ('£' + (f.gbp >= 1000 ? (f.gbp/1000).toFixed(1) + 'k' : Math.round(f.gbp))) : null;
+    const impColor = f.verdict === 'expected' ? 'var(--text-muted)' : 'var(--good)';
+    return (
+      <div className="live-row" key={'live'+i}>
+        <div className="lr-status">
+          <span className="lr-pill" style={{color:vs.fg, background:vs.bg}}>{vs.label}</span>
+          <span className="lr-pill lr-conf" style={{color:cf.fg, background:cf.bg}}>{cf.lbl}</span>
+        </div>
+        <div className="lr-content">
+          <div className="lr-title"><b>{f.area}.</b> {f.recommendation}</div>
+          {f.metric && <div className="lr-ev">{f.metric}</div>}
+          <div className="lr-cta"><PlaybookHint text={`${f.recommendation} ${f.metric} ${f.area}`}/><NavChip f={f}/></div>
+        </div>
+        <div className="lr-impact">
+          {amt ? (<><span className="amt" style={{color:impColor}}>{amt}</span><span className="per">/mo</span></>)
+               : <span className="per">—</span>}
+        </div>
+      </div>);
   };
 
   return (<div className="card">
