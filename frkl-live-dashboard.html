@@ -18,24 +18,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606091430"></script>
-<script src="./frkl-live-data.js?v=202606091430"></script>
-<script src="./frkl-agent-insights.js?v=202606091430"></script>
-<script src="./frkl-business-data.js?v=202606091430"></script>
-<script src="./frkl-action-status.js?v=202606091430"></script>
-<script src="./frkl-patterns.js?v=202606091430"></script>
-<script src="./frkl-creators.js?v=202606091430"></script>
-<script src="./frkl-creative-vision.js?v=202606091430"></script>
-<script src="./frkl-links.js?v=202606091430"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606091430"></script>
-<script src="./frkl-events.js?v=202606091430"></script>
-<script src="./frkl-products.js?v=202606091430"></script>
-<script src="./frkl-discount-codes.js?v=202606091430"></script>
-<script src="./frkl-cvr.js?v=202606091430"></script>
-<script src="./frkl-cohorts.js?v=202606091430"></script>
-<script src="./frkl-retention.js?v=202606091430"></script>
-<script src="./frkl-clarity.js?v=202606091430"></script>
-<script src="./frkl-board-read.js?v=202606091430"></script>
+<script src="./frkl-data-loader.js?v=202606091438"></script>
+<script src="./frkl-live-data.js?v=202606091438"></script>
+<script src="./frkl-agent-insights.js?v=202606091438"></script>
+<script src="./frkl-business-data.js?v=202606091438"></script>
+<script src="./frkl-action-status.js?v=202606091438"></script>
+<script src="./frkl-patterns.js?v=202606091438"></script>
+<script src="./frkl-creators.js?v=202606091438"></script>
+<script src="./frkl-creative-vision.js?v=202606091438"></script>
+<script src="./frkl-links.js?v=202606091438"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606091438"></script>
+<script src="./frkl-events.js?v=202606091438"></script>
+<script src="./frkl-products.js?v=202606091438"></script>
+<script src="./frkl-discount-codes.js?v=202606091438"></script>
+<script src="./frkl-cvr.js?v=202606091438"></script>
+<script src="./frkl-cohorts.js?v=202606091438"></script>
+<script src="./frkl-retention.js?v=202606091438"></script>
+<script src="./frkl-clarity.js?v=202606091438"></script>
+<script src="./frkl-board-read.js?v=202606091438"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -53,40 +53,41 @@
     --t-display: 22px; --t-h2: 15px; --t-h3: 13px;
     --t-body: 13px;    --t-meta: 11.5px; --t-micro: 10.5px;
 
-    /* Surface — darker, more confident than before */
-    --bg-app:        #08080b;
-    --bg-card:       #111116;
-    --bg-card-hover: #16161d;
-    --bg-input:      #0a0a10;
-    --bg-elevated:   #181820;
+    /* Surface — "ink" dark: a lifted cool-slate base (NOT pure black) with clear
+       elevation layers, so cards read as surfaces, not console output. */
+    --bg-app:        #0d0f14;
+    --bg-card:       #15181f;
+    --bg-card-hover: #1b1f27;
+    --bg-input:      #0a0c10;
+    --bg-elevated:   #1e222b;
 
-    /* Border — only two tones now */
-    --border-subtle:  #1f1f27;
-    --border-default: #2a2a34;
+    /* Border — a touch more present so layers separate cleanly */
+    --border-subtle:  #242832;
+    --border-default: #313641;
 
-    /* Text — four tones */
-    --text-primary:   #f1f1f4;
-    --text-secondary: #b1b1bc;
-    --text-muted:     #7e7e8a;
-    --text-faint:     #54545e;
+    /* Text — softened top end (no pure white) for a calmer, premium contrast */
+    --text-primary:   #e8eaef;
+    --text-secondary: #aab0bd;
+    --text-muted:     #7d828f;
+    --text-faint:     #585e6a;
 
-    /* Semantic — three colours only, used sparingly */
-    --good:    #4ade80;
-    --warn:    #f5b544;
-    --bad:     #ef6b6f;
-    --accent:  #7c8cff;   /* product accent — used for primary chrome only */
-    --accent-soft: #2a2f55;
+    /* Semantic — slightly desaturated so red/green read as signal, not neon */
+    --good:    #4ec98c;
+    --warn:    #e9a23b;
+    --bad:     #e96b73;
+    --accent:  #818cf8;   /* refined indigo — primary chrome only */
+    --accent-soft: #272d4f;
 
     /* Status surfaces (tinted backgrounds for pills/banners) */
-    --good-bg:   rgba(74,222,128,.10);
-    --warn-bg:   rgba(245,181,68,.10);
-    --bad-bg:    rgba(239,107,111,.10);
-    --accent-bg: rgba(124,140,255,.08);
+    --good-bg:   rgba(78,201,140,.11);
+    --warn-bg:   rgba(233,162,59,.11);
+    --bad-bg:    rgba(233,107,115,.11);
+    --accent-bg: rgba(129,140,248,.09);
 
-    /* Shadows */
-    --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
-    --shadow-md: 0 4px 14px rgba(0,0,0,.45);
-    --shadow-lg: 0 16px 36px rgba(0,0,0,.55);
+    /* Shadows — softer + slightly larger spread for a lifted, premium feel */
+    --shadow-sm: 0 1px 2px rgba(0,0,0,.35);
+    --shadow-md: 0 6px 18px rgba(0,0,0,.40);
+    --shadow-lg: 0 20px 44px rgba(0,0,0,.50);
 
     /* Motion */
     --motion-fast: 120ms ease;
