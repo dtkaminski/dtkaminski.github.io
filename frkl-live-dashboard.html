@@ -3279,6 +3279,7 @@ function LtvCacCard({daily, gm, ordersPerCust}){
         <R.Brush {...brushProps('label')} />
       </R.ComposedChart>
     </R.ResponsiveContainer>
+    <div style={{fontSize:10.5,color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{BRUSH_HINT}</div>
     <div className="note" style={{marginTop:8}}>Weekly estimate: CAC = paid spend ÷ new customers (new-customer share from repeat data); LTV = AOV × gross margin ({PCT(gm)}) × repeat orders/customer. Healthy DTC unit economics run LTV:CAC ≥ 3×.</div>
     <ChartFooter note="Is growth profitable? Watch LTV:CAC against the 3× line week to week."
       ask="Looking at the LTV vs CAC trend, is my growth profitable and is the LTV:CAC ratio improving or deteriorating?"
@@ -4032,6 +4033,7 @@ function Overview({start, period, customActive}){
           })()}
         </R.ComposedChart>
       </R.ResponsiveContainer>
+      <div style={{fontSize:10.5,color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{BRUSH_HINT}</div>
       {(function(){ var pins=buildChartPins(daily.map(function(d){return {x:d.dlabel, date:d.date};})); if(!pins.length) return null; return (
         <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>🏷️ sales &amp; promos · 📌 your events — <span style={{color:'var(--text-muted)'}}>hover any marker for what it was</span></div>); })()}
       <ChartFooter note="Does paid spend track with revenue? Watch for spend rising while revenue flattens — that's efficiency slipping."
@@ -5277,6 +5279,7 @@ function CvrDrivers(){
           })()}
         </R.ComposedChart>
       </R.ResponsiveContainer>
+      <div style={{fontSize:10.5,color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{BRUSH_HINT}</div>
       {(function(){ var pins=buildChartPins(chartData.map(function(d){return d.w;})); if(!pins.length) return null; return (
         <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>🏷️ sales &amp; promos · 📌 your events — <span style={{color:'var(--text-muted)'}}>hover any marker for what it was</span></div>); })()}
       <ChartFooter note={`Is conversion holding above the ${CVR_BENCH_LABEL} target? A falling line on rising sessions usually means traffic-mix, not the site.`}
@@ -5458,6 +5461,7 @@ function ZoomControls({z}){
   </div>);
 }
 const ZOOM_HINT = 'Drag to pan · pinch or ⌘/Ctrl-scroll to zoom · double-click to reset';
+const BRUSH_HINT = 'Drag the slider below to scroll · drag its handles to zoom the date range';
 // Themed Recharts <Brush> for time-series charts — drag the window to scroll,
 // drag a handle to zoom the date range. Must be a direct child of the chart.
 function brushProps(key, fmt){
@@ -8091,6 +8095,7 @@ function CohortsPanel(){
             <R.Brush {...brushProps('m')} />
           </R.ComposedChart>
         </R.ResponsiveContainer>
+        <div style={{fontSize:10.5,color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{BRUSH_HINT}</div>
         <div className="micro" style={{color:'var(--text-faint)', marginTop:4}}>Later months average fewer, older customers (shown on hover) — the curve is observed value to date, not a projection.</div>
         <ChartFooter note="What a customer is worth over time — and when they pay back CAC."
           ask="From the lifetime-value curve, how long until an average customer pays back paid CAC, and what does that mean for how aggressively I can acquire?"
@@ -8110,6 +8115,7 @@ function CohortsPanel(){
             <R.Brush {...brushProps('month')} />
           </R.ComposedChart>
         </R.ResponsiveContainer>
+        <div style={{fontSize:10.5,color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{BRUSH_HINT}</div>
         <div className="micro" style={{color:'var(--text-faint)', marginTop:4}}>Most early customers came via unpaid channels (organic/email) — paid CAC only applies where there was paid spend.</div>
         <ChartFooter note="Is acquisition getting more expensive over time?"
           ask="Looking at CAC by acquisition month, is paid CAC trending up, and what's driving it?"
