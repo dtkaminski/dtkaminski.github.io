@@ -18,24 +18,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606091310"></script>
-<script src="./frkl-live-data.js?v=202606091310"></script>
-<script src="./frkl-agent-insights.js?v=202606091310"></script>
-<script src="./frkl-business-data.js?v=202606091310"></script>
-<script src="./frkl-action-status.js?v=202606091310"></script>
-<script src="./frkl-patterns.js?v=202606091310"></script>
-<script src="./frkl-creators.js?v=202606091310"></script>
-<script src="./frkl-creative-vision.js?v=202606091310"></script>
-<script src="./frkl-links.js?v=202606091310"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606091310"></script>
-<script src="./frkl-events.js?v=202606091310"></script>
-<script src="./frkl-products.js?v=202606091310"></script>
-<script src="./frkl-discount-codes.js?v=202606091310"></script>
-<script src="./frkl-cvr.js?v=202606091310"></script>
-<script src="./frkl-cohorts.js?v=202606091310"></script>
-<script src="./frkl-retention.js?v=202606091310"></script>
-<script src="./frkl-clarity.js?v=202606091310"></script>
-<script src="./frkl-board-read.js?v=202606091310"></script>
+<script src="./frkl-data-loader.js?v=202606091318"></script>
+<script src="./frkl-live-data.js?v=202606091318"></script>
+<script src="./frkl-agent-insights.js?v=202606091318"></script>
+<script src="./frkl-business-data.js?v=202606091318"></script>
+<script src="./frkl-action-status.js?v=202606091318"></script>
+<script src="./frkl-patterns.js?v=202606091318"></script>
+<script src="./frkl-creators.js?v=202606091318"></script>
+<script src="./frkl-creative-vision.js?v=202606091318"></script>
+<script src="./frkl-links.js?v=202606091318"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606091318"></script>
+<script src="./frkl-events.js?v=202606091318"></script>
+<script src="./frkl-products.js?v=202606091318"></script>
+<script src="./frkl-discount-codes.js?v=202606091318"></script>
+<script src="./frkl-cvr.js?v=202606091318"></script>
+<script src="./frkl-cohorts.js?v=202606091318"></script>
+<script src="./frkl-retention.js?v=202606091318"></script>
+<script src="./frkl-clarity.js?v=202606091318"></script>
+<script src="./frkl-board-read.js?v=202606091318"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -3108,22 +3108,8 @@ function Overview({start, period, customActive}){
   return (<div style={{display:'flex', flexDirection:'column', gap:'var(--s-5)'}}>
     {costsOpen && <CostSetupModal catalogueGm={grossMargin} onClose={()=>setCostsOpen(false)}/>}
 
-    {/* Margin-trust gate: until real costs are confirmed, every contribution/CAC/LTV
-        figure is an estimate — say so, and make fixing it one click. */}
-    {!costsVerified && (
-      <div className="card" style={{borderLeft:'3px solid var(--warn)', display:'flex', alignItems:'center', gap:16, flexWrap:'wrap'}}>
-        <div style={{flex:'1 1 420px'}}>
-          <div style={{fontWeight:650, fontSize:14.5, marginBottom:3}}>Your margin numbers are estimates</div>
-          <div className="micro" style={{color:'var(--text-secondary)', lineHeight:1.5}}>Contribution, CAC payback and LTV:CAC are running on catalogue defaults. Enter your real costs once (~5 min) to make every margin figure accurate and trustworthy.</div>
-        </div>
-        <button onClick={()=>setCostsOpen(true)} className="btn-primary" style={{flexShrink:0}}>Set up costs →</button>
-      </div>
-    )}
-    {costsVerified && (
-      <div className="micro" style={{color:'var(--text-faint)', display:'flex', alignItems:'center', gap:8}}>
-        <MarginBadge/> margin figures are based on your entered costs · <span onClick={()=>setCostsOpen(true)} style={{color:'var(--accent)', cursor:'pointer'}}>edit costs</span>
-      </div>
-    )}
+    {/* Cost-setup prompt deliberately lives BELOW the hero + diagnosis (prove value
+        first, then ask for the ~5-min margin input) — see after DiagnosticCard. */}
 
     {/* Mobile "Today" — 60-second check-in at the very top on narrow screens. */}
     {isMobile && <MobileToday/>}
@@ -3137,6 +3123,24 @@ function Overview({start, period, customActive}){
     {/* Crux verdict: compact scorecard strip + the diagnostic (with the £-bridge nested in its "thinking") */}
     <ScoresStrip metrics={dxMetrics}/>
     <DiagnosticCard metrics={dxMetrics} context={dxContext} period={customActive?null:period} onLogEvent={()=>setEvTick(t=>t+1)}/>
+
+    {/* Prove-value-first onboarding nudge: the read above already works on
+        catalogue-estimate margins — now offer the one ~5-min input that makes the
+        margin figures exact. Placed AFTER the value, framed as "make it exact". */}
+    {!costsVerified && (
+      <div className="card" style={{borderLeft:'3px solid var(--accent)', display:'flex', alignItems:'center', gap:16, flexWrap:'wrap'}}>
+        <div style={{flex:'1 1 420px'}}>
+          <div style={{fontWeight:650, fontSize:14, marginBottom:3}}>Make the margin numbers exact <span style={{fontWeight:400, color:'var(--text-faint)', fontSize:12}}>· optional, ~5 min</span></div>
+          <div className="micro" style={{color:'var(--text-secondary)', lineHeight:1.5}}>The read above already works on catalogue-estimate margins. Enter your real COGS + fulfilment once and contribution, CAC payback and LTV:CAC become exact — and carry a <b>✓ verified</b> badge for the raise.</div>
+        </div>
+        <button onClick={()=>setCostsOpen(true)} className="btn-primary" style={{flexShrink:0}}>Set up costs →</button>
+      </div>
+    )}
+    {costsVerified && (
+      <div className="micro" style={{color:'var(--text-faint)', display:'flex', alignItems:'center', gap:8}}>
+        <MarginBadge/> margin figures are based on your entered costs · <span onClick={()=>setCostsOpen(true)} style={{color:'var(--accent)', cursor:'pointer'}}>edit costs</span>
+      </div>
+    )}
 
     {/* DO THIS NEXT — the action queue sits directly under the diagnosis (what's
         happening + why → what to do), not buried beneath the analysis charts. */}
