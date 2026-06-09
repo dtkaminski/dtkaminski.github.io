@@ -19,24 +19,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606091800"></script>
-<script src="./frkl-live-data.js?v=202606091800"></script>
-<script src="./frkl-agent-insights.js?v=202606091800"></script>
-<script src="./frkl-business-data.js?v=202606091800"></script>
-<script src="./frkl-action-status.js?v=202606091800"></script>
-<script src="./frkl-patterns.js?v=202606091800"></script>
-<script src="./frkl-creators.js?v=202606091800"></script>
-<script src="./frkl-creative-vision.js?v=202606091800"></script>
-<script src="./frkl-links.js?v=202606091800"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606091800"></script>
-<script src="./frkl-events.js?v=202606091800"></script>
-<script src="./frkl-products.js?v=202606091800"></script>
-<script src="./frkl-discount-codes.js?v=202606091800"></script>
-<script src="./frkl-cvr.js?v=202606091800"></script>
-<script src="./frkl-cohorts.js?v=202606091800"></script>
-<script src="./frkl-retention.js?v=202606091800"></script>
-<script src="./frkl-clarity.js?v=202606091800"></script>
-<script src="./frkl-board-read.js?v=202606091800"></script>
+<script src="./frkl-data-loader.js?v=202606091900"></script>
+<script src="./frkl-live-data.js?v=202606091900"></script>
+<script src="./frkl-agent-insights.js?v=202606091900"></script>
+<script src="./frkl-business-data.js?v=202606091900"></script>
+<script src="./frkl-action-status.js?v=202606091900"></script>
+<script src="./frkl-patterns.js?v=202606091900"></script>
+<script src="./frkl-creators.js?v=202606091900"></script>
+<script src="./frkl-creative-vision.js?v=202606091900"></script>
+<script src="./frkl-links.js?v=202606091900"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606091900"></script>
+<script src="./frkl-events.js?v=202606091900"></script>
+<script src="./frkl-products.js?v=202606091900"></script>
+<script src="./frkl-discount-codes.js?v=202606091900"></script>
+<script src="./frkl-cvr.js?v=202606091900"></script>
+<script src="./frkl-cohorts.js?v=202606091900"></script>
+<script src="./frkl-retention.js?v=202606091900"></script>
+<script src="./frkl-clarity.js?v=202606091900"></script>
+<script src="./frkl-board-read.js?v=202606091900"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -394,21 +394,37 @@
   /* ── Tables ──────────────────────────────────────────────────────────── */
   .mrow { display: flex; justify-content: space-between; font-size: var(--t-body); }
   .mrow .k { color: var(--text-muted); } .mrow .v { font-weight: 600; }
+  /* ── Tables — one professional standard for all 40+ data tables ───────────
+     Numbers right + tabular figures so digits align in a column; text left.
+     Row label (first col) carries primary weight; body cells sit one step back
+     for a clean hierarchy. Header is a quiet uppercase micro-label over a firm
+     divider. Hover is theme-aware (token, not a white overlay). */
   table { width: 100%; border-collapse: collapse; font-size: var(--t-body); }
   th, td {
-    text-align: right; padding: var(--s-2) var(--s-3);
+    text-align: right; padding: 9px var(--s-3);
     border-bottom: 1px solid var(--border-subtle);
+    vertical-align: middle;
   }
+  td { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
   th:first-child, td:first-child { text-align: left; }
+  td:first-child { color: var(--text-primary); font-weight: 550; }
   th {
     color: var(--text-muted); font-weight: 600; font-size: 10.5px;
-    letter-spacing: .06em; text-transform: uppercase;
-    padding-bottom: var(--s-3); padding-top: 0;
-    border-bottom-color: var(--border-default);
+    letter-spacing: .06em; text-transform: uppercase; white-space: nowrap;
+    padding-bottom: var(--s-3); padding-top: 0; vertical-align: bottom;
+    border-bottom: 1px solid var(--border-default);
   }
+  /* Alignment utilities for the few columns that break the numeric default. */
+  th.tl, td.tl { text-align: left; }
+  th.tr, td.tr { text-align: right; }
+  th.tc, td.tc { text-align: center; }
+  td.tnum { font-variant-numeric: tabular-nums; }
   tbody tr { transition: background var(--motion-fast); }
-  tbody tr:hover { background: rgba(255,255,255,0.015); }
+  tbody tr:hover { background: var(--bg-card-hover); }
   tbody tr:last-child td { border-bottom: 0; }
+  /* Opt-in sticky header for tall scroll-bodied tables. */
+  table.sticky thead th { position: sticky; top: 0; z-index: 1; background: var(--bg-card); }
+  td code { font-size: 11px; color: var(--text-muted); background: var(--bg-app); padding: 1px 5px; border-radius: var(--r-sm); }
 
   /* ── Recharts global polish — quieter grid, cleaner tooltips ─────────── */
   .recharts-cartesian-grid-horizontal line,
@@ -1359,20 +1375,20 @@ function MoneyOnTablePanel(){
             <div className="meta" style={{fontSize:10}}>{m.agent || m.source} · {m.priority || ''} · {m.kind}</div>
           </td>
           <td><MoneyBadge money={m}/></td>
-          <td style={{fontSize:10, textTransform:'uppercase', letterSpacing:.04, color:confColor(m.confidence), fontWeight:600}}>{tier(m.confidence)}</td>
-          <td className="meta" style={{fontSize:11, maxWidth:320}}>{m.basis}</td>
-          <td><span className="pill grey" style={{fontSize:10}}>{m.status||'open'}</span></td>
+          <td className="tl" style={{fontSize:10, textTransform:'uppercase', letterSpacing:.04, color:confColor(m.confidence), fontWeight:600}}>{tier(m.confidence)}</td>
+          <td className="meta tl" style={{fontSize:11, maxWidth:320}}>{m.basis}</td>
+          <td className="tl"><span className="pill grey" style={{fontSize:10}}>{m.status||'open'}</span></td>
         </tr>);
       };
       return (<>
-        <table><thead><tr><th>Evidenced finding</th><th>£/mo impact</th><th>Confidence</th><th>Basis</th><th>Status</th></tr></thead>
+        <table><thead><tr><th>Evidenced finding</th><th>£/mo impact</th><th className="tl">Confidence</th><th className="tl">Basis</th><th className="tl">Status</th></tr></thead>
           <tbody>{evidenced.map(Row)}</tbody></table>
         {hypotheses.length > 0 && (<div style={{marginTop:'var(--s-5)'}}>
           <div className="card-section-title" style={{marginBottom:6}}>
             <h3 style={{margin:0, fontSize:13, color:'var(--text-muted)'}}>Hypotheses — unvalidated upside</h3>
             <span className="meta" style={{fontSize:11}}>low-confidence estimates · test before committing budget, don't bank them</span>
           </div>
-          <table style={{opacity:0.85}}><thead><tr><th>Hypothesis</th><th>£/mo if it works</th><th>Confidence</th><th>Assumption</th><th>Status</th></tr></thead>
+          <table style={{opacity:0.85}}><thead><tr><th>Hypothesis</th><th>£/mo if it works</th><th className="tl">Confidence</th><th className="tl">Assumption</th><th className="tl">Status</th></tr></thead>
             <tbody>{hypotheses.map(Row)}</tbody></table>
         </div>)}
       </>);
@@ -4024,13 +4040,13 @@ function CreatorCandidatesPanel(){
         </select>
         <span className="muted" style={{marginLeft:'auto',fontSize:11}}>{candidates.length} of {summary.totalCandidates || 0}</span>
       </div>
-      <table><thead><tr><th>Tier</th><th>Handle</th><th>Name / themes</th><th>Est. reach</th><th>Brand fit</th><th>Audience fit</th><th>Eng. quality</th><th>Composite</th><th>Status</th></tr></thead><tbody>
+      <table><thead><tr><th>Tier</th><th className="tl">Handle</th><th className="tl">Name / themes</th><th>Est. reach</th><th>Brand fit</th><th>Audience fit</th><th>Eng. quality</th><th>Composite</th><th className="tl">Status</th></tr></thead><tbody>
       {candidates.map((c,i) => {
         const color = TIER_COLOR[c.tier] || '#7b7b87';
         return (<tr key={i}>
           <td><span className="pill" style={{background:color+'22',color:color,fontSize:10,padding:'2px 8px',borderRadius:4,fontWeight:700,textTransform:'uppercase'}}>{c.tier}</span></td>
-          <td style={{fontSize:11.5}}><code>{c.handle}</code></td>
-          <td style={{fontSize:11,maxWidth:280}}>
+          <td className="tl" style={{fontSize:11.5}}><code>{c.handle}</code></td>
+          <td className="tl" style={{fontSize:11,maxWidth:280}}>
             <b>{c.name}</b>
             <div className="muted" style={{fontSize:10,marginTop:2}}>{(c.themes||[]).join(' · ')}</div>
             {(c.brand_partnerships_known||[]).length>0 && <div className="muted" style={{fontSize:10,marginTop:2}}>Past: {(c.brand_partnerships_known||[]).join(', ')}</div>}
@@ -4040,7 +4056,7 @@ function CreatorCandidatesPanel(){
           <td>{PCT(c.audience_fit)}</td>
           <td>{PCT(c.engagement_quality)}</td>
           <td><b style={{color:color}}>{PCT(c.composite)}</b></td>
-          <td><span className="pill grey" style={{fontSize:10}}>{c.status}</span></td>
+          <td className="tl"><span className="pill grey" style={{fontSize:10}}>{c.status}</span></td>
         </tr>);
       })}
       </tbody></table>
@@ -4274,10 +4290,10 @@ function BundlesPanel(){
       <div className="card" style={{flex:'2 1 460px'}}>
         <h2>Explicit stack SKUs sold (last 90d)</h2>
         <div className="muted" style={{marginBottom:8, fontSize:12}}>Each row = a stack product set up as its own SKU. Sold as one purchase.</div>
-        {explicitRows.length ? (<table><thead><tr><th>Type</th><th>Title</th><th>Units</th><th>Net rev</th><th>AOV</th><th>Returns</th></tr></thead><tbody>
+        {explicitRows.length ? (<table><thead><tr><th>Type</th><th className="tl">Title</th><th>Units</th><th>Net rev</th><th>AOV</th><th>Returns</th></tr></thead><tbody>
         {explicitRows.map((b,i)=>(<tr key={i}>
           <td><span className="pill" style={{background:'#c084fc22',color:'#c084fc',fontSize:10,padding:'2px 6px',borderRadius:4,fontWeight:600}}>{b.type}</span></td>
-          <td style={{fontSize:12, maxWidth:280}}>{b.image && <img src={b.image} style={{width:22,height:22,borderRadius:4,verticalAlign:'middle',marginRight:8,objectFit:'cover'}} onError={e=>{e.target.style.opacity=.2;}}/>}{b.title}</td>
+          <td className="tl" style={{fontSize:12, maxWidth:280}}>{b.image && <img src={b.image} style={{width:22,height:22,borderRadius:4,verticalAlign:'middle',marginRight:8,objectFit:'cover'}} onError={e=>{e.target.style.opacity=.2;}}/>}{b.title}</td>
           <td>{b.units}</td>
           <td>{GBP(b.netSales)}</td>
           <td>{GBP(b.units ? b.netSales/b.units : null)}</td>
@@ -4363,16 +4379,16 @@ function InventoryPanel(){
       <span className="muted" style={{marginLeft:'auto',fontSize:11}}>{sorted.length} of {inv.length} SKUs</span>
     </div>
     <div style={{maxHeight:560,overflowY:'auto'}}>
-      <table><thead><tr><th>Tier</th><th>SKU / title</th><th>Type</th><th>Stock</th><th>Sold 90d</th><th>Days cover</th><th>Inv £ value</th></tr></thead><tbody>
+      <table className="sticky"><thead><tr><th>Tier</th><th className="tl">SKU / title</th><th className="tl">Type</th><th>Stock</th><th>Sold 90d</th><th>Days cover</th><th>Inv £ value</th></tr></thead><tbody>
       {sorted.slice(0,80).map((r,i) => {
         const color = TIER_COLOR[r.coverTier] || '#7b7b87';
         return (<tr key={i}>
           <td><span className="pill" style={{background:color+'22',color:color,fontSize:10,padding:'2px 6px',borderRadius:4,fontWeight:700,whiteSpace:'nowrap'}}>{TIER_LABEL[r.coverTier]||r.coverTier}</span></td>
-          <td style={{fontSize:11,maxWidth:280}}>
+          <td className="tl" style={{fontSize:11,maxWidth:280}}>
             <b>{r.title}</b>
             {r.sku && <div className="muted" style={{fontSize:10}}><code>{r.sku}</code></div>}
           </td>
-          <td className="muted" style={{fontSize:11}}>{r.type||'—'}</td>
+          <td className="muted tl" style={{fontSize:11}}>{r.type||'—'}</td>
           <td><b>{r.inventoryQty}</b></td>
           <td>{r.units90d}</td>
           <td>{r.daysOfCover === null ? '∞' : r.daysOfCover === 999 ? '∞' : r.daysOfCover + 'd'}</td>
@@ -4395,7 +4411,7 @@ function CollectionsPanel(){
   return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid #38bdf8'}}>
     <h2>Collections — revenue by product category (90d)</h2>
     <div className="muted" style={{marginBottom:10, fontSize:12}}>Buyer-facing category roll-up. Click any collection's top SKUs to find drilldown candidates. Bundles are surfaced separately above.</div>
-    <table><thead><tr><th>Collection</th><th>SKUs</th><th>Units</th><th>Net rev</th><th>% rev</th><th>AOV/unit</th><th>Margin</th><th>Return</th><th>Top SKUs</th></tr></thead><tbody>
+    <table><thead><tr><th>Collection</th><th>SKUs</th><th>Units</th><th>Net rev</th><th>% rev</th><th>AOV/unit</th><th>Margin</th><th>Return</th><th className="tl">Top SKUs</th></tr></thead><tbody>
     {cols.map((c,i)=>{
       const color = COLOR[c.collection] || '#7b7b87';
       return (<tr key={i}>
@@ -4403,11 +4419,11 @@ function CollectionsPanel(){
         <td><b>{c.skus}</b>{c.skus<=2&&<span className="muted" style={{fontSize:10,marginLeft:4}}>thin range</span>}</td>
         <td>{NUM(c.units)}</td>
         <td><b>{GBP(c.netSales)}</b></td>
-        <td><span style={{display:'inline-block',width:60,background:'#23232b',borderRadius:4,height:8,position:'relative',marginRight:8,verticalAlign:'middle'}}><span style={{display:'block',width:(c.revenueShare*100)+'%',height:8,background:color,borderRadius:4,maxWidth:'100%'}}/></span>{PCT(c.revenueShare)}</td>
+        <td>{PCT(c.revenueShare)}</td>
         <td>{GBP(c.aovPerUnit)}</td>
-        <td style={{color:c.marginPct>=0.8?'#4ade80':c.marginPct>=0.6?'#fbbf24':'#f87171'}}>{PCT(c.marginPct)}</td>
-        <td style={{color:c.returnRate>=0.1?'#f87171':c.returnRate>=0.06?'#fbbf24':'#7b7b87'}}>{PCT(c.returnRate)}</td>
-        <td className="muted" style={{fontSize:11,maxWidth:240}}>{(c.topSkus||[]).map(s=>s.title?.slice(0,28)).join(' · ')}</td>
+        <td style={{color:c.marginPct>=0.8?'var(--good)':c.marginPct>=0.6?'var(--warn)':'var(--bad)',fontWeight:600}}>{PCT(c.marginPct)}</td>
+        <td style={{color:c.returnRate>=0.1?'var(--bad)':c.returnRate>=0.06?'var(--warn)':'var(--text-faint)',fontWeight:600}}>{PCT(c.returnRate)}</td>
+        <td className="muted tl" style={{fontSize:11,maxWidth:240}}>{(c.topSkus||[]).map(s=>s.title?.slice(0,28)).join(' · ')}</td>
       </tr>);
     })}
     </tbody></table>
@@ -4432,8 +4448,8 @@ function ProductTiersPanel(){
         <td><b>{GBP(t.netSales)}</b></td>
         <td>{PCT(t.netSales/total)}</td>
         <td>{GBP(t.aovPerUnit)}</td>
-        <td style={{color:t.marginPct>=0.8?'#4ade80':t.marginPct>=0.6?'#fbbf24':'#f87171'}}>{PCT(t.marginPct)}</td>
-        <td style={{color:t.returnRate>=0.1?'#f87171':t.returnRate>=0.06?'#fbbf24':'#7b7b87'}}>{PCT(t.returnRate)}</td>
+        <td style={{color:t.marginPct>=0.8?'var(--good)':t.marginPct>=0.6?'var(--warn)':'var(--bad)',fontWeight:600}}>{PCT(t.marginPct)}</td>
+        <td style={{color:t.returnRate>=0.1?'var(--bad)':t.returnRate>=0.06?'var(--warn)':'var(--text-faint)',fontWeight:600}}>{PCT(t.returnRate)}</td>
       </tr>))}
     </tbody></table>
     <div className="note" style={{marginTop:12}}><b>Tier read:</b> bases drive revenue (£23k, biggest), styles drive margin (92%, highest), charms drive volume (450 units = lowest unit price but highest engagement). A pre-styled stack is literally one of each — so the bundle thesis is exactly the multiplier this product system was designed to produce.</div>
@@ -4836,7 +4852,7 @@ function CvrDrivers(){
         <tbody>{channels.map(c=>{ const cg=c.cvrNow-c.cvrPrev; return (<tr key={c.name} style={{borderTop:'1px solid var(--border-subtle)'}}>
           <td style={{padding:'6px 8px 6px 0',fontWeight:600}}>{c.name}</td>
           <td style={{padding:'6px 8px',textAlign:'right',color:'var(--text-muted)'}}>{c.sharePrev}% → {c.shareNow}%</td>
-          <td style={{padding:'6px 8px',textAlign:'right'}}>{c.cvrPrev}% → <b>{c.cvrNow}%</b> <span style={{color:cg>=0?'#4ade80':'#ef6b6f',fontSize:11}}>{cg>=0?'+':''}{cg.toFixed(2)}</span></td></tr>); })}</tbody>
+          <td style={{padding:'6px 8px',textAlign:'right'}}>{c.cvrPrev}% → <b>{c.cvrNow}%</b> <span style={{color:cg>=0?'var(--good)':'var(--bad)',fontSize:11}}>{cg>=0?'+':''}{cg.toFixed(2)}</span></td></tr>); })}</tbody>
       </table></div>
     </div>
 
@@ -5227,23 +5243,23 @@ function RestockAlertsPanel(){
     <div style={{overflowX:'auto'}}>
       <table><thead><tr>
         {th('urgency','Urgency')}
-        <th>Product</th>
-        {th('slack','Reorder by')}
-        {th('cover','Days left')}
-        {th('vel','Sold / 90d')}
+        <th className="tl">Product</th>
+        {th('slack','Reorder by', true)}
+        {th('cover','Days left', true)}
+        {th('vel','Sold / 90d', true)}
         {th('monthlyRev','£/mo at risk', true)}
         {th('reorder','Reorder qty', true)}
       </tr></thead><tbody>
       {sorted.map((r,i)=>{ const u=U[r.urgency]; const rb=reorderByLabel(r.slack);
         return (<tr key={i}>
           <td><span className="pill" style={{background:u.bg,color:u.fg,fontSize:10,padding:'2px 7px',borderRadius:4,fontWeight:700,whiteSpace:'nowrap'}}>{u.lbl}</span></td>
-          <td style={{fontSize:12,maxWidth:260}}>
+          <td className="tl" style={{fontSize:12,maxWidth:260}}>
             <b>{r.title}</b>
             {(r.type||r.sku) && <div className="muted" style={{fontSize:10}}>{r.type||''}{r.type&&r.sku?' · ':''}{r.sku?<code>{r.sku}</code>:''} · {r.leadDays}d lead</div>}
           </td>
-          <td style={{whiteSpace:'nowrap',fontWeight:700,color:rb.overdue?'var(--bad)':'var(--text-secondary)'}}>{rb.txt}</td>
-          <td style={{whiteSpace:'nowrap',color:u.fg}}>{Math.round(r.daysOfCover)}d</td>
-          <td>{NUM(r.units90d)} <span className="muted" style={{fontSize:10}}>({r.daily.toFixed(1)}/day)</span></td>
+          <td style={{whiteSpace:'nowrap',fontWeight:700,textAlign:'right',color:rb.overdue?'var(--bad)':'var(--text-secondary)'}}>{rb.txt}</td>
+          <td style={{whiteSpace:'nowrap',textAlign:'right',color:u.fg}}>{Math.round(r.daysOfCover)}d</td>
+          <td style={{textAlign:'right'}}>{NUM(r.units90d)} <span className="muted" style={{fontSize:10}}>({r.daily.toFixed(1)}/day)</span></td>
           <td style={{textAlign:'right',fontVariantNumeric:'tabular-nums',fontWeight:700}}>{GBP(r.monthlyRev)}</td>
           <td style={{textAlign:'right',fontVariantNumeric:'tabular-nums'}}>{r.reorderQty>0?('+'+NUM(r.reorderQty)):'—'}</td>
         </tr>);
@@ -5305,16 +5321,16 @@ function Products(){
       <div className="seg">{['units','netSales','grossProfit','marginPct','returnRate'].map(s=>(<button key={s} className={sort===s?'on':''} onClick={()=>setSort(s)}>{ {units:'Units',netSales:'Revenue',grossProfit:'Gross profit',marginPct:'Margin %',returnRate:'Return %'}[s] }</button>))}</div>
     </div>
     <div className="card">
-      <table><thead><tr><th>#</th><th>Product</th><th>SKU</th><th>Units</th><th>Returns</th><th>Net rev</th><th>Gross profit</th><th>Margin</th></tr></thead><tbody>
+      <table><thead><tr><th className="tc">#</th><th className="tl">Product</th><th className="tl">SKU</th><th>Units</th><th>Returns</th><th>Net rev</th><th>Gross profit</th><th>Margin</th></tr></thead><tbody>
       {sorted.slice(0,30).map((p,i)=>(<tr key={i}>
-        <td>{i+1}</td>
-        <td style={{maxWidth:300}}>{p.image&&<img src={p.image} style={{width:22,height:22,borderRadius:4,verticalAlign:'middle',marginRight:8,objectFit:'cover',background:'#222'}} onError={e=>{e.target.style.opacity=.2;}}/>}{p.title}</td>
-        <td><span className="muted" style={{fontSize:11}}>{p.sku||'—'}</span></td>
+        <td className="tc muted">{i+1}</td>
+        <td className="tl" style={{maxWidth:300}}>{p.image&&<img src={p.image} style={{width:22,height:22,borderRadius:4,verticalAlign:'middle',marginRight:8,objectFit:'cover',background:'var(--bg-elevated)'}} onError={e=>{e.target.style.opacity=.2;}}/>}{p.title}</td>
+        <td className="tl"><span className="muted" style={{fontSize:11}}>{p.sku||'—'}</span></td>
         <td>{p.units}</td>
         <td><span className={'pill '+((p.returnRate||0)>=0.1?'red':(p.returnRate||0)>=0.05?'amber':'grey')}>{p.returns}</span></td>
         <td>{GBP(p.netSales)}</td>
         <td>{GBP(p.grossProfit)}</td>
-        <td style={{color:p.marginPct>=0.7?'#4ade80':p.marginPct>=0.4?'#fbbf24':'#f87171'}}>{PCT(p.marginPct)}</td>
+        <td style={{color:p.marginPct>=0.7?'var(--good)':p.marginPct>=0.4?'var(--warn)':'var(--bad)',fontWeight:600}}>{PCT(p.marginPct)}</td>
       </tr>))}
       </tbody></table>
     </div>
@@ -5522,11 +5538,11 @@ function EmailHealthPanel(){
     <div className="row">
       <div className="card" style={{flex:'2 1 460px'}}>
         <h2>Flow inventory vs best-practice DTC stack</h2>
-        <table><thead><tr><th>Flow</th><th>Status</th><th>Notes</th></tr></thead><tbody>
+        <table><thead><tr><th>Flow</th><th className="tl">Status</th><th className="tl">Notes</th></tr></thead><tbody>
         {flowChecklist.map((f,i)=>(<tr key={i}>
           <td style={{fontSize:12}}>{f.label} {f.critical && <span className="muted" style={{fontSize:10,marginLeft:4}}>critical</span>}</td>
-          <td>{f.present ? <span className="pill" style={{background:'#4ade8022',color:'#4ade80',fontSize:10,padding:'2px 6px',borderRadius:4,fontWeight:700}}>PRESENT</span> : <span className="pill" style={{background:'#f8717122',color:'#f87171',fontSize:10,padding:'2px 6px',borderRadius:4,fontWeight:700}}>GAP</span>}</td>
-          <td className="muted" style={{fontSize:11,maxWidth:340}}>{f.present ? (f.present_detail || '—') : (f.gap_text || 'Not detected in current flow list.')}</td>
+          <td className="tl">{f.present ? <span className="pill" style={{background:'var(--good-bg)',color:'var(--good)',fontSize:10,padding:'2px 6px',borderRadius:4,fontWeight:700}}>PRESENT</span> : <span className="pill" style={{background:'var(--bad-bg)',color:'var(--bad)',fontSize:10,padding:'2px 6px',borderRadius:4,fontWeight:700}}>GAP</span>}</td>
+          <td className="muted tl" style={{fontSize:11,maxWidth:340}}>{f.present ? (f.present_detail || '—') : (f.gap_text || 'Not detected in current flow list.')}</td>
         </tr>))}
         </tbody></table>
       </div>
@@ -5736,10 +5752,10 @@ function ContentCalendar(){
     </div>
     <div style={{overflowX:'auto'}}>
       <table style={{width:'100%',borderCollapse:'separate',borderSpacing:'4px 4px'}}>
-        <thead><tr><th></th>{dayLabels.map(d=>(<th key={d} style={{fontSize:10,color:'#6f6f7b',fontWeight:500}}>{d}</th>))}</tr></thead>
+        <thead><tr><th></th>{dayLabels.map(d=>(<th key={d} style={{fontSize:10,color:'var(--text-faint)',fontWeight:500}}>{d}</th>))}</tr></thead>
         <tbody>
           {weeks.map((wk,wi)=>(<tr key={wi}>
-            <td style={{fontSize:10,color:'#6f6f7b',padding:'0 6px',whiteSpace:'nowrap'}}>{wk[0].slice(5)}</td>
+            <td style={{fontSize:10,color:'var(--text-faint)',padding:'0 6px',whiteSpace:'nowrap'}}>{wk[0].slice(5)}</td>
             {wk.map((date,di)=>{
               const items = byDate[date] || [];
               const hasContent = items.length > 0;
@@ -5906,14 +5922,14 @@ function Competitors(){
     <div className="card" style={{marginBottom:14}}>
       <h2>Competitor matrix — Scout snapshot</h2>
       <div className="muted" style={{marginBottom:10}}>Category positioning for the demi-fine / customisable jewellery space. Refresh via Chrome (Meta Ads Library + competitor stores) when warranted — the dashboard's a flag-board, not a live scraper.</div>
-      <table><thead><tr><th>Brand</th><th>Position</th><th>AOV</th><th>Meta intensity</th><th>Threat</th><th>vs frkl</th></tr></thead><tbody>
+      <table><thead><tr><th>Brand</th><th className="tl">Position</th><th>AOV</th><th>Meta intensity</th><th>Threat</th><th className="tl">vs frkl</th></tr></thead><tbody>
       {comps.map((c,i)=>(<tr key={i}>
         <td><b>{c.name}</b><br/><span className="muted" style={{fontSize:11}}>{c.url}</span></td>
-        <td style={{maxWidth:200}}>{c.position}</td>
+        <td className="tl" style={{maxWidth:200}}>{c.position}</td>
         <td>{c.aov}</td>
         <td>{c.metaIntensity}</td>
         <td><span className={'pill '+(c.threat||'grey')}>{c.threat==='red'?'High':c.threat==='amber'?'Watch':'Low'}</span></td>
-        <td style={{fontSize:12,color:'#b6b6c0'}}>{c.vsFrkl}</td>
+        <td className="tl" style={{fontSize:12,color:'var(--text-secondary)'}}>{c.vsFrkl}</td>
       </tr>))}
       </tbody></table>
     </div>
@@ -6271,7 +6287,7 @@ function IntelligencePanel(){
             <h2 style={{margin:0}}>Attribution ledger</h2>
             <span className="meta">{hits} hits · {misses} misses · {openCount} open</span>
           </div>
-          <table><thead><tr><th>Agent</th><th>Action</th><th>Status</th><th>Baseline → Observed</th><th>Counterfactual Δ</th><th>Attributed lift</th><th>Verdict</th></tr></thead><tbody>
+          <table><thead><tr><th>Agent</th><th className="tl">Action</th><th>Status</th><th>Baseline → Observed</th><th>Counterfactual Δ</th><th>Attributed lift</th><th>Verdict</th></tr></thead><tbody>
           {attribActions.map((a, i) => {
             const m = metrics[a.predicted_metric_id] || {};
             const fmt = (v) => v == null ? '—' : (m.unit==='pct' ? (v*100).toFixed(1)+'%' : m.unit==='gbp' ? '£'+Math.round(v).toLocaleString() : m.unit==='ratio' ? v.toFixed(2)+'×' : v.toFixed(3));
@@ -6456,12 +6472,12 @@ function ForecastPanel(){
         <span className="meta">spend × ROAS × horizon · no baseline extrapolation</span>
       </div>
       <table>
-        <thead><tr><th>Channel</th><th>Inputs</th><th>Forecast revenue</th></tr></thead>
+        <thead><tr><th>Channel</th><th className="tl">Inputs</th><th>Forecast revenue</th></tr></thead>
         <tbody>
-          <tr><td><b>Meta</b></td><td className="meta" style={{fontSize:11}}>£{inputs.metaSpend}/day × {inputs.metaRoas}× × {horizon}d</td><td><b>£{Math.round(calc.metaRevenue).toLocaleString()}</b></td></tr>
-          <tr><td><b>Google</b></td><td className="meta" style={{fontSize:11}}>£{inputs.googleSpend}/day × {inputs.googleRoas}× × {horizon}d</td><td><b>£{Math.round(calc.googleRevenue).toLocaleString()}</b></td></tr>
-          {calc.emailRevenue > 0 && <tr><td><b>Email</b></td><td className="meta" style={{fontSize:11}}>£{inputs.emailUplift}/day × {horizon}d (no extrapolation)</td><td><b>£{Math.round(calc.emailRevenue).toLocaleString()}</b></td></tr>}
-          <tr style={{background:'rgba(255,255,255,0.03)', fontWeight:600}}><td>Total (paid + supplied email)</td><td></td><td><b style={{color:'var(--good)'}}>£{Math.round(calc.total).toLocaleString()}</b></td></tr>
+          <tr><td><b>Meta</b></td><td className="meta tl" style={{fontSize:11}}>£{inputs.metaSpend}/day × {inputs.metaRoas}× × {horizon}d</td><td><b>£{Math.round(calc.metaRevenue).toLocaleString()}</b></td></tr>
+          <tr><td><b>Google</b></td><td className="meta tl" style={{fontSize:11}}>£{inputs.googleSpend}/day × {inputs.googleRoas}× × {horizon}d</td><td><b>£{Math.round(calc.googleRevenue).toLocaleString()}</b></td></tr>
+          {calc.emailRevenue > 0 && <tr><td><b>Email</b></td><td className="meta tl" style={{fontSize:11}}>£{inputs.emailUplift}/day × {horizon}d (no extrapolation)</td><td><b>£{Math.round(calc.emailRevenue).toLocaleString()}</b></td></tr>}
+          <tr style={{background:'var(--bg-card-hover)', fontWeight:600}}><td>Total (paid + supplied email)</td><td></td><td><b style={{color:'var(--good)'}}>£{Math.round(calc.total).toLocaleString()}</b></td></tr>
         </tbody>
       </table>
       <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'var(--s-3)', marginTop:'var(--s-4)'}}>
