@@ -18,23 +18,23 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606090754"></script>
-<script src="./frkl-live-data.js?v=202606090754"></script>
-<script src="./frkl-agent-insights.js?v=202606090754"></script>
-<script src="./frkl-business-data.js?v=202606090754"></script>
-<script src="./frkl-action-status.js?v=202606090754"></script>
-<script src="./frkl-patterns.js?v=202606090754"></script>
-<script src="./frkl-creators.js?v=202606090754"></script>
-<script src="./frkl-creative-vision.js?v=202606090754"></script>
-<script src="./frkl-links.js?v=202606090754"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606090754"></script>
-<script src="./frkl-events.js?v=202606090754"></script>
-<script src="./frkl-products.js?v=202606090754"></script>
-<script src="./frkl-discount-codes.js?v=202606090754"></script>
-<script src="./frkl-cvr.js?v=202606090754"></script>
-<script src="./frkl-cohorts.js?v=202606090754"></script>
-<script src="./frkl-retention.js?v=202606090754"></script>
-<script src="./frkl-clarity.js?v=202606090754"></script>
+<script src="./frkl-data-loader.js?v=202606090757"></script>
+<script src="./frkl-live-data.js?v=202606090757"></script>
+<script src="./frkl-agent-insights.js?v=202606090757"></script>
+<script src="./frkl-business-data.js?v=202606090757"></script>
+<script src="./frkl-action-status.js?v=202606090757"></script>
+<script src="./frkl-patterns.js?v=202606090757"></script>
+<script src="./frkl-creators.js?v=202606090757"></script>
+<script src="./frkl-creative-vision.js?v=202606090757"></script>
+<script src="./frkl-links.js?v=202606090757"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606090757"></script>
+<script src="./frkl-events.js?v=202606090757"></script>
+<script src="./frkl-products.js?v=202606090757"></script>
+<script src="./frkl-discount-codes.js?v=202606090757"></script>
+<script src="./frkl-cvr.js?v=202606090757"></script>
+<script src="./frkl-cohorts.js?v=202606090757"></script>
+<script src="./frkl-retention.js?v=202606090757"></script>
+<script src="./frkl-clarity.js?v=202606090757"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -4971,9 +4971,27 @@ function EmailHub(){
   const lift = summary.flows.revPerRecip && summary.campaigns.revPerRecip ? (summary.flows.revPerRecip/summary.campaigns.revPerRecip).toFixed(1) : '—';
   const totalRev = (summary.flows.orderValue||0) + (summary.campaigns.orderValue||0);
   const flowShare = totalRev ? summary.flows.orderValue/totalRev : null;
+  // Discount dependency (Phase 3.2) — code-level proxy from FRKL_DISCOUNT_CODES:
+  // promo/campaign codes (pushed in broadcasts & flows) vs standing affiliate codes.
+  const _codes = (typeof window!=='undefined' && window.FRKL_DISCOUNT_CODES && window.FRKL_DISCOUNT_CODES.codes) || [];
+  const _promo = _codes.filter(c=>c && c.pattern!=='always-on');
+  const promoRev = _promo.reduce((a,c)=>a+(c.revenue||0),0);
+  const promoDisc = _promo.reduce((a,c)=>a+(c.discount||0),0);
+  const promoRate = (promoRev+promoDisc)>0 ? promoDisc/(promoRev+promoDisc) : null;
+  const alwaysOnDisc = _codes.filter(c=>c&&c.pattern==='always-on').reduce((a,c)=>a+(c.discount||0),0);
   return (<div>
     <EmailAttributionPanel/>
     <EmailHealthPanel/>
+    {_codes.length>0 && (<div className="card" style={{marginBottom:14, borderLeft:'3px solid var(--warn)'}}>
+      <h2>How discount-dependent is email-driven demand?</h2>
+      <div className="muted" style={{marginBottom:10, fontSize:12}}>Promo/campaign codes — the kind pushed in broadcasts &amp; flows — vs standing affiliate codes. <i>(A precise email-attributed split needs the Klaviyo↔Shopify order-code join; this is the code-level proxy.)</i></div>
+      <div className="row">
+        <KPI label="Revenue on promo codes" val={GBP(promoRev)} sub={`${_promo.length} campaign/promo codes`}/>
+        <KPI label="Discount given (promo)" val={GBP(promoDisc)} sub={promoRate!=null?`${PCT(promoRate)} blended off`:''} goodDirection="down"/>
+        <KPI label="Always-on affiliate leak" val={GBP(alwaysOnDisc)} sub="standing codes — margin given away regardless of channel" goodDirection="down"/>
+      </div>
+      <div className="note" style={{marginTop:6}}>If broadcast revenue mostly rides on a code, that demand is <b>rented, not owned</b> — a margin risk. Build full-price email angles (new-in, restock, editorial, UGC) so campaigns aren't only "here's a discount", and reserve codes for genuine win-back.</div>
+    </div>)}
     <div className="card" style={{marginBottom:14, borderLeft:'3px solid #c084fc'}}>
       <h2>Email is the #1 revenue channel — and flows are doing the heavy lifting</h2>
       <div className="muted" style={{marginBottom:10,fontSize:12}}>Last 90 days · Klaviyo via Supermetrics. Campaigns = broadcasts. Flows = automated triggers (welcome, abandoned cart, browse abandonment, back-in-stock, birthday).</div>
