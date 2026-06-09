@@ -18,24 +18,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606091209"></script>
-<script src="./frkl-live-data.js?v=202606091209"></script>
-<script src="./frkl-agent-insights.js?v=202606091209"></script>
-<script src="./frkl-business-data.js?v=202606091209"></script>
-<script src="./frkl-action-status.js?v=202606091209"></script>
-<script src="./frkl-patterns.js?v=202606091209"></script>
-<script src="./frkl-creators.js?v=202606091209"></script>
-<script src="./frkl-creative-vision.js?v=202606091209"></script>
-<script src="./frkl-links.js?v=202606091209"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606091209"></script>
-<script src="./frkl-events.js?v=202606091209"></script>
-<script src="./frkl-products.js?v=202606091209"></script>
-<script src="./frkl-discount-codes.js?v=202606091209"></script>
-<script src="./frkl-cvr.js?v=202606091209"></script>
-<script src="./frkl-cohorts.js?v=202606091209"></script>
-<script src="./frkl-retention.js?v=202606091209"></script>
-<script src="./frkl-clarity.js?v=202606091209"></script>
-<script src="./frkl-board-read.js?v=202606091209"></script>
+<script src="./frkl-data-loader.js?v=202606091230"></script>
+<script src="./frkl-live-data.js?v=202606091230"></script>
+<script src="./frkl-agent-insights.js?v=202606091230"></script>
+<script src="./frkl-business-data.js?v=202606091230"></script>
+<script src="./frkl-action-status.js?v=202606091230"></script>
+<script src="./frkl-patterns.js?v=202606091230"></script>
+<script src="./frkl-creators.js?v=202606091230"></script>
+<script src="./frkl-creative-vision.js?v=202606091230"></script>
+<script src="./frkl-links.js?v=202606091230"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606091230"></script>
+<script src="./frkl-events.js?v=202606091230"></script>
+<script src="./frkl-products.js?v=202606091230"></script>
+<script src="./frkl-discount-codes.js?v=202606091230"></script>
+<script src="./frkl-cvr.js?v=202606091230"></script>
+<script src="./frkl-cohorts.js?v=202606091230"></script>
+<script src="./frkl-retention.js?v=202606091230"></script>
+<script src="./frkl-clarity.js?v=202606091230"></script>
+<script src="./frkl-board-read.js?v=202606091230"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -2894,6 +2894,7 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
 function Overview({start, period, customActive}){
   const [evTick, setEvTick] = useState(0);   // bump to re-read the operator event log
   const [costsOpen, setCostsOpen] = useState(false);
+  const [showPlanning, setShowPlanning] = useState(false);  // collapse forecast/LTV deep-dive
   const costsVerified = useCostTick();       // re-renders margin figures/badges on save
   const daily = useMemo(()=>buildDaily(start),[start]);
   const end = dataEndOf();
@@ -3041,6 +3042,18 @@ function Overview({start, period, customActive}){
     <ScoresStrip metrics={dxMetrics}/>
     <DiagnosticCard metrics={dxMetrics} context={dxContext} period={customActive?null:period} onLogEvent={()=>setEvTick(t=>t+1)}/>
 
+    {/* DO THIS NEXT — the action queue sits directly under the diagnosis (what's
+        happening + why → what to do), not buried beneath the analysis charts. */}
+    <div className="section-eyebrow" style={{display:'flex',alignItems:'center',gap:8,margin:'4px 0 -4px',fontSize:11,fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--accent)'}}>
+      <span style={{width:3,height:14,background:'var(--accent)',borderRadius:2}}/>Do this next
+    </div>
+    <ActionBoard/>
+
+    {/* COMMERCIAL HEALTH */}
+    <div className="section-eyebrow" style={{display:'flex',alignItems:'center',gap:8,margin:'8px 0 -4px',fontSize:11,fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--text-muted)'}}>
+      <span style={{width:3,height:14,background:'var(--text-faint)',borderRadius:2}}/>Commercial health
+    </div>
+
     {/* KPI strip — collapsed by default, hover for full agent commentary */}
     <div>
       <div className="card-section-title" style={{marginBottom:'var(--s-3)'}}>
@@ -3104,14 +3117,8 @@ function Overview({start, period, customActive}){
       </div>
     </div>
 
-    {/* LTV : CAC tracked weekly over the selected period */}
-    <LtvCacCard daily={daily} gm={gm} ordersPerCust={ordersPerCust}/>
-
     {/* Contribution margin — editable, fully-loaded operator P&L for the period */}
     <ContributionCard rev={rev} orders={orders} paid={paid} gm={gm}/>
-
-    {/* P&L + forecast — top-down (revenue) or bottom-up (paid+organic) */}
-    <ForecastCard rev={rev} orders={orders} paid={paid} gm={gm} aov={orders?rev/orders:83} cac={cac} returningPct={returningPct}/>
 
     {/* Margin bridge — why contribution moved vs prior period (volume/price/discount/returns/paid) */}
     <MarginBridge cur={bridgeCur} pri={bridgePri} gm={gm}
@@ -3157,8 +3164,18 @@ function Overview({start, period, customActive}){
         <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>🏷️ sales &amp; promos · 📌 your events — <span style={{color:'var(--text-muted)'}}>hover any marker for what it was</span></div>); })()}
     </div>
 
-    {/* Full action board at the bottom — the long-form list */}
-    <ActionBoard/>
+    {/* PLANNING & DEEP-DIVE — forecast + unit-economics-over-time are board/planning
+        artifacts, not "what's happening this week", so they live behind a toggle. */}
+    <div className="section-eyebrow" style={{display:'flex',alignItems:'center',gap:8,margin:'8px 0 -4px',fontSize:11,fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--text-muted)'}}>
+      <span style={{width:3,height:14,background:'var(--text-faint)',borderRadius:2}}/>Planning &amp; deep-dive
+    </div>
+    <button onClick={()=>setShowPlanning(s=>!s)} className="show-more">
+      {showPlanning ? '↑ Hide planning & forecast' : '↓ Planning & forecast — LTV:CAC trend + Year-1 P&L'}
+    </button>
+    {showPlanning && (<div style={{display:'flex', flexDirection:'column', gap:'var(--s-5)', marginTop:'var(--s-4)'}}>
+      <LtvCacCard daily={daily} gm={gm} ordersPerCust={ordersPerCust}/>
+      <ForecastCard rev={rev} orders={orders} paid={paid} gm={gm} aov={orders?rev/orders:83} cac={cac} returningPct={returningPct}/>
+    </div>)}
   </div>);
 }
 
