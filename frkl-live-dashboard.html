@@ -19,24 +19,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606092100"></script>
-<script src="./frkl-live-data.js?v=202606092100"></script>
-<script src="./frkl-agent-insights.js?v=202606092100"></script>
-<script src="./frkl-business-data.js?v=202606092100"></script>
-<script src="./frkl-action-status.js?v=202606092100"></script>
-<script src="./frkl-patterns.js?v=202606092100"></script>
-<script src="./frkl-creators.js?v=202606092100"></script>
-<script src="./frkl-creative-vision.js?v=202606092100"></script>
-<script src="./frkl-links.js?v=202606092100"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606092100"></script>
-<script src="./frkl-events.js?v=202606092100"></script>
-<script src="./frkl-products.js?v=202606092100"></script>
-<script src="./frkl-discount-codes.js?v=202606092100"></script>
-<script src="./frkl-cvr.js?v=202606092100"></script>
-<script src="./frkl-cohorts.js?v=202606092100"></script>
-<script src="./frkl-retention.js?v=202606092100"></script>
-<script src="./frkl-clarity.js?v=202606092100"></script>
-<script src="./frkl-board-read.js?v=202606092100"></script>
+<script src="./frkl-data-loader.js?v=202606092200"></script>
+<script src="./frkl-live-data.js?v=202606092200"></script>
+<script src="./frkl-agent-insights.js?v=202606092200"></script>
+<script src="./frkl-business-data.js?v=202606092200"></script>
+<script src="./frkl-action-status.js?v=202606092200"></script>
+<script src="./frkl-patterns.js?v=202606092200"></script>
+<script src="./frkl-creators.js?v=202606092200"></script>
+<script src="./frkl-creative-vision.js?v=202606092200"></script>
+<script src="./frkl-links.js?v=202606092200"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606092200"></script>
+<script src="./frkl-events.js?v=202606092200"></script>
+<script src="./frkl-products.js?v=202606092200"></script>
+<script src="./frkl-discount-codes.js?v=202606092200"></script>
+<script src="./frkl-cvr.js?v=202606092200"></script>
+<script src="./frkl-cohorts.js?v=202606092200"></script>
+<script src="./frkl-retention.js?v=202606092200"></script>
+<script src="./frkl-clarity.js?v=202606092200"></script>
+<script src="./frkl-board-read.js?v=202606092200"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -2828,19 +2828,20 @@ function LtvCacCard({daily, gm, ordersPerCust}){
       <h2 style={{margin:0}}>LTV : CAC over time <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>— weekly · est.</span></h2>
       <span className="meta">This period: CAC {GBP(cacT)} · LTV {GBP(ltvT)} · ratio <b style={{color:(ratioT||0)>=3?'var(--good)':(ratioT||0)>=1?'var(--warn)':'var(--bad)'}}>{ratioT?ratioT.toFixed(1)+'×':'—'}</b> · target 3×+</span>
     </div>
-    <R.ResponsiveContainer width="100%" height={280}>
+    <R.ResponsiveContainer width="100%" height={312}>
       <R.ComposedChart data={rows} margin={{top:6,right:20,left:14,bottom:22}}>
         <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
         <R.XAxis dataKey="label" tick={{fill:'#7e7e8a',fontSize:11}} label={{value:'Week (starting)', position:'insideBottom', offset:-10, fill:'#6f6f7b', fontSize:11}}/>
         <R.YAxis yAxisId="l" tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>'£'+v} label={{value:'£ per customer', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
         <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>v+'×'} label={{value:'LTV:CAC', angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
-        <R.Tooltip contentStyle={{background:'#181820',border:'1px solid #2a2a34',borderRadius:10}} formatter={(v,nm)=> nm==='LTV:CAC' ? v+'×' : GBP(v)} labelFormatter={l=>'Week of '+l}/>
+        <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,boxShadow:'var(--shadow-md)'}} formatter={(v,nm)=> nm==='LTV:CAC' ? v+'×' : GBP(v)} labelFormatter={l=>'Week of '+l}/>
         <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}}/>
         <R.Line yAxisId="l" type="monotone" dataKey="ltv" name="LTV" stroke={COL.revenue} strokeWidth={2.2} dot={single?{r:3}:false}/>
         <R.Line yAxisId="l" type="monotone" dataKey="cac" name="CAC" stroke={COL.meta} strokeWidth={2.2} dot={single?{r:3}:false}/>
         <R.Line yAxisId="r" type="monotone" dataKey="ratio" name="LTV:CAC" stroke={COL.email} strokeWidth={2} strokeDasharray="4 3" dot={single?{r:3}:false}/>
         <R.ReferenceLine yAxisId="r" y={3} stroke="#4ade80" strokeDasharray="5 4" strokeOpacity={0.7}
           label={{value:'3× target', position:'insideTopRight', fill:'#4ade80', fontSize:10.5}}/>
+        <R.Brush {...brushProps('label')} />
       </R.ComposedChart>
     </R.ResponsiveContainer>
     <div className="note" style={{marginTop:8}}>Weekly estimate: CAC = paid spend ÷ new customers (new-customer share from repeat data); LTV = AOV × gross margin ({PCT(gm)}) × repeat orders/customer. Healthy DTC unit economics run LTV:CAC ≥ 3×.</div>
@@ -3502,7 +3503,7 @@ function Overview({start, period, customActive}){
         <h2 style={{margin:0}}>Paid spend vs Shopify revenue — daily</h2>
         <span className="meta">Bars = paid spend (left axis) · Line = net revenue (right axis)</span>
       </div>
-      <R.ResponsiveContainer width="100%" height={300}>
+      <R.ResponsiveContainer width="100%" height={334}>
         <R.ComposedChart data={daily} margin={{top:6,right:20,left:14,bottom:22}}>
           <R.CartesianGrid stroke="#1f1f27" vertical={false} />
           <R.XAxis dataKey="dlabel" tick={{fill:'#7e7e8a',fontSize:11}} interval={Math.ceil(daily.length/12)}
@@ -3511,13 +3512,14 @@ function Overview({start, period, customActive}){
                    label={{value:'Paid spend (£)', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}} />
           <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>'£'+(v/1000).toFixed(1)+'k'}
                    label={{value:'Net revenue (£)', angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}} />
-          <R.Tooltip contentStyle={{background:'#181820',border:'1px solid #2a2a34',borderRadius:10}}
+          <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,boxShadow:'var(--shadow-md)'}}
                      formatter={(v,n)=>[GBP(v),n]}
                      labelFormatter={(l,p)=> (p&&p[0]&&p[0].payload&&p[0].payload.date) ? p[0].payload.date : l} />
           <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}} />
           <R.Bar yAxisId="l" dataKey="metaSpend" stackId="s" name="Meta spend" fill={COL.meta} />
           <R.Bar yAxisId="l" dataKey="googleSpend" stackId="s" name="Google spend" fill={COL.google} />
           <R.Line yAxisId="r" type="monotone" dataKey="revenue" name="Shopify net rev" stroke={COL.revenue} strokeWidth={2.4} dot={false} />
+          <R.Brush {...brushProps('dlabel')} />
           {/* Event & sale pins: same hoverable markers as the CVR trend so spikes have a named cause. */}
           {(function(){ var pins=buildChartPins(daily.map(function(d){return {x:d.dlabel, date:d.date};}));
             return pins.map(function(p,i){ return (
@@ -4740,15 +4742,16 @@ function CvrDrivers(){
         {[[0,'All'],[90,'90d'],[60,'60d'],[30,'30d'],[14,'14d']].map(([d,l])=>(<button key={l} onClick={()=>setChartDays(d)} style={segBtn(chartDays===d)}>{l}</button>))}
         <span style={{fontSize:11,color:'var(--text-faint)',marginLeft:4}}>{chartData.length} {chartGran==='day'?'days':'weeks'}{chartGran==='day'?' · daily CVR is noisier — read the trend, not single days':''}</span>
       </div>
-      <R.ResponsiveContainer width="100%" height={250}>
+      <R.ResponsiveContainer width="100%" height={288}>
         <R.ComposedChart data={chartData} margin={{top:6,right:14,left:8,bottom:20}}>
           <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
           <R.XAxis dataKey="w" tickFormatter={fmtWk} tick={{fill:'#7e7e8a',fontSize:10.5}} interval={Math.ceil(chartData.length/9)} tickMargin={8} label={{value:chartGran==='day'?'Day':'Week', position:'insideBottom', offset:-10, fill:'#6f6f7b', fontSize:11}}/>
           <R.YAxis yAxisId="l" tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>v+'%'} label={{value:'CVR (sessions→order)', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
           <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>(v/1000).toFixed(0)+'k'} label={{value:'Sessions', angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
-          <R.Tooltip contentStyle={{background:'#181820',border:'1px solid #2a2a34',borderRadius:10,fontSize:12}} labelFormatter={w=>(chartGran==='day'?'':'Week of ')+fmtWk(w)} formatter={(v,n)=> n==='CVR'?v+'%':NUM(v)}/>
+          <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,fontSize:12,boxShadow:'var(--shadow-md)'}} labelFormatter={w=>(chartGran==='day'?'':'Week of ')+fmtWk(w)} formatter={(v,n)=> n==='CVR'?v+'%':NUM(v)}/>
           <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}}/>
           <R.Bar yAxisId="r" dataKey="sessions" name="Sessions" fill="#26262e" maxBarSize={30}/>
+          <R.Brush {...brushProps('w', fmtWk)} />
           <R.Line yAxisId="l" type="monotone" dataKey="cvr" name="CVR" stroke="#7c8cff" strokeWidth={2.5} dot={false}/>
           {/* Show, don't tell: the single CVR benchmark drawn on the chart so the gap is visible, not described. */}
           <R.ReferenceLine yAxisId="l" y={CVR_BENCH*100} stroke="#4ade80" strokeDasharray="5 4" strokeOpacity={0.75}
@@ -4928,6 +4931,12 @@ function ZoomControls({z}){
   </div>);
 }
 const ZOOM_HINT = 'Drag to pan · scroll to zoom · double-click to reset';
+// Themed Recharts <Brush> for time-series charts — drag the window to scroll,
+// drag a handle to zoom the date range. Must be a direct child of the chart.
+function brushProps(key, fmt){
+  return { dataKey:key, height:24, travellerWidth:9, gap:1,
+           stroke:'var(--accent)', fill:'var(--bg-app)', tickFormatter:fmt };
+}
 
 function ProductSignal(){
   const S = computeProductSignals();
@@ -7525,32 +7534,34 @@ function CohortsPanel(){
     <div className="row">
       <div className="card" style={{flex:'2 1 480px'}}>
         <div className="card-section-title"><h2 style={{margin:0}}>Lifetime value curve</h2><span className="meta">cumulative £ per customer by months since first order</span></div>
-        <R.ResponsiveContainer width="100%" height={260}>
+        <R.ResponsiveContainer width="100%" height={292}>
           <R.ComposedChart data={curve} margin={{top:8,right:18,left:6,bottom:6}}>
             <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
             <R.XAxis dataKey="m" tick={{fill:'#7e7e8a',fontSize:11}}/>
             <R.YAxis tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>'£'+v}/>
-            <R.Tooltip contentStyle={{background:'#181820',border:'1px solid #2a2a34',borderRadius:10}} formatter={(v,n)=>[GBP(v), n==='contrib'?'Contribution':'Revenue']}
+            <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,boxShadow:'var(--shadow-md)'}} formatter={(v,n)=>[GBP(v), n==='contrib'?'Contribution':'Revenue']}
               labelFormatter={(l,p)=> l + (p&&p[0]&&p[0].payload? ' · '+p[0].payload.n+' customers observed':'')}/>
             <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}}/>
             {paidCac!=null && <R.ReferenceLine y={paidCac} stroke="#f4a23b" strokeDasharray="5 4" strokeOpacity={0.8} label={{value:'paid CAC', position:'insideTopRight', fill:'#f4a23b', fontSize:10}}/>}
             <R.Area type="monotone" dataKey="rev" name="Revenue" stroke={COL.revenue} fill={COL.revenue+'22'} strokeWidth={2}/>
             <R.Line type="monotone" dataKey="contrib" name="Contribution" stroke="#a78bfa" strokeWidth={2.4} dot={false}/>
+            <R.Brush {...brushProps('m')} />
           </R.ComposedChart>
         </R.ResponsiveContainer>
         <div className="micro" style={{color:'var(--text-faint)', marginTop:4}}>Later months average fewer, older customers (shown on hover) — the curve is observed value to date, not a projection.</div>
       </div>
       <div className="card" style={{flex:'1 1 300px'}}>
         <div className="card-section-title"><h2 style={{margin:0}}>CAC by acquisition month</h2><span className="meta">new customers vs paid CAC</span></div>
-        <R.ResponsiveContainer width="100%" height={260}>
+        <R.ResponsiveContainer width="100%" height={292}>
           <R.ComposedChart data={cacMonths} margin={{top:8,right:14,left:6,bottom:6}}>
             <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
             <R.XAxis dataKey="month" tick={{fill:'#7e7e8a',fontSize:10}}/>
             <R.YAxis yAxisId="l" tick={{fill:'#7e7e8a',fontSize:10}}/>
             <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#7e7e8a',fontSize:10}} tickFormatter={v=>'£'+v}/>
-            <R.Tooltip contentStyle={{background:'#181820',border:'1px solid #2a2a34',borderRadius:10}} formatter={(v,n)=> n==='cac'?[v!=null?GBP(v):'no paid spend','Paid CAC']:[NUM(v),'New customers']}/>
+            <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,boxShadow:'var(--shadow-md)'}} formatter={(v,n)=> n==='cac'?[v!=null?GBP(v):'no paid spend','Paid CAC']:[NUM(v),'New customers']}/>
             <R.Bar yAxisId="l" dataKey="newCust" name="New customers" fill={COL.sessions} radius={[2,2,0,0]}/>
             <R.Line yAxisId="r" type="monotone" dataKey="cac" name="cac" stroke={COL.google} strokeWidth={2.2} dot={{r:2.5}} connectNulls/>
+            <R.Brush {...brushProps('month')} />
           </R.ComposedChart>
         </R.ResponsiveContainer>
         <div className="micro" style={{color:'var(--text-faint)', marginTop:4}}>Most early customers came via unpaid channels (organic/email) — paid CAC only applies where there was paid spend.</div>
