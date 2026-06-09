@@ -19,24 +19,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606092700"></script>
-<script src="./frkl-live-data.js?v=202606092700"></script>
-<script src="./frkl-agent-insights.js?v=202606092700"></script>
-<script src="./frkl-business-data.js?v=202606092700"></script>
-<script src="./frkl-action-status.js?v=202606092700"></script>
-<script src="./frkl-patterns.js?v=202606092700"></script>
-<script src="./frkl-creators.js?v=202606092700"></script>
-<script src="./frkl-creative-vision.js?v=202606092700"></script>
-<script src="./frkl-links.js?v=202606092700"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606092700"></script>
-<script src="./frkl-events.js?v=202606092700"></script>
-<script src="./frkl-products.js?v=202606092700"></script>
-<script src="./frkl-discount-codes.js?v=202606092700"></script>
-<script src="./frkl-cvr.js?v=202606092700"></script>
-<script src="./frkl-cohorts.js?v=202606092700"></script>
-<script src="./frkl-retention.js?v=202606092700"></script>
-<script src="./frkl-clarity.js?v=202606092700"></script>
-<script src="./frkl-board-read.js?v=202606092700"></script>
+<script src="./frkl-data-loader.js?v=202606092800"></script>
+<script src="./frkl-live-data.js?v=202606092800"></script>
+<script src="./frkl-agent-insights.js?v=202606092800"></script>
+<script src="./frkl-business-data.js?v=202606092800"></script>
+<script src="./frkl-action-status.js?v=202606092800"></script>
+<script src="./frkl-patterns.js?v=202606092800"></script>
+<script src="./frkl-creators.js?v=202606092800"></script>
+<script src="./frkl-creative-vision.js?v=202606092800"></script>
+<script src="./frkl-links.js?v=202606092800"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606092800"></script>
+<script src="./frkl-events.js?v=202606092800"></script>
+<script src="./frkl-products.js?v=202606092800"></script>
+<script src="./frkl-discount-codes.js?v=202606092800"></script>
+<script src="./frkl-cvr.js?v=202606092800"></script>
+<script src="./frkl-cohorts.js?v=202606092800"></script>
+<script src="./frkl-retention.js?v=202606092800"></script>
+<script src="./frkl-clarity.js?v=202606092800"></script>
+<script src="./frkl-board-read.js?v=202606092800"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -632,6 +632,20 @@
   .health-bar .hb-metric b { color: var(--text-primary); font-size: 13.5px; font-variant-numeric: tabular-nums; }
   .health-bar .hb-spacer { flex: 1; }
   @media (max-width: 760px) { .health-bar { display: none; } }
+
+  /* ── Chart card footer — interpretation + view-as-table + ask AI ──────── */
+  .chart-foot { display: flex; align-items: center; gap: 12px; margin-top: 9px; padding-top: 9px;
+    border-top: 1px solid var(--border-subtle); flex-wrap: wrap; }
+  .cf-note { font-size: 11.5px; color: var(--text-faint); line-height: 1.45; flex: 1 1 200px; }
+  .cf-btn { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 550; font-family: inherit;
+    padding: 4px 9px; border-radius: var(--r-sm); border: 1px solid var(--border-default); background: var(--bg-card);
+    color: var(--text-secondary); cursor: pointer; transition: all var(--motion-fast); white-space: nowrap; }
+  .cf-btn:hover { color: var(--text-primary); border-color: var(--text-faint); }
+  .cf-btn .oi-ic { color: var(--text-faint); }
+  .cf-btn:hover .oi-ic { color: var(--text-secondary); }
+  .cf-table-wrap { margin-top: 10px; max-height: 320px; overflow: auto; border: 1px solid var(--border-subtle); border-radius: var(--r-md); }
+  .cf-table-wrap table { font-size: 12px; }
+  .cf-table-wrap thead th { position: sticky; top: 0; background: var(--bg-card); }
 
   /* ── Agent insights ─────────────────────────────────────────────────── */
   .insight { border-left: 3px solid var(--accent); }
@@ -2801,6 +2815,25 @@ function StickyHealthBar(){
   </div>);
 }
 
+// Chart card footer — short interpretation + view-as-table + ask-AI-about-this.
+function ChartFooter({note, ask, rows, columns}){
+  const [tbl, setTbl] = React.useState(false);
+  const hasTable = rows && rows.length && columns && columns.length;
+  return (<>
+    <div className="chart-foot">
+      {note && <span className="cf-note">{note}</span>}
+      {!note && <span style={{flex:1}}/>}
+      {hasTable && <button className="cf-btn" onClick={()=>setTbl(v=>!v)}><Icon name="clipboard" size={12}/>{tbl?'Hide table':'View as table'}</button>}
+      {ask && <button className="cf-btn" onClick={()=>window.__oiAsk && window.__oiAsk(ask)}><Icon name="spark" size={12}/>Ask AI about this</button>}
+    </div>
+    {tbl && hasTable && (<div className="cf-table-wrap">
+      <table><thead><tr>{columns.map((c,i)=>(<th key={i} className={c.right?'':'tl'}>{c.label}</th>))}</tr></thead>
+        <tbody>{rows.map((r,ri)=>(<tr key={ri}>{columns.map((c,ci)=>(<td key={ci} className={c.right?'':'tl'}>{c.fmt?c.fmt(r[c.key], r):r[c.key]}</td>))}</tr>))}</tbody>
+      </table>
+    </div>)}
+  </>);
+}
+
 function DataFreshness(){
   const today = (()=>{ try { return new Date(); } catch(e){ return null; } })();
   const maxDate = rows => (rows && rows.length) ? rows.reduce((m,r)=> (r.date && r.date>m) ? r.date : m, '') : '';
@@ -3967,6 +4000,14 @@ function Overview({start, period, customActive}){
       </R.ResponsiveContainer>
       {(function(){ var pins=buildChartPins(daily.map(function(d){return {x:d.dlabel, date:d.date};})); if(!pins.length) return null; return (
         <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>🏷️ sales &amp; promos · 📌 your events — <span style={{color:'var(--text-muted)'}}>hover any marker for what it was</span></div>); })()}
+      <ChartFooter note="Does paid spend track with revenue? Watch for spend rising while revenue flattens — that's efficiency slipping."
+        ask="Looking at daily paid spend vs Shopify revenue, is my paid media still efficient, and what changed?"
+        rows={daily} columns={[
+          {key:'dlabel', label:'Date'},
+          {key:'metaSpend', label:'Meta spend', right:true, fmt:v=>GBP(v)},
+          {key:'googleSpend', label:'Google spend', right:true, fmt:v=>GBP(v)},
+          {key:'revenue', label:'Net revenue', right:true, fmt:v=>GBP(v)},
+        ]}/>
     </div></LazyMount>
 
     {/* PLANNING & DEEP-DIVE — forecast + unit-economics-over-time are board/planning
@@ -5204,6 +5245,13 @@ function CvrDrivers(){
       </R.ResponsiveContainer>
       {(function(){ var pins=buildChartPins(chartData.map(function(d){return d.w;})); if(!pins.length) return null; return (
         <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>🏷️ sales &amp; promos · 📌 your events — <span style={{color:'var(--text-muted)'}}>hover any marker for what it was</span></div>); })()}
+      <ChartFooter note={`Is conversion holding above the ${CVR_BENCH_LABEL} target? A falling line on rising sessions usually means traffic-mix, not the site.`}
+        ask="Looking at the weekly conversion-rate trend vs sessions, what's driving CVR and is it a site problem or a traffic-mix one?"
+        rows={chartData} columns={[
+          {key:'w', label:'Week', fmt:v=>fmtWk(v)},
+          {key:'cvr', label:'CVR', right:true, fmt:v=>v!=null?v+'%':'—'},
+          {key:'sessions', label:'Sessions', right:true, fmt:v=>NUM(v)},
+        ]}/>
     </div>
 
     <div className="card" style={{marginBottom:14}}>
