@@ -18,23 +18,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606090937"></script>
-<script src="./frkl-live-data.js?v=202606090937"></script>
-<script src="./frkl-agent-insights.js?v=202606090937"></script>
-<script src="./frkl-business-data.js?v=202606090937"></script>
-<script src="./frkl-action-status.js?v=202606090937"></script>
-<script src="./frkl-patterns.js?v=202606090937"></script>
-<script src="./frkl-creators.js?v=202606090937"></script>
-<script src="./frkl-creative-vision.js?v=202606090937"></script>
-<script src="./frkl-links.js?v=202606090937"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606090937"></script>
-<script src="./frkl-events.js?v=202606090937"></script>
-<script src="./frkl-products.js?v=202606090937"></script>
-<script src="./frkl-discount-codes.js?v=202606090937"></script>
-<script src="./frkl-cvr.js?v=202606090937"></script>
-<script src="./frkl-cohorts.js?v=202606090937"></script>
-<script src="./frkl-retention.js?v=202606090937"></script>
-<script src="./frkl-clarity.js?v=202606090937"></script>
+<script src="./frkl-data-loader.js?v=202606090950"></script>
+<script src="./frkl-live-data.js?v=202606090950"></script>
+<script src="./frkl-agent-insights.js?v=202606090950"></script>
+<script src="./frkl-business-data.js?v=202606090950"></script>
+<script src="./frkl-action-status.js?v=202606090950"></script>
+<script src="./frkl-patterns.js?v=202606090950"></script>
+<script src="./frkl-creators.js?v=202606090950"></script>
+<script src="./frkl-creative-vision.js?v=202606090950"></script>
+<script src="./frkl-links.js?v=202606090950"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606090950"></script>
+<script src="./frkl-events.js?v=202606090950"></script>
+<script src="./frkl-products.js?v=202606090950"></script>
+<script src="./frkl-discount-codes.js?v=202606090950"></script>
+<script src="./frkl-cvr.js?v=202606090950"></script>
+<script src="./frkl-cohorts.js?v=202606090950"></script>
+<script src="./frkl-retention.js?v=202606090950"></script>
+<script src="./frkl-clarity.js?v=202606090950"></script>
+<script src="./frkl-board-read.js?v=202606090950"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -6564,6 +6565,30 @@ function WeeklyBoard(){
         <button onClick={()=>window.print()} className="board-nav-btn" title="Print / save this week as a PDF board pack">⎙ Print</button>
       </div>
     </div>
+
+    {/* LLM analyst read (last 7d) — shown on the latest week; rule-based read below is the deterministic baseline */}
+    {(function(){
+      var br = (typeof window!=='undefined' && window.FRKL_BOARD_READ) || null;
+      if(!br || !br.read || idx < weeks.length-2) return null;   // show on the two most recent weeks (covers default + in-progress)
+      var r = br.read;
+      return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid var(--accent)'}}>
+        <div className="card-section-title">
+          <h2 style={{margin:0}}>✦ Analyst read</h2>
+          <span className="meta">AI · last 7 days to {br.asOf} · {r.model||'llm'}</span>
+        </div>
+        <p style={{margin:'0 0 10px', fontSize:16, lineHeight:1.5, color:'var(--text-primary)', fontWeight:500}}>{r.headline}</p>
+        {r.narrative && <p style={{margin:'0 0 12px', fontSize:13.5, lineHeight:1.55, color:'var(--text-secondary)'}}>{r.narrative}</p>}
+        {(r.findings||[]).length>0 && <div style={{display:'flex', flexDirection:'column', gap:7}}>
+          {r.findings.map(function(f,i){ var col = f.verdict==='act'?'#f87171':f.verdict==='monitor'?'var(--warn)':'var(--text-faint)';
+            return (<div key={i} style={{display:'flex', gap:8, alignItems:'baseline', fontSize:13}}>
+              <span className="pill" style={{background:col+'22', color:col, fontSize:9.5, fontWeight:700, padding:'2px 7px', borderRadius:'var(--r-full)', textTransform:'uppercase', flexShrink:0}}>{f.verdict}</span>
+              <span style={{color:'var(--text-secondary)'}}><b style={{color:'var(--text-primary)'}}>{f.metric}{f.gbp!=null?` (£${NUM(f.gbp)})`:''}</b> — {f.recommendation}</span>
+            </div>); })}
+        </div>}
+        {(r.blindspots||[]).length>0 && <div className="micro" style={{color:'var(--text-faint)', marginTop:10}}>Blind spots: {r.blindspots.join(' · ')}</div>}
+        <div className="micro" style={{color:'var(--text-faint)', marginTop:8, fontStyle:'italic'}}>AI-written from your data; £ figures grounded against the dataset. The rule-based read below is the deterministic baseline.</div>
+      </div>);
+    })()}
 
     {/* Commentary — the report-card narrative: headline + what worked / what to watch / context */}
     <div className="card board-commentary" style={{marginBottom:14, borderLeft:`3px solid ${commentary.verdict==='Strong week'?'var(--good)':commentary.verdict==='Tough week'?'#f87171':commentary.verdict==='Mixed week'?'var(--warn)':'var(--accent)'}`}}>
