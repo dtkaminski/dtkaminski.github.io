@@ -18,24 +18,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606091018"></script>
-<script src="./frkl-live-data.js?v=202606091018"></script>
-<script src="./frkl-agent-insights.js?v=202606091018"></script>
-<script src="./frkl-business-data.js?v=202606091018"></script>
-<script src="./frkl-action-status.js?v=202606091018"></script>
-<script src="./frkl-patterns.js?v=202606091018"></script>
-<script src="./frkl-creators.js?v=202606091018"></script>
-<script src="./frkl-creative-vision.js?v=202606091018"></script>
-<script src="./frkl-links.js?v=202606091018"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606091018"></script>
-<script src="./frkl-events.js?v=202606091018"></script>
-<script src="./frkl-products.js?v=202606091018"></script>
-<script src="./frkl-discount-codes.js?v=202606091018"></script>
-<script src="./frkl-cvr.js?v=202606091018"></script>
-<script src="./frkl-cohorts.js?v=202606091018"></script>
-<script src="./frkl-retention.js?v=202606091018"></script>
-<script src="./frkl-clarity.js?v=202606091018"></script>
-<script src="./frkl-board-read.js?v=202606091018"></script>
+<script src="./frkl-data-loader.js?v=202606091021"></script>
+<script src="./frkl-live-data.js?v=202606091021"></script>
+<script src="./frkl-agent-insights.js?v=202606091021"></script>
+<script src="./frkl-business-data.js?v=202606091021"></script>
+<script src="./frkl-action-status.js?v=202606091021"></script>
+<script src="./frkl-patterns.js?v=202606091021"></script>
+<script src="./frkl-creators.js?v=202606091021"></script>
+<script src="./frkl-creative-vision.js?v=202606091021"></script>
+<script src="./frkl-links.js?v=202606091021"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606091021"></script>
+<script src="./frkl-events.js?v=202606091021"></script>
+<script src="./frkl-products.js?v=202606091021"></script>
+<script src="./frkl-discount-codes.js?v=202606091021"></script>
+<script src="./frkl-cvr.js?v=202606091021"></script>
+<script src="./frkl-cohorts.js?v=202606091021"></script>
+<script src="./frkl-retention.js?v=202606091021"></script>
+<script src="./frkl-clarity.js?v=202606091021"></script>
+<script src="./frkl-board-read.js?v=202606091021"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -6047,6 +6047,22 @@ function buildAskContext(){
   // Aims to stay well under 100k tokens so prompt caching covers most of the cost.
   const D = window.FRKL_DATA || {}, B = window.FRKL_BUSINESS || {};
   const tail = (a, n=14) => Array.isArray(a) ? a.slice(-n) : a;
+  // Data-quality guardrail — the same partial-window / small-sample protection the
+  // automated reads get, computed client-side so the interactive analyst can't
+  // diagnose off a half-finished day or a thin order base for any window the user asks about.
+  const _shp = D.shopify || [];
+  let _today = ''; try { _today = new Date().toISOString().slice(0,10); } catch(e) {}
+  const _dates = _shp.map(r=>r && r.date).filter(Boolean).sort();
+  const _latestDate = _dates.length ? _dates[_dates.length-1] : null;
+  const _partialLatestDay = !!(_latestDate && _today && _latestDate >= _today);
+  let _lastCompleteDate = _latestDate;
+  if (_partialLatestDay && _latestDate) { try { const d=new Date(_latestDate+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()-1); _lastCompleteDate=d.toISOString().slice(0,10); } catch(e) {} }
+  const _recentDailyOrders = _shp.slice(-10).map(r=>({date:r&&r.date, orders: Math.round(Number(r&&r.orders)||0)}));
+  const dataQuality = {
+    latestDate: _latestDate, today: _today, partialLatestDay: _partialLatestDay,
+    lastCompleteDate: _lastCompleteDate, recentDailyOrders: _recentDailyOrders, smallSampleOrders: 60,
+    note: 'GUARDRAIL (must reflect in confidence + caveats): when answering about a recent window, treat the latest date as a PARTIAL/incomplete day if partialLatestDay is true — never read a partial-window dip as a real decline; compare complete days only (≤ lastCompleteDate) or say the period is still in progress. If the window in question has under ~60 orders (see recentDailyOrders), treat CVR/AOV swings as possible sampling noise and lower confidence accordingly.',
+  };
   const ctx = {
     _meta: { brand:'frkl', currency:'GBP', captured:D.meta?.captured, range:D.meta?.range,
       data_dictionary: {
@@ -6077,8 +6093,9 @@ function buildAskContext(){
         'Meta claims ~10x more revenue than GA4 attributes; both are real, neither is the whole truth.',
         'Frkl is an Irish/UK demi-fine jewellery brand; 97% of paid spend reaches female users.',
         'Email flows generate 19x more revenue per recipient than campaigns.',
-        'Today (latest date) may be a partial day — caveat any "today" answers.',
+        'Today (latest date) may be a partial day — caveat any "today" answers (see dataQuality).',
       ],
+      dataQuality,
     },
     metaDaily: D.metaDaily || [],
     googleAds: D.googleAds || [],
@@ -6134,7 +6151,7 @@ CORE RULE: never diagnose a performance movement until you have checked for conf
 
 For any "why did X change / what happened / analyse performance" question, work through this before concluding:
 1. DECOMPOSE the move and locate the layer — demand generation (spend/sessions/impressions/CTR) → conversion (CVR/ATC/checkout/device) → order economics (AOV/discount/margin/returns) → customer mix (new vs returning/email share) → product mix (hero SKU/stock) → context. Diagnose in that order; don't blame conversion if demand fell, or demand if a bestseller was out of stock.
-2. BASELINE — was the comparison period normal, or inflated/depressed by a promo, launch, stockout or quiet week? If the prior period was abnormal, say so and compare to the multi-week / seasonal baseline. A drop after a promo is usually reversion, not weakening demand.
+2. BASELINE — was the comparison period normal, or inflated/depressed by a promo, launch, stockout or quiet week? If the prior period was abnormal, say so and compare to the multi-week / seasonal baseline. A drop after a promo is usually reversion, not weakening demand. Honour _meta.dataQuality: if partialLatestDay is true the latest date is an incomplete day (a partial-window dip is NOT a real decline — compare complete days ≤ lastCompleteDate, or say the period is still in progress); if the window in question has under ~60 orders, treat CVR/AOV swings as possible sampling noise and lower confidence.
 3. CONFOUNDER CHECK — could a known event explain it? Promotions/discount codes/free-ship changes, paid-spend changes, creative refresh/fatigue, email sends/flow changes, launches/stockouts/returns spikes, site/checkout/tracking changes, margin/AOV shifts, seasonality/paydays/holidays/competitor promos.
 4. LAG — demand pull-forward from last week's promo, 24-72h email spikes that normalise, paid scaling worsening CAC after a lag, stockout disrupting ad-algo learning, a launch spike that shouldn't become the baseline.
 5. CAUSE + CONFIDENCE — most likely cause in one line, labelled strongly-supported / likely / possible / weak / unknown. Separate correlation from causation; never assert a cause without evidence.
