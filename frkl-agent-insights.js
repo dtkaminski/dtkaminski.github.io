@@ -5,12 +5,12 @@ window.FRKL_INSIGHTS = {
     agent: "Pulse",
     headline: "ROAS 2.76x sits below the 3.0x floor — dragged down by a saturated Ireland campaign.",
     analysis: [
-      "Blended Meta ROAS 2.76x (30d) is under target; the UK A+ campaign runs ~3.64x but Ireland A+ is ~2.97x and SATURATED at 10.6x frequency — your top-spend creative is the Ireland catalogue ad (£1,064).",
+      "Blended Meta ROAS 2.76x (30d) is under target; the UK A+ campaign runs ~3.64x but Ireland A+ is ~2.97x and SATURATED at 6.2x frequency — your top-spend creative is the Ireland catalogue ad (£1,064).",
       "Meta went dark 2–8 April then re-scaled from 13 Apr; spend nearly doubled vs the prior baseline while ROAS slipped — classic over-scaling into a fatigued audience.",
       "Meta is 60% of paid budget but returns less per £ than Google."
     ],
     actions: [
-      {id:"pulse-meta-cut-ireland-budget-30", p:"P1", text:"Cut Ireland A+ budget to ~£30/day to bring 10.6x frequency down; reallocate to UK."},
+      {id:"pulse-meta-cut-ireland-budget-30", p:"P1", text:"Cut Ireland A+ budget to ~£30/day to bring 6.2x frequency down; reallocate to UK."},
       {id:"pulse-meta-refresh-fatigued-ireland-creative", p:"P1", text:"Refresh fatigued Ireland creative — frequency >10x means the audience has seen it too often."},
       {id:"pulse-meta-hold-uk-frequency-under", p:"P2", text:"Hold UK frequency under 8x as you scale; watch ROAS daily, not weekly."},
       {id:"pulse-meta-rebalance-budget-toward-google", p:"P2", text:"Rebalance budget toward Google until Meta ROAS recovers above 3.0x."}

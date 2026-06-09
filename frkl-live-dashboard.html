@@ -18,24 +18,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606091059"></script>
-<script src="./frkl-live-data.js?v=202606091059"></script>
-<script src="./frkl-agent-insights.js?v=202606091059"></script>
-<script src="./frkl-business-data.js?v=202606091059"></script>
-<script src="./frkl-action-status.js?v=202606091059"></script>
-<script src="./frkl-patterns.js?v=202606091059"></script>
-<script src="./frkl-creators.js?v=202606091059"></script>
-<script src="./frkl-creative-vision.js?v=202606091059"></script>
-<script src="./frkl-links.js?v=202606091059"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606091059"></script>
-<script src="./frkl-events.js?v=202606091059"></script>
-<script src="./frkl-products.js?v=202606091059"></script>
-<script src="./frkl-discount-codes.js?v=202606091059"></script>
-<script src="./frkl-cvr.js?v=202606091059"></script>
-<script src="./frkl-cohorts.js?v=202606091059"></script>
-<script src="./frkl-retention.js?v=202606091059"></script>
-<script src="./frkl-clarity.js?v=202606091059"></script>
-<script src="./frkl-board-read.js?v=202606091059"></script>
+<script src="./frkl-data-loader.js?v=202606091137"></script>
+<script src="./frkl-live-data.js?v=202606091137"></script>
+<script src="./frkl-agent-insights.js?v=202606091137"></script>
+<script src="./frkl-business-data.js?v=202606091137"></script>
+<script src="./frkl-action-status.js?v=202606091137"></script>
+<script src="./frkl-patterns.js?v=202606091137"></script>
+<script src="./frkl-creators.js?v=202606091137"></script>
+<script src="./frkl-creative-vision.js?v=202606091137"></script>
+<script src="./frkl-links.js?v=202606091137"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606091137"></script>
+<script src="./frkl-events.js?v=202606091137"></script>
+<script src="./frkl-products.js?v=202606091137"></script>
+<script src="./frkl-discount-codes.js?v=202606091137"></script>
+<script src="./frkl-cvr.js?v=202606091137"></script>
+<script src="./frkl-cohorts.js?v=202606091137"></script>
+<script src="./frkl-retention.js?v=202606091137"></script>
+<script src="./frkl-clarity.js?v=202606091137"></script>
+<script src="./frkl-board-read.js?v=202606091137"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -5509,10 +5509,15 @@ function IntelligencePanel(){
         }
       }
       const st = (window.FRKL_ACTION_STATUS || {})[id] || {};
-      return {id, ...ph, ...(match || {}), status: st.status || 'unknown'};
+      // Prefer the reconciled live copy from action-status over the (possibly stale)
+      // specialist text, and carry the contradiction flag through.
+      const liveText = st.text || (match && match.text);
+      return {id, ...ph, ...(match || {}), ...(liveText?{text:liveText}:{}), status: st.status || 'unknown',
+              premiseStale: !!st.premiseStale, reconcileNote: st.reconcileNote || null};
     });
+    // Stale-premise actions (the live metric no longer supports them) sink to the bottom.
     return all.filter(a => a.status !== 'verified-done' && a.status !== 'done')
-              .sort((a,b) => (b.phit || 0) - (a.phit || 0));
+              .sort((a,b) => (a.premiseStale?1:0) - (b.premiseStale?1:0) || (b.phit || 0) - (a.phit || 0));
   })();
 
   return (<div style={{display:'flex', flexDirection:'column', gap:'var(--s-7)'}}>
@@ -5637,7 +5642,8 @@ function IntelligencePanel(){
             <div style={{flexShrink:0}}><PHitBadge phit={a}/></div>
             <span className={'pill '+(a.p === 'P1' ? 'red' : a.p === 'P2' ? 'amber' : 'grey')} style={{fontSize:10, flexShrink:0}}>{a.p}</span>
             <span style={{fontSize:11, color:'var(--text-muted)', flexShrink:0, width:56}}>{a.agent || '—'}</span>
-            <span style={{fontSize:12.5, color:'var(--text-primary)', flex:1, lineHeight:1.45}}>{a.text || a.id}</span>
+            <span style={{fontSize:12.5, color: a.premiseStale?'var(--text-muted)':'var(--text-primary)', flex:1, lineHeight:1.45, textDecoration:a.premiseStale?'line-through':'none'}}>{a.text || a.id}</span>
+            {a.premiseStale && <span className="pill grey" title={a.reconcileNote||''} style={{fontSize:9.5, flexShrink:0}}>⚠ premise out of date</span>}
             <span className="meta" style={{fontSize:10, flexShrink:0}}>{a.confidence} (n={a.sample_size})</span>
           </div>)}
         />
