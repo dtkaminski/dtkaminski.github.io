@@ -18,21 +18,22 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606090746"></script>
-<script src="./frkl-live-data.js?v=202606090746"></script>
-<script src="./frkl-agent-insights.js?v=202606090746"></script>
-<script src="./frkl-business-data.js?v=202606090746"></script>
-<script src="./frkl-action-status.js?v=202606090746"></script>
-<script src="./frkl-patterns.js?v=202606090746"></script>
-<script src="./frkl-creators.js?v=202606090746"></script>
-<script src="./frkl-creative-vision.js?v=202606090746"></script>
-<script src="./frkl-links.js?v=202606090746"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606090746"></script>
-<script src="./frkl-events.js?v=202606090746"></script>
-<script src="./frkl-products.js?v=202606090746"></script>
-<script src="./frkl-discount-codes.js?v=202606090746"></script>
-<script src="./frkl-cvr.js?v=202606090746"></script>
-<script src="./frkl-cohorts.js?v=202606090746"></script>
+<script src="./frkl-data-loader.js?v=202606090748"></script>
+<script src="./frkl-live-data.js?v=202606090748"></script>
+<script src="./frkl-agent-insights.js?v=202606090748"></script>
+<script src="./frkl-business-data.js?v=202606090748"></script>
+<script src="./frkl-action-status.js?v=202606090748"></script>
+<script src="./frkl-patterns.js?v=202606090748"></script>
+<script src="./frkl-creators.js?v=202606090748"></script>
+<script src="./frkl-creative-vision.js?v=202606090748"></script>
+<script src="./frkl-links.js?v=202606090748"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606090748"></script>
+<script src="./frkl-events.js?v=202606090748"></script>
+<script src="./frkl-products.js?v=202606090748"></script>
+<script src="./frkl-discount-codes.js?v=202606090748"></script>
+<script src="./frkl-cvr.js?v=202606090748"></script>
+<script src="./frkl-cohorts.js?v=202606090748"></script>
+<script src="./frkl-retention.js?v=202606090748"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -3768,6 +3769,7 @@ function Customers(){
   const retRevPctSeries = weeks.map(w=>({d:w.label, v:+w.retRevPct.toFixed(1)}));
   const listNetSeries   = listChart.map(r=>({d:r.date, v:r.net}));
   return (<div>
+    <RetentionPanel/>
     <div className="row" style={{marginBottom:14}}>
       <KPI label="% orders from returning" val={PCT((totalRet)/(totalNew+totalRet))} sub={`${NUM(totalRet)} returning / ${NUM(totalNew)} new (90d)`} series={retPctSeries} seriesLabel="Returning order share · by week"
         agent="Lux" observation="38.7% repeat is healthier than Clarity's 95% new-visitor stat suggested — buyers ARE coming back."
@@ -6767,6 +6769,51 @@ function CohortsPanel(){
     <div className="micro" style={{color:'var(--text-faint)', marginTop:12, lineHeight:1.5}}>
       {C.notes && <><b>Read carefully:</b> {C.notes.channel} {C.notes.google}</>}
     </div>
+  </div>);
+}
+
+// ── Predictive retention (Phase 3.1) ─────────────────────────────────────────
+// Turns "retention is the lever" into a weekly worklist: median repurchase
+// interval → due / overdue / lapsed segments with £ at stake + the products that
+// drive the fastest repeat. Advisory — tells the operator WHEN to nudge.
+function RetentionPanel(){
+  const R = (typeof window!=='undefined' && window.FRKL_RETENTION) || null;
+  if(!R || !R.customers) return null;
+  const seg = R.segments || {};
+  const med = R.medianIntervalDays;
+  const SEG = [
+    {k:'due',     label:'Due now',  col:'var(--good)',  desc:'in the reorder window — nudge now'},
+    {k:'overdue', label:'Overdue',  col:'var(--warn)',  desc:'past their window — slipping, win back'},
+    {k:'lapsed',  label:'Lapsed',   col:'#f87171',      desc:'>150 days — deep win-back'},
+  ];
+  return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid var(--accent)'}}>
+    <div className="card-section-title">
+      <h2 style={{margin:0}}>Retention worklist — who to nudge, and when</h2>
+      <span className="meta">median reorder interval {med} days · ~{R.repeatCustomers} repeat customers</span>
+    </div>
+    <div className="micro" style={{color:'var(--text-secondary)', marginBottom:10, lineHeight:1.55}}>
+      Repeat customers reorder about every <b>{med} days</b> (p25 {R.p25} / p75 {R.p75}). That's your replenishment trigger — a flow firing around day {med} catches customers at peak intent. <b style={{color:'var(--text-primary)'}}>{GBP(R.atStake)}</b> of expected reorder value is sitting in the due + overdue pools right now.
+    </div>
+    <div className="row" style={{marginBottom:10}}>
+      <div className="card kpi" style={{borderLeft:'3px solid var(--accent)'}}>
+        <div className="label">This week's nudge list</div>
+        <div className="val" style={{fontSize:24}}>{NUM(R.worklist.count)}</div>
+        <div className="sub">customers entering their reorder window · {GBP(R.worklist.value)} expected</div>
+      </div>
+      {SEG.map(s=>{ const v=seg[s.k]||{count:0,value:0}; return (
+        <div key={s.k} className="card kpi" style={{borderLeft:'3px solid '+s.col}}>
+          <div className="label">{s.label}</div>
+          <div className="val" style={{fontSize:24}}>{NUM(v.count)}</div>
+          <div className="sub">{GBP(v.value)} expected · {s.desc}</div>
+        </div>); })}
+    </div>
+    {(R.byProduct||[]).length>0 && (<div>
+      <h3 style={{margin:'4px 0 6px', fontSize:13, color:'var(--text-muted)'}}>Products that drive the fastest repeat <span style={{fontWeight:400,color:'var(--text-faint)'}}>— build replenishment around these</span></h3>
+      <div style={{display:'flex', flexWrap:'wrap', gap:8}}>
+        {R.byProduct.slice(0,6).map((p,i)=>(<span key={i} className="pill" style={{background:'var(--accent-bg)', color:'var(--accent)', fontSize:11.5, padding:'4px 10px', borderRadius:'var(--r-full)'}}>{p.name} · {p.medianInterval}d</span>))}
+      </div>
+    </div>)}
+    <div className="note" style={{marginTop:12}}>Action: set a Klaviyo replenishment flow to fire at ~day {Math.max(7, med-3)} post-purchase, and a win-back flow at day {Math.round(med*2)} for the overdue pool. {R.notes && R.notes.thin}</div>
   </div>);
 }
 
