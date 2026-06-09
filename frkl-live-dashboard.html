@@ -19,24 +19,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606093600"></script>
-<script src="./frkl-live-data.js?v=202606093600"></script>
-<script src="./frkl-agent-insights.js?v=202606093600"></script>
-<script src="./frkl-business-data.js?v=202606093600"></script>
-<script src="./frkl-action-status.js?v=202606093600"></script>
-<script src="./frkl-patterns.js?v=202606093600"></script>
-<script src="./frkl-creators.js?v=202606093600"></script>
-<script src="./frkl-creative-vision.js?v=202606093600"></script>
-<script src="./frkl-links.js?v=202606093600"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606093600"></script>
-<script src="./frkl-events.js?v=202606093600"></script>
-<script src="./frkl-products.js?v=202606093600"></script>
-<script src="./frkl-discount-codes.js?v=202606093600"></script>
-<script src="./frkl-cvr.js?v=202606093600"></script>
-<script src="./frkl-cohorts.js?v=202606093600"></script>
-<script src="./frkl-retention.js?v=202606093600"></script>
-<script src="./frkl-clarity.js?v=202606093600"></script>
-<script src="./frkl-board-read.js?v=202606093600"></script>
+<script src="./frkl-data-loader.js?v=202606093700"></script>
+<script src="./frkl-live-data.js?v=202606093700"></script>
+<script src="./frkl-agent-insights.js?v=202606093700"></script>
+<script src="./frkl-business-data.js?v=202606093700"></script>
+<script src="./frkl-action-status.js?v=202606093700"></script>
+<script src="./frkl-patterns.js?v=202606093700"></script>
+<script src="./frkl-creators.js?v=202606093700"></script>
+<script src="./frkl-creative-vision.js?v=202606093700"></script>
+<script src="./frkl-links.js?v=202606093700"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606093700"></script>
+<script src="./frkl-events.js?v=202606093700"></script>
+<script src="./frkl-products.js?v=202606093700"></script>
+<script src="./frkl-discount-codes.js?v=202606093700"></script>
+<script src="./frkl-cvr.js?v=202606093700"></script>
+<script src="./frkl-cohorts.js?v=202606093700"></script>
+<script src="./frkl-retention.js?v=202606093700"></script>
+<script src="./frkl-clarity.js?v=202606093700"></script>
+<script src="./frkl-board-read.js?v=202606093700"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -8288,16 +8288,145 @@ function CreativeFatiguePanel(){
   </div>);
 }
 
+// ── Manual Clarity CSV upload (no backend) ───────────────────────────────────
+// Until the daily Clarity sync is wired, let the founder paste / upload a CSV of
+// the friction metrics off the Clarity dashboard. Tolerant key→value mapper:
+// accepts "metric,value" rows OR a wide header+row export. Stored per-browser.
+function splitCsvLine(line){
+  const out=[]; let cur='', q=false;
+  for(let i=0;i<line.length;i++){ const ch=line[i];
+    if(q){ if(ch==='"'){ if(line[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=ch; }
+    else { if(ch==='"') q=true; else if(ch===','){ out.push(cur.trim()); cur=''; } else cur+=ch; } }
+  out.push(cur.trim()); return out;
+}
+function parseClarityCsv(text){
+  const lines = String(text||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  if(!lines.length) return {ok:false, error:'The file looks empty.'};
+  const rows = lines.map(splitCsvLine).filter(r=>r.length);
+  const isNum = s => s!=null && s!=='' && isFinite(parseFloat(String(s).replace(/[£%,\s]/g,'')));
+  const num = s => parseFloat(String(s).replace(/[£%,\s]/g,''));
+  // Collect (label, value) pairs across layouts.
+  let pairs = [];
+  const kvRows = rows.filter(r=>r.length>=2 && isNum(r[1])).length;
+  if(kvRows >= Math.max(2, rows.length*0.5)){
+    rows.forEach(r=>{ if(r.length>=2 && isNum(r[1])) pairs.push([r[0], r[1]]); });
+  } else {
+    const header = rows[0]||[];
+    const valRow = rows.slice(1).find(r=> r.filter(isNum).length >= Math.max(1, header.length*0.4));
+    if(header.length && valRow) header.forEach((h,i)=>{ if(isNum(valRow[i])) pairs.push([h, valRow[i]]); });
+    rows.forEach(r=>{ if(r.length===2 && isNum(r[1])) pairs.push([r[0], r[1]]); });
+  }
+  if(!pairs.length) return {ok:false, error:"Couldn't find any metric/number pairs. Use two columns: a metric name and its value."};
+  const M = {}; const matched = [];
+  pairs.forEach(([k,v])=>{ const key=String(k).toLowerCase(); const n=num(v); if(!isFinite(n)) return;
+    const set=(f,label)=>{ if(M[f]==null){ M[f]=n; matched.push(label+': '+v); } };
+    if(/pages?\s*\/?\s*(per\s*)?session|pages per/.test(key)) set('pps','Pages/session');
+    else if(/scroll/.test(key)) set('scroll','Scroll depth');
+    else if(/script\s*error|js\s*error|javascript/.test(key)) set('scriptError','JS-error %');
+    else if(/dead\s*click/.test(key)) set('deadClick','Dead-click %');
+    else if(/rage\s*click/.test(key)) set('rageClick','Rage-click %');
+    else if(/quick\s*-?back/.test(key)) set('quickback','Quickback %');
+    else if(/excessive\s*scroll/.test(key)) set('excessiveScroll','Excessive-scroll %');
+    else if(/error\s*click/.test(key)) set('errorClick','Error-click %');
+    else if(/active|engage/.test(key)) set('active','Active engagement %');
+    else if(/distinct|unique\s*user/.test(key)) set('users','Distinct users');
+    else if(/bot/.test(key)) set('bots','Bot sessions');
+    else if(/session/.test(key)) set('sessions','Sessions');
+  });
+  if(!matched.length) return {ok:false, error:"None of the rows matched a known Clarity metric. Check the metric names (e.g. 'Scroll depth', 'JS error %', 'Dead clicks')."};
+  const activeFrac = M.active==null ? null : (M.active>1 ? M.active/100 : M.active);
+  const friction = {
+    scriptError:{pct:M.scriptError??null, count:M.scriptErrorCount??0},
+    errorClick:{pct:M.errorClick??null}, deadClick:{pct:M.deadClick??null},
+    quickback:{pct:M.quickback??null}, rageClick:{pct:M.rageClick??null},
+    excessiveScroll:{pct:M.excessiveScroll??null},
+  };
+  const flags=[];
+  if(M.scriptError!=null && M.scriptError>=10) flags.push({sev:'high', text:`${M.scriptError.toFixed(0)}% of sessions hit a JavaScript error — a likely conversion blocker. Reproduce the top error before scaling spend.`});
+  if(M.pps!=null && M.pps<1.5) flags.push({sev:'high', text:`Only ${M.pps.toFixed(2)} pages per session — visitors land and leave without browsing. A landing/PDP problem, not a traffic one.`});
+  if(M.scroll!=null && M.scroll<50) flags.push({sev:'med', text:`Average scroll depth is ${M.scroll.toFixed(0)}% — content + product below that point is essentially unseen.`});
+  if(M.errorClick!=null && M.errorClick>=2) flags.push({sev:'med', text:`${M.errorClick.toFixed(1)}% of sessions click something broken (error clicks) — usually a dead button or failing widget.`});
+  if(M.deadClick!=null && M.deadClick>=3) flags.push({sev:'med', text:`${M.deadClick.toFixed(1)}% of sessions register dead clicks — taps that do nothing, a sign of confusing or broken UI.`});
+  if(activeFrac!=null && activeFrac<0.5) flags.push({sev:'low', text:`Active engagement is ${(activeFrac*100).toFixed(0)}% of time on site — attention drops fast; tighten above-the-fold.`});
+  const today = (()=>{ try{ return new Date().toISOString().slice(0,10); }catch(e){ return ''; } })();
+  return {ok:true, matched, bundle:{
+    available:true, source:'manual', asOf:today, uploadedAt:today,
+    sessions:M.sessions??null, botSessions:M.bots??0, distinctUsers:M.users??null,
+    pagesPerSession:M.pps??null, scrollDepth:M.scroll??null,
+    engagement:{activePct:activeFrac}, friction, flags,
+    notes:{window:'Manually uploaded — re-upload a newer Clarity export to refresh.'},
+  }};
+}
+function clarityManualGet(){ try{ const s=JSON.parse(localStorage.getItem('oi_clarity_manual')||'null'); return (s&&s.available)?s:null; }catch(e){ return null; } }
+function clarityManualSave(b){ try{ localStorage.setItem('oi_clarity_manual', JSON.stringify(b)); }catch(e){} }
+function clarityManualClear(){ try{ localStorage.removeItem('oi_clarity_manual'); }catch(e){} }
+function clarityResolve(){ return clarityManualGet() || ((typeof window!=='undefined' && window.FRKL_CLARITY) || null); }
+
+const CLARITY_TEMPLATE = `metric,value
+Sessions,4200
+Pages per session,1.42
+Scroll depth,46
+JS error %,12
+Dead click %,3.1
+Rage click %,1.2
+Error click %,2.4
+Quickback %,8
+Active engagement %,41`;
+
+function ClarityUploadModal({onClose, onSaved}){
+  const [text, setText] = React.useState('');
+  const [res, setRes] = React.useState(null);   // {ok, bundle, matched} | {ok:false,error}
+  const onFile = (e)=>{ const f=e.target.files&&e.target.files[0]; if(!f) return;
+    const r=new FileReader(); r.onload=()=>{ const t=String(r.result||''); setText(t); setRes(parseClarityCsv(t)); }; r.readAsText(f); };
+  const parseNow = ()=> setRes(parseClarityCsv(text));
+  const save = ()=>{ if(res&&res.ok){ clarityManualSave(res.bundle); toast('Clarity data uploaded',{kind:'good', body:`${res.matched.length} metric${res.matched.length===1?'':'s'} mapped.`}); onSaved&&onSaved(); onClose(); } };
+  return (<div className="modal-bg" onClick={onClose}>
+    <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:560}}>
+      <h3>Upload Microsoft Clarity data</h3>
+      <div className="micro" style={{color:'var(--text-secondary)', lineHeight:1.5, marginBottom:10}}>
+        Read the headline numbers off your Clarity dashboard into a two-column CSV (<b>metric, value</b>), then drop the file or paste it below. Percentages can include the % sign. Stored in this browser.
+      </div>
+      <label>Upload a .csv</label>
+      <input type="file" accept=".csv,text/csv,text/plain" onChange={onFile} style={{margin:'4px 0 12px'}}/>
+      <label>…or paste CSV</label>
+      <textarea value={text} onChange={e=>setText(e.target.value)} rows={7} placeholder={CLARITY_TEMPLATE}
+        style={{width:'100%', margin:'4px 0 6px', padding:'9px 11px', background:'var(--bg-input)', border:'1px solid var(--border-default)', borderRadius:6, color:'var(--text-primary)', fontSize:12.5, fontFamily:'ui-monospace,Menlo,monospace', resize:'vertical'}}/>
+      <div style={{display:'flex', gap:8, alignItems:'center', marginBottom:10}}>
+        <button onClick={parseNow}>Preview</button>
+        <button className="btn-ghost" onClick={()=>{ try{navigator.clipboard.writeText(CLARITY_TEMPLATE);}catch(e){} toast('Template copied',{body:'Paste into a spreadsheet, fill the values.'}); }}>Copy template</button>
+      </div>
+      {res && !res.ok && <div className="note" style={{borderLeft:'3px solid var(--bad)', marginBottom:10, fontSize:12.5}}>{res.error}</div>}
+      {res && res.ok && <div className="note" style={{borderLeft:'3px solid var(--good)', marginBottom:10, fontSize:12.5}}>
+        Mapped {res.matched.length} metric{res.matched.length===1?'':'s'}: {res.matched.join(' · ')}</div>}
+      <div className="row">
+        <button className="primary" disabled={!(res&&res.ok)} onClick={save} style={{opacity:(res&&res.ok)?1:0.5}}>Save &amp; show</button>
+        {clarityManualGet() && <button className="btn-ghost" onClick={()=>{ clarityManualClear(); toast('Manual Clarity data cleared'); onSaved&&onSaved(); onClose(); }}>Clear uploaded data</button>}
+        <button onClick={onClose} style={{marginLeft:'auto'}}>Cancel</button>
+      </div>
+    </div>
+  </div>);
+}
+
 // ── Clarity site friction (Phase 3.3) ────────────────────────────────────────
 // The "it's the SITE, not the media" evidence: script errors, broken clicks,
 // quick-backs, scroll depth, traffic quality. Surfaced on CVR drivers + Site.
 function ClarityFrictionPanel(){
-  const C = (typeof window!=='undefined' && window.FRKL_CLARITY) || null;
-  if(!C || !C.available) return null;
+  const [tick, setTick] = React.useState(0);
+  const [upload, setUpload] = React.useState(false);
+  const C = clarityResolve(); void tick;
+  const uploader = upload && <ClarityUploadModal onClose={()=>setUpload(false)} onSaved={()=>setTick(t=>t+1)}/>;
+  if(!C || !C.available) return (<div className="card" style={{marginBottom:14}}>
+    <EmptyState icon="info"
+      title="No Microsoft Clarity data yet"
+      body="Clarity shows whether the site itself is the conversion bottleneck — JavaScript errors, dead/rage clicks, scroll depth and engagement. The daily sync isn't wired yet, so upload a quick CSV of the headline numbers from your Clarity dashboard to light this up."
+      cta="Upload Clarity CSV" ctaOnClick={()=>setUpload(true)}/>
+    {uploader}
+  </div>);
+  const manual = C.source==='manual';
   const f = C.friction || {};
   const sev = s => s==='high'?'#f87171':s==='med'?'var(--warn)':'var(--text-muted)';
   const tiles = [
-    {label:'Sessions w/ JS error', val: f.scriptError.pct!=null?f.scriptError.pct.toFixed(0)+'%':'—', bad: (f.scriptError.pct||0)>=10, sub:`${NUM(f.scriptError.count)} script errors`},
+    {label:'Sessions w/ JS error', val: f.scriptError.pct!=null?f.scriptError.pct.toFixed(0)+'%':'—', bad: (f.scriptError.pct||0)>=10, sub: f.scriptError.count?`${NUM(f.scriptError.count)} script errors`:'of sessions hit a JS error'},
     {label:'Pages / session',      val: C.pagesPerSession!=null?C.pagesPerSession.toFixed(2):'—', bad:(C.pagesPerSession||9)<1.5, sub:'land-and-leave if < 1.5'},
     {label:'Avg scroll depth',     val: C.scrollDepth!=null?C.scrollDepth+'%':'—', bad:(C.scrollDepth||100)<50, sub:'content below is unseen'},
     {label:'Error clicks',         val: f.errorClick.pct!=null?f.errorClick.pct.toFixed(1)+'%':'—', bad:(f.errorClick.pct||0)>=2, sub:'clicks on broken elements'},
@@ -8305,11 +8434,15 @@ function ClarityFrictionPanel(){
     {label:'Active engagement',    val: C.engagement.activePct!=null?PCT(C.engagement.activePct):'—', bad:(C.engagement.activePct||1)<0.5, sub:'share of time actually active'},
   ];
   return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid #f87171'}}>
+    {uploader}
     <div className="card-section-title">
       <h2 style={{margin:0}}>Site friction — is the site the bottleneck?</h2>
-      <span className="meta">Microsoft Clarity · {NUM(C.sessions)} sessions · {C.windowDays||C.days}d window · as of {C.asOf}</span>
+      <span className="meta" style={{display:'inline-flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+        <span>Microsoft Clarity · {C.sessions!=null?NUM(C.sessions)+' sessions · ':''}{manual?`manual upload · ${C.asOf}`:`${C.windowDays||C.days}d window · as of ${C.asOf}`}</span>
+        <button className="cf-btn" onClick={()=>setUpload(true)}><Icon name="clipboard" size={12}/>{manual?'Replace data':'Upload CSV'}</button>
+      </span>
     </div>
-    {C.thinData && (<div className="note" style={{marginBottom:10, borderLeft:'3px solid var(--warn)'}}>
+    {!manual && C.thinData && (<div className="note" style={{marginBottom:10, borderLeft:'3px solid var(--warn)'}}>
       ⚠ Only {C.windowDays||C.days} days of Clarity data — these are <b>medium-confidence, directional</b> signals (capped: none shown as high). Reproduce a flagged issue before committing dev time; the picture firms up as the window grows past a week.
     </div>)}
     {C.flags && C.flags.length>0 && (<div style={{display:'flex', flexDirection:'column', gap:6, marginBottom:10}}>
