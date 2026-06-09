@@ -19,24 +19,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606092400"></script>
-<script src="./frkl-live-data.js?v=202606092400"></script>
-<script src="./frkl-agent-insights.js?v=202606092400"></script>
-<script src="./frkl-business-data.js?v=202606092400"></script>
-<script src="./frkl-action-status.js?v=202606092400"></script>
-<script src="./frkl-patterns.js?v=202606092400"></script>
-<script src="./frkl-creators.js?v=202606092400"></script>
-<script src="./frkl-creative-vision.js?v=202606092400"></script>
-<script src="./frkl-links.js?v=202606092400"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606092400"></script>
-<script src="./frkl-events.js?v=202606092400"></script>
-<script src="./frkl-products.js?v=202606092400"></script>
-<script src="./frkl-discount-codes.js?v=202606092400"></script>
-<script src="./frkl-cvr.js?v=202606092400"></script>
-<script src="./frkl-cohorts.js?v=202606092400"></script>
-<script src="./frkl-retention.js?v=202606092400"></script>
-<script src="./frkl-clarity.js?v=202606092400"></script>
-<script src="./frkl-board-read.js?v=202606092400"></script>
+<script src="./frkl-data-loader.js?v=202606092500"></script>
+<script src="./frkl-live-data.js?v=202606092500"></script>
+<script src="./frkl-agent-insights.js?v=202606092500"></script>
+<script src="./frkl-business-data.js?v=202606092500"></script>
+<script src="./frkl-action-status.js?v=202606092500"></script>
+<script src="./frkl-patterns.js?v=202606092500"></script>
+<script src="./frkl-creators.js?v=202606092500"></script>
+<script src="./frkl-creative-vision.js?v=202606092500"></script>
+<script src="./frkl-links.js?v=202606092500"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606092500"></script>
+<script src="./frkl-events.js?v=202606092500"></script>
+<script src="./frkl-products.js?v=202606092500"></script>
+<script src="./frkl-discount-codes.js?v=202606092500"></script>
+<script src="./frkl-cvr.js?v=202606092500"></script>
+<script src="./frkl-cohorts.js?v=202606092500"></script>
+<script src="./frkl-retention.js?v=202606092500"></script>
+<script src="./frkl-clarity.js?v=202606092500"></script>
+<script src="./frkl-board-read.js?v=202606092500"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -562,6 +562,40 @@
   .cmd-row.sel .oi-ic { color: var(--accent); }
   .cmd-row .cmd-sub { color: var(--text-faint); font-size: 11.5px; margin-left: auto; }
   .cmd-empty { padding: 20px; text-align: center; color: var(--text-faint); font-size: 13px; }
+
+  /* ── Insight action row — operator recommendations, not blog text ─────── */
+  .insight-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 13px; padding-top: 12px; border-top: 1px solid var(--border-subtle); }
+  .ia-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 550; font-family: inherit;
+    padding: 5px 10px; border-radius: var(--r-md); border: 1px solid var(--border-default); background: var(--bg-card);
+    color: var(--text-secondary); cursor: pointer; transition: all var(--motion-fast); }
+  .ia-btn:hover { color: var(--text-primary); border-color: var(--text-faint); background: var(--bg-card-hover); }
+  .ia-btn .oi-ic { color: var(--text-faint); }
+  .ia-btn:hover .oi-ic { color: var(--text-secondary); }
+  .ia-btn.primary { color: var(--accent); border-color: var(--accent-soft); }
+  .ia-btn.primary .oi-ic { color: var(--accent); }
+  .ia-dismissed { display: flex; align-items: center; gap: 9px; color: var(--text-muted); font-size: 12.5px; }
+  .ia-dismissed button { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 12.5px; font-family: inherit; font-weight: 600; margin-left: auto; }
+  .insight.ia-collapsed { padding: 12px 16px; }
+
+  /* ── Evidence drawer — slide-in trust panel ───────────────────────────── */
+  .drawer-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1090; animation: fade-in 160ms ease; }
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+  .drawer { position: fixed; top: 0; right: 0; height: 100%; width: min(440px, 94vw); background: var(--bg-card);
+    border-left: 1px solid var(--border-default); box-shadow: var(--shadow-lg); z-index: 1091;
+    display: flex; flex-direction: column; animation: drawer-in 220ms cubic-bezier(.2,.8,.2,1); }
+  @keyframes drawer-in { from { transform: translateX(24px); opacity: .5; } to { transform: none; opacity: 1; } }
+  .drawer-head { display: flex; align-items: flex-start; gap: 10px; padding: 18px 20px 14px; border-bottom: 1px solid var(--border-subtle); }
+  .drawer-head h3 { margin: 0; font-size: 15px; font-weight: 650; line-height: 1.4; }
+  .drawer-x { margin-left: auto; background: none; border: none; color: var(--text-faint); cursor: pointer; font-size: 20px; line-height: 1; padding: 0 2px; }
+  .drawer-x:hover { color: var(--text-secondary); }
+  .drawer-body { padding: 16px 20px 28px; overflow-y: auto; }
+  .drawer-sec { margin-bottom: 16px; }
+  .drawer-sec .lbl { font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); margin-bottom: 6px; }
+  .drawer-sec .bd { font-size: 13px; color: var(--text-secondary); line-height: 1.55; }
+  .drawer-sec ul { margin: 0; padding-left: 17px; } .drawer-sec li { font-size: 13px; color: var(--text-secondary); line-height: 1.55; margin-bottom: 4px; }
+  .drawer-src { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-muted);
+    background: var(--bg-app); border: 1px solid var(--border-subtle); border-radius: var(--r-full); padding: 3px 9px; margin: 0 6px 6px 0; }
+  @media (max-width: 760px) { .drawer { width: 100%; } }
 
   /* ── Agent insights ─────────────────────────────────────────────────── */
   .insight { border-left: 3px solid var(--accent); }
@@ -1398,6 +1432,16 @@ function ActionRow({a, area, onMark}){
 function Insight({k}){
   const d=INS[k]; if(!d) return null;
   const [modalAction, setModalAction] = React.useState(null);
+  const [dismissed, setDismissed] = React.useState(()=> oiSnoozed(d.headline) ? 'snoozed' : null);
+  if(dismissed){
+    return (<div className="card insight ia-collapsed" style={{marginTop:14}}>
+      <div className="ia-dismissed">
+        <Icon name={dismissed==='wrong'?'alert':'bell'} size={14}/>
+        <span><b>{d.agent}</b> · {dismissed==='wrong'?'flagged as not useful':'snoozed'} — {d.headline}</span>
+        <button onClick={()=>{ oiSnoozeRemove(d.headline); setDismissed(null); }}>Undo</button>
+      </div>
+    </div>);
+  }
   return (<div className="card insight" style={{marginTop:14}}>
     <span className="agentbadge">◆ {d.agent}</span>
     <div className="head">{d.headline}</div>
@@ -1405,6 +1449,9 @@ function Insight({k}){
     <div style={{marginTop:8}}>
       {d.actions.map((a,i)=>(<ActionRow key={i} a={a} area={k} onMark={setModalAction}/>))}
     </div>
+    <InsightActions title={d.headline} why={d.analysis} agent={d.agent}
+      recommendation={(d.actions[0] && d.actions[0].text) || d.headline}
+      onSnooze={()=>setDismissed('snoozed')} onWrong={()=>setDismissed('wrong')}/>
     {modalAction && <MarkDoneModal action={modalAction} onClose={()=>setModalAction(null)}/>}
   </div>);
 }
@@ -2608,6 +2655,63 @@ function ToastHost(){
     </div>))}</div>);
 }
 function toast(msg, opts){ try{ window.__oiToast && window.__oiToast(msg, opts); }catch(e){} }
+
+// ── Insight feedback store (snooze / mark-wrong), persisted per browser ──────
+function oiSnoozeAdd(t){ try{ const s=JSON.parse(localStorage.getItem('oi_snoozed')||'[]'); if(!s.some(x=>x.t===t)){ s.push({t}); localStorage.setItem('oi_snoozed', JSON.stringify(s.slice(-200))); } }catch(e){} }
+function oiSnoozeRemove(t){ try{ let s=JSON.parse(localStorage.getItem('oi_snoozed')||'[]'); s=s.filter(x=>x.t!==t); localStorage.setItem('oi_snoozed', JSON.stringify(s)); }catch(e){} }
+function oiSnoozed(t){ try{ return JSON.parse(localStorage.getItem('oi_snoozed')||'[]').some(x=>x.t===t); }catch(e){ return false; } }
+function oiFeedbackAdd(t){ try{ const s=JSON.parse(localStorage.getItem('oi_insight_feedback')||'[]'); s.push({t, at:new Date().toISOString()}); localStorage.setItem('oi_insight_feedback', JSON.stringify(s.slice(-200))); }catch(e){} }
+
+// ── Evidence drawer — global slide-in trust panel; window.__oiEvidence(payload) ──
+function EvidenceDrawer(){
+  const [data, setData] = React.useState(null);
+  React.useEffect(()=>{
+    window.__oiEvidence = (payload) => setData(payload || {});
+    const onKey = (e)=>{ if(e.key==='Escape') setData(null); };
+    window.addEventListener('keydown', onKey);
+    return ()=>{ window.removeEventListener('keydown', onKey); try{ delete window.__oiEvidence; }catch(e){} };
+  }, []);
+  if(!data) return null;
+  const close = ()=>setData(null);
+  const sec = (label, body) => body ? (<div className="drawer-sec"><div className="lbl">{label}</div>{Array.isArray(body)
+    ? <ul>{body.map((w,i)=><li key={i}>{w}</li>)}</ul> : <div className="bd">{body}</div>}</div>) : null;
+  return (<><div className="drawer-bg" onClick={close}/>
+    <div className="drawer" role="dialog" aria-label="Evidence">
+      <div className="drawer-head">
+        <Icon name="info" size={18} style={{color:'var(--accent)', marginTop:1}}/>
+        <h3>{data.title || 'Evidence'}</h3>
+        <button className="drawer-x" onClick={close} aria-label="Close evidence">×</button>
+      </div>
+      <div className="drawer-body">
+        {(data.impact || data.confidence) && <div className="drawer-sec" style={{display:'flex', gap:8, flexWrap:'wrap', alignItems:'center'}}>
+          {data.impact && <StatusBadge kind="info" label={data.impact}/>}
+          {data.confidence && confChip(data.confidence)}
+        </div>}
+        {sec("Why you're seeing this", data.why)}
+        {sec('Recommended action', data.recommendation)}
+        {sec('Caveat', data.caveat)}
+        {data.sources && data.sources.length>0 && <div className="drawer-sec"><div className="lbl">Data sources</div>
+          <div>{data.sources.map((s,i)=>(<span key={i} className="drawer-src"><Icon name="info" size={12}/>{s}</span>))}</div></div>}
+        {data.synced && sec('Last synced', data.synced)}
+      </div>
+    </div></>);
+}
+
+// ── Standard insight action row — View evidence / Create task / Ask AI / Snooze / Mark wrong ──
+function InsightActions({title, why, recommendation, agent, askQ, caveat, confidence, impact, onSnooze, onWrong}){
+  const evidence = () => window.__oiEvidence && window.__oiEvidence({
+    title, why, recommendation, caveat, confidence, impact,
+    sources: agent ? ['Agent: '+agent] : [],
+    synced: (window.FRKL_DATA && window.FRKL_DATA.meta && window.FRKL_DATA.meta.captured) || null,
+  });
+  return (<div className="insight-actions">
+    <button className="ia-btn primary" onClick={evidence}><Icon name="info" size={13}/>View evidence</button>
+    <button className="ia-btn" onClick={()=>aiSaveTask(recommendation||title)}><Icon name="clipboard" size={13}/>Create task</button>
+    <button className="ia-btn" onClick={()=>window.__oiAsk && window.__oiAsk(askQ||('Explain this finding: '+title))}><Icon name="spark" size={13}/>Ask AI</button>
+    <button className="ia-btn" onClick={()=>{ oiSnoozeAdd(title); toast('Snoozed', {body:'Hidden from your view.'}); onSnooze && onSnooze(); }}><Icon name="bell" size={13}/>Snooze</button>
+    <button className="ia-btn" onClick={()=>{ oiFeedbackAdd(title); toast('Flagged as not useful', {kind:'warn', body:'Thanks — this tunes future insights.'}); onWrong && onWrong(); }}><Icon name="alert" size={13}/>Mark wrong</button>
+  </div>);
+}
 
 function DataFreshness(){
   const today = (()=>{ try { return new Date(); } catch(e){ return null; } })();
@@ -8556,6 +8660,7 @@ function App(){
     </footer>
     <ToastHost/>
     <CommandMenu/>
+    <EvidenceDrawer/>
   </div>);
 }
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
