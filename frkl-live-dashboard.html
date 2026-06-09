@@ -19,24 +19,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606091500"></script>
-<script src="./frkl-live-data.js?v=202606091500"></script>
-<script src="./frkl-agent-insights.js?v=202606091500"></script>
-<script src="./frkl-business-data.js?v=202606091500"></script>
-<script src="./frkl-action-status.js?v=202606091500"></script>
-<script src="./frkl-patterns.js?v=202606091500"></script>
-<script src="./frkl-creators.js?v=202606091500"></script>
-<script src="./frkl-creative-vision.js?v=202606091500"></script>
-<script src="./frkl-links.js?v=202606091500"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606091500"></script>
-<script src="./frkl-events.js?v=202606091500"></script>
-<script src="./frkl-products.js?v=202606091500"></script>
-<script src="./frkl-discount-codes.js?v=202606091500"></script>
-<script src="./frkl-cvr.js?v=202606091500"></script>
-<script src="./frkl-cohorts.js?v=202606091500"></script>
-<script src="./frkl-retention.js?v=202606091500"></script>
-<script src="./frkl-clarity.js?v=202606091500"></script>
-<script src="./frkl-board-read.js?v=202606091500"></script>
+<script src="./frkl-data-loader.js?v=202606091600"></script>
+<script src="./frkl-live-data.js?v=202606091600"></script>
+<script src="./frkl-agent-insights.js?v=202606091600"></script>
+<script src="./frkl-business-data.js?v=202606091600"></script>
+<script src="./frkl-action-status.js?v=202606091600"></script>
+<script src="./frkl-patterns.js?v=202606091600"></script>
+<script src="./frkl-creators.js?v=202606091600"></script>
+<script src="./frkl-creative-vision.js?v=202606091600"></script>
+<script src="./frkl-links.js?v=202606091600"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606091600"></script>
+<script src="./frkl-events.js?v=202606091600"></script>
+<script src="./frkl-products.js?v=202606091600"></script>
+<script src="./frkl-discount-codes.js?v=202606091600"></script>
+<script src="./frkl-cvr.js?v=202606091600"></script>
+<script src="./frkl-cohorts.js?v=202606091600"></script>
+<script src="./frkl-retention.js?v=202606091600"></script>
+<script src="./frkl-clarity.js?v=202606091600"></script>
+<script src="./frkl-board-read.js?v=202606091600"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -503,6 +503,41 @@
     .live-head { display: none; }
     .live-row { display: flex; flex-direction: column; gap: 6px; }
     .live-row .lr-impact { text-align: left; }
+  }
+
+  /* ── Specialist channel table — same column grid as the live read, headers per channel ── */
+  .sp-head, .sp-row {
+    display: grid; grid-template-columns: 96px minmax(0,1fr) 124px 92px;
+    gap: var(--s-4); align-items: start;
+  }
+  .sp-head { padding: 7px var(--s-3) 6px; }
+  .sp-hcell {
+    font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--text-faint);
+  }
+  .sp-hcell.right { text-align: right; }
+  .sp-row {
+    padding: 13px var(--s-3); border-top: 1px solid var(--border-subtle);
+    font-size: 12.5px; transition: background 120ms ease;
+  }
+  .sp-row:hover { background: rgba(127,127,127,0.045); }
+  .sp-pri { display: inline-flex; align-items: center; gap: 6px; }
+  .sp-pri .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .sp-pri .lbl { font-size: 11px; font-weight: 700; color: var(--text-secondary); }
+  .sp-text { color: var(--text-secondary); line-height: 1.5; }
+  .sp-row.done .sp-text { color: var(--text-muted); text-decoration: line-through; text-decoration-color: rgba(74,222,128,.5); }
+  .sp-ev { font-size: var(--t-micro); color: var(--text-muted); font-style: italic; margin-top: 3px; }
+  .sp-cta { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+  .sp-agent { font-size: 10.5px; color: var(--text-faint); }
+  .sp-status { display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
+  .sp-impact { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .sp-impact .amt { font-size: 14px; font-weight: 700; letter-spacing: -.01em; }
+  .sp-impact .per { display: block; font-size: 10px; color: var(--text-faint); margin-top: 1px; }
+  .sp-impact .dash { font-size: 11px; color: var(--text-faint); }
+  @media (max-width: 760px) {
+    .sp-head { display: none; }
+    .sp-row { display: flex; flex-direction: column; gap: 6px; }
+    .sp-impact { text-align: left; }
   }
   .impact .label { color: var(--text-muted); font-style: italic; }
   .markbtn {
@@ -1472,21 +1507,40 @@ function ActionBoard(){
     const fs = !isDone ? friendly(eff) : null;
     const pdot = pClass(a.p);
     const contra = !isDone && contradicts(a.text);
-    return (<div className={"actionrow"+(isDone?" done":"")} key={i} style={{alignItems:'baseline', opacity:contra?0.6:1}}>
-      <span title={a.p+' priority'} style={{width:7,height:7,borderRadius:'50%',flexShrink:0,alignSelf:'center',background:pdot==='red'?'var(--bad)':pdot==='amber'?'var(--warn)':'var(--text-muted)'}}/>
-      {!isDone && <MoneyBadge money={moneyMap[a.id]} />}
-      {showPhit && <PHitBadge phit={phit} />}
-      <div className="t" style={{flex:1}}>
-        <span style={{textDecoration:contra?'line-through':'none',textDecorationColor:'var(--bad)'}}>{linkify(a.text)}</span>
-        {contra && <div style={{fontSize:11,color:'var(--bad)',marginTop:2}}>⚠ Today's live read contradicts this (ad frequency is healthy — fatigue ruled out). Re-validate before acting.</div>}
-        {why && <div className="ev">{why}</div>}
-        {isDone && st.impact && <ImpactLine impact={st.impact} resolvedAt={st.resolvedAt}/>}
+    const money = moneyAbs(moneyMap[a.id]);
+    return (<div className={"sp-row"+(isDone?" done":"")} key={i} style={{opacity:contra?0.6:1}}>
+      <div className="sp-pri">
+        <span className="dot" title={a.p+' priority'} style={{background:pdot==='red'?'var(--bad)':pdot==='amber'?'var(--warn)':'var(--text-muted)'}}/>
+        <span className="lbl">{a.p}</span>
       </div>
-      {fs && <span className={'stat '+fs.c} style={{whiteSpace:'nowrap'}}>{fs.t}</span>}
-      <span className="muted" style={{fontSize:10.5,whiteSpace:'nowrap'}}>{a.agent}</span>
-      {!isDone && <button className="markbtn" onClick={()=>setModalAction(a)}>Mark done</button>}
+      <div>
+        <div className="sp-text" style={{textDecoration:contra?'line-through':'none',textDecorationColor:'var(--bad)'}}>{linkify(a.text)}</div>
+        {contra && <div style={{fontSize:11,color:'var(--bad)',marginTop:2}}>⚠ Today's live read contradicts this (ad frequency is healthy — fatigue ruled out). Re-validate before acting.</div>}
+        {why && <div className="sp-ev">{why}</div>}
+        {isDone && st.impact && <ImpactLine impact={st.impact} resolvedAt={st.resolvedAt}/>}
+        <div className="sp-cta">
+          <span className="sp-agent">{a.agent}</span>
+          {!isDone && <button className="markbtn" onClick={()=>setModalAction(a)}>Mark done</button>}
+        </div>
+      </div>
+      <div className="sp-status">
+        {showPhit && <PHitBadge phit={phit} />}
+        {fs ? <span className={'stat '+fs.c}>{fs.t}</span>
+            : isDone ? <span className="stat done">Done</span>
+            : <span style={{fontSize:11,color:'var(--text-faint)'}}>On track</span>}
+      </div>
+      <div className="sp-impact">
+        {money>0 ? (<><span className="amt">{gbpShort(money)}</span><span className="per">/mo</span></>)
+                 : <span className="dash">—</span>}
+      </div>
     </div>);
   };
+  const SpecialistHead = () => (<div className="sp-head">
+    <span className="sp-hcell">Priority</span>
+    <span className="sp-hcell">Action</span>
+    <span className="sp-hcell">Status</span>
+    <span className="sp-hcell right">£/mo</span>
+  </div>);
 
   // Group open actions by theme; rank groups (and rows) by £ at stake.
   const groups = {};
@@ -1591,7 +1645,7 @@ function ActionBoard(){
             <span style={{fontSize:11,color:'var(--text-faint)',background:'var(--border-subtle)',borderRadius:999,padding:'1px 7px'}}>{items.length}</span>
             {sum>0 && <span style={{marginLeft:'auto',fontSize:12,fontWeight:700,color:'var(--text-secondary)'}}>~{gbpShort(sum)}/mo</span>}
           </button>
-          {openGroups[g] && items.map(renderRow)}
+          {openGroups[g] && <><SpecialistHead/>{items.map(renderRow)}</>}
         </div>
       ))}
     </div>
