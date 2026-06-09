@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WheyHey x Juustoportti - Interactive Commercial Model</title>
+<meta name="description" content="Interactive WheyHey x Juustoportti commercial model with editable assumptions, SKU landed costs, retailer pricing sensitivity, minimum RSP, and full product range details.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;550;600;650;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f14;
+    --panel: #15181f;
+    --panel-2: #1c2028;
+    --line: #2b303a;
+    --line-soft: #222731;
+    --text: #eceff4;
+    --muted: #a9b0bd;
+    --faint: #737b8a;
+    --blue: #80a7ff;
+    --green: #55d69a;
+    --amber: #efbd5d;
+    --red: #ee7880;
+    --pink: #e58ab2;
+    --cyan: #61d7df;
+    --ink: #080a0e;
+    --radius: 8px;
+    --shadow: 0 18px 40px rgba(0,0,0,.32);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  button, input, select { font: inherit; }
+  a { color: inherit; text-decoration: none; }
+
+  .app {
+    min-height: 100vh;
+  }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    border-bottom: 1px solid var(--line-soft);
+    background: rgba(13,15,20,.9);
+    backdrop-filter: blur(16px);
+  }
+
+  .topbar-inner {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 260px;
+  }
+
+  .mark {
+    width: 32px;
+    height: 32px;
+    border: 1px solid rgba(128,167,255,.55);
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    color: var(--blue);
+    font-weight: 800;
+    letter-spacing: 0;
+  }
+
+  .brand strong {
+    display: block;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0;
+  }
+
+  .brand span {
+    display: block;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .nav {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-left: auto;
+  }
+
+  .nav a, .download-btn {
+    min-height: 34px;
+    padding: 8px 11px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
+    background: transparent;
+    cursor: pointer;
+  }
+
+  .nav a:hover, .download-btn:hover {
+    color: var(--text);
+    border-color: var(--line);
+    background: var(--panel);
+  }
+
+  .wrap {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 22px 20px 64px;
+  }
+
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr);
+    gap: 20px;
+    align-items: stretch;
+    margin-bottom: 20px;
+  }
+
+  .hero-main, .panel, .metric, .sku-card, .product-card {
+    border: 1px solid var(--line-soft);
+    background: var(--panel);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    min-width: 0;
+  }
+
+  .hero-main {
+    padding: 26px;
+    min-height: 330px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  .eyebrow {
+    color: var(--cyan);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    font-weight: 800;
+  }
+
+  h1 {
+    margin: 14px 0 12px;
+    max-width: 920px;
+    font-size: 38px;
+    line-height: 1.05;
+    letter-spacing: 0;
+  }
+
+  .lede {
+    max-width: 780px;
+    color: var(--muted);
+    font-size: 16px;
+  }
+
+  .hero-foot {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(130px, 1fr));
+    gap: 10px;
+    margin-top: 28px;
+  }
+
+  .hero-stat {
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius);
+    padding: 12px;
+    background: rgba(8,10,14,.36);
+  }
+
+  .hero-stat span {
+    display: block;
+    color: var(--faint);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    font-weight: 800;
+  }
+
+  .hero-stat strong {
+    display: block;
+    margin-top: 6px;
+    font-size: 20px;
+    letter-spacing: 0;
+  }
+
+  .model-status {
+    padding: 18px;
+    display: grid;
+    gap: 12px;
+  }
+
+  .status-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 11px 12px;
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius);
+    background: rgba(8,10,14,.28);
+  }
+
+  .status-row span {
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .status-row strong {
+    font-size: 14px;
+    text-align: right;
+  }
+
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .tag.good { color: var(--green); border-color: rgba(85,214,154,.35); background: rgba(85,214,154,.08); }
+  .tag.warn { color: var(--amber); border-color: rgba(239,189,93,.35); background: rgba(239,189,93,.08); }
+  .tag.bad { color: var(--red); border-color: rgba(238,120,128,.35); background: rgba(238,120,128,.08); }
+  .tag.blue { color: var(--blue); border-color: rgba(128,167,255,.35); background: rgba(128,167,255,.08); }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 330px minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+  }
+
+  .sidebar {
+    position: sticky;
+    top: 82px;
+    display: grid;
+    gap: 14px;
+  }
+
+  .panel {
+    padding: 18px;
+  }
+
+  .panel-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 15px;
+  }
+
+  .panel h2 {
+    margin: 0;
+    font-size: 17px;
+    letter-spacing: 0;
+  }
+
+  .panel h3 {
+    margin: 0 0 10px;
+    font-size: 13px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: .07em;
+  }
+
+  .assumptions {
+    display: grid;
+    gap: 14px;
+  }
+
+  .control {
+    display: grid;
+    gap: 7px;
+  }
+
+  .control-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .control-row strong {
+    color: var(--text);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 12px;
+  }
+
+  input[type="range"] {
+    width: 100%;
+    accent-color: var(--blue);
+  }
+
+  .input-line {
+    display: grid;
+    grid-template-columns: 1fr 86px;
+    gap: 8px;
+    align-items: center;
+  }
+
+  input[type="number"], select, .search {
+    width: 100%;
+    min-height: 36px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--ink);
+    color: var(--text);
+    padding: 8px 10px;
+  }
+
+  .reset-btn {
+    width: 100%;
+    min-height: 38px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--panel-2);
+    color: var(--text);
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .reset-btn:hover { border-color: var(--blue); }
+
+  .main {
+    display: grid;
+    gap: 20px;
+    min-width: 0;
+  }
+
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .metric {
+    padding: 16px;
+  }
+
+  .metric span {
+    display: block;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+  }
+
+  .metric strong {
+    display: block;
+    margin-top: 8px;
+    font-size: 25px;
+    line-height: 1.05;
+    letter-spacing: 0;
+  }
+
+  .metric em {
+    display: block;
+    margin-top: 8px;
+    color: var(--faint);
+    font-style: normal;
+    font-size: 12px;
+  }
+
+  .sku-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .sku-card {
+    padding: 16px;
+    display: grid;
+    gap: 12px;
+  }
+
+  .sku-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .sku-card h3 {
+    margin: 0;
+    color: var(--text);
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 15px;
+  }
+
+  .cost-bars {
+    display: grid;
+    gap: 7px;
+  }
+
+  .cost-bar {
+    display: grid;
+    grid-template-columns: 76px 1fr 62px;
+    gap: 8px;
+    align-items: center;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .track {
+    height: 8px;
+    border-radius: 999px;
+    background: var(--ink);
+    overflow: hidden;
+  }
+
+  .fill {
+    height: 100%;
+    border-radius: 999px;
+    background: var(--blue);
+  }
+
+  .cost-bar:nth-child(2) .fill { background: var(--green); }
+  .cost-bar:nth-child(3) .fill { background: var(--amber); }
+  .cost-bar:nth-child(4) .fill { background: var(--pink); }
+  .cost-bar:nth-child(5) .fill { background: var(--red); }
+
+  .table-wrap {
+    width: 100%;
+    overflow: auto;
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius);
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 760px;
+  }
+
+  th, td {
+    padding: 10px 11px;
+    border-bottom: 1px solid var(--line-soft);
+    text-align: left;
+    vertical-align: top;
+    font-size: 13px;
+  }
+
+  th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--panel-2);
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    font-weight: 800;
+  }
+
+  tbody tr:hover td { background: rgba(128,167,255,.04); }
+  td.num, th.num {
+    text-align: right;
+    font-family: "JetBrains Mono", monospace;
+    white-space: nowrap;
+  }
+
+  .heat {
+    color: var(--text);
+    font-family: "JetBrains Mono", monospace;
+    font-weight: 600;
+  }
+
+  .heat.bad { color: var(--red); }
+  .heat.warn { color: var(--amber); }
+  .heat.good { color: var(--green); }
+
+  .formula-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .formula {
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius);
+    padding: 13px;
+    background: rgba(8,10,14,.24);
+  }
+
+  .formula span {
+    display: block;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 7px;
+  }
+
+  .formula code {
+    display: block;
+    color: var(--text);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 12px;
+    white-space: normal;
+  }
+
+  .toolbar {
+    display: grid;
+    grid-template-columns: 1.2fr .8fr .8fr;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .product-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .product-card {
+    padding: 15px;
+    display: grid;
+    gap: 12px;
+  }
+
+  .product-card h3 {
+    margin: 0;
+    color: var(--text);
+    text-transform: none;
+    letter-spacing: 0;
+    font-size: 15px;
+  }
+
+  .product-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+  }
+
+  .nutrition {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .nutri {
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius);
+    padding: 9px;
+    background: rgba(8,10,14,.24);
+  }
+
+  .nutri span {
+    display: block;
+    color: var(--faint);
+    font-size: 11px;
+  }
+
+  .nutri strong {
+    display: block;
+    margin-top: 3px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 13px;
+  }
+
+  details {
+    border-top: 1px solid var(--line-soft);
+    padding-top: 10px;
+  }
+
+  summary {
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  details p {
+    margin: 10px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+    white-space: pre-line;
+  }
+
+  .notes-list {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .notes-list li {
+    padding: 10px 11px;
+    border: 1px solid var(--line-soft);
+    border-radius: var(--radius);
+    color: var(--muted);
+    background: rgba(8,10,14,.24);
+    font-size: 13px;
+  }
+
+  .source {
+    margin-top: 20px;
+    color: var(--faint);
+    font-size: 12px;
+    text-align: center;
+  }
+
+  @media (max-width: 1120px) {
+    .hero, .layout { grid-template-columns: 1fr; }
+    .sidebar { position: static; }
+    .metrics, .sku-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  @media (max-width: 760px) {
+    .topbar-inner { align-items: flex-start; flex-direction: column; }
+    .nav { margin-left: 0; }
+    .hero-main { padding: 20px; }
+    h1 { font-size: 30px; }
+    .hero-foot, .metrics, .sku-grid, .formula-grid, .product-grid, .nutrition, .toolbar {
+      grid-template-columns: 1fr;
+    }
+    .brand { min-width: 0; }
+    .wrap { padding: 16px 14px 44px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="#top" aria-label="WheyHey x Juustoportti model">
+        <div class="mark">WJ</div>
+        <div>
+          <strong>WheyHey x Juustoportti</strong>
+          <span>Interactive commercial model</span>
+        </div>
+      </a>
+      <nav class="nav" aria-label="Sections">
+        <a href="#economics">Economics</a>
+        <a href="#sensitivity">Sensitivity</a>
+        <a href="#products">Product range</a>
+        <a href="#formulae">Formulae</a>
+        <button class="download-btn" id="copyLink" type="button">Copy link</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap" id="top">
+    <section class="hero">
+      <div class="hero-main">
+        <div>
+          <div class="eyebrow">Pricing valid EXW until 31 Jul 2026</div>
+          <h1>WheyHey x Juustoportti commercial model</h1>
+          <p class="lede">A live version of the workbook model: update FX, landed-cost assumptions, retailer margin, and target WheyHey margin to see SKU economics, RSP thresholds, and product range context refresh instantly.</p>
+        </div>
+        <div class="hero-foot" id="heroStats"></div>
+      </div>
+      <aside class="panel model-status">
+        <div class="status-row">
+          <span>Workbook source</span>
+          <strong>Juustoportti_Product_Range.xlsx</strong>
+        </div>
+        <div class="status-row">
+          <span>Confirmed EXW SKUs</span>
+          <strong>3 of 9 commercial rows</strong>
+        </div>
+        <div class="status-row">
+          <span>Range coverage</span>
+          <strong>14 product variants</strong>
+        </div>
+        <div class="status-row">
+          <span>Known gaps</span>
+          <strong><span class="tag warn">Retailer terms pending</span></strong>
+        </div>
+      </aside>
+    </section>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <section class="panel" aria-labelledby="assumptions-title">
+          <div class="panel-head">
+            <h2 id="assumptions-title">Assumptions</h2>
+            <span class="tag blue">Editable</span>
+          </div>
+          <div class="assumptions" id="assumptions"></div>
+          <button class="reset-btn" id="resetAssumptions" type="button">Reset workbook assumptions</button>
+        </section>
+
+        <section class="panel">
+          <h3>Not included</h3>
+          <ul class="notes-list">
+            <li>Listing fees / slotting allowances.</li>
+            <li>Retrospective rebates and end-of-year payments.</li>
+            <li>Promotional contributions and volume discounts.</li>
+            <li>Lower-volume pricing below 1M units per SKU per year.</li>
+            <li>Currency hedging cost and working-capital VAT timing.</li>
+          </ul>
+        </section>
+      </aside>
+
+      <div class="main">
+        <section class="metrics" aria-label="Key model outputs" id="economics"></section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>Confirmed SKU Economics</h2>
+            </div>
+            <span class="tag good">Formula-backed</span>
+          </div>
+          <div class="sku-grid" id="skuGrid"></div>
+        </section>
+
+        <section class="panel" id="sensitivity">
+          <div class="panel-head">
+            <h2>Retail Price Sensitivity</h2>
+            <span class="tag blue">RSP bands</span>
+          </div>
+          <div class="table-wrap">
+            <table id="sensitivityTable"></table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Minimum RSP Required</h2>
+            <span class="tag warn">Target GM test</span>
+          </div>
+          <div class="table-wrap">
+            <table id="minRspTable"></table>
+          </div>
+        </section>
+
+        <section class="panel" id="products">
+          <div class="panel-head">
+            <h2>Full Product Range</h2>
+            <span class="tag blue">14 variants</span>
+          </div>
+          <div class="toolbar">
+            <input class="search" id="productSearch" type="search" placeholder="Search products, USPs, ingredients">
+            <select id="rangeFilter" aria-label="Product range filter"></select>
+            <select id="sweetenerFilter" aria-label="Sweetener filter"></select>
+          </div>
+          <div class="product-grid" id="productGrid"></div>
+        </section>
+
+        <section class="panel" id="formulae">
+          <div class="panel-head">
+            <h2>Workbook Formulae</h2>
+            <span class="tag blue">Transparent logic</span>
+          </div>
+          <div class="formula-grid">
+            <div class="formula"><span>EXW GBP</span><code>EXW EUR / GBP-EUR exchange rate</code></div>
+            <div class="formula"><span>Import duty</span><code>EXW GBP * import duty rate</code></div>
+            <div class="formula"><span>Total landed cost</span><code>EXW GBP + freight + 3PL + branding + import duty</code></div>
+            <div class="formula"><span>Retailer trade price</span><code>RSP * (1 - retailer margin)</code></div>
+            <div class="formula"><span>WheyHey gross profit</span><code>trade price - total landed cost</code></div>
+            <div class="formula"><span>WheyHey gross margin</span><code>gross profit / trade price</code></div>
+            <div class="formula"><span>Minimum RSP</span><code>landed cost / (1 - target WH GM) / (1 - retailer margin)</code></div>
+            <div class="formula"><span>Workbook status</span><code>Unconfirmed prices remain excluded from economics until EXW is known</code></div>
+          </div>
+        </section>
+
+        <p class="source">Source: Juustoportti Food Oy product specifications and WheyHey x Juustoportti Commercial Model workbook, created 9 Jun 2026.</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const WORKBOOK_DEFAULTS = {
+  fx: 1.18,
+  freight: 0.10,
+  distribution: 0.08,
+  branding: 0.05,
+  duty: 0,
+  retailerMargin: 0.40,
+  targetGm: 0.30,
+  rebates: 0
+};
+
+const ASSUMPTION_META = [
+  { key: "fx", label: "EUR/GBP exchange rate", min: 1.00, max: 1.35, step: 0.01, unit: "rate", note: "GBP1 = EUR" },
+  { key: "freight", label: "Freight Finland to UK", min: 0, max: 0.30, step: 0.01, unit: "gbp" },
+  { key: "distribution", label: "UK 3PL / distribution", min: 0, max: 0.25, step: 0.01, unit: "gbp" },
+  { key: "branding", label: "WheyHey branding", min: 0, max: 0.20, step: 0.01, unit: "gbp" },
+  { key: "duty", label: "Import duty", min: 0, max: 0.12, step: 0.005, unit: "pct" },
+  { key: "retailerMargin", label: "Retailer margin", min: 0.20, max: 0.55, step: 0.01, unit: "pct" },
+  { key: "targetGm", label: "Target WheyHey GM", min: 0.15, max: 0.50, step: 0.01, unit: "pct" },
+  { key: "rebates", label: "Promo / retrospective rebates", min: 0, max: 0.06, step: 0.005, unit: "pct" }
+];
+
+const COMMERCIAL_SKUS = [
+  { sku: "Strawberry 330ml", exwEur: 0.885, note: "Pricing confirmed by Juustoportti 9 Jun 2026" },
+  { sku: "Chocolate + Creatine 330ml", exwEur: 0.945, note: "Pricing confirmed by Juustoportti 9 Jun 2026" },
+  { sku: "Toffee / Caramel 330ml", exwEur: 0.900, note: "Pricing confirmed by Juustoportti 9 Jun 2026" }
+];
+
+const UNCONFIRMED_SKUS = [
+  "Chocolate 330ml",
+  "Raspberry-Chocolate 330ml",
+  "Banana-Chocolate 330ml",
+  "White Choc-Vanilla + Magnesium 330ml",
+  "Frezza Latte 250ml",
+  "Frezza Choco 250ml"
+];
+
+const RSP_POINTS = [1.50, 1.75, 2.00, 2.25, 2.50];
+const GM_TARGETS = [0.25, 0.30, 0.35, 0.40];
+
+const PRODUCTS = [
+  { name: "Protein Drink - Chocolate", range: "330ml UHT", size: 330, kcal100: 76, sugar100: 7.9, protein100: 8.5, kcalBottle: 251, sugarBottle: 26.1, proteinBottle: 28, sweetener: "Sugar", allergens: "Milk", other: "Riboflavin 0.2mg\nVit B12 0.4ug", ingredients: "MILK (Finland), MILK protein, sugar, low fat cocoa powder (1%), maltodextrin, flavourings, acidity regulator (tripotassium citrate), stabilizer (carrageenan), vitamin D", usps: "Finnish #1 bestseller\n28g protein per bottle\nLactose-free\nAmbient storage\nIFS Food certified", notes: "No artificial sweeteners\nCore hero SKU" },
+  { name: "Protein Drink - Chocolate + Creatine", range: "330ml UHT", size: 330, kcal100: 76, sugar100: 7.9, protein100: 8.5, kcalBottle: 251, sugarBottle: 26.1, proteinBottle: 28, sweetener: "Sugar", allergens: "Milk", other: "Riboflavin 0.2mg\nVit B12 0.4ug\nCreatine 0.3g/100ml\n1g per bottle", ingredients: "MILK (Finland), MILK protein, sugar, low fat cocoa powder (1%), maltodextrin, creatine, flavourings, acidity regulator (tripotassium citrate), stabilizer (carrageenan), vitamin D", usps: "Finnish bestseller\n28g protein + 1g creatine/bottle\nDual performance benefit\nLactose-free", notes: "Creatine 1g/bottle - low vs sports nutrition standard of 3-5g\nDiscuss dose uplift with supplier" },
+  { name: "Protein Drink - Banana-Chocolate", range: "330ml UHT", size: 330, kcal100: 75, sugar100: 7.9, protein100: 8.5, kcalBottle: 248, sugarBottle: 26.1, proteinBottle: 28, sweetener: "Sugar", allergens: "Milk", other: "Riboflavin 0.2mg\nVit B12 0.4ug", ingredients: "MILK (Finland), MILK protein, sugar, maltodextrin, low fat cocoa powder (0.5%), flavourings, acidity regulator (tripotassium citrate), stabilizer (carrageenan), vitamin D", usps: "28g protein per bottle\nBanana-chocolate flavour\nLactose-free\nFinnish bestseller", notes: "Lower cocoa (0.5%) vs other chocolate variants (1%)" },
+  { name: "Protein Drink - Raspberry-Chocolate", range: "330ml UHT", size: 330, kcal100: 61, sugar100: 4.9, protein100: 8.5, kcalBottle: 201, sugarBottle: 16.2, proteinBottle: 28, sweetener: "Acesulfame-K + Sucralose", allergens: "Milk", other: "Riboflavin 0.2mg\nVit B12 0.4ug", ingredients: "MILK (Finland), MILK protein, low fat cocoa powder (0.8%), acidity regulator (tripotassium citrate), stabilizer (carrageenan), flavourings, sweeteners (acesulfame-K, sucralose), vitamin D", usps: "28g protein per bottle\nNo added sugar\nLowest calorie 330ml (201 kcal/bottle)\nHigh protein-to-calorie ratio", notes: "Artificial sweeteners - check retailer clean-label policy" },
+  { name: "Protein Drink - Strawberry", range: "330ml UHT", size: 330, kcal100: 76, sugar100: 7.9, protein100: 8.5, kcalBottle: 251, sugarBottle: 26.1, proteinBottle: 28, sweetener: "Sugar", allergens: "Milk", other: "Riboflavin 0.2mg\nVit B12 0.4ug", ingredients: "MILK (Finland), MILK protein, sugar, maltodextrin, flavourings, acidity regulator (tripotassium citrate), stabilizer (carrageenan), colour (carmine), vitamin D", usps: "28g protein per bottle\nNatural ruby colour (carmine)\nFamiliar UK flavour\nLactose-free", notes: "Carmine (E120) is insect-derived - not vegan" },
+  { name: "Protein Drink - Toffee", range: "330ml UHT", size: 330, kcal100: 60, sugar100: 4.9, protein100: 8.5, kcalBottle: 198, sugarBottle: 16.2, proteinBottle: 28, sweetener: "Acesulfame-K + Sucralose", allergens: "Milk", other: "Riboflavin 0.2mg\nVit B12 0.4ug", ingredients: "MILK (Finland), MILK protein, acidity regulator (tripotassium citrate), stabilizer (carrageenan), flavourings, salt, sweeteners (acesulfame-K, sucralose), colour (E150c), vitamin D", usps: "28g protein per bottle\nNo added sugar\n198 kcal per bottle\nCaramel/toffee flavour\nLactose-free", notes: "Artificial sweeteners - check retailer clean-label policy\nHighest salt in 330ml range (0.66g/bottle)" },
+  { name: "Protein Drink - White Choc-Vanilla + Magnesium", range: "330ml UHT", size: 330, kcal100: 86, sugar100: 7.7, protein100: 5.1, kcalBottle: 284, sugarBottle: 25.4, proteinBottle: 16.8, sweetener: "Sugar", allergens: "Milk", other: "Riboflavin 0.2mg\nVit B12 0.4ug\nMagnesium 18mg/100ml\n~59mg per bottle", ingredients: "MILK (Finland), maltodextrin, sugar, MILK protein, acidity regulator (tripotassium citrate), flavourings, trimagnesium citrate, stabilizer (carrageenan), vitamin D", usps: "Recovery/relaxation positioning\nMagnesium added (~59mg/bottle)\nUnique white choc-vanilla flavour\nLactose-free", notes: "Lowest protein in 330ml range (17g/bottle)\nMagnesium 59mg/bottle modest vs 375mg RDA\nHighest carbs in range (49.5g/bottle)" },
+  { name: "Unsweetened Protein Drink - Cocoa", range: "250ml Unsweetened", size: 250, kcal100: 60, sugar100: 4.5, protein100: 8, kcalBottle: 150, sugarBottle: 11.2, proteinBottle: 20, sweetener: "None", allergens: "Milk", other: "Riboflavin 0.23mg\nVit B12 0.37ug\nNaturally occurring sugars", ingredients: "Pasteurized milk, milk protein, low fat cocoa powder (1%), natural flavours, salt, stabilizer (gellan gum), vitamin D", usps: "No added sugar\nNo sweeteners - clean label\n20g protein per bottle\nLactose-free\nAmbient storage", notes: "Shelf life: 120 days\nGellan gum stabilizer (cleaner than carrageenan)" },
+  { name: "Unsweetened Protein Drink - Mint-Cocoa", range: "250ml Unsweetened", size: 250, kcal100: 60, sugar100: 4.5, protein100: 8, kcalBottle: 150, sugarBottle: 11.2, proteinBottle: 20, sweetener: "None", allergens: "Milk", other: "Riboflavin 0.23mg\nVit B12 0.37ug\nNaturally occurring sugars", ingredients: "Pasteurized milk, milk protein, low fat cocoa powder (1%), natural flavours, salt, stabilizer (gellan gum), vitamin D", usps: "No added sugar\nNo sweeteners - clean label\n20g protein per bottle\nUnique mint-cocoa flavour\nLactose-free", notes: "Shelf life: 120 days" },
+  { name: "Unsweetened Protein Drink - Orange-Cocoa", range: "250ml Unsweetened", size: 250, kcal100: 60, sugar100: 4.5, protein100: 8, kcalBottle: 150, sugarBottle: 11.2, proteinBottle: 20, sweetener: "None", allergens: "Milk", other: "Riboflavin 0.23mg\nVit B12 0.37ug\nNaturally occurring sugars", ingredients: "Pasteurized milk, milk protein, low fat cocoa powder (1%), natural flavours, salt, stabilizer (gellan gum), vitamin D", usps: "No added sugar\nNo sweeteners - clean label\n20g protein per bottle\nOrange-cocoa flavour\nLactose-free", notes: "Shelf life: 120 days" },
+  { name: "Unsweetened Protein Drink - Cocoa-Banana", range: "250ml Unsweetened", size: 250, kcal100: 60, sugar100: 4.5, protein100: 8, kcalBottle: 150, sugarBottle: 11.2, proteinBottle: 20, sweetener: "None", allergens: "Milk", other: "Riboflavin 0.23mg\nVit B12 0.37ug\nNaturally occurring sugars", ingredients: "Pasteurized milk, milk protein, low fat cocoa powder (1%), natural flavours, salt, stabilizer (gellan gum), vitamin D", usps: "No added sugar\nNo sweeteners - clean label\n20g protein per bottle\nCocoa-banana flavour\nLactose-free", notes: "Shelf life: 120 days" },
+  { name: "Unsweetened Protein Drink - Cocoa-Raspberry", range: "250ml Unsweetened", size: 250, kcal100: 60, sugar100: 4.5, protein100: 8, kcalBottle: 150, sugarBottle: 11.2, proteinBottle: 20, sweetener: "None", allergens: "Milk", other: "Riboflavin 0.23mg\nVit B12 0.37ug\nNaturally occurring sugars", ingredients: "Pasteurized milk, milk protein, low fat cocoa powder (1%), natural flavours, salt, stabilizer (gellan gum), vitamin D", usps: "No added sugar\nNo sweeteners - clean label\n20g protein per bottle\nCocoa-raspberry flavour\nLactose-free", notes: "Shelf life: 120 days" },
+  { name: "Frezza Coffee Shake - Choco", range: "250ml Frezza Coffee", size: 250, kcal100: 82, sugar100: 7.9, protein100: 8, kcalBottle: 205, sugarBottle: 19.8, proteinBottle: 20, sweetener: "Sugar", allergens: "Milk", other: "Caffeine 20mg/100ml\n50mg per bottle\nLactose 0g/100g\nCalcium 31% DI", ingredients: "MILK (Finland), MILK protein, espresso coffee (6.1%), sugar, flavours, colour (E150c), acidity regulators (E500, E340), stabilisers (E407, E418), vitamin D", usps: "20g protein + natural caffeine\n50mg caffeine/bottle (real espresso)\nDual benefit: energy + protein\nLactose-free\nBreakfast/morning occasion", notes: "Highest calcium in range (240mg/100ml)\nReal espresso 6.1% - not flavouring\nMost differentiated vs UK competition" },
+  { name: "Frezza Coffee Shake - Latte", range: "250ml Frezza Coffee", size: 250, kcal100: 82, sugar100: 7.9, protein100: 8, kcalBottle: 205, sugarBottle: 19.8, proteinBottle: 20, sweetener: "Sugar", allergens: "Milk", other: "Caffeine 20mg/100ml\n50mg per bottle\nLactose 0g/100g\nCalcium 31% DI", ingredients: "MILK (Finland), MILK protein, espresso coffee (6.1%), sugar, flavours, colour (E150c), acidity regulators (E500, E340), stabilisers (E407, E418), vitamin D", usps: "20g protein + natural caffeine\n50mg caffeine/bottle (real espresso)\nDual benefit: energy + protein\nLactose-free\nBreakfast/morning occasion", notes: "Highest calcium in range (240mg/100ml)\nReal espresso 6.1% - not flavouring\nMost differentiated vs UK competition" }
+];
+
+let assumptions = { ...WORKBOOK_DEFAULTS };
+
+const gbp = value => new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+const eur = value => new Intl.NumberFormat("en-IE", { style: "currency", currency: "EUR", minimumFractionDigits: 3, maximumFractionDigits: 3 }).format(value);
+const pct = value => `${(value * 100).toFixed(1)}%`;
+const num = value => Number.isFinite(value) ? value.toFixed(2) : "N/A";
+
+function formatAssumption(meta, value) {
+  if (meta.unit === "gbp") return gbp(value);
+  if (meta.unit === "pct") return pct(value);
+  return `${value.toFixed(2)} ${meta.note || ""}`.trim();
+}
+
+function landedCost(sku, a = assumptions) {
+  const exwGbp = sku.exwEur / a.fx;
+  const duty = exwGbp * a.duty;
+  const total = exwGbp + a.freight + a.distribution + a.branding + duty;
+  return { exwGbp, freight: a.freight, distribution: a.distribution, branding: a.branding, duty, total };
+}
+
+function economicsAtRsp(sku, rsp, a = assumptions) {
+  const cost = landedCost(sku, a);
+  const trade = rsp * (1 - a.retailerMargin);
+  const rebateCost = trade * a.rebates;
+  const gp = trade - cost.total - rebateCost;
+  const gm = trade === 0 ? null : gp / trade;
+  return { trade, rebateCost, gp, gm, cost };
+}
+
+function minRsp(sku, targetGm, a = assumptions) {
+  const cost = landedCost(sku, a).total;
+  const netTradeFactor = (1 - targetGm) * (1 - a.retailerMargin) - a.rebates * (1 - a.retailerMargin);
+  return netTradeFactor <= 0 ? null : cost / netTradeFactor;
+}
+
+function classForGm(gm) {
+  if (gm == null || gm < 0.10) return "bad";
+  if (gm < assumptions.targetGm) return "warn";
+  return "good";
+}
+
+function renderAssumptions() {
+  const host = document.getElementById("assumptions");
+  host.innerHTML = ASSUMPTION_META.map(meta => `
+    <label class="control" for="${meta.key}">
+      <span class="control-row"><span>${meta.label}</span><strong id="${meta.key}Value">${formatAssumption(meta, assumptions[meta.key])}</strong></span>
+      <div class="input-line">
+        <input id="${meta.key}" data-key="${meta.key}" type="range" min="${meta.min}" max="${meta.max}" step="${meta.step}" value="${assumptions[meta.key]}">
+        <input data-key="${meta.key}" type="number" min="${meta.min}" max="${meta.max}" step="${meta.step}" value="${assumptions[meta.key]}">
+      </div>
+    </label>
+  `).join("");
+
+  host.querySelectorAll("input").forEach(input => {
+    input.addEventListener("input", event => {
+      const key = event.target.dataset.key;
+      assumptions[key] = Number(event.target.value);
+      host.querySelectorAll(`[data-key="${key}"]`).forEach(peer => {
+        if (peer !== event.target) peer.value = event.target.value;
+      });
+      document.getElementById(`${key}Value`).textContent = formatAssumption(ASSUMPTION_META.find(item => item.key === key), assumptions[key]);
+      renderModel();
+    });
+  });
+}
+
+function renderHeroStats() {
+  const avgLanded = COMMERCIAL_SKUS.reduce((sum, sku) => sum + landedCost(sku).total, 0) / COMMERCIAL_SKUS.length;
+  const rspNeeded = Math.max(...COMMERCIAL_SKUS.map(sku => minRsp(sku, assumptions.targetGm)));
+  const bestProtein = Math.max(...PRODUCTS.map(p => p.proteinBottle));
+  const cleanLabel = PRODUCTS.filter(p => p.sweetener === "None").length;
+  document.getElementById("heroStats").innerHTML = [
+    ["Avg landed cost", gbp(avgLanded)],
+    [`Min RSP @ ${pct(assumptions.targetGm)}`, gbp(rspNeeded)],
+    ["Highest protein", `${bestProtein}g`],
+    ["No-sweetener SKUs", `${cleanLabel}`]
+  ].map(([label, value]) => `<div class="hero-stat"><span>${label}</span><strong>${value}</strong></div>`).join("");
+}
+
+function renderMetrics() {
+  const heroSku = COMMERCIAL_SKUS[0];
+  const heroCost = landedCost(heroSku).total;
+  const atTwo = economicsAtRsp(heroSku, 2.00);
+  const passingAtTwo = COMMERCIAL_SKUS.filter(sku => economicsAtRsp(sku, 2.00).gm >= assumptions.targetGm).length;
+  const worstMinRsp = Math.max(...COMMERCIAL_SKUS.map(sku => minRsp(sku, assumptions.targetGm)));
+  document.getElementById("economics").innerHTML = [
+    ["Strawberry landed cost", gbp(heroCost), "Workbook base SKU"],
+    ["RSP GBP2.00 WH GM", pct(atTwo.gm), `${gbp(atTwo.gp)} GP per unit`],
+    ["SKUs passing @ GBP2.00", `${passingAtTwo}/${COMMERCIAL_SKUS.length}`, `Target ${pct(assumptions.targetGm)}`],
+    ["Highest min RSP", gbp(worstMinRsp), "Among confirmed SKUs"]
+  ].map(([label, value, note]) => `<div class="metric"><span>${label}</span><strong>${value}</strong><em>${note}</em></div>`).join("");
+}
+
+function renderSkuGrid() {
+  const maxTotal = Math.max(...COMMERCIAL_SKUS.map(sku => landedCost(sku).total));
+  document.getElementById("skuGrid").innerHTML = COMMERCIAL_SKUS.map(sku => {
+    const cost = landedCost(sku);
+    const e = economicsAtRsp(sku, 2.00);
+    const parts = [
+      ["EXW GBP", cost.exwGbp],
+      ["Freight", cost.freight],
+      ["3PL", cost.distribution],
+      ["Brand", cost.branding],
+      ["Duty", cost.duty]
+    ];
+    return `
+      <article class="sku-card">
+        <div class="sku-top">
+          <h3>${sku.sku}</h3>
+          <span class="tag ${classForGm(e.gm)}">${pct(e.gm)} @ GBP2.00</span>
+        </div>
+        <div class="status-row"><span>EXW EUR</span><strong>${eur(sku.exwEur)}</strong></div>
+        <div class="status-row"><span>Total landed</span><strong>${gbp(cost.total)}</strong></div>
+        <div class="status-row"><span>Min RSP @ target</span><strong>${gbp(minRsp(sku, assumptions.targetGm))}</strong></div>
+        <div class="cost-bars">
+          ${parts.map(([label, value]) => `<div class="cost-bar"><span>${label}</span><div class="track"><div class="fill" style="width:${Math.max(2, value / maxTotal * 100)}%"></div></div><strong>${gbp(value)}</strong></div>`).join("")}
+        </div>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderSensitivityTable() {
+  const rows = COMMERCIAL_SKUS.map(sku => {
+    const cost = landedCost(sku).total;
+    const cells = RSP_POINTS.map(rsp => {
+      const e = economicsAtRsp(sku, rsp);
+      return `<td class="num"><span class="heat ${classForGm(e.gm)}">${gbp(e.gp)}<br>${pct(e.gm)}</span></td>`;
+    }).join("");
+    return `<tr><td>${sku.sku}</td><td class="num">${gbp(cost)}</td>${cells}</tr>`;
+  }).join("");
+  document.getElementById("sensitivityTable").innerHTML = `
+    <thead><tr><th>SKU</th><th class="num">Landed cost</th>${RSP_POINTS.map(rsp => `<th class="num">RSP ${gbp(rsp)}<br>Trade ${gbp(rsp * (1 - assumptions.retailerMargin))}</th>`).join("")}</tr></thead>
+    <tbody>${rows}</tbody>
+  `;
+}
+
+function renderMinRspTable() {
+  const rows = COMMERCIAL_SKUS.map(sku => {
+    const cells = GM_TARGETS.map(target => {
+      const val = minRsp(sku, target);
+      const cls = Math.abs(target - assumptions.targetGm) < 0.001 ? "good" : "";
+      return `<td class="num"><span class="heat ${cls}">${val == null ? "N/A" : gbp(val)}</span></td>`;
+    }).join("");
+    return `<tr><td>${sku.sku}</td><td class="num">${gbp(landedCost(sku).total)}</td>${cells}<td>${sku.note}</td></tr>`;
+  }).join("");
+  document.getElementById("minRspTable").innerHTML = `
+    <thead><tr><th>SKU</th><th class="num">Landed cost</th>${GM_TARGETS.map(target => `<th class="num">Min RSP @ ${pct(target)}</th>`).join("")}<th>Note</th></tr></thead>
+    <tbody>${rows}</tbody>
+  `;
+}
+
+function renderProductFilters() {
+  const rangeSelect = document.getElementById("rangeFilter");
+  const sweetenerSelect = document.getElementById("sweetenerFilter");
+  const ranges = [...new Set(PRODUCTS.map(p => p.range))];
+  const sweeteners = [...new Set(PRODUCTS.map(p => p.sweetener))];
+  rangeSelect.innerHTML = `<option value="">All ranges</option>${ranges.map(v => `<option>${v}</option>`).join("")}`;
+  sweetenerSelect.innerHTML = `<option value="">All sweeteners</option>${sweeteners.map(v => `<option>${v}</option>`).join("")}`;
+  [rangeSelect, sweetenerSelect, document.getElementById("productSearch")].forEach(el => el.addEventListener("input", renderProducts));
+}
+
+function renderProducts() {
+  const q = document.getElementById("productSearch").value.trim().toLowerCase();
+  const range = document.getElementById("rangeFilter").value;
+  const sweetener = document.getElementById("sweetenerFilter").value;
+  const filtered = PRODUCTS.filter(p => {
+    const blob = `${p.name} ${p.range} ${p.sweetener} ${p.ingredients} ${p.usps} ${p.notes}`.toLowerCase();
+    return (!q || blob.includes(q)) && (!range || p.range === range) && (!sweetener || p.sweetener === sweetener);
+  });
+  document.getElementById("productGrid").innerHTML = filtered.map(p => `
+    <article class="product-card">
+      <div>
+        <h3>${p.name}</h3>
+        <div class="product-meta">
+          <span class="tag blue">${p.range}</span>
+          <span class="tag">${p.size}ml</span>
+          <span class="tag ${p.sweetener === "None" ? "good" : p.sweetener === "Sugar" ? "blue" : "warn"}">${p.sweetener}</span>
+        </div>
+      </div>
+      <div class="nutrition">
+        <div class="nutri"><span>Protein</span><strong>${p.proteinBottle}g</strong></div>
+        <div class="nutri"><span>Calories</span><strong>${p.kcalBottle}</strong></div>
+        <div class="nutri"><span>Sugar</span><strong>${p.sugarBottle}g</strong></div>
+        <div class="nutri"><span>Per 100ml</span><strong>${p.protein100}g</strong></div>
+      </div>
+      <details open>
+        <summary>USPs and notes</summary>
+        <p>${p.usps}</p>
+        <p>${p.notes}</p>
+      </details>
+      <details>
+        <summary>Ingredients and other nutrients</summary>
+        <p>${p.ingredients}</p>
+        <p>${p.other}</p>
+      </details>
+    </article>
+  `).join("") || `<p class="source">No products match the current filters.</p>`;
+}
+
+function renderModel() {
+  renderHeroStats();
+  renderMetrics();
+  renderSkuGrid();
+  renderSensitivityTable();
+  renderMinRspTable();
+}
+
+document.getElementById("resetAssumptions").addEventListener("click", () => {
+  assumptions = { ...WORKBOOK_DEFAULTS };
+  renderAssumptions();
+  renderModel();
+});
+
+document.getElementById("copyLink").addEventListener("click", async event => {
+  try {
+    await navigator.clipboard.writeText(location.href);
+    event.target.textContent = "Copied";
+    setTimeout(() => { event.target.textContent = "Copy link"; }, 1400);
+  } catch (error) {
+    event.target.textContent = "Link ready";
+    setTimeout(() => { event.target.textContent = "Copy link"; }, 1400);
+  }
+});
+
+renderAssumptions();
+renderProductFilters();
+renderProducts();
+renderModel();
+</script>
+</body>
+</html>

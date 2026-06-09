@@ -45,3 +45,8 @@
   from = "/demo"
   to = "/app/demo.html"
   status = 301
+
+[[redirects]]
+  from = "/juustoportti"
+  to = "/juustoportti-financial-model.html"
+  status = 301
