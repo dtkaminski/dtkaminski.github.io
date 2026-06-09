@@ -18,24 +18,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606091422"></script>
-<script src="./frkl-live-data.js?v=202606091422"></script>
-<script src="./frkl-agent-insights.js?v=202606091422"></script>
-<script src="./frkl-business-data.js?v=202606091422"></script>
-<script src="./frkl-action-status.js?v=202606091422"></script>
-<script src="./frkl-patterns.js?v=202606091422"></script>
-<script src="./frkl-creators.js?v=202606091422"></script>
-<script src="./frkl-creative-vision.js?v=202606091422"></script>
-<script src="./frkl-links.js?v=202606091422"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606091422"></script>
-<script src="./frkl-events.js?v=202606091422"></script>
-<script src="./frkl-products.js?v=202606091422"></script>
-<script src="./frkl-discount-codes.js?v=202606091422"></script>
-<script src="./frkl-cvr.js?v=202606091422"></script>
-<script src="./frkl-cohorts.js?v=202606091422"></script>
-<script src="./frkl-retention.js?v=202606091422"></script>
-<script src="./frkl-clarity.js?v=202606091422"></script>
-<script src="./frkl-board-read.js?v=202606091422"></script>
+<script src="./frkl-data-loader.js?v=202606091430"></script>
+<script src="./frkl-live-data.js?v=202606091430"></script>
+<script src="./frkl-agent-insights.js?v=202606091430"></script>
+<script src="./frkl-business-data.js?v=202606091430"></script>
+<script src="./frkl-action-status.js?v=202606091430"></script>
+<script src="./frkl-patterns.js?v=202606091430"></script>
+<script src="./frkl-creators.js?v=202606091430"></script>
+<script src="./frkl-creative-vision.js?v=202606091430"></script>
+<script src="./frkl-links.js?v=202606091430"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606091430"></script>
+<script src="./frkl-events.js?v=202606091430"></script>
+<script src="./frkl-products.js?v=202606091430"></script>
+<script src="./frkl-discount-codes.js?v=202606091430"></script>
+<script src="./frkl-cvr.js?v=202606091430"></script>
+<script src="./frkl-cohorts.js?v=202606091430"></script>
+<script src="./frkl-retention.js?v=202606091430"></script>
+<script src="./frkl-clarity.js?v=202606091430"></script>
+<script src="./frkl-board-read.js?v=202606091430"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -428,16 +428,26 @@
   .actionrow .ev { font-size: var(--t-micro); color: var(--text-muted); font-style: italic; }
   .impact { font-size: var(--t-micro); color: var(--good); padding: 2px 0 0 2px; }
 
-  /* ── Live action rows — aligned 3-column grid (status · content · £ impact) ── */
+  /* ── Live action table — sortable, column-aligned (priority · action · confidence · £/mo) ── */
+  .live-head, .live-row {
+    display: grid; grid-template-columns: 96px minmax(0,1fr) 124px 92px;
+    gap: var(--s-4); align-items: start;
+  }
+  .live-head { padding: 9px var(--s-3); border-bottom: 1px solid var(--border-default); }
+  .live-hcell {
+    display: inline-flex; align-items: center; gap: 4px; background: none; border: none; padding: 0;
+    cursor: pointer; font-family: inherit; font-size: 10px; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--text-faint); transition: color 120ms;
+  }
+  .live-hcell:hover { color: var(--text-secondary); }
+  .live-hcell.active { color: var(--text-primary); }
+  .live-hcell.right { justify-content: flex-end; }
+  .live-hcell .caret { font-size: 8px; line-height: 1; }
   .live-row {
-    display: grid; grid-template-columns: 124px minmax(0,1fr) 96px;
-    gap: var(--s-5); align-items: start;
-    padding: 16px var(--s-3); border-top: 1px solid var(--border-subtle);
+    padding: 15px var(--s-3); border-top: 1px solid var(--border-subtle);
     transition: background 120ms ease;
   }
-  .live-row:first-of-type { border-top: none; }
   .live-row:hover { background: rgba(255,255,255,0.022); }
-  .live-row .lr-status { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
   .live-row .lr-pill {
     display: inline-flex; align-items: center; max-width: 100%;
     font-size: 9px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
@@ -452,9 +462,9 @@
   .live-row .lr-impact .amt { font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
   .live-row .lr-impact .per { display: block; font-size: 10px; color: var(--text-faint); margin-top: 1px; }
   @media (max-width: 760px) {
-    .live-row { grid-template-columns: 1fr auto; gap: var(--s-3); }
-    .live-row .lr-status { flex-direction: row; flex-wrap: wrap; }
-    .live-row .lr-content { grid-column: 1 / -1; order: 3; }
+    .live-head { display: none; }
+    .live-row { display: flex; flex-direction: column; gap: 6px; }
+    .live-row .lr-impact { text-align: left; }
   }
   .impact .label { color: var(--text-muted); font-style: italic; }
   .markbtn {
@@ -1393,6 +1403,7 @@ function ActionBoard(){
   const [showDone, setShowDone] = useState(false);
   const [openGroups, setOpenGroups] = useState({});   // specialist groups collapsed by default (default-collapsed = less noise)
   const [liveAll, setLiveAll] = useState(false);       // live read shows top few, expand for the rest
+  const [liveSort, setLiveSort] = useState({key:'gbp', dir:'desc'});   // sortable live-read table
   const [modalAction, setModalAction] = React.useState(null);
   const effStatus = (a) => isLocallyDone(a.id) ? "verified-done" : (STATUS[a.id]||{}).status;
   const done = all.filter(a => effStatus(a) === "verified-done");
@@ -1464,21 +1475,40 @@ function ActionBoard(){
     const impColor = f.verdict === 'expected' ? 'var(--text-muted)' : 'var(--good)';
     return (
       <div className="live-row" key={'live'+i}>
-        <div className="lr-status">
-          <span className="lr-pill" style={{color:vs.fg, background:vs.bg}}>{vs.label}</span>
-          <span className="lr-pill lr-conf" style={{color:cf.fg, background:cf.bg}}>{cf.lbl}</span>
-        </div>
+        <div className="lr-verdict"><span className="lr-pill" style={{color:vs.fg, background:vs.bg}}>{vs.label}</span></div>
         <div className="lr-content">
           <div className="lr-title"><b>{f.area}.</b> {f.recommendation}</div>
           {f.metric && <div className="lr-ev">{f.metric}</div>}
           <div className="lr-cta"><PlaybookHint text={`${f.recommendation} ${f.metric} ${f.area}`}/><NavChip f={f}/></div>
         </div>
+        <div className="lr-confcell"><span className="lr-pill lr-conf" style={{color:cf.fg, background:cf.bg}}>{cf.lbl}</span></div>
         <div className="lr-impact">
           {amt ? (<><span className="amt" style={{color:impColor}}>{amt}</span><span className="per">/mo</span></>)
                : <span className="per">—</span>}
         </div>
       </div>);
   };
+  // Sortable header + sorted rows for the live-read table.
+  const LIVE_RANK = { verdict:{act:3, monitor:2, expected:1}, confidence:{high:3, med:2, low:1} };
+  const liveSortVal = (f) => {
+    if(liveSort.key==='verdict')    return LIVE_RANK.verdict[f.verdict] || 0;
+    if(liveSort.key==='confidence') return LIVE_RANK.confidence[f.confidence||'med'] || 0;
+    if(liveSort.key==='area')       return (f.area||'').toLowerCase();
+    return f.gbp || 0;                                                  // 'gbp'
+  };
+  const onLiveSort = (key) => setLiveSort(s => s.key===key ? {key, dir: s.dir==='asc'?'desc':'asc'} : {key, dir: key==='area'?'asc':'desc'});
+  const liveHeadCell = (key, label, right) => {
+    const active = liveSort.key===key;
+    return (<button className={'live-hcell'+(active?' active':'')+(right?' right':'')} onClick={()=>onLiveSort(key)} title={`Sort by ${label.toLowerCase()}`}>
+      {label}<span className="caret">{active ? (liveSort.dir==='asc'?'▲':'▼') : '↕'}</span>
+    </button>);
+  };
+  const LiveHead = () => (<div className="live-head">
+    {liveHeadCell('verdict','Priority')}
+    {liveHeadCell('area','Action')}
+    {liveHeadCell('confidence','Confidence')}
+    {liveHeadCell('gbp','£/mo', true)}
+  </div>);
 
   return (<div className="card">
     <div className="card-section-title">
@@ -1494,9 +1524,17 @@ function ActionBoard(){
         <span style={{fontWeight:700,color:'var(--text-primary)',fontSize:13.5}}>Now — live read</span>
         <span style={{fontSize:11,color:'var(--text-faint)'}}>Crux · from today's diagnostic</span>
       </div>
-      {(()=>{ const ranked=[...liveFindings].sort((a,b)=>findingScore(b)-findingScore(a)); const CAP=6; const shown=liveAll?ranked:ranked.slice(0,CAP); return (<>
+      {(()=>{
+        const dir = liveSort.dir==='asc' ? 1 : -1;
+        const ranked=[...liveFindings].sort((a,b)=>{
+          const va=liveSortVal(a), vb=liveSortVal(b);
+          if(va<vb) return -1*dir; if(va>vb) return 1*dir;
+          return findingScore(b)-findingScore(a);   // stable tiebreak by £-weighted score
+        });
+        const CAP=6; const shown=liveAll?ranked:ranked.slice(0,CAP); return (<>
+        <LiveHead/>
         {shown.map(renderLive)}
-        {ranked.length>CAP && <button onClick={()=>setLiveAll(v=>!v)} className="btn-ghost" style={{padding:'5px 11px',fontSize:11.5,marginTop:4}}>{liveAll?'Show fewer':`Show ${ranked.length-CAP} more`}</button>}
+        {ranked.length>CAP && <button onClick={()=>setLiveAll(v=>!v)} className="btn-ghost" style={{padding:'5px 11px',fontSize:11.5,marginTop:8}}>{liveAll?'Show fewer':`Show ${ranked.length-CAP} more`}</button>}
       </>); })()}
     </div>)}
 
