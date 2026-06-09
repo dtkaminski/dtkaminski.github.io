@@ -19,24 +19,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606093100"></script>
-<script src="./frkl-live-data.js?v=202606093100"></script>
-<script src="./frkl-agent-insights.js?v=202606093100"></script>
-<script src="./frkl-business-data.js?v=202606093100"></script>
-<script src="./frkl-action-status.js?v=202606093100"></script>
-<script src="./frkl-patterns.js?v=202606093100"></script>
-<script src="./frkl-creators.js?v=202606093100"></script>
-<script src="./frkl-creative-vision.js?v=202606093100"></script>
-<script src="./frkl-links.js?v=202606093100"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606093100"></script>
-<script src="./frkl-events.js?v=202606093100"></script>
-<script src="./frkl-products.js?v=202606093100"></script>
-<script src="./frkl-discount-codes.js?v=202606093100"></script>
-<script src="./frkl-cvr.js?v=202606093100"></script>
-<script src="./frkl-cohorts.js?v=202606093100"></script>
-<script src="./frkl-retention.js?v=202606093100"></script>
-<script src="./frkl-clarity.js?v=202606093100"></script>
-<script src="./frkl-board-read.js?v=202606093100"></script>
+<script src="./frkl-data-loader.js?v=202606093200"></script>
+<script src="./frkl-live-data.js?v=202606093200"></script>
+<script src="./frkl-agent-insights.js?v=202606093200"></script>
+<script src="./frkl-business-data.js?v=202606093200"></script>
+<script src="./frkl-action-status.js?v=202606093200"></script>
+<script src="./frkl-patterns.js?v=202606093200"></script>
+<script src="./frkl-creators.js?v=202606093200"></script>
+<script src="./frkl-creative-vision.js?v=202606093200"></script>
+<script src="./frkl-links.js?v=202606093200"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606093200"></script>
+<script src="./frkl-events.js?v=202606093200"></script>
+<script src="./frkl-products.js?v=202606093200"></script>
+<script src="./frkl-discount-codes.js?v=202606093200"></script>
+<script src="./frkl-cvr.js?v=202606093200"></script>
+<script src="./frkl-cohorts.js?v=202606093200"></script>
+<script src="./frkl-retention.js?v=202606093200"></script>
+<script src="./frkl-clarity.js?v=202606093200"></script>
+<script src="./frkl-board-read.js?v=202606093200"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -535,15 +535,23 @@
   }
   .icon-btn:hover { color: var(--text-primary); border-color: var(--text-faint); }
   .mobile-secnav { display: none; }
+  /* Mobile: fixed bottom tab bar (founder quick-nav); ⌘K/More reaches the rest. */
+  .mobile-botnav { display: none; }
   @media (max-width: 760px) {
     .app-shell { display: block; }
     .sidebar { display: none; }
-    .mobile-secnav {
-      display: flex; gap: 6px; overflow-x: auto; -webkit-overflow-scrolling: touch;
-      padding: 8px var(--s-4); margin-bottom: 4px; position: sticky; top: var(--appbar-h);
-      background: var(--bg-app); z-index: 20; border-bottom: 1px solid var(--border-subtle);
+    .mobile-botnav {
+      display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+      background: var(--bg-elevated); border-top: 1px solid var(--border-default);
+      box-shadow: 0 -3px 14px rgba(0,0,0,0.18);
+      padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
     }
-    .mobile-secnav .nav-item { padding: 6px 11px; border: 1px solid var(--border-subtle); flex-shrink: 0; }
+    .mb-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+      padding: 5px 2px; background: none; border: none; color: var(--text-muted);
+      font-size: 9.5px; font-weight: 600; font-family: inherit; cursor: pointer; min-width: 0; }
+    .mb-item span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mb-item.active { color: var(--accent); }
+    body { padding-bottom: 62px; }
   }
 
   /* ── Command menu (⌘K) ───────────────────────────────────────────────── */
@@ -5625,6 +5633,7 @@ function DiscountCodeTracker(){
         </R.BarChart>
       </R.ResponsiveContainer>
       <div style={{fontSize:11,color:'var(--text-faint)',margin:'2px 0 4px'}}>A steady band every week = an <b style={{color:'#f59e0b'}}>always-on</b> code (structural discount). A tall single-week bar = a <b style={{color:'#4ade80'}}>spike</b> (sale/launch). <span style={{color:'#ef6b6f'}}>Service</span> = goodwill codes (replacement/resend), shown for context — not promotion.</div>
+      <ChartFooter ask="From discount-code usage over time, which codes are always-on structural margin give-away vs one-off campaign spikes, and where should I tighten?"/>
     </div>
 
     <div className="card">
@@ -6256,6 +6265,9 @@ function EmailHub(){
           <R.Line yAxisId="r" type="monotone" dataKey="revenue" name="Revenue" stroke={COL.revenue} strokeWidth={2} dot={false} />
         </R.ComposedChart>
       </R.ResponsiveContainer>
+      <ChartFooter note="Are we over-emailing? Watch revenue-per-send falling as send volume climbs."
+        ask="Looking at email send volume vs revenue, are we over-emailing the list and is revenue-per-send holding up?"
+        rows={sendChart} columns={[{key:'date',label:'Date'},{key:'sends',label:'Sends',right:true,fmt:v=>NUM(v)},{key:'revenue',label:'Revenue',right:true,fmt:v=>GBP(v)}]}/>
     </div>
     <div className="card" style={{marginTop:14}}>
       <h2>All campaigns — sorted by recent</h2>
@@ -6365,7 +6377,10 @@ function StoriesPanel(){
   return (<div className="card" style={{marginTop:14, borderLeft:'3px solid #fbbf24'}}>
     <h2>Instagram Stories — last 60 days</h2>
     <div className="muted" style={{marginBottom:10,fontSize:12}}>Stories are the daily-cadence organic surface. Competitors post 5-15/week; frkl posted {stories.length} in 60 days.</div>
-    {stories.length === 0 ? (<div style={{padding:20,background:'var(--bad-bg)',borderRadius:8,color:'var(--bad)'}}>No stories posted in the last 60 days. This is a missed daily organic touchpoint — Stories outperform Feed for product link-outs and live-feel community signals.</div>) : (
+    {stories.length === 0 ? (<EmptyState icon="image"
+      title="No Instagram Stories in the last 60 days"
+      body="Stories are the daily-cadence organic touchpoint — they outperform Feed for product link-outs and live-feel community signals. Competitors post 5–15 a week; a consistent Stories habit is one of the cheapest reach levers you have."
+      cta="Ask AI for a Stories plan" ctaOnClick={()=>window.__oiAsk && window.__oiAsk('I post no Instagram Stories. Give me a simple weekly Stories cadence and content plan to lift organic reach.')}/>) : (
       <table><thead><tr><th>Date</th><th>Type</th><th>Views</th><th>Reach</th><th>Exits</th><th>Replies</th><th>Shares</th><th>Tap fwd</th><th>Tap back</th><th>Completion</th></tr></thead><tbody>
       {stories.map((s,i)=>{
         const completion = s.views ? 1 - (s.exits||0)/s.views : null;
@@ -8562,6 +8577,13 @@ const RAIL = [
   { label:'Settings',         icon:'sliders',   section:'settings' },
 ];
 const NAV_BY_ID = Object.fromEntries(NAV.map(s=>[s.id, s]));
+// Mobile bottom tab bar — the 4 most-used destinations + More (opens ⌘K palette).
+const MOBILE_NAV = [
+  { label:'Today',    icon:'home',      section:'home' },
+  { label:'Actions',  icon:'clipboard', section:'actions' },
+  { label:'Analyst',  icon:'spark',     section:'home', sub:'ask' },
+  { label:'Products', icon:'box',       section:'commerce' },
+];
 
 // ── Connections panel — shows OAuth status per source + install actions ─────
 function ConnectionsPanel(){
@@ -8865,13 +8887,6 @@ function App(){
         ))}
       </nav>
       <main className="app-main">
-        <div className="mobile-secnav">
-          {RAIL.map((e,i) => (
-            <div key={i} className={'nav-item' + (railActive(e) ? ' active' : '')} onClick={()=>goRail(e)}>
-              <Icon name={e.icon||'info'} size={15}/>{e.label}
-            </div>
-          ))}
-        </div>
         <div className="wrap">
       {/* Sub-nav: only render when the section has >1 sub-tab */}
       {activeSection.subtabs.length > 1 && (
@@ -8915,6 +8930,16 @@ function App(){
     <CommandMenu/>
     <EvidenceDrawer/>
     <StickyHealthBar/>
+    <nav className="mobile-botnav">
+      {MOBILE_NAV.map((e,i)=>(
+        <button key={i} className={'mb-item'+(railActive(e)?' active':'')} onClick={()=>goRail(e)}>
+          <Icon name={e.icon} size={19}/><span>{e.label}</span>
+        </button>
+      ))}
+      <button className="mb-item" onClick={()=>window.__oiCommandOpen&&window.__oiCommandOpen()}>
+        <Icon name="search" size={19}/><span>More</span>
+      </button>
+    </nav>
   </div>);
 }
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
