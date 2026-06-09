@@ -19,24 +19,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606093500"></script>
-<script src="./frkl-live-data.js?v=202606093500"></script>
-<script src="./frkl-agent-insights.js?v=202606093500"></script>
-<script src="./frkl-business-data.js?v=202606093500"></script>
-<script src="./frkl-action-status.js?v=202606093500"></script>
-<script src="./frkl-patterns.js?v=202606093500"></script>
-<script src="./frkl-creators.js?v=202606093500"></script>
-<script src="./frkl-creative-vision.js?v=202606093500"></script>
-<script src="./frkl-links.js?v=202606093500"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606093500"></script>
-<script src="./frkl-events.js?v=202606093500"></script>
-<script src="./frkl-products.js?v=202606093500"></script>
-<script src="./frkl-discount-codes.js?v=202606093500"></script>
-<script src="./frkl-cvr.js?v=202606093500"></script>
-<script src="./frkl-cohorts.js?v=202606093500"></script>
-<script src="./frkl-retention.js?v=202606093500"></script>
-<script src="./frkl-clarity.js?v=202606093500"></script>
-<script src="./frkl-board-read.js?v=202606093500"></script>
+<script src="./frkl-data-loader.js?v=202606093600"></script>
+<script src="./frkl-live-data.js?v=202606093600"></script>
+<script src="./frkl-agent-insights.js?v=202606093600"></script>
+<script src="./frkl-business-data.js?v=202606093600"></script>
+<script src="./frkl-action-status.js?v=202606093600"></script>
+<script src="./frkl-patterns.js?v=202606093600"></script>
+<script src="./frkl-creators.js?v=202606093600"></script>
+<script src="./frkl-creative-vision.js?v=202606093600"></script>
+<script src="./frkl-links.js?v=202606093600"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606093600"></script>
+<script src="./frkl-events.js?v=202606093600"></script>
+<script src="./frkl-products.js?v=202606093600"></script>
+<script src="./frkl-discount-codes.js?v=202606093600"></script>
+<script src="./frkl-cvr.js?v=202606093600"></script>
+<script src="./frkl-cohorts.js?v=202606093600"></script>
+<script src="./frkl-retention.js?v=202606093600"></script>
+<script src="./frkl-clarity.js?v=202606093600"></script>
+<script src="./frkl-board-read.js?v=202606093600"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -8387,20 +8387,25 @@ function MarginBridge({cur, pri, gm, perOrderFixed, payPct}){
       <div style={{fontWeight:700}}>{d.name}</div>
       <div style={{color: d.isTotal?'var(--text-secondary)':(d.amt>=0?'var(--good)':'#f87171')}}>{d.isTotal?GBP(d.amt):(d.amt>=0?'+':'−')+GBP(Math.abs(d.amt))}</div>
     </div>); };
+  // £ label above each bar — small steps on a big base are unreadable by height, so
+  // we show the number. (recharts-text class lets the light-theme override recolour it.)
+  const segLabel = (which)=>(p)=>{ const d=data[p.index]||{}; if(!(d[which]>0)) return null;   // only the row's real segment
+    const txt = d.isTotal ? GBP(d.amt) : ((d.amt>=0?'+':'−')+GBP(Math.abs(d.amt)));
+    return (<text className="recharts-text" x={(p.x||0)+(p.width||0)/2} y={(p.y||0)-5} textAnchor="middle" fontSize="10.5" fontWeight="600" fill="#aab0bd">{txt}</text>); };
   return (<div className="card" style={{marginBottom:14}}>
     <div className="card-section-title">
       <h2 style={{margin:0}}>Why contribution moved <span style={{fontWeight:400,color:'var(--text-faint)',fontSize:13}}>— vs prior period</span></h2>
       <span className="meta" style={{display:'inline-flex',alignItems:'center',gap:6}}><MarginBadge/> {delta>=0?'+':'−'}{GBP(Math.abs(delta))}{dpct!=null?` (${(dpct>=0?'+':'')}${(dpct*100).toFixed(0)}%)`:''}</span>
     </div>
     <R.ResponsiveContainer width="100%" height={260}>
-      <R.BarChart data={data} margin={{top:10,right:16,left:10,bottom:6}}>
+      <R.BarChart data={data} margin={{top:24,right:16,left:10,bottom:6}}>
         <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
         <R.XAxis dataKey="name" tick={{fill:'#7e7e8a',fontSize:11}} interval={0}/>
         <R.YAxis tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>'£'+(Math.abs(v)>=1000?(v/1000).toFixed(0)+'k':v)}/>
         <R.Tooltip cursor={{fill:'#ffffff08'}} content={<Tip/>}/>
         <R.Bar dataKey="base" stackId="s" fill="transparent" isAnimationActive={false}/>
-        <R.Bar dataKey="pos" stackId="s" isAnimationActive={false}>{data.map((d,i)=><R.Cell key={i} fill={d.isTotal?'#7c8cff':'#4ade80'}/>)}</R.Bar>
-        <R.Bar dataKey="neg" stackId="s" fill="#f87171" isAnimationActive={false}/>
+        <R.Bar dataKey="pos" stackId="s" isAnimationActive={false}>{data.map((d,i)=><R.Cell key={i} fill={d.isTotal?'#7c8cff':'#4ade80'}/>)}<R.LabelList content={segLabel('pos')}/></R.Bar>
+        <R.Bar dataKey="neg" stackId="s" fill="#f87171" isAnimationActive={false}><R.LabelList content={segLabel('neg')}/></R.Bar>
       </R.BarChart>
     </R.ResponsiveContainer>
     <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>Fully-loaded contribution = net revenue × {PCT(gm)} margin − variable costs − paid media. Bars sum exactly to the change; green helped, red hurt.</div>
