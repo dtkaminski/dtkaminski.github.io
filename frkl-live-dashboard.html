@@ -18,23 +18,23 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606090803"></script>
-<script src="./frkl-live-data.js?v=202606090803"></script>
-<script src="./frkl-agent-insights.js?v=202606090803"></script>
-<script src="./frkl-business-data.js?v=202606090803"></script>
-<script src="./frkl-action-status.js?v=202606090803"></script>
-<script src="./frkl-patterns.js?v=202606090803"></script>
-<script src="./frkl-creators.js?v=202606090803"></script>
-<script src="./frkl-creative-vision.js?v=202606090803"></script>
-<script src="./frkl-links.js?v=202606090803"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606090803"></script>
-<script src="./frkl-events.js?v=202606090803"></script>
-<script src="./frkl-products.js?v=202606090803"></script>
-<script src="./frkl-discount-codes.js?v=202606090803"></script>
-<script src="./frkl-cvr.js?v=202606090803"></script>
-<script src="./frkl-cohorts.js?v=202606090803"></script>
-<script src="./frkl-retention.js?v=202606090803"></script>
-<script src="./frkl-clarity.js?v=202606090803"></script>
+<script src="./frkl-data-loader.js?v=202606090806"></script>
+<script src="./frkl-live-data.js?v=202606090806"></script>
+<script src="./frkl-agent-insights.js?v=202606090806"></script>
+<script src="./frkl-business-data.js?v=202606090806"></script>
+<script src="./frkl-action-status.js?v=202606090806"></script>
+<script src="./frkl-patterns.js?v=202606090806"></script>
+<script src="./frkl-creators.js?v=202606090806"></script>
+<script src="./frkl-creative-vision.js?v=202606090806"></script>
+<script src="./frkl-links.js?v=202606090806"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606090806"></script>
+<script src="./frkl-events.js?v=202606090806"></script>
+<script src="./frkl-products.js?v=202606090806"></script>
+<script src="./frkl-discount-codes.js?v=202606090806"></script>
+<script src="./frkl-cvr.js?v=202606090806"></script>
+<script src="./frkl-cohorts.js?v=202606090806"></script>
+<script src="./frkl-retention.js?v=202606090806"></script>
+<script src="./frkl-clarity.js?v=202606090806"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -5480,6 +5480,9 @@ function IntelligencePanel(){
 
   return (<div style={{display:'flex', flexDirection:'column', gap:'var(--s-7)'}}>
 
+    {/* Track record — closes the loop on acted-on advice */}
+    <AdviceLedgerPanel/>
+
     {/* ZONE 1 — WHAT CHANGED */}
     <section>
       <ZoneHeader
@@ -6792,6 +6795,44 @@ function CohortsPanel(){
     <div className="micro" style={{color:'var(--text-faint)', marginTop:12, lineHeight:1.5}}>
       {C.notes && <><b>Read carefully:</b> {C.notes.channel} {C.notes.google}</>}
     </div>
+  </div>);
+}
+
+// ── Advice → impact ledger (Phase 5.2) ───────────────────────────────────────
+// Closes the loop: the recommendations marked done + what moved on the metrics
+// each watches. The single most powerful trust feature — it proves OI's keep.
+function AdviceLedgerPanel(){
+  const S = (typeof window!=='undefined' && window.FRKL_ACTION_STATUS) || {};
+  let local = {}; try { local = JSON.parse(localStorage.getItem('frkl-action-local-done')||'{}'); } catch(e){}
+  const all = Object.keys(S).map(id=>({id, ...S[id]}));
+  if(!all.length) return null;
+  const done = all.filter(a=> a.status==='verified-done' || local[a.id])
+                  .sort((a,b)=> ((local[b.id]&&local[b.id].completedDate)||b.resolvedAt||'').localeCompare((local[a.id]&&local[a.id].completedDate)||a.resolvedAt||''));
+  const openN = all.filter(a=> a.status==='open').length;
+  const fmtP = x => x==null ? '—' : (x>=0?'+':'')+(x*100).toFixed(0)+'%';
+  return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid var(--good)'}}>
+    <div className="card-section-title">
+      <h2 style={{margin:0}}>Track record — advice acted on</h2>
+      <span className="meta">{done.length} actioned · {openN} open</span>
+    </div>
+    <div className="micro" style={{color:'var(--text-secondary)', marginBottom:10, lineHeight:1.5}}>
+      Closing the loop: the recommendations you've marked done and what then moved on the metrics each one watches. (Impact is measured per watched metric; £-tagged impact lands once findings carry a £ value.)
+    </div>
+    {done.length===0
+      ? <div className="muted" style={{fontSize:13}}>No recommendations marked done yet — mark one from the action board and its measured impact appears here.</div>
+      : <div style={{display:'flex', flexDirection:'column', gap:8}}>
+          {done.slice(0,12).map(a=>{ const when=(local[a.id]&&local[a.id].completedDate)||(a.resolvedAt||'').slice(0,10);
+            const imp = a.impact && Object.keys(a.impact).length ? Object.entries(a.impact).map(([k,v])=>`${k.replace(/_/g,' ')} ${fmtP(v.deltaPct)}`).join(' · ') : null;
+            return (<div key={a.id} style={{padding:'8px 10px', background:'var(--bg-app)', border:'1px solid var(--border-subtle)', borderRadius:'var(--r-sm)'}}>
+              <div style={{display:'flex', gap:8, alignItems:'baseline'}}>
+                <span style={{color:'var(--good)', fontWeight:700}}>✓</span>
+                <span style={{flex:1, fontSize:13, color:'var(--text-primary)'}}>{a.text}</span>
+                {a.agent && <span className="micro" style={{color:'var(--text-faint)'}}>{a.agent}</span>}
+                {when && <span className="micro" style={{color:'var(--text-faint)'}}>{when}</span>}
+              </div>
+              {imp && <div className="micro" style={{color:'var(--text-secondary)', marginTop:3, marginLeft:18}}>Since: {imp}</div>}
+            </div>); })}
+        </div>}
   </div>);
 }
 
