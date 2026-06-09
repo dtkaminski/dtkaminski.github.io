@@ -18,24 +18,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606091201"></script>
-<script src="./frkl-live-data.js?v=202606091201"></script>
-<script src="./frkl-agent-insights.js?v=202606091201"></script>
-<script src="./frkl-business-data.js?v=202606091201"></script>
-<script src="./frkl-action-status.js?v=202606091201"></script>
-<script src="./frkl-patterns.js?v=202606091201"></script>
-<script src="./frkl-creators.js?v=202606091201"></script>
-<script src="./frkl-creative-vision.js?v=202606091201"></script>
-<script src="./frkl-links.js?v=202606091201"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606091201"></script>
-<script src="./frkl-events.js?v=202606091201"></script>
-<script src="./frkl-products.js?v=202606091201"></script>
-<script src="./frkl-discount-codes.js?v=202606091201"></script>
-<script src="./frkl-cvr.js?v=202606091201"></script>
-<script src="./frkl-cohorts.js?v=202606091201"></script>
-<script src="./frkl-retention.js?v=202606091201"></script>
-<script src="./frkl-clarity.js?v=202606091201"></script>
-<script src="./frkl-board-read.js?v=202606091201"></script>
+<script src="./frkl-data-loader.js?v=202606091208"></script>
+<script src="./frkl-live-data.js?v=202606091208"></script>
+<script src="./frkl-agent-insights.js?v=202606091208"></script>
+<script src="./frkl-business-data.js?v=202606091208"></script>
+<script src="./frkl-action-status.js?v=202606091208"></script>
+<script src="./frkl-patterns.js?v=202606091208"></script>
+<script src="./frkl-creators.js?v=202606091208"></script>
+<script src="./frkl-creative-vision.js?v=202606091208"></script>
+<script src="./frkl-links.js?v=202606091208"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606091208"></script>
+<script src="./frkl-events.js?v=202606091208"></script>
+<script src="./frkl-products.js?v=202606091208"></script>
+<script src="./frkl-discount-codes.js?v=202606091208"></script>
+<script src="./frkl-cvr.js?v=202606091208"></script>
+<script src="./frkl-cohorts.js?v=202606091208"></script>
+<script src="./frkl-retention.js?v=202606091208"></script>
+<script src="./frkl-clarity.js?v=202606091208"></script>
+<script src="./frkl-board-read.js?v=202606091208"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -1183,21 +1183,40 @@ function MoneyOnTablePanel(){
         <div className="stat-strip-label">Total identified</div>
       </div>
     </div>
-    <table><thead><tr><th>Item</th><th>£/mo impact</th><th>Confidence</th><th>Basis</th><th>Status</th></tr></thead><tbody>
-    {items.map((m,i)=>{
-      const confColor = m.confidence==='high'?'var(--good)':m.confidence==='medium'?'var(--warn)':'var(--text-muted)';
-      return (<tr key={i}>
-        <td style={{fontSize:12, maxWidth:320}}>
-          <span style={{fontWeight:550, color: m.source==='synthetic' ? 'var(--text-secondary)' : 'var(--text-primary)'}}>{m.description}</span>
-          <div className="meta" style={{fontSize:10}}>{m.agent || m.source} · {m.priority || ''} · {m.kind}</div>
-        </td>
-        <td><MoneyBadge money={m}/></td>
-        <td style={{fontSize:10, textTransform:'uppercase', letterSpacing:.04, color:confColor, fontWeight:600}}>{m.confidence}</td>
-        <td className="meta" style={{fontSize:11, maxWidth:320}}>{m.basis}</td>
-        <td><span className="pill grey" style={{fontSize:10}}>{m.status||'open'}</span></td>
-      </tr>);
-    })}
-    </tbody></table>
+    {(() => {
+      // Separate EVIDENCED findings from HYPOTHESES (unvalidated opportunities) so
+      // speculation never sits beside grounded leakage. Synthetic opportunities and
+      // low-confidence items are hypotheses; everything else is evidenced.
+      const tier = (c) => typeof c === 'number' ? (c >= 0.66 ? 'high' : c >= 0.45 ? 'medium' : 'low') : (c || 'low');
+      const isHyp = (m) => m.source === 'synthetic' || tier(m.confidence) === 'low';
+      const evidenced = items.filter(m => !isHyp(m));
+      const hypotheses = items.filter(isHyp);
+      const confColor = (c) => { const t=tier(c); return t==='high'?'var(--good)':t==='medium'?'var(--warn)':'var(--text-muted)'; };
+      const Row = (m,i)=>{
+        return (<tr key={i}>
+          <td style={{fontSize:12, maxWidth:320}}>
+            <span style={{fontWeight:550, color: m.source==='synthetic' ? 'var(--text-secondary)' : 'var(--text-primary)'}}>{m.description}</span>
+            <div className="meta" style={{fontSize:10}}>{m.agent || m.source} · {m.priority || ''} · {m.kind}</div>
+          </td>
+          <td><MoneyBadge money={m}/></td>
+          <td style={{fontSize:10, textTransform:'uppercase', letterSpacing:.04, color:confColor(m.confidence), fontWeight:600}}>{tier(m.confidence)}</td>
+          <td className="meta" style={{fontSize:11, maxWidth:320}}>{m.basis}</td>
+          <td><span className="pill grey" style={{fontSize:10}}>{m.status||'open'}</span></td>
+        </tr>);
+      };
+      return (<>
+        <table><thead><tr><th>Evidenced finding</th><th>£/mo impact</th><th>Confidence</th><th>Basis</th><th>Status</th></tr></thead>
+          <tbody>{evidenced.map(Row)}</tbody></table>
+        {hypotheses.length > 0 && (<div style={{marginTop:'var(--s-5)'}}>
+          <div className="card-section-title" style={{marginBottom:6}}>
+            <h3 style={{margin:0, fontSize:13, color:'var(--text-muted)'}}>Hypotheses — unvalidated upside</h3>
+            <span className="meta" style={{fontSize:11}}>low-confidence estimates · test before committing budget, don't bank them</span>
+          </div>
+          <table style={{opacity:0.85}}><thead><tr><th>Hypothesis</th><th>£/mo if it works</th><th>Confidence</th><th>Assumption</th><th>Status</th></tr></thead>
+            <tbody>{hypotheses.map(Row)}</tbody></table>
+        </div>)}
+      </>);
+    })()}
   </div>);
 }
 
@@ -3050,6 +3069,12 @@ function Overview({start, period, customActive}){
         <KPI label="Discount depth" val={PCT(discLoad)} sub="£ off ÷ £ of sales — how deep, not how many orders · drafts excluded" series={seriesDisc} current={discLoad} prior={pDiscLoad} goodDirection="down"
           agent="Atlas" observation={`Code + automatic discount as a share of DTC gross sales (draft/exchange orders excluded). This excludes sale-price markdowns${_mdPct?`, which add ~${_mdPct}% of value on top`:''} — the full load is on the Promotions tab.`}
           implication="Audit always-on codes + affiliate rates; protect full-price demand. The true load incl. markdowns is materially higher — see Promotions." />
+        <KPI label="Contribution margin" val={cmPct!=null?PCT(cmPct):'—'} sub="net rev × margin − ad spend, net of returns · ≥10% healthy" badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesContrib} seriesLabel="Contribution £ · by day" current={contrib} prior={pContrib} goodDirection="up"
+          agent="Atlas" observation="Whether the growth is actually profitable — net revenue × product margin minus paid media, as a share of revenue. Returns are already netted out of revenue. The single best read on profitable vs vanity growth."
+          implication="Below 10% means scaling just amplifies a thin engine — fix discount load, returns and CAC before adding spend." />
+        <KPI label="CAC payback" val={paybackOrders!=null?(paybackOrders<=1?'1st order':paybackOrders.toFixed(1)+' orders'):'—'} sub={cac!=null?`paid CAC £${Math.round(cac)} ÷ first-order contribution · target ≤2`:'needs paid CAC'} goodDirection="down"
+          agent="Atlas" observation="How many orders it takes to recover the paid cost of acquiring a customer, at your margin. Under ~2 orders = a healthy cash cycle that funds reinvestment."
+          implication="This is the lever on cash flow — faster payback frees working capital. Watch it as you scale spend; if it stretches past 2, growth starts eating cash." />
         <MoreKpis count={8}>
         <KPI label="Gross margin" val={PCT(gm)} sub={costsVerified?"Your entered gross margin":"COGS-based · catalogue estimate"} badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesGM} seriesLabel="Catalogue margin · structurally stable"
           agent="Atlas" observation="Blended product margin across the live catalogue, after cost of goods."
@@ -5509,10 +5534,18 @@ function IntelligencePanel(){
         }
       }
       const st = (window.FRKL_ACTION_STATUS || {})[id] || {};
+      const mon = (P.action_money || {})[id] || {};
       // Prefer the reconciled live copy from action-status over the (possibly stale)
       // specialist text, and carry the contradiction flag through.
       const liveText = st.text || (match && match.text);
+      // Completeness: expected £ impact, success metric (watch metric → target), and a
+      // by-when horizon derived from priority — so every action is executable.
+      const watchM = Array.isArray(st.watch) && st.watch.length ? st.watch[0] : null;
+      const successMetric = watchM ? (watchM.replace(/_/g,' ') + (st.target!=null ? ` → ${st.target}` : '')) : null;
+      const byWhen = {P1:'this week', P2:'next 2 weeks', P3:'this month'}[(match&&match.p)||st.priority] || null;
       return {id, ...ph, ...(match || {}), ...(liveText?{text:liveText}:{}), status: st.status || 'unknown',
+              gbp: mon.monthly_impact_gbp || null, kind: mon.kind || null, basis: mon.basis || null,
+              successMetric, byWhen, owner: (match&&match.agent)||st.agent||null,
               premiseStale: !!st.premiseStale, reconcileNote: st.reconcileNote || null};
     });
     // Stale-premise actions (the live metric no longer supports them) sink to the bottom.
@@ -5634,18 +5667,27 @@ function IntelligencePanel(){
           items={phitRows}
           initialCount={6}
           moreLabel="open actions"
-          renderItem={(a, i) => (<div key={i} style={{
-            display:'flex', alignItems:'center', gap:'var(--s-3)',
+          renderItem={(a, i) => { const kc = a.kind==='opportunity'?'var(--good)':a.kind==='at_risk'?'var(--warn)':'var(--bad)'; return (<div key={i} style={{
+            display:'flex', alignItems:'flex-start', gap:'var(--s-3)',
             padding:'var(--s-3) var(--s-4)', background:'var(--bg-elevated)',
             border:'1px solid var(--border-subtle)', borderRadius:'var(--r-md)',
           }}>
-            <div style={{flexShrink:0}}><PHitBadge phit={a}/></div>
-            <span className={'pill '+(a.p === 'P1' ? 'red' : a.p === 'P2' ? 'amber' : 'grey')} style={{fontSize:10, flexShrink:0}}>{a.p}</span>
-            <span style={{fontSize:11, color:'var(--text-muted)', flexShrink:0, width:56}}>{a.agent || '—'}</span>
-            <span style={{fontSize:12.5, color: a.premiseStale?'var(--text-muted)':'var(--text-primary)', flex:1, lineHeight:1.45, textDecoration:a.premiseStale?'line-through':'none'}}>{a.text || a.id}</span>
-            {a.premiseStale && <span className="pill grey" title={a.reconcileNote||''} style={{fontSize:9.5, flexShrink:0}}>⚠ premise out of date</span>}
-            <span className="meta" style={{fontSize:10, flexShrink:0}}>{a.confidence} (n={a.sample_size})</span>
-          </div>)}
+            <div style={{flexShrink:0, marginTop:2}}><PHitBadge phit={a}/></div>
+            <span className={'pill '+(a.p === 'P1' ? 'red' : a.p === 'P2' ? 'amber' : 'grey')} style={{fontSize:10, flexShrink:0, marginTop:2}}>{a.p}</span>
+            <div style={{flex:1, minWidth:0}}>
+              <div style={{display:'flex', alignItems:'baseline', gap:8, flexWrap:'wrap'}}>
+                <span style={{fontSize:12.5, color: a.premiseStale?'var(--text-muted)':'var(--text-primary)', lineHeight:1.4, textDecoration:a.premiseStale?'line-through':'none'}}>{a.text || a.id}</span>
+                {a.premiseStale && <span className="pill grey" title={a.reconcileNote||''} style={{fontSize:9.5}}>⚠ premise out of date</span>}
+              </div>
+              <div style={{display:'flex', flexWrap:'wrap', gap:12, marginTop:5, fontSize:10.5, color:'var(--text-faint)', alignItems:'baseline'}}>
+                <span title="Owner">{a.owner || '—'}</span>
+                {a.gbp ? <span style={{color:kc, fontWeight:600}} title="Expected monthly impact">~£{Math.round(Math.abs(a.gbp)).toLocaleString()}/mo</span> : null}
+                {a.successMetric && <span title="Success metric">✓ {a.successMetric}</span>}
+                {a.byWhen && <span title="Review by">⏱ {a.byWhen}</span>}
+                <span title="P(hit) confidence · sample size">{a.confidence} (n={a.sample_size})</span>
+              </div>
+            </div>
+          </div>); }}
         />
       </div>)}
     </section>
