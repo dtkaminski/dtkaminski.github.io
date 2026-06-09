@@ -18,24 +18,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606091240"></script>
-<script src="./frkl-live-data.js?v=202606091240"></script>
-<script src="./frkl-agent-insights.js?v=202606091240"></script>
-<script src="./frkl-business-data.js?v=202606091240"></script>
-<script src="./frkl-action-status.js?v=202606091240"></script>
-<script src="./frkl-patterns.js?v=202606091240"></script>
-<script src="./frkl-creators.js?v=202606091240"></script>
-<script src="./frkl-creative-vision.js?v=202606091240"></script>
-<script src="./frkl-links.js?v=202606091240"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606091240"></script>
-<script src="./frkl-events.js?v=202606091240"></script>
-<script src="./frkl-products.js?v=202606091240"></script>
-<script src="./frkl-discount-codes.js?v=202606091240"></script>
-<script src="./frkl-cvr.js?v=202606091240"></script>
-<script src="./frkl-cohorts.js?v=202606091240"></script>
-<script src="./frkl-retention.js?v=202606091240"></script>
-<script src="./frkl-clarity.js?v=202606091240"></script>
-<script src="./frkl-board-read.js?v=202606091240"></script>
+<script src="./frkl-data-loader.js?v=202606091251"></script>
+<script src="./frkl-live-data.js?v=202606091251"></script>
+<script src="./frkl-agent-insights.js?v=202606091251"></script>
+<script src="./frkl-business-data.js?v=202606091251"></script>
+<script src="./frkl-action-status.js?v=202606091251"></script>
+<script src="./frkl-patterns.js?v=202606091251"></script>
+<script src="./frkl-creators.js?v=202606091251"></script>
+<script src="./frkl-creative-vision.js?v=202606091251"></script>
+<script src="./frkl-links.js?v=202606091251"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606091251"></script>
+<script src="./frkl-events.js?v=202606091251"></script>
+<script src="./frkl-products.js?v=202606091251"></script>
+<script src="./frkl-discount-codes.js?v=202606091251"></script>
+<script src="./frkl-cvr.js?v=202606091251"></script>
+<script src="./frkl-cohorts.js?v=202606091251"></script>
+<script src="./frkl-retention.js?v=202606091251"></script>
+<script src="./frkl-clarity.js?v=202606091251"></script>
+<script src="./frkl-board-read.js?v=202606091251"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -2893,7 +2893,80 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
   </div>);
 }
 
+// ── Mobile + performance helpers (UX Phase 3) ────────────────────────────────
+function useIsMobile(bp){
+  const b = bp || 760;
+  // Use the layout viewport (documentElement.clientWidth) — it's the reliable width
+  // (window.innerWidth can lag/!= the rendered viewport in embedded/iframed contexts).
+  const w = () => (typeof document!=='undefined' && document.documentElement && document.documentElement.clientWidth) || (typeof window!=='undefined' ? window.innerWidth : 1280);
+  const [m, setM] = useState(()=> w() < b);
+  React.useEffect(()=>{ const f=()=>setM(w() < b); window.addEventListener('resize', f); return ()=>window.removeEventListener('resize', f); }, [b]);
+  return m;
+}
+
+// Defer a heavy (chart) subtree until it scrolls near the viewport — keeps cold
+// first-paint fast and avoids mounting Recharts at 0-width. Reserves height so
+// layout doesn't jump.
+function LazyMount({minHeight, children}){
+  const ref = React.useRef(null);
+  const [shown, setShown] = useState(false);
+  React.useEffect(()=>{
+    if(shown) return;
+    const el = ref.current; if(!el) return;
+    let io;
+    if(typeof IntersectionObserver!=='undefined'){
+      io = new IntersectionObserver(es=>{ if(es.some(e=>e.isIntersecting)){ setShown(true); io.disconnect(); } }, {rootMargin:'600px'});
+      io.observe(el);
+    }
+    // Fallback: after first paint settles, mount regardless — so a jump-scroll or
+    // SPA nav-reset can never leave a section as an empty placeholder. Off-screen
+    // mounting is safe (the placeholder has real column width, so no 0-width charts).
+    const t = setTimeout(()=>setShown(true), 2500);
+    return ()=>{ if(io) io.disconnect(); clearTimeout(t); };
+  }, [shown]);
+  return <div ref={ref} style={shown?undefined:{minHeight: minHeight||320}}>{shown ? children : null}</div>;
+}
+
+// Mobile "Today" — a 60-second check-in: £ in play, the health verdict, the top 3
+// £-ranked open actions (tap → ask the AI how), and one Ask button. Reads globals
+// directly so it has no dependency on Overview internals.
+function MobileToday(){
+  const P = (typeof window!=='undefined' && window.FRKL_PATTERNS) || {};
+  const dx = ((typeof window!=='undefined' && window.FRKL_DX_ANALYST) || {})['30d'] || {};
+  const rollup = P.money_rollup || {};
+  const am = P.action_money || {};
+  const byWhen = p => ({P1:'this week', P2:'next 2 weeks', P3:'this month'})[p] || '';
+  const kc = k => k==='opportunity'?'var(--good)':k==='at_risk'?'var(--warn)':'var(--bad)';
+  const actions = Object.values(am)
+    .filter(a => a && a.status!=='done' && a.status!=='verified-done' && Math.abs(a.monthly_impact_gbp||0) >= 50)
+    .sort((a,b)=> Math.abs(b.monthly_impact_gbp||0) - Math.abs(a.monthly_impact_gbp||0))
+    .slice(0,3);
+  return (<div className="card" style={{borderLeft:'3px solid var(--accent)', marginBottom:14}}>
+    <div style={{fontSize:11,fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--accent)',marginBottom:6}}>Today</div>
+    {rollup.total!=null && <div style={{fontSize:22,fontWeight:750,lineHeight:1.2}}>£{(Math.round((rollup.total||0)/100)/10)}k/mo in play</div>}
+    {dx.headline && <div style={{fontSize:13,color:'var(--text-secondary)',margin:'6px 0 12px',lineHeight:1.5}}>{dx.headline}</div>}
+    <div style={{fontSize:11,fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-muted)',marginBottom:6}}>Do this next</div>
+    <div style={{display:'flex',flexDirection:'column',gap:8}}>
+      {actions.length ? actions.map((a,i)=>(
+        <div key={i} onClick={()=>window.__oiAsk&&window.__oiAsk(`How do I action this, and what's the expected impact: ${a.description}`)}
+          style={{padding:'10px 12px',background:'var(--bg-elevated)',border:'1px solid var(--border-subtle)',borderRadius:10,cursor:'pointer'}}>
+          <div style={{fontSize:13,color:'var(--text-primary)',lineHeight:1.4}}>{a.description}</div>
+          <div style={{fontSize:11,color:'var(--text-faint)',marginTop:5,display:'flex',gap:12,flexWrap:'wrap'}}>
+            <span style={{color:kc(a.kind),fontWeight:600}}>~£{Math.round(Math.abs(a.monthly_impact_gbp)).toLocaleString()}/mo</span>
+            {a.priority && <span>⏱ {byWhen(a.priority)}</span>}
+            <span style={{color:'var(--accent)'}}>tap to ask →</span>
+          </div>
+        </div>
+      )) : <div className="muted" style={{fontSize:12}}>No high-£ actions open right now.</div>}
+    </div>
+    <button onClick={()=>window.__oiAsk&&window.__oiAsk('What should I do today? Give me the top 3 actions, ranked by £ impact.')}
+      style={{marginTop:12,width:'100%',padding:'12px',background:'#c084fc',border:'none',borderRadius:10,color:'#fff',fontWeight:650,fontSize:14,cursor:'pointer'}}>✦ Ask: What should I do today?</button>
+    <div style={{fontSize:11,color:'var(--text-faint)',textAlign:'center',marginTop:10}}>↓ Full dashboard below</div>
+  </div>);
+}
+
 function Overview({start, period, customActive}){
+  const isMobile = useIsMobile();
   const [evTick, setEvTick] = useState(0);   // bump to re-read the operator event log
   const [costsOpen, setCostsOpen] = useState(false);
   const [showPlanning, setShowPlanning] = useState(false);  // collapse forecast/LTV deep-dive
@@ -3034,6 +3107,9 @@ function Overview({start, period, customActive}){
       </div>
     )}
 
+    {/* Mobile "Today" — 60-second check-in at the very top on narrow screens. */}
+    {isMobile && <MobileToday/>}
+
     {/* Per-channel data freshness — trust signal: don't act on stale channels */}
     <DataFreshness/>
 
@@ -3119,21 +3195,23 @@ function Overview({start, period, customActive}){
       </div>
     </div>
 
+    {/* Below-the-fold operational charts — lazy-mounted so cold first-paint isn't
+        blocked by mounting every Recharts at once (and never at 0-width). */}
     {/* Contribution margin — editable, fully-loaded operator P&L for the period */}
-    <ContributionCard rev={rev} orders={orders} paid={paid} gm={gm}/>
+    <LazyMount minHeight={360}><ContributionCard rev={rev} orders={orders} paid={paid} gm={gm}/></LazyMount>
 
     {/* Margin bridge — why contribution moved vs prior period (volume/price/discount/returns/paid) */}
-    <MarginBridge cur={bridgeCur} pri={bridgePri} gm={gm}
-      perOrderFixed={_cn('packaging')+_cn('fulfilment')+_cn('shipping')+_cn('payFixed')} payPct={_cn('payPct')/100}/>
+    <LazyMount minHeight={360}><MarginBridge cur={bridgeCur} pri={bridgePri} gm={gm}
+      perOrderFixed={_cn('packaging')+_cn('fulfilment')+_cn('shipping')+_cn('payFixed')} payPct={_cn('payPct')/100}/></LazyMount>
 
     {/* Channel stream chart */}
-    <ChannelStreamPanel/>
+    <LazyMount minHeight={340}><ChannelStreamPanel/></LazyMount>
 
     {/* Today's view — the pacing + anomaly tile */}
-    <DailyPanel/>
+    <LazyMount minHeight={300}><DailyPanel/></LazyMount>
 
     {/* The big paid-vs-revenue chart */}
-    <div className="card">
+    <LazyMount minHeight={360}><div className="card">
       <div className="card-section-title">
         <h2 style={{margin:0}}>Paid spend vs Shopify revenue — daily</h2>
         <span className="meta">Bars = paid spend (left axis) · Line = net revenue (right axis)</span>
@@ -3164,7 +3242,7 @@ function Overview({start, period, customActive}){
       </R.ResponsiveContainer>
       {(function(){ var pins=buildChartPins(daily.map(function(d){return {x:d.dlabel, date:d.date};})); if(!pins.length) return null; return (
         <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>🏷️ sales &amp; promos · 📌 your events — <span style={{color:'var(--text-muted)'}}>hover any marker for what it was</span></div>); })()}
-    </div>
+    </div></LazyMount>
 
     {/* PLANNING & DEEP-DIVE — forecast + unit-economics-over-time are board/planning
         artifacts, not "what's happening this week", so they live behind a toggle. */}
