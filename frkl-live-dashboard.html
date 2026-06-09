@@ -19,24 +19,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606091700"></script>
-<script src="./frkl-live-data.js?v=202606091700"></script>
-<script src="./frkl-agent-insights.js?v=202606091700"></script>
-<script src="./frkl-business-data.js?v=202606091700"></script>
-<script src="./frkl-action-status.js?v=202606091700"></script>
-<script src="./frkl-patterns.js?v=202606091700"></script>
-<script src="./frkl-creators.js?v=202606091700"></script>
-<script src="./frkl-creative-vision.js?v=202606091700"></script>
-<script src="./frkl-links.js?v=202606091700"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606091700"></script>
-<script src="./frkl-events.js?v=202606091700"></script>
-<script src="./frkl-products.js?v=202606091700"></script>
-<script src="./frkl-discount-codes.js?v=202606091700"></script>
-<script src="./frkl-cvr.js?v=202606091700"></script>
-<script src="./frkl-cohorts.js?v=202606091700"></script>
-<script src="./frkl-retention.js?v=202606091700"></script>
-<script src="./frkl-clarity.js?v=202606091700"></script>
-<script src="./frkl-board-read.js?v=202606091700"></script>
+<script src="./frkl-data-loader.js?v=202606091800"></script>
+<script src="./frkl-live-data.js?v=202606091800"></script>
+<script src="./frkl-agent-insights.js?v=202606091800"></script>
+<script src="./frkl-business-data.js?v=202606091800"></script>
+<script src="./frkl-action-status.js?v=202606091800"></script>
+<script src="./frkl-patterns.js?v=202606091800"></script>
+<script src="./frkl-creators.js?v=202606091800"></script>
+<script src="./frkl-creative-vision.js?v=202606091800"></script>
+<script src="./frkl-links.js?v=202606091800"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606091800"></script>
+<script src="./frkl-events.js?v=202606091800"></script>
+<script src="./frkl-products.js?v=202606091800"></script>
+<script src="./frkl-discount-codes.js?v=202606091800"></script>
+<script src="./frkl-cvr.js?v=202606091800"></script>
+<script src="./frkl-cohorts.js?v=202606091800"></script>
+<script src="./frkl-retention.js?v=202606091800"></script>
+<script src="./frkl-clarity.js?v=202606091800"></script>
+<script src="./frkl-board-read.js?v=202606091800"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -869,6 +869,28 @@ function saveCostConfig(next){ try { localStorage.setItem('frkl-contrib-inputs',
 // User-entered gross margin (fraction) when present, else null → callers fall
 // back to OI_CONFIG.grossMargin or the live catalogue margin.
 function userGrossMargin(){ const c = costConfig(); const v = parseFloat(c.gmPct); return (c.gmPct!=='' && c.gmPct!=null && isFinite(v)) ? v/100 : null; }
+
+// ── Supplier lead times (for restock alerts) ─────────────────────────────────
+// Days between placing a reorder and stock landing. Drives the reorder-by date
+// and the urgency bands (a slow-to-restock SKU needs ordering far earlier than a
+// fast one at the same days-of-cover). Editable per product type; defaults are
+// estimates until the operator confirms them. localStorage-first like cost config.
+const LEAD_DEFAULTS = { default: 30, byType: { Charm: 14, Necklace: 42, Bracelet: 42, Earring: 21 } };
+function leadConfig(){
+  try {
+    const s = JSON.parse(localStorage.getItem('oi_lead_times') || 'null');
+    if(s && typeof s==='object') return { default: s.default!=null?s.default:LEAD_DEFAULTS.default, byType: {...(s.byType||{})} };
+  } catch(e){}
+  return { default: LEAD_DEFAULTS.default, byType: {...LEAD_DEFAULTS.byType} };
+}
+function saveLeadConfig(next){ try { localStorage.setItem('oi_lead_times', JSON.stringify(next)); window.dispatchEvent(new Event('oi-leadtimes-updated')); } catch(e){} }
+function leadDaysFor(type, cfg){
+  cfg = cfg || leadConfig();
+  const ov = type!=null ? cfg.byType[type] : null;
+  if(ov!=null && ov!=='' && isFinite(Number(ov))) return Number(ov);
+  const d = Number(cfg.default);
+  return isFinite(d) && d>0 ? d : 30;
+}
 // Best-available gross margin: verified operator value → tenant config → catalogue → 0.6.
 function oiGrossMargin(){
   const u = userGrossMargin(); if(u!=null) return u;
@@ -5061,11 +5083,12 @@ function DiscountCodeTracker(){
 // the products table, net of returns) so the £ at risk is grounded, then surface the
 // GOOD SELLERS (above-median velocity) that are about to run out. Keeps founders from
 // losing the SKUs that actually pay the bills. Pure frontend over existing data.
-function computeRestockAlerts(){
+function computeRestockAlerts(leadCfg){
   const BB = window.FRKL_BUSINESS || {};
   const inv = BB.inventory || [];
   const prods = BB.products || [];
   if(!inv.length) return null;
+  const cfg = leadCfg || leadConfig();
   // SKU / title → net revenue per unit.
   const revBySku = {}, revByTitle = {};
   prods.forEach(p=>{
@@ -5088,34 +5111,52 @@ function computeRestockAlerts(){
   // "Good seller" = at or above median velocity among selling SKUs (relative, brand-agnostic).
   const vels = selling.map(r=>r.units90d).sort((a,b)=>a-b);
   const medVel = vels[Math.floor(vels.length/2)] || 0;
-  const TARGET_COVER = 60;  // reorder-to target, in days
   const enriched = selling.map(r=>{
     const rpu = revPerUnitOf(r);
     const daily = r.dailyVelocity || (r.units90d/90);
     const monthlyRev = daily * 30 * rpu;          // £/mo throughput this SKU generates
     const cover = r.daysOfCover;
-    const goodSeller = r.units90d >= Math.max(medVel, 3) && monthlyRev >= 100;
-    const urgency = cover < 14 ? 'now' : cover < 30 ? 'soon' : cover <= 45 ? 'watch' : null;
-    const reorderQty = Math.max(0, Math.round(daily*TARGET_COVER) - (r.inventoryQty||0));
-    return {...r, revPerUnit:rpu, monthlyRev, goodSeller, urgency, reorderQty, daily, targetCover:TARGET_COVER};
+    const leadDays = leadDaysFor(r.type, cfg);     // supplier lead time for this SKU's type
+    // Slack = days you can wait before the order MUST be placed to avoid a stock-out.
+    const slack = cover - leadDays;
+    // Lead-time-aware bands: a slow-to-restock SKU is urgent far earlier than a fast one.
+    const urgency = slack <= 0 ? 'now' : slack <= 7 ? 'soon' : slack <= 21 ? 'watch' : null;
+    // Reorder-to target = cover the lead time + a 30-day buffer after stock lands.
+    const targetCover = leadDays + 30;
+    const reorderQty = Math.max(0, Math.round(daily*targetCover) - (r.inventoryQty||0));
+    return {...r, revPerUnit:rpu, monthlyRev, goodSeller:(r.units90d >= Math.max(medVel,3) && monthlyRev >= 100), urgency, reorderQty, daily, leadDays, slack, targetCover};
   });
   const alerts = enriched.filter(r=>r.goodSeller && r.urgency).sort((a,b)=>(b.monthlyRev||0)-(a.monthlyRev||0));
   const imminent = alerts.filter(a=>a.urgency!=='watch');
+  // Distinct product types present among alerts — drives the per-type lead-time editor.
+  const typesPresent = [...new Set(alerts.map(a=>a.type).filter(Boolean))];
   return {
     alerts,
     atRiskMonthly: imminent.reduce((s,a)=>s+a.monthlyRev,0),
     nowCount: alerts.filter(a=>a.urgency==='now').length,
     soonCount: alerts.filter(a=>a.urgency==='soon').length,
     watchCount: alerts.filter(a=>a.urgency==='watch').length,
-    targetCover: TARGET_COVER,
+    typesPresent,
   };
 }
 
+// Format a "reorder by" date from slack days (days until the order must be placed).
+function reorderByLabel(slackDays){
+  if(slackDays <= 0) return {txt:'Order today', overdue:true};
+  const d = new Date(Date.now() + Math.round(slackDays)*86400000);
+  return {txt: d.toLocaleDateString('en-GB',{day:'numeric',month:'short'}), overdue:false};
+}
+
 function RestockAlertsPanel(){
-  const data = computeRestockAlerts();
-  const [sort,setSort]=useState({key:'monthlyRev',dir:'desc'});
-  const [showWatch,setShowWatch]=useState(false);
+  const [lead,setLead] = useState(leadConfig());
+  const [sort,setSort] = useState({key:'slack',dir:'asc'});   // most-urgent (least slack) first
+  const [showWatch,setShowWatch] = useState(false);
+  const [editLead,setEditLead] = useState(false);
+  const data = computeRestockAlerts(lead);
   if(!data || !data.alerts.length) return null;
+  const updateLead = (next) => { setLead(next); saveLeadConfig(next); };
+  const setDefault = (v) => updateLead({...lead, default: v});
+  const setType = (type, v) => updateLead({...lead, byType: {...lead.byType, [type]: v}});
   const U = {
     now:  {lbl:'REORDER NOW',  fg:'var(--bad)',        bg:'var(--bad-bg)'},
     soon: {lbl:'REORDER SOON', fg:'var(--warn)',       bg:'var(--warn-bg)'},
@@ -5127,6 +5168,7 @@ function RestockAlertsPanel(){
     switch(sort.key){
       case 'urgency': return URANK[r.urgency]||0;
       case 'cover':   return r.daysOfCover;
+      case 'slack':   return r.slack;
       case 'vel':     return r.units90d;
       case 'reorder': return r.reorderQty;
       default:        return r.monthlyRev;   // 'monthlyRev'
@@ -5134,29 +5176,47 @@ function RestockAlertsPanel(){
   };
   const dir = sort.dir==='asc' ? 1 : -1;
   const sorted = [...rows].sort((a,b)=>{ const va=sortVal(a), vb=sortVal(b); return va<vb?-1*dir : va>vb?1*dir : (b.monthlyRev-a.monthlyRev); });
-  const onSort = (key) => setSort(s => s.key===key ? {key, dir:s.dir==='asc'?'desc':'asc'} : {key, dir: key==='cover'?'asc':'desc'});
+  const onSort = (key) => setSort(s => s.key===key ? {key, dir:s.dir==='asc'?'desc':'asc'} : {key, dir:(key==='cover'||key==='slack')?'asc':'desc'});
   const th = (key,label,right) => {
     const active = sort.key===key;
     return (<th onClick={()=>onSort(key)} style={{cursor:'pointer',whiteSpace:'nowrap',textAlign:right?'right':'left',userSelect:'none',color:active?'var(--text-primary)':undefined}}
       title={`Sort by ${label.toLowerCase()}`}>{label} <span style={{fontSize:9,opacity:active?1:.4}}>{active?(sort.dir==='asc'?'▲':'▼'):'↕'}</span></th>);
   };
   const top = data.alerts.find(a=>a.urgency!=='watch') || data.alerts[0];
+  const leadInput = (val, onCh) => (<input type="number" min="0" value={val==null?'':val} onChange={e=>onCh(e.target.value)}
+    style={{width:52,background:'var(--bg-app)',color:'var(--text-primary)',border:'1px solid var(--border-default)',borderRadius:5,padding:'3px 6px',fontSize:12,fontFamily:'inherit'}}/>);
   return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid var(--bad)'}}>
-    <h2>Restock alerts — good sellers running low</h2>
-    <div className="muted" style={{marginBottom:10, fontSize:12}}>
-      Your fastest-moving SKUs (at or above median velocity) ranked by the revenue they'd stop earning if they stock out.
-      Days of cover = stock ÷ 90-day daily velocity. Suggested reorder refills to <b>{data.targetCover} days</b> of cover.
+    <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',flexWrap:'wrap',gap:8}}>
+      <h2 style={{margin:0}}>Restock alerts — good sellers running low</h2>
+      <button className="btn-ghost" style={{padding:'4px 10px',fontSize:11.5}} onClick={()=>setEditLead(v=>!v)}>
+        {editLead?'Done':'⚙ Lead times'}
+      </button>
     </div>
+    <div className="muted" style={{margin:'8px 0 10px', fontSize:12}}>
+      Your fastest-moving SKUs ranked by the revenue they'd stop earning if they stock out. <b>Reorder by</b> = the date you
+      must place the order so it lands before you run out (days of cover − supplier lead time). Suggested reorder refills to
+      lead time + 30 days of cover.
+    </div>
+    {editLead && (<div className="card" style={{background:'var(--bg-app)',marginBottom:10,padding:'10px 12px'}}>
+      <div style={{fontSize:12,fontWeight:700,marginBottom:8}}>Supplier lead times <span className="muted" style={{fontWeight:400}}>— days from reorder to stock landing. Defaults are estimates; set your real ones.</span></div>
+      <div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
+        <label style={{display:'flex',alignItems:'center',gap:6,fontSize:12}}>Default {leadInput(lead.default, setDefault)} days</label>
+        {data.typesPresent.map(t=>(
+          <label key={t} style={{display:'flex',alignItems:'center',gap:6,fontSize:12}}>{t} {leadInput(lead.byType[t]!=null?lead.byType[t]:'', v=>setType(t,v))} <span className="muted" style={{fontSize:10}}>days</span></label>
+        ))}
+      </div>
+      <div className="muted" style={{fontSize:10.5,marginTop:8}}>Blank type = uses the default. Saved to this browser.</div>
+    </div>)}
     <div className="row" style={{marginBottom:10}}>
       <div className="card kpi" style={{borderLeft:'3px solid var(--bad)'}}>
         <div className="label">Reorder now</div>
         <div className="val">{data.nowCount}</div>
-        <div className="sub">good sellers with &lt;14 days cover</div>
+        <div className="sub">must order today — cover ≤ lead time</div>
       </div>
       <div className="card kpi" style={{borderLeft:'3px solid var(--warn)'}}>
         <div className="label">Reorder soon</div>
         <div className="val">{data.soonCount}</div>
-        <div className="sub">good sellers with &lt;30 days cover</div>
+        <div className="sub">order within ~a week</div>
       </div>
       <div className="card kpi" style={{borderLeft:'3px solid var(--accent)'}}>
         <div className="label">Revenue at risk / mo</div>
@@ -5168,19 +5228,21 @@ function RestockAlertsPanel(){
       <table><thead><tr>
         {th('urgency','Urgency')}
         <th>Product</th>
+        {th('slack','Reorder by')}
         {th('cover','Days left')}
         {th('vel','Sold / 90d')}
         {th('monthlyRev','£/mo at risk', true)}
         {th('reorder','Reorder qty', true)}
       </tr></thead><tbody>
-      {sorted.map((r,i)=>{ const u=U[r.urgency];
+      {sorted.map((r,i)=>{ const u=U[r.urgency]; const rb=reorderByLabel(r.slack);
         return (<tr key={i}>
           <td><span className="pill" style={{background:u.bg,color:u.fg,fontSize:10,padding:'2px 7px',borderRadius:4,fontWeight:700,whiteSpace:'nowrap'}}>{u.lbl}</span></td>
-          <td style={{fontSize:12,maxWidth:280}}>
+          <td style={{fontSize:12,maxWidth:260}}>
             <b>{r.title}</b>
-            {(r.type||r.sku) && <div className="muted" style={{fontSize:10}}>{r.type||''}{r.type&&r.sku?' · ':''}{r.sku?<code>{r.sku}</code>:''}</div>}
+            {(r.type||r.sku) && <div className="muted" style={{fontSize:10}}>{r.type||''}{r.type&&r.sku?' · ':''}{r.sku?<code>{r.sku}</code>:''} · {r.leadDays}d lead</div>}
           </td>
-          <td style={{whiteSpace:'nowrap',fontWeight:700,color:u.fg}}>{Math.round(r.daysOfCover)}d</td>
+          <td style={{whiteSpace:'nowrap',fontWeight:700,color:rb.overdue?'var(--bad)':'var(--text-secondary)'}}>{rb.txt}</td>
+          <td style={{whiteSpace:'nowrap',color:u.fg}}>{Math.round(r.daysOfCover)}d</td>
           <td>{NUM(r.units90d)} <span className="muted" style={{fontSize:10}}>({r.daily.toFixed(1)}/day)</span></td>
           <td style={{textAlign:'right',fontVariantNumeric:'tabular-nums',fontWeight:700}}>{GBP(r.monthlyRev)}</td>
           <td style={{textAlign:'right',fontVariantNumeric:'tabular-nums'}}>{r.reorderQty>0?('+'+NUM(r.reorderQty)):'—'}</td>
@@ -5189,12 +5251,12 @@ function RestockAlertsPanel(){
       </tbody></table>
     </div>
     {data.watchCount>0 && <button className="btn-ghost" style={{marginTop:10,padding:'5px 11px',fontSize:11.5}} onClick={()=>setShowWatch(v=>!v)}>
-      {showWatch ? 'Hide watch list' : `+ ${data.watchCount} approaching (30–45 days cover)`}
+      {showWatch ? 'Hide watch list' : `+ ${data.watchCount} approaching (order within ~3 weeks)`}
     </button>}
     <div className="note" style={{marginTop:14}}>
       {data.nowCount+data.soonCount>0
-        ? <><b>Atlas read:</b> {data.nowCount+data.soonCount} of your best sellers are within 30 days of stocking out — roughly <b>{GBP(data.atRiskMonthly)}/mo</b> of revenue depends on reordering them in time. {top ? <>Top priority: <b>{top.title}</b> ({Math.round(top.daysOfCover)} days left, {GBP(top.monthlyRev)}/mo).</> : null} Place these reorders before chasing new-SKU launches.</>
-        : <><b>Atlas read:</b> no good sellers are critically low right now — the watch list shows the next ones to keep an eye on so you stay ahead of a stock-out.</>}
+        ? <><b>Atlas read:</b> {data.nowCount+data.soonCount} of your best sellers need a reorder placed within the week to land before they run out — roughly <b>{GBP(data.atRiskMonthly)}/mo</b> of revenue rides on it. {top ? <>Top priority: <b>{top.title}</b> — {reorderByLabel(top.slack).overdue?'order today':`order by ${reorderByLabel(top.slack).txt}`} ({top.leadDays}d lead, {GBP(top.monthlyRev)}/mo). </> : null}Place these before chasing new-SKU launches. Adjust lead times above if these don't match your suppliers.</>
+        : <><b>Atlas read:</b> no good sellers need an order placed right now — the watch list shows the next ones so you stay ahead of a stock-out.</>}
     </div>
   </div>);
 }
