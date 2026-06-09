@@ -19,24 +19,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606092500"></script>
-<script src="./frkl-live-data.js?v=202606092500"></script>
-<script src="./frkl-agent-insights.js?v=202606092500"></script>
-<script src="./frkl-business-data.js?v=202606092500"></script>
-<script src="./frkl-action-status.js?v=202606092500"></script>
-<script src="./frkl-patterns.js?v=202606092500"></script>
-<script src="./frkl-creators.js?v=202606092500"></script>
-<script src="./frkl-creative-vision.js?v=202606092500"></script>
-<script src="./frkl-links.js?v=202606092500"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606092500"></script>
-<script src="./frkl-events.js?v=202606092500"></script>
-<script src="./frkl-products.js?v=202606092500"></script>
-<script src="./frkl-discount-codes.js?v=202606092500"></script>
-<script src="./frkl-cvr.js?v=202606092500"></script>
-<script src="./frkl-cohorts.js?v=202606092500"></script>
-<script src="./frkl-retention.js?v=202606092500"></script>
-<script src="./frkl-clarity.js?v=202606092500"></script>
-<script src="./frkl-board-read.js?v=202606092500"></script>
+<script src="./frkl-data-loader.js?v=202606092600"></script>
+<script src="./frkl-live-data.js?v=202606092600"></script>
+<script src="./frkl-agent-insights.js?v=202606092600"></script>
+<script src="./frkl-business-data.js?v=202606092600"></script>
+<script src="./frkl-action-status.js?v=202606092600"></script>
+<script src="./frkl-patterns.js?v=202606092600"></script>
+<script src="./frkl-creators.js?v=202606092600"></script>
+<script src="./frkl-creative-vision.js?v=202606092600"></script>
+<script src="./frkl-links.js?v=202606092600"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606092600"></script>
+<script src="./frkl-events.js?v=202606092600"></script>
+<script src="./frkl-products.js?v=202606092600"></script>
+<script src="./frkl-discount-codes.js?v=202606092600"></script>
+<script src="./frkl-cvr.js?v=202606092600"></script>
+<script src="./frkl-cohorts.js?v=202606092600"></script>
+<script src="./frkl-retention.js?v=202606092600"></script>
+<script src="./frkl-clarity.js?v=202606092600"></script>
+<script src="./frkl-board-read.js?v=202606092600"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -596,6 +596,15 @@
   .drawer-src { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-muted);
     background: var(--bg-app); border: 1px solid var(--border-subtle); border-radius: var(--r-full); padding: 3px 9px; margin: 0 6px 6px 0; }
   @media (max-width: 760px) { .drawer { width: 100%; } }
+
+  /* ── What changed — weekly movers strip ──────────────────────────────── */
+  .wc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(216px, 1fr)); gap: 12px; }
+  .wc-item { border: 1px solid var(--border-subtle); border-radius: var(--r-md); padding: 12px 14px 10px; background: var(--bg-app); }
+  .wc-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
+  .wc-label { font-size: 12px; color: var(--text-muted); font-weight: 550; }
+  .wc-val { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-primary); display: flex; align-items: baseline; gap: 8px; }
+  .wc-ch { font-size: 12.5px; font-weight: 650; }
+  .wc-item svg { margin-top: 7px; }
 
   /* ── Agent insights ─────────────────────────────────────────────────── */
   .insight { border-left: 3px solid var(--accent); }
@@ -3509,6 +3518,66 @@ function MobileToday(){
   </div>);
 }
 
+// "What changed" — latest complete week vs the one before, the movers worth a look.
+// Reuses the weekly-board data model (boardWeeks/boardRag); picker-independent.
+function WhatChangedStrip(){
+  const weeks = useMemo(boardWeeks, []);
+  if(!weeks.length) return null;
+  let i = weeks.length-1; while(i>0 && weeks[i].partial) i--;
+  const W = weeks[i], prev = weeks[i-1];
+  if(!W || !prev) return null;
+  const SPECS = [
+    {key:'revenue',       label:'Revenue',             fmt:v=>GBP(v),                              better:'up'},
+    {key:'orders',        label:'Orders',              fmt:v=>NUM(v),                              better:'up'},
+    {key:'aov',           label:'AOV',                 fmt:v=>GBP(v),                              better:'up'},
+    {key:'cvr',           label:'Conversion rate',     fmt:v=>v!=null?(v*100).toFixed(2)+'%':'—',  better:'up',   bench:CVR_BENCH},
+    {key:'mer',           label:'Blended ROAS (MER)',  fmt:v=>v!=null?v.toFixed(2)+'×':'—',         better:'up',   bench:3},
+    {key:'paid',          label:'Paid spend',          fmt:v=>GBP(v),                              better:'flat'},
+    {key:'discountDepth', label:'Discount depth',      fmt:v=>v!=null?(v*100).toFixed(1)+'%':'—',  better:'down'},
+    {key:'returnRate',    label:'Return rate',         fmt:v=>v!=null?(v*100).toFixed(1)+'%':'—',  better:'down'},
+    {key:'emailShare',    label:'Email revenue share', fmt:v=>v!=null?(v*100).toFixed(0)+'%':'—',  better:'up'},
+  ];
+  const trail = (key)=> weeks.slice(Math.max(0,i-8), i+1).map(w=>w.m[key]);
+  const ddNow=W.m.discountDepth, ddPrev=prev.m.discountDepth;
+  const promoUp = (ddNow!=null && ddPrev!=null && (ddNow-ddPrev) > 0.03);   // +3pp discount depth = revenue likely promo-distorted
+  const rows = SPECS.map(sp=>{
+    const val=W.m[sp.key], pv=prev.m[sp.key];
+    const ch = (pv!=null && pv!==0 && val!=null) ? (val-pv)/Math.abs(pv) : null;
+    return {...sp, val, pv, ch, rag: boardRag(sp, val, pv)};
+  }).filter(r=>r.val!=null && r.ch!=null);
+  const movers = rows.filter(r=> Math.abs(r.ch)>=0.03 || r.key==='revenue')
+                     .sort((a,b)=> Math.abs(b.ch)-Math.abs(a.ch)).slice(0,6);
+  // Level-aware status: a WoW dip on a metric that's still above its benchmark is
+  // NOT "off-track" (revenue/MER down ≠ red). Red is reserved for an actual
+  // benchmark breach; an un-benchmarked dip reads as "Watch", not alarm.
+  const badgeFor = (r)=>{
+    if(r.key==='revenue' && promoUp && r.rag!=='bad') return {kind:'promo', label:'Promo-distorted'};
+    if(r.rag==='good') return {kind:'healthy', label:'Healthy'};
+    if(r.rag==='bad')  return r.bench!=null ? {kind:'action', label:'Below target'} : {kind:'watch', label:'Watch'};
+    if(r.rag==='warn') return {kind:'watch',  label:'Watch'};
+    return {kind:'info', label:'Steady'};
+  };
+  return (<div>
+    <div className="section-eyebrow" style={{display:'flex',alignItems:'center',gap:8,margin:'4px 0 -4px',fontSize:11,fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--text-muted)'}}>
+      <span style={{width:3,height:14,background:'var(--text-faint)',borderRadius:2}}/>What changed · week of {W.label}
+    </div>
+    <div className="card">
+      <div className="muted" style={{fontSize:12, marginBottom:11}}>Latest complete week vs the one before — the movers worth a look. Independent of the date picker above.</div>
+      {movers.length ? (<div className="wc-grid">
+        {movers.map((r,idx)=>{ const sb=badgeFor(r); const up=r.ch>=0;
+          const good = r.better==='flat' ? null : (r.better==='down' ? !up : up);
+          const chColor = good==null ? 'var(--text-muted)' : (good ? 'var(--good)' : 'var(--bad)');
+          return (<div key={idx} className="wc-item">
+            <div className="wc-top"><span className="wc-label">{r.label}</span><StatusBadge kind={sb.kind} label={sb.label}/></div>
+            <div className="wc-val">{r.fmt(r.val)} <span className="wc-ch" style={{color:chColor}}>{up?'↑':'↓'}{Math.abs(r.ch*100).toFixed(0)}%</span></div>
+            <BoardSpark vals={trail(r.key)} color={RAG_COL[r.rag]||'var(--text-faint)'}/>
+          </div>);
+        })}
+      </div>) : (<div className="muted" style={{fontSize:13}}>Quiet week — nothing moved more than 3% vs the prior week.</div>)}
+    </div>
+  </div>);
+}
+
 function Overview({start, period, customActive}){
   const isMobile = useIsMobile();
   const [evTick, setEvTick] = useState(0);   // bump to re-read the operator event log
@@ -3674,6 +3743,9 @@ function Overview({start, period, customActive}){
     {/* Crux verdict: compact scorecard strip + the diagnostic (with the £-bridge nested in its "thinking") */}
     <ScoresStrip metrics={cruxMetrics} windowLabel={`last ${CRUX_DAYS} days`}/>
     <DiagnosticCard metrics={dxMetrics} context={dxContext} period={customActive?null:period} onLogEvent={()=>setEvTick(t=>t+1)}/>
+
+    {/* WHAT CHANGED — the weekly diff, so the founder sees the movers before the deep-dive. */}
+    <WhatChangedStrip/>
 
     {/* Prove-value-first onboarding nudge: the read above already works on
         catalogue-estimate margins — now offer the one ~5-min input that makes the
