@@ -19,24 +19,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606092800"></script>
-<script src="./frkl-live-data.js?v=202606092800"></script>
-<script src="./frkl-agent-insights.js?v=202606092800"></script>
-<script src="./frkl-business-data.js?v=202606092800"></script>
-<script src="./frkl-action-status.js?v=202606092800"></script>
-<script src="./frkl-patterns.js?v=202606092800"></script>
-<script src="./frkl-creators.js?v=202606092800"></script>
-<script src="./frkl-creative-vision.js?v=202606092800"></script>
-<script src="./frkl-links.js?v=202606092800"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606092800"></script>
-<script src="./frkl-events.js?v=202606092800"></script>
-<script src="./frkl-products.js?v=202606092800"></script>
-<script src="./frkl-discount-codes.js?v=202606092800"></script>
-<script src="./frkl-cvr.js?v=202606092800"></script>
-<script src="./frkl-cohorts.js?v=202606092800"></script>
-<script src="./frkl-retention.js?v=202606092800"></script>
-<script src="./frkl-clarity.js?v=202606092800"></script>
-<script src="./frkl-board-read.js?v=202606092800"></script>
+<script src="./frkl-data-loader.js?v=202606092900"></script>
+<script src="./frkl-live-data.js?v=202606092900"></script>
+<script src="./frkl-agent-insights.js?v=202606092900"></script>
+<script src="./frkl-business-data.js?v=202606092900"></script>
+<script src="./frkl-action-status.js?v=202606092900"></script>
+<script src="./frkl-patterns.js?v=202606092900"></script>
+<script src="./frkl-creators.js?v=202606092900"></script>
+<script src="./frkl-creative-vision.js?v=202606092900"></script>
+<script src="./frkl-links.js?v=202606092900"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606092900"></script>
+<script src="./frkl-events.js?v=202606092900"></script>
+<script src="./frkl-products.js?v=202606092900"></script>
+<script src="./frkl-discount-codes.js?v=202606092900"></script>
+<script src="./frkl-cvr.js?v=202606092900"></script>
+<script src="./frkl-cohorts.js?v=202606092900"></script>
+<script src="./frkl-retention.js?v=202606092900"></script>
+<script src="./frkl-clarity.js?v=202606092900"></script>
+<script src="./frkl-board-read.js?v=202606092900"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -2654,6 +2654,8 @@ const OI_ICONS = {
   calendar:'<rect x="3.2" y="4.6" width="17.6" height="16" rx="2"/><path d="M3.2 9.2h17.6M8 3v3.2M16 3v3.2"/>',
   sliders:'<path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.1"/><circle cx="9" cy="17" r="2.1"/>',
   search:'<circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4-4"/>',
+  pulse:'<path d="M3 12h3.5l2.2-6.5 4 13 2.3-6.5H21"/>',
+  image:'<rect x="3" y="4.5" width="18" height="15" rx="2"/><circle cx="8.4" cy="9.4" r="1.5"/><path d="M21 15.5 16 11 5 19.5"/>',
 };
 function Icon({name, size=16, stroke=1.7, style, className, title}){
   const p = OI_ICONS[name]; if(!p) return null;
@@ -8527,6 +8529,23 @@ const NAV = [
   ]},
 ];
 
+// Decision-led rail — a presentation layer over NAV (section IDs unchanged).
+// Entries may target a specific sub-tab so decisions like "AI Analyst" and
+// "Creative" become first-class destinations without restructuring the sections.
+const RAIL = [
+  { label:'Today',            icon:'home',      section:'home' },
+  { label:'Actions',          icon:'clipboard', section:'actions' },
+  { label:'AI Analyst',       icon:'spark',     section:'home',     sub:'ask' },
+  { label:'What changed',     icon:'calendar',  section:'board' },
+  { label:'Commercial health',icon:'pulse',     section:'intel' },
+  { label:'Growth channels',  icon:'trendUp',   section:'channels' },
+  { label:'Creative & brand', icon:'image',     section:'channels', sub:'creatives' },
+  { label:'Products & stock', icon:'box',       section:'commerce' },
+  { label:'Customers',        icon:'users',     section:'audience' },
+  { label:'Settings',         icon:'sliders',   section:'settings' },
+];
+const NAV_BY_ID = Object.fromEntries(NAV.map(s=>[s.id, s]));
+
 // ── Connections panel — shows OAuth status per source + install actions ─────
 function ConnectionsPanel(){
   // The Supabase project is awcncqvsnuhqyihpdgcx — install URLs route through
@@ -8731,6 +8750,21 @@ function App(){
   const activeSubId = subTabBySection[section] || activeSection.subtabs[0].id;
   const activeSubTab = activeSection.subtabs.find(t => t.id === activeSubId) || activeSection.subtabs[0];
 
+  // Decision-led rail: a rail entry is active when its section is active AND (if it
+  // targets a sub-tab) that sub is active; otherwise when the section's default sub
+  // is active — so "Today"/"AI Analyst" (and "Growth"/"Creative") stay distinct.
+  const railActive = (e) => {
+    if (e.section !== section) return false;
+    const def = (NAV_BY_ID[e.section]?.subtabs[0]?.id);
+    return e.sub ? (activeSubId === e.sub) : (activeSubId === def);
+  };
+  const goRail = (e) => {
+    setSection(e.section);
+    const sub = e.sub || (NAV_BY_ID[e.section]?.subtabs[0]?.id);
+    if (sub) setSubTabBySection(p => ({...p, [e.section]: sub}));
+    window.scrollTo({top: 0, behavior: 'smooth'});
+  };
+
   // Global deep-link helper so findings can jump to their evidence tab (clickable cross-refs).
   React.useEffect(() => {
     window.__oiNav = (sec, sub) => {
@@ -8807,17 +8841,17 @@ function App(){
         <button className="nav-cmd" onClick={()=>window.__oiCommandOpen&&window.__oiCommandOpen()}>
           <Icon name="search" size={14}/> Search… <kbd>⌘K</kbd>
         </button>
-        {NAV.map(s => (
-          <div key={s.id} className={'nav-item' + (section===s.id ? ' active' : '')} onClick={()=>setSection(s.id)}>
-            <Icon name={s.icon||'info'} size={17}/>{s.label}
+        {RAIL.map((e,i) => (
+          <div key={i} className={'nav-item' + (railActive(e) ? ' active' : '')} onClick={()=>goRail(e)}>
+            <Icon name={e.icon||'info'} size={17}/>{e.label}
           </div>
         ))}
       </nav>
       <main className="app-main">
         <div className="mobile-secnav">
-          {NAV.map(s => (
-            <div key={s.id} className={'nav-item' + (section===s.id ? ' active' : '')} onClick={()=>setSection(s.id)}>
-              <Icon name={s.icon||'info'} size={15}/>{s.label}
+          {RAIL.map((e,i) => (
+            <div key={i} className={'nav-item' + (railActive(e) ? ' active' : '')} onClick={()=>goRail(e)}>
+              <Icon name={e.icon||'info'} size={15}/>{e.label}
             </div>
           ))}
         </div>
