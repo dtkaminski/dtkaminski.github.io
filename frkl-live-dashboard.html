@@ -19,24 +19,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606092000"></script>
-<script src="./frkl-live-data.js?v=202606092000"></script>
-<script src="./frkl-agent-insights.js?v=202606092000"></script>
-<script src="./frkl-business-data.js?v=202606092000"></script>
-<script src="./frkl-action-status.js?v=202606092000"></script>
-<script src="./frkl-patterns.js?v=202606092000"></script>
-<script src="./frkl-creators.js?v=202606092000"></script>
-<script src="./frkl-creative-vision.js?v=202606092000"></script>
-<script src="./frkl-links.js?v=202606092000"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606092000"></script>
-<script src="./frkl-events.js?v=202606092000"></script>
-<script src="./frkl-products.js?v=202606092000"></script>
-<script src="./frkl-discount-codes.js?v=202606092000"></script>
-<script src="./frkl-cvr.js?v=202606092000"></script>
-<script src="./frkl-cohorts.js?v=202606092000"></script>
-<script src="./frkl-retention.js?v=202606092000"></script>
-<script src="./frkl-clarity.js?v=202606092000"></script>
-<script src="./frkl-board-read.js?v=202606092000"></script>
+<script src="./frkl-data-loader.js?v=202606092100"></script>
+<script src="./frkl-live-data.js?v=202606092100"></script>
+<script src="./frkl-agent-insights.js?v=202606092100"></script>
+<script src="./frkl-business-data.js?v=202606092100"></script>
+<script src="./frkl-action-status.js?v=202606092100"></script>
+<script src="./frkl-patterns.js?v=202606092100"></script>
+<script src="./frkl-creators.js?v=202606092100"></script>
+<script src="./frkl-creative-vision.js?v=202606092100"></script>
+<script src="./frkl-links.js?v=202606092100"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606092100"></script>
+<script src="./frkl-events.js?v=202606092100"></script>
+<script src="./frkl-products.js?v=202606092100"></script>
+<script src="./frkl-discount-codes.js?v=202606092100"></script>
+<script src="./frkl-cvr.js?v=202606092100"></script>
+<script src="./frkl-cohorts.js?v=202606092100"></script>
+<script src="./frkl-retention.js?v=202606092100"></script>
+<script src="./frkl-clarity.js?v=202606092100"></script>
+<script src="./frkl-board-read.js?v=202606092100"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -4880,6 +4880,55 @@ function CvrDrivers(){
 }
 
 // Product Signal (Pulse) — the per-product quadrant + opportunities view (Commerce tab).
+// ── Interactive chart zoom + pan (Products deep-dive) ────────────────────────
+// Investigate scatter detail like a map: drag to pan, mouse-wheel to zoom toward
+// the cursor, +/−/Reset controls, double-click to reset. Controlled numeric
+// domains drive the chart's X/Y axes; allowDataOverflow clips points outside the
+// current window. Domains clamp to the data extents so you can't pan into a void.
+function useChartZoom(fx0, fx1, fy0, fy1){
+  const [v, setV] = useState([fx0, fx1, fy0, fy1]);
+  const wrapRef = React.useRef(null);
+  const drag = React.useRef(null);
+  React.useEffect(()=>{ setV([fx0, fx1, fy0, fy1]); }, [fx0, fx1, fy0, fy1]);
+  const minX=(fx1-fx0)*0.05||1, minY=(fy1-fy0)*0.05||1;
+  const clampX=(a,b)=>{ if(b-a<minX){const m=(a+b)/2; a=m-minX/2; b=m+minX/2;} if(a<fx0){b+=fx0-a;a=fx0;} if(b>fx1){a-=b-fx1;b=fx1;} return [Math.max(a,fx0),Math.min(b,fx1)]; };
+  const clampY=(a,b)=>{ if(b-a<minY){const m=(a+b)/2; a=m-minY/2; b=m+minY/2;} if(a<fy0){b+=fy0-a;a=fy0;} if(b>fy1){a-=b-fy1;b=fy1;} return [Math.max(a,fy0),Math.min(b,fy1)]; };
+  const zoom=(f, rx, ry)=>setV(([a,b,c,d])=>{
+    const fpx=a+(b-a)*rx, fpy=d-(d-c)*ry;                 // focal point (ry: 0 = top)
+    const [na,nb]=clampX(fpx-(fpx-a)*f, fpx+(b-fpx)*f);
+    const [nc,nd]=clampY(fpy-(fpy-c)*f, fpy+(d-fpy)*f);
+    return [na,nb,nc,nd];
+  });
+  React.useEffect(()=>{
+    const el=wrapRef.current; if(!el) return;
+    const onWheel=(e)=>{ e.preventDefault(); const r=el.getBoundingClientRect();
+      const rx=Math.min(1,Math.max(0,(e.clientX-r.left)/r.width)), ry=Math.min(1,Math.max(0,(e.clientY-r.top)/r.height));
+      zoom(e.deltaY<0?0.82:1.22, rx, ry); };
+    el.addEventListener('wheel', onWheel, {passive:false});
+    return ()=>el.removeEventListener('wheel', onWheel);
+  }, [fx0, fx1, fy0, fy1]);
+  const onMouseDown=(e)=>{ const el=wrapRef.current; if(!el) return; drag.current={x:e.clientX, y:e.clientY, v:v.slice(), r:el.getBoundingClientRect()}; };
+  const onMouseMove=(e)=>{ const d=drag.current; if(!d) return; const dx=(e.clientX-d.x)/d.r.width, dy=(e.clientY-d.y)/d.r.height;
+    const [a,b,c,dd]=d.v; const sx=b-a, sy=dd-c;
+    const [na,nb]=clampX(a-dx*sx, b-dx*sx); const [nc,nd]=clampY(c+dy*sy, dd+dy*sy); setV([na,nb,nc,nd]); };
+  const end=()=>{ drag.current=null; };
+  const reset=()=>setV([fx0, fx1, fy0, fy1]);
+  const zoomed = v[0]>fx0+1e-6 || v[1]<fx1-1e-6 || v[2]>fy0+1e-6 || v[3]<fy1-1e-6;
+  return { wrapRef, view:v, zoomed, reset, zoomIn:()=>zoom(0.7,0.5,0.5), zoomOut:()=>zoom(1.43,0.5,0.5),
+    bind:{ ref:wrapRef, onMouseDown, onMouseMove, onMouseUp:end, onMouseLeave:end, onDoubleClick:reset,
+           style:{ cursor:'grab', position:'relative', userSelect:'none' } } };
+}
+function ZoomControls({z}){
+  const b={width:27,height:27,display:'inline-flex',alignItems:'center',justifyContent:'center',border:'1px solid var(--border-default)',background:'var(--bg-card)',color:'var(--text-secondary)',borderRadius:7,cursor:'pointer',fontSize:15,lineHeight:1,fontFamily:'inherit'};
+  return (<div style={{position:'absolute',top:4,right:8,display:'flex',gap:5,zIndex:3}}>
+    <button title="Zoom out" style={b} onClick={z.zoomOut}>–</button>
+    <button title="Zoom in" style={b} onClick={z.zoomIn}>+</button>
+    <button title="Reset zoom (or double-click the chart)" onClick={z.reset} disabled={!z.zoomed}
+      style={{...b, width:'auto', padding:'0 9px', fontSize:11, fontWeight:600, opacity:z.zoomed?1:0.4, cursor:z.zoomed?'pointer':'default'}}>Reset</button>
+  </div>);
+}
+const ZOOM_HINT = 'Drag to pan · scroll to zoom · double-click to reset';
+
 function ProductSignal(){
   const S = computeProductSignals();
   if(!S) return null;
@@ -4897,6 +4946,10 @@ function ProductSignal(){
   const L=LENS[lens];
   const scatter = enriched.filter(p=>p.views>=30);
   const series = ['gem','star','dud','oos','dead'].map(k=>({k, data: scatter.filter(p=>p.lab===k).map(p=>({x:p.pctViews, y:+(p[L.key]*100).toFixed(1), z:p.views, name:p.name, d:+(p.viewToAtc*100).toFixed(1), c:+(p.atcToPurch*100).toFixed(1)}))}));
+  const allPts = series.flatMap(s=>s.data);
+  const xMax = allPts.length ? Math.max(...allPts.map(p=>p.x)) : 100;
+  const yMax = allPts.length ? Math.max(...allPts.map(p=>p.y)) : 100;
+  const z = useChartZoom(0, +((xMax*1.08)||1).toFixed(2), 0, +((yMax*1.12)||1).toFixed(2));
   const lensBtn=(id)=>(<button key={id} onClick={()=>setLens(id)} style={{fontSize:11.5,fontWeight:600,padding:'3px 11px',borderRadius:7,cursor:'pointer',border:'1px solid '+(lens===id?'#7c8cff':'var(--border-subtle)'),background:lens===id?'rgba(124,140,255,0.14)':'transparent',color:lens===id?'#9aa6ff':'var(--text-muted)'}}>{LENS[id].short}</button>);
 
   const oppRow = (p,accent) => (<div key={p.name} style={{display:'flex',gap:10,alignItems:'baseline',padding:'7px 0',borderTop:'1px solid var(--border-subtle)'}}>
@@ -4930,19 +4983,23 @@ function ProductSignal(){
       {['desire','completion'].map(lensBtn)}
       <span style={{fontSize:11,color:'var(--text-faint)'}}>{lens==='completion'?'— a high-desire dot sitting low here = wanted, but not bought':'— how badly people want it once they see it'}</span>
     </div>
+    <div {...z.bind}>
+    <ZoomControls z={z}/>
     <R.ResponsiveContainer width="100%" height={300}>
       <R.ScatterChart margin={{top:10,right:20,left:10,bottom:24}}>
         <R.CartesianGrid stroke="#1f1f27"/>
-        <R.XAxis type="number" dataKey="x" name="Visibility" unit="%" tick={{fill:'#7e7e8a',fontSize:11}} label={{value:'Visibility — % of all product views', position:'insideBottom', offset:-12, fill:'#6f6f7b', fontSize:11}}/>
-        <R.YAxis type="number" dataKey="y" name={L.short} unit="%" tick={{fill:'#7e7e8a',fontSize:11}} label={{value:L.label, angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
+        <R.XAxis type="number" dataKey="x" name="Visibility" unit="%" domain={[z.view[0],z.view[1]]} allowDataOverflow tickFormatter={v=>Math.round(v)} tick={{fill:'#7e7e8a',fontSize:11}} label={{value:'Visibility — % of all product views', position:'insideBottom', offset:-12, fill:'#6f6f7b', fontSize:11}}/>
+        <R.YAxis type="number" dataKey="y" name={L.short} unit="%" domain={[z.view[2],z.view[3]]} allowDataOverflow tickFormatter={v=>Math.round(v)} tick={{fill:'#7e7e8a',fontSize:11}} label={{value:L.label, angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
         <R.ZAxis type="number" dataKey="z" range={[25,320]} name="views"/>
         <R.ReferenceLine x={medPct} stroke="#3a3a44" strokeDasharray="4 3"/>
         <R.ReferenceLine y={+(L.ref*100).toFixed(1)} stroke="#3a3a44" strokeDasharray="4 3"/>
-        <R.Tooltip cursor={{strokeDasharray:'3 3'}} contentStyle={{background:'#181820',border:'1px solid #2a2a34',borderRadius:10}} content={({payload})=>{ const p=payload&&payload[0]&&payload[0].payload; return p?(<div style={{background:'#181820',border:'1px solid #2a2a34',borderRadius:8,padding:'7px 10px',fontSize:12}}><b>{p.name}</b><br/>{NUM(p.z)} views · {p.x}% of views<br/>view→cart {p.d}% · cart→buy {p.c}%</div>):null; }}/>
+        <R.Tooltip cursor={{strokeDasharray:'3 3'}} content={({payload})=>{ const p=payload&&payload[0]&&payload[0].payload; return p?(<div style={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:8,padding:'7px 10px',fontSize:12,boxShadow:'var(--shadow-md)'}}><b>{p.name}</b><br/>{NUM(p.z)} views · {p.x}% of views<br/>view→cart {p.d}% · cart→buy {p.c}%</div>):null; }}/>
         <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}}/>
         {series.map(s=> s.data.length>0 && <R.Scatter key={s.k} name={LBL[s.k]} data={s.data} fill={COL[s.k]} fillOpacity={0.75}/>)}
       </R.ScatterChart>
     </R.ResponsiveContainer>
+    <div style={{fontSize:10.5,color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{ZOOM_HINT}</div>
+    </div>
     <div style={{fontSize:11,color:'var(--text-faint)',margin:'2px 0 12px'}}>{lens==='completion'
       ? <>Y = cart→purchase. Dots <b>below the dashed line buy worse than the site average once carted</b> — a checkout/commitment problem, not a desire one. X = visibility. Bubble = views.</>
       : <>Top-left = wanted but unseen (merchandise) · top-right = stars · bottom-right = seen but unwanted (fix/stop). Dashed lines = site median visibility &amp; average view→cart.</>}</div>
@@ -7805,7 +7862,7 @@ function MarginBridge({cur, pri, gm, perOrderFixed, payPct}){
 function MatrixTip({active, payload}){
   if(!active || !payload || !payload.length) return null;
   const d = payload[0].payload;
-  return (<div style={{background:'#181820', border:'1px solid #2a2a34', borderRadius:10, padding:'8px 10px', fontSize:12}}>
+  return (<div style={{background:'var(--bg-elevated)', border:'1px solid var(--border-default)', borderRadius:10, padding:'8px 10px', fontSize:12, boxShadow:'var(--shadow-md)', color:'var(--text-primary)'}}>
     <div style={{fontWeight:700, marginBottom:3}}>{d.name}</div>
     <div style={{color:'var(--text-secondary)'}}>{NUM(d.buyers)} buyers · {NUM(d.y)} acquired on 1st order</div>
     <div style={{color:'var(--text-secondary)'}}>Repeat {(d.repeat*100).toFixed(0)}% · LTV {GBP(d.ltv)}/cust</div>
@@ -7830,6 +7887,9 @@ function ProductRetentionMatrix(){
   };
   const groups = {hero:[], gem:[], leaky:[], tail:[]};
   pts.forEach(p=>{ const hiR=p.x>=brandRep, hiV=p.y>=medAcq; groups[hiR&&hiV?'hero':hiR&&!hiV?'gem':!hiR&&hiV?'leaky':'tail'].push(p); });
+  const rxMax = pts.length ? Math.max(...pts.map(p=>p.x)) : 100;
+  const ryMax = pts.length ? Math.max(...pts.map(p=>p.y)) : 100;
+  const z = useChartZoom(0, +((rxMax*1.08)||1).toFixed(2), 0, Math.ceil((ryMax*1.12)||1));
   return (<div className="card" style={{marginBottom:14}}>
     <div className="card-section-title">
       <h2 style={{margin:0}}>Which products acquire vs retain</h2>
@@ -7838,12 +7898,14 @@ function ProductRetentionMatrix(){
     <div className="micro" style={{color:'var(--text-secondary)', marginBottom:8, lineHeight:1.5}}>
       Almost every frkl product is bought on a customer's <b>first</b> order, so the catalogue is acquisition-led across the board and <b>retention is the gap</b>. Below: which first products bring customers who come <i>back</i> (right) vs once-and-done (left). Dashed lines = brand-average repeat ({brandRep.toFixed(0)}%) and median acquisition volume.
     </div>
+    <div {...z.bind}>
+    <ZoomControls z={z}/>
     <R.ResponsiveContainer width="100%" height={330}>
       <R.ScatterChart margin={{top:10,right:24,left:6,bottom:26}}>
         <R.CartesianGrid stroke="#1f1f27"/>
-        <R.XAxis type="number" dataKey="x" name="Retention" unit="%" tick={{fill:'#7e7e8a',fontSize:11}}
+        <R.XAxis type="number" dataKey="x" name="Retention" unit="%" domain={[z.view[0],z.view[1]]} allowDataOverflow tickFormatter={v=>Math.round(v)} tick={{fill:'#7e7e8a',fontSize:11}}
           label={{value:'Repeat rate of acquired customers →', position:'insideBottom', offset:-14, fill:'#6f6f7b', fontSize:11}}/>
-        <R.YAxis type="number" dataKey="y" name="Acquired" tick={{fill:'#7e7e8a',fontSize:11}}
+        <R.YAxis type="number" dataKey="y" name="Acquired" domain={[z.view[2],z.view[3]]} allowDataOverflow tickFormatter={v=>Math.round(v)} tick={{fill:'#7e7e8a',fontSize:11}}
           label={{value:'Customers acquired', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
         <R.ZAxis type="number" dataKey="z" range={[50,520]} name="LTV"/>
         <R.ReferenceLine x={brandRep} stroke="#5a5a66" strokeDasharray="4 3"/>
@@ -7852,6 +7914,8 @@ function ProductRetentionMatrix(){
         {['hero','gem','leaky','tail'].map(k=> groups[k].length ? <R.Scatter key={k} name={QMETA[k].label} data={groups[k]} fill={QMETA[k].col} fillOpacity={0.78}/> : null)}
       </R.ScatterChart>
     </R.ResponsiveContainer>
+    <div style={{fontSize:10.5,color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{ZOOM_HINT}</div>
+    </div>
     <div className="row" style={{marginTop:6, gap:10}}>
       {['hero','leaky','gem','tail'].map(k=> groups[k].length ? (
         <div key={k} style={{flex:'1 1 200px', fontSize:11.5, lineHeight:1.45}}>

@@ -449,7 +449,7 @@
     // pre-satisfy the dashboard's access gate via shared same-origin localStorage
     // (no passcode prompt). The embedded dashboard's loader reads live tenant data
     // using this same session.
-    const RICH_DASH = { frkl: '/frkl-live-dashboard.html?v=202606092000' };
+    const RICH_DASH = { frkl: '/frkl-live-dashboard.html?v=202606092100' };
     const richUrl = RICH_DASH[currentBrand.slug];
     if (richUrl) {
       try { localStorage.setItem('oi_gate_v1', 'b8bd9e7d7fe04b396ddc52df76d65e84a99565fff0f22d805d6b13b4517bcdb5'); } catch (e) {}
