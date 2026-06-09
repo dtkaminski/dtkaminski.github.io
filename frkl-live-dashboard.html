@@ -19,24 +19,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606093400"></script>
-<script src="./frkl-live-data.js?v=202606093400"></script>
-<script src="./frkl-agent-insights.js?v=202606093400"></script>
-<script src="./frkl-business-data.js?v=202606093400"></script>
-<script src="./frkl-action-status.js?v=202606093400"></script>
-<script src="./frkl-patterns.js?v=202606093400"></script>
-<script src="./frkl-creators.js?v=202606093400"></script>
-<script src="./frkl-creative-vision.js?v=202606093400"></script>
-<script src="./frkl-links.js?v=202606093400"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606093400"></script>
-<script src="./frkl-events.js?v=202606093400"></script>
-<script src="./frkl-products.js?v=202606093400"></script>
-<script src="./frkl-discount-codes.js?v=202606093400"></script>
-<script src="./frkl-cvr.js?v=202606093400"></script>
-<script src="./frkl-cohorts.js?v=202606093400"></script>
-<script src="./frkl-retention.js?v=202606093400"></script>
-<script src="./frkl-clarity.js?v=202606093400"></script>
-<script src="./frkl-board-read.js?v=202606093400"></script>
+<script src="./frkl-data-loader.js?v=202606093500"></script>
+<script src="./frkl-live-data.js?v=202606093500"></script>
+<script src="./frkl-agent-insights.js?v=202606093500"></script>
+<script src="./frkl-business-data.js?v=202606093500"></script>
+<script src="./frkl-action-status.js?v=202606093500"></script>
+<script src="./frkl-patterns.js?v=202606093500"></script>
+<script src="./frkl-creators.js?v=202606093500"></script>
+<script src="./frkl-creative-vision.js?v=202606093500"></script>
+<script src="./frkl-links.js?v=202606093500"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606093500"></script>
+<script src="./frkl-events.js?v=202606093500"></script>
+<script src="./frkl-products.js?v=202606093500"></script>
+<script src="./frkl-discount-codes.js?v=202606093500"></script>
+<script src="./frkl-cvr.js?v=202606093500"></script>
+<script src="./frkl-cohorts.js?v=202606093500"></script>
+<script src="./frkl-retention.js?v=202606093500"></script>
+<script src="./frkl-clarity.js?v=202606093500"></script>
+<script src="./frkl-board-read.js?v=202606093500"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -608,8 +608,9 @@
   /* ── What changed — weekly movers strip ──────────────────────────────── */
   .wc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(216px, 1fr)); gap: 12px; }
   .wc-item { border: 1px solid var(--border-subtle); border-radius: var(--r-md); padding: 12px 14px 10px; background: var(--bg-app); }
-  .wc-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
-  .wc-label { font-size: 12px; color: var(--text-muted); font-weight: 550; }
+  .wc-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 7px; min-height: 31px; }
+  .wc-label { font-size: 12px; color: var(--text-muted); font-weight: 550; line-height: 1.3; }
+  .wc-top .sbadge { flex-shrink: 0; }
   .wc-val { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-primary); display: flex; align-items: baseline; gap: 8px; }
   .wc-ch { font-size: 12.5px; font-weight: 650; }
   .wc-item svg { margin-top: 7px; }
@@ -3658,7 +3659,7 @@ function WhatChangedStrip(){
     {key:'orders',        label:'Orders',              fmt:v=>NUM(v),                              better:'up'},
     {key:'aov',           label:'AOV',                 fmt:v=>GBP(v),                              better:'up'},
     {key:'cvr',           label:'Conversion rate',     fmt:v=>v!=null?(v*100).toFixed(2)+'%':'—',  better:'up',   bench:CVR_BENCH},
-    {key:'mer',           label:'Blended ROAS (MER)',  fmt:v=>v!=null?v.toFixed(2)+'×':'—',         better:'up',   bench:3},
+    {key:'mer',           label:'Blended ROAS',        fmt:v=>v!=null?v.toFixed(2)+'×':'—',         better:'up',   bench:3},
     {key:'paid',          label:'Paid spend',          fmt:v=>GBP(v),                              better:'flat'},
     {key:'discountDepth', label:'Discount depth',      fmt:v=>v!=null?(v*100).toFixed(1)+'%':'—',  better:'down'},
     {key:'returnRate',    label:'Return rate',         fmt:v=>v!=null?(v*100).toFixed(1)+'%':'—',  better:'down'},
