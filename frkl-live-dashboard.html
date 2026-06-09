@@ -18,23 +18,23 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606090806"></script>
-<script src="./frkl-live-data.js?v=202606090806"></script>
-<script src="./frkl-agent-insights.js?v=202606090806"></script>
-<script src="./frkl-business-data.js?v=202606090806"></script>
-<script src="./frkl-action-status.js?v=202606090806"></script>
-<script src="./frkl-patterns.js?v=202606090806"></script>
-<script src="./frkl-creators.js?v=202606090806"></script>
-<script src="./frkl-creative-vision.js?v=202606090806"></script>
-<script src="./frkl-links.js?v=202606090806"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606090806"></script>
-<script src="./frkl-events.js?v=202606090806"></script>
-<script src="./frkl-products.js?v=202606090806"></script>
-<script src="./frkl-discount-codes.js?v=202606090806"></script>
-<script src="./frkl-cvr.js?v=202606090806"></script>
-<script src="./frkl-cohorts.js?v=202606090806"></script>
-<script src="./frkl-retention.js?v=202606090806"></script>
-<script src="./frkl-clarity.js?v=202606090806"></script>
+<script src="./frkl-data-loader.js?v=202606090809"></script>
+<script src="./frkl-live-data.js?v=202606090809"></script>
+<script src="./frkl-agent-insights.js?v=202606090809"></script>
+<script src="./frkl-business-data.js?v=202606090809"></script>
+<script src="./frkl-action-status.js?v=202606090809"></script>
+<script src="./frkl-patterns.js?v=202606090809"></script>
+<script src="./frkl-creators.js?v=202606090809"></script>
+<script src="./frkl-creative-vision.js?v=202606090809"></script>
+<script src="./frkl-links.js?v=202606090809"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606090809"></script>
+<script src="./frkl-events.js?v=202606090809"></script>
+<script src="./frkl-products.js?v=202606090809"></script>
+<script src="./frkl-discount-codes.js?v=202606090809"></script>
+<script src="./frkl-cvr.js?v=202606090809"></script>
+<script src="./frkl-cohorts.js?v=202606090809"></script>
+<script src="./frkl-retention.js?v=202606090809"></script>
+<script src="./frkl-clarity.js?v=202606090809"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -3151,6 +3151,17 @@ function CrossChannel({start}){
   // simple spend->revenue correlation (same-day, paid vs revenue)
   const xs=daily.map(d=>d.paid), ys=daily.map(d=>d.revenue);
   const corr=pearson(xs,ys);
+  // Lagged correlation — paid today vs revenue +0..3 days (Phase 2.3): revenue
+  // responds with a lag, so same-day understates paid's effect.
+  const lagCorr=[0,1,2,3].map(L=>({lag:L, r:(L<xs.length-3)?pearson(xs.slice(0,xs.length-L), ys.slice(L)):null}));
+  const bestLag=lagCorr.filter(l=>l.r!=null).slice().sort((a,b)=>b.r-a.r)[0];
+  // Meta spend-tier efficiency (Phase 2.1, Meta-only): claimed ROAS by daily spend
+  // tier → does each extra pound earn less? (Google absent → Meta only for now.)
+  const mdays=meta.filter(r=>(r.cost||0)>0 && r.purchaseValue!=null).map(r=>({cost:r.cost, val:r.purchaseValue})).sort((a,b)=>a.cost-b.cost);
+  let tiers=null;
+  if(mdays.length>=6){ const t=Math.floor(mdays.length/3); const grp=[mdays.slice(0,t), mdays.slice(t,2*t), mdays.slice(2*t)];
+    tiers=grp.map((g,i)=>{ const c=g.reduce((a,x)=>a+x.cost,0), v=g.reduce((a,x)=>a+x.val,0); return {label:['Low','Mid','High'][i], avgSpend:c/g.length, roas:c>0?v/c:null, n:g.length}; }); }
+  const tierFalling = tiers && tiers[0].roas!=null && tiers[2].roas!=null && tiers[2].roas < tiers[0].roas*0.85;
   return (<div>
     <div className="card" style={{marginBottom:14}}>
       <h2>Channel revenue claims vs spend</h2>
@@ -3172,9 +3183,25 @@ function CrossChannel({start}){
         <div className="muted" style={{marginTop:8}}>Add-to-cart → checkout is the steepest drop — a website-structure question for the next phase.</div>
       </div>
       <div className="card" style={{flex:'1 1 380px'}}>
-        <h2>Same-day spend ↔ revenue</h2>
-        <div style={{fontSize:40,fontWeight:700,margin:'8px 0'}}>{corr==null?'—':corr.toFixed(2)}</div>
-        <div className="muted">Pearson correlation between daily paid spend and Shopify net revenue over the selected window. Positive but imperfect same-day — revenue also responds with a lag and to email, which is what a proper relationship model will separate.</div>
+        <h2>Paid effect &amp; incrementality</h2>
+        <div className="micro" style={{color:'var(--text-muted)', marginBottom:6}}>Spend↔revenue correlation by lag (revenue responds with a delay, so same-day understates paid).</div>
+        <div style={{display:'flex', gap:8, marginBottom:10}}>
+          {lagCorr.map(l=>(<div key={l.lag} style={{flex:1, textAlign:'center', padding:'8px 4px', borderRadius:'var(--r-sm)', background: bestLag&&l.lag===bestLag.lag?'var(--accent-bg)':'var(--bg-app)', border:'1px solid '+(bestLag&&l.lag===bestLag.lag?'rgba(124,140,255,.35)':'var(--border-subtle)')}}>
+            <div style={{fontSize:18, fontWeight:700, color: bestLag&&l.lag===bestLag.lag?'var(--accent)':'var(--text-primary)'}}>{l.r==null?'—':l.r.toFixed(2)}</div>
+            <div className="micro" style={{color:'var(--text-faint)'}}>+{l.lag}d</div>
+          </div>))}
+        </div>
+        {bestLag && <div className="micro" style={{color:'var(--text-secondary)', marginBottom:10}}>Strongest at a <b>{bestLag.lag}-day lag</b> (r={bestLag.r.toFixed(2)}) — judge paid on a few-day window, not same-day ROAS.</div>}
+        {tiers && (<div style={{marginBottom:8}}>
+          <div className="micro" style={{color:'var(--text-muted)', marginBottom:4}}>Meta claimed ROAS by daily-spend tier {tierFalling?'— falling at higher spend (diminishing returns)':'— broadly flat across tiers'}:</div>
+          <div style={{display:'flex', gap:8}}>
+            {tiers.map((t,i)=>(<div key={i} style={{flex:1, textAlign:'center', fontSize:12}}>
+              <div style={{fontWeight:700, color: tierFalling&&i===2?'#f87171':'var(--text-primary)'}}>{t.roas!=null?t.roas.toFixed(1)+'×':'—'}</div>
+              <div className="micro" style={{color:'var(--text-faint)'}}>{t.label} · {GBP(t.avgSpend)}/d</div>
+            </div>))}
+          </div>
+        </div>)}
+        <div className="note" style={{marginTop:6}}>Correlation isn't causation. To <b>measure</b> incrementality: log a 2-week geo-holdout in the event log (pause Meta in one region, hold another), then read the revenue gap here. {tiers?'':'Google Ads data will unlock true cross-channel allocation once linked.'}</div>
       </div>
     </div>
     <Insight k="economics" />
