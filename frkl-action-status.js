@@ -66,7 +66,8 @@ window.FRKL_ACTION_STATUS = {
     "deltaPct": 0.0427452734370662
    }
   },
-  "resolvedAt": "2026-05-26T15:34:22+00:00"
+  "resolvedAt": "2026-05-26T15:34:22+00:00",
+  "label_original": "UK creatives kept below 6.2x frequency"
  },
  "pulse-meta-rebalance-budget-toward-google": {
   "status": "no-recipe",

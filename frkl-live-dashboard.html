@@ -18,24 +18,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606091137"></script>
-<script src="./frkl-live-data.js?v=202606091137"></script>
-<script src="./frkl-agent-insights.js?v=202606091137"></script>
-<script src="./frkl-business-data.js?v=202606091137"></script>
-<script src="./frkl-action-status.js?v=202606091137"></script>
-<script src="./frkl-patterns.js?v=202606091137"></script>
-<script src="./frkl-creators.js?v=202606091137"></script>
-<script src="./frkl-creative-vision.js?v=202606091137"></script>
-<script src="./frkl-links.js?v=202606091137"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606091137"></script>
-<script src="./frkl-events.js?v=202606091137"></script>
-<script src="./frkl-products.js?v=202606091137"></script>
-<script src="./frkl-discount-codes.js?v=202606091137"></script>
-<script src="./frkl-cvr.js?v=202606091137"></script>
-<script src="./frkl-cohorts.js?v=202606091137"></script>
-<script src="./frkl-retention.js?v=202606091137"></script>
-<script src="./frkl-clarity.js?v=202606091137"></script>
-<script src="./frkl-board-read.js?v=202606091137"></script>
+<script src="./frkl-data-loader.js?v=202606091201"></script>
+<script src="./frkl-live-data.js?v=202606091201"></script>
+<script src="./frkl-agent-insights.js?v=202606091201"></script>
+<script src="./frkl-business-data.js?v=202606091201"></script>
+<script src="./frkl-action-status.js?v=202606091201"></script>
+<script src="./frkl-patterns.js?v=202606091201"></script>
+<script src="./frkl-creators.js?v=202606091201"></script>
+<script src="./frkl-creative-vision.js?v=202606091201"></script>
+<script src="./frkl-links.js?v=202606091201"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606091201"></script>
+<script src="./frkl-events.js?v=202606091201"></script>
+<script src="./frkl-products.js?v=202606091201"></script>
+<script src="./frkl-discount-codes.js?v=202606091201"></script>
+<script src="./frkl-cvr.js?v=202606091201"></script>
+<script src="./frkl-cohorts.js?v=202606091201"></script>
+<script src="./frkl-retention.js?v=202606091201"></script>
+<script src="./frkl-clarity.js?v=202606091201"></script>
+<script src="./frkl-board-read.js?v=202606091201"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -6823,7 +6823,7 @@ function CohortsPanel(){
 
     <div className="row" style={{marginBottom:14}}>
       <CohortStat label="Contribution LTV / customer" val={GBP(contribLTV)} sub={`${GBP(lifetimeRev)} revenue × ${PCT(gm)} margin · observed to date`} badge={badge} accent="var(--good)"/>
-      <CohortStat label="Paid CAC" val={paidCac!=null?GBP(paidCac):'—'} sub={`spend ÷ new customers · ${C.cac.paidMonths||0} paid month(s) · blended ${blendedCac!=null?GBP(blendedCac):'—'}`} accent="var(--accent)"/>
+      <CohortStat label="Paid CAC" val={paidCac!=null?GBP(paidCac):'—'} sub={`spend ÷ new customers · ${C.cac.paidMonths||0} paid month(s) · blended ${blendedCac!=null?GBP(blendedCac):'—'} understates (incl. £0-spend cohorts)`} accent="var(--accent)"/>
       <CohortStat label="LTV : CAC (paid)" val={ltvCacPaid!=null?ltvCacPaid.toFixed(1)+'×':'—'} sub="contribution LTV ÷ paid CAC · target 3×+" badge={badge} accent={ragRatio}/>
       <CohortStat label="First-order payback" val={paybackOrders!=null?(paybackOrders<=1?'1st order':paybackOrders.toFixed(1)+' orders'):'—'} sub="orders to recover paid CAC" badge={badge}/>
       <CohortStat label="Repeat rate" val={PCT(C.repeatRate)} sub={`${C.ordersPerCustomer} orders / customer`}/>
@@ -7040,8 +7040,11 @@ function ClarityFrictionPanel(){
   return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid #f87171'}}>
     <div className="card-section-title">
       <h2 style={{margin:0}}>Site friction — is the site the bottleneck?</h2>
-      <span className="meta">Microsoft Clarity · {NUM(C.sessions)} sessions · as of {C.asOf}</span>
+      <span className="meta">Microsoft Clarity · {NUM(C.sessions)} sessions · {C.windowDays||C.days}d window · as of {C.asOf}</span>
     </div>
+    {C.thinData && (<div className="note" style={{marginBottom:10, borderLeft:'3px solid var(--warn)'}}>
+      ⚠ Only {C.windowDays||C.days} days of Clarity data — these are <b>medium-confidence, directional</b> signals (capped: none shown as high). Reproduce a flagged issue before committing dev time; the picture firms up as the window grows past a week.
+    </div>)}
     {C.flags && C.flags.length>0 && (<div style={{display:'flex', flexDirection:'column', gap:6, marginBottom:10}}>
       {C.flags.map((fl,i)=>(<div key={i} style={{display:'flex', gap:8, alignItems:'baseline', fontSize:13.5}}>
         <span style={{color:sev(fl.sev), fontWeight:700}}>{fl.sev==='high'?'▲':'•'}</span>
@@ -7079,19 +7082,19 @@ function RetentionPanel(){
       <span className="meta">median reorder interval {med} days · ~{R.repeatCustomers} repeat customers</span>
     </div>
     <div className="micro" style={{color:'var(--text-secondary)', marginBottom:10, lineHeight:1.55}}>
-      Repeat customers reorder about every <b>{med} days</b> (p25 {R.p25} / p75 {R.p75}). That's your replenishment trigger — a flow firing around day {med} catches customers at peak intent. <b style={{color:'var(--text-primary)'}}>{GBP(R.atStake)}</b> of expected reorder value is sitting in the due + overdue pools right now.
+      Repeat customers reorder about every <b>{med} days</b> (p25 {R.p25} / p75 {R.p75}). That's your replenishment trigger — a flow firing around day {med} catches customers at peak intent. <b style={{color:'var(--text-primary)'}}>{GBP(R.atStake)}</b> of <b>realistically recoverable</b> reorder value is in the due + overdue pools{R.atStakeGross?<span> (the {GBP(R.atStakeGross)} gross × your {Math.round((R.repeatRate||0)*100)}% repeat rate — most overdue customers won't return)</span>:null}.
     </div>
     <div className="row" style={{marginBottom:10}}>
       <div className="card kpi" style={{borderLeft:'3px solid var(--accent)'}}>
         <div className="label">This week's nudge list</div>
         <div className="val" style={{fontSize:24}}>{NUM(R.worklist.count)}</div>
-        <div className="sub">customers entering their reorder window · {GBP(R.worklist.value)} expected</div>
+        <div className="sub">customers entering their reorder window · {GBP(R.worklist.recoverable!=null?R.worklist.recoverable:R.worklist.value)} recoverable</div>
       </div>
       {SEG.map(s=>{ const v=seg[s.k]||{count:0,value:0}; return (
         <div key={s.k} className="card kpi" style={{borderLeft:'3px solid '+s.col}}>
           <div className="label">{s.label}</div>
           <div className="val" style={{fontSize:24}}>{NUM(v.count)}</div>
-          <div className="sub">{GBP(v.value)} expected · {s.desc}</div>
+          <div className="sub">{GBP(v.recoverable!=null?v.recoverable:v.value)} recoverable{v.recoverable!=null&&v.value?<span style={{color:'var(--text-faint)'}}> of {GBP(v.value)} gross</span>:null} · {s.desc}</div>
         </div>); })}
     </div>
     {(R.byProduct||[]).length>0 && (<div>
