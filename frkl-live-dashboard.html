@@ -18,22 +18,23 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606090748"></script>
-<script src="./frkl-live-data.js?v=202606090748"></script>
-<script src="./frkl-agent-insights.js?v=202606090748"></script>
-<script src="./frkl-business-data.js?v=202606090748"></script>
-<script src="./frkl-action-status.js?v=202606090748"></script>
-<script src="./frkl-patterns.js?v=202606090748"></script>
-<script src="./frkl-creators.js?v=202606090748"></script>
-<script src="./frkl-creative-vision.js?v=202606090748"></script>
-<script src="./frkl-links.js?v=202606090748"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606090748"></script>
-<script src="./frkl-events.js?v=202606090748"></script>
-<script src="./frkl-products.js?v=202606090748"></script>
-<script src="./frkl-discount-codes.js?v=202606090748"></script>
-<script src="./frkl-cvr.js?v=202606090748"></script>
-<script src="./frkl-cohorts.js?v=202606090748"></script>
-<script src="./frkl-retention.js?v=202606090748"></script>
+<script src="./frkl-data-loader.js?v=202606090754"></script>
+<script src="./frkl-live-data.js?v=202606090754"></script>
+<script src="./frkl-agent-insights.js?v=202606090754"></script>
+<script src="./frkl-business-data.js?v=202606090754"></script>
+<script src="./frkl-action-status.js?v=202606090754"></script>
+<script src="./frkl-patterns.js?v=202606090754"></script>
+<script src="./frkl-creators.js?v=202606090754"></script>
+<script src="./frkl-creative-vision.js?v=202606090754"></script>
+<script src="./frkl-links.js?v=202606090754"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606090754"></script>
+<script src="./frkl-events.js?v=202606090754"></script>
+<script src="./frkl-products.js?v=202606090754"></script>
+<script src="./frkl-discount-codes.js?v=202606090754"></script>
+<script src="./frkl-cvr.js?v=202606090754"></script>
+<script src="./frkl-cohorts.js?v=202606090754"></script>
+<script src="./frkl-retention.js?v=202606090754"></script>
+<script src="./frkl-clarity.js?v=202606090754"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -4274,6 +4275,7 @@ function CvrDrivers(){
     : `${topReal?`${topReal.label} tracks CVR most tightly (r=${topReal.r}). It's a hypothesis, not proof — run a controlled change (e.g. a holdout or A/B) and watch CVR before committing.`:'Confirm the top correlate with a controlled test before acting.'}`;
 
   return (<div>
+    <ClarityFrictionPanel/>
     <div className="card" style={{marginBottom:14}}>
       <div className="card-section-title">
         <h2 style={{margin:0}}>Conversion rate — what's moving it <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>(sessions → order)</span></h2>
@@ -5299,7 +5301,8 @@ function SiteStructure({start}){
   const f=[{stage:'Sessions',v:sum(ga,'sessions')},{stage:'Add to cart',v:sum(ga,'addToCarts')},{stage:'Checkout',v:sum(ga,'checkouts')},{stage:'Purchase',v:sum(ga,'purchases')}];
   const fmax=f[0].v||1;
   return (<div>
-    <div className="note" style={{marginBottom:14}}>Funnel mapped live from myfrkl.com + overlaid with the May 2026 Clarity report. Frustration signals are healthy — the problem is <b>engagement and a broken cart→checkout step</b>. Paid spend (Overview tab) lands on a homepage where half of visitors drop before 15% scroll.</div>
+    <ClarityFrictionPanel/>
+    <div className="note" style={{marginBottom:14}}>Funnel mapped live from myfrkl.com. The problem is <b>engagement and a broken cart→checkout step</b> — see the live Clarity friction signals above. Paid spend (Overview tab) lands on a homepage where most visitors drop before 15% scroll.</div>
     <div className="row">
       <div className="card" style={{flex:'2 1 520px'}}>
         <h2>Funnel structure & friction</h2>
@@ -6769,6 +6772,44 @@ function CohortsPanel(){
     <div className="micro" style={{color:'var(--text-faint)', marginTop:12, lineHeight:1.5}}>
       {C.notes && <><b>Read carefully:</b> {C.notes.channel} {C.notes.google}</>}
     </div>
+  </div>);
+}
+
+// ── Clarity site friction (Phase 3.3) ────────────────────────────────────────
+// The "it's the SITE, not the media" evidence: script errors, broken clicks,
+// quick-backs, scroll depth, traffic quality. Surfaced on CVR drivers + Site.
+function ClarityFrictionPanel(){
+  const C = (typeof window!=='undefined' && window.FRKL_CLARITY) || null;
+  if(!C || !C.available) return null;
+  const f = C.friction || {};
+  const sev = s => s==='high'?'#f87171':s==='med'?'var(--warn)':'var(--text-muted)';
+  const tiles = [
+    {label:'Sessions w/ JS error', val: f.scriptError.pct!=null?f.scriptError.pct.toFixed(0)+'%':'—', bad: (f.scriptError.pct||0)>=10, sub:`${NUM(f.scriptError.count)} script errors`},
+    {label:'Pages / session',      val: C.pagesPerSession!=null?C.pagesPerSession.toFixed(2):'—', bad:(C.pagesPerSession||9)<1.5, sub:'land-and-leave if < 1.5'},
+    {label:'Avg scroll depth',     val: C.scrollDepth!=null?C.scrollDepth+'%':'—', bad:(C.scrollDepth||100)<50, sub:'content below is unseen'},
+    {label:'Error clicks',         val: f.errorClick.pct!=null?f.errorClick.pct.toFixed(1)+'%':'—', bad:(f.errorClick.pct||0)>=2, sub:'clicks on broken elements'},
+    {label:'Dead clicks',          val: f.deadClick.pct!=null?f.deadClick.pct.toFixed(1)+'%':'—', bad:(f.deadClick.pct||0)>=3, sub:'clicks that do nothing'},
+    {label:'Active engagement',    val: C.engagement.activePct!=null?PCT(C.engagement.activePct):'—', bad:(C.engagement.activePct||1)<0.5, sub:'share of time actually active'},
+  ];
+  return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid #f87171'}}>
+    <div className="card-section-title">
+      <h2 style={{margin:0}}>Site friction — is the site the bottleneck?</h2>
+      <span className="meta">Microsoft Clarity · {NUM(C.sessions)} sessions · as of {C.asOf}</span>
+    </div>
+    {C.flags && C.flags.length>0 && (<div style={{display:'flex', flexDirection:'column', gap:6, marginBottom:10}}>
+      {C.flags.map((fl,i)=>(<div key={i} style={{display:'flex', gap:8, alignItems:'baseline', fontSize:13.5}}>
+        <span style={{color:sev(fl.sev), fontWeight:700}}>{fl.sev==='high'?'▲':'•'}</span>
+        <span style={{color:'var(--text-secondary)'}}>{fl.text}</span>
+      </div>))}
+    </div>)}
+    <div className="board-grid">
+      {tiles.map((t,i)=>(<div key={i} className="card board-card" style={{borderLeft:'3px solid '+(t.bad?'#f87171':'var(--border-default)')}}>
+        <div className="micro" style={{color:'var(--text-muted)', fontWeight:600}}>{t.label}</div>
+        <div style={{fontSize:22, fontWeight:700, margin:'4px 0 2px', color:t.bad?'#f87171':'var(--text-primary)'}}>{t.val}</div>
+        <div className="micro" style={{color:'var(--text-faint)'}}>{t.sub}</div>
+      </div>))}
+    </div>
+    <div className="note" style={{marginTop:12}}>When a quarter of sessions hit a JS error and visitors see ~1 page before leaving, more ad spend just buys more bounces. <b>Fix the site before scaling paid.</b> {C.notes && C.notes.window}</div>
   </div>);
 }
 
