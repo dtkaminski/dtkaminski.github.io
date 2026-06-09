@@ -18,24 +18,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606091021"></script>
-<script src="./frkl-live-data.js?v=202606091021"></script>
-<script src="./frkl-agent-insights.js?v=202606091021"></script>
-<script src="./frkl-business-data.js?v=202606091021"></script>
-<script src="./frkl-action-status.js?v=202606091021"></script>
-<script src="./frkl-patterns.js?v=202606091021"></script>
-<script src="./frkl-creators.js?v=202606091021"></script>
-<script src="./frkl-creative-vision.js?v=202606091021"></script>
-<script src="./frkl-links.js?v=202606091021"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606091021"></script>
-<script src="./frkl-events.js?v=202606091021"></script>
-<script src="./frkl-products.js?v=202606091021"></script>
-<script src="./frkl-discount-codes.js?v=202606091021"></script>
-<script src="./frkl-cvr.js?v=202606091021"></script>
-<script src="./frkl-cohorts.js?v=202606091021"></script>
-<script src="./frkl-retention.js?v=202606091021"></script>
-<script src="./frkl-clarity.js?v=202606091021"></script>
-<script src="./frkl-board-read.js?v=202606091021"></script>
+<script src="./frkl-data-loader.js?v=202606091059"></script>
+<script src="./frkl-live-data.js?v=202606091059"></script>
+<script src="./frkl-agent-insights.js?v=202606091059"></script>
+<script src="./frkl-business-data.js?v=202606091059"></script>
+<script src="./frkl-action-status.js?v=202606091059"></script>
+<script src="./frkl-patterns.js?v=202606091059"></script>
+<script src="./frkl-creators.js?v=202606091059"></script>
+<script src="./frkl-creative-vision.js?v=202606091059"></script>
+<script src="./frkl-links.js?v=202606091059"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606091059"></script>
+<script src="./frkl-events.js?v=202606091059"></script>
+<script src="./frkl-products.js?v=202606091059"></script>
+<script src="./frkl-discount-codes.js?v=202606091059"></script>
+<script src="./frkl-cvr.js?v=202606091059"></script>
+<script src="./frkl-cohorts.js?v=202606091059"></script>
+<script src="./frkl-retention.js?v=202606091059"></script>
+<script src="./frkl-clarity.js?v=202606091059"></script>
+<script src="./frkl-board-read.js?v=202606091059"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -825,6 +825,10 @@ function linkify(text){
 // startFor / dataEndOf transparently respect a custom end with no prop-threading.
 const REAL_END = (() => { const ds=(D.shopify||[]).map(r=>r.date).sort(); return ds[ds.length-1]; })();
 const REAL_START = (() => { const ds=(D.shopify||[]).map(r=>r.date).sort(); return ds[0]; })();
+// ── Canonical benchmarks (single source of truth — must match scripts/oi_db.py BENCHMARKS).
+// Site CVR = Shopify orders ÷ GA4 sessions; one benchmark everywhere so the dashboard
+// never shows the same KPI against two different targets.
+const CVR_BENCH = 0.015, CVR_BENCH_LABEL = '1.5%';
 let ACTIVE_END = REAL_END;
 function setActiveEnd(e){ ACTIVE_END = e || REAL_END; }
 
@@ -1966,10 +1970,10 @@ function runDiagnostic(m, ctx){
   const f = [];
   const aov = m.orders>0 ? m.rev/m.orders : 0;
   const gm = m.gm || 0;
-  // 1. Conversion rate vs 2% DTC benchmark — usually the biggest revenue lever.
-  if (m.cvr!=null && m.cvr < 0.02 && m.sessions>0){
-    const gbp = m.sessions*(0.02 - m.cvr)*aov*gm;
-    f.push({sev: m.cvr<0.015?'red':'amber', area:'Conversion', metric:`CVR ${(m.cvr*100).toFixed(2)}% vs 2.0% target`,
+  // 1. Conversion rate vs the single CVR benchmark — usually the biggest revenue lever.
+  if (m.cvr!=null && m.cvr < CVR_BENCH && m.sessions>0){
+    const gbp = m.sessions*(CVR_BENCH - m.cvr)*aov*gm;
+    f.push({sev: m.cvr<CVR_BENCH*0.75?'red':'amber', area:'Conversion', metric:`CVR ${(m.cvr*100).toFixed(2)}% vs ${CVR_BENCH_LABEL} target`,
       title:'Site conversion is throttling revenue', gbp,
       evidence:`${NUM(m.sessions)} sessions converting at ${(m.cvr*100).toFixed(2)}% — you're paying for visits that don't convert.`,
       action:'Fix cart→checkout friction + PDP before adding spend; every 0.1pt of CVR is more revenue than more traffic.'});
@@ -2185,7 +2189,7 @@ function computeScores(m){
   add('CAC vs allowable', (m.cac && m.allowableCac) ? m.allowableCac/m.cac : null, 0.15, (m.cac&&m.allowableCac)?`£${Math.round(m.cac)} vs £${Math.round(m.allowableCac)} allowable`:'');
   add('LTV:CAC', m.ltvCac!=null ? m.ltvCac/3 : null, 0.15, m.ltvCac!=null?`${m.ltvCac.toFixed(1)}× (3× target)`:'');
   add('Gross margin', m.gm ? m.gm/0.6 : null, 0.10, m.gm?`${(m.gm*100).toFixed(0)}%`:'');
-  add('Conversion rate', m.cvr!=null ? m.cvr/0.02 : null, 0.10, m.cvr!=null?`${(m.cvr*100).toFixed(2)}% (2% target)`:'');
+  add('Conversion rate', m.cvr!=null ? m.cvr/CVR_BENCH : null, 0.10, m.cvr!=null?`${(m.cvr*100).toFixed(2)}% (${CVR_BENCH_LABEL} target)`:'');
   add('Discount discipline', m.discLoad!=null ? 1-m.discLoad/0.20 : null, 0.08, m.discLoad!=null?`${(m.discLoad*100).toFixed(0)}% load`:'');
   add('Returns', m.returnRate!=null ? 1-m.returnRate/0.10 : null, 0.07, m.returnRate!=null?`${(m.returnRate*100).toFixed(1)}%`:'');
   const wsum = f.reduce((a,x)=>a+x.w,0) || 1;
@@ -3034,14 +3038,14 @@ function Overview({start, period, customActive}){
         <KPI label="Blended MER" val={mer?mer.toFixed(2)+'x':'—'} sub="net revenue ÷ paid spend" series={seriesMER} current={mer} prior={pMer} goodDirection="up"
           agent="Atlas" observation="Down ~14%: revenue grew slower than spend (27% vs 46%), so each pound of ad earns less."
           implication="Classic diminishing returns from scaling into a fatigued audience — pause scaling, fix creative + site first." />
-        <KPI label="Sessions (GA4)" val={NUM(sessions)} sub={`CVR ${PCT(sessions?purch/sessions:null)}`} series={seriesSessions} current={sessions} prior={pSessions} goodDirection="up"
-          agent="Pulse" observation="Only +16% on a +46% spend bump. Site CVR sits at 1.24% — well below the 2% target."
+        <KPI label="Sessions (GA4)" val={NUM(sessions)} sub={`Site CVR ${PCT(sessions?orders/sessions:null)} (orders ÷ sessions)`} series={seriesSessions} current={sessions} prior={pSessions} goodDirection="up"
+          agent="Pulse" observation={`Sessions grew far slower than spend. Site CVR (Shopify orders ÷ GA4 sessions) is ${sessions?PCT(orders/sessions):'—'} vs the ${CVR_BENCH_LABEL} target.`}
           implication="Spend is buying impressions, not visits. Site fixes (cart JS, sticky checkout) unlock more revenue than more spend." />
         <KPI label="Klaviyo-tracked orders" val={GBP(emailRev)} sub="gross order value — not email-attributed" series={seriesEmail} current={emailRev} prior={pEmailRev} goodDirection="up"
           agent="Lux" observation="Up ~32% — email is keeping pace with the paid scale-up."
           implication="Highest-leverage moment to switch on attributed reporting + a real abandoned-cart sequence." />
         <KPI label="Conversion rate (CVR)" val={PCT(cvr)} sub={`${NUM(orders)} orders ÷ ${NUM(sessions)} sessions`} series={seriesCVR} current={cvr} prior={pCvr} goodDirection="up"
-          agent="Pulse" observation="Site CVR is the single biggest revenue lever — below the ~2% DTC benchmark, more spend just buys more bounces."
+          agent="Pulse" observation={`Site CVR (Shopify orders ÷ GA4 sessions) is the single biggest revenue lever — against the ${CVR_BENCH_LABEL} target, more spend just buys more bounces.`}
           implication="Fix the cart→checkout JS error and sticky-checkout before scaling spend further." />
         <KPI label="Discount depth" val={PCT(discLoad)} sub="£ off ÷ £ of sales — how deep, not how many orders · drafts excluded" series={seriesDisc} current={discLoad} prior={pDiscLoad} goodDirection="down"
           agent="Atlas" observation={`Code + automatic discount as a share of DTC gross sales (draft/exchange orders excluded). This excludes sale-price markdowns${_mdPct?`, which add ~${_mdPct}% of value on top`:''} — the full load is on the Promotions tab.`}
@@ -4310,11 +4314,16 @@ function CvrDrivers(){
         <h2 style={{margin:0}}>Conversion rate — what's moving it <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>(sessions → order)</span></h2>
         <span className="meta">Crux · {M.lo} → {M.hi} · {M.days} days · GA4 × Shopify × Klaviyo × Meta</span>
       </div>
-      <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:14}}>
-        {tile('CVR now (recent half)', M.cvrNow+'%', `was ${M.cvrPrev}% · ${M.deltaCVR>=0?'+':''}${M.deltaCVR}pp`, up?'#4ade80':'#ef6b6f')}
+      <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:8}}>
+        {tile('GA4 funnel CVR (recent)', M.cvrNow+'%', `was ${M.cvrPrev}% · ${M.deltaCVR>=0?'+':''}${M.deltaCVR}pp`, up?'#4ade80':'#ef6b6f')}
         {tile('What kind of move', verdict.txt, verdict.sub, verdict.color)}
         {tile('Biggest funnel mover', M.moverStage, `${Math.round((M.stageContribution[M.moverStage]||0)*100)}% of the change`, '#9aa6ff')}
       </div>
+      {M.siteCvrNow!=null && (
+        <div className="note" style={{marginBottom:14}}>
+          <b>Headline site CVR: {M.siteCvrNow}%</b> (Shopify orders ÷ GA4 sessions) vs the {M.benchmarkLabel||CVR_BENCH_LABEL} target — this is the figure shown on the Overview and board. The funnel percentages here are GA4-tracked (GA4 undercounts purchases vs Shopify), used to pinpoint <i>where</i> in the journey conversion moves, not as the headline number.
+        </div>
+      )}
       <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center',marginBottom:8}}>
         <span style={{fontSize:11,color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'.04em',marginRight:2}}>View</span>
         {[['week','Weekly'],['day','Daily']].map(([g,l])=>(<button key={g} onClick={()=>setChartGran(g)} style={segBtn(chartGran===g)}>{l}</button>))}
@@ -4333,9 +4342,9 @@ function CvrDrivers(){
           <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}}/>
           <R.Bar yAxisId="r" dataKey="sessions" name="Sessions" fill="#26262e" maxBarSize={30}/>
           <R.Line yAxisId="l" type="monotone" dataKey="cvr" name="CVR" stroke="#7c8cff" strokeWidth={2.5} dot={false}/>
-          {/* Show, don't tell: the 2% DTC benchmark drawn on the chart so the gap is visible, not described. */}
-          <R.ReferenceLine yAxisId="l" y={2} stroke="#4ade80" strokeDasharray="5 4" strokeOpacity={0.75}
-            label={{value:'2% DTC benchmark', position:'insideTopRight', fill:'#4ade80', fontSize:10.5}}/>
+          {/* Show, don't tell: the single CVR benchmark drawn on the chart so the gap is visible, not described. */}
+          <R.ReferenceLine yAxisId="l" y={CVR_BENCH*100} stroke="#4ade80" strokeDasharray="5 4" strokeOpacity={0.75}
+            label={{value:`${CVR_BENCH_LABEL} CVR target`, position:'insideTopRight', fill:'#4ade80', fontSize:10.5}}/>
           {/* Event & sale pins: logged events + major site-wide sales, snapped to chart buckets.
               Icon-only on the chart; full detail lives on hover so the chart stays calm. */}
           {(function(){ var pins=buildChartPins(chartData.map(function(d){return d.w;}));
@@ -6386,12 +6395,12 @@ function weekCommentary(W, prev){
     if(sCh!=null && rc!=null && sCh>=0.15 && rc < sCh*0.5)
       watch.push({sev:2.8, text:`Spend rose ${fp(sCh)} but revenue ${rc>=0?'only rose '+fp(rc):'fell '+fp(rc)} — diminishing return on the extra budget.`}); }
 
-  // Conversion vs 2%
+  // Conversion vs the single CVR benchmark
   if(m.cvr!=null){
-    if(m.cvr>=0.02){ const cCh=p?ch(m.cvr,p.cvr):null;
-      worked.push({sev:2+(cCh&&cCh>0?Math.min(cCh,1):0), text:`Conversion healthy at ${PCT(m.cvr)} (above the 2% DTC mark).`}); }
+    if(m.cvr>=CVR_BENCH){ const cCh=p?ch(m.cvr,p.cvr):null;
+      worked.push({sev:2+(cCh&&cCh>0?Math.min(cCh,1):0), text:`Conversion healthy at ${PCT(m.cvr)} (at/above the ${CVR_BENCH_LABEL} target).`}); }
     else { const cCh=p?ch(m.cvr,p.cvr):null;
-      watch.push({sev:2.2, text:`Conversion ${PCT(m.cvr)} — still under the 2% benchmark${cCh&&cCh>=0.05?`, though improving (${fp(cCh)} WoW)`:''}.`}); }
+      watch.push({sev:2.2, text:`Conversion ${PCT(m.cvr)} — still under the ${CVR_BENCH_LABEL} target${cCh&&cCh>=0.05?`, though improving (${fp(cCh)} WoW)`:''}.`}); }
   }
 
   // Funnel leak: strong add-to-cart but weak checkout follow-through
