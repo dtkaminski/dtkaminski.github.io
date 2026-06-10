@@ -1147,6 +1147,14 @@ const REORDER_DEFAULTS = {safetyDays:14, coverDays:45};
 function reorderConfig(){ try { const s=JSON.parse(localStorage.getItem('oi_reorder_v1')||'null'); if(s) return {...REORDER_DEFAULTS, ...s}; } catch(e){} return {...REORDER_DEFAULTS}; }
 function saveReorderConfig(next){ try { localStorage.setItem('oi_reorder_v1', JSON.stringify(next)); window.dispatchEvent(new Event('oi-supplier-updated')); } catch(e){} }
 function usePlanningTick(){ const [,f]=React.useState(0); React.useEffect(()=>{ const h=()=>f(x=>x+1); ['oi-supplier-updated','oi-leadtimes-updated','oi-costs-updated','oi-forecast-updated'].forEach(ev=>window.addEventListener(ev,h)); return ()=>['oi-supplier-updated','oi-leadtimes-updated','oi-costs-updated','oi-forecast-updated'].forEach(ev=>window.removeEventListener(ev,h)); }, []); return 0; }
+
+// ── Demand-plan + packaging BOM (for the Forecast & demand planner) ───────────
+const DEMAND_DEFAULTS = {months:3, growth:0, targetMode:'growth', targetValue:''};
+function demandConfig(){ try { const s=JSON.parse(localStorage.getItem('oi_demandplan_v1')||'null'); if(s) return {...DEMAND_DEFAULTS, ...s}; } catch(e){} return {...DEMAND_DEFAULTS}; }
+function saveDemandConfig(next){ try { localStorage.setItem('oi_demandplan_v1', JSON.stringify(next)); window.dispatchEvent(new Event('oi-forecast-updated')); } catch(e){} }
+const PACK_DEFAULTS = { avgItemsPerOrder:1.3, components:[ {name:'Mailer / box',perItem:0,perOrder:1}, {name:'Pouch / bag',perItem:1,perOrder:0}, {name:'Thank-you card',perItem:0,perOrder:1}, {name:'Sticker / seal',perItem:0,perOrder:1} ] };
+function packagingConfig(){ try { const s=JSON.parse(localStorage.getItem('oi_packaging_v1')||'null'); if(s && Array.isArray(s.components)) return {avgItemsPerOrder:s.avgItemsPerOrder!=null?s.avgItemsPerOrder:1.3, components:s.components.map(c=>({...c}))}; } catch(e){} return {avgItemsPerOrder:PACK_DEFAULTS.avgItemsPerOrder, components:PACK_DEFAULTS.components.map(c=>({...c}))}; }
+function savePackagingConfig(next){ try { localStorage.setItem('oi_packaging_v1', JSON.stringify(next)); window.dispatchEvent(new Event('oi-forecast-updated')); } catch(e){} }
 function leadDaysFor(type, cfg){
   cfg = cfg || leadConfig();
   const ov = type!=null ? cfg.byType[type] : null;
@@ -9282,6 +9290,162 @@ function ProductionPlanner(){
   </div>);
 }
 
+// ── Forecast & demand planner ────────────────────────────────────────────────
+// You set a forecast (growth on the run-rate, or a top-down units/revenue target
+// for the horizon); the app converts it to a per-product demand plan off live
+// velocity, then rolls total demand into packaging requirements via an editable
+// bill-of-materials. Flags products that will stock out under the plan.
+function DemandPlanner(){
+  usePlanningTick();
+  const B = (typeof window!=='undefined' && window.FRKL_BUSINESS) || {};
+  const inv = (B.inventory||[]).filter(p=>p && p.status!=='ARCHIVED');
+  const sellers = inv.filter(p=>(p.dailyVelocity||0)>0);
+  const rc = reorderConfig(); const safety = Number(rc.safetyDays)||14;
+
+  const dc0 = demandConfig();
+  const [months, setMonths] = useState(dc0.months||3);
+  const [growth, setGrowth] = useState(dc0.growth!=null?String(dc0.growth):'0');
+  const [targetMode, setTargetMode] = useState(dc0.targetMode||'growth');
+  const [targetValue, setTargetValue] = useState(dc0.targetValue!=null?String(dc0.targetValue):'');
+  const [showAll, setShowAll] = useState(false);
+  const [packOpen, setPackOpen] = useState(false);
+  React.useEffect(()=>{ saveDemandConfig({months, growth:Number(growth)||0, targetMode, targetValue}); }, [months, growth, targetMode, targetValue]);
+
+  const k = v=>{ v=Math.round(v); const a=Math.abs(v); return a>=1000?(v/1000).toFixed(a>=10000?0:1).replace(/\.0$/,'')+'k':''+v; };
+  const horizonDays = months*30.4;
+  const revMap={}; (B.products||[]).forEach(p=>{ if(p.sku && p.units>0) revMap[p.sku]=p.netSales/p.units; });
+  const fallbackRev = (B.productSummary&&B.productSummary.singles&&B.productSummary.singles.aovPerUnit)||37;
+  const revPerUnit = p=> (p.sku&&revMap[p.sku]!=null)?revMap[p.sku]:fallbackRev;
+  const baseUnits = p=> p.dailyVelocity*horizonDays;
+  const baseTotal = sellers.reduce((t,p)=>t+baseUnits(p),0);
+  const baseRev = sellers.reduce((t,p)=>t+baseUnits(p)*revPerUnit(p),0);
+  let scale=1;
+  if(targetMode==='growth') scale = 1+(Number(growth)||0)/100;
+  else if(targetMode==='units' && Number(targetValue)>0 && baseTotal>0) scale = Number(targetValue)/baseTotal;
+  else if(targetMode==='revenue' && Number(targetValue)>0 && baseRev>0) scale = Number(targetValue)/baseRev;
+  const planUnits = p=> baseUnits(p)*scale;
+  const totalUnits = baseTotal*scale;
+  const totalRev = baseRev*scale;
+  const impliedGrowth = (scale-1)*100;
+
+  const rows = sellers.map(p=>{ const plan=planUnits(p); const end=(p.inventoryQty||0)-plan; return {p, runMo:p.dailyVelocity*30.4, plan, stock:p.inventoryQty||0, end, short:end<0}; })
+    .sort((a,b)=>b.plan-a.plan);
+  const stockouts = rows.filter(r=>r.short).length;
+  const toProduce = rows.filter(r=>r.short).reduce((t,r)=>t+(-r.end),0);
+  const shown = showAll?rows:rows.slice(0,12);
+
+  // packaging
+  const pack = packagingConfig();
+  const aipo = Number(pack.avgItemsPerOrder)||1.3;
+  const orders = aipo>0?totalUnits/aipo:0;
+  const compNeeds = pack.components.map(c=>({name:c.name, perItem:Number(c.perItem)||0, perOrder:Number(c.perOrder)||0, qty:(Number(c.perItem)||0)*totalUnits + (Number(c.perOrder)||0)*orders}));
+  const [packDraft, setPackDraft] = useState(()=>({ avgItemsPerOrder:String(pack.avgItemsPerOrder), components:pack.components.map(c=>({name:c.name, perItem:String(c.perItem), perOrder:String(c.perOrder)})) }));
+  const setComp=(i,f,v)=>setPackDraft(d=>({...d, components:d.components.map((c,j)=>j===i?{...c,[f]:v}:c)}));
+  const addComp=()=>setPackDraft(d=>({...d, components:[...d.components, {name:'New component', perItem:'0', perOrder:'0'}]}));
+  const rmComp=(i)=>setPackDraft(d=>({...d, components:d.components.filter((_,j)=>j!==i)}));
+  const savePack=()=>{ savePackagingConfig({avgItemsPerOrder:Number(packDraft.avgItemsPerOrder)||1.3, components:packDraft.components.filter(c=>c.name&&c.name.trim()).map(c=>({name:c.name.trim(), perItem:Number(c.perItem)||0, perOrder:Number(c.perOrder)||0}))}); setPackOpen(false); toast('Packaging plan saved', {kind:'good'}); };
+
+  const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:12.5,fontWeight:600,padding:'7px 13px',borderRadius:8,border:'1px solid var(--border-default)',background:'var(--bg-elevated)',color:'var(--text-primary)',cursor:'pointer'};
+  const seg = (active)=>({...btn, padding:'6px 12px', background:active?'var(--accent)':'var(--bg-elevated)', color:active?'#fff':'var(--text-secondary)', borderColor:active?'var(--accent)':'var(--border-default)'});
+  const inp = {padding:'6px 9px',borderRadius:7,border:'1px solid var(--border-default)',background:'var(--bg-base)',color:'var(--text-primary)',fontSize:13};
+  const th = {textAlign:'left',fontSize:10.5,fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-faint)',padding:'0 10px 7px 0',whiteSpace:'nowrap'};
+  const td = {padding:'7px 10px 7px 0',fontSize:12.5,color:'var(--text-secondary)',borderTop:'1px solid var(--border-subtle)'};
+
+  const exportPlan = ()=>{
+    const rowsCsv=[['Product','SKU','Type','Run-rate (u/mo)','Planned units','Current stock','Projected end stock']];
+    rows.forEach(r=>rowsCsv.push([r.p.title, r.p.sku||'', r.p.type||'', Math.round(r.runMo), Math.ceil(r.plan), r.stock, Math.round(r.end)]));
+    rowsCsv.push([], ['PACKAGING','','','','','','']);
+    compNeeds.forEach(c=>rowsCsv.push([c.name,'','','','',Math.ceil(c.qty),'']));
+    const csv=rowsCsv.map(r=>r.map(c=>{const s=String(c==null?'':c); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}).join(',')).join('\n');
+    try{ const blob=new Blob([csv],{type:'text/csv'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='demand_plan_'+months+'mo.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000); toast('Demand plan exported', {kind:'good'}); }catch(e){ toast('Export failed',{kind:'bad'}); }
+  };
+
+  return (<div>
+    <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:6}}>
+      <h2 style={{margin:0,fontSize:18}}>Forecast &amp; demand plan</h2>
+      <span className="muted" style={{fontSize:12}}>Per-product demand + packaging from live velocity · independent of the date picker</span>
+    </div>
+
+    {/* plan controls */}
+    <div className="card">
+      <div style={{display:'flex',gap:18,flexWrap:'wrap',alignItems:'flex-end'}}>
+        <div><div style={{fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',marginBottom:5}}>Horizon</div>
+          <div style={{display:'flex',gap:6}}>{[1,3,6,12].map(m=>(<button key={m} style={seg(months===m)} onClick={()=>setMonths(m)}>{m}mo</button>))}</div></div>
+        <div><div style={{fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',marginBottom:5}}>Plan basis</div>
+          <div style={{display:'flex',gap:6}}>
+            <button style={seg(targetMode==='growth')} onClick={()=>setTargetMode('growth')}>Growth %</button>
+            <button style={seg(targetMode==='units')} onClick={()=>setTargetMode('units')}>Units target</button>
+            <button style={seg(targetMode==='revenue')} onClick={()=>setTargetMode('revenue')}>Revenue target</button>
+          </div></div>
+        <div>
+          {targetMode==='growth'
+            ? <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:5}}>Growth vs run-rate (%)<input type="number" style={{...inp,width:120}} value={growth} onChange={e=>setGrowth(e.target.value)}/></label>
+            : <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:5}}>{targetMode==='units'?'Total units target':'Total revenue target (£)'}<input type="number" style={{...inp,width:150}} value={targetValue} onChange={e=>setTargetValue(e.target.value)} placeholder={targetMode==='units'?'e.g. 1200':'e.g. 60000'}/></label>}
+        </div>
+        <button style={{...btn,marginLeft:'auto'}} onClick={exportPlan}><Icon name="report" size={13}/> Export plan</button>
+      </div>
+      <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:11,lineHeight:1.5}}>Baseline is each product's 90-day sales velocity projected over {months} month{months===1?'':'s'} ({sellers.length} active sellers). {targetMode!=='growth' && Number(targetValue)>0 ? `Your target implies ${impliedGrowth>=0?'+':''}${impliedGrowth.toFixed(0)}% vs the run-rate, applied proportionally across products.` : 'Growth is applied evenly on top of each run-rate.'} A factual projection — it assumes the current product mix holds.</div>
+    </div>
+
+    {/* summary */}
+    <div className="card">
+      <div style={{display:'flex',gap:24,flexWrap:'wrap',alignItems:'flex-end'}}>
+        <div><div style={{fontSize:24,fontWeight:800,color:'var(--text-primary)'}}>{NUM(Math.ceil(totalUnits))}</div><div className="muted" style={{fontSize:11.5}}>units planned · {months}mo</div></div>
+        <div><div style={{fontSize:24,fontWeight:800,color:'var(--text-primary)'}}>£{k(totalRev)}</div><div className="muted" style={{fontSize:11.5}}>projected revenue</div></div>
+        <div><div style={{fontSize:24,fontWeight:800,color: impliedGrowth>=0?'var(--good)':'var(--bad)'}}>{impliedGrowth>=0?'+':''}{impliedGrowth.toFixed(0)}%</div><div className="muted" style={{fontSize:11.5}}>vs run-rate</div></div>
+        <div><div style={{fontSize:24,fontWeight:800,color: stockouts?'var(--warn)':'var(--good)'}}>{stockouts}</div><div className="muted" style={{fontSize:11.5}}>will stock out</div></div>
+        {toProduce>0 && <div><div style={{fontSize:24,fontWeight:800,color:'var(--text-primary)'}}>{NUM(Math.ceil(toProduce))}</div><div className="muted" style={{fontSize:11.5}}>units short to produce</div></div>}
+      </div>
+    </div>
+
+    {/* demand plan table */}
+    <div className="card">
+      <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:8}}><span style={{fontSize:14,fontWeight:700,color:'var(--text-primary)'}}>Demand plan by product</span><span className="muted" style={{fontSize:11.5}}>sorted by planned demand</span></div>
+      <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:580}}><thead><tr>
+        <th style={th}>Product</th><th style={{...th,textAlign:'right'}}>Run-rate /mo</th><th style={{...th,textAlign:'right'}}>Planned ({months}mo)</th><th style={{...th,textAlign:'right'}}>Stock</th><th style={{...th,textAlign:'right'}}>Projected end</th>
+      </tr></thead><tbody>
+        {shown.map((r,idx)=>(<tr key={idx}>
+          <td style={{...td,color:'var(--text-primary)'}}>{r.p.title}<div style={{fontSize:10.5,color:'var(--text-faint)'}}>{r.p.type}</div></td>
+          <td style={{...td,textAlign:'right'}}>{NUM(Math.round(r.runMo))}</td>
+          <td style={{...td,textAlign:'right',fontWeight:700,color:'var(--text-primary)'}}>{NUM(Math.ceil(r.plan))}</td>
+          <td style={{...td,textAlign:'right'}}>{NUM(r.stock)}</td>
+          <td style={{...td,textAlign:'right',fontWeight:600,color: r.short?'var(--bad)':'var(--good)'}}>{r.short?'−'+NUM(Math.ceil(-r.end)):NUM(Math.floor(r.end))}</td>
+        </tr>))}
+      </tbody></table></div>
+      {rows.length>12 && <button style={{...btn,marginTop:10}} onClick={()=>setShowAll(s=>!s)}>{showAll?'Show top 12':`Show all ${rows.length}`}</button>}
+      {stockouts>0 && <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:9,lineHeight:1.5}}>Products with a negative projected end stock will run out under this plan — those are your production priorities. The Production / POs tab handles the reorder side off current cover.</div>}
+    </div>
+
+    {/* packaging requirements */}
+    <div className="card">
+      <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:8}}>
+        <span style={{fontSize:14,fontWeight:700,color:'var(--text-primary)'}}>Packaging requirements</span>
+        <button style={{...btn,fontSize:11.5,padding:'5px 10px'}} onClick={()=>setPackOpen(o=>!o)}><Icon name="sliders" size={12}/> Edit packaging plan</button>
+      </div>
+      <div className="wc-grid">{compNeeds.map((c,idx)=>(<div key={idx} className="wc-item">
+        <div className="wc-top"><span className="wc-label">{c.name}</span></div>
+        <div className="wc-val">{NUM(Math.ceil(c.qty))}</div>
+        <div style={{fontSize:11,color:'var(--text-faint)',marginTop:6,lineHeight:1.4}}>{c.perItem>0?`${c.perItem}/item`:''}{c.perItem>0&&c.perOrder>0?' · ':''}{c.perOrder>0?`${c.perOrder}/order`:''}{!c.perItem&&!c.perOrder?'not used':''}</div>
+      </div>))}</div>
+      <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:10,lineHeight:1.5}}>Based on {NUM(Math.ceil(totalUnits))} units across ≈{NUM(Math.ceil(orders))} orders (at {aipo} items/order). Per-item components scale with units; per-order components scale with orders.</div>
+      {packOpen && (<div style={{marginTop:12,borderTop:'1px solid var(--border-subtle)',paddingTop:12}}>
+        <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'flex-end',marginBottom:10}}>
+          <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}}>Avg items per order<input type="number" style={{...inp,width:90}} value={packDraft.avgItemsPerOrder} onChange={e=>setPackDraft(d=>({...d,avgItemsPerOrder:e.target.value}))}/></label>
+        </div>
+        <table style={{borderCollapse:'collapse',width:'100%',minWidth:420}}><thead><tr><th style={th}>Component</th><th style={th}>Per item</th><th style={th}>Per order</th><th style={th}></th></tr></thead><tbody>
+          {packDraft.components.map((c,idx)=>(<tr key={idx}>
+            <td style={td}><input style={{...inp,width:170}} value={c.name} onChange={e=>setComp(idx,'name',e.target.value)}/></td>
+            <td style={td}><input type="number" step="0.1" style={{...inp,width:70}} value={c.perItem} onChange={e=>setComp(idx,'perItem',e.target.value)}/></td>
+            <td style={td}><input type="number" step="0.1" style={{...inp,width:70}} value={c.perOrder} onChange={e=>setComp(idx,'perOrder',e.target.value)}/></td>
+            <td style={td}><button style={{...btn,fontSize:11,padding:'4px 9px',color:'var(--text-muted)'}} onClick={()=>rmComp(idx)}>Remove</button></td>
+          </tr>))}
+        </tbody></table>
+        <div style={{marginTop:10,display:'flex',gap:8}}><button style={btn} onClick={savePack}>Save packaging plan</button><button style={btn} onClick={addComp}>+ Add component</button><button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setPackOpen(false)}>Cancel</button></div>
+      </div>)}
+    </div>
+  </div>);
+}
+
 const NAV = [
   { id:'home',    label:'Today',    icon:'home',     subtabs:[
     { id:'overview', label:'Overview',     component: (p) => <Overview start={p.start} period={p.period} customActive={p.customActive}/> },
@@ -9319,7 +9483,8 @@ const NAV = [
     { id:'review',   label:'Business review', component: () => <BusinessReview/> },
   ]},
   { id:'planning',label:'Planning',     icon:'box', subtabs:[
-    { id:'production', label:'Production / POs', component: () => <ProductionPlanner/> },
+    { id:'forecast',   label:'Forecast & demand', component: () => <DemandPlanner/> },
+    { id:'production', label:'Production / POs',   component: () => <ProductionPlanner/> },
   ]},
   { id:'settings',label:'Settings',     icon:'sliders', subtabs:[
     { id:'connections', label:'Connections', component: () => <ConnectionsPanel/> },
@@ -9335,6 +9500,7 @@ const RAIL = [
   { label:'AI Analyst',       icon:'spark',     section:'home',     sub:'ask' },
   { label:'What changed',     icon:'calendar',  section:'board' },
   { label:'Business review',  icon:'report',    section:'review' },
+  { label:'Forecast & demand', icon:'trendUp',   section:'planning', sub:'forecast' },
   { label:'Production & POs',  icon:'box',       section:'planning', sub:'production' },
   { label:'Commercial health',icon:'pulse',     section:'intel' },
   { label:'Growth channels',  icon:'trendUp',   section:'channels' },
