@@ -1155,6 +1155,28 @@ function saveDemandConfig(next){ try { localStorage.setItem('oi_demandplan_v1', 
 const PACK_DEFAULTS = { avgItemsPerOrder:1.3, components:[ {name:'Mailer / box',perItem:0,perOrder:1}, {name:'Pouch / bag',perItem:1,perOrder:0}, {name:'Thank-you card',perItem:0,perOrder:1}, {name:'Sticker / seal',perItem:0,perOrder:1} ] };
 function packagingConfig(){ try { const s=JSON.parse(localStorage.getItem('oi_packaging_v1')||'null'); if(s && Array.isArray(s.components)) return {avgItemsPerOrder:s.avgItemsPerOrder!=null?s.avgItemsPerOrder:1.3, components:s.components.map(c=>({...c}))}; } catch(e){} return {avgItemsPerOrder:PACK_DEFAULTS.avgItemsPerOrder, components:PACK_DEFAULTS.components.map(c=>({...c}))}; }
 function savePackagingConfig(next){ try { localStorage.setItem('oi_packaging_v1', JSON.stringify(next)); window.dispatchEvent(new Event('oi-forecast-updated')); } catch(e){} }
+// The forecast multiplier the demand plan applies to each product's run-rate.
+// Reads the SAVED plan (demandConfig) so the PO planner sizes orders to planned
+// demand, not just current velocity. (DemandPlanner computes the same scale from
+// its live local state for instant feedback; this reads the persisted plan.)
+function demandScaleFactor(){
+  const cfg = demandConfig();
+  const B = (typeof window!=='undefined' && window.FRKL_BUSINESS) || {};
+  const months = cfg.months||3, horizonDays = months*30.4;
+  let scale = 1;
+  if(cfg.targetMode==='growth') scale = 1+(Number(cfg.growth)||0)/100;
+  else {
+    const sellers = (B.inventory||[]).filter(p=>p && p.status!=='ARCHIVED' && (p.dailyVelocity||0)>0);
+    const revMap={}; (B.products||[]).forEach(p=>{ if(p.sku && p.units>0) revMap[p.sku]=p.netSales/p.units; });
+    const fb=(B.productSummary&&B.productSummary.singles&&B.productSummary.singles.aovPerUnit)||37;
+    const baseTotal = sellers.reduce((t,p)=>t+p.dailyVelocity*horizonDays,0);
+    const baseRev = sellers.reduce((t,p)=>t+p.dailyVelocity*horizonDays*((p.sku&&revMap[p.sku]!=null)?revMap[p.sku]:fb),0);
+    if(cfg.targetMode==='units' && Number(cfg.targetValue)>0 && baseTotal>0) scale = Number(cfg.targetValue)/baseTotal;
+    else if(cfg.targetMode==='revenue' && Number(cfg.targetValue)>0 && baseRev>0) scale = Number(cfg.targetValue)/baseRev;
+  }
+  if(!(scale>0)) scale = 1;
+  return {scale, months, growthPct:(scale-1)*100, mode:cfg.targetMode, active: Math.abs(scale-1)>0.005};
+}
 function leadDaysFor(type, cfg){
   cfg = cfg || leadConfig();
   const ov = type!=null ? cfg.byType[type] : null;
@@ -9150,20 +9172,24 @@ function ProductionPlanner(){
   const inv = (B.inventory||[]).filter(p=>p && p.status!=='ARCHIVED');
   const rc = reorderConfig();
   const safety = Number(rc.safetyDays)||14, coverDays = Number(rc.coverDays)||45;
+  const plan = demandScaleFactor();           // forecast multiplier from the saved demand plan
+  const scale = plan.scale;
   const [supOpen, setSupOpen] = useState(false);
   const [setOpen, setSetOpen] = useState(false);
   const types = [...new Set(inv.map(p=>p.type).filter(Boolean))].sort();
 
   const k = v=>{ v=Math.abs(Math.round(v)); return v>=1000?(v/1000).toFixed(v>=10000?0:1).replace(/\.0$/,'')+'k':''+v; };
 
-  // per-SKU reorder maths (only SKUs with real sales velocity)
+  // per-SKU reorder maths — sized to PLANNED velocity (run-rate × forecast scale),
+  // so a growth plan or a units/revenue target drives both trigger and quantity.
   const lines = inv.filter(p=>(p.dailyVelocity||0)>0).map(p=>{
     const lead = leadDaysForType(p.type);
     const sup = supplierFor(p.type);
     const trigger = lead + safety;
-    const cover = p.daysOfCover!=null ? p.daysOfCover : (p.dailyVelocity>0 ? (p.inventoryQty||0)/p.dailyVelocity : 999);
+    const vel = (p.dailyVelocity||0)*scale;
+    const cover = vel>0 ? (p.inventoryQty||0)/vel : 999;
     const needs = cover <= trigger;
-    const orderUpTo = Math.ceil(p.dailyVelocity * (lead + coverDays));
+    const orderUpTo = Math.ceil(vel * (lead + coverDays));
     let qty = Math.max(0, orderUpTo - (p.inventoryQty||0));
     const moq = Number(sup.moq)||0; let moqBumped=false;
     if(qty>0 && moq>0 && qty<moq){ qty=moq; moqBumped=true; }
@@ -9236,6 +9262,11 @@ function ProductionPlanner(){
         </div>
       </div>
       <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:11,lineHeight:1.5}}>Reorder triggers when a product's stock cover falls within its <b>lead time + {safety}d safety</b>. Suggested quantity orders up to <b>{coverDays}d of cover beyond lead</b>, then rounds up to the supplier MOQ. {approaching>0?`${approaching} more product${approaching===1?'':'s'} will cross the trigger soon. `:''}Drafts only — nothing is sent to suppliers automatically.</div>
+      {plan.active && (<div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginTop:10,padding:'8px 12px',borderRadius:8,background:'var(--accent-bg)',border:'1px solid var(--border-subtle)'}}>
+        <Icon name="trendUp" size={14} style={{color:'var(--accent)'}}/>
+        <span style={{fontSize:12,color:'var(--text-secondary)'}}>Orders are sized to your demand plan — <b style={{color:'var(--text-primary)'}}>{plan.growthPct>=0?'+':''}{plan.growthPct.toFixed(0)}% vs run-rate</b> ({plan.mode==='growth'?'growth target':plan.mode==='units'?'units target':'revenue target'}), not flat velocity.</span>
+        <button style={{...btn,fontSize:11.5,padding:'4px 10px',marginLeft:'auto'}} onClick={()=>window.__oiNav&&window.__oiNav('planning','forecast')}>Adjust plan <Icon name="chevron" size={12}/></button>
+      </div>)}
     </div>
 
     {/* supplier editor */}
