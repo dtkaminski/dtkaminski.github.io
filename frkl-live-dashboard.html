@@ -1119,6 +1119,16 @@ function leadConfig(){
   return { default: LEAD_DEFAULTS.default, byType: {...LEAD_DEFAULTS.byType} };
 }
 function saveLeadConfig(next){ try { localStorage.setItem('oi_lead_times', JSON.stringify(next)); window.dispatchEvent(new Event('oi-leadtimes-updated')); } catch(e){} }
+
+// ── Cash position (for the runway card) ──────────────────────────────────────
+// Cash on hand + monthly overheads (salaries/rent/tools — NOT ad spend or COGS,
+// which the run-rate already captures). localStorage-first like cost config;
+// reuses the 'oi-costs-updated' event so subscribed cards refresh on save.
+function cashConfig(){
+  try { const s = JSON.parse(localStorage.getItem('oi_cash_v1')||'null'); if(s && typeof s==='object') return {cash:s.cash!=null?s.cash:'', overheads:s.overheads!=null?s.overheads:''}; } catch(e){}
+  return {cash:'', overheads:''};
+}
+function saveCashConfig(next){ try { localStorage.setItem('oi_cash_v1', JSON.stringify(next)); window.dispatchEvent(new Event('oi-costs-updated')); } catch(e){} }
 function leadDaysFor(type, cfg){
   cfg = cfg || leadConfig();
   const ov = type!=null ? cfg.byType[type] : null;
@@ -8844,6 +8854,10 @@ function BusinessReview(){
   const C = (typeof window!=='undefined' && window.FRKL_COHORTS) || {};
   const B = (typeof window!=='undefined' && window.FRKL_BUSINESS) || {};
   const gm = oiGrossMargin();
+  const cc0 = cashConfig();
+  const [cashOpen, setCashOpen] = useState(false);
+  const [cashDraft, setCashDraft] = useState(cc0.cash||'');
+  const [ovDraft, setOvDraft] = useState(cc0.overheads||'');
   let i = weeks.length-1; while(i>0 && weeks[i] && weeks[i].partial) i--;
   const W = weeks.length ? weeks[i] : null, prev = i>0 ? weeks[i-1] : null;
   const trail = (key)=> weeks.slice(Math.max(0,i-8), i+1).map(w=>({x:(w.weekStart||'').slice(5), v:w.m[key]}));
@@ -8953,6 +8967,40 @@ function BusinessReview(){
       read:`£${k(slowCapital)} capital tied in slow-moving stock (${sk('overstock')} overstock SKUs)` },
   ];
 
+  // ── Cash runway — cash on hand ÷ net monthly burn (run-rate from last 4 weeks) ──
+  // Factual estimate: monthly gross profit (rev×GM) − ad spend − overheads. Ignores
+  // one-off inventory purchases and working-capital timing (stated on the card).
+  const cashCfg = cashConfig();
+  const cashBal = parseFloat(cashCfg.cash);
+  const overheads = parseFloat(cashCfg.overheads) || 0;
+  const haveCash = cashCfg.cash!=='' && isFinite(cashBal) && cashBal>0;
+  const recentW = weeks.filter(w=>!w.partial).slice(-4);
+  const W2M = 52/12;  // weeks → month run-rate
+  const moRev = recentW.length ? (recentW.reduce((s,w)=>s+(w.m.revenue||0),0)/recentW.length)*W2M : null;
+  const moSpend = recentW.length ? (recentW.reduce((s,w)=>s+(w.m.paid||0),0)/recentW.length)*W2M : null;
+  const moNet = (moRev!=null && gm!=null) ? moRev*gm - moSpend - overheads : null;
+  const editCash = ()=>setCashOpen(o=>!o);
+  let runwayCard;
+  if(!haveCash){
+    runwayCard = { label:'Cash runway', value:'Set balance', status:'missing', statusLabel:'Needs input',
+      sub:'Enter cash on hand + monthly overheads →', onClick:editCash, read:'Cash runway: not set' };
+  } else if(moNet==null){
+    runwayCard = { label:'Cash runway', value:'—', status:'missing', statusLabel:'Needs data',
+      sub:'Not enough weekly revenue history to estimate burn', onClick:editCash, read:'Cash runway: insufficient data' };
+  } else if(moNet>=0){
+    runwayCard = { label:'Cash runway', value:'Cash-flow positive', status:'healthy', statusLabel:'Self-funding',
+      sub:`Net +£${k(moNet)}/mo run-rate · £${k(cashBal)} on hand`, onClick:editCash,
+      read:`Cash runway: cash-flow positive (net +£${k(moNet)}/mo, £${k(cashBal)} on hand)` };
+  } else {
+    const months = cashBal/(-moNet);
+    runwayCard = { label:'Cash runway', value: months>=24?'24+ mo':months.toFixed(1)+' mo',
+      status: months<6?'action':months<12?'watch':'healthy', statusLabel: months<6?'Under 6 months':months<12?'Under 12 months':'12+ months',
+      sub:`£${k(cashBal)} ÷ £${k(-moNet)}/mo net burn (rev×GM − ad spend − overheads)`, onClick:editCash,
+      read:`Cash runway ${months.toFixed(1)} months (£${k(cashBal)} ÷ £${k(-moNet)}/mo net burn)` };
+  }
+  durD.push(runwayCard);
+  const saveCash = ()=>{ saveCashConfig({cash:cashDraft, overheads:ovDraft}); setCashOpen(false); };
+
   // overall posture — factual: benchmark breaches in trading + material risk
   const breaches = nowD.filter(d=>d.sp.bench!=null && d.rag==='bad').length;
   const overall = breaches>=2 ? {kind:'action',label:'Action required'}
@@ -8982,12 +9030,14 @@ function BusinessReview(){
 
   const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:12.5,fontWeight:600,padding:'7px 13px',borderRadius:8,border:'1px solid var(--border-default)',background:'var(--bg-elevated)',color:'var(--text-primary)',cursor:'pointer'};
   const Eyebrow = ({children}) => (<div style={{display:'flex',alignItems:'center',gap:8,margin:'20px 0 9px',fontSize:11,fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--text-muted)'}}><span style={{width:3,height:14,background:'var(--text-faint)',borderRadius:2}}/>{children}</div>);
-  const RvCard = (c,idx) => (<div key={idx} className="wc-item">
+  const RvCard = (c,idx) => (<div key={idx} className="wc-item" onClick={c.onClick} style={c.onClick?{cursor:'pointer'}:undefined} title={c.onClick?'Click to edit':undefined}>
     <div className="wc-top"><span className="wc-label">{c.label}</span>{c.status&&<StatusBadge kind={c.status} label={c.statusLabel}/>}</div>
     <div className="wc-val">{c.value}{c.change!=null && <span className="wc-ch" style={{color:c.changeColor}}>{c.change}</span>}</div>
     {c.series ? <WcSpark data={c.series} color={c.color} fmt={c.fmt} axisFmt={c.axisFmt}/>
               : (c.sub && <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:7,lineHeight:1.45}}>{c.sub}</div>)}
   </div>);
+  const inp = {width:120,marginTop:4,padding:'6px 9px',borderRadius:7,border:'1px solid var(--border-default)',background:'var(--bg-base)',color:'var(--text-primary)',fontSize:13};
+  const lbl = {display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)'};
   const regRow = (accent) => (x,idx) => (<div key={idx} style={{display:'flex',gap:12,alignItems:'baseline',padding:'9px 0',borderTop:idx?'1px solid var(--border-subtle)':'none'}}>
     <div style={{flex:1,minWidth:0}}>
       <div style={{fontSize:13,color:'var(--text-primary)',lineHeight:1.4}}>{x.description}</div>
@@ -9030,6 +9080,16 @@ function BusinessReview(){
 
     <Eyebrow>Durability · will it compound — and what could break it</Eyebrow>
     <div className="card"><div className="wc-grid">{durD.map(RvCard)}</div></div>
+    {cashOpen && (<div className="card" style={{marginTop:10, borderLeft:'3px solid var(--accent)'}}>
+      <div style={{fontSize:13,fontWeight:700,color:'var(--text-primary)',marginBottom:9}}>Cash position</div>
+      <div style={{display:'flex',gap:18,flexWrap:'wrap',alignItems:'flex-end'}}>
+        <label style={lbl}>Cash on hand (£)<input type="number" value={cashDraft} onChange={e=>setCashDraft(e.target.value)} placeholder="e.g. 80000" style={inp}/></label>
+        <label style={lbl}>Monthly overheads (£)<input type="number" value={ovDraft} onChange={e=>setOvDraft(e.target.value)} placeholder="e.g. 12000" style={inp}/></label>
+        <button style={btn} onClick={saveCash}>Save</button>
+        <button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setCashOpen(false)}>Cancel</button>
+      </div>
+      <div style={{fontSize:11,color:'var(--text-faint)',marginTop:10,lineHeight:1.5}}>Overheads = salaries, rent, software — costs <b>not</b> already in ad spend or COGS. Runway = cash ÷ (monthly gross profit − ad spend − overheads), using your last {recentW.length||4} complete weeks as the run-rate. A factual estimate; it ignores one-off inventory purchases and working-capital timing.</div>
+    </div>)}
 
     {/* Risk & opportunity registers */}
     <Eyebrow>Risks & opportunities · quantified</Eyebrow>
