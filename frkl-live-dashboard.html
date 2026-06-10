@@ -19,24 +19,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606093800"></script>
-<script src="./frkl-live-data.js?v=202606093800"></script>
-<script src="./frkl-agent-insights.js?v=202606093800"></script>
-<script src="./frkl-business-data.js?v=202606093800"></script>
-<script src="./frkl-action-status.js?v=202606093800"></script>
-<script src="./frkl-patterns.js?v=202606093800"></script>
-<script src="./frkl-creators.js?v=202606093800"></script>
-<script src="./frkl-creative-vision.js?v=202606093800"></script>
-<script src="./frkl-links.js?v=202606093800"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606093800"></script>
-<script src="./frkl-events.js?v=202606093800"></script>
-<script src="./frkl-products.js?v=202606093800"></script>
-<script src="./frkl-discount-codes.js?v=202606093800"></script>
-<script src="./frkl-cvr.js?v=202606093800"></script>
-<script src="./frkl-cohorts.js?v=202606093800"></script>
-<script src="./frkl-retention.js?v=202606093800"></script>
-<script src="./frkl-clarity.js?v=202606093800"></script>
-<script src="./frkl-board-read.js?v=202606093800"></script>
+<script src="./frkl-data-loader.js?v=202606093900"></script>
+<script src="./frkl-live-data.js?v=202606093900"></script>
+<script src="./frkl-agent-insights.js?v=202606093900"></script>
+<script src="./frkl-business-data.js?v=202606093900"></script>
+<script src="./frkl-action-status.js?v=202606093900"></script>
+<script src="./frkl-patterns.js?v=202606093900"></script>
+<script src="./frkl-creators.js?v=202606093900"></script>
+<script src="./frkl-creative-vision.js?v=202606093900"></script>
+<script src="./frkl-links.js?v=202606093900"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606093900"></script>
+<script src="./frkl-events.js?v=202606093900"></script>
+<script src="./frkl-products.js?v=202606093900"></script>
+<script src="./frkl-discount-codes.js?v=202606093900"></script>
+<script src="./frkl-cvr.js?v=202606093900"></script>
+<script src="./frkl-cohorts.js?v=202606093900"></script>
+<script src="./frkl-retention.js?v=202606093900"></script>
+<script src="./frkl-clarity.js?v=202606093900"></script>
+<script src="./frkl-board-read.js?v=202606093900"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -5518,7 +5518,7 @@ function ProductSignal(){
 
   const oppRow = (p,accent) => (<div key={p.name} style={{display:'flex',gap:10,alignItems:'baseline',padding:'7px 0',borderTop:'1px solid var(--border-subtle)'}}>
     <span style={{width:7,height:7,borderRadius:'50%',background:accent,flexShrink:0,alignSelf:'center'}}/>
-    <div style={{flex:1,minWidth:200}}>
+    <div style={{flex:1,minWidth:0}}>
       <div style={{fontSize:13,color:'var(--text-primary)',fontWeight:600}}>{p.handle?<a className="txt-link" href={`https://myfrkl.com/products/${p.handle}`} target="_blank">{p.name}</a>:p.name}</div>
       <div style={{fontSize:11.5,color:'var(--text-muted)',marginTop:1}}>{NUM(p.views)} views · {p.pctViews}% of views · view→cart {(p.viewToAtc*100).toFixed(1)}% · cart→buy {(p.atcToPurch*100).toFixed(0)}%{p.price?` · £${p.price}`:''}</div>
       <div style={{fontSize:12,color:'var(--text-secondary)',marginTop:2}}>→ {p.move}</div>
@@ -5529,7 +5529,10 @@ function ProductSignal(){
   // A funnel-stage column: header (with count) + up to CAP rows + "+N more".
   const CAP = showAll ? 10 : 3;
   const oppCol = (title,color,arr,empty) => (<div>
-    <div style={{fontSize:11,letterSpacing:'.05em',textTransform:'uppercase',color,marginBottom:2}}>{title} {arr.length>0 && <span style={{color:'var(--text-faint)'}}>· {arr.length}</span>}</div>
+    <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:8,marginBottom:3}}>
+      <span style={{fontSize:11,letterSpacing:'.05em',textTransform:'uppercase',color,lineHeight:1.35}}>{title}</span>
+      {arr.length>0 && <span style={{fontSize:11,fontWeight:700,color:'var(--text-faint)',flexShrink:0}}>{arr.length}</span>}
+    </div>
     {arr.length
       ? <>{arr.slice(0,CAP).map(p=>oppRow(p,color))}{arr.length>CAP && <div style={{fontSize:11,color:'var(--text-faint)',paddingTop:6}}>+ {arr.length-CAP} more (smaller £)</div>}</>
       : <div style={{fontSize:12,color:'var(--text-muted)',padding:'6px 0'}}>{empty}</div>}
