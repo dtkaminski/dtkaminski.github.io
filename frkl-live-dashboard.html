@@ -1129,6 +1129,24 @@ function cashConfig(){
   return {cash:'', overheads:''};
 }
 function saveCashConfig(next){ try { localStorage.setItem('oi_cash_v1', JSON.stringify(next)); window.dispatchEvent(new Event('oi-costs-updated')); } catch(e){} }
+
+// ── Supplier / MOQ / unit-cost (per product type) + reorder policy ───────────
+// Powers the Production / PO planner. Lead time comes from leadConfig (per type);
+// supplier name, MOQ and a unit-cost override live here. Inventory types are
+// granular ("Necklace stack") so leadDaysForType matches the lead-time category
+// by substring (a "Necklace stack" inherits the "Necklace" lead time).
+function leadDaysForType(type){
+  const cfg = leadConfig();
+  if(type){ for(const key of Object.keys(cfg.byType)){ const ov=cfg.byType[key]; if(ov!=null && ov!=='' && isFinite(Number(ov)) && String(type).toLowerCase().includes(key.toLowerCase())) return Number(ov); } }
+  const d = Number(cfg.default); return isFinite(d)&&d>0?d:30;
+}
+function supplierConfig(){ try { const s=JSON.parse(localStorage.getItem('oi_supplier_v1')||'null'); if(s && s.byType) return {byType:{...s.byType}}; } catch(e){} return {byType:{}}; }
+function saveSupplierConfig(next){ try { localStorage.setItem('oi_supplier_v1', JSON.stringify(next)); window.dispatchEvent(new Event('oi-supplier-updated')); } catch(e){} }
+function supplierFor(type){ const c=supplierConfig(); return (c.byType && c.byType[type]) || {}; }
+const REORDER_DEFAULTS = {safetyDays:14, coverDays:45};
+function reorderConfig(){ try { const s=JSON.parse(localStorage.getItem('oi_reorder_v1')||'null'); if(s) return {...REORDER_DEFAULTS, ...s}; } catch(e){} return {...REORDER_DEFAULTS}; }
+function saveReorderConfig(next){ try { localStorage.setItem('oi_reorder_v1', JSON.stringify(next)); window.dispatchEvent(new Event('oi-supplier-updated')); } catch(e){} }
+function usePlanningTick(){ const [,f]=React.useState(0); React.useEffect(()=>{ const h=()=>f(x=>x+1); ['oi-supplier-updated','oi-leadtimes-updated','oi-costs-updated','oi-forecast-updated'].forEach(ev=>window.addEventListener(ev,h)); return ()=>['oi-supplier-updated','oi-leadtimes-updated','oi-costs-updated','oi-forecast-updated'].forEach(ev=>window.removeEventListener(ev,h)); }, []); return 0; }
 function leadDaysFor(type, cfg){
   cfg = cfg || leadConfig();
   const ov = type!=null ? cfg.byType[type] : null;
@@ -5237,12 +5255,14 @@ function CvrDrivers(){
 
   // ── Two-week comparator: default to the pair with the biggest CVR gap among
   // similar-session weeks (sessions within 75%) — i.e. "same traffic, different CVR". ──
-  const [gran,setGran] = useState('week');         // compare weeks ↔ days
   const seriesDaily = D.seriesDaily || [];
-  const panel = (gran==='day' ? seriesDaily : series);
-  // ── Trend-chart controls (independent of the comparator): granularity + date range ──
-  const [chartGran,setChartGran] = useState('week');   // weekly ↔ daily trend
+  // ── Granularity + range. chartGran is the SINGLE source for both the trend
+  // chart and the period comparison, so clicking a point on the chart selects a
+  // directly-comparable period. ──
+  const [chartGran,setChartGran] = useState('week');   // weekly ↔ daily
   const [chartDays,setChartDays] = useState(0);        // 0 = all; else last N days
+  const gran = chartGran;                              // comparator follows the chart
+  const panel = (chartGran==='day' ? seriesDaily : series);
   const segBtn = (active)=>({fontSize:11.5,fontWeight:600,padding:'4px 10px',borderRadius:7,cursor:'pointer',border:'1px solid '+(active?'#7c8cff':'var(--border-subtle)'),background:active?'rgba(124,140,255,0.14)':'transparent',color:active?'#9aa6ff':'var(--text-muted)'});
   const _cbase = (chartGran==='day' ? seriesDaily : series);
   const _clast = _cbase.length ? _cbase[_cbase.length-1].w : null;
@@ -5258,20 +5278,20 @@ function CvrDrivers(){
     return best?{a:best.a,b:best.b}:{a:p[0]&&p[0].w,b:p[0]&&p[0].w};
   };
   const [cmp,setCmp] = useState(()=>defaultPair(series));
-  // ── Click-to-select period picker (replaces the two dropdowns) ──
-  // Tap a period to fill slot A, tap another for slot B; the table builds the
-  // moment both are set. Tapping a selected period clears it. Far fewer
-  // keystrokes than open-scroll-select on two dropdowns.
-  const [picker,setPicker] = useState(false);
+  // ── Click a point on the trend chart to select it ──
+  // First click → A, second → B, and the comparison rebuilds the moment both
+  // are set. Clicking a selected period clears it; a third click starts a fresh
+  // pair. No dropdowns, no chips — you point at the week you mean.
   const pickPeriod = (w)=>{ const p=cmp; let n;
     if(p.a===w)      n={a:null,b:p.b};   // deselect A
     else if(p.b===w) n={a:p.a,b:null};   // deselect B
     else if(!p.a)    n={a:w,b:p.b};      // fill A
     else if(!p.b)    n={a:p.a,b:w};      // fill B
     else             n={a:w,b:null};     // both full → start a fresh pair
-    setCmp(n); if(n.a&&n.b) setPicker(false);
+    setCmp(n);
   };
-  const switchGran = (g)=>{ setGran(g); setCmp(defaultPair(g==='day'?seriesDaily:series)); };
+  // Switching weekly/daily re-defaults the pair (week keys ≠ day keys).
+  const setGranReset = (g)=>{ setChartGran(g); setCmp(defaultPair(g==='day'?seriesDaily:series)); };
   const lbl = (s)=> (gran==='day'?'':'wc ')+fmtWk(s.w);
   const CMP_METRICS=[
     {g:'Funnel stage', k:'s2c', l:'Session→cart', t:'pct'},
@@ -5308,18 +5328,6 @@ function CvrDrivers(){
   const hiW=(cA&&cB)?(cA.cvr>=cB.cvr?cA:cB):null, loW=(cA&&cB)?(cA.cvr>=cB.cvr?cB:cA):null;
   const sessClose = (cA&&cB)?(Math.min(cA.sessions,cB.sessions)/Math.max(cA.sessions,cB.sessions)>=0.8):false;
   const dlt=(r)=>{ if(r.a==null||r.b==null) return '—'; const d=r.b-r.a; const s=d>=0?'+':''; return r.t==='pct'?`${s}${d.toFixed(1)}pp`: r.t==='gbp'?`${d>=0?'+':'-'}${GBP(Math.abs(d))}`:`${s}${NUM(d)}`; };
-  const weekOpt=(s)=>(<option key={s.w} value={s.w}>{`${gran==='day'?'':'wc '}${fmtWk(s.w)} · ${s.cvr}% CVR · ${NUM(s.sessions)} sess`}</option>);
-  // A single selectable period as a clickable chip (slot A = blue, B = green).
-  const periodChip=(s)=>{ const isA=cmp.a===s.w, isB=cmp.b===s.w, col=isA?'#7c8cff':isB?'#4ade80':null;
-    return (<button key={s.w} onClick={()=>pickPeriod(s.w)}
-      title={`${lbl(s)} · ${s.cvr}% CVR · ${NUM(s.sessions)} sessions${s.orders!=null?` · ${NUM(s.orders)} orders`:''}${(isA||isB)?` — tap to clear ${isA?'A':'B'}`:''}`}
-      style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:12,fontWeight:(isA||isB)?700:500,padding:'5px 10px',borderRadius:8,cursor:'pointer',whiteSpace:'nowrap',
-        border:'1px solid '+(col||'var(--border-subtle)'),
-        background:col?(isA?'rgba(124,140,255,0.16)':'rgba(74,222,128,0.14)'):'var(--surface-1,#111116)',
-        color:col||'var(--text-secondary)'}}>
-      {(isA||isB)&&<span style={{fontSize:9.5,fontWeight:800,width:14,height:14,borderRadius:4,display:'inline-flex',alignItems:'center',justifyContent:'center',background:col,color:'#0b0b10'}}>{isA?'A':'B'}</span>}
-      <span>{lbl(s)}</span><span style={{color:col||'var(--text-faint)',fontWeight:600,opacity:.95}}>{s.cvr}%</span>
-    </button>); };
 
   const tile = (label,val,sub,accent) => (<div style={{flex:'1 1 170px',background:'var(--surface-1,#111116)',border:'1px solid var(--border-subtle,#23232b)',borderRadius:12,padding:'12px 14px'}}>
     <div style={{fontSize:11,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-faint)'}}>{label}</div>
@@ -5367,14 +5375,24 @@ function CvrDrivers(){
       )}
       <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center',marginBottom:8}}>
         <span style={{fontSize:11,color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'.04em',marginRight:2}}>View</span>
-        {[['week','Weekly'],['day','Daily']].map(([g,l])=>(<button key={g} onClick={()=>setChartGran(g)} style={segBtn(chartGran===g)}>{l}</button>))}
+        {[['week','Weekly'],['day','Daily']].map(([g,l])=>(<button key={g} onClick={()=>setGranReset(g)} style={segBtn(chartGran===g)}>{l}</button>))}
         <span style={{width:1,height:18,background:'var(--border-subtle)',margin:'0 6px'}}/>
         <span style={{fontSize:11,color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'.04em',marginRight:2}}>Range</span>
         {[[0,'All'],[90,'90d'],[60,'60d'],[30,'30d'],[14,'14d']].map(([d,l])=>(<button key={l} onClick={()=>setChartDays(d)} style={segBtn(chartDays===d)}>{l}</button>))}
         <span style={{fontSize:11,color:'var(--text-faint)',marginLeft:4}}>{chartData.length} {chartGran==='day'?'days':'weeks'}{chartGran==='day'?' · daily CVR is noisier — read the trend, not single days':''}</span>
       </div>
+      <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',margin:'2px 0 8px',padding:'7px 11px',borderRadius:9,background:'rgba(124,140,255,0.07)',border:'1px solid rgba(124,140,255,0.18)'}}>
+        <span style={{fontSize:12,fontWeight:600,color:'#9aa6ff'}}>📈 Click two points on the chart to compare them</span>
+        <span style={{fontSize:12,color:'var(--text-muted)'}}>{cA&&cB
+          ? <>Comparing <b style={{color:'#7c8cff'}}>A · {lbl(cA)}</b> <span style={{color:'var(--text-faint)'}}>vs</span> <b style={{color:'#4ade80'}}>B · {lbl(cB)}</b> — see table below.</>
+          : cA ? <>Picked <b style={{color:'#7c8cff'}}>A · {lbl(cA)}</b> — now click another point for <b style={{color:'#4ade80'}}>B</b>.</>
+          : <>Click the first {chartGran==='day'?'day':'week'} to set <b style={{color:'#7c8cff'}}>A</b>.</>}</span>
+        {(cmp.a||cmp.b) && <button onClick={()=>setCmp({a:null,b:null})} style={{fontSize:11.5,fontWeight:600,padding:'4px 10px',borderRadius:7,cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-muted)'}}>✕ Clear</button>}
+        <button onClick={()=>setCmp(defaultPair(panel))} title="Auto-pick the clearest pair: similar traffic, biggest CVR gap" style={{fontSize:11.5,fontWeight:600,padding:'4px 10px',borderRadius:7,cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-muted)'}}>↻ Best pair</button>
+      </div>
+      <div style={{cursor:'pointer'}}>
       <R.ResponsiveContainer width="100%" height={288}>
-        <R.ComposedChart data={chartData} margin={{top:6,right:14,left:8,bottom:20}}>
+        <R.ComposedChart data={chartData} margin={{top:6,right:14,left:8,bottom:20}} onClick={(st)=>{ if(st && st.activeLabel!=null) pickPeriod(st.activeLabel); }}>
           <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
           <R.XAxis dataKey="w" tickFormatter={fmtWk} tick={{fill:'#7e7e8a',fontSize:10.5}} interval={Math.ceil(chartData.length/9)} tickMargin={8} label={{value:chartGran==='day'?'Day':'Week', position:'insideBottom', offset:-10, fill:'#6f6f7b', fontSize:11}}/>
           <R.YAxis yAxisId="l" tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>v+'%'} label={{value:'CVR (sessions→order)', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
@@ -5387,6 +5405,11 @@ function CvrDrivers(){
           {/* Show, don't tell: the single CVR benchmark drawn on the chart so the gap is visible, not described. */}
           <R.ReferenceLine yAxisId="l" y={CVR_BENCH*100} stroke="#7c8cff" strokeDasharray="5 4" strokeOpacity={0.75}
             label={{value:`${CVR_BENCH_LABEL} CVR target`, position:'insideTopRight', fill:'#7c8cff', fontSize:10.5}}/>
+          {/* The two selected periods, marked where you clicked — A (blue) vs B (green). */}
+          {cmp.a && chartData.some(d=>d.w===cmp.a) && <R.ReferenceLine yAxisId="l" x={cmp.a} stroke="#7c8cff" strokeWidth={2} strokeOpacity={0.95}
+            label={{value:'A', position:'top', fill:'#7c8cff', fontSize:12.5, fontWeight:800}}/>}
+          {cmp.b && chartData.some(d=>d.w===cmp.b) && <R.ReferenceLine yAxisId="l" x={cmp.b} stroke="#4ade80" strokeWidth={2} strokeOpacity={0.95}
+            label={{value:'B', position:'top', fill:'#4ade80', fontSize:12.5, fontWeight:800}}/>}
           {/* Event & sale pins: logged events + major site-wide sales, snapped to chart buckets.
               Icon-only on the chart; full detail lives on hover so the chart stays calm. */}
           {(function(){ var pins=buildChartPins(chartData.map(function(d){return d.w;}));
@@ -5396,6 +5419,7 @@ function CvrDrivers(){
           })()}
         </R.ComposedChart>
       </R.ResponsiveContainer>
+      </div>
       <div style={{fontSize:10.5,color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{BRUSH_HINT}</div>
       {(function(){ var pins=buildChartPins(chartData.map(function(d){return d.w;})); if(!pins.length) return null; return (
         <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>🏷️ sales &amp; promos · 📌 your events — <span style={{color:'var(--text-muted)'}}>hover any marker for what it was</span></div>); })()}
@@ -5410,28 +5434,13 @@ function CvrDrivers(){
 
     <div className="card" style={{marginBottom:14}}>
       <div className="card-section-title"><h2 style={{margin:0}}>Compare two {gran==='day'?'days':'weeks'}</h2>
-        <span className="meta">press Compare, then tap two {gran==='day'?'days':'weeks'} — biggest differences flagged automatically</span></div>
-      <div style={{marginBottom:10}}>
-        <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center'}}>
-          <div style={{display:'flex',gap:4,marginRight:2}}>{['week','day'].map(g=>(<button key={g} onClick={()=>switchGran(g)} style={{fontSize:11.5,fontWeight:600,padding:'5px 11px',borderRadius:7,cursor:'pointer',border:'1px solid '+(gran===g?'#7c8cff':'var(--border-subtle)'),background:gran===g?'rgba(124,140,255,0.14)':'transparent',color:gran===g?'#9aa6ff':'var(--text-muted)'}}>{g==='week'?'Weeks':'Days'}</button>))}</div>
-          {!picker && cA && cB && (
-            <div style={{fontSize:12.5,color:'var(--text-muted)'}}>Comparing <b style={{color:'#9aa6ff'}}>{lbl(cA)}</b> <span style={{color:'var(--text-faint)'}}>vs</span> <b style={{color:'#4ade80'}}>{lbl(cB)}</b></div>
-          )}
-          <button onClick={()=>setPicker(p=>!p)} style={{fontSize:12,fontWeight:600,padding:'6px 13px',borderRadius:8,cursor:'pointer',border:'1px solid #7c8cff',background:'rgba(124,140,255,0.16)',color:'#9aa6ff'}}>{picker?'✓ Done':(cA&&cB?'⇄ Compare different periods':'⇄ Compare periods')}</button>
-          {!picker && <button onClick={()=>setCmp(defaultPair(panel))} title="Auto-pick the clearest pair: similar traffic, biggest CVR gap" style={{fontSize:12,fontWeight:600,padding:'6px 12px',borderRadius:8,cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-muted)'}}>↻ Best pair</button>}
-        </div>
-        {picker && (
-          <div style={{marginTop:10}}>
-            <div style={{fontSize:11.5,color:'var(--text-faint)',marginBottom:6}}>
-              {!cmp.a ? <>Tap a {gran==='day'?'day':'week'} to set <b style={{color:'#9aa6ff'}}>A</b> →</>
-                : !cmp.b ? <>Now tap another for <b style={{color:'#4ade80'}}>B</b> → the table builds automatically.</>
-                : <>Tap a chip to swap it, or press <b>Done</b>.</>}
-            </div>
-            <div style={{display:'flex',gap:6,flexWrap:'wrap',maxHeight:148,overflowY:'auto',padding:'2px',border:'1px solid var(--border-subtle)',borderRadius:10,background:'var(--surface-2,#0f0f14)'}}>
-              {panel.map(periodChip)}
-            </div>
-          </div>
-        )}
+        <span className="meta">click two points on the trend chart above — biggest differences flagged automatically</span></div>
+      <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center',marginBottom:10}}>
+        {cA && cB
+          ? <div style={{fontSize:12.5,color:'var(--text-muted)'}}>Comparing <b style={{color:'#7c8cff'}}>{lbl(cA)}</b> <span style={{color:'var(--text-faint)'}}>vs</span> <b style={{color:'#4ade80'}}>{lbl(cB)}</b></div>
+          : <div style={{fontSize:12.5,color:'var(--text-faint)'}}>↑ Click two points on the chart above to pick the {gran==='day'?'days':'weeks'} to compare.</div>}
+        <button onClick={()=>setCmp(defaultPair(panel))} title="Auto-pick the clearest pair: similar traffic, biggest CVR gap" style={{fontSize:12,fontWeight:600,padding:'6px 12px',borderRadius:8,cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-muted)'}}>↻ Best pair</button>
+        {(cmp.a||cmp.b) && <button onClick={()=>setCmp({a:null,b:null})} style={{fontSize:12,fontWeight:600,padding:'6px 12px',borderRadius:8,cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-muted)'}}>✕ Clear</button>}
       </div>
       {cA&&cB&&<>
         <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:12}}>
@@ -9122,6 +9131,157 @@ function BusinessReview(){
   </div>);
 }
 
+// ── Production / PO planner ──────────────────────────────────────────────────
+// Reorder engine off live inventory (dailyVelocity, inventoryQty, daysOfCover)
+// + lead times. When a seller's cover falls within lead+safety days, it drafts a
+// purchase order: order-up-to (lead+cover) days of demand, bumped to MOQ. POs are
+// grouped by supplier and exportable (CSV / copy). Nothing is sent automatically.
+function ProductionPlanner(){
+  usePlanningTick();
+  const B = (typeof window!=='undefined' && window.FRKL_BUSINESS) || {};
+  const inv = (B.inventory||[]).filter(p=>p && p.status!=='ARCHIVED');
+  const rc = reorderConfig();
+  const safety = Number(rc.safetyDays)||14, coverDays = Number(rc.coverDays)||45;
+  const [supOpen, setSupOpen] = useState(false);
+  const [setOpen, setSetOpen] = useState(false);
+  const types = [...new Set(inv.map(p=>p.type).filter(Boolean))].sort();
+
+  const k = v=>{ v=Math.abs(Math.round(v)); return v>=1000?(v/1000).toFixed(v>=10000?0:1).replace(/\.0$/,'')+'k':''+v; };
+
+  // per-SKU reorder maths (only SKUs with real sales velocity)
+  const lines = inv.filter(p=>(p.dailyVelocity||0)>0).map(p=>{
+    const lead = leadDaysForType(p.type);
+    const sup = supplierFor(p.type);
+    const trigger = lead + safety;
+    const cover = p.daysOfCover!=null ? p.daysOfCover : (p.dailyVelocity>0 ? (p.inventoryQty||0)/p.dailyVelocity : 999);
+    const needs = cover <= trigger;
+    const orderUpTo = Math.ceil(p.dailyVelocity * (lead + coverDays));
+    let qty = Math.max(0, orderUpTo - (p.inventoryQty||0));
+    const moq = Number(sup.moq)||0; let moqBumped=false;
+    if(qty>0 && moq>0 && qty<moq){ qty=moq; moqBumped=true; }
+    const unitCost = (sup.unitCost!=null&&sup.unitCost!=='') ? Number(sup.unitCost) : (p.costPerItem!=null?p.costPerItem:null);
+    const supplier = (sup.supplier&&sup.supplier.trim()) || p.vendor || p.type || 'Unassigned';
+    return {p, lead, cover, needs, qty, moq, moqBumped, unitCost, supplier, lineCost: unitCost!=null?unitCost*qty:null};
+  });
+  const reorder = lines.filter(l=>l.needs && l.qty>0).sort((a,b)=>a.cover-b.cover);
+  const approaching = lines.filter(l=>!l.needs && l.cover <= l.lead + coverDays).length;
+
+  const bySupplier = {};
+  reorder.forEach(l=>{ (bySupplier[l.supplier]=bySupplier[l.supplier]||[]).push(l); });
+  const pos = Object.keys(bySupplier).sort().map(s=>{
+    const ls=bySupplier[s], total=ls.reduce((t,l)=>t+(l.lineCost||0),0);
+    return {supplier:s, lines:ls, total, hasCost:ls.every(l=>l.unitCost!=null), units:ls.reduce((t,l)=>t+l.qty,0)};
+  });
+  const totalValue = pos.reduce((t,p)=>t+p.total,0);
+  const missingCost = reorder.some(l=>l.unitCost==null);
+  const today = (()=>{ try{ return new Date().toLocaleDateString('en-GB'); }catch(e){ return ''; } })();
+
+  const csvFor = (po)=>{
+    const rows=[['SKU','Product','Type','Order qty','Unit cost','Line total','Current stock','Days cover','Lead days']];
+    po.lines.forEach(l=>rows.push([l.p.sku||'', l.p.title||'', l.p.type||'', l.qty, l.unitCost!=null?l.unitCost:'', l.lineCost!=null?l.lineCost.toFixed(2):'', l.p.inventoryQty, Math.round(l.cover), l.lead]));
+    rows.push([], ['','','','TOTAL','',po.total.toFixed(2)]);
+    return rows.map(r=>r.map(c=>{const s=String(c==null?'':c); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}).join(',')).join('\n');
+  };
+  const download = (po)=>{ try{
+    const blob=new Blob([csvFor(po)],{type:'text/csv'}); const url=URL.createObjectURL(blob);
+    const a=document.createElement('a'); a.href=url; a.download='PO_'+po.supplier.replace(/[^a-z0-9]+/gi,'_')+'.csv'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000); toast('PO exported', {kind:'good', body:po.supplier+' · '+po.lines.length+' lines'});
+  }catch(e){ toast('Export failed', {kind:'bad'}); } };
+  const copyPO = (po)=>{
+    const L=['PURCHASE ORDER (DRAFT) — '+po.supplier, 'frkl'+(today?' · '+today:''), ''];
+    po.lines.forEach(l=>L.push(l.qty+' × '+l.p.title+' ['+(l.p.sku||'no SKU')+']'+(l.unitCost!=null?(' @ £'+l.unitCost+' = £'+l.lineCost.toFixed(2)):'')+(l.moqBumped?(' (MOQ '+l.moq+')'):'')));
+    L.push('', po.hasCost?('TOTAL: £'+po.total.toFixed(2)+' · '+po.units+' units'):(po.units+' units · set unit costs for a total'));
+    try{ navigator.clipboard&&navigator.clipboard.writeText(L.join('\n')); }catch(e){}
+    toast('PO copied', {kind:'good', body:po.supplier});
+  };
+
+  // editors (local draft → explicit save, avoids focus loss on keystroke)
+  const [supDraft, setSupDraft] = useState(()=>{ const c=supplierConfig(), d={}; types.forEach(t=>{ const s=c.byType[t]||{}; d[t]={supplier:s.supplier||'', moq:s.moq!=null?s.moq:'', unitCost:s.unitCost!=null?s.unitCost:''}; }); return d; });
+  const saveSuppliers = ()=>{ const byType={}; Object.keys(supDraft).forEach(t=>{ const s=supDraft[t]; if((s.supplier&&s.supplier.trim())||s.moq!==''||s.unitCost!=='') byType[t]={supplier:s.supplier||'', moq:s.moq, unitCost:s.unitCost}; }); saveSupplierConfig({byType}); setSupOpen(false); toast('Suppliers saved', {kind:'good'}); };
+  const setSup = (t,field,val)=>setSupDraft(d=>({...d, [t]:{...d[t], [field]:val}}));
+  const [safDraft, setSafDraft] = useState(String(rc.safetyDays));
+  const [covDraft, setCovDraft] = useState(String(rc.coverDays));
+  const saveSettings = ()=>{ saveReorderConfig({safetyDays:Number(safDraft)||14, coverDays:Number(covDraft)||45}); setSetOpen(false); toast('Reorder policy saved', {kind:'good'}); };
+
+  const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:12.5,fontWeight:600,padding:'7px 13px',borderRadius:8,border:'1px solid var(--border-default)',background:'var(--bg-elevated)',color:'var(--text-primary)',cursor:'pointer'};
+  const smbtn = {...btn, fontSize:11.5, padding:'5px 10px'};
+  const inp = {padding:'5px 8px',borderRadius:6,border:'1px solid var(--border-default)',background:'var(--bg-base)',color:'var(--text-primary)',fontSize:12.5};
+  const th = {textAlign:'left',fontSize:10.5,fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-faint)',padding:'0 10px 7px 0',whiteSpace:'nowrap'};
+  const td = {padding:'7px 10px 7px 0',fontSize:12.5,color:'var(--text-secondary)',borderTop:'1px solid var(--border-subtle)',verticalAlign:'top'};
+
+  return (<div>
+    <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:6}}>
+      <h2 style={{margin:0,fontSize:18}}>Production &amp; purchase orders</h2>
+      <span className="muted" style={{fontSize:12}}>Reorder engine on live stock + velocity · independent of the date picker</span>
+    </div>
+
+    {/* summary + controls */}
+    <div className="card">
+      <div style={{display:'flex',gap:22,flexWrap:'wrap',alignItems:'flex-end'}}>
+        <div><div style={{fontSize:24,fontWeight:800,color: reorder.length?'var(--warn)':'var(--good)'}}>{reorder.length}</div><div className="muted" style={{fontSize:11.5}}>SKUs to reorder now</div></div>
+        <div><div style={{fontSize:24,fontWeight:800,color:'var(--text-primary)'}}>{NUM(reorder.reduce((t,l)=>t+l.qty,0))}</div><div className="muted" style={{fontSize:11.5}}>units across all POs</div></div>
+        <div><div style={{fontSize:24,fontWeight:800,color:'var(--text-primary)'}}>{totalValue>0?'£'+k(totalValue):'—'}</div><div className="muted" style={{fontSize:11.5}}>draft order value{missingCost?' (partial)':''}</div></div>
+        <div><div style={{fontSize:24,fontWeight:800,color:'var(--text-primary)'}}>{pos.length}</div><div className="muted" style={{fontSize:11.5}}>supplier{pos.length===1?'':'s'}</div></div>
+        <div style={{marginLeft:'auto',display:'flex',gap:8,flexWrap:'wrap'}}>
+          <button style={btn} onClick={()=>setSupOpen(o=>!o)}><Icon name="sliders" size={13}/> Suppliers &amp; MOQ</button>
+          <button style={btn} onClick={()=>setSetOpen(o=>!o)}><Icon name="sliders" size={13}/> Reorder policy</button>
+        </div>
+      </div>
+      <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:11,lineHeight:1.5}}>Reorder triggers when a product's stock cover falls within its <b>lead time + {safety}d safety</b>. Suggested quantity orders up to <b>{coverDays}d of cover beyond lead</b>, then rounds up to the supplier MOQ. {approaching>0?`${approaching} more product${approaching===1?'':'s'} will cross the trigger soon. `:''}Drafts only — nothing is sent to suppliers automatically.</div>
+    </div>
+
+    {/* supplier editor */}
+    {supOpen && (<div className="card" style={{borderLeft:'3px solid var(--accent)'}}>
+      <div style={{fontSize:13,fontWeight:700,marginBottom:4}}>Suppliers, MOQ &amp; unit cost <span className="muted" style={{fontWeight:400,fontSize:11.5}}>· per product type · lead times are set in Products &amp; stock</span></div>
+      <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:560}}><thead><tr><th style={th}>Type</th><th style={th}>Supplier</th><th style={th}>MOQ</th><th style={th}>Unit cost £</th><th style={th}>Lead (d)</th></tr></thead><tbody>
+        {types.map(t=>{ const d=supDraft[t]||{supplier:'',moq:'',unitCost:''}; return (<tr key={t}>
+          <td style={{...td,color:'var(--text-primary)',fontWeight:600}}>{t}</td>
+          <td style={td}><input style={{...inp,width:150}} value={d.supplier} onChange={e=>setSup(t,'supplier',e.target.value)} placeholder="Supplier name"/></td>
+          <td style={td}><input type="number" style={{...inp,width:72}} value={d.moq} onChange={e=>setSup(t,'moq',e.target.value)} placeholder="0"/></td>
+          <td style={td}><input type="number" style={{...inp,width:80}} value={d.unitCost} onChange={e=>setSup(t,'unitCost',e.target.value)} placeholder="auto"/></td>
+          <td style={{...td,color:'var(--text-faint)'}}>{leadDaysForType(t)}</td>
+        </tr>); })}
+      </tbody></table></div>
+      <div style={{marginTop:10,display:'flex',gap:8}}><button style={btn} onClick={saveSuppliers}>Save suppliers</button><button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setSupOpen(false)}>Cancel</button></div>
+      <div style={{fontSize:11,color:'var(--text-faint)',marginTop:8}}>Unit cost defaults to each SKU's catalogue cost when left blank. MOQ rounds order quantities up.</div>
+    </div>)}
+
+    {/* reorder policy editor */}
+    {setOpen && (<div className="card" style={{borderLeft:'3px solid var(--accent)'}}>
+      <div style={{fontSize:13,fontWeight:700,marginBottom:9}}>Reorder policy</div>
+      <div style={{display:'flex',gap:18,flexWrap:'wrap',alignItems:'flex-end'}}>
+        <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}}>Safety stock (days)<input type="number" style={{...inp,width:90}} value={safDraft} onChange={e=>setSafDraft(e.target.value)}/></label>
+        <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}}>Order-up-to cover beyond lead (days)<input type="number" style={{...inp,width:90}} value={covDraft} onChange={e=>setCovDraft(e.target.value)}/></label>
+        <button style={btn} onClick={saveSettings}>Save policy</button><button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setSetOpen(false)}>Cancel</button>
+      </div>
+    </div>)}
+
+    {/* draft POs */}
+    {pos.length ? pos.map(po=>(<div key={po.supplier} className="card">
+      <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:8}}>
+        <div><span style={{fontSize:15,fontWeight:700,color:'var(--text-primary)'}}>{po.supplier}</span> <span className="muted" style={{fontSize:12}}>· {po.lines.length} line{po.lines.length===1?'':'s'} · {NUM(po.units)} units</span></div>
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          <span style={{fontSize:15,fontWeight:800,color:'var(--text-primary)'}}>{po.hasCost?'£'+po.total.toFixed(2):'set costs'}</span>
+          <button style={smbtn} onClick={()=>copyPO(po)}><Icon name="clipboard" size={12}/> Copy</button>
+          <button style={smbtn} onClick={()=>download(po)}><Icon name="report" size={12}/> CSV</button>
+        </div>
+      </div>
+      <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:560}}><thead><tr>
+        <th style={th}>Product</th><th style={{...th,textAlign:'right'}}>Stock</th><th style={{...th,textAlign:'right'}}>Cover</th><th style={{...th,textAlign:'right'}}>Order qty</th><th style={{...th,textAlign:'right'}}>Unit £</th><th style={{...th,textAlign:'right'}}>Line £</th>
+      </tr></thead><tbody>
+        {po.lines.map((l,idx)=>(<tr key={idx}>
+          <td style={{...td,color:'var(--text-primary)'}}>{l.p.title}<div style={{fontSize:10.5,color:'var(--text-faint)'}}>{l.p.sku||'no SKU'} · {l.p.type}{l.moqBumped?' · MOQ '+l.moq:''}</div></td>
+          <td style={{...td,textAlign:'right'}}>{NUM(l.p.inventoryQty)}</td>
+          <td style={{...td,textAlign:'right',color:l.cover<=l.lead?'var(--bad)':'var(--warn)'}}>{Math.round(l.cover)}d</td>
+          <td style={{...td,textAlign:'right',fontWeight:700,color:'var(--text-primary)'}}>{NUM(l.qty)}</td>
+          <td style={{...td,textAlign:'right'}}>{l.unitCost!=null?'£'+l.unitCost:'—'}</td>
+          <td style={{...td,textAlign:'right'}}>{l.lineCost!=null?'£'+l.lineCost.toFixed(2):'—'}</td>
+        </tr>))}
+      </tbody></table></div>
+    </div>)) : (<div className="card"><div style={{display:'flex',alignItems:'center',gap:10}}><StatusBadge kind="healthy" label="Stock healthy"/><span className="muted" style={{fontSize:13}}>No products are within their reorder window right now. {approaching>0?`${approaching} will cross it soon — check back, or tighten the safety days.`:'Good sellers all have enough cover for their lead times.'}</span></div></div>)}
+  </div>);
+}
+
 const NAV = [
   { id:'home',    label:'Today',    icon:'home',     subtabs:[
     { id:'overview', label:'Overview',     component: (p) => <Overview start={p.start} period={p.period} customActive={p.customActive}/> },
@@ -9158,6 +9318,9 @@ const NAV = [
   { id:'review',  label:'Business review', icon:'report', subtabs:[
     { id:'review',   label:'Business review', component: () => <BusinessReview/> },
   ]},
+  { id:'planning',label:'Planning',     icon:'box', subtabs:[
+    { id:'production', label:'Production / POs', component: () => <ProductionPlanner/> },
+  ]},
   { id:'settings',label:'Settings',     icon:'sliders', subtabs:[
     { id:'connections', label:'Connections', component: () => <ConnectionsPanel/> },
   ]},
@@ -9172,6 +9335,7 @@ const RAIL = [
   { label:'AI Analyst',       icon:'spark',     section:'home',     sub:'ask' },
   { label:'What changed',     icon:'calendar',  section:'board' },
   { label:'Business review',  icon:'report',    section:'review' },
+  { label:'Production & POs',  icon:'box',       section:'planning', sub:'production' },
   { label:'Commercial health',icon:'pulse',     section:'intel' },
   { label:'Growth channels',  icon:'trendUp',   section:'channels' },
   { label:'Creative & brand', icon:'image',     section:'channels', sub:'creatives' },
