@@ -3664,24 +3664,45 @@ function MobileToday(){
 
 // "What changed" — latest complete week vs the one before, the movers worth a look.
 // Reuses the weekly-board data model (boardWeeks/boardRag); picker-independent.
+// Mini trend chart for the What-changed cards — axes + hover detail (not a bare sparkline).
+function WcSpark({data, color, fmt, axisFmt}){
+  if(!data || data.filter(d=>d.v!=null).length < 2) return <div style={{height:66}}/>;
+  return (<R.ResponsiveContainer width="100%" height={66}>
+    <R.LineChart data={data} margin={{top:6, right:8, left:-6, bottom:0}}>
+      <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
+      <R.XAxis dataKey="x" tick={{fill:'#7e7e8a', fontSize:8.5}} interval={Math.ceil(data.length/3)} tickLine={false} axisLine={{stroke:'#2a2a34'}} minTickGap={6}/>
+      <R.YAxis tick={{fill:'#7e7e8a', fontSize:8.5}} width={34} tickCount={3} tickLine={false} axisLine={false} domain={['auto','auto']} tickFormatter={axisFmt||fmt}/>
+      <R.Tooltip cursor={{stroke:color, strokeWidth:1, strokeDasharray:'3 3'}} content={({active,payload,label})=>{
+        if(!active||!payload||!payload.length) return null; const v=payload[0].value;
+        return (<div style={{background:'var(--bg-elevated)', border:'1px solid var(--border-default)', borderRadius:8, fontSize:11, padding:'5px 9px', boxShadow:'var(--shadow-md)'}}>
+          <div style={{color:'var(--text-faint)', fontSize:10, marginBottom:1}}>Week of {label}</div>
+          <div style={{fontWeight:700, color:'var(--text-primary)'}}>{fmt?fmt(v):v}</div>
+        </div>); }}/>
+      <R.Line type="monotone" dataKey="v" stroke={color} strokeWidth={1.8} dot={false} activeDot={{r:3, strokeWidth:0}} isAnimationActive={false}/>
+    </R.LineChart>
+  </R.ResponsiveContainer>);
+}
+
 function WhatChangedStrip(){
   const weeks = useMemo(boardWeeks, []);
   if(!weeks.length) return null;
   let i = weeks.length-1; while(i>0 && weeks[i].partial) i--;
   const W = weeks[i], prev = weeks[i-1];
   if(!W || !prev) return null;
+  const gbpK = v=>'£'+(Math.abs(v)>=1000?(v/1000).toFixed(1).replace(/\.0$/,'')+'k':Math.round(v));
+  const pct0 = v=>v!=null?(v*100).toFixed(0)+'%':'—';
   const SPECS = [
-    {key:'revenue',       label:'Revenue',             fmt:v=>GBP(v),                              better:'up'},
-    {key:'orders',        label:'Orders',              fmt:v=>NUM(v),                              better:'up'},
-    {key:'aov',           label:'AOV',                 fmt:v=>GBP(v),                              better:'up'},
-    {key:'cvr',           label:'Conversion rate',     fmt:v=>v!=null?(v*100).toFixed(2)+'%':'—',  better:'up',   bench:CVR_BENCH},
-    {key:'mer',           label:'Blended ROAS',        fmt:v=>v!=null?v.toFixed(2)+'×':'—',         better:'up',   bench:3},
-    {key:'paid',          label:'Paid spend',          fmt:v=>GBP(v),                              better:'flat'},
-    {key:'discountDepth', label:'Discount depth',      fmt:v=>v!=null?(v*100).toFixed(1)+'%':'—',  better:'down'},
-    {key:'returnRate',    label:'Return rate',         fmt:v=>v!=null?(v*100).toFixed(1)+'%':'—',  better:'down'},
-    {key:'emailShare',    label:'Email revenue share', fmt:v=>v!=null?(v*100).toFixed(0)+'%':'—',  better:'up'},
+    {key:'revenue',       label:'Revenue',             fmt:v=>GBP(v),                              axisFmt:gbpK,                better:'up'},
+    {key:'orders',        label:'Orders',              fmt:v=>NUM(v),                              axisFmt:v=>Math.round(v),    better:'up'},
+    {key:'aov',           label:'AOV',                 fmt:v=>GBP(v),                              axisFmt:v=>'£'+Math.round(v), better:'up'},
+    {key:'cvr',           label:'Conversion rate',     fmt:v=>v!=null?(v*100).toFixed(2)+'%':'—',  axisFmt:v=>(v*100).toFixed(1)+'%', better:'up',   bench:CVR_BENCH},
+    {key:'mer',           label:'Blended ROAS',        fmt:v=>v!=null?v.toFixed(2)+'×':'—',         axisFmt:v=>v.toFixed(1)+'×', better:'up',   bench:3},
+    {key:'paid',          label:'Paid spend',          fmt:v=>GBP(v),                              axisFmt:gbpK,                better:'flat'},
+    {key:'discountDepth', label:'Discount depth',      fmt:v=>v!=null?(v*100).toFixed(1)+'%':'—',  axisFmt:pct0,                better:'down'},
+    {key:'returnRate',    label:'Return rate',         fmt:v=>v!=null?(v*100).toFixed(1)+'%':'—',  axisFmt:pct0,                better:'down'},
+    {key:'emailShare',    label:'Email revenue share', fmt:v=>v!=null?(v*100).toFixed(0)+'%':'—',  axisFmt:pct0,                better:'up'},
   ];
-  const trail = (key)=> weeks.slice(Math.max(0,i-8), i+1).map(w=>w.m[key]);
+  const trail = (key)=> weeks.slice(Math.max(0,i-8), i+1).map(w=>({x:(w.weekStart||'').slice(5), v:w.m[key]}));
   const ddNow=W.m.discountDepth, ddPrev=prev.m.discountDepth;
   const promoUp = (ddNow!=null && ddPrev!=null && (ddNow-ddPrev) > 0.03);   // +3pp discount depth = revenue likely promo-distorted
   const rows = SPECS.map(sp=>{
@@ -3714,7 +3735,7 @@ function WhatChangedStrip(){
           return (<div key={idx} className="wc-item">
             <div className="wc-top"><span className="wc-label">{r.label}</span><StatusBadge kind={sb.kind} label={sb.label}/></div>
             <div className="wc-val">{r.fmt(r.val)} <span className="wc-ch" style={{color:chColor}}>{up?'↑':'↓'}{Math.abs(r.ch*100).toFixed(0)}%</span></div>
-            <BoardSpark vals={trail(r.key)} color={RAG_COL[r.rag]||'var(--text-faint)'}/>
+            <WcSpark data={trail(r.key)} color={RAG_COL[r.rag]||'var(--text-faint)'} fmt={r.fmt} axisFmt={r.axisFmt}/>
           </div>);
         })}
       </div>) : (<div className="muted" style={{fontSize:13}}>Quiet week — nothing moved more than 3% vs the prior week.</div>)}
