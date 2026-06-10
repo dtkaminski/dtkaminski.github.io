@@ -19,25 +19,25 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606101330"></script>
-<script src="./frkl-live-data.js?v=202606101330"></script>
-<script src="./frkl-agent-insights.js?v=202606101330"></script>
-<script src="./frkl-business-data.js?v=202606101330"></script>
-<script src="./frkl-action-status.js?v=202606101330"></script>
-<script src="./frkl-patterns.js?v=202606101330"></script>
-<script src="./frkl-creators.js?v=202606101330"></script>
-<script src="./frkl-creative-vision.js?v=202606101330"></script>
-<script src="./frkl-links.js?v=202606101330"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606101330"></script>
-<script src="./frkl-events.js?v=202606101330"></script>
-<script src="./frkl-products.js?v=202606101330"></script>
-<script src="./frkl-discount-codes.js?v=202606101330"></script>
-<script src="./frkl-cvr.js?v=202606101330"></script>
-<script src="./frkl-cohorts.js?v=202606101330"></script>
-<script src="./frkl-retention.js?v=202606101330"></script>
-<script src="./frkl-clarity.js?v=202606101330"></script>
-<script src="./frkl-board-read.js?v=202606101330"></script>
-<script src="./frkl-benchmarks.js?v=202606101330"></script>
+<script src="./frkl-data-loader.js?v=202606101400"></script>
+<script src="./frkl-live-data.js?v=202606101400"></script>
+<script src="./frkl-agent-insights.js?v=202606101400"></script>
+<script src="./frkl-business-data.js?v=202606101400"></script>
+<script src="./frkl-action-status.js?v=202606101400"></script>
+<script src="./frkl-patterns.js?v=202606101400"></script>
+<script src="./frkl-creators.js?v=202606101400"></script>
+<script src="./frkl-creative-vision.js?v=202606101400"></script>
+<script src="./frkl-links.js?v=202606101400"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606101400"></script>
+<script src="./frkl-events.js?v=202606101400"></script>
+<script src="./frkl-products.js?v=202606101400"></script>
+<script src="./frkl-discount-codes.js?v=202606101400"></script>
+<script src="./frkl-cvr.js?v=202606101400"></script>
+<script src="./frkl-cohorts.js?v=202606101400"></script>
+<script src="./frkl-retention.js?v=202606101400"></script>
+<script src="./frkl-clarity.js?v=202606101400"></script>
+<script src="./frkl-board-read.js?v=202606101400"></script>
+<script src="./frkl-benchmarks.js?v=202606101400"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -1143,7 +1143,7 @@ function leadDaysForType(type){
 function supplierConfig(){ try { const s=JSON.parse(localStorage.getItem('oi_supplier_v1')||'null'); if(s && s.byType) return {byType:{...s.byType}}; } catch(e){} return {byType:{}}; }
 function saveSupplierConfig(next){ try { localStorage.setItem('oi_supplier_v1', JSON.stringify(next)); window.dispatchEvent(new Event('oi-supplier-updated')); } catch(e){} }
 function supplierFor(type){ const c=supplierConfig(); return (c.byType && c.byType[type]) || {}; }
-const REORDER_DEFAULTS = {safetyDays:14, coverDays:45};
+const REORDER_DEFAULTS = {safetyDays:14, coverDays:45, strategy:'jit', waves:3};
 function reorderConfig(){ try { const s=JSON.parse(localStorage.getItem('oi_reorder_v1')||'null'); if(s) return {...REORDER_DEFAULTS, ...s}; } catch(e){} return {...REORDER_DEFAULTS}; }
 function saveReorderConfig(next){ try { localStorage.setItem('oi_reorder_v1', JSON.stringify(next)); window.dispatchEvent(new Event('oi-supplier-updated')); } catch(e){} }
 function usePlanningTick(){ const [,f]=React.useState(0); React.useEffect(()=>{ const h=()=>f(x=>x+1); ['oi-supplier-updated','oi-leadtimes-updated','oi-costs-updated','oi-forecast-updated','oi-po-updated'].forEach(ev=>window.addEventListener(ev,h)); return ()=>['oi-supplier-updated','oi-leadtimes-updated','oi-costs-updated','oi-forecast-updated','oi-po-updated'].forEach(ev=>window.removeEventListener(ev,h)); }, []); return 0; }
@@ -1196,18 +1196,33 @@ function planReorder(){
   const B = (typeof window!=='undefined' && window.FRKL_BUSINESS) || {};
   const inv = (B.inventory||[]).filter(p=>p && p.status!=='ARCHIVED');
   const rc = reorderConfig(); const safety = Number(rc.safetyDays)||14, coverDays = Number(rc.coverDays)||45;
+  const strategy = rc.strategy||'jit'; const waves = Math.max(1, Math.round(Number(rc.waves)||3));
   const plan = demandScaleFactor(); const scale = plan.scale;
+  const horizonDays = (plan.months||3)*30.4;
   const po = poStatusAll(); const today = oiToday();
   const lines = inv.filter(p=>(p.dailyVelocity||0)>0).map(p=>{
-    const lead = leadDaysForType(p.type); const sup = supplierFor(p.type); const trigger = lead + safety;
-    const vel = (p.dailyVelocity||0)*scale; const cover = vel>0 ? (p.inventoryQty||0)/vel : 999;
-    const needs = cover <= trigger; const orderUpTo = Math.ceil(vel * (lead + coverDays));
-    let qty = Math.max(0, orderUpTo - (p.inventoryQty||0));
+    const lead = leadDaysForType(p.type); const sup = supplierFor(p.type); const stock = p.inventoryQty||0;
+    const vel = (p.dailyVelocity||0)*scale; const cover = vel>0 ? stock/vel : 999;
+    const forecastUnits = Math.ceil(vel*horizonDays);          // total planned demand over the horizon
+    let qty=0, needs=false, basis='cover', waveUnits=null, nextWaveBy=null;
+    if(strategy==='bulk'){
+      // commit the whole forecast horizon now, net of stock (+ safety buffer)
+      const target = forecastUnits + Math.ceil(vel*safety);
+      qty = Math.max(0, target - stock); needs = qty>0; basis='forecast';
+    } else if(strategy==='staged'){
+      // order the forecast in `waves`; each order covers lead + one wave's worth
+      const waveDays = horizonDays/waves; waveUnits = Math.ceil(vel*waveDays);
+      qty = Math.max(0, Math.ceil(vel*(lead+waveDays)) - stock); needs = cover <= lead+safety; basis='wave';
+      nextWaveBy = oiAddDays(today, Math.max(0, Math.round(cover - lead - safety)));
+    } else {
+      // just-in-time: lean rolling cover (lead + buffer)
+      qty = Math.max(0, Math.ceil(vel*(lead+coverDays)) - stock); needs = cover <= lead+safety; basis='cover';
+    }
     const moq = Number(sup.moq)||0; let moqBumped=false;
     if(qty>0 && moq>0 && qty<moq){ qty=moq; moqBumped=true; }
     const unitCost = (sup.unitCost!=null&&sup.unitCost!=='') ? Number(sup.unitCost) : (p.costPerItem!=null?p.costPerItem:null);
     const supplier = (sup.supplier&&sup.supplier.trim()) || p.vendor || p.type || 'Unassigned';
-    return {key:p.sku||p.title, p, lead, cover, needs, qty, moq, moqBumped, unitCost, supplier, lineCost: unitCost!=null?unitCost*qty:null};
+    return {key:p.sku||p.title, p, lead, cover, stock, vel, forecastUnits, needs, qty, basis, waveUnits, nextWaveBy, moq, moqBumped, unitCost, supplier, lineCost: unitCost!=null?unitCost*qty:null};
   });
   // auto-acknowledge: a raised/received PO whose Shopify stock has risen materially is closed
   const ackPending={};
@@ -1217,7 +1232,7 @@ function planReorder(){
   const toOrder = lines.filter(l=>l.needs && l.qty>0 && !l.poStatus).sort((a,b)=>a.cover-b.cover);
   const awaiting = lines.filter(l=>l.poStatus==='ordered').sort((a,b)=>(a.expected||'').localeCompare(b.expected||''));
   const approaching = lines.filter(l=>!l.needs && l.cover <= l.lead + coverDays && !l.poStatus).length;
-  return {inv, lines, toOrder, awaiting, approaching, ackPending, plan, scale, safety, coverDays};
+  return {inv, lines, toOrder, awaiting, approaching, ackPending, plan, scale, safety, coverDays, strategy, waves, horizonDays};
 }
 function leadDaysFor(type, cfg){
   cfg = cfg || leadConfig();
@@ -5308,6 +5323,47 @@ function cvrFindings(){
   }];
 }
 
+// ── Lightweight stats (no deps) — used to lift the CVR analysis from "here are
+// the numbers" to "is this gap even real, and what survives the confounds". ────
+function _mean(a){ return a.length? a.reduce((s,x)=>s+x,0)/a.length : 0; }
+function _normCdf(x){ const t=1/(1+0.2316419*Math.abs(x)); const d=0.3989423*Math.exp(-x*x/2);
+  const pr=d*t*(0.3193815+t*(-0.3565638+t*(1.781478+t*(-1.821256+t*1.330274)))); return x>0? 1-pr : pr; }
+// significance of a correlation: |r| past the ~95% two-sided line for n points
+function corrSig(r,n){ if(n<4) return false; const t=Math.abs(r)*Math.sqrt((n-2)/Math.max(1e-9,1-r*r)); return t>1.98; }
+// Wilson score interval for k successes of n (z=1.96 -> 95%)
+function wilson(k,n,z){ z=z||1.96; if(!n) return {p:0,lo:0,hi:0}; const p=k/n, z2=z*z, dn=1+z2/n;
+  const c=(p+z2/(2*n))/dn, h=(z*Math.sqrt(p*(1-p)/n+z2/(4*n*n)))/dn; return {p,lo:Math.max(0,c-h),hi:Math.min(1,c+h)}; }
+// Two-proportion z-test (two-sided p). k1/n1 vs k2/n2.
+function twoPropZ(k1,n1,k2,n2){ if(!n1||!n2) return {z:0,p:1}; const p1=k1/n1,p2=k2/n2,pp=(k1+k2)/(n1+n2);
+  const se=Math.sqrt(pp*(1-pp)*(1/n1+1/n2)); if(se===0) return {z:0,p:1}; const z=(p1-p2)/se; return {z,p:2*(1-_normCdf(Math.abs(z)))}; }
+// Solve Ax=b (Gaussian elimination, partial pivot). Returns null if singular.
+function _solve(A,b){ const n=b.length, M=A.map((r,i)=>[...r,b[i]]);
+  for(let c=0;c<n;c++){ let pv=c; for(let r=c+1;r<n;r++) if(Math.abs(M[r][c])>Math.abs(M[pv][c])) pv=r;
+    if(Math.abs(M[pv][c])<1e-12) return null; const tmp=M[c]; M[c]=M[pv]; M[pv]=tmp;
+    for(let r=0;r<n;r++){ if(r===c) continue; const fct=M[r][c]/M[c][c]; for(let j=c;j<=n;j++) M[r][j]-=fct*M[c][j]; } }
+  return M.map((r,i)=>r[n]/r[i][i]); }
+// OLS with intercept. Predictors are STANDARDIZED internally and a small ridge is
+// added — essential here because the candidate predictors (traffic shares) are
+// collinear and on wildly different scales; raw normal-equations would go singular
+// and silently return NaN. predictRow accepts RAW rows (standardisation applied).
+function ols(X,y,lam){ const n=X.length, k=(X[0]?X[0].length:0); if(n<k+2) return null;
+  const cols=Array.from({length:k},(_,j)=>X.map(r=>r[j]));
+  const mu=cols.map(_mean), sg=cols.map(c=>{ const m=_mean(c); return Math.sqrt(_mean(c.map(v=>(v-m)*(v-m))))||1; });
+  const Zs=Array.from({length:n},(_,i)=>cols.map((c,j)=>(c[i]-mu[j])/sg[j]));
+  const p=k+1, D=Zs.map(r=>[1,...r]);
+  const XtX=Array.from({length:p},()=>new Array(p).fill(0)), Xty=new Array(p).fill(0);
+  for(let i=0;i<n;i++){ for(let a=0;a<p;a++){ Xty[a]+=D[i][a]*y[i]; for(let b=0;b<p;b++) XtX[a][b]+=D[i][a]*D[i][b]; } }
+  const ridge=Math.max(lam||0, n*1e-3); for(let a=1;a<p;a++) XtX[a][a]+=ridge;   // ridge off the intercept
+  const beta=_solve(XtX,Xty); if(!beta) return null;
+  return {beta, mu, sg, predictRow:(r)=>{ let v=beta[0]; for(let j=0;j<k;j++) v+=beta[j+1]*((r[j]-mu[j])/sg[j]); return v; }}; }
+// Partial correlation of y with x controlling for the columns in Z (array of vectors).
+function partialCorr(x,y,Z){ const _r=(a,b)=>{ const v=pearson(a,b); return v==null?0:v; };
+  const n=x.length; if(n<6||!Z.length) return _r(x,y);
+  const rows=Array.from({length:n},(_,i)=> Z.map(z=>z[i]));
+  const fx=ols(rows,x), fy=ols(rows,y); if(!fx||!fy) return _r(x,y);
+  const rx=x.map((v,i)=> v-fx.predictRow(rows[i])), ry=y.map((v,i)=> v-fy.predictRow(rows[i]));
+  return _r(rx,ry); }
+
 // ── CVR drivers (Crux) — a clearer picture of conversion rate ────────────────
 // Three layers, strongest evidence first: (1) WHERE in the funnel CVR moved,
 // (2) WHETHER it's traffic-mix or the site itself, (3) WHAT correlates with it
@@ -5487,6 +5543,64 @@ function CvrDrivers(){
     return {pp,up,tiny,stages,lead,offset,consistent,against,topKind,verdict:topKind?KIND_VERDICT[topKind]:null};
   };
   const cmpStory = buildCmpStory();
+  // ── Significance on the A↔B CVR gap + Wilson CIs (CVR = orders ÷ sessions). ──
+  const ciA = cA? wilson(cA.orders,cA.sessions):null;
+  const ciB = cB? wilson(cB.orders,cB.sessions):null;
+  const gapSig = (cA&&cB)? twoPropZ(cA.orders,cA.sessions,cB.orders,cB.sessions):null;
+  const pTxt = (p)=> p<0.001?'p<0.001': p<0.01?'p<0.01': p<0.05?('p='+p.toFixed(3)): ('p='+p.toFixed(2));
+
+  // ── Deeper signal: confound-controlled drivers + expected-CVR residuals + the
+  // cleanest "natural experiment" pairs. Computed from the daily/weekly series. ──
+  const STAT = useMemo(()=>{
+    const dd = seriesDaily.length>=12 ? seriesDaily : series; const nD=dd.length;
+    const col = k => dd.map(d=> d[k]);
+    const ctrlKeys=['newShare','paidShare','mobileShare'];
+    const LEVERS=[
+      {k:'trueDiscountIntensity',label:'Discount depth (incl. sale)'},
+      {k:'discountIntensity',label:'Code/auto discount'},
+      {k:'bounce',label:'Bounce rate'},
+      {k:'engagement',label:'Engagement rate'},
+      {k:'emailSends',label:'Email sends'},
+      {k:'adSpend',label:'Ad spend'},
+      {k:'aov',label:'AOV'},
+      {k:'freeShipShare',label:'Free-shipping rate'},
+      {k:'altPayShare',label:'Alt-payment share'},
+      {k:'emailShare',label:'Email-traffic share'},
+    ];
+    const Zall=ctrlKeys.map(k=>col(k)); const y=col('cvr');
+    const drivers=LEVERS.map(L=>{ const x=col(L.k);
+      const X=[],Y=[],ZZ=ctrlKeys.map(()=>[]);
+      for(let i=0;i<nD;i++){ const xv=x[i],yv=y[i],zv=Zall.map(z=>z[i]);
+        if(xv==null||yv==null||zv.some(v=>v==null)) continue; X.push(xv); Y.push(yv); zv.forEach((v,j)=>ZZ[j].push(v)); }
+      if(X.length<8) return null;
+      const raw=(()=>{ const r=pearson(X,Y); return r==null?0:r; })();
+      const adj=partialCorr(X,Y,ZZ);
+      return {k:L.k,label:L.label,n:X.length,raw,adj,sig:corrSig(adj,X.length)};
+    }).filter(Boolean).sort((a,b)=>Math.abs(b.adj)-Math.abs(a.adj));
+    // expected-CVR residuals, weekly (interpretable)
+    const wk=series, mdl=['newShare','paidShare','mobileShare','trueDiscountIntensity'];
+    const rows=[],yy=[],idx=[];
+    wk.forEach((sx,i)=>{ const xv=mdl.map(k=>sx[k]); if(xv.some(v=>v==null)||sx.cvr==null) return; rows.push(xv); yy.push(sx.cvr); idx.push(i); });
+    let resid=null;
+    if(rows.length>=8){ const fit=ols(rows,yy);
+      if(fit){ const res=yy.map((v,i)=> v-fit.predictRow(rows[i])); const sd=Math.sqrt(_mean(res.map(r=>r*r)));
+        const byW={}; idx.forEach((wi,i)=>{ const w=wk[wi].w; byW[w]={exp:fit.predictRow(rows[i]),act:yy[i],e:res[i],z:sd?res[i]/sd:0}; });
+        resid={sd,byW,list:Object.keys(byW).map(w=>({w,...byW[w]})).filter(r=>Math.abs(r.z)>=1.3).sort((a,b)=>Math.abs(b.e)-Math.abs(a.e)).slice(0,5)};
+      } }
+    // clean "natural experiment" pairs: matched traffic, one lever differs
+    const mixKeys=['newShare','paidShare','mobileShare'];
+    const levers=[['trueDiscountIntensity','discount depth','pct'],['emailSends','email volume','num'],['freeShipShare','free-ship rate','pct'],['aov','AOV','gbp']];
+    const pairs=[];
+    for(let i=0;i<wk.length;i++) for(let j=i+1;j<wk.length;j++){ const A=wk[i],B=wk[j]; if(A.cvr==null||B.cvr==null) continue;
+      const lo=Math.min(A.sessions,B.sessions),hi=Math.max(A.sessions,B.sessions); if(hi<=0||lo/hi<0.7) continue;
+      if(!mixKeys.every(k=> A[k]!=null&&B[k]!=null&&Math.abs(A[k]-B[k])<=6)) continue;
+      let best=null; levers.forEach(([k,lab,t])=>{ if(A[k]==null||B[k]==null) return; const rel=relDiff(A[k],B[k]); if(!best||rel>best.rel) best={k,lab,t,rel,a:A[k],b:B[k]}; });
+      if(!best||best.rel<0.2) continue;
+      pairs.push({a:A.w,b:B.w,lever:best,cvrGap:Math.abs(A.cvr-B.cvr),score:best.rel*Math.abs(A.cvr-B.cvr)});
+    }
+    return {drivers, resid, cleanPairs:pairs.sort((x,y)=>y.score-x.score).slice(0,3)};
+  }, [seriesDaily, series]);
+
   const fmtMetric=(k,v)=> fmtVal(cmType[k]||'pct', v);
   const cmpAskAI = ()=>{ if(!window.__oiAsk||!cA||!cB||!cmpStory) return; const S=cmpStory; const u=gran==='day'?'day':'week';
     const fld=(c)=>`CVR ${c.cvr}%, sessions ${NUM(c.sessions)} | funnel: session→cart ${c.s2c}%, cart→checkout ${c.c2co}%, checkout→purchase ${c.co2p}% | new-visitor ${c.newShare}%, paid ${c.paidShare}%, email ${c.emailShare}%, mobile ${c.mobileShare}%, bounce ${c.bounce}%, engagement ${c.engagement}% | discount(incl. sale) ${c.trueDiscountIntensity}%, free-ship ${c.freeShipShare}%, AOV ${GBP(c.aov)}`;
@@ -5637,11 +5751,18 @@ function CvrDrivers(){
         <button onClick={()=>setCmp(defaultPair(panel))} title="Auto-pick the clearest pair: similar traffic, biggest CVR gap" style={{fontSize:12,fontWeight:600,padding:'6px 12px',borderRadius:8,cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-muted)'}}>↻ Best pair</button>
         {(cmp.a||cmp.b) && <button onClick={()=>setCmp({a:null,b:null})} style={{fontSize:12,fontWeight:600,padding:'6px 12px',borderRadius:8,cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-muted)'}}>✕ Clear</button>}
       </div>
+      {gran==='week' && STAT.cleanPairs && STAT.cleanPairs.length>0 && <div style={{marginBottom:12}}>
+        <div style={{fontSize:10.5,textTransform:'uppercase',letterSpacing:'.04em',color:'var(--text-faint)',marginBottom:5}}>Cleanest tests — matched traffic, one lever differs <span title="Week pairs where traffic mix (new/paid/mobile share) and volume are near-identical, so the CVR gap is mostly attributable to the single lever shown. The lowest-confound comparisons in your data — the closest thing to a natural experiment." style={{cursor:'help',color:'var(--text-muted)'}}>ⓘ</span></div>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{STAT.cleanPairs.map((p,i)=>{ const A=byW[p.a],B=byW[p.b]; if(!A||!B) return null; const f=(t,v)=> t==='pct'?Math.round(v)+'%': t==='gbp'?GBP(v): NUM(v);
+          return (<button key={i} onClick={()=>setCmp({a:p.a,b:p.b})} title="Load this low-confound pair" style={{fontSize:11.5,padding:'5px 10px',borderRadius:8,cursor:'pointer',border:'1px solid rgba(110,231,183,0.3)',background:'rgba(110,231,183,0.08)',color:'var(--text-secondary)',textAlign:'left'}}>
+            <b style={{color:'#6ee7b7'}}>{p.lever.lab}</b> {f(p.lever.t,p.lever.a)}→{f(p.lever.t,p.lever.b)} <span style={{color:'var(--text-faint)'}}>· {fmtWk(p.a)} vs {fmtWk(p.b)} · ΔCVR {p.cvrGap.toFixed(2)}pp</span>
+          </button>); })}</div>
+      </div>}
       {cA&&cB&&<>
         <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:12}}>
-          {tile(lbl(cA), cA.cvr+'%', `${NUM(cA.sessions)} sessions · ${NUM(cA.orders)} orders`, cA.cvr>=cB.cvr?'#4ade80':'var(--text-primary)')}
-          {tile(lbl(cB), cB.cvr+'%', `${NUM(cB.sessions)} sessions · ${NUM(cB.orders)} orders`, cB.cvr>=cA.cvr?'#4ade80':'var(--text-primary)')}
-          {tile('CVR gap', `${(Math.abs(cA.cvr-cB.cvr)).toFixed(2)}pp`, sessClose?'on near-identical sessions — a clean comparison':'sessions differ — read with care', sessClose?'#9aa6ff':'#f5b544')}
+          {tile(lbl(cA), cA.cvr+'%', `${NUM(cA.orders)}/${NUM(cA.sessions)} · 95% CI ${ciA?(ciA.lo*100).toFixed(2)+'–'+(ciA.hi*100).toFixed(2)+'%':'—'}`, cA.cvr>=cB.cvr?'#4ade80':'var(--text-primary)')}
+          {tile(lbl(cB), cB.cvr+'%', `${NUM(cB.orders)}/${NUM(cB.sessions)} · 95% CI ${ciB?(ciB.lo*100).toFixed(2)+'–'+(ciB.hi*100).toFixed(2)+'%':'—'}`, cB.cvr>=cA.cvr?'#4ade80':'var(--text-primary)')}
+          {tile('CVR gap', `${(Math.abs(cA.cvr-cB.cvr)).toFixed(2)}pp`, gapSig?(gapSig.p<0.05?`${pTxt(gapSig.p)} — a real difference`:`${pTxt(gapSig.p)} — within sampling noise`):'', gapSig?(gapSig.p<0.05?'#4ade80':'#f5b544'):'#9aa6ff')}
         </div>
         {movers.length>0 && <div style={{marginBottom:10}}>
           <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'var(--text-faint)',marginBottom:5}}>Biggest differences</div>
@@ -5655,6 +5776,9 @@ function CvrDrivers(){
               <span style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#9aa6ff',fontWeight:700}}>✦ Why the difference — likely drivers</span>
               <span style={{fontSize:11,color:'var(--text-faint)'}} title={agentTitle('Pulse')}>◆ Pulse · auto-diagnosis from the metric model</span>
             </div>
+            {gapSig && (gapSig.p<0.05
+              ? <div style={{fontSize:11.5,color:'#4ade80',marginBottom:8,fontWeight:600}}>✓ The CVR gap is statistically real ({pTxt(gapSig.p)}, two-proportion test) — worth explaining.</div>
+              : <div style={{fontSize:12,color:'#f5b544',marginBottom:8,padding:'7px 10px',borderRadius:8,background:'rgba(245,181,68,0.08)',border:'1px solid rgba(245,181,68,0.25)'}}>⚠ This CVR gap is within sampling noise ({pTxt(gapSig.p)}) — only {NUM(cA.orders)} vs {NUM(cB.orders)} orders on these {gran==='day'?'days':'weeks'}. Treat the read below as a weak hypothesis, not a finding; a wider-apart or higher-volume pair gives a cleaner signal.</div>)}
             {S.tiny
               ? <div style={{fontSize:12.5,color:'var(--text-muted)'}}>CVR is essentially flat between these two ({S.pp>=0?'+':''}{S.pp}pp). The inputs below shifted but netted out — there's no real conversion difference to explain. Pick a wider-apart pair to see a driver story.</div>
               : <div style={{fontSize:12.5,color:'var(--text-secondary)',lineHeight:1.55}}>
@@ -5664,6 +5788,8 @@ function CvrDrivers(){
                     : <span style={{color:'var(--text-muted)'}}>nothing else moved much — the tracked inputs don't explain this gap, so suspect data noise or an untracked factor.</span>}</div>
                   {S.against.length>0 && <div style={{marginBottom:6}}><b style={{color:'#7c8cff'}}>3 · Against the grain.</b> {S.against.map((d,i)=><span key={d.k}>{i>0?'; ':''}<b>{cmLabel[d.k]}</b> {fmtMetric(d.k,d.a)}→{fmtMetric(d.k,d.b)}</span>)} usually push{S.against.length>1?'':'es'} CVR the other way — so the {S.up?'gain':'drop'} happened <i>despite</i> {S.against.length>1?'them':'it'}, which sharpens the diagnosis.</div>}
                   {S.verdict && <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--border-subtle)'}}><b style={{color:vcol}}>Likely driver:</b> <span style={{color:'var(--text-secondary)'}}>{S.verdict}</span> <span style={{color:'var(--text-faint)'}}>{sessClose?'Sessions are near-identical, so this is a relatively clean read.':'Sessions differ a lot here — volume itself shifts the mix, so read with care.'} Two periods is correlation, not proof.</span></div>}
+                  {STAT.resid && STAT.resid.byW[cmp.b] && (()=>{ const rB=STAT.resid.byW[cmp.b]; const unexp=Math.abs(rB.z)>=1.3;
+                    return (<div style={{marginTop:6,fontSize:11.5,color:'var(--text-faint)'}}><b style={{color:unexp?'#9aa6ff':'var(--text-muted)'}}>Mix-adjusted:</b> after modelling CVR from traffic mix + discount, {lbl(cB)} lands <b style={{color:rB.e>=0?'#4ade80':'#ef6b6f'}}>{rB.e>=0?'+':''}{rB.e.toFixed(2)}pp</b> vs expected ({(rB.exp).toFixed(2)}%) — {unexp?'a genuinely un-modelled move, the kind worth a controlled test':'about what the model predicts, so most of the gap is explained by the inputs'}.</div>); })()}
                 </div>}
             <div onClick={cmpAskAI} style={{marginTop:9,fontSize:12,color:'#9aa6ff',cursor:'pointer',fontWeight:600}}>✦ Ask AI to dig deeper into this pair →</div>
           </div>); })()}
@@ -5757,6 +5883,39 @@ function CvrDrivers(){
         <div style={{fontSize:11,color:'var(--text-faint)',marginTop:2}}>{d.note}</div>
       </div>))}</div>
       <div className="note" style={{marginTop:12}}><b>Correlation ≠ causation.</b> This ranks what moves <i>with</i> CVR day-to-day; the funnel and mix sections above are stronger evidence. ⚑-flagged drivers (paid share, new-visitor share, traffic volume, spend) mostly reflect <i>who</i> is visiting, not a site lever. <b>Next:</b> {test} <span style={{color:'var(--text-faint)'}}>Significance: |r| past the ~95% line for the sample (n shown); “ns” = not significant. Bounce ≈ 1−engagement, so they’re one signal shown twice.</span></div>
+    </div>
+
+    <div className="card" style={{marginTop:14}}>
+      <div className="card-section-title"><h2 style={{margin:0}}>4 · Deeper signal <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>— what survives the confounds</span></h2>
+        <span className="meta">Pulse · partial correlations + an expected-CVR model{STAT.drivers[0]?` · n=${STAT.drivers[0].n} ${seriesDaily.length>=12?'days':'weeks'}`:''}</span></div>
+      {STAT.drivers.length>0 ? <>
+      <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#7c8cff',marginBottom:6}}>Levers, mix-adjusted — independent link to CVR after holding traffic mix constant</div>
+      <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:12.5}}>
+        <thead><tr style={{textAlign:'left',color:'var(--text-faint)',fontSize:10.5,textTransform:'uppercase',letterSpacing:'.04em'}}>
+          <th style={{padding:'4px 8px 4px 0'}}>Lever</th><th style={{padding:'4px 8px',textAlign:'right'}}>Raw r</th><th style={{padding:'4px 8px',width:120}}>Mix-adjusted</th><th style={{padding:'4px 8px',textAlign:'right'}}>Adj r</th><th style={{padding:'4px 8px'}}></th></tr></thead>
+        <tbody>{STAT.drivers.map(d=>{ const w=Math.round(Math.min(Math.abs(d.adj),1)*46); const pos=d.adj>=0; const col=d.sig?(pos?'#4ade80':'#ef6b6f'):'var(--text-faint)';
+          const collapsed=Math.abs(d.raw)>=0.12 && Math.abs(d.adj)<Math.abs(d.raw)*0.5;
+          return (<tr key={d.k} style={{borderTop:'1px solid var(--border-subtle)'}}>
+            <td style={{padding:'6px 8px 6px 0',fontWeight:600}}>{d.label}{!d.sig&&<span style={{color:'var(--text-faint)',fontWeight:400,fontSize:10.5}}> · ns</span>}</td>
+            <td style={{padding:'6px 8px',textAlign:'right',color:'var(--text-faint)'}}>{d.raw>=0?'+':''}{d.raw.toFixed(2)}</td>
+            <td style={{padding:'6px 8px'}}><div style={{position:'relative',height:12,background:'var(--surface-2,#15151b)',borderRadius:3}}><div style={{position:'absolute',left:'50%',top:0,bottom:0,width:1,background:'#3a3a44'}}/><div style={{position:'absolute',top:2,bottom:2,borderRadius:2,background:col,left:(pos?50:(50-w))+'%',width:w+'%'}}/></div></td>
+            <td style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:col}}>{d.adj>=0?'+':''}{d.adj.toFixed(2)}</td>
+            <td style={{padding:'6px 8px',fontSize:10.5,color:collapsed?'#f5b544':'var(--text-faint)'}}>{collapsed?'mostly mix':(d.sig?'holds':'')}</td>
+          </tr>); })}</tbody>
+      </table></div>
+      <div className="note" style={{marginTop:8}}>Each lever's correlation with daily CVR <b>after removing traffic mix</b> (new / paid / mobile share) via partial regression. Where the adjusted figure holds near the raw one, the signal is genuinely that lever; where it collapses toward 0 (<span style={{color:'#f5b544'}}>“mostly mix”</span>), the raw correlation was really just <i>who</i> visited. This is the honest read on what's actually moveable. “ns” = not significant at n shown.</div>
+      </> : <div className="note">Not enough clean daily history yet to separate levers from traffic mix.</div>}
+
+      {STAT.resid && <div style={{marginTop:16}}>
+        <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#7c8cff',marginBottom:6}}>Unexplained CVR weeks — actual vs an expected-CVR model</div>
+        {STAT.resid.list.length? <div style={{display:'flex',flexDirection:'column',gap:6}}>{STAT.resid.list.map(r=>{ const pos=r.e>=0;
+          return (<div key={r.w} style={{display:'flex',justifyContent:'space-between',gap:10,padding:'6px 10px',borderRadius:8,background:'var(--surface-1,#111116)',border:'1px solid var(--border-subtle)'}}>
+            <span><b>{fmtWk(r.w)}</b> <span style={{color:'var(--text-faint)'}}>actual {r.act.toFixed(2)}% vs expected {r.exp.toFixed(2)}%</span></span>
+            <span style={{fontWeight:700,color:pos?'#4ade80':'#ef6b6f'}}>{pos?'+':''}{r.e.toFixed(2)}pp unexplained</span>
+          </div>); })}</div>
+          : <div className="note">No week deviates much from the model — over this window CVR is well-explained by traffic mix + discount, so there's no off-model anomaly to chase.</div>}
+        <div className="note" style={{marginTop:8}}>Expected CVR is modelled (OLS) from traffic mix + discount depth; big residuals are weeks where <b>something not in the model</b> moved CVR — a site change, a tracking break, a one-off promo — i.e. the genuine “investigate this” list, already stripped of the mix confound. Click a flagged week on the chart above to compare it.</div>
+      </div>}
     </div>
   </div>);
 }
@@ -9039,8 +9198,8 @@ function RestockActionQueue(){
         return (<div key={idx} style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',padding:'8px 0',borderTop:idx?'1px solid var(--border-subtle)':'none'}}>
           <span style={{width:8,height:8,borderRadius:'50%',background:urgent?'var(--bad)':'var(--warn)',flexShrink:0}}/>
           <div style={{flex:1,minWidth:200}}>
-            <div style={{fontSize:13,color:'var(--text-primary)'}}>Raise PO — <b>{NUM(l.qty)} units</b> of {l.p.title}</div>
-            <div style={{fontSize:11,color:'var(--text-faint)',marginTop:1}}>{l.supplier} · runs out in ~{Math.round(l.cover)}d (lead {l.lead}d){l.lineCost!=null?` · ~£${k(l.lineCost)}`:''}{l.moqBumped?` · MOQ ${l.moq}`:''}</div>
+            <div style={{fontSize:13,color:'var(--text-primary)'}}>{l.basis==='forecast'?'Order for forecast':'Raise PO'} — <b>{NUM(l.qty)} units</b> of {l.p.title}</div>
+            <div style={{fontSize:11,color:'var(--text-faint)',marginTop:1}}>{l.supplier} · {l.basis==='forecast'?`plan needs ${NUM(l.forecastUnits)}, have ${NUM(l.stock)}`:`runs out in ~${Math.round(l.cover)}d (lead ${l.lead}d)`}{l.lineCost!=null?` · ~£${k(l.lineCost)}`:''}{l.moqBumped?` · MOQ ${l.moq}`:''}</div>
           </div>
           <button style={{...btn,background:'var(--accent)',color:'#fff',borderColor:'var(--accent)'}} onClick={()=>raise(l)}><Icon name="check" size={12}/> Mark PO raised</button>
           <button style={btn} onClick={()=>window.__oiNav&&window.__oiNav('planning','production')}>Open planner</button>
@@ -9406,7 +9565,8 @@ function BusinessReview(){
 function ProductionPlanner(){
   usePlanningTick();
   const R = planReorder();
-  const {inv, toOrder, awaiting, approaching, ackPending, plan, scale, safety, coverDays} = R;
+  const {inv, toOrder, awaiting, approaching, ackPending, plan, scale, safety, coverDays, strategy, waves, horizonDays} = R;
+  const STRAT = {jit:'Just-in-time', bulk:'Bulk upfront', staged:'Staged waves'};
   // persist auto-acknowledgements (stock landed in Shopify → close the PO)
   const ackKeys = Object.keys(ackPending||{});
   React.useEffect(()=>{ if(ackKeys.length){ ackKeys.forEach(key=>clearPoStatus(key)); } }, [ackKeys.join(',')]);
@@ -9453,7 +9613,9 @@ function ProductionPlanner(){
   const setSup = (t,field,val)=>setSupDraft(d=>({...d, [t]:{...d[t], [field]:val}}));
   const [safDraft, setSafDraft] = useState(String(rc.safetyDays));
   const [covDraft, setCovDraft] = useState(String(rc.coverDays));
-  const saveSettings = ()=>{ saveReorderConfig({safetyDays:Number(safDraft)||14, coverDays:Number(covDraft)||45}); setSetOpen(false); toast('Reorder policy saved', {kind:'good'}); };
+  const [stratDraft, setStratDraft] = useState(rc.strategy||'jit');
+  const [wavesDraft, setWavesDraft] = useState(String(rc.waves||3));
+  const saveSettings = ()=>{ saveReorderConfig({safetyDays:Number(safDraft)||14, coverDays:Number(covDraft)||45, strategy:stratDraft, waves:Math.max(1,Number(wavesDraft)||3)}); setSetOpen(false); toast('Reorder policy saved', {kind:'good', body:STRAT[stratDraft]}); };
 
   const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:12.5,fontWeight:600,padding:'7px 13px',borderRadius:8,border:'1px solid var(--border-default)',background:'var(--bg-elevated)',color:'var(--text-primary)',cursor:'pointer'};
   const smbtn = {...btn, fontSize:11.5, padding:'5px 10px'};
@@ -9479,7 +9641,13 @@ function ProductionPlanner(){
           <button style={btn} onClick={()=>setSetOpen(o=>!o)}><Icon name="sliders" size={13}/> Reorder policy</button>
         </div>
       </div>
-      <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:11,lineHeight:1.5}}>Reorder triggers when a product's stock cover falls within its <b>lead time + {safety}d safety</b>. Suggested quantity orders up to <b>{coverDays}d of cover beyond lead</b>, then rounds up to the supplier MOQ. {approaching>0?`${approaching} more product${approaching===1?'':'s'} will cross the trigger soon. `:''}Drafts only — nothing is sent to suppliers automatically.</div>
+      <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:11,lineHeight:1.5}}>
+        Strategy: <b style={{color:'var(--text-secondary)'}}>{STRAT[strategy]}</b> · <a className="txt-link" style={{cursor:'pointer'}} onClick={()=>setSetOpen(o=>!o)}>change</a>. {strategy==='bulk'
+          ? <>Provisioning the full <b>{Math.round((horizonDays/30.4))}-month</b> demand plan upfront — each product's order is its planned demand (split by historic mix) net of stock, then rounded to MOQ.</>
+          : strategy==='staged'
+          ? <>Ordering the forecast in <b>{waves} waves</b>; each order covers lead + one wave, and the next wave's order-by date is shown per line.</>
+          : <>Lean / JIT — reorder triggers when cover falls within <b>lead + {safety}d safety</b>, ordering up to <b>{coverDays}d beyond lead</b>, rounded to MOQ.</>}
+        {approaching>0?` ${approaching} more will cross the trigger soon.`:''} Drafts only — nothing is sent to suppliers automatically.</div>
       {plan.active && (<div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginTop:10,padding:'8px 12px',borderRadius:8,background:'var(--accent-bg)',border:'1px solid var(--border-subtle)'}}>
         <Icon name="trendUp" size={14} style={{color:'var(--accent)'}}/>
         <span style={{fontSize:12,color:'var(--text-secondary)'}}>Orders are sized to your demand plan — <b style={{color:'var(--text-primary)'}}>{plan.growthPct>=0?'+':''}{plan.growthPct.toFixed(0)}% vs run-rate</b> ({plan.mode==='growth'?'growth target':plan.mode==='units'?'units target':'revenue target'}), not flat velocity.</span>
@@ -9506,9 +9674,23 @@ function ProductionPlanner(){
     {/* reorder policy editor */}
     {setOpen && (<div className="card" style={{borderLeft:'3px solid var(--accent)'}}>
       <div style={{fontSize:13,fontWeight:700,marginBottom:9}}>Reorder policy</div>
+      <div style={{fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',marginBottom:6}}>Ordering strategy</div>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:6}}>
+        {[['jit','Just-in-time','Lean — order small, rolling batches to cover lead time + a buffer. Least cash tied up.'],
+          ['bulk','Bulk upfront','Commit the whole forecast horizon now (e.g. all of Q4), net of stock. Best for peaks, MOQ economics, supply risk.'],
+          ['staged','Staged waves','Split the forecast into scheduled waves with order-by dates — a middle path.']].map(([id,label,desc])=>(
+          <button key={id} onClick={()=>setStratDraft(id)} title={desc} style={{...btn, padding:'6px 12px', background:stratDraft===id?'var(--accent)':'var(--bg-elevated)', color:stratDraft===id?'#fff':'var(--text-secondary)', borderColor:stratDraft===id?'var(--accent)':'var(--border-default)'}}>{label}</button>
+        ))}
+      </div>
+      <div style={{fontSize:11,color:'var(--text-faint)',marginBottom:12,lineHeight:1.5,maxWidth:620}}>
+        {stratDraft==='jit' && 'Lean / JIT — keeps capital free; reorders roll as stock depletes. The forecast still scales each run-rate, but you commit in small batches.'}
+        {stratDraft==='bulk' && `Bulk — orders the full ${plan&&plan.months?plan.months:3}-month demand plan upfront (set the target in Forecast & demand), tailored per product by historic sales mix, net of what you hold. Maximises availability; ties up more cash.`}
+        {stratDraft==='staged' && `Staged — provisions the forecast in waves, each with an order-by date so stock arrives just before it's needed. Balances availability against cash.`}
+      </div>
       <div style={{display:'flex',gap:18,flexWrap:'wrap',alignItems:'flex-end'}}>
         <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}}>Safety stock (days)<input type="number" style={{...inp,width:90}} value={safDraft} onChange={e=>setSafDraft(e.target.value)}/></label>
-        <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}}>Order-up-to cover beyond lead (days)<input type="number" style={{...inp,width:90}} value={covDraft} onChange={e=>setCovDraft(e.target.value)}/></label>
+        {stratDraft==='jit' && <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}}>Order-up-to cover beyond lead (days)<input type="number" style={{...inp,width:90}} value={covDraft} onChange={e=>setCovDraft(e.target.value)}/></label>}
+        {stratDraft==='staged' && <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}}>Number of waves<input type="number" style={{...inp,width:90}} value={wavesDraft} onChange={e=>setWavesDraft(e.target.value)}/></label>}
         <button style={btn} onClick={saveSettings}>Save policy</button><button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setSetOpen(false)}>Cancel</button>
       </div>
     </div>)}
@@ -9528,7 +9710,7 @@ function ProductionPlanner(){
         <th style={th}>Product</th><th style={{...th,textAlign:'right'}}>Stock</th><th style={{...th,textAlign:'right'}}>Cover</th><th style={{...th,textAlign:'right'}}>Order qty</th><th style={{...th,textAlign:'right'}}>Unit £</th><th style={{...th,textAlign:'right'}}>Line £</th>
       </tr></thead><tbody>
         {po.lines.map((l,idx)=>(<tr key={idx}>
-          <td style={{...td,color:'var(--text-primary)'}}>{l.p.title}<div style={{fontSize:10.5,color:'var(--text-faint)'}}>{l.p.sku||'no SKU'} · {l.p.type}{l.moqBumped?' · MOQ '+l.moq:''}</div></td>
+          <td style={{...td,color:'var(--text-primary)'}}>{l.p.title}<div style={{fontSize:10.5,color:'var(--text-faint)'}}>{l.p.sku||'no SKU'} · {l.p.type}{l.basis==='forecast'?` · plan needs ${NUM(l.forecastUnits)}`:''}{l.basis==='wave'&&l.nextWaveBy?` · next wave by ${l.nextWaveBy}`:''}{l.moqBumped?' · MOQ '+l.moq:''}</div></td>
           <td style={{...td,textAlign:'right'}}>{NUM(l.p.inventoryQty)}</td>
           <td style={{...td,textAlign:'right',color:l.cover<=l.lead?'var(--bad)':'var(--warn)'}}>{Math.round(l.cover)}d</td>
           <td style={{...td,textAlign:'right',fontWeight:700,color:'var(--text-primary)'}}>{NUM(l.qty)}</td>
