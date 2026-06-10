@@ -19,24 +19,24 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606093700"></script>
-<script src="./frkl-live-data.js?v=202606093700"></script>
-<script src="./frkl-agent-insights.js?v=202606093700"></script>
-<script src="./frkl-business-data.js?v=202606093700"></script>
-<script src="./frkl-action-status.js?v=202606093700"></script>
-<script src="./frkl-patterns.js?v=202606093700"></script>
-<script src="./frkl-creators.js?v=202606093700"></script>
-<script src="./frkl-creative-vision.js?v=202606093700"></script>
-<script src="./frkl-links.js?v=202606093700"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606093700"></script>
-<script src="./frkl-events.js?v=202606093700"></script>
-<script src="./frkl-products.js?v=202606093700"></script>
-<script src="./frkl-discount-codes.js?v=202606093700"></script>
-<script src="./frkl-cvr.js?v=202606093700"></script>
-<script src="./frkl-cohorts.js?v=202606093700"></script>
-<script src="./frkl-retention.js?v=202606093700"></script>
-<script src="./frkl-clarity.js?v=202606093700"></script>
-<script src="./frkl-board-read.js?v=202606093700"></script>
+<script src="./frkl-data-loader.js?v=202606093800"></script>
+<script src="./frkl-live-data.js?v=202606093800"></script>
+<script src="./frkl-agent-insights.js?v=202606093800"></script>
+<script src="./frkl-business-data.js?v=202606093800"></script>
+<script src="./frkl-action-status.js?v=202606093800"></script>
+<script src="./frkl-patterns.js?v=202606093800"></script>
+<script src="./frkl-creators.js?v=202606093800"></script>
+<script src="./frkl-creative-vision.js?v=202606093800"></script>
+<script src="./frkl-links.js?v=202606093800"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606093800"></script>
+<script src="./frkl-events.js?v=202606093800"></script>
+<script src="./frkl-products.js?v=202606093800"></script>
+<script src="./frkl-discount-codes.js?v=202606093800"></script>
+<script src="./frkl-cvr.js?v=202606093800"></script>
+<script src="./frkl-cohorts.js?v=202606093800"></script>
+<script src="./frkl-retention.js?v=202606093800"></script>
+<script src="./frkl-clarity.js?v=202606093800"></script>
+<script src="./frkl-board-read.js?v=202606093800"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -1222,6 +1222,9 @@ const AGENT_ROLE = {
 };
 function agentRole(name){ return AGENT_ROLE[name] || null; }
 function agentTitle(name){ const r=agentRole(name); return r ? `${name} — ${r}` : (name||''); }
+// Axis tick formatter that keeps precision on small-range axes (e.g. visibility
+// 0–3%): 1 dp under 10 so ticks stay distinct, integers above. Trailing .0 stripped.
+function niceTick(v){ if(v==null||isNaN(v)) return v; return (+(v).toFixed(Math.abs(v)<10?1:0)).toString(); }
 let ACTIVE_END = REAL_END;
 function setActiveEnd(e){ ACTIVE_END = e || REAL_END; }
 
@@ -5549,8 +5552,8 @@ function ProductSignal(){
     <R.ResponsiveContainer width="100%" height={300}>
       <R.ScatterChart margin={{top:10,right:20,left:10,bottom:24}}>
         <R.CartesianGrid stroke="#1f1f27"/>
-        <R.XAxis type="number" dataKey="x" name="Visibility" unit="%" domain={[z.view[0],z.view[1]]} allowDataOverflow tickFormatter={v=>Math.round(v)} tick={{fill:'#7e7e8a',fontSize:11}} label={{value:'Visibility — % of all product views', position:'insideBottom', offset:-12, fill:'#6f6f7b', fontSize:11}}/>
-        <R.YAxis type="number" dataKey="y" name={L.short} unit="%" domain={[z.view[2],z.view[3]]} allowDataOverflow tickFormatter={v=>Math.round(v)} tick={{fill:'#7e7e8a',fontSize:11}} label={{value:L.label, angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
+        <R.XAxis type="number" dataKey="x" name="Visibility" unit="%" domain={[z.view[0],z.view[1]]} allowDataOverflow tickFormatter={niceTick} tick={{fill:'#7e7e8a',fontSize:11}} label={{value:'Visibility — % of all product views', position:'insideBottom', offset:-12, fill:'#6f6f7b', fontSize:11}}/>
+        <R.YAxis type="number" dataKey="y" name={L.short} unit="%" domain={[z.view[2],z.view[3]]} allowDataOverflow tickFormatter={niceTick} tick={{fill:'#7e7e8a',fontSize:11}} label={{value:L.label, angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
         <R.ZAxis type="number" dataKey="z" range={[25,320]} name="views"/>
         <R.ReferenceLine x={medPct} stroke="#3a3a44" strokeDasharray="4 3"/>
         <R.ReferenceLine y={+(L.ref*100).toFixed(1)} stroke="#3a3a44" strokeDasharray="4 3"/>
@@ -8645,9 +8648,9 @@ function ProductRetentionMatrix(){
     <R.ResponsiveContainer width="100%" height={330}>
       <R.ScatterChart margin={{top:10,right:24,left:6,bottom:26}}>
         <R.CartesianGrid stroke="#1f1f27"/>
-        <R.XAxis type="number" dataKey="x" name="Retention" unit="%" domain={[z.view[0],z.view[1]]} allowDataOverflow tickFormatter={v=>Math.round(v)} tick={{fill:'#7e7e8a',fontSize:11}}
+        <R.XAxis type="number" dataKey="x" name="Retention" unit="%" domain={[z.view[0],z.view[1]]} allowDataOverflow tickFormatter={niceTick} tick={{fill:'#7e7e8a',fontSize:11}}
           label={{value:'Repeat rate of acquired customers →', position:'insideBottom', offset:-14, fill:'#6f6f7b', fontSize:11}}/>
-        <R.YAxis type="number" dataKey="y" name="Acquired" domain={[z.view[2],z.view[3]]} allowDataOverflow tickFormatter={v=>Math.round(v)} tick={{fill:'#7e7e8a',fontSize:11}}
+        <R.YAxis type="number" dataKey="y" name="Acquired" domain={[z.view[2],z.view[3]]} allowDataOverflow tickFormatter={niceTick} tick={{fill:'#7e7e8a',fontSize:11}}
           label={{value:'Customers acquired', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
         <R.ZAxis type="number" dataKey="z" range={[50,520]} name="LTV"/>
         <R.ReferenceLine x={brandRep} stroke="#5a5a66" strokeDasharray="4 3"/>
