@@ -5248,6 +5248,19 @@ function CvrDrivers(){
     return best?{a:best.a,b:best.b}:{a:p[0]&&p[0].w,b:p[0]&&p[0].w};
   };
   const [cmp,setCmp] = useState(()=>defaultPair(series));
+  // ── Click-to-select period picker (replaces the two dropdowns) ──
+  // Tap a period to fill slot A, tap another for slot B; the table builds the
+  // moment both are set. Tapping a selected period clears it. Far fewer
+  // keystrokes than open-scroll-select on two dropdowns.
+  const [picker,setPicker] = useState(false);
+  const pickPeriod = (w)=>{ const p=cmp; let n;
+    if(p.a===w)      n={a:null,b:p.b};   // deselect A
+    else if(p.b===w) n={a:p.a,b:null};   // deselect B
+    else if(!p.a)    n={a:w,b:p.b};      // fill A
+    else if(!p.b)    n={a:p.a,b:w};      // fill B
+    else             n={a:w,b:null};     // both full → start a fresh pair
+    setCmp(n); if(n.a&&n.b) setPicker(false);
+  };
   const switchGran = (g)=>{ setGran(g); setCmp(defaultPair(g==='day'?seriesDaily:series)); };
   const lbl = (s)=> (gran==='day'?'':'wc ')+fmtWk(s.w);
   const CMP_METRICS=[
@@ -5286,6 +5299,17 @@ function CvrDrivers(){
   const sessClose = (cA&&cB)?(Math.min(cA.sessions,cB.sessions)/Math.max(cA.sessions,cB.sessions)>=0.8):false;
   const dlt=(r)=>{ if(r.a==null||r.b==null) return '—'; const d=r.b-r.a; const s=d>=0?'+':''; return r.t==='pct'?`${s}${d.toFixed(1)}pp`: r.t==='gbp'?`${d>=0?'+':'-'}${GBP(Math.abs(d))}`:`${s}${NUM(d)}`; };
   const weekOpt=(s)=>(<option key={s.w} value={s.w}>{`${gran==='day'?'':'wc '}${fmtWk(s.w)} · ${s.cvr}% CVR · ${NUM(s.sessions)} sess`}</option>);
+  // A single selectable period as a clickable chip (slot A = blue, B = green).
+  const periodChip=(s)=>{ const isA=cmp.a===s.w, isB=cmp.b===s.w, col=isA?'#7c8cff':isB?'#4ade80':null;
+    return (<button key={s.w} onClick={()=>pickPeriod(s.w)}
+      title={`${lbl(s)} · ${s.cvr}% CVR · ${NUM(s.sessions)} sessions${s.orders!=null?` · ${NUM(s.orders)} orders`:''}${(isA||isB)?` — tap to clear ${isA?'A':'B'}`:''}`}
+      style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:12,fontWeight:(isA||isB)?700:500,padding:'5px 10px',borderRadius:8,cursor:'pointer',whiteSpace:'nowrap',
+        border:'1px solid '+(col||'var(--border-subtle)'),
+        background:col?(isA?'rgba(124,140,255,0.16)':'rgba(74,222,128,0.14)'):'var(--surface-1,#111116)',
+        color:col||'var(--text-secondary)'}}>
+      {(isA||isB)&&<span style={{fontSize:9.5,fontWeight:800,width:14,height:14,borderRadius:4,display:'inline-flex',alignItems:'center',justifyContent:'center',background:col,color:'#0b0b10'}}>{isA?'A':'B'}</span>}
+      <span>{lbl(s)}</span><span style={{color:col||'var(--text-faint)',fontWeight:600,opacity:.95}}>{s.cvr}%</span>
+    </button>); };
 
   const tile = (label,val,sub,accent) => (<div style={{flex:'1 1 170px',background:'var(--surface-1,#111116)',border:'1px solid var(--border-subtle,#23232b)',borderRadius:12,padding:'12px 14px'}}>
     <div style={{fontSize:11,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-faint)'}}>{label}</div>
@@ -5376,12 +5400,28 @@ function CvrDrivers(){
 
     <div className="card" style={{marginBottom:14}}>
       <div className="card-section-title"><h2 style={{margin:0}}>Compare two {gran==='day'?'days':'weeks'}</h2>
-        <span className="meta">pick any two {gran==='day'?'days':'weeks'} — defaults to similar traffic but different CVR · biggest differences flagged</span></div>
-      <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center',marginBottom:10}}>
-        <div style={{display:'flex',gap:4,marginRight:4}}>{['week','day'].map(g=>(<button key={g} onClick={()=>switchGran(g)} style={{fontSize:11.5,fontWeight:600,padding:'5px 11px',borderRadius:7,cursor:'pointer',border:'1px solid '+(gran===g?'#7c8cff':'var(--border-subtle)'),background:gran===g?'rgba(124,140,255,0.14)':'transparent',color:gran===g?'#9aa6ff':'var(--text-muted)'}}>{g==='week'?'Weeks':'Days'}</button>))}</div>
-        <select value={cmp.a} onChange={e=>setCmp({...cmp,a:e.target.value})} style={{background:'var(--surface-1,#111116)',color:'var(--text-primary)',border:'1px solid var(--border-subtle)',borderRadius:8,padding:'6px 10px',fontSize:12.5}}>{panel.map(weekOpt)}</select>
-        <span style={{color:'var(--text-faint)'}}>vs</span>
-        <select value={cmp.b} onChange={e=>setCmp({...cmp,b:e.target.value})} style={{background:'var(--surface-1,#111116)',color:'var(--text-primary)',border:'1px solid var(--border-subtle)',borderRadius:8,padding:'6px 10px',fontSize:12.5}}>{panel.map(weekOpt)}</select>
+        <span className="meta">press Compare, then tap two {gran==='day'?'days':'weeks'} — biggest differences flagged automatically</span></div>
+      <div style={{marginBottom:10}}>
+        <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center'}}>
+          <div style={{display:'flex',gap:4,marginRight:2}}>{['week','day'].map(g=>(<button key={g} onClick={()=>switchGran(g)} style={{fontSize:11.5,fontWeight:600,padding:'5px 11px',borderRadius:7,cursor:'pointer',border:'1px solid '+(gran===g?'#7c8cff':'var(--border-subtle)'),background:gran===g?'rgba(124,140,255,0.14)':'transparent',color:gran===g?'#9aa6ff':'var(--text-muted)'}}>{g==='week'?'Weeks':'Days'}</button>))}</div>
+          {!picker && cA && cB && (
+            <div style={{fontSize:12.5,color:'var(--text-muted)'}}>Comparing <b style={{color:'#9aa6ff'}}>{lbl(cA)}</b> <span style={{color:'var(--text-faint)'}}>vs</span> <b style={{color:'#4ade80'}}>{lbl(cB)}</b></div>
+          )}
+          <button onClick={()=>setPicker(p=>!p)} style={{fontSize:12,fontWeight:600,padding:'6px 13px',borderRadius:8,cursor:'pointer',border:'1px solid #7c8cff',background:'rgba(124,140,255,0.16)',color:'#9aa6ff'}}>{picker?'✓ Done':(cA&&cB?'⇄ Compare different periods':'⇄ Compare periods')}</button>
+          {!picker && <button onClick={()=>setCmp(defaultPair(panel))} title="Auto-pick the clearest pair: similar traffic, biggest CVR gap" style={{fontSize:12,fontWeight:600,padding:'6px 12px',borderRadius:8,cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-muted)'}}>↻ Best pair</button>}
+        </div>
+        {picker && (
+          <div style={{marginTop:10}}>
+            <div style={{fontSize:11.5,color:'var(--text-faint)',marginBottom:6}}>
+              {!cmp.a ? <>Tap a {gran==='day'?'day':'week'} to set <b style={{color:'#9aa6ff'}}>A</b> →</>
+                : !cmp.b ? <>Now tap another for <b style={{color:'#4ade80'}}>B</b> → the table builds automatically.</>
+                : <>Tap a chip to swap it, or press <b>Done</b>.</>}
+            </div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',maxHeight:148,overflowY:'auto',padding:'2px',border:'1px solid var(--border-subtle)',borderRadius:10,background:'var(--surface-2,#0f0f14)'}}>
+              {panel.map(periodChip)}
+            </div>
+          </div>
+        )}
       </div>
       {cA&&cB&&<>
         <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:12}}>
@@ -8881,16 +8921,10 @@ function BusinessReview(){
       statusLabel: repeat==null?'—':(repeat>=0.25?'Healthy':repeat>=0.12?'Building':'Low'),
       sub:`${opc?opc.toFixed(2):'—'} orders/customer · ${NUM(C.totalCustomers||0)} customers to date`,
       read:`Repeat rate ${repeat!=null?pct1(repeat):'—'}, ${opc?opc.toFixed(2):'—'} orders/customer` },
-    { label:'Blended ROAS trend', value: merNow!=null?merNow.toFixed(2)+'×':'—',
-      status: merNow==null?'missing':(merNow>=3?'healthy':merNow>=2?'watch':'action'),
-      statusLabel: merNow==null?'—':(merNow>=3?'Healthy':merNow>=2?'Watch':'Below 2×'),
-      series: trail('mer'), color: RAG_COL[merNow>=3?'good':merNow>=2?'warn':'bad']||'var(--accent)',
-      fmt:v=>v!=null?v.toFixed(2)+'×':'—', axisFmt:v=>v.toFixed(1)+'×',
-      read:`Blended ROAS ${merNow!=null?merNow.toFixed(2)+'×':'—'} (8-week trend)` },
-    { label:'Email revenue share', value: W&&W.m.emailShare!=null?pct0(W.m.emailShare):'—',
-      status:'info', statusLabel:'Owned channel',
-      series: trail('emailShare'), color:'var(--accent)', fmt:v=>pct0(v), axisFmt:v=>pct0(v),
-      read:`Email revenue share ${W&&W.m.emailShare!=null?pct0(W.m.emailShare):'—'}` },
+    { label:'Average order value', value: W&&W.m.aov!=null?GBP(W.m.aov):'—',
+      status:'info', statusLabel:'Monetization',
+      series: trail('aov'), color:'var(--accent)', fmt:v=>GBP(v), axisFmt:v=>'£'+Math.round(v),
+      read:`AOV ${W&&W.m.aov!=null?GBP(W.m.aov):'—'} (8-week trend)` },
     { label:'Stock cover risk', value: lowCover+(lowCover===1?' SKU':' SKUs'),
       status: sk('critical')>0?'watch':'healthy', statusLabel: sk('critical')>0?'Restock needed':'Covered',
       sub:`${sk('critical')} critical · ${sk('low')} low — sellers near stockout`,
