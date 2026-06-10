@@ -19,25 +19,25 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606101230"></script>
-<script src="./frkl-live-data.js?v=202606101230"></script>
-<script src="./frkl-agent-insights.js?v=202606101230"></script>
-<script src="./frkl-business-data.js?v=202606101230"></script>
-<script src="./frkl-action-status.js?v=202606101230"></script>
-<script src="./frkl-patterns.js?v=202606101230"></script>
-<script src="./frkl-creators.js?v=202606101230"></script>
-<script src="./frkl-creative-vision.js?v=202606101230"></script>
-<script src="./frkl-links.js?v=202606101230"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606101230"></script>
-<script src="./frkl-events.js?v=202606101230"></script>
-<script src="./frkl-products.js?v=202606101230"></script>
-<script src="./frkl-discount-codes.js?v=202606101230"></script>
-<script src="./frkl-cvr.js?v=202606101230"></script>
-<script src="./frkl-cohorts.js?v=202606101230"></script>
-<script src="./frkl-retention.js?v=202606101230"></script>
-<script src="./frkl-clarity.js?v=202606101230"></script>
-<script src="./frkl-board-read.js?v=202606101230"></script>
-<script src="./frkl-benchmarks.js?v=202606101230"></script>
+<script src="./frkl-data-loader.js?v=202606101300"></script>
+<script src="./frkl-live-data.js?v=202606101300"></script>
+<script src="./frkl-agent-insights.js?v=202606101300"></script>
+<script src="./frkl-business-data.js?v=202606101300"></script>
+<script src="./frkl-action-status.js?v=202606101300"></script>
+<script src="./frkl-patterns.js?v=202606101300"></script>
+<script src="./frkl-creators.js?v=202606101300"></script>
+<script src="./frkl-creative-vision.js?v=202606101300"></script>
+<script src="./frkl-links.js?v=202606101300"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606101300"></script>
+<script src="./frkl-events.js?v=202606101300"></script>
+<script src="./frkl-products.js?v=202606101300"></script>
+<script src="./frkl-discount-codes.js?v=202606101300"></script>
+<script src="./frkl-cvr.js?v=202606101300"></script>
+<script src="./frkl-cohorts.js?v=202606101300"></script>
+<script src="./frkl-retention.js?v=202606101300"></script>
+<script src="./frkl-clarity.js?v=202606101300"></script>
+<script src="./frkl-board-read.js?v=202606101300"></script>
+<script src="./frkl-benchmarks.js?v=202606101300"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -1146,7 +1146,7 @@ function supplierFor(type){ const c=supplierConfig(); return (c.byType && c.byTy
 const REORDER_DEFAULTS = {safetyDays:14, coverDays:45};
 function reorderConfig(){ try { const s=JSON.parse(localStorage.getItem('oi_reorder_v1')||'null'); if(s) return {...REORDER_DEFAULTS, ...s}; } catch(e){} return {...REORDER_DEFAULTS}; }
 function saveReorderConfig(next){ try { localStorage.setItem('oi_reorder_v1', JSON.stringify(next)); window.dispatchEvent(new Event('oi-supplier-updated')); } catch(e){} }
-function usePlanningTick(){ const [,f]=React.useState(0); React.useEffect(()=>{ const h=()=>f(x=>x+1); ['oi-supplier-updated','oi-leadtimes-updated','oi-costs-updated','oi-forecast-updated'].forEach(ev=>window.addEventListener(ev,h)); return ()=>['oi-supplier-updated','oi-leadtimes-updated','oi-costs-updated','oi-forecast-updated'].forEach(ev=>window.removeEventListener(ev,h)); }, []); return 0; }
+function usePlanningTick(){ const [,f]=React.useState(0); React.useEffect(()=>{ const h=()=>f(x=>x+1); ['oi-supplier-updated','oi-leadtimes-updated','oi-costs-updated','oi-forecast-updated','oi-po-updated'].forEach(ev=>window.addEventListener(ev,h)); return ()=>['oi-supplier-updated','oi-leadtimes-updated','oi-costs-updated','oi-forecast-updated','oi-po-updated'].forEach(ev=>window.removeEventListener(ev,h)); }, []); return 0; }
 
 // ── Demand-plan + packaging BOM (for the Forecast & demand planner) ───────────
 const DEMAND_DEFAULTS = {months:3, growth:0, targetMode:'growth', targetValue:''};
@@ -1176,6 +1176,48 @@ function demandScaleFactor(){
   }
   if(!(scale>0)) scale = 1;
   return {scale, months, growthPct:(scale-1)*100, mode:cfg.targetMode, active: Math.abs(scale-1)>0.005};
+}
+
+// ── PO lifecycle: raised → awaiting Shopify stock → auto-closed ───────────────
+// Per-SKU status so the app never re-nags about a PO already raised. When marked
+// raised we snapshot baselineQty; on a later data sync, if Shopify stock has risen
+// materially, the PO auto-closes (the acknowledgement). Key = SKU (or 'pkg:Name').
+function oiToday(){ try{ return new Date().toISOString().slice(0,10); }catch(e){ return ''; } }
+function oiAddDays(iso, n){ try{ const d=new Date((iso||oiToday())+'T00:00:00'); d.setDate(d.getDate()+(Number(n)||0)); return d.toISOString().slice(0,10); }catch(e){ return ''; } }
+function poStatusAll(){ try{ const s=JSON.parse(localStorage.getItem('oi_po_status_v1')||'{}'); return (s&&typeof s==='object')?s:{}; }catch(e){ return {}; } }
+function savePoStatusAll(all){ try{ localStorage.setItem('oi_po_status_v1', JSON.stringify(all)); window.dispatchEvent(new Event('oi-po-updated')); }catch(e){} }
+function setPoStatus(key, patch){ const all=poStatusAll(); if(patch==null) delete all[key]; else all[key]={...(all[key]||{}), ...patch}; savePoStatusAll(all); }
+function setPoStatusMany(updates){ const all=poStatusAll(); Object.keys(updates).forEach(key=>{ const patch=updates[key]; if(patch==null) delete all[key]; else all[key]={...(all[key]||{}), ...patch}; }); savePoStatusAll(all); }
+function clearPoStatus(key){ setPoStatus(key, null); }
+
+// Shared reorder engine — used by the Production planner AND the action queue, so
+// the to-do list and the PO drafts can never disagree about what's been ordered.
+function planReorder(){
+  const B = (typeof window!=='undefined' && window.FRKL_BUSINESS) || {};
+  const inv = (B.inventory||[]).filter(p=>p && p.status!=='ARCHIVED');
+  const rc = reorderConfig(); const safety = Number(rc.safetyDays)||14, coverDays = Number(rc.coverDays)||45;
+  const plan = demandScaleFactor(); const scale = plan.scale;
+  const po = poStatusAll(); const today = oiToday();
+  const lines = inv.filter(p=>(p.dailyVelocity||0)>0).map(p=>{
+    const lead = leadDaysForType(p.type); const sup = supplierFor(p.type); const trigger = lead + safety;
+    const vel = (p.dailyVelocity||0)*scale; const cover = vel>0 ? (p.inventoryQty||0)/vel : 999;
+    const needs = cover <= trigger; const orderUpTo = Math.ceil(vel * (lead + coverDays));
+    let qty = Math.max(0, orderUpTo - (p.inventoryQty||0));
+    const moq = Number(sup.moq)||0; let moqBumped=false;
+    if(qty>0 && moq>0 && qty<moq){ qty=moq; moqBumped=true; }
+    const unitCost = (sup.unitCost!=null&&sup.unitCost!=='') ? Number(sup.unitCost) : (p.costPerItem!=null?p.costPerItem:null);
+    const supplier = (sup.supplier&&sup.supplier.trim()) || p.vendor || p.type || 'Unassigned';
+    return {key:p.sku||p.title, p, lead, cover, needs, qty, moq, moqBumped, unitCost, supplier, lineCost: unitCost!=null?unitCost*qty:null};
+  });
+  // auto-acknowledge: a raised/received PO whose Shopify stock has risen materially is closed
+  const ackPending={};
+  lines.forEach(l=>{ const st=po[l.key]; if(st && (st.status==='ordered'||st.status==='received')){ const cur=l.p.inventoryQty||0; if(cur >= (st.baselineQty||0)+Math.max(1, Math.ceil(0.5*(st.qty||l.qty)))) ackPending[l.key]=true; } });
+  lines.forEach(l=>{ const st = ackPending[l.key]?null:(po[l.key]||null); l.po=st; l.poStatus=st?st.status:null;
+    if(st && st.status==='ordered'){ l.expected = oiAddDays(st.raisedAt||today, l.lead); l.overdue = l.expected && today > oiAddDays(st.raisedAt||today, l.lead+7); } });
+  const toOrder = lines.filter(l=>l.needs && l.qty>0 && !l.poStatus).sort((a,b)=>a.cover-b.cover);
+  const awaiting = lines.filter(l=>l.poStatus==='ordered').sort((a,b)=>(a.expected||'').localeCompare(b.expected||''));
+  const approaching = lines.filter(l=>!l.needs && l.cover <= l.lead + coverDays && !l.poStatus).length;
+  return {inv, lines, toOrder, awaiting, approaching, ackPending, plan, scale, safety, coverDays};
 }
 function leadDaysFor(type, cfg){
   cfg = cfg || leadConfig();
@@ -5313,6 +5355,18 @@ function CvrDrivers(){
       <path d={`M${cx} ${cy-5} L${cx+5} ${cy} L${cx} ${cy+5} L${cx-5} ${cy} Z`} fill="#f5b544" stroke="var(--bg-card)" strokeWidth={1.2}/>
       <text x={cx} y={cy-8} textAnchor="middle" fill="#f5b544" fontSize={9.5} fontWeight={700}>{Math.round(v)}%</text>
     </g>); };
+  // ── Discount lift: mean CVR on the deepest-discount periods vs all the rest,
+  // over the visible range. A direct number for "do deep promos convert better?"
+  // — observational, so we flag the confound rather than imply causation. ──
+  const _deep = chartData.filter(d=>d.trueDiscountIntensity!=null && d.cvr!=null && d.trueDiscountIntensity>=discThr);
+  const _rest = chartData.filter(d=>d.trueDiscountIntensity!=null && d.cvr!=null && d.trueDiscountIntensity< discThr);
+  const _avg = (a,k)=> a.length ? a.reduce((s,d)=>s+d[k],0)/a.length : null;
+  let discLift = (_deep.length>=2 && _rest.length>=2) ? {
+    deepN:_deep.length, restN:_rest.length,
+    deepCvr:_avg(_deep,'cvr'),  restCvr:_avg(_rest,'cvr'),
+    deepDisc:_avg(_deep,'trueDiscountIntensity'), restDisc:_avg(_rest,'trueDiscountIntensity'),
+  } : null;
+  if(discLift){ discLift.pp = discLift.deepCvr - discLift.restCvr; discLift.pct = discLift.restCvr ? discLift.pp/discLift.restCvr : null; }
   const defaultPair = (p)=>{ let best=null;
     for(let i=0;i<p.length;i++) for(let j=i+1;j<p.length;j++){
       const A=p[i],B=p[j], lo=Math.min(A.sessions,B.sessions), hi=Math.max(A.sessions,B.sessions);
@@ -5477,6 +5531,27 @@ function CvrDrivers(){
         <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>🏷️ sales &amp; promos · 📌 your events — <span style={{color:'var(--text-muted)'}}>hover any marker for what it was</span></div>); })()}
       {showDisc && _dv.length>0 && <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>
         <span style={{color:'#f5b544',fontWeight:600}}>◆ amber band = total discount depth</span> (codes + automatic + sale prices, % of sales) · <span style={{color:'#f5b544'}}>◆ diamonds</span> = the deepest {chartGran==='day'?'days':'weeks'} (≥{Math.round(discThr)}%, top quartile). Line up the amber peaks against CVR to see whether a deep promo actually moved conversion{chartGran==='day'?'':' — heavy always-on discounting can flatten the link, so look for the spikes'}.</div>}
+      {showDisc && discLift && (()=>{ const L=discLift; const big=Math.abs(L.pct||0)>=0.05; const pos=L.pp>=0; const col=!big?'var(--text-muted)':(pos?'#4ade80':'#ef6b6f');
+        const unit=chartGran==='day'?'days':'weeks';
+        const verdict = !big
+          ? `Deep-discount ${unit} convert about the same as the rest — discounting isn't buying conversion here.`
+          : pos
+            ? `Deep-discount ${unit} convert ${Math.abs(L.pct*100).toFixed(0)}% higher — worth a look, but check it isn't just traffic mix or seasonality.`
+            : `Deep-discount ${unit} convert ${Math.abs(L.pct*100).toFixed(0)}% lower — promos aren't lifting conversion.`;
+        return (<div style={{marginTop:10,padding:'11px 13px',borderRadius:10,background:'rgba(245,181,68,0.06)',border:'1px solid rgba(245,181,68,0.22)'}}>
+          <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap',marginBottom:7}}>
+            <span style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#f5b544',fontWeight:700}}>◆ Discount lift</span>
+            <span style={{fontSize:11.5,color:'var(--text-faint)'}}>mean CVR on the deepest-discount {unit} vs the rest · this range</span>
+          </div>
+          <div style={{display:'flex',gap:16,flexWrap:'wrap',alignItems:'center'}}>
+            <div><div style={{fontSize:10,color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'.03em'}}>Deepest {L.deepN} · avg {Math.round(L.deepDisc)}% off</div><div style={{fontSize:19,fontWeight:700,color:'#f5b544'}}>{L.deepCvr.toFixed(2)}%</div></div>
+            <div style={{fontSize:15,color:'var(--text-faint)'}}>vs</div>
+            <div><div style={{fontSize:10,color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'.03em'}}>Other {L.restN} · avg {Math.round(L.restDisc)}% off</div><div style={{fontSize:19,fontWeight:700}}>{L.restCvr.toFixed(2)}%</div></div>
+            <div style={{fontSize:15,color:'var(--text-faint)'}}>→</div>
+            <div><div style={{fontSize:10,color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'.03em'}}>Lift</div><div style={{fontSize:19,fontWeight:800,color:col}}>{L.pp>=0?'+':''}{L.pp.toFixed(2)}pp{L.pct!=null?` (${L.pp>=0?'+':''}${Math.round(L.pct*100)}%)`:''}</div></div>
+          </div>
+          <div style={{fontSize:11.5,color:'var(--text-muted)',marginTop:8}}>{verdict} <span style={{color:'var(--text-faint)'}}>Observational, not causal — deep-discount {unit} can also differ in traffic mix, season and email volume. Click a deep-discount point vs a normal one below to inspect a specific pair.</span></div>
+        </div>); })()}
       <ChartFooter note={`Is conversion holding above the ${CVR_BENCH_LABEL} target? A falling line on rising sessions usually means traffic-mix, not the site.`}
         ask="Looking at the weekly conversion-rate trend vs sessions, what's driving CVR and is it a site problem or a traffic-mix one?"
         rows={chartData} columns={[
@@ -8851,12 +8926,64 @@ function ProductRetentionMatrix(){
 // 5 top-level sections, each with its own sub-pages. Premium SaaS pattern.
 // Sub-pages render contextual sub-nav when the section has >1 page.
 // Dedicated Actions page — the action queue as a first-class destination.
+// ── Restock action queue — stock-ordering notifications + PO lifecycle ───────
+// Surfaces "raise a PO" as an action; once raised it leaves the to-do list and
+// moves to a quiet "awaiting stock" state that auto-closes when Shopify stock
+// rises. The whole point: never remind the user to do something already done.
+function RestockActionQueue(){
+  usePlanningTick();
+  const R = planReorder();
+  const {toOrder, awaiting, ackPending} = R;
+  const ackKeys = Object.keys(ackPending||{});
+  React.useEffect(()=>{ if(ackKeys.length){ ackKeys.forEach(key=>clearPoStatus(key)); toast('Stock landed', {kind:'good', body:`${ackKeys.length} PO${ackKeys.length>1?'s':''} closed — stock is back in Shopify.`}); } }, [ackKeys.join(',')]);
+  if(!toOrder.length && !awaiting.length) return null;
+
+  const k = v=>{ v=Math.abs(Math.round(v)); return v>=1000?(v/1000).toFixed(v>=10000?0:1).replace(/\.0$/,'')+'k':''+v; };
+  const btn = {display:'inline-flex',alignItems:'center',gap:5,fontSize:11.5,fontWeight:600,padding:'5px 11px',borderRadius:7,border:'1px solid var(--border-default)',background:'var(--bg-elevated)',color:'var(--text-primary)',cursor:'pointer',whiteSpace:'nowrap'};
+  const raise = (l)=>{ setPoStatus(l.key, {status:'ordered', qty:l.qty, raisedAt:oiToday(), baselineQty:l.p.inventoryQty||0, lead:l.lead, supplier:l.supplier, title:l.p.title}); toast('PO marked raised', {kind:'good', body:l.p.title+' · awaiting stock'}); };
+
+  return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid '+(toOrder.length?'var(--warn)':'var(--accent)')}}>
+    <div className="card-section-title" style={{marginBottom:6}}>
+      <h2 style={{margin:0}}>Stock &amp; purchasing</h2>
+      <span className="meta">{toOrder.length} to order{awaiting.length?` · ${awaiting.length} awaiting stock`:''} · Atlas · finance &amp; commercial</span>
+    </div>
+
+    {toOrder.length>0 ? (<div style={{display:'flex',flexDirection:'column',gap:7}}>
+      {toOrder.slice(0,8).map((l,idx)=>{ const urgent=l.cover<=l.lead;
+        return (<div key={idx} style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',padding:'8px 0',borderTop:idx?'1px solid var(--border-subtle)':'none'}}>
+          <span style={{width:8,height:8,borderRadius:'50%',background:urgent?'var(--bad)':'var(--warn)',flexShrink:0}}/>
+          <div style={{flex:1,minWidth:200}}>
+            <div style={{fontSize:13,color:'var(--text-primary)'}}>Raise PO — <b>{NUM(l.qty)} units</b> of {l.p.title}</div>
+            <div style={{fontSize:11,color:'var(--text-faint)',marginTop:1}}>{l.supplier} · runs out in ~{Math.round(l.cover)}d (lead {l.lead}d){l.lineCost!=null?` · ~£${k(l.lineCost)}`:''}{l.moqBumped?` · MOQ ${l.moq}`:''}</div>
+          </div>
+          <button style={{...btn,background:'var(--accent)',color:'#fff',borderColor:'var(--accent)'}} onClick={()=>raise(l)}><Icon name="check" size={12}/> Mark PO raised</button>
+          <button style={btn} onClick={()=>window.__oiNav&&window.__oiNav('planning','production')}>Open planner</button>
+        </div>); })}
+      {toOrder.length>8 && <div style={{fontSize:11.5,color:'var(--text-faint)',paddingTop:6}}><a className="txt-link" onClick={()=>window.__oiNav&&window.__oiNav('planning','production')} style={{cursor:'pointer'}}>+ {toOrder.length-8} more in the planner</a></div>}
+    </div>) : <div className="muted" style={{fontSize:12.5,padding:'2px 0'}}>Nothing to order right now — {awaiting.length} PO{awaiting.length===1?'':'s'} awaiting stock below.</div>}
+
+    {awaiting.length>0 && (<div style={{marginTop:12,paddingTop:10,borderTop:'1px solid var(--border-subtle)'}}>
+      <div style={{fontSize:11,fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:6}}>Awaiting stock · already ordered</div>
+      <div style={{display:'flex',flexDirection:'column',gap:6}}>
+        {awaiting.map((l,idx)=>(<div key={idx} style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',fontSize:12}}>
+          <Icon name="check" size={13} style={{color:'var(--accent)',flexShrink:0}}/>
+          <span style={{flex:1,minWidth:180,color:'var(--text-secondary)'}}>{NUM((l.po&&l.po.qty)||l.qty)} × {l.p.title} <span style={{color:'var(--text-faint)'}}>· expected ~{l.expected||'?'}{l.overdue?' · overdue, chase supplier':''}</span></span>
+          <button style={{...btn,padding:'3px 9px'}} onClick={()=>{ setPoStatus(l.key,{status:'received', baselineQty:l.p.inventoryQty||0, receivedAt:oiToday()}); toast('Marked received', {kind:'good', body:l.p.title}); }}>Received</button>
+          <button style={{...btn,padding:'3px 9px',background:'transparent',color:'var(--text-muted)'}} onClick={()=>{ clearPoStatus(l.key); toast('PO cancelled', {body:l.p.title}); }}>Cancel</button>
+        </div>))}
+      </div>
+      <div style={{fontSize:11,color:'var(--text-faint)',marginTop:8,lineHeight:1.5}}>You won't be reminded about these again. Each auto-closes when its stock rises in Shopify on the next sync.</div>
+    </div>)}
+  </div>);
+}
+
 function ActionsView(){
   return (<div>
     <div className="card-section-title" style={{marginBottom:12}}>
       <h2 style={{margin:0}}>Actions</h2>
       <span className="meta">Everything worth doing, ranked by £ impact — work the queue, mark items done as you go</span>
     </div>
+    <RestockActionQueue/>
     <ActionBoard/>
     <AdviceLedgerPanel/>
   </div>);
@@ -9192,47 +9319,28 @@ function BusinessReview(){
 // grouped by supplier and exportable (CSV / copy). Nothing is sent automatically.
 function ProductionPlanner(){
   usePlanningTick();
-  const B = (typeof window!=='undefined' && window.FRKL_BUSINESS) || {};
-  const inv = (B.inventory||[]).filter(p=>p && p.status!=='ARCHIVED');
+  const R = planReorder();
+  const {inv, toOrder, awaiting, approaching, ackPending, plan, scale, safety, coverDays} = R;
+  // persist auto-acknowledgements (stock landed in Shopify → close the PO)
+  const ackKeys = Object.keys(ackPending||{});
+  React.useEffect(()=>{ if(ackKeys.length){ ackKeys.forEach(key=>clearPoStatus(key)); } }, [ackKeys.join(',')]);
   const rc = reorderConfig();
-  const safety = Number(rc.safetyDays)||14, coverDays = Number(rc.coverDays)||45;
-  const plan = demandScaleFactor();           // forecast multiplier from the saved demand plan
-  const scale = plan.scale;
   const [supOpen, setSupOpen] = useState(false);
   const [setOpen, setSetOpen] = useState(false);
   const types = [...new Set(inv.map(p=>p.type).filter(Boolean))].sort();
 
   const k = v=>{ v=Math.abs(Math.round(v)); return v>=1000?(v/1000).toFixed(v>=10000?0:1).replace(/\.0$/,'')+'k':''+v; };
 
-  // per-SKU reorder maths — sized to PLANNED velocity (run-rate × forecast scale),
-  // so a growth plan or a units/revenue target drives both trigger and quantity.
-  const lines = inv.filter(p=>(p.dailyVelocity||0)>0).map(p=>{
-    const lead = leadDaysForType(p.type);
-    const sup = supplierFor(p.type);
-    const trigger = lead + safety;
-    const vel = (p.dailyVelocity||0)*scale;
-    const cover = vel>0 ? (p.inventoryQty||0)/vel : 999;
-    const needs = cover <= trigger;
-    const orderUpTo = Math.ceil(vel * (lead + coverDays));
-    let qty = Math.max(0, orderUpTo - (p.inventoryQty||0));
-    const moq = Number(sup.moq)||0; let moqBumped=false;
-    if(qty>0 && moq>0 && qty<moq){ qty=moq; moqBumped=true; }
-    const unitCost = (sup.unitCost!=null&&sup.unitCost!=='') ? Number(sup.unitCost) : (p.costPerItem!=null?p.costPerItem:null);
-    const supplier = (sup.supplier&&sup.supplier.trim()) || p.vendor || p.type || 'Unassigned';
-    return {p, lead, cover, needs, qty, moq, moqBumped, unitCost, supplier, lineCost: unitCost!=null?unitCost*qty:null};
-  });
-  const reorder = lines.filter(l=>l.needs && l.qty>0).sort((a,b)=>a.cover-b.cover);
-  const approaching = lines.filter(l=>!l.needs && l.cover <= l.lead + coverDays).length;
-
   const bySupplier = {};
-  reorder.forEach(l=>{ (bySupplier[l.supplier]=bySupplier[l.supplier]||[]).push(l); });
+  toOrder.forEach(l=>{ (bySupplier[l.supplier]=bySupplier[l.supplier]||[]).push(l); });
   const pos = Object.keys(bySupplier).sort().map(s=>{
     const ls=bySupplier[s], total=ls.reduce((t,l)=>t+(l.lineCost||0),0);
     return {supplier:s, lines:ls, total, hasCost:ls.every(l=>l.unitCost!=null), units:ls.reduce((t,l)=>t+l.qty,0)};
   });
   const totalValue = pos.reduce((t,p)=>t+p.total,0);
-  const missingCost = reorder.some(l=>l.unitCost==null);
+  const missingCost = toOrder.some(l=>l.unitCost==null);
   const today = (()=>{ try{ return new Date().toLocaleDateString('en-GB'); }catch(e){ return ''; } })();
+  const raisePO = (po)=>{ const u={}; po.lines.forEach(l=>{ u[l.key]={status:'ordered', qty:l.qty, raisedAt:oiToday(), baselineQty:l.p.inventoryQty||0, lead:l.lead, supplier:l.supplier, title:l.p.title}; }); setPoStatusMany(u); toast('PO marked raised', {kind:'good', body:po.supplier+' · now awaiting stock'}); };
 
   const csvFor = (po)=>{
     const rows=[['SKU','Product','Type','Order qty','Unit cost','Line total','Current stock','Days cover','Lead days']];
@@ -9276,10 +9384,10 @@ function ProductionPlanner(){
     {/* summary + controls */}
     <div className="card">
       <div style={{display:'flex',gap:22,flexWrap:'wrap',alignItems:'flex-end'}}>
-        <div><div style={{fontSize:24,fontWeight:800,color: reorder.length?'var(--warn)':'var(--good)'}}>{reorder.length}</div><div className="muted" style={{fontSize:11.5}}>SKUs to reorder now</div></div>
-        <div><div style={{fontSize:24,fontWeight:800,color:'var(--text-primary)'}}>{NUM(reorder.reduce((t,l)=>t+l.qty,0))}</div><div className="muted" style={{fontSize:11.5}}>units across all POs</div></div>
+        <div><div style={{fontSize:24,fontWeight:800,color: toOrder.length?'var(--warn)':'var(--good)'}}>{toOrder.length}</div><div className="muted" style={{fontSize:11.5}}>SKUs to reorder now</div></div>
+        <div><div style={{fontSize:24,fontWeight:800,color:'var(--text-primary)'}}>{NUM(toOrder.reduce((t,l)=>t+l.qty,0))}</div><div className="muted" style={{fontSize:11.5}}>units across all POs</div></div>
         <div><div style={{fontSize:24,fontWeight:800,color:'var(--text-primary)'}}>{totalValue>0?'£'+k(totalValue):'—'}</div><div className="muted" style={{fontSize:11.5}}>draft order value{missingCost?' (partial)':''}</div></div>
-        <div><div style={{fontSize:24,fontWeight:800,color:'var(--text-primary)'}}>{pos.length}</div><div className="muted" style={{fontSize:11.5}}>supplier{pos.length===1?'':'s'}</div></div>
+        <div><div style={{fontSize:24,fontWeight:800,color: awaiting.length?'var(--accent)':'var(--text-faint)'}}>{awaiting.length}</div><div className="muted" style={{fontSize:11.5}}>awaiting stock</div></div>
         <div style={{marginLeft:'auto',display:'flex',gap:8,flexWrap:'wrap'}}>
           <button style={btn} onClick={()=>setSupOpen(o=>!o)}><Icon name="sliders" size={13}/> Suppliers &amp; MOQ</button>
           <button style={btn} onClick={()=>setSetOpen(o=>!o)}><Icon name="sliders" size={13}/> Reorder policy</button>
@@ -9320,13 +9428,14 @@ function ProductionPlanner(){
     </div>)}
 
     {/* draft POs */}
-    {pos.length ? pos.map(po=>(<div key={po.supplier} className="card">
+    {pos.map(po=>(<div key={po.supplier} className="card">
       <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:8}}>
         <div><span style={{fontSize:15,fontWeight:700,color:'var(--text-primary)'}}>{po.supplier}</span> <span className="muted" style={{fontSize:12}}>· {po.lines.length} line{po.lines.length===1?'':'s'} · {NUM(po.units)} units</span></div>
-        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
           <span style={{fontSize:15,fontWeight:800,color:'var(--text-primary)'}}>{po.hasCost?'£'+po.total.toFixed(2):'set costs'}</span>
           <button style={smbtn} onClick={()=>copyPO(po)}><Icon name="clipboard" size={12}/> Copy</button>
           <button style={smbtn} onClick={()=>download(po)}><Icon name="report" size={12}/> CSV</button>
+          <button style={{...smbtn, background:'var(--accent)', color:'#fff', borderColor:'var(--accent)'}} onClick={()=>raisePO(po)}><Icon name="check" size={12}/> Mark PO raised</button>
         </div>
       </div>
       <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:560}}><thead><tr>
@@ -9341,7 +9450,29 @@ function ProductionPlanner(){
           <td style={{...td,textAlign:'right'}}>{l.lineCost!=null?'£'+l.lineCost.toFixed(2):'—'}</td>
         </tr>))}
       </tbody></table></div>
-    </div>)) : (<div className="card"><div style={{display:'flex',alignItems:'center',gap:10}}><StatusBadge kind="healthy" label="Stock healthy"/><span className="muted" style={{fontSize:13}}>No products are within their reorder window right now. {approaching>0?`${approaching} will cross it soon — check back, or tighten the safety days.`:'Good sellers all have enough cover for their lead times.'}</span></div></div>)}
+    </div>))}
+
+    {/* awaiting stock — POs already raised; informational, NOT a reminder */}
+    {awaiting.length>0 && (<div className="card" style={{borderLeft:'3px solid var(--accent)'}}>
+      <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:8}}><Icon name="check" size={14} style={{color:'var(--accent)'}}/><span style={{fontSize:14,fontWeight:700,color:'var(--text-primary)'}}>Awaiting stock</span><span className="muted" style={{fontSize:12}}>· {awaiting.length} PO line{awaiting.length===1?'':'s'} raised — waiting for stock to land in Shopify</span></div>
+      <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:520}}><thead><tr>
+        <th style={th}>Product</th><th style={{...th,textAlign:'right'}}>Ordered</th><th style={th}>Raised</th><th style={th}>Expected</th><th style={{...th,textAlign:'right'}}></th>
+      </tr></thead><tbody>
+        {awaiting.map((l,idx)=>(<tr key={idx}>
+          <td style={{...td,color:'var(--text-primary)'}}>{l.p.title}<div style={{fontSize:10.5,color:'var(--text-faint)'}}>{l.supplier}{l.overdue?' · overdue — chase supplier':''}</div></td>
+          <td style={{...td,textAlign:'right',fontWeight:700,color:'var(--text-primary)'}}>{NUM((l.po&&l.po.qty)||l.qty)}</td>
+          <td style={td}>{(l.po&&l.po.raisedAt)||'—'}</td>
+          <td style={{...td,color:l.overdue?'var(--warn)':'var(--text-secondary)'}}>{l.expected||'—'}</td>
+          <td style={{...td,textAlign:'right',whiteSpace:'nowrap'}}>
+            <button style={{...smbtn,padding:'4px 9px'}} onClick={()=>{ setPoStatus(l.key,{status:'received', baselineQty:l.p.inventoryQty||0, receivedAt:oiToday()}); toast('Marked received', {kind:'good', body:l.p.title}); }}>Received</button>
+            <button style={{...smbtn,padding:'4px 9px',marginLeft:6,background:'transparent',color:'var(--text-muted)'}} onClick={()=>{ clearPoStatus(l.key); toast('PO cancelled', {body:l.p.title}); }}>Cancel</button>
+          </td>
+        </tr>))}
+      </tbody></table></div>
+      <div style={{fontSize:11,color:'var(--text-faint)',marginTop:9,lineHeight:1.5}}>These won't show as reminders. Each auto-closes when its Shopify stock rises on the next data sync — or mark it received manually.</div>
+    </div>)}
+
+    {pos.length===0 && awaiting.length===0 && (<div className="card"><div style={{display:'flex',alignItems:'center',gap:10}}><StatusBadge kind="healthy" label="Stock healthy"/><span className="muted" style={{fontSize:13}}>No products are within their reorder window right now. {approaching>0?`${approaching} will cross it soon — check back, or tighten the safety days.`:'Good sellers all have enough cover for their lead times.'}</span></div></div>)}
   </div>);
 }
 
