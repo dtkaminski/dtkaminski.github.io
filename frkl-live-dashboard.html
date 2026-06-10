@@ -19,25 +19,25 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606101200"></script>
-<script src="./frkl-live-data.js?v=202606101200"></script>
-<script src="./frkl-agent-insights.js?v=202606101200"></script>
-<script src="./frkl-business-data.js?v=202606101200"></script>
-<script src="./frkl-action-status.js?v=202606101200"></script>
-<script src="./frkl-patterns.js?v=202606101200"></script>
-<script src="./frkl-creators.js?v=202606101200"></script>
-<script src="./frkl-creative-vision.js?v=202606101200"></script>
-<script src="./frkl-links.js?v=202606101200"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606101200"></script>
-<script src="./frkl-events.js?v=202606101200"></script>
-<script src="./frkl-products.js?v=202606101200"></script>
-<script src="./frkl-discount-codes.js?v=202606101200"></script>
-<script src="./frkl-cvr.js?v=202606101200"></script>
-<script src="./frkl-cohorts.js?v=202606101200"></script>
-<script src="./frkl-retention.js?v=202606101200"></script>
-<script src="./frkl-clarity.js?v=202606101200"></script>
-<script src="./frkl-board-read.js?v=202606101200"></script>
-<script src="./frkl-benchmarks.js?v=202606101200"></script>
+<script src="./frkl-data-loader.js?v=202606101230"></script>
+<script src="./frkl-live-data.js?v=202606101230"></script>
+<script src="./frkl-agent-insights.js?v=202606101230"></script>
+<script src="./frkl-business-data.js?v=202606101230"></script>
+<script src="./frkl-action-status.js?v=202606101230"></script>
+<script src="./frkl-patterns.js?v=202606101230"></script>
+<script src="./frkl-creators.js?v=202606101230"></script>
+<script src="./frkl-creative-vision.js?v=202606101230"></script>
+<script src="./frkl-links.js?v=202606101230"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606101230"></script>
+<script src="./frkl-events.js?v=202606101230"></script>
+<script src="./frkl-products.js?v=202606101230"></script>
+<script src="./frkl-discount-codes.js?v=202606101230"></script>
+<script src="./frkl-cvr.js?v=202606101230"></script>
+<script src="./frkl-cohorts.js?v=202606101230"></script>
+<script src="./frkl-retention.js?v=202606101230"></script>
+<script src="./frkl-clarity.js?v=202606101230"></script>
+<script src="./frkl-board-read.js?v=202606101230"></script>
+<script src="./frkl-benchmarks.js?v=202606101230"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -5291,6 +5291,7 @@ function CvrDrivers(){
   // directly-comparable period. ──
   const [chartGran,setChartGran] = useState('week');   // weekly ↔ daily
   const [chartDays,setChartDays] = useState(0);        // 0 = all; else last N days
+  const [showDisc,setShowDisc] = useState(true);       // overlay total discount depth on the trend
   const gran = chartGran;                              // comparator follows the chart
   const panel = (chartGran==='day' ? seriesDaily : series);
   const segBtn = (active)=>({fontSize:11.5,fontWeight:600,padding:'4px 10px',borderRadius:7,cursor:'pointer',border:'1px solid '+(active?'#7c8cff':'var(--border-subtle)'),background:active?'rgba(124,140,255,0.14)':'transparent',color:active?'#9aa6ff':'var(--text-muted)'});
@@ -5298,6 +5299,20 @@ function CvrDrivers(){
   const _clast = _cbase.length ? _cbase[_cbase.length-1].w : null;
   const _ccut = (chartDays && _clast) ? new Date(new Date(_clast+'T00:00:00Z').getTime() - chartDays*86400000).toISOString().slice(0,10) : '0000';
   const chartData = _cbase.filter(s=> s.w >= _ccut);
+  // ── Discount-depth overlay. trueDiscountIntensity = codes + automatic + sale-
+  // price markdowns, as % of sales. We shade it as a low amber band and flag the
+  // deepest periods (top quartile of the visible range) so promo spikes line up
+  // visually against the CVR line — the eye does the correlation. ──
+  const _dv = chartData.map(d=>d.trueDiscountIntensity).filter(v=>v!=null).sort((a,b)=>a-b);
+  const discMax = _dv.length ? _dv[_dv.length-1] : 1;
+  const discThr = _dv.length ? _dv[Math.floor(_dv.length*0.75)] : Infinity;   // top quartile = "deep"
+  // Custom dot: an amber diamond + % label, drawn only on the deepest periods.
+  const discDot = (props)=>{ const {cx,cy,payload}=props; const v=payload&&payload.trueDiscountIntensity;
+    if(cx==null||cy==null||v==null||v<discThr) return null;
+    return (<g key={'dd'+cx+'-'+cy} style={{pointerEvents:'none'}}>
+      <path d={`M${cx} ${cy-5} L${cx+5} ${cy} L${cx} ${cy+5} L${cx-5} ${cy} Z`} fill="#f5b544" stroke="var(--bg-card)" strokeWidth={1.2}/>
+      <text x={cx} y={cy-8} textAnchor="middle" fill="#f5b544" fontSize={9.5} fontWeight={700}>{Math.round(v)}%</text>
+    </g>); };
   const defaultPair = (p)=>{ let best=null;
     for(let i=0;i<p.length;i++) for(let j=i+1;j<p.length;j++){
       const A=p[i],B=p[j], lo=Math.min(A.sessions,B.sessions), hi=Math.max(A.sessions,B.sessions);
@@ -5409,6 +5424,9 @@ function CvrDrivers(){
         <span style={{width:1,height:18,background:'var(--border-subtle)',margin:'0 6px'}}/>
         <span style={{fontSize:11,color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'.04em',marginRight:2}}>Range</span>
         {[[0,'All'],[90,'90d'],[60,'60d'],[30,'30d'],[14,'14d']].map(([d,l])=>(<button key={l} onClick={()=>setChartDays(d)} style={segBtn(chartDays===d)}>{l}</button>))}
+        <span style={{width:1,height:18,background:'var(--border-subtle)',margin:'0 6px'}}/>
+        <span style={{fontSize:11,color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'.04em',marginRight:2}}>Overlay</span>
+        <button onClick={()=>setShowDisc(v=>!v)} title="Shade total discount depth (codes + sale prices) and flag the deepest-discount periods" style={{...segBtn(showDisc), border:'1px solid '+(showDisc?'#f5b544':'var(--border-subtle)'), background:showDisc?'rgba(245,181,68,0.14)':'transparent', color:showDisc?'#f5b544':'var(--text-muted)'}}>🏷️ Discounts</button>
         <span style={{fontSize:11,color:'var(--text-faint)',marginLeft:4}}>{chartData.length} {chartGran==='day'?'days':'weeks'}{chartGran==='day'?' · daily CVR is noisier — read the trend, not single days':''}</span>
       </div>
       <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',margin:'2px 0 8px',padding:'7px 11px',borderRadius:9,background:'rgba(124,140,255,0.07)',border:'1px solid rgba(124,140,255,0.18)'}}>
@@ -5427,9 +5445,13 @@ function CvrDrivers(){
           <R.XAxis dataKey="w" tickFormatter={fmtWk} tick={{fill:'#7e7e8a',fontSize:10.5}} interval={Math.ceil(chartData.length/9)} tickMargin={8} label={{value:chartGran==='day'?'Day':'Week', position:'insideBottom', offset:-10, fill:'#6f6f7b', fontSize:11}}/>
           <R.YAxis yAxisId="l" tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>v+'%'} label={{value:'CVR (sessions→order)', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
           <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>(v/1000).toFixed(0)+'k'} label={{value:'Sessions', angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
-          <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,fontSize:12,boxShadow:'var(--shadow-md)'}} labelFormatter={w=>(chartGran==='day'?'':'Week of ')+fmtWk(w)} formatter={(v,n)=> n==='CVR'?v+'%':NUM(v)}/>
+          {/* Hidden axis for the discount-depth overlay, scaled so the amber band sits in the lower ~45% — readable but never fighting the CVR line. */}
+          <R.YAxis yAxisId="disc" hide domain={[0, (discMax||10)*2.2]}/>
+          <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,fontSize:12,boxShadow:'var(--shadow-md)'}} labelFormatter={w=>(chartGran==='day'?'':'Week of ')+fmtWk(w)} formatter={(v,n)=> (n==='CVR'||n==='Discount depth')?v+'%':NUM(v)}/>
           <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}}/>
           <R.Bar yAxisId="r" dataKey="sessions" name="Sessions" fill="#26262e" maxBarSize={30}/>
+          {/* Total discount depth (codes + sale prices) as a soft amber band; amber diamonds flag the deepest periods. */}
+          {showDisc && <R.Area yAxisId="disc" type="monotone" dataKey="trueDiscountIntensity" name="Discount depth" stroke="#f5b544" strokeWidth={1.4} strokeOpacity={0.6} fill="#f5b544" fillOpacity={0.10} dot={discDot} activeDot={false} isAnimationActive={false} connectNulls/>}
           <R.Brush {...brushProps('w', fmtWk)} />
           <R.Line yAxisId="l" type="monotone" dataKey="cvr" name="CVR" stroke="#7c8cff" strokeWidth={2.5} dot={false}/>
           {/* Show, don't tell: the single CVR benchmark drawn on the chart so the gap is visible, not described. */}
@@ -5453,6 +5475,8 @@ function CvrDrivers(){
       <div style={{fontSize:10.5,color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{BRUSH_HINT}</div>
       {(function(){ var pins=buildChartPins(chartData.map(function(d){return d.w;})); if(!pins.length) return null; return (
         <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>🏷️ sales &amp; promos · 📌 your events — <span style={{color:'var(--text-muted)'}}>hover any marker for what it was</span></div>); })()}
+      {showDisc && _dv.length>0 && <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>
+        <span style={{color:'#f5b544',fontWeight:600}}>◆ amber band = total discount depth</span> (codes + automatic + sale prices, % of sales) · <span style={{color:'#f5b544'}}>◆ diamonds</span> = the deepest {chartGran==='day'?'days':'weeks'} (≥{Math.round(discThr)}%, top quartile). Line up the amber peaks against CVR to see whether a deep promo actually moved conversion{chartGran==='day'?'':' — heavy always-on discounting can flatten the link, so look for the spikes'}.</div>}
       <ChartFooter note={`Is conversion holding above the ${CVR_BENCH_LABEL} target? A falling line on rising sessions usually means traffic-mix, not the site.`}
         ask="Looking at the weekly conversion-rate trend vs sessions, what's driving CVR and is it a site problem or a traffic-mix one?"
         rows={chartData} columns={[
