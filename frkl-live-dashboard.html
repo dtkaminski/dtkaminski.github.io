@@ -19,25 +19,25 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606101300"></script>
-<script src="./frkl-live-data.js?v=202606101300"></script>
-<script src="./frkl-agent-insights.js?v=202606101300"></script>
-<script src="./frkl-business-data.js?v=202606101300"></script>
-<script src="./frkl-action-status.js?v=202606101300"></script>
-<script src="./frkl-patterns.js?v=202606101300"></script>
-<script src="./frkl-creators.js?v=202606101300"></script>
-<script src="./frkl-creative-vision.js?v=202606101300"></script>
-<script src="./frkl-links.js?v=202606101300"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606101300"></script>
-<script src="./frkl-events.js?v=202606101300"></script>
-<script src="./frkl-products.js?v=202606101300"></script>
-<script src="./frkl-discount-codes.js?v=202606101300"></script>
-<script src="./frkl-cvr.js?v=202606101300"></script>
-<script src="./frkl-cohorts.js?v=202606101300"></script>
-<script src="./frkl-retention.js?v=202606101300"></script>
-<script src="./frkl-clarity.js?v=202606101300"></script>
-<script src="./frkl-board-read.js?v=202606101300"></script>
-<script src="./frkl-benchmarks.js?v=202606101300"></script>
+<script src="./frkl-data-loader.js?v=202606101330"></script>
+<script src="./frkl-live-data.js?v=202606101330"></script>
+<script src="./frkl-agent-insights.js?v=202606101330"></script>
+<script src="./frkl-business-data.js?v=202606101330"></script>
+<script src="./frkl-action-status.js?v=202606101330"></script>
+<script src="./frkl-patterns.js?v=202606101330"></script>
+<script src="./frkl-creators.js?v=202606101330"></script>
+<script src="./frkl-creative-vision.js?v=202606101330"></script>
+<script src="./frkl-links.js?v=202606101330"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606101330"></script>
+<script src="./frkl-events.js?v=202606101330"></script>
+<script src="./frkl-products.js?v=202606101330"></script>
+<script src="./frkl-discount-codes.js?v=202606101330"></script>
+<script src="./frkl-cvr.js?v=202606101330"></script>
+<script src="./frkl-cohorts.js?v=202606101330"></script>
+<script src="./frkl-retention.js?v=202606101330"></script>
+<script src="./frkl-clarity.js?v=202606101330"></script>
+<script src="./frkl-board-read.js?v=202606101330"></script>
+<script src="./frkl-benchmarks.js?v=202606101330"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -5428,6 +5428,72 @@ function CvrDrivers(){
   const sessClose = (cA&&cB)?(Math.min(cA.sessions,cB.sessions)/Math.max(cA.sessions,cB.sessions)>=0.8):false;
   const dlt=(r)=>{ if(r.a==null||r.b==null) return '—'; const d=r.b-r.a; const s=d>=0?'+':''; return r.t==='pct'?`${s}${d.toFixed(1)}pp`: r.t==='gbp'?`${d>=0?'+':'-'}${GBP(Math.abs(d))}`:`${s}${NUM(d)}`; };
 
+  // ── A↔B explanation engine ──────────────────────────────────────────────────
+  // Applies the structural model that connects the metrics: CVR is *exactly*
+  // session→cart × cart→checkout × checkout→purchase, so the CVR change splits
+  // across those three stages by log-contribution. Then it reads which inputs
+  // moved with the change and classifies each by how it's known to act on CVR —
+  // separating genuine site/offer/checkout levers from traffic-mix confounds
+  // (the #1 false positive). Output is a ranked, honest "why", not a black box.
+  const cmLabel={}, cmType={}; CMP_METRICS.forEach(m=>{ cmLabel[m.k]=m.l; cmType[m.k]=m.t; });
+  // dir = sign of the effect on CVR for an *increase* in the metric. rate = use
+  // higher/lower wording (rates) vs more/fewer (shares & counts). The phrase is
+  // built direction-aware at runtime so "new share 73→62%" reads "fewer", not "more".
+  const DRIVER_MODEL = {
+    newShare:             {dir:-1, kind:'mix',      noun:'first-time visitors', note:'a colder, lower-converting segment'},
+    paidShare:            {dir:-1, kind:'mix',      noun:'paid traffic', note:'colder than organic/email'},
+    organicShare:         {dir:+1, kind:'mix',      noun:'organic traffic', note:'warmer intent'},
+    emailShare:           {dir:+1, kind:'mix',      noun:'email traffic', note:'your warmest audience'},
+    mobileShare:          {dir:-1, kind:'device',   noun:'mobile traffic', note:'converts below desktop'},
+    ukShare:              {dir:+1, kind:'mix',      noun:'UK traffic', note:'your best-converting market'},
+    bounce:               {dir:-1, kind:'site',     noun:'bounce', rate:true, note:'landing relevance or speed'},
+    engagement:           {dir:+1, kind:'site',     noun:'engagement', rate:true, note:'stickier sessions'},
+    trueDiscountIntensity:{dir:+1, kind:'offer',    noun:'discounting', rate:true, note:'codes + sale prices'},
+    discountIntensity:    {dir:+1, kind:'offer',    noun:'code/automatic discounting', rate:true},
+    freeShipShare:        {dir:+1, kind:'checkout', noun:'free-shipping orders', note:'removes a checkout blocker'},
+    altPayShare:          {dir:+1, kind:'checkout', noun:'express/alt payments', note:'smoother checkout'},
+    adSpend:              {dir:-1, kind:'mix',      noun:'ad spend', rate:true, note:'usually buys colder reach'},
+  };
+  const KIND_VERDICT = {
+    mix:`mostly a traffic-mix effect — the gap is about WHO visited, not how the site converted. Treat it as a composition artefact unless within-channel CVR also moved.`,
+    site:`a site / behaviour change (relevance, speed, engagement) — a genuine, ownable lever.`,
+    offer:`offer-led — discounting moved with CVR. Watch margin: a CVR win bought with depth can still lose money.`,
+    checkout:`checkout mechanics (shipping or payment friction) — usually a fixable, durable lever.`,
+    device:`a device-mix shift (mobile vs desktop) — check mobile CVR specifically before acting.`,
+  };
+  const buildCmpStory = ()=>{ if(!cA||!cB||cA.cvr==null||cB.cvr==null) return null;
+    const pp=+(cB.cvr-cA.cvr).toFixed(2), up=pp>=0;
+    const ln=(a,b)=> (a>0&&b>0)?Math.log(b/a):0;
+    const stages=[['session→cart','s2c'],['cart→checkout','c2co'],['checkout→purchase','co2p']]
+      .map(([label,k])=>({label,k,a:cA[k],b:cB[k],ln:ln(cA[k],cB[k])}));
+    const sumLn=stages.reduce((s,x)=>s+x.ln,0);
+    const tiny = Math.abs(pp)<0.03 || Math.abs(sumLn)<1e-4;
+    stages.forEach(x=> x.share = sumLn? x.ln/sumLn : 0);
+    const ranked=[...stages].sort((x,y)=>Math.abs(y.ln)-Math.abs(x.ln));
+    const lead=ranked[0];
+    const offset=ranked.find(x=> x!==lead && Math.sign(x.ln)!==Math.sign(lead.ln) && Math.abs(x.ln)>Math.abs(lead.ln)*0.3);
+    const drivers=Object.keys(DRIVER_MODEL).map(k=>{ const a=cA[k], b=cB[k]; if(a==null||b==null) return null;
+      const d=b-a, mag=relDiff(a,b), m=DRIVER_MODEL[k];
+      if(k!=='adSpend' && Math.abs(d)<1) return null;     // <1pp pct move = noise
+      if(mag<0.08) return null;                            // <8% relative = noise
+      const word = d>0 ? (m.rate?'higher':'more') : (m.rate?'lower':'fewer');
+      const phrase = `${word} ${m.noun}${m.note?` — ${m.note}`:''}`;
+      const push=Math.sign(d)*m.dir, consistent= up? push>0 : push<0;
+      return {k,a,b,d,mag,kind:m.kind,phrase,consistent}; }).filter(Boolean).sort((x,y)=>y.mag-x.mag);
+    const consistent=drivers.filter(d=>d.consistent).slice(0,4);
+    const against=drivers.filter(d=>!d.consistent).slice(0,2);
+    const kw={}; consistent.forEach(d=> kw[d.kind]=(kw[d.kind]||0)+d.mag);
+    const topKind=Object.keys(kw).sort((a,b)=>kw[b]-kw[a])[0]||null;
+    return {pp,up,tiny,stages,lead,offset,consistent,against,topKind,verdict:topKind?KIND_VERDICT[topKind]:null};
+  };
+  const cmpStory = buildCmpStory();
+  const fmtMetric=(k,v)=> fmtVal(cmType[k]||'pct', v);
+  const cmpAskAI = ()=>{ if(!window.__oiAsk||!cA||!cB||!cmpStory) return; const S=cmpStory; const u=gran==='day'?'day':'week';
+    const fld=(c)=>`CVR ${c.cvr}%, sessions ${NUM(c.sessions)} | funnel: session→cart ${c.s2c}%, cart→checkout ${c.c2co}%, checkout→purchase ${c.co2p}% | new-visitor ${c.newShare}%, paid ${c.paidShare}%, email ${c.emailShare}%, mobile ${c.mobileShare}%, bounce ${c.bounce}%, engagement ${c.engagement}% | discount(incl. sale) ${c.trueDiscountIntensity}%, free-ship ${c.freeShipShare}%, AOV ${GBP(c.aov)}`;
+    const prompt=`Act as my analyst. Compare these two ${u}s for frkl and explain what most likely drove the CVR difference. Use the identity CVR = session→cart × cart→checkout × checkout→purchase, and separate genuine site/offer/checkout levers from traffic-mix confounds (paid/new-visitor/device share).\n\nA · ${lbl(cA)} — ${fld(cA)}\nB · ${lbl(cB)} — ${fld(cB)}\n\nMy structural read: CVR moved ${S.up?'+':''}${S.pp}pp, mostly at ${S.lead?S.lead.label:'—'}${S.offset?` (partly offset by ${S.offset.label})`:''}. Moving with it: ${S.consistent.map(d=>cmLabel[d.k]).join(', ')||'little else'}. Against the grain: ${S.against.map(d=>cmLabel[d.k]).join(', ')||'none'}. Looks ${S.topKind||'unclear'}.\n\nDo you agree? Give the single most likely cause, the strongest confound to rule out, and one controlled test (holdout/A-B) that would confirm it.`;
+    window.__oiAsk(prompt);
+  };
+
   const tile = (label,val,sub,accent) => (<div style={{flex:'1 1 170px',background:'var(--surface-1,#111116)',border:'1px solid var(--border-subtle,#23232b)',borderRadius:12,padding:'12px 14px'}}>
     <div style={{fontSize:11,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-faint)'}}>{label}</div>
     <div style={{fontSize:22,fontWeight:700,marginTop:3,color:accent||'var(--text-primary)'}}>{val}</div>
@@ -5581,6 +5647,26 @@ function CvrDrivers(){
           <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'var(--text-faint)',marginBottom:5}}>Biggest differences</div>
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{movers.map(m=>(<span key={m.k} style={{fontSize:12,background:'rgba(124,140,255,0.12)',border:'1px solid rgba(124,140,255,0.3)',borderRadius:999,padding:'3px 10px'}}><b>{m.l}</b> {fmtVal(m.t,m.a)} <span style={{color:'var(--text-faint)'}}>→</span> {fmtVal(m.t,m.b)}</span>))}</div>
         </div>}
+        {/* Why the difference — deterministic read of the metric algorithm: funnel split + driver classification + confound-aware verdict, with a handoff to the live assistant. */}
+        {cmpStory && (()=>{ const S=cmpStory; const vcol = S.topKind==='site'||S.topKind==='checkout'?'#4ade80' : S.topKind==='offer'?'#f5b544' : S.topKind==='mix'||S.topKind==='device'?'#9aa6ff' : 'var(--text-muted)';
+          const u=gran==='day'?'day':'week';
+          return (<div style={{marginBottom:12,padding:'13px 15px',borderRadius:12,background:'rgba(124,140,255,0.06)',border:'1px solid rgba(124,140,255,0.22)'}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:8}}>
+              <span style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#9aa6ff',fontWeight:700}}>✦ Why the difference — likely drivers</span>
+              <span style={{fontSize:11,color:'var(--text-faint)'}} title={agentTitle('Pulse')}>◆ Pulse · auto-diagnosis from the metric model</span>
+            </div>
+            {S.tiny
+              ? <div style={{fontSize:12.5,color:'var(--text-muted)'}}>CVR is essentially flat between these two ({S.pp>=0?'+':''}{S.pp}pp). The inputs below shifted but netted out — there's no real conversion difference to explain. Pick a wider-apart pair to see a driver story.</div>
+              : <div style={{fontSize:12.5,color:'var(--text-secondary)',lineHeight:1.55}}>
+                  <div style={{marginBottom:6}}><b style={{color:'#7c8cff'}}>1 · Where in the funnel.</b> The <b style={{color:S.up?'#4ade80':'#ef6b6f'}}>{S.up?'+':''}{S.pp}pp</b> move is mostly at <b>{S.lead.label}</b> ({Math.round(Math.min(Math.abs(S.lead.share),1)*100)}% of it{S.offset?<>, partly offset by <b>{S.offset.label}</b></>:''}) — {(+S.lead.a).toFixed(1)}% → {(+S.lead.b).toFixed(1)}%.</div>
+                  <div style={{marginBottom:6}}><b style={{color:'#7c8cff'}}>2 · What moved with it.</b> {S.consistent.length
+                    ? <>{S.consistent.map((d,i)=><span key={d.k}>{i>0?'; ':''}<b>{cmLabel[d.k]}</b> {fmtMetric(d.k,d.a)}→{fmtMetric(d.k,d.b)} <span style={{color:'var(--text-faint)'}}>({d.phrase})</span></span>)}.</>
+                    : <span style={{color:'var(--text-muted)'}}>nothing else moved much — the tracked inputs don't explain this gap, so suspect data noise or an untracked factor.</span>}</div>
+                  {S.against.length>0 && <div style={{marginBottom:6}}><b style={{color:'#7c8cff'}}>3 · Against the grain.</b> {S.against.map((d,i)=><span key={d.k}>{i>0?'; ':''}<b>{cmLabel[d.k]}</b> {fmtMetric(d.k,d.a)}→{fmtMetric(d.k,d.b)}</span>)} usually push{S.against.length>1?'':'es'} CVR the other way — so the {S.up?'gain':'drop'} happened <i>despite</i> {S.against.length>1?'them':'it'}, which sharpens the diagnosis.</div>}
+                  {S.verdict && <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--border-subtle)'}}><b style={{color:vcol}}>Likely driver:</b> <span style={{color:'var(--text-secondary)'}}>{S.verdict}</span> <span style={{color:'var(--text-faint)'}}>{sessClose?'Sessions are near-identical, so this is a relatively clean read.':'Sessions differ a lot here — volume itself shifts the mix, so read with care.'} Two periods is correlation, not proof.</span></div>}
+                </div>}
+            <div onClick={cmpAskAI} style={{marginTop:9,fontSize:12,color:'#9aa6ff',cursor:'pointer',fontWeight:600}}>✦ Ask AI to dig deeper into this pair →</div>
+          </div>); })()}
         <div style={{overflowX:'auto'}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:12.5}}>
           <thead><tr style={{textAlign:'left',color:'var(--text-faint)',fontSize:11,textTransform:'uppercase',letterSpacing:'.04em'}}>
