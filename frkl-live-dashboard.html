@@ -19,25 +19,25 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606101030"></script>
-<script src="./frkl-live-data.js?v=202606101030"></script>
-<script src="./frkl-agent-insights.js?v=202606101030"></script>
-<script src="./frkl-business-data.js?v=202606101030"></script>
-<script src="./frkl-action-status.js?v=202606101030"></script>
-<script src="./frkl-patterns.js?v=202606101030"></script>
-<script src="./frkl-creators.js?v=202606101030"></script>
-<script src="./frkl-creative-vision.js?v=202606101030"></script>
-<script src="./frkl-links.js?v=202606101030"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606101030"></script>
-<script src="./frkl-events.js?v=202606101030"></script>
-<script src="./frkl-products.js?v=202606101030"></script>
-<script src="./frkl-discount-codes.js?v=202606101030"></script>
-<script src="./frkl-cvr.js?v=202606101030"></script>
-<script src="./frkl-cohorts.js?v=202606101030"></script>
-<script src="./frkl-retention.js?v=202606101030"></script>
-<script src="./frkl-clarity.js?v=202606101030"></script>
-<script src="./frkl-board-read.js?v=202606101030"></script>
-<script src="./frkl-benchmarks.js?v=202606101030"></script>
+<script src="./frkl-data-loader.js?v=202606101100"></script>
+<script src="./frkl-live-data.js?v=202606101100"></script>
+<script src="./frkl-agent-insights.js?v=202606101100"></script>
+<script src="./frkl-business-data.js?v=202606101100"></script>
+<script src="./frkl-action-status.js?v=202606101100"></script>
+<script src="./frkl-patterns.js?v=202606101100"></script>
+<script src="./frkl-creators.js?v=202606101100"></script>
+<script src="./frkl-creative-vision.js?v=202606101100"></script>
+<script src="./frkl-links.js?v=202606101100"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606101100"></script>
+<script src="./frkl-events.js?v=202606101100"></script>
+<script src="./frkl-products.js?v=202606101100"></script>
+<script src="./frkl-discount-codes.js?v=202606101100"></script>
+<script src="./frkl-cvr.js?v=202606101100"></script>
+<script src="./frkl-cohorts.js?v=202606101100"></script>
+<script src="./frkl-retention.js?v=202606101100"></script>
+<script src="./frkl-clarity.js?v=202606101100"></script>
+<script src="./frkl-board-read.js?v=202606101100"></script>
+<script src="./frkl-benchmarks.js?v=202606101100"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -2709,6 +2709,7 @@ const OI_ICONS = {
   search:'<circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4-4"/>',
   pulse:'<path d="M3 12h3.5l2.2-6.5 4 13 2.3-6.5H21"/>',
   image:'<rect x="3" y="4.5" width="18" height="15" rx="2"/><circle cx="8.4" cy="9.4" r="1.5"/><path d="M21 15.5 16 11 5 19.5"/>',
+  report:'<rect x="5" y="3.2" width="14" height="17.6" rx="2"/><path d="M8.4 8h7.2M8.4 12h7.2M8.4 16h4.2"/>',
 };
 function Icon({name, size=16, stroke=1.7, style, className, title}){
   const p = OI_ICONS[name]; if(!p) return null;
@@ -3328,8 +3329,8 @@ function LtvCacCard({daily, gm, ordersPerCust}){
         <R.Line yAxisId="l" type="monotone" dataKey="ltv" name="LTV" stroke={COL.revenue} strokeWidth={2.2} dot={single?{r:3}:false}/>
         <R.Line yAxisId="l" type="monotone" dataKey="cac" name="CAC" stroke={COL.meta} strokeWidth={2.2} dot={single?{r:3}:false}/>
         <R.Line yAxisId="r" type="monotone" dataKey="ratio" name="LTV:CAC" stroke={COL.email} strokeWidth={2} strokeDasharray="4 3" dot={single?{r:3}:false}/>
-        <R.ReferenceLine yAxisId="r" y={3} stroke="#4ade80" strokeDasharray="5 4" strokeOpacity={0.7}
-          label={{value:'3× target', position:'insideTopRight', fill:'#4ade80', fontSize:10.5}}/>
+        <R.ReferenceLine yAxisId="r" y={3} stroke={COL.email} strokeDasharray="5 4" strokeOpacity={0.7}
+          label={{value:'3× target', position:'insideTopRight', fill:COL.email, fontSize:10.5}}/>
         <R.Brush {...brushProps('label')} />
       </R.ComposedChart>
     </R.ResponsiveContainer>
@@ -5350,8 +5351,8 @@ function CvrDrivers(){
           <R.Brush {...brushProps('w', fmtWk)} />
           <R.Line yAxisId="l" type="monotone" dataKey="cvr" name="CVR" stroke="#7c8cff" strokeWidth={2.5} dot={false}/>
           {/* Show, don't tell: the single CVR benchmark drawn on the chart so the gap is visible, not described. */}
-          <R.ReferenceLine yAxisId="l" y={CVR_BENCH*100} stroke="#4ade80" strokeDasharray="5 4" strokeOpacity={0.75}
-            label={{value:`${CVR_BENCH_LABEL} CVR target`, position:'insideTopRight', fill:'#4ade80', fontSize:10.5}}/>
+          <R.ReferenceLine yAxisId="l" y={CVR_BENCH*100} stroke="#7c8cff" strokeDasharray="5 4" strokeOpacity={0.75}
+            label={{value:`${CVR_BENCH_LABEL} CVR target`, position:'insideTopRight', fill:'#7c8cff', fontSize:10.5}}/>
           {/* Event & sale pins: logged events + major site-wide sales, snapped to chart buckets.
               Icon-only on the chart; full detail lives on hover so the chart stays calm. */}
           {(function(){ var pins=buildChartPins(chartData.map(function(d){return d.w;}));
@@ -8070,7 +8071,7 @@ function WeeklyBoard(){
             <R.YAxis yAxisId="l" tick={{fill:'#7e7e8a',fontSize:10}} tickFormatter={v=>v+'×'}/>
             <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#7e7e8a',fontSize:10}} tickFormatter={v=>v+'%'}/>
             <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}}/>
-            <R.ReferenceLine yAxisId="l" y={2} stroke="#4ade80" strokeDasharray="5 4" strokeOpacity={0.7} label={{value:'MER 2×', position:'insideTopLeft', fill:'#4ade80', fontSize:9.5}}/>
+            <R.ReferenceLine yAxisId="l" y={2} stroke="#a78bfa" strokeDasharray="5 4" strokeOpacity={0.7} label={{value:'MER 2×', position:'insideTopLeft', fill:'#a78bfa', fontSize:9.5}}/>
             <R.ReferenceLine yAxisId="r" y={2} stroke="#38bdf8" strokeDasharray="5 4" strokeOpacity={0.6} label={{value:'CVR 2%', position:'insideTopRight', fill:'#38bdf8', fontSize:9.5}}/>
             <R.Line yAxisId="l" type="monotone" dataKey="mer" name="MER" stroke="#a78bfa" strokeWidth={2.2} dot={false}/>
             <R.Line yAxisId="r" type="monotone" dataKey="cvr" name="CVR %" stroke={COL.sessions} strokeWidth={2.2} dot={false}/>
@@ -8174,7 +8175,7 @@ function CohortsPanel(){
             <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,boxShadow:'var(--shadow-md)'}} formatter={(v,n)=>[GBP(v), n==='contrib'?'Contribution':'Revenue']}
               labelFormatter={(l,p)=> l + (p&&p[0]&&p[0].payload? ' · '+p[0].payload.n+' customers observed':'')}/>
             <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}}/>
-            {paidCac!=null && <R.ReferenceLine y={paidCac} stroke="#f4a23b" strokeDasharray="5 4" strokeOpacity={0.8} label={{value:'paid CAC', position:'insideTopRight', fill:'#f4a23b', fontSize:10}}/>}
+            {paidCac!=null && <R.ReferenceLine y={paidCac} stroke="#a78bfa" strokeDasharray="5 4" strokeOpacity={0.8} label={{value:'paid CAC', position:'insideTopRight', fill:'#a78bfa', fontSize:10}}/>}
             <R.Area type="monotone" dataKey="rev" name="Revenue" stroke={COL.revenue} fill={COL.revenue+'22'} strokeWidth={2}/>
             <R.Line type="monotone" dataKey="contrib" name="Contribution" stroke="#a78bfa" strokeWidth={2.4} dot={false}/>
             <R.Brush {...brushProps('m')} />
@@ -8791,6 +8792,242 @@ function CommandMenu(){
   </div>);
 }
 
+// ── Business Review — a management-overview surface built entirely on live data ──
+// Structure: executive verdict → three-horizon scorecard (Now / Engine / Durability)
+// → £-tagged risk & opportunity registers → decisions → copy-as-briefing. Every
+// figure is a factual read of synced data (boardWeeks, money_rollup/findings,
+// cohorts, channelMix, inventorySummary) — no projections, no fabrication.
+function BusinessReview(){
+  useCostTick();
+  const weeks = useMemo(boardWeeks, []);
+  const P = (typeof window!=='undefined' && window.FRKL_PATTERNS) || {};
+  const C = (typeof window!=='undefined' && window.FRKL_COHORTS) || {};
+  const B = (typeof window!=='undefined' && window.FRKL_BUSINESS) || {};
+  const gm = oiGrossMargin();
+  let i = weeks.length-1; while(i>0 && weeks[i] && weeks[i].partial) i--;
+  const W = weeks.length ? weeks[i] : null, prev = i>0 ? weeks[i-1] : null;
+  const trail = (key)=> weeks.slice(Math.max(0,i-8), i+1).map(w=>({x:(w.weekStart||'').slice(5), v:w.m[key]}));
+
+  // formatters
+  const gbpK = v=>'£'+(Math.abs(v)>=1000?(v/1000).toFixed(1).replace(/\.0$/,'')+'k':Math.round(v));
+  const pct0 = v=>v!=null?(v*100).toFixed(0)+'%':'—';
+  const pct1 = v=>v!=null?(v*100).toFixed(1)+'%':'—';
+  const k = v=>{ v=Math.abs(Math.round(v)); return v>=1000?(v/1000).toFixed(v>=10000?0:1).replace(/\.0$/,'')+'k':''+v; };
+
+  // ── £-tagged registers: live findings only (≥£50/mo, not already done) ──
+  const confTier = c => typeof c==='number' ? (c>=0.66?'high':c>=0.45?'med':'low') : (c==='high'?'high':c==='medium'?'med':'low');
+  const DONE = new Set(['done','verified-done','dismissed','wont-do']);
+  const items = [
+    ...Object.values(P.action_money||{}).map(m=>({description:m.description, basis:m.basis, monthly_impact_gbp:m.monthly_impact_gbp, kind:m.kind, confidence:m.confidence, status:m.status})),
+    ...((P.money_patterns||[]).map(m=>({description:m.label||m.description, basis:m.basis, monthly_impact_gbp:m.monthly_impact_gbp, kind:m.kind, confidence:m.confidence, status:'open'}))),
+  ].filter(x=> x.monthly_impact_gbp && Math.abs(x.monthly_impact_gbp)>=50 && !DONE.has(x.status) && (x.description||'').trim());
+  const byImpact = (a,b)=>Math.abs(b.monthly_impact_gbp)-Math.abs(a.monthly_impact_gbp);
+  const risks = items.filter(x=>x.kind==='leakage'||x.kind==='at_risk').sort(byImpact);
+  const opps  = items.filter(x=>x.kind==='opportunity').sort(byImpact);
+  const roll = P.money_rollup||{};
+  const atRisk = (roll.leakage||0)+(roll.at_risk||0);
+  const upside = roll.opportunity||0;
+  const openActions = Object.values((typeof window!=='undefined'&&window.FRKL_ACTION_STATUS)||{}).filter(s=> s && !DONE.has(s.status)).length;
+
+  // ── cohort / engine reads ──
+  const repeat = C.repeatRate;
+  const opc = C.ordersPerCustomer;
+  const paidCac = C.cac && C.cac.paid;
+  const ltvPerCust = C.lifetimeRevPerCust;
+  const contribLTV = (ltvPerCust!=null && gm!=null) ? ltvPerCust*gm : null;
+  const ltvCac = (contribLTV!=null && paidCac) ? contribLTV/paidCac : null;
+  const newCustSeries = ((C.cac&&C.cac.byMonth)||[]).map(m=>({x:(m.month||'').slice(5), v:m.newCustomers}));
+
+  // ── channel concentration ──
+  const chans = (B.channelMix||[]).slice().sort((a,b)=>(b.revenue||0)-(a.revenue||0));
+  const chanTotal = chans.reduce((s,c)=>s+(c.revenue||0),0);
+  const topChan = chans[0];
+  const topShare = (topChan&&chanTotal)? topChan.revenue/chanTotal : null;
+  const paidShare = chanTotal? chans.filter(c=>/^Paid/i.test(c.channel||'')).reduce((s,c)=>s+(c.revenue||0),0)/chanTotal : null;
+
+  // ── inventory / capital ──
+  const inv = B.inventorySummary||{};
+  const sk = t=> (inv[t]&&inv[t].skus)||0;
+  const slowCapital = ((inv.overstock&&inv.overstock.totalValue)||0)+((inv.archived_stock&&inv.archived_stock.totalValue)||0);
+  const lowCover = sk('critical')+sk('low');
+
+  // ── HORIZON 1 — Now (trading, this week vs last) ──
+  const NOW_SPECS=[
+    {key:'revenue',       label:'Revenue',         fmt:v=>GBP(v),                             axisFmt:gbpK,                     better:'up'},
+    {key:'orders',        label:'Orders',          fmt:v=>NUM(v),                             axisFmt:v=>Math.round(v),         better:'up'},
+    {key:'cvr',           label:'Conversion rate', fmt:v=>v!=null?(v*100).toFixed(2)+'%':'—', axisFmt:v=>(v*100).toFixed(1)+'%',better:'up',  bench:CVR_BENCH},
+    {key:'mer',           label:'Blended ROAS',    fmt:v=>v!=null?v.toFixed(2)+'×':'—',        axisFmt:v=>v.toFixed(1)+'×',      better:'up',  bench:3},
+    {key:'discountDepth', label:'Discount depth',  fmt:v=>v!=null?(v*100).toFixed(1)+'%':'—', axisFmt:pct0,                     better:'down'},
+  ];
+  const nowD = (W&&prev) ? NOW_SPECS.map(sp=>{
+    const val=W.m[sp.key], pv=prev.m[sp.key];
+    const ch=(pv!=null&&pv!==0&&val!=null)?(val-pv)/Math.abs(pv):null;
+    const rag=boardRag(sp,val,pv); const up=ch!=null&&ch>=0;
+    const good=sp.better==='flat'?null:(sp.better==='down'?!up:up);
+    const badge = rag==='good'?{kind:'healthy',label:'Healthy'} : rag==='bad'?(sp.bench!=null?{kind:'action',label:'Below target'}:{kind:'watch',label:'Watch'}) : rag==='warn'?{kind:'watch',label:'Watch'} : {kind:'info',label:'Steady'};
+    return {sp,val,ch,rag,up,good,badge, read:`${sp.label}: ${sp.fmt(val)}${ch!=null?` (${up?'+':''}${(ch*100).toFixed(0)}% WoW)`:''}`};
+  }).filter(d=>d.val!=null) : [];
+
+  // ── HORIZON 2 — The engine (is the machine strengthening) ──
+  const merNow = W&&W.m.mer;
+  const engineD = [
+    { label:'Contribution LTV : CAC', value: ltvCac!=null?ltvCac.toFixed(1)+'×':'—',
+      status: ltvCac==null?'missing':(ltvCac>=3?'healthy':ltvCac>=2?'watch':'action'),
+      statusLabel: ltvCac==null?'Needs data':(ltvCac>=3?'Healthy':ltvCac>=2?'Watch':'Below 2×'),
+      sub: ltvCac!=null?`Contribution LTV £${NUM(Math.round(contribLTV))} ÷ paid CAC £${NUM(Math.round(paidCac))} · target ≥3×`:'Needs cost + cohort data',
+      read:`Contribution LTV:CAC ${ltvCac!=null?ltvCac.toFixed(1)+'×':'—'} (target ≥3×)` },
+    { label:'Repeat purchase rate', value: repeat!=null?pct1(repeat):'—',
+      status: repeat==null?'missing':(repeat>=0.25?'healthy':repeat>=0.12?'watch':'action'),
+      statusLabel: repeat==null?'—':(repeat>=0.25?'Healthy':repeat>=0.12?'Building':'Low'),
+      sub:`${opc?opc.toFixed(2):'—'} orders/customer · ${NUM(C.totalCustomers||0)} customers to date`,
+      read:`Repeat rate ${repeat!=null?pct1(repeat):'—'}, ${opc?opc.toFixed(2):'—'} orders/customer` },
+    { label:'Blended ROAS trend', value: merNow!=null?merNow.toFixed(2)+'×':'—',
+      status: merNow==null?'missing':(merNow>=3?'healthy':merNow>=2?'watch':'action'),
+      statusLabel: merNow==null?'—':(merNow>=3?'Healthy':merNow>=2?'Watch':'Below 2×'),
+      series: trail('mer'), color: RAG_COL[merNow>=3?'good':merNow>=2?'warn':'bad']||'var(--accent)',
+      fmt:v=>v!=null?v.toFixed(2)+'×':'—', axisFmt:v=>v.toFixed(1)+'×',
+      read:`Blended ROAS ${merNow!=null?merNow.toFixed(2)+'×':'—'} (8-week trend)` },
+    { label:'Email revenue share', value: W&&W.m.emailShare!=null?pct0(W.m.emailShare):'—',
+      status:'info', statusLabel:'Owned channel',
+      series: trail('emailShare'), color:'var(--accent)', fmt:v=>pct0(v), axisFmt:v=>pct0(v),
+      read:`Email revenue share ${W&&W.m.emailShare!=null?pct0(W.m.emailShare):'—'}` },
+    { label:'Stock cover risk', value: lowCover+(lowCover===1?' SKU':' SKUs'),
+      status: sk('critical')>0?'watch':'healthy', statusLabel: sk('critical')>0?'Restock needed':'Covered',
+      sub:`${sk('critical')} critical · ${sk('low')} low — sellers near stockout`,
+      read:`${lowCover} SKUs at low/critical stock cover (${sk('critical')} critical)` },
+  ];
+
+  // ── HORIZON 3 — Durability (will it compound, and what could break it) ──
+  const newCustLatest = newCustSeries.length ? newCustSeries[newCustSeries.length-1].v : null;
+  const durD = [
+    { label:'New customers / month', value: newCustLatest!=null?NUM(newCustLatest):'—',
+      status:'info', statusLabel:'Acquisition',
+      series: newCustSeries, color:'var(--accent)', fmt:v=>NUM(v), axisFmt:v=>Math.round(v),
+      read:`New customers/mo ${newCustLatest!=null?NUM(newCustLatest):'—'} (latest month)` },
+    { label:'Customer base', value: NUM(C.totalCustomers||0),
+      status:'info', statusLabel:'To date',
+      sub:'Total DTC customers acquired across the analysis window',
+      read:`Customer base ${NUM(C.totalCustomers||0)} customers` },
+    { label:'Revenue concentration', value: topShare!=null?pct0(topShare):'—',
+      status: topShare==null?'missing':(topShare>0.45?'watch':'healthy'),
+      statusLabel: topShare==null?'—':(topShare>0.45?'Concentrated':'Diversified'),
+      sub: topChan?`${topChan.channel} is the largest revenue channel${paidShare!=null?` · paid = ${pct0(paidShare)} of revenue`:''}`:'—',
+      read:`Revenue concentration: ${topChan?topChan.channel:'—'} ${topShare!=null?pct0(topShare):''}${paidShare!=null?`, paid ${pct0(paidShare)} of revenue`:''}` },
+    { label:'Capital in slow stock', value: GBP(Math.round(slowCapital)),
+      status: slowCapital>50000?'watch':'healthy', statusLabel: slowCapital>50000?'Cash tied up':'Lean',
+      sub:`${sk('overstock')} overstock SKUs (>180d cover) valued at cost`,
+      read:`£${k(slowCapital)} capital tied in slow-moving stock (${sk('overstock')} overstock SKUs)` },
+  ];
+
+  // overall posture — factual: benchmark breaches in trading + material risk
+  const breaches = nowD.filter(d=>d.sp.bench!=null && d.rag==='bad').length;
+  const overall = breaches>=2 ? {kind:'action',label:'Action required'}
+                : (breaches===1 || atRisk>2000) ? {kind:'watch',label:'Watch'}
+                : {kind:'healthy',label:'On track'};
+  const verdictSentence = `£${k(atRisk)}/mo of contribution is exposed across ${risks.length} flagged risk${risks.length===1?'':'s'}, against £${k(upside)}/mo of identified upside across ${opps.length} opportunit${opps.length===1?'y':'ies'}. ${openActions} actions are open in the queue. `
+    + `Unit economics: ${ltvCac!=null?ltvCac.toFixed(1)+'× contribution LTV:CAC':'LTV:CAC pending cost data'}, repeat rate ${repeat!=null?pct1(repeat):'—'}. `
+    + `${topChan&&topShare!=null?`${topChan.channel} drives ${pct0(topShare)} of revenue`:''}${slowCapital>50000?`, with £${k(slowCapital)} of capital tied in slow-moving stock`:''}.`;
+
+  const copyBriefing = ()=>{
+    const L=[];
+    L.push(`BUSINESS REVIEW — frkl${W?` · week of ${W.label}`:''}`);
+    L.push(`Posture: ${overall.label}. ${verdictSentence}`);
+    L.push('');
+    L.push('NOW — trading (this week vs last):');   nowD.forEach(d=>L.push('  • '+d.read));
+    L.push('THE ENGINE:');                           engineD.forEach(d=>L.push('  • '+d.read));
+    L.push('DURABILITY:');                           durD.forEach(d=>L.push('  • '+d.read));
+    L.push('');
+    L.push(`TOP RISKS (£${k(atRisk)}/mo exposed):`);
+    (risks.length?risks:[{description:'None flagged'}]).slice(0,5).forEach(x=>L.push('  • '+x.description+(x.monthly_impact_gbp?` (~£${k(Math.abs(x.monthly_impact_gbp))}/mo)`:'')));
+    L.push(`TOP OPPORTUNITIES (£${k(upside)}/mo identified):`);
+    (opps.length?opps:[{description:'None flagged'}]).slice(0,5).forEach(x=>L.push('  • '+x.description+(x.monthly_impact_gbp?` (~£${k(Math.abs(x.monthly_impact_gbp))}/mo)`:'')));
+    const text=L.join('\n');
+    try{ (navigator.clipboard&&navigator.clipboard.writeText(text)); }catch(e){}
+    toast('Briefing copied', {kind:'good', body:'Paste into your notes or board pack.'});
+  };
+
+  const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:12.5,fontWeight:600,padding:'7px 13px',borderRadius:8,border:'1px solid var(--border-default)',background:'var(--bg-elevated)',color:'var(--text-primary)',cursor:'pointer'};
+  const Eyebrow = ({children}) => (<div style={{display:'flex',alignItems:'center',gap:8,margin:'20px 0 9px',fontSize:11,fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--text-muted)'}}><span style={{width:3,height:14,background:'var(--text-faint)',borderRadius:2}}/>{children}</div>);
+  const RvCard = (c,idx) => (<div key={idx} className="wc-item">
+    <div className="wc-top"><span className="wc-label">{c.label}</span>{c.status&&<StatusBadge kind={c.status} label={c.statusLabel}/>}</div>
+    <div className="wc-val">{c.value}{c.change!=null && <span className="wc-ch" style={{color:c.changeColor}}>{c.change}</span>}</div>
+    {c.series ? <WcSpark data={c.series} color={c.color} fmt={c.fmt} axisFmt={c.axisFmt}/>
+              : (c.sub && <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:7,lineHeight:1.45}}>{c.sub}</div>)}
+  </div>);
+  const regRow = (accent) => (x,idx) => (<div key={idx} style={{display:'flex',gap:12,alignItems:'baseline',padding:'9px 0',borderTop:idx?'1px solid var(--border-subtle)':'none'}}>
+    <div style={{flex:1,minWidth:0}}>
+      <div style={{fontSize:13,color:'var(--text-primary)',lineHeight:1.4}}>{x.description}</div>
+      {x.basis && <div style={{fontSize:11,color:'var(--text-faint)',marginTop:2,lineHeight:1.4}}>{x.basis}</div>}
+    </div>
+    <div style={{textAlign:'right',flexShrink:0}}>
+      <div style={{fontWeight:700,fontSize:13.5,color:accent,whiteSpace:'nowrap'}}>~£{k(Math.abs(x.monthly_impact_gbp))}/mo</div>
+      <div style={{marginTop:4}}>{confChip(confTier(x.confidence))}</div>
+    </div>
+  </div>);
+  const topMoves = [...risks,...opps].sort(byImpact).slice(0,3);
+
+  if(!W){
+    return (<div className="card"><div className="muted" style={{fontSize:13}}>Business review needs at least one complete week of synced data. Connect your sources and check back once a full week has closed.</div></div>);
+  }
+
+  return (<div>
+    <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:6}}>
+      <h2 style={{margin:0,fontSize:18}}>Business review</h2>
+      <span className="muted" style={{fontSize:12}}>Management overview · week of {W.label} + trailing trend · independent of the date picker</span>
+    </div>
+
+    {/* Executive verdict */}
+    <div className="card" style={{borderLeft:'3px solid var(--accent)'}}>
+      <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+        <StatusBadge kind={overall.kind} label={overall.label}/>
+        <span className="muted" style={{fontSize:12}}>Overall posture</span>
+        <button style={{...btn,marginLeft:'auto'}} onClick={copyBriefing}><Icon name="clipboard" size={13}/> Copy as briefing</button>
+      </div>
+      <div style={{fontSize:14.5,marginTop:11,lineHeight:1.55,color:'var(--text-primary)'}}>{verdictSentence}</div>
+      <div style={{fontSize:11,color:'var(--text-faint)',marginTop:9,lineHeight:1.4}}>Built from live Shopify, GA4, Meta, Google Ads, Klaviyo and cohort data. Every figure is a factual read of synced data — not a projection.</div>
+    </div>
+
+    {/* Three-horizon scorecard */}
+    <Eyebrow>Now · trading — this week vs last</Eyebrow>
+    <div className="card"><div className="wc-grid">{nowD.map((d,idx)=>RvCard({label:d.sp.label, value:d.sp.fmt(d.val), change:`${d.up?'↑':'↓'}${Math.abs(d.ch*100).toFixed(0)}%`, changeColor:d.good==null?'var(--text-muted)':(d.good?'var(--good)':'var(--bad)'), status:d.badge.kind, statusLabel:d.badge.label, series:trail(d.sp.key), color:RAG_COL[d.rag]||'var(--text-faint)', fmt:d.sp.fmt, axisFmt:d.sp.axisFmt}, idx))}</div></div>
+
+    <Eyebrow>The engine · is the machine strengthening (trailing)</Eyebrow>
+    <div className="card"><div className="wc-grid">{engineD.map(RvCard)}</div></div>
+
+    <Eyebrow>Durability · will it compound — and what could break it</Eyebrow>
+    <div className="card"><div className="wc-grid">{durD.map(RvCard)}</div></div>
+
+    {/* Risk & opportunity registers */}
+    <Eyebrow>Risks & opportunities · quantified</Eyebrow>
+    <div className="row">
+      <div className="card" style={{flex:'1 1 340px', minWidth:0, borderTop:'3px solid var(--bad)'}}>
+        <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:8,marginBottom:4}}>
+          <span style={{fontSize:14,fontWeight:700,color:'var(--text-primary)'}}>Risk register</span>
+          <span style={{fontSize:12,fontWeight:700,color:'var(--bad)',whiteSpace:'nowrap'}}>£{k(atRisk)}/mo exposed</span>
+        </div>
+        {risks.length ? risks.slice(0,6).map(regRow('var(--bad)')) : <div className="muted" style={{fontSize:12.5,padding:'8px 0'}}>No material risks flagged — leakage and at-risk revenue are within normal range.</div>}
+      </div>
+      <div className="card" style={{flex:'1 1 340px', minWidth:0, borderTop:'3px solid var(--good)'}}>
+        <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:8,marginBottom:4}}>
+          <span style={{fontSize:14,fontWeight:700,color:'var(--text-primary)'}}>Opportunity register</span>
+          <span style={{fontSize:12,fontWeight:700,color:'var(--good)',whiteSpace:'nowrap'}}>£{k(upside)}/mo identified</span>
+        </div>
+        {opps.length ? opps.slice(0,6).map(regRow('var(--good)')) : <div className="muted" style={{fontSize:12.5,padding:'8px 0'}}>No quantified upside flagged right now — check back as new signals land.</div>}
+      </div>
+    </div>
+
+    {/* Decisions */}
+    <div className="card" style={{marginTop:14}}>
+      <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+        <span style={{fontSize:14,fontWeight:700,color:'var(--text-primary)'}}>Decisions &amp; next actions</span>
+        <span className="muted" style={{fontSize:12.5}}>{openActions} open in the queue</span>
+        <button style={{...btn,marginLeft:'auto'}} onClick={()=>window.__oiNav&&window.__oiNav('actions','queue')}>Open action queue <Icon name="chevron" size={13}/></button>
+      </div>
+      {topMoves.length>0 && <div className="muted" style={{fontSize:12.5,marginTop:9,lineHeight:1.55}}>Highest-value moves right now: {topMoves.map(m=>`${m.description} (~£${k(Math.abs(m.monthly_impact_gbp))}/mo)`).join(' · ')}.</div>}
+    </div>
+  </div>);
+}
+
 const NAV = [
   { id:'home',    label:'Today',    icon:'home',     subtabs:[
     { id:'overview', label:'Overview',     component: (p) => <Overview start={p.start} period={p.period} customActive={p.customActive}/> },
@@ -8824,6 +9061,9 @@ const NAV = [
   { id:'board',   label:'Weekly review', icon:'calendar', subtabs:[
     { id:'weekly',   label:'Weekly review', component: () => <WeeklyBoard/> },
   ]},
+  { id:'review',  label:'Business review', icon:'report', subtabs:[
+    { id:'review',   label:'Business review', component: () => <BusinessReview/> },
+  ]},
   { id:'settings',label:'Settings',     icon:'sliders', subtabs:[
     { id:'connections', label:'Connections', component: () => <ConnectionsPanel/> },
   ]},
@@ -8837,6 +9077,7 @@ const RAIL = [
   { label:'Actions',          icon:'clipboard', section:'actions' },
   { label:'AI Analyst',       icon:'spark',     section:'home',     sub:'ask' },
   { label:'What changed',     icon:'calendar',  section:'board' },
+  { label:'Business review',  icon:'report',    section:'review' },
   { label:'Commercial health',icon:'pulse',     section:'intel' },
   { label:'Growth channels',  icon:'trendUp',   section:'channels' },
   { label:'Creative & brand', icon:'image',     section:'channels', sub:'creatives' },
