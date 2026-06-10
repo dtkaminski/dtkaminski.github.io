@@ -19,24 +19,25 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606093900"></script>
-<script src="./frkl-live-data.js?v=202606093900"></script>
-<script src="./frkl-agent-insights.js?v=202606093900"></script>
-<script src="./frkl-business-data.js?v=202606093900"></script>
-<script src="./frkl-action-status.js?v=202606093900"></script>
-<script src="./frkl-patterns.js?v=202606093900"></script>
-<script src="./frkl-creators.js?v=202606093900"></script>
-<script src="./frkl-creative-vision.js?v=202606093900"></script>
-<script src="./frkl-links.js?v=202606093900"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606093900"></script>
-<script src="./frkl-events.js?v=202606093900"></script>
-<script src="./frkl-products.js?v=202606093900"></script>
-<script src="./frkl-discount-codes.js?v=202606093900"></script>
-<script src="./frkl-cvr.js?v=202606093900"></script>
-<script src="./frkl-cohorts.js?v=202606093900"></script>
-<script src="./frkl-retention.js?v=202606093900"></script>
-<script src="./frkl-clarity.js?v=202606093900"></script>
-<script src="./frkl-board-read.js?v=202606093900"></script>
+<script src="./frkl-data-loader.js?v=202606101030"></script>
+<script src="./frkl-live-data.js?v=202606101030"></script>
+<script src="./frkl-agent-insights.js?v=202606101030"></script>
+<script src="./frkl-business-data.js?v=202606101030"></script>
+<script src="./frkl-action-status.js?v=202606101030"></script>
+<script src="./frkl-patterns.js?v=202606101030"></script>
+<script src="./frkl-creators.js?v=202606101030"></script>
+<script src="./frkl-creative-vision.js?v=202606101030"></script>
+<script src="./frkl-links.js?v=202606101030"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606101030"></script>
+<script src="./frkl-events.js?v=202606101030"></script>
+<script src="./frkl-products.js?v=202606101030"></script>
+<script src="./frkl-discount-codes.js?v=202606101030"></script>
+<script src="./frkl-cvr.js?v=202606101030"></script>
+<script src="./frkl-cohorts.js?v=202606101030"></script>
+<script src="./frkl-retention.js?v=202606101030"></script>
+<script src="./frkl-clarity.js?v=202606101030"></script>
+<script src="./frkl-board-read.js?v=202606101030"></script>
+<script src="./frkl-benchmarks.js?v=202606101030"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -656,6 +657,17 @@
   .cf-table-wrap table { font-size: 12px; }
   .cf-table-wrap thead th { position: sticky; top: 0; background: var(--bg-card); }
 
+  /* ── Industry benchmark chip ──────────────────────────────────────────── */
+  .bm-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 600;
+    color: var(--text-muted); background: var(--border-subtle); border-radius: var(--r-full);
+    padding: 2px 7px 2px 8px; white-space: nowrap; cursor: help; vertical-align: middle; }
+  .bm-chip .bm-cat { color: var(--text-faint); font-weight: 500; }
+  .bm-chip .bm-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .bm-chip .bm-dot.good { background: var(--good); }
+  .bm-chip .bm-dot.bad  { background: var(--warn); }
+  .bm-chip .bm-q { width: 12px; height: 12px; border-radius: 50%; display: inline-flex; align-items: center;
+    justify-content: center; border: 1px solid var(--text-faint); color: var(--text-faint); font-size: 8px; font-weight: 700; }
+
   /* ── Agent insights ─────────────────────────────────────────────────── */
   .insight { border-left: 3px solid var(--accent); }
   .agentbadge {
@@ -1203,7 +1215,18 @@ const REAL_START = (() => { const ds=(D.shopify||[]).map(r=>r.date).sort(); retu
 // ── Canonical benchmarks (single source of truth — must match scripts/oi_db.py BENCHMARKS).
 // Site CVR = Shopify orders ÷ GA4 sessions; one benchmark everywhere so the dashboard
 // never shows the same KPI against two different targets.
-const CVR_BENCH = 0.015, CVR_BENCH_LABEL = '1.5%';
+// Industry benchmark library — category-resolved for this brand, emitted from
+// oi_db.BENCHMARK_LIB (single source of truth). Falls back gracefully if absent.
+const OI_BM = (typeof window!=='undefined' && window.OI_BENCHMARKS) || {metrics:{}};
+function bmGet(metric){ return (OI_BM.metrics||{})[metric] || null; }
+function bmFmt(unit, v){ if(v==null) return '—';
+  if(unit==='pct')   return (+(v*100).toFixed(v*100<10?1:0))+'%';
+  if(unit==='gbp')   return '£'+Math.round(v).toLocaleString('en-GB');
+  if(unit==='ratio') return (+v.toFixed(1))+'×';
+  return String(v); }
+// CVR benchmark now flows from the registry (jewellery/frkl = 1.5%), not a literal.
+const CVR_BENCH = (bmGet('site_cvr') && bmGet('site_cvr').value) || 0.015;
+const CVR_BENCH_LABEL = bmFmt('pct', CVR_BENCH);
 // ── Brand identity for copy + LLM prompts (multi-brand). The /app shell can inject
 // window.OI_BRAND per tenant; falls back to frkl so single-tenant copy is unchanged.
 const OI_BRAND = (typeof window!=='undefined' && window.OI_BRAND) || {
@@ -1355,7 +1378,7 @@ function CostSetupModal({catalogueGm, onClose}){
   </div>);
 }
 
-function KPI({label, val, sub, badge, status, statusLabel, conf, series, seriesLabel, current, prior, goodDirection, agent, observation, implication}){
+function KPI({label, val, sub, badge, status, statusLabel, conf, series, seriesLabel, current, prior, goodDirection, agent, observation, implication, benchmark, bmValue}){
   const delta = (prior!=null && current!=null && prior!==0) ? (current-prior)/prior : null;
   let deltaColor = 'var(--text-muted)';
   if (delta!=null && goodDirection) {
@@ -1385,6 +1408,7 @@ function KPI({label, val, sub, badge, status, statusLabel, conf, series, seriesL
     <div className="val">{val}{delta!=null && <span className="delta" style={{color:deltaColor}}>{fmtDelta(delta)}</span>}</div>
     {sub && <div className="sub">{sub}{conf && <span style={{marginLeft:7}}>{confChip(conf)}</span>}</div>}
     {!sub && conf && <div className="sub">{confChip(conf)}</div>}
+    {benchmark && <div className="sub" style={{marginTop:6}}><Benchmark metric={benchmark} value={bmValue}/></div>}
     {hasPop && (
       <div className="kpi-pop">
         {hasSpark && (<div>
@@ -2708,6 +2732,33 @@ function StatusBadge({kind, label, dot=true, title}){
   return (<span className={'sbadge '+s.c} title={title||label||s.l}>{dot && <span className="dot"/>}{label||s.l}</span>);
 }
 
+// Industry benchmark chip: "vs ~1.5% · jewellery (?)" — hover reveals source,
+// definition, range, recency and confidence. Optional live `value` adds an
+// above/below dot (direction-aware via the metric's `better`). Renders nothing
+// if the metric isn't in the registry.
+function Benchmark({metric, value}){
+  const b = bmGet(metric);
+  if(!b || b.value==null) return null;
+  const catTxt = (!b.category || b.category==='default') ? 'all DTC' : b.category;
+  const rangeTxt = (b.lo!=null && b.hi!=null && b.lo!==b.hi) ? `${bmFmt(b.unit,b.lo)}–${bmFmt(b.unit,b.hi)}` : null;
+  // Some metrics are targets (a goal to clear), not observed peer medians.
+  const isTarget = b.kind==='target' || ['contribution_margin','ltv_cac','cart_abandonment'].indexOf(metric)>=0;
+  let good = null;
+  if(value!=null) good = b.better==='down' ? value<=b.value : value>=b.value;
+  const tip = [
+    `${isTarget?'Target':'Typical'} ${bmFmt(b.unit,b.value)}${rangeTxt?` (range ${rangeTxt})`:''} for ${catTxt}.`,
+    b.definition ? `Definition: ${b.definition}.` : '',
+    b.source ? `Source: ${b.source}${b.as_of?` (${b.as_of})`:''}.` : '',
+    b.confidence ? `Confidence: ${b.confidence}.` : '',
+    b.caveat || '', b.note || '',
+  ].filter(Boolean).join(' ');
+  return (<span className="bm-chip" title={tip}>
+    {good!=null && <span className={'bm-dot '+(good?'good':'bad')}/>}
+    {isTarget?'target':'vs'} {bmFmt(b.unit, b.value)} <span className="bm-cat">{catTxt}</span>
+    <span className="bm-q">?</span>
+  </span>);
+}
+
 // ── Toasts — lightweight confirmations; window.__oiToast(msg, {kind,body,icon,ttl}) ──
 function ToastHost(){
   const [items, setItems] = React.useState([]);
@@ -3960,7 +4011,8 @@ function Overview({start, period, customActive}){
           implication="Confirm a real COGS% so this becomes a defensible contribution number for the raise." />
         <KPI label="Blended MER" val={mer?mer.toFixed(2)+'x':'—'} sub="net revenue ÷ paid spend" series={seriesMER} current={mer} prior={pMer} goodDirection="up"
           agent="Atlas" observation="Down ~14%: revenue grew slower than spend (27% vs 46%), so each pound of ad earns less."
-          implication="Classic diminishing returns from scaling into a fatigued audience — pause scaling, fix creative + site first." />
+          implication="Classic diminishing returns from scaling into a fatigued audience — pause scaling, fix creative + site first."
+          benchmark="blended_mer" bmValue={mer} />
         <KPI label="Sessions (GA4)" val={NUM(sessions)} sub={`Site CVR ${PCT(sessions?orders/sessions:null)} (orders ÷ sessions)`} series={seriesSessions} current={sessions} prior={pSessions} goodDirection="up"
           agent="Pulse" observation={`Sessions grew far slower than spend. Site CVR (Shopify orders ÷ GA4 sessions) is ${sessions?PCT(orders/sessions):'—'} vs the ${CVR_BENCH_LABEL} target.`}
           implication="Spend is buying impressions, not visits. Site fixes (cart JS, sticky checkout) unlock more revenue than more spend." />
@@ -3970,14 +4022,17 @@ function Overview({start, period, customActive}){
         <KPI label="Conversion rate (CVR)" val={PCT(cvr)} sub={`${NUM(orders)} orders ÷ ${NUM(sessions)} sessions`} series={seriesCVR} current={cvr} prior={pCvr} goodDirection="up"
           status={cvr==null?undefined:cvr>=CVR_BENCH?'healthy':cvr>=CVR_BENCH*0.8?'watch':'action'} statusLabel={cvr==null?undefined:cvr>=CVR_BENCH?'Healthy':cvr>=CVR_BENCH*0.8?'Watch':'Below target'}
           agent="Pulse" observation={`Site CVR (Shopify orders ÷ GA4 sessions) is the single biggest revenue lever — against the ${CVR_BENCH_LABEL} target, more spend just buys more bounces.`}
-          implication="Fix the cart→checkout JS error and sticky-checkout before scaling spend further." />
+          implication="Fix the cart→checkout JS error and sticky-checkout before scaling spend further."
+          benchmark="site_cvr" bmValue={cvr} />
         <KPI label="Discount depth" val={PCT(discLoad)} sub="£ off ÷ £ of sales — how deep, not how many orders · drafts excluded" series={seriesDisc} current={discLoad} prior={pDiscLoad} goodDirection="down"
           agent="Atlas" observation={`Code + automatic discount as a share of DTC gross sales (draft/exchange orders excluded). This excludes sale-price markdowns${_mdPct?`, which add ~${_mdPct}% of value on top`:''} — the full load is on the Promotions tab.`}
-          implication="Audit always-on codes + affiliate rates; protect full-price demand. The true load incl. markdowns is materially higher — see Promotions." />
+          implication="Audit always-on codes + affiliate rates; protect full-price demand. The true load incl. markdowns is materially higher — see Promotions."
+          benchmark="discount_load" bmValue={discLoad} />
         <KPI label="Contribution margin" val={cmPct!=null?PCT(cmPct):'—'} sub="net rev × margin − ad spend, net of returns · ≥10% healthy" badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesContrib} seriesLabel="Contribution £ · by day" current={contrib} prior={pContrib} goodDirection="up"
           status={cmPct==null?undefined:cmPct>=0.10?'healthy':cmPct>=0.05?'watch':'margin'} statusLabel={cmPct==null?undefined:cmPct>=0.10?'Healthy':cmPct>=0.05?'Watch':'Margin risk'}
           agent="Atlas" observation="Whether the growth is actually profitable — net revenue × product margin minus paid media, as a share of revenue. Returns are already netted out of revenue. The single best read on profitable vs vanity growth."
-          implication="Below 10% means scaling just amplifies a thin engine — fix discount load, returns and CAC before adding spend." />
+          implication="Below 10% means scaling just amplifies a thin engine — fix discount load, returns and CAC before adding spend."
+          benchmark="contribution_margin" bmValue={cmPct} />
         <KPI label="CAC payback" val={paybackOrders!=null?(paybackOrders<=1?'1st order':paybackOrders.toFixed(1)+' orders'):'—'} sub={cac!=null?`paid CAC £${Math.round(cac)} ÷ first-order contribution · target ≤2`:'needs paid CAC'} goodDirection="down"
           status={paybackOrders==null?undefined:paybackOrders<=2?'healthy':paybackOrders<=3?'watch':'action'} statusLabel={paybackOrders==null?undefined:paybackOrders<=2?'Healthy':paybackOrders<=3?'Watch':'Slow payback'}
           agent="Atlas" observation="How many orders it takes to recover the paid cost of acquiring a customer, at your margin. Under ~2 orders = a healthy cash cycle that funds reinvestment."
@@ -3985,10 +4040,12 @@ function Overview({start, period, customActive}){
         <MoreKpis count={8}>
         <KPI label="Gross margin" val={PCT(gm)} sub={costsVerified?"Your entered gross margin":"COGS-based · catalogue estimate"} badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesGM} seriesLabel="Catalogue margin · structurally stable"
           agent="Atlas" observation="Blended product margin across the live catalogue, after cost of goods."
-          implication="This is the contribution base for the raise — defend it by keeping discount load in check." />
+          implication="This is the contribution base for the raise — defend it by keeping discount load in check."
+          benchmark="gross_margin" bmValue={gm} />
         <KPI label="Return rate" val={PCT(returnRate)} sub={`${NUM(_rets)} of ${NUM(_units)} units · 90d`} series={seriesReturn} seriesLabel="Refunds ÷ sales · by day" goodDirection="down"
           agent="Lux" observation="Share of shipped units returned — watch by SKU for sizing/quality hotspots. (Card is unit-based over 90d; trend is refund-£ share of sales by day.)"
-          implication="A point of return rate is pure margin; flag any SKU materially above this blended rate." />
+          implication="A point of return rate is pure margin; flag any SKU materially above this blended rate."
+          benchmark="return_rate" bmValue={returnRate} />
         <KPI label="Orders with a discount" val={_dc.fullPriceShare!=null?PCT(1-_dc.fullPriceShare):'—'} sub="share of orders using a code/auto discount — how often, not how deep · drafts excluded" goodDirection="down"
           agent="Atlas" observation={_dc.fullPriceShare!=null?`${Math.round((1-_dc.fullPriceShare)*100)}% of orders carry a discount; ${Math.round(_dc.fullPriceShare*100)}% pay full price. Read it with Discount depth: lots of orders but a shallow ~${discLoad!=null?Math.round(discLoad*100):9}% of revenue = many small codes, not deep cuts.`:'How often a discount is used across orders (draft/exchange orders excluded).'}
           implication="If penetration and depth climb together you're training customers to wait for a code — tighten the always-on codes first." series={seriesPenetration} seriesLabel="Orders with a code · by week" />
@@ -4006,7 +4063,8 @@ function Overview({start, period, customActive}){
           implication="Judge against contribution-LTV — keep scaling only while LTV:CAC stays at 3×+." />
         <KPI label="LTV (est.)" val={GBP(ltv)} sub={`contribution · ${ordersPerCust?ordersPerCust.toFixed(1):'—'} orders/customer · LTV:CAC ${ltvCac?ltvCac.toFixed(1)+'×':'—'}`} badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesLTV} seriesLabel="Contribution/customer · by day" goodDirection="up"
           agent="Atlas" observation="Estimated contribution per acquired customer: AOV × gross margin × repeat orders per customer."
-          implication="The LTV:CAC ratio is the unit-economics headline for the raise — 3×+ is the target to defend." />
+          implication="The LTV:CAC ratio is the unit-economics headline for the raise — 3×+ is the target to defend."
+          benchmark="ltv_cac" bmValue={ltvCac} />
         </MoreKpis>
       </div>
     </div>
