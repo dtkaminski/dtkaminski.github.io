@@ -19,25 +19,25 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606101400"></script>
-<script src="./frkl-live-data.js?v=202606101400"></script>
-<script src="./frkl-agent-insights.js?v=202606101400"></script>
-<script src="./frkl-business-data.js?v=202606101400"></script>
-<script src="./frkl-action-status.js?v=202606101400"></script>
-<script src="./frkl-patterns.js?v=202606101400"></script>
-<script src="./frkl-creators.js?v=202606101400"></script>
-<script src="./frkl-creative-vision.js?v=202606101400"></script>
-<script src="./frkl-links.js?v=202606101400"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606101400"></script>
-<script src="./frkl-events.js?v=202606101400"></script>
-<script src="./frkl-products.js?v=202606101400"></script>
-<script src="./frkl-discount-codes.js?v=202606101400"></script>
-<script src="./frkl-cvr.js?v=202606101400"></script>
-<script src="./frkl-cohorts.js?v=202606101400"></script>
-<script src="./frkl-retention.js?v=202606101400"></script>
-<script src="./frkl-clarity.js?v=202606101400"></script>
-<script src="./frkl-board-read.js?v=202606101400"></script>
-<script src="./frkl-benchmarks.js?v=202606101400"></script>
+<script src="./frkl-data-loader.js?v=202606101500"></script>
+<script src="./frkl-live-data.js?v=202606101500"></script>
+<script src="./frkl-agent-insights.js?v=202606101500"></script>
+<script src="./frkl-business-data.js?v=202606101500"></script>
+<script src="./frkl-action-status.js?v=202606101500"></script>
+<script src="./frkl-patterns.js?v=202606101500"></script>
+<script src="./frkl-creators.js?v=202606101500"></script>
+<script src="./frkl-creative-vision.js?v=202606101500"></script>
+<script src="./frkl-links.js?v=202606101500"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606101500"></script>
+<script src="./frkl-events.js?v=202606101500"></script>
+<script src="./frkl-products.js?v=202606101500"></script>
+<script src="./frkl-discount-codes.js?v=202606101500"></script>
+<script src="./frkl-cvr.js?v=202606101500"></script>
+<script src="./frkl-cohorts.js?v=202606101500"></script>
+<script src="./frkl-retention.js?v=202606101500"></script>
+<script src="./frkl-clarity.js?v=202606101500"></script>
+<script src="./frkl-board-read.js?v=202606101500"></script>
+<script src="./frkl-benchmarks.js?v=202606101500"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -1153,7 +1153,11 @@ const DEMAND_DEFAULTS = {months:3, growth:0, targetMode:'growth', targetValue:''
 function demandConfig(){ try { const s=JSON.parse(localStorage.getItem('oi_demandplan_v1')||'null'); if(s) return {...DEMAND_DEFAULTS, ...s}; } catch(e){} return {...DEMAND_DEFAULTS}; }
 function saveDemandConfig(next){ try { localStorage.setItem('oi_demandplan_v1', JSON.stringify(next)); window.dispatchEvent(new Event('oi-forecast-updated')); } catch(e){} }
 const PACK_DEFAULTS = { avgItemsPerOrder:1.3, components:[ {name:'Mailer / box',perItem:0,perOrder:1}, {name:'Pouch / bag',perItem:1,perOrder:0}, {name:'Thank-you card',perItem:0,perOrder:1}, {name:'Sticker / seal',perItem:0,perOrder:1} ] };
-function packagingConfig(){ try { const s=JSON.parse(localStorage.getItem('oi_packaging_v1')||'null'); if(s && Array.isArray(s.components)) return {avgItemsPerOrder:s.avgItemsPerOrder!=null?s.avgItemsPerOrder:1.3, components:s.components.map(c=>({...c}))}; } catch(e){} return {avgItemsPerOrder:PACK_DEFAULTS.avgItemsPerOrder, components:PACK_DEFAULTS.components.map(c=>({...c}))}; }
+// Each component carries its BOM (perItem/perOrder) and — when the operator wants
+// packaging reorder POs — stock-on-hand + supplier/MOQ/cost/lead. onHand blank =
+// "not tracked" → no packaging PO is raised for it.
+function _packComp(c){ return {name:c.name||'', perItem:c.perItem!=null?c.perItem:0, perOrder:c.perOrder!=null?c.perOrder:0, onHand:c.onHand!=null?c.onHand:'', supplier:c.supplier||'', moq:c.moq!=null?c.moq:'', unitCost:c.unitCost!=null?c.unitCost:'', leadDays:c.leadDays!=null?c.leadDays:30}; }
+function packagingConfig(){ try { const s=JSON.parse(localStorage.getItem('oi_packaging_v1')||'null'); if(s && Array.isArray(s.components)) return {avgItemsPerOrder:s.avgItemsPerOrder!=null?s.avgItemsPerOrder:1.3, components:s.components.map(_packComp)}; } catch(e){} return {avgItemsPerOrder:PACK_DEFAULTS.avgItemsPerOrder, components:PACK_DEFAULTS.components.map(_packComp)}; }
 function savePackagingConfig(next){ try { localStorage.setItem('oi_packaging_v1', JSON.stringify(next)); window.dispatchEvent(new Event('oi-forecast-updated')); } catch(e){} }
 // The forecast multiplier the demand plan applies to each product's run-rate.
 // Reads the SAVED plan (demandConfig) so the PO planner sizes orders to planned
@@ -1192,6 +1196,24 @@ function clearPoStatus(key){ setPoStatus(key, null); }
 
 // Shared reorder engine — used by the Production planner AND the action queue, so
 // the to-do list and the PO drafts can never disagree about what's been ordered.
+// Strategy-aware order sizing — shared by products AND packaging so they can't drift.
+// vel = planned daily consumption, stock = units on hand. Returns trigger + quantity.
+function _reorderSizing(strategy, vel, stock, lead, o){
+  const cover = vel>0 ? stock/vel : 999;
+  const forecastUnits = Math.ceil(vel*o.horizonDays);
+  let qty=0, needs=false, basis='cover', waveUnits=null, nextWaveBy=null;
+  if(strategy==='bulk'){
+    const target = forecastUnits + Math.ceil(vel*o.safety);
+    qty = Math.max(0, target - stock); needs = qty>0; basis='forecast';
+  } else if(strategy==='staged'){
+    const waveDays = o.horizonDays/o.waves; waveUnits = Math.ceil(vel*waveDays);
+    qty = Math.max(0, Math.ceil(vel*(lead+waveDays)) - stock); needs = cover <= lead+o.safety; basis='wave';
+    nextWaveBy = oiAddDays(o.today, Math.max(0, Math.round(cover - lead - o.safety)));
+  } else {
+    qty = Math.max(0, Math.ceil(vel*(lead+o.coverDays)) - stock); needs = cover <= lead+o.safety; basis='cover';
+  }
+  return {cover, forecastUnits, qty, needs, basis, waveUnits, nextWaveBy};
+}
 function planReorder(){
   const B = (typeof window!=='undefined' && window.FRKL_BUSINESS) || {};
   const inv = (B.inventory||[]).filter(p=>p && p.status!=='ARCHIVED');
@@ -1200,31 +1222,36 @@ function planReorder(){
   const plan = demandScaleFactor(); const scale = plan.scale;
   const horizonDays = (plan.months||3)*30.4;
   const po = poStatusAll(); const today = oiToday();
-  const lines = inv.filter(p=>(p.dailyVelocity||0)>0).map(p=>{
+  const opt = {safety, coverDays, horizonDays, waves, today};
+  const productLines = inv.filter(p=>(p.dailyVelocity||0)>0).map(p=>{
     const lead = leadDaysForType(p.type); const sup = supplierFor(p.type); const stock = p.inventoryQty||0;
-    const vel = (p.dailyVelocity||0)*scale; const cover = vel>0 ? stock/vel : 999;
-    const forecastUnits = Math.ceil(vel*horizonDays);          // total planned demand over the horizon
-    let qty=0, needs=false, basis='cover', waveUnits=null, nextWaveBy=null;
-    if(strategy==='bulk'){
-      // commit the whole forecast horizon now, net of stock (+ safety buffer)
-      const target = forecastUnits + Math.ceil(vel*safety);
-      qty = Math.max(0, target - stock); needs = qty>0; basis='forecast';
-    } else if(strategy==='staged'){
-      // order the forecast in `waves`; each order covers lead + one wave's worth
-      const waveDays = horizonDays/waves; waveUnits = Math.ceil(vel*waveDays);
-      qty = Math.max(0, Math.ceil(vel*(lead+waveDays)) - stock); needs = cover <= lead+safety; basis='wave';
-      nextWaveBy = oiAddDays(today, Math.max(0, Math.round(cover - lead - safety)));
-    } else {
-      // just-in-time: lean rolling cover (lead + buffer)
-      qty = Math.max(0, Math.ceil(vel*(lead+coverDays)) - stock); needs = cover <= lead+safety; basis='cover';
-    }
-    const moq = Number(sup.moq)||0; let moqBumped=false;
+    const vel = (p.dailyVelocity||0)*scale;
+    const s = _reorderSizing(strategy, vel, stock, lead, opt);
+    let qty = s.qty; const moq = Number(sup.moq)||0; let moqBumped=false;
     if(qty>0 && moq>0 && qty<moq){ qty=moq; moqBumped=true; }
     const unitCost = (sup.unitCost!=null&&sup.unitCost!=='') ? Number(sup.unitCost) : (p.costPerItem!=null?p.costPerItem:null);
     const supplier = (sup.supplier&&sup.supplier.trim()) || p.vendor || p.type || 'Unassigned';
-    return {key:p.sku||p.title, p, lead, cover, stock, vel, forecastUnits, needs, qty, basis, waveUnits, nextWaveBy, moq, moqBumped, unitCost, supplier, lineCost: unitCost!=null?unitCost*qty:null};
+    return {key:p.sku||p.title, p, lead, cover:s.cover, stock, vel, forecastUnits:s.forecastUnits, needs:s.needs, qty, basis:s.basis, waveUnits:s.waveUnits, nextWaveBy:s.nextWaveBy, moq, moqBumped, unitCost, supplier, lineCost: unitCost!=null?unitCost*qty:null};
   });
-  // auto-acknowledge: a raised/received PO whose Shopify stock has risen materially is closed
+  // ── packaging lines — consume the demand plan (per-item × units + per-order × orders) ──
+  const pk = packagingConfig(); const aipo = Number(pk.avgItemsPerOrder)||1.3;
+  const totalDailyUnits = inv.reduce((t,p)=>t+(p.dailyVelocity||0)*scale, 0);
+  const totalDailyOrders = aipo>0 ? totalDailyUnits/aipo : 0;
+  const pkgLines = (pk.components||[]).filter(c=> c.onHand!=='' && c.onHand!=null && isFinite(Number(c.onHand)) && ((Number(c.perItem)||0)>0 || (Number(c.perOrder)||0)>0)).map(c=>{
+    const onHand = Number(c.onHand)||0;
+    const dailyUse = (Number(c.perItem)||0)*totalDailyUnits + (Number(c.perOrder)||0)*totalDailyOrders;
+    const lead = Number(c.leadDays)||30;
+    const s = _reorderSizing(strategy, dailyUse, onHand, lead, opt);
+    let qty = s.qty; const moq = Number(c.moq)||0; let moqBumped=false;
+    if(qty>0 && moq>0 && qty<moq){ qty=moq; moqBumped=true; }
+    const unitCost = (c.unitCost!=null&&c.unitCost!=='') ? Number(c.unitCost) : null;
+    const supplier = (c.supplier&&c.supplier.trim()) || 'Packaging';
+    const p = {title:c.name, type:'Packaging', sku:'', inventoryQty:onHand};
+    return {key:'pkg:'+c.name, p, isPackaging:true, lead, cover:s.cover, stock:onHand, vel:dailyUse, forecastUnits:s.forecastUnits, needs:s.needs, qty, basis:s.basis, waveUnits:s.waveUnits, nextWaveBy:s.nextWaveBy, moq, moqBumped, unitCost, supplier, lineCost: unitCost!=null?unitCost*qty:null};
+  });
+  const lines = productLines.concat(pkgLines);
+  // auto-acknowledge: a raised/received PO whose stock has risen materially is closed
+  // (products: Shopify inventory; packaging: the on-hand figure you update)
   const ackPending={};
   lines.forEach(l=>{ const st=po[l.key]; if(st && (st.status==='ordered'||st.status==='received')){ const cur=l.p.inventoryQty||0; if(cur >= (st.baselineQty||0)+Math.max(1, Math.ceil(0.5*(st.qty||l.qty)))) ackPending[l.key]=true; } });
   lines.forEach(l=>{ const st = ackPending[l.key]?null:(po[l.key]||null); l.po=st; l.poStatus=st?st.status:null;
@@ -5339,9 +5366,9 @@ function twoPropZ(k1,n1,k2,n2){ if(!n1||!n2) return {z:0,p:1}; const p1=k1/n1,p2
 // Solve Ax=b (Gaussian elimination, partial pivot). Returns null if singular.
 function _solve(A,b){ const n=b.length, M=A.map((r,i)=>[...r,b[i]]);
   for(let c=0;c<n;c++){ let pv=c; for(let r=c+1;r<n;r++) if(Math.abs(M[r][c])>Math.abs(M[pv][c])) pv=r;
-    if(Math.abs(M[pv][c])<1e-12) return null; const tmp=M[c]; M[c]=M[pv]; M[pv]=tmp;
+    if(Math.abs(M[pv][c])<1e-9) return null; const tmp=M[c]; M[c]=M[pv]; M[pv]=tmp;
     for(let r=0;r<n;r++){ if(r===c) continue; const fct=M[r][c]/M[c][c]; for(let j=c;j<=n;j++) M[r][j]-=fct*M[c][j]; } }
-  return M.map((r,i)=>r[n]/r[i][i]); }
+  const out=M.map((r,i)=>r[n]/r[i][i]); return out.every(v=>Number.isFinite(v))? out : null; }
 // OLS with intercept. Predictors are STANDARDIZED internally and a small ridge is
 // added — essential here because the candidate predictors (traffic shares) are
 // collinear and on wildly different scales; raw normal-equations would go singular
@@ -5356,13 +5383,13 @@ function ols(X,y,lam){ const n=X.length, k=(X[0]?X[0].length:0); if(n<k+2) retur
   const ridge=Math.max(lam||0, n*1e-3); for(let a=1;a<p;a++) XtX[a][a]+=ridge;   // ridge off the intercept
   const beta=_solve(XtX,Xty); if(!beta) return null;
   return {beta, mu, sg, predictRow:(r)=>{ let v=beta[0]; for(let j=0;j<k;j++) v+=beta[j+1]*((r[j]-mu[j])/sg[j]); return v; }}; }
-// Partial correlation of y with x controlling for the columns in Z (array of vectors).
-function partialCorr(x,y,Z){ const _r=(a,b)=>{ const v=pearson(a,b); return v==null?0:v; };
-  const n=x.length; if(n<6||!Z.length) return _r(x,y);
-  const rows=Array.from({length:n},(_,i)=> Z.map(z=>z[i]));
-  const fx=ols(rows,x), fy=ols(rows,y); if(!fx||!fy) return _r(x,y);
-  const rx=x.map((v,i)=> v-fx.predictRow(rows[i])), ry=y.map((v,i)=> v-fy.predictRow(rows[i]));
-  return _r(rx,ry); }
+// Partial correlation of x with y controlling for a single variable z (closed form
+// — exact and numerically bulletproof, unlike multi-control normal equations which
+// go singular when the controls are collinear). z = the dominant confound vector.
+function partialCorr(x,y,z){ const _r=(a,b)=>{ const v=pearson(a,b); return v==null?0:v; };
+  if(x.length<6) return _r(x,y);
+  const rxy=_r(x,y), rxz=_r(x,z), ryz=_r(y,z), den=Math.sqrt(Math.max(0,(1-rxz*rxz)*(1-ryz*ryz)));
+  return den>1e-6? Math.max(-1,Math.min(1,(rxy-rxz*ryz)/den)) : _r(x,y); }
 
 // ── CVR drivers (Crux) — a clearer picture of conversion rate ────────────────
 // Three layers, strongest evidence first: (1) WHERE in the funnel CVR moved,
@@ -5554,7 +5581,7 @@ function CvrDrivers(){
   const STAT = useMemo(()=>{
     const dd = seriesDaily.length>=12 ? seriesDaily : series; const nD=dd.length;
     const col = k => dd.map(d=> d[k]);
-    const ctrlKeys=['newShare','paidShare','mobileShare'];
+    const ctrlKey='newShare';   // dominant traffic-mix confound (closed-form partial)
     const LEVERS=[
       {k:'trueDiscountIntensity',label:'Discount depth (incl. sale)'},
       {k:'discountIntensity',label:'Code/auto discount'},
@@ -5567,26 +5594,29 @@ function CvrDrivers(){
       {k:'altPayShare',label:'Alt-payment share'},
       {k:'emailShare',label:'Email-traffic share'},
     ];
-    const Zall=ctrlKeys.map(k=>col(k)); const y=col('cvr');
-    const drivers=LEVERS.map(L=>{ const x=col(L.k);
-      const X=[],Y=[],ZZ=ctrlKeys.map(()=>[]);
-      for(let i=0;i<nD;i++){ const xv=x[i],yv=y[i],zv=Zall.map(z=>z[i]);
-        if(xv==null||yv==null||zv.some(v=>v==null)) continue; X.push(xv); Y.push(yv); zv.forEach((v,j)=>ZZ[j].push(v)); }
+    const zc=col(ctrlKey); const y=col('cvr');
+    const drivers=LEVERS.filter(L=>L.k!==ctrlKey).map(L=>{ const x=col(L.k);
+      const X=[],Y=[],Zv=[];
+      for(let i=0;i<nD;i++){ const xv=x[i],yv=y[i],zv=zc[i];
+        if(xv==null||yv==null||zv==null) continue; X.push(xv); Y.push(yv); Zv.push(zv); }
       if(X.length<8) return null;
       const raw=(()=>{ const r=pearson(X,Y); return r==null?0:r; })();
-      const adj=partialCorr(X,Y,ZZ);
+      const adj=partialCorr(X,Y,Zv);
       return {k:L.k,label:L.label,n:X.length,raw,adj,sig:corrSig(adj,X.length)};
     }).filter(Boolean).sort((a,b)=>Math.abs(b.adj)-Math.abs(a.adj));
-    // expected-CVR residuals, weekly (interpretable)
-    const wk=series, mdl=['newShare','paidShare','mobileShare','trueDiscountIntensity'];
-    const rows=[],yy=[],idx=[];
-    wk.forEach((sx,i)=>{ const xv=mdl.map(k=>sx[k]); if(xv.some(v=>v==null)||sx.cvr==null) return; rows.push(xv); yy.push(sx.cvr); idx.push(i); });
+    // expected-CVR residuals, weekly: simple closed-form regression on new-visitor
+    // share (traffic warmth). Residual = CVR the traffic mix alone does NOT explain
+    // — the genuine "something off-model happened" signal. Closed form = bulletproof.
+    const wk=series; const XX=[],yy=[],idx=[];
+    wk.forEach((sx,i)=>{ if(sx.newShare==null||sx.cvr==null) return; XX.push(sx.newShare); yy.push(sx.cvr); idx.push(i); });
     let resid=null;
-    if(rows.length>=8){ const fit=ols(rows,yy);
-      if(fit){ const res=yy.map((v,i)=> v-fit.predictRow(rows[i])); const sd=Math.sqrt(_mean(res.map(r=>r*r)));
-        const byW={}; idx.forEach((wi,i)=>{ const w=wk[wi].w; byW[w]={exp:fit.predictRow(rows[i]),act:yy[i],e:res[i],z:sd?res[i]/sd:0}; });
-        resid={sd,byW,list:Object.keys(byW).map(w=>({w,...byW[w]})).filter(r=>Math.abs(r.z)>=1.3).sort((a,b)=>Math.abs(b.e)-Math.abs(a.e)).slice(0,5)};
-      } }
+    if(XX.length>=8){ const mx=_mean(XX), my=_mean(yy); let sxy=0,sxx=0;
+      for(let i=0;i<XX.length;i++){ sxy+=(XX[i]-mx)*(yy[i]-my); sxx+=(XX[i]-mx)*(XX[i]-mx); }
+      const slope=sxx>0? sxy/sxx : 0, b0=my-slope*mx;
+      const res=yy.map((v,i)=> v-(b0+slope*XX[i])); const sd=Math.sqrt(_mean(res.map(r=>r*r)));
+      const byW={}; idx.forEach((wi,i)=>{ const w=wk[wi].w; const e=res[i]; byW[w]={exp:b0+slope*XX[i],act:yy[i],e,z:sd?e/sd:0}; });
+      resid={sd,byW,list:Object.keys(byW).map(w=>({w,...byW[w]})).filter(r=>Math.abs(r.z)>=1.3).sort((a,b)=>Math.abs(b.e)-Math.abs(a.e)).slice(0,5)};
+    }
     // clean "natural experiment" pairs: matched traffic, one lever differs
     const mixKeys=['newShare','paidShare','mobileShare'];
     const levers=[['trueDiscountIntensity','discount depth','pct'],['emailSends','email volume','num'],['freeShipShare','free-ship rate','pct'],['aov','AOV','gbp']];
@@ -5789,7 +5819,7 @@ function CvrDrivers(){
                   {S.against.length>0 && <div style={{marginBottom:6}}><b style={{color:'#7c8cff'}}>3 · Against the grain.</b> {S.against.map((d,i)=><span key={d.k}>{i>0?'; ':''}<b>{cmLabel[d.k]}</b> {fmtMetric(d.k,d.a)}→{fmtMetric(d.k,d.b)}</span>)} usually push{S.against.length>1?'':'es'} CVR the other way — so the {S.up?'gain':'drop'} happened <i>despite</i> {S.against.length>1?'them':'it'}, which sharpens the diagnosis.</div>}
                   {S.verdict && <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--border-subtle)'}}><b style={{color:vcol}}>Likely driver:</b> <span style={{color:'var(--text-secondary)'}}>{S.verdict}</span> <span style={{color:'var(--text-faint)'}}>{sessClose?'Sessions are near-identical, so this is a relatively clean read.':'Sessions differ a lot here — volume itself shifts the mix, so read with care.'} Two periods is correlation, not proof.</span></div>}
                   {STAT.resid && STAT.resid.byW[cmp.b] && (()=>{ const rB=STAT.resid.byW[cmp.b]; const unexp=Math.abs(rB.z)>=1.3;
-                    return (<div style={{marginTop:6,fontSize:11.5,color:'var(--text-faint)'}}><b style={{color:unexp?'#9aa6ff':'var(--text-muted)'}}>Mix-adjusted:</b> after modelling CVR from traffic mix + discount, {lbl(cB)} lands <b style={{color:rB.e>=0?'#4ade80':'#ef6b6f'}}>{rB.e>=0?'+':''}{rB.e.toFixed(2)}pp</b> vs expected ({(rB.exp).toFixed(2)}%) — {unexp?'a genuinely un-modelled move, the kind worth a controlled test':'about what the model predicts, so most of the gap is explained by the inputs'}.</div>); })()}
+                    return (<div style={{marginTop:6,fontSize:11.5,color:'var(--text-faint)'}}><b style={{color:unexp?'#9aa6ff':'var(--text-muted)'}}>Mix-adjusted:</b> after modelling CVR from traffic warmth (new-visitor share), {lbl(cB)} lands <b style={{color:rB.e>=0?'#4ade80':'#ef6b6f'}}>{rB.e>=0?'+':''}{rB.e.toFixed(2)}pp</b> vs expected ({(rB.exp).toFixed(2)}%) — {unexp?'a genuinely un-modelled move, the kind worth a controlled test':'about what the model predicts, so most of the gap is explained by the inputs'}.</div>); })()}
                 </div>}
             <div onClick={cmpAskAI} style={{marginTop:9,fontSize:12,color:'#9aa6ff',cursor:'pointer',fontWeight:600}}>✦ Ask AI to dig deeper into this pair →</div>
           </div>); })()}
@@ -5889,7 +5919,7 @@ function CvrDrivers(){
       <div className="card-section-title"><h2 style={{margin:0}}>4 · Deeper signal <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>— what survives the confounds</span></h2>
         <span className="meta">Pulse · partial correlations + an expected-CVR model{STAT.drivers[0]?` · n=${STAT.drivers[0].n} ${seriesDaily.length>=12?'days':'weeks'}`:''}</span></div>
       {STAT.drivers.length>0 ? <>
-      <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#7c8cff',marginBottom:6}}>Levers, mix-adjusted — independent link to CVR after holding traffic mix constant</div>
+      <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#7c8cff',marginBottom:6}}>Levers, mix-adjusted — independent link to CVR after holding new-visitor share constant</div>
       <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:12.5}}>
         <thead><tr style={{textAlign:'left',color:'var(--text-faint)',fontSize:10.5,textTransform:'uppercase',letterSpacing:'.04em'}}>
           <th style={{padding:'4px 8px 4px 0'}}>Lever</th><th style={{padding:'4px 8px',textAlign:'right'}}>Raw r</th><th style={{padding:'4px 8px',width:120}}>Mix-adjusted</th><th style={{padding:'4px 8px',textAlign:'right'}}>Adj r</th><th style={{padding:'4px 8px'}}></th></tr></thead>
@@ -5903,7 +5933,7 @@ function CvrDrivers(){
             <td style={{padding:'6px 8px',fontSize:10.5,color:collapsed?'#f5b544':'var(--text-faint)'}}>{collapsed?'mostly mix':(d.sig?'holds':'')}</td>
           </tr>); })}</tbody>
       </table></div>
-      <div className="note" style={{marginTop:8}}>Each lever's correlation with daily CVR <b>after removing traffic mix</b> (new / paid / mobile share) via partial regression. Where the adjusted figure holds near the raw one, the signal is genuinely that lever; where it collapses toward 0 (<span style={{color:'#f5b544'}}>“mostly mix”</span>), the raw correlation was really just <i>who</i> visited. This is the honest read on what's actually moveable. “ns” = not significant at n shown.</div>
+      <div className="note" style={{marginTop:8}}>Each lever's correlation with daily CVR <b>after partialling out new-visitor share</b> — the dominant traffic-mix confound (it alone correlates r≈−0.46 with CVR). Where the adjusted figure holds near the raw one, the signal is genuinely that lever; where it collapses toward 0 (<span style={{color:'#f5b544'}}>“mostly mix”</span>), the raw correlation was really just <i>who</i> visited. This is the honest read on what's actually moveable. “ns” = not significant at n shown.</div>
       </> : <div className="note">Not enough clean daily history yet to separate levers from traffic mix.</div>}
 
       {STAT.resid && <div style={{marginTop:16}}>
@@ -5914,7 +5944,7 @@ function CvrDrivers(){
             <span style={{fontWeight:700,color:pos?'#4ade80':'#ef6b6f'}}>{pos?'+':''}{r.e.toFixed(2)}pp unexplained</span>
           </div>); })}</div>
           : <div className="note">No week deviates much from the model — over this window CVR is well-explained by traffic mix + discount, so there's no off-model anomaly to chase.</div>}
-        <div className="note" style={{marginTop:8}}>Expected CVR is modelled (OLS) from traffic mix + discount depth; big residuals are weeks where <b>something not in the model</b> moved CVR — a site change, a tracking break, a one-off promo — i.e. the genuine “investigate this” list, already stripped of the mix confound. Click a flagged week on the chart above to compare it.</div>
+        <div className="note" style={{marginTop:8}}>Expected CVR is modelled from new-visitor share (how cold the week's traffic was); big residuals are weeks where <b>something other than traffic warmth</b> moved CVR — a site change, a tracking break, a one-off promo — i.e. the genuine “investigate this” list, already stripped of the mix confound. Click a flagged week on the chart above to compare it.</div>
       </div>}
     </div>
   </div>);
@@ -9217,7 +9247,7 @@ function RestockActionQueue(){
           <button style={{...btn,padding:'3px 9px',background:'transparent',color:'var(--text-muted)'}} onClick={()=>{ clearPoStatus(l.key); toast('PO cancelled', {body:l.p.title}); }}>Cancel</button>
         </div>))}
       </div>
-      <div style={{fontSize:11,color:'var(--text-faint)',marginTop:8,lineHeight:1.5}}>You won't be reminded about these again. Each auto-closes when its stock rises in Shopify on the next sync.</div>
+      <div style={{fontSize:11,color:'var(--text-faint)',marginTop:8,lineHeight:1.5}}>You won't be reminded about these again. Each auto-closes when its stock comes back up — Shopify inventory for products, your on-hand figure for packaging.</div>
     </div>)}
   </div>);
 }
@@ -9793,11 +9823,11 @@ function DemandPlanner(){
   const aipo = Number(pack.avgItemsPerOrder)||1.3;
   const orders = aipo>0?totalUnits/aipo:0;
   const compNeeds = pack.components.map(c=>({name:c.name, perItem:Number(c.perItem)||0, perOrder:Number(c.perOrder)||0, qty:(Number(c.perItem)||0)*totalUnits + (Number(c.perOrder)||0)*orders}));
-  const [packDraft, setPackDraft] = useState(()=>({ avgItemsPerOrder:String(pack.avgItemsPerOrder), components:pack.components.map(c=>({name:c.name, perItem:String(c.perItem), perOrder:String(c.perOrder)})) }));
+  const [packDraft, setPackDraft] = useState(()=>({ avgItemsPerOrder:String(pack.avgItemsPerOrder), components:pack.components.map(c=>({name:c.name, perItem:String(c.perItem), perOrder:String(c.perOrder), onHand:c.onHand===''?'':String(c.onHand), supplier:c.supplier||'', moq:c.moq===''?'':String(c.moq), unitCost:c.unitCost===''?'':String(c.unitCost), leadDays:String(c.leadDays!=null?c.leadDays:30)})) }));
   const setComp=(i,f,v)=>setPackDraft(d=>({...d, components:d.components.map((c,j)=>j===i?{...c,[f]:v}:c)}));
-  const addComp=()=>setPackDraft(d=>({...d, components:[...d.components, {name:'New component', perItem:'0', perOrder:'0'}]}));
+  const addComp=()=>setPackDraft(d=>({...d, components:[...d.components, {name:'New component', perItem:'0', perOrder:'0', onHand:'', supplier:'', moq:'', unitCost:'', leadDays:'30'}]}));
   const rmComp=(i)=>setPackDraft(d=>({...d, components:d.components.filter((_,j)=>j!==i)}));
-  const savePack=()=>{ savePackagingConfig({avgItemsPerOrder:Number(packDraft.avgItemsPerOrder)||1.3, components:packDraft.components.filter(c=>c.name&&c.name.trim()).map(c=>({name:c.name.trim(), perItem:Number(c.perItem)||0, perOrder:Number(c.perOrder)||0}))}); setPackOpen(false); toast('Packaging plan saved', {kind:'good'}); };
+  const savePack=()=>{ savePackagingConfig({avgItemsPerOrder:Number(packDraft.avgItemsPerOrder)||1.3, components:packDraft.components.filter(c=>c.name&&c.name.trim()).map(c=>({name:c.name.trim(), perItem:Number(c.perItem)||0, perOrder:Number(c.perOrder)||0, onHand:c.onHand==='' ? '' : (Number(c.onHand)||0), supplier:(c.supplier||'').trim(), moq:c.moq==='' ? '' : (Number(c.moq)||0), unitCost:c.unitCost==='' ? '' : (Number(c.unitCost)||0), leadDays:Number(c.leadDays)||30}))}); setPackOpen(false); toast('Packaging plan saved', {kind:'good'}); };
 
   const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:12.5,fontWeight:600,padding:'7px 13px',borderRadius:8,border:'1px solid var(--border-default)',background:'var(--bg-elevated)',color:'var(--text-primary)',cursor:'pointer'};
   const seg = (active)=>({...btn, padding:'6px 12px', background:active?'var(--accent)':'var(--bg-elevated)', color:active?'#fff':'var(--text-secondary)', borderColor:active?'var(--accent)':'var(--border-default)'});
@@ -9886,14 +9916,20 @@ function DemandPlanner(){
         <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'flex-end',marginBottom:10}}>
           <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}}>Avg items per order<input type="number" style={{...inp,width:90}} value={packDraft.avgItemsPerOrder} onChange={e=>setPackDraft(d=>({...d,avgItemsPerOrder:e.target.value}))}/></label>
         </div>
-        <table style={{borderCollapse:'collapse',width:'100%',minWidth:420}}><thead><tr><th style={th}>Component</th><th style={th}>Per item</th><th style={th}>Per order</th><th style={th}></th></tr></thead><tbody>
+        <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:760}}><thead><tr><th style={th}>Component</th><th style={th}>Per item</th><th style={th}>Per order</th><th style={th}>On hand</th><th style={th}>Supplier</th><th style={th}>MOQ</th><th style={th}>£/unit</th><th style={th}>Lead d</th><th style={th}></th></tr></thead><tbody>
           {packDraft.components.map((c,idx)=>(<tr key={idx}>
-            <td style={td}><input style={{...inp,width:170}} value={c.name} onChange={e=>setComp(idx,'name',e.target.value)}/></td>
-            <td style={td}><input type="number" step="0.1" style={{...inp,width:70}} value={c.perItem} onChange={e=>setComp(idx,'perItem',e.target.value)}/></td>
-            <td style={td}><input type="number" step="0.1" style={{...inp,width:70}} value={c.perOrder} onChange={e=>setComp(idx,'perOrder',e.target.value)}/></td>
+            <td style={td}><input style={{...inp,width:150}} value={c.name} onChange={e=>setComp(idx,'name',e.target.value)}/></td>
+            <td style={td}><input type="number" step="0.1" style={{...inp,width:60}} value={c.perItem} onChange={e=>setComp(idx,'perItem',e.target.value)}/></td>
+            <td style={td}><input type="number" step="0.1" style={{...inp,width:60}} value={c.perOrder} onChange={e=>setComp(idx,'perOrder',e.target.value)}/></td>
+            <td style={td}><input type="number" style={{...inp,width:74}} value={c.onHand} onChange={e=>setComp(idx,'onHand',e.target.value)} placeholder="untracked"/></td>
+            <td style={td}><input style={{...inp,width:120}} value={c.supplier} onChange={e=>setComp(idx,'supplier',e.target.value)} placeholder="Supplier"/></td>
+            <td style={td}><input type="number" style={{...inp,width:64}} value={c.moq} onChange={e=>setComp(idx,'moq',e.target.value)} placeholder="0"/></td>
+            <td style={td}><input type="number" step="0.01" style={{...inp,width:64}} value={c.unitCost} onChange={e=>setComp(idx,'unitCost',e.target.value)} placeholder="—"/></td>
+            <td style={td}><input type="number" style={{...inp,width:56}} value={c.leadDays} onChange={e=>setComp(idx,'leadDays',e.target.value)}/></td>
             <td style={td}><button style={{...btn,fontSize:11,padding:'4px 9px',color:'var(--text-muted)'}} onClick={()=>rmComp(idx)}>Remove</button></td>
           </tr>))}
-        </tbody></table>
+        </tbody></table></div>
+        <div style={{fontSize:11,color:'var(--text-faint)',marginTop:8,lineHeight:1.5}}>Set <b>On hand</b> to enable packaging reorder POs — they appear in Production / POs and the Actions queue under your chosen ordering strategy. Leave it blank to track the requirement only.</div>
         <div style={{marginTop:10,display:'flex',gap:8}}><button style={btn} onClick={savePack}>Save packaging plan</button><button style={btn} onClick={addComp}>+ Add component</button><button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setPackOpen(false)}>Cancel</button></div>
       </div>)}
     </div>
