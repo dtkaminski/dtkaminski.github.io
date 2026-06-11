@@ -19,25 +19,25 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606111100"></script>
-<script src="./frkl-live-data.js?v=202606111100"></script>
-<script src="./frkl-agent-insights.js?v=202606111100"></script>
-<script src="./frkl-business-data.js?v=202606111100"></script>
-<script src="./frkl-action-status.js?v=202606111100"></script>
-<script src="./frkl-patterns.js?v=202606111100"></script>
-<script src="./frkl-creators.js?v=202606111100"></script>
-<script src="./frkl-creative-vision.js?v=202606111100"></script>
-<script src="./frkl-links.js?v=202606111100"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606111100"></script>
-<script src="./frkl-events.js?v=202606111100"></script>
-<script src="./frkl-products.js?v=202606111100"></script>
-<script src="./frkl-discount-codes.js?v=202606111100"></script>
-<script src="./frkl-cvr.js?v=202606111100"></script>
-<script src="./frkl-cohorts.js?v=202606111100"></script>
-<script src="./frkl-retention.js?v=202606111100"></script>
-<script src="./frkl-clarity.js?v=202606111100"></script>
-<script src="./frkl-board-read.js?v=202606111100"></script>
-<script src="./frkl-benchmarks.js?v=202606111100"></script>
+<script src="./frkl-data-loader.js?v=202606111200"></script>
+<script src="./frkl-live-data.js?v=202606111200"></script>
+<script src="./frkl-agent-insights.js?v=202606111200"></script>
+<script src="./frkl-business-data.js?v=202606111200"></script>
+<script src="./frkl-action-status.js?v=202606111200"></script>
+<script src="./frkl-patterns.js?v=202606111200"></script>
+<script src="./frkl-creators.js?v=202606111200"></script>
+<script src="./frkl-creative-vision.js?v=202606111200"></script>
+<script src="./frkl-links.js?v=202606111200"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606111200"></script>
+<script src="./frkl-events.js?v=202606111200"></script>
+<script src="./frkl-products.js?v=202606111200"></script>
+<script src="./frkl-discount-codes.js?v=202606111200"></script>
+<script src="./frkl-cvr.js?v=202606111200"></script>
+<script src="./frkl-cohorts.js?v=202606111200"></script>
+<script src="./frkl-retention.js?v=202606111200"></script>
+<script src="./frkl-clarity.js?v=202606111200"></script>
+<script src="./frkl-board-read.js?v=202606111200"></script>
+<script src="./frkl-benchmarks.js?v=202606111200"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -1266,7 +1266,7 @@ function planReorder(){
     if(qty>0 && moq>0 && qty<moq){ qty=moq; moqBumped=true; }
     const unitCost = (sup.unitCost!=null&&sup.unitCost!=='') ? Number(sup.unitCost) : (p.costPerItem!=null?p.costPerItem:null);
     const supplier = (sup.supplier&&sup.supplier.trim()) || p.vendor || p.type || 'Unassigned';
-    return {key:p.sku||p.title, p, lead, cover:s.cover, stock, vel, focusM, forecastUnits:s.forecastUnits, needs:s.needs, qty, basis:s.basis, waveUnits:s.waveUnits, nextWaveBy:s.nextWaveBy, moq, moqBumped, unitCost, supplier, lineCost: unitCost!=null?unitCost*qty:null};
+    return {key:p.sku||p.title, p, lead, cover:s.cover, stock, vel, focusM, forecastUnits:s.forecastUnits, needs:s.needs, qty, basis:s.basis, waveUnits:s.waveUnits, nextWaveBy:s.nextWaveBy, moq, moqBumped, unitCost, supplier, supEmail:sup.email||'', supNotes:sup.notes||'', lineCost: unitCost!=null?unitCost*qty:null};
   });
   // ── packaging lines — consume the demand plan (per-item × units + per-order × orders) ──
   const pk = packagingConfig(); const aipo = Number(pk.avgItemsPerOrder)||1.3;
@@ -9267,9 +9267,9 @@ function RestockActionQueue(){
             <div style={{fontSize:11,color:'var(--text-faint)',marginTop:1}}>{l.supplier} · {l.basis==='forecast'?`plan needs ${NUM(l.forecastUnits)}, have ${NUM(l.stock)}`:`runs out in ~${Math.round(l.cover)}d (lead ${l.lead}d)`}{l.lineCost!=null?` · ~£${k(l.lineCost)}`:''}{l.moqBumped?` · MOQ ${l.moq}`:''}</div>
           </div>
           <button style={{...btn,background:'var(--accent)',color:'#fff',borderColor:'var(--accent)'}} onClick={()=>raise(l)}><Icon name="check" size={12}/> Mark PO raised</button>
-          <button style={btn} onClick={()=>window.__oiNav&&window.__oiNav('planning','production')}>Open planner</button>
+          <button style={btn} onClick={()=>window.__oiNav&&window.__oiNav('planning','plan')}>Open planner</button>
         </div>); })}
-      {toOrder.length>8 && <div style={{fontSize:11.5,color:'var(--text-faint)',paddingTop:6}}><a className="txt-link" onClick={()=>window.__oiNav&&window.__oiNav('planning','production')} style={{cursor:'pointer'}}>+ {toOrder.length-8} more in the planner</a></div>}
+      {toOrder.length>8 && <div style={{fontSize:11.5,color:'var(--text-faint)',paddingTop:6}}><a className="txt-link" onClick={()=>window.__oiNav&&window.__oiNav('planning','plan')} style={{cursor:'pointer'}}>+ {toOrder.length-8} more in the planner</a></div>}
     </div>) : <div className="muted" style={{fontSize:12.5,padding:'2px 0'}}>Nothing to order right now — {awaiting.length} PO{awaiting.length===1?'':'s'} awaiting stock below.</div>}
 
     {awaiting.length>0 && (<div style={{marginTop:12,paddingTop:10,borderTop:'1px solid var(--border-subtle)'}}>
@@ -9624,7 +9624,7 @@ function BusinessReview(){
 
 // ── Shared planning header — one Forecast → Strategy → Orders strip on both the
 // Forecast & demand and Production / POs tabs, so they read as one workflow.
-function PlanningHeader({active}){
+function PlanningHeader({active, embedded}){
   usePlanningTick();
   const R = planReorder();
   const dc = demandConfig(); const rc = reorderConfig();
@@ -9637,14 +9637,20 @@ function PlanningHeader({active}){
     : dc.shape==='month' ? `${months}-mo, by month`
     : (Number(dc.targetValue)>0 ? (dc.targetMode==='revenue'?`£${k(dc.targetValue)} over ${months}mo`:`${NUM(Number(dc.targetValue))}u over ${months}mo`) : `${months}-mo run-rate`);
   const go = (sub)=>window.__oiNav&&window.__oiNav('planning',sub);
+  const jump = (id)=>{ const el=document.getElementById(id); if(el) el.scrollIntoView({behavior:'smooth', block:'start'}); };
+  // in the merged tab, chips scroll to sections; otherwise they cross-navigate
+  const onForecast = embedded ? ()=>jump('plan-forecast') : (active==='forecast'?undefined:()=>go('forecast'));
+  const onPOs = embedded ? ()=>jump('plan-pos') : (active==='production'?undefined:()=>go('production'));
+  const fHint = embedded ? ' · jump ›' : (active!=='forecast'?' · edit ›':'');
+  const pHint = embedded ? ' · jump ›' : (active!=='production'?' · open ›':'');
   const chip = (on)=>({flex:'1 1 190px',minWidth:172,padding:'10px 13px',borderRadius:10,background:on?'var(--accent-bg)':'var(--bg-elevated)',border:'1px solid '+(on?'var(--accent)':'var(--border-subtle)')});
   const lab = {fontSize:10,fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:4};
   const sbtn = (id)=>({fontSize:11,fontWeight:700,padding:'5px 9px',borderRadius:7,cursor:'pointer',border:'1.5px solid '+(strat===id?'var(--accent)':'var(--border-default)'),background:strat===id?'var(--accent)':'transparent',color:strat===id?'#fff':'var(--text-secondary)'});
   const arrow = <div style={{display:'flex',alignItems:'center',color:'var(--text-faint)',fontSize:16,fontWeight:700}}>→</div>;
   return (<div className="card" style={{padding:'12px 14px',marginBottom:14}}>
     <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'stretch'}}>
-      <div style={{...chip(active==='forecast'), cursor:active==='forecast'?'default':'pointer'}} onClick={active==='forecast'?undefined:()=>go('forecast')}>
-        <div style={lab}>① Forecast{active!=='forecast'&&<span style={{color:'var(--accent)'}}> · edit ›</span>}</div>
+      <div style={{...chip(active==='forecast'), cursor:onForecast?'pointer':'default'}} onClick={onForecast}>
+        <div style={lab}>① Forecast{fHint&&<span style={{color:'var(--accent)'}}>{fHint}</span>}</div>
         <div style={{fontSize:13.5,fontWeight:700,color:'var(--text-primary)'}}>{fLabel}</div>
         <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>{growthPct>=0?'+':''}{Math.round(growthPct)}% vs run-rate</div>
       </div>
@@ -9656,8 +9662,8 @@ function PlanningHeader({active}){
         </div>
       </div>
       {arrow}
-      <div style={{...chip(active==='production'), cursor:active==='production'?'default':'pointer'}} onClick={active==='production'?undefined:()=>go('production')}>
-        <div style={lab}>③ Purchase orders{active!=='production'&&<span style={{color:'var(--accent)'}}> · open ›</span>}</div>
+      <div style={{...chip(active==='production'), cursor:onPOs?'pointer':'default'}} onClick={onPOs}>
+        <div style={lab}>③ Purchase orders{pHint&&<span style={{color:'var(--accent)'}}>{pHint}</span>}</div>
         <div style={{fontSize:13.5,fontWeight:700,color:R.toOrder.length?'var(--warn)':'var(--good)'}}>{R.toOrder.length} to order{orderVal>0?` · £${k(orderVal)}`:''}</div>
         <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>{R.awaiting.length} awaiting stock</div>
       </div>
@@ -9670,7 +9676,7 @@ function PlanningHeader({active}){
 // + lead times. When a seller's cover falls within lead+safety days, it drafts a
 // purchase order: order-up-to (lead+cover) days of demand, bumped to MOQ. POs are
 // grouped by supplier and exportable (CSV / copy). Nothing is sent automatically.
-function ProductionPlanner(){
+function ProductionPlanner({embedded}={}){
   usePlanningTick();
   const R = planReorder();
   const {inv, toOrder, awaiting, approaching, ackPending, plan, scale, safety, coverDays, strategy, waves, horizonDays} = R;
@@ -9689,7 +9695,8 @@ function ProductionPlanner(){
   toOrder.forEach(l=>{ (bySupplier[l.supplier]=bySupplier[l.supplier]||[]).push(l); });
   const pos = Object.keys(bySupplier).sort().map(s=>{
     const ls=bySupplier[s], total=ls.reduce((t,l)=>t+(l.lineCost||0),0);
-    return {supplier:s, lines:ls, total, hasCost:ls.every(l=>l.unitCost!=null), units:ls.reduce((t,l)=>t+l.qty,0)};
+    const withEmail=ls.find(l=>l.supEmail), withNotes=ls.find(l=>l.supNotes);
+    return {supplier:s, lines:ls, total, hasCost:ls.every(l=>l.unitCost!=null), units:ls.reduce((t,l)=>t+l.qty,0), email:withEmail?withEmail.supEmail:'', notes:withNotes?withNotes.supNotes:''};
   });
   const totalValue = pos.reduce((t,p)=>t+p.total,0);
   const missingCost = toOrder.some(l=>l.unitCost==null);
@@ -9708,7 +9715,7 @@ function ProductionPlanner(){
     setTimeout(()=>URL.revokeObjectURL(url),1000); toast('PO exported', {kind:'good', body:po.supplier+' · '+po.lines.length+' lines'});
   }catch(e){ toast('Export failed', {kind:'bad'}); } };
   const copyPO = (po)=>{
-    const L=['PURCHASE ORDER (DRAFT) — '+po.supplier, 'frkl'+(today?' · '+today:''), ''];
+    const L=['PURCHASE ORDER (DRAFT)', 'To: '+po.supplier+(po.email?' <'+po.email+'>':''), ...(po.notes?[po.notes]:[]), 'From: frkl'+(today?'  ·  '+today:''), ''];
     po.lines.forEach(l=>L.push(l.qty+' × '+l.p.title+' ['+(l.p.sku||'no SKU')+']'+(l.unitCost!=null?(' @ £'+l.unitCost+' = £'+l.lineCost.toFixed(2)):'')+(l.moqBumped?(' (MOQ '+l.moq+')'):'')));
     L.push('', po.hasCost?('TOTAL: £'+po.total.toFixed(2)+' · '+po.units+' units'):(po.units+' units · set unit costs for a total'));
     try{ navigator.clipboard&&navigator.clipboard.writeText(L.join('\n')); }catch(e){}
@@ -9716,8 +9723,8 @@ function ProductionPlanner(){
   };
 
   // editors (local draft → explicit save, avoids focus loss on keystroke)
-  const [supDraft, setSupDraft] = useState(()=>{ const c=supplierConfig(), d={}; types.forEach(t=>{ const s=c.byType[t]||{}; d[t]={supplier:s.supplier||'', moq:s.moq!=null?s.moq:'', unitCost:s.unitCost!=null?s.unitCost:''}; }); return d; });
-  const saveSuppliers = ()=>{ const byType={}; Object.keys(supDraft).forEach(t=>{ const s=supDraft[t]; if((s.supplier&&s.supplier.trim())||s.moq!==''||s.unitCost!=='') byType[t]={supplier:s.supplier||'', moq:s.moq, unitCost:s.unitCost}; }); saveSupplierConfig({byType}); setSupOpen(false); toast('Suppliers saved', {kind:'good'}); };
+  const [supDraft, setSupDraft] = useState(()=>{ const c=supplierConfig(), d={}; types.forEach(t=>{ const s=c.byType[t]||{}; d[t]={supplier:s.supplier||'', email:s.email||'', notes:s.notes||'', moq:s.moq!=null?s.moq:'', unitCost:s.unitCost!=null?s.unitCost:''}; }); return d; });
+  const saveSuppliers = ()=>{ const byType={}; Object.keys(supDraft).forEach(t=>{ const s=supDraft[t]; if((s.supplier&&s.supplier.trim())||(s.email&&s.email.trim())||(s.notes&&s.notes.trim())||s.moq!==''||s.unitCost!=='') byType[t]={supplier:s.supplier||'', email:s.email||'', notes:s.notes||'', moq:s.moq, unitCost:s.unitCost}; }); saveSupplierConfig({byType}); setSupOpen(false); toast('Suppliers saved', {kind:'good'}); };
   const setSup = (t,field,val)=>setSupDraft(d=>({...d, [t]:{...d[t], [field]:val}}));
   const [safDraft, setSafDraft] = useState(String(rc.safetyDays));
   const [covDraft, setCovDraft] = useState(String(rc.coverDays));
@@ -9732,12 +9739,11 @@ function ProductionPlanner(){
   const td = {padding:'7px 10px 7px 0',fontSize:12.5,color:'var(--text-secondary)',borderTop:'1px solid var(--border-subtle)',verticalAlign:'top'};
 
   return (<div>
-    <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:6}}>
+    {!embedded && (<><div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:6}}>
       <h2 style={{margin:0,fontSize:18}}>Production &amp; purchase orders</h2>
       <span className="muted" style={{fontSize:12}}>Reorder engine on live stock + velocity · independent of the date picker</span>
     </div>
-
-    <PlanningHeader active="production"/>
+    <PlanningHeader active="production"/></>)}
 
     {/* summary + controls */}
     <div className="card">
@@ -9761,24 +9767,26 @@ function ProductionPlanner(){
       {plan.active && (<div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginTop:10,padding:'8px 12px',borderRadius:8,background:'var(--accent-bg)',border:'1px solid var(--border-subtle)'}}>
         <Icon name="trendUp" size={14} style={{color:'var(--accent)'}}/>
         <span style={{fontSize:12,color:'var(--text-secondary)'}}>Orders are sized to your demand plan — <b style={{color:'var(--text-primary)'}}>{plan.growthPct>=0?'+':''}{plan.growthPct.toFixed(0)}% vs run-rate</b> ({plan.mode==='growth'?'growth target':plan.mode==='units'?'units target':'revenue target'}), not flat velocity.</span>
-        <button style={{...btn,fontSize:11.5,padding:'4px 10px',marginLeft:'auto'}} onClick={()=>window.__oiNav&&window.__oiNav('planning','forecast')}>Adjust plan <Icon name="chevron" size={12}/></button>
+        <button style={{...btn,fontSize:11.5,padding:'4px 10px',marginLeft:'auto'}} onClick={()=>{ const el=document.getElementById('plan-forecast'); if(el) el.scrollIntoView({behavior:'smooth'}); else if(window.__oiNav) window.__oiNav('planning','forecast'); }}>Adjust plan <Icon name="chevron" size={12}/></button>
       </div>)}
     </div>
 
     {/* supplier editor */}
     {supOpen && (<div className="card" style={{borderLeft:'3px solid var(--accent)'}}>
-      <div style={{fontSize:13,fontWeight:700,marginBottom:4}}>Suppliers, MOQ &amp; unit cost <span className="muted" style={{fontWeight:400,fontSize:11.5}}>· per product type · lead times are set in Products &amp; stock</span></div>
-      <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:560}}><thead><tr><th style={th}>Type</th><th style={th}>Supplier</th><th style={th}>MOQ</th><th style={th}>Unit cost £</th><th style={th}>Lead (d)</th></tr></thead><tbody>
-        {types.map(t=>{ const d=supDraft[t]||{supplier:'',moq:'',unitCost:''}; return (<tr key={t}>
+      <div style={{fontSize:13,fontWeight:700,marginBottom:4}}>Suppliers &amp; manufacturers <span className="muted" style={{fontWeight:400,fontSize:11.5}}>· per product type · lead times are set in Products &amp; stock</span></div>
+      <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:820}}><thead><tr><th style={th}>Type</th><th style={th}>Supplier / manufacturer</th><th style={th}>Contact email</th><th style={th}>Notes / terms</th><th style={th}>MOQ</th><th style={th}>Unit £</th><th style={th}>Lead (d)</th></tr></thead><tbody>
+        {types.map(t=>{ const d=supDraft[t]||{supplier:'',email:'',notes:'',moq:'',unitCost:''}; return (<tr key={t}>
           <td style={{...td,color:'var(--text-primary)',fontWeight:600}}>{t}</td>
           <td style={td}><input style={{...inp,width:150}} value={d.supplier} onChange={e=>setSup(t,'supplier',e.target.value)} placeholder="Supplier name"/></td>
-          <td style={td}><input type="number" style={{...inp,width:72}} value={d.moq} onChange={e=>setSup(t,'moq',e.target.value)} placeholder="0"/></td>
-          <td style={td}><input type="number" style={{...inp,width:80}} value={d.unitCost} onChange={e=>setSup(t,'unitCost',e.target.value)} placeholder="auto"/></td>
+          <td style={td}><input type="email" style={{...inp,width:170}} value={d.email} onChange={e=>setSup(t,'email',e.target.value)} placeholder="orders@supplier.com"/></td>
+          <td style={td}><input style={{...inp,width:170}} value={d.notes} onChange={e=>setSup(t,'notes',e.target.value)} placeholder="address · terms · ref"/></td>
+          <td style={td}><input type="number" style={{...inp,width:64}} value={d.moq} onChange={e=>setSup(t,'moq',e.target.value)} placeholder="0"/></td>
+          <td style={td}><input type="number" style={{...inp,width:64}} value={d.unitCost} onChange={e=>setSup(t,'unitCost',e.target.value)} placeholder="auto"/></td>
           <td style={{...td,color:'var(--text-faint)'}}>{leadDaysForType(t)}</td>
         </tr>); })}
       </tbody></table></div>
       <div style={{marginTop:10,display:'flex',gap:8}}><button style={btn} onClick={saveSuppliers}>Save suppliers</button><button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setSupOpen(false)}>Cancel</button></div>
-      <div style={{fontSize:11,color:'var(--text-faint)',marginTop:8}}>Unit cost defaults to each SKU's catalogue cost when left blank. MOQ rounds order quantities up.</div>
+      <div style={{fontSize:11,color:'var(--text-faint)',marginTop:8}}>Supplier name, email &amp; notes flow onto each draft PO so it's ready to send to the right manufacturer. Unit cost defaults to each SKU's catalogue cost; MOQ rounds order quantities up.</div>
     </div>)}
 
     {/* reorder policy editor */}
@@ -9795,7 +9803,7 @@ function ProductionPlanner(){
     {/* draft POs */}
     {pos.map(po=>(<div key={po.supplier} className="card">
       <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:8}}>
-        <div><span style={{fontSize:15,fontWeight:700,color:'var(--text-primary)'}}>{po.supplier}</span> <span className="muted" style={{fontSize:12}}>· {po.lines.length} line{po.lines.length===1?'':'s'} · {NUM(po.units)} units</span></div>
+        <div><span style={{fontSize:15,fontWeight:700,color:'var(--text-primary)'}}>{po.supplier}</span> <span className="muted" style={{fontSize:12}}>· {po.lines.length} line{po.lines.length===1?'':'s'} · {NUM(po.units)} units</span>{(po.email||po.notes) && <div style={{fontSize:11,color:'var(--text-faint)',marginTop:2}}>{po.email}{po.email&&po.notes?' · ':''}{po.notes}</div>}</div>
         <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
           <span style={{fontSize:15,fontWeight:800,color:'var(--text-primary)'}}>{po.hasCost?'£'+po.total.toFixed(2):'set costs'}</span>
           <button style={smbtn} onClick={()=>copyPO(po)}><Icon name="clipboard" size={12}/> Copy</button>
@@ -9846,7 +9854,7 @@ function ProductionPlanner(){
 // for the horizon); the app converts it to a per-product demand plan off live
 // velocity, then rolls total demand into packaging requirements via an editable
 // bill-of-materials. Flags products that will stock out under the plan.
-function DemandPlanner(){
+function DemandPlanner({embedded}={}){
   usePlanningTick();
   const B = (typeof window!=='undefined' && window.FRKL_BUSINESS) || {};
   const inv = (B.inventory||[]).filter(p=>p && p.status!=='ARCHIVED');
@@ -9943,12 +9951,11 @@ function DemandPlanner(){
   };
 
   return (<div>
-    <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:6}}>
+    {!embedded && (<><div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:6}}>
       <h2 style={{margin:0,fontSize:18}}>Forecast &amp; demand plan</h2>
       <span className="muted" style={{fontSize:12}}>Per-product demand + packaging from live velocity · independent of the date picker</span>
     </div>
-
-    <PlanningHeader active="forecast"/>
+    <PlanningHeader active="forecast"/></>)}
 
     {/* plan controls */}
     <div className="card">
@@ -10054,7 +10061,7 @@ function DemandPlanner(){
       </tbody></table></div>
       <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',marginTop:10}}>
         {rows.length>12 && <button style={btn} onClick={()=>setShowAll(s=>!s)}>{showAll?'Show top 12':`Show all ${rows.length}`}</button>}
-        <button style={{...btn,background:'var(--accent)',color:'#fff',borderColor:'var(--accent)'}} onClick={()=>window.__oiNav&&window.__oiNav('planning','production')}>Review &amp; raise POs ({RR.toOrder.length}) <Icon name="chevron" size={13}/></button>
+        <button style={{...btn,background:'var(--accent)',color:'#fff',borderColor:'var(--accent)'}} onClick={()=>{ const el=document.getElementById('plan-pos'); if(el) el.scrollIntoView({behavior:'smooth'}); else if(window.__oiNav) window.__oiNav('planning','plan'); }}>Review &amp; raise POs ({RR.toOrder.length}) <Icon name="chevron" size={13}/></button>
       </div>
       {stockouts>0 && <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:9,lineHeight:1.5}}>The <b>Order</b> column is what each product triggers under your <b>{STRAT_SHORT[RR.strategy]||'JIT'}</b> strategy — products with a negative projected end stock are the priorities. Raise the POs (and track raised→received) in Production / POs.</div>}
     </div>
@@ -10095,6 +10102,28 @@ function DemandPlanner(){
   </div>);
 }
 
+// ── Planning — forecast + purchase orders on ONE tab ─────────────────────────
+// Renders the shared header (chips scroll to sections) then the demand planner and
+// the PO planner embedded back-to-back. Changing the forecast above live-updates
+// the POs below (both read the same config via usePlanningTick), so there's no
+// flicking between tabs.
+function PlanningView(){
+  return (<div>
+    <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:6}}>
+      <h2 style={{margin:0,fontSize:18}}>Planning — forecast &amp; purchase orders</h2>
+      <span className="muted" style={{fontSize:12}}>Shape the forecast and raise POs on one screen · independent of the date picker</span>
+    </div>
+    <PlanningHeader active="combined" embedded/>
+    <div id="plan-forecast"><DemandPlanner embedded/></div>
+    <div style={{display:'flex',alignItems:'center',gap:10,margin:'24px 0 12px'}}>
+      <span style={{width:3,height:16,background:'var(--accent)',borderRadius:2}}/>
+      <span style={{fontSize:13,fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-secondary)'}}>Purchase orders</span>
+      <span className="muted" style={{fontSize:11.5}}>sized to the plan above, under your strategy</span>
+    </div>
+    <div id="plan-pos"><ProductionPlanner embedded/></div>
+  </div>);
+}
+
 const NAV = [
   { id:'home',    label:'Today',    icon:'home',     subtabs:[
     { id:'overview', label:'Overview',     component: (p) => <Overview start={p.start} period={p.period} customActive={p.customActive}/> },
@@ -10132,8 +10161,7 @@ const NAV = [
     { id:'review',   label:'Business review', component: () => <BusinessReview/> },
   ]},
   { id:'planning',label:'Planning',     icon:'box', subtabs:[
-    { id:'forecast',   label:'Forecast & demand', component: () => <DemandPlanner/> },
-    { id:'production', label:'Production / POs',   component: () => <ProductionPlanner/> },
+    { id:'plan',   label:'Planning', component: () => <PlanningView/> },
   ]},
   { id:'settings',label:'Settings',     icon:'sliders', subtabs:[
     { id:'connections', label:'Connections', component: () => <ConnectionsPanel/> },
@@ -10149,8 +10177,7 @@ const RAIL = [
   { label:'AI Analyst',       icon:'spark',     section:'home',     sub:'ask' },
   { label:'What changed',     icon:'calendar',  section:'board' },
   { label:'Business review',  icon:'report',    section:'review' },
-  { label:'Forecast & demand', icon:'trendUp',   section:'planning', sub:'forecast' },
-  { label:'Production & POs',  icon:'box',       section:'planning', sub:'production' },
+  { label:'Planning',          icon:'box',       section:'planning', sub:'plan' },
   { label:'Commercial health',icon:'pulse',     section:'intel' },
   { label:'Growth channels',  icon:'trendUp',   section:'channels' },
   { label:'Creative & brand', icon:'image',     section:'channels', sub:'creatives' },
