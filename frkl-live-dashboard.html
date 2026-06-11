@@ -19,25 +19,25 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606111200"></script>
-<script src="./frkl-live-data.js?v=202606111200"></script>
-<script src="./frkl-agent-insights.js?v=202606111200"></script>
-<script src="./frkl-business-data.js?v=202606111200"></script>
-<script src="./frkl-action-status.js?v=202606111200"></script>
-<script src="./frkl-patterns.js?v=202606111200"></script>
-<script src="./frkl-creators.js?v=202606111200"></script>
-<script src="./frkl-creative-vision.js?v=202606111200"></script>
-<script src="./frkl-links.js?v=202606111200"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606111200"></script>
-<script src="./frkl-events.js?v=202606111200"></script>
-<script src="./frkl-products.js?v=202606111200"></script>
-<script src="./frkl-discount-codes.js?v=202606111200"></script>
-<script src="./frkl-cvr.js?v=202606111200"></script>
-<script src="./frkl-cohorts.js?v=202606111200"></script>
-<script src="./frkl-retention.js?v=202606111200"></script>
-<script src="./frkl-clarity.js?v=202606111200"></script>
-<script src="./frkl-board-read.js?v=202606111200"></script>
-<script src="./frkl-benchmarks.js?v=202606111200"></script>
+<script src="./frkl-data-loader.js?v=202606111300"></script>
+<script src="./frkl-live-data.js?v=202606111300"></script>
+<script src="./frkl-agent-insights.js?v=202606111300"></script>
+<script src="./frkl-business-data.js?v=202606111300"></script>
+<script src="./frkl-action-status.js?v=202606111300"></script>
+<script src="./frkl-patterns.js?v=202606111300"></script>
+<script src="./frkl-creators.js?v=202606111300"></script>
+<script src="./frkl-creative-vision.js?v=202606111300"></script>
+<script src="./frkl-links.js?v=202606111300"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606111300"></script>
+<script src="./frkl-events.js?v=202606111300"></script>
+<script src="./frkl-products.js?v=202606111300"></script>
+<script src="./frkl-discount-codes.js?v=202606111300"></script>
+<script src="./frkl-cvr.js?v=202606111300"></script>
+<script src="./frkl-cohorts.js?v=202606111300"></script>
+<script src="./frkl-retention.js?v=202606111300"></script>
+<script src="./frkl-clarity.js?v=202606111300"></script>
+<script src="./frkl-board-read.js?v=202606111300"></script>
+<script src="./frkl-benchmarks.js?v=202606111300"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -9723,8 +9723,10 @@ function ProductionPlanner({embedded}={}){
   };
 
   // editors (local draft → explicit save, avoids focus loss on keystroke)
-  const [supDraft, setSupDraft] = useState(()=>{ const c=supplierConfig(), d={}; types.forEach(t=>{ const s=c.byType[t]||{}; d[t]={supplier:s.supplier||'', email:s.email||'', notes:s.notes||'', moq:s.moq!=null?s.moq:'', unitCost:s.unitCost!=null?s.unitCost:''}; }); return d; });
-  const saveSuppliers = ()=>{ const byType={}; Object.keys(supDraft).forEach(t=>{ const s=supDraft[t]; if((s.supplier&&s.supplier.trim())||(s.email&&s.email.trim())||(s.notes&&s.notes.trim())||s.moq!==''||s.unitCost!=='') byType[t]={supplier:s.supplier||'', email:s.email||'', notes:s.notes||'', moq:s.moq, unitCost:s.unitCost}; }); saveSupplierConfig({byType}); setSupOpen(false); toast('Suppliers saved', {kind:'good'}); };
+  const [supDraft, setSupDraft] = useState(()=>{ const c=supplierConfig(), d={}; types.forEach(t=>{ const s=c.byType[t]||{}; d[t]={supplier:s.supplier||'', email:s.email||'', notes:s.notes||'', moq:s.moq!=null?s.moq:'', unitCost:s.unitCost!=null?s.unitCost:'', lead:String(leadDaysForType(t))}; }); return d; });
+  const saveSuppliers = ()=>{ const byType={}; Object.keys(supDraft).forEach(t=>{ const s=supDraft[t]; if((s.supplier&&s.supplier.trim())||(s.email&&s.email.trim())||(s.notes&&s.notes.trim())||s.moq!==''||s.unitCost!=='') byType[t]={supplier:s.supplier||'', email:s.email||'', notes:s.notes||'', moq:s.moq, unitCost:s.unitCost}; });
+    const lc = leadConfig(); const lb={...lc.byType}; Object.keys(supDraft).forEach(t=>{ const v=Number(supDraft[t].lead); if(isFinite(v)&&v>0) lb[t]=v; });
+    saveSupplierConfig({byType}); saveLeadConfig({default:lc.default, byType:lb}); setSupOpen(false); toast('Suppliers & lead times saved', {kind:'good'}); };
   const setSup = (t,field,val)=>setSupDraft(d=>({...d, [t]:{...d[t], [field]:val}}));
   const [safDraft, setSafDraft] = useState(String(rc.safetyDays));
   const [covDraft, setCovDraft] = useState(String(rc.coverDays));
@@ -9773,16 +9775,16 @@ function ProductionPlanner({embedded}={}){
 
     {/* supplier editor */}
     {supOpen && (<div className="card" style={{borderLeft:'3px solid var(--accent)'}}>
-      <div style={{fontSize:13,fontWeight:700,marginBottom:4}}>Suppliers &amp; manufacturers <span className="muted" style={{fontWeight:400,fontSize:11.5}}>· per product type · lead times are set in Products &amp; stock</span></div>
-      <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:820}}><thead><tr><th style={th}>Type</th><th style={th}>Supplier / manufacturer</th><th style={th}>Contact email</th><th style={th}>Notes / terms</th><th style={th}>MOQ</th><th style={th}>Unit £</th><th style={th}>Lead (d)</th></tr></thead><tbody>
-        {types.map(t=>{ const d=supDraft[t]||{supplier:'',email:'',notes:'',moq:'',unitCost:''}; return (<tr key={t}>
+      <div style={{fontSize:13,fontWeight:700,marginBottom:4}}>Suppliers &amp; manufacturers <span className="muted" style={{fontWeight:400,fontSize:11.5}}>· per product type · production lead = days from placing the order to stock landing</span></div>
+      <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:860}}><thead><tr><th style={th}>Type</th><th style={th}>Supplier / manufacturer</th><th style={th}>Contact email</th><th style={th}>Notes / terms</th><th style={th}>MOQ</th><th style={th}>Unit £</th><th style={th}>Lead (days)</th></tr></thead><tbody>
+        {types.map(t=>{ const d=supDraft[t]||{supplier:'',email:'',notes:'',moq:'',unitCost:'',lead:''}; return (<tr key={t}>
           <td style={{...td,color:'var(--text-primary)',fontWeight:600}}>{t}</td>
           <td style={td}><input style={{...inp,width:150}} value={d.supplier} onChange={e=>setSup(t,'supplier',e.target.value)} placeholder="Supplier name"/></td>
           <td style={td}><input type="email" style={{...inp,width:170}} value={d.email} onChange={e=>setSup(t,'email',e.target.value)} placeholder="orders@supplier.com"/></td>
           <td style={td}><input style={{...inp,width:170}} value={d.notes} onChange={e=>setSup(t,'notes',e.target.value)} placeholder="address · terms · ref"/></td>
           <td style={td}><input type="number" style={{...inp,width:64}} value={d.moq} onChange={e=>setSup(t,'moq',e.target.value)} placeholder="0"/></td>
           <td style={td}><input type="number" style={{...inp,width:64}} value={d.unitCost} onChange={e=>setSup(t,'unitCost',e.target.value)} placeholder="auto"/></td>
-          <td style={{...td,color:'var(--text-faint)'}}>{leadDaysForType(t)}</td>
+          <td style={td}><input type="number" style={{...inp,width:64}} value={d.lead} onChange={e=>setSup(t,'lead',e.target.value)} placeholder="30"/></td>
         </tr>); })}
       </tbody></table></div>
       <div style={{marginTop:10,display:'flex',gap:8}}><button style={btn} onClick={saveSuppliers}>Save suppliers</button><button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setSupOpen(false)}>Cancel</button></div>
@@ -9915,9 +9917,16 @@ function DemandPlanner({embedded}={}){
   });
   const maxMonthRev = Math.max(1, ...monthlyPlan.map(m=>m.rev));
 
-  const rows = sellers.map(p=>{ const plan=planUnits(p); const end=(p.inventoryQty||0)-plan; return {p, runMo:p.dailyVelocity*30.4, plan, stock:p.inventoryQty||0, end, short:end<0}; })
+  const rows = sellers.map(p=>{ const plan=planUnits(p); const stock=p.inventoryQty||0; const end=stock-plan;
+    const dayVel = plan/horizonDays;                          // planned units/day (incl. focus)
+    const lead = leadDaysForType(p.type);
+    const daysToOOS = dayVel>0 ? stock/dayVel : Infinity;     // days of cover at the planned rate
+    const oosBeforeLead = daysToOOS < lead;                   // runs out before a reorder placed today lands
+    const oosGap = oosBeforeLead ? Math.round(lead-daysToOOS) : 0;
+    return {p, runMo:p.dailyVelocity*30.4, plan, stock, end, short:end<0, lead, daysToOOS, oosBeforeLead, oosGap}; })
     .sort((a,b)=>b.plan-a.plan);
   const stockouts = rows.filter(r=>r.short).length;
+  const oosRisk = rows.filter(r=>r.oosBeforeLead).length;     // can't be saved by ordering today
   const toProduce = rows.filter(r=>r.short).reduce((t,r)=>t+(-r.end),0);
   const shown = showAll?rows:rows.slice(0,12);
   // link each forecast row to the PO it triggers under the saved strategy
@@ -10035,6 +10044,7 @@ function DemandPlanner({embedded}={}){
         <div><div style={{fontSize:24,fontWeight:800,color:'var(--text-primary)'}}>£{k(totalRev)}</div><div className="muted" style={{fontSize:11.5}}>projected revenue</div></div>
         <div><div style={{fontSize:24,fontWeight:800,color: impliedGrowth>=0?'var(--good)':'var(--bad)'}}>{impliedGrowth>=0?'+':''}{impliedGrowth.toFixed(0)}%</div><div className="muted" style={{fontSize:11.5}}>vs run-rate</div></div>
         <div><div style={{fontSize:24,fontWeight:800,color: stockouts?'var(--warn)':'var(--good)'}}>{stockouts}</div><div className="muted" style={{fontSize:11.5}}>will stock out</div></div>
+        <div title="Products that run out before a reorder placed today could arrive, given production lead time"><div style={{fontSize:24,fontWeight:800,color: oosRisk?'var(--bad)':'var(--good)'}}>{oosRisk}</div><div className="muted" style={{fontSize:11.5}}>OOS before lead</div></div>
         {toProduce>0 && <div><div style={{fontSize:24,fontWeight:800,color:'var(--text-primary)'}}>{NUM(Math.ceil(toProduce))}</div><div className="muted" style={{fontSize:11.5}}>units short to produce</div></div>}
       </div>
     </div>
@@ -10042,8 +10052,8 @@ function DemandPlanner({embedded}={}){
     {/* demand plan table */}
     <div className="card">
       <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:8}}><span style={{fontSize:14,fontWeight:700,color:'var(--text-primary)'}}>Demand plan by product</span><span className="muted" style={{fontSize:11.5}}>sorted by planned demand</span></div>
-      <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:580}}><thead><tr>
-        <th style={th}>Product</th><th style={{...th,textAlign:'right'}}>Run-rate /mo</th><th style={{...th,textAlign:'right'}}>Planned ({months}mo)</th><th style={{...th,textAlign:'right'}}>Stock</th><th style={{...th,textAlign:'right'}}>Projected end</th><th style={{...th,textAlign:'right'}}>Order ({STRAT_SHORT[RR.strategy]||'JIT'})</th>
+      <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:680}}><thead><tr>
+        <th style={th}>Product</th><th style={{...th,textAlign:'right'}}>Run-rate /mo</th><th style={{...th,textAlign:'right'}}>Planned ({months}mo)</th><th style={{...th,textAlign:'right'}}>Stock</th><th style={{...th,textAlign:'right'}}>Projected end</th><th style={{...th,textAlign:'right'}}>Stockout vs lead</th><th style={{...th,textAlign:'right'}}>Order ({STRAT_SHORT[RR.strategy]||'JIT'})</th>
       </tr></thead><tbody>
         {shown.map((r,idx)=>{ const o=orderFor(r.p);
           const oCell = !o ? <span style={{color:'var(--text-faint)'}}>—</span>
@@ -10056,6 +10066,7 @@ function DemandPlanner({embedded}={}){
           <td style={{...td,textAlign:'right',fontWeight:700,color:'var(--text-primary)'}}>{NUM(Math.ceil(r.plan))}</td>
           <td style={{...td,textAlign:'right'}}>{NUM(r.stock)}</td>
           <td style={{...td,textAlign:'right',fontWeight:600,color: r.short?'var(--bad)':'var(--good)'}}>{r.short?'−'+NUM(Math.ceil(-r.end)):NUM(Math.floor(r.end))}</td>
+          <td style={{...td,textAlign:'right'}}>{r.daysToOOS===Infinity ? <span style={{color:'var(--text-faint)'}}>—</span> : <span style={{fontWeight:600,color: r.oosBeforeLead?'var(--bad)':(r.daysToOOS<r.lead*1.5?'var(--warn)':'var(--text-secondary)')}}>{Math.round(r.daysToOOS)}d{r.oosBeforeLead?` · gap ${r.oosGap}d`:''}</span>}<div style={{fontSize:10,color:'var(--text-faint)'}}>{r.lead}d lead</div></td>
           <td style={{...td,textAlign:'right'}}>{oCell}</td>
         </tr>); })}
       </tbody></table></div>
@@ -10063,7 +10074,7 @@ function DemandPlanner({embedded}={}){
         {rows.length>12 && <button style={btn} onClick={()=>setShowAll(s=>!s)}>{showAll?'Show top 12':`Show all ${rows.length}`}</button>}
         <button style={{...btn,background:'var(--accent)',color:'#fff',borderColor:'var(--accent)'}} onClick={()=>{ const el=document.getElementById('plan-pos'); if(el) el.scrollIntoView({behavior:'smooth'}); else if(window.__oiNav) window.__oiNav('planning','plan'); }}>Review &amp; raise POs ({RR.toOrder.length}) <Icon name="chevron" size={13}/></button>
       </div>
-      {stockouts>0 && <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:9,lineHeight:1.5}}>The <b>Order</b> column is what each product triggers under your <b>{STRAT_SHORT[RR.strategy]||'JIT'}</b> strategy — products with a negative projected end stock are the priorities. Raise the POs (and track raised→received) in Production / POs.</div>}
+      {(stockouts>0||oosRisk>0) && <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:9,lineHeight:1.5}}><b>Stockout vs lead</b> is days of cover at the planned rate against production lead time — <span style={{color:'var(--bad)'}}>red</span> means it runs out <b>before</b> a reorder placed today could land ({oosRisk} product{oosRisk===1?'':'s'} · ~{Math.round(rows.filter(r=>r.oosBeforeLead).reduce((t,r)=>t+r.oosGap,0)/Math.max(1,oosRisk))}d avg gap), so it needs ordering now or it'll go OOS. Edit lead times in Suppliers &amp; manufacturers below. The <b>Order</b> column is what each triggers under your <b>{STRAT_SHORT[RR.strategy]||'JIT'}</b> strategy.</div>}
     </div>
 
     {/* packaging requirements */}
