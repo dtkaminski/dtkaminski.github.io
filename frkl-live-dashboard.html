@@ -19,25 +19,25 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606110900"></script>
-<script src="./frkl-live-data.js?v=202606110900"></script>
-<script src="./frkl-agent-insights.js?v=202606110900"></script>
-<script src="./frkl-business-data.js?v=202606110900"></script>
-<script src="./frkl-action-status.js?v=202606110900"></script>
-<script src="./frkl-patterns.js?v=202606110900"></script>
-<script src="./frkl-creators.js?v=202606110900"></script>
-<script src="./frkl-creative-vision.js?v=202606110900"></script>
-<script src="./frkl-links.js?v=202606110900"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606110900"></script>
-<script src="./frkl-events.js?v=202606110900"></script>
-<script src="./frkl-products.js?v=202606110900"></script>
-<script src="./frkl-discount-codes.js?v=202606110900"></script>
-<script src="./frkl-cvr.js?v=202606110900"></script>
-<script src="./frkl-cohorts.js?v=202606110900"></script>
-<script src="./frkl-retention.js?v=202606110900"></script>
-<script src="./frkl-clarity.js?v=202606110900"></script>
-<script src="./frkl-board-read.js?v=202606110900"></script>
-<script src="./frkl-benchmarks.js?v=202606110900"></script>
+<script src="./frkl-data-loader.js?v=202606111000"></script>
+<script src="./frkl-live-data.js?v=202606111000"></script>
+<script src="./frkl-agent-insights.js?v=202606111000"></script>
+<script src="./frkl-business-data.js?v=202606111000"></script>
+<script src="./frkl-action-status.js?v=202606111000"></script>
+<script src="./frkl-patterns.js?v=202606111000"></script>
+<script src="./frkl-creators.js?v=202606111000"></script>
+<script src="./frkl-creative-vision.js?v=202606111000"></script>
+<script src="./frkl-links.js?v=202606111000"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606111000"></script>
+<script src="./frkl-events.js?v=202606111000"></script>
+<script src="./frkl-products.js?v=202606111000"></script>
+<script src="./frkl-discount-codes.js?v=202606111000"></script>
+<script src="./frkl-cvr.js?v=202606111000"></script>
+<script src="./frkl-cohorts.js?v=202606111000"></script>
+<script src="./frkl-retention.js?v=202606111000"></script>
+<script src="./frkl-clarity.js?v=202606111000"></script>
+<script src="./frkl-board-read.js?v=202606111000"></script>
+<script src="./frkl-benchmarks.js?v=202606111000"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -1150,8 +1150,17 @@ function saveReorderConfig(next){ try { localStorage.setItem('oi_reorder_v1', JS
 function usePlanningTick(){ const [,f]=React.useState(0); React.useEffect(()=>{ const h=()=>f(x=>x+1); ['oi-supplier-updated','oi-leadtimes-updated','oi-costs-updated','oi-forecast-updated','oi-po-updated'].forEach(ev=>window.addEventListener(ev,h)); return ()=>['oi-supplier-updated','oi-leadtimes-updated','oi-costs-updated','oi-forecast-updated','oi-po-updated'].forEach(ev=>window.removeEventListener(ev,h)); }, []); return 0; }
 
 // ── Demand-plan + packaging BOM (for the Forecast & demand planner) ───────────
-const DEMAND_DEFAULTS = {months:3, growth:0, targetMode:'growth', targetValue:'', shape:'even', startMonth:'', monthly:[]};
-function demandConfig(){ try { const s=JSON.parse(localStorage.getItem('oi_demandplan_v1')||'null'); if(s) return {...DEMAND_DEFAULTS, ...s, monthly:Array.isArray(s.monthly)?s.monthly:[]}; } catch(e){} return {...DEMAND_DEFAULTS}; }
+const DEMAND_DEFAULTS = {months:3, growth:0, targetMode:'growth', targetValue:'', shape:'even', startMonth:'', monthly:[], focus:[]};
+function demandConfig(){ try { const s=JSON.parse(localStorage.getItem('oi_demandplan_v1')||'null'); if(s) return {...DEMAND_DEFAULTS, ...s, monthly:Array.isArray(s.monthly)?s.monthly:[], focus:Array.isArray(s.focus)?s.focus:[]}; } catch(e){} return {...DEMAND_DEFAULTS}; }
+// Product-focus / promotion weight for a product: multiply matching focus entries.
+// A focus entry is {key:'type:Necklace'|'product:SKU', mult, label}. Default 1.
+function focusMultFor(p, focus){
+  if(!Array.isArray(focus) || !focus.length || !p) return 1;
+  const pid = 'product:'+(p.sku||p.title), tid = 'type:'+(p.type||'');
+  let m = 1;
+  focus.forEach(f=>{ const mult=Number(f.mult); if(!(mult>0)) return; if(f.key===pid || f.key===tid || f.key==='all') m*=mult; });
+  return m;
+}
 // Month label N steps on from a YYYY-MM start (browser Date is fine here).
 function oiMonthLabel(startYYYYMM, i){ try { let y,m; if(/^\d{4}-\d{2}$/.test(startYYYYMM||'')){ y=+startYYYYMM.slice(0,4); m=+startYYYYMM.slice(5,7)-1; } else { const d=new Date(); y=d.getFullYear(); m=d.getMonth(); } const d=new Date(y, m+i, 1); return d.toLocaleString('en-GB',{month:'short', year:'2-digit'}); } catch(e){ return 'M'+(i+1); } }
 function saveDemandConfig(next){ try { localStorage.setItem('oi_demandplan_v1', JSON.stringify(next)); window.dispatchEvent(new Event('oi-forecast-updated')); } catch(e){} }
@@ -1170,26 +1179,33 @@ function demandScaleFactor(){
   const cfg = demandConfig();
   const B = (typeof window!=='undefined' && window.FRKL_BUSINESS) || {};
   const months = cfg.months||3, horizonDays = months*30.4;
+  const sellers = (B.inventory||[]).filter(p=>p && p.status!=='ARCHIVED' && (p.dailyVelocity||0)>0);
+  const revMap={}; (B.products||[]).forEach(p=>{ if(p.sku && p.units>0) revMap[p.sku]=p.netSales/p.units; });
+  const fb=(B.productSummary&&B.productSummary.singles&&B.productSummary.singles.aovPerUnit)||37;
+  const rv = p=> (p.sku&&revMap[p.sku]!=null)?revMap[p.sku]:fb;
+  const fm = p=> focusMultFor(p, cfg.focus);
+  const baseTotal = sellers.reduce((t,p)=>t+p.dailyVelocity*horizonDays,0);                 // raw
+  const baseRev = sellers.reduce((t,p)=>t+p.dailyVelocity*horizonDays*rv(p),0);             // raw
+  const baseTotalF = sellers.reduce((t,p)=>t+p.dailyVelocity*horizonDays*fm(p),0);          // focus-weighted
+  const baseRevF = sellers.reduce((t,p)=>t+p.dailyVelocity*horizonDays*fm(p)*rv(p),0);
+  const focusActive = (cfg.focus||[]).some(f=>Number(f.mult)>0 && Number(f.mult)!==1);
   let scale = 1;
   if(cfg.targetMode==='growth') scale = 1+(Number(cfg.growth)||0)/100;
   else {
-    const sellers = (B.inventory||[]).filter(p=>p && p.status!=='ARCHIVED' && (p.dailyVelocity||0)>0);
-    const revMap={}; (B.products||[]).forEach(p=>{ if(p.sku && p.units>0) revMap[p.sku]=p.netSales/p.units; });
-    const fb=(B.productSummary&&B.productSummary.singles&&B.productSummary.singles.aovPerUnit)||37;
-    const baseTotal = sellers.reduce((t,p)=>t+p.dailyVelocity*horizonDays,0);
-    const baseRev = sellers.reduce((t,p)=>t+p.dailyVelocity*horizonDays*((p.sku&&revMap[p.sku]!=null)?revMap[p.sku]:fb),0);
-    // month-by-month: sum the per-month targets (a blank month falls back to the
-    // run-rate baseline); aggregate scale = total target ÷ baseline over the horizon
+    // month-by-month: sum per-month targets (blank month → raw run-rate baseline)
     let target;
     if(cfg.shape==='month'){
       const baseMo = (cfg.targetMode==='units'?baseTotal:baseRev)/months;
       target = 0; for(let i=0;i<months;i++){ const v=(cfg.monthly||[])[i]; target += (v!=null&&v!=='')?(Number(v)||0):baseMo; }
     } else target = Number(cfg.targetValue);
-    if(cfg.targetMode==='units' && target>0 && baseTotal>0) scale = target/baseTotal;
-    else if(cfg.targetMode==='revenue' && target>0 && baseRev>0) scale = target/baseRev;
+    // normalise against the FOCUS-weighted baseline so the total still hits the target
+    if(cfg.targetMode==='units' && target>0 && baseTotalF>0) scale = target/baseTotalF;
+    else if(cfg.targetMode==='revenue' && target>0 && baseRevF>0) scale = target/baseRevF;
   }
   if(!(scale>0)) scale = 1;
-  return {scale, months, growthPct:(scale-1)*100, mode:cfg.targetMode, active: Math.abs(scale-1)>0.005, byMonth: cfg.shape==='month'};
+  const totalUnits = scale*baseTotalF;
+  const growthPct = baseTotal>0 ? (totalUnits/baseTotal-1)*100 : (scale-1)*100;
+  return {scale, months, growthPct, mode:cfg.targetMode, active: Math.abs(scale-1)>0.005 || focusActive, byMonth: cfg.shape==='month', focusActive};
 }
 
 // ── PO lifecycle: raised → awaiting Shopify stock → auto-closed ───────────────
@@ -1230,22 +1246,24 @@ function planReorder(){
   const rc = reorderConfig(); const safety = Number(rc.safetyDays)||14, coverDays = Number(rc.coverDays)||45;
   const strategy = rc.strategy||'jit'; const waves = Math.max(1, Math.round(Number(rc.waves)||3));
   const plan = demandScaleFactor(); const scale = plan.scale;
+  const dcfg = demandConfig();                 // product-focus / promotion weights
   const horizonDays = (plan.months||3)*30.4;
   const po = poStatusAll(); const today = oiToday();
   const opt = {safety, coverDays, horizonDays, waves, today};
   const productLines = inv.filter(p=>(p.dailyVelocity||0)>0).map(p=>{
     const lead = leadDaysForType(p.type); const sup = supplierFor(p.type); const stock = p.inventoryQty||0;
-    const vel = (p.dailyVelocity||0)*scale;
+    const focusM = focusMultFor(p, dcfg.focus);
+    const vel = (p.dailyVelocity||0)*scale*focusM;
     const s = _reorderSizing(strategy, vel, stock, lead, opt);
     let qty = s.qty; const moq = Number(sup.moq)||0; let moqBumped=false;
     if(qty>0 && moq>0 && qty<moq){ qty=moq; moqBumped=true; }
     const unitCost = (sup.unitCost!=null&&sup.unitCost!=='') ? Number(sup.unitCost) : (p.costPerItem!=null?p.costPerItem:null);
     const supplier = (sup.supplier&&sup.supplier.trim()) || p.vendor || p.type || 'Unassigned';
-    return {key:p.sku||p.title, p, lead, cover:s.cover, stock, vel, forecastUnits:s.forecastUnits, needs:s.needs, qty, basis:s.basis, waveUnits:s.waveUnits, nextWaveBy:s.nextWaveBy, moq, moqBumped, unitCost, supplier, lineCost: unitCost!=null?unitCost*qty:null};
+    return {key:p.sku||p.title, p, lead, cover:s.cover, stock, vel, focusM, forecastUnits:s.forecastUnits, needs:s.needs, qty, basis:s.basis, waveUnits:s.waveUnits, nextWaveBy:s.nextWaveBy, moq, moqBumped, unitCost, supplier, lineCost: unitCost!=null?unitCost*qty:null};
   });
   // ── packaging lines — consume the demand plan (per-item × units + per-order × orders) ──
   const pk = packagingConfig(); const aipo = Number(pk.avgItemsPerOrder)||1.3;
-  const totalDailyUnits = inv.reduce((t,p)=>t+(p.dailyVelocity||0)*scale, 0);
+  const totalDailyUnits = inv.reduce((t,p)=>t+(p.dailyVelocity||0)*scale*focusMultFor(p, dcfg.focus), 0);
   const totalDailyOrders = aipo>0 ? totalDailyUnits/aipo : 0;
   const pkgLines = (pk.components||[]).filter(c=> c.onHand!=='' && c.onHand!=null && isFinite(Number(c.onHand)) && ((Number(c.perItem)||0)>0 || (Number(c.perOrder)||0)>0)).map(c=>{
     const onHand = Number(c.onHand)||0;
@@ -9836,10 +9854,14 @@ function DemandPlanner(){
   const [shape, setShape] = useState(dc0.shape||'even');
   const [startMonth, setStartMonth] = useState(dc0.startMonth||'');
   const [monthly, setMonthly] = useState(()=>Array.isArray(dc0.monthly)?dc0.monthly.map(v=>v==null?'':String(v)):[]);
+  const [focus, setFocus] = useState(()=>Array.isArray(dc0.focus)?dc0.focus:[]);
   const [showAll, setShowAll] = useState(false);
   const [packOpen, setPackOpen] = useState(false);
-  React.useEffect(()=>{ saveDemandConfig({months, growth:Number(growth)||0, targetMode, targetValue, shape, startMonth, monthly}); }, [months, growth, targetMode, targetValue, shape, startMonth, monthly]);
+  React.useEffect(()=>{ saveDemandConfig({months, growth:Number(growth)||0, targetMode, targetValue, shape, startMonth, monthly, focus}); }, [months, growth, targetMode, targetValue, shape, startMonth, monthly, focus]);
   const setMonth = (i,v)=> setMonthly(prev=> Array.from({length:months}, (_,j)=> j===i ? v : (prev[j]!=null?prev[j]:'')));
+  const addFocus = ()=> setFocus(f=>[...f, {key:'', mult:'2', label:''}]);
+  const setFoc = (i,field,v)=> setFocus(f=>f.map((e,j)=>j===i?{...e,[field]:v}:e));
+  const rmFocus = (i)=> setFocus(f=>f.filter((_,j)=>j!==i));
 
   const k = v=>{ v=Math.round(v); const a=Math.abs(v); return a>=1000?(v/1000).toFixed(a>=10000?0:1).replace(/\.0$/,'')+'k':''+v; };
   const horizonDays = months*30.4;
@@ -9847,8 +9869,11 @@ function DemandPlanner(){
   const fallbackRev = (B.productSummary&&B.productSummary.singles&&B.productSummary.singles.aovPerUnit)||37;
   const revPerUnit = p=> (p.sku&&revMap[p.sku]!=null)?revMap[p.sku]:fallbackRev;
   const baseUnits = p=> p.dailyVelocity*horizonDays;
-  const baseTotal = sellers.reduce((t,p)=>t+baseUnits(p),0);
-  const baseRev = sellers.reduce((t,p)=>t+baseUnits(p)*revPerUnit(p),0);
+  const focusM = p=> focusMultFor(p, focus);                 // product-focus / promotion weight
+  const baseTotal = sellers.reduce((t,p)=>t+baseUnits(p),0);                 // raw
+  const baseRev = sellers.reduce((t,p)=>t+baseUnits(p)*revPerUnit(p),0);     // raw
+  const baseTotalF = sellers.reduce((t,p)=>t+baseUnits(p)*focusM(p),0);      // focus-weighted
+  const baseRevF = sellers.reduce((t,p)=>t+baseUnits(p)*focusM(p)*revPerUnit(p),0);
   // month-by-month shaping: blank month = run-rate baseline; total drives the scale
   const byMonth = shape==='month' && targetMode!=='growth';
   const baseMo = targetMode==='units' ? baseTotal/months : baseRev/months;
@@ -9857,13 +9882,13 @@ function DemandPlanner(){
   const monthlySum = monthlyArr.reduce((a,b)=>a+b,0);
   let scale=1;
   if(targetMode==='growth') scale = 1+(Number(growth)||0)/100;
-  else { const target = byMonth ? monthlySum : Number(targetValue);
-    if(targetMode==='units' && target>0 && baseTotal>0) scale = target/baseTotal;
-    else if(targetMode==='revenue' && target>0 && baseRev>0) scale = target/baseRev; }
-  const planUnits = p=> baseUnits(p)*scale;
-  const totalUnits = baseTotal*scale;
-  const totalRev = baseRev*scale;
-  const impliedGrowth = (scale-1)*100;
+  else { const target = byMonth ? monthlySum : Number(targetValue);     // normalise vs focus-weighted baseline
+    if(targetMode==='units' && target>0 && baseTotalF>0) scale = target/baseTotalF;
+    else if(targetMode==='revenue' && target>0 && baseRevF>0) scale = target/baseRevF; }
+  const planUnits = p=> baseUnits(p)*focusM(p)*scale;
+  const totalUnits = baseTotalF*scale;
+  const totalRev = baseRevF*scale;
+  const impliedGrowth = baseTotal>0 ? (totalUnits/baseTotal-1)*100 : (scale-1)*100;
   // per-month breakdown (units + revenue) for the shaped plan
   const uPerRev = baseRev>0 ? baseTotal/baseRev : 0;     // units per £ at the baseline mix
   const revPerU = baseTotal>0 ? baseRev/baseTotal : 0;   // blended £ per unit
@@ -9959,6 +9984,32 @@ function DemandPlanner(){
       <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:11,lineHeight:1.5}}>Baseline is each product's 90-day sales velocity over {months} month{months===1?'':'s'} ({sellers.length} active sellers). {byMonth ? `Month-by-month plan totals ${targetMode==='units'?NUM(Math.ceil(monthlySum))+' units':'£'+k(monthlySum)} — ${impliedGrowth>=0?'+':''}${impliedGrowth.toFixed(0)}% vs run-rate, allocated across products by historic mix.` : (targetMode!=='growth' && Number(targetValue)>0 ? `Your target implies ${impliedGrowth>=0?'+':''}${impliedGrowth.toFixed(0)}% vs the run-rate, allocated by historic mix.` : 'Growth is applied evenly on top of each run-rate.')} The order timing follows your strategy in Production / POs.</div>
     </div>
 
+    {/* product focus & promotions */}
+    <div className="card">
+      <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom: focus.length?10:0}}>
+        <div><span style={{fontSize:14,fontWeight:700,color:'var(--text-primary)'}}>Product focus &amp; promotions</span> <span className="muted" style={{fontSize:11.5}}>· push specific products or types — re-weights the plan{targetMode!=='growth'?' within your target':' on top of growth'}</span></div>
+        <button style={{...btn,fontSize:11.5,padding:'5px 11px'}} onClick={addFocus}>+ Add focus</button>
+      </div>
+      {focus.length===0
+        ? <div className="muted" style={{fontSize:12.5}}>None — the plan follows historic product mix. Add a focus to push a product or type (e.g. a Q4 promo on charms).</div>
+        : <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            {focus.map((e,i)=>{ const matched = sellers.filter(p=>{ const pid='product:'+(p.sku||p.title), tid='type:'+(p.type||''); return e.key===pid||e.key===tid||e.key==='all'; });
+              return (<div key={i} style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
+                <select value={e.key} onChange={ev=>setFoc(i,'key',ev.target.value)} style={{...inp,minWidth:220}}>
+                  <option value="">Choose product or type…</option>
+                  <option value="all">All products</option>
+                  <optgroup label="Type">{[...new Set(sellers.map(p=>p.type).filter(Boolean))].sort().map(t=><option key={t} value={'type:'+t}>{t}</option>)}</optgroup>
+                  <optgroup label="Product">{sellers.slice(0,50).map(p=><option key={p.sku||p.title} value={'product:'+(p.sku||p.title)}>{p.title}</option>)}</optgroup>
+                </select>
+                <label style={{display:'flex',alignItems:'center',gap:4,fontSize:12,color:'var(--text-secondary)'}}>uplift <input type="number" step="0.1" min="0" value={e.mult} onChange={ev=>setFoc(i,'mult',ev.target.value)} style={{...inp,width:60}}/> ×</label>
+                <input value={e.label||''} onChange={ev=>setFoc(i,'label',ev.target.value)} placeholder="label (e.g. BF promo)" style={{...inp,width:150}}/>
+                <span style={{fontSize:11,color:'var(--text-faint)'}}>{e.key?`${matched.length} product${matched.length===1?'':'s'}`:''}</span>
+                <button style={{...btn,fontSize:11,padding:'4px 9px',color:'var(--text-muted)',marginLeft:'auto'}} onClick={()=>rmFocus(i)}>Remove</button>
+              </div>); })}
+          </div>}
+      {focus.some(e=>e.key&&Number(e.mult)>0&&Number(e.mult)!==1) && <div style={{fontSize:11,color:'var(--text-faint)',marginTop:10,lineHeight:1.5}}>Focused items take a bigger share of the plan and their PO quantities rise to match. {targetMode!=='growth'?'A target is set, so the total stays fixed and the mix shifts toward the focus.':'No target set, so focus adds volume on top of growth.'} For promotions, remember the extra volume is typically lower-margin.</div>}
+    </div>
+
     {/* summary */}
     <div className="card">
       <div style={{display:'flex',gap:24,flexWrap:'wrap',alignItems:'flex-end'}}>
@@ -9982,7 +10033,7 @@ function DemandPlanner(){
             : (o.needs && o.qty>0) ? <span style={{color:'var(--text-primary)',fontWeight:700}}>{NUM(o.qty)}</span>
             : <span style={{color:'var(--good)'}}>covered</span>;
           return (<tr key={idx}>
-          <td style={{...td,color:'var(--text-primary)'}}>{r.p.title}<div style={{fontSize:10.5,color:'var(--text-faint)'}}>{r.p.type}</div></td>
+          <td style={{...td,color:'var(--text-primary)'}}>{r.p.title}{focusM(r.p)!==1 && <span style={{marginLeft:6,fontSize:10,fontWeight:700,color:'var(--accent)',background:'var(--accent-bg)',padding:'1px 6px',borderRadius:999}}>↑{focusM(r.p)}×</span>}<div style={{fontSize:10.5,color:'var(--text-faint)'}}>{r.p.type}</div></td>
           <td style={{...td,textAlign:'right'}}>{NUM(Math.round(r.runMo))}</td>
           <td style={{...td,textAlign:'right',fontWeight:700,color:'var(--text-primary)'}}>{NUM(Math.ceil(r.plan))}</td>
           <td style={{...td,textAlign:'right'}}>{NUM(r.stock)}</td>
