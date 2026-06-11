@@ -19,25 +19,25 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606111300"></script>
-<script src="./frkl-live-data.js?v=202606111300"></script>
-<script src="./frkl-agent-insights.js?v=202606111300"></script>
-<script src="./frkl-business-data.js?v=202606111300"></script>
-<script src="./frkl-action-status.js?v=202606111300"></script>
-<script src="./frkl-patterns.js?v=202606111300"></script>
-<script src="./frkl-creators.js?v=202606111300"></script>
-<script src="./frkl-creative-vision.js?v=202606111300"></script>
-<script src="./frkl-links.js?v=202606111300"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606111300"></script>
-<script src="./frkl-events.js?v=202606111300"></script>
-<script src="./frkl-products.js?v=202606111300"></script>
-<script src="./frkl-discount-codes.js?v=202606111300"></script>
-<script src="./frkl-cvr.js?v=202606111300"></script>
-<script src="./frkl-cohorts.js?v=202606111300"></script>
-<script src="./frkl-retention.js?v=202606111300"></script>
-<script src="./frkl-clarity.js?v=202606111300"></script>
-<script src="./frkl-board-read.js?v=202606111300"></script>
-<script src="./frkl-benchmarks.js?v=202606111300"></script>
+<script src="./frkl-data-loader.js?v=202606111400"></script>
+<script src="./frkl-live-data.js?v=202606111400"></script>
+<script src="./frkl-agent-insights.js?v=202606111400"></script>
+<script src="./frkl-business-data.js?v=202606111400"></script>
+<script src="./frkl-action-status.js?v=202606111400"></script>
+<script src="./frkl-patterns.js?v=202606111400"></script>
+<script src="./frkl-creators.js?v=202606111400"></script>
+<script src="./frkl-creative-vision.js?v=202606111400"></script>
+<script src="./frkl-links.js?v=202606111400"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606111400"></script>
+<script src="./frkl-events.js?v=202606111400"></script>
+<script src="./frkl-products.js?v=202606111400"></script>
+<script src="./frkl-discount-codes.js?v=202606111400"></script>
+<script src="./frkl-cvr.js?v=202606111400"></script>
+<script src="./frkl-cohorts.js?v=202606111400"></script>
+<script src="./frkl-retention.js?v=202606111400"></script>
+<script src="./frkl-clarity.js?v=202606111400"></script>
+<script src="./frkl-board-read.js?v=202606111400"></script>
+<script src="./frkl-benchmarks.js?v=202606111400"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -1285,16 +1285,21 @@ function planReorder(){
     return {key:'pkg:'+c.name, p, isPackaging:true, lead, cover:s.cover, stock:onHand, vel:dailyUse, forecastUnits:s.forecastUnits, needs:s.needs, qty, basis:s.basis, waveUnits:s.waveUnits, nextWaveBy:s.nextWaveBy, moq, moqBumped, unitCost, supplier, lineCost: unitCost!=null?unitCost*qty:null};
   });
   const lines = productLines.concat(pkgLines);
+  // OOS-before-lead: runs out before a reorder placed today could land → order TODAY
+  lines.forEach(l=>{ l.oosBeforeLead = l.cover < l.lead; l.oosGap = l.oosBeforeLead ? Math.round(l.lead-l.cover) : 0; });
   // auto-acknowledge: a raised/received PO whose stock has risen materially is closed
   // (products: Shopify inventory; packaging: the on-hand figure you update)
   const ackPending={};
   lines.forEach(l=>{ const st=po[l.key]; if(st && (st.status==='ordered'||st.status==='received')){ const cur=l.p.inventoryQty||0; if(cur >= (st.baselineQty||0)+Math.max(1, Math.ceil(0.5*(st.qty||l.qty)))) ackPending[l.key]=true; } });
   lines.forEach(l=>{ const st = ackPending[l.key]?null:(po[l.key]||null); l.po=st; l.poStatus=st?st.status:null;
     if(st && st.status==='ordered'){ l.expected = oiAddDays(st.raisedAt||today, l.lead); l.overdue = l.expected && today > oiAddDays(st.raisedAt||today, l.lead+7); } });
-  const toOrder = lines.filter(l=>l.needs && l.qty>0 && !l.poStatus).sort((a,b)=>a.cover-b.cover);
+  // strategy surfaces the can't-wait items first: OOS-before-lead, biggest gap, then lowest cover
+  const toOrder = lines.filter(l=>l.needs && l.qty>0 && !l.poStatus)
+    .sort((a,b)=> (b.oosBeforeLead-a.oosBeforeLead) || (b.oosGap-a.oosGap) || (a.cover-b.cover));
   const awaiting = lines.filter(l=>l.poStatus==='ordered').sort((a,b)=>(a.expected||'').localeCompare(b.expected||''));
   const approaching = lines.filter(l=>!l.needs && l.cover <= l.lead + coverDays && !l.poStatus).length;
-  return {inv, lines, toOrder, awaiting, approaching, ackPending, plan, scale, safety, coverDays, strategy, waves, horizonDays};
+  const oosNow = toOrder.filter(l=>l.oosBeforeLead).length;   // order today to avoid a gap
+  return {inv, lines, toOrder, awaiting, approaching, oosNow, ackPending, plan, scale, safety, coverDays, strategy, waves, horizonDays};
 }
 function leadDaysFor(type, cfg){
   cfg = cfg || leadConfig();
@@ -9243,7 +9248,7 @@ function ProductRetentionMatrix(){
 function RestockActionQueue(){
   usePlanningTick();
   const R = planReorder();
-  const {toOrder, awaiting, ackPending} = R;
+  const {toOrder, awaiting, oosNow, ackPending} = R;
   const ackKeys = Object.keys(ackPending||{});
   React.useEffect(()=>{ if(ackKeys.length){ ackKeys.forEach(key=>clearPoStatus(key)); toast('Stock landed', {kind:'good', body:`${ackKeys.length} PO${ackKeys.length>1?'s':''} closed — stock is back in Shopify.`}); } }, [ackKeys.join(',')]);
   if(!toOrder.length && !awaiting.length) return null;
@@ -9255,16 +9260,16 @@ function RestockActionQueue(){
   return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid '+(toOrder.length?'var(--warn)':'var(--accent)')}}>
     <div className="card-section-title" style={{marginBottom:6}}>
       <h2 style={{margin:0}}>Stock &amp; purchasing</h2>
-      <span className="meta">{toOrder.length} to order{awaiting.length?` · ${awaiting.length} awaiting stock`:''} · Atlas · finance &amp; commercial</span>
+      <span className="meta">{oosNow>0?<b style={{color:'var(--bad)'}}>{oosNow} order today</b>:null}{oosNow>0?' · ':''}{toOrder.length} to order{awaiting.length?` · ${awaiting.length} awaiting stock`:''} · Atlas · finance &amp; commercial</span>
     </div>
 
     {toOrder.length>0 ? (<div style={{display:'flex',flexDirection:'column',gap:7}}>
-      {toOrder.slice(0,8).map((l,idx)=>{ const urgent=l.cover<=l.lead;
+      {toOrder.slice(0,8).map((l,idx)=>{ const urgent=l.oosBeforeLead;
         return (<div key={idx} style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',padding:'8px 0',borderTop:idx?'1px solid var(--border-subtle)':'none'}}>
           <span style={{width:8,height:8,borderRadius:'50%',background:urgent?'var(--bad)':'var(--warn)',flexShrink:0}}/>
           <div style={{flex:1,minWidth:200}}>
-            <div style={{fontSize:13,color:'var(--text-primary)'}}>{l.basis==='forecast'?'Order for forecast':'Raise PO'} — <b>{NUM(l.qty)} units</b> of {l.p.title}</div>
-            <div style={{fontSize:11,color:'var(--text-faint)',marginTop:1}}>{l.supplier} · {l.basis==='forecast'?`plan needs ${NUM(l.forecastUnits)}, have ${NUM(l.stock)}`:`runs out in ~${Math.round(l.cover)}d (lead ${l.lead}d)`}{l.lineCost!=null?` · ~£${k(l.lineCost)}`:''}{l.moqBumped?` · MOQ ${l.moq}`:''}</div>
+            <div style={{fontSize:13,color:'var(--text-primary)'}}>{l.basis==='forecast'?'Order for forecast':'Raise PO'} — <b>{NUM(l.qty)} units</b> of {l.p.title}{urgent && <span style={{marginLeft:6,fontSize:9.5,fontWeight:800,letterSpacing:'.03em',color:'#fff',background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}</div>
+            <div style={{fontSize:11,color:'var(--text-faint)',marginTop:1}}>{l.supplier} · {urgent?`OOS in ~${Math.round(l.cover)}d — ${l.oosGap}d short of the ${l.lead}d lead`:(l.basis==='forecast'?`plan needs ${NUM(l.forecastUnits)}, have ${NUM(l.stock)}`:`runs out in ~${Math.round(l.cover)}d (lead ${l.lead}d)`)}{l.lineCost!=null?` · ~£${k(l.lineCost)}`:''}{l.moqBumped?` · MOQ ${l.moq}`:''}</div>
           </div>
           <button style={{...btn,background:'var(--accent)',color:'#fff',borderColor:'var(--accent)'}} onClick={()=>raise(l)}><Icon name="check" size={12}/> Mark PO raised</button>
           <button style={btn} onClick={()=>window.__oiNav&&window.__oiNav('planning','plan')}>Open planner</button>
@@ -9679,7 +9684,7 @@ function PlanningHeader({active, embedded}){
 function ProductionPlanner({embedded}={}){
   usePlanningTick();
   const R = planReorder();
-  const {inv, toOrder, awaiting, approaching, ackPending, plan, scale, safety, coverDays, strategy, waves, horizonDays} = R;
+  const {inv, toOrder, awaiting, approaching, oosNow, ackPending, plan, scale, safety, coverDays, strategy, waves, horizonDays} = R;
   const STRAT = {jit:'Just-in-time', bulk:'Bulk upfront', staged:'Staged waves'};
   // persist auto-acknowledgements (stock landed in Shopify → close the PO)
   const ackKeys = Object.keys(ackPending||{});
@@ -9693,11 +9698,12 @@ function ProductionPlanner({embedded}={}){
 
   const bySupplier = {};
   toOrder.forEach(l=>{ (bySupplier[l.supplier]=bySupplier[l.supplier]||[]).push(l); });
-  const pos = Object.keys(bySupplier).sort().map(s=>{
+  const pos = Object.keys(bySupplier).map(s=>{
     const ls=bySupplier[s], total=ls.reduce((t,l)=>t+(l.lineCost||0),0);
     const withEmail=ls.find(l=>l.supEmail), withNotes=ls.find(l=>l.supNotes);
-    return {supplier:s, lines:ls, total, hasCost:ls.every(l=>l.unitCost!=null), units:ls.reduce((t,l)=>t+l.qty,0), email:withEmail?withEmail.supEmail:'', notes:withNotes?withNotes.supNotes:''};
-  });
+    return {supplier:s, lines:ls, total, hasCost:ls.every(l=>l.unitCost!=null), units:ls.reduce((t,l)=>t+l.qty,0), email:withEmail?withEmail.supEmail:'', notes:withNotes?withNotes.supNotes:'', urgent:ls.filter(l=>l.oosBeforeLead).length, minCover:Math.min(...ls.map(l=>l.cover))};
+  // suppliers with order-today items first, then earliest stockout
+  }).sort((a,b)=> (b.urgent>0)-(a.urgent>0) || (a.minCover-b.minCover) || a.supplier.localeCompare(b.supplier));
   const totalValue = pos.reduce((t,p)=>t+p.total,0);
   const missingCost = toOrder.some(l=>l.unitCost==null);
   const today = (()=>{ try{ return new Date().toLocaleDateString('en-GB'); }catch(e){ return ''; } })();
@@ -9750,6 +9756,7 @@ function ProductionPlanner({embedded}={}){
     {/* summary + controls */}
     <div className="card">
       <div style={{display:'flex',gap:22,flexWrap:'wrap',alignItems:'flex-end'}}>
+        <div title="Run out before a reorder placed today could land — order these now"><div style={{fontSize:24,fontWeight:800,color: oosNow?'var(--bad)':'var(--good)'}}>{oosNow}</div><div className="muted" style={{fontSize:11.5}}>order today (OOS risk)</div></div>
         <div><div style={{fontSize:24,fontWeight:800,color: toOrder.length?'var(--warn)':'var(--good)'}}>{toOrder.length}</div><div className="muted" style={{fontSize:11.5}}>SKUs to reorder now</div></div>
         <div><div style={{fontSize:24,fontWeight:800,color:'var(--text-primary)'}}>{NUM(toOrder.reduce((t,l)=>t+l.qty,0))}</div><div className="muted" style={{fontSize:11.5}}>units across all POs</div></div>
         <div><div style={{fontSize:24,fontWeight:800,color:'var(--text-primary)'}}>{totalValue>0?'£'+k(totalValue):'—'}</div><div className="muted" style={{fontSize:11.5}}>draft order value{missingCost?' (partial)':''}</div></div>
@@ -9817,7 +9824,7 @@ function ProductionPlanner({embedded}={}){
         <th style={th}>Product</th><th style={{...th,textAlign:'right'}}>Stock</th><th style={{...th,textAlign:'right'}}>Cover</th><th style={{...th,textAlign:'right'}}>Order qty</th><th style={{...th,textAlign:'right'}}>Unit £</th><th style={{...th,textAlign:'right'}}>Line £</th>
       </tr></thead><tbody>
         {po.lines.map((l,idx)=>(<tr key={idx}>
-          <td style={{...td,color:'var(--text-primary)'}}>{l.p.title}<div style={{fontSize:10.5,color:'var(--text-faint)'}}>{l.p.sku||'no SKU'} · {l.p.type}{l.basis==='forecast'?` · plan needs ${NUM(l.forecastUnits)}`:''}{l.basis==='wave'&&l.nextWaveBy?` · next wave by ${l.nextWaveBy}`:''}{l.moqBumped?' · MOQ '+l.moq:''}</div></td>
+          <td style={{...td,color:'var(--text-primary)'}}>{l.p.title}{l.oosBeforeLead && <span style={{marginLeft:6,fontSize:9.5,fontWeight:800,letterSpacing:'.03em',color:'#fff',background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}<div style={{fontSize:10.5,color:'var(--text-faint)'}}>{l.p.sku||'no SKU'} · {l.p.type}{l.oosBeforeLead?` · OOS gap ${l.oosGap}d`:''}{l.basis==='forecast'?` · plan needs ${NUM(l.forecastUnits)}`:''}{l.basis==='wave'&&l.nextWaveBy?` · next wave by ${l.nextWaveBy}`:''}{l.moqBumped?' · MOQ '+l.moq:''}</div></td>
           <td style={{...td,textAlign:'right'}}>{NUM(l.p.inventoryQty)}</td>
           <td style={{...td,textAlign:'right',color:l.cover<=l.lead?'var(--bad)':'var(--warn)'}}>{Math.round(l.cover)}d</td>
           <td style={{...td,textAlign:'right',fontWeight:700,color:'var(--text-primary)'}}>{NUM(l.qty)}</td>
