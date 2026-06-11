@@ -1,4 +1,4 @@
-// frkl-events.js — operator event log (window.FRKL_EVENTS).
+// operator event log (window.FRKL_EVENTS).
 // Ground-truth context the metrics can't contain; generated from OI's brand_events.
 window.FRKL_EVENTS = [
   {
