@@ -19,25 +19,25 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606111700"></script>
-<script src="./frkl-live-data.js?v=202606111700"></script>
-<script src="./frkl-agent-insights.js?v=202606111700"></script>
-<script src="./frkl-business-data.js?v=202606111700"></script>
-<script src="./frkl-action-status.js?v=202606111700"></script>
-<script src="./frkl-patterns.js?v=202606111700"></script>
-<script src="./frkl-creators.js?v=202606111700"></script>
-<script src="./frkl-creative-vision.js?v=202606111700"></script>
-<script src="./frkl-links.js?v=202606111700"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606111700"></script>
-<script src="./frkl-events.js?v=202606111700"></script>
-<script src="./frkl-products.js?v=202606111700"></script>
-<script src="./frkl-discount-codes.js?v=202606111700"></script>
-<script src="./frkl-cvr.js?v=202606111700"></script>
-<script src="./frkl-cohorts.js?v=202606111700"></script>
-<script src="./frkl-retention.js?v=202606111700"></script>
-<script src="./frkl-clarity.js?v=202606111700"></script>
-<script src="./frkl-board-read.js?v=202606111700"></script>
-<script src="./frkl-benchmarks.js?v=202606111700"></script>
+<script src="./frkl-data-loader.js?v=202606111800"></script>
+<script src="./frkl-live-data.js?v=202606111800"></script>
+<script src="./frkl-agent-insights.js?v=202606111800"></script>
+<script src="./frkl-business-data.js?v=202606111800"></script>
+<script src="./frkl-action-status.js?v=202606111800"></script>
+<script src="./frkl-patterns.js?v=202606111800"></script>
+<script src="./frkl-creators.js?v=202606111800"></script>
+<script src="./frkl-creative-vision.js?v=202606111800"></script>
+<script src="./frkl-links.js?v=202606111800"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606111800"></script>
+<script src="./frkl-events.js?v=202606111800"></script>
+<script src="./frkl-products.js?v=202606111800"></script>
+<script src="./frkl-discount-codes.js?v=202606111800"></script>
+<script src="./frkl-cvr.js?v=202606111800"></script>
+<script src="./frkl-cohorts.js?v=202606111800"></script>
+<script src="./frkl-retention.js?v=202606111800"></script>
+<script src="./frkl-clarity.js?v=202606111800"></script>
+<script src="./frkl-board-read.js?v=202606111800"></script>
+<script src="./frkl-benchmarks.js?v=202606111800"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -3735,36 +3735,9 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
       <div style={{display:'flex',gap:6}}>{modeBtn('topdown','Top-down')}{modeBtn('bottomup','Bottom-up')}</div>
     </div>
 
-    {/* Outputs first */}
-    <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:6}}>
-      {tile(annLabel+' revenue', GBP(t.revenue), null)}
-      {tile(annLabel+' contribution', GBP(t.contribution), PCT(t.cmPct)+' margin', t.contribution>=0?'var(--good)':'var(--bad)')}
-      {tile(annLabel+' EBITDA', GBP(t.ebitda), PCT(t.ebitdaPct)+' margin', t.ebitda>=0?'var(--good)':'var(--bad)')}
-      {tile('EBITDA break-even', beLabel, mode==='bottomup'?('repeat '+n('repeatRate').toFixed(0)+'%/mo'):('growth '+n('growthPct').toFixed(0)+'%/mo'))}
-    </div>
-    {mode==='bottomup' && <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:10}}>Revenue mix: <b style={{color:'#7c8cff'}}>New {pctOf(t.newRev)}%</b> · <b style={{color:'#6ee7b7'}}>Returning {pctOf(t.retRev)}%</b>{t.whRev>0?<> · <b style={{color:'#f59e0b'}}>Wholesale {pctOf(t.whRev)}%</b></>:''} — returning revenue compounds as the base grows.</div>}
-
-    <R.ResponsiveContainer width="100%" height={250}>
-      <R.ComposedChart data={rows} margin={{top:6,right:16,left:14,bottom:20}}>
-        <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
-        <R.XAxis dataKey="label" tick={{fill:'#7e7e8a',fontSize:11}} label={{value:'Month', position:'insideBottom', offset:-9, fill:'#6f6f7b', fontSize:11}}/>
-        <R.YAxis tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>'£'+(Math.abs(v)>=1000?(v/1000).toFixed(0)+'k':v)} width={52}/>
-        <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} formatter={v=>GBP(v)}/>
-        <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}}/>
-        {mode==='bottomup' ? [
-          <R.Area key="n" type="monotone" dataKey="newRev" name="New" stackId="rev" stroke="#7c8cff" fill="rgba(124,140,255,0.5)" strokeWidth={1}/>,
-          <R.Area key="r" type="monotone" dataKey="retRev" name="Returning" stackId="rev" stroke="#6ee7b7" fill="rgba(110,231,183,0.45)" strokeWidth={1}/>,
-          <R.Area key="w" type="monotone" dataKey="whRev" name="Wholesale" stackId="rev" stroke="#f59e0b" fill="rgba(245,158,11,0.4)" strokeWidth={1}/>
-        ] : (
-          <R.Area key="rev" type="monotone" dataKey="revenue" name="Revenue" stroke="#7c8cff" fill="rgba(124,140,255,0.16)" strokeWidth={2}/>
-        )}
-        <R.Line type="monotone" dataKey="ebitda" name="EBITDA" stroke="#f0f0f4" strokeWidth={2} strokeDasharray="4 3" dot={false}/>
-      </R.ComposedChart>
-    </R.ResponsiveContainer>
-
-    {/* Core assumptions */}
+    {/* Assumptions — all number inputs at the TOP, before the outputs */}
     <div style={{marginTop:6}}>
-      <div style={{fontSize:11,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:8}}>Assumptions <span style={{textTransform:'none',letterSpacing:0,color:'var(--text-muted)'}}>· seeded from last 30 days · saved in your browser</span></div>
+      <div style={{fontSize:11,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:8}}>Assumptions <span style={{textTransform:'none',letterSpacing:0,color:'var(--text-muted)'}}>· seeded from last 30 days · saved in your browser · edit to recompute below</span></div>
       <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:8}}>
         {mode==='topdown' ? (<>
           {fld('startRevenue','Start revenue','£')}
@@ -3809,6 +3782,33 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
         </div>
       </div>
     )}
+
+    {/* Outputs — recompute live from the assumptions above */}
+    <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:6}}>
+      {tile(annLabel+' revenue', GBP(t.revenue), null)}
+      {tile(annLabel+' contribution', GBP(t.contribution), PCT(t.cmPct)+' margin', t.contribution>=0?'var(--good)':'var(--bad)')}
+      {tile(annLabel+' EBITDA', GBP(t.ebitda), PCT(t.ebitdaPct)+' margin', t.ebitda>=0?'var(--good)':'var(--bad)')}
+      {tile('EBITDA break-even', beLabel, mode==='bottomup'?('repeat '+n('repeatRate').toFixed(0)+'%/mo'):('growth '+n('growthPct').toFixed(0)+'%/mo'))}
+    </div>
+    {mode==='bottomup' && <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:10}}>Revenue mix: <b style={{color:'#7c8cff'}}>New {pctOf(t.newRev)}%</b> · <b style={{color:'#6ee7b7'}}>Returning {pctOf(t.retRev)}%</b>{t.whRev>0?<> · <b style={{color:'#f59e0b'}}>Wholesale {pctOf(t.whRev)}%</b></>:''} — returning revenue compounds as the base grows.</div>}
+
+    <R.ResponsiveContainer width="100%" height={250}>
+      <R.ComposedChart data={rows} margin={{top:6,right:16,left:14,bottom:20}}>
+        <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
+        <R.XAxis dataKey="label" tick={{fill:'#7e7e8a',fontSize:11}} label={{value:'Month', position:'insideBottom', offset:-9, fill:'#6f6f7b', fontSize:11}}/>
+        <R.YAxis tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>'£'+(Math.abs(v)>=1000?(v/1000).toFixed(0)+'k':v)} width={52}/>
+        <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} formatter={v=>GBP(v)}/>
+        <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}}/>
+        {mode==='bottomup' ? [
+          <R.Area key="n" type="monotone" dataKey="newRev" name="New" stackId="rev" stroke="#7c8cff" fill="rgba(124,140,255,0.5)" strokeWidth={1}/>,
+          <R.Area key="r" type="monotone" dataKey="retRev" name="Returning" stackId="rev" stroke="#6ee7b7" fill="rgba(110,231,183,0.45)" strokeWidth={1}/>,
+          <R.Area key="w" type="monotone" dataKey="whRev" name="Wholesale" stackId="rev" stroke="#f59e0b" fill="rgba(245,158,11,0.4)" strokeWidth={1}/>
+        ] : (
+          <R.Area key="rev" type="monotone" dataKey="revenue" name="Revenue" stroke="#7c8cff" fill="rgba(124,140,255,0.16)" strokeWidth={2}/>
+        )}
+        <R.Line type="monotone" dataKey="ebitda" name="EBITDA" stroke="#f0f0f4" strokeWidth={2} strokeDasharray="4 3" dot={false}/>
+      </R.ComposedChart>
+    </R.ResponsiveContainer>
 
     {/* Scenario band — investor-grade */}
     <div style={{marginTop:14,overflowX:'auto'}}>
