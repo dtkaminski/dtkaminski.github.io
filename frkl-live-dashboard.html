@@ -19,25 +19,25 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606121400"></script>
-<script src="./frkl-live-data.js?v=202606121400"></script>
-<script src="./frkl-agent-insights.js?v=202606121400"></script>
-<script src="./frkl-business-data.js?v=202606121400"></script>
-<script src="./frkl-action-status.js?v=202606121400"></script>
-<script src="./frkl-patterns.js?v=202606121400"></script>
-<script src="./frkl-creators.js?v=202606121400"></script>
-<script src="./frkl-creative-vision.js?v=202606121400"></script>
-<script src="./frkl-links.js?v=202606121400"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606121400"></script>
-<script src="./frkl-events.js?v=202606121400"></script>
-<script src="./frkl-products.js?v=202606121400"></script>
-<script src="./frkl-discount-codes.js?v=202606121400"></script>
-<script src="./frkl-cvr.js?v=202606121400"></script>
-<script src="./frkl-cohorts.js?v=202606121400"></script>
-<script src="./frkl-retention.js?v=202606121400"></script>
-<script src="./frkl-clarity.js?v=202606121400"></script>
-<script src="./frkl-board-read.js?v=202606121400"></script>
-<script src="./frkl-benchmarks.js?v=202606121400"></script>
+<script src="./frkl-data-loader.js?v=202606121500"></script>
+<script src="./frkl-live-data.js?v=202606121500"></script>
+<script src="./frkl-agent-insights.js?v=202606121500"></script>
+<script src="./frkl-business-data.js?v=202606121500"></script>
+<script src="./frkl-action-status.js?v=202606121500"></script>
+<script src="./frkl-patterns.js?v=202606121500"></script>
+<script src="./frkl-creators.js?v=202606121500"></script>
+<script src="./frkl-creative-vision.js?v=202606121500"></script>
+<script src="./frkl-links.js?v=202606121500"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606121500"></script>
+<script src="./frkl-events.js?v=202606121500"></script>
+<script src="./frkl-products.js?v=202606121500"></script>
+<script src="./frkl-discount-codes.js?v=202606121500"></script>
+<script src="./frkl-cvr.js?v=202606121500"></script>
+<script src="./frkl-cohorts.js?v=202606121500"></script>
+<script src="./frkl-retention.js?v=202606121500"></script>
+<script src="./frkl-clarity.js?v=202606121500"></script>
+<script src="./frkl-board-read.js?v=202606121500"></script>
+<script src="./frkl-benchmarks.js?v=202606121500"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -1151,6 +1151,8 @@ function skuSupplierAll(){ try { const s=JSON.parse(localStorage.getItem('oi_sup
 function saveSkuSupplierAll(all){ try { localStorage.setItem('oi_supplier_sku_v1', JSON.stringify(all)); window.dispatchEvent(new Event('oi-supplier-updated')); } catch(e){} }
 // Add a quoted unit price to a SKU later (supplier quotes off the PO).
 function setSkuPrice(key, v){ const all=skuSupplierAll(); const cur=all[key]||{}; all[key]={...cur, unitCost:(v===''||v==null)?'':Number(v)}; saveSkuSupplierAll(all); }
+// Set a SKU's production lead (order→shipment, days) inline. Blank → falls back to the type default.
+function setSkuLead(key, v){ const all=skuSupplierAll(); const cur=all[key]||{}; all[key]={...cur, lead:(v===''||v==null)?'':Number(v)}; saveSkuSupplierAll(all); }
 function supplierForSku(p){ const r = skuSupplierAll()[skuKeyOf(p)]; return r || {}; }
 function skuHasSupplier(p){ const r = skuSupplierAll()[skuKeyOf(p)]; return !!(r && r.supplier && String(r.supplier).trim()); }
 // ── Supplier directory — tracked suppliers keyed by name; SKUs reference by name,
@@ -9838,7 +9840,12 @@ function ProductionPlanner({embedded}={}){
   const [wavesDraft, setWavesDraft] = useState(String(rc.waves||3));
   const [depDraft, setDepDraft] = useState(String(rc.depositPct!=null?rc.depositPct:100));
   const [shipDraft, setShipDraft] = useState(String(rc.shipDays!=null?rc.shipDays:0));
-  const saveSettings = ()=>{ saveReorderConfig({...reorderConfig(), safetyDays:Number(safDraft)||14, coverDays:Number(covDraft)||45, waves:Math.max(1,Number(wavesDraft)||3), depositPct:Math.max(0,Math.min(100,Number(depDraft)||0)), shipDays:Math.max(0,Number(shipDraft)||0)}); setSetOpen(false); toast('Reorder policy saved', {kind:'good'}); };
+  const leadTypes = [...new Set(inv.map(p=>p.type).filter(Boolean))].sort((a,b)=>a.localeCompare(b));   // distinct product types
+  const [leadDraft, setLeadDraft] = useState(()=>{ const lc=leadConfig(); const bt={}; leadTypes.forEach(t=>{ bt[t]= (lc.byType&&lc.byType[t]!=null&&lc.byType[t]!=='')?String(lc.byType[t]):''; }); return {def:String(lc.default!=null?lc.default:30), byType:bt}; });
+  const setLeadType = (t,v)=>setLeadDraft(d=>({...d, byType:{...d.byType,[t]:v}}));
+  const saveSettings = ()=>{ saveReorderConfig({...reorderConfig(), safetyDays:Number(safDraft)||14, coverDays:Number(covDraft)||45, waves:Math.max(1,Number(wavesDraft)||3), depositPct:Math.max(0,Math.min(100,Number(depDraft)||0)), shipDays:Math.max(0,Number(shipDraft)||0)});
+    const lc=leadConfig(); const bt={...(lc.byType||{})}; Object.keys(leadDraft.byType).forEach(t=>{ const v=leadDraft.byType[t]; if(v===''||v==null) delete bt[t]; else if(isFinite(Number(v))) bt[t]=Number(v); }); saveLeadConfig({...lc, default:Number(leadDraft.def)||30, byType:bt});
+    setSetOpen(false); toast('Reorder policy saved', {kind:'good'}); };
 
   const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:12.5,fontWeight:600,padding:'7px 13px',borderRadius:8,border:'1px solid var(--border-default)',background:'var(--bg-elevated)',color:'var(--text-primary)',cursor:'pointer'};
   const smbtn = {...btn, fontSize:11.5, padding:'5px 10px'};
@@ -9919,9 +9926,17 @@ function ProductionPlanner({embedded}={}){
         {strategy==='staged' && <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}}>Number of waves<input type="number" style={{...inp,width:90}} value={wavesDraft} onChange={e=>setWavesDraft(e.target.value)}/></label>}
         <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}} title="Default % paid upfront at order; the balance falls due at shipment. Override per supplier on the Suppliers tab.">Deposit % at order<input type="number" style={{...inp,width:90}} value={depDraft} onChange={e=>setDepDraft(e.target.value)}/></label>
         <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}} title="Default shipping transit days from shipment to landing, added on top of each product's production lead. Override per supplier on the Suppliers tab.">Transit days (ship→land)<input type="number" style={{...inp,width:90}} value={shipDraft} onChange={e=>setShipDraft(e.target.value)}/></label>
-        <button style={btn} onClick={saveSettings}>Save policy</button><button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setSetOpen(false)}>Cancel</button>
       </div>
-      <div style={{fontSize:11,color:'var(--text-faint)',marginTop:9,lineHeight:1.5}}>Deposit % and transit days are <b>defaults</b> — set them per supplier on the <a className="txt-link" style={{cursor:'pointer'}} onClick={()=>window.__oiNav&&window.__oiNav('planning','suppliers')}>Suppliers tab</a> where terms differ. Both feed the stock landing plan (when to order each tranche, deposit now vs balance on shipment).</div>
+      {/* default production lead by type — used when a SKU has no specific lead */}
+      <div style={{marginTop:14,paddingTop:12,borderTop:'1px solid var(--border-subtle)'}}>
+        <div style={{fontSize:12,fontWeight:700,marginBottom:2}}>Default production lead by type <span className="muted" style={{fontWeight:400,fontSize:11}}>· days from order to shipment — used when a SKU has no specific lead set in the demand table / Supplier master</span></div>
+        <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'flex-end',marginTop:9}}>
+          <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}}>All types (default)<input type="number" min="0" style={{...inp,width:80}} value={leadDraft.def} onChange={e=>setLeadDraft(d=>({...d,def:e.target.value}))}/></label>
+          {leadTypes.map(t=>(<label key={t} style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}}>{t}<input type="number" min="0" placeholder={String(leadDraft.def||30)} style={{...inp,width:72}} value={leadDraft.byType[t]||''} onChange={e=>setLeadType(t,e.target.value)}/></label>))}
+        </div>
+      </div>
+      <div style={{display:'flex',gap:8,marginTop:14}}><button style={btn} onClick={saveSettings}>Save policy</button><button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setSetOpen(false)}>Cancel</button></div>
+      <div style={{fontSize:11,color:'var(--text-faint)',marginTop:9,lineHeight:1.5}}>Lead = <b>production</b> (this section / per SKU) <b>+ transit</b> (per supplier, or the default above). Deposit % and transit are <b>defaults</b> — override per supplier on the <a className="txt-link" style={{cursor:'pointer'}} onClick={()=>window.__oiNav&&window.__oiNav('planning','suppliers')}>Suppliers tab</a>. All feed the stock landing plan.</div>
     </div>)}
 
     {/* draft POs */}
@@ -10055,14 +10070,16 @@ function DemandPlanner({embedded}={}){
   const rows = sellers.map(p=>{ const plan=planUnits(p); const stock=p.inventoryQty||0; const end=stock-plan;
     const dayVel = plan/horizonDays;                          // planned units/day (incl. focus)
     const _sm = supplierForSku(p);                            // per-SKU lead (order→ship), else type default
-    const leadMake = (_sm.lead!=null&&_sm.lead!=='') ? Number(_sm.lead) : leadDaysForType(p.type);
+    const leadSet = (_sm.lead!=null&&_sm.lead!=='');          // is there an explicit per-SKU lead?
+    const leadDefault = leadDaysForType(p.type);              // type-level fallback
+    const leadMake = leadSet ? Number(_sm.lead) : leadDefault;
     const _sn = (_sm.supplier&&String(_sm.supplier).trim())||''; const _de = _sn ? (_ldir[_sn]||{}) : {};
     const leadShip = (_de.shipDays!=null&&_de.shipDays!=='') ? Number(_de.shipDays) : (Number(_lrc.shipDays)||0);   // ship→land transit
     const lead = leadMake + leadShip;                        // order → in stock — same basis as the PO engine
     const daysToOOS = dayVel>0 ? stock/dayVel : Infinity;     // days of cover at the planned rate
     const oosBeforeLead = daysToOOS < lead;                   // runs out before a reorder placed today lands
     const oosGap = oosBeforeLead ? Math.round(lead-daysToOOS) : 0;
-    return {p, runMo:p.dailyVelocity*30.4, plan, stock, end, short:end<0, lead, leadMake, leadShip, daysToOOS, oosBeforeLead, oosGap}; })
+    return {p, runMo:p.dailyVelocity*30.4, plan, stock, end, short:end<0, lead, leadMake, leadShip, leadSet, leadDefault, daysToOOS, oosBeforeLead, oosGap}; })
     .sort((a,b)=>b.plan-a.plan);
   const stockouts = rows.filter(r=>r.short).length;
   const oosRisk = rows.filter(r=>r.oosBeforeLead).length;     // can't be saved by ordering today
@@ -10203,7 +10220,7 @@ function DemandPlanner({embedded}={}){
           <td style={{...td,color:'var(--text-primary)'}}>{r.p.title}{r.oosBeforeLead && <span style={{marginLeft:6,fontSize:9.5,fontWeight:800,letterSpacing:'.03em',color:'#fff',background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}{focusM(r.p)!==1 && <span style={{marginLeft:6,fontSize:10,fontWeight:700,color:'var(--accent)',background:'var(--accent-bg)',padding:'1px 6px',borderRadius:999}}>↑{(focusM(r.p)%1?focusM(r.p).toFixed(2):focusM(r.p))}×</span>}<div style={{fontSize:10.5,color:'var(--text-faint)'}}>{r.p.type}</div></td>
           <td style={{...td,textAlign:'right'}}>{NUM(Math.round(r.runMo))}</td>
           <td style={{...td,textAlign:'right'}}>{NUM(r.stock)}</td>
-          <td style={{...td,textAlign:'right'}}>{r.daysToOOS===Infinity ? <span style={{color:'var(--text-faint)'}}>—</span> : <span style={{fontWeight:600,color: r.oosBeforeLead?'var(--bad)':(r.daysToOOS<r.lead*1.5?'var(--warn)':'var(--text-secondary)')}}>{Math.round(r.daysToOOS)}d{r.oosBeforeLead?` · gap ${r.oosGap}d`:''}</span>}<div style={{fontSize:10,color:'var(--text-faint)'}}>{r.lead}d lead</div></td>
+          <td style={{...td,textAlign:'right'}}>{r.daysToOOS===Infinity ? <span style={{color:'var(--text-faint)'}}>—</span> : <span style={{fontWeight:600,color: r.oosBeforeLead?'var(--bad)':(r.daysToOOS<r.lead*1.5?'var(--warn)':'var(--text-secondary)')}}>{Math.round(r.daysToOOS)}d{r.oosBeforeLead?` · gap ${r.oosGap}d`:''}</span>}<div style={{fontSize:10,color:'var(--text-faint)',display:'flex',alignItems:'center',gap:3,justifyContent:'flex-end',marginTop:2}}><input type="number" min="0" defaultValue={r.leadSet?r.leadMake:''} key={'ld'+(r.leadSet?r.leadMake:'d')} placeholder={String(r.leadDefault)} title={`Production lead — days from order to shipment (per SKU). Blank uses the ${r.p.type||'type'} default of ${r.leadDefault}d. Set defaults in Reorder policy.`} onBlur={e=>{ if(e.target.value!=='') setSkuLead(skuKeyOf(r.p), e.target.value); }} style={{width:38,padding:'1px 4px',borderRadius:5,border:'1px solid var(--border-default)',background:'var(--bg-base)',color:'var(--text-secondary)',fontSize:10,textAlign:'right'}}/><span>d make{r.leadShip>0?` +${r.leadShip} ship = ${r.lead}`:' lead'}{!r.leadSet?' ·def':''}</span></div></td>
           <td style={{...td,textAlign:'right',fontWeight:700,color:'var(--text-primary)'}}>{NUM(Math.ceil(r.plan))}</td>
           <td style={{...td,textAlign:'right',fontWeight:600,color: r.short?'var(--bad)':'var(--good)'}}>{r.short?'−'+NUM(Math.ceil(-r.end)):NUM(Math.floor(r.end))}</td>
           <td style={{...td,textAlign:'right'}}>{oCell}</td>
@@ -10219,7 +10236,7 @@ function DemandPlanner({embedded}={}){
         <div style={{fontSize:11,fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:6}}>Delisted — excluded from the plan &amp; POs</div>
         <div style={{display:'flex',flexWrap:'wrap',gap:8}}>{inv.filter(p=>(p.dailyVelocity||0)>0 && del[p.sku||p.title]).map((p,i)=>(<span key={i} style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:12,color:'var(--text-secondary)',background:'var(--bg-elevated)',border:'1px solid var(--border-subtle)',borderRadius:999,padding:'3px 6px 3px 11px'}}>{p.title}<button style={{fontSize:11,fontWeight:600,color:'var(--accent)',background:'none',border:'none',cursor:'pointer'}} onClick={()=>{ setDelisted(skuKeyOf(p), false); toast('Relisted', {kind:'good', body:p.title}); }}>Relist</button></span>))}</div>
       </div>}
-      {(stockouts>0||oosRisk>0) && <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:9,lineHeight:1.5}}><b>Stockout vs lead</b> is days of cover at the planned rate against production lead time — <span style={{color:'var(--bad)'}}>red</span> means it runs out <b>before</b> a reorder placed today could land ({oosRisk} product{oosRisk===1?'':'s'} · ~{Math.round(rows.filter(r=>r.oosBeforeLead).reduce((t,r)=>t+r.oosGap,0)/Math.max(1,oosRisk))}d avg gap), so it needs ordering now or it'll go OOS. Edit lead times in the Supplier master below. The <b>Order</b> column is what each triggers under your <b>{STRAT_SHORT[RR.strategy]||'JIT'}</b> strategy. Stock is consumed <b>FIFO</b> — current stock first, on-order isn't counted as available until it lands, so the OOS gap is the real shortfall window.</div>}
+      {(stockouts>0||oosRisk>0) && <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:9,lineHeight:1.5}}><b>Stockout vs lead</b> is days of cover at the planned rate against production lead time — <span style={{color:'var(--bad)'}}>red</span> means it runs out <b>before</b> a reorder placed today could land ({oosRisk} product{oosRisk===1?'':'s'} · ~{Math.round(rows.filter(r=>r.oosBeforeLead).reduce((t,r)=>t+r.oosGap,0)/Math.max(1,oosRisk))}d avg gap), so it needs ordering now or it'll go OOS. Edit each product's <b>make lead</b> inline in this column (blank = the type default, set in Reorder policy); transit is per-supplier. The <b>Order</b> column is what each triggers under your <b>{STRAT_SHORT[RR.strategy]||'JIT'}</b> strategy. Stock is consumed <b>FIFO</b> — current stock first, on-order isn't counted as available until it lands, so the OOS gap is the real shortfall window.</div>}
     </div>
 
     {/* packaging requirements */}
