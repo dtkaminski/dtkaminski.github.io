@@ -19,25 +19,25 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606120900"></script>
-<script src="./frkl-live-data.js?v=202606120900"></script>
-<script src="./frkl-agent-insights.js?v=202606120900"></script>
-<script src="./frkl-business-data.js?v=202606120900"></script>
-<script src="./frkl-action-status.js?v=202606120900"></script>
-<script src="./frkl-patterns.js?v=202606120900"></script>
-<script src="./frkl-creators.js?v=202606120900"></script>
-<script src="./frkl-creative-vision.js?v=202606120900"></script>
-<script src="./frkl-links.js?v=202606120900"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606120900"></script>
-<script src="./frkl-events.js?v=202606120900"></script>
-<script src="./frkl-products.js?v=202606120900"></script>
-<script src="./frkl-discount-codes.js?v=202606120900"></script>
-<script src="./frkl-cvr.js?v=202606120900"></script>
-<script src="./frkl-cohorts.js?v=202606120900"></script>
-<script src="./frkl-retention.js?v=202606120900"></script>
-<script src="./frkl-clarity.js?v=202606120900"></script>
-<script src="./frkl-board-read.js?v=202606120900"></script>
-<script src="./frkl-benchmarks.js?v=202606120900"></script>
+<script src="./frkl-data-loader.js?v=202606121000"></script>
+<script src="./frkl-live-data.js?v=202606121000"></script>
+<script src="./frkl-agent-insights.js?v=202606121000"></script>
+<script src="./frkl-business-data.js?v=202606121000"></script>
+<script src="./frkl-action-status.js?v=202606121000"></script>
+<script src="./frkl-patterns.js?v=202606121000"></script>
+<script src="./frkl-creators.js?v=202606121000"></script>
+<script src="./frkl-creative-vision.js?v=202606121000"></script>
+<script src="./frkl-links.js?v=202606121000"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606121000"></script>
+<script src="./frkl-events.js?v=202606121000"></script>
+<script src="./frkl-products.js?v=202606121000"></script>
+<script src="./frkl-discount-codes.js?v=202606121000"></script>
+<script src="./frkl-cvr.js?v=202606121000"></script>
+<script src="./frkl-cohorts.js?v=202606121000"></script>
+<script src="./frkl-retention.js?v=202606121000"></script>
+<script src="./frkl-clarity.js?v=202606121000"></script>
+<script src="./frkl-board-read.js?v=202606121000"></script>
+<script src="./frkl-benchmarks.js?v=202606121000"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -2922,6 +2922,8 @@ const OI_ICONS = {
   pulse:'<path d="M3 12h3.5l2.2-6.5 4 13 2.3-6.5H21"/>',
   image:'<rect x="3" y="4.5" width="18" height="15" rx="2"/><circle cx="8.4" cy="9.4" r="1.5"/><path d="M21 15.5 16 11 5 19.5"/>',
   report:'<rect x="5" y="3.2" width="14" height="17.6" rx="2"/><path d="M8.4 8h7.2M8.4 12h7.2M8.4 16h4.2"/>',
+  truck:'<rect x="1.5" y="6.5" width="11.5" height="8.5" rx="1"/><path d="M13 9.5h3.6l3.4 3.2V15H13z"/><circle cx="6" cy="17.4" r="1.7"/><circle cx="16.6" cy="17.4" r="1.7"/>',
+  factory:'<path d="M3 21V10.5l5.2 3.2V10.5l5.2 3.2V6.5H21V21z"/><path d="M2.2 21h19.6M11 21v-3.2M16 21v-3.2"/>',
 };
 function Icon({name, size=16, stroke=1.7, style, className, title}){
   const p = OI_ICONS[name]; if(!p) return null;
@@ -10314,20 +10316,22 @@ const NAV = [
 // Decision-led rail — a presentation layer over NAV (section IDs unchanged).
 // Entries may target a specific sub-tab so decisions like "AI Analyst" and
 // "Creative" become first-class destinations without restructuring the sections.
+// Grouped by JOB, not build order: Overview (how's the business) → Act (what to do)
+// → Plan & supply (forward) → Analyse (deep dives) → Settings (pinned bottom).
 const RAIL = [
-  { label:'Today',            icon:'home',      section:'home' },
-  { label:'Actions',          icon:'clipboard', section:'actions' },
-  { label:'AI Analyst',       icon:'spark',     section:'home',     sub:'ask' },
-  { label:'What changed',     icon:'calendar',  section:'board' },
-  { label:'Business review',  icon:'report',    section:'review' },
-  { label:'Planning',          icon:'box',       section:'planning', sub:'plan' },
-  { label:'Suppliers',         icon:'users',     section:'planning', sub:'suppliers' },
-  { label:'Commercial health',icon:'pulse',     section:'intel' },
-  { label:'Growth channels',  icon:'trendUp',   section:'channels' },
-  { label:'Creative & brand', icon:'image',     section:'channels', sub:'creatives' },
-  { label:'Products & stock', icon:'box',       section:'commerce' },
-  { label:'Customers',        icon:'users',     section:'audience' },
-  { label:'Settings',         icon:'sliders',   section:'settings' },
+  { group:'Overview', label:'Today',             icon:'home',      section:'home' },
+  { group:'Overview', label:'What changed',      icon:'calendar',  section:'board' },
+  { group:'Overview', label:'Business review',   icon:'report',    section:'review' },
+  { group:'Act',      label:'Actions',           icon:'clipboard', section:'actions' },
+  { group:'Act',      label:'AI Analyst',        icon:'spark',     section:'home',     sub:'ask' },
+  { group:'Plan & supply', label:'Planning',     icon:'truck',     section:'planning', sub:'plan' },
+  { group:'Plan & supply', label:'Suppliers',    icon:'factory',   section:'planning', sub:'suppliers' },
+  { group:'Analyse',  label:'Commercial health', icon:'pulse',     section:'intel' },
+  { group:'Analyse',  label:'Growth channels',   icon:'trendUp',   section:'channels' },
+  { group:'Analyse',  label:'Creative & brand',  icon:'image',     section:'channels', sub:'creatives' },
+  { group:'Analyse',  label:'Products & stock',  icon:'box',       section:'commerce' },
+  { group:'Analyse',  label:'Customers',         icon:'users',     section:'audience' },
+  { group:'',         label:'Settings',          icon:'sliders',   section:'settings', pin:true },
 ];
 const NAV_BY_ID = Object.fromEntries(NAV.map(s=>[s.id, s]));
 // Mobile bottom tab bar — the 4 most-used destinations + More (opens ⌘K palette).
@@ -10633,11 +10637,16 @@ function App(){
         <button className="nav-cmd" onClick={()=>window.__oiCommandOpen&&window.__oiCommandOpen()}>
           <Icon name="search" size={14}/> Search… <kbd>⌘K</kbd>
         </button>
-        {RAIL.map((e,i) => (
-          <div key={i} className={'nav-item' + (railActive(e) ? ' active' : '')} onClick={()=>goRail(e)}>
-            <Icon name={e.icon||'info'} size={17}/>{e.label}
-          </div>
-        ))}
+        {(()=>{ let prev=null; return RAIL.map((e,i) => {
+          const head = (e.group && e.group!==prev) ? <div className="nav-label">{e.group}</div> : null;
+          prev = e.group;
+          return (<React.Fragment key={i}>
+            {head}
+            <div className={'nav-item' + (railActive(e) ? ' active' : '')} onClick={()=>goRail(e)} style={e.pin?{marginTop:'auto',borderTop:'1px solid var(--border-subtle)',borderRadius:0,paddingTop:'13px',marginLeft:2,marginRight:2}:undefined}>
+              <Icon name={e.icon||'info'} size={17}/>{e.label}
+            </div>
+          </React.Fragment>);
+        }); })()}
       </nav>
       <main className="app-main">
         <div className="wrap">
