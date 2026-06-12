@@ -19,25 +19,25 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606121600"></script>
-<script src="./frkl-live-data.js?v=202606121600"></script>
-<script src="./frkl-agent-insights.js?v=202606121600"></script>
-<script src="./frkl-business-data.js?v=202606121600"></script>
-<script src="./frkl-action-status.js?v=202606121600"></script>
-<script src="./frkl-patterns.js?v=202606121600"></script>
-<script src="./frkl-creators.js?v=202606121600"></script>
-<script src="./frkl-creative-vision.js?v=202606121600"></script>
-<script src="./frkl-links.js?v=202606121600"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606121600"></script>
-<script src="./frkl-events.js?v=202606121600"></script>
-<script src="./frkl-products.js?v=202606121600"></script>
-<script src="./frkl-discount-codes.js?v=202606121600"></script>
-<script src="./frkl-cvr.js?v=202606121600"></script>
-<script src="./frkl-cohorts.js?v=202606121600"></script>
-<script src="./frkl-retention.js?v=202606121600"></script>
-<script src="./frkl-clarity.js?v=202606121600"></script>
-<script src="./frkl-board-read.js?v=202606121600"></script>
-<script src="./frkl-benchmarks.js?v=202606121600"></script>
+<script src="./frkl-data-loader.js?v=202606121700"></script>
+<script src="./frkl-live-data.js?v=202606121700"></script>
+<script src="./frkl-agent-insights.js?v=202606121700"></script>
+<script src="./frkl-business-data.js?v=202606121700"></script>
+<script src="./frkl-action-status.js?v=202606121700"></script>
+<script src="./frkl-patterns.js?v=202606121700"></script>
+<script src="./frkl-creators.js?v=202606121700"></script>
+<script src="./frkl-creative-vision.js?v=202606121700"></script>
+<script src="./frkl-links.js?v=202606121700"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606121700"></script>
+<script src="./frkl-events.js?v=202606121700"></script>
+<script src="./frkl-products.js?v=202606121700"></script>
+<script src="./frkl-discount-codes.js?v=202606121700"></script>
+<script src="./frkl-cvr.js?v=202606121700"></script>
+<script src="./frkl-cohorts.js?v=202606121700"></script>
+<script src="./frkl-retention.js?v=202606121700"></script>
+<script src="./frkl-clarity.js?v=202606121700"></script>
+<script src="./frkl-board-read.js?v=202606121700"></script>
+<script src="./frkl-benchmarks.js?v=202606121700"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -1125,8 +1125,8 @@ function saveLeadConfig(next){ try { localStorage.setItem('oi_lead_times', JSON.
 // which the run-rate already captures). localStorage-first like cost config;
 // reuses the 'oi-costs-updated' event so subscribed cards refresh on save.
 function cashConfig(){
-  try { const s = JSON.parse(localStorage.getItem('oi_cash_v1')||'null'); if(s && typeof s==='object') return {cash:s.cash!=null?s.cash:'', overheads:s.overheads!=null?s.overheads:''}; } catch(e){}
-  return {cash:'', overheads:''};
+  try { const s = JSON.parse(localStorage.getItem('oi_cash_v1')||'null'); if(s && typeof s==='object') return {cash:s.cash!=null?s.cash:'', overheads:s.overheads!=null?s.overheads:'', adSpend:s.adSpend!=null?s.adSpend:''}; } catch(e){}
+  return {cash:'', overheads:'', adSpend:''};
 }
 function saveCashConfig(next){ try { localStorage.setItem('oi_cash_v1', JSON.stringify(next)); window.dispatchEvent(new Event('oi-costs-updated')); } catch(e){} }
 
@@ -1251,8 +1251,9 @@ function demandScaleFactor(){
   }
   if(!(scale>0)) scale = 1;
   const totalUnits = scale*baseTotalF;
+  const totalRevenue = scale*baseRevF;                       // projected gross revenue over the horizon
   const growthPct = baseTotal>0 ? (totalUnits/baseTotal-1)*100 : (scale-1)*100;
-  return {scale, months, growthPct, mode:cfg.targetMode, active: Math.abs(scale-1)>0.005 || focusActive, byMonth: cfg.shape==='month', focusActive};
+  return {scale, months, growthPct, mode:cfg.targetMode, active: Math.abs(scale-1)>0.005 || focusActive, byMonth: cfg.shape==='month', focusActive, units:totalUnits, revenue:totalRevenue};
 }
 
 // ── PO lifecycle: raised → awaiting Shopify stock → auto-closed ───────────────
@@ -9578,7 +9579,7 @@ function BusinessReview(){
       read:`Cash runway ${months.toFixed(1)} months (£${k(cashBal)} ÷ £${k(-moNet)}/mo net burn)` };
   }
   durD.push(runwayCard);
-  const saveCash = ()=>{ saveCashConfig({cash:cashDraft, overheads:ovDraft}); setCashOpen(false); };
+  const saveCash = ()=>{ saveCashConfig({...cashConfig(), cash:cashDraft, overheads:ovDraft}); setCashOpen(false); };
 
   // overall posture — factual: benchmark breaches in trading + material risk
   const breaches = nowD.filter(d=>d.sp.bench!=null && d.rag==='bad').length;
@@ -10321,6 +10322,86 @@ function SuppliersDirectory(){
   </div>);
 }
 
+// ── Cash impact of the plan — projects the bank balance forward over the horizon,
+// layering the lumpy PO payments (deposits on order, balances on shipment) on top of
+// projected revenue, overheads & ad spend. Answers "can I afford this plan?" by
+// surfacing the cash trough. Cash basis: revenue in at gross, stock paid via the POs
+// (so COGS isn't double-counted), opex = overheads + ad spend. Excludes tax/one-offs.
+function CashFlowPlan({tranches, plan, months}){
+  usePlanningTick();
+  const cf = cashConfig();
+  const [cashD,setCashD] = useState(cf.cash);
+  const [ovD,setOvD] = useState(cf.overheads);
+  const [adD,setAdD] = useState(cf.adSpend);
+  const commit = ()=>saveCashConfig({...cashConfig(), cash:cashD, overheads:ovD, adSpend:adD});
+  const k = v=>{ const n=Math.abs(Math.round(v)); const s=n>=1000?(n/1000).toFixed(n>=10000?0:1).replace(/\.0$/,'')+'k':''+n; return (v<0?'-£':'£')+s; };
+  const today = oiToday();
+  const startCash = parseFloat(cashD); const cashKnown = isFinite(startCash);
+  const overM = parseFloat(ovD)||0, adM = parseFloat(adD)||0;
+  const monthlyRev = (plan && plan.revenue>0 ? plan.revenue : 0)/Math.max(1,months);   // gross, spread evenly
+  // bucket PO payments into months from today: deposit at order date, balance at shipment
+  const moIdx = iso => Math.max(0, Math.floor(oiDayDiff(today, iso)/30.4));
+  const pays = [];
+  (tranches||[]).forEach(t=>{ const od=(t.isNow||t.late)?today:t.orderISO; if(t.dep>0) pays.push({m:moIdx(od), v:t.dep}); if(t.bal>0) pays.push({m:moIdx(t.shipISO), v:t.bal}); });
+  const lastPayMonth = pays.reduce((mx,p)=>Math.max(mx,p.m),0);
+  const projLen = Math.max(months, lastPayMonth+1, 2);
+  const poByMonth = Array.from({length:projLen},()=>0); pays.forEach(p=>{ poByMonth[Math.min(p.m,projLen-1)] += p.v; });
+  const monName = i => { try{ const y=+today.slice(0,4), m=+today.slice(5,7)-1; return new Date(y, m+i, 1).toLocaleDateString('en-GB',{month:'short'}); }catch(e){ return 'M'+(i+1); } };
+  let bal = cashKnown?startCash:0; const series=[];
+  for(let i=0;i<projLen;i++){ const stock=poByMonth[i]||0; const net=monthlyRev-overM-adM-stock; bal+=net; series.push({i, label:monName(i), rev:monthlyRev, opex:overM+adM, stock, net, bal}); }
+  let trough=series[0]; series.forEach(s=>{ if(s.bal<trough.bal) trough=s; });
+  const totalStock = pays.reduce((t,p)=>t+p.v,0);
+  // chart geometry — SVG line via currentColor (CSS var() doesn't work in SVG attrs)
+  const W=720,H=168,padL=46,padR=14,padT=16,padB=24, innerW=W-padL-padR, innerH=H-padT-padB;
+  const vals = series.map(s=>s.bal).concat([0, cashKnown?startCash:0]);
+  let lo=Math.min(...vals), hi=Math.max(...vals); if(lo===hi){lo-=1;hi+=1;} const padv=(hi-lo)*0.14||1; lo-=padv; hi+=padv;
+  const X = i => padL + (projLen>1? i/(projLen-1):0.5)*innerW;
+  const Y = v => padT + (1-(v-lo)/(hi-lo))*innerH;
+  const linePath = series.map((s,i)=>`${i?'L':'M'}${X(i).toFixed(1)} ${Y(s.bal).toFixed(1)}`).join(' ');
+  const areaPath = linePath+` L${X(projLen-1).toFixed(1)} ${Y(lo).toFixed(1)} L${X(0).toFixed(1)} ${Y(lo).toFixed(1)} Z`;
+  const zeroIn = lo<0 && hi>0;
+  const inp = {padding:'5px 8px',borderRadius:7,border:'1px solid var(--border-default)',background:'var(--bg-base)',color:'var(--text-primary)',fontSize:13,width:110};
+  const lab = {fontSize:10,fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:5};
+  const tone = !cashKnown ? 'var(--text-secondary)' : trough.bal<0 ? 'var(--bad)' : trough.bal < Math.max(overM*1.5, (cashKnown?startCash*0.2:0)) ? 'var(--warn)' : 'var(--good)';
+  const verdict = !cashKnown
+    ? <>Add your <b>cash on hand</b> for a real balance. From today, committing this plan swings cash to a low of <b>{k(trough.bal)}</b> around <b>{trough.label}</b>.</>
+    : trough.bal<0 ? <>This plan takes cash <b style={{color:'var(--bad)'}}>negative — down to {k(trough.bal)}</b> in <b>{trough.label}</b>. Stagger the orders (Staged / front-load less), renegotiate deposit terms, or raise funding before committing.</>
+    : trough.bal < Math.max(overM*1.5, startCash*0.2) ? <>Cash dips to a <b style={{color:'var(--warn)'}}>tight {k(trough.bal)}</b> in <b>{trough.label}</b> — under ~{(trough.bal/Math.max(1,overM)).toFixed(1)} months of overheads. Workable, but little headroom.</>
+    : <>Cash stays healthy — the low point is <b style={{color:'var(--good)'}}>{k(trough.bal)}</b> in <b>{trough.label}</b>. This plan is affordable.</>;
+  return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid '+tone}}>
+    <div style={{display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap',marginBottom:6}}>
+      <div style={{fontSize:14,fontWeight:800,color:'var(--text-primary)'}}>Cash impact of this plan</div>
+      <span className="muted" style={{fontSize:11.5}}>projected balance over {projLen} months · stock payments on their due dates</span>
+    </div>
+    <div style={{fontSize:13,color:'var(--text-secondary)',marginBottom:12,lineHeight:1.5}}>{verdict}</div>
+    {/* assumptions */}
+    <div style={{display:'flex',gap:16,flexWrap:'wrap',marginBottom:14}}>
+      <label style={{display:'flex',flexDirection:'column',gap:4}}><span style={lab}>Cash on hand (£)</span><input type="number" value={cashD} onChange={e=>setCashD(e.target.value)} onBlur={commit} placeholder="e.g. 80000" style={inp}/></label>
+      <label style={{display:'flex',flexDirection:'column',gap:4}}><span style={lab}>Monthly overheads (£)</span><input type="number" value={ovD} onChange={e=>setOvD(e.target.value)} onBlur={commit} placeholder="e.g. 12000" style={inp}/></label>
+      <label style={{display:'flex',flexDirection:'column',gap:4}}><span style={lab}>Monthly ad spend (£)</span><input type="number" value={adD} onChange={e=>setAdD(e.target.value)} onBlur={commit} placeholder="e.g. 15000" style={inp}/></label>
+      <div style={{display:'flex',flexDirection:'column',gap:4}}><span style={lab}>Revenue in / mo</span><span style={{fontSize:15,fontWeight:700,color:'var(--good)'}}>{monthlyRev>0?k(monthlyRev):'—'}</span></div>
+      <div style={{display:'flex',flexDirection:'column',gap:4}}><span style={lab}>Stock to pay (total)</span><span style={{fontSize:15,fontWeight:700,color:'var(--text-primary)'}}>{totalStock>0?k(totalStock):'—'}</span></div>
+    </div>
+    {/* chart */}
+    <div style={{color:tone, width:'100%'}}>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{display:'block',overflow:'visible'}} preserveAspectRatio="xMidYMid meet">
+        {zeroIn && <line x1={padL} y1={Y(0)} x2={W-padR} y2={Y(0)} stroke="var(--bad)" strokeDasharray="4 4" strokeWidth="1" opacity="0.5"/>}
+        {zeroIn && <text x={padL-6} y={Y(0)+3} textAnchor="end" fontSize="9.5" fill="var(--text-faint)">£0</text>}
+        <text x={padL-6} y={Y(hi-padv*0.5)+3} textAnchor="end" fontSize="9.5" fill="var(--text-faint)">{k(hi-padv*0.5)}</text>
+        <path d={areaPath} fill="currentColor" opacity="0.08"/>
+        <path d={linePath} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round"/>
+        {series.map((s,i)=>(<g key={i}>
+          <circle cx={X(i)} cy={Y(s.bal)} r={i===trough.i?5:3.5} fill={s.bal<0?'var(--bad)':'currentColor'} stroke="var(--bg-surface)" strokeWidth="1.5"/>
+          {s.stock>0 && <text x={X(i)} y={Y(s.bal)-9} textAnchor="middle" fontSize="9" fill="var(--text-faint)">−{k(s.stock).replace('£','£')}</text>}
+          <text x={X(i)} y={H-8} textAnchor="middle" fontSize="9.5" fill={i===trough.i?tone:'var(--text-faint)'} fontWeight={i===trough.i?700:400}>{s.label}</text>
+        </g>))}
+        <text x={X(trough.i)} y={Y(trough.bal)+ (trough.bal< (lo+hi)/2 ? 18 : -12)} textAnchor="middle" fontSize="10" fontWeight="700" fill={tone}>{k(trough.bal)}</text>
+      </svg>
+    </div>
+    <div style={{fontSize:11,color:'var(--text-faint)',marginTop:10,lineHeight:1.5}}>Revenue in from your demand plan ({plan&&plan.revenue>0?k(plan.revenue):'—'} over {months}mo, spread evenly, gross); stock paid via the landing plan (deposit on order, balance on shipment); opex = overheads + ad spend. Cash basis — COGS is the stock payments, not double-counted. Excludes tax, refunds &amp; one-offs. {!cashKnown && <span style={{color:'var(--warn)'}}>Set cash on hand above for an absolute balance.</span>}</div>
+  </div>);
+}
+
 // ── Planning — forecast + purchase orders on ONE tab ─────────────────────────
 // Renders the shared header (chips scroll to sections) then the demand planner and
 // the PO planner embedded back-to-back. Changing the forecast above live-updates
@@ -10513,6 +10594,9 @@ function PlanningView(){
           : rc.strategy==='bulk' ? <>One order now covers the whole plan. Balance (if any) falls due when the supplier ships, ~{leadMakeRep}d after order.</>
           : <>JIT reorders roll as stock depletes — this is the order due now; the next triggers when cover next falls within lead + safety.</>}</div>
       </div>); })()}
+
+    {/* Cash impact — forward balance projection from the plan's commitments */}
+    {tranches.length>0 && <CashFlowPlan tranches={tranches} plan={R.plan} months={months}/>}
 
     {/* ① Forecast & demand — collapsed by default (config + detail), opened on demand */}
     <button onClick={()=>setShowForecast(s=>!s)} style={{display:'flex',alignItems:'center',gap:10,width:'100%',background:'transparent',border:'1px solid var(--border-subtle)',borderRadius:10,padding:'11px 14px',cursor:'pointer',textAlign:'left',marginBottom:showForecast?12:14}}>
