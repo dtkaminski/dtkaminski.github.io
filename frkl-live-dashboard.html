@@ -19,25 +19,25 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606120747"></script>
-<script src="./frkl-live-data.js?v=202606120747"></script>
-<script src="./frkl-agent-insights.js?v=202606120747"></script>
-<script src="./frkl-business-data.js?v=202606120747"></script>
-<script src="./frkl-action-status.js?v=202606120747"></script>
-<script src="./frkl-patterns.js?v=202606120747"></script>
-<script src="./frkl-creators.js?v=202606120747"></script>
-<script src="./frkl-creative-vision.js?v=202606120747"></script>
-<script src="./frkl-links.js?v=202606120747"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606120747"></script>
-<script src="./frkl-events.js?v=202606120747"></script>
-<script src="./frkl-products.js?v=202606120747"></script>
-<script src="./frkl-discount-codes.js?v=202606120747"></script>
-<script src="./frkl-cvr.js?v=202606120747"></script>
-<script src="./frkl-cohorts.js?v=202606120747"></script>
-<script src="./frkl-retention.js?v=202606120747"></script>
-<script src="./frkl-clarity.js?v=202606120747"></script>
-<script src="./frkl-board-read.js?v=202606120747"></script>
-<script src="./frkl-benchmarks.js?v=202606120747"></script>
+<script src="./frkl-data-loader.js?v=202606111900"></script>
+<script src="./frkl-live-data.js?v=202606111900"></script>
+<script src="./frkl-agent-insights.js?v=202606111900"></script>
+<script src="./frkl-business-data.js?v=202606111900"></script>
+<script src="./frkl-action-status.js?v=202606111900"></script>
+<script src="./frkl-patterns.js?v=202606111900"></script>
+<script src="./frkl-creators.js?v=202606111900"></script>
+<script src="./frkl-creative-vision.js?v=202606111900"></script>
+<script src="./frkl-links.js?v=202606111900"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606111900"></script>
+<script src="./frkl-events.js?v=202606111900"></script>
+<script src="./frkl-products.js?v=202606111900"></script>
+<script src="./frkl-discount-codes.js?v=202606111900"></script>
+<script src="./frkl-cvr.js?v=202606111900"></script>
+<script src="./frkl-cohorts.js?v=202606111900"></script>
+<script src="./frkl-retention.js?v=202606111900"></script>
+<script src="./frkl-clarity.js?v=202606111900"></script>
+<script src="./frkl-board-read.js?v=202606111900"></script>
+<script src="./frkl-benchmarks.js?v=202606111900"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -1999,7 +1999,7 @@ function ActionBoard(){
   const phitMap = (window.FRKL_PATTERNS && window.FRKL_PATTERNS.action_phit) || {};
   const moneyMap = (window.FRKL_PATTERNS && window.FRKL_PATTERNS.action_money) || {};
   // Only show a "needs you" flag when it's genuinely on the operator; hide internal states.
-  const friendly = s => s==='needs-input' ? {t:'Needs your input', c:'input'} : s==='needs-chrome' ? {t:'Needs a check', c:'chrome'} : null;
+  const friendly = s => s==='needs-input' ? {t:'Needs your input', c:'input'} : s==='needs-chrome' ? {t:'Needs a site check', c:'chrome'} : null;
 
   // ── LIVE actions straight from the diagnostic engine (Crux) — coherent with the
   // diagnostic by construction. The specialist FRKL_INSIGHTS below are a static
@@ -2040,7 +2040,7 @@ function ActionBoard(){
       </div>
       <div className="sp-status">
         {showPhit && <PHitBadge phit={phit} />}
-        {fs ? <span className={'stat '+fs.c}>{fs.t}</span>
+        {fs ? <span className={'stat '+fs.c} title={fs.c==='chrome'?'Needs a manual check on the live site / Shopify — the data can flag it, but someone has to eyeball it to confirm.':'Waiting on a number or decision from you before it can proceed.'} style={{cursor:'help'}}>{fs.t}</span>
             : isDone ? <span className="stat done">Done</span>
             : <span style={{fontSize:11,color:'var(--text-faint)'}}>On track</span>}
       </div>
@@ -2151,6 +2151,7 @@ function ActionBoard(){
       <span style={{fontSize:11,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-faint)'}}>Specialist agent review</span>
       <span style={{fontSize:11,color:stale?'var(--warn)':'var(--text-muted)'}}>· {run?`from ${run}${age!=null?` · ${age}d old`:''}`:'static'}{stale?' — needs an agent re-run; re-validate against the live read above':' — re-validate against the live read above'}</span>
     </div>); })()}
+    <div style={{fontSize:11,color:'var(--text-faint)',lineHeight:1.5,margin:'4px 0 2px'}}>The <b style={{color:'#4ade80'}}>%</b> next to a status is the <b>hit-rate</b> — how often this <i>type</i> of action has actually moved the metric before (<span style={{color:'#4ade80'}}>green &gt;60%</span> · <span style={{color:'#fbbf24'}}>amber 30–60%</span> · <span style={{color:'#f87171'}}>red &lt;30%</span>; a “?” = small sample). Hover it for the track record.</div>
     <div style={{display:'flex', flexDirection:'column', gap:4}}>
       {groupList.map(({g, items, sum})=>(
         <div key={g}>
