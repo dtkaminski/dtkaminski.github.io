@@ -19,25 +19,25 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606121300"></script>
-<script src="./frkl-live-data.js?v=202606121300"></script>
-<script src="./frkl-agent-insights.js?v=202606121300"></script>
-<script src="./frkl-business-data.js?v=202606121300"></script>
-<script src="./frkl-action-status.js?v=202606121300"></script>
-<script src="./frkl-patterns.js?v=202606121300"></script>
-<script src="./frkl-creators.js?v=202606121300"></script>
-<script src="./frkl-creative-vision.js?v=202606121300"></script>
-<script src="./frkl-links.js?v=202606121300"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606121300"></script>
-<script src="./frkl-events.js?v=202606121300"></script>
-<script src="./frkl-products.js?v=202606121300"></script>
-<script src="./frkl-discount-codes.js?v=202606121300"></script>
-<script src="./frkl-cvr.js?v=202606121300"></script>
-<script src="./frkl-cohorts.js?v=202606121300"></script>
-<script src="./frkl-retention.js?v=202606121300"></script>
-<script src="./frkl-clarity.js?v=202606121300"></script>
-<script src="./frkl-board-read.js?v=202606121300"></script>
-<script src="./frkl-benchmarks.js?v=202606121300"></script>
+<script src="./frkl-data-loader.js?v=202606121400"></script>
+<script src="./frkl-live-data.js?v=202606121400"></script>
+<script src="./frkl-agent-insights.js?v=202606121400"></script>
+<script src="./frkl-business-data.js?v=202606121400"></script>
+<script src="./frkl-action-status.js?v=202606121400"></script>
+<script src="./frkl-patterns.js?v=202606121400"></script>
+<script src="./frkl-creators.js?v=202606121400"></script>
+<script src="./frkl-creative-vision.js?v=202606121400"></script>
+<script src="./frkl-links.js?v=202606121400"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606121400"></script>
+<script src="./frkl-events.js?v=202606121400"></script>
+<script src="./frkl-products.js?v=202606121400"></script>
+<script src="./frkl-discount-codes.js?v=202606121400"></script>
+<script src="./frkl-cvr.js?v=202606121400"></script>
+<script src="./frkl-cohorts.js?v=202606121400"></script>
+<script src="./frkl-retention.js?v=202606121400"></script>
+<script src="./frkl-clarity.js?v=202606121400"></script>
+<script src="./frkl-board-read.js?v=202606121400"></script>
+<script src="./frkl-benchmarks.js?v=202606121400"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -1170,6 +1170,20 @@ const REORDER_DEFAULTS = {safetyDays:14, coverDays:45, strategy:'jit', waves:3, 
 const STRAT_SHORT = {jit:'JIT', bulk:'Bulk', staged:'Staged'};
 function reorderConfig(){ try { const s=JSON.parse(localStorage.getItem('oi_reorder_v1')||'null'); if(s) return {...REORDER_DEFAULTS, ...s}; } catch(e){} return {...REORDER_DEFAULTS}; }
 function saveReorderConfig(next){ try { localStorage.setItem('oi_reorder_v1', JSON.stringify(next)); window.dispatchEvent(new Event('oi-supplier-updated')); } catch(e){} }
+// Per-wave demand split for Staged ordering. rc.waveSplit holds relative weights;
+// blank or a length that no longer matches the wave count → an even split. Returns a
+// normalized array (length = waves, sums to 1) so Wave 1 can be front-loaded for peak.
+function waveWeights(rc, waves){ waves=Math.max(1,Math.round(waves||1));
+  let raw = Array.isArray(rc&&rc.waveSplit) ? rc.waveSplit.map(Number).filter(x=>isFinite(x)&&x>0) : [];
+  if(raw.length!==waves) raw = Array.from({length:waves}, ()=>1);
+  const sum = raw.reduce((t,x)=>t+x,0)||waves; return raw.map(x=>x/sum); }
+function wavePreset(kind, waves){ waves=Math.max(1,Math.round(waves||1));
+  const arr=Array.from({length:waves},(_,i)=> kind==='front'?(waves-i):kind==='back'?(i+1):1);
+  const sum=arr.reduce((t,x)=>t+x,0)||waves; return arr.map(x=>x/sum); }
+function wavePresetName(weights){ const n=weights.length; if(n<2) return 'even';
+  if(weights.every(w=>Math.abs(w-1/n)<0.02)) return 'even';
+  const m=(a,b)=>a.every((x,i)=>Math.abs(x-b[i])<0.02);
+  if(m(weights,wavePreset('front',n))) return 'front'; if(m(weights,wavePreset('back',n))) return 'back'; return 'custom'; }
 function usePlanningTick(){ const [,f]=React.useState(0); React.useEffect(()=>{ const h=()=>f(x=>x+1); ['oi-supplier-updated','oi-leadtimes-updated','oi-costs-updated','oi-forecast-updated','oi-po-updated'].forEach(ev=>window.addEventListener(ev,h)); return ()=>['oi-supplier-updated','oi-leadtimes-updated','oi-costs-updated','oi-forecast-updated','oi-po-updated'].forEach(ev=>window.removeEventListener(ev,h)); }, []); return 0; }
 
 // ── Demand-plan + packaging BOM (for the Forecast & demand planner) ───────────
@@ -1245,6 +1259,7 @@ function demandScaleFactor(){
 // materially, the PO auto-closes (the acknowledgement). Key = SKU (or 'pkg:Name').
 function oiToday(){ try{ return new Date().toISOString().slice(0,10); }catch(e){ return ''; } }
 function oiAddDays(iso, n){ try{ const d=new Date((iso||oiToday())+'T00:00:00'); d.setDate(d.getDate()+(Number(n)||0)); return d.toISOString().slice(0,10); }catch(e){ return ''; } }
+function oiDayDiff(aIso, bIso){ try{ const a=new Date((aIso||oiToday())+'T00:00:00'), b=new Date((bIso||oiToday())+'T00:00:00'); return Math.round((b-a)/86400000); }catch(e){ return 0; } }
 function poStatusAll(){ try{ const s=JSON.parse(localStorage.getItem('oi_po_status_v1')||'{}'); return (s&&typeof s==='object')?s:{}; }catch(e){ return {}; } }
 function savePoStatusAll(all){ try{ localStorage.setItem('oi_po_status_v1', JSON.stringify(all)); window.dispatchEvent(new Event('oi-po-updated')); }catch(e){} }
 function setPoStatus(key, patch){ const all=poStatusAll(); if(patch==null) delete all[key]; else all[key]={...(all[key]||{}), ...patch}; savePoStatusAll(all); }
@@ -1263,7 +1278,7 @@ function _reorderSizing(strategy, vel, stock, lead, o){
     const target = forecastUnits + Math.ceil(vel*o.safety);
     qty = Math.max(0, target - stock); needs = qty>0; basis='forecast';
   } else if(strategy==='staged'){
-    const waveDays = o.horizonDays/o.waves; waveUnits = Math.ceil(vel*waveDays);
+    const waveDays = o.horizonDays*(o.waveFrac!=null?o.waveFrac:1/o.waves); waveUnits = Math.ceil(vel*waveDays);  // first wave's slice (front-loadable)
     qty = Math.max(0, Math.ceil(vel*(lead+waveDays)) - stock); needs = cover <= lead+o.safety; basis='wave';
     nextWaveBy = oiAddDays(o.today, Math.max(0, Math.round(cover - lead - o.safety)));
   } else {
@@ -1281,7 +1296,8 @@ function planReorder(over){
   const dcfg = demandConfig();                 // product-focus / promotion weights
   const horizonDays = (plan.months||3)*30.4;
   const po = poStatusAll(); const today = oiToday();
-  const opt = {safety, coverDays, horizonDays, waves, today};
+  const _ww = waveWeights(rc, waves);                          // per-wave demand split (front-loadable)
+  const opt = {safety, coverDays, horizonDays, waves, today, waveFrac:_ww[0]};
   const skuSup = skuSupplierAll(); const del = delistAll(); const dir = suppliersAll();
   const productLines = inv.filter(p=>(p.dailyVelocity||0)>0 && !del[p.sku||p.title]).map(p=>{
     const sup = skuSup[p.sku||p.title] || {};                                   // SKU-level supplier master
@@ -10295,6 +10311,7 @@ function SuppliersDirectory(){
 function PlanningView(){
   usePlanningTick();
   const [showForecast, setShowForecast] = useState(false);
+  const [planView, setPlanView] = useState('timeline');   // landing plan: timeline | table
   React.useEffect(()=>{ window.__oiOpenForecast = ()=>{ setShowForecast(true); setTimeout(()=>{ const el=document.getElementById('plan-forecast'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }, 60); }; return ()=>{ try{ delete window.__oiOpenForecast; }catch(e){} }; }, []);
   const R = planReorder(); const dc = demandConfig(); const rc = reorderConfig();
   const k = v=>{ v=Math.abs(Math.round(v)); return v>=1000?(v/1000).toFixed(v>=10000?0:1).replace(/\.0$/,'')+'k':''+v; };
@@ -10331,19 +10348,25 @@ function PlanningView(){
   let bind=null; R.toOrder.forEach(l=>{ if(!bind || (l.lead||0)>(bind.lead||0)) bind=l; });
   const leadTotalRep = bind ? (bind.lead||0) : 0;
   const leadMakeRep = bind ? (bind.leadMake!=null?bind.leadMake:bind.lead||0) : 0;
-  const waveDays = (R.horizonDays||91)/wavesN;
-  // steady per-wave demand value (one wave-slice of horizon demand, all lines)
-  const waveVal = R.lines.reduce((t,l)=> t + ((l.unitCost!=null)? l.unitCost*Math.ceil((l.vel||0)*waveDays):0), 0);
+  const horizonDays = R.horizonDays||91;
+  const weights = waveWeights(rc, wavesN);                       // per-wave demand split (front/back-loadable)
+  const splitName = wavePresetName(weights);
+  // full-horizon demand value across all lines → each wave is its weighted slice
+  const horizonVal = R.lines.reduce((t,l)=> t + ((l.unitCost!=null)? l.unitCost*Math.ceil((l.vel||0)*horizonDays):0), 0);
   const mkTranche = (n,name,orderISO,isNow,val,coverTxt)=>{ const late=!isNow && orderISO<=today; const base=(isNow||late)?today:orderISO; const dep=val*depPctBlend; const shipISO=oiAddDays(base, leadMakeRep); const landISO=oiAddDays(base, leadTotalRep); return {n,name,orderISO,isNow,late,val,dep,bal:Math.max(0,val-dep),shipISO,landISO,coverTxt}; };
   let tranches=[];
   if(R.toOrder.length){
     if(rc.strategy==='bulk'){
       tranches=[ mkTranche(1,'Full order',today,true,orderTotal,`full ${months}-mo plan`) ];
     } else if(rc.strategy==='staged'){
+      let cum=0;                                                 // fraction of horizon covered before this wave
       for(let kk=1; kk<=wavesN; kk++){
-        const needBy = oiAddDays(today, Math.round((kk-1)*waveDays));   // when this wave's stock must be in
-        const orderISO = kk===1 ? today : oiAddDays(today, Math.round((kk-1)*waveDays - leadTotalRep));  // lead-adjusted order-by
-        tranches.push( mkTranche(kk, `Wave ${kk}`, orderISO, kk===1, kk===1?orderTotal:waveVal, `covers from ~${fmtD(needBy)}`) );
+        const needDays = Math.round(cum*horizonDays);            // when this wave's stock must be in
+        const needBy = oiAddDays(today, needDays);
+        const orderISO = kk===1 ? today : oiAddDays(today, needDays - leadTotalRep);   // lead-adjusted order-by
+        const val = kk===1 ? orderTotal : Math.round(horizonVal*weights[kk-1]);
+        tranches.push( mkTranche(kk, `Wave ${kk}`, orderISO, kk===1, val, `covers from ~${fmtD(needBy)} · ${Math.round(weights[kk-1]*100)}% of demand`) );
+        cum += weights[kk-1];
       }
     } else {
       tranches=[ mkTranche(1,'Reorder now',today,true,orderTotal,'rolling — reorder as stock depletes') ];
@@ -10401,22 +10424,60 @@ function PlanningView(){
     {tranches.length>0 && (()=>{
       const tdL = {padding:'8px 12px 8px 0',fontSize:12.5,color:'var(--text-secondary)',borderTop:'1px solid var(--border-subtle)',whiteSpace:'nowrap'};
       const thL = {textAlign:'left',fontSize:10,fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-faint)',padding:'0 12px 7px 0',whiteSpace:'nowrap'};
+      // timeline geometry — position order/ship/land along a today→last-landing axis
+      const spanDays = Math.max(7, Math.max(...tranches.map(t=>oiDayDiff(today,t.landISO)))+4);
+      const pctOf = iso => Math.max(0, Math.min(100, oiDayDiff(today,iso)/spanDays*100));
+      const ticks=[]; for(let i=0;i*30<=spanDays+2 && i<10;i++){ const d=oiAddDays(today,i*30); ticks.push({x:Math.min(100,(i*30)/spanDays*100), label:i===0?'now':(()=>{ try{ return new Date(d+'T00:00:00').toLocaleDateString('en-GB',{month:'short'}); }catch(e){ return ''; } })()}); }
+      const dot=(x,color,size,filled,title)=>(<div title={title} style={{position:'absolute',left:x+'%',top:'50%',transform:'translate(-50%,-50%)',width:size,height:size,borderRadius:'50%',background:filled?color:'var(--bg-base)',border:'2px solid '+color,zIndex:2}}/>);
+      const toggle = (v,lbl)=>{ const on=planView===v; return <button key={v} onClick={()=>setPlanView(v)} style={{fontSize:11,fontWeight:700,padding:'4px 11px',borderRadius:6,cursor:'pointer',border:'none',background:on?'var(--accent)':'transparent',color:on?'#fff':'var(--text-muted)'}}>{lbl}</button>; };
       return (<div className="card" style={{marginBottom:14}}>
-        <div style={{display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap',marginBottom:4}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:4}}>
           <div style={{fontSize:14,fontWeight:800,color:'var(--text-primary)'}}>Stock landing plan</div>
-          <span className="muted" style={{fontSize:11.5}}>{STRAT[rc.strategy]} · when to order, pay &amp; expect stock — lead {leadTotalRep}d ({leadMakeRep}d make + {leadTotalRep-leadMakeRep}d transit)</span>
+          <span className="muted" style={{fontSize:11.5}}>{STRAT[rc.strategy]} · lead {leadTotalRep}d ({leadMakeRep}d make + {leadTotalRep-leadMakeRep}d transit)</span>
+          <div style={{marginLeft:'auto',display:'flex',gap:3,background:'var(--bg-elevated)',borderRadius:8,padding:3}}>{toggle('timeline','Timeline')}{toggle('table','Table')}</div>
         </div>
         <div style={{fontSize:12.5,color:'var(--text-muted)',marginBottom:10,lineHeight:1.5}}>
           {hasDeposit
             ? <>To start, pay a <b style={{color:'var(--text-primary)'}}>£{k(depNow)} deposit now</b>, with <b style={{color:'var(--text-primary)'}}>£{k(balLater)} balance on shipment</b> — <b>£{k(orderTotal)}</b> committed in total.</>
             : <><b style={{color:'var(--text-primary)'}}>£{k(orderTotal)}</b> to commit now. Add a deposit % per supplier (Suppliers tab) to split this into deposit-now vs balance-on-shipment.</>}
-          {rc.strategy==='staged' && <> Each wave below must be <b>ordered</b> early enough to <b>land</b> before the previous runs out.</>}
+          {rc.strategy==='staged' && <> Each wave must be <b>ordered</b> early enough to <b>land</b> before the previous runs out.</>}
         </div>
-        {lateWaves>0 && <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,padding:'7px 11px',borderRadius:8,background:'rgba(248,113,113,.10)',border:'1px solid var(--bad)'}}>
-          <Icon name="alert" size={13} style={{color:'var(--bad)'}}/>
-          <span style={{fontSize:12,color:'var(--text-secondary)'}}>{lateWaves} wave{lateWaves===1?'':'s'} should already be on order — the {leadTotalRep}d lead is longer than the gap between waves. Order {lateWaves===1?'it':'them'} now, or widen the wave count / shorten lead.</span>
+        {rc.strategy==='staged' && wavesN>1 && <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:12}}>
+          <span style={{fontSize:11,color:'var(--text-faint)',fontWeight:700,letterSpacing:'.03em',textTransform:'uppercase'}}>Wave split</span>
+          {[['even','Even'],['front','Front-load'],['back','Back-load']].map(([kind,lbl])=>{ const on=splitName===kind;
+            return <button key={kind} onClick={()=>saveReorderConfig({...rc, waveSplit: wavePreset(kind, wavesN)})} title={kind==='front'?'Bigger first wave — buy into peak early':kind==='back'?'Smaller first wave, ramp later':'Equal waves'} style={{fontSize:11,fontWeight:700,padding:'4px 11px',borderRadius:7,cursor:'pointer',border:'1.5px solid '+(on?'var(--accent)':'var(--border-default)'),background:on?'var(--accent)':'transparent',color:on?'#fff':'var(--text-secondary)'}}>{lbl}</button>; })}
+          <span style={{fontSize:11,color:'var(--text-faint)'}}>{weights.map(w=>Math.round(w*100)+'%').join(' / ')}{splitName==='custom'?' · custom':''}</span>
         </div>}
-        <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:640}}><thead><tr>
+        {lateWaves>0 && <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12,padding:'7px 11px',borderRadius:8,background:'rgba(248,113,113,.10)',border:'1px solid var(--bad)'}}>
+          <Icon name="alert" size={13} style={{color:'var(--bad)'}}/>
+          <span style={{fontSize:12,color:'var(--text-secondary)'}}>{lateWaves} wave{lateWaves===1?'':'s'} should already be on order — the {leadTotalRep}d lead is longer than the gap between waves. Order {lateWaves===1?'it':'them'} now, front-load Wave 1, or widen the wave count.</span>
+        </div>}
+
+        {planView==='timeline' ? (<div>
+          {/* axis */}
+          <div style={{display:'flex',alignItems:'flex-end',gap:10,marginBottom:4}}>
+            <div style={{width:132,flexShrink:0}}/>
+            <div style={{position:'relative',flex:1,height:13}}>{ticks.map((tk,i)=><span key={i} style={{position:'absolute',left:tk.x+'%',transform:'translateX(-50%)',fontSize:9.5,color:'var(--text-faint)',whiteSpace:'nowrap'}}>{tk.label}</span>)}</div>
+          </div>
+          {tranches.map(t=>{ const ox=pctOf((t.isNow||t.late)?today:t.orderISO), sx=pctOf(t.shipISO), lx=pctOf(t.landISO); return (
+            <div key={t.n} style={{display:'flex',alignItems:'center',gap:10,marginBottom:7}}>
+              <div style={{width:132,flexShrink:0}}>
+                <div style={{fontSize:12,fontWeight:700,color:'var(--text-primary)'}}>{t.name} {t.late&&<span style={{fontSize:9.5,fontWeight:800,color:'#fff',background:'var(--bad)',padding:'1px 5px',borderRadius:999}}>LATE</span>}</div>
+                <div style={{fontSize:10.5,color:'var(--text-faint)'}}>{hasDeposit?`£${k(t.dep)} now · £${k(t.bal)} on ship`:`£${k(t.val)}`}</div>
+              </div>
+              <div style={{position:'relative',flex:1,height:28,borderRadius:7,background:'var(--bg-elevated)'}}>
+                <div style={{position:'absolute',left:ox+'%',width:Math.max(0,lx-ox)+'%',top:'50%',height:3,transform:'translateY(-50%)',background:t.late?'var(--bad)':'var(--accent)',opacity:.45,borderRadius:2}}/>
+                {dot(ox, t.late?'var(--bad)':'var(--text-muted)',12,false,'Order '+(t.isNow?'now':t.late?'now (was due '+fmtD(t.orderISO)+')':fmtD(t.orderISO)))}
+                {dot(sx,'var(--warn)',10,true,'Ships '+fmtD(t.shipISO)+(hasDeposit?' · balance £'+k(t.bal)+' due':''))}
+                {dot(lx,'var(--good)',15,true,'Lands '+fmtD(t.landISO))}
+              </div>
+            </div>); })}
+          <div style={{display:'flex',gap:16,flexWrap:'wrap',marginTop:8,paddingLeft:142}}>
+            <span style={{fontSize:10.5,color:'var(--text-faint)',display:'inline-flex',alignItems:'center',gap:5}}><span style={{width:10,height:10,borderRadius:'50%',border:'2px solid var(--text-muted)',display:'inline-block'}}/>Order</span>
+            <span style={{fontSize:10.5,color:'var(--text-faint)',display:'inline-flex',alignItems:'center',gap:5}}><span style={{width:10,height:10,borderRadius:'50%',background:'var(--warn)',display:'inline-block'}}/>Ships{hasDeposit?' (balance due)':''}</span>
+            <span style={{fontSize:10.5,color:'var(--text-faint)',display:'inline-flex',alignItems:'center',gap:5}}><span style={{width:12,height:12,borderRadius:'50%',background:'var(--good)',display:'inline-block'}}/>Lands</span>
+          </div>
+        </div>) : (<div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:640}}><thead><tr>
           <th style={thL}>Tranche</th><th style={thL}>Order by</th><th style={{...thL,textAlign:'right'}}>{hasDeposit?'Deposit now':'Pay'}</th>{hasDeposit&&<th style={{...thL,textAlign:'right'}}>Balance on ship</th>}<th style={thL}>Ships ~</th><th style={thL}>Lands ~</th><th style={thL}>Covers</th>
         </tr></thead><tbody>
           {tranches.map(t=>(<tr key={t.n}>
@@ -10428,8 +10489,8 @@ function PlanningView(){
             <td style={tdL}>{fmtD(t.landISO)}</td>
             <td style={{...tdL,color:'var(--text-faint)',whiteSpace:'normal'}}>{t.coverTxt}</td>
           </tr>))}
-        </tbody></table></div>
-        <div style={{fontSize:11,color:'var(--text-faint)',marginTop:9,lineHeight:1.5}}>{rc.strategy==='staged'
+        </tbody></table></div>)}
+        <div style={{fontSize:11,color:'var(--text-faint)',marginTop:10,lineHeight:1.5}}>{rc.strategy==='staged'
           ? <>Wave 1 is the order below — re-run the plan on each order-by date to size the next wave on the latest stock. Dates use the slowest item's lead so nothing stocks out.</>
           : rc.strategy==='bulk' ? <>One order now covers the whole plan. Balance (if any) falls due when the supplier ships, ~{leadMakeRep}d after order.</>
           : <>JIT reorders roll as stock depletes — this is the order due now; the next triggers when cover next falls within lead + safety.</>}</div>
