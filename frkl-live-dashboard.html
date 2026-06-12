@@ -19,25 +19,25 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606120800"></script>
-<script src="./frkl-live-data.js?v=202606120800"></script>
-<script src="./frkl-agent-insights.js?v=202606120800"></script>
-<script src="./frkl-business-data.js?v=202606120800"></script>
-<script src="./frkl-action-status.js?v=202606120800"></script>
-<script src="./frkl-patterns.js?v=202606120800"></script>
-<script src="./frkl-creators.js?v=202606120800"></script>
-<script src="./frkl-creative-vision.js?v=202606120800"></script>
-<script src="./frkl-links.js?v=202606120800"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606120800"></script>
-<script src="./frkl-events.js?v=202606120800"></script>
-<script src="./frkl-products.js?v=202606120800"></script>
-<script src="./frkl-discount-codes.js?v=202606120800"></script>
-<script src="./frkl-cvr.js?v=202606120800"></script>
-<script src="./frkl-cohorts.js?v=202606120800"></script>
-<script src="./frkl-retention.js?v=202606120800"></script>
-<script src="./frkl-clarity.js?v=202606120800"></script>
-<script src="./frkl-board-read.js?v=202606120800"></script>
-<script src="./frkl-benchmarks.js?v=202606120800"></script>
+<script src="./frkl-data-loader.js?v=202606120900"></script>
+<script src="./frkl-live-data.js?v=202606120900"></script>
+<script src="./frkl-agent-insights.js?v=202606120900"></script>
+<script src="./frkl-business-data.js?v=202606120900"></script>
+<script src="./frkl-action-status.js?v=202606120900"></script>
+<script src="./frkl-patterns.js?v=202606120900"></script>
+<script src="./frkl-creators.js?v=202606120900"></script>
+<script src="./frkl-creative-vision.js?v=202606120900"></script>
+<script src="./frkl-links.js?v=202606120900"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606120900"></script>
+<script src="./frkl-events.js?v=202606120900"></script>
+<script src="./frkl-products.js?v=202606120900"></script>
+<script src="./frkl-discount-codes.js?v=202606120900"></script>
+<script src="./frkl-cvr.js?v=202606120900"></script>
+<script src="./frkl-cohorts.js?v=202606120900"></script>
+<script src="./frkl-retention.js?v=202606120900"></script>
+<script src="./frkl-clarity.js?v=202606120900"></script>
+<script src="./frkl-board-read.js?v=202606120900"></script>
+<script src="./frkl-benchmarks.js?v=202606120900"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -8225,7 +8225,7 @@ const BOARD_METRICS = [
 // funnel detail that explains the headline KPIs above.
 const _xRoas = v => v==null ? '—' : v.toFixed(1)+'×';
 const BOARD_METRICS2 = [
-  {key:'returnRate',   label:'Return rate',     fmt:PCT, better:'down', bench:0.08, benchTip:'Refunds ÷ gross sales · watch > 8%'},
+  {key:'returnRate',   label:'Return rate',     fmt:PCT, better:'down', bench:0.08, benchTip:'Watch > 8%', note:'90-day blended return rate (returns ÷ units). Returns post asynchronously so can\'t be reliably dated to a single week — shown as a stable blend rather than a misleading weekly 0%.'},
   {key:'metaRoas',     label:'Meta ROAS',       fmt:_xRoas, better:'up', bench:2, note:'Meta-claimed purchase value ÷ Meta spend. Platform-claimed (overlaps other channels), not incremental.'},
   {key:'googleRoas',   label:'Google ROAS',     fmt:_xRoas, better:'up', bench:2, note:'Google-claimed conversion value ÷ Google spend. Platform-claimed, not incremental.'},
   {key:'atcRate',      label:'Add-to-cart rate',fmt:PCT, better:'up', note:'GA4 add-to-carts ÷ sessions — top-of-funnel intent.'},
@@ -8339,6 +8339,15 @@ function boardWeeks(){
   const addDays = (s,n) => { const d=new Date(s+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()+n); return iso(d); };
   const buckets = {};
   days.forEach(m=>{ const ws=mondayOf(m.date); (buckets[ws]=buckets[ws]||[]).push(m); });
+  // Returns aren't dated in the daily feed (they post async at the order level), so
+  // weekly returns ≈ 0. Fall back to the reliable 90-day blended product return rate.
+  const _B=(typeof window!=='undefined'&&window.FRKL_BUSINESS)||{}; const _prod=_B.products||[];
+  const _u=_prod.reduce((a,p)=>a+(p.units||0),0), _r=_prod.reduce((a,p)=>a+(p.returns||0),0);
+  const blendedReturnRate = _u>0 ? _r/_u : null;
+  // Blended email open/click rate over the whole window — the honest fallback when a
+  // single week's opens exceed its recipients (the Klaviyo send-vs-open dating artifact).
+  const _tO=days.reduce((a,r)=>a+(r.emailOpens||0),0), _tC=days.reduce((a,r)=>a+(r.emailClicks||0),0), _tR=days.reduce((a,r)=>a+(r.emailRecipients||0),0);
+  const blendedOpenRate = _tR>0 ? Math.min(1,_tO/_tR) : null, blendedClickRate = _tR>0 ? Math.min(1,_tC/_tR) : null;
   return Object.keys(buckets).sort().map(ws=>{
     const rows = buckets[ws], s = k => rows.reduce((a,r)=>a+(r[k]||0),0);
     const revenue=s('revenue'), paid=s('metaSpend')+s('googleSpend'), orders=s('orders'),
@@ -8358,13 +8367,15 @@ function boardWeeks(){
         aov: orders>0 ? revenue/orders : null,
         cvr: sessions>0 ? orders/sessions : null,
         discountDepth: totalSales>0 ? discounts/totalSales : null,
-        returnRate: totalSales>0 ? returns/totalSales : null,
+        returnRate: returns>0 && totalSales>0 ? returns/totalSales : blendedReturnRate,
         metaRoas: metaSpend>0 ? metaValue/metaSpend : null,
         googleRoas: googleSpend>0 ? googleValue/googleSpend : null,
         atcRate: sessions>0 ? addToCarts/sessions : null,
         checkoutRate: sessions>0 ? checkouts/sessions : null,
-        emailOpenRate: emailRecipients>0 ? emailOpens/emailRecipients : null,
-        emailClickRate: emailRecipients>0 ? emailClicks/emailRecipients : null,
+        // Klaviyo opens/clicks are dated when they happen but recipients when sent, so a
+        // single week can read >100% — when it does, fall back to the blended rate.
+        emailOpenRate: emailRecipients>0 ? (emailOpens<=emailRecipients ? emailOpens/emailRecipients : blendedOpenRate) : blendedOpenRate,
+        emailClickRate: emailRecipients>0 ? (emailClicks<=emailRecipients ? emailClicks/emailRecipients : blendedClickRate) : blendedClickRate,
         emailShare: revenue>0 ? emailRev/revenue : null,
       },
     };
