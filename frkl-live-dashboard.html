@@ -19,25 +19,25 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606121200"></script>
-<script src="./frkl-live-data.js?v=202606121200"></script>
-<script src="./frkl-agent-insights.js?v=202606121200"></script>
-<script src="./frkl-business-data.js?v=202606121200"></script>
-<script src="./frkl-action-status.js?v=202606121200"></script>
-<script src="./frkl-patterns.js?v=202606121200"></script>
-<script src="./frkl-creators.js?v=202606121200"></script>
-<script src="./frkl-creative-vision.js?v=202606121200"></script>
-<script src="./frkl-links.js?v=202606121200"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606121200"></script>
-<script src="./frkl-events.js?v=202606121200"></script>
-<script src="./frkl-products.js?v=202606121200"></script>
-<script src="./frkl-discount-codes.js?v=202606121200"></script>
-<script src="./frkl-cvr.js?v=202606121200"></script>
-<script src="./frkl-cohorts.js?v=202606121200"></script>
-<script src="./frkl-retention.js?v=202606121200"></script>
-<script src="./frkl-clarity.js?v=202606121200"></script>
-<script src="./frkl-board-read.js?v=202606121200"></script>
-<script src="./frkl-benchmarks.js?v=202606121200"></script>
+<script src="./frkl-data-loader.js?v=202606121300"></script>
+<script src="./frkl-live-data.js?v=202606121300"></script>
+<script src="./frkl-agent-insights.js?v=202606121300"></script>
+<script src="./frkl-business-data.js?v=202606121300"></script>
+<script src="./frkl-action-status.js?v=202606121300"></script>
+<script src="./frkl-patterns.js?v=202606121300"></script>
+<script src="./frkl-creators.js?v=202606121300"></script>
+<script src="./frkl-creative-vision.js?v=202606121300"></script>
+<script src="./frkl-links.js?v=202606121300"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606121300"></script>
+<script src="./frkl-events.js?v=202606121300"></script>
+<script src="./frkl-products.js?v=202606121300"></script>
+<script src="./frkl-discount-codes.js?v=202606121300"></script>
+<script src="./frkl-cvr.js?v=202606121300"></script>
+<script src="./frkl-cohorts.js?v=202606121300"></script>
+<script src="./frkl-retention.js?v=202606121300"></script>
+<script src="./frkl-clarity.js?v=202606121300"></script>
+<script src="./frkl-board-read.js?v=202606121300"></script>
+<script src="./frkl-benchmarks.js?v=202606121300"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -1166,7 +1166,7 @@ function supplierNamesInUse(){ const set=new Set(Object.keys(suppliersAll())); c
 function delistAll(){ try { const s=JSON.parse(localStorage.getItem('oi_delist_v1')||'{}'); return (s&&typeof s==='object')?s:{}; } catch(e){ return {}; } }
 function isDelisted(p){ return !!delistAll()[skuKeyOf(p)]; }
 function setDelisted(key, on){ const all=delistAll(); if(on) all[key]=true; else delete all[key]; try { localStorage.setItem('oi_delist_v1', JSON.stringify(all)); window.dispatchEvent(new Event('oi-supplier-updated')); } catch(e){} }
-const REORDER_DEFAULTS = {safetyDays:14, coverDays:45, strategy:'jit', waves:3};
+const REORDER_DEFAULTS = {safetyDays:14, coverDays:45, strategy:'jit', waves:3, depositPct:100, shipDays:0};
 const STRAT_SHORT = {jit:'JIT', bulk:'Bulk', staged:'Staged'};
 function reorderConfig(){ try { const s=JSON.parse(localStorage.getItem('oi_reorder_v1')||'null'); if(s) return {...REORDER_DEFAULTS, ...s}; } catch(e){} return {...REORDER_DEFAULTS}; }
 function saveReorderConfig(next){ try { localStorage.setItem('oi_reorder_v1', JSON.stringify(next)); window.dispatchEvent(new Event('oi-supplier-updated')); } catch(e){} }
@@ -1285,7 +1285,13 @@ function planReorder(over){
   const skuSup = skuSupplierAll(); const del = delistAll(); const dir = suppliersAll();
   const productLines = inv.filter(p=>(p.dailyVelocity||0)>0 && !del[p.sku||p.title]).map(p=>{
     const sup = skuSup[p.sku||p.title] || {};                                   // SKU-level supplier master
-    const lead = (sup.lead!=null&&sup.lead!=='') ? Number(sup.lead) : leadDaysForType(p.type);  // per-SKU lead, else type default
+    const assigned = !!(sup.supplier && String(sup.supplier).trim());
+    const supplier = assigned ? sup.supplier.trim() : 'Unassigned — set supplier';
+    const contact = assigned ? (dir[supplier]||{}) : {};
+    const leadMake = (sup.lead!=null&&sup.lead!=='') ? Number(sup.lead) : leadDaysForType(p.type);  // order → shipment (production)
+    const leadShip = (contact.shipDays!=null&&contact.shipDays!=='') ? Number(contact.shipDays) : (Number(rc.shipDays)||0);  // shipment → landing (transit)
+    const lead = leadMake + leadShip;                                            // order → in stock — drives OOS + sizing
+    const depositPct = (contact.depositPct!=null&&contact.depositPct!=='') ? Number(contact.depositPct) : (rc.depositPct!=null?Number(rc.depositPct):100);
     const stock = p.inventoryQty||0;
     const focusM = focusMultFor(p, dcfg.focus, plan.months);
     const vel = (p.dailyVelocity||0)*scale*focusM;
@@ -1293,10 +1299,9 @@ function planReorder(over){
     let qty = s.qty; const moq = Number(sup.moq)||0; let moqBumped=false;
     if(qty>0 && moq>0 && qty<moq){ qty=moq; moqBumped=true; }
     const unitCost = (sup.unitCost!=null&&sup.unitCost!=='') ? Number(sup.unitCost) : (p.costPerItem!=null?p.costPerItem:null);
-    const assigned = !!(sup.supplier && String(sup.supplier).trim());
-    const supplier = assigned ? sup.supplier.trim() : 'Unassigned — set supplier';
-    const contact = assigned ? (dir[supplier]||{}) : {};
-    return {key:p.sku||p.title, p, lead, cover:s.cover, stock, vel, focusM, assigned, forecastUnits:s.forecastUnits, needs:s.needs, qty, basis:s.basis, waveUnits:s.waveUnits, nextWaveBy:s.nextWaveBy, moq, moqBumped, unitCost, priceTBC: unitCost==null, supplier, supEmail:contact.email||sup.email||'', supNotes:contact.notes||sup.notes||'', supPhone:contact.phone||'', supAddress:contact.address||'', lineCost: unitCost!=null?unitCost*qty:null};
+    const lineCost = unitCost!=null?unitCost*qty:null;
+    const depositCost = lineCost!=null ? lineCost*Math.max(0,Math.min(100,depositPct))/100 : null;
+    return {key:p.sku||p.title, p, lead, leadMake, leadShip, depositPct, cover:s.cover, stock, vel, focusM, assigned, forecastUnits:s.forecastUnits, needs:s.needs, qty, basis:s.basis, waveUnits:s.waveUnits, nextWaveBy:s.nextWaveBy, moq, moqBumped, unitCost, priceTBC: unitCost==null, supplier, supEmail:contact.email||sup.email||'', supNotes:contact.notes||sup.notes||'', supPhone:contact.phone||'', supAddress:contact.address||'', lineCost, depositCost, balanceCost: lineCost!=null?lineCost-depositCost:null};
   });
   // ── packaging lines — consume the demand plan (per-item × units + per-order × orders) ──
   const pk = packagingConfig(); const aipo = Number(pk.avgItemsPerOrder)||1.3;
@@ -1305,14 +1310,19 @@ function planReorder(over){
   const pkgLines = (pk.components||[]).filter(c=> c.onHand!=='' && c.onHand!=null && isFinite(Number(c.onHand)) && ((Number(c.perItem)||0)>0 || (Number(c.perOrder)||0)>0)).map(c=>{
     const onHand = Number(c.onHand)||0;
     const dailyUse = (Number(c.perItem)||0)*totalDailyUnits + (Number(c.perOrder)||0)*totalDailyOrders;
-    const lead = Number(c.leadDays)||30;
+    const leadMake = Number(c.leadDays)||30;
+    const leadShip = Number(rc.shipDays)||0;
+    const lead = leadMake + leadShip;
+    const depositPct = (rc.depositPct!=null?Number(rc.depositPct):100);
     const s = _reorderSizing(strategy, dailyUse, onHand, lead, opt);
     let qty = s.qty; const moq = Number(c.moq)||0; let moqBumped=false;
     if(qty>0 && moq>0 && qty<moq){ qty=moq; moqBumped=true; }
     const unitCost = (c.unitCost!=null&&c.unitCost!=='') ? Number(c.unitCost) : null;
     const supplier = (c.supplier&&c.supplier.trim()) || 'Packaging';
     const p = {title:c.name, type:'Packaging', sku:'', inventoryQty:onHand};
-    return {key:'pkg:'+c.name, p, isPackaging:true, lead, cover:s.cover, stock:onHand, vel:dailyUse, forecastUnits:s.forecastUnits, needs:s.needs, qty, basis:s.basis, waveUnits:s.waveUnits, nextWaveBy:s.nextWaveBy, moq, moqBumped, unitCost, supplier, lineCost: unitCost!=null?unitCost*qty:null};
+    const lineCost = unitCost!=null?unitCost*qty:null;
+    const depositCost = lineCost!=null ? lineCost*Math.max(0,Math.min(100,depositPct))/100 : null;
+    return {key:'pkg:'+c.name, p, isPackaging:true, lead, leadMake, leadShip, depositPct, cover:s.cover, stock:onHand, vel:dailyUse, forecastUnits:s.forecastUnits, needs:s.needs, qty, basis:s.basis, waveUnits:s.waveUnits, nextWaveBy:s.nextWaveBy, moq, moqBumped, unitCost, supplier, lineCost, depositCost, balanceCost: lineCost!=null?lineCost-depositCost:null};
   });
   const lines = productLines.concat(pkgLines);
   // OOS-before-lead: runs out before a reorder placed today could land → order TODAY
@@ -9760,10 +9770,16 @@ function ProductionPlanner({embedded}={}){
 
   const bySupplier = {};
   toOrder.forEach(l=>{ (bySupplier[l.supplier]=bySupplier[l.supplier]||[]).push(l); });
+  const _tdy = oiToday();
   const pos = Object.keys(bySupplier).map(s=>{
     const ls=bySupplier[s], total=ls.reduce((t,l)=>t+(l.lineCost||0),0);
     const withEmail=ls.find(l=>l.supEmail), withNotes=ls.find(l=>l.supNotes);
-    return {supplier:s, lines:ls, total, hasCost:ls.every(l=>l.unitCost!=null), units:ls.reduce((t,l)=>t+l.qty,0), email:withEmail?withEmail.supEmail:'', notes:withNotes?withNotes.supNotes:'', urgent:ls.filter(l=>l.oosBeforeLead).length, minCover:Math.min(...ls.map(l=>l.cover))};
+    const deposit=ls.reduce((t,l)=>t+(l.depositCost!=null?l.depositCost:(l.lineCost||0)),0);
+    const balance=Math.max(0,total-deposit);
+    const leadMakeMax=Math.max(...ls.map(l=>l.leadMake!=null?l.leadMake:l.lead||0));
+    const leadTotalMax=Math.max(...ls.map(l=>l.lead||0));
+    const depPctShown=ls.find(l=>l.depositPct!=null&&l.depositPct<100); const depPct=depPctShown?depPctShown.depositPct:null;
+    return {supplier:s, lines:ls, total, deposit, balance, hasDeposit: total>0 && deposit<total-0.5, depPct, leadMakeMax, leadTotalMax, ships:oiAddDays(_tdy,leadMakeMax), lands:oiAddDays(_tdy,leadTotalMax), hasCost:ls.every(l=>l.unitCost!=null), units:ls.reduce((t,l)=>t+l.qty,0), email:withEmail?withEmail.supEmail:'', notes:withNotes?withNotes.supNotes:'', urgent:ls.filter(l=>l.oosBeforeLead).length, minCover:Math.min(...ls.map(l=>l.cover))};
   // suppliers with order-today items first, then earliest stockout
   }).sort((a,b)=> (b.urgent>0)-(a.urgent>0) || (a.minCover-b.minCover) || a.supplier.localeCompare(b.supplier));
   const totalValue = pos.reduce((t,p)=>t+p.total,0);
@@ -9787,6 +9803,9 @@ function ProductionPlanner({embedded}={}){
     const L=['PURCHASE ORDER (DRAFT)', 'To: '+po.supplier+(po.email?' <'+po.email+'>':''), ...(firstLine.supPhone?['Tel: '+firstLine.supPhone]:[]), ...(firstLine.supAddress?[firstLine.supAddress]:[]), ...(po.notes?[po.notes]:[]), 'From: frkl'+(today?'  ·  '+today:''), ''];
     po.lines.forEach(l=>L.push(l.qty+' × '+l.p.title+' ['+(l.p.sku||'no SKU')+']'+(l.unitCost!=null?(' @ £'+l.unitCost+' = £'+l.lineCost.toFixed(2)):'  — PRICE TBC (please quote)')+(l.moqBumped?(' (MOQ '+l.moq+')'):'')));
     L.push('', po.hasCost?('TOTAL: £'+po.total.toFixed(2)+' · '+po.units+' units'):(po.units+' units · PRICING TBC — please quote against this PO'));
+    if(po.hasCost){ const fd=iso=>{ try{ return new Date((iso||'')+'T00:00:00').toLocaleDateString('en-GB'); }catch(e){ return iso; } };
+      if(po.hasDeposit) L.push('Terms: £'+po.deposit.toFixed(2)+' deposit'+(po.depPct!=null?(' ('+po.depPct+'%)'):'')+' on order, £'+po.balance.toFixed(2)+' balance on shipment');
+      L.push('Lead: '+po.leadTotalMax+' days from order — ships ~'+fd(po.ships)+', lands ~'+fd(po.lands)); }
     try{ navigator.clipboard&&navigator.clipboard.writeText(L.join('\n')); }catch(e){}
     toast('PO copied', {kind:'good', body:po.supplier});
   };
@@ -9801,7 +9820,9 @@ function ProductionPlanner({embedded}={}){
   const [covDraft, setCovDraft] = useState(String(rc.coverDays));
   const [stratDraft, setStratDraft] = useState(rc.strategy||'jit');
   const [wavesDraft, setWavesDraft] = useState(String(rc.waves||3));
-  const saveSettings = ()=>{ saveReorderConfig({...reorderConfig(), safetyDays:Number(safDraft)||14, coverDays:Number(covDraft)||45, waves:Math.max(1,Number(wavesDraft)||3)}); setSetOpen(false); toast('Reorder policy saved', {kind:'good'}); };
+  const [depDraft, setDepDraft] = useState(String(rc.depositPct!=null?rc.depositPct:100));
+  const [shipDraft, setShipDraft] = useState(String(rc.shipDays!=null?rc.shipDays:0));
+  const saveSettings = ()=>{ saveReorderConfig({...reorderConfig(), safetyDays:Number(safDraft)||14, coverDays:Number(covDraft)||45, waves:Math.max(1,Number(wavesDraft)||3), depositPct:Math.max(0,Math.min(100,Number(depDraft)||0)), shipDays:Math.max(0,Number(shipDraft)||0)}); setSetOpen(false); toast('Reorder policy saved', {kind:'good'}); };
 
   const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:12.5,fontWeight:600,padding:'7px 13px',borderRadius:8,border:'1px solid var(--border-default)',background:'var(--bg-elevated)',color:'var(--text-primary)',cursor:'pointer'};
   const smbtn = {...btn, fontSize:11.5, padding:'5px 10px'};
@@ -9880,8 +9901,11 @@ function ProductionPlanner({embedded}={}){
         <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}}>Safety stock (days)<input type="number" style={{...inp,width:90}} value={safDraft} onChange={e=>setSafDraft(e.target.value)}/></label>
         {strategy==='jit' && <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}}>Order-up-to cover beyond lead (days)<input type="number" style={{...inp,width:90}} value={covDraft} onChange={e=>setCovDraft(e.target.value)}/></label>}
         {strategy==='staged' && <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}}>Number of waves<input type="number" style={{...inp,width:90}} value={wavesDraft} onChange={e=>setWavesDraft(e.target.value)}/></label>}
+        <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}} title="Default % paid upfront at order; the balance falls due at shipment. Override per supplier on the Suppliers tab.">Deposit % at order<input type="number" style={{...inp,width:90}} value={depDraft} onChange={e=>setDepDraft(e.target.value)}/></label>
+        <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}} title="Default shipping transit days from shipment to landing, added on top of each product's production lead. Override per supplier on the Suppliers tab.">Transit days (ship→land)<input type="number" style={{...inp,width:90}} value={shipDraft} onChange={e=>setShipDraft(e.target.value)}/></label>
         <button style={btn} onClick={saveSettings}>Save policy</button><button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setSetOpen(false)}>Cancel</button>
       </div>
+      <div style={{fontSize:11,color:'var(--text-faint)',marginTop:9,lineHeight:1.5}}>Deposit % and transit days are <b>defaults</b> — set them per supplier on the <a className="txt-link" style={{cursor:'pointer'}} onClick={()=>window.__oiNav&&window.__oiNav('planning','suppliers')}>Suppliers tab</a> where terms differ. Both feed the stock landing plan (when to order each tranche, deposit now vs balance on shipment).</div>
     </div>)}
 
     {/* draft POs */}
@@ -9896,6 +9920,14 @@ function ProductionPlanner({embedded}={}){
           <button style={{...smbtn, background:'var(--accent)', color:'#fff', borderColor:'var(--accent)'}} onClick={()=>raisePO(po)}><Icon name="check" size={12}/> Mark PO raised</button>
         </div>
       </div>
+      {po.hasCost && (()=>{ const fd=iso=>{ try{ return new Date((iso||'')+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'}); }catch(e){ return iso; } }; return (
+        <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'center',fontSize:11.5,color:'var(--text-muted)',margin:'0 0 10px',padding:'7px 11px',borderRadius:8,background:'var(--bg-elevated)'}}>
+          {po.hasDeposit
+            ? <span><b style={{color:'var(--text-primary)'}}>£{k(po.deposit)} deposit now</b>{po.depPct!=null?` (${po.depPct}%)`:''} · <b style={{color:'var(--text-primary)'}}>£{k(po.balance)}</b> on shipment</span>
+            : <span><b style={{color:'var(--text-primary)'}}>£{k(po.total)}</b> due now</span>}
+          <span style={{color:'var(--text-faint)'}}>Ships ~{fd(po.ships)}{po.hasDeposit?' · balance due then':''}</span>
+          <span style={{color:'var(--text-faint)'}}>Lands ~{fd(po.lands)} ({po.leadTotalMax}d lead)</span>
+        </div>); })()}
       <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:560}}><thead><tr>
         <th style={th}>Product</th><th style={{...th,textAlign:'right'}}>Stock</th><th style={{...th,textAlign:'right'}}>Cover</th><th style={{...th,textAlign:'right'}}>Order qty</th><th style={{...th,textAlign:'right'}}>Unit £</th><th style={{...th,textAlign:'right'}}>Line £</th>
       </tr></thead><tbody>
@@ -10003,13 +10035,18 @@ function DemandPlanner({embedded}={}){
   });
   const maxMonthRev = Math.max(1, ...monthlyPlan.map(m=>m.rev));
 
+  const _lrc = reorderConfig(); const _ldir = suppliersAll();   // global transit default + per-supplier overrides
   const rows = sellers.map(p=>{ const plan=planUnits(p); const stock=p.inventoryQty||0; const end=stock-plan;
     const dayVel = plan/horizonDays;                          // planned units/day (incl. focus)
-    const lead = leadDaysForType(p.type);
+    const _sm = supplierForSku(p);                            // per-SKU lead (order→ship), else type default
+    const leadMake = (_sm.lead!=null&&_sm.lead!=='') ? Number(_sm.lead) : leadDaysForType(p.type);
+    const _sn = (_sm.supplier&&String(_sm.supplier).trim())||''; const _de = _sn ? (_ldir[_sn]||{}) : {};
+    const leadShip = (_de.shipDays!=null&&_de.shipDays!=='') ? Number(_de.shipDays) : (Number(_lrc.shipDays)||0);   // ship→land transit
+    const lead = leadMake + leadShip;                        // order → in stock — same basis as the PO engine
     const daysToOOS = dayVel>0 ? stock/dayVel : Infinity;     // days of cover at the planned rate
     const oosBeforeLead = daysToOOS < lead;                   // runs out before a reorder placed today lands
     const oosGap = oosBeforeLead ? Math.round(lead-daysToOOS) : 0;
-    return {p, runMo:p.dailyVelocity*30.4, plan, stock, end, short:end<0, lead, daysToOOS, oosBeforeLead, oosGap}; })
+    return {p, runMo:p.dailyVelocity*30.4, plan, stock, end, short:end<0, lead, leadMake, leadShip, daysToOOS, oosBeforeLead, oosGap}; })
     .sort((a,b)=>b.plan-a.plan);
   const stockouts = rows.filter(r=>r.short).length;
   const oosRisk = rows.filter(r=>r.oosBeforeLead).length;     // can't be saved by ordering today
@@ -10211,12 +10248,13 @@ function SuppliersDirectory(){
   const names = supplierNamesInUse();
   const sk = skuSupplierAll();
   const skuCount = {}; Object.keys(sk).forEach(k=>{ const n=sk[k]&&sk[k].supplier&&String(sk[k].supplier).trim(); if(n) skuCount[n]=(skuCount[n]||0)+1; });
-  const [draft, setDraft] = useState(()=>{ const all=suppliersAll(), d={}; names.forEach(n=>{ const s=all[n]||{}; d[n]={email:s.email||'', phone:s.phone||'', address:s.address||'', notes:s.notes||''}; }); return d; });
+  const [draft, setDraft] = useState(()=>{ const all=suppliersAll(), d={}; names.forEach(n=>{ const s=all[n]||{}; d[n]={email:s.email||'', phone:s.phone||'', address:s.address||'', notes:s.notes||'', depositPct:s.depositPct!=null?String(s.depositPct):'', shipDays:s.shipDays!=null?String(s.shipDays):''}; }); return d; });
   const [newName, setNewName] = useState('');
   const rows = [...new Set([...names, ...Object.keys(draft)])].sort((a,b)=>a.localeCompare(b));
-  const set = (n,f,v)=>setDraft(d=>({...d,[n]:{...(d[n]||{email:'',phone:'',address:'',notes:''}),[f]:v}}));
-  const save = ()=>{ const all={...suppliersAll()}; Object.keys(draft).forEach(n=>{ all[n]={name:n, ...draft[n]}; }); saveSuppliersAll(all); toast('Suppliers saved', {kind:'good'}); };
-  const add = ()=>{ const n=newName.trim(); if(!n) return; setDraft(d=>d[n]?d:({...d,[n]:{email:'',phone:'',address:'',notes:''}})); registerSupplier(n); setNewName(''); };
+  const _blank = {email:'',phone:'',address:'',notes:'',depositPct:'',shipDays:''};
+  const set = (n,f,v)=>setDraft(d=>({...d,[n]:{...(d[n]||_blank),[f]:v}}));
+  const save = ()=>{ const all={...suppliersAll()}; Object.keys(draft).forEach(n=>{ const x=draft[n]||{}; all[n]={name:n, email:x.email||'', phone:x.phone||'', address:x.address||'', notes:x.notes||'', depositPct:x.depositPct===''||x.depositPct==null?'':Number(x.depositPct), shipDays:x.shipDays===''||x.shipDays==null?'':Number(x.shipDays)}; }); saveSuppliersAll(all); toast('Suppliers saved', {kind:'good'}); };
+  const add = ()=>{ const n=newName.trim(); if(!n) return; setDraft(d=>d[n]?d:({...d,[n]:{..._blank}})); registerSupplier(n); setNewName(''); };
   const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:12.5,fontWeight:600,padding:'7px 13px',borderRadius:8,border:'1px solid var(--border-default)',background:'var(--bg-elevated)',color:'var(--text-primary)',cursor:'pointer'};
   const inp = {padding:'6px 9px',borderRadius:7,border:'1px solid var(--border-default)',background:'var(--bg-base)',color:'var(--text-primary)',fontSize:13};
   const th = {textAlign:'left',fontSize:10.5,fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-faint)',padding:'0 10px 7px 0',whiteSpace:'nowrap'};
@@ -10232,17 +10270,19 @@ function SuppliersDirectory(){
         <button style={btn} onClick={add}><Icon name="check" size={13}/> Add supplier</button>
         <button style={{...btn,marginLeft:'auto',background:'var(--accent)',color:'#fff',borderColor:'var(--accent)'}} onClick={save}>Save all</button>
       </div>
-      {rows.length ? (<div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:820}}><thead><tr><th style={th}>Supplier</th><th style={{...th,textAlign:'right'}}>SKUs</th><th style={th}>Email</th><th style={th}>Phone</th><th style={th}>Address</th><th style={th}>Notes / terms</th></tr></thead><tbody>
-        {rows.map(n=>{ const d=draft[n]||{email:'',phone:'',address:'',notes:''}; return (<tr key={n}>
+      {rows.length ? (<div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:980}}><thead><tr><th style={th}>Supplier</th><th style={{...th,textAlign:'right'}}>SKUs</th><th style={th}>Email</th><th style={th}>Phone</th><th style={th}>Address</th><th style={th} title="Deposit paid at order; the balance falls due at shipment">Deposit&nbsp;%</th><th style={th} title="Transit days from shipment to stock landing — added on top of the production lead">Transit&nbsp;d</th><th style={th}>Notes / terms</th></tr></thead><tbody>
+        {rows.map(n=>{ const d=draft[n]||_blank; return (<tr key={n}>
           <td style={{...td,color:'var(--text-primary)',fontWeight:600}}>{n}</td>
           <td style={{...td,textAlign:'right',color:'var(--text-faint)'}}>{skuCount[n]||0}</td>
-          <td style={td}><input type="email" style={{...inp,width:180}} value={d.email} onChange={e=>set(n,'email',e.target.value)} placeholder="orders@supplier.com"/></td>
-          <td style={td}><input style={{...inp,width:120}} value={d.phone} onChange={e=>set(n,'phone',e.target.value)} placeholder="+44…"/></td>
-          <td style={td}><input style={{...inp,width:180}} value={d.address} onChange={e=>set(n,'address',e.target.value)} placeholder="address"/></td>
-          <td style={td}><input style={{...inp,width:180}} value={d.notes} onChange={e=>set(n,'notes',e.target.value)} placeholder="terms · ref · MOQ notes"/></td>
+          <td style={td}><input type="email" style={{...inp,width:170}} value={d.email} onChange={e=>set(n,'email',e.target.value)} placeholder="orders@supplier.com"/></td>
+          <td style={td}><input style={{...inp,width:110}} value={d.phone} onChange={e=>set(n,'phone',e.target.value)} placeholder="+44…"/></td>
+          <td style={td}><input style={{...inp,width:160}} value={d.address} onChange={e=>set(n,'address',e.target.value)} placeholder="address"/></td>
+          <td style={td}><input type="number" style={{...inp,width:62}} value={d.depositPct} onChange={e=>set(n,'depositPct',e.target.value)} placeholder="100"/></td>
+          <td style={td}><input type="number" style={{...inp,width:56}} value={d.shipDays} onChange={e=>set(n,'shipDays',e.target.value)} placeholder="0"/></td>
+          <td style={td}><input style={{...inp,width:160}} value={d.notes} onChange={e=>set(n,'notes',e.target.value)} placeholder="terms · ref · MOQ notes"/></td>
         </tr>); })}
       </tbody></table></div>) : <div className="muted" style={{fontSize:13}}>No suppliers yet. Add one above, or assign a supplier to a product in the planning Supplier master — it'll appear here to flesh out.</div>}
-      <div style={{fontSize:11,color:'var(--text-faint)',marginTop:10,lineHeight:1.5}}>Suppliers are referenced by name from each SKU. SKU-specific MOQ, unit cost &amp; lead live in the planning Supplier master; the contact details here are shared across every SKU that supplier makes and appear on the draft PO.</div>
+      <div style={{fontSize:11,color:'var(--text-faint)',marginTop:10,lineHeight:1.5}}>Suppliers are referenced by name from each SKU. SKU-specific MOQ, unit cost &amp; production lead live in the planning Supplier master. <b>Deposit %</b> is what's payable upfront (balance on shipment) and <b>Transit d</b> is the shipping time added after production — both flow into the stock landing plan. Blank = the global default in Reorder policy. Contact details here are shared across every SKU that supplier makes and appear on the draft PO.</div>
     </div>
   </div>);
 }
@@ -10268,7 +10308,8 @@ function PlanningView(){
     : (Number(dc.targetValue)>0 ? (dc.targetMode==='revenue'?`£${k(dc.targetValue)} revenue · ${months}mo`:`${NUM(Number(dc.targetValue))} units · ${months}mo`) : `${months}-mo run-rate (no target set)`);
   const STRAT = {jit:'Just-in-time', bulk:'Bulk upfront', staged:'Staged waves'};
   // Cost each strategy (without switching) so the trade-off is visible at the point of choice.
-  const stratCmp = {}; ['jit','bulk','staged'].forEach(s=>{ const r=(s===rc.strategy)?R:planReorder({strategy:s}); stratCmp[s]={count:r.toOrder.length, val:r.toOrder.reduce((t,l)=>t+(l.lineCost||0),0)}; });
+  // dep = cash due now (deposits); val = total committed — they differ when suppliers take a deposit.
+  const stratCmp = {}; ['jit','bulk','staged'].forEach(s=>{ const r=(s===rc.strategy)?R:planReorder({strategy:s}); const v=r.toOrder.reduce((t,l)=>t+(l.lineCost||0),0); const dp=r.toOrder.reduce((t,l)=>t+(l.depositCost!=null?l.depositCost:(l.lineCost||0)),0); stratCmp[s]={count:r.toOrder.length, val:v, dep:dp}; });
   const wavesN = Math.max(1, Math.round(Number(rc.waves)||3));
   const stratDesc = {jit:'lean · rolling cover', bulk:'all upfront', staged:`${wavesN} waves`};
   const stratExplain = {jit:'Lean — order small rolling batches to cover lead time + a buffer. Least cash tied up, but you reorder often.', bulk:'Commit the whole forecast now, net of stock. Maximises availability and MOQ economics; ties up the most cash upfront.', staged:'Split the forecast into scheduled waves — spreads the cash and the supply risk across the horizon.'};
@@ -10276,9 +10317,39 @@ function PlanningView(){
   let recStrat='jit', recWhy='steady demand — keep cash free and reorder as stock depletes';
   if(oosNow>=3){ recStrat='bulk'; recWhy=`${oosNow} product${oosNow===1?'':'s'} will run out before a reorder can land — commit the stock now`; }
   else if(growthPct>=40){ recStrat='staged'; recWhy=`a big +${Math.round(growthPct)}% ramp — spread the commitment across waves`; }
-  // Staged wave schedule — order-by dates, ~waveDays apart
+  // ── Stock landing plan — when to order each tranche, what's payable, when it lands ──
+  // Order-by dates are back-calculated from total lead (production + transit) so each
+  // tranche lands before the previous depletes; any tranche whose order-by has passed is flagged.
+  const today = oiToday();
+  const fmtD = iso=>{ try{ const d=new Date((iso||today)+'T00:00:00'); return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'}); }catch(e){ return iso; } };
+  const orderTotal = orderVal;                                   // total committed by the orders due now
+  const depNow = R.toOrder.reduce((t,l)=>t+(l.depositCost!=null?l.depositCost:(l.lineCost||0)),0);
+  const balLater = Math.max(0, orderTotal - depNow);
+  const depPctBlend = orderTotal>0 ? depNow/orderTotal : 1;      // blended deposit share for steady waves
+  const hasDeposit = orderTotal>0 && depNow < orderTotal-0.5;    // any supplier actually takes a deposit
+  // binding lead = the slowest item that needs ordering (so nothing stocks out), with its make/ship split
+  let bind=null; R.toOrder.forEach(l=>{ if(!bind || (l.lead||0)>(bind.lead||0)) bind=l; });
+  const leadTotalRep = bind ? (bind.lead||0) : 0;
+  const leadMakeRep = bind ? (bind.leadMake!=null?bind.leadMake:bind.lead||0) : 0;
   const waveDays = (R.horizonDays||91)/wavesN;
-  const stagedSchedule = Array.from({length:wavesN}, (_,i)=>({ n:i+1, by: i===0?'now':oiAddDays(oiToday(), Math.round(i*waveDays)) }));
+  // steady per-wave demand value (one wave-slice of horizon demand, all lines)
+  const waveVal = R.lines.reduce((t,l)=> t + ((l.unitCost!=null)? l.unitCost*Math.ceil((l.vel||0)*waveDays):0), 0);
+  const mkTranche = (n,name,orderISO,isNow,val,coverTxt)=>{ const late=!isNow && orderISO<=today; const base=(isNow||late)?today:orderISO; const dep=val*depPctBlend; const shipISO=oiAddDays(base, leadMakeRep); const landISO=oiAddDays(base, leadTotalRep); return {n,name,orderISO,isNow,late,val,dep,bal:Math.max(0,val-dep),shipISO,landISO,coverTxt}; };
+  let tranches=[];
+  if(R.toOrder.length){
+    if(rc.strategy==='bulk'){
+      tranches=[ mkTranche(1,'Full order',today,true,orderTotal,`full ${months}-mo plan`) ];
+    } else if(rc.strategy==='staged'){
+      for(let kk=1; kk<=wavesN; kk++){
+        const needBy = oiAddDays(today, Math.round((kk-1)*waveDays));   // when this wave's stock must be in
+        const orderISO = kk===1 ? today : oiAddDays(today, Math.round((kk-1)*waveDays - leadTotalRep));  // lead-adjusted order-by
+        tranches.push( mkTranche(kk, `Wave ${kk}`, orderISO, kk===1, kk===1?orderTotal:waveVal, `covers from ~${fmtD(needBy)}`) );
+      }
+    } else {
+      tranches=[ mkTranche(1,'Reorder now',today,true,orderTotal,'rolling — reorder as stock depletes') ];
+    }
+  }
+  const lateWaves = tranches.filter(t=>t.late).length;
   const heroColor = oosNow ? 'var(--bad)' : toOrderN ? 'var(--warn)' : 'var(--good)';
   const headline = oosNow ? `Order today — ${oosNow} product${oosNow===1?'':'s'} at OOS risk` : toOrderN ? `${toOrderN} product${toOrderN===1?'':'s'} to reorder` : 'Stock is on track for your plan';
   const sub = toOrderN ? `${toOrderN} SKU${toOrderN===1?'':'s'} to order · ~£${k(orderVal)} to commit${stockoutsUnderPlan?` · ${stockoutsUnderPlan} forecast to run out under the plan`:''}${awaiting?` · ${awaiting} awaiting stock`:''}`
@@ -10311,10 +10382,10 @@ function PlanningView(){
       <div style={{marginTop:14}}>
         <div style={lab}>② Strategy — how to commit against the forecast</div>
         <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-          {['jit','bulk','staged'].map(id=>{ const on=rc.strategy===id; const c=stratCmp[id];
+          {['jit','bulk','staged'].map(id=>{ const on=rc.strategy===id; const c=stratCmp[id]; const dep=hasDeposit&&c.dep<c.val-0.5;
             return (<button key={id} onClick={()=>saveReorderConfig({...rc,strategy:id})} style={{textAlign:'left',flex:'1 1 160px',minWidth:148,padding:'9px 12px',borderRadius:9,cursor:'pointer',border:'1.5px solid '+(on?'var(--accent)':'var(--border-default)'),background:on?'var(--accent-bg)':'var(--bg-elevated)'}}>
               <div style={{fontSize:12.5,fontWeight:700,color:on?'var(--accent)':'var(--text-primary)'}}>{on?'✓ ':''}{STRAT[id]}</div>
-              <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>{c.count?`~£${k(c.val)} to commit now`:'nothing to order'} · {stratDesc[id]}</div>
+              <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>{c.count?(dep?`£${k(c.dep)} deposit now · £${k(c.val)} total`:`~£${k(c.val)} to commit now`):'nothing to order'} · {stratDesc[id]}</div>
             </button>); })}
         </div>
         <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:8,lineHeight:1.5}}>{stratExplain[rc.strategy]}</div>
@@ -10323,9 +10394,46 @@ function PlanningView(){
           <span style={{fontSize:12,color:'var(--text-secondary)'}}>Suggested: <b style={{color:'var(--text-primary)'}}>{STRAT[recStrat]}</b> — {recWhy}.</span>
           <button style={{...btn,fontSize:11.5,padding:'5px 11px',marginLeft:'auto'}} onClick={()=>saveReorderConfig({...rc,strategy:recStrat})}>Use {STRAT[recStrat]}</button>
         </div>}
-        {rc.strategy==='staged' && <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:8,lineHeight:1.5}}><b style={{color:'var(--text-secondary)'}}>Wave schedule</b> · {wavesN} waves, ~{Math.round(waveDays)}d apart: {stagedSchedule.map(w=>`Wave ${w.n} ${w.by}`).join(' · ')}. Wave 1 is the order below — re-run the plan on each date as stock depletes.</div>}
       </div>
     </div>
+
+    {/* Stock landing plan — when to order each tranche, what's payable, when it lands */}
+    {tranches.length>0 && (()=>{
+      const tdL = {padding:'8px 12px 8px 0',fontSize:12.5,color:'var(--text-secondary)',borderTop:'1px solid var(--border-subtle)',whiteSpace:'nowrap'};
+      const thL = {textAlign:'left',fontSize:10,fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-faint)',padding:'0 12px 7px 0',whiteSpace:'nowrap'};
+      return (<div className="card" style={{marginBottom:14}}>
+        <div style={{display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap',marginBottom:4}}>
+          <div style={{fontSize:14,fontWeight:800,color:'var(--text-primary)'}}>Stock landing plan</div>
+          <span className="muted" style={{fontSize:11.5}}>{STRAT[rc.strategy]} · when to order, pay &amp; expect stock — lead {leadTotalRep}d ({leadMakeRep}d make + {leadTotalRep-leadMakeRep}d transit)</span>
+        </div>
+        <div style={{fontSize:12.5,color:'var(--text-muted)',marginBottom:10,lineHeight:1.5}}>
+          {hasDeposit
+            ? <>To start, pay a <b style={{color:'var(--text-primary)'}}>£{k(depNow)} deposit now</b>, with <b style={{color:'var(--text-primary)'}}>£{k(balLater)} balance on shipment</b> — <b>£{k(orderTotal)}</b> committed in total.</>
+            : <><b style={{color:'var(--text-primary)'}}>£{k(orderTotal)}</b> to commit now. Add a deposit % per supplier (Suppliers tab) to split this into deposit-now vs balance-on-shipment.</>}
+          {rc.strategy==='staged' && <> Each wave below must be <b>ordered</b> early enough to <b>land</b> before the previous runs out.</>}
+        </div>
+        {lateWaves>0 && <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,padding:'7px 11px',borderRadius:8,background:'rgba(248,113,113,.10)',border:'1px solid var(--bad)'}}>
+          <Icon name="alert" size={13} style={{color:'var(--bad)'}}/>
+          <span style={{fontSize:12,color:'var(--text-secondary)'}}>{lateWaves} wave{lateWaves===1?'':'s'} should already be on order — the {leadTotalRep}d lead is longer than the gap between waves. Order {lateWaves===1?'it':'them'} now, or widen the wave count / shorten lead.</span>
+        </div>}
+        <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:640}}><thead><tr>
+          <th style={thL}>Tranche</th><th style={thL}>Order by</th><th style={{...thL,textAlign:'right'}}>{hasDeposit?'Deposit now':'Pay'}</th>{hasDeposit&&<th style={{...thL,textAlign:'right'}}>Balance on ship</th>}<th style={thL}>Ships ~</th><th style={thL}>Lands ~</th><th style={thL}>Covers</th>
+        </tr></thead><tbody>
+          {tranches.map(t=>(<tr key={t.n}>
+            <td style={{...tdL,color:'var(--text-primary)',fontWeight:600}}>{t.name}</td>
+            <td style={{...tdL,color:t.isNow?'var(--accent)':t.late?'var(--bad)':'var(--text-secondary)',fontWeight:t.isNow||t.late?700:400}}>{t.isNow?'now':t.late?`${fmtD(t.orderISO)} · now (late)`:fmtD(t.orderISO)}</td>
+            <td style={{...tdL,textAlign:'right',color:'var(--text-primary)'}}>{t.val>0?`£${k(t.dep)}`:'—'}</td>
+            {hasDeposit&&<td style={{...tdL,textAlign:'right',color:'var(--text-muted)'}}>{t.bal>0?`£${k(t.bal)}`:'—'}</td>}
+            <td style={tdL}>{fmtD(t.shipISO)}</td>
+            <td style={tdL}>{fmtD(t.landISO)}</td>
+            <td style={{...tdL,color:'var(--text-faint)',whiteSpace:'normal'}}>{t.coverTxt}</td>
+          </tr>))}
+        </tbody></table></div>
+        <div style={{fontSize:11,color:'var(--text-faint)',marginTop:9,lineHeight:1.5}}>{rc.strategy==='staged'
+          ? <>Wave 1 is the order below — re-run the plan on each order-by date to size the next wave on the latest stock. Dates use the slowest item's lead so nothing stocks out.</>
+          : rc.strategy==='bulk' ? <>One order now covers the whole plan. Balance (if any) falls due when the supplier ships, ~{leadMakeRep}d after order.</>
+          : <>JIT reorders roll as stock depletes — this is the order due now; the next triggers when cover next falls within lead + safety.</>}</div>
+      </div>); })()}
 
     {/* ① Forecast & demand — collapsed by default (config + detail), opened on demand */}
     <button onClick={()=>setShowForecast(s=>!s)} style={{display:'flex',alignItems:'center',gap:10,width:'100%',background:'transparent',border:'1px solid var(--border-subtle)',borderRadius:10,padding:'11px 14px',cursor:'pointer',textAlign:'left',marginBottom:showForecast?12:14}}>
