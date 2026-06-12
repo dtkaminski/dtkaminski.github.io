@@ -19,25 +19,25 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606121000"></script>
-<script src="./frkl-live-data.js?v=202606121000"></script>
-<script src="./frkl-agent-insights.js?v=202606121000"></script>
-<script src="./frkl-business-data.js?v=202606121000"></script>
-<script src="./frkl-action-status.js?v=202606121000"></script>
-<script src="./frkl-patterns.js?v=202606121000"></script>
-<script src="./frkl-creators.js?v=202606121000"></script>
-<script src="./frkl-creative-vision.js?v=202606121000"></script>
-<script src="./frkl-links.js?v=202606121000"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606121000"></script>
-<script src="./frkl-events.js?v=202606121000"></script>
-<script src="./frkl-products.js?v=202606121000"></script>
-<script src="./frkl-discount-codes.js?v=202606121000"></script>
-<script src="./frkl-cvr.js?v=202606121000"></script>
-<script src="./frkl-cohorts.js?v=202606121000"></script>
-<script src="./frkl-retention.js?v=202606121000"></script>
-<script src="./frkl-clarity.js?v=202606121000"></script>
-<script src="./frkl-board-read.js?v=202606121000"></script>
-<script src="./frkl-benchmarks.js?v=202606121000"></script>
+<script src="./frkl-data-loader.js?v=202606121100"></script>
+<script src="./frkl-live-data.js?v=202606121100"></script>
+<script src="./frkl-agent-insights.js?v=202606121100"></script>
+<script src="./frkl-business-data.js?v=202606121100"></script>
+<script src="./frkl-action-status.js?v=202606121100"></script>
+<script src="./frkl-patterns.js?v=202606121100"></script>
+<script src="./frkl-creators.js?v=202606121100"></script>
+<script src="./frkl-creative-vision.js?v=202606121100"></script>
+<script src="./frkl-links.js?v=202606121100"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606121100"></script>
+<script src="./frkl-events.js?v=202606121100"></script>
+<script src="./frkl-products.js?v=202606121100"></script>
+<script src="./frkl-discount-codes.js?v=202606121100"></script>
+<script src="./frkl-cvr.js?v=202606121100"></script>
+<script src="./frkl-cohorts.js?v=202606121100"></script>
+<script src="./frkl-retention.js?v=202606121100"></script>
+<script src="./frkl-clarity.js?v=202606121100"></script>
+<script src="./frkl-board-read.js?v=202606121100"></script>
+<script src="./frkl-benchmarks.js?v=202606121100"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -9838,7 +9838,7 @@ function ProductionPlanner({embedded}={}){
       {plan.active && (<div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginTop:10,padding:'8px 12px',borderRadius:8,background:'var(--accent-bg)',border:'1px solid var(--border-subtle)'}}>
         <Icon name="trendUp" size={14} style={{color:'var(--accent)'}}/>
         <span style={{fontSize:12,color:'var(--text-secondary)'}}>Orders are sized to your demand plan — <b style={{color:'var(--text-primary)'}}>{plan.growthPct>=0?'+':''}{plan.growthPct.toFixed(0)}% vs run-rate</b> ({plan.mode==='growth'?'growth target':plan.mode==='units'?'units target':'revenue target'}), not flat velocity.</span>
-        <button style={{...btn,fontSize:11.5,padding:'4px 10px',marginLeft:'auto'}} onClick={()=>{ const el=document.getElementById('plan-forecast'); if(el) el.scrollIntoView({behavior:'smooth'}); else if(window.__oiNav) window.__oiNav('planning','forecast'); }}>Adjust plan <Icon name="chevron" size={12}/></button>
+        <button style={{...btn,fontSize:11.5,padding:'4px 10px',marginLeft:'auto'}} onClick={()=>{ if(window.__oiOpenForecast){ window.__oiOpenForecast(); return; } const el=document.getElementById('plan-forecast'); if(el) el.scrollIntoView({behavior:'smooth'}); else if(window.__oiNav) window.__oiNav('planning','forecast'); }}>Adjust plan <Icon name="chevron" size={12}/></button>
       </div>)}
     </div>
 
@@ -10252,17 +10252,70 @@ function SuppliersDirectory(){
 // the POs below (both read the same config via usePlanningTick), so there's no
 // flicking between tabs.
 function PlanningView(){
+  usePlanningTick();
+  const [showForecast, setShowForecast] = useState(false);
+  React.useEffect(()=>{ window.__oiOpenForecast = ()=>{ setShowForecast(true); setTimeout(()=>{ const el=document.getElementById('plan-forecast'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }, 60); }; return ()=>{ try{ delete window.__oiOpenForecast; }catch(e){} }; }, []);
+  const R = planReorder(); const dc = demandConfig(); const rc = reorderConfig();
+  const k = v=>{ v=Math.abs(Math.round(v)); return v>=1000?(v/1000).toFixed(v>=10000?0:1).replace(/\.0$/,'')+'k':''+v; };
+  const months = (R.plan&&R.plan.months)||3;
+  const oosNow = R.oosNow, toOrderN = R.toOrder.length, awaiting = R.awaiting.length;
+  const orderVal = R.toOrder.reduce((t,l)=>t+(l.lineCost||0),0);
+  const stockoutsUnderPlan = R.lines.filter(l=>l.forecastUnits>l.stock).length;
+  const growthPct = R.plan?R.plan.growthPct:0;
+  const fLabel = dc.targetMode==='growth' ? `${(Number(dc.growth)||0)>=0?'+':''}${Number(dc.growth)||0}% on run-rate · ${months}mo`
+    : dc.shape==='month' ? `${months}-mo, shaped by month (${growthPct>=0?'+':''}${Math.round(growthPct)}%)`
+    : (Number(dc.targetValue)>0 ? (dc.targetMode==='revenue'?`£${k(dc.targetValue)} revenue · ${months}mo`:`${NUM(Number(dc.targetValue))} units · ${months}mo`) : `${months}-mo run-rate (no target set)`);
+  const STRAT = {jit:'Just-in-time', bulk:'Bulk upfront', staged:'Staged waves'};
+  const heroColor = oosNow ? 'var(--bad)' : toOrderN ? 'var(--warn)' : 'var(--good)';
+  const headline = oosNow ? `Order today — ${oosNow} product${oosNow===1?'':'s'} at OOS risk` : toOrderN ? `${toOrderN} product${toOrderN===1?'':'s'} to reorder` : 'Stock is on track for your plan';
+  const sub = toOrderN ? `${toOrderN} SKU${toOrderN===1?'':'s'} to order · ~£${k(orderVal)} to commit${stockoutsUnderPlan?` · ${stockoutsUnderPlan} forecast to run out under the plan`:''}${awaiting?` · ${awaiting} awaiting stock`:''}`
+    : (awaiting?`${awaiting} PO${awaiting===1?'':'s'} awaiting stock`:'Nothing to order right now — good sellers have cover for their lead times.');
+  const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:13,fontWeight:700,padding:'9px 15px',borderRadius:9,border:'none',background:'var(--accent)',color:'#fff',cursor:'pointer',whiteSpace:'nowrap'};
+  const sbtn = (id)=>({fontSize:11.5,fontWeight:700,padding:'5px 11px',borderRadius:7,cursor:'pointer',border:'1.5px solid '+(rc.strategy===id?'var(--accent)':'var(--border-default)'),background:rc.strategy===id?'var(--accent)':'transparent',color:rc.strategy===id?'#fff':'var(--text-secondary)'});
+  const lab = {fontSize:10,fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:5};
+  const goPOs = ()=>{ const el=document.getElementById('plan-pos'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); };
   return (<div>
-    <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:6}}>
-      <h2 style={{margin:0,fontSize:18}}>Planning — forecast &amp; purchase orders</h2>
-      <span className="muted" style={{fontSize:12}}>Shape the forecast and raise POs on one screen · independent of the date picker</span>
+    <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:8}}>
+      <h2 style={{margin:0,fontSize:18}}>Planning</h2>
+      <span className="muted" style={{fontSize:12}}>Forecast → strategy → purchase orders · independent of the date picker</span>
     </div>
-    <PlanningHeader active="combined" embedded/>
-    <div id="plan-forecast"><DemandPlanner embedded/></div>
-    <div style={{display:'flex',alignItems:'center',gap:10,margin:'24px 0 12px'}}>
+
+    {/* HERO — what to do now + the two levers (forecast + strategy) in one band */}
+    <div className="card" style={{borderLeft:'3px solid '+heroColor, marginBottom:14}}>
+      <div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
+        <div style={{flex:'1 1 320px',minWidth:0}}>
+          <div style={lab}>What to do now</div>
+          <div style={{fontSize:19,fontWeight:800,color:heroColor,lineHeight:1.2}}>{headline}</div>
+          <div style={{fontSize:12.5,color:'var(--text-muted)',marginTop:4,lineHeight:1.45}}>{sub}</div>
+        </div>
+        {toOrderN>0 && <button style={btn} onClick={goPOs}>Review &amp; raise POs <Icon name="chevron" size={14}/></button>}
+      </div>
+      <div style={{display:'flex',gap:22,flexWrap:'wrap',alignItems:'flex-end',marginTop:14,paddingTop:12,borderTop:'1px solid var(--border-subtle)'}}>
+        <div style={{flex:'1 1 240px',minWidth:0}}>
+          <div style={lab}>① Forecast <a className="txt-link" style={{cursor:'pointer',textTransform:'none',letterSpacing:0,fontWeight:600}} onClick={()=>window.__oiOpenForecast&&window.__oiOpenForecast()}>· {showForecast?'editing below':'edit ›'}</a></div>
+          <div style={{fontSize:13.5,fontWeight:700,color:'var(--text-primary)'}}>{fLabel}</div>
+        </div>
+        <div>
+          <div style={lab}>② Strategy — how to commit</div>
+          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>{['jit','bulk','staged'].map(id=>(<button key={id} title={STRAT[id]} style={sbtn(id)} onClick={()=>saveReorderConfig({...rc,strategy:id})}>{STRAT[id]}</button>))}</div>
+        </div>
+      </div>
+    </div>
+
+    {/* ① Forecast & demand — collapsed by default (config + detail), opened on demand */}
+    <button onClick={()=>setShowForecast(s=>!s)} style={{display:'flex',alignItems:'center',gap:10,width:'100%',background:'transparent',border:'1px solid var(--border-subtle)',borderRadius:10,padding:'11px 14px',cursor:'pointer',textAlign:'left',marginBottom:showForecast?12:14}}>
+      <span style={{color:'var(--text-faint)',display:'inline-flex',transform:showForecast?'rotate(90deg)':'none',transition:'transform 120ms'}}><Icon name="chevron" size={13}/></span>
+      <span style={{fontWeight:700,color:'var(--text-primary)',fontSize:13.5}}>Forecast &amp; demand plan</span>
+      <span className="muted" style={{fontSize:11.5}}>{fLabel} · per-product demand, focus/promotions, by-month shaping &amp; packaging</span>
+      <span style={{marginLeft:'auto',fontSize:11.5,color:'var(--accent)',fontWeight:600}}>{showForecast?'Hide':'Open'}</span>
+    </button>
+    {showForecast && <div id="plan-forecast"><DemandPlanner embedded/></div>}
+
+    {/* ③ Purchase orders — the action surface, always visible */}
+    <div style={{display:'flex',alignItems:'center',gap:10,margin:'8px 0 12px'}}>
       <span style={{width:3,height:16,background:'var(--accent)',borderRadius:2}}/>
-      <span style={{fontSize:13,fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-secondary)'}}>Purchase orders</span>
-      <span className="muted" style={{fontSize:11.5}}>sized to the plan above, under your strategy</span>
+      <span style={{fontSize:13,fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-secondary)'}}>③ Purchase orders</span>
+      <span className="muted" style={{fontSize:11.5}}>sized to your forecast, under your strategy</span>
     </div>
     <div id="plan-pos"><ProductionPlanner embedded/></div>
   </div>);
