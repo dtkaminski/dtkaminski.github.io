@@ -19,25 +19,25 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606121100"></script>
-<script src="./frkl-live-data.js?v=202606121100"></script>
-<script src="./frkl-agent-insights.js?v=202606121100"></script>
-<script src="./frkl-business-data.js?v=202606121100"></script>
-<script src="./frkl-action-status.js?v=202606121100"></script>
-<script src="./frkl-patterns.js?v=202606121100"></script>
-<script src="./frkl-creators.js?v=202606121100"></script>
-<script src="./frkl-creative-vision.js?v=202606121100"></script>
-<script src="./frkl-links.js?v=202606121100"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606121100"></script>
-<script src="./frkl-events.js?v=202606121100"></script>
-<script src="./frkl-products.js?v=202606121100"></script>
-<script src="./frkl-discount-codes.js?v=202606121100"></script>
-<script src="./frkl-cvr.js?v=202606121100"></script>
-<script src="./frkl-cohorts.js?v=202606121100"></script>
-<script src="./frkl-retention.js?v=202606121100"></script>
-<script src="./frkl-clarity.js?v=202606121100"></script>
-<script src="./frkl-board-read.js?v=202606121100"></script>
-<script src="./frkl-benchmarks.js?v=202606121100"></script>
+<script src="./frkl-data-loader.js?v=202606121200"></script>
+<script src="./frkl-live-data.js?v=202606121200"></script>
+<script src="./frkl-agent-insights.js?v=202606121200"></script>
+<script src="./frkl-business-data.js?v=202606121200"></script>
+<script src="./frkl-action-status.js?v=202606121200"></script>
+<script src="./frkl-patterns.js?v=202606121200"></script>
+<script src="./frkl-creators.js?v=202606121200"></script>
+<script src="./frkl-creative-vision.js?v=202606121200"></script>
+<script src="./frkl-links.js?v=202606121200"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606121200"></script>
+<script src="./frkl-events.js?v=202606121200"></script>
+<script src="./frkl-products.js?v=202606121200"></script>
+<script src="./frkl-discount-codes.js?v=202606121200"></script>
+<script src="./frkl-cvr.js?v=202606121200"></script>
+<script src="./frkl-cohorts.js?v=202606121200"></script>
+<script src="./frkl-retention.js?v=202606121200"></script>
+<script src="./frkl-clarity.js?v=202606121200"></script>
+<script src="./frkl-board-read.js?v=202606121200"></script>
+<script src="./frkl-benchmarks.js?v=202606121200"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -1271,11 +1271,12 @@ function _reorderSizing(strategy, vel, stock, lead, o){
   }
   return {cover, forecastUnits, qty, needs, basis, waveUnits, nextWaveBy};
 }
-function planReorder(){
+function planReorder(over){
+  over = over||{};   // {strategy} lets callers cost a strategy without switching to it
   const B = (typeof window!=='undefined' && window.FRKL_BUSINESS) || {};
   const inv = (B.inventory||[]).filter(p=>p && p.status!=='ARCHIVED');
   const rc = reorderConfig(); const safety = Number(rc.safetyDays)||14, coverDays = Number(rc.coverDays)||45;
-  const strategy = rc.strategy||'jit'; const waves = Math.max(1, Math.round(Number(rc.waves)||3));
+  const strategy = over.strategy || rc.strategy || 'jit'; const waves = Math.max(1, Math.round(Number(over.waves!=null?over.waves:rc.waves)||3));
   const plan = demandScaleFactor(); const scale = plan.scale;
   const dcfg = demandConfig();                 // product-focus / promotion weights
   const horizonDays = (plan.months||3)*30.4;
@@ -10266,6 +10267,18 @@ function PlanningView(){
     : dc.shape==='month' ? `${months}-mo, shaped by month (${growthPct>=0?'+':''}${Math.round(growthPct)}%)`
     : (Number(dc.targetValue)>0 ? (dc.targetMode==='revenue'?`£${k(dc.targetValue)} revenue · ${months}mo`:`${NUM(Number(dc.targetValue))} units · ${months}mo`) : `${months}-mo run-rate (no target set)`);
   const STRAT = {jit:'Just-in-time', bulk:'Bulk upfront', staged:'Staged waves'};
+  // Cost each strategy (without switching) so the trade-off is visible at the point of choice.
+  const stratCmp = {}; ['jit','bulk','staged'].forEach(s=>{ const r=(s===rc.strategy)?R:planReorder({strategy:s}); stratCmp[s]={count:r.toOrder.length, val:r.toOrder.reduce((t,l)=>t+(l.lineCost||0),0)}; });
+  const wavesN = Math.max(1, Math.round(Number(rc.waves)||3));
+  const stratDesc = {jit:'lean · rolling cover', bulk:'all upfront', staged:`${wavesN} waves`};
+  const stratExplain = {jit:'Lean — order small rolling batches to cover lead time + a buffer. Least cash tied up, but you reorder often.', bulk:'Commit the whole forecast now, net of stock. Maximises availability and MOQ economics; ties up the most cash upfront.', staged:'Split the forecast into scheduled waves — spreads the cash and the supply risk across the horizon.'};
+  // Recommendation from the situation
+  let recStrat='jit', recWhy='steady demand — keep cash free and reorder as stock depletes';
+  if(oosNow>=3){ recStrat='bulk'; recWhy=`${oosNow} product${oosNow===1?'':'s'} will run out before a reorder can land — commit the stock now`; }
+  else if(growthPct>=40){ recStrat='staged'; recWhy=`a big +${Math.round(growthPct)}% ramp — spread the commitment across waves`; }
+  // Staged wave schedule — order-by dates, ~waveDays apart
+  const waveDays = (R.horizonDays||91)/wavesN;
+  const stagedSchedule = Array.from({length:wavesN}, (_,i)=>({ n:i+1, by: i===0?'now':oiAddDays(oiToday(), Math.round(i*waveDays)) }));
   const heroColor = oosNow ? 'var(--bad)' : toOrderN ? 'var(--warn)' : 'var(--good)';
   const headline = oosNow ? `Order today — ${oosNow} product${oosNow===1?'':'s'} at OOS risk` : toOrderN ? `${toOrderN} product${toOrderN===1?'':'s'} to reorder` : 'Stock is on track for your plan';
   const sub = toOrderN ? `${toOrderN} SKU${toOrderN===1?'':'s'} to order · ~£${k(orderVal)} to commit${stockoutsUnderPlan?` · ${stockoutsUnderPlan} forecast to run out under the plan`:''}${awaiting?` · ${awaiting} awaiting stock`:''}`
@@ -10290,15 +10303,27 @@ function PlanningView(){
         </div>
         {toOrderN>0 && <button style={btn} onClick={goPOs}>Review &amp; raise POs <Icon name="chevron" size={14}/></button>}
       </div>
-      <div style={{display:'flex',gap:22,flexWrap:'wrap',alignItems:'flex-end',marginTop:14,paddingTop:12,borderTop:'1px solid var(--border-subtle)'}}>
-        <div style={{flex:'1 1 240px',minWidth:0}}>
-          <div style={lab}>① Forecast <a className="txt-link" style={{cursor:'pointer',textTransform:'none',letterSpacing:0,fontWeight:600}} onClick={()=>window.__oiOpenForecast&&window.__oiOpenForecast()}>· {showForecast?'editing below':'edit ›'}</a></div>
-          <div style={{fontSize:13.5,fontWeight:700,color:'var(--text-primary)'}}>{fLabel}</div>
+      <div style={{marginTop:14,paddingTop:12,borderTop:'1px solid var(--border-subtle)'}}>
+        <div style={lab}>① Forecast <a className="txt-link" style={{cursor:'pointer',textTransform:'none',letterSpacing:0,fontWeight:600}} onClick={()=>window.__oiOpenForecast&&window.__oiOpenForecast()}>· {showForecast?'editing below':'edit ›'}</a></div>
+        <div style={{fontSize:13.5,fontWeight:700,color:'var(--text-primary)'}}>{fLabel}</div>
+      </div>
+      {/* ② Strategy — compare the trade-off, pick, see the recommendation */}
+      <div style={{marginTop:14}}>
+        <div style={lab}>② Strategy — how to commit against the forecast</div>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+          {['jit','bulk','staged'].map(id=>{ const on=rc.strategy===id; const c=stratCmp[id];
+            return (<button key={id} onClick={()=>saveReorderConfig({...rc,strategy:id})} style={{textAlign:'left',flex:'1 1 160px',minWidth:148,padding:'9px 12px',borderRadius:9,cursor:'pointer',border:'1.5px solid '+(on?'var(--accent)':'var(--border-default)'),background:on?'var(--accent-bg)':'var(--bg-elevated)'}}>
+              <div style={{fontSize:12.5,fontWeight:700,color:on?'var(--accent)':'var(--text-primary)'}}>{on?'✓ ':''}{STRAT[id]}</div>
+              <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>{c.count?`~£${k(c.val)} to commit now`:'nothing to order'} · {stratDesc[id]}</div>
+            </button>); })}
         </div>
-        <div>
-          <div style={lab}>② Strategy — how to commit</div>
-          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>{['jit','bulk','staged'].map(id=>(<button key={id} title={STRAT[id]} style={sbtn(id)} onClick={()=>saveReorderConfig({...rc,strategy:id})}>{STRAT[id]}</button>))}</div>
-        </div>
+        <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:8,lineHeight:1.5}}>{stratExplain[rc.strategy]}</div>
+        {recStrat!==rc.strategy && <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginTop:8,padding:'7px 11px',borderRadius:8,background:'var(--accent-bg)',border:'1px solid var(--border-subtle)'}}>
+          <Icon name="spark" size={13} style={{color:'var(--accent)'}}/>
+          <span style={{fontSize:12,color:'var(--text-secondary)'}}>Suggested: <b style={{color:'var(--text-primary)'}}>{STRAT[recStrat]}</b> — {recWhy}.</span>
+          <button style={{...btn,fontSize:11.5,padding:'5px 11px',marginLeft:'auto'}} onClick={()=>saveReorderConfig({...rc,strategy:recStrat})}>Use {STRAT[recStrat]}</button>
+        </div>}
+        {rc.strategy==='staged' && <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:8,lineHeight:1.5}}><b style={{color:'var(--text-secondary)'}}>Wave schedule</b> · {wavesN} waves, ~{Math.round(waveDays)}d apart: {stagedSchedule.map(w=>`Wave ${w.n} ${w.by}`).join(' · ')}. Wave 1 is the order below — re-run the plan on each date as stock depletes.</div>}
       </div>
     </div>
 
