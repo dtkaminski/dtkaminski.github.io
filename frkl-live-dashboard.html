@@ -19,25 +19,25 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./frkl-data-loader.js?v=202606121500"></script>
-<script src="./frkl-live-data.js?v=202606121500"></script>
-<script src="./frkl-agent-insights.js?v=202606121500"></script>
-<script src="./frkl-business-data.js?v=202606121500"></script>
-<script src="./frkl-action-status.js?v=202606121500"></script>
-<script src="./frkl-patterns.js?v=202606121500"></script>
-<script src="./frkl-creators.js?v=202606121500"></script>
-<script src="./frkl-creative-vision.js?v=202606121500"></script>
-<script src="./frkl-links.js?v=202606121500"></script>
-<script src="./frkl-diagnostic-analyst.js?v=202606121500"></script>
-<script src="./frkl-events.js?v=202606121500"></script>
-<script src="./frkl-products.js?v=202606121500"></script>
-<script src="./frkl-discount-codes.js?v=202606121500"></script>
-<script src="./frkl-cvr.js?v=202606121500"></script>
-<script src="./frkl-cohorts.js?v=202606121500"></script>
-<script src="./frkl-retention.js?v=202606121500"></script>
-<script src="./frkl-clarity.js?v=202606121500"></script>
-<script src="./frkl-board-read.js?v=202606121500"></script>
-<script src="./frkl-benchmarks.js?v=202606121500"></script>
+<script src="./frkl-data-loader.js?v=202606121600"></script>
+<script src="./frkl-live-data.js?v=202606121600"></script>
+<script src="./frkl-agent-insights.js?v=202606121600"></script>
+<script src="./frkl-business-data.js?v=202606121600"></script>
+<script src="./frkl-action-status.js?v=202606121600"></script>
+<script src="./frkl-patterns.js?v=202606121600"></script>
+<script src="./frkl-creators.js?v=202606121600"></script>
+<script src="./frkl-creative-vision.js?v=202606121600"></script>
+<script src="./frkl-links.js?v=202606121600"></script>
+<script src="./frkl-diagnostic-analyst.js?v=202606121600"></script>
+<script src="./frkl-events.js?v=202606121600"></script>
+<script src="./frkl-products.js?v=202606121600"></script>
+<script src="./frkl-discount-codes.js?v=202606121600"></script>
+<script src="./frkl-cvr.js?v=202606121600"></script>
+<script src="./frkl-cohorts.js?v=202606121600"></script>
+<script src="./frkl-retention.js?v=202606121600"></script>
+<script src="./frkl-clarity.js?v=202606121600"></script>
+<script src="./frkl-board-read.js?v=202606121600"></script>
+<script src="./frkl-benchmarks.js?v=202606121600"></script>
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -10220,7 +10220,7 @@ function DemandPlanner({embedded}={}){
           <td style={{...td,color:'var(--text-primary)'}}>{r.p.title}{r.oosBeforeLead && <span style={{marginLeft:6,fontSize:9.5,fontWeight:800,letterSpacing:'.03em',color:'#fff',background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}{focusM(r.p)!==1 && <span style={{marginLeft:6,fontSize:10,fontWeight:700,color:'var(--accent)',background:'var(--accent-bg)',padding:'1px 6px',borderRadius:999}}>↑{(focusM(r.p)%1?focusM(r.p).toFixed(2):focusM(r.p))}×</span>}<div style={{fontSize:10.5,color:'var(--text-faint)'}}>{r.p.type}</div></td>
           <td style={{...td,textAlign:'right'}}>{NUM(Math.round(r.runMo))}</td>
           <td style={{...td,textAlign:'right'}}>{NUM(r.stock)}</td>
-          <td style={{...td,textAlign:'right'}}>{r.daysToOOS===Infinity ? <span style={{color:'var(--text-faint)'}}>—</span> : <span style={{fontWeight:600,color: r.oosBeforeLead?'var(--bad)':(r.daysToOOS<r.lead*1.5?'var(--warn)':'var(--text-secondary)')}}>{Math.round(r.daysToOOS)}d{r.oosBeforeLead?` · gap ${r.oosGap}d`:''}</span>}<div style={{fontSize:10,color:'var(--text-faint)',display:'flex',alignItems:'center',gap:3,justifyContent:'flex-end',marginTop:2}}><input type="number" min="0" defaultValue={r.leadSet?r.leadMake:''} key={'ld'+(r.leadSet?r.leadMake:'d')} placeholder={String(r.leadDefault)} title={`Production lead — days from order to shipment (per SKU). Blank uses the ${r.p.type||'type'} default of ${r.leadDefault}d. Set defaults in Reorder policy.`} onBlur={e=>{ if(e.target.value!=='') setSkuLead(skuKeyOf(r.p), e.target.value); }} style={{width:38,padding:'1px 4px',borderRadius:5,border:'1px solid var(--border-default)',background:'var(--bg-base)',color:'var(--text-secondary)',fontSize:10,textAlign:'right'}}/><span>d make{r.leadShip>0?` +${r.leadShip} ship = ${r.lead}`:' lead'}{!r.leadSet?' ·def':''}</span></div></td>
+          <td style={{...td,textAlign:'right'}}>{r.daysToOOS===Infinity ? <span style={{color:'var(--text-faint)'}}>—</span> : <span style={{fontWeight:600,color: r.oosBeforeLead?'var(--bad)':(r.daysToOOS<r.lead*1.5?'var(--warn)':'var(--text-secondary)')}}>{Math.round(r.daysToOOS)}d{r.oosBeforeLead?` · gap ${r.oosGap}d`:''}</span>}<div style={{fontSize:10,color:'var(--text-faint)',display:'flex',alignItems:'center',gap:3,justifyContent:'flex-end',marginTop:2}}>{!r.leadSet && <span title={`Estimate — using the ${r.p.type||'type'} default of ${r.leadDefault}d. Set this SKU's real supplier lead.`} style={{color:'var(--warn)',fontSize:8,lineHeight:1}}>●</span>}<input type="number" min="0" defaultValue={r.leadSet?r.leadMake:''} key={'ld'+(r.leadSet?r.leadMake:'d')} placeholder={String(r.leadDefault)} title={`Production lead — days from order to shipment (per SKU). Blank uses the ${r.p.type||'type'} default of ${r.leadDefault}d. Set defaults in Reorder policy.`} onBlur={e=>{ if(e.target.value!=='') setSkuLead(skuKeyOf(r.p), e.target.value); }} style={{width:38,padding:'1px 4px',borderRadius:5,border:'1px solid '+(r.leadSet?'var(--border-default)':'var(--warn)'),background:'var(--bg-base)',color:'var(--text-secondary)',fontSize:10,textAlign:'right'}}/><span>d make{r.leadShip>0?` +${r.leadShip} ship = ${r.lead}`:' lead'}</span></div></td>
           <td style={{...td,textAlign:'right',fontWeight:700,color:'var(--text-primary)'}}>{NUM(Math.ceil(r.plan))}</td>
           <td style={{...td,textAlign:'right',fontWeight:600,color: r.short?'var(--bad)':'var(--good)'}}>{r.short?'−'+NUM(Math.ceil(-r.end)):NUM(Math.floor(r.end))}</td>
           <td style={{...td,textAlign:'right'}}>{oCell}</td>
@@ -10231,6 +10231,7 @@ function DemandPlanner({embedded}={}){
         {rows.length>12 && <button style={btn} onClick={()=>setShowAll(s=>!s)}>{showAll?'Show top 12':`Show all ${rows.length}`}</button>}
         <button style={{...btn,background:'var(--accent)',color:'#fff',borderColor:'var(--accent)'}} onClick={()=>{ const el=document.getElementById('plan-pos'); if(el) el.scrollIntoView({behavior:'smooth'}); else if(window.__oiNav) window.__oiNav('planning','plan'); }}>Review &amp; raise POs ({RR.toOrder.length}) <Icon name="chevron" size={13}/></button>
         {delistedCount>0 && <button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setShowDelisted(s=>!s)}>{showDelisted?'Hide delisted':`${delistedCount} delisted`}</button>}
+        {rows.filter(r=>!r.leadSet).length>0 && <span style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:11.5,color:'var(--text-faint)'}} title="These products use the type's default lead — set each SKU's real supplier lead (the input in the Stockout-vs-lead column) for accurate order-by dates."><span style={{color:'var(--warn)',fontSize:8}}>●</span>{rows.filter(r=>!r.leadSet).length} on an estimated lead</span>}
       </div>
       {showDelisted && delistedCount>0 && <div style={{marginTop:10,paddingTop:10,borderTop:'1px solid var(--border-subtle)'}}>
         <div style={{fontSize:11,fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:6}}>Delisted — excluded from the plan &amp; POs</div>
