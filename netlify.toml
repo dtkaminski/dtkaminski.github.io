@@ -8,6 +8,10 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "geolocation=(), microphone=(), camera=()"
+    # CSP allow-list matched to the app's real dependencies (React/Recharts/Babel/Supabase CDNs,
+    # Google Fonts, Supabase API). 'unsafe-eval' is required by in-browser Babel; 'unsafe-inline'
+    # by the dashboard's inline scripts/styles. Tighten further once the build is bundled.
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://unpkg.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co https://*.functions.supabase.co; frame-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'"
 
 # Always revalidate HTML so a new deploy is picked up without a hard refresh
 # (the dashboard + demo shell reference versioned assets, but the shells
@@ -44,6 +48,21 @@
 [[redirects]]
   from = "/demo"
   to = "/app/demo.html"
+  status = 301
+
+[[redirects]]
+  from = "/privacy"
+  to = "/privacy.html"
+  status = 301
+
+[[redirects]]
+  from = "/terms"
+  to = "/terms.html"
+  status = 301
+
+[[redirects]]
+  from = "/contact"
+  to = "/contact.html"
   status = 301
 
 [[redirects]]

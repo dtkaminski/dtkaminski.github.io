@@ -46,18 +46,22 @@ It's pure static HTML. Drop the folder onto Vercel, Cloudflare Pages, GitHub Pag
 | Honesty table | — | 6-row failure-mode comparison |
 | Case study | `#case-study` | frkl receipts — £30.7k/mo, £295k inventory, etc. |
 | Eval scorecard | — | 54.5/62 combined |
-| Pricing | `#pricing` | Four tiers (£99 / £249 / £599 / £1750+) |
+| Pricing | `#pricing` | Single founding-cohort **Managed tier — £750/mo**, 30-day rolling, human-reviewed delivery. (Self-serve tiers are a future roadmap item, not shown on the live page.) |
 | FAQ | `#faq` | 8 questions a sceptical founder would ask |
 | Final CTA | `#trial` | Free-trial conversion surface |
 | Footer | — | Brand, links, legal |
 
-## What's not on the page yet (intentional)
+## Status of the funnel
 
-- **Real auth / trial flow** — CTAs link to `#trial` placeholders. Wire to a real signup endpoint when the tenant onboarding flow exists.
-- **Live demo link** — points to `#demo`. Replace with the actual frkl dashboard URL once it's deployed at a stable domain.
-- **Email capture form** — no JS-driven lead form yet. Drop in Formspree, Netlify Forms, or your own backend.
-- **Analytics** — no pixel/Plausible/Fathom yet. Add to `<head>` when chosen.
-- **Real legal pages** — `/privacy`, `/terms`, `/contact` are footer placeholders.
+- **Real auth / trial flow** — ✅ live. `auth/signup.html` → Supabase `signup` edge function → magic-link invite → `auth/workspace.html` onboarding (connect Shopify, etc.). No longer a `#trial` placeholder.
+- **Live demo link** — ✅ footer "Live demo" now points to `/demo` (→ `app/demo.html`, the frkl design-partner dashboard).
+- **Real legal pages** — ✅ `/privacy`, `/terms`, `/contact` are now real pages (`privacy.html`, `terms.html`, `contact.html`), wired in the footer and via Netlify redirects. They are an honest beta template — have a solicitor review before GA, and confirm the `@operatorintelligence.com` contact addresses resolve.
+- **Email capture form** — still TODO. No JS-driven lead form yet; the primary CTA is the signup flow. Add Formspree/Netlify Forms if you want a separate lead capture.
+- **Analytics** — still TODO. No pixel/Plausible/Fathom yet. Add to `<head>` when chosen.
+
+## Security headers
+
+`netlify.toml` now ships a real **Content-Security-Policy** (in addition to X-Frame-Options / nosniff / Referrer-Policy / Permissions-Policy). The CSP allow-lists exactly the app's CDNs (cdnjs, unpkg, jsdelivr), Google Fonts, and the Supabase API, and includes `'unsafe-eval'` (required by in-browser Babel) and `'unsafe-inline'`. **Smoke-test the deployed dashboard once after first deploy** — if anything fails to load, check the browser console for a CSP violation and add the origin. Tighten `'unsafe-*'` out once the dashboard is bundled rather than transpiled in-browser.
 
 ## Brand consistency
 
@@ -79,10 +83,13 @@ If you want a real screenshot instead, capture one with the dashboard at 1440px 
 
 ## TODO before going live
 
-- [ ] Decide on real CTA destinations (signup form, Calendly, email)
+- [x] Real CTA destinations — signup flow + `/demo` wired
+- [x] Privacy + Terms + Contact pages (beta template — solicitor-review before GA)
+- [x] Content-Security-Policy in `netlify.toml`
+- [ ] Confirm `hello@ / privacy@ / support@operatorintelligence.com` mailboxes resolve
 - [ ] Connect a domain (`operatorintelligence.com` if available)
 - [ ] Add Plausible / Fathom analytics snippet
-- [ ] Write the real Privacy + Terms + Contact pages
 - [ ] OG image for social sharing (use the hero mockup screenshot)
-- [ ] Verify all anchor links work after any anchor renames
+- [ ] Smoke-test the deployed dashboard against the new CSP (console = no violations)
 - [ ] Decide on a real lead-capture mechanism (Formspree, ConvertKit, Notion DB)
+- [ ] Replace the client-side `gate.js` passcode with real auth, or bundle a sanitised demo dataset (the static `frkl-*.js` files are aggregated/anonymised — no customer PII — but they are frkl's real commercial numbers in the clear on the public deploy)

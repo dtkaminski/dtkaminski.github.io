@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — Operator Intelligence</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;650;700&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#08080b;--card:#111116;--border:#2a2a34;--text:#f1f1f4;--muted:#b1b1bc;--faint:#7a7a86;--accent:#7c8cff;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);
+       -webkit-font-smoothing:antialiased;line-height:1.6;}
+  .wrap{max-width:760px;margin:0 auto;padding:48px 24px 96px;}
+  .eyebrow{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin-bottom:14px;}
+  h1{font-size:30px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px;}
+  .updated{font-size:13px;color:var(--faint);margin-bottom:8px;}
+  .note{font-size:13px;color:var(--muted);background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin:20px 0 32px;}
+  h2{font-size:18px;font-weight:650;letter-spacing:-.01em;margin:34px 0 10px;}
+  p,li{font-size:15px;color:var(--muted);margin-bottom:12px;}
+  ul{padding-left:20px;}
+  a{color:var(--accent);text-decoration:none;}
+  a:hover{text-decoration:underline;}
+  strong{color:var(--text);font-weight:600;}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px;}
+  td,th{border:1px solid var(--border);padding:9px 12px;text-align:left;color:var(--muted);vertical-align:top;}
+  th{color:var(--text);font-weight:600;background:var(--card);}
+  .back{display:inline-block;margin-top:40px;font-size:14px;}
+  footer{border-top:1px solid var(--border);margin-top:48px;padding-top:20px;font-size:12.5px;color:var(--faint);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Operator Intelligence</div>
+  <h1>Privacy Policy</h1>
+  <div class="updated">Last updated: 12 June 2026</div>
+  <div class="note">
+    This is the privacy policy for the Operator Intelligence beta. It describes our practices accurately as the
+    product stands today. It is written to be honest rather than exhaustive and should be reviewed by a solicitor
+    before general availability. Questions: <a href="/contact">contact us</a>.
+  </div>
+
+  <h2>1. Who we are</h2>
+  <p>
+    Operator Intelligence ("we", "us") provides an analytics and operations platform for direct-to-consumer (DTC)
+    brands. For the personal data we process about your customers, <strong>you (the brand) are the data controller and
+    we act as your data processor</strong>. For the personal data we hold about you, the account holder, we are the
+    controller. We are based in the United Kingdom and operate under the UK GDPR and the Data Protection Act 2018.
+  </p>
+
+  <h2>2. What data we process</h2>
+  <table>
+    <tr><th>Category</th><th>Examples</th><th>Source</th></tr>
+    <tr><td>Account data</td><td>Your email address, workspace name, role</td><td>You, at signup</td></tr>
+    <tr><td>Commercial data</td><td>Orders, revenue, AOV, discounts, inventory, product mix</td><td>Your Shopify store (read-only)</td></tr>
+    <tr><td>Customer data</td><td>Order-level records that may include a customer identifier and order details contained in the Shopify order payload</td><td>Your Shopify store (read-only)</td></tr>
+    <tr><td>Marketing data</td><td>Ad spend, impressions, clicks, ROAS, email/flow metrics</td><td>Meta, Google Ads, GA4, Klaviyo, TikTok (read-only)</td></tr>
+  </table>
+  <p>
+    All third-party connections request <strong>read-only</strong> scopes. We never write to, change, or send anything
+    in your store, ad accounts, or email platform.
+  </p>
+
+  <h2>3. Why we process it (lawful basis)</h2>
+  <ul>
+    <li><strong>Contract</strong> — to provide the analytics, findings, and weekly briefs you sign up for.</li>
+    <li><strong>Legitimate interests</strong> — to operate, secure, and improve the service, balanced against your and your customers' rights.</li>
+  </ul>
+
+  <h2>4. Where it's stored and who processes it</h2>
+  <p>
+    Your data is hosted on <strong>Supabase</strong> (PostgreSQL) in the <strong>London (eu-west-2) region</strong>.
+    We use the following sub-processors:
+  </p>
+  <ul>
+    <li><strong>Supabase</strong> — database, authentication, and hosting (UK/EU).</li>
+    <li><strong>Netlify</strong> — static site delivery for the marketing site and app shell.</li>
+    <li><strong>Anthropic and/or OpenAI</strong> — to generate the natural-language analysis in the "Ask the data" feature and written findings. Only the aggregated figures needed to answer a question are sent; we do not send raw customer records for model training.</li>
+  </ul>
+  <p>
+    Tenant data is isolated per workspace using database row-level security, so one brand cannot access another
+    brand's data.
+  </p>
+
+  <h2>5. How long we keep it</h2>
+  <p>
+    We retain your data for as long as your workspace is active. If you close your account, we delete your workspace
+    data within 30 days, except where we must retain limited records to meet a legal obligation.
+  </p>
+
+  <h2>6. Your rights</h2>
+  <p>
+    You can ask us to access, correct, export, or delete personal data we hold. To exercise any of these rights — or
+    to request deletion or export of your customers' data that we process on your behalf — email us via the
+    <a href="/contact">contact page</a> and we will respond within one month. You also have the right to complain to
+    the UK Information Commissioner's Office (ICO).
+  </p>
+
+  <h2>7. Disconnecting a source</h2>
+  <p>
+    You can revoke any connection at any time from your workspace, or directly in Shopify, Meta, Google, Klaviyo, or
+    TikTok. Revoking stops further syncs; to also delete already-synced data, contact us.
+  </p>
+
+  <h2>8. Changes</h2>
+  <p>We'll update this page when our practices change and revise the "last updated" date above.</p>
+
+  <a class="back" href="/">← Back to Operator Intelligence</a>
+  <footer>© 2026 Operator Intelligence · <a href="/terms">Terms</a> · <a href="/contact">Contact</a></footer>
+</div>
+</body>
+</html>
