@@ -266,7 +266,7 @@
   async function fetchDailyShopify(sb, brandId) {
     try {
       const { data } = await sb.from('v_tenant_shopify_daily')
-        .select('day, order_count, net_revenue, discounts, line_items, aov, channel')
+        .select('day, order_count, net_revenue, discounts, line_items, aov, returns, channel')
         .eq('brand_id', brandId)
         .eq('channel', 'online_store')
         .order('day', { ascending: true });
@@ -276,6 +276,8 @@
         netSales: Number(r.net_revenue || 0),
         discounts: Number(r.discounts || 0),
         totalSales: Number(r.net_revenue || 0) + Number(r.discounts || 0),
+        aov: Number(r.aov || 0),      // static schema has aov; was selected but dropped → undefined → 0
+        returns: Number(r.returns || 0), // real net-merch refunds (subtotal − current_subtotal); was absent → 0
       }));
     } catch (e) { return []; }
   }
@@ -286,17 +288,22 @@
         .select('date, spend, impressions, reach, clicks, link_clicks, purchases, purchase_value, frequency')
         .eq('brand_id', brandId).eq('level', 'account')
         .order('date', { ascending: true });
-      return (data || []).map(r => ({
-        date: r.date,
-        cost: Number(r.spend || 0),
-        impressions: Number(r.impressions || 0),
-        reach: Number(r.reach || 0),
-        clicks: Number(r.clicks || 0),
-        linkClicks: Number(r.link_clicks || 0),
-        purchases: Number(r.purchases || 0),
-        purchaseValue: Number(r.purchase_value || 0),
-        frequency: Number(r.frequency || 0),
-      }));
+      return (data || []).map(r => {
+        const impressions = Number(r.impressions || 0);
+        const linkClicks = Number(r.link_clicks || 0);
+        return {
+          date: r.date,
+          cost: Number(r.spend || 0),
+          impressions,
+          reach: Number(r.reach || 0),
+          clicks: Number(r.clicks || 0),
+          linkClicks,
+          linkCtr: impressions > 0 ? linkClicks / impressions : 0, // static schema has linkCtr (rate); loader emitted only the raw count → component read .linkCtr → 0
+          purchases: Number(r.purchases || 0),
+          purchaseValue: Number(r.purchase_value || 0),
+          frequency: Number(r.frequency || 0),
+        };
+      });
     } catch (e) { return []; }
   }
 
@@ -306,14 +313,19 @@
         .select('date, spend, impressions, clicks, conversions, conversion_value')
         .eq('brand_id', brandId)
         .order('date', { ascending: true });
-      return (data || []).map(r => ({
-        date: r.date,
-        cost: Number(r.spend || 0),
-        impressions: Number(r.impressions || 0),
-        clicks: Number(r.clicks || 0),
-        conv: Number(r.conversions || 0),
-        convValue: Number(r.conversion_value || 0),
-      }));
+      return (data || []).map(r => {
+        const cost = Number(r.spend || 0);
+        const clicks = Number(r.clicks || 0);
+        return {
+          date: r.date,
+          cost,
+          impressions: Number(r.impressions || 0),
+          clicks,
+          conversions: Number(r.conversions || 0), // was mis-keyed `conv` → dashboard read .conversions → undefined → 0
+          convValue: Number(r.conversion_value || 0),
+          cpc: clicks > 0 ? cost / clicks : 0,       // dashboard expects a cpc field; was absent → £0
+        };
+      });
     } catch (e) { return []; }
   }
 
@@ -339,7 +351,7 @@
       // GA4 daily is stored per channel-group (~12 rows/day), so it crosses the
       // 1000-row cap after ~80 days — paginate, then sum to one row per date.
       const all = await fetchAllPaged((from, to) => sb.from('tenant_ga4_daily')
-        .select('date, channel, sessions, active_users, new_users, conversions, purchase_revenue, ecommerce_purchases, add_to_carts, begin_checkouts')
+        .select('date, channel, sessions, active_users, new_users, conversions, purchase_revenue, ecommerce_purchases, add_to_carts, begin_checkouts, engagement_rate, bounce_rate')
         .eq('brand_id', brandId)
         .neq('channel', 'total')   // exclude GA4's daily summary row — channel groups already sum to it; including it double-counts sessions/purchases
         .order('date', { ascending: true })
@@ -347,8 +359,9 @@
         .range(from, to));
       const byDate = {};
       for (const r of all) {
-        const a = byDate[r.date] = byDate[r.date] || { date: r.date, sessions: 0, active_users: 0, new_users: 0, conversions: 0, purchase_revenue: 0, ecommerce_purchases: 0, add_to_carts: 0, begin_checkouts: 0 };
-        a.sessions += Number(r.sessions || 0);
+        const a = byDate[r.date] = byDate[r.date] || { date: r.date, sessions: 0, active_users: 0, new_users: 0, conversions: 0, purchase_revenue: 0, ecommerce_purchases: 0, add_to_carts: 0, begin_checkouts: 0, engaged_sessions: 0, bounced_sessions: 0 };
+        const sess = Number(r.sessions || 0);
+        a.sessions += sess;
         a.active_users += Number(r.active_users || 0);
         a.new_users += Number(r.new_users || 0);
         a.conversions += Number(r.conversions || 0);
@@ -356,17 +369,27 @@
         a.ecommerce_purchases += Number(r.ecommerce_purchases || 0);
         a.add_to_carts += Number(r.add_to_carts || 0);
         a.begin_checkouts += Number(r.begin_checkouts || 0);
+        // engagement_rate / bounce_rate are RATES — weight by sessions before summing across channel rows
+        a.engaged_sessions += sess * Number(r.engagement_rate || 0);
+        a.bounced_sessions += sess * Number(r.bounce_rate || 0);
       }
       const rows = Object.values(byDate).sort((a, b) => a.date < b.date ? -1 : 1);
-      return rows.map(r => ({
-        date: r.date,
-        sessions: Number(r.sessions || 0),
-        users: Number(r.active_users || 0),
-        purchases: Number(r.ecommerce_purchases || 0),
-        purchaseValue: Number(r.purchase_revenue || 0),
-        addToCarts: Number(r.add_to_carts || 0),
-        checkouts: Number(r.begin_checkouts || 0),
-      }));
+      return rows.map(r => {
+        const sessions = Number(r.sessions || 0);
+        return {
+          date: r.date,
+          sessions,
+          users: Number(r.active_users || 0),
+          engagedSessions: Math.round(r.engaged_sessions || 0),
+          engagementRate: sessions > 0 ? r.engaged_sessions / sessions : 0, // was never selected → 0.0%
+          bounceRate: sessions > 0 ? r.bounced_sessions / sessions : 0,
+          purchases: Number(r.ecommerce_purchases || 0),
+          purchaseValue: Number(r.purchase_revenue || 0),
+          revenue: Number(r.purchase_revenue || 0),
+          addToCarts: Number(r.add_to_carts || 0),
+          checkouts: Number(r.begin_checkouts || 0),
+        };
+      });
     } catch (e) { return []; }
   }
 
@@ -379,15 +402,25 @@
         .order('date', { ascending: true })
         .order('metric_id', { ascending: true })
         .range(from, to));
-      // Pivot: one row per date with placed_order count + value
+      // Pivot: one row per date with email engagement + placed_order count + value.
+      // Was dropping Received/Opened/Clicked Email entirely → sends/opens/open-rate all read 0.
       const byDate = {};
       for (const r of (data || [])) {
         const k = r.date;
-        const a = byDate[k] = byDate[k] || { date: r.date, orders: 0, orderValue: 0 };
-        if (r.metric_name === 'Placed Order') a.orders = Number(r.value || 0);
-        if (r.metric_name === 'Placed Order Value') a.orderValue = Number(r.value || 0);
+        const a = byDate[k] = byDate[k] || { date: r.date, recipients: 0, opens: 0, clicks: 0, orders: 0, orderValue: 0 };
+        switch (r.metric_name) {
+          case 'Received Email':     a.recipients = Number(r.value || 0); break;
+          case 'Opened Email':       a.opens      = Number(r.value || 0); break;
+          case 'Clicked Email':      a.clicks     = Number(r.value || 0); break;
+          case 'Placed Order':       a.orders     = Number(r.value || 0); break;
+          case 'Placed Order Value': a.orderValue = Number(r.value || 0); break;
+        }
       }
-      return Object.values(byDate).sort((a, b) => a.date < b.date ? -1 : 1);
+      return Object.values(byDate).sort((a, b) => a.date < b.date ? -1 : 1).map(a => ({
+        ...a,
+        openRate: a.recipients > 0 ? a.opens / a.recipients : 0,
+        clickRate: a.recipients > 0 ? a.clicks / a.recipients : 0,
+      }));
     } catch (e) { return []; }
   }
 

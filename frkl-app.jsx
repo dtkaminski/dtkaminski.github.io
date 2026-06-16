@@ -3400,9 +3400,55 @@ function FitGauge({label,band,value}){
     <span className="v" style={{color:fitBandColor(band)}}>{value}</span>
   </div>);
 }
-function FitCard(){
-  const FIT=(typeof window!=='undefined'&&window.FRKL_FIT)||null;
-  if(!FIT||!FIT.blended){ return (<div className="card" style={{marginBottom:14}}><h2>Offer &amp; Product Market Fit</h2><div className="note">No fit assessment yet — connect Meta, Shopify and GA4, then the engine reads offer-market fit (the paid funnel) and product-market fit (cohorts) and tells you whether to scale.</div></div>); }
+// Live per-tenant fit. The /app shell injects window.OI_ASK = {endpoint, brand_id, getJwt}
+// (the same context the Ask panel uses). When present we fetch assess-fit for the SELECTED
+// window, scoped to this brand by the caller's JWT (RLS). With no shell (public demo) we fall
+// back to the static window.FRKL_FIT snapshot. An authenticated tenant NEVER falls back to the
+// static snapshot (which is frkl's), so there is no cross-tenant bleed.
+function getOIAsk(){
+  try{
+    if(typeof window==='undefined') return null;
+    if(window.OI_ASK) return window.OI_ASK;
+    if(window.parent && window.parent!==window) return window.parent.OI_ASK || null;
+  }catch(e){}
+  return null;
+}
+function useFitResult(start, end){
+  const ASK = getOIAsk();
+  const authed = !!(ASK && ASK.brand_id && typeof ASK.getJwt==='function' && ASK.endpoint);
+  const [state, setState] = React.useState(()=>({
+    fit: authed ? null : ((typeof window!=='undefined' && window.FRKL_FIT) || null),
+    loading: authed, error: '',
+  }));
+  React.useEffect(()=>{
+    if(!authed){ setState({ fit:(typeof window!=='undefined'&&window.FRKL_FIT)||null, loading:false, error:'' }); return; }
+    if(!start || !end){ return; }
+    let cancelled=false;
+    setState(s=>({ ...s, loading:true, error:'' }));
+    (async ()=>{
+      try{
+        const jwt = await ASK.getJwt();
+        if(!jwt) throw new Error('no session');
+        const base = String(ASK.endpoint).replace(/\/[^/]*$/, '');   // …/functions/v1
+        const resp = await fetch(base+'/assess-fit', {
+          method:'POST',
+          headers:{ 'content-type':'application/json', 'authorization':'Bearer '+jwt },
+          body: JSON.stringify({ brandId: ASK.brand_id, start, end }),
+        });
+        const data = await resp.json().catch(()=>null);
+        if(cancelled) return;
+        if(!resp.ok || !data || data.error){ setState({ fit:null, loading:false, error:(data&&data.error) || ('assess-fit '+resp.status) }); return; }
+        setState({ fit:data, loading:false, error:'' });
+      }catch(e){ if(!cancelled) setState({ fit:null, loading:false, error:e.message||String(e) }); }
+    })();
+    return ()=>{ cancelled=true; };
+  }, [authed, start, end]);
+  return state;
+}
+function FitCard({start, end}){
+  const { fit:FIT, loading, error } = useFitResult(start, end);
+  if(loading && (!FIT||!FIT.blended)){ return (<div className="card" style={{marginBottom:14}}><h2>Offer &amp; Product Market Fit</h2><div className="note">Assessing fit for the selected window…</div></div>); }
+  if(!FIT||!FIT.blended){ return (<div className="card" style={{marginBottom:14}}><h2>Offer &amp; Product Market Fit</h2><div className="note">{error ? ('Fit not available — '+error) : 'No fit assessment yet — connect Meta, Shopify and GA4, then the engine reads offer-market fit (the paid funnel) and product-market fit (cohorts) and tells you whether to scale.'}</div></div>); }
   const b=FIT.blended;
   const pc=(x,dp=1)=>x==null?'—':(x*100).toFixed(dp)+'%';
   const rx=(x,dp=2)=>x==null?'—':x.toFixed(dp)+'x';
@@ -3480,7 +3526,7 @@ function CrossChannel({start}){
     tiers=grp.map((g,i)=>{ const c=g.reduce((a,x)=>a+x.cost,0), v=g.reduce((a,x)=>a+x.val,0); return {label:['Low','Mid','High'][i], avgSpend:c/g.length, roas:c>0?v/c:null, n:g.length}; }); }
   const tierFalling = tiers && tiers[0].roas!=null && tiers[2].roas!=null && tiers[2].roas < tiers[0].roas*0.85;
   return (<div>
-    <FitCard/>
+    <FitCard start={start} end={ACTIVE_END}/>
     <div className="card" style={{marginBottom:14}}>
       <h2>Channel revenue claims vs spend</h2>
       <table>
