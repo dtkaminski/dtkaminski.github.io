@@ -3874,7 +3874,15 @@ function Channels({start}){
   const box=(title,kids)=> (<div className="card" style={{flex:'1 1 380px'}}><h2>{title}</h2>{kids}</div>);
   const line=(k,v)=>(<div className="mrow" style={{margin:'6px 0'}}><span className="k">{k}</span><span className="v">{v}</span></div>);
   const klEmail = kl.filter(r=>(r.recipients||0)>1000);
-  return (<div><div className="row">
+  const chMix = (B.channelMix||[]).map(c=>({channel:c.channel, group:/^Paid/.test(c.channel)?'Paid':'Organic & owned', revenue:c.revenue||0, purchases:c.purchases||0, sessions:c.sessions||0}));
+  return (<div>
+    {chMix.length>0 && <ConfigurableChart
+      title="Explore channels — GA4 attribution"
+      dataset={chMix}
+      dimensions={[{key:'channel',label:'Channel'},{key:'group',label:'Paid vs organic'}]}
+      metrics={[{key:'revenue',label:'Revenue',fmt:GBP},{key:'purchases',label:'Purchases',fmt:NUM},{key:'sessions',label:'Sessions',fmt:NUM}]}
+      defaultMetric="revenue" defaultSplit="channel" defaultChart="bar" defaultTopN={10}/>}
+    <div className="row">
     {box('Meta Ads',(<div>{line('Spend',GBP(sum(meta,'cost')))}{line('Impressions',NUM(sum(meta,'impressions')))}{line('Pixel purchases',NUM(sum(meta,'purchases')))}{line('Claimed value',GBP(sum(meta,'purchaseValue')))}{line('Claimed ROAS',(sum(meta,'purchaseValue')/sum(meta,'cost')).toFixed(2)+'x')}</div>))}
     {box('Google Ads',(<div>{line('Spend',GBP(sum(gads,'cost')))}{line('Clicks',NUM(sum(gads,'clicks')))}{line('Impressions',NUM(sum(gads,'impressions')))}{line('Conversions',NUM(sum(gads,'conversions')))}{line('Conv. value',GBP(sum(gads,'convValue')))}{line('CPC',GBP2(sum(gads,'cost')/Math.max(1,sum(gads,'clicks'))))}</div>))}
     {box('Klaviyo (email/SMS)',(<div>{line('Send days',klEmail.length)}{line('Recipients (sends)',NUM(sum(klEmail,'recipients')))}{line('Avg open rate',PCT(klEmail.reduce((a,r)=>a+(r.openRate>2?0:r.openRate||0),0)/Math.max(1,klEmail.filter(r=>r.openRate<=2).length)))}{line('Klaviyo-tracked orders',NUM(sum(kl,'orders')))}{line('Tracked order value (gross)',GBP(sum(kl,'orderValue')))}</div>))}
