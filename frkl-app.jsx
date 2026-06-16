@@ -2081,6 +2081,79 @@ function ChartFooter({note, ask, rows, columns}){
   </>);
 }
 
+// Small labelled-control wrapper for the configurable-chart control strip.
+function Field({label, children}){
+  return (<label style={{display:'flex',flexDirection:'column',gap:3}}>
+    <span style={{fontSize:10,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-faint)'}}>{label}</span>
+    {children}
+  </label>);
+}
+
+// Inline-config exploratory chart — "metric × dimension" with KPI/Split/Chart/Order/Top-N
+// controls, mirroring the Conjura pattern. Aggregates `dataset` live and reuses ChartFooter
+// (data table + "Ask AI about this"). For exploratory views only; bespoke diagnostic charts stay hand-built.
+function ConfigurableChart({dataset, dimensions, metrics, defaultMetric, defaultSplit, defaultChart='bar', defaultTopN=10, title}){
+  const [metric, setMetric] = useState(defaultMetric || metrics[0].key);
+  const [split,  setSplit]  = useState(defaultSplit  || dimensions[0].key);
+  const [ctype,  setCtype]  = useState(defaultChart);
+  const [order,  setOrder]  = useState('desc');
+  const [topN,   setTopN]   = useState(defaultTopN);
+  const M = metrics.find(m=>m.key===metric) || metrics[0];
+  const D = dimensions.find(d=>d.key===split) || dimensions[0];
+  const fmt = M.fmt || (v=>v);
+
+  const rows = useMemo(()=>{
+    const g = {};
+    (dataset||[]).forEach(r=>{
+      const k = (r[split]==null || r[split]==='') ? '—' : String(r[split]);
+      (g[k] || (g[k]={label:k, val:0})).val += Number(r[metric])||0;
+    });
+    return Object.values(g).sort((a,b)=> order==='desc' ? b.val-a.val : a.val-b.val).slice(0, topN);
+  }, [dataset, metric, split, order, topN]);
+
+  const selStyle = {background:'var(--bg-app)',color:'var(--text-primary)',border:'1px solid var(--border-default)',borderRadius:6,padding:'4px 8px',fontSize:12,fontFamily:'inherit',cursor:'pointer'};
+  const sel = (val,set,opts) => (
+    <select value={val} onChange={e=>set(e.target.value)} style={selStyle}>
+      {opts.map(o=><option key={o.key} value={o.key}>{o.label}</option>)}
+    </select>);
+  const segB = (active)=>({fontSize:11.5,fontWeight:600,padding:'5px 11px',borderRadius:6,cursor:'pointer',border:'1px solid '+(active?'#7c8cff':'var(--border-subtle)'),background:active?'rgba(124,140,255,0.14)':'transparent',color:active?'#9aa6ff':'var(--text-muted)'});
+  const bar = ctype==='bar';
+
+  return (<div className="card">
+    {title && <div className="card-section-title"><h2 style={{margin:0}}>{title}</h2></div>}
+    <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'flex-end',margin:'4px 0 12px'}}>
+      <Field label="KPI">{sel(metric,setMetric,metrics.map(m=>({key:m.key,label:m.label})))}</Field>
+      <Field label="Split by">{sel(split,setSplit,dimensions.map(d=>({key:d.key,label:d.label})))}</Field>
+      <Field label="Chart">
+        <div style={{display:'inline-flex',gap:6}}>
+          <button style={segB(bar)}  onClick={()=>setCtype('bar')}>Bar</button>
+          <button style={segB(!bar)} onClick={()=>setCtype('line')}>Line</button>
+        </div>
+      </Field>
+      <Field label="Order">{sel(order,setOrder,[{key:'desc',label:'Top'},{key:'asc',label:'Bottom'}])}</Field>
+      <Field label="Show">{sel(String(topN),v=>setTopN(+v),[5,10,15,25].map(n=>({key:String(n),label:'Top '+n})))}</Field>
+    </div>
+    <R.ResponsiveContainer width="100%" height={bar?Math.max(220, rows.length*30+60):300}>
+      <R.ComposedChart data={rows} layout={bar?'vertical':'horizontal'} margin={{top:6,right:24,left:14,bottom:16}}>
+        <R.CartesianGrid stroke="#1f1f27" horizontal={!bar} vertical={bar}/>
+        {bar
+          ? (<><R.XAxis type="number" tickFormatter={fmt} tick={{fill:'#7e7e8a',fontSize:11}}/>
+               <R.YAxis type="category" dataKey="label" width={150} tick={{fill:'#7e7e8a',fontSize:11}}/></>)
+          : (<><R.XAxis dataKey="label" tick={{fill:'#7e7e8a',fontSize:11}} interval={0} angle={-20} textAnchor="end" height={60}/>
+               <R.YAxis tickFormatter={fmt} tick={{fill:'#7e7e8a',fontSize:11}}/></>)}
+        <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,boxShadow:'var(--shadow-md)'}} formatter={v=>fmt(v)}/>
+        {bar
+          ? <R.Bar dataKey="val" name={M.label} fill={COL.revenue} radius={[0,4,4,0]}/>
+          : <R.Line dataKey="val" name={M.label} stroke={COL.revenue} strokeWidth={2.2} dot={false}/>}
+      </R.ComposedChart>
+    </R.ResponsiveContainer>
+    <ChartFooter
+      note={`${M.label} by ${D.label.toLowerCase()} — ${order==='desc'?'highest':'lowest'} ${topN}.`}
+      ask={`Looking at ${M.label} by ${D.label}, what's driving the ${order==='desc'?'top':'bottom'} ${topN} and what should I do about it?`}
+      rows={rows} columns={[{key:'label',label:D.label},{key:'val',label:M.label,right:true,fmt}]}/>
+  </div>);
+}
+
 function DataFreshness(){
   const today = (()=>{ try { return new Date(); } catch(e){ return null; } })();
   const maxDate = rows => (rows && rows.length) ? rows.reduce((m,r)=> (r.date && r.date>m) ? r.date : m, '') : '';
@@ -4487,6 +4560,7 @@ function partialCorr(x,y,z){ const _r=(a,b)=>{ const v=pearson(a,b); return v==n
 // (2) WHETHER it's traffic-mix or the site itself, (3) WHAT correlates with it
 // day-to-day (ranked hypotheses to test — correlation is not causation).
 function CvrDrivers(){
+  const [showStats,setShowStats]=useState(false);
   const D = (typeof window!=='undefined' && window.FRKL_CVR) || null;
   if(!D || !D.meta || D.meta.insufficient) return (
     <div className="card"><div className="card-section-title"><h2 style={{margin:0}}>Conversion rate — drivers</h2></div>
@@ -4992,6 +5066,13 @@ function CvrDrivers(){
       </table></div>
     </div>
 
+    <button onClick={()=>setShowStats(s=>!s)} style={{display:'flex',alignItems:'center',gap:8,width:'100%',background:'transparent',border:'1px solid var(--border-subtle)',borderRadius:10,padding:'11px 14px',cursor:'pointer',textAlign:'left',marginBottom:showStats?0:14}}>
+      <span style={{color:'var(--text-faint)',display:'inline-flex',transform:showStats?'rotate(90deg)':'none',transition:'transform 120ms'}}><Icon name="chevron" size={13}/></span>
+      <span style={{fontWeight:700,color:'var(--text-primary)',fontSize:13.5}}>Show the statistics</span>
+      <span className="muted" style={{fontSize:11.5}}>correlation scan + mix-adjusted partial correlations — methodology, on demand</span>
+      <span style={{marginLeft:'auto',fontSize:11.5,color:'var(--accent)',fontWeight:600}}>{showStats?'Hide':'Show'}</span>
+    </button>
+    {showStats && (<div>
     <div className="card">
       <div className="card-section-title"><h2 style={{margin:0}}>3 · What correlates with daily CVR</h2>
         <span className="meta">ranked by strength · green = moves with CVR, red = against · ⚑ = likely confounded by traffic mix</span></div>
@@ -5038,6 +5119,7 @@ function CvrDrivers(){
         <div className="note" style={{marginTop:8}}>Expected CVR is modelled from new-visitor share (how cold the week's traffic was); big residuals are weeks where <b>something other than traffic warmth</b> moved CVR — a site change, a tracking break, a one-off promo — i.e. the genuine “investigate this” list, already stripped of the mix confound. Click a flagged week on the chart above to compare it.</div>
       </div>}
     </div>
+    </div>)}
   </div>);
 }
 
@@ -5483,9 +5565,9 @@ function RestockAlertsPanel(){
         <div className="sub">order within ~a week</div>
       </div>
       <div className="card kpi" style={{borderLeft:'3px solid var(--accent)'}}>
-        <div className="label">Revenue at risk / mo</div>
-        <div className="val">{GBP(data.atRiskMonthly)}</div>
-        <div className="sub">monthly throughput of the now + soon SKUs</div>
+        <div className="label">At risk if you don't reorder</div>
+        <div className="val">{GBP(data.atRiskMonthly)}<span style={{fontSize:13,fontWeight:600}}>/mo</span></div>
+        <div className="sub">{data.nowCount+data.soonCount} best-sellers · order this week to keep it</div>
       </div>
     </div>
     <div style={{overflowX:'auto'}}>
@@ -5500,7 +5582,7 @@ function RestockAlertsPanel(){
       </tr></thead><tbody>
       {sorted.map((r,i)=>{ const u=U[r.urgency]; const rb=reorderByLabel(r.slack);
         return (<tr key={i}>
-          <td><span className="pill" style={{background:u.bg,color:u.fg,fontSize:10,padding:'2px 7px',borderRadius:4,fontWeight:700,whiteSpace:'nowrap'}}>{u.lbl}</span></td>
+          <td><span className="pill" style={{background:u.bg,color:u.fg,fontSize:10,padding:'2px 7px',borderRadius:4,fontWeight:700,whiteSpace:'nowrap'}}>{r.urgency==='now' ? `Restock or lose ${GBP(r.monthlyRev)}/mo` : u.lbl}</span></td>
           <td className="tl" style={{fontSize:12,maxWidth:260}}>
             <b>{r.title}</b>
             {(r.type||r.sku) && <div className="muted" style={{fontSize:10}}>{r.type||''}{r.type&&r.sku?' · ':''}{r.sku?<code>{r.sku}</code>:''} · {r.leadDays}d lead</div>}
@@ -5519,7 +5601,7 @@ function RestockAlertsPanel(){
     </button>}
     <div className="note" style={{marginTop:14}}>
       {data.nowCount+data.soonCount>0
-        ? <><b>Atlas read:</b> {data.nowCount+data.soonCount} of your best sellers need a reorder placed within the week to land before they run out — roughly <b>{GBP(data.atRiskMonthly)}/mo</b> of revenue rides on it. {top ? <>Top priority: <b>{top.title}</b> — {reorderByLabel(top.slack).overdue?'order today':`order by ${reorderByLabel(top.slack).txt}`} ({top.leadDays}d lead, {GBP(top.monthlyRev)}/mo). </> : null}Place these before chasing new-SKU launches. Adjust lead times above if these don't match your suppliers.</>
+        ? <><b>Atlas read:</b> <b>{GBP(data.atRiskMonthly)}/mo</b> of revenue rides on {data.nowCount+data.soonCount} best-sellers you need to reorder within the week to land before they run out. {top ? <>Biggest: <b>{top.title}</b> — {reorderByLabel(top.slack).overdue?'order today':`order by ${reorderByLabel(top.slack).txt}`} or lose <b>{GBP(top.monthlyRev)}/mo</b> ({top.leadDays}d lead). </> : null}Place these before chasing new-SKU launches. Adjust lead times above if these don't match your suppliers.</>
         : <><b>Atlas read:</b> no good sellers need an order placed right now — the watch list shows the next ones so you stay ahead of a stock-out.</>}
     </div>
   </div>);
@@ -5570,6 +5652,17 @@ function Products(){
           {returnHotspots.map((p,i)=>(<tr key={i}><td>{p.title}</td><td>{p.units}</td><td>{p.returns}</td><td><span className="pill red">{PCT(p.returnRate)}</span></td></tr>))}
         </tbody></table>
       </div>)}
+      <ConfigurableChart
+        title="Explore products"
+        dataset={products}
+        dimensions={[{key:'title',label:'Product'},{key:'type',label:'Type'}]}
+        metrics={[
+          {key:'grossProfit',label:'Gross profit',fmt:GBP},
+          {key:'netSales',label:'Net revenue',fmt:GBP},
+          {key:'units',label:'Units',fmt:NUM},
+          {key:'returns',label:'Returns',fmt:NUM},
+        ]}
+        defaultMetric="grossProfit" defaultSplit="title" defaultChart="bar" defaultTopN={10}/>
       <div className="card" style={{marginBottom:14,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}}>
         <h2 style={{margin:0}}>Top SKUs — sortable</h2>
         <div className="seg">{['units','netSales','grossProfit','marginPct','returnRate'].map(s=>(<button key={s} className={sort===s?'on':''} onClick={()=>setSort(s)}>{ {units:'Units',netSales:'Revenue',grossProfit:'Gross profit',marginPct:'Margin %',returnRate:'Return %'}[s] }</button>))}</div>
@@ -8341,6 +8434,7 @@ function ProductRetentionMatrix(){
 // rises. The whole point: never remind the user to do something already done.
 function RestockActionQueue(){
   usePlanningTick();
+  const [showAllToOrder,setShowAllToOrder]=useState(false);
   const R = planReorder();
   const {toOrder, awaiting, oosNow, ackPending} = R;
   const ackKeys = Object.keys(ackPending||{});
@@ -8358,7 +8452,8 @@ function RestockActionQueue(){
     </div>
 
     {toOrder.length>0 ? (<div style={{display:'flex',flexDirection:'column',gap:7}}>
-      {toOrder.slice(0,8).map((l,idx)=>{ const urgent=l.oosBeforeLead;
+      {/* Urgent (OOS-before-lead) rows always show; the non-urgent tail collapses to keep the queue scannable. */}
+      {(showAllToOrder ? toOrder : toOrder.filter(l=>l.oosBeforeLead)).slice(0,12).map((l,idx)=>{ const urgent=l.oosBeforeLead;
         return (<div key={idx} style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',padding:'8px 0',borderTop:idx?'1px solid var(--border-subtle)':'none'}}>
           <span style={{width:8,height:8,borderRadius:'50%',background:urgent?'var(--bad)':'var(--warn)',flexShrink:0}}/>
           <div style={{flex:1,minWidth:200}}>
@@ -8368,7 +8463,10 @@ function RestockActionQueue(){
           <button style={{...btn,background:'var(--accent)',color:'#fff',borderColor:'var(--accent)'}} onClick={()=>raise(l)}><Icon name="check" size={12}/> Mark PO raised</button>
           <button style={btn} onClick={()=>window.__oiNav&&window.__oiNav('planning','plan')}>Open planner</button>
         </div>); })}
-      {toOrder.length>8 && <div style={{fontSize:11.5,color:'var(--text-faint)',paddingTop:6}}><a className="txt-link" onClick={()=>window.__oiNav&&window.__oiNav('planning','plan')} style={{cursor:'pointer'}}>+ {toOrder.length-8} more in the planner</a></div>}
+      {(()=>{ const rest=toOrder.filter(l=>!l.oosBeforeLead); if(!rest.length) return null;
+        if(!showAllToOrder){ const restVal=rest.reduce((a,l)=>a+(l.lineCost||0),0); return (<button onClick={()=>setShowAllToOrder(true)} style={{...btn,alignSelf:'flex-start',marginTop:4}}>Show {rest.length} more to order{restVal>0?` · ~£${k(restVal)}`:''}</button>); }
+        return (<a className="txt-link" onClick={()=>setShowAllToOrder(false)} style={{cursor:'pointer',fontSize:11.5,marginTop:4,alignSelf:'flex-start'}}>Show less</a>); })()}
+      {showAllToOrder && toOrder.length>12 && <div style={{fontSize:11.5,color:'var(--text-faint)',paddingTop:6}}><a className="txt-link" onClick={()=>window.__oiNav&&window.__oiNav('planning','plan')} style={{cursor:'pointer'}}>+ {toOrder.length-12} more in the planner</a></div>}
     </div>) : <div className="muted" style={{fontSize:12.5,padding:'2px 0'}}>Nothing to order right now — {awaiting.length} PO{awaiting.length===1?'':'s'} awaiting stock below.</div>}
 
     {awaiting.length>0 && (<div style={{marginTop:12,paddingTop:10,borderTop:'1px solid var(--border-subtle)'}}>
