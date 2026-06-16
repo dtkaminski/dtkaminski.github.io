@@ -4155,6 +4155,12 @@ function Customers(){
         </R.ComposedChart>
       </R.ResponsiveContainer>
     </div>
+    <ConfigurableChart
+      title="Explore markets — Shopify settlement"
+      dataset={(geo||[]).map(g=>({country:g.country||'(unknown)', region:/kingdom|^uk$|^gb$/i.test(g.country||'')?'UK':/ireland|^ie$/i.test(g.country||'')?'Ireland':'Rest of world', revenue:g.netSales||0, orders:g.orders||0}))}
+      dimensions={[{key:'country',label:'Country'},{key:'region',label:'Region (UK/IE/RoW)'}]}
+      metrics={[{key:'revenue',label:'Net revenue',fmt:GBP},{key:'orders',label:'Orders',fmt:NUM}]}
+      defaultMetric="revenue" defaultSplit="country" defaultChart="bar" defaultTopN={10}/>
     <div className="row">
       <div className="card" style={{flex:'1 1 360px'}}>
         <h2>Markets — top 10</h2>
@@ -5394,6 +5400,12 @@ function DiscountCodeTracker(){
       <ChartFooter ask="From discount-code usage over time, which codes are always-on structural margin give-away vs one-off campaign spikes, and where should I tighten?"/>
     </div>
 
+    <ConfigurableChart
+      title="Explore codes — marketing discounts"
+      dataset={mkt.map(c=>({code:c.code, pattern:(DC_PATTERN[c.pattern]||DC_PATTERN.recurring).label, discount:c.discount||0, revenue:c.revenue||0, orders:c.orders||0}))}
+      dimensions={[{key:'code',label:'Code'},{key:'pattern',label:'Pattern'}]}
+      metrics={[{key:'discount',label:'Discount £',fmt:GBP},{key:'revenue',label:'Revenue',fmt:GBP},{key:'orders',label:'Orders',fmt:NUM}]}
+      defaultMetric="discount" defaultSplit="code" defaultChart="bar" defaultTopN={10}/>
     <div className="card">
       <div className="card-section-title"><h2 style={{margin:0}}>By code</h2>
         <span className="meta">marketing codes · sorted by orders · sparkline = weekly usage across the window</span></div>
