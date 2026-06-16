@@ -3,10 +3,10 @@ window.FRKL_DATA = {
  "meta": {
   "brand": "frkl",
   "currency": "GBP",
-  "captured": "2026-06-14",
+  "captured": "2026-06-16",
   "range": {
    "start": "2026-01-15",
-   "end": "2026-06-14"
+   "end": "2026-06-16"
   },
   "source": "Supermetrics (live) — Meta FA, Google Ads AW, GA4 GAWA, Klaviyo KLAV, Shopify SHP",
   "shopifySegmentation": "DTC = Online Store. Wholesale = John Lewis + Faire (channel 4901177). Gifting = Draft Orders. Headline metrics exclude wholesale and gifting."
@@ -838,17 +838,25 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-06-14",
-   "cost": 156.35,
-   "impressions": 15566,
+   "cost": 156.36,
+   "impressions": 15568,
    "linkCtr": 0.0199,
    "purchases": 1,
    "purchaseValue": 70
   },
   {
    "date": "2026-06-15",
-   "cost": 16.91,
-   "impressions": 2093,
-   "linkCtr": 0.0091,
+   "cost": 149.3,
+   "impressions": 16912,
+   "linkCtr": 0.0148,
+   "purchases": 4,
+   "purchaseValue": 250.46
+  },
+  {
+   "date": "2026-06-16",
+   "cost": 13.98,
+   "impressions": 1458,
+   "linkCtr": 0.0082,
    "purchases": null,
    "purchaseValue": null
   }
@@ -2852,24 +2860,35 @@ window.FRKL_DATA = {
   {
    "date": "2026-06-14",
    "sessions": 767,
-   "engagedSessions": 389,
-   "engagementRate": 0.5072,
+   "engagedSessions": 386,
+   "engagementRate": 0.5033,
    "addToCarts": 116,
    "checkouts": 15,
    "purchases": 2,
    "revenue": 227,
-   "bounceRate": 0.4928
+   "bounceRate": 0.4967
   },
   {
    "date": "2026-06-15",
-   "sessions": 13,
+   "sessions": 630,
+   "engagedSessions": 300,
+   "engagementRate": 0.4762,
+   "addToCarts": 98,
+   "checkouts": 20,
+   "purchases": 9,
+   "revenue": 475.47,
+   "bounceRate": 0.5238
+  },
+  {
+   "date": "2026-06-16",
+   "sessions": 15,
    "engagedSessions": 5,
-   "engagementRate": 0.3846,
-   "addToCarts": 2,
-   "checkouts": 0,
+   "engagementRate": 0.3333,
+   "addToCarts": 4,
+   "checkouts": 4,
    "purchases": 0,
    "revenue": 0,
-   "bounceRate": 0.6154
+   "bounceRate": 0.6667
   }
  ],
  "klaviyo": [
@@ -3655,11 +3674,11 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-05-16",
-   "recipients": 8839,
-   "opens": 4629,
-   "clicks": 188,
-   "openRate": 0.5237,
-   "clickRate": 0.0213,
+   "recipients": 8832,
+   "opens": 4459,
+   "clicks": 176,
+   "openRate": 0.5049,
+   "clickRate": 0.0199,
    "orders": 14,
    "orderValue": 1321.87
   },
@@ -3945,114 +3964,430 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-06-14",
-   "recipients": 9,
-   "opens": 297,
+   "recipients": 189,
+   "opens": 1338,
+   "clicks": 33,
+   "openRate": 1,
+   "clickRate": 0.1746,
+   "orders": 15,
+   "orderValue": 951.42
+  },
+  {
+   "date": "2026-06-15",
+   "recipients": 5,
+   "opens": 246,
    "clicks": 3,
    "openRate": 1,
-   "clickRate": 0.3333,
-   "orders": 0,
-   "orderValue": 0
+   "clickRate": 0.6,
+   "orders": 1,
+   "orderValue": 80
   }
  ],
  "shopify": [
   {
    "date": "2026-01-15",
-   "totalSales": 160.0,
-   "netSales": 160.0,
-   "orders": 1,
-   "discounts": 0.0,
+   "totalSales": 1906.92,
+   "netSales": 1728.16,
+   "orders": 21,
+   "discounts": 178.76,
    "returns": 0.0,
-   "aov": 160.0
+   "aov": 90.81
+  },
+  {
+   "date": "2026-01-16",
+   "totalSales": 1285.66,
+   "netSales": 1119.01,
+   "orders": 17,
+   "discounts": 166.65,
+   "returns": 0.0,
+   "aov": 75.63
+  },
+  {
+   "date": "2026-01-17",
+   "totalSales": 1378.04,
+   "netSales": 1162.99,
+   "orders": 20,
+   "discounts": 215.05,
+   "returns": 0.0,
+   "aov": 68.9
+  },
+  {
+   "date": "2026-01-18",
+   "totalSales": 1046.08,
+   "netSales": 946.44,
+   "orders": 14,
+   "discounts": 99.64,
+   "returns": 0.0,
+   "aov": 74.72
+  },
+  {
+   "date": "2026-01-19",
+   "totalSales": 918.46,
+   "netSales": 775.82,
+   "orders": 17,
+   "discounts": 142.64,
+   "returns": 0.0,
+   "aov": 54.03
+  },
+  {
+   "date": "2026-01-20",
+   "totalSales": 611.31,
+   "netSales": 543.65,
+   "orders": 9,
+   "discounts": 67.66,
+   "returns": 0.0,
+   "aov": 67.92
+  },
+  {
+   "date": "2026-01-21",
+   "totalSales": 761.11,
+   "netSales": 655.21,
+   "orders": 9,
+   "discounts": 105.9,
+   "returns": 0.0,
+   "aov": 84.57
+  },
+  {
+   "date": "2026-01-22",
+   "totalSales": 629.21,
+   "netSales": 608.77,
+   "orders": 6,
+   "discounts": 20.44,
+   "returns": 0.0,
+   "aov": 104.87
+  },
+  {
+   "date": "2026-01-23",
+   "totalSales": 1290.19,
+   "netSales": 1096.05,
+   "orders": 12,
+   "discounts": 194.14,
+   "returns": 0.0,
+   "aov": 107.52
+  },
+  {
+   "date": "2026-01-24",
+   "totalSales": 905.49,
+   "netSales": 790.38,
+   "orders": 10,
+   "discounts": 115.11,
+   "returns": 0.0,
+   "aov": 90.55
+  },
+  {
+   "date": "2026-01-25",
+   "totalSales": 582.68,
+   "netSales": 481.69,
+   "orders": 10,
+   "discounts": 100.99,
+   "returns": 0.0,
+   "aov": 58.27
+  },
+  {
+   "date": "2026-01-26",
+   "totalSales": 172.32,
+   "netSales": 147.21,
+   "orders": 3,
+   "discounts": 25.11,
+   "returns": 0.0,
+   "aov": 57.44
+  },
+  {
+   "date": "2026-01-27",
+   "totalSales": 599.01,
+   "netSales": 493.31,
+   "orders": 6,
+   "discounts": 105.7,
+   "returns": 0.0,
+   "aov": 99.83
+  },
+  {
+   "date": "2026-01-28",
+   "totalSales": 1075.23,
+   "netSales": 872.44,
+   "orders": 12,
+   "discounts": 202.79,
+   "returns": 0.0,
+   "aov": 89.6
+  },
+  {
+   "date": "2026-01-29",
+   "totalSales": 856.09,
+   "netSales": 734.01,
+   "orders": 9,
+   "discounts": 122.08,
+   "returns": 0.0,
+   "aov": 95.12
+  },
+  {
+   "date": "2026-01-30",
+   "totalSales": 952.82,
+   "netSales": 836.74,
+   "orders": 8,
+   "discounts": 116.08,
+   "returns": 0.0,
+   "aov": 119.1
+  },
+  {
+   "date": "2026-01-31",
+   "totalSales": 411.67,
+   "netSales": 354.74,
+   "orders": 7,
+   "discounts": 56.93,
+   "returns": 0.0,
+   "aov": 58.81
   },
   {
    "date": "2026-02-01",
-   "totalSales": 121.4,
-   "netSales": 99.98,
-   "orders": 1,
-   "discounts": 21.42,
+   "totalSales": 634.4,
+   "netSales": 561.98,
+   "orders": 7,
+   "discounts": 72.42,
    "returns": 0.0,
-   "aov": 121.4
+   "aov": 90.63
+  },
+  {
+   "date": "2026-02-02",
+   "totalSales": 727.91,
+   "netSales": 607.49,
+   "orders": 8,
+   "discounts": 120.42,
+   "returns": 0.0,
+   "aov": 90.99
   },
   {
    "date": "2026-02-03",
-   "totalSales": 235.0,
-   "netSales": 235.0,
-   "orders": 1,
-   "discounts": 0.0,
+   "totalSales": 877.72,
+   "netSales": 777.55,
+   "orders": 9,
+   "discounts": 100.17,
    "returns": 0.0,
-   "aov": 235.0
+   "aov": 97.52
+  },
+  {
+   "date": "2026-02-04",
+   "totalSales": 880.75,
+   "netSales": 794.5,
+   "orders": 11,
+   "discounts": 86.25,
+   "returns": 0.0,
+   "aov": 80.07
+  },
+  {
+   "date": "2026-02-05",
+   "totalSales": 574.01,
+   "netSales": 454.48,
+   "orders": 7,
+   "discounts": 119.53,
+   "returns": 0.0,
+   "aov": 82.0
+  },
+  {
+   "date": "2026-02-06",
+   "totalSales": 118.21,
+   "netSales": 102.85,
+   "orders": 3,
+   "discounts": 15.36,
+   "returns": 0.0,
+   "aov": 39.4
   },
   {
    "date": "2026-02-07",
-   "totalSales": 136.0,
-   "netSales": 112.0,
-   "orders": 1,
-   "discounts": 24.0,
+   "totalSales": 1316.11,
+   "netSales": 1167.81,
+   "orders": 17,
+   "discounts": 148.3,
    "returns": 0.0,
-   "aov": 136.0
+   "aov": 77.42
+  },
+  {
+   "date": "2026-02-08",
+   "totalSales": 608.11,
+   "netSales": 530.8,
+   "orders": 8,
+   "discounts": 77.31,
+   "returns": 0.0,
+   "aov": 76.01
+  },
+  {
+   "date": "2026-02-09",
+   "totalSales": 542.15,
+   "netSales": 378.83,
+   "orders": 6,
+   "discounts": 163.32,
+   "returns": 0.0,
+   "aov": 90.36
+  },
+  {
+   "date": "2026-02-10",
+   "totalSales": 1111.8,
+   "netSales": 946.4,
+   "orders": 9,
+   "discounts": 165.4,
+   "returns": 0.0,
+   "aov": 123.53
   },
   {
    "date": "2026-02-11",
-   "totalSales": 89.25,
-   "netSales": 73.5,
-   "orders": 1,
-   "discounts": 15.75,
+   "totalSales": 637.17,
+   "netSales": 525.55,
+   "orders": 8,
+   "discounts": 111.62,
    "returns": 0.0,
-   "aov": 89.25
+   "aov": 79.65
+  },
+  {
+   "date": "2026-02-12",
+   "totalSales": 388.42,
+   "netSales": 318.22,
+   "orders": 5,
+   "discounts": 70.2,
+   "returns": 0.0,
+   "aov": 77.68
+  },
+  {
+   "date": "2026-02-13",
+   "totalSales": 992.78,
+   "netSales": 880.05,
+   "orders": 10,
+   "discounts": 112.73,
+   "returns": 0.0,
+   "aov": 99.28
+  },
+  {
+   "date": "2026-02-14",
+   "totalSales": 532.83,
+   "netSales": 466.58,
+   "orders": 7,
+   "discounts": 66.25,
+   "returns": 0.0,
+   "aov": 76.12
+  },
+  {
+   "date": "2026-02-15",
+   "totalSales": 857.52,
+   "netSales": 735.13,
+   "orders": 11,
+   "discounts": 122.39,
+   "returns": 0.0,
+   "aov": 77.96
+  },
+  {
+   "date": "2026-02-16",
+   "totalSales": 504.38,
+   "netSales": 405.88,
+   "orders": 7,
+   "discounts": 98.5,
+   "returns": 0.0,
+   "aov": 72.05
+  },
+  {
+   "date": "2026-02-17",
+   "totalSales": 261.5,
+   "netSales": 217.0,
+   "orders": 3,
+   "discounts": 44.5,
+   "returns": 0.0,
+   "aov": 87.17
+  },
+  {
+   "date": "2026-02-18",
+   "totalSales": 360.97,
+   "netSales": 333.54,
+   "orders": 3,
+   "discounts": 27.43,
+   "returns": 0.0,
+   "aov": 120.32
+  },
+  {
+   "date": "2026-02-19",
+   "totalSales": 147.15,
+   "netSales": 130.81,
+   "orders": 1,
+   "discounts": 16.34,
+   "returns": 0.0,
+   "aov": 147.15
+  },
+  {
+   "date": "2026-02-20",
+   "totalSales": 425.88,
+   "netSales": 405.88,
+   "orders": 5,
+   "discounts": 20.0,
+   "returns": 0.0,
+   "aov": 85.18
+  },
+  {
+   "date": "2026-02-21",
+   "totalSales": 951.88,
+   "netSales": 883.16,
+   "orders": 9,
+   "discounts": 68.72,
+   "returns": 0.0,
+   "aov": 105.76
+  },
+  {
+   "date": "2026-02-22",
+   "totalSales": 1003.39,
+   "netSales": 894.66,
+   "orders": 13,
+   "discounts": 108.73,
+   "returns": 0.0,
+   "aov": 77.18
   },
   {
    "date": "2026-02-23",
-   "totalSales": 72.0,
-   "netSales": 64.0,
-   "orders": 1,
-   "discounts": 8.0,
+   "totalSales": 826.5,
+   "netSales": 773.0,
+   "orders": 9,
+   "discounts": 53.5,
    "returns": 0.0,
-   "aov": 72.0
+   "aov": 91.83
   },
   {
    "date": "2026-02-24",
-   "totalSales": 130.5,
-   "netSales": 116.0,
-   "orders": 1,
-   "discounts": 14.5,
+   "totalSales": 585.38,
+   "netSales": 551.47,
+   "orders": 7,
+   "discounts": 33.91,
    "returns": 0.0,
-   "aov": 130.5
+   "aov": 83.63
   },
   {
    "date": "2026-02-25",
-   "totalSales": 50.0,
-   "netSales": 50.0,
-   "orders": 1,
-   "discounts": 0.0,
+   "totalSales": 608.96,
+   "netSales": 548.21,
+   "orders": 8,
+   "discounts": 60.75,
    "returns": 0.0,
-   "aov": 50.0
+   "aov": 76.12
   },
   {
    "date": "2026-02-26",
-   "totalSales": 169.44,
-   "netSales": 169.44,
-   "orders": 2,
-   "discounts": 0.0,
+   "totalSales": 667.74,
+   "netSales": 627.74,
+   "orders": 7,
+   "discounts": 40.0,
    "returns": 0.0,
-   "aov": 84.72
+   "aov": 95.39
   },
   {
    "date": "2026-02-27",
-   "totalSales": 878.53,
-   "netSales": 829.15,
-   "orders": 9,
-   "discounts": 49.38,
+   "totalSales": 2291.93,
+   "netSales": 2093.95,
+   "orders": 32,
+   "discounts": 197.98,
    "returns": 0.0,
-   "aov": 97.61
+   "aov": 71.62
   },
   {
    "date": "2026-02-28",
-   "totalSales": 940.54,
-   "netSales": 851.04,
-   "orders": 14,
-   "discounts": 89.5,
+   "totalSales": 1974.44,
+   "netSales": 1857.84,
+   "orders": 28,
+   "discounts": 116.6,
    "returns": 0.0,
-   "aov": 67.18
+   "aov": 70.52
   },
   {
    "date": "2026-03-01",
@@ -5007,11 +5342,191 @@ window.FRKL_DATA = {
    "discounts": 34.5,
    "returns": 0.0,
    "aov": 103.5
+  },
+  {
+   "date": "2026-06-15",
+   "totalSales": 475.69,
+   "netSales": 435.8,
+   "orders": 9,
+   "discounts": 39.89,
+   "returns": 0.0,
+   "aov": 52.85
+  },
+  {
+   "date": "2026-06-16",
+   "totalSales": 80.0,
+   "netSales": 80.0,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "aov": 80.0
   }
  ],
  "shopifyWholesale": [
   {
+   "date": "2026-01-17",
+   "totalSales": 70.83,
+   "netSales": 70.83,
+   "orders": 2,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "aov": 35.41
+  },
+  {
+   "date": "2026-01-18",
+   "totalSales": 287.5,
+   "netSales": 287.5,
+   "orders": 3,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "aov": 95.83
+  },
+  {
+   "date": "2026-01-19",
+   "totalSales": 241.67,
+   "netSales": 241.67,
+   "orders": 3,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "aov": 80.56
+  },
+  {
+   "date": "2026-01-20",
+   "totalSales": 75.0,
+   "netSales": 75.0,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "aov": 75.0
+  },
+  {
+   "date": "2026-01-23",
+   "totalSales": 70.83,
+   "netSales": 70.83,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "aov": 70.83
+  },
+  {
+   "date": "2026-01-24",
+   "totalSales": 45.83,
+   "netSales": 45.83,
+   "orders": 2,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "aov": 22.91
+  },
+  {
+   "date": "2026-01-26",
+   "totalSales": 20.83,
+   "netSales": 20.83,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "aov": 20.83
+  },
+  {
+   "date": "2026-01-29",
+   "totalSales": 125.0,
+   "netSales": -45.0,
+   "orders": 2,
+   "discounts": 170.0,
+   "returns": 0.0,
+   "aov": 62.5
+  },
+  {
+   "date": "2026-02-01",
+   "totalSales": 66.66,
+   "netSales": 66.66,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "aov": 66.66
+  },
+  {
+   "date": "2026-02-02",
+   "totalSales": 158.33,
+   "netSales": -31.669999999999987,
+   "orders": 3,
+   "discounts": 190.0,
+   "returns": 0.0,
+   "aov": 52.78
+  },
+  {
+   "date": "2026-02-04",
+   "totalSales": 395.82,
+   "netSales": 205.82,
+   "orders": 5,
+   "discounts": 190.0,
+   "returns": 0.0,
+   "aov": 79.16
+  },
+  {
+   "date": "2026-02-05",
+   "totalSales": 37.5,
+   "netSales": 37.5,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "aov": 37.5
+  },
+  {
+   "date": "2026-02-07",
+   "totalSales": 104.17,
+   "netSales": 104.17,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "aov": 104.17
+  },
+  {
+   "date": "2026-02-08",
+   "totalSales": 54.17,
+   "netSales": -135.82999999999998,
+   "orders": 2,
+   "discounts": 190.0,
+   "returns": 0.0,
+   "aov": 27.09
+  },
+  {
    "date": "2026-02-09",
+   "totalSales": 75.0,
+   "netSales": 75.0,
+   "orders": 2,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "aov": 37.5
+  },
+  {
+   "date": "2026-02-10",
+   "totalSales": 37.5,
+   "netSales": 37.5,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "aov": 37.5
+  },
+  {
+   "date": "2026-02-11",
+   "totalSales": 41.66,
+   "netSales": 41.66,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "aov": 41.66
+  },
+  {
+   "date": "2026-02-13",
+   "totalSales": 20.83,
+   "netSales": 20.83,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "aov": 20.83
+  },
+  {
+   "date": "2026-02-17",
    "totalSales": 25.0,
    "netSales": 25.0,
    "orders": 1,
@@ -5020,7 +5535,25 @@ window.FRKL_DATA = {
    "aov": 25.0
   },
   {
+   "date": "2026-02-19",
+   "totalSales": 245.84,
+   "netSales": 55.84,
+   "orders": 5,
+   "discounts": 190.0,
+   "returns": 0.0,
+   "aov": 49.17
+  },
+  {
    "date": "2026-02-22",
+   "totalSales": 25.0,
+   "netSales": 25.0,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "aov": 25.0
+  },
+  {
+   "date": "2026-02-26",
    "totalSales": 25.0,
    "netSales": 25.0,
    "orders": 1,
@@ -5567,9 +6100,243 @@ window.FRKL_DATA = {
    "discounts": 0.0,
    "returns": 0.0,
    "aov": 62.49
+  },
+  {
+   "date": "2026-06-15",
+   "totalSales": 362.5,
+   "netSales": 172.5,
+   "orders": 3,
+   "discounts": 190.0,
+   "returns": 0.0,
+   "aov": 120.83
   }
  ],
  "shopifyGifting": [
+  {
+   "date": "2026-01-15",
+   "totalSales": 0.0,
+   "netSales": -185.0,
+   "orders": 4,
+   "discounts": 185.0,
+   "returns": 0.0,
+   "aov": 0.0
+  },
+  {
+   "date": "2026-01-16",
+   "totalSales": 0.0,
+   "netSales": -114.37,
+   "orders": 2,
+   "discounts": 114.37,
+   "returns": 0.0,
+   "aov": 0.0
+  },
+  {
+   "date": "2026-01-19",
+   "totalSales": 0.0,
+   "netSales": -258.99,
+   "orders": 5,
+   "discounts": 258.99,
+   "returns": 0.0,
+   "aov": 0.0
+  },
+  {
+   "date": "2026-01-20",
+   "totalSales": 0.0,
+   "netSales": -19.1,
+   "orders": 1,
+   "discounts": 19.1,
+   "returns": 0.0,
+   "aov": 0.0
+  },
+  {
+   "date": "2026-01-21",
+   "totalSales": 0.0,
+   "netSales": -405.0,
+   "orders": 3,
+   "discounts": 405.0,
+   "returns": 0.0,
+   "aov": 0.0
+  },
+  {
+   "date": "2026-01-22",
+   "totalSales": 0.0,
+   "netSales": -139.86,
+   "orders": 2,
+   "discounts": 139.86,
+   "returns": 0.0,
+   "aov": 0.0
+  },
+  {
+   "date": "2026-01-26",
+   "totalSales": 0.0,
+   "netSales": -95.16,
+   "orders": 3,
+   "discounts": 95.16,
+   "returns": 0.0,
+   "aov": 0.0
+  },
+  {
+   "date": "2026-01-27",
+   "totalSales": 0.0,
+   "netSales": -81.64,
+   "orders": 1,
+   "discounts": 81.64,
+   "returns": 0.0,
+   "aov": 0.0
+  },
+  {
+   "date": "2026-01-28",
+   "totalSales": 0.0,
+   "netSales": -448.8,
+   "orders": 4,
+   "discounts": 448.8,
+   "returns": 0.0,
+   "aov": 0.0
+  },
+  {
+   "date": "2026-01-29",
+   "totalSales": 0.0,
+   "netSales": -272.26,
+   "orders": 3,
+   "discounts": 272.26,
+   "returns": 0.0,
+   "aov": 0.0
+  },
+  {
+   "date": "2026-01-30",
+   "totalSales": 0.0,
+   "netSales": -235.0,
+   "orders": 2,
+   "discounts": 235.0,
+   "returns": 0.0,
+   "aov": 0.0
+  },
+  {
+   "date": "2026-02-02",
+   "totalSales": 0.0,
+   "netSales": -162.08,
+   "orders": 2,
+   "discounts": 162.08,
+   "returns": 0.0,
+   "aov": 0.0
+  },
+  {
+   "date": "2026-02-03",
+   "totalSales": 0.0,
+   "netSales": -111.0,
+   "orders": 1,
+   "discounts": 111.0,
+   "returns": 0.0,
+   "aov": 0.0
+  },
+  {
+   "date": "2026-02-04",
+   "totalSales": 0.0,
+   "netSales": -30.0,
+   "orders": 1,
+   "discounts": 30.0,
+   "returns": 0.0,
+   "aov": 0.0
+  },
+  {
+   "date": "2026-02-05",
+   "totalSales": 0.0,
+   "netSales": -328.39,
+   "orders": 1,
+   "discounts": 328.39,
+   "returns": 0.0,
+   "aov": 0.0
+  },
+  {
+   "date": "2026-02-09",
+   "totalSales": 30.0,
+   "netSales": -55.0,
+   "orders": 2,
+   "discounts": 85.0,
+   "returns": 0.0,
+   "aov": 15.0
+  },
+  {
+   "date": "2026-02-10",
+   "totalSales": 0.0,
+   "netSales": -555.0,
+   "orders": 1,
+   "discounts": 555.0,
+   "returns": 0.0,
+   "aov": 0.0
+  },
+  {
+   "date": "2026-02-11",
+   "totalSales": 0.0,
+   "netSales": -151.34,
+   "orders": 2,
+   "discounts": 151.34,
+   "returns": 0.0,
+   "aov": 0.0
+  },
+  {
+   "date": "2026-02-13",
+   "totalSales": 0.0,
+   "netSales": -587.81,
+   "orders": 2,
+   "discounts": 587.81,
+   "returns": 0.0,
+   "aov": 0.0
+  },
+  {
+   "date": "2026-02-14",
+   "totalSales": 0.0,
+   "netSales": -50.0,
+   "orders": 1,
+   "discounts": 50.0,
+   "returns": 0.0,
+   "aov": 0.0
+  },
+  {
+   "date": "2026-02-16",
+   "totalSales": 0.0,
+   "netSales": -12.0,
+   "orders": 1,
+   "discounts": 12.0,
+   "returns": 0.0,
+   "aov": 0.0
+  },
+  {
+   "date": "2026-02-17",
+   "totalSales": 0.0,
+   "netSales": -204.85,
+   "orders": 2,
+   "discounts": 204.85,
+   "returns": 0.0,
+   "aov": 0.0
+  },
+  {
+   "date": "2026-02-18",
+   "totalSales": 0.0,
+   "netSales": -304.99,
+   "orders": 2,
+   "discounts": 304.99,
+   "returns": 0.0,
+   "aov": 0.0
+  },
+  {
+   "date": "2026-02-19",
+   "totalSales": 0.0,
+   "netSales": -140.0,
+   "orders": 1,
+   "discounts": 140.0,
+   "returns": 0.0,
+   "aov": 0.0
+  },
+  {
+   "date": "2026-02-23",
+   "totalSales": 0.0,
+   "netSales": -225.39,
+   "orders": 2,
+   "discounts": 225.39,
+   "returns": 0.0,
+   "aov": 0.0
+  },
   {
    "date": "2026-03-02",
    "totalSales": 0.0,
@@ -6100,9 +6867,72 @@ window.FRKL_DATA = {
    "discounts": 77.6,
    "returns": 0.0,
    "aov": 0.0
+  },
+  {
+   "date": "2026-06-15",
+   "totalSales": 0.0,
+   "netSales": -622.12,
+   "orders": 3,
+   "discounts": 622.12,
+   "returns": 0.0,
+   "aov": 0.0
   }
  ],
  "shopifyOther": [
+  {
+   "date": "2026-01-17",
+   "totalSales": 137.81,
+   "netSales": 137.81,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "aov": 137.81
+  },
+  {
+   "date": "2026-02-05",
+   "totalSales": 30.0,
+   "netSales": 30.0,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "aov": 30.0
+  },
+  {
+   "date": "2026-02-12",
+   "totalSales": 114.75,
+   "netSales": 94.5,
+   "orders": 1,
+   "discounts": 20.25,
+   "returns": 0.0,
+   "aov": 114.75
+  },
+  {
+   "date": "2026-02-15",
+   "totalSales": 107.07,
+   "netSales": 88.18,
+   "orders": 1,
+   "discounts": 18.89,
+   "returns": 0.0,
+   "aov": 107.07
+  },
+  {
+   "date": "2026-02-22",
+   "totalSales": 25.5,
+   "netSales": 21.0,
+   "orders": 1,
+   "discounts": 4.5,
+   "returns": 0.0,
+   "aov": 25.5
+  },
+  {
+   "date": "2026-02-28",
+   "totalSales": 42.0,
+   "netSales": 42.0,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "aov": 42.0
+  },
   {
    "date": "2026-04-24",
    "totalSales": 125.25,
@@ -6179,120 +7009,408 @@ window.FRKL_DATA = {
  "shopifyAll": [
   {
    "date": "2026-01-15",
-   "totalSales": 160.0,
-   "netSales": 160.0,
-   "orders": 1,
-   "discounts": 0.0,
+   "totalSales": 1906.92,
+   "netSales": 1543.16,
+   "orders": 25,
+   "discounts": 363.76,
    "returns": 0.0,
-   "aov": 160.0
+   "aov": 76.28
+  },
+  {
+   "date": "2026-01-16",
+   "totalSales": 1285.66,
+   "netSales": 1004.64,
+   "orders": 19,
+   "discounts": 281.02,
+   "returns": 0.0,
+   "aov": 67.67
+  },
+  {
+   "date": "2026-01-17",
+   "totalSales": 1586.6799999999998,
+   "netSales": 1371.63,
+   "orders": 23,
+   "discounts": 215.05,
+   "returns": 0.0,
+   "aov": 68.99
+  },
+  {
+   "date": "2026-01-18",
+   "totalSales": 1333.58,
+   "netSales": 1233.94,
+   "orders": 17,
+   "discounts": 99.64,
+   "returns": 0.0,
+   "aov": 78.45
+  },
+  {
+   "date": "2026-01-19",
+   "totalSales": 1160.13,
+   "netSales": 758.5,
+   "orders": 25,
+   "discounts": 401.63,
+   "returns": 0.0,
+   "aov": 46.41
+  },
+  {
+   "date": "2026-01-20",
+   "totalSales": 686.31,
+   "netSales": 599.55,
+   "orders": 11,
+   "discounts": 86.75999999999999,
+   "returns": 0.0,
+   "aov": 62.39
+  },
+  {
+   "date": "2026-01-21",
+   "totalSales": 761.11,
+   "netSales": 250.21000000000004,
+   "orders": 12,
+   "discounts": 510.9,
+   "returns": 0.0,
+   "aov": 63.43
+  },
+  {
+   "date": "2026-01-22",
+   "totalSales": 629.21,
+   "netSales": 468.90999999999997,
+   "orders": 8,
+   "discounts": 160.3,
+   "returns": 0.0,
+   "aov": 78.65
+  },
+  {
+   "date": "2026-01-23",
+   "totalSales": 1361.02,
+   "netSales": 1166.8799999999999,
+   "orders": 13,
+   "discounts": 194.14,
+   "returns": 0.0,
+   "aov": 104.69
+  },
+  {
+   "date": "2026-01-24",
+   "totalSales": 951.32,
+   "netSales": 836.21,
+   "orders": 12,
+   "discounts": 115.11,
+   "returns": 0.0,
+   "aov": 79.28
+  },
+  {
+   "date": "2026-01-25",
+   "totalSales": 582.68,
+   "netSales": 481.69,
+   "orders": 10,
+   "discounts": 100.99,
+   "returns": 0.0,
+   "aov": 58.27
+  },
+  {
+   "date": "2026-01-26",
+   "totalSales": 193.14999999999998,
+   "netSales": 72.88000000000002,
+   "orders": 7,
+   "discounts": 120.27,
+   "returns": 0.0,
+   "aov": 27.59
+  },
+  {
+   "date": "2026-01-27",
+   "totalSales": 599.01,
+   "netSales": 411.67,
+   "orders": 7,
+   "discounts": 187.34,
+   "returns": 0.0,
+   "aov": 85.57
+  },
+  {
+   "date": "2026-01-28",
+   "totalSales": 1075.23,
+   "netSales": 423.64000000000004,
+   "orders": 16,
+   "discounts": 651.59,
+   "returns": 0.0,
+   "aov": 67.2
+  },
+  {
+   "date": "2026-01-29",
+   "totalSales": 981.09,
+   "netSales": 416.75,
+   "orders": 14,
+   "discounts": 564.3399999999999,
+   "returns": 0.0,
+   "aov": 70.08
+  },
+  {
+   "date": "2026-01-30",
+   "totalSales": 952.82,
+   "netSales": 601.74,
+   "orders": 10,
+   "discounts": 351.08,
+   "returns": 0.0,
+   "aov": 95.28
+  },
+  {
+   "date": "2026-01-31",
+   "totalSales": 411.67,
+   "netSales": 354.74,
+   "orders": 7,
+   "discounts": 56.93,
+   "returns": 0.0,
+   "aov": 58.81
   },
   {
    "date": "2026-02-01",
-   "totalSales": 121.4,
-   "netSales": 99.98,
-   "orders": 1,
-   "discounts": 21.42,
+   "totalSales": 701.06,
+   "netSales": 628.64,
+   "orders": 8,
+   "discounts": 72.42,
    "returns": 0.0,
-   "aov": 121.4
+   "aov": 87.63
+  },
+  {
+   "date": "2026-02-02",
+   "totalSales": 886.24,
+   "netSales": 413.74,
+   "orders": 13,
+   "discounts": 472.5,
+   "returns": 0.0,
+   "aov": 68.17
   },
   {
    "date": "2026-02-03",
-   "totalSales": 235.0,
-   "netSales": 235.0,
-   "orders": 1,
-   "discounts": 0.0,
+   "totalSales": 877.72,
+   "netSales": 666.55,
+   "orders": 10,
+   "discounts": 211.17000000000002,
    "returns": 0.0,
-   "aov": 235.0
+   "aov": 87.77
+  },
+  {
+   "date": "2026-02-04",
+   "totalSales": 1276.57,
+   "netSales": 970.3199999999999,
+   "orders": 17,
+   "discounts": 306.25,
+   "returns": 0.0,
+   "aov": 75.09
+  },
+  {
+   "date": "2026-02-05",
+   "totalSales": 641.51,
+   "netSales": 193.59000000000003,
+   "orders": 10,
+   "discounts": 447.91999999999996,
+   "returns": 0.0,
+   "aov": 64.15
+  },
+  {
+   "date": "2026-02-06",
+   "totalSales": 118.21,
+   "netSales": 102.85,
+   "orders": 3,
+   "discounts": 15.36,
+   "returns": 0.0,
+   "aov": 39.4
   },
   {
    "date": "2026-02-07",
-   "totalSales": 136.0,
-   "netSales": 112.0,
-   "orders": 1,
-   "discounts": 24.0,
+   "totalSales": 1420.28,
+   "netSales": 1271.98,
+   "orders": 18,
+   "discounts": 148.3,
    "returns": 0.0,
-   "aov": 136.0
+   "aov": 78.9
+  },
+  {
+   "date": "2026-02-08",
+   "totalSales": 662.28,
+   "netSales": 394.96999999999997,
+   "orders": 10,
+   "discounts": 267.31,
+   "returns": 0.0,
+   "aov": 66.23
   },
   {
    "date": "2026-02-09",
-   "totalSales": 25.0,
-   "netSales": 25.0,
-   "orders": 1,
-   "discounts": 0.0,
+   "totalSales": 647.15,
+   "netSales": 398.83,
+   "orders": 10,
+   "discounts": 248.32,
    "returns": 0.0,
-   "aov": 25.0
+   "aov": 64.72
+  },
+  {
+   "date": "2026-02-10",
+   "totalSales": 1149.3,
+   "netSales": 428.9,
+   "orders": 11,
+   "discounts": 720.4,
+   "returns": 0.0,
+   "aov": 104.48
   },
   {
    "date": "2026-02-11",
-   "totalSales": 89.25,
-   "netSales": 73.5,
-   "orders": 1,
-   "discounts": 15.75,
+   "totalSales": 678.8299999999999,
+   "netSales": 415.8699999999999,
+   "orders": 11,
+   "discounts": 262.96000000000004,
    "returns": 0.0,
-   "aov": 89.25
+   "aov": 61.71
+  },
+  {
+   "date": "2026-02-12",
+   "totalSales": 503.17,
+   "netSales": 412.72,
+   "orders": 6,
+   "discounts": 90.45,
+   "returns": 0.0,
+   "aov": 83.86
+  },
+  {
+   "date": "2026-02-13",
+   "totalSales": 1013.61,
+   "netSales": 313.07000000000005,
+   "orders": 13,
+   "discounts": 700.54,
+   "returns": 0.0,
+   "aov": 77.97
+  },
+  {
+   "date": "2026-02-14",
+   "totalSales": 532.83,
+   "netSales": 416.58,
+   "orders": 8,
+   "discounts": 116.25,
+   "returns": 0.0,
+   "aov": 66.6
+  },
+  {
+   "date": "2026-02-15",
+   "totalSales": 964.5899999999999,
+   "netSales": 823.31,
+   "orders": 12,
+   "discounts": 141.28,
+   "returns": 0.0,
+   "aov": 80.38
+  },
+  {
+   "date": "2026-02-16",
+   "totalSales": 504.38,
+   "netSales": 393.88,
+   "orders": 8,
+   "discounts": 110.5,
+   "returns": 0.0,
+   "aov": 63.05
+  },
+  {
+   "date": "2026-02-17",
+   "totalSales": 286.5,
+   "netSales": 37.150000000000006,
+   "orders": 6,
+   "discounts": 249.35,
+   "returns": 0.0,
+   "aov": 47.75
+  },
+  {
+   "date": "2026-02-18",
+   "totalSales": 360.97,
+   "netSales": 28.55000000000001,
+   "orders": 5,
+   "discounts": 332.42,
+   "returns": 0.0,
+   "aov": 72.19
+  },
+  {
+   "date": "2026-02-19",
+   "totalSales": 392.99,
+   "netSales": 46.650000000000006,
+   "orders": 7,
+   "discounts": 346.34000000000003,
+   "returns": 0.0,
+   "aov": 56.14
+  },
+  {
+   "date": "2026-02-20",
+   "totalSales": 425.88,
+   "netSales": 405.88,
+   "orders": 5,
+   "discounts": 20.0,
+   "returns": 0.0,
+   "aov": 85.18
+  },
+  {
+   "date": "2026-02-21",
+   "totalSales": 951.88,
+   "netSales": 883.16,
+   "orders": 9,
+   "discounts": 68.72,
+   "returns": 0.0,
+   "aov": 105.76
   },
   {
    "date": "2026-02-22",
-   "totalSales": 25.0,
-   "netSales": 25.0,
-   "orders": 1,
-   "discounts": 0.0,
+   "totalSales": 1053.8899999999999,
+   "netSales": 940.66,
+   "orders": 15,
+   "discounts": 113.23,
    "returns": 0.0,
-   "aov": 25.0
+   "aov": 70.26
   },
   {
    "date": "2026-02-23",
-   "totalSales": 72.0,
-   "netSales": 64.0,
-   "orders": 1,
-   "discounts": 8.0,
+   "totalSales": 826.5,
+   "netSales": 547.61,
+   "orders": 11,
+   "discounts": 278.89,
    "returns": 0.0,
-   "aov": 72.0
+   "aov": 75.14
   },
   {
    "date": "2026-02-24",
-   "totalSales": 130.5,
-   "netSales": 116.0,
-   "orders": 1,
-   "discounts": 14.5,
+   "totalSales": 585.38,
+   "netSales": 551.47,
+   "orders": 7,
+   "discounts": 33.91,
    "returns": 0.0,
-   "aov": 130.5
+   "aov": 83.63
   },
   {
    "date": "2026-02-25",
-   "totalSales": 50.0,
-   "netSales": 50.0,
-   "orders": 1,
-   "discounts": 0.0,
+   "totalSales": 608.96,
+   "netSales": 548.21,
+   "orders": 8,
+   "discounts": 60.75,
    "returns": 0.0,
-   "aov": 50.0
+   "aov": 76.12
   },
   {
    "date": "2026-02-26",
-   "totalSales": 169.44,
-   "netSales": 169.44,
-   "orders": 2,
-   "discounts": 0.0,
+   "totalSales": 692.74,
+   "netSales": 652.74,
+   "orders": 8,
+   "discounts": 40.0,
    "returns": 0.0,
-   "aov": 84.72
+   "aov": 86.59
   },
   {
    "date": "2026-02-27",
-   "totalSales": 878.53,
-   "netSales": 829.15,
-   "orders": 9,
-   "discounts": 49.38,
+   "totalSales": 2291.93,
+   "netSales": 2093.95,
+   "orders": 32,
+   "discounts": 197.98,
    "returns": 0.0,
-   "aov": 97.61
+   "aov": 71.62
   },
   {
    "date": "2026-02-28",
-   "totalSales": 990.54,
-   "netSales": 901.04,
-   "orders": 15,
-   "discounts": 89.5,
+   "totalSales": 2066.44,
+   "netSales": 1949.84,
+   "orders": 30,
+   "discounts": 116.6,
    "returns": 0.0,
-   "aov": 66.04
+   "aov": 68.88
   },
   {
    "date": "2026-03-01",
@@ -7247,6 +8365,24 @@ window.FRKL_DATA = {
    "discounts": 34.5,
    "returns": 0.0,
    "aov": 93.88
+  },
+  {
+   "date": "2026-06-15",
+   "totalSales": 838.19,
+   "netSales": -13.82000000000005,
+   "orders": 15,
+   "discounts": 852.01,
+   "returns": 0.0,
+   "aov": 55.88
+  },
+  {
+   "date": "2026-06-16",
+   "totalSales": 80.0,
+   "netSales": 80.0,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "aov": 80.0
   }
  ],
  "shopifyByChannel": [
@@ -7254,8 +8390,464 @@ window.FRKL_DATA = {
    "date": "2026-01-15",
    "channel": "Online Store",
    "stream": "dtc",
-   "totalSales": 160.0,
-   "netSales": 160.0,
+   "totalSales": 1906.92,
+   "netSales": 1728.16,
+   "orders": 21,
+   "discounts": 178.76,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-15",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 0.0,
+   "netSales": -185.0,
+   "orders": 4,
+   "discounts": 185.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-16",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 1285.66,
+   "netSales": 1119.01,
+   "orders": 17,
+   "discounts": 166.65,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-16",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 0.0,
+   "netSales": -114.37,
+   "orders": 2,
+   "discounts": 114.37,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-17",
+   "channel": "3890849",
+   "stream": "other",
+   "totalSales": 137.81,
+   "netSales": 137.81,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-17",
+   "channel": "John Lewis",
+   "stream": "wholesale",
+   "totalSales": 70.83,
+   "netSales": 70.83,
+   "orders": 2,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-17",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 1378.04,
+   "netSales": 1162.99,
+   "orders": 20,
+   "discounts": 215.05,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-18",
+   "channel": "John Lewis",
+   "stream": "wholesale",
+   "totalSales": 287.5,
+   "netSales": 287.5,
+   "orders": 3,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-18",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 1046.08,
+   "netSales": 946.44,
+   "orders": 14,
+   "discounts": 99.64,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-19",
+   "channel": "John Lewis",
+   "stream": "wholesale",
+   "totalSales": 241.67,
+   "netSales": 241.67,
+   "orders": 3,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-19",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 918.46,
+   "netSales": 775.82,
+   "orders": 17,
+   "discounts": 142.64,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-19",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 0.0,
+   "netSales": -258.99,
+   "orders": 5,
+   "discounts": 258.99,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-20",
+   "channel": "John Lewis",
+   "stream": "wholesale",
+   "totalSales": 75.0,
+   "netSales": 75.0,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-20",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 611.31,
+   "netSales": 543.65,
+   "orders": 9,
+   "discounts": 67.66,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-20",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 0.0,
+   "netSales": -19.1,
+   "orders": 1,
+   "discounts": 19.1,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-21",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 761.11,
+   "netSales": 655.21,
+   "orders": 9,
+   "discounts": 105.9,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-21",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 0.0,
+   "netSales": -405.0,
+   "orders": 3,
+   "discounts": 405.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-22",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 629.21,
+   "netSales": 608.77,
+   "orders": 6,
+   "discounts": 20.44,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-22",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 0.0,
+   "netSales": -139.86,
+   "orders": 2,
+   "discounts": 139.86,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-23",
+   "channel": "John Lewis",
+   "stream": "wholesale",
+   "totalSales": 70.83,
+   "netSales": 70.83,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-23",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 1290.19,
+   "netSales": 1096.05,
+   "orders": 12,
+   "discounts": 194.14,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-24",
+   "channel": "John Lewis",
+   "stream": "wholesale",
+   "totalSales": 45.83,
+   "netSales": 45.83,
+   "orders": 2,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-24",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 905.49,
+   "netSales": 790.38,
+   "orders": 10,
+   "discounts": 115.11,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-25",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 582.68,
+   "netSales": 481.69,
+   "orders": 10,
+   "discounts": 100.99,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-26",
+   "channel": "John Lewis",
+   "stream": "wholesale",
+   "totalSales": 20.83,
+   "netSales": 20.83,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-26",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 172.32,
+   "netSales": 147.21,
+   "orders": 3,
+   "discounts": 25.11,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-26",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 0.0,
+   "netSales": -95.16,
+   "orders": 3,
+   "discounts": 95.16,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-27",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 599.01,
+   "netSales": 493.31,
+   "orders": 6,
+   "discounts": 105.7,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-27",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 0.0,
+   "netSales": -81.64,
+   "orders": 1,
+   "discounts": 81.64,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-28",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 1075.23,
+   "netSales": 872.44,
+   "orders": 12,
+   "discounts": 202.79,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-28",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 0.0,
+   "netSales": -448.8,
+   "orders": 4,
+   "discounts": 448.8,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-29",
+   "channel": "4901177",
+   "stream": "wholesale",
+   "totalSales": 0.0,
+   "netSales": -170.0,
+   "orders": 1,
+   "discounts": 170.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-29",
+   "channel": "John Lewis",
+   "stream": "wholesale",
+   "totalSales": 125.0,
+   "netSales": 125.0,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-29",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 856.09,
+   "netSales": 734.01,
+   "orders": 9,
+   "discounts": 122.08,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-29",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 0.0,
+   "netSales": -272.26,
+   "orders": 3,
+   "discounts": 272.26,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-30",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 952.82,
+   "netSales": 836.74,
+   "orders": 8,
+   "discounts": 116.08,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-30",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 0.0,
+   "netSales": -235.0,
+   "orders": 2,
+   "discounts": 235.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-01-31",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 411.67,
+   "netSales": 354.74,
+   "orders": 7,
+   "discounts": 56.93,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-01",
+   "channel": "John Lewis",
+   "stream": "wholesale",
+   "totalSales": 66.66,
+   "netSales": 66.66,
    "orders": 1,
    "discounts": 0.0,
    "returns": 0.0,
@@ -7266,10 +8858,58 @@ window.FRKL_DATA = {
    "date": "2026-02-01",
    "channel": "Online Store",
    "stream": "dtc",
-   "totalSales": 121.4,
-   "netSales": 99.98,
+   "totalSales": 634.4,
+   "netSales": 561.98,
+   "orders": 7,
+   "discounts": 72.42,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-02",
+   "channel": "4901177",
+   "stream": "wholesale",
+   "totalSales": 0.0,
+   "netSales": -190.0,
    "orders": 1,
-   "discounts": 21.42,
+   "discounts": 190.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-02",
+   "channel": "John Lewis",
+   "stream": "wholesale",
+   "totalSales": 158.33,
+   "netSales": 158.33,
+   "orders": 2,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-02",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 727.91,
+   "netSales": 607.49,
+   "orders": 8,
+   "discounts": 120.42,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-02",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 0.0,
+   "netSales": -162.08,
+   "orders": 2,
+   "discounts": 162.08,
    "returns": 0.0,
    "shipping": 0.0,
    "tax": 0.0
@@ -7278,8 +8918,140 @@ window.FRKL_DATA = {
    "date": "2026-02-03",
    "channel": "Online Store",
    "stream": "dtc",
-   "totalSales": 235.0,
-   "netSales": 235.0,
+   "totalSales": 877.72,
+   "netSales": 777.55,
+   "orders": 9,
+   "discounts": 100.17,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-03",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 0.0,
+   "netSales": -111.0,
+   "orders": 1,
+   "discounts": 111.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-04",
+   "channel": "4901177",
+   "stream": "wholesale",
+   "totalSales": 0.0,
+   "netSales": -190.0,
+   "orders": 1,
+   "discounts": 190.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-04",
+   "channel": "John Lewis",
+   "stream": "wholesale",
+   "totalSales": 395.82,
+   "netSales": 395.82,
+   "orders": 4,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-04",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 880.75,
+   "netSales": 794.5,
+   "orders": 11,
+   "discounts": 86.25,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-04",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 0.0,
+   "netSales": -30.0,
+   "orders": 1,
+   "discounts": 30.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-05",
+   "channel": "3890849",
+   "stream": "other",
+   "totalSales": 30.0,
+   "netSales": 30.0,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-05",
+   "channel": "John Lewis",
+   "stream": "wholesale",
+   "totalSales": 37.5,
+   "netSales": 37.5,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-05",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 574.01,
+   "netSales": 454.48,
+   "orders": 7,
+   "discounts": 119.53,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-05",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 0.0,
+   "netSales": -328.39,
+   "orders": 1,
+   "discounts": 328.39,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-06",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 118.21,
+   "netSales": 102.85,
+   "orders": 3,
+   "discounts": 15.36,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-07",
+   "channel": "John Lewis",
+   "stream": "wholesale",
+   "totalSales": 104.17,
+   "netSales": 104.17,
    "orders": 1,
    "discounts": 0.0,
    "returns": 0.0,
@@ -7290,16 +9062,292 @@ window.FRKL_DATA = {
    "date": "2026-02-07",
    "channel": "Online Store",
    "stream": "dtc",
-   "totalSales": 136.0,
-   "netSales": 112.0,
+   "totalSales": 1316.11,
+   "netSales": 1167.81,
+   "orders": 17,
+   "discounts": 148.3,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-08",
+   "channel": "4901177",
+   "stream": "wholesale",
+   "totalSales": 0.0,
+   "netSales": -190.0,
    "orders": 1,
-   "discounts": 24.0,
+   "discounts": 190.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-08",
+   "channel": "John Lewis",
+   "stream": "wholesale",
+   "totalSales": 54.17,
+   "netSales": 54.17,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-08",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 608.11,
+   "netSales": 530.8,
+   "orders": 8,
+   "discounts": 77.31,
    "returns": 0.0,
    "shipping": 0.0,
    "tax": 0.0
   },
   {
    "date": "2026-02-09",
+   "channel": "John Lewis",
+   "stream": "wholesale",
+   "totalSales": 75.0,
+   "netSales": 75.0,
+   "orders": 2,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-09",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 542.15,
+   "netSales": 378.83,
+   "orders": 6,
+   "discounts": 163.32,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-09",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 30.0,
+   "netSales": -55.0,
+   "orders": 2,
+   "discounts": 85.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-10",
+   "channel": "John Lewis",
+   "stream": "wholesale",
+   "totalSales": 37.5,
+   "netSales": 37.5,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-10",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 1111.8,
+   "netSales": 946.4,
+   "orders": 9,
+   "discounts": 165.4,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-10",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 0.0,
+   "netSales": -555.0,
+   "orders": 1,
+   "discounts": 555.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-11",
+   "channel": "John Lewis",
+   "stream": "wholesale",
+   "totalSales": 41.66,
+   "netSales": 41.66,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-11",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 637.17,
+   "netSales": 525.55,
+   "orders": 8,
+   "discounts": 111.62,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-11",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 0.0,
+   "netSales": -151.34,
+   "orders": 2,
+   "discounts": 151.34,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-12",
+   "channel": "2329312",
+   "stream": "other",
+   "totalSales": 114.75,
+   "netSales": 94.5,
+   "orders": 1,
+   "discounts": 20.25,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-12",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 388.42,
+   "netSales": 318.22,
+   "orders": 5,
+   "discounts": 70.2,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-13",
+   "channel": "John Lewis",
+   "stream": "wholesale",
+   "totalSales": 20.83,
+   "netSales": 20.83,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-13",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 992.78,
+   "netSales": 880.05,
+   "orders": 10,
+   "discounts": 112.73,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-13",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 0.0,
+   "netSales": -587.81,
+   "orders": 2,
+   "discounts": 587.81,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-14",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 532.83,
+   "netSales": 466.58,
+   "orders": 7,
+   "discounts": 66.25,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-14",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 0.0,
+   "netSales": -50.0,
+   "orders": 1,
+   "discounts": 50.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-15",
+   "channel": "3890849",
+   "stream": "other",
+   "totalSales": 107.07,
+   "netSales": 88.18,
+   "orders": 1,
+   "discounts": 18.89,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-15",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 857.52,
+   "netSales": 735.13,
+   "orders": 11,
+   "discounts": 122.39,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-16",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 504.38,
+   "netSales": 405.88,
+   "orders": 7,
+   "discounts": 98.5,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-16",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 0.0,
+   "netSales": -12.0,
+   "orders": 1,
+   "discounts": 12.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-17",
    "channel": "John Lewis",
    "stream": "wholesale",
    "totalSales": 25.0,
@@ -7311,13 +9359,133 @@ window.FRKL_DATA = {
    "tax": 0.0
   },
   {
-   "date": "2026-02-11",
+   "date": "2026-02-17",
    "channel": "Online Store",
    "stream": "dtc",
-   "totalSales": 89.25,
-   "netSales": 73.5,
+   "totalSales": 261.5,
+   "netSales": 217.0,
+   "orders": 3,
+   "discounts": 44.5,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-17",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 0.0,
+   "netSales": -204.85,
+   "orders": 2,
+   "discounts": 204.85,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-18",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 360.97,
+   "netSales": 333.54,
+   "orders": 3,
+   "discounts": 27.43,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-18",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 0.0,
+   "netSales": -304.99,
+   "orders": 2,
+   "discounts": 304.99,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-19",
+   "channel": "4901177",
+   "stream": "wholesale",
+   "totalSales": 0.0,
+   "netSales": -190.0,
    "orders": 1,
-   "discounts": 15.75,
+   "discounts": 190.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-19",
+   "channel": "John Lewis",
+   "stream": "wholesale",
+   "totalSales": 245.84,
+   "netSales": 245.84,
+   "orders": 4,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-19",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 147.15,
+   "netSales": 130.81,
+   "orders": 1,
+   "discounts": 16.34,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-19",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 0.0,
+   "netSales": -140.0,
+   "orders": 1,
+   "discounts": 140.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-20",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 425.88,
+   "netSales": 405.88,
+   "orders": 5,
+   "discounts": 20.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-21",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 951.88,
+   "netSales": 883.16,
+   "orders": 9,
+   "discounts": 68.72,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-22",
+   "channel": "2329312",
+   "stream": "other",
+   "totalSales": 25.5,
+   "netSales": 21.0,
+   "orders": 1,
+   "discounts": 4.5,
    "returns": 0.0,
    "shipping": 0.0,
    "tax": 0.0
@@ -7335,13 +9503,37 @@ window.FRKL_DATA = {
    "tax": 0.0
   },
   {
+   "date": "2026-02-22",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 1003.39,
+   "netSales": 894.66,
+   "orders": 13,
+   "discounts": 108.73,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
    "date": "2026-02-23",
    "channel": "Online Store",
    "stream": "dtc",
-   "totalSales": 72.0,
-   "netSales": 64.0,
-   "orders": 1,
-   "discounts": 8.0,
+   "totalSales": 826.5,
+   "netSales": 773.0,
+   "orders": 9,
+   "discounts": 53.5,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-23",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 0.0,
+   "netSales": -225.39,
+   "orders": 2,
+   "discounts": 225.39,
    "returns": 0.0,
    "shipping": 0.0,
    "tax": 0.0
@@ -7350,10 +9542,10 @@ window.FRKL_DATA = {
    "date": "2026-02-24",
    "channel": "Online Store",
    "stream": "dtc",
-   "totalSales": 130.5,
-   "netSales": 116.0,
-   "orders": 1,
-   "discounts": 14.5,
+   "totalSales": 585.38,
+   "netSales": 551.47,
+   "orders": 7,
+   "discounts": 33.91,
    "returns": 0.0,
    "shipping": 0.0,
    "tax": 0.0
@@ -7362,8 +9554,20 @@ window.FRKL_DATA = {
    "date": "2026-02-25",
    "channel": "Online Store",
    "stream": "dtc",
-   "totalSales": 50.0,
-   "netSales": 50.0,
+   "totalSales": 608.96,
+   "netSales": 548.21,
+   "orders": 8,
+   "discounts": 60.75,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-26",
+   "channel": "John Lewis",
+   "stream": "wholesale",
+   "totalSales": 25.0,
+   "netSales": 25.0,
    "orders": 1,
    "discounts": 0.0,
    "returns": 0.0,
@@ -7374,10 +9578,10 @@ window.FRKL_DATA = {
    "date": "2026-02-26",
    "channel": "Online Store",
    "stream": "dtc",
-   "totalSales": 169.44,
-   "netSales": 169.44,
-   "orders": 2,
-   "discounts": 0.0,
+   "totalSales": 667.74,
+   "netSales": 627.74,
+   "orders": 7,
+   "discounts": 40.0,
    "returns": 0.0,
    "shipping": 0.0,
    "tax": 0.0
@@ -7386,10 +9590,22 @@ window.FRKL_DATA = {
    "date": "2026-02-27",
    "channel": "Online Store",
    "stream": "dtc",
-   "totalSales": 878.53,
-   "netSales": 829.15,
-   "orders": 9,
-   "discounts": 49.38,
+   "totalSales": 2291.93,
+   "netSales": 2093.95,
+   "orders": 32,
+   "discounts": 197.98,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-02-28",
+   "channel": "3890849",
+   "stream": "other",
+   "totalSales": 42.0,
+   "netSales": 42.0,
+   "orders": 1,
+   "discounts": 0.0,
    "returns": 0.0,
    "shipping": 0.0,
    "tax": 0.0
@@ -7410,10 +9626,10 @@ window.FRKL_DATA = {
    "date": "2026-02-28",
    "channel": "Online Store",
    "stream": "dtc",
-   "totalSales": 940.54,
-   "netSales": 851.04,
-   "orders": 14,
-   "discounts": 89.5,
+   "totalSales": 1974.44,
+   "netSales": 1857.84,
+   "orders": 28,
+   "discounts": 116.6,
    "returns": 0.0,
    "shipping": 0.0,
    "tax": 0.0
@@ -10306,6 +12522,66 @@ window.FRKL_DATA = {
    "netSales": 276.0,
    "orders": 3,
    "discounts": 34.5,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-06-15",
+   "channel": "4901177",
+   "stream": "wholesale",
+   "totalSales": 0.0,
+   "netSales": -190.0,
+   "orders": 1,
+   "discounts": 190.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-06-15",
+   "channel": "John Lewis",
+   "stream": "wholesale",
+   "totalSales": 362.5,
+   "netSales": 362.5,
+   "orders": 2,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-06-15",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 475.69,
+   "netSales": 435.8,
+   "orders": 9,
+   "discounts": 39.89,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-06-15",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 0.0,
+   "netSales": -622.12,
+   "orders": 3,
+   "discounts": 622.12,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-06-16",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 80.0,
+   "netSales": 80.0,
+   "orders": 1,
+   "discounts": 0.0,
    "returns": 0.0,
    "shipping": 0.0,
    "tax": 0.0
