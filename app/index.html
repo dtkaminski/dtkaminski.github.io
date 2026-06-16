@@ -181,6 +181,7 @@
     <div class="app-tabs">
       <div class="app-tab active" data-tab="overview">Overview</div>
       <div class="app-tab" data-tab="intelligence">Intelligence</div>
+      <div class="app-tab" data-tab="customers">Customers</div>
       <div class="app-tab" data-tab="connections">Connections</div>
     </div>
     <button id="logout-btn" class="btn-ghost" style="padding: 5px 10px; font-size: 11.5px;">Log out</button>
@@ -338,6 +339,15 @@
     </div>
   </div>
 
+  <!-- ── CUSTOMERS TAB ──────────────────────────────────────────────────── -->
+  <div id="tab-customers" class="tab-content" hidden>
+    <h2 style="font-size:16px; font-weight:650; margin-bottom: var(--s-2);">Customers</h2>
+    <p class="meta" style="font-size:12.5px; margin-bottom: var(--s-5);">
+      Who your customers are, by value and loyalty — and reward the ones worth keeping. Names and consent are read live; nothing is stored in the page.
+    </p>
+    <div id="customers-root"></div>
+  </div>
+
   <!-- ── CONNECTIONS TAB ────────────────────────────────────────────────── -->
   <div id="tab-connections" class="tab-content" hidden>
     <h2 style="font-size:16px; font-weight:650; margin-bottom: var(--s-3);">Your data sources</h2>
@@ -360,6 +370,7 @@
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
   let currentBrand = null;
+  let currentToken = null;
   let connByProvider = {};
 
   // ── Tab switching ──────────────────────────────────────────────────────
@@ -382,6 +393,7 @@
   (async () => {
     const { data } = await sb.auth.getSession();
     const session = data?.session;
+    currentToken = session?.access_token || null;
 
     if (!session) {
       document.getElementById('loading').hidden = true;
@@ -572,6 +584,136 @@
       list.appendChild(card);
     });
   }
+
+  // ── Customers tab: RFM + loyalty + consent-gated reward staging ──────────
+  // Reads live via the JWT-gated customer-intelligence / stage-reward functions
+  // (PII stays server-side: the browser only gets first name + last initial).
+  const CI_SEG = {
+    'Champion':           { c:'#34d399', blurb:'High value, frequent, recent — reward & protect' },
+    'Loyal':              { c:'#60a5fa', blurb:'Repeat & recent — nurture toward Champion' },
+    'At risk':            { c:'#fbbf24', blurb:'Were valuable, gone quiet — win back' },
+    'Promising (new)':    { c:'#a78bfa', blurb:'One order, recent — drive the 2nd purchase' },
+    'Dormant (one-time)': { c:'#94a3b8', blurb:'One order, lapsed — reactivation pool' },
+  };
+  const CI_LOY = {
+    full_price:      { label:'Full-price loyal', c:'#34d399', play:'The real VIPs — reward with non-discount perks' },
+    mixed:           { label:'Mixed',            c:'#fbbf24', play:'Nurture toward full price' },
+    discount_driven: { label:'Discount-driven',  c:'#f87171', play:'Loyal to the deal — test-wean, don’t send more codes' },
+  };
+  const ciGBP = n => n == null ? '—' : '£' + Math.round(n).toLocaleString();
+  const ciEsc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+  async function ciPost(fn, payload) {
+    const res = await fetch(`${SUPABASE_FNS}/${fn}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${currentToken}` },
+      body: JSON.stringify({ brandId: currentBrand.id, ...payload }),
+    });
+    if (!res.ok) throw new Error(`${fn} ${res.status}: ${(await res.text()).slice(0, 160)}`);
+    return res.json();
+  }
+
+  let customersBooted = false;
+  let ciState = { seg: null, consent: true, loyalty: '' };
+
+  async function renderCustomersTab() {
+    if (customersBooted) return; customersBooted = true;
+    const root = document.getElementById('customers-root');
+    if (!currentBrand || !currentToken) { root.innerHTML = '<div class="panel-locked-msg">Log in to view customers.</div>'; return; }
+    root.innerHTML = '<div class="meta" style="padding:var(--s-5);">Loading customer segments…</div>';
+    try { drawOverview(await ciPost('customer-intelligence', { action: 'overview' })); }
+    catch (e) { root.innerHTML = `<div class="state-banner warn"><div class="state-banner-icon">!</div><div class="state-banner-body"><div class="state-banner-title">Couldn’t load customers</div><div class="state-banner-sub">${ciEsc(e.message)}</div></div></div>`; }
+  }
+
+  function drawOverview(ov) {
+    const cards = ov.segments.map(s => {
+      const m = CI_SEG[s.segment] || { c: 'var(--accent)', blurb: '' };
+      return `<div class="ci-card" data-seg="${ciEsc(s.segment)}" style="cursor:pointer; flex:1 1 150px; padding:var(--s-4); border-radius:var(--r-md); background:var(--bg-card); border:1px solid var(--border-subtle);">
+        <div style="font-size:11px; font-weight:700; color:${m.c}; display:flex; align-items:center; gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:${m.c};"></span>${ciEsc(s.segment)}</div>
+        <div style="font-size:24px; font-weight:700; margin-top:4px;">${s.customers.toLocaleString()}</div>
+        <div class="meta" style="font-size:11px;">${ciGBP(s.netRevenue)} · ${s.revSharePct}% · avg ${ciGBP(s.avgValue)}</div>
+      </div>`;
+    }).join('');
+    const loy = (ov.championLoyalty || []).map(l => {
+      const m = CI_LOY[l.type]; return `<div style="flex:1 1 160px;"><div style="font-size:11px;font-weight:700;color:${m.c};">${m.label}: ${l.customers}</div><div class="meta" style="font-size:11px;">${ciGBP(l.netRevenue)} · ${m.play}</div></div>`;
+    }).join('');
+    document.getElementById('customers-root').innerHTML = `
+      <div class="meta" style="font-size:11.5px; margin-bottom:var(--s-3);">${ov.totals.customers.toLocaleString()} customers · ${ciGBP(ov.totals.netRevenue)} net</div>
+      <div style="display:flex; gap:var(--s-2); flex-wrap:wrap; margin-bottom:var(--s-4);">${cards}</div>
+      <div class="state-banner info" style="display:block;"><div style="font-weight:650; margin-bottom:6px;">Reward by loyalty, not blanket discount</div><div style="display:flex; gap:var(--s-4); flex-wrap:wrap;">${loy}</div></div>
+      <div id="ci-detail"></div>`;
+    document.querySelectorAll('#customers-root .ci-card').forEach(el => el.addEventListener('click', () => openSegment(el.dataset.seg)));
+  }
+
+  async function openSegment(seg) {
+    ciState = { seg, consent: true, loyalty: '' };
+    const d = document.getElementById('ci-detail');
+    d.innerHTML = '<div class="meta" style="padding:var(--s-4);">Loading…</div>';
+    try { drawSegment(await ciPost('customer-intelligence', { action: 'segment', segment: seg, limit: 200 })); }
+    catch (e) { d.innerHTML = `<div class="panel-locked-msg">${ciEsc(e.message)}</div>`; }
+  }
+
+  function drawSegment(res) {
+    const m = CI_SEG[res.segment] || { c: 'var(--accent)', blurb: '' };
+    const rows = res.people.slice(0, 25).map(p => `<tr>
+      <td style="padding:6px 8px;">${ciEsc(p.name)}</td><td style="padding:6px 8px;">${p.orders}</td>
+      <td style="padding:6px 8px;">${ciGBP(p.netRevenue)}</td><td style="padding:6px 8px;">${p.recencyDays}d</td>
+      <td style="padding:6px 8px;">${ciEsc(p.acquisitionChannel)}</td>
+      <td style="padding:6px 8px; color:${(CI_LOY[p.loyalty] || {}).c || 'inherit'};">${p.discountPct}%</td>
+      <td style="padding:6px 8px; color:${p.emailable ? 'var(--good)' : 'var(--text-faint)'};">${p.emailable ? '✓' : '—'}</td></tr>`).join('');
+    document.getElementById('ci-detail').innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--s-3); margin:var(--s-4) 0 var(--s-2);">
+        <div style="font-size:12px; font-weight:700; color:${m.c};">${ciEsc(res.segment)} — ${ciEsc(m.blurb)}</div>
+        <div style="display:flex; gap:var(--s-2); align-items:center; flex-wrap:wrap;">
+          <select id="ci-loyalty" class="meta" style="background:var(--bg-elevated); color:var(--text-secondary); border:1px solid var(--border-default); border-radius:6px; padding:4px 6px;">
+            <option value="">All loyalty types</option><option value="full_price">Full-price loyal</option><option value="mixed">Mixed</option><option value="discount_driven">Discount-driven</option>
+          </select>
+          <label class="meta" style="display:flex; gap:4px; align-items:center;"><input type="checkbox" id="ci-consent" checked> consented only</label>
+          <button id="ci-preview" class="btn-ghost" style="padding:5px 11px; font-size:12px;">Preview reward audience</button>
+        </div>
+      </div>
+      <div id="ci-stage"></div>
+      <div style="overflow:auto; border:1px solid var(--border-subtle); border-radius:var(--r-md); margin-top:var(--s-2);">
+        <table style="width:100%; border-collapse:collapse; font-size:12.5px;">
+          <thead><tr style="text-align:left; color:var(--text-muted);"><th style="padding:6px 8px;">Customer</th><th style="padding:6px 8px;">Orders</th><th style="padding:6px 8px;">Net spend</th><th style="padding:6px 8px;">Last</th><th style="padding:6px 8px;">Acquired</th><th style="padding:6px 8px;">Disc%</th><th style="padding:6px 8px;">Email</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      ${res.count > 25 ? `<div class="meta" style="font-size:11px; margin-top:6px;">Showing top 25 of ${res.count} by spend.</div>` : ''}`;
+    document.getElementById('ci-loyalty').addEventListener('change', e => ciState.loyalty = e.target.value);
+    document.getElementById('ci-consent').addEventListener('change', e => ciState.consent = e.target.checked);
+    document.getElementById('ci-preview').addEventListener('click', previewReward);
+  }
+
+  async function previewReward() {
+    const stage = document.getElementById('ci-stage');
+    stage.innerHTML = '<div class="meta" style="padding:var(--s-2);">…</div>';
+    try {
+      const p = await ciPost('customer-intelligence', { action: 'stage_preview', segment: ciState.seg, requireConsent: ciState.consent, ...(ciState.loyalty ? { loyalty: ciState.loyalty } : {}) });
+      stage.innerHTML = `<div class="state-banner info" style="display:block; margin-bottom:var(--s-2);">
+        Would reach <b>${p.audienceReachable}</b> of ${p.audienceTotal} ${ciEsc(ciState.seg.toLowerCase())} customers worth <b>${ciGBP(p.audienceValue)}</b>${p.excludedNoConsent ? ` · ${p.excludedNoConsent} excluded (no consent)` : ''}.
+        <div style="margin-top:6px; display:flex; gap:var(--s-2); align-items:center; flex-wrap:wrap;">
+          <button id="ci-stage-btn" class="btn-primary" style="padding:5px 11px; font-size:12px;">Stage in Klaviyo →</button>
+          <span class="meta" style="font-size:11px;">Creates a Klaviyo list — nothing sent. You send from Klaviyo.</span>
+          <span id="ci-stage-result" class="meta" style="font-size:11.5px;"></span>
+        </div></div>`;
+      document.getElementById('ci-stage-btn').addEventListener('click', stageReward);
+    } catch (e) { stage.innerHTML = `<div class="panel-locked-msg">${ciEsc(e.message)}</div>`; }
+  }
+
+  async function stageReward() {
+    const out = document.getElementById('ci-stage-result');
+    const btn = document.getElementById('ci-stage-btn');
+    if (!confirm(`Stage these consented ${ciState.seg} customers as a Klaviyo list?\n\nThis creates a list in Klaviyo — no email is sent. You build and send the campaign yourself in Klaviyo.`)) return;
+    btn.disabled = true; out.style.color = 'var(--text-muted)'; out.textContent = 'Staging…';
+    try {
+      const r = await ciPost('stage-reward', { segment: ciState.seg, requireConsent: ciState.consent, ...(ciState.loyalty ? { loyalty: ciState.loyalty } : {}), confirm: true });
+      out.style.color = 'var(--good)';
+      out.textContent = `✓ Staged “${r.listName}” — ${r.profilesSubmitted} profiles imported. Build the campaign in Klaviyo.`;
+    } catch (e) { out.style.color = 'var(--warn)'; out.textContent = 'Couldn’t stage — ' + e.message; btn.disabled = false; }
+  }
+
+  document.querySelector('.app-tab[data-tab="customers"]').addEventListener('click', renderCustomersTab);
 </script>
 </body>
 </html>
