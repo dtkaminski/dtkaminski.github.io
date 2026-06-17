@@ -2870,25 +2870,36 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-06-15",
-   "sessions": 630,
+   "sessions": 629,
    "engagedSessions": 300,
-   "engagementRate": 0.4762,
+   "engagementRate": 0.4769,
    "addToCarts": 98,
    "checkouts": 20,
    "purchases": 9,
    "revenue": 475.47,
-   "bounceRate": 0.5238
+   "bounceRate": 0.5231
   },
   {
    "date": "2026-06-16",
-   "sessions": 15,
-   "engagedSessions": 5,
-   "engagementRate": 0.3333,
-   "addToCarts": 4,
-   "checkouts": 4,
+   "sessions": 684,
+   "engagedSessions": 323,
+   "engagementRate": 0.4722,
+   "addToCarts": 92,
+   "checkouts": 28,
+   "purchases": 6,
+   "revenue": 548.04,
+   "bounceRate": 0.5278
+  },
+  {
+   "date": "2026-06-17",
+   "sessions": 14,
+   "engagedSessions": 4,
+   "engagementRate": 0.2857,
+   "addToCarts": 0,
+   "checkouts": 0,
    "purchases": 0,
    "revenue": 0,
-   "bounceRate": 0.6667
+   "bounceRate": 0.7143
   }
  ],
  "klaviyo": [
@@ -3684,11 +3695,11 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-05-17",
-   "recipients": 177,
-   "opens": 2594,
+   "recipients": 172,
+   "opens": 1608,
    "clicks": 69,
    "openRate": 1,
-   "clickRate": 0.3898,
+   "clickRate": 0.4012,
    "orders": 6,
    "orderValue": 521.21
   },
@@ -3974,13 +3985,23 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-06-15",
-   "recipients": 5,
-   "opens": 246,
+   "recipients": 121,
+   "opens": 863,
    "clicks": 3,
    "openRate": 1,
-   "clickRate": 0.6,
-   "orders": 1,
-   "orderValue": 80
+   "clickRate": 0.0248,
+   "orders": 12,
+   "orderValue": 1027.24
+  },
+  {
+   "date": "2026-06-16",
+   "recipients": 6,
+   "opens": 172,
+   "clicks": 0,
+   "openRate": 1,
+   "clickRate": 0,
+   "orders": 0,
+   "orderValue": 0
   }
  ],
  "shopify": [
@@ -5354,12 +5375,12 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-06-16",
-   "totalSales": 80.0,
-   "netSales": 80.0,
-   "orders": 1,
-   "discounts": 0.0,
+   "totalSales": 840.74,
+   "netSales": 760.11,
+   "orders": 9,
+   "discounts": 80.63,
    "returns": 0.0,
-   "aov": 80.0
+   "aov": 93.42
   }
  ],
  "shopifyWholesale": [
@@ -6109,6 +6130,15 @@ window.FRKL_DATA = {
    "discounts": 190.0,
    "returns": 0.0,
    "aov": 120.83
+  },
+  {
+   "date": "2026-06-16",
+   "totalSales": 20.83,
+   "netSales": 20.83,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "aov": 20.83
   }
  ],
  "shopifyGifting": [
@@ -6876,6 +6906,15 @@ window.FRKL_DATA = {
    "discounts": 622.12,
    "returns": 0.0,
    "aov": 0.0
+  },
+  {
+   "date": "2026-06-16",
+   "totalSales": 140.0,
+   "netSales": -40.0,
+   "orders": 2,
+   "discounts": 180.0,
+   "returns": 0.0,
+   "aov": 70.0
   }
  ],
  "shopifyOther": [
@@ -8377,12 +8416,12 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-06-16",
-   "totalSales": 80.0,
-   "netSales": 80.0,
-   "orders": 1,
-   "discounts": 0.0,
+   "totalSales": 1001.57,
+   "netSales": 740.94,
+   "orders": 12,
+   "discounts": 260.63,
    "returns": 0.0,
-   "aov": 80.0
+   "aov": 83.46
   }
  ],
  "shopifyByChannel": [
@@ -12576,12 +12615,36 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-06-16",
-   "channel": "Online Store",
-   "stream": "dtc",
-   "totalSales": 80.0,
-   "netSales": 80.0,
+   "channel": "John Lewis",
+   "stream": "wholesale",
+   "totalSales": 20.83,
+   "netSales": 20.83,
    "orders": 1,
    "discounts": 0.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-06-16",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 840.74,
+   "netSales": 760.11,
+   "orders": 9,
+   "discounts": 80.63,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-06-16",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 140.0,
+   "netSales": -40.0,
+   "orders": 2,
+   "discounts": 180.0,
    "returns": 0.0,
    "shipping": 0.0,
    "tax": 0.0
