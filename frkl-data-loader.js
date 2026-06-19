@@ -39,6 +39,13 @@
     sb: null,               // the supabase client (for ad-hoc queries from devtools)
   };
 
+  // Provisional Fit panels (genome cash/EBITDA/CCC + the shadow signal layer) are GATED
+  // OFF until frkl's real brand_config (fixed costs, inventory/supplier days, discount rate)
+  // is populated — until then those figures are prior-driven. Flip genomeSignal to true
+  // (here, or via an inline window.FRKL_FIT_FLAGS set BEFORE this script) to reveal them.
+  // No rebuild needed — it's a runtime global the panel reads on the next render.
+  window.FRKL_FIT_FLAGS = window.FRKL_FIT_FLAGS || { genomeSignal: false };
+
   // ── Bootstrap ─────────────────────────────────────────────────────────────
 
   async function bootstrap() {
@@ -78,6 +85,21 @@
       return;
     }
     window.FRKL_LIVE.brandId = frkl.brand_id;
+
+    // Activate the dashboard's live per-tenant Fit path. useFitResult() in the app treats
+    // OI_ASK as authenticated only when it carries a getJwt() FUNCTION (oi-app-boot's /app
+    // shell sets a static jwt, which leaves the standalone demo dormant). We publish getJwt
+    // sourced from the live Supabase session so FitCard calls assess-fit with the user's JWT.
+    // endpoint ends in /ask-data by convention — useFitResult strips the last segment to reach
+    // …/functions/v1 and appends /assess-fit. No privileged key: publishable key + user JWT only.
+    window.OI_ASK = window.OI_ASK || {
+      endpoint: SUPABASE_URL + '/functions/v1/ask-data',
+      brand_id: frkl.brand_id,
+      getJwt: async () => {
+        const { data: { session } } = await sb.auth.getSession();
+        return session?.access_token || '';
+      },
+    };
 
     // 4. First fetch immediately, then poll
     await refresh();

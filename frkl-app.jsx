@@ -3416,12 +3416,13 @@ function getOIAsk(){
 function useFitResult(start, end){
   const ASK = getOIAsk();
   const authed = !!(ASK && ASK.brand_id && typeof ASK.getJwt==='function' && ASK.endpoint);
+  const cached = ()=> (typeof window!=='undefined' && window.FRKL_FIT) || null;   // static frkl-fit.js fallback
   const [state, setState] = React.useState(()=>({
-    fit: authed ? null : ((typeof window!=='undefined' && window.FRKL_FIT) || null),
-    loading: authed, error: '',
+    fit: authed ? null : cached(),
+    loading: authed, error: '', source: authed ? 'live' : 'cached',
   }));
   React.useEffect(()=>{
-    if(!authed){ setState({ fit:(typeof window!=='undefined'&&window.FRKL_FIT)||null, loading:false, error:'' }); return; }
+    if(!authed){ setState({ fit:cached(), loading:false, error:'', source:'cached' }); return; }
     if(!start || !end){ return; }
     let cancelled=false;
     setState(s=>({ ...s, loading:true, error:'' }));
@@ -3437,16 +3438,23 @@ function useFitResult(start, end){
         });
         const data = await resp.json().catch(()=>null);
         if(cancelled) return;
-        if(!resp.ok || !data || data.error){ setState({ fit:null, loading:false, error:(data&&data.error) || ('assess-fit '+resp.status) }); return; }
-        setState({ fit:data, loading:false, error:'' });
-      }catch(e){ if(!cancelled) setState({ fit:null, loading:false, error:e.message||String(e) }); }
+        if(!resp.ok || !data || data.error){
+          // Live fetch failed → fall back to the cached static snapshot, flagged 'cached'.
+          setState({ fit:cached(), loading:false, error:(data&&data.error) || ('assess-fit '+resp.status), source:'cached' });
+          return;
+        }
+        // Publish the live result so the sibling FitGenomePanel reads it, and nudge a
+        // re-render via the loader's existing event (deps are stable → no refetch loop).
+        if(typeof window!=='undefined'){ window.FRKL_FIT = data; window.FRKL_FIT_SOURCE = 'live'; try{ window.dispatchEvent(new CustomEvent('frkl-data-updated')); }catch(_){} }
+        setState({ fit:data, loading:false, error:'', source:'live' });
+      }catch(e){ if(!cancelled) setState({ fit:cached(), loading:false, error:e.message||String(e), source:'cached' }); }
     })();
     return ()=>{ cancelled=true; };
   }, [authed, start, end]);
   return state;
 }
 function FitCard({start, end}){
-  const { fit:FIT, loading, error } = useFitResult(start, end);
+  const { fit:FIT, loading, error, source } = useFitResult(start, end);
   if(loading && (!FIT||!FIT.blended)){ return (<div className="card" style={{marginBottom:14}}><h2>Offer &amp; Product Market Fit</h2><div className="note">Assessing fit for the selected window…</div></div>); }
   if(!FIT||!FIT.blended){ return (<div className="card" style={{marginBottom:14}}><h2>Offer &amp; Product Market Fit</h2><div className="note">{error ? ('Fit not available — '+error) : 'No fit assessment yet — connect Meta, Shopify and GA4, then the engine reads offer-market fit (the paid funnel) and product-market fit (cohorts) and tells you whether to scale.'}</div></div>); }
   const b=FIT.blended;
@@ -3455,7 +3463,12 @@ function FitCard({start, end}){
   return (<div className="card" style={{marginBottom:14}}>
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:8}}>
       <h2 style={{margin:0}}>Offer &amp; Product Market Fit</h2>
-      <span className="pill" style={{background:fitConfColor(FIT.confidence)+'22',color:fitConfColor(FIT.confidence)}}>{FIT.confidence} confidence</span>
+      <div style={{display:'flex',gap:6,alignItems:'center'}}>
+        {source==='live'
+          ? <span className="pill" style={{background:'rgba(52,211,153,.13)',color:'#34d399'}} title={'Live engine output'+(FIT.window?` · window ${FIT.window.start} → ${FIT.window.end}`:'')}>live</span>
+          : <span className="pill" style={{background:'rgba(148,148,160,.14)',color:'var(--text-faint)'}} title={(error?('Live fetch failed ('+error+') — showing cached snapshot. '):'')+'Log in as a frkl user (dan@myfrkl.com) to load live engine output'}>cached</span>}
+        <span className="pill" style={{background:fitConfColor(FIT.confidence)+'22',color:fitConfColor(FIT.confidence)}}>{FIT.confidence} confidence</span>
+      </div>
     </div>
     <div style={{display:'flex',gap:10,margin:'12px 0'}}>
       <FitScore label="Offer-market fit" value={b.omfScore} sub="CTR · landing CVR · CAC coverage"/>
@@ -3495,6 +3508,48 @@ function FitCard({start, end}){
   </div>);
 }
 
+// ── Genome (cash/profitability) + signal layer — GATED behind window.FRKL_FIT_FLAGS.genomeSignal.
+//    These figures are PRIOR-DRIVEN until frkl's brand_config (fixed costs, inventory/supplier
+//    days, discount rate) is populated, so the panel is hidden by default. Built now so flipping
+//    the flag reveals it with NO rebuild. Every prior-sourced value carries an "est." tag, and the
+//    £ contribution figure is labelled "Contribution (after variable costs)" — never "revenue".
+function FitGenomePanel(){
+  if(typeof window==='undefined') return null;
+  if(!(window.FRKL_FIT_FLAGS && window.FRKL_FIT_FLAGS.genomeSignal)) return null;   // gated off
+  const FIT=window.FRKL_FIT||null;
+  const p=FIT&&FIT.parameters;
+  if(!p) return null;   // genome/signal only present on a LIVE assess-fit result
+  const prof=p.profitability||{}, cash=p.cashConversion||{}, sig=p.signal||{}, me=sig.marginalEconomics||{};
+  const gbp=(x)=>x==null?'—':'£'+Math.round(x).toLocaleString('en-GB');
+  const pct=(x,dp=1)=>x==null?'—':(x*100).toFixed(dp)+'%';
+  const est=(src)=>src==='prior'?<span className="pill" style={{background:'rgba(245,181,68,.14)',color:'#f5b544',marginLeft:6,fontSize:10}}>est.</span>:null;
+  const invSrc=cash.inventoryDays&&cash.inventoryDays.source;
+  return (<div className="card" style={{marginBottom:14}}>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:8}}>
+      <h2 style={{margin:0}}>Cash &amp; profitability <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>— genome</span></h2>
+      <span className="pill" style={{background:'rgba(245,181,68,.14)',color:'#f5b544'}}>provisional · default assumptions</span>
+    </div>
+    <div className="note" style={{marginTop:10,marginBottom:12}}>Figures marked <b>est.</b> use default assumptions until frkl's real cost inputs (fixed costs, inventory &amp; supplier terms, discount rate) are entered in <code>brand_config</code>. Directional, not booked.</div>
+    <div className="row">
+      <div style={{flex:'1 1 240px'}}>
+        <div className="micro" style={{color:'var(--text-muted)',marginBottom:6,fontWeight:600}}>PROFITABILITY</div>
+        <div className="mrow"><span className="k">Contribution <span style={{color:'var(--text-faint)'}}>(after variable costs)</span></span><span className="v">{gbp(prof.contributionWindow)}</span></div>
+        <div className="mrow"><span className="k">EBITDA margin {est(prof.fixedCostsSource)}</span><span className="v">{pct(prof.ebitdaMarginPct)}</span></div>
+        <div className="mrow"><span className="k">Operating profit · window {est(prof.fixedCostsSource)}</span><span className="v">{gbp(prof.operatingProfitWindow)}</span></div>
+        <div className="mrow"><span className="k">Fixed costs / mo {est(prof.fixedCostsSource)}</span><span className="v">{gbp(prof.fixedCostsPerMonth)}</span></div>
+      </div>
+      <div style={{flex:'1 1 240px'}}>
+        <div className="micro" style={{color:'var(--text-muted)',marginBottom:6,fontWeight:600}}>CASH CONVERSION</div>
+        <div className="mrow"><span className="k">Cash conversion cycle {est(invSrc)}</span><span className="v">{cash.cccDays==null?'—':Math.round(cash.cccDays)+' days'}</span></div>
+        <div className="mrow"><span className="k">Working capital tied {est(invSrc)}</span><span className="v">{gbp(cash.workingCapitalRequired)}</span></div>
+        <div className="mrow"><span className="k">Discounted LTV / customer</span><span className="v">{gbp(p.discountedLtv)}</span></div>
+        <div className="mrow"><span className="k">Inventory days {est(invSrc)}</span><span className="v">{cash.inventoryDays?cash.inventoryDays.days+'d':'—'}</span></div>
+      </div>
+    </div>
+    {sig.shadow&&(<div className="note" style={{marginTop:12}}><b>Signal layer (shadow):</b> {me.status==='insufficient-curve'?(me.note||'marginal economics need ≥3 aligned spend/CAC months — spend ceiling not yet derivable.'):'experimental trajectories — not yet validated.'} Shown for inspection only; not a recommendation.</div>)}
+  </div>);
+}
+
 function CrossChannel({start}){
   const daily = useMemo(()=>buildDaily(start),[start]);
   const meta=inRange(D.metaDaily,start), gads=inRange(D.googleAds,start), shop=inRange(D.shopify,start), ga=inRange(D.ga4,start), kl=inRange(D.klaviyo,start);
@@ -3527,6 +3582,7 @@ function CrossChannel({start}){
   const tierFalling = tiers && tiers[0].roas!=null && tiers[2].roas!=null && tiers[2].roas < tiers[0].roas*0.85;
   return (<div>
     <FitCard start={start} end={ACTIVE_END}/>
+    <FitGenomePanel/>
     <div className="card" style={{marginBottom:14}}>
       <h2>Channel revenue claims vs spend</h2>
       <table>
