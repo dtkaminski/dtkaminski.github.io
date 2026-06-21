@@ -3,10 +3,10 @@ window.FRKL_DATA = {
  "meta": {
   "brand": "frkl",
   "currency": "GBP",
-  "captured": "2026-06-18",
+  "captured": "2026-06-19",
   "range": {
    "start": "2026-01-15",
-   "end": "2026-06-18"
+   "end": "2026-06-19"
   },
   "source": "Supermetrics (live) — Meta FA, Google Ads AW, GA4 GAWA, Klaviyo KLAV, Shopify SHP",
   "shopifySegmentation": "DTC = Online Store. Wholesale = John Lewis + Faire (channel 4901177). Gifting = Draft Orders. Headline metrics exclude wholesale and gifting."
@@ -846,17 +846,49 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-06-15",
-   "cost": 149.3,
-   "impressions": 16912,
+   "cost": 149.39,
+   "impressions": 16916,
    "linkCtr": 0.0148,
    "purchases": 4,
    "purchaseValue": 250.46
   },
   {
    "date": "2026-06-16",
-   "cost": 13.98,
-   "impressions": 1458,
-   "linkCtr": 0.0082,
+   "cost": 178,
+   "impressions": 18601,
+   "linkCtr": 0.0118,
+   "purchases": 2,
+   "purchaseValue": 95
+  },
+  {
+   "date": "2026-06-17",
+   "cost": 127.27,
+   "impressions": 12420,
+   "linkCtr": 0.0177,
+   "purchases": 1,
+   "purchaseValue": null
+  },
+  {
+   "date": "2026-06-18",
+   "cost": 175.11,
+   "impressions": 21100,
+   "linkCtr": 0.009,
+   "purchases": 2,
+   "purchaseValue": 85
+  },
+  {
+   "date": "2026-06-19",
+   "cost": 131.29,
+   "impressions": 17421,
+   "linkCtr": 0.0083,
+   "purchases": 2,
+   "purchaseValue": 186.84
+  },
+  {
+   "date": "2026-06-20",
+   "cost": 10.11,
+   "impressions": 1256,
+   "linkCtr": 0.008,
    "purchases": null,
    "purchaseValue": null
   }
@@ -2903,25 +2935,25 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-06-18",
-   "sessions": 859,
-   "engagedSessions": 382,
-   "engagementRate": 0.4447,
+   "sessions": 860,
+   "engagedSessions": 385,
+   "engagementRate": 0.4477,
    "addToCarts": 128,
    "checkouts": 12,
    "purchases": 5,
    "revenue": 423.57,
-   "bounceRate": 0.5553
+   "bounceRate": 0.5523
   },
   {
    "date": "2026-06-19",
-   "sessions": 17,
-   "engagedSessions": 8,
-   "engagementRate": 0.4706,
-   "addToCarts": 0,
-   "checkouts": 0,
-   "purchases": 0,
-   "revenue": 0,
-   "bounceRate": 0.5294
+   "sessions": 846,
+   "engagedSessions": 291,
+   "engagementRate": 0.344,
+   "addToCarts": 267,
+   "checkouts": 27,
+   "purchases": 7,
+   "revenue": 846.14,
+   "bounceRate": 0.656
   }
  ],
  "klaviyo": [
@@ -3737,21 +3769,21 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-05-19",
-   "recipients": 8745,
-   "opens": 4471,
-   "clicks": 128,
-   "openRate": 0.5113,
-   "clickRate": 0.0146,
-   "orders": 6,
-   "orderValue": 384.37
+   "recipients": 8697,
+   "opens": 4253,
+   "clicks": 121,
+   "openRate": 0.489,
+   "clickRate": 0.0139,
+   "orders": 5,
+   "orderValue": 359.37
   },
   {
    "date": "2026-05-20",
-   "recipients": 114,
-   "opens": 2452,
-   "clicks": 92,
+   "recipients": 106,
+   "opens": 1420,
+   "clicks": 79,
    "openRate": 1,
-   "clickRate": 0.807,
+   "clickRate": 0.7453,
    "orders": 4,
    "orderValue": 261.81
   },
@@ -4037,9 +4069,19 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-06-18",
-   "recipients": 7,
-   "opens": 176,
-   "clicks": 21,
+   "recipients": 11568,
+   "opens": 5117,
+   "clicks": 189,
+   "openRate": 0.4423,
+   "clickRate": 0.0163,
+   "orders": 8,
+   "orderValue": 923.27
+  },
+  {
+   "date": "2026-06-19",
+   "recipients": 10,
+   "opens": 898,
+   "clicks": 32,
    "openRate": 1,
    "clickRate": 1,
    "orders": 0,
@@ -5441,6 +5483,15 @@ window.FRKL_DATA = {
    "discounts": 92.32,
    "returns": 0.0,
    "aov": 83.45
+  },
+  {
+   "date": "2026-06-19",
+   "totalSales": 911.77,
+   "netSales": 876.33,
+   "orders": 8,
+   "discounts": 35.44,
+   "returns": 0.0,
+   "aov": 113.97
   }
  ],
  "shopifyWholesale": [
@@ -8527,6 +8578,15 @@ window.FRKL_DATA = {
    "discounts": 123.5,
    "returns": 0.0,
    "aov": 65.71
+  },
+  {
+   "date": "2026-06-19",
+   "totalSales": 911.77,
+   "netSales": 876.33,
+   "orders": 8,
+   "discounts": 35.44,
+   "returns": 0.0,
+   "aov": 113.97
   }
  ],
  "shopifyByChannel": [
@@ -12810,6 +12870,18 @@ window.FRKL_DATA = {
    "netSales": -31.18,
    "orders": 1,
    "discounts": 31.18,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-06-19",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 911.77,
+   "netSales": 876.33,
+   "orders": 8,
+   "discounts": 35.44,
    "returns": 0.0,
    "shipping": 0.0,
    "tax": 0.0
