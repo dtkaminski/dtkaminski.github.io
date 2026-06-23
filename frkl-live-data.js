@@ -3,10 +3,10 @@ window.FRKL_DATA = {
  "meta": {
   "brand": "frkl",
   "currency": "GBP",
-  "captured": "2026-06-21",
+  "captured": "2026-06-22",
   "range": {
    "start": "2026-01-15",
-   "end": "2026-06-21"
+   "end": "2026-06-22"
   },
   "source": "Supermetrics (live) — Meta FA, Google Ads AW, GA4 GAWA, Klaviyo KLAV, Shopify SHP",
   "shopifySegmentation": "DTC = Online Store. Wholesale = John Lewis + Faire (channel 4901177). Gifting = Draft Orders. Headline metrics exclude wholesale and gifting."
@@ -887,24 +887,32 @@ window.FRKL_DATA = {
   {
    "date": "2026-06-20",
    "cost": 129.11,
-   "impressions": 16012,
+   "impressions": 16014,
    "linkCtr": 0.0089,
    "purchases": 6,
    "purchaseValue": 758.29
   },
   {
    "date": "2026-06-21",
-   "cost": 166.53,
-   "impressions": 23596,
-   "linkCtr": 0.0078,
+   "cost": 166.74,
+   "impressions": 23623,
+   "linkCtr": 0.0077,
    "purchases": 4,
    "purchaseValue": 240.7
   },
   {
    "date": "2026-06-22",
-   "cost": 7.33,
-   "impressions": 1166,
-   "linkCtr": 0.006,
+   "cost": 135.4,
+   "impressions": 19830,
+   "linkCtr": 0.0095,
+   "purchases": 5,
+   "purchaseValue": 380.36
+  },
+  {
+   "date": "2026-06-23",
+   "cost": 9.75,
+   "impressions": 1256,
+   "linkCtr": 0.0088,
    "purchases": null,
    "purchaseValue": null
   }
@@ -2995,14 +3003,25 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-06-22",
-   "sessions": 17,
-   "engagedSessions": 7,
-   "engagementRate": 0.4118,
+   "sessions": 704,
+   "engagedSessions": 321,
+   "engagementRate": 0.456,
+   "addToCarts": 106,
+   "checkouts": 24,
+   "purchases": 6,
+   "revenue": 575.9,
+   "bounceRate": 0.544
+  },
+  {
+   "date": "2026-06-23",
+   "sessions": 35,
+   "engagedSessions": 11,
+   "engagementRate": 0.3143,
    "addToCarts": 2,
-   "checkouts": 2,
+   "checkouts": 0,
    "purchases": 0,
    "revenue": 0,
-   "bounceRate": 0.5882
+   "bounceRate": 0.6857
   }
  ],
  "klaviyo": [
@@ -3858,11 +3877,11 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-05-23",
-   "recipients": 129,
-   "opens": 1668,
-   "clicks": 58,
+   "recipients": 118,
+   "opens": 1050,
+   "clicks": 56,
    "openRate": 1,
-   "clickRate": 0.4496,
+   "clickRate": 0.4746,
    "orders": 7,
    "orderValue": 581.94
   },
@@ -4148,13 +4167,23 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-06-21",
-   "recipients": 14,
-   "opens": 706,
-   "clicks": 23,
+   "recipients": 137,
+   "opens": 2176,
+   "clicks": 61,
    "openRate": 1,
-   "clickRate": 1,
-   "orders": 0,
-   "orderValue": 0
+   "clickRate": 0.4453,
+   "orders": 6,
+   "orderValue": 485.36
+  },
+  {
+   "date": "2026-06-22",
+   "recipients": 19,
+   "opens": 305,
+   "clicks": 12,
+   "openRate": 1,
+   "clickRate": 0.6316,
+   "orders": 1,
+   "orderValue": 101.62
   }
  ],
  "shopify": [
@@ -5579,6 +5608,15 @@ window.FRKL_DATA = {
    "discounts": 60.75,
    "returns": 0.0,
    "aov": 116.72
+  },
+  {
+   "date": "2026-06-22",
+   "totalSales": 575.48,
+   "netSales": 534.32,
+   "orders": 6,
+   "discounts": 41.16,
+   "returns": 0.0,
+   "aov": 95.91
   }
  ],
  "shopifyWholesale": [
@@ -7167,6 +7205,15 @@ window.FRKL_DATA = {
    "discounts": 30.0,
    "returns": 0.0,
    "aov": 0.0
+  },
+  {
+   "date": "2026-06-22",
+   "totalSales": 0.0,
+   "netSales": -51.12,
+   "orders": 1,
+   "discounts": 51.12,
+   "returns": 0.0,
+   "aov": 0.0
   }
  ],
  "shopifyOther": [
@@ -8719,6 +8766,15 @@ window.FRKL_DATA = {
    "discounts": 90.75,
    "returns": 0.0,
    "aov": 93.56
+  },
+  {
+   "date": "2026-06-22",
+   "totalSales": 575.48,
+   "netSales": 483.20000000000005,
+   "orders": 7,
+   "discounts": 92.28,
+   "returns": 0.0,
+   "aov": 82.21
   }
  ],
  "shopifyByChannel": [
@@ -13074,6 +13130,30 @@ window.FRKL_DATA = {
    "netSales": -30.0,
    "orders": 1,
    "discounts": 30.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-06-22",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 575.48,
+   "netSales": 534.32,
+   "orders": 6,
+   "discounts": 41.16,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-06-22",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 0.0,
+   "netSales": -51.12,
+   "orders": 1,
+   "discounts": 51.12,
    "returns": 0.0,
    "shipping": 0.0,
    "tax": 0.0
