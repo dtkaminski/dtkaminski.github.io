@@ -475,7 +475,9 @@
       };
       document.getElementById('hero-card').hidden = true;
       const pg = document.querySelector('#tab-overview .panel-grid');
-      if (pg) pg.hidden = true;
+      // .panel-grid sets display:grid, which overrides the [hidden] attribute
+      // (author rule beats the UA [hidden]{display:none}). Hide it explicitly.
+      if (pg) pg.style.display = 'none';
       const page = document.querySelector('.page');
       if (page) { page.style.maxWidth = 'none'; page.style.padding = '0'; }
       const fr = document.getElementById('rich-dash');
