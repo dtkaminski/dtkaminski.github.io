@@ -3488,6 +3488,25 @@ function FitCard({start, end}){
       <div style={{fontWeight:700,color:'var(--text-primary)',marginBottom:4}}>{FIT.primaryDiagnosis}</div>
       <div style={{fontSize:'12.5px',lineHeight:1.5,color:'var(--text-secondary)'}}>{FIT.recommendedAction}</div>
     </div>
+    {(()=>{
+      // Prioritized actionable insights (engine: parameters.insights). The verdict + confidence items are
+      // already shown (diagnosis box / confidence pill), so render the rest — paid dilution, cash, scaling.
+      const ins=((FIT.parameters&&FIT.parameters.insights)||[]).filter(i=>i.key!=='verdict'&&i.key!=='confidence');
+      if(!ins.length) return null;
+      const sc={critical:'#f87171',warning:'#fbbf24',good:'#34d399',info:'var(--text-faint)'};
+      const sl={critical:'Act now',warning:'Watch',good:'Good',info:'Note'};
+      return (<div style={{marginBottom:12}}>
+        <div className="micro" style={{color:'var(--text-muted)',marginBottom:6,fontWeight:600}}>WHAT TO ACT ON</div>
+        {ins.map((i,idx)=>(<div key={i.key||idx} style={{borderLeft:'3px solid '+(sc[i.severity]||'var(--text-faint)'),background:'var(--bg-app)',borderRadius:'var(--r-sm)',padding:'10px 12px',marginBottom:6}}>
+          <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap'}}>
+            <span className="pill" style={{background:(sc[i.severity]||'#888')+'22',color:sc[i.severity]||'var(--text-faint)',fontSize:10}}>{sl[i.severity]||i.severity}</span>
+            <span style={{fontWeight:700,color:'var(--text-primary)'}}>{i.title}</span>
+          </div>
+          {i.detail&&<div style={{fontSize:'12px',color:'var(--text-secondary)',marginTop:4,lineHeight:1.5}}>{i.detail}</div>}
+          <div style={{fontSize:'12px',color:'var(--text-primary)',marginTop:5,lineHeight:1.5}}><span style={{color:'var(--accent)'}}>→ </span>{i.action}</div>
+        </div>))}
+      </div>);
+    })()}
     <div className="row">
       <div style={{flex:'1 1 240px'}}>
         <div className="micro" style={{color:'var(--text-muted)',marginBottom:6,fontWeight:600}}>OFFER (the paid funnel)</div>
@@ -3518,46 +3537,151 @@ function FitCard({start, end}){
   </div>);
 }
 
-// ── Genome (cash/profitability) + signal layer — GATED behind window.FRKL_FIT_FLAGS.genomeSignal.
-//    These figures are PRIOR-DRIVEN until frkl's brand_config (fixed costs, inventory/supplier
-//    days, discount rate) is populated, so the panel is hidden by default. Built now so flipping
-//    the flag reveals it with NO rebuild. Every prior-sourced value carries an "est." tag, and the
-//    £ contribution figure is labelled "Contribution (after variable costs)" — never "revenue".
-function FitGenomePanel(){
-  if(typeof window==='undefined') return null;
-  if(!(window.FRKL_FIT_FLAGS && window.FRKL_FIT_FLAGS.genomeSignal)) return null;   // gated off
-  const FIT=window.FRKL_FIT||null;
-  const p=FIT&&FIT.parameters;
-  if(!p) return null;   // genome/signal only present on a LIVE assess-fit result
-  const prof=p.profitability||{}, cash=p.cashConversion||{}, sig=p.signal||{}, me=sig.marginalEconomics||{};
-  const gbp=(x)=>x==null?'—':'£'+Math.round(x).toLocaleString('en-GB');
-  const pct=(x,dp=1)=>x==null?'—':(x*100).toFixed(dp)+'%';
-  const est=(src)=>src==='prior'?<span className="pill" style={{background:'rgba(245,181,68,.14)',color:'#f5b544',marginLeft:6,fontSize:10}}>est.</span>:null;
-  const invSrc=cash.inventoryDays&&cash.inventoryDays.source;
-  return (<div className="card" style={{marginBottom:14}}>
-    <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',flexWrap:'wrap',gap:8}}>
-      <h2 style={{margin:0}}>Cash &amp; profitability <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>— genome</span></h2>
-      <span className="pill" style={{background:'rgba(245,181,68,.14)',color:'#f5b544'}}>provisional · default assumptions</span>
+// ── Genome (cash, profitability & discounted LTV) + shadow SIGNAL layer ───────────────────────
+//    Ported verbatim from the backend repo's fit-engine/dashboard/GenomePanel.jsx (commit ba8242f)
+//    — the richer rendering that SUPERSEDES the old gated FitGenomePanel. Reads window.FRKL_FIT
+//    .parameters (cashConversion / profitability / discountedLtv / signal), all of which the LIVE
+//    assess-fit engine already returns. Self-hides when the parameter vector is absent (public
+//    cached snapshot / pre-genome engine), so no flag gate is needed. Source-honest: each genome
+//    input is tagged 'your number' (brand-entered) or 'prior' (category default); the whole panel
+//    is badged 'shadow · not scored' — reported, never folded into the OMF/PMF verdict.
+function gpGBP0(x) { return x == null ? '-' : '£' + Math.round(x).toLocaleString('en-GB'); }
+function gpGBP2(x) { return x == null ? '-' : '£' + x.toFixed(2); }
+function gpPCT(x, dp = 1) { return x == null ? '-' : (x * 100).toFixed(dp) + '%'; }
+function gpRX(x, dp = 2) { return x == null ? '-' : x.toFixed(dp) + 'x'; }
+function gpDays(x) { return x == null ? '-' : Math.round(x) + 'd'; }
+
+/* 'your number' (brand-entered) vs 'prior' (category default) - the source-honesty tag. */
+function GpSrc({ source }) {
+  const brand = source === 'brand-entered';
+  return (
+    <span className="pill" style={{
+      fontSize: 10, padding: '1px 6px', marginLeft: 6, verticalAlign: 'middle',
+      background: brand ? 'var(--accent-bg)' : 'transparent',
+      color: brand ? 'var(--accent)' : 'var(--text-faint)',
+      border: '1px solid ' + (brand ? 'rgba(124,140,255,.35)' : 'var(--border-subtle)'),
+    }}>{brand ? 'your number' : 'prior'}</span>
+  );
+}
+
+function GpStat({ label, value, sub, accent }) {
+  return (
+    <div style={{ flex: 1, minWidth: 124, padding: '12px 12px', borderRadius: 'var(--r-sm)', background: 'var(--bg-app)', border: '1px solid var(--border-subtle)' }}>
+      <div className="micro" style={{ color: 'var(--text-muted)', fontWeight: 600, marginBottom: 7 }}>{label}</div>
+      <div className="v" style={{ fontSize: 23, lineHeight: 1, color: accent || 'var(--text-primary)' }}>{value}</div>
+      {sub && <div className="micro" style={{ color: 'var(--text-faint)', marginTop: 6 }}>{sub}</div>}
     </div>
-    <div className="note" style={{marginTop:10,marginBottom:12}}>Figures marked <b>est.</b> use default assumptions until frkl's real cost inputs (fixed costs, inventory &amp; supplier terms, discount rate) are entered in <code>brand_config</code>. Directional, not booked.</div>
-    <div className="row">
-      <div style={{flex:'1 1 240px'}}>
-        <div className="micro" style={{color:'var(--text-muted)',marginBottom:6,fontWeight:600}}>PROFITABILITY</div>
-        <div className="mrow"><span className="k">Contribution <span style={{color:'var(--text-faint)'}}>(after variable costs)</span></span><span className="v">{gbp(prof.contributionWindow)}</span></div>
-        <div className="mrow"><span className="k">EBITDA margin {est(prof.fixedCostsSource)}</span><span className="v">{pct(prof.ebitdaMarginPct)}</span></div>
-        <div className="mrow"><span className="k">Operating profit · window {est(prof.fixedCostsSource)}</span><span className="v">{gbp(prof.operatingProfitWindow)}</span></div>
-        <div className="mrow"><span className="k">Fixed costs / mo {est(prof.fixedCostsSource)}</span><span className="v">{gbp(prof.fixedCostsPerMonth)}</span></div>
+  );
+}
+
+/* Tiny inline sparkline for a monthly trajectory. Normalises across its own min/max. */
+function GpSpark({ series, color }) {
+  const pts = (series || []).filter((n) => typeof n === 'number' && isFinite(n));
+  if (pts.length < 2) return null;
+  const w = 132, h = 30, pad = 3;
+  const lo = Math.min(...pts), hi = Math.max(...pts), span = hi - lo || 1;
+  const x = (i) => pad + (i * (w - 2 * pad)) / (pts.length - 1);
+  const y = (v) => pad + (h - 2 * pad) * (1 - (v - lo) / span);
+  const d = pts.map((v, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1)).join(' ');
+  return (
+    <svg width={w} height={h} style={{ display: 'block' }} aria-hidden="true">
+      <path d={d} fill="none" stroke={color} strokeWidth="1.6" />
+      <circle cx={x(pts.length - 1)} cy={y(pts[pts.length - 1])} r="2.4" fill={color} />
+    </svg>
+  );
+}
+
+function GenomePanel() {
+  const FIT = (typeof window !== 'undefined' && window.FRKL_FIT) || null;
+  const p = FIT && FIT.parameters;
+  if (!p || !p.cashConversion) return null; // pre-genome engine / no profile - render nothing
+
+  const cc = p.cashConversion, dl = p.discountedLtv, pr = p.profitability;
+  const sig = p.signal || {}, me = sig.marginalEconomics || {}, tj = sig.trajectories || {};
+  const accent = 'var(--accent)';
+  const good = '#34d399', warn = '#fbbf24', bad = '#f87171';
+
+  // The headline insight: a profitable P&L can still be cash-negative once ad spend + the cash cycle
+  // are counted. Surface it when EBITDA is positive but operating cash isn't.
+  const cashTrap = (pr.operatingProfitWindow ?? 0) > 0 && (tj.monthlyNetOperatingCash ?? 0) < 0;
+
+  return (
+    <div className="card" style={{ marginBottom: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 8 }}>
+        <h2 style={{ margin: 0 }}>Cash, profitability &amp; forward signal</h2>
+        <span className="pill" style={{ background: 'var(--bg-app)', color: 'var(--text-faint)', border: '1px solid var(--border-subtle)' }}>shadow · not scored</span>
       </div>
-      <div style={{flex:'1 1 240px'}}>
-        <div className="micro" style={{color:'var(--text-muted)',marginBottom:6,fontWeight:600}}>CASH CONVERSION</div>
-        <div className="mrow"><span className="k">Cash conversion cycle {est(invSrc)}</span><span className="v">{cash.cccDays==null?'—':Math.round(cash.cccDays)+' days'}</span></div>
-        <div className="mrow"><span className="k">Working capital tied {est(invSrc)}</span><span className="v">{gbp(cash.workingCapitalRequired)}</span></div>
-        <div className="mrow"><span className="k">Discounted LTV / customer</span><span className="v">{gbp(p.discountedLtv)}</span></div>
-        <div className="mrow"><span className="k">Inventory days {est(invSrc)}</span><span className="v">{cash.inventoryDays?cash.inventoryDays.days+'d':'—'}</span></div>
+      <div className="micro" style={{ color: 'var(--text-faint)', margin: '4px 0 12px' }}>
+        Computed from the fitted curves &amp; your economics - what the OMF/PMF score can't see: when cash moves, and whether the business (not the order) makes money.
+      </div>
+
+      {/* The four genome magnitudes. */}
+      <div className="row" style={{ gap: 10 }}>
+        <GpStat label="Cash conversion cycle" value={gpDays(cc.cccDays)} sub="cash gap, order to bank" />
+        <GpStat label="Working capital tied" value={gpGBP0(cc.workingCapitalRequired)} sub="locked across the cycle" />
+        <GpStat label="Discounted LTV" value={gpGBP2(dl.discountedLtv)} sub={'vs ' + gpGBP2(dl.undiscountedLtv) + ' undiscounted'} />
+        <GpStat label="Operating profit (EBITDA)" value={gpGBP0(pr.operatingProfitWindow)} sub={gpPCT(pr.ebitdaMarginPct) + ' margin · window'} accent={(pr.operatingProfitWindow ?? 0) >= 0 ? good : bad} />
+      </div>
+
+      {cashTrap && (
+        <div style={{ padding: '11px 13px', borderRadius: 'var(--r-sm)', background: 'rgba(251,191,36,.10)', border: '1px solid rgba(251,191,36,.30)', marginTop: 12 }}>
+          <div style={{ fontWeight: 700, color: warn, marginBottom: 3 }}>EBITDA-positive, cash-negative</div>
+          <div className="micro" style={{ color: 'var(--text-secondary)' }}>
+            The window clears {gpGBP0(pr.operatingProfitWindow)} of operating profit, but once ad spend is netted in, monthly operating cash is {gpGBP0(tj.monthlyNetOperatingCash)} and {gpGBP0(cc.workingCapitalRequired)} sits locked in the {gpDays(cc.cccDays)} cash cycle. Unit-profitable, cash-trapped.
+          </div>
+        </div>
+      )}
+
+      {/* Genome breakdowns + sources. */}
+      <div className="row" style={{ marginTop: 12 }}>
+        <div style={{ flex: '1 1 240px' }}>
+          <div className="micro" style={{ color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600 }}>CASH CYCLE (days)</div>
+          <div className="mrow"><span className="k">Inventory held<GpSrc source={cc.inventoryDays.source} /></span><span className="v">{gpDays(cc.inventoryDays.days)}</span></div>
+          <div className="mrow"><span className="k">+ Settlement lag<GpSrc source={cc.settlementLagDays.source} /></span><span className="v">{gpDays(cc.settlementLagDays.days)}</span></div>
+          <div className="mrow"><span className="k">− Supplier terms (DPO)<GpSrc source={cc.supplierPaymentDays.source} /></span><span className="v">{gpDays(cc.supplierPaymentDays.days)}</span></div>
+          <div className="mrow" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 6, marginTop: 2 }}><span className="k" style={{ fontWeight: 700 }}>= Cash conversion cycle</span><span className="v" style={{ fontWeight: 700 }}>{gpDays(cc.cccDays)}</span></div>
+        </div>
+        <div style={{ flex: '1 1 240px' }}>
+          <div className="micro" style={{ color: 'var(--text-muted)', marginBottom: 6, fontWeight: 600 }}>PROFIT &amp; LTV</div>
+          <div className="mrow"><span className="k">Contribution (window)</span><span className="v">{gpGBP0(pr.contributionWindow)}</span></div>
+          <div className="mrow"><span className="k">− Fixed costs<GpSrc source={pr.fixedCostsSource} /></span><span className="v">{gpGBP0(pr.fixedCostsWindow)}</span></div>
+          <div className="mrow" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 6, marginTop: 2 }}><span className="k" style={{ fontWeight: 700 }}>= EBITDA</span><span className="v" style={{ fontWeight: 700, color: (pr.operatingProfitWindow ?? 0) >= 0 ? good : bad }}>{gpGBP0(pr.operatingProfitWindow)}</span></div>
+          <div className="mrow"><span className="k">Discount rate<GpSrc source={dl.discountRateSource} /></span><span className="v">{gpPCT(dl.discountRateAnnual, 0)}/yr</span></div>
+          <div className="mrow"><span className="k">LTV haircut (discounting)</span><span className="v">{gpGBP2(dl.discountHaircut)}</span></div>
+        </div>
+      </div>
+
+      {/* The forward signal: marginal economics + trajectories. */}
+      <div className="micro" style={{ color: 'var(--text-muted)', margin: '16px 0 8px', fontWeight: 600 }}>FORWARD SIGNAL <span style={{ color: 'var(--text-faint)', fontWeight: 400 }}>· projected from the fitted curves</span></div>
+      <div className="row">
+        <div style={{ flex: '1 1 240px' }}>
+          {me.status === 'ok' ? (
+            <>
+              <div className="mrow"><span className="k">Marginal CAC (next customer)</span><span className="v">{gpGBP2(me.marginalCac)}</span></div>
+              <div className="mrow"><span className="k">Avg CAC (now)</span><span className="v">{gpGBP2(me.averageCac)}</span></div>
+              <div className="mrow"><span className="k">Profitable spend ceiling</span><span className="v">{gpGBP0(me.profitableSpendCeiling)}/mo</span></div>
+              <div className="mrow"><span className="k">Headroom vs current</span><span className="v" style={{ color: (me.spendHeadroom ?? 0) >= 0 ? good : bad }}>{gpPCT(me.spendHeadroomPct, 0)}</span></div>
+            </>
+          ) : (
+            <div style={{ padding: '12px 13px', borderRadius: 'var(--r-sm)', background: 'var(--bg-app)', border: '1px dashed var(--border-subtle)' }}>
+              <div style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>Marginal CAC &amp; spend ceiling — not yet available</div>
+              <div className="micro" style={{ color: 'var(--text-faint)' }}>{me.note || 'Needs a fitted CAC-elasticity curve (≥3 aligned spend/CAC months). No number shown rather than a guessed one.'}</div>
+            </div>
+          )}
+        </div>
+        <div style={{ flex: '1 1 240px' }}>
+          <div className="mrow" style={{ alignItems: 'center' }}><span className="k">LTV:CAC over {tj.horizonMonths}mo</span><span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><GpSpark series={tj.ltvCacTrajectory} color={good} /><span className="v">{gpRX(tj.ltvCacTrajectory && tj.ltvCacTrajectory[tj.ltvCacTrajectory.length - 1])}</span></span></div>
+          <div className="mrow" style={{ alignItems: 'center' }}><span className="k">Cash position, {tj.horizonMonths}mo</span><span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><GpSpark series={tj.netCashPositionByMonth} color={bad} /><span className="v" style={{ color: bad }}>{gpGBP0(tj.netCashPositionByMonth && tj.netCashPositionByMonth[tj.netCashPositionByMonth.length - 1])}</span></span></div>
+          <div className="mrow"><span className="k">Monthly operating cash</span><span className="v" style={{ color: (tj.monthlyNetOperatingCash ?? 0) >= 0 ? good : bad }}>{gpGBP0(tj.monthlyNetOperatingCash)}</span></div>
+          <div className="mrow"><span className="k">CAC payback</span><span className="v">{tj.paybackMonthProjected == null ? '> ' + tj.horizonMonths + 'mo' : (tj.paybackMonthProjected === 0 ? 'first order' : 'month ' + tj.paybackMonthProjected)}</span></div>
+        </div>
+      </div>
+
+      <div className="micro" style={{ color: 'var(--text-faint)', marginTop: 10 }}>
+        Projection assumes spend flat, retention curve holds, costs constant; paid-attributed orders only. Shadow layer — reported, not yet gating any verdict.
       </div>
     </div>
-    {sig.shadow&&(<div className="note" style={{marginTop:12}}><b>Signal layer (shadow):</b> {me.status==='insufficient-curve'?(me.note||'marginal economics need ≥3 aligned spend/CAC months — spend ceiling not yet derivable.'):'experimental trajectories — not yet validated.'} Shown for inspection only; not a recommendation.</div>)}
-  </div>);
+  );
 }
 
 function CrossChannel({start}){
@@ -3592,7 +3716,7 @@ function CrossChannel({start}){
   const tierFalling = tiers && tiers[0].roas!=null && tiers[2].roas!=null && tiers[2].roas < tiers[0].roas*0.85;
   return (<div>
     <FitCard start={start} end={ACTIVE_END}/>
-    <FitGenomePanel/>
+    {window.FRKL_FIT_FLAGS?.genomeSignal && <GenomePanel/>}
     <div className="card" style={{marginBottom:14}}>
       <h2>Channel revenue claims vs spend</h2>
       <table>
