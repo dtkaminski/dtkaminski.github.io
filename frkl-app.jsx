@@ -9909,6 +9909,7 @@ const NAV = [
   ]},
   { id:'settings',label:'Settings',     icon:'sliders', subtabs:[
     { id:'connections', label:'Connections', component: () => <ConnectionsPanel/> },
+    { id:'team',        label:'Team',        component: () => <TeamPanel/> },
   ]},
 ];
 
@@ -10126,6 +10127,136 @@ function ConnectionsPanel(){
       </div>
     </section>
 
+  </div>);
+}
+
+// ── Team / multi-user ──────────────────────────────────────────────────────
+// Owner/admin invite + member management, in-dashboard. Uses the same auth
+// context as Ask (window[.parent].OI_ASK = {endpoint, brand_id, getJwt}); all
+// reads/writes go through the invite-member edge fn (brand_users is not
+// client-writable). In the public demo there's no OI_ASK → a gentle notice.
+function TeamPanel(){
+  const ASK = getOIAsk();
+  const authed = !!(ASK && ASK.brand_id && typeof ASK.getJwt==='function' && ASK.endpoint);
+  const fnBase = authed ? ASK.endpoint.replace(/\/[^/]*$/, '') : '';
+  const inviteUrl = fnBase + '/invite-member';
+
+  const [members, setMembers] = React.useState([]);
+  const [caller, setCaller] = React.useState(null);
+  const [loading, setLoading] = React.useState(authed);
+  const [loadErr, setLoadErr] = React.useState('');
+  const [email, setEmail] = React.useState('');
+  const [role, setRole] = React.useState('member');
+  const [busy, setBusy] = React.useState(false);
+  const [msg, setMsg] = React.useState(null);   // {text, kind}
+
+  const call = async (action, extra) => {
+    const jwt = await ASK.getJwt();
+    if(!jwt) return { ok:false, data:{ detail:'Your session expired — refresh the page and sign in again.' } };
+    const r = await fetch(inviteUrl, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+jwt },
+      body: JSON.stringify({ brand_id: ASK.brand_id, action, ...(extra||{}) }),
+    });
+    const data = await r.json().catch(()=>({}));
+    return { ok:r.ok, data };
+  };
+
+  const load = async () => {
+    if(!authed) return;
+    setLoading(true); setLoadErr('');
+    const { ok, data } = await call('list');
+    if(!ok || !data.members){ setLoadErr(data.detail||data.error||'Could not load the team.'); setLoading(false); return; }
+    setMembers(data.members); setCaller(data.caller||null); setLoading(false);
+  };
+  React.useEffect(()=>{ load(); }, []);   // eslint-disable-line
+
+  const submitInvite = async (e) => {
+    e.preventDefault();
+    if(busy) return;
+    setBusy(true); setMsg(null);
+    const { ok, data } = await call('invite', { email: email.trim(), role, redirect_to: 'https://operatorintelligence.com/auth/workspace.html' });
+    setBusy(false);
+    if(!ok){ setMsg({ text:data.detail||data.message||data.error||'Invite failed.', kind:'err' }); return; }
+    setMsg({ text:data.message||'Invite sent.', kind:'ok' });
+    setEmail('');
+    load();
+  };
+
+  const removeMember = async (m) => {
+    const ask = m.is_self ? 'Leave this workspace? You will lose access immediately.' : `Remove ${m.email} from this workspace?`;
+    if(!window.confirm(ask)) return;
+    const { ok, data } = await call('remove', { target_user_id: m.user_id });
+    if(!ok){ setMsg({ text:data.detail||data.error||'Could not remove.', kind:'err' }); return; }
+    if(m.is_self){ try{ (window.top||window).location.href='/auth/login.html'; }catch(_){ window.location.href='/auth/login.html'; } return; }
+    load();
+  };
+
+  const canManage = !!(caller && caller.can_manage);
+  const isOwner = caller && caller.role === 'owner';
+  const roleColor = (rl) => rl==='owner' ? 'var(--accent)' : 'var(--text-secondary)';
+
+  if(!authed){
+    return (<div className="card" style={{padding:'var(--s-7)'}}>
+      <div style={{fontSize:15, fontWeight:650, marginBottom:'var(--s-2)'}}>Team</div>
+      <div className="meta" style={{lineHeight:1.6, maxWidth:520}}>
+        Inviting teammates is available in your live, signed-in workspace. This is the public demo, so team management is read-only here.
+      </div>
+    </div>);
+  }
+
+  return (<div style={{display:'flex', flexDirection:'column', gap:'var(--s-7)'}}>
+    {/* Invite */}
+    <div className="card" style={{padding:'var(--s-7)'}}>
+      <div style={{fontSize:15, fontWeight:650, marginBottom:4}}>Team</div>
+      <div className="meta" style={{fontSize:12.5, marginBottom:'var(--s-5)'}}>
+        Everyone with access to this workspace. {canManage ? 'Invite a teammate by email — they get a magic-link and land straight here.' : 'Only an owner or admin can change the team.'}
+      </div>
+
+      {canManage && (<form onSubmit={submitInvite} style={{display:'flex', gap:'var(--s-2)', flexWrap:'wrap', alignItems:'center', paddingTop:'var(--s-4)', borderTop:'1px solid var(--color-line, var(--border-subtle))'}}>
+        <input type="email" required value={email} onChange={e=>setEmail(e.target.value)}
+          placeholder="teammate@yourbrand.com" autoComplete="off"
+          style={{flex:'1 1 240px', minWidth:0, padding:'9px 12px', fontSize:13, fontFamily:'inherit', color:'var(--text-primary)', background:'var(--bg-input)', border:'1px solid var(--border-default)', borderRadius:'var(--r-md)'}}/>
+        <select value={role} onChange={e=>setRole(e.target.value)} aria-label="Role"
+          style={{padding:'9px 12px', fontSize:13, fontFamily:'inherit', color:'var(--text-primary)', background:'var(--bg-input)', border:'1px solid var(--border-default)', borderRadius:'var(--r-md)'}}>
+          <option value="member">Member — full access</option>
+          <option value="viewer">Viewer — read only</option>
+          {isOwner && <option value="admin">Admin — can manage team</option>}
+        </select>
+        <button type="submit" className="btn-primary" disabled={busy}
+          style={{padding:'9px 16px', fontSize:13, border:0, borderRadius:'var(--r-md)', cursor:busy?'default':'pointer', fontFamily:'inherit', fontWeight:600, opacity:busy?0.6:1}}>
+          {busy ? 'Sending…' : 'Send invite →'}
+        </button>
+      </form>)}
+
+      {msg && (<div style={{marginTop:'var(--s-3)', padding:'10px 14px', borderRadius:'var(--r-md)', fontSize:13,
+        color: msg.kind==='ok'?'var(--good)':'var(--bad)',
+        background: msg.kind==='ok'?'rgba(74,222,128,0.08)':'rgba(248,113,113,0.08)',
+        border:'1px solid '+(msg.kind==='ok'?'rgba(74,222,128,0.35)':'rgba(248,113,113,0.35)')}}>{msg.text}</div>)}
+
+      {/* Member list */}
+      <div style={{marginTop:'var(--s-5)'}}>
+        {loading && <div className="meta" style={{fontSize:12.5}}>Loading team…</div>}
+        {loadErr && <div className="meta" style={{fontSize:12.5, color:'var(--bad)'}}>{loadErr}</div>}
+        {!loading && !loadErr && members.map(m => {
+          const canRemove = canManage && (m.is_self || (m.role!=='owner' && (isOwner || m.role==='member' || m.role==='viewer')));
+          return (<div key={m.user_id} style={{display:'flex', alignItems:'center', gap:'var(--s-3)', padding:'var(--s-3) 0', borderTop:'1px solid var(--color-line, var(--border-subtle))'}}>
+            <div style={{width:30, height:30, borderRadius:'var(--r-full)', flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, textTransform:'uppercase', color:'var(--text-muted)', background:'var(--bg-elevated, var(--bg-input))', border:'1px solid var(--border-default)'}}>
+              {(m.email||'?').trim().charAt(0)||'?'}
+            </div>
+            <div style={{minWidth:0, flex:1}}>
+              <div style={{fontSize:13.5, fontWeight:550, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                {m.email}{m.is_self && <span className="meta" style={{fontWeight:450}}> (you)</span>}
+              </div>
+              <div className="meta" style={{fontSize:11}}>Added {new Date(m.created_at).toLocaleDateString()}</div>
+            </div>
+            <span style={{flexShrink:0, fontSize:10.5, fontWeight:700, letterSpacing:'.06em', textTransform:'uppercase', color:roleColor(m.role), padding:'4px 9px', border:'1px solid var(--border-default)', borderRadius:'var(--r-full)'}}>{m.role}</span>
+            {canRemove && <button onClick={()=>removeMember(m)} title={m.is_self?'Leave workspace':'Remove'}
+              style={{flexShrink:0, background:'none', border:0, cursor:'pointer', color:'var(--text-muted)', fontSize:15, lineHeight:1, padding:'4px 6px', borderRadius:'var(--r-md)'}}>✕</button>}
+          </div>);
+        })}
+      </div>
+    </div>
   </div>);
 }
 
