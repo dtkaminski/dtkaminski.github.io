@@ -2994,7 +2994,9 @@ function WhatChangedStrip(){
     {key:'paid',          label:'Paid spend',          fmt:v=>GBP(v),                              axisFmt:gbpK,                better:'flat'},
     {key:'discountDepth', label:'Discount depth',      fmt:v=>v!=null?(v*100).toFixed(1)+'%':'—',  axisFmt:pct0,                better:'down'},
     {key:'returnRate',    label:'Return rate',         fmt:v=>v!=null?(v*100).toFixed(1)+'%':'—',  axisFmt:pct0,                better:'down'},
-    {key:'emailShare',    label:'Email revenue share', fmt:v=>v!=null?(v*100).toFixed(0)+'%':'—',  axisFmt:pct0,                better:'up'},
+    // 'Email revenue share' removed: Klaviyo orderValue over-counts (same order credited to
+    // multiple emails/flows) and is gross vs Shopify net, so the share crossed 100% (e.g. 116%).
+    // Attributed email revenue lives honestly in Channels → Email; kept off the board per :7487.
   ];
   const trail = (key)=> weeks.slice(Math.max(0,i-8), i+1).map(w=>({x:(w.weekStart||'').slice(5), v:w.m[key]}));
   const ddNow=W.m.discountDepth, ddPrev=prev.m.discountDepth;
@@ -7642,7 +7644,6 @@ function boardWeeks(){
         // single week can read >100% — when it does, fall back to the blended rate.
         emailOpenRate: emailRecipients>0 ? (emailOpens<=emailRecipients ? emailOpens/emailRecipients : blendedOpenRate) : blendedOpenRate,
         emailClickRate: emailRecipients>0 ? (emailClicks<=emailRecipients ? emailClicks/emailRecipients : blendedClickRate) : blendedClickRate,
-        emailShare: revenue>0 ? emailRev/revenue : null,
       },
     };
   });
