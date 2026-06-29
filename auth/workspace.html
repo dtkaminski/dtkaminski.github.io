@@ -137,6 +137,50 @@
     margin-top: var(--s-4); font-size: 13px;
   }
   .demo-banner .btn-ghost { margin-left: auto; padding: 6px 12px; font-size: 12px; }
+
+  /* Team */
+  .team-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--s-3); }
+  .invite-form {
+    display: flex; gap: var(--s-2); flex-wrap: wrap; align-items: center;
+    margin-top: var(--s-4); padding-top: var(--s-4); border-top: 1px solid var(--border-subtle);
+  }
+  .invite-form input[type="email"] { flex: 1 1 220px; min-width: 0; }
+  .invite-form select {
+    flex: 0 0 auto; background: var(--bg-input); color: var(--text-primary);
+    border: 1px solid var(--border-default); border-radius: var(--r-md);
+    padding: 9px 12px; font-size: 13px; font-family: inherit;
+  }
+  .invite-msg {
+    margin-top: var(--s-3); padding: 10px 14px; border-radius: var(--r-md); font-size: 13px;
+    border: 1px solid var(--border-default); background: var(--bg-elevated);
+  }
+  .invite-msg.ok { color: var(--good); border-color: rgba(74,222,128,0.35); background: rgba(74,222,128,0.08); }
+  .invite-msg.err { color: var(--bad); border-color: rgba(248,113,113,0.35); background: rgba(248,113,113,0.08); }
+  .team-list { margin-top: var(--s-4); display: flex; flex-direction: column; }
+  .team-row {
+    display: flex; align-items: center; gap: var(--s-3);
+    padding: var(--s-3) 0; border-top: 1px solid var(--border-subtle);
+  }
+  .team-row:first-child { border-top: none; }
+  .team-avatar {
+    width: 30px; height: 30px; border-radius: var(--r-full); flex-shrink: 0;
+    background: var(--bg-elevated); border: 1px solid var(--border-default);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;
+  }
+  .team-email { font-size: 13.5px; font-weight: 550; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .team-meta { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+  .team-role {
+    margin-left: auto; flex-shrink: 0; font-size: 10.5px; font-weight: 700;
+    letter-spacing: .06em; text-transform: uppercase; color: var(--text-secondary);
+    padding: 4px 9px; border: 1px solid var(--border-default); border-radius: var(--r-full);
+  }
+  .team-role.owner { color: var(--accent); border-color: rgba(124,140,255,0.4); }
+  .team-remove {
+    flex-shrink: 0; background: none; border: none; cursor: pointer;
+    color: var(--text-muted); font-size: 15px; line-height: 1; padding: 4px 6px; border-radius: var(--r-md);
+  }
+  .team-remove:hover { color: var(--bad); background: rgba(248,113,113,0.08); }
 </style>
 </head>
 <body>
@@ -257,6 +301,30 @@
         <tr><td>Your role</td><td id="kv-role">—</td></tr>
         <tr><td>Workspace ID</td><td><code id="kv-id" style="font-size:10.5px;">—</code></td></tr>
       </table>
+    </div>
+
+    <!-- ── TEAM ───────────────────────────────────────────────────────── -->
+    <div class="welcome-card team-card" id="team-card" style="margin-top:var(--s-4);" hidden>
+      <div class="team-head">
+        <div>
+          <h2 style="font-size:14px; margin:0; font-weight:650; color:var(--text-secondary);">Team</h2>
+          <p class="meta" style="font-size:12px; margin:4px 0 0;">Everyone with access to this workspace.</p>
+        </div>
+        <button class="btn-ghost" id="invite-toggle" hidden style="padding:8px 14px; font-size:13px;">+ Invite teammate</button>
+      </div>
+
+      <form class="invite-form" id="invite-form" hidden>
+        <input type="email" id="invite-email" placeholder="teammate@yourbrand.com" autocomplete="off" required/>
+        <select id="invite-role" aria-label="Role">
+          <option value="member">Member — full access</option>
+          <option value="viewer">Viewer — read only</option>
+          <option value="admin">Admin — can manage team</option>
+        </select>
+        <button type="submit" class="btn-primary" id="invite-submit" style="padding:9px 16px; font-size:13px;">Send invite →</button>
+      </form>
+      <div id="invite-msg" class="invite-msg" hidden></div>
+
+      <div id="team-list" class="team-list"><!-- filled by JS --></div>
     </div>
   </div>
 </div>
@@ -459,6 +527,7 @@
     const connByProvider = Object.fromEntries((connections || []).map(c => [c.provider, c]));
     renderConnections(connByProvider);
     renderProgress(connByProvider);
+    renderTeam();
 
     document.getElementById('loading').hidden = true;
     document.getElementById('workspace-view').hidden = false;
@@ -691,6 +760,99 @@
       klaviyoSubmit.disabled = false;
       klaviyoSubmit.textContent = 'Connect →';
     }
+  });
+
+  // ── TEAM MANAGEMENT ──────────────────────────────────────────────────
+  // Members can't be read via PostgREST (RLS shows only your own row), and
+  // brand_users has no client-writable policy — every read/write here goes
+  // through the invite-member edge fn, authenticated with the user's JWT.
+  let teamCanManage = false;
+
+  async function callTeam(payload) {
+    const r = await fetch(`${SUPABASE_FNS}/invite-member`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
+      body: JSON.stringify({ brand_id: currentBrand.id, ...payload }),
+    });
+    const data = await r.json().catch(() => ({}));
+    return { ok: r.ok, data };
+  }
+
+  async function renderTeam() {
+    const card = document.getElementById('team-card');
+    if (!currentBrand || !currentSession) return;
+    const { ok, data } = await callTeam({ action: 'list' });
+    if (!ok || !data.members) return;            // fail quiet — team is a secondary panel
+    card.hidden = false;
+    teamCanManage = !!data.caller?.can_manage;
+    document.getElementById('invite-toggle').hidden = !teamCanManage;
+
+    const list = document.getElementById('team-list');
+    list.innerHTML = '';
+    for (const m of data.members) {
+      const row = document.createElement('div');
+      row.className = 'team-row';
+      const initial = (m.email || '?').trim().charAt(0) || '?';
+      const canRemove = teamCanManage && (m.is_self || (m.role !== 'owner' && (data.caller.role === 'owner' || m.role === 'member' || m.role === 'viewer')));
+      row.innerHTML = `
+        <div class="team-avatar">${escapeHtml(initial)}</div>
+        <div style="min-width:0;">
+          <div class="team-email">${escapeHtml(m.email)}${m.is_self ? ' <span style="color:var(--text-muted);font-weight:450;">(you)</span>' : ''}</div>
+          <div class="team-meta">Added ${new Date(m.created_at).toLocaleDateString()}</div>
+        </div>
+        <span class="team-role ${m.role === 'owner' ? 'owner' : ''}">${escapeHtml(m.role)}</span>
+        ${canRemove ? `<button class="team-remove" title="${m.is_self ? 'Leave workspace' : 'Remove'}" data-uid="${escapeHtml(m.user_id)}" data-email="${escapeHtml(m.email)}" data-self="${m.is_self}">✕</button>` : ''}
+      `;
+      list.appendChild(row);
+    }
+
+    list.querySelectorAll('.team-remove').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const self = btn.dataset.self === 'true';
+        const who = self ? 'Leave this workspace?' : `Remove ${btn.dataset.email}?`;
+        if (!confirm(who)) return;
+        btn.disabled = true;
+        const { ok, data } = await callTeam({ action: 'remove', target_user_id: btn.dataset.uid });
+        if (!ok) { showInviteMsg(data.detail || data.error || 'Could not remove.', 'err'); btn.disabled = false; return; }
+        if (self) { window.location.href = './workspace.html'; return; }
+        renderTeam();
+      });
+    });
+  }
+
+  function showInviteMsg(text, kind) {
+    const el = document.getElementById('invite-msg');
+    el.textContent = text;
+    el.className = 'invite-msg ' + (kind || '');
+    el.hidden = false;
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  document.getElementById('invite-toggle').addEventListener('click', () => {
+    const form = document.getElementById('invite-form');
+    form.hidden = !form.hidden;
+    if (!form.hidden) document.getElementById('invite-email').focus();
+  });
+
+  document.getElementById('invite-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('invite-email').value.trim();
+    const role = document.getElementById('invite-role').value;
+    const submit = document.getElementById('invite-submit');
+    submit.disabled = true; submit.textContent = 'Sending…';
+    const { ok, data } = await callTeam({
+      action: 'invite', email, role,
+      redirect_to: window.location.origin + '/auth/workspace.html',
+    });
+    submit.disabled = false; submit.textContent = 'Send invite →';
+    if (!ok) { showInviteMsg(data.detail || data.message || data.error || 'Invite failed.', 'err'); return; }
+    showInviteMsg(data.message || 'Invite sent.', 'ok');
+    document.getElementById('invite-email').value = '';
+    document.getElementById('invite-form').hidden = true;
+    renderTeam();
   });
 
   // Logout
