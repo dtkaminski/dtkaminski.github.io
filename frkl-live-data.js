@@ -3,10 +3,10 @@ window.FRKL_DATA = {
  "meta": {
   "brand": "frkl",
   "currency": "GBP",
-  "captured": "2026-06-27",
+  "captured": "2026-06-28",
   "range": {
    "start": "2026-01-15",
-   "end": "2026-06-27"
+   "end": "2026-06-28"
   },
   "source": "Supermetrics (live) — Meta FA, Google Ads AW, GA4 GAWA, Klaviyo KLAV, Shopify SHP",
   "shopifySegmentation": "DTC = Online Store. Wholesale = John Lewis + Faire (channel 4901177). Gifting = Draft Orders. Headline metrics exclude wholesale and gifting."
@@ -1287,16 +1287,24 @@ window.FRKL_DATA = {
   {
    "date": "2026-06-27",
    "cost": 135.7,
-   "impressions": 15084,
+   "impressions": 15089,
    "linkCtr": 0.0088,
    "purchases": 3,
    "purchaseValue": 336.89
   },
   {
    "date": "2026-06-28",
-   "cost": 15.48,
-   "impressions": 2159,
-   "linkCtr": 0.0148,
+   "cost": 188.18,
+   "impressions": 21740,
+   "linkCtr": 0.01,
+   "purchases": 1,
+   "purchaseValue": 120
+  },
+  {
+   "date": "2026-06-29",
+   "cost": 9.39,
+   "impressions": 1083,
+   "linkCtr": 0.0092,
    "purchases": null,
    "purchaseValue": null
   }
@@ -3453,14 +3461,25 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-06-28",
-   "sessions": 6,
-   "engagedSessions": 2,
-   "engagementRate": 0.3333,
+   "sessions": 383,
+   "engagedSessions": 170,
+   "engagementRate": 0.4439,
+   "addToCarts": 30,
+   "checkouts": 3,
+   "purchases": 2,
+   "revenue": 161.89,
+   "bounceRate": 0.5561
+  },
+  {
+   "date": "2026-06-29",
+   "sessions": 5,
+   "engagedSessions": 4,
+   "engagementRate": 0.8,
    "addToCarts": 0,
    "checkouts": 0,
    "purchases": 0,
    "revenue": 0,
-   "bounceRate": 0.6667
+   "bounceRate": 0.2
   }
  ],
  "klaviyo": [
@@ -4376,13 +4395,13 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-05-29",
-   "recipients": 9922,
-   "opens": 6214,
-   "clicks": 306,
-   "openRate": 0.6263,
-   "clickRate": 0.0308,
-   "orders": 28,
-   "orderValue": 2531.18
+   "recipients": 9903,
+   "opens": 5548,
+   "clicks": 291,
+   "openRate": 0.5602,
+   "clickRate": 0.0294,
+   "orders": 27,
+   "orderValue": 2461.9
   },
   {
    "date": "2026-05-30",
@@ -4666,11 +4685,21 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-06-27",
-   "recipients": 5,
-   "opens": 702,
-   "clicks": 2,
+   "recipients": 10225,
+   "opens": 5450,
+   "clicks": 181,
+   "openRate": 0.533,
+   "clickRate": 0.0177,
+   "orders": 7,
+   "orderValue": 524.3
+  },
+  {
+   "date": "2026-06-28",
+   "recipients": 4,
+   "opens": 1411,
+   "clicks": 26,
    "openRate": 1,
-   "clickRate": 0.4,
+   "clickRate": 1,
    "orders": 0,
    "orderValue": 0
   }
@@ -6151,6 +6180,15 @@ window.FRKL_DATA = {
    "discounts": 30.3,
    "returns": 0.0,
    "aov": 99.49
+  },
+  {
+   "date": "2026-06-28",
+   "totalSales": 426.96,
+   "netSales": 414.31,
+   "orders": 5,
+   "discounts": 12.65,
+   "returns": 0.0,
+   "aov": 85.39
   }
  ],
  "shopifyWholesale": [
@@ -6957,6 +6995,15 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-06-26",
+   "totalSales": 20.83,
+   "netSales": 20.83,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "aov": 20.83
+  },
+  {
+   "date": "2026-06-28",
    "totalSales": 20.83,
    "netSales": 20.83,
    "orders": 1,
@@ -7939,6 +7986,15 @@ window.FRKL_DATA = {
    "discounts": 17.0,
    "returns": 0.0,
    "aov": 153.0
+  },
+  {
+   "date": "2026-06-28",
+   "totalSales": 52.0,
+   "netSales": 52.0,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "aov": 52.0
   }
  ],
  "shopifyAll": [
@@ -9417,6 +9473,15 @@ window.FRKL_DATA = {
    "discounts": 47.3,
    "returns": 0.0,
    "aov": 105.43
+  },
+  {
+   "date": "2026-06-28",
+   "totalSales": 499.78999999999996,
+   "netSales": 487.14,
+   "orders": 7,
+   "discounts": 12.65,
+   "returns": 0.0,
+   "aov": 71.4
   }
  ],
  "shopifyByChannel": [
@@ -13952,6 +14017,42 @@ window.FRKL_DATA = {
    "netSales": 765.59,
    "orders": 8,
    "discounts": 30.3,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-06-28",
+   "channel": "3890849",
+   "stream": "other",
+   "totalSales": 52.0,
+   "netSales": 52.0,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-06-28",
+   "channel": "John Lewis",
+   "stream": "wholesale",
+   "totalSales": 20.83,
+   "netSales": 20.83,
+   "orders": 1,
+   "discounts": 0.0,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-06-28",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 426.96,
+   "netSales": 414.31,
+   "orders": 5,
+   "discounts": 12.65,
    "returns": 0.0,
    "shipping": 0.0,
    "tax": 0.0
