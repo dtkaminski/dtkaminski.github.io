@@ -3460,6 +3460,13 @@ function FitCard({start, end}){
   if(loading && (!FIT||!FIT.blended)){ return (<div className="card" style={{marginBottom:14}}><h2>Offer &amp; Product Market Fit</h2><div className="note">Assessing fit for the selected window…</div></div>); }
   if(!FIT||!FIT.blended){ return (<div className="card" style={{marginBottom:14}}><h2>Offer &amp; Product Market Fit</h2><div className="note">{error ? ('Fit not available — '+error) : 'No fit assessment yet — connect Meta, Shopify and GA4, then the engine reads offer-market fit (the paid funnel) and product-market fit (cohorts) and tells you whether to scale.'}</div></div>); }
   const b=FIT.blended;
+  // Paid-only offer fit (engine: parameters.paidOmf). OMF is a paid-acquisition read, but the blended
+  // headline sums in zero-spend organic/direct customers, flattering it. Show the honest paid number as
+  // the headline when the engine reports it and some channels were excluded for no spend; absent
+  // (pre-deploy / cached snapshot) ⇒ falls back to the blended OMF unchanged.
+  const pomf=(FIT.parameters&&FIT.parameters.paidOmf)||null;
+  const diluted=!!(pomf&&pomf.excludedChannels&&pomf.excludedChannels.length>0&&pomf.omfScore!=null);
+  const omfHeadline=diluted?pomf.omfScore:b.omfScore;
   const pc=(x,dp=1)=>x==null?'—':(x*100).toFixed(dp)+'%';
   const rx=(x,dp=2)=>x==null?'—':x.toFixed(dp)+'x';
   return (<div className="card" style={{marginBottom:14}}>
@@ -3473,9 +3480,10 @@ function FitCard({start, end}){
       </div>
     </div>
     <div style={{display:'flex',gap:10,margin:'12px 0'}}>
-      <FitScore label="Offer-market fit" value={b.omfScore} sub="CTR · landing CVR · CAC coverage"/>
+      <FitScore label="Offer-market fit" value={omfHeadline} sub={diluted?'paid channels only':'CTR · landing CVR · CAC coverage'}/>
       <FitScore label="Product-market fit" value={b.pmfScore} sub="LTV:CAC · payback · retention"/>
     </div>
+    {diluted&&(<div className="note" style={{marginBottom:12,borderLeft:'3px solid #f5b544'}}><b>Paid-only offer fit.</b> Blended (incl. organic/direct) reads <b>{pomf.blendedOmfScore}</b> at {rx(pomf.blendedCacCoverageRatio)} CAC coverage — flattered by {pomf.excludedChannels.join(', ')} with no ad spend. On the paid channels you control, CAC coverage is {rx(pomf.cacCoverageRatio)}.</div>)}
     <div style={{padding:'12px 14px',borderRadius:'var(--r-sm)',background:'var(--accent-bg)',border:'1px solid rgba(124,140,255,.25)',marginBottom:12}}>
       <div style={{fontWeight:700,color:'var(--text-primary)',marginBottom:4}}>{FIT.primaryDiagnosis}</div>
       <div style={{fontSize:'12.5px',lineHeight:1.5,color:'var(--text-secondary)'}}>{FIT.recommendedAction}</div>
