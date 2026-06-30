@@ -5,23 +5,22 @@
   --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px;
   --s-5: 20px; --s-6: 24px; --s-7: 32px; --s-8: 48px;
   --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-xl: 20px; --r-full: 999px;
-  /* ── Greta light palette (brand book) ───────────────────────────────
-     Cloud canvas, navy ink, Intelligence-Purple accent, Data-Green good. */
-  --bg-app: #F1F5F9;          /* Cloud — background canvas */
+  /* ── Greta light palette (brand book) ── */
+  --bg-app: #F1F5F9;
   --bg-card: #FFFFFF;
   --bg-card-hover: #F8FAFC;
   --bg-input: #FFFFFF;
   --bg-elevated: #F1F5F9;
   --border-subtle: #E9EEF4;
   --border-default: #D7DEE8;
-  --text-primary: #0B132B;    /* Greta Navy */
-  --text-secondary: #334155;  /* Slate */
+  --text-primary: #0B132B;
+  --text-secondary: #334155;
   --text-muted: #64748B;
   --text-faint: #94A3B8;
-  --good: #0E9E78;            /* Data Green (accessible text shade of #22D3A6) */
+  --good: #0E9E78;
   --warn: #B45309;
   --bad: #DC2626;
-  --accent: #7C3AED;          /* Intelligence Purple (accessible) — brand mark uses #8B5CF6 */
+  --accent: #7C3AED;
   --accent-soft: #EDE9FE;
   --good-bg: rgba(34,211,166,.12);
   --warn-bg: rgba(180,83,9,.10);
@@ -263,4 +262,13 @@ input::placeholder { color: var(--text-faint); }
 .advanced-details summary::-webkit-details-marker { display: none; }
 .advanced-details summary::before {
   content: '+'; color: var(--text-faint); font-size: 14px; font-weight: 400;
-  transition: transform var(
+  transition: transform var(--motion-fast);
+}
+.advanced-details[open] summary::before { transform: rotate(45deg); }
+.advanced-details summary:hover { color: var(--text-secondary); }
+
+/* Focus states (a11y) */
+button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
