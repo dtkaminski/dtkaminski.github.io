@@ -3551,8 +3551,20 @@ function gpPCT(x, dp = 1) { return x == null ? '-' : (x * 100).toFixed(dp) + '%'
 function gpRX(x, dp = 2) { return x == null ? '-' : x.toFixed(dp) + 'x'; }
 function gpDays(x) { return x == null ? '-' : Math.round(x) + 'd'; }
 
-/* 'your number' (brand-entered) vs 'prior' (category default) - the source-honesty tag. */
-function GpSrc({ source }) {
+/* 'your number' (brand-entered) vs 'prior' (category default) - the source-honesty tag.
+ * When `label` is passed it overrides the brand/prior dichotomy with free-text basis honesty
+ * (e.g. 'vintage-weighted · extrapolated · low confidence'), always rendered in the muted /
+ * non-confident style so the value never reads as a precise, brand-confirmed figure. */
+function GpSrc({ source, label }) {
+  if (label) {
+    return (
+      <span className="pill" style={{
+        fontSize: 10, padding: '1px 6px', marginLeft: 6, verticalAlign: 'middle',
+        background: 'transparent', color: 'var(--text-faint)',
+        border: '1px solid var(--border-subtle)',
+      }}>{label}</span>
+    );
+  }
   const brand = source === 'brand-entered';
   return (
     <span className="pill" style={{
@@ -3564,10 +3576,10 @@ function GpSrc({ source }) {
   );
 }
 
-function GpStat({ label, value, sub, accent }) {
+function GpStat({ label, value, sub, accent, src }) {
   return (
     <div style={{ flex: 1, minWidth: 124, padding: '12px 12px', borderRadius: 'var(--r-sm)', background: 'var(--bg-app)', border: '1px solid var(--border-subtle)' }}>
-      <div className="micro" style={{ color: 'var(--text-muted)', fontWeight: 600, marginBottom: 7 }}>{label}</div>
+      <div className="micro" style={{ color: 'var(--text-muted)', fontWeight: 600, marginBottom: 7 }}>{label}{src}</div>
       <div className="v" style={{ fontSize: 23, lineHeight: 1, color: accent || 'var(--text-primary)' }}>{value}</div>
       {sub && <div className="micro" style={{ color: 'var(--text-faint)', marginTop: 6 }}>{sub}</div>}
     </div>
@@ -3598,6 +3610,23 @@ function GenomePanel() {
 
   const cc = p.cashConversion, dl = p.discountedLtv, pr = p.profitability;
   const sig = p.signal || {}, me = sig.marginalEconomics || {}, tj = sig.trajectories || {};
+
+  // Source-honesty tag for the Discounted-LTV £: it's a curve-fitted estimate, not a brand-entered
+  // figure. Reflect what the engine actually emitted for the value — the discountedLtv.basis (the
+  // engine's single-enum primary qualifier) plus extrapolation (which composes with vintage-weighting
+  // in confidenceReasons, not the enum) plus the result-level confidence — so the £ reads as the
+  // estimate it is. Never asserts a confident label.
+  const BASIS_PHRASE = { 'curve-vintage-weighted': 'vintage-weighted', 'curve-extrapolated': 'extrapolated', 'curve-timed': 'curve-timed', 'cadence-timed': 'cadence-timed', 'single-order': 'single-order' };
+  const ltvBasisLabel = (() => {
+    if (!dl || dl.discountedLtv == null || dl.basis === 'none') return null;
+    const quals = [];
+    if (BASIS_PHRASE[dl.basis]) quals.push(BASIS_PHRASE[dl.basis]);
+    const reasons = (FIT && FIT.confidenceReasons) || [];
+    const extrapolated = Array.isArray(reasons) && reasons.some((r) => /extrapolat/i.test(r));
+    if (extrapolated && !quals.includes('extrapolated')) quals.push('extrapolated');
+    if (FIT && FIT.confidence) quals.push(FIT.confidence + ' confidence');
+    return quals.length ? quals.join(' · ') : null;
+  })();
   const accent = 'var(--accent)';
   const good = '#34d399', warn = '#fbbf24', bad = '#f87171';
 
@@ -3619,7 +3648,7 @@ function GenomePanel() {
       <div className="row" style={{ gap: 10 }}>
         <GpStat label="Cash conversion cycle" value={gpDays(cc.cccDays)} sub="cash gap, order to bank" />
         <GpStat label="Working capital tied" value={gpGBP0(cc.workingCapitalRequired)} sub="locked across the cycle" />
-        <GpStat label="Discounted LTV" value={gpGBP2(dl.discountedLtv)} sub={'vs ' + gpGBP2(dl.undiscountedLtv) + ' undiscounted'} />
+        <GpStat label="Discounted LTV" value={gpGBP2(dl.discountedLtv)} sub={'vs ' + gpGBP2(dl.undiscountedLtv) + ' undiscounted'} src={ltvBasisLabel && <GpSrc label={ltvBasisLabel} />} />
         <GpStat label="Operating profit (EBITDA)" value={gpGBP0(pr.operatingProfitWindow)} sub={gpPCT(pr.ebitdaMarginPct) + ' margin · window'} accent={(pr.operatingProfitWindow ?? 0) >= 0 ? good : bad} />
       </div>
 

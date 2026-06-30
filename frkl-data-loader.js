@@ -44,7 +44,7 @@
   // is populated — until then those figures are prior-driven. Flip genomeSignal to true
   // (here, or via an inline window.FRKL_FIT_FLAGS set BEFORE this script) to reveal them.
   // No rebuild needed — it's a runtime global the panel reads on the next render.
-  window.FRKL_FIT_FLAGS = window.FRKL_FIT_FLAGS || { genomeSignal: false };
+  window.FRKL_FIT_FLAGS = window.FRKL_FIT_FLAGS || { genomeSignal: true };
 
   // ── Bootstrap ─────────────────────────────────────────────────────────────
 
@@ -59,10 +59,18 @@
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
     window.FRKL_LIVE.sb = sb;
 
-    // 2. Check for active session (set if user is logged in via /saas/auth/login.html)
+    // 2. Check for active session (set if the user logged in via the same-origin /auth/login.html).
     const { data: sessionData } = await sb.auth.getSession();
     if (!sessionData?.session) {
-      console.info('[frkl-live] no auth session — static mode. Log in at /saas/auth/login.html to enable live data.');
+      // No same-origin session → stay static, but surface a login ENTRY so the user can switch to live.
+      // RLS stays intact: login yields a per-user Supabase session JWT (publishable key only — never a
+      // privileged/static token). The magic-link round-trip carries ?next so it returns to this page.
+      try {
+        const next = location.pathname + location.search;
+        window.FRKL_LIVE.loginUrl = '/auth/login.html?next=' + encodeURIComponent(next);
+        window.FRKL_LIVE.needsLogin = true;
+      } catch (e) { /* location unavailable — leave the plain static state */ }
+      console.info('[frkl-live] no auth session — static mode. Click the status pill to log in for live data.');
       setStatus('static-only', 'not authenticated');
       return;
     }
@@ -508,10 +516,18 @@
     host.style.background = s.bg;
     host.style.border = `1px solid ${s.border}`;
     host.style.color = s.text;
-    host.title = window.FRKL_LIVE.lastError
-      ? `${s.label} · ${window.FRKL_LIVE.lastError}`
-      : `${s.label}\nLast fetch: ${lastFetch ? lastFetch.toLocaleString() : 'never'}\nClick for details`;
+    host.style.cursor = 'pointer';
+    host.title = window.FRKL_LIVE.needsLogin
+      ? `${s.label}\nClick to log in for live data`
+      : window.FRKL_LIVE.lastError
+        ? `${s.label} · ${window.FRKL_LIVE.lastError}`
+        : `${s.label}\nLast fetch: ${lastFetch ? lastFetch.toLocaleString() : 'never'}\nClick for details`;
     host.onclick = () => {
+      // No session → the pill is the login entry. Same-origin magic-link login, returns here via ?next.
+      if (window.FRKL_LIVE.needsLogin && window.FRKL_LIVE.loginUrl) {
+        window.location.href = window.FRKL_LIVE.loginUrl;
+        return;
+      }
       console.log('[frkl-live]', JSON.parse(JSON.stringify({
         status: window.FRKL_LIVE.status,
         lastFetchAt: window.FRKL_LIVE.lastFetchAt,
