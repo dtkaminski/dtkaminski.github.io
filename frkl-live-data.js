@@ -3,10 +3,10 @@ window.FRKL_DATA = {
  "meta": {
   "brand": "frkl",
   "currency": "GBP",
-  "captured": "2026-06-28",
+  "captured": "2026-06-29",
   "range": {
    "start": "2026-01-15",
-   "end": "2026-06-28"
+   "end": "2026-06-29"
   },
   "source": "Supermetrics (live) — Meta FA, Google Ads AW, GA4 GAWA, Klaviyo KLAV, Shopify SHP",
   "shopifySegmentation": "DTC = Online Store. Wholesale = John Lewis + Faire (channel 4901177). Gifting = Draft Orders. Headline metrics exclude wholesale and gifting."
@@ -1294,17 +1294,25 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-06-28",
-   "cost": 188.18,
-   "impressions": 21740,
+   "cost": 188.27,
+   "impressions": 21756,
    "linkCtr": 0.01,
    "purchases": 1,
    "purchaseValue": 120
   },
   {
    "date": "2026-06-29",
-   "cost": 9.39,
-   "impressions": 1083,
-   "linkCtr": 0.0092,
+   "cost": 135.14,
+   "impressions": 16129,
+   "linkCtr": 0.0091,
+   "purchases": null,
+   "purchaseValue": null
+  },
+  {
+   "date": "2026-06-30",
+   "cost": 3.16,
+   "impressions": 419,
+   "linkCtr": 0.0143,
    "purchases": null,
    "purchaseValue": null
   }
@@ -2129,6 +2137,479 @@ window.FRKL_DATA = {
  ],
  "ga4": [
   {
+   "date": "2026-01-15",
+   "sessions": 501,
+   "engagedSessions": 268,
+   "engagementRate": 0.5349,
+   "addToCarts": 154,
+   "checkouts": 40,
+   "purchases": 13,
+   "revenue": 942.75,
+   "bounceRate": 0.4651
+  },
+  {
+   "date": "2026-01-16",
+   "sessions": 866,
+   "engagedSessions": 436,
+   "engagementRate": 0.5035,
+   "addToCarts": 192,
+   "checkouts": 50,
+   "purchases": 15,
+   "revenue": 1089.85,
+   "bounceRate": 0.4965
+  },
+  {
+   "date": "2026-01-17",
+   "sessions": 732,
+   "engagedSessions": 417,
+   "engagementRate": 0.5697,
+   "addToCarts": 346,
+   "checkouts": 75,
+   "purchases": 13,
+   "revenue": 1002.57,
+   "bounceRate": 0.4303
+  },
+  {
+   "date": "2026-01-18",
+   "sessions": 736,
+   "engagedSessions": 411,
+   "engagementRate": 0.5584,
+   "addToCarts": 242,
+   "checkouts": 84,
+   "purchases": 9,
+   "revenue": 589.18,
+   "bounceRate": 0.4416
+  },
+  {
+   "date": "2026-01-19",
+   "sessions": 686,
+   "engagedSessions": 369,
+   "engagementRate": 0.5379,
+   "addToCarts": 140,
+   "checkouts": 57,
+   "purchases": 14,
+   "revenue": 691.96,
+   "bounceRate": 0.4621
+  },
+  {
+   "date": "2026-01-20",
+   "sessions": 617,
+   "engagedSessions": 325,
+   "engagementRate": 0.5267,
+   "addToCarts": 116,
+   "checkouts": 34,
+   "purchases": 8,
+   "revenue": 567.44,
+   "bounceRate": 0.4733
+  },
+  {
+   "date": "2026-01-21",
+   "sessions": 487,
+   "engagedSessions": 241,
+   "engagementRate": 0.4949,
+   "addToCarts": 68,
+   "checkouts": 16,
+   "purchases": 8,
+   "revenue": 584.79,
+   "bounceRate": 0.5051
+  },
+  {
+   "date": "2026-01-22",
+   "sessions": 881,
+   "engagedSessions": 467,
+   "engagementRate": 0.5301,
+   "addToCarts": 118,
+   "checkouts": 34,
+   "purchases": 5,
+   "revenue": 464.4,
+   "bounceRate": 0.4699
+  },
+  {
+   "date": "2026-01-23",
+   "sessions": 749,
+   "engagedSessions": 380,
+   "engagementRate": 0.5073,
+   "addToCarts": 143,
+   "checkouts": 41,
+   "purchases": 8,
+   "revenue": 791.52,
+   "bounceRate": 0.4927
+  },
+  {
+   "date": "2026-01-24",
+   "sessions": 602,
+   "engagedSessions": 288,
+   "engagementRate": 0.4784,
+   "addToCarts": 58,
+   "checkouts": 36,
+   "purchases": 7,
+   "revenue": 640.8,
+   "bounceRate": 0.5216
+  },
+  {
+   "date": "2026-01-25",
+   "sessions": 579,
+   "engagedSessions": 315,
+   "engagementRate": 0.544,
+   "addToCarts": 402,
+   "checkouts": 21,
+   "purchases": 8,
+   "revenue": 504.34,
+   "bounceRate": 0.456
+  },
+  {
+   "date": "2026-01-26",
+   "sessions": 441,
+   "engagedSessions": 225,
+   "engagementRate": 0.5102,
+   "addToCarts": 66,
+   "checkouts": 22,
+   "purchases": 3,
+   "revenue": 172.22,
+   "bounceRate": 0.4898
+  },
+  {
+   "date": "2026-01-27",
+   "sessions": 581,
+   "engagedSessions": 307,
+   "engagementRate": 0.5284,
+   "addToCarts": 92,
+   "checkouts": 13,
+   "purchases": 6,
+   "revenue": 598.58,
+   "bounceRate": 0.4716
+  },
+  {
+   "date": "2026-01-28",
+   "sessions": 497,
+   "engagedSessions": 250,
+   "engagementRate": 0.503,
+   "addToCarts": 102,
+   "checkouts": 37,
+   "purchases": 9,
+   "revenue": 916.94,
+   "bounceRate": 0.497
+  },
+  {
+   "date": "2026-01-29",
+   "sessions": 608,
+   "engagedSessions": 304,
+   "engagementRate": 0.5,
+   "addToCarts": 100,
+   "checkouts": 27,
+   "purchases": 4,
+   "revenue": 373.08,
+   "bounceRate": 0.5
+  },
+  {
+   "date": "2026-01-30",
+   "sessions": 480,
+   "engagedSessions": 236,
+   "engagementRate": 0.4917,
+   "addToCarts": 84,
+   "checkouts": 28,
+   "purchases": 7,
+   "revenue": 723.46,
+   "bounceRate": 0.5083
+  },
+  {
+   "date": "2026-01-31",
+   "sessions": 528,
+   "engagedSessions": 262,
+   "engagementRate": 0.4962,
+   "addToCarts": 114,
+   "checkouts": 22,
+   "purchases": 7,
+   "revenue": 411.72,
+   "bounceRate": 0.5038
+  },
+  {
+   "date": "2026-02-01",
+   "sessions": 647,
+   "engagedSessions": 339,
+   "engagementRate": 0.524,
+   "addToCarts": 100,
+   "checkouts": 30,
+   "purchases": 6,
+   "revenue": 570.72,
+   "bounceRate": 0.476
+  },
+  {
+   "date": "2026-02-02",
+   "sessions": 451,
+   "engagedSessions": 221,
+   "engagementRate": 0.49,
+   "addToCarts": 48,
+   "checkouts": 21,
+   "purchases": 6,
+   "revenue": 563.41,
+   "bounceRate": 0.51
+  },
+  {
+   "date": "2026-02-03",
+   "sessions": 505,
+   "engagedSessions": 248,
+   "engagementRate": 0.4911,
+   "addToCarts": 90,
+   "checkouts": 22,
+   "purchases": 6,
+   "revenue": 555.11,
+   "bounceRate": 0.5089
+  },
+  {
+   "date": "2026-02-04",
+   "sessions": 523,
+   "engagedSessions": 275,
+   "engagementRate": 0.5258,
+   "addToCarts": 102,
+   "checkouts": 41,
+   "purchases": 8,
+   "revenue": 485,
+   "bounceRate": 0.4742
+  },
+  {
+   "date": "2026-02-05",
+   "sessions": 500,
+   "engagedSessions": 233,
+   "engagementRate": 0.466,
+   "addToCarts": 92,
+   "checkouts": 31,
+   "purchases": 4,
+   "revenue": 400.75,
+   "bounceRate": 0.534
+  },
+  {
+   "date": "2026-02-06",
+   "sessions": 434,
+   "engagedSessions": 225,
+   "engagementRate": 0.5184,
+   "addToCarts": 46,
+   "checkouts": 17,
+   "purchases": 1,
+   "revenue": 17,
+   "bounceRate": 0.4816
+  },
+  {
+   "date": "2026-02-07",
+   "sessions": 1006,
+   "engagedSessions": 524,
+   "engagementRate": 0.5209,
+   "addToCarts": 202,
+   "checkouts": 46,
+   "purchases": 14,
+   "revenue": 1124.8,
+   "bounceRate": 0.4791
+  },
+  {
+   "date": "2026-02-08",
+   "sessions": 700,
+   "engagedSessions": 367,
+   "engagementRate": 0.5243,
+   "addToCarts": 74,
+   "checkouts": 30,
+   "purchases": 5,
+   "revenue": 257.76,
+   "bounceRate": 0.4757
+  },
+  {
+   "date": "2026-02-09",
+   "sessions": 521,
+   "engagedSessions": 259,
+   "engagementRate": 0.4971,
+   "addToCarts": 102,
+   "checkouts": 27,
+   "purchases": 4,
+   "revenue": 364.52,
+   "bounceRate": 0.5029
+  },
+  {
+   "date": "2026-02-10",
+   "sessions": 621,
+   "engagedSessions": 311,
+   "engagementRate": 0.5008,
+   "addToCarts": 145,
+   "checkouts": 42,
+   "purchases": 7,
+   "revenue": 759.08,
+   "bounceRate": 0.4992
+  },
+  {
+   "date": "2026-02-11",
+   "sessions": 599,
+   "engagedSessions": 274,
+   "engagementRate": 0.4574,
+   "addToCarts": 116,
+   "checkouts": 60,
+   "purchases": 6,
+   "revenue": 501.71,
+   "bounceRate": 0.5426
+  },
+  {
+   "date": "2026-02-12",
+   "sessions": 443,
+   "engagedSessions": 219,
+   "engagementRate": 0.4944,
+   "addToCarts": 80,
+   "checkouts": 37,
+   "purchases": 4,
+   "revenue": 308.01,
+   "bounceRate": 0.5056
+  },
+  {
+   "date": "2026-02-13",
+   "sessions": 478,
+   "engagedSessions": 246,
+   "engagementRate": 0.5146,
+   "addToCarts": 79,
+   "checkouts": 28,
+   "purchases": 9,
+   "revenue": 792.68,
+   "bounceRate": 0.4854
+  },
+  {
+   "date": "2026-02-14",
+   "sessions": 491,
+   "engagedSessions": 267,
+   "engagementRate": 0.5438,
+   "addToCarts": 126,
+   "checkouts": 23,
+   "purchases": 8,
+   "revenue": 608.44,
+   "bounceRate": 0.4562
+  },
+  {
+   "date": "2026-02-15",
+   "sessions": 566,
+   "engagedSessions": 283,
+   "engagementRate": 0.5,
+   "addToCarts": 200,
+   "checkouts": 16,
+   "purchases": 7,
+   "revenue": 521.7,
+   "bounceRate": 0.5
+  },
+  {
+   "date": "2026-02-16",
+   "sessions": 400,
+   "engagedSessions": 201,
+   "engagementRate": 0.5025,
+   "addToCarts": 86,
+   "checkouts": 26,
+   "purchases": 5,
+   "revenue": 421.2,
+   "bounceRate": 0.4975
+  },
+  {
+   "date": "2026-02-17",
+   "sessions": 391,
+   "engagedSessions": 174,
+   "engagementRate": 0.445,
+   "addToCarts": 48,
+   "checkouts": 8,
+   "purchases": 2,
+   "revenue": 181.5,
+   "bounceRate": 0.555
+  },
+  {
+   "date": "2026-02-18",
+   "sessions": 447,
+   "engagedSessions": 205,
+   "engagementRate": 0.4586,
+   "addToCarts": 26,
+   "checkouts": 4,
+   "purchases": 0,
+   "revenue": 0,
+   "bounceRate": 0.5414
+  },
+  {
+   "date": "2026-02-19",
+   "sessions": 379,
+   "engagedSessions": 198,
+   "engagementRate": 0.5224,
+   "addToCarts": 16,
+   "checkouts": 4,
+   "purchases": 0,
+   "revenue": 0,
+   "bounceRate": 0.4776
+  },
+  {
+   "date": "2026-02-20",
+   "sessions": 463,
+   "engagedSessions": 239,
+   "engagementRate": 0.5162,
+   "addToCarts": 56,
+   "checkouts": 4,
+   "purchases": 3,
+   "revenue": 313.38,
+   "bounceRate": 0.4838
+  },
+  {
+   "date": "2026-02-21",
+   "sessions": 640,
+   "engagedSessions": 318,
+   "engagementRate": 0.4969,
+   "addToCarts": 82,
+   "checkouts": 24,
+   "purchases": 7,
+   "revenue": 508.04,
+   "bounceRate": 0.5031
+  },
+  {
+   "date": "2026-02-22",
+   "sessions": 612,
+   "engagedSessions": 338,
+   "engagementRate": 0.5523,
+   "addToCarts": 118,
+   "checkouts": 35,
+   "purchases": 11,
+   "revenue": 729.04,
+   "bounceRate": 0.4477
+  },
+  {
+   "date": "2026-02-23",
+   "sessions": 473,
+   "engagedSessions": 228,
+   "engagementRate": 0.482,
+   "addToCarts": 112,
+   "checkouts": 26,
+   "purchases": 8,
+   "revenue": 754.5,
+   "bounceRate": 0.518
+  },
+  {
+   "date": "2026-02-24",
+   "sessions": 455,
+   "engagedSessions": 243,
+   "engagementRate": 0.5341,
+   "addToCarts": 74,
+   "checkouts": 37,
+   "purchases": 5,
+   "revenue": 440.48,
+   "bounceRate": 0.4659
+  },
+  {
+   "date": "2026-02-25",
+   "sessions": 451,
+   "engagedSessions": 215,
+   "engagementRate": 0.4767,
+   "addToCarts": 69,
+   "checkouts": 23,
+   "purchases": 6,
+   "revenue": 492.66,
+   "bounceRate": 0.5233
+  },
+  {
+   "date": "2026-02-26",
+   "sessions": 473,
+   "engagedSessions": 222,
+   "engagementRate": 0.4693,
+   "addToCarts": 76,
+   "checkouts": 40,
+   "purchases": 6,
+   "revenue": 503.61,
+   "bounceRate": 0.5307
+  },
+  {
    "date": "2026-02-27",
    "sessions": 788,
    "engagedSessions": 466,
@@ -2136,7 +2617,7 @@ window.FRKL_DATA = {
    "addToCarts": 291,
    "checkouts": 64,
    "purchases": 20,
-   "revenue": 1653.2425,
+   "revenue": 1653.24,
    "bounceRate": 0.4086
   },
   {
@@ -2147,7 +2628,7 @@ window.FRKL_DATA = {
    "addToCarts": 264,
    "checkouts": 75,
    "purchases": 16,
-   "revenue": 1149.7195,
+   "revenue": 1149.72,
    "bounceRate": 0.4598
   },
   {
@@ -2158,7 +2639,7 @@ window.FRKL_DATA = {
    "addToCarts": 251,
    "checkouts": 73,
    "purchases": 24,
-   "revenue": 1749.516,
+   "revenue": 1749.52,
    "bounceRate": 0.4803
   },
   {
@@ -2169,7 +2650,7 @@ window.FRKL_DATA = {
    "addToCarts": 178,
    "checkouts": 91,
    "purchases": 16,
-   "revenue": 1316.1739,
+   "revenue": 1316.17,
    "bounceRate": 0.4828
   },
   {
@@ -2180,7 +2661,7 @@ window.FRKL_DATA = {
    "addToCarts": 94,
    "checkouts": 34,
    "purchases": 10,
-   "revenue": 1093.7156,
+   "revenue": 1093.72,
    "bounceRate": 0.4526
   },
   {
@@ -2191,7 +2672,7 @@ window.FRKL_DATA = {
    "addToCarts": 74,
    "checkouts": 24,
    "purchases": 12,
-   "revenue": 1201.7974,
+   "revenue": 1201.8,
    "bounceRate": 0.4989
   },
   {
@@ -3461,28 +3942,458 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-06-28",
-   "sessions": 383,
+   "sessions": 382,
    "engagedSessions": 170,
-   "engagementRate": 0.4439,
+   "engagementRate": 0.445,
    "addToCarts": 30,
    "checkouts": 3,
    "purchases": 2,
    "revenue": 161.89,
-   "bounceRate": 0.5561
+   "bounceRate": 0.555
   },
   {
    "date": "2026-06-29",
-   "sessions": 5,
-   "engagedSessions": 4,
-   "engagementRate": 0.8,
-   "addToCarts": 0,
-   "checkouts": 0,
+   "sessions": 302,
+   "engagedSessions": 120,
+   "engagementRate": 0.3974,
+   "addToCarts": 15,
+   "checkouts": 1,
    "purchases": 0,
    "revenue": 0,
-   "bounceRate": 0.2
+   "bounceRate": 0.6026
   }
  ],
  "klaviyo": [
+  {
+   "date": "2026-01-15",
+   "recipients": 397,
+   "opens": 919,
+   "clicks": 100,
+   "openRate": 1,
+   "clickRate": 0.2519,
+   "orders": 25,
+   "orderValue": 1981.32
+  },
+  {
+   "date": "2026-01-16",
+   "recipients": 9167,
+   "opens": 5363,
+   "clicks": 403,
+   "openRate": 0.585,
+   "clickRate": 0.044,
+   "orders": 19,
+   "orderValue": 1337.86
+  },
+  {
+   "date": "2026-01-17",
+   "recipients": 9210,
+   "opens": 6056,
+   "clicks": 264,
+   "openRate": 0.6575,
+   "clickRate": 0.0287,
+   "orders": 23,
+   "orderValue": 1671.65
+  },
+  {
+   "date": "2026-01-18",
+   "recipients": 9836,
+   "opens": 5907,
+   "clicks": 186,
+   "openRate": 0.6005,
+   "clickRate": 0.0189,
+   "orders": 17,
+   "orderValue": 1443.7
+  },
+  {
+   "date": "2026-01-19",
+   "recipients": 9589,
+   "opens": 7769,
+   "clicks": 192,
+   "openRate": 0.8102,
+   "clickRate": 0.02,
+   "orders": 25,
+   "orderValue": 1279.27
+  },
+  {
+   "date": "2026-01-20",
+   "recipients": 452,
+   "opens": 2074,
+   "clicks": 63,
+   "openRate": 1,
+   "clickRate": 0.1394,
+   "orders": 11,
+   "orderValue": 731.53
+  },
+  {
+   "date": "2026-01-21",
+   "recipients": 195,
+   "opens": 1057,
+   "clicks": 30,
+   "openRate": 1,
+   "clickRate": 0.1538,
+   "orders": 12,
+   "orderValue": 791.34
+  },
+  {
+   "date": "2026-01-22",
+   "recipients": 8882,
+   "opens": 4811,
+   "clicks": 258,
+   "openRate": 0.5417,
+   "clickRate": 0.029,
+   "orders": 8,
+   "orderValue": 634.43
+  },
+  {
+   "date": "2026-01-23",
+   "recipients": 334,
+   "opens": 2585,
+   "clicks": 130,
+   "openRate": 1,
+   "clickRate": 0.3892,
+   "orders": 13,
+   "orderValue": 1390.39
+  },
+  {
+   "date": "2026-01-24",
+   "recipients": 275,
+   "opens": 1100,
+   "clicks": 62,
+   "openRate": 1,
+   "clickRate": 0.2255,
+   "orders": 12,
+   "orderValue": 975.69
+  },
+  {
+   "date": "2026-01-25",
+   "recipients": 8748,
+   "opens": 5914,
+   "clicks": 124,
+   "openRate": 0.676,
+   "clickRate": 0.0142,
+   "orders": 10,
+   "orderValue": 618.28
+  },
+  {
+   "date": "2026-01-26",
+   "recipients": 209,
+   "opens": 1504,
+   "clicks": 31,
+   "openRate": 1,
+   "clickRate": 0.1483,
+   "orders": 7,
+   "orderValue": 212.53
+  },
+  {
+   "date": "2026-01-27",
+   "recipients": 3406,
+   "opens": 1320,
+   "clicks": 49,
+   "openRate": 0.3876,
+   "clickRate": 0.0144,
+   "orders": 7,
+   "orderValue": 614.62
+  },
+  {
+   "date": "2026-01-28",
+   "recipients": 192,
+   "opens": 898,
+   "clicks": 13,
+   "openRate": 1,
+   "clickRate": 0.0677,
+   "orders": 16,
+   "orderValue": 1116.04
+  },
+  {
+   "date": "2026-01-29",
+   "recipients": 9269,
+   "opens": 5406,
+   "clicks": 179,
+   "openRate": 0.5832,
+   "clickRate": 0.0193,
+   "orders": 14,
+   "orderValue": 1026.29
+  },
+  {
+   "date": "2026-01-30",
+   "recipients": 201,
+   "opens": 1742,
+   "clicks": 79,
+   "openRate": 1,
+   "clickRate": 0.393,
+   "orders": 10,
+   "orderValue": 968.22
+  },
+  {
+   "date": "2026-01-31",
+   "recipients": 8692,
+   "opens": 5501,
+   "clicks": 96,
+   "openRate": 0.6329,
+   "clickRate": 0.011,
+   "orders": 7,
+   "orderValue": 437.07
+  },
+  {
+   "date": "2026-02-01",
+   "recipients": 8687,
+   "opens": 5073,
+   "clicks": 150,
+   "openRate": 0.584,
+   "clickRate": 0.0173,
+   "orders": 8,
+   "orderValue": 734.4
+  },
+  {
+   "date": "2026-02-02",
+   "recipients": 159,
+   "opens": 3082,
+   "clicks": 81,
+   "openRate": 1,
+   "clickRate": 0.5094,
+   "orders": 13,
+   "orderValue": 944.91
+  },
+  {
+   "date": "2026-02-03",
+   "recipients": 148,
+   "opens": 1284,
+   "clicks": 20,
+   "openRate": 1,
+   "clickRate": 0.1351,
+   "orders": 10,
+   "orderValue": 910.26
+  },
+  {
+   "date": "2026-02-04",
+   "recipients": 9282,
+   "opens": 4291,
+   "clicks": 112,
+   "openRate": 0.4623,
+   "clickRate": 0.0121,
+   "orders": 17,
+   "orderValue": 1390.75
+  },
+  {
+   "date": "2026-02-05",
+   "recipients": 172,
+   "opens": 2801,
+   "clicks": 72,
+   "openRate": 1,
+   "clickRate": 0.4186,
+   "orders": 9,
+   "orderValue": 686.01
+  },
+  {
+   "date": "2026-02-06",
+   "recipients": 167,
+   "opens": 1083,
+   "clicks": 24,
+   "openRate": 1,
+   "clickRate": 0.1437,
+   "orders": 3,
+   "orderValue": 133.63
+  },
+  {
+   "date": "2026-02-07",
+   "recipients": 10485,
+   "opens": 5571,
+   "clicks": 185,
+   "openRate": 0.5313,
+   "clickRate": 0.0176,
+   "orders": 18,
+   "orderValue": 1503.32
+  },
+  {
+   "date": "2026-02-08",
+   "recipients": 9532,
+   "opens": 4948,
+   "clicks": 118,
+   "openRate": 0.5191,
+   "clickRate": 0.0124,
+   "orders": 10,
+   "orderValue": 698.11
+  },
+  {
+   "date": "2026-02-09",
+   "recipients": 209,
+   "opens": 2734,
+   "clicks": 87,
+   "openRate": 1,
+   "clickRate": 0.4163,
+   "orders": 10,
+   "orderValue": 677.15
+  },
+  {
+   "date": "2026-02-10",
+   "recipients": 227,
+   "opens": 1102,
+   "clicks": 31,
+   "openRate": 1,
+   "clickRate": 0.1366,
+   "orders": 11,
+   "orderValue": 1161.8
+  },
+  {
+   "date": "2026-02-11",
+   "recipients": 10731,
+   "opens": 5477,
+   "clicks": 253,
+   "openRate": 0.5104,
+   "clickRate": 0.0236,
+   "orders": 11,
+   "orderValue": 720.9
+  },
+  {
+   "date": "2026-02-12",
+   "recipients": 181,
+   "opens": 1509,
+   "clicks": 77,
+   "openRate": 1,
+   "clickRate": 0.4254,
+   "orders": 6,
+   "orderValue": 525.11
+  },
+  {
+   "date": "2026-02-13",
+   "recipients": 10271,
+   "opens": 3552,
+   "clicks": 91,
+   "openRate": 0.3458,
+   "clickRate": 0.0089,
+   "orders": 12,
+   "orderValue": 1051.46
+  },
+  {
+   "date": "2026-02-14",
+   "recipients": 119,
+   "opens": 2834,
+   "clicks": 73,
+   "openRate": 1,
+   "clickRate": 0.6134,
+   "orders": 8,
+   "orderValue": 558.93
+  },
+  {
+   "date": "2026-02-15",
+   "recipients": 9285,
+   "opens": 4990,
+   "clicks": 168,
+   "openRate": 0.5374,
+   "clickRate": 0.0181,
+   "orders": 12,
+   "orderValue": 996.31
+  },
+  {
+   "date": "2026-02-16",
+   "recipients": 1157,
+   "opens": 2099,
+   "clicks": 76,
+   "openRate": 1,
+   "clickRate": 0.0657,
+   "orders": 8,
+   "orderValue": 529.81
+  },
+  {
+   "date": "2026-02-17",
+   "recipients": 167,
+   "opens": 1001,
+   "clicks": 29,
+   "openRate": 1,
+   "clickRate": 0.1737,
+   "orders": 6,
+   "orderValue": 303
+  },
+  {
+   "date": "2026-02-18",
+   "recipients": 9249,
+   "opens": 3867,
+   "clicks": 102,
+   "openRate": 0.4181,
+   "clickRate": 0.011,
+   "orders": 5,
+   "orderValue": 371.2
+  },
+  {
+   "date": "2026-02-19",
+   "recipients": 122,
+   "opens": 2363,
+   "clicks": 69,
+   "openRate": 1,
+   "clickRate": 0.5656,
+   "orders": 7,
+   "orderValue": 447.4
+  },
+  {
+   "date": "2026-02-20",
+   "recipients": 112,
+   "opens": 1004,
+   "clicks": 31,
+   "openRate": 1,
+   "clickRate": 0.2768,
+   "orders": 5,
+   "orderValue": 447.87
+  },
+  {
+   "date": "2026-02-21",
+   "recipients": 8929,
+   "opens": 5754,
+   "clicks": 196,
+   "openRate": 0.6444,
+   "clickRate": 0.022,
+   "orders": 9,
+   "orderValue": 978.38
+  },
+  {
+   "date": "2026-02-22",
+   "recipients": 8978,
+   "opens": 5657,
+   "clicks": 113,
+   "openRate": 0.6301,
+   "clickRate": 0.0126,
+   "orders": 15,
+   "orderValue": 1102.63
+  },
+  {
+   "date": "2026-02-23",
+   "recipients": 170,
+   "opens": 2712,
+   "clicks": 54,
+   "openRate": 1,
+   "clickRate": 0.3176,
+   "orders": 11,
+   "orderValue": 848
+  },
+  {
+   "date": "2026-02-24",
+   "recipients": 128,
+   "opens": 1341,
+   "clicks": 33,
+   "openRate": 1,
+   "clickRate": 0.2578,
+   "orders": 8,
+   "orderValue": 730.88
+  },
+  {
+   "date": "2026-02-25",
+   "recipients": 134,
+   "opens": 1017,
+   "clicks": 24,
+   "openRate": 1,
+   "clickRate": 0.1791,
+   "orders": 8,
+   "orderValue": 639.19
+  },
+  {
+   "date": "2026-02-26",
+   "recipients": 114,
+   "opens": 952,
+   "clicks": 24,
+   "openRate": 1,
+   "clickRate": 0.2105,
+   "orders": 8,
+   "orderValue": 723.69
+  },
   {
    "date": "2026-02-27",
    "recipients": 10377,
@@ -3528,7 +4439,7 @@ window.FRKL_DATA = {
    "recipients": 142,
    "opens": 1721,
    "clicks": 32,
-   "openRate": 12.1197,
+   "openRate": 1,
    "clickRate": 0.2254,
    "orders": 11,
    "orderValue": 1153.13
@@ -3538,7 +4449,7 @@ window.FRKL_DATA = {
    "recipients": 223,
    "opens": 1087,
    "clicks": 69,
-   "openRate": 4.8744,
+   "openRate": 1,
    "clickRate": 0.3094,
    "orders": 18,
    "orderValue": 1419.11
@@ -3548,7 +4459,7 @@ window.FRKL_DATA = {
    "recipients": 112,
    "opens": 881,
    "clicks": 20,
-   "openRate": 7.8661,
+   "openRate": 1,
    "clickRate": 0.1786,
    "orders": 9,
    "orderValue": 834.25
@@ -3578,7 +4489,7 @@ window.FRKL_DATA = {
    "recipients": 156,
    "opens": 2576,
    "clicks": 61,
-   "openRate": 16.5128,
+   "openRate": 1,
    "clickRate": 0.391,
    "orders": 12,
    "orderValue": 702.96
@@ -3588,7 +4499,7 @@ window.FRKL_DATA = {
    "recipients": 149,
    "opens": 1249,
    "clicks": 33,
-   "openRate": 8.3826,
+   "openRate": 1,
    "clickRate": 0.2215,
    "orders": 8,
    "orderValue": 463.5
@@ -3608,7 +4519,7 @@ window.FRKL_DATA = {
    "recipients": 233,
    "opens": 1405,
    "clicks": 60,
-   "openRate": 6.03,
+   "openRate": 1,
    "clickRate": 0.2575,
    "orders": 11,
    "orderValue": 998.46
@@ -3618,7 +4529,7 @@ window.FRKL_DATA = {
    "recipients": 172,
    "opens": 877,
    "clicks": 51,
-   "openRate": 5.0988,
+   "openRate": 1,
    "clickRate": 0.2965,
    "orders": 8,
    "orderValue": 469.7
@@ -3628,7 +4539,7 @@ window.FRKL_DATA = {
    "recipients": 163,
    "opens": 697,
    "clicks": 40,
-   "openRate": 4.2761,
+   "openRate": 1,
    "clickRate": 0.2454,
    "orders": 11,
    "orderValue": 904.67
@@ -3648,7 +4559,7 @@ window.FRKL_DATA = {
    "recipients": 227,
    "opens": 1481,
    "clicks": 41,
-   "openRate": 6.5242,
+   "openRate": 1,
    "clickRate": 0.1806,
    "orders": 12,
    "orderValue": 668.64
@@ -3658,7 +4569,7 @@ window.FRKL_DATA = {
    "recipients": 163,
    "opens": 913,
    "clicks": 25,
-   "openRate": 5.6012,
+   "openRate": 1,
    "clickRate": 0.1534,
    "orders": 12,
    "orderValue": 923.17
@@ -3678,7 +4589,7 @@ window.FRKL_DATA = {
    "recipients": 171,
    "opens": 2545,
    "clicks": 65,
-   "openRate": 14.883,
+   "openRate": 1,
    "clickRate": 0.3801,
    "orders": 9,
    "orderValue": 536.73
@@ -3688,7 +4599,7 @@ window.FRKL_DATA = {
    "recipients": 129,
    "opens": 883,
    "clicks": 11,
-   "openRate": 6.845,
+   "openRate": 1,
    "clickRate": 0.0853,
    "orders": 7,
    "orderValue": 750.34
@@ -3698,7 +4609,7 @@ window.FRKL_DATA = {
    "recipients": 147,
    "opens": 699,
    "clicks": 21,
-   "openRate": 4.7551,
+   "openRate": 1,
    "clickRate": 0.1429,
    "orders": 7,
    "orderValue": 272.3
@@ -3718,7 +4629,7 @@ window.FRKL_DATA = {
    "recipients": 147,
    "opens": 1418,
    "clicks": 44,
-   "openRate": 9.6463,
+   "openRate": 1,
    "clickRate": 0.2993,
    "orders": 7,
    "orderValue": 860.78
@@ -3728,7 +4639,7 @@ window.FRKL_DATA = {
    "recipients": 101,
    "opens": 788,
    "clicks": 28,
-   "openRate": 7.802,
+   "openRate": 1,
    "clickRate": 0.2772,
    "orders": 12,
    "orderValue": 714
@@ -3738,7 +4649,7 @@ window.FRKL_DATA = {
    "recipients": 91,
    "opens": 681,
    "clicks": 29,
-   "openRate": 7.4835,
+   "openRate": 1,
    "clickRate": 0.3187,
    "orders": 3,
    "orderValue": 263.22
@@ -3748,7 +4659,7 @@ window.FRKL_DATA = {
    "recipients": 139,
    "opens": 627,
    "clicks": 40,
-   "openRate": 4.5108,
+   "openRate": 1,
    "clickRate": 0.2878,
    "orders": 12,
    "orderValue": 804.68
@@ -3768,7 +4679,7 @@ window.FRKL_DATA = {
    "recipients": 168,
    "opens": 1189,
    "clicks": 53,
-   "openRate": 7.0774,
+   "openRate": 1,
    "clickRate": 0.3155,
    "orders": 8,
    "orderValue": 560.88
@@ -3785,110 +4696,110 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-03-29",
-   "recipients": 9882,
-   "opens": 5329,
-   "clicks": 220,
-   "openRate": 0.5393,
-   "clickRate": 0.0223,
+   "recipients": 9877,
+   "opens": 4893,
+   "clicks": 216,
+   "openRate": 0.4954,
+   "clickRate": 0.0219,
    "orders": 13,
    "orderValue": 1398.15
   },
   {
    "date": "2026-03-30",
-   "recipients": 255,
-   "opens": 2420,
-   "clicks": 121,
-   "openRate": 9.4902,
-   "clickRate": 0.4745,
+   "recipients": 254,
+   "opens": 2773,
+   "clicks": 125,
+   "openRate": 1,
+   "clickRate": 0.4921,
    "orders": 11,
    "orderValue": 1005.74
   },
   {
    "date": "2026-03-31",
-   "recipients": 3796,
-   "opens": 1428,
-   "clicks": 92,
-   "openRate": 0.3762,
-   "clickRate": 0.0242,
+   "recipients": 3799,
+   "opens": 1432,
+   "clicks": 88,
+   "openRate": 0.3769,
+   "clickRate": 0.0232,
    "orders": 10,
    "orderValue": 872.16
   },
   {
    "date": "2026-04-01",
-   "recipients": 10486,
-   "opens": 5535,
-   "clicks": 155,
-   "openRate": 0.5278,
-   "clickRate": 0.0148,
+   "recipients": 10487,
+   "opens": 5411,
+   "clicks": 158,
+   "openRate": 0.516,
+   "clickRate": 0.0151,
    "orders": 7,
    "orderValue": 733.47
   },
   {
    "date": "2026-04-02",
-   "recipients": 135,
-   "opens": 1240,
-   "clicks": 65,
-   "openRate": 9.1852,
-   "clickRate": 0.4815,
-   "orders": 6,
-   "orderValue": 732.48
+   "recipients": 136,
+   "opens": 1383,
+   "clicks": 66,
+   "openRate": 1,
+   "clickRate": 0.4853,
+   "orders": 7,
+   "orderValue": 903.37
   },
   {
    "date": "2026-04-03",
-   "recipients": 8209,
-   "opens": 3944,
+   "recipients": 8208,
+   "opens": 3872,
    "clicks": 250,
-   "openRate": 0.4804,
+   "openRate": 0.4717,
    "clickRate": 0.0305,
    "orders": 12,
    "orderValue": 1002.28
   },
   {
    "date": "2026-04-04",
-   "recipients": 6870,
-   "opens": 4170,
-   "clicks": 234,
-   "openRate": 0.607,
-   "clickRate": 0.0341,
+   "recipients": 6871,
+   "opens": 4167,
+   "clicks": 231,
+   "openRate": 0.6065,
+   "clickRate": 0.0336,
    "orders": 10,
    "orderValue": 729.8
   },
   {
    "date": "2026-04-05",
-   "recipients": 9734,
-   "opens": 5229,
-   "clicks": 134,
-   "openRate": 0.5372,
-   "clickRate": 0.0138,
+   "recipients": 9733,
+   "opens": 4953,
+   "clicks": 135,
+   "openRate": 0.5089,
+   "clickRate": 0.0139,
    "orders": 4,
    "orderValue": 897.61
   },
   {
    "date": "2026-04-06",
-   "recipients": 6824,
-   "opens": 5257,
-   "clicks": 109,
-   "openRate": 0.7704,
-   "clickRate": 0.016,
+   "recipients": 6826,
+   "opens": 5538,
+   "clicks": 111,
+   "openRate": 0.8113,
+   "clickRate": 0.0163,
    "orders": 10,
    "orderValue": 954.38
   },
   {
    "date": "2026-04-07",
-   "recipients": 77,
-   "opens": 1589,
+   "recipients": 76,
+   "opens": 1660,
    "clicks": 26,
-   "openRate": 20.6364,
-   "clickRate": 0.3377,
+   "openRate": 1,
+   "clickRate": 0.3421,
    "orders": 11,
    "orderValue": 1640.93
   },
   {
    "date": "2026-04-08",
    "recipients": 96,
-   "opens": 909,
+   "opens": 936,
    "clicks": 25,
-   "openRate": 9.4688,
+   "openRate": 1,
    "clickRate": 0.2604,
    "orders": 9,
    "orderValue": 1101.72
@@ -3896,525 +4807,535 @@ window.FRKL_DATA = {
   {
    "date": "2026-04-09",
    "recipients": 9663,
-   "opens": 5718,
-   "clicks": 172,
-   "openRate": 0.5917,
-   "clickRate": 0.0178,
+   "opens": 5550,
+   "clicks": 162,
+   "openRate": 0.5744,
+   "clickRate": 0.0168,
    "orders": 8,
    "orderValue": 687.53
   },
   {
    "date": "2026-04-10",
-   "recipients": 127,
-   "opens": 1296,
-   "clicks": 37,
-   "openRate": 10.2047,
-   "clickRate": 0.2913,
+   "recipients": 128,
+   "opens": 1448,
+   "clicks": 45,
+   "openRate": 1,
+   "clickRate": 0.3516,
    "orders": 5,
    "orderValue": 338
   },
   {
    "date": "2026-04-11",
-   "recipients": 12293,
-   "opens": 5708,
-   "clicks": 207,
-   "openRate": 0.4643,
-   "clickRate": 0.0168,
-   "orders": 8,
-   "orderValue": 618.67
+   "recipients": 12292,
+   "opens": 5575,
+   "clicks": 208,
+   "openRate": 0.4535,
+   "clickRate": 0.0169,
+   "orders": 7,
+   "orderValue": 538.67
   },
   {
    "date": "2026-04-12",
-   "recipients": 186,
-   "opens": 1522,
-   "clicks": 71,
-   "openRate": 8.1828,
-   "clickRate": 0.3817,
-   "orders": 5,
-   "orderValue": 512.86
+   "recipients": 185,
+   "opens": 1631,
+   "clicks": 72,
+   "openRate": 1,
+   "clickRate": 0.3892,
+   "orders": 6,
+   "orderValue": 592.86
   },
   {
    "date": "2026-04-13",
-   "recipients": 129,
-   "opens": 947,
+   "recipients": 127,
+   "opens": 982,
    "clicks": 51,
-   "openRate": 7.3411,
-   "clickRate": 0.3953,
+   "openRate": 1,
+   "clickRate": 0.4016,
    "orders": 9,
    "orderValue": 715.65
   },
   {
    "date": "2026-04-14",
-   "recipients": 141,
-   "opens": 677,
+   "recipients": 139,
+   "opens": 682,
    "clicks": 43,
-   "openRate": 4.8014,
-   "clickRate": 0.305,
+   "openRate": 1,
+   "clickRate": 0.3094,
    "orders": 14,
    "orderValue": 813.34
   },
   {
    "date": "2026-04-15",
-   "recipients": 9771,
-   "opens": 4463,
-   "clicks": 128,
-   "openRate": 0.4568,
-   "clickRate": 0.0131,
+   "recipients": 9775,
+   "opens": 4043,
+   "clicks": 127,
+   "openRate": 0.4136,
+   "clickRate": 0.013,
    "orders": 6,
    "orderValue": 909.51
   },
   {
    "date": "2026-04-16",
-   "recipients": 197,
-   "opens": 2140,
-   "clicks": 118,
-   "openRate": 10.8629,
-   "clickRate": 0.599,
+   "recipients": 193,
+   "opens": 2494,
+   "clicks": 119,
+   "openRate": 1,
+   "clickRate": 0.6166,
    "orders": 14,
    "orderValue": 934.08
   },
   {
    "date": "2026-04-17",
-   "recipients": 189,
-   "opens": 923,
-   "clicks": 69,
-   "openRate": 4.8836,
-   "clickRate": 0.3651,
+   "recipients": 191,
+   "opens": 973,
+   "clicks": 68,
+   "openRate": 1,
+   "clickRate": 0.356,
    "orders": 8,
    "orderValue": 692.87
   },
   {
    "date": "2026-04-18",
    "recipients": 9803,
-   "opens": 5503,
-   "clicks": 186,
-   "openRate": 0.5614,
-   "clickRate": 0.019,
+   "opens": 5414,
+   "clicks": 187,
+   "openRate": 0.5523,
+   "clickRate": 0.0191,
    "orders": 6,
    "orderValue": 771.22
   },
   {
    "date": "2026-04-19",
-   "recipients": 9858,
-   "opens": 5508,
-   "clicks": 168,
-   "openRate": 0.5587,
-   "clickRate": 0.017,
+   "recipients": 9859,
+   "opens": 5223,
+   "clicks": 167,
+   "openRate": 0.5298,
+   "clickRate": 0.0169,
    "orders": 17,
    "orderValue": 1703.68
   },
   {
    "date": "2026-04-20",
-   "recipients": 157,
-   "opens": 2458,
-   "clicks": 83,
-   "openRate": 15.6561,
-   "clickRate": 0.5287,
+   "recipients": 159,
+   "opens": 2799,
+   "clicks": 84,
+   "openRate": 1,
+   "clickRate": 0.5283,
    "orders": 12,
    "orderValue": 875.56
   },
   {
    "date": "2026-04-21",
    "recipients": 120,
-   "opens": 1043,
-   "clicks": 34,
-   "openRate": 8.6917,
-   "clickRate": 0.2833,
+   "opens": 1066,
+   "clicks": 30,
+   "openRate": 1,
+   "clickRate": 0.25,
    "orders": 6,
    "orderValue": 743.64
   },
   {
    "date": "2026-04-22",
    "recipients": 4216,
-   "opens": 2667,
-   "clicks": 198,
-   "openRate": 0.6326,
-   "clickRate": 0.047,
+   "opens": 2621,
+   "clicks": 202,
+   "openRate": 0.6217,
+   "clickRate": 0.0479,
    "orders": 26,
    "orderValue": 1813.34
   },
   {
    "date": "2026-04-23",
-   "recipients": 155,
-   "opens": 932,
-   "clicks": 48,
-   "openRate": 6.0129,
-   "clickRate": 0.3097,
+   "recipients": 152,
+   "opens": 987,
+   "clicks": 47,
+   "openRate": 1,
+   "clickRate": 0.3092,
    "orders": 14,
    "orderValue": 922.12
   },
   {
    "date": "2026-04-24",
-   "recipients": 10478,
-   "opens": 5520,
-   "clicks": 249,
-   "openRate": 0.5268,
-   "clickRate": 0.0238,
-   "orders": 35,
-   "orderValue": 2719.01
+   "recipients": 10477,
+   "opens": 5336,
+   "clicks": 250,
+   "openRate": 0.5093,
+   "clickRate": 0.0239,
+   "orders": 34,
+   "orderValue": 2689.6
   },
   {
    "date": "2026-04-25",
-   "recipients": 9768,
-   "opens": 5912,
-   "clicks": 237,
-   "openRate": 0.6052,
-   "clickRate": 0.0243,
-   "orders": 37,
-   "orderValue": 3408.77
+   "recipients": 9772,
+   "opens": 5924,
+   "clicks": 235,
+   "openRate": 0.6062,
+   "clickRate": 0.024,
+   "orders": 38,
+   "orderValue": 3438.18
   },
   {
    "date": "2026-04-26",
-   "recipients": 10566,
-   "opens": 5747,
-   "clicks": 195,
-   "openRate": 0.5439,
-   "clickRate": 0.0185,
+   "recipients": 10565,
+   "opens": 5555,
+   "clicks": 197,
+   "openRate": 0.5258,
+   "clickRate": 0.0186,
    "orders": 44,
    "orderValue": 3755.8
   },
   {
    "date": "2026-04-27",
-   "recipients": 8929,
-   "opens": 6461,
+   "recipients": 8925,
+   "opens": 6463,
    "clicks": 166,
-   "openRate": 0.7236,
+   "openRate": 0.7241,
    "clickRate": 0.0186,
    "orders": 28,
    "orderValue": 2377.16
   },
   {
    "date": "2026-04-28",
-   "recipients": 8923,
-   "opens": 6995,
-   "clicks": 332,
-   "openRate": 0.7839,
-   "clickRate": 0.0372,
+   "recipients": 8925,
+   "opens": 7161,
+   "clicks": 315,
+   "openRate": 0.8024,
+   "clickRate": 0.0353,
    "orders": 21,
    "orderValue": 1509.7
   },
   {
    "date": "2026-04-29",
    "recipients": 186,
-   "opens": 2050,
-   "clicks": 85,
-   "openRate": 11.0215,
-   "clickRate": 0.457,
+   "opens": 2187,
+   "clicks": 96,
+   "openRate": 1,
+   "clickRate": 0.5161,
    "orders": 8,
    "orderValue": 293
   },
   {
    "date": "2026-04-30",
-   "recipients": 125,
-   "opens": 1094,
-   "clicks": 15,
-   "openRate": 8.752,
-   "clickRate": 0.12,
+   "recipients": 129,
+   "opens": 1112,
+   "clicks": 21,
+   "openRate": 1,
+   "clickRate": 0.1628,
    "orders": 12,
    "orderValue": 517.97
   },
   {
    "date": "2026-05-01",
-   "recipients": 9715,
-   "opens": 4449,
-   "clicks": 171,
-   "openRate": 0.458,
-   "clickRate": 0.0176,
-   "orders": 2,
-   "orderValue": 236.81
+   "recipients": 9711,
+   "opens": 3986,
+   "clicks": 161,
+   "openRate": 0.4105,
+   "clickRate": 0.0166,
+   "orders": 10,
+   "orderValue": 732.16
   },
   {
    "date": "2026-05-02",
-   "recipients": 161,
-   "opens": 2394,
-   "clicks": 148,
-   "openRate": 14.8696,
-   "clickRate": 0.9193,
-   "orders": 6,
-   "orderValue": 741.9
+   "recipients": 160,
+   "opens": 2844,
+   "clicks": 158,
+   "openRate": 1,
+   "clickRate": 0.9875,
+   "orders": 4,
+   "orderValue": 477.31
   },
   {
    "date": "2026-05-03",
-   "recipients": 120,
-   "opens": 1560,
-   "clicks": 20,
-   "openRate": 1,
-   "clickRate": 0.1667,
-   "orders": 3,
-   "orderValue": 161.36
+   "recipients": 9899,
+   "opens": 4533,
+   "clicks": 135,
+   "openRate": 0.4579,
+   "clickRate": 0.0136,
+   "orders": 8,
+   "orderValue": 906.03
   },
   {
    "date": "2026-05-04",
-   "recipients": 110,
-   "opens": 918,
+   "recipients": 158,
+   "opens": 3518,
+   "clicks": 38,
+   "openRate": 1,
+   "clickRate": 0.2405,
+   "orders": 4,
+   "orderValue": 234.36
+  },
+  {
+   "date": "2026-05-05",
+   "recipients": 123,
+   "opens": 1613,
    "clicks": 22,
    "openRate": 1,
-   "clickRate": 0.2,
+   "clickRate": 0.1789,
    "orders": 7,
    "orderValue": 180.08
   },
   {
-   "date": "2026-05-05",
-   "recipients": 222,
-   "opens": 1282,
-   "clicks": 46,
+   "date": "2026-05-06",
+   "recipients": 232,
+   "opens": 1556,
+   "clicks": 52,
    "openRate": 1,
-   "clickRate": 0.2072,
+   "clickRate": 0.2241,
    "orders": 16,
    "orderValue": 1318.65
   },
   {
-   "date": "2026-05-06",
-   "recipients": 8931,
-   "opens": 4533,
+   "date": "2026-05-07",
+   "recipients": 8939,
+   "opens": 5221,
    "clicks": 190,
-   "openRate": 0.5076,
+   "openRate": 0.5841,
    "clickRate": 0.0213,
    "orders": 12,
    "orderValue": 1266.33
   },
   {
-   "date": "2026-05-07",
-   "recipients": 175,
-   "opens": 1885,
-   "clicks": 82,
+   "date": "2026-05-08",
+   "recipients": 180,
+   "opens": 3451,
+   "clicks": 97,
    "openRate": 1,
-   "clickRate": 0.4686,
+   "clickRate": 0.5389,
    "orders": 14,
    "orderValue": 1216.27
   },
   {
-   "date": "2026-05-08",
-   "recipients": 8885,
-   "opens": 5675,
-   "clicks": 206,
-   "openRate": 0.6387,
-   "clickRate": 0.0232,
+   "date": "2026-05-09",
+   "recipients": 8893,
+   "opens": 6470,
+   "clicks": 227,
+   "openRate": 0.7275,
+   "clickRate": 0.0255,
    "orders": 8,
    "orderValue": 1064.3
   },
   {
-   "date": "2026-05-09",
-   "recipients": 8946,
-   "opens": 5823,
-   "clicks": 182,
-   "openRate": 0.6509,
-   "clickRate": 0.0203,
-   "orders": 9,
-   "orderValue": 803.12
-  },
-  {
    "date": "2026-05-10",
-   "recipients": 198,
-   "opens": 1876,
-   "clicks": 80,
-   "openRate": 1,
-   "clickRate": 0.404,
-   "orders": 8,
-   "orderValue": 330
+   "recipients": 8950,
+   "opens": 6564,
+   "clicks": 182,
+   "openRate": 0.7334,
+   "clickRate": 0.0203,
+   "orders": 10,
+   "orderValue": 827.15
   },
   {
    "date": "2026-05-11",
-   "recipients": 143,
-   "opens": 1055,
-   "clicks": 57,
+   "recipients": 208,
+   "opens": 2900,
+   "clicks": 90,
    "openRate": 1,
-   "clickRate": 0.3986,
-   "orders": 11,
-   "orderValue": 834.9
+   "clickRate": 0.4327,
+   "orders": 9,
+   "orderValue": 379
   },
   {
    "date": "2026-05-12",
-   "recipients": 149,
-   "opens": 791,
-   "clicks": 65,
+   "recipients": 157,
+   "opens": 1521,
+   "clicks": 57,
    "openRate": 1,
-   "clickRate": 0.4362,
-   "orders": 8,
-   "orderValue": 527.96
+   "clickRate": 0.3631,
+   "orders": 12,
+   "orderValue": 919.9
   },
   {
    "date": "2026-05-13",
-   "recipients": 8882,
-   "opens": 4405,
-   "clicks": 128,
-   "openRate": 0.4959,
-   "clickRate": 0.0144,
+   "recipients": 158,
+   "opens": 1142,
+   "clicks": 65,
+   "openRate": 1,
+   "clickRate": 0.4114,
+   "orders": 10,
+   "orderValue": 711.46
+  },
+  {
+   "date": "2026-05-14",
+   "recipients": 8895,
+   "opens": 4700,
+   "clicks": 141,
+   "openRate": 0.5284,
+   "clickRate": 0.0159,
    "orders": 9,
    "orderValue": 820.17
   },
   {
-   "date": "2026-05-14",
-   "recipients": 134,
-   "opens": 1439,
-   "clicks": 101,
+   "date": "2026-05-15",
+   "recipients": 139,
+   "opens": 2549,
+   "clicks": 115,
    "openRate": 1,
-   "clickRate": 0.7537,
+   "clickRate": 0.8273,
    "orders": 8,
    "orderValue": 1023.67
   },
   {
-   "date": "2026-05-15",
-   "recipients": 142,
-   "opens": 744,
-   "clicks": 112,
+   "date": "2026-05-16",
+   "recipients": 151,
+   "opens": 982,
+   "clicks": 145,
    "openRate": 1,
-   "clickRate": 0.7887,
+   "clickRate": 0.9603,
    "orders": 7,
    "orderValue": 684.94
   },
   {
-   "date": "2026-05-16",
-   "recipients": 8832,
-   "opens": 4459,
-   "clicks": 176,
-   "openRate": 0.5049,
-   "clickRate": 0.0199,
+   "date": "2026-05-17",
+   "recipients": 8839,
+   "opens": 4629,
+   "clicks": 188,
+   "openRate": 0.5237,
+   "clickRate": 0.0213,
    "orders": 14,
    "orderValue": 1321.87
   },
   {
-   "date": "2026-05-17",
-   "recipients": 172,
-   "opens": 1608,
+   "date": "2026-05-18",
+   "recipients": 177,
+   "opens": 2594,
    "clicks": 69,
    "openRate": 1,
-   "clickRate": 0.4012,
+   "clickRate": 0.3898,
    "orders": 6,
    "orderValue": 521.21
   },
   {
-   "date": "2026-05-18",
-   "recipients": 110,
-   "opens": 762,
-   "clicks": 17,
-   "openRate": 1,
-   "clickRate": 0.1545,
-   "orders": 6,
-   "orderValue": 455.72
-  },
-  {
    "date": "2026-05-19",
-   "recipients": 8697,
-   "opens": 4253,
-   "clicks": 121,
-   "openRate": 0.489,
-   "clickRate": 0.0139,
-   "orders": 5,
-   "orderValue": 359.37
+   "recipients": 121,
+   "opens": 1060,
+   "clicks": 20,
+   "openRate": 1,
+   "clickRate": 0.1653,
+   "orders": 7,
+   "orderValue": 621.47
   },
   {
    "date": "2026-05-20",
-   "recipients": 106,
-   "opens": 1420,
-   "clicks": 79,
+   "recipients": 8753,
+   "opens": 4649,
+   "clicks": 129,
+   "openRate": 0.5311,
+   "clickRate": 0.0147,
+   "orders": 6,
+   "orderValue": 384.37
+  },
+  {
+   "date": "2026-05-21",
+   "recipients": 114,
+   "opens": 2452,
+   "clicks": 92,
    "openRate": 1,
-   "clickRate": 0.7453,
+   "clickRate": 0.807,
    "orders": 4,
    "orderValue": 261.81
   },
   {
-   "date": "2026-05-21",
-   "recipients": 106,
-   "opens": 732,
-   "clicks": 11,
+   "date": "2026-05-22",
+   "recipients": 116,
+   "opens": 1037,
+   "clicks": 15,
    "openRate": 1,
-   "clickRate": 0.1038,
+   "clickRate": 0.1293,
    "orders": 6,
    "orderValue": 409.73
   },
   {
-   "date": "2026-05-22",
-   "recipients": 8704,
-   "opens": 4924,
-   "clicks": 164,
-   "openRate": 0.5657,
-   "clickRate": 0.0188,
-   "orders": 12,
-   "orderValue": 1129.76
+   "date": "2026-05-23",
+   "recipients": 8719,
+   "opens": 5131,
+   "clicks": 200,
+   "openRate": 0.5885,
+   "clickRate": 0.0229,
+   "orders": 13,
+   "orderValue": 1254.76
   },
   {
-   "date": "2026-05-23",
-   "recipients": 118,
-   "opens": 1050,
-   "clicks": 56,
+   "date": "2026-05-24",
+   "recipients": 129,
+   "opens": 1668,
+   "clicks": 58,
    "openRate": 1,
-   "clickRate": 0.4746,
+   "clickRate": 0.4496,
    "orders": 7,
    "orderValue": 581.94
   },
   {
-   "date": "2026-05-24",
-   "recipients": 8736,
-   "opens": 4672,
-   "clicks": 148,
-   "openRate": 0.5348,
-   "clickRate": 0.0169,
+   "date": "2026-05-25",
+   "recipients": 8747,
+   "opens": 4975,
+   "clicks": 151,
+   "openRate": 0.5688,
+   "clickRate": 0.0173,
    "orders": 13,
    "orderValue": 1237.5
   },
   {
-   "date": "2026-05-25",
-   "recipients": 127,
-   "opens": 1427,
+   "date": "2026-05-26",
+   "recipients": 136,
+   "opens": 2418,
    "clicks": 108,
    "openRate": 1,
-   "clickRate": 0.8504,
+   "clickRate": 0.7941,
    "orders": 12,
    "orderValue": 860.9
   },
   {
-   "date": "2026-05-26",
-   "recipients": 135,
-   "opens": 752,
-   "clicks": 16,
+   "date": "2026-05-27",
+   "recipients": 147,
+   "opens": 1068,
+   "clicks": 20,
    "openRate": 1,
-   "clickRate": 0.1185,
+   "clickRate": 0.1361,
    "orders": 16,
    "orderValue": 1073.77
   },
   {
-   "date": "2026-05-27",
-   "recipients": 4285,
-   "opens": 2355,
+   "date": "2026-05-28",
+   "recipients": 4293,
+   "opens": 2580,
    "clicks": 184,
-   "openRate": 0.5496,
+   "openRate": 0.601,
    "clickRate": 0.0429,
    "orders": 21,
    "orderValue": 1682.98
   },
   {
-   "date": "2026-05-28",
-   "recipients": 10722,
-   "opens": 5433,
-   "clicks": 219,
-   "openRate": 0.5067,
-   "clickRate": 0.0204,
-   "orders": 37,
-   "orderValue": 3311.53
-  },
-  {
    "date": "2026-05-29",
-   "recipients": 9903,
-   "opens": 5548,
-   "clicks": 291,
-   "openRate": 0.5602,
-   "clickRate": 0.0294,
-   "orders": 27,
-   "orderValue": 2461.9
+   "recipients": 10740,
+   "opens": 5850,
+   "clicks": 239,
+   "openRate": 0.5447,
+   "clickRate": 0.0223,
+   "orders": 39,
+   "orderValue": 3451.53
   },
   {
    "date": "2026-05-30",
-   "recipients": 10257,
-   "opens": 6984,
-   "clicks": 238,
-   "openRate": 0.6809,
-   "clickRate": 0.0232,
-   "orders": 44,
-   "orderValue": 4483.24
+   "recipients": 9922,
+   "opens": 6214,
+   "clicks": 306,
+   "openRate": 0.6263,
+   "clickRate": 0.0308,
+   "orders": 28,
+   "orderValue": 2531.18
   },
   {
    "date": "2026-05-31",
+   "recipients": 10233,
+   "opens": 6288,
+   "clicks": 238,
+   "openRate": 0.6145,
+   "clickRate": 0.0233,
+   "orders": 41,
+   "orderValue": 4001.93
+  },
+  {
+   "date": "2026-06-01",
    "recipients": 10838,
    "opens": 7084,
    "clicks": 245,
@@ -4424,7 +5345,7 @@ window.FRKL_DATA = {
    "orderValue": 3111.79
   },
   {
-   "date": "2026-06-01",
+   "date": "2026-06-02",
    "recipients": 8731,
    "opens": 6986,
    "clicks": 324,
@@ -4434,7 +5355,7 @@ window.FRKL_DATA = {
    "orderValue": 1386.47
   },
   {
-   "date": "2026-06-02",
+   "date": "2026-06-03",
    "recipients": 162,
    "opens": 2172,
    "clicks": 91,
@@ -4444,7 +5365,7 @@ window.FRKL_DATA = {
    "orderValue": 335.83
   },
   {
-   "date": "2026-06-03",
+   "date": "2026-06-04",
    "recipients": 137,
    "opens": 1222,
    "clicks": 103,
@@ -4454,7 +5375,7 @@ window.FRKL_DATA = {
    "orderValue": 886.47
   },
   {
-   "date": "2026-06-04",
+   "date": "2026-06-05",
    "recipients": 108,
    "opens": 919,
    "clicks": 48,
@@ -4464,7 +5385,7 @@ window.FRKL_DATA = {
    "orderValue": 217.94
   },
   {
-   "date": "2026-06-05",
+   "date": "2026-06-06",
    "recipients": 8754,
    "opens": 4029,
    "clicks": 153,
@@ -4474,7 +5395,7 @@ window.FRKL_DATA = {
    "orderValue": 548.59
   },
   {
-   "date": "2026-06-06",
+   "date": "2026-06-07",
    "recipients": 210,
    "opens": 3165,
    "clicks": 114,
@@ -4484,7 +5405,7 @@ window.FRKL_DATA = {
    "orderValue": 975.94
   },
   {
-   "date": "2026-06-07",
+   "date": "2026-06-08",
    "recipients": 277,
    "opens": 1374,
    "clicks": 92,
@@ -4494,7 +5415,7 @@ window.FRKL_DATA = {
    "orderValue": 491.26
   },
   {
-   "date": "2026-06-08",
+   "date": "2026-06-09",
    "recipients": 175,
    "opens": 904,
    "clicks": 53,
@@ -4504,7 +5425,7 @@ window.FRKL_DATA = {
    "orderValue": 927.92
   },
   {
-   "date": "2026-06-09",
+   "date": "2026-06-10",
    "recipients": 206,
    "opens": 749,
    "clicks": 45,
@@ -4514,7 +5435,7 @@ window.FRKL_DATA = {
    "orderValue": 648.43
   },
   {
-   "date": "2026-06-10",
+   "date": "2026-06-11",
    "recipients": 8847,
    "opens": 4474,
    "clicks": 198,
@@ -4524,7 +5445,7 @@ window.FRKL_DATA = {
    "orderValue": 198.43
   },
   {
-   "date": "2026-06-11",
+   "date": "2026-06-12",
    "recipients": 145,
    "opens": 2566,
    "clicks": 79,
@@ -4534,7 +5455,7 @@ window.FRKL_DATA = {
    "orderValue": 907.12
   },
   {
-   "date": "2026-06-12",
+   "date": "2026-06-13",
    "recipients": 8812,
    "opens": 3937,
    "clicks": 181,
@@ -4544,7 +5465,7 @@ window.FRKL_DATA = {
    "orderValue": 80
   },
   {
-   "date": "2026-06-13",
+   "date": "2026-06-14",
    "recipients": 139,
    "opens": 3109,
    "clicks": 108,
@@ -4554,7 +5475,7 @@ window.FRKL_DATA = {
    "orderValue": 444.05
   },
   {
-   "date": "2026-06-14",
+   "date": "2026-06-15",
    "recipients": 189,
    "opens": 1338,
    "clicks": 33,
@@ -4564,7 +5485,7 @@ window.FRKL_DATA = {
    "orderValue": 951.42
   },
   {
-   "date": "2026-06-15",
+   "date": "2026-06-16",
    "recipients": 121,
    "opens": 863,
    "clicks": 30,
@@ -4574,7 +5495,7 @@ window.FRKL_DATA = {
    "orderValue": 1027.24
   },
   {
-   "date": "2026-06-16",
+   "date": "2026-06-17",
    "recipients": 139,
    "opens": 710,
    "clicks": 33,
@@ -4584,7 +5505,7 @@ window.FRKL_DATA = {
    "orderValue": 73
   },
   {
-   "date": "2026-06-17",
+   "date": "2026-06-18",
    "recipients": 114,
    "opens": 599,
    "clicks": 42,
@@ -4594,7 +5515,7 @@ window.FRKL_DATA = {
    "orderValue": 535.69
   },
   {
-   "date": "2026-06-18",
+   "date": "2026-06-19",
    "recipients": 11568,
    "opens": 5117,
    "clicks": 189,
@@ -4604,7 +5525,7 @@ window.FRKL_DATA = {
    "orderValue": 923.27
   },
   {
-   "date": "2026-06-19",
+   "date": "2026-06-20",
    "recipients": 9388,
    "opens": 5651,
    "clicks": 233,
@@ -4614,7 +5535,7 @@ window.FRKL_DATA = {
    "orderValue": 924.9
   },
   {
-   "date": "2026-06-20",
+   "date": "2026-06-21",
    "recipients": 9262,
    "opens": 7761,
    "clicks": 162,
@@ -4624,7 +5545,7 @@ window.FRKL_DATA = {
    "orderValue": 857.44
   },
   {
-   "date": "2026-06-21",
+   "date": "2026-06-22",
    "recipients": 137,
    "opens": 2176,
    "clicks": 61,
@@ -4634,7 +5555,7 @@ window.FRKL_DATA = {
    "orderValue": 485.36
   },
   {
-   "date": "2026-06-22",
+   "date": "2026-06-23",
    "recipients": 9301,
    "opens": 6054,
    "clicks": 157,
@@ -4644,7 +5565,7 @@ window.FRKL_DATA = {
    "orderValue": 1262.51
   },
   {
-   "date": "2026-06-23",
+   "date": "2026-06-24",
    "recipients": 181,
    "opens": 1846,
    "clicks": 48,
@@ -4654,7 +5575,7 @@ window.FRKL_DATA = {
    "orderValue": 1074.07
   },
   {
-   "date": "2026-06-24",
+   "date": "2026-06-25",
    "recipients": 142,
    "opens": 943,
    "clicks": 24,
@@ -4664,7 +5585,7 @@ window.FRKL_DATA = {
    "orderValue": 555.34
   },
   {
-   "date": "2026-06-25",
+   "date": "2026-06-26",
    "recipients": 127,
    "opens": 817,
    "clicks": 46,
@@ -4674,7 +5595,7 @@ window.FRKL_DATA = {
    "orderValue": 1071.43
   },
   {
-   "date": "2026-06-26",
+   "date": "2026-06-27",
    "recipients": 10237,
    "opens": 5262,
    "clicks": 158,
@@ -4684,7 +5605,7 @@ window.FRKL_DATA = {
    "orderValue": 964.06
   },
   {
-   "date": "2026-06-27",
+   "date": "2026-06-28",
    "recipients": 10225,
    "opens": 5450,
    "clicks": 181,
@@ -4694,12 +5615,22 @@ window.FRKL_DATA = {
    "orderValue": 524.3
   },
   {
-   "date": "2026-06-28",
-   "recipients": 4,
-   "opens": 1411,
-   "clicks": 26,
+   "date": "2026-06-29",
+   "recipients": 124,
+   "opens": 3438,
+   "clicks": 60,
    "openRate": 1,
-   "clickRate": 1,
+   "clickRate": 0.4839,
+   "orders": 5,
+   "orderValue": 407.3
+  },
+  {
+   "date": "2026-06-30",
+   "recipients": 5,
+   "opens": 353,
+   "clicks": 0,
+   "openRate": 1,
+   "clickRate": 0,
    "orders": 0,
    "orderValue": 0
   }
@@ -6189,6 +7120,15 @@ window.FRKL_DATA = {
    "discounts": 12.65,
    "returns": 0.0,
    "aov": 85.39
+  },
+  {
+   "date": "2026-06-29",
+   "totalSales": 407.3,
+   "netSales": 377.6,
+   "orders": 3,
+   "discounts": 29.7,
+   "returns": 0.0,
+   "aov": 135.77
   }
  ],
  "shopifyWholesale": [
@@ -7849,6 +8789,15 @@ window.FRKL_DATA = {
    "discounts": 80.0,
    "returns": 0.0,
    "aov": 0.0
+  },
+  {
+   "date": "2026-06-29",
+   "totalSales": 0.0,
+   "netSales": -160.0,
+   "orders": 2,
+   "discounts": 160.0,
+   "returns": 0.0,
+   "aov": 0.0
   }
  ],
  "shopifyOther": [
@@ -9482,6 +10431,15 @@ window.FRKL_DATA = {
    "discounts": 12.65,
    "returns": 0.0,
    "aov": 71.4
+  },
+  {
+   "date": "2026-06-29",
+   "totalSales": 407.3,
+   "netSales": 217.60000000000002,
+   "orders": 5,
+   "discounts": 189.7,
+   "returns": 0.0,
+   "aov": 81.46
   }
  ],
  "shopifyByChannel": [
@@ -14053,6 +15011,30 @@ window.FRKL_DATA = {
    "netSales": 414.31,
    "orders": 5,
    "discounts": 12.65,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-06-29",
+   "channel": "Online Store",
+   "stream": "dtc",
+   "totalSales": 407.3,
+   "netSales": 377.6,
+   "orders": 3,
+   "discounts": 29.7,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-06-29",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 0.0,
+   "netSales": -160.0,
+   "orders": 2,
+   "discounts": 160.0,
    "returns": 0.0,
    "shipping": 0.0,
    "tax": 0.0
