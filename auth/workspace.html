@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Your workspace — Operator Intelligence</title>
+<title>Your workspace — greta</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;550;600;650;700&display=swap" rel="stylesheet">
@@ -18,7 +18,7 @@
   }
   .progress-card-bg {
     position: absolute; inset: 0; pointer-events: none;
-    background: radial-gradient(700px 300px at 0% 0%, rgba(124,140,255,0.10), transparent 60%);
+    background: radial-gradient(700px 300px at 0% 0%, rgba(139,92,246,0.10), transparent 60%);
   }
   .progress-card-inner { position: relative; }
   .progress-eyebrow {
@@ -38,9 +38,9 @@
     border-radius: var(--r-full); overflow: hidden; margin-bottom: var(--s-3);
   }
   .progress-fill {
-    height: 100%; background: linear-gradient(90deg, var(--accent) 0%, #5762cc 100%);
+    height: 100%; background: linear-gradient(90deg, var(--accent) 0%, #6D28D9 100%);
     border-radius: var(--r-full); transition: width 400ms cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 0 12px rgba(124,140,255,0.4);
+    box-shadow: 0 0 12px rgba(139,92,246,0.4);
   }
   .progress-row {
     display: flex; justify-content: space-between; align-items: center;
@@ -50,7 +50,7 @@
 
   .next-step-cta {
     margin-top: var(--s-5); padding: var(--s-4) var(--s-5);
-    background: var(--accent-bg); border: 1px solid rgba(124,140,255,0.3);
+    background: var(--accent-bg); border: 1px solid rgba(139,92,246,0.3);
     border-radius: var(--r-md); display: flex; align-items: center; gap: var(--s-4);
   }
   .next-step-tag {
@@ -175,7 +175,7 @@
     letter-spacing: .06em; text-transform: uppercase; color: var(--text-secondary);
     padding: 4px 9px; border: 1px solid var(--border-default); border-radius: var(--r-full);
   }
-  .team-role.owner { color: var(--accent); border-color: rgba(124,140,255,0.4); }
+  .team-role.owner { color: var(--accent); border-color: rgba(139,92,246,0.4); }
   .team-remove {
     flex-shrink: 0; background: none; border: none; cursor: pointer;
     color: var(--text-muted); font-size: 15px; line-height: 1; padding: 4px 6px; border-radius: var(--r-md);
@@ -187,8 +187,8 @@
 <div class="auth-wrap workspace-wrap" style="max-width: 880px;">
   <header class="workspace-bar">
     <a href="/" class="brand">
-      <div class="brand-mark">Oi</div>
-      <div class="brand-name">Operator Intelligence</div>
+      <div class="brand-mark"><svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" aria-label="Greta"><defs><linearGradient id="apb" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8B5CF6"/><stop offset="1" stop-color="#38BDF8"/></linearGradient><linearGradient id="agm" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#22D3A6"/><stop offset="1" stop-color="#5DE5C8"/></linearGradient></defs><rect x="49" y="30" width="138" height="41" rx="20.5" transform="rotate(-45 118 50.5)" fill="url(#apb)"/><rect x="71" y="177" width="138" height="41" rx="20.5" transform="rotate(-45 140 197.5)" fill="url(#agm)"/><circle cx="97" cy="132" r="24" fill="#0B132B"/></svg></div>
+      <div class="brand-name">greta</div>
     </a>
     <div style="flex:1"></div>
     <span id="user-email" class="meta"></span>
@@ -210,7 +210,7 @@
     <p class="lead">You're logged in but not a member of any workspace.</p>
 
     <!-- Surfaced if there's a brand you can claim with your email -->
-    <div id="claim-prompt" hidden style="background:var(--accent-bg); border:1px solid rgba(124,140,255,0.3); border-radius:var(--r-md); padding:var(--s-4); margin:var(--s-4) 0;">
+    <div id="claim-prompt" hidden style="background:var(--accent-bg); border:1px solid rgba(139,92,246,0.3); border-radius:var(--r-md); padding:var(--s-4); margin:var(--s-4) 0;">
       <div class="micro" style="color:var(--accent); margin-bottom:6px;">An existing workspace matches your email</div>
       <div style="font-size:14px; font-weight:600; margin-bottom:4px;" id="claim-brand-name">—</div>
       <div class="meta" style="font-size:12px; margin-bottom:var(--s-3);">You're on the claim allowlist for this workspace. Click below to link your account as owner.</div>
@@ -227,7 +227,7 @@
     <div class="progress-card">
       <div class="progress-card-bg"></div>
       <div class="progress-card-inner">
-        <div class="progress-eyebrow">Welcome to Operator Intelligence</div>
+        <div class="progress-eyebrow">Welcome to Greta</div>
         <h1 class="progress-headline" id="welcome-headline">Let's get <span id="welcome-brand">your workspace</span> producing findings.</h1>
         <p class="progress-sub" id="welcome-sub">Connect Shopify in 30 seconds and you'll have your first £-quantified findings within an hour. Everything else can wait.</p>
 
@@ -357,8 +357,8 @@
       Paste a <b style="color:var(--text-primary);">read-only Private API Key</b> — takes about 30 seconds:
     </p>
     <ol style="font-size:12.5px; color:var(--text-secondary); margin:0 0 14px; padding-left:18px; line-height:1.7;">
-      <li><a href="https://www.klaviyo.com/settings/account/api-keys" target="_blank" rel="noopener" style="color:var(--accent,#7c8cff);">Open Klaviyo → Settings → API keys ↗</a></li>
-      <li>Click <b style="color:var(--text-primary);">Create Private API Key</b>, name it “Operator Intelligence”</li>
+      <li><a href="https://www.klaviyo.com/settings/account/api-keys" target="_blank" rel="noopener" style="color:var(--accent,#7C3AED);">Open Klaviyo → Settings → API keys ↗</a></li>
+      <li>Click <b style="color:var(--text-primary);">Create Private API Key</b>, name it “Greta”</li>
       <li>Choose <b style="color:var(--text-primary);">Read-only</b> access (or scopes: accounts, metrics, flows, campaigns, profiles)</li>
       <li>Copy the key (starts with <code>pk_</code>) and paste it below</li>
     </ol>

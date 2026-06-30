@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Operator Intelligence — hire your DTC operator team. Founding cohort, £750/mo.</title>
+<title>greta — hire your DTC operator team. Founding cohort, £750/mo.</title>
 <meta name="description" content="Six specialist agents across paid, creative, finance, CX, content, and competitive intelligence. They observe, diagnose, and give you the specific £-tagged actions to take this week. Currently onboarding 10 design partners at £750/mo Managed tier. Self-serve launches Q3 2026.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,27 +13,27 @@
     --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px;
     --s-5: 20px; --s-6: 24px; --s-7: 32px; --s-8: 48px; --s-9: 64px; --s-10: 96px;
     --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-xl: 20px; --r-full: 999px;
-    --bg-app: #08080b;
-    --bg-card: #111116;
-    --bg-card-hover: #16161d;
-    --bg-elevated: #181820;
-    --border-subtle: #1f1f27;
-    --border-default: #2a2a34;
-    --text-primary: #f1f1f4;
-    --text-secondary: #b1b1bc;
-    --text-muted: #7e7e8a;
-    --text-faint: #54545e;
-    --good: #4ade80;
-    --warn: #f5b544;
-    --bad: #ef6b6f;
-    --accent: #7c8cff;
-    --accent-soft: #2a2f55;
-    --good-bg: rgba(74,222,128,.10);
-    --warn-bg: rgba(245,181,68,.10);
-    --bad-bg: rgba(239,107,111,.10);
-    --accent-bg: rgba(124,140,255,.08);
-    --shadow-md: 0 4px 14px rgba(0,0,0,.45);
-    --shadow-lg: 0 16px 36px rgba(0,0,0,.55);
+    --bg-app: #F1F5F9;
+    --bg-card: #FFFFFF;
+    --bg-card-hover: #F8FAFC;
+    --bg-elevated: #F1F5F9;
+    --border-subtle: #E9EEF4;
+    --border-default: #D7DEE8;
+    --text-primary: #0B132B;
+    --text-secondary: #334155;
+    --text-muted: #64748B;
+    --text-faint: #94A3B8;
+    --good: #0E9E78;
+    --warn: #B45309;
+    --bad: #DC2626;
+    --accent: #7C3AED;
+    --accent-soft: #EDE9FE;
+    --good-bg: rgba(34,211,166,.12);
+    --warn-bg: rgba(180,83,9,.10);
+    --bad-bg: rgba(220,38,38,.08);
+    --accent-bg: rgba(124,58,237,.08);
+    --shadow-md: 0 1px 2px rgba(11,19,43,.04), 0 4px 14px rgba(11,19,43,.08);
+    --shadow-lg: 0 16px 36px rgba(11,19,43,.14);
     --motion-fast: 120ms ease;
     --motion-base: 180ms ease;
   }
@@ -52,7 +52,7 @@
   /* ── Nav ─────────────────────────────────────────────────────────────── */
   .nav {
     position: sticky; top: 0; z-index: 50;
-    background: rgba(8,8,11,0.85); backdrop-filter: blur(14px);
+    background: rgba(255,255,255,0.85); backdrop-filter: blur(14px);
     border-bottom: 1px solid var(--border-subtle);
   }
   .nav-inner {
@@ -65,13 +65,11 @@
     cursor: pointer;
   }
   .brand-mark {
-    width: 30px; height: 30px; border-radius: 8px;
-    background: linear-gradient(135deg, var(--accent) 0%, #5762cc 100%);
+    width: 30px; height: 30px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    color: white; font-weight: 800; font-size: 15px; letter-spacing: -.02em;
-    box-shadow: 0 2px 8px rgba(124,140,255,0.3);
   }
-  .brand-name { font-size: 16px; font-weight: 650; letter-spacing: -.01em; }
+  .brand-mark svg { width: 100%; height: 100%; display: block; }
+  .brand-name { font-size: 20px; font-weight: 900; letter-spacing: -.05em; text-transform: lowercase; }
   .nav-links {
     display: flex; gap: var(--s-5); margin-left: var(--s-5);
     color: var(--text-secondary); font-size: 14px; font-weight: 500;
@@ -93,9 +91,9 @@
   }
   .btn-primary {
     background: var(--accent); color: white; border-color: var(--accent);
-    box-shadow: 0 2px 8px rgba(124,140,255,0.25);
+    box-shadow: 0 2px 8px rgba(139,92,246,0.25);
   }
-  .btn-primary:hover { background: #8b9aff; box-shadow: 0 4px 14px rgba(124,140,255,0.35); }
+  .btn-primary:hover { background: #8b9aff; box-shadow: 0 4px 14px rgba(139,92,246,0.35); }
   .btn-ghost {
     background: transparent; color: var(--text-secondary);
     border-color: var(--border-default);
@@ -114,7 +112,7 @@
     font-size: 11.5px; font-weight: 700; letter-spacing: .08em;
     text-transform: uppercase; color: var(--accent);
     background: var(--accent-bg); padding: 5px 11px; border-radius: var(--r-full);
-    border: 1px solid rgba(124,140,255,0.2);
+    border: 1px solid rgba(139,92,246,0.2);
   }
 
   /* ── Hero ────────────────────────────────────────────────────────────── */
@@ -125,8 +123,8 @@
   .hero-bg {
     position: absolute; inset: 0; pointer-events: none; z-index: 0;
     background:
-      radial-gradient(900px 400px at 50% -100px, rgba(124,140,255,0.18), transparent 60%),
-      radial-gradient(700px 300px at 10% 30%, rgba(124,140,255,0.06), transparent 60%);
+      radial-gradient(900px 400px at 50% -100px, rgba(139,92,246,0.18), transparent 60%),
+      radial-gradient(700px 300px at 10% 30%, rgba(139,92,246,0.06), transparent 60%);
   }
   .hero-content { position: relative; z-index: 1; text-align: center; max-width: 880px; margin: 0 auto; }
   .hero-headline {
@@ -156,9 +154,9 @@
     border-radius: var(--r-xl);
     overflow: hidden;
     box-shadow:
-      0 0 0 1px rgba(124,140,255,0.05),
+      0 0 0 1px rgba(139,92,246,0.05),
       0 20px 60px rgba(0,0,0,0.5),
-      0 4px 14px rgba(124,140,255,0.1);
+      0 4px 14px rgba(139,92,246,0.1);
   }
   .mockup-chrome {
     display: flex; align-items: center; gap: var(--s-3);
@@ -184,7 +182,7 @@
   }
   .mockup-mark {
     width: 24px; height: 24px; border-radius: 6px;
-    background: linear-gradient(135deg, var(--accent) 0%, #5762cc 100%);
+    background: linear-gradient(135deg, var(--accent) 0%, #6D28D9 100%);
     display: flex; align-items: center; justify-content: center;
     color: white; font-weight: 800; font-size: 11px;
   }
@@ -216,8 +214,8 @@
   .mk-hero-bg {
     position: absolute; inset: 0; pointer-events: none;
     background:
-      radial-gradient(600px 250px at 0% 0%, rgba(124,140,255,0.10), transparent 60%),
-      radial-gradient(400px 200px at 100% 100%, rgba(124,140,255,0.04), transparent 60%);
+      radial-gradient(600px 250px at 0% 0%, rgba(139,92,246,0.10), transparent 60%),
+      radial-gradient(400px 200px at 100% 100%, rgba(34,211,166,0.05), transparent 60%);
   }
   .mk-meta { position: relative; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
   .mk-headline {
@@ -269,7 +267,7 @@
     padding: var(--s-7) var(--s-6);
     border-top: 1px solid var(--border-subtle);
     border-bottom: 1px solid var(--border-subtle);
-    background: rgba(124,140,255,0.015);
+    background: rgba(139,92,246,0.015);
   }
   .proof-bar-inner {
     max-width: 1180px; margin: 0 auto;
@@ -307,8 +305,8 @@
   }
   .step-card-highlight {
     border-color: var(--accent);
-    background: linear-gradient(180deg, var(--bg-card) 0%, rgba(124,140,255,0.04) 100%);
-    box-shadow: 0 0 0 1px rgba(124,140,255,0.15), 0 8px 24px rgba(124,140,255,0.1);
+    background: linear-gradient(180deg, var(--bg-card) 0%, rgba(34,211,166,0.05) 100%);
+    box-shadow: 0 0 0 1px rgba(124,58,237,0.15), 0 8px 24px rgba(139,92,246,0.1);
     transform: translateY(-4px);
   }
   .step-num {
@@ -356,7 +354,7 @@
     color: white; font-weight: 800; font-size: 17px; letter-spacing: -.02em;
     margin-bottom: var(--s-2);
   }
-  .team-avatar.pulse  { background: linear-gradient(135deg, #7c8cff 0%, #5762cc 100%); }
+  .team-avatar.pulse  { background: linear-gradient(135deg, #7C3AED 0%, #6D28D9 100%); }
   .team-avatar.atlas  { background: linear-gradient(135deg, #4ade80 0%, #2d9a59 100%); }
   .team-avatar.frame  { background: linear-gradient(135deg, #f5b544 0%, #c98a2b 100%); }
   .team-avatar.lux    { background: linear-gradient(135deg, #ef6b6f 0%, #b94349 100%); }
@@ -435,7 +433,7 @@
   /* ── Wedge quote ─────────────────────────────────────────────────────── */
   .wedge {
     text-align: center; padding: var(--s-9) var(--s-6);
-    background: linear-gradient(180deg, transparent 0%, rgba(124,140,255,0.04) 50%, transparent 100%);
+    background: linear-gradient(180deg, transparent 0%, rgba(34,211,166,0.05) 50%, transparent 100%);
   }
   .wedge-quote {
     font-size: clamp(22px, 3vw, 32px); font-weight: 500; letter-spacing: -.015em;
@@ -512,7 +510,7 @@
   }
   .case-card-bg {
     position: absolute; inset: 0; pointer-events: none;
-    background: radial-gradient(700px 300px at 100% 0%, rgba(124,140,255,0.06), transparent 60%);
+    background: radial-gradient(700px 300px at 100% 0%, rgba(139,92,246,0.06), transparent 60%);
   }
   .case-card-inner { position: relative; }
   .case-card-eyebrow { display: flex; align-items: center; gap: var(--s-3); margin-bottom: var(--s-3); }
@@ -584,7 +582,7 @@
   }
   .price-card.featured {
     border-color: var(--accent); position: relative;
-    box-shadow: 0 0 0 1px rgba(124,140,255,0.2), 0 8px 24px rgba(124,140,255,0.12);
+    box-shadow: 0 0 0 1px rgba(139,92,246,0.2), 0 8px 24px rgba(139,92,246,0.12);
   }
   .price-card.featured::before {
     content: 'Most popular'; position: absolute; top: -10px; left: 50%;
@@ -655,7 +653,7 @@
   /* ── Final CTA ───────────────────────────────────────────────────────── */
   .cta-section {
     text-align: center; padding: var(--s-10) var(--s-6);
-    background: radial-gradient(600px 300px at 50% 50%, rgba(124,140,255,0.1), transparent 70%);
+    background: radial-gradient(600px 300px at 50% 50%, rgba(139,92,246,0.1), transparent 70%);
   }
   .cta-headline {
     font-size: clamp(28px, 4vw, 42px); font-weight: 650; letter-spacing: -.02em;
@@ -695,8 +693,8 @@
 <nav class="nav">
   <div class="nav-inner">
     <a href="#" class="brand">
-      <div class="brand-mark">Oi</div>
-      <div class="brand-name">Operator Intelligence</div>
+      <div class="brand-mark"><svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" aria-label="Greta"><defs><linearGradient id="ipb" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8B5CF6"/><stop offset="1" stop-color="#38BDF8"/></linearGradient><linearGradient id="igm" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#22D3A6"/><stop offset="1" stop-color="#5DE5C8"/></linearGradient></defs><rect x="49" y="30" width="138" height="41" rx="20.5" transform="rotate(-45 118 50.5)" fill="url(#ipb)"/><rect x="71" y="177" width="138" height="41" rx="20.5" transform="rotate(-45 140 197.5)" fill="url(#igm)"/><circle cx="97" cy="132" r="24" fill="#0B132B"/></svg></div>
+      <div class="brand-name">greta</div>
     </a>
     <div class="nav-links">
       <a href="#how">How it works</a>
@@ -744,12 +742,12 @@
         <span class="mockup-dot r"></span>
         <span class="mockup-dot y"></span>
         <span class="mockup-dot g"></span>
-        <div class="mockup-url">operatorintelligence.com/workspace/frkl</div>
+        <div class="mockup-url">greta.app/workspace/frkl</div>
       </div>
       <div class="mockup-body">
         <div class="mockup-toolbar">
-          <div class="mockup-mark">Oi</div>
-          <div class="mockup-brand-name">Operator Intelligence</div>
+          <div class="mockup-mark"><svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" aria-label="Greta"><defs><linearGradient id="mpb" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8B5CF6"/><stop offset="1" stop-color="#38BDF8"/></linearGradient><linearGradient id="mgm" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#22D3A6"/><stop offset="1" stop-color="#5DE5C8"/></linearGradient></defs><rect x="49" y="30" width="138" height="41" rx="20.5" transform="rotate(-45 118 50.5)" fill="url(#mpb)"/><rect x="71" y="177" width="138" height="41" rx="20.5" transform="rotate(-45 140 197.5)" fill="url(#mgm)"/><circle cx="97" cy="132" r="24" fill="#0B132B"/></svg></div>
+          <div class="mockup-brand-name">greta</div>
           <div class="mockup-divider"></div>
           <div class="mockup-workspace">
             <span class="dot"></span>
@@ -913,7 +911,7 @@
         <div class="step-name">Act</div>
         <div class="step-who">Where we live</div>
         <div class="step-detail">Hands you the specific, priority-ranked actions with the £ on each. Verifies the outcome.</div>
-        <div class="step-tools" style="color:var(--accent); font-weight:600;">Operator Intelligence — six specialists, one workspace</div>
+        <div class="step-tools" style="color:var(--accent); font-weight:600;">Greta — six specialists, one workspace</div>
       </div>
     </div>
   </div>
@@ -1083,7 +1081,7 @@
     <div class="honesty-table">
       <div class="honesty-row header">
         <div class="honesty-cell left">Failure mode in other tools</div>
-        <div class="honesty-cell right">What Operator Intelligence does instead</div>
+        <div class="honesty-cell right">What Greta does instead</div>
       </div>
       <div class="honesty-row">
         <div class="honesty-cell left">Silently builds trend lines on 14 days of data</div>
@@ -1119,7 +1117,7 @@
     <div class="section-head">
       <span class="eyebrow">Proof</span>
       <h2 class="section-title">£30.7k/mo found in one weekend</h2>
-      <p class="section-sub">Real receipts on a real brand. frkl is a £16k/mo DTC jewellery brand. Operator Intelligence was deployed on a Friday — by Monday the team had a new action list.</p>
+      <p class="section-sub">Real receipts on a real brand. frkl is a £16k/mo DTC jewellery brand. Greta was deployed on a Friday — by Monday the team had a new action list.</p>
     </div>
 
     <div class="case-card">
@@ -1312,7 +1310,7 @@
       </details>
       <details class="faq-item">
         <summary>I already pay for Triple Whale. Why would I switch?</summary>
-        <p>Most operators don't switch — they add. Triple Whale stays as the attribution debate venue for the media buyer. Operator Intelligence sits next to it as the operator's Monday-morning surface. The Scale tier (£599) costs less than Triple Whale Pro (£1,500) and covers eight functions instead of one. The Starter tier (£99) is small enough to add without procurement.</p>
+        <p>Most operators don't switch — they add. Triple Whale stays as the attribution debate venue for the media buyer. Greta sits next to it as the operator's Monday-morning surface. The Scale tier (£599) costs less than Triple Whale Pro (£1,500) and covers eight functions instead of one. The Starter tier (£99) is small enough to add without procurement.</p>
       </details>
       <details class="faq-item">
         <summary>What's the catch?</summary>
@@ -1344,7 +1342,7 @@
     <div class="footer-brand">
       <div class="brand-mark" style="width:24px; height:24px; font-size:12px;">Oi</div>
       <div>
-        <div style="font-size: 13px; font-weight: 650;">Operator Intelligence</div>
+        <div style="font-size: 13px; font-weight: 650;">Greta</div>
         <div class="footer-tag">Every part of your business, every week.</div>
       </div>
     </div>
@@ -1357,7 +1355,7 @@
     </div>
   </div>
   <div class="footer-legal">
-    © 2026 Operator Intelligence · Built on real DTC data, not slideware ·
+    © 2026 Greta · Built on real DTC data, not slideware ·
     <a href="/privacy">Privacy</a> · <a href="/terms">Terms</a> · <a href="/contact">Contact</a>
   </div>
 </footer>

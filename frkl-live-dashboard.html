@@ -4,9 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title>Operator Intelligence — frkl workspace</title>
+<title>greta — frkl workspace</title>
 <script src="./gate.js"></script>
-<script>/* set theme before paint — no flash of the wrong theme */try{document.documentElement.dataset.theme=localStorage.getItem('oi_theme')||'dark';}catch(e){document.documentElement.dataset.theme='dark';}</script>
+<script>/* set theme before paint — no flash of the wrong theme */try{document.documentElement.dataset.theme=localStorage.getItem('oi_theme')||'light';}catch(e){document.documentElement.dataset.theme='light';}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;550;600;650;700&display=swap" rel="stylesheet">
@@ -77,14 +77,14 @@
     --good:    #4ec98c;
     --warn:    #e9a23b;
     --bad:     #e96b73;
-    --accent:  #818cf8;   /* refined indigo — primary chrome only */
+    --accent:  #8B5CF6;   /* refined indigo — primary chrome only */
     --accent-soft: #272d4f;
 
     /* Status surfaces (tinted backgrounds for pills/banners) */
     --good-bg:   rgba(78,201,140,.11);
     --warn-bg:   rgba(233,162,59,.11);
     --bad-bg:    rgba(233,107,115,.11);
-    --accent-bg: rgba(129,140,248,.09);
+    --accent-bg: rgba(139,92,246,.10);
 
     /* Heatmap scale (IG cadence calendar) — poor→strong engagement */
     --heat-empty: #1a1a22; --heat-none: #2b2b34; --heat-low: #7c2d12;
@@ -103,32 +103,34 @@
 
   /* ── Daylight (light) theme — token overrides; toggled via html[data-theme=light] ── */
   html[data-theme="light"] {
-    --bg-app:        #f6f7f9;   /* soft off-white canvas */
+    /* ── Greta light cockpit (brand book): Cloud canvas, navy ink,
+       Intelligence-Purple accent, Data-Green good ── */
+    --bg-app:        #F1F5F9;   /* Cloud — background canvas */
     --bg-card:       #ffffff;
-    --bg-card-hover: #f2f4f7;
+    --bg-card-hover: #F8FAFC;
     --bg-input:      #ffffff;
     --bg-elevated:   #ffffff;
-    --border-subtle:  #ebedf1;
-    --border-default: #dcdfe5;
-    --text-primary:   #181b21;
-    --text-secondary: #474d57;
-    --text-muted:     #6a707b;
-    --text-faint:     #9398a3;
-    --good:    #15a34a;   /* deeper so colour reads on white, not neon */
-    --warn:    #b9750e;
-    --bad:     #d63440;
-    --accent:  #5a62d4;
-    --accent-soft: #e7e8fb;
-    --good-bg:   rgba(21,163,74,.10);
-    --warn-bg:   rgba(185,117,14,.12);
-    --bad-bg:    rgba(214,52,64,.10);
-    --accent-bg: rgba(90,98,212,.10);
-    /* Heatmap scale — soft tints that read on white */
-    --heat-empty: #eef1f4; --heat-none: #dfe4ea; --heat-low: #f4cdba;
-    --heat-mid: #f0e09c; --heat-high: #b6e3c6; --heat-ink: #5a606b;
-    --shadow-sm: 0 1px 2px rgba(16,24,40,.06);
-    --shadow-md: 0 6px 18px rgba(16,24,40,.08);
-    --shadow-lg: 0 20px 44px rgba(16,24,40,.12);
+    --border-subtle:  #E9EEF4;
+    --border-default: #D7DEE8;
+    --text-primary:   #0B132B;   /* Greta Navy */
+    --text-secondary: #334155;   /* Slate */
+    --text-muted:     #64748B;
+    --text-faint:     #94A3B8;
+    --good:    #0E9E78;   /* Data Green (accessible text shade of #22D3A6) */
+    --warn:    #B45309;
+    --bad:     #DC2626;
+    --accent:  #7C3AED;   /* Intelligence Purple (accessible) */
+    --accent-soft: #EDE9FE;
+    --good-bg:   rgba(34,211,166,.12);
+    --warn-bg:   rgba(180,83,9,.10);
+    --bad-bg:    rgba(220,38,38,.08);
+    --accent-bg: rgba(124,58,237,.08);
+    /* Heatmap scale — soft tints that read on white (Data-Green strong end) */
+    --heat-empty: #EEF2F7; --heat-none: #DFE4EA; --heat-low: #F4CDBA;
+    --heat-mid: #F0E09C; --heat-high: #9FE6CE; --heat-ink: #5A606B;
+    --shadow-sm: 0 1px 2px rgba(11,19,43,.06);
+    --shadow-md: 0 6px 18px rgba(11,19,43,.08);
+    --shadow-lg: 0 20px 44px rgba(11,19,43,.12);
   }
   /* Recharts SVG adapts via its generated classes (var() can't be used in SVG attrs). */
   html[data-theme="light"] .recharts-cartesian-grid line { stroke: #edeff3; }
@@ -166,15 +168,13 @@
   }
   .brand { display:flex; align-items:center; gap: var(--s-3); }
   .brand-mark {
-    width: 28px; height: 28px; border-radius: 8px;
-    background: linear-gradient(135deg, var(--accent) 0%, #5762cc 100%);
+    width: 28px; height: 28px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    color: white; font-weight: 800; font-size: 14px; letter-spacing: -.02em;
-    box-shadow: 0 2px 8px rgba(124,140,255,0.3);
   }
+  .brand-mark svg { width: 100%; height: 100%; display: block; }
   .brand-name {
-    font-size: 14.5px; font-weight: 650; letter-spacing: -.01em;
-    color: var(--text-primary);
+    font-size: 18px; font-weight: 900; letter-spacing: -.05em;
+    text-transform: lowercase; color: var(--text-primary);
   }
   .brand-sub {
     font-size: 11px; font-weight: 500; color: var(--text-muted);
@@ -368,7 +368,7 @@
   .kpi-pop .imp { color: var(--text-muted); margin-top: var(--s-1); }
   .kpi-pop .imp::before { content: '→ '; color: var(--accent); font-weight: 700; }
   .txt-link { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); }
-  .txt-link:hover { border-bottom-style: solid; background: rgba(124,140,255,0.08); }
+  .txt-link:hover { border-bottom-style: solid; background: rgba(139,92,246,0.08); }
 
   /* ── Type ────────────────────────────────────────────────────────────── */
   h1 { font-size: var(--t-display); font-weight: 650; letter-spacing: -.015em; }
@@ -695,7 +695,7 @@
   }
   .stat.done   { background: var(--good-bg); color: var(--good); }
   .stat.chrome { background: var(--warn-bg); color: var(--warn); }
-  .stat.input  { background: rgba(124,140,255,.10); color: var(--accent); }
+  .stat.input  { background: rgba(139,92,246,.10); color: var(--accent); }
   .stat.open   { background: var(--bad-bg); color: var(--bad); }
   .stat.noreg  { background: var(--border-subtle); color: var(--text-faint); }
   .actionrow .ev { font-size: var(--t-micro); color: var(--text-muted); font-style: italic; }
@@ -981,8 +981,8 @@
   .hero-bg {
     position: absolute; inset: 0; pointer-events: none;
     background:
-      radial-gradient(800px 300px at 0% 0%, rgba(124,140,255,0.10), transparent 60%),
-      radial-gradient(600px 300px at 100% 100%, rgba(124,140,255,0.04), transparent 60%);
+      radial-gradient(800px 300px at 0% 0%, rgba(139,92,246,0.10), transparent 60%),
+      radial-gradient(600px 300px at 100% 100%, rgba(34,211,166,0.05), transparent 60%);
   }
   .hero-content { position: relative; z-index: 1; }
   .hero-meta {
@@ -1074,10 +1074,4 @@
   .modal button.primary:hover { background: #8b9aff; border-color: #8b9aff; }
   .modal .hint { font-size: var(--t-meta); color: var(--text-muted); margin-top: var(--s-3); line-height: 1.5; }
   .copied { color: var(--good) !important; }
-</style>
-</head>
-<body>
-<div id="root"></div>
-<script src="./frkl-app.js?v=202606300806"></script>
-</body>
-</html>
+<
