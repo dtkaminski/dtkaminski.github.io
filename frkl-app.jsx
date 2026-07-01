@@ -3745,7 +3745,7 @@ function CrossChannel({start}){
   const tierFalling = tiers && tiers[0].roas!=null && tiers[2].roas!=null && tiers[2].roas < tiers[0].roas*0.85;
   return (<div>
     <FitCard start={start} end={ACTIVE_END}/>
-    {window.FRKL_FIT_FLAGS?.genomeSignal && <GenomePanel/>}
+    <GenomePanel/>
     <div className="card" style={{marginBottom:14}}>
       <h2>Channel revenue claims vs spend</h2>
       <table>
