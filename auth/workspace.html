@@ -428,6 +428,14 @@
       return;
     }
 
+    // If we were only a stop-off to land a session for another page (e.g. the live dashboard after
+    // magic-link login), honour a same-origin ?next and go straight there. Same-origin guard
+    // (single leading '/', not '//' or a scheme) prevents the param being used as an open redirect.
+    try {
+      const nx = new URLSearchParams(window.location.search).get('next');
+      if (nx && /^\/(?!\/)/.test(nx)) { window.location.replace(nx); return; }
+    } catch (e) { /* fall through to the normal workspace render */ }
+
     document.getElementById('user-email').textContent = currentSession.user.email;
 
     const { data: memberships, error } = await sb

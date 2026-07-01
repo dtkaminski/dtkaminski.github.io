@@ -63,21 +63,31 @@
   const formState = document.getElementById('form-state');
   const successState = document.getElementById('success-state');
 
-  // If we already have a session, skip straight to workspace
+  // Optional ?next= post-login destination. ONLY same-origin paths (start with a single '/',
+  // never '//' or a scheme) are honoured — this prevents the param being used as an open redirect.
+  function safeNext() {
+    try {
+      const n = new URLSearchParams(window.location.search).get('next');
+      if (n && /^\/(?!\/)/.test(n)) return n;
+    } catch (e) {}
+    return '';
+  }
+  const NEXT = safeNext();
+
+  // If we already have a session, skip straight to the destination (next if given, else workspace).
   (async () => {
     const { data } = await sb.auth.getSession();
     if (data?.session) {
-      window.location.replace('./workspace.html');
+      window.location.replace(NEXT || './workspace.html');
     }
   })();
 
   async function sendMagicLink(email) {
-    return await sb.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: window.location.origin + window.location.pathname.replace('/login.html', '/workspace.html'),
-      },
-    });
+    // Land on workspace.html (the allow-listed redirect target) and pass ?next through so it can
+    // forward to the originating page (e.g. the live dashboard) once the session is established.
+    const base = window.location.origin + window.location.pathname.replace('/login.html', '/workspace.html');
+    const emailRedirectTo = NEXT ? base + '?next=' + encodeURIComponent(NEXT) : base;
+    return await sb.auth.signInWithOtp({ email, options: { emailRedirectTo } });
   }
 
   form.addEventListener('submit', async (e) => {

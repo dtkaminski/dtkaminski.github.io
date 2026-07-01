@@ -1,0 +1,3 @@
+fix(dashboard): render GenomePanel via its own data-gate (drop vestigial genomeSignal flag wrapper)
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
