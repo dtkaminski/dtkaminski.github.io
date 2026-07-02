@@ -1,21 +1,26 @@
-feat(marketing): wire self-serve signup into the primary funnel CTAs
+feat(marketing): self-serve-first narrative + signup error-UX polish
 
-The 5 marketing "Apply for the founding cohort" CTAs all pointed at the gated
-application page (auth/apply.html). The self-serve create-account flow
-(auth/signup.html — email + brand name + auto-derived editable slug, posts to
-the deployed signup edge fn, "check your email" success, claim-aware) already
-existed but was only linked from secondary/internal spots.
+index.html — reframe to self-serve-first with Managed as a secondary
+done-for-you tier, removing the scarcity framing that contradicted the live
+create-account CTAs:
+- <title>, meta description, hero eyebrow/sub/trust, pricing headline + sub,
+  the "why" paragraph and the first FAQ now lead with "create your account free
+  / connect Shopify"; Managed (£750/mo) is framed as the done-for-you option,
+  not a gated cohort.
+- Stripped "10 spots", "48hr review", "founding cohort", "onboarding 10 brands",
+  "launching once the cohort is full". Managed card badge 'Apply now' →
+  'Done-for-you'; tier label 'founding cohort' → 'done-for-you'.
+- Kept the factual £750 Managed price and the frkl-as-design-partner history.
+  Paid self-serve plans stay truthfully marked Q3 2026 (account creation is the
+  live/free path; the £99/£249/£599 tiers are not yet live).
 
-Repoint the four primary CTAs (nav, hero, self-serve pricing card, final CTA)
-to auth/signup.html with create-account wording ("Get started" / "Create your
-account"), dropping the £750 / 10-spots / 48hr-review framing on those CTAs and
-the final-CTA headline + sub. The Managed price-card CTA still points at
-apply.html, reworded "Apply for Managed (done-for-you) →" — apply.html is
-preserved intact as the done-for-you application. No backend change (signup is
-already deployed + verified); no duplicated signup page.
+auth/signup.html — map signup error codes to clean copy:
+- slug_taken → "That handle's taken — pick another." + auto-open the Advanced
+  panel, prefill the rejected handle, focus + select it for a one-edit retry.
+- invalid_brand_slug / invalid_email / invalid_brand_name → clean messages that
+  focus the offending field. Unknown errors fall back to the server message.
 
-Note: surrounding narrative (hero eyebrow/sub, pricing section headline,
-<title>) still carries cohort/£750 framing — left for a separate positioning
-pass rather than over-editing marketing copy here.
+Static pages — no build. index.html edits are text / CSS-label only (no
+structural changes); signup.html adds an error-branch mapping (braces balanced).
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>

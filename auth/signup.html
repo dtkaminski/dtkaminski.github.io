@@ -181,7 +181,39 @@
       const data = await resp.json();
 
       if (!resp.ok) {
-        errorBox.textContent = data.message || data.error || 'Something went wrong. Try again.';
+        const code = data.error || '';
+        const openAdvancedOnSlug = () => {
+          // Reveal the (collapsed) Advanced panel and prefill the handle field with the
+          // rejected slug so the user can edit it in place rather than retype from scratch.
+          const adv = document.querySelector('.advanced-details');
+          if (adv) adv.open = true;
+          if (!advancedSlugInput.value) {
+            advancedSlugInput.value = slug;
+            slugManuallyEdited = true;
+            hiddenSlugInput.value = slug;
+          }
+          advancedSlugInput.focus();
+          advancedSlugInput.select();
+        };
+
+        let msg;
+        if (code === 'slug_taken') {
+          msg = "That handle's taken — pick another.";
+          openAdvancedOnSlug();
+        } else if (code === 'invalid_brand_slug') {
+          msg = "That handle isn't valid — use 3–50 lowercase letters, numbers or hyphens.";
+          openAdvancedOnSlug();
+        } else if (code === 'invalid_email') {
+          msg = "That email doesn't look right — check it and try again.";
+          form.email.focus();
+        } else if (code === 'invalid_brand_name') {
+          msg = 'Enter your brand name (1–100 characters).';
+          nameInput.focus();
+        } else {
+          msg = data.message || data.error || 'Something went wrong. Try again.';
+        }
+
+        errorBox.textContent = msg;
         errorBox.hidden = false;
         submitBtn.disabled = false;
         submitBtn.querySelector('.btn-label').textContent = 'Create workspace → email me a magic link';
