@@ -416,7 +416,7 @@
     const wantSlug = new URLSearchParams(window.location.search).get('brand');
     const { data: memberships } = await sb
       .from('brand_users')
-      .select('role, brand:brands(id, slug, name, vertical, currency)')
+      .select('role, brand:brands(id, slug, name, vertical, currency, metadata)')
       .eq('user_id', session.user.id);
 
     if (!memberships || memberships.length === 0) {
@@ -466,13 +466,14 @@
     stateNotConnected.hidden = true;
     stateFirstSync.hidden = true;
 
-    // Brands whose rich dashboard is wired up render the full live view inline,
-    // instead of the placeholder panels. The user is already authenticated, so we
-    // pre-satisfy the dashboard's access gate via shared same-origin localStorage
-    // (no passcode prompt). The embedded dashboard's loader reads live tenant data
-    // using this same session.
-    const RICH_DASH = { frkl: '/frkl-live-dashboard.html?v=202607020808' };
-    const richUrl = RICH_DASH[currentBrand.slug];
+    // Every connected brand renders the full live dashboard inline, instead of the
+    // placeholder panels (previously gated to an allow-list of one — 'frkl' — which left
+    // every other tenant on the placeholder path). Brand identity is injected via the
+    // OI_* globals below; the ?v= just pins the cache. The user is already authenticated,
+    // so we pre-satisfy the dashboard's access gate via shared same-origin localStorage
+    // (no passcode prompt). The embedded dashboard's loader reads live tenant data using
+    // this same session.
+    const richUrl = '/frkl-live-dashboard.html?v=202607020808';
     if (richUrl) {
       try { localStorage.setItem('oi_gate_v1', 'b8bd9e7d7fe04b396ddc52df76d65e84a99565fff0f22d805d6b13b4517bcdb5'); } catch (e) {}
       // Activate the dashboard's "Ask the data" panel: same-origin iframe reads
@@ -482,6 +483,19 @@
         endpoint: SUPABASE_URL + '/functions/v1/ask-data',
         brand_id: currentBrand.id,
         getJwt: async () => { const { data } = await sb.auth.getSession(); return data?.session?.access_token || ''; },
+      };
+      // Per-tenant brand identity for the embedded dashboard. The iframe's data loader
+      // (OI_BRAND_SLUG) and app copy/LLM prompts (OI_BRAND) read these via window.parent,
+      // mirroring OI_ASK. Without them the loader defaults to frkl's data and the copy
+      // renders frkl's name/vertical/markets. markets/seasonality live in brands.metadata.
+      window.OI_BRAND_SLUG = currentBrand.slug;
+      const _md = currentBrand.metadata || {};
+      window.OI_BRAND = {
+        name: currentBrand.name,
+        slug: currentBrand.slug,
+        vertical: currentBrand.vertical || 'DTC',
+        markets: Array.isArray(_md.primary_markets) ? _md.primary_markets.join('/') : (_md.markets || ''),
+        seasonality: _md.seasonality || 'No specific seasonality profile on record — treat seasonal claims cautiously.',
       };
       document.getElementById('hero-card').hidden = true;
       const pg = document.querySelector('#tab-overview .panel-grid');

@@ -1,3 +1,35 @@
-fix(dashboard): render GenomePanel via its own data-gate (drop vestigial genomeSignal flag wrapper)
+feat(multi-tenant): render live dashboard for any brand (de-frkl P1)
+
+The rich dashboard was gated to a one-entry allow-list (RICH_DASH = {frkl}),
+so every other tenant fell through to the placeholder panels and never loaded
+the live view. And the brand slug was never threaded into the same-origin
+iframe, so the embedded data loader defaulted to frkl's data and the app copy
+/ LLM prompts rendered frkl's name, vertical and markets for everyone.
+
+Shell (app/index.html):
+- Un-gate: every connected brand now loads frkl-live-dashboard.html inline
+  (?v= just pins the cache); brand identity comes from the OI_* globals below.
+- Inject per-tenant identity on the parent window before setting the iframe
+  src: window.OI_BRAND_SLUG = currentBrand.slug and window.OI_BRAND =
+  {name, slug, vertical, markets, seasonality}. markets/seasonality read from
+  brands.metadata (primary_markets); added metadata to the brand select.
+
+Iframe readers (mirror the existing OI_ASK window.parent fallback):
+- frkl-app.jsx: OI_BRAND reads own window, then window.parent.OI_BRAND, then
+  the frkl default (standalone/demo unchanged).
+- frkl-data-loader.js: OI_BRAND_SLUG same parent fallback; without it the
+  loader silently loaded frkl's tenant data for every brand.
+
+Static fit snapshot:
+- Stop shipping frkl-fit.js as a shared default — it baked in one brand's
+  OMF 100 / PMF 90 and rendered for every tenant and the unauthed demo. Removed
+  the <script> include; fit now comes live per brand from assess-fit
+  (useFitResult), with the panel's loading/empty state until it resolves.
+
+Rebuilt frkl-app.js via build-app.mjs.
+
+Note: the Shopify connect button still points at the legacy oauth-shopify-install
+GET with the (now correct) slug; moving it to the authenticated connect-start
+path is tracked separately.
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>

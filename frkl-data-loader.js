@@ -23,9 +23,15 @@
 
   const SUPABASE_URL = 'https://awcncqvsnuhqyihpdgcx.supabase.co';
   const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_6NLIq1JL_LZIMjez3FmnVQ_JIVw3-A2';
-  // Brand slug for the live-data fetch. Defaults to frkl; the /app shell can inject
-  // window.OI_BRAND_SLUG to point the same loader at another tenant.
-  const BRAND_SLUG = (typeof window !== 'undefined' && window.OI_BRAND_SLUG) || 'frkl';
+  // Brand slug for the live-data fetch. The /app shell injects window.OI_BRAND_SLUG per
+  // tenant. This loader runs inside a same-origin iframe, so (like OI_ASK) we read our own
+  // window first, then window.parent.OI_BRAND_SLUG; without the parent fallback every tenant
+  // would silently load frkl's data. Final fallback is frkl for the standalone/demo view.
+  const parentSlug = (function () {
+    try { return (window.parent && window.parent !== window) ? window.parent.OI_BRAND_SLUG : null; }
+    catch (e) { return null; }
+  })();
+  const BRAND_SLUG = (typeof window !== 'undefined' && (window.OI_BRAND_SLUG || parentSlug)) || 'frkl';
   const POLL_INTERVAL_MS = 60_000; // 60 seconds
 
   // Public surface — accessed by the dashboard to query liveness state

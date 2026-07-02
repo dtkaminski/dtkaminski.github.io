@@ -37,7 +37,10 @@
 <script src="./frkl-clarity.js?v=202607020808"></script>
 <script src="./frkl-board-read.js?v=202607020808"></script>
 <script src="./frkl-benchmarks.js?v=202607020808"></script>
-<script src="./frkl-fit.js?v=202607020808"></script>
+<!-- frkl-fit.js (static per-brand fit snapshot) intentionally NOT loaded: it baked in one
+     brand's OMF/PMF and would render for every tenant / the unauthed demo. Fit now comes
+     live from the assess-fit edge function per brand (useFitResult); with no snapshot the
+     panel shows its loading/empty state until the live read resolves. -->
 <style>
   /* ─────────────────────────────────────────────────────────────────────────
      OPERATOR INTELLIGENCE — DESIGN SYSTEM (Phase 1)
@@ -1076,6 +1079,6 @@
 </head>
 <body>
 <div id="root"></div>
-<script src="./frkl-app.js?v=1782986177512"></script>
+<script src="./frkl-app.js?v=1782991205006"></script>
 </body>
 </html>

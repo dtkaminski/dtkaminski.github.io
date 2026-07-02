@@ -388,9 +388,15 @@ function bmFmt(unit, v){ if(v==null) return '—';
 // CVR benchmark now flows from the registry (jewellery/frkl = 1.5%), not a literal.
 const CVR_BENCH = (bmGet('site_cvr') && bmGet('site_cvr').value) || 0.015;
 const CVR_BENCH_LABEL = bmFmt('pct', CVR_BENCH);
-// ── Brand identity for copy + LLM prompts (multi-brand). The /app shell can inject
-// window.OI_BRAND per tenant; falls back to frkl so single-tenant copy is unchanged.
-const OI_BRAND = (typeof window!=='undefined' && window.OI_BRAND) || {
+// ── Brand identity for copy + LLM prompts (multi-brand). The /app shell injects
+// window.OI_BRAND per tenant. This dashboard runs as a same-origin iframe inside the
+// shell, so — exactly like OI_ASK below — we read our own window first, then fall back
+// to window.parent.OI_BRAND. Final fallback is frkl so the standalone/demo view is
+// unchanged. Without the parent fallback a tenant would silently render frkl's copy.
+const OI_BRAND = (typeof window!=='undefined' && (window.OI_BRAND || (function(){
+  try { return (window.parent && window.parent!==window) ? window.parent.OI_BRAND : null; }
+  catch(e){ return null; }
+})())) || {
   name: 'frkl', vertical: 'demi-fine jewellery', markets: 'UK/Ireland',
   seasonality: "Valentine's, Mother's Day and Christmas are demand peaks; post-peak softness is normal",
 };
