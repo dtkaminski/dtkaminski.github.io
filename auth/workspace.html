@@ -413,6 +413,17 @@
   let currentSession = null;
 
   (async () => {
+    // Detect an auth error Supabase hands back via the /verify redirect — e.g. an
+    // expired or already-used magic link arrives as
+    //   workspace.html#error=access_denied&error_code=otp_expired&error_description=...
+    // There is no access_token in that case, so without this we fall through to the
+    // generic "not logged in" card and the user loops with no idea the link simply expired.
+    const authErr = (() => {
+      const h = new URLSearchParams((window.location.hash || '').replace(/^#/, ''));
+      const q = new URLSearchParams(window.location.search || '');
+      return h.get('error_code') || h.get('error') || q.get('error_code') || q.get('error') || null;
+    })();
+
     const { data } = await sb.auth.getSession();
     currentSession = data?.session;
 
@@ -423,6 +434,19 @@
     }
 
     if (!currentSession) {
+      // If the failure was an expired/used link, say so plainly and offer a fresh one —
+      // rather than the generic card that makes it look like a dead end.
+      if (authErr) {
+        const card = document.getElementById('no-session');
+        const h1 = card.querySelector('h1');
+        const lead = card.querySelector('.lead');
+        const btn = card.querySelector('a.btn-primary');
+        if (h1) h1.textContent = 'That sign-in link expired';
+        if (lead) lead.textContent = 'Magic links can only be used once and expire quickly — and requesting a new link cancels older ones. Send yourself a fresh link and open the newest email.';
+        if (btn) btn.textContent = 'Send a new link →';
+        // Strip the error out of the URL so a refresh doesn't re-trigger this state.
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
       document.getElementById('loading').hidden = true;
       document.getElementById('no-session').hidden = false;
       return;
