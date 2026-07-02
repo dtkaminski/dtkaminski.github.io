@@ -10071,6 +10071,7 @@ const NAV = [
   ]},
   { id:'settings',label:'Settings',     icon:'sliders', subtabs:[
     { id:'connections', label:'Connections', component: () => <ConnectionsPanel/> },
+    { id:'economics',   label:'Business economics', component: () => <BusinessEconomicsPanel/> },
     { id:'team',        label:'Team',        component: () => <TeamPanel/> },
   ]},
 ];
@@ -10289,6 +10290,349 @@ function ConnectionsPanel(){
       </div>
     </section>
 
+  </div>);
+}
+
+// ── Business economics (brand_config) ──────────────────────────────────────
+// Captures the brand's financial "genome" — the operator-known facts that aren't
+// in Shopify. gross_margin is the ONE hard gate: without it assess-fit throws 412
+// and the engine skips the brand entirely (no fit profile, no actions). The cost
+// stack + cash-cycle inputs are optional — each one supplied OVERRIDES the engine's
+// category prior (source flips 'prior' → 'brand-entered'); left blank, the prior
+// stands. So the input value IS the provenance: filled = your number, blank = prior.
+// Writes go through the save-brand-config edge fn (validated, membership-checked);
+// reads via the same fn (GET). Same auth context as Team/Ask (OI_ASK).
+
+// Category priors — rough per-vertical estimates used ONLY to guide the form
+// (placeholders / hints). They are never written unless the operator confirms a
+// value. frkl (jewellery) + meridian (coffee) are the two real reference rows;
+// the rest are sensible DTC defaults. Percentages are whole numbers (7.4 = 7.4%).
+const CATEGORY_PRIORS = {
+  jewellery: { label:'Jewellery',   grossMarginPct:77, fixedCostsMonthly:10000, inventoryDays:120, supplierDays:0,  discountRatePct:15, vc:{ shipping:3.5, fulfilment:2.0, packaging:0.5, payPct:1.5, payFixed:0.25, refundPct:7.4 } },
+  coffee:    { label:'Coffee / F&B', grossMarginPct:75, fixedCostsMonthly:18000, inventoryDays:45,  supplierDays:30, discountRatePct:12, vc:{ shipping:3.2, fulfilment:1.6, packaging:0.9, payPct:1.5, payFixed:0.25, refundPct:4.55 } },
+  apparel:   { label:'Apparel',     grossMarginPct:60, fixedCostsMonthly:15000, inventoryDays:90,  supplierDays:30, discountRatePct:15, vc:{ shipping:4.5, fulfilment:3.0, packaging:1.2, payPct:2.4, payFixed:0.25, refundPct:20 } },
+  beauty:    { label:'Beauty',      grossMarginPct:70, fixedCostsMonthly:14000, inventoryDays:60,  supplierDays:30, discountRatePct:12, vc:{ shipping:3.8, fulfilment:2.0, packaging:1.0, payPct:2.4, payFixed:0.25, refundPct:4 } },
+  supplements:{label:'Supplements', grossMarginPct:68, fixedCostsMonthly:12000, inventoryDays:60,  supplierDays:30, discountRatePct:12, vc:{ shipping:3.5, fulfilment:2.0, packaging:0.8, payPct:2.4, payFixed:0.25, refundPct:4 } },
+  default:   { label:'DTC (general)',grossMarginPct:60, fixedCostsMonthly:12000, inventoryDays:75,  supplierDays:30, discountRatePct:15, vc:{ shipping:4.5, fulfilment:2.5, packaging:0.8, payPct:2.4, payFixed:0.25, refundPct:5 } },
+};
+// Map a free-text vertical → a prior set (loose keyword match, defaults to DTC general).
+function priorsForVertical(v){
+  const s = String(v||'').toLowerCase();
+  if(/jewel|ring|neckl/.test(s)) return CATEGORY_PRIORS.jewellery;
+  if(/coffee|tea|food|drink|beverage|snack|f&b/.test(s)) return CATEGORY_PRIORS.coffee;
+  if(/apparel|cloth|fashion|wear|garment/.test(s)) return CATEGORY_PRIORS.apparel;
+  if(/beauty|cosmet|skincare|makeup/.test(s)) return CATEGORY_PRIORS.beauty;
+  if(/supplement|nutri|vitamin|protein|wellness/.test(s)) return CATEGORY_PRIORS.supplements;
+  return CATEGORY_PRIORS.default;
+}
+
+function BusinessEconomicsPanel(){
+  const ASK = getOIAsk();
+  const authed = !!(ASK && ASK.brand_id && typeof ASK.getJwt==='function' && ASK.endpoint);
+  const fnBase = authed ? ASK.endpoint.replace(/\/[^/]*$/, '') : '';
+  const cfgUrl = fnBase + '/save-brand-config';
+
+  const [config, setConfig] = React.useState(null);
+  const [loading, setLoading] = React.useState(authed);
+  const [loadErr, setLoadErr] = React.useState('');
+
+  // Input state — seeded from the SAVED config only (never from priors). Blank ⇒ unset ⇒ prior.
+  const [gm, setGm] = React.useState('');           // gross margin, as a percentage string
+  const [genome, setGenome] = React.useState({});   // { fixed_costs_monthly, inventory_days, supplier_payment_terms_days, discount_rate_annual(%) }
+  const [vc, setVc] = React.useState({});            // variable_costs keys as strings
+  const [gmBusy, setGmBusy] = React.useState(false);
+  const [csBusy, setCsBusy] = React.useState(false);
+  const [gmMsg, setGmMsg] = React.useState(null);    // {text, kind}
+  const [csMsg, setCsMsg] = React.useState(null);
+
+  const priors = priorsForVertical(config?.vertical);
+
+  // Seed every input from a config row (or clear when null). discount_rate_annual is a fraction
+  // in the DB; the form shows it as a percentage.
+  const seed = (cfg) => {
+    setGm(cfg?.gross_margin != null ? String(round2(Number(cfg.gross_margin) * 100)) : '');
+    setGenome({
+      fixed_costs_monthly:         cfg?.fixed_costs_monthly != null ? String(cfg.fixed_costs_monthly) : '',
+      inventory_days:              cfg?.inventory_days != null ? String(cfg.inventory_days) : '',
+      supplier_payment_terms_days: cfg?.supplier_payment_terms_days != null ? String(cfg.supplier_payment_terms_days) : '',
+      discount_rate_annual:        cfg?.discount_rate_annual != null ? String(round2(Number(cfg.discount_rate_annual) * 100)) : '',
+    });
+    const savedVc = (cfg && cfg.variable_costs) || {};
+    setVc(Object.fromEntries(['shipping','fulfilment','packaging','payPct','payFixed','refundPct']
+      .map(k => [k, savedVc[k] != null ? String(savedVc[k]) : ''])));
+  };
+
+  const load = async () => {
+    if(!authed) return;
+    setLoading(true); setLoadErr('');
+    const jwt = await ASK.getJwt();
+    if(!jwt){ setLoadErr('Your session expired — refresh the page and sign in again.'); setLoading(false); return; }
+    try{
+      const r = await fetch(cfgUrl + '?brand_id=' + encodeURIComponent(ASK.brand_id), {
+        headers:{ 'Authorization':'Bearer '+jwt },
+      });
+      const data = await r.json().catch(()=>({}));
+      if(!r.ok){ setLoadErr(data.detail||data.message||data.error||'Could not load your economics.'); setLoading(false); return; }
+      setConfig(data.config || null);
+      seed(data.config || null);
+    }catch(e){ setLoadErr('Could not reach the server. Try again.'); }
+    setLoading(false);
+  };
+  React.useEffect(()=>{ load(); }, []);   // eslint-disable-line
+
+  // POST a patch (only the keys present are written; omitted keys keep their stored value / prior).
+  const save = async (patch) => {
+    const jwt = await ASK.getJwt();
+    if(!jwt) return { ok:false, data:{ message:'Your session expired — refresh and sign in again.' } };
+    const r = await fetch(cfgUrl, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+jwt },
+      body: JSON.stringify({ brand_id: ASK.brand_id, ...patch }),
+    });
+    const data = await r.json().catch(()=>({}));
+    return { ok:r.ok, data };
+  };
+
+  const num = (s) => { const n = parseFloat(String(s).trim()); return isFinite(n) ? n : null; };
+
+  const saveMargin = async (e) => {
+    e.preventDefault();
+    if(gmBusy) return;
+    const pct = num(gm);
+    if(pct == null || pct <= 0 || pct >= 100){ setGmMsg({ text:'Enter a gross margin between 1 and 99%.', kind:'err' }); return; }
+    setGmBusy(true); setGmMsg(null);
+    const { ok, data } = await save({ gross_margin: round4(pct / 100) });
+    setGmBusy(false);
+    if(!ok){ setGmMsg({ text:data.message||data.detail||data.error||'Save failed.', kind:'err' }); return; }
+    setConfig(data.config); seed(data.config);
+    try { window.dispatchEvent(new Event('oi-config-updated')); } catch(e){}
+    setGmMsg({ text:'Gross margin saved — your numbers switch on at the next engine run.', kind:'ok' });
+  };
+
+  const saveCostStack = async (e) => {
+    e.preventDefault();
+    if(csBusy) return;
+    const patch = {};
+    // Genome: only send fields the operator actually filled with a valid number. Blank/invalid stays
+    // NULL ⇒ engine keeps its prior (source 'prior'). A supplied value flips it to 'brand-entered'.
+    const setNum = (col, raw, xform) => { const n = num(raw); if(n != null) patch[col] = xform ? xform(n) : n; };
+    setNum('fixed_costs_monthly', genome.fixed_costs_monthly);
+    setNum('inventory_days', genome.inventory_days);
+    setNum('supplier_payment_terms_days', genome.supplier_payment_terms_days);
+    setNum('discount_rate_annual', genome.discount_rate_annual, n => round4(n/100)); // % → fraction
+    // variable_costs is a jsonb blob (wholesale replace): build it from every valid non-blank key.
+    const vcOut = {};
+    for(const k of ['shipping','fulfilment','packaging','payPct','payFixed','refundPct']){
+      const n = num(vc[k]); if(n != null) vcOut[k] = n;
+    }
+    if(Object.keys(vcOut).length) patch.variable_costs = vcOut;
+
+    if(!Object.keys(patch).length){ setCsMsg({ text:'Fill in at least one cost to save.', kind:'err' }); return; }
+    setCsBusy(true); setCsMsg(null);
+    const { ok, data } = await save(patch);
+    setCsBusy(false);
+    if(!ok){ setCsMsg({ text:data.message||data.detail||data.error||'Save failed.', kind:'err' }); return; }
+    setConfig(data.config); seed(data.config);
+    try { window.dispatchEvent(new Event('oi-config-updated')); } catch(e){}
+    setCsMsg({ text:'Cost stack saved. Confirmed values now drive the model instead of category estimates.', kind:'ok' });
+  };
+
+  if(!authed){
+    return (<div className="card" style={{padding:'var(--s-7)'}}>
+      <div style={{fontSize:15, fontWeight:650, marginBottom:'var(--s-2)'}}>Business economics</div>
+      <div className="meta" style={{lineHeight:1.6, maxWidth:520}}>
+        Your margin and cost stack live in your signed-in workspace. This is the public demo, so economics is read-only here.
+      </div>
+    </div>);
+  }
+
+  const marginSet = config?.gross_margin != null;
+  const inputStyle = { width:'100%', padding:'9px 12px', fontSize:13, fontFamily:'JetBrains Mono, ui-monospace, monospace', color:'var(--text-primary)', background:'var(--bg-input)', border:'1px solid var(--border-default)', borderRadius:'var(--r-md)' };
+  const msgBox = (m) => m && (<div style={{marginTop:'var(--s-3)', padding:'10px 14px', borderRadius:'var(--r-md)', fontSize:13,
+    color: m.kind==='ok'?'var(--good)':'var(--bad)',
+    background: m.kind==='ok'?'rgba(74,222,128,0.08)':'rgba(248,113,113,0.08)',
+    border:'1px solid '+(m.kind==='ok'?'rgba(74,222,128,0.35)':'rgba(248,113,113,0.35)')}}>{m.text}</div>);
+
+  // Provenance chip: 'your number' when the config has a stored value, else the fallback the engine uses.
+  const Tag = ({ saved, fallback }) => (
+    <span style={{ fontSize:10.5, fontWeight:700, letterSpacing:'.04em', textTransform:'uppercase',
+      color: saved ? 'var(--good)' : (fallback.warn ? 'var(--warn)' : 'var(--text-muted)'),
+      whiteSpace:'nowrap' }}>
+      {saved ? '● your number' : '○ ' + fallback.label}
+    </span>
+  );
+
+  // A single labelled field with a provenance chip and a category-prior placeholder.
+  const Field = ({ label, hint, unit, value, onChange, placeholder, saved, fallback, int }) => (
+    <div style={{display:'flex', flexDirection:'column', gap:5}}>
+      <div style={{display:'flex', alignItems:'baseline', justifyContent:'space-between', gap:'var(--s-2)'}}>
+        <span style={{fontSize:12.5, fontWeight:600}}>{label}</span>
+        <Tag saved={saved} fallback={fallback}/>
+      </div>
+      <div style={{position:'relative', display:'flex', alignItems:'center'}}>
+        <input type="number" inputMode="decimal" step={int?'1':'any'} min="0"
+          value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}
+          style={{...inputStyle, paddingRight:44}}/>
+        <span style={{position:'absolute', right:12, fontSize:11, color:'var(--text-muted)', pointerEvents:'none', fontFamily:'inherit'}}>{unit}</span>
+      </div>
+      {hint && <div className="meta" style={{fontSize:11, lineHeight:1.45}}>{hint}</div>}
+    </div>
+  );
+
+  return (<div style={{display:'flex', flexDirection:'column', gap:'var(--s-7)'}}>
+
+    {loading && <div className="meta" style={{fontSize:12.5}}>Loading your economics…</div>}
+    {loadErr && <div className="meta" style={{fontSize:12.5, color:'var(--bad)'}}>{loadErr}</div>}
+
+    {!loading && !loadErr && (<>
+
+      {/* ── Step 1 — Gross margin (the gate) ── */}
+      <div className="card" style={{padding:'var(--s-7)', borderTop: marginSet ? undefined : '2px solid var(--warn)'}}>
+        <div style={{display:'flex', alignItems:'baseline', gap:'var(--s-2)', flexWrap:'wrap', marginBottom:4}}>
+          <div style={{fontSize:15, fontWeight:650}}>Gross margin</div>
+          <span style={{fontSize:10.5, fontWeight:700, letterSpacing:'.05em', textTransform:'uppercase', color: marginSet?'var(--good)':'var(--warn)'}}>
+            {marginSet ? '● Numbers are ON' : '○ Required — numbers are OFF'}
+          </span>
+        </div>
+        <div className="meta" style={{fontSize:12.5, marginBottom:'var(--s-5)', lineHeight:1.6, maxWidth:640}}>
+          {marginSet
+            ? 'This is the one number your engine can’t read from Shopify. It’s set — every model runs on it.'
+            : 'Until you set this, the engine can’t value anything and skips your brand entirely. It’s COGS-based: what it costs to make or buy the product, as a % of its price. One number switches everything on.'}
+        </div>
+        <form onSubmit={saveMargin} style={{display:'flex', gap:'var(--s-2)', flexWrap:'wrap', alignItems:'center', paddingTop:'var(--s-4)', borderTop:'1px solid var(--color-line, var(--border-subtle))'}}>
+          <div style={{position:'relative', display:'flex', alignItems:'center', flex:'0 1 200px'}}>
+            <input type="number" inputMode="decimal" step="any" min="1" max="99" value={gm} onChange={e=>setGm(e.target.value)}
+              placeholder={'e.g. ' + priors.grossMarginPct} autoFocus={!marginSet}
+              style={{...inputStyle, paddingRight:34}}/>
+            <span style={{position:'absolute', right:12, fontSize:12, color:'var(--text-muted)', pointerEvents:'none'}}>%</span>
+          </div>
+          <button type="submit" className="btn-primary" disabled={gmBusy}
+            style={{padding:'9px 16px', fontSize:13, border:0, borderRadius:'var(--r-md)', cursor:gmBusy?'default':'pointer', fontFamily:'inherit', fontWeight:600, opacity:gmBusy?0.6:1}}>
+            {gmBusy ? 'Saving…' : (marginSet ? 'Update margin' : 'Switch on my numbers →')}
+          </button>
+          <span className="meta" style={{fontSize:11}}>{priors.label} brands typically sit around {priors.grossMarginPct}%.</span>
+        </form>
+        {msgBox(gmMsg)}
+      </div>
+
+      {/* ── Step 2 — Cost stack + cash cycle (optional, sharpens the model) ── */}
+      <div className="card" style={{padding:'var(--s-7)'}}>
+        <div style={{fontSize:15, fontWeight:650, marginBottom:4}}>Cost stack & cash cycle</div>
+        <div className="meta" style={{fontSize:12.5, marginBottom:'var(--s-5)', lineHeight:1.6, maxWidth:640}}>
+          Optional, but each number you confirm replaces a {priors.label.toLowerCase()} category estimate with your own — sharpening contribution, cash-cycle and profitability. Leave a field blank and the estimate stands.
+        </div>
+
+        <form onSubmit={saveCostStack} style={{display:'flex', flexDirection:'column', gap:'var(--s-6)'}}>
+
+          {/* Per-order variable costs */}
+          <div>
+            <div className="micro" style={{color:'var(--accent)', marginBottom:'var(--s-3)'}}>Per-order costs</div>
+            <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:'var(--s-4)'}}>
+              <Field label="Shipping" unit="£" int={false} value={vc.shipping||''} onChange={v=>setVc(s=>({...s, shipping:v}))}
+                placeholder={'~'+priors.vc.shipping} saved={config?.variable_costs?.shipping != null}
+                fallback={{ label:'assumes £0', warn:true }} hint="Outbound delivery you pay per order."/>
+              <Field label="Fulfilment / pick-pack" unit="£" value={vc.fulfilment||''} onChange={v=>setVc(s=>({...s, fulfilment:v}))}
+                placeholder={'~'+priors.vc.fulfilment} saved={config?.variable_costs?.fulfilment != null}
+                fallback={{ label:'assumes £0', warn:true }} hint="3PL / warehouse handling per order."/>
+              <Field label="Packaging" unit="£" value={vc.packaging||''} onChange={v=>setVc(s=>({...s, packaging:v}))}
+                placeholder={'~'+priors.vc.packaging} saved={config?.variable_costs?.packaging != null}
+                fallback={{ label:'assumes £0', warn:true }} hint="Boxes, inserts, mailers per order."/>
+              <Field label="Payment processing" unit="%" value={vc.payPct||''} onChange={v=>setVc(s=>({...s, payPct:v}))}
+                placeholder={'~'+priors.vc.payPct} saved={config?.variable_costs?.payPct != null}
+                fallback={{ label:'assumes 0%', warn:true }} hint="Gateway rate, e.g. 2.4 for 2.4%."/>
+              <Field label="Payment fixed fee" unit="£" value={vc.payFixed||''} onChange={v=>setVc(s=>({...s, payFixed:v}))}
+                placeholder={'~'+priors.vc.payFixed} saved={config?.variable_costs?.payFixed != null}
+                fallback={{ label:'assumes £0', warn:true }} hint="Flat fee per transaction, e.g. £0.25."/>
+              <Field label="Refund / return rate" unit="%" value={vc.refundPct||''} onChange={v=>setVc(s=>({...s, refundPct:v}))}
+                placeholder={'~'+priors.vc.refundPct} saved={config?.variable_costs?.refundPct != null}
+                fallback={{ label:'assumes 0%', warn:true }} hint="% of order value refunded, e.g. 7.4."/>
+            </div>
+          </div>
+
+          {/* Cash cycle + fixed base */}
+          <div>
+            <div className="micro" style={{color:'var(--accent)', marginBottom:'var(--s-3)'}}>Cash cycle & fixed base</div>
+            <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:'var(--s-4)'}}>
+              <Field label="Monthly fixed costs" unit="£/mo" value={genome.fixed_costs_monthly||''} onChange={v=>setGenome(s=>({...s, fixed_costs_monthly:v}))}
+                placeholder={'~'+priors.fixedCostsMonthly} saved={config?.fixed_costs_monthly != null}
+                fallback={{ label:'est. £'+priors.fixedCostsMonthly.toLocaleString() }} hint="Rent, salaries, software — anything that doesn’t scale per order."/>
+              <Field label="Inventory days (DIO)" unit="days" int value={genome.inventory_days||''} onChange={v=>setGenome(s=>({...s, inventory_days:v}))}
+                placeholder={'~'+priors.inventoryDays} saved={config?.inventory_days != null}
+                fallback={{ label:'est. '+priors.inventoryDays+'d' }} hint="Avg days stock is held before it sells."/>
+              <Field label="Supplier terms (DPO)" unit="days" int value={genome.supplier_payment_terms_days||''} onChange={v=>setGenome(s=>({...s, supplier_payment_terms_days:v}))}
+                placeholder={'~'+priors.supplierDays} saved={config?.supplier_payment_terms_days != null}
+                fallback={{ label:'est. '+priors.supplierDays+'d' }} hint="Days you have to pay suppliers. 0 = pay upfront."/>
+              <Field label="Annual discount rate" unit="%" value={genome.discount_rate_annual||''} onChange={v=>setGenome(s=>({...s, discount_rate_annual:v}))}
+                placeholder={'~'+priors.discountRatePct} saved={config?.discount_rate_annual != null}
+                fallback={{ label:'est. '+priors.discountRatePct+'%' }} hint="Cost of capital used to discount future LTV."/>
+            </div>
+          </div>
+
+          <div style={{display:'flex', alignItems:'center', gap:'var(--s-3)', paddingTop:'var(--s-4)', borderTop:'1px solid var(--color-line, var(--border-subtle))'}}>
+            <button type="submit" className="btn-primary" disabled={csBusy}
+              style={{padding:'9px 16px', fontSize:13, border:0, borderRadius:'var(--r-md)', cursor:csBusy?'default':'pointer', fontFamily:'inherit', fontWeight:600, opacity:csBusy?0.6:1}}>
+              {csBusy ? 'Saving…' : 'Save cost stack'}
+            </button>
+            <span className="meta" style={{fontSize:11}}>Blank fields keep the category estimate — nothing is overwritten.</span>
+          </div>
+        </form>
+        {msgBox(csMsg)}
+      </div>
+    </>)}
+  </div>);
+}
+// Small rounding helpers — keep stored fractions tidy (avoid 0.7699999 float noise).
+function round2(n){ return Math.round(Number(n) * 100) / 100; }
+function round4(n){ return Math.round(Number(n) * 10000) / 10000; }
+
+// Global "confirm your gross margin" nudge. gross_margin is the one gate: without it the engine
+// skips the brand (no fit, no actions). We check the config once (via save-brand-config GET) and,
+// if unset, show a dismissible banner at the top of the content column that deep-links to the
+// Business economics panel. Re-checks on 'oi-config-updated' so it clears the instant margin is saved.
+// Silent (renders nothing) in the public demo or once margin is set.
+function MarginNudge(){
+  const ASK = getOIAsk();
+  const authed = !!(ASK && ASK.brand_id && typeof ASK.getJwt==='function' && ASK.endpoint);
+  const [status, setStatus] = React.useState('unknown'); // 'unknown' | 'set' | 'unset'
+  const [dismissed, setDismissed] = React.useState(false);
+
+  const check = React.useCallback(async ()=>{
+    if(!authed) return;
+    try{
+      const jwt = await ASK.getJwt();
+      if(!jwt) return;
+      const base = ASK.endpoint.replace(/\/[^/]*$/, '');
+      const r = await fetch(base + '/save-brand-config?brand_id=' + encodeURIComponent(ASK.brand_id), { headers:{ 'Authorization':'Bearer '+jwt } });
+      const data = await r.json().catch(()=>({}));
+      if(r.ok) setStatus(data.gross_margin_set ? 'set' : 'unset');
+    }catch(e){}
+  }, [authed]); // eslint-disable-line
+
+  React.useEffect(()=>{ check(); }, [check]);
+  React.useEffect(()=>{
+    const h = ()=>check();
+    window.addEventListener('oi-config-updated', h);
+    return ()=>window.removeEventListener('oi-config-updated', h);
+  }, [check]);
+
+  if(!authed || status!=='unset' || dismissed) return null;
+  return (<div style={{
+      display:'flex', alignItems:'center', gap:'var(--s-4)', marginBottom:'var(--s-5)',
+      padding:'12px var(--s-5)', borderRadius:'var(--r-md)',
+      background:'rgba(251,191,36,0.08)', border:'1px solid var(--warn)',
+    }}>
+    <div style={{flex:1, minWidth:0}}>
+      <div style={{fontSize:13.5, fontWeight:650, marginBottom:2}}>Your numbers are switched off</div>
+      <div className="meta" style={{fontSize:12, lineHeight:1.5}}>
+        Confirm your gross margin — the one figure we can’t read from Shopify — and the engine starts valuing every recommendation in £.
+      </div>
+    </div>
+    <button className="btn-primary" onClick={()=>window.__oiNav&&window.__oiNav('settings','economics')}
+      style={{flexShrink:0, padding:'8px 14px', fontSize:12.5, border:0, borderRadius:'var(--r-md)', cursor:'pointer', fontFamily:'inherit', fontWeight:600}}>
+      Confirm gross margin →
+    </button>
+    <button onClick={()=>setDismissed(true)} title="Dismiss for now" aria-label="Dismiss"
+      style={{flexShrink:0, background:'none', border:0, cursor:'pointer', color:'var(--text-muted)', fontSize:16, lineHeight:1, padding:'4px 6px'}}>✕</button>
   </div>);
 }
 
@@ -10572,6 +10916,9 @@ function App(){
 
       {/* Freshness now lives as a compact chip in the app bar (FreshnessChip). */}
       <BrandAgeBanner/>
+
+      {/* Nudge: if gross_margin isn't set, the engine skips this brand — surface it everywhere. */}
+      <MarginNudge/>
 
       {/* Active sub-tab */}
       {activeSubTab.component({start, period, customActive})}
