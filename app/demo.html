@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title>Demo workspace (frkl) — greta</title>
+<title>See Greta live — demo workspace</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;550;600;650;700&display=swap" rel="stylesheet">
@@ -14,6 +14,7 @@
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     background: #F1F5F9; color: #0B132B; min-height: 100vh;
     -webkit-font-smoothing: antialiased;
+    display: flex; flex-direction: column;
   }
   .demo-banner {
     position: sticky; top: 0; z-index: 100;
@@ -30,57 +31,93 @@
   }
   .demo-text { color: #334155; }
   .demo-text b { color: #0B132B; font-weight: 600; }
-  .demo-cta {
-    margin-left: auto; padding: 7px 14px; background: #7C3AED; color: white;
-    text-decoration: none; font-weight: 600; font-size: 12.5px;
-    border-radius: 6px; transition: background 120ms ease;
+  .demo-back {
+    margin-left: auto; color: #7C3AED; text-decoration: none;
+    font-weight: 600; font-size: 12.5px;
   }
-  .demo-cta:hover { background: #6D28D9; }
-  iframe {
-    width: 100%; height: calc(100vh - 50px); border: 0; display: block;
-    background: #F1F5F9;
-  }
-  .demo-fallback {
-    max-width: 720px; margin: 64px auto; padding: 32px;
+  .demo-back:hover { text-decoration: underline; }
+
+  .wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 48px 24px; }
+  .card {
+    max-width: 620px; width: 100%;
     background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px;
-    text-align: center;
+    padding: 40px; text-align: center;
+    box-shadow: 0 1px 2px rgba(11,19,43,0.04), 0 12px 32px -12px rgba(11,19,43,0.12);
   }
-  .demo-fallback h1 { font-size: 22px; font-weight: 650; margin-bottom: 12px; letter-spacing: -.015em; }
-  .demo-fallback p { color: #334155; line-height: 1.6; margin-bottom: 16px; }
-  .demo-fallback a { color: #7C3AED; }
+  .card .eyebrow {
+    font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
+    color: #7C3AED; margin-bottom: 14px;
+  }
+  .card h1 { font-size: 26px; font-weight: 650; letter-spacing: -.02em; margin-bottom: 14px; line-height: 1.2; }
+  .card h1 .accent { color: #7C3AED; }
+  .card p { color: #334155; line-height: 1.65; margin-bottom: 14px; font-size: 15px; }
+  .card p.small { font-size: 13px; color: #64748B; }
+
+  .stat-row {
+    display: flex; gap: 0; justify-content: center; flex-wrap: wrap;
+    margin: 26px 0 30px; border-top: 1px solid #EEF2F7; border-bottom: 1px solid #EEF2F7;
+  }
+  .stat { padding: 18px 22px; }
+  .stat + .stat { border-left: 1px solid #EEF2F7; }
+  .stat-val { font-size: 22px; font-weight: 700; color: #0B132B; letter-spacing: -.01em; }
+  .stat-val.accent { color: #7C3AED; }
+  .stat-label { font-size: 11.5px; color: #64748B; margin-top: 3px; }
+
+  .ctas { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 4px; }
+  .btn {
+    padding: 12px 22px; text-decoration: none; font-weight: 600; font-size: 14px;
+    border-radius: 8px; transition: all 120ms ease; display: inline-block;
+  }
+  .btn-primary { background: #7C3AED; color: #fff; }
+  .btn-primary:hover { background: #6D28D9; }
+  .btn-ghost { background: #fff; color: #334155; border: 1px solid #CBD5E1; }
+  .btn-ghost:hover { border-color: #7C3AED; color: #7C3AED; }
 </style>
 </head>
 <body>
 
 <div class="demo-banner">
-  <span class="demo-tag">Demo workspace</span>
-  <span class="demo-text">
-    This is the live <b>frkl</b> dashboard — our DTC jewellery design partner. Your workspace will look like this once Shopify is connected and the engines have run.
-  </span>
-  <a href="../auth/signup.html" class="demo-cta">Start your free trial →</a>
+  <span class="demo-tag">Demo</span>
+  <span class="demo-text">Greta runs on <b>your</b> connected data — there's no generic sandbox to click through. Here's the fastest way to see it live.</span>
+  <a href="/" class="demo-back">← Back to site</a>
 </div>
 
-<!-- Live frkl dashboard loaded in iframe. Falls back gracefully if the file
-     isn't reachable (e.g. when deployed to a static host without the dashboard
-     bundled alongside). -->
-<iframe id="demo-frame"
-        src="/frkl-live-dashboard.html?v=202607020808"
-        title="frkl design-partner dashboard"
-        onerror="this.style.display='none'; document.getElementById('fallback').style.display='block';"></iframe>
+<div class="wrap">
+  <div class="card">
+    <div class="eyebrow">See it on your own data</div>
+    <h1>The live workspace runs on <span class="accent">real brand data</span>, not a canned tour.</h1>
+    <p>
+      Greta's six specialists observe, diagnose and hand you £-tagged actions from <b>your</b> Shopify, Meta,
+      Klaviyo, Google and GA4 — so the most honest demo is the one on your own numbers. Create your account
+      free and connect Shopify in about 30 seconds; the team starts on your data and your first brief lands
+      the Monday after.
+    </p>
 
-<div id="fallback" class="demo-fallback" style="display:none;">
-  <h1>Demo dashboard not bundled with this deploy</h1>
-  <p>
-    The frkl design-partner dashboard lives in the project root at
-    <code style="background:#F1F5F9; padding:2px 6px; border-radius:4px; font-size:11px;">frkl-live-dashboard.html</code>
-    and needs to be served alongside this site for the iframe to load.
-  </p>
-  <p>
-    In production this would be a curated, sanitised demo bundled with the marketing site. For now you can view the live dashboard directly during local preview.
-  </p>
-  <p style="margin-top:24px;">
-    <a href="../auth/signup.html" style="display:inline-block; padding:10px 20px; background:#7C3AED; color:white; text-decoration:none; font-weight:600; border-radius:6px;">Start your free trial →</a>
-  </p>
+    <div class="stat-row">
+      <div class="stat">
+        <div class="stat-val accent">54.5/62</div>
+        <div class="stat-label">combined capability + edge-case eval</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val">~10 min</div>
+        <div class="stat-label">connection to first insight</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val">8</div>
+        <div class="stat-label">business functions, one screen</div>
+      </div>
+    </div>
+
+    <div class="ctas">
+      <a href="/auth/signup.html" class="btn btn-primary">Create your account free →</a>
+      <a href="/contact.html" class="btn btn-ghost">Book a live walkthrough →</a>
+    </div>
+
+    <p class="small" style="margin-top:22px;">
+      Prefer to see it before connecting anything? A live walkthrough on the design-partner brand's data is
+      available on request — no card, no commitment.
+    </p>
+  </div>
 </div>
 
 </body>
