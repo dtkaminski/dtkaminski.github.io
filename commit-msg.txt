@@ -1,25 +1,21 @@
-feat(connect): route Shopify connect through authenticated connect-start
+feat(marketing): wire self-serve signup into the primary funnel CTAs
 
-The Shopify "Approve on Shopify" action was an <a href> navigation to the
-public GET oauth-shopify-install?shop=..&brand=frkl — unauthenticated, brand
-slug hardcoded, and spoofable via the &brand= param.
+The 5 marketing "Apply for the founding cohort" CTAs all pointed at the gated
+application page (auth/apply.html). The self-serve create-account flow
+(auth/signup.html — email + brand name + auto-derived editable slug, posts to
+the deployed signup edge fn, "check your email" success, claim-aware) already
+existed but was only linked from secondary/internal spots.
 
-It now POSTs connect-start with the user's JWT (provider:'shopify', brand from
-OI_BRAND.slug, shop), which verifies brand_users owner/admin membership, stamps
-metadata.initiated_by_user_id, and returns the provider authorize_url — we then
-send the top window to Shopify's consent screen. Endpoint base is derived from
-OI_ASK.endpoint (no hardcoded project); auth mirrors the BusinessEconomicsPanel
-save path (getOIAsk → ASK.getJwt).
+Repoint the four primary CTAs (nav, hero, self-serve pricing card, final CTA)
+to auth/signup.html with create-account wording ("Get started" / "Create your
+account"), dropping the £750 / 10-spots / 48hr-review framing on those CTAs and
+the final-CTA headline + sub. The Managed price-card CTA still points at
+apply.html, reworded "Apply for Managed (done-for-you) →" — apply.html is
+preserved intact as the done-for-you application. No backend change (signup is
+already deployed + verified); no duplicated signup page.
 
-- Removed the hardcoded SUPABASE_FNS / BRAND_SLUG and the buildInstallUrl GET.
-- Modal button is disabled until a valid *.myshopify.com domain + an authed
-  session; surfaces connect errors and a sign-in nudge.
-
-COORDINATED RELEASE — deploy together with the staged fit-engine guards:
-  oauth-shopify-callback (enforces initiated_by_user_id = owner/admin before it
-  activates) and oauth-shopify-install (hardened / retire candidate). Deploying
-  the callback guard without this change would 403 the old unstamped GET flow.
-
-Rebuilt frkl-app.js via build-app.mjs.
+Note: surrounding narrative (hero eyebrow/sub, pricing section headline,
+<title>) still carries cohort/£750 framing — left for a separate positioning
+pass rather than over-editing marketing copy here.
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
