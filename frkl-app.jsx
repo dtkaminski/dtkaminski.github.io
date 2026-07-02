@@ -10922,6 +10922,28 @@ function App(){
                  style={{background:'transparent', border:'1px solid var(--border-subtle)', borderRadius:6, color: customActive?'var(--text-primary)':'var(--text-muted)', fontSize:11, padding:'3px 6px', colorScheme:'light dark', cursor:'pointer'}}/>
           {customActive && <button onClick={()=>{setRangeStart('');setRangeEnd('');}} title="Clear custom range" style={{background:'transparent',border:'none',color:'var(--text-faint)',cursor:'pointer',fontSize:14,lineHeight:1,padding:'0 2px'}}>×</button>}
         </div>
+        {(() => {
+          // Sign out — only in an authenticated workspace (OI_ASK present); hidden in the
+          // public demo, where there's no session to end. Clears the Supabase session and
+          // sends the whole page (this dashboard runs in a same-origin iframe) to the homepage.
+          const ask = getOIAsk();
+          const authed = !!(ask && ask.brand_id && typeof ask.getJwt === 'function');
+          if (!authed) return null;
+          const signOut = async () => {
+            try { const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb; if (sb && sb.auth) await sb.auth.signOut(); } catch (e) { /* fall through to hard-clear */ }
+            try {
+              // Belt-and-braces so the user is fully logged out even if the client instance
+              // wasn't reachable: drop any persisted Supabase session + the demo passcode gate.
+              Object.keys(localStorage).forEach(k => { if (/^sb-.*-auth-token$/.test(k)) localStorage.removeItem(k); });
+              localStorage.removeItem('oi_gate_v1');
+            } catch (e) {}
+            (window.top || window).location.href = '/';
+          };
+          return (<button onClick={signOut} title="Sign out" aria-label="Sign out"
+            style={{background:'transparent', border:'1px solid var(--border-subtle)', borderRadius:6, color:'var(--text-muted)', fontSize:12, fontWeight:600, padding:'4px 10px', marginLeft:'var(--s-1)', cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap'}}>
+            Sign out
+          </button>);
+        })()}
       </div>
     </div>
 

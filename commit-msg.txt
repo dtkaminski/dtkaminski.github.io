@@ -1,26 +1,16 @@
-feat(marketing): self-serve-first narrative + signup error-UX polish
+feat(dashboard): add Sign out to the greta app bar
 
-index.html — reframe to self-serve-first with Managed as a secondary
-done-for-you tier, removing the scarcity framing that contradicted the live
-create-account CTAs:
-- <title>, meta description, hero eyebrow/sub/trust, pricing headline + sub,
-  the "why" paragraph and the first FAQ now lead with "create your account free
-  / connect Shopify"; Managed (£750/mo) is framed as the done-for-you option,
-  not a gated cohort.
-- Stripped "10 spots", "48hr review", "founding cohort", "onboarding 10 brands",
-  "launching once the cohort is full". Managed card badge 'Apply now' →
-  'Done-for-you'; tier label 'founding cohort' → 'done-for-you'.
-- Kept the factual £750 Managed price and the frkl-as-design-partner history.
-  Paid self-serve plans stay truthfully marked Q3 2026 (account creation is the
-  live/free path; the £99/£249/£599 tiers are not yet live).
+The only logout lived in the /app shell header, which is hidden once the rich
+dashboard iframe takes over — so a signed-in user had no visible way to sign
+out. Add a "Sign out" button to the dashboard app bar (far right), shown only
+in an authenticated workspace (OI_ASK present; hidden in the public demo where
+there's no session to end).
 
-auth/signup.html — map signup error codes to clean copy:
-- slug_taken → "That handle's taken — pick another." + auto-open the Advanced
-  panel, prefill the rejected handle, focus + select it for a one-edit retry.
-- invalid_brand_slug / invalid_email / invalid_brand_name → clean messages that
-  focus the offending field. Unknown errors fall back to the server message.
+On click: end the Supabase session (window.FRKL_LIVE.sb.auth.signOut(), with a
+belt-and-braces localStorage clear of the sb-*-auth-token + demo passcode gate
+so logout holds even if the client instance isn't reachable), then send the top
+window (this dashboard runs in a same-origin iframe) to the homepage (/).
 
-Static pages — no build. index.html edits are text / CSS-label only (no
-structural changes); signup.html adds an error-branch mapping (braces balanced).
+Rebuilt frkl-app.js via build-app.mjs.
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
