@@ -20,7 +20,7 @@
   <div class="auth-card">
     <div id="form-state">
       <h1>Log in</h1>
-      <p class="lead">Enter your email — we'll send you a magic link. No passwords. Sessions last 7 days.</p>
+      <p class="lead">Enter your email — we'll email you a 6-digit code (and a sign-in link). No passwords. Sessions last 7 days.</p>
 
       <form id="login-form">
         <label>Email
@@ -28,7 +28,7 @@
         </label>
 
         <button type="submit" class="btn-primary" id="submit-btn">
-          <span class="btn-label">Send magic link</span>
+          <span class="btn-label">Email me a code</span>
         </button>
 
         <div id="error-box" class="error-box" hidden></div>
@@ -42,7 +42,14 @@
     <div id="success-state" hidden>
       <div class="success-icon">✓</div>
       <h1>Check your email</h1>
-      <p class="lead">We sent a sign-in link to <b id="success-email"></b>. Click it to log in.</p>
+      <p class="lead">We emailed a 6-digit code to <b id="success-email"></b>. Enter it below — or just click the sign-in link in the same email.</p>
+      <form id="code-form">
+        <label>6-digit code
+          <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="6" placeholder="123456" />
+        </label>
+        <button type="submit" class="btn-primary" id="verify-btn"><span class="btn-label">Verify &amp; sign in</span></button>
+        <div id="code-error" class="error-box" hidden></div>
+      </form>
       <p class="fine-print">Didn't arrive in 60 seconds? <a href="#" id="resend-link">Resend</a> · check spam · or <a href="mailto:hello@operatorintelligence.com">contact support</a>.</p>
     </div>
   </div>
@@ -103,7 +110,7 @@
       errorBox.textContent = error.message || 'Could not send link. Try again.';
       errorBox.hidden = false;
       submitBtn.disabled = false;
-      submitBtn.querySelector('.btn-label').textContent = 'Send magic link';
+      submitBtn.querySelector('.btn-label').textContent = 'Email me a code';
       return;
     }
 
@@ -117,6 +124,26 @@
       await sendMagicLink(email);
       e.target.textContent = 'Resent ✓';
     });
+  });
+
+  // Verify the emailed 6-digit code — robust against link prefetch, reused/old links, and cross-device.
+  document.getElementById('code-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const codeErr = document.getElementById('code-error');
+    const verifyBtn = document.getElementById('verify-btn');
+    codeErr.hidden = true;
+    const email = document.getElementById('success-email').textContent.trim();
+    const token = (e.target.code.value || '').trim();
+    if (!/^\d{6}$/.test(token)) { codeErr.textContent = 'Enter the 6-digit code from your email.'; codeErr.hidden = false; return; }
+    verifyBtn.disabled = true; verifyBtn.querySelector('.btn-label').textContent = 'Verifying…';
+    const { error } = await sb.auth.verifyOtp({ email, token, type: 'email' });
+    if (error) {
+      codeErr.textContent = error.message || 'That code is invalid or expired — request a new one.';
+      codeErr.hidden = false;
+      verifyBtn.disabled = false; verifyBtn.querySelector('.btn-label').textContent = 'Verify & sign in';
+      return;
+    }
+    window.location.replace(NEXT || './workspace.html');
   });
 </script>
 </body>
