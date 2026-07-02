@@ -10115,10 +10115,15 @@ const MOBILE_NAV = [
 
 // ── Connections panel — shows OAuth status per source + install actions ─────
 function ConnectionsPanel(){
-  // The Supabase project is awcncqvsnuhqyihpdgcx — install URLs route through
-  // its edge functions. The brand slug for this workspace is 'frkl'.
-  const SUPABASE_FNS = 'https://awcncqvsnuhqyihpdgcx.supabase.co/functions/v1';
-  const BRAND_SLUG = 'frkl';
+  // Authenticated connect flow: POST connect-start with the user's JWT. connect-start
+  // verifies brand_users owner/admin membership, stamps the initiator, and returns the
+  // provider authorize_url we navigate to — replacing the old unauthenticated GET
+  // oauth-*-install (whose &brand= slug was spoofable). The functions base is derived
+  // from OI_ASK.endpoint (no hardcoded project); the brand slug from OI_BRAND.
+  const ASK = getOIAsk();
+  const authed = !!(ASK && ASK.brand_id && typeof ASK.getJwt==='function' && ASK.endpoint);
+  const fnBase = authed ? ASK.endpoint.replace(/\/[^/]*$/, '') : '';
+  const brandSlug = (OI_BRAND && OI_BRAND.slug) || 'frkl';
 
   // Derive "live" status from the existing data-recency signal until we have
   // an authenticated client-side query against the connections table.
@@ -10139,7 +10144,6 @@ function ConnectionsPanel(){
       description: 'Orders, products, inventory, customers',
       last: lastDate(D.shopify),
       installable: true,
-      buildInstallUrl: (shop) => `${SUPABASE_FNS}/oauth-shopify-install?shop=${encodeURIComponent(shop)}&brand=${BRAND_SLUG}`,
     },
     {
       id: 'meta', name: 'Meta Ads', icon: 'M',
@@ -10183,6 +10187,38 @@ function ConnectionsPanel(){
 
   const [shopDomain, setShopDomain] = useState('');
   const [showShopifyForm, setShowShopifyForm] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [connectErr, setConnectErr] = useState('');
+  const shopValid = /^[a-zA-Z0-9][a-zA-Z0-9-]*\.myshopify\.com$/.test(shopDomain.trim());
+
+  // Start the OAuth flow through the authenticated connect-start endpoint, then send the
+  // TOP window (this dashboard is a same-origin iframe) to Shopify's consent screen. The
+  // callback refuses to activate any connection whose initiator isn't an authorized owner.
+  const startShopifyConnect = async () => {
+    if (!authed) { setConnectErr('Sign in to connect a store.'); return; }
+    if (!shopValid) { setConnectErr('Enter a valid *.myshopify.com domain.'); return; }
+    setConnecting(true); setConnectErr('');
+    let jwt = '';
+    try { jwt = await ASK.getJwt(); } catch (e) { jwt = ''; }
+    if (!jwt) { setConnectErr('Your session expired — refresh the page and sign in again.'); setConnecting(false); return; }
+    try {
+      const r = await fetch(fnBase + '/connect-start', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+jwt },
+        body: JSON.stringify({ provider:'shopify', brand: brandSlug, shop: shopDomain.trim().toLowerCase() }),
+      });
+      const data = await r.json().catch(()=>({}));
+      if (!r.ok || !data.authorize_url) {
+        setConnectErr(data.message || data.error || 'Could not start the Shopify connection.');
+        setConnecting(false);
+        return;
+      }
+      (window.top || window).location.href = data.authorize_url;  // leaves the page → no need to clear `connecting`
+    } catch (e) {
+      setConnectErr('Could not reach the server. Try again.');
+      setConnecting(false);
+    }
+  };
 
   return (<div style={{display:'flex', flexDirection:'column', gap:'var(--s-7)'}}>
 
@@ -10250,17 +10286,19 @@ function ConnectionsPanel(){
           placeholder="e.g. frkl.myshopify.com" autoFocus
           style={{fontFamily:'JetBrains Mono, ui-monospace, monospace', fontSize:12.5}}/>
         <div className="row">
-          <a href={shopDomain && /^[a-zA-Z0-9][a-zA-Z0-9-]*\.myshopify\.com$/.test(shopDomain.trim()) ? sources[0].buildInstallUrl(shopDomain.trim()) : '#'}
-            className="primary"
+          <button onClick={startShopifyConnect}
+            disabled={!shopValid || !authed || connecting}
             style={{
-              padding:'8px 14px', borderRadius:'var(--r-sm)', cursor:'pointer', fontSize:12, fontWeight:600,
-              background: shopDomain ? 'var(--accent)' : 'var(--border-default)',
-              color: shopDomain ? 'white' : 'var(--text-muted)',
-              border:0, textDecoration:'none', pointerEvents: shopDomain ? 'auto' : 'none',
-            }}
-            target="_top">Approve on Shopify →</a>
+              padding:'8px 14px', borderRadius:'var(--r-sm)', fontSize:12, fontWeight:600, fontFamily:'inherit',
+              cursor:(shopValid && authed && !connecting) ? 'pointer' : 'not-allowed',
+              background:(shopValid && authed) ? 'var(--accent)' : 'var(--border-default)',
+              color:(shopValid && authed) ? 'white' : 'var(--text-muted)',
+              border:0,
+            }}>{connecting ? 'Starting…' : 'Approve on Shopify →'}</button>
           <button onClick={()=>setShowShopifyForm(false)} style={{marginLeft:'auto'}}>Cancel</button>
         </div>
+        {connectErr && <div style={{marginTop:'var(--s-3)', fontSize:12, color:'var(--bad)'}}>{connectErr}</div>}
+        {!authed && <div style={{marginTop:'var(--s-3)', fontSize:11.5, color:'var(--text-muted)'}}>You need to be signed in to connect a store.</div>}
         <div className="hint">
           <b>What happens next:</b> Shopify shows you the requested scopes. After approving, you'll land back here with a "Connected" confirmation. The first data sync runs immediately and Monday-morning refreshes from then on.
           <br/><br/>

@@ -1,35 +1,25 @@
-feat(multi-tenant): render live dashboard for any brand (de-frkl P1)
+feat(connect): route Shopify connect through authenticated connect-start
 
-The rich dashboard was gated to a one-entry allow-list (RICH_DASH = {frkl}),
-so every other tenant fell through to the placeholder panels and never loaded
-the live view. And the brand slug was never threaded into the same-origin
-iframe, so the embedded data loader defaulted to frkl's data and the app copy
-/ LLM prompts rendered frkl's name, vertical and markets for everyone.
+The Shopify "Approve on Shopify" action was an <a href> navigation to the
+public GET oauth-shopify-install?shop=..&brand=frkl — unauthenticated, brand
+slug hardcoded, and spoofable via the &brand= param.
 
-Shell (app/index.html):
-- Un-gate: every connected brand now loads frkl-live-dashboard.html inline
-  (?v= just pins the cache); brand identity comes from the OI_* globals below.
-- Inject per-tenant identity on the parent window before setting the iframe
-  src: window.OI_BRAND_SLUG = currentBrand.slug and window.OI_BRAND =
-  {name, slug, vertical, markets, seasonality}. markets/seasonality read from
-  brands.metadata (primary_markets); added metadata to the brand select.
+It now POSTs connect-start with the user's JWT (provider:'shopify', brand from
+OI_BRAND.slug, shop), which verifies brand_users owner/admin membership, stamps
+metadata.initiated_by_user_id, and returns the provider authorize_url — we then
+send the top window to Shopify's consent screen. Endpoint base is derived from
+OI_ASK.endpoint (no hardcoded project); auth mirrors the BusinessEconomicsPanel
+save path (getOIAsk → ASK.getJwt).
 
-Iframe readers (mirror the existing OI_ASK window.parent fallback):
-- frkl-app.jsx: OI_BRAND reads own window, then window.parent.OI_BRAND, then
-  the frkl default (standalone/demo unchanged).
-- frkl-data-loader.js: OI_BRAND_SLUG same parent fallback; without it the
-  loader silently loaded frkl's tenant data for every brand.
+- Removed the hardcoded SUPABASE_FNS / BRAND_SLUG and the buildInstallUrl GET.
+- Modal button is disabled until a valid *.myshopify.com domain + an authed
+  session; surfaces connect errors and a sign-in nudge.
 
-Static fit snapshot:
-- Stop shipping frkl-fit.js as a shared default — it baked in one brand's
-  OMF 100 / PMF 90 and rendered for every tenant and the unauthed demo. Removed
-  the <script> include; fit now comes live per brand from assess-fit
-  (useFitResult), with the panel's loading/empty state until it resolves.
+COORDINATED RELEASE — deploy together with the staged fit-engine guards:
+  oauth-shopify-callback (enforces initiated_by_user_id = owner/admin before it
+  activates) and oauth-shopify-install (hardened / retire candidate). Deploying
+  the callback guard without this change would 403 the old unstamped GET flow.
 
 Rebuilt frkl-app.js via build-app.mjs.
-
-Note: the Shopify connect button still points at the legacy oauth-shopify-install
-GET with the (now correct) slug; moving it to the authenticated connect-start
-path is tracked separately.
 
 Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
