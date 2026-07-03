@@ -76,10 +76,10 @@
     <div id="success-state" hidden>
       <div class="success-icon">✓</div>
       <h1 id="success-title">Enter your code</h1>
-      <p class="lead">Workspace <b><span id="success-brand"></span></b> created. We emailed a 6-digit code to <b id="success-email"></b> — enter it to finish and land in your workspace.</p>
+      <p class="lead">Workspace <b><span id="success-brand"></span></b> created. We emailed a login code to <b id="success-email"></b> — enter it to finish and land in your workspace.</p>
       <form id="code-form">
-        <label>6-digit code
-          <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="6" placeholder="123456" />
+        <label>login code
+          <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="10" placeholder="123456" />
         </label>
         <button type="submit" class="btn-primary" id="verify-btn"><span class="btn-label">Verify &amp; enter workspace</span></button>
         <div id="code-error" class="error-box" hidden></div>
@@ -227,7 +227,7 @@
       signupSlug = data.brand.slug;
       document.getElementById('success-email').textContent = signupEmail;
       document.getElementById('success-brand').textContent = data.brand.name;
-      // Send the 6-digit code — same robust flow as login, no fragile invite link.
+      // Send the login code — same robust flow as login, no fragile invite link.
       await sb.auth.signInWithOtp({ email: signupEmail });
       formState.hidden = true;
       successState.hidden = false;
@@ -240,14 +240,14 @@
     }
   });
 
-  // Verify the 6-digit code and enter the workspace.
+  // Verify the login code and enter the workspace.
   document.getElementById('code-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const codeErr = document.getElementById('code-error');
     const verifyBtn = document.getElementById('verify-btn');
     codeErr.hidden = true;
-    const token = (e.target.code.value || '').trim();
-    if (!/^\d{6}$/.test(token)) { codeErr.textContent = 'Enter the 6-digit code from your email.'; codeErr.hidden = false; return; }
+    const token = (e.target.code.value || '').replace(/\D/g, '');
+    if (token.length < 6) { codeErr.textContent = 'Enter the code from your email.'; codeErr.hidden = false; return; }
     verifyBtn.disabled = true; verifyBtn.querySelector('.btn-label').textContent = 'Verifying…';
     const { error } = await sb.auth.verifyOtp({ email: signupEmail, token, type: 'email' });
     if (error) {
