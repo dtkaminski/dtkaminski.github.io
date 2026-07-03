@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;550;600;650;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./auth.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 </head>
 <body>
 <div class="auth-wrap">
@@ -60,7 +61,7 @@
         </details>
 
         <button type="submit" class="btn-primary" id="submit-btn">
-          <span class="btn-label">Create workspace → send me a magic link</span>
+          <span class="btn-label">Create workspace → email me a code</span>
         </button>
 
         <div id="error-box" class="error-box" hidden></div>
@@ -74,18 +75,16 @@
 
     <div id="success-state" hidden>
       <div class="success-icon">✓</div>
-      <h1 id="success-title">Check your email</h1>
-      <p class="lead"><span id="success-action-line">We sent a magic link to</span> <b id="success-email"></b>. Click it to finish setup and land in your workspace.</p>
-      <div class="info-box">
-        <div class="info-box-title" id="success-steps-title">What happens next</div>
-        <ol id="success-steps">
-          <li>Click the magic link in the email (check spam if it's not in your inbox in 60 seconds)</li>
-          <li>You'll land in your <b><span id="success-brand"></span></b> workspace</li>
-          <li>Connect Shopify in Settings → Connections (~30 seconds via OAuth)</li>
-          <li>Your first weekly brief lands Monday morning</li>
-        </ol>
-      </div>
-      <p class="fine-print">Didn't arrive? <a href="#" id="resend-link">Resend</a> or <a href="mailto:hello@operatorintelligence.com">contact support</a>.</p>
+      <h1 id="success-title">Enter your code</h1>
+      <p class="lead">Workspace <b><span id="success-brand"></span></b> created. We emailed a 6-digit code to <b id="success-email"></b> — enter it to finish and land in your workspace.</p>
+      <form id="code-form">
+        <label>6-digit code
+          <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="6" placeholder="123456" />
+        </label>
+        <button type="submit" class="btn-primary" id="verify-btn"><span class="btn-label">Verify &amp; enter workspace</span></button>
+        <div id="code-error" class="error-box" hidden></div>
+      </form>
+      <p class="fine-print">Didn't arrive in 60 seconds? <a href="#" id="resend-link">Resend</a> · check spam · or <a href="mailto:hello@operatorintelligence.com">contact support</a>.</p>
     </div>
   </div>
 
@@ -97,6 +96,10 @@
 
 <script>
   const SUPABASE_FNS = 'https://awcncqvsnuhqyihpdgcx.supabase.co/functions/v1';
+  const SUPABASE_URL = 'https://awcncqvsnuhqyihpdgcx.supabase.co';
+  const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_6NLIq1JL_LZIMjez3FmnVQ_JIVw3-A2';
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+  let signupEmail = '', signupSlug = '';
 
   const form = document.getElementById('signup-form');
   const submitBtn = document.getElementById('submit-btn');
@@ -160,7 +163,7 @@
       errorBox.textContent = 'Brand name must produce a valid handle. Try a longer name or set one manually under Advanced.';
       errorBox.hidden = false;
       submitBtn.disabled = false;
-      submitBtn.querySelector('.btn-label').textContent = 'Create workspace → send me a magic link';
+      submitBtn.querySelector('.btn-label').textContent = 'Create workspace → email me a code';
       return;
     }
 
@@ -216,35 +219,51 @@
         errorBox.textContent = msg;
         errorBox.hidden = false;
         submitBtn.disabled = false;
-        submitBtn.querySelector('.btn-label').textContent = 'Create workspace → email me a magic link';
+        submitBtn.querySelector('.btn-label').textContent = 'Create workspace → email me a code';
         return;
       }
 
-      document.getElementById('success-email').textContent = data.user.email;
+      signupEmail = data.user.email;
+      signupSlug = data.brand.slug;
+      document.getElementById('success-email').textContent = signupEmail;
       document.getElementById('success-brand').textContent = data.brand.name;
-
-      // Customise success state based on whether we created or claimed
-      if (data.action === 'claimed') {
-        document.getElementById('success-title').textContent = `Workspace claimed`;
-        document.getElementById('success-action-line').textContent = `Found existing '${data.brand.name}' workspace and linked you as owner. Magic link sent to`;
-        document.getElementById('success-steps-title').textContent = 'Your existing workspace is ready';
-        document.getElementById('success-steps').innerHTML = `
-          <li>Click the magic link in the email (check spam if not in inbox in 60s)</li>
-          <li>You'll land in your existing <b>${data.brand.name}</b> workspace</li>
-          <li>All existing data, connections, and findings are immediately visible</li>
-          <li>Next Monday's brief lands as scheduled</li>
-        `;
-      } else {
-        // 'created' path — default copy applies
-      }
+      // Send the 6-digit code — same robust flow as login, no fragile invite link.
+      await sb.auth.signInWithOtp({ email: signupEmail });
       formState.hidden = true;
       successState.hidden = false;
+      setTimeout(() => { const ci = document.querySelector('#code-form input[name=code]'); if (ci) ci.focus(); }, 50);
     } catch (err) {
       errorBox.textContent = `Network error: ${err.message || err}`;
       errorBox.hidden = false;
       submitBtn.disabled = false;
-      submitBtn.querySelector('.btn-label').textContent = 'Create workspace → email me a magic link';
+      submitBtn.querySelector('.btn-label').textContent = 'Create workspace → email me a code';
     }
+  });
+
+  // Verify the 6-digit code and enter the workspace.
+  document.getElementById('code-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const codeErr = document.getElementById('code-error');
+    const verifyBtn = document.getElementById('verify-btn');
+    codeErr.hidden = true;
+    const token = (e.target.code.value || '').trim();
+    if (!/^\d{6}$/.test(token)) { codeErr.textContent = 'Enter the 6-digit code from your email.'; codeErr.hidden = false; return; }
+    verifyBtn.disabled = true; verifyBtn.querySelector('.btn-label').textContent = 'Verifying…';
+    const { error } = await sb.auth.verifyOtp({ email: signupEmail, token, type: 'email' });
+    if (error) {
+      codeErr.textContent = error.message || 'That code is invalid or expired — tap Resend for a new one.';
+      codeErr.hidden = false;
+      verifyBtn.disabled = false; verifyBtn.querySelector('.btn-label').textContent = 'Verify & enter workspace';
+      return;
+    }
+    window.location.href = './workspace.html?brand=' + encodeURIComponent(signupSlug);
+  });
+
+  // Resend a fresh code.
+  document.getElementById('resend-link').addEventListener('click', async (e) => {
+    e.preventDefault();
+    await sb.auth.signInWithOtp({ email: signupEmail });
+    e.target.textContent = 'Resent ✓';
   });
 </script>
 </body>
