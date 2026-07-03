@@ -599,7 +599,7 @@
           </div>
           <div>
             ${isActive
-              ? `<button class="btn-ghost" style="padding:6px 12px; font-size:12px;" data-provider="${p.id}">Reconnect</button>`
+              ? `<a href="../auth/workspace.html" class="btn-ghost" style="padding:6px 12px; font-size:12px; text-decoration:none;" data-provider="${p.id}">Reconnect</a>`
               : (p.installable
                   ? `<a href="../auth/workspace.html" class="btn-primary" style="padding:6px 12px; font-size:12px; text-decoration:none;">Set up →</a>`
                   : `<span class="meta" style="font-size:11px;">Coming soon</span>`)
