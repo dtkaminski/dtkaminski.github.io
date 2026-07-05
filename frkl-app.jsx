@@ -3481,7 +3481,7 @@ function FitCard({start, end}){
       <div style={{display:'flex',gap:6,alignItems:'center'}}>
         {source==='live'
           ? <span className="pill" style={{background:'rgba(52,211,153,.13)',color:'#34d399'}} title={'Live engine output'+(FIT.window?` · window ${FIT.window.start} → ${FIT.window.end}`:'')}>live</span>
-          : <span className="pill" style={{background:'rgba(148,148,160,.14)',color:'var(--text-faint)'}} title={(error?('Live fetch failed ('+error+') — showing cached snapshot. '):'')+'Log in as a frkl user (dan@myfrkl.com) to load live engine output'}>cached</span>}
+          : <span className="pill" style={{background:'rgba(148,148,160,.14)',color:'var(--text-faint)'}} title={(error?('Live fetch failed ('+error+') — showing cached snapshot. '):'')+'Log in to load your live engine output'}>cached</span>}
         <span className="pill" style={{background:fitConfColor(FIT.confidence)+'22',color:fitConfColor(FIT.confidence)}}>{FIT.confidence} confidence</span>
       </div>
     </div>
@@ -7334,7 +7334,7 @@ function buildAskContext(){
     note: 'GUARDRAIL (must reflect in confidence + caveats): when answering about a recent window, treat the latest date as a PARTIAL/incomplete day if partialLatestDay is true — never read a partial-window dip as a real decline; compare complete days only (≤ lastCompleteDate) or say the period is still in progress. If the window in question has under ~60 orders (see recentDailyOrders), treat CVR/AOV swings as possible sampling noise and lower confidence accordingly.',
   };
   const ctx = {
-    _meta: { brand:'frkl', currency:'GBP', captured:D.meta?.captured, range:D.meta?.range,
+    _meta: { brand: OI_BRAND.slug, currency:'GBP', captured:D.meta?.captured, range:D.meta?.range,
       data_dictionary: {
         metaDaily: 'Meta paid daily: {date,cost,impressions,linkCtr,purchases,purchaseValue}',
         googleAds: 'Google paid daily: {date,cost,clicks,impressions,conversions,convValue}',
