@@ -1334,17 +1334,25 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-07-03",
-   "cost": 176.01,
-   "impressions": 18000,
+   "cost": 176.1,
+   "impressions": 18004,
    "linkCtr": 0.0252,
    "purchases": 7,
    "purchaseValue": 389.81
   },
   {
    "date": "2026-07-04",
-   "cost": 10.25,
-   "impressions": 1006,
-   "linkCtr": 0.0298,
+   "cost": 199.52,
+   "impressions": 20537,
+   "linkCtr": 0.0248,
+   "purchases": 5,
+   "purchaseValue": 665.9
+  },
+  {
+   "date": "2026-07-05",
+   "cost": 10.7,
+   "impressions": 1290,
+   "linkCtr": 0.0279,
    "purchases": null,
    "purchaseValue": null
   }
@@ -4029,25 +4037,36 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-07-03",
-   "sessions": 668,
+   "sessions": 667,
    "engagedSessions": 311,
-   "engagementRate": 0.4656,
+   "engagementRate": 0.4663,
    "addToCarts": 93,
    "checkouts": 18,
    "purchases": 15,
    "revenue": 1145.48,
-   "bounceRate": 0.5344
+   "bounceRate": 0.5337
   },
   {
    "date": "2026-07-04",
-   "sessions": 11,
+   "sessions": 827,
+   "engagedSessions": 340,
+   "engagementRate": 0.4111,
+   "addToCarts": 129,
+   "checkouts": 16,
+   "purchases": 6,
+   "revenue": 816.63,
+   "bounceRate": 0.5889
+  },
+  {
+   "date": "2026-07-05",
+   "sessions": 18,
    "engagedSessions": 4,
-   "engagementRate": 0.3636,
+   "engagementRate": 0.2222,
    "addToCarts": 1,
    "checkouts": 0,
    "purchases": 0,
    "revenue": 0,
-   "bounceRate": 0.6364
+   "bounceRate": 0.7778
   }
  ],
  "klaviyo": [
@@ -5463,11 +5482,11 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-06-05",
-   "recipients": 108,
-   "opens": 919,
-   "clicks": 48,
+   "recipients": 101,
+   "opens": 648,
+   "clicks": 42,
    "openRate": 1,
-   "clickRate": 0.4444,
+   "clickRate": 0.4158,
    "orders": 6,
    "orderValue": 217.94
   },
@@ -5753,13 +5772,23 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-07-04",
-   "recipients": 16,
-   "opens": 358,
-   "clicks": 12,
+   "recipients": 10346,
+   "opens": 6201,
+   "clicks": 302,
+   "openRate": 0.5994,
+   "clickRate": 0.0292,
+   "orders": 12,
+   "orderValue": 1427.65
+  },
+  {
+   "date": "2026-07-05",
+   "recipients": 7,
+   "opens": 670,
+   "clicks": 22,
    "openRate": 1,
-   "clickRate": 0.75,
-   "orders": 1,
-   "orderValue": 85
+   "clickRate": 1,
+   "orders": 0,
+   "orderValue": 0
   }
  ],
  "shopify": [
@@ -7295,12 +7324,12 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-07-04",
-   "totalSales": 85.0,
-   "netSales": 35.0,
-   "orders": 1,
-   "discounts": 50.0,
+   "totalSales": 1400.37,
+   "netSales": 1263.87,
+   "orders": 11,
+   "discounts": 136.5,
    "returns": 0.0,
-   "aov": 85.0
+   "aov": 127.31
   }
  ],
  "shopifyWholesale": [
@@ -9024,6 +9053,15 @@ window.FRKL_DATA = {
    "discounts": 164.53,
    "returns": 0.0,
    "aov": 0.0
+  },
+  {
+   "date": "2026-07-04",
+   "totalSales": 0.0,
+   "netSales": -80.0,
+   "orders": 1,
+   "discounts": 80.0,
+   "returns": 0.0,
+   "aov": 0.0
   }
  ],
  "shopifyOther": [
@@ -10723,12 +10761,12 @@ window.FRKL_DATA = {
   },
   {
    "date": "2026-07-04",
-   "totalSales": 85.0,
-   "netSales": 35.0,
-   "orders": 1,
-   "discounts": 50.0,
+   "totalSales": 1400.37,
+   "netSales": 1183.87,
+   "orders": 12,
+   "discounts": 216.5,
    "returns": 0.0,
-   "aov": 85.0
+   "aov": 116.7
   }
  ],
  "shopifyByChannel": [
@@ -15476,10 +15514,22 @@ window.FRKL_DATA = {
    "date": "2026-07-04",
    "channel": "Online Store",
    "stream": "dtc",
-   "totalSales": 85.0,
-   "netSales": 35.0,
+   "totalSales": 1400.37,
+   "netSales": 1263.87,
+   "orders": 11,
+   "discounts": 136.5,
+   "returns": 0.0,
+   "shipping": 0.0,
+   "tax": 0.0
+  },
+  {
+   "date": "2026-07-04",
+   "channel": "Draft Orders",
+   "stream": "gifting",
+   "totalSales": 0.0,
+   "netSales": -80.0,
    "orders": 1,
-   "discounts": 50.0,
+   "discounts": 80.0,
    "returns": 0.0,
    "shipping": 0.0,
    "tax": 0.0
