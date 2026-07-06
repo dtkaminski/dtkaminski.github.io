@@ -54,7 +54,28 @@
 
   // ── Bootstrap ─────────────────────────────────────────────────────────────
 
+  // ── De-frkl: neutralise static-only globals for non-frkl brands ──────────────
+  // The static frkl-*.js files set these globals to frkl's snapshot as the DEFAULT, and
+  // there is no live per-brand source for them yet. For any brand other than frkl, null them
+  // so each panel falls to its own empty state instead of showing frkl's data. frkl itself
+  // returns early here, so its curated dashboard is completely unaffected. Remove entries as
+  // live per-brand sources come online. See [[cache-bust-regex-hazard]] for why we edit plainly.
+  function neutraliseStaticOnlyForNonFrkl() {
+    if (BRAND_SLUG === 'frkl') return;
+    window.FRKL_COHORTS = null;          // Cohorts + ProductRetentionMatrix
+    window.FRKL_RETENTION = null;        // Retention worklist
+    window.FRKL_CREATIVE_VISION = null;  // Creative vision analysis
+    window.FRKL_CREATORS = null;         // Creator candidate discovery
+    if (window.FRKL_BUSINESS && typeof window.FRKL_BUSINESS === 'object') {
+      // Empty only the inventory subtrees; leave the rest of FRKL_BUSINESS for later phases.
+      window.FRKL_BUSINESS = Object.assign({}, window.FRKL_BUSINESS, { inventory: [], inventorySummary: {} });
+    }
+  }
+
   async function bootstrap() {
+    // De-frkl static-only globals before anything renders live (frkl is a no-op).
+    neutraliseStaticOnlyForNonFrkl();
+    dispatchUpdate();
     // 1. Wait for supabase-js to be on window
     if (!window.supabase) {
       console.warn('[frkl-live] supabase-js not loaded — staying in static mode');
