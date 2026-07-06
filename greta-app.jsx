@@ -522,31 +522,33 @@ function CostSetupModal({catalogueGm, onClose}){
         {hint && <span className="micro" style={{color:'var(--text-faint)', marginLeft:4}}>{hint}</span>}
       </div>
     </div>);
-  return (<div className="modal-bg" onClick={onClose}>
-    <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:560}}>
-      <h3>Set up your real costs <span style={{fontWeight:400, color:'var(--text-faint)', fontSize:13}}>· ~5 min, makes margin numbers accurate</span></h3>
-      <div className="micro" style={{color:'var(--text-muted)', marginBottom:14, lineHeight:1.5}}>
-        Contribution, CAC payback and LTV:CAC are only as good as the costs behind them. Until these are confirmed they're shown as <b style={{color:'var(--warn)'}}>estimates</b>. Enter your real numbers once and every margin figure flips to <b style={{color:'var(--good)'}}>verified</b>.
+  return (
+    <div className="modal-bg" onClick={onClose}>
+      <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:560}}>
+        <h3>Set up your real costs <span style={{fontWeight:400, color:'var(--text-faint)', fontSize:13}}>· ~5 min, makes margin numbers accurate</span></h3>
+        <div className="micro" style={{color:'var(--text-muted)', marginBottom:14, lineHeight:1.5}}>
+          Contribution, CAC payback and LTV:CAC are only as good as the costs behind them. Until these are confirmed they're shown as <b style={{color:'var(--warn)'}}>estimates</b>. Enter your real numbers once and every margin figure flips to <b style={{color:'var(--good)'}}>verified</b>.
+        </div>
+        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 24px'}}>
+          <Field k="gmPct"    label="Gross margin %"        suffix="%" hint={catalogueGm!=null?`catalogue ≈ ${(catalogueGm*100).toFixed(0)}%`:''}/>
+          <Field k="refundPct" label="Refund / return rate" suffix="%"/>
+          <Field k="fulfilment" label="Fulfilment / pick-pack" prefix={curSym()} suffix="/order"/>
+          <Field k="packaging"  label="Packaging"             prefix={curSym()} suffix="/order"/>
+          <Field k="shipping"   label="Shipping cost"         prefix={curSym()} suffix="/order"/>
+          <Field k="payFixed"   label="Payment fee (fixed)"   prefix={curSym()} suffix="/order"/>
+          <Field k="payPct"     label="Payment fee (%)"       suffix="%"/>
+        </div>
+        <div style={{marginTop:8, padding:'10px 12px', background:'var(--bg-app)', borderRadius:'var(--r-sm)', border:'1px solid var(--border-subtle)', fontSize:12.5, color:'var(--text-secondary)'}}>
+          At ~{GBP(aovGuess)} AOV that's a <b style={{color:'var(--text-primary)'}}>{(cmRate*100).toFixed(0)}%</b> per-order contribution margin → break-even ROAS <b style={{color:'var(--text-primary)'}}>{beRoas?beRoas.toFixed(2)+'×':'—'}</b>. Every order needs to clear this to be profitable.
+        </div>
+        <div className="row">
+          <button className="primary" onClick={save} disabled={!valid} style={!valid?{opacity:.5,cursor:'default'}:undefined}>Save &amp; verify costs</button>
+          <button onClick={onClose} style={{marginLeft:'auto'}}>Cancel</button>
+        </div>
+        <div className="hint">Stored in this browser for now (server-side per-tenant config is coming). Edit any time from the cost badge.</div>
       </div>
-      <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 24px'}}>
-        <Field k="gmPct"    label="Gross margin %"        suffix="%" hint={catalogueGm!=null?`catalogue ≈ ${(catalogueGm*100).toFixed(0)}%`:''}/>
-        <Field k="refundPct" label="Refund / return rate" suffix="%"/>
-        <Field k="fulfilment" label="Fulfilment / pick-pack" prefix="£" suffix="/order"/>
-        <Field k="packaging"  label="Packaging"             prefix="£" suffix="/order"/>
-        <Field k="shipping"   label="Shipping cost"         prefix="£" suffix="/order"/>
-        <Field k="payFixed"   label="Payment fee (fixed)"   prefix="£" suffix="/order"/>
-        <Field k="payPct"     label="Payment fee (%)"       suffix="%"/>
-      </div>
-      <div style={{marginTop:8, padding:'10px 12px', background:'var(--bg-app)', borderRadius:'var(--r-sm)', border:'1px solid var(--border-subtle)', fontSize:12.5, color:'var(--text-secondary)'}}>
-        At ~{GBP(aovGuess)} AOV that's a <b style={{color:'var(--text-primary)'}}>{(cmRate*100).toFixed(0)}%</b> per-order contribution margin → break-even ROAS <b style={{color:'var(--text-primary)'}}>{beRoas?beRoas.toFixed(2)+'×':'—'}</b>. Every order needs to clear this to be profitable.
-      </div>
-      <div className="row">
-        <button className="primary" onClick={save} disabled={!valid} style={!valid?{opacity:.5,cursor:'default'}:undefined}>Save &amp; verify costs</button>
-        <button onClick={onClose} style={{marginLeft:'auto'}}>Cancel</button>
-      </div>
-      <div className="hint">Stored in this browser for now (server-side per-tenant config is coming). Edit any time from the cost badge.</div>
     </div>
-  </div>);
+  );
 }
 
 function KPI({label, val, sub, badge, status, statusLabel, conf, series, seriesLabel, current, prior, goodDirection, agent, observation, implication, benchmark, bmValue}){
@@ -741,7 +743,7 @@ function MoneyBadge({money}){
   const bg = KIND_BG[kind] || 'var(--border-subtle)';
   const opacity = conf === 'high' ? 1 : conf === 'medium' ? 0.88 : 0.72;
   const abs = Math.abs(v);
-  const fmt = abs >= 1000 ? '£'+(abs/1000).toFixed(1)+'k' : '£'+Math.round(abs);
+  const fmt = abs >= 1000 ? curSym()+(abs/1000).toFixed(1)+'k' : curSym()+Math.round(abs);
   const tooltip = `${fmt}/mo ${KIND_LABEL[kind]} (${conf} confidence). ${money.basis||''}`;
   return (<span title={tooltip} style={{
     display:'inline-block', whiteSpace:'nowrap',
@@ -770,67 +772,71 @@ function MoneyOnTablePanel(){
     }))
   ].filter(x => x.monthly_impact_gbp && Math.abs(x.monthly_impact_gbp) >= 50)
    .sort((a,b) => Math.abs(b.monthly_impact_gbp) - Math.abs(a.monthly_impact_gbp));
-  return (<div className="card">
-    <div className="card-section-title">
-      <h2 style={{margin:0}}>Money on the table</h2>
-      <span className="meta">£/mo at stake · conservative estimates · total is illustrative (items overlap)</span>
+  return (
+    <div className="card">
+      <div className="card-section-title">
+        <h2 style={{margin:0}}>Money on the table</h2>
+        <span className="meta">{curSym()}/mo at stake · conservative estimates · total is illustrative (items overlap)</span>
+      </div>
+      <div className="stat-strip" style={{marginBottom:'var(--s-4)'}}>
+        <div className="stat-strip-item">
+          <div className="stat-strip-val" style={{color:'var(--bad)'}}>{curSym()}{(rollup.leakage/1000).toFixed(1)}k<span style={{fontSize:11, color:'var(--text-muted)', marginLeft:3}}>/mo</span></div>
+          <div className="stat-strip-label">Leaking now</div>
+        </div>
+        <div className="stat-strip-divider"/>
+        <div className="stat-strip-item">
+          <div className="stat-strip-val" style={{color:'var(--warn)'}}>{curSym()}{(rollup.at_risk/1000).toFixed(1)}k<span style={{fontSize:11, color:'var(--text-muted)', marginLeft:3}}>/mo</span></div>
+          <div className="stat-strip-label">At risk</div>
+        </div>
+        <div className="stat-strip-divider"/>
+        <div className="stat-strip-item">
+          <div className="stat-strip-val" style={{color:'var(--good)'}}>{curSym()}{(rollup.opportunity/1000).toFixed(1)}k<span style={{fontSize:11, color:'var(--text-muted)', marginLeft:3}}>/mo</span></div>
+          <div className="stat-strip-label">Opportunity</div>
+        </div>
+        <div className="stat-strip-divider"/>
+        <div className="stat-strip-item">
+          <div className="stat-strip-val">{curSym()}{(rollup.total/1000).toFixed(1)}k<span style={{fontSize:11, color:'var(--text-muted)', marginLeft:3}}>/mo</span></div>
+          <div className="stat-strip-label">Total identified</div>
+        </div>
+      </div>
+      {(() => {
+        // Separate EVIDENCED findings from HYPOTHESES (unvalidated opportunities) so
+        // speculation never sits beside grounded leakage. Synthetic opportunities and
+        // low-confidence items are hypotheses; everything else is evidenced.
+        const tier = (c) => typeof c === 'number' ? (c >= 0.66 ? 'high' : c >= 0.45 ? 'medium' : 'low') : (c || 'low');
+        const isHyp = (m) => m.source === 'synthetic' || tier(m.confidence) === 'low';
+        const evidenced = items.filter(m => !isHyp(m));
+        const hypotheses = items.filter(isHyp);
+        const confColor = (c) => { const t=tier(c); return t==='high'?'var(--good)':t==='medium'?'var(--warn)':'var(--text-muted)'; };
+        const Row = (m,i)=>{
+          return (<tr key={i}>
+            <td style={{fontSize:12, maxWidth:320}}>
+              <span style={{fontWeight:550, color: m.source==='synthetic' ? 'var(--text-secondary)' : 'var(--text-primary)'}}>{m.description}</span>
+              <div className="meta" style={{fontSize:10}}>{m.agent || m.source} · {m.priority || ''} · {m.kind}</div>
+            </td>
+            <td><MoneyBadge money={m}/></td>
+            <td className="tl" style={{fontSize:10, textTransform:'uppercase', letterSpacing:.04, color:confColor(m.confidence), fontWeight:600}}>{tier(m.confidence)}</td>
+            <td className="meta tl" style={{fontSize:11, maxWidth:320}}>{m.basis}</td>
+            <td className="tl"><span className="pill grey" style={{fontSize:10}}>{m.status||'open'}</span></td>
+          </tr>);
+        };
+        return (
+          <>
+            <table><thead><tr><th>Evidenced finding</th><th>{curSym()}/mo impact</th><th className="tl">Confidence</th><th className="tl">Basis</th><th className="tl">Status</th></tr></thead>
+              <tbody>{evidenced.map(Row)}</tbody></table>
+            {hypotheses.length > 0 && (<div style={{marginTop:'var(--s-5)'}}>
+              <div className="card-section-title" style={{marginBottom:6}}>
+                <h3 style={{margin:0, fontSize:13, color:'var(--text-muted)'}}>Hypotheses — unvalidated upside</h3>
+                <span className="meta" style={{fontSize:11}}>low-confidence estimates · test before committing budget, don't bank them</span>
+              </div>
+              <table style={{opacity:0.85}}><thead><tr><th>Hypothesis</th><th>{curSym()}/mo if it works</th><th className="tl">Confidence</th><th className="tl">Assumption</th><th className="tl">Status</th></tr></thead>
+                <tbody>{hypotheses.map(Row)}</tbody></table>
+            </div>)}
+          </>
+        );
+      })()}
     </div>
-    <div className="stat-strip" style={{marginBottom:'var(--s-4)'}}>
-      <div className="stat-strip-item">
-        <div className="stat-strip-val" style={{color:'var(--bad)'}}>£{(rollup.leakage/1000).toFixed(1)}k<span style={{fontSize:11, color:'var(--text-muted)', marginLeft:3}}>/mo</span></div>
-        <div className="stat-strip-label">Leaking now</div>
-      </div>
-      <div className="stat-strip-divider"/>
-      <div className="stat-strip-item">
-        <div className="stat-strip-val" style={{color:'var(--warn)'}}>£{(rollup.at_risk/1000).toFixed(1)}k<span style={{fontSize:11, color:'var(--text-muted)', marginLeft:3}}>/mo</span></div>
-        <div className="stat-strip-label">At risk</div>
-      </div>
-      <div className="stat-strip-divider"/>
-      <div className="stat-strip-item">
-        <div className="stat-strip-val" style={{color:'var(--good)'}}>£{(rollup.opportunity/1000).toFixed(1)}k<span style={{fontSize:11, color:'var(--text-muted)', marginLeft:3}}>/mo</span></div>
-        <div className="stat-strip-label">Opportunity</div>
-      </div>
-      <div className="stat-strip-divider"/>
-      <div className="stat-strip-item">
-        <div className="stat-strip-val">£{(rollup.total/1000).toFixed(1)}k<span style={{fontSize:11, color:'var(--text-muted)', marginLeft:3}}>/mo</span></div>
-        <div className="stat-strip-label">Total identified</div>
-      </div>
-    </div>
-    {(() => {
-      // Separate EVIDENCED findings from HYPOTHESES (unvalidated opportunities) so
-      // speculation never sits beside grounded leakage. Synthetic opportunities and
-      // low-confidence items are hypotheses; everything else is evidenced.
-      const tier = (c) => typeof c === 'number' ? (c >= 0.66 ? 'high' : c >= 0.45 ? 'medium' : 'low') : (c || 'low');
-      const isHyp = (m) => m.source === 'synthetic' || tier(m.confidence) === 'low';
-      const evidenced = items.filter(m => !isHyp(m));
-      const hypotheses = items.filter(isHyp);
-      const confColor = (c) => { const t=tier(c); return t==='high'?'var(--good)':t==='medium'?'var(--warn)':'var(--text-muted)'; };
-      const Row = (m,i)=>{
-        return (<tr key={i}>
-          <td style={{fontSize:12, maxWidth:320}}>
-            <span style={{fontWeight:550, color: m.source==='synthetic' ? 'var(--text-secondary)' : 'var(--text-primary)'}}>{m.description}</span>
-            <div className="meta" style={{fontSize:10}}>{m.agent || m.source} · {m.priority || ''} · {m.kind}</div>
-          </td>
-          <td><MoneyBadge money={m}/></td>
-          <td className="tl" style={{fontSize:10, textTransform:'uppercase', letterSpacing:.04, color:confColor(m.confidence), fontWeight:600}}>{tier(m.confidence)}</td>
-          <td className="meta tl" style={{fontSize:11, maxWidth:320}}>{m.basis}</td>
-          <td className="tl"><span className="pill grey" style={{fontSize:10}}>{m.status||'open'}</span></td>
-        </tr>);
-      };
-      return (<>
-        <table><thead><tr><th>Evidenced finding</th><th>£/mo impact</th><th className="tl">Confidence</th><th className="tl">Basis</th><th className="tl">Status</th></tr></thead>
-          <tbody>{evidenced.map(Row)}</tbody></table>
-        {hypotheses.length > 0 && (<div style={{marginTop:'var(--s-5)'}}>
-          <div className="card-section-title" style={{marginBottom:6}}>
-            <h3 style={{margin:0, fontSize:13, color:'var(--text-muted)'}}>Hypotheses — unvalidated upside</h3>
-            <span className="meta" style={{fontSize:11}}>low-confidence estimates · test before committing budget, don't bank them</span>
-          </div>
-          <table style={{opacity:0.85}}><thead><tr><th>Hypothesis</th><th>£/mo if it works</th><th className="tl">Confidence</th><th className="tl">Assumption</th><th className="tl">Status</th></tr></thead>
-            <tbody>{hypotheses.map(Row)}</tbody></table>
-        </div>)}
-      </>);
-    })()}
-  </div>);
+  );
 }
 
 function MoneyHeaderStrip(){
@@ -838,13 +844,15 @@ function MoneyHeaderStrip(){
   const P = window.FRKL_PATTERNS;
   if (!P || !P.money_rollup) return null;
   const r = P.money_rollup;
-  return (<div className="card" style={{marginBottom:14, padding:'10px 14px', borderLeft:'3px solid #4ade80', display:'flex',gap:18,alignItems:'center',flexWrap:'wrap'}}>
-    <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:.05,color:'#7b7b87',fontWeight:700}}>£ AT STAKE THIS MONTH</div>
-    <div style={{display:'flex',alignItems:'baseline',gap:6}}><span style={{fontSize:18,fontWeight:700,color:'#f87171'}}>£{(r.leakage/1000).toFixed(1)}k</span><span className="muted" style={{fontSize:11}}>leaking</span></div>
-    <div style={{display:'flex',alignItems:'baseline',gap:6}}><span style={{fontSize:18,fontWeight:700,color:'#fbbf24'}}>£{(r.at_risk/1000).toFixed(1)}k</span><span className="muted" style={{fontSize:11}}>at risk</span></div>
-    <div style={{display:'flex',alignItems:'baseline',gap:6}}><span style={{fontSize:18,fontWeight:700,color:'#4ade80'}}>£{(r.opportunity/1000).toFixed(1)}k</span><span className="muted" style={{fontSize:11}}>opportunity</span></div>
-    <div style={{marginLeft:'auto',fontSize:11,color:'#7b7b87'}}>See <b>Intelligence</b> tab → Money on the table for breakdown</div>
-  </div>);
+  return (
+    <div className="card" style={{marginBottom:14, padding:'10px 14px', borderLeft:'3px solid #4ade80', display:'flex',gap:18,alignItems:'center',flexWrap:'wrap'}}>
+      <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:.05,color:'#7b7b87',fontWeight:700}}>{curSym()}AT STAKE THIS MONTH</div>
+      <div style={{display:'flex',alignItems:'baseline',gap:6}}><span style={{fontSize:18,fontWeight:700,color:'#f87171'}}>{curSym()}{(r.leakage/1000).toFixed(1)}k</span><span className="muted" style={{fontSize:11}}>leaking</span></div>
+      <div style={{display:'flex',alignItems:'baseline',gap:6}}><span style={{fontSize:18,fontWeight:700,color:'#fbbf24'}}>{curSym()}{(r.at_risk/1000).toFixed(1)}k</span><span className="muted" style={{fontSize:11}}>at risk</span></div>
+      <div style={{display:'flex',alignItems:'baseline',gap:6}}><span style={{fontSize:18,fontWeight:700,color:'#4ade80'}}>{curSym()}{(r.opportunity/1000).toFixed(1)}k</span><span className="muted" style={{fontSize:11}}>opportunity</span></div>
+      <div style={{marginLeft:'auto',fontSize:11,color:'#7b7b87'}}>See <b>Intelligence</b> tab → Money on the table for breakdown</div>
+    </div>
+  );
 }
 
 function PHitBadge({phit}){
@@ -889,7 +897,7 @@ const ACTION_TRADEOFFS = [
     name: "New customer acquisition vs Retention focus",
     keywords_a: ["new customer", "acquisition", "cold audience", "prospecting"],
     keywords_b: ["returning", "loyalty", "win-back", "vip", "retargeting only"],
-    framework: "Both are valid but resource-constrained. Quantify: 1 new customer at £15 CAC vs 1 reactivated returning customer at £4 CAC — the math usually says retention first when CAC is high. State your bet explicitly.",
+    framework: `Both are valid but resource-constrained. Quantify: 1 new customer at ${curSym()}15 CAC vs 1 reactivated returning customer at ${curSym()}4 CAC — the math usually says retention first when CAC is high. State your bet explicitly.`,
   },
 ];
 
@@ -1014,7 +1022,7 @@ function ActionBoard(){
     <span className="sp-hcell">Priority</span>
     <span className="sp-hcell">Action</span>
     <span className="sp-hcell">Status</span>
-    <span className="sp-hcell right">£/mo</span>
+    <span className="sp-hcell right">{curSym()}/mo</span>
   </div>);
 
   // Group open actions by theme; rank groups (and rows) by £ at stake.
@@ -1038,7 +1046,7 @@ function ActionBoard(){
     };
     const cf = CONF[f.confidence || 'med'] || CONF.med;
     // £ impact: right-aligned, magnitude only; muted for "expected" (context, not opportunity).
-    const amt = f.gbp > 0 ? ('£' + (f.gbp >= 1000 ? (f.gbp/1000).toFixed(1) + 'k' : Math.round(f.gbp))) : null;
+    const amt = f.gbp > 0 ? (curSym() + (f.gbp >= 1000 ? (f.gbp/1000).toFixed(1) + 'k' : Math.round(f.gbp))) : null;
     const impColor = f.verdict === 'expected' ? 'var(--text-muted)' : 'var(--good)';
     return (
       <div className="live-row" key={'live'+i}>
@@ -1074,69 +1082,69 @@ function ActionBoard(){
     {liveHeadCell('verdict','Priority')}
     {liveHeadCell('area','Action')}
     {liveHeadCell('confidence','Confidence')}
-    {liveHeadCell('gbp','£/mo', true)}
+    {liveHeadCell('gbp',`${curSym()}/mo`, true)}
   </div>);
 
-  return (<div className="card">
-    <div className="card-section-title">
-      <h2 style={{margin:0}}>Action plan <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>— live read first, ranked by £ impact</span></h2>
-      <span className="meta">Crux live read{liveRead&&liveRead.generatedAt?` (${liveRead.generatedAt.slice(0,10)})`:''} · {open.length} specialist items{contraCount>0?` · ${contraCount} contradicted by today's read`:''}</span>
-    </div>
-    <ActionConflictBanner/>
-
-    {/* LIVE — from the diagnostic engine, always coherent with the diagnostic card */}
-    {liveFindings.length>0 && (<div style={{marginBottom:12}}>
-      <div style={{display:'flex',alignItems:'center',gap:9,borderBottom:'1px solid var(--border-subtle)',padding:'9px 0 7px'}}>
-        <span style={{width:7,height:7,borderRadius:'50%',background:'var(--accent)'}}/>
-        <span style={{fontWeight:700,color:'var(--text-primary)',fontSize:13.5}}>Now — live read</span>
-        <span style={{fontSize:11,color:'var(--text-faint)'}}>Crux · from today's diagnostic</span>
+  return (
+    <div className="card">
+      <div className="card-section-title">
+        <h2 style={{margin:0}}>Action plan <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>— live read first, ranked by {curSym()}impact</span></h2>
+        <span className="meta">Crux live read{liveRead&&liveRead.generatedAt?` (${liveRead.generatedAt.slice(0,10)})`:''} · {open.length} specialist items{contraCount>0?` · ${contraCount} contradicted by today's read`:''}</span>
       </div>
-      {(()=>{
-        const dir = liveSort.dir==='asc' ? 1 : -1;
-        const ranked=[...liveFindings].sort((a,b)=>{
-          const va=liveSortVal(a), vb=liveSortVal(b);
-          if(va<vb) return -1*dir; if(va>vb) return 1*dir;
-          return findingScore(b)-findingScore(a);   // stable tiebreak by £-weighted score
-        });
-        const CAP=6; const shown=liveAll?ranked:ranked.slice(0,CAP); return (<>
-        <LiveHead/>
-        {shown.map(renderLive)}
-        {ranked.length>CAP && <button onClick={()=>setLiveAll(v=>!v)} className="btn-ghost" style={{padding:'5px 11px',fontSize:11.5,marginTop:8}}>{liveAll?'Show fewer':`Show ${ranked.length-CAP} more`}</button>}
-      </>); })()}
-    </div>)}
-
-    {/* SPECIALIST — dated agent review (LLM-generated, not the daily metric refresh) */}
-    {(()=>{ const sm=(typeof window!=='undefined'&&window.FRKL_INSIGHTS_META)||{}; const run=sm.specialistRunAt; const age=run?Math.round((Date.now()-new Date(run))/86400000):null; const stale=age!=null&&age>7; return (
-    <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:2,flexWrap:'wrap'}}>
-      <span style={{fontSize:11,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-faint)'}}>Specialist agent review</span>
-      <span style={{fontSize:11,color:stale?'var(--warn)':'var(--text-muted)'}}>· {run?`from ${run}${age!=null?` · ${age}d old`:''}`:'static'}{stale?' — needs an agent re-run; re-validate against the live read above':' — re-validate against the live read above'}</span>
-    </div>); })()}
-    <div style={{fontSize:11,color:'var(--text-faint)',lineHeight:1.5,margin:'4px 0 2px'}}>The <b style={{color:'#4ade80'}}>%</b> next to a status is the <b>hit-rate</b> — how often this <i>type</i> of action has actually moved the metric before (<span style={{color:'#4ade80'}}>green &gt;60%</span> · <span style={{color:'#fbbf24'}}>amber 30–60%</span> · <span style={{color:'#f87171'}}>red &lt;30%</span>; a “?” = small sample). Hover it for the track record.</div>
-    <div style={{display:'flex', flexDirection:'column', gap:4}}>
-      {groupList.map(({g, items, sum})=>(
-        <div key={g}>
-          <button onClick={()=>setOpenGroups(o=>({...o,[g]:!o[g]}))} style={{display:'flex',alignItems:'center',gap:9,width:'100%',background:'transparent',border:'none',borderBottom:'1px solid var(--border-subtle)',padding:'9px 0 7px',cursor:'pointer',textAlign:'left',marginTop:6}}>
-            <span style={{color:'var(--text-faint)',display:'inline-flex',transform:openGroups[g]?'rotate(90deg)':'none',transition:'transform 120ms'}}><Icon name="chevron" size={12}/></span>
-            <span style={{fontWeight:700,color:'var(--text-primary)',fontSize:13.5}}>{g}</span>
-            <span style={{fontSize:11,color:'var(--text-faint)',background:'var(--border-subtle)',borderRadius:999,padding:'1px 7px'}}>{items.length}</span>
-            {sum>0 && <span style={{marginLeft:'auto',fontSize:12,fontWeight:700,color:'var(--text-secondary)'}}>~{gbpShort(sum)}/mo</span>}
-          </button>
-          {openGroups[g] && <><SpecialistHead/>{items.map(renderRow)}</>}
+      <ActionConflictBanner/>
+      {/* LIVE — from the diagnostic engine, always coherent with the diagnostic card */}
+      {liveFindings.length>0 && (<div style={{marginBottom:12}}>
+        <div style={{display:'flex',alignItems:'center',gap:9,borderBottom:'1px solid var(--border-subtle)',padding:'9px 0 7px'}}>
+          <span style={{width:7,height:7,borderRadius:'50%',background:'var(--accent)'}}/>
+          <span style={{fontWeight:700,color:'var(--text-primary)',fontSize:13.5}}>Now — live read</span>
+          <span style={{fontSize:11,color:'var(--text-faint)'}}>Crux · from today's diagnostic</span>
         </div>
-      ))}
+        {(()=>{
+          const dir = liveSort.dir==='asc' ? 1 : -1;
+          const ranked=[...liveFindings].sort((a,b)=>{
+            const va=liveSortVal(a), vb=liveSortVal(b);
+            if(va<vb) return -1*dir; if(va>vb) return 1*dir;
+            return findingScore(b)-findingScore(a);   // stable tiebreak by £-weighted score
+          });
+          const CAP=6; const shown=liveAll?ranked:ranked.slice(0,CAP); return (<>
+          <LiveHead/>
+          {shown.map(renderLive)}
+          {ranked.length>CAP && <button onClick={()=>setLiveAll(v=>!v)} className="btn-ghost" style={{padding:'5px 11px',fontSize:11.5,marginTop:8}}>{liveAll?'Show fewer':`Show ${ranked.length-CAP} more`}</button>}
+        </>); })()}
+      </div>)}
+      {/* SPECIALIST — dated agent review (LLM-generated, not the daily metric refresh) */}
+      {(()=>{ const sm=(typeof window!=='undefined'&&window.FRKL_INSIGHTS_META)||{}; const run=sm.specialistRunAt; const age=run?Math.round((Date.now()-new Date(run))/86400000):null; const stale=age!=null&&age>7; return (
+      <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:2,flexWrap:'wrap'}}>
+        <span style={{fontSize:11,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-faint)'}}>Specialist agent review</span>
+        <span style={{fontSize:11,color:stale?'var(--warn)':'var(--text-muted)'}}>· {run?`from ${run}${age!=null?` · ${age}d old`:''}`:'static'}{stale?' — needs an agent re-run; re-validate against the live read above':' — re-validate against the live read above'}</span>
+      </div>); })()}
+      <div style={{fontSize:11,color:'var(--text-faint)',lineHeight:1.5,margin:'4px 0 2px'}}>The <b style={{color:'#4ade80'}}>%</b> next to a status is the <b>hit-rate</b> — how often this <i>type</i> of action has actually moved the metric before (<span style={{color:'#4ade80'}}>green &gt;60%</span> · <span style={{color:'#fbbf24'}}>amber 30–60%</span> · <span style={{color:'#f87171'}}>red &lt;30%</span>; a “?” = small sample). Hover it for the track record.</div>
+      <div style={{display:'flex', flexDirection:'column', gap:4}}>
+        {groupList.map(({g, items, sum})=>(
+          <div key={g}>
+            <button onClick={()=>setOpenGroups(o=>({...o,[g]:!o[g]}))} style={{display:'flex',alignItems:'center',gap:9,width:'100%',background:'transparent',border:'none',borderBottom:'1px solid var(--border-subtle)',padding:'9px 0 7px',cursor:'pointer',textAlign:'left',marginTop:6}}>
+              <span style={{color:'var(--text-faint)',display:'inline-flex',transform:openGroups[g]?'rotate(90deg)':'none',transition:'transform 120ms'}}><Icon name="chevron" size={12}/></span>
+              <span style={{fontWeight:700,color:'var(--text-primary)',fontSize:13.5}}>{g}</span>
+              <span style={{fontSize:11,color:'var(--text-faint)',background:'var(--border-subtle)',borderRadius:999,padding:'1px 7px'}}>{items.length}</span>
+              {sum>0 && <span style={{marginLeft:'auto',fontSize:12,fontWeight:700,color:'var(--text-secondary)'}}>~{gbpShort(sum)}/mo</span>}
+            </button>
+            {openGroups[g] && <><SpecialistHead/>{items.map(renderRow)}</>}
+          </div>
+        ))}
+      </div>
+      <div style={{display:'flex',alignItems:'center',marginTop:'var(--s-4)'}}>
+        <span className="meta">{done.length} closed</span>
+        <div style={{flex:1}}/>
+        <button onClick={()=>setShowDone(s=>!s)} className="btn-ghost" style={{padding:'5px 11px', fontSize:11.5}}>
+          {showDone ? 'Hide closed' : `Show ${done.length} closed`}
+        </button>
+      </div>
+      {showDone && done.length > 0 && (<div style={{marginTop:'var(--s-2)', paddingTop:'var(--s-3)', borderTop:'1px solid var(--border-subtle)'}}>
+        <div style={{display:'flex', flexDirection:'column'}}>{done.map(renderRow)}</div>
+      </div>)}
+      {modalAction && <MarkDoneModal action={modalAction} onClose={()=>setModalAction(null)}/>}
     </div>
-    <div style={{display:'flex',alignItems:'center',marginTop:'var(--s-4)'}}>
-      <span className="meta">{done.length} closed</span>
-      <div style={{flex:1}}/>
-      <button onClick={()=>setShowDone(s=>!s)} className="btn-ghost" style={{padding:'5px 11px', fontSize:11.5}}>
-        {showDone ? 'Hide closed' : `Show ${done.length} closed`}
-      </button>
-    </div>
-    {showDone && done.length > 0 && (<div style={{marginTop:'var(--s-2)', paddingTop:'var(--s-3)', borderTop:'1px solid var(--border-subtle)'}}>
-      <div style={{display:'flex', flexDirection:'column'}}>{done.map(renderRow)}</div>
-    </div>)}
-    {modalAction && <MarkDoneModal action={modalAction} onClose={()=>setModalAction(null)}/>}
-  </div>);
+  );
 }
 
 function buildDaily(start){
@@ -1170,21 +1178,23 @@ function ChannelStreamPanel(){
   const _cs = (rows,k) => rows.slice().sort((a,b)=>a.date<b.date?-1:1).map(r=>({d:(r.date||'').slice(5), v:+(r[k]||0).toFixed(0)}));
   const sDtc=_cs(dt,'netSales'), sWh=_cs(wh30,'netSales'), sGi=_cs(gi30,'orders'), sOt=_cs(ot30,'netSales');
   const _dot = c => (<span style={{display:'inline-block',width:6,height:6,borderRadius:'var(--r-full)',background:c,marginRight:6}}/>);
-  return (<div className="card">
-    <div className="card-section-title">
-      <h2 style={{margin:0}}>Revenue by stream — last 30 days</h2>
-      <span className="meta">Headline KPIs use <b>DTC only</b> · wholesale + gifting tracked separately</span>
+  return (
+    <div className="card">
+      <div className="card-section-title">
+        <h2 style={{margin:0}}>Revenue by stream — last 30 days</h2>
+        <span className="meta">Headline KPIs use <b>DTC only</b> · wholesale + gifting tracked separately</span>
+      </div>
+      <div className="row" style={{marginBottom:'var(--s-3)'}}>
+        <KPI label={<>{_dot('var(--good)')}DTC (Online Store)</>} val={GBP(dtcRev)} sub={`${NUM(dtcOrd)} orders · ${PCT(dtcRev/total)} of revenue · AOV ${GBP(dtcOrd?dtcRev/dtcOrd:null)}`} series={sDtc} seriesLabel="DTC revenue · last 30 days" />
+        <KPI label={<>{_dot('var(--warn)')}Wholesale (JL + Faire)</>} val={GBP(whRev)} sub={`${NUM(whOrd)} orders · ${PCT(whRev/total)} of revenue · AOV ${GBP(whOrd?whRev/whOrd:null)}`} series={sWh} seriesLabel="Wholesale revenue · last 30 days" />
+        <KPI label={<>{_dot('var(--accent)')}Gifting (Draft Orders)</>} val={`${NUM(giOrd)} drops`} sub={`${GBP(giDisc)} retail value gifted · ${curSym()}0 revenue (100% comped)`} series={sGi} seriesLabel="Gifting drops · last 30 days" />
+        <KPI label={<>{_dot('var(--text-muted)')}Other channels</>} val={GBP(otRev)} sub={`${NUM(otOrd)} orders · likely IG/FB Shop / POS`} series={sOt} seriesLabel="Other revenue · last 30 days" />
+      </div>
+      <div className="note">
+        <b>Important context:</b>before this segmentation, headline metrics conflated all 4 streams. Discount rate looked like 36-47% (actually 12% on real DTC); AOV looked like {curSym()}63 (actually {curSym()}{Math.round(dtcOrd?dtcRev/dtcOrd:0)}). Two headline "crises" were data artefacts.
+            </div>
     </div>
-    <div className="row" style={{marginBottom:'var(--s-3)'}}>
-      <KPI label={<>{_dot('var(--good)')}DTC (Online Store)</>} val={GBP(dtcRev)} sub={`${NUM(dtcOrd)} orders · ${PCT(dtcRev/total)} of revenue · AOV ${GBP(dtcOrd?dtcRev/dtcOrd:null)}`} series={sDtc} seriesLabel="DTC revenue · last 30 days" />
-      <KPI label={<>{_dot('var(--warn)')}Wholesale (JL + Faire)</>} val={GBP(whRev)} sub={`${NUM(whOrd)} orders · ${PCT(whRev/total)} of revenue · AOV ${GBP(whOrd?whRev/whOrd:null)}`} series={sWh} seriesLabel="Wholesale revenue · last 30 days" />
-      <KPI label={<>{_dot('var(--accent)')}Gifting (Draft Orders)</>} val={`${NUM(giOrd)} drops`} sub={`${GBP(giDisc)} retail value gifted · £0 revenue (100% comped)`} series={sGi} seriesLabel="Gifting drops · last 30 days" />
-      <KPI label={<>{_dot('var(--text-muted)')}Other channels</>} val={GBP(otRev)} sub={`${NUM(otOrd)} orders · likely IG/FB Shop / POS`} series={sOt} seriesLabel="Other revenue · last 30 days" />
-    </div>
-    <div className="note">
-      <b>Important context:</b> before this segmentation, headline metrics conflated all 4 streams. Discount rate looked like 36-47% (actually 12% on real DTC); AOV looked like £63 (actually £{Math.round(dtcOrd?dtcRev/dtcOrd:0)}). Two headline "crises" were data artefacts.
-    </div>
-  </div>);
+  );
 }
 
 function DailyPanel(){
@@ -1320,11 +1330,11 @@ function MoreKpis({count, children}){
 // driving it. Turns a bare colour-coded number into "here's what & why".
 function HeroStat({valK, color, label, explain, items, total, alignRight}){
   const [show, setShow] = React.useState(false);
-  const money = (g)=> '£' + Math.round(Math.abs(g||0)).toLocaleString() + '/mo';
+  const money = (g)=> curSym() + Math.round(Math.abs(g||0)).toLocaleString() + '/mo';
   return (
     <div className="hero-stat" style={{position:'relative', cursor:'help'}}
          onMouseEnter={()=>setShow(true)} onMouseLeave={()=>setShow(false)}>
-      <div className="hero-stat-val" style={{color}}>£{valK}k</div>
+      <div className="hero-stat-val" style={{color}}>{curSym()}{valK}k</div>
       <div className="hero-stat-label" style={{borderBottom:'1px dotted var(--text-faint)', display:'inline-block', paddingBottom:1}}>
         {label} <span style={{fontSize:9, opacity:.55}} aria-hidden="true">&#9432;</span>
       </div>
@@ -1407,71 +1417,73 @@ function ThisWeekHero(){
     : biggestKind === 'at_risk' ? 'concentration risk to diversify'
     : 'opportunity unlock to chase';
 
-  return (<div className="hero">
-    <div className="hero-bg"/>
-    <div className="hero-content">
-      <div className="hero-meta">
-        <span className="micro" style={{color:'var(--accent)'}}>{weekday} · {dateStr}</span>
-        <span style={{margin:'0 var(--s-2)', color:'var(--text-faint)'}}>·</span>
-        <span className="micro">Operator weekly</span>
-      </div>
-      <h1 className="hero-headline">
-        <span style={{color:'var(--accent)'}}>£{totalK}k/mo</span> in play this week
-      </h1>
-      <div className="hero-sub">
-        Concentrated in <b style={{color:'var(--text-primary)'}}>{biggestLabel}</b>. The three highest-impact actions are queued below.
-      </div>
-
-      <div className="hero-stats">
-        <HeroStat valK={(r.leakage/1000).toFixed(1)} color="var(--bad)" label="Leaking now"
-          explain="Revenue going out the door right now — broken checkout/PDP steps, JS errors, over-discounting. The most urgent bucket: fixing these recovers money you're already losing."
-          items={topFor('leakage')}/>
-        <div className="hero-stat-divider"/>
-        <HeroStat valK={(r.at_risk/1000).toFixed(1)} color="var(--warn)" label="At risk"
-          explain="Revenue exposed but not yet lost — over-reliance on one channel, code or SKU, or a metric trending down. Worth de-risking before it bites."
-          items={topFor('at_risk')}/>
-        <div className="hero-stat-divider"/>
-        <HeroStat valK={(r.opportunity/1000).toFixed(1)} color="var(--good)" label="Opportunity"
-          explain="Upside you're not yet capturing — AOV, bundle attach, audience or range levers that could add revenue if pursued."
-          items={topFor('opportunity')}/>
-        <div className="hero-stat-divider"/>
-        <HeroStat valK={totalK} color="var(--text-primary)" label="Total identified" alignRight
-          explain="Everything money-tagged this week — leaking + at-risk + opportunity. These are illustrative estimates that can overlap, so they're not strictly additive. Read it as where to look, not a guaranteed sum."
-          total={[{c:'var(--bad)',k:'Leaking now',v:r.leakage},{c:'var(--warn)',k:'At risk',v:r.at_risk},{c:'var(--good)',k:'Opportunity',v:r.opportunity}]}/>
-      </div>
-      <div className="micro" style={{color:'var(--text-faint)',marginTop:'var(--s-2)'}}>Illustrative — each line is a money-tagged <i>estimate</i>, not a guaranteed recovery, and findings can overlap so the total isn't strictly additive. Treat it as where to look, not a forecast.</div>
-
-      <div className="hero-grid">
-        <div className="hero-col">
-          <div className="micro" style={{marginBottom:'var(--s-3)'}}>What changed since last run</div>
-          {!diff.previous_run_at && <div className="meta">First run — comparison will appear next week.</div>}
-          {diff.previous_run_at && (<div style={{display:'flex',flexDirection:'column',gap:'var(--s-2)'}}>
-            <HeroChangeRow color="var(--bad)"  count={diff.new.length}      label="new findings"/>
-            <HeroChangeRow color="var(--warn)" count={diff.stronger.length} label="strengthened"/>
-            <HeroChangeRow color="var(--good)" count={diff.resolved.length} label="resolved"/>
-            <HeroChangeRow color="var(--text-muted)" count={diff.weaker.length} label="weakened"/>
-          </div>)}
+  return (
+    <div className="hero">
+      <div className="hero-bg"/>
+      <div className="hero-content">
+        <div className="hero-meta">
+          <span className="micro" style={{color:'var(--accent)'}}>{weekday} · {dateStr}</span>
+          <span style={{margin:'0 var(--s-2)', color:'var(--text-faint)'}}>·</span>
+          <span className="micro">Operator weekly</span>
         </div>
-        <div className="hero-col">
-          <div className="micro" style={{marginBottom:'var(--s-3)'}}>Do this week</div>
-          {top3.length === 0 && <div className="meta">All open actions cleared. Sit tight until next refresh.</div>}
-          {top3.map((a, i) => (<div key={a.id} className="hero-action">
-            <div className="hero-action-rank">{i+1}</div>
-            <div className="hero-action-body">
-              <div className="hero-action-text">{linkify(a.text)}</div>
-              <div className="hero-action-meta">
-                <span className={'pill ' + (a.p==='P1'?'red':a.p==='P2'?'amber':'grey')} style={{fontSize:9.5,padding:'1px 6px'}}>{a.p}</span>
-                <span className="meta" style={{fontSize:10.5}} title={agentTitle(a.agent)}>{a.agent}</span>
-                {Math.abs(a.money) >= 100 && <span style={{
-                  fontSize:10.5, fontWeight:700, color: a.money < 0 ? 'var(--bad)' : 'var(--good)',
-                }}>£{Math.abs(a.money/1000).toFixed(1)}k/mo</span>}
+        <h1 className="hero-headline">
+          <span style={{color:'var(--accent)'}}>{curSym()}{totalK}k/mo</span> in play this week
+        </h1>
+        <div className="hero-sub">
+          Concentrated in <b style={{color:'var(--text-primary)'}}>{biggestLabel}</b>. The three highest-impact actions are queued below.
+        </div>
+
+        <div className="hero-stats">
+          <HeroStat valK={(r.leakage/1000).toFixed(1)} color="var(--bad)" label="Leaking now"
+            explain="Revenue going out the door right now — broken checkout/PDP steps, JS errors, over-discounting. The most urgent bucket: fixing these recovers money you're already losing."
+            items={topFor('leakage')}/>
+          <div className="hero-stat-divider"/>
+          <HeroStat valK={(r.at_risk/1000).toFixed(1)} color="var(--warn)" label="At risk"
+            explain="Revenue exposed but not yet lost — over-reliance on one channel, code or SKU, or a metric trending down. Worth de-risking before it bites."
+            items={topFor('at_risk')}/>
+          <div className="hero-stat-divider"/>
+          <HeroStat valK={(r.opportunity/1000).toFixed(1)} color="var(--good)" label="Opportunity"
+            explain="Upside you're not yet capturing — AOV, bundle attach, audience or range levers that could add revenue if pursued."
+            items={topFor('opportunity')}/>
+          <div className="hero-stat-divider"/>
+          <HeroStat valK={totalK} color="var(--text-primary)" label="Total identified" alignRight
+            explain="Everything money-tagged this week — leaking + at-risk + opportunity. These are illustrative estimates that can overlap, so they're not strictly additive. Read it as where to look, not a guaranteed sum."
+            total={[{c:'var(--bad)',k:'Leaking now',v:r.leakage},{c:'var(--warn)',k:'At risk',v:r.at_risk},{c:'var(--good)',k:'Opportunity',v:r.opportunity}]}/>
+        </div>
+        <div className="micro" style={{color:'var(--text-faint)',marginTop:'var(--s-2)'}}>Illustrative — each line is a money-tagged <i>estimate</i>, not a guaranteed recovery, and findings can overlap so the total isn't strictly additive. Treat it as where to look, not a forecast.</div>
+
+        <div className="hero-grid">
+          <div className="hero-col">
+            <div className="micro" style={{marginBottom:'var(--s-3)'}}>What changed since last run</div>
+            {!diff.previous_run_at && <div className="meta">First run — comparison will appear next week.</div>}
+            {diff.previous_run_at && (<div style={{display:'flex',flexDirection:'column',gap:'var(--s-2)'}}>
+              <HeroChangeRow color="var(--bad)"  count={diff.new.length}      label="new findings"/>
+              <HeroChangeRow color="var(--warn)" count={diff.stronger.length} label="strengthened"/>
+              <HeroChangeRow color="var(--good)" count={diff.resolved.length} label="resolved"/>
+              <HeroChangeRow color="var(--text-muted)" count={diff.weaker.length} label="weakened"/>
+            </div>)}
+          </div>
+          <div className="hero-col">
+            <div className="micro" style={{marginBottom:'var(--s-3)'}}>Do this week</div>
+            {top3.length === 0 && <div className="meta">All open actions cleared. Sit tight until next refresh.</div>}
+            {top3.map((a, i) => (<div key={a.id} className="hero-action">
+              <div className="hero-action-rank">{i+1}</div>
+              <div className="hero-action-body">
+                <div className="hero-action-text">{linkify(a.text)}</div>
+                <div className="hero-action-meta">
+                  <span className={'pill ' + (a.p==='P1'?'red':a.p==='P2'?'amber':'grey')} style={{fontSize:9.5,padding:'1px 6px'}}>{a.p}</span>
+                  <span className="meta" style={{fontSize:10.5}} title={agentTitle(a.agent)}>{a.agent}</span>
+                  {Math.abs(a.money) >= 100 && <span style={{
+                    fontSize:10.5, fontWeight:700, color: a.money < 0 ? 'var(--bad)' : 'var(--good)',
+                  }}>{curSym()}{Math.abs(a.money/1000).toFixed(1)}k/mo</span>}
+                </div>
               </div>
-            </div>
-          </div>))}
+            </div>))}
+          </div>
         </div>
       </div>
     </div>
-  </div>);
+  );
 }
 
 function HeroChangeRow({color, count, label}){
@@ -1586,7 +1598,7 @@ function buildChartPins(buckets){
       if(!pk) return; const x = snap(pk.w); if(x==null) return;
       const rate = c.discountRate!=null ? Math.round(c.discountRate*100)+'% off' : 'sale';
       pins.push({x, icon:'🏷️', title:c.code, date:pk.w, sale:true,
-        detail:`${rate} · £${Math.round(c.discount)} given · ${c.orders} orders`});
+        detail:`${rate} · ${curSym()}${Math.round(c.discount)} given · ${c.orders} orders`});
     });
   // 3) collapse pins landing in the same bucket so markers never crowd; sale leads the badge
   const byX = {};
@@ -1678,7 +1690,7 @@ function runDiagnostic(m, ctx){
   if (m.ltvCac!=null && m.ltvCac < 3 && m.cac!=null){
     f.push({sev: m.ltvCac<1.5?'red':'amber', area:'Unit economics', metric:`LTV:CAC ${m.ltvCac.toFixed(1)}× vs 3× target`,
       title:'Acquisition economics below the scaling threshold', gbp:0,
-      evidence:`Each acquired customer returns ${m.ltvCac.toFixed(1)}× their £${Math.round(m.cac)} CAC. Below 3×, more spend erodes value.`,
+      evidence:`Each acquired customer returns ${m.ltvCac.toFixed(1)}× their ${curSym()}${Math.round(m.cac)} CAC. Below 3×, more spend erodes value.`,
       action:'Lift repeat rate (post-purchase flows) or cut CAC (creative/targeting) before scaling spend.'});
   }
   // 3. Discount load vs 20% ceiling — margin recapture on the excess.
@@ -1719,7 +1731,7 @@ function runDiagnostic(m, ctx){
       const fatigue = dc.spendChg!=null && dc.spendChg>0.10;
       f.push({sev:'amber', area:'Efficiency', metric:`MER ${m.mer.toFixed(2)}× (was ${m.pMer.toFixed(2)}×)`, confidence:'med',
         title:'Ad efficiency falling as spend scales', gbp:m.paid*(m.pMer-m.mer),
-        evidence:`Each £ of spend now returns ${m.mer.toFixed(2)}× vs ${m.pMer.toFixed(2)}× prior${driverTxt} — ${fatigue?'spend is scaling into a fatiguing audience':'demand is softening faster than spend is coming down'}.`,
+        evidence:`Each ${curSym()} of spend now returns ${m.mer.toFixed(2)}× vs ${m.pMer.toFixed(2)}× prior${driverTxt} — ${fatigue?'spend is scaling into a fatiguing audience':'demand is softening faster than spend is coming down'}.`,
         action: fatigue?'Pause scaling; refresh fatigued creative + fix the conversion leak first.':'Hold spend flat and protect efficiency until demand recovers; don\'t cut winning campaigns into the dip.'});
     }
   }
@@ -2061,15 +2073,17 @@ function StickyHealthBar(){
     openCount = Object.keys(st).filter(id=>{ const s=(st[id]||{}).status; return s!=='verified-done' && s!=='done' && !local[id]; }).length;
   } catch(e){}
   const status = (roll.leakage>0) ? {kind:'action', label:'Action required'} : (roll.at_risk>0) ? {kind:'watch', label:'Watch'} : {kind:'healthy', label:'Healthy'};
-  return (<div className={'health-bar'+(show?' show':'')} aria-hidden={!show}>
-    <div className="health-bar-inner">
-      <StatusBadge kind={status.kind} label={status.label}/>
-      {atStake>0 && <span className="hb-metric"><b>{atStake>=1000?'£'+(atStake/1000).toFixed(1)+'k':'£'+Math.round(atStake)}</b>/mo at stake</span>}
-      {openCount>0 && <span className="hb-metric"><b>{openCount}</b> open action{openCount===1?'':'s'}</span>}
-      <span className="hb-spacer"/>
-      <button className="ia-btn primary" onClick={()=>window.__oiNav && window.__oiNav('actions','queue')}><Icon name="clipboard" size={13}/>Review actions</button>
+  return (
+    <div className={'health-bar'+(show?' show':'')} aria-hidden={!show}>
+      <div className="health-bar-inner">
+        <StatusBadge kind={status.kind} label={status.label}/>
+        {atStake>0 && <span className="hb-metric"><b>{atStake>=1000?curSym()+(atStake/1000).toFixed(1)+'k':curSym()+Math.round(atStake)}</b>/mo at stake</span>}
+        {openCount>0 && <span className="hb-metric"><b>{openCount}</b> open action{openCount===1?'':'s'}</span>}
+        <span className="hb-spacer"/>
+        <button className="ia-btn primary" onClick={()=>window.__oiNav && window.__oiNav('actions','queue')}><Icon name="clipboard" size={13}/>Review actions</button>
+      </div>
     </div>
-  </div>);
+  );
 }
 
 // Chart card footer — short interpretation + view-as-table + ask-AI-about-this.
@@ -2201,7 +2215,7 @@ function computeScores(m){
   const add = (label, val, w, detail) => { if(val!=null && isFinite(val)) f.push({label, s:clamp01(val), w, detail}); };
   add('Contribution margin', m.cmPct!=null ? m.cmPct/0.10 : null, 0.20, m.cmPct!=null?`${(m.cmPct*100).toFixed(0)}% (≥10% healthy)`:'');
   add('Marketing efficiency', m.mer!=null ? m.mer/(beRoas*2) : null, 0.15, m.mer!=null?`MER ${m.mer.toFixed(1)}× vs ${beRoas.toFixed(1)}× break-even`:'');
-  add('CAC vs allowable', (m.cac && m.allowableCac) ? m.allowableCac/m.cac : null, 0.15, (m.cac&&m.allowableCac)?`£${Math.round(m.cac)} vs £${Math.round(m.allowableCac)} allowable`:'');
+  add('CAC vs allowable', (m.cac && m.allowableCac) ? m.allowableCac/m.cac : null, 0.15, (m.cac&&m.allowableCac)?`${curSym()}${Math.round(m.cac)} vs ${curSym()}${Math.round(m.allowableCac)} allowable`:'');
   add('LTV:CAC', m.ltvCac!=null ? m.ltvCac/3 : null, 0.15, m.ltvCac!=null?`${m.ltvCac.toFixed(1)}× (3× target)`:'');
   add('Gross margin', m.gm ? m.gm/0.6 : null, 0.10, m.gm?`${(m.gm*100).toFixed(0)}%`:'');
   add('Conversion rate', m.cvr!=null ? m.cvr/CVR_BENCH : null, 0.10, m.cvr!=null?`${(m.cvr*100).toFixed(2)}% (${CVR_BENCH_LABEL} target)`:'');
@@ -2274,6 +2288,23 @@ function ScoreTip({valueNode, title, lines}){
 // Each score hovers to a plain-English explainer; a "plain terms" line under the row
 // translates all three into one sentence a first-time user can act on.
 function ScoresStrip({metrics, windowLabel}){
+  // Thin-data guard: scoring a near-empty store returns 100/100 (no negative
+  // signal), which over-claims badly. Below 30 days of trading history, say so
+  // instead of scoring. Uses the same D.shopify span as BrandAgeBanner.
+  const histDays = (()=>{ try{
+    const rows = (D && D.shopify) || [];
+    const ds = rows.map(r=>r.date).filter(Boolean).sort();
+    if (!ds.length) return 0;
+    return Math.round((new Date(ds[ds.length-1]) - new Date(ds[0]))/86400000) + 1;
+  } catch(e){ return null; } })();
+  if (histDays != null && histDays < 30) {
+    return (<div style={{padding:'10px 12px',borderRadius:'var(--r-md)',background:'rgba(255,255,255,0.02)',border:'1px solid var(--border-subtle)',marginBottom:12}}>
+      <div style={{display:'flex',alignItems:'center',gap:16,flexWrap:'wrap',fontSize:12,color:'var(--text-secondary)'}}>
+        <span style={{textTransform:'uppercase',letterSpacing:'.05em',fontSize:10,color:'var(--text-faint)'}}>Crux scorecard</span>
+        <span>Not scored yet — needs ≥30 days of trading history ({histDays}d so far). Scoring this early would over-claim; check back as data accumulates.</span>
+      </div>
+    </div>);
+  }
   const s = computeScores(metrics);
   const [open, setOpen] = React.useState(false);
   const tone = v => v>=75?'var(--good)':v>=55?'var(--warn)':'var(--bad)';
@@ -2379,65 +2410,64 @@ function AnalystRead({read, dx, metrics, onLog, logUI}){
   const isWatch = f => (f.verdict !== 'act' || conf(f) === 'low');
   const rest = findings.filter(f => f !== move).sort((a,b)=> (isWatch(a)?1:0)-(isWatch(b)?1:0) || findingScore(b)-findingScore(a));
 
-  return (<div className="card">
-    {logUI}
-    <div className="card-section-title">
-      <h2 style={{margin:0}}>What to do next <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>— operator diagnostic</span></h2>
-      <div style={{display:'flex',alignItems:'center',gap:10}}>
-        <span className="meta">AI analyst{read.generatedAt?` · ${read.generatedAt.slice(0,10)}`:''}</span>
-        {onLog && <LogEventButton onClick={onLog}/>}
-      </div>
-    </div>
-
-    {/* TIER 1 — THE MOVE (framing + accent shift by confidence) */}
-    {move && (
-    <div style={{padding:'14px 16px',borderRadius:'var(--r-md)',background:moveLow?'rgba(255,255,255,0.03)':'rgba(124,140,255,0.07)',border:'1px solid '+(moveLow?'var(--border-default)':'var(--border-subtle)')}}>
-      <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-        <span style={{fontSize:10,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:moveLow?'var(--text-muted)':'var(--accent)'}}>{moveLow?'Top hypothesis · validate first':'Do this next'}</span>
-        {confChip(conf(move))}
-        {move.gbp>0 && <span style={{marginLeft:'auto',fontWeight:700,color:'var(--good)',whiteSpace:'nowrap'}}>~{GBP(move.gbp)}{moveLow?' if confirmed':' on the table'}</span>}
-      </div>
-      <div style={{fontSize:16,fontWeight:700,color:'var(--text-primary)',marginTop:6,lineHeight:1.45}}>{moveLow?'Test this: ':''}{move.recommendation}</div>
-      <div style={{fontSize:12.5,color:'var(--text-secondary)',marginTop:6,lineHeight:1.5}}><span style={{color:'var(--text-faint)'}}>Why · </span>{move.metric}</div>
-      <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginTop:2}}><PlaybookHint text={`${move.recommendation} ${move.metric} ${move.area}`}/><NavChip f={move}/></div>
-    </div>
-    )}
-
-    {/* TIER 2 — what else (folded): verdict + confidence on every row */}
-    {rest.length>0 && <Disclosure label={`What else (${rest.length})`} open={showMore} onToggle={()=>setShowMore(s=>!s)}/>}
-    {showMore && rest.map((x,i)=>{ const vs=verdictStyle(x.verdict); const low=conf(x)==='low'; return (
-      <div key={i} style={{display:'flex',gap:10,alignItems:'baseline',padding:'9px 0 9px 18px',borderTop:i?'1px solid var(--border-subtle)':'none'}}>
-        <div style={{display:'flex',gap:6,flexShrink:0,width:142,flexWrap:'wrap'}}>
-          <span style={{fontSize:9,fontWeight:700,letterSpacing:'.05em',color:vs.fg,background:vs.bg,padding:'2px 6px',borderRadius:999,height:'fit-content'}}>{vs.label}</span>
-          {confChip(conf(x))}
+  return (
+    <div className="card">
+      {logUI}
+      <div className="card-section-title">
+        <h2 style={{margin:0}}>What to do next <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>— operator diagnostic</span></h2>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <span className="meta">AI analyst{read.generatedAt?` · ${read.generatedAt.slice(0,10)}`:''}</span>
+          {onLog && <LogEventButton onClick={onLog}/>}
         </div>
-        <div style={{flex:1,minWidth:0,fontSize:13,color:low?'var(--text-secondary)':'var(--text-primary)',lineHeight:1.5}}><b>{x.area}.</b> {low?'Worth checking: ':''}{x.recommendation}{x.metric && <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:1}}>{x.metric}</div>}</div>
-        <div style={{width:64,textAlign:'right',flexShrink:0,fontWeight:700,color:'var(--good)',whiteSpace:'nowrap',fontSize:12.5}}>{x.gbp>0?'~'+GBP(x.gbp):''}</div>
-        <div style={{flexShrink:0}}><NavChip f={x}/></div>
       </div>
-    );})}
-
-    {/* TIER 3 — the thinking (folded) */}
-    <Disclosure label="Show the thinking" open={showWhy} onToggle={()=>setShowWhy(s=>!s)}/>
-    {showWhy && (
-      <div style={{padding:'8px 0 0 18px'}}>
-        <div style={{fontSize:13,color:'var(--text-primary)',fontWeight:600,lineHeight:1.5}}>{read.headline}</div>
-        <div style={{fontSize:12.5,color:'var(--text-secondary)',marginTop:6,lineHeight:1.55}}>{read.narrative}</div>
-        {metrics && <ChangeBridgeBody metrics={metrics}/>}
-        <div style={{marginTop:10}}>
-          {findings.map((x,i)=>(<div key={i} style={{fontSize:12.5,color:'var(--text-secondary)',lineHeight:1.5,marginBottom:5}}><b style={{color:'var(--text-primary)'}}>{x.area}{x.confidence?` · ${x.confidence} confidence`:''}.</b> {x.reasoning}</div>))}
+      {/* TIER 1 — THE MOVE (framing + accent shift by confidence) */}
+      {move && (
+      <div style={{padding:'14px 16px',borderRadius:'var(--r-md)',background:moveLow?'rgba(255,255,255,0.03)':'rgba(124,140,255,0.07)',border:'1px solid '+(moveLow?'var(--border-default)':'var(--border-subtle)')}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+          <span style={{fontSize:10,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:moveLow?'var(--text-muted)':'var(--accent)'}}>{moveLow?'Top hypothesis · validate first':'Do this next'}</span>
+          {confChip(conf(move))}
+          {move.gbp>0 && <span style={{marginLeft:'auto',fontWeight:700,color:'var(--good)',whiteSpace:'nowrap'}}>~{GBP(move.gbp)}{moveLow?' if confirmed':' on the table'}</span>}
         </div>
-        {(read.blindspots||[]).length>0 && (
-          <div style={{marginTop:10,padding:'10px 14px',borderRadius:'var(--r-md)',background:'rgba(255,255,255,0.02)',border:'1px solid var(--border-subtle)'}}>
-            <div style={{fontSize:11,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:6}}>What I can't see yet</div>
-            {read.blindspots.map((b,i)=>(<div key={i} style={{fontSize:12,color:'var(--text-secondary)',lineHeight:1.5,display:'flex',gap:8,marginBottom:3}}><span style={{color:'var(--text-faint)'}}>·</span><span>{b}</span></div>))}
+        <div style={{fontSize:16,fontWeight:700,color:'var(--text-primary)',marginTop:6,lineHeight:1.45}}>{moveLow?'Test this: ':''}{move.recommendation}</div>
+        <div style={{fontSize:12.5,color:'var(--text-secondary)',marginTop:6,lineHeight:1.5}}><span style={{color:'var(--text-faint)'}}>Why · </span>{move.metric}</div>
+        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginTop:2}}><PlaybookHint text={`${move.recommendation} ${move.metric} ${move.area}`}/><NavChip f={move}/></div>
+      </div>
+      )}
+      {/* TIER 2 — what else (folded): verdict + confidence on every row */}
+      {rest.length>0 && <Disclosure label={`What else (${rest.length})`} open={showMore} onToggle={()=>setShowMore(s=>!s)}/>}
+      {showMore && rest.map((x,i)=>{ const vs=verdictStyle(x.verdict); const low=conf(x)==='low'; return (
+        <div key={i} style={{display:'flex',gap:10,alignItems:'baseline',padding:'9px 0 9px 18px',borderTop:i?'1px solid var(--border-subtle)':'none'}}>
+          <div style={{display:'flex',gap:6,flexShrink:0,width:142,flexWrap:'wrap'}}>
+            <span style={{fontSize:9,fontWeight:700,letterSpacing:'.05em',color:vs.fg,background:vs.bg,padding:'2px 6px',borderRadius:999,height:'fit-content'}}>{vs.label}</span>
+            {confChip(conf(x))}
           </div>
-        )}
-        <ContextConsidered dx={dx}/>
-        <div className="note" style={{marginTop:10}}>Reasoned over the live evidence bundle (decomposition → baseline → confounder → verdict). £ are contribution-impact estimates used to rank leverage, not forecasts.</div>
-      </div>
-    )}
-  </div>);
+          <div style={{flex:1,minWidth:0,fontSize:13,color:low?'var(--text-secondary)':'var(--text-primary)',lineHeight:1.5}}><b>{x.area}.</b> {low?'Worth checking: ':''}{x.recommendation}{x.metric && <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:1}}>{x.metric}</div>}</div>
+          <div style={{width:64,textAlign:'right',flexShrink:0,fontWeight:700,color:'var(--good)',whiteSpace:'nowrap',fontSize:12.5}}>{x.gbp>0?'~'+GBP(x.gbp):''}</div>
+          <div style={{flexShrink:0}}><NavChip f={x}/></div>
+        </div>
+      );})}
+      {/* TIER 3 — the thinking (folded) */}
+      <Disclosure label="Show the thinking" open={showWhy} onToggle={()=>setShowWhy(s=>!s)}/>
+      {showWhy && (
+        <div style={{padding:'8px 0 0 18px'}}>
+          <div style={{fontSize:13,color:'var(--text-primary)',fontWeight:600,lineHeight:1.5}}>{read.headline}</div>
+          <div style={{fontSize:12.5,color:'var(--text-secondary)',marginTop:6,lineHeight:1.55}}>{read.narrative}</div>
+          {metrics && <ChangeBridgeBody metrics={metrics}/>}
+          <div style={{marginTop:10}}>
+            {findings.map((x,i)=>(<div key={i} style={{fontSize:12.5,color:'var(--text-secondary)',lineHeight:1.5,marginBottom:5}}><b style={{color:'var(--text-primary)'}}>{x.area}{x.confidence?` · ${x.confidence} confidence`:''}.</b> {x.reasoning}</div>))}
+          </div>
+          {(read.blindspots||[]).length>0 && (
+            <div style={{marginTop:10,padding:'10px 14px',borderRadius:'var(--r-md)',background:'rgba(255,255,255,0.02)',border:'1px solid var(--border-subtle)'}}>
+              <div style={{fontSize:11,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:6}}>What I can't see yet</div>
+              {read.blindspots.map((b,i)=>(<div key={i} style={{fontSize:12,color:'var(--text-secondary)',lineHeight:1.5,display:'flex',gap:8,marginBottom:3}}><span style={{color:'var(--text-faint)'}}>·</span><span>{b}</span></div>))}
+            </div>
+          )}
+          <ContextConsidered dx={dx}/>
+          <div className="note" style={{marginTop:10}}>Reasoned over the live evidence bundle (decomposition → baseline → confounder → verdict). {curSym()}are contribution-impact estimates used to rank leverage, not forecasts.</div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // Lets the operator log business context the data can't contain (a promo, a
@@ -2508,34 +2538,36 @@ function DiagnosticCard({metrics, context, period, onLogEvent}){
     <ContextConsidered dx={dx}/>
   </div>);
   const top = dx.findings[0];
-  return (<div className="card">
-    {logUI}
-    <div className="card-section-title">
-      <h2 style={{margin:0}}>Operator diagnostic <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>— what the numbers say right now</span></h2>
-      <div style={{display:'flex',alignItems:'center',gap:10}}><span className="meta">Live cross-metric read{dx.inPlay>0?` · ~${GBP(dx.inPlay)} contribution in play`:''}</span><LogEventButton onClick={()=>setLogOpen(true)}/></div>
-    </div>
-    <div style={{padding:'12px 16px',borderRadius:'var(--r-md)',background:'rgba(124,140,255,0.06)',border:'1px solid var(--border-subtle)',marginBottom:14}}>
-      <div style={{fontSize:11,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-faint)'}}>Biggest lever</div>
-      <div style={{fontSize:16,fontWeight:700,color:'var(--text-primary)',marginTop:2}}>{top.title}</div>
-      <div style={{fontSize:13,color:'var(--text-secondary)',marginTop:4,lineHeight:1.5}}>{top.evidence}</div>
-    </div>
-    <div style={{display:'flex',flexDirection:'column'}}>
-      {dx.findings.map((x,i)=>(
-        <div key={i} style={{display:'flex',gap:12,alignItems:'flex-start',padding:'11px 0',borderTop:i?'1px solid var(--border-subtle)':'none'}}>
-          <span style={{width:8,height:8,borderRadius:'50%',background:sevColor(x.sev),marginTop:6,flexShrink:0}}/>
-          <div style={{flex:1}}>
-            <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'baseline'}}>
-              <span style={{fontWeight:600,color:'var(--text-primary)'}}>{x.area}: {x.metric}</span>
-              {x.gbp>0 && <span style={{fontWeight:700,color:'var(--good)',whiteSpace:'nowrap'}}>~{GBP(x.gbp)}</span>}
+  return (
+    <div className="card">
+      {logUI}
+      <div className="card-section-title">
+        <h2 style={{margin:0}}>Operator diagnostic <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>— what the numbers say right now</span></h2>
+        <div style={{display:'flex',alignItems:'center',gap:10}}><span className="meta">Live cross-metric read{dx.inPlay>0?` · ~${GBP(dx.inPlay)} contribution in play`:''}</span><LogEventButton onClick={()=>setLogOpen(true)}/></div>
+      </div>
+      <div style={{padding:'12px 16px',borderRadius:'var(--r-md)',background:'rgba(124,140,255,0.06)',border:'1px solid var(--border-subtle)',marginBottom:14}}>
+        <div style={{fontSize:11,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-faint)'}}>Biggest lever</div>
+        <div style={{fontSize:16,fontWeight:700,color:'var(--text-primary)',marginTop:2}}>{top.title}</div>
+        <div style={{fontSize:13,color:'var(--text-secondary)',marginTop:4,lineHeight:1.5}}>{top.evidence}</div>
+      </div>
+      <div style={{display:'flex',flexDirection:'column'}}>
+        {dx.findings.map((x,i)=>(
+          <div key={i} style={{display:'flex',gap:12,alignItems:'flex-start',padding:'11px 0',borderTop:i?'1px solid var(--border-subtle)':'none'}}>
+            <span style={{width:8,height:8,borderRadius:'50%',background:sevColor(x.sev),marginTop:6,flexShrink:0}}/>
+            <div style={{flex:1}}>
+              <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'baseline'}}>
+                <span style={{fontWeight:600,color:'var(--text-primary)'}}>{x.area}: {x.metric}</span>
+                {x.gbp>0 && <span style={{fontWeight:700,color:'var(--good)',whiteSpace:'nowrap'}}>~{GBP(x.gbp)}</span>}
+              </div>
+              <div style={{fontSize:13,color:'var(--text-secondary)',marginTop:3,lineHeight:1.5}}>→ {x.action}</div>
             </div>
-            <div style={{fontSize:13,color:'var(--text-secondary)',marginTop:3,lineHeight:1.5}}>→ {x.action}</div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
+      <ContextConsidered dx={dx}/>
+      <div className="note" style={{marginTop:10}}>Computed live from this period's metrics via the operator model (funnel × unit economics × margin), with decomposition + event detection applied before ranking. {curSym()}are contribution-impact estimates used to rank leverage — not forecasts.</div>
     </div>
-    <ContextConsidered dx={dx}/>
-    <div className="note" style={{marginTop:10}}>Computed live from this period's metrics via the operator model (funnel × unit economics × margin), with decomposition + event detection applied before ranking. £ are contribution-impact estimates used to rank leverage — not forecasts.</div>
-  </div>);
+  );
 }
 
 function LtvCacCard({daily, gm, ordersPerCust}){
@@ -2562,33 +2594,35 @@ function LtvCacCard({daily, gm, ordersPerCust}){
   const ltvT = aovT*gm*ordersPerCust;
   const ratioT = cacT ? ltvT/cacT : null;
   const single = rows.length <= 1;
-  return (<div className="card">
-    <div className="card-section-title">
-      <h2 style={{margin:0}}>LTV : CAC over time <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>— weekly · est.</span></h2>
-      <span className="meta">This period: CAC {GBP(cacT)} · LTV {GBP(ltvT)} · ratio <b style={{color:(ratioT||0)>=3?'var(--good)':(ratioT||0)>=1?'var(--warn)':'var(--bad)'}}>{ratioT?ratioT.toFixed(1)+'×':'—'}</b> · target 3×+</span>
+  return (
+    <div className="card">
+      <div className="card-section-title">
+        <h2 style={{margin:0}}>LTV : CAC over time <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>— weekly · est.</span></h2>
+        <span className="meta">This period: CAC {GBP(cacT)} · LTV {GBP(ltvT)} · ratio <b style={{color:(ratioT||0)>=3?'var(--good)':(ratioT||0)>=1?'var(--warn)':'var(--bad)'}}>{ratioT?ratioT.toFixed(1)+'×':'—'}</b> · target 3×+</span>
+      </div>
+      <R.ResponsiveContainer width="100%" height={312}>
+        <R.ComposedChart data={rows} margin={{top:6,right:20,left:14,bottom:22}}>
+          <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
+          <R.XAxis dataKey="label" tick={{fill:'#7e7e8a',fontSize:11}} label={{value:'Week (starting)', position:'insideBottom', offset:-10, fill:'#6f6f7b', fontSize:11}}/>
+          <R.YAxis yAxisId="l" tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>curSym()+v} label={{value:`${curSym()} per customer`, angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
+          <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>v+'×'} label={{value:'LTV:CAC', angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
+          <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,boxShadow:'var(--shadow-md)'}} formatter={(v,nm)=> nm==='LTV:CAC' ? v+'×' : GBP(v)} labelFormatter={l=>'Week of '+l}/>
+          <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}}/>
+          <R.Line yAxisId="l" type="monotone" dataKey="ltv" name="LTV" stroke={COL.revenue} strokeWidth={2.2} dot={single?{r:3}:false}/>
+          <R.Line yAxisId="l" type="monotone" dataKey="cac" name="CAC" stroke={COL.meta} strokeWidth={2.2} dot={single?{r:3}:false}/>
+          <R.Line yAxisId="r" type="monotone" dataKey="ratio" name="LTV:CAC" stroke={COL.email} strokeWidth={2} strokeDasharray="4 3" dot={single?{r:3}:false}/>
+          <R.ReferenceLine yAxisId="r" y={3} stroke={COL.email} strokeDasharray="5 4" strokeOpacity={0.7}
+            label={{value:'3× target', position:'insideTopRight', fill:COL.email, fontSize:10.5}}/>
+          <R.Brush {...brushProps('label')} />
+        </R.ComposedChart>
+      </R.ResponsiveContainer>
+      <div style={{fontSize:10.5,color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{BRUSH_HINT}</div>
+      <div className="note" style={{marginTop:8}}>Weekly estimate: CAC = paid spend ÷ new customers (new-customer share from repeat data); LTV = AOV × gross margin ({PCT(gm)}) × repeat orders/customer. Healthy DTC unit economics run LTV:CAC ≥ 3×.</div>
+      <ChartFooter note="Is growth profitable? Watch LTV:CAC against the 3× line week to week."
+        ask="Looking at the LTV vs CAC trend, is my growth profitable and is the LTV:CAC ratio improving or deteriorating?"
+        rows={rows} columns={[{key:'label',label:'Week'},{key:'ltv',label:'LTV',right:true,fmt:v=>GBP(v)},{key:'cac',label:'CAC',right:true,fmt:v=>GBP(v)},{key:'ratio',label:'LTV:CAC',right:true,fmt:v=>v!=null?v.toFixed(2)+'×':'—'}]}/>
     </div>
-    <R.ResponsiveContainer width="100%" height={312}>
-      <R.ComposedChart data={rows} margin={{top:6,right:20,left:14,bottom:22}}>
-        <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
-        <R.XAxis dataKey="label" tick={{fill:'#7e7e8a',fontSize:11}} label={{value:'Week (starting)', position:'insideBottom', offset:-10, fill:'#6f6f7b', fontSize:11}}/>
-        <R.YAxis yAxisId="l" tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>'£'+v} label={{value:'£ per customer', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
-        <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>v+'×'} label={{value:'LTV:CAC', angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
-        <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,boxShadow:'var(--shadow-md)'}} formatter={(v,nm)=> nm==='LTV:CAC' ? v+'×' : GBP(v)} labelFormatter={l=>'Week of '+l}/>
-        <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}}/>
-        <R.Line yAxisId="l" type="monotone" dataKey="ltv" name="LTV" stroke={COL.revenue} strokeWidth={2.2} dot={single?{r:3}:false}/>
-        <R.Line yAxisId="l" type="monotone" dataKey="cac" name="CAC" stroke={COL.meta} strokeWidth={2.2} dot={single?{r:3}:false}/>
-        <R.Line yAxisId="r" type="monotone" dataKey="ratio" name="LTV:CAC" stroke={COL.email} strokeWidth={2} strokeDasharray="4 3" dot={single?{r:3}:false}/>
-        <R.ReferenceLine yAxisId="r" y={3} stroke={COL.email} strokeDasharray="5 4" strokeOpacity={0.7}
-          label={{value:'3× target', position:'insideTopRight', fill:COL.email, fontSize:10.5}}/>
-        <R.Brush {...brushProps('label')} />
-      </R.ComposedChart>
-    </R.ResponsiveContainer>
-    <div style={{fontSize:10.5,color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{BRUSH_HINT}</div>
-    <div className="note" style={{marginTop:8}}>Weekly estimate: CAC = paid spend ÷ new customers (new-customer share from repeat data); LTV = AOV × gross margin ({PCT(gm)}) × repeat orders/customer. Healthy DTC unit economics run LTV:CAC ≥ 3×.</div>
-    <ChartFooter note="Is growth profitable? Watch LTV:CAC against the 3× line week to week."
-      ask="Looking at the LTV vs CAC trend, is my growth profitable and is the LTV:CAC ratio improving or deteriorating?"
-      rows={rows} columns={[{key:'label',label:'Week'},{key:'ltv',label:'LTV',right:true,fmt:v=>GBP(v)},{key:'cac',label:'CAC',right:true,fmt:v=>GBP(v)},{key:'ratio',label:'LTV:CAC',right:true,fmt:v=>v!=null?v.toFixed(2)+'×':'—'}]}/>
-  </div>);
+  );
 }
 
 function ContributionCard({rev, orders, paid, gm}){
@@ -2765,133 +2799,128 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
   const modeBtn = (key,label)=>(<button onClick={()=>set('mode',key)} style={{padding:'5px 11px',borderRadius:6,border:'1px solid '+(mode===key?'var(--accent)':'var(--border-subtle)'),background:mode===key?'rgba(124,140,255,0.14)':'transparent',color:mode===key?'var(--text-primary)':'var(--text-muted)',fontSize:12,fontWeight:600,cursor:'pointer'}}>{label}</button>);
   const annLabel = rows.length===12 ? 'Year 1' : rows.length+'-month';
 
-  return (<div className="card">
-    <div className="card-section-title">
-      <h2 style={{margin:0}}>P&amp;L &amp; forecast <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>— {annLabel}, seasonalised</span></h2>
-      <div style={{display:'flex',gap:6}}>{modeBtn('topdown','Top-down')}{modeBtn('bottomup','Bottom-up')}</div>
-    </div>
-
-    {/* Assumptions — all number inputs at the TOP, before the outputs */}
-    <div style={{marginTop:6}}>
-      <div style={{fontSize:11,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:8}}>Assumptions <span style={{textTransform:'none',letterSpacing:0,color:'var(--text-muted)'}}>· seeded from last 30 days · saved in your browser · edit to recompute below</span></div>
-      <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:8}}>
-        {mode==='topdown' ? (<>
-          {fld('startRevenue','Start revenue','£')}
-          {fld('growthPct','Growth /mo',null,'%')}
-          {fld('targetMER','Target MER',null,'×')}
-          {fld('newAov','AOV','£')}
-        </>) : (<>
-          {fld('startSpend','Paid spend /mo','£')}
-          {fld('spendGrowthPct','Spend growth /mo',null,'%')}
-          {fld('cac','CAC','£')}
-          {fld('newAov','New AOV','£')}
-          {fld('organicNew','Organic new /mo',null,'cust')}
-          {fld('organicGrowthPct','Organic growth /mo',null,'%')}
-          {fld('repeatRate','Repeat rate /mo',null,'%')}
-          {fld('returnAov','Returning AOV','£')}
-        </>)}
+  return (
+    <div className="card">
+      <div className="card-section-title">
+        <h2 style={{margin:0}}>P&amp;L &amp; forecast <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>— {annLabel}, seasonalised</span></h2>
+        <div style={{display:'flex',gap:6}}>{modeBtn('topdown','Top-down')}{modeBtn('bottomup','Bottom-up')}</div>
       </div>
-      <div style={{display:'flex',gap:14,flexWrap:'wrap'}}>
-        {fld('gmPct','Gross margin',null,'%')}
-        {fld('fixedOpex','Fixed opex /mo','£')}
-        {fld('horizon','Horizon',null,'mo')}
-        {fld('startMonth','Start month (1-12)',null,null)}
-      </div>
-    </div>
-
-    {/* Advanced — retention, wholesale, seasonality */}
-    <Disclosure label="Advanced — retention base, wholesale & seasonality" open={showAdv} onToggle={()=>setShowAdv(s=>!s)}/>
-    {showAdv && (
-      <div style={{padding:'10px 0 0 4px'}}>
-        {mode==='bottomup' && <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:12}}>
-          {fld('startBase','Customer base',null,'cust')}
-          {fld('churnPct','Monthly churn',null,'%')}
-          {fld('wholesale','Wholesale /mo','£')}
-          {fld('wholesaleGrowthPct','Wholesale growth /mo',null,'%')}
-        </div>}
-        <div style={{fontSize:10.5,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:6}}>Seasonality index <span style={{textTransform:'none',letterSpacing:0,color:'var(--text-muted)'}}>· 1.0 = average month · default = UK jewellery (Nov–Dec, Feb, Mar peaks)</span></div>
-        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-          {FC_MONTHS.map((m,j)=>(<label key={j} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:2,fontSize:10,color:'var(--text-faint)'}}>
-            <span>{m}</span>
-            <input type="text" inputMode="decimal" defaultValue={inp['seas'+j]} onChange={e=>set('seas'+j,e.target.value)} onFocus={e=>e.target.select()} style={seasStyle}/>
-          </label>))}
+      {/* Assumptions — all number inputs at the TOP, before the outputs */}
+      <div style={{marginTop:6}}>
+        <div style={{fontSize:11,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:8}}>Assumptions <span style={{textTransform:'none',letterSpacing:0,color:'var(--text-muted)'}}>· seeded from last 30 days · saved in your browser · edit to recompute below</span></div>
+        <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:8}}>
+          {mode==='topdown' ? (<>
+            {fld('startRevenue','Start revenue',curSym())}
+            {fld('growthPct','Growth /mo',null,'%')}
+            {fld('targetMER','Target MER',null,'×')}
+            {fld('newAov','AOV',curSym())}
+          </>) : (<>
+            {fld('startSpend','Paid spend /mo',curSym())}
+            {fld('spendGrowthPct','Spend growth /mo',null,'%')}
+            {fld('cac','CAC',curSym())}
+            {fld('newAov','New AOV',curSym())}
+            {fld('organicNew','Organic new /mo',null,'cust')}
+            {fld('organicGrowthPct','Organic growth /mo',null,'%')}
+            {fld('repeatRate','Repeat rate /mo',null,'%')}
+            {fld('returnAov','Returning AOV',curSym())}
+          </>)}
+        </div>
+        <div style={{display:'flex',gap:14,flexWrap:'wrap'}}>
+          {fld('gmPct','Gross margin',null,'%')}
+          {fld('fixedOpex','Fixed opex /mo',curSym())}
+          {fld('horizon','Horizon',null,'mo')}
+          {fld('startMonth','Start month (1-12)',null,null)}
         </div>
       </div>
-    )}
-
-    {/* Outputs — recompute live from the assumptions above */}
-    <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:6}}>
-      {tile(annLabel+' revenue', GBP(t.revenue), null)}
-      {tile(annLabel+' contribution', GBP(t.contribution), PCT(t.cmPct)+' margin', t.contribution>=0?'var(--good)':'var(--bad)')}
-      {tile(annLabel+' EBITDA', GBP(t.ebitda), PCT(t.ebitdaPct)+' margin', t.ebitda>=0?'var(--good)':'var(--bad)')}
-      {tile('EBITDA break-even', beLabel, mode==='bottomup'?('repeat '+n('repeatRate').toFixed(0)+'%/mo'):('growth '+n('growthPct').toFixed(0)+'%/mo'))}
-    </div>
-    {mode==='bottomup' && <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:10}}>Revenue mix: <b style={{color:'#7c8cff'}}>New {pctOf(t.newRev)}%</b> · <b style={{color:'#6ee7b7'}}>Returning {pctOf(t.retRev)}%</b>{t.whRev>0?<> · <b style={{color:'#f59e0b'}}>Wholesale {pctOf(t.whRev)}%</b></>:''} — returning revenue compounds as the base grows.</div>}
-
-    <R.ResponsiveContainer width="100%" height={250}>
-      <R.ComposedChart data={rows} margin={{top:6,right:16,left:14,bottom:20}}>
-        <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
-        <R.XAxis dataKey="label" tick={{fill:'#7e7e8a',fontSize:11}} label={{value:'Month', position:'insideBottom', offset:-9, fill:'#6f6f7b', fontSize:11}}/>
-        <R.YAxis tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>'£'+(Math.abs(v)>=1000?(v/1000).toFixed(0)+'k':v)} width={52}/>
-        <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} formatter={v=>GBP(v)}/>
-        <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}}/>
-        {mode==='bottomup' ? [
-          <R.Area key="n" type="monotone" dataKey="newRev" name="New" stackId="rev" stroke="#7c8cff" fill="rgba(124,140,255,0.5)" strokeWidth={1}/>,
-          <R.Area key="r" type="monotone" dataKey="retRev" name="Returning" stackId="rev" stroke="#6ee7b7" fill="rgba(110,231,183,0.45)" strokeWidth={1}/>,
-          <R.Area key="w" type="monotone" dataKey="whRev" name="Wholesale" stackId="rev" stroke="#f59e0b" fill="rgba(245,158,11,0.4)" strokeWidth={1}/>
-        ] : (
-          <R.Area key="rev" type="monotone" dataKey="revenue" name="Revenue" stroke="#7c8cff" fill="rgba(124,140,255,0.16)" strokeWidth={2}/>
-        )}
-        <R.Line type="monotone" dataKey="ebitda" name="EBITDA" stroke="#f0f0f4" strokeWidth={2} strokeDasharray="4 3" dot={false}/>
-      </R.ComposedChart>
-    </R.ResponsiveContainer>
-
-    {/* Scenario band — investor-grade */}
-    <div style={{marginTop:14,overflowX:'auto'}}>
-      <table style={{width:'100%',borderCollapse:'collapse',fontSize:12.5,minWidth:420}}>
-        <thead><tr style={{color:'var(--text-faint)',textAlign:'right'}}>
-          <th style={{textAlign:'left',fontWeight:600,padding:'4px 0'}}>{annLabel} scenario</th>
-          <th style={{fontWeight:600,padding:'4px 8px'}}>Downside</th>
-          <th style={{fontWeight:600,padding:'4px 8px',color:'var(--text-secondary)'}}>Base</th>
-          <th style={{fontWeight:600,padding:'4px 8px'}}>Upside</th>
-        </tr></thead>
-        <tbody>
-          {[['Revenue','revenue'],['Contribution','contribution'],['EBITDA','ebitda']].map(([lab,key])=>(
-            <tr key={key} style={{borderTop:'1px solid var(--border-subtle)',textAlign:'right'}}>
-              <td style={{textAlign:'left',padding:'5px 0',color:'var(--text-secondary)'}}>{lab}</td>
-              <td style={{padding:'5px 8px',color:'var(--text-muted)'}}>{GBP(downside[key])}</td>
-              <td style={{padding:'5px 8px',fontWeight:700,color:'var(--text-primary)'}}>{GBP(t[key])}</td>
-              <td style={{padding:'5px 8px',color:'var(--good)'}}>{GBP(upside[key])}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-
-    <Disclosure label="Show annual P&L statement" open={showWork} onToggle={()=>setShowWork(s=>!s)}/>
-    {showWork && (
-      <div style={{maxWidth:560,fontSize:13,padding:'8px 0 0 4px'}}>
-        <CmRow label={`Revenue (${annLabel})`} amount={GBP(t.revenue)} bold color="var(--text-primary)" top="none"/>
-        {mode==='bottomup' && <><CmRow label="  · New customers" amount={GBP(t.newRev)} color="var(--text-muted)"/>
-        <CmRow label="  · Returning customers" amount={GBP(t.retRev)} color="var(--text-muted)"/>
-        {t.whRev>0 && <CmRow label="  · Wholesale" amount={GBP(t.whRev)} color="var(--text-muted)"/>}</>}
-        <CmRow label={`− COGS (${PCT(1-n('gmPct')/100)})`} amount={'−'+GBP(t.cogs)} color="var(--text-muted)"/>
-        <CmRow label="= Gross profit" amount={GBP(t.grossProfit)} bold color="var(--good)"/>
-        <CmRow label="− Variable order costs (pack/fulfil/ship/fees/refunds)" amount={'−'+GBP(t.varCosts)} color="var(--text-muted)"/>
-        <CmRow label="− Paid marketing" amount={'−'+GBP(t.paidSpend)} color="var(--text-muted)"/>
-        <CmRow label="= Contribution" amount={GBP(t.contribution)} bold color={t.contribution>=0?'var(--good)':'var(--bad)'} top="2px solid var(--border-default)"/>
-        <CmRow label="− Fixed overheads" amount={'−'+GBP(t.opex)} color="var(--text-muted)"/>
-        <CmRow label="= EBITDA" amount={GBP(t.ebitda)} bold color={t.ebitda>=0?'var(--good)':'var(--bad)'} top="2px solid var(--border-default)"/>
+      {/* Advanced — retention, wholesale, seasonality */}
+      <Disclosure label="Advanced — retention base, wholesale & seasonality" open={showAdv} onToggle={()=>setShowAdv(s=>!s)}/>
+      {showAdv && (
+        <div style={{padding:'10px 0 0 4px'}}>
+          {mode==='bottomup' && <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:12}}>
+            {fld('startBase','Customer base',null,'cust')}
+            {fld('churnPct','Monthly churn',null,'%')}
+            {fld('wholesale','Wholesale /mo',curSym())}
+            {fld('wholesaleGrowthPct','Wholesale growth /mo',null,'%')}
+          </div>}
+          <div style={{fontSize:10.5,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:6}}>Seasonality index <span style={{textTransform:'none',letterSpacing:0,color:'var(--text-muted)'}}>· 1.0 = average month · default = UK jewellery (Nov–Dec, Feb, Mar peaks)</span></div>
+          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+            {FC_MONTHS.map((m,j)=>(<label key={j} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:2,fontSize:10,color:'var(--text-faint)'}}>
+              <span>{m}</span>
+              <input type="text" inputMode="decimal" defaultValue={inp['seas'+j]} onChange={e=>set('seas'+j,e.target.value)} onFocus={e=>e.target.select()} style={seasStyle}/>
+            </label>))}
+          </div>
+        </div>
+      )}
+      {/* Outputs — recompute live from the assumptions above */}
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:6}}>
+        {tile(annLabel+' revenue', GBP(t.revenue), null)}
+        {tile(annLabel+' contribution', GBP(t.contribution), PCT(t.cmPct)+' margin', t.contribution>=0?'var(--good)':'var(--bad)')}
+        {tile(annLabel+' EBITDA', GBP(t.ebitda), PCT(t.ebitdaPct)+' margin', t.ebitda>=0?'var(--good)':'var(--bad)')}
+        {tile('EBITDA break-even', beLabel, mode==='bottomup'?('repeat '+n('repeatRate').toFixed(0)+'%/mo'):('growth '+n('growthPct').toFixed(0)+'%/mo'))}
       </div>
-    )}
-
-    <div className="note" style={{marginTop:10}}>
-      {mode==='bottomup'
-        ? <>Bottom-up: <b>New</b> = (paid spend ÷ CAC + organic new) × new AOV; <b>Returning</b> = customer base × repeat rate × returning AOV, where the base compounds (each month's new customers join it); <b>+ Wholesale</b>. Every line is seasonalised by calendar month. CAC bundles CPM×CTR×CVR — seed it from a defensible blended figure. Base + repeat rate are seeded to reproduce your current returning-order share.</>
-        : <>Top-down: revenue compounds at your monthly growth rate (×seasonality); paid marketing is implied at your target MER. Cross-check against bottom-up — if the spend to hit this revenue is unaffordable, it's a wish, not a plan.</>}
-      {' '}Seasonality defaults to a UK-jewellery curve (peaks Nov–Dec, Feb, Mar; troughs Jan + summer) — edit in Advanced. Scenarios flex growth + retention. Not a cash-flow model — working capital (stock + AR/AP days) sits on top.
+      {mode==='bottomup' && <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:10}}>Revenue mix: <b style={{color:'#7c8cff'}}>New {pctOf(t.newRev)}%</b> · <b style={{color:'#6ee7b7'}}>Returning {pctOf(t.retRev)}%</b>{t.whRev>0?<> · <b style={{color:'#f59e0b'}}>Wholesale {pctOf(t.whRev)}%</b></>:''} — returning revenue compounds as the base grows.</div>}
+      <R.ResponsiveContainer width="100%" height={250}>
+        <R.ComposedChart data={rows} margin={{top:6,right:16,left:14,bottom:20}}>
+          <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
+          <R.XAxis dataKey="label" tick={{fill:'#7e7e8a',fontSize:11}} label={{value:'Month', position:'insideBottom', offset:-9, fill:'#6f6f7b', fontSize:11}}/>
+          <R.YAxis tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>curSym()+(Math.abs(v)>=1000?(v/1000).toFixed(0)+'k':v)} width={52}/>
+          <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} formatter={v=>GBP(v)}/>
+          <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}}/>
+          {mode==='bottomup' ? [
+            <R.Area key="n" type="monotone" dataKey="newRev" name="New" stackId="rev" stroke="#7c8cff" fill="rgba(124,140,255,0.5)" strokeWidth={1}/>,
+            <R.Area key="r" type="monotone" dataKey="retRev" name="Returning" stackId="rev" stroke="#6ee7b7" fill="rgba(110,231,183,0.45)" strokeWidth={1}/>,
+            <R.Area key="w" type="monotone" dataKey="whRev" name="Wholesale" stackId="rev" stroke="#f59e0b" fill="rgba(245,158,11,0.4)" strokeWidth={1}/>
+          ] : (
+            <R.Area key="rev" type="monotone" dataKey="revenue" name="Revenue" stroke="#7c8cff" fill="rgba(124,140,255,0.16)" strokeWidth={2}/>
+          )}
+          <R.Line type="monotone" dataKey="ebitda" name="EBITDA" stroke="#f0f0f4" strokeWidth={2} strokeDasharray="4 3" dot={false}/>
+        </R.ComposedChart>
+      </R.ResponsiveContainer>
+      {/* Scenario band — investor-grade */}
+      <div style={{marginTop:14,overflowX:'auto'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:12.5,minWidth:420}}>
+          <thead><tr style={{color:'var(--text-faint)',textAlign:'right'}}>
+            <th style={{textAlign:'left',fontWeight:600,padding:'4px 0'}}>{annLabel} scenario</th>
+            <th style={{fontWeight:600,padding:'4px 8px'}}>Downside</th>
+            <th style={{fontWeight:600,padding:'4px 8px',color:'var(--text-secondary)'}}>Base</th>
+            <th style={{fontWeight:600,padding:'4px 8px'}}>Upside</th>
+          </tr></thead>
+          <tbody>
+            {[['Revenue','revenue'],['Contribution','contribution'],['EBITDA','ebitda']].map(([lab,key])=>(
+              <tr key={key} style={{borderTop:'1px solid var(--border-subtle)',textAlign:'right'}}>
+                <td style={{textAlign:'left',padding:'5px 0',color:'var(--text-secondary)'}}>{lab}</td>
+                <td style={{padding:'5px 8px',color:'var(--text-muted)'}}>{GBP(downside[key])}</td>
+                <td style={{padding:'5px 8px',fontWeight:700,color:'var(--text-primary)'}}>{GBP(t[key])}</td>
+                <td style={{padding:'5px 8px',color:'var(--good)'}}>{GBP(upside[key])}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Disclosure label="Show annual P&L statement" open={showWork} onToggle={()=>setShowWork(s=>!s)}/>
+      {showWork && (
+        <div style={{maxWidth:560,fontSize:13,padding:'8px 0 0 4px'}}>
+          <CmRow label={`Revenue (${annLabel})`} amount={GBP(t.revenue)} bold color="var(--text-primary)" top="none"/>
+          {mode==='bottomup' && <><CmRow label="  · New customers" amount={GBP(t.newRev)} color="var(--text-muted)"/>
+          <CmRow label="  · Returning customers" amount={GBP(t.retRev)} color="var(--text-muted)"/>
+          {t.whRev>0 && <CmRow label="  · Wholesale" amount={GBP(t.whRev)} color="var(--text-muted)"/>}</>}
+          <CmRow label={`− COGS (${PCT(1-n('gmPct')/100)})`} amount={'−'+GBP(t.cogs)} color="var(--text-muted)"/>
+          <CmRow label="= Gross profit" amount={GBP(t.grossProfit)} bold color="var(--good)"/>
+          <CmRow label="− Variable order costs (pack/fulfil/ship/fees/refunds)" amount={'−'+GBP(t.varCosts)} color="var(--text-muted)"/>
+          <CmRow label="− Paid marketing" amount={'−'+GBP(t.paidSpend)} color="var(--text-muted)"/>
+          <CmRow label="= Contribution" amount={GBP(t.contribution)} bold color={t.contribution>=0?'var(--good)':'var(--bad)'} top="2px solid var(--border-default)"/>
+          <CmRow label="− Fixed overheads" amount={'−'+GBP(t.opex)} color="var(--text-muted)"/>
+          <CmRow label="= EBITDA" amount={GBP(t.ebitda)} bold color={t.ebitda>=0?'var(--good)':'var(--bad)'} top="2px solid var(--border-default)"/>
+        </div>
+      )}
+      <div className="note" style={{marginTop:10}}>
+        {mode==='bottomup'
+          ? <>Bottom-up: <b>New</b> = (paid spend ÷ CAC + organic new) × new AOV; <b>Returning</b> = customer base × repeat rate × returning AOV, where the base compounds (each month's new customers join it); <b>+ Wholesale</b>. Every line is seasonalised by calendar month. CAC bundles CPM×CTR×CVR — seed it from a defensible blended figure. Base + repeat rate are seeded to reproduce your current returning-order share.</>
+          : <>Top-down: revenue compounds at your monthly growth rate (×seasonality); paid marketing is implied at your target MER. Cross-check against bottom-up — if the spend to hit this revenue is unaffordable, it's a wish, not a plan.</>}
+        {' '}Seasonality defaults to a UK-jewellery curve (peaks Nov–Dec, Feb, Mar; troughs Jan + summer) — edit in Advanced. Scenarios flex growth + retention. Not a cash-flow model — working capital (stock + AR/AP days) sits on top.
+      </div>
     </div>
-  </div>);
+  );
 }
 
 // ── Mobile + performance helpers (UX Phase 3) ────────────────────────────────
@@ -2942,28 +2971,30 @@ function MobileToday(){
     .filter(a => a && a.status!=='done' && a.status!=='verified-done' && Math.abs(a.monthly_impact_gbp||0) >= 50)
     .sort((a,b)=> Math.abs(b.monthly_impact_gbp||0) - Math.abs(a.monthly_impact_gbp||0))
     .slice(0,3);
-  return (<div className="card" style={{borderLeft:'3px solid var(--accent)', marginBottom:14}}>
-    <div style={{fontSize:11,fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--accent)',marginBottom:6}}>Today</div>
-    {rollup.total!=null && <div style={{fontSize:22,fontWeight:750,lineHeight:1.2}}>£{(Math.round((rollup.total||0)/100)/10)}k/mo in play</div>}
-    {dx.headline && <div style={{fontSize:13,color:'var(--text-secondary)',margin:'6px 0 12px',lineHeight:1.5}}>{dx.headline}</div>}
-    <div style={{fontSize:11,fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-muted)',marginBottom:6}}>Do this next</div>
-    <div style={{display:'flex',flexDirection:'column',gap:8}}>
-      {actions.length ? actions.map((a,i)=>(
-        <div key={i} onClick={()=>window.__oiAsk&&window.__oiAsk(`How do I action this, and what's the expected impact: ${a.description}`)}
-          style={{padding:'10px 12px',background:'var(--bg-elevated)',border:'1px solid var(--border-subtle)',borderRadius:10,cursor:'pointer'}}>
-          <div style={{fontSize:13,color:'var(--text-primary)',lineHeight:1.4}}>{a.description}</div>
-          <div style={{fontSize:11,color:'var(--text-faint)',marginTop:5,display:'flex',gap:12,flexWrap:'wrap'}}>
-            <span style={{color:kc(a.kind),fontWeight:600}}>~£{Math.round(Math.abs(a.monthly_impact_gbp)).toLocaleString()}/mo</span>
-            {a.priority && <span>⏱ {byWhen(a.priority)}</span>}
-            <span style={{color:'var(--accent)'}}>tap to ask →</span>
+  return (
+    <div className="card" style={{borderLeft:'3px solid var(--accent)', marginBottom:14}}>
+      <div style={{fontSize:11,fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--accent)',marginBottom:6}}>Today</div>
+      {rollup.total!=null && <div style={{fontSize:22,fontWeight:750,lineHeight:1.2}}>{curSym()}{(Math.round((rollup.total||0)/100)/10)}k/mo in play</div>}
+      {dx.headline && <div style={{fontSize:13,color:'var(--text-secondary)',margin:'6px 0 12px',lineHeight:1.5}}>{dx.headline}</div>}
+      <div style={{fontSize:11,fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-muted)',marginBottom:6}}>Do this next</div>
+      <div style={{display:'flex',flexDirection:'column',gap:8}}>
+        {actions.length ? actions.map((a,i)=>(
+          <div key={i} onClick={()=>window.__oiAsk&&window.__oiAsk(`How do I action this, and what's the expected impact: ${a.description}`)}
+            style={{padding:'10px 12px',background:'var(--bg-elevated)',border:'1px solid var(--border-subtle)',borderRadius:10,cursor:'pointer'}}>
+            <div style={{fontSize:13,color:'var(--text-primary)',lineHeight:1.4}}>{a.description}</div>
+            <div style={{fontSize:11,color:'var(--text-faint)',marginTop:5,display:'flex',gap:12,flexWrap:'wrap'}}>
+              <span style={{color:kc(a.kind),fontWeight:600}}>~{curSym()}{Math.round(Math.abs(a.monthly_impact_gbp)).toLocaleString()}/mo</span>
+              {a.priority && <span>⏱ {byWhen(a.priority)}</span>}
+              <span style={{color:'var(--accent)'}}>tap to ask →</span>
+            </div>
           </div>
-        </div>
-      )) : <div className="muted" style={{fontSize:12}}>No high-£ actions open right now.</div>}
+        )) : <div className="muted" style={{fontSize:12}}>No high-{curSym()}actions open right now.</div>}
+      </div>
+      <button onClick={()=>window.__oiAsk&&window.__oiAsk(`What should I do today? Give me the top 3 actions, ranked by ${curSym()} impact.`)}
+        style={{marginTop:12,width:'100%',padding:'12px',background:'#c084fc',border:'none',borderRadius:10,color:'#fff',fontWeight:650,fontSize:14,cursor:'pointer'}}>✦ Ask: What should I do today?</button>
+      <div style={{fontSize:11,color:'var(--text-faint)',textAlign:'center',marginTop:10}}>↓ Full dashboard below</div>
     </div>
-    <button onClick={()=>window.__oiAsk&&window.__oiAsk('What should I do today? Give me the top 3 actions, ranked by £ impact.')}
-      style={{marginTop:12,width:'100%',padding:'12px',background:'#c084fc',border:'none',borderRadius:10,color:'#fff',fontWeight:650,fontSize:14,cursor:'pointer'}}>✦ Ask: What should I do today?</button>
-    <div style={{fontSize:11,color:'var(--text-faint)',textAlign:'center',marginTop:10}}>↓ Full dashboard below</div>
-  </div>);
+  );
 }
 
 // "What changed" — latest complete week vs the one before, the movers worth a look.
@@ -2993,12 +3024,12 @@ function WhatChangedStrip(){
   let i = weeks.length-1; while(i>0 && weeks[i].partial) i--;
   const W = weeks[i], prev = weeks[i-1];
   if(!W || !prev) return null;
-  const gbpK = v=>'£'+(Math.abs(v)>=1000?(v/1000).toFixed(1).replace(/\.0$/,'')+'k':Math.round(v));
+  const gbpK = v=>curSym()+(Math.abs(v)>=1000?(v/1000).toFixed(1).replace(/\.0$/,'')+'k':Math.round(v));
   const pct0 = v=>v!=null?(v*100).toFixed(0)+'%':'—';
   const SPECS = [
     {key:'revenue',       label:'Revenue',             fmt:v=>GBP(v),                              axisFmt:gbpK,                better:'up'},
     {key:'orders',        label:'Orders',              fmt:v=>NUM(v),                              axisFmt:v=>Math.round(v),    better:'up'},
-    {key:'aov',           label:'AOV',                 fmt:v=>GBP(v),                              axisFmt:v=>'£'+Math.round(v), better:'up'},
+    {key:'aov',           label:'AOV',                 fmt:v=>GBP(v),                              axisFmt:v=>curSym()+Math.round(v), better:'up'},
     {key:'cvr',           label:'Conversion rate',     fmt:v=>v!=null?(v*100).toFixed(2)+'%':'—',  axisFmt:v=>(v*100).toFixed(1)+'%', better:'up',   bench:CVR_BENCH},
     {key:'mer',           label:'Blended ROAS',        fmt:v=>v!=null?v.toFixed(2)+'×':'—',         axisFmt:v=>v.toFixed(1)+'×', better:'up',   bench:3},
     {key:'paid',          label:'Paid spend',          fmt:v=>GBP(v),                              axisFmt:gbpK,                better:'flat'},
@@ -3196,202 +3227,188 @@ function Overview({start, period, customActive}){
   const priEvents = brandEvents.filter(e=>eventOverlaps(e, prior.start, prior.end));
   const dxContext = buildEvidence({mer, pMer, paid, pPaid, rev, pRev, orders, pOrders, discLoad, pDiscLoad, histDaily,
                                    events:{current:curEvents, prior:priEvents, all:brandEvents}});
-  return (<div style={{display:'flex', flexDirection:'column', gap:'var(--s-5)'}}>
-    {costsOpen && <CostSetupModal catalogueGm={grossMargin} onClose={()=>setCostsOpen(false)}/>}
-
-    {/* Cost-setup prompt deliberately lives BELOW the hero + diagnosis (prove value
-        first, then ask for the ~5-min margin input) — see after DiagnosticCard. */}
-
-    {/* Mobile "Today" — 60-second check-in at the very top on narrow screens. */}
-    {isMobile && <MobileToday/>}
-
-    {/* Per-channel freshness moved to the app-bar FreshnessChip (was duplicated here). */}
-
-    {/* Hero — the answer to "what should I look at right now" */}
-    <ThisWeekHero/>
-
-    {/* Crux verdict: compact scorecard strip + the diagnostic (with the £-bridge nested in its "thinking") */}
-    <ScoresStrip metrics={cruxMetrics} windowLabel={`last ${CRUX_DAYS} days`}/>
-    <DiagnosticCard metrics={dxMetrics} context={dxContext} period={customActive?null:period} onLogEvent={()=>setEvTick(t=>t+1)}/>
-
-    {/* WHAT CHANGED — the weekly diff, so the founder sees the movers before the deep-dive. */}
-    <WhatChangedStrip/>
-
-    {/* Prove-value-first onboarding nudge: the read above already works on
-        catalogue-estimate margins — now offer the one ~5-min input that makes the
-        margin figures exact. Placed AFTER the value, framed as "make it exact". */}
-    {!costsVerified && (
-      <div className="card" style={{borderLeft:'3px solid var(--accent)', display:'flex', alignItems:'center', gap:16, flexWrap:'wrap'}}>
-        <div style={{flex:'1 1 420px'}}>
-          <div style={{fontWeight:650, fontSize:14, marginBottom:3}}>Make the margin numbers exact <span style={{fontWeight:400, color:'var(--text-faint)', fontSize:12}}>· optional, ~5 min</span></div>
-          <div className="micro" style={{color:'var(--text-secondary)', lineHeight:1.5}}>The read above already works on catalogue-estimate margins. Enter your real COGS + fulfilment once and contribution, CAC payback and LTV:CAC become exact — and carry a <b>✓ verified</b> badge for the raise.</div>
+  return (
+    <div style={{display:'flex', flexDirection:'column', gap:'var(--s-5)'}}>
+      {costsOpen && <CostSetupModal catalogueGm={grossMargin} onClose={()=>setCostsOpen(false)}/>}
+      {/* Cost-setup prompt deliberately lives BELOW the hero + diagnosis (prove value
+          first, then ask for the ~5-min margin input) — see after DiagnosticCard. */}
+      {/* Mobile "Today" — 60-second check-in at the very top on narrow screens. */}
+      {isMobile && <MobileToday/>}
+      {/* Per-channel freshness moved to the app-bar FreshnessChip (was duplicated here). */}
+      {/* Hero — the answer to "what should I look at right now" */}
+      <ThisWeekHero/>
+      {/* Crux verdict: compact scorecard strip + the diagnostic (with the £-bridge nested in its "thinking") */}
+      <ScoresStrip metrics={cruxMetrics} windowLabel={`last ${CRUX_DAYS} days`}/>
+      <DiagnosticCard metrics={dxMetrics} context={dxContext} period={customActive?null:period} onLogEvent={()=>setEvTick(t=>t+1)}/>
+      {/* WHAT CHANGED — the weekly diff, so the founder sees the movers before the deep-dive. */}
+      <WhatChangedStrip/>
+      {/* Prove-value-first onboarding nudge: the read above already works on
+          catalogue-estimate margins — now offer the one ~5-min input that makes the
+          margin figures exact. Placed AFTER the value, framed as "make it exact". */}
+      {!costsVerified && (
+        <div className="card" style={{borderLeft:'3px solid var(--accent)', display:'flex', alignItems:'center', gap:16, flexWrap:'wrap'}}>
+          <div style={{flex:'1 1 420px'}}>
+            <div style={{fontWeight:650, fontSize:14, marginBottom:3}}>Make the margin numbers exact <span style={{fontWeight:400, color:'var(--text-faint)', fontSize:12}}>· optional, ~5 min</span></div>
+            <div className="micro" style={{color:'var(--text-secondary)', lineHeight:1.5}}>The read above already works on catalogue-estimate margins. Enter your real COGS + fulfilment once and contribution, CAC payback and LTV:CAC become exact — and carry a <b>✓ verified</b> badge for the raise.</div>
+          </div>
+          <button onClick={()=>setCostsOpen(true)} className="btn-primary" style={{flexShrink:0}}>Set up costs →</button>
         </div>
-        <button onClick={()=>setCostsOpen(true)} className="btn-primary" style={{flexShrink:0}}>Set up costs →</button>
+      )}
+      {costsVerified && (
+        <div className="micro" style={{color:'var(--text-faint)', display:'flex', alignItems:'center', gap:8}}>
+          <MarginBadge/> margin figures are based on your entered costs · <span onClick={()=>setCostsOpen(true)} style={{color:'var(--accent)', cursor:'pointer'}}>edit costs</span>
+        </div>
+      )}
+      {/* DO THIS NEXT — the action queue sits directly under the diagnosis (what's
+          happening + why → what to do), not buried beneath the analysis charts. */}
+      <div className="section-eyebrow" style={{display:'flex',alignItems:'center',gap:8,margin:'4px 0 -4px',fontSize:11,fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--accent)'}}>
+        <span style={{width:3,height:14,background:'var(--accent)',borderRadius:2}}/>Do this next
       </div>
-    )}
-    {costsVerified && (
-      <div className="micro" style={{color:'var(--text-faint)', display:'flex', alignItems:'center', gap:8}}>
-        <MarginBadge/> margin figures are based on your entered costs · <span onClick={()=>setCostsOpen(true)} style={{color:'var(--accent)', cursor:'pointer'}}>edit costs</span>
+      <ActionBoard/>
+      {/* COMMERCIAL HEALTH */}
+      <div className="section-eyebrow" style={{display:'flex',alignItems:'center',gap:8,margin:'8px 0 -4px',fontSize:11,fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--text-muted)'}}>
+        <span style={{width:3,height:14,background:'var(--text-faint)',borderRadius:2}}/>Commercial health
       </div>
-    )}
-
-    {/* DO THIS NEXT — the action queue sits directly under the diagnosis (what's
-        happening + why → what to do), not buried beneath the analysis charts. */}
-    <div className="section-eyebrow" style={{display:'flex',alignItems:'center',gap:8,margin:'4px 0 -4px',fontSize:11,fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--accent)'}}>
-      <span style={{width:3,height:14,background:'var(--accent)',borderRadius:2}}/>Do this next
+      {/* KPI strip — collapsed by default, hover for full agent commentary */}
+      <div>
+        <div className="card-section-title" style={{marginBottom:'var(--s-3)'}}>
+          <h2 style={{margin:0}}>Headline KPIs</h2>
+          <span className="meta">Last {daily.length} days · vs prior period · hover any card for the full read</span>
+        </div>
+        <div className="row">
+          <KPI label="Paid ad spend" val={GBP(paid)} sub={`Meta ${GBP(sum(meta,'cost'))} · Google ${GBP(sum(gads,'cost'))}`} series={seriesPaid} current={paid} prior={pPaid}
+            agent="Pulse" observation={OI_BRAND.slug==='frkl' ? `Up ~46% on prior period as Meta scaled from ~${curSym()}100 to ~${curSym()}170/day from 13 April.` : undefined}
+            implication={OI_BRAND.slug==='frkl' ? "Don't push further until Ireland frequency drops below 8× and the cart-checkout JS error is fixed." : undefined} />
+          <KPI label="Shopify net revenue" val={GBP(rev)} sub={`${NUM(orders)} orders · AOV ${GBP(orders?rev/orders:null)}`} series={seriesRev} current={rev} prior={pRev} goodDirection="up"
+            agent="Atlas" observation={`Draft/exchange orders are excluded. ~${discLoad!=null?Math.round(discLoad*100):10}% of DTC gross sales went out as code/automatic discounts, with sale-price markdowns on top — see Promotions for the full load.`}
+            implication="Confirm a real COGS% so this becomes a defensible contribution number for the raise." />
+          <KPI label="Blended MER" val={mer?mer.toFixed(2)+'x':'—'} sub="net revenue ÷ paid spend" series={seriesMER} current={mer} prior={pMer} goodDirection="up"
+            agent="Atlas" observation="Down ~14%: revenue grew slower than spend (27% vs 46%), so each pound of ad earns less."
+            implication="Classic diminishing returns from scaling into a fatigued audience — pause scaling, fix creative + site first."
+            benchmark="blended_mer" bmValue={mer} />
+          <KPI label="Sessions (GA4)" val={NUM(sessions)} sub={`Site CVR ${PCT(sessions?orders/sessions:null)} (orders ÷ sessions)`} series={seriesSessions} current={sessions} prior={pSessions} goodDirection="up"
+            agent="Pulse" observation={`Sessions grew far slower than spend. Site CVR (Shopify orders ÷ GA4 sessions) is ${sessions?PCT(orders/sessions):'—'} vs the ${CVR_BENCH_LABEL} target.`}
+            implication="Spend is buying impressions, not visits. Site fixes (cart JS, sticky checkout) unlock more revenue than more spend." />
+          <KPI label="Klaviyo-tracked orders" val={GBP(emailRev)} sub="gross order value — not email-attributed" series={seriesEmail} current={emailRev} prior={pEmailRev} goodDirection="up"
+            agent="Lux" observation="Up ~32% — email is keeping pace with the paid scale-up."
+            implication="Highest-leverage moment to switch on attributed reporting + a real abandoned-cart sequence." />
+          <KPI label="Conversion rate (CVR)" val={PCT(cvr)} sub={`${NUM(orders)} orders ÷ ${NUM(sessions)} sessions`} series={seriesCVR} current={cvr} prior={pCvr} goodDirection="up"
+            status={cvr==null?undefined:cvr>=CVR_BENCH?'healthy':cvr>=CVR_BENCH*0.8?'watch':'action'} statusLabel={cvr==null?undefined:cvr>=CVR_BENCH?'Healthy':cvr>=CVR_BENCH*0.8?'Watch':'Below target'}
+            agent="Pulse" observation={`Site CVR (Shopify orders ÷ GA4 sessions) is the single biggest revenue lever — against the ${CVR_BENCH_LABEL} target, more spend just buys more bounces.`}
+            implication="Fix the cart→checkout JS error and sticky-checkout before scaling spend further."
+            benchmark="site_cvr" bmValue={cvr} />
+          <KPI label="Discount depth" val={PCT(discLoad)} sub={`${curSym()} off ÷ ${curSym()} of sales — how deep, not how many orders · drafts excluded`} series={seriesDisc} current={discLoad} prior={pDiscLoad} goodDirection="down"
+            agent="Atlas" observation={`Code + automatic discount as a share of DTC gross sales (draft/exchange orders excluded). This excludes sale-price markdowns${_mdPct?`, which add ~${_mdPct}% of value on top`:''} — the full load is on the Promotions tab.`}
+            implication="Audit always-on codes + affiliate rates; protect full-price demand. The true load incl. markdowns is materially higher — see Promotions."
+            benchmark="discount_load" bmValue={discLoad} />
+          <KPI label="Contribution margin" val={cmPct!=null?PCT(cmPct):'—'} sub="net rev × margin − ad spend, net of returns · ≥10% healthy" badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesContrib} seriesLabel={`Contribution ${curSym()} · by day`} current={contrib} prior={pContrib} goodDirection="up"
+            status={cmPct==null?undefined:cmPct>=0.10?'healthy':cmPct>=0.05?'watch':'margin'} statusLabel={cmPct==null?undefined:cmPct>=0.10?'Healthy':cmPct>=0.05?'Watch':'Margin risk'}
+            agent="Atlas" observation="Whether the growth is actually profitable — net revenue × product margin minus paid media, as a share of revenue. Returns are already netted out of revenue. The single best read on profitable vs vanity growth."
+            implication="Below 10% means scaling just amplifies a thin engine — fix discount load, returns and CAC before adding spend."
+            benchmark="contribution_margin" bmValue={cmPct} />
+          <KPI label="CAC payback" val={paybackOrders!=null?(paybackOrders<=1?'1st order':paybackOrders.toFixed(1)+' orders'):'—'} sub={cac!=null?`paid CAC ${curSym()}${Math.round(cac)} ÷ first-order contribution · target ≤2`:'needs paid CAC'} goodDirection="down"
+            status={paybackOrders==null?undefined:paybackOrders<=2?'healthy':paybackOrders<=3?'watch':'action'} statusLabel={paybackOrders==null?undefined:paybackOrders<=2?'Healthy':paybackOrders<=3?'Watch':'Slow payback'}
+            agent="Atlas" observation="How many orders it takes to recover the paid cost of acquiring a customer, at your margin. Under ~2 orders = a healthy cash cycle that funds reinvestment."
+            implication="This is the lever on cash flow — faster payback frees working capital. Watch it as you scale spend; if it stretches past 2, growth starts eating cash." />
+          <MoreKpis count={8}>
+          <KPI label="Gross margin" val={PCT(gm)} sub={costsVerified?"Your entered gross margin":"COGS-based · catalogue estimate"} badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesGM} seriesLabel="Catalogue margin · structurally stable"
+            agent="Atlas" observation="Blended product margin across the live catalogue, after cost of goods."
+            implication="This is the contribution base for the raise — defend it by keeping discount load in check."
+            benchmark="gross_margin" bmValue={gm} />
+          <KPI label="Return rate" val={PCT(returnRate)} sub={`${NUM(_rets)} of ${NUM(_units)} units · 90d`} series={seriesReturn} seriesLabel="Refunds ÷ sales · by day" goodDirection="down"
+            agent="Lux" observation={`Share of shipped units returned — watch by SKU for sizing/quality hotspots. (Card is unit-based over 90d; trend is refund-${curSym()} share of sales by day.)`}
+            implication="A point of return rate is pure margin; flag any SKU materially above this blended rate."
+            benchmark="return_rate" bmValue={returnRate} />
+          <KPI label="Orders with a discount" val={_dc.fullPriceShare!=null?PCT(1-_dc.fullPriceShare):'—'} sub="share of orders using a code/auto discount — how often, not how deep · drafts excluded" goodDirection="down"
+            agent="Atlas" observation={_dc.fullPriceShare!=null?`${Math.round((1-_dc.fullPriceShare)*100)}% of orders carry a discount; ${Math.round(_dc.fullPriceShare*100)}% pay full price. Read it with Discount depth: lots of orders but a shallow ~${discLoad!=null?Math.round(discLoad*100):9}% of revenue = many small codes, not deep cuts.`:'How often a discount is used across orders (draft/exchange orders excluded).'}
+            implication="If penetration and depth climb together you're training customers to wait for a code — tighten the always-on codes first." series={seriesPenetration} seriesLabel="Orders with a code · by week" />
+          <KPI label="Discount value" val={GBP(discAmt)} sub={`total ${curSym()} given as code/auto discount this period — drafts excluded`} series={seriesDiscVal} seriesLabel={`Discount ${curSym()} given · by day`} goodDirection="down"
+            agent="Atlas" observation="The actual money handed back as discounts this period (code + automatic). Excludes sale-price markdowns, which are shown separately on Promotions."
+            implication="Recoverable margin to the extent any of it went to buyers who'd have paid full price — start with the biggest always-on codes." />
+          <KPI label="Returning customers" val={PCT(returningPct)} sub="share of orders · trailing months" series={seriesReturning} seriesLabel="Repeat-order share · by month" goodDirection="up"
+            agent="Lux" observation="Repeat-purchase share — the cheapest revenue you have and a read on brand love."
+            implication="Lift with post-purchase flows + a reason to come back; it compounds faster than paid." />
+          <KPI label="Contribution (pre-opex)" val={GBP(contrib)} sub="gross profit − paid media · full breakdown below" badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesContrib} current={contrib} prior={pContrib} goodDirection="up"
+            agent="Atlas" observation="Net revenue × blended product margin, minus paid ad spend — before packaging/fulfilment/fees. The fully-loaded figure is in the Contribution margin card."
+            implication="This is what the raise hinges on; hold it by balancing discount load (margin) against MER (CAC)." />
+          <KPI label="CAC (est.)" val={GBP(cac)} sub={`${NUM(newCust)} new customers · paid spend ÷ new`} badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesCAC} seriesLabel="Spend ÷ new customers · by day" current={cac} prior={pCac} goodDirection="down"
+            agent="Pulse" observation="Paid ad spend ÷ estimated new customers (new-customer share derived from repeat-purchase data)."
+            implication="Judge against contribution-LTV — keep scaling only while LTV:CAC stays at 3×+." />
+          <KPI label="LTV (est.)" val={GBP(ltv)} sub={`contribution · ${ordersPerCust?ordersPerCust.toFixed(1):'—'} orders/customer · LTV:CAC ${ltvCac?ltvCac.toFixed(1)+'×':'—'}`} badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesLTV} seriesLabel="Contribution/customer · by day" goodDirection="up"
+            agent="Atlas" observation="Estimated contribution per acquired customer: AOV × gross margin × repeat orders per customer."
+            implication="The LTV:CAC ratio is the unit-economics headline for the raise — 3×+ is the target to defend."
+            benchmark="ltv_cac" bmValue={ltvCac} />
+          </MoreKpis>
+        </div>
+      </div>
+      {/* Below-the-fold operational charts — lazy-mounted so cold first-paint isn't
+          blocked by mounting every Recharts at once (and never at 0-width). */}
+      {/* Contribution margin — editable, fully-loaded operator P&L for the period */}
+      <LazyMount minHeight={360}><ContributionCard rev={rev} orders={orders} paid={paid} gm={gm}/></LazyMount>
+      {/* Margin bridge — why contribution moved vs prior period (volume/price/discount/returns/paid) */}
+      <LazyMount minHeight={360}><MarginBridge cur={bridgeCur} pri={bridgePri} gm={gm}
+        perOrderFixed={_cn('packaging')+_cn('fulfilment')+_cn('shipping')+_cn('payFixed')} payPct={_cn('payPct')/100}/></LazyMount>
+      {/* Channel stream chart */}
+      <LazyMount minHeight={340}><ChannelStreamPanel/></LazyMount>
+      {/* Today's view — the pacing + anomaly tile */}
+      <LazyMount minHeight={300}><DailyPanel/></LazyMount>
+      {/* The big paid-vs-revenue chart */}
+      <LazyMount minHeight={360}><div className="card">
+        <div className="card-section-title">
+          <h2 style={{margin:0}}>Paid spend vs Shopify revenue — daily</h2>
+          <span className="meta">Bars = paid spend (left axis) · Line = net revenue (right axis)</span>
+        </div>
+        <R.ResponsiveContainer width="100%" height={334}>
+          <R.ComposedChart data={daily} margin={{top:6,right:20,left:14,bottom:22}}>
+            <R.CartesianGrid stroke="#1f1f27" vertical={false} />
+            <R.XAxis dataKey="dlabel" tick={{fill:'#7e7e8a',fontSize:11}} interval={Math.ceil(daily.length/12)}
+                     label={{value:'Date', position:'insideBottom', offset:-10, fill:'#6f6f7b', fontSize:11}} />
+            <R.YAxis yAxisId="l" tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>curSym()+(v/1000).toFixed(0)+'k'}
+                     label={{value:`Paid spend (${curSym()})`, angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}} />
+            <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>curSym()+(v/1000).toFixed(1)+'k'}
+                     label={{value:`Net revenue (${curSym()})`, angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}} />
+            <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,boxShadow:'var(--shadow-md)'}}
+                       formatter={(v,n)=>[GBP(v),n]}
+                       labelFormatter={(l,p)=> (p&&p[0]&&p[0].payload&&p[0].payload.date) ? p[0].payload.date : l} />
+            <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}} />
+            <R.Bar yAxisId="l" dataKey="metaSpend" stackId="s" name="Meta spend" fill={COL.meta} />
+            <R.Bar yAxisId="l" dataKey="googleSpend" stackId="s" name="Google spend" fill={COL.google} />
+            <R.Line yAxisId="r" type="monotone" dataKey="revenue" name="Shopify net rev" stroke={COL.revenue} strokeWidth={2.4} dot={false} />
+            <R.Brush {...brushProps('dlabel')} />
+            {/* Event & sale pins: same hoverable markers as the CVR trend so spikes have a named cause. */}
+            {(function(){ var pins=buildChartPins(daily.map(function(d){return {x:d.dlabel, date:d.date};}));
+              return pins.map(function(p,i){ return (
+                <R.ReferenceLine key={'pin'+i} yAxisId="l" x={p.x} stroke="#8b8b99" strokeDasharray="3 3" strokeOpacity={0.55}
+                  label={<PinMarker icon={p.icon} n={p.n} tip={p.tip}/>}/>); });
+            })()}
+          </R.ComposedChart>
+        </R.ResponsiveContainer>
+        <div style={{fontSize:10.5,color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{BRUSH_HINT}</div>
+        {(function(){ var pins=buildChartPins(daily.map(function(d){return {x:d.dlabel, date:d.date};})); if(!pins.length) return null; return (
+          <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>🏷️ sales &amp; promos · 📌 your events — <span style={{color:'var(--text-muted)'}}>hover any marker for what it was</span></div>); })()}
+        <ChartFooter note="Does paid spend track with revenue? Watch for spend rising while revenue flattens — that's efficiency slipping."
+          ask="Looking at daily paid spend vs Shopify revenue, is my paid media still efficient, and what changed?"
+          rows={daily} columns={[
+            {key:'dlabel', label:'Date'},
+            {key:'metaSpend', label:'Meta spend', right:true, fmt:v=>GBP(v)},
+            {key:'googleSpend', label:'Google spend', right:true, fmt:v=>GBP(v)},
+            {key:'revenue', label:'Net revenue', right:true, fmt:v=>GBP(v)},
+          ]}/>
+      </div></LazyMount>
+      {/* PLANNING & DEEP-DIVE — forecast + unit-economics-over-time are board/planning
+          artifacts, not "what's happening this week", so they live behind a toggle. */}
+      <div className="section-eyebrow" style={{display:'flex',alignItems:'center',gap:8,margin:'8px 0 -4px',fontSize:11,fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--text-muted)'}}>
+        <span style={{width:3,height:14,background:'var(--text-faint)',borderRadius:2}}/>Planning &amp; deep-dive
+      </div>
+      <button onClick={()=>setShowPlanning(s=>!s)} className="show-more">
+        {showPlanning ? '↑ Hide planning & forecast' : '↓ Planning & forecast — LTV:CAC trend + Year-1 P&L'}
+      </button>
+      {showPlanning && (<div style={{display:'flex', flexDirection:'column', gap:'var(--s-5)', marginTop:'var(--s-4)'}}>
+        <LtvCacCard daily={daily} gm={gm} ordersPerCust={ordersPerCust}/>
+        <ForecastCard rev={rev} orders={orders} paid={paid} gm={gm} aov={orders?rev/orders:83} cac={cac} returningPct={returningPct}/>
+      </div>)}
     </div>
-    <ActionBoard/>
-
-    {/* COMMERCIAL HEALTH */}
-    <div className="section-eyebrow" style={{display:'flex',alignItems:'center',gap:8,margin:'8px 0 -4px',fontSize:11,fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--text-muted)'}}>
-      <span style={{width:3,height:14,background:'var(--text-faint)',borderRadius:2}}/>Commercial health
-    </div>
-
-    {/* KPI strip — collapsed by default, hover for full agent commentary */}
-    <div>
-      <div className="card-section-title" style={{marginBottom:'var(--s-3)'}}>
-        <h2 style={{margin:0}}>Headline KPIs</h2>
-        <span className="meta">Last {daily.length} days · vs prior period · hover any card for the full read</span>
-      </div>
-      <div className="row">
-        <KPI label="Paid ad spend" val={GBP(paid)} sub={`Meta ${GBP(sum(meta,'cost'))} · Google ${GBP(sum(gads,'cost'))}`} series={seriesPaid} current={paid} prior={pPaid}
-          agent="Pulse" observation={OI_BRAND.slug==='frkl' ? "Up ~46% on prior period as Meta scaled from ~£100 to ~£170/day from 13 April." : undefined}
-          implication={OI_BRAND.slug==='frkl' ? "Don't push further until Ireland frequency drops below 8× and the cart-checkout JS error is fixed." : undefined} />
-        <KPI label="Shopify net revenue" val={GBP(rev)} sub={`${NUM(orders)} orders · AOV ${GBP(orders?rev/orders:null)}`} series={seriesRev} current={rev} prior={pRev} goodDirection="up"
-          agent="Atlas" observation={`Draft/exchange orders are excluded. ~${discLoad!=null?Math.round(discLoad*100):10}% of DTC gross sales went out as code/automatic discounts, with sale-price markdowns on top — see Promotions for the full load.`}
-          implication="Confirm a real COGS% so this becomes a defensible contribution number for the raise." />
-        <KPI label="Blended MER" val={mer?mer.toFixed(2)+'x':'—'} sub="net revenue ÷ paid spend" series={seriesMER} current={mer} prior={pMer} goodDirection="up"
-          agent="Atlas" observation="Down ~14%: revenue grew slower than spend (27% vs 46%), so each pound of ad earns less."
-          implication="Classic diminishing returns from scaling into a fatigued audience — pause scaling, fix creative + site first."
-          benchmark="blended_mer" bmValue={mer} />
-        <KPI label="Sessions (GA4)" val={NUM(sessions)} sub={`Site CVR ${PCT(sessions?orders/sessions:null)} (orders ÷ sessions)`} series={seriesSessions} current={sessions} prior={pSessions} goodDirection="up"
-          agent="Pulse" observation={`Sessions grew far slower than spend. Site CVR (Shopify orders ÷ GA4 sessions) is ${sessions?PCT(orders/sessions):'—'} vs the ${CVR_BENCH_LABEL} target.`}
-          implication="Spend is buying impressions, not visits. Site fixes (cart JS, sticky checkout) unlock more revenue than more spend." />
-        <KPI label="Klaviyo-tracked orders" val={GBP(emailRev)} sub="gross order value — not email-attributed" series={seriesEmail} current={emailRev} prior={pEmailRev} goodDirection="up"
-          agent="Lux" observation="Up ~32% — email is keeping pace with the paid scale-up."
-          implication="Highest-leverage moment to switch on attributed reporting + a real abandoned-cart sequence." />
-        <KPI label="Conversion rate (CVR)" val={PCT(cvr)} sub={`${NUM(orders)} orders ÷ ${NUM(sessions)} sessions`} series={seriesCVR} current={cvr} prior={pCvr} goodDirection="up"
-          status={cvr==null?undefined:cvr>=CVR_BENCH?'healthy':cvr>=CVR_BENCH*0.8?'watch':'action'} statusLabel={cvr==null?undefined:cvr>=CVR_BENCH?'Healthy':cvr>=CVR_BENCH*0.8?'Watch':'Below target'}
-          agent="Pulse" observation={`Site CVR (Shopify orders ÷ GA4 sessions) is the single biggest revenue lever — against the ${CVR_BENCH_LABEL} target, more spend just buys more bounces.`}
-          implication="Fix the cart→checkout JS error and sticky-checkout before scaling spend further."
-          benchmark="site_cvr" bmValue={cvr} />
-        <KPI label="Discount depth" val={PCT(discLoad)} sub="£ off ÷ £ of sales — how deep, not how many orders · drafts excluded" series={seriesDisc} current={discLoad} prior={pDiscLoad} goodDirection="down"
-          agent="Atlas" observation={`Code + automatic discount as a share of DTC gross sales (draft/exchange orders excluded). This excludes sale-price markdowns${_mdPct?`, which add ~${_mdPct}% of value on top`:''} — the full load is on the Promotions tab.`}
-          implication="Audit always-on codes + affiliate rates; protect full-price demand. The true load incl. markdowns is materially higher — see Promotions."
-          benchmark="discount_load" bmValue={discLoad} />
-        <KPI label="Contribution margin" val={cmPct!=null?PCT(cmPct):'—'} sub="net rev × margin − ad spend, net of returns · ≥10% healthy" badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesContrib} seriesLabel="Contribution £ · by day" current={contrib} prior={pContrib} goodDirection="up"
-          status={cmPct==null?undefined:cmPct>=0.10?'healthy':cmPct>=0.05?'watch':'margin'} statusLabel={cmPct==null?undefined:cmPct>=0.10?'Healthy':cmPct>=0.05?'Watch':'Margin risk'}
-          agent="Atlas" observation="Whether the growth is actually profitable — net revenue × product margin minus paid media, as a share of revenue. Returns are already netted out of revenue. The single best read on profitable vs vanity growth."
-          implication="Below 10% means scaling just amplifies a thin engine — fix discount load, returns and CAC before adding spend."
-          benchmark="contribution_margin" bmValue={cmPct} />
-        <KPI label="CAC payback" val={paybackOrders!=null?(paybackOrders<=1?'1st order':paybackOrders.toFixed(1)+' orders'):'—'} sub={cac!=null?`paid CAC £${Math.round(cac)} ÷ first-order contribution · target ≤2`:'needs paid CAC'} goodDirection="down"
-          status={paybackOrders==null?undefined:paybackOrders<=2?'healthy':paybackOrders<=3?'watch':'action'} statusLabel={paybackOrders==null?undefined:paybackOrders<=2?'Healthy':paybackOrders<=3?'Watch':'Slow payback'}
-          agent="Atlas" observation="How many orders it takes to recover the paid cost of acquiring a customer, at your margin. Under ~2 orders = a healthy cash cycle that funds reinvestment."
-          implication="This is the lever on cash flow — faster payback frees working capital. Watch it as you scale spend; if it stretches past 2, growth starts eating cash." />
-        <MoreKpis count={8}>
-        <KPI label="Gross margin" val={PCT(gm)} sub={costsVerified?"Your entered gross margin":"COGS-based · catalogue estimate"} badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesGM} seriesLabel="Catalogue margin · structurally stable"
-          agent="Atlas" observation="Blended product margin across the live catalogue, after cost of goods."
-          implication="This is the contribution base for the raise — defend it by keeping discount load in check."
-          benchmark="gross_margin" bmValue={gm} />
-        <KPI label="Return rate" val={PCT(returnRate)} sub={`${NUM(_rets)} of ${NUM(_units)} units · 90d`} series={seriesReturn} seriesLabel="Refunds ÷ sales · by day" goodDirection="down"
-          agent="Lux" observation="Share of shipped units returned — watch by SKU for sizing/quality hotspots. (Card is unit-based over 90d; trend is refund-£ share of sales by day.)"
-          implication="A point of return rate is pure margin; flag any SKU materially above this blended rate."
-          benchmark="return_rate" bmValue={returnRate} />
-        <KPI label="Orders with a discount" val={_dc.fullPriceShare!=null?PCT(1-_dc.fullPriceShare):'—'} sub="share of orders using a code/auto discount — how often, not how deep · drafts excluded" goodDirection="down"
-          agent="Atlas" observation={_dc.fullPriceShare!=null?`${Math.round((1-_dc.fullPriceShare)*100)}% of orders carry a discount; ${Math.round(_dc.fullPriceShare*100)}% pay full price. Read it with Discount depth: lots of orders but a shallow ~${discLoad!=null?Math.round(discLoad*100):9}% of revenue = many small codes, not deep cuts.`:'How often a discount is used across orders (draft/exchange orders excluded).'}
-          implication="If penetration and depth climb together you're training customers to wait for a code — tighten the always-on codes first." series={seriesPenetration} seriesLabel="Orders with a code · by week" />
-        <KPI label="Discount value" val={GBP(discAmt)} sub="total £ given as code/auto discount this period — drafts excluded" series={seriesDiscVal} seriesLabel="Discount £ given · by day" goodDirection="down"
-          agent="Atlas" observation="The actual money handed back as discounts this period (code + automatic). Excludes sale-price markdowns, which are shown separately on Promotions."
-          implication="Recoverable margin to the extent any of it went to buyers who'd have paid full price — start with the biggest always-on codes." />
-        <KPI label="Returning customers" val={PCT(returningPct)} sub="share of orders · trailing months" series={seriesReturning} seriesLabel="Repeat-order share · by month" goodDirection="up"
-          agent="Lux" observation="Repeat-purchase share — the cheapest revenue you have and a read on brand love."
-          implication="Lift with post-purchase flows + a reason to come back; it compounds faster than paid." />
-        <KPI label="Contribution (pre-opex)" val={GBP(contrib)} sub="gross profit − paid media · full breakdown below" badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesContrib} current={contrib} prior={pContrib} goodDirection="up"
-          agent="Atlas" observation="Net revenue × blended product margin, minus paid ad spend — before packaging/fulfilment/fees. The fully-loaded figure is in the Contribution margin card."
-          implication="This is what the raise hinges on; hold it by balancing discount load (margin) against MER (CAC)." />
-        <KPI label="CAC (est.)" val={GBP(cac)} sub={`${NUM(newCust)} new customers · paid spend ÷ new`} badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesCAC} seriesLabel="Spend ÷ new customers · by day" current={cac} prior={pCac} goodDirection="down"
-          agent="Pulse" observation="Paid ad spend ÷ estimated new customers (new-customer share derived from repeat-purchase data)."
-          implication="Judge against contribution-LTV — keep scaling only while LTV:CAC stays at 3×+." />
-        <KPI label="LTV (est.)" val={GBP(ltv)} sub={`contribution · ${ordersPerCust?ordersPerCust.toFixed(1):'—'} orders/customer · LTV:CAC ${ltvCac?ltvCac.toFixed(1)+'×':'—'}`} badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesLTV} seriesLabel="Contribution/customer · by day" goodDirection="up"
-          agent="Atlas" observation="Estimated contribution per acquired customer: AOV × gross margin × repeat orders per customer."
-          implication="The LTV:CAC ratio is the unit-economics headline for the raise — 3×+ is the target to defend."
-          benchmark="ltv_cac" bmValue={ltvCac} />
-        </MoreKpis>
-      </div>
-    </div>
-
-    {/* Below-the-fold operational charts — lazy-mounted so cold first-paint isn't
-        blocked by mounting every Recharts at once (and never at 0-width). */}
-    {/* Contribution margin — editable, fully-loaded operator P&L for the period */}
-    <LazyMount minHeight={360}><ContributionCard rev={rev} orders={orders} paid={paid} gm={gm}/></LazyMount>
-
-    {/* Margin bridge — why contribution moved vs prior period (volume/price/discount/returns/paid) */}
-    <LazyMount minHeight={360}><MarginBridge cur={bridgeCur} pri={bridgePri} gm={gm}
-      perOrderFixed={_cn('packaging')+_cn('fulfilment')+_cn('shipping')+_cn('payFixed')} payPct={_cn('payPct')/100}/></LazyMount>
-
-    {/* Channel stream chart */}
-    <LazyMount minHeight={340}><ChannelStreamPanel/></LazyMount>
-
-    {/* Today's view — the pacing + anomaly tile */}
-    <LazyMount minHeight={300}><DailyPanel/></LazyMount>
-
-    {/* The big paid-vs-revenue chart */}
-    <LazyMount minHeight={360}><div className="card">
-      <div className="card-section-title">
-        <h2 style={{margin:0}}>Paid spend vs Shopify revenue — daily</h2>
-        <span className="meta">Bars = paid spend (left axis) · Line = net revenue (right axis)</span>
-      </div>
-      <R.ResponsiveContainer width="100%" height={334}>
-        <R.ComposedChart data={daily} margin={{top:6,right:20,left:14,bottom:22}}>
-          <R.CartesianGrid stroke="#1f1f27" vertical={false} />
-          <R.XAxis dataKey="dlabel" tick={{fill:'#7e7e8a',fontSize:11}} interval={Math.ceil(daily.length/12)}
-                   label={{value:'Date', position:'insideBottom', offset:-10, fill:'#6f6f7b', fontSize:11}} />
-          <R.YAxis yAxisId="l" tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>'£'+(v/1000).toFixed(0)+'k'}
-                   label={{value:'Paid spend (£)', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}} />
-          <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>'£'+(v/1000).toFixed(1)+'k'}
-                   label={{value:'Net revenue (£)', angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}} />
-          <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,boxShadow:'var(--shadow-md)'}}
-                     formatter={(v,n)=>[GBP(v),n]}
-                     labelFormatter={(l,p)=> (p&&p[0]&&p[0].payload&&p[0].payload.date) ? p[0].payload.date : l} />
-          <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}} />
-          <R.Bar yAxisId="l" dataKey="metaSpend" stackId="s" name="Meta spend" fill={COL.meta} />
-          <R.Bar yAxisId="l" dataKey="googleSpend" stackId="s" name="Google spend" fill={COL.google} />
-          <R.Line yAxisId="r" type="monotone" dataKey="revenue" name="Shopify net rev" stroke={COL.revenue} strokeWidth={2.4} dot={false} />
-          <R.Brush {...brushProps('dlabel')} />
-          {/* Event & sale pins: same hoverable markers as the CVR trend so spikes have a named cause. */}
-          {(function(){ var pins=buildChartPins(daily.map(function(d){return {x:d.dlabel, date:d.date};}));
-            return pins.map(function(p,i){ return (
-              <R.ReferenceLine key={'pin'+i} yAxisId="l" x={p.x} stroke="#8b8b99" strokeDasharray="3 3" strokeOpacity={0.55}
-                label={<PinMarker icon={p.icon} n={p.n} tip={p.tip}/>}/>); });
-          })()}
-        </R.ComposedChart>
-      </R.ResponsiveContainer>
-      <div style={{fontSize:10.5,color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{BRUSH_HINT}</div>
-      {(function(){ var pins=buildChartPins(daily.map(function(d){return {x:d.dlabel, date:d.date};})); if(!pins.length) return null; return (
-        <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>🏷️ sales &amp; promos · 📌 your events — <span style={{color:'var(--text-muted)'}}>hover any marker for what it was</span></div>); })()}
-      <ChartFooter note="Does paid spend track with revenue? Watch for spend rising while revenue flattens — that's efficiency slipping."
-        ask="Looking at daily paid spend vs Shopify revenue, is my paid media still efficient, and what changed?"
-        rows={daily} columns={[
-          {key:'dlabel', label:'Date'},
-          {key:'metaSpend', label:'Meta spend', right:true, fmt:v=>GBP(v)},
-          {key:'googleSpend', label:'Google spend', right:true, fmt:v=>GBP(v)},
-          {key:'revenue', label:'Net revenue', right:true, fmt:v=>GBP(v)},
-        ]}/>
-    </div></LazyMount>
-
-    {/* PLANNING & DEEP-DIVE — forecast + unit-economics-over-time are board/planning
-        artifacts, not "what's happening this week", so they live behind a toggle. */}
-    <div className="section-eyebrow" style={{display:'flex',alignItems:'center',gap:8,margin:'8px 0 -4px',fontSize:11,fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--text-muted)'}}>
-      <span style={{width:3,height:14,background:'var(--text-faint)',borderRadius:2}}/>Planning &amp; deep-dive
-    </div>
-    <button onClick={()=>setShowPlanning(s=>!s)} className="show-more">
-      {showPlanning ? '↑ Hide planning & forecast' : '↓ Planning & forecast — LTV:CAC trend + Year-1 P&L'}
-    </button>
-    {showPlanning && (<div style={{display:'flex', flexDirection:'column', gap:'var(--s-5)', marginTop:'var(--s-4)'}}>
-      <LtvCacCard daily={daily} gm={gm} ordersPerCust={ordersPerCust}/>
-      <ForecastCard rev={rev} orders={orders} paid={paid} gm={gm} aov={orders?rev/orders:83} cac={cac} returningPct={returningPct}/>
-    </div>)}
-  </div>);
+  );
 }
 
 // ── Fit engine (OMF + PMF) — renders window.FRKL_FIT in Channels › Cross-channel ──────────────
@@ -3555,8 +3572,8 @@ function FitCard({start, end}){
 //    cached snapshot / pre-genome engine), so no flag gate is needed. Source-honest: each genome
 //    input is tagged 'your number' (brand-entered) or 'prior' (category default); the whole panel
 //    is badged 'shadow · not scored' — reported, never folded into the OMF/PMF verdict.
-function gpGBP0(x) { return x == null ? '-' : '£' + Math.round(x).toLocaleString('en-GB'); }
-function gpGBP2(x) { return x == null ? '-' : '£' + x.toFixed(2); }
+function gpGBP0(x) { return x == null ? '-' : curSym() + Math.round(x).toLocaleString('en-GB'); }
+function gpGBP2(x) { return x == null ? '-' : curSym() + x.toFixed(2); }
 function gpPCT(x, dp = 1) { return x == null ? '-' : (x * 100).toFixed(dp) + '%'; }
 function gpRX(x, dp = 2) { return x == null ? '-' : x.toFixed(dp) + 'x'; }
 function gpDays(x) { return x == null ? '-' : Math.round(x) + 'd'; }
@@ -3857,28 +3874,30 @@ function DemoPanel(){
   const femaleSpend=byGender.find(g=>g.key==='female')?.cost||0;
   const ageOrder=['18-24','25-34','35-44','45-54','55-64','65+'];
   const sortedAge=[...byAge].sort((a,b)=>ageOrder.indexOf(a.key)-ageOrder.indexOf(b.key));
-  return (<div className="card" style={{marginTop:14}}>
-    <h2>Audience — who's actually buying</h2>
-    <div className="row" style={{marginBottom:12}}>
-      <KPI label="% spend female" val={PCT(totalSpend>0?femaleSpend/totalSpend:0)} sub={`vs ${PCT(totalSpend>0?(1-femaleSpend/totalSpend):0)} male/unknown`}
-        agent="Pulse" observation="95%+ of spend is female — Meta has correctly identified the audience, the IG follower base confirms it."
-        implication="Explicitly exclude male audiences in targeting — the ~5% currently going there is waste." />
-      <KPI label="Top spend age" val={byAge[0]?.key||'—'} sub={byAge[0]?GBP(byAge[0].cost)+' · ROAS '+(byAge[0].roas?byAge[0].roas.toFixed(2)+'x':'—'):''}
-        agent="Pulse" observation="35-44 / 45-54 females absorb most of the spend — Meta's algorithm chose them because they trigger more events."
-        implication="Check ROAS per £, not just spend volume — the algorithm optimises for events, not necessarily for your margin." />
-      <KPI label="Best ROAS age" val={[...byAge].filter(a=>a.roas).sort((a,b)=>b.roas-a.roas)[0]?.key||'—'} sub={(()=>{const b=[...byAge].filter(a=>a.roas).sort((a,b)=>b.roas-a.roas)[0]; return b?b.roas.toFixed(2)+'x · '+GBP(b.cost)+' spend':'';})()}
-        agent="Frame" observation="25-34 females convert at the highest ROAS per £ but get the lowest spend allocation."
-        implication="Run an age-split test campaign aimed at 25-34 to validate scaling — could materially shift the efficiency curve." />
+  return (
+    <div className="card" style={{marginTop:14}}>
+      <h2>Audience — who's actually buying</h2>
+      <div className="row" style={{marginBottom:12}}>
+        <KPI label="% spend female" val={PCT(totalSpend>0?femaleSpend/totalSpend:0)} sub={`vs ${PCT(totalSpend>0?(1-femaleSpend/totalSpend):0)} male/unknown`}
+          agent="Pulse" observation="95%+ of spend is female — Meta has correctly identified the audience, the IG follower base confirms it."
+          implication="Explicitly exclude male audiences in targeting — the ~5% currently going there is waste." />
+        <KPI label="Top spend age" val={byAge[0]?.key||'—'} sub={byAge[0]?GBP(byAge[0].cost)+' · ROAS '+(byAge[0].roas?byAge[0].roas.toFixed(2)+'x':'—'):''}
+          agent="Pulse" observation="35-44 / 45-54 females absorb most of the spend — Meta's algorithm chose them because they trigger more events."
+          implication={`Check ROAS per ${curSym()}, not just spend volume — the algorithm optimises for events, not necessarily for your margin.`} />
+        <KPI label="Best ROAS age" val={[...byAge].filter(a=>a.roas).sort((a,b)=>b.roas-a.roas)[0]?.key||'—'} sub={(()=>{const b=[...byAge].filter(a=>a.roas).sort((a,b)=>b.roas-a.roas)[0]; return b?b.roas.toFixed(2)+'x · '+GBP(b.cost)+' spend':'';})()}
+          agent="Frame" observation={`25-34 females convert at the highest ROAS per ${curSym()} but get the lowest spend allocation.`}
+          implication="Run an age-split test campaign aimed at 25-34 to validate scaling — could materially shift the efficiency curve." />
+      </div>
+      <h2 style={{fontSize:14,marginTop:8}}>By age band (female only — male spend is tiny)</h2>
+      <table><thead><tr><th>Age</th><th>Spend</th><th>% of spend</th><th>CTR</th><th>Purch</th><th>CPA</th><th>ROAS</th></tr></thead><tbody>
+        {sortedAge.map((a,i)=>(<tr key={i}>
+          <td>{a.key}</td><td>{GBP(a.cost)}</td><td>{PCT(totalSpend>0?a.cost/totalSpend:0)}</td><td>{PCT(a.ctr)}</td><td>{a.purch}</td><td>{a.cpa?GBP(a.cpa):'—'}</td>
+          <td style={{color:a.roas==null?'#888':a.roas>=2.5?'#4ade80':a.roas>=1.7?'#fbbf24':'#f87171'}}>{a.roas?a.roas.toFixed(2)+'x':'—'}</td>
+        </tr>))}
+      </tbody></table>
+      <div className="note" style={{marginTop:10}}>The algorithm has settled on <b>35–54 females</b>as the biggest spend bucket — but younger <b>25–34 females</b>often convert at higher ROAS per {curSym()}when they do convert. <b>18–24 doesn't convert.</b>Almost zero male conversions across the whole library — male spend is wasted.</div>
     </div>
-    <h2 style={{fontSize:14,marginTop:8}}>By age band (female only — male spend is tiny)</h2>
-    <table><thead><tr><th>Age</th><th>Spend</th><th>% of spend</th><th>CTR</th><th>Purch</th><th>CPA</th><th>ROAS</th></tr></thead><tbody>
-      {sortedAge.map((a,i)=>(<tr key={i}>
-        <td>{a.key}</td><td>{GBP(a.cost)}</td><td>{PCT(totalSpend>0?a.cost/totalSpend:0)}</td><td>{PCT(a.ctr)}</td><td>{a.purch}</td><td>{a.cpa?GBP(a.cpa):'—'}</td>
-        <td style={{color:a.roas==null?'#888':a.roas>=2.5?'#4ade80':a.roas>=1.7?'#fbbf24':'#f87171'}}>{a.roas?a.roas.toFixed(2)+'x':'—'}</td>
-      </tr>))}
-    </tbody></table>
-    <div className="note" style={{marginTop:10}}>The algorithm has settled on <b>35–54 females</b> as the biggest spend bucket — but younger <b>25–34 females</b> often convert at higher ROAS per £ when they do convert. <b>18–24 doesn't convert.</b> Almost zero male conversions across the whole library — male spend is wasted.</div>
-  </div>);
+  );
 }
 
 function PlacementPanel(){
@@ -3888,35 +3907,37 @@ function PlacementPanel(){
   const byDevice=aggBy(rows, r=>r.device);
   const totalSpend=byPlat.reduce((a,b)=>a+b.cost,0);
   const igSpend=byPlat.find(p=>p.key==='instagram')?.cost||0;
-  return (<div className="card" style={{marginTop:14}}>
-    <h2>Where the ads run — placement & device</h2>
-    <div className="row" style={{marginBottom:12}}>
-      <KPI label="% Instagram spend" val={PCT(totalSpend>0?igSpend/totalSpend:0)} sub="Facebook delivery: zero"
-        agent="Pulse" observation="100% Instagram, 0% Facebook — an entire ad surface is currently untouched."
-        implication="Test FB placement with the same creative — different audience, often lower CPM, free incremental reach." />
-      <KPI label="Top placement" val={byPos[0]?.key.replace('instagram_','').replace('_',' ')||'—'} sub={byPos[0]?GBP(byPos[0].cost)+' · ROAS '+(byPos[0].roas?byPos[0].roas.toFixed(2)+'x':'—'):''}
-        agent="Frame" observation="Feed dominates spend, but Stories has the highest CTR on catalogue ads (3.6% iPhone, 5.3% Android)."
-        implication="Brief Stories-native creative for the Stacks catalogue — match format to the placement that's already winning." />
-      <KPI label="Best ROAS placement" val={(()=>{const b=[...byPos].filter(a=>a.roas&&a.cost>50).sort((a,b)=>b.roas-a.roas)[0]; return b?b.key.replace('instagram_','').replace('_',' '):'—';})()} sub={(()=>{const b=[...byPos].filter(a=>a.roas&&a.cost>50).sort((a,b)=>b.roas-a.roas)[0]; return b?b.roas.toFixed(2)+'x · '+GBP(b.cost):'';})()}
-        agent="Frame" observation="Reels iPhone on Angela is 4.49× ROAS but starved at £192 vs £530 in feed."
-        implication="Push budget into Reels with Reels-native edits (9:16, hook in 1.5s, captions for sound-off)." />
-    </div>
-    <div className="row">
-      <div style={{flex:'1 1 320px'}}>
-        <h2 style={{fontSize:14}}>By placement (position)</h2>
-        <table><thead><tr><th>Placement</th><th>Spend</th><th>CTR</th><th>Purch</th><th>ROAS</th></tr></thead><tbody>
-          {byPos.map((a,i)=>(<tr key={i}><td>{a.key.replace('instagram_','').replace('_',' ')}</td><td>{GBP(a.cost)}</td><td>{PCT(a.ctr)}</td><td>{a.purch}</td><td style={{color:a.roas==null?'#888':a.roas>=2.5?'#4ade80':a.roas>=1.7?'#fbbf24':'#f87171'}}>{a.roas?a.roas.toFixed(2)+'x':'—'}</td></tr>))}
-        </tbody></table>
+  return (
+    <div className="card" style={{marginTop:14}}>
+      <h2>Where the ads run — placement & device</h2>
+      <div className="row" style={{marginBottom:12}}>
+        <KPI label="% Instagram spend" val={PCT(totalSpend>0?igSpend/totalSpend:0)} sub="Facebook delivery: zero"
+          agent="Pulse" observation="100% Instagram, 0% Facebook — an entire ad surface is currently untouched."
+          implication="Test FB placement with the same creative — different audience, often lower CPM, free incremental reach." />
+        <KPI label="Top placement" val={byPos[0]?.key.replace('instagram_','').replace('_',' ')||'—'} sub={byPos[0]?GBP(byPos[0].cost)+' · ROAS '+(byPos[0].roas?byPos[0].roas.toFixed(2)+'x':'—'):''}
+          agent="Frame" observation="Feed dominates spend, but Stories has the highest CTR on catalogue ads (3.6% iPhone, 5.3% Android)."
+          implication="Brief Stories-native creative for the Stacks catalogue — match format to the placement that's already winning." />
+        <KPI label="Best ROAS placement" val={(()=>{const b=[...byPos].filter(a=>a.roas&&a.cost>50).sort((a,b)=>b.roas-a.roas)[0]; return b?b.key.replace('instagram_','').replace('_',' '):'—';})()} sub={(()=>{const b=[...byPos].filter(a=>a.roas&&a.cost>50).sort((a,b)=>b.roas-a.roas)[0]; return b?b.roas.toFixed(2)+'x · '+GBP(b.cost):'';})()}
+          agent="Frame" observation={`Reels iPhone on Angela is 4.49× ROAS but starved at ${curSym()}192 vs ${curSym()}530 in feed.`}
+          implication="Push budget into Reels with Reels-native edits (9:16, hook in 1.5s, captions for sound-off)." />
       </div>
-      <div style={{flex:'1 1 320px'}}>
-        <h2 style={{fontSize:14}}>By device</h2>
-        <table><thead><tr><th>Device</th><th>Spend</th><th>CTR</th><th>Purch</th><th>ROAS</th></tr></thead><tbody>
-          {byDevice.map((a,i)=>(<tr key={i}><td>{a.key.replace('_',' ')}</td><td>{GBP(a.cost)}</td><td>{PCT(a.ctr)}</td><td>{a.purch}</td><td style={{color:a.roas==null?'#888':a.roas>=2.5?'#4ade80':a.roas>=1.7?'#fbbf24':'#f87171'}}>{a.roas?a.roas.toFixed(2)+'x':'—'}</td></tr>))}
-        </tbody></table>
+      <div className="row">
+        <div style={{flex:'1 1 320px'}}>
+          <h2 style={{fontSize:14}}>By placement (position)</h2>
+          <table><thead><tr><th>Placement</th><th>Spend</th><th>CTR</th><th>Purch</th><th>ROAS</th></tr></thead><tbody>
+            {byPos.map((a,i)=>(<tr key={i}><td>{a.key.replace('instagram_','').replace('_',' ')}</td><td>{GBP(a.cost)}</td><td>{PCT(a.ctr)}</td><td>{a.purch}</td><td style={{color:a.roas==null?'#888':a.roas>=2.5?'#4ade80':a.roas>=1.7?'#fbbf24':'#f87171'}}>{a.roas?a.roas.toFixed(2)+'x':'—'}</td></tr>))}
+          </tbody></table>
+        </div>
+        <div style={{flex:'1 1 320px'}}>
+          <h2 style={{fontSize:14}}>By device</h2>
+          <table><thead><tr><th>Device</th><th>Spend</th><th>CTR</th><th>Purch</th><th>ROAS</th></tr></thead><tbody>
+            {byDevice.map((a,i)=>(<tr key={i}><td>{a.key.replace('_',' ')}</td><td>{GBP(a.cost)}</td><td>{PCT(a.ctr)}</td><td>{a.purch}</td><td style={{color:a.roas==null?'#888':a.roas>=2.5?'#4ade80':a.roas>=1.7?'#fbbf24':'#f87171'}}>{a.roas?a.roas.toFixed(2)+'x':'—'}</td></tr>))}
+          </tbody></table>
+        </div>
       </div>
+      {DEMO && <div className="note" style={{marginTop:10}}>frkl is delivering <b>100% on Instagram, 0% on Facebook</b> — an entire ad surface is untouched. <b>iPhone dominates</b> spend (~70%); Android converts at similar quality. <b>Stories</b> on Stacks/Catalogue is the highest-CTR placement; <b>Reels</b> is the best converter on Angela but under-funded.</div>}
     </div>
-    {DEMO && <div className="note" style={{marginTop:10}}>frkl is delivering <b>100% on Instagram, 0% on Facebook</b> — an entire ad surface is untouched. <b>iPhone dominates</b> spend (~70%); Android converts at similar quality. <b>Stories</b> on Stacks/Catalogue is the highest-CTR placement; <b>Reels</b> is the best converter on Angela but under-funded.</div>}
-  </div>);
+  );
 }
 
 function FatigueBoard({rows}){
@@ -4187,98 +4208,100 @@ function CreatorCandidatesPanel(){
   const summary = C.summary || {};
   const meta = C.meta || {};
 
-  return (<div style={{marginTop:14}}>
-    <div className="card" style={{marginBottom:14, borderLeft:'3px solid #38bdf8'}}>
-      <h2>Creator candidate discovery — Tier B</h2>
-      <div className="muted" style={{marginBottom:10, fontSize:12}}>
-        {summary.totalCandidates || 0} candidates scored by LLM against frkl's brand brief and current winning affiliates. Sources searched: Astrid &amp; Miyu ambassador roster · Modash UK micro-influencer listings · SheerLuxe / Marie Claire / Fashion Monitor curated lists · UK lifestyle podcast hosts. <b>Scores are inference, not measurement</b> — verify follower counts, audience demos and engagement via Heepsy / Modash before significant outreach.
+  return (
+    <div style={{marginTop:14}}>
+      <div className="card" style={{marginBottom:14, borderLeft:'3px solid #38bdf8'}}>
+        <h2>Creator candidate discovery — Tier B</h2>
+        <div className="muted" style={{marginBottom:10, fontSize:12}}>
+          {summary.totalCandidates || 0} candidates scored by LLM against frkl's brand brief and current winning affiliates. Sources searched: Astrid &amp; Miyu ambassador roster · Modash UK micro-influencer listings · SheerLuxe / Marie Claire / Fashion Monitor curated lists · UK lifestyle podcast hosts. <b>Scores are inference, not measurement</b> — verify follower counts, audience demos and engagement via Heepsy / Modash before significant outreach.
+        </div>
+        <div className="row" style={{marginBottom:8}}>
+          <div className="card kpi" style={{borderLeft:'3px solid #4ade80'}}>
+            <div className="label">Hero candidates</div>
+            <div className="val">{(summary.tierCounts && summary.tierCounts.hero) || 0}</div>
+            <div className="sub">composite ≥ 0.80</div>
+          </div>
+          <div className="card kpi" style={{borderLeft:'3px solid #5b8def'}}>
+            <div className="label">Core candidates</div>
+            <div className="val">{(summary.tierCounts && summary.tierCounts.core) || 0}</div>
+            <div className="sub">composite 0.65–0.80</div>
+          </div>
+          <div className="card kpi" style={{borderLeft:'3px solid #fbbf24'}}>
+            <div className="label">Est. actionable reach</div>
+            <div className="val">{(summary.actionableReachEst||0).toLocaleString()}</div>
+            <div className="sub">summed followers of hero + core. Inferred.</div>
+          </div>
+          <div className="card kpi" style={{borderLeft:'3px solid #c084fc'}}>
+            <div className="label">Avg actionable score</div>
+            <div className="val">{((summary.actionableAvgComposite||0)*100).toFixed(0)}%</div>
+            <div className="sub">brand × audience × engagement</div>
+          </div>
+        </div>
+        <div style={{display:'flex',gap:10,alignItems:'center',marginBottom:10,flexWrap:'wrap'}}>
+          <span className="muted" style={{fontSize:11,textTransform:'uppercase',letterSpacing:.05,fontWeight:700}}>FILTER</span>
+          <select value={tierFilter} onChange={e=>setTierFilter(e.target.value)} style={{background:'var(--bg-input)',color:'var(--text-primary)',border:'1px solid var(--border-default)',borderRadius:4,padding:'4px 8px',fontSize:12}}>
+            <option value="actionable">Actionable (hero + core)</option>
+            <option value="all">All tiers</option>
+            <option value="hero">Hero only</option>
+            <option value="core">Core only</option>
+            <option value="longtail">Longtail</option>
+            <option value="pass">Pass (audience/budget mismatch)</option>
+          </select>
+          <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)} style={{background:'var(--bg-input)',color:'var(--text-primary)',border:'1px solid var(--border-default)',borderRadius:4,padding:'4px 8px',fontSize:12}}>
+            <option value="all">All statuses</option>
+            <option value="prospect">Prospect</option>
+            <option value="contacted">Contacted</option>
+            <option value="active">Active</option>
+            <option value="declined">Declined</option>
+            <option value="pass">Passed</option>
+          </select>
+          <span className="muted" style={{marginLeft:'auto',fontSize:11}}>{candidates.length} of {summary.totalCandidates || 0}</span>
+        </div>
+        <table><thead><tr><th>Tier</th><th className="tl">Handle</th><th className="tl">Name / themes</th><th>Est. reach</th><th>Brand fit</th><th>Audience fit</th><th>Eng. quality</th><th>Composite</th><th className="tl">Status</th></tr></thead><tbody>
+        {candidates.map((c,i) => {
+          const color = TIER_COLOR[c.tier] || '#7b7b87';
+          return (<tr key={i}>
+            <td><span className="pill" style={{background:color+'22',color:color,fontSize:10,padding:'2px 8px',borderRadius:4,fontWeight:700,textTransform:'uppercase'}}>{c.tier}</span></td>
+            <td className="tl" style={{fontSize:11.5}}><code>{c.handle}</code></td>
+            <td className="tl" style={{fontSize:11,maxWidth:280}}>
+              <b>{c.name}</b>
+              <div className="muted" style={{fontSize:10,marginTop:2}}>{(c.themes||[]).join(' · ')}</div>
+              {(c.brand_partnerships_known||[]).length>0 && <div className="muted" style={{fontSize:10,marginTop:2}}>Past: {(c.brand_partnerships_known||[]).join(', ')}</div>}
+            </td>
+            <td>{c.audience_size_estimated ? (c.audience_size_estimated/1000).toFixed(0)+'k' : '—'}<br/><span className="muted" style={{fontSize:9}}>{c.audience_size_confidence} conf.</span></td>
+            <td>{PCT(c.brand_fit)}</td>
+            <td>{PCT(c.audience_fit)}</td>
+            <td>{PCT(c.engagement_quality)}</td>
+            <td><b style={{color:color}}>{PCT(c.composite)}</b></td>
+            <td className="tl"><span className="pill grey" style={{fontSize:10}}>{c.status}</span></td>
+          </tr>);
+        })}
+        </tbody></table>
       </div>
-      <div className="row" style={{marginBottom:8}}>
-        <div className="card kpi" style={{borderLeft:'3px solid #4ade80'}}>
-          <div className="label">Hero candidates</div>
-          <div className="val">{(summary.tierCounts && summary.tierCounts.hero) || 0}</div>
-          <div className="sub">composite ≥ 0.80</div>
+      <div className="row">
+        <div className="card" style={{flex:'1 1 360px'}}>
+          <h2>Top reasoning notes</h2>
+          <div className="muted" style={{marginBottom:8,fontSize:11}}>Why each hero/core candidate ranks where they do. Click handle in table above for details.</div>
+          <div style={{display:'flex',flexDirection:'column',gap:10,maxHeight:520,overflowY:'auto'}}>
+          {(C.candidates||[]).filter(c=>c.tier==='hero'||c.tier==='core').slice(0,12).map((c,i)=>(<div key={i} style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${TIER_COLOR[c.tier]}`,borderRadius:'0 6px 6px 0',fontSize:11.5}}>
+            <div style={{fontWeight:600,marginBottom:4}}>{c.name} <span className="muted" style={{fontWeight:400}}>({c.handle})</span></div>
+            <div style={{color:'#b6b6c0',lineHeight:1.45}}>{c.reasoning}</div>
+            {(c.verify_next||[]).length>0 && <div style={{marginTop:6,fontSize:10,color:'#7b7b87'}}><b>Verify next:</b> {c.verify_next.join(' · ')}</div>}
+          </div>))}
+          </div>
         </div>
-        <div className="card kpi" style={{borderLeft:'3px solid #5b8def'}}>
-          <div className="label">Core candidates</div>
-          <div className="val">{(summary.tierCounts && summary.tierCounts.core) || 0}</div>
-          <div className="sub">composite 0.65–0.80</div>
-        </div>
-        <div className="card kpi" style={{borderLeft:'3px solid #fbbf24'}}>
-          <div className="label">Est. actionable reach</div>
-          <div className="val">{(summary.actionableReachEst||0).toLocaleString()}</div>
-          <div className="sub">summed followers of hero + core. Inferred.</div>
-        </div>
-        <div className="card kpi" style={{borderLeft:'3px solid #c084fc'}}>
-          <div className="label">Avg actionable score</div>
-          <div className="val">{((summary.actionableAvgComposite||0)*100).toFixed(0)}%</div>
-          <div className="sub">brand × audience × engagement</div>
+        <div className="card" style={{flex:'1 1 280px'}}>
+          <h2>How to use this</h2>
+          <div style={{fontSize:12.5,lineHeight:1.6,color:'var(--text-secondary)'}}>
+            <p><b>Scores are inferred not measured.</b> They reflect what LLM reasoning can extract from public web signals — past partnerships, audience age cues, content themes, engagement signals quoted in articles.</p>
+            <p><b>Before outreaching at scale</b>, verify with a real creator-discovery tool (Heepsy {curSym()}69/mo or Modash {curSym()}150+/mo). Look for: actual follower count, UK audience %, age split, engagement rate, brand-overlap with frkl peers.</p>
+            <p><b>The highest-EV move</b> isn't in any external creator — it's an internal audit of <code>#myfrkl</code> tagged users. These are existing customers who already buy frkl AND have audiences. Brief Lux to pull that list.</p>
+            <p><b>To add a new candidate:</b> edit <code>creator_candidates.json</code> and re-run <code>python scripts/build_creators_data.py</code>. Status field tracks: prospect → contacted → active → declined.</p>
+          </div>
         </div>
       </div>
-      <div style={{display:'flex',gap:10,alignItems:'center',marginBottom:10,flexWrap:'wrap'}}>
-        <span className="muted" style={{fontSize:11,textTransform:'uppercase',letterSpacing:.05,fontWeight:700}}>FILTER</span>
-        <select value={tierFilter} onChange={e=>setTierFilter(e.target.value)} style={{background:'var(--bg-input)',color:'var(--text-primary)',border:'1px solid var(--border-default)',borderRadius:4,padding:'4px 8px',fontSize:12}}>
-          <option value="actionable">Actionable (hero + core)</option>
-          <option value="all">All tiers</option>
-          <option value="hero">Hero only</option>
-          <option value="core">Core only</option>
-          <option value="longtail">Longtail</option>
-          <option value="pass">Pass (audience/budget mismatch)</option>
-        </select>
-        <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)} style={{background:'var(--bg-input)',color:'var(--text-primary)',border:'1px solid var(--border-default)',borderRadius:4,padding:'4px 8px',fontSize:12}}>
-          <option value="all">All statuses</option>
-          <option value="prospect">Prospect</option>
-          <option value="contacted">Contacted</option>
-          <option value="active">Active</option>
-          <option value="declined">Declined</option>
-          <option value="pass">Passed</option>
-        </select>
-        <span className="muted" style={{marginLeft:'auto',fontSize:11}}>{candidates.length} of {summary.totalCandidates || 0}</span>
-      </div>
-      <table><thead><tr><th>Tier</th><th className="tl">Handle</th><th className="tl">Name / themes</th><th>Est. reach</th><th>Brand fit</th><th>Audience fit</th><th>Eng. quality</th><th>Composite</th><th className="tl">Status</th></tr></thead><tbody>
-      {candidates.map((c,i) => {
-        const color = TIER_COLOR[c.tier] || '#7b7b87';
-        return (<tr key={i}>
-          <td><span className="pill" style={{background:color+'22',color:color,fontSize:10,padding:'2px 8px',borderRadius:4,fontWeight:700,textTransform:'uppercase'}}>{c.tier}</span></td>
-          <td className="tl" style={{fontSize:11.5}}><code>{c.handle}</code></td>
-          <td className="tl" style={{fontSize:11,maxWidth:280}}>
-            <b>{c.name}</b>
-            <div className="muted" style={{fontSize:10,marginTop:2}}>{(c.themes||[]).join(' · ')}</div>
-            {(c.brand_partnerships_known||[]).length>0 && <div className="muted" style={{fontSize:10,marginTop:2}}>Past: {(c.brand_partnerships_known||[]).join(', ')}</div>}
-          </td>
-          <td>{c.audience_size_estimated ? (c.audience_size_estimated/1000).toFixed(0)+'k' : '—'}<br/><span className="muted" style={{fontSize:9}}>{c.audience_size_confidence} conf.</span></td>
-          <td>{PCT(c.brand_fit)}</td>
-          <td>{PCT(c.audience_fit)}</td>
-          <td>{PCT(c.engagement_quality)}</td>
-          <td><b style={{color:color}}>{PCT(c.composite)}</b></td>
-          <td className="tl"><span className="pill grey" style={{fontSize:10}}>{c.status}</span></td>
-        </tr>);
-      })}
-      </tbody></table>
     </div>
-    <div className="row">
-      <div className="card" style={{flex:'1 1 360px'}}>
-        <h2>Top reasoning notes</h2>
-        <div className="muted" style={{marginBottom:8,fontSize:11}}>Why each hero/core candidate ranks where they do. Click handle in table above for details.</div>
-        <div style={{display:'flex',flexDirection:'column',gap:10,maxHeight:520,overflowY:'auto'}}>
-        {(C.candidates||[]).filter(c=>c.tier==='hero'||c.tier==='core').slice(0,12).map((c,i)=>(<div key={i} style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${TIER_COLOR[c.tier]}`,borderRadius:'0 6px 6px 0',fontSize:11.5}}>
-          <div style={{fontWeight:600,marginBottom:4}}>{c.name} <span className="muted" style={{fontWeight:400}}>({c.handle})</span></div>
-          <div style={{color:'#b6b6c0',lineHeight:1.45}}>{c.reasoning}</div>
-          {(c.verify_next||[]).length>0 && <div style={{marginTop:6,fontSize:10,color:'#7b7b87'}}><b>Verify next:</b> {c.verify_next.join(' · ')}</div>}
-        </div>))}
-        </div>
-      </div>
-      <div className="card" style={{flex:'1 1 280px'}}>
-        <h2>How to use this</h2>
-        <div style={{fontSize:12.5,lineHeight:1.6,color:'var(--text-secondary)'}}>
-          <p><b>Scores are inferred not measured.</b> They reflect what LLM reasoning can extract from public web signals — past partnerships, audience age cues, content themes, engagement signals quoted in articles.</p>
-          <p><b>Before outreaching at scale</b>, verify with a real creator-discovery tool (Heepsy £69/mo or Modash £150+/mo). Look for: actual follower count, UK audience %, age split, engagement rate, brand-overlap with frkl peers.</p>
-          <p><b>The highest-EV move</b> isn't in any external creator — it's an internal audit of <code>#myfrkl</code> tagged users. These are existing customers who already buy frkl AND have audiences. Brief Lux to pull that list.</p>
-          <p><b>To add a new candidate:</b> edit <code>creator_candidates.json</code> and re-run <code>python scripts/build_creators_data.py</code>. Status field tracks: prospect → contacted → active → declined.</p>
-        </div>
-      </div>
-    </div>
-  </div>);
+  );
 }
 
 function AffiliatePanel(){
@@ -4295,70 +4318,72 @@ function AffiliatePanel(){
   const noCode = summary.no_code || {};
   const dtcTotal = (aff.netSales||0) + (camp.netSales||0) + (noCode.netSales||0);
   const affShareDTC = dtcTotal ? totalAffRev / dtcTotal : 0;
-  return (<div style={{marginTop:14}}>
-    <div className="card" style={{marginBottom:14, borderLeft:'3px solid #4ade80'}}>
-      <h2>Affiliates & creator partnerships — 90d</h2>
-      <div className="muted" style={{marginBottom:10,fontSize:12}}>Tracked via Shopify discount-code attribution. Edit the code → creator mapping in <code>scripts/_affiliate_codes.txt</code>.</div>
-      <div className="row" style={{marginBottom:8}}>
-        <KPI label="Affiliate revenue (90d)" val={GBP(totalAffRev)} sub={`${PCT(affShareDTC)} of DTC revenue · ${aff.orders||0} orders · AOV £${aff.avgAov||0}`}
-          agent="Scout" observation={`Creator partnerships drive ${PCT(affShareDTC)} of revenue — significantly higher per-order than paid acquisition.`}
-          implication="This is the most efficient acquisition channel in the business. Double down on top performers, replicate format with lookalikes." />
-        <KPI label="Top affiliate" val={topAff.code} sub={`${topAff.orders} orders · ${GBP(topAff.netSales)} · ${PCT(topShare)} of affiliate rev`}
-          agent="Lux" observation={`${topAff.label} is the single biggest revenue driver — ${PCT(topShare)} concentration is a risk if the relationship cools.`}
-          implication="Lock in long-term commercials. Brief a like-for-like discovery search to reduce single-creator dependency." />
-        <KPI label="Affiliate avg discount" val={PCT(aff.discountPct)} sub={`vs ${PCT(camp.discountPct)} for promo campaigns`}
-          agent="Atlas" observation={`Affiliates cost ~${Math.round((aff.discountPct||0)*100)}% off list vs ${Math.round((camp.discountPct||0)*100)}% for blanket promos. Cheaper acquisition, higher AOV.`}
-          implication="Shift incremental budget from promo campaigns toward creator commercials. Better unit economics." />
-        <KPI label="Gifting & CS adjustments" val={cs.orders||0} sub={`${cs.codeCount||0} codes · £${NUM(cs.discounts)} retail value of comped product`}
-          agent="Lux" observation="Operational comps (gifting, replacements, lost-in-transit) total £10k+ in product value over 90d. Tracked but not in DTC revenue."
-          implication="Worth quarterly review with ops — is the gifting budget converting to UGC / press / repurchase? Currently no attribution loop." />
+  return (
+    <div style={{marginTop:14}}>
+      <div className="card" style={{marginBottom:14, borderLeft:'3px solid #4ade80'}}>
+        <h2>Affiliates & creator partnerships — 90d</h2>
+        <div className="muted" style={{marginBottom:10,fontSize:12}}>Tracked via Shopify discount-code attribution. Edit the code → creator mapping in <code>scripts/_affiliate_codes.txt</code>.</div>
+        <div className="row" style={{marginBottom:8}}>
+          <KPI label="Affiliate revenue (90d)" val={GBP(totalAffRev)} sub={`${PCT(affShareDTC)} of DTC revenue · ${aff.orders||0} orders · AOV ${curSym()}${aff.avgAov||0}`}
+            agent="Scout" observation={`Creator partnerships drive ${PCT(affShareDTC)} of revenue — significantly higher per-order than paid acquisition.`}
+            implication="This is the most efficient acquisition channel in the business. Double down on top performers, replicate format with lookalikes." />
+          <KPI label="Top affiliate" val={topAff.code} sub={`${topAff.orders} orders · ${GBP(topAff.netSales)} · ${PCT(topShare)} of affiliate rev`}
+            agent="Lux" observation={`${topAff.label} is the single biggest revenue driver — ${PCT(topShare)} concentration is a risk if the relationship cools.`}
+            implication="Lock in long-term commercials. Brief a like-for-like discovery search to reduce single-creator dependency." />
+          <KPI label="Affiliate avg discount" val={PCT(aff.discountPct)} sub={`vs ${PCT(camp.discountPct)} for promo campaigns`}
+            agent="Atlas" observation={`Affiliates cost ~${Math.round((aff.discountPct||0)*100)}% off list vs ${Math.round((camp.discountPct||0)*100)}% for blanket promos. Cheaper acquisition, higher AOV.`}
+            implication="Shift incremental budget from promo campaigns toward creator commercials. Better unit economics." />
+          <KPI label="Gifting & CS adjustments" val={cs.orders||0} sub={`${cs.codeCount||0} codes · ${curSym()}${NUM(cs.discounts)} retail value of comped product`}
+            agent="Lux" observation={`Operational comps (gifting, replacements, lost-in-transit) total ${curSym()}10k+ in product value over 90d. Tracked but not in DTC revenue.`}
+            implication="Worth quarterly review with ops — is the gifting budget converting to UGC / press / repurchase? Currently no attribution loop." />
+        </div>
       </div>
+      <div className="row">
+        <div className="card" style={{flex:'2 1 520px'}}>
+          <h2>Affiliate league table</h2>
+          <table><thead><tr><th>Code</th><th>Creator</th><th>Orders</th><th>Net rev</th><th>AOV</th><th>Discount %</th><th>{curSym()}given/order</th></tr></thead><tbody>
+          {affs.map((a,i)=>{
+            const tier = a.netSales > 5000 ? 'hero' : a.netSales > 1000 ? 'core' : a.netSales > 200 ? 'mid' : 'long-tail';
+            const tierColor = {hero:'#4ade80',core:'#5b8def',mid:'#fbbf24','long-tail':'#7b7b87'}[tier];
+            return (<tr key={i}>
+              <td><span className="pill" style={{background:tierColor+'22',color:tierColor,fontSize:10,padding:'2px 6px',borderRadius:4,fontWeight:700}}>{a.code}</span></td>
+              <td style={{fontSize:12,maxWidth:200}}>{a.label}{a.notes && <div className="muted" style={{fontSize:10}}>{a.notes}</div>}</td>
+              <td><b>{a.orders}</b></td>
+              <td><b>{GBP(a.netSales)}</b></td>
+              <td style={{color: a.aov>80?'#4ade80':a.aov>50?'#fbbf24':'#7b7b87'}}>{GBP(a.aov)}</td>
+              <td>{PCT(a.discountPct)}</td>
+              <td>{GBP(a.avgDiscountGivenPerOrder)}</td>
+            </tr>);
+          })}
+          </tbody></table>
+        </div>
+        <div className="card" style={{flex:'1 1 300px'}}>
+          <h2>Code categories</h2>
+          <table><thead><tr><th>Category</th><th>Codes</th><th>Orders</th><th>Net rev</th><th>AOV</th></tr></thead><tbody>
+          {Object.entries(summary).filter(([_,s])=>s.orders>0).sort((a,b)=>(b[1].netSales||0)-(a[1].netSales||0)).map(([cat,s],i)=>{
+            const LABELS = {affiliate:'Affiliate creators',campaign:'Promo campaigns',cs_adjustment:'Gifting / CS',auto_generated:'Auto-generated',bundle_ref:'Bundle ref',no_code:'No code',unclassified:'Unclassified'};
+            const COLORS = {affiliate:'#4ade80',campaign:'#fbbf24',cs_adjustment:'#c084fc',no_code:'#7b7b87',auto_generated:'#94a3b8',unclassified:'#f87171'};
+            return (<tr key={i}>
+              <td><span className="pill" style={{background:(COLORS[cat]||'#7b7b87')+'22',color:COLORS[cat]||'#7b7b87',fontSize:10,padding:'2px 6px',borderRadius:4,fontWeight:600}}>{LABELS[cat]||cat}</span></td>
+              <td>{s.codeCount}</td>
+              <td>{s.orders}</td>
+              <td>{GBP(s.netSales)}</td>
+              <td>{GBP(s.avgAov)}</td>
+            </tr>);
+          })}
+          </tbody></table>
+        </div>
+      </div>
+      <div className="note" style={{marginTop:14}}><b>Scout's read:</b> Creator partnerships are doing more work than the data has been crediting them for. HEYGIRL (Angela Scanlon) is genuinely the biggest single attribution lever you have — that's <b>one quarter of revenue from one relationship</b>. Diversification candidates: brief a discovery search for UK creators in the 35-54 lifestyle/jewellery space with engagement rates above 4% (matching Angela's audience profile). The other named affiliates (GMS, Boldly, Davidson, Nora, Charissa) all have signal but tiny volume — worth a deeper conversation per creator about content cadence and commercial terms.</div>
     </div>
-    <div className="row">
-      <div className="card" style={{flex:'2 1 520px'}}>
-        <h2>Affiliate league table</h2>
-        <table><thead><tr><th>Code</th><th>Creator</th><th>Orders</th><th>Net rev</th><th>AOV</th><th>Discount %</th><th>£ given/order</th></tr></thead><tbody>
-        {affs.map((a,i)=>{
-          const tier = a.netSales > 5000 ? 'hero' : a.netSales > 1000 ? 'core' : a.netSales > 200 ? 'mid' : 'long-tail';
-          const tierColor = {hero:'#4ade80',core:'#5b8def',mid:'#fbbf24','long-tail':'#7b7b87'}[tier];
-          return (<tr key={i}>
-            <td><span className="pill" style={{background:tierColor+'22',color:tierColor,fontSize:10,padding:'2px 6px',borderRadius:4,fontWeight:700}}>{a.code}</span></td>
-            <td style={{fontSize:12,maxWidth:200}}>{a.label}{a.notes && <div className="muted" style={{fontSize:10}}>{a.notes}</div>}</td>
-            <td><b>{a.orders}</b></td>
-            <td><b>{GBP(a.netSales)}</b></td>
-            <td style={{color: a.aov>80?'#4ade80':a.aov>50?'#fbbf24':'#7b7b87'}}>{GBP(a.aov)}</td>
-            <td>{PCT(a.discountPct)}</td>
-            <td>{GBP(a.avgDiscountGivenPerOrder)}</td>
-          </tr>);
-        })}
-        </tbody></table>
-      </div>
-      <div className="card" style={{flex:'1 1 300px'}}>
-        <h2>Code categories</h2>
-        <table><thead><tr><th>Category</th><th>Codes</th><th>Orders</th><th>Net rev</th><th>AOV</th></tr></thead><tbody>
-        {Object.entries(summary).filter(([_,s])=>s.orders>0).sort((a,b)=>(b[1].netSales||0)-(a[1].netSales||0)).map(([cat,s],i)=>{
-          const LABELS = {affiliate:'Affiliate creators',campaign:'Promo campaigns',cs_adjustment:'Gifting / CS',auto_generated:'Auto-generated',bundle_ref:'Bundle ref',no_code:'No code',unclassified:'Unclassified'};
-          const COLORS = {affiliate:'#4ade80',campaign:'#fbbf24',cs_adjustment:'#c084fc',no_code:'#7b7b87',auto_generated:'#94a3b8',unclassified:'#f87171'};
-          return (<tr key={i}>
-            <td><span className="pill" style={{background:(COLORS[cat]||'#7b7b87')+'22',color:COLORS[cat]||'#7b7b87',fontSize:10,padding:'2px 6px',borderRadius:4,fontWeight:600}}>{LABELS[cat]||cat}</span></td>
-            <td>{s.codeCount}</td>
-            <td>{s.orders}</td>
-            <td>{GBP(s.netSales)}</td>
-            <td>{GBP(s.avgAov)}</td>
-          </tr>);
-        })}
-        </tbody></table>
-      </div>
-    </div>
-    <div className="note" style={{marginTop:14}}><b>Scout's read:</b> Creator partnerships are doing more work than the data has been crediting them for. HEYGIRL (Angela Scanlon) is genuinely the biggest single attribution lever you have — that's <b>one quarter of revenue from one relationship</b>. Diversification candidates: brief a discovery search for UK creators in the 35-54 lifestyle/jewellery space with engagement rates above 4% (matching Angela's audience profile). The other named affiliates (GMS, Boldly, Davidson, Nora, Charissa) all have signal but tiny volume — worth a deeper conversation per creator about content cadence and commercial terms.</div>
-  </div>);
+  );
 }
 
 const SITE_STEPS = [
-  {step:'Homepage', live:'Promo "10% off" popup interrupts on load; announcement bar (free UK delivery over £75); clear nav (necklaces/charms/bracelets/earrings, gifting).', issue:'Cookie banner + popup consume the first interaction. 50.8% of visitors drop between 10–15% scroll — most never see past the hero. 1.07 pages/session.', sev:'red'},
-  {step:'Collection (PLP)', live:'Filters (type/price/availability), "worth £X" bundle-saving badges, 106 products, build-system style labels.', issue:'Out-of-stock products sit in prime grid slots → dead-end clicks. 80–85% scroll cliff where the grid ends. Mobile filter/pagination friction.', sev:'amber'},
+  {step:'Homepage', live:`Promo "10% off" popup interrupts on load; announcement bar (free UK delivery over ${curSym()}75); clear nav (necklaces/charms/bracelets/earrings, gifting).`, issue:'Cookie banner + popup consume the first interaction. 50.8% of visitors drop between 10–15% scroll — most never see past the hero. 1.07 pages/session.', sev:'red'},
+  {step:'Collection (PLP)', live:`Filters (type/price/availability), "worth ${curSym()}X" bundle-saving badges, 106 products, build-system style labels.`, issue:'Out-of-stock products sit in prime grid slots → dead-end clicks. 80–85% scroll cliff where the grid ends. Mobile filter/pagination friction.', sev:'amber'},
   {step:'Product (PDP)', live:'Gallery + lifestyle shots, Clearpay BNPL, reviews, variant swatches, Shop Pay express, 90-day returns & free-ship badges.', issue:'Judge.me review widget throws JS errors → elements look clickable but do nothing (dead/rage clicks).', sev:'amber'},
-  {step:'Cart drawer', live:'Free-shipping progress bar, cross-sell add-ons (charm £25, notebook £12), qty stepper, coupon field, Checkout CTA.', issue:'Coupon-code field throws JS errors when codes are applied — a prime suspect for the 67.8% ATC→checkout drop (people hunt for a code, it fails, they leave).', sev:'red'},
+  {step:'Cart drawer', live:`Free-shipping progress bar, cross-sell add-ons (charm ${curSym()}25, notebook ${curSym()}12), qty stepper, coupon field, Checkout CTA.`, issue:'Coupon-code field throws JS errors when codes are applied — a prime suspect for the 67.8% ATC→checkout drop (people hunt for a code, it fails, they leave).', sev:'red'},
   {step:'Checkout', live:'Standard Shopify checkout. Express: Shop Pay + Google Pay. Discount field, taxes shown.', issue:'No Apple Pay express button — a real gap for an iOS-heavy female audience. 90% of checkout-starters still abandon (vs 50–60% benchmark).', sev:'red'},
 ];
 const CLARITY = [
@@ -4398,66 +4423,68 @@ function Customers(){
   const retPctSeries    = weeks.map(w=>({d:w.label, v:+w.retPct.toFixed(1)}));
   const retRevPctSeries = weeks.map(w=>({d:w.label, v:+w.retRevPct.toFixed(1)}));
   const listNetSeries   = listChart.map(r=>({d:r.date, v:r.net}));
-  return (<div>
-    <RetentionPanel/>
-    <div className="row" style={{marginBottom:14}}>
-      <KPI label="% orders from returning" val={PCT((totalRet)/(totalNew+totalRet))} sub={`${NUM(totalRet)} returning / ${NUM(totalNew)} new (90d)`} series={retPctSeries} seriesLabel="Returning order share · by week"
-        agent="Lux" observation="38.7% repeat is healthier than Clarity's 95% new-visitor stat suggested — buyers ARE coming back."
-        implication="The repeat customer is real but undermonetised — post-purchase + restyle flows would lift LTV materially." />
-      <KPI label="Returning revenue share" val={PCT((totalRetRev)/(totalNewRev+totalRetRev))} sub={`£${NUM(totalRetRev)} of £${NUM(totalNewRev+totalRetRev)}`} series={retRevPctSeries} seriesLabel="Returning revenue share · by week"
-        agent="Atlas" observation="29.6% of revenue from returning customers comes with zero acquisition cost — highest-margin slice."
-        implication="Every £1 of retention spend likely returns more than every £1 of paid acquisition right now." />
-      <KPI label="Net list growth (90d)" val={'+'+NUM(subsTotal-unsubsTotal)} sub={`${NUM(subsTotal)} new − ${NUM(unsubsTotal)} unsub`} series={listNetSeries} seriesLabel="Net list growth · by day"
-        agent="Sage" observation="~26 new subs/day with <5 unsubs — acquisition is filling the funnel cleanly."
-        implication="The list is healthy; the gap is monetisation — abandoned-cart + welcome series are the levers, not more sign-ups." />
-      <KPI label="Markets" val={geo.length+'+'} sub={`UK ${PCT(geo[0]?.netSales/geo.reduce((a,b)=>a+b.netSales,0))} · IE ${PCT((geo[1]?.netSales||0)/geo.reduce((a,b)=>a+b.netSales,0))}`}
-        agent="Scout" observation={OI_BRAND.slug==='frkl' ? "UK 66% / Ireland 30% — Ireland is genuinely a second home market, and AOV is £6 higher there." : undefined}
-        implication={OI_BRAND.slug==='frkl' ? "An IE-specific creative + landing test could capitalise on the higher-AOV behaviour you're already seeing." : undefined} />
-    </div>
-    <div className="card" style={{marginBottom:14}}>
-      <h2>New vs returning orders — weekly</h2>
-      <R.ResponsiveContainer width="100%" height={250}>
-        <R.ComposedChart data={weeks} margin={{top:6,right:8,left:14,bottom:20}}>
-          <R.CartesianGrid stroke="#222229" vertical={false} />
-          <R.XAxis dataKey="label" tick={{fill:'#6f6f7b',fontSize:11}} label={{value:'Week', position:'insideBottom', offset:-8, fill:'#6f6f7b', fontSize:11}} />
-          <R.YAxis yAxisId="l" tick={{fill:'#6f6f7b',fontSize:11}} label={{value:'Orders', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}} />
-          <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#6f6f7b',fontSize:11}} tickFormatter={v=>v+'%'} domain={[0,80]} label={{value:'% returning', angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}} />
-          <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} />
-          <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}} />
-          <R.Bar yAxisId="l" dataKey="new" stackId="o" name="New" fill={COL.sessions} />
-          <R.Bar yAxisId="l" dataKey="ret" stackId="o" name="Returning" fill={COL.revenue} />
-          <R.Line yAxisId="r" type="monotone" dataKey="retPct" name="% returning" stroke={COL.email} strokeWidth={2} dot={false} />
-        </R.ComposedChart>
-      </R.ResponsiveContainer>
-    </div>
-    <ConfigurableChart
-      title="Explore markets — Shopify settlement"
-      dataset={(geo||[]).map(g=>({country:g.country||'(unknown)', region:/kingdom|^uk$|^gb$/i.test(g.country||'')?'UK':/ireland|^ie$/i.test(g.country||'')?'Ireland':'Rest of world', revenue:g.netSales||0, orders:g.orders||0}))}
-      dimensions={[{key:'country',label:'Country'},{key:'region',label:'Region (UK/IE/RoW)'}]}
-      metrics={[{key:'revenue',label:'Net revenue',fmt:GBP},{key:'orders',label:'Orders',fmt:NUM}]}
-      defaultMetric="revenue" defaultSplit="country" defaultChart="bar" defaultTopN={10}/>
-    <div className="row">
-      <div className="card" style={{flex:'1 1 360px'}}>
-        <h2>Markets — top 10</h2>
-        <table><thead><tr><th>Country</th><th>Orders</th><th>Net rev</th><th>AOV</th></tr></thead><tbody>
-        {geo.map((g,i)=>(<tr key={i}><td>{g.country||'(unknown)'}</td><td>{NUM(g.orders)}</td><td>{GBP(g.netSales)}</td><td>{GBP(g.aov)}</td></tr>))}
-        </tbody></table>
+  return (
+    <div>
+      <RetentionPanel/>
+      <div className="row" style={{marginBottom:14}}>
+        <KPI label="% orders from returning" val={PCT((totalRet)/(totalNew+totalRet))} sub={`${NUM(totalRet)} returning / ${NUM(totalNew)} new (90d)`} series={retPctSeries} seriesLabel="Returning order share · by week"
+          agent="Lux" observation="38.7% repeat is healthier than Clarity's 95% new-visitor stat suggested — buyers ARE coming back."
+          implication="The repeat customer is real but undermonetised — post-purchase + restyle flows would lift LTV materially." />
+        <KPI label="Returning revenue share" val={PCT((totalRetRev)/(totalNewRev+totalRetRev))} sub={`${curSym()}${NUM(totalRetRev)} of ${curSym()}${NUM(totalNewRev+totalRetRev)}`} series={retRevPctSeries} seriesLabel="Returning revenue share · by week"
+          agent="Atlas" observation="29.6% of revenue from returning customers comes with zero acquisition cost — highest-margin slice."
+          implication={`Every ${curSym()}1 of retention spend likely returns more than every ${curSym()}1 of paid acquisition right now.`} />
+        <KPI label="Net list growth (90d)" val={'+'+NUM(subsTotal-unsubsTotal)} sub={`${NUM(subsTotal)} new − ${NUM(unsubsTotal)} unsub`} series={listNetSeries} seriesLabel="Net list growth · by day"
+          agent="Sage" observation="~26 new subs/day with <5 unsubs — acquisition is filling the funnel cleanly."
+          implication="The list is healthy; the gap is monetisation — abandoned-cart + welcome series are the levers, not more sign-ups." />
+        <KPI label="Markets" val={geo.length+'+'} sub={`UK ${PCT(geo[0]?.netSales/geo.reduce((a,b)=>a+b.netSales,0))} · IE ${PCT((geo[1]?.netSales||0)/geo.reduce((a,b)=>a+b.netSales,0))}`}
+          agent="Scout" observation={OI_BRAND.slug==='frkl' ? `UK 66% / Ireland 30% — Ireland is genuinely a second home market, and AOV is ${curSym()}6 higher there.` : undefined}
+          implication={OI_BRAND.slug==='frkl' ? "An IE-specific creative + landing test could capitalise on the higher-AOV behaviour you're already seeing." : undefined} />
       </div>
-      <div className="card" style={{flex:'1 1 360px'}}>
-        <h2>Klaviyo list — daily net growth</h2>
-        <R.ResponsiveContainer width="100%" height={200}>
-          <R.BarChart data={listChart} margin={{top:6,right:8,left:14,bottom:18}}>
+      <div className="card" style={{marginBottom:14}}>
+        <h2>New vs returning orders — weekly</h2>
+        <R.ResponsiveContainer width="100%" height={250}>
+          <R.ComposedChart data={weeks} margin={{top:6,right:8,left:14,bottom:20}}>
             <R.CartesianGrid stroke="#222229" vertical={false} />
-            <R.XAxis dataKey="date" tick={{fill:'#6f6f7b',fontSize:10}} interval={Math.ceil(listChart.length/10)} label={{value:'Date', position:'insideBottom', offset:-6, fill:'#6f6f7b', fontSize:10}} />
-            <R.YAxis tick={{fill:'#6f6f7b',fontSize:10}} label={{value:'Net subs', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:10}} />
+            <R.XAxis dataKey="label" tick={{fill:'#6f6f7b',fontSize:11}} label={{value:'Week', position:'insideBottom', offset:-8, fill:'#6f6f7b', fontSize:11}} />
+            <R.YAxis yAxisId="l" tick={{fill:'#6f6f7b',fontSize:11}} label={{value:'Orders', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}} />
+            <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#6f6f7b',fontSize:11}} tickFormatter={v=>v+'%'} domain={[0,80]} label={{value:'% returning', angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}} />
             <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} />
-            <R.Bar dataKey="net" fill={COL.email} />
-          </R.BarChart>
+            <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}} />
+            <R.Bar yAxisId="l" dataKey="new" stackId="o" name="New" fill={COL.sessions} />
+            <R.Bar yAxisId="l" dataKey="ret" stackId="o" name="Returning" fill={COL.revenue} />
+            <R.Line yAxisId="r" type="monotone" dataKey="retPct" name="% returning" stroke={COL.email} strokeWidth={2} dot={false} />
+          </R.ComposedChart>
         </R.ResponsiveContainer>
       </div>
+      <ConfigurableChart
+        title="Explore markets — Shopify settlement"
+        dataset={(geo||[]).map(g=>({country:g.country||'(unknown)', region:/kingdom|^uk$|^gb$/i.test(g.country||'')?'UK':/ireland|^ie$/i.test(g.country||'')?'Ireland':'Rest of world', revenue:g.netSales||0, orders:g.orders||0}))}
+        dimensions={[{key:'country',label:'Country'},{key:'region',label:'Region (UK/IE/RoW)'}]}
+        metrics={[{key:'revenue',label:'Net revenue',fmt:GBP},{key:'orders',label:'Orders',fmt:NUM}]}
+        defaultMetric="revenue" defaultSplit="country" defaultChart="bar" defaultTopN={10}/>
+      <div className="row">
+        <div className="card" style={{flex:'1 1 360px'}}>
+          <h2>Markets — top 10</h2>
+          <table><thead><tr><th>Country</th><th>Orders</th><th>Net rev</th><th>AOV</th></tr></thead><tbody>
+          {geo.map((g,i)=>(<tr key={i}><td>{g.country||'(unknown)'}</td><td>{NUM(g.orders)}</td><td>{GBP(g.netSales)}</td><td>{GBP(g.aov)}</td></tr>))}
+          </tbody></table>
+        </div>
+        <div className="card" style={{flex:'1 1 360px'}}>
+          <h2>Klaviyo list — daily net growth</h2>
+          <R.ResponsiveContainer width="100%" height={200}>
+            <R.BarChart data={listChart} margin={{top:6,right:8,left:14,bottom:18}}>
+              <R.CartesianGrid stroke="#222229" vertical={false} />
+              <R.XAxis dataKey="date" tick={{fill:'#6f6f7b',fontSize:10}} interval={Math.ceil(listChart.length/10)} label={{value:'Date', position:'insideBottom', offset:-6, fill:'#6f6f7b', fontSize:10}} />
+              <R.YAxis tick={{fill:'#6f6f7b',fontSize:10}} label={{value:'Net subs', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:10}} />
+              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} />
+              <R.Bar dataKey="net" fill={COL.email} />
+            </R.BarChart>
+          </R.ResponsiveContainer>
+        </div>
+      </div>
+      {OI_BRAND.slug==='frkl' && <div className="note" style={{marginTop:14}}>The big spike of returning customers <b>late April</b>(Apr 22–28) is the cohort responding to Meta re-scaling on Apr 13 — and the email flow firing on that traffic. Ireland's AOV ({curSym()}71) is meaningfully higher than the UK's ({curSym()}65). The list is net-positive every single day — Klaviyo has product-market fit for acquisition; the gap is monetisation of the list with proper attributed reporting.</div>}
     </div>
-    {OI_BRAND.slug==='frkl' && <div className="note" style={{marginTop:14}}>The big spike of returning customers <b>late April</b> (Apr 22–28) is the cohort responding to Meta re-scaling on Apr 13 — and the email flow firing on that traffic. Ireland's AOV (£71) is meaningfully higher than the UK's (£65). The list is net-positive every single day — Klaviyo has product-market fit for acquisition; the gap is monetisation of the list with proper attributed reporting.</div>}
-  </div>);
+  );
 }
 
 function BundlesPanel(){
@@ -4470,48 +4497,50 @@ function BundlesPanel(){
   const explicitRows = bundles.filter(b => !((b.title||'').toLowerCase().includes('(bundle for reference only)')));
   const aovLift = (singles.aovPerUnit && bundlesAgg.aovPerUnit)
     ? ((bundlesAgg.aovPerUnit / singles.aovPerUnit) - 1) : null;
-  return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid #c084fc'}}>
-    <h2>Bundles & stacks — 90d</h2>
-    {DEMO && <div className="muted" style={{marginBottom:10, fontSize:12}}>frkl's "stack" products are pre-styled bundles (base + style + charm). They unlock higher AOV but currently sell rarely. Two bundle tracking systems exist in Shopify: explicit "stack" SKUs and a hidden "Bundle for reference only" wrapper — both surfaced below.</div>}
-    <div className="row" style={{marginBottom:10}}>
-      <KPI label="Bundle revenue share" val={PCT(summary.bundleRevenueShare)} sub={`£${NUM(bundlesAgg.netSales)} of £${NUM((singles.netSales||0)+(bundlesAgg.netSales||0)+(summary.giftCards?.netSales||0))} total products`}
-        agent="Atlas" observation={`Bundles are only ${PCT(summary.bundleRevenueShare)} of product revenue. This is the single biggest AOV lever sitting unused.`}
-        implication="Brief Lux + Frame on a bundle merchandising push: stack-builder UX, social proof, gifting positioning. Worth pulling forward in Q3 plan." />
-      <KPI label="Bundle attach rate" val={PCT(summary.bundleAttachRate)} sub={`${bundlesAgg.units} bundle units of ${(singles.units||0)+(bundlesAgg.units||0)} total`}
-        agent="Lux" observation="Less than 1% of customers buy a pre-styled stack. Either discovery's broken (no PDP cross-sell?) or the price gap to à la carte isn't compelling."
-        implication="Test a 'complete the stack' upsell on every PDP. Test a £10 bundle saving banner. Track delta in Site CVR." />
-      <KPI label="Avg bundle price (per unit)" val={GBP(bundlesAgg.aovPerUnit)} sub={aovLift != null ? `${(aovLift*100).toFixed(0)}% vs single AOV £${NUM(singles.aovPerUnit)}` : '—'}
-        agent="Frame" observation={aovLift > 0 ? `Bundle AOV per unit is ${(aovLift*100).toFixed(0)}% higher than singles. Each stack sale = one customer behaving like ${(1+aovLift).toFixed(1)} customers.` : 'Bundle pricing not yet outperforming singles — pricing strategy worth reviewing.'}
-        implication="Frame bundles to investor materials as the AOV play. Each percentage point of bundle attach rate moves blended AOV measurably." />
-      <KPI label="Bundle margin %" val={PCT(bundlesAgg.marginPct)} sub={`100% reflects missing bundle COGS in Shopify — true margin is component-weighted`}
-        agent="Atlas" observation="COGS isn't tracked per bundle SKU in Shopify, so the margin figure here is artificial. Real bundle margin should match (or exceed) the weighted-average margin of its components."
-        implication="One-off fix: add COGS to each bundle parent SKU in Shopify. ~30 min job, makes this number trustworthy." />
-    </div>
-    <div className="row">
-      <div className="card" style={{flex:'2 1 460px'}}>
-        <h2>Explicit stack SKUs sold (last 90d)</h2>
-        <div className="muted" style={{marginBottom:8, fontSize:12}}>Each row = a stack product set up as its own SKU. Sold as one purchase.</div>
-        {explicitRows.length ? (<table><thead><tr><th>Type</th><th className="tl">Title</th><th>Units</th><th>Net rev</th><th>AOV</th><th>Returns</th></tr></thead><tbody>
-        {explicitRows.map((b,i)=>(<tr key={i}>
-          <td><span className="pill" style={{background:'#c084fc22',color:'#c084fc',fontSize:10,padding:'2px 6px',borderRadius:4,fontWeight:600}}>{b.type}</span></td>
-          <td className="tl" style={{fontSize:12, maxWidth:280}}>{b.image && <img src={b.image} style={{width:22,height:22,borderRadius:4,verticalAlign:'middle',marginRight:8,objectFit:'cover'}} onError={e=>{e.target.style.opacity=.2;}}/>}{b.title}</td>
-          <td>{b.units}</td>
-          <td>{GBP(b.netSales)}</td>
-          <td>{GBP(b.units ? b.netSales/b.units : null)}</td>
-          <td>{b.returns}</td>
-        </tr>))}
-        </tbody></table>) : (<div className="muted">No explicit stack SKUs sold in this window.</div>)}
+  return (
+    <div className="card" style={{marginBottom:14, borderLeft:'3px solid #c084fc'}}>
+      <h2>Bundles & stacks — 90d</h2>
+      {DEMO && <div className="muted" style={{marginBottom:10, fontSize:12}}>frkl's "stack" products are pre-styled bundles (base + style + charm). They unlock higher AOV but currently sell rarely. Two bundle tracking systems exist in Shopify: explicit "stack" SKUs and a hidden "Bundle for reference only" wrapper — both surfaced below.</div>}
+      <div className="row" style={{marginBottom:10}}>
+        <KPI label="Bundle revenue share" val={PCT(summary.bundleRevenueShare)} sub={`${curSym()}${NUM(bundlesAgg.netSales)} of ${curSym()}${NUM((singles.netSales||0)+(bundlesAgg.netSales||0)+(summary.giftCards?.netSales||0))} total products`}
+          agent="Atlas" observation={`Bundles are only ${PCT(summary.bundleRevenueShare)} of product revenue. This is the single biggest AOV lever sitting unused.`}
+          implication="Brief Lux + Frame on a bundle merchandising push: stack-builder UX, social proof, gifting positioning. Worth pulling forward in Q3 plan." />
+        <KPI label="Bundle attach rate" val={PCT(summary.bundleAttachRate)} sub={`${bundlesAgg.units} bundle units of ${(singles.units||0)+(bundlesAgg.units||0)} total`}
+          agent="Lux" observation="Less than 1% of customers buy a pre-styled stack. Either discovery's broken (no PDP cross-sell?) or the price gap to à la carte isn't compelling."
+          implication={`Test a 'complete the stack' upsell on every PDP. Test a ${curSym()}10 bundle saving banner. Track delta in Site CVR.`} />
+        <KPI label="Avg bundle price (per unit)" val={GBP(bundlesAgg.aovPerUnit)} sub={aovLift != null ? `${(aovLift*100).toFixed(0)}% vs single AOV ${curSym()}${NUM(singles.aovPerUnit)}` : '—'}
+          agent="Frame" observation={aovLift > 0 ? `Bundle AOV per unit is ${(aovLift*100).toFixed(0)}% higher than singles. Each stack sale = one customer behaving like ${(1+aovLift).toFixed(1)} customers.` : 'Bundle pricing not yet outperforming singles — pricing strategy worth reviewing.'}
+          implication="Frame bundles to investor materials as the AOV play. Each percentage point of bundle attach rate moves blended AOV measurably." />
+        <KPI label="Bundle margin %" val={PCT(bundlesAgg.marginPct)} sub={`100% reflects missing bundle COGS in Shopify — true margin is component-weighted`}
+          agent="Atlas" observation="COGS isn't tracked per bundle SKU in Shopify, so the margin figure here is artificial. Real bundle margin should match (or exceed) the weighted-average margin of its components."
+          implication="One-off fix: add COGS to each bundle parent SKU in Shopify. ~30 min job, makes this number trustworthy." />
       </div>
-      <div className="card" style={{flex:'1 1 280px'}}>
-        <h2>Bundle wrappers (Shopify-native)</h2>
-        <div className="muted" style={{marginBottom:8, fontSize:12}}>"Bundle for reference only" entries record the purchase event without splitting line items. Revenue is recorded on component SKUs.</div>
-        {wrapperRows.length ? (<ul style={{margin:0,padding:'0 0 0 18px',fontSize:12,lineHeight:1.7}}>
-          {wrapperRows.map((b,i)=>(<li key={i}>{(b.title||'').replace(' (Bundle for reference only)','')} — <b>{b.units} purchase{b.units===1?'':'s'}</b></li>))}
-        </ul>) : (<div className="muted">No Shopify-native bundle wrappers in this window.</div>)}
+      <div className="row">
+        <div className="card" style={{flex:'2 1 460px'}}>
+          <h2>Explicit stack SKUs sold (last 90d)</h2>
+          <div className="muted" style={{marginBottom:8, fontSize:12}}>Each row = a stack product set up as its own SKU. Sold as one purchase.</div>
+          {explicitRows.length ? (<table><thead><tr><th>Type</th><th className="tl">Title</th><th>Units</th><th>Net rev</th><th>AOV</th><th>Returns</th></tr></thead><tbody>
+          {explicitRows.map((b,i)=>(<tr key={i}>
+            <td><span className="pill" style={{background:'#c084fc22',color:'#c084fc',fontSize:10,padding:'2px 6px',borderRadius:4,fontWeight:600}}>{b.type}</span></td>
+            <td className="tl" style={{fontSize:12, maxWidth:280}}>{b.image && <img src={b.image} style={{width:22,height:22,borderRadius:4,verticalAlign:'middle',marginRight:8,objectFit:'cover'}} onError={e=>{e.target.style.opacity=.2;}}/>}{b.title}</td>
+            <td>{b.units}</td>
+            <td>{GBP(b.netSales)}</td>
+            <td>{GBP(b.units ? b.netSales/b.units : null)}</td>
+            <td>{b.returns}</td>
+          </tr>))}
+          </tbody></table>) : (<div className="muted">No explicit stack SKUs sold in this window.</div>)}
+        </div>
+        <div className="card" style={{flex:'1 1 280px'}}>
+          <h2>Bundle wrappers (Shopify-native)</h2>
+          <div className="muted" style={{marginBottom:8, fontSize:12}}>"Bundle for reference only" entries record the purchase event without splitting line items. Revenue is recorded on component SKUs.</div>
+          {wrapperRows.length ? (<ul style={{margin:0,padding:'0 0 0 18px',fontSize:12,lineHeight:1.7}}>
+            {wrapperRows.map((b,i)=>(<li key={i}>{(b.title||'').replace(' (Bundle for reference only)','')} — <b>{b.units} purchase{b.units===1?'':'s'}</b></li>))}
+          </ul>) : (<div className="muted">No Shopify-native bundle wrappers in this window.</div>)}
+        </div>
       </div>
+      <div className="note" style={{marginTop:14}}><b>Strategic read:</b> bundles are a tiny share of revenue (1.9%) at a high relative AOV. If you can move bundle attach from ~0.8% to ~5%, blended AOV would lift by roughly 2-4% with no extra ad spend. The Klaviyo data already showed Pre-styled stacks have their own welcome flow — that audience is the natural place to test a stack-builder PDP module first.</div>
     </div>
-    <div className="note" style={{marginTop:14}}><b>Strategic read:</b> bundles are a tiny share of revenue (1.9%) at a high relative AOV. If you can move bundle attach from ~0.8% to ~5%, blended AOV would lift by roughly 2-4% with no extra ad spend. The Klaviyo data already showed Pre-styled stacks have their own welcome flow — that audience is the natural place to test a stack-builder PDP module first.</div>
-  </div>);
+  );
 }
 
 function InventoryPanel(){
@@ -4538,69 +4567,73 @@ function InventoryPanel(){
   const lostSalesEstMonthly = critRows.reduce((acc, r) => acc + (r.units90d / 90) * 30 * 7, 0);  // assume £7 charm avg
   const overstockValue = (summary.overstock || {}).totalValue || 0;
   const archivedValue = (summary.archived_stock || {}).totalValue || 0;
-  return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid #fbbf24'}}>
-    <h2>Inventory + stock cover (DTC velocity)</h2>
-    <div className="muted" style={{marginBottom:10, fontSize:12}}>
-      Days of cover = inventory ÷ daily 90-day velocity. Joined SKU-level via Shopify ProductNoTimeDimensions. <b>Capital tied up in &gt;180d cover SKUs is dead-money risk.</b>
-    </div>
-    <div className="row" style={{marginBottom:10}}>
-      <div className="card kpi" style={{borderLeft:'3px solid #f87171'}}>
-        <div className="label">Critical / out of stock</div>
-        <div className="val">{(summary.critical||{}).skus||0}</div>
-        <div className="sub">{(summary.critical||{}).totalQty||0} units left · running out in &lt;14 days</div>
+  return (
+    <div className="card" style={{marginBottom:14, borderLeft:'3px solid #fbbf24'}}>
+      <h2>Inventory + stock cover (DTC velocity)</h2>
+      <div className="muted" style={{marginBottom:10, fontSize:12}}>
+        Days of cover = inventory ÷ daily 90-day velocity. Joined SKU-level via Shopify ProductNoTimeDimensions. <b>Capital tied up in &gt;180d cover SKUs is dead-money risk.</b>
       </div>
-      <div className="card kpi" style={{borderLeft:'3px solid #fbbf24'}}>
-        <div className="label">Healthy cover (30-90d)</div>
-        <div className="val">{(summary.healthy||{}).skus||0}</div>
-        <div className="sub">{(summary.healthy||{}).totalQty||0} units · £{NUM((summary.healthy||{}).totalValue)} on shelf</div>
+      <div className="row" style={{marginBottom:10}}>
+        <div className="card kpi" style={{borderLeft:'3px solid #f87171'}}>
+          <div className="label">Critical / out of stock</div>
+          <div className="val">{(summary.critical||{}).skus||0}</div>
+          <div className="sub">{(summary.critical||{}).totalQty||0} units left · running out in &lt;14 days</div>
+        </div>
+        <div className="card kpi" style={{borderLeft:'3px solid #fbbf24'}}>
+          <div className="label">Healthy cover (30-90d)</div>
+          <div className="val">{(summary.healthy||{}).skus||0}</div>
+          <div className="sub">{(summary.healthy||{}).totalQty||0}units · {curSym()}{NUM((summary.healthy||{}).totalValue)}on shelf</div>
+        </div>
+        <div className="card kpi" style={{borderLeft:'3px solid #c084fc'}}>
+          <div className="label">Overstock (&gt;180d)</div>
+          <div className="val">{(summary.overstock||{}).skus||0}</div>
+          <div className="sub">{(summary.overstock||{}).totalQty||0} units · <b>{curSym()}{NUM(overstockValue)} tied up</b></div>
+        </div>
+        <div className="card kpi" style={{borderLeft:'3px solid #7b7b87'}}>
+          <div className="label">Archived (dead stock)</div>
+          <div className="val">{(summary.archived_stock||{}).skus||0}</div>
+          <div className="sub">{(summary.archived_stock||{}).totalQty||0} units · <b>{curSym()}{NUM(archivedValue)}</b> at sell-value</div>
+        </div>
       </div>
-      <div className="card kpi" style={{borderLeft:'3px solid #c084fc'}}>
-        <div className="label">Overstock (&gt;180d)</div>
-        <div className="val">{(summary.overstock||{}).skus||0}</div>
-        <div className="sub">{(summary.overstock||{}).totalQty||0} units · <b>£{NUM(overstockValue)} tied up</b></div>
+      <div style={{display:'flex',gap:10,alignItems:'center',marginBottom:10,flexWrap:'wrap'}}>
+        <span className="muted" style={{fontSize:11,textTransform:'uppercase',letterSpacing:.05,fontWeight:700}}>FILTER</span>
+        <select value={tierFilter} onChange={e=>setTierFilter(e.target.value)} style={{background:'var(--bg-input)',color:'var(--text-primary)',border:'1px solid var(--border-default)',borderRadius:4,padding:'4px 8px',fontSize:12}}>
+          <option value="actionable">Actionable (critical + low + overstock + archived)</option>
+          <option value="all">All tiers</option>
+          <option value="critical">Critical only (&lt;14d)</option>
+          <option value="low">Low (&lt;30d)</option>
+          <option value="healthy">Healthy (30-90d)</option>
+          <option value="high">High (90-180d)</option>
+          <option value="overstock">Overstock (&gt;180d)</option>
+          <option value="archived_stock">Archived</option>
+        </select>
+        <span className="muted" style={{marginLeft:'auto',fontSize:11}}>{sorted.length} of {inv.length} SKUs</span>
       </div>
-      <div className="card kpi" style={{borderLeft:'3px solid #7b7b87'}}>
-        <div className="label">Archived (dead stock)</div>
-        <div className="val">{(summary.archived_stock||{}).skus||0}</div>
-        <div className="sub">{(summary.archived_stock||{}).totalQty||0} units · <b>£{NUM(archivedValue)}</b> at sell-value</div>
+      <div style={{maxHeight:560,overflowY:'auto'}}>
+        <table className="sticky"><thead><tr><th>Tier</th><th className="tl">SKU / title</th><th className="tl">Type</th><th>Stock</th><th>Sold 90d</th><th>Days cover</th><th>Inv {curSym()}value</th></tr></thead><tbody>
+        {sorted.slice(0,80).map((r,i) => {
+          const color = TIER_COLOR[r.coverTier] || '#7b7b87';
+          return (
+            <tr key={i}>
+              <td><span className="pill" style={{background:color+'22',color:color,fontSize:10,padding:'2px 6px',borderRadius:4,fontWeight:700,whiteSpace:'nowrap'}}>{TIER_LABEL[r.coverTier]||r.coverTier}</span></td>
+              <td className="tl" style={{fontSize:11,maxWidth:280}}>
+                <b>{r.title}</b>
+                {r.sku && <div className="muted" style={{fontSize:10}}><code>{r.sku}</code></div>}
+              </td>
+              <td className="muted tl" style={{fontSize:11}}>{r.type||'—'}</td>
+              <td><b>{r.inventoryQty}</b></td>
+              <td>{r.units90d}</td>
+              <td>{r.daysOfCover === null ? '∞' : r.daysOfCover === 999 ? '∞' : r.daysOfCover + 'd'}</td>
+              <td>{curSym()}{NUM(r.inventoryValue)}</td>
+            </tr>
+          );
+        })}
+        </tbody></table>
       </div>
+      {sorted.length > 80 && <div className="muted" style={{fontSize:11,marginTop:8}}>Showing 80 of {sorted.length}. Adjust filter to drill in.</div>}
+      {DEMO && <div className="note" style={{marginTop:14}}><b>Atlas read:</b> {critRows.length}SKUs are about to stock out — at current velocity that's roughly {curSym()}{NUM(lostSalesEstMonthly)}/mo in lost sales if reorders don't land. Meanwhile <b>{curSym()}{NUM(overstockValue + archivedValue)} of capital is locked in slow-moving stock + archived SKUs</b>. For a brand at {curSym()}16k/mo DTC revenue, that's ~18 months of working capital tied up. Most of the overstock is in <b>pre-styled stack SKUs</b>— connects directly to the Bundle attach finding (Products tab): bundles aren't selling, so the bundle-specific inventory is bloating. Liquidate the dead bundles + redirect capital to charm + necklace replenishment.</div>}
     </div>
-    <div style={{display:'flex',gap:10,alignItems:'center',marginBottom:10,flexWrap:'wrap'}}>
-      <span className="muted" style={{fontSize:11,textTransform:'uppercase',letterSpacing:.05,fontWeight:700}}>FILTER</span>
-      <select value={tierFilter} onChange={e=>setTierFilter(e.target.value)} style={{background:'var(--bg-input)',color:'var(--text-primary)',border:'1px solid var(--border-default)',borderRadius:4,padding:'4px 8px',fontSize:12}}>
-        <option value="actionable">Actionable (critical + low + overstock + archived)</option>
-        <option value="all">All tiers</option>
-        <option value="critical">Critical only (&lt;14d)</option>
-        <option value="low">Low (&lt;30d)</option>
-        <option value="healthy">Healthy (30-90d)</option>
-        <option value="high">High (90-180d)</option>
-        <option value="overstock">Overstock (&gt;180d)</option>
-        <option value="archived_stock">Archived</option>
-      </select>
-      <span className="muted" style={{marginLeft:'auto',fontSize:11}}>{sorted.length} of {inv.length} SKUs</span>
-    </div>
-    <div style={{maxHeight:560,overflowY:'auto'}}>
-      <table className="sticky"><thead><tr><th>Tier</th><th className="tl">SKU / title</th><th className="tl">Type</th><th>Stock</th><th>Sold 90d</th><th>Days cover</th><th>Inv £ value</th></tr></thead><tbody>
-      {sorted.slice(0,80).map((r,i) => {
-        const color = TIER_COLOR[r.coverTier] || '#7b7b87';
-        return (<tr key={i}>
-          <td><span className="pill" style={{background:color+'22',color:color,fontSize:10,padding:'2px 6px',borderRadius:4,fontWeight:700,whiteSpace:'nowrap'}}>{TIER_LABEL[r.coverTier]||r.coverTier}</span></td>
-          <td className="tl" style={{fontSize:11,maxWidth:280}}>
-            <b>{r.title}</b>
-            {r.sku && <div className="muted" style={{fontSize:10}}><code>{r.sku}</code></div>}
-          </td>
-          <td className="muted tl" style={{fontSize:11}}>{r.type||'—'}</td>
-          <td><b>{r.inventoryQty}</b></td>
-          <td>{r.units90d}</td>
-          <td>{r.daysOfCover === null ? '∞' : r.daysOfCover === 999 ? '∞' : r.daysOfCover + 'd'}</td>
-          <td>£{NUM(r.inventoryValue)}</td>
-        </tr>);
-      })}
-      </tbody></table>
-    </div>
-    {sorted.length > 80 && <div className="muted" style={{fontSize:11,marginTop:8}}>Showing 80 of {sorted.length}. Adjust filter to drill in.</div>}
-    {DEMO && <div className="note" style={{marginTop:14}}><b>Atlas read:</b> {critRows.length} SKUs are about to stock out — at current velocity that's roughly £{NUM(lostSalesEstMonthly)}/mo in lost sales if reorders don't land. Meanwhile <b>£{NUM(overstockValue + archivedValue)} of capital is locked in slow-moving stock + archived SKUs</b>. For a brand at £16k/mo DTC revenue, that's ~18 months of working capital tied up. Most of the overstock is in <b>pre-styled stack SKUs</b> — connects directly to the Bundle attach finding (Products tab): bundles aren't selling, so the bundle-specific inventory is bloating. Liquidate the dead bundles + redirect capital to charm + necklace replenishment.</div>}
-  </div>);
+  );
 }
 
 function CollectionsPanel(){
@@ -4609,27 +4642,29 @@ function CollectionsPanel(){
   const COLOR = {'Necklaces':'#5b8def','Bracelets':'#c084fc','Earrings':'#4ade80','Charms':'#fbbf24','Accessories':'#38bdf8','Gift cards':'#94a3b8'};
   const top = cols[0];
   const tinyCollections = cols.filter(c => c.skus <= 2 && c.netSales > 50);
-  return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid #38bdf8'}}>
-    <h2>Collections — revenue by product category (90d)</h2>
-    <div className="muted" style={{marginBottom:10, fontSize:12}}>Buyer-facing category roll-up. Click any collection's top SKUs to find drilldown candidates. Bundles are surfaced separately above.</div>
-    <table><thead><tr><th>Collection</th><th>SKUs</th><th>Units</th><th>Net rev</th><th>% rev</th><th>AOV/unit</th><th>Margin</th><th>Return</th><th className="tl">Top SKUs</th></tr></thead><tbody>
-    {cols.map((c,i)=>{
-      const color = COLOR[c.collection] || '#7b7b87';
-      return (<tr key={i}>
-        <td><span className="pill" style={{background:color+'22',color:color,fontSize:11,padding:'3px 8px',borderRadius:4,fontWeight:700}}>{c.collection}</span></td>
-        <td><b>{c.skus}</b>{c.skus<=2&&<span className="muted" style={{fontSize:10,marginLeft:4}}>thin range</span>}</td>
-        <td>{NUM(c.units)}</td>
-        <td><b>{GBP(c.netSales)}</b></td>
-        <td>{PCT(c.revenueShare)}</td>
-        <td>{GBP(c.aovPerUnit)}</td>
-        <td style={{color:c.marginPct>=0.8?'var(--good)':c.marginPct>=0.6?'var(--warn)':'var(--bad)',fontWeight:600}}>{PCT(c.marginPct)}</td>
-        <td style={{color:c.returnRate>=0.1?'var(--bad)':c.returnRate>=0.06?'var(--warn)':'var(--text-faint)',fontWeight:600}}>{PCT(c.returnRate)}</td>
-        <td className="muted tl" style={{fontSize:11,maxWidth:240}}>{(c.topSkus||[]).map(s=>s.title?.slice(0,28)).join(' · ')}</td>
-      </tr>);
-    })}
-    </tbody></table>
-    <div className="note" style={{marginTop:14}}><b>Collection read:</b> {top.collection} drive {PCT(top.revenueShare)} of product revenue ({top.skus} SKUs, AOV £{Math.round(top.aovPerUnit||0)}). {tinyCollections.length > 0 ? `${tinyCollections.length} collection${tinyCollections.length>1?'s':''} have only 1-2 active SKUs (${tinyCollections.map(c=>c.collection).join(', ')}) — long-tail expansion candidates worth a Frame brief.` : ''} The Necklaces + Charms combination is 85% of revenue — the modular system working as designed.</div>
-  </div>);
+  return (
+    <div className="card" style={{marginBottom:14, borderLeft:'3px solid #38bdf8'}}>
+      <h2>Collections — revenue by product category (90d)</h2>
+      <div className="muted" style={{marginBottom:10, fontSize:12}}>Buyer-facing category roll-up. Click any collection's top SKUs to find drilldown candidates. Bundles are surfaced separately above.</div>
+      <table><thead><tr><th>Collection</th><th>SKUs</th><th>Units</th><th>Net rev</th><th>% rev</th><th>AOV/unit</th><th>Margin</th><th>Return</th><th className="tl">Top SKUs</th></tr></thead><tbody>
+      {cols.map((c,i)=>{
+        const color = COLOR[c.collection] || '#7b7b87';
+        return (<tr key={i}>
+          <td><span className="pill" style={{background:color+'22',color:color,fontSize:11,padding:'3px 8px',borderRadius:4,fontWeight:700}}>{c.collection}</span></td>
+          <td><b>{c.skus}</b>{c.skus<=2&&<span className="muted" style={{fontSize:10,marginLeft:4}}>thin range</span>}</td>
+          <td>{NUM(c.units)}</td>
+          <td><b>{GBP(c.netSales)}</b></td>
+          <td>{PCT(c.revenueShare)}</td>
+          <td>{GBP(c.aovPerUnit)}</td>
+          <td style={{color:c.marginPct>=0.8?'var(--good)':c.marginPct>=0.6?'var(--warn)':'var(--bad)',fontWeight:600}}>{PCT(c.marginPct)}</td>
+          <td style={{color:c.returnRate>=0.1?'var(--bad)':c.returnRate>=0.06?'var(--warn)':'var(--text-faint)',fontWeight:600}}>{PCT(c.returnRate)}</td>
+          <td className="muted tl" style={{fontSize:11,maxWidth:240}}>{(c.topSkus||[]).map(s=>s.title?.slice(0,28)).join(' · ')}</td>
+        </tr>);
+      })}
+      </tbody></table>
+      <div className="note" style={{marginTop:14}}><b>Collection read:</b> {top.collection}drive {PCT(top.revenueShare)}of product revenue ({top.skus}SKUs, AOV {curSym()}{Math.round(top.aovPerUnit||0)}). {tinyCollections.length > 0 ? `${tinyCollections.length} collection${tinyCollections.length>1?'s':''} have only 1-2 active SKUs (${tinyCollections.map(c=>c.collection).join(', ')}) — long-tail expansion candidates worth a Frame brief.` : ''}The Necklaces + Charms combination is 85% of revenue — the modular system working as designed.</div>
+    </div>
+  );
 }
 
 function ProductTiersPanel(){
@@ -4638,23 +4673,25 @@ function ProductTiersPanel(){
   const colors = {base:'#5b8def', charm:'#fbbf24', style:'#4ade80'};
   const labels = {base:'01: Base', charm:'02: Charm', style:'03: Style'};
   const total = tiers.reduce((a,t)=>a+(t.netSales||0),0);
-  return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid #5b8def'}}>
-    <h2>Component tiers — base / charm / style</h2>
-    {DEMO && <div className="muted" style={{marginBottom:10, fontSize:12}}>frkl's modular system uses three tiers, encoded in the Shopify vendor field. A customer buys a base, layers a style, attaches charms — every charm raises AOV, every style raises margin.</div>}
-    <table><thead><tr><th>Tier</th><th>SKUs</th><th>Units</th><th>Net revenue</th><th>% of rev</th><th>AOV / unit</th><th>Margin %</th><th>Return %</th></tr></thead><tbody>
-      {tiers.map((t,i)=>(<tr key={i}>
-        <td><span className="pill" style={{background:colors[t.tier]+'22',color:colors[t.tier],fontSize:11,padding:'2px 8px',borderRadius:4,fontWeight:700,textTransform:'uppercase'}}>{labels[t.tier]||t.tier}</span></td>
-        <td>{t.skus}</td>
-        <td>{NUM(t.units)}</td>
-        <td><b>{GBP(t.netSales)}</b></td>
-        <td>{PCT(t.netSales/total)}</td>
-        <td>{GBP(t.aovPerUnit)}</td>
-        <td style={{color:t.marginPct>=0.8?'var(--good)':t.marginPct>=0.6?'var(--warn)':'var(--bad)',fontWeight:600}}>{PCT(t.marginPct)}</td>
-        <td style={{color:t.returnRate>=0.1?'var(--bad)':t.returnRate>=0.06?'var(--warn)':'var(--text-faint)',fontWeight:600}}>{PCT(t.returnRate)}</td>
-      </tr>))}
-    </tbody></table>
-    {DEMO && <div className="note" style={{marginTop:12}}><b>Tier read:</b> bases drive revenue (£23k, biggest), styles drive margin (92%, highest), charms drive volume (450 units = lowest unit price but highest engagement). A pre-styled stack is literally one of each — so the bundle thesis is exactly the multiplier this product system was designed to produce.</div>}
-  </div>);
+  return (
+    <div className="card" style={{marginBottom:14, borderLeft:'3px solid #5b8def'}}>
+      <h2>Component tiers — base / charm / style</h2>
+      {DEMO && <div className="muted" style={{marginBottom:10, fontSize:12}}>frkl's modular system uses three tiers, encoded in the Shopify vendor field. A customer buys a base, layers a style, attaches charms — every charm raises AOV, every style raises margin.</div>}
+      <table><thead><tr><th>Tier</th><th>SKUs</th><th>Units</th><th>Net revenue</th><th>% of rev</th><th>AOV / unit</th><th>Margin %</th><th>Return %</th></tr></thead><tbody>
+        {tiers.map((t,i)=>(<tr key={i}>
+          <td><span className="pill" style={{background:colors[t.tier]+'22',color:colors[t.tier],fontSize:11,padding:'2px 8px',borderRadius:4,fontWeight:700,textTransform:'uppercase'}}>{labels[t.tier]||t.tier}</span></td>
+          <td>{t.skus}</td>
+          <td>{NUM(t.units)}</td>
+          <td><b>{GBP(t.netSales)}</b></td>
+          <td>{PCT(t.netSales/total)}</td>
+          <td>{GBP(t.aovPerUnit)}</td>
+          <td style={{color:t.marginPct>=0.8?'var(--good)':t.marginPct>=0.6?'var(--warn)':'var(--bad)',fontWeight:600}}>{PCT(t.marginPct)}</td>
+          <td style={{color:t.returnRate>=0.1?'var(--bad)':t.returnRate>=0.06?'var(--warn)':'var(--text-faint)',fontWeight:600}}>{PCT(t.returnRate)}</td>
+        </tr>))}
+      </tbody></table>
+      {DEMO && <div className="note" style={{marginTop:12}}><b>Tier read:</b>bases drive revenue ({curSym()}23k, biggest), styles drive margin (92%, highest), charms drive volume (450 units = lowest unit price but highest engagement). A pre-styled stack is literally one of each — so the bundle thesis is exactly the multiplier this product system was designed to produce.</div>}
+    </div>
+  );
 }
 
 // Shared product-signal engine — used by the Products view AND the Crux diagnostic,
@@ -5504,7 +5541,7 @@ function ProductSignal(){
     <span style={{width:7,height:7,borderRadius:'50%',background:accent,flexShrink:0,alignSelf:'center'}}/>
     <div style={{flex:1,minWidth:0}}>
       <div style={{fontSize:13,color:'var(--text-primary)',fontWeight:600}}>{p.handle?<a className="txt-link" href={`https://myfrkl.com/products/${p.handle}`} target="_blank">{p.name}</a>:p.name}</div>
-      <div style={{fontSize:11.5,color:'var(--text-muted)',marginTop:1}}>{NUM(p.views)} views · {p.pctViews}% of views · view→cart {(p.viewToAtc*100).toFixed(1)}% · cart→buy {(p.atcToPurch*100).toFixed(0)}%{p.price?` · £${p.price}`:''}</div>
+      <div style={{fontSize:11.5,color:'var(--text-muted)',marginTop:1}}>{NUM(p.views)} views · {p.pctViews}% of views · view→cart {(p.viewToAtc*100).toFixed(1)}% · cart→buy {(p.atcToPurch*100).toFixed(0)}%{p.price?` · ${curSym()}${p.price}`:''}</div>
       <div style={{fontSize:12,color:'var(--text-secondary)',marginTop:2}}>→ {p.move}</div>
     </div>
     {p.gbp>=50 && <span style={{fontWeight:700,color:'var(--good)',whiteSpace:'nowrap'}}>~{GBP(p.gbp)}/mo</span>}
@@ -5518,56 +5555,56 @@ function ProductSignal(){
       {arr.length>0 && <span style={{fontSize:11,fontWeight:700,color:'var(--text-faint)',flexShrink:0}}>{arr.length}</span>}
     </div>
     {arr.length
-      ? <>{arr.slice(0,CAP).map(p=>oppRow(p,color))}{arr.length>CAP && <div style={{fontSize:11,color:'var(--text-faint)',paddingTop:6}}>+ {arr.length-CAP} more (smaller £)</div>}</>
+      ? <>{arr.slice(0,CAP).map(p=>oppRow(p,color))}{arr.length>CAP && <div style={{fontSize:11,color:'var(--text-faint)',paddingTop:6}}>+ {arr.length-CAP}more (smaller {curSym()})</div>}</>
       : <div style={{fontSize:12,color:'var(--text-muted)',padding:'6px 0'}}>{empty}</div>}
   </div>);
   const totalOpps = gems.length+pdpFix.length+checkoutFix.length+restock.length;
   const moreAvail = Math.max(gems.length,pdpFix.length,checkoutFix.length,restock.length) > 3;
 
-  return (<div className="card" style={{marginBottom:14}}>
-    <div className="card-section-title">
-      <h2 style={{margin:0}}>Product signals <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>— where each product leaks in the funnel</span></h2>
-      <span className="meta">Pulse · {gems.length} unseen gems · {pdpFix.length} PDP problems · {checkoutFix.length} checkout leaks · {restock.length} OOS in demand · view→cart = desire, cart→buy = completion</span>
+  return (
+    <div className="card" style={{marginBottom:14}}>
+      <div className="card-section-title">
+        <h2 style={{margin:0}}>Product signals <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>— where each product leaks in the funnel</span></h2>
+        <span className="meta">Pulse · {gems.length} unseen gems · {pdpFix.length} PDP problems · {checkoutFix.length} checkout leaks · {restock.length} OOS in demand · view→cart = desire, cart→buy = completion</span>
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:8,margin:'2px 0 6px'}}>
+        <span style={{fontSize:11,color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'.04em'}}>Y axis</span>
+        {['desire','completion'].map(lensBtn)}
+        <span style={{fontSize:11,color:'var(--text-faint)'}}>{lens==='completion'?'— a high-desire dot sitting low here = wanted, but not bought':'— how badly people want it once they see it'}</span>
+      </div>
+      <div {...z.bind}>
+      <ZoomControls z={z}/>
+      <R.ResponsiveContainer width="100%" height={300}>
+        <R.ScatterChart margin={{top:10,right:20,left:10,bottom:24}}>
+          <R.CartesianGrid stroke="#1f1f27"/>
+          <R.XAxis type="number" dataKey="x" name="Visibility" unit="%" domain={[z.view[0],z.view[1]]} allowDataOverflow tickFormatter={niceTick} tick={{fill:'#7e7e8a',fontSize:11}} label={{value:'Visibility — % of all product views', position:'insideBottom', offset:-12, fill:'#6f6f7b', fontSize:11}}/>
+          <R.YAxis type="number" dataKey="y" name={L.short} unit="%" domain={[z.view[2],z.view[3]]} allowDataOverflow tickFormatter={niceTick} tick={{fill:'#7e7e8a',fontSize:11}} label={{value:L.label, angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
+          <R.ZAxis type="number" dataKey="z" range={[25,320]} name="views"/>
+          <R.ReferenceLine x={medPct} stroke="#3a3a44" strokeDasharray="4 3"/>
+          <R.ReferenceLine y={+(L.ref*100).toFixed(1)} stroke="#3a3a44" strokeDasharray="4 3"/>
+          <R.Tooltip cursor={{strokeDasharray:'3 3'}} content={({payload})=>{ const p=payload&&payload[0]&&payload[0].payload; return p?(<div style={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:8,padding:'7px 10px',fontSize:12,boxShadow:'var(--shadow-md)'}}><b>{p.name}</b><br/>{NUM(p.z)} views · {p.x}% of views<br/>view→cart {p.d}% · cart→buy {p.c}%</div>):null; }}/>
+          <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}}/>
+          {series.map(s=> s.data.length>0 && <R.Scatter key={s.k} name={LBL[s.k]} data={s.data} fill={COL[s.k]} fillOpacity={0.75}/>)}
+        </R.ScatterChart>
+      </R.ResponsiveContainer>
+      <div style={{fontSize:10.5,color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{ZOOM_HINT}</div>
+      </div>
+      <div style={{fontSize:11,color:'var(--text-faint)',margin:'2px 0 12px'}}>{lens==='completion'
+        ? <>Y = cart→purchase. Dots <b>below the dashed line buy worse than the site average once carted</b> — a checkout/commitment problem, not a desire one. X = visibility. Bubble = views.</>
+        : <>Top-left = wanted but unseen (merchandise) · top-right = stars · bottom-right = seen but unwanted (fix/stop). Dashed lines = site median visibility &amp; average view→cart.</>}</div>
+      <div style={{fontSize:11.5,color:'var(--text-muted)',margin:'2px 0 10px',lineHeight:1.5}}>The <b style={{color:'var(--good)'}}>~{curSym()}/mo in green</b>is the <b>opportunity size</b>— estimated extra <b>gross profit per month</b>if this product closed the gap to the site's average funnel (for out-of-stock, the demand missed while it's unavailable). Margin-weighted at {PCT(gm)}and scaled to a month — a ceiling worth chasing, not a guaranteed gain. Only products worth ≥ {curSym()}50/mo are listed.</div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(250px,1fr))',gap:16}}>
+        {oppCol('Unseen — visibility problem','#7c8cff',gems,'None — visibility matches desire.')}
+        {oppCol('Browsed, not wanted — PDP problem','#f87171',pdpFix,'None flagged.')}
+        {oppCol('Wanted, not bought — checkout leak','#fbbf24',checkoutFix,'None — carts close at the site rate.')}
+        {oppCol('Restock — in demand, out of stock','#f59e0b',restock,'None.')}
+      </div>
+      {moreAvail && <div style={{marginTop:12,textAlign:'center'}}>
+        <button onClick={()=>setShowAll(!showAll)} style={{fontSize:12,fontWeight:600,padding:'6px 16px',borderRadius:8,cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'#9aa6ff'}}>{showAll?'Show fewer':`Show more — ${totalOpps} opportunities ≥ ${curSym()}50/mo`}</button>
+      </div>}
+      <div className="note" style={{marginTop:12}}>The full funnel, per product: <b>% of views = visibility</b>, <b>view→cart = desire</b>(do they want it once seen), <b>cart→purchase = completion</b>(do they close once they want it). Splitting the last two is the depth — a low-converting SKU is now diagnosed as either <b style={{color:'#f87171'}}>browsed-not-wanted</b>(fix the PDP/product) or <b style={{color:'#fbbf24'}}>wanted-not-bought</b>(fix price/shipping/trust/variant at checkout) — opposite fixes. Out-of-stock SKUs are separated (they can't convert); {curSym()}is margin-weighted at {PCT(gm)}, scaled to /month. GA4 item-scoped ({META.products||PR.length}products) × Shopify price/stock.</div>
     </div>
-    <div style={{display:'flex',alignItems:'center',gap:8,margin:'2px 0 6px'}}>
-      <span style={{fontSize:11,color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'.04em'}}>Y axis</span>
-      {['desire','completion'].map(lensBtn)}
-      <span style={{fontSize:11,color:'var(--text-faint)'}}>{lens==='completion'?'— a high-desire dot sitting low here = wanted, but not bought':'— how badly people want it once they see it'}</span>
-    </div>
-    <div {...z.bind}>
-    <ZoomControls z={z}/>
-    <R.ResponsiveContainer width="100%" height={300}>
-      <R.ScatterChart margin={{top:10,right:20,left:10,bottom:24}}>
-        <R.CartesianGrid stroke="#1f1f27"/>
-        <R.XAxis type="number" dataKey="x" name="Visibility" unit="%" domain={[z.view[0],z.view[1]]} allowDataOverflow tickFormatter={niceTick} tick={{fill:'#7e7e8a',fontSize:11}} label={{value:'Visibility — % of all product views', position:'insideBottom', offset:-12, fill:'#6f6f7b', fontSize:11}}/>
-        <R.YAxis type="number" dataKey="y" name={L.short} unit="%" domain={[z.view[2],z.view[3]]} allowDataOverflow tickFormatter={niceTick} tick={{fill:'#7e7e8a',fontSize:11}} label={{value:L.label, angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
-        <R.ZAxis type="number" dataKey="z" range={[25,320]} name="views"/>
-        <R.ReferenceLine x={medPct} stroke="#3a3a44" strokeDasharray="4 3"/>
-        <R.ReferenceLine y={+(L.ref*100).toFixed(1)} stroke="#3a3a44" strokeDasharray="4 3"/>
-        <R.Tooltip cursor={{strokeDasharray:'3 3'}} content={({payload})=>{ const p=payload&&payload[0]&&payload[0].payload; return p?(<div style={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:8,padding:'7px 10px',fontSize:12,boxShadow:'var(--shadow-md)'}}><b>{p.name}</b><br/>{NUM(p.z)} views · {p.x}% of views<br/>view→cart {p.d}% · cart→buy {p.c}%</div>):null; }}/>
-        <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}}/>
-        {series.map(s=> s.data.length>0 && <R.Scatter key={s.k} name={LBL[s.k]} data={s.data} fill={COL[s.k]} fillOpacity={0.75}/>)}
-      </R.ScatterChart>
-    </R.ResponsiveContainer>
-    <div style={{fontSize:10.5,color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{ZOOM_HINT}</div>
-    </div>
-    <div style={{fontSize:11,color:'var(--text-faint)',margin:'2px 0 12px'}}>{lens==='completion'
-      ? <>Y = cart→purchase. Dots <b>below the dashed line buy worse than the site average once carted</b> — a checkout/commitment problem, not a desire one. X = visibility. Bubble = views.</>
-      : <>Top-left = wanted but unseen (merchandise) · top-right = stars · bottom-right = seen but unwanted (fix/stop). Dashed lines = site median visibility &amp; average view→cart.</>}</div>
-
-    <div style={{fontSize:11.5,color:'var(--text-muted)',margin:'2px 0 10px',lineHeight:1.5}}>The <b style={{color:'var(--good)'}}>~£/mo in green</b> is the <b>opportunity size</b> — estimated extra <b>gross profit per month</b> if this product closed the gap to the site's average funnel (for out-of-stock, the demand missed while it's unavailable). Margin-weighted at {PCT(gm)} and scaled to a month — a ceiling worth chasing, not a guaranteed gain. Only products worth ≥ £50/mo are listed.</div>
-
-    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(250px,1fr))',gap:16}}>
-      {oppCol('Unseen — visibility problem','#7c8cff',gems,'None — visibility matches desire.')}
-      {oppCol('Browsed, not wanted — PDP problem','#f87171',pdpFix,'None flagged.')}
-      {oppCol('Wanted, not bought — checkout leak','#fbbf24',checkoutFix,'None — carts close at the site rate.')}
-      {oppCol('Restock — in demand, out of stock','#f59e0b',restock,'None.')}
-    </div>
-    {moreAvail && <div style={{marginTop:12,textAlign:'center'}}>
-      <button onClick={()=>setShowAll(!showAll)} style={{fontSize:12,fontWeight:600,padding:'6px 16px',borderRadius:8,cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'#9aa6ff'}}>{showAll?'Show fewer':`Show more — ${totalOpps} opportunities ≥ £50/mo`}</button>
-    </div>}
-    <div className="note" style={{marginTop:12}}>The full funnel, per product: <b>% of views = visibility</b>, <b>view→cart = desire</b> (do they want it once seen), <b>cart→purchase = completion</b> (do they close once they want it). Splitting the last two is the depth — a low-converting SKU is now diagnosed as either <b style={{color:'#f87171'}}>browsed-not-wanted</b> (fix the PDP/product) or <b style={{color:'#fbbf24'}}>wanted-not-bought</b> (fix price/shipping/trust/variant at checkout) — opposite fixes. Out-of-stock SKUs are separated (they can't convert); £ is margin-weighted at {PCT(gm)}, scaled to /month. GA4 item-scoped ({META.products||PR.length} products) × Shopify price/stock.</div>
-  </div>);
+  );
 }
 
 // ── Affiliate & discount code tracker over time ─────────────────────────────
@@ -5626,95 +5663,97 @@ function DiscountCodeTracker(){
     <div style={{fontSize:11.5,color:'var(--text-muted)',marginTop:2}}>{sub}</div>
   </div>);
 
-  return (<div>
-    <div className="card" style={{marginBottom:14}}>
-      <div className="card-section-title">
-        <h2 style={{margin:0}}>Affiliate & discount codes <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>— over time</span></h2>
-        <span className="meta">Atlas · {Math.round((M.codedShare||0)*100)}% of orders use a code · spike vs constant · codes + automatic + markdowns · last {M.weeks||26}w · draft/exchange orders excluded</span>
-      </div>
-
-      <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:14}}>
-        {tile('Full-price orders', Math.round((M.fullPriceShare||0)*100)+'%', `${NUM(M.fullPriceOrders)} orders · ${GBP(M.fullPriceRevenue)} (${Math.round((M.fullPriceRevenueShare||0)*100)}% of revenue)`, 'var(--good)')}
-        {tile('Orders with a discount', Math.round((1-(M.fullPriceShare||0))*100)+'%', `${NUM(M.discountedOrders)} orders · ${GBP(M.discountedRevenue)} revenue`)}
-        {tile('Marketing discount', GBP(M.marketingDiscount), `${mkt.length} promo / affiliate codes`, '#7c8cff')}
-        {tile('Draft orders excluded', String(M.draftOrdersExcluded||0), `exchanges/replacements · ${GBP(M.draftDiscountExcluded)} internal credits not counted as discount`, 'var(--text-muted)')}
-        {tile('Always-on codes', String(M.alwaysOnCount||0), leak?`${leak.code} = ${GBP(leak.discount)} given away`:'—', '#f59e0b')}
-      </div>
-
-      {(()=>{ const td=(M.marketingDiscount||0)+(M.automaticDiscount||0);
-        const gr=(M.fullPriceRevenue||0)+(M.discountedRevenue||0);
-        const inten=gr?Math.round(td/gr*100):0, pen=Math.round((1-(M.fullPriceShare||0))*100), avg=(M.discountedOrders)?td/M.discountedOrders:0;
-        return (
-        <div style={{background:'var(--accent-bg)',border:'1px solid rgba(124,140,255,0.25)',borderRadius:12,padding:'11px 14px',marginBottom:14,fontSize:12.5,color:'var(--text-secondary)',lineHeight:1.55}}>
-          <b style={{color:'var(--text-primary)'}}>How often vs how deep —</b> these two figures look like they disagree but they measure different things:
-          <span style={{display:'inline'}}> <b style={{color:'var(--text-primary)'}}>{pen}%</b> of orders carry a discount (how <i>often</i>), but the average is only <b style={{color:'var(--text-primary)'}}>{GBP(avg)}</b> off — so across all sales discounts come to only <b style={{color:'var(--text-primary)'}}>~{inten}%</b> of revenue (how <i>deep</i>). Frequent but shallow: lots of small codes, not deep cuts.</span>
-          <span style={{color:'var(--text-faint)',display:'block',marginTop:4}}>The Home <i>“Discount depth”</i> tile (~{inten}%) is the £-weighted view; the <i>“Orders with a discount”</i> tile above ({pen}%) is the order-count view. Same data, different denominators — not a discrepancy.</span>
-        </div>); })()}
-
-      {(M.markdownEstimate>0 || M.automaticDiscount>0) && <div style={{background:'rgba(245,181,68,0.06)',border:'1px solid rgba(245,181,68,0.3)',borderRadius:12,padding:'11px 14px',marginBottom:14}}>
-        <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#f5b544',fontWeight:700,marginBottom:5}}>Discounts beyond codes — not in the £ above</div>
-        <div style={{display:'flex',gap:20,flexWrap:'wrap',fontSize:12.5,color:'var(--text-secondary)'}}>
-          <div style={{flex:'1 1 240px'}}><b>Automatic (no code):</b> {GBP(M.automaticDiscount)} on {NUM(M.automaticOrders)} orders <span style={{color:'var(--text-faint)'}}>— in Shopify's discount totals, just not tied to a code.</span></div>
-          <div style={{flex:'1 1 320px'}}><b style={{color:'#ef6b6f'}}>Sale-price markdowns:</b> ~{GBP(M.markdownEstimate)} est. ({Math.round((M.markdownShareOfValue||0)*100)}% of sold value) · <b>{M.catalogOnSale}/{M.catalogActive}</b> of catalog on sale at ~{M.avgMarkdownPct}% off. <span style={{color:'var(--text-faint)'}}>Compare-at markdowns never enter Shopify's <code>total_discounts</code>, so they're invisible to the code/automatic figures — this is the true site-wide discount the £ above misses. Estimated from web line-items × current compare-at price.</span></div>
+  return (
+    <div>
+      <div className="card" style={{marginBottom:14}}>
+        <div className="card-section-title">
+          <h2 style={{margin:0}}>Affiliate & discount codes <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>— over time</span></h2>
+          <span className="meta">Atlas · {Math.round((M.codedShare||0)*100)}% of orders use a code · spike vs constant · codes + automatic + markdowns · last {M.weeks||26}w · draft/exchange orders excluded</span>
         </div>
-      </div>}
 
-      <R.ResponsiveContainer width="100%" height={280}>
-        <R.BarChart data={weekly} margin={{top:6,right:16,left:6,bottom:22}}>
-          <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
-          <R.XAxis dataKey="w" tickFormatter={fmtWk} tick={{fill:'#7e7e8a',fontSize:10.5}} interval={Math.ceil(axis.length/9)} tickMargin={8}
-            label={{value:'Week', position:'insideBottom', offset:-10, fill:'#6f6f7b', fontSize:11}}/>
-          <R.YAxis allowDecimals={false} tick={{fill:'#7e7e8a',fontSize:11}} label={{value:'Orders with a code', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
-          <R.Tooltip cursor={{fill:'rgba(124,140,255,0.06)'}} contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,fontSize:12}}
-            labelFormatter={w=>'Week of '+fmtWk(w)} itemSorter={it=>-it.value}/>
-          <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:11.5, paddingBottom:8}}/>
-          {stackKeys.map(k=> <R.Bar key={k.code} dataKey={k.code} stackId="a" fill={k.color} maxBarSize={26}/>) }
-        </R.BarChart>
-      </R.ResponsiveContainer>
-      <div style={{fontSize:11,color:'var(--text-faint)',margin:'2px 0 4px'}}>A steady band every week = an <b style={{color:'#f59e0b'}}>always-on</b> code (structural discount). A tall single-week bar = a <b style={{color:'#4ade80'}}>spike</b> (sale/launch). <span style={{color:'#ef6b6f'}}>Service</span> = goodwill codes (replacement/resend), shown for context — not promotion.</div>
-      <ChartFooter ask="From discount-code usage over time, which codes are always-on structural margin give-away vs one-off campaign spikes, and where should I tighten?"/>
-    </div>
+        <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:14}}>
+          {tile('Full-price orders', Math.round((M.fullPriceShare||0)*100)+'%', `${NUM(M.fullPriceOrders)} orders · ${GBP(M.fullPriceRevenue)} (${Math.round((M.fullPriceRevenueShare||0)*100)}% of revenue)`, 'var(--good)')}
+          {tile('Orders with a discount', Math.round((1-(M.fullPriceShare||0))*100)+'%', `${NUM(M.discountedOrders)} orders · ${GBP(M.discountedRevenue)} revenue`)}
+          {tile('Marketing discount', GBP(M.marketingDiscount), `${mkt.length} promo / affiliate codes`, '#7c8cff')}
+          {tile('Draft orders excluded', String(M.draftOrdersExcluded||0), `exchanges/replacements · ${GBP(M.draftDiscountExcluded)} internal credits not counted as discount`, 'var(--text-muted)')}
+          {tile('Always-on codes', String(M.alwaysOnCount||0), leak?`${leak.code} = ${GBP(leak.discount)} given away`:'—', '#f59e0b')}
+        </div>
 
-    <ConfigurableChart
-      title="Explore codes — marketing discounts"
-      dataset={mkt.map(c=>({code:c.code, pattern:(DC_PATTERN[c.pattern]||DC_PATTERN.recurring).label, discount:c.discount||0, revenue:c.revenue||0, orders:c.orders||0}))}
-      dimensions={[{key:'code',label:'Code'},{key:'pattern',label:'Pattern'}]}
-      metrics={[{key:'discount',label:'Discount £',fmt:GBP},{key:'revenue',label:'Revenue',fmt:GBP},{key:'orders',label:'Orders',fmt:NUM}]}
-      defaultMetric="discount" defaultSplit="code" defaultChart="bar" defaultTopN={10}/>
-    <div className="card">
-      <div className="card-section-title"><h2 style={{margin:0}}>By code</h2>
-        <span className="meta">marketing codes · sorted by orders · sparkline = weekly usage across the window</span></div>
-      <div style={{overflowX:'auto'}}>
-      <table style={{width:'100%',borderCollapse:'collapse',fontSize:12.5}}>
-        <thead><tr style={{textAlign:'left',color:'var(--text-faint)',fontSize:11,textTransform:'uppercase',letterSpacing:'.04em'}}>
-          <th style={{padding:'6px 8px 6px 0'}}>Code</th><th style={{padding:'6px 8px'}}>Pattern</th>
-          <th style={{padding:'6px 8px'}}>Usage over time</th>
-          <th style={{padding:'6px 8px',textAlign:'right'}}>Orders</th><th style={{padding:'6px 8px',textAlign:'right'}}>Revenue</th>
-          <th style={{padding:'6px 8px',textAlign:'right'}}>Discount £</th><th style={{padding:'6px 8px',textAlign:'right'}}>Disc %</th>
-          <th style={{padding:'6px 8px',whiteSpace:'nowrap'}}>Active window</th></tr></thead>
-        <tbody>
-          {tableMkt.map(c=>{ const m=DC_PATTERN[c.pattern]||DC_PATTERN['recurring'];
-            return (<tr key={c.code} style={{borderTop:'1px solid var(--border-subtle)'}}>
-            <td style={{padding:'8px 8px 8px 0',fontWeight:600,color:'var(--text-primary)'}}>{c.code}
-              {c.discountRate>=0.22 && <span title="heavy discount" style={{marginLeft:6,color:'#f59e0b',fontSize:11}}>⚠ deep</span>}</td>
-            <td style={{padding:'8px'}}><Badge p={c.pattern}/></td>
-            <td style={{padding:'6px 8px'}}><DCSpark series={c.series} axis={axis} color={m.color}/></td>
-            <td style={{padding:'8px',textAlign:'right'}}>{NUM(c.orders)}</td>
-            <td style={{padding:'8px',textAlign:'right'}}>{GBP(c.revenue)}</td>
-            <td style={{padding:'8px',textAlign:'right',color:'#ef6b6f'}}>{GBP(c.discount)}</td>
-            <td style={{padding:'8px',textAlign:'right'}}>{Math.round(c.discountRate*100)}%</td>
-            <td style={{padding:'8px',whiteSpace:'nowrap',color:'var(--text-muted)',fontSize:11.5}}>{fmtWk(c.firstSeen)} → {fmtWk(c.lastSeen)}{c.recent?'':' · ended'}</td>
-          </tr>); })}
-          {oneOffN>0 && <tr style={{borderTop:'1px solid var(--border-subtle)'}}><td colSpan={8} style={{padding:'8px 0',color:'var(--text-faint)',fontSize:11.5}}>+ {oneOffN} one-off / single-order codes (creator trials, edge cases)</td></tr>}
-        </tbody>
-      </table>
+        {(()=>{ const td=(M.marketingDiscount||0)+(M.automaticDiscount||0);
+          const gr=(M.fullPriceRevenue||0)+(M.discountedRevenue||0);
+          const inten=gr?Math.round(td/gr*100):0, pen=Math.round((1-(M.fullPriceShare||0))*100), avg=(M.discountedOrders)?td/M.discountedOrders:0;
+          return (
+            <div style={{background:'var(--accent-bg)',border:'1px solid rgba(124,140,255,0.25)',borderRadius:12,padding:'11px 14px',marginBottom:14,fontSize:12.5,color:'var(--text-secondary)',lineHeight:1.55}}>
+              <b style={{color:'var(--text-primary)'}}>How often vs how deep —</b>these two figures look like they disagree but they measure different things:
+                        <span style={{display:'inline'}}> <b style={{color:'var(--text-primary)'}}>{pen}%</b> of orders carry a discount (how <i>often</i>), but the average is only <b style={{color:'var(--text-primary)'}}>{GBP(avg)}</b> off — so across all sales discounts come to only <b style={{color:'var(--text-primary)'}}>~{inten}%</b> of revenue (how <i>deep</i>). Frequent but shallow: lots of small codes, not deep cuts.</span>
+              <span style={{color:'var(--text-faint)',display:'block',marginTop:4}}>The Home <i>“Discount depth”</i>tile (~{inten}%) is the {curSym()}-weighted view; the <i>“Orders with a discount”</i>tile above ({pen}%) is the order-count view. Same data, different denominators — not a discrepancy.</span>
+            </div>
+          ); })()}
+
+        {(M.markdownEstimate>0 || M.automaticDiscount>0) && <div style={{background:'rgba(245,181,68,0.06)',border:'1px solid rgba(245,181,68,0.3)',borderRadius:12,padding:'11px 14px',marginBottom:14}}>
+          <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#f5b544',fontWeight:700,marginBottom:5}}>Discounts beyond codes — not in the {curSym()}above</div>
+          <div style={{display:'flex',gap:20,flexWrap:'wrap',fontSize:12.5,color:'var(--text-secondary)'}}>
+            <div style={{flex:'1 1 240px'}}><b>Automatic (no code):</b> {GBP(M.automaticDiscount)} on {NUM(M.automaticOrders)} orders <span style={{color:'var(--text-faint)'}}>— in Shopify's discount totals, just not tied to a code.</span></div>
+            <div style={{flex:'1 1 320px'}}><b style={{color:'#ef6b6f'}}>Sale-price markdowns:</b> ~{GBP(M.markdownEstimate)} est. ({Math.round((M.markdownShareOfValue||0)*100)}% of sold value) · <b>{M.catalogOnSale}/{M.catalogActive}</b> of catalog on sale at ~{M.avgMarkdownPct}% off. <span style={{color:'var(--text-faint)'}}>Compare-at markdowns never enter Shopify's <code>total_discounts</code>, so they're invisible to the code/automatic figures — this is the true site-wide discount the {curSym()}above misses. Estimated from web line-items × current compare-at price.</span></div>
+          </div>
+        </div>}
+
+        <R.ResponsiveContainer width="100%" height={280}>
+          <R.BarChart data={weekly} margin={{top:6,right:16,left:6,bottom:22}}>
+            <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
+            <R.XAxis dataKey="w" tickFormatter={fmtWk} tick={{fill:'#7e7e8a',fontSize:10.5}} interval={Math.ceil(axis.length/9)} tickMargin={8}
+              label={{value:'Week', position:'insideBottom', offset:-10, fill:'#6f6f7b', fontSize:11}}/>
+            <R.YAxis allowDecimals={false} tick={{fill:'#7e7e8a',fontSize:11}} label={{value:'Orders with a code', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
+            <R.Tooltip cursor={{fill:'rgba(124,140,255,0.06)'}} contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,fontSize:12}}
+              labelFormatter={w=>'Week of '+fmtWk(w)} itemSorter={it=>-it.value}/>
+            <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:11.5, paddingBottom:8}}/>
+            {stackKeys.map(k=> <R.Bar key={k.code} dataKey={k.code} stackId="a" fill={k.color} maxBarSize={26}/>) }
+          </R.BarChart>
+        </R.ResponsiveContainer>
+        <div style={{fontSize:11,color:'var(--text-faint)',margin:'2px 0 4px'}}>A steady band every week = an <b style={{color:'#f59e0b'}}>always-on</b> code (structural discount). A tall single-week bar = a <b style={{color:'#4ade80'}}>spike</b> (sale/launch). <span style={{color:'#ef6b6f'}}>Service</span> = goodwill codes (replacement/resend), shown for context — not promotion.</div>
+        <ChartFooter ask="From discount-code usage over time, which codes are always-on structural margin give-away vs one-off campaign spikes, and where should I tighten?"/>
       </div>
-      <div className="note" style={{marginTop:12}}>
-        <b>Read it:</b> <b>{Math.round((M.fullPriceShare||0)*100)}% of orders ({NUM(M.fullPriceOrders)}) were placed at full price</b> — {GBP(M.fullPriceRevenue)}, {Math.round((M.fullPriceRevenueShare||0)*100)}% of revenue, at ~{GBP(M.fullPriceOrders?M.fullPriceRevenue/M.fullPriceOrders:0)} AOV. The other {NUM(M.discountedOrders)} orders carried a discount. {leak ? <>Your biggest always-on code <b>{leak.code}</b> has run every week since launch on {NUM(leak.orders)} orders — {GBP(leak.discount)} of margin given away with no campaign trigger. Worth asking whether it's a deliberate evergreen offer or a default that quietly caps margin. </> : null}
-        {(M.draftOrdersExcluded>0) && <> <b>{NUM(M.draftOrdersExcluded)} draft orders</b> (exchanges/replacements, ~{GBP(M.draftDiscountExcluded)} of internal credits) are <b>excluded</b> — they're not real sales and were inflating the discount totals.</>} The figures above are codes + automatic discounts; sale-price markdowns are shown separately as they never enter Shopify's discount totals.
+      <ConfigurableChart
+        title="Explore codes — marketing discounts"
+        dataset={mkt.map(c=>({code:c.code, pattern:(DC_PATTERN[c.pattern]||DC_PATTERN.recurring).label, discount:c.discount||0, revenue:c.revenue||0, orders:c.orders||0}))}
+        dimensions={[{key:'code',label:'Code'},{key:'pattern',label:'Pattern'}]}
+        metrics={[{key:'discount',label:`Discount ${curSym()}`,fmt:GBP},{key:'revenue',label:'Revenue',fmt:GBP},{key:'orders',label:'Orders',fmt:NUM}]}
+        defaultMetric="discount" defaultSplit="code" defaultChart="bar" defaultTopN={10}/>
+      <div className="card">
+        <div className="card-section-title"><h2 style={{margin:0}}>By code</h2>
+          <span className="meta">marketing codes · sorted by orders · sparkline = weekly usage across the window</span></div>
+        <div style={{overflowX:'auto'}}>
+        <table style={{width:'100%',borderCollapse:'collapse',fontSize:12.5}}>
+          <thead><tr style={{textAlign:'left',color:'var(--text-faint)',fontSize:11,textTransform:'uppercase',letterSpacing:'.04em'}}>
+            <th style={{padding:'6px 8px 6px 0'}}>Code</th><th style={{padding:'6px 8px'}}>Pattern</th>
+            <th style={{padding:'6px 8px'}}>Usage over time</th>
+            <th style={{padding:'6px 8px',textAlign:'right'}}>Orders</th><th style={{padding:'6px 8px',textAlign:'right'}}>Revenue</th>
+            <th style={{padding:'6px 8px',textAlign:'right'}}>Discount {curSym()}</th><th style={{padding:'6px 8px',textAlign:'right'}}>Disc %</th>
+            <th style={{padding:'6px 8px',whiteSpace:'nowrap'}}>Active window</th></tr></thead>
+          <tbody>
+            {tableMkt.map(c=>{ const m=DC_PATTERN[c.pattern]||DC_PATTERN['recurring'];
+              return (<tr key={c.code} style={{borderTop:'1px solid var(--border-subtle)'}}>
+              <td style={{padding:'8px 8px 8px 0',fontWeight:600,color:'var(--text-primary)'}}>{c.code}
+                {c.discountRate>=0.22 && <span title="heavy discount" style={{marginLeft:6,color:'#f59e0b',fontSize:11}}>⚠ deep</span>}</td>
+              <td style={{padding:'8px'}}><Badge p={c.pattern}/></td>
+              <td style={{padding:'6px 8px'}}><DCSpark series={c.series} axis={axis} color={m.color}/></td>
+              <td style={{padding:'8px',textAlign:'right'}}>{NUM(c.orders)}</td>
+              <td style={{padding:'8px',textAlign:'right'}}>{GBP(c.revenue)}</td>
+              <td style={{padding:'8px',textAlign:'right',color:'#ef6b6f'}}>{GBP(c.discount)}</td>
+              <td style={{padding:'8px',textAlign:'right'}}>{Math.round(c.discountRate*100)}%</td>
+              <td style={{padding:'8px',whiteSpace:'nowrap',color:'var(--text-muted)',fontSize:11.5}}>{fmtWk(c.firstSeen)} → {fmtWk(c.lastSeen)}{c.recent?'':' · ended'}</td>
+            </tr>); })}
+            {oneOffN>0 && <tr style={{borderTop:'1px solid var(--border-subtle)'}}><td colSpan={8} style={{padding:'8px 0',color:'var(--text-faint)',fontSize:11.5}}>+ {oneOffN} one-off / single-order codes (creator trials, edge cases)</td></tr>}
+          </tbody>
+        </table>
+        </div>
+        <div className="note" style={{marginTop:12}}>
+          <b>Read it:</b> <b>{Math.round((M.fullPriceShare||0)*100)}% of orders ({NUM(M.fullPriceOrders)}) were placed at full price</b> — {GBP(M.fullPriceRevenue)}, {Math.round((M.fullPriceRevenueShare||0)*100)}% of revenue, at ~{GBP(M.fullPriceOrders?M.fullPriceRevenue/M.fullPriceOrders:0)} AOV. The other {NUM(M.discountedOrders)} orders carried a discount. {leak ? <>Your biggest always-on code <b>{leak.code}</b> has run every week since launch on {NUM(leak.orders)} orders — {GBP(leak.discount)} of margin given away with no campaign trigger. Worth asking whether it's a deliberate evergreen offer or a default that quietly caps margin. </> : null}
+          {(M.draftOrdersExcluded>0) && <> <b>{NUM(M.draftOrdersExcluded)} draft orders</b> (exchanges/replacements, ~{GBP(M.draftDiscountExcluded)} of internal credits) are <b>excluded</b> — they're not real sales and were inflating the discount totals.</>} The figures above are codes + automatic discounts; sale-price markdowns are shown separately as they never enter Shopify's discount totals.
+        </div>
       </div>
     </div>
-  </div>);
+  );
 }
 
 // Restock intelligence — join inventory velocity with REAL revenue-per-unit (from
@@ -5823,83 +5862,85 @@ function RestockAlertsPanel(){
   const top = data.alerts.find(a=>a.urgency!=='watch') || data.alerts[0];
   const leadInput = (val, onCh) => (<input type="number" min="0" value={val==null?'':val} onChange={e=>onCh(e.target.value)}
     style={{width:52,background:'var(--bg-app)',color:'var(--text-primary)',border:'1px solid var(--border-default)',borderRadius:5,padding:'3px 6px',fontSize:12,fontFamily:'inherit'}}/>);
-  return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid var(--bad)'}}>
-    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8}}>
-      <div style={{display:'inline-flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-        <h2 style={{margin:0}}>Restock alerts — good sellers running low</h2>
-        <StatusBadge kind={data.nowCount>0 ? 'action' : 'watch'} label={data.nowCount>0 ? 'Action required' : 'Watch'}/>
+  return (
+    <div className="card" style={{marginBottom:14, borderLeft:'3px solid var(--bad)'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8}}>
+        <div style={{display:'inline-flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+          <h2 style={{margin:0}}>Restock alerts — good sellers running low</h2>
+          <StatusBadge kind={data.nowCount>0 ? 'action' : 'watch'} label={data.nowCount>0 ? 'Action required' : 'Watch'}/>
+        </div>
+        <button className="btn-ghost" style={{padding:'4px 10px',fontSize:11.5}} onClick={()=>setEditLead(v=>!v)}>
+          {editLead?'Done':'⚙ Lead times'}
+        </button>
       </div>
-      <button className="btn-ghost" style={{padding:'4px 10px',fontSize:11.5}} onClick={()=>setEditLead(v=>!v)}>
-        {editLead?'Done':'⚙ Lead times'}
-      </button>
-    </div>
-    <div className="muted" style={{margin:'8px 0 10px', fontSize:12}}>
-      Your fastest-moving SKUs ranked by the revenue they'd stop earning if they stock out. <b>Reorder by</b> = the date you
-      must place the order so it lands before you run out (days of cover − supplier lead time). Suggested reorder refills to
-      lead time + 30 days of cover.
-    </div>
-    {editLead && (<div className="card" style={{background:'var(--bg-app)',marginBottom:10,padding:'10px 12px'}}>
-      <div style={{fontSize:12,fontWeight:700,marginBottom:8}}>Supplier lead times <span className="muted" style={{fontWeight:400}}>— days from reorder to stock landing. Defaults are estimates; set your real ones.</span></div>
-      <div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
-        <label style={{display:'flex',alignItems:'center',gap:6,fontSize:12}}>Default {leadInput(lead.default, setDefault)} days</label>
-        {data.typesPresent.map(t=>(
-          <label key={t} style={{display:'flex',alignItems:'center',gap:6,fontSize:12}}>{t} {leadInput(lead.byType[t]!=null?lead.byType[t]:'', v=>setType(t,v))} <span className="muted" style={{fontSize:10}}>days</span></label>
-        ))}
+      <div className="muted" style={{margin:'8px 0 10px', fontSize:12}}>
+        Your fastest-moving SKUs ranked by the revenue they'd stop earning if they stock out. <b>Reorder by</b> = the date you
+        must place the order so it lands before you run out (days of cover − supplier lead time). Suggested reorder refills to
+        lead time + 30 days of cover.
       </div>
-      <div className="muted" style={{fontSize:10.5,marginTop:8}}>Blank type = uses the default. Saved to this browser.</div>
-    </div>)}
-    <div className="row" style={{marginBottom:10}}>
-      <div className="card kpi" style={{borderLeft:'3px solid var(--bad)'}}>
-        <div className="label">Reorder now</div>
-        <div className="val">{data.nowCount}</div>
-        <div className="sub">must order today — cover ≤ lead time</div>
+      {editLead && (<div className="card" style={{background:'var(--bg-app)',marginBottom:10,padding:'10px 12px'}}>
+        <div style={{fontSize:12,fontWeight:700,marginBottom:8}}>Supplier lead times <span className="muted" style={{fontWeight:400}}>— days from reorder to stock landing. Defaults are estimates; set your real ones.</span></div>
+        <div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
+          <label style={{display:'flex',alignItems:'center',gap:6,fontSize:12}}>Default {leadInput(lead.default, setDefault)} days</label>
+          {data.typesPresent.map(t=>(
+            <label key={t} style={{display:'flex',alignItems:'center',gap:6,fontSize:12}}>{t} {leadInput(lead.byType[t]!=null?lead.byType[t]:'', v=>setType(t,v))} <span className="muted" style={{fontSize:10}}>days</span></label>
+          ))}
+        </div>
+        <div className="muted" style={{fontSize:10.5,marginTop:8}}>Blank type = uses the default. Saved to this browser.</div>
+      </div>)}
+      <div className="row" style={{marginBottom:10}}>
+        <div className="card kpi" style={{borderLeft:'3px solid var(--bad)'}}>
+          <div className="label">Reorder now</div>
+          <div className="val">{data.nowCount}</div>
+          <div className="sub">must order today — cover ≤ lead time</div>
+        </div>
+        <div className="card kpi" style={{borderLeft:'3px solid var(--warn)'}}>
+          <div className="label">Reorder soon</div>
+          <div className="val">{data.soonCount}</div>
+          <div className="sub">order within ~a week</div>
+        </div>
+        <div className="card kpi" style={{borderLeft:'3px solid var(--accent)'}}>
+          <div className="label">At risk if you don't reorder</div>
+          <div className="val">{GBP(data.atRiskMonthly)}<span style={{fontSize:13,fontWeight:600}}>/mo</span></div>
+          <div className="sub">{data.nowCount+data.soonCount} best-sellers · order this week to keep it</div>
+        </div>
       </div>
-      <div className="card kpi" style={{borderLeft:'3px solid var(--warn)'}}>
-        <div className="label">Reorder soon</div>
-        <div className="val">{data.soonCount}</div>
-        <div className="sub">order within ~a week</div>
+      <div style={{overflowX:'auto'}}>
+        <table><thead><tr>
+          {th('urgency','Urgency')}
+          <th className="tl">Product</th>
+          {th('slack','Reorder by', true)}
+          {th('cover','Days left', true)}
+          {th('vel','Sold / 90d', true)}
+          {th('monthlyRev',`${curSym()}/mo at risk`, true)}
+          {th('reorder','Reorder qty', true)}
+        </tr></thead><tbody>
+        {sorted.map((r,i)=>{ const u=U[r.urgency]; const rb=reorderByLabel(r.slack);
+          return (<tr key={i}>
+            <td><span className="pill" style={{background:u.bg,color:u.fg,fontSize:10,padding:'2px 7px',borderRadius:4,fontWeight:700,whiteSpace:'nowrap'}}>{r.urgency==='now' ? `Restock or lose ${GBP(r.monthlyRev)}/mo` : u.lbl}</span></td>
+            <td className="tl" style={{fontSize:12,maxWidth:260}}>
+              <b>{r.title}</b>
+              {(r.type||r.sku) && <div className="muted" style={{fontSize:10}}>{r.type||''}{r.type&&r.sku?' · ':''}{r.sku?<code>{r.sku}</code>:''} · {r.leadDays}d lead</div>}
+            </td>
+            <td style={{whiteSpace:'nowrap',fontWeight:700,textAlign:'right',color:rb.overdue?'var(--bad)':'var(--text-secondary)'}}>{rb.txt}</td>
+            <td style={{whiteSpace:'nowrap',textAlign:'right',color:u.fg}}>{Math.round(r.daysOfCover)}d</td>
+            <td style={{textAlign:'right'}}>{NUM(r.units90d)} <span className="muted" style={{fontSize:10}}>({r.daily.toFixed(1)}/day)</span></td>
+            <td style={{textAlign:'right',fontVariantNumeric:'tabular-nums',fontWeight:700}}>{GBP(r.monthlyRev)}</td>
+            <td style={{textAlign:'right',fontVariantNumeric:'tabular-nums'}}>{r.reorderQty>0?('+'+NUM(r.reorderQty)):'—'}</td>
+          </tr>);
+        })}
+        </tbody></table>
       </div>
-      <div className="card kpi" style={{borderLeft:'3px solid var(--accent)'}}>
-        <div className="label">At risk if you don't reorder</div>
-        <div className="val">{GBP(data.atRiskMonthly)}<span style={{fontSize:13,fontWeight:600}}>/mo</span></div>
-        <div className="sub">{data.nowCount+data.soonCount} best-sellers · order this week to keep it</div>
+      {data.watchCount>0 && <button className="btn-ghost" style={{marginTop:10,padding:'5px 11px',fontSize:11.5}} onClick={()=>setShowWatch(v=>!v)}>
+        {showWatch ? 'Hide watch list' : `+ ${data.watchCount} approaching (order within ~3 weeks)`}
+      </button>}
+      <div className="note" style={{marginTop:14}}>
+        {data.nowCount+data.soonCount>0
+          ? <><b>Atlas read:</b> <b>{GBP(data.atRiskMonthly)}/mo</b> of revenue rides on {data.nowCount+data.soonCount} best-sellers you need to reorder within the week to land before they run out. {top ? <>Biggest: <b>{top.title}</b> — {reorderByLabel(top.slack).overdue?'order today':`order by ${reorderByLabel(top.slack).txt}`} or lose <b>{GBP(top.monthlyRev)}/mo</b> ({top.leadDays}d lead). </> : null}Place these before chasing new-SKU launches. Adjust lead times above if these don't match your suppliers.</>
+          : <><b>Atlas read:</b> no good sellers need an order placed right now — the watch list shows the next ones so you stay ahead of a stock-out.</>}
       </div>
     </div>
-    <div style={{overflowX:'auto'}}>
-      <table><thead><tr>
-        {th('urgency','Urgency')}
-        <th className="tl">Product</th>
-        {th('slack','Reorder by', true)}
-        {th('cover','Days left', true)}
-        {th('vel','Sold / 90d', true)}
-        {th('monthlyRev','£/mo at risk', true)}
-        {th('reorder','Reorder qty', true)}
-      </tr></thead><tbody>
-      {sorted.map((r,i)=>{ const u=U[r.urgency]; const rb=reorderByLabel(r.slack);
-        return (<tr key={i}>
-          <td><span className="pill" style={{background:u.bg,color:u.fg,fontSize:10,padding:'2px 7px',borderRadius:4,fontWeight:700,whiteSpace:'nowrap'}}>{r.urgency==='now' ? `Restock or lose ${GBP(r.monthlyRev)}/mo` : u.lbl}</span></td>
-          <td className="tl" style={{fontSize:12,maxWidth:260}}>
-            <b>{r.title}</b>
-            {(r.type||r.sku) && <div className="muted" style={{fontSize:10}}>{r.type||''}{r.type&&r.sku?' · ':''}{r.sku?<code>{r.sku}</code>:''} · {r.leadDays}d lead</div>}
-          </td>
-          <td style={{whiteSpace:'nowrap',fontWeight:700,textAlign:'right',color:rb.overdue?'var(--bad)':'var(--text-secondary)'}}>{rb.txt}</td>
-          <td style={{whiteSpace:'nowrap',textAlign:'right',color:u.fg}}>{Math.round(r.daysOfCover)}d</td>
-          <td style={{textAlign:'right'}}>{NUM(r.units90d)} <span className="muted" style={{fontSize:10}}>({r.daily.toFixed(1)}/day)</span></td>
-          <td style={{textAlign:'right',fontVariantNumeric:'tabular-nums',fontWeight:700}}>{GBP(r.monthlyRev)}</td>
-          <td style={{textAlign:'right',fontVariantNumeric:'tabular-nums'}}>{r.reorderQty>0?('+'+NUM(r.reorderQty)):'—'}</td>
-        </tr>);
-      })}
-      </tbody></table>
-    </div>
-    {data.watchCount>0 && <button className="btn-ghost" style={{marginTop:10,padding:'5px 11px',fontSize:11.5}} onClick={()=>setShowWatch(v=>!v)}>
-      {showWatch ? 'Hide watch list' : `+ ${data.watchCount} approaching (order within ~3 weeks)`}
-    </button>}
-    <div className="note" style={{marginTop:14}}>
-      {data.nowCount+data.soonCount>0
-        ? <><b>Atlas read:</b> <b>{GBP(data.atRiskMonthly)}/mo</b> of revenue rides on {data.nowCount+data.soonCount} best-sellers you need to reorder within the week to land before they run out. {top ? <>Biggest: <b>{top.title}</b> — {reorderByLabel(top.slack).overdue?'order today':`order by ${reorderByLabel(top.slack).txt}`} or lose <b>{GBP(top.monthlyRev)}/mo</b> ({top.leadDays}d lead). </> : null}Place these before chasing new-SKU launches. Adjust lead times above if these don't match your suppliers.</>
-        : <><b>Atlas read:</b> no good sellers need an order placed right now — the watch list shows the next ones so you stay ahead of a stock-out.</>}
-    </div>
-  </div>);
+  );
 }
 
 function Products(){
@@ -5912,77 +5953,79 @@ function Products(){
   const totalProfit=products.reduce((a,p)=>a+(p.grossProfit||0),0);
   const blendedMargin=totalRev>0?totalProfit/totalRev:0;
   const returnHotspots=[...products].filter(p=>(p.returnRate||0)>=0.1&&(p.units||0)>=10).sort((a,b)=>(b.returnRate||0)-(a.returnRate||0));
-  return (<div>
-    <div className="row" style={{marginBottom:14}}>
-      <KPI label="SKUs sold (90d)" val={products.length+'+'} sub={`${NUM(totalUnits)} units · £${NUM(totalRev)} net`}
-        agent="Atlas" observation="200+ SKUs sold in 90d but the top 40 carry most of the volume — long tail of low-velocity stock."
-        implication="Trim the tail. Focus inventory + creative on the top 20 to lift margin and shorten the cash cycle." />
-      <KPI label="Top seller" val={sorted[0]?.title?.slice(0,28)||'—'} sub={`${sorted[0]?.units||0} units · £${NUM(sorted[0]?.netSales)} · ${PCT(sorted[0]?.marginPct)} margin`}
-        agent="Frame" observation={DEMO ? "The mega necklace gold is the hero (117 units, £8.7k) but has the lowest margin (~58%) and 8.5% returns." : undefined}
-        implication={DEMO ? "Heavy reliance on one SKU = concentration risk. Find the next hero — and root-cause why this one returns." : undefined} />
-      <KPI label="Blended gross margin" val={PCT(blendedMargin)} sub={`£${NUM(totalProfit)} GP / £${NUM(totalRev)} net`}
-        agent="Atlas" observation={DEMO ? "78% blended GM is excellent for jewellery — the charms (80–93% margin) are the cash cow." : undefined}
-        implication="Investors will love this number once COGS is confirmed and the true discount load — code + automatic + sale-price markdowns, draft orders excluded — is netted out (see Promotions)." />
-      <KPI label="Return-rate hotspots" val={returnHotspots.length} sub={`SKUs with ≥10% returns (sold ≥10)`}
-        agent="Lux" observation={DEMO ? "12 SKUs have ≥10% return rates — 'love is pain charm' hits 22% — that's a CX signal, not a quality fluke." : undefined}
-        implication="Add a post-purchase survey + PDP sizing/expectation copy to the top 3 hotspots before adding any new SKUs." />
-    </div>
-    {/* Three jobs split into subtabs — Stock (ops) · Performance (analytics) · Bundles (merch) */}
-    <div className="seg" style={{marginBottom:14}}>
-      {[['stock','Stock'],['performance','Performance'],['bundles','Bundles']].map(([k,l])=>(<button key={k} className={pview===k?'on':''} onClick={()=>setPview(k)}>{l}</button>))}
-    </div>
-    {pview==='stock' && (<div>
-      <RestockAlertsPanel/>
-      <StockThrottlePanel/>
-      <InventoryPanel/>
-    </div>)}
-    {pview==='performance' && (<div>
-      <ProductRetentionMatrix/>
-      <ProductSignal/>
-      <CollectionsPanel/>
-      {returnHotspots.length>0&&(<div className="card" style={{marginBottom:14}}>
-        <h2>Return-rate hotspots</h2>
-        <div className="muted" style={{marginBottom:8}}>SKUs returning ≥10% of units sold — likely sizing/quality/expectation issues per Lux's read.</div>
-        <table><thead><tr><th>Product</th><th>Sold</th><th>Returns</th><th>Rate</th></tr></thead><tbody>
-          {returnHotspots.map((p,i)=>(<tr key={i}><td>{p.title}</td><td>{p.units}</td><td>{p.returns}</td><td><span className="pill red">{PCT(p.returnRate)}</span></td></tr>))}
-        </tbody></table>
+  return (
+    <div>
+      <div className="row" style={{marginBottom:14}}>
+        <KPI label="SKUs sold (90d)" val={products.length+'+'} sub={`${NUM(totalUnits)} units · ${curSym()}${NUM(totalRev)} net`}
+          agent="Atlas" observation="200+ SKUs sold in 90d but the top 40 carry most of the volume — long tail of low-velocity stock."
+          implication="Trim the tail. Focus inventory + creative on the top 20 to lift margin and shorten the cash cycle." />
+        <KPI label="Top seller" val={sorted[0]?.title?.slice(0,28)||'—'} sub={`${sorted[0]?.units||0} units · ${curSym()}${NUM(sorted[0]?.netSales)} · ${PCT(sorted[0]?.marginPct)} margin`}
+          agent="Frame" observation={DEMO ? `The mega necklace gold is the hero (117 units, ${curSym()}8.7k) but has the lowest margin (~58%) and 8.5% returns.` : undefined}
+          implication={DEMO ? "Heavy reliance on one SKU = concentration risk. Find the next hero — and root-cause why this one returns." : undefined} />
+        <KPI label="Blended gross margin" val={PCT(blendedMargin)} sub={`${curSym()}${NUM(totalProfit)} GP / ${curSym()}${NUM(totalRev)} net`}
+          agent="Atlas" observation={DEMO ? "78% blended GM is excellent for jewellery — the charms (80–93% margin) are the cash cow." : undefined}
+          implication="Investors will love this number once COGS is confirmed and the true discount load — code + automatic + sale-price markdowns, draft orders excluded — is netted out (see Promotions)." />
+        <KPI label="Return-rate hotspots" val={returnHotspots.length} sub={`SKUs with ≥10% returns (sold ≥10)`}
+          agent="Lux" observation={DEMO ? "12 SKUs have ≥10% return rates — 'love is pain charm' hits 22% — that's a CX signal, not a quality fluke." : undefined}
+          implication="Add a post-purchase survey + PDP sizing/expectation copy to the top 3 hotspots before adding any new SKUs." />
+      </div>
+      {/* Three jobs split into subtabs — Stock (ops) · Performance (analytics) · Bundles (merch) */}
+      <div className="seg" style={{marginBottom:14}}>
+        {[['stock','Stock'],['performance','Performance'],['bundles','Bundles']].map(([k,l])=>(<button key={k} className={pview===k?'on':''} onClick={()=>setPview(k)}>{l}</button>))}
+      </div>
+      {pview==='stock' && (<div>
+        <RestockAlertsPanel/>
+        <StockThrottlePanel/>
+        <InventoryPanel/>
       </div>)}
-      <ConfigurableChart
-        title="Explore products"
-        dataset={products}
-        dimensions={[{key:'title',label:'Product'},{key:'type',label:'Type'}]}
-        metrics={[
-          {key:'grossProfit',label:'Gross profit',fmt:GBP},
-          {key:'netSales',label:'Net revenue',fmt:GBP},
-          {key:'units',label:'Units',fmt:NUM},
-          {key:'returns',label:'Returns',fmt:NUM},
-        ]}
-        defaultMetric="grossProfit" defaultSplit="title" defaultChart="bar" defaultTopN={10}/>
-      <div className="card" style={{marginBottom:14,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}}>
-        <h2 style={{margin:0}}>Top SKUs — sortable</h2>
-        <div className="seg">{['units','netSales','grossProfit','marginPct','returnRate'].map(s=>(<button key={s} className={sort===s?'on':''} onClick={()=>setSort(s)}>{ {units:'Units',netSales:'Revenue',grossProfit:'Gross profit',marginPct:'Margin %',returnRate:'Return %'}[s] }</button>))}</div>
-      </div>
-      <div className="card">
-        <table><thead><tr><th className="tc">#</th><th className="tl">Product</th><th className="tl">SKU</th><th>Units</th><th>Returns</th><th>Net rev</th><th>Gross profit</th><th>Margin</th></tr></thead><tbody>
-        {sorted.slice(0,30).map((p,i)=>(<tr key={i}>
-          <td className="tc muted">{i+1}</td>
-          <td className="tl" style={{maxWidth:300}}>{p.image&&<img src={p.image} style={{width:22,height:22,borderRadius:4,verticalAlign:'middle',marginRight:8,objectFit:'cover',background:'var(--bg-elevated)'}} onError={e=>{e.target.style.opacity=.2;}}/>}{p.title}</td>
-          <td className="tl"><span className="muted" style={{fontSize:11}}>{p.sku||'—'}</span></td>
-          <td>{p.units}</td>
-          <td><span className={'pill '+((p.returnRate||0)>=0.1?'red':(p.returnRate||0)>=0.05?'amber':'grey')}>{p.returns}</span></td>
-          <td>{GBP(p.netSales)}</td>
-          <td>{GBP(p.grossProfit)}</td>
-          <td style={{color:p.marginPct>=0.7?'var(--good)':p.marginPct>=0.4?'var(--warn)':'var(--bad)',fontWeight:600}}>{PCT(p.marginPct)}</td>
-        </tr>))}
-        </tbody></table>
-      </div>
-      {DEMO && <div className="note" style={{marginTop:14}}>The <b>mega necklace gold</b> drives volume but has the lowest margin (~58%) and an 8.5% return rate. <b>Charms are the cash cow</b> — punk pearl choker (93% margin), candy bead necklace (91%), pixelated heart (84%). The <b>love is pain charm</b> has a 22% return rate — investigate immediately.</div>}
-    </div>)}
-    {pview==='bundles' && (<div>
-      <BundlesPanel/>
-      <ProductTiersPanel/>
-    </div>)}
-  </div>);
+      {pview==='performance' && (<div>
+        <ProductRetentionMatrix/>
+        <ProductSignal/>
+        <CollectionsPanel/>
+        {returnHotspots.length>0&&(<div className="card" style={{marginBottom:14}}>
+          <h2>Return-rate hotspots</h2>
+          <div className="muted" style={{marginBottom:8}}>SKUs returning ≥10% of units sold — likely sizing/quality/expectation issues per Lux's read.</div>
+          <table><thead><tr><th>Product</th><th>Sold</th><th>Returns</th><th>Rate</th></tr></thead><tbody>
+            {returnHotspots.map((p,i)=>(<tr key={i}><td>{p.title}</td><td>{p.units}</td><td>{p.returns}</td><td><span className="pill red">{PCT(p.returnRate)}</span></td></tr>))}
+          </tbody></table>
+        </div>)}
+        <ConfigurableChart
+          title="Explore products"
+          dataset={products}
+          dimensions={[{key:'title',label:'Product'},{key:'type',label:'Type'}]}
+          metrics={[
+            {key:'grossProfit',label:'Gross profit',fmt:GBP},
+            {key:'netSales',label:'Net revenue',fmt:GBP},
+            {key:'units',label:'Units',fmt:NUM},
+            {key:'returns',label:'Returns',fmt:NUM},
+          ]}
+          defaultMetric="grossProfit" defaultSplit="title" defaultChart="bar" defaultTopN={10}/>
+        <div className="card" style={{marginBottom:14,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}}>
+          <h2 style={{margin:0}}>Top SKUs — sortable</h2>
+          <div className="seg">{['units','netSales','grossProfit','marginPct','returnRate'].map(s=>(<button key={s} className={sort===s?'on':''} onClick={()=>setSort(s)}>{ {units:'Units',netSales:'Revenue',grossProfit:'Gross profit',marginPct:'Margin %',returnRate:'Return %'}[s] }</button>))}</div>
+        </div>
+        <div className="card">
+          <table><thead><tr><th className="tc">#</th><th className="tl">Product</th><th className="tl">SKU</th><th>Units</th><th>Returns</th><th>Net rev</th><th>Gross profit</th><th>Margin</th></tr></thead><tbody>
+          {sorted.slice(0,30).map((p,i)=>(<tr key={i}>
+            <td className="tc muted">{i+1}</td>
+            <td className="tl" style={{maxWidth:300}}>{p.image&&<img src={p.image} style={{width:22,height:22,borderRadius:4,verticalAlign:'middle',marginRight:8,objectFit:'cover',background:'var(--bg-elevated)'}} onError={e=>{e.target.style.opacity=.2;}}/>}{p.title}</td>
+            <td className="tl"><span className="muted" style={{fontSize:11}}>{p.sku||'—'}</span></td>
+            <td>{p.units}</td>
+            <td><span className={'pill '+((p.returnRate||0)>=0.1?'red':(p.returnRate||0)>=0.05?'amber':'grey')}>{p.returns}</span></td>
+            <td>{GBP(p.netSales)}</td>
+            <td>{GBP(p.grossProfit)}</td>
+            <td style={{color:p.marginPct>=0.7?'var(--good)':p.marginPct>=0.4?'var(--warn)':'var(--bad)',fontWeight:600}}>{PCT(p.marginPct)}</td>
+          </tr>))}
+          </tbody></table>
+        </div>
+        {DEMO && <div className="note" style={{marginTop:14}}>The <b>mega necklace gold</b> drives volume but has the lowest margin (~58%) and an 8.5% return rate. <b>Charms are the cash cow</b> — punk pearl choker (93% margin), candy bead necklace (91%), pixelated heart (84%). The <b>love is pain charm</b> has a 22% return rate — investigate immediately.</div>}
+      </div>)}
+      {pview==='bundles' && (<div>
+        <BundlesPanel/>
+        <ProductTiersPanel/>
+      </div>)}
+    </div>
+  );
 }
 
 function Organic(){
@@ -5994,50 +6037,52 @@ function Organic(){
   const orgRev=total-paidRev;
   const palette=['#5b8def','#c084fc','#4ade80','#fbbf24','#38bdf8','#f87171','#a3a3a3','#34d399','#fb923c','#818cf8','#6ee7b7','#fcd34d'];
   const pieData=sortedCh.map((c,i)=>({name:c.channel,value:c.revenue||0,fill:palette[i%palette.length]}));
-  return (<div>
-    <div className="row" style={{marginBottom:14}}>
-      <KPI label="Organic+direct revenue share" val={PCT(orgRev/total)} sub={`£${NUM(orgRev)} of £${NUM(total)} (GA4-attributed)`}
-        agent="Sage" observation={DEMO ? "74% of attributed revenue is organic+direct — frkl is NOT a paid-acquisition business." : undefined}
-        implication="Defend organic search rankings + brand search aggressively. That's the moat — paid is a top-up." />
-      <KPI label="Top channel" val={sortedCh[0]?.channel||'—'} sub={`£${NUM(sortedCh[0]?.revenue)} · ${sortedCh[0]?.purchases} purchases`}
-        agent="Lux" observation="Email drives 32% of attributed revenue — more than every paid channel combined."
-        implication={DEMO ? "Klaviyo is the highest-leverage marketing surface frkl has. Fix attributed reporting + abandoned-cart flow first." : undefined} />
-      <KPI label="Paid social GA4 vs Meta claim" val="≈10×" sub="Meta claims £12.5k; GA4 attributes £1.1k"
-        agent="Atlas" observation="A 10× gap between platform-claimed and GA4-attributed Meta revenue is normal but startling at first."
-        implication="For investor materials, lead with contribution-net ROAS — neither claimed nor last-click is the right answer alone." />
-      <KPI label="Channels active" val={ch.length} sub="GA4 default channel grouping"
-        agent="Scout" observation="12 channels active with no single-channel >32% — healthy diversification, no single-point-of-failure."
-        implication={DEMO ? "This is a real strength to lead with in the fundraise — frkl isn't a one-channel pony." : undefined} />
-    </div>
-    <div className="row">
-      <div className="card" style={{flex:'1 1 340px'}}>
-        <h2>Revenue share by channel (GA4 attribution)</h2>
-        <R.ResponsiveContainer width="100%" height={280}>
-          <R.PieChart>
-            <R.Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={100} paddingAngle={1}>
-              {pieData.map((p,i)=><R.Cell key={i} fill={p.fill}/>)}
-            </R.Pie>
-            <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} formatter={v=>GBP(v)} />
-          </R.PieChart>
-        </R.ResponsiveContainer>
+  return (
+    <div>
+      <div className="row" style={{marginBottom:14}}>
+        <KPI label="Organic+direct revenue share" val={PCT(orgRev/total)} sub={`${curSym()}${NUM(orgRev)} of ${curSym()}${NUM(total)} (GA4-attributed)`}
+          agent="Sage" observation={DEMO ? "74% of attributed revenue is organic+direct — frkl is NOT a paid-acquisition business." : undefined}
+          implication="Defend organic search rankings + brand search aggressively. That's the moat — paid is a top-up." />
+        <KPI label="Top channel" val={sortedCh[0]?.channel||'—'} sub={`${curSym()}${NUM(sortedCh[0]?.revenue)} · ${sortedCh[0]?.purchases} purchases`}
+          agent="Lux" observation="Email drives 32% of attributed revenue — more than every paid channel combined."
+          implication={DEMO ? "Klaviyo is the highest-leverage marketing surface frkl has. Fix attributed reporting + abandoned-cart flow first." : undefined} />
+        <KPI label="Paid social GA4 vs Meta claim" val="≈10×" sub={`Meta claims ${curSym()}12.5k; GA4 attributes ${curSym()}1.1k`}
+          agent="Atlas" observation="A 10× gap between platform-claimed and GA4-attributed Meta revenue is normal but startling at first."
+          implication="For investor materials, lead with contribution-net ROAS — neither claimed nor last-click is the right answer alone." />
+        <KPI label="Channels active" val={ch.length} sub="GA4 default channel grouping"
+          agent="Scout" observation="12 channels active with no single-channel >32% — healthy diversification, no single-point-of-failure."
+          implication={DEMO ? "This is a real strength to lead with in the fundraise — frkl isn't a one-channel pony." : undefined} />
       </div>
-      <div className="card" style={{flex:'1 1 380px'}}>
-        <h2>Channel detail</h2>
-        <table><thead><tr><th>Channel</th><th>Sessions</th><th>Purch</th><th>Rev</th><th>% rev</th><th>CVR</th></tr></thead><tbody>
-        {sortedCh.map((c,i)=>(<tr key={i}>
-          <td>{c.channel}</td><td>{NUM(c.sessions)}</td><td>{c.purchases||0}</td>
-          <td>{GBP(c.revenue)}</td>
-          <td>{PCT((c.revenue||0)/total)}</td>
-          <td>{PCT((c.purchases||0)/Math.max(1,c.sessions))}</td>
-        </tr>))}
-        </tbody></table>
+      <div className="row">
+        <div className="card" style={{flex:'1 1 340px'}}>
+          <h2>Revenue share by channel (GA4 attribution)</h2>
+          <R.ResponsiveContainer width="100%" height={280}>
+            <R.PieChart>
+              <R.Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={100} paddingAngle={1}>
+                {pieData.map((p,i)=><R.Cell key={i} fill={p.fill}/>)}
+              </R.Pie>
+              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} formatter={v=>GBP(v)} />
+            </R.PieChart>
+          </R.ResponsiveContainer>
+        </div>
+        <div className="card" style={{flex:'1 1 380px'}}>
+          <h2>Channel detail</h2>
+          <table><thead><tr><th>Channel</th><th>Sessions</th><th>Purch</th><th>Rev</th><th>% rev</th><th>CVR</th></tr></thead><tbody>
+          {sortedCh.map((c,i)=>(<tr key={i}>
+            <td>{c.channel}</td><td>{NUM(c.sessions)}</td><td>{c.purchases||0}</td>
+            <td>{GBP(c.revenue)}</td>
+            <td>{PCT((c.revenue||0)/total)}</td>
+            <td>{PCT((c.purchases||0)/Math.max(1,c.sessions))}</td>
+          </tr>))}
+          </tbody></table>
+        </div>
       </div>
+      <div className="note" style={{marginTop:14}}><b>Email is the #1 revenue channel</b>({curSym()}18.5k, 32% of attributed revenue) — the Klaviyo flows are doing more for the business than any paid channel. <b>Organic Search drives {curSym()}10k (17.3%)</b>— bigger than Paid Search. The <b>Paid Social attribution gap</b>(Meta claims 10× what GA4 measures) is the headline reconciliation problem for the investor view.</div>
+      <InstagramPanel/>
+      <ContentCalendar/>
+      <StoriesPanel/>
     </div>
-    <div className="note" style={{marginTop:14}}><b>Email is the #1 revenue channel</b> (£18.5k, 32% of attributed revenue) — the Klaviyo flows are doing more for the business than any paid channel. <b>Organic Search drives £10k (17.3%)</b> — bigger than Paid Search. The <b>Paid Social attribution gap</b> (Meta claims 10× what GA4 measures) is the headline reconciliation problem for the investor view.</div>
-    <InstagramPanel/>
-    <ContentCalendar/>
-    <StoriesPanel/>
-  </div>);
+  );
 }
 
 function EmailAttributionPanel(){
@@ -6049,60 +6094,62 @@ function EmailAttributionPanel(){
   const gapPct = a.grossFlowRevenue_90d_klaviyo_tracked
     ? gap / a.grossFlowRevenue_90d_klaviyo_tracked
     : 0;
-  return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid #4ade80'}}>
-    <h2>True email attribution (Klaviyo Attributed report types)</h2>
-    <div className="muted" style={{marginBottom:10,fontSize:12}}>
-      Pulled from <code>MetricExportAttributedFlow</code> + <code>MetricExportAttributedCampaign</code>. These are TRUE email-attributed orders within Klaviyo's attribution window (default: 5 days post-click). <b>This is the correct figure for "email channel revenue contribution".</b> The previous "gross Klaviyo-tracked" was every Shopify order Klaviyo's profiles touched — including orders the customer would have made anyway. {a.interpretation}
+  return (
+    <div className="card" style={{marginBottom:14, borderLeft:'3px solid #4ade80'}}>
+      <h2>True email attribution (Klaviyo Attributed report types)</h2>
+      <div className="muted" style={{marginBottom:10,fontSize:12}}>
+        Pulled from <code>MetricExportAttributedFlow</code> + <code>MetricExportAttributedCampaign</code>. These are TRUE email-attributed orders within Klaviyo's attribution window (default: 5 days post-click). <b>This is the correct figure for "email channel revenue contribution".</b> The previous "gross Klaviyo-tracked" was every Shopify order Klaviyo's profiles touched — including orders the customer would have made anyway. {a.interpretation}
+      </div>
+      <div className="row" style={{marginBottom:10}}>
+        <div className="card kpi" style={{borderLeft:'3px solid #4ade80'}}>
+          <div className="label">Attributed flow rev (90d)</div>
+          <div className="val">{GBP(a.attributedFlowRevenue_90d)}</div>
+          <div className="sub">{a.attributedFlowOrders_90d} orders directly attributable to email flows</div>
+        </div>
+        <div className="card kpi" style={{borderLeft:'3px solid #5b8def'}}>
+          <div className="label">Attributed campaign rev (30d)</div>
+          <div className="val">{GBP(a.attributedCampaignRevenue_30d)}</div>
+          <div className="sub">{a.attributedCampaignOrders_30d} orders directly attributable to campaign sends</div>
+        </div>
+        <div className="card kpi" style={{borderLeft: Math.abs(gapPct) > 0.3 ? '3px solid #fbbf24' : '3px solid #4ade80'}}>
+          <div className="label">Flow attribution gap</div>
+          <div className="val">{GBP(gap)}</div>
+          <div className="sub">vs gross tracked {curSym()}{NUM(a.grossFlowRevenue_90d_klaviyo_tracked)}({(gapPct*100).toFixed(0)}% gap)</div>
+        </div>
+        <div className="card kpi" style={{borderLeft:'3px solid #c084fc'}}>
+          <div className="label">Attribution window</div>
+          <div className="val" style={{fontSize:14,lineHeight:1.3}}>5d post-click</div>
+          <div className="sub">Klaviyo default. Cross-channel attribution overlap is the residual.</div>
+        </div>
+      </div>
+      <div className="row">
+        <div className="card" style={{flex:'1 1 380px'}}>
+          <h2>Per-flow attributed revenue (90d)</h2>
+          <table><thead><tr><th>Flow</th><th>Orders</th><th>Revenue</th><th>Active days</th><th>{curSym()}/active day</th></tr></thead><tbody>
+          {flows.map((f,i)=>(<tr key={i}>
+            <td style={{fontSize:12}}>{f.flow}</td>
+            <td>{f.orders}</td>
+            <td><b>{GBP(f.orderValue)}</b></td>
+            <td>{f.days}</td>
+            <td>{GBP(f.avgPerDay)}</td>
+          </tr>))}
+          </tbody></table>
+        </div>
+        <div className="card" style={{flex:'1 1 380px'}}>
+          <h2>Per-campaign attributed revenue (30d)</h2>
+          <table><thead><tr><th>Campaign</th><th>Orders</th><th>Revenue</th></tr></thead><tbody>
+          {campaigns30.slice(0,15).map((c,i)=>(<tr key={i}>
+            <td style={{fontSize:12, maxWidth:240}}>{c.name}</td>
+            <td>{c.orders}</td>
+            <td><b>{GBP(c.orderValue)}</b></td>
+          </tr>))}
+          </tbody></table>
+          <div className="muted" style={{fontSize:11, marginTop:6}}>Showing top {Math.min(15, campaigns30.length)} of {campaigns30.length} attributed campaigns.</div>
+        </div>
+      </div>
+      {DEMO && <div className="note" style={{marginTop:14}}><b>Atlas read:</b>for frkl, the gross-vs-attributed flow gap is ~{curSym()}{Math.abs(gap)}({(gapPct*100).toFixed(0)}%) — Klaviyo's flow tracking is precise. So the {curSym()}28k flow revenue claim that drives the "flows = 19× lift over campaigns" finding holds up. The Welcome Flow alone attributes {curSym()}{NUM(flows[0]?.orderValue)}from {flows[0]?.orders}orders over 90d — the highest-leverage owned-audience surface frkl has.</div>}
     </div>
-    <div className="row" style={{marginBottom:10}}>
-      <div className="card kpi" style={{borderLeft:'3px solid #4ade80'}}>
-        <div className="label">Attributed flow rev (90d)</div>
-        <div className="val">{GBP(a.attributedFlowRevenue_90d)}</div>
-        <div className="sub">{a.attributedFlowOrders_90d} orders directly attributable to email flows</div>
-      </div>
-      <div className="card kpi" style={{borderLeft:'3px solid #5b8def'}}>
-        <div className="label">Attributed campaign rev (30d)</div>
-        <div className="val">{GBP(a.attributedCampaignRevenue_30d)}</div>
-        <div className="sub">{a.attributedCampaignOrders_30d} orders directly attributable to campaign sends</div>
-      </div>
-      <div className="card kpi" style={{borderLeft: Math.abs(gapPct) > 0.3 ? '3px solid #fbbf24' : '3px solid #4ade80'}}>
-        <div className="label">Flow attribution gap</div>
-        <div className="val">{GBP(gap)}</div>
-        <div className="sub">vs gross tracked £{NUM(a.grossFlowRevenue_90d_klaviyo_tracked)} ({(gapPct*100).toFixed(0)}% gap)</div>
-      </div>
-      <div className="card kpi" style={{borderLeft:'3px solid #c084fc'}}>
-        <div className="label">Attribution window</div>
-        <div className="val" style={{fontSize:14,lineHeight:1.3}}>5d post-click</div>
-        <div className="sub">Klaviyo default. Cross-channel attribution overlap is the residual.</div>
-      </div>
-    </div>
-    <div className="row">
-      <div className="card" style={{flex:'1 1 380px'}}>
-        <h2>Per-flow attributed revenue (90d)</h2>
-        <table><thead><tr><th>Flow</th><th>Orders</th><th>Revenue</th><th>Active days</th><th>£/active day</th></tr></thead><tbody>
-        {flows.map((f,i)=>(<tr key={i}>
-          <td style={{fontSize:12}}>{f.flow}</td>
-          <td>{f.orders}</td>
-          <td><b>{GBP(f.orderValue)}</b></td>
-          <td>{f.days}</td>
-          <td>{GBP(f.avgPerDay)}</td>
-        </tr>))}
-        </tbody></table>
-      </div>
-      <div className="card" style={{flex:'1 1 380px'}}>
-        <h2>Per-campaign attributed revenue (30d)</h2>
-        <table><thead><tr><th>Campaign</th><th>Orders</th><th>Revenue</th></tr></thead><tbody>
-        {campaigns30.slice(0,15).map((c,i)=>(<tr key={i}>
-          <td style={{fontSize:12, maxWidth:240}}>{c.name}</td>
-          <td>{c.orders}</td>
-          <td><b>{GBP(c.orderValue)}</b></td>
-        </tr>))}
-        </tbody></table>
-        <div className="muted" style={{fontSize:11, marginTop:6}}>Showing top {Math.min(15, campaigns30.length)} of {campaigns30.length} attributed campaigns.</div>
-      </div>
-    </div>
-    {DEMO && <div className="note" style={{marginTop:14}}><b>Atlas read:</b> for frkl, the gross-vs-attributed flow gap is ~£{Math.abs(gap)} ({(gapPct*100).toFixed(0)}%) — Klaviyo's flow tracking is precise. So the £28k flow revenue claim that drives the "flows = 19× lift over campaigns" finding holds up. The Welcome Flow alone attributes £{NUM(flows[0]?.orderValue)} from {flows[0]?.orders} orders over 90d — the highest-leverage owned-audience surface frkl has.</div>}
-  </div>);
+  );
 }
 
 function EmailHealthPanel(){
@@ -6139,9 +6186,9 @@ function EmailHealthPanel(){
     {label: "Back-in-stock", present: has(['back in stock','back-in-stock']), critical: true},
     {label: "Post-purchase / shipping", present: has(['post purchase','post-purchase','first time purchaser']), critical: true},
     {label: "Birthday", present: has(['birthday']), critical: false,
-     present_detail: 'Present but earning £0 — flow is broken (subject works, CTA fails).'},
+     present_detail: `Present but earning ${curSym()}0 — flow is broken (subject works, CTA fails).`},
     {label: "Win-back (lapsed 60-90d)", present: has(['win back','win-back','lapsed','we miss you']), critical: true,
-     gap_text: "MISSING. For a brand where ~35% of orders are returning, this is the highest-leverage missing flow. Trigger at 60-90d since last purchase with a £-off return code."},
+     gap_text: `MISSING. For a brand where ~35% of orders are returning, this is the highest-leverage missing flow. Trigger at 60-90d since last purchase with a ${curSym()}-off return code.`},
     {label: "Replenishment / repurchase nudge", present: has(['replenish','repurchase','time to restock']), critical: false,
      gap_text: "MISSING. Less critical for jewellery (not consumable) but a 'complete your stack' replenishment nudge for prior charm-buyers would convert."},
     {label: "VIP / 2nd+ purchaser", present: has(['vip','loyalty','existing customer']) || flowNames.some(n=>n.includes('existing customer')), critical: false,
@@ -6155,68 +6202,70 @@ function EmailHealthPanel(){
   const missingCritical = flowChecklist.filter(f => f.critical && !f.present).length;
   const presentCount = flowChecklist.filter(f => f.present).length;
 
-  return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid #c084fc'}}>
-    <h2>Email programme health + flow gap audit</h2>
-    <div className="muted" style={{marginBottom:10, fontSize:12}}>
-      Lux audit of deliverability signals, list growth, and flow coverage vs DTC best-practice inventory.
-    </div>
-    <div className="row" style={{marginBottom:10}}>
-      <div className="card kpi" style={{borderLeft: mppFlag ? '3px solid #fbbf24' : '3px solid #4ade80'}}>
-        <div className="label">Open rates {mppFlag && <span style={{color:'#fbbf24',fontSize:10}}>⚠ MPP inflated</span>}</div>
-        <div className="val">{(campOpenW*100).toFixed(0)}% / {(flowOpenW*100).toFixed(0)}%</div>
-        <div className="sub">campaigns / flows. {mppFlag ? 'Apple Mail Privacy Protection auto-fetches emails since iOS 15 — anything >50% is inflated. Click rate is the true engagement signal.' : 'Open rates look natural.'}</div>
+  return (
+    <div className="card" style={{marginBottom:14, borderLeft:'3px solid #c084fc'}}>
+      <h2>Email programme health + flow gap audit</h2>
+      <div className="muted" style={{marginBottom:10, fontSize:12}}>
+        Lux audit of deliverability signals, list growth, and flow coverage vs DTC best-practice inventory.
       </div>
-      <div className="card kpi" style={{borderLeft:'3px solid #5b8def'}}>
-        <div className="label">Click rates (truth)</div>
-        <div className="val">{(campClickW*100).toFixed(1)}% / {(flowClickW*100).toFixed(1)}%</div>
-        <div className="sub">campaigns / flows · vs DTC benchmarks 2.5% campaigns / 5%+ flows</div>
+      <div className="row" style={{marginBottom:10}}>
+        <div className="card kpi" style={{borderLeft: mppFlag ? '3px solid #fbbf24' : '3px solid #4ade80'}}>
+          <div className="label">Open rates {mppFlag && <span style={{color:'#fbbf24',fontSize:10}}>⚠ MPP inflated</span>}</div>
+          <div className="val">{(campOpenW*100).toFixed(0)}% / {(flowOpenW*100).toFixed(0)}%</div>
+          <div className="sub">campaigns / flows. {mppFlag ? 'Apple Mail Privacy Protection auto-fetches emails since iOS 15 — anything >50% is inflated. Click rate is the true engagement signal.' : 'Open rates look natural.'}</div>
+        </div>
+        <div className="card kpi" style={{borderLeft:'3px solid #5b8def'}}>
+          <div className="label">Click rates (truth)</div>
+          <div className="val">{(campClickW*100).toFixed(1)}% / {(flowClickW*100).toFixed(1)}%</div>
+          <div className="sub">campaigns / flows · vs DTC benchmarks 2.5% campaigns / 5%+ flows</div>
+        </div>
+        <div className="card kpi" style={{borderLeft:'3px solid #4ade80'}}>
+          <div className="label">List net growth (60d)</div>
+          <div className="val">+{NUM(netGrowth)}</div>
+          <div className="sub">{NUM(subs)} subs · {NUM(unsubs)} unsubs · churn ~{(dailyChurnRate*1000).toFixed(2)}‰/day proxy</div>
+        </div>
+        <div className="card kpi" style={{borderLeft: missingCritical > 0 ? '3px solid #f87171' : '3px solid #4ade80'}}>
+          <div className="label">Critical flow gaps</div>
+          <div className="val">{missingCritical}</div>
+          <div className="sub">{presentCount} of {flowChecklist.length} best-practice flows present</div>
+        </div>
       </div>
-      <div className="card kpi" style={{borderLeft:'3px solid #4ade80'}}>
-        <div className="label">List net growth (60d)</div>
-        <div className="val">+{NUM(netGrowth)}</div>
-        <div className="sub">{NUM(subs)} subs · {NUM(unsubs)} unsubs · churn ~{(dailyChurnRate*1000).toFixed(2)}‰/day proxy</div>
-      </div>
-      <div className="card kpi" style={{borderLeft: missingCritical > 0 ? '3px solid #f87171' : '3px solid #4ade80'}}>
-        <div className="label">Critical flow gaps</div>
-        <div className="val">{missingCritical}</div>
-        <div className="sub">{presentCount} of {flowChecklist.length} best-practice flows present</div>
-      </div>
-    </div>
-    <div className="row">
-      <div className="card" style={{flex:'2 1 460px'}}>
-        <h2>Flow inventory vs best-practice DTC stack</h2>
-        <table><thead><tr><th>Flow</th><th className="tl">Status</th><th className="tl">Notes</th></tr></thead><tbody>
-        {flowChecklist.map((f,i)=>(<tr key={i}>
-          <td style={{fontSize:12}}>{f.label} {f.critical && <span className="muted" style={{fontSize:10,marginLeft:4}}>critical</span>}</td>
-          <td className="tl">{f.present ? <span className="pill" style={{background:'var(--good-bg)',color:'var(--good)',fontSize:10,padding:'2px 6px',borderRadius:4,fontWeight:700}}>PRESENT</span> : <span className="pill" style={{background:'var(--bad-bg)',color:'var(--bad)',fontSize:10,padding:'2px 6px',borderRadius:4,fontWeight:700}}>GAP</span>}</td>
-          <td className="muted tl" style={{fontSize:11,maxWidth:340}}>{f.present ? (f.present_detail || '—') : (f.gap_text || 'Not detected in current flow list.')}</td>
-        </tr>))}
-        </tbody></table>
-      </div>
-      <div className="card" style={{flex:'1 1 300px'}}>
-        <h2>Deliverability + list health flags</h2>
-        <div style={{display:'flex',flexDirection:'column',gap:10,fontSize:12.5}}>
-          {mppFlag && (<div style={{padding:10,background:'var(--bg-app)',borderLeft:'3px solid #fbbf24',borderRadius:'0 6px 6px 0'}}>
-            <div style={{fontWeight:600,marginBottom:3,color:'#fbbf24'}}>⚠ Apple MPP open-rate inflation</div>
-            <div className="muted">Campaign opens {(campOpenW*100).toFixed(0)}%, flow opens {(flowOpenW*100).toFixed(0)}%. Real open rates are likely 25-40% lower. <b>Don't optimise on open rate</b>. Use click rate + order-attributed revenue as the true signals. Suppress "non-openers" segmentation that relies on opens; use "non-clickers" instead.</div>
-          </div>)}
-          <div style={{padding:10,background:'var(--bg-app)',borderLeft:'3px solid #5b8def',borderRadius:'0 6px 6px 0'}}>
-            <div style={{fontWeight:600,marginBottom:3}}>List engagement decay risk</div>
-            <div className="muted">No 30/60/90d engagement segmentation visible in current data. <b>Recommended:</b> create "actively engaged" (opened or clicked in last 30d) and "decayed" (no engagement 60d+) segments. Suppress decayed list from regular campaigns or reactivate via re-engagement series. Otherwise sender rep degrades over months.</div>
-          </div>
-          <div style={{padding:10,background:'var(--bg-app)',borderLeft:'3px solid #f87171',borderRadius:'0 6px 6px 0'}}>
-            <div style={{fontWeight:600,marginBottom:3,color:'#f87171'}}>Bounce/spam complaint rate not tracked</div>
-            <div className="muted">Supermetrics' Klaviyo connector doesn't expose bounce or spam-complaint rates in current pull. <b>Manual check needed:</b> log into Klaviyo → Analytics → Deliverability. Bounce rate should be &lt;2%, spam complaints &lt;0.1%. Higher = deliverability is at risk.</div>
-          </div>
-          <div style={{padding:10,background:'var(--bg-app)',borderLeft:'3px solid #c084fc',borderRadius:'0 6px 6px 0'}}>
-            <div style={{fontWeight:600,marginBottom:3}}>Top opportunity: win-back flow</div>
-            <div className="muted">~35% of orders are returning customers, but there's no flow nurturing the lapsed segment. Building a win-back (trigger at 60-90d since purchase) likely adds £200-500/mo at current scale. Best-practice format: nostalgia trigger → product reminder → discount escalation.</div>
+      <div className="row">
+        <div className="card" style={{flex:'2 1 460px'}}>
+          <h2>Flow inventory vs best-practice DTC stack</h2>
+          <table><thead><tr><th>Flow</th><th className="tl">Status</th><th className="tl">Notes</th></tr></thead><tbody>
+          {flowChecklist.map((f,i)=>(<tr key={i}>
+            <td style={{fontSize:12}}>{f.label} {f.critical && <span className="muted" style={{fontSize:10,marginLeft:4}}>critical</span>}</td>
+            <td className="tl">{f.present ? <span className="pill" style={{background:'var(--good-bg)',color:'var(--good)',fontSize:10,padding:'2px 6px',borderRadius:4,fontWeight:700}}>PRESENT</span> : <span className="pill" style={{background:'var(--bad-bg)',color:'var(--bad)',fontSize:10,padding:'2px 6px',borderRadius:4,fontWeight:700}}>GAP</span>}</td>
+            <td className="muted tl" style={{fontSize:11,maxWidth:340}}>{f.present ? (f.present_detail || '—') : (f.gap_text || 'Not detected in current flow list.')}</td>
+          </tr>))}
+          </tbody></table>
+        </div>
+        <div className="card" style={{flex:'1 1 300px'}}>
+          <h2>Deliverability + list health flags</h2>
+          <div style={{display:'flex',flexDirection:'column',gap:10,fontSize:12.5}}>
+            {mppFlag && (<div style={{padding:10,background:'var(--bg-app)',borderLeft:'3px solid #fbbf24',borderRadius:'0 6px 6px 0'}}>
+              <div style={{fontWeight:600,marginBottom:3,color:'#fbbf24'}}>⚠ Apple MPP open-rate inflation</div>
+              <div className="muted">Campaign opens {(campOpenW*100).toFixed(0)}%, flow opens {(flowOpenW*100).toFixed(0)}%. Real open rates are likely 25-40% lower. <b>Don't optimise on open rate</b>. Use click rate + order-attributed revenue as the true signals. Suppress "non-openers" segmentation that relies on opens; use "non-clickers" instead.</div>
+            </div>)}
+            <div style={{padding:10,background:'var(--bg-app)',borderLeft:'3px solid #5b8def',borderRadius:'0 6px 6px 0'}}>
+              <div style={{fontWeight:600,marginBottom:3}}>List engagement decay risk</div>
+              <div className="muted">No 30/60/90d engagement segmentation visible in current data. <b>Recommended:</b> create "actively engaged" (opened or clicked in last 30d) and "decayed" (no engagement 60d+) segments. Suppress decayed list from regular campaigns or reactivate via re-engagement series. Otherwise sender rep degrades over months.</div>
+            </div>
+            <div style={{padding:10,background:'var(--bg-app)',borderLeft:'3px solid #f87171',borderRadius:'0 6px 6px 0'}}>
+              <div style={{fontWeight:600,marginBottom:3,color:'#f87171'}}>Bounce/spam complaint rate not tracked</div>
+              <div className="muted">Supermetrics' Klaviyo connector doesn't expose bounce or spam-complaint rates in current pull. <b>Manual check needed:</b> log into Klaviyo → Analytics → Deliverability. Bounce rate should be &lt;2%, spam complaints &lt;0.1%. Higher = deliverability is at risk.</div>
+            </div>
+            <div style={{padding:10,background:'var(--bg-app)',borderLeft:'3px solid #c084fc',borderRadius:'0 6px 6px 0'}}>
+              <div style={{fontWeight:600,marginBottom:3}}>Top opportunity: win-back flow</div>
+              <div className="muted">~35% of orders are returning customers, but there's no flow nurturing the lapsed segment. Building a win-back (trigger at 60-90d since purchase) likely adds {curSym()}200-500/mo at current scale. Best-practice format: nostalgia trigger → product reminder → discount escalation.</div>
+            </div>
           </div>
         </div>
       </div>
+      <div className="note" style={{marginTop:14}}><b>Lux's read:</b> the flow programme is fundamentally healthy (5 critical flows present, per-category welcomes is best-practice). The two missing critical flows are <b>win-back</b> and <b>review request</b> — both are 1-time builds with ongoing revenue. The MPP open-rate inflation isn't a problem per se, but means anyone optimising on opens (subject-line testing) is optimising for noise. Click-rate-as-truth is the right rule.</div>
     </div>
-    <div className="note" style={{marginTop:14}}><b>Lux's read:</b> the flow programme is fundamentally healthy (5 critical flows present, per-category welcomes is best-practice). The two missing critical flows are <b>win-back</b> and <b>review request</b> — both are 1-time builds with ongoing revenue. The MPP open-rate inflation isn't a problem per se, but means anyone optimising on opens (subject-line testing) is optimising for noise. Click-rate-as-truth is the right rule.</div>
-  </div>);
+  );
 }
 
 function EmailHub(){
@@ -6249,112 +6298,114 @@ function EmailHub(){
   const promoDisc = _promo.reduce((a,c)=>a+(c.discount||0),0);
   const promoRate = (promoRev+promoDisc)>0 ? promoDisc/(promoRev+promoDisc) : null;
   const alwaysOnDisc = _codes.filter(c=>c&&c.pattern==='always-on').reduce((a,c)=>a+(c.discount||0),0);
-  return (<div>
-    <EmailAttributionPanel/>
-    <EmailHealthPanel/>
-    {_codes.length>0 && (<div className="card" style={{marginBottom:14, borderLeft:'3px solid var(--warn)'}}>
-      <h2>How discount-dependent is email-driven demand?</h2>
-      <div className="muted" style={{marginBottom:10, fontSize:12}}>Promo/campaign codes — the kind pushed in broadcasts &amp; flows — vs standing affiliate codes. <i>(A precise email-attributed split needs the Klaviyo↔Shopify order-code join; this is the code-level proxy.)</i></div>
+  return (
+    <div>
+      <EmailAttributionPanel/>
+      <EmailHealthPanel/>
+      {_codes.length>0 && (<div className="card" style={{marginBottom:14, borderLeft:'3px solid var(--warn)'}}>
+        <h2>How discount-dependent is email-driven demand?</h2>
+        <div className="muted" style={{marginBottom:10, fontSize:12}}>Promo/campaign codes — the kind pushed in broadcasts &amp; flows — vs standing affiliate codes. <i>(A precise email-attributed split needs the Klaviyo↔Shopify order-code join; this is the code-level proxy.)</i></div>
+        <div className="row">
+          <KPI label="Revenue on promo codes" val={GBP(promoRev)} sub={`${_promo.length} campaign/promo codes`}/>
+          <KPI label="Discount given (promo)" val={GBP(promoDisc)} sub={promoRate!=null?`${PCT(promoRate)} blended off`:''} goodDirection="down"/>
+          <KPI label="Always-on affiliate leak" val={GBP(alwaysOnDisc)} sub="standing codes — margin given away regardless of channel" goodDirection="down"/>
+        </div>
+        <div className="note" style={{marginTop:6}}>If broadcast revenue mostly rides on a code, that demand is <b>rented, not owned</b> — a margin risk. Build full-price email angles (new-in, restock, editorial, UGC) so campaigns aren't only "here's a discount", and reserve codes for genuine win-back.</div>
+      </div>)}
+      <div className="card" style={{marginBottom:14, borderLeft:'3px solid #c084fc'}}>
+        <h2>Email is the #1 revenue channel — and flows are doing the heavy lifting</h2>
+        <div className="muted" style={{marginBottom:10,fontSize:12}}>Last 90 days · Klaviyo via Supermetrics. Campaigns = broadcasts. Flows = automated triggers (welcome, abandoned cart, browse abandonment, back-in-stock, birthday).</div>
+        <div className="row">
+          <KPI label="Flow revenue (90d)" val={GBP(summary.flows.orderValue)} sub={`${summary.flows.messages} messages · ${NUM(summary.flows.recipients)} recipients`}
+            agent="Lux" observation={`Flows generate ${PCT(flowShare)} of email revenue from just ${summary.flows.messages} message templates.`}
+            implication={DEMO ? "This is the highest-margin marketing activity frkl runs. Investment in flow optimisation = direct revenue." : undefined} />
+          <KPI label="Campaign revenue (90d)" val={GBP(summary.campaigns.orderValue)} sub={`${summary.campaigns.messages} sends · ${NUM(summary.campaigns.recipients)} total recipients`} series={sendChart.map(w=>({d:w.date, v:Math.round(w.revenue)}))} seriesLabel="Campaign revenue · by send date"
+            agent="Lux" observation={`${summary.campaigns.messages} broadcasts producing ${GBP(summary.campaigns.orderValue)} — less revenue than 15 flow messages.`}
+            implication="Send cadence is high; revenue per send isn't. Either cut the 50% lowest-performing or differentiate angles." />
+          <KPI label="Flow rev per recipient" val={curSym()+(summary.flows.revPerRecip||0).toFixed(2)} sub={`vs ${curSym()}${(summary.campaigns.revPerRecip||0).toFixed(2)} for campaigns — ${lift}× lift`}
+            agent="Atlas" observation={`Each flow recipient is worth ${lift}× more than a campaign recipient.`}
+            implication="The action: get more profiles INTO flows (sign-up forms, browse, cart, post-purchase) before sending another broadcast." />
+          <KPI label="Avg open rate (camp.)" val={PCT(summary.campaigns.avgOpenRate)} sub={`Click ${PCT(summary.campaigns.avgClickRate)} — flows avg ${PCT(summary.flows.avgOpenRate)} open`}
+            agent="Lux" observation="58% campaign open rate is excellent — list hygiene + brand affinity are strong. Click-through is the weak link."
+            implication="Subject lines work; CTAs and content layout don't. A/B test single-CTA emails next." />
+        </div>
+      </div>
       <div className="row">
-        <KPI label="Revenue on promo codes" val={GBP(promoRev)} sub={`${_promo.length} campaign/promo codes`}/>
-        <KPI label="Discount given (promo)" val={GBP(promoDisc)} sub={promoRate!=null?`${PCT(promoRate)} blended off`:''} goodDirection="down"/>
-        <KPI label="Always-on affiliate leak" val={GBP(alwaysOnDisc)} sub="standing codes — margin given away regardless of channel" goodDirection="down"/>
-      </div>
-      <div className="note" style={{marginTop:6}}>If broadcast revenue mostly rides on a code, that demand is <b>rented, not owned</b> — a margin risk. Build full-price email angles (new-in, restock, editorial, UGC) so campaigns aren't only "here's a discount", and reserve codes for genuine win-back.</div>
-    </div>)}
-    <div className="card" style={{marginBottom:14, borderLeft:'3px solid #c084fc'}}>
-      <h2>Email is the #1 revenue channel — and flows are doing the heavy lifting</h2>
-      <div className="muted" style={{marginBottom:10,fontSize:12}}>Last 90 days · Klaviyo via Supermetrics. Campaigns = broadcasts. Flows = automated triggers (welcome, abandoned cart, browse abandonment, back-in-stock, birthday).</div>
-      <div className="row">
-        <KPI label="Flow revenue (90d)" val={GBP(summary.flows.orderValue)} sub={`${summary.flows.messages} messages · ${NUM(summary.flows.recipients)} recipients`}
-          agent="Lux" observation={`Flows generate ${PCT(flowShare)} of email revenue from just ${summary.flows.messages} message templates.`}
-          implication={DEMO ? "This is the highest-margin marketing activity frkl runs. Investment in flow optimisation = direct revenue." : undefined} />
-        <KPI label="Campaign revenue (90d)" val={GBP(summary.campaigns.orderValue)} sub={`${summary.campaigns.messages} sends · ${NUM(summary.campaigns.recipients)} total recipients`} series={sendChart.map(w=>({d:w.date, v:Math.round(w.revenue)}))} seriesLabel="Campaign revenue · by send date"
-          agent="Lux" observation={`${summary.campaigns.messages} broadcasts producing ${GBP(summary.campaigns.orderValue)} — less revenue than 15 flow messages.`}
-          implication="Send cadence is high; revenue per send isn't. Either cut the 50% lowest-performing or differentiate angles." />
-        <KPI label="Flow rev per recipient" val={'£'+(summary.flows.revPerRecip||0).toFixed(2)} sub={`vs £${(summary.campaigns.revPerRecip||0).toFixed(2)} for campaigns — ${lift}× lift`}
-          agent="Atlas" observation={`Each flow recipient is worth ${lift}× more than a campaign recipient.`}
-          implication="The action: get more profiles INTO flows (sign-up forms, browse, cart, post-purchase) before sending another broadcast." />
-        <KPI label="Avg open rate (camp.)" val={PCT(summary.campaigns.avgOpenRate)} sub={`Click ${PCT(summary.campaigns.avgClickRate)} — flows avg ${PCT(summary.flows.avgOpenRate)} open`}
-          agent="Lux" observation="58% campaign open rate is excellent — list hygiene + brand affinity are strong. Click-through is the weak link."
-          implication="Subject lines work; CTAs and content layout don't. A/B test single-CTA emails next." />
-      </div>
-    </div>
-    <div className="row">
-      <div className="card" style={{flex:'2 1 480px'}}>
-        <h2>Top flows by revenue per recipient</h2>
-        <div className="muted" style={{marginBottom:8,fontSize:12}}>The signal: which automated touchpoints justify investment in deeper personalisation.</div>
-        <table><thead><tr><th>Flow</th><th>Recip</th><th>Open</th><th>Click</th><th>Orders</th><th>Revenue</th><th>£/recip</th></tr></thead><tbody>
-        {flowSorted.map((f,i)=>(<tr key={i}>
-          <td style={{fontSize:12}}>{f.name}</td>
-          <td>{NUM(f.recipients)}</td>
-          <td>{PCT(f.openRate)}</td>
-          <td>{PCT(f.clickRate)}</td>
-          <td>{f.orders}</td>
-          <td>{GBP(f.orderValue)}</td>
-          <td><b style={{color:f.revPerRecip>3?'#4ade80':f.revPerRecip>1?'#fbbf24':'#7b7b87'}}>£{(f.revPerRecip||0).toFixed(2)}</b></td>
-        </tr>))}
-        </tbody></table>
-      </div>
-      <div className="card" style={{flex:'1 1 280px'}}>
-        <h2>Quick wins</h2>
-        <div style={{display:'flex',flexDirection:'column',gap:10,fontSize:12.5}}>
-          <div style={{padding:10,background:'var(--bg-app)',borderLeft:'3px solid #4ade80',borderRadius:'0 6px 6px 0'}}>
-            <div style={{fontWeight:600,marginBottom:3}}>Back-in-Stock at £8.16/recipient</div>
-            <div className="muted">Best-performing flow. Audit which products trigger it — expand to more SKUs.</div>
-          </div>
-          <div style={{padding:10,background:'var(--bg-app)',borderLeft:'3px solid #4ade80',borderRadius:'0 6px 6px 0'}}>
-            <div style={{fontWeight:600,marginBottom:3}}>NECKLACES Welcome at £6.65/recipient</div>
-            <div className="muted">Per-category welcome flows crushing — replicate for new categories.</div>
-          </div>
-          <div style={{padding:10,background:'var(--bg-app)',borderLeft:'3px solid #fbbf24',borderRadius:'0 6px 6px 0'}}>
-            <div style={{fontWeight:600,marginBottom:3}}>Happy Birthday flow = 0 revenue</div>
-            <div className="muted">Open rate 41% but zero orders. Subject works, CTA doesn't. Test a stronger offer.</div>
-          </div>
-          <div style={{padding:10,background:'var(--bg-app)',borderLeft:'3px solid #f87171',borderRadius:'0 6px 6px 0'}}>
-            <div style={{fontWeight:600,marginBottom:3}}>43 campaigns in 90d = 1 every 2 days</div>
-            <div className="muted">High frequency. List fatigue likely — consider cutting low performers.</div>
+        <div className="card" style={{flex:'2 1 480px'}}>
+          <h2>Top flows by revenue per recipient</h2>
+          <div className="muted" style={{marginBottom:8,fontSize:12}}>The signal: which automated touchpoints justify investment in deeper personalisation.</div>
+          <table><thead><tr><th>Flow</th><th>Recip</th><th>Open</th><th>Click</th><th>Orders</th><th>Revenue</th><th>{curSym()}/recip</th></tr></thead><tbody>
+          {flowSorted.map((f,i)=>(<tr key={i}>
+            <td style={{fontSize:12}}>{f.name}</td>
+            <td>{NUM(f.recipients)}</td>
+            <td>{PCT(f.openRate)}</td>
+            <td>{PCT(f.clickRate)}</td>
+            <td>{f.orders}</td>
+            <td>{GBP(f.orderValue)}</td>
+            <td><b style={{color:f.revPerRecip>3?'#4ade80':f.revPerRecip>1?'#fbbf24':'#7b7b87'}}>{curSym()}{(f.revPerRecip||0).toFixed(2)}</b></td>
+          </tr>))}
+          </tbody></table>
+        </div>
+        <div className="card" style={{flex:'1 1 280px'}}>
+          <h2>Quick wins</h2>
+          <div style={{display:'flex',flexDirection:'column',gap:10,fontSize:12.5}}>
+            <div style={{padding:10,background:'var(--bg-app)',borderLeft:'3px solid #4ade80',borderRadius:'0 6px 6px 0'}}>
+              <div style={{fontWeight:600,marginBottom:3}}>Back-in-Stock at {curSym()}8.16/recipient</div>
+              <div className="muted">Best-performing flow. Audit which products trigger it — expand to more SKUs.</div>
+            </div>
+            <div style={{padding:10,background:'var(--bg-app)',borderLeft:'3px solid #4ade80',borderRadius:'0 6px 6px 0'}}>
+              <div style={{fontWeight:600,marginBottom:3}}>NECKLACES Welcome at {curSym()}6.65/recipient</div>
+              <div className="muted">Per-category welcome flows crushing — replicate for new categories.</div>
+            </div>
+            <div style={{padding:10,background:'var(--bg-app)',borderLeft:'3px solid #fbbf24',borderRadius:'0 6px 6px 0'}}>
+              <div style={{fontWeight:600,marginBottom:3}}>Happy Birthday flow = 0 revenue</div>
+              <div className="muted">Open rate 41% but zero orders. Subject works, CTA doesn't. Test a stronger offer.</div>
+            </div>
+            <div style={{padding:10,background:'var(--bg-app)',borderLeft:'3px solid #f87171',borderRadius:'0 6px 6px 0'}}>
+              <div style={{fontWeight:600,marginBottom:3}}>43 campaigns in 90d = 1 every 2 days</div>
+              <div className="muted">High frequency. List fatigue likely — consider cutting low performers.</div>
+            </div>
           </div>
         </div>
       </div>
+      <div className="card" style={{marginTop:14}}>
+        <h2>Campaign sends by week</h2>
+        <R.ResponsiveContainer width="100%" height={220}>
+          <R.ComposedChart data={sendChart} margin={{top:6,right:12,left:14,bottom:18}}>
+            <R.CartesianGrid stroke="#222229" vertical={false} />
+            <R.XAxis dataKey="date" tick={{fill:'#6f6f7b',fontSize:10}} interval={Math.ceil(sendChart.length/12)} label={{value:'Date', position:'insideBottom', offset:-6, fill:'#6f6f7b', fontSize:10}} />
+            <R.YAxis yAxisId="l" tick={{fill:'#6f6f7b',fontSize:10}} label={{value:'Sends', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:10}} />
+            <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#6f6f7b',fontSize:10}} tickFormatter={v=>curSym()+(v/1000).toFixed(1)+'k'} label={{value:`Revenue (${curSym()})`, angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:10}} />
+            <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} />
+            <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:11, paddingBottom:8}}/>
+            <R.Bar yAxisId="l" dataKey="sends" name="Campaign sends" fill={COL.email} />
+            <R.Line yAxisId="r" type="monotone" dataKey="revenue" name="Revenue" stroke={COL.revenue} strokeWidth={2} dot={false} />
+          </R.ComposedChart>
+        </R.ResponsiveContainer>
+        <ChartFooter note="Are we over-emailing? Watch revenue-per-send falling as send volume climbs."
+          ask="Looking at email send volume vs revenue, are we over-emailing the list and is revenue-per-send holding up?"
+          rows={sendChart} columns={[{key:'date',label:'Date'},{key:'sends',label:'Sends',right:true,fmt:v=>NUM(v)},{key:'revenue',label:'Revenue',right:true,fmt:v=>GBP(v)}]}/>
+      </div>
+      <div className="card" style={{marginTop:14}}>
+        <h2>All campaigns — sorted by recent</h2>
+        <table><thead><tr><th>Date</th><th>Name</th><th>Subject</th><th>Recip</th><th>Open</th><th>Click</th><th>Orders</th><th>Revenue</th><th>{curSym()}/recip</th></tr></thead><tbody>
+        {campByDate.slice(0,30).map((c,i)=>(<tr key={i}>
+          <td style={{whiteSpace:'nowrap'}}>{c.sendDate}</td>
+          <td style={{fontSize:11}}>{c.name}</td>
+          <td className="muted" style={{fontSize:11,maxWidth:240}}>{c.subject}</td>
+          <td>{NUM(c.recipients)}</td>
+          <td>{PCT(c.openRate)}</td>
+          <td>{PCT(c.clickRate)}</td>
+          <td>{c.orders}</td>
+          <td>{GBP(c.orderValue)}</td>
+          <td><span style={{color:c.revPerRecip>0.2?'#4ade80':c.revPerRecip>0.05?'#e8e8ec':'#7b7b87'}}>{curSym()}{(c.revPerRecip||0).toFixed(2)}</span></td>
+        </tr>))}
+        </tbody></table>
+        <div className="muted" style={{fontSize:11,marginTop:8}}>Showing 30 most recent of {camps.length} campaigns.</div>
+      </div>
+      {DEMO && <div className="note" style={{marginTop:14}}><b>Lux's read:</b> the 19× revenue lift of flows over campaigns is the single biggest leverage finding in this dashboard. Every pound spent making flows smarter (segmentation, dynamic content, more triggers) returns multiples of any pound spent on the next broadcast. Three immediate moves: (1) audit Back-in-Stock — expand triggers to more SKUs; (2) replicate the NECKLACES per-category welcome flow for charms/bracelets/pre-styled (already exists for those — confirm performance match); (3) fix the Happy Birthday flow — open rate proves attention, offer must be stronger to convert.</div>}
     </div>
-    <div className="card" style={{marginTop:14}}>
-      <h2>Campaign sends by week</h2>
-      <R.ResponsiveContainer width="100%" height={220}>
-        <R.ComposedChart data={sendChart} margin={{top:6,right:12,left:14,bottom:18}}>
-          <R.CartesianGrid stroke="#222229" vertical={false} />
-          <R.XAxis dataKey="date" tick={{fill:'#6f6f7b',fontSize:10}} interval={Math.ceil(sendChart.length/12)} label={{value:'Date', position:'insideBottom', offset:-6, fill:'#6f6f7b', fontSize:10}} />
-          <R.YAxis yAxisId="l" tick={{fill:'#6f6f7b',fontSize:10}} label={{value:'Sends', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:10}} />
-          <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#6f6f7b',fontSize:10}} tickFormatter={v=>'£'+(v/1000).toFixed(1)+'k'} label={{value:'Revenue (£)', angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:10}} />
-          <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} />
-          <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:11, paddingBottom:8}}/>
-          <R.Bar yAxisId="l" dataKey="sends" name="Campaign sends" fill={COL.email} />
-          <R.Line yAxisId="r" type="monotone" dataKey="revenue" name="Revenue" stroke={COL.revenue} strokeWidth={2} dot={false} />
-        </R.ComposedChart>
-      </R.ResponsiveContainer>
-      <ChartFooter note="Are we over-emailing? Watch revenue-per-send falling as send volume climbs."
-        ask="Looking at email send volume vs revenue, are we over-emailing the list and is revenue-per-send holding up?"
-        rows={sendChart} columns={[{key:'date',label:'Date'},{key:'sends',label:'Sends',right:true,fmt:v=>NUM(v)},{key:'revenue',label:'Revenue',right:true,fmt:v=>GBP(v)}]}/>
-    </div>
-    <div className="card" style={{marginTop:14}}>
-      <h2>All campaigns — sorted by recent</h2>
-      <table><thead><tr><th>Date</th><th>Name</th><th>Subject</th><th>Recip</th><th>Open</th><th>Click</th><th>Orders</th><th>Revenue</th><th>£/recip</th></tr></thead><tbody>
-      {campByDate.slice(0,30).map((c,i)=>(<tr key={i}>
-        <td style={{whiteSpace:'nowrap'}}>{c.sendDate}</td>
-        <td style={{fontSize:11}}>{c.name}</td>
-        <td className="muted" style={{fontSize:11,maxWidth:240}}>{c.subject}</td>
-        <td>{NUM(c.recipients)}</td>
-        <td>{PCT(c.openRate)}</td>
-        <td>{PCT(c.clickRate)}</td>
-        <td>{c.orders}</td>
-        <td>{GBP(c.orderValue)}</td>
-        <td><span style={{color:c.revPerRecip>0.2?'#4ade80':c.revPerRecip>0.05?'#e8e8ec':'#7b7b87'}}>£{(c.revPerRecip||0).toFixed(2)}</span></td>
-      </tr>))}
-      </tbody></table>
-      <div className="muted" style={{fontSize:11,marginTop:8}}>Showing 30 most recent of {camps.length} campaigns.</div>
-    </div>
-    {DEMO && <div className="note" style={{marginTop:14}}><b>Lux's read:</b> the 19× revenue lift of flows over campaigns is the single biggest leverage finding in this dashboard. Every pound spent making flows smarter (segmentation, dynamic content, more triggers) returns multiples of any pound spent on the next broadcast. Three immediate moves: (1) audit Back-in-Stock — expand triggers to more SKUs; (2) replicate the NECKLACES per-category welcome flow for charms/bracelets/pre-styled (already exists for those — confirm performance match); (3) fix the Happy Birthday flow — open rate proves attention, offer must be stronger to convert.</div>}
-  </div>);
+  );
 }
 
 function ContentCalendar(){
@@ -6492,81 +6543,83 @@ function InstagramPanel(){
   const igNewSeries   = daily.map(d=>({d:(d.date||'').slice(5), v:d.newFollowers||0}));
   const igReachSeries = daily.map(d=>({d:(d.date||'').slice(5), v:Math.round(d.reach||0)}));
   const igFollowerSeries = (function(){ const out=[]; let run=snap.followers||0; for(let i=daily.length-1;i>=0;i--){ out.unshift({d:(daily[i].date||'').slice(5), v:Math.round(run)}); run -= (daily[i].newFollowers||0); } return out; })();
-  return (<div style={{marginTop:14}}>
-    <div className="card" style={{marginBottom:14}}>
-      <h2>Instagram organic — {OI_BRAND.name||'frkl'}</h2>
-      <div className="muted" style={{marginBottom:10}}>Live from Instagram Insights via Supermetrics. Profile snapshot + last-30-days growth + top-20 posts (last 90 days).</div>
+  return (
+    <div style={{marginTop:14}}>
+      <div className="card" style={{marginBottom:14}}>
+        <h2>Instagram organic — {OI_BRAND.name||'frkl'}</h2>
+        <div className="muted" style={{marginBottom:10}}>Live from Instagram Insights via Supermetrics. Profile snapshot + last-30-days growth + top-20 posts (last 90 days).</div>
+        <div className="row">
+          <KPI label="Followers" val={NUM(snap.followers)} sub={`${NUM(snap.mediaCount)} posts · following ${NUM(snap.follows)}`} series={igFollowerSeries} seriesLabel="Total followers · by day"
+            agent="Lux" observation="37.8k followers, 974 posts — a substantial owned audience that converts at the highest ROAS when reached."
+            implication="Treat this list with the same intent as your email list — content cadence, IG-native creator collabs." />
+          <KPI label="New followers (30d)" val={'+'+NUM(totalNew)} sub={`~${Math.round(totalNew/30)} /day avg`} series={igNewSeries} seriesLabel="New followers · by day"
+            agent="Sage" observation="+613 in 30d with a May 17 outlier (+86) — proves content can break out when the topic lands."
+            implication="Study what drove May 17. If repeatable, it's a recurring lever for organic acquisition." />
+          <KPI label="Avg daily reach" val={NUM(avgReach)} sub={`Profile views ${NUM(avgViews)}/day`} series={igReachSeries} seriesLabel="Daily reach · by day"
+            agent="Frame" observation={`~9.5k people reached organically every day — roughly what ${curSym()}100/day of paid would buy you.`}
+            implication="Organic IG is paid-equivalent reach for free. Brief 2 content pillars per week, not occasional one-offs." />
+          <KPI label="Top post (90d)" val={NUM(topPosts[0]?.views)} sub={`${topPosts[0]?.likes} likes — ${(topPosts[0]?.caption||'').slice(0,32)}…`}
+            agent="Frame" observation="The ADHD reel (79k views) is the breakout outlier — non-jewellery, relatable hook, broad appeal."
+            implication="Test more lifestyle/relatable content alongside product posts. Not every Reel needs to sell directly." />
+        </div>
+      </div>
       <div className="row">
-        <KPI label="Followers" val={NUM(snap.followers)} sub={`${NUM(snap.mediaCount)} posts · following ${NUM(snap.follows)}`} series={igFollowerSeries} seriesLabel="Total followers · by day"
-          agent="Lux" observation="37.8k followers, 974 posts — a substantial owned audience that converts at the highest ROAS when reached."
-          implication="Treat this list with the same intent as your email list — content cadence, IG-native creator collabs." />
-        <KPI label="New followers (30d)" val={'+'+NUM(totalNew)} sub={`~${Math.round(totalNew/30)} /day avg`} series={igNewSeries} seriesLabel="New followers · by day"
-          agent="Sage" observation="+613 in 30d with a May 17 outlier (+86) — proves content can break out when the topic lands."
-          implication="Study what drove May 17. If repeatable, it's a recurring lever for organic acquisition." />
-        <KPI label="Avg daily reach" val={NUM(avgReach)} sub={`Profile views ${NUM(avgViews)}/day`} series={igReachSeries} seriesLabel="Daily reach · by day"
-          agent="Frame" observation="~9.5k people reached organically every day — roughly what £100/day of paid would buy you."
-          implication="Organic IG is paid-equivalent reach for free. Brief 2 content pillars per week, not occasional one-offs." />
-        <KPI label="Top post (90d)" val={NUM(topPosts[0]?.views)} sub={`${topPosts[0]?.likes} likes — ${(topPosts[0]?.caption||'').slice(0,32)}…`}
-          agent="Frame" observation="The ADHD reel (79k views) is the breakout outlier — non-jewellery, relatable hook, broad appeal."
-          implication="Test more lifestyle/relatable content alongside product posts. Not every Reel needs to sell directly." />
+        <div className="card" style={{flex:'2 1 420px'}}>
+          <h2>Daily growth — new followers + reach</h2>
+          <R.ResponsiveContainer width="100%" height={240}>
+            <R.ComposedChart data={dailyChart} margin={{top:6,right:10,left:14,bottom:18}}>
+              <R.CartesianGrid stroke="#222229" vertical={false} />
+              <R.XAxis dataKey="date" tick={{fill:'#6f6f7b',fontSize:10}} interval={Math.ceil(dailyChart.length/8)} label={{value:'Date', position:'insideBottom', offset:-6, fill:'#6f6f7b', fontSize:10}} />
+              <R.YAxis yAxisId="l" tick={{fill:'#6f6f7b',fontSize:10}} label={{value:'New followers', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:10}} />
+              <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#6f6f7b',fontSize:10}} tickFormatter={v=>(v/1000).toFixed(0)+'k'} label={{value:'Reach', angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:10}} />
+              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} />
+              <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:11, paddingBottom:8}}/>
+              <R.Bar yAxisId="l" dataKey="new" name="New followers" fill={COL.email} />
+              <R.Line yAxisId="r" type="monotone" dataKey="reach" name="Reach" stroke={COL.sessions} strokeWidth={2} dot={false} />
+            </R.ComposedChart>
+          </R.ResponsiveContainer>
+        </div>
+        <div className="card" style={{flex:'1 1 320px'}}>
+          <h2>Follower audience (age × gender)</h2>
+          <div className="muted" style={{marginBottom:8,fontSize:12}}>{PCT(totalFemale/totalAudience)} female · {NUM(totalAudience)} followers with reported demographics</div>
+          <table><thead><tr><th>Age</th><th>Female</th><th>Other</th><th>% of total</th></tr></thead><tbody>
+          {ageRows.map((r,i)=>(<tr key={i}>
+            <td>{r.age}</td>
+            <td>{NUM(r.female)}</td>
+            <td>{NUM(r.male+r.undef)}</td>
+            <td><span style={{display:'inline-block',width:80,background:'#23232b',borderRadius:4,height:8,position:'relative',marginRight:8,verticalAlign:'middle'}}><span style={{display:'block',width:(100*r.total/totalAudience)+'%',height:8,background:COL.email,borderRadius:4}}/></span>{PCT(r.total/totalAudience)}</td>
+          </tr>))}
+          </tbody></table>
+        </div>
       </div>
-    </div>
-    <div className="row">
-      <div className="card" style={{flex:'2 1 420px'}}>
-        <h2>Daily growth — new followers + reach</h2>
-        <R.ResponsiveContainer width="100%" height={240}>
-          <R.ComposedChart data={dailyChart} margin={{top:6,right:10,left:14,bottom:18}}>
-            <R.CartesianGrid stroke="#222229" vertical={false} />
-            <R.XAxis dataKey="date" tick={{fill:'#6f6f7b',fontSize:10}} interval={Math.ceil(dailyChart.length/8)} label={{value:'Date', position:'insideBottom', offset:-6, fill:'#6f6f7b', fontSize:10}} />
-            <R.YAxis yAxisId="l" tick={{fill:'#6f6f7b',fontSize:10}} label={{value:'New followers', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:10}} />
-            <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#6f6f7b',fontSize:10}} tickFormatter={v=>(v/1000).toFixed(0)+'k'} label={{value:'Reach', angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:10}} />
-            <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} />
-            <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:11, paddingBottom:8}}/>
-            <R.Bar yAxisId="l" dataKey="new" name="New followers" fill={COL.email} />
-            <R.Line yAxisId="r" type="monotone" dataKey="reach" name="Reach" stroke={COL.sessions} strokeWidth={2} dot={false} />
-          </R.ComposedChart>
-        </R.ResponsiveContainer>
-      </div>
-      <div className="card" style={{flex:'1 1 320px'}}>
-        <h2>Follower audience (age × gender)</h2>
-        <div className="muted" style={{marginBottom:8,fontSize:12}}>{PCT(totalFemale/totalAudience)} female · {NUM(totalAudience)} followers with reported demographics</div>
-        <table><thead><tr><th>Age</th><th>Female</th><th>Other</th><th>% of total</th></tr></thead><tbody>
-        {ageRows.map((r,i)=>(<tr key={i}>
-          <td>{r.age}</td>
-          <td>{NUM(r.female)}</td>
-          <td>{NUM(r.male+r.undef)}</td>
-          <td><span style={{display:'inline-block',width:80,background:'#23232b',borderRadius:4,height:8,position:'relative',marginRight:8,verticalAlign:'middle'}}><span style={{display:'block',width:(100*r.total/totalAudience)+'%',height:8,background:COL.email,borderRadius:4}}/></span>{PCT(r.total/totalAudience)}</td>
-        </tr>))}
-        </tbody></table>
-      </div>
-    </div>
-    <div className="card" style={{marginTop:14}}>
-      <h2>Top posts — last 90 days</h2>
-      <div className="muted" style={{marginBottom:10}}>Sorted by likes. Click any title to open the original post. Thumbnails are Instagram CDN URLs — they may expire after ~24h; regenerate the data file for fresh images.</div>
-      <div className="grid cg">
-      {topPosts.slice(0,20).map((p,i)=>{
-        const eng=(p.likes||0)+(p.comments||0)+(p.saves||0)+(p.shares||0);
-        return (<div className="creative" key={i}>
-          {p.thumb?(<img className="thumb" src={p.thumb} alt={p.caption?.slice(0,30)} referrerPolicy="no-referrer" onError={e=>{e.target.style.opacity=.2;}} />):(<div className="thumb" style={{display:'flex',alignItems:'center',justifyContent:'center',color:'#5a5a64',fontSize:11,letterSpacing:1}}>{p.type==='CAROUSEL_ALBUM'?'CAROUSEL':p.type}</div>)}
-          <div className="body">
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'start',gap:8}}>
-              <a href={p.permalink} target="_blank" rel="noreferrer" className="name" style={{fontSize:12,fontWeight:600,color:'var(--text-primary)'}}>{p.date} · {p.product||p.type}</a>
-              <span className="pill grey" style={{fontSize:10}}>#{i+1}</span>
+      <div className="card" style={{marginTop:14}}>
+        <h2>Top posts — last 90 days</h2>
+        <div className="muted" style={{marginBottom:10}}>Sorted by likes. Click any title to open the original post. Thumbnails are Instagram CDN URLs — they may expire after ~24h; regenerate the data file for fresh images.</div>
+        <div className="grid cg">
+        {topPosts.slice(0,20).map((p,i)=>{
+          const eng=(p.likes||0)+(p.comments||0)+(p.saves||0)+(p.shares||0);
+          return (<div className="creative" key={i}>
+            {p.thumb?(<img className="thumb" src={p.thumb} alt={p.caption?.slice(0,30)} referrerPolicy="no-referrer" onError={e=>{e.target.style.opacity=.2;}} />):(<div className="thumb" style={{display:'flex',alignItems:'center',justifyContent:'center',color:'#5a5a64',fontSize:11,letterSpacing:1}}>{p.type==='CAROUSEL_ALBUM'?'CAROUSEL':p.type}</div>)}
+            <div className="body">
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'start',gap:8}}>
+                <a href={p.permalink} target="_blank" rel="noreferrer" className="name" style={{fontSize:12,fontWeight:600,color:'var(--text-primary)'}}>{p.date} · {p.product||p.type}</a>
+                <span className="pill grey" style={{fontSize:10}}>#{i+1}</span>
+              </div>
+              <div className="copy">{p.caption}</div>
+              <div style={{marginTop:'auto',display:'flex',flexDirection:'column',gap:3}}>
+                <div className="mrow"><span className="k">Views / reach</span><span className="v">{NUM(p.views)} / {NUM(p.reach)}</span></div>
+                <div className="mrow"><span className="k">Likes / comments</span><span className="v">{p.likes} · {p.comments}</span></div>
+                <div className="mrow"><span className="k">Saves / shares</span><span className="v">{p.saves} · {p.shares}</span></div>
+                <div className="mrow"><span className="k">Eng. rate (reach)</span><span className="v">{PCT((p.reach>0)?eng/p.reach:0)}</span></div>
+              </div>
             </div>
-            <div className="copy">{p.caption}</div>
-            <div style={{marginTop:'auto',display:'flex',flexDirection:'column',gap:3}}>
-              <div className="mrow"><span className="k">Views / reach</span><span className="v">{NUM(p.views)} / {NUM(p.reach)}</span></div>
-              <div className="mrow"><span className="k">Likes / comments</span><span className="v">{p.likes} · {p.comments}</span></div>
-              <div className="mrow"><span className="k">Saves / shares</span><span className="v">{p.saves} · {p.shares}</span></div>
-              <div className="mrow"><span className="k">Eng. rate (reach)</span><span className="v">{PCT((p.reach>0)?eng/p.reach:0)}</span></div>
-            </div>
-          </div>
-        </div>);
-      })}
+          </div>);
+        })}
+        </div>
       </div>
+      {DEMO && <div className="note" style={{marginTop:14}}><b>Audience confirmation:</b>the IG follower base independently confirms the Meta Ads finding — frkl is genuinely a <b>35–54 female brand</b>(35–44 ≈ 44%, 45–54 ≈ 31%), with 25–34 a meaningful secondary (~15%). 18–24 is essentially absent (1.4%). The <b>ADHD reel</b>(79k views) is the breakout outlier — non-jewellery content with high relatable hook; worth studying. The <b>#myfrkl UGC mechanic</b>({curSym()}250 monthly) is generating reliable engagement on community posts.</div>}
     </div>
-    {DEMO && <div className="note" style={{marginTop:14}}><b>Audience confirmation:</b> the IG follower base independently confirms the Meta Ads finding — frkl is genuinely a <b>35–54 female brand</b> (35–44 ≈ 44%, 45–54 ≈ 31%), with 25–34 a meaningful secondary (~15%). 18–24 is essentially absent (1.4%). The <b>ADHD reel</b> (79k views) is the breakout outlier — non-jewellery content with high relatable hook; worth studying. The <b>#myfrkl UGC mechanic</b> (£250 monthly) is generating reliable engagement on community posts.</div>}
-  </div>);
+  );
 }
 
 function Competitors(){
@@ -6574,8 +6627,8 @@ function Competitors(){
   return (<div>
     <div className="card" style={{marginBottom:14}}>
       <h2>Competitor matrix — Scout snapshot</h2>
-      <div className="muted" style={{marginBottom:10}}>Category positioning for the demi-fine / customisable jewellery space. Refresh via Chrome (Meta Ads Library + competitor stores) when warranted — the dashboard's a flag-board, not a live scraper.</div>
-      <table><thead><tr><th>Brand</th><th className="tl">Position</th><th>AOV</th><th>Meta intensity</th><th>Threat</th><th className="tl">vs frkl</th></tr></thead><tbody>
+      <div className="muted" style={{marginBottom:10}}>Category positioning for the {DEMO ? 'demi-fine / customisable jewellery' : (OI_BRAND.vertical || 'category')} space. Refresh via Chrome (Meta Ads Library + competitor stores) when warranted — the dashboard's a flag-board, not a live scraper.</div>
+      <table><thead><tr><th>Brand</th><th className="tl">Position</th><th>AOV</th><th>Meta intensity</th><th>Threat</th><th className="tl">vs {OI_BRAND.name}</th></tr></thead><tbody>
       {comps.map((c,i)=>(<tr key={i}>
         <td><b>{c.name}</b><br/><span className="muted" style={{fontSize:11}}>{c.url}</span></td>
         <td className="tl" style={{maxWidth:200}}>{c.position}</td>
@@ -6683,7 +6736,7 @@ function IntelligencePanel(){
   // Use design-token-aligned palette: trends are accent, status patterns are semantic
   const KIND_COLOR = {trend:'#7c8cff', change_point:'#f5b544', anomaly:'#ef6b6f', association:'#7c8cff', co_movement:'#7e7e8a', divergence:'#f5b544', money:'#4ade80', diagnosis:'#7c8cff'};
   const VERDICT_COLOR = {favourable:'#4ade80', unfavourable:'#ef6b6f', neutral:'#7e7e8a', hit:'#4ade80', miss:'#ef6b6f', inconclusive:'#7e7e8a'};
-  const KIND_LABEL = {trend:'Trend', change_point:'Step change', anomaly:'Anomaly', association:'Action attribution', co_movement:'Co-mover', divergence:'Divergence', money:'£ finding', diagnosis:'Diagnosis'};
+  const KIND_LABEL = {trend:'Trend', change_point:'Step change', anomaly:'Anomaly', association:'Action attribution', co_movement:'Co-mover', divergence:'Divergence', money:`${curSym()} finding`, diagnosis:'Diagnosis'};
 
   const filtered = topLevelPatterns.filter(p => {
     if (kindFilter !== 'all' && p.kind !== kindFilter) return false;
@@ -6770,203 +6823,202 @@ function IntelligencePanel(){
               .sort((a,b) => (a.premiseStale?1:0) - (b.premiseStale?1:0) || (b.phit || 0) - (a.phit || 0));
   })();
 
-  return (<div style={{display:'flex', flexDirection:'column', gap:'var(--s-7)'}}>
-
-    {/* Track record — closes the loop on acted-on advice */}
-    <AdviceLedgerPanel/>
-
-    {/* ZONE 1 — WHAT CHANGED */}
-    <section>
-      <ZoneHeader
-        number="01"
-        title="What changed"
-        meta={P.diff?.previous_run_at ? `vs run at ${new Date(P.diff.previous_run_at).toLocaleString()}` : 'No prior run to diff against'}
-      />
-      {P.diff && P.diff.previous_run_at ? (<>
-        <div className="stat-strip" style={{marginBottom:'var(--s-4)'}}>
-          <div className="stat-strip-item">
-            <div className="stat-strip-val" style={{color:'var(--bad)'}}>{P.diff.new.length}</div>
-            <div className="stat-strip-label">New</div>
+  return (
+    <div style={{display:'flex', flexDirection:'column', gap:'var(--s-7)'}}>
+      {/* Track record — closes the loop on acted-on advice */}
+      <AdviceLedgerPanel/>
+      {/* ZONE 1 — WHAT CHANGED */}
+      <section>
+        <ZoneHeader
+          number="01"
+          title="What changed"
+          meta={P.diff?.previous_run_at ? `vs run at ${new Date(P.diff.previous_run_at).toLocaleString()}` : 'No prior run to diff against'}
+        />
+        {P.diff && P.diff.previous_run_at ? (<>
+          <div className="stat-strip" style={{marginBottom:'var(--s-4)'}}>
+            <div className="stat-strip-item">
+              <div className="stat-strip-val" style={{color:'var(--bad)'}}>{P.diff.new.length}</div>
+              <div className="stat-strip-label">New</div>
+            </div>
+            <div className="stat-strip-divider"/>
+            <div className="stat-strip-item">
+              <div className="stat-strip-val" style={{color:'var(--warn)'}}>{P.diff.stronger.length}</div>
+              <div className="stat-strip-label">Stronger</div>
+            </div>
+            <div className="stat-strip-divider"/>
+            <div className="stat-strip-item">
+              <div className="stat-strip-val" style={{color:'var(--good)'}}>{P.diff.resolved.length}</div>
+              <div className="stat-strip-label">Resolved</div>
+            </div>
+            <div className="stat-strip-divider"/>
+            <div className="stat-strip-item">
+              <div className="stat-strip-val" style={{color:'var(--text-muted)'}}>{P.diff.weaker.length}</div>
+              <div className="stat-strip-label">Weaker</div>
+            </div>
+            <div style={{flex:1}}/>
+            <div className="meta" style={{fontSize:11}}>{P.diff.previous_run_size} → {topLevelPatterns.length} patterns active</div>
           </div>
-          <div className="stat-strip-divider"/>
-          <div className="stat-strip-item">
-            <div className="stat-strip-val" style={{color:'var(--warn)'}}>{P.diff.stronger.length}</div>
-            <div className="stat-strip-label">Stronger</div>
-          </div>
-          <div className="stat-strip-divider"/>
-          <div className="stat-strip-item">
-            <div className="stat-strip-val" style={{color:'var(--good)'}}>{P.diff.resolved.length}</div>
-            <div className="stat-strip-label">Resolved</div>
-          </div>
-          <div className="stat-strip-divider"/>
-          <div className="stat-strip-item">
-            <div className="stat-strip-val" style={{color:'var(--text-muted)'}}>{P.diff.weaker.length}</div>
-            <div className="stat-strip-label">Weaker</div>
-          </div>
-          <div style={{flex:1}}/>
-          <div className="meta" style={{fontSize:11}}>{P.diff.previous_run_size} → {topLevelPatterns.length} patterns active</div>
-        </div>
-        {[['new','New findings','var(--bad)'],['stronger','Strengthened','var(--warn)'],['resolved','Resolved','var(--good)'],['weaker','Weakened','var(--text-muted)']].map(([key, label, color]) => {
-          const list = P.diff[key] || [];
-          if (!list.length) return null;
-          return (<div key={key} style={{marginBottom:'var(--s-3)'}}>
-            <div className="micro" style={{color, marginBottom:'var(--s-2)'}}>{label} ({list.length})</div>
-            <Collapsible
-              items={list}
-              initialCount={4}
-              moreLabel={label.toLowerCase()}
-              renderItem={(p, i) => (<div key={i} style={{
-                padding:'8px 12px', background:'var(--bg-elevated)',
-                borderLeft:`2px solid ${color}`, borderRadius:'0 var(--r-sm) var(--r-sm) 0',
-                fontSize:12, color:'var(--text-secondary)', lineHeight:1.5,
-              }}>
-                {p.description}
-                {p._effect_delta_pct != null && <span style={{color, fontWeight:600, marginLeft:8}}>({p._effect_delta_pct>0?'+':''}{p._effect_delta_pct}%)</span>}
-              </div>)}
-            />
-          </div>);
-        })}
-      </>) : (<div className="card"><div className="muted">First engine run — pattern diff will appear next week.</div></div>)}
-    </section>
-
-    {/* ZONE 2 — WHY (the diagnostic layer) */}
-    <section>
-      <ZoneHeader
-        number="02"
-        title="Why it's happening"
-        meta={`${topLevelPatterns.length} patterns · ${diagnosisCount} auto-diagnoses`}
-      />
-      <div className="toolbar">
-        <label>Kind</label>
-        <select value={kindFilter} onChange={e=>setKindFilter(e.target.value)}>
-          <option value="all">All</option>
-          {Object.keys(kindCounts).map(k => <option key={k} value={k}>{KIND_LABEL[k] || k}</option>)}
-        </select>
-        <div className="divider"/>
-        <label>Verdict</label>
-        <select value={verdictFilter} onChange={e=>setVerdictFilter(e.target.value)}>
-          <option value="all">All</option>
-          <option value="unfavourable">Unfavourable</option>
-          <option value="favourable">Favourable</option>
-          <option value="neutral">Neutral</option>
-        </select>
-        <div className="divider"/>
-        <label>Sort</label>
-        <select value={sortBy} onChange={e=>setSortBy(e.target.value)}>
-          <option value="effect">Effect size</option>
-          <option value="confidence">Confidence</option>
-          <option value="recent">Most recent</option>
-        </select>
-        <span className="toolbar-count">{filtered.length} of {topLevelPatterns.length}</span>
-      </div>
-      <Collapsible
-        items={filtered}
-        initialCount={8}
-        moreLabel="patterns"
-        renderItem={renderPattern}
-      />
-    </section>
-
-    {/* ZONE 3 — WHAT TO DO (money + actions) */}
-    <section>
-      <ZoneHeader
-        number="03"
-        title="What to do"
-        meta={`${phitRows.length} open actions · £${((P.money_rollup?.total || 0)/1000).toFixed(1)}k/mo at stake`}
-      />
-      <MoneyOnTablePanel/>
-      {phitRows.length > 0 && (<div style={{marginTop:'var(--s-4)'}}>
-        <div className="card-section-title">
-          <h2 style={{margin:0}}>Open actions, ranked by P(hit)</h2>
-          <span className="meta">Bayesian estimate per agent + category, with sample size badges</span>
+          {[['new','New findings','var(--bad)'],['stronger','Strengthened','var(--warn)'],['resolved','Resolved','var(--good)'],['weaker','Weakened','var(--text-muted)']].map(([key, label, color]) => {
+            const list = P.diff[key] || [];
+            if (!list.length) return null;
+            return (<div key={key} style={{marginBottom:'var(--s-3)'}}>
+              <div className="micro" style={{color, marginBottom:'var(--s-2)'}}>{label} ({list.length})</div>
+              <Collapsible
+                items={list}
+                initialCount={4}
+                moreLabel={label.toLowerCase()}
+                renderItem={(p, i) => (<div key={i} style={{
+                  padding:'8px 12px', background:'var(--bg-elevated)',
+                  borderLeft:`2px solid ${color}`, borderRadius:'0 var(--r-sm) var(--r-sm) 0',
+                  fontSize:12, color:'var(--text-secondary)', lineHeight:1.5,
+                }}>
+                  {p.description}
+                  {p._effect_delta_pct != null && <span style={{color, fontWeight:600, marginLeft:8}}>({p._effect_delta_pct>0?'+':''}{p._effect_delta_pct}%)</span>}
+                </div>)}
+              />
+            </div>);
+          })}
+        </>) : (<div className="card"><div className="muted">First engine run — pattern diff will appear next week.</div></div>)}
+      </section>
+      {/* ZONE 2 — WHY (the diagnostic layer) */}
+      <section>
+        <ZoneHeader
+          number="02"
+          title="Why it's happening"
+          meta={`${topLevelPatterns.length} patterns · ${diagnosisCount} auto-diagnoses`}
+        />
+        <div className="toolbar">
+          <label>Kind</label>
+          <select value={kindFilter} onChange={e=>setKindFilter(e.target.value)}>
+            <option value="all">All</option>
+            {Object.keys(kindCounts).map(k => <option key={k} value={k}>{KIND_LABEL[k] || k}</option>)}
+          </select>
+          <div className="divider"/>
+          <label>Verdict</label>
+          <select value={verdictFilter} onChange={e=>setVerdictFilter(e.target.value)}>
+            <option value="all">All</option>
+            <option value="unfavourable">Unfavourable</option>
+            <option value="favourable">Favourable</option>
+            <option value="neutral">Neutral</option>
+          </select>
+          <div className="divider"/>
+          <label>Sort</label>
+          <select value={sortBy} onChange={e=>setSortBy(e.target.value)}>
+            <option value="effect">Effect size</option>
+            <option value="confidence">Confidence</option>
+            <option value="recent">Most recent</option>
+          </select>
+          <span className="toolbar-count">{filtered.length} of {topLevelPatterns.length}</span>
         </div>
         <Collapsible
-          items={phitRows}
-          initialCount={6}
-          moreLabel="open actions"
-          renderItem={(a, i) => { const kc = a.kind==='opportunity'?'var(--good)':a.kind==='at_risk'?'var(--warn)':'var(--bad)'; return (<div key={i} style={{
-            display:'flex', alignItems:'flex-start', gap:'var(--s-3)',
-            padding:'var(--s-3) var(--s-4)', background:'var(--bg-elevated)',
-            border:'1px solid var(--border-subtle)', borderRadius:'var(--r-md)',
-          }}>
-            <div style={{flexShrink:0, marginTop:2}}><PHitBadge phit={a}/></div>
-            <span className={'pill '+(a.p === 'P1' ? 'red' : a.p === 'P2' ? 'amber' : 'grey')} style={{fontSize:10, flexShrink:0, marginTop:2}}>{a.p}</span>
-            <div style={{flex:1, minWidth:0}}>
-              <div style={{display:'flex', alignItems:'baseline', gap:8, flexWrap:'wrap'}}>
-                <span style={{fontSize:12.5, color: a.premiseStale?'var(--text-muted)':'var(--text-primary)', lineHeight:1.4, textDecoration:a.premiseStale?'line-through':'none'}}>{a.text || a.id}</span>
-                {a.premiseStale && <span className="pill grey" title={a.reconcileNote||''} style={{fontSize:9.5}}>⚠ premise out of date</span>}
-              </div>
-              <div style={{display:'flex', flexWrap:'wrap', gap:12, marginTop:5, fontSize:10.5, color:'var(--text-faint)', alignItems:'baseline'}}>
-                <span title="Owner">{a.owner || '—'}</span>
-                {a.gbp ? <span style={{color:kc, fontWeight:600}} title="Expected monthly impact">~£{Math.round(Math.abs(a.gbp)).toLocaleString()}/mo</span> : null}
-                {a.successMetric && <span title="Success metric">✓ {a.successMetric}</span>}
-                {a.byWhen && <span title="Review by">⏱ {a.byWhen}</span>}
-                <span title="P(hit) confidence · sample size">{a.confidence} (n={a.sample_size})</span>
-              </div>
-            </div>
-          </div>); }}
+          items={filtered}
+          initialCount={8}
+          moreLabel="patterns"
+          renderItem={renderPattern}
         />
-      </div>)}
-    </section>
-
-    {/* Advanced detail — collapsible by default, for reference */}
-    <section>
-      <button className="show-more" onClick={()=>setShowAdvanced(!showAdvanced)}>
-        {showAdvanced ? '↑ Hide advanced' : '↓ Advanced: synergy matrix · agent scorecard · attribution ledger'}
-      </button>
-      {showAdvanced && (<div style={{display:'flex', flexDirection:'column', gap:'var(--s-4)', marginTop:'var(--s-4)'}}>
-        <SynergyMatrix/>
-        {(P.scorecard || []).length > 0 && (<div className="card">
+      </section>
+      {/* ZONE 3 — WHAT TO DO (money + actions) */}
+      <section>
+        <ZoneHeader
+          number="03"
+          title="What to do"
+          meta={`${phitRows.length} open actions · ${curSym()}${((P.money_rollup?.total || 0)/1000).toFixed(1)}k/mo at stake`}
+        />
+        <MoneyOnTablePanel/>
+        {phitRows.length > 0 && (<div style={{marginTop:'var(--s-4)'}}>
           <div className="card-section-title">
-            <h2 style={{margin:0}}>Agent scorecard</h2>
-            <span className="meta">3-7 closed = medium confidence · 8+ = high</span>
+            <h2 style={{margin:0}}>Open actions, ranked by P(hit)</h2>
+            <span className="meta">Bayesian estimate per agent + category, with sample size badges</span>
           </div>
-          <table><thead><tr><th>Agent</th><th>Category</th><th>Closed</th><th>Hits</th><th>Misses</th><th>Inconc.</th><th>Hit rate</th><th>Avg lift</th><th>Confidence</th></tr></thead><tbody>
-          {P.scorecard.map((s, i) => {
-            const conf = s.total_closed >= 8 ? 'high' : s.total_closed >= 3 ? 'medium' : 'low';
-            const confColor = conf === 'high' ? 'var(--good)' : conf === 'medium' ? 'var(--warn)' : 'var(--text-muted)';
-            const isRollup = s.category === 'ALL';
-            return (<tr key={i} style={{background: isRollup ? 'rgba(255,255,255,0.02)' : undefined, fontWeight: isRollup ? 600 : 400}}>
-              <td><b>{s.agent}</b>{agentRole(s.agent) && <div className="meta" style={{fontSize:10}}>{agentRole(s.agent)}</div>}</td>
-              <td>{isRollup ? <span style={{color:'var(--text-muted)'}}>— all —</span> : s.category}</td>
-              <td>{s.total_closed}</td>
-              <td style={{color:'var(--good)'}}>{s.hits}</td>
-              <td style={{color:'var(--bad)'}}>{s.misses}</td>
-              <td className="muted">{s.inconclusive}</td>
-              <td>{s.hit_rate != null ? <b>{(s.hit_rate * 100).toFixed(0)}%</b> : '—'}</td>
-              <td>{s.avg_attributed_lift != null ? s.avg_attributed_lift.toFixed(3) : '—'}</td>
-              <td><span style={{fontSize:10, padding:'2px 6px', borderRadius:4, color:confColor, fontWeight:600, textTransform:'uppercase'}}>{conf} (n={s.total_closed})</span></td>
-            </tr>);
-          })}
-          </tbody></table>
+          <Collapsible
+            items={phitRows}
+            initialCount={6}
+            moreLabel="open actions"
+            renderItem={(a, i) => { const kc = a.kind==='opportunity'?'var(--good)':a.kind==='at_risk'?'var(--warn)':'var(--bad)'; return (
+              <div key={i} style={{
+                display:'flex', alignItems:'flex-start', gap:'var(--s-3)',
+                padding:'var(--s-3) var(--s-4)', background:'var(--bg-elevated)',
+                border:'1px solid var(--border-subtle)', borderRadius:'var(--r-md)',
+              }}>
+                <div style={{flexShrink:0, marginTop:2}}><PHitBadge phit={a}/></div>
+                <span className={'pill '+(a.p === 'P1' ? 'red' : a.p === 'P2' ? 'amber' : 'grey')} style={{fontSize:10, flexShrink:0, marginTop:2}}>{a.p}</span>
+                <div style={{flex:1, minWidth:0}}>
+                  <div style={{display:'flex', alignItems:'baseline', gap:8, flexWrap:'wrap'}}>
+                    <span style={{fontSize:12.5, color: a.premiseStale?'var(--text-muted)':'var(--text-primary)', lineHeight:1.4, textDecoration:a.premiseStale?'line-through':'none'}}>{a.text || a.id}</span>
+                    {a.premiseStale && <span className="pill grey" title={a.reconcileNote||''} style={{fontSize:9.5}}>⚠ premise out of date</span>}
+                  </div>
+                  <div style={{display:'flex', flexWrap:'wrap', gap:12, marginTop:5, fontSize:10.5, color:'var(--text-faint)', alignItems:'baseline'}}>
+                    <span title="Owner">{a.owner || '—'}</span>
+                    {a.gbp ? <span style={{color:kc, fontWeight:600}} title="Expected monthly impact">~{curSym()}{Math.round(Math.abs(a.gbp)).toLocaleString()}/mo</span> : null}
+                    {a.successMetric && <span title="Success metric">✓ {a.successMetric}</span>}
+                    {a.byWhen && <span title="Review by">⏱ {a.byWhen}</span>}
+                    <span title="P(hit) confidence · sample size">{a.confidence} (n={a.sample_size})</span>
+                  </div>
+                </div>
+              </div>
+            ); }}
+          />
         </div>)}
-        {attribActions.length > 0 && (<div className="card">
-          <div className="card-section-title">
-            <h2 style={{margin:0}}>Attribution ledger</h2>
-            <span className="meta">{hits} hits · {misses} misses · {openCount} open</span>
-          </div>
-          <table><thead><tr><th>Agent</th><th className="tl">Action</th><th>Status</th><th>Baseline → Observed</th><th>Counterfactual Δ</th><th>Attributed lift</th><th>Verdict</th></tr></thead><tbody>
-          {attribActions.map((a, i) => {
-            const m = metrics[a.predicted_metric_id] || {};
-            const fmt = (v) => v == null ? '—' : (m.unit==='pct' ? (v*100).toFixed(1)+'%' : m.unit==='gbp' ? '£'+Math.round(v).toLocaleString() : m.unit==='ratio' ? v.toFixed(2)+'×' : v.toFixed(3));
-            const lift = a.attributed_lift;
-            const goodLift = m.direction==='higher_better' ? lift>0 : m.direction==='lower_better' ? lift<0 : null;
-            const liftColor = goodLift==null ? 'var(--text-muted)' : goodLift ? 'var(--good)' : 'var(--bad)';
-            return (<tr key={i}>
-              <td title={agentTitle(a.agent)}><b>{a.agent}</b><br/><span className="meta" style={{fontSize:10}}>{agentRole(a.agent)||a.category} · {a.priority}</span></td>
-              <td style={{fontSize:12, maxWidth:280}}>{a.description}</td>
-              <td><span className="pill grey" style={{fontSize:10}}>{a.status}</span></td>
-              <td>{fmt(a.baseline_value)} → {fmt(a.observed_value)}</td>
-              <td>{fmt(a.counterfactual_delta)}</td>
-              <td><b style={{color:liftColor}}>{fmt(lift)}</b>{a.significance_z!=null && <span className="meta" style={{fontSize:10, marginLeft:4}}>z={a.significance_z.toFixed(2)}</span>}</td>
-              <td>{a.verdict ? <span className="pill" style={{background:VERDICT_COLOR[a.verdict]+'22', color:VERDICT_COLOR[a.verdict], fontSize:10}}>{a.verdict}</span> : <span className="meta">open</span>}</td>
-            </tr>);
-          })}
-          </tbody></table>
+      </section>
+      {/* Advanced detail — collapsible by default, for reference */}
+      <section>
+        <button className="show-more" onClick={()=>setShowAdvanced(!showAdvanced)}>
+          {showAdvanced ? '↑ Hide advanced' : '↓ Advanced: synergy matrix · agent scorecard · attribution ledger'}
+        </button>
+        {showAdvanced && (<div style={{display:'flex', flexDirection:'column', gap:'var(--s-4)', marginTop:'var(--s-4)'}}>
+          <SynergyMatrix/>
+          {(P.scorecard || []).length > 0 && (<div className="card">
+            <div className="card-section-title">
+              <h2 style={{margin:0}}>Agent scorecard</h2>
+              <span className="meta">3-7 closed = medium confidence · 8+ = high</span>
+            </div>
+            <table><thead><tr><th>Agent</th><th>Category</th><th>Closed</th><th>Hits</th><th>Misses</th><th>Inconc.</th><th>Hit rate</th><th>Avg lift</th><th>Confidence</th></tr></thead><tbody>
+            {P.scorecard.map((s, i) => {
+              const conf = s.total_closed >= 8 ? 'high' : s.total_closed >= 3 ? 'medium' : 'low';
+              const confColor = conf === 'high' ? 'var(--good)' : conf === 'medium' ? 'var(--warn)' : 'var(--text-muted)';
+              const isRollup = s.category === 'ALL';
+              return (<tr key={i} style={{background: isRollup ? 'rgba(255,255,255,0.02)' : undefined, fontWeight: isRollup ? 600 : 400}}>
+                <td><b>{s.agent}</b>{agentRole(s.agent) && <div className="meta" style={{fontSize:10}}>{agentRole(s.agent)}</div>}</td>
+                <td>{isRollup ? <span style={{color:'var(--text-muted)'}}>— all —</span> : s.category}</td>
+                <td>{s.total_closed}</td>
+                <td style={{color:'var(--good)'}}>{s.hits}</td>
+                <td style={{color:'var(--bad)'}}>{s.misses}</td>
+                <td className="muted">{s.inconclusive}</td>
+                <td>{s.hit_rate != null ? <b>{(s.hit_rate * 100).toFixed(0)}%</b> : '—'}</td>
+                <td>{s.avg_attributed_lift != null ? s.avg_attributed_lift.toFixed(3) : '—'}</td>
+                <td><span style={{fontSize:10, padding:'2px 6px', borderRadius:4, color:confColor, fontWeight:600, textTransform:'uppercase'}}>{conf} (n={s.total_closed})</span></td>
+              </tr>);
+            })}
+            </tbody></table>
+          </div>)}
+          {attribActions.length > 0 && (<div className="card">
+            <div className="card-section-title">
+              <h2 style={{margin:0}}>Attribution ledger</h2>
+              <span className="meta">{hits} hits · {misses} misses · {openCount} open</span>
+            </div>
+            <table><thead><tr><th>Agent</th><th className="tl">Action</th><th>Status</th><th>Baseline → Observed</th><th>Counterfactual Δ</th><th>Attributed lift</th><th>Verdict</th></tr></thead><tbody>
+            {attribActions.map((a, i) => {
+              const m = metrics[a.predicted_metric_id] || {};
+              const fmt = (v) => v == null ? '—' : (m.unit==='pct' ? (v*100).toFixed(1)+'%' : m.unit==='gbp' ? curSym()+Math.round(v).toLocaleString() : m.unit==='ratio' ? v.toFixed(2)+'×' : v.toFixed(3));
+              const lift = a.attributed_lift;
+              const goodLift = m.direction==='higher_better' ? lift>0 : m.direction==='lower_better' ? lift<0 : null;
+              const liftColor = goodLift==null ? 'var(--text-muted)' : goodLift ? 'var(--good)' : 'var(--bad)';
+              return (<tr key={i}>
+                <td title={agentTitle(a.agent)}><b>{a.agent}</b><br/><span className="meta" style={{fontSize:10}}>{agentRole(a.agent)||a.category} · {a.priority}</span></td>
+                <td style={{fontSize:12, maxWidth:280}}>{a.description}</td>
+                <td><span className="pill grey" style={{fontSize:10}}>{a.status}</span></td>
+                <td>{fmt(a.baseline_value)} → {fmt(a.observed_value)}</td>
+                <td>{fmt(a.counterfactual_delta)}</td>
+                <td><b style={{color:liftColor}}>{fmt(lift)}</b>{a.significance_z!=null && <span className="meta" style={{fontSize:10, marginLeft:4}}>z={a.significance_z.toFixed(2)}</span>}</td>
+                <td>{a.verdict ? <span className="pill" style={{background:VERDICT_COLOR[a.verdict]+'22', color:VERDICT_COLOR[a.verdict], fontSize:10}}>{a.verdict}</span> : <span className="meta">open</span>}</td>
+              </tr>);
+            })}
+            </tbody></table>
+          </div>)}
         </div>)}
-      </div>)}
-    </section>
-  </div>);
+      </section>
+    </div>
+  );
 }
 
 function ForecastPanel(){
@@ -7051,113 +7103,110 @@ function ForecastPanel(){
     setGoogleRoas(historicalGoogleRoas ? (historicalGoogleRoas * mult).toFixed(2) : '');
   };
 
-  return (<div style={{display:'flex', flexDirection:'column', gap:'var(--s-5)'}}>
-    {/* Header — quieter, explains the principle once */}
-    <div>
-      <div className="card-section-title">
-        <h2 style={{margin:0}}>Forecast</h2>
-        <span className="meta">Operator-input-driven · no baseline extrapolation</span>
+  return (
+    <div style={{display:'flex', flexDirection:'column', gap:'var(--s-5)'}}>
+      {/* Header — quieter, explains the principle once */}
+      <div>
+        <div className="card-section-title">
+          <h2 style={{margin:0}}>Forecast</h2>
+          <span className="meta">Operator-input-driven · no baseline extrapolation</span>
+        </div>
+        <div className="meta" style={{lineHeight:1.6}}>
+          Most analytics tools extrapolate forward from the last 30 days as if the next 30 will look the same. They won't. Enter your planning assumptions below, or pick a scenario to pre-fill the form.
+        </div>
       </div>
-      <div className="meta" style={{lineHeight:1.6}}>
-        Most analytics tools extrapolate forward from the last 30 days as if the next 30 will look the same. They won't. Enter your planning assumptions below, or pick a scenario to pre-fill the form.
+      {/* Guided empty state — only when nothing submitted yet */}
+      {!submitted && (<div className="forecast-empty">
+        <div className="forecast-empty-icon">∅</div>
+        <div className="forecast-empty-title">Pick a scenario to start</div>
+        <div className="forecast-empty-body">
+          Each scenario pre-fills the form with your historical baseline × a multiplier. You can then tune any value before computing. This is the platform's "what-if" mode — it never assumes the future will look like the past without you saying so.
+        </div>
+        <div className="forecast-empty-cta">
+          <button className="btn-ghost" onClick={()=>applyScenario('worst')}>Worst case (×0.8)</button>
+          <button className="btn-primary" onClick={()=>applyScenario('central')}>Current rate (×1.0)</button>
+          <button className="btn-ghost" onClick={()=>applyScenario('best')}>Best case (×1.2)</button>
+        </div>
+        <div className="meta" style={{marginTop:'var(--s-5)', fontSize:11}}>
+          Historical reference (last 30 days):
+          Meta <b style={{color:'var(--text-secondary)'}}>{curSym()}{historicalMetaSpend30d ?? '—'}/day</b> @ <b style={{color:'var(--text-secondary)'}}>{historicalMetaRoas != null ? historicalMetaRoas.toFixed(2) + '×' : '—'}</b> ·
+          Google <b style={{color:'var(--text-secondary)'}}>{curSym()}{historicalGoogleSpend30d ?? '—'}/day</b> @ <b style={{color:'var(--text-secondary)'}}>{historicalGoogleRoas != null ? historicalGoogleRoas.toFixed(2) + '×' : '—'}</b>
+        </div>
+      </div>)}
+      {/* Input form */}
+      <div className="card">
+        <div className="card-section-title">
+          <h2 style={{margin:0}}>Planning inputs</h2>
+          <span className="meta">Reference: Meta {curSym()}{historicalMetaSpend30d ?? '—'}/d @ {historicalMetaRoas != null ? historicalMetaRoas.toFixed(2) + '×' : '—'}· Google {curSym()}{historicalGoogleSpend30d ?? '—'}/d @ {historicalGoogleRoas != null ? historicalGoogleRoas.toFixed(2) + '×' : '—'}
+          </span>
+        </div>
+        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:'var(--s-3)'}}>
+          <FInput label="Horizon (days)" type="select" value={horizon} setValue={v=>setHorizon(parseInt(v))} options={[7,14,30,60,90]} optionLabels={d=>`${d} days`}/>
+          <FInput label={`Meta spend/day (${curSym()})`} required value={metaSpend} setValue={setMetaSpend} placeholder="e.g. 120"/>
+          <FInput label="Meta target ROAS"   required value={metaRoas} setValue={setMetaRoas} placeholder="e.g. 2.5" step="0.1"/>
+          <FInput label={`Google spend/day (${curSym()})`} required value={googleSpend} setValue={setGoogleSpend} placeholder="e.g. 50"/>
+          <FInput label="Google target ROAS"   required value={googleRoas} setValue={setGoogleRoas} placeholder="e.g. 3.0" step="0.1"/>
+          <FInput label={`Daily email revenue (${curSym()})`} optional value={emailUplift} setValue={setEmailUplift} placeholder="e.g. 250"/>
+          <FInput label="Seasonal events in window" type="text" value={eventDays} setValue={setEventDays} placeholder="e.g. Father's Day, BFCM"/>
+          <FInput label="Organic assumption" type="select" value={organicAssumption} setValue={setOrganicAssumption}
+            options={['flat','grow','decline','exclude']}
+            optionLabels={v => ({flat:'Flat vs last 30d', grow:'+10% (organic acceleration)', decline:'-10% (organic decline)', exclude:'Exclude entirely'}[v])}/>
+        </div>
+        <div style={{marginTop:'var(--s-4)', display:'flex', alignItems:'center', gap:'var(--s-3)'}}>
+          <button className="btn-primary" onClick={()=>setSubmitted(true)}>Compute forecast</button>
+          <span className="meta" style={{fontSize:11}}>Required fields are marked. Empty required = no forecast.</span>
+        </div>
       </div>
-    </div>
-
-    {/* Guided empty state — only when nothing submitted yet */}
-    {!submitted && (<div className="forecast-empty">
-      <div className="forecast-empty-icon">∅</div>
-      <div className="forecast-empty-title">Pick a scenario to start</div>
-      <div className="forecast-empty-body">
-        Each scenario pre-fills the form with your historical baseline × a multiplier. You can then tune any value before computing. This is the platform's "what-if" mode — it never assumes the future will look like the past without you saying so.
-      </div>
-      <div className="forecast-empty-cta">
-        <button className="btn-ghost" onClick={()=>applyScenario('worst')}>Worst case (×0.8)</button>
-        <button className="btn-primary" onClick={()=>applyScenario('central')}>Current rate (×1.0)</button>
-        <button className="btn-ghost" onClick={()=>applyScenario('best')}>Best case (×1.2)</button>
-      </div>
-      <div className="meta" style={{marginTop:'var(--s-5)', fontSize:11}}>
-        Historical reference (last 30 days):
-        Meta <b style={{color:'var(--text-secondary)'}}>£{historicalMetaSpend30d ?? '—'}/day</b> @ <b style={{color:'var(--text-secondary)'}}>{historicalMetaRoas != null ? historicalMetaRoas.toFixed(2) + '×' : '—'}</b> ·
-        Google <b style={{color:'var(--text-secondary)'}}>£{historicalGoogleSpend30d ?? '—'}/day</b> @ <b style={{color:'var(--text-secondary)'}}>{historicalGoogleRoas != null ? historicalGoogleRoas.toFixed(2) + '×' : '—'}</b>
-      </div>
-    </div>)}
-
-    {/* Input form */}
-    <div className="card">
-      <div className="card-section-title">
-        <h2 style={{margin:0}}>Planning inputs</h2>
-        <span className="meta">
-          Reference: Meta £{historicalMetaSpend30d ?? '—'}/d @ {historicalMetaRoas != null ? historicalMetaRoas.toFixed(2) + '×' : '—'} · Google £{historicalGoogleSpend30d ?? '—'}/d @ {historicalGoogleRoas != null ? historicalGoogleRoas.toFixed(2) + '×' : '—'}
-        </span>
-      </div>
-      <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:'var(--s-3)'}}>
-        <FInput label="Horizon (days)" type="select" value={horizon} setValue={v=>setHorizon(parseInt(v))} options={[7,14,30,60,90]} optionLabels={d=>`${d} days`}/>
-        <FInput label="Meta spend/day (£)" required value={metaSpend} setValue={setMetaSpend} placeholder="e.g. 120"/>
-        <FInput label="Meta target ROAS"   required value={metaRoas} setValue={setMetaRoas} placeholder="e.g. 2.5" step="0.1"/>
-        <FInput label="Google spend/day (£)" required value={googleSpend} setValue={setGoogleSpend} placeholder="e.g. 50"/>
-        <FInput label="Google target ROAS"   required value={googleRoas} setValue={setGoogleRoas} placeholder="e.g. 3.0" step="0.1"/>
-        <FInput label="Daily email revenue (£)" optional value={emailUplift} setValue={setEmailUplift} placeholder="e.g. 250"/>
-        <FInput label="Seasonal events in window" type="text" value={eventDays} setValue={setEventDays} placeholder="e.g. Father's Day, BFCM"/>
-        <FInput label="Organic assumption" type="select" value={organicAssumption} setValue={setOrganicAssumption}
-          options={['flat','grow','decline','exclude']}
-          optionLabels={v => ({flat:'Flat vs last 30d', grow:'+10% (organic acceleration)', decline:'-10% (organic decline)', exclude:'Exclude entirely'}[v])}/>
-      </div>
-      <div style={{marginTop:'var(--s-4)', display:'flex', alignItems:'center', gap:'var(--s-3)'}}>
-        <button className="btn-primary" onClick={()=>setSubmitted(true)}>Compute forecast</button>
-        <span className="meta" style={{fontSize:11}}>Required fields are marked. Empty required = no forecast.</span>
-      </div>
-    </div>
-
-    {/* Refusal panel */}
-    {submitted && !allRequiredFilled && (<div className="card alert-bad">
-      <div className="card-section-title">
-        <h2 style={{margin:0, color:'var(--bad)'}}>Refusing to forecast — required inputs missing</h2>
-      </div>
-      <div style={{fontSize:13, lineHeight:1.6, color:'var(--text-secondary)'}}>
-        At least one of Meta spend, Meta ROAS, Google spend, or Google ROAS is empty or non-numeric. Extrapolating the missing channel would just re-project the last 30 days, which:
-        <ul style={{marginTop:'var(--s-2)', paddingLeft:'var(--s-5)'}}>
-          <li>contains discount-rate contamination (Draft Orders channel)</li>
-          <li>contains creative fatigue not yet corrected</li>
-          <li>doesn't reflect your stated plans for next month</li>
-        </ul>
-      </div>
-    </div>)}
-
-    {/* Forecast results */}
-    {submitted && calc && (<div className="card alert-good">
-      <div className="card-section-title">
-        <h2 style={{margin:0}}>Forecast — next {horizon} days</h2>
-        <span className="meta">spend × ROAS × horizon · no baseline extrapolation</span>
-      </div>
-      <table>
-        <thead><tr><th>Channel</th><th className="tl">Inputs</th><th>Forecast revenue</th></tr></thead>
-        <tbody>
-          <tr><td><b>Meta</b></td><td className="meta tl" style={{fontSize:11}}>£{inputs.metaSpend}/day × {inputs.metaRoas}× × {horizon}d</td><td><b>£{Math.round(calc.metaRevenue).toLocaleString()}</b></td></tr>
-          <tr><td><b>Google</b></td><td className="meta tl" style={{fontSize:11}}>£{inputs.googleSpend}/day × {inputs.googleRoas}× × {horizon}d</td><td><b>£{Math.round(calc.googleRevenue).toLocaleString()}</b></td></tr>
-          {calc.emailRevenue > 0 && <tr><td><b>Email</b></td><td className="meta tl" style={{fontSize:11}}>£{inputs.emailUplift}/day × {horizon}d (no extrapolation)</td><td><b>£{Math.round(calc.emailRevenue).toLocaleString()}</b></td></tr>}
-          <tr style={{background:'var(--bg-card-hover)', fontWeight:600}}><td>Total (paid + supplied email)</td><td></td><td><b style={{color:'var(--good)'}}>£{Math.round(calc.total).toLocaleString()}</b></td></tr>
-        </tbody>
-      </table>
-      <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'var(--s-3)', marginTop:'var(--s-4)'}}>
-        <div style={{padding:'var(--s-3)', background:'var(--bg-elevated)', borderLeft:'2px solid var(--warn)', borderRadius:'0 var(--r-sm) var(--r-sm) 0'}}>
-          <div className="micro" style={{color:'var(--warn)', marginBottom:'var(--s-2)'}}>NOT included</div>
-          <ul style={{fontSize:12, color:'var(--text-secondary)', lineHeight:1.6, paddingLeft:'var(--s-4)', margin:0}}>
-            <li>Organic / direct traffic (you marked "{organicAssumption}")</li>
-            <li>Affiliate revenue (held separately)</li>
-            <li>Wholesale orders (DTC scope by design)</li>
-            <li>BFCM amplification (state in input ROAS)</li>
-            <li>Creative-fatigue degradation mid-period</li>
+      {/* Refusal panel */}
+      {submitted && !allRequiredFilled && (<div className="card alert-bad">
+        <div className="card-section-title">
+          <h2 style={{margin:0, color:'var(--bad)'}}>Refusing to forecast — required inputs missing</h2>
+        </div>
+        <div style={{fontSize:13, lineHeight:1.6, color:'var(--text-secondary)'}}>
+          At least one of Meta spend, Meta ROAS, Google spend, or Google ROAS is empty or non-numeric. Extrapolating the missing channel would just re-project the last 30 days, which:
+          <ul style={{marginTop:'var(--s-2)', paddingLeft:'var(--s-5)'}}>
+            <li>contains discount-rate contamination (Draft Orders channel)</li>
+            <li>contains creative fatigue not yet corrected</li>
+            <li>doesn't reflect your stated plans for next month</li>
           </ul>
         </div>
-        <div style={{padding:'var(--s-3)', background:'var(--bg-elevated)', borderLeft:'2px solid var(--accent)', borderRadius:'0 var(--r-sm) var(--r-sm) 0'}}>
-          <div className="micro" style={{color:'var(--accent)', marginBottom:'var(--s-2)'}}>Stress-test this</div>
-          <div style={{fontSize:12, color:'var(--text-secondary)', lineHeight:1.6}}>
-            Re-run with ROAS at your <b>worst</b> 30-day rate, then your <b>best</b>. The gap between those two forecasts is the planning range — not the central case. Use the scenario buttons at the top to swap quickly.
+      </div>)}
+      {/* Forecast results */}
+      {submitted && calc && (<div className="card alert-good">
+        <div className="card-section-title">
+          <h2 style={{margin:0}}>Forecast — next {horizon} days</h2>
+          <span className="meta">spend × ROAS × horizon · no baseline extrapolation</span>
+        </div>
+        <table>
+          <thead><tr><th>Channel</th><th className="tl">Inputs</th><th>Forecast revenue</th></tr></thead>
+          <tbody>
+            <tr><td><b>Meta</b></td><td className="meta tl" style={{fontSize:11}}>{curSym()}{inputs.metaSpend}/day × {inputs.metaRoas}× × {horizon}d</td><td><b>{curSym()}{Math.round(calc.metaRevenue).toLocaleString()}</b></td></tr>
+            <tr><td><b>Google</b></td><td className="meta tl" style={{fontSize:11}}>{curSym()}{inputs.googleSpend}/day × {inputs.googleRoas}× × {horizon}d</td><td><b>{curSym()}{Math.round(calc.googleRevenue).toLocaleString()}</b></td></tr>
+            {calc.emailRevenue > 0 && <tr><td><b>Email</b></td><td className="meta tl" style={{fontSize:11}}>{curSym()}{inputs.emailUplift}/day × {horizon}d (no extrapolation)</td><td><b>{curSym()}{Math.round(calc.emailRevenue).toLocaleString()}</b></td></tr>}
+            <tr style={{background:'var(--bg-card-hover)', fontWeight:600}}><td>Total (paid + supplied email)</td><td></td><td><b style={{color:'var(--good)'}}>{curSym()}{Math.round(calc.total).toLocaleString()}</b></td></tr>
+          </tbody>
+        </table>
+        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'var(--s-3)', marginTop:'var(--s-4)'}}>
+          <div style={{padding:'var(--s-3)', background:'var(--bg-elevated)', borderLeft:'2px solid var(--warn)', borderRadius:'0 var(--r-sm) var(--r-sm) 0'}}>
+            <div className="micro" style={{color:'var(--warn)', marginBottom:'var(--s-2)'}}>NOT included</div>
+            <ul style={{fontSize:12, color:'var(--text-secondary)', lineHeight:1.6, paddingLeft:'var(--s-4)', margin:0}}>
+              <li>Organic / direct traffic (you marked "{organicAssumption}")</li>
+              <li>Affiliate revenue (held separately)</li>
+              <li>Wholesale orders (DTC scope by design)</li>
+              <li>BFCM amplification (state in input ROAS)</li>
+              <li>Creative-fatigue degradation mid-period</li>
+            </ul>
+          </div>
+          <div style={{padding:'var(--s-3)', background:'var(--bg-elevated)', borderLeft:'2px solid var(--accent)', borderRadius:'0 var(--r-sm) var(--r-sm) 0'}}>
+            <div className="micro" style={{color:'var(--accent)', marginBottom:'var(--s-2)'}}>Stress-test this</div>
+            <div style={{fontSize:12, color:'var(--text-secondary)', lineHeight:1.6}}>
+              Re-run with ROAS at your <b>worst</b> 30-day rate, then your <b>best</b>. The gap between those two forecasts is the planning range — not the central case. Use the scenario buttons at the top to swap quickly.
+            </div>
           </div>
         </div>
-      </div>
-    </div>)}
-  </div>);
+      </div>)}
+    </div>
+  );
 }
 
 // Small input wrapper used by ForecastPanel — keeps the form code dense without losing semantics
@@ -7358,15 +7407,17 @@ function buildAskContext(){
         emailFlows: 'Klaviyo flow messages 90d (automated triggers): same shape minus sendDate',
         emailSummary: 'Pre-aggregated flows-vs-campaigns totals (GROSS Klaviyo-tracked — see emailAttribution for TRUE attributed values)',
         emailAttribution: 'TRUE email-attributed orders/revenue using Klaviyo Attributed report types. attributedFlowRevenue_90d + attributedCampaignRevenue_30d are the correct figures for "email channel revenue contribution". Gross values overstate by including non-attributable overlap with other channels.',
-        attributedFlows: 'Per-flow attributed performance (90d): flow, orders, orderValue, days active, £/active day',
+        attributedFlows: `Per-flow attributed performance (90d): flow, orders, orderValue, days active, ${curSym()}/active day`,
         igSnapshot: 'IG profile: {followers, mediaCount}',
         igAudience: 'IG follower demographics: {age,gender,followers}',
         contentCadence: 'Per-week posting counts: {week,reels,feed,stories,totalReach,total}',
       },
       important_notes: [
-        'Meta claims ~10x more revenue than GA4 attributes; both are real, neither is the whole truth.',
-        'Frkl is an Irish/UK demi-fine jewellery brand; 97% of paid spend reaches female users.',
-        'Email flows generate 19x more revenue per recipient than campaigns.',
+        ...(DEMO ? [
+          'Meta claims ~10x more revenue than GA4 attributes; both are real, neither is the whole truth.',
+          'Frkl is an Irish/UK demi-fine jewellery brand; 97% of paid spend reaches female users.',
+          'Email flows generate 19x more revenue per recipient than campaigns.',
+        ] : []),
         'Today (latest date) may be a partial day — caveat any "today" answers (see dataQuality).',
       ],
       dataQuality,
@@ -7427,7 +7478,7 @@ function AskPanel(){
     const q = question.trim();
     const ctx = buildAskContext();
     const ctxJson = JSON.stringify(ctx);
-    const systemPrompt = `You are a senior D2C commercial analyst, growth strategist and operator for ${OI_BRAND.name}, a ${OI_BRAND.markets} DTC ${OI_BRAND.vertical} brand. Seasonality to keep in mind: ${OI_BRAND.seasonality}. You are given the brand's live marketing dataset (last ~90 days, captured ${ctx._meta.captured}). Answer using ONLY the data provided. Show the calculation when possible (e.g. "£X / £Y = Z%"). Quote specific numbers and dates. If the question cannot be answered from the data, say so clearly and state what data would be needed.
+    const systemPrompt = `You are a senior D2C commercial analyst, growth strategist and operator for ${OI_BRAND.name}, a ${OI_BRAND.markets} DTC ${OI_BRAND.vertical} brand. Seasonality to keep in mind: ${OI_BRAND.seasonality}. You are given the brand's live marketing dataset (last ~90 days, captured ${ctx._meta.captured}). Answer using ONLY the data provided. Show the calculation when possible (e.g. "${curSym()}X / ${curSym()}Y = Z%"). Quote specific numbers and dates. If the question cannot be answered from the data, say so clearly and state what data would be needed.
 
 CORE RULE: never diagnose a performance movement until you have checked for confounding factors. Do not just describe what changed — explain what most likely CAUSED it, the evidence, the caveats, and the next action. A naive read ("revenue up = healthy", "ROAS down = pause ads", "email up = send more", "AOV up = better") is a failure. Your job is to stop the founder making the wrong call because a metric moved without context.
 
@@ -7489,7 +7540,7 @@ ${ctxJson}`;
   // Action-oriented prompts first (what to do / not do / what changed), then the
   // analytical deep-dives. These are what a busy operator actually opens with.
   const quickPrompts = [
-    'What should I do today? Give me the top 3 actions, ranked by £ impact.',
+    `What should I do today? Give me the top 3 actions, ranked by ${curSym()} impact.`,
     'What should I NOT do this week, and why?',
     'What changed since last week, and does any of it actually matter?',
     'Which single action would most improve contribution margin?',
@@ -7559,12 +7610,13 @@ function BrandAgeBanner(){
   const sev = days < 14 ? 'critical' : days < 30 ? 'high' : 'medium';
   const colorVar = sev === 'critical' ? 'var(--bad)' : sev === 'high' ? 'var(--warn)' : 'var(--text-muted)';
   const bgVar = sev === 'critical' ? 'var(--bad-bg)' : sev === 'high' ? 'var(--warn-bg)' : 'var(--bg-card)';
-  return (<div className="status-banner" style={{background: bgVar, borderColor: colorVar + '40', marginBottom: 'var(--s-3)'}}>
-    <span className="status-banner-tag" style={{color: colorVar}}>⚠ Thin data · {days}d</span>
-    <span className="status-banner-body">
-      Fewer than 60 days of trading history. Trends, diffs and £ quantifications are <b>directional only</b>. Forecasts not meaningful at this scale.
-    </span>
-  </div>);
+  return (
+    <div className="status-banner" style={{background: bgVar, borderColor: colorVar + '40', marginBottom: 'var(--s-3)'}}>
+      <span className="status-banner-tag" style={{color: colorVar}}>⚠ Thin data · {days}d</span>
+      <span className="status-banner-body">Fewer than 60 days of trading history. Trends, diffs and {curSym()}quantifications are <b>directional only</b>. Forecasts not meaningful at this scale.
+            </span>
+    </div>
+  );
 }
 
 // Compact app-bar freshness chip — replaces the full-width banner on every screen.
@@ -7739,7 +7791,7 @@ function weekCommentary(W, prev){
 
   // Context: events, sales, data caveats
   loadBrandEvents().forEach(e=>{ if(e.startsOn>=W.weekStart && e.startsOn<=W.weekEnding){ const mt=EVENT_META[e.type]||EVENT_META.other; context.push({sev:2, text:`${mt.icon} ${e.title||mt.label} ran (${(e.startsOn||'').slice(5)}).`}); }});
-  ((window.FRKL_DISCOUNT_CODES && window.FRKL_DISCOUNT_CODES.codes)||[]).filter(c=>c && c.pattern!=='always-on' && (c.discount||0)>=120).forEach(c=>{ let pk=null;(c.series||[]).forEach(x=>{if(!pk||x.d>pk.d)pk=x;}); if(pk && pk.w>=W.weekStart && pk.w<=W.weekEnding) context.push({sev:1.8, text:`🏷️ ${c.code} sale ran — ${c.discountRate!=null?Math.round(c.discountRate*100)+'% off':'sale'}, £${Math.round(c.discount)} given.`}); });
+  ((window.FRKL_DISCOUNT_CODES && window.FRKL_DISCOUNT_CODES.codes)||[]).filter(c=>c && c.pattern!=='always-on' && (c.discount||0)>=120).forEach(c=>{ let pk=null;(c.series||[]).forEach(x=>{if(!pk||x.d>pk.d)pk=x;}); if(pk && pk.w>=W.weekStart && pk.w<=W.weekEnding) context.push({sev:1.8, text:`🏷️ ${c.code} sale ran — ${c.discountRate!=null?Math.round(c.discountRate*100)+'% off':'sale'}, ${curSym()}${Math.round(c.discount)} given.`}); });
   if(W.partial) context.push({sev:3, text:`Week still in progress — ${W.days}/7 days captured so far.`});
   else if(prev && prev.partial) context.push({sev:1, text:`Prior week was partial, so week-on-week comparisons are muted.`});
   if(!p && !W.partial) context.push({sev:1, text:`No comparable prior week — first full week in range.`});
@@ -7912,191 +7964,191 @@ function WeeklyBoard(){
   const doneThisWeek = actions.filter(a=>a.status==='done' && a.doneWeek===W.weekEnding);
   const visibleActions = actions.filter(a=>a.status!=='done' || a.doneWeek===W.weekEnding);
 
-  return (<div className="board">
-    {/* Header + week selector */}
-    <div className="card" style={{marginBottom:14, display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap'}}>
-      <div>
-        <div className="micro" style={{color:'var(--accent)', fontWeight:700, letterSpacing:'.06em', textTransform:'uppercase'}}>Weekly board · report card</div>
-        <h1 style={{margin:'4px 0 2px', fontSize:24}}>Week of {W.weekStart} <span style={{color:'var(--text-muted)', fontWeight:500, fontSize:16}}>→ {W.weekEnding}</span></h1>
-        <div className="micro" style={{color:'var(--text-faint)'}}>
-          {W.partial ? <span style={{color:'var(--warn)'}}>● In progress — {W.days}/7 days so far</span> : <span>Completed week · frozen from daily data</span>}
-          {' · for the Monday 3pm review'}
-        </div>
-      </div>
-      <div style={{display:'flex', alignItems:'center', gap:8}}>
-        <button onClick={()=>setIdx(i=>Math.max(0,i-1))} disabled={idx<=0} className="board-nav-btn">◀ Prev</button>
-        <select value={idx} onChange={e=>setIdx(+e.target.value)} style={{background:'var(--bg-card)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--r-sm)', padding:'7px 10px', fontSize:13}}>
-          {weeks.map((w,i)=>(<option key={w.weekStart} value={i}>{w.label}{w.partial?' (in progress)':''}</option>))}
-        </select>
-        <button onClick={()=>setIdx(i=>Math.min(weeks.length-1,i+1))} disabled={idx>=weeks.length-1} className="board-nav-btn">Next ▶</button>
-        <button onClick={()=>window.print()} className="board-nav-btn" title="Print / save this week as a PDF board pack">⎙ Print</button>
-      </div>
-    </div>
-
-    {/* LLM analyst read (last 7d) — shown on the latest week; rule-based read below is the deterministic baseline */}
-    {(function(){
-      var br = (typeof window!=='undefined' && window.FRKL_BOARD_READ) || null;
-      if(!br || !br.read || idx < weeks.length-2) return null;   // show on the two most recent weeks (covers default + in-progress)
-      var r = br.read;
-      return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid var(--accent)'}}>
-        <div className="card-section-title">
-          <h2 style={{margin:0}}>✦ Analyst read</h2>
-          <span className="meta">AI · last 7 days to {br.asOf} · {r.model||'llm'}</span>
-        </div>
-        <p style={{margin:'0 0 10px', fontSize:16, lineHeight:1.5, color:'var(--text-primary)', fontWeight:500}}>{r.headline}</p>
-        {r.narrative && <p style={{margin:'0 0 12px', fontSize:13.5, lineHeight:1.55, color:'var(--text-secondary)'}}>{r.narrative}</p>}
-        {(r.findings||[]).length>0 && <div style={{display:'flex', flexDirection:'column', gap:7}}>
-          {r.findings.map(function(f,i){ var col = f.verdict==='act'?'#f87171':f.verdict==='monitor'?'var(--warn)':'var(--text-faint)';
-            return (<div key={i} style={{display:'flex', gap:8, alignItems:'baseline', fontSize:13}}>
-              <span className="pill" style={{background:col+'22', color:col, fontSize:9.5, fontWeight:700, padding:'2px 7px', borderRadius:'var(--r-full)', textTransform:'uppercase', flexShrink:0}}>{f.verdict}</span>
-              <span style={{color:'var(--text-secondary)'}}><b style={{color:'var(--text-primary)'}}>{f.metric}{f.gbp!=null?` (£${NUM(f.gbp)})`:''}</b> — {f.recommendation}</span>
-            </div>); })}
-        </div>}
-        {(r.blindspots||[]).length>0 && <div className="micro" style={{color:'var(--text-faint)', marginTop:10}}>Blind spots: {r.blindspots.join(' · ')}</div>}
-        <div className="micro" style={{color:'var(--text-faint)', marginTop:8, fontStyle:'italic'}}>AI-written from your data; £ figures grounded against the dataset. The rule-based read below is the deterministic baseline.</div>
-      </div>);
-    })()}
-
-    {/* Commentary — the report-card narrative: headline + what worked / what to watch / context */}
-    <div className="card board-commentary" style={{marginBottom:14, borderLeft:`3px solid ${commentary.verdict==='Strong week'?'var(--good)':commentary.verdict==='Tough week'?'#f87171':commentary.verdict==='Mixed week'?'var(--warn)':'var(--accent)'}`}}>
-      <div className="micro" style={{color:'var(--text-muted)', fontWeight:700, letterSpacing:'.05em', textTransform:'uppercase', marginBottom:6}}>This week in a nutshell</div>
-      <p style={{margin:'0 0 14px', fontSize:16, lineHeight:1.5, color:'var(--text-primary)', fontWeight:500}}>{commentary.headline}</p>
-      <div className="board-commentary-cols">
+  return (
+    <div className="board">
+      {/* Header + week selector */}
+      <div className="card" style={{marginBottom:14, display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap'}}>
         <div>
-          <div className="board-comm-head" style={{color:'var(--good)'}}>✓ What worked</div>
-          {commentary.worked.length ? commentary.worked.map((t,i)=>(<div key={i} className="board-comm-line">{t}</div>)) : <div className="board-comm-line muted">Nothing stood out as a clear win this week.</div>}
-        </div>
-        <div>
-          <div className="board-comm-head" style={{color:'#f87171'}}>⚠ What to watch</div>
-          {commentary.watch.length ? commentary.watch.map((t,i)=>(<div key={i} className="board-comm-line">{t}</div>)) : <div className="board-comm-line muted">No material concerns flagged.</div>}
-        </div>
-        <div>
-          <div className="board-comm-head" style={{color:'var(--text-muted)'}}>📌 Context</div>
-          {commentary.context.length ? commentary.context.map((t,i)=>(<div key={i} className="board-comm-line">{t}</div>)) : <div className="board-comm-line muted">No logged events or sales this week.</div>}
-        </div>
-      </div>
-    </div>
-
-    {/* Scorecard grid */}
-    <div className="board-grid">
-      {BOARD_METRICS.map(spec=>{
-        const val=W.m[spec.key];
-        // A partial prior week is not a fair baseline — suppress WoW against it.
-        const pv=(prev && !prev.partial) ? prev.m[spec.key] : null;
-        const rag=boardRag(spec, val, pv), col=RAG_COL[rag];
-        let ch=null; if(pv!=null && pv!==0 && val!=null) ch=(val-pv)/Math.abs(pv);
-        const good = ch==null?null:((ch>0)===(spec.better!=='down'));
-        const tip = spec.benchTip || spec.note;
-        return (<div key={spec.key} className="card board-card" style={{borderLeft:`3px solid ${col}`}}>
-          <div className="micro" style={{color:'var(--text-muted)', fontWeight:600, display:'flex', justifyContent:'space-between'}}>
-            <span>{spec.label}</span>
-            {tip && <span title={tip} style={{cursor:'help', color:'var(--text-faint)'}}>ⓘ</span>}
+          <div className="micro" style={{color:'var(--accent)', fontWeight:700, letterSpacing:'.06em', textTransform:'uppercase'}}>Weekly board · report card</div>
+          <h1 style={{margin:'4px 0 2px', fontSize:24}}>Week of {W.weekStart} <span style={{color:'var(--text-muted)', fontWeight:500, fontSize:16}}>→ {W.weekEnding}</span></h1>
+          <div className="micro" style={{color:'var(--text-faint)'}}>
+            {W.partial ? <span style={{color:'var(--warn)'}}>● In progress — {W.days}/7 days so far</span> : <span>Completed week · frozen from daily data</span>}
+            {' · for the Monday 3pm review'}
           </div>
-          <div style={{fontSize:24, fontWeight:700, letterSpacing:'-.01em', margin:'4px 0 2px'}}>{spec.fmt(val)}</div>
-          <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:6}}>
-            <span style={{fontSize:12, fontWeight:600, color: spec.better==='flat'||good==null ? 'var(--text-faint)' : (good?'var(--good)':'#f87171')}}>
-              {ch==null?'—':(ch>0?'▲ ':'▼ ')+Math.abs(ch*100).toFixed(ch>=0.1||ch<=-0.1?0:1)+'% WoW'}
-            </span>
-            <BoardSpark vals={trail(spec.key, idx)} color={spec.better==='flat'?'#8b8b99':col}/>
-          </div>
-        </div>);
-      })}
-    </div>
-
-    {/* Supporting metrics — channel + funnel detail behind the headline KPIs */}
-    <div className="micro" style={{color:'var(--text-faint)', fontWeight:700, letterSpacing:'.05em', textTransform:'uppercase', margin:'18px 2px 8px'}}>Supporting metrics</div>
-    <div className="board-grid">
-      {BOARD_METRICS2.map(spec=>{
-        const val=W.m[spec.key];
-        const pv=(prev && !prev.partial) ? prev.m[spec.key] : null;
-        const rag=boardRag(spec, val, pv), col=RAG_COL[rag];
-        let ch=null; if(pv!=null && pv!==0 && val!=null) ch=(val-pv)/Math.abs(pv);
-        const good = ch==null?null:((ch>0)===(spec.better!=='down'));
-        const tip = spec.benchTip || spec.note;
-        return (<div key={spec.key} className="card board-card" style={{borderLeft:`3px solid ${col}`}}>
-          <div className="micro" style={{color:'var(--text-muted)', fontWeight:600, display:'flex', justifyContent:'space-between'}}>
-            <span>{spec.label}</span>
-            {tip && <span title={tip} style={{cursor:'help', color:'var(--text-faint)'}}>ⓘ</span>}
-          </div>
-          <div style={{fontSize:22, fontWeight:700, letterSpacing:'-.01em', margin:'4px 0 2px'}}>{spec.fmt(val)}</div>
-          <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:6}}>
-            <span style={{fontSize:12, fontWeight:600, color: good==null ? 'var(--text-faint)' : (good?'var(--good)':'#f87171')}}>
-              {ch==null?'—':(ch>0?'▲ ':'▼ ')+Math.abs(ch*100).toFixed(ch>=0.1||ch<=-0.1?0:1)+'% WoW'}
-            </span>
-            <BoardSpark vals={trail(spec.key, idx)} color={col}/>
-          </div>
-        </div>);
-      })}
-    </div>
-
-    {/* Trend strip */}
-    <div className="row" style={{marginTop:14}}>
-      <div className="card" style={{flex:'1 1 520px'}}>
-        <div className="card-section-title"><h2 style={{margin:0}}>Revenue vs paid spend — weekly</h2><span className="meta">Bars = paid spend · Line = net revenue</span></div>
-        <R.ResponsiveContainer width="100%" height={230}>
-          <R.ComposedChart data={trend} margin={{top:18,right:16,left:6,bottom:6}}>
-            <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
-            <R.XAxis dataKey="x" tick={{fill:'#7e7e8a',fontSize:10}} interval={Math.ceil(trend.length/8)}/>
-            <R.YAxis yAxisId="l" tick={{fill:'#7e7e8a',fontSize:10}} tickFormatter={v=>'£'+(v/1000).toFixed(0)+'k'}/>
-            <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#7e7e8a',fontSize:10}} tickFormatter={v=>'£'+(v/1000).toFixed(0)+'k'}/>
-            <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} formatter={(v,n)=>[GBP(v),n]}/>
-            <R.Bar yAxisId="l" dataKey="paid" name="Paid spend" fill={COL.meta} radius={[2,2,0,0]}/>
-            <R.Line yAxisId="r" type="monotone" dataKey="revenue" name="Net revenue" stroke={COL.revenue} strokeWidth={2.4} dot={false}/>
-            {renderPins()}
-          </R.ComposedChart>
-        </R.ResponsiveContainer>
-      </div>
-      <div className="card" style={{flex:'1 1 320px'}}>
-        <div className="card-section-title"><h2 style={{margin:0}}>Efficiency — MER &amp; CVR</h2><span className="meta">MER (×) left · CVR (%) right</span></div>
-        <R.ResponsiveContainer width="100%" height={230}>
-          <R.ComposedChart data={trend} margin={{top:18,right:16,left:6,bottom:6}}>
-            <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
-            <R.XAxis dataKey="x" tick={{fill:'#7e7e8a',fontSize:10}} interval={Math.ceil(trend.length/6)}/>
-            <R.YAxis yAxisId="l" tick={{fill:'#7e7e8a',fontSize:10}} tickFormatter={v=>v+'×'}/>
-            <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#7e7e8a',fontSize:10}} tickFormatter={v=>v+'%'}/>
-            <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}}/>
-            <R.ReferenceLine yAxisId="l" y={2} stroke="#a78bfa" strokeDasharray="5 4" strokeOpacity={0.7} label={{value:'MER 2×', position:'insideTopLeft', fill:'#a78bfa', fontSize:9.5}}/>
-            <R.ReferenceLine yAxisId="r" y={2} stroke="#38bdf8" strokeDasharray="5 4" strokeOpacity={0.6} label={{value:'CVR 2%', position:'insideTopRight', fill:'#38bdf8', fontSize:9.5}}/>
-            <R.Line yAxisId="l" type="monotone" dataKey="mer" name="MER" stroke="#a78bfa" strokeWidth={2.2} dot={false}/>
-            <R.Line yAxisId="r" type="monotone" dataKey="cvr" name="CVR %" stroke={COL.sessions} strokeWidth={2.2} dot={false}/>
-          </R.ComposedChart>
-        </R.ResponsiveContainer>
-      </div>
-    </div>
-
-    {/* Decisions log */}
-    <div className="row" style={{marginTop:14}}>
-      <div className="card" style={{flex:'1 1 420px'}}>
-        <h2 style={{marginTop:0}}>Meeting notes</h2>
-        <div className="micro" style={{color:'var(--text-faint)', marginBottom:8}}>Week of {W.weekStart} → {W.weekEnding} · decisions, context, anything to remember</div>
-        <textarea value={notes[W.weekEnding]||''} onChange={e=>setNote(e.target.value)} placeholder="What did we decide? e.g. 'Pausing the 22% sitewide code — margin too thin. Brief on mobile checkout fix by Friday. Test free-ship threshold at £75.'"
-          style={{width:'100%', minHeight:150, background:'var(--bg-app)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--r-sm)', padding:10, fontSize:13, fontFamily:'inherit', resize:'vertical'}}/>
-      </div>
-
-      <div className="card" style={{flex:'1 1 420px'}}>
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'baseline'}}>
-          <h2 style={{marginTop:0}}>Actions</h2>
-          <span className="micro" style={{color:'var(--text-faint)'}}>{openCount} open · carried week to week</span>
         </div>
-        <div style={{display:'flex', flexDirection:'column', gap:6, marginBottom:10}}>
-          {visibleActions.length===0 && <div className="muted" style={{fontSize:13}}>No open actions. Add one below as the meeting decides.</div>}
-          {visibleActions.map(a=>{ const meta=ACTION_META[a.status]||ACTION_META.open; return (
-            <div key={a.id} style={{display:'flex', alignItems:'center', gap:8, padding:'7px 9px', background:'var(--bg-app)', border:'1px solid var(--border-subtle)', borderRadius:'var(--r-sm)'}}>
-              <button onClick={()=>cycleAction(a)} title="Click to advance status" style={{cursor:'pointer', flexShrink:0, border:'1px solid '+meta.col, color:meta.col, background:'transparent', borderRadius:'var(--r-full)', fontSize:10.5, fontWeight:700, padding:'2px 8px'}}>{meta.label}</button>
-              <span style={{flex:1, fontSize:13, textDecoration: a.status==='done'?'line-through':'none', color: a.status==='done'?'var(--text-faint)':'var(--text-primary)'}}>{a.text}</span>
-              <span className="micro" style={{color:'var(--text-faint)', flexShrink:0}} title={'Raised week ending '+a.raised}>{(a.raised||'').slice(5)}</span>
-              <button onClick={()=>delAction(a)} title="Remove" style={{cursor:'pointer', border:'none', background:'transparent', color:'var(--text-faint)', fontSize:15, lineHeight:1}}>×</button>
-            </div>); })}
+        <div style={{display:'flex', alignItems:'center', gap:8}}>
+          <button onClick={()=>setIdx(i=>Math.max(0,i-1))} disabled={idx<=0} className="board-nav-btn">◀ Prev</button>
+          <select value={idx} onChange={e=>setIdx(+e.target.value)} style={{background:'var(--bg-card)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--r-sm)', padding:'7px 10px', fontSize:13}}>
+            {weeks.map((w,i)=>(<option key={w.weekStart} value={i}>{w.label}{w.partial?' (in progress)':''}</option>))}
+          </select>
+          <button onClick={()=>setIdx(i=>Math.min(weeks.length-1,i+1))} disabled={idx>=weeks.length-1} className="board-nav-btn">Next ▶</button>
+          <button onClick={()=>window.print()} className="board-nav-btn" title="Print / save this week as a PDF board pack">⎙ Print</button>
         </div>
-        <div style={{display:'flex', gap:6}}>
-          <input value={newAction} onChange={e=>setNewAction(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addAction();}} placeholder="Add an action…"
-            style={{flex:1, background:'var(--bg-app)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--r-sm)', padding:'8px 10px', fontSize:13}}/>
-          <button onClick={addAction} className="board-nav-btn" style={{flexShrink:0}}>+ Add</button>
+      </div>
+      {/* LLM analyst read (last 7d) — shown on the latest week; rule-based read below is the deterministic baseline */}
+      {(function(){
+        var br = (typeof window!=='undefined' && window.FRKL_BOARD_READ) || null;
+        if(!br || !br.read || idx < weeks.length-2) return null;   // show on the two most recent weeks (covers default + in-progress)
+        var r = br.read;
+        return (
+          <div className="card" style={{marginBottom:14, borderLeft:'3px solid var(--accent)'}}>
+            <div className="card-section-title">
+              <h2 style={{margin:0}}>✦ Analyst read</h2>
+              <span className="meta">AI · last 7 days to {br.asOf} · {r.model||'llm'}</span>
+            </div>
+            <p style={{margin:'0 0 10px', fontSize:16, lineHeight:1.5, color:'var(--text-primary)', fontWeight:500}}>{r.headline}</p>
+            {r.narrative && <p style={{margin:'0 0 12px', fontSize:13.5, lineHeight:1.55, color:'var(--text-secondary)'}}>{r.narrative}</p>}
+            {(r.findings||[]).length>0 && <div style={{display:'flex', flexDirection:'column', gap:7}}>
+              {r.findings.map(function(f,i){ var col = f.verdict==='act'?'#f87171':f.verdict==='monitor'?'var(--warn)':'var(--text-faint)';
+                return (
+                  <div key={i} style={{display:'flex', gap:8, alignItems:'baseline', fontSize:13}}>
+                    <span className="pill" style={{background:col+'22', color:col, fontSize:9.5, fontWeight:700, padding:'2px 7px', borderRadius:'var(--r-full)', textTransform:'uppercase', flexShrink:0}}>{f.verdict}</span>
+                    <span style={{color:'var(--text-secondary)'}}><b style={{color:'var(--text-primary)'}}>{f.metric}{f.gbp!=null?` (${curSym()}${NUM(f.gbp)})`:''}</b> — {f.recommendation}</span>
+                  </div>
+                ); })}
+            </div>}
+            {(r.blindspots||[]).length>0 && <div className="micro" style={{color:'var(--text-faint)', marginTop:10}}>Blind spots: {r.blindspots.join(' · ')}</div>}
+            <div className="micro" style={{color:'var(--text-faint)', marginTop:8, fontStyle:'italic'}}>AI-written from your data; {curSym()}figures grounded against the dataset. The rule-based read below is the deterministic baseline.</div>
+          </div>
+        );
+      })()}
+      {/* Commentary — the report-card narrative: headline + what worked / what to watch / context */}
+      <div className="card board-commentary" style={{marginBottom:14, borderLeft:`3px solid ${commentary.verdict==='Strong week'?'var(--good)':commentary.verdict==='Tough week'?'#f87171':commentary.verdict==='Mixed week'?'var(--warn)':'var(--accent)'}`}}>
+        <div className="micro" style={{color:'var(--text-muted)', fontWeight:700, letterSpacing:'.05em', textTransform:'uppercase', marginBottom:6}}>This week in a nutshell</div>
+        <p style={{margin:'0 0 14px', fontSize:16, lineHeight:1.5, color:'var(--text-primary)', fontWeight:500}}>{commentary.headline}</p>
+        <div className="board-commentary-cols">
+          <div>
+            <div className="board-comm-head" style={{color:'var(--good)'}}>✓ What worked</div>
+            {commentary.worked.length ? commentary.worked.map((t,i)=>(<div key={i} className="board-comm-line">{t}</div>)) : <div className="board-comm-line muted">Nothing stood out as a clear win this week.</div>}
+          </div>
+          <div>
+            <div className="board-comm-head" style={{color:'#f87171'}}>⚠ What to watch</div>
+            {commentary.watch.length ? commentary.watch.map((t,i)=>(<div key={i} className="board-comm-line">{t}</div>)) : <div className="board-comm-line muted">No material concerns flagged.</div>}
+          </div>
+          <div>
+            <div className="board-comm-head" style={{color:'var(--text-muted)'}}>📌 Context</div>
+            {commentary.context.length ? commentary.context.map((t,i)=>(<div key={i} className="board-comm-line">{t}</div>)) : <div className="board-comm-line muted">No logged events or sales this week.</div>}
+          </div>
         </div>
-        {doneThisWeek.length>0 && <div className="micro" style={{color:'var(--good)', marginTop:8}}>✓ {doneThisWeek.length} completed this week</div>}
+      </div>
+      {/* Scorecard grid */}
+      <div className="board-grid">
+        {BOARD_METRICS.map(spec=>{
+          const val=W.m[spec.key];
+          // A partial prior week is not a fair baseline — suppress WoW against it.
+          const pv=(prev && !prev.partial) ? prev.m[spec.key] : null;
+          const rag=boardRag(spec, val, pv), col=RAG_COL[rag];
+          let ch=null; if(pv!=null && pv!==0 && val!=null) ch=(val-pv)/Math.abs(pv);
+          const good = ch==null?null:((ch>0)===(spec.better!=='down'));
+          const tip = spec.benchTip || spec.note;
+          return (<div key={spec.key} className="card board-card" style={{borderLeft:`3px solid ${col}`}}>
+            <div className="micro" style={{color:'var(--text-muted)', fontWeight:600, display:'flex', justifyContent:'space-between'}}>
+              <span>{spec.label}</span>
+              {tip && <span title={tip} style={{cursor:'help', color:'var(--text-faint)'}}>ⓘ</span>}
+            </div>
+            <div style={{fontSize:24, fontWeight:700, letterSpacing:'-.01em', margin:'4px 0 2px'}}>{spec.fmt(val)}</div>
+            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:6}}>
+              <span style={{fontSize:12, fontWeight:600, color: spec.better==='flat'||good==null ? 'var(--text-faint)' : (good?'var(--good)':'#f87171')}}>
+                {ch==null?'—':(ch>0?'▲ ':'▼ ')+Math.abs(ch*100).toFixed(ch>=0.1||ch<=-0.1?0:1)+'% WoW'}
+              </span>
+              <BoardSpark vals={trail(spec.key, idx)} color={spec.better==='flat'?'#8b8b99':col}/>
+            </div>
+          </div>);
+        })}
+      </div>
+      {/* Supporting metrics — channel + funnel detail behind the headline KPIs */}
+      <div className="micro" style={{color:'var(--text-faint)', fontWeight:700, letterSpacing:'.05em', textTransform:'uppercase', margin:'18px 2px 8px'}}>Supporting metrics</div>
+      <div className="board-grid">
+        {BOARD_METRICS2.map(spec=>{
+          const val=W.m[spec.key];
+          const pv=(prev && !prev.partial) ? prev.m[spec.key] : null;
+          const rag=boardRag(spec, val, pv), col=RAG_COL[rag];
+          let ch=null; if(pv!=null && pv!==0 && val!=null) ch=(val-pv)/Math.abs(pv);
+          const good = ch==null?null:((ch>0)===(spec.better!=='down'));
+          const tip = spec.benchTip || spec.note;
+          return (<div key={spec.key} className="card board-card" style={{borderLeft:`3px solid ${col}`}}>
+            <div className="micro" style={{color:'var(--text-muted)', fontWeight:600, display:'flex', justifyContent:'space-between'}}>
+              <span>{spec.label}</span>
+              {tip && <span title={tip} style={{cursor:'help', color:'var(--text-faint)'}}>ⓘ</span>}
+            </div>
+            <div style={{fontSize:22, fontWeight:700, letterSpacing:'-.01em', margin:'4px 0 2px'}}>{spec.fmt(val)}</div>
+            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:6}}>
+              <span style={{fontSize:12, fontWeight:600, color: good==null ? 'var(--text-faint)' : (good?'var(--good)':'#f87171')}}>
+                {ch==null?'—':(ch>0?'▲ ':'▼ ')+Math.abs(ch*100).toFixed(ch>=0.1||ch<=-0.1?0:1)+'% WoW'}
+              </span>
+              <BoardSpark vals={trail(spec.key, idx)} color={col}/>
+            </div>
+          </div>);
+        })}
+      </div>
+      {/* Trend strip */}
+      <div className="row" style={{marginTop:14}}>
+        <div className="card" style={{flex:'1 1 520px'}}>
+          <div className="card-section-title"><h2 style={{margin:0}}>Revenue vs paid spend — weekly</h2><span className="meta">Bars = paid spend · Line = net revenue</span></div>
+          <R.ResponsiveContainer width="100%" height={230}>
+            <R.ComposedChart data={trend} margin={{top:18,right:16,left:6,bottom:6}}>
+              <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
+              <R.XAxis dataKey="x" tick={{fill:'#7e7e8a',fontSize:10}} interval={Math.ceil(trend.length/8)}/>
+              <R.YAxis yAxisId="l" tick={{fill:'#7e7e8a',fontSize:10}} tickFormatter={v=>curSym()+(v/1000).toFixed(0)+'k'}/>
+              <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#7e7e8a',fontSize:10}} tickFormatter={v=>curSym()+(v/1000).toFixed(0)+'k'}/>
+              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} formatter={(v,n)=>[GBP(v),n]}/>
+              <R.Bar yAxisId="l" dataKey="paid" name="Paid spend" fill={COL.meta} radius={[2,2,0,0]}/>
+              <R.Line yAxisId="r" type="monotone" dataKey="revenue" name="Net revenue" stroke={COL.revenue} strokeWidth={2.4} dot={false}/>
+              {renderPins()}
+            </R.ComposedChart>
+          </R.ResponsiveContainer>
+        </div>
+        <div className="card" style={{flex:'1 1 320px'}}>
+          <div className="card-section-title"><h2 style={{margin:0}}>Efficiency — MER &amp; CVR</h2><span className="meta">MER (×) left · CVR (%) right</span></div>
+          <R.ResponsiveContainer width="100%" height={230}>
+            <R.ComposedChart data={trend} margin={{top:18,right:16,left:6,bottom:6}}>
+              <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
+              <R.XAxis dataKey="x" tick={{fill:'#7e7e8a',fontSize:10}} interval={Math.ceil(trend.length/6)}/>
+              <R.YAxis yAxisId="l" tick={{fill:'#7e7e8a',fontSize:10}} tickFormatter={v=>v+'×'}/>
+              <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#7e7e8a',fontSize:10}} tickFormatter={v=>v+'%'}/>
+              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}}/>
+              <R.ReferenceLine yAxisId="l" y={2} stroke="#a78bfa" strokeDasharray="5 4" strokeOpacity={0.7} label={{value:'MER 2×', position:'insideTopLeft', fill:'#a78bfa', fontSize:9.5}}/>
+              <R.ReferenceLine yAxisId="r" y={2} stroke="#38bdf8" strokeDasharray="5 4" strokeOpacity={0.6} label={{value:'CVR 2%', position:'insideTopRight', fill:'#38bdf8', fontSize:9.5}}/>
+              <R.Line yAxisId="l" type="monotone" dataKey="mer" name="MER" stroke="#a78bfa" strokeWidth={2.2} dot={false}/>
+              <R.Line yAxisId="r" type="monotone" dataKey="cvr" name="CVR %" stroke={COL.sessions} strokeWidth={2.2} dot={false}/>
+            </R.ComposedChart>
+          </R.ResponsiveContainer>
+        </div>
+      </div>
+      {/* Decisions log */}
+      <div className="row" style={{marginTop:14}}>
+        <div className="card" style={{flex:'1 1 420px'}}>
+          <h2 style={{marginTop:0}}>Meeting notes</h2>
+          <div className="micro" style={{color:'var(--text-faint)', marginBottom:8}}>Week of {W.weekStart} → {W.weekEnding} · decisions, context, anything to remember</div>
+          <textarea value={notes[W.weekEnding]||''} onChange={e=>setNote(e.target.value)} placeholder={`What did we decide? e.g. 'Pausing the 22% sitewide code — margin too thin. Brief on mobile checkout fix by Friday. Test free-ship threshold at ${curSym()}75.'`}
+            style={{width:'100%', minHeight:150, background:'var(--bg-app)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--r-sm)', padding:10, fontSize:13, fontFamily:'inherit', resize:'vertical'}}/>
+        </div>
+
+        <div className="card" style={{flex:'1 1 420px'}}>
+          <div style={{display:'flex', justifyContent:'space-between', alignItems:'baseline'}}>
+            <h2 style={{marginTop:0}}>Actions</h2>
+            <span className="micro" style={{color:'var(--text-faint)'}}>{openCount} open · carried week to week</span>
+          </div>
+          <div style={{display:'flex', flexDirection:'column', gap:6, marginBottom:10}}>
+            {visibleActions.length===0 && <div className="muted" style={{fontSize:13}}>No open actions. Add one below as the meeting decides.</div>}
+            {visibleActions.map(a=>{ const meta=ACTION_META[a.status]||ACTION_META.open; return (
+              <div key={a.id} style={{display:'flex', alignItems:'center', gap:8, padding:'7px 9px', background:'var(--bg-app)', border:'1px solid var(--border-subtle)', borderRadius:'var(--r-sm)'}}>
+                <button onClick={()=>cycleAction(a)} title="Click to advance status" style={{cursor:'pointer', flexShrink:0, border:'1px solid '+meta.col, color:meta.col, background:'transparent', borderRadius:'var(--r-full)', fontSize:10.5, fontWeight:700, padding:'2px 8px'}}>{meta.label}</button>
+                <span style={{flex:1, fontSize:13, textDecoration: a.status==='done'?'line-through':'none', color: a.status==='done'?'var(--text-faint)':'var(--text-primary)'}}>{a.text}</span>
+                <span className="micro" style={{color:'var(--text-faint)', flexShrink:0}} title={'Raised week ending '+a.raised}>{(a.raised||'').slice(5)}</span>
+                <button onClick={()=>delAction(a)} title="Remove" style={{cursor:'pointer', border:'none', background:'transparent', color:'var(--text-faint)', fontSize:15, lineHeight:1}}>×</button>
+              </div>); })}
+          </div>
+          <div style={{display:'flex', gap:6}}>
+            <input value={newAction} onChange={e=>setNewAction(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addAction();}} placeholder="Add an action…"
+              style={{flex:1, background:'var(--bg-app)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--r-sm)', padding:'8px 10px', fontSize:13}}/>
+            <button onClick={addAction} className="board-nav-btn" style={{flexShrink:0}}>+ Add</button>
+          </div>
+          {doneThisWeek.length>0 && <div className="micro" style={{color:'var(--good)', marginTop:8}}>✓ {doneThisWeek.length} completed this week</div>}
+        </div>
       </div>
     </div>
-  </div>);
+  );
 }
 
 // ── Acquisition cohorts (real CAC/LTV from customer-level orders) ────────────
@@ -8129,102 +8181,100 @@ function CohortsPanel(){
   const ragRatio = ltvCacPaid==null?'var(--text-faint)':(ltvCacPaid>=3?'var(--good)':ltvCacPaid>=1?'var(--warn)':'#f87171');
   const badge = <MarginBadge/>;
 
-  return (<div>
-    <div className="card" style={{marginBottom:14}}>
-      <div className="card-section-title">
-        <h2 style={{margin:0}}>Acquisition cohorts — what a customer is really worth</h2>
-        <span className="meta">{C.totalCustomers} DTC customers · {C.windowFirst}→{C.windowLast} · real first-order cohorts</span>
+  return (
+    <div>
+      <div className="card" style={{marginBottom:14}}>
+        <div className="card-section-title">
+          <h2 style={{margin:0}}>Acquisition cohorts — what a customer is really worth</h2>
+          <span className="meta">{C.totalCustomers} DTC customers · {C.windowFirst}→{C.windowLast} · real first-order cohorts</span>
+        </div>
+        <div className="micro" style={{color:'var(--text-secondary)', lineHeight:1.55}}>
+          Each customer is bucketed by the month of their <b>first order</b>, then we track what they go on to spend. {firstShare!=null && <>frkl banks <b style={{color:'var(--text-primary)'}}>{PCT(firstShare)}</b> of a customer's lifetime value in their <b>first order</b> — so every point of repeat purchase is almost pure upside, and retention is the biggest untapped lever.</>}
+        </div>
       </div>
-      <div className="micro" style={{color:'var(--text-secondary)', lineHeight:1.55}}>
-        Each customer is bucketed by the month of their <b>first order</b>, then we track what they go on to spend. {firstShare!=null && <>frkl banks <b style={{color:'var(--text-primary)'}}>{PCT(firstShare)}</b> of a customer's lifetime value in their <b>first order</b> — so every point of repeat purchase is almost pure upside, and retention is the biggest untapped lever.</>}
+      <div className="row" style={{marginBottom:14}}>
+        <CohortStat label="Contribution LTV / customer" val={GBP(contribLTV)} sub={`${GBP(lifetimeRev)} revenue × ${PCT(gm)} margin · observed to date`} badge={badge} accent="var(--good)"/>
+        <CohortStat label="Paid CAC" val={paidCac!=null?GBP(paidCac):'—'} sub={`spend ÷ new customers · ${C.cac.paidMonths||0} paid month(s) · blended ${blendedCac!=null?GBP(blendedCac):'—'} understates (incl. ${curSym()}0-spend cohorts)`} accent="var(--accent)"/>
+        <CohortStat label="LTV : CAC (paid)" val={ltvCacPaid!=null?ltvCacPaid.toFixed(1)+'×':'—'} sub="contribution LTV ÷ paid CAC · target 3×+" badge={badge} accent={ragRatio}/>
+        <CohortStat label="First-order payback" val={paybackOrders!=null?(paybackOrders<=1?'1st order':paybackOrders.toFixed(1)+' orders'):'—'} sub="orders to recover paid CAC" badge={badge}/>
+        <CohortStat label="Repeat rate" val={PCT(C.repeatRate)} sub={`${C.ordersPerCustomer} orders / customer`}/>
+      </div>
+      <div className="row">
+        <div className="card" style={{flex:'2 1 480px'}}>
+          <div className="card-section-title"><h2 style={{margin:0}}>Lifetime value curve</h2><span className="meta">cumulative {curSym()}per customer by months since first order</span></div>
+          <R.ResponsiveContainer width="100%" height={292}>
+            <R.ComposedChart data={curve} margin={{top:8,right:18,left:6,bottom:6}}>
+              <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
+              <R.XAxis dataKey="m" tick={{fill:'#7e7e8a',fontSize:11}}/>
+              <R.YAxis tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>curSym()+v}/>
+              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,boxShadow:'var(--shadow-md)'}} formatter={(v,n)=>[GBP(v), n==='contrib'?'Contribution':'Revenue']}
+                labelFormatter={(l,p)=> l + (p&&p[0]&&p[0].payload? ' · '+p[0].payload.n+' customers observed':'')}/>
+              <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}}/>
+              {paidCac!=null && <R.ReferenceLine y={paidCac} stroke="#a78bfa" strokeDasharray="5 4" strokeOpacity={0.8} label={{value:'paid CAC', position:'insideTopRight', fill:'#a78bfa', fontSize:10}}/>}
+              <R.Area type="monotone" dataKey="rev" name="Revenue" stroke={COL.revenue} fill={COL.revenue+'22'} strokeWidth={2}/>
+              <R.Line type="monotone" dataKey="contrib" name="Contribution" stroke="#a78bfa" strokeWidth={2.4} dot={false}/>
+              <R.Brush {...brushProps('m')} />
+            </R.ComposedChart>
+          </R.ResponsiveContainer>
+          <div style={{fontSize:10.5,color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{BRUSH_HINT}</div>
+          <div className="micro" style={{color:'var(--text-faint)', marginTop:4}}>Later months average fewer, older customers (shown on hover) — the curve is observed value to date, not a projection.</div>
+          <ChartFooter note="What a customer is worth over time — and when they pay back CAC."
+            ask="From the lifetime-value curve, how long until an average customer pays back paid CAC, and what does that mean for how aggressively I can acquire?"
+            rows={curve} columns={[{key:'m',label:'Months since 1st order'},{key:'rev',label:'Cumulative rev/cust',right:true,fmt:v=>GBP(v)},{key:'contrib',label:'Cumulative contribution/cust',right:true,fmt:v=>GBP(v)}]}/>
+        </div>
+        <div className="card" style={{flex:'1 1 300px'}}>
+          <div className="card-section-title"><h2 style={{margin:0}}>CAC by acquisition month</h2><span className="meta">new customers vs paid CAC</span></div>
+          <R.ResponsiveContainer width="100%" height={292}>
+            <R.ComposedChart data={cacMonths} margin={{top:8,right:14,left:6,bottom:6}}>
+              <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
+              <R.XAxis dataKey="month" tick={{fill:'#7e7e8a',fontSize:10}}/>
+              <R.YAxis yAxisId="l" tick={{fill:'#7e7e8a',fontSize:10}}/>
+              <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#7e7e8a',fontSize:10}} tickFormatter={v=>curSym()+v}/>
+              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,boxShadow:'var(--shadow-md)'}} formatter={(v,n)=> n==='cac'?[v!=null?GBP(v):'no paid spend','Paid CAC']:[NUM(v),'New customers']}/>
+              <R.Bar yAxisId="l" dataKey="newCust" name="New customers" fill={COL.sessions} radius={[2,2,0,0]}/>
+              <R.Line yAxisId="r" type="monotone" dataKey="cac" name="cac" stroke={COL.google} strokeWidth={2.2} dot={{r:2.5}} connectNulls/>
+              <R.Brush {...brushProps('month')} />
+            </R.ComposedChart>
+          </R.ResponsiveContainer>
+          <div style={{fontSize:10.5,color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{BRUSH_HINT}</div>
+          <div className="micro" style={{color:'var(--text-faint)', marginTop:4}}>Most early customers came via unpaid channels (organic/email) — paid CAC only applies where there was paid spend.</div>
+          <ChartFooter note="Is acquisition getting more expensive over time?"
+            ask="Looking at CAC by acquisition month, is paid CAC trending up, and what's driving it?"
+            rows={cacMonths} columns={[{key:'month',label:'Month'},{key:'newCust',label:'New customers',right:true,fmt:v=>NUM(v)},{key:'cac',label:'Paid CAC',right:true,fmt:v=>v!=null?GBP(v):'—'}]}/>
+        </div>
+      </div>
+      <div className="row" style={{marginTop:14}}>
+        <div className="card" style={{flex:'1 1 380px'}}>
+          <h2 style={{marginTop:0}}>Discounted vs full-price acquisition</h2>
+          <table><thead><tr><th>First order</th><th>Customers</th><th>Repeat</th><th>Orders/cust</th><th>Lifetime {curSym()}/cust</th></tr></thead><tbody>
+            {(C.byAcqType||[]).map((a,i)=>(<tr key={i}>
+              <td>{a.type}</td><td>{NUM(a.newCustomers)}</td><td>{PCT(a.repeatRate)}</td><td>{a.ordersPerCust}</td><td>{GBP(a.lifetimeRevPerCust)}</td>
+            </tr>))}
+          </tbody></table>
+          {(()=>{ const d=(C.byAcqType||[]).find(a=>/Discount/.test(a.type)), f=(C.byAcqType||[]).find(a=>/Full/.test(a.type));
+            if(!d||!f) return null; const better = d.repeatRate>=f.repeatRate;
+            return <div className="note" style={{marginTop:10}}>{better
+              ? `Discount-acquired customers repeat at least as well (${PCT(d.repeatRate)} vs ${PCT(f.repeatRate)}) — the usual "discount buyers churn" worry doesn't hold here, so first-order codes look like a fair acquisition cost.`
+              : `Discount-acquired customers repeat less (${PCT(d.repeatRate)} vs ${PCT(f.repeatRate)}) — those codes are buying lower-quality customers; tighten first-order discounting.`}</div>; })()}
+        </div>
+        <div className="card" style={{flex:'1 1 380px'}}>
+          <h2 style={{marginTop:0}}>Which products acquire customers that come back</h2>
+          <table><thead><tr><th>Acquisition product</th><th>New custs</th><th>Repeat</th><th>Lifetime {curSym()}/cust</th></tr></thead><tbody>
+            {(C.byProduct||[]).map((p,i)=>{ const hot=p.repeatRate>=(C.repeatRate*1.3); const cold=p.repeatRate<=(C.repeatRate*0.5);
+              return (<tr key={i}>
+                <td style={{maxWidth:200}}>{p.name}</td><td>{NUM(p.newCustomers)}</td>
+                <td style={{color: hot?'var(--good)':cold?'#f87171':'var(--text-primary)', fontWeight:hot||cold?700:400}}>{PCT(p.repeatRate)}</td>
+                <td>{GBP(p.lifetimeRevPerCust)}</td>
+              </tr>); })}
+          </tbody></table>
+          <div className="note" style={{marginTop:10}}>Green = retains above the {PCT(C.repeatRate)} brand average (advertise these to acquire); red = acquires but doesn't retain (needs a follow-up flow, not more spend). Full acquisition-vs-retention matrix lands in the Products view.</div>
+        </div>
+      </div>
+      <div className="micro" style={{color:'var(--text-faint)', marginTop:12, lineHeight:1.5}}>
+        {C.notes && <><b>Read carefully:</b> {C.notes.channel} {C.notes.google}</>}
       </div>
     </div>
-
-    <div className="row" style={{marginBottom:14}}>
-      <CohortStat label="Contribution LTV / customer" val={GBP(contribLTV)} sub={`${GBP(lifetimeRev)} revenue × ${PCT(gm)} margin · observed to date`} badge={badge} accent="var(--good)"/>
-      <CohortStat label="Paid CAC" val={paidCac!=null?GBP(paidCac):'—'} sub={`spend ÷ new customers · ${C.cac.paidMonths||0} paid month(s) · blended ${blendedCac!=null?GBP(blendedCac):'—'} understates (incl. £0-spend cohorts)`} accent="var(--accent)"/>
-      <CohortStat label="LTV : CAC (paid)" val={ltvCacPaid!=null?ltvCacPaid.toFixed(1)+'×':'—'} sub="contribution LTV ÷ paid CAC · target 3×+" badge={badge} accent={ragRatio}/>
-      <CohortStat label="First-order payback" val={paybackOrders!=null?(paybackOrders<=1?'1st order':paybackOrders.toFixed(1)+' orders'):'—'} sub="orders to recover paid CAC" badge={badge}/>
-      <CohortStat label="Repeat rate" val={PCT(C.repeatRate)} sub={`${C.ordersPerCustomer} orders / customer`}/>
-    </div>
-
-    <div className="row">
-      <div className="card" style={{flex:'2 1 480px'}}>
-        <div className="card-section-title"><h2 style={{margin:0}}>Lifetime value curve</h2><span className="meta">cumulative £ per customer by months since first order</span></div>
-        <R.ResponsiveContainer width="100%" height={292}>
-          <R.ComposedChart data={curve} margin={{top:8,right:18,left:6,bottom:6}}>
-            <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
-            <R.XAxis dataKey="m" tick={{fill:'#7e7e8a',fontSize:11}}/>
-            <R.YAxis tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>'£'+v}/>
-            <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,boxShadow:'var(--shadow-md)'}} formatter={(v,n)=>[GBP(v), n==='contrib'?'Contribution':'Revenue']}
-              labelFormatter={(l,p)=> l + (p&&p[0]&&p[0].payload? ' · '+p[0].payload.n+' customers observed':'')}/>
-            <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}}/>
-            {paidCac!=null && <R.ReferenceLine y={paidCac} stroke="#a78bfa" strokeDasharray="5 4" strokeOpacity={0.8} label={{value:'paid CAC', position:'insideTopRight', fill:'#a78bfa', fontSize:10}}/>}
-            <R.Area type="monotone" dataKey="rev" name="Revenue" stroke={COL.revenue} fill={COL.revenue+'22'} strokeWidth={2}/>
-            <R.Line type="monotone" dataKey="contrib" name="Contribution" stroke="#a78bfa" strokeWidth={2.4} dot={false}/>
-            <R.Brush {...brushProps('m')} />
-          </R.ComposedChart>
-        </R.ResponsiveContainer>
-        <div style={{fontSize:10.5,color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{BRUSH_HINT}</div>
-        <div className="micro" style={{color:'var(--text-faint)', marginTop:4}}>Later months average fewer, older customers (shown on hover) — the curve is observed value to date, not a projection.</div>
-        <ChartFooter note="What a customer is worth over time — and when they pay back CAC."
-          ask="From the lifetime-value curve, how long until an average customer pays back paid CAC, and what does that mean for how aggressively I can acquire?"
-          rows={curve} columns={[{key:'m',label:'Months since 1st order'},{key:'rev',label:'Cumulative rev/cust',right:true,fmt:v=>GBP(v)},{key:'contrib',label:'Cumulative contribution/cust',right:true,fmt:v=>GBP(v)}]}/>
-      </div>
-      <div className="card" style={{flex:'1 1 300px'}}>
-        <div className="card-section-title"><h2 style={{margin:0}}>CAC by acquisition month</h2><span className="meta">new customers vs paid CAC</span></div>
-        <R.ResponsiveContainer width="100%" height={292}>
-          <R.ComposedChart data={cacMonths} margin={{top:8,right:14,left:6,bottom:6}}>
-            <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
-            <R.XAxis dataKey="month" tick={{fill:'#7e7e8a',fontSize:10}}/>
-            <R.YAxis yAxisId="l" tick={{fill:'#7e7e8a',fontSize:10}}/>
-            <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#7e7e8a',fontSize:10}} tickFormatter={v=>'£'+v}/>
-            <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,boxShadow:'var(--shadow-md)'}} formatter={(v,n)=> n==='cac'?[v!=null?GBP(v):'no paid spend','Paid CAC']:[NUM(v),'New customers']}/>
-            <R.Bar yAxisId="l" dataKey="newCust" name="New customers" fill={COL.sessions} radius={[2,2,0,0]}/>
-            <R.Line yAxisId="r" type="monotone" dataKey="cac" name="cac" stroke={COL.google} strokeWidth={2.2} dot={{r:2.5}} connectNulls/>
-            <R.Brush {...brushProps('month')} />
-          </R.ComposedChart>
-        </R.ResponsiveContainer>
-        <div style={{fontSize:10.5,color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{BRUSH_HINT}</div>
-        <div className="micro" style={{color:'var(--text-faint)', marginTop:4}}>Most early customers came via unpaid channels (organic/email) — paid CAC only applies where there was paid spend.</div>
-        <ChartFooter note="Is acquisition getting more expensive over time?"
-          ask="Looking at CAC by acquisition month, is paid CAC trending up, and what's driving it?"
-          rows={cacMonths} columns={[{key:'month',label:'Month'},{key:'newCust',label:'New customers',right:true,fmt:v=>NUM(v)},{key:'cac',label:'Paid CAC',right:true,fmt:v=>v!=null?GBP(v):'—'}]}/>
-      </div>
-    </div>
-
-    <div className="row" style={{marginTop:14}}>
-      <div className="card" style={{flex:'1 1 380px'}}>
-        <h2 style={{marginTop:0}}>Discounted vs full-price acquisition</h2>
-        <table><thead><tr><th>First order</th><th>Customers</th><th>Repeat</th><th>Orders/cust</th><th>Lifetime £/cust</th></tr></thead><tbody>
-          {(C.byAcqType||[]).map((a,i)=>(<tr key={i}>
-            <td>{a.type}</td><td>{NUM(a.newCustomers)}</td><td>{PCT(a.repeatRate)}</td><td>{a.ordersPerCust}</td><td>{GBP(a.lifetimeRevPerCust)}</td>
-          </tr>))}
-        </tbody></table>
-        {(()=>{ const d=(C.byAcqType||[]).find(a=>/Discount/.test(a.type)), f=(C.byAcqType||[]).find(a=>/Full/.test(a.type));
-          if(!d||!f) return null; const better = d.repeatRate>=f.repeatRate;
-          return <div className="note" style={{marginTop:10}}>{better
-            ? `Discount-acquired customers repeat at least as well (${PCT(d.repeatRate)} vs ${PCT(f.repeatRate)}) — the usual "discount buyers churn" worry doesn't hold here, so first-order codes look like a fair acquisition cost.`
-            : `Discount-acquired customers repeat less (${PCT(d.repeatRate)} vs ${PCT(f.repeatRate)}) — those codes are buying lower-quality customers; tighten first-order discounting.`}</div>; })()}
-      </div>
-      <div className="card" style={{flex:'1 1 380px'}}>
-        <h2 style={{marginTop:0}}>Which products acquire customers that come back</h2>
-        <table><thead><tr><th>Acquisition product</th><th>New custs</th><th>Repeat</th><th>Lifetime £/cust</th></tr></thead><tbody>
-          {(C.byProduct||[]).map((p,i)=>{ const hot=p.repeatRate>=(C.repeatRate*1.3); const cold=p.repeatRate<=(C.repeatRate*0.5);
-            return (<tr key={i}>
-              <td style={{maxWidth:200}}>{p.name}</td><td>{NUM(p.newCustomers)}</td>
-              <td style={{color: hot?'var(--good)':cold?'#f87171':'var(--text-primary)', fontWeight:hot||cold?700:400}}>{PCT(p.repeatRate)}</td>
-              <td>{GBP(p.lifetimeRevPerCust)}</td>
-            </tr>); })}
-        </tbody></table>
-        <div className="note" style={{marginTop:10}}>Green = retains above the {PCT(C.repeatRate)} brand average (advertise these to acquire); red = acquires but doesn't retain (needs a follow-up flow, not more spend). Full acquisition-vs-retention matrix lands in the Products view.</div>
-      </div>
-    </div>
-
-    <div className="micro" style={{color:'var(--text-faint)', marginTop:12, lineHeight:1.5}}>
-      {C.notes && <><b>Read carefully:</b> {C.notes.channel} {C.notes.google}</>}
-    </div>
-  </div>);
+  );
 }
 
 // ── Advice → impact ledger (Phase 5.2) ───────────────────────────────────────
@@ -8239,43 +8289,44 @@ function AdviceLedgerPanel(){
                   .sort((a,b)=> ((local[b.id]&&local[b.id].completedDate)||b.resolvedAt||'').localeCompare((local[a.id]&&local[a.id].completedDate)||a.resolvedAt||''));
   const openN = all.filter(a=> a.status==='open').length;
   const fmtP = x => x==null ? '—' : (x>=0?'+':'')+(x*100).toFixed(0)+'%';
-  return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid var(--good)'}}>
-    <div className="card-section-title">
-      <h2 style={{margin:0}}>Track record — advice acted on</h2>
-      <span className="meta">{done.length} actioned · {openN} open</span>
-    </div>
-    <div className="micro" style={{color:'var(--text-secondary)', marginBottom:10, lineHeight:1.5}}>
-      Closing the loop: the recommendations you've marked done and what then moved on the metrics each one watches. (Impact is measured per watched metric; £-tagged impact lands once findings carry a £ value.)
-    </div>
-    {(()=>{
-      // Only entries with a real recommendation are a "story". Without text there's
-      // nothing to show — drop them rather than render an empty row.
-      const rows = done.filter(a => (a.text||'').trim()).slice(0,12);
-      if(!rows.length) return <div className="muted" style={{fontSize:13}}>No recommendations marked done yet — mark one from the action board and its measured impact appears here.</div>;
-      const niceMetric = k => String(k||'').replace(/_/g,' ').replace(/\b30d\b/,'(30d)')
-        .replace(/\broas\b/ig,'ROAS').replace(/\bmer\b/ig,'MER').replace(/\baov\b/ig,'AOV').replace(/\bcvr\b/ig,'CVR');
-      // A movement only counts if it's meaningful (≥2%) and not a divide-by-tiny artifact (<300%).
-      const movesOf = (impact) => impact ? Object.entries(impact)
-        .filter(([k,v]) => v && v.deltaPct!=null && Math.abs(v.deltaPct)>=0.02 && Math.abs(v.deltaPct)<3)
-        .sort((x,y)=>Math.abs(y[1].deltaPct)-Math.abs(x[1].deltaPct)) : [];
-      return (<div style={{display:'flex', flexDirection:'column', gap:8}}>
-        {rows.map(a=>{ const when=(local[a.id]&&local[a.id].completedDate)||(a.resolvedAt||'').slice(0,10);
-          const moves = movesOf(a.impact);
-          const watched = a.impact ? Object.keys(a.impact) : [];
-          return (<div key={a.id} style={{padding:'8px 10px', background:'var(--bg-app)', border:'1px solid var(--border-subtle)', borderRadius:'var(--r-sm)'}}>
-            <div style={{display:'flex', gap:8, alignItems:'baseline'}}>
-              <span style={{color:'var(--good)', fontWeight:700}}>✓</span>
-              <span style={{flex:1, fontSize:13, color:'var(--text-primary)'}}>{a.text}</span>
-              {a.agent && <span className="micro" style={{color:'var(--text-faint)'}} title={agentTitle(a.agent)}>{a.agent}{agentRole(a.agent)?` · ${agentRole(a.agent)}`:''}</span>}
-              {when && <span className="micro" style={{color:'var(--text-faint)'}}>{when}</span>}
+  return (
+    <div className="card" style={{marginBottom:14, borderLeft:'3px solid var(--good)'}}>
+      <div className="card-section-title">
+        <h2 style={{margin:0}}>Track record — advice acted on</h2>
+        <span className="meta">{done.length} actioned · {openN} open</span>
+      </div>
+      <div className="micro" style={{color:'var(--text-secondary)', marginBottom:10, lineHeight:1.5}}>Closing the loop: the recommendations you've marked done and what then moved on the metrics each one watches. (Impact is measured per watched metric; {curSym()}-tagged impact lands once findings carry a {curSym()}value.)
             </div>
-            {moves.length
-              ? <div className="micro" style={{color:'var(--text-secondary)', marginTop:3, marginLeft:18}}>Since done: {moves.map(([k,v])=>`${niceMetric(k)} ${fmtP(v.deltaPct)}`).join(' · ')}</div>
-              : (watched.length ? <div className="micro" style={{color:'var(--text-faint)', marginTop:3, marginLeft:18}}>Measuring — watching {watched.slice(0,2).map(niceMetric).join(', ')}; no clear move yet</div> : null)}
-          </div>); })}
-      </div>);
-    })()}
-  </div>);
+      {(()=>{
+        // Only entries with a real recommendation are a "story". Without text there's
+        // nothing to show — drop them rather than render an empty row.
+        const rows = done.filter(a => (a.text||'').trim()).slice(0,12);
+        if(!rows.length) return <div className="muted" style={{fontSize:13}}>No recommendations marked done yet — mark one from the action board and its measured impact appears here.</div>;
+        const niceMetric = k => String(k||'').replace(/_/g,' ').replace(/\b30d\b/,'(30d)')
+          .replace(/\broas\b/ig,'ROAS').replace(/\bmer\b/ig,'MER').replace(/\baov\b/ig,'AOV').replace(/\bcvr\b/ig,'CVR');
+        // A movement only counts if it's meaningful (≥2%) and not a divide-by-tiny artifact (<300%).
+        const movesOf = (impact) => impact ? Object.entries(impact)
+          .filter(([k,v]) => v && v.deltaPct!=null && Math.abs(v.deltaPct)>=0.02 && Math.abs(v.deltaPct)<3)
+          .sort((x,y)=>Math.abs(y[1].deltaPct)-Math.abs(x[1].deltaPct)) : [];
+        return (<div style={{display:'flex', flexDirection:'column', gap:8}}>
+          {rows.map(a=>{ const when=(local[a.id]&&local[a.id].completedDate)||(a.resolvedAt||'').slice(0,10);
+            const moves = movesOf(a.impact);
+            const watched = a.impact ? Object.keys(a.impact) : [];
+            return (<div key={a.id} style={{padding:'8px 10px', background:'var(--bg-app)', border:'1px solid var(--border-subtle)', borderRadius:'var(--r-sm)'}}>
+              <div style={{display:'flex', gap:8, alignItems:'baseline'}}>
+                <span style={{color:'var(--good)', fontWeight:700}}>✓</span>
+                <span style={{flex:1, fontSize:13, color:'var(--text-primary)'}}>{a.text}</span>
+                {a.agent && <span className="micro" style={{color:'var(--text-faint)'}} title={agentTitle(a.agent)}>{a.agent}{agentRole(a.agent)?` · ${agentRole(a.agent)}`:''}</span>}
+                {when && <span className="micro" style={{color:'var(--text-faint)'}}>{when}</span>}
+              </div>
+              {moves.length
+                ? <div className="micro" style={{color:'var(--text-secondary)', marginTop:3, marginLeft:18}}>Since done: {moves.map(([k,v])=>`${niceMetric(k)} ${fmtP(v.deltaPct)}`).join(' · ')}</div>
+                : (watched.length ? <div className="micro" style={{color:'var(--text-faint)', marginTop:3, marginLeft:18}}>Measuring — watching {watched.slice(0,2).map(niceMetric).join(', ')}; no clear move yet</div> : null)}
+            </div>); })}
+        </div>);
+      })()}
+    </div>
+  );
 }
 
 // ── Stock-out spend throttle (Phase 4.1) ─────────────────────────────────────
@@ -8379,8 +8430,8 @@ function parseClarityCsv(text){
   const lines = String(text||'').split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
   if(!lines.length) return {ok:false, error:'The file looks empty.'};
   const rows = lines.map(splitCsvLine).filter(r=>r.length);
-  const isNum = s => s!=null && s!=='' && isFinite(parseFloat(String(s).replace(/[£%,\s]/g,'')));
-  const num = s => parseFloat(String(s).replace(/[£%,\s]/g,''));
+  const isNum = s => s!=null && s!=='' && isFinite(parseFloat(String(s).replace(/[£$€¥%,\s]/g,'')));
+  const num = s => parseFloat(String(s).replace(/[£$€¥%,\s]/g,''));
   // Collect (label, value) pairs across layouts.
   let pairs = [];
   const kvRows = rows.filter(r=>r.length>=2 && isNum(r[1])).length;
@@ -8624,27 +8675,29 @@ function MarginBridge({cur, pri, gm, perOrderFixed, payPct}){
   const segLabel = (which)=>(p)=>{ const d=data[p.index]||{}; if(!(d[which]>0)) return null;   // only the row's real segment
     const txt = d.isTotal ? GBP(d.amt) : ((d.amt>=0?'+':'−')+GBP(Math.abs(d.amt)));
     return (<text className="recharts-text" x={(p.x||0)+(p.width||0)/2} y={(p.y||0)-5} textAnchor="middle" fontSize="10.5" fontWeight="600" fill="#aab0bd">{txt}</text>); };
-  return (<div className="card" style={{marginBottom:14}}>
-    <div className="card-section-title">
-      <h2 style={{margin:0}}>Why contribution moved <span style={{fontWeight:400,color:'var(--text-faint)',fontSize:13}}>— vs prior period</span></h2>
-      <span className="meta" style={{display:'inline-flex',alignItems:'center',gap:6}}><MarginBadge/> {delta>=0?'+':'−'}{GBP(Math.abs(delta))}{dpct!=null?` (${(dpct>=0?'+':'')}${(dpct*100).toFixed(0)}%)`:''}</span>
+  return (
+    <div className="card" style={{marginBottom:14}}>
+      <div className="card-section-title">
+        <h2 style={{margin:0}}>Why contribution moved <span style={{fontWeight:400,color:'var(--text-faint)',fontSize:13}}>— vs prior period</span></h2>
+        <span className="meta" style={{display:'inline-flex',alignItems:'center',gap:6}}><MarginBadge/> {delta>=0?'+':'−'}{GBP(Math.abs(delta))}{dpct!=null?` (${(dpct>=0?'+':'')}${(dpct*100).toFixed(0)}%)`:''}</span>
+      </div>
+      <R.ResponsiveContainer width="100%" height={260}>
+        <R.BarChart data={data} margin={{top:24,right:16,left:10,bottom:6}}>
+          <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
+          <R.XAxis dataKey="name" tick={{fill:'#7e7e8a',fontSize:11}} interval={0}/>
+          <R.YAxis tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>curSym()+(Math.abs(v)>=1000?(v/1000).toFixed(0)+'k':v)}/>
+          <R.Tooltip cursor={{fill:'#ffffff08'}} content={<Tip/>}/>
+          <R.Bar dataKey="base" stackId="s" fill="transparent" isAnimationActive={false}/>
+          <R.Bar dataKey="pos" stackId="s" isAnimationActive={false}>{data.map((d,i)=><R.Cell key={i} fill={d.isTotal?'#7c8cff':'#4ade80'}/>)}<R.LabelList content={segLabel('pos')}/></R.Bar>
+          <R.Bar dataKey="neg" stackId="s" fill="#f87171" isAnimationActive={false}><R.LabelList content={segLabel('neg')}/></R.Bar>
+        </R.BarChart>
+      </R.ResponsiveContainer>
+      <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>Fully-loaded contribution = net revenue × {PCT(gm)} margin − variable costs − paid media. Bars sum exactly to the change; green helped, red hurt.</div>
+      <ChartFooter note="Which lever moved contribution most this period — and was it volume, margin, or spend?"
+        ask="From the contribution bridge, what drove the change in contribution most, and is it something I can act on?"
+        rows={rows} columns={[{key:'name',label:'Driver'},{key:'delta',label:'Δ contribution',right:true,fmt:(v,r)=>r.total!=null?GBP(r.total):(v>=0?'+':'−')+GBP(Math.abs(v))}]}/>
     </div>
-    <R.ResponsiveContainer width="100%" height={260}>
-      <R.BarChart data={data} margin={{top:24,right:16,left:10,bottom:6}}>
-        <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
-        <R.XAxis dataKey="name" tick={{fill:'#7e7e8a',fontSize:11}} interval={0}/>
-        <R.YAxis tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>'£'+(Math.abs(v)>=1000?(v/1000).toFixed(0)+'k':v)}/>
-        <R.Tooltip cursor={{fill:'#ffffff08'}} content={<Tip/>}/>
-        <R.Bar dataKey="base" stackId="s" fill="transparent" isAnimationActive={false}/>
-        <R.Bar dataKey="pos" stackId="s" isAnimationActive={false}>{data.map((d,i)=><R.Cell key={i} fill={d.isTotal?'#7c8cff':'#4ade80'}/>)}<R.LabelList content={segLabel('pos')}/></R.Bar>
-        <R.Bar dataKey="neg" stackId="s" fill="#f87171" isAnimationActive={false}><R.LabelList content={segLabel('neg')}/></R.Bar>
-      </R.BarChart>
-    </R.ResponsiveContainer>
-    <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>Fully-loaded contribution = net revenue × {PCT(gm)} margin − variable costs − paid media. Bars sum exactly to the change; green helped, red hurt.</div>
-    <ChartFooter note="Which lever moved contribution most this period — and was it volume, margin, or spend?"
-      ask="From the contribution bridge, what drove the change in contribution most, and is it something I can act on?"
-      rows={rows} columns={[{key:'name',label:'Driver'},{key:'delta',label:'Δ contribution',right:true,fmt:(v,r)=>r.total!=null?GBP(r.total):(v>=0?'+':'−')+GBP(Math.abs(v))}]}/>
-  </div>);
+  );
 }
 
 // ── Acquisition-vs-retention product matrix (Phase 1.3) ──────────────────────
@@ -8739,55 +8792,59 @@ function RestockActionQueue(){
   const btn = {display:'inline-flex',alignItems:'center',gap:5,fontSize:11.5,fontWeight:600,padding:'5px 11px',borderRadius:7,border:'1px solid var(--border-default)',background:'var(--bg-elevated)',color:'var(--text-primary)',cursor:'pointer',whiteSpace:'nowrap'};
   const raise = (l)=>{ setPoStatus(l.key, {status:'ordered', qty:l.qty, raisedAt:oiToday(), baselineQty:l.p.inventoryQty||0, lead:l.lead, supplier:l.supplier, title:l.p.title}); toast('PO marked raised', {kind:'good', body:l.p.title+' · awaiting stock'}); };
 
-  return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid '+(toOrder.length?'var(--warn)':'var(--accent)')}}>
-    <div className="card-section-title" style={{marginBottom:6}}>
-      <h2 style={{margin:0}}>Stock &amp; purchasing</h2>
-      <span className="meta">{oosNow>0?<b style={{color:'var(--bad)'}}>{oosNow} order today</b>:null}{oosNow>0?' · ':''}{toOrder.length} to order{awaiting.length?` · ${awaiting.length} awaiting stock`:''} · Atlas · finance &amp; commercial</span>
-    </div>
-
-    {toOrder.length>0 ? (<div style={{display:'flex',flexDirection:'column',gap:7}}>
-      {/* Urgent (OOS-before-lead) rows always show; the non-urgent tail collapses to keep the queue scannable. */}
-      {(showAllToOrder ? toOrder : toOrder.filter(l=>l.oosBeforeLead)).slice(0,12).map((l,idx)=>{ const urgent=l.oosBeforeLead;
-        return (<div key={idx} style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',padding:'8px 0',borderTop:idx?'1px solid var(--border-subtle)':'none'}}>
-          <span style={{width:8,height:8,borderRadius:'50%',background:urgent?'var(--bad)':'var(--warn)',flexShrink:0}}/>
-          <div style={{flex:1,minWidth:200}}>
-            <div style={{fontSize:13,color:'var(--text-primary)'}}>{l.basis==='forecast'?'Order for forecast':'Raise PO'} — <b>{NUM(l.qty)} units</b> of {l.p.title}{urgent && <span style={{marginLeft:6,fontSize:9.5,fontWeight:800,letterSpacing:'.03em',color:'#fff',background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}</div>
-            <div style={{fontSize:11,color:'var(--text-faint)',marginTop:1}}>{l.supplier} · {urgent?`OOS in ~${Math.round(l.cover)}d — ${l.oosGap}d short of the ${l.lead}d lead`:(l.basis==='forecast'?`plan needs ${NUM(l.forecastUnits)}, have ${NUM(l.stock)}`:`runs out in ~${Math.round(l.cover)}d (lead ${l.lead}d)`)}{l.lineCost!=null?` · ~£${k(l.lineCost)}`:''}{l.moqBumped?` · MOQ ${l.moq}`:''}</div>
-          </div>
-          <button style={{...btn,background:'var(--accent)',color:'#fff',borderColor:'var(--accent)'}} onClick={()=>raise(l)}><Icon name="check" size={12}/> Mark PO raised</button>
-          <button style={btn} onClick={()=>window.__oiNav&&window.__oiNav('planning','plan')}>Open planner</button>
-        </div>); })}
-      {(()=>{ const rest=toOrder.filter(l=>!l.oosBeforeLead); if(!rest.length) return null;
-        if(!showAllToOrder){ const restVal=rest.reduce((a,l)=>a+(l.lineCost||0),0); return (<button onClick={()=>setShowAllToOrder(true)} style={{...btn,alignSelf:'flex-start',marginTop:4}}>Show {rest.length} more to order{restVal>0?` · ~£${k(restVal)}`:''}</button>); }
-        return (<a className="txt-link" onClick={()=>setShowAllToOrder(false)} style={{cursor:'pointer',fontSize:11.5,marginTop:4,alignSelf:'flex-start'}}>Show less</a>); })()}
-      {showAllToOrder && toOrder.length>12 && <div style={{fontSize:11.5,color:'var(--text-faint)',paddingTop:6}}><a className="txt-link" onClick={()=>window.__oiNav&&window.__oiNav('planning','plan')} style={{cursor:'pointer'}}>+ {toOrder.length-12} more in the planner</a></div>}
-    </div>) : <div className="muted" style={{fontSize:12.5,padding:'2px 0'}}>Nothing to order right now — {awaiting.length} PO{awaiting.length===1?'':'s'} awaiting stock below.</div>}
-
-    {awaiting.length>0 && (<div style={{marginTop:12,paddingTop:10,borderTop:'1px solid var(--border-subtle)'}}>
-      <div style={{fontSize:11,fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:6}}>Awaiting stock · already ordered</div>
-      <div style={{display:'flex',flexDirection:'column',gap:6}}>
-        {awaiting.map((l,idx)=>(<div key={idx} style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',fontSize:12}}>
-          <Icon name="check" size={13} style={{color:'var(--accent)',flexShrink:0}}/>
-          <span style={{flex:1,minWidth:180,color:'var(--text-secondary)'}}>{NUM((l.po&&l.po.qty)||l.qty)} × {l.p.title} <span style={{color:'var(--text-faint)'}}>· expected ~{l.expected||'?'}{l.overdue?' · overdue, chase supplier':''}</span></span>
-          <button style={{...btn,padding:'3px 9px'}} onClick={()=>{ setPoStatus(l.key,{status:'received', baselineQty:l.p.inventoryQty||0, receivedAt:oiToday()}); toast('Marked received', {kind:'good', body:l.p.title}); }}>Received</button>
-          <button style={{...btn,padding:'3px 9px',background:'transparent',color:'var(--text-muted)'}} onClick={()=>{ clearPoStatus(l.key); toast('PO cancelled', {body:l.p.title}); }}>Cancel</button>
-        </div>))}
+  return (
+    <div className="card" style={{marginBottom:14, borderLeft:'3px solid '+(toOrder.length?'var(--warn)':'var(--accent)')}}>
+      <div className="card-section-title" style={{marginBottom:6}}>
+        <h2 style={{margin:0}}>Stock &amp; purchasing</h2>
+        <span className="meta">{oosNow>0?<b style={{color:'var(--bad)'}}>{oosNow} order today</b>:null}{oosNow>0?' · ':''}{toOrder.length} to order{awaiting.length?` · ${awaiting.length} awaiting stock`:''} · Atlas · finance &amp; commercial</span>
       </div>
-      <div style={{fontSize:11,color:'var(--text-faint)',marginTop:8,lineHeight:1.5}}>You won't be reminded about these again. Each auto-closes when its stock comes back up — Shopify inventory for products, your on-hand figure for packaging.</div>
-    </div>)}
-  </div>);
+      {toOrder.length>0 ? (<div style={{display:'flex',flexDirection:'column',gap:7}}>
+        {/* Urgent (OOS-before-lead) rows always show; the non-urgent tail collapses to keep the queue scannable. */}
+        {(showAllToOrder ? toOrder : toOrder.filter(l=>l.oosBeforeLead)).slice(0,12).map((l,idx)=>{ const urgent=l.oosBeforeLead;
+          return (
+            <div key={idx} style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',padding:'8px 0',borderTop:idx?'1px solid var(--border-subtle)':'none'}}>
+              <span style={{width:8,height:8,borderRadius:'50%',background:urgent?'var(--bad)':'var(--warn)',flexShrink:0}}/>
+              <div style={{flex:1,minWidth:200}}>
+                <div style={{fontSize:13,color:'var(--text-primary)'}}>{l.basis==='forecast'?'Order for forecast':'Raise PO'} — <b>{NUM(l.qty)} units</b> of {l.p.title}{urgent && <span style={{marginLeft:6,fontSize:9.5,fontWeight:800,letterSpacing:'.03em',color:'#fff',background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}</div>
+                <div style={{fontSize:11,color:'var(--text-faint)',marginTop:1}}>{l.supplier} · {urgent?`OOS in ~${Math.round(l.cover)}d — ${l.oosGap}d short of the ${l.lead}d lead`:(l.basis==='forecast'?`plan needs ${NUM(l.forecastUnits)}, have ${NUM(l.stock)}`:`runs out in ~${Math.round(l.cover)}d (lead ${l.lead}d)`)}{l.lineCost!=null?` · ~${curSym()}${k(l.lineCost)}`:''}{l.moqBumped?` · MOQ ${l.moq}`:''}</div>
+              </div>
+              <button style={{...btn,background:'var(--accent)',color:'#fff',borderColor:'var(--accent)'}} onClick={()=>raise(l)}><Icon name="check" size={12}/> Mark PO raised</button>
+              <button style={btn} onClick={()=>window.__oiNav&&window.__oiNav('planning','plan')}>Open planner</button>
+            </div>
+          ); })}
+        {(()=>{ const rest=toOrder.filter(l=>!l.oosBeforeLead); if(!rest.length) return null;
+          if(!showAllToOrder){ const restVal=rest.reduce((a,l)=>a+(l.lineCost||0),0); return (<button onClick={()=>setShowAllToOrder(true)} style={{...btn,alignSelf:'flex-start',marginTop:4}}>Show {rest.length}more to order{restVal>0?` · ~${curSym()}${k(restVal)}`:''}</button>); }
+          return (<a className="txt-link" onClick={()=>setShowAllToOrder(false)} style={{cursor:'pointer',fontSize:11.5,marginTop:4,alignSelf:'flex-start'}}>Show less</a>); })()}
+        {showAllToOrder && toOrder.length>12 && <div style={{fontSize:11.5,color:'var(--text-faint)',paddingTop:6}}><a className="txt-link" onClick={()=>window.__oiNav&&window.__oiNav('planning','plan')} style={{cursor:'pointer'}}>+ {toOrder.length-12} more in the planner</a></div>}
+      </div>) : <div className="muted" style={{fontSize:12.5,padding:'2px 0'}}>Nothing to order right now — {awaiting.length} PO{awaiting.length===1?'':'s'} awaiting stock below.</div>}
+      {awaiting.length>0 && (<div style={{marginTop:12,paddingTop:10,borderTop:'1px solid var(--border-subtle)'}}>
+        <div style={{fontSize:11,fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:6}}>Awaiting stock · already ordered</div>
+        <div style={{display:'flex',flexDirection:'column',gap:6}}>
+          {awaiting.map((l,idx)=>(<div key={idx} style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',fontSize:12}}>
+            <Icon name="check" size={13} style={{color:'var(--accent)',flexShrink:0}}/>
+            <span style={{flex:1,minWidth:180,color:'var(--text-secondary)'}}>{NUM((l.po&&l.po.qty)||l.qty)} × {l.p.title} <span style={{color:'var(--text-faint)'}}>· expected ~{l.expected||'?'}{l.overdue?' · overdue, chase supplier':''}</span></span>
+            <button style={{...btn,padding:'3px 9px'}} onClick={()=>{ setPoStatus(l.key,{status:'received', baselineQty:l.p.inventoryQty||0, receivedAt:oiToday()}); toast('Marked received', {kind:'good', body:l.p.title}); }}>Received</button>
+            <button style={{...btn,padding:'3px 9px',background:'transparent',color:'var(--text-muted)'}} onClick={()=>{ clearPoStatus(l.key); toast('PO cancelled', {body:l.p.title}); }}>Cancel</button>
+          </div>))}
+        </div>
+        <div style={{fontSize:11,color:'var(--text-faint)',marginTop:8,lineHeight:1.5}}>You won't be reminded about these again. Each auto-closes when its stock comes back up — Shopify inventory for products, your on-hand figure for packaging.</div>
+      </div>)}
+    </div>
+  );
 }
 
 function ActionsView(){
-  return (<div>
-    <div className="card-section-title" style={{marginBottom:12}}>
-      <h2 style={{margin:0}}>Actions</h2>
-      <span className="meta">Everything worth doing, ranked by £ impact — work the queue, mark items done as you go</span>
+  return (
+    <div>
+      <div className="card-section-title" style={{marginBottom:12}}>
+        <h2 style={{margin:0}}>Actions</h2>
+        <span className="meta">Everything worth doing, ranked by {curSym()}impact — work the queue, mark items done as you go</span>
+      </div>
+      <RestockActionQueue/>
+      <ActionBoard/>
+      <AdviceLedgerPanel/>
     </div>
-    <RestockActionQueue/>
-    <ActionBoard/>
-    <AdviceLedgerPanel/>
-  </div>);
+  );
 }
 
 // Command menu (⌘K / Ctrl-K) — jump to any page or the AI analyst from anywhere.
@@ -8854,7 +8911,7 @@ function BusinessReview(){
   const trail = (key)=> weeks.slice(Math.max(0,i-8), i+1).map(w=>({x:(w.weekStart||'').slice(5), v:w.m[key]}));
 
   // formatters
-  const gbpK = v=>'£'+(Math.abs(v)>=1000?(v/1000).toFixed(1).replace(/\.0$/,'')+'k':Math.round(v));
+  const gbpK = v=>curSym()+(Math.abs(v)>=1000?(v/1000).toFixed(1).replace(/\.0$/,'')+'k':Math.round(v));
   const pct0 = v=>v!=null?(v*100).toFixed(0)+'%':'—';
   const pct1 = v=>v!=null?(v*100).toFixed(1)+'%':'—';
   const k = v=>{ v=Math.abs(Math.round(v)); return v>=1000?(v/1000).toFixed(v>=10000?0:1).replace(/\.0$/,'')+'k':''+v; };
@@ -8919,7 +8976,7 @@ function BusinessReview(){
     { label:'Contribution LTV : CAC', value: ltvCac!=null?ltvCac.toFixed(1)+'×':'—',
       status: ltvCac==null?'missing':(ltvCac>=3?'healthy':ltvCac>=2?'watch':'action'),
       statusLabel: ltvCac==null?'Needs data':(ltvCac>=3?'Healthy':ltvCac>=2?'Watch':'Below 2×'),
-      sub: ltvCac!=null?`Contribution LTV £${NUM(Math.round(contribLTV))} ÷ paid CAC £${NUM(Math.round(paidCac))} · target ≥3×`:'Needs cost + cohort data',
+      sub: ltvCac!=null?`Contribution LTV ${curSym()}${NUM(Math.round(contribLTV))} ÷ paid CAC ${curSym()}${NUM(Math.round(paidCac))} · target ≥3×`:'Needs cost + cohort data',
       read:`Contribution LTV:CAC ${ltvCac!=null?ltvCac.toFixed(1)+'×':'—'} (target ≥3×)` },
     { label:'Repeat purchase rate', value: repeat!=null?pct1(repeat):'—',
       status: repeat==null?'missing':(repeat>=0.25?'healthy':repeat>=0.12?'watch':'action'),
@@ -8928,7 +8985,7 @@ function BusinessReview(){
       read:`Repeat rate ${repeat!=null?pct1(repeat):'—'}, ${opc?opc.toFixed(2):'—'} orders/customer` },
     { label:'Average order value', value: W&&W.m.aov!=null?GBP(W.m.aov):'—',
       status:'info', statusLabel:'Monetization',
-      series: trail('aov'), color:'var(--accent)', fmt:v=>GBP(v), axisFmt:v=>'£'+Math.round(v),
+      series: trail('aov'), color:'var(--accent)', fmt:v=>GBP(v), axisFmt:v=>curSym()+Math.round(v),
       read:`AOV ${W&&W.m.aov!=null?GBP(W.m.aov):'—'} (8-week trend)` },
     { label:'Stock cover risk', value: lowCover+(lowCover===1?' SKU':' SKUs'),
       status: sk('critical')>0?'watch':'healthy', statusLabel: sk('critical')>0?'Restock needed':'Covered',
@@ -8955,7 +9012,7 @@ function BusinessReview(){
     { label:'Capital in slow stock', value: GBP(Math.round(slowCapital)),
       status: slowCapital>50000?'watch':'healthy', statusLabel: slowCapital>50000?'Cash tied up':'Lean',
       sub:`${sk('overstock')} overstock SKUs (>180d cover) valued at cost`,
-      read:`£${k(slowCapital)} capital tied in slow-moving stock (${sk('overstock')} overstock SKUs)` },
+      read:`${curSym()}${k(slowCapital)} capital tied in slow-moving stock (${sk('overstock')} overstock SKUs)` },
   ];
 
   // ── Cash runway — cash on hand ÷ net monthly burn (run-rate from last 4 weeks) ──
@@ -8980,14 +9037,14 @@ function BusinessReview(){
       sub:'Not enough weekly revenue history to estimate burn', onClick:editCash, read:'Cash runway: insufficient data' };
   } else if(moNet>=0){
     runwayCard = { label:'Cash runway', value:'Cash-flow positive', status:'healthy', statusLabel:'Self-funding',
-      sub:`Net +£${k(moNet)}/mo run-rate · £${k(cashBal)} on hand`, onClick:editCash,
-      read:`Cash runway: cash-flow positive (net +£${k(moNet)}/mo, £${k(cashBal)} on hand)` };
+      sub:`Net +${curSym()}${k(moNet)}/mo run-rate · ${curSym()}${k(cashBal)} on hand`, onClick:editCash,
+      read:`Cash runway: cash-flow positive (net +${curSym()}${k(moNet)}/mo, ${curSym()}${k(cashBal)} on hand)` };
   } else {
     const months = cashBal/(-moNet);
     runwayCard = { label:'Cash runway', value: months>=24?'24+ mo':months.toFixed(1)+' mo',
       status: months<6?'action':months<12?'watch':'healthy', statusLabel: months<6?'Under 6 months':months<12?'Under 12 months':'12+ months',
-      sub:`£${k(cashBal)} ÷ £${k(-moNet)}/mo net burn (rev×GM − ad spend − overheads)`, onClick:editCash,
-      read:`Cash runway ${months.toFixed(1)} months (£${k(cashBal)} ÷ £${k(-moNet)}/mo net burn)` };
+      sub:`${curSym()}${k(cashBal)} ÷ ${curSym()}${k(-moNet)}/mo net burn (rev×GM − ad spend − overheads)`, onClick:editCash,
+      read:`Cash runway ${months.toFixed(1)} months (${curSym()}${k(cashBal)} ÷ ${curSym()}${k(-moNet)}/mo net burn)` };
   }
   durD.push(runwayCard);
   const saveCash = ()=>{ saveCashConfig({...cashConfig(), cash:cashDraft, overheads:ovDraft}); setCashOpen(false); };
@@ -8997,9 +9054,9 @@ function BusinessReview(){
   const overall = breaches>=2 ? {kind:'action',label:'Action required'}
                 : (breaches===1 || atRisk>2000) ? {kind:'watch',label:'Watch'}
                 : {kind:'healthy',label:'On track'};
-  const verdictSentence = `£${k(atRisk)}/mo of contribution is exposed across ${risks.length} flagged risk${risks.length===1?'':'s'}, against £${k(upside)}/mo of identified upside across ${opps.length} opportunit${opps.length===1?'y':'ies'}. ${openActions} actions are open in the queue. `
+  const verdictSentence = `${curSym()}${k(atRisk)}/mo of contribution is exposed across ${risks.length} flagged risk${risks.length===1?'':'s'}, against ${curSym()}${k(upside)}/mo of identified upside across ${opps.length} opportunit${opps.length===1?'y':'ies'}. ${openActions} actions are open in the queue. `
     + `Unit economics: ${ltvCac!=null?ltvCac.toFixed(1)+'× contribution LTV:CAC':'LTV:CAC pending cost data'}, repeat rate ${repeat!=null?pct1(repeat):'—'}. `
-    + `${topChan&&topShare!=null?`${topChan.channel} drives ${pct0(topShare)} of revenue`:''}${slowCapital>50000?`, with £${k(slowCapital)} of capital tied in slow-moving stock`:''}.`;
+    + `${topChan&&topShare!=null?`${topChan.channel} drives ${pct0(topShare)} of revenue`:''}${slowCapital>50000?`, with ${curSym()}${k(slowCapital)} of capital tied in slow-moving stock`:''}.`;
 
   const copyBriefing = ()=>{
     const L=[];
@@ -9010,10 +9067,10 @@ function BusinessReview(){
     L.push('THE ENGINE:');                           engineD.forEach(d=>L.push('  • '+d.read));
     L.push('DURABILITY:');                           durD.forEach(d=>L.push('  • '+d.read));
     L.push('');
-    L.push(`TOP RISKS (£${k(atRisk)}/mo exposed):`);
-    (risks.length?risks:[{description:'None flagged'}]).slice(0,5).forEach(x=>L.push('  • '+x.description+(x.monthly_impact_gbp?` (~£${k(Math.abs(x.monthly_impact_gbp))}/mo)`:'')));
-    L.push(`TOP OPPORTUNITIES (£${k(upside)}/mo identified):`);
-    (opps.length?opps:[{description:'None flagged'}]).slice(0,5).forEach(x=>L.push('  • '+x.description+(x.monthly_impact_gbp?` (~£${k(Math.abs(x.monthly_impact_gbp))}/mo)`:'')));
+    L.push(`TOP RISKS (${curSym()}${k(atRisk)}/mo exposed):`);
+    (risks.length?risks:[{description:'None flagged'}]).slice(0,5).forEach(x=>L.push('  • '+x.description+(x.monthly_impact_gbp?` (~${curSym()}${k(Math.abs(x.monthly_impact_gbp))}/mo)`:'')));
+    L.push(`TOP OPPORTUNITIES (${curSym()}${k(upside)}/mo identified):`);
+    (opps.length?opps:[{description:'None flagged'}]).slice(0,5).forEach(x=>L.push('  • '+x.description+(x.monthly_impact_gbp?` (~${curSym()}${k(Math.abs(x.monthly_impact_gbp))}/mo)`:'')));
     const text=L.join('\n');
     try{ (navigator.clipboard&&navigator.clipboard.writeText(text)); }catch(e){}
     toast('Briefing copied', {kind:'good', body:'Paste into your notes or board pack.'});
@@ -9035,7 +9092,7 @@ function BusinessReview(){
       {x.basis && <div style={{fontSize:11,color:'var(--text-faint)',marginTop:2,lineHeight:1.4}}>{x.basis}</div>}
     </div>
     <div style={{textAlign:'right',flexShrink:0}}>
-      <div style={{fontWeight:700,fontSize:13.5,color:accent,whiteSpace:'nowrap'}}>~£{k(Math.abs(x.monthly_impact_gbp))}/mo</div>
+      <div style={{fontWeight:700,fontSize:13.5,color:accent,whiteSpace:'nowrap'}}>~{curSym()}{k(Math.abs(x.monthly_impact_gbp))}/mo</div>
       <div style={{marginTop:4}}>{confChip(confTier(x.confidence))}</div>
     </div>
   </div>);
@@ -9045,88 +9102,83 @@ function BusinessReview(){
     return (<div className="card"><div className="muted" style={{fontSize:13}}>Business review needs at least one complete week of synced data. Connect your sources and check back once a full week has closed.</div></div>);
   }
 
-  return (<div>
-    <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:6}}>
-      <h2 style={{margin:0,fontSize:18}}>Business review</h2>
-      <span className="muted" style={{fontSize:12}}>Management overview · week of {W.label} + trailing trend · independent of the date picker</span>
-    </div>
-
-    {/* TL;DR — the main points across the business, in five lines */}
-    {(()=>{ const tl=[];
-      tl.push({t:`${overall.label}: £${k(atRisk)}/mo of contribution exposed vs £${k(upside)}/mo of identified upside · ${openActions} actions open.`, c: overall.kind==='action'?'var(--bad)':overall.kind==='watch'?'var(--warn)':'var(--good)'});
-      if(risks[0]) tl.push({t:`Biggest risk — ${risks[0].description} (~£${k(Math.abs(risks[0].monthly_impact_gbp))}/mo).`, c:'var(--bad)'});
-      if(opps[0]) tl.push({t:`Biggest opportunity — ${opps[0].description} (~£${k(Math.abs(opps[0].monthly_impact_gbp))}/mo).`, c:'var(--good)'});
-      tl.push({t:`Unit economics: ${ltvCac!=null?ltvCac.toFixed(1)+'× contribution LTV:CAC':'LTV:CAC pending cost data'}, repeat rate ${repeat!=null?pct1(repeat):'—'}${ltvCac!=null?` — ${ltvCac>=3?'healthy':'below the 3× target'}`:''}.`, c: (ltvCac!=null&&ltvCac>=3)?'var(--good)':'var(--warn)'});
-      if(slowCapital>50000) tl.push({t:`£${k(slowCapital)} of capital tied up in slow-moving stock${topChan&&topShare!=null?`; ${topChan.channel} drives ${pct0(topShare)} of revenue`:''}.`, c:'var(--warn)'});
-      return (<div className="card" style={{borderLeft:'3px solid var(--text-faint)'}}>
-        <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:8}}>
-          <span style={{fontSize:13,fontWeight:800,letterSpacing:'.06em',color:'var(--text-primary)'}}>TL;DR</span>
-          <span className="muted" style={{fontSize:11.5}}>the main points across the business right now</span>
-          <button style={{...btn,marginLeft:'auto',fontSize:11.5,padding:'5px 11px'}} onClick={copyBriefing}><Icon name="clipboard" size={12}/> Copy briefing</button>
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:6}}>
+        <h2 style={{margin:0,fontSize:18}}>Business review</h2>
+        <span className="muted" style={{fontSize:12}}>Management overview · week of {W.label} + trailing trend · independent of the date picker</span>
+      </div>
+      {/* TL;DR — the main points across the business, in five lines */}
+      {(()=>{ const tl=[];
+        tl.push({t:`${overall.label}: ${curSym()}${k(atRisk)}/mo of contribution exposed vs ${curSym()}${k(upside)}/mo of identified upside · ${openActions} actions open.`, c: overall.kind==='action'?'var(--bad)':overall.kind==='watch'?'var(--warn)':'var(--good)'});
+        if(risks[0]) tl.push({t:`Biggest risk — ${risks[0].description} (~${curSym()}${k(Math.abs(risks[0].monthly_impact_gbp))}/mo).`, c:'var(--bad)'});
+        if(opps[0]) tl.push({t:`Biggest opportunity — ${opps[0].description} (~${curSym()}${k(Math.abs(opps[0].monthly_impact_gbp))}/mo).`, c:'var(--good)'});
+        tl.push({t:`Unit economics: ${ltvCac!=null?ltvCac.toFixed(1)+'× contribution LTV:CAC':'LTV:CAC pending cost data'}, repeat rate ${repeat!=null?pct1(repeat):'—'}${ltvCac!=null?` — ${ltvCac>=3?'healthy':'below the 3× target'}`:''}.`, c: (ltvCac!=null&&ltvCac>=3)?'var(--good)':'var(--warn)'});
+        if(slowCapital>50000) tl.push({t:`${curSym()}${k(slowCapital)} of capital tied up in slow-moving stock${topChan&&topShare!=null?`; ${topChan.channel} drives ${pct0(topShare)} of revenue`:''}.`, c:'var(--warn)'});
+        return (<div className="card" style={{borderLeft:'3px solid var(--text-faint)'}}>
+          <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:8}}>
+            <span style={{fontSize:13,fontWeight:800,letterSpacing:'.06em',color:'var(--text-primary)'}}>TL;DR</span>
+            <span className="muted" style={{fontSize:11.5}}>the main points across the business right now</span>
+            <button style={{...btn,marginLeft:'auto',fontSize:11.5,padding:'5px 11px'}} onClick={copyBriefing}><Icon name="clipboard" size={12}/> Copy briefing</button>
+          </div>
+          <div style={{display:'flex',flexDirection:'column',gap:7}}>{tl.map((b,i)=>(<div key={i} style={{display:'flex',gap:9,alignItems:'baseline',fontSize:13.5,lineHeight:1.5,color:'var(--text-primary)'}}><span style={{width:6,height:6,borderRadius:'50%',background:b.c,flexShrink:0,marginTop:6}}/><span>{b.t}</span></div>))}</div>
+        </div>); })()}
+      {/* Executive verdict */}
+      <div className="card" style={{borderLeft:'3px solid var(--accent)'}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+          <StatusBadge kind={overall.kind} label={overall.label}/>
+          <span className="muted" style={{fontSize:12}}>Overall posture</span>
+          <button style={{...btn,marginLeft:'auto'}} onClick={copyBriefing}><Icon name="clipboard" size={13}/> Copy as briefing</button>
         </div>
-        <div style={{display:'flex',flexDirection:'column',gap:7}}>{tl.map((b,i)=>(<div key={i} style={{display:'flex',gap:9,alignItems:'baseline',fontSize:13.5,lineHeight:1.5,color:'var(--text-primary)'}}><span style={{width:6,height:6,borderRadius:'50%',background:b.c,flexShrink:0,marginTop:6}}/><span>{b.t}</span></div>))}</div>
-      </div>); })()}
-
-    {/* Executive verdict */}
-    <div className="card" style={{borderLeft:'3px solid var(--accent)'}}>
-      <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-        <StatusBadge kind={overall.kind} label={overall.label}/>
-        <span className="muted" style={{fontSize:12}}>Overall posture</span>
-        <button style={{...btn,marginLeft:'auto'}} onClick={copyBriefing}><Icon name="clipboard" size={13}/> Copy as briefing</button>
+        <div style={{fontSize:14.5,marginTop:11,lineHeight:1.55,color:'var(--text-primary)'}}>{verdictSentence}</div>
+        <div style={{fontSize:11,color:'var(--text-faint)',marginTop:9,lineHeight:1.4}}>Built from live Shopify, GA4, Meta, Google Ads, Klaviyo and cohort data. Every figure is a factual read of synced data — not a projection.</div>
       </div>
-      <div style={{fontSize:14.5,marginTop:11,lineHeight:1.55,color:'var(--text-primary)'}}>{verdictSentence}</div>
-      <div style={{fontSize:11,color:'var(--text-faint)',marginTop:9,lineHeight:1.4}}>Built from live Shopify, GA4, Meta, Google Ads, Klaviyo and cohort data. Every figure is a factual read of synced data — not a projection.</div>
-    </div>
-
-    {/* Three-horizon scorecard */}
-    <Eyebrow>Now · trading — this week vs last</Eyebrow>
-    <div className="card"><div className="wc-grid">{nowD.map((d,idx)=>RvCard({label:d.sp.label, value:d.sp.fmt(d.val), change:`${d.up?'↑':'↓'}${Math.abs(d.ch*100).toFixed(0)}%`, changeColor:d.good==null?'var(--text-muted)':(d.good?'var(--good)':'var(--bad)'), status:d.badge.kind, statusLabel:d.badge.label, series:trail(d.sp.key), color:RAG_COL[d.rag]||'var(--text-faint)', fmt:d.sp.fmt, axisFmt:d.sp.axisFmt}, idx))}</div></div>
-
-    <Eyebrow>The engine · is the machine strengthening (trailing)</Eyebrow>
-    <div className="card"><div className="wc-grid">{engineD.map(RvCard)}</div></div>
-
-    <Eyebrow>Durability · will it compound — and what could break it</Eyebrow>
-    <div className="card"><div className="wc-grid">{durD.map(RvCard)}</div></div>
-    {cashOpen && (<div className="card" style={{marginTop:10, borderLeft:'3px solid var(--accent)'}}>
-      <div style={{fontSize:13,fontWeight:700,color:'var(--text-primary)',marginBottom:9}}>Cash position</div>
-      <div style={{display:'flex',gap:18,flexWrap:'wrap',alignItems:'flex-end'}}>
-        <label style={lbl}>Cash on hand (£)<input type="number" value={cashDraft} onChange={e=>setCashDraft(e.target.value)} placeholder="e.g. 80000" style={inp}/></label>
-        <label style={lbl}>Monthly overheads (£)<input type="number" value={ovDraft} onChange={e=>setOvDraft(e.target.value)} placeholder="e.g. 12000" style={inp}/></label>
-        <button style={btn} onClick={saveCash}>Save</button>
-        <button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setCashOpen(false)}>Cancel</button>
-      </div>
-      <div style={{fontSize:11,color:'var(--text-faint)',marginTop:10,lineHeight:1.5}}>Overheads = salaries, rent, software — costs <b>not</b> already in ad spend or COGS. Runway = cash ÷ (monthly gross profit − ad spend − overheads), using your last {recentW.length||4} complete weeks as the run-rate. A factual estimate; it ignores one-off inventory purchases and working-capital timing.</div>
-    </div>)}
-
-    {/* Risk & opportunity registers */}
-    <Eyebrow>Risks & opportunities · quantified</Eyebrow>
-    <div className="row">
-      <div className="card" style={{flex:'1 1 340px', minWidth:0, borderTop:'3px solid var(--bad)'}}>
-        <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:8,marginBottom:4}}>
-          <span style={{fontSize:14,fontWeight:700,color:'var(--text-primary)'}}>Risk register</span>
-          <span style={{fontSize:12,fontWeight:700,color:'var(--bad)',whiteSpace:'nowrap'}}>£{k(atRisk)}/mo exposed</span>
+      {/* Three-horizon scorecard */}
+      <Eyebrow>Now · trading — this week vs last</Eyebrow>
+      <div className="card"><div className="wc-grid">{nowD.map((d,idx)=>RvCard({label:d.sp.label, value:d.sp.fmt(d.val), change:`${d.up?'↑':'↓'}${Math.abs(d.ch*100).toFixed(0)}%`, changeColor:d.good==null?'var(--text-muted)':(d.good?'var(--good)':'var(--bad)'), status:d.badge.kind, statusLabel:d.badge.label, series:trail(d.sp.key), color:RAG_COL[d.rag]||'var(--text-faint)', fmt:d.sp.fmt, axisFmt:d.sp.axisFmt}, idx))}</div></div>
+      <Eyebrow>The engine · is the machine strengthening (trailing)</Eyebrow>
+      <div className="card"><div className="wc-grid">{engineD.map(RvCard)}</div></div>
+      <Eyebrow>Durability · will it compound — and what could break it</Eyebrow>
+      <div className="card"><div className="wc-grid">{durD.map(RvCard)}</div></div>
+      {cashOpen && (<div className="card" style={{marginTop:10, borderLeft:'3px solid var(--accent)'}}>
+        <div style={{fontSize:13,fontWeight:700,color:'var(--text-primary)',marginBottom:9}}>Cash position</div>
+        <div style={{display:'flex',gap:18,flexWrap:'wrap',alignItems:'flex-end'}}>
+          <label style={lbl}>Cash on hand ({curSym()})<input type="number" value={cashDraft} onChange={e=>setCashDraft(e.target.value)} placeholder="e.g. 80000" style={inp}/></label>
+          <label style={lbl}>Monthly overheads ({curSym()})<input type="number" value={ovDraft} onChange={e=>setOvDraft(e.target.value)} placeholder="e.g. 12000" style={inp}/></label>
+          <button style={btn} onClick={saveCash}>Save</button>
+          <button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setCashOpen(false)}>Cancel</button>
         </div>
-        {risks.length ? risks.slice(0,6).map(regRow('var(--bad)')) : <div className="muted" style={{fontSize:12.5,padding:'8px 0'}}>No material risks flagged — leakage and at-risk revenue are within normal range.</div>}
-      </div>
-      <div className="card" style={{flex:'1 1 340px', minWidth:0, borderTop:'3px solid var(--good)'}}>
-        <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:8,marginBottom:4}}>
-          <span style={{fontSize:14,fontWeight:700,color:'var(--text-primary)'}}>Opportunity register</span>
-          <span style={{fontSize:12,fontWeight:700,color:'var(--good)',whiteSpace:'nowrap'}}>£{k(upside)}/mo identified</span>
+        <div style={{fontSize:11,color:'var(--text-faint)',marginTop:10,lineHeight:1.5}}>Overheads = salaries, rent, software — costs <b>not</b> already in ad spend or COGS. Runway = cash ÷ (monthly gross profit − ad spend − overheads), using your last {recentW.length||4} complete weeks as the run-rate. A factual estimate; it ignores one-off inventory purchases and working-capital timing.</div>
+      </div>)}
+      {/* Risk & opportunity registers */}
+      <Eyebrow>Risks & opportunities · quantified</Eyebrow>
+      <div className="row">
+        <div className="card" style={{flex:'1 1 340px', minWidth:0, borderTop:'3px solid var(--bad)'}}>
+          <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:8,marginBottom:4}}>
+            <span style={{fontSize:14,fontWeight:700,color:'var(--text-primary)'}}>Risk register</span>
+            <span style={{fontSize:12,fontWeight:700,color:'var(--bad)',whiteSpace:'nowrap'}}>{curSym()}{k(atRisk)}/mo exposed</span>
+          </div>
+          {risks.length ? risks.slice(0,6).map(regRow('var(--bad)')) : <div className="muted" style={{fontSize:12.5,padding:'8px 0'}}>No material risks flagged — leakage and at-risk revenue are within normal range.</div>}
         </div>
-        {opps.length ? opps.slice(0,6).map(regRow('var(--good)')) : <div className="muted" style={{fontSize:12.5,padding:'8px 0'}}>No quantified upside flagged right now — check back as new signals land.</div>}
+        <div className="card" style={{flex:'1 1 340px', minWidth:0, borderTop:'3px solid var(--good)'}}>
+          <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:8,marginBottom:4}}>
+            <span style={{fontSize:14,fontWeight:700,color:'var(--text-primary)'}}>Opportunity register</span>
+            <span style={{fontSize:12,fontWeight:700,color:'var(--good)',whiteSpace:'nowrap'}}>{curSym()}{k(upside)}/mo identified</span>
+          </div>
+          {opps.length ? opps.slice(0,6).map(regRow('var(--good)')) : <div className="muted" style={{fontSize:12.5,padding:'8px 0'}}>No quantified upside flagged right now — check back as new signals land.</div>}
+        </div>
+      </div>
+      {/* Decisions */}
+      <div className="card" style={{marginTop:14}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+          <span style={{fontSize:14,fontWeight:700,color:'var(--text-primary)'}}>Decisions &amp; next actions</span>
+          <span className="muted" style={{fontSize:12.5}}>{openActions} open in the queue</span>
+          <button style={{...btn,marginLeft:'auto'}} onClick={()=>window.__oiNav&&window.__oiNav('actions','queue')}>Open action queue <Icon name="chevron" size={13}/></button>
+        </div>
+        {topMoves.length>0 && <div className="muted" style={{fontSize:12.5,marginTop:9,lineHeight:1.55}}>Highest-value moves right now: {topMoves.map(m=>`${m.description} (~${curSym()}${k(Math.abs(m.monthly_impact_gbp))}/mo)`).join(' · ')}.</div>}
       </div>
     </div>
-
-    {/* Decisions */}
-    <div className="card" style={{marginTop:14}}>
-      <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-        <span style={{fontSize:14,fontWeight:700,color:'var(--text-primary)'}}>Decisions &amp; next actions</span>
-        <span className="muted" style={{fontSize:12.5}}>{openActions} open in the queue</span>
-        <button style={{...btn,marginLeft:'auto'}} onClick={()=>window.__oiNav&&window.__oiNav('actions','queue')}>Open action queue <Icon name="chevron" size={13}/></button>
-      </div>
-      {topMoves.length>0 && <div className="muted" style={{fontSize:12.5,marginTop:9,lineHeight:1.55}}>Highest-value moves right now: {topMoves.map(m=>`${m.description} (~£${k(Math.abs(m.monthly_impact_gbp))}/mo)`).join(' · ')}.</div>}
-    </div>
-  </div>);
+  );
 }
 
 // ── Shared planning header — one Forecast → Strategy → Orders strip on both the
@@ -9142,7 +9194,7 @@ function PlanningHeader({active, embedded}){
   const orderVal = R.toOrder.reduce((t,l)=>t+(l.lineCost||0),0);
   const fLabel = dc.targetMode==='growth' ? `${(Number(dc.growth)||0)>=0?'+':''}${Number(dc.growth)||0}% on run-rate`
     : dc.shape==='month' ? `${months}-mo, by month`
-    : (Number(dc.targetValue)>0 ? (dc.targetMode==='revenue'?`£${k(dc.targetValue)} over ${months}mo`:`${NUM(Number(dc.targetValue))}u over ${months}mo`) : `${months}-mo run-rate`);
+    : (Number(dc.targetValue)>0 ? (dc.targetMode==='revenue'?`${curSym()}${k(dc.targetValue)} over ${months}mo`:`${NUM(Number(dc.targetValue))}u over ${months}mo`) : `${months}-mo run-rate`);
   const go = (sub)=>window.__oiNav&&window.__oiNav('planning',sub);
   const jump = (id)=>{ const el=document.getElementById(id); if(el) el.scrollIntoView({behavior:'smooth', block:'start'}); };
   // in the merged tab, chips scroll to sections; otherwise they cross-navigate
@@ -9154,28 +9206,30 @@ function PlanningHeader({active, embedded}){
   const lab = {fontSize:10,fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:4};
   const sbtn = (id)=>({fontSize:11,fontWeight:700,padding:'5px 9px',borderRadius:7,cursor:'pointer',border:'1.5px solid '+(strat===id?'var(--accent)':'var(--border-default)'),background:strat===id?'var(--accent)':'transparent',color:strat===id?'#fff':'var(--text-secondary)'});
   const arrow = <div style={{display:'flex',alignItems:'center',color:'var(--text-faint)',fontSize:16,fontWeight:700}}>→</div>;
-  return (<div className="card" style={{padding:'12px 14px',marginBottom:14}}>
-    <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'stretch'}}>
-      <div style={{...chip(active==='forecast'), cursor:onForecast?'pointer':'default'}} onClick={onForecast}>
-        <div style={lab}>① Forecast{fHint&&<span style={{color:'var(--accent)'}}>{fHint}</span>}</div>
-        <div style={{fontSize:13.5,fontWeight:700,color:'var(--text-primary)'}}>{fLabel}</div>
-        <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>{growthPct>=0?'+':''}{Math.round(growthPct)}% vs run-rate</div>
-      </div>
-      {arrow}
-      <div style={{...chip(false), flex:'1 1 250px'}}>
-        <div style={lab}>② Strategy — how to commit</div>
-        <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:3}}>
-          {['jit','bulk','staged'].map(id=>(<button key={id} title={STRAT[id]} style={sbtn(id)} onClick={()=>saveReorderConfig({...rc,strategy:id})}>{STRAT[id]}</button>))}
+  return (
+    <div className="card" style={{padding:'12px 14px',marginBottom:14}}>
+      <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'stretch'}}>
+        <div style={{...chip(active==='forecast'), cursor:onForecast?'pointer':'default'}} onClick={onForecast}>
+          <div style={lab}>① Forecast{fHint&&<span style={{color:'var(--accent)'}}>{fHint}</span>}</div>
+          <div style={{fontSize:13.5,fontWeight:700,color:'var(--text-primary)'}}>{fLabel}</div>
+          <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>{growthPct>=0?'+':''}{Math.round(growthPct)}% vs run-rate</div>
+        </div>
+        {arrow}
+        <div style={{...chip(false), flex:'1 1 250px'}}>
+          <div style={lab}>② Strategy — how to commit</div>
+          <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:3}}>
+            {['jit','bulk','staged'].map(id=>(<button key={id} title={STRAT[id]} style={sbtn(id)} onClick={()=>saveReorderConfig({...rc,strategy:id})}>{STRAT[id]}</button>))}
+          </div>
+        </div>
+        {arrow}
+        <div style={{...chip(active==='production'), cursor:onPOs?'pointer':'default'}} onClick={onPOs}>
+          <div style={lab}>③ Purchase orders{pHint&&<span style={{color:'var(--accent)'}}>{pHint}</span>}</div>
+          <div style={{fontSize:13.5,fontWeight:700,color:R.toOrder.length?'var(--warn)':'var(--good)'}}>{R.toOrder.length} to order{orderVal>0?` · ${curSym()}${k(orderVal)}`:''}</div>
+          <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>{R.awaiting.length} awaiting stock</div>
         </div>
       </div>
-      {arrow}
-      <div style={{...chip(active==='production'), cursor:onPOs?'pointer':'default'}} onClick={onPOs}>
-        <div style={lab}>③ Purchase orders{pHint&&<span style={{color:'var(--accent)'}}>{pHint}</span>}</div>
-        <div style={{fontSize:13.5,fontWeight:700,color:R.toOrder.length?'var(--warn)':'var(--good)'}}>{R.toOrder.length} to order{orderVal>0?` · £${k(orderVal)}`:''}</div>
-        <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>{R.awaiting.length} awaiting stock</div>
-      </div>
     </div>
-  </div>);
+  );
 }
 
 // ── Production / PO planner ──────────────────────────────────────────────────
@@ -9231,10 +9285,10 @@ function ProductionPlanner({embedded}={}){
   const copyPO = (po)=>{
     const firstLine=po.lines[0]||{};
     const L=['PURCHASE ORDER (DRAFT)', 'To: '+po.supplier+(po.email?' <'+po.email+'>':''), ...(firstLine.supPhone?['Tel: '+firstLine.supPhone]:[]), ...(firstLine.supAddress?[firstLine.supAddress]:[]), ...(po.notes?[po.notes]:[]), 'From: '+(OI_BRAND.name||'frkl')+(today?'  ·  '+today:''), ''];
-    po.lines.forEach(l=>L.push(l.qty+' × '+l.p.title+' ['+(l.p.sku||'no SKU')+']'+(l.unitCost!=null?(' @ £'+l.unitCost+' = £'+l.lineCost.toFixed(2)):'  — PRICE TBC (please quote)')+(l.moqBumped?(' (MOQ '+l.moq+')'):'')));
-    L.push('', po.hasCost?('TOTAL: £'+po.total.toFixed(2)+' · '+po.units+' units'):(po.units+' units · PRICING TBC — please quote against this PO'));
+    po.lines.forEach(l=>L.push(l.qty+' × '+l.p.title+' ['+(l.p.sku||'no SKU')+']'+(l.unitCost!=null?(` @ ${curSym()}`+l.unitCost+` = ${curSym()}`+l.lineCost.toFixed(2)):'  — PRICE TBC (please quote)')+(l.moqBumped?(' (MOQ '+l.moq+')'):'')));
+    L.push('', po.hasCost?(`TOTAL: ${curSym()}`+po.total.toFixed(2)+' · '+po.units+' units'):(po.units+' units · PRICING TBC — please quote against this PO'));
     if(po.hasCost){ const fd=iso=>{ try{ return new Date((iso||'')+'T00:00:00').toLocaleDateString('en-GB'); }catch(e){ return iso; } };
-      if(po.hasDeposit) L.push('Terms: £'+po.deposit.toFixed(2)+' deposit'+(po.depPct!=null?(' ('+po.depPct+'%)'):'')+' on order, £'+po.balance.toFixed(2)+' balance on shipment');
+      if(po.hasDeposit) L.push(`Terms: ${curSym()}`+po.deposit.toFixed(2)+' deposit'+(po.depPct!=null?(' ('+po.depPct+'%)'):'')+` on order, ${curSym()}`+po.balance.toFixed(2)+' balance on shipment');
       L.push('Lead: '+po.leadTotalMax+' days from order — ships ~'+fd(po.ships)+', lands ~'+fd(po.lands)); }
     try{ navigator.clipboard&&navigator.clipboard.writeText(L.join('\n')); }catch(e){}
     toast('PO copied', {kind:'good', body:po.supplier});
@@ -9265,148 +9319,147 @@ function ProductionPlanner({embedded}={}){
   const th = {textAlign:'left',fontSize:10.5,fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-faint)',padding:'0 10px 7px 0',whiteSpace:'nowrap'};
   const td = {padding:'7px 10px 7px 0',fontSize:12.5,color:'var(--text-secondary)',borderTop:'1px solid var(--border-subtle)',verticalAlign:'top'};
 
-  return (<div>
-    {!embedded && (<><div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:6}}>
-      <h2 style={{margin:0,fontSize:18}}>Production &amp; purchase orders</h2>
-      <span className="muted" style={{fontSize:12}}>Reorder engine on live stock + velocity · independent of the date picker</span>
-    </div>
-    <PlanningHeader active="production"/></>)}
-
-    {/* summary + controls */}
-    <div className="card">
-      <div style={{display:'flex',gap:22,flexWrap:'wrap',alignItems:'flex-end'}}>
-        <div title="Run out before a reorder placed today could land — order these now"><div style={{fontSize:24,fontWeight:800,color: oosNow?'var(--bad)':'var(--good)'}}>{oosNow}</div><div className="muted" style={{fontSize:11.5}}>order today (OOS risk)</div></div>
-        <div><div style={{fontSize:24,fontWeight:800,color: toOrder.length?'var(--warn)':'var(--good)'}}>{toOrder.length}</div><div className="muted" style={{fontSize:11.5}}>SKUs to reorder now</div></div>
-        <div><div style={{fontSize:24,fontWeight:800,color:'var(--text-primary)'}}>{NUM(toOrder.reduce((t,l)=>t+l.qty,0))}</div><div className="muted" style={{fontSize:11.5}}>units across all POs</div></div>
-        <div><div style={{fontSize:24,fontWeight:800,color:'var(--text-primary)'}}>{totalValue>0?'£'+k(totalValue):'—'}</div><div className="muted" style={{fontSize:11.5}}>draft order value{missingCost?' (partial)':''}</div></div>
-        <div><div style={{fontSize:24,fontWeight:800,color: awaiting.length?'var(--accent)':'var(--text-faint)'}}>{awaiting.length}</div><div className="muted" style={{fontSize:11.5}}>awaiting stock</div></div>
-        <div style={{marginLeft:'auto',display:'flex',gap:8,flexWrap:'wrap'}}>
-          <button style={btn} onClick={()=>setSupOpen(o=>!o)}><Icon name="sliders" size={13}/> Supplier master</button>
-          <button style={btn} onClick={()=>setSetOpen(o=>!o)}><Icon name="sliders" size={13}/> Reorder policy</button>
-        </div>
+  return (
+    <div>
+      {!embedded && (<><div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:6}}>
+        <h2 style={{margin:0,fontSize:18}}>Production &amp; purchase orders</h2>
+        <span className="muted" style={{fontSize:12}}>Reorder engine on live stock + velocity · independent of the date picker</span>
       </div>
-      <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:11,lineHeight:1.5}}>
-        Strategy: <b style={{color:'var(--text-secondary)'}}>{STRAT[strategy]}</b> · <a className="txt-link" style={{cursor:'pointer'}} onClick={()=>setSetOpen(o=>!o)}>change</a>. {strategy==='bulk'
-          ? <>Provisioning the full <b>{Math.round((horizonDays/30.4))}-month</b> demand plan upfront — each product's order is its planned demand (split by historic mix) net of stock, then rounded to MOQ.</>
-          : strategy==='staged'
-          ? <>Ordering the forecast in <b>{waves} waves</b>; each order covers lead + one wave, and the next wave's order-by date is shown per line.</>
-          : <>Lean / JIT — reorder triggers when cover falls within <b>lead + {safety}d safety</b>, ordering up to <b>{coverDays}d beyond lead</b>, rounded to MOQ.</>}
-        {approaching>0?` ${approaching} more will cross the trigger soon.`:''} Drafts only — nothing is sent to suppliers automatically.</div>
-      {plan.active && (<div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginTop:10,padding:'8px 12px',borderRadius:8,background:'var(--accent-bg)',border:'1px solid var(--border-subtle)'}}>
-        <Icon name="trendUp" size={14} style={{color:'var(--accent)'}}/>
-        <span style={{fontSize:12,color:'var(--text-secondary)'}}>Orders are sized to your demand plan — <b style={{color:'var(--text-primary)'}}>{plan.growthPct>=0?'+':''}{plan.growthPct.toFixed(0)}% vs run-rate</b> ({plan.mode==='growth'?'growth target':plan.mode==='units'?'units target':'revenue target'}), not flat velocity.</span>
-        <button style={{...btn,fontSize:11.5,padding:'4px 10px',marginLeft:'auto'}} onClick={()=>{ if(window.__oiOpenForecast){ window.__oiOpenForecast(); return; } const el=document.getElementById('plan-forecast'); if(el) el.scrollIntoView({behavior:'smooth'}); else if(window.__oiNav) window.__oiNav('planning','forecast'); }}>Adjust plan <Icon name="chevron" size={12}/></button>
+      <PlanningHeader active="production"/></>)}
+      {/* summary + controls */}
+      <div className="card">
+        <div style={{display:'flex',gap:22,flexWrap:'wrap',alignItems:'flex-end'}}>
+          <div title="Run out before a reorder placed today could land — order these now"><div style={{fontSize:24,fontWeight:800,color: oosNow?'var(--bad)':'var(--good)'}}>{oosNow}</div><div className="muted" style={{fontSize:11.5}}>order today (OOS risk)</div></div>
+          <div><div style={{fontSize:24,fontWeight:800,color: toOrder.length?'var(--warn)':'var(--good)'}}>{toOrder.length}</div><div className="muted" style={{fontSize:11.5}}>SKUs to reorder now</div></div>
+          <div><div style={{fontSize:24,fontWeight:800,color:'var(--text-primary)'}}>{NUM(toOrder.reduce((t,l)=>t+l.qty,0))}</div><div className="muted" style={{fontSize:11.5}}>units across all POs</div></div>
+          <div><div style={{fontSize:24,fontWeight:800,color:'var(--text-primary)'}}>{totalValue>0?curSym()+k(totalValue):'—'}</div><div className="muted" style={{fontSize:11.5}}>draft order value{missingCost?' (partial)':''}</div></div>
+          <div><div style={{fontSize:24,fontWeight:800,color: awaiting.length?'var(--accent)':'var(--text-faint)'}}>{awaiting.length}</div><div className="muted" style={{fontSize:11.5}}>awaiting stock</div></div>
+          <div style={{marginLeft:'auto',display:'flex',gap:8,flexWrap:'wrap'}}>
+            <button style={btn} onClick={()=>setSupOpen(o=>!o)}><Icon name="sliders" size={13}/> Supplier master</button>
+            <button style={btn} onClick={()=>setSetOpen(o=>!o)}><Icon name="sliders" size={13}/> Reorder policy</button>
+          </div>
+        </div>
+        <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:11,lineHeight:1.5}}>
+          Strategy: <b style={{color:'var(--text-secondary)'}}>{STRAT[strategy]}</b> · <a className="txt-link" style={{cursor:'pointer'}} onClick={()=>setSetOpen(o=>!o)}>change</a>. {strategy==='bulk'
+            ? <>Provisioning the full <b>{Math.round((horizonDays/30.4))}-month</b> demand plan upfront — each product's order is its planned demand (split by historic mix) net of stock, then rounded to MOQ.</>
+            : strategy==='staged'
+            ? <>Ordering the forecast in <b>{waves} waves</b>; each order covers lead + one wave, and the next wave's order-by date is shown per line.</>
+            : <>Lean / JIT — reorder triggers when cover falls within <b>lead + {safety}d safety</b>, ordering up to <b>{coverDays}d beyond lead</b>, rounded to MOQ.</>}
+          {approaching>0?` ${approaching} more will cross the trigger soon.`:''} Drafts only — nothing is sent to suppliers automatically.</div>
+        {plan.active && (<div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginTop:10,padding:'8px 12px',borderRadius:8,background:'var(--accent-bg)',border:'1px solid var(--border-subtle)'}}>
+          <Icon name="trendUp" size={14} style={{color:'var(--accent)'}}/>
+          <span style={{fontSize:12,color:'var(--text-secondary)'}}>Orders are sized to your demand plan — <b style={{color:'var(--text-primary)'}}>{plan.growthPct>=0?'+':''}{plan.growthPct.toFixed(0)}% vs run-rate</b> ({plan.mode==='growth'?'growth target':plan.mode==='units'?'units target':'revenue target'}), not flat velocity.</span>
+          <button style={{...btn,fontSize:11.5,padding:'4px 10px',marginLeft:'auto'}} onClick={()=>{ if(window.__oiOpenForecast){ window.__oiOpenForecast(); return; } const el=document.getElementById('plan-forecast'); if(el) el.scrollIntoView({behavior:'smooth'}); else if(window.__oiNav) window.__oiNav('planning','forecast'); }}>Adjust plan <Icon name="chevron" size={12}/></button>
+        </div>)}
+      </div>
+      {/* supplier master — per SKU, built up over time */}
+      {supOpen && (()=>{
+        const q = supSearch.trim().toLowerCase();
+        const allActive = inv;
+        let visible;
+        if(q){ visible = allActive.filter(p=> (p.title+' '+(p.sku||'')+' '+(p.type||'')).toLowerCase().includes(q)).slice(0,50); }
+        else { const seen=new Set(); visible=[];
+          toOrder.forEach(l=>{ if(!seen.has(l.key)){ seen.add(l.key); visible.push(l.p); } });          // needing ordering first
+          allActive.forEach(p=>{ const key=skuKeyOf(p); if(supDraft[key] && !seen.has(key)){ seen.add(key); visible.push(p); } });  // then already-set
+        }
+        return (
+          <div className="card" style={{borderLeft:'3px solid var(--accent)'}}>
+            <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:6}}>
+              <div style={{fontSize:13,fontWeight:700}}>Supplier master <span className="muted" style={{fontWeight:400,fontSize:11.5}}>· per SKU · fill in as you order — production lead = days from order to stock landing</span></div>
+              <input value={supSearch} onChange={e=>setSupSearch(e.target.value)} placeholder="Search any product to assign…" style={{...inp,width:240}}/>
+            </div>
+            <datalist id="oi-supplier-names">{supplierNamesInUse().map(n=><option key={n} value={n}/>)}</datalist>
+            <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:680}}><thead><tr><th style={th}>Product</th><th style={th}>Supplier / manufacturer</th><th style={th}>MOQ</th><th style={th}>Unit {curSym()} <span style={{fontWeight:400,textTransform:'none'}}>(blank = quote)</span></th><th style={th}>Lead (days)</th></tr></thead><tbody>
+              {visible.map(p=>{ const key=skuKeyOf(p); const d=supDraft[key]||{supplier:'',moq:'',unitCost:'',lead:''}; const set=!!(d.supplier&&d.supplier.trim()); return (<tr key={key}>
+                <td style={{...td,color:'var(--text-primary)'}}>{set?'':<span style={{color:'var(--warn)',marginRight:4}}>●</span>}{p.title}<div style={{fontSize:10.5,color:'var(--text-faint)'}}>{p.sku||'no SKU'} · {p.type}</div></td>
+                <td style={td}><input list="oi-supplier-names" style={{...inp,width:190}} value={d.supplier} onChange={e=>setSup(key,'supplier',e.target.value)} placeholder="Pick or type a new supplier"/></td>
+                <td style={td}><input type="number" style={{...inp,width:64}} value={d.moq} onChange={e=>setSup(key,'moq',e.target.value)} placeholder="0"/></td>
+                <td style={td}><input type="number" style={{...inp,width:72}} value={d.unitCost} onChange={e=>setSup(key,'unitCost',e.target.value)} placeholder="quote"/></td>
+                <td style={td}><input type="number" style={{...inp,width:64}} value={d.lead} onChange={e=>setSup(key,'lead',e.target.value)} placeholder={String(leadDaysForType(p.type))}/></td>
+              </tr>); })}
+              {!visible.length && <tr><td colSpan={5} style={{...td,color:'var(--text-faint)'}}>{q?'No products match.':'Nothing to assign right now — search for a product above.'}</td></tr>}
+            </tbody></table></div>
+            <div style={{marginTop:10,display:'flex',gap:8}}><button style={btn} onClick={saveSuppliers}>Save supplier master</button><button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setSupOpen(false)}>Cancel</button></div>
+            <div style={{fontSize:11,color:'var(--text-faint)',marginTop:8}}>Per-SKU — set the supplier the first time you order a product; it sticks. Type a new name to add a supplier (manage full contact details on the <a className="txt-link" style={{cursor:'pointer'}} onClick={()=>window.__oiNav&&window.__oiNav('planning','suppliers')}>Suppliers tab</a>). Leave <b>Unit {curSym()}</b> blank to raise the PO for a quote and add the price later; lead defaults to the type's.</div>
+          </div>
+        ); })()}
+      {/* reorder policy editor */}
+      {setOpen && (<div className="card" style={{borderLeft:'3px solid var(--accent)'}}>
+        <div style={{fontSize:13,fontWeight:700,marginBottom:3}}>Reorder policy <span className="muted" style={{fontWeight:400,fontSize:11.5}}>· strategy: {STRAT[strategy]} — set in the band above</span></div>
+        <div style={{display:'flex',gap:18,flexWrap:'wrap',alignItems:'flex-end',marginTop:10}}>
+          <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}}>Safety stock (days)<input type="number" style={{...inp,width:90}} value={safDraft} onChange={e=>setSafDraft(e.target.value)}/></label>
+          {strategy==='jit' && <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}}>Order-up-to cover beyond lead (days)<input type="number" style={{...inp,width:90}} value={covDraft} onChange={e=>setCovDraft(e.target.value)}/></label>}
+          {strategy==='staged' && <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}}>Number of waves<input type="number" style={{...inp,width:90}} value={wavesDraft} onChange={e=>setWavesDraft(e.target.value)}/></label>}
+          <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}} title="Default % paid upfront at order; the balance falls due at shipment. Override per supplier on the Suppliers tab.">Deposit % at order<input type="number" style={{...inp,width:90}} value={depDraft} onChange={e=>setDepDraft(e.target.value)}/></label>
+          <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}} title="Default shipping transit days from shipment to landing, added on top of each product's production lead. Override per supplier on the Suppliers tab.">Transit days (ship→land)<input type="number" style={{...inp,width:90}} value={shipDraft} onChange={e=>setShipDraft(e.target.value)}/></label>
+        </div>
+        {/* default production lead by type — used when a SKU has no specific lead */}
+        <div style={{marginTop:14,paddingTop:12,borderTop:'1px solid var(--border-subtle)'}}>
+          <div style={{fontSize:12,fontWeight:700,marginBottom:2}}>Default production lead by type <span className="muted" style={{fontWeight:400,fontSize:11}}>· days from order to shipment — used when a SKU has no specific lead set in the demand table / Supplier master</span></div>
+          <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'flex-end',marginTop:9}}>
+            <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}}>All types (default)<input type="number" min="0" style={{...inp,width:80}} value={leadDraft.def} onChange={e=>setLeadDraft(d=>({...d,def:e.target.value}))}/></label>
+            {leadTypes.map(t=>(<label key={t} style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}}>{t}<input type="number" min="0" placeholder={String(leadDraft.def||30)} style={{...inp,width:72}} value={leadDraft.byType[t]||''} onChange={e=>setLeadType(t,e.target.value)}/></label>))}
+          </div>
+        </div>
+        <div style={{display:'flex',gap:8,marginTop:14}}><button style={btn} onClick={saveSettings}>Save policy</button><button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setSetOpen(false)}>Cancel</button></div>
+        <div style={{fontSize:11,color:'var(--text-faint)',marginTop:9,lineHeight:1.5}}>Lead = <b>production</b> (this section / per SKU) <b>+ transit</b> (per supplier, or the default above). Deposit % and transit are <b>defaults</b> — override per supplier on the <a className="txt-link" style={{cursor:'pointer'}} onClick={()=>window.__oiNav&&window.__oiNav('planning','suppliers')}>Suppliers tab</a>. All feed the stock landing plan.</div>
       </div>)}
+      {/* draft POs */}
+      {pos.map(po=>(<div key={po.supplier} className="card">
+        <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:8}}>
+          <div><span style={{fontSize:15,fontWeight:700,color:'var(--text-primary)'}}>{po.supplier}</span> <span className="muted" style={{fontSize:12}}>· {po.lines.length} line{po.lines.length===1?'':'s'} · {NUM(po.units)} units</span>{(po.email||po.notes) && <div style={{fontSize:11,color:'var(--text-faint)',marginTop:2}}>{po.email}{po.email&&po.notes?' · ':''}{po.notes}</div>}</div>
+          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+            {po.hasCost ? <span style={{fontSize:15,fontWeight:800,color:'var(--text-primary)'}}>{curSym()}{po.total.toFixed(2)}</span>
+              : <span style={{fontSize:11.5,fontWeight:700,color:'var(--warn)',background:'var(--warn-bg)',padding:'2px 9px',borderRadius:999}}>Pricing pending{po.total>0?` · ${curSym()}${po.total.toFixed(0)} so far`:''}</span>}
+            <button style={smbtn} onClick={()=>copyPO(po)}><Icon name="clipboard" size={12}/> Copy</button>
+            <button style={smbtn} onClick={()=>download(po)}><Icon name="report" size={12}/> CSV</button>
+            <button style={{...smbtn, background:'var(--accent)', color:'#fff', borderColor:'var(--accent)'}} onClick={()=>raisePO(po)}><Icon name="check" size={12}/> Mark PO raised</button>
+          </div>
+        </div>
+        {po.hasCost && (()=>{ const fd=iso=>{ try{ return new Date((iso||'')+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'}); }catch(e){ return iso; } }; return (
+          <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'center',fontSize:11.5,color:'var(--text-muted)',margin:'0 0 10px',padding:'7px 11px',borderRadius:8,background:'var(--bg-elevated)'}}>
+            {po.hasDeposit
+              ? <span><b style={{color:'var(--text-primary)'}}>{curSym()}{k(po.deposit)} deposit now</b>{po.depPct!=null?` (${po.depPct}%)`:''} · <b style={{color:'var(--text-primary)'}}>{curSym()}{k(po.balance)}</b> on shipment</span>
+              : <span><b style={{color:'var(--text-primary)'}}>{curSym()}{k(po.total)}</b> due now</span>}
+            <span style={{color:'var(--text-faint)'}}>Ships ~{fd(po.ships)}{po.hasDeposit?' · balance due then':''}</span>
+            <span style={{color:'var(--text-faint)'}}>Lands ~{fd(po.lands)} ({po.leadTotalMax}d lead)</span>
+          </div>
+        ); })()}
+        <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:560}}><thead><tr>
+          <th style={th}>Product</th><th style={{...th,textAlign:'right'}}>Stock</th><th style={{...th,textAlign:'right'}}>Cover</th><th style={{...th,textAlign:'right'}}>Order qty</th><th style={{...th,textAlign:'right'}}>Unit {curSym()}</th><th style={{...th,textAlign:'right'}}>Line {curSym()}</th>
+        </tr></thead><tbody>
+          {po.lines.map((l,idx)=>(<tr key={idx}>
+            <td style={{...td,color:'var(--text-primary)'}}>{l.p.title}{l.oosBeforeLead && <span style={{marginLeft:6,fontSize:9.5,fontWeight:800,letterSpacing:'.03em',color:'#fff',background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}<div style={{fontSize:10.5,color:'var(--text-faint)'}}>{l.p.sku||'no SKU'} · {l.p.type}{l.oosBeforeLead?` · OOS gap ${l.oosGap}d`:''}{l.basis==='forecast'?` · plan needs ${NUM(l.forecastUnits)}`:''}{l.basis==='wave'&&l.nextWaveBy?` · next wave by ${l.nextWaveBy}`:''}{l.moqBumped?' · MOQ '+l.moq:''}</div></td>
+            <td style={{...td,textAlign:'right'}}>{NUM(l.p.inventoryQty)}</td>
+            <td style={{...td,textAlign:'right',color:l.cover<=l.lead?'var(--bad)':'var(--warn)'}}>{Math.round(l.cover)}d</td>
+            <td style={{...td,textAlign:'right',fontWeight:700,color:'var(--text-primary)'}}>{NUM(l.qty)}</td>
+            <td style={{...td,textAlign:'right'}}>{l.unitCost!=null ? curSym()+l.unitCost : <input type="number" step="0.01" defaultValue="" placeholder="quote" title="Add the quoted unit price" onBlur={e=>{ if(e.target.value!=='') setSkuPrice(l.key, e.target.value); }} style={{...inp,width:62,textAlign:'right'}}/>}</td>
+            <td style={{...td,textAlign:'right'}}>{l.lineCost!=null?curSym()+l.lineCost.toFixed(2):<span style={{color:'var(--warn)',fontSize:11}}>TBC</span>}</td>
+          </tr>))}
+        </tbody></table></div>
+      </div>))}
+      {/* awaiting stock — POs already raised; informational, NOT a reminder */}
+      {awaiting.length>0 && (<div className="card" style={{borderLeft:'3px solid var(--accent)'}}>
+        <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:8}}><Icon name="check" size={14} style={{color:'var(--accent)'}}/><span style={{fontSize:14,fontWeight:700,color:'var(--text-primary)'}}>Awaiting stock</span><span className="muted" style={{fontSize:12}}>· {awaiting.length} PO line{awaiting.length===1?'':'s'} raised — waiting for stock to land in Shopify</span></div>
+        <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:520}}><thead><tr>
+          <th style={th}>Product</th><th style={{...th,textAlign:'right'}}>Ordered</th><th style={th}>Raised</th><th style={th}>Expected</th><th style={{...th,textAlign:'right'}}></th>
+        </tr></thead><tbody>
+          {awaiting.map((l,idx)=>(<tr key={idx}>
+            <td style={{...td,color:'var(--text-primary)'}}>{l.p.title}<div style={{fontSize:10.5,color:'var(--text-faint)'}}>{l.supplier}{l.overdue?' · overdue — chase supplier':''}</div></td>
+            <td style={{...td,textAlign:'right',fontWeight:700,color:'var(--text-primary)'}}>{NUM((l.po&&l.po.qty)||l.qty)}</td>
+            <td style={td}>{(l.po&&l.po.raisedAt)||'—'}</td>
+            <td style={{...td,color:l.overdue?'var(--warn)':'var(--text-secondary)'}}>{l.expected||'—'}</td>
+            <td style={{...td,textAlign:'right',whiteSpace:'nowrap'}}>
+              <button style={{...smbtn,padding:'4px 9px'}} onClick={()=>{ setPoStatus(l.key,{status:'received', baselineQty:l.p.inventoryQty||0, receivedAt:oiToday()}); toast('Marked received', {kind:'good', body:l.p.title}); }}>Received</button>
+              <button style={{...smbtn,padding:'4px 9px',marginLeft:6,background:'transparent',color:'var(--text-muted)'}} onClick={()=>{ clearPoStatus(l.key); toast('PO cancelled', {body:l.p.title}); }}>Cancel</button>
+            </td>
+          </tr>))}
+        </tbody></table></div>
+        <div style={{fontSize:11,color:'var(--text-faint)',marginTop:9,lineHeight:1.5}}>These won't show as reminders. Each auto-closes when its Shopify stock rises on the next data sync — or mark it received manually.</div>
+      </div>)}
+      {pos.length===0 && awaiting.length===0 && (<div className="card"><div style={{display:'flex',alignItems:'center',gap:10}}><StatusBadge kind="healthy" label="Stock healthy"/><span className="muted" style={{fontSize:13}}>No products are within their reorder window right now. {approaching>0?`${approaching} will cross it soon — check back, or tighten the safety days.`:'Good sellers all have enough cover for their lead times.'}</span></div></div>)}
     </div>
-
-    {/* supplier master — per SKU, built up over time */}
-    {supOpen && (()=>{
-      const q = supSearch.trim().toLowerCase();
-      const allActive = inv;
-      let visible;
-      if(q){ visible = allActive.filter(p=> (p.title+' '+(p.sku||'')+' '+(p.type||'')).toLowerCase().includes(q)).slice(0,50); }
-      else { const seen=new Set(); visible=[];
-        toOrder.forEach(l=>{ if(!seen.has(l.key)){ seen.add(l.key); visible.push(l.p); } });          // needing ordering first
-        allActive.forEach(p=>{ const key=skuKeyOf(p); if(supDraft[key] && !seen.has(key)){ seen.add(key); visible.push(p); } });  // then already-set
-      }
-      return (<div className="card" style={{borderLeft:'3px solid var(--accent)'}}>
-      <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:6}}>
-        <div style={{fontSize:13,fontWeight:700}}>Supplier master <span className="muted" style={{fontWeight:400,fontSize:11.5}}>· per SKU · fill in as you order — production lead = days from order to stock landing</span></div>
-        <input value={supSearch} onChange={e=>setSupSearch(e.target.value)} placeholder="Search any product to assign…" style={{...inp,width:240}}/>
-      </div>
-      <datalist id="oi-supplier-names">{supplierNamesInUse().map(n=><option key={n} value={n}/>)}</datalist>
-      <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:680}}><thead><tr><th style={th}>Product</th><th style={th}>Supplier / manufacturer</th><th style={th}>MOQ</th><th style={th}>Unit £ <span style={{fontWeight:400,textTransform:'none'}}>(blank = quote)</span></th><th style={th}>Lead (days)</th></tr></thead><tbody>
-        {visible.map(p=>{ const key=skuKeyOf(p); const d=supDraft[key]||{supplier:'',moq:'',unitCost:'',lead:''}; const set=!!(d.supplier&&d.supplier.trim()); return (<tr key={key}>
-          <td style={{...td,color:'var(--text-primary)'}}>{set?'':<span style={{color:'var(--warn)',marginRight:4}}>●</span>}{p.title}<div style={{fontSize:10.5,color:'var(--text-faint)'}}>{p.sku||'no SKU'} · {p.type}</div></td>
-          <td style={td}><input list="oi-supplier-names" style={{...inp,width:190}} value={d.supplier} onChange={e=>setSup(key,'supplier',e.target.value)} placeholder="Pick or type a new supplier"/></td>
-          <td style={td}><input type="number" style={{...inp,width:64}} value={d.moq} onChange={e=>setSup(key,'moq',e.target.value)} placeholder="0"/></td>
-          <td style={td}><input type="number" style={{...inp,width:72}} value={d.unitCost} onChange={e=>setSup(key,'unitCost',e.target.value)} placeholder="quote"/></td>
-          <td style={td}><input type="number" style={{...inp,width:64}} value={d.lead} onChange={e=>setSup(key,'lead',e.target.value)} placeholder={String(leadDaysForType(p.type))}/></td>
-        </tr>); })}
-        {!visible.length && <tr><td colSpan={5} style={{...td,color:'var(--text-faint)'}}>{q?'No products match.':'Nothing to assign right now — search for a product above.'}</td></tr>}
-      </tbody></table></div>
-      <div style={{marginTop:10,display:'flex',gap:8}}><button style={btn} onClick={saveSuppliers}>Save supplier master</button><button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setSupOpen(false)}>Cancel</button></div>
-      <div style={{fontSize:11,color:'var(--text-faint)',marginTop:8}}>Per-SKU — set the supplier the first time you order a product; it sticks. Type a new name to add a supplier (manage full contact details on the <a className="txt-link" style={{cursor:'pointer'}} onClick={()=>window.__oiNav&&window.__oiNav('planning','suppliers')}>Suppliers tab</a>). Leave <b>Unit £</b> blank to raise the PO for a quote and add the price later; lead defaults to the type's.</div>
-    </div>); })()}
-
-    {/* reorder policy editor */}
-    {setOpen && (<div className="card" style={{borderLeft:'3px solid var(--accent)'}}>
-      <div style={{fontSize:13,fontWeight:700,marginBottom:3}}>Reorder policy <span className="muted" style={{fontWeight:400,fontSize:11.5}}>· strategy: {STRAT[strategy]} — set in the band above</span></div>
-      <div style={{display:'flex',gap:18,flexWrap:'wrap',alignItems:'flex-end',marginTop:10}}>
-        <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}}>Safety stock (days)<input type="number" style={{...inp,width:90}} value={safDraft} onChange={e=>setSafDraft(e.target.value)}/></label>
-        {strategy==='jit' && <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}}>Order-up-to cover beyond lead (days)<input type="number" style={{...inp,width:90}} value={covDraft} onChange={e=>setCovDraft(e.target.value)}/></label>}
-        {strategy==='staged' && <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}}>Number of waves<input type="number" style={{...inp,width:90}} value={wavesDraft} onChange={e=>setWavesDraft(e.target.value)}/></label>}
-        <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}} title="Default % paid upfront at order; the balance falls due at shipment. Override per supplier on the Suppliers tab.">Deposit % at order<input type="number" style={{...inp,width:90}} value={depDraft} onChange={e=>setDepDraft(e.target.value)}/></label>
-        <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}} title="Default shipping transit days from shipment to landing, added on top of each product's production lead. Override per supplier on the Suppliers tab.">Transit days (ship→land)<input type="number" style={{...inp,width:90}} value={shipDraft} onChange={e=>setShipDraft(e.target.value)}/></label>
-      </div>
-      {/* default production lead by type — used when a SKU has no specific lead */}
-      <div style={{marginTop:14,paddingTop:12,borderTop:'1px solid var(--border-subtle)'}}>
-        <div style={{fontSize:12,fontWeight:700,marginBottom:2}}>Default production lead by type <span className="muted" style={{fontWeight:400,fontSize:11}}>· days from order to shipment — used when a SKU has no specific lead set in the demand table / Supplier master</span></div>
-        <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'flex-end',marginTop:9}}>
-          <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}}>All types (default)<input type="number" min="0" style={{...inp,width:80}} value={leadDraft.def} onChange={e=>setLeadDraft(d=>({...d,def:e.target.value}))}/></label>
-          {leadTypes.map(t=>(<label key={t} style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}}>{t}<input type="number" min="0" placeholder={String(leadDraft.def||30)} style={{...inp,width:72}} value={leadDraft.byType[t]||''} onChange={e=>setLeadType(t,e.target.value)}/></label>))}
-        </div>
-      </div>
-      <div style={{display:'flex',gap:8,marginTop:14}}><button style={btn} onClick={saveSettings}>Save policy</button><button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setSetOpen(false)}>Cancel</button></div>
-      <div style={{fontSize:11,color:'var(--text-faint)',marginTop:9,lineHeight:1.5}}>Lead = <b>production</b> (this section / per SKU) <b>+ transit</b> (per supplier, or the default above). Deposit % and transit are <b>defaults</b> — override per supplier on the <a className="txt-link" style={{cursor:'pointer'}} onClick={()=>window.__oiNav&&window.__oiNav('planning','suppliers')}>Suppliers tab</a>. All feed the stock landing plan.</div>
-    </div>)}
-
-    {/* draft POs */}
-    {pos.map(po=>(<div key={po.supplier} className="card">
-      <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:8}}>
-        <div><span style={{fontSize:15,fontWeight:700,color:'var(--text-primary)'}}>{po.supplier}</span> <span className="muted" style={{fontSize:12}}>· {po.lines.length} line{po.lines.length===1?'':'s'} · {NUM(po.units)} units</span>{(po.email||po.notes) && <div style={{fontSize:11,color:'var(--text-faint)',marginTop:2}}>{po.email}{po.email&&po.notes?' · ':''}{po.notes}</div>}</div>
-        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-          {po.hasCost ? <span style={{fontSize:15,fontWeight:800,color:'var(--text-primary)'}}>£{po.total.toFixed(2)}</span>
-            : <span style={{fontSize:11.5,fontWeight:700,color:'var(--warn)',background:'var(--warn-bg)',padding:'2px 9px',borderRadius:999}}>Pricing pending{po.total>0?` · £${po.total.toFixed(0)} so far`:''}</span>}
-          <button style={smbtn} onClick={()=>copyPO(po)}><Icon name="clipboard" size={12}/> Copy</button>
-          <button style={smbtn} onClick={()=>download(po)}><Icon name="report" size={12}/> CSV</button>
-          <button style={{...smbtn, background:'var(--accent)', color:'#fff', borderColor:'var(--accent)'}} onClick={()=>raisePO(po)}><Icon name="check" size={12}/> Mark PO raised</button>
-        </div>
-      </div>
-      {po.hasCost && (()=>{ const fd=iso=>{ try{ return new Date((iso||'')+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'}); }catch(e){ return iso; } }; return (
-        <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'center',fontSize:11.5,color:'var(--text-muted)',margin:'0 0 10px',padding:'7px 11px',borderRadius:8,background:'var(--bg-elevated)'}}>
-          {po.hasDeposit
-            ? <span><b style={{color:'var(--text-primary)'}}>£{k(po.deposit)} deposit now</b>{po.depPct!=null?` (${po.depPct}%)`:''} · <b style={{color:'var(--text-primary)'}}>£{k(po.balance)}</b> on shipment</span>
-            : <span><b style={{color:'var(--text-primary)'}}>£{k(po.total)}</b> due now</span>}
-          <span style={{color:'var(--text-faint)'}}>Ships ~{fd(po.ships)}{po.hasDeposit?' · balance due then':''}</span>
-          <span style={{color:'var(--text-faint)'}}>Lands ~{fd(po.lands)} ({po.leadTotalMax}d lead)</span>
-        </div>); })()}
-      <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:560}}><thead><tr>
-        <th style={th}>Product</th><th style={{...th,textAlign:'right'}}>Stock</th><th style={{...th,textAlign:'right'}}>Cover</th><th style={{...th,textAlign:'right'}}>Order qty</th><th style={{...th,textAlign:'right'}}>Unit £</th><th style={{...th,textAlign:'right'}}>Line £</th>
-      </tr></thead><tbody>
-        {po.lines.map((l,idx)=>(<tr key={idx}>
-          <td style={{...td,color:'var(--text-primary)'}}>{l.p.title}{l.oosBeforeLead && <span style={{marginLeft:6,fontSize:9.5,fontWeight:800,letterSpacing:'.03em',color:'#fff',background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}<div style={{fontSize:10.5,color:'var(--text-faint)'}}>{l.p.sku||'no SKU'} · {l.p.type}{l.oosBeforeLead?` · OOS gap ${l.oosGap}d`:''}{l.basis==='forecast'?` · plan needs ${NUM(l.forecastUnits)}`:''}{l.basis==='wave'&&l.nextWaveBy?` · next wave by ${l.nextWaveBy}`:''}{l.moqBumped?' · MOQ '+l.moq:''}</div></td>
-          <td style={{...td,textAlign:'right'}}>{NUM(l.p.inventoryQty)}</td>
-          <td style={{...td,textAlign:'right',color:l.cover<=l.lead?'var(--bad)':'var(--warn)'}}>{Math.round(l.cover)}d</td>
-          <td style={{...td,textAlign:'right',fontWeight:700,color:'var(--text-primary)'}}>{NUM(l.qty)}</td>
-          <td style={{...td,textAlign:'right'}}>{l.unitCost!=null ? '£'+l.unitCost : <input type="number" step="0.01" defaultValue="" placeholder="quote" title="Add the quoted unit price" onBlur={e=>{ if(e.target.value!=='') setSkuPrice(l.key, e.target.value); }} style={{...inp,width:62,textAlign:'right'}}/>}</td>
-          <td style={{...td,textAlign:'right'}}>{l.lineCost!=null?'£'+l.lineCost.toFixed(2):<span style={{color:'var(--warn)',fontSize:11}}>TBC</span>}</td>
-        </tr>))}
-      </tbody></table></div>
-    </div>))}
-
-    {/* awaiting stock — POs already raised; informational, NOT a reminder */}
-    {awaiting.length>0 && (<div className="card" style={{borderLeft:'3px solid var(--accent)'}}>
-      <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:8}}><Icon name="check" size={14} style={{color:'var(--accent)'}}/><span style={{fontSize:14,fontWeight:700,color:'var(--text-primary)'}}>Awaiting stock</span><span className="muted" style={{fontSize:12}}>· {awaiting.length} PO line{awaiting.length===1?'':'s'} raised — waiting for stock to land in Shopify</span></div>
-      <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:520}}><thead><tr>
-        <th style={th}>Product</th><th style={{...th,textAlign:'right'}}>Ordered</th><th style={th}>Raised</th><th style={th}>Expected</th><th style={{...th,textAlign:'right'}}></th>
-      </tr></thead><tbody>
-        {awaiting.map((l,idx)=>(<tr key={idx}>
-          <td style={{...td,color:'var(--text-primary)'}}>{l.p.title}<div style={{fontSize:10.5,color:'var(--text-faint)'}}>{l.supplier}{l.overdue?' · overdue — chase supplier':''}</div></td>
-          <td style={{...td,textAlign:'right',fontWeight:700,color:'var(--text-primary)'}}>{NUM((l.po&&l.po.qty)||l.qty)}</td>
-          <td style={td}>{(l.po&&l.po.raisedAt)||'—'}</td>
-          <td style={{...td,color:l.overdue?'var(--warn)':'var(--text-secondary)'}}>{l.expected||'—'}</td>
-          <td style={{...td,textAlign:'right',whiteSpace:'nowrap'}}>
-            <button style={{...smbtn,padding:'4px 9px'}} onClick={()=>{ setPoStatus(l.key,{status:'received', baselineQty:l.p.inventoryQty||0, receivedAt:oiToday()}); toast('Marked received', {kind:'good', body:l.p.title}); }}>Received</button>
-            <button style={{...smbtn,padding:'4px 9px',marginLeft:6,background:'transparent',color:'var(--text-muted)'}} onClick={()=>{ clearPoStatus(l.key); toast('PO cancelled', {body:l.p.title}); }}>Cancel</button>
-          </td>
-        </tr>))}
-      </tbody></table></div>
-      <div style={{fontSize:11,color:'var(--text-faint)',marginTop:9,lineHeight:1.5}}>These won't show as reminders. Each auto-closes when its Shopify stock rises on the next data sync — or mark it received manually.</div>
-    </div>)}
-
-    {pos.length===0 && awaiting.length===0 && (<div className="card"><div style={{display:'flex',alignItems:'center',gap:10}}><StatusBadge kind="healthy" label="Stock healthy"/><span className="muted" style={{fontSize:13}}>No products are within their reorder window right now. {approaching>0?`${approaching} will cross it soon — check back, or tighten the safety days.`:'Good sellers all have enough cover for their lead times.'}</span></div></div>)}
-  </div>);
+  );
 }
 
 // ── Forecast & demand planner ────────────────────────────────────────────────
@@ -9527,165 +9580,162 @@ function DemandPlanner({embedded}={}){
     try{ const blob=new Blob([csv],{type:'text/csv'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='demand_plan_'+months+'mo.csv'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000); toast('Demand plan exported', {kind:'good'}); }catch(e){ toast('Export failed',{kind:'bad'}); }
   };
 
-  return (<div>
-    {!embedded && (<><div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:6}}>
-      <h2 style={{margin:0,fontSize:18}}>Forecast &amp; demand plan</h2>
-      <span className="muted" style={{fontSize:12}}>Per-product demand + packaging from live velocity · independent of the date picker</span>
-    </div>
-    <PlanningHeader active="forecast"/></>)}
-
-    {/* plan controls */}
-    <div className="card">
-      <div style={{display:'flex',gap:18,flexWrap:'wrap',alignItems:'flex-end'}}>
-        <div><div style={{fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',marginBottom:5}}>Horizon</div>
-          <div style={{display:'flex',gap:6}}>{[1,3,6,12].map(m=>(<button key={m} style={seg(months===m)} onClick={()=>setMonths(m)}>{m}mo</button>))}</div></div>
-        <div><div style={{fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',marginBottom:5}}>Plan basis</div>
-          <div style={{display:'flex',gap:6}}>
-            <button style={seg(targetMode==='growth')} onClick={()=>setTargetMode('growth')}>Growth %</button>
-            <button style={seg(targetMode==='units')} onClick={()=>setTargetMode('units')}>Units target</button>
-            <button style={seg(targetMode==='revenue')} onClick={()=>setTargetMode('revenue')}>Revenue target</button>
-          </div></div>
-        {targetMode!=='growth' && <div><div style={{fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',marginBottom:5}}>Shape</div>
-          <div style={{display:'flex',gap:6}}>
-            <button style={seg(shape==='even')} onClick={()=>setShape('even')}>Even</button>
-            <button style={seg(shape==='month')} onClick={()=>setShape('month')}>By month</button>
-          </div></div>}
-        <div>
-          {targetMode==='growth'
-            ? <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:5}}>Growth vs run-rate (%)<input type="number" style={{...inp,width:120}} value={growth} onChange={e=>setGrowth(e.target.value)}/></label>
-            : byMonth
-            ? <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:5}}>Start month<input type="month" style={{...inp,width:150}} value={startMonth} onChange={e=>setStartMonth(e.target.value)}/></label>
-            : <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:5}}>{targetMode==='units'?'Total units target':'Total revenue target (£)'}<input type="number" style={{...inp,width:150}} value={targetValue} onChange={e=>setTargetValue(e.target.value)} placeholder={targetMode==='units'?'e.g. 1200':'e.g. 60000'}/></label>}
+  return (
+    <div>
+      {!embedded && (<><div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:6}}>
+        <h2 style={{margin:0,fontSize:18}}>Forecast &amp; demand plan</h2>
+        <span className="muted" style={{fontSize:12}}>Per-product demand + packaging from live velocity · independent of the date picker</span>
+      </div>
+      <PlanningHeader active="forecast"/></>)}
+      {/* plan controls */}
+      <div className="card">
+        <div style={{display:'flex',gap:18,flexWrap:'wrap',alignItems:'flex-end'}}>
+          <div><div style={{fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',marginBottom:5}}>Horizon</div>
+            <div style={{display:'flex',gap:6}}>{[1,3,6,12].map(m=>(<button key={m} style={seg(months===m)} onClick={()=>setMonths(m)}>{m}mo</button>))}</div></div>
+          <div><div style={{fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',marginBottom:5}}>Plan basis</div>
+            <div style={{display:'flex',gap:6}}>
+              <button style={seg(targetMode==='growth')} onClick={()=>setTargetMode('growth')}>Growth %</button>
+              <button style={seg(targetMode==='units')} onClick={()=>setTargetMode('units')}>Units target</button>
+              <button style={seg(targetMode==='revenue')} onClick={()=>setTargetMode('revenue')}>Revenue target</button>
+            </div></div>
+          {targetMode!=='growth' && <div><div style={{fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',marginBottom:5}}>Shape</div>
+            <div style={{display:'flex',gap:6}}>
+              <button style={seg(shape==='even')} onClick={()=>setShape('even')}>Even</button>
+              <button style={seg(shape==='month')} onClick={()=>setShape('month')}>By month</button>
+            </div></div>}
+          <div>
+            {targetMode==='growth'
+              ? <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:5}}>Growth vs run-rate (%)<input type="number" style={{...inp,width:120}} value={growth} onChange={e=>setGrowth(e.target.value)}/></label>
+              : byMonth
+              ? <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:5}}>Start month<input type="month" style={{...inp,width:150}} value={startMonth} onChange={e=>setStartMonth(e.target.value)}/></label>
+              : <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:5}}>{targetMode==='units'?'Total units target':`Total revenue target (${curSym()})`}<input type="number" style={{...inp,width:150}} value={targetValue} onChange={e=>setTargetValue(e.target.value)} placeholder={targetMode==='units'?'e.g. 1200':'e.g. 60000'}/></label>}
+          </div>
+          <button style={{...btn,marginLeft:'auto'}} onClick={exportPlan}><Icon name="report" size={13}/> Export plan</button>
         </div>
-        <button style={{...btn,marginLeft:'auto'}} onClick={exportPlan}><Icon name="report" size={13}/> Export plan</button>
-      </div>
 
-      {byMonth && (<div style={{marginTop:14}}>
-        <div style={{fontSize:11,fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-muted)',marginBottom:8}}>Monthly plan — set each month ({targetMode==='units'?'units':'£ revenue'}); blank = run-rate</div>
-        <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
-          {monthlyPlan.map((m,i)=>(<div key={i} style={{minWidth:118,flex:'1 1 118px',maxWidth:170,border:'1px solid var(--border-subtle)',borderRadius:9,padding:'9px 11px',background:'var(--bg-elevated)'}}>
-            <div style={{fontSize:12,fontWeight:700,color:'var(--text-primary)',marginBottom:5}}>{m.label}</div>
-            <input type="number" style={{...inp,width:'100%',boxSizing:'border-box'}} value={monthly[i]!=null?monthly[i]:''} onChange={e=>setMonth(i,e.target.value)} placeholder={(targetMode==='units'?'':'£')+NUM(Math.round(baseMo))}/>
-            <div style={{height:30,display:'flex',alignItems:'flex-end',marginTop:7}}><div style={{width:'100%',height:Math.max(3,Math.round(28*m.rev/maxMonthRev)),background:m.set?'var(--accent)':'var(--border-default)',borderRadius:'3px 3px 0 0'}}/></div>
-            <div style={{fontSize:10.5,color:'var(--text-faint)',marginTop:4}}>{NUM(Math.ceil(m.units))} u · £{k(m.rev)}</div>
-          </div>))}
+        {byMonth && (<div style={{marginTop:14}}>
+          <div style={{fontSize:11,fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-muted)',marginBottom:8}}>Monthly plan — set each month ({targetMode==='units'?'units':`${curSym()} revenue`}); blank = run-rate</div>
+          <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+            {monthlyPlan.map((m,i)=>(<div key={i} style={{minWidth:118,flex:'1 1 118px',maxWidth:170,border:'1px solid var(--border-subtle)',borderRadius:9,padding:'9px 11px',background:'var(--bg-elevated)'}}>
+              <div style={{fontSize:12,fontWeight:700,color:'var(--text-primary)',marginBottom:5}}>{m.label}</div>
+              <input type="number" style={{...inp,width:'100%',boxSizing:'border-box'}} value={monthly[i]!=null?monthly[i]:''} onChange={e=>setMonth(i,e.target.value)} placeholder={(targetMode==='units'?'':curSym())+NUM(Math.round(baseMo))}/>
+              <div style={{height:30,display:'flex',alignItems:'flex-end',marginTop:7}}><div style={{width:'100%',height:Math.max(3,Math.round(28*m.rev/maxMonthRev)),background:m.set?'var(--accent)':'var(--border-default)',borderRadius:'3px 3px 0 0'}}/></div>
+              <div style={{fontSize:10.5,color:'var(--text-faint)',marginTop:4}}>{NUM(Math.ceil(m.units))}u · {curSym()}{k(m.rev)}</div>
+            </div>))}
+          </div>
+        </div>)}
+
+        <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:11,lineHeight:1.5}}>Baseline is each product's 90-day sales velocity over {months} month{months===1?'':'s'} ({sellers.length} active sellers). {byMonth ? `Month-by-month plan totals ${targetMode==='units'?NUM(Math.ceil(monthlySum))+' units':curSym()+k(monthlySum)} — ${impliedGrowth>=0?'+':''}${impliedGrowth.toFixed(0)}% vs run-rate, allocated across products by historic mix.` : (targetMode!=='growth' && Number(targetValue)>0 ? `Your target implies ${impliedGrowth>=0?'+':''}${impliedGrowth.toFixed(0)}% vs the run-rate, allocated by historic mix.` : 'Growth is applied evenly on top of each run-rate.')} The order timing follows your strategy in Production / POs.</div>
+      </div>
+      {/* product focus & promotions */}
+      <div className="card">
+        <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom: focus.length?10:0}}>
+          <div><span style={{fontSize:14,fontWeight:700,color:'var(--text-primary)'}}>Product focus &amp; promotions</span> <span className="muted" style={{fontSize:11.5}}>· push specific products or types — re-weights the plan{targetMode!=='growth'?' within your target':' on top of growth'}</span></div>
+          <button style={{...btn,fontSize:11.5,padding:'5px 11px'}} onClick={addFocus}>+ Add focus</button>
         </div>
-      </div>)}
-
-      <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:11,lineHeight:1.5}}>Baseline is each product's 90-day sales velocity over {months} month{months===1?'':'s'} ({sellers.length} active sellers). {byMonth ? `Month-by-month plan totals ${targetMode==='units'?NUM(Math.ceil(monthlySum))+' units':'£'+k(monthlySum)} — ${impliedGrowth>=0?'+':''}${impliedGrowth.toFixed(0)}% vs run-rate, allocated across products by historic mix.` : (targetMode!=='growth' && Number(targetValue)>0 ? `Your target implies ${impliedGrowth>=0?'+':''}${impliedGrowth.toFixed(0)}% vs the run-rate, allocated by historic mix.` : 'Growth is applied evenly on top of each run-rate.')} The order timing follows your strategy in Production / POs.</div>
-    </div>
-
-    {/* product focus & promotions */}
-    <div className="card">
-      <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom: focus.length?10:0}}>
-        <div><span style={{fontSize:14,fontWeight:700,color:'var(--text-primary)'}}>Product focus &amp; promotions</span> <span className="muted" style={{fontSize:11.5}}>· push specific products or types — re-weights the plan{targetMode!=='growth'?' within your target':' on top of growth'}</span></div>
-        <button style={{...btn,fontSize:11.5,padding:'5px 11px'}} onClick={addFocus}>+ Add focus</button>
+        {focus.length===0
+          ? <div className="muted" style={{fontSize:12.5}}>None — the plan follows historic product mix. Add a focus to push a product or type (e.g. a Q4 promo on charms).</div>
+          : <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              {focus.map((e,i)=>{ const matched = sellers.filter(p=>{ const pid='product:'+(p.sku||p.title), tid='type:'+(p.type||''); return e.key===pid||e.key===tid||e.key==='all'; });
+                return (<div key={i} style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
+                  <select value={e.key} onChange={ev=>setFoc(i,'key',ev.target.value)} style={{...inp,minWidth:220}}>
+                    <option value="">Choose product or type…</option>
+                    <option value="all">All products</option>
+                    <optgroup label="Type">{[...new Set(sellers.map(p=>p.type).filter(Boolean))].sort().map(t=><option key={t} value={'type:'+t}>{t}</option>)}</optgroup>
+                    <optgroup label="Product">{sellers.slice(0,50).map(p=><option key={p.sku||p.title} value={'product:'+(p.sku||p.title)}>{p.title}</option>)}</optgroup>
+                  </select>
+                  <label style={{display:'flex',alignItems:'center',gap:4,fontSize:12,color:'var(--text-secondary)'}}>uplift <input type="number" step="0.1" min="0" value={e.mult} onChange={ev=>setFoc(i,'mult',ev.target.value)} style={{...inp,width:60}}/> ×</label>
+                  <label style={{display:'flex',alignItems:'center',gap:4,fontSize:12,color:'var(--text-secondary)'}}>in <select value={e.month!=null?e.month:''} onChange={ev=>setFoc(i,'month',ev.target.value)} style={{...inp,width:118}}>
+                    <option value="">whole horizon</option>
+                    {Array.from({length:months},(_,mi)=><option key={mi} value={String(mi)}>{oiMonthLabel(startMonth, mi)}</option>)}
+                  </select></label>
+                  <input value={e.label||''} onChange={ev=>setFoc(i,'label',ev.target.value)} placeholder="label (e.g. BF promo)" style={{...inp,width:140}}/>
+                  <span style={{fontSize:11,color:'var(--text-faint)'}}>{e.key?`${matched.length} product${matched.length===1?'':'s'}`:''}</span>
+                  <button style={{...btn,fontSize:11,padding:'4px 9px',color:'var(--text-muted)',marginLeft:'auto'}} onClick={()=>rmFocus(i)}>Remove</button>
+                </div>); })}
+            </div>}
+        {focus.some(e=>e.key&&Number(e.mult)>0&&Number(e.mult)!==1) && <div style={{fontSize:11,color:'var(--text-faint)',marginTop:10,lineHeight:1.5}}>Focused items take a bigger share of the plan and their PO quantities rise to match. {targetMode!=='growth'?'A target is set, so the total stays fixed and the mix shifts toward the focus.':'No target set, so focus adds volume on top of growth.'} A promo set to one month lifts only that month, so its horizon-average weight (the ↑× badge) is smaller. The extra volume is typically lower-margin.</div>}
       </div>
-      {focus.length===0
-        ? <div className="muted" style={{fontSize:12.5}}>None — the plan follows historic product mix. Add a focus to push a product or type (e.g. a Q4 promo on charms).</div>
-        : <div style={{display:'flex',flexDirection:'column',gap:8}}>
-            {focus.map((e,i)=>{ const matched = sellers.filter(p=>{ const pid='product:'+(p.sku||p.title), tid='type:'+(p.type||''); return e.key===pid||e.key===tid||e.key==='all'; });
-              return (<div key={i} style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
-                <select value={e.key} onChange={ev=>setFoc(i,'key',ev.target.value)} style={{...inp,minWidth:220}}>
-                  <option value="">Choose product or type…</option>
-                  <option value="all">All products</option>
-                  <optgroup label="Type">{[...new Set(sellers.map(p=>p.type).filter(Boolean))].sort().map(t=><option key={t} value={'type:'+t}>{t}</option>)}</optgroup>
-                  <optgroup label="Product">{sellers.slice(0,50).map(p=><option key={p.sku||p.title} value={'product:'+(p.sku||p.title)}>{p.title}</option>)}</optgroup>
-                </select>
-                <label style={{display:'flex',alignItems:'center',gap:4,fontSize:12,color:'var(--text-secondary)'}}>uplift <input type="number" step="0.1" min="0" value={e.mult} onChange={ev=>setFoc(i,'mult',ev.target.value)} style={{...inp,width:60}}/> ×</label>
-                <label style={{display:'flex',alignItems:'center',gap:4,fontSize:12,color:'var(--text-secondary)'}}>in <select value={e.month!=null?e.month:''} onChange={ev=>setFoc(i,'month',ev.target.value)} style={{...inp,width:118}}>
-                  <option value="">whole horizon</option>
-                  {Array.from({length:months},(_,mi)=><option key={mi} value={String(mi)}>{oiMonthLabel(startMonth, mi)}</option>)}
-                </select></label>
-                <input value={e.label||''} onChange={ev=>setFoc(i,'label',ev.target.value)} placeholder="label (e.g. BF promo)" style={{...inp,width:140}}/>
-                <span style={{fontSize:11,color:'var(--text-faint)'}}>{e.key?`${matched.length} product${matched.length===1?'':'s'}`:''}</span>
-                <button style={{...btn,fontSize:11,padding:'4px 9px',color:'var(--text-muted)',marginLeft:'auto'}} onClick={()=>rmFocus(i)}>Remove</button>
-              </div>); })}
-          </div>}
-      {focus.some(e=>e.key&&Number(e.mult)>0&&Number(e.mult)!==1) && <div style={{fontSize:11,color:'var(--text-faint)',marginTop:10,lineHeight:1.5}}>Focused items take a bigger share of the plan and their PO quantities rise to match. {targetMode!=='growth'?'A target is set, so the total stays fixed and the mix shifts toward the focus.':'No target set, so focus adds volume on top of growth.'} A promo set to one month lifts only that month, so its horizon-average weight (the ↑× badge) is smaller. The extra volume is typically lower-margin.</div>}
-    </div>
-
-    {/* summary */}
-    <div className="card">
-      <div style={{display:'flex',gap:24,flexWrap:'wrap',alignItems:'flex-end'}}>
-        <div><div style={{fontSize:24,fontWeight:800,color:'var(--text-primary)'}}>{NUM(Math.ceil(totalUnits))}</div><div className="muted" style={{fontSize:11.5}}>units planned · {months}mo</div></div>
-        <div><div style={{fontSize:24,fontWeight:800,color:'var(--text-primary)'}}>£{k(totalRev)}</div><div className="muted" style={{fontSize:11.5}}>projected revenue</div></div>
-        <div><div style={{fontSize:24,fontWeight:800,color: impliedGrowth>=0?'var(--good)':'var(--bad)'}}>{impliedGrowth>=0?'+':''}{impliedGrowth.toFixed(0)}%</div><div className="muted" style={{fontSize:11.5}}>vs run-rate</div></div>
-        <div><div style={{fontSize:24,fontWeight:800,color: stockouts?'var(--warn)':'var(--good)'}}>{stockouts}</div><div className="muted" style={{fontSize:11.5}}>will stock out</div></div>
-        <div title="Products that run out before a reorder placed today could arrive, given production lead time"><div style={{fontSize:24,fontWeight:800,color: oosRisk?'var(--bad)':'var(--good)'}}>{oosRisk}</div><div className="muted" style={{fontSize:11.5}}>OOS before lead</div></div>
-        {toProduce>0 && <div><div style={{fontSize:24,fontWeight:800,color:'var(--text-primary)'}}>{NUM(Math.ceil(toProduce))}</div><div className="muted" style={{fontSize:11.5}}>units short to produce</div></div>}
-      </div>
-    </div>
-
-    {/* demand plan table */}
-    <div className="card">
-      <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:8}}><span style={{fontSize:14,fontWeight:700,color:'var(--text-primary)'}}>Demand plan by product</span><span className="muted" style={{fontSize:11.5}}>sorted by planned demand</span></div>
-      <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:740}}><thead><tr>
-        <th style={th}>Product</th><th style={{...th,textAlign:'right'}}>Run-rate /mo</th><th style={{...th,textAlign:'right'}}>Stock</th><th style={{...th,textAlign:'right'}}>Stockout vs lead</th><th style={{...th,textAlign:'right'}}>Planned ({months}mo)</th><th style={{...th,textAlign:'right'}}>Projected end</th><th style={{...th,textAlign:'right'}}>Order ({STRAT_SHORT[RR.strategy]||'JIT'})</th><th style={th}></th>
-      </tr></thead><tbody>
-        {shown.map((r,idx)=>{ const o=orderFor(r.p);
-          const oCell = !o ? <span style={{color:'var(--text-faint)'}}>—</span>
-            : o.poStatus==='ordered' ? <span style={{color:'var(--accent)',fontWeight:600}}>● awaiting</span>
-            : (o.needs && o.qty>0) ? <span style={{color:'var(--text-primary)',fontWeight:700}}>{NUM(o.qty)}</span>
-            : <span style={{color:'var(--good)'}}>covered</span>;
-          return (<tr key={idx}>
-          <td style={{...td,color:'var(--text-primary)'}}>{r.p.title}{r.oosBeforeLead && <span style={{marginLeft:6,fontSize:9.5,fontWeight:800,letterSpacing:'.03em',color:'#fff',background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}{focusM(r.p)!==1 && <span style={{marginLeft:6,fontSize:10,fontWeight:700,color:'var(--accent)',background:'var(--accent-bg)',padding:'1px 6px',borderRadius:999}}>↑{(focusM(r.p)%1?focusM(r.p).toFixed(2):focusM(r.p))}×</span>}<div style={{fontSize:10.5,color:'var(--text-faint)'}}>{r.p.type}</div></td>
-          <td style={{...td,textAlign:'right'}}>{NUM(Math.round(r.runMo))}</td>
-          <td style={{...td,textAlign:'right'}}>{NUM(r.stock)}</td>
-          <td style={{...td,textAlign:'right'}}>{r.daysToOOS===Infinity ? <span style={{color:'var(--text-faint)'}}>—</span> : <span style={{fontWeight:600,color: r.oosBeforeLead?'var(--bad)':(r.daysToOOS<r.lead*1.5?'var(--warn)':'var(--text-secondary)')}}>{Math.round(r.daysToOOS)}d{r.oosBeforeLead?` · gap ${r.oosGap}d`:''}</span>}<div style={{fontSize:10,color:'var(--text-faint)',display:'flex',alignItems:'center',gap:3,justifyContent:'flex-end',marginTop:2}}>{!r.leadSet && <span title={`Estimate — using the ${r.p.type||'type'} default of ${r.leadDefault}d. Set this SKU's real supplier lead.`} style={{color:'var(--warn)',fontSize:8,lineHeight:1}}>●</span>}<input type="number" min="0" defaultValue={r.leadSet?r.leadMake:''} key={'ld'+(r.leadSet?r.leadMake:'d')} placeholder={String(r.leadDefault)} title={`Production lead — days from order to shipment (per SKU). Blank uses the ${r.p.type||'type'} default of ${r.leadDefault}d. Set defaults in Reorder policy.`} onBlur={e=>{ if(e.target.value!=='') setSkuLead(skuKeyOf(r.p), e.target.value); }} style={{width:38,padding:'1px 4px',borderRadius:5,border:'1px solid '+(r.leadSet?'var(--border-default)':'var(--warn)'),background:'var(--bg-base)',color:'var(--text-secondary)',fontSize:10,textAlign:'right'}}/><span>d make{r.leadShip>0?` +${r.leadShip} ship = ${r.lead}`:' lead'}</span></div></td>
-          <td style={{...td,textAlign:'right',fontWeight:700,color:'var(--text-primary)'}}>{NUM(Math.ceil(r.plan))}</td>
-          <td style={{...td,textAlign:'right',fontWeight:600,color: r.short?'var(--bad)':'var(--good)'}}>{r.short?'−'+NUM(Math.ceil(-r.end)):NUM(Math.floor(r.end))}</td>
-          <td style={{...td,textAlign:'right'}}>{oCell}</td>
-          <td style={{...td,textAlign:'right'}}><button title="Delist — won't be reordered, hide from the plan" style={{fontSize:10.5,color:'var(--text-faint)',background:'none',border:'none',cursor:'pointer',padding:'2px 4px'}} onClick={()=>{ setDelisted(skuKeyOf(r.p), true); toast('Delisted', {body:r.p.title+' — hidden from the plan'}); }}>Delist</button></td>
-        </tr>); })}
-      </tbody></table></div>
-      <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',marginTop:10}}>
-        {rows.length>12 && <button style={btn} onClick={()=>setShowAll(s=>!s)}>{showAll?'Show top 12':`Show all ${rows.length}`}</button>}
-        <button style={{...btn,background:'var(--accent)',color:'#fff',borderColor:'var(--accent)'}} onClick={()=>{ const el=document.getElementById('plan-pos'); if(el) el.scrollIntoView({behavior:'smooth'}); else if(window.__oiNav) window.__oiNav('planning','plan'); }}>Review &amp; raise POs ({RR.toOrder.length}) <Icon name="chevron" size={13}/></button>
-        {delistedCount>0 && <button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setShowDelisted(s=>!s)}>{showDelisted?'Hide delisted':`${delistedCount} delisted`}</button>}
-        {rows.filter(r=>!r.leadSet).length>0 && <span style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:11.5,color:'var(--text-faint)'}} title="These products use the type's default lead — set each SKU's real supplier lead (the input in the Stockout-vs-lead column) for accurate order-by dates."><span style={{color:'var(--warn)',fontSize:8}}>●</span>{rows.filter(r=>!r.leadSet).length} on an estimated lead</span>}
-      </div>
-      {showDelisted && delistedCount>0 && <div style={{marginTop:10,paddingTop:10,borderTop:'1px solid var(--border-subtle)'}}>
-        <div style={{fontSize:11,fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:6}}>Delisted — excluded from the plan &amp; POs</div>
-        <div style={{display:'flex',flexWrap:'wrap',gap:8}}>{inv.filter(p=>(p.dailyVelocity||0)>0 && del[p.sku||p.title]).map((p,i)=>(<span key={i} style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:12,color:'var(--text-secondary)',background:'var(--bg-elevated)',border:'1px solid var(--border-subtle)',borderRadius:999,padding:'3px 6px 3px 11px'}}>{p.title}<button style={{fontSize:11,fontWeight:600,color:'var(--accent)',background:'none',border:'none',cursor:'pointer'}} onClick={()=>{ setDelisted(skuKeyOf(p), false); toast('Relisted', {kind:'good', body:p.title}); }}>Relist</button></span>))}</div>
-      </div>}
-      {(stockouts>0||oosRisk>0) && <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:9,lineHeight:1.5}}><b>Stockout vs lead</b> is days of cover at the planned rate against production lead time — <span style={{color:'var(--bad)'}}>red</span> means it runs out <b>before</b> a reorder placed today could land ({oosRisk} product{oosRisk===1?'':'s'} · ~{Math.round(rows.filter(r=>r.oosBeforeLead).reduce((t,r)=>t+r.oosGap,0)/Math.max(1,oosRisk))}d avg gap), so it needs ordering now or it'll go OOS. Edit each product's <b>make lead</b> inline in this column (blank = the type default, set in Reorder policy); transit is per-supplier. The <b>Order</b> column is what each triggers under your <b>{STRAT_SHORT[RR.strategy]||'JIT'}</b> strategy. Stock is consumed <b>FIFO</b> — current stock first, on-order isn't counted as available until it lands, so the OOS gap is the real shortfall window.</div>}
-    </div>
-
-    {/* packaging requirements */}
-    <div className="card">
-      <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:8}}>
-        <span style={{fontSize:14,fontWeight:700,color:'var(--text-primary)'}}>Packaging requirements</span>
-        <button style={{...btn,fontSize:11.5,padding:'5px 10px'}} onClick={()=>setPackOpen(o=>!o)}><Icon name="sliders" size={12}/> Edit packaging plan</button>
-      </div>
-      <div className="wc-grid">{compNeeds.map((c,idx)=>(<div key={idx} className="wc-item">
-        <div className="wc-top"><span className="wc-label">{c.name}</span></div>
-        <div className="wc-val">{NUM(Math.ceil(c.qty))}</div>
-        <div style={{fontSize:11,color:'var(--text-faint)',marginTop:6,lineHeight:1.4}}>{c.perItem>0?`${c.perItem}/item`:''}{c.perItem>0&&c.perOrder>0?' · ':''}{c.perOrder>0?`${c.perOrder}/order`:''}{!c.perItem&&!c.perOrder?'not used':''}</div>
-      </div>))}</div>
-      <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:10,lineHeight:1.5}}>Based on {NUM(Math.ceil(totalUnits))} units across ≈{NUM(Math.ceil(orders))} orders (at {aipo} items/order). Per-item components scale with units; per-order components scale with orders.</div>
-      {packOpen && (<div style={{marginTop:12,borderTop:'1px solid var(--border-subtle)',paddingTop:12}}>
-        <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'flex-end',marginBottom:10}}>
-          <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}}>Avg items per order<input type="number" style={{...inp,width:90}} value={packDraft.avgItemsPerOrder} onChange={e=>setPackDraft(d=>({...d,avgItemsPerOrder:e.target.value}))}/></label>
+      {/* summary */}
+      <div className="card">
+        <div style={{display:'flex',gap:24,flexWrap:'wrap',alignItems:'flex-end'}}>
+          <div><div style={{fontSize:24,fontWeight:800,color:'var(--text-primary)'}}>{NUM(Math.ceil(totalUnits))}</div><div className="muted" style={{fontSize:11.5}}>units planned · {months}mo</div></div>
+          <div><div style={{fontSize:24,fontWeight:800,color:'var(--text-primary)'}}>{curSym()}{k(totalRev)}</div><div className="muted" style={{fontSize:11.5}}>projected revenue</div></div>
+          <div><div style={{fontSize:24,fontWeight:800,color: impliedGrowth>=0?'var(--good)':'var(--bad)'}}>{impliedGrowth>=0?'+':''}{impliedGrowth.toFixed(0)}%</div><div className="muted" style={{fontSize:11.5}}>vs run-rate</div></div>
+          <div><div style={{fontSize:24,fontWeight:800,color: stockouts?'var(--warn)':'var(--good)'}}>{stockouts}</div><div className="muted" style={{fontSize:11.5}}>will stock out</div></div>
+          <div title="Products that run out before a reorder placed today could arrive, given production lead time"><div style={{fontSize:24,fontWeight:800,color: oosRisk?'var(--bad)':'var(--good)'}}>{oosRisk}</div><div className="muted" style={{fontSize:11.5}}>OOS before lead</div></div>
+          {toProduce>0 && <div><div style={{fontSize:24,fontWeight:800,color:'var(--text-primary)'}}>{NUM(Math.ceil(toProduce))}</div><div className="muted" style={{fontSize:11.5}}>units short to produce</div></div>}
         </div>
-        <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:760}}><thead><tr><th style={th}>Component</th><th style={th}>Per item</th><th style={th}>Per order</th><th style={th}>On hand</th><th style={th}>Supplier</th><th style={th}>MOQ</th><th style={th}>£/unit</th><th style={th}>Lead d</th><th style={th}></th></tr></thead><tbody>
-          {packDraft.components.map((c,idx)=>(<tr key={idx}>
-            <td style={td}><input style={{...inp,width:150}} value={c.name} onChange={e=>setComp(idx,'name',e.target.value)}/></td>
-            <td style={td}><input type="number" step="0.1" style={{...inp,width:60}} value={c.perItem} onChange={e=>setComp(idx,'perItem',e.target.value)}/></td>
-            <td style={td}><input type="number" step="0.1" style={{...inp,width:60}} value={c.perOrder} onChange={e=>setComp(idx,'perOrder',e.target.value)}/></td>
-            <td style={td}><input type="number" style={{...inp,width:74}} value={c.onHand} onChange={e=>setComp(idx,'onHand',e.target.value)} placeholder="untracked"/></td>
-            <td style={td}><input style={{...inp,width:120}} value={c.supplier} onChange={e=>setComp(idx,'supplier',e.target.value)} placeholder="Supplier"/></td>
-            <td style={td}><input type="number" style={{...inp,width:64}} value={c.moq} onChange={e=>setComp(idx,'moq',e.target.value)} placeholder="0"/></td>
-            <td style={td}><input type="number" step="0.01" style={{...inp,width:64}} value={c.unitCost} onChange={e=>setComp(idx,'unitCost',e.target.value)} placeholder="—"/></td>
-            <td style={td}><input type="number" style={{...inp,width:56}} value={c.leadDays} onChange={e=>setComp(idx,'leadDays',e.target.value)}/></td>
-            <td style={td}><button style={{...btn,fontSize:11,padding:'4px 9px',color:'var(--text-muted)'}} onClick={()=>rmComp(idx)}>Remove</button></td>
-          </tr>))}
+      </div>
+      {/* demand plan table */}
+      <div className="card">
+        <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',marginBottom:8}}><span style={{fontSize:14,fontWeight:700,color:'var(--text-primary)'}}>Demand plan by product</span><span className="muted" style={{fontSize:11.5}}>sorted by planned demand</span></div>
+        <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:740}}><thead><tr>
+          <th style={th}>Product</th><th style={{...th,textAlign:'right'}}>Run-rate /mo</th><th style={{...th,textAlign:'right'}}>Stock</th><th style={{...th,textAlign:'right'}}>Stockout vs lead</th><th style={{...th,textAlign:'right'}}>Planned ({months}mo)</th><th style={{...th,textAlign:'right'}}>Projected end</th><th style={{...th,textAlign:'right'}}>Order ({STRAT_SHORT[RR.strategy]||'JIT'})</th><th style={th}></th>
+        </tr></thead><tbody>
+          {shown.map((r,idx)=>{ const o=orderFor(r.p);
+            const oCell = !o ? <span style={{color:'var(--text-faint)'}}>—</span>
+              : o.poStatus==='ordered' ? <span style={{color:'var(--accent)',fontWeight:600}}>● awaiting</span>
+              : (o.needs && o.qty>0) ? <span style={{color:'var(--text-primary)',fontWeight:700}}>{NUM(o.qty)}</span>
+              : <span style={{color:'var(--good)'}}>covered</span>;
+            return (<tr key={idx}>
+            <td style={{...td,color:'var(--text-primary)'}}>{r.p.title}{r.oosBeforeLead && <span style={{marginLeft:6,fontSize:9.5,fontWeight:800,letterSpacing:'.03em',color:'#fff',background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}{focusM(r.p)!==1 && <span style={{marginLeft:6,fontSize:10,fontWeight:700,color:'var(--accent)',background:'var(--accent-bg)',padding:'1px 6px',borderRadius:999}}>↑{(focusM(r.p)%1?focusM(r.p).toFixed(2):focusM(r.p))}×</span>}<div style={{fontSize:10.5,color:'var(--text-faint)'}}>{r.p.type}</div></td>
+            <td style={{...td,textAlign:'right'}}>{NUM(Math.round(r.runMo))}</td>
+            <td style={{...td,textAlign:'right'}}>{NUM(r.stock)}</td>
+            <td style={{...td,textAlign:'right'}}>{r.daysToOOS===Infinity ? <span style={{color:'var(--text-faint)'}}>—</span> : <span style={{fontWeight:600,color: r.oosBeforeLead?'var(--bad)':(r.daysToOOS<r.lead*1.5?'var(--warn)':'var(--text-secondary)')}}>{Math.round(r.daysToOOS)}d{r.oosBeforeLead?` · gap ${r.oosGap}d`:''}</span>}<div style={{fontSize:10,color:'var(--text-faint)',display:'flex',alignItems:'center',gap:3,justifyContent:'flex-end',marginTop:2}}>{!r.leadSet && <span title={`Estimate — using the ${r.p.type||'type'} default of ${r.leadDefault}d. Set this SKU's real supplier lead.`} style={{color:'var(--warn)',fontSize:8,lineHeight:1}}>●</span>}<input type="number" min="0" defaultValue={r.leadSet?r.leadMake:''} key={'ld'+(r.leadSet?r.leadMake:'d')} placeholder={String(r.leadDefault)} title={`Production lead — days from order to shipment (per SKU). Blank uses the ${r.p.type||'type'} default of ${r.leadDefault}d. Set defaults in Reorder policy.`} onBlur={e=>{ if(e.target.value!=='') setSkuLead(skuKeyOf(r.p), e.target.value); }} style={{width:38,padding:'1px 4px',borderRadius:5,border:'1px solid '+(r.leadSet?'var(--border-default)':'var(--warn)'),background:'var(--bg-base)',color:'var(--text-secondary)',fontSize:10,textAlign:'right'}}/><span>d make{r.leadShip>0?` +${r.leadShip} ship = ${r.lead}`:' lead'}</span></div></td>
+            <td style={{...td,textAlign:'right',fontWeight:700,color:'var(--text-primary)'}}>{NUM(Math.ceil(r.plan))}</td>
+            <td style={{...td,textAlign:'right',fontWeight:600,color: r.short?'var(--bad)':'var(--good)'}}>{r.short?'−'+NUM(Math.ceil(-r.end)):NUM(Math.floor(r.end))}</td>
+            <td style={{...td,textAlign:'right'}}>{oCell}</td>
+            <td style={{...td,textAlign:'right'}}><button title="Delist — won't be reordered, hide from the plan" style={{fontSize:10.5,color:'var(--text-faint)',background:'none',border:'none',cursor:'pointer',padding:'2px 4px'}} onClick={()=>{ setDelisted(skuKeyOf(r.p), true); toast('Delisted', {body:r.p.title+' — hidden from the plan'}); }}>Delist</button></td>
+          </tr>); })}
         </tbody></table></div>
-        <div style={{fontSize:11,color:'var(--text-faint)',marginTop:8,lineHeight:1.5}}>Set <b>On hand</b> to enable packaging reorder POs — they appear in Production / POs and the Actions queue under your chosen ordering strategy. Leave it blank to track the requirement only.</div>
-        <div style={{marginTop:10,display:'flex',gap:8}}><button style={btn} onClick={savePack}>Save packaging plan</button><button style={btn} onClick={addComp}>+ Add component</button><button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setPackOpen(false)}>Cancel</button></div>
-      </div>)}
+        <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',marginTop:10}}>
+          {rows.length>12 && <button style={btn} onClick={()=>setShowAll(s=>!s)}>{showAll?'Show top 12':`Show all ${rows.length}`}</button>}
+          <button style={{...btn,background:'var(--accent)',color:'#fff',borderColor:'var(--accent)'}} onClick={()=>{ const el=document.getElementById('plan-pos'); if(el) el.scrollIntoView({behavior:'smooth'}); else if(window.__oiNav) window.__oiNav('planning','plan'); }}>Review &amp; raise POs ({RR.toOrder.length}) <Icon name="chevron" size={13}/></button>
+          {delistedCount>0 && <button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setShowDelisted(s=>!s)}>{showDelisted?'Hide delisted':`${delistedCount} delisted`}</button>}
+          {rows.filter(r=>!r.leadSet).length>0 && <span style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:11.5,color:'var(--text-faint)'}} title="These products use the type's default lead — set each SKU's real supplier lead (the input in the Stockout-vs-lead column) for accurate order-by dates."><span style={{color:'var(--warn)',fontSize:8}}>●</span>{rows.filter(r=>!r.leadSet).length} on an estimated lead</span>}
+        </div>
+        {showDelisted && delistedCount>0 && <div style={{marginTop:10,paddingTop:10,borderTop:'1px solid var(--border-subtle)'}}>
+          <div style={{fontSize:11,fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:6}}>Delisted — excluded from the plan &amp; POs</div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:8}}>{inv.filter(p=>(p.dailyVelocity||0)>0 && del[p.sku||p.title]).map((p,i)=>(<span key={i} style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:12,color:'var(--text-secondary)',background:'var(--bg-elevated)',border:'1px solid var(--border-subtle)',borderRadius:999,padding:'3px 6px 3px 11px'}}>{p.title}<button style={{fontSize:11,fontWeight:600,color:'var(--accent)',background:'none',border:'none',cursor:'pointer'}} onClick={()=>{ setDelisted(skuKeyOf(p), false); toast('Relisted', {kind:'good', body:p.title}); }}>Relist</button></span>))}</div>
+        </div>}
+        {(stockouts>0||oosRisk>0) && <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:9,lineHeight:1.5}}><b>Stockout vs lead</b> is days of cover at the planned rate against production lead time — <span style={{color:'var(--bad)'}}>red</span> means it runs out <b>before</b> a reorder placed today could land ({oosRisk} product{oosRisk===1?'':'s'} · ~{Math.round(rows.filter(r=>r.oosBeforeLead).reduce((t,r)=>t+r.oosGap,0)/Math.max(1,oosRisk))}d avg gap), so it needs ordering now or it'll go OOS. Edit each product's <b>make lead</b> inline in this column (blank = the type default, set in Reorder policy); transit is per-supplier. The <b>Order</b> column is what each triggers under your <b>{STRAT_SHORT[RR.strategy]||'JIT'}</b> strategy. Stock is consumed <b>FIFO</b> — current stock first, on-order isn't counted as available until it lands, so the OOS gap is the real shortfall window.</div>}
+      </div>
+      {/* packaging requirements */}
+      <div className="card">
+        <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:8}}>
+          <span style={{fontSize:14,fontWeight:700,color:'var(--text-primary)'}}>Packaging requirements</span>
+          <button style={{...btn,fontSize:11.5,padding:'5px 10px'}} onClick={()=>setPackOpen(o=>!o)}><Icon name="sliders" size={12}/> Edit packaging plan</button>
+        </div>
+        <div className="wc-grid">{compNeeds.map((c,idx)=>(<div key={idx} className="wc-item">
+          <div className="wc-top"><span className="wc-label">{c.name}</span></div>
+          <div className="wc-val">{NUM(Math.ceil(c.qty))}</div>
+          <div style={{fontSize:11,color:'var(--text-faint)',marginTop:6,lineHeight:1.4}}>{c.perItem>0?`${c.perItem}/item`:''}{c.perItem>0&&c.perOrder>0?' · ':''}{c.perOrder>0?`${c.perOrder}/order`:''}{!c.perItem&&!c.perOrder?'not used':''}</div>
+        </div>))}</div>
+        <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:10,lineHeight:1.5}}>Based on {NUM(Math.ceil(totalUnits))} units across ≈{NUM(Math.ceil(orders))} orders (at {aipo} items/order). Per-item components scale with units; per-order components scale with orders.</div>
+        {packOpen && (<div style={{marginTop:12,borderTop:'1px solid var(--border-subtle)',paddingTop:12}}>
+          <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'flex-end',marginBottom:10}}>
+            <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}}>Avg items per order<input type="number" style={{...inp,width:90}} value={packDraft.avgItemsPerOrder} onChange={e=>setPackDraft(d=>({...d,avgItemsPerOrder:e.target.value}))}/></label>
+          </div>
+          <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:760}}><thead><tr><th style={th}>Component</th><th style={th}>Per item</th><th style={th}>Per order</th><th style={th}>On hand</th><th style={th}>Supplier</th><th style={th}>MOQ</th><th style={th}>{curSym()}/unit</th><th style={th}>Lead d</th><th style={th}></th></tr></thead><tbody>
+            {packDraft.components.map((c,idx)=>(<tr key={idx}>
+              <td style={td}><input style={{...inp,width:150}} value={c.name} onChange={e=>setComp(idx,'name',e.target.value)}/></td>
+              <td style={td}><input type="number" step="0.1" style={{...inp,width:60}} value={c.perItem} onChange={e=>setComp(idx,'perItem',e.target.value)}/></td>
+              <td style={td}><input type="number" step="0.1" style={{...inp,width:60}} value={c.perOrder} onChange={e=>setComp(idx,'perOrder',e.target.value)}/></td>
+              <td style={td}><input type="number" style={{...inp,width:74}} value={c.onHand} onChange={e=>setComp(idx,'onHand',e.target.value)} placeholder="untracked"/></td>
+              <td style={td}><input style={{...inp,width:120}} value={c.supplier} onChange={e=>setComp(idx,'supplier',e.target.value)} placeholder="Supplier"/></td>
+              <td style={td}><input type="number" style={{...inp,width:64}} value={c.moq} onChange={e=>setComp(idx,'moq',e.target.value)} placeholder="0"/></td>
+              <td style={td}><input type="number" step="0.01" style={{...inp,width:64}} value={c.unitCost} onChange={e=>setComp(idx,'unitCost',e.target.value)} placeholder="—"/></td>
+              <td style={td}><input type="number" style={{...inp,width:56}} value={c.leadDays} onChange={e=>setComp(idx,'leadDays',e.target.value)}/></td>
+              <td style={td}><button style={{...btn,fontSize:11,padding:'4px 9px',color:'var(--text-muted)'}} onClick={()=>rmComp(idx)}>Remove</button></td>
+            </tr>))}
+          </tbody></table></div>
+          <div style={{fontSize:11,color:'var(--text-faint)',marginTop:8,lineHeight:1.5}}>Set <b>On hand</b> to enable packaging reorder POs — they appear in Production / POs and the Actions queue under your chosen ordering strategy. Leave it blank to track the requirement only.</div>
+          <div style={{marginTop:10,display:'flex',gap:8}}><button style={btn} onClick={savePack}>Save packaging plan</button><button style={btn} onClick={addComp}>+ Add component</button><button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setPackOpen(false)}>Cancel</button></div>
+        </div>)}
+      </div>
     </div>
-  </div>);
+  );
 }
 
 // ── Suppliers directory — tracked suppliers + full contact details ───────────
@@ -9745,7 +9795,7 @@ function CashFlowPlan({tranches, plan, months}){
   const [ovD,setOvD] = useState(cf.overheads);
   const [adD,setAdD] = useState(cf.adSpend);
   const commit = ()=>saveCashConfig({...cashConfig(), cash:cashD, overheads:ovD, adSpend:adD});
-  const k = v=>{ const n=Math.abs(Math.round(v)); const s=n>=1000?(n/1000).toFixed(n>=10000?0:1).replace(/\.0$/,'')+'k':''+n; return (v<0?'-£':'£')+s; };
+  const k = v=>{ const n=Math.abs(Math.round(v)); const s=n>=1000?(n/1000).toFixed(n>=10000?0:1).replace(/\.0$/,'')+'k':''+n; return (v<0?`-${curSym()}`:curSym())+s; };
   const today = oiToday();
   const startCash = parseFloat(cashD); const cashKnown = isFinite(startCash);
   const overM = parseFloat(ovD)||0, adM = parseFloat(adD)||0;
@@ -9779,38 +9829,40 @@ function CashFlowPlan({tranches, plan, months}){
     : trough.bal<0 ? <>This plan takes cash <b style={{color:'var(--bad)'}}>negative — down to {k(trough.bal)}</b> in <b>{trough.label}</b>. Stagger the orders (Staged / front-load less), renegotiate deposit terms, or raise funding before committing.</>
     : trough.bal < Math.max(overM*1.5, startCash*0.2) ? <>Cash dips to a <b style={{color:'var(--warn)'}}>tight {k(trough.bal)}</b> in <b>{trough.label}</b> — under ~{(trough.bal/Math.max(1,overM)).toFixed(1)} months of overheads. Workable, but little headroom.</>
     : <>Cash stays healthy — the low point is <b style={{color:'var(--good)'}}>{k(trough.bal)}</b> in <b>{trough.label}</b>. This plan is affordable.</>;
-  return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid '+tone}}>
-    <div style={{display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap',marginBottom:6}}>
-      <div style={{fontSize:14,fontWeight:800,color:'var(--text-primary)'}}>Cash impact of this plan</div>
-      <span className="muted" style={{fontSize:11.5}}>projected balance over {projLen} months · stock payments on their due dates</span>
+  return (
+    <div className="card" style={{marginBottom:14, borderLeft:'3px solid '+tone}}>
+      <div style={{display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap',marginBottom:6}}>
+        <div style={{fontSize:14,fontWeight:800,color:'var(--text-primary)'}}>Cash impact of this plan</div>
+        <span className="muted" style={{fontSize:11.5}}>projected balance over {projLen} months · stock payments on their due dates</span>
+      </div>
+      <div style={{fontSize:13,color:'var(--text-secondary)',marginBottom:12,lineHeight:1.5}}>{verdict}</div>
+      {/* assumptions */}
+      <div style={{display:'flex',gap:16,flexWrap:'wrap',marginBottom:14}}>
+        <label style={{display:'flex',flexDirection:'column',gap:4}}><span style={lab}>Cash on hand ({curSym()})</span><input type="number" value={cashD} onChange={e=>setCashD(e.target.value)} onBlur={commit} placeholder="e.g. 80000" style={inp}/></label>
+        <label style={{display:'flex',flexDirection:'column',gap:4}}><span style={lab}>Monthly overheads ({curSym()})</span><input type="number" value={ovD} onChange={e=>setOvD(e.target.value)} onBlur={commit} placeholder="e.g. 12000" style={inp}/></label>
+        <label style={{display:'flex',flexDirection:'column',gap:4}}><span style={lab}>Monthly ad spend ({curSym()})</span><input type="number" value={adD} onChange={e=>setAdD(e.target.value)} onBlur={commit} placeholder="e.g. 15000" style={inp}/></label>
+        <div style={{display:'flex',flexDirection:'column',gap:4}}><span style={lab}>Revenue in / mo</span><span style={{fontSize:15,fontWeight:700,color:'var(--good)'}}>{monthlyRev>0?k(monthlyRev):'—'}</span></div>
+        <div style={{display:'flex',flexDirection:'column',gap:4}}><span style={lab}>Stock to pay (total)</span><span style={{fontSize:15,fontWeight:700,color:'var(--text-primary)'}}>{totalStock>0?k(totalStock):'—'}</span></div>
+      </div>
+      {/* chart */}
+      <div style={{color:tone, width:'100%'}}>
+        <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{display:'block',overflow:'visible'}} preserveAspectRatio="xMidYMid meet">
+          {zeroIn && <line x1={padL} y1={Y(0)} x2={W-padR} y2={Y(0)} stroke="var(--bad)" strokeDasharray="4 4" strokeWidth="1" opacity="0.5"/>}
+          {zeroIn && <text x={padL-6} y={Y(0)+3} textAnchor="end" fontSize="9.5" fill="var(--text-faint)">{curSym()}0</text>}
+          <text x={padL-6} y={Y(hi-padv*0.5)+3} textAnchor="end" fontSize="9.5" fill="var(--text-faint)">{k(hi-padv*0.5)}</text>
+          <path d={areaPath} fill="currentColor" opacity="0.08"/>
+          <path d={linePath} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round"/>
+          {series.map((s,i)=>(<g key={i}>
+            <circle cx={X(i)} cy={Y(s.bal)} r={i===trough.i?5:3.5} fill={s.bal<0?'var(--bad)':'currentColor'} stroke="var(--bg-surface)" strokeWidth="1.5"/>
+            {s.stock>0 && <text x={X(i)} y={Y(s.bal)-9} textAnchor="middle" fontSize="9" fill="var(--text-faint)">−{k(s.stock).replace(curSym(),curSym())}</text>}
+            <text x={X(i)} y={H-8} textAnchor="middle" fontSize="9.5" fill={i===trough.i?tone:'var(--text-faint)'} fontWeight={i===trough.i?700:400}>{s.label}</text>
+          </g>))}
+          <text x={X(trough.i)} y={Y(trough.bal)+ (trough.bal< (lo+hi)/2 ? 18 : -12)} textAnchor="middle" fontSize="10" fontWeight="700" fill={tone}>{k(trough.bal)}</text>
+        </svg>
+      </div>
+      <div style={{fontSize:11,color:'var(--text-faint)',marginTop:10,lineHeight:1.5}}>Revenue in from your demand plan ({plan&&plan.revenue>0?k(plan.revenue):'—'} over {months}mo, spread evenly, gross); stock paid via the landing plan (deposit on order, balance on shipment); opex = overheads + ad spend. Cash basis — COGS is the stock payments, not double-counted. Excludes tax, refunds &amp; one-offs. {!cashKnown && <span style={{color:'var(--warn)'}}>Set cash on hand above for an absolute balance.</span>}</div>
     </div>
-    <div style={{fontSize:13,color:'var(--text-secondary)',marginBottom:12,lineHeight:1.5}}>{verdict}</div>
-    {/* assumptions */}
-    <div style={{display:'flex',gap:16,flexWrap:'wrap',marginBottom:14}}>
-      <label style={{display:'flex',flexDirection:'column',gap:4}}><span style={lab}>Cash on hand (£)</span><input type="number" value={cashD} onChange={e=>setCashD(e.target.value)} onBlur={commit} placeholder="e.g. 80000" style={inp}/></label>
-      <label style={{display:'flex',flexDirection:'column',gap:4}}><span style={lab}>Monthly overheads (£)</span><input type="number" value={ovD} onChange={e=>setOvD(e.target.value)} onBlur={commit} placeholder="e.g. 12000" style={inp}/></label>
-      <label style={{display:'flex',flexDirection:'column',gap:4}}><span style={lab}>Monthly ad spend (£)</span><input type="number" value={adD} onChange={e=>setAdD(e.target.value)} onBlur={commit} placeholder="e.g. 15000" style={inp}/></label>
-      <div style={{display:'flex',flexDirection:'column',gap:4}}><span style={lab}>Revenue in / mo</span><span style={{fontSize:15,fontWeight:700,color:'var(--good)'}}>{monthlyRev>0?k(monthlyRev):'—'}</span></div>
-      <div style={{display:'flex',flexDirection:'column',gap:4}}><span style={lab}>Stock to pay (total)</span><span style={{fontSize:15,fontWeight:700,color:'var(--text-primary)'}}>{totalStock>0?k(totalStock):'—'}</span></div>
-    </div>
-    {/* chart */}
-    <div style={{color:tone, width:'100%'}}>
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{display:'block',overflow:'visible'}} preserveAspectRatio="xMidYMid meet">
-        {zeroIn && <line x1={padL} y1={Y(0)} x2={W-padR} y2={Y(0)} stroke="var(--bad)" strokeDasharray="4 4" strokeWidth="1" opacity="0.5"/>}
-        {zeroIn && <text x={padL-6} y={Y(0)+3} textAnchor="end" fontSize="9.5" fill="var(--text-faint)">£0</text>}
-        <text x={padL-6} y={Y(hi-padv*0.5)+3} textAnchor="end" fontSize="9.5" fill="var(--text-faint)">{k(hi-padv*0.5)}</text>
-        <path d={areaPath} fill="currentColor" opacity="0.08"/>
-        <path d={linePath} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round"/>
-        {series.map((s,i)=>(<g key={i}>
-          <circle cx={X(i)} cy={Y(s.bal)} r={i===trough.i?5:3.5} fill={s.bal<0?'var(--bad)':'currentColor'} stroke="var(--bg-surface)" strokeWidth="1.5"/>
-          {s.stock>0 && <text x={X(i)} y={Y(s.bal)-9} textAnchor="middle" fontSize="9" fill="var(--text-faint)">−{k(s.stock).replace('£','£')}</text>}
-          <text x={X(i)} y={H-8} textAnchor="middle" fontSize="9.5" fill={i===trough.i?tone:'var(--text-faint)'} fontWeight={i===trough.i?700:400}>{s.label}</text>
-        </g>))}
-        <text x={X(trough.i)} y={Y(trough.bal)+ (trough.bal< (lo+hi)/2 ? 18 : -12)} textAnchor="middle" fontSize="10" fontWeight="700" fill={tone}>{k(trough.bal)}</text>
-      </svg>
-    </div>
-    <div style={{fontSize:11,color:'var(--text-faint)',marginTop:10,lineHeight:1.5}}>Revenue in from your demand plan ({plan&&plan.revenue>0?k(plan.revenue):'—'} over {months}mo, spread evenly, gross); stock paid via the landing plan (deposit on order, balance on shipment); opex = overheads + ad spend. Cash basis — COGS is the stock payments, not double-counted. Excludes tax, refunds &amp; one-offs. {!cashKnown && <span style={{color:'var(--warn)'}}>Set cash on hand above for an absolute balance.</span>}</div>
-  </div>);
+  );
 }
 
 // ── Planning — forecast + purchase orders on ONE tab ─────────────────────────
@@ -9832,7 +9884,7 @@ function PlanningView(){
   const growthPct = R.plan?R.plan.growthPct:0;
   const fLabel = dc.targetMode==='growth' ? `${(Number(dc.growth)||0)>=0?'+':''}${Number(dc.growth)||0}% on run-rate · ${months}mo`
     : dc.shape==='month' ? `${months}-mo, shaped by month (${growthPct>=0?'+':''}${Math.round(growthPct)}%)`
-    : (Number(dc.targetValue)>0 ? (dc.targetMode==='revenue'?`£${k(dc.targetValue)} revenue · ${months}mo`:`${NUM(Number(dc.targetValue))} units · ${months}mo`) : `${months}-mo run-rate (no target set)`);
+    : (Number(dc.targetValue)>0 ? (dc.targetMode==='revenue'?`${curSym()}${k(dc.targetValue)} revenue · ${months}mo`:`${NUM(Number(dc.targetValue))} units · ${months}mo`) : `${months}-mo run-rate (no target set)`);
   const STRAT = {jit:'Just-in-time', bulk:'Bulk upfront', staged:'Staged waves'};
   // Cost each strategy (without switching) so the trade-off is visible at the point of choice.
   // dep = cash due now (deposits); val = total committed — they differ when suppliers take a deposit.
@@ -9885,147 +9937,148 @@ function PlanningView(){
   const lateWaves = tranches.filter(t=>t.late).length;
   const heroColor = oosNow ? 'var(--bad)' : toOrderN ? 'var(--warn)' : 'var(--good)';
   const headline = oosNow ? `Order today — ${oosNow} product${oosNow===1?'':'s'} at OOS risk` : toOrderN ? `${toOrderN} product${toOrderN===1?'':'s'} to reorder` : 'Stock is on track for your plan';
-  const sub = toOrderN ? `${toOrderN} SKU${toOrderN===1?'':'s'} to order · ~£${k(orderVal)} to commit${stockoutsUnderPlan?` · ${stockoutsUnderPlan} forecast to run out under the plan`:''}${awaiting?` · ${awaiting} awaiting stock`:''}`
+  const sub = toOrderN ? `${toOrderN} SKU${toOrderN===1?'':'s'} to order · ~${curSym()}${k(orderVal)} to commit${stockoutsUnderPlan?` · ${stockoutsUnderPlan} forecast to run out under the plan`:''}${awaiting?` · ${awaiting} awaiting stock`:''}`
     : (awaiting?`${awaiting} PO${awaiting===1?'':'s'} awaiting stock`:'Nothing to order right now — good sellers have cover for their lead times.');
   const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:13,fontWeight:700,padding:'9px 15px',borderRadius:9,border:'none',background:'var(--accent)',color:'#fff',cursor:'pointer',whiteSpace:'nowrap'};
   const sbtn = (id)=>({fontSize:11.5,fontWeight:700,padding:'5px 11px',borderRadius:7,cursor:'pointer',border:'1.5px solid '+(rc.strategy===id?'var(--accent)':'var(--border-default)'),background:rc.strategy===id?'var(--accent)':'transparent',color:rc.strategy===id?'#fff':'var(--text-secondary)'});
   const lab = {fontSize:10,fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:5};
   const goPOs = ()=>{ const el=document.getElementById('plan-pos'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); };
-  return (<div>
-    <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:8}}>
-      <h2 style={{margin:0,fontSize:18}}>Planning</h2>
-      <span className="muted" style={{fontSize:12}}>Forecast → strategy → purchase orders · independent of the date picker</span>
-    </div>
-
-    {/* HERO — what to do now + the two levers (forecast + strategy) in one band */}
-    <div className="card" style={{borderLeft:'3px solid '+heroColor, marginBottom:14}}>
-      <div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
-        <div style={{flex:'1 1 320px',minWidth:0}}>
-          <div style={lab}>What to do now</div>
-          <div style={{fontSize:19,fontWeight:800,color:heroColor,lineHeight:1.2}}>{headline}</div>
-          <div style={{fontSize:12.5,color:'var(--text-muted)',marginTop:4,lineHeight:1.45}}>{sub}</div>
-        </div>
-        {toOrderN>0 && <button style={btn} onClick={goPOs}>Review &amp; raise POs <Icon name="chevron" size={14}/></button>}
+  return (
+    <div>
+      <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:8}}>
+        <h2 style={{margin:0,fontSize:18}}>Planning</h2>
+        <span className="muted" style={{fontSize:12}}>Forecast → strategy → purchase orders · independent of the date picker</span>
       </div>
-      <div style={{marginTop:14,paddingTop:12,borderTop:'1px solid var(--border-subtle)'}}>
-        <div style={lab}>① Forecast <a className="txt-link" style={{cursor:'pointer',textTransform:'none',letterSpacing:0,fontWeight:600}} onClick={()=>window.__oiOpenForecast&&window.__oiOpenForecast()}>· {showForecast?'editing below':'edit ›'}</a></div>
-        <div style={{fontSize:13.5,fontWeight:700,color:'var(--text-primary)'}}>{fLabel}</div>
-      </div>
-      {/* ② Strategy — compare the trade-off, pick, see the recommendation */}
-      <div style={{marginTop:14}}>
-        <div style={lab}>② Strategy — how to commit against the forecast</div>
-        <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
-          {['jit','bulk','staged'].map(id=>{ const on=rc.strategy===id; const c=stratCmp[id]; const dep=hasDeposit&&c.dep<c.val-0.5;
-            return (<button key={id} onClick={()=>saveReorderConfig({...rc,strategy:id})} style={{textAlign:'left',flex:'1 1 160px',minWidth:148,padding:'9px 12px',borderRadius:9,cursor:'pointer',border:'1.5px solid '+(on?'var(--accent)':'var(--border-default)'),background:on?'var(--accent-bg)':'var(--bg-elevated)'}}>
-              <div style={{fontSize:12.5,fontWeight:700,color:on?'var(--accent)':'var(--text-primary)'}}>{on?'✓ ':''}{STRAT[id]}</div>
-              <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>{c.count?(dep?`£${k(c.dep)} deposit now · £${k(c.val)} total`:`~£${k(c.val)} to commit now`):'nothing to order'} · {stratDesc[id]}</div>
-            </button>); })}
-        </div>
-        <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:8,lineHeight:1.5}}>{stratExplain[rc.strategy]}</div>
-        {recStrat!==rc.strategy && <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginTop:8,padding:'7px 11px',borderRadius:8,background:'var(--accent-bg)',border:'1px solid var(--border-subtle)'}}>
-          <Icon name="spark" size={13} style={{color:'var(--accent)'}}/>
-          <span style={{fontSize:12,color:'var(--text-secondary)'}}>Suggested: <b style={{color:'var(--text-primary)'}}>{STRAT[recStrat]}</b> — {recWhy}.</span>
-          <button style={{...btn,fontSize:11.5,padding:'5px 11px',marginLeft:'auto'}} onClick={()=>saveReorderConfig({...rc,strategy:recStrat})}>Use {STRAT[recStrat]}</button>
-        </div>}
-      </div>
-    </div>
-
-    {/* Stock landing plan — when to order each tranche, what's payable, when it lands */}
-    {tranches.length>0 && (()=>{
-      const tdL = {padding:'8px 12px 8px 0',fontSize:12.5,color:'var(--text-secondary)',borderTop:'1px solid var(--border-subtle)',whiteSpace:'nowrap'};
-      const thL = {textAlign:'left',fontSize:10,fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-faint)',padding:'0 12px 7px 0',whiteSpace:'nowrap'};
-      // timeline geometry — position order/ship/land along a today→last-landing axis
-      const spanDays = Math.max(7, Math.max(...tranches.map(t=>oiDayDiff(today,t.landISO)))+4);
-      const pctOf = iso => Math.max(0, Math.min(100, oiDayDiff(today,iso)/spanDays*100));
-      const ticks=[]; for(let i=0;i*30<=spanDays+2 && i<10;i++){ const d=oiAddDays(today,i*30); ticks.push({x:Math.min(100,(i*30)/spanDays*100), label:i===0?'now':(()=>{ try{ return new Date(d+'T00:00:00').toLocaleDateString('en-GB',{month:'short'}); }catch(e){ return ''; } })()}); }
-      const dot=(x,color,size,filled,title)=>(<div title={title} style={{position:'absolute',left:x+'%',top:'50%',transform:'translate(-50%,-50%)',width:size,height:size,borderRadius:'50%',background:filled?color:'var(--bg-base)',border:'2px solid '+color,zIndex:2}}/>);
-      const toggle = (v,lbl)=>{ const on=planView===v; return <button key={v} onClick={()=>setPlanView(v)} style={{fontSize:11,fontWeight:700,padding:'4px 11px',borderRadius:6,cursor:'pointer',border:'none',background:on?'var(--accent)':'transparent',color:on?'#fff':'var(--text-muted)'}}>{lbl}</button>; };
-      return (<div className="card" style={{marginBottom:14}}>
-        <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:4}}>
-          <div style={{fontSize:14,fontWeight:800,color:'var(--text-primary)'}}>Stock landing plan</div>
-          <span className="muted" style={{fontSize:11.5}}>{STRAT[rc.strategy]} · lead {leadTotalRep}d ({leadMakeRep}d make + {leadTotalRep-leadMakeRep}d transit)</span>
-          <div style={{marginLeft:'auto',display:'flex',gap:3,background:'var(--bg-elevated)',borderRadius:8,padding:3}}>{toggle('timeline','Timeline')}{toggle('table','Table')}</div>
-        </div>
-        <div style={{fontSize:12.5,color:'var(--text-muted)',marginBottom:10,lineHeight:1.5}}>
-          {hasDeposit
-            ? <>To start, pay a <b style={{color:'var(--text-primary)'}}>£{k(depNow)} deposit now</b>, with <b style={{color:'var(--text-primary)'}}>£{k(balLater)} balance on shipment</b> — <b>£{k(orderTotal)}</b> committed in total.</>
-            : <><b style={{color:'var(--text-primary)'}}>£{k(orderTotal)}</b> to commit now. Add a deposit % per supplier (Suppliers tab) to split this into deposit-now vs balance-on-shipment.</>}
-          {rc.strategy==='staged' && <> Each wave must be <b>ordered</b> early enough to <b>land</b> before the previous runs out.</>}
-        </div>
-        {rc.strategy==='staged' && wavesN>1 && <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:12}}>
-          <span style={{fontSize:11,color:'var(--text-faint)',fontWeight:700,letterSpacing:'.03em',textTransform:'uppercase'}}>Wave split</span>
-          {[['even','Even'],['front','Front-load'],['back','Back-load']].map(([kind,lbl])=>{ const on=splitName===kind;
-            return <button key={kind} onClick={()=>saveReorderConfig({...rc, waveSplit: wavePreset(kind, wavesN)})} title={kind==='front'?'Bigger first wave — buy into peak early':kind==='back'?'Smaller first wave, ramp later':'Equal waves'} style={{fontSize:11,fontWeight:700,padding:'4px 11px',borderRadius:7,cursor:'pointer',border:'1.5px solid '+(on?'var(--accent)':'var(--border-default)'),background:on?'var(--accent)':'transparent',color:on?'#fff':'var(--text-secondary)'}}>{lbl}</button>; })}
-          <span style={{fontSize:11,color:'var(--text-faint)'}}>{weights.map(w=>Math.round(w*100)+'%').join(' / ')}{splitName==='custom'?' · custom':''}</span>
-        </div>}
-        {lateWaves>0 && <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12,padding:'7px 11px',borderRadius:8,background:'rgba(248,113,113,.10)',border:'1px solid var(--bad)'}}>
-          <Icon name="alert" size={13} style={{color:'var(--bad)'}}/>
-          <span style={{fontSize:12,color:'var(--text-secondary)'}}>{lateWaves} wave{lateWaves===1?'':'s'} should already be on order — the {leadTotalRep}d lead is longer than the gap between waves. Order {lateWaves===1?'it':'them'} now, front-load Wave 1, or widen the wave count.</span>
-        </div>}
-
-        {planView==='timeline' ? (<div>
-          {/* axis */}
-          <div style={{display:'flex',alignItems:'flex-end',gap:10,marginBottom:4}}>
-            <div style={{width:132,flexShrink:0}}/>
-            <div style={{position:'relative',flex:1,height:13}}>{ticks.map((tk,i)=><span key={i} style={{position:'absolute',left:tk.x+'%',transform:'translateX(-50%)',fontSize:9.5,color:'var(--text-faint)',whiteSpace:'nowrap'}}>{tk.label}</span>)}</div>
+      {/* HERO — what to do now + the two levers (forecast + strategy) in one band */}
+      <div className="card" style={{borderLeft:'3px solid '+heroColor, marginBottom:14}}>
+        <div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
+          <div style={{flex:'1 1 320px',minWidth:0}}>
+            <div style={lab}>What to do now</div>
+            <div style={{fontSize:19,fontWeight:800,color:heroColor,lineHeight:1.2}}>{headline}</div>
+            <div style={{fontSize:12.5,color:'var(--text-muted)',marginTop:4,lineHeight:1.45}}>{sub}</div>
           </div>
-          {tranches.map(t=>{ const ox=pctOf((t.isNow||t.late)?today:t.orderISO), sx=pctOf(t.shipISO), lx=pctOf(t.landISO); return (
-            <div key={t.n} style={{display:'flex',alignItems:'center',gap:10,marginBottom:7}}>
-              <div style={{width:132,flexShrink:0}}>
-                <div style={{fontSize:12,fontWeight:700,color:'var(--text-primary)'}}>{t.name} {t.late&&<span style={{fontSize:9.5,fontWeight:800,color:'#fff',background:'var(--bad)',padding:'1px 5px',borderRadius:999}}>LATE</span>}</div>
-                <div style={{fontSize:10.5,color:'var(--text-faint)'}}>{hasDeposit?`£${k(t.dep)} now · £${k(t.bal)} on ship`:`£${k(t.val)}`}</div>
-              </div>
-              <div style={{position:'relative',flex:1,height:28,borderRadius:7,background:'var(--bg-elevated)'}}>
-                <div style={{position:'absolute',left:ox+'%',width:Math.max(0,lx-ox)+'%',top:'50%',height:3,transform:'translateY(-50%)',background:t.late?'var(--bad)':'var(--accent)',opacity:.45,borderRadius:2}}/>
-                {dot(ox, t.late?'var(--bad)':'var(--text-muted)',12,false,'Order '+(t.isNow?'now':t.late?'now (was due '+fmtD(t.orderISO)+')':fmtD(t.orderISO)))}
-                {dot(sx,'var(--warn)',10,true,'Ships '+fmtD(t.shipISO)+(hasDeposit?' · balance £'+k(t.bal)+' due':''))}
-                {dot(lx,'var(--good)',15,true,'Lands '+fmtD(t.landISO))}
-              </div>
-            </div>); })}
-          <div style={{display:'flex',gap:16,flexWrap:'wrap',marginTop:8,paddingLeft:142}}>
-            <span style={{fontSize:10.5,color:'var(--text-faint)',display:'inline-flex',alignItems:'center',gap:5}}><span style={{width:10,height:10,borderRadius:'50%',border:'2px solid var(--text-muted)',display:'inline-block'}}/>Order</span>
-            <span style={{fontSize:10.5,color:'var(--text-faint)',display:'inline-flex',alignItems:'center',gap:5}}><span style={{width:10,height:10,borderRadius:'50%',background:'var(--warn)',display:'inline-block'}}/>Ships{hasDeposit?' (balance due)':''}</span>
-            <span style={{fontSize:10.5,color:'var(--text-faint)',display:'inline-flex',alignItems:'center',gap:5}}><span style={{width:12,height:12,borderRadius:'50%',background:'var(--good)',display:'inline-block'}}/>Lands</span>
+          {toOrderN>0 && <button style={btn} onClick={goPOs}>Review &amp; raise POs <Icon name="chevron" size={14}/></button>}
+        </div>
+        <div style={{marginTop:14,paddingTop:12,borderTop:'1px solid var(--border-subtle)'}}>
+          <div style={lab}>① Forecast <a className="txt-link" style={{cursor:'pointer',textTransform:'none',letterSpacing:0,fontWeight:600}} onClick={()=>window.__oiOpenForecast&&window.__oiOpenForecast()}>· {showForecast?'editing below':'edit ›'}</a></div>
+          <div style={{fontSize:13.5,fontWeight:700,color:'var(--text-primary)'}}>{fLabel}</div>
+        </div>
+        {/* ② Strategy — compare the trade-off, pick, see the recommendation */}
+        <div style={{marginTop:14}}>
+          <div style={lab}>② Strategy — how to commit against the forecast</div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            {['jit','bulk','staged'].map(id=>{ const on=rc.strategy===id; const c=stratCmp[id]; const dep=hasDeposit&&c.dep<c.val-0.5;
+              return (
+                <button key={id} onClick={()=>saveReorderConfig({...rc,strategy:id})} style={{textAlign:'left',flex:'1 1 160px',minWidth:148,padding:'9px 12px',borderRadius:9,cursor:'pointer',border:'1.5px solid '+(on?'var(--accent)':'var(--border-default)'),background:on?'var(--accent-bg)':'var(--bg-elevated)'}}>
+                  <div style={{fontSize:12.5,fontWeight:700,color:on?'var(--accent)':'var(--text-primary)'}}>{on?'✓ ':''}{STRAT[id]}</div>
+                  <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>{c.count?(dep?`${curSym()}${k(c.dep)} deposit now · ${curSym()}${k(c.val)} total`:`~${curSym()}${k(c.val)} to commit now`):'nothing to order'} · {stratDesc[id]}</div>
+                </button>
+              ); })}
           </div>
-        </div>) : (<div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:640}}><thead><tr>
-          <th style={thL}>Tranche</th><th style={thL}>Order by</th><th style={{...thL,textAlign:'right'}}>{hasDeposit?'Deposit now':'Pay'}</th>{hasDeposit&&<th style={{...thL,textAlign:'right'}}>Balance on ship</th>}<th style={thL}>Ships ~</th><th style={thL}>Lands ~</th><th style={thL}>Covers</th>
-        </tr></thead><tbody>
-          {tranches.map(t=>(<tr key={t.n}>
-            <td style={{...tdL,color:'var(--text-primary)',fontWeight:600}}>{t.name}</td>
-            <td style={{...tdL,color:t.isNow?'var(--accent)':t.late?'var(--bad)':'var(--text-secondary)',fontWeight:t.isNow||t.late?700:400}}>{t.isNow?'now':t.late?`${fmtD(t.orderISO)} · now (late)`:fmtD(t.orderISO)}</td>
-            <td style={{...tdL,textAlign:'right',color:'var(--text-primary)'}}>{t.val>0?`£${k(t.dep)}`:'—'}</td>
-            {hasDeposit&&<td style={{...tdL,textAlign:'right',color:'var(--text-muted)'}}>{t.bal>0?`£${k(t.bal)}`:'—'}</td>}
-            <td style={tdL}>{fmtD(t.shipISO)}</td>
-            <td style={tdL}>{fmtD(t.landISO)}</td>
-            <td style={{...tdL,color:'var(--text-faint)',whiteSpace:'normal'}}>{t.coverTxt}</td>
-          </tr>))}
-        </tbody></table></div>)}
-        <div style={{fontSize:11,color:'var(--text-faint)',marginTop:10,lineHeight:1.5}}>{rc.strategy==='staged'
-          ? <>Wave 1 is the order below — re-run the plan on each order-by date to size the next wave on the latest stock. Dates use the slowest item's lead so nothing stocks out.</>
-          : rc.strategy==='bulk' ? <>One order now covers the whole plan. Balance (if any) falls due when the supplier ships, ~{leadMakeRep}d after order.</>
-          : <>JIT reorders roll as stock depletes — this is the order due now; the next triggers when cover next falls within lead + safety.</>}</div>
-      </div>); })()}
-
-    {/* Cash impact — forward balance projection from the plan's commitments */}
-    {tranches.length>0 && <CashFlowPlan tranches={tranches} plan={R.plan} months={months}/>}
-
-    {/* ① Forecast & demand — collapsed by default (config + detail), opened on demand */}
-    <button onClick={()=>setShowForecast(s=>!s)} style={{display:'flex',alignItems:'center',gap:10,width:'100%',background:'transparent',border:'1px solid var(--border-subtle)',borderRadius:10,padding:'11px 14px',cursor:'pointer',textAlign:'left',marginBottom:showForecast?12:14}}>
-      <span style={{color:'var(--text-faint)',display:'inline-flex',transform:showForecast?'rotate(90deg)':'none',transition:'transform 120ms'}}><Icon name="chevron" size={13}/></span>
-      <span style={{fontWeight:700,color:'var(--text-primary)',fontSize:13.5}}>Forecast &amp; demand plan</span>
-      <span className="muted" style={{fontSize:11.5}}>{fLabel} · per-product demand, focus/promotions, by-month shaping &amp; packaging</span>
-      <span style={{marginLeft:'auto',fontSize:11.5,color:'var(--accent)',fontWeight:600}}>{showForecast?'Hide':'Open'}</span>
-    </button>
-    {showForecast && <div id="plan-forecast"><DemandPlanner embedded/></div>}
-
-    {/* ③ Purchase orders — the action surface, always visible */}
-    <div style={{display:'flex',alignItems:'center',gap:10,margin:'8px 0 12px'}}>
-      <span style={{width:3,height:16,background:'var(--accent)',borderRadius:2}}/>
-      <span style={{fontSize:13,fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-secondary)'}}>③ Purchase orders</span>
-      <span className="muted" style={{fontSize:11.5}}>sized to your forecast, under your strategy</span>
+          <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:8,lineHeight:1.5}}>{stratExplain[rc.strategy]}</div>
+          {recStrat!==rc.strategy && <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginTop:8,padding:'7px 11px',borderRadius:8,background:'var(--accent-bg)',border:'1px solid var(--border-subtle)'}}>
+            <Icon name="spark" size={13} style={{color:'var(--accent)'}}/>
+            <span style={{fontSize:12,color:'var(--text-secondary)'}}>Suggested: <b style={{color:'var(--text-primary)'}}>{STRAT[recStrat]}</b> — {recWhy}.</span>
+            <button style={{...btn,fontSize:11.5,padding:'5px 11px',marginLeft:'auto'}} onClick={()=>saveReorderConfig({...rc,strategy:recStrat})}>Use {STRAT[recStrat]}</button>
+          </div>}
+        </div>
+      </div>
+      {/* Stock landing plan — when to order each tranche, what's payable, when it lands */}
+      {tranches.length>0 && (()=>{
+        const tdL = {padding:'8px 12px 8px 0',fontSize:12.5,color:'var(--text-secondary)',borderTop:'1px solid var(--border-subtle)',whiteSpace:'nowrap'};
+        const thL = {textAlign:'left',fontSize:10,fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-faint)',padding:'0 12px 7px 0',whiteSpace:'nowrap'};
+        // timeline geometry — position order/ship/land along a today→last-landing axis
+        const spanDays = Math.max(7, Math.max(...tranches.map(t=>oiDayDiff(today,t.landISO)))+4);
+        const pctOf = iso => Math.max(0, Math.min(100, oiDayDiff(today,iso)/spanDays*100));
+        const ticks=[]; for(let i=0;i*30<=spanDays+2 && i<10;i++){ const d=oiAddDays(today,i*30); ticks.push({x:Math.min(100,(i*30)/spanDays*100), label:i===0?'now':(()=>{ try{ return new Date(d+'T00:00:00').toLocaleDateString('en-GB',{month:'short'}); }catch(e){ return ''; } })()}); }
+        const dot=(x,color,size,filled,title)=>(<div title={title} style={{position:'absolute',left:x+'%',top:'50%',transform:'translate(-50%,-50%)',width:size,height:size,borderRadius:'50%',background:filled?color:'var(--bg-base)',border:'2px solid '+color,zIndex:2}}/>);
+        const toggle = (v,lbl)=>{ const on=planView===v; return <button key={v} onClick={()=>setPlanView(v)} style={{fontSize:11,fontWeight:700,padding:'4px 11px',borderRadius:6,cursor:'pointer',border:'none',background:on?'var(--accent)':'transparent',color:on?'#fff':'var(--text-muted)'}}>{lbl}</button>; };
+        return (
+          <div className="card" style={{marginBottom:14}}>
+            <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:4}}>
+              <div style={{fontSize:14,fontWeight:800,color:'var(--text-primary)'}}>Stock landing plan</div>
+              <span className="muted" style={{fontSize:11.5}}>{STRAT[rc.strategy]} · lead {leadTotalRep}d ({leadMakeRep}d make + {leadTotalRep-leadMakeRep}d transit)</span>
+              <div style={{marginLeft:'auto',display:'flex',gap:3,background:'var(--bg-elevated)',borderRadius:8,padding:3}}>{toggle('timeline','Timeline')}{toggle('table','Table')}</div>
+            </div>
+            <div style={{fontSize:12.5,color:'var(--text-muted)',marginBottom:10,lineHeight:1.5}}>
+              {hasDeposit
+                ? <>To start, pay a <b style={{color:'var(--text-primary)'}}>{curSym()}{k(depNow)} deposit now</b>, with <b style={{color:'var(--text-primary)'}}>{curSym()}{k(balLater)} balance on shipment</b> — <b>{curSym()}{k(orderTotal)}</b> committed in total.</>
+                : <><b style={{color:'var(--text-primary)'}}>{curSym()}{k(orderTotal)}</b> to commit now. Add a deposit % per supplier (Suppliers tab) to split this into deposit-now vs balance-on-shipment.</>}
+              {rc.strategy==='staged' && <> Each wave must be <b>ordered</b> early enough to <b>land</b> before the previous runs out.</>}
+            </div>
+            {rc.strategy==='staged' && wavesN>1 && <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:12}}>
+              <span style={{fontSize:11,color:'var(--text-faint)',fontWeight:700,letterSpacing:'.03em',textTransform:'uppercase'}}>Wave split</span>
+              {[['even','Even'],['front','Front-load'],['back','Back-load']].map(([kind,lbl])=>{ const on=splitName===kind;
+                return <button key={kind} onClick={()=>saveReorderConfig({...rc, waveSplit: wavePreset(kind, wavesN)})} title={kind==='front'?'Bigger first wave — buy into peak early':kind==='back'?'Smaller first wave, ramp later':'Equal waves'} style={{fontSize:11,fontWeight:700,padding:'4px 11px',borderRadius:7,cursor:'pointer',border:'1.5px solid '+(on?'var(--accent)':'var(--border-default)'),background:on?'var(--accent)':'transparent',color:on?'#fff':'var(--text-secondary)'}}>{lbl}</button>; })}
+              <span style={{fontSize:11,color:'var(--text-faint)'}}>{weights.map(w=>Math.round(w*100)+'%').join(' / ')}{splitName==='custom'?' · custom':''}</span>
+            </div>}
+            {lateWaves>0 && <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12,padding:'7px 11px',borderRadius:8,background:'rgba(248,113,113,.10)',border:'1px solid var(--bad)'}}>
+              <Icon name="alert" size={13} style={{color:'var(--bad)'}}/>
+              <span style={{fontSize:12,color:'var(--text-secondary)'}}>{lateWaves} wave{lateWaves===1?'':'s'} should already be on order — the {leadTotalRep}d lead is longer than the gap between waves. Order {lateWaves===1?'it':'them'} now, front-load Wave 1, or widen the wave count.</span>
+            </div>}
+            {planView==='timeline' ? (<div>
+              {/* axis */}
+              <div style={{display:'flex',alignItems:'flex-end',gap:10,marginBottom:4}}>
+                <div style={{width:132,flexShrink:0}}/>
+                <div style={{position:'relative',flex:1,height:13}}>{ticks.map((tk,i)=><span key={i} style={{position:'absolute',left:tk.x+'%',transform:'translateX(-50%)',fontSize:9.5,color:'var(--text-faint)',whiteSpace:'nowrap'}}>{tk.label}</span>)}</div>
+              </div>
+              {tranches.map(t=>{ const ox=pctOf((t.isNow||t.late)?today:t.orderISO), sx=pctOf(t.shipISO), lx=pctOf(t.landISO); return (
+                <div key={t.n} style={{display:'flex',alignItems:'center',gap:10,marginBottom:7}}>
+                  <div style={{width:132,flexShrink:0}}>
+                    <div style={{fontSize:12,fontWeight:700,color:'var(--text-primary)'}}>{t.name} {t.late&&<span style={{fontSize:9.5,fontWeight:800,color:'#fff',background:'var(--bad)',padding:'1px 5px',borderRadius:999}}>LATE</span>}</div>
+                    <div style={{fontSize:10.5,color:'var(--text-faint)'}}>{hasDeposit?`${curSym()}${k(t.dep)} now · ${curSym()}${k(t.bal)} on ship`:`${curSym()}${k(t.val)}`}</div>
+                  </div>
+                  <div style={{position:'relative',flex:1,height:28,borderRadius:7,background:'var(--bg-elevated)'}}>
+                    <div style={{position:'absolute',left:ox+'%',width:Math.max(0,lx-ox)+'%',top:'50%',height:3,transform:'translateY(-50%)',background:t.late?'var(--bad)':'var(--accent)',opacity:.45,borderRadius:2}}/>
+                    {dot(ox, t.late?'var(--bad)':'var(--text-muted)',12,false,'Order '+(t.isNow?'now':t.late?'now (was due '+fmtD(t.orderISO)+')':fmtD(t.orderISO)))}
+                    {dot(sx,'var(--warn)',10,true,'Ships '+fmtD(t.shipISO)+(hasDeposit?` · balance ${curSym()}`+k(t.bal)+' due':''))}
+                    {dot(lx,'var(--good)',15,true,'Lands '+fmtD(t.landISO))}
+                  </div>
+                </div>
+              ); })}
+              <div style={{display:'flex',gap:16,flexWrap:'wrap',marginTop:8,paddingLeft:142}}>
+                <span style={{fontSize:10.5,color:'var(--text-faint)',display:'inline-flex',alignItems:'center',gap:5}}><span style={{width:10,height:10,borderRadius:'50%',border:'2px solid var(--text-muted)',display:'inline-block'}}/>Order</span>
+                <span style={{fontSize:10.5,color:'var(--text-faint)',display:'inline-flex',alignItems:'center',gap:5}}><span style={{width:10,height:10,borderRadius:'50%',background:'var(--warn)',display:'inline-block'}}/>Ships{hasDeposit?' (balance due)':''}</span>
+                <span style={{fontSize:10.5,color:'var(--text-faint)',display:'inline-flex',alignItems:'center',gap:5}}><span style={{width:12,height:12,borderRadius:'50%',background:'var(--good)',display:'inline-block'}}/>Lands</span>
+              </div>
+            </div>) : (<div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:640}}><thead><tr>
+              <th style={thL}>Tranche</th><th style={thL}>Order by</th><th style={{...thL,textAlign:'right'}}>{hasDeposit?'Deposit now':'Pay'}</th>{hasDeposit&&<th style={{...thL,textAlign:'right'}}>Balance on ship</th>}<th style={thL}>Ships ~</th><th style={thL}>Lands ~</th><th style={thL}>Covers</th>
+            </tr></thead><tbody>
+              {tranches.map(t=>(<tr key={t.n}>
+                <td style={{...tdL,color:'var(--text-primary)',fontWeight:600}}>{t.name}</td>
+                <td style={{...tdL,color:t.isNow?'var(--accent)':t.late?'var(--bad)':'var(--text-secondary)',fontWeight:t.isNow||t.late?700:400}}>{t.isNow?'now':t.late?`${fmtD(t.orderISO)} · now (late)`:fmtD(t.orderISO)}</td>
+                <td style={{...tdL,textAlign:'right',color:'var(--text-primary)'}}>{t.val>0?`${curSym()}${k(t.dep)}`:'—'}</td>
+                {hasDeposit&&<td style={{...tdL,textAlign:'right',color:'var(--text-muted)'}}>{t.bal>0?`${curSym()}${k(t.bal)}`:'—'}</td>}
+                <td style={tdL}>{fmtD(t.shipISO)}</td>
+                <td style={tdL}>{fmtD(t.landISO)}</td>
+                <td style={{...tdL,color:'var(--text-faint)',whiteSpace:'normal'}}>{t.coverTxt}</td>
+              </tr>))}
+            </tbody></table></div>)}
+            <div style={{fontSize:11,color:'var(--text-faint)',marginTop:10,lineHeight:1.5}}>{rc.strategy==='staged'
+              ? <>Wave 1 is the order below — re-run the plan on each order-by date to size the next wave on the latest stock. Dates use the slowest item's lead so nothing stocks out.</>
+              : rc.strategy==='bulk' ? <>One order now covers the whole plan. Balance (if any) falls due when the supplier ships, ~{leadMakeRep}d after order.</>
+              : <>JIT reorders roll as stock depletes — this is the order due now; the next triggers when cover next falls within lead + safety.</>}</div>
+          </div>
+        ); })()}
+      {/* Cash impact — forward balance projection from the plan's commitments */}
+      {tranches.length>0 && <CashFlowPlan tranches={tranches} plan={R.plan} months={months}/>}
+      {/* ① Forecast & demand — collapsed by default (config + detail), opened on demand */}
+      <button onClick={()=>setShowForecast(s=>!s)} style={{display:'flex',alignItems:'center',gap:10,width:'100%',background:'transparent',border:'1px solid var(--border-subtle)',borderRadius:10,padding:'11px 14px',cursor:'pointer',textAlign:'left',marginBottom:showForecast?12:14}}>
+        <span style={{color:'var(--text-faint)',display:'inline-flex',transform:showForecast?'rotate(90deg)':'none',transition:'transform 120ms'}}><Icon name="chevron" size={13}/></span>
+        <span style={{fontWeight:700,color:'var(--text-primary)',fontSize:13.5}}>Forecast &amp; demand plan</span>
+        <span className="muted" style={{fontSize:11.5}}>{fLabel} · per-product demand, focus/promotions, by-month shaping &amp; packaging</span>
+        <span style={{marginLeft:'auto',fontSize:11.5,color:'var(--accent)',fontWeight:600}}>{showForecast?'Hide':'Open'}</span>
+      </button>
+      {showForecast && <div id="plan-forecast"><DemandPlanner embedded/></div>}
+      {/* ③ Purchase orders — the action surface, always visible */}
+      <div style={{display:'flex',alignItems:'center',gap:10,margin:'8px 0 12px'}}>
+        <span style={{width:3,height:16,background:'var(--accent)',borderRadius:2}}/>
+        <span style={{fontSize:13,fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-secondary)'}}>③ Purchase orders</span>
+        <span className="muted" style={{fontSize:11.5}}>sized to your forecast, under your strategy</span>
+      </div>
+      <div id="plan-pos"><ProductionPlanner embedded/></div>
     </div>
-    <div id="plan-pos"><ProductionPlanner embedded/></div>
-  </div>);
+  );
 }
 
 const NAV = [
@@ -10527,107 +10580,107 @@ function BusinessEconomicsPanel(){
     </div>
   );
 
-  return (<div style={{display:'flex', flexDirection:'column', gap:'var(--s-7)'}}>
+  return (
+    <div style={{display:'flex', flexDirection:'column', gap:'var(--s-7)'}}>
+      {loading && <div className="meta" style={{fontSize:12.5}}>Loading your economics…</div>}
+      {loadErr && <div className="meta" style={{fontSize:12.5, color:'var(--bad)'}}>{loadErr}</div>}
+      {!loading && !loadErr && (<>
 
-    {loading && <div className="meta" style={{fontSize:12.5}}>Loading your economics…</div>}
-    {loadErr && <div className="meta" style={{fontSize:12.5, color:'var(--bad)'}}>{loadErr}</div>}
-
-    {!loading && !loadErr && (<>
-
-      {/* ── Step 1 — Gross margin (the gate) ── */}
-      <div className="card" style={{padding:'var(--s-7)', borderTop: marginSet ? undefined : '2px solid var(--warn)'}}>
-        <div style={{display:'flex', alignItems:'baseline', gap:'var(--s-2)', flexWrap:'wrap', marginBottom:4}}>
-          <div style={{fontSize:15, fontWeight:650}}>Gross margin</div>
-          <span style={{fontSize:10.5, fontWeight:700, letterSpacing:'.05em', textTransform:'uppercase', color: marginSet?'var(--good)':'var(--warn)'}}>
-            {marginSet ? '● Numbers are ON' : '○ Required — numbers are OFF'}
-          </span>
-        </div>
-        <div className="meta" style={{fontSize:12.5, marginBottom:'var(--s-5)', lineHeight:1.6, maxWidth:640}}>
-          {marginSet
-            ? 'This is the one number your engine can’t read from Shopify. It’s set — every model runs on it.'
-            : 'Until you set this, the engine can’t value anything and skips your brand entirely. It’s COGS-based: what it costs to make or buy the product, as a % of its price. One number switches everything on.'}
-        </div>
-        <form onSubmit={saveMargin} style={{display:'flex', gap:'var(--s-2)', flexWrap:'wrap', alignItems:'center', paddingTop:'var(--s-4)', borderTop:'1px solid var(--color-line, var(--border-subtle))'}}>
-          <div style={{position:'relative', display:'flex', alignItems:'center', flex:'0 1 200px'}}>
-            <input type="number" inputMode="decimal" step="any" min="1" max="99" value={gm} onChange={e=>setGm(e.target.value)}
-              placeholder={'e.g. ' + priors.grossMarginPct} autoFocus={!marginSet}
-              style={{...inputStyle, paddingRight:34}}/>
-            <span style={{position:'absolute', right:12, fontSize:12, color:'var(--text-muted)', pointerEvents:'none'}}>%</span>
+        {/* ── Step 1 — Gross margin (the gate) ── */}
+        <div className="card" style={{padding:'var(--s-7)', borderTop: marginSet ? undefined : '2px solid var(--warn)'}}>
+          <div style={{display:'flex', alignItems:'baseline', gap:'var(--s-2)', flexWrap:'wrap', marginBottom:4}}>
+            <div style={{fontSize:15, fontWeight:650}}>Gross margin</div>
+            <span style={{fontSize:10.5, fontWeight:700, letterSpacing:'.05em', textTransform:'uppercase', color: marginSet?'var(--good)':'var(--warn)'}}>
+              {marginSet ? '● Numbers are ON' : '○ Required — numbers are OFF'}
+            </span>
           </div>
-          <button type="submit" className="btn-primary" disabled={gmBusy}
-            style={{padding:'9px 16px', fontSize:13, border:0, borderRadius:'var(--r-md)', cursor:gmBusy?'default':'pointer', fontFamily:'inherit', fontWeight:600, opacity:gmBusy?0.6:1}}>
-            {gmBusy ? 'Saving…' : (marginSet ? 'Update margin' : 'Switch on my numbers →')}
-          </button>
-          <span className="meta" style={{fontSize:11}}>{priors.label} brands typically sit around {priors.grossMarginPct}%.</span>
-        </form>
-        {msgBox(gmMsg)}
-      </div>
-
-      {/* ── Step 2 — Cost stack + cash cycle (optional, sharpens the model) ── */}
-      <div className="card" style={{padding:'var(--s-7)'}}>
-        <div style={{fontSize:15, fontWeight:650, marginBottom:4}}>Cost stack & cash cycle</div>
-        <div className="meta" style={{fontSize:12.5, marginBottom:'var(--s-5)', lineHeight:1.6, maxWidth:640}}>
-          Optional, but each number you confirm replaces a {priors.label.toLowerCase()} category estimate with your own — sharpening contribution, cash-cycle and profitability. Leave a field blank and the estimate stands.
-        </div>
-
-        <form onSubmit={saveCostStack} style={{display:'flex', flexDirection:'column', gap:'var(--s-6)'}}>
-
-          {/* Per-order variable costs */}
-          <div>
-            <div className="micro" style={{color:'var(--accent)', marginBottom:'var(--s-3)'}}>Per-order costs</div>
-            <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:'var(--s-4)'}}>
-              <Field label="Shipping" unit="£" int={false} value={vc.shipping||''} onChange={v=>setVc(s=>({...s, shipping:v}))}
-                placeholder={'~'+priors.vc.shipping} saved={config?.variable_costs?.shipping != null}
-                fallback={{ label:'assumes £0', warn:true }} hint="Outbound delivery you pay per order."/>
-              <Field label="Fulfilment / pick-pack" unit="£" value={vc.fulfilment||''} onChange={v=>setVc(s=>({...s, fulfilment:v}))}
-                placeholder={'~'+priors.vc.fulfilment} saved={config?.variable_costs?.fulfilment != null}
-                fallback={{ label:'assumes £0', warn:true }} hint="3PL / warehouse handling per order."/>
-              <Field label="Packaging" unit="£" value={vc.packaging||''} onChange={v=>setVc(s=>({...s, packaging:v}))}
-                placeholder={'~'+priors.vc.packaging} saved={config?.variable_costs?.packaging != null}
-                fallback={{ label:'assumes £0', warn:true }} hint="Boxes, inserts, mailers per order."/>
-              <Field label="Payment processing" unit="%" value={vc.payPct||''} onChange={v=>setVc(s=>({...s, payPct:v}))}
-                placeholder={'~'+priors.vc.payPct} saved={config?.variable_costs?.payPct != null}
-                fallback={{ label:'assumes 0%', warn:true }} hint="Gateway rate, e.g. 2.4 for 2.4%."/>
-              <Field label="Payment fixed fee" unit="£" value={vc.payFixed||''} onChange={v=>setVc(s=>({...s, payFixed:v}))}
-                placeholder={'~'+priors.vc.payFixed} saved={config?.variable_costs?.payFixed != null}
-                fallback={{ label:'assumes £0', warn:true }} hint="Flat fee per transaction, e.g. £0.25."/>
-              <Field label="Refund / return rate" unit="%" value={vc.refundPct||''} onChange={v=>setVc(s=>({...s, refundPct:v}))}
-                placeholder={'~'+priors.vc.refundPct} saved={config?.variable_costs?.refundPct != null}
-                fallback={{ label:'assumes 0%', warn:true }} hint="% of order value refunded, e.g. 7.4."/>
+          <div className="meta" style={{fontSize:12.5, marginBottom:'var(--s-5)', lineHeight:1.6, maxWidth:640}}>
+            {marginSet
+              ? 'This is the one number your engine can’t read from Shopify. It’s set — every model runs on it.'
+              : 'Until you set this, the engine can’t value anything and skips your brand entirely. It’s COGS-based: what it costs to make or buy the product, as a % of its price. One number switches everything on.'}
+          </div>
+          <form onSubmit={saveMargin} style={{display:'flex', gap:'var(--s-2)', flexWrap:'wrap', alignItems:'center', paddingTop:'var(--s-4)', borderTop:'1px solid var(--color-line, var(--border-subtle))'}}>
+            <div style={{position:'relative', display:'flex', alignItems:'center', flex:'0 1 200px'}}>
+              <input type="number" inputMode="decimal" step="any" min="1" max="99" value={gm} onChange={e=>setGm(e.target.value)}
+                placeholder={'e.g. ' + priors.grossMarginPct} autoFocus={!marginSet}
+                style={{...inputStyle, paddingRight:34}}/>
+              <span style={{position:'absolute', right:12, fontSize:12, color:'var(--text-muted)', pointerEvents:'none'}}>%</span>
             </div>
-          </div>
-
-          {/* Cash cycle + fixed base */}
-          <div>
-            <div className="micro" style={{color:'var(--accent)', marginBottom:'var(--s-3)'}}>Cash cycle & fixed base</div>
-            <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:'var(--s-4)'}}>
-              <Field label="Monthly fixed costs" unit="£/mo" value={genome.fixed_costs_monthly||''} onChange={v=>setGenome(s=>({...s, fixed_costs_monthly:v}))}
-                placeholder={'~'+priors.fixedCostsMonthly} saved={config?.fixed_costs_monthly != null}
-                fallback={{ label:'est. £'+priors.fixedCostsMonthly.toLocaleString() }} hint="Rent, salaries, software — anything that doesn’t scale per order."/>
-              <Field label="Inventory days (DIO)" unit="days" int value={genome.inventory_days||''} onChange={v=>setGenome(s=>({...s, inventory_days:v}))}
-                placeholder={'~'+priors.inventoryDays} saved={config?.inventory_days != null}
-                fallback={{ label:'est. '+priors.inventoryDays+'d' }} hint="Avg days stock is held before it sells."/>
-              <Field label="Supplier terms (DPO)" unit="days" int value={genome.supplier_payment_terms_days||''} onChange={v=>setGenome(s=>({...s, supplier_payment_terms_days:v}))}
-                placeholder={'~'+priors.supplierDays} saved={config?.supplier_payment_terms_days != null}
-                fallback={{ label:'est. '+priors.supplierDays+'d' }} hint="Days you have to pay suppliers. 0 = pay upfront."/>
-              <Field label="Annual discount rate" unit="%" value={genome.discount_rate_annual||''} onChange={v=>setGenome(s=>({...s, discount_rate_annual:v}))}
-                placeholder={'~'+priors.discountRatePct} saved={config?.discount_rate_annual != null}
-                fallback={{ label:'est. '+priors.discountRatePct+'%' }} hint="Cost of capital used to discount future LTV."/>
-            </div>
-          </div>
-
-          <div style={{display:'flex', alignItems:'center', gap:'var(--s-3)', paddingTop:'var(--s-4)', borderTop:'1px solid var(--color-line, var(--border-subtle))'}}>
-            <button type="submit" className="btn-primary" disabled={csBusy}
-              style={{padding:'9px 16px', fontSize:13, border:0, borderRadius:'var(--r-md)', cursor:csBusy?'default':'pointer', fontFamily:'inherit', fontWeight:600, opacity:csBusy?0.6:1}}>
-              {csBusy ? 'Saving…' : 'Save cost stack'}
+            <button type="submit" className="btn-primary" disabled={gmBusy}
+              style={{padding:'9px 16px', fontSize:13, border:0, borderRadius:'var(--r-md)', cursor:gmBusy?'default':'pointer', fontFamily:'inherit', fontWeight:600, opacity:gmBusy?0.6:1}}>
+              {gmBusy ? 'Saving…' : (marginSet ? 'Update margin' : 'Switch on my numbers →')}
             </button>
-            <span className="meta" style={{fontSize:11}}>Blank fields keep the category estimate — nothing is overwritten.</span>
+            <span className="meta" style={{fontSize:11}}>{priors.label} brands typically sit around {priors.grossMarginPct}%.</span>
+          </form>
+          {msgBox(gmMsg)}
+        </div>
+
+        {/* ── Step 2 — Cost stack + cash cycle (optional, sharpens the model) ── */}
+        <div className="card" style={{padding:'var(--s-7)'}}>
+          <div style={{fontSize:15, fontWeight:650, marginBottom:4}}>Cost stack & cash cycle</div>
+          <div className="meta" style={{fontSize:12.5, marginBottom:'var(--s-5)', lineHeight:1.6, maxWidth:640}}>
+            Optional, but each number you confirm replaces a {priors.label.toLowerCase()} category estimate with your own — sharpening contribution, cash-cycle and profitability. Leave a field blank and the estimate stands.
           </div>
-        </form>
-        {msgBox(csMsg)}
-      </div>
-    </>)}
-  </div>);
+
+          <form onSubmit={saveCostStack} style={{display:'flex', flexDirection:'column', gap:'var(--s-6)'}}>
+
+            {/* Per-order variable costs */}
+            <div>
+              <div className="micro" style={{color:'var(--accent)', marginBottom:'var(--s-3)'}}>Per-order costs</div>
+              <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:'var(--s-4)'}}>
+                <Field label="Shipping" unit={curSym()} int={false} value={vc.shipping||''} onChange={v=>setVc(s=>({...s, shipping:v}))}
+                  placeholder={'~'+priors.vc.shipping} saved={config?.variable_costs?.shipping != null}
+                  fallback={{ label:`assumes ${curSym()}0`, warn:true }} hint="Outbound delivery you pay per order."/>
+                <Field label="Fulfilment / pick-pack" unit={curSym()} value={vc.fulfilment||''} onChange={v=>setVc(s=>({...s, fulfilment:v}))}
+                  placeholder={'~'+priors.vc.fulfilment} saved={config?.variable_costs?.fulfilment != null}
+                  fallback={{ label:`assumes ${curSym()}0`, warn:true }} hint="3PL / warehouse handling per order."/>
+                <Field label="Packaging" unit={curSym()} value={vc.packaging||''} onChange={v=>setVc(s=>({...s, packaging:v}))}
+                  placeholder={'~'+priors.vc.packaging} saved={config?.variable_costs?.packaging != null}
+                  fallback={{ label:`assumes ${curSym()}0`, warn:true }} hint="Boxes, inserts, mailers per order."/>
+                <Field label="Payment processing" unit="%" value={vc.payPct||''} onChange={v=>setVc(s=>({...s, payPct:v}))}
+                  placeholder={'~'+priors.vc.payPct} saved={config?.variable_costs?.payPct != null}
+                  fallback={{ label:'assumes 0%', warn:true }} hint="Gateway rate, e.g. 2.4 for 2.4%."/>
+                <Field label="Payment fixed fee" unit={curSym()} value={vc.payFixed||''} onChange={v=>setVc(s=>({...s, payFixed:v}))}
+                  placeholder={'~'+priors.vc.payFixed} saved={config?.variable_costs?.payFixed != null}
+                  fallback={{ label:`assumes ${curSym()}0`, warn:true }} hint={`Flat fee per transaction, e.g. ${curSym()}0.25.`}/>
+                <Field label="Refund / return rate" unit="%" value={vc.refundPct||''} onChange={v=>setVc(s=>({...s, refundPct:v}))}
+                  placeholder={'~'+priors.vc.refundPct} saved={config?.variable_costs?.refundPct != null}
+                  fallback={{ label:'assumes 0%', warn:true }} hint="% of order value refunded, e.g. 7.4."/>
+              </div>
+            </div>
+
+            {/* Cash cycle + fixed base */}
+            <div>
+              <div className="micro" style={{color:'var(--accent)', marginBottom:'var(--s-3)'}}>Cash cycle & fixed base</div>
+              <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:'var(--s-4)'}}>
+                <Field label="Monthly fixed costs" unit={`${curSym()}/mo`} value={genome.fixed_costs_monthly||''} onChange={v=>setGenome(s=>({...s, fixed_costs_monthly:v}))}
+                  placeholder={'~'+priors.fixedCostsMonthly} saved={config?.fixed_costs_monthly != null}
+                  fallback={{ label:`est. ${curSym()}`+priors.fixedCostsMonthly.toLocaleString() }} hint="Rent, salaries, software — anything that doesn’t scale per order."/>
+                <Field label="Inventory days (DIO)" unit="days" int value={genome.inventory_days||''} onChange={v=>setGenome(s=>({...s, inventory_days:v}))}
+                  placeholder={'~'+priors.inventoryDays} saved={config?.inventory_days != null}
+                  fallback={{ label:'est. '+priors.inventoryDays+'d' }} hint="Avg days stock is held before it sells."/>
+                <Field label="Supplier terms (DPO)" unit="days" int value={genome.supplier_payment_terms_days||''} onChange={v=>setGenome(s=>({...s, supplier_payment_terms_days:v}))}
+                  placeholder={'~'+priors.supplierDays} saved={config?.supplier_payment_terms_days != null}
+                  fallback={{ label:'est. '+priors.supplierDays+'d' }} hint="Days you have to pay suppliers. 0 = pay upfront."/>
+                <Field label="Annual discount rate" unit="%" value={genome.discount_rate_annual||''} onChange={v=>setGenome(s=>({...s, discount_rate_annual:v}))}
+                  placeholder={'~'+priors.discountRatePct} saved={config?.discount_rate_annual != null}
+                  fallback={{ label:'est. '+priors.discountRatePct+'%' }} hint="Cost of capital used to discount future LTV."/>
+              </div>
+            </div>
+
+            <div style={{display:'flex', alignItems:'center', gap:'var(--s-3)', paddingTop:'var(--s-4)', borderTop:'1px solid var(--color-line, var(--border-subtle))'}}>
+              <button type="submit" className="btn-primary" disabled={csBusy}
+                style={{padding:'9px 16px', fontSize:13, border:0, borderRadius:'var(--r-md)', cursor:csBusy?'default':'pointer', fontFamily:'inherit', fontWeight:600, opacity:csBusy?0.6:1}}>
+                {csBusy ? 'Saving…' : 'Save cost stack'}
+              </button>
+              <span className="meta" style={{fontSize:11}}>Blank fields keep the category estimate — nothing is overwritten.</span>
+            </div>
+          </form>
+          {msgBox(csMsg)}
+        </div>
+      </>)}
+    </div>
+  );
 }
 // Small rounding helpers — keep stored fractions tidy (avoid 0.7699999 float noise).
 function round2(n){ return Math.round(Number(n) * 100) / 100; }
@@ -10664,24 +10717,25 @@ function MarginNudge(){
   }, [check]);
 
   if(!authed || status!=='unset' || dismissed) return null;
-  return (<div style={{
-      display:'flex', alignItems:'center', gap:'var(--s-4)', marginBottom:'var(--s-5)',
-      padding:'12px var(--s-5)', borderRadius:'var(--r-md)',
-      background:'rgba(251,191,36,0.08)', border:'1px solid var(--warn)',
-    }}>
-    <div style={{flex:1, minWidth:0}}>
-      <div style={{fontSize:13.5, fontWeight:650, marginBottom:2}}>Your numbers are switched off</div>
-      <div className="meta" style={{fontSize:12, lineHeight:1.5}}>
-        Confirm your gross margin — the one figure we can’t read from Shopify — and the engine starts valuing every recommendation in £.
+  return (
+    <div style={{
+        display:'flex', alignItems:'center', gap:'var(--s-4)', marginBottom:'var(--s-5)',
+        padding:'12px var(--s-5)', borderRadius:'var(--r-md)',
+        background:'rgba(251,191,36,0.08)', border:'1px solid var(--warn)',
+      }}>
+      <div style={{flex:1, minWidth:0}}>
+        <div style={{fontSize:13.5, fontWeight:650, marginBottom:2}}>Your numbers are switched off</div>
+        <div className="meta" style={{fontSize:12, lineHeight:1.5}}>Confirm your gross margin — the one figure we can’t read from Shopify — and the engine starts valuing every recommendation in {curSym()}.
+                </div>
       </div>
+      <button className="btn-primary" onClick={()=>window.__oiNav&&window.__oiNav('settings','economics')}
+        style={{flexShrink:0, padding:'8px 14px', fontSize:12.5, border:0, borderRadius:'var(--r-md)', cursor:'pointer', fontFamily:'inherit', fontWeight:600}}>
+        Confirm gross margin →
+      </button>
+      <button onClick={()=>setDismissed(true)} title="Dismiss for now" aria-label="Dismiss"
+        style={{flexShrink:0, background:'none', border:0, cursor:'pointer', color:'var(--text-muted)', fontSize:16, lineHeight:1, padding:'4px 6px'}}>✕</button>
     </div>
-    <button className="btn-primary" onClick={()=>window.__oiNav&&window.__oiNav('settings','economics')}
-      style={{flexShrink:0, padding:'8px 14px', fontSize:12.5, border:0, borderRadius:'var(--r-md)', cursor:'pointer', fontFamily:'inherit', fontWeight:600}}>
-      Confirm gross margin →
-    </button>
-    <button onClick={()=>setDismissed(true)} title="Dismiss for now" aria-label="Dismiss"
-      style={{flexShrink:0, background:'none', border:0, cursor:'pointer', color:'var(--text-muted)', fontSize:16, lineHeight:1, padding:'4px 6px'}}>✕</button>
-  </div>);
+  );
 }
 
 // ── Team / multi-user ──────────────────────────────────────────────────────
@@ -10878,161 +10932,161 @@ function App(){
     return () => window.removeEventListener('frkl-data-updated', handler);
   }, []);
 
-  return (<div>
-    {/* App bar — sticky, product chrome, workspace context */}
-    <div className="appbar">
-      <div className="appbar-inner">
-        <div className="brand">
-          <div className="brand-mark">
+  return (
+    <div>
+      {/* App bar — sticky, product chrome, workspace context */}
+      <div className="appbar">
+        <div className="appbar-inner">
+          <div className="brand">
+            <div className="brand-mark">
+              <svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" aria-label="Greta">
+                <defs>
+                  <linearGradient id="fpb" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#8B5CF6"/><stop offset="1" stopColor="#38BDF8"/></linearGradient>
+                  <linearGradient id="fgm" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#22D3A6"/><stop offset="1" stopColor="#5DE5C8"/></linearGradient>
+                </defs>
+                <rect x="49" y="30" width="138" height="41" rx="20.5" transform="rotate(-45 118 50.5)" fill="url(#fpb)"/>
+                <rect x="71" y="177" width="138" height="41" rx="20.5" transform="rotate(-45 140 197.5)" fill="url(#fgm)"/>
+                <circle cx="97" cy="132" r="24" fill="#0B132B"/>
+              </svg>
+            </div>
+            <div>
+              <div className="brand-name">greta</div>
+              <div className="brand-sub">Every part of your business, every week, with a {curSym()}tag.</div>
+            </div>
+          </div>
+          <div style={{width:1, height:24, background:'var(--border-subtle)', margin:'0 var(--s-2)'}}/>
+          <div className="workspace-chip">
+            <div className="dot"/>
+            <span>{OI_BRAND.name||'frkl'}</span>
+            <span style={{color:'var(--text-faint)',marginLeft:'var(--s-1)'}}>workspace</span>
+          </div>
+          <div className="appbar-spacer"/>
+          <button className="icon-btn" title="Search (⌘K)" aria-label="Open command menu" onClick={()=>window.__oiCommandOpen&&window.__oiCommandOpen()}><Icon name="search" size={15}/></button>
+          <ThemeToggle/>
+          <FreshnessChip/>
+          <div className="env-badge">Design partner</div>
+          <select value={customActive ? '' : period} aria-label="Time period"
+                  onChange={e=>{ if(e.target.value){ setRangeStart(''); setRangeEnd(''); setPeriod(e.target.value); } }}
+                  style={{background:'var(--bg-elevated)', border:'1px solid var(--border-subtle)', borderRadius:6, color:'var(--text-primary)', fontSize:12, padding:'4px 8px', cursor:'pointer'}}>
+            {customActive && <option value="">Custom range</option>}
+            {PERIODS.map(p=>(<option key={p.key} value={p.key}>{p.label}</option>))}
+          </select>
+          <div className="seg" style={{gap:6, alignItems:'center', paddingLeft:8}} title="Custom date range — review any two dates">
+            <input type="date" aria-label="From date" value={rangeStart} min={REAL_START} max={REAL_END}
+                   onChange={e=>setRangeStart(e.target.value)}
+                   style={{background:'transparent', border:'1px solid var(--border-subtle)', borderRadius:6, color: customActive?'var(--text-primary)':'var(--text-muted)', fontSize:11, padding:'3px 6px', colorScheme:'light dark', cursor:'pointer'}}/>
+            <span style={{color:'var(--text-faint)', fontSize:11}}>→</span>
+            <input type="date" aria-label="To date" value={rangeEnd} min={rangeStart||REAL_START} max={REAL_END}
+                   onChange={e=>setRangeEnd(e.target.value)}
+                   style={{background:'transparent', border:'1px solid var(--border-subtle)', borderRadius:6, color: customActive?'var(--text-primary)':'var(--text-muted)', fontSize:11, padding:'3px 6px', colorScheme:'light dark', cursor:'pointer'}}/>
+            {customActive && <button onClick={()=>{setRangeStart('');setRangeEnd('');}} title="Clear custom range" style={{background:'transparent',border:'none',color:'var(--text-faint)',cursor:'pointer',fontSize:14,lineHeight:1,padding:'0 2px'}}>×</button>}
+          </div>
+          {(() => {
+            // Sign out — only in an authenticated workspace (OI_ASK present); hidden in the
+            // public demo, where there's no session to end. Clears the Supabase session and
+            // sends the whole page (this dashboard runs in a same-origin iframe) to the homepage.
+            const ask = getOIAsk();
+            const authed = !!(ask && ask.brand_id && typeof ask.getJwt === 'function');
+            if (!authed) return null;
+            const signOut = async () => {
+              try { const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb; if (sb && sb.auth) await sb.auth.signOut(); } catch (e) { /* fall through to hard-clear */ }
+              try {
+                // Belt-and-braces so the user is fully logged out even if the client instance
+                // wasn't reachable: drop any persisted Supabase session + the demo passcode gate.
+                Object.keys(localStorage).forEach(k => { if (/^sb-.*-auth-token$/.test(k)) localStorage.removeItem(k); });
+                localStorage.removeItem('oi_gate_v1');
+              } catch (e) {}
+              (window.top || window).location.href = '/';
+            };
+            return (<button onClick={signOut} title="Sign out" aria-label="Sign out"
+              style={{background:'transparent', border:'1px solid var(--border-subtle)', borderRadius:6, color:'var(--text-muted)', fontSize:12, fontWeight:600, padding:'4px 10px', marginLeft:'var(--s-1)', cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap'}}>
+              Sign out
+            </button>);
+          })()}
+        </div>
+      </div>
+      <div className="app-shell">
+        <nav className="sidebar">
+          <button className="nav-cmd" onClick={()=>window.__oiCommandOpen&&window.__oiCommandOpen()}>
+            <Icon name="search" size={14}/> Search… <kbd>⌘K</kbd>
+          </button>
+          {(()=>{ let prev=null; return RAIL.map((e,i) => {
+            const head = (e.group && e.group!==prev) ? <div className="nav-label">{e.group}</div> : null;
+            prev = e.group;
+            return (<React.Fragment key={i}>
+              {head}
+              <div className={'nav-item' + (railActive(e) ? ' active' : '')} onClick={()=>goRail(e)} style={e.pin?{marginTop:'auto',borderTop:'1px solid var(--border-subtle)',borderRadius:0,paddingTop:'13px',marginLeft:2,marginRight:2}:undefined}>
+                <Icon name={e.icon||'info'} size={17}/>{e.label}
+              </div>
+            </React.Fragment>);
+          }); })()}
+        </nav>
+        <main className="app-main">
+          <div className="wrap">
+        {/* Sub-nav: only render when the section has >1 sub-tab */}
+        {activeSection.subtabs.length > 1 && (
+          <div className="subnav">
+            {activeSection.subtabs.map(t => (
+              <div key={t.id}
+                   className={'subtab' + (activeSubId === t.id ? ' active' : '')}
+                   onClick={()=>setSubTabBySection({...subTabBySection, [section]: t.id})}>
+                {t.label}
+              </div>
+            ))}
+            <div style={{flex:1}}/>
+            <div className="meta" style={{fontSize:11}} title={D.meta.source}>{(D.meta.source||'').split('—')[0].trim()||'Live data'} · updated {D.meta.captured}</div>
+          </div>
+        )}
+
+        {/* Freshness now lives as a compact chip in the app bar (FreshnessChip). */}
+        <BrandAgeBanner/>
+
+        {/* Nudge: if gross_margin isn't set, the engine skips this brand — surface it everywhere. */}
+        <MarginNudge/>
+
+        {/* Active sub-tab */}
+        {activeSubTab.component({start, period, customActive})}
+          </div>
+        </main>
+      </div>
+      {/* Product footer — quiet, signals "real product" */}
+      <footer className="app-footer">
+        <div className="app-footer-brand">
+          <div className="brand-mark" style={{width:18, height:18}}>
             <svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" aria-label="Greta">
               <defs>
-                <linearGradient id="fpb" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#8B5CF6"/><stop offset="1" stopColor="#38BDF8"/></linearGradient>
-                <linearGradient id="fgm" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#22D3A6"/><stop offset="1" stopColor="#5DE5C8"/></linearGradient>
+                <linearGradient id="ffpb" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#8B5CF6"/><stop offset="1" stopColor="#38BDF8"/></linearGradient>
+                <linearGradient id="ffgm" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#22D3A6"/><stop offset="1" stopColor="#5DE5C8"/></linearGradient>
               </defs>
-              <rect x="49" y="30" width="138" height="41" rx="20.5" transform="rotate(-45 118 50.5)" fill="url(#fpb)"/>
-              <rect x="71" y="177" width="138" height="41" rx="20.5" transform="rotate(-45 140 197.5)" fill="url(#fgm)"/>
+              <rect x="49" y="30" width="138" height="41" rx="20.5" transform="rotate(-45 118 50.5)" fill="url(#ffpb)"/>
+              <rect x="71" y="177" width="138" height="41" rx="20.5" transform="rotate(-45 140 197.5)" fill="url(#ffgm)"/>
               <circle cx="97" cy="132" r="24" fill="#0B132B"/>
             </svg>
           </div>
-          <div>
-            <div className="brand-name">greta</div>
-            <div className="brand-sub">Every part of your business, every week, with a £ tag.</div>
-          </div>
+          <span>greta</span>
         </div>
-        <div style={{width:1, height:24, background:'var(--border-subtle)', margin:'0 var(--s-2)'}}/>
-        <div className="workspace-chip">
-          <div className="dot"/>
-          <span>{OI_BRAND.name||'frkl'}</span>
-          <span style={{color:'var(--text-faint)',marginLeft:'var(--s-1)'}}>workspace</span>
-        </div>
-        <div className="appbar-spacer"/>
-        <button className="icon-btn" title="Search (⌘K)" aria-label="Open command menu" onClick={()=>window.__oiCommandOpen&&window.__oiCommandOpen()}><Icon name="search" size={15}/></button>
-        <ThemeToggle/>
-        <FreshnessChip/>
-        <div className="env-badge">Design partner</div>
-        <select value={customActive ? '' : period} aria-label="Time period"
-                onChange={e=>{ if(e.target.value){ setRangeStart(''); setRangeEnd(''); setPeriod(e.target.value); } }}
-                style={{background:'var(--bg-elevated)', border:'1px solid var(--border-subtle)', borderRadius:6, color:'var(--text-primary)', fontSize:12, padding:'4px 8px', cursor:'pointer'}}>
-          {customActive && <option value="">Custom range</option>}
-          {PERIODS.map(p=>(<option key={p.key} value={p.key}>{p.label}</option>))}
-        </select>
-        <div className="seg" style={{gap:6, alignItems:'center', paddingLeft:8}} title="Custom date range — review any two dates">
-          <input type="date" aria-label="From date" value={rangeStart} min={REAL_START} max={REAL_END}
-                 onChange={e=>setRangeStart(e.target.value)}
-                 style={{background:'transparent', border:'1px solid var(--border-subtle)', borderRadius:6, color: customActive?'var(--text-primary)':'var(--text-muted)', fontSize:11, padding:'3px 6px', colorScheme:'light dark', cursor:'pointer'}}/>
-          <span style={{color:'var(--text-faint)', fontSize:11}}>→</span>
-          <input type="date" aria-label="To date" value={rangeEnd} min={rangeStart||REAL_START} max={REAL_END}
-                 onChange={e=>setRangeEnd(e.target.value)}
-                 style={{background:'transparent', border:'1px solid var(--border-subtle)', borderRadius:6, color: customActive?'var(--text-primary)':'var(--text-muted)', fontSize:11, padding:'3px 6px', colorScheme:'light dark', cursor:'pointer'}}/>
-          {customActive && <button onClick={()=>{setRangeStart('');setRangeEnd('');}} title="Clear custom range" style={{background:'transparent',border:'none',color:'var(--text-faint)',cursor:'pointer',fontSize:14,lineHeight:1,padding:'0 2px'}}>×</button>}
-        </div>
-        {(() => {
-          // Sign out — only in an authenticated workspace (OI_ASK present); hidden in the
-          // public demo, where there's no session to end. Clears the Supabase session and
-          // sends the whole page (this dashboard runs in a same-origin iframe) to the homepage.
-          const ask = getOIAsk();
-          const authed = !!(ask && ask.brand_id && typeof ask.getJwt === 'function');
-          if (!authed) return null;
-          const signOut = async () => {
-            try { const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb; if (sb && sb.auth) await sb.auth.signOut(); } catch (e) { /* fall through to hard-clear */ }
-            try {
-              // Belt-and-braces so the user is fully logged out even if the client instance
-              // wasn't reachable: drop any persisted Supabase session + the demo passcode gate.
-              Object.keys(localStorage).forEach(k => { if (/^sb-.*-auth-token$/.test(k)) localStorage.removeItem(k); });
-              localStorage.removeItem('oi_gate_v1');
-            } catch (e) {}
-            (window.top || window).location.href = '/';
-          };
-          return (<button onClick={signOut} title="Sign out" aria-label="Sign out"
-            style={{background:'transparent', border:'1px solid var(--border-subtle)', borderRadius:6, color:'var(--text-muted)', fontSize:12, fontWeight:600, padding:'4px 10px', marginLeft:'var(--s-1)', cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap'}}>
-            Sign out
-          </button>);
-        })()}
-      </div>
-    </div>
-
-    <div className="app-shell">
-      <nav className="sidebar">
-        <button className="nav-cmd" onClick={()=>window.__oiCommandOpen&&window.__oiCommandOpen()}>
-          <Icon name="search" size={14}/> Search… <kbd>⌘K</kbd>
+        <span className="app-footer-dot"/>
+        <span title={D.meta.source}>{(OI_BRAND.name||'frkl')} workspace · {(D.meta.source||'').split('—')[0].trim()||'Live data'}</span>
+        <span className="app-footer-dot"/>
+        <span>data updated {D.meta.captured}</span>
+        <div style={{flex:1}}/>
+        <span>Auto-updates daily</span>
+      </footer>
+      <ToastHost/>
+      <CommandMenu/>
+      <EvidenceDrawer/>
+      <StickyHealthBar/>
+      <nav className="mobile-botnav">
+        {MOBILE_NAV.map((e,i)=>(
+          <button key={i} className={'mb-item'+(railActive(e)?' active':'')} onClick={()=>goRail(e)}>
+            <Icon name={e.icon} size={19}/><span>{e.label}</span>
+          </button>
+        ))}
+        <button className="mb-item" onClick={()=>window.__oiCommandOpen&&window.__oiCommandOpen()}>
+          <Icon name="search" size={19}/><span>More</span>
         </button>
-        {(()=>{ let prev=null; return RAIL.map((e,i) => {
-          const head = (e.group && e.group!==prev) ? <div className="nav-label">{e.group}</div> : null;
-          prev = e.group;
-          return (<React.Fragment key={i}>
-            {head}
-            <div className={'nav-item' + (railActive(e) ? ' active' : '')} onClick={()=>goRail(e)} style={e.pin?{marginTop:'auto',borderTop:'1px solid var(--border-subtle)',borderRadius:0,paddingTop:'13px',marginLeft:2,marginRight:2}:undefined}>
-              <Icon name={e.icon||'info'} size={17}/>{e.label}
-            </div>
-          </React.Fragment>);
-        }); })()}
       </nav>
-      <main className="app-main">
-        <div className="wrap">
-      {/* Sub-nav: only render when the section has >1 sub-tab */}
-      {activeSection.subtabs.length > 1 && (
-        <div className="subnav">
-          {activeSection.subtabs.map(t => (
-            <div key={t.id}
-                 className={'subtab' + (activeSubId === t.id ? ' active' : '')}
-                 onClick={()=>setSubTabBySection({...subTabBySection, [section]: t.id})}>
-              {t.label}
-            </div>
-          ))}
-          <div style={{flex:1}}/>
-          <div className="meta" style={{fontSize:11}} title={D.meta.source}>{(D.meta.source||'').split('—')[0].trim()||'Live data'} · updated {D.meta.captured}</div>
-        </div>
-      )}
-
-      {/* Freshness now lives as a compact chip in the app bar (FreshnessChip). */}
-      <BrandAgeBanner/>
-
-      {/* Nudge: if gross_margin isn't set, the engine skips this brand — surface it everywhere. */}
-      <MarginNudge/>
-
-      {/* Active sub-tab */}
-      {activeSubTab.component({start, period, customActive})}
-        </div>
-      </main>
     </div>
-
-    {/* Product footer — quiet, signals "real product" */}
-    <footer className="app-footer">
-      <div className="app-footer-brand">
-        <div className="brand-mark" style={{width:18, height:18}}>
-          <svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" aria-label="Greta">
-            <defs>
-              <linearGradient id="ffpb" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#8B5CF6"/><stop offset="1" stopColor="#38BDF8"/></linearGradient>
-              <linearGradient id="ffgm" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#22D3A6"/><stop offset="1" stopColor="#5DE5C8"/></linearGradient>
-            </defs>
-            <rect x="49" y="30" width="138" height="41" rx="20.5" transform="rotate(-45 118 50.5)" fill="url(#ffpb)"/>
-            <rect x="71" y="177" width="138" height="41" rx="20.5" transform="rotate(-45 140 197.5)" fill="url(#ffgm)"/>
-            <circle cx="97" cy="132" r="24" fill="#0B132B"/>
-          </svg>
-        </div>
-        <span>greta</span>
-      </div>
-      <span className="app-footer-dot"/>
-      <span title={D.meta.source}>{(OI_BRAND.name||'frkl')} workspace · {(D.meta.source||'').split('—')[0].trim()||'Live data'}</span>
-      <span className="app-footer-dot"/>
-      <span>data updated {D.meta.captured}</span>
-      <div style={{flex:1}}/>
-      <span>Auto-updates daily</span>
-    </footer>
-    <ToastHost/>
-    <CommandMenu/>
-    <EvidenceDrawer/>
-    <StickyHealthBar/>
-    <nav className="mobile-botnav">
-      {MOBILE_NAV.map((e,i)=>(
-        <button key={i} className={'mb-item'+(railActive(e)?' active':'')} onClick={()=>goRail(e)}>
-          <Icon name={e.icon} size={19}/><span>{e.label}</span>
-        </button>
-      ))}
-      <button className="mb-item" onClick={()=>window.__oiCommandOpen&&window.__oiCommandOpen()}>
-        <Icon name="search" size={19}/><span>More</span>
-      </button>
-    </nav>
-  </div>);
+  );
 }
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
