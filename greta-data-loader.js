@@ -98,6 +98,16 @@
     var DATA = window.FRKL_DATA;
     if (DATA && typeof DATA === 'object') { emptyAllKeys(DATA); DATA.meta = { source: 'Live data', captured: '' }; }
     if (window.FRKL_PRODUCTS_META && typeof window.FRKL_PRODUCTS_META === 'object') window.FRKL_PRODUCTS_META = {};
+    // OI_BENCHMARKS is the static jewellery-category set (frkl). For other brands, relabel every
+    // metric's category to 'default' so the benchmark chips read 'all DTC', not 'jewellery'. Values
+    // stay as reasonable DTC defaults; true per-vertical benchmarks come from the backend later.
+    // OI_BM (const in the bundle) holds this same object ref, so mutating .category is seen at render.
+    var BM = window.OI_BENCHMARKS;
+    if (BM && BM.metrics && typeof BM.metrics === 'object') {
+      Object.keys(BM.metrics).forEach(function (k) {
+        if (BM.metrics[k] && typeof BM.metrics[k] === 'object') BM.metrics[k].category = 'default';
+      });
+    }
     var INSIGHTS = window.FRKL_INSIGHTS;
     if (INSIGHTS && typeof INSIGHTS === 'object') {
       Object.keys(INSIGHTS).forEach(function (k) { delete INSIGHTS[k]; });
