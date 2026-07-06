@@ -776,26 +776,26 @@ function MoneyOnTablePanel(){
     <div className="card">
       <div className="card-section-title">
         <h2 style={{margin:0}}>Money on the table</h2>
-        <span className="meta">{curSym()}/mo at stake · conservative estimates · total is illustrative (items overlap)</span>
+        <span className="meta">{`${curSym()}/mo at stake · conservative estimates · total is illustrative (items overlap)`}</span>
       </div>
       <div className="stat-strip" style={{marginBottom:'var(--s-4)'}}>
         <div className="stat-strip-item">
-          <div className="stat-strip-val" style={{color:'var(--bad)'}}>{curSym()}{(rollup.leakage/1000).toFixed(1)}k<span style={{fontSize:11, color:'var(--text-muted)', marginLeft:3}}>/mo</span></div>
+          <div className="stat-strip-val" style={{color:'var(--bad)'}}>{`${curSym()}`}{(rollup.leakage/1000).toFixed(1)}k<span style={{fontSize:11, color:'var(--text-muted)', marginLeft:3}}>/mo</span></div>
           <div className="stat-strip-label">Leaking now</div>
         </div>
         <div className="stat-strip-divider"/>
         <div className="stat-strip-item">
-          <div className="stat-strip-val" style={{color:'var(--warn)'}}>{curSym()}{(rollup.at_risk/1000).toFixed(1)}k<span style={{fontSize:11, color:'var(--text-muted)', marginLeft:3}}>/mo</span></div>
+          <div className="stat-strip-val" style={{color:'var(--warn)'}}>{`${curSym()}`}{(rollup.at_risk/1000).toFixed(1)}k<span style={{fontSize:11, color:'var(--text-muted)', marginLeft:3}}>/mo</span></div>
           <div className="stat-strip-label">At risk</div>
         </div>
         <div className="stat-strip-divider"/>
         <div className="stat-strip-item">
-          <div className="stat-strip-val" style={{color:'var(--good)'}}>{curSym()}{(rollup.opportunity/1000).toFixed(1)}k<span style={{fontSize:11, color:'var(--text-muted)', marginLeft:3}}>/mo</span></div>
+          <div className="stat-strip-val" style={{color:'var(--good)'}}>{`${curSym()}`}{(rollup.opportunity/1000).toFixed(1)}k<span style={{fontSize:11, color:'var(--text-muted)', marginLeft:3}}>/mo</span></div>
           <div className="stat-strip-label">Opportunity</div>
         </div>
         <div className="stat-strip-divider"/>
         <div className="stat-strip-item">
-          <div className="stat-strip-val">{curSym()}{(rollup.total/1000).toFixed(1)}k<span style={{fontSize:11, color:'var(--text-muted)', marginLeft:3}}>/mo</span></div>
+          <div className="stat-strip-val">{`${curSym()}`}{(rollup.total/1000).toFixed(1)}k<span style={{fontSize:11, color:'var(--text-muted)', marginLeft:3}}>/mo</span></div>
           <div className="stat-strip-label">Total identified</div>
         </div>
       </div>
@@ -822,14 +822,14 @@ function MoneyOnTablePanel(){
         };
         return (
           <>
-            <table><thead><tr><th>Evidenced finding</th><th>{curSym()}/mo impact</th><th className="tl">Confidence</th><th className="tl">Basis</th><th className="tl">Status</th></tr></thead>
+            <table><thead><tr><th>Evidenced finding</th><th>{`${curSym()}/mo impact`}</th><th className="tl">Confidence</th><th className="tl">Basis</th><th className="tl">Status</th></tr></thead>
               <tbody>{evidenced.map(Row)}</tbody></table>
             {hypotheses.length > 0 && (<div style={{marginTop:'var(--s-5)'}}>
               <div className="card-section-title" style={{marginBottom:6}}>
                 <h3 style={{margin:0, fontSize:13, color:'var(--text-muted)'}}>Hypotheses — unvalidated upside</h3>
                 <span className="meta" style={{fontSize:11}}>low-confidence estimates · test before committing budget, don't bank them</span>
               </div>
-              <table style={{opacity:0.85}}><thead><tr><th>Hypothesis</th><th>{curSym()}/mo if it works</th><th className="tl">Confidence</th><th className="tl">Assumption</th><th className="tl">Status</th></tr></thead>
+              <table style={{opacity:0.85}}><thead><tr><th>Hypothesis</th><th>{`${curSym()}/mo if it works`}</th><th className="tl">Confidence</th><th className="tl">Assumption</th><th className="tl">Status</th></tr></thead>
                 <tbody>{hypotheses.map(Row)}</tbody></table>
             </div>)}
           </>
@@ -846,10 +846,10 @@ function MoneyHeaderStrip(){
   const r = P.money_rollup;
   return (
     <div className="card" style={{marginBottom:14, padding:'10px 14px', borderLeft:'3px solid #4ade80', display:'flex',gap:18,alignItems:'center',flexWrap:'wrap'}}>
-      <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:.05,color:'#7b7b87',fontWeight:700}}>{curSym()}AT STAKE THIS MONTH</div>
-      <div style={{display:'flex',alignItems:'baseline',gap:6}}><span style={{fontSize:18,fontWeight:700,color:'#f87171'}}>{curSym()}{(r.leakage/1000).toFixed(1)}k</span><span className="muted" style={{fontSize:11}}>leaking</span></div>
-      <div style={{display:'flex',alignItems:'baseline',gap:6}}><span style={{fontSize:18,fontWeight:700,color:'#fbbf24'}}>{curSym()}{(r.at_risk/1000).toFixed(1)}k</span><span className="muted" style={{fontSize:11}}>at risk</span></div>
-      <div style={{display:'flex',alignItems:'baseline',gap:6}}><span style={{fontSize:18,fontWeight:700,color:'#4ade80'}}>{curSym()}{(r.opportunity/1000).toFixed(1)}k</span><span className="muted" style={{fontSize:11}}>opportunity</span></div>
+      <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:.05,color:'#7b7b87',fontWeight:700}}>{`${curSym()} AT STAKE THIS MONTH`}</div>
+      <div style={{display:'flex',alignItems:'baseline',gap:6}}><span style={{fontSize:18,fontWeight:700,color:'#f87171'}}>{`${curSym()}`}{(r.leakage/1000).toFixed(1)}k</span><span className="muted" style={{fontSize:11}}>leaking</span></div>
+      <div style={{display:'flex',alignItems:'baseline',gap:6}}><span style={{fontSize:18,fontWeight:700,color:'#fbbf24'}}>{`${curSym()}`}{(r.at_risk/1000).toFixed(1)}k</span><span className="muted" style={{fontSize:11}}>at risk</span></div>
+      <div style={{display:'flex',alignItems:'baseline',gap:6}}><span style={{fontSize:18,fontWeight:700,color:'#4ade80'}}>{`${curSym()}`}{(r.opportunity/1000).toFixed(1)}k</span><span className="muted" style={{fontSize:11}}>opportunity</span></div>
       <div style={{marginLeft:'auto',fontSize:11,color:'#7b7b87'}}>See <b>Intelligence</b> tab → Money on the table for breakdown</div>
     </div>
   );
@@ -1022,7 +1022,7 @@ function ActionBoard(){
     <span className="sp-hcell">Priority</span>
     <span className="sp-hcell">Action</span>
     <span className="sp-hcell">Status</span>
-    <span className="sp-hcell right">{curSym()}/mo</span>
+    <span className="sp-hcell right">{`${curSym()}/mo`}</span>
   </div>);
 
   // Group open actions by theme; rank groups (and rows) by £ at stake.
@@ -1088,7 +1088,7 @@ function ActionBoard(){
   return (
     <div className="card">
       <div className="card-section-title">
-        <h2 style={{margin:0}}>Action plan <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>— live read first, ranked by {curSym()}impact</span></h2>
+        <h2 style={{margin:0}}>Action plan <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>{`— live read first, ranked by ${curSym()} impact`}</span></h2>
         <span className="meta">Crux live read{liveRead&&liveRead.generatedAt?` (${liveRead.generatedAt.slice(0,10)})`:''} · {open.length} specialist items{contraCount>0?` · ${contraCount} contradicted by today's read`:''}</span>
       </div>
       <ActionConflictBanner/>
@@ -1191,8 +1191,8 @@ function ChannelStreamPanel(){
         <KPI label={<>{_dot('var(--text-muted)')}Other channels</>} val={GBP(otRev)} sub={`${NUM(otOrd)} orders · likely IG/FB Shop / POS`} series={sOt} seriesLabel="Other revenue · last 30 days" />
       </div>
       <div className="note">
-        <b>Important context:</b>before this segmentation, headline metrics conflated all 4 streams. Discount rate looked like 36-47% (actually 12% on real DTC); AOV looked like {curSym()}63 (actually {curSym()}{Math.round(dtcOrd?dtcRev/dtcOrd:0)}). Two headline "crises" were data artefacts.
-            </div>
+        <b>Important context:</b>{` before this segmentation, headline metrics conflated all 4 streams. Discount rate looked like 36-47% (actually 12% on real DTC); AOV looked like ${curSym()}63 (actually ${curSym()}`}{Math.round(dtcOrd?dtcRev/dtcOrd:0)}). Two headline "crises" were data artefacts.
+      </div>
     </div>
   );
 }
@@ -1334,7 +1334,7 @@ function HeroStat({valK, color, label, explain, items, total, alignRight}){
   return (
     <div className="hero-stat" style={{position:'relative', cursor:'help'}}
          onMouseEnter={()=>setShow(true)} onMouseLeave={()=>setShow(false)}>
-      <div className="hero-stat-val" style={{color}}>{curSym()}{valK}k</div>
+      <div className="hero-stat-val" style={{color}}>{`${curSym()}`}{valK}k</div>
       <div className="hero-stat-label" style={{borderBottom:'1px dotted var(--text-faint)', display:'inline-block', paddingBottom:1}}>
         {label} <span style={{fontSize:9, opacity:.55}} aria-hidden="true">&#9432;</span>
       </div>
@@ -1427,7 +1427,7 @@ function ThisWeekHero(){
           <span className="micro">Operator weekly</span>
         </div>
         <h1 className="hero-headline">
-          <span style={{color:'var(--accent)'}}>{curSym()}{totalK}k/mo</span> in play this week
+          <span style={{color:'var(--accent)'}}>{`${curSym()}`}{totalK}k/mo</span> in play this week
         </h1>
         <div className="hero-sub">
           Concentrated in <b style={{color:'var(--text-primary)'}}>{biggestLabel}</b>. The three highest-impact actions are queued below.
@@ -1475,7 +1475,7 @@ function ThisWeekHero(){
                   <span className="meta" style={{fontSize:10.5}} title={agentTitle(a.agent)}>{a.agent}</span>
                   {Math.abs(a.money) >= 100 && <span style={{
                     fontSize:10.5, fontWeight:700, color: a.money < 0 ? 'var(--bad)' : 'var(--good)',
-                  }}>{curSym()}{Math.abs(a.money/1000).toFixed(1)}k/mo</span>}
+                  }}>{`${curSym()}`}{Math.abs(a.money/1000).toFixed(1)}k/mo</span>}
                 </div>
               </div>
             </div>))}
@@ -2463,7 +2463,7 @@ function AnalystRead({read, dx, metrics, onLog, logUI}){
             </div>
           )}
           <ContextConsidered dx={dx}/>
-          <div className="note" style={{marginTop:10}}>Reasoned over the live evidence bundle (decomposition → baseline → confounder → verdict). {curSym()}are contribution-impact estimates used to rank leverage, not forecasts.</div>
+          <div className="note" style={{marginTop:10}}>{`Reasoned over the live evidence bundle (decomposition → baseline → confounder → verdict). ${curSym()} are contribution-impact estimates used to rank leverage, not forecasts.`}</div>
         </div>
       )}
     </div>
@@ -2565,7 +2565,7 @@ function DiagnosticCard({metrics, context, period, onLogEvent}){
         ))}
       </div>
       <ContextConsidered dx={dx}/>
-      <div className="note" style={{marginTop:10}}>Computed live from this period's metrics via the operator model (funnel × unit economics × margin), with decomposition + event detection applied before ranking. {curSym()}are contribution-impact estimates used to rank leverage — not forecasts.</div>
+      <div className="note" style={{marginTop:10}}>{`Computed live from this period's metrics via the operator model (funnel × unit economics × margin), with decomposition + event detection applied before ranking. ${curSym()} are contribution-impact estimates used to rank leverage — not forecasts.`}</div>
     </div>
   );
 }
@@ -2974,7 +2974,7 @@ function MobileToday(){
   return (
     <div className="card" style={{borderLeft:'3px solid var(--accent)', marginBottom:14}}>
       <div style={{fontSize:11,fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--accent)',marginBottom:6}}>Today</div>
-      {rollup.total!=null && <div style={{fontSize:22,fontWeight:750,lineHeight:1.2}}>{curSym()}{(Math.round((rollup.total||0)/100)/10)}k/mo in play</div>}
+      {rollup.total!=null && <div style={{fontSize:22,fontWeight:750,lineHeight:1.2}}>{`${curSym()}`}{(Math.round((rollup.total||0)/100)/10)}k/mo in play</div>}
       {dx.headline && <div style={{fontSize:13,color:'var(--text-secondary)',margin:'6px 0 12px',lineHeight:1.5}}>{dx.headline}</div>}
       <div style={{fontSize:11,fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-muted)',marginBottom:6}}>Do this next</div>
       <div style={{display:'flex',flexDirection:'column',gap:8}}>
@@ -2983,12 +2983,12 @@ function MobileToday(){
             style={{padding:'10px 12px',background:'var(--bg-elevated)',border:'1px solid var(--border-subtle)',borderRadius:10,cursor:'pointer'}}>
             <div style={{fontSize:13,color:'var(--text-primary)',lineHeight:1.4}}>{a.description}</div>
             <div style={{fontSize:11,color:'var(--text-faint)',marginTop:5,display:'flex',gap:12,flexWrap:'wrap'}}>
-              <span style={{color:kc(a.kind),fontWeight:600}}>~{curSym()}{Math.round(Math.abs(a.monthly_impact_gbp)).toLocaleString()}/mo</span>
+              <span style={{color:kc(a.kind),fontWeight:600}}>{`~${curSym()}`}{Math.round(Math.abs(a.monthly_impact_gbp)).toLocaleString()}/mo</span>
               {a.priority && <span>⏱ {byWhen(a.priority)}</span>}
               <span style={{color:'var(--accent)'}}>tap to ask →</span>
             </div>
           </div>
-        )) : <div className="muted" style={{fontSize:12}}>No high-{curSym()}actions open right now.</div>}
+        )) : <div className="muted" style={{fontSize:12}}>{`No high-${curSym()} actions open right now.`}</div>}
       </div>
       <button onClick={()=>window.__oiAsk&&window.__oiAsk(`What should I do today? Give me the top 3 actions, ranked by ${curSym()} impact.`)}
         style={{marginTop:12,width:'100%',padding:'12px',background:'#c084fc',border:'none',borderRadius:10,color:'#fff',fontWeight:650,fontSize:14,cursor:'pointer'}}>✦ Ask: What should I do today?</button>
@@ -3895,7 +3895,7 @@ function DemoPanel(){
           <td style={{color:a.roas==null?'#888':a.roas>=2.5?'#4ade80':a.roas>=1.7?'#fbbf24':'#f87171'}}>{a.roas?a.roas.toFixed(2)+'x':'—'}</td>
         </tr>))}
       </tbody></table>
-      <div className="note" style={{marginTop:10}}>The algorithm has settled on <b>35–54 females</b>as the biggest spend bucket — but younger <b>25–34 females</b>often convert at higher ROAS per {curSym()}when they do convert. <b>18–24 doesn't convert.</b>Almost zero male conversions across the whole library — male spend is wasted.</div>
+      <div className="note" style={{marginTop:10}}>The algorithm has settled on <b>35–54 females</b> as the biggest spend bucket — but younger <b>25–34 females</b>{` often convert at higher ROAS per ${curSym()} when they do convert. `}<b>18–24 doesn't convert.</b> Almost zero male conversions across the whole library — male spend is wasted.</div>
     </div>
   );
 }
@@ -4294,7 +4294,7 @@ function CreatorCandidatesPanel(){
           <h2>How to use this</h2>
           <div style={{fontSize:12.5,lineHeight:1.6,color:'var(--text-secondary)'}}>
             <p><b>Scores are inferred not measured.</b> They reflect what LLM reasoning can extract from public web signals — past partnerships, audience age cues, content themes, engagement signals quoted in articles.</p>
-            <p><b>Before outreaching at scale</b>, verify with a real creator-discovery tool (Heepsy {curSym()}69/mo or Modash {curSym()}150+/mo). Look for: actual follower count, UK audience %, age split, engagement rate, brand-overlap with frkl peers.</p>
+            <p><b>Before outreaching at scale</b>{`, verify with a real creator-discovery tool (Heepsy ${curSym()}69/mo or Modash ${curSym()}150+/mo). Look for: actual follower count, UK audience %, age split, engagement rate, brand-overlap with frkl peers.`}</p>
             <p><b>The highest-EV move</b> isn't in any external creator — it's an internal audit of <code>#myfrkl</code> tagged users. These are existing customers who already buy frkl AND have audiences. Brief Lux to pull that list.</p>
             <p><b>To add a new candidate:</b> edit <code>creator_candidates.json</code> and re-run <code>python scripts/build_creators_data.py</code>. Status field tracks: prospect → contacted → active → declined.</p>
           </div>
@@ -4341,7 +4341,7 @@ function AffiliatePanel(){
       <div className="row">
         <div className="card" style={{flex:'2 1 520px'}}>
           <h2>Affiliate league table</h2>
-          <table><thead><tr><th>Code</th><th>Creator</th><th>Orders</th><th>Net rev</th><th>AOV</th><th>Discount %</th><th>{curSym()}given/order</th></tr></thead><tbody>
+          <table><thead><tr><th>Code</th><th>Creator</th><th>Orders</th><th>Net rev</th><th>AOV</th><th>Discount %</th><th>{`${curSym()} given/order`}</th></tr></thead><tbody>
           {affs.map((a,i)=>{
             const tier = a.netSales > 5000 ? 'hero' : a.netSales > 1000 ? 'core' : a.netSales > 200 ? 'mid' : 'long-tail';
             const tierColor = {hero:'#4ade80',core:'#5b8def',mid:'#fbbf24','long-tail':'#7b7b87'}[tier];
@@ -4482,7 +4482,7 @@ function Customers(){
           </R.ResponsiveContainer>
         </div>
       </div>
-      {OI_BRAND.slug==='frkl' && <div className="note" style={{marginTop:14}}>The big spike of returning customers <b>late April</b>(Apr 22–28) is the cohort responding to Meta re-scaling on Apr 13 — and the email flow firing on that traffic. Ireland's AOV ({curSym()}71) is meaningfully higher than the UK's ({curSym()}65). The list is net-positive every single day — Klaviyo has product-market fit for acquisition; the gap is monetisation of the list with proper attributed reporting.</div>}
+      {OI_BRAND.slug==='frkl' && <div className="note" style={{marginTop:14}}>The big spike of returning customers <b>late April</b>{` (Apr 22–28) is the cohort responding to Meta re-scaling on Apr 13 — and the email flow firing on that traffic. Ireland's AOV (${curSym()}71) is meaningfully higher than the UK's (${curSym()}65). The list is net-positive every single day — Klaviyo has product-market fit for acquisition; the gap is monetisation of the list with proper attributed reporting.`}</div>}
     </div>
   );
 }
@@ -4582,17 +4582,17 @@ function InventoryPanel(){
         <div className="card kpi" style={{borderLeft:'3px solid #fbbf24'}}>
           <div className="label">Healthy cover (30-90d)</div>
           <div className="val">{(summary.healthy||{}).skus||0}</div>
-          <div className="sub">{(summary.healthy||{}).totalQty||0}units · {curSym()}{NUM((summary.healthy||{}).totalValue)}on shelf</div>
+          <div className="sub">{(summary.healthy||{}).totalQty||0}{` units · ${curSym()}`}{NUM((summary.healthy||{}).totalValue)} on shelf</div>
         </div>
         <div className="card kpi" style={{borderLeft:'3px solid #c084fc'}}>
           <div className="label">Overstock (&gt;180d)</div>
           <div className="val">{(summary.overstock||{}).skus||0}</div>
-          <div className="sub">{(summary.overstock||{}).totalQty||0} units · <b>{curSym()}{NUM(overstockValue)} tied up</b></div>
+          <div className="sub">{(summary.overstock||{}).totalQty||0} units · <b>{`${curSym()}`}{NUM(overstockValue)} tied up</b></div>
         </div>
         <div className="card kpi" style={{borderLeft:'3px solid #7b7b87'}}>
           <div className="label">Archived (dead stock)</div>
           <div className="val">{(summary.archived_stock||{}).skus||0}</div>
-          <div className="sub">{(summary.archived_stock||{}).totalQty||0} units · <b>{curSym()}{NUM(archivedValue)}</b> at sell-value</div>
+          <div className="sub">{(summary.archived_stock||{}).totalQty||0} units · <b>{`${curSym()}`}{NUM(archivedValue)}</b> at sell-value</div>
         </div>
       </div>
       <div style={{display:'flex',gap:10,alignItems:'center',marginBottom:10,flexWrap:'wrap'}}>
@@ -4610,7 +4610,7 @@ function InventoryPanel(){
         <span className="muted" style={{marginLeft:'auto',fontSize:11}}>{sorted.length} of {inv.length} SKUs</span>
       </div>
       <div style={{maxHeight:560,overflowY:'auto'}}>
-        <table className="sticky"><thead><tr><th>Tier</th><th className="tl">SKU / title</th><th className="tl">Type</th><th>Stock</th><th>Sold 90d</th><th>Days cover</th><th>Inv {curSym()}value</th></tr></thead><tbody>
+        <table className="sticky"><thead><tr><th>Tier</th><th className="tl">SKU / title</th><th className="tl">Type</th><th>Stock</th><th>Sold 90d</th><th>Days cover</th><th>{`Inv ${curSym()} value`}</th></tr></thead><tbody>
         {sorted.slice(0,80).map((r,i) => {
           const color = TIER_COLOR[r.coverTier] || '#7b7b87';
           return (
@@ -4624,14 +4624,14 @@ function InventoryPanel(){
               <td><b>{r.inventoryQty}</b></td>
               <td>{r.units90d}</td>
               <td>{r.daysOfCover === null ? '∞' : r.daysOfCover === 999 ? '∞' : r.daysOfCover + 'd'}</td>
-              <td>{curSym()}{NUM(r.inventoryValue)}</td>
+              <td>{`${curSym()}`}{NUM(r.inventoryValue)}</td>
             </tr>
           );
         })}
         </tbody></table>
       </div>
       {sorted.length > 80 && <div className="muted" style={{fontSize:11,marginTop:8}}>Showing 80 of {sorted.length}. Adjust filter to drill in.</div>}
-      {DEMO && <div className="note" style={{marginTop:14}}><b>Atlas read:</b> {critRows.length}SKUs are about to stock out — at current velocity that's roughly {curSym()}{NUM(lostSalesEstMonthly)}/mo in lost sales if reorders don't land. Meanwhile <b>{curSym()}{NUM(overstockValue + archivedValue)} of capital is locked in slow-moving stock + archived SKUs</b>. For a brand at {curSym()}16k/mo DTC revenue, that's ~18 months of working capital tied up. Most of the overstock is in <b>pre-styled stack SKUs</b>— connects directly to the Bundle attach finding (Products tab): bundles aren't selling, so the bundle-specific inventory is bloating. Liquidate the dead bundles + redirect capital to charm + necklace replenishment.</div>}
+      {DEMO && <div className="note" style={{marginTop:14}}><b>Atlas read:</b> {critRows.length}{` SKUs are about to stock out — at current velocity that's roughly ${curSym()}`}{NUM(lostSalesEstMonthly)}/mo in lost sales if reorders don't land. Meanwhile <b>{`${curSym()}`}{NUM(overstockValue + archivedValue)} of capital is locked in slow-moving stock + archived SKUs</b>{`. For a brand at ${curSym()}16k/mo DTC revenue, that's ~18 months of working capital tied up. Most of the overstock is in `}<b>pre-styled stack SKUs</b> — connects directly to the Bundle attach finding (Products tab): bundles aren't selling, so the bundle-specific inventory is bloating. Liquidate the dead bundles + redirect capital to charm + necklace replenishment.</div>}
     </div>
   );
 }
@@ -4662,7 +4662,7 @@ function CollectionsPanel(){
         </tr>);
       })}
       </tbody></table>
-      <div className="note" style={{marginTop:14}}><b>Collection read:</b> {top.collection}drive {PCT(top.revenueShare)}of product revenue ({top.skus}SKUs, AOV {curSym()}{Math.round(top.aovPerUnit||0)}). {tinyCollections.length > 0 ? `${tinyCollections.length} collection${tinyCollections.length>1?'s':''} have only 1-2 active SKUs (${tinyCollections.map(c=>c.collection).join(', ')}) — long-tail expansion candidates worth a Frame brief.` : ''}The Necklaces + Charms combination is 85% of revenue — the modular system working as designed.</div>
+      <div className="note" style={{marginTop:14}}><b>Collection read:</b> {top.collection} drive {PCT(top.revenueShare)} of product revenue ({top.skus}{` SKUs, AOV ${curSym()}`}{Math.round(top.aovPerUnit||0)}). {tinyCollections.length > 0 ? `${tinyCollections.length} collection${tinyCollections.length>1?'s':''} have only 1-2 active SKUs (${tinyCollections.map(c=>c.collection).join(', ')}) — long-tail expansion candidates worth a Frame brief.` : ''} The Necklaces + Charms combination is 85% of revenue — the modular system working as designed.</div>
     </div>
   );
 }
@@ -4689,7 +4689,7 @@ function ProductTiersPanel(){
           <td style={{color:t.returnRate>=0.1?'var(--bad)':t.returnRate>=0.06?'var(--warn)':'var(--text-faint)',fontWeight:600}}>{PCT(t.returnRate)}</td>
         </tr>))}
       </tbody></table>
-      {DEMO && <div className="note" style={{marginTop:12}}><b>Tier read:</b>bases drive revenue ({curSym()}23k, biggest), styles drive margin (92%, highest), charms drive volume (450 units = lowest unit price but highest engagement). A pre-styled stack is literally one of each — so the bundle thesis is exactly the multiplier this product system was designed to produce.</div>}
+      {DEMO && <div className="note" style={{marginTop:12}}><b>Tier read:</b>{` bases drive revenue (${curSym()}23k, biggest), styles drive margin (92%, highest), charms drive volume (450 units = lowest unit price but highest engagement). A pre-styled stack is literally one of each — so the bundle thesis is exactly the multiplier this product system was designed to produce.`}</div>}
     </div>
   );
 }
@@ -5555,7 +5555,7 @@ function ProductSignal(){
       {arr.length>0 && <span style={{fontSize:11,fontWeight:700,color:'var(--text-faint)',flexShrink:0}}>{arr.length}</span>}
     </div>
     {arr.length
-      ? <>{arr.slice(0,CAP).map(p=>oppRow(p,color))}{arr.length>CAP && <div style={{fontSize:11,color:'var(--text-faint)',paddingTop:6}}>+ {arr.length-CAP}more (smaller {curSym()})</div>}</>
+      ? <>{arr.slice(0,CAP).map(p=>oppRow(p,color))}{arr.length>CAP && <div style={{fontSize:11,color:'var(--text-faint)',paddingTop:6}}>+ {arr.length-CAP}{` more (smaller ${curSym()})`}</div>}</>
       : <div style={{fontSize:12,color:'var(--text-muted)',padding:'6px 0'}}>{empty}</div>}
   </div>);
   const totalOpps = gems.length+pdpFix.length+checkoutFix.length+restock.length;
@@ -5592,7 +5592,7 @@ function ProductSignal(){
       <div style={{fontSize:11,color:'var(--text-faint)',margin:'2px 0 12px'}}>{lens==='completion'
         ? <>Y = cart→purchase. Dots <b>below the dashed line buy worse than the site average once carted</b> — a checkout/commitment problem, not a desire one. X = visibility. Bubble = views.</>
         : <>Top-left = wanted but unseen (merchandise) · top-right = stars · bottom-right = seen but unwanted (fix/stop). Dashed lines = site median visibility &amp; average view→cart.</>}</div>
-      <div style={{fontSize:11.5,color:'var(--text-muted)',margin:'2px 0 10px',lineHeight:1.5}}>The <b style={{color:'var(--good)'}}>~{curSym()}/mo in green</b>is the <b>opportunity size</b>— estimated extra <b>gross profit per month</b>if this product closed the gap to the site's average funnel (for out-of-stock, the demand missed while it's unavailable). Margin-weighted at {PCT(gm)}and scaled to a month — a ceiling worth chasing, not a guaranteed gain. Only products worth ≥ {curSym()}50/mo are listed.</div>
+      <div style={{fontSize:11.5,color:'var(--text-muted)',margin:'2px 0 10px',lineHeight:1.5}}>The <b style={{color:'var(--good)'}}>{`~${curSym()}/mo in green`}</b> is the <b>opportunity size</b> — estimated extra <b>gross profit per month</b> if this product closed the gap to the site's average funnel (for out-of-stock, the demand missed while it's unavailable). Margin-weighted at {PCT(gm)}{` and scaled to a month — a ceiling worth chasing, not a guaranteed gain. Only products worth ≥ ${curSym()}50/mo are listed.`}</div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(250px,1fr))',gap:16}}>
         {oppCol('Unseen — visibility problem','#7c8cff',gems,'None — visibility matches desire.')}
         {oppCol('Browsed, not wanted — PDP problem','#f87171',pdpFix,'None flagged.')}
@@ -5602,7 +5602,7 @@ function ProductSignal(){
       {moreAvail && <div style={{marginTop:12,textAlign:'center'}}>
         <button onClick={()=>setShowAll(!showAll)} style={{fontSize:12,fontWeight:600,padding:'6px 16px',borderRadius:8,cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'#9aa6ff'}}>{showAll?'Show fewer':`Show more — ${totalOpps} opportunities ≥ ${curSym()}50/mo`}</button>
       </div>}
-      <div className="note" style={{marginTop:12}}>The full funnel, per product: <b>% of views = visibility</b>, <b>view→cart = desire</b>(do they want it once seen), <b>cart→purchase = completion</b>(do they close once they want it). Splitting the last two is the depth — a low-converting SKU is now diagnosed as either <b style={{color:'#f87171'}}>browsed-not-wanted</b>(fix the PDP/product) or <b style={{color:'#fbbf24'}}>wanted-not-bought</b>(fix price/shipping/trust/variant at checkout) — opposite fixes. Out-of-stock SKUs are separated (they can't convert); {curSym()}is margin-weighted at {PCT(gm)}, scaled to /month. GA4 item-scoped ({META.products||PR.length}products) × Shopify price/stock.</div>
+      <div className="note" style={{marginTop:12}}>The full funnel, per product: <b>% of views = visibility</b>, <b>view→cart = desire</b> (do they want it once seen), <b>cart→purchase = completion</b> (do they close once they want it). Splitting the last two is the depth — a low-converting SKU is now diagnosed as either <b style={{color:'#f87171'}}>browsed-not-wanted</b> (fix the PDP/product) or <b style={{color:'#fbbf24'}}>wanted-not-bought</b>{` (fix price/shipping/trust/variant at checkout) — opposite fixes. Out-of-stock SKUs are separated (they can't convert); ${curSym()} is margin-weighted at `}{PCT(gm)}, scaled to /month. GA4 item-scoped ({META.products||PR.length} products) × Shopify price/stock.</div>
     </div>
   );
 }
@@ -5686,15 +5686,15 @@ function DiscountCodeTracker(){
             <div style={{background:'var(--accent-bg)',border:'1px solid rgba(124,140,255,0.25)',borderRadius:12,padding:'11px 14px',marginBottom:14,fontSize:12.5,color:'var(--text-secondary)',lineHeight:1.55}}>
               <b style={{color:'var(--text-primary)'}}>How often vs how deep —</b>these two figures look like they disagree but they measure different things:
                         <span style={{display:'inline'}}> <b style={{color:'var(--text-primary)'}}>{pen}%</b> of orders carry a discount (how <i>often</i>), but the average is only <b style={{color:'var(--text-primary)'}}>{GBP(avg)}</b> off — so across all sales discounts come to only <b style={{color:'var(--text-primary)'}}>~{inten}%</b> of revenue (how <i>deep</i>). Frequent but shallow: lots of small codes, not deep cuts.</span>
-              <span style={{color:'var(--text-faint)',display:'block',marginTop:4}}>The Home <i>“Discount depth”</i>tile (~{inten}%) is the {curSym()}-weighted view; the <i>“Orders with a discount”</i>tile above ({pen}%) is the order-count view. Same data, different denominators — not a discrepancy.</span>
+              <span style={{color:'var(--text-faint)',display:'block',marginTop:4}}>The Home <i>“Discount depth”</i> tile (~{inten}{`%) is the ${curSym()}-weighted view; the `}<i>“Orders with a discount”</i> tile above ({pen}%) is the order-count view. Same data, different denominators — not a discrepancy.</span>
             </div>
           ); })()}
 
         {(M.markdownEstimate>0 || M.automaticDiscount>0) && <div style={{background:'rgba(245,181,68,0.06)',border:'1px solid rgba(245,181,68,0.3)',borderRadius:12,padding:'11px 14px',marginBottom:14}}>
-          <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#f5b544',fontWeight:700,marginBottom:5}}>Discounts beyond codes — not in the {curSym()}above</div>
+          <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#f5b544',fontWeight:700,marginBottom:5}}>{`Discounts beyond codes — not in the ${curSym()} above`}</div>
           <div style={{display:'flex',gap:20,flexWrap:'wrap',fontSize:12.5,color:'var(--text-secondary)'}}>
             <div style={{flex:'1 1 240px'}}><b>Automatic (no code):</b> {GBP(M.automaticDiscount)} on {NUM(M.automaticOrders)} orders <span style={{color:'var(--text-faint)'}}>— in Shopify's discount totals, just not tied to a code.</span></div>
-            <div style={{flex:'1 1 320px'}}><b style={{color:'#ef6b6f'}}>Sale-price markdowns:</b> ~{GBP(M.markdownEstimate)} est. ({Math.round((M.markdownShareOfValue||0)*100)}% of sold value) · <b>{M.catalogOnSale}/{M.catalogActive}</b> of catalog on sale at ~{M.avgMarkdownPct}% off. <span style={{color:'var(--text-faint)'}}>Compare-at markdowns never enter Shopify's <code>total_discounts</code>, so they're invisible to the code/automatic figures — this is the true site-wide discount the {curSym()}above misses. Estimated from web line-items × current compare-at price.</span></div>
+            <div style={{flex:'1 1 320px'}}><b style={{color:'#ef6b6f'}}>Sale-price markdowns:</b> ~{GBP(M.markdownEstimate)} est. ({Math.round((M.markdownShareOfValue||0)*100)}% of sold value) · <b>{M.catalogOnSale}/{M.catalogActive}</b> of catalog on sale at ~{M.avgMarkdownPct}% off. <span style={{color:'var(--text-faint)'}}>Compare-at markdowns never enter Shopify's <code>total_discounts</code>{`, so they're invisible to the code/automatic figures — this is the true site-wide discount the ${curSym()} above misses. Estimated from web line-items × current compare-at price.`}</span></div>
           </div>
         </div>}
 
@@ -5728,7 +5728,7 @@ function DiscountCodeTracker(){
             <th style={{padding:'6px 8px 6px 0'}}>Code</th><th style={{padding:'6px 8px'}}>Pattern</th>
             <th style={{padding:'6px 8px'}}>Usage over time</th>
             <th style={{padding:'6px 8px',textAlign:'right'}}>Orders</th><th style={{padding:'6px 8px',textAlign:'right'}}>Revenue</th>
-            <th style={{padding:'6px 8px',textAlign:'right'}}>Discount {curSym()}</th><th style={{padding:'6px 8px',textAlign:'right'}}>Disc %</th>
+            <th style={{padding:'6px 8px',textAlign:'right'}}>{`Discount ${curSym()}`}</th><th style={{padding:'6px 8px',textAlign:'right'}}>Disc %</th>
             <th style={{padding:'6px 8px',whiteSpace:'nowrap'}}>Active window</th></tr></thead>
           <tbody>
             {tableMkt.map(c=>{ const m=DC_PATTERN[c.pattern]||DC_PATTERN['recurring'];
@@ -6077,7 +6077,7 @@ function Organic(){
           </tbody></table>
         </div>
       </div>
-      <div className="note" style={{marginTop:14}}><b>Email is the #1 revenue channel</b>({curSym()}18.5k, 32% of attributed revenue) — the Klaviyo flows are doing more for the business than any paid channel. <b>Organic Search drives {curSym()}10k (17.3%)</b>— bigger than Paid Search. The <b>Paid Social attribution gap</b>(Meta claims 10× what GA4 measures) is the headline reconciliation problem for the investor view.</div>
+      <div className="note" style={{marginTop:14}}><b>Email is the #1 revenue channel</b>{` (${curSym()}18.5k, 32% of attributed revenue) — the Klaviyo flows are doing more for the business than any paid channel. `}<b>{`Organic Search drives ${curSym()}10k (17.3%)`}</b> — bigger than Paid Search. The <b>Paid Social attribution gap</b> (Meta claims 10× what GA4 measures) is the headline reconciliation problem for the investor view.</div>
       <InstagramPanel/>
       <ContentCalendar/>
       <StoriesPanel/>
@@ -6114,7 +6114,7 @@ function EmailAttributionPanel(){
         <div className="card kpi" style={{borderLeft: Math.abs(gapPct) > 0.3 ? '3px solid #fbbf24' : '3px solid #4ade80'}}>
           <div className="label">Flow attribution gap</div>
           <div className="val">{GBP(gap)}</div>
-          <div className="sub">vs gross tracked {curSym()}{NUM(a.grossFlowRevenue_90d_klaviyo_tracked)}({(gapPct*100).toFixed(0)}% gap)</div>
+          <div className="sub">{`vs gross tracked ${curSym()}`}{NUM(a.grossFlowRevenue_90d_klaviyo_tracked)} ({(gapPct*100).toFixed(0)}% gap)</div>
         </div>
         <div className="card kpi" style={{borderLeft:'3px solid #c084fc'}}>
           <div className="label">Attribution window</div>
@@ -6125,7 +6125,7 @@ function EmailAttributionPanel(){
       <div className="row">
         <div className="card" style={{flex:'1 1 380px'}}>
           <h2>Per-flow attributed revenue (90d)</h2>
-          <table><thead><tr><th>Flow</th><th>Orders</th><th>Revenue</th><th>Active days</th><th>{curSym()}/active day</th></tr></thead><tbody>
+          <table><thead><tr><th>Flow</th><th>Orders</th><th>Revenue</th><th>Active days</th><th>{`${curSym()}/active day`}</th></tr></thead><tbody>
           {flows.map((f,i)=>(<tr key={i}>
             <td style={{fontSize:12}}>{f.flow}</td>
             <td>{f.orders}</td>
@@ -6147,7 +6147,7 @@ function EmailAttributionPanel(){
           <div className="muted" style={{fontSize:11, marginTop:6}}>Showing top {Math.min(15, campaigns30.length)} of {campaigns30.length} attributed campaigns.</div>
         </div>
       </div>
-      {DEMO && <div className="note" style={{marginTop:14}}><b>Atlas read:</b>for frkl, the gross-vs-attributed flow gap is ~{curSym()}{Math.abs(gap)}({(gapPct*100).toFixed(0)}%) — Klaviyo's flow tracking is precise. So the {curSym()}28k flow revenue claim that drives the "flows = 19× lift over campaigns" finding holds up. The Welcome Flow alone attributes {curSym()}{NUM(flows[0]?.orderValue)}from {flows[0]?.orders}orders over 90d — the highest-leverage owned-audience surface frkl has.</div>}
+      {DEMO && <div className="note" style={{marginTop:14}}><b>Atlas read:</b>{` for frkl, the gross-vs-attributed flow gap is ~${curSym()}`}{Math.abs(gap)} ({(gapPct*100).toFixed(0)}{`%) — Klaviyo's flow tracking is precise. So the ${curSym()}28k flow revenue claim that drives the "flows = 19× lift over campaigns" finding holds up. The Welcome Flow alone attributes ${curSym()}`}{NUM(flows[0]?.orderValue)} from {flows[0]?.orders} orders over 90d — the highest-leverage owned-audience surface frkl has.</div>}
     </div>
   );
 }
@@ -6258,7 +6258,7 @@ function EmailHealthPanel(){
             </div>
             <div style={{padding:10,background:'var(--bg-app)',borderLeft:'3px solid #c084fc',borderRadius:'0 6px 6px 0'}}>
               <div style={{fontWeight:600,marginBottom:3}}>Top opportunity: win-back flow</div>
-              <div className="muted">~35% of orders are returning customers, but there's no flow nurturing the lapsed segment. Building a win-back (trigger at 60-90d since purchase) likely adds {curSym()}200-500/mo at current scale. Best-practice format: nostalgia trigger → product reminder → discount escalation.</div>
+              <div className="muted">{`~35% of orders are returning customers, but there's no flow nurturing the lapsed segment. Building a win-back (trigger at 60-90d since purchase) likely adds ${curSym()}200-500/mo at current scale. Best-practice format: nostalgia trigger → product reminder → discount escalation.`}</div>
             </div>
           </div>
         </div>
@@ -6334,7 +6334,7 @@ function EmailHub(){
         <div className="card" style={{flex:'2 1 480px'}}>
           <h2>Top flows by revenue per recipient</h2>
           <div className="muted" style={{marginBottom:8,fontSize:12}}>The signal: which automated touchpoints justify investment in deeper personalisation.</div>
-          <table><thead><tr><th>Flow</th><th>Recip</th><th>Open</th><th>Click</th><th>Orders</th><th>Revenue</th><th>{curSym()}/recip</th></tr></thead><tbody>
+          <table><thead><tr><th>Flow</th><th>Recip</th><th>Open</th><th>Click</th><th>Orders</th><th>Revenue</th><th>{`${curSym()}/recip`}</th></tr></thead><tbody>
           {flowSorted.map((f,i)=>(<tr key={i}>
             <td style={{fontSize:12}}>{f.name}</td>
             <td>{NUM(f.recipients)}</td>
@@ -6342,7 +6342,7 @@ function EmailHub(){
             <td>{PCT(f.clickRate)}</td>
             <td>{f.orders}</td>
             <td>{GBP(f.orderValue)}</td>
-            <td><b style={{color:f.revPerRecip>3?'#4ade80':f.revPerRecip>1?'#fbbf24':'#7b7b87'}}>{curSym()}{(f.revPerRecip||0).toFixed(2)}</b></td>
+            <td><b style={{color:f.revPerRecip>3?'#4ade80':f.revPerRecip>1?'#fbbf24':'#7b7b87'}}>{`${curSym()}`}{(f.revPerRecip||0).toFixed(2)}</b></td>
           </tr>))}
           </tbody></table>
         </div>
@@ -6350,11 +6350,11 @@ function EmailHub(){
           <h2>Quick wins</h2>
           <div style={{display:'flex',flexDirection:'column',gap:10,fontSize:12.5}}>
             <div style={{padding:10,background:'var(--bg-app)',borderLeft:'3px solid #4ade80',borderRadius:'0 6px 6px 0'}}>
-              <div style={{fontWeight:600,marginBottom:3}}>Back-in-Stock at {curSym()}8.16/recipient</div>
+              <div style={{fontWeight:600,marginBottom:3}}>{`Back-in-Stock at ${curSym()}8.16/recipient`}</div>
               <div className="muted">Best-performing flow. Audit which products trigger it — expand to more SKUs.</div>
             </div>
             <div style={{padding:10,background:'var(--bg-app)',borderLeft:'3px solid #4ade80',borderRadius:'0 6px 6px 0'}}>
-              <div style={{fontWeight:600,marginBottom:3}}>NECKLACES Welcome at {curSym()}6.65/recipient</div>
+              <div style={{fontWeight:600,marginBottom:3}}>{`NECKLACES Welcome at ${curSym()}6.65/recipient`}</div>
               <div className="muted">Per-category welcome flows crushing — replicate for new categories.</div>
             </div>
             <div style={{padding:10,background:'var(--bg-app)',borderLeft:'3px solid #fbbf24',borderRadius:'0 6px 6px 0'}}>
@@ -6388,7 +6388,7 @@ function EmailHub(){
       </div>
       <div className="card" style={{marginTop:14}}>
         <h2>All campaigns — sorted by recent</h2>
-        <table><thead><tr><th>Date</th><th>Name</th><th>Subject</th><th>Recip</th><th>Open</th><th>Click</th><th>Orders</th><th>Revenue</th><th>{curSym()}/recip</th></tr></thead><tbody>
+        <table><thead><tr><th>Date</th><th>Name</th><th>Subject</th><th>Recip</th><th>Open</th><th>Click</th><th>Orders</th><th>Revenue</th><th>{`${curSym()}/recip`}</th></tr></thead><tbody>
         {campByDate.slice(0,30).map((c,i)=>(<tr key={i}>
           <td style={{whiteSpace:'nowrap'}}>{c.sendDate}</td>
           <td style={{fontSize:11}}>{c.name}</td>
@@ -6398,7 +6398,7 @@ function EmailHub(){
           <td>{PCT(c.clickRate)}</td>
           <td>{c.orders}</td>
           <td>{GBP(c.orderValue)}</td>
-          <td><span style={{color:c.revPerRecip>0.2?'#4ade80':c.revPerRecip>0.05?'#e8e8ec':'#7b7b87'}}>{curSym()}{(c.revPerRecip||0).toFixed(2)}</span></td>
+          <td><span style={{color:c.revPerRecip>0.2?'#4ade80':c.revPerRecip>0.05?'#e8e8ec':'#7b7b87'}}>{`${curSym()}`}{(c.revPerRecip||0).toFixed(2)}</span></td>
         </tr>))}
         </tbody></table>
         <div className="muted" style={{fontSize:11,marginTop:8}}>Showing 30 most recent of {camps.length} campaigns.</div>
@@ -6617,7 +6617,7 @@ function InstagramPanel(){
         })}
         </div>
       </div>
-      {DEMO && <div className="note" style={{marginTop:14}}><b>Audience confirmation:</b>the IG follower base independently confirms the Meta Ads finding — frkl is genuinely a <b>35–54 female brand</b>(35–44 ≈ 44%, 45–54 ≈ 31%), with 25–34 a meaningful secondary (~15%). 18–24 is essentially absent (1.4%). The <b>ADHD reel</b>(79k views) is the breakout outlier — non-jewellery content with high relatable hook; worth studying. The <b>#myfrkl UGC mechanic</b>({curSym()}250 monthly) is generating reliable engagement on community posts.</div>}
+      {DEMO && <div className="note" style={{marginTop:14}}><b>Audience confirmation:</b> the IG follower base independently confirms the Meta Ads finding — frkl is genuinely a <b>35–54 female brand</b> (35–44 ≈ 44%, 45–54 ≈ 31%), with 25–34 a meaningful secondary (~15%). 18–24 is essentially absent (1.4%). The <b>ADHD reel</b> (79k views) is the breakout outlier — non-jewellery content with high relatable hook; worth studying. The <b>#myfrkl UGC mechanic</b>{` (${curSym()}250 monthly) is generating reliable engagement on community posts.`}</div>}
     </div>
   );
 }
@@ -6949,7 +6949,7 @@ function IntelligencePanel(){
                   </div>
                   <div style={{display:'flex', flexWrap:'wrap', gap:12, marginTop:5, fontSize:10.5, color:'var(--text-faint)', alignItems:'baseline'}}>
                     <span title="Owner">{a.owner || '—'}</span>
-                    {a.gbp ? <span style={{color:kc, fontWeight:600}} title="Expected monthly impact">~{curSym()}{Math.round(Math.abs(a.gbp)).toLocaleString()}/mo</span> : null}
+                    {a.gbp ? <span style={{color:kc, fontWeight:600}} title="Expected monthly impact">{`~${curSym()}`}{Math.round(Math.abs(a.gbp)).toLocaleString()}/mo</span> : null}
                     {a.successMetric && <span title="Success metric">✓ {a.successMetric}</span>}
                     {a.byWhen && <span title="Review by">⏱ {a.byWhen}</span>}
                     <span title="P(hit) confidence · sample size">{a.confidence} (n={a.sample_size})</span>
@@ -7129,15 +7129,16 @@ function ForecastPanel(){
         </div>
         <div className="meta" style={{marginTop:'var(--s-5)', fontSize:11}}>
           Historical reference (last 30 days):
-          Meta <b style={{color:'var(--text-secondary)'}}>{curSym()}{historicalMetaSpend30d ?? '—'}/day</b> @ <b style={{color:'var(--text-secondary)'}}>{historicalMetaRoas != null ? historicalMetaRoas.toFixed(2) + '×' : '—'}</b> ·
-          Google <b style={{color:'var(--text-secondary)'}}>{curSym()}{historicalGoogleSpend30d ?? '—'}/day</b> @ <b style={{color:'var(--text-secondary)'}}>{historicalGoogleRoas != null ? historicalGoogleRoas.toFixed(2) + '×' : '—'}</b>
+          Meta <b style={{color:'var(--text-secondary)'}}>{`${curSym()}`}{historicalMetaSpend30d ?? '—'}/day</b> @ <b style={{color:'var(--text-secondary)'}}>{historicalMetaRoas != null ? historicalMetaRoas.toFixed(2) + '×' : '—'}</b> ·
+          Google <b style={{color:'var(--text-secondary)'}}>{`${curSym()}`}{historicalGoogleSpend30d ?? '—'}/day</b> @ <b style={{color:'var(--text-secondary)'}}>{historicalGoogleRoas != null ? historicalGoogleRoas.toFixed(2) + '×' : '—'}</b>
         </div>
       </div>)}
       {/* Input form */}
       <div className="card">
         <div className="card-section-title">
           <h2 style={{margin:0}}>Planning inputs</h2>
-          <span className="meta">Reference: Meta {curSym()}{historicalMetaSpend30d ?? '—'}/d @ {historicalMetaRoas != null ? historicalMetaRoas.toFixed(2) + '×' : '—'}· Google {curSym()}{historicalGoogleSpend30d ?? '—'}/d @ {historicalGoogleRoas != null ? historicalGoogleRoas.toFixed(2) + '×' : '—'}
+          <span className="meta">{`
+          Reference: Meta ${curSym()}`}{historicalMetaSpend30d ?? '—'}/d @ {historicalMetaRoas != null ? historicalMetaRoas.toFixed(2) + '×' : '—'}{` · Google ${curSym()}`}{historicalGoogleSpend30d ?? '—'}/d @ {historicalGoogleRoas != null ? historicalGoogleRoas.toFixed(2) + '×' : '—'}
           </span>
         </div>
         <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:'var(--s-3)'}}>
@@ -7180,10 +7181,10 @@ function ForecastPanel(){
         <table>
           <thead><tr><th>Channel</th><th className="tl">Inputs</th><th>Forecast revenue</th></tr></thead>
           <tbody>
-            <tr><td><b>Meta</b></td><td className="meta tl" style={{fontSize:11}}>{curSym()}{inputs.metaSpend}/day × {inputs.metaRoas}× × {horizon}d</td><td><b>{curSym()}{Math.round(calc.metaRevenue).toLocaleString()}</b></td></tr>
-            <tr><td><b>Google</b></td><td className="meta tl" style={{fontSize:11}}>{curSym()}{inputs.googleSpend}/day × {inputs.googleRoas}× × {horizon}d</td><td><b>{curSym()}{Math.round(calc.googleRevenue).toLocaleString()}</b></td></tr>
-            {calc.emailRevenue > 0 && <tr><td><b>Email</b></td><td className="meta tl" style={{fontSize:11}}>{curSym()}{inputs.emailUplift}/day × {horizon}d (no extrapolation)</td><td><b>{curSym()}{Math.round(calc.emailRevenue).toLocaleString()}</b></td></tr>}
-            <tr style={{background:'var(--bg-card-hover)', fontWeight:600}}><td>Total (paid + supplied email)</td><td></td><td><b style={{color:'var(--good)'}}>{curSym()}{Math.round(calc.total).toLocaleString()}</b></td></tr>
+            <tr><td><b>Meta</b></td><td className="meta tl" style={{fontSize:11}}>{`${curSym()}`}{inputs.metaSpend}/day × {inputs.metaRoas}× × {horizon}d</td><td><b>{`${curSym()}`}{Math.round(calc.metaRevenue).toLocaleString()}</b></td></tr>
+            <tr><td><b>Google</b></td><td className="meta tl" style={{fontSize:11}}>{`${curSym()}`}{inputs.googleSpend}/day × {inputs.googleRoas}× × {horizon}d</td><td><b>{`${curSym()}`}{Math.round(calc.googleRevenue).toLocaleString()}</b></td></tr>
+            {calc.emailRevenue > 0 && <tr><td><b>Email</b></td><td className="meta tl" style={{fontSize:11}}>{`${curSym()}`}{inputs.emailUplift}/day × {horizon}d (no extrapolation)</td><td><b>{`${curSym()}`}{Math.round(calc.emailRevenue).toLocaleString()}</b></td></tr>}
+            <tr style={{background:'var(--bg-card-hover)', fontWeight:600}}><td>Total (paid + supplied email)</td><td></td><td><b style={{color:'var(--good)'}}>{`${curSym()}`}{Math.round(calc.total).toLocaleString()}</b></td></tr>
           </tbody>
         </table>
         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'var(--s-3)', marginTop:'var(--s-4)'}}>
@@ -7613,8 +7614,9 @@ function BrandAgeBanner(){
   return (
     <div className="status-banner" style={{background: bgVar, borderColor: colorVar + '40', marginBottom: 'var(--s-3)'}}>
       <span className="status-banner-tag" style={{color: colorVar}}>⚠ Thin data · {days}d</span>
-      <span className="status-banner-body">Fewer than 60 days of trading history. Trends, diffs and {curSym()}quantifications are <b>directional only</b>. Forecasts not meaningful at this scale.
-            </span>
+      <span className="status-banner-body">{`
+      Fewer than 60 days of trading history. Trends, diffs and ${curSym()} quantifications are `}<b>directional only</b>. Forecasts not meaningful at this scale.
+      </span>
     </div>
   );
 }
@@ -8008,7 +8010,7 @@ function WeeklyBoard(){
                 ); })}
             </div>}
             {(r.blindspots||[]).length>0 && <div className="micro" style={{color:'var(--text-faint)', marginTop:10}}>Blind spots: {r.blindspots.join(' · ')}</div>}
-            <div className="micro" style={{color:'var(--text-faint)', marginTop:8, fontStyle:'italic'}}>AI-written from your data; {curSym()}figures grounded against the dataset. The rule-based read below is the deterministic baseline.</div>
+            <div className="micro" style={{color:'var(--text-faint)', marginTop:8, fontStyle:'italic'}}>{`AI-written from your data; ${curSym()} figures grounded against the dataset. The rule-based read below is the deterministic baseline.`}</div>
           </div>
         );
       })()}
@@ -8201,7 +8203,7 @@ function CohortsPanel(){
       </div>
       <div className="row">
         <div className="card" style={{flex:'2 1 480px'}}>
-          <div className="card-section-title"><h2 style={{margin:0}}>Lifetime value curve</h2><span className="meta">cumulative {curSym()}per customer by months since first order</span></div>
+          <div className="card-section-title"><h2 style={{margin:0}}>Lifetime value curve</h2><span className="meta">{`cumulative ${curSym()} per customer by months since first order`}</span></div>
           <R.ResponsiveContainer width="100%" height={292}>
             <R.ComposedChart data={curve} margin={{top:8,right:18,left:6,bottom:6}}>
               <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
@@ -8246,7 +8248,7 @@ function CohortsPanel(){
       <div className="row" style={{marginTop:14}}>
         <div className="card" style={{flex:'1 1 380px'}}>
           <h2 style={{marginTop:0}}>Discounted vs full-price acquisition</h2>
-          <table><thead><tr><th>First order</th><th>Customers</th><th>Repeat</th><th>Orders/cust</th><th>Lifetime {curSym()}/cust</th></tr></thead><tbody>
+          <table><thead><tr><th>First order</th><th>Customers</th><th>Repeat</th><th>Orders/cust</th><th>{`Lifetime ${curSym()}/cust`}</th></tr></thead><tbody>
             {(C.byAcqType||[]).map((a,i)=>(<tr key={i}>
               <td>{a.type}</td><td>{NUM(a.newCustomers)}</td><td>{PCT(a.repeatRate)}</td><td>{a.ordersPerCust}</td><td>{GBP(a.lifetimeRevPerCust)}</td>
             </tr>))}
@@ -8259,7 +8261,7 @@ function CohortsPanel(){
         </div>
         <div className="card" style={{flex:'1 1 380px'}}>
           <h2 style={{marginTop:0}}>Which products acquire customers that come back</h2>
-          <table><thead><tr><th>Acquisition product</th><th>New custs</th><th>Repeat</th><th>Lifetime {curSym()}/cust</th></tr></thead><tbody>
+          <table><thead><tr><th>Acquisition product</th><th>New custs</th><th>Repeat</th><th>{`Lifetime ${curSym()}/cust`}</th></tr></thead><tbody>
             {(C.byProduct||[]).map((p,i)=>{ const hot=p.repeatRate>=(C.repeatRate*1.3); const cold=p.repeatRate<=(C.repeatRate*0.5);
               return (<tr key={i}>
                 <td style={{maxWidth:200}}>{p.name}</td><td>{NUM(p.newCustomers)}</td>
@@ -8295,8 +8297,9 @@ function AdviceLedgerPanel(){
         <h2 style={{margin:0}}>Track record — advice acted on</h2>
         <span className="meta">{done.length} actioned · {openN} open</span>
       </div>
-      <div className="micro" style={{color:'var(--text-secondary)', marginBottom:10, lineHeight:1.5}}>Closing the loop: the recommendations you've marked done and what then moved on the metrics each one watches. (Impact is measured per watched metric; {curSym()}-tagged impact lands once findings carry a {curSym()}value.)
-            </div>
+      <div className="micro" style={{color:'var(--text-secondary)', marginBottom:10, lineHeight:1.5}}>{`
+      Closing the loop: the recommendations you've marked done and what then moved on the metrics each one watches. (Impact is measured per watched metric; ${curSym()}-tagged impact lands once findings carry a ${curSym()} value.)
+    `}</div>
       {(()=>{
         // Only entries with a real recommendation are a "story". Without text there's
         // nothing to show — drop them rather than render an empty row.
@@ -8838,7 +8841,7 @@ function ActionsView(){
     <div>
       <div className="card-section-title" style={{marginBottom:12}}>
         <h2 style={{margin:0}}>Actions</h2>
-        <span className="meta">Everything worth doing, ranked by {curSym()}impact — work the queue, mark items done as you go</span>
+        <span className="meta">{`Everything worth doing, ranked by ${curSym()} impact — work the queue, mark items done as you go`}</span>
       </div>
       <RestockActionQueue/>
       <ActionBoard/>
@@ -9092,7 +9095,7 @@ function BusinessReview(){
       {x.basis && <div style={{fontSize:11,color:'var(--text-faint)',marginTop:2,lineHeight:1.4}}>{x.basis}</div>}
     </div>
     <div style={{textAlign:'right',flexShrink:0}}>
-      <div style={{fontWeight:700,fontSize:13.5,color:accent,whiteSpace:'nowrap'}}>~{curSym()}{k(Math.abs(x.monthly_impact_gbp))}/mo</div>
+      <div style={{fontWeight:700,fontSize:13.5,color:accent,whiteSpace:'nowrap'}}>{`~${curSym()}`}{k(Math.abs(x.monthly_impact_gbp))}/mo</div>
       <div style={{marginTop:4}}>{confChip(confTier(x.confidence))}</div>
     </div>
   </div>);
@@ -9143,8 +9146,8 @@ function BusinessReview(){
       {cashOpen && (<div className="card" style={{marginTop:10, borderLeft:'3px solid var(--accent)'}}>
         <div style={{fontSize:13,fontWeight:700,color:'var(--text-primary)',marginBottom:9}}>Cash position</div>
         <div style={{display:'flex',gap:18,flexWrap:'wrap',alignItems:'flex-end'}}>
-          <label style={lbl}>Cash on hand ({curSym()})<input type="number" value={cashDraft} onChange={e=>setCashDraft(e.target.value)} placeholder="e.g. 80000" style={inp}/></label>
-          <label style={lbl}>Monthly overheads ({curSym()})<input type="number" value={ovDraft} onChange={e=>setOvDraft(e.target.value)} placeholder="e.g. 12000" style={inp}/></label>
+          <label style={lbl}>{`Cash on hand (${curSym()})`}<input type="number" value={cashDraft} onChange={e=>setCashDraft(e.target.value)} placeholder="e.g. 80000" style={inp}/></label>
+          <label style={lbl}>{`Monthly overheads (${curSym()})`}<input type="number" value={ovDraft} onChange={e=>setOvDraft(e.target.value)} placeholder="e.g. 12000" style={inp}/></label>
           <button style={btn} onClick={saveCash}>Save</button>
           <button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setCashOpen(false)}>Cancel</button>
         </div>
@@ -9156,14 +9159,14 @@ function BusinessReview(){
         <div className="card" style={{flex:'1 1 340px', minWidth:0, borderTop:'3px solid var(--bad)'}}>
           <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:8,marginBottom:4}}>
             <span style={{fontSize:14,fontWeight:700,color:'var(--text-primary)'}}>Risk register</span>
-            <span style={{fontSize:12,fontWeight:700,color:'var(--bad)',whiteSpace:'nowrap'}}>{curSym()}{k(atRisk)}/mo exposed</span>
+            <span style={{fontSize:12,fontWeight:700,color:'var(--bad)',whiteSpace:'nowrap'}}>{`${curSym()}`}{k(atRisk)}/mo exposed</span>
           </div>
           {risks.length ? risks.slice(0,6).map(regRow('var(--bad)')) : <div className="muted" style={{fontSize:12.5,padding:'8px 0'}}>No material risks flagged — leakage and at-risk revenue are within normal range.</div>}
         </div>
         <div className="card" style={{flex:'1 1 340px', minWidth:0, borderTop:'3px solid var(--good)'}}>
           <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:8,marginBottom:4}}>
             <span style={{fontSize:14,fontWeight:700,color:'var(--text-primary)'}}>Opportunity register</span>
-            <span style={{fontSize:12,fontWeight:700,color:'var(--good)',whiteSpace:'nowrap'}}>{curSym()}{k(upside)}/mo identified</span>
+            <span style={{fontSize:12,fontWeight:700,color:'var(--good)',whiteSpace:'nowrap'}}>{`${curSym()}`}{k(upside)}/mo identified</span>
           </div>
           {opps.length ? opps.slice(0,6).map(regRow('var(--good)')) : <div className="muted" style={{fontSize:12.5,padding:'8px 0'}}>No quantified upside flagged right now — check back as new signals land.</div>}
         </div>
@@ -9369,7 +9372,7 @@ function ProductionPlanner({embedded}={}){
               <input value={supSearch} onChange={e=>setSupSearch(e.target.value)} placeholder="Search any product to assign…" style={{...inp,width:240}}/>
             </div>
             <datalist id="oi-supplier-names">{supplierNamesInUse().map(n=><option key={n} value={n}/>)}</datalist>
-            <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:680}}><thead><tr><th style={th}>Product</th><th style={th}>Supplier / manufacturer</th><th style={th}>MOQ</th><th style={th}>Unit {curSym()} <span style={{fontWeight:400,textTransform:'none'}}>(blank = quote)</span></th><th style={th}>Lead (days)</th></tr></thead><tbody>
+            <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:680}}><thead><tr><th style={th}>Product</th><th style={th}>Supplier / manufacturer</th><th style={th}>MOQ</th><th style={th}>{`Unit ${curSym()} `}<span style={{fontWeight:400,textTransform:'none'}}>(blank = quote)</span></th><th style={th}>Lead (days)</th></tr></thead><tbody>
               {visible.map(p=>{ const key=skuKeyOf(p); const d=supDraft[key]||{supplier:'',moq:'',unitCost:'',lead:''}; const set=!!(d.supplier&&d.supplier.trim()); return (<tr key={key}>
                 <td style={{...td,color:'var(--text-primary)'}}>{set?'':<span style={{color:'var(--warn)',marginRight:4}}>●</span>}{p.title}<div style={{fontSize:10.5,color:'var(--text-faint)'}}>{p.sku||'no SKU'} · {p.type}</div></td>
                 <td style={td}><input list="oi-supplier-names" style={{...inp,width:190}} value={d.supplier} onChange={e=>setSup(key,'supplier',e.target.value)} placeholder="Pick or type a new supplier"/></td>
@@ -9380,7 +9383,7 @@ function ProductionPlanner({embedded}={}){
               {!visible.length && <tr><td colSpan={5} style={{...td,color:'var(--text-faint)'}}>{q?'No products match.':'Nothing to assign right now — search for a product above.'}</td></tr>}
             </tbody></table></div>
             <div style={{marginTop:10,display:'flex',gap:8}}><button style={btn} onClick={saveSuppliers}>Save supplier master</button><button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setSupOpen(false)}>Cancel</button></div>
-            <div style={{fontSize:11,color:'var(--text-faint)',marginTop:8}}>Per-SKU — set the supplier the first time you order a product; it sticks. Type a new name to add a supplier (manage full contact details on the <a className="txt-link" style={{cursor:'pointer'}} onClick={()=>window.__oiNav&&window.__oiNav('planning','suppliers')}>Suppliers tab</a>). Leave <b>Unit {curSym()}</b> blank to raise the PO for a quote and add the price later; lead defaults to the type's.</div>
+            <div style={{fontSize:11,color:'var(--text-faint)',marginTop:8}}>Per-SKU — set the supplier the first time you order a product; it sticks. Type a new name to add a supplier (manage full contact details on the <a className="txt-link" style={{cursor:'pointer'}} onClick={()=>window.__oiNav&&window.__oiNav('planning','suppliers')}>Suppliers tab</a>). Leave <b>{`Unit ${curSym()}`}</b> blank to raise the PO for a quote and add the price later; lead defaults to the type's.</div>
           </div>
         ); })()}
       {/* reorder policy editor */}
@@ -9409,7 +9412,7 @@ function ProductionPlanner({embedded}={}){
         <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:8}}>
           <div><span style={{fontSize:15,fontWeight:700,color:'var(--text-primary)'}}>{po.supplier}</span> <span className="muted" style={{fontSize:12}}>· {po.lines.length} line{po.lines.length===1?'':'s'} · {NUM(po.units)} units</span>{(po.email||po.notes) && <div style={{fontSize:11,color:'var(--text-faint)',marginTop:2}}>{po.email}{po.email&&po.notes?' · ':''}{po.notes}</div>}</div>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-            {po.hasCost ? <span style={{fontSize:15,fontWeight:800,color:'var(--text-primary)'}}>{curSym()}{po.total.toFixed(2)}</span>
+            {po.hasCost ? <span style={{fontSize:15,fontWeight:800,color:'var(--text-primary)'}}>{`${curSym()}`}{po.total.toFixed(2)}</span>
               : <span style={{fontSize:11.5,fontWeight:700,color:'var(--warn)',background:'var(--warn-bg)',padding:'2px 9px',borderRadius:999}}>Pricing pending{po.total>0?` · ${curSym()}${po.total.toFixed(0)} so far`:''}</span>}
             <button style={smbtn} onClick={()=>copyPO(po)}><Icon name="clipboard" size={12}/> Copy</button>
             <button style={smbtn} onClick={()=>download(po)}><Icon name="report" size={12}/> CSV</button>
@@ -9419,14 +9422,14 @@ function ProductionPlanner({embedded}={}){
         {po.hasCost && (()=>{ const fd=iso=>{ try{ return new Date((iso||'')+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'}); }catch(e){ return iso; } }; return (
           <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'center',fontSize:11.5,color:'var(--text-muted)',margin:'0 0 10px',padding:'7px 11px',borderRadius:8,background:'var(--bg-elevated)'}}>
             {po.hasDeposit
-              ? <span><b style={{color:'var(--text-primary)'}}>{curSym()}{k(po.deposit)} deposit now</b>{po.depPct!=null?` (${po.depPct}%)`:''} · <b style={{color:'var(--text-primary)'}}>{curSym()}{k(po.balance)}</b> on shipment</span>
-              : <span><b style={{color:'var(--text-primary)'}}>{curSym()}{k(po.total)}</b> due now</span>}
+              ? <span><b style={{color:'var(--text-primary)'}}>{`${curSym()}`}{k(po.deposit)} deposit now</b>{po.depPct!=null?` (${po.depPct}%)`:''} · <b style={{color:'var(--text-primary)'}}>{`${curSym()}`}{k(po.balance)}</b> on shipment</span>
+              : <span><b style={{color:'var(--text-primary)'}}>{`${curSym()}`}{k(po.total)}</b> due now</span>}
             <span style={{color:'var(--text-faint)'}}>Ships ~{fd(po.ships)}{po.hasDeposit?' · balance due then':''}</span>
             <span style={{color:'var(--text-faint)'}}>Lands ~{fd(po.lands)} ({po.leadTotalMax}d lead)</span>
           </div>
         ); })()}
         <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:560}}><thead><tr>
-          <th style={th}>Product</th><th style={{...th,textAlign:'right'}}>Stock</th><th style={{...th,textAlign:'right'}}>Cover</th><th style={{...th,textAlign:'right'}}>Order qty</th><th style={{...th,textAlign:'right'}}>Unit {curSym()}</th><th style={{...th,textAlign:'right'}}>Line {curSym()}</th>
+          <th style={th}>Product</th><th style={{...th,textAlign:'right'}}>Stock</th><th style={{...th,textAlign:'right'}}>Cover</th><th style={{...th,textAlign:'right'}}>Order qty</th><th style={{...th,textAlign:'right'}}>{`Unit ${curSym()}`}</th><th style={{...th,textAlign:'right'}}>{`Line ${curSym()}`}</th>
         </tr></thead><tbody>
           {po.lines.map((l,idx)=>(<tr key={idx}>
             <td style={{...td,color:'var(--text-primary)'}}>{l.p.title}{l.oosBeforeLead && <span style={{marginLeft:6,fontSize:9.5,fontWeight:800,letterSpacing:'.03em',color:'#fff',background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}<div style={{fontSize:10.5,color:'var(--text-faint)'}}>{l.p.sku||'no SKU'} · {l.p.type}{l.oosBeforeLead?` · OOS gap ${l.oosGap}d`:''}{l.basis==='forecast'?` · plan needs ${NUM(l.forecastUnits)}`:''}{l.basis==='wave'&&l.nextWaveBy?` · next wave by ${l.nextWaveBy}`:''}{l.moqBumped?' · MOQ '+l.moq:''}</div></td>
@@ -9620,7 +9623,7 @@ function DemandPlanner({embedded}={}){
               <div style={{fontSize:12,fontWeight:700,color:'var(--text-primary)',marginBottom:5}}>{m.label}</div>
               <input type="number" style={{...inp,width:'100%',boxSizing:'border-box'}} value={monthly[i]!=null?monthly[i]:''} onChange={e=>setMonth(i,e.target.value)} placeholder={(targetMode==='units'?'':curSym())+NUM(Math.round(baseMo))}/>
               <div style={{height:30,display:'flex',alignItems:'flex-end',marginTop:7}}><div style={{width:'100%',height:Math.max(3,Math.round(28*m.rev/maxMonthRev)),background:m.set?'var(--accent)':'var(--border-default)',borderRadius:'3px 3px 0 0'}}/></div>
-              <div style={{fontSize:10.5,color:'var(--text-faint)',marginTop:4}}>{NUM(Math.ceil(m.units))}u · {curSym()}{k(m.rev)}</div>
+              <div style={{fontSize:10.5,color:'var(--text-faint)',marginTop:4}}>{NUM(Math.ceil(m.units))}{` u · ${curSym()}`}{k(m.rev)}</div>
             </div>))}
           </div>
         </div>)}
@@ -9660,7 +9663,7 @@ function DemandPlanner({embedded}={}){
       <div className="card">
         <div style={{display:'flex',gap:24,flexWrap:'wrap',alignItems:'flex-end'}}>
           <div><div style={{fontSize:24,fontWeight:800,color:'var(--text-primary)'}}>{NUM(Math.ceil(totalUnits))}</div><div className="muted" style={{fontSize:11.5}}>units planned · {months}mo</div></div>
-          <div><div style={{fontSize:24,fontWeight:800,color:'var(--text-primary)'}}>{curSym()}{k(totalRev)}</div><div className="muted" style={{fontSize:11.5}}>projected revenue</div></div>
+          <div><div style={{fontSize:24,fontWeight:800,color:'var(--text-primary)'}}>{`${curSym()}`}{k(totalRev)}</div><div className="muted" style={{fontSize:11.5}}>projected revenue</div></div>
           <div><div style={{fontSize:24,fontWeight:800,color: impliedGrowth>=0?'var(--good)':'var(--bad)'}}>{impliedGrowth>=0?'+':''}{impliedGrowth.toFixed(0)}%</div><div className="muted" style={{fontSize:11.5}}>vs run-rate</div></div>
           <div><div style={{fontSize:24,fontWeight:800,color: stockouts?'var(--warn)':'var(--good)'}}>{stockouts}</div><div className="muted" style={{fontSize:11.5}}>will stock out</div></div>
           <div title="Products that run out before a reorder placed today could arrive, given production lead time"><div style={{fontSize:24,fontWeight:800,color: oosRisk?'var(--bad)':'var(--good)'}}>{oosRisk}</div><div className="muted" style={{fontSize:11.5}}>OOS before lead</div></div>
@@ -9717,7 +9720,7 @@ function DemandPlanner({embedded}={}){
           <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'flex-end',marginBottom:10}}>
             <label style={{display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',gap:4}}>Avg items per order<input type="number" style={{...inp,width:90}} value={packDraft.avgItemsPerOrder} onChange={e=>setPackDraft(d=>({...d,avgItemsPerOrder:e.target.value}))}/></label>
           </div>
-          <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:760}}><thead><tr><th style={th}>Component</th><th style={th}>Per item</th><th style={th}>Per order</th><th style={th}>On hand</th><th style={th}>Supplier</th><th style={th}>MOQ</th><th style={th}>{curSym()}/unit</th><th style={th}>Lead d</th><th style={th}></th></tr></thead><tbody>
+          <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:760}}><thead><tr><th style={th}>Component</th><th style={th}>Per item</th><th style={th}>Per order</th><th style={th}>On hand</th><th style={th}>Supplier</th><th style={th}>MOQ</th><th style={th}>{`${curSym()}/unit`}</th><th style={th}>Lead d</th><th style={th}></th></tr></thead><tbody>
             {packDraft.components.map((c,idx)=>(<tr key={idx}>
               <td style={td}><input style={{...inp,width:150}} value={c.name} onChange={e=>setComp(idx,'name',e.target.value)}/></td>
               <td style={td}><input type="number" step="0.1" style={{...inp,width:60}} value={c.perItem} onChange={e=>setComp(idx,'perItem',e.target.value)}/></td>
@@ -9838,9 +9841,9 @@ function CashFlowPlan({tranches, plan, months}){
       <div style={{fontSize:13,color:'var(--text-secondary)',marginBottom:12,lineHeight:1.5}}>{verdict}</div>
       {/* assumptions */}
       <div style={{display:'flex',gap:16,flexWrap:'wrap',marginBottom:14}}>
-        <label style={{display:'flex',flexDirection:'column',gap:4}}><span style={lab}>Cash on hand ({curSym()})</span><input type="number" value={cashD} onChange={e=>setCashD(e.target.value)} onBlur={commit} placeholder="e.g. 80000" style={inp}/></label>
-        <label style={{display:'flex',flexDirection:'column',gap:4}}><span style={lab}>Monthly overheads ({curSym()})</span><input type="number" value={ovD} onChange={e=>setOvD(e.target.value)} onBlur={commit} placeholder="e.g. 12000" style={inp}/></label>
-        <label style={{display:'flex',flexDirection:'column',gap:4}}><span style={lab}>Monthly ad spend ({curSym()})</span><input type="number" value={adD} onChange={e=>setAdD(e.target.value)} onBlur={commit} placeholder="e.g. 15000" style={inp}/></label>
+        <label style={{display:'flex',flexDirection:'column',gap:4}}><span style={lab}>{`Cash on hand (${curSym()})`}</span><input type="number" value={cashD} onChange={e=>setCashD(e.target.value)} onBlur={commit} placeholder="e.g. 80000" style={inp}/></label>
+        <label style={{display:'flex',flexDirection:'column',gap:4}}><span style={lab}>{`Monthly overheads (${curSym()})`}</span><input type="number" value={ovD} onChange={e=>setOvD(e.target.value)} onBlur={commit} placeholder="e.g. 12000" style={inp}/></label>
+        <label style={{display:'flex',flexDirection:'column',gap:4}}><span style={lab}>{`Monthly ad spend (${curSym()})`}</span><input type="number" value={adD} onChange={e=>setAdD(e.target.value)} onBlur={commit} placeholder="e.g. 15000" style={inp}/></label>
         <div style={{display:'flex',flexDirection:'column',gap:4}}><span style={lab}>Revenue in / mo</span><span style={{fontSize:15,fontWeight:700,color:'var(--good)'}}>{monthlyRev>0?k(monthlyRev):'—'}</span></div>
         <div style={{display:'flex',flexDirection:'column',gap:4}}><span style={lab}>Stock to pay (total)</span><span style={{fontSize:15,fontWeight:700,color:'var(--text-primary)'}}>{totalStock>0?k(totalStock):'—'}</span></div>
       </div>
@@ -9848,7 +9851,7 @@ function CashFlowPlan({tranches, plan, months}){
       <div style={{color:tone, width:'100%'}}>
         <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{display:'block',overflow:'visible'}} preserveAspectRatio="xMidYMid meet">
           {zeroIn && <line x1={padL} y1={Y(0)} x2={W-padR} y2={Y(0)} stroke="var(--bad)" strokeDasharray="4 4" strokeWidth="1" opacity="0.5"/>}
-          {zeroIn && <text x={padL-6} y={Y(0)+3} textAnchor="end" fontSize="9.5" fill="var(--text-faint)">{curSym()}0</text>}
+          {zeroIn && <text x={padL-6} y={Y(0)+3} textAnchor="end" fontSize="9.5" fill="var(--text-faint)">{`${curSym()}0`}</text>}
           <text x={padL-6} y={Y(hi-padv*0.5)+3} textAnchor="end" fontSize="9.5" fill="var(--text-faint)">{k(hi-padv*0.5)}</text>
           <path d={areaPath} fill="currentColor" opacity="0.08"/>
           <path d={linePath} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round"/>
@@ -10002,8 +10005,8 @@ function PlanningView(){
             </div>
             <div style={{fontSize:12.5,color:'var(--text-muted)',marginBottom:10,lineHeight:1.5}}>
               {hasDeposit
-                ? <>To start, pay a <b style={{color:'var(--text-primary)'}}>{curSym()}{k(depNow)} deposit now</b>, with <b style={{color:'var(--text-primary)'}}>{curSym()}{k(balLater)} balance on shipment</b> — <b>{curSym()}{k(orderTotal)}</b> committed in total.</>
-                : <><b style={{color:'var(--text-primary)'}}>{curSym()}{k(orderTotal)}</b> to commit now. Add a deposit % per supplier (Suppliers tab) to split this into deposit-now vs balance-on-shipment.</>}
+                ? <>To start, pay a <b style={{color:'var(--text-primary)'}}>{`${curSym()}`}{k(depNow)} deposit now</b>, with <b style={{color:'var(--text-primary)'}}>{`${curSym()}`}{k(balLater)} balance on shipment</b> — <b>{`${curSym()}`}{k(orderTotal)}</b> committed in total.</>
+                : <><b style={{color:'var(--text-primary)'}}>{`${curSym()}`}{k(orderTotal)}</b> to commit now. Add a deposit % per supplier (Suppliers tab) to split this into deposit-now vs balance-on-shipment.</>}
               {rc.strategy==='staged' && <> Each wave must be <b>ordered</b> early enough to <b>land</b> before the previous runs out.</>}
             </div>
             {rc.strategy==='staged' && wavesN>1 && <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:12}}>
@@ -10725,8 +10728,9 @@ function MarginNudge(){
       }}>
       <div style={{flex:1, minWidth:0}}>
         <div style={{fontSize:13.5, fontWeight:650, marginBottom:2}}>Your numbers are switched off</div>
-        <div className="meta" style={{fontSize:12, lineHeight:1.5}}>Confirm your gross margin — the one figure we can’t read from Shopify — and the engine starts valuing every recommendation in {curSym()}.
-                </div>
+        <div className="meta" style={{fontSize:12, lineHeight:1.5}}>{`
+        Confirm your gross margin — the one figure we can’t read from Shopify — and the engine starts valuing every recommendation in ${curSym()}.
+      `}</div>
       </div>
       <button className="btn-primary" onClick={()=>window.__oiNav&&window.__oiNav('settings','economics')}
         style={{flexShrink:0, padding:'8px 14px', fontSize:12.5, border:0, borderRadius:'var(--r-md)', cursor:'pointer', fontFamily:'inherit', fontWeight:600}}>
@@ -10951,7 +10955,7 @@ function App(){
             </div>
             <div>
               <div className="brand-name">greta</div>
-              <div className="brand-sub">Every part of your business, every week, with a {curSym()}tag.</div>
+              <div className="brand-sub">{`Every part of your business, every week, with a ${curSym()} tag.`}</div>
             </div>
           </div>
           <div style={{width:1, height:24, background:'var(--border-subtle)', margin:'0 var(--s-2)'}}/>
