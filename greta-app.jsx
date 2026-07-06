@@ -3251,8 +3251,8 @@ function Overview({start, period, customActive}){
       </div>
       <div className="row">
         <KPI label="Paid ad spend" val={GBP(paid)} sub={`Meta ${GBP(sum(meta,'cost'))} · Google ${GBP(sum(gads,'cost'))}`} series={seriesPaid} current={paid} prior={pPaid}
-          agent="Pulse" observation="Up ~46% on prior period as Meta scaled from ~£100 to ~£170/day from 13 April."
-          implication="Don't push further until Ireland frequency drops below 8× and the cart-checkout JS error is fixed." />
+          agent="Pulse" observation={OI_BRAND.slug==='frkl' ? "Up ~46% on prior period as Meta scaled from ~£100 to ~£170/day from 13 April." : undefined}
+          implication={OI_BRAND.slug==='frkl' ? "Don't push further until Ireland frequency drops below 8× and the cart-checkout JS error is fixed." : undefined} />
         <KPI label="Shopify net revenue" val={GBP(rev)} sub={`${NUM(orders)} orders · AOV ${GBP(orders?rev/orders:null)}`} series={seriesRev} current={rev} prior={pRev} goodDirection="up"
           agent="Atlas" observation={`Draft/exchange orders are excluded. ~${discLoad!=null?Math.round(discLoad*100):10}% of DTC gross sales went out as code/automatic discounts, with sale-price markdowns on top — see Promotions for the full load.`}
           implication="Confirm a real COGS% so this becomes a defensible contribution number for the raise." />
@@ -4407,8 +4407,8 @@ function Customers(){
         agent="Sage" observation="~26 new subs/day with <5 unsubs — acquisition is filling the funnel cleanly."
         implication="The list is healthy; the gap is monetisation — abandoned-cart + welcome series are the levers, not more sign-ups." />
       <KPI label="Markets" val={geo.length+'+'} sub={`UK ${PCT(geo[0]?.netSales/geo.reduce((a,b)=>a+b.netSales,0))} · IE ${PCT((geo[1]?.netSales||0)/geo.reduce((a,b)=>a+b.netSales,0))}`}
-        agent="Scout" observation="UK 66% / Ireland 30% — Ireland is genuinely a second home market, and AOV is £6 higher there."
-        implication="An IE-specific creative + landing test could capitalise on the higher-AOV behaviour you're already seeing." />
+        agent="Scout" observation={OI_BRAND.slug==='frkl' ? "UK 66% / Ireland 30% — Ireland is genuinely a second home market, and AOV is £6 higher there." : undefined}
+        implication={OI_BRAND.slug==='frkl' ? "An IE-specific creative + landing test could capitalise on the higher-AOV behaviour you're already seeing." : undefined} />
     </div>
     <div className="card" style={{marginBottom:14}}>
       <h2>New vs returning orders — weekly</h2>
@@ -4452,7 +4452,7 @@ function Customers(){
         </R.ResponsiveContainer>
       </div>
     </div>
-    <div className="note" style={{marginTop:14}}>The big spike of returning customers <b>late April</b> (Apr 22–28) is the cohort responding to Meta re-scaling on Apr 13 — and the email flow firing on that traffic. Ireland's AOV (£71) is meaningfully higher than the UK's (£65). The list is net-positive every single day — Klaviyo has product-market fit for acquisition; the gap is monetisation of the list with proper attributed reporting.</div>
+    {OI_BRAND.slug==='frkl' && <div className="note" style={{marginTop:14}}>The big spike of returning customers <b>late April</b> (Apr 22–28) is the cohort responding to Meta re-scaling on Apr 13 — and the email flow firing on that traffic. Ireland's AOV (£71) is meaningfully higher than the UK's (£65). The list is net-positive every single day — Klaviyo has product-market fit for acquisition; the gap is monetisation of the list with proper attributed reporting.</div>}
   </div>);
 }
 
@@ -11009,7 +11009,7 @@ function App(){
         <span>greta</span>
       </div>
       <span className="app-footer-dot"/>
-      <span title={D.meta.source}>frkl workspace · {(D.meta.source||'').split('—')[0].trim()||'Live data'}</span>
+      <span title={D.meta.source}>{(OI_BRAND.name||'frkl')} workspace · {(D.meta.source||'').split('—')[0].trim()||'Live data'}</span>
       <span className="app-footer-dot"/>
       <span>data updated {D.meta.captured}</span>
       <div style={{flex:1}}/>
