@@ -60,6 +60,11 @@
   // so each panel falls to its own empty state instead of showing frkl's data. frkl itself
   // returns early here, so its curated dashboard is completely unaffected. Remove entries as
   // live per-brand sources come online. See [[cache-bust-regex-hazard]] for why we edit plainly.
+  // Empty every own key of an object in place, preserving shape (array->[], object->{}), leaving
+  // primitives untouched. Used to strip static frkl snapshots the loader doesn't repopulate live.
+  function emptyAllKeys(o){ for (var k in o){ if(!Object.prototype.hasOwnProperty.call(o,k)) continue;
+    var v=o[k]; if(Array.isArray(v)) o[k]=[]; else if(v&&typeof v==='object') o[k]={}; } }
+
   function neutraliseStaticOnlyForNonFrkl() {
     if (BRAND_SLUG === 'frkl') return;
     // (A) Render-time globals — components read window.FRKL_* fresh each render, so nulling makes
@@ -80,13 +85,19 @@
     // (FRKL_BUSINESS -> const B @L4377 used by InventoryPanel/EmailAttributionPanel; FRKL_INSIGHTS
     // -> const INS @L608 used by the specialist-actions aggregator). Reassigning window.X would not
     // reach those consts, so we MUTATE the existing objects in place.
+    // FRKL_BUSINESS is a 100% static frkl snapshot — no key has a live per-brand source — so empty
+    // EVERY key so nothing (products, bundles, tiers, collections, discountCodes, email*, igPosts,
+    // competitors, geo, returning, retention...) leaks frkl data. Mutated in place: module const
+    // B @L4377 holds this same reference.
     var BUS = window.FRKL_BUSINESS;
-    if (BUS && typeof BUS === 'object') {
-      BUS.inventory = []; BUS.inventorySummary = {};
-      BUS.emailAttribution = null; BUS.attributedFlows = []; BUS.attributedCampaigns_30d = [];
-      BUS.affiliates = []; BUS.discountSummary = {};
-      BUS.products = []; BUS.productSummary = {};
-    }
+    if (BUS && typeof BUS === 'object') { emptyAllKeys(BUS); }
+    // FRKL_DATA: the live fetch below repopulates the channel keys (shopify/metaDaily/googleAds/ga4/
+    // klaviyo); every OTHER key is a static frkl extra (creatives, demoAgeGender/Placement, the
+    // shopify* channel breakdowns). Empty them all now — the 5 live keys are overwritten moments
+    // later. Reset meta to a neutral label so the footer never renders frkl's snapshot source.
+    var DATA = window.FRKL_DATA;
+    if (DATA && typeof DATA === 'object') { emptyAllKeys(DATA); DATA.meta = { source: 'Live data', captured: '' }; }
+    if (window.FRKL_PRODUCTS_META && typeof window.FRKL_PRODUCTS_META === 'object') window.FRKL_PRODUCTS_META = {};
     var INSIGHTS = window.FRKL_INSIGHTS;
     if (INSIGHTS && typeof INSIGHTS === 'object') {
       Object.keys(INSIGHTS).forEach(function (k) { delete INSIGHTS[k]; });
