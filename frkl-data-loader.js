@@ -62,14 +62,37 @@
   // live per-brand sources come online. See [[cache-bust-regex-hazard]] for why we edit plainly.
   function neutraliseStaticOnlyForNonFrkl() {
     if (BRAND_SLUG === 'frkl') return;
-    window.FRKL_COHORTS = null;          // Cohorts + ProductRetentionMatrix
-    window.FRKL_RETENTION = null;        // Retention worklist
-    window.FRKL_CREATIVE_VISION = null;  // Creative vision analysis
-    window.FRKL_CREATORS = null;         // Creator candidate discovery
-    if (window.FRKL_BUSINESS && typeof window.FRKL_BUSINESS === 'object') {
-      // Empty only the inventory subtrees; leave the rest of FRKL_BUSINESS for later phases.
-      window.FRKL_BUSINESS = Object.assign({}, window.FRKL_BUSINESS, { inventory: [], inventorySummary: {} });
+    // (A) Render-time globals — components read window.FRKL_* fresh each render, so nulling makes
+    // each panel fall to its own verified empty state (Cohorts/Retention/Creative/Creators/Clarity/
+    // CVR/Discounts/Board/Products/DX/Events).
+    window.FRKL_COHORTS = null;
+    window.FRKL_RETENTION = null;
+    window.FRKL_CREATIVE_VISION = null;
+    window.FRKL_CREATORS = null;
+    window.FRKL_CLARITY = null;
+    window.FRKL_CVR = null;
+    window.FRKL_DISCOUNT_CODES = null;
+    window.FRKL_BOARD_READ = null;
+    window.FRKL_PRODUCTS = null;
+    window.FRKL_DX_ANALYST = null;
+    window.FRKL_EVENTS = null;
+    // (B) Module-captured objects — frkl-app.jsx binds these into TOP-LEVEL consts at bundle-eval
+    // (FRKL_BUSINESS -> const B @L4377 used by InventoryPanel/EmailAttributionPanel; FRKL_INSIGHTS
+    // -> const INS @L608 used by the specialist-actions aggregator). Reassigning window.X would not
+    // reach those consts, so we MUTATE the existing objects in place.
+    var BUS = window.FRKL_BUSINESS;
+    if (BUS && typeof BUS === 'object') {
+      BUS.inventory = []; BUS.inventorySummary = {};
+      BUS.emailAttribution = null; BUS.attributedFlows = []; BUS.attributedCampaigns_30d = [];
+      BUS.affiliates = []; BUS.discountSummary = {};
+      BUS.products = []; BUS.productSummary = {};
     }
+    var INSIGHTS = window.FRKL_INSIGHTS;
+    if (INSIGHTS && typeof INSIGHTS === 'object') {
+      Object.keys(INSIGHTS).forEach(function (k) { delete INSIGHTS[k]; });
+    }
+    // Deferred: FRKL_LINKS (autolink URL map) is captured AND derived at eval (_linkKeys/_linkRe are
+    // frozen), so it can't be cleared from here — needs an inline gate before frkl-app.js or a rebuild.
   }
 
   async function bootstrap() {
