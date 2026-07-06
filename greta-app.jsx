@@ -2629,7 +2629,7 @@ function ContributionCard({rev, orders, paid, gm}){
       </div>
     </div>
     <div className="note" style={{marginTop:10}}>
-      Edit the per-order costs + fee rate to frkl's actuals — the waterfall recomputes live for the selected period. COGS is the blended product margin from live catalogue data. <b>Refunds:</b> Shopify net revenue here doesn't yet net out refunds, so they're subtracted in this line; capturing refunds in the Shopify sync will fold them into net revenue and make this exact.
+      Edit the per-order costs + fee rate to your actuals — the waterfall recomputes live for the selected period. COGS is the blended product margin from live catalogue data. <b>Refunds:</b> Shopify net revenue here doesn't yet net out refunds, so they're subtracted in this line; capturing refunds in the Shopify sync will fold them into net revenue and make this exact.
     </div>
   </div>);
 }
@@ -6490,7 +6490,7 @@ function InstagramPanel(){
   const igFollowerSeries = (function(){ const out=[]; let run=snap.followers||0; for(let i=daily.length-1;i>=0;i--){ out.unshift({d:(daily[i].date||'').slice(5), v:Math.round(run)}); run -= (daily[i].newFollowers||0); } return out; })();
   return (<div style={{marginTop:14}}>
     <div className="card" style={{marginBottom:14}}>
-      <h2>Instagram organic — @frkl.</h2>
+      <h2>Instagram organic — {OI_BRAND.name||'frkl'}</h2>
       <div className="muted" style={{marginBottom:10}}>Live from Instagram Insights via Supermetrics. Profile snapshot + last-30-days growth + top-20 posts (last 90 days).</div>
       <div className="row">
         <KPI label="Followers" val={NUM(snap.followers)} sub={`${NUM(snap.mediaCount)} posts · following ${NUM(snap.follows)}`} series={igFollowerSeries} seriesLabel="Total followers · by day"
@@ -7500,7 +7500,7 @@ ${ctxJson}`;
   return (<div>
     <div className="card" style={{marginBottom:14, borderLeft:'3px solid #c084fc'}}>
       <h2>Ask the data</h2>
-      <div className="muted" style={{marginBottom:10, fontSize:12}}>Runs <b>securely server-side</b> — the LLM key stays on the server and never touches your browser. Your question goes with a compact summary of your live frkl data ({Math.round(JSON.stringify(buildAskContext()).length/1024)}KB).</div>
+      <div className="muted" style={{marginBottom:10, fontSize:12}}>Runs <b>securely server-side</b> — the LLM key stays on the server and never touches your browser. Your question goes with a compact summary of your live data ({Math.round(JSON.stringify(buildAskContext()).length/1024)}KB).</div>
       {!ASK && (<div style={{padding:12, background:'var(--bg-app)', borderRadius:8, marginBottom:10, border:'1px solid var(--border-default)'}}>
         <div style={{fontSize:13, color:'var(--text-primary)', lineHeight:1.5}}>🔒 Ask data runs inside your authenticated workspace, where the model key is held server-side (never in the browser). It isn't enabled in this public demo. The examples below show the questions it answers from your live data.</div>
       </div>)}
@@ -8999,7 +8999,7 @@ function BusinessReview(){
 
   const copyBriefing = ()=>{
     const L=[];
-    L.push(`BUSINESS REVIEW — frkl${W?` · week of ${W.label}`:''}`);
+    L.push(`BUSINESS REVIEW — ${OI_BRAND.name||'frkl'}${W?` · week of ${W.label}`:''}`);
     L.push(`Posture: ${overall.label}. ${verdictSentence}`);
     L.push('');
     L.push('NOW — trading (this week vs last):');   nowD.forEach(d=>L.push('  • '+d.read));
@@ -9226,7 +9226,7 @@ function ProductionPlanner({embedded}={}){
   }catch(e){ toast('Export failed', {kind:'bad'}); } };
   const copyPO = (po)=>{
     const firstLine=po.lines[0]||{};
-    const L=['PURCHASE ORDER (DRAFT)', 'To: '+po.supplier+(po.email?' <'+po.email+'>':''), ...(firstLine.supPhone?['Tel: '+firstLine.supPhone]:[]), ...(firstLine.supAddress?[firstLine.supAddress]:[]), ...(po.notes?[po.notes]:[]), 'From: frkl'+(today?'  ·  '+today:''), ''];
+    const L=['PURCHASE ORDER (DRAFT)', 'To: '+po.supplier+(po.email?' <'+po.email+'>':''), ...(firstLine.supPhone?['Tel: '+firstLine.supPhone]:[]), ...(firstLine.supAddress?[firstLine.supAddress]:[]), ...(po.notes?[po.notes]:[]), 'From: '+(OI_BRAND.name||'frkl')+(today?'  ·  '+today:''), ''];
     po.lines.forEach(l=>L.push(l.qty+' × '+l.p.title+' ['+(l.p.sku||'no SKU')+']'+(l.unitCost!=null?(' @ £'+l.unitCost+' = £'+l.lineCost.toFixed(2)):'  — PRICE TBC (please quote)')+(l.moqBumped?(' (MOQ '+l.moq+')'):'')));
     L.push('', po.hasCost?('TOTAL: £'+po.total.toFixed(2)+' · '+po.units+' units'):(po.units+' units · PRICING TBC — please quote against this PO'));
     if(po.hasCost){ const fd=iso=>{ try{ return new Date((iso||'')+'T00:00:00').toLocaleDateString('en-GB'); }catch(e){ return iso; } };
@@ -10283,7 +10283,7 @@ function ConnectionsPanel(){
         </div>
         <label>Shop domain</label>
         <input type="text" value={shopDomain} onChange={e=>setShopDomain(e.target.value)}
-          placeholder="e.g. frkl.myshopify.com" autoFocus
+          placeholder="e.g. your-store.myshopify.com" autoFocus
           style={{fontFamily:'JetBrains Mono, ui-monospace, monospace', fontSize:12.5}}/>
         <div className="row">
           <button onClick={startShopifyConnect}
@@ -10898,7 +10898,7 @@ function App(){
         <div style={{width:1, height:24, background:'var(--border-subtle)', margin:'0 var(--s-2)'}}/>
         <div className="workspace-chip">
           <div className="dot"/>
-          <span>frkl</span>
+          <span>{OI_BRAND.name||'frkl'}</span>
           <span style={{color:'var(--text-faint)',marginLeft:'var(--s-1)'}}>workspace</span>
         </div>
         <div className="appbar-spacer"/>
