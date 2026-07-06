@@ -2,8 +2,10 @@
 const { useState, useMemo } = React;
 const R = Recharts;
 const D = window.FRKL_DATA;
-const GBP = n => n==null ? '—' : '£' + Math.round(n).toLocaleString('en-GB');
-const GBP2 = n => n==null ? '—' : '£' + n.toLocaleString('en-GB',{minimumFractionDigits:0,maximumFractionDigits:0});
+const _CUR_SYM = { GBP:'£', USD:'$', EUR:'€', AUD:'A$', CAD:'C$', NZD:'NZ$', JPY:'¥' };
+const curSym = () => _CUR_SYM[(typeof window!=='undefined' && window.OI_CURRENCY)] || '£';
+const GBP = n => n==null ? '—' : curSym() + Math.round(n).toLocaleString('en-GB');
+const GBP2 = n => n==null ? '—' : curSym() + n.toLocaleString('en-GB',{minimumFractionDigits:0,maximumFractionDigits:0});
 const PCT = n => n==null ? '—' : (n*100).toFixed(1) + '%';
 const NUM = n => n==null ? '—' : Math.round(n).toLocaleString('en-GB');
 
@@ -382,7 +384,7 @@ const OI_BM = (typeof window!=='undefined' && window.OI_BENCHMARKS) || {metrics:
 function bmGet(metric){ return (OI_BM.metrics||{})[metric] || null; }
 function bmFmt(unit, v){ if(v==null) return '—';
   if(unit==='pct')   return (+(v*100).toFixed(v*100<10?1:0))+'%';
-  if(unit==='gbp')   return '£'+Math.round(v).toLocaleString('en-GB');
+  if(unit==='gbp')   return curSym()+Math.round(v).toLocaleString('en-GB');
   if(unit==='ratio') return (+v.toFixed(1))+'×';
   return String(v); }
 // CVR benchmark now flows from the registry (jewellery/frkl = 1.5%), not a literal.
@@ -941,7 +943,7 @@ function ActionConflictBanner(){
 // Areas roll up into a handful of themes an operator actually reviews by.
 const ACTION_GROUP_OF = {meta:'Paid media', google:'Paid media', klaviyo:'Email', cro:'Site & CVR', shopify:'Site & CVR', creative:'Creative', economics:'Finance', cx:'Customer & retention', content:'Content', competitive:'Competitive'};
 function moneyAbs(money){ return (money && money.monthly_impact_gbp!=null) ? Math.abs(money.monthly_impact_gbp) : 0; }
-function gbpShort(v){ return v>=1000 ? '£'+(v/1000).toFixed(1)+'k' : '£'+Math.round(v); }
+function gbpShort(v){ return v>=1000 ? curSym()+(v/1000).toFixed(1)+'k' : curSym()+Math.round(v); }
 function ActionBoard(){
   const order={P1:0,P2:1,P3:2};
   const all=[];

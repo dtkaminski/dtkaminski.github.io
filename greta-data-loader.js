@@ -150,7 +150,7 @@
     // 3. Resolve user's brand membership for frkl
     const { data: memberships, error: memErr } = await sb
       .from('brand_users')
-      .select('brand_id, role, brand:brands(id, slug, name)')
+      .select('brand_id, role, brand:brands(id, slug, name, currency)')
       .eq('user_id', sessionData.session.user.id);
     if (memErr) {
       console.warn('[frkl-live] brand_users query failed', memErr);
@@ -164,6 +164,8 @@
       return;
     }
     window.FRKL_LIVE.brandId = frkl.brand_id;
+    // Currency for the dashboard formatters (they read window.OI_CURRENCY at render).
+    window.OI_CURRENCY = (frkl.brand && frkl.brand.currency) || 'GBP';
 
     // Activate the dashboard's live per-tenant Fit path. useFitResult() in the app treats
     // OI_ASK as authenticated only when it carries a getJwt() FUNCTION (oi-app-boot's /app
@@ -193,7 +195,7 @@
     if (!sb || !brandId) return;
 
     try {
-      const [patterns, actions, connections, dailyShopify, dailyMeta, dailyGoogle, dailyGa4, klaviyoDaily, syncLog] = await Promise.all([
+      const [patterns, actions, connections, dailyShopify, dailyMeta, dailyGoogle, dailyGa4, klaviyoDaily, syncLog, inventory] = await Promise.all([
         fetchPatterns(sb, brandId),
         fetchActions(sb, brandId),
         fetchConnections(sb, brandId),
@@ -203,6 +205,7 @@
         fetchDailyGa4(sb, brandId),
         fetchDailyKlaviyo(sb, brandId),
         fetchRecentSyncLog(sb, brandId),
+        fetchInventory(sb, brandId),
       ]);
 
       // ── Patterns / money — ALWAYS reflect the authenticated brand's real live state, even when
@@ -238,6 +241,14 @@
         window.FRKL_DATA.googleAds = dailyGoogle;
         window.FRKL_DATA.ga4 = dailyGa4;
         window.FRKL_DATA.klaviyo = klaviyoDaily;
+      }
+      // Live catalogue → inventory panel (non-frkl only; frkl keeps its backend-computed inventory
+      // that carries real 90d velocity + cover tiers, which a catalogue-only view can't reproduce).
+      if (BRAND_SLUG !== 'frkl' && window.FRKL_BUSINESS && inventory) {
+        window.FRKL_BUSINESS.inventory = inventory.items;
+        window.FRKL_BUSINESS.inventorySummary = inventory.summary;
+      }
+      if (window.FRKL_DATA) {
         // Update meta block so the timestamp surfaces in the UI
         window.FRKL_DATA.meta = {
           ...(window.FRKL_DATA.meta || {}),
@@ -367,21 +378,50 @@
 
   async function fetchDailyShopify(sb, brandId) {
     try {
+      // Sum ALL sale channels per day (online_store + shopify_draft_order + POS/wholesale) so the
+      // dashboard total matches Shopify Analytics. Previously filtered to online_store only, which
+      // hid stores whose only orders are drafts/manual (e.g. a freshly-connected test store).
       const { data } = await sb.from('v_tenant_shopify_daily')
         .select('day, order_count, net_revenue, discounts, line_items, aov, returns, channel')
         .eq('brand_id', brandId)
-        .eq('channel', 'online_store')
         .order('day', { ascending: true });
-      return (data || []).map(r => ({
-        date: r.day,
-        orders: Number(r.order_count || 0),
-        netSales: Number(r.net_revenue || 0),
-        discounts: Number(r.discounts || 0),
-        totalSales: Number(r.net_revenue || 0) + Number(r.discounts || 0),
-        aov: Number(r.aov || 0),      // static schema has aov; was selected but dropped → undefined → 0
-        returns: Number(r.returns || 0), // real net-merch refunds (subtotal − current_subtotal); was absent → 0
-      }));
+      const byDay = {};
+      (data || []).forEach(r => {
+        const d = r.day; if (!byDay[d]) byDay[d] = { date: d, orders: 0, netSales: 0, discounts: 0, returns: 0 };
+        byDay[d].orders   += Number(r.order_count || 0);
+        byDay[d].netSales += Number(r.net_revenue || 0);
+        byDay[d].discounts+= Number(r.discounts || 0);
+        byDay[d].returns  += Number(r.returns || 0);
+      });
+      return Object.values(byDay)
+        .map(x => ({ ...x, totalSales: x.netSales + x.discounts, aov: x.orders ? x.netSales / x.orders : 0 }))
+        .sort((a, b) => (a.date < b.date ? -1 : 1));
     } catch (e) { return []; }
+  }
+
+  // Catalogue → inventory rows for the Inventory panel. No order line-item velocity is available
+  // client-side, so units90d/velocity are 0 and cover is ∞; tier is stock-based (in-stock=healthy,
+  // out=no_stock_no_sales). Enough to SHOW the store's real catalogue + stock + capital-at-value.
+  async function fetchInventory(sb, brandId) {
+    try {
+      const { data } = await sb.from('tenant_shopify_products')
+        .select('title, product_type, status, inventory_quantity, price, variant_count')
+        .eq('brand_id', brandId)
+        .order('inventory_quantity', { ascending: false });
+      const items = (data || []).map(p => {
+        const qty = Number(p.inventory_quantity || 0);
+        const val = qty * Number(p.price || 0);
+        const tier = (p.status && p.status !== 'active') ? 'archived_stock' : (qty <= 0 ? 'no_stock_no_sales' : 'healthy');
+        return { title: p.title, sku: '', type: p.product_type || '', inventoryQty: qty,
+                 units90d: 0, dailyVelocity: 0, daysOfCover: null, inventoryValue: val,
+                 coverTier: tier, status: (p.status || '').toUpperCase() };
+      });
+      const summary = {};
+      items.forEach(it => { const k = it.coverTier;
+        if (!summary[k]) summary[k] = { skus: 0, totalQty: 0, totalValue: 0 };
+        summary[k].skus += 1; summary[k].totalQty += it.inventoryQty; summary[k].totalValue += it.inventoryValue; });
+      return { items, summary };
+    } catch (e) { return { items: [], summary: {} }; }
   }
 
   async function fetchDailyMeta(sb, brandId) {
