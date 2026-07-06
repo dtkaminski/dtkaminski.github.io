@@ -2988,7 +2988,7 @@ function WcSpark({data, color, fmt, axisFmt}){
 }
 
 function WhatChangedStrip(){
-  const weeks = useMemo(boardWeeks, []);
+  const weeks = useMemo(boardWeeks, [(typeof window!=='undefined' && window.FRKL_LIVE && window.FRKL_LIVE.lastFetchAt) || 0]);  // recompute when live data arrives (was [] → froze frkl static)
   if(!weeks.length) return null;
   let i = weeks.length-1; while(i>0 && weeks[i].partial) i--;
   const W = weeks[i], prev = weeks[i-1];
@@ -7876,7 +7876,7 @@ const ACTION_META = {
 };
 
 function WeeklyBoard(){
-  const weeks = useMemo(boardWeeks, []);
+  const weeks = useMemo(boardWeeks, [(typeof window!=='undefined' && window.FRKL_LIVE && window.FRKL_LIVE.lastFetchAt) || 0]);  // recompute when live data arrives (was [] → froze frkl static)
   const lastCompleteIdx = (()=>{ for(let i=weeks.length-1;i>=0;i--){ if(!weeks[i].partial) return i; } return weeks.length-1; })();
   const [idx, setIdx] = useState(lastCompleteIdx<0?0:lastCompleteIdx);
   const [actions, setActions] = useState(boardLoadActions);
@@ -8840,7 +8840,7 @@ function CommandMenu(){
 // cohorts, channelMix, inventorySummary) — no projections, no fabrication.
 function BusinessReview(){
   useCostTick();
-  const weeks = useMemo(boardWeeks, []);
+  const weeks = useMemo(boardWeeks, [(typeof window!=='undefined' && window.FRKL_LIVE && window.FRKL_LIVE.lastFetchAt) || 0]);  // recompute when live data arrives (was [] → froze frkl static)
   const P = (typeof window!=='undefined' && window.FRKL_PATTERNS) || {};
   const C = (typeof window!=='undefined' && window.FRKL_COHORTS) || {};
   const B = (typeof window!=='undefined' && window.FRKL_BUSINESS) || {};
