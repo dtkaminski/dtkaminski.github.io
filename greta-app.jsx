@@ -400,6 +400,8 @@ const OI_BRAND = (typeof window!=='undefined' && (window.OI_BRAND || (function()
   name: 'frkl', vertical: 'demi-fine jewellery', markets: 'UK/Ireland',
   seasonality: "Valentine's, Mother's Day and Christmas are demand peaks; post-peak softness is normal",
 };
+// DEMO gate: hardcoded frkl narratives/examples render ONLY on the frkl demo workspace.
+const DEMO = (typeof OI_BRAND!=='undefined' && OI_BRAND && OI_BRAND.slug==='frkl');
 // The six specialist agents and their remit — surfaced next to each name so the
 // founder knows whose lens a read is coming from (transparency).
 const AGENT_ROLE = {
@@ -3911,7 +3913,7 @@ function PlacementPanel(){
         </tbody></table>
       </div>
     </div>
-    <div className="note" style={{marginTop:10}}>frkl is delivering <b>100% on Instagram, 0% on Facebook</b> — an entire ad surface is untouched. <b>iPhone dominates</b> spend (~70%); Android converts at similar quality. <b>Stories</b> on Stacks/Catalogue is the highest-CTR placement; <b>Reels</b> is the best converter on Angela but under-funded.</div>
+    {DEMO && <div className="note" style={{marginTop:10}}>frkl is delivering <b>100% on Instagram, 0% on Facebook</b> — an entire ad surface is untouched. <b>iPhone dominates</b> spend (~70%); Android converts at similar quality. <b>Stories</b> on Stacks/Catalogue is the highest-CTR placement; <b>Reels</b> is the best converter on Angela but under-funded.</div>}
   </div>);
 }
 
@@ -4468,7 +4470,7 @@ function BundlesPanel(){
     ? ((bundlesAgg.aovPerUnit / singles.aovPerUnit) - 1) : null;
   return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid #c084fc'}}>
     <h2>Bundles & stacks — 90d</h2>
-    <div className="muted" style={{marginBottom:10, fontSize:12}}>frkl's "stack" products are pre-styled bundles (base + style + charm). They unlock higher AOV but currently sell rarely. Two bundle tracking systems exist in Shopify: explicit "stack" SKUs and a hidden "Bundle for reference only" wrapper — both surfaced below.</div>
+    {DEMO && <div className="muted" style={{marginBottom:10, fontSize:12}}>frkl's "stack" products are pre-styled bundles (base + style + charm). They unlock higher AOV but currently sell rarely. Two bundle tracking systems exist in Shopify: explicit "stack" SKUs and a hidden "Bundle for reference only" wrapper — both surfaced below.</div>}
     <div className="row" style={{marginBottom:10}}>
       <KPI label="Bundle revenue share" val={PCT(summary.bundleRevenueShare)} sub={`£${NUM(bundlesAgg.netSales)} of £${NUM((singles.netSales||0)+(bundlesAgg.netSales||0)+(summary.giftCards?.netSales||0))} total products`}
         agent="Atlas" observation={`Bundles are only ${PCT(summary.bundleRevenueShare)} of product revenue. This is the single biggest AOV lever sitting unused.`}
@@ -4595,7 +4597,7 @@ function InventoryPanel(){
       </tbody></table>
     </div>
     {sorted.length > 80 && <div className="muted" style={{fontSize:11,marginTop:8}}>Showing 80 of {sorted.length}. Adjust filter to drill in.</div>}
-    <div className="note" style={{marginTop:14}}><b>Atlas read:</b> {critRows.length} SKUs are about to stock out — at current velocity that's roughly £{NUM(lostSalesEstMonthly)}/mo in lost sales if reorders don't land. Meanwhile <b>£{NUM(overstockValue + archivedValue)} of capital is locked in slow-moving stock + archived SKUs</b>. For a brand at £16k/mo DTC revenue, that's ~18 months of working capital tied up. Most of the overstock is in <b>pre-styled stack SKUs</b> — connects directly to the Bundle attach finding (Products tab): bundles aren't selling, so the bundle-specific inventory is bloating. Liquidate the dead bundles + redirect capital to charm + necklace replenishment.</div>
+    {DEMO && <div className="note" style={{marginTop:14}}><b>Atlas read:</b> {critRows.length} SKUs are about to stock out — at current velocity that's roughly £{NUM(lostSalesEstMonthly)}/mo in lost sales if reorders don't land. Meanwhile <b>£{NUM(overstockValue + archivedValue)} of capital is locked in slow-moving stock + archived SKUs</b>. For a brand at £16k/mo DTC revenue, that's ~18 months of working capital tied up. Most of the overstock is in <b>pre-styled stack SKUs</b> — connects directly to the Bundle attach finding (Products tab): bundles aren't selling, so the bundle-specific inventory is bloating. Liquidate the dead bundles + redirect capital to charm + necklace replenishment.</div>}
   </div>);
 }
 
@@ -4636,7 +4638,7 @@ function ProductTiersPanel(){
   const total = tiers.reduce((a,t)=>a+(t.netSales||0),0);
   return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid #5b8def'}}>
     <h2>Component tiers — base / charm / style</h2>
-    <div className="muted" style={{marginBottom:10, fontSize:12}}>frkl's modular system uses three tiers, encoded in the Shopify vendor field. A customer buys a base, layers a style, attaches charms — every charm raises AOV, every style raises margin.</div>
+    {DEMO && <div className="muted" style={{marginBottom:10, fontSize:12}}>frkl's modular system uses three tiers, encoded in the Shopify vendor field. A customer buys a base, layers a style, attaches charms — every charm raises AOV, every style raises margin.</div>}
     <table><thead><tr><th>Tier</th><th>SKUs</th><th>Units</th><th>Net revenue</th><th>% of rev</th><th>AOV / unit</th><th>Margin %</th><th>Return %</th></tr></thead><tbody>
       {tiers.map((t,i)=>(<tr key={i}>
         <td><span className="pill" style={{background:colors[t.tier]+'22',color:colors[t.tier],fontSize:11,padding:'2px 8px',borderRadius:4,fontWeight:700,textTransform:'uppercase'}}>{labels[t.tier]||t.tier}</span></td>
@@ -4649,7 +4651,7 @@ function ProductTiersPanel(){
         <td style={{color:t.returnRate>=0.1?'var(--bad)':t.returnRate>=0.06?'var(--warn)':'var(--text-faint)',fontWeight:600}}>{PCT(t.returnRate)}</td>
       </tr>))}
     </tbody></table>
-    <div className="note" style={{marginTop:12}}><b>Tier read:</b> bases drive revenue (£23k, biggest), styles drive margin (92%, highest), charms drive volume (450 units = lowest unit price but highest engagement). A pre-styled stack is literally one of each — so the bundle thesis is exactly the multiplier this product system was designed to produce.</div>
+    {DEMO && <div className="note" style={{marginTop:12}}><b>Tier read:</b> bases drive revenue (£23k, biggest), styles drive margin (92%, highest), charms drive volume (450 units = lowest unit price but highest engagement). A pre-styled stack is literally one of each — so the bundle thesis is exactly the multiplier this product system was designed to produce.</div>}
   </div>);
 }
 
@@ -5914,13 +5916,13 @@ function Products(){
         agent="Atlas" observation="200+ SKUs sold in 90d but the top 40 carry most of the volume — long tail of low-velocity stock."
         implication="Trim the tail. Focus inventory + creative on the top 20 to lift margin and shorten the cash cycle." />
       <KPI label="Top seller" val={sorted[0]?.title?.slice(0,28)||'—'} sub={`${sorted[0]?.units||0} units · £${NUM(sorted[0]?.netSales)} · ${PCT(sorted[0]?.marginPct)} margin`}
-        agent="Frame" observation="The mega necklace gold is the hero (117 units, £8.7k) but has the lowest margin (~58%) and 8.5% returns."
-        implication="Heavy reliance on one SKU = concentration risk. Find the next hero — and root-cause why this one returns." />
+        agent="Frame" observation={DEMO ? "The mega necklace gold is the hero (117 units, £8.7k) but has the lowest margin (~58%) and 8.5% returns." : undefined}
+        implication={DEMO ? "Heavy reliance on one SKU = concentration risk. Find the next hero — and root-cause why this one returns." : undefined} />
       <KPI label="Blended gross margin" val={PCT(blendedMargin)} sub={`£${NUM(totalProfit)} GP / £${NUM(totalRev)} net`}
-        agent="Atlas" observation="78% blended GM is excellent for jewellery — the charms (80–93% margin) are the cash cow."
+        agent="Atlas" observation={DEMO ? "78% blended GM is excellent for jewellery — the charms (80–93% margin) are the cash cow." : undefined}
         implication="Investors will love this number once COGS is confirmed and the true discount load — code + automatic + sale-price markdowns, draft orders excluded — is netted out (see Promotions)." />
       <KPI label="Return-rate hotspots" val={returnHotspots.length} sub={`SKUs with ≥10% returns (sold ≥10)`}
-        agent="Lux" observation="12 SKUs have ≥10% return rates — 'love is pain charm' hits 22% — that's a CX signal, not a quality fluke."
+        agent="Lux" observation={DEMO ? "12 SKUs have ≥10% return rates — 'love is pain charm' hits 22% — that's a CX signal, not a quality fluke." : undefined}
         implication="Add a post-purchase survey + PDP sizing/expectation copy to the top 3 hotspots before adding any new SKUs." />
     </div>
     {/* Three jobs split into subtabs — Stock (ops) · Performance (analytics) · Bundles (merch) */}
@@ -5972,7 +5974,7 @@ function Products(){
         </tr>))}
         </tbody></table>
       </div>
-      <div className="note" style={{marginTop:14}}>The <b>mega necklace gold</b> drives volume but has the lowest margin (~58%) and an 8.5% return rate. <b>Charms are the cash cow</b> — punk pearl choker (93% margin), candy bead necklace (91%), pixelated heart (84%). The <b>love is pain charm</b> has a 22% return rate — investigate immediately.</div>
+      {DEMO && <div className="note" style={{marginTop:14}}>The <b>mega necklace gold</b> drives volume but has the lowest margin (~58%) and an 8.5% return rate. <b>Charms are the cash cow</b> — punk pearl choker (93% margin), candy bead necklace (91%), pixelated heart (84%). The <b>love is pain charm</b> has a 22% return rate — investigate immediately.</div>}
     </div>)}
     {pview==='bundles' && (<div>
       <BundlesPanel/>
@@ -5993,17 +5995,17 @@ function Organic(){
   return (<div>
     <div className="row" style={{marginBottom:14}}>
       <KPI label="Organic+direct revenue share" val={PCT(orgRev/total)} sub={`£${NUM(orgRev)} of £${NUM(total)} (GA4-attributed)`}
-        agent="Sage" observation="74% of attributed revenue is organic+direct — frkl is NOT a paid-acquisition business."
+        agent="Sage" observation={DEMO ? "74% of attributed revenue is organic+direct — frkl is NOT a paid-acquisition business." : undefined}
         implication="Defend organic search rankings + brand search aggressively. That's the moat — paid is a top-up." />
       <KPI label="Top channel" val={sortedCh[0]?.channel||'—'} sub={`£${NUM(sortedCh[0]?.revenue)} · ${sortedCh[0]?.purchases} purchases`}
         agent="Lux" observation="Email drives 32% of attributed revenue — more than every paid channel combined."
-        implication="Klaviyo is the highest-leverage marketing surface frkl has. Fix attributed reporting + abandoned-cart flow first." />
+        implication={DEMO ? "Klaviyo is the highest-leverage marketing surface frkl has. Fix attributed reporting + abandoned-cart flow first." : undefined} />
       <KPI label="Paid social GA4 vs Meta claim" val="≈10×" sub="Meta claims £12.5k; GA4 attributes £1.1k"
         agent="Atlas" observation="A 10× gap between platform-claimed and GA4-attributed Meta revenue is normal but startling at first."
         implication="For investor materials, lead with contribution-net ROAS — neither claimed nor last-click is the right answer alone." />
       <KPI label="Channels active" val={ch.length} sub="GA4 default channel grouping"
         agent="Scout" observation="12 channels active with no single-channel >32% — healthy diversification, no single-point-of-failure."
-        implication="This is a real strength to lead with in the fundraise — frkl isn't a one-channel pony." />
+        implication={DEMO ? "This is a real strength to lead with in the fundraise — frkl isn't a one-channel pony." : undefined} />
     </div>
     <div className="row">
       <div className="card" style={{flex:'1 1 340px'}}>
@@ -6097,7 +6099,7 @@ function EmailAttributionPanel(){
         <div className="muted" style={{fontSize:11, marginTop:6}}>Showing top {Math.min(15, campaigns30.length)} of {campaigns30.length} attributed campaigns.</div>
       </div>
     </div>
-    <div className="note" style={{marginTop:14}}><b>Atlas read:</b> for frkl, the gross-vs-attributed flow gap is ~£{Math.abs(gap)} ({(gapPct*100).toFixed(0)}%) — Klaviyo's flow tracking is precise. So the £28k flow revenue claim that drives the "flows = 19× lift over campaigns" finding holds up. The Welcome Flow alone attributes £{NUM(flows[0]?.orderValue)} from {flows[0]?.orders} orders over 90d — the highest-leverage owned-audience surface frkl has.</div>
+    {DEMO && <div className="note" style={{marginTop:14}}><b>Atlas read:</b> for frkl, the gross-vs-attributed flow gap is ~£{Math.abs(gap)} ({(gapPct*100).toFixed(0)}%) — Klaviyo's flow tracking is precise. So the £28k flow revenue claim that drives the "flows = 19× lift over campaigns" finding holds up. The Welcome Flow alone attributes £{NUM(flows[0]?.orderValue)} from {flows[0]?.orders} orders over 90d — the highest-leverage owned-audience surface frkl has.</div>}
   </div>);
 }
 
@@ -6264,7 +6266,7 @@ function EmailHub(){
       <div className="row">
         <KPI label="Flow revenue (90d)" val={GBP(summary.flows.orderValue)} sub={`${summary.flows.messages} messages · ${NUM(summary.flows.recipients)} recipients`}
           agent="Lux" observation={`Flows generate ${PCT(flowShare)} of email revenue from just ${summary.flows.messages} message templates.`}
-          implication="This is the highest-margin marketing activity frkl runs. Investment in flow optimisation = direct revenue." />
+          implication={DEMO ? "This is the highest-margin marketing activity frkl runs. Investment in flow optimisation = direct revenue." : undefined} />
         <KPI label="Campaign revenue (90d)" val={GBP(summary.campaigns.orderValue)} sub={`${summary.campaigns.messages} sends · ${NUM(summary.campaigns.recipients)} total recipients`} series={sendChart.map(w=>({d:w.date, v:Math.round(w.revenue)}))} seriesLabel="Campaign revenue · by send date"
           agent="Lux" observation={`${summary.campaigns.messages} broadcasts producing ${GBP(summary.campaigns.orderValue)} — less revenue than 15 flow messages.`}
           implication="Send cadence is high; revenue per send isn't. Either cut the 50% lowest-performing or differentiate angles." />
@@ -6349,7 +6351,7 @@ function EmailHub(){
       </tbody></table>
       <div className="muted" style={{fontSize:11,marginTop:8}}>Showing 30 most recent of {camps.length} campaigns.</div>
     </div>
-    <div className="note" style={{marginTop:14}}><b>Lux's read:</b> the 19× revenue lift of flows over campaigns is the single biggest leverage finding in this dashboard. Every pound spent making flows smarter (segmentation, dynamic content, more triggers) returns multiples of any pound spent on the next broadcast. Three immediate moves: (1) audit Back-in-Stock — expand triggers to more SKUs; (2) replicate the NECKLACES per-category welcome flow for charms/bracelets/pre-styled (already exists for those — confirm performance match); (3) fix the Happy Birthday flow — open rate proves attention, offer must be stronger to convert.</div>
+    {DEMO && <div className="note" style={{marginTop:14}}><b>Lux's read:</b> the 19× revenue lift of flows over campaigns is the single biggest leverage finding in this dashboard. Every pound spent making flows smarter (segmentation, dynamic content, more triggers) returns multiples of any pound spent on the next broadcast. Three immediate moves: (1) audit Back-in-Stock — expand triggers to more SKUs; (2) replicate the NECKLACES per-category welcome flow for charms/bracelets/pre-styled (already exists for those — confirm performance match); (3) fix the Happy Birthday flow — open rate proves attention, offer must be stronger to convert.</div>}
   </div>);
 }
 
@@ -6439,7 +6441,7 @@ function StoriesPanel(){
   const stories = B.igStories || [];
   return (<div className="card" style={{marginTop:14, borderLeft:'3px solid #fbbf24'}}>
     <h2>Instagram Stories — last 60 days</h2>
-    <div className="muted" style={{marginBottom:10,fontSize:12}}>Stories are the daily-cadence organic surface. Competitors post 5-15/week; frkl posted {stories.length} in 60 days.</div>
+    {DEMO && <div className="muted" style={{marginBottom:10,fontSize:12}}>Stories are the daily-cadence organic surface. Competitors post 5-15/week; frkl posted {stories.length} in 60 days.</div>}
     {stories.length === 0 ? (<EmptyState icon="image"
       title="No Instagram Stories in the last 60 days"
       body="Stories are the daily-cadence organic touchpoint — they outperform Feed for product link-outs and live-feel community signals. Competitors post 5–15 a week; a consistent Stories habit is one of the cheapest reach levers you have."
@@ -6462,7 +6464,7 @@ function StoriesPanel(){
       })}
       </tbody></table>
     )}
-    <div className="note" style={{marginTop:14}}><b>Frame's read:</b> the one Story posted on 2026-05-26 had 161 views, 122 reach, 93% completion (only 11 exits of 161 views) — strong signal that when frkl posts Stories, the audience watches. The opportunity: 0.5 stories/month is essentially "Stories are off". Move to 3-5/week. Use as: behind-the-scenes (campaign shoots, packing), new-product reveals, polls/quizzes, link-stickers to bestsellers. Each Story is essentially a free push notification to ~30% of your 37k followers.</div>
+    {DEMO && <div className="note" style={{marginTop:14}}><b>Frame's read:</b> the one Story posted on 2026-05-26 had 161 views, 122 reach, 93% completion (only 11 exits of 161 views) — strong signal that when frkl posts Stories, the audience watches. The opportunity: 0.5 stories/month is essentially "Stories are off". Move to 3-5/week. Use as: behind-the-scenes (campaign shoots, packing), new-product reveals, polls/quizzes, link-stickers to bestsellers. Each Story is essentially a free push notification to ~30% of your 37k followers.</div>}
   </div>);
 }
 
@@ -6561,7 +6563,7 @@ function InstagramPanel(){
       })}
       </div>
     </div>
-    <div className="note" style={{marginTop:14}}><b>Audience confirmation:</b> the IG follower base independently confirms the Meta Ads finding — frkl is genuinely a <b>35–54 female brand</b> (35–44 ≈ 44%, 45–54 ≈ 31%), with 25–34 a meaningful secondary (~15%). 18–24 is essentially absent (1.4%). The <b>ADHD reel</b> (79k views) is the breakout outlier — non-jewellery content with high relatable hook; worth studying. The <b>#myfrkl UGC mechanic</b> (£250 monthly) is generating reliable engagement on community posts.</div>
+    {DEMO && <div className="note" style={{marginTop:14}}><b>Audience confirmation:</b> the IG follower base independently confirms the Meta Ads finding — frkl is genuinely a <b>35–54 female brand</b> (35–44 ≈ 44%, 45–54 ≈ 31%), with 25–34 a meaningful secondary (~15%). 18–24 is essentially absent (1.4%). The <b>ADHD reel</b> (79k views) is the breakout outlier — non-jewellery content with high relatable hook; worth studying. The <b>#myfrkl UGC mechanic</b> (£250 monthly) is generating reliable engagement on community posts.</div>}
   </div>);
 }
 
@@ -6592,7 +6594,7 @@ function SiteStructure({start}){
   const fmax=f[0].v||1;
   return (<div>
     <ClarityFrictionPanel/>
-    <div className="note" style={{marginBottom:14}}>Funnel mapped live from myfrkl.com. The problem is <b>engagement and a broken cart→checkout step</b> — see the live Clarity friction signals above. Paid spend (Overview tab) lands on a homepage where most visitors drop before 15% scroll.</div>
+    {DEMO && <div className="note" style={{marginBottom:14}}>Funnel mapped live from myfrkl.com. The problem is <b>engagement and a broken cart→checkout step</b> — see the live Clarity friction signals above. Paid spend (Overview tab) lands on a homepage where most visitors drop before 15% scroll.</div>}
     <div className="row">
       <div className="card" style={{flex:'2 1 520px'}}>
         <h2>Funnel structure & friction</h2>
