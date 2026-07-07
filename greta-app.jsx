@@ -7675,13 +7675,27 @@ function FreshnessChip(){
   const today = new Date();
   const lastDate = (rows) => { if(!rows||!rows.length) return null; const s=[...rows].filter(r=>r.date).sort((a,b)=>a.date<b.date?-1:1); return s.length?s[s.length-1].date:null; };
   const daysAgo = (iso) => iso==null?null:Math.floor((today-new Date(iso+'T00:00:00Z'))/86400000);
-  const sources=[['Meta',D.metaDaily],['Google',D.googleAds],['GA4',D.ga4],['Klaviyo',D.klaviyo],['Shopify',D.shopify],['IG',B.igDaily]]
-    .map(([name,rows])=>({name,n:daysAgo(lastDate(rows))}));
+  // When live connection rows exist, judge freshness by LAST SYNC of connected
+  // providers only — an unconnected source (or a day without orders) is not "stale".
+  // Fallback to data-age across all sources for the static demo (no live rows).
+  const conns = (window.FRKL_LIVE && Array.isArray(window.FRKL_LIVE.connections)) ? window.FRKL_LIVE.connections.filter(c=>c.status==='active') : null;
+  const syncDaysAgo = (iso) => iso==null?null:Math.floor((today-new Date(iso))/86400000);
+  let sources;
+  if (conns && conns.length) {
+    const defs=[['Shopify','shopify',D.shopify],['Meta','meta',D.metaDaily],['Google','google_ads',D.googleAds],['GA4','ga4',D.ga4],['Klaviyo','klaviyo',D.klaviyo]];
+    sources = defs
+      .map(([name,provider,rows])=>{ const c=conns.find(x=>x.provider===provider); return c?{name, n: c.last_sync_at!=null ? syncDaysAgo(c.last_sync_at) : daysAgo(lastDate(rows))}:null; })
+      .filter(Boolean);
+  }
+  if (!sources || !sources.length) {
+    sources=[['Meta',D.metaDaily],['Google',D.googleAds],['GA4',D.ga4],['Klaviyo',D.klaviyo],['Shopify',D.shopify],['IG',B.igDaily]]
+      .map(([name,rows])=>({name,n:daysAgo(lastDate(rows))}));
+  }
   const ageStr=(n)=> n==null?'no data':n===0?'today':n+'d';
   const stale=sources.filter(s=>s.n==null||s.n>4), ageing=sources.filter(s=>s.n==null||s.n>1);
   const color=stale.length?'var(--bad)':ageing.length?'var(--warn)':'var(--good)';
   const label=stale.length?`${stale.length} stale`:ageing.length?`${ageing.length} ageing`:'Live';
-  const tip='Data freshness\n'+sources.map(s=>`${s.name}: ${ageStr(s.n)}`).join('   ·   ')+'\n(click to manage connections)';
+  const tip='Sync freshness (connected sources)\n'+sources.map(s=>`${s.name}: ${ageStr(s.n)}`).join('   ·   ')+'\n(click to manage connections)';
   return (<button onClick={()=>window.__oiNav&&window.__oiNav('settings','connections')} title={tip} aria-label={`Data freshness: ${label}`}
     style={{display:'inline-flex',alignItems:'center',gap:6,height:30,padding:'0 10px',flexShrink:0,borderRadius:8,background:'var(--bg-card)',border:'1px solid var(--border-default)',color:'var(--text-secondary)',cursor:'pointer',fontSize:12,whiteSpace:'nowrap'}}>
     <span style={{width:7,height:7,borderRadius:'50%',background:color,display:'inline-block'}}/>
@@ -10337,11 +10351,18 @@ function ConnectionsPanel(){
 
       <div style={{display:'flex', flexDirection:'column', gap:'var(--s-3)'}}>
         {sources.map(s => {
-          const n = s.last == null ? null : daysAgo(s.last);
+          // Health = pipeline freshness (last successful sync) when a live connection
+          // exists; falls back to data recency for unconnected/static sources. A quiet
+          // store with no orders for a few days is NOT a stale connection.
+          const dataN = s.last == null ? null : daysAgo(s.last);
+          const conn = s.provider ? LIVE_CONNS.find(x => x.provider === s.provider && x.status === 'active') : null;
+          const syncMs = conn && conn.last_sync_at ? (today - new Date(conn.last_sync_at)) : null;
+          const syncN = syncMs == null ? null : Math.floor(syncMs / 86400000);
+          const n = conn ? syncN : dataN;
           const c = sevVar(n);
-          const lbl = sevLabel(n);
-          const ageStr = s.last == null ? '—' : n === 0 ? 'today' : n === 1 ? '1 day ago' : n + ' days ago';
-          const conn = s.provider ? LIVE_CONNS.find(c => c.provider === s.provider && c.status === 'active') : null;
+          const lbl = conn ? (syncN == null ? 'Never synced' : syncN <= 1 ? 'Fresh' : syncN <= 4 ? 'Sync overdue' : 'Stale') : sevLabel(dataN);
+          const ageStr = s.last == null ? '—' : dataN === 0 ? 'today' : dataN === 1 ? '1 day ago' : dataN + ' days ago';
+          const syncStr = syncMs == null ? null : syncMs < 3600000 ? 'just now' : syncMs < 86400000 ? Math.floor(syncMs/3600000) + 'h ago' : syncN + 'd ago';
 
           return (<div key={s.id} className="card" style={{
             display:'flex', alignItems:'center', gap:'var(--s-4)',
@@ -10362,7 +10383,7 @@ function ConnectionsPanel(){
                   <span style={{width:6, height:6, borderRadius:'var(--r-full)', background:c}}/>
                   {lbl}
                 </span>
-                <span className="meta" style={{fontSize:11}}>· last data {ageStr}</span>
+                <span className="meta" style={{fontSize:11}}>{conn && syncStr ? `· synced ${syncStr} ` : ''}· {s.id === 'shopify' ? 'last order' : 'last data'} {ageStr}</span>
               </div>
               <div className="meta" style={{fontSize:12}}>{s.description}</div>
             </div>
