@@ -1371,6 +1371,52 @@ function HeroStat({valK, color, label, explain, items, total, alignRight}){
 }
 
 // ── This-week hero — the one card a founder needs to see on Monday morning ──
+// Setup-progress card — continues onboarding inside the dashboard. Shown to a
+// non-demo brand while fewer than 2 core sources are connected (the Shopify-only
+// phase, where activation leaks). Links to the onboarding home for the OAuth flows.
+function SetupProgressCard(){
+  if (DEMO) return null;
+  const live = (typeof window!=='undefined' && window.FRKL_LIVE) || null;
+  if (!live || !Array.isArray(live.connections)) return null;   // wait for live data
+  const CORE = [
+    {id:'shopify',    name:'Shopify',            unlock:'orders, products & customers'},
+    {id:'meta',       name:'Meta Ads',           unlock:'paid intelligence & creative analysis'},
+    {id:'klaviyo',    name:'Klaviyo',            unlock:'email attribution & flow performance'},
+    {id:'ga4',        name:'Google Analytics 4', unlock:'site funnel & channel mix'},
+    {id:'google_ads', name:'Google Ads',         unlock:'search performance'},
+  ];
+  const isOn = id => live.connections.some(c => c.provider === id && c.status === 'active');
+  const activeCount = CORE.filter(c => isOn(c.id)).length;
+  const next = CORE.find(c => !isOn(c.id));
+  if (!next || activeCount >= 2) return null;
+  const d = new Date(); d.setDate(d.getDate() + (((8 - d.getDay()) % 7) || 7));
+  const briefDate = d.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'short'});
+  return (
+    <div className="card" style={{display:'flex', alignItems:'center', gap:'var(--s-4)', flexWrap:'wrap',
+        padding:'var(--s-4) var(--s-5)', marginBottom:'var(--s-4)',
+        border:'1px solid rgba(124,58,237,0.35)', background:'var(--accent-bg, rgba(124,58,237,0.06))'}}>
+      <div style={{flex:'1 1 260px', minWidth:0}}>
+        <div style={{display:'flex', alignItems:'center', gap:'var(--s-3)', marginBottom:4}}>
+          <span style={{fontSize:10, fontWeight:700, letterSpacing:'.06em', textTransform:'uppercase', color:'var(--accent)'}}>Setup</span>
+          <span style={{display:'inline-flex', gap:4}} aria-label={`${activeCount} of ${CORE.length} sources connected`}>
+            {CORE.map(c => <span key={c.id} title={c.name} style={{width:7, height:7, borderRadius:'50%',
+              background: isOn(c.id) ? 'var(--good)' : 'var(--border-default)'}}/>)}
+          </span>
+          <span style={{fontSize:11.5, color:'var(--text-muted)', fontWeight:600}}>{activeCount} of {CORE.length} sources connected</span>
+        </div>
+        <div style={{fontSize:13, color:'var(--text-secondary)', lineHeight:1.5}}>
+          Connect <b style={{color:'var(--text-primary)'}}>{next.name}</b> to unlock {next.unlock}.
+          <span style={{color:'var(--text-muted)'}}> Your first weekly brief lands <b style={{color:'var(--text-secondary)'}}>{briefDate}</b>.</span>
+        </div>
+      </div>
+      <a href="/auth/workspace.html" target="_top" className="btn-primary"
+         style={{padding:'8px 16px', fontSize:12.5, borderRadius:'var(--r-sm)', textDecoration:'none', fontWeight:600, flexShrink:0}}>
+        Connect {next.name} →
+      </a>
+    </div>
+  );
+}
+
 function ThisWeekHero(){
   const P = window.FRKL_PATTERNS;
   const r = (P && P.money_rollup) || {leakage:0, at_risk:0, opportunity:0, total:0};
@@ -3236,6 +3282,7 @@ function Overview({start, period, customActive}){
       {isMobile && <MobileToday/>}
       {/* Per-channel freshness moved to the app-bar FreshnessChip (was duplicated here). */}
       {/* Hero — the answer to "what should I look at right now" */}
+      <SetupProgressCard/>
       <ThisWeekHero/>
       {/* Crux verdict: compact scorecard strip + the diagnostic (with the £-bridge nested in its "thinking") */}
       <ScoresStrip metrics={cruxMetrics} windowLabel={`last ${CRUX_DAYS} days`}/>
@@ -10198,47 +10245,46 @@ function ConnectionsPanel(){
     return Math.floor((today - new Date(iso + 'T00:00:00Z')) / 86400000);
   };
 
+  // Live connection rows (provider, status, account_label, last_sync_at) — populated by
+  // the data loader from the tenant's `connections` table. Empty on the static demo.
+  const LIVE_CONNS = (typeof window!=='undefined' && window.FRKL_LIVE && window.FRKL_LIVE.connections) || [];
   const sources = [
     {
-      id: 'shopify', name: 'Shopify', icon: 'S',
+      id: 'shopify', name: 'Shopify', icon: 'S', provider: 'shopify',
       description: 'Orders, products, inventory, customers',
       last: lastDate(D.shopify),
       installable: true,
     },
     {
-      id: 'meta', name: 'Meta Ads', icon: 'M',
-      description: 'Campaign performance, creative-level data, audience health',
+      id: 'meta', name: 'Meta Ads', icon: 'M', provider: 'meta',
+      description: 'Campaign performance, creative-level data, audience health · includes Instagram',
       last: lastDate(D.metaDaily),
       installable: false,
-      comingSoon: 'Direct OAuth coming next sprint',
     },
     {
-      id: 'google_ads', name: 'Google Ads', icon: 'G',
+      id: 'google_ads', name: 'Google Ads', icon: 'G', provider: 'google_ads',
       description: 'Spend, conversions, search terms',
       last: lastDate(D.googleAds),
       installable: false,
-      comingSoon: 'Direct OAuth coming next sprint',
     },
     {
-      id: 'ga4', name: 'Google Analytics 4', icon: 'A',
+      id: 'ga4', name: 'Google Analytics 4', icon: 'A', provider: 'ga4',
       description: 'Sessions, funnel, channel mix, on-site conversions',
       last: lastDate(D.ga4),
       installable: false,
-      comingSoon: 'Direct OAuth coming next sprint',
     },
     {
-      id: 'klaviyo', name: 'Klaviyo', icon: 'K',
+      id: 'klaviyo', name: 'Klaviyo', icon: 'K', provider: 'klaviyo',
       description: 'Flows, campaigns, attributed revenue, list health',
       last: lastDate(D.klaviyo),
       installable: false,
-      comingSoon: 'API-key auth coming next sprint',
     },
     {
       id: 'instagram', name: 'Instagram', icon: 'I',
       description: 'Organic posts, reels, stories, follower growth',
       last: lastDate(B.igDaily),
       installable: false,
-      comingSoon: 'Direct OAuth coming next sprint',
+      comingSoon: 'Included with Meta Ads · organic API coming soon',
     },
   ];
 
@@ -10295,6 +10341,7 @@ function ConnectionsPanel(){
           const c = sevVar(n);
           const lbl = sevLabel(n);
           const ageStr = s.last == null ? '—' : n === 0 ? 'today' : n === 1 ? '1 day ago' : n + ' days ago';
+          const conn = s.provider ? LIVE_CONNS.find(c => c.provider === s.provider && c.status === 'active') : null;
 
           return (<div key={s.id} className="card" style={{
             display:'flex', alignItems:'center', gap:'var(--s-4)',
@@ -10310,6 +10357,7 @@ function ConnectionsPanel(){
             <div style={{flex:1, minWidth:0}}>
               <div style={{display:'flex', alignItems:'baseline', gap:'var(--s-3)', marginBottom:4}}>
                 <span style={{fontSize:14.5, fontWeight:650}}>{s.name}</span>
+                {conn && <span style={{fontSize:11, color:'var(--good)', fontWeight:700}}>Connected{conn.account_label ? ` · ${conn.account_label}` : ''}</span>}
                 <span style={{display:'inline-flex', alignItems:'center', gap:5, fontSize:11, color:c, fontWeight:600}}>
                   <span style={{width:6, height:6, borderRadius:'var(--r-full)', background:c}}/>
                   {lbl}
@@ -10323,10 +10371,14 @@ function ConnectionsPanel(){
               {s.installable ? (
                 <button className="btn-primary" style={{padding:'7px 14px', fontSize:12.5, border:0, borderRadius:'var(--r-sm)', cursor:'pointer', fontFamily:'inherit', fontWeight:600}}
                   onClick={() => setShowShopifyForm(true)}>
-                  Connect via OAuth
+                  {conn ? 'Reconnect' : 'Connect via OAuth'}
                 </button>
-              ) : (
+              ) : !s.provider ? (
                 <span className="meta" style={{fontSize:11, fontStyle:'italic'}}>{s.comingSoon}</span>
+              ) : conn ? (
+                <a href="/auth/workspace.html" target="_top" className="meta" style={{fontSize:12, textDecoration:'none'}}>Manage →</a>
+              ) : (
+                <a href="/auth/workspace.html" target="_top" className="btn-primary" style={{padding:'7px 14px', fontSize:12.5, borderRadius:'var(--r-sm)', textDecoration:'none', fontWeight:600, display:'inline-block'}}>Set up →</a>
               )}
             </div>
           </div>);
