@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>greta — Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;550;600;650;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../auth/auth.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  /* ── App shell ─────────────────────────────────────────────────────── */
+  body { background: var(--bg-app); }
+  .app-bar {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(255,255,255,0.85); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .app-bar-inner {
+    max-width: 1180px; margin: 0 auto;
+    padding: var(--s-3) var(--s-6);
+    display: flex; align-items: center; gap: var(--s-4);
+  }
+  .app-bar .brand { margin-bottom: 0; }
+  .app-bar .divider { width: 1px; height: 22px; background: var(--border-subtle); }
+  .workspace-chip {
+    display: inline-flex; align-items: center; gap: var(--s-2);
+    padding: 5px 11px; border-radius: var(--r-md);
+    background: var(--bg-card); border: 1px solid var(--border-default);
+    font-size: 12px; font-weight: 550; color: var(--text-secondary);
+  }
+  .workspace-chip .dot {
+    width: 6px; height: 6px; border-radius: var(--r-full); background: var(--good);
+    box-shadow: 0 0 6px rgba(74,222,128,.6);
+  }
+  .app-bar-spacer { flex: 1; }
+  .app-tabs { display: flex; gap: var(--s-1); }
+  .app-tab {
+    padding: 6px 12px; border-radius: var(--r-sm); cursor: pointer;
+    font-size: 13px; color: var(--text-muted); font-weight: 530;
+    transition: color var(--motion-fast);
+  }
+  .app-tab:hover { color: var(--text-secondary); }
+  .app-tab.active {
+    color: var(--text-primary); background: var(--bg-card);
+    border: 1px solid var(--border-default);
+  }
+
+  .page { max-width: 1180px; margin: 0 auto; padding: var(--s-6); }
+
+  /* ── State banners ─────────────────────────────────────────────────── */
+  .state-banner {
+    display: flex; align-items: center; gap: var(--s-4);
+    padding: var(--s-4) var(--s-5); border-radius: var(--r-md);
+    border: 1px solid; margin-bottom: var(--s-5);
+  }
+  .state-banner.info { background: var(--accent-bg); border-color: rgba(124,58,237,0.3); }
+  .state-banner.warn { background: var(--warn-bg); border-color: rgba(245,181,68,0.3); }
+  .state-banner.good { background: var(--good-bg); border-color: rgba(74,222,128,0.3); }
+  .state-banner-icon {
+    width: 32px; height: 32px; border-radius: var(--r-md); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 700;
+  }
+  .state-banner.info .state-banner-icon { background: var(--accent-bg); color: var(--accent); }
+  .state-banner.warn .state-banner-icon { background: rgba(245,181,68,0.18); color: var(--warn); }
+  .state-banner.good .state-banner-icon { background: rgba(74,222,128,0.18); color: var(--good); }
+  .state-banner-body { flex: 1; }
+  .state-banner-title { font-size: 14px; font-weight: 650; margin-bottom: 2px; }
+  .state-banner-sub { font-size: 12.5px; color: var(--text-secondary); line-height: 1.5; }
+  .state-banner-action { flex-shrink: 0; }
+  .state-banner-action .btn-primary { padding: 8px 14px; font-size: 12.5px; }
+
+  /* ── Hero placeholder ──────────────────────────────────────────────── */
+  .hero-placeholder {
+    background: var(--bg-card); border: 1px solid var(--border-subtle);
+    border-radius: var(--r-lg); padding: var(--s-7) var(--s-8);
+    position: relative; overflow: hidden;
+  }
+  .hero-placeholder-bg {
+    position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(700px 300px at 0% 0%, rgba(139,92,246,0.10), transparent 60%);
+  }
+  .hero-content { position: relative; }
+  .hero-eyebrow {
+    font-size: 10.5px; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--accent); margin-bottom: var(--s-3);
+  }
+  .hero-headline {
+    font-size: 30px; font-weight: 650; letter-spacing: -.02em;
+    line-height: 1.1; margin-bottom: var(--s-3);
+  }
+  .hero-headline .accent { color: var(--accent); }
+  .hero-headline .muted { color: var(--text-muted); font-weight: 500; }
+  .hero-sub {
+    font-size: 15px; color: var(--text-secondary); max-width: 580px;
+    line-height: 1.55; margin-bottom: var(--s-5);
+  }
+
+  /* ── Panel grid ────────────────────────────────────────────────────── */
+  .panel-grid {
+    display: grid; gap: var(--s-3); margin-top: var(--s-5);
+    grid-template-columns: 1fr 1fr;
+  }
+  @media (max-width: 720px) { .panel-grid { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--bg-card); border: 1px solid var(--border-subtle);
+    border-radius: var(--r-md); padding: var(--s-5);
+    display: flex; flex-direction: column; gap: var(--s-3);
+    min-height: 180px;
+  }
+  .panel-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); }
+  .panel-title { font-size: 14px; font-weight: 650; }
+  .panel-pill {
+    font-size: 10px; font-weight: 700; letter-spacing: .04em;
+    text-transform: uppercase; padding: 2px 8px; border-radius: var(--r-full);
+  }
+  .panel-pill.locked {
+    background: var(--bg-elevated); color: var(--text-muted);
+    border: 1px solid var(--border-default);
+  }
+  .panel-pill.live { background: var(--good-bg); color: var(--good); }
+  .panel-pill.pending { background: var(--warn-bg); color: var(--warn); }
+  .panel-body { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+  .panel-locked-msg {
+    color: var(--text-muted); font-size: 12.5px; line-height: 1.6; text-align: center;
+    padding: var(--s-4) var(--s-3);
+  }
+  .panel-locked-msg b { color: var(--text-secondary); font-weight: 600; }
+  .panel-locked-action {
+    display: inline-block; margin-top: var(--s-3);
+    padding: 6px 12px; font-size: 11.5px; font-weight: 600;
+    background: var(--accent-bg); color: var(--accent);
+    border: 1px solid rgba(124,58,237,0.3);
+    border-radius: var(--r-sm); text-decoration: none;
+    transition: all var(--motion-fast);
+  }
+  .panel-locked-action:hover { background: rgba(124,58,237,0.15); text-decoration: none; }
+
+  .panel-stat-val { font-size: 28px; font-weight: 650; letter-spacing: -.015em; line-height: 1; }
+  .panel-stat-sub { font-size: 12px; color: var(--text-muted); margin-top: var(--s-2); }
+
+  /* ── First-sync progress card ──────────────────────────────────────── */
+  .sync-progress {
+    background: var(--bg-card); border: 1px solid var(--border-subtle);
+    border-radius: var(--r-lg); padding: var(--s-6) var(--s-7);
+    text-align: center; margin-bottom: var(--s-5);
+  }
+  .sync-spinner {
+    width: 32px; height: 32px; margin: 0 auto var(--s-4);
+    border: 3px solid var(--border-default);
+    border-top-color: var(--accent);
+    border-radius: var(--r-full); animation: spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .sync-resource {
+    font-size: 12.5px; color: var(--text-muted); margin-top: var(--s-1);
+  }
+  .sync-resource b { color: var(--text-secondary); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<header class="app-bar">
+  <div class="app-bar-inner">
+    <a href="/" class="brand" style="margin-bottom:0;">
+      <div class="brand-mark">
+        <svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" aria-label="Greta">
+          <defs>
+            <linearGradient id="gpb" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8B5CF6"/><stop offset="1" stop-color="#38BDF8"/></linearGradient>
+            <linearGradient id="ggm" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#22D3A6"/><stop offset="1" stop-color="#5DE5C8"/></linearGradient>
+          </defs>
+          <rect x="49" y="30" width="138" height="41" rx="20.5" transform="rotate(-45 118 50.5)" fill="url(#gpb)"/>
+          <rect x="71" y="177" width="138" height="41" rx="20.5" transform="rotate(-45 140 197.5)" fill="url(#ggm)"/>
+          <circle cx="97" cy="132" r="24" fill="#0B132B"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-name" style="font-size:19px; line-height:1;">greta</div>
+        <div class="meta" style="font-size:10.5px; margin-top:1px;">Every part of your business, every week.</div>
+      </div>
+    </a>
+    <div class="divider"></div>
+    <div class="workspace-chip">
+      <div class="dot"></div>
+      <span id="brand-chip">loading…</span>
+    </div>
+    <div class="app-bar-spacer"></div>
+    <div class="app-tabs">
+      <div class="app-tab active" data-tab="overview">Overview</div>
+      <div class="app-tab" data-tab="intelligence">Intelligence</div>
+      <div class="app-tab" data-tab="customers">Customers</div>
+      <div class="app-tab" data-tab="connections">Connections</div>
+    </div>
+    <button id="logout-btn" class="btn-ghost" style="padding: 5px 10px; font-size: 11.5px;">Log out</button>
+  </div>
+</header>
+
+<div class="page">
+  <div id="loading" style="text-align:center; padding:var(--s-8); color:var(--text-muted);">Loading your dashboard…</div>
+
+  <div id="no-session" hidden>
+    <div class="state-banner warn">
+      <div class="state-banner-icon">!</div>
+      <div class="state-banner-body">
+        <div class="state-banner-title">Not logged in</div>
+        <div class="state-banner-sub">Your session has expired. Log back in to continue.</div>
+      </div>
+      <div class="state-banner-action">
+        <a href="../auth/login.html" class="btn-primary">Log in →</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── OVERVIEW TAB ───────────────────────────────────────────────────── -->
+  <div id="tab-overview" class="tab-content">
+    <!-- Connection state banner (shown when Shopify not connected OR first sync running) -->
+    <div id="state-not-connected" hidden>
+      <div class="state-banner info">
+        <div class="state-banner-icon">→</div>
+        <div class="state-banner-body">
+          <div class="state-banner-title">Connect Shopify to populate your dashboard</div>
+          <div class="state-banner-sub">~30 seconds via OAuth. Pulls 90 days of orders, products, inventory and discounts. First findings appear within the hour.</div>
+        </div>
+        <div class="state-banner-action">
+          <a href="../auth/workspace.html" class="btn-primary">Set up Shopify →</a>
+        </div>
+      </div>
+    </div>
+
+    <div id="state-first-sync" hidden>
+      <div class="sync-progress">
+        <div class="sync-spinner"></div>
+        <h2 style="font-size:18px; font-weight:650; margin-bottom: 8px;">First sync in progress</h2>
+        <p class="meta" style="font-size:13.5px;">Pulling 90 days of data from <b id="sync-shop">your Shopify store</b> — usually takes a few minutes.</p>
+        <div class="sync-resource" id="sync-resource">Starting…</div>
+      </div>
+    </div>
+
+    <!-- Hero -->
+    <div class="hero-placeholder" id="hero-card">
+      <div class="hero-placeholder-bg"></div>
+      <div class="hero-content">
+        <div class="hero-eyebrow" id="hero-eyebrow">Monday brief</div>
+        <h1 class="hero-headline" id="hero-headline">Welcome to <span class="accent" id="hero-brand">your workspace</span></h1>
+        <p class="hero-sub" id="hero-sub">Your first Monday brief will land once Shopify is connected and the first 7 days of data have synced. Until then, here's the shape of what's coming.</p>
+      </div>
+    </div>
+
+    <!-- Panel grid -->
+    <div class="panel-grid">
+      <div class="panel" id="panel-money">
+        <div class="panel-head">
+          <div class="panel-title">Money on the table</div>
+          <span class="panel-pill locked" id="panel-money-pill">Locked</span>
+        </div>
+        <div class="panel-body" id="panel-money-body">
+          <div class="panel-locked-msg">
+            <b>£/month at stake</b><br/>
+            Quantifies every finding the engines surface — leakage, at-risk, opportunity.
+            <br/>
+            <span style="display:inline-block; margin-top:var(--s-2);">Requires Shopify + at least one paid channel.</span>
+            <br/>
+            <a href="../auth/workspace.html" class="panel-locked-action">Connect Shopify →</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-inventory">
+        <div class="panel-head">
+          <div class="panel-title">Inventory health</div>
+          <span class="panel-pill locked" id="panel-inventory-pill">Locked</span>
+        </div>
+        <div class="panel-body" id="panel-inventory-body">
+          <div class="panel-locked-msg">
+            <b>Days of cover per SKU</b><br/>
+            Flags critical low-stock + working capital trapped in overstock — days of cover per SKU and the cash tied up in slow movers.
+            <br/>
+            <a href="../auth/workspace.html" class="panel-locked-action">Connect Shopify →</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-creative">
+        <div class="panel-head">
+          <div class="panel-title">Creative vision</div>
+          <span class="panel-pill locked">Requires Meta</span>
+        </div>
+        <div class="panel-body">
+          <div class="panel-locked-msg">
+            <b>Vision-AI scores per ad asset</b><br/>
+            Hook strength · visual hierarchy · claim quality · audience fit · brand consistency. The differentiator vs Triple Whale.
+            <br/>
+            <span style="color:var(--text-faint); display:inline-block; margin-top:var(--s-2); font-size:11.5px;">Meta OAuth coming next sprint.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-email">
+        <div class="panel-head">
+          <div class="panel-title">Email attribution</div>
+          <span class="panel-pill locked">Requires Klaviyo</span>
+        </div>
+        <div class="panel-body">
+          <div class="panel-locked-msg">
+            <b>True attributed revenue (not gross)</b><br/>
+            Klaviyo's own dashboard reports gross-tracked. We pull AttributedFlow + AttributedCampaign so the £ figure is real.
+            <br/>
+            <span style="color:var(--text-faint); display:inline-block; margin-top:var(--s-2); font-size:11.5px;">Klaviyo connector coming next sprint.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Full live dashboard (embedded for brands whose rich view is wired up). -->
+    <iframe id="rich-dash" title="Live dashboard" hidden
+      style="width:100%; height:calc(100vh - 58px); border:0; background:var(--bg-app); display:block;"></iframe>
+  </div>
+
+  <!-- ── INTELLIGENCE TAB ───────────────────────────────────────────────── -->
+  <div id="tab-intelligence" class="tab-content" hidden>
+    <div class="state-banner info">
+      <div class="state-banner-icon">i</div>
+      <div class="state-banner-body">
+        <div class="state-banner-title">Intelligence engines run after the first 7 days of data</div>
+        <div class="state-banner-sub">Trend detection, divergence, money quantification and diagnostic recipes need ≥14 days of history to fire meaningfully. We deliberately refuse to surface low-confidence findings — see the intellectual-honesty layer.</div>
+      </div>
+    </div>
+
+    <div class="panel" style="min-height: 320px;">
+      <div class="panel-head">
+        <div class="panel-title">No active findings yet</div>
+        <span class="panel-pill pending">Pending data</span>
+      </div>
+      <div class="panel-body">
+        <div class="panel-locked-msg" style="max-width: 540px; margin: 0 auto;">
+          Engines that will fire as data accumulates:
+          <ul style="text-align: left; max-width: 380px; margin: var(--s-4) auto 0; padding-left: var(--s-5); color: var(--text-secondary); font-size: 12.5px; line-height: 1.7;">
+            <li><b style="color:var(--text-primary);">Trend engine</b> — slope detection with change-point + anomaly flagging (≥14 days)</li>
+            <li><b style="color:var(--text-primary);">Divergence engine</b> — when correlated channels decouple (≥14 days)</li>
+            <li><b style="color:var(--text-primary);">Money quantifier</b> — £/mo on every finding (with first action)</li>
+            <li><b style="color:var(--text-primary);">Diagnostic recipes</b> — auto-investigates the why (after first finding)</li>
+            <li><b style="color:var(--text-primary);">P(hit) calibration</b> — sample-size badges (after 3+ actions close)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CUSTOMERS TAB ──────────────────────────────────────────────────── -->
+  <div id="tab-customers" class="tab-content" hidden>
+    <h2 style="font-size:16px; font-weight:650; margin-bottom: var(--s-2);">Customers</h2>
+    <p class="meta" style="font-size:12.5px; margin-bottom: var(--s-5);">
+      Who your customers are, by value and loyalty — and reward the ones worth keeping. Names and consent are read live; nothing is stored in the page.
+    </p>
+    <div id="customers-root"></div>
+  </div>
+
+  <!-- ── CONNECTIONS TAB ────────────────────────────────────────────────── -->
+  <div id="tab-connections" class="tab-content" hidden>
+    <h2 style="font-size:16px; font-weight:650; margin-bottom: var(--s-3);">Your data sources</h2>
+    <p class="meta" style="font-size:12.5px; margin-bottom: var(--s-5);">
+      Manage connections, reconnect when tokens expire, see sync history.
+    </p>
+    <div id="conn-list" style="display:flex; flex-direction:column; gap:var(--s-3);">
+      <!-- Filled by JS -->
+    </div>
+    <p class="meta" style="font-size:12px; margin-top:var(--s-5);">
+      Need more setup help? <a href="../auth/workspace.html">Open the onboarding home →</a>
+    </p>
+  </div>
+</div>
+
+<script>
+  const SUPABASE_URL = 'https://awcncqvsnuhqyihpdgcx.supabase.co';
+  const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_6NLIq1JL_LZIMjez3FmnVQ_JIVw3-A2';
+  const SUPABASE_FNS = `${SUPABASE_URL}/functions/v1`;
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+  let currentBrand = null;
+  let currentToken = null;
+  let connByProvider = {};
+
+  // ── Tab switching ──────────────────────────────────────────────────────
+  document.querySelectorAll('.app-tab').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('.app-tab').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      document.querySelectorAll('.tab-content').forEach(c => c.hidden = true);
+      document.getElementById(`tab-${t.dataset.tab}`).hidden = false;
+    });
+  });
+
+  // ── Logout ─────────────────────────────────────────────────────────────
+  document.getElementById('logout-btn').addEventListener('click', async () => {
+    await sb.auth.signOut();
+    window.location.href = '../auth/login.html';
+  });
+
+  // ── Boot ───────────────────────────────────────────────────────────────
+  (async () => {
+    const { data } = await sb.auth.getSession();
+    const session = data?.session;
+    currentToken = session?.access_token || null;
+
+    if (!session) {
+      document.getElementById('loading').hidden = true;
+      document.getElementById('no-session').hidden = false;
+      document.querySelectorAll('.tab-content').forEach(c => c.hidden = true);
+      return;
+    }
+
+    // Resolve brand. URL param ?brand=slug takes precedence over first membership.
+    const wantSlug = new URLSearchParams(window.location.search).get('brand');
+    const { data: memberships } = await sb
+      .from('brand_users')
+      .select('role, brand:brands(id, slug, name, vertical, currency, metadata)')
+      .eq('user_id', session.user.id);
+
+    if (!memberships || memberships.length === 0) {
+      window.location.href = '../auth/workspace.html';
+      return;
+    }
+
+    currentBrand = (wantSlug && memberships.find(m => m.brand.slug === wantSlug)?.brand)
+                   || memberships[0].brand;
+
+    document.getElementById('brand-chip').textContent = currentBrand.name;
+    document.getElementById('hero-brand').textContent = currentBrand.name;
+
+    // Load connections
+    const { data: connections } = await sb
+      .from('connections')
+      .select('id, provider, status, account_label, last_sync_at')
+      .eq('brand_id', currentBrand.id);
+    connByProvider = Object.fromEntries((connections || []).map(c => [c.provider, c]));
+
+    renderOverview();
+    renderConnectionsTab();
+    document.getElementById('loading').hidden = true;
+  })();
+
+  function renderOverview() {
+    const shop = connByProvider['shopify'];
+    const stateNotConnected = document.getElementById('state-not-connected');
+    const stateFirstSync = document.getElementById('state-first-sync');
+
+    if (!shop || shop.status !== 'active') {
+      stateNotConnected.hidden = false;
+      stateFirstSync.hidden = true;
+      return;
+    }
+
+    // Shopify is connected. Is first sync done?
+    if (!shop.last_sync_at) {
+      stateNotConnected.hidden = true;
+      stateFirstSync.hidden = false;
+      document.getElementById('sync-shop').textContent = shop.account_label || 'your Shopify store';
+      pollSyncProgress();
+      return;
+    }
+
+    // Sync has run at least once — show the populated state.
+    stateNotConnected.hidden = true;
+    stateFirstSync.hidden = true;
+
+    // Every connected brand renders the full live dashboard inline, instead of the
+    // placeholder panels (previously gated to an allow-list of one — 'frkl' — which left
+    // every other tenant on the placeholder path). Brand identity is injected via the
+    // OI_* globals below; the ?v= just pins the cache. The user is already authenticated,
+    // so we pre-satisfy the dashboard's access gate via shared same-origin localStorage
+    // (no passcode prompt). The embedded dashboard's loader reads live tenant data using
+    // this same session.
+    const richUrl = '/greta-dashboard.html?v=20260706165604';
+    if (richUrl) {
+      try { localStorage.setItem('oi_gate_v1', 'b8bd9e7d7fe04b396ddc52df76d65e84a99565fff0f22d805d6b13b4517bcdb5'); } catch (e) {}
+      // Activate the dashboard's "Ask the data" panel: same-origin iframe reads
+      // window.parent.OI_ASK. getJwt() returns a FRESH session token each send
+      // (supabase auto-refreshes it), so the relay's per-tenant auth never goes stale.
+      window.OI_ASK = {
+        endpoint: SUPABASE_URL + '/functions/v1/ask-data',
+        brand_id: currentBrand.id,
+        getJwt: async () => { const { data } = await sb.auth.getSession(); return data?.session?.access_token || ''; },
+      };
+      // Per-tenant brand identity for the embedded dashboard. The iframe's data loader
+      // (OI_BRAND_SLUG) and app copy/LLM prompts (OI_BRAND) read these via window.parent,
+      // mirroring OI_ASK. Without them the loader defaults to frkl's data and the copy
+      // renders frkl's name/vertical/markets. markets/seasonality live in brands.metadata.
+      window.OI_BRAND_SLUG = currentBrand.slug;
+      const _md = currentBrand.metadata || {};
+      window.OI_BRAND = {
+        name: currentBrand.name,
+        slug: currentBrand.slug,
+        vertical: currentBrand.vertical || 'DTC',
+        markets: Array.isArray(_md.primary_markets) ? _md.primary_markets.join('/') : (_md.markets || ''),
+        seasonality: _md.seasonality || 'No specific seasonality profile on record — treat seasonal claims cautiously.',
+      };
+      document.getElementById('hero-card').hidden = true;
+      const pg = document.querySelector('#tab-overview .panel-grid');
+      // .panel-grid sets display:grid, which overrides the [hidden] attribute
+      // (author rule beats the UA [hidden]{display:none}). Hide it explicitly.
+      if (pg) pg.style.display = 'none';
+      const page = document.querySelector('.page');
+      if (page) { page.style.maxWidth = 'none'; page.style.padding = '0'; }
+      const fr = document.getElementById('rich-dash');
+      if (fr) { if (!fr.getAttribute('src')) fr.setAttribute('src', richUrl); fr.hidden = false; }
+      return;
+    }
+
+    // Update hero
+    const synced = new Date(shop.last_sync_at);
+    document.getElementById('hero-eyebrow').textContent = 'Your dashboard';
+    document.getElementById('hero-headline').innerHTML = `<span class="accent">${currentBrand.name}</span> <span class="muted">is live.</span>`;
+    document.getElementById('hero-sub').innerHTML = `Last synced from ${shop.account_label} at <b style="color:var(--text-primary);">${synced.toLocaleString()}</b>. Findings populate as the engines run.`;
+
+    // Unlock Shopify-dependent panels
+    document.getElementById('panel-money-pill').textContent = 'Pending findings';
+    document.getElementById('panel-money-pill').className = 'panel-pill pending';
+    document.getElementById('panel-money-body').innerHTML = `
+      <div class="panel-locked-msg">
+        Money quantifier runs after the first algorithm pass.<br/>
+        Next algorithm run: <b>Monday</b> · expected to surface 5-10 £-tagged findings.
+      </div>
+    `;
+
+    document.getElementById('panel-inventory-pill').textContent = 'Live';
+    document.getElementById('panel-inventory-pill').className = 'panel-pill live';
+    document.getElementById('panel-inventory-body').innerHTML = `
+      <div class="panel-locked-msg">
+        Inventory data synced. <br/>
+        Panel UI ships in the next sprint — for now it lives in your <a href="#" style="color:var(--accent);">weekly brief email</a>.
+      </div>
+    `;
+  }
+
+  async function pollSyncProgress() {
+    if (!connByProvider['shopify']) return;
+    const { data: logs } = await sb
+      .from('connection_sync_log')
+      .select('resource, status, rows_synced, started_at, finished_at')
+      .eq('connection_id', connByProvider['shopify'].id)
+      .order('started_at', { ascending: false })
+      .limit(3);
+
+    if (logs && logs.length > 0) {
+      const latest = logs[0];
+      const txt = latest.status === 'success'
+        ? `Synced <b>${latest.resource}</b> · ${latest.rows_synced ?? '?'} rows`
+        : latest.status === 'error'
+        ? `Error syncing <b>${latest.resource}</b> — check Connections tab`
+        : `Syncing <b>${latest.resource || 'data'}</b>…`;
+      document.getElementById('sync-resource').innerHTML = txt;
+    }
+    // Poll every 5s for up to ~5 minutes
+    setTimeout(() => {
+      // Re-fetch the connection to see if last_sync_at populated
+      sb.from('connections').select('last_sync_at').eq('id', connByProvider['shopify'].id).single()
+        .then(({data}) => {
+          if (data?.last_sync_at) {
+            connByProvider['shopify'].last_sync_at = data.last_sync_at;
+            renderOverview();
+          } else {
+            pollSyncProgress();
+          }
+        });
+    }, 5000);
+  }
+
+  function renderConnectionsTab() {
+    const PROVIDERS = [
+      {id:'shopify', name:'Shopify', icon:'S', installable:true},
+      {id:'meta', name:'Meta Ads', icon:'M', installable:true},
+      {id:'klaviyo', name:'Klaviyo', icon:'K', installable:true},
+      {id:'google_ads', name:'Google Ads', icon:'G', installable:true},
+      {id:'ga4', name:'Google Analytics 4', icon:'A', installable:true},
+      {id:'tiktok_ads', name:'TikTok Ads', icon:'T', installable:true},
+    ];
+    const list = document.getElementById('conn-list');
+    list.innerHTML = '';
+
+    PROVIDERS.forEach(p => {
+      const conn = connByProvider[p.id];
+      const isActive = conn && conn.status === 'active';
+      const card = document.createElement('div');
+      card.className = 'panel';
+      card.style.minHeight = '0';
+      card.innerHTML = `
+        <div style="display:flex; align-items:center; gap:var(--s-3);">
+          <div style="width:36px; height:36px; border-radius:var(--r-md); background:var(--bg-elevated); border:1px solid var(--border-default); display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; color:${isActive ? 'var(--good)' : 'var(--text-muted)'};">
+            ${p.icon}
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:14px; font-weight:650;">${p.name}</div>
+            <div style="font-size:11.5px; color:${isActive ? 'var(--good)' : 'var(--text-muted)'}; font-weight:600; margin-top:2px;">
+              ${isActive ? `Connected · ${conn.account_label || ''}${conn.last_sync_at ? ` · synced ${new Date(conn.last_sync_at).toLocaleString()}` : ''}` : (p.installable ? 'Not connected' : 'Coming next sprint')}
+            </div>
+          </div>
+          <div>
+            ${isActive
+              ? `<a href="../auth/workspace.html" class="btn-ghost" style="padding:6px 12px; font-size:12px; text-decoration:none;" data-provider="${p.id}">Reconnect</a>`
+              : (p.installable
+                  ? `<a href="../auth/workspace.html" class="btn-primary" style="padding:6px 12px; font-size:12px; text-decoration:none;">Set up →</a>`
+                  : `<span class="meta" style="font-size:11px;">Coming soon</span>`)
+            }
+          </div>
+        </div>
+      `;
+      list.appendChild(card);
+    });
+  }
+
+  // ── Customers tab: RFM + loyalty + consent-gated reward staging ──────────
+  // Reads live via the JWT-gated customer-intelligence / stage-reward functions
+  // (PII stays server-side: the browser only gets first name + last initial).
+  const CI_SEG = {
+    'Champion':           { c:'#34d399', blurb:'High value, frequent, recent — reward & protect' },
+    'Loyal':              { c:'#60a5fa', blurb:'Repeat & recent — nurture toward Champion' },
+    'At risk':            { c:'#fbbf24', blurb:'Were valuable, gone quiet — win back' },
+    'Promising (new)':    { c:'#a78bfa', blurb:'One order, recent — drive the 2nd purchase' },
+    'Dormant (one-time)': { c:'#94a3b8', blurb:'One order, lapsed — reactivation pool' },
+  };
+  const CI_LOY = {
+    full_price:      { label:'Full-price loyal', c:'#34d399', play:'The real VIPs — reward with non-discount perks' },
+    mixed:           { label:'Mixed',            c:'#fbbf24', play:'Nurture toward full price' },
+    discount_driven: { label:'Discount-driven',  c:'#f87171', play:'Loyal to the deal — test-wean, don’t send more codes' },
+  };
+  const ciGBP = n => n == null ? '—' : '£' + Math.round(n).toLocaleString();
+  const ciEsc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+  async function ciPost(fn, payload) {
+    const res = await fetch(`${SUPABASE_FNS}/${fn}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${currentToken}` },
+      body: JSON.stringify({ brandId: currentBrand.id, ...payload }),
+    });
+    if (!res.ok) throw new Error(`${fn} ${res.status}: ${(await res.text()).slice(0, 160)}`);
+    return res.json();
+  }
+
+  let customersBooted = false;
+  let ciState = { seg: null, consent: true, loyalty: '' };
+
+  async function renderCustomersTab() {
+    if (customersBooted) return; customersBooted = true;
+    const root = document.getElementById('customers-root');
+    if (!currentBrand || !currentToken) { root.innerHTML = '<div class="panel-locked-msg">Log in to view customers.</div>'; return; }
+    root.innerHTML = '<div class="meta" style="padding:var(--s-5);">Loading customer segments…</div>';
+    try { drawOverview(await ciPost('customer-intelligence', { action: 'overview' })); }
+    catch (e) { root.innerHTML = `<div class="state-banner warn"><div class="state-banner-icon">!</div><div class="state-banner-body"><div class="state-banner-title">Couldn’t load customers</div><div class="state-banner-sub">${ciEsc(e.message)}</div></div></div>`; }
+  }
+
+  function drawOverview(ov) {
+    const cards = ov.segments.map(s => {
+      const m = CI_SEG[s.segment] || { c: 'var(--accent)', blurb: '' };
+      return `<div class="ci-card" data-seg="${ciEsc(s.segment)}" style="cursor:pointer; flex:1 1 150px; padding:var(--s-4); border-radius:var(--r-md); background:var(--bg-card); border:1px solid var(--border-subtle);">
+        <div style="font-size:11px; font-weight:700; color:${m.c}; display:flex; align-items:center; gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:${m.c};"></span>${ciEsc(s.segment)}</div>
+        <div style="font-size:24px; font-weight:700; margin-top:4px;">${s.customers.toLocaleString()}</div>
+        <div class="meta" style="font-size:11px;">${ciGBP(s.netRevenue)} · ${s.revSharePct}% · avg ${ciGBP(s.avgValue)}</div>
+      </div>`;
+    }).join('');
+    const loy = (ov.championLoyalty || []).map(l => {
+      const m = CI_LOY[l.type]; return `<div style="flex:1 1 160px;"><div style="font-size:11px;font-weight:700;color:${m.c};">${m.label}: ${l.customers}</div><div class="meta" style="font-size:11px;">${ciGBP(l.netRevenue)} · ${m.play}</div></div>`;
+    }).join('');
+    document.getElementById('customers-root').innerHTML = `
+      <div class="meta" style="font-size:11.5px; margin-bottom:var(--s-3);">${ov.totals.customers.toLocaleString()} customers · ${ciGBP(ov.totals.netRevenue)} net</div>
+      <div style="display:flex; gap:var(--s-2); flex-wrap:wrap; margin-bottom:var(--s-4);">${cards}</div>
+      <div class="state-banner info" style="display:block;"><div style="font-weight:650; margin-bottom:6px;">Reward by loyalty, not blanket discount</div><div style="display:flex; gap:var(--s-4); flex-wrap:wrap;">${loy}</div></div>
+      <div id="ci-detail"></div>`;
+    document.querySelectorAll('#customers-root .ci-card').forEach(el => el.addEventListener('click', () => openSegment(el.dataset.seg)));
+  }
+
+  async function openSegment(seg) {
+    ciState = { seg, consent: true, loyalty: '' };
+    const d = document.getElementById('ci-detail');
+    d.innerHTML = '<div class="meta" style="padding:var(--s-4);">Loading…</div>';
+    try { drawSegment(await ciPost('customer-intelligence', { action: 'segment', segment: seg, limit: 200 })); }
+    catch (e) { d.innerHTML = `<div class="panel-locked-msg">${ciEsc(e.message)}</div>`; }
+  }
+
+  function drawSegment(res) {
+    const m = CI_SEG[res.segment] || { c: 'var(--accent)', blurb: '' };
+    const rows = res.people.slice(0, 25).map(p => `<tr>
+      <td style="padding:6px 8px;">${ciEsc(p.name)}</td><td style="padding:6px 8px;">${p.orders}</td>
+      <td style="padding:6px 8px;">${ciGBP(p.netRevenue)}</td><td style="padding:6px 8px;">${p.recencyDays}d</td>
+      <td style="padding:6px 8px;">${ciEsc(p.acquisitionChannel)}</td>
+      <td style="padding:6px 8px; color:${(CI_LOY[p.loyalty] || {}).c || 'inherit'};">${p.discountPct}%</td>
+      <td style="padding:6px 8px; color:${p.emailable ? 'var(--good)' : 'var(--text-faint)'};">${p.emailable ? '✓' : '—'}</td></tr>`).join('');
+    document.getElementById('ci-detail').innerHTML = `
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--s-3); margin:var(--s-4) 0 var(--s-2);">
+        <div style="font-size:12px; font-weight:700; color:${m.c};">${ciEsc(res.segment)} — ${ciEsc(m.blurb)}</div>
+        <div style="display:flex; gap:var(--s-2); align-items:center; flex-wrap:wrap;">
+          <select id="ci-loyalty" class="meta" style="background:var(--bg-elevated); color:var(--text-secondary); border:1px solid var(--border-default); border-radius:6px; padding:4px 6px;">
+            <option value="">All loyalty types</option><option value="full_price">Full-price loyal</option><option value="mixed">Mixed</option><option value="discount_driven">Discount-driven</option>
+          </select>
+          <label class="meta" style="display:flex; gap:4px; align-items:center;"><input type="checkbox" id="ci-consent" checked> consented only</label>
+          <button id="ci-preview" class="btn-ghost" style="padding:5px 11px; font-size:12px;">Preview reward audience</button>
+        </div>
+      </div>
+      <div id="ci-stage"></div>
+      <div style="overflow:auto; border:1px solid var(--border-subtle); border-radius:var(--r-md); margin-top:var(--s-2);">
+        <table style="width:100%; border-collapse:collapse; font-size:12.5px;">
+          <thead><tr style="text-align:left; color:var(--text-muted);"><th style="padding:6px 8px;">Customer</th><th style="padding:6px 8px;">Orders</th><th style="padding:6px 8px;">Net spend</th><th style="padding:6px 8px;">Last</th><th style="padding:6px 8px;">Acquired</th><th style="padding:6px 8px;">Disc%</th><th style="padding:6px 8px;">Email</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      ${res.count > 25 ? `<div class="meta" style="font-size:11px; margin-top:6px;">Showing top 25 of ${res.count} by spend.</div>` : ''}`;
+    document.getElementById('ci-loyalty').addEventListener('change', e => ciState.loyalty = e.target.value);
+    document.getElementById('ci-consent').addEventListener('change', e => ciState.consent = e.target.checked);
+    document.getElementById('ci-preview').addEventListener('click', previewReward);
+  }
+
+  async function previewReward() {
+    const stage = document.getElementById('ci-stage');
+    stage.innerHTML = '<div class="meta" style="padding:var(--s-2);">…</div>';
+    try {
+      const p = await ciPost('customer-intelligence', { action: 'stage_preview', segment: ciState.seg, requireConsent: ciState.consent, ...(ciState.loyalty ? { loyalty: ciState.loyalty } : {}) });
+      stage.innerHTML = `<div class="state-banner info" style="display:block; margin-bottom:var(--s-2);">
+        Would reach <b>${p.audienceReachable}</b> of ${p.audienceTotal} ${ciEsc(ciState.seg.toLowerCase())} customers worth <b>${ciGBP(p.audienceValue)}</b>${p.excludedNoConsent ? ` · ${p.excludedNoConsent} excluded (no consent)` : ''}.
+        <div style="margin-top:6px; display:flex; gap:var(--s-2); align-items:center; flex-wrap:wrap;">
+          <button id="ci-stage-btn" class="btn-primary" style="padding:5px 11px; font-size:12px;">Stage in Klaviyo →</button>
+          <span class="meta" style="font-size:11px;">Creates a Klaviyo list — nothing sent. You send from Klaviyo.</span>
+          <span id="ci-stage-result" class="meta" style="font-size:11.5px;"></span>
+        </div></div>`;
+      document.getElementById('ci-stage-btn').addEventListener('click', stageReward);
+    } catch (e) { stage.innerHTML = `<div class="panel-locked-msg">${ciEsc(e.message)}</div>`; }
+  }
+
+  async function stageReward() {
+    const out = document.getElementById('ci-stage-result');
+    const btn = document.getElementById('ci-stage-btn');
+    if (!confirm(`Stage these consented ${ciState.seg} customers as a Klaviyo list?\n\nThis creates a list in Klaviyo — no email is sent. You build and send the campaign yourself in Klaviyo.`)) return;
+    btn.disabled = true; out.style.color = 'var(--text-muted)'; out.textContent = 'Staging…';
+    try {
+      const r = await ciPost('stage-reward', { segment: ciState.seg, requireConsent: ciState.consent, ...(ciState.loyalty ? { loyalty: ciState.loyalty } : {}), confirm: true });
+      out.style.color = 'var(--good)';
+      out.textContent = `✓ Staged “${r.listName}” — ${r.profilesSubmitted} profiles imported. Build the campaign in Klaviyo.`;
+    } catch (e) { out.style.color = 'var(--warn)'; out.textContent = 'Couldn’t stage — ' + e.message; btn.disabled = false; }
+  }
+
+  document.querySelector('.app-tab[data-tab="customers"]').addEventListener('click', renderCustomersTab);
+</script>
+</body>
+</html>
