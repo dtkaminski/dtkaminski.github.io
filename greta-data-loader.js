@@ -300,8 +300,12 @@
         else if (m.kind === 'opportunity') rollup.opportunity += v;
         else if (m.kind === 'at_risk') rollup.at_risk += v;
       }
+      // A finding promoted to an action by the action-synthesizer carries the same £ in both
+      // places — count it once (the action side), or the hero rollup double-counts.
+      const promotedSynth = new Set(Object.values(action_money).map(m => m.synthetic_id).filter(Boolean));
       for (const p of moneyPatterns) {
         const md = p.metadata || {};
+        if (md.synthetic_id && promotedSynth.has(md.synthetic_id)) continue;
         const v = Math.abs(md.monthly_impact_gbp || 0);
         if (md.kind === 'leakage') rollup.leakage += v;
         else if (md.kind === 'opportunity') rollup.opportunity += v;
