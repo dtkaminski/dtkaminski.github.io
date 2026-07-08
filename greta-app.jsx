@@ -10145,6 +10145,17 @@ function PlanningView(){
   );
 }
 
+// Marketing OS views (Command Centre / Decision log) — rendered from the pre-built marketing-os.build.js
+// bundle (window.CommandCentre / window.DecisionLog), wired to the live Supabase auth via window.OI_ASK.
+function mosView(name){
+  const C = window[name];
+  const A = window.OI_ASK || {};
+  if (!C) return React.createElement('div',{className:'note'}, name+' unavailable — marketing-os.build.js not loaded.');
+  if (!A.brand_id) return React.createElement('div',{className:'note'}, 'Sign in to load the Marketing OS for your brand.');
+  const apiBase = (A.endpoint||'').replace(/\/functions\/v1\/[^/]*$/, '');
+  return React.createElement(C, { brandId: A.brand_id, apiBase: apiBase, getToken: A.getJwt });
+}
+
 const NAV = [
   // OVERVIEW — how's the business (daily → weekly → periodic → auto-detected)
   { id:'home',    label:'Today',    icon:'home',     subtabs:[
@@ -10196,6 +10207,10 @@ const NAV = [
     { id:'plan',      label:'Demand & POs', component: () => <PlanningView/> },
     { id:'suppliers', label:'Suppliers',    component: () => <SuppliersDirectory/> },
   ]},
+  { id:'operate', label:'Command Centre', icon:'clipboard', subtabs:[
+    { id:'command',   label:'Command Centre', component: () => mosView('CommandCentre') },
+    { id:'decisions', label:'Decision log',   component: () => mosView('DecisionLog') },
+  ]},
   { id:'settings',label:'Settings',     icon:'sliders', subtabs:[
     { id:'connections', label:'Connections', component: () => <ConnectionsPanel/> },
     { id:'economics',   label:'Business economics', component: () => <BusinessEconomicsPanel/> },
@@ -10223,6 +10238,7 @@ const RAIL = [
   { group:'Customers',label:'Competitors',       icon:'search',    section:'market' },
   { group:'Products & supply', label:'Products & stock', icon:'box',   section:'commerce' },
   { group:'Products & supply', label:'Plan & supply',    icon:'truck', section:'planning' },
+  { group:'Act',      label:'Command Centre',    icon:'clipboard', section:'operate' },
   { group:'',         label:'Settings',          icon:'sliders',   section:'settings', pin:true },
 ];
 const NAV_BY_ID = Object.fromEntries(NAV.map(s=>[s.id, s]));

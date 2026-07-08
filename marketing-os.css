@@ -1,0 +1,122 @@
+/* marketing-os.css — Command Centre component styles.
+ *
+ * EVERY visual value references a token from /design-tokens.css (link that FIRST). No hardcoded hex,
+ * px spacing, or radii here — per the project design rules. Numbers/metrics use --font-mono; labels
+ * and body use --font-sans. Sections are separated by whitespace + a hairline (--color-line) rather
+ * than stacked cards; cards (shadow) are reserved for interactive content (recommendations).
+ */
+
+.mos-root {
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+  background: var(--color-surface);
+  padding: var(--space-8);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* ---- header ---- */
+.mos-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: var(--space-3); margin-bottom: var(--space-8); }
+.mos-title { font-size: var(--text-xl); font-weight: 600; margin: 0; }
+.mos-asof { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-muted); }
+
+/* ---- section (whitespace + hairline, NOT a card) ---- */
+.mos-section { border-top: 1px solid var(--color-line); padding-top: var(--space-4); margin-bottom: var(--space-10); }
+.mos-section > h2 { font-size: var(--text-sm); font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: var(--color-muted); margin: 0 0 var(--space-4); }
+
+/* ---- metric grid + stat ---- */
+.mos-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--space-6) var(--space-8); }
+.mos-stat { display: flex; flex-direction: column; gap: var(--space-1); }
+.mos-stat-label { font-size: var(--text-xs); color: var(--color-muted); display: flex; align-items: center; gap: var(--space-1); }
+.mos-stat-value { font-family: var(--font-mono); font-size: var(--text-lg); font-weight: 500; color: var(--color-ink); font-variant-numeric: tabular-nums; }
+.mos-stat-sub { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-muted); }
+.mos-hero .mos-stat-value { font-size: var(--text-2xl); }
+
+/* target/pacing deltas */
+.mos-pos { color: var(--color-success); }
+.mos-neg { color: var(--color-danger); }
+.mos-warn { color: var(--color-warning); }
+.mos-muted { color: var(--color-muted); }
+
+/* basis / provenance tag */
+.mos-basis { font-size: var(--text-xs); color: var(--color-muted); margin-top: var(--space-2); font-style: italic; }
+.mos-tag { font-family: var(--font-mono); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; padding: 1px var(--space-1); border: 1px solid var(--color-line); border-radius: var(--radius-sm); color: var(--color-muted); }
+
+/* ---- channel table ---- */
+.mos-table { width: 100%; border-collapse: collapse; }
+.mos-table th { text-align: right; font-size: var(--text-xs); font-weight: 600; color: var(--color-muted); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-line); }
+.mos-table th:first-child, .mos-table td:first-child { text-align: left; }
+.mos-table td { font-family: var(--font-mono); font-size: var(--text-sm); text-align: right; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--color-line); font-variant-numeric: tabular-nums; }
+.mos-table td:first-child { font-family: var(--font-sans); }
+
+/* ---- recommendation cards (interactive → elevation allowed) ---- */
+.mos-recs { display: flex; flex-direction: column; gap: var(--space-4); }
+.mos-rec { background: var(--color-panel); border: 1px solid var(--color-line); border-left: 3px solid var(--color-accent); border-radius: var(--radius-none); box-shadow: var(--shadow-panel); padding: var(--space-4) var(--space-6); }
+.mos-rec-top { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); }
+.mos-rec-kind { font-weight: 600; font-size: var(--text-sm); }
+.mos-rec-impact { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-accent); white-space: nowrap; }
+.mos-rec-rationale { font-size: var(--text-sm); color: var(--color-muted); margin: var(--space-2) 0 var(--space-4); }
+.mos-rec-actions { display: flex; gap: var(--space-2); }
+
+/* ---- buttons (radius-md) ---- */
+.mos-btn { font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 500; padding: var(--space-2) var(--space-4); border-radius: var(--radius-md); border: 1px solid var(--color-line); background: var(--color-panel); color: var(--color-ink); cursor: pointer; transition: background var(--transition-fast); }
+.mos-btn:hover { background: var(--color-surface); }
+.mos-btn-primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-panel); }
+.mos-btn-primary:hover { filter: brightness(0.94); background: var(--color-accent); }
+
+/* ---- campaigns ---- */
+.mos-camp { display: flex; justify-content: space-between; align-items: center; gap: var(--space-4); padding: var(--space-3) 0; border-bottom: 1px solid var(--color-line); }
+.mos-camp-name { font-weight: 500; font-size: var(--text-sm); }
+.mos-camp-meta { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-muted); }
+.mos-status { font-family: var(--font-mono); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; padding: 1px var(--space-2); border-radius: var(--radius-sm); border: 1px solid var(--color-line); color: var(--color-muted); }
+.mos-status-live { color: var(--color-success); border-color: var(--color-success); }
+
+/* ---- empty states (first-class, not broken) ---- */
+.mos-empty { padding: var(--space-6); border: 1px dashed var(--color-line); border-radius: var(--radius-none); color: var(--color-muted); font-size: var(--text-sm); }
+.mos-empty a, .mos-empty button { color: var(--color-accent); background: none; border: none; padding: 0; cursor: pointer; font: inherit; text-decoration: underline; }
+
+/* ---- tooltip (metric definitions) ---- */
+.mos-info { display: inline-flex; align-items: center; justify-content: center; width: 13px; height: 13px; border-radius: 50%; border: 1px solid var(--color-line); font-size: 9px; color: var(--color-muted); cursor: help; }
+
+/* ---- drawers (GoalEditor, CampaignDrawer) ---- */
+.mos-overlay { position: fixed; inset: 0; background: rgba(20,20,20,0.28); display: flex; justify-content: flex-end; z-index: 50; }
+.mos-drawer { width: 480px; max-width: 92vw; height: 100%; overflow-y: auto; background: var(--color-panel); box-shadow: var(--shadow-raised); border-left: 1px solid var(--color-line); padding: var(--space-8); }
+.mos-drawer-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: var(--space-6); }
+.mos-drawer-title { font-size: var(--text-lg); font-weight: 600; margin: 0; }
+.mos-drawer-close { background: none; border: none; font-size: var(--text-lg); color: var(--color-muted); cursor: pointer; line-height: 1; }
+
+/* form controls */
+.mos-field { display: flex; flex-direction: column; gap: var(--space-1); margin-bottom: var(--space-4); }
+.mos-field > label { font-size: var(--text-xs); color: var(--color-muted); font-weight: 600; }
+.mos-field .mos-req { color: var(--color-accent); }
+.mos-input, .mos-select { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--color-ink); background: var(--color-panel); border: 1px solid var(--color-line); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); width: 100%; box-sizing: border-box; }
+.mos-input:focus, .mos-select:focus { outline: none; border-color: var(--color-accent); }
+.mos-input.mos-num-input { font-family: var(--font-mono); }
+.mos-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+.mos-drawer-actions { display: flex; gap: var(--space-2); margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--color-line); }
+.mos-form-error { color: var(--color-danger); font-size: var(--text-sm); margin-top: var(--space-2); }
+.mos-subhead { font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-muted); font-weight: 600; margin: var(--space-6) 0 var(--space-3); }
+
+/* ---- Canon: diagnosis banner + flags ---- */
+.mos-diag { padding: var(--space-3) var(--space-4); border-radius: var(--radius-none); border: 1px solid var(--color-line); border-left: 3px solid var(--color-muted); margin-bottom: var(--space-4); font-size: var(--text-sm); }
+.mos-diag-over { border-left-color: var(--color-warning); background: color-mix(in srgb, var(--color-warning) 6%, transparent); }
+.mos-diag-eff { border-left-color: var(--color-danger); background: color-mix(in srgb, var(--color-danger) 5%, transparent); }
+.mos-diag-vol { border-left-color: var(--color-accent); background: color-mix(in srgb, var(--color-accent) 5%, transparent); }
+.mos-diag-label { font-family: var(--font-mono); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-muted); margin-right: var(--space-2); }
+.mos-badge-demand { font-family: var(--font-mono); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-success); border: 1px solid var(--color-success); border-radius: var(--radius-sm); padding: 0 var(--space-1); margin-left: var(--space-2); white-space: nowrap; }
+.mos-row-demand td { background: color-mix(in srgb, var(--color-success) 5%, transparent); }
+.mos-below td.mos-cell-flag { color: var(--color-warning); }
+
+/* ---- Decision log ---- */
+.mos-dl { display: flex; flex-direction: column; }
+.mos-dl-row { border-bottom: 1px solid var(--color-line); }
+.mos-dl-head { display: grid; grid-template-columns: 92px 1fr auto; gap: var(--space-4); align-items: center; padding: var(--space-3) 0; cursor: pointer; }
+.mos-dl-when { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-muted); }
+.mos-dl-title { font-weight: 500; font-size: var(--text-sm); }
+.mos-dl-diag { font-size: var(--text-xs); color: var(--color-muted); margin-top: 2px; }
+.mos-dl-right { display: flex; align-items: center; gap: var(--space-3); }
+.mos-dl-caret { color: var(--color-muted); font-size: var(--text-xs); }
+.mos-dl-detail { padding: var(--space-3) 0 var(--space-4) 92px; display: flex; flex-direction: column; gap: var(--space-2); }
+.mos-dl-kv { display: grid; grid-template-columns: 96px 1fr; gap: var(--space-4); font-size: var(--text-sm); }
+.mos-dl-kv > span { color: var(--color-muted); font-size: var(--text-xs); }
+.mos-dl-kv > b { font-weight: 500; }

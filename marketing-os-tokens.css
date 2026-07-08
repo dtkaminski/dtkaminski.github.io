@@ -1,0 +1,46 @@
+:root {
+  --color-ink:      #141414;
+  --color-surface:  #F5F2ED;
+  --color-panel:    #FFFFFF;
+  --color-accent:   #C84B00;
+  --color-muted:    #6B6B6B;
+  --color-line:     #E0DCD6;
+  --color-success:  #1A7A4A;
+  --color-warning:  #B45309;
+  --color-danger:   #B91C1C;
+  --color-data-1:   #C84B00;
+  --color-data-2:   #1A7A4A;
+  --color-data-3:   #2563EB;
+  --color-data-4:   #7C3AED;
+
+  --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'DM Mono', 'Fira Code', ui-monospace, monospace;
+
+  --text-xs:   0.75rem;
+  --text-sm:   0.875rem;
+  --text-base: 1rem;
+  --text-lg:   1.125rem;
+  --text-xl:   1.5rem;
+  --text-2xl:  2rem;
+  --text-data: 2.5rem;
+
+  --radius-none: 0px;
+  --radius-sm:   2px;
+  --radius-md:   4px;
+
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  --shadow-panel:  0 1px 3px rgba(0,0,0,0.07);
+  --shadow-raised: 0 4px 12px rgba(0,0,0,0.10);
+
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+}
