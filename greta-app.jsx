@@ -9,6 +9,22 @@ const GBP2 = n => n==null ? '—' : curSym() + n.toLocaleString('en-GB',{minimum
 const PCT = n => n==null ? '—' : (n*100).toFixed(1) + '%';
 const NUM = n => n==null ? '—' : Math.round(n).toLocaleString('en-GB');
 
+// ── Canonical DTC AOV ────────────────────────────────────────────────────────
+// ONE definition of "AOV" for the whole app: DTC net sales ÷ DTC orders, over the
+// captured range. Every estimate/fallback must route through this so the dashboard
+// can't show £57 in one panel and £83 in another (audit TICKET-3). Panels that need a
+// specific window still compute rev÷orders themselves, but must use net-by-orders to
+// stay definition-consistent. Segment AOVs (wholesale, cohort) are deliberately separate.
+const AOV_FALLBACK = 60;
+function dtcAov(){
+  try {
+    const s = (typeof window!=='undefined' && window.FRKL_DATA && window.FRKL_DATA.shopify) || [];
+    const o = s.reduce((a,r)=>a+(r.orders||0),0);
+    const rev = s.reduce((a,r)=>a+(r.netSales||0),0);
+    return o>0 ? rev/o : AOV_FALLBACK;
+  } catch(e){ return AOV_FALLBACK; }
+}
+
 // ── Cost config & margin confidence ─────────────────────────────────────────
 // Every margin-derived number (gross margin, contribution, CAC payback, LTV:CAC,
 // break-even ROAS) is only as good as the costs behind it. Until the operator
@@ -504,8 +520,7 @@ function CostSetupModal({catalogueGm, onClose}){
   const set = (k,v)=> setF(p=>({...p, [k]:v}));
   const num = v => { const x=parseFloat(String(v).replace(',','.').replace(/[^0-9.]/g,'')); return isFinite(x)?x:0; };
   const gm = num(f.gmPct)/100;
-  const aovGuess = (typeof window!=='undefined' && window.FRKL_DATA && (window.FRKL_DATA.shopify||[]).length)
-    ? (()=>{ const s=window.FRKL_DATA.shopify; const o=s.reduce((a,r)=>a+(r.orders||0),0); const rev=s.reduce((a,r)=>a+(r.netSales||0),0); return o>0?rev/o:60; })() : 60;
+  const aovGuess = dtcAov();   // canonical DTC net÷orders (audit TICKET-3)
   const varPerOrder = num(f.packaging)+num(f.fulfilment)+num(f.shipping)+num(f.payFixed) + aovGuess*(num(f.payPct)/100) + aovGuess*(num(f.refundPct)/100);
   const cmRate = Math.max(0, gm - (aovGuess>0?varPerOrder/aovGuess:0));
   const beRoas = cmRate>0 ? 1/cmRate : null;
@@ -2788,7 +2803,7 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
   const retShare = (returningPct!=null && returningPct>0 && returningPct<1) ? returningPct : 0.3;
   const newOrders = Math.max(1, Math.round((orders||1)*(1-retShare)));
   const retOrdersNow = Math.max(0, Math.round((orders||0)*retShare));
-  const aovN = Math.round(aov||83);
+  const aovN = Math.round(aov||dtcAov());   // seed from canonical AOV, not a hardcoded 83 (audit TICKET-3)
   const cacSeed = (cac && cac>0) ? cac : (paid>0 && newOrders>0 ? paid/newOrders : 35);
   const paidNewSeed = cacSeed>0 ? (paid||0)/cacSeed : 0;
   const orgNewSeed = Math.max(0, Math.round(newOrders - paidNewSeed));
