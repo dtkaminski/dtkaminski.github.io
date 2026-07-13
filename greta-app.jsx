@@ -5602,7 +5602,11 @@ function ProductSignal(){
   const oppRow = (p,accent) => (<div key={p.name} style={{display:'flex',gap:10,alignItems:'baseline',padding:'7px 0',borderTop:'1px solid var(--border-subtle)'}}>
     <span style={{width:7,height:7,borderRadius:'50%',background:accent,flexShrink:0,alignSelf:'center'}}/>
     <div style={{flex:1,minWidth:0}}>
-      <div style={{fontSize:13,color:'var(--text-primary)',fontWeight:600}}>{p.handle?<a className="txt-link" href={`https://myfrkl.com/products/${p.handle}`} target="_blank">{p.name}</a>:p.name}</div>
+      {/* 2026-07-13 fix: myfrkl.com was hardcoded for every brand, so non-frkl brands got a wrong/dead
+          PDP link rendered as if it were their own live product page. No live storefront-domain source
+          exists in this bundle yet, so gate to the one brand we know the domain for (matches the
+          OI_BRAND.slug==='frkl' convention used elsewhere in this file) and fall back to plain text. */}
+      <div style={{fontSize:13,color:'var(--text-primary)',fontWeight:600}}>{(p.handle && typeof OI_BRAND!=='undefined' && OI_BRAND && OI_BRAND.slug==='frkl')?<a className="txt-link" href={`https://myfrkl.com/products/${p.handle}`} target="_blank">{p.name}</a>:p.name}</div>
       <div style={{fontSize:11.5,color:'var(--text-muted)',marginTop:1}}>{NUM(p.views)} views · {p.pctViews}% of views · view→cart {(p.viewToAtc*100).toFixed(1)}% · cart→buy {(p.atcToPurch*100).toFixed(0)}%{p.price?` · ${curSym()}${p.price}`:''}</div>
       <div style={{fontSize:12,color:'var(--text-secondary)',marginTop:2}}>→ {p.move}</div>
     </div>
@@ -7465,7 +7469,12 @@ function buildAskContext(){
         products: 'Top 40 SKUs 90d: {title,sku,units,returns,netSales,grossProfit,marginPct,returnRate}',
         geo: 'Shopify orders by country 90d',
         igPosts60d: 'Top IG posts 60d: {date,type,product,caption,permalink,likes,comments,views,reach,saves,shares,engagement,engRate}',
-        igStories: 'IG Stories 60d (frkl barely posts any)',
+        // 2026-07-13 fix: this schema-description string carried a frkl-specific narrative claim
+        // ("frkl barely posts any") unconditionally into every tenant's AI Analyst prompt context —
+        // unlike the neighboring important_notes array, it wasn't gated behind DEMO. Made brand-neutral;
+        // if posting volume is genuinely thin for a given brand, that's something the live igPosts60d/
+        // contentCadence data itself should show, not a hardcoded claim baked into the schema.
+        igStories: 'IG Stories 60d: {date,type,product,caption,permalink,likes,comments,views,reach,saves,shares,engagement,engRate}',
         emailCampaigns: 'Klaviyo broadcasts 90d: {name,sendDate,subject,recipients,openRate,clickRate,orders,orderValue,revPerRecip}',
         emailFlows: 'Klaviyo flow messages 90d (automated triggers): same shape minus sendDate',
         emailSummary: 'Pre-aggregated flows-vs-campaigns totals (GROSS Klaviyo-tracked — see emailAttribution for TRUE attributed values)',
@@ -10181,8 +10190,13 @@ function mosView(name){
 const NAV = [
   // OVERVIEW — how's the business (daily → weekly → periodic → auto-detected)
   { id:'home',    label:'Today',    icon:'home',     subtabs:[
-    { id:'overview', label:'Overview',     component: (p) => <Overview start={p.start} period={p.period} customActive={p.customActive}/> },
-    { id:'ask',      label:'AI Analyst',   component: () => <AskPanel/> },
+    // 2026-07-13 (hierarchy fix): this is now the real CM-verdict-first Today (hero action, stock
+    // gate, ranked queue, Proven strip) via the marketing-os embed, not the old dashboard Overview.
+    // Before this, "Today" in the top nav opened Overview while the actual Today lived buried under
+    // Daily Ops > Today — so the app's single most important screen wasn't where its own label said it was.
+    { id:'owner-today', label:'Today',      component: () => mosView('Today') },
+    { id:'overview',    label:'Details',    component: (p) => <Overview start={p.start} period={p.period} customActive={p.customActive}/> },
+    { id:'ask',         label:'AI Analyst', component: () => <AskPanel/> },
   ]},
   { id:'board',   label:'What changed', icon:'calendar', subtabs:[
     { id:'weekly',   label:'What changed', component: () => <WeeklyBoard/> },
@@ -10230,7 +10244,8 @@ const NAV = [
     { id:'suppliers', label:'Suppliers',    component: () => <SuppliersDirectory/> },
   ]},
   { id:'operate', label:'Daily Ops', icon:'clipboard', subtabs:[
-    { id:'owner-today', label:'Today',         component: () => mosView('Today') },
+    // 'Today' moved to the 'home' section above (2026-07-13 hierarchy fix) — Daily Ops now covers
+    // the operating-cadence surfaces that sit alongside Today, not a second copy of Today itself.
     { id:'calendar',    label:'Calendar',      component: () => mosView('Calendar') },
     { id:'command',     label:'Command Centre', component: () => mosView('CommandCentre') },
     { id:'decisions',   label:'Decision log',   component: () => mosView('DecisionLog') },
