@@ -6,6 +6,52 @@
  * than stacked cards; cards (shadow) are reserved for interactive content (recommendations).
  */
 
+/* ── Embed scope 2026-07-13 ──────────────────────────────────────────────
+   This file's tokens (--color-ink, --space-*, --font-sans, etc.) were authored
+   against a separate "rust/light" design system (marketing-os-tokens.css) that
+   never matched Greta's actual runtime theme — the result was Today/Calendar
+   rendering with zero real styling once embedded as a nav tab in greta-app.jsx
+   (undefined custom properties silently drop the declarations that use them).
+   greta-app.jsx's mosView() wraps every embedded view (Today/Calendar/Command
+   Centre/Decision log) in a `.mos-embed-scope` div — redefine the tokens here
+   in terms of Greta's real, already-toggling light/dark :root variables so
+   every .tdy-*/.cg-*/.dw-*/.mc-*/.dc-*/.mos-* rule below picks up the correct
+   values automatically, with no per-rule edits needed. */
+.mos-embed-scope {
+  --color-ink:     var(--text-primary, #141414);
+  --color-surface: var(--bg-app, #F5F2ED);
+  --color-panel:   var(--bg-card, #FFFFFF);
+  --color-accent:  var(--accent, #C84B00);
+  --color-muted:   var(--text-muted, #6B6B6B);
+  --color-line:    var(--border-default, #E0DCD6);
+  --color-success: var(--good, #1A7A4A);
+  --color-warning: var(--warn, #B45309);
+  --color-danger:  var(--bad, #B91C1C);
+
+  --font-sans: inherit;
+  --font-mono: 'SF Mono', 'JetBrains Mono', ui-monospace, monospace;
+
+  --text-xs:   var(--t-meta, 0.75rem);
+  --text-sm:   var(--t-body, 0.875rem);
+  --text-lg:   var(--t-h2, 1.125rem);
+
+  --radius-sm: var(--r-sm, 2px);
+  --radius-md: var(--r-md, 4px);
+
+  --space-1:  var(--s-1, 4px);
+  --space-2:  var(--s-2, 8px);
+  --space-3:  var(--s-3, 12px);
+  --space-4:  var(--s-4, 16px);
+  --space-6:  var(--s-6, 24px);
+  --space-8:  var(--s-7, 32px);
+  --space-12: var(--s-8, 48px);
+
+  --shadow-panel:  var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.07));
+  --shadow-raised: var(--shadow-md, 0 4px 12px rgba(0,0,0,0.10));
+  --transition-fast: var(--motion-fast, 150ms ease);
+  --transition-base: var(--motion-base, 180ms ease);
+}
+
 .mos-root {
   font-family: var(--font-sans);
   color: var(--color-ink);
@@ -115,30 +161,4 @@
 .mos-dl-title { font-weight: 500; font-size: var(--text-sm); }
 .mos-dl-diag { font-size: var(--text-xs); color: var(--color-muted); margin-top: 2px; }
 .mos-dl-right { display: flex; align-items: center; gap: var(--space-3); }
-.mos-dl-caret { color: var(--color-muted); font-size: var(--text-xs); }
-.mos-dl-detail { padding: var(--space-3) 0 var(--space-4) 92px; display: flex; flex-direction: column; gap: var(--space-2); }
-.mos-dl-kv { display: grid; grid-template-columns: 96px 1fr; gap: var(--space-4); font-size: var(--text-sm); }
-.mos-dl-kv > span { color: var(--color-muted); font-size: var(--text-xs); }
-.mos-dl-kv > b { font-weight: 500; }
-
-/* ── UI_V2 additions (2026-07-12 review P0) — additive only; remove this block to revert styles ── */
-.tdy-plan-otherline{font-size:12px;margin-top:6px}
-.tdy-abstained{border-left:3px solid var(--warn, #fbbf24);padding-left:12px}
-.tdy-pricing-note{font-size:11.5px;margin:6px 0 2px;font-style:italic}
-.tdy-chan-tier{font-size:10.5px;padding:1px 7px;border-radius:999px;margin-left:8px;vertical-align:middle}
-.tdy-tier-warn{background:rgba(251,191,36,.12);color:var(--warn, #fbbf24)}
-.tdy-tier-ok{background:rgba(52,211,153,.12);color:var(--good, #34d399)}
-.tdy-chan-target{font-size:11px;margin-left:8px}
-.cg-collided{background:repeating-linear-gradient(45deg,rgba(251,191,36,.25),rgba(251,191,36,.25) 4px,rgba(251,191,36,.1) 4px,rgba(251,191,36,.1) 8px);border:1px dashed var(--warn, #fbbf24)}
-
-/* ── UI_V2 Family S + Proven (2026-07-12) — additive; remove block to revert ── */
-.tdy-stockgate{font-size:12.5px;margin:8px 0;padding:7px 10px;border-radius:8px}
-.tdy-gate-blocked{background:rgba(248,113,113,.12);color:var(--bad,#f87171);border:1px solid rgba(248,113,113,.3)}
-.tdy-gate-warn{background:rgba(251,191,36,.10);color:var(--warn,#fbbf24)}
-.tdy-gate-ok{background:rgba(52,211,153,.08);color:var(--good,#34d399)}
-.tdy-stock-row{display:flex;gap:10px;align-items:baseline;padding:7px 0;border-top:1px solid rgba(255,255,255,.07);font-size:13px}
-.tdy-stock-row:first-of-type{border-top:none}
-.tdy-stock-sku{font-family:var(--font-mono,monospace);min-width:130px}
-.tdy-stock-out{color:var(--bad,#f87171)}
-.tdy-stock-risk{margin-left:auto;font-family:var(--font-mono,monospace)}
-.tdy-proven{font-size:12px;margin-top:12px;padding-top:8px;border-top:1px dashed rgba(255,255,255,.12)}
+.mos-dl-caret { color: var(

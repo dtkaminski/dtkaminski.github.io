@@ -10172,7 +10172,10 @@ function mosView(name){
   if (!C) return React.createElement('div',{className:'note'}, name+' unavailable — marketing-os.build.js not loaded.');
   if (!A.brand_id) return React.createElement('div',{className:'note'}, 'Sign in to load the Marketing OS for your brand.');
   const apiBase = (A.endpoint||'').replace(/\/functions\/v1\/[^/]*$/, '');
-  return React.createElement(C, { brandId: A.brand_id, apiBase: apiBase, getToken: A.getJwt });
+  // .mos-embed-scope (marketing-os.css, 2026-07-13) remaps the component's own design tokens
+  // onto Greta's real :root theme variables, so it renders styled instead of bare/unstyled.
+  return React.createElement('div', { className: 'mos-embed-scope' },
+    React.createElement(C, { brandId: A.brand_id, apiBase: apiBase, getToken: A.getJwt }));
 }
 
 const NAV = [
