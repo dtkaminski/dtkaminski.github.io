@@ -344,7 +344,13 @@
   }
   function Today(props) {
     const brandId = props.brandId || typeof window !== 'undefined' && window.OI_BRAND;
-    const fetcher = props.fetcher || tdyDefaultFetcher(props.apiBase, props.getToken);
+    // 2026-07-13 fix: tdyDefaultFetcher(...) was called unmemoized on every render, creating a new
+    // function reference each time. That flowed into load's useCallback deps -> load itself changed
+    // identity every render -> the effect below (deps: [load]) refired every render -> setData ->
+    // re-render -> repeat, forever. Confirmed live: hundreds of duplicate OPTIONS preflights per
+    // second hitting the marketing-os edge function (one even timed out at 10s), which is what made
+    // Daily Ops feel "incredibly slow" once Today/Calendar were actually mounted for the first time.
+    const fetcher = useMemo(() => props.fetcher || tdyDefaultFetcher(props.apiBase, props.getToken), [props.fetcher, props.apiBase, props.getToken]);
     const [data, setData] = useState(null);
     const [err, setErr] = useState(null);
     const [busy, setBusy] = useState(null);
@@ -490,7 +496,10 @@
       className: "tdy-btn",
       disabled: busy === top.external_id,
       onClick: () => act('action_done', top.external_id)
-    }, "Mark done"))) : TDY_V2 && data.abstention ? /*#__PURE__*/React.createElement("div", {
+    }, "Mark done"))) : TDY_V2 && data.abstention ?
+    /*#__PURE__*/
+    /* UI_V2 (review A4): abstention is NOT "you're clear" — silence must be typed. */
+    React.createElement("div", {
       className: "mos-empty tdy-abstained"
     }, "⏸ No reliable read this cycle. ", data.abstention.reason || 'A data gate failed.', /*#__PURE__*/React.createElement("span", {
       className: "tdy-muted"
@@ -664,6 +673,8 @@
     };
     const revVar = variance(f.expected_revenue, f.actual_revenue);
     const cmVar = variance(f.expected_cm, f.actual_cm);
+
+    // channel-history forecast (fix #4): seed expected from vw_platform_channel normalized iROAS
     const ps = props.platformStats && props.platformStats[f.channel];
     const cmR = props.cmRatio || 0.6;
     const es = numOrNull(f.expected_spend);
@@ -803,6 +814,9 @@
     const brandId = props.brandId || window.OI_BRAND;
     const [events, setEvents] = useState(null);
     const [liftMap, setLiftMap] = useState({});
+    /* UI_V2 (2026-07-12 review A2): event truth prefers vw_event_actualisation (CM-scored,
+       net-of-trough, provisional/collided). Old lift map stays as fallback. Reversible:
+       set window.GRETA_UI_V2 = false before load to restore the previous behaviour. */
     const CAL_V2 = typeof window === 'undefined' || window.GRETA_UI_V2 !== false;
     const [actMap, setActMap] = useState({});
     const [platformStats, setPlatformStats] = useState({});
@@ -828,7 +842,9 @@
           alive = false;
         };
       }
-      Promise.all([sb.from('mos_calendar_event').select('id,campaign_id,row_group,channel,title,description,start_date,end_date,creator,sku,content_pillar,format,message_angle,cta,asset_link,usage_rights,approval_status,status,expected_revenue,expected_spend,expected_cm,target_kpi,measurement_plan,actual_revenue,actual_spend,actual_cm,revenue_basis,learnings,metadata').eq('brand_id', brandId), sb.from('vw_brand_calendar').select('campaign_id,lift_vs_baseline').eq('brand_id', brandId), sb.from('vw_platform_channel').select('platform,spend_30d,reported_roas,normalized_iroas').eq('brand_id', brandId), sb.from('vw_brand_cm_ladder').select('cm_ratio').eq('brand_id', brandId), sb.from('vw_event_actualisation').select('event_id,cm_impact,net_revenue_impact,event_delta,provisional,collided,baseline_source').eq('brand_id', brandId)]).then(res => {
+      Promise.all([sb.from('mos_calendar_event').select('id,campaign_id,row_group,channel,title,description,start_date,end_date,creator,sku,content_pillar,format,message_angle,cta,asset_link,usage_rights,approval_status,status,expected_revenue,expected_spend,expected_cm,target_kpi,measurement_plan,actual_revenue,actual_spend,actual_cm,revenue_basis,learnings,metadata').eq('brand_id', brandId), sb.from('vw_brand_calendar').select('campaign_id,lift_vs_baseline').eq('brand_id', brandId), sb.from('vw_platform_channel').select('platform,spend_30d,reported_roas,normalized_iroas').eq('brand_id', brandId), sb.from('vw_brand_cm_ladder').select('cm_ratio').eq('brand_id', brandId),
+      // UI_V2 additive read (0070) — non-blocking; on error the calendar just falls back.
+      sb.from('vw_event_actualisation').select('event_id,cm_impact,net_revenue_impact,event_delta,provisional,collided,baseline_source').eq('brand_id', brandId)]).then(res => {
         if (!alive) return;
         const ev = res[0],
           lf = res[1],
@@ -945,6 +961,8 @@
       return v == null ? null : Number(v);
     };
     const evClass = e => {
+      // UI_V2 (A2): CM-scored actualisation wins; collided reads are quarantined (J3), never
+      // coloured as wins or losses; provisional stays pending-styled until returns close.
       const act = CAL_V2 ? actMap[e.id] : null;
       if (act) {
         if (act.collided) return 'cg-collided';
@@ -957,6 +975,7 @@
       if (e.approval_status === 'approved') return 'cg-approved';
       return 'cg-pending';
     };
+    // UI_V2: honest tooltip per event — the CM verdict, its state, and its baseline source.
     const evTitle = e => {
       const act = CAL_V2 ? actMap[e.id] : null;
       if (!act) return e.title || '';
@@ -1340,6 +1359,17 @@
       className: "err"
     }, err));
   }
+
+  // EMBED-SAFE 2026-07-13: this file serves two contexts from one source.
+  //   1. Standalone (today.html): no globals set beforehand → self-mounts <Shell/> (own
+  //      passwordless auth, own Nav) into #root, exactly as before this change.
+  //   2. Embedded (greta-dashboard.html, as a nav tab alongside Command Centre): the host page
+  //      sets `window.MOS_EMBEDDED = true` in an inline <script> BEFORE this bundle loads, and
+  //      already has its own #root mounted by greta-app.js for the main app shell. Self-mounting
+  //      here would either crash (no #root belonging to this app) or double-mount over the host
+  //      app. Skip the mount; expose `Today`/`Calendar` as plain components on window instead, so
+  //      the host's own `mosView('Today')` / `mosView('Calendar')` (same pattern already used for
+  //      window.CommandCentre / window.DecisionLog) can render them with its own auth/brandId.
   if (typeof window !== 'undefined') {
     window.Today = Today;
     window.Calendar = Calendar;
