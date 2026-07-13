@@ -1085,4 +1085,11 @@
 <script>/* de-frkl pre-eval gate: for non-frkl brands, clear static-only FRKL_* globals that frkl-app.js captures into module-level consts at load (FRKL_LINKS -> _linkKeys/_linkRe, FRKL_INSIGHTS -> INS) BEFORE the bundle reads them. Runs after the static frkl-*.js files. frkl keeps its demo snapshot; the data-loader still handles all render-time globals. */
 (function(){try{var s=window.OI_BRAND_SLUG||(window.parent&&window.parent!==window?window.parent.OI_BRAND_SLUG:null)||'frkl';if(s==='frkl')return;window.FRKL_LINKS={};window.FRKL_INSIGHTS={};}catch(e){}})();</script>
 <script src="./marketing-os.build.js?v=20260708160000"></script>
-<script src="./greta-app.js?v=1783516487109409675"></script>
+<script>/* today-calendar.build.js serves both a standalone today.html deploy and this embedded
+   nav-tab context. Setting MOS_EMBEDDED before it loads suppresses its self-mount (ReactDOM.render
+   into #root) and instead exposes window.Today / window.Calendar as plain components for
+   greta-app.jsx's mosView() to render — the same pattern marketing-os.build.js already uses for
+   window.CommandCentre / window.DecisionLog. */
+window.MOS_EMBEDDED = true;</script>
+<script src="./today-calendar.build.js?v=20260713"></script>
+<script src="./greta-app.js?v=1783950987497"></script>

@@ -10160,8 +10160,12 @@ function PlanningView(){
   );
 }
 
-// Marketing OS views (Command Centre / Decision log) — rendered from the pre-built marketing-os.build.js
-// bundle (window.CommandCentre / window.DecisionLog), wired to the live Supabase auth via window.OI_ASK.
+// Marketing OS views (Command Centre / Decision log / Today / Calendar) — rendered from
+// pre-built bundles (window.CommandCentre / window.DecisionLog from marketing-os.build.js,
+// window.Today / window.Calendar from today-calendar.build.js), wired to the live Supabase
+// auth via window.OI_ASK. Today/Calendar are the canonical owner-screen upgrade (2026-07-13);
+// per FRONTEND-SOT-SPEC-2026-07-10.md, Command Centre is deprecated in favour of Today but is
+// left wired below until Dan confirms cutover.
 function mosView(name){
   const C = window[name];
   const A = window.OI_ASK || {};
@@ -10222,9 +10226,11 @@ const NAV = [
     { id:'plan',      label:'Demand & POs', component: () => <PlanningView/> },
     { id:'suppliers', label:'Suppliers',    component: () => <SuppliersDirectory/> },
   ]},
-  { id:'operate', label:'Command Centre', icon:'clipboard', subtabs:[
-    { id:'command',   label:'Command Centre', component: () => mosView('CommandCentre') },
-    { id:'decisions', label:'Decision log',   component: () => mosView('DecisionLog') },
+  { id:'operate', label:'Daily Ops', icon:'clipboard', subtabs:[
+    { id:'owner-today', label:'Today',         component: () => mosView('Today') },
+    { id:'calendar',    label:'Calendar',      component: () => mosView('Calendar') },
+    { id:'command',     label:'Command Centre', component: () => mosView('CommandCentre') },
+    { id:'decisions',   label:'Decision log',   component: () => mosView('DecisionLog') },
   ]},
   { id:'settings',label:'Settings',     icon:'sliders', subtabs:[
     { id:'connections', label:'Connections', component: () => <ConnectionsPanel/> },
@@ -10253,7 +10259,7 @@ const RAIL = [
   { group:'Customers',label:'Competitors',       icon:'search',    section:'market' },
   { group:'Products & supply', label:'Products & stock', icon:'box',   section:'commerce' },
   { group:'Products & supply', label:'Plan & supply',    icon:'truck', section:'planning' },
-  { group:'Act',      label:'Command Centre',    icon:'clipboard', section:'operate' },
+  { group:'Act',      label:'Daily Ops',         icon:'clipboard', section:'operate' },
   { group:'',         label:'Settings',          icon:'sliders',   section:'settings', pin:true },
 ];
 const NAV_BY_ID = Object.fromEntries(NAV.map(s=>[s.id, s]));
