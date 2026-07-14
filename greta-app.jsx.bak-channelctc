@@ -10340,19 +10340,18 @@ function GretaOverviewTiers(){
       </div>
 
       <div style={{margin:'22px 0 8px'}}>
-        <GO_TierHead n="03" title="Channel" sub="avg vs marginal iROAS — where the next £ goes (CTC)"/>
+        <GO_TierHead n="03" title="Channel" sub="true efficiency — iROAS vs target (CTC)"/>
         <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:11,padding:'2px 4px',overflowX:'auto'}}>
-          <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
-            <thead><tr>{['Channel','Spend','Incr rev','iCPA','iROAS','Marginal','Verdict'].map((h,i)=><th key={i} style={{textAlign:i===0?'left':'right',color:GO_T.dim,fontWeight:500,fontSize:10.5,textTransform:'uppercase',letterSpacing:'.4px',padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{h}</th>)}</tr></thead>
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:12.5}}>
+            <thead><tr>{['Channel','Spend 30d','Reported ROAS','iROAS (φ-adj)','Target','Verdict'].map((h,i)=><th key={i} style={{textAlign:i===0?'left':'right',color:GO_T.dim,fontWeight:500,fontSize:11,textTransform:'uppercase',letterSpacing:'.4px',padding:'9px 10px',borderBottom:'1px solid '+GO_T.line}}>{h}</th>)}</tr></thead>
             <tbody>{d.channel.map((c,i)=>(
-              <tr key={i} style={{background:c.family==='email'?'#0f1420':'none'}}>
-                <td style={{textAlign:'left',padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{c.name} <span style={{fontSize:10.5,color:c.family==='email'?GO_T.accent2:GO_T.mut}}>{c.family==='email'?'email':(c.acquisition?'acq':'retn')}{c.phi!=null?' · φ'+c.phi:''}</span></td>
-                <td style={{textAlign:'right',fontFamily:GO_T.mono,padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{GO_gbp(c.spend)}</td>
-                <td style={{textAlign:'right',fontFamily:GO_T.mono,padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{GO_gbp(c.incRev)}</td>
-                <td style={{textAlign:'right',fontFamily:GO_T.mono,padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{c.icpa!=null?GO_gbp(c.icpa):'—'}</td>
-                <td style={{textAlign:'right',fontFamily:GO_T.mono,color:c.rag==='r'?GO_T.red:c.rag==='g'?GO_T.green:GO_T.ink,padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{c.iroas!=null?c.iroas.toFixed(2)+'×':'—'}</td>
-                <td style={{textAlign:'right',fontFamily:GO_T.mono,color:c.marginal!=null?(c.marginal>=c.tgt?GO_T.green:GO_T.amber):GO_T.dim,padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{c.marginal!=null?c.marginal.toFixed(2)+'×':'—'}</td>
-                <td style={{textAlign:'right',fontSize:11.5,padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}><GO_Dot r={c.rag}/> {c.verdict}</td>
+              <tr key={i}>
+                <td style={{textAlign:'left',padding:'9px 10px',borderBottom:'1px solid '+GO_T.line}}>{c.name} <span style={{fontSize:11,color:GO_T.mut}}>{c.phi!=null?'φ '+c.phi:'not running'}</span></td>
+                <td style={{textAlign:'right',fontFamily:GO_T.mono,padding:'9px 10px',borderBottom:'1px solid '+GO_T.line}}>{GO_gbp(c.spend)}</td>
+                <td style={{textAlign:'right',fontFamily:GO_T.mono,padding:'9px 10px',borderBottom:'1px solid '+GO_T.line}}>{c.rep!=null?c.rep.toFixed(2)+'×':'—'}</td>
+                <td style={{textAlign:'right',fontFamily:GO_T.mono,color:c.rag==='r'?GO_T.red:c.rag==='g'?GO_T.green:GO_T.ink,padding:'9px 10px',borderBottom:'1px solid '+GO_T.line}}>{c.iroas!=null?c.iroas.toFixed(2)+'×':'—'}</td>
+                <td style={{textAlign:'right',fontFamily:GO_T.mono,padding:'9px 10px',borderBottom:'1px solid '+GO_T.line}}>{c.tgt.toFixed(2)}×</td>
+                <td style={{textAlign:'right',padding:'9px 10px',borderBottom:'1px solid '+GO_T.line}}><GO_Dot r={c.rag}/> {c.verdict}</td>
               </tr>))}</tbody>
           </table>
         </div>

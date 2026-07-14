@@ -49,17 +49,19 @@
     var cutoff = new Date(Date.now() - 400 * 864e5).toISOString().slice(0, 10);
     var Q = 12000;
     var r = await Promise.all([
-      safeQ(sb.from('vw_brand_cm').select('cm_ratio').eq('brand_id', brandId).limit(1), Q, null),
+      safeQ(sb.from('vw_brand_cm').select('cm_ratio, aov').eq('brand_id', brandId).limit(1), Q, null),
       safeQ(sb.from('vw_brand_customer_economics_30d').select('new_customers, ncac, amer').eq('brand_id', brandId).limit(1), Q, null),
       safeQ(sb.from('vw_channel_iroas').select('channel_type, spend_30d, reported_roas, normalized_iroas, phi_applied').eq('brand_id', brandId), Q, []),
       safeQ(sb.from('vw_channel_iroas_targets').select('channel_type, target_true_iroas').eq('brand_id', brandId), Q, []),
       safeQ(sb.from('vw_daily_new_vs_returning').select('order_date, customer_type, orders, net_revenue').eq('brand_id', brandId).gte('order_date', cutoff).order('order_date', { ascending: false }).limit(1000), Q, []),
       safeQ(sb.from('v_tenant_shopify_lineitems_daily').select('day, product_title, units, revenue').eq('brand_id', brandId).gte('day', cutoff).order('day', { ascending: false }).limit(1000), Q, []),
-      safeQ(sb.from('vw_brand_action_board').select('external_id, description, step1, priority, category, cm_gbp').eq('brand_id', brandId).order('cm_gbp', { ascending: false, nullsFirst: false }).limit(30), Q, [])
+      safeQ(sb.from('vw_brand_action_board').select('external_id, description, step1, priority, category, cm_gbp').eq('brand_id', brandId).order('cm_gbp', { ascending: false, nullsFirst: false }).limit(30), Q, []),
+      safeQ(sb.from('vw_channel_effect').select('channel_type, family, spend_30d, attributed_rev_30d, phi, incremental_rev_30d, cost_30d, contribution_30d, drives, rev_per_send').eq('brand_id', brandId), Q, []),
+      safeQ(sb.from('vw_channel_optimum').select('channel_type, avg_iroas, marginal_iroas, target_marginal_iroas, break_even_iroas, marginal_cm_per_pound, status').eq('brand_id', brandId), Q, [])
     ]);
     var cmRow = Array.isArray(r[0]) ? r[0][0] : r[0];
     var econRow = Array.isArray(r[1]) ? r[1][0] : r[1];
-    return { cmRatio: (cmRow && cmRow.cm_ratio) || 0.6, econ: econRow || {}, iroas: r[2] || [], tgts: r[3] || [], nvr: r[4] || [], items: r[5] || [], board: r[6] || [] };
+    return { cmRatio: (cmRow && cmRow.cm_ratio) || 0.6, aov: (cmRow && cmRow.aov) || 55, econ: econRow || {}, iroas: r[2] || [], tgts: r[3] || [], nvr: r[4] || [], items: r[5] || [], board: r[6] || [], effect: r[7] || [], optimum: r[8] || [] };
   }
 
   function topSellers(items, s, e) {
@@ -72,18 +74,30 @@
     r.sort(function (a, b) { return n(b.cm_gbp) - n(a.cm_gbp); });
     return r[0] || null;
   }
-  function channelTable(iroas, tgts, cmRatio) {
+  function channelTable(effect, optimum, cmRatio, aov) {
     var breakEven = cmRatio > 0 ? 1 / cmRatio : null;
-    var tmap = {}; tgts.forEach(function (t) { tmap[t.channel_type] = n(t.target_true_iroas); });
-    var rows = (iroas || []).slice().sort(function (a, b) { return n(b.spend_30d) - n(a.spend_30d); }).map(function (c) {
-      var ir = c.normalized_iroas == null ? null : n(c.normalized_iroas);
-      var tg = tmap[c.channel_type] || 1.23, phi = c.phi_applied == null ? null : n(c.phi_applied), spend = n(c.spend_30d);
-      var paidContrib = (ir == null ? 0 : spend * ir) * cmRatio - spend;
-      var rag = ir == null ? 'n' : ir >= tg ? 'g' : ir >= 0.8 * tg ? 'a' : 'r';
-      var verdict = spend === 0 ? 'untapped' : ir == null ? '—' : (breakEven != null && ir < breakEven) ? 'below break-even' : ir >= tg * 1.3 ? 'scale headroom' : (phi != null && phi < 0.4) ? 'low incrementality' : ir < tg ? 'below target' : 'on target';
-      return { name: c.channel_type.replace(/_/g, ' ').replace(/\b\w/g, function (m) { return m.toUpperCase(); }), phi: phi, spend: spend, rep: c.reported_roas == null ? null : n(c.reported_roas), iroas: ir, tgt: tg, rag: rag, verdict: verdict, paidContrib: paidContrib };
+    var omap = {}; (optimum || []).forEach(function (o) { omap[o.channel_type] = o; });
+    var rows = (effect || []).slice().sort(function (a, b) { return n(b.contribution_30d) - n(a.contribution_30d); }).map(function (c) {
+      var spend = n(c.spend_30d), incRev = n(c.incremental_rev_30d), phi = c.phi == null ? null : n(c.phi);
+      var iroas = spend > 0 ? incRev / spend : null;
+      var icpa = (iroas && iroas > 0) ? aov / iroas : null;
+      var o = omap[c.channel_type] || {};
+      var marg = o.marginal_iroas == null ? null : n(o.marginal_iroas);
+      var tgt = o.target_marginal_iroas == null ? 1.23 : n(o.target_marginal_iroas);
+      var status = o.status || null, isEmail = c.family === "email";
+      var rag = isEmail ? "g" : iroas == null ? "n" : (breakEven != null && iroas < breakEven) ? "r" : iroas >= tgt * 1.3 ? "g" : iroas < tgt ? "a" : "g";
+      var verdict = isEmail ? ("returning" + (c.rev_per_send != null ? " · £" + f0(n(c.rev_per_send) * 1000) + "/1k sent" : ""))
+        : status === "fix" ? "fix — avg below break-even" : status === "scale" ? "scale — marginal headroom"
+        : status === "ease" ? "ease — near saturation" : status === "hold" ? "at optimum"
+        : (iroas != null && breakEven != null && iroas < breakEven ? "below break-even" : "on target");
+      return { name: c.channel_type.replace(/_/g, " ").replace(/\b\w/g, function (m) { return m.toUpperCase(); }),
+        family: c.family, acquisition: c.drives !== "returning", spend: spend, incRev: incRev, phi: phi,
+        aov: aov, iroas: iroas, icpa: icpa, marginal: marg, tgt: tgt, status: status, rag: rag,
+        verdict: verdict, contribution: n(c.contribution_30d) };
     });
-    return { rows: rows, breakEven: breakEven, paidContribution: rows.reduce(function (a, r) { return a + r.paidContrib; }, 0), channelSpend: rows.reduce(function (a, r) { return a + r.spend; }, 0) };
+    return { rows: rows, breakEven: breakEven,
+      paidContribution: rows.filter(function (r) { return r.family === "paid"; }).reduce(function (a, r) { return a + r.contribution; }, 0),
+      channelSpend: rows.reduce(function (a, r) { return a + r.spend; }, 0) };
   }
   function heroFromBoard(board, fallback) {
     var top = (board || []).filter(function (a) { return a.cm_gbp != null; })[0];
@@ -94,7 +108,7 @@
     var cands = [];
     if (m30.cvr != null && m30.cvr < CVR_BENCH && m30.sessions > 0) cands.push({ v: m30.sessions * (CVR_BENCH / 100 - m30.cvr / 100) * m30.aov * cmRatio, title: 'Restore site conversion to ' + CVR_BENCH + '%', why: 'CVR ' + m30.cvr.toFixed(2) + '% on ' + f0(m30.sessions).toLocaleString('en-GB') + ' sessions.' });
     if (m30.discRate > 20 && m30.revenue > 0) cands.push({ v: (m30.discounts - 0.20 * m30.revenue) * cmRatio, title: 'Cut discount depth toward 20%', why: 'Discounts ' + m30.discRate.toFixed(0) + '% of revenue.' });
-    (chan || []).forEach(function (c) { if (c.iroas != null && c.paidContrib < 0 && c.spend > 0) cands.push({ v: -c.paidContrib, title: 'Cut ' + c.name + ' — iROAS ' + c.iroas.toFixed(2), why: c.name + ' below break-even.' }); });
+    (chan || []).forEach(function (c) { if (c.iroas != null && c.contribution < 0 && c.spend > 0) cands.push({ v: -c.contribution, title: 'Cut ' + c.name + ' — iROAS ' + c.iroas.toFixed(2), why: c.name + ' below break-even.' }); });
     cands.sort(function (a, b) { return b.v - a.v; });
     var t = cands[0] || { v: 0, title: 'Hold course', why: 'No single lever dominates.' };
     return { value: cmk(t.v) + '/mo CM', title: t.title, why: t.why, source: 'derived' };
@@ -133,7 +147,7 @@
     var oNew = sumR(S.nvr, 'order_date', w.cs, w.ce, function (r) { return r.customer_type === 'new' ? n(r.orders) : 0; });
     var oRet = sumR(S.nvr, 'order_date', w.cs, w.ce, function (r) { return r.customer_type === 'returning' ? n(r.orders) : 0; });
     var repeat = (oNew + oRet) > 0 ? +(oRet / (oNew + oRet) * 100).toFixed(1) : 0;
-    var ch = channelTable(S.iroas, S.tgts, S.cmRatio);
+    var ch = channelTable(S.effect, S.optimum, S.cmRatio, S.aov);
     var m30 = win(endS, 30), wg30 = win(endG, 30);
     var r30 = sumR(D.shopify, 'date', m30.cs, m30.ce, function (r) { return n(r.netSales); });
     var o30 = sumR(D.shopify, 'date', m30.cs, m30.ce, function (r) { return n(r.orders); });
