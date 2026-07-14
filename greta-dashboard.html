@@ -30,10 +30,6 @@
 <script src="./greta-links.js?v=202607060755"></script>
 <script src="./greta-diagnostic-analyst.js?v=202607060755"></script>
 <script src="./greta-events.js?v=202607060755"></script>
-<script src="./greta-products.js?v=202607060755"></script>
-<script src="./greta-discount-codes.js?v=202607060755"></script>
-<script src="./greta-cvr.js?v=202607060755"></script>
-<script src="./greta-cohorts.js?v=202607060755"></script>
 <script src="./greta-retention.js?v=202607060755"></script>
 <script src="./greta-clarity.js?v=202607060755"></script>
 <script src="./greta-board-read.js?v=202607060755"></script>
@@ -1094,3 +1090,5 @@
 window.MOS_EMBEDDED = true;</script>
 <script src="./today-calendar.build.js?v=20260713"></script>
 <script src="./greta-app.js?v=1784031074920"></script>
+<script>/* perf: defer frkl static deep-tab data (CVR ~1.7MB, cohorts, promos, products) — not used by the Overview/landing. Background-load after paint; skip for non-frkl (de-frkl). */
+(function(){try{var slug=window.OI_BRAND_SLUG||(window.parent&&window.parent!==window?window.parent.OI_BRAND_SLUG:null)||"frkl";if(slug!=="frkl")return;var files=["greta-cvr.js","greta-cohorts.js","greta-discount-codes.js","greta-products.js"],i=0;function next(){if(i>=files.length)return;var s=document.createElement("script");s.src="./"+files[i++]+"?v=202607060755";s.async=true;s.onload=next;s.onerror=next;document.head.appendChild(s);}var kick=function(){next();};if(window.requestIdleCallback){window.requestIdleCallback(kick,{timeout:1500});}else{setTimeout(kick,300);}}catch(e){}})();</script>
