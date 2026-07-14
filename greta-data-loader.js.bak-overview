@@ -385,8 +385,8 @@
       // Sum ALL sale channels per day (online_store + shopify_draft_order + POS/wholesale) so the
       // dashboard total matches Shopify Analytics. Previously filtered to online_store only, which
       // hid stores whose only orders are drafts/manual (e.g. a freshly-connected test store).
-      const { data } = await sb.from('v_tenant_shopify_daily_agg')
-        .select('day, order_count, net_revenue, discounts, line_items, aov, returns')
+      const { data } = await sb.from('v_tenant_shopify_daily')
+        .select('day, order_count, net_revenue, discounts, line_items, aov, returns, channel')
         .eq('brand_id', brandId)
         .order('day', { ascending: true });
       const byDay = {};

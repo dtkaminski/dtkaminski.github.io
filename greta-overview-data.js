@@ -1,0 +1,219 @@
+/*
+ * greta-overview-data.js — builds window.FRKL_OVERVIEW[timeframe] for the Overview tiers.
+ * Plain global-scope JS (no build). Load AFTER greta-data-loader.js in greta-dashboard.html.
+ *
+ * ── CANONICAL METRIC SPINE (enforced here; source: Greta-Metrics-Hierarchy-Review.md §8) ──
+ *   L1 revenue          = Shopify truth (v_tenant_shopify_daily_agg) — NEVER Σ channel reported.
+ *   Product CM          = revenue × cm_ratio                        (cm_ratio from vw_brand_cm)
+ *   CAM (after mktg)     = Product CM − ad spend                     (the hero rung)
+ *   MER                 = revenue / ad spend
+ *   AOV                 = net revenue / orders
+ *   CVR                 = orders / sessions
+ *   reported ROAS       = reported revenue / spend
+ *   normalized iROAS    = reported ROAS × φ                         (from vw_channel_iroas)
+ *   incremental revenue = spend × normalized iROAS
+ *   paid contribution   = Σ (incremental revenue × cm_ratio − spend) across channels
+ *   break-even iROAS    = 1 / cm_ratio
+ * Identities kept: new+returning revenue == L1 revenue (split applied to L1 truth); channel spend
+ * reconciled to L1 ad spend (flagged if off); CAM == ProductCM − spend everywhere.
+ *
+ * ── INSIGHTS ARE DIAGNOSIS-DERIVED, not templated ──
+ *   Each tier's read = an enforced-numbers clause + the top real item from vw_brand_action_board
+ *   (the synthesised diagnosis: description + first step + cm_gbp) for that tier's categories:
+ *     Business ← site, finance, ops, product   Customer ← retention, cx   Channel ← paid, creative
+ *   The hero action is the board's global top by cm_gbp — the SAME CM-ranked source Today/Actions
+ *   use, so the surfaces can't disagree. Derived fallback (same formulas) only when the board is
+ *   empty. Reuses the loader's authed client; recomputes on 'frkl-data-updated'; never throws.
+ */
+(function () {
+  'use strict';
+  var TF = { daily: 1, weekly: 7, monthly: 30, quarterly: 90, yearly: 365 };
+  var LBL = {
+    daily: ['Today', 'vs yesterday'], weekly: ['Last 7 days', 'vs previous 7 days'],
+    monthly: ['Last 30 days', 'vs previous 30 days'], quarterly: ['Last 90 days', 'vs previous 90 days'],
+    yearly: ['Last 365 days', 'vs previous 365 days']
+  };
+  var CVR_BENCH = 1.5;
+  var TIER_CATS = { business: ['site', 'finance', 'ops', 'product'], customer: ['retention', 'cx'], channel: ['paid', 'creative'] };
+
+  var n = function (x) { return Number(x || 0); };
+  var f0 = function (x) { return Math.round(x); };
+  var gbp = function (x) { return '£' + f0(x).toLocaleString('en-GB'); };
+  var cmk = function (v) { return '£' + (Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + 'k' : String(f0(v))); };
+  function trim(s, m) { s = String(s || ''); return s.length > m ? s.slice(0, m - 1) + '…' : s; }
+  function maxDate(a, k) { var m = null, i; for (i = 0; i < (a || []).length; i++) { var d = a[i][k]; if (d && (!m || d > m)) m = d; } return m; }
+  function addDays(iso, d) { var t = new Date(iso + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + d); return t.toISOString().slice(0, 10); }
+  function sumR(a, dk, s, e, vf) { var t = 0, i; for (i = 0; i < (a || []).length; i++) { var d = a[i][dk]; if (d >= s && d <= e) t += vf(a[i]); } return t; }
+  function delta(cur, prev) { if (prev == null || prev === 0) return null; return (cur - prev) / prev * 100; }
+  function win(end, days) { return { cs: addDays(end, -(days - 1)), ce: end, ps: addDays(end, -(2 * days - 1)), pe: addDays(end, -days) }; }
+  function ragTrend(d) { if (d == null) return 'a'; return d >= -2 ? 'g' : d >= -15 ? 'a' : 'r'; }
+  function tile(k, v, fmt, d, cmp, rag, tgt) { return { k: k, v: v, fmt: fmt, d: d, cmp: cmp, rag: rag, tgt: tgt }; }
+
+  async function fetchPaged(makeQuery) {
+    var PAGE = 1000, from = 0, out = [];
+    for (;;) { var r = await makeQuery(from, from + PAGE - 1); if (r.error || !r.data || !r.data.length) break; out.push.apply(out, r.data); if (r.data.length < PAGE) break; from += PAGE; }
+    return out;
+  }
+
+  async function fetchSupp(sb, brandId) {
+    var cm = sb.from('vw_brand_cm').select('cm_ratio, cm_per_order, aov').eq('brand_id', brandId).maybeSingle();
+    var econ = sb.from('vw_brand_customer_economics_30d').select('new_customers, ncac, amer, blended_mer, new_rev_share, returning_rev_share').eq('brand_id', brandId).maybeSingle();
+    var iroas = sb.from('vw_channel_iroas').select('channel_type, spend_30d, reported_roas, normalized_iroas, phi_applied').eq('brand_id', brandId);
+    var tgts = sb.from('vw_channel_iroas_targets').select('channel_type, target_true_iroas').eq('brand_id', brandId);
+    var nvr = fetchPaged(function (a, b) { return sb.from('vw_daily_new_vs_returning').select('order_date, customer_type, orders, net_revenue').eq('brand_id', brandId).order('order_date', { ascending: true }).range(a, b); });
+    var items = fetchPaged(function (a, b) { return sb.from('v_tenant_shopify_lineitems_daily').select('day, product_title, units, revenue').eq('brand_id', brandId).order('day', { ascending: true }).range(a, b); });
+    var board = sb.from('vw_brand_action_board').select('external_id, description, step1, priority, category, cm_gbp').eq('brand_id', brandId).order('cm_gbp', { ascending: false, nullsFirst: false }).limit(30);
+    var res = await Promise.all([cm, econ, iroas, tgts, nvr, items, board]);
+    return {
+      cmRatio: (res[0] && res[0].data && res[0].data.cm_ratio) || 0.6,
+      econ: (res[1] && res[1].data) || {},
+      iroas: (res[2] && res[2].data) || [], tgts: (res[3] && res[3].data) || [],
+      nvr: res[4] || [], items: res[5] || [], board: (res[6] && res[6].data) || []
+    };
+  }
+
+  function topSellers(items, s, e) {
+    var by = {}, i;
+    for (i = 0; i < items.length; i++) { var r = items[i]; if (r.day >= s && r.day <= e) by[r.product_title] = (by[r.product_title] || 0) + n(r.revenue); }
+    return Object.keys(by).map(function (k) { return { name: k, rev: by[k] }; }).sort(function (a, b) { return b.rev - a.rev; }).slice(0, 3);
+  }
+
+  function boardTop(board, cats) {
+    var r = (board || []).filter(function (a) { return a.cm_gbp != null && cats.indexOf(a.category) >= 0; });
+    r.sort(function (a, b) { return n(b.cm_gbp) - n(a.cm_gbp); });
+    return r[0] || null;
+  }
+
+  // Channel table — normalized iROAS = reported×φ (from view), RAG vs target_true_iroas, flag below
+  // product break-even (1/cm_ratio), and paid contribution = incremental×CM − spend per channel.
+  function channelTable(iroas, tgts, cmRatio) {
+    var breakEven = cmRatio > 0 ? 1 / cmRatio : null;
+    var tmap = {}; tgts.forEach(function (t) { tmap[t.channel_type] = n(t.target_true_iroas); });
+    var rows = (iroas || []).slice().sort(function (a, b) { return n(b.spend_30d) - n(a.spend_30d); }).map(function (c) {
+      var ir = c.normalized_iroas == null ? null : n(c.normalized_iroas);
+      var tg = tmap[c.channel_type] || 1.23, phi = c.phi_applied == null ? null : n(c.phi_applied), spend = n(c.spend_30d);
+      var paidContrib = (ir == null ? 0 : spend * ir) * cmRatio - spend;
+      var rag = ir == null ? 'n' : ir >= tg ? 'g' : ir >= 0.8 * tg ? 'a' : 'r';
+      var verdict = spend === 0 ? 'untapped' : ir == null ? '—' : (breakEven != null && ir < breakEven) ? 'below break-even' : ir >= tg * 1.3 ? 'scale headroom' : (phi != null && phi < 0.4) ? 'low incrementality' : ir < tg ? 'below target' : 'on target';
+      return { name: c.channel_type.replace(/_/g, ' ').replace(/\b\w/g, function (m) { return m.toUpperCase(); }), phi: phi, spend: spend, rep: c.reported_roas == null ? null : n(c.reported_roas), iroas: ir, tgt: tg, rag: rag, verdict: verdict, paidContrib: paidContrib };
+    });
+    return { rows: rows, breakEven: breakEven, paidContribution: rows.reduce(function (a, r) { return a + r.paidContrib; }, 0), channelSpend: rows.reduce(function (a, r) { return a + r.spend; }, 0) };
+  }
+
+  function heroFromBoard(board, fallback) {
+    var top = (board || []).filter(function (a) { return a.cm_gbp != null; })[0];
+    if (!top) return fallback;
+    return { value: cmk(n(top.cm_gbp)) + '/mo CM', title: top.description, why: trim(top.step1 || ('Priority ' + (top.priority || '') + ' · ' + (top.category || '')), 150), source: 'action-board:' + top.external_id };
+  }
+  function heroDerived(m30, chan, cmRatio) {
+    var cands = [];
+    if (m30.cvr != null && m30.cvr < CVR_BENCH && m30.sessions > 0) cands.push({ v: m30.sessions * (CVR_BENCH / 100 - m30.cvr / 100) * m30.aov * cmRatio, title: 'Restore site conversion to ' + CVR_BENCH + '%', why: 'CVR ' + m30.cvr.toFixed(2) + '% on ' + f0(m30.sessions).toLocaleString('en-GB') + ' sessions.' });
+    if (m30.discRate > 20 && m30.revenue > 0) cands.push({ v: (m30.discounts - 0.20 * m30.revenue) * cmRatio, title: 'Cut discount depth toward 20%', why: 'Discounts ' + m30.discRate.toFixed(0) + '% of revenue.' });
+    (chan || []).forEach(function (c) { if (c.iroas != null && c.paidContrib < 0 && c.spend > 0) cands.push({ v: -c.paidContrib, title: 'Cut ' + c.name + ' — iROAS ' + c.iroas.toFixed(2), why: c.name + ' below break-even.' }); });
+    cands.sort(function (a, b) { return b.v - a.v; });
+    var t = cands[0] || { v: 0, title: 'Hold course', why: 'No single lever dominates.' };
+    return { value: cmk(t.v) + '/mo CM', title: t.title, why: t.why, source: 'derived' };
+  }
+  // Tier read: numbers clause + the real top board item for that tier (diagnosis-derived, CM-ranked).
+  function tierInsight(nums, board, cats, fb) {
+    var a = boardTop(board, cats);
+    if (!a) return fb;
+    return { text: nums + ' Top lever: ' + trim(a.description, 92), action: trim(a.step1 || a.description, 130), value: cmk(n(a.cm_gbp)) + '/mo CM' };
+  }
+
+  function buildTf(tf, D, S) {
+    var days = TF[tf];
+    var endS = maxDate(D.shopify, 'date'); if (!endS) return null;
+    var w = win(endS, days);
+    var rev = sumR(D.shopify, 'date', w.cs, w.ce, function (r) { return n(r.netSales); });
+    var revP = sumR(D.shopify, 'date', w.ps, w.pe, function (r) { return n(r.netSales); });
+    var ord = sumR(D.shopify, 'date', w.cs, w.ce, function (r) { return n(r.orders); });
+    var ordP = sumR(D.shopify, 'date', w.ps, w.pe, function (r) { return n(r.orders); });
+    var disc = sumR(D.shopify, 'date', w.cs, w.ce, function (r) { return n(r.discounts); });
+    var ret = sumR(D.shopify, 'date', w.cs, w.ce, function (r) { return n(r.returns); });
+    var aov = ord > 0 ? rev / ord : 0, aovP = ordP > 0 ? revP / ordP : 0;
+    var endG = maxDate(D.ga4 || [], 'date') || endS, wg = win(endG, days);
+    var sess = sumR(D.ga4 || [], 'date', wg.cs, wg.ce, function (r) { return n(r.sessions); });
+    var sessP = sumR(D.ga4 || [], 'date', wg.ps, wg.pe, function (r) { return n(r.sessions); });
+    var metaSp = sumR(D.metaDaily || [], 'date', w.cs, w.ce, function (r) { return n(r.cost); });
+    var googleSp = sumR(D.googleAds || [], 'date', w.cs, w.ce, function (r) { return n(r.cost); });
+    var spend = metaSp + googleSp;
+    var productCM = S.cmRatio * rev, productCMp = S.cmRatio * revP, CAM = productCM - spend;
+    var mer = spend > 0 ? rev / spend : null;
+    var cvr = sess > 0 ? ord / sess * 100 : null, cvrP = sessP > 0 ? ordP / sessP * 100 : null;
+    var discRate = rev > 0 ? disc / rev * 100 : 0, retRate = rev > 0 ? ret / rev * 100 : 0;
+
+    var nNew = sumR(S.nvr, 'order_date', w.cs, w.ce, function (r) { return r.customer_type === 'new' ? n(r.net_revenue) : 0; });
+    var nRet = sumR(S.nvr, 'order_date', w.cs, w.ce, function (r) { return r.customer_type === 'returning' ? n(r.net_revenue) : 0; });
+    var nTot = nNew + nRet, splitNew = nTot > 0 ? +(nNew / nTot * 100).toFixed(1) : 0;
+    var newRev = f0(splitNew / 100 * rev), retRev = f0(rev - newRev);
+    var oNew = sumR(S.nvr, 'order_date', w.cs, w.ce, function (r) { return r.customer_type === 'new' ? n(r.orders) : 0; });
+    var oRet = sumR(S.nvr, 'order_date', w.cs, w.ce, function (r) { return r.customer_type === 'returning' ? n(r.orders) : 0; });
+    var repeat = (oNew + oRet) > 0 ? +(oRet / (oNew + oRet) * 100).toFixed(1) : 0;
+
+    var ch = channelTable(S.iroas, S.tgts, S.cmRatio);
+    var m30 = win(endS, 30), wg30 = win(endG, 30);
+    var r30 = sumR(D.shopify, 'date', m30.cs, m30.ce, function (r) { return n(r.netSales); });
+    var o30 = sumR(D.shopify, 'date', m30.cs, m30.ce, function (r) { return n(r.orders); });
+    var d30 = sumR(D.shopify, 'date', m30.cs, m30.ce, function (r) { return n(r.discounts); });
+    var s30 = sumR(D.ga4 || [], 'date', wg30.cs, wg30.ce, function (r) { return n(r.sessions); });
+    var sp30 = sumR(D.metaDaily || [], 'date', m30.cs, m30.ce, function (r) { return n(r.cost); }) + sumR(D.googleAds || [], 'date', m30.cs, m30.ce, function (r) { return n(r.cost); });
+    var spendReconcile = sp30 > 0 ? Math.abs(ch.channelSpend - sp30) / sp30 : 0;
+    var hero = heroFromBoard(S.board, heroDerived({ revenue: r30, discounts: d30, discRate: r30 > 0 ? d30 / r30 * 100 : 0, sessions: s30, aov: o30 > 0 ? r30 / o30 : 0, cvr: s30 > 0 ? o30 / s30 * 100 : null }, ch.rows, S.cmRatio));
+    var productCM30 = S.cmRatio * r30, CAM30 = productCM30 - sp30, breakEvenTxt = ch.breakEven != null ? ch.breakEven.toFixed(2) : '—';
+
+    var numsB = 'Revenue ' + (delta(rev, revP) == null ? '—' : (delta(rev, revP) >= 0 ? 'up ' : 'down ') + Math.abs(delta(rev, revP)).toFixed(0) + '%') + ', CVR ' + (cvr == null ? '—' : cvr.toFixed(2) + '% vs ' + CVR_BENCH + '%') + '; product CM ' + gbp(productCM) + ' → CAM ' + gbp(CAM) + ' after ' + gbp(spend) + ' spend.';
+    var numsC = 'New ' + splitNew + '% / returning ' + (100 - splitNew).toFixed(0) + '% of L1 revenue (' + gbp(newRev) + ' / ' + gbp(retRev) + '); repeat ' + repeat + '%.';
+    var numsCh = 'Trailing 30d · break-even iROAS ' + breakEvenTxt + '; paid contribution ' + gbp(ch.paidContribution) + '; channel spend ' + gbp(ch.channelSpend) + ' vs L1 ' + gbp(sp30) + (spendReconcile > 0.10 ? ' ⚠' : ' ✓') + '.';
+
+    return {
+      periodLabel: LBL[tf][0] + ' · ' + w.cs + ' – ' + w.ce, compareLabel: LBL[tf][1],
+      hero: { cmAfterMkt: CAM30, cm: productCM30, cmPct: +(S.cmRatio * 100).toFixed(1), spend: sp30, targetEstimated: true, action: hero },
+      business: [
+        tile('Revenue', rev, 'gbp', delta(rev, revP), 'vs ' + gbp(revP), ragTrend(delta(rev, revP)), 'Shopify truth (L1)'),
+        tile('Contribution (product)', productCM, 'gbp', delta(productCM, productCMp), '= rev × ' + (S.cmRatio * 100).toFixed(1) + '%', ragTrend(delta(productCM, productCMp)), 'before ad spend'),
+        tile('Contribution after mktg', CAM, 'gbp', null, '= product CM − spend', CAM >= 0 ? 'g' : 'r', 'CAM'),
+        tile('Ad spend', spend, 'gbp', null, 'Meta ' + gbp(metaSp) + ' · Google ' + gbp(googleSp), 'a', mer != null ? 'MER ' + mer.toFixed(2) : ''),
+        tile('Conversion rate', cvr, 'pct1', delta(cvr, cvrP), cvrP != null ? 'vs ' + cvrP.toFixed(2) + '%' : '', cvr == null ? 'n' : cvr >= CVR_BENCH ? 'g' : cvr >= 1.2 ? 'a' : 'r', 'benchmark ' + CVR_BENCH + '%'),
+        tile('Sessions', sess, 'int', delta(sess, sessP), 'vs ' + f0(sessP).toLocaleString('en-GB'), ragTrend(delta(sess, sessP)), 'GA4'),
+        tile('AOV', aov, 'gbp', delta(aov, aovP), 'net ÷ orders', ragTrend(delta(aov, aovP)), 'vs ' + gbp(aovP)),
+        tile('Discounts', disc, 'gbp', null, discRate.toFixed(1) + '% of revenue', discRate > 25 ? 'r' : discRate > 20 ? 'a' : 'g', 'target <20%'),
+        tile('Returns', ret, 'gbp', null, retRate.toFixed(1) + '% of revenue', retRate > 15 ? 'r' : retRate > 8 ? 'a' : 'g', 'healthy <8%'),
+        tile('Orders', ord, 'int', delta(ord, ordP), 'vs ' + f0(ordP).toLocaleString('en-GB'), ragTrend(delta(ord, ordP)), 'MER ' + (mer != null ? mer.toFixed(2) : '—'))
+      ],
+      bestSellers: topSellers(S.items, w.cs, w.ce),
+      customer: {
+        splitNew: splitNew, splitRet: +(100 - splitNew).toFixed(1), newRev: newRev, retRev: retRev,
+        tiles: [
+          tile('New customers', n(S.econ.new_customers), 'int', null, 'trailing 30d', 'g'),
+          tile('New CAC', S.econ.ncac == null ? null : n(S.econ.ncac), 'gbp2', null, 'vs CM/order', n(S.econ.ncac) > 0 && n(S.econ.ncac) < S.cmRatio * aov ? 'g' : 'a', 'spend ÷ new custs'),
+          tile('Repeat rate', repeat, 'pct1', null, 'this period', repeat >= 30 ? 'g' : repeat >= 20 ? 'a' : 'r', 'target 30%+'),
+          tile('aMER', S.econ.amer == null ? null : n(S.econ.amer), 'x', null, 'acq MER · 30d', n(S.econ.amer) >= 2 ? 'g' : 'a', 'rev ÷ acq spend')
+        ]
+      },
+      channel: ch.rows.length ? ch.rows : [{ name: 'No channel data', phi: null, spend: 0, rep: null, iroas: null, tgt: 1.23, rag: 'n', verdict: 'connect ad platforms' }],
+      insights: {
+        business: tierInsight(numsB, S.board, TIER_CATS.business, { text: numsB, action: hero.title, value: hero.value }),
+        customer: tierInsight(numsC, S.board, TIER_CATS.customer, { text: numsC, action: repeat < 30 ? 'Turn on post-purchase & winback flows to lift repeat rate.' : 'Retention healthy — protect it.', value: 'retention' }),
+        channel: tierInsight(numsCh, S.board, TIER_CATS.channel, { text: numsCh, action: 'Reallocate from below-break-even channels.', value: 'iROAS' })
+      }
+    };
+  }
+
+  var _supp = null;
+  function rebuild() {
+    try {
+      var L = window.FRKL_LIVE, D = window.FRKL_DATA;
+      if (!L || !L.brandId || !D || !D.shopify || !D.shopify.length || !_supp) return;
+      var out = {};
+      Object.keys(TF).forEach(function (tf) { var b = buildTf(tf, D, _supp); if (b) out[tf] = b; });
+      if (Object.keys(out).length) { window.FRKL_OVERVIEW = out; window.dispatchEvent(new CustomEvent('frkl-overview-updated')); }
+    } catch (e) { if (window.console) console.warn('[overview-data] rebuild failed', e); }
+  }
+  async function refreshSupp() {
+    try { var L = window.FRKL_LIVE; if (!L || !L.sb || !L.brandId) return; _supp = await fetchSupp(L.sb, L.brandId); rebuild(); }
+    catch (e) { if (window.console) console.warn('[overview-data] supp fetch failed', e); }
+  }
+  window.addEventListener('frkl-data-updated', refreshSupp);
+  var tries = 0, iv = setInterval(function () { tries++; if ((window.FRKL_LIVE && window.FRKL_LIVE.brandId && window.FRKL_DATA && window.FRKL_DATA.shopify && window.FRKL_DATA.shopify.length) || tries > 40) { clearInterval(iv); refreshSupp(); } }, 500);
+})();
