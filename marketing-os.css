@@ -255,7 +255,13 @@
 .tdy-foot { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-muted); margin-top: var(--space-3); }
 
 /* Targets — plan status chip + owner target-input form (audit 2026-07-10) */
-.tdy-planstatus { display: flex; align-items: center; gap: var(--space-2); margin: calc(-1 * var(--space-4)) 0 var(--space-6); }
+/* 2026-07-14 fix: this used a negative top margin (calc(-1 * var(--space-4))) tuned for when
+   .tdy-planstatus sat directly under .tdy-plan-sub with nothing between them. The Data coverage
+   strip (.dc, 2026-07-14) was inserted as a sibling right before it and carries its own
+   margin-bottom: var(--space-4) — the negative margin here exactly cancelled that out, pulling
+   this banner up on top of the coverage chips (worse once the chip row wraps to two lines, per
+   the frkl screenshot). Small positive gap instead — .dc already provides its own separation. */
+.tdy-planstatus { display: flex; align-items: center; gap: var(--space-2); margin: var(--space-2) 0 var(--space-6); }
 .tdy-prov-chip { font-family: var(--font-sans); font-size: var(--text-xs); color: var(--color-warning); border: 1px solid var(--color-warning); border-radius: var(--radius-sm); padding: 1px var(--space-2); }
 .tdy-conf-chip { font-family: var(--font-sans); }
 .tdy-targets { border-top: 1px solid var(--color-line); padding-top: var(--space-4); margin-bottom: var(--space-8); border-radius: var(--radius-none); }
