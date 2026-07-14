@@ -10327,15 +10327,19 @@ function GretaOverviewTiers(){
       </div>
 
       <div style={{margin:'22px 0 8px'}}>
-        <GO_TierHead n="02" title="Customer" sub="who is buying — new vs returning"/>
-        <div style={{display:'grid',gap:10,gridTemplateColumns:'repeat(5,1fr)'}}>
-          <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:11,padding:'12px 13px'}}>
-            <div style={{fontSize:11.5,color:GO_T.mut}}>New vs returning revenue</div>
-            <div style={{display:'flex',height:9,borderRadius:5,overflow:'hidden',margin:'10px 0 7px'}}><div style={{width:d.customer.splitNew+'%',background:GO_T.accent}}/><div style={{width:d.customer.splitRet+'%',background:'#2563EB'}}/></div>
-            <div style={{fontFamily:GO_T.mono,fontSize:11.5}}><span style={{color:GO_T.accent2}}>New {d.customer.splitNew}% · {GO_gbp(d.customer.newRev)}</span> <span style={{color:GO_T.mut}}>Ret {d.customer.splitRet}% · {GO_gbp(d.customer.retRev)}</span></div>
-          </div>
-          {d.customer.tiles.map((t,i)=><GO_Tile key={i} t={t}/>)}
+        <GO_TierHead n="02" title="Customer" sub="returning · new · paid-incremental (CTC)"/>
+        <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:8,padding:'11px 13px',boxShadow:'var(--shadow-panel)',marginBottom:10}}>
+          <div style={{fontSize:11,color:GO_T.mut,marginBottom:6}}>New vs returning revenue</div>
+          <div style={{display:'flex',height:9,borderRadius:5,overflow:'hidden',marginBottom:6}}><div style={{width:d.customer.splitNew+'%',background:GO_T.accent}}/><div style={{width:d.customer.splitRet+'%',background:'#2563EB'}}/></div>
+          <div style={{fontFamily:GO_T.mono,fontSize:11.5}}><span style={{color:GO_T.accent}}>New {d.customer.splitNew}% · {GO_gbp(d.customer.newRev)}</span> &nbsp; <span style={{color:'#2563EB'}}>Ret {d.customer.splitRet}% · {GO_gbp(d.customer.retRev)}</span></div>
         </div>
+        {(d.customer.rows||[]).map(function(row,ri){return (
+          <div key={ri} style={{display:'flex',alignItems:'stretch',gap:10,marginBottom:8,flexWrap:'wrap'}}>
+            <div style={{minWidth:120,display:'flex',alignItems:'center',gap:7,fontSize:12.5,fontWeight:600}}><GO_Dot r={row.rag}/> {row.label}</div>
+            <div style={{flex:1,display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(115px,1fr))',gap:8}}>
+              {row.cells.map(function(c,ci){return <div key={ci} style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:8,padding:'8px 11px',boxShadow:'var(--shadow-panel)'}}><div style={{fontSize:10.5,color:GO_T.mut}}>{c.k}</div><div style={{fontFamily:GO_T.mono,fontSize:15,fontWeight:600,marginTop:1}}>{c.v}</div></div>;})}
+            </div>
+          </div>);})}
         <GO_Insight i={d.insights.customer}/>
       </div>
 

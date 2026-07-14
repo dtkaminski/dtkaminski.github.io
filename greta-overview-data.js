@@ -177,15 +177,29 @@
         tile('Orders', ord, 'int', delta(ord, ordP), 'vs ' + f0(ordP).toLocaleString('en-GB'), ragTrend(delta(ord, ordP)), 'MER ' + (mer != null ? mer.toFixed(2) : '—'))
       ],
       bestSellers: topSellers(S.items, w.cs, w.ce),
-      customer: {
-        splitNew: splitNew, splitRet: +(100 - splitNew).toFixed(1), newRev: newRev, retRev: retRev,
-        tiles: [
-          tile('New customers', n(S.econ.new_customers), 'int', null, 'trailing 30d', 'g'),
-          tile('New CAC', S.econ.ncac == null ? null : n(S.econ.ncac), 'gbp2', null, 'vs CM/order', n(S.econ.ncac) > 0 && n(S.econ.ncac) < S.cmRatio * aov ? 'g' : 'a', 'spend ÷ new custs'),
-          tile('Repeat rate', repeat, 'pct1', null, 'this period', repeat >= 30 ? 'g' : repeat >= 20 ? 'a' : 'r', 'target 30%+'),
-          tile('aMER', S.econ.amer == null ? null : n(S.econ.amer), 'x', null, 'acq MER · 30d', n(S.econ.amer) >= 2 ? 'g' : 'a', 'rev ÷ acq spend')
-        ]
-      },
+      customer: (function () {
+        var retAov = oRet > 0 ? nRet / oRet : 0, newAov = oNew > 0 ? nNew / oNew : 0;
+        var paidRows = (S.effect || []).filter(function (e) { return e.family === "paid"; });
+        var pRev = paidRows.reduce(function (a, e) { return a + n(e.incremental_rev_30d); }, 0);
+        var pSpend = paidRows.reduce(function (a, e) { return a + n(e.spend_30d); }, 0);
+        var pOrders = newAov > 0 ? pRev / newAov : 0;
+        return {
+          splitNew: splitNew, splitRet: +(100 - splitNew).toFixed(1), newRev: newRev, retRev: retRev,
+          rows: [
+            { label: "Returning", rag: repeat >= 30 ? "g" : repeat >= 20 ? "a" : "r", cells: [
+              { k: "Revenue", v: gbp(nRet) }, { k: "Orders", v: f0(oRet).toLocaleString("en-GB") },
+              { k: "AOV", v: gbp(retAov) }, { k: "Repeat rate", v: repeat + "%" } ] },
+            { label: "New", rag: "g", cells: [
+              { k: "Revenue", v: gbp(nNew) }, { k: "Orders", v: f0(oNew).toLocaleString("en-GB") },
+              { k: "AOV", v: gbp(newAov) }, { k: "Weighted CAC", v: S.econ.ncac == null ? "—" : gbp(n(S.econ.ncac)) },
+              { k: "aMER", v: S.econ.amer == null ? "—" : n(S.econ.amer).toFixed(2) + "×" } ] },
+            { label: "Paid · incremental", rag: pRev > pSpend ? "g" : "a", cells: [
+              { k: "iRevenue", v: gbp(pRev) }, { k: "iOrders", v: f0(pOrders).toLocaleString("en-GB") },
+              { k: "iAOV", v: gbp(newAov) }, { k: "iCAC", v: pOrders > 0 ? gbp(pSpend / pOrders) : "—" },
+              { k: "ipaMER", v: pSpend > 0 ? (pRev / pSpend).toFixed(2) + "×" : "—" } ] }
+          ]
+        };
+      })(),
       emailBlock: S.email,
       channel: ch.rows.length ? ch.rows : [{ name: 'No channel data', phi: null, spend: 0, rep: null, iroas: null, tgt: 1.23, rag: 'n', verdict: 'connect ad platforms' }],
       insights: {
