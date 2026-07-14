@@ -2,28 +2,16 @@
  * greta-overview-data.js — builds window.FRKL_OVERVIEW[timeframe] for the Overview tiers.
  * Plain global-scope JS (no build). Load AFTER greta-data-loader.js in greta-dashboard.html.
  *
- * ── CANONICAL METRIC SPINE (enforced here; source: Greta-Metrics-Hierarchy-Review.md §8) ──
- *   L1 revenue          = Shopify truth (v_tenant_shopify_daily_agg) — NEVER Σ channel reported.
- *   Product CM          = revenue × cm_ratio                        (cm_ratio from vw_brand_cm)
- *   CAM (after mktg)     = Product CM − ad spend                     (the hero rung)
- *   MER                 = revenue / ad spend
- *   AOV                 = net revenue / orders
- *   CVR                 = orders / sessions
- *   reported ROAS       = reported revenue / spend
- *   normalized iROAS    = reported ROAS × φ                         (from vw_channel_iroas)
- *   incremental revenue = spend × normalized iROAS
- *   paid contribution   = Σ (incremental revenue × cm_ratio − spend) across channels
- *   break-even iROAS    = 1 / cm_ratio
- * Identities kept: new+returning revenue == L1 revenue (split applied to L1 truth); channel spend
- * reconciled to L1 ad spend (flagged if off); CAM == ProductCM − spend everywhere.
+ * ── CANONICAL METRIC SPINE (Greta-Metrics-Hierarchy-Review.md §8) ──
+ *   L1 revenue = Shopify truth; Product CM = revenue × cm_ratio; CAM = Product CM − ad spend;
+ *   MER = revenue/spend; CVR = orders/sessions; normalized iROAS = reported × φ;
+ *   incremental revenue = spend × iROAS; paid contribution = Σ(incremental×cm_ratio − spend);
+ *   break-even iROAS = 1/cm_ratio. New+returning revenue == L1 revenue (split applied to L1).
+ * Insights are diagnosis-derived from vw_brand_action_board (cm_gbp), same source as Today/Actions.
  *
- * ── INSIGHTS ARE DIAGNOSIS-DERIVED, not templated ──
- *   Each tier's read = an enforced-numbers clause + the top real item from vw_brand_action_board
- *   (the synthesised diagnosis: description + first step + cm_gbp) for that tier's categories:
- *     Business ← site, finance, ops, product   Customer ← retention, cx   Channel ← paid, creative
- *   The hero action is the board's global top by cm_gbp — the SAME CM-ranked source Today/Actions
- *   use, so the surfaces can't disagree. Derived fallback (same formulas) only when the board is
- *   empty. Reuses the loader's authed client; recomputes on 'frkl-data-updated'; never throws.
+ * ROBUSTNESS: every supplemental query is individually timed (no Promise.all fail-all/hang); the
+ * business tier always builds from the loader's FRKL_DATA even if all supplementals are empty, so
+ * FRKL_OVERVIEW always populates. Reuses FRKL_LIVE.sb; recomputes on 'frkl-data-updated'; never throws.
  */
 (function () {
   'use strict';
@@ -49,27 +37,29 @@
   function ragTrend(d) { if (d == null) return 'a'; return d >= -2 ? 'g' : d >= -15 ? 'a' : 'r'; }
   function tile(k, v, fmt, d, cmp, rag, tgt) { return { k: k, v: v, fmt: fmt, d: d, cmp: cmp, rag: rag, tgt: tgt }; }
 
-  async function fetchPaged(makeQuery) {
-    var PAGE = 1000, from = 0, out = [];
-    for (;;) { var r = await makeQuery(from, from + PAGE - 1); if (r.error || !r.data || !r.data.length) break; out.push.apply(out, r.data); if (r.data.length < PAGE) break; from += PAGE; }
-    return out;
+  // Individually-timed query: resolves to data or the default within ms; never rejects, never hangs.
+  function safeQ(q, ms, def) {
+    return Promise.race([
+      Promise.resolve(q).then(function (r) { return (r && !r.error && r.data != null) ? r.data : def; }).catch(function () { return def; }),
+      new Promise(function (res) { setTimeout(function () { res(def); }, ms); })
+    ]);
   }
 
   async function fetchSupp(sb, brandId) {
-    var cm = sb.from('vw_brand_cm').select('cm_ratio, cm_per_order, aov').eq('brand_id', brandId).maybeSingle();
-    var econ = sb.from('vw_brand_customer_economics_30d').select('new_customers, ncac, amer, blended_mer, new_rev_share, returning_rev_share').eq('brand_id', brandId).maybeSingle();
-    var iroas = sb.from('vw_channel_iroas').select('channel_type, spend_30d, reported_roas, normalized_iroas, phi_applied').eq('brand_id', brandId);
-    var tgts = sb.from('vw_channel_iroas_targets').select('channel_type, target_true_iroas').eq('brand_id', brandId);
-    var nvr = fetchPaged(function (a, b) { return sb.from('vw_daily_new_vs_returning').select('order_date, customer_type, orders, net_revenue').eq('brand_id', brandId).order('order_date', { ascending: true }).range(a, b); });
-    var items = fetchPaged(function (a, b) { return sb.from('v_tenant_shopify_lineitems_daily').select('day, product_title, units, revenue').eq('brand_id', brandId).order('day', { ascending: true }).range(a, b); });
-    var board = sb.from('vw_brand_action_board').select('external_id, description, step1, priority, category, cm_gbp').eq('brand_id', brandId).order('cm_gbp', { ascending: false, nullsFirst: false }).limit(30);
-    var res = await Promise.all([cm, econ, iroas, tgts, nvr, items, board]);
-    return {
-      cmRatio: (res[0] && res[0].data && res[0].data.cm_ratio) || 0.6,
-      econ: (res[1] && res[1].data) || {},
-      iroas: (res[2] && res[2].data) || [], tgts: (res[3] && res[3].data) || [],
-      nvr: res[4] || [], items: res[5] || [], board: (res[6] && res[6].data) || []
-    };
+    var cutoff = new Date(Date.now() - 400 * 864e5).toISOString().slice(0, 10);
+    var Q = 12000;
+    var r = await Promise.all([
+      safeQ(sb.from('vw_brand_cm').select('cm_ratio').eq('brand_id', brandId).limit(1), Q, null),
+      safeQ(sb.from('vw_brand_customer_economics_30d').select('new_customers, ncac, amer').eq('brand_id', brandId).limit(1), Q, null),
+      safeQ(sb.from('vw_channel_iroas').select('channel_type, spend_30d, reported_roas, normalized_iroas, phi_applied').eq('brand_id', brandId), Q, []),
+      safeQ(sb.from('vw_channel_iroas_targets').select('channel_type, target_true_iroas').eq('brand_id', brandId), Q, []),
+      safeQ(sb.from('vw_daily_new_vs_returning').select('order_date, customer_type, orders, net_revenue').eq('brand_id', brandId).gte('order_date', cutoff).order('order_date', { ascending: false }).limit(1000), Q, []),
+      safeQ(sb.from('v_tenant_shopify_lineitems_daily').select('day, product_title, units, revenue').eq('brand_id', brandId).gte('day', cutoff).order('day', { ascending: false }).limit(1000), Q, []),
+      safeQ(sb.from('vw_brand_action_board').select('external_id, description, step1, priority, category, cm_gbp').eq('brand_id', brandId).order('cm_gbp', { ascending: false, nullsFirst: false }).limit(30), Q, [])
+    ]);
+    var cmRow = Array.isArray(r[0]) ? r[0][0] : r[0];
+    var econRow = Array.isArray(r[1]) ? r[1][0] : r[1];
+    return { cmRatio: (cmRow && cmRow.cm_ratio) || 0.6, econ: econRow || {}, iroas: r[2] || [], tgts: r[3] || [], nvr: r[4] || [], items: r[5] || [], board: r[6] || [] };
   }
 
   function topSellers(items, s, e) {
@@ -77,15 +67,11 @@
     for (i = 0; i < items.length; i++) { var r = items[i]; if (r.day >= s && r.day <= e) by[r.product_title] = (by[r.product_title] || 0) + n(r.revenue); }
     return Object.keys(by).map(function (k) { return { name: k, rev: by[k] }; }).sort(function (a, b) { return b.rev - a.rev; }).slice(0, 3);
   }
-
   function boardTop(board, cats) {
     var r = (board || []).filter(function (a) { return a.cm_gbp != null && cats.indexOf(a.category) >= 0; });
     r.sort(function (a, b) { return n(b.cm_gbp) - n(a.cm_gbp); });
     return r[0] || null;
   }
-
-  // Channel table — normalized iROAS = reported×φ (from view), RAG vs target_true_iroas, flag below
-  // product break-even (1/cm_ratio), and paid contribution = incremental×CM − spend per channel.
   function channelTable(iroas, tgts, cmRatio) {
     var breakEven = cmRatio > 0 ? 1 / cmRatio : null;
     var tmap = {}; tgts.forEach(function (t) { tmap[t.channel_type] = n(t.target_true_iroas); });
@@ -99,7 +85,6 @@
     });
     return { rows: rows, breakEven: breakEven, paidContribution: rows.reduce(function (a, r) { return a + r.paidContrib; }, 0), channelSpend: rows.reduce(function (a, r) { return a + r.spend; }, 0) };
   }
-
   function heroFromBoard(board, fallback) {
     var top = (board || []).filter(function (a) { return a.cm_gbp != null; })[0];
     if (!top) return fallback;
@@ -114,7 +99,6 @@
     var t = cands[0] || { v: 0, title: 'Hold course', why: 'No single lever dominates.' };
     return { value: cmk(t.v) + '/mo CM', title: t.title, why: t.why, source: 'derived' };
   }
-  // Tier read: numbers clause + the real top board item for that tier (diagnosis-derived, CM-ranked).
   function tierInsight(nums, board, cats, fb) {
     var a = boardTop(board, cats);
     if (!a) return fb;
@@ -142,7 +126,6 @@
     var mer = spend > 0 ? rev / spend : null;
     var cvr = sess > 0 ? ord / sess * 100 : null, cvrP = sessP > 0 ? ordP / sessP * 100 : null;
     var discRate = rev > 0 ? disc / rev * 100 : 0, retRate = rev > 0 ? ret / rev * 100 : 0;
-
     var nNew = sumR(S.nvr, 'order_date', w.cs, w.ce, function (r) { return r.customer_type === 'new' ? n(r.net_revenue) : 0; });
     var nRet = sumR(S.nvr, 'order_date', w.cs, w.ce, function (r) { return r.customer_type === 'returning' ? n(r.net_revenue) : 0; });
     var nTot = nNew + nRet, splitNew = nTot > 0 ? +(nNew / nTot * 100).toFixed(1) : 0;
@@ -150,7 +133,6 @@
     var oNew = sumR(S.nvr, 'order_date', w.cs, w.ce, function (r) { return r.customer_type === 'new' ? n(r.orders) : 0; });
     var oRet = sumR(S.nvr, 'order_date', w.cs, w.ce, function (r) { return r.customer_type === 'returning' ? n(r.orders) : 0; });
     var repeat = (oNew + oRet) > 0 ? +(oRet / (oNew + oRet) * 100).toFixed(1) : 0;
-
     var ch = channelTable(S.iroas, S.tgts, S.cmRatio);
     var m30 = win(endS, 30), wg30 = win(endG, 30);
     var r30 = sumR(D.shopify, 'date', m30.cs, m30.ce, function (r) { return n(r.netSales); });
@@ -161,11 +143,9 @@
     var spendReconcile = sp30 > 0 ? Math.abs(ch.channelSpend - sp30) / sp30 : 0;
     var hero = heroFromBoard(S.board, heroDerived({ revenue: r30, discounts: d30, discRate: r30 > 0 ? d30 / r30 * 100 : 0, sessions: s30, aov: o30 > 0 ? r30 / o30 : 0, cvr: s30 > 0 ? o30 / s30 * 100 : null }, ch.rows, S.cmRatio));
     var productCM30 = S.cmRatio * r30, CAM30 = productCM30 - sp30, breakEvenTxt = ch.breakEven != null ? ch.breakEven.toFixed(2) : '—';
-
     var numsB = 'Revenue ' + (delta(rev, revP) == null ? '—' : (delta(rev, revP) >= 0 ? 'up ' : 'down ') + Math.abs(delta(rev, revP)).toFixed(0) + '%') + ', CVR ' + (cvr == null ? '—' : cvr.toFixed(2) + '% vs ' + CVR_BENCH + '%') + '; product CM ' + gbp(productCM) + ' → CAM ' + gbp(CAM) + ' after ' + gbp(spend) + ' spend.';
     var numsC = 'New ' + splitNew + '% / returning ' + (100 - splitNew).toFixed(0) + '% of L1 revenue (' + gbp(newRev) + ' / ' + gbp(retRev) + '); repeat ' + repeat + '%.';
     var numsCh = 'Trailing 30d · break-even iROAS ' + breakEvenTxt + '; paid contribution ' + gbp(ch.paidContribution) + '; channel spend ' + gbp(ch.channelSpend) + ' vs L1 ' + gbp(sp30) + (spendReconcile > 0.10 ? ' ⚠' : ' ✓') + '.';
-
     return {
       periodLabel: LBL[tf][0] + ' · ' + w.cs + ' – ' + w.ce, compareLabel: LBL[tf][1],
       hero: { cmAfterMkt: CAM30, cm: productCM30, cmPct: +(S.cmRatio * 100).toFixed(1), spend: sp30, targetEstimated: true, action: hero },
@@ -204,16 +184,19 @@
   function rebuild() {
     try {
       var L = window.FRKL_LIVE, D = window.FRKL_DATA;
-      if (!L || !L.brandId || !D || !D.shopify || !D.shopify.length || !_supp) return;
+      if (!L || !L.brandId || !D || !D.shopify || !D.shopify.length) { return; }
+      var S = _supp || { cmRatio: 0.6, econ: {}, iroas: [], tgts: [], nvr: [], items: [], board: [] };
       var out = {};
-      Object.keys(TF).forEach(function (tf) { var b = buildTf(tf, D, _supp); if (b) out[tf] = b; });
-      if (Object.keys(out).length) { window.FRKL_OVERVIEW = out; window.dispatchEvent(new CustomEvent('frkl-overview-updated')); }
+      Object.keys(TF).forEach(function (tf) { try { var b = buildTf(tf, D, S); if (b) out[tf] = b; } catch (e) { if (window.console) console.warn('[overview-data] buildTf ' + tf, e); } });
+      if (Object.keys(out).length) { window.FRKL_OVERVIEW = out; window.dispatchEvent(new CustomEvent('frkl-overview-updated')); if (window.console) console.info('[overview-data] FRKL_OVERVIEW built', Object.keys(out).length, 'timeframes · supp=' + (_supp ? 'yes' : 'pending')); }
     } catch (e) { if (window.console) console.warn('[overview-data] rebuild failed', e); }
   }
   async function refreshSupp() {
-    try { var L = window.FRKL_LIVE; if (!L || !L.sb || !L.brandId) return; _supp = await fetchSupp(L.sb, L.brandId); rebuild(); }
-    catch (e) { if (window.console) console.warn('[overview-data] supp fetch failed', e); }
+    var L = window.FRKL_LIVE;
+    if (!L || !L.brandId || !window.FRKL_DATA || !window.FRKL_DATA.shopify || !window.FRKL_DATA.shopify.length) return;
+    rebuild(); // build business tier immediately from loader data
+    if (L.sb) { try { _supp = await fetchSupp(L.sb, L.brandId); } catch (e) { if (window.console) console.warn('[overview-data] supp fetch failed', e); } rebuild(); }
   }
   window.addEventListener('frkl-data-updated', refreshSupp);
-  var tries = 0, iv = setInterval(function () { tries++; if ((window.FRKL_LIVE && window.FRKL_LIVE.brandId && window.FRKL_DATA && window.FRKL_DATA.shopify && window.FRKL_DATA.shopify.length) || tries > 40) { clearInterval(iv); refreshSupp(); } }, 500);
+  var tries = 0, iv = setInterval(function () { tries++; if ((window.FRKL_LIVE && window.FRKL_LIVE.brandId && window.FRKL_DATA && window.FRKL_DATA.shopify && window.FRKL_DATA.shopify.length) || tries > 60) { clearInterval(iv); refreshSupp(); } }, 500);
 })();
