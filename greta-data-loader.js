@@ -494,40 +494,18 @@
 
   async function fetchDailyGa4(sb, brandId) {
     try {
-      // GA4 daily is stored per channel-group (~12 rows/day), so it crosses the
-      // 1000-row cap after ~80 days — paginate, then sum to one row per date.
-      const all = await fetchAllPaged((from, to) => sb.from('tenant_ga4_daily')
-        .select('date, channel, sessions, active_users, new_users, conversions, purchase_revenue, ecommerce_purchases, add_to_carts, begin_checkouts, engagement_rate, bounce_rate')
-        .eq('brand_id', brandId)
-        .neq('channel', 'total')   // exclude GA4's daily summary row — channel groups already sum to it; including it double-counts sessions/purchases
-        .order('date', { ascending: true })
-        .order('channel', { ascending: true })
-        .range(from, to));
-      const byDate = {};
-      for (const r of all) {
-        const a = byDate[r.date] = byDate[r.date] || { date: r.date, sessions: 0, active_users: 0, new_users: 0, conversions: 0, purchase_revenue: 0, ecommerce_purchases: 0, add_to_carts: 0, begin_checkouts: 0, engaged_sessions: 0, bounced_sessions: 0 };
-        const sess = Number(r.sessions || 0);
-        a.sessions += sess;
-        a.active_users += Number(r.active_users || 0);
-        a.new_users += Number(r.new_users || 0);
-        a.conversions += Number(r.conversions || 0);
-        a.purchase_revenue += Number(r.purchase_revenue || 0);
-        a.ecommerce_purchases += Number(r.ecommerce_purchases || 0);
-        a.add_to_carts += Number(r.add_to_carts || 0);
-        a.begin_checkouts += Number(r.begin_checkouts || 0);
-        // engagement_rate / bounce_rate are RATES — weight by sessions before summing across channel rows
-        a.engaged_sessions += sess * Number(r.engagement_rate || 0);
-        a.bounced_sessions += sess * Number(r.bounce_rate || 0);
-      }
-      const rows = Object.values(byDate).sort((a, b) => a.date < b.date ? -1 : 1);
-      return rows.map(r => {
+      // Reads the per-day GA4 aggregate view (channel groups pre-summed server-side) so this is ONE
+      // request (<1000 rows for years) instead of paginating the channel-split table (~9 round trips).
+      const { data } = await sb.from("v_tenant_ga4_daily_agg")
+        .select("date, sessions, active_users, new_users, conversions, purchase_revenue, ecommerce_purchases, add_to_carts, begin_checkouts, engaged_sessions, bounced_sessions")
+        .eq("brand_id", brandId)
+        .order("date", { ascending: true });
+      return (data || []).map(r => {
         const sessions = Number(r.sessions || 0);
         return {
-          date: r.date,
-          sessions,
-          users: Number(r.active_users || 0),
+          date: r.date, sessions, users: Number(r.active_users || 0),
           engagedSessions: Math.round(r.engaged_sessions || 0),
-          engagementRate: sessions > 0 ? r.engaged_sessions / sessions : 0, // was never selected → 0.0%
+          engagementRate: sessions > 0 ? r.engaged_sessions / sessions : 0,
           bounceRate: sessions > 0 ? r.bounced_sessions / sessions : 0,
           purchases: Number(r.ecommerce_purchases || 0),
           purchaseValue: Number(r.purchase_revenue || 0),

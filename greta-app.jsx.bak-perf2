@@ -770,7 +770,7 @@ function MoneyBadge({money}){
 }
 
 function MoneyOnTablePanel(){
-  const P = window.FRKL_PATTERNS || {};
+  const P = window.FRKL_PATTERNS;
   if (!P || !P.money_rollup) return null;
   const rollup = P.money_rollup;
   const am = P.action_money || {};
@@ -856,7 +856,7 @@ function MoneyOnTablePanel(){
 
 function MoneyHeaderStrip(){
   // Compact strip for the Overview tab. Headline £ numbers only.
-  const P = window.FRKL_PATTERNS || {};
+  const P = window.FRKL_PATTERNS;
   if (!P || !P.money_rollup) return null;
   const r = P.money_rollup;
   return (
@@ -1433,7 +1433,7 @@ function SetupProgressCard(){
 }
 
 function ThisWeekHero(){
-  const P = window.FRKL_PATTERNS || {};
+  const P = window.FRKL_PATTERNS;
   const r = (P && P.money_rollup) || {leakage:0, at_risk:0, opportunity:0, total:0};
   const moneyPatterns = (P && P.money_patterns) || [];
   const topFor = (k) => moneyPatterns.filter(m => m.kind === k)
@@ -6781,7 +6781,7 @@ function ZoneHeader({number, title, meta, accent}) {
 }
 
 function IntelligencePanel(){
-  const P = window.FRKL_PATTERNS || {};
+  const P = window.FRKL_PATTERNS;
   if (!P || !Array.isArray(P.patterns)) {
     return (<div className="card"><EmptyState icon="spark"
       title="Intelligence is still warming up"
@@ -7297,7 +7297,7 @@ function FInput({label, required, optional, value, setValue, placeholder, type, 
 }
 
 function SynergyMatrix(){
-  const P = window.FRKL_PATTERNS || {};
+  const P = window.FRKL_PATTERNS;
   if (!P || !Array.isArray(P.patterns)) return null;
   const synergies = P.patterns.filter(p => p.kind === 'synergy');
   if (!synergies.length) return null;
