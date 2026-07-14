@@ -4,9 +4,9 @@
 // (CAM) or revenue and see the full derived target set (both units), then confirm it as the
 // plan of record (mos_business_goal.confirmed=true). Global-scope, GP_* namespaced. Data +
 // writes live in window.FRKL_PLAN (greta-plan-data.js). Confirm is user-initiated only.
-var GP_T = { bg:'#0b0d12', panel:'#14161c', panel2:'#181b23', line:'#232733', ink:'#e8eaf0',
-  mut:'#8b93a7', dim:'#5b6479', accent:'#7c8cff', accent2:'#a6b0ff', green:'#3fbf87', amber:'#e0a53d', red:'#e5644e',
-  mono:'"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace' };
+var GP_T = { bg:'transparent', panel:'var(--color-panel)', panel2:'var(--color-surface)', line:'var(--color-line)', ink:'var(--color-ink)',
+  mut:'var(--color-muted)', dim:'#9a948c', accent:'var(--color-accent)', accent2:'var(--color-accent)', green:'var(--color-success)', amber:'var(--color-warning)', red:'var(--color-danger)',
+  mono:'var(--font-mono)' };
 var GP_gbp = function (x) { return x == null ? '—' : '£' + Math.round(Number(x)).toLocaleString('en-GB'); };
 var GP_rag = function (s) { return s === 'ready' ? GP_T.green : s === 'unconfirmed' || s === 'stale' ? GP_T.amber : GP_T.red; };
 
@@ -55,8 +55,8 @@ function GretaPlanPanel() {
   }
 
   var wrap = { maxWidth: 1180, margin: '0 auto', padding: '10px 6px 60px', background: GP_T.bg, color: GP_T.ink };
-  var input = { background: '#0f1218', border: '1px solid ' + GP_T.line, borderRadius: 8, color: GP_T.ink, fontFamily: GP_T.mono, fontSize: 16, padding: '8px 11px', width: 160 };
-  var seg = function (on) { return { background: on ? GP_T.accent : 'none', color: on ? '#0b0d12' : GP_T.mut, fontWeight: on ? 600 : 400, border: 0, fontSize: 12.5, padding: '7px 13px', borderRadius: 6, cursor: 'pointer' }; };
+  var input = { background: 'var(--color-surface)', border: '1px solid ' + GP_T.line, borderRadius: 8, color: GP_T.ink, fontFamily: GP_T.mono, fontSize: 16, padding: '8px 11px', width: 160 };
+  var seg = function (on) { return { background: on ? GP_T.accent : 'none', color: on ? '#fff' : GP_T.mut, fontWeight: on ? 600 : 400, border: 0, fontSize: 12.5, padding: '7px 13px', borderRadius: 6, cursor: 'pointer' }; };
   var g = P.goal;
 
   return (
@@ -97,7 +97,7 @@ function GretaPlanPanel() {
       <div style={{ background: 'linear-gradient(180deg,' + GP_T.panel + ',' + GP_T.panel2 + ')', border: '1px solid ' + GP_T.line, borderRadius: 12, padding: '16px 18px' }}>
         <div style={{ fontSize: 11, letterSpacing: '.5px', textTransform: 'uppercase', color: GP_T.accent2, marginBottom: 10 }}>Set the quarter goal</div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <div style={{ display: 'inline-flex', background: '#0f1218', border: '1px solid ' + GP_T.line, borderRadius: 8, padding: 3 }}>
+          <div style={{ display: 'inline-flex', background: 'var(--color-surface)', border: '1px solid ' + GP_T.line, borderRadius: 8, padding: 3 }}>
             <button onClick={function () { setBasis('cam'); }} style={seg(basis === 'cam')}>Contribution (CAM)</button>
             <button onClick={function () { setBasis('revenue'); }} style={seg(basis === 'revenue')}>Revenue</button>
           </div>
@@ -125,7 +125,7 @@ function GretaPlanPanel() {
               </div>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
-              <button onClick={confirm} disabled={busy} style={{ borderRadius: 8, padding: '9px 16px', fontSize: 13, border: '1px solid ' + GP_T.accent, background: GP_T.accent, color: '#0b0d12', fontWeight: 600, cursor: 'pointer' }}>Confirm as plan of record</button>
+              <button onClick={confirm} disabled={busy} style={{ borderRadius: 8, padding: '9px 16px', fontSize: 13, border: '1px solid ' + GP_T.accent, background: GP_T.accent, color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Confirm as plan of record</button>
               {msg === 'ok' && <span style={{ color: GP_T.green, fontSize: 12.5 }}>✓ Confirmed — this is now your plan; pace &amp; RAG-vs-target are live.</span>}
               {msg && msg.indexOf('err') === 0 && <span style={{ color: GP_T.red, fontSize: 12.5 }}>{msg.slice(4)}</span>}
               <span style={{ fontSize: 11, color: GP_T.dim }}>Confirming derives from live economics (cm {Math.round((derived.cm_ratio_used || 0) * 100)}%, aMER {derived.amer_used}).</span>
@@ -136,3 +136,4 @@ function GretaPlanPanel() {
     </div>
   );
 }
+

@@ -57,11 +57,12 @@
       safeQ(sb.from('v_tenant_shopify_lineitems_daily').select('day, product_title, units, revenue').eq('brand_id', brandId).gte('day', cutoff).order('day', { ascending: false }).limit(1000), Q, []),
       safeQ(sb.from('vw_brand_action_board').select('external_id, description, step1, priority, category, cm_gbp').eq('brand_id', brandId).order('cm_gbp', { ascending: false, nullsFirst: false }).limit(30), Q, []),
       safeQ(sb.from('vw_channel_effect').select('channel_type, family, spend_30d, attributed_rev_30d, phi, incremental_rev_30d, cost_30d, contribution_30d, drives, rev_per_send').eq('brand_id', brandId), Q, []),
-      safeQ(sb.from('vw_channel_optimum').select('channel_type, avg_iroas, marginal_iroas, target_marginal_iroas, break_even_iroas, marginal_cm_per_pound, status').eq('brand_id', brandId), Q, [])
+      safeQ(sb.from('vw_channel_optimum').select('channel_type, avg_iroas, marginal_iroas, target_marginal_iroas, break_even_iroas, marginal_cm_per_pound, status').eq('brand_id', brandId), Q, []),
+      safeQ(sb.from('vw_email_breakdown').select('total_rev, total_orders, total_sends, campaign_rev, campaign_orders, flow_rev, flow_orders, rev_per_1k_sent').eq('brand_id', brandId).limit(1), Q, null)
     ]);
     var cmRow = Array.isArray(r[0]) ? r[0][0] : r[0];
     var econRow = Array.isArray(r[1]) ? r[1][0] : r[1];
-    return { cmRatio: (cmRow && cmRow.cm_ratio) || 0.6, aov: (cmRow && cmRow.aov) || 55, econ: econRow || {}, iroas: r[2] || [], tgts: r[3] || [], nvr: r[4] || [], items: r[5] || [], board: r[6] || [], effect: r[7] || [], optimum: r[8] || [] };
+    return { cmRatio: (cmRow && cmRow.cm_ratio) || 0.6, aov: (cmRow && cmRow.aov) || 55, econ: econRow || {}, iroas: r[2] || [], tgts: r[3] || [], nvr: r[4] || [], items: r[5] || [], board: r[6] || [], effect: r[7] || [], optimum: r[8] || [], email: (Array.isArray(r[9]) ? r[9][0] : r[9]) || null };
   }
 
   function topSellers(items, s, e) {
@@ -185,6 +186,7 @@
           tile('aMER', S.econ.amer == null ? null : n(S.econ.amer), 'x', null, 'acq MER · 30d', n(S.econ.amer) >= 2 ? 'g' : 'a', 'rev ÷ acq spend')
         ]
       },
+      emailBlock: S.email,
       channel: ch.rows.length ? ch.rows : [{ name: 'No channel data', phi: null, spend: 0, rep: null, iroas: null, tgt: 1.23, rag: 'n', verdict: 'connect ad platforms' }],
       insights: {
         business: tierInsight(numsB, S.board, TIER_CATS.business, { text: numsB, action: hero.title, value: hero.value }),

@@ -19,7 +19,7 @@
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="./greta-data-loader.js?v=20260707100634"></script>
-<script src="./greta-overview-data.js?v=1784038934295"></script>
+<script src="./greta-overview-data.js?v=1784037832441"></script>
 <script src="./greta-plan-data.js?v=1784035249342"></script>
 <script src="./greta-live-data.js?v=202607060755"></script>
 <script src="./greta-agent-insights.js?v=202607060755"></script>
@@ -1089,6 +1089,6 @@
    window.CommandCentre / window.DecisionLog. */
 window.MOS_EMBEDDED = true;</script>
 <script src="./today-calendar.build.js?v=20260713"></script>
-<script src="./greta-app.js?v=1784038938853"></script>
+<script src="./greta-app.js?v=1784037837781"></script>
 <script>/* perf: defer frkl static deep-tab data (CVR ~1.7MB, cohorts, promos, products) — not used by the Overview/landing. Background-load after paint; skip for non-frkl (de-frkl). */
 (function(){try{var slug=window.OI_BRAND_SLUG||(window.parent&&window.parent!==window?window.parent.OI_BRAND_SLUG:null)||"frkl";if(slug!=="frkl")return;var files=["greta-cvr.js","greta-cohorts.js","greta-discount-codes.js","greta-products.js","greta-patterns.js"],i=0;function next(){if(i>=files.length)return;var s=document.createElement("script");s.src="./"+files[i++]+"?v=202607060755";s.async=true;s.onload=next;s.onerror=next;document.head.appendChild(s);}var kick=function(){next();};if(window.requestIdleCallback){window.requestIdleCallback(kick,{timeout:1500});}else{setTimeout(kick,300);}}catch(e){}})();</script>

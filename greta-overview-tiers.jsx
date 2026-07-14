@@ -4,9 +4,9 @@
 // read), detail out back. Reads window.FRKL_OVERVIEW[timeframe] once the loader feeds
 // it; until then falls back to the live frkl snapshot — but ONLY on brand frkl, so no
 // frkl values leak onto other brands (de-frkl rule). Namespaced GO_* to avoid collisions.
-const GO_T = { bg:'#0b0d12', panel:'#14161c', panel2:'#181b23', line:'#232733', ink:'#e8eaf0',
-  mut:'#8b93a7', dim:'#5b6479', accent:'#7c8cff', accent2:'#a6b0ff', green:'#3fbf87', amber:'#e0a53d', red:'#e5644e',
-  mono:'"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace' };
+const GO_T = { bg:'transparent', panel:'var(--color-panel)', panel2:'var(--color-surface)', line:'var(--color-line)', ink:'var(--color-ink)',
+  mut:'var(--color-muted)', dim:'#9a948c', accent:'var(--color-accent)', accent2:'var(--color-accent)', green:'var(--color-success)', amber:'var(--color-warning)', red:'var(--color-danger)',
+  mono:'var(--font-mono)' };
 const GO_gbp = n => (n==null?'—':'£'+Math.round(n).toLocaleString('en-GB'));
 const GO_pctv = n => (n==null?'':(n>0?'+':'')+n.toFixed(1)+'%');
 const GO_rag = r => r==='g'?GO_T.green:r==='a'?GO_T.amber:r==='r'?GO_T.red:GO_T.dim;
@@ -53,7 +53,7 @@ const GO_FALLBACK = { monthly: {
 function GO_Dot(p){ return React.createElement('span',{style:Object.assign({width:7,height:7,borderRadius:'50%',display:'inline-block',background:GO_rag(p.r)},p.style||{})}); }
 
 function GO_Tile(p){ const t=p.t; return (
-  <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:11,padding:'12px 13px',position:'relative'}}>
+  <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:8,padding:'12px 13px',position:'relative',boxShadow:'var(--shadow-panel)'}}>
     {t.rag && <GO_Dot r={t.rag} style={{position:'absolute',top:12,right:12}}/>}
     <div style={{fontSize:11.5,color:GO_T.mut}}>{t.k}</div>
     <div style={{fontFamily:GO_T.mono,fontSize:23,fontWeight:600,margin:'6px 0 3px',letterSpacing:'-.5px',fontVariantNumeric:'tabular-nums'}}>{GO_fmt(t.v,t.fmt)}</div>
@@ -62,12 +62,12 @@ function GO_Tile(p){ const t=p.t; return (
   </div>); }
 
 function GO_Insight(p){ const i=p.i; return (
-  <div style={{background:'#0f1420',border:'1px solid #202742',borderRadius:11,padding:'13px 15px',marginTop:11}}>
+  <div style={{background:'var(--color-surface)',border:'1px solid #202742',borderRadius:11,padding:'13px 15px',marginTop:11}}>
     <div style={{display:'flex',alignItems:'center',gap:8,fontSize:11,letterSpacing:'.5px',textTransform:'uppercase',color:GO_T.accent2,marginBottom:6}}>
       <span style={{width:14,height:14,borderRadius:4,background:'linear-gradient(135deg,'+GO_T.accent+',#5563d6)',display:'inline-block'}}/> greta reads this
     </div>
-    <p style={{margin:'0 0 8px',fontSize:13,color:'#c9cee0'}}>{i.text}</p>
-    <div style={{fontSize:12.5,background:'#141a2b',border:'1px solid #263056',borderRadius:8,padding:'8px 11px',display:'flex',justifyContent:'space-between',gap:12,alignItems:'center'}}>
+    <p style={{margin:'0 0 8px',fontSize:13,color:'var(--color-ink)'}}>{i.text}</p>
+    <div style={{fontSize:12.5,background:'#FBEEE6',border:'1px solid #263056',borderRadius:8,padding:'8px 11px',display:'flex',justifyContent:'space-between',gap:12,alignItems:'center'}}>
       <span>{i.action}</span><b style={{color:GO_T.accent2,fontFamily:GO_T.mono}}>{i.value}</b>
     </div>
   </div>); }
@@ -97,7 +97,7 @@ function GretaOverviewTiers(){
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:6,marginBottom:6}}>
       <div style={{fontSize:12.5,color:GO_T.dim}}>{d?('Snapshot · '):''}{d && <span style={{fontFamily:GO_T.mono}}>{d.periodLabel}</span>} {d?d.compareLabel:''}</div>
       <div style={{display:'inline-flex',background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:9,padding:3}}>
-        {GO_TIMEFRAMES.map(x=> <button key={x} onClick={()=>setTf(x)} style={{background:x===tf?GO_T.accent:'none',color:x===tf?'#0b0d12':GO_T.mut,fontWeight:x===tf?600:400,border:0,fontSize:12.5,padding:'6px 12px',borderRadius:6,cursor:'pointer',textTransform:'capitalize'}}>{x}</button>)}
+        {GO_TIMEFRAMES.map(x=> <button key={x} onClick={()=>setTf(x)} style={{background:x===tf?GO_T.accent:'none',color:x===tf?'#fff':GO_T.mut,fontWeight:x===tf?600:400,border:0,fontSize:12.5,padding:'6px 12px',borderRadius:6,cursor:'pointer',textTransform:'capitalize'}}>{x}</button>)}
       </div>
     </div>);
 
@@ -117,7 +117,7 @@ function GretaOverviewTiers(){
           <div style={{fontFamily:GO_T.mono,fontSize:38,fontWeight:600,margin:'4px 0 2px',letterSpacing:'-1px'}}>{GO_gbp(d.hero.cmAfterMkt)}</div>
           <div style={{fontSize:12.5,color:GO_T.mut}}>CM {GO_gbp(d.hero.cm)} ({d.hero.cmPct}%) − ad spend {GO_gbp(d.hero.spend)}{d.hero.targetEstimated && <span style={{color:GO_T.amber}}> · target auto-estimated — not yet confirmed</span>}</div>
         </div>
-        <div style={{minWidth:300,flex:1,background:'#101219',border:'1px solid '+GO_T.line,borderLeft:'3px solid '+GO_T.accent,borderRadius:10,padding:'13px 15px'}}>
+        <div style={{minWidth:300,flex:1,background:'var(--color-panel)',border:'1px solid '+GO_T.line,borderLeft:'3px solid '+GO_T.accent,borderRadius:10,padding:'13px 15px'}}>
           <div><span style={{fontSize:10.5,fontFamily:GO_T.mono,letterSpacing:'.5px',color:GO_T.accent2,border:'1px solid #2b3050',borderRadius:5,padding:'1px 6px',marginRight:6}}>DO FIRST</span><span style={{fontSize:10.5,fontFamily:GO_T.mono,letterSpacing:'.5px',color:GO_T.red,border:'1px solid #4a2b2b',borderRadius:5,padding:'1px 6px'}}>{d.hero.action.value}</span></div>
           <h3 style={{margin:'8px 0 5px',fontSize:15}}>{d.hero.action.title}</h3>
           <p style={{margin:0,color:GO_T.mut,fontSize:12.5}}>{d.hero.action.why}</p>
@@ -129,7 +129,7 @@ function GretaOverviewTiers(){
         <GO_TierHead n="01" title="Business" sub="how the business is performing"/>
         <div style={{display:'grid',gap:10,gridTemplateColumns:'repeat(5,1fr)'}}>
           {d.business.map((t,i)=><GO_Tile key={i} t={t}/>)}
-          <div style={{background:'#0f1420',border:'1px solid #202742',borderRadius:11,padding:'12px 13px'}}>
+          <div style={{background:'var(--color-surface)',border:'1px solid #202742',borderRadius:11,padding:'12px 13px'}}>
             <div style={{fontSize:11.5,color:GO_T.mut}}>Best sellers →</div>
             <div style={{fontSize:12,color:GO_T.mut,marginTop:6,lineHeight:1.7}}>{d.bestSellers.map((s,i)=><div key={i}>{s.name} · {GO_gbp(s.rev)}</div>)}</div>
           </div>
@@ -142,7 +142,7 @@ function GretaOverviewTiers(){
         <div style={{display:'grid',gap:10,gridTemplateColumns:'repeat(5,1fr)'}}>
           <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:11,padding:'12px 13px'}}>
             <div style={{fontSize:11.5,color:GO_T.mut}}>New vs returning revenue</div>
-            <div style={{display:'flex',height:9,borderRadius:5,overflow:'hidden',margin:'10px 0 7px'}}><div style={{width:d.customer.splitNew+'%',background:GO_T.accent}}/><div style={{width:d.customer.splitRet+'%',background:'#38406e'}}/></div>
+            <div style={{display:'flex',height:9,borderRadius:5,overflow:'hidden',margin:'10px 0 7px'}}><div style={{width:d.customer.splitNew+'%',background:GO_T.accent}}/><div style={{width:d.customer.splitRet+'%',background:'#2563EB'}}/></div>
             <div style={{fontFamily:GO_T.mono,fontSize:11.5}}><span style={{color:GO_T.accent2}}>New {d.customer.splitNew}% · {GO_gbp(d.customer.newRev)}</span> <span style={{color:GO_T.mut}}>Ret {d.customer.splitRet}% · {GO_gbp(d.customer.retRev)}</span></div>
           </div>
           {d.customer.tiles.map((t,i)=><GO_Tile key={i} t={t}/>)}
@@ -154,12 +154,13 @@ function GretaOverviewTiers(){
         <GO_TierHead n="03" title="Channel" sub="avg vs marginal iROAS — where the next £ goes (CTC)"/>
         <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:11,padding:'2px 4px',overflowX:'auto'}}>
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
-            <thead><tr>{['Channel','Spend','Incr rev','iCPA','iROAS','Marginal','Verdict'].map((h,i)=><th key={i} style={{textAlign:i===0?'left':'right',color:GO_T.dim,fontWeight:500,fontSize:10.5,textTransform:'uppercase',letterSpacing:'.4px',padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{h}</th>)}</tr></thead>
+            <thead><tr>{['Channel','Spend','Incr rev','AOV','iCPA','iROAS','Marginal','Verdict'].map((h,i)=><th key={i} style={{textAlign:i===0?'left':'right',color:GO_T.dim,fontWeight:500,fontSize:10.5,textTransform:'uppercase',letterSpacing:'.4px',padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{h}</th>)}</tr></thead>
             <tbody>{d.channel.map((c,i)=>(
-              <tr key={i} style={{background:c.family==='email'?'#0f1420':'none'}}>
+              <tr key={i} style={{background:c.family==='email'?'var(--color-surface)':'none'}}>
                 <td style={{textAlign:'left',padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{c.name} <span style={{fontSize:10.5,color:c.family==='email'?GO_T.accent2:GO_T.mut}}>{c.family==='email'?'email':(c.acquisition?'acq':'retn')}{c.phi!=null?' · φ'+c.phi:''}</span></td>
                 <td style={{textAlign:'right',fontFamily:GO_T.mono,padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{GO_gbp(c.spend)}</td>
                 <td style={{textAlign:'right',fontFamily:GO_T.mono,padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{GO_gbp(c.incRev)}</td>
+                <td style={{textAlign:'right',fontFamily:GO_T.mono,padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{c.aov!=null?GO_gbp(c.aov):'—'}</td>
                 <td style={{textAlign:'right',fontFamily:GO_T.mono,padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{c.icpa!=null?GO_gbp(c.icpa):'—'}</td>
                 <td style={{textAlign:'right',fontFamily:GO_T.mono,color:c.rag==='r'?GO_T.red:c.rag==='g'?GO_T.green:GO_T.ink,padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{c.iroas!=null?c.iroas.toFixed(2)+'×':'—'}</td>
                 <td style={{textAlign:'right',fontFamily:GO_T.mono,color:c.marginal!=null?(c.marginal>=c.tgt?GO_T.green:GO_T.amber):GO_T.dim,padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{c.marginal!=null?c.marginal.toFixed(2)+'×':'—'}</td>
@@ -167,147 +168,9 @@ function GretaOverviewTiers(){
               </tr>))}</tbody>
           </table>
         </div>
+        {d.emailBlock && (function () { var E = d.emailBlock; var cell = function (k, v, sub) { return <div style={{ background: GO_T.panel, border: '1px solid ' + GO_T.line, borderRadius: 8, padding: '9px 11px', boxShadow: 'var(--shadow-panel)' }}><div style={{ fontSize: 10.5, color: GO_T.mut }}>{k}</div><div style={{ fontFamily: GO_T.mono, fontSize: 16, fontWeight: 600, marginTop: 2 }}>{v}</div><div style={{ fontSize: 10, color: GO_T.dim }}>{sub}</div></div>; }; return <div style={{ marginTop: 10 }}><div style={{ fontSize: 10.5, color: GO_T.dim, textTransform: 'uppercase', letterSpacing: '.4px', margin: '0 2px 6px' }}>Email breakdown · Klaviyo</div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(130px,1fr))', gap: 8 }}>{cell('Email revenue', GO_gbp(E.total_rev), E.total_orders + ' orders')}{cell('Campaign rev', GO_gbp(E.campaign_rev), E.campaign_orders + ' orders')}{cell('Flow rev', GO_gbp(E.flow_rev), E.flow_orders + ' orders')}{cell('Rev / 1k sent', GO_gbp(E.rev_per_1k_sent), Math.round(E.total_sends / 1000) + 'k sent')}</div></div>; })()}
         <GO_Insight i={d.insights.channel}/>
       </div>
     </div>);
-}
-
-// ── Plan panel (readiness gate + target setter) ──────────────────────────────
-// Added 2026-07-14. Wires steps 1-2 of the targets workstream: shows the plan-readiness
-// gate (vw_brand_plan_readiness), lets the user set a quarter goal in EITHER contribution
-// (CAM) or revenue and see the full derived target set (both units), then confirm it as the
-// plan of record (mos_business_goal.confirmed=true). Global-scope, GP_* namespaced. Data +
-// writes live in window.FRKL_PLAN (greta-plan-data.js). Confirm is user-initiated only.
-var GP_T = { bg:'#0b0d12', panel:'#14161c', panel2:'#181b23', line:'#232733', ink:'#e8eaf0',
-  mut:'#8b93a7', dim:'#5b6479', accent:'#7c8cff', accent2:'#a6b0ff', green:'#3fbf87', amber:'#e0a53d', red:'#e5644e',
-  mono:'"SF Mono",ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace' };
-var GP_gbp = function (x) { return x == null ? '—' : '£' + Math.round(Number(x)).toLocaleString('en-GB'); };
-var GP_rag = function (s) { return s === 'ready' ? GP_T.green : s === 'unconfirmed' || s === 'stale' ? GP_T.amber : GP_T.red; };
-
-function GP_Dot(p) { return React.createElement('span', { style: { width: 8, height: 8, borderRadius: '50%', display: 'inline-block', background: p.c } }); }
-
-function GP_Metric(p) {
-  return (
-    <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 10, padding: '10px 12px' }}>
-      <div style={{ fontSize: 11, color: GP_T.mut }}>{p.k}</div>
-      <div style={{ fontFamily: GP_T.mono, fontSize: 19, fontWeight: 600, marginTop: 3, color: p.hi ? GP_T.accent2 : GP_T.ink }}>{p.v}</div>
-      {p.sub && <div style={{ fontSize: 10.5, color: GP_T.dim, marginTop: 2 }}>{p.sub}</div>}
-    </div>
-  );
-}
-
-function GretaPlanPanel() {
-  var P = (typeof window !== 'undefined' && window.FRKL_PLAN) || { readiness: [], goal: null, period: { start: '', end: '' } };
-  var s = React.useState(0), tick = s[0], setTick = s[1];
-  var b = React.useState('cam'), basis = b[0], setBasis = b[1];
-  var a = React.useState(''), amount = a[0], setAmount = a[1];
-  var d = React.useState(null), derived = d[0], setDerived = d[1];
-  var z = React.useState(false), busy = z[0], setBusy = z[1];
-  var m = React.useState(null), msg = m[0], setMsg = m[1];
-
-  React.useEffect(function () {
-    var h = function () { setTick(function (x) { return x + 1; }); };
-    window.addEventListener('frkl-plan-updated', h);
-    if (window.FRKL_PLAN && !derived) window.FRKL_PLAN.derive(null, 'auto').then(function (r) { if (r) setDerived(r); });
-    return function () { window.removeEventListener('frkl-plan-updated', h); };
-  }, []);
-
-  var readiness = P.readiness || [];
-  var blocking = readiness.filter(function (r) { return r.blocks_targets && r.status !== 'ready'; });
-  var readyCount = readiness.filter(function (r) { return r.status === 'ready'; }).length;
-  var sections = {};
-  readiness.forEach(function (r) { (sections[r.section] = sections[r.section] || []).push(r); });
-
-  function calc() {
-    setBusy(true); setMsg(null);
-    window.FRKL_PLAN.derive(amount === '' ? null : amount, amount === '' ? 'auto' : basis).then(function (r) { setDerived(r); setBusy(false); });
-  }
-  function confirm() {
-    if (!derived) return;
-    setBusy(true); setMsg(null);
-    window.FRKL_PLAN.confirm(derived).then(function (res) { setBusy(false); setMsg(res.ok ? 'ok' : ('err:' + (res.error || 'failed'))); });
-  }
-
-  var wrap = { maxWidth: 1180, margin: '0 auto', padding: '10px 6px 60px', background: GP_T.bg, color: GP_T.ink };
-  var input = { background: '#0f1218', border: '1px solid ' + GP_T.line, borderRadius: 8, color: GP_T.ink, fontFamily: GP_T.mono, fontSize: 16, padding: '8px 11px', width: 160 };
-  var seg = function (on) { return { background: on ? GP_T.accent : 'none', color: on ? '#0b0d12' : GP_T.mut, fontWeight: on ? 600 : 400, border: 0, fontSize: 12.5, padding: '7px 13px', borderRadius: 6, cursor: 'pointer' }; };
-  var g = P.goal;
-
-  return (
-    <div style={wrap}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 4 }}>
-        <h2 style={{ fontSize: 16, margin: 0 }}>Plan</h2>
-        <span style={{ fontSize: 12.5, color: GP_T.dim }}>quarter {P.period.start} – {P.period.end}</span>
-      </div>
-      <div style={{ fontSize: 12, color: GP_T.dim, marginBottom: 14 }}>Confirm your economics, set a goal, and the targets below drive pace &amp; the action queue.</div>
-
-      {/* readiness gate */}
-      <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 12, padding: '14px 16px', marginBottom: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <div style={{ fontSize: 11, letterSpacing: '.5px', textTransform: 'uppercase', color: GP_T.accent2 }}>Data readiness</div>
-          <div style={{ fontSize: 12, color: blocking.length ? GP_T.amber : GP_T.green }}>{readyCount}/{readiness.length} ready{blocking.length ? ' · ' + blocking.length + ' blocking targets' : ' · plan-ready ✓'}</div>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: '6px 22px' }}>
-          {Object.keys(sections).map(function (sec) {
-            return (
-              <div key={sec}>
-                <div style={{ fontSize: 10.5, color: GP_T.dim, textTransform: 'uppercase', letterSpacing: '.4px', margin: '4px 0 3px' }}>{sec}</div>
-                {sections[sec].map(function (r, i) {
-                  return (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0', fontSize: 12.5 }}>
-                      <GP_Dot c={GP_rag(r.status)} />
-                      <span style={{ flex: 1 }}>{r.item}{r.blocks_targets ? '' : ' ·'}</span>
-                      <span style={{ color: GP_T.dim, fontSize: 11.5 }}>{r.detail}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* goal setter */}
-      <div style={{ background: 'linear-gradient(180deg,' + GP_T.panel + ',' + GP_T.panel2 + ')', border: '1px solid ' + GP_T.line, borderRadius: 12, padding: '16px 18px' }}>
-        <div style={{ fontSize: 11, letterSpacing: '.5px', textTransform: 'uppercase', color: GP_T.accent2, marginBottom: 10 }}>Set the quarter goal</div>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <div style={{ display: 'inline-flex', background: '#0f1218', border: '1px solid ' + GP_T.line, borderRadius: 8, padding: 3 }}>
-            <button onClick={function () { setBasis('cam'); }} style={seg(basis === 'cam')}>Contribution (CAM)</button>
-            <button onClick={function () { setBasis('revenue'); }} style={seg(basis === 'revenue')}>Revenue</button>
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: GP_T.mut, marginBottom: 4 }}>{basis === 'cam' ? 'Contribution-after-marketing goal' : 'Revenue goal'} (£)</div>
-            <input style={input} value={amount} onChange={function (e) { setAmount(e.target.value.replace(/[^0-9.]/g, '')); }} placeholder={basis === 'cam' ? 'e.g. 25000' : 'e.g. 90000'} />
-          </div>
-          <button onClick={calc} disabled={busy} style={{ borderRadius: 8, padding: '9px 15px', fontSize: 13, border: '1px solid ' + GP_T.line, background: GP_T.panel, color: GP_T.ink, cursor: 'pointer' }}>{busy ? '…' : 'Calculate'}</button>
-          <span style={{ fontSize: 11.5, color: GP_T.dim }}>leave blank + Calculate for the run-rate baseline</span>
-        </div>
-
-        {derived && (
-          <div style={{ marginTop: 16 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 10 }}>
-              <GP_Metric k="Revenue target" v={GP_gbp(derived.revenue_target)} />
-              <GP_Metric k="Contribution (product)" v={GP_gbp(derived.product_cm_target)} sub={'× ' + Math.round((derived.cm_ratio_used || 0) * 100) + '%'} />
-              <GP_Metric k="Contribution after mktg" v={GP_gbp(derived.cam_target)} hi={true} sub="the arbiter (CAM)" />
-              <GP_Metric k="Spend cap" v={GP_gbp(derived.spend_cap)} sub={'MER ' + derived.mer_target} />
-              <GP_Metric k="New customers" v={Math.round(derived.new_customer_target).toLocaleString('en-GB')} sub={'aMER ' + derived.amer_used} />
-              <GP_Metric k="Returning (baseline)" v={GP_gbp(derived.returning_revenue_target)} />
-            </div>
-            {g && (
-              <div style={{ fontSize: 11.5, color: GP_T.dim, marginTop: 8 }}>
-                Current {g.confirmed ? 'confirmed' : 'provisional'} goal: revenue {GP_gbp(g.revenue_target)} · product CM {GP_gbp(g.contribution_margin_target)} · spend cap {GP_gbp(g.spend_cap)} · MER {g.mer_target}
-              </div>
-            )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
-              <button onClick={confirm} disabled={busy} style={{ borderRadius: 8, padding: '9px 16px', fontSize: 13, border: '1px solid ' + GP_T.accent, background: GP_T.accent, color: '#0b0d12', fontWeight: 600, cursor: 'pointer' }}>Confirm as plan of record</button>
-              {msg === 'ok' && <span style={{ color: GP_T.green, fontSize: 12.5 }}>✓ Confirmed — this is now your plan; pace &amp; RAG-vs-target are live.</span>}
-              {msg && msg.indexOf('err') === 0 && <span style={{ color: GP_T.red, fontSize: 12.5 }}>{msg.slice(4)}</span>}
-              <span style={{ fontSize: 11, color: GP_T.dim }}>Confirming derives from live economics (cm {Math.round((derived.cm_ratio_used || 0) * 100)}%, aMER {derived.amer_used}).</span>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
 }
 
