@@ -1,6 +1,6 @@
 /*
  * greta-plan-data.js — Plan/target setup data layer. Load AFTER greta-data-loader.js.
- * Exposes window.FRKL_PLAN = { ready, readiness[], goal, period, refresh(), derive(amt,basis), confirm(derived) }.
+ * Exposes window.FRKL_PLAN = { ready, readiness[], goal, config, period, refresh(), derive(amt,basis), confirm(derived), saveEconomics(fields) }.
  *   readiness  ← vw_brand_plan_readiness (the completeness gate)
  *   derive()   ← rpc fn_derive_business_goal (preview targets from a CAM or revenue goal; 'auto' = run-rate)
  *   confirm()  ← upserts mos_business_goal (confirmed=true). USER-initiated only (a button), never automatic.
@@ -23,8 +23,10 @@
     try {
       var rd = await s.from('vw_brand_plan_readiness').select('section,item,status,detail,blocks_targets,ord').eq('brand_id', b).order('ord', { ascending: true });
       var g = await s.from('mos_business_goal').select('*').eq('brand_id', b).lte('period_start', PERIOD.end).gte('period_end', PERIOD.start).order('created_at', { ascending: false }).limit(1);
+      var cfg = await s.from('brand_config').select('gross_margin, variable_costs, fixed_costs_monthly, inventory_days, discount_rate_annual').eq('brand_id', b).limit(1);
       window.FRKL_PLAN.readiness = (rd && rd.data) || [];
       window.FRKL_PLAN.goal = (g && g.data && g.data[0]) || null;
+      window.FRKL_PLAN.config = (cfg && cfg.data && cfg.data[0]) || null;
       window.FRKL_PLAN.ready = true;
       window.dispatchEvent(new CustomEvent('frkl-plan-updated'));
     } catch (e) { if (window.console) console.warn('[plan] refresh failed', e); }
@@ -55,7 +57,21 @@
       return { ok: true };
     } catch (e) { if (window.console) console.warn('[plan] confirm failed', e); return { ok: false, error: String((e && e.message) || e) }; }
   }
-  window.FRKL_PLAN = { ready: false, readiness: [], goal: null, period: PERIOD, refresh: refresh, derive: derive, confirm: confirm };
+  async function saveEconomics(fields) {
+    var s = sb(), b = bid(); if (!s || !b || !fields) return { ok: false, error: 'no session' };
+    var patch = {};
+    if (fields.gross_margin != null && fields.gross_margin !== '') patch.gross_margin = Number(fields.gross_margin);
+    if (fields.fixed_costs_monthly != null && fields.fixed_costs_monthly !== '') patch.fixed_costs_monthly = Number(fields.fixed_costs_monthly);
+    if (fields.variable_costs && typeof fields.variable_costs === 'object') patch.variable_costs = fields.variable_costs;
+    if (!Object.keys(patch).length) return { ok: false, error: 'nothing to save' };
+    try {
+      var res = await s.from('brand_config').update(patch).eq('brand_id', b);
+      if (res.error) throw res.error;
+      await refresh();
+      return { ok: true };
+    } catch (e) { if (window.console) console.warn('[plan] saveEconomics failed', e); return { ok: false, error: String((e && e.message) || e) }; }
+  }
+  window.FRKL_PLAN = { ready: false, readiness: [], goal: null, config: null, period: PERIOD, refresh: refresh, derive: derive, confirm: confirm, saveEconomics: saveEconomics };
   window.addEventListener('frkl-data-updated', refresh);
   var t = 0, iv = setInterval(function () { t++; if ((sb() && bid()) || t > 60) { clearInterval(iv); refresh(); } }, 500);
 })();

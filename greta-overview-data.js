@@ -60,11 +60,12 @@
       safeQ(sb.from('vw_channel_optimum').select('channel_type, avg_iroas, marginal_iroas, target_marginal_iroas, break_even_iroas, marginal_cm_per_pound, status').eq('brand_id', brandId), Q, []),
       safeQ(sb.from('vw_email_breakdown').select('total_rev, total_orders, total_sends, campaign_rev, campaign_orders, flow_rev, flow_orders, rev_per_1k_sent').eq('brand_id', brandId).limit(1), Q, null),
       safeQ(sb.from('mos_business_goal').select('revenue_target, contribution_margin_target, spend_cap, period_start, period_end, confirmed').eq('brand_id', brandId).lte('period_start', new Date().toISOString().slice(0,10)).gte('period_end', new Date().toISOString().slice(0,10)).order('created_at', { ascending: false }).limit(1), Q, null),
-      safeQ(sb.from('daily_forecast').select('day, revenue, spend, cm').eq('brand_id', brandId).order('day', { ascending: true }), Q, [])
+      safeQ(sb.from('daily_forecast').select('day, revenue, spend, cm').eq('brand_id', brandId).order('day', { ascending: true }), Q, []),
+      safeQ(sb.from('brand_config').select('fixed_costs_monthly, gross_margin').eq('brand_id', brandId).limit(1), Q, null)
     ]);
     var cmRow = Array.isArray(r[0]) ? r[0][0] : r[0];
     var econRow = Array.isArray(r[1]) ? r[1][0] : r[1];
-    return { cmRatio: (cmRow && cmRow.cm_ratio) || 0.6, aov: (cmRow && cmRow.aov) || 55, econ: econRow || {}, iroas: r[2] || [], tgts: r[3] || [], nvr: r[4] || [], items: r[5] || [], board: r[6] || [], effect: r[7] || [], optimum: r[8] || [], email: (Array.isArray(r[9]) ? r[9][0] : r[9]) || null, goal: (Array.isArray(r[10]) ? r[10][0] : r[10]) || null, forecast: r[11] || [] };
+    return { cmRatio: (cmRow && cmRow.cm_ratio) || 0.6, aov: (cmRow && cmRow.aov) || 55, econ: econRow || {}, iroas: r[2] || [], tgts: r[3] || [], nvr: r[4] || [], items: r[5] || [], board: r[6] || [], effect: r[7] || [], optimum: r[8] || [], email: (Array.isArray(r[9]) ? r[9][0] : r[9]) || null, goal: (Array.isArray(r[10]) ? r[10][0] : r[10]) || null, forecast: r[11] || [], config: (Array.isArray(r[12]) ? r[12][0] : r[12]) || null };
   }
 
   function topSellers(items, s, e) {
@@ -140,6 +141,7 @@
     var googleSp = sumR(D.googleAds || [], 'date', w.cs, w.ce, function (r) { return n(r.cost); });
     var spend = metaSp + googleSp;
     var productCM = S.cmRatio * rev, productCMp = S.cmRatio * revP, CAM = productCM - spend;
+    var fixedMonthly = n(S.config && S.config.fixed_costs_monthly), fixedWin = fixedMonthly * (days / 30), opProfit = CAM - fixedWin;
     var mer = spend > 0 ? rev / spend : null;
     var cvr = sess > 0 ? ord / sess * 100 : null, cvrP = sessP > 0 ? ordP / sessP * 100 : null;
     var discRate = rev > 0 ? disc / rev * 100 : 0, retRate = rev > 0 ? ret / rev * 100 : 0;
@@ -186,6 +188,7 @@
         tile('Revenue', rev, 'gbp', delta(rev, revP), 'vs ' + gbp(revP), ragTrend(delta(rev, revP)), 'Shopify truth (L1)'),
         tile('Contribution (product)', productCM, 'gbp', delta(productCM, productCMp), '= rev × ' + (S.cmRatio * 100).toFixed(1) + '%', ragTrend(delta(productCM, productCMp)), 'before ad spend'),
         tile('Contribution after mktg', CAM, 'gbp', null, '= product CM − spend', CAM >= 0 ? 'g' : 'r', 'CAM'),
+        tile('Operating profit', opProfit, 'gbp', null, fixedMonthly > 0 ? '= CAM − fixed ' + gbp(fixedWin) : 'set fixed costs in Plan', fixedMonthly <= 0 ? 'n' : opProfit >= 0 ? 'g' : 'r', fixedMonthly > 0 ? 'after £' + f0(fixedMonthly) + '/mo' : '—'),
         tile('Ad spend', spend, 'gbp', null, 'Meta ' + gbp(metaSp) + ' · Google ' + gbp(googleSp), 'a', mer != null ? 'MER ' + mer.toFixed(2) : ''),
         tile('Conversion rate', cvr, 'pct1', delta(cvr, cvrP), cvrP != null ? 'vs ' + cvrP.toFixed(2) + '%' : '', cvr == null ? 'n' : cvr >= CVR_BENCH ? 'g' : cvr >= 1.2 ? 'a' : 'r', 'benchmark ' + CVR_BENCH + '%'),
         tile('Sessions', sess, 'int', delta(sess, sessP), 'vs ' + f0(sessP).toLocaleString('en-GB'), ragTrend(delta(sess, sessP)), 'GA4'),
