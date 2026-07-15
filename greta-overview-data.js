@@ -61,11 +61,12 @@
       safeQ(sb.from('vw_email_breakdown').select('total_rev, total_orders, total_sends, campaign_rev, campaign_orders, flow_rev, flow_orders, rev_per_1k_sent').eq('brand_id', brandId).limit(1), Q, null),
       safeQ(sb.from('mos_business_goal').select('revenue_target, contribution_margin_target, spend_cap, period_start, period_end, confirmed').eq('brand_id', brandId).lte('period_start', new Date().toISOString().slice(0,10)).gte('period_end', new Date().toISOString().slice(0,10)).order('created_at', { ascending: false }).limit(1), Q, null),
       safeQ(sb.from('daily_forecast').select('day, revenue, spend, cm').eq('brand_id', brandId).order('day', { ascending: true }), Q, []),
-      safeQ(sb.from('brand_config').select('fixed_costs_monthly, gross_margin').eq('brand_id', brandId).limit(1), Q, null)
+      safeQ(sb.from('brand_config').select('fixed_costs_monthly, gross_margin').eq('brand_id', brandId).limit(1), Q, null),
+      safeQ(sb.from('vw_brand_efficiency_targets').select('actual_cac, breakeven_cac_first_order, breakeven_cac_ltv, target_cac, actual_roas, breakeven_roas_first_order, breakeven_roas_ltv, target_roas, goal_confirmed, cac_ltv_headroom, roas_ltv_headroom, orders_per_customer, repeat_ltv_share, status').eq('brand_id', brandId).limit(1), Q, null)
     ]);
     var cmRow = Array.isArray(r[0]) ? r[0][0] : r[0];
     var econRow = Array.isArray(r[1]) ? r[1][0] : r[1];
-    return { cmRatio: (cmRow && cmRow.cm_ratio) || 0.6, aov: (cmRow && cmRow.aov) || 55, econ: econRow || {}, iroas: r[2] || [], tgts: r[3] || [], nvr: r[4] || [], items: r[5] || [], board: r[6] || [], effect: r[7] || [], optimum: r[8] || [], email: (Array.isArray(r[9]) ? r[9][0] : r[9]) || null, goal: (Array.isArray(r[10]) ? r[10][0] : r[10]) || null, forecast: r[11] || [], config: (Array.isArray(r[12]) ? r[12][0] : r[12]) || null };
+    return { cmRatio: (cmRow && cmRow.cm_ratio) || 0.6, aov: (cmRow && cmRow.aov) || 55, econ: econRow || {}, iroas: r[2] || [], tgts: r[3] || [], nvr: r[4] || [], items: r[5] || [], board: r[6] || [], effect: r[7] || [], optimum: r[8] || [], email: (Array.isArray(r[9]) ? r[9][0] : r[9]) || null, goal: (Array.isArray(r[10]) ? r[10][0] : r[10]) || null, forecast: r[11] || [], config: (Array.isArray(r[12]) ? r[12][0] : r[12]) || null, cac: (Array.isArray(r[13]) ? r[13][0] : r[13]) || null };
   }
 
   function topSellers(items, s, e) {
@@ -180,10 +181,25 @@
       var tgtTD = tSalesPD * elapsed;
       return { days: days, goalConfirmed: g.confirmed === true, revActual: f0(actTD), revTarget: f0(tgtTD), pacePct: tgtTD > 0 ? +((actTD / tgtTD - 1) * 100).toFixed(1) : null };
     })();
+    var cacBlock = (function () {
+      var c = S.cac; if (!c) return null;
+      var st = c.status;
+      var verdict = st === 'scale' ? 'Returning above break-even ROAS (below break-even CAC) — headroom to scale acquisition.'
+        : st === 'watch' ? 'Between lifetime and first-order break-even — profitable over the customer’s life but not on order 1. Hold spend, or lift AOV / repeat.'
+        : st === 'fix' ? 'Below lifetime break-even ROAS (above lifetime CAC) — each new customer loses money. Cut CAC / raise ROAS before scaling.'
+        : 'Efficiency targets need cohort + spend data.';
+      return {
+        cac: { actual: n(c.actual_cac), first: n(c.breakeven_cac_first_order), ltv: n(c.breakeven_cac_ltv), target: n(c.target_cac) },
+        roas: { actual: n(c.actual_roas), first: n(c.breakeven_roas_first_order), ltv: n(c.breakeven_roas_ltv), target: n(c.target_roas) },
+        status: st, rag: st === 'scale' ? 'g' : st === 'watch' ? 'a' : st === 'fix' ? 'r' : 'n',
+        opc: n(c.orders_per_customer), repeatPct: c.repeat_ltv_share != null ? +(100 * c.repeat_ltv_share).toFixed(1) : null,
+        goalConfirmed: c.goal_confirmed === true, verdict: verdict };
+    })();
     return {
       pacing: pacing,
+      cacBlock: cacBlock,
       periodLabel: LBL[tf][0] + ' · ' + w.cs + ' – ' + w.ce, compareLabel: LBL[tf][1],
-      hero: { cmAfterMkt: CAM30, cm: productCM30, cmPct: +(S.cmRatio * 100).toFixed(1), spend: sp30, targetEstimated: true, action: hero },
+      hero: { cmAfterMkt: CAM30, cm: productCM30, cmPct: +(S.cmRatio * 100).toFixed(1), spend: sp30, opProfit: CAM30 - fixedMonthly, fixedMonthly: fixedMonthly, targetEstimated: true, action: hero },
       business: [
         tile('Revenue', rev, 'gbp', delta(rev, revP), 'vs ' + gbp(revP), ragTrend(delta(rev, revP)), 'Shopify truth (L1)'),
         tile('Contribution (product)', productCM, 'gbp', delta(productCM, productCMp), '= rev × ' + (S.cmRatio * 100).toFixed(1) + '%', ragTrend(delta(productCM, productCMp)), 'before ad spend'),

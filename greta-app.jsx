@@ -10305,6 +10305,7 @@ function GretaOverviewTiers(){
           <div style={{fontSize:11,letterSpacing:'.6px',textTransform:'uppercase',color:GO_T.dim}}>Contribution after marketing · this period</div>
           <div style={{fontFamily:GO_T.mono,fontSize:38,fontWeight:600,margin:'4px 0 2px',letterSpacing:'-1px'}}>{GO_gbp(d.hero.cmAfterMkt)}</div>
           <div style={{fontSize:12.5,color:GO_T.mut}}>CM {GO_gbp(d.hero.cm)} ({d.hero.cmPct}%) − ad spend {GO_gbp(d.hero.spend)}{d.hero.targetEstimated && <span style={{color:GO_T.amber}}> · target auto-estimated — not yet confirmed</span>}</div>
+        {d.hero.opProfit!=null && d.hero.fixedMonthly>0 && <div style={{fontSize:12,marginTop:2,color:(d.hero.opProfit>=0?GO_T.green:GO_T.red)}}>{'Operating profit '+GO_gbp(d.hero.opProfit)+' · after '+GO_gbp(d.hero.fixedMonthly)+'/mo fixed costs'}</div>}
         {d.pacing && <div style={{fontSize:12,marginTop:4,color:(d.pacing.pacePct==null?GO_T.mut:(d.pacing.pacePct>=0?GO_T.green:GO_T.red))}}>{'Pace · '+GO_gbp(d.pacing.revActual)+' of '+GO_gbp(d.pacing.revTarget)+' revenue to date'+(d.pacing.pacePct!=null?(' · '+(d.pacing.pacePct>=0?'+':'')+d.pacing.pacePct+'%'):'')+' · '+(d.pacing.goalConfirmed?'your plan':'auto-estimated')}</div>}
         </div>
         <div style={{minWidth:300,flex:1,background:'var(--color-panel)',border:'1px solid '+GO_T.line,borderLeft:'3px solid '+GO_T.accent,borderRadius:10,padding:'13px 15px'}}>
@@ -10342,6 +10343,31 @@ function GretaOverviewTiers(){
               {row.cells.map(function(c,ci){return <div key={ci} style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:8,padding:'8px 11px',boxShadow:'var(--shadow-panel)'}}><div style={{fontSize:10.5,color:GO_T.mut}}>{c.k}</div><div style={{fontFamily:GO_T.mono,fontSize:15,fontWeight:600,marginTop:1}}>{c.v}</div></div>;})}
             </div>
           </div>);})}
+                {d.cacBlock && (function(){ var C=d.cacBlock;
+          var g2=function(x){return x==null?"—":"£"+Number(x).toFixed(2);};
+          var rx=function(x){return x==null?"—":Number(x).toFixed(2)+"×";};
+          var col=C.rag==="g"?GO_T.green:C.rag==="a"?GO_T.amber:C.rag==="r"?GO_T.red:GO_T.dim;
+          var cell=function(k,v,sub,hi){return <div style={{background:GO_T.panel,border:"1px solid "+(hi||GO_T.line),borderRadius:8,padding:"9px 11px",boxShadow:"var(--shadow-panel)"}}><div style={{fontSize:10.5,color:GO_T.mut}}>{k}</div><div style={{fontFamily:GO_T.mono,fontSize:16,fontWeight:600,marginTop:2}}>{v}</div><div style={{fontSize:10,color:GO_T.dim}}>{sub}</div></div>;};
+          var ltvSub=C.opc.toFixed(2)+" orders/cust"+(C.repeatPct!=null?" · "+C.repeatPct+"% repeat":"");
+          var tgtSub=C.goalConfirmed?"from your goal":"profit-safe default";
+          return <div style={{marginTop:2,marginBottom:6}}>
+            <div style={{fontSize:10.5,color:GO_T.dim,textTransform:"uppercase",letterSpacing:".4px",margin:"0 2px 6px"}}>Acquisition efficiency · break-even &amp; optimal</div>
+            <div style={{fontSize:10.5,color:GO_T.mut,margin:"0 2px 4px"}}>CAC — most you can pay per new customer</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:8,marginBottom:9}}>
+              {cell("Actual CAC (paid)",g2(C.cac.actual),"spend ÷ new custs",col)}
+              {cell("Break-even · 1st order",g2(C.cac.first),"CM-positive on order 1")}
+              {cell("Break-even · lifetime",g2(C.cac.ltv),ltvSub)}
+              {cell("Target / optimal CAC",g2(C.cac.target),tgtSub)}
+            </div>
+            <div style={{fontSize:10.5,color:GO_T.mut,margin:"0 2px 4px"}}>ROAS — least you can accept (aMER)</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:8}}>
+              {cell("Actual ROAS (aMER)",rx(C.roas.actual),"new rev ÷ spend",col)}
+              {cell("Break-even · 1st order",rx(C.roas.first),"= 1 ÷ contribution")}
+              {cell("Break-even · lifetime",rx(C.roas.ltv),"LTV-adjusted floor")}
+              {cell("Target / optimal ROAS",rx(C.roas.target),tgtSub)}
+            </div>
+            <div style={{fontSize:11.5,color:col,marginTop:7,display:"flex",gap:6,alignItems:"baseline"}}><GO_Dot r={C.rag} style={{marginTop:4}}/> <span>{C.verdict}</span></div>
+          </div>; })()}
         <GO_Insight i={d.insights.customer}/>
       </div>
 
@@ -10455,6 +10481,11 @@ function GretaPlanPanel() {
   var wrap = { maxWidth: 1180, margin: '0 auto', padding: '10px 6px 60px', background: GP_T.bg, color: GP_T.ink };
   var input = { background: 'var(--color-surface)', border: '1px solid ' + GP_T.line, borderRadius: 8, color: GP_T.ink, fontFamily: GP_T.mono, fontSize: 16, padding: '8px 11px', width: 160 };
   var seg = function (on) { return { background: on ? GP_T.accent : 'none', color: on ? '#fff' : GP_T.mut, fontWeight: on ? 600 : 400, border: 0, fontSize: 12.5, padding: '7px 13px', borderRadius: 6, cursor: 'pointer' }; };
+  var cfg = (window.FRKL_PLAN && window.FRKL_PLAN.config) || null;
+  var perDays = (P.period && P.period.start && P.period.end) ? Math.max(1, Math.round((new Date(P.period.end) - new Date(P.period.start)) / 864e5) + 1) : 90;
+  var fixedForPeriod = cfg && cfg.fixed_costs_monthly ? Number(cfg.fixed_costs_monthly) * (perDays / 30) : 0;
+  var opTarget = derived ? (Number(derived.cam_target || 0) - fixedForPeriod) : null;
+  var targetCac = (derived && derived.new_customer_target > 0) ? (derived.spend_cap / derived.new_customer_target) : null;
   var g = P.goal;
 
   return (
@@ -10548,6 +10579,8 @@ function GretaPlanPanel() {
               <GP_Metric k="Spend cap" v={GP_gbp(derived.spend_cap)} sub={'MER ' + derived.mer_target} />
               <GP_Metric k="New customers" v={Math.round(derived.new_customer_target).toLocaleString('en-GB')} sub={'aMER ' + derived.amer_used} />
               <GP_Metric k="Returning (baseline)" v={GP_gbp(derived.returning_revenue_target)} />
+              <GP_Metric k="Target CAC (optimal)" v={targetCac == null ? '—' : '£' + targetCac.toFixed(2)} hi={true} sub="spend cap ÷ new custs" />
+              <GP_Metric k="Operating profit" v={opTarget == null ? '—' : GP_gbp(opTarget)} sub={fixedForPeriod > 0 ? 'CAM − ' + GP_gbp(fixedForPeriod) + ' fixed' : 'set fixed costs above'} />
             </div>
             {g && (
               <div style={{ fontSize: 11.5, color: GP_T.dim, marginTop: 8 }}>
