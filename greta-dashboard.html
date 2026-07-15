@@ -52,7 +52,7 @@
     --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-full: 999px;
 
     /* Type scale */
-    --t-display: 22px; --t-h2: 15px; --t-h3: 13px;
+    --t-display: 23px; --t-h2: 16px; --t-h3: 14px;
     --t-body: 13px;    --t-meta: 11.5px; --t-micro: 10.5px;
 
     /* Surface — "ink" dark: a lifted cool-slate base (NOT pure black) with clear
@@ -79,6 +79,7 @@
     --bad:     #e96b73;
     --accent:  #8B5CF6;   /* refined indigo — primary chrome only */
     --accent-soft: #272d4f;
+    --accent-hover: #A78BFA;  /* lighter indigo for hover on solid accent (dark) */
 
     /* Status surfaces (tinted backgrounds for pills/banners) */
     --good-bg:   rgba(78,201,140,.11);
@@ -120,6 +121,7 @@
     --bad:     #DC2626;
     --accent:  #7C3AED;
     --accent-soft: #EDE9FE;
+    --accent-hover: #6D28D9;  /* deeper indigo for hover on solid accent (light) */
     --good-bg:   rgba(34,211,166,.12);
     --warn-bg:   rgba(180,83,9,.10);
     --bad-bg:    rgba(220,38,38,.08);
@@ -916,7 +918,7 @@
     color: white; font-size: 13px; font-weight: 600; border-radius: var(--r-sm);
     cursor: pointer; font-family: inherit; transition: all var(--motion-fast);
   }
-  .btn-primary:hover { background: #8b9aff; }
+  .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
   .btn-ghost {
     padding: 9px 16px; background: transparent; border: 1px solid var(--border-default);
     color: var(--text-secondary); font-size: 13px; font-weight: 550; border-radius: var(--r-sm);
@@ -934,7 +936,7 @@
   }
   .status-banner code {
     background: var(--bg-card); padding: 2px 6px; border-radius: 4px;
-    font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10.5px;
+    font-family: var(--font-mono); font-size: 10.5px;
     color: var(--text-primary);
   }
   .status-banner-tag {
@@ -1047,7 +1049,7 @@
     max-width: 560px; width: 100%; box-shadow: var(--shadow-lg);
   }
   .modal h3 { font-size: 15px; font-weight: 650; margin-bottom: var(--s-1); }
-  .modal .id { font-size: var(--t-meta); color: var(--text-muted); font-family: monospace; }
+  .modal .id { font-size: var(--t-meta); color: var(--text-muted); font-family: var(--font-mono); }
   .modal .actiontxt { font-size: var(--t-body); color: var(--text-secondary); margin: var(--s-3) 0 var(--s-4); line-height: 1.5; }
   .modal label { display: block; font-size: var(--t-meta); color: var(--text-muted); margin: var(--s-3) 0 var(--s-1); letter-spacing: .03em; text-transform: uppercase; }
   .modal input[type=text] {
@@ -1057,7 +1059,7 @@
   }
   .modal .cmd {
     background: var(--bg-input); border: 1px solid var(--border-default);
-    border-radius: var(--r-sm); padding: var(--s-3); font-family: monospace;
+    border-radius: var(--r-sm); padding: var(--s-3); font-family: var(--font-mono);
     font-size: 12px; color: var(--accent); word-break: break-all; line-height: 1.5;
   }
   .modal .row { display: flex; gap: var(--s-2); margin-top: var(--s-4); }
@@ -1069,11 +1071,11 @@
   }
   .modal button:hover { background: var(--bg-card-hover); border-color: var(--border-default); }
   .modal button.primary { background: var(--accent); border-color: var(--accent); color: white; }
-  .modal button.primary:hover { background: #8b9aff; border-color: #8b9aff; }
+  .modal button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
   .modal .hint { font-size: var(--t-meta); color: var(--text-muted); margin-top: var(--s-3); line-height: 1.5; }
   .copied { color: var(--good) !important; }
 </style>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./marketing-os-tokens.css?v=20260713b">
 <link rel="stylesheet" href="./marketing-os.css?v=20260714b">
 </head>
@@ -1089,6 +1091,6 @@
    window.CommandCentre / window.DecisionLog. */
 window.MOS_EMBEDDED = true;</script>
 <script src="./today-calendar.build.js?v=20260713"></script>
-<script src="./greta-app.js?v=1784105015481"></script>
+<script src="./greta-app.js?v=1784135203512"></script>
 <script>/* perf: defer frkl static deep-tab data (CVR ~1.7MB, cohorts, promos, products) — not used by the Overview/landing. Background-load after paint; skip for non-frkl (de-frkl). */
 (function(){try{var slug=window.OI_BRAND_SLUG||(window.parent&&window.parent!==window?window.parent.OI_BRAND_SLUG:null)||"frkl";if(slug!=="frkl")return;var files=["greta-cvr.js","greta-cohorts.js","greta-discount-codes.js","greta-products.js","greta-patterns.js"],i=0;function next(){if(i>=files.length)return;var s=document.createElement("script");s.src="./"+files[i++]+"?v=202607060755";s.async=true;s.onload=next;s.onerror=next;document.head.appendChild(s);}var kick=function(){next();};if(window.requestIdleCallback){window.requestIdleCallback(kick,{timeout:1500});}else{setTimeout(kick,300);}}catch(e){}})();</script>

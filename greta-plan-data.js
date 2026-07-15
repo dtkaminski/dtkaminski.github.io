@@ -1,7 +1,9 @@
 /*
  * greta-plan-data.js — Plan/target setup data layer. Load AFTER greta-data-loader.js.
- * Exposes window.FRKL_PLAN = { ready, readiness[], goal, config, period, refresh(), derive(amt,basis), confirm(derived), saveEconomics(fields) }.
+ * Exposes window.FRKL_PLAN = { ready, readiness[], goal, config, forecast, period, refresh(), derive(amt,basis), confirm(derived), saveEconomics(fields) }.
  *   readiness  ← vw_brand_plan_readiness (the completeness gate)
+ *   forecast   ← vw_forecast_vs_goal (calendar-aware forecast for the period vs goal + the gap; SOT view, not recomputed)
+ *   channels   ← vw_channel_scoreboard (per-channel normalized iROAS vs break-even/target CAC, CM-first focus rank)
  *   derive()   ← rpc fn_derive_business_goal (preview targets from a CAM or revenue goal; 'auto' = run-rate)
  *   confirm()  ← upserts mos_business_goal (confirmed=true). USER-initiated only (a button), never automatic.
  * Reuses FRKL_LIVE.sb; recomputes on 'frkl-data-updated'; fires 'frkl-plan-updated'; never throws.
@@ -24,9 +26,13 @@
       var rd = await s.from('vw_brand_plan_readiness').select('section,item,status,detail,blocks_targets,ord').eq('brand_id', b).order('ord', { ascending: true });
       var g = await s.from('mos_business_goal').select('*').eq('brand_id', b).lte('period_start', PERIOD.end).gte('period_end', PERIOD.start).order('created_at', { ascending: false }).limit(1);
       var cfg = await s.from('brand_config').select('gross_margin, variable_costs, fixed_costs_monthly, inventory_days, discount_rate_annual').eq('brand_id', b).limit(1);
+      var fc = await s.from('vw_forecast_vs_goal').select('*').eq('brand_id', b).limit(1);
+      var ch = await s.from('vw_channel_scoreboard').select('channel_type,spend_30d,avg_iroas,break_even_iroas,target_marginal_iroas,marginal_cac,max_cac_first_order,status,action,focus_rank,phi_is_assumed,planned_spend,spend_pace_pct_of_plan,plan_target_iroas,plan_target_cac,plan_confirmed').eq('brand_id', b).order('focus_rank', { ascending: true });
       window.FRKL_PLAN.readiness = (rd && rd.data) || [];
       window.FRKL_PLAN.goal = (g && g.data && g.data[0]) || null;
       window.FRKL_PLAN.config = (cfg && cfg.data && cfg.data[0]) || null;
+      window.FRKL_PLAN.forecast = (fc && fc.data && fc.data[0]) || null;
+      window.FRKL_PLAN.channels = (ch && ch.data) || [];
       window.FRKL_PLAN.ready = true;
       window.dispatchEvent(new CustomEvent('frkl-plan-updated'));
     } catch (e) { if (window.console) console.warn('[plan] refresh failed', e); }
@@ -71,7 +77,16 @@
       return { ok: true };
     } catch (e) { if (window.console) console.warn('[plan] saveEconomics failed', e); return { ok: false, error: String((e && e.message) || e) }; }
   }
-  window.FRKL_PLAN = { ready: false, readiness: [], goal: null, config: null, period: PERIOD, refresh: refresh, derive: derive, confirm: confirm, saveEconomics: saveEconomics };
+  async function deriveChannelPlan(confirm) {
+    var s = sb(), b = bid(); if (!s || !b) return { ok: false, error: 'no session' };
+    try {
+      var r = await s.rpc('fn_derive_channel_plan', { p_brand: b, p_start: PERIOD.start, p_end: PERIOD.end, p_commit: true, p_confirm: !!confirm });
+      if (r.error) throw r.error;
+      await refresh();
+      return { ok: true, data: r.data };
+    } catch (e) { if (window.console) console.warn('[plan] deriveChannelPlan failed', e); return { ok: false, error: String((e && e.message) || e) }; }
+  }
+  window.FRKL_PLAN = { ready: false, readiness: [], goal: null, config: null, forecast: null, channels: [], period: PERIOD, refresh: refresh, derive: derive, confirm: confirm, saveEconomics: saveEconomics, deriveChannelPlan: deriveChannelPlan };
   window.addEventListener('frkl-data-updated', refresh);
   var t = 0, iv = setInterval(function () { t++; if ((sb() && bid()) || t > 60) { clearInterval(iv); refresh(); } }, 500);
 })();

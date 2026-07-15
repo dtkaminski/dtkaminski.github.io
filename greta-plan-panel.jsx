@@ -157,6 +157,68 @@ function GretaPlanPanel() {
         )}
       </div>
 
+      {/* forecast vs goal — the calendar's impact on the plan (reads vw_forecast_vs_goal, SOT) */}
+      {P.forecast && (
+        <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 12, padding: '14px 16px', marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ fontSize: 11, letterSpacing: '.5px', textTransform: 'uppercase', color: GP_T.accent2 }}>Forecast vs goal</div>
+            <div style={{ fontSize: 11.5, color: GP_T.dim }}>calendar-driven · covers {P.forecast.forecast_covers_from} – {P.forecast.forecast_covers_to}{Number(P.forecast.uncovered_days) > 0 ? ' · ' + P.forecast.uncovered_days + 'd beyond horizon' : ''}</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 10 }}>
+            <GP_Metric k="Forecast revenue" v={GP_gbp(P.forecast.forecast_revenue_period)} sub={'target ' + GP_gbp(P.forecast.revenue_target)} />
+            <GP_Metric k="Forecast CAM" v={GP_gbp(P.forecast.forecast_cm_period)} hi={true} sub={'target ' + GP_gbp(P.forecast.contribution_margin_target)} />
+            <GP_Metric k="From the calendar" v={GP_gbp(P.forecast.forecast_event_revenue_period)} sub={'CM ' + GP_gbp(P.forecast.forecast_event_cm_period)} />
+            <GP_Metric k="Revenue gap" v={GP_gbp(P.forecast.revenue_gap)} sub={Number(P.forecast.revenue_gap) >= 0 ? 'ahead of plan' : 'behind — add events'} />
+            <GP_Metric k="CAM gap" v={GP_gbp(P.forecast.cm_gap)} sub={Number(P.forecast.cm_gap) >= 0 ? 'ahead' : 'behind plan'} />
+          </div>
+          <div style={{ fontSize: 11, color: GP_T.dim, marginTop: 8 }}>Events with no expected figure are benchmark-seeded (flagged, not measured). Add promos/launches to the calendar to lift the forecast toward the goal.</div>
+        </div>
+      )}
+
+      {/* channel efficiency vs targets — CTC: CM-first, normalized iROAS, fix before scale */}
+      {P.channels && P.channels.length ? (
+        <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 12, padding: '14px 16px', marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ fontSize: 11, letterSpacing: '.5px', textTransform: 'uppercase', color: GP_T.accent2 }}>Channel efficiency vs targets</div>
+            <button onClick={function () { window.FRKL_PLAN.deriveChannelPlan(true); }} style={{ fontSize: 11, color: GP_T.mut, background: 'none', border: '1px solid ' + GP_T.line, borderRadius: 6, padding: '4px 9px', cursor: 'pointer' }}>{(P.channels[0] && P.channels[0].plan_confirmed) ? 'Re-derive plan from goal' : 'Set plan from goal'}</button>
+          </div>
+          <table style={{ width: '100%', fontSize: 12.5, borderCollapse: 'collapse' }}>
+            <thead><tr style={{ color: GP_T.mut, fontSize: 11 }}>
+              <th style={{ textAlign: 'left', fontWeight: 400 }}>Channel</th>
+              <th style={{ textAlign: 'right', fontWeight: 400 }}>Spend 30d</th>
+              <th style={{ textAlign: 'right', fontWeight: 400 }}>iROAS</th>
+              <th style={{ textAlign: 'right', fontWeight: 400 }}>CAC</th>
+              <th style={{ textAlign: 'right', fontWeight: 400 }}>Planned</th>
+              <th style={{ textAlign: 'right', fontWeight: 400 }}>Pace</th>
+              <th style={{ textAlign: 'right', fontWeight: 400, paddingLeft: 10 }}>Verdict</th>
+            </tr></thead>
+            <tbody>
+              {P.channels.map(function (c, i) {
+                var col = c.status === 'fix' ? GP_T.red : c.status === 'scale' ? GP_T.green : c.status === 'ease' ? GP_T.amber : GP_T.mut;
+                var pace = c.spend_pace_pct_of_plan;
+                var paceCol = pace == null ? GP_T.dim : ((c.status === 'fix' && pace > 100) || pace > 140) ? GP_T.red : pace < 80 ? GP_T.amber : GP_T.dim;
+                var tgt = c.plan_target_iroas != null ? c.plan_target_iroas : (c.target_marginal_iroas != null ? c.target_marginal_iroas : c.break_even_iroas);
+                return (
+                  <tr key={i} style={{ borderTop: '1px solid ' + GP_T.line }}>
+                    <td style={{ textAlign: 'left', padding: '4px 0' }}>{String(c.channel_type).replace(/_/g, ' ')}</td>
+                    <td style={{ textAlign: 'right', fontFamily: GP_T.mono }}>{GP_gbp(c.spend_30d)}</td>
+                    <td style={{ textAlign: 'right', fontFamily: GP_T.mono, color: col }}>{Number(c.avg_iroas).toFixed(2)}×</td>
+                    <td style={{ textAlign: 'right', fontFamily: GP_T.mono, color: c.plan_target_cac != null && c.plan_target_cac > 100 ? GP_T.red : GP_T.dim }}>{c.plan_target_cac == null ? '—' : '£' + Math.round(c.plan_target_cac)}</td>
+                    <td style={{ textAlign: 'right', fontFamily: GP_T.mono }}>{c.planned_spend == null ? '—' : GP_gbp(c.planned_spend)}</td>
+                    <td style={{ textAlign: 'right', fontFamily: GP_T.mono, color: paceCol }}>{pace == null ? '—' : pace + '%'}</td>
+                    <td style={{ textAlign: 'right', color: col, textTransform: 'uppercase', fontSize: 11, paddingLeft: 10 }}>{c.status}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <div style={{ fontSize: 11, color: GP_T.dim, marginTop: 8 }}>
+            Focus: <b style={{ color: GP_T.ink }}>{String(P.channels[0].channel_type).replace(/_/g, ' ')}</b> — {P.channels[0].action}
+            {P.channels[0].phi_is_assumed ? <span> · iROAS uses <b>benchmark</b> incrementality (φ), not yet measured — run a holdout to confirm.</span> : null}
+          </div>
+        </div>
+      ) : null}
+
       {/* goal setter */}
       <div style={{ background: 'linear-gradient(180deg,' + GP_T.panel + ',' + GP_T.panel2 + ')', border: '1px solid ' + GP_T.line, borderRadius: 12, padding: '16px 18px' }}>
         <div style={{ fontSize: 11, letterSpacing: '.5px', textTransform: 'uppercase', color: GP_T.accent2, marginBottom: 10 }}>Set the quarter goal</div>

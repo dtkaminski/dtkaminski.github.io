@@ -348,7 +348,7 @@ function findingNav(f){
 function NavChip({f}){
   const n = findingNav(f); if(!n) return null;
   return <button onClick={()=>window.__oiNav&&window.__oiNav(n.section,n.sub)} title={`Open ${n.label}`}
-    style={{fontSize:10.5,fontWeight:600,color:'#9aa6ff',background:'rgba(124,140,255,0.12)',border:'1px solid rgba(124,140,255,0.3)',borderRadius:999,padding:'1px 8px',cursor:'pointer',whiteSpace:'nowrap'}}>→ {n.label}</button>;
+    style={{fontSize:10.5,fontWeight:600,color:'#8B5CF6',background:'rgba(139,92,246,0.12)',border:'1px solid rgba(139,92,246,0.3)',borderRadius:999,padding:'1px 8px',cursor:'pointer',whiteSpace:'nowrap'}}>→ {n.label}</button>;
 }
 const sum = (arr,k) => arr.reduce((a,r)=>a+(r[k]||0),0);
 const COL = { meta:'#5b8def', google:'#f4a23b', revenue:'#4ade80', email:'#c084fc', sessions:'#38bdf8' };
@@ -584,8 +584,8 @@ function KPI({label, val, sub, badge, status, statusLabel, conf, series, seriesL
   // Resolve the CSS variable to a real hex for Recharts SVG stroke
   const rechartsStroke = lineColor === 'var(--good)' ? '#4ade80'
     : lineColor === 'var(--bad)' ? '#ef6b6f'
-    : lineColor === 'var(--accent)' ? '#7c8cff'
-    : '#7c8cff';
+    : lineColor === 'var(--accent)' ? '#8B5CF6'
+    : '#8B5CF6';
   return (<div className={'card kpi' + (hasPop ? ' has-pop' : '')}>
     <div className="label">
       <span>{label}</span>
@@ -618,7 +618,7 @@ function KPI({label, val, sub, badge, status, statusLabel, conf, series, seriesL
             {observation && <div className="obs">{observation}</div>}
             {implication && <div className="imp">{implication}</div>}
             <div onClick={(e)=>{ e.stopPropagation(); if(window.__oiAsk) window.__oiAsk(`About "${label}"${val?` (currently ${val})`:''}: what's driving this, and what should I do about it?`); }}
-              style={{marginTop:8, fontSize:11, color:'#9aa6ff', cursor:'pointer', fontWeight:600}}>✦ Ask AI about this →</div>
+              style={{marginTop:8, fontSize:11, color:'#8B5CF6', cursor:'pointer', fontWeight:600}}>✦ Ask AI about this →</div>
           </div>
         )}
       </div>
@@ -1814,7 +1814,7 @@ function ContextConsidered({dx}){
   const evs = dx.eventLines || [];
   if(!dx.context.length && !dx.notes.length && !evs.length) return null;
   const srcStyle = s => s==='inferred' ? {fg:'var(--text-muted)',bg:'rgba(255,255,255,0.05)',lbl:'detected'}
-                       : s==='shopify' ? {fg:'var(--accent)',bg:'rgba(124,140,255,0.12)',lbl:'shopify'}
+                       : s==='shopify' ? {fg:'var(--accent)',bg:'rgba(139,92,246,0.12)',lbl:'shopify'}
                        : {fg:'var(--good)',bg:'rgba(110,231,183,0.10)',lbl:'logged'};
   return (<div style={{marginTop:12,padding:'10px 14px',borderRadius:'var(--r-md)',background:'rgba(255,255,255,0.02)',border:'1px solid var(--border-subtle)'}}>
     <div style={{fontSize:11,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:6}}>Context considered</div>
@@ -1839,7 +1839,7 @@ function ContextConsidered({dx}){
 // snapshot time). Reasons over the evidence bundle with confidence + blindspots.
 function verdictStyle(v){
   if(v==='act')      return {label:'ACT NOW', bg:'rgba(255,99,99,0.12)',  fg:'var(--bad)'};
-  if(v==='monitor')  return {label:'MONITOR', bg:'rgba(124,140,255,0.12)', fg:'var(--accent)'};
+  if(v==='monitor')  return {label:'MONITOR', bg:'rgba(139,92,246,0.12)', fg:'var(--accent)'};
   return {label:'EXPECTED', bg:'rgba(255,255,255,0.05)', fg:'var(--text-muted)'};   // 'expected'
 }
 function Disclosure({label, open, onToggle}){
@@ -2201,7 +2201,7 @@ function ConfigurableChart({dataset, dimensions, metrics, defaultMetric, default
     <select value={val} onChange={e=>set(e.target.value)} style={selStyle}>
       {opts.map(o=><option key={o.key} value={o.key}>{o.label}</option>)}
     </select>);
-  const segB = (active)=>({fontSize:11.5,fontWeight:600,padding:'5px 11px',borderRadius:6,cursor:'pointer',border:'1px solid '+(active?'#7c8cff':'var(--border-subtle)'),background:active?'rgba(124,140,255,0.14)':'transparent',color:active?'#9aa6ff':'var(--text-muted)'});
+  const segB = (active)=>({fontSize:11.5,fontWeight:600,padding:'5px 11px',borderRadius:6,cursor:'pointer',border:'1px solid '+(active?'#8B5CF6':'var(--border-subtle)'),background:active?'rgba(139,92,246,0.14)':'transparent',color:active?'#8B5CF6':'var(--text-muted)'});
   const bar = ctype==='bar';
 
   return (<div className="card">
@@ -2483,7 +2483,7 @@ function AnalystRead({read, dx, metrics, onLog, logUI}){
       </div>
       {/* TIER 1 — THE MOVE (framing + accent shift by confidence) */}
       {move && (
-      <div style={{padding:'14px 16px',borderRadius:'var(--r-md)',background:moveLow?'rgba(255,255,255,0.03)':'rgba(124,140,255,0.07)',border:'1px solid '+(moveLow?'var(--border-default)':'var(--border-subtle)')}}>
+      <div style={{padding:'14px 16px',borderRadius:'var(--r-md)',background:moveLow?'rgba(255,255,255,0.03)':'rgba(139,92,246,0.07)',border:'1px solid '+(moveLow?'var(--border-default)':'var(--border-subtle)')}}>
         <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
           <span style={{fontSize:10,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:moveLow?'var(--text-muted)':'var(--accent)'}}>{moveLow?'Top hypothesis · validate first':'Do this next'}</span>
           {confChip(conf(move))}
@@ -2606,7 +2606,7 @@ function DiagnosticCard({metrics, context, period, onLogEvent}){
         <h2 style={{margin:0}}>Operator diagnostic <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>— what the numbers say right now</span></h2>
         <div style={{display:'flex',alignItems:'center',gap:10}}><span className="meta">Live cross-metric read{dx.inPlay>0?` · ~${GBP(dx.inPlay)} contribution in play`:''}</span><LogEventButton onClick={()=>setLogOpen(true)}/></div>
       </div>
-      <div style={{padding:'12px 16px',borderRadius:'var(--r-md)',background:'rgba(124,140,255,0.06)',border:'1px solid var(--border-subtle)',marginBottom:14}}>
+      <div style={{padding:'12px 16px',borderRadius:'var(--r-md)',background:'rgba(139,92,246,0.06)',border:'1px solid var(--border-subtle)',marginBottom:14}}>
         <div style={{fontSize:11,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-faint)'}}>Biggest lever</div>
         <div style={{fontSize:16,fontWeight:700,color:'var(--text-primary)',marginTop:2}}>{top.title}</div>
         <div style={{fontSize:13,color:'var(--text-secondary)',marginTop:4,lineHeight:1.5}}>{top.evidence}</div>
@@ -2857,7 +2857,7 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
     <div style={{fontSize:18,fontWeight:700,color:col||'var(--text-primary)',marginTop:2}}>{val}</div>
     {sub&&<div style={{fontSize:11,color:'var(--text-muted)',marginTop:1}}>{sub}</div>}
   </div>);
-  const modeBtn = (key,label)=>(<button onClick={()=>set('mode',key)} style={{padding:'5px 11px',borderRadius:6,border:'1px solid '+(mode===key?'var(--accent)':'var(--border-subtle)'),background:mode===key?'rgba(124,140,255,0.14)':'transparent',color:mode===key?'var(--text-primary)':'var(--text-muted)',fontSize:12,fontWeight:600,cursor:'pointer'}}>{label}</button>);
+  const modeBtn = (key,label)=>(<button onClick={()=>set('mode',key)} style={{padding:'5px 11px',borderRadius:6,border:'1px solid '+(mode===key?'var(--accent)':'var(--border-subtle)'),background:mode===key?'rgba(139,92,246,0.14)':'transparent',color:mode===key?'var(--text-primary)':'var(--text-muted)',fontSize:12,fontWeight:600,cursor:'pointer'}}>{label}</button>);
   const annLabel = rows.length===12 ? 'Year 1' : rows.length+'-month';
 
   return (
@@ -2919,7 +2919,7 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
         {tile(annLabel+' EBITDA', GBP(t.ebitda), PCT(t.ebitdaPct)+' margin', t.ebitda>=0?'var(--good)':'var(--bad)')}
         {tile('EBITDA break-even', beLabel, mode==='bottomup'?('repeat '+n('repeatRate').toFixed(0)+'%/mo'):('growth '+n('growthPct').toFixed(0)+'%/mo'))}
       </div>
-      {mode==='bottomup' && <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:10}}>Revenue mix: <b style={{color:'#7c8cff'}}>New {pctOf(t.newRev)}%</b> · <b style={{color:'#6ee7b7'}}>Returning {pctOf(t.retRev)}%</b>{t.whRev>0?<> · <b style={{color:'#f59e0b'}}>Wholesale {pctOf(t.whRev)}%</b></>:''} — returning revenue compounds as the base grows.</div>}
+      {mode==='bottomup' && <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:10}}>Revenue mix: <b style={{color:'#8B5CF6'}}>New {pctOf(t.newRev)}%</b> · <b style={{color:'#6ee7b7'}}>Returning {pctOf(t.retRev)}%</b>{t.whRev>0?<> · <b style={{color:'#f59e0b'}}>Wholesale {pctOf(t.whRev)}%</b></>:''} — returning revenue compounds as the base grows.</div>}
       <R.ResponsiveContainer width="100%" height={250}>
         <R.ComposedChart data={rows} margin={{top:6,right:16,left:14,bottom:20}}>
           <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
@@ -2928,11 +2928,11 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
           <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} formatter={v=>GBP(v)}/>
           <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}}/>
           {mode==='bottomup' ? [
-            <R.Area key="n" type="monotone" dataKey="newRev" name="New" stackId="rev" stroke="#7c8cff" fill="rgba(124,140,255,0.5)" strokeWidth={1}/>,
+            <R.Area key="n" type="monotone" dataKey="newRev" name="New" stackId="rev" stroke="#8B5CF6" fill="rgba(139,92,246,0.5)" strokeWidth={1}/>,
             <R.Area key="r" type="monotone" dataKey="retRev" name="Returning" stackId="rev" stroke="#6ee7b7" fill="rgba(110,231,183,0.45)" strokeWidth={1}/>,
             <R.Area key="w" type="monotone" dataKey="whRev" name="Wholesale" stackId="rev" stroke="#f59e0b" fill="rgba(245,158,11,0.4)" strokeWidth={1}/>
           ] : (
-            <R.Area key="rev" type="monotone" dataKey="revenue" name="Revenue" stroke="#7c8cff" fill="rgba(124,140,255,0.16)" strokeWidth={2}/>
+            <R.Area key="rev" type="monotone" dataKey="revenue" name="Revenue" stroke="#8B5CF6" fill="rgba(139,92,246,0.16)" strokeWidth={2}/>
           )}
           <R.Line type="monotone" dataKey="ebitda" name="EBITDA" stroke="#f0f0f4" strokeWidth={2} strokeDasharray="4 3" dot={false}/>
         </R.ComposedChart>
@@ -3573,7 +3573,7 @@ function FitCard({start, end}){
       <FitScore label="Product-market fit" value={b.pmfScore} sub="LTV:CAC · payback · retention"/>
     </div>
     {diluted&&(<div className="note" style={{marginBottom:12,borderLeft:'3px solid #f5b544'}}><b>Paid-only offer fit.</b> Blended (incl. organic/direct) reads <b>{pomf.blendedOmfScore}</b> at {rx(pomf.blendedCacCoverageRatio)} CAC coverage — flattered by {pomf.excludedChannels.join(', ')} with no ad spend. On the paid channels you control, CAC coverage is {rx(pomf.cacCoverageRatio)}.</div>)}
-    <div style={{padding:'12px 14px',borderRadius:'var(--r-sm)',background:'var(--accent-bg)',border:'1px solid rgba(124,140,255,.25)',marginBottom:12}}>
+    <div style={{padding:'12px 14px',borderRadius:'var(--r-sm)',background:'var(--accent-bg)',border:'1px solid rgba(139,92,246,.25)',marginBottom:12}}>
       <div style={{fontWeight:700,color:'var(--text-primary)',marginBottom:4}}>{FIT.primaryDiagnosis}</div>
       <div style={{fontSize:'12.5px',lineHeight:1.5,color:'var(--text-secondary)'}}>{FIT.recommendedAction}</div>
     </div>
@@ -3660,7 +3660,7 @@ function GpSrc({ source, label }) {
       fontSize: 10, padding: '1px 6px', marginLeft: 6, verticalAlign: 'middle',
       background: brand ? 'var(--accent-bg)' : 'transparent',
       color: brand ? 'var(--accent)' : 'var(--text-faint)',
-      border: '1px solid ' + (brand ? 'rgba(124,140,255,.35)' : 'var(--border-subtle)'),
+      border: '1px solid ' + (brand ? 'rgba(139,92,246,.35)' : 'var(--border-subtle)'),
     }}>{brand ? 'your number' : 'prior'}</span>
   );
 }
@@ -3858,7 +3858,7 @@ function CrossChannel({start}){
         <h2>Paid effect &amp; incrementality</h2>
         <div className="micro" style={{color:'var(--text-muted)', marginBottom:6}}>Spend↔revenue correlation by lag (revenue responds with a delay, so same-day understates paid).</div>
         <div style={{display:'flex', gap:8, marginBottom:10}}>
-          {lagCorr.map(l=>(<div key={l.lag} style={{flex:1, textAlign:'center', padding:'8px 4px', borderRadius:'var(--r-sm)', background: bestLag&&l.lag===bestLag.lag?'var(--accent-bg)':'var(--bg-app)', border:'1px solid '+(bestLag&&l.lag===bestLag.lag?'rgba(124,140,255,.35)':'var(--border-subtle)')}}>
+          {lagCorr.map(l=>(<div key={l.lag} style={{flex:1, textAlign:'center', padding:'8px 4px', borderRadius:'var(--r-sm)', background: bestLag&&l.lag===bestLag.lag?'var(--accent-bg)':'var(--bg-app)', border:'1px solid '+(bestLag&&l.lag===bestLag.lag?'rgba(139,92,246,.35)':'var(--border-subtle)')}}>
             <div style={{fontSize:18, fontWeight:700, color: bestLag&&l.lag===bestLag.lag?'var(--accent)':'var(--text-primary)'}}>{l.r==null?'—':l.r.toFixed(2)}</div>
             <div className="micro" style={{color:'var(--text-faint)'}}>+{l.lag}d</div>
           </div>))}
@@ -4972,7 +4972,7 @@ function CvrDrivers(){
   const [showDisc,setShowDisc] = useState(true);       // overlay total discount depth on the trend
   const gran = chartGran;                              // comparator follows the chart
   const panel = (chartGran==='day' ? seriesDaily : series);
-  const segBtn = (active)=>({fontSize:11.5,fontWeight:600,padding:'4px 10px',borderRadius:7,cursor:'pointer',border:'1px solid '+(active?'#7c8cff':'var(--border-subtle)'),background:active?'rgba(124,140,255,0.14)':'transparent',color:active?'#9aa6ff':'var(--text-muted)'});
+  const segBtn = (active)=>({fontSize:11.5,fontWeight:600,padding:'4px 10px',borderRadius:7,cursor:'pointer',border:'1px solid '+(active?'#8B5CF6':'var(--border-subtle)'),background:active?'rgba(139,92,246,0.14)':'transparent',color:active?'#8B5CF6':'var(--text-muted)'});
   const _cbase = (chartGran==='day' ? seriesDaily : series);
   const _clast = _cbase.length ? _cbase[_cbase.length-1].w : null;
   const _ccut = (chartDays && _clast) ? new Date(new Date(_clast+'T00:00:00Z').getTime() - chartDays*86400000).toISOString().slice(0,10) : '0000';
@@ -5198,8 +5198,8 @@ function CvrDrivers(){
   </div>);
 
   const stageCard = (k) => { const now=M.stageNow[k], prev=M.stagePrev[k], dlt=M.stageMoves[k], contrib=Math.round((M.stageContribution[k]||0)*100); const isMover=k===M.moverStage; const good=dlt>=0;
-    return (<div key={k} style={{flex:'1 1 200px',background:isMover?'rgba(124,140,255,0.08)':'var(--surface-1,#111116)',border:'1px solid '+(isMover?'#3a4080':'var(--border-subtle,#23232b)'),borderRadius:12,padding:'11px 13px'}}>
-      <div style={{fontSize:12,fontWeight:600,color:'var(--text-secondary)'}}>{k}{isMover&&<span style={{marginLeft:6,fontSize:10,color:'#9aa6ff',fontWeight:700}}>BIGGEST MOVER</span>}</div>
+    return (<div key={k} style={{flex:'1 1 200px',background:isMover?'rgba(139,92,246,0.08)':'var(--surface-1,#111116)',border:'1px solid '+(isMover?'#3a4080':'var(--border-subtle,#23232b)'),borderRadius:12,padding:'11px 13px'}}>
+      <div style={{fontSize:12,fontWeight:600,color:'var(--text-secondary)'}}>{k}{isMover&&<span style={{marginLeft:6,fontSize:10,color:'#8B5CF6',fontWeight:700}}>BIGGEST MOVER</span>}</div>
       <div style={{fontSize:18,fontWeight:700,marginTop:3}}>{prev}% <span style={{color:'var(--text-faint)'}}>→</span> {now}% <span style={{fontSize:12.5,color:good?'#4ade80':'#ef6b6f'}}>{dlt>=0?'+':''}{dlt}pp</span></div>
       <div style={{fontSize:11.5,color:'var(--text-muted)',marginTop:2}}>{contrib>=0?contrib:0}% of the CVR change</div>
     </div>);
@@ -5228,7 +5228,7 @@ function CvrDrivers(){
       <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:8}}>
         {tile('GA4 funnel CVR (recent)', M.cvrNow+'%', `was ${M.cvrPrev}% · ${M.deltaCVR>=0?'+':''}${M.deltaCVR}pp`, up?'#4ade80':'#ef6b6f')}
         {tile('What kind of move', verdict.txt, verdict.sub, verdict.color)}
-        {tile('Biggest funnel mover', M.moverStage, `${Math.round((M.stageContribution[M.moverStage]||0)*100)}% of the change`, '#9aa6ff')}
+        {tile('Biggest funnel mover', M.moverStage, `${Math.round((M.stageContribution[M.moverStage]||0)*100)}% of the change`, '#8B5CF6')}
       </div>
       {M.siteCvrNow!=null && (
         <div className="note" style={{marginBottom:14}}>
@@ -5246,12 +5246,12 @@ function CvrDrivers(){
         <button onClick={()=>setShowDisc(v=>!v)} title="Shade total discount depth (codes + sale prices) and flag the deepest-discount periods" style={{...segBtn(showDisc), border:'1px solid '+(showDisc?'#f5b544':'var(--border-subtle)'), background:showDisc?'rgba(245,181,68,0.14)':'transparent', color:showDisc?'#f5b544':'var(--text-muted)'}}>🏷️ Discounts</button>
         <span style={{fontSize:11,color:'var(--text-faint)',marginLeft:4}}>{chartData.length} {chartGran==='day'?'days':'weeks'}{chartGran==='day'?' · daily CVR is noisier — read the trend, not single days':''}</span>
       </div>
-      <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',margin:'2px 0 8px',padding:'7px 11px',borderRadius:9,background:'rgba(124,140,255,0.07)',border:'1px solid rgba(124,140,255,0.18)'}}>
-        <span style={{fontSize:12,fontWeight:600,color:'#9aa6ff'}}>📈 Click two points on the chart to compare them</span>
+      <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',margin:'2px 0 8px',padding:'7px 11px',borderRadius:9,background:'rgba(139,92,246,0.07)',border:'1px solid rgba(139,92,246,0.18)'}}>
+        <span style={{fontSize:12,fontWeight:600,color:'#8B5CF6'}}>📈 Click two points on the chart to compare them</span>
         <span style={{fontSize:12,color:'var(--text-muted)'}}>{cA&&cB
-          ? <>Comparing <b style={{color:'#7c8cff'}}>A · {lbl(cA)}</b> <span style={{color:'var(--text-faint)'}}>vs</span> <b style={{color:'#4ade80'}}>B · {lbl(cB)}</b> — see table below.</>
-          : cA ? <>Picked <b style={{color:'#7c8cff'}}>A · {lbl(cA)}</b> — now click another point for <b style={{color:'#4ade80'}}>B</b>.</>
-          : <>Click the first {chartGran==='day'?'day':'week'} to set <b style={{color:'#7c8cff'}}>A</b>.</>}</span>
+          ? <>Comparing <b style={{color:'#8B5CF6'}}>A · {lbl(cA)}</b> <span style={{color:'var(--text-faint)'}}>vs</span> <b style={{color:'#4ade80'}}>B · {lbl(cB)}</b> — see table below.</>
+          : cA ? <>Picked <b style={{color:'#8B5CF6'}}>A · {lbl(cA)}</b> — now click another point for <b style={{color:'#4ade80'}}>B</b>.</>
+          : <>Click the first {chartGran==='day'?'day':'week'} to set <b style={{color:'#8B5CF6'}}>A</b>.</>}</span>
         {(cmp.a||cmp.b) && <button onClick={()=>setCmp({a:null,b:null})} style={{fontSize:11.5,fontWeight:600,padding:'4px 10px',borderRadius:7,cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-muted)'}}>✕ Clear</button>}
         <button onClick={()=>setCmp(defaultPair(panel))} title="Auto-pick the clearest pair: similar traffic, biggest CVR gap" style={{fontSize:11.5,fontWeight:600,padding:'4px 10px',borderRadius:7,cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-muted)'}}>↻ Best pair</button>
       </div>
@@ -5270,13 +5270,13 @@ function CvrDrivers(){
           {/* Total discount depth (codes + sale prices) as a soft amber band; amber diamonds flag the deepest periods. */}
           {showDisc && <R.Area yAxisId="disc" type="monotone" dataKey="trueDiscountIntensity" name="Discount depth" stroke="#f5b544" strokeWidth={1.4} strokeOpacity={0.6} fill="#f5b544" fillOpacity={0.10} dot={discDot} activeDot={false} isAnimationActive={false} connectNulls/>}
           <R.Brush {...brushProps('w', fmtWk)} />
-          <R.Line yAxisId="l" type="monotone" dataKey="cvr" name="CVR" stroke="#7c8cff" strokeWidth={2.5} dot={false}/>
+          <R.Line yAxisId="l" type="monotone" dataKey="cvr" name="CVR" stroke="#8B5CF6" strokeWidth={2.5} dot={false}/>
           {/* Show, don't tell: the single CVR benchmark drawn on the chart so the gap is visible, not described. */}
-          <R.ReferenceLine yAxisId="l" y={CVR_BENCH*100} stroke="#7c8cff" strokeDasharray="5 4" strokeOpacity={0.75}
-            label={{value:`${CVR_BENCH_LABEL} CVR target`, position:'insideTopRight', fill:'#7c8cff', fontSize:10.5}}/>
+          <R.ReferenceLine yAxisId="l" y={CVR_BENCH*100} stroke="#8B5CF6" strokeDasharray="5 4" strokeOpacity={0.75}
+            label={{value:`${CVR_BENCH_LABEL} CVR target`, position:'insideTopRight', fill:'#8B5CF6', fontSize:10.5}}/>
           {/* The two selected periods, marked where you clicked — A (blue) vs B (green). */}
-          {cmp.a && chartData.some(d=>d.w===cmp.a) && <R.ReferenceLine yAxisId="l" x={cmp.a} stroke="#7c8cff" strokeWidth={2} strokeOpacity={0.95}
-            label={{value:'A', position:'top', fill:'#7c8cff', fontSize:12.5, fontWeight:800}}/>}
+          {cmp.a && chartData.some(d=>d.w===cmp.a) && <R.ReferenceLine yAxisId="l" x={cmp.a} stroke="#8B5CF6" strokeWidth={2} strokeOpacity={0.95}
+            label={{value:'A', position:'top', fill:'#8B5CF6', fontSize:12.5, fontWeight:800}}/>}
           {cmp.b && chartData.some(d=>d.w===cmp.b) && <R.ReferenceLine yAxisId="l" x={cmp.b} stroke="#4ade80" strokeWidth={2} strokeOpacity={0.95}
             label={{value:'B', position:'top', fill:'#4ade80', fontSize:12.5, fontWeight:800}}/>}
           {/* Event & sale pins: logged events + major site-wide sales, snapped to chart buckets.
@@ -5329,7 +5329,7 @@ function CvrDrivers(){
         <span className="meta">click two points on the trend chart above — biggest differences flagged automatically</span></div>
       <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center',marginBottom:10}}>
         {cA && cB
-          ? <div style={{fontSize:12.5,color:'var(--text-muted)'}}>Comparing <b style={{color:'#7c8cff'}}>{lbl(cA)}</b> <span style={{color:'var(--text-faint)'}}>vs</span> <b style={{color:'#4ade80'}}>{lbl(cB)}</b></div>
+          ? <div style={{fontSize:12.5,color:'var(--text-muted)'}}>Comparing <b style={{color:'#8B5CF6'}}>{lbl(cA)}</b> <span style={{color:'var(--text-faint)'}}>vs</span> <b style={{color:'#4ade80'}}>{lbl(cB)}</b></div>
           : <div style={{fontSize:12.5,color:'var(--text-faint)'}}>↑ Click two points on the chart above to pick the {gran==='day'?'days':'weeks'} to compare.</div>}
         <button onClick={()=>setCmp(defaultPair(panel))} title="Auto-pick the clearest pair: similar traffic, biggest CVR gap" style={{fontSize:12,fontWeight:600,padding:'6px 12px',borderRadius:8,cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-muted)'}}>↻ Best pair</button>
         {(cmp.a||cmp.b) && <button onClick={()=>setCmp({a:null,b:null})} style={{fontSize:12,fontWeight:600,padding:'6px 12px',borderRadius:8,cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-muted)'}}>✕ Clear</button>}
@@ -5345,18 +5345,18 @@ function CvrDrivers(){
         <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:12}}>
           {tile(lbl(cA), cA.cvr+'%', `${NUM(cA.orders)}/${NUM(cA.sessions)} · 95% CI ${ciA?(ciA.lo*100).toFixed(2)+'–'+(ciA.hi*100).toFixed(2)+'%':'—'}`, cA.cvr>=cB.cvr?'#4ade80':'var(--text-primary)')}
           {tile(lbl(cB), cB.cvr+'%', `${NUM(cB.orders)}/${NUM(cB.sessions)} · 95% CI ${ciB?(ciB.lo*100).toFixed(2)+'–'+(ciB.hi*100).toFixed(2)+'%':'—'}`, cB.cvr>=cA.cvr?'#4ade80':'var(--text-primary)')}
-          {tile('CVR gap', `${(Math.abs(cA.cvr-cB.cvr)).toFixed(2)}pp`, gapSig?(gapSig.p<0.05?`${pTxt(gapSig.p)} — a real difference`:`${pTxt(gapSig.p)} — within sampling noise`):'', gapSig?(gapSig.p<0.05?'#4ade80':'#f5b544'):'#9aa6ff')}
+          {tile('CVR gap', `${(Math.abs(cA.cvr-cB.cvr)).toFixed(2)}pp`, gapSig?(gapSig.p<0.05?`${pTxt(gapSig.p)} — a real difference`:`${pTxt(gapSig.p)} — within sampling noise`):'', gapSig?(gapSig.p<0.05?'#4ade80':'#f5b544'):'#8B5CF6')}
         </div>
         {movers.length>0 && <div style={{marginBottom:10}}>
           <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'var(--text-faint)',marginBottom:5}}>Biggest differences</div>
-          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{movers.map(m=>(<span key={m.k} style={{fontSize:12,background:'rgba(124,140,255,0.12)',border:'1px solid rgba(124,140,255,0.3)',borderRadius:999,padding:'3px 10px'}}><b>{m.l}</b> {fmtVal(m.t,m.a)} <span style={{color:'var(--text-faint)'}}>→</span> {fmtVal(m.t,m.b)}</span>))}</div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{movers.map(m=>(<span key={m.k} style={{fontSize:12,background:'rgba(139,92,246,0.12)',border:'1px solid rgba(139,92,246,0.3)',borderRadius:999,padding:'3px 10px'}}><b>{m.l}</b> {fmtVal(m.t,m.a)} <span style={{color:'var(--text-faint)'}}>→</span> {fmtVal(m.t,m.b)}</span>))}</div>
         </div>}
         {/* Why the difference — deterministic read of the metric algorithm: funnel split + driver classification + confound-aware verdict, with a handoff to the live assistant. */}
-        {cmpStory && (()=>{ const S=cmpStory; const vcol = S.topKind==='site'||S.topKind==='checkout'?'#4ade80' : S.topKind==='offer'?'#f5b544' : S.topKind==='mix'||S.topKind==='device'?'#9aa6ff' : 'var(--text-muted)';
+        {cmpStory && (()=>{ const S=cmpStory; const vcol = S.topKind==='site'||S.topKind==='checkout'?'#4ade80' : S.topKind==='offer'?'#f5b544' : S.topKind==='mix'||S.topKind==='device'?'#8B5CF6' : 'var(--text-muted)';
           const u=gran==='day'?'day':'week';
-          return (<div style={{marginBottom:12,padding:'13px 15px',borderRadius:12,background:'rgba(124,140,255,0.06)',border:'1px solid rgba(124,140,255,0.22)'}}>
+          return (<div style={{marginBottom:12,padding:'13px 15px',borderRadius:12,background:'rgba(139,92,246,0.06)',border:'1px solid rgba(139,92,246,0.22)'}}>
             <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:8}}>
-              <span style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#9aa6ff',fontWeight:700}}>✦ Why the difference — likely drivers</span>
+              <span style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#8B5CF6',fontWeight:700}}>✦ Why the difference — likely drivers</span>
               <span style={{fontSize:11,color:'var(--text-faint)'}} title={agentTitle('Pulse')}>◆ Pulse · auto-diagnosis from the metric model</span>
             </div>
             {gapSig && (gapSig.p<0.05
@@ -5365,34 +5365,34 @@ function CvrDrivers(){
             {S.tiny
               ? <div style={{fontSize:12.5,color:'var(--text-muted)'}}>CVR is essentially flat between these two ({S.pp>=0?'+':''}{S.pp}pp). The inputs below shifted but netted out — there's no real conversion difference to explain. Pick a wider-apart pair to see a driver story.</div>
               : <div style={{fontSize:12.5,color:'var(--text-secondary)',lineHeight:1.55}}>
-                  <div style={{marginBottom:6}}><b style={{color:'#7c8cff'}}>1 · Where in the funnel.</b> The <b style={{color:S.up?'#4ade80':'#ef6b6f'}}>{S.up?'+':''}{S.pp}pp</b> move is mostly at <b>{S.lead.label}</b> ({Math.round(Math.min(Math.abs(S.lead.share),1)*100)}% of it{S.offset?<>, partly offset by <b>{S.offset.label}</b></>:''}) — {(+S.lead.a).toFixed(1)}% → {(+S.lead.b).toFixed(1)}%.</div>
-                  <div style={{marginBottom:6}}><b style={{color:'#7c8cff'}}>2 · What moved with it.</b> {S.consistent.length
+                  <div style={{marginBottom:6}}><b style={{color:'#8B5CF6'}}>1 · Where in the funnel.</b> The <b style={{color:S.up?'#4ade80':'#ef6b6f'}}>{S.up?'+':''}{S.pp}pp</b> move is mostly at <b>{S.lead.label}</b> ({Math.round(Math.min(Math.abs(S.lead.share),1)*100)}% of it{S.offset?<>, partly offset by <b>{S.offset.label}</b></>:''}) — {(+S.lead.a).toFixed(1)}% → {(+S.lead.b).toFixed(1)}%.</div>
+                  <div style={{marginBottom:6}}><b style={{color:'#8B5CF6'}}>2 · What moved with it.</b> {S.consistent.length
                     ? <>{S.consistent.map((d,i)=><span key={d.k}>{i>0?'; ':''}<b>{cmLabel[d.k]}</b> {fmtMetric(d.k,d.a)}→{fmtMetric(d.k,d.b)} <span style={{color:'var(--text-faint)'}}>({d.phrase})</span></span>)}.</>
                     : <span style={{color:'var(--text-muted)'}}>nothing else moved much — the tracked inputs don't explain this gap, so suspect data noise or an untracked factor.</span>}</div>
-                  {S.against.length>0 && <div style={{marginBottom:6}}><b style={{color:'#7c8cff'}}>3 · Against the grain.</b> {S.against.map((d,i)=><span key={d.k}>{i>0?'; ':''}<b>{cmLabel[d.k]}</b> {fmtMetric(d.k,d.a)}→{fmtMetric(d.k,d.b)}</span>)} usually push{S.against.length>1?'':'es'} CVR the other way — so the {S.up?'gain':'drop'} happened <i>despite</i> {S.against.length>1?'them':'it'}, which sharpens the diagnosis.</div>}
+                  {S.against.length>0 && <div style={{marginBottom:6}}><b style={{color:'#8B5CF6'}}>3 · Against the grain.</b> {S.against.map((d,i)=><span key={d.k}>{i>0?'; ':''}<b>{cmLabel[d.k]}</b> {fmtMetric(d.k,d.a)}→{fmtMetric(d.k,d.b)}</span>)} usually push{S.against.length>1?'':'es'} CVR the other way — so the {S.up?'gain':'drop'} happened <i>despite</i> {S.against.length>1?'them':'it'}, which sharpens the diagnosis.</div>}
                   {S.verdict && <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--border-subtle)'}}><b style={{color:vcol}}>Likely driver:</b> <span style={{color:'var(--text-secondary)'}}>{S.verdict}</span> <span style={{color:'var(--text-faint)'}}>{sessClose?'Sessions are near-identical, so this is a relatively clean read.':'Sessions differ a lot here — volume itself shifts the mix, so read with care.'} Two periods is correlation, not proof.</span></div>}
                   {STAT.resid && STAT.resid.byW[cmp.b] && (()=>{ const rB=STAT.resid.byW[cmp.b]; const unexp=Math.abs(rB.z)>=1.3;
-                    return (<div style={{marginTop:6,fontSize:11.5,color:'var(--text-faint)'}}><b style={{color:unexp?'#9aa6ff':'var(--text-muted)'}}>Mix-adjusted:</b> after modelling CVR from traffic warmth (new-visitor share), {lbl(cB)} lands <b style={{color:rB.e>=0?'#4ade80':'#ef6b6f'}}>{rB.e>=0?'+':''}{rB.e.toFixed(2)}pp</b> vs expected ({(rB.exp).toFixed(2)}%) — {unexp?'a genuinely un-modelled move, the kind worth a controlled test':'about what the model predicts, so most of the gap is explained by the inputs'}.</div>); })()}
+                    return (<div style={{marginTop:6,fontSize:11.5,color:'var(--text-faint)'}}><b style={{color:unexp?'#8B5CF6':'var(--text-muted)'}}>Mix-adjusted:</b> after modelling CVR from traffic warmth (new-visitor share), {lbl(cB)} lands <b style={{color:rB.e>=0?'#4ade80':'#ef6b6f'}}>{rB.e>=0?'+':''}{rB.e.toFixed(2)}pp</b> vs expected ({(rB.exp).toFixed(2)}%) — {unexp?'a genuinely un-modelled move, the kind worth a controlled test':'about what the model predicts, so most of the gap is explained by the inputs'}.</div>); })()}
                 </div>}
-            <div onClick={cmpAskAI} style={{marginTop:9,fontSize:12,color:'#9aa6ff',cursor:'pointer',fontWeight:600}}>✦ Ask AI to dig deeper into this pair →</div>
+            <div onClick={cmpAskAI} style={{marginTop:9,fontSize:12,color:'#8B5CF6',cursor:'pointer',fontWeight:600}}>✦ Ask AI to dig deeper into this pair →</div>
           </div>); })()}
         <div style={{overflowX:'auto'}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:12.5}}>
           <thead><tr style={{textAlign:'left',color:'var(--text-faint)',fontSize:11,textTransform:'uppercase',letterSpacing:'.04em'}}>
             <th style={{padding:'5px 8px 5px 0'}}>Metric</th><th style={{padding:'5px 8px',textAlign:'right'}}>{lbl(cA)}</th><th style={{padding:'5px 8px',textAlign:'right'}}>{lbl(cB)}</th><th style={{padding:'5px 8px',textAlign:'right'}}>Δ</th></tr></thead>
           <tbody>{['Funnel stage','Traffic & behaviour','Device, geography & source','Checkout & payment','Commercial'].map(g=>(<React.Fragment key={g}>
-            <tr><td colSpan={4} style={{padding:'8px 0 3px',fontSize:10.5,textTransform:'uppercase',letterSpacing:'.05em',color:'#7c8cff'}}>{g}</td></tr>
-            {cmpRows.filter(r=>r.g===g).map(r=>{ const big=moverKeys.has(r.k); return (<tr key={r.k} style={{borderTop:'1px solid var(--border-subtle)',background:big?'rgba(124,140,255,0.06)':'transparent'}}>
-              <td style={{padding:'6px 8px 6px 8px',fontWeight:big?700:500,borderLeft:big?'2px solid #7c8cff':'2px solid transparent'}}>{r.l}</td>
+            <tr><td colSpan={4} style={{padding:'8px 0 3px',fontSize:10.5,textTransform:'uppercase',letterSpacing:'.05em',color:'#8B5CF6'}}>{g}</td></tr>
+            {cmpRows.filter(r=>r.g===g).map(r=>{ const big=moverKeys.has(r.k); return (<tr key={r.k} style={{borderTop:'1px solid var(--border-subtle)',background:big?'rgba(139,92,246,0.06)':'transparent'}}>
+              <td style={{padding:'6px 8px 6px 8px',fontWeight:big?700:500,borderLeft:big?'2px solid #8B5CF6':'2px solid transparent'}}>{r.l}</td>
               <td style={{padding:'6px 8px',textAlign:'right',color:'var(--text-muted)'}}>{fmtVal(r.t,r.a)}</td>
               <td style={{padding:'6px 8px',textAlign:'right',fontWeight:big?700:500}}>{fmtVal(r.t,r.b)}</td>
-              <td style={{padding:'6px 8px',textAlign:'right',color:big?'#9aa6ff':'var(--text-faint)'}}>{dlt(r)}</td></tr>); })}
+              <td style={{padding:'6px 8px',textAlign:'right',color:big?'#8B5CF6':'var(--text-faint)'}}>{dlt(r)}</td></tr>); })}
           </React.Fragment>))}</tbody>
         </table></div>
 
         {Object.keys(cA.landing||{}).length>0 && (()=>{ const types=[...new Set([...Object.keys(cA.landing||{}),...Object.keys(cB.landing||{})])].sort((x,y)=>((cB.landing[y]||{}).share||0)-((cB.landing[x]||{}).share||0));
           return (<div style={{marginTop:14}}>
-            <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#7c8cff',marginBottom:4}}>Landing pages — where they entered (share · CVR within type)</div>
+            <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#8B5CF6',marginBottom:4}}>Landing pages — where they entered (share · CVR within type)</div>
             <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:12.5}}>
               <thead><tr style={{textAlign:'left',color:'var(--text-faint)',fontSize:10.5,textTransform:'uppercase',letterSpacing:'.04em'}}><th style={{padding:'4px 8px 4px 0'}}>Type</th><th style={{padding:'4px 8px',textAlign:'right'}}>{lbl(cA)} share</th><th style={{padding:'4px 8px',textAlign:'right'}}>{lbl(cB)} share</th><th style={{padding:'4px 8px',textAlign:'right'}}>{lbl(cA)} CVR</th><th style={{padding:'4px 8px',textAlign:'right'}}>{lbl(cB)} CVR</th></tr></thead>
               <tbody>{types.map(t=>{ const A=cA.landing[t]||{}, B=cB.landing[t]||{}; const cg=(B.cvr||0)-(A.cvr||0); return (<tr key={t} style={{borderTop:'1px solid var(--border-subtle)'}}>
@@ -5406,7 +5406,7 @@ function CvrDrivers(){
           </div>); })()}
 
         {((cA.landTop||[]).length>0 || (cB.landTop||[]).length>0) && <div style={{marginTop:14}}>
-          <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#7c8cff',marginBottom:4}}>Top landing pages — specific URLs (sessions · CVR)</div>
+          <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#8B5CF6',marginBottom:4}}>Top landing pages — specific URLs (sessions · CVR)</div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))',gap:16}}>
             {[[lbl(cA),cA.landTop||[]],[lbl(cB),cB.landTop||[]]].map((pair,i)=>(<div key={i}>
               <div style={{fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',marginBottom:2}}>{pair[0]}</div>
@@ -5420,7 +5420,7 @@ function CvrDrivers(){
         </div>}
 
         {((cA.topProducts||[]).length>0 || (cB.topProducts||[]).length>0) && <div style={{marginTop:14}}>
-          <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#7c8cff',marginBottom:4}}>Top products purchased (web · units · % of units)</div>
+          <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#8B5CF6',marginBottom:4}}>Top products purchased (web · units · % of units)</div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:16}}>
             {[[lbl(cA),cA.topProducts||[]],[lbl(cB),cB.topProducts||[]]].map((pair,i)=>(<div key={i}>
               <div style={{fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',marginBottom:2}}>{pair[0]}</div>
@@ -5479,7 +5479,7 @@ function CvrDrivers(){
       <div className="card-section-title"><h2 style={{margin:0}}>4 · Deeper signal <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>— what survives the confounds</span></h2>
         <span className="meta">Pulse · partial correlations + an expected-CVR model{STAT.drivers[0]?` · n=${STAT.drivers[0].n} ${seriesDaily.length>=12?'days':'weeks'}`:''}</span></div>
       {STAT.drivers.length>0 ? <>
-      <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#7c8cff',marginBottom:6}}>Levers, mix-adjusted — independent link to CVR after holding new-visitor share constant</div>
+      <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#8B5CF6',marginBottom:6}}>Levers, mix-adjusted — independent link to CVR after holding new-visitor share constant</div>
       <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:12.5}}>
         <thead><tr style={{textAlign:'left',color:'var(--text-faint)',fontSize:10.5,textTransform:'uppercase',letterSpacing:'.04em'}}>
           <th style={{padding:'4px 8px 4px 0'}}>Lever</th><th style={{padding:'4px 8px',textAlign:'right'}}>Raw r</th><th style={{padding:'4px 8px',width:120}}>Mix-adjusted</th><th style={{padding:'4px 8px',textAlign:'right'}}>Adj r</th><th style={{padding:'4px 8px'}}></th></tr></thead>
@@ -5497,7 +5497,7 @@ function CvrDrivers(){
       </> : <div className="note">Not enough clean daily history yet to separate levers from traffic mix.</div>}
 
       {STAT.resid && <div style={{marginTop:16}}>
-        <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#7c8cff',marginBottom:6}}>Unexplained CVR weeks — actual vs an expected-CVR model</div>
+        <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#8B5CF6',marginBottom:6}}>Unexplained CVR weeks — actual vs an expected-CVR model</div>
         {STAT.resid.list.length? <div style={{display:'flex',flexDirection:'column',gap:6}}>{STAT.resid.list.map(r=>{ const pos=r.e>=0;
           return (<div key={r.w} style={{display:'flex',justifyContent:'space-between',gap:10,padding:'6px 10px',borderRadius:8,background:'var(--surface-1,#111116)',border:'1px solid var(--border-subtle)'}}>
             <span><b>{fmtWk(r.w)}</b> <span style={{color:'var(--text-faint)'}}>actual {r.act.toFixed(2)}% vs expected {r.exp.toFixed(2)}%</span></span>
@@ -5583,7 +5583,7 @@ function ProductSignal(){
   const [lens,setLens] = useState('desire');   // Y-axis lens: desirability ↔ completion
   const [showAll,setShowAll] = useState(false); // ranked lists: top 3 ↔ up to 10
 
-  const COL={star:'#6ee7b7',gem:'#7c8cff',dud:'#f87171',dead:'#6f6f7b',oos:'#f59e0b'};
+  const COL={star:'#6ee7b7',gem:'#8B5CF6',dud:'#f87171',dead:'#6f6f7b',oos:'#f59e0b'};
   const LBL={star:'Star',gem:'Hidden gem',dud:'Dud',dead:'Dead weight',oos:'Out of stock'};
   // Two lenses, same quadrant: Y = desire (view→cart) or completion (cart→purchase).
   // Plotting completion while keeping the desire-based colours makes the leak visible —
@@ -5597,7 +5597,7 @@ function ProductSignal(){
   const xMax = allPts.length ? Math.max(...allPts.map(p=>p.x)) : 100;
   const yMax = allPts.length ? Math.max(...allPts.map(p=>p.y)) : 100;
   const z = useChartZoom(0, +((xMax*1.08)||1).toFixed(2), 0, +((yMax*1.12)||1).toFixed(2));
-  const lensBtn=(id)=>(<button key={id} onClick={()=>setLens(id)} style={{fontSize:11.5,fontWeight:600,padding:'3px 11px',borderRadius:7,cursor:'pointer',border:'1px solid '+(lens===id?'#7c8cff':'var(--border-subtle)'),background:lens===id?'rgba(124,140,255,0.14)':'transparent',color:lens===id?'#9aa6ff':'var(--text-muted)'}}>{LENS[id].short}</button>);
+  const lensBtn=(id)=>(<button key={id} onClick={()=>setLens(id)} style={{fontSize:11.5,fontWeight:600,padding:'3px 11px',borderRadius:7,cursor:'pointer',border:'1px solid '+(lens===id?'#8B5CF6':'var(--border-subtle)'),background:lens===id?'rgba(139,92,246,0.14)':'transparent',color:lens===id?'#8B5CF6':'var(--text-muted)'}}>{LENS[id].short}</button>);
 
   const oppRow = (p,accent) => (<div key={p.name} style={{display:'flex',gap:10,alignItems:'baseline',padding:'7px 0',borderTop:'1px solid var(--border-subtle)'}}>
     <span style={{width:7,height:7,borderRadius:'50%',background:accent,flexShrink:0,alignSelf:'center'}}/>
@@ -5660,13 +5660,13 @@ function ProductSignal(){
         : <>Top-left = wanted but unseen (merchandise) · top-right = stars · bottom-right = seen but unwanted (fix/stop). Dashed lines = site median visibility &amp; average view→cart.</>}</div>
       <div style={{fontSize:11.5,color:'var(--text-muted)',margin:'2px 0 10px',lineHeight:1.5}}>The <b style={{color:'var(--good)'}}>{`~${curSym()}/mo in green`}</b> is the <b>opportunity size</b> — estimated extra <b>gross profit per month</b> if this product closed the gap to the site's average funnel (for out-of-stock, the demand missed while it's unavailable). Margin-weighted at {PCT(gm)}{` and scaled to a month — a ceiling worth chasing, not a guaranteed gain. Only products worth ≥ ${curSym()}50/mo are listed.`}</div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(250px,1fr))',gap:16}}>
-        {oppCol('Unseen — visibility problem','#7c8cff',gems,'None — visibility matches desire.')}
+        {oppCol('Unseen — visibility problem','#8B5CF6',gems,'None — visibility matches desire.')}
         {oppCol('Browsed, not wanted — PDP problem','#f87171',pdpFix,'None flagged.')}
         {oppCol('Wanted, not bought — checkout leak','#fbbf24',checkoutFix,'None — carts close at the site rate.')}
         {oppCol('Restock — in demand, out of stock','#f59e0b',restock,'None.')}
       </div>
       {moreAvail && <div style={{marginTop:12,textAlign:'center'}}>
-        <button onClick={()=>setShowAll(!showAll)} style={{fontSize:12,fontWeight:600,padding:'6px 16px',borderRadius:8,cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'#9aa6ff'}}>{showAll?'Show fewer':`Show more — ${totalOpps} opportunities ≥ ${curSym()}50/mo`}</button>
+        <button onClick={()=>setShowAll(!showAll)} style={{fontSize:12,fontWeight:600,padding:'6px 16px',borderRadius:8,cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'#8B5CF6'}}>{showAll?'Show fewer':`Show more — ${totalOpps} opportunities ≥ ${curSym()}50/mo`}</button>
       </div>}
       <div className="note" style={{marginTop:12}}>The full funnel, per product: <b>% of views = visibility</b>, <b>view→cart = desire</b> (do they want it once seen), <b>cart→purchase = completion</b> (do they close once they want it). Splitting the last two is the depth — a low-converting SKU is now diagnosed as either <b style={{color:'#f87171'}}>browsed-not-wanted</b> (fix the PDP/product) or <b style={{color:'#fbbf24'}}>wanted-not-bought</b>{` (fix price/shipping/trust/variant at checkout) — opposite fixes. Out-of-stock SKUs are separated (they can't convert); ${curSym()} is margin-weighted at `}{PCT(gm)}, scaled to /month. GA4 item-scoped ({META.products||PR.length} products) × Shopify price/stock.</div>
     </div>
@@ -5680,7 +5680,7 @@ function ProductSignal(){
 // revenue cost, not promotion. From Shopify order-level discount_codes over time.
 const DC_PATTERN = {
   'always-on': {label:'Always-on', color:'#f59e0b', note:'runs constantly — structural margin'},
-  'recurring': {label:'Recurring', color:'#7c8cff', note:'on & off over time'},
+  'recurring': {label:'Recurring', color:'#8B5CF6', note:'on & off over time'},
   'spike':     {label:'Spike',     color:'#4ade80', note:'short campaign burst'},
   'one-off':   {label:'One-off',   color:'#9aa0aa', note:'single day'},
 };
@@ -5714,7 +5714,7 @@ function DiscountCodeTracker(){
   const leak = M.alwaysOnLeak;
 
   // Palette for the stacked chart — top codes get distinct hues, Other grey, Service red.
-  const HUES = ['#f59e0b','#7c8cff','#4ade80','#f472b6','#38bdf8','#c084fc'];
+  const HUES = ['#f59e0b','#8B5CF6','#4ade80','#f472b6','#38bdf8','#c084fc'];
   const top = (M.topCodes||[]).map((c,i)=>({code:c, color:HUES[i%HUES.length]}));
   const stackKeys = [...top, {code:'Other', color:'#3a3a44'}, {code:'Service', color:'#ef6b6f'}];
   const weekly = DATA.weekly||[];
@@ -5740,7 +5740,7 @@ function DiscountCodeTracker(){
         <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:14}}>
           {tile('Full-price orders', Math.round((M.fullPriceShare||0)*100)+'%', `${NUM(M.fullPriceOrders)} orders · ${GBP(M.fullPriceRevenue)} (${Math.round((M.fullPriceRevenueShare||0)*100)}% of revenue)`, 'var(--good)')}
           {tile('Orders with a discount', Math.round((1-(M.fullPriceShare||0))*100)+'%', `${NUM(M.discountedOrders)} orders · ${GBP(M.discountedRevenue)} revenue`)}
-          {tile('Marketing discount', GBP(M.marketingDiscount), `${mkt.length} promo / affiliate codes`, '#7c8cff')}
+          {tile('Marketing discount', GBP(M.marketingDiscount), `${mkt.length} promo / affiliate codes`, '#8B5CF6')}
           {tile('Draft orders excluded', String(M.draftOrdersExcluded||0), `exchanges/replacements · ${GBP(M.draftDiscountExcluded)} internal credits not counted as discount`, 'var(--text-muted)')}
           {tile('Always-on codes', String(M.alwaysOnCount||0), leak?`${leak.code} = ${GBP(leak.discount)} given away`:'—', '#f59e0b')}
         </div>
@@ -5749,7 +5749,7 @@ function DiscountCodeTracker(){
           const gr=(M.fullPriceRevenue||0)+(M.discountedRevenue||0);
           const inten=gr?Math.round(td/gr*100):0, pen=Math.round((1-(M.fullPriceShare||0))*100), avg=(M.discountedOrders)?td/M.discountedOrders:0;
           return (
-            <div style={{background:'var(--accent-bg)',border:'1px solid rgba(124,140,255,0.25)',borderRadius:12,padding:'11px 14px',marginBottom:14,fontSize:12.5,color:'var(--text-secondary)',lineHeight:1.55}}>
+            <div style={{background:'var(--accent-bg)',border:'1px solid rgba(139,92,246,0.25)',borderRadius:12,padding:'11px 14px',marginBottom:14,fontSize:12.5,color:'var(--text-secondary)',lineHeight:1.55}}>
               <b style={{color:'var(--text-primary)'}}>How often vs how deep —</b>these two figures look like they disagree but they measure different things:
                         <span style={{display:'inline'}}> <b style={{color:'var(--text-primary)'}}>{pen}%</b> of orders carry a discount (how <i>often</i>), but the average is only <b style={{color:'var(--text-primary)'}}>{GBP(avg)}</b> off — so across all sales discounts come to only <b style={{color:'var(--text-primary)'}}>~{inten}%</b> of revenue (how <i>deep</i>). Frequent but shallow: lots of small codes, not deep cuts.</span>
               <span style={{color:'var(--text-faint)',display:'block',marginTop:4}}>The Home <i>“Discount depth”</i> tile (~{inten}{`%) is the ${curSym()}-weighted view; the `}<i>“Orders with a discount”</i> tile above ({pen}%) is the order-count view. Same data, different denominators — not a discrepancy.</span>
@@ -5770,7 +5770,7 @@ function DiscountCodeTracker(){
             <R.XAxis dataKey="w" tickFormatter={fmtWk} tick={{fill:'#7e7e8a',fontSize:10.5}} interval={Math.ceil(axis.length/9)} tickMargin={8}
               label={{value:'Week', position:'insideBottom', offset:-10, fill:'#6f6f7b', fontSize:11}}/>
             <R.YAxis allowDecimals={false} tick={{fill:'#7e7e8a',fontSize:11}} label={{value:'Orders with a code', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
-            <R.Tooltip cursor={{fill:'rgba(124,140,255,0.06)'}} contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,fontSize:12}}
+            <R.Tooltip cursor={{fill:'rgba(139,92,246,0.06)'}} contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,fontSize:12}}
               labelFormatter={w=>'Week of '+fmtWk(w)} itemSorter={it=>-it.value}/>
             <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:11.5, paddingBottom:8}}/>
             {stackKeys.map(k=> <R.Bar key={k.code} dataKey={k.code} stackId="a" fill={k.color} maxBarSize={26}/>) }
@@ -6800,7 +6800,7 @@ function IntelligencePanel(){
   const diagnosisCount = P.patterns.length - topLevelPatterns.length;
 
   // Use design-token-aligned palette: trends are accent, status patterns are semantic
-  const KIND_COLOR = {trend:'#7c8cff', change_point:'#f5b544', anomaly:'#ef6b6f', association:'#7c8cff', co_movement:'#7e7e8a', divergence:'#f5b544', money:'#4ade80', diagnosis:'#7c8cff'};
+  const KIND_COLOR = {trend:'#8B5CF6', change_point:'#f5b544', anomaly:'#ef6b6f', association:'#8B5CF6', co_movement:'#7e7e8a', divergence:'#f5b544', money:'#4ade80', diagnosis:'#8B5CF6'};
   const VERDICT_COLOR = {favourable:'#4ade80', unfavourable:'#ef6b6f', neutral:'#7e7e8a', hit:'#4ade80', miss:'#ef6b6f', inconclusive:'#7e7e8a'};
   const KIND_LABEL = {trend:'Trend', change_point:'Step change', anomaly:'Anomaly', association:'Action attribution', co_movement:'Co-mover', divergence:'Divergence', money:`${curSym()} finding`, diagnosis:'Diagnosis'};
 
@@ -8776,7 +8776,7 @@ function MarginBridge({cur, pri, gm, perOrderFixed, payPct}){
           <R.YAxis tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>curSym()+(Math.abs(v)>=1000?(v/1000).toFixed(0)+'k':v)}/>
           <R.Tooltip cursor={{fill:'#ffffff08'}} content={<Tip/>}/>
           <R.Bar dataKey="base" stackId="s" fill="transparent" isAnimationActive={false}/>
-          <R.Bar dataKey="pos" stackId="s" isAnimationActive={false}>{data.map((d,i)=><R.Cell key={i} fill={d.isTotal?'#7c8cff':'#4ade80'}/>)}<R.LabelList content={segLabel('pos')}/></R.Bar>
+          <R.Bar dataKey="pos" stackId="s" isAnimationActive={false}>{data.map((d,i)=><R.Cell key={i} fill={d.isTotal?'#8B5CF6':'#4ade80'}/>)}<R.LabelList content={segLabel('pos')}/></R.Bar>
           <R.Bar dataKey="neg" stackId="s" fill="#f87171" isAnimationActive={false}><R.LabelList content={segLabel('neg')}/></R.Bar>
         </R.BarChart>
       </R.ResponsiveContainer>
@@ -10242,16 +10242,16 @@ const GO_FALLBACK = { monthly: {
 function GO_Dot(p){ return React.createElement('span',{style:Object.assign({width:7,height:7,borderRadius:'50%',display:'inline-block',background:GO_rag(p.r)},p.style||{})}); }
 
 function GO_Tile(p){ const t=p.t; return (
-  <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:8,padding:'12px 13px',position:'relative',boxShadow:'var(--shadow-panel)'}}>
+  <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:8,padding:'14px 15px',position:'relative',boxShadow:'var(--shadow-panel)'}}>
     {t.rag && <GO_Dot r={t.rag} style={{position:'absolute',top:12,right:12}}/>}
     <div style={{fontSize:11.5,color:GO_T.mut}}>{t.k}</div>
-    <div style={{fontFamily:GO_T.mono,fontSize:23,fontWeight:600,margin:'6px 0 3px',letterSpacing:'-.5px',fontVariantNumeric:'tabular-nums'}}>{GO_fmt(t.v,t.fmt)}</div>
+    <div style={{fontFamily:GO_T.mono,fontSize:23,fontWeight:600,margin:'8px 0 4px',letterSpacing:'-.5px',fontVariantNumeric:'tabular-nums'}}>{GO_fmt(t.v,t.fmt)}</div>
     <div style={{fontFamily:GO_T.mono,fontSize:11.5,color:t.d>0?GO_T.green:t.d<0?GO_T.red:GO_T.mut}}>{t.d!=null?GO_arrow(t.d)+' '+GO_pctv(Math.abs(t.d)).replace('+','')+' ':''}<span style={{color:GO_T.dim}}>{t.cmp}</span></div>
-    {t.tgt && <div style={{fontSize:10.5,color:GO_T.dim,marginTop:4}}>{t.tgt}</div>}
+    {t.tgt && <div style={{fontSize:10.5,color:GO_T.dim,marginTop:5}}>{t.tgt}</div>}
   </div>); }
 
 function GO_Insight(p){ const i=p.i; return (
-  <div style={{background:'var(--color-surface)',border:'1px solid #202742',borderRadius:11,padding:'13px 15px',marginTop:11}}>
+  <div style={{background:'var(--color-surface)',border:'1px solid #202742',borderRadius:11,padding:'15px 17px',marginTop:14}}>
     <div style={{display:'flex',alignItems:'center',gap:8,fontSize:11,letterSpacing:'.5px',textTransform:'uppercase',color:GO_T.accent2,marginBottom:6}}>
       <span style={{width:14,height:14,borderRadius:4,background:'linear-gradient(135deg,'+GO_T.accent+',#5563d6)',display:'inline-block'}}/> greta reads this
     </div>
@@ -10262,7 +10262,7 @@ function GO_Insight(p){ const i=p.i; return (
   </div>); }
 
 function GO_TierHead(p){ return (
-  <div style={{display:'flex',alignItems:'baseline',gap:10,margin:'0 2px 12px'}}>
+  <div style={{display:'flex',alignItems:'baseline',gap:10,margin:'0 2px 16px'}}>
     <span style={{fontFamily:GO_T.mono,fontSize:11,color:GO_T.accent2,border:'1px solid #2b3050',borderRadius:5,padding:'1px 6px'}}>{p.n}</span>
     <h2 style={{fontSize:15,margin:0,letterSpacing:'.2px'}}>{p.title}</h2>
     <span style={{fontSize:12,color:GO_T.dim}}>{p.sub}</span>
@@ -10300,7 +10300,7 @@ function GretaOverviewTiers(){
   return (
     <div style={wrap}>
       {toggle}
-      <div style={{background:'linear-gradient(180deg,'+GO_T.panel+','+GO_T.panel2+')',border:'1px solid '+GO_T.line,borderRadius:14,padding:'18px 20px',margin:'8px 0 6px',display:'flex',justifyContent:'space-between',gap:24,flexWrap:'wrap'}}>
+      <div style={{background:'linear-gradient(180deg,'+GO_T.panel+','+GO_T.panel2+')',border:'1px solid '+GO_T.line,borderRadius:14,padding:'20px 24px',margin:'8px 0 6px',display:'flex',justifyContent:'space-between',gap:24,flexWrap:'wrap'}}>
         <div>
           <div style={{fontSize:11,letterSpacing:'.6px',textTransform:'uppercase',color:GO_T.dim}}>Contribution after marketing · this period</div>
           <div style={{fontFamily:GO_T.mono,fontSize:38,fontWeight:600,margin:'4px 0 2px',letterSpacing:'-1px'}}>{GO_gbp(d.hero.cmAfterMkt)}</div>
@@ -10316,11 +10316,11 @@ function GretaOverviewTiers(){
       </div>
       <div style={{fontSize:11,color:GO_T.dim,margin:'4px 2px 0'}}>Factual read of synced Shopify · GA4 · Meta · Google · Klaviyo — not a projection. RAG is vs target; arrows vs previous period.</div>
 
-      <div style={{margin:'22px 0 8px'}}>
+      <div style={{margin:'28px 0 10px'}}>
         <GO_TierHead n="01" title="Business" sub="how the business is performing"/>
-        <div style={{display:'grid',gap:10,gridTemplateColumns:'repeat(5,1fr)'}}>
+        <div style={{display:'grid',gap:12,gridTemplateColumns:'repeat(5,1fr)'}}>
           {d.business.map((t,i)=><GO_Tile key={i} t={t}/>)}
-          <div style={{background:'var(--color-surface)',border:'1px solid #202742',borderRadius:11,padding:'12px 13px'}}>
+          <div style={{background:'var(--color-surface)',border:'1px solid #202742',borderRadius:11,padding:'14px 15px'}}>
             <div style={{fontSize:11.5,color:GO_T.mut}}>Best sellers →</div>
             <div style={{fontSize:12,color:GO_T.mut,marginTop:6,lineHeight:1.7}}>{d.bestSellers.map((s,i)=><div key={i}>{s.name} · {GO_gbp(s.rev)}</div>)}</div>
           </div>
@@ -10329,9 +10329,9 @@ function GretaOverviewTiers(){
         <GO_Insight i={d.insights.business}/>
       </div>
 
-      <div style={{margin:'22px 0 8px'}}>
+      <div style={{margin:'28px 0 10px'}}>
         <GO_TierHead n="02" title="Customer" sub="returning · new · paid-incremental (CTC)"/>
-        <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:8,padding:'11px 13px',boxShadow:'var(--shadow-panel)',marginBottom:10}}>
+        <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:8,padding:'13px 15px',boxShadow:'var(--shadow-panel)',marginBottom:10}}>
           <div style={{fontSize:11,color:GO_T.mut,marginBottom:6}}>New vs returning revenue</div>
           <div style={{display:'flex',height:9,borderRadius:5,overflow:'hidden',marginBottom:6}}><div style={{width:d.customer.splitNew+'%',background:GO_T.accent}}/><div style={{width:d.customer.splitRet+'%',background:'#2563EB'}}/></div>
           <div style={{fontFamily:GO_T.mono,fontSize:11.5}}><span style={{color:GO_T.accent}}>New {d.customer.splitNew}% · {GO_gbp(d.customer.newRev)}</span> &nbsp; <span style={{color:'#2563EB'}}>Ret {d.customer.splitRet}% · {GO_gbp(d.customer.retRev)}</span></div>
@@ -10371,7 +10371,7 @@ function GretaOverviewTiers(){
         <GO_Insight i={d.insights.customer}/>
       </div>
 
-      <div style={{margin:'22px 0 8px'}}>
+      <div style={{margin:'28px 0 10px'}}>
         <GO_TierHead n="03" title="Channel" sub="avg vs marginal iROAS — where the next £ goes (CTC)"/>
         <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:11,padding:'2px 4px',overflowX:'auto'}}>
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
@@ -10553,6 +10553,68 @@ function GretaPlanPanel() {
           <div style={{ fontSize: 12.5, color: GP_T.dim }}>Loading economics…</div>
         )}
       </div>
+
+      {/* forecast vs goal — the calendar's impact on the plan (reads vw_forecast_vs_goal, SOT) */}
+      {P.forecast && (
+        <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 12, padding: '14px 16px', marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ fontSize: 11, letterSpacing: '.5px', textTransform: 'uppercase', color: GP_T.accent2 }}>Forecast vs goal</div>
+            <div style={{ fontSize: 11.5, color: GP_T.dim }}>calendar-driven · covers {P.forecast.forecast_covers_from} – {P.forecast.forecast_covers_to}{Number(P.forecast.uncovered_days) > 0 ? ' · ' + P.forecast.uncovered_days + 'd beyond horizon' : ''}</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 10 }}>
+            <GP_Metric k="Forecast revenue" v={GP_gbp(P.forecast.forecast_revenue_period)} sub={'target ' + GP_gbp(P.forecast.revenue_target)} />
+            <GP_Metric k="Forecast CAM" v={GP_gbp(P.forecast.forecast_cm_period)} hi={true} sub={'target ' + GP_gbp(P.forecast.contribution_margin_target)} />
+            <GP_Metric k="From the calendar" v={GP_gbp(P.forecast.forecast_event_revenue_period)} sub={'CM ' + GP_gbp(P.forecast.forecast_event_cm_period)} />
+            <GP_Metric k="Revenue gap" v={GP_gbp(P.forecast.revenue_gap)} sub={Number(P.forecast.revenue_gap) >= 0 ? 'ahead of plan' : 'behind — add events'} />
+            <GP_Metric k="CAM gap" v={GP_gbp(P.forecast.cm_gap)} sub={Number(P.forecast.cm_gap) >= 0 ? 'ahead' : 'behind plan'} />
+          </div>
+          <div style={{ fontSize: 11, color: GP_T.dim, marginTop: 8 }}>Events with no expected figure are benchmark-seeded (flagged, not measured). Add promos/launches to the calendar to lift the forecast toward the goal.</div>
+        </div>
+      )}
+
+      {/* channel efficiency vs targets — CTC: CM-first, normalized iROAS, fix before scale */}
+      {P.channels && P.channels.length ? (
+        <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 12, padding: '14px 16px', marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ fontSize: 11, letterSpacing: '.5px', textTransform: 'uppercase', color: GP_T.accent2 }}>Channel efficiency vs targets</div>
+            <button onClick={function () { window.FRKL_PLAN.deriveChannelPlan(true); }} style={{ fontSize: 11, color: GP_T.mut, background: 'none', border: '1px solid ' + GP_T.line, borderRadius: 6, padding: '4px 9px', cursor: 'pointer' }}>{(P.channels[0] && P.channels[0].plan_confirmed) ? 'Re-derive plan from goal' : 'Set plan from goal'}</button>
+          </div>
+          <table style={{ width: '100%', fontSize: 12.5, borderCollapse: 'collapse' }}>
+            <thead><tr style={{ color: GP_T.mut, fontSize: 11 }}>
+              <th style={{ textAlign: 'left', fontWeight: 400 }}>Channel</th>
+              <th style={{ textAlign: 'right', fontWeight: 400 }}>Spend 30d</th>
+              <th style={{ textAlign: 'right', fontWeight: 400 }}>iROAS</th>
+              <th style={{ textAlign: 'right', fontWeight: 400 }}>CAC</th>
+              <th style={{ textAlign: 'right', fontWeight: 400 }}>Planned</th>
+              <th style={{ textAlign: 'right', fontWeight: 400 }}>Pace</th>
+              <th style={{ textAlign: 'right', fontWeight: 400, paddingLeft: 10 }}>Verdict</th>
+            </tr></thead>
+            <tbody>
+              {P.channels.map(function (c, i) {
+                var col = c.status === 'fix' ? GP_T.red : c.status === 'scale' ? GP_T.green : c.status === 'ease' ? GP_T.amber : GP_T.mut;
+                var pace = c.spend_pace_pct_of_plan;
+                var paceCol = pace == null ? GP_T.dim : ((c.status === 'fix' && pace > 100) || pace > 140) ? GP_T.red : pace < 80 ? GP_T.amber : GP_T.dim;
+                var tgt = c.plan_target_iroas != null ? c.plan_target_iroas : (c.target_marginal_iroas != null ? c.target_marginal_iroas : c.break_even_iroas);
+                return (
+                  <tr key={i} style={{ borderTop: '1px solid ' + GP_T.line }}>
+                    <td style={{ textAlign: 'left', padding: '4px 0' }}>{String(c.channel_type).replace(/_/g, ' ')}</td>
+                    <td style={{ textAlign: 'right', fontFamily: GP_T.mono }}>{GP_gbp(c.spend_30d)}</td>
+                    <td style={{ textAlign: 'right', fontFamily: GP_T.mono, color: col }}>{Number(c.avg_iroas).toFixed(2)}×</td>
+                    <td style={{ textAlign: 'right', fontFamily: GP_T.mono, color: c.plan_target_cac != null && c.plan_target_cac > 100 ? GP_T.red : GP_T.dim }}>{c.plan_target_cac == null ? '—' : '£' + Math.round(c.plan_target_cac)}</td>
+                    <td style={{ textAlign: 'right', fontFamily: GP_T.mono }}>{c.planned_spend == null ? '—' : GP_gbp(c.planned_spend)}</td>
+                    <td style={{ textAlign: 'right', fontFamily: GP_T.mono, color: paceCol }}>{pace == null ? '—' : pace + '%'}</td>
+                    <td style={{ textAlign: 'right', color: col, textTransform: 'uppercase', fontSize: 11, paddingLeft: 10 }}>{c.status}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <div style={{ fontSize: 11, color: GP_T.dim, marginTop: 8 }}>
+            Focus: <b style={{ color: GP_T.ink }}>{String(P.channels[0].channel_type).replace(/_/g, ' ')}</b> — {P.channels[0].action}
+            {P.channels[0].phi_is_assumed ? <span> · iROAS uses <b>benchmark</b> incrementality (φ), not yet measured — run a holdout to confirm.</span> : null}
+          </div>
+        </div>
+      ) : null}
 
       {/* goal setter */}
       <div style={{ background: 'linear-gradient(180deg,' + GP_T.panel + ',' + GP_T.panel2 + ')', border: '1px solid ' + GP_T.line, borderRadius: 12, padding: '16px 18px' }}>
