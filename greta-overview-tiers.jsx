@@ -15,6 +15,30 @@ const GO_fmt = (v,f) => f==='gbp'?GO_gbp(v):f==='gbp2'?'£'+(v!=null?v.toFixed(2
   :f==='pct1'?(v!=null?v.toFixed(2)+'%':'—'):f==='x'?(v!=null?v.toFixed(1)+'×':'—'):v;
 const GO_TIMEFRAMES = ['daily','weekly','monthly','quarterly','yearly'];
 
+// Plain-language "what this metric means" for the Customer-tier hover popovers. Efficiency cells are
+// keyed CAC:/ROAS: to disambiguate the shared "Break-even" labels; row cells use the bare label.
+const GO_EXPLAIN = {
+  'Revenue':'Net revenue from this customer segment over the selected timeframe.',
+  'Orders':'Number of orders placed by this segment.',
+  'AOV':'Average order value — revenue ÷ orders for this segment.',
+  'Repeat rate':'Share of orders from returning customers — your core retention signal.',
+  'Weighted CAC':'Blended cost to acquire one new customer (ad spend ÷ new customers).',
+  'aMER':'Acquisition MER — new-customer revenue ÷ ad spend. The efficiency of acquisition on its own.',
+  'iRevenue':'Incremental revenue — the extra revenue paid actually caused (φ-adjusted), not last-click attributed.',
+  'iOrders':'Incremental orders paid actually caused, after removing the organic baseline.',
+  'iAOV':'Average value of one incremental (paid-caused) order.',
+  'iCAC':'Incremental CAC — spend ÷ incremental orders. The true cost of a paid-caused customer.',
+  'ipaMER':'Incremental paid aMER — incremental revenue ÷ spend. Paid efficiency on a causal basis.',
+  'CAC:Actual CAC (paid)':'What you actually pay per new customer right now (spend ÷ new customers).',
+  'CAC:Break-even · 1st order':'The most you can pay per customer and still be CM-positive on their first order.',
+  'CAC:Break-even · lifetime':'The most you can pay and still break even over the customer’s whole lifetime (LTV-adjusted).',
+  'CAC:Target / optimal CAC':'Your target acquisition cost — taken from your goal, or a profit-safe default.',
+  'ROAS:Actual ROAS (aMER)':'Your actual acquisition ROAS — new-customer revenue ÷ spend.',
+  'ROAS:Break-even · 1st order':'Minimum ROAS to be CM-positive on order one (= 1 ÷ contribution margin).',
+  'ROAS:Break-even · lifetime':'Minimum ROAS once repeat purchases are counted — the LTV-adjusted floor.',
+  'ROAS:Target / optimal ROAS':'Your target ROAS — taken from your goal, or a profit-safe default.'
+};
+
 const GO_FALLBACK = { monthly: {
   periodLabel:'14 Jun – 14 Jul 2026', compareLabel:'vs previous 30 days',
   hero:{ cmAfterMkt:6343, cm:12817, cmPct:59.9, spend:6474, targetEstimated:true,
@@ -171,14 +195,14 @@ function GretaOverviewTiers(){
           <div key={ri} style={{display:'flex',alignItems:'stretch',gap:10,marginBottom:8,flexWrap:'wrap'}}>
             <div style={{minWidth:120,display:'flex',alignItems:'center',gap:7,fontSize:12.5,fontWeight:600}}><GO_Dot r={row.rag}/> {row.label}</div>
             <div style={{flex:1,display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(115px,1fr))',gap:8}}>
-              {row.cells.map(function(c,ci){return <div key={ci} style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:8,padding:'8px 11px',boxShadow:'var(--shadow-panel)'}}><div style={{fontSize:10.5,color:GO_T.mut}}>{c.k}</div><div style={{fontFamily:GO_T.mono,fontSize:15,fontWeight:600,marginTop:1}}>{c.v}</div></div>;})}
+              {row.cells.map(function(c,ci){var ex=GO_EXPLAIN[c.k];return <div key={ci} className="go-tile" style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:8,padding:'8px 11px',boxShadow:'var(--shadow-panel)'}}><div style={{fontSize:10.5,color:GO_T.mut}}>{c.k}</div><div style={{fontFamily:GO_T.mono,fontSize:15,fontWeight:600,marginTop:1}}>{c.v}</div>{ex&&<div className="go-pop"><div className="go-head">{row.label} · {c.k}</div><div style={{fontSize:11.5,color:GO_T.mut,lineHeight:1.5}}>{ex}</div></div>}</div>;})}
             </div>
           </div>);})}
                 {d.cacBlock && (function(){ var C=d.cacBlock;
           var g2=function(x){return x==null?"—":"£"+Number(x).toFixed(2);};
           var rx=function(x){return x==null?"—":Number(x).toFixed(2)+"×";};
           var col=C.rag==="g"?GO_T.green:C.rag==="a"?GO_T.amber:C.rag==="r"?GO_T.red:GO_T.dim;
-          var cell=function(k,v,sub,hi){return <div style={{background:GO_T.panel,border:"1px solid "+(hi||GO_T.line),borderRadius:8,padding:"9px 11px",boxShadow:"var(--shadow-panel)"}}><div style={{fontSize:10.5,color:GO_T.mut}}>{k}</div><div style={{fontFamily:GO_T.mono,fontSize:16,fontWeight:600,marginTop:2}}>{v}</div><div style={{fontSize:10,color:GO_T.dim}}>{sub}</div></div>;};
+          var cell=function(k,v,sub,hi){var ex=GO_EXPLAIN[(String(v).indexOf("×")>=0?"ROAS:":"CAC:")+k]||GO_EXPLAIN[k]||"";return <div className="go-tile" style={{background:GO_T.panel,border:"1px solid "+(hi||GO_T.line),borderRadius:8,padding:"9px 11px",boxShadow:"var(--shadow-panel)"}}><div style={{fontSize:10.5,color:GO_T.mut}}>{k}</div><div style={{fontFamily:GO_T.mono,fontSize:16,fontWeight:600,marginTop:2}}>{v}</div><div style={{fontSize:10,color:GO_T.dim}}>{sub}</div>{ex&&<div className="go-pop"><div className="go-head">{k}</div><div style={{fontSize:11.5,color:GO_T.mut,lineHeight:1.5}}>{ex}</div></div>}</div>;};
           var ltvSub=C.opc.toFixed(2)+" orders/cust"+(C.repeatPct!=null?" · "+C.repeatPct+"% repeat":"");
           var tgtSub=C.goalConfirmed?"from your goal":"profit-safe default";
           return <div style={{marginTop:2,marginBottom:6}}>
