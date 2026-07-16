@@ -192,9 +192,9 @@ function GretaOverviewTiers(){
           <div style={{fontFamily:GO_T.mono,fontSize:11.5}}><span style={{color:GO_T.accent}}>New {d.customer.splitNew}% · {GO_gbp(d.customer.newRev)}</span> &nbsp; <span style={{color:'#2563EB'}}>Ret {d.customer.splitRet}% · {GO_gbp(d.customer.retRev)}</span></div>
         </div>
         {(d.customer.rows||[]).map(function(row,ri){return (
-          <div key={ri} style={{display:'flex',alignItems:'stretch',gap:10,marginBottom:8,flexWrap:'wrap'}}>
-            <div style={{minWidth:120,display:'flex',alignItems:'center',gap:7,fontSize:12.5,fontWeight:600}}><GO_Dot r={row.rag}/> {row.label}</div>
-            <div style={{flex:1,display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:12}}>
+          <div key={ri} style={{marginTop:ri>0?20:2,marginBottom:6}}>
+            <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 0 10px',paddingBottom:7,borderBottom:'1px solid '+GO_T.line}}><GO_Dot r={row.rag}/> <span style={{fontSize:13.5,fontWeight:700,color:GO_T.ink,letterSpacing:'.2px'}}>{row.label}</span></div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:12}}>
               {row.cells.map(function(c,ci){var ex=GO_EXPLAIN[c.k];return <div key={ci} className="go-tile" style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:8,padding:'14px 15px',boxShadow:'var(--shadow-panel)'}}><div style={{fontSize:11.5,color:GO_T.mut}}>{c.k}</div><div style={{fontFamily:GO_T.mono,fontSize:23,fontWeight:600,margin:'8px 0 4px'}}>{c.v}</div>{ex&&<div className="go-pop"><div className="go-head">{row.label} · {c.k}</div><div style={{fontSize:11.5,color:GO_T.mut,lineHeight:1.5}}>{ex}</div></div>}</div>;})}
             </div>
           </div>);})}
