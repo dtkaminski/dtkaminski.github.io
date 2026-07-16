@@ -358,6 +358,28 @@
     border-top: 1px solid var(--border-subtle); padding-top: var(--s-3);
   }
   .kpi-pop .explainer:first-child { border-top: 0; padding-top: 0; }
+
+  /* ── Overview tile hover popover (.go-pop) — detail + optional sparkline, mirrors .kpi-pop ── */
+  .go-tile { position: relative; }
+  .go-tile .go-dot { opacity: 0; transition: opacity var(--motion-fast); }
+  .go-tile:hover .go-dot { opacity: 1; }
+  .go-pop {
+    position: absolute; top: 100%; left: 0; right: 0; margin-top: 6px;
+    background: var(--bg-elevated); border: 1px solid var(--border-default);
+    border-radius: var(--r-md); padding: var(--s-3);
+    opacity: 0; pointer-events: none;
+    transition: opacity var(--motion-fast) 0.18s;
+    z-index: 120; box-shadow: var(--shadow-lg);
+    display: flex; flex-direction: column; gap: var(--s-2); min-width: 260px;
+  }
+  /* invisible bridge over the seam so card→popout never drops :hover */
+  .go-pop::before { content: ''; position: absolute; left: 0; right: 0; top: -10px; height: 12px; }
+  .go-tile:hover .go-pop { opacity: 1; pointer-events: auto; transition-delay: 0s; }
+  .go-pop .go-head { font-size: 9.5px; color: var(--text-muted); letter-spacing: .04em; text-transform: uppercase; }
+  .go-pop .go-row { font-size: var(--t-meta); color: var(--text-secondary); line-height: 1.5; display: flex; justify-content: space-between; gap: 12px; }
+  .go-pop .go-row b { color: var(--text-primary); font-family: var(--font-mono); font-weight: 500; font-variant-numeric: tabular-nums; }
+  .go-pop .go-ask { font-size: var(--t-meta); color: var(--accent); cursor: pointer; margin-top: 2px; font-weight: 500; }
+  .go-pop .go-ask:hover { text-decoration: underline; }
   .kpi-pop .agent {
     display: inline-block; font-size: 9.5px; font-weight: 700;
     letter-spacing: .05em; text-transform: uppercase;
@@ -621,7 +643,7 @@
     padding: 18px 20px; position: relative; overflow: hidden; }
   .skeleton-card::after { content: ''; position: absolute; inset: 0; transform: translateX(-100%);
     background: linear-gradient(90deg, transparent, rgba(140,140,170,0.07), transparent); animation: shimmer 1.5s infinite; }
-  .sk-bar { background: var(--border-subtle); border-radius: 6px; }
+  .sk-bar { background: var(--border-subtle); border-radius: var(--r-sm); }
   @keyframes shimmer { 100% { transform: translateX(100%); } }
 
   /* ── Empty states ─────────────────────────────────────────────────────── */
@@ -695,7 +717,7 @@
   }
   .stat.done   { background: var(--good-bg); color: var(--good); }
   .stat.chrome { background: var(--warn-bg); color: var(--warn); }
-  .stat.input  { background: rgba(139,92,246,.10); color: var(--accent); }
+  .stat.input  { background: var(--accent-bg); color: var(--accent); }
   .stat.open   { background: var(--bad-bg); color: var(--bad); }
   .stat.noreg  { background: var(--border-subtle); color: var(--text-faint); }
   .actionrow .ev { font-size: var(--t-micro); color: var(--text-muted); font-style: italic; }
@@ -883,7 +905,7 @@
     flex-wrap: wrap;
   }
   .stat-strip-item { display: flex; flex-direction: column; gap: 2px; }
-  .stat-strip-val { font-size: 22px; font-weight: 650; letter-spacing: -.01em; line-height: 1; }
+  .stat-strip-val { font-size: 22px; font-weight: 650; letter-spacing: -.01em; line-height: 1; font-variant-numeric: tabular-nums; }
   .stat-strip-label {
     font-size: 10px; font-weight: 600; letter-spacing: .05em;
     text-transform: uppercase; color: var(--text-muted);
@@ -1091,6 +1113,6 @@
    window.CommandCentre / window.DecisionLog. */
 window.MOS_EMBEDDED = true;</script>
 <script src="./today-calendar.build.js?v=20260713"></script>
-<script src="./greta-app.js?v=1784135203512"></script>
+<script src="./greta-app.js?v=1784139349603"></script>
 <script>/* perf: defer frkl static deep-tab data (CVR ~1.7MB, cohorts, promos, products) — not used by the Overview/landing. Background-load after paint; skip for non-frkl (de-frkl). */
 (function(){try{var slug=window.OI_BRAND_SLUG||(window.parent&&window.parent!==window?window.parent.OI_BRAND_SLUG:null)||"frkl";if(slug!=="frkl")return;var files=["greta-cvr.js","greta-cohorts.js","greta-discount-codes.js","greta-products.js","greta-patterns.js"],i=0;function next(){if(i>=files.length)return;var s=document.createElement("script");s.src="./"+files[i++]+"?v=202607060755";s.async=true;s.onload=next;s.onerror=next;document.head.appendChild(s);}var kick=function(){next();};if(window.requestIdleCallback){window.requestIdleCallback(kick,{timeout:1500});}else{setTimeout(kick,300);}}catch(e){}})();</script>

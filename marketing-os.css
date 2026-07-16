@@ -29,7 +29,7 @@
   --color-danger:  var(--bad, #B91C1C);
 
   --font-sans: inherit;
-  --font-mono: 'SF Mono', 'JetBrains Mono', ui-monospace, monospace;
+  --font-mono: 'DM Mono', ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
 
   --text-xs:   var(--t-meta, 0.75rem);
   --text-sm:   var(--t-body, 0.875rem);
@@ -221,6 +221,22 @@
 .tdy-bar > i.tdy-behind { background: var(--color-warning); }
 .tdy-behind { color: var(--color-warning); }
 .tdy-plan-sub { font-size: var(--text-sm); color: var(--color-muted); }
+
+/* ── Today hover-detail popover (.tdy-pop) — mirrors the Overview .go-pop / KPI popover UX ── */
+.tdy-pop-host { position: relative; }
+.tdy-pop-host .tdy-pop {
+  position: absolute; top: 100%; left: 0; right: 0; margin-top: var(--space-2);
+  background: var(--color-panel); border: 1px solid var(--color-line); border-radius: var(--radius-md);
+  padding: var(--space-3); opacity: 0; pointer-events: none;
+  transition: opacity var(--transition-fast) 0.18s; z-index: 120; box-shadow: var(--shadow-raised);
+  display: flex; flex-direction: column; gap: var(--space-2); min-width: 260px;
+}
+/* invisible bridge over the seam so container→popout never drops :hover */
+.tdy-pop-host .tdy-pop::before { content: ''; position: absolute; left: 0; right: 0; top: -10px; height: 12px; }
+.tdy-pop-host:hover .tdy-pop { opacity: 1; pointer-events: auto; transition-delay: 0s; }
+.tdy-pop .tdy-pop-head { font-size: 9.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--color-muted); }
+.tdy-pop .tdy-pop-row { font-size: var(--text-xs); color: var(--color-muted); line-height: 1.5; display: flex; justify-content: space-between; gap: var(--space-3); }
+.tdy-pop .tdy-pop-row b { color: var(--color-ink); font-family: var(--font-mono); font-weight: 500; font-variant-numeric: tabular-nums; }
 
 .tdy-sec { font-size: var(--text-sm); font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: var(--color-muted); margin: 0 0 var(--space-3); }
 

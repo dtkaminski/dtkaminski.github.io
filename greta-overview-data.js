@@ -35,7 +35,12 @@
   function delta(cur, prev) { if (prev == null || prev === 0) return null; return (cur - prev) / prev * 100; }
   function win(end, days) { return { cs: addDays(end, -(days - 1)), ce: end, ps: addDays(end, -(2 * days - 1)), pe: addDays(end, -days) }; }
   function ragTrend(d) { if (d == null) return 'a'; return d >= -2 ? 'g' : d >= -15 ? 'a' : 'r'; }
-  function tile(k, v, fmt, d, cmp, rag, tgt) { return { k: k, v: v, fmt: fmt, d: d, cmp: cmp, rag: rag, tgt: tgt }; }
+  function tile(k, v, fmt, d, cmp, rag, tgt, series) { return { k: k, v: v, fmt: fmt, d: d, cmp: cmp, rag: rag, tgt: tgt, series: series || null }; }
+  // Daily [{d:'MM-DD', v}] series over [s,e] for a source array — feeds the hover pop-out sparkline.
+  function daySeries(arr, dk, s, e, vf) {
+    var by = {}, i; for (i = 0; i < (arr || []).length; i++) { var r = arr[i], dd = r[dk]; if (dd >= s && dd <= e) by[dd] = (by[dd] || 0) + vf(r); }
+    return Object.keys(by).sort().map(function (k) { return { d: k.slice(5), v: Math.round(by[k]) }; });
+  }
 
   // Individually-timed query: resolves to data or the default within ms; never rejects, never hangs.
   function safeQ(q, ms, def) {
@@ -195,23 +200,31 @@
         opc: n(c.orders_per_customer), repeatPct: c.repeat_ltv_share != null ? +(100 * c.repeat_ltv_share).toFixed(1) : null,
         goalConfirmed: c.goal_confirmed === true, verdict: verdict };
     })();
+    var _revSeries = daySeries(D.shopify, 'date', w.cs, w.ce, function (r) { return n(r.netSales); });
+    var _ordSeries = daySeries(D.shopify, 'date', w.cs, w.ce, function (r) { return n(r.orders); });
+    var _sessSeries = daySeries(D.ga4 || [], 'date', w.cs, w.ce, function (r) { return n(r.sessions); });
+    var _discSeries = daySeries(D.shopify, 'date', w.cs, w.ce, function (r) { return n(r.discounts); });
+    var _spendBy = {};
+    (D.metaDaily || []).forEach(function (r) { if (r.date >= w.cs && r.date <= w.ce) _spendBy[r.date] = (_spendBy[r.date] || 0) + n(r.cost); });
+    (D.googleAds || []).forEach(function (r) { if (r.date >= w.cs && r.date <= w.ce) _spendBy[r.date] = (_spendBy[r.date] || 0) + n(r.cost); });
+    var _spendSeries = Object.keys(_spendBy).sort().map(function (k) { return { d: k.slice(5), v: Math.round(_spendBy[k]) }; });
     return {
       pacing: pacing,
       cacBlock: cacBlock,
       periodLabel: LBL[tf][0] + ' · ' + w.cs + ' – ' + w.ce, compareLabel: LBL[tf][1],
       hero: { cmAfterMkt: CAM30, cm: productCM30, cmPct: +(S.cmRatio * 100).toFixed(1), spend: sp30, opProfit: CAM30 - fixedMonthly, fixedMonthly: fixedMonthly, targetEstimated: true, action: hero },
       business: [
-        tile('Revenue', rev, 'gbp', delta(rev, revP), 'vs ' + gbp(revP), ragTrend(delta(rev, revP)), 'Shopify truth (L1)'),
+        tile('Revenue', rev, 'gbp', delta(rev, revP), 'vs ' + gbp(revP), ragTrend(delta(rev, revP)), 'Shopify truth (L1)', _revSeries),
         tile('Contribution (product)', productCM, 'gbp', delta(productCM, productCMp), '= rev × ' + (S.cmRatio * 100).toFixed(1) + '%', ragTrend(delta(productCM, productCMp)), 'before ad spend'),
         tile('Contribution after mktg', CAM, 'gbp', null, '= product CM − spend', CAM >= 0 ? 'g' : 'r', 'CAM'),
         tile('Operating profit', opProfit, 'gbp', null, fixedMonthly > 0 ? '= CAM − fixed ' + gbp(fixedWin) : 'set fixed costs in Plan', fixedMonthly <= 0 ? 'n' : opProfit >= 0 ? 'g' : 'r', fixedMonthly > 0 ? 'after £' + f0(fixedMonthly) + '/mo' : '—'),
-        tile('Ad spend', spend, 'gbp', null, 'Meta ' + gbp(metaSp) + ' · Google ' + gbp(googleSp), 'a', mer != null ? 'MER ' + mer.toFixed(2) : ''),
+        tile('Ad spend', spend, 'gbp', null, 'Meta ' + gbp(metaSp) + ' · Google ' + gbp(googleSp), 'a', mer != null ? 'MER ' + mer.toFixed(2) : '', _spendSeries),
         tile('Conversion rate', cvr, 'pct1', delta(cvr, cvrP), cvrP != null ? 'vs ' + cvrP.toFixed(2) + '%' : '', cvr == null ? 'n' : cvr >= CVR_BENCH ? 'g' : cvr >= 1.2 ? 'a' : 'r', 'benchmark ' + CVR_BENCH + '%'),
-        tile('Sessions', sess, 'int', delta(sess, sessP), 'vs ' + f0(sessP).toLocaleString('en-GB'), ragTrend(delta(sess, sessP)), 'GA4'),
+        tile('Sessions', sess, 'int', delta(sess, sessP), 'vs ' + f0(sessP).toLocaleString('en-GB'), ragTrend(delta(sess, sessP)), 'GA4', _sessSeries),
         tile('AOV', aov, 'gbp', delta(aov, aovP), 'net ÷ orders', ragTrend(delta(aov, aovP)), 'vs ' + gbp(aovP)),
-        tile('Discounts', disc, 'gbp', null, discRate.toFixed(1) + '% of revenue', discRate > 25 ? 'r' : discRate > 20 ? 'a' : 'g', 'target <20%'),
+        tile('Discounts', disc, 'gbp', null, discRate.toFixed(1) + '% of revenue', discRate > 25 ? 'r' : discRate > 20 ? 'a' : 'g', 'target <20%', _discSeries),
         tile('Returns', ret, 'gbp', null, retRate.toFixed(1) + '% of revenue', retRate > 15 ? 'r' : retRate > 8 ? 'a' : 'g', 'healthy <8%'),
-        tile('Orders', ord, 'int', delta(ord, ordP), 'vs ' + f0(ordP).toLocaleString('en-GB'), ragTrend(delta(ord, ordP)), 'MER ' + (mer != null ? mer.toFixed(2) : '—'))
+        tile('Orders', ord, 'int', delta(ord, ordP), 'vs ' + f0(ordP).toLocaleString('en-GB'), ragTrend(delta(ord, ordP)), 'MER ' + (mer != null ? mer.toFixed(2) : '—'), _ordSeries)
       ],
       bestSellers: topSellers(S.items, w.cs, w.ce),
       customer: (function () {

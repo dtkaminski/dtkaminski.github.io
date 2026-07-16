@@ -10241,13 +10241,33 @@ const GO_FALLBACK = { monthly: {
 
 function GO_Dot(p){ return React.createElement('span',{style:Object.assign({width:7,height:7,borderRadius:'50%',display:'inline-block',background:GO_rag(p.r)},p.style||{})}); }
 
-function GO_Tile(p){ const t=p.t; return (
-  <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:8,padding:'14px 15px',position:'relative',boxShadow:'var(--shadow-panel)'}}>
+function GO_Tile(p){ const t=p.t; const _sr=(t.series&&t.series.length>1)?t.series:null;
+  const _stroke=t.rag==='r'?'#e96b73':t.rag==='g'?'#4ec98c':'#8B5CF6';
+  const _statusTxt=t.rag==='g'?'On track':t.rag==='a'?'Watch':t.rag==='r'?'Off target':'—';
+  return (
+  <div className="go-tile" style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:8,padding:'14px 15px',position:'relative',boxShadow:'var(--shadow-panel)'}}>
     {t.rag && <GO_Dot r={t.rag} style={{position:'absolute',top:12,right:12}}/>}
-    <div style={{fontSize:11.5,color:GO_T.mut}}>{t.k}</div>
+    <div style={{fontSize:11.5,color:GO_T.mut,display:'flex',alignItems:'center',gap:5}}>{t.k}<span className="go-dot" style={{width:4,height:4,borderRadius:'50%',background:GO_T.accent,display:'inline-block'}}/></div>
     <div style={{fontFamily:GO_T.mono,fontSize:23,fontWeight:600,margin:'8px 0 4px',letterSpacing:'-.5px',fontVariantNumeric:'tabular-nums'}}>{GO_fmt(t.v,t.fmt)}</div>
     <div style={{fontFamily:GO_T.mono,fontSize:11.5,color:t.d>0?GO_T.green:t.d<0?GO_T.red:GO_T.mut}}>{t.d!=null?GO_arrow(t.d)+' '+GO_pctv(Math.abs(t.d)).replace('+','')+' ':''}<span style={{color:GO_T.dim}}>{t.cmp}</span></div>
     {t.tgt && <div style={{fontSize:10.5,color:GO_T.dim,marginTop:5}}>{t.tgt}</div>}
+    <div className="go-pop">
+      <div className="go-head">{_sr?(t.k+' · trend over selected timeframe'):(t.k+' · detail')}</div>
+      {_sr && <R.ResponsiveContainer width="100%" height={92}>
+        <R.LineChart data={t.series} margin={{top:4,right:6,left:-6,bottom:0}}>
+          <R.CartesianGrid stroke="var(--color-line)" vertical={false}/>
+          <R.XAxis dataKey="d" tick={{fill:GO_T.dim,fontSize:8}} interval="preserveStartEnd" tickLine={false} axisLine={false}/>
+          <R.YAxis tick={{fill:GO_T.dim,fontSize:8}} width={30} tickFormatter={function(v){return Math.abs(v)>=1000?(v/1000).toFixed(0)+'k':Math.round(v);}}/>
+          <R.Tooltip contentStyle={{fontSize:10,background:'var(--color-panel)',border:'1px solid '+GO_T.line,borderRadius:6,padding:'2px 6px'}} labelStyle={{color:GO_T.dim}} formatter={function(v){return [GO_fmt(v,t.fmt),t.k];}}/>
+          <R.Line type="monotone" dataKey="v" stroke={_stroke} strokeWidth={2} dot={false} isAnimationActive={false}/>
+        </R.LineChart>
+      </R.ResponsiveContainer>}
+      {t.d!=null && <div className="go-row"><span>Change vs prior</span><b style={{color:t.d>0?GO_T.green:t.d<0?GO_T.red:GO_T.mut}}>{GO_arrow(t.d)+' '+GO_pctv(t.d)}</b></div>}
+      {t.cmp && <div className="go-row"><span>Detail</span><b>{t.cmp}</b></div>}
+      {t.tgt && <div className="go-row"><span>Target</span><b>{t.tgt}</b></div>}
+      <div className="go-row"><span>Status</span><b style={{color:GO_rag(t.rag)}}>{_statusTxt}</b></div>
+      <div className="go-ask" onClick={function(e){e.stopPropagation(); if(window.__oiAsk) window.__oiAsk('About "'+t.k+'" (currently '+GO_fmt(t.v,t.fmt)+'): what is driving this over the selected timeframe, and what should I do?');}}>Ask Greta about {t.k} →</div>
+    </div>
   </div>); }
 
 function GO_Insight(p){ const i=p.i; return (
@@ -10411,10 +10431,10 @@ function GP_Dot(p) { return React.createElement('span', { style: { width: 8, hei
 
 function GP_Metric(p) {
   return (
-    <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 10, padding: '10px 12px' }}>
+    <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 10, padding: '12px 14px' }}>
       <div style={{ fontSize: 11, color: GP_T.mut }}>{p.k}</div>
-      <div style={{ fontFamily: GP_T.mono, fontSize: 19, fontWeight: 600, marginTop: 3, color: p.hi ? GP_T.accent2 : GP_T.ink }}>{p.v}</div>
-      {p.sub && <div style={{ fontSize: 10.5, color: GP_T.dim, marginTop: 2 }}>{p.sub}</div>}
+      <div style={{ fontFamily: GP_T.mono, fontSize: 19, fontWeight: 600, marginTop: 4, color: p.hi ? GP_T.accent2 : GP_T.ink }}>{p.v}</div>
+      {p.sub && <div style={{ fontSize: 10.5, color: GP_T.dim, marginTop: 3 }}>{p.sub}</div>}
     </div>
   );
 }
@@ -10561,7 +10581,7 @@ function GretaPlanPanel() {
             <div style={{ fontSize: 11, letterSpacing: '.5px', textTransform: 'uppercase', color: GP_T.accent2 }}>Forecast vs goal</div>
             <div style={{ fontSize: 11.5, color: GP_T.dim }}>calendar-driven · covers {P.forecast.forecast_covers_from} – {P.forecast.forecast_covers_to}{Number(P.forecast.uncovered_days) > 0 ? ' · ' + P.forecast.uncovered_days + 'd beyond horizon' : ''}</div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 12 }}>
             <GP_Metric k="Forecast revenue" v={GP_gbp(P.forecast.forecast_revenue_period)} sub={'target ' + GP_gbp(P.forecast.revenue_target)} />
             <GP_Metric k="Forecast CAM" v={GP_gbp(P.forecast.forecast_cm_period)} hi={true} sub={'target ' + GP_gbp(P.forecast.contribution_margin_target)} />
             <GP_Metric k="From the calendar" v={GP_gbp(P.forecast.forecast_event_revenue_period)} sub={'CM ' + GP_gbp(P.forecast.forecast_event_cm_period)} />
@@ -10634,7 +10654,7 @@ function GretaPlanPanel() {
 
         {derived && (
           <div style={{ marginTop: 16 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 12 }}>
               <GP_Metric k="Revenue target" v={GP_gbp(derived.revenue_target)} />
               <GP_Metric k="Contribution (product)" v={GP_gbp(derived.product_cm_target)} sub={'× ' + Math.round((derived.cm_ratio_used || 0) * 100) + '%'} />
               <GP_Metric k="Contribution after mktg" v={GP_gbp(derived.cam_target)} hi={true} sub="the arbiter (CAM)" />

@@ -52,17 +52,37 @@ const GO_FALLBACK = { monthly: {
 
 function GO_Dot(p){ return React.createElement('span',{style:Object.assign({width:7,height:7,borderRadius:'50%',display:'inline-block',background:GO_rag(p.r)},p.style||{})}); }
 
-function GO_Tile(p){ const t=p.t; return (
-  <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:8,padding:'12px 13px',position:'relative',boxShadow:'var(--shadow-panel)'}}>
+function GO_Tile(p){ const t=p.t; const _sr=(t.series&&t.series.length>1)?t.series:null;
+  const _stroke=t.rag==='r'?'#e96b73':t.rag==='g'?'#4ec98c':'#8B5CF6';
+  const _statusTxt=t.rag==='g'?'On track':t.rag==='a'?'Watch':t.rag==='r'?'Off target':'—';
+  return (
+  <div className="go-tile" style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:8,padding:'14px 15px',position:'relative',boxShadow:'var(--shadow-panel)'}}>
     {t.rag && <GO_Dot r={t.rag} style={{position:'absolute',top:12,right:12}}/>}
-    <div style={{fontSize:11.5,color:GO_T.mut}}>{t.k}</div>
-    <div style={{fontFamily:GO_T.mono,fontSize:23,fontWeight:600,margin:'6px 0 3px',letterSpacing:'-.5px',fontVariantNumeric:'tabular-nums'}}>{GO_fmt(t.v,t.fmt)}</div>
+    <div style={{fontSize:11.5,color:GO_T.mut,display:'flex',alignItems:'center',gap:5}}>{t.k}<span className="go-dot" style={{width:4,height:4,borderRadius:'50%',background:GO_T.accent,display:'inline-block'}}/></div>
+    <div style={{fontFamily:GO_T.mono,fontSize:23,fontWeight:600,margin:'8px 0 4px',letterSpacing:'-.5px',fontVariantNumeric:'tabular-nums'}}>{GO_fmt(t.v,t.fmt)}</div>
     <div style={{fontFamily:GO_T.mono,fontSize:11.5,color:t.d>0?GO_T.green:t.d<0?GO_T.red:GO_T.mut}}>{t.d!=null?GO_arrow(t.d)+' '+GO_pctv(Math.abs(t.d)).replace('+','')+' ':''}<span style={{color:GO_T.dim}}>{t.cmp}</span></div>
-    {t.tgt && <div style={{fontSize:10.5,color:GO_T.dim,marginTop:4}}>{t.tgt}</div>}
+    {t.tgt && <div style={{fontSize:10.5,color:GO_T.dim,marginTop:5}}>{t.tgt}</div>}
+    <div className="go-pop">
+      <div className="go-head">{_sr?(t.k+' · trend over selected timeframe'):(t.k+' · detail')}</div>
+      {_sr && <R.ResponsiveContainer width="100%" height={92}>
+        <R.LineChart data={t.series} margin={{top:4,right:6,left:-6,bottom:0}}>
+          <R.CartesianGrid stroke="var(--color-line)" vertical={false}/>
+          <R.XAxis dataKey="d" tick={{fill:GO_T.dim,fontSize:8}} interval="preserveStartEnd" tickLine={false} axisLine={false}/>
+          <R.YAxis tick={{fill:GO_T.dim,fontSize:8}} width={30} tickFormatter={function(v){return Math.abs(v)>=1000?(v/1000).toFixed(0)+'k':Math.round(v);}}/>
+          <R.Tooltip contentStyle={{fontSize:10,background:'var(--color-panel)',border:'1px solid '+GO_T.line,borderRadius:6,padding:'2px 6px'}} labelStyle={{color:GO_T.dim}} formatter={function(v){return [GO_fmt(v,t.fmt),t.k];}}/>
+          <R.Line type="monotone" dataKey="v" stroke={_stroke} strokeWidth={2} dot={false} isAnimationActive={false}/>
+        </R.LineChart>
+      </R.ResponsiveContainer>}
+      {t.d!=null && <div className="go-row"><span>Change vs prior</span><b style={{color:t.d>0?GO_T.green:t.d<0?GO_T.red:GO_T.mut}}>{GO_arrow(t.d)+' '+GO_pctv(t.d)}</b></div>}
+      {t.cmp && <div className="go-row"><span>Detail</span><b>{t.cmp}</b></div>}
+      {t.tgt && <div className="go-row"><span>Target</span><b>{t.tgt}</b></div>}
+      <div className="go-row"><span>Status</span><b style={{color:GO_rag(t.rag)}}>{_statusTxt}</b></div>
+      <div className="go-ask" onClick={function(e){e.stopPropagation(); if(window.__oiAsk) window.__oiAsk('About "'+t.k+'" (currently '+GO_fmt(t.v,t.fmt)+'): what is driving this over the selected timeframe, and what should I do?');}}>Ask Greta about {t.k} →</div>
+    </div>
   </div>); }
 
 function GO_Insight(p){ const i=p.i; return (
-  <div style={{background:'var(--color-surface)',border:'1px solid #202742',borderRadius:11,padding:'13px 15px',marginTop:11}}>
+  <div style={{background:'var(--color-surface)',border:'1px solid #202742',borderRadius:11,padding:'15px 17px',marginTop:14}}>
     <div style={{display:'flex',alignItems:'center',gap:8,fontSize:11,letterSpacing:'.5px',textTransform:'uppercase',color:GO_T.accent2,marginBottom:6}}>
       <span style={{width:14,height:14,borderRadius:4,background:'linear-gradient(135deg,'+GO_T.accent+',#5563d6)',display:'inline-block'}}/> greta reads this
     </div>
@@ -73,7 +93,7 @@ function GO_Insight(p){ const i=p.i; return (
   </div>); }
 
 function GO_TierHead(p){ return (
-  <div style={{display:'flex',alignItems:'baseline',gap:10,margin:'0 2px 12px'}}>
+  <div style={{display:'flex',alignItems:'baseline',gap:10,margin:'0 2px 16px'}}>
     <span style={{fontFamily:GO_T.mono,fontSize:11,color:GO_T.accent2,border:'1px solid #2b3050',borderRadius:5,padding:'1px 6px'}}>{p.n}</span>
     <h2 style={{fontSize:15,margin:0,letterSpacing:'.2px'}}>{p.title}</h2>
     <span style={{fontSize:12,color:GO_T.dim}}>{p.sub}</span>
@@ -111,7 +131,7 @@ function GretaOverviewTiers(){
   return (
     <div style={wrap}>
       {toggle}
-      <div style={{background:'linear-gradient(180deg,'+GO_T.panel+','+GO_T.panel2+')',border:'1px solid '+GO_T.line,borderRadius:14,padding:'18px 20px',margin:'8px 0 6px',display:'flex',justifyContent:'space-between',gap:24,flexWrap:'wrap'}}>
+      <div style={{background:'linear-gradient(180deg,'+GO_T.panel+','+GO_T.panel2+')',border:'1px solid '+GO_T.line,borderRadius:14,padding:'20px 24px',margin:'8px 0 6px',display:'flex',justifyContent:'space-between',gap:24,flexWrap:'wrap'}}>
         <div>
           <div style={{fontSize:11,letterSpacing:'.6px',textTransform:'uppercase',color:GO_T.dim}}>Contribution after marketing · this period</div>
           <div style={{fontFamily:GO_T.mono,fontSize:38,fontWeight:600,margin:'4px 0 2px',letterSpacing:'-1px'}}>{GO_gbp(d.hero.cmAfterMkt)}</div>
@@ -127,11 +147,11 @@ function GretaOverviewTiers(){
       </div>
       <div style={{fontSize:11,color:GO_T.dim,margin:'4px 2px 0'}}>Factual read of synced Shopify · GA4 · Meta · Google · Klaviyo — not a projection. RAG is vs target; arrows vs previous period.</div>
 
-      <div style={{margin:'22px 0 8px'}}>
+      <div style={{margin:'28px 0 10px'}}>
         <GO_TierHead n="01" title="Business" sub="how the business is performing"/>
-        <div style={{display:'grid',gap:10,gridTemplateColumns:'repeat(5,1fr)'}}>
+        <div style={{display:'grid',gap:12,gridTemplateColumns:'repeat(5,1fr)'}}>
           {d.business.map((t,i)=><GO_Tile key={i} t={t}/>)}
-          <div style={{background:'var(--color-surface)',border:'1px solid #202742',borderRadius:11,padding:'12px 13px'}}>
+          <div style={{background:'var(--color-surface)',border:'1px solid #202742',borderRadius:11,padding:'14px 15px'}}>
             <div style={{fontSize:11.5,color:GO_T.mut}}>Best sellers →</div>
             <div style={{fontSize:12,color:GO_T.mut,marginTop:6,lineHeight:1.7}}>{d.bestSellers.map((s,i)=><div key={i}>{s.name} · {GO_gbp(s.rev)}</div>)}</div>
           </div>
@@ -140,9 +160,9 @@ function GretaOverviewTiers(){
         <GO_Insight i={d.insights.business}/>
       </div>
 
-      <div style={{margin:'22px 0 8px'}}>
+      <div style={{margin:'28px 0 10px'}}>
         <GO_TierHead n="02" title="Customer" sub="returning · new · paid-incremental (CTC)"/>
-        <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:8,padding:'11px 13px',boxShadow:'var(--shadow-panel)',marginBottom:10}}>
+        <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:8,padding:'13px 15px',boxShadow:'var(--shadow-panel)',marginBottom:10}}>
           <div style={{fontSize:11,color:GO_T.mut,marginBottom:6}}>New vs returning revenue</div>
           <div style={{display:'flex',height:9,borderRadius:5,overflow:'hidden',marginBottom:6}}><div style={{width:d.customer.splitNew+'%',background:GO_T.accent}}/><div style={{width:d.customer.splitRet+'%',background:'#2563EB'}}/></div>
           <div style={{fontFamily:GO_T.mono,fontSize:11.5}}><span style={{color:GO_T.accent}}>New {d.customer.splitNew}% · {GO_gbp(d.customer.newRev)}</span> &nbsp; <span style={{color:'#2563EB'}}>Ret {d.customer.splitRet}% · {GO_gbp(d.customer.retRev)}</span></div>
@@ -182,7 +202,7 @@ function GretaOverviewTiers(){
         <GO_Insight i={d.insights.customer}/>
       </div>
 
-      <div style={{margin:'22px 0 8px'}}>
+      <div style={{margin:'28px 0 10px'}}>
         <GO_TierHead n="03" title="Channel" sub="avg vs marginal iROAS — where the next £ goes (CTC)"/>
         <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:11,padding:'2px 4px',overflowX:'auto'}}>
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>

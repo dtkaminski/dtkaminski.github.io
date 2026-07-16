@@ -27,7 +27,7 @@
       var g = await s.from('mos_business_goal').select('*').eq('brand_id', b).lte('period_start', PERIOD.end).gte('period_end', PERIOD.start).order('created_at', { ascending: false }).limit(1);
       var cfg = await s.from('brand_config').select('gross_margin, variable_costs, fixed_costs_monthly, inventory_days, discount_rate_annual').eq('brand_id', b).limit(1);
       var fc = await s.from('vw_forecast_vs_goal').select('*').eq('brand_id', b).limit(1);
-      var ch = await s.from('vw_channel_scoreboard').select('channel_type,spend_30d,avg_iroas,break_even_iroas,target_marginal_iroas,marginal_cac,max_cac_first_order,status,action,focus_rank,phi_is_assumed,planned_spend,spend_pace_pct_of_plan,plan_target_iroas,plan_target_cac,plan_confirmed').eq('brand_id', b).order('focus_rank', { ascending: true });
+      var ch = await s.from('vw_channel_scoreboard').select('channel_type,spend_30d,avg_iroas,phi,break_even_iroas,target_marginal_iroas,break_even_reported_roas,target_reported_roas,target_is_ltv_adjusted,ltv_share,ltv_status,marginal_cac,max_cac_first_order,status,action,focus_rank,phi_is_assumed,planned_spend,spend_pace_pct_of_plan,plan_target_iroas,plan_target_cac,plan_confirmed').eq('brand_id', b).order('focus_rank', { ascending: true });
       window.FRKL_PLAN.readiness = (rd && rd.data) || [];
       window.FRKL_PLAN.goal = (g && g.data && g.data[0]) || null;
       window.FRKL_PLAN.config = (cfg && cfg.data && cfg.data[0]) || null;

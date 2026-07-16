@@ -13,7 +13,7 @@
   --color-data-3:   #2563EB;
   --color-data-4:   #7C3AED;
 
-  --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'DM Mono', 'Fira Code', ui-monospace, monospace;
 
   --text-xs:   0.75rem;

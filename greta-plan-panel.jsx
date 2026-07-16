@@ -14,10 +14,10 @@ function GP_Dot(p) { return React.createElement('span', { style: { width: 8, hei
 
 function GP_Metric(p) {
   return (
-    <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 10, padding: '10px 12px' }}>
+    <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 10, padding: '12px 14px' }}>
       <div style={{ fontSize: 11, color: GP_T.mut }}>{p.k}</div>
-      <div style={{ fontFamily: GP_T.mono, fontSize: 19, fontWeight: 600, marginTop: 3, color: p.hi ? GP_T.accent2 : GP_T.ink }}>{p.v}</div>
-      {p.sub && <div style={{ fontSize: 10.5, color: GP_T.dim, marginTop: 2 }}>{p.sub}</div>}
+      <div style={{ fontFamily: GP_T.mono, fontSize: 19, fontWeight: 600, marginTop: 4, color: p.hi ? GP_T.accent2 : GP_T.ink }}>{p.v}</div>
+      {p.sub && <div style={{ fontSize: 10.5, color: GP_T.dim, marginTop: 3 }}>{p.sub}</div>}
     </div>
   );
 }
@@ -164,7 +164,7 @@ function GretaPlanPanel() {
             <div style={{ fontSize: 11, letterSpacing: '.5px', textTransform: 'uppercase', color: GP_T.accent2 }}>Forecast vs goal</div>
             <div style={{ fontSize: 11.5, color: GP_T.dim }}>calendar-driven · covers {P.forecast.forecast_covers_from} – {P.forecast.forecast_covers_to}{Number(P.forecast.uncovered_days) > 0 ? ' · ' + P.forecast.uncovered_days + 'd beyond horizon' : ''}</div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 10 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 12 }}>
             <GP_Metric k="Forecast revenue" v={GP_gbp(P.forecast.forecast_revenue_period)} sub={'target ' + GP_gbp(P.forecast.revenue_target)} />
             <GP_Metric k="Forecast CAM" v={GP_gbp(P.forecast.forecast_cm_period)} hi={true} sub={'target ' + GP_gbp(P.forecast.contribution_margin_target)} />
             <GP_Metric k="From the calendar" v={GP_gbp(P.forecast.forecast_event_revenue_period)} sub={'CM ' + GP_gbp(P.forecast.forecast_event_cm_period)} />
@@ -237,7 +237,7 @@ function GretaPlanPanel() {
 
         {derived && (
           <div style={{ marginTop: 16 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 10 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 12 }}>
               <GP_Metric k="Revenue target" v={GP_gbp(derived.revenue_target)} />
               <GP_Metric k="Contribution (product)" v={GP_gbp(derived.product_cm_target)} sub={'× ' + Math.round((derived.cm_ratio_used || 0) * 100) + '%'} />
               <GP_Metric k="Contribution after mktg" v={GP_gbp(derived.cam_target)} hi={true} sub="the arbiter (CAM)" />
