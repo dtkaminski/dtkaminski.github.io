@@ -10383,28 +10383,28 @@ function GretaOverviewTiers(){
         {(d.customer.rows||[]).map(function(row,ri){return (
           <div key={ri} style={{display:'flex',alignItems:'stretch',gap:10,marginBottom:8,flexWrap:'wrap'}}>
             <div style={{minWidth:120,display:'flex',alignItems:'center',gap:7,fontSize:12.5,fontWeight:600}}><GO_Dot r={row.rag}/> {row.label}</div>
-            <div style={{flex:1,display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(115px,1fr))',gap:8}}>
-              {row.cells.map(function(c,ci){var ex=GO_EXPLAIN[c.k];return <div key={ci} className="go-tile" style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:8,padding:'8px 11px',boxShadow:'var(--shadow-panel)'}}><div style={{fontSize:10.5,color:GO_T.mut}}>{c.k}</div><div style={{fontFamily:GO_T.mono,fontSize:15,fontWeight:600,marginTop:1}}>{c.v}</div>{ex&&<div className="go-pop"><div className="go-head">{row.label} · {c.k}</div><div style={{fontSize:11.5,color:GO_T.mut,lineHeight:1.5}}>{ex}</div></div>}</div>;})}
+            <div style={{flex:1,display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:12}}>
+              {row.cells.map(function(c,ci){var ex=GO_EXPLAIN[c.k];return <div key={ci} className="go-tile" style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:8,padding:'14px 15px',boxShadow:'var(--shadow-panel)'}}><div style={{fontSize:11.5,color:GO_T.mut}}>{c.k}</div><div style={{fontFamily:GO_T.mono,fontSize:23,fontWeight:600,margin:'8px 0 4px'}}>{c.v}</div>{ex&&<div className="go-pop"><div className="go-head">{row.label} · {c.k}</div><div style={{fontSize:11.5,color:GO_T.mut,lineHeight:1.5}}>{ex}</div></div>}</div>;})}
             </div>
           </div>);})}
                 {d.cacBlock && (function(){ var C=d.cacBlock;
           var g2=function(x){return x==null?"—":"£"+Number(x).toFixed(2);};
           var rx=function(x){return x==null?"—":Number(x).toFixed(2)+"×";};
           var col=C.rag==="g"?GO_T.green:C.rag==="a"?GO_T.amber:C.rag==="r"?GO_T.red:GO_T.dim;
-          var cell=function(k,v,sub,hi){var ex=GO_EXPLAIN[(String(v).indexOf("×")>=0?"ROAS:":"CAC:")+k]||GO_EXPLAIN[k]||"";return <div className="go-tile" style={{background:GO_T.panel,border:"1px solid "+(hi||GO_T.line),borderRadius:8,padding:"9px 11px",boxShadow:"var(--shadow-panel)"}}><div style={{fontSize:10.5,color:GO_T.mut}}>{k}</div><div style={{fontFamily:GO_T.mono,fontSize:16,fontWeight:600,marginTop:2}}>{v}</div><div style={{fontSize:10,color:GO_T.dim}}>{sub}</div>{ex&&<div className="go-pop"><div className="go-head">{k}</div><div style={{fontSize:11.5,color:GO_T.mut,lineHeight:1.5}}>{ex}</div></div>}</div>;};
+          var cell=function(k,v,sub,hi){var ex=GO_EXPLAIN[(String(v).indexOf("×")>=0?"ROAS:":"CAC:")+k]||GO_EXPLAIN[k]||"";return <div className="go-tile" style={{background:GO_T.panel,border:"1px solid "+(hi||GO_T.line),borderRadius:8,padding:"14px 15px",boxShadow:"var(--shadow-panel)"}}><div style={{fontSize:11.5,color:GO_T.mut}}>{k}</div><div style={{fontFamily:GO_T.mono,fontSize:23,fontWeight:600,margin:"8px 0 4px"}}>{v}</div><div style={{fontSize:10.5,color:GO_T.dim}}>{sub}</div>{ex&&<div className="go-pop"><div className="go-head">{k}</div><div style={{fontSize:11.5,color:GO_T.mut,lineHeight:1.5}}>{ex}</div></div>}</div>;};
           var ltvSub=C.opc.toFixed(2)+" orders/cust"+(C.repeatPct!=null?" · "+C.repeatPct+"% repeat":"");
           var tgtSub=C.goalConfirmed?"from your goal":"profit-safe default";
           return <div style={{marginTop:2,marginBottom:6}}>
             <div style={{fontSize:10.5,color:GO_T.dim,textTransform:"uppercase",letterSpacing:".4px",margin:"0 2px 6px"}}>Acquisition efficiency · break-even &amp; optimal</div>
             <div style={{fontSize:10.5,color:GO_T.mut,margin:"0 2px 4px"}}>CAC — most you can pay per new customer</div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:8,marginBottom:9}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:12,marginBottom:9}}>
               {cell("Actual CAC (paid)",g2(C.cac.actual),"spend ÷ new custs",col)}
               {cell("Break-even · 1st order",g2(C.cac.first),"CM-positive on order 1")}
               {cell("Break-even · lifetime",g2(C.cac.ltv),ltvSub)}
               {cell("Target / optimal CAC",g2(C.cac.target),tgtSub)}
             </div>
             <div style={{fontSize:10.5,color:GO_T.mut,margin:"0 2px 4px"}}>ROAS — least you can accept (aMER)</div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:8}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:12}}>
               {cell("Actual ROAS (aMER)",rx(C.roas.actual),"new rev ÷ spend",col)}
               {cell("Break-even · 1st order",rx(C.roas.first),"= 1 ÷ contribution")}
               {cell("Break-even · lifetime",rx(C.roas.ltv),"LTV-adjusted floor")}
