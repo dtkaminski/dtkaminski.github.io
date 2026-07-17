@@ -58,7 +58,7 @@
       safeQ(sb.from('vw_brand_customer_economics_30d').select('new_customers, ncac, amer').eq('brand_id', brandId).limit(1), Q, null),
       safeQ(sb.from('vw_channel_iroas').select('channel_type, spend_30d, reported_roas, normalized_iroas, phi_applied').eq('brand_id', brandId), Q, []),
       safeQ(sb.from('vw_channel_iroas_targets').select('channel_type, target_true_iroas').eq('brand_id', brandId), Q, []),
-      safeQ(sb.from('vw_daily_new_vs_returning').select('order_date, customer_type, orders, net_revenue').eq('brand_id', brandId).gte('order_date', cutoff).order('order_date', { ascending: false }).limit(1000), Q, []),
+      safeQ(sb.from('vw_daily_new_vs_returning').select('order_date, customer_type, orders, net_revenue').eq('brand_id', brandId).eq('ledger', 'dtc').gte('order_date', cutoff).order('order_date', { ascending: false }).limit(1000), Q, []),
       safeQ(sb.from('v_tenant_shopify_lineitems_daily').select('day, product_title, units, revenue').eq('brand_id', brandId).gte('day', cutoff).order('day', { ascending: false }).limit(1000), Q, []),
       safeQ(sb.from('vw_brand_action_board').select('external_id, description, step1, priority, category, cm_gbp').eq('brand_id', brandId).order('cm_gbp', { ascending: false, nullsFirst: false }).limit(30), Q, []),
       safeQ(sb.from('vw_channel_effect').select('channel_type, family, spend_30d, attributed_rev_30d, phi, incremental_rev_30d, cost_30d, contribution_30d, drives, rev_per_send').eq('brand_id', brandId), Q, []),
@@ -67,11 +67,16 @@
       safeQ(sb.from('mos_business_goal').select('revenue_target, contribution_margin_target, spend_cap, period_start, period_end, confirmed').eq('brand_id', brandId).lte('period_start', new Date().toISOString().slice(0,10)).gte('period_end', new Date().toISOString().slice(0,10)).order('created_at', { ascending: false }).limit(1), Q, null),
       safeQ(sb.from('daily_forecast').select('day, revenue, spend, cm').eq('brand_id', brandId).order('day', { ascending: true }), Q, []),
       safeQ(sb.from('brand_config').select('fixed_costs_monthly, gross_margin').eq('brand_id', brandId).limit(1), Q, null),
-      safeQ(sb.from('vw_brand_efficiency_targets').select('actual_cac, breakeven_cac_first_order, breakeven_cac_ltv, target_cac, actual_roas, breakeven_roas_first_order, breakeven_roas_ltv, target_roas, goal_confirmed, cac_ltv_headroom, roas_ltv_headroom, orders_per_customer, repeat_ltv_share, status').eq('brand_id', brandId).limit(1), Q, null)
+      safeQ(sb.from('vw_brand_efficiency_targets').select('actual_cac, breakeven_cac_first_order, breakeven_cac_ltv, target_cac, actual_roas, breakeven_roas_first_order, breakeven_roas_ltv, target_roas, goal_confirmed, cac_ltv_headroom, roas_ltv_headroom, orders_per_customer, repeat_ltv_share, status').eq('brand_id', brandId).limit(1), Q, null),
+      // Canonical CTC customer-30d spine (single source for the Customer tier's split + ncac/amer).
+      safeQ(sb.from('vw_customer_tier_periods').select('window_label, net_sales, new_net, returning_net, new_customers, returning_customers, paid_spend, amer, ncac, new_rev_share, returning_rev_share').eq('brand_id', brandId).eq('window_label', 'current_30d').limit(1), Q, null),
+      // Canonical Shopify-truth net AOV (NOT brand_parameter_profile.aov, which is a stale fit-engine value).
+      safeQ(sb.from('vw_brand_aov').select('aov').eq('brand_id', brandId).eq('window_label', 'current_30d').limit(1), Q, null)
     ]);
     var cmRow = Array.isArray(r[0]) ? r[0][0] : r[0];
     var econRow = Array.isArray(r[1]) ? r[1][0] : r[1];
-    return { cmRatio: (cmRow && cmRow.cm_ratio) || 0.6, aov: (cmRow && cmRow.aov) || 55, econ: econRow || {}, iroas: r[2] || [], tgts: r[3] || [], nvr: r[4] || [], items: r[5] || [], board: r[6] || [], effect: r[7] || [], optimum: r[8] || [], email: (Array.isArray(r[9]) ? r[9][0] : r[9]) || null, goal: (Array.isArray(r[10]) ? r[10][0] : r[10]) || null, forecast: r[11] || [], config: (Array.isArray(r[12]) ? r[12][0] : r[12]) || null, cac: (Array.isArray(r[13]) ? r[13][0] : r[13]) || null };
+    var aovRow = Array.isArray(r[15]) ? r[15][0] : r[15];
+    return { cmRatio: (cmRow && cmRow.cm_ratio) || 0.6, aov: (aovRow && aovRow.aov) || 55, econ: econRow || {}, iroas: r[2] || [], tgts: r[3] || [], nvr: r[4] || [], items: r[5] || [], board: r[6] || [], effect: r[7] || [], optimum: r[8] || [], email: (Array.isArray(r[9]) ? r[9][0] : r[9]) || null, goal: (Array.isArray(r[10]) ? r[10][0] : r[10]) || null, forecast: r[11] || [], config: (Array.isArray(r[12]) ? r[12][0] : r[12]) || null, cac: (Array.isArray(r[13]) ? r[13][0] : r[13]) || null, tier: (Array.isArray(r[14]) ? r[14][0] : r[14]) || null };
   }
 
   function topSellers(items, s, e) {
@@ -93,7 +98,7 @@
       var icpa = (iroas && iroas > 0) ? aov / iroas : null;
       var o = omap[c.channel_type] || {};
       var marg = o.marginal_iroas == null ? null : n(o.marginal_iroas);
-      var tgt = o.target_marginal_iroas == null ? 1.23 : n(o.target_marginal_iroas);
+      var tgt = o.target_marginal_iroas == null ? (cmRatio > 0 ? +(1 / cmRatio).toFixed(2) : null) : n(o.target_marginal_iroas);
       var status = o.status || null, isEmail = c.family === "email";
       var rag = isEmail ? "g" : iroas == null ? "n" : (breakEven != null && iroas < breakEven) ? "r" : iroas >= tgt * 1.3 ? "g" : iroas < tgt ? "a" : "g";
       var verdict = isEmail ? ("returning" + (c.rev_per_send != null ? " · £" + f0(n(c.rev_per_send) * 1000) + "/1k sent" : ""))
@@ -151,13 +156,29 @@
     var mer = spend > 0 ? rev / spend : null;
     var cvr = sess > 0 ? ord / sess * 100 : null, cvrP = sessP > 0 ? ordP / sessP * 100 : null;
     var discRate = rev > 0 ? disc / rev * 100 : 0, retRate = rev > 0 ? ret / rev * 100 : 0;
-    var nNew = sumR(S.nvr, 'order_date', w.cs, w.ce, function (r) { return r.customer_type === 'new' ? n(r.net_revenue) : 0; });
-    var nRet = sumR(S.nvr, 'order_date', w.cs, w.ce, function (r) { return r.customer_type === 'returning' ? n(r.net_revenue) : 0; });
-    var nTot = nNew + nRet, splitNew = nTot > 0 ? +(nNew / nTot * 100).toFixed(1) : 0;
-    var newRev = f0(splitNew / 100 * rev), retRev = f0(rev - newRev);
-    var oNew = sumR(S.nvr, 'order_date', w.cs, w.ce, function (r) { return r.customer_type === 'new' ? n(r.orders) : 0; });
-    var oRet = sumR(S.nvr, 'order_date', w.cs, w.ce, function (r) { return r.customer_type === 'returning' ? n(r.orders) : 0; });
-    var repeat = (oNew + oRet) > 0 ? +(oRet / (oNew + oRet) * 100).toFixed(1) : 0;
+    // New/returning: decompose the CANONICAL L1 revenue (rev) + L1 orders (ord) by the new/returning
+    // PROPORTION — so the split ties to the business-tier revenue, not a second, larger total. For the
+    // 30d window use the canonical CTC share + ncac/amer from vw_customer_tier_periods (S.tier); other
+    // windows fall back to the vw_daily_new_vs_returning proportion. This makes the masthead £, the
+    // New/Returning revenue tiles, and aMER/CAC all reconcile to one basis.
+    var nNew0 = sumR(S.nvr, 'order_date', w.cs, w.ce, function (r) { return r.customer_type === 'new' ? n(r.net_revenue) : 0; });
+    var nRet0 = sumR(S.nvr, 'order_date', w.cs, w.ce, function (r) { return r.customer_type === 'returning' ? n(r.net_revenue) : 0; });
+    var oNew0 = sumR(S.nvr, 'order_date', w.cs, w.ce, function (r) { return r.customer_type === 'new' ? n(r.orders) : 0; });
+    var oRet0 = sumR(S.nvr, 'order_date', w.cs, w.ce, function (r) { return r.customer_type === 'returning' ? n(r.orders) : 0; });
+    var nvrTot = nNew0 + nRet0, ordTot0 = oNew0 + oRet0;
+    var tierRow = (days === 30 && S.tier) ? S.tier : null;
+    var revShareNew = tierRow && tierRow.new_rev_share != null ? n(tierRow.new_rev_share) : (nvrTot > 0 ? nNew0 / nvrTot : 0);
+    var splitNew = +(revShareNew * 100).toFixed(1);
+    var newRev = f0(revShareNew * rev), retRev = f0(rev - newRev);
+    var ordShareNew = ordTot0 > 0 ? oNew0 / ordTot0 : revShareNew;
+    var oNew = Math.round(ordShareNew * ord), oRet = Math.round(ord - oNew);
+    var repeat = ord > 0 ? +((oRet / ord) * 100).toFixed(1) : 0;
+    // aMER/CAC are 30d-canonical (vw_customer_tier_periods / vw_brand_customer_economics_30d are 30d
+    // views). Only show them on the 30d window; on other timeframes leave '—' rather than pin a 30d
+    // number to a 7d/90d revenue or recompute aMER a second way (F5).
+    var is30d = (days === 30);
+    var custNcac = (tierRow && tierRow.ncac != null) ? n(tierRow.ncac) : (is30d && S.econ && S.econ.ncac != null ? n(S.econ.ncac) : null);
+    var custAmer = (tierRow && tierRow.amer != null) ? n(tierRow.amer) : (is30d && S.econ && S.econ.amer != null ? n(S.econ.amer) : null);
     var ch = channelTable(S.effect, S.optimum, S.cmRatio, S.aov);
     var m30 = win(endS, 30), wg30 = win(endG, 30);
     var r30 = sumR(D.shopify, 'date', m30.cs, m30.ce, function (r) { return n(r.netSales); });
@@ -228,7 +249,7 @@
       ],
       bestSellers: topSellers(S.items, w.cs, w.ce),
       customer: (function () {
-        var retAov = oRet > 0 ? nRet / oRet : 0, newAov = oNew > 0 ? nNew / oNew : 0;
+        var retAov = oRet > 0 ? retRev / oRet : 0, newAov = oNew > 0 ? newRev / oNew : 0;
         var paidRows = (S.effect || []).filter(function (e) { return e.family === "paid"; });
         var pRev = paidRows.reduce(function (a, e) { return a + n(e.incremental_rev_30d); }, 0);
         var pSpend = paidRows.reduce(function (a, e) { return a + n(e.spend_30d); }, 0);
@@ -237,12 +258,12 @@
           splitNew: splitNew, splitRet: +(100 - splitNew).toFixed(1), newRev: newRev, retRev: retRev,
           rows: [
             { label: "Returning", rag: repeat >= 30 ? "g" : repeat >= 20 ? "a" : "r", cells: [
-              { k: "Revenue", v: gbp(nRet) }, { k: "Orders", v: f0(oRet).toLocaleString("en-GB") },
+              { k: "Revenue", v: gbp(retRev) }, { k: "Orders", v: f0(oRet).toLocaleString("en-GB") },
               { k: "AOV", v: gbp(retAov) }, { k: "Repeat rate", v: repeat + "%" } ] },
             { label: "New", rag: "g", cells: [
-              { k: "Revenue", v: gbp(nNew) }, { k: "Orders", v: f0(oNew).toLocaleString("en-GB") },
-              { k: "AOV", v: gbp(newAov) }, { k: "Weighted CAC", v: S.econ.ncac == null ? "—" : gbp(n(S.econ.ncac)) },
-              { k: "aMER", v: S.econ.amer == null ? "—" : n(S.econ.amer).toFixed(2) + "×" } ] },
+              { k: "Revenue", v: gbp(newRev) }, { k: "Orders", v: f0(oNew).toLocaleString("en-GB") },
+              { k: "AOV", v: gbp(newAov) }, { k: "Weighted CAC", v: custNcac == null ? "—" : gbp(custNcac) },
+              { k: "aMER", v: custAmer == null ? "—" : custAmer.toFixed(2) + "×" } ] },
             { label: "Paid · incremental", rag: pRev > pSpend ? "g" : "a", cells: [
               { k: "iRevenue", v: gbp(pRev) }, { k: "iOrders", v: f0(pOrders).toLocaleString("en-GB") },
               { k: "iAOV", v: gbp(newAov) }, { k: "iCAC", v: pOrders > 0 ? gbp(pSpend / pOrders) : "—" },
