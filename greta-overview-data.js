@@ -233,7 +233,7 @@
       pacing: pacing,
       cacBlock: cacBlock,
       periodLabel: LBL[tf][0] + ' · ' + w.cs + ' – ' + w.ce, compareLabel: LBL[tf][1],
-      hero: { cmAfterMkt: CAM30, cm: productCM30, cmPct: +(S.cmRatio * 100).toFixed(1), spend: sp30, opProfit: CAM30 - fixedMonthly, fixedMonthly: fixedMonthly, targetEstimated: true, action: hero },
+      hero: { cmAfterMkt: CAM, cm: productCM, cmPct: +(S.cmRatio * 100).toFixed(1), spend: spend, opProfit: opProfit, fixedMonthly: fixedMonthly, targetEstimated: true, action: hero },
       business: [
         tile('Revenue', rev, 'gbp', delta(rev, revP), 'vs ' + gbp(revP), ragTrend(delta(rev, revP)), 'Shopify truth (L1)', _revSeries),
         tile('Contribution (product)', productCM, 'gbp', delta(productCM, productCMp), '= rev × ' + (S.cmRatio * 100).toFixed(1) + '%', ragTrend(delta(productCM, productCMp)), 'before ad spend'),
