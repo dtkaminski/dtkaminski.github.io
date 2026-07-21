@@ -95,7 +95,7 @@
     var rows = (effect || []).slice().sort(function (a, b) { return n(b.contribution_30d) - n(a.contribution_30d); }).map(function (c) {
       var spend = n(c.spend_30d), incRev = n(c.incremental_rev_30d), phi = c.phi == null ? null : n(c.phi);
       var iroas = spend > 0 ? incRev / spend : null;
-      var icpa = (iroas && iroas > 0) ? aov / iroas : null;
+      var icpa = null; // per-channel iCPA needs per-channel orders (absent from vw_channel_effect); do NOT derive from the brand-wide AOV
       var o = omap[c.channel_type] || {};
       var marg = o.marginal_iroas == null ? null : n(o.marginal_iroas);
       var tgt = o.target_marginal_iroas == null ? (cmRatio > 0 ? +(1 / cmRatio).toFixed(2) : null) : n(o.target_marginal_iroas);
@@ -107,7 +107,7 @@
         : (iroas != null && breakEven != null && iroas < breakEven ? "below break-even" : "on target");
       return { name: c.channel_type.replace(/_/g, " ").replace(/\b\w/g, function (m) { return m.toUpperCase(); }),
         family: c.family, acquisition: c.drives !== "returning", spend: spend, incRev: incRev, phi: phi,
-        aov: aov, iroas: iroas, icpa: icpa, marginal: marg, tgt: tgt, status: status, rag: rag,
+        aov: null, iroas: iroas, icpa: icpa, marginal: marg, tgt: tgt, status: status, rag: rag,
         verdict: verdict, contribution: n(c.contribution_30d) };
     });
     return { rows: rows, breakEven: breakEven,

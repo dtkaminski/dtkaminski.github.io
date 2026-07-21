@@ -10419,14 +10419,13 @@ function GretaOverviewTiers(){
         <GO_TierHead n="03" title="Channel" sub="avg vs marginal iROAS — where the next £ goes (CTC)"/>
         <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:11,padding:'2px 4px',overflowX:'auto'}}>
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
-            <thead><tr>{['Channel','Spend','Incr rev','AOV','iCPA','iROAS','Marginal','Verdict'].map((h,i)=><th key={i} style={{textAlign:i===0?'left':'right',color:GO_T.dim,fontWeight:500,fontSize:10.5,textTransform:'uppercase',letterSpacing:'.4px',padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{h}</th>)}</tr></thead>
+            <thead><tr>{['Channel','Spend','Incr rev','CM','iROAS','Marginal','Verdict'].map((h,i)=><th key={i} style={{textAlign:i===0?'left':'right',color:GO_T.dim,fontWeight:500,fontSize:10.5,textTransform:'uppercase',letterSpacing:'.4px',padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{h}</th>)}</tr></thead>
             <tbody>{d.channel.map((c,i)=>(
               <tr key={i} style={{background:c.family==='email'?'var(--color-surface)':'none'}}>
                 <td style={{textAlign:'left',padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{c.name} <span style={{fontSize:10.5,color:c.family==='email'?GO_T.accent2:GO_T.mut}}>{c.family==='email'?'email':(c.acquisition?'acq':'retn')}{c.phi!=null?' · φ'+c.phi:''}</span></td>
                 <td style={{textAlign:'right',fontFamily:GO_T.mono,padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{GO_gbp(c.spend)}</td>
                 <td style={{textAlign:'right',fontFamily:GO_T.mono,padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{GO_gbp(c.incRev)}</td>
-                <td style={{textAlign:'right',fontFamily:GO_T.mono,padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{c.aov!=null?GO_gbp(c.aov):'—'}</td>
-                <td style={{textAlign:'right',fontFamily:GO_T.mono,padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{c.icpa!=null?GO_gbp(c.icpa):'—'}</td>
+                <td style={{textAlign:'right',fontFamily:GO_T.mono,color:(c.contribution!=null&&c.contribution<0)?GO_T.red:GO_T.ink,padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{c.contribution!=null?GO_gbp(c.contribution):'—'}</td>
                 <td style={{textAlign:'right',fontFamily:GO_T.mono,color:c.rag==='r'?GO_T.red:c.rag==='g'?GO_T.green:GO_T.ink,padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{c.iroas!=null?c.iroas.toFixed(2)+'×':'—'}</td>
                 <td style={{textAlign:'right',fontFamily:GO_T.mono,color:c.marginal!=null?(c.marginal>=c.tgt?GO_T.green:GO_T.amber):GO_T.dim,padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{c.marginal!=null?c.marginal.toFixed(2)+'×':'—'}</td>
                 <td style={{textAlign:'right',fontSize:11.5,padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}><GO_Dot r={c.rag}/> {c.verdict}</td>
