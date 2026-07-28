@@ -20,22 +20,30 @@
   function sb() { return window.FRKL_LIVE && window.FRKL_LIVE.sb; }
   function bid() { return window.FRKL_LIVE && window.FRKL_LIVE.brandId; }
 
+  function withTimeout(pr, ms) {
+    return Promise.race([
+      Promise.resolve(pr).catch(function (e) { return { data: null, error: e }; }),
+      new Promise(function (res) { setTimeout(function () { res({ data: null, error: { message: 'timeout' } }); }, ms); })
+    ]);
+  }
   async function refresh() {
     var s = sb(), b = bid(); if (!s || !b) return;
-    try {
-      var rd = await s.from('vw_brand_plan_readiness').select('section,item,status,detail,blocks_targets,ord').eq('brand_id', b).order('ord', { ascending: true });
-      var g = await s.from('mos_business_goal').select('*').eq('brand_id', b).lte('period_start', PERIOD.end).gte('period_end', PERIOD.start).order('created_at', { ascending: false }).limit(1);
-      var cfg = await s.from('brand_config').select('gross_margin, variable_costs, fixed_costs_monthly, inventory_days, discount_rate_annual').eq('brand_id', b).limit(1);
-      var fc = await s.from('vw_forecast_vs_goal').select('*').eq('brand_id', b).limit(1);
-      var ch = await s.from('vw_channel_scoreboard').select('channel_type,spend_30d,avg_iroas,phi,break_even_iroas,target_marginal_iroas,break_even_reported_roas,target_reported_roas,target_is_ltv_adjusted,ltv_share,ltv_status,marginal_cac,max_cac_first_order,status,action,focus_rank,phi_is_assumed,planned_spend,spend_pace_pct_of_plan,plan_target_iroas,plan_target_cac,plan_confirmed').eq('brand_id', b).order('focus_rank', { ascending: true });
-      window.FRKL_PLAN.readiness = (rd && rd.data) || [];
-      window.FRKL_PLAN.goal = (g && g.data && g.data[0]) || null;
-      window.FRKL_PLAN.config = (cfg && cfg.data && cfg.data[0]) || null;
-      window.FRKL_PLAN.forecast = (fc && fc.data && fc.data[0]) || null;
-      window.FRKL_PLAN.channels = (ch && ch.data) || [];
-      window.FRKL_PLAN.ready = true;
-      window.dispatchEvent(new CustomEvent('frkl-plan-updated'));
-    } catch (e) { if (window.console) console.warn('[plan] refresh failed', e); }
+    // Resilient: each query is independent + time-boxed, so one slow/failing view can't
+    // stall or wipe the whole plan feed. Core (goal + config + readiness) flips `ready` so the
+    // rail and Plan tab render; the heavy scoreboard/forecast views fill in afterwards.
+    var g = await withTimeout(s.from('mos_business_goal').select('*').eq('brand_id', b).lte('period_start', PERIOD.end).gte('period_end', PERIOD.start).order('created_at', { ascending: false }).limit(1), 8000);
+    if (g && g.data) window.FRKL_PLAN.goal = g.data[0] || null;
+    var cfg = await withTimeout(s.from('brand_config').select('gross_margin, variable_costs, fixed_costs_monthly, inventory_days, discount_rate_annual').eq('brand_id', b).limit(1), 8000);
+    if (cfg && cfg.data) window.FRKL_PLAN.config = cfg.data[0] || null;
+    var rd = await withTimeout(s.from('vw_brand_plan_readiness').select('section,item,status,detail,blocks_targets,ord').eq('brand_id', b).order('ord', { ascending: true }), 8000);
+    if (rd && rd.data) window.FRKL_PLAN.readiness = rd.data || [];
+    window.FRKL_PLAN.ready = true;
+    window.dispatchEvent(new CustomEvent('frkl-plan-updated'));
+    var fc = await withTimeout(s.from('vw_forecast_vs_goal').select('*').eq('brand_id', b).limit(1), 12000);
+    if (fc && fc.data) window.FRKL_PLAN.forecast = fc.data[0] || null;
+    var ch = await withTimeout(s.from('vw_channel_scoreboard').select('channel_type,spend_30d,avg_iroas,phi,break_even_iroas,target_marginal_iroas,break_even_reported_roas,target_reported_roas,target_is_ltv_adjusted,ltv_share,ltv_status,marginal_cac,max_cac_first_order,status,action,focus_rank,phi_is_assumed,planned_spend,spend_pace_pct_of_plan,plan_target_iroas,plan_target_cac,plan_confirmed').eq('brand_id', b).order('focus_rank', { ascending: true }), 12000);
+    if (ch && ch.data) window.FRKL_PLAN.channels = ch.data || [];
+    window.dispatchEvent(new CustomEvent('frkl-plan-updated'));
   }
   async function derive(amount, basis) {
     var s = sb(), b = bid(); if (!s || !b) return null;

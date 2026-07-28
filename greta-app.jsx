@@ -11624,7 +11624,7 @@ function GretaPlanRail(){
   },[]);
   const P  = (typeof window!=='undefined' && window.FRKL_PLAN) || null;
   const OV = (typeof window!=='undefined' && window.FRKL_OVERVIEW) || null;
-  if(!P || !P.ready) return null;
+  if(!P) return null;
   const goal = P.goal;
   const confirmed = !!(goal && goal.confirmed===true);
   const period = P.period || (goal ? {start:goal.period_start, end:goal.period_end} : null);
@@ -11655,6 +11655,10 @@ function GretaPlanRail(){
     </div>
   );
   const card = { background:PR_T.panel, border:'1px solid '+PR_T.line, borderRadius:12, padding:'13px 14px' };
+
+  if(!P.ready && !goal){
+    return (<div style={{display:'flex', flexDirection:'column', gap:10}}>{head}<div style={card}><div style={{fontSize:12.5, color:PR_T.mut}}>Loading your plan…</div></div></div>);
+  }
   if(!confirmed){
     return (
       <div style={{display:'flex', flexDirection:'column', gap:10}}>
