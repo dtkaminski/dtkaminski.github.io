@@ -522,7 +522,7 @@
   @media (max-width: 760px) { .toast-host { left: 12px; right: 12px; bottom: 12px; max-width: none; } }
 
   /* ── App shell — decision-led left rail ──────────────────────────────── */
-  .app-shell { display: flex; align-items: flex-start; max-width: 1460px; margin: 0 auto; }
+  .app-shell { display: flex; align-items: flex-start; max-width: 1800px; margin: 0 auto; }
   .sidebar {
     position: sticky; top: var(--appbar-h); align-self: flex-start;
     width: 214px; flex-shrink: 0; height: calc(100vh - var(--appbar-h));
@@ -551,6 +551,15 @@
   .nav-item.active .oi-ic { color: var(--accent); }
   .app-main { flex: 1; min-width: 0; overflow-x: clip; }
   .app-main .wrap { max-width: none; }
+  /* ── Global plan rail (persistent targets panel, right side) ── */
+  .plan-rail {
+    position: sticky; top: var(--appbar-h); align-self: flex-start;
+    width: 300px; flex-shrink: 0; height: calc(100vh - var(--appbar-h));
+    overflow-y: auto; padding: 16px 4px 28px; margin-left: 20px;
+    border-left: 1px solid var(--border-subtle);
+  }
+  .plan-rail:empty { display: none; }
+  @media (max-width: 1200px) { .plan-rail { display: none; } }
   .icon-btn {
     display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; flex-shrink: 0;
     border-radius: 8px; background: var(--bg-card); border: 1px solid var(--border-default);
@@ -1113,6 +1122,6 @@
    window.CommandCentre / window.DecisionLog. */
 window.MOS_EMBEDDED = true;</script>
 <script src="./today-calendar.build.js?v=20260720110730"></script>
-<script src="./greta-app.js?v=1784626682000"></script>
+<script src="./greta-app.js?v=1785245258780"></script>
 <script>/* perf: defer frkl static deep-tab data (CVR ~1.7MB, cohorts, promos, products) — not used by the Overview/landing. Background-load after paint; skip for non-frkl (de-frkl). */
 (function(){try{var slug=window.OI_BRAND_SLUG||(window.parent&&window.parent!==window?window.parent.OI_BRAND_SLUG:null)||"frkl";if(slug!=="frkl")return;var files=["greta-cvr.js","greta-cohorts.js","greta-discount-codes.js","greta-products.js","greta-patterns.js"],i=0;function next(){if(i>=files.length)return;var s=document.createElement("script");s.src="./"+files[i++]+"?v=202607060755";s.async=true;s.onload=next;s.onerror=next;document.head.appendChild(s);}var kick=function(){next();};if(window.requestIdleCallback){window.requestIdleCallback(kick,{timeout:1500});}else{setTimeout(kick,300);}}catch(e){}})();</script>

@@ -10350,7 +10350,24 @@ function GretaOverviewTiers(){
           <div style={{fontFamily:GO_T.mono,fontSize:38,fontWeight:600,margin:'4px 0 2px',letterSpacing:'-1px'}}>{GO_gbp(d.hero.cmAfterMkt)}</div>
           <div style={{fontSize:12.5,color:GO_T.mut}}>CM {GO_gbp(d.hero.cm)} ({d.hero.cmPct}%) − ad spend {GO_gbp(d.hero.spend)}{d.hero.targetEstimated && <span style={{color:GO_T.amber}}> · target auto-estimated — not yet confirmed</span>}</div>
         {d.hero.opProfit!=null && d.hero.fixedMonthly>0 && <div style={{fontSize:12,marginTop:2,color:(d.hero.opProfit>=0?GO_T.green:GO_T.red)}}>{'Operating profit '+GO_gbp(d.hero.opProfit)+' · after '+GO_gbp(d.hero.fixedMonthly)+'/mo fixed costs'}</div>}
-        {d.pacing && <div style={{fontSize:12,marginTop:4,color:(d.pacing.pacePct==null?GO_T.mut:(d.pacing.pacePct>=0?GO_T.green:GO_T.red))}}>{'Pace · '+GO_gbp(d.pacing.revActual)+' of '+GO_gbp(d.pacing.revTarget)+' revenue to date'+(d.pacing.pacePct!=null?(' · '+(d.pacing.pacePct>=0?'+':'')+d.pacing.pacePct+'%'):'')+' · '+(d.pacing.goalConfirmed?'your plan':'auto-estimated')}</div>}
+        {d.pacing && (function(){
+          var pct=d.pacing.pacePct;
+          var col = pct==null?GO_T.mut : pct>=-5?GO_T.green : pct>=-15?GO_T.amber : GO_T.red;
+          var lab = pct==null?'No pace yet' : pct>=5?'Ahead of plan' : pct>=-5?'On track' : pct>=-15?'Watch' : 'Behind plan';
+          var fill = pct==null?0:Math.max(0,Math.min(140,100+pct));
+          return (
+          <div style={{marginTop:10, maxWidth:470}}>
+            <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:5,flexWrap:'wrap'}}>
+              <span style={{display:'inline-flex',alignItems:'center',background:col,color:'#fff',fontSize:11,fontWeight:700,letterSpacing:'.4px',padding:'2px 10px',borderRadius:20}}>{lab.toUpperCase()}</span>
+              <span style={{fontSize:12.5,color:GO_T.mut}}>{GO_gbp(d.pacing.revActual)+' of '+GO_gbp(d.pacing.revTarget)+' expected to date'+(pct!=null?(' · '+(pct>=0?'+':'')+pct+'%'):'')}</span>
+            </div>
+            <div style={{position:'relative',height:8,borderRadius:5,background:'var(--color-surface)',overflow:'hidden'}}>
+              <div style={{position:'absolute',left:0,top:0,bottom:0,width:(fill/140*100)+'%',background:col,opacity:.9}}/>
+              <div style={{position:'absolute',left:(100/140*100)+'%',top:-1,bottom:-1,width:2,background:GO_T.dim}}/>
+            </div>
+            <div style={{fontSize:10.5,color:GO_T.dim,marginTop:4}}>{(d.pacing.goalConfirmed?'vs your confirmed plan':'vs auto-estimated target — confirm it in Plan')+' · the mark is exactly on pace'}</div>
+          </div>);
+        })()}
         </div>
         <div style={{minWidth:300,flex:1,background:'var(--color-panel)',border:'1px solid '+GO_T.line,borderLeft:'3px solid '+GO_T.accent,borderRadius:10,padding:'13px 15px'}}>
           <div><span style={{fontSize:10.5,fontFamily:GO_T.mono,letterSpacing:'.5px',color:GO_T.accent2,border:'1px solid #2b3050',borderRadius:5,padding:'1px 6px',marginRight:6}}>DO FIRST</span><span style={{fontSize:10.5,fontFamily:GO_T.mono,letterSpacing:'.5px',color:GO_T.red,border:'1px solid #4a2b2b',borderRadius:5,padding:'1px 6px'}}>{d.hero.action.value}</span></div>
@@ -10458,6 +10475,32 @@ function GP_Metric(p) {
       <div style={{ fontSize: 11, color: GP_T.mut }}>{p.k}</div>
       <div style={{ fontFamily: GP_T.mono, fontSize: 19, fontWeight: 600, marginTop: 4, color: p.hi ? GP_T.accent2 : GP_T.ink }}>{p.v}</div>
       {p.sub && <div style={{ fontSize: 10.5, color: GP_T.dim, marginTop: 3 }}>{p.sub}</div>}
+    </div>
+  );
+}
+
+function GP_Why(p){
+  var st = React.useState(false), open = st[0], setOpen = st[1];
+  var d = p.d; if(!d) return null;
+  var cac = p.cac;
+  var cmPct = Math.round((d.cm_ratio_used||0)*100);
+  var nc = Math.round(d.new_customer_target||0).toLocaleString('en-GB');
+  var line = { display:'flex', gap:8, padding:'7px 0', borderTop:'1px solid '+GP_T.line, fontSize:12.5, color:GP_T.mut, lineHeight:1.55 };
+  var num = { fontFamily:GP_T.mono, color:GP_T.ink, fontWeight:600 };
+  return (
+    <div style={{ marginTop:12 }}>
+      <button onClick={function(){ setOpen(!open); }} style={{ background:'none', border:'none', color:GP_T.accent2, fontSize:12.5, fontWeight:600, cursor:'pointer', padding:0, fontFamily:'inherit' }}>
+        {open?'▾':'▸'} Why are these the targets?
+      </button>
+      {open && (
+        <div style={{ marginTop:8, background:'var(--color-surface)', border:'1px solid '+GP_T.line, borderRadius:10, padding:'2px 14px 12px' }}>
+          <div style={line}><span><b style={{color:GP_T.ink}}>Revenue target</b> — your contribution goal grossed back up by your contribution margin. <span style={num}>{GP_gbp(d.cam_target)}</span> CAM &divide; {cmPct}% margin, plus the returning-customer baseline, &asymp; <span style={num}>{GP_gbp(d.revenue_target)}</span>.</span></div>
+          <div style={line}><span><b style={{color:GP_T.ink}}>Ad spend cap</b> — the revenue you must <i>buy</i>, &divide; your MER target. At MER <span style={num}>{d.mer_target}</span> (revenue &divide; ad spend), the plan needs at most <span style={num}>{GP_gbp(d.spend_cap)}</span> of spend.</span></div>
+          <div style={line}><span><b style={{color:GP_T.ink}}>New customers</b> — new-customer revenue &divide; aMER <span style={num}>{d.amer_used}</span> (how much revenue each &pound;1 of acquisition spend brings). That lands at <span style={num}>{nc}</span> new customers this quarter.</span></div>
+          <div style={line}><span><b style={{color:GP_T.ink}}>Target CAC</b> — the spend cap shared across those customers: <span style={num}>{GP_gbp(d.spend_cap)}</span> &divide; <span style={num}>{nc}</span> = <span style={num}>{cac==null?'—':'£'+cac.toFixed(2)}</span>. Pay more than this per new customer and you slip behind the profit plan; pay less and you have room to scale.</span></div>
+          <div style={{ fontSize:11, color:GP_T.dim, marginTop:9, lineHeight:1.5 }}>Every figure derives from your confirmed economics (contribution margin {cmPct}%, aMER {d.amer_used}). Change those on the economics panel above and the targets move with them.</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -10687,6 +10730,7 @@ function GretaPlanPanel() {
               <GP_Metric k="Target CAC (optimal)" v={targetCac == null ? '—' : '£' + targetCac.toFixed(2)} hi={true} sub="spend cap ÷ new custs" />
               <GP_Metric k="Operating profit" v={opTarget == null ? '—' : GP_gbp(opTarget)} sub={fixedForPeriod > 0 ? 'CAM − ' + GP_gbp(fixedForPeriod) + ' fixed' : 'set fixed costs above'} />
             </div>
+            <GP_Why d={derived} cac={targetCac}/>
             {g && (
               <div style={{ fontSize: 11.5, color: GP_T.dim, marginTop: 8 }}>
                 Current {g.confirmed ? 'confirmed' : 'provisional'} goal: revenue {GP_gbp(g.revenue_target)} · product CM {GP_gbp(g.contribution_margin_target)} · spend cap {GP_gbp(g.spend_cap)} · MER {g.mer_target}
@@ -11217,7 +11261,7 @@ function BusinessEconomicsPanel(){
   // A single labelled field with a provenance chip and a category-prior placeholder.
   const Field = ({ label, hint, unit, value, onChange, placeholder, saved, fallback, int }) => (
     <div style={{display:'flex', flexDirection:'column', gap:5}}>
-      <div style={{display:'flex', alignItems:'baseline', justifyContent:'space-between', gap:'var(--s-2)'}}>
+      <div style={{display:'flex', alignItems:'baseline', justifyContent:'space-between', gap:'var(--s-2)', minHeight:'2.6em'}}>
         <span style={{fontSize:12.5, fontWeight:600}}>{label}</span>
         <Tag saved={saved} fallback={fallback}/>
       </div>
@@ -11520,6 +11564,188 @@ function TeamPanel(){
   </div>);
 }
 
+// ── Global plan rail (persistent right-hand targets panel), rendered once in the app shell ──
+const PR_T = { line:'var(--color-line)', panel:'var(--color-panel)', surf:'var(--color-surface)', ink:'var(--color-ink)',
+  mut:'var(--color-muted)', dim:'#9a948c', accent:'var(--color-accent)', green:'var(--color-success)', amber:'var(--color-warning)', red:'var(--color-danger)', mono:'var(--font-mono)' };
+const PR_num = v => (v==null||v===''||isNaN(Number(v))) ? null : Number(v);
+const PR_gbp = n => { const v=PR_num(n); return v==null?'—':'£'+Math.round(v).toLocaleString('en-GB'); };
+const PR_gbpk = n => { const v=PR_num(n); if(v==null) return '—'; const a=Math.abs(v); return a>=1000 ? '£'+(v/1000).toFixed(a>=10000?0:1)+'k' : '£'+Math.round(v); };
+const PR_int = n => { const v=PR_num(n); return v==null?'—':Math.round(v).toLocaleString('en-GB'); };
+function PR_rag(pct){
+  if(pct==null) return { k:'n', label:'No pace yet', col:PR_T.dim };
+  if(pct>=5)   return { k:'g', label:'Ahead of plan', col:PR_T.green };
+  if(pct>=-5)  return { k:'g', label:'On track', col:PR_T.green };
+  if(pct>=-15) return { k:'a', label:'Slightly behind', col:PR_T.amber };
+  return { k:'r', label:'Behind plan', col:PR_T.red };
+}
+function PR_months(startISO, endISO){
+  try {
+    const s=new Date(startISO+'T00:00:00Z'), e=new Date(endISO+'T00:00:00Z');
+    if(isNaN(s)||isNaN(e)) return [];
+    const out=[]; let cur=new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth(), 1));
+    while(cur<=e){
+      const mStart=new Date(Math.max(cur.getTime(), s.getTime()));
+      const mEnd=new Date(Math.min(Date.UTC(cur.getUTCFullYear(), cur.getUTCMonth()+1, 0), e.getTime()));
+      out.push({ label: cur.toLocaleDateString('en-GB',{month:'short',timeZone:'UTC'}),
+        from:mStart, to:mEnd, days: Math.round((mEnd-mStart)/864e5)+1 });
+      cur=new Date(Date.UTC(cur.getUTCFullYear(), cur.getUTCMonth()+1, 1));
+    }
+    return out;
+  } catch(_) { return []; }
+}
+function PR_Bar({ pct }){
+  const v = pct==null ? null : Math.max(0, Math.min(140, 100 + pct));
+  const rag = PR_rag(pct);
+  return (
+    <div style={{marginTop:6}}>
+      <div style={{position:'relative', height:7, borderRadius:4, background:'var(--color-surface)', overflow:'hidden'}}>
+        <div style={{position:'absolute', left:0, top:0, bottom:0, width:(v==null?0:(v/140*100))+'%', background:rag.col, opacity:.85}}/>
+        <div style={{position:'absolute', left:(100/140*100)+'%', top:-1, bottom:-1, width:1.5, background:PR_T.dim}}/>
+      </div>
+    </div>
+  );
+}
+function PR_Row({ label, value, sub, hi }){
+  return (
+    <div style={{display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8, padding:'5px 0', borderTop:'1px solid '+PR_T.line}}>
+      <span style={{fontSize:11.5, color:PR_T.mut}}>{label}{sub && <span style={{color:PR_T.dim, fontSize:10.5}}> · {sub}</span>}</span>
+      <span style={{fontFamily:PR_T.mono, fontSize:13, fontWeight:hi?700:500, color:hi?PR_T.accent:PR_T.ink}}>{value}</span>
+    </div>
+  );
+}
+function GretaPlanRail(){
+  const [,force] = React.useState(0);
+  const [collapsed, setCollapsed] = React.useState(false);
+  React.useEffect(()=>{
+    const h=()=>force(x=>x+1);
+    const evs=['frkl-plan-updated','frkl-overview-updated','frkl-data-updated'];
+    evs.forEach(ev=>window.addEventListener(ev,h));
+    return ()=>evs.forEach(ev=>window.removeEventListener(ev,h));
+  },[]);
+  const P  = (typeof window!=='undefined' && window.FRKL_PLAN) || null;
+  const OV = (typeof window!=='undefined' && window.FRKL_OVERVIEW) || null;
+  if(!P || !P.ready) return null;
+  const goal = P.goal;
+  const confirmed = !!(goal && goal.confirmed===true);
+  const period = P.period || (goal ? {start:goal.period_start, end:goal.period_end} : null);
+  const openPlan = () => { if(window.__oiNav) window.__oiNav('home','plansetup'); };
+  let daysLeft=null, ended=false, qLabel='';
+  if(period && period.end){
+    const end=new Date(period.end+'T23:59:59Z'), now=new Date();
+    daysLeft=Math.ceil((end-now)/864e5); ended=daysLeft<0;
+    const qs=new Date(period.start+'T00:00:00Z');
+    qLabel='Q'+(Math.floor(qs.getUTCMonth()/3)+1)+' '+qs.getUTCFullYear();
+  }
+  const collapseBtn = (
+    <button onClick={()=>setCollapsed(true)} title="Hide plan"
+      style={{background:'none', border:'none', color:PR_T.dim, cursor:'pointer', fontSize:14, lineHeight:1, padding:2}}>›</button>
+  );
+  if(collapsed){
+    return (
+      <div style={{padding:'8px 2px'}}>
+        <button onClick={()=>setCollapsed(false)} title="Show plan"
+          style={{writingMode:'vertical-rl', transform:'rotate(180deg)', background:PR_T.panel, border:'1px solid '+PR_T.line, borderRadius:8, color:PR_T.mut, cursor:'pointer', fontSize:11, fontWeight:700, letterSpacing:'.5px', padding:'10px 5px'}}>‹ PLAN</button>
+      </div>
+    );
+  }
+  const head = (
+    <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:2}}>
+      <div style={{fontSize:11, letterSpacing:'.6px', textTransform:'uppercase', color:PR_T.accent, fontWeight:700}}>Your plan</div>
+      {collapseBtn}
+    </div>
+  );
+  const card = { background:PR_T.panel, border:'1px solid '+PR_T.line, borderRadius:12, padding:'13px 14px' };
+  if(!confirmed){
+    return (
+      <div style={{display:'flex', flexDirection:'column', gap:10}}>
+        {head}
+        <div style={{...card, borderColor:'var(--color-warning)'}}>
+          <div style={{fontSize:13.5, fontWeight:650, marginBottom:4}}>No goal set for this quarter</div>
+          <div style={{fontSize:12, color:PR_T.mut, lineHeight:1.5, marginBottom:11}}>
+            Greta needs a target to tell you whether you’re on track. Set one and this panel tracks your pace every day.
+          </div>
+          <button onClick={openPlan} style={{width:'100%', padding:'9px 12px', fontSize:12.5, fontWeight:650, border:0, borderRadius:8, background:PR_T.accent, color:'#fff', cursor:'pointer'}}>Set your goal →</button>
+        </div>
+      </div>
+    );
+  }
+  const rev   = PR_num(goal.revenue_target);
+  const spend = PR_num(goal.spend_cap);
+  const prodCM= PR_num(goal.contribution_margin_target);
+  const newC  = PR_num(goal.new_customer_target);
+  const camTgt= (prodCM!=null && spend!=null) ? prodCM - spend : null;
+  const cac   = (spend!=null && newC) ? spend/newC : null;
+  const mer   = PR_num(goal.mer_target);
+  const pacing = OV && ((OV.quarterly&&OV.quarterly.pacing) || (OV.monthly&&OV.monthly.pacing) || (OV.yearly&&OV.yearly.pacing)) || null;
+  const rag = PR_rag(pacing ? pacing.pacePct : null);
+  const months = period ? PR_months(period.start, period.end) : [];
+  const totalDays = months.reduce((a,m)=>a+m.days,0) || 1;
+  const today = new Date();
+  const curIdx = months.findIndex(m => today>=m.from && today<=m.to);
+  return (
+    <div style={{display:'flex', flexDirection:'column', gap:10}}>
+      {head}
+      <div style={card}>
+        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:8}}>
+          <div>
+            <div style={{fontSize:10.5, color:PR_T.dim, textTransform:'uppercase', letterSpacing:'.5px'}}>{qLabel} · {ended?'ended':daysLeft+' days left'}</div>
+            <div style={{display:'flex', alignItems:'center', gap:7, marginTop:3}}>
+              <span style={{width:9, height:9, borderRadius:'50%', background:rag.col, display:'inline-block'}}/>
+              <span style={{fontSize:14, fontWeight:700, color:rag.col}}>{rag.label}</span>
+            </div>
+          </div>
+          <button onClick={openPlan} style={{fontSize:11, color:PR_T.mut, background:'none', border:'1px solid '+PR_T.line, borderRadius:6, padding:'3px 8px', cursor:'pointer'}}>Edit</button>
+        </div>
+        {pacing && <React.Fragment>
+          <PR_Bar pct={pacing.pacePct}/>
+          <div style={{fontSize:11, color:PR_T.dim, marginTop:5}}>
+            Revenue {PR_gbpk(pacing.revActual)} of {PR_gbpk(pacing.revTarget)} expected so far{pacing.pacePct!=null ? ' · '+(pacing.pacePct>=0?'+':'')+pacing.pacePct+'%' : ''}
+          </div>
+        </React.Fragment>}
+        {!pacing && <div style={{fontSize:11, color:PR_T.dim, marginTop:6}}>Pace appears once this period has live sales data.</div>}
+      </div>
+      <div style={card}>
+        <div style={{fontSize:10.5, letterSpacing:'.5px', textTransform:'uppercase', color:PR_T.accent, marginBottom:2}}>Targets · this quarter</div>
+        <PR_Row label="Contribution (after mktg)" value={PR_gbp(camTgt)} hi={true}/>
+        <PR_Row label="Revenue" value={PR_gbp(rev)}/>
+        <PR_Row label="Ad spend cap" value={PR_gbp(spend)} sub={mer!=null?('MER '+mer):null}/>
+        <PR_Row label="Target CAC" value={cac==null?'—':'£'+cac.toFixed(2)} sub="cap ÷ new custs"/>
+        {newC!=null && <PR_Row label="New customers" value={PR_int(newC)}/>}
+      </div>
+      {months.length>1 && (
+        <div style={card}>
+          <div style={{fontSize:10.5, letterSpacing:'.5px', textTransform:'uppercase', color:PR_T.accent, marginBottom:6}}>Monthly checkpoints</div>
+          {months.map((m,i)=>{
+            const share=m.days/totalDays;
+            const isCur=i===curIdx, isPast=today>m.to;
+            return (
+              <div key={i} style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, padding:'5px 0', borderTop:i?'1px solid '+PR_T.line:'none', opacity:isPast?0.55:1}}>
+                <span style={{display:'flex', alignItems:'center', gap:6, fontSize:12, fontWeight:isCur?700:400, color:isCur?PR_T.ink:PR_T.mut}}>
+                  {isCur && <span style={{width:6, height:6, borderRadius:'50%', background:PR_T.accent, display:'inline-block'}}/>}
+                  {m.label}{isCur && <span style={{fontSize:9.5, color:PR_T.accent, border:'1px solid '+PR_T.line, borderRadius:4, padding:'0 4px'}}>now</span>}
+                </span>
+                <span style={{fontFamily:PR_T.mono, fontSize:12, color:isCur?PR_T.ink:PR_T.dim}}>
+                  {PR_gbpk(rev!=null?rev*share:null)} <span style={{color:PR_T.dim}}>rev</span>
+                </span>
+              </div>
+            );
+          })}
+          <div style={{fontSize:10.5, color:PR_T.dim, marginTop:7, lineHeight:1.45}}>Each month carries a share of the quarter target, weighted by its days. The current month is your live checkpoint.</div>
+        </div>
+      )}
+      {(ended || (daysLeft!=null && daysLeft<=10)) && (
+        <div style={{...card, borderColor:'var(--color-warning)'}}>
+          <div style={{fontSize:12.5, fontWeight:650, marginBottom:3}}>{ended?'This quarter has ended':'Quarter ends in '+daysLeft+' days'}</div>
+          <div style={{fontSize:11.5, color:PR_T.mut, lineHeight:1.5, marginBottom:9}}>Set next quarter’s goal so Greta keeps tracking your pace without a gap.</div>
+          <button onClick={openPlan} style={{width:'100%', padding:'8px 12px', fontSize:12, fontWeight:650, border:0, borderRadius:8, background:'var(--color-warning)', color:'#fff', cursor:'pointer'}}>Set next quarter’s goal →</button>
+        </div>
+      )}
+    </div>
+  );
+}
+if (typeof window!=='undefined') window.GretaPlanRail = GretaPlanRail;
+
+
 function App(){
   const [section, setSection] = useState('home');
   const [subTabBySection, setSubTabBySection] = useState(
@@ -11700,6 +11926,7 @@ function App(){
         {activeSubTab.component({start, period, customActive})}
           </div>
         </main>
+        <aside className="plan-rail"><GretaPlanRail/></aside>
       </div>
       {/* Product footer — quiet, signals "real product" */}
       <footer className="app-footer">
