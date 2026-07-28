@@ -43,6 +43,8 @@
     if (fc && fc.data) window.FRKL_PLAN.forecast = fc.data[0] || null;
     var ch = await withTimeout(s.from('vw_channel_scoreboard').select('channel_type,spend_30d,avg_iroas,phi,break_even_iroas,target_marginal_iroas,break_even_reported_roas,target_reported_roas,target_is_ltv_adjusted,ltv_share,ltv_status,marginal_cac,max_cac_first_order,status,action,focus_rank,phi_is_assumed,planned_spend,spend_pace_pct_of_plan,plan_target_iroas,plan_target_cac,plan_confirmed').eq('brand_id', b).order('focus_rank', { ascending: true }), 12000);
     if (ch && ch.data) window.FRKL_PLAN.channels = ch.data || [];
+    var cm = await withTimeout(s.from('vw_channel_revenue_mix').select('window_label,channel,orders,net_revenue,aov,new_orders,returning_orders,new_revenue,returning_revenue,orders_with_discount,pct_of_revenue').eq('brand_id', b), 10000);
+    if (cm && cm.data) window.FRKL_PLAN.channelMix = cm.data || [];
     window.dispatchEvent(new CustomEvent('frkl-plan-updated'));
   }
   async function derive(amount, basis) {
@@ -94,7 +96,7 @@
       return { ok: true, data: r.data };
     } catch (e) { if (window.console) console.warn('[plan] deriveChannelPlan failed', e); return { ok: false, error: String((e && e.message) || e) }; }
   }
-  window.FRKL_PLAN = { ready: false, readiness: [], goal: null, config: null, forecast: null, channels: [], period: PERIOD, refresh: refresh, derive: derive, confirm: confirm, saveEconomics: saveEconomics, deriveChannelPlan: deriveChannelPlan };
+  window.FRKL_PLAN = { ready: false, readiness: [], goal: null, config: null, forecast: null, channels: [], channelMix: [], period: PERIOD, refresh: refresh, derive: derive, confirm: confirm, saveEconomics: saveEconomics, deriveChannelPlan: deriveChannelPlan };
   window.addEventListener('frkl-data-updated', refresh);
   var t = 0, iv = setInterval(function () { t++; if ((sb() && bid()) || t > 60) { clearInterval(iv); refresh(); } }, 500);
 })();

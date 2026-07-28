@@ -10505,6 +10505,46 @@ function GP_Why(p){
   );
 }
 
+function GP_ChannelMix(p){
+  var mix = p.mix || [];
+  var cur = mix.filter(function(r){ return r.window_label==='current_30d'; });
+  if(!cur.length) return null;
+  var prior = {}; mix.forEach(function(r){ if(r.window_label==='prior_30d') prior[r.channel]=Number(r.net_revenue); });
+  cur = cur.slice().sort(function(a,b){ return Number(b.net_revenue)-Number(a.net_revenue); });
+  var total = cur.reduce(function(a,r){ return a+Number(r.net_revenue); },0) || 1;
+  var LBL = {paid_social:'Paid social', paid_search:'Paid search', email:'Email', referral:'Referral', direct:'Direct', organic_social:'Organic social', organic_search:'Organic search', sms:'SMS'};
+  var PAID = {paid_social:1, paid_search:1};
+  var paidRev = cur.reduce(function(a,r){ return a + (PAID[r.channel]?Number(r.net_revenue):0); },0);
+  return (
+    <div style={{ background: GP_T.panel, border:'1px solid '+GP_T.line, borderRadius:12, padding:'14px 16px', marginBottom:16 }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+        <div style={{ fontSize:11, letterSpacing:'.5px', textTransform:'uppercase', color:GP_T.accent2 }}>Where revenue comes from &middot; last 30 days</div>
+        <span style={{ fontSize:11.5, color:GP_T.dim }}>paid {Math.round(100*paidRev/total)}% &middot; non-paid {Math.round(100*(1-paidRev/total))}%</span>
+      </div>
+      <div style={{ fontSize:12, color:GP_T.dim, marginBottom:10 }}>Shopify last-click attribution, reconciled to L1 revenue &mdash; the basis for bottom-up channel targets.</div>
+      {cur.map(function(r,i){
+        var rev=Number(r.net_revenue), pct=rev/total*100;
+        var pr=prior[r.channel], d=(pr && pr>0)?(rev/pr-1)*100:null;
+        var ret=Number(r.orders)>0?Math.round(100*Number(r.returning_orders)/Number(r.orders)):0;
+        var col=PAID[r.channel]?GP_T.accent:GP_T.green;
+        return (
+          <div key={i} style={{ padding:'7px 0', borderTop:'1px solid '+GP_T.line }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8, fontSize:12.5 }}>
+              <span style={{ fontWeight:600 }}>{LBL[r.channel]||r.channel}{r.channel==='referral' && Number(r.orders_with_discount)>0 ? <span style={{ color:GP_T.dim, fontWeight:400 }}> &middot; {r.orders_with_discount} coded</span> : null}</span>
+              <span style={{ fontFamily:GP_T.mono }}>{GP_gbp(rev)} <span style={{ color:GP_T.dim }}>({pct.toFixed(0)}%)</span>{d!=null ? <span style={{ color:d>=0?GP_T.green:GP_T.red, marginLeft:6 }}>{(d>=0?'▲':'▼')+Math.abs(d).toFixed(0)+'%'}</span> : null}</span>
+            </div>
+            <div style={{ position:'relative', height:5, borderRadius:3, background:'var(--color-surface)', margin:'5px 0 3px', overflow:'hidden' }}>
+              <div style={{ position:'absolute', left:0, top:0, bottom:0, width:pct+'%', background:col, opacity:0.8 }}/>
+            </div>
+            <div style={{ fontSize:10.5, color:GP_T.dim }}>{r.new_orders} new &middot; {r.returning_orders} returning ({ret}% ret) &middot; AOV {GP_gbp(r.aov)}</div>
+          </div>
+        );
+      })}
+      <div style={{ fontSize:11, color:GP_T.dim, marginTop:9, lineHeight:1.5 }}>Influencer/affiliate currently sits inside Referral &amp; Direct via discount codes &mdash; tag creator codes to split it out. Email is last-click here; Klaviyo credits more via open/click attribution.</div>
+    </div>
+  );
+}
+
 function GretaPlanPanel() {
   var P = (typeof window !== 'undefined' && window.FRKL_PLAN) || { readiness: [], goal: null, period: { start: '', end: '' } };
   var s = React.useState(0), tick = s[0], setTick = s[1];
@@ -10607,6 +10647,8 @@ function GretaPlanPanel() {
           })}
         </div>
       </div>
+
+      <GP_ChannelMix mix={P.channelMix}/>
 
       {/* economics editor — operating costs feed Operating Profit on the Overview */}
       <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 12, padding: '14px 16px', marginBottom: 16 }}>
