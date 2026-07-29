@@ -10505,6 +10505,58 @@ function GP_Why(p){
   );
 }
 
+function GP_ChannelHealth(p){
+  var h = p.h; if(!h) return null;
+  var noData = !h.has_data;
+  var ragCol = h.rag==='g'?GP_T.green : h.rag==='a'?GP_T.amber : h.rag==='r'?GP_T.red : GP_T.dim;
+  var ret = Number(h.returning_rev_share_pct)||0;
+  var prret = h.prior_returning_share_pct!=null?Number(h.prior_returning_share_pct):null;
+  var lo = Number(h.ret_low), hi = Number(h.ret_high);
+  var SCALE = 80, clamp = function(x){ return Math.max(0, Math.min(100, x/SCALE*100)); };
+  var d = prret!=null ? ret-prret : null;
+  var emailLc = h.email_share_lastclick_pct!=null?Number(h.email_share_lastclick_pct):null;
+  var emailPr = h.prior_email_share_lastclick_pct!=null?Number(h.prior_email_share_lastclick_pct):null;
+  var ed = (emailLc!=null && emailPr!=null) ? emailLc-emailPr : null;
+  return (
+    <div style={{ background: GP_T.panel, border:'1px solid '+GP_T.line, borderRadius:12, padding:'14px 16px', marginBottom:16 }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+        <div style={{ fontSize:11, letterSpacing:'.5px', textTransform:'uppercase', color:GP_T.accent2 }}>Retention balance &middot; new vs returning</div>
+        <span style={{ fontSize:11, color:GP_T.dim }}>{h.category} &middot; {h.band_source==='brand_override'?'custom band':'category default'}</span>
+      </div>
+      {noData ? (
+        <div style={{ fontSize:12.5, color:GP_T.dim }}>{h.guidance}</div>
+      ) : (
+        <div>
+          <div style={{ position:'relative', height:10, borderRadius:5, background:'var(--color-surface)', margin:'12px 0 5px' }}>
+            <div style={{ position:'absolute', left:clamp(lo)+'%', width:(clamp(hi)-clamp(lo))+'%', top:0, bottom:0, background:GP_T.green, opacity:0.28, borderRadius:5 }}/>
+            <div style={{ position:'absolute', left:'calc('+clamp(ret)+'% - 1px)', top:-3, bottom:-3, width:2, background:ragCol }}/>
+          </div>
+          <div style={{ display:'flex', justifyContent:'space-between', fontSize:10, color:GP_T.dim }}>
+            <span>0%</span><span>healthy {Math.round(lo)}&ndash;{Math.round(hi)}% returning</span><span>{SCALE}%</span>
+          </div>
+          <div style={{ fontSize:13.5, color:ragCol, fontWeight:600, margin:'11px 0 5px' }}>
+            {ret.toFixed(0)}% returning / {(100-ret).toFixed(0)}% new{d!=null ? <span style={{ fontSize:11, color:GP_T.dim, fontWeight:400 }}> &middot; {(d>=0?'▲':'▼')+Math.abs(d).toFixed(0)+'pts vs prior 30d'}</span> : null}
+          </div>
+          <div style={{ fontSize:12.5, color:GP_T.mut, lineHeight:1.55 }}>{h.guidance}</div>
+          <div style={{ display:'flex', gap:20, marginTop:11, paddingTop:10, borderTop:'1px solid '+GP_T.line, flexWrap:'wrap' }}>
+            <div>
+              <div style={{ fontSize:10.5, color:GP_T.dim }}>Email &middot; last-click</div>
+              <div style={{ fontFamily:GP_T.mono, fontSize:14 }}>{emailLc!=null?emailLc.toFixed(1)+'%':'—'}{ed!=null ? <span style={{ fontSize:10.5, color:ed>=0?GP_T.green:GP_T.red, marginLeft:5 }}>{(ed>=0?'▲':'▼')+Math.abs(ed).toFixed(1)}</span> : null}</div>
+              <div style={{ fontSize:10, color:GP_T.dim }}>target {Math.round(Number(h.email_low))}&ndash;{Math.round(Number(h.email_high))}%</div>
+            </div>
+            <div>
+              <div style={{ fontSize:10.5, color:GP_T.dim }}>Email &middot; Klaviyo</div>
+              <div style={{ fontFamily:GP_T.mono, fontSize:14 }}>{h.email_share_klaviyo_pct!=null?Number(h.email_share_klaviyo_pct).toFixed(0)+'%':'—'}</div>
+              <div style={{ fontSize:10, color:GP_T.dim }}>over-counts &mdash; context</div>
+            </div>
+          </div>
+          <div style={{ fontSize:11, color:GP_T.dim, marginTop:9, lineHeight:1.5 }}>Email is the main lever on this balance. Last-click is the reconciled floor; Klaviyo credits far more via open/click attribution. Bands are per-category and editable per brand.</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function GP_ChannelMix(p){
   var mix = p.mix || [];
   var cur = mix.filter(function(r){ return r.window_label==='current_30d'; });
@@ -10648,6 +10700,7 @@ function GretaPlanPanel() {
         </div>
       </div>
 
+      <GP_ChannelHealth h={P.channelHealth}/>
       <GP_ChannelMix mix={P.channelMix}/>
 
       {/* economics editor — operating costs feed Operating Profit on the Overview */}
