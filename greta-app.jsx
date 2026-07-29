@@ -10506,7 +10506,12 @@ function GP_Why(p){
 }
 
 function GP_ChannelHealth(p){
-  var h = p.h; if(!h) return null;
+  var h = p.h;
+  var es = React.useState(false), edit = es[0], setEdit = es[1];
+  var fs = React.useState(null), f = fs[0], setF = fs[1];
+  var bs = React.useState(false), busy = bs[0], setBusy = bs[1];
+  var ms = React.useState(null), msg = ms[0], setMsg = ms[1];
+  if(!h) return null;
   var noData = !h.has_data;
   var ragCol = h.rag==='g'?GP_T.green : h.rag==='a'?GP_T.amber : h.rag==='r'?GP_T.red : GP_T.dim;
   var ret = Number(h.returning_rev_share_pct)||0;
@@ -10517,13 +10522,33 @@ function GP_ChannelHealth(p){
   var emailLc = h.email_share_lastclick_pct!=null?Number(h.email_share_lastclick_pct):null;
   var emailPr = h.prior_email_share_lastclick_pct!=null?Number(h.prior_email_share_lastclick_pct):null;
   var ed = (emailLc!=null && emailPr!=null) ? emailLc-emailPr : null;
+  function openEdit(){ setF({ retLow:String(Math.round(lo)), retHigh:String(Math.round(hi)), emailLow:String(Math.round(Number(h.email_low))), emailHigh:String(Math.round(Number(h.email_high))) }); setMsg(null); setEdit(true); }
+  function setK(k,v){ setF(function(o){ var n=Object.assign({},o); n[k]=v.replace(/[^0-9.]/g,''); return n; }); }
+  function save(){ if(!window.FRKL_PLAN||!window.FRKL_PLAN.saveBands) return; setBusy(true); setMsg(null);
+    window.FRKL_PLAN.saveBands(f).then(function(r){ setBusy(false); if(r.ok){ setEdit(false); } else { setMsg(r.error||'failed'); } }); }
+  var inp = { background:'var(--color-surface)', border:'1px solid '+GP_T.line, borderRadius:7, color:GP_T.ink, fontFamily:GP_T.mono, fontSize:13, padding:'6px 8px', width:'100%', boxSizing:'border-box' };
   return (
     <div style={{ background: GP_T.panel, border:'1px solid '+GP_T.line, borderRadius:12, padding:'14px 16px', marginBottom:16 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
         <div style={{ fontSize:11, letterSpacing:'.5px', textTransform:'uppercase', color:GP_T.accent2 }}>Retention balance &middot; new vs returning</div>
-        <span style={{ fontSize:11, color:GP_T.dim }}>{h.category} &middot; {h.band_source==='brand_override'?'custom band':'category default'}</span>
+        <span style={{ fontSize:11, color:GP_T.dim }}>{h.category} &middot; {h.band_source==='brand_override'?'custom band':'category default'}{!edit ? <button onClick={openEdit} style={{ marginLeft:8, fontSize:11, color:GP_T.mut, background:'none', border:'1px solid '+GP_T.line, borderRadius:6, padding:'2px 7px', cursor:'pointer' }}>Edit band</button> : null}</span>
       </div>
-      {noData ? (
+      {edit && f ? (
+        <div style={{ marginTop:8 }}>
+          <div style={{ fontSize:12, color:GP_T.dim, marginBottom:8 }}>Set the healthy band for this brand. Leave as-is to keep the {h.category}-category default.</div>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+            <label style={{ fontSize:11, color:GP_T.mut }}>Returning share &mdash; low (%)<input style={Object.assign({marginTop:4},inp)} value={f.retLow} onChange={function(e){setK('retLow',e.target.value);}}/></label>
+            <label style={{ fontSize:11, color:GP_T.mut }}>Returning share &mdash; high (%)<input style={Object.assign({marginTop:4},inp)} value={f.retHigh} onChange={function(e){setK('retHigh',e.target.value);}}/></label>
+            <label style={{ fontSize:11, color:GP_T.mut }}>Email share &mdash; low (%)<input style={Object.assign({marginTop:4},inp)} value={f.emailLow} onChange={function(e){setK('emailLow',e.target.value);}}/></label>
+            <label style={{ fontSize:11, color:GP_T.mut }}>Email share &mdash; high (%)<input style={Object.assign({marginTop:4},inp)} value={f.emailHigh} onChange={function(e){setK('emailHigh',e.target.value);}}/></label>
+          </div>
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:12 }}>
+            <button onClick={save} disabled={busy} style={{ borderRadius:8, padding:'8px 15px', fontSize:13, border:'1px solid '+GP_T.accent, background:GP_T.accent, color:'#fff', fontWeight:600, cursor:'pointer' }}>{busy?'Saving…':'Save band'}</button>
+            <button onClick={function(){ setEdit(false); }} disabled={busy} style={{ borderRadius:8, padding:'8px 12px', fontSize:13, border:'1px solid '+GP_T.line, background:GP_T.panel, color:GP_T.ink, cursor:'pointer' }}>Cancel</button>
+            {msg ? <span style={{ fontSize:12, color:GP_T.red }}>{msg}</span> : null}
+          </div>
+        </div>
+      ) : noData ? (
         <div style={{ fontSize:12.5, color:GP_T.dim }}>{h.guidance}</div>
       ) : (
         <div>

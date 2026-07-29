@@ -98,7 +98,17 @@
       return { ok: true, data: r.data };
     } catch (e) { if (window.console) console.warn('[plan] deriveChannelPlan failed', e); return { ok: false, error: String((e && e.message) || e) }; }
   }
-  window.FRKL_PLAN = { ready: false, readiness: [], goal: null, config: null, forecast: null, channels: [], channelMix: [], channelHealth: null, period: PERIOD, refresh: refresh, derive: derive, confirm: confirm, saveEconomics: saveEconomics, deriveChannelPlan: deriveChannelPlan };
+  async function saveBands(f) {
+    var s = sb(), b = bid(); if (!s || !b || !f) return { ok: false, error: 'no session' };
+    var num = function (v) { return (v == null || v === '') ? null : Number(v); };
+    try {
+      var r = await s.rpc('fn_set_channel_bands', { p_brand: b, p_ret_low: num(f.retLow), p_ret_high: num(f.retHigh), p_email_low: num(f.emailLow), p_email_high: num(f.emailHigh) });
+      if (r.error) throw r.error;
+      await refresh();
+      return { ok: true };
+    } catch (e) { if (window.console) console.warn('[plan] saveBands failed', e); return { ok: false, error: String((e && e.message) || e) }; }
+  }
+  window.FRKL_PLAN = { ready: false, readiness: [], goal: null, config: null, forecast: null, channels: [], channelMix: [], channelHealth: null, period: PERIOD, refresh: refresh, derive: derive, confirm: confirm, saveEconomics: saveEconomics, deriveChannelPlan: deriveChannelPlan, saveBands: saveBands };
   window.addEventListener('frkl-data-updated', refresh);
   var t = 0, iv = setInterval(function () { t++; if ((sb() && bid()) || t > 60) { clearInterval(iv); refresh(); } }, 500);
 })();
