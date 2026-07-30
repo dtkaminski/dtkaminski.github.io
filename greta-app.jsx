@@ -1375,7 +1375,6 @@ function DailyPanel(){
       <h2 style={{margin:0}}>Today's view</h2>
       <span className="meta">Latest day in data: <b style={{color:'var(--text-secondary)'}}>{latest}</b> · data auto-updates daily</span>
     </div>
-    <TrackRecord/>
     <div className="row" style={{marginBottom:'var(--s-4)'}}>
       <KPI label="Latest-day spend" val={GBP(ySpend)} sub={`7d avg ${GBP(pSpendAvg)}`} series={sSpend} seriesLabel="Daily spend · last 14 days" current={ySpend} prior={pSpendAvg} />
       <KPI label="Latest-day revenue" val={GBP(yRev)} sub={`${NUM(yOrders)} orders · 7d avg ${GBP(pRevAvg)}`} series={sRev} seriesLabel="Daily revenue · last 14 days" current={yRev} prior={pRevAvg} goodDirection="up" />
@@ -3369,6 +3368,7 @@ function Overview({start, period, customActive}){
       {/* Hero — the answer to "what should I look at right now" */}
       <SetupProgressCard/>
       <ThisWeekHero/>
+      <TrackRecord/>
       {/* Crux verdict: compact scorecard strip + the diagnostic (with the £-bridge nested in its "thinking") */}
       <ScoresStrip metrics={cruxMetrics} windowLabel={`last ${CRUX_DAYS} days`}/>
       <DiagnosticCard metrics={dxMetrics} context={dxContext} period={customActive?null:period} onLogEvent={()=>setEvTick(t=>t+1)}/>
