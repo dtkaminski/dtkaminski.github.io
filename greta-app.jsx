@@ -3693,6 +3693,11 @@ function GpSpark({ series, color }) {
 }
 
 function GenomePanel() {
+  const [gate, setGate] = React.useState(null);
+  React.useEffect(function(){
+    var sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
+    if (sb && b) { sb.from('vw_marginal_econ_gate').select('s_star_status,reason').eq('brand_id', b).limit(1).then(function(r){ if (r && r.data) setGate(r.data[0] || null); }); }
+  }, []);
   const FIT = (typeof window !== 'undefined' && window.FRKL_FIT) || null;
   const p = FIT && FIT.parameters;
   if (!p || !p.cashConversion) return null; // pre-genome engine / no profile - render nothing
@@ -3774,12 +3779,20 @@ function GenomePanel() {
       <div className="row">
         <div style={{ flex: '1 1 240px' }}>
           {me.status === 'ok' ? (
+            (gate && gate.s_star_status === 'suppress') ? (
+              <div style={{ padding: '12px 13px', borderRadius: 'var(--r-sm)', background: 'var(--bg-app)', border: '1px dashed var(--border-subtle)' }}>
+                <div style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>Spend ceiling — not yet reliable</div>
+                <div className="micro" style={{ color: 'var(--text-faint)' }}>{gate.reason}</div>
+              </div>
+            ) : (
             <>
               <div className="mrow"><span className="k">Marginal CAC (next customer)</span><span className="v">{gpGBP2(me.marginalCac)}</span></div>
               <div className="mrow"><span className="k">Avg CAC (now)</span><span className="v">{gpGBP2(me.averageCac)}</span></div>
-              <div className="mrow"><span className="k">Profitable spend ceiling</span><span className="v">{gpGBP0(me.profitableSpendCeiling)}/mo</span></div>
+              <div className="mrow"><span className="k">Profitable spend ceiling{(gate && gate.s_star_status === 'provisional') ? <span className="pill" style={{ marginLeft: 6, fontSize: 9, background: 'rgba(251,191,36,.12)', color: warn, border: '1px solid rgba(251,191,36,.35)' }}>PROVISIONAL</span> : null}</span><span className="v">{(gate && gate.s_star_status === 'provisional') ? '~' : ''}{gpGBP0(me.profitableSpendCeiling)}/mo</span></div>
               <div className="mrow"><span className="k">Headroom vs current</span><span className="v" style={{ color: (me.spendHeadroom ?? 0) >= 0 ? good : bad }}>{gpPCT(me.spendHeadroomPct, 0)}</span></div>
+              {(gate && gate.s_star_status === 'provisional') ? <div className="micro" style={{ color: warn, marginTop: 4 }}>{gate.reason}</div> : null}
             </>
+            )
           ) : (
             <div style={{ padding: '12px 13px', borderRadius: 'var(--r-sm)', background: 'var(--bg-app)', border: '1px dashed var(--border-subtle)' }}>
               <div style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 4 }}>Marginal CAC &amp; spend ceiling — not yet available</div>
