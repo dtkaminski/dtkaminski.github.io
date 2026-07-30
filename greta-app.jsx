@@ -10410,7 +10410,11 @@ function OverviewSummary({d, tf}){
     if(!d || !d.hero || !Array.isArray(d.channel) || d.channel.length===0 || !d.pacing){ return; }
     var ASK = (typeof window!=='undefined' && window.OI_ASK) || (function(){ try{ return (window.parent && window.parent!==window) ? window.parent.OI_ASK : null; }catch(e){ return null; } })();
     if(!ASK || !ASK.endpoint){ setErr('nollm'); return; }
-    var key = 'oi_ovsum3_'+(ASK.brand_id||'')+'_'+(tf||'')+'_'+(d.periodLabel||'');
+    // Key the cache to the ACTUAL numbers (CAM + revenue-to-date), not just the period label,
+    // so the read can never show figures that no longer match the hero — a live data refresh
+    // changes the signature → cache miss → regenerate, keeping the read and the hero in lockstep.
+    var sig = Math.round(d.hero.cmAfterMkt||0)+'_'+Math.round((d.pacing&&d.pacing.revActual)||0);
+    var key = 'oi_ovsum3_'+(ASK.brand_id||'')+'_'+(tf||'')+'_'+(d.periodLabel||'')+'_'+sig;
     try{ var cached = sessionStorage.getItem(key); if(cached){ setTxt(cached); setErr(''); setLoading(false); return; } }catch(e){}
     var C = d.cacBlock || null;
     var compact = {
