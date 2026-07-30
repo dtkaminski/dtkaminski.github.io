@@ -699,8 +699,76 @@ function isLocallyDone(id){
   } catch(e){ return false; }
 }
 
+// ── Verification loop surface ─────────────────────────────────────────────────
+// Live-fetches each action's prediction contract + graded verdict (vw_action_verification_ui)
+// and the brand's track record (vw_action_scorecard_ui), keyed by external_id so ActionRow
+// can show "predicts X → result" and the top of the app can show the hit-rate. Reuses the
+// same window.FRKL_LIVE.sb client the S* gate uses.
+var OI_VERIFY = { map:{}, score:null, loaded:false, _started:false };
+function oiLoadVerification(){
+  try{
+    var sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
+    if(!sb || !b || OI_VERIFY._started) return; OI_VERIFY._started = true;
+    sb.from('vw_action_verification_ui')
+      .select('external_id,status,verdict,metric_label,metric_format,predicted_direction,predicted_magnitude_pct,baseline_value,current_value,predicted_window_days,is_matured')
+      .eq('brand_id', b).then(function(r){
+        if(r && r.data){ var m={}; r.data.forEach(function(x){ if(x.external_id) m[x.external_id]=x; }); OI_VERIFY.map=m; OI_VERIFY.loaded=true; try{window.dispatchEvent(new Event('oi-verify'));}catch(e){} }
+      });
+    sb.from('vw_action_scorecard_ui').select('*').eq('brand_id', b).limit(1).then(function(r){
+      if(r && r.data){ OI_VERIFY.score = r.data[0] || null; try{window.dispatchEvent(new Event('oi-verify'));}catch(e){} }
+    });
+  }catch(e){}
+}
+function useVerify(){
+  const [,f] = React.useState(0);
+  React.useEffect(function(){ oiLoadVerification(); var h=function(){ f(function(x){return x+1;}); }; window.addEventListener('oi-verify',h); return function(){ window.removeEventListener('oi-verify',h); }; }, []);
+  return OI_VERIFY;
+}
+function oiVfmt(v, f){
+  if(v==null) return '—';
+  if(f==='gbp') return curSym() + Math.round(v).toLocaleString('en-GB');
+  if(f==='pct') return (v*100).toFixed(1)+'%';
+  if(f==='ratio') return (+v).toFixed(2)+'×';
+  return Math.round(v).toLocaleString('en-GB');
+}
+function ActionContract({vf}){
+  if(!vf) return null;
+  const dir = vf.predicted_direction==='down' ? '↓' : '↑';
+  const mag = vf.predicted_magnitude_pct!=null ? ' ~'+Math.round(vf.predicted_magnitude_pct)+'%' : '';
+  const win = vf.predicted_window_days!=null ? ' within '+vf.predicted_window_days+'d' : '';
+  const predict = 'Predicts '+vf.metric_label+' '+dir+mag+win;
+  let result=null, rc='var(--text-faint)';
+  if(vf.verdict){
+    const V = {hit:['✓ hit','var(--good)'], miss:['✗ miss','var(--bad)'], flat:['– no move','var(--text-muted)']}[vf.verdict] || ['',''];
+    rc = V[1];
+    result = oiVfmt(vf.baseline_value, vf.metric_format)+' → '+oiVfmt(vf.current_value, vf.metric_format)+' · '+V[0];
+  } else if(vf.current_value!=null){
+    result = 'now '+oiVfmt(vf.current_value, vf.metric_format) + (vf.is_matured ? ' · grading due' : '');
+  }
+  return (<div className="ev" style={{marginTop:3, display:'flex', gap:8, flexWrap:'wrap', alignItems:'baseline'}}>
+    <span style={{color:'var(--accent)', fontWeight:600}}>◎ {predict}</span>
+    {result && <span style={{color:rc}}>{result}</span>}
+  </div>);
+}
+function TrackRecord({compact}){
+  const V = useVerify();
+  const s = V.score;
+  if(!s) return null;
+  const box = {display:'flex', alignItems:'center', gap:8, fontSize:12, padding:compact?'6px 10px':'8px 12px', border:'1px solid var(--color-line, #23252d)', borderRadius:6, background:'rgba(124,140,255,0.06)', margin: compact?'0 0 8px':'0 0 12px'};
+  if(!s.graded){
+    if(s.predicted_total>0) return (<div style={box}><span style={{color:'var(--accent)',fontWeight:700}}>◎ Verification loop live</span><span style={{color:'var(--text-muted)'}}>{s.predicted_total} predictions tracked · first grades pending</span></div>);
+    return null;
+  }
+  return (<div style={box}>
+    <span style={{color:'var(--accent)',fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',fontSize:10.5}}>Track record</span>
+    <span style={{fontWeight:600}}>{s.hits}/{s.graded} predicted actions hit</span>
+    <span style={{color: s.hit_rate_pct>=60?'var(--good)':s.hit_rate_pct>=40?'var(--warn)':'var(--bad)', fontWeight:700}}>{s.hit_rate_pct}%</span>
+    {s.awaiting_grade>0 && <span style={{color:'var(--text-muted)'}}>· {s.awaiting_grade} awaiting grade</span>}
+  </div>);
+}
 function ActionRow({a, area, onMark}){
   const st = STATUS[a.id] || {};
+  const V = useVerify(); const vf = V.map[a.id];
   const localDone = isLocallyDone(a.id);
   const effectiveStatus = localDone && st.status !== "verified-done" ? "verified-done" : st.status;
   const [statCls, statTxt] = statusBadge(effectiveStatus);
@@ -711,6 +779,7 @@ function ActionRow({a, area, onMark}){
     <div className="t" style={{flex:1}}>
       {linkify(a.text)}
       {ev && <div className="ev">{ev}</div>}
+      <ActionContract vf={vf}/>
       {isDone && st.impact && <ImpactLine impact={st.impact} resolvedAt={st.resolvedAt}/>}
     </div>
     {!isDone && onMark && <button className="markbtn" onClick={()=>onMark(a)}>Mark done</button>}
@@ -1306,6 +1375,7 @@ function DailyPanel(){
       <h2 style={{margin:0}}>Today's view</h2>
       <span className="meta">Latest day in data: <b style={{color:'var(--text-secondary)'}}>{latest}</b> · data auto-updates daily</span>
     </div>
+    <TrackRecord/>
     <div className="row" style={{marginBottom:'var(--s-4)'}}>
       <KPI label="Latest-day spend" val={GBP(ySpend)} sub={`7d avg ${GBP(pSpendAvg)}`} series={sSpend} seriesLabel="Daily spend · last 14 days" current={ySpend} prior={pSpendAvg} />
       <KPI label="Latest-day revenue" val={GBP(yRev)} sub={`${NUM(yOrders)} orders · 7d avg ${GBP(pRevAvg)}`} series={sRev} seriesLabel="Daily revenue · last 14 days" current={yRev} prior={pRevAvg} goodDirection="up" />
