@@ -10395,6 +10395,65 @@ function GO_TierHead(p){ return (
     <span style={{fontSize:12,color:GO_T.dim}}>{p.sub}</span>
   </div>); }
 
+// LLM performance read at the top of Overview. Grounded in the current snapshot (the same
+// Business/Customer/Channel tiers shown below), framework-led, always linked to the present +
+// the lever to pull. Live per view, cached per session by (brand, timeframe, period) so it
+// only calls the relay once per timeframe. Reuses the ask-data relay (window.OI_ASK).
+function OverviewSummary({d, tf}){
+  const [txt, setTxt] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+  const [err, setErr] = React.useState('');
+  React.useEffect(function(){
+    if(!d || !d.hero){ setTxt(''); return; }
+    var ASK = (typeof window!=='undefined' && window.OI_ASK) || (function(){ try{ return (window.parent && window.parent!==window) ? window.parent.OI_ASK : null; }catch(e){ return null; } })();
+    if(!ASK || !ASK.endpoint){ setErr('nollm'); return; }
+    var key = 'oi_ovsum_'+(ASK.brand_id||'')+'_'+(tf||'')+'_'+(d.periodLabel||'');
+    try{ var cached = sessionStorage.getItem(key); if(cached){ setTxt(cached); setErr(''); setLoading(false); return; } }catch(e){}
+    var compact = {
+      timeframe: tf, period: d.periodLabel, comparedTo: d.compareLabel,
+      business: { contributionAfterMarketing: d.hero.cmAfterMkt, contributionMargin: d.hero.cm, contributionMarginPct: d.hero.cmPct, adSpend: d.hero.spend, operatingProfit: d.hero.opProfit },
+      pacingVsPlan: d.pacing ? { pctVsTarget: d.pacing.pacePct, revActual: d.pacing.revActual, revTarget: d.pacing.revTarget, goalConfirmed: d.pacing.goalConfirmed } : null,
+      businessMetrics: (d.business||[]).map(function(t){ return {metric:t.k, value:t.v, rag:t.rag}; }),
+      customer: d.customer ? { newPct: d.customer.splitNew, returningPct: d.customer.splitRet, newRevenue: d.customer.newRev, returningRevenue: d.customer.retRev, cac: (d.customer.cacBlock && d.customer.cacBlock.cac) ? {actual:d.customer.cacBlock.cac.actual, target:d.customer.cacBlock.cac.target, breakevenLtv:d.customer.cacBlock.cac.ltv} : null } : null,
+      channel: Array.isArray(d.channel) ? d.channel.slice(0,8) : null,
+      highestPriorityAction: d.hero.action ? { title: d.hero.action.title, why: d.hero.action.why, value: d.hero.action.value } : null
+    };
+    var brand = (typeof OI_BRAND!=='undefined' && OI_BRAND) || {name:'the brand'};
+    setLoading(true); setErr('');
+    (async function(){
+      try{
+        var jwt=''; if(typeof ASK.getJwt==='function'){ try{ jwt=await ASK.getJwt(); }catch(e){} } else if(ASK.jwt){ jwt=ASK.jwt; }
+        var headers = jwt ? {'content-type':'application/json','authorization':'Bearer '+jwt} : {'content-type':'application/json','x-internal-secret':ASK.token||''};
+        var cur = (typeof curSym==='function') ? curSym() : '£';
+        var system = 'You are a senior D2C commercial operator for '+(brand.name||'the brand')+' ('+((brand.markets||'')+' '+(brand.vertical||'')).trim()+'). All monetary values are in '+cur+' — always use the '+cur+' symbol, never $. You are given the current Overview snapshot for the selected timeframe, structured by the hierarchy of metrics: Business (contribution after marketing = the single arbiter of health, contribution margin %, revenue vs plan, ad spend), Customer (new vs returning mix, CAC vs break-even), Channel (per-channel efficiency), plus the single highest-priority action already computed. '
+          + 'Write EXACTLY two sentences, ~45 words max total, plain prose — no lists, no preamble, no headings, no markdown, no greeting. '
+          + 'Sentence 1: how the store is performing over this '+(tf||'')+' timeframe, read through the framework — lead with contribution-after-marketing and whether it is ahead or behind plan, and cite the key number; never call revenue "healthy" without checking contribution margin and the new/returning mix. '
+          + 'Sentence 2: link it to the present — the single most important thing right now and the one lever to pull (use the highest-priority action if it fits). Direct, specific, operator-to-operator. Output only the two sentences.';
+        var user = 'Snapshot JSON:\n'+JSON.stringify(compact)+'\n\nWrite the two-sentence read now.';
+        var resp = await fetch(ASK.endpoint, { method:'POST', headers, body: JSON.stringify({ system: system, messages:[{role:'user', content:user}], model:'claude-sonnet-4-5', brand_id: ASK.brand_id }) });
+        if(!resp.ok){ throw new Error(String(resp.status)); }
+        var data = await resp.json();
+        if(data.error){ throw new Error(data.detail||data.error); }
+        var out = (data.text||'').trim();
+        if(!out){ throw new Error('empty'); }
+        setTxt(out); try{ sessionStorage.setItem(key, out); }catch(e){}
+      }catch(e){ setErr('unavailable'); }
+      finally{ setLoading(false); }
+    })();
+  }, [d && d.periodLabel, tf]);
+
+  if(err==='nollm') return null;   // public / no-auth workspace: no relay, skip silently
+  return (
+    <div style={{background:GO_T.panel, border:'1px solid '+GO_T.line, borderLeft:'3px solid '+GO_T.accent, borderRadius:10, padding:'13px 16px', margin:'2px 0 6px'}}>
+      <div style={{fontSize:10, fontWeight:700, letterSpacing:'.5px', textTransform:'uppercase', color:GO_T.accent, marginBottom:5}}>Performance read</div>
+      {(loading && !txt)
+        ? <div style={{fontSize:13, color:GO_T.mut, fontStyle:'italic'}}>Reading the numbers…</div>
+        : txt
+          ? <div style={{fontSize:13.5, lineHeight:1.55, color:GO_T.ink}}>{txt}</div>
+          : <div style={{fontSize:12.5, color:GO_T.mut}}>Performance read unavailable right now.</div>}
+    </div>
+  );
+}
 function GretaOverviewTiers(){
   const [tf,setTf] = React.useState('monthly');
   const [,GO_force] = React.useState(0);
@@ -10460,6 +10519,8 @@ function GretaOverviewTiers(){
         </div>
       </div>
       <div style={{fontSize:11,color:GO_T.dim,margin:'4px 2px 0'}}>Factual read of synced Shopify · GA4 · Meta · Google · Klaviyo — not a projection. RAG is vs target; arrows vs previous period.</div>
+
+      <OverviewSummary d={d} tf={tf}/>
 
       <div style={{margin:'28px 0 10px'}}>
         <GO_TierHead n="01" title="Business" sub="how the business is performing"/>
