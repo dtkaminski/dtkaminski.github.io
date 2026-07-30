@@ -16,4 +16,12 @@ let html = readFileSync(HTML, 'utf8');
 const v = String(Date.now());
 html = html.replace(/(greta-app\.js\?v=)[^"]+/, `$1${v}`);
 writeFileSync(HTML, html);
-console.log(`built greta-app.js (${size} chars) · cache-bust v=${v}`);
+
+// Also bump the app-shell's pointer to greta-dashboard.html — otherwise returning
+// visitors keep the cached shell (fixed ?v) and never fetch the rebuilt dashboard.
+const SHELL = join(DIR, 'app', 'index.html');
+let shell = readFileSync(SHELL, 'utf8');
+shell = shell.replace(/(greta-dashboard\.html\?v=)[^'"]+/, `$1${v}`);
+writeFileSync(SHELL, shell);
+
+console.log(`built greta-app.js (${size} chars) · cache-bust v=${v} (dashboard + shell)`);
