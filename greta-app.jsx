@@ -10404,10 +10404,13 @@ function OverviewSummary({d, tf}){
   const [loading, setLoading] = React.useState(false);
   const [err, setErr] = React.useState('');
   React.useEffect(function(){
-    if(!d || !d.hero){ setTxt(''); return; }
+    // Wait for the rich snapshot to finish loading before calling the LLM — firing on a
+    // half-loaded `d` (no channels / no pacing) produced a vague "not provided" read that
+    // then got cached. Require the channel table + pacing to be present.
+    if(!d || !d.hero || !Array.isArray(d.channel) || d.channel.length===0 || !d.pacing){ return; }
     var ASK = (typeof window!=='undefined' && window.OI_ASK) || (function(){ try{ return (window.parent && window.parent!==window) ? window.parent.OI_ASK : null; }catch(e){ return null; } })();
     if(!ASK || !ASK.endpoint){ setErr('nollm'); return; }
-    var key = 'oi_ovsum2_'+(ASK.brand_id||'')+'_'+(tf||'')+'_'+(d.periodLabel||'');
+    var key = 'oi_ovsum3_'+(ASK.brand_id||'')+'_'+(tf||'')+'_'+(d.periodLabel||'');
     try{ var cached = sessionStorage.getItem(key); if(cached){ setTxt(cached); setErr(''); setLoading(false); return; } }catch(e){}
     var C = d.cacBlock || null;
     var compact = {
@@ -10449,7 +10452,7 @@ function OverviewSummary({d, tf}){
       }catch(e){ setErr('unavailable'); }
       finally{ setLoading(false); }
     })();
-  }, [d && d.periodLabel, tf]);
+  }, [d && d.periodLabel, tf, (d && Array.isArray(d.channel)) ? d.channel.length : 0, (d && d.pacing) ? d.pacing.revActual : null]);
 
   if(err==='nollm') return null;   // public / no-auth workspace: no relay, skip silently
   return (
