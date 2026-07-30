@@ -12020,48 +12020,9 @@ function App(){
 
   return (
     <div>
-      {/* App bar — sticky, product chrome, workspace context */}
-      <div className="appbar">
-        <div className="appbar-inner">
-          {/* Brand logo + tagline removed here — the app shell (app/index.html) already renders
-              the greta wordmark + tagline above, so showing it again produced a duplicate header.
-              The dashboard bar now starts at the workspace chip. */}
-          <div className="workspace-chip">
-            <div className="dot"/>
-            <span>{OI_BRAND.name||'frkl'}</span>
-            <span style={{color:'var(--text-faint)',marginLeft:'var(--s-1)'}}>workspace</span>
-          </div>
-          <div className="appbar-spacer"/>
-          <button className="icon-btn" title="Search (⌘K)" aria-label="Open command menu" onClick={()=>window.__oiCommandOpen&&window.__oiCommandOpen()}><Icon name="search" size={15}/></button>
-          <ThemeToggle/>
-          <FreshnessChip/>
-          <div className="env-badge">Design partner</div>
-          {/* Single date control: presets by default; "Custom range…" reveals the two date
-              pickers inline (progressive disclosure) so there's never a double selector. */}
-          <select value={customActive ? '__custom' : period} aria-label="Time period"
-                  onChange={e=>{ const v=e.target.value;
-                    if(v==='__custom'){ setRangeStart(oiAddDays(REAL_END,-29)); setRangeEnd(REAL_END); }
-                    else { setRangeStart(''); setRangeEnd(''); setPeriod(v); } }}
-                  style={{background:'var(--bg-elevated)', border:'1px solid var(--border-subtle)', borderRadius:6, color:'var(--text-primary)', fontSize:12, padding:'4px 8px', cursor:'pointer'}}>
-            {PERIODS.map(p=>(<option key={p.key} value={p.key}>{p.label}</option>))}
-            <option value="__custom">Custom range…</option>
-          </select>
-          {customActive && (
-          <div className="seg" style={{gap:6, alignItems:'center', paddingLeft:8}} title="Custom date range — review any two dates">
-            <input type="date" aria-label="From date" value={rangeStart} min={REAL_START} max={REAL_END}
-                   onChange={e=>setRangeStart(e.target.value)}
-                   style={{background:'transparent', border:'1px solid var(--border-subtle)', borderRadius:6, color:'var(--text-primary)', fontSize:11, padding:'3px 6px', colorScheme:'light dark', cursor:'pointer'}}/>
-            <span style={{color:'var(--text-faint)', fontSize:11}}>→</span>
-            <input type="date" aria-label="To date" value={rangeEnd} min={rangeStart||REAL_START} max={REAL_END}
-                   onChange={e=>setRangeEnd(e.target.value)}
-                   style={{background:'transparent', border:'1px solid var(--border-subtle)', borderRadius:6, color:'var(--text-primary)', fontSize:11, padding:'3px 6px', colorScheme:'light dark', cursor:'pointer'}}/>
-            <button onClick={()=>{setRangeStart('');setRangeEnd('');}} title="Back to presets" style={{background:'transparent',border:'none',color:'var(--text-faint)',cursor:'pointer',fontSize:14,lineHeight:1,padding:'0 2px'}}>×</button>
-          </div>
-          )}
-          {/* Sign out removed — the app shell (app/index.html) already provides a single
-              "Log out" in the top bar; two sign-out controls were redundant. */}
-        </div>
-      </div>
+      {/* Inner app bar removed — the app shell (app/index.html) is now the SINGLE top bar
+          (brand + workspace + account nav + theme + log out). Search lives in the sidebar
+          below; the redundant per-dashboard "Last N days" date selector was removed. */}
       <div className="app-shell">
         <nav className="sidebar">
           <button className="nav-cmd" onClick={()=>window.__oiCommandOpen&&window.__oiCommandOpen()}>
