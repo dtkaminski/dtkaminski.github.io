@@ -10407,15 +10407,20 @@ function OverviewSummary({d, tf}){
     if(!d || !d.hero){ setTxt(''); return; }
     var ASK = (typeof window!=='undefined' && window.OI_ASK) || (function(){ try{ return (window.parent && window.parent!==window) ? window.parent.OI_ASK : null; }catch(e){ return null; } })();
     if(!ASK || !ASK.endpoint){ setErr('nollm'); return; }
-    var key = 'oi_ovsum_'+(ASK.brand_id||'')+'_'+(tf||'')+'_'+(d.periodLabel||'');
+    var key = 'oi_ovsum2_'+(ASK.brand_id||'')+'_'+(tf||'')+'_'+(d.periodLabel||'');
     try{ var cached = sessionStorage.getItem(key); if(cached){ setTxt(cached); setErr(''); setLoading(false); return; } }catch(e){}
+    var C = d.cacBlock || null;
     var compact = {
       timeframe: tf, period: d.periodLabel, comparedTo: d.compareLabel,
       business: { contributionAfterMarketing: d.hero.cmAfterMkt, contributionMargin: d.hero.cm, contributionMarginPct: d.hero.cmPct, adSpend: d.hero.spend, operatingProfit: d.hero.opProfit },
-      pacingVsPlan: d.pacing ? { pctVsTarget: d.pacing.pacePct, revActual: d.pacing.revActual, revTarget: d.pacing.revTarget, goalConfirmed: d.pacing.goalConfirmed } : null,
+      pacingVsPlan: d.pacing ? { pctVsTarget: d.pacing.pacePct, revActual: d.pacing.revActual, revTarget: d.pacing.revTarget,
+        shortfall: (d.pacing.revTarget!=null && d.pacing.revActual!=null) ? Math.round(d.pacing.revTarget - d.pacing.revActual) : null, goalConfirmed: d.pacing.goalConfirmed } : null,
       businessMetrics: (d.business||[]).map(function(t){ return {metric:t.k, value:t.v, rag:t.rag}; }),
-      customer: d.customer ? { newPct: d.customer.splitNew, returningPct: d.customer.splitRet, newRevenue: d.customer.newRev, returningRevenue: d.customer.retRev, cac: (d.customer.cacBlock && d.customer.cacBlock.cac) ? {actual:d.customer.cacBlock.cac.actual, target:d.customer.cacBlock.cac.target, breakevenLtv:d.customer.cacBlock.cac.ltv} : null } : null,
-      channel: Array.isArray(d.channel) ? d.channel.slice(0,8) : null,
+      customerMix: d.customer ? { newPct: d.customer.splitNew, returningPct: d.customer.splitRet, newRevenue: d.customer.newRev, returningRevenue: d.customer.retRev } : null,
+      customerSegments: (d.customer && d.customer.rows) ? d.customer.rows.map(function(r){ return {segment:r.label, rag:r.rag, metrics:(r.cells||[]).map(function(c){ return {k:c.k, v:c.v}; })}; }) : null,
+      acquisitionEconomics: C ? { rag:C.rag, cacActual:(C.cac&&C.cac.actual), cacBreakevenFirstOrder:(C.cac&&C.cac.first), cacBreakevenLtv:(C.cac&&C.cac.ltv), cacTarget:(C.cac&&C.cac.target), roasActual:(C.roas&&C.roas.actual), roasTarget:(C.roas&&C.roas.target), ordersPerCustomer:C.opc, repeatPct:C.repeatPct } : null,
+      channels: Array.isArray(d.channel) ? d.channel.map(function(c){ return {name:c.name, role:(c.family==='email'?'email':(c.acquisition?'acquisition':'retention')), spend:c.spend, incrementalRevenue:c.incRev, contribution:c.contribution, iroas:c.iroas, marginalIroas:c.marginal, targetIroas:c.tgt, rag:c.rag, verdict:c.verdict}; }) : null,
+      computedInsights: d.insights ? { business:d.insights.business, customer:d.insights.customer, channel:d.insights.channel } : null,
       highestPriorityAction: d.hero.action ? { title: d.hero.action.title, why: d.hero.action.why, value: d.hero.action.value } : null
     };
     var brand = (typeof OI_BRAND!=='undefined' && OI_BRAND) || {name:'the brand'};
@@ -10425,11 +10430,15 @@ function OverviewSummary({d, tf}){
         var jwt=''; if(typeof ASK.getJwt==='function'){ try{ jwt=await ASK.getJwt(); }catch(e){} } else if(ASK.jwt){ jwt=ASK.jwt; }
         var headers = jwt ? {'content-type':'application/json','authorization':'Bearer '+jwt} : {'content-type':'application/json','x-internal-secret':ASK.token||''};
         var cur = (typeof curSym==='function') ? curSym() : '£';
-        var system = 'You are a senior D2C commercial operator for '+(brand.name||'the brand')+' ('+((brand.markets||'')+' '+(brand.vertical||'')).trim()+'). All monetary values are in '+cur+' — always use the '+cur+' symbol, never $. You are given the current Overview snapshot for the selected timeframe, structured by the hierarchy of metrics: Business (contribution after marketing = the single arbiter of health, contribution margin %, revenue vs plan, ad spend), Customer (new vs returning mix, CAC vs break-even), Channel (per-channel efficiency), plus the single highest-priority action already computed. '
-          + 'Write EXACTLY two sentences, ~45 words max total, plain prose — no lists, no preamble, no headings, no markdown, no greeting. '
-          + 'Sentence 1: how the store is performing over this '+(tf||'')+' timeframe, read through the framework — lead with contribution-after-marketing and whether it is ahead or behind plan, and cite the key number; never call revenue "healthy" without checking contribution margin and the new/returning mix. '
-          + 'Sentence 2: link it to the present — the single most important thing right now and the one lever to pull (use the highest-priority action if it fits). Direct, specific, operator-to-operator. Output only the two sentences.';
-        var user = 'Snapshot JSON:\n'+JSON.stringify(compact)+'\n\nWrite the two-sentence read now.';
+        var system = 'You are a senior D2C growth operator for '+(brand.name||'the brand')+' ('+((brand.markets||'')+' '+(brand.vertical||'')).trim()+') working the CTC "hierarchy of metrics". All monetary values are in '+cur+' — always use '+cur+', never $. '
+          + 'You are given the current Overview snapshot: Business (contribution-after-marketing = the arbiter, contribution margin, revenue vs plan + the '+cur+' shortfall); Customer (new-vs-returning mix, per-segment metrics, and acquisitionEconomics = CAC actual vs break-even vs target, ROAS/aMER actual vs target, repeat rate); Channels (per channel: role, spend, incremental revenue, contribution, iROAS vs targetIroas, marginalIroas, verdict — read a POSITIVE iROAS-minus-target gap as over-efficient / UNDER-spending, and a NEGATIVE gap as inefficient / OVER-spending); pre-computed insights per tier; and the single highest-priority action. '
+          + 'Write a SPECIFIC diagnostic read of 3-4 sentences (~70-90 words), plain prose — no lists, no headings, no markdown, no greeting. Follow the CTC logic and NAME NAMES: '
+          + '(1) Lead with the business result for this '+(tf||'')+' window — contribution-after-marketing and whether it is ahead or behind PLAN, with the '+cur+' gap. '
+          + '(2) DECOMPOSE the gap: state whether it is a VOLUME problem (too little profitable spend / too few new customers) or an EFFICIENCY problem (CAC or iROAS off target) — say which. '
+          + '(3) PINPOINT the driver by name: the exact channel (quote its iROAS vs target and whether it is under- or over-spending) and/or the customer segment (new vs returning, with CAC vs target) causing the shortfall — lean on computedInsights and the channels table. '
+          + '(4) End on ONE specific lever: the precise reallocation or move, with the '+cur+' contribution impact if available. '
+          + 'Never say "hold course" if any channel is off its target or the business is behind plan. Be concrete, quantitative, operator-to-operator. Output only the read.';
+        var user = 'Snapshot JSON:\n'+JSON.stringify(compact)+'\n\nWrite the diagnostic read now.';
         var resp = await fetch(ASK.endpoint, { method:'POST', headers, body: JSON.stringify({ system: system, messages:[{role:'user', content:user}], model:'claude-sonnet-4-5', brand_id: ASK.brand_id }) });
         if(!resp.ok){ throw new Error(String(resp.status)); }
         var data = await resp.json();
