@@ -12036,44 +12036,30 @@ function App(){
           <ThemeToggle/>
           <FreshnessChip/>
           <div className="env-badge">Design partner</div>
-          <select value={customActive ? '' : period} aria-label="Time period"
-                  onChange={e=>{ if(e.target.value){ setRangeStart(''); setRangeEnd(''); setPeriod(e.target.value); } }}
+          {/* Single date control: presets by default; "Custom range…" reveals the two date
+              pickers inline (progressive disclosure) so there's never a double selector. */}
+          <select value={customActive ? '__custom' : period} aria-label="Time period"
+                  onChange={e=>{ const v=e.target.value;
+                    if(v==='__custom'){ setRangeStart(oiAddDays(REAL_END,-29)); setRangeEnd(REAL_END); }
+                    else { setRangeStart(''); setRangeEnd(''); setPeriod(v); } }}
                   style={{background:'var(--bg-elevated)', border:'1px solid var(--border-subtle)', borderRadius:6, color:'var(--text-primary)', fontSize:12, padding:'4px 8px', cursor:'pointer'}}>
-            {customActive && <option value="">Custom range</option>}
             {PERIODS.map(p=>(<option key={p.key} value={p.key}>{p.label}</option>))}
+            <option value="__custom">Custom range…</option>
           </select>
+          {customActive && (
           <div className="seg" style={{gap:6, alignItems:'center', paddingLeft:8}} title="Custom date range — review any two dates">
             <input type="date" aria-label="From date" value={rangeStart} min={REAL_START} max={REAL_END}
                    onChange={e=>setRangeStart(e.target.value)}
-                   style={{background:'transparent', border:'1px solid var(--border-subtle)', borderRadius:6, color: customActive?'var(--text-primary)':'var(--text-muted)', fontSize:11, padding:'3px 6px', colorScheme:'light dark', cursor:'pointer'}}/>
+                   style={{background:'transparent', border:'1px solid var(--border-subtle)', borderRadius:6, color:'var(--text-primary)', fontSize:11, padding:'3px 6px', colorScheme:'light dark', cursor:'pointer'}}/>
             <span style={{color:'var(--text-faint)', fontSize:11}}>→</span>
             <input type="date" aria-label="To date" value={rangeEnd} min={rangeStart||REAL_START} max={REAL_END}
                    onChange={e=>setRangeEnd(e.target.value)}
-                   style={{background:'transparent', border:'1px solid var(--border-subtle)', borderRadius:6, color: customActive?'var(--text-primary)':'var(--text-muted)', fontSize:11, padding:'3px 6px', colorScheme:'light dark', cursor:'pointer'}}/>
-            {customActive && <button onClick={()=>{setRangeStart('');setRangeEnd('');}} title="Clear custom range" style={{background:'transparent',border:'none',color:'var(--text-faint)',cursor:'pointer',fontSize:14,lineHeight:1,padding:'0 2px'}}>×</button>}
+                   style={{background:'transparent', border:'1px solid var(--border-subtle)', borderRadius:6, color:'var(--text-primary)', fontSize:11, padding:'3px 6px', colorScheme:'light dark', cursor:'pointer'}}/>
+            <button onClick={()=>{setRangeStart('');setRangeEnd('');}} title="Back to presets" style={{background:'transparent',border:'none',color:'var(--text-faint)',cursor:'pointer',fontSize:14,lineHeight:1,padding:'0 2px'}}>×</button>
           </div>
-          {(() => {
-            // Sign out — only in an authenticated workspace (OI_ASK present); hidden in the
-            // public demo, where there's no session to end. Clears the Supabase session and
-            // sends the whole page (this dashboard runs in a same-origin iframe) to the homepage.
-            const ask = getOIAsk();
-            const authed = !!(ask && ask.brand_id && typeof ask.getJwt === 'function');
-            if (!authed) return null;
-            const signOut = async () => {
-              try { const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb; if (sb && sb.auth) await sb.auth.signOut(); } catch (e) { /* fall through to hard-clear */ }
-              try {
-                // Belt-and-braces so the user is fully logged out even if the client instance
-                // wasn't reachable: drop any persisted Supabase session + the demo passcode gate.
-                Object.keys(localStorage).forEach(k => { if (/^sb-.*-auth-token$/.test(k)) localStorage.removeItem(k); });
-                localStorage.removeItem('oi_gate_v1');
-              } catch (e) {}
-              (window.top || window).location.href = '/';
-            };
-            return (<button onClick={signOut} title="Sign out" aria-label="Sign out"
-              style={{background:'transparent', border:'1px solid var(--border-subtle)', borderRadius:6, color:'var(--text-muted)', fontSize:12, fontWeight:600, padding:'4px 10px', marginLeft:'var(--s-1)', cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap'}}>
-              Sign out
-            </button>);
-          })()}
+          )}
+          {/* Sign out removed — the app shell (app/index.html) already provides a single
+              "Log out" in the top bar; two sign-out controls were redundant. */}
         </div>
       </div>
       <div className="app-shell">
