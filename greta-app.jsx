@@ -10414,7 +10414,7 @@ function OverviewSummary({d, tf}){
     // so the read can never show figures that no longer match the hero — a live data refresh
     // changes the signature → cache miss → regenerate, keeping the read and the hero in lockstep.
     var sig = Math.round(d.hero.cmAfterMkt||0)+'_'+Math.round((d.pacing&&d.pacing.revActual)||0);
-    var key = 'oi_ovsum3_'+(ASK.brand_id||'')+'_'+(tf||'')+'_'+(d.periodLabel||'')+'_'+sig;
+    var key = 'oi_ovsum4_'+(ASK.brand_id||'')+'_'+(tf||'')+'_'+(d.periodLabel||'')+'_'+sig;
     try{ var cached = sessionStorage.getItem(key); if(cached){ setTxt(cached); setErr(''); setLoading(false); return; } }catch(e){}
     var C = d.cacBlock || null;
     var compact = {
@@ -10434,17 +10434,28 @@ function OverviewSummary({d, tf}){
     setLoading(true); setErr('');
     (async function(){
       try{
+        // Pull the granular Meta campaign + ad performance already in the warehouse, so the read
+        // can name the specific campaign / ad / creative that's dragging — not just the channel.
+        try{
+          var sb = (window.FRKL_LIVE && window.FRKL_LIVE.sb) || (function(){ try{ return window.parent && window.parent.FRKL_LIVE && window.parent.FRKL_LIVE.sb; }catch(e){ return null; } })();
+          if(sb){
+            var rc = await sb.from('vw_meta_campaign_perf_ui').select('campaign_name,spend,revenue,roas,cvr_pct,avg_frequency').eq('brand_id',ASK.brand_id).order('spend',{ascending:false}).limit(8);
+            if(rc && rc.data && rc.data.length) compact.metaCampaigns = rc.data;
+            var ra = await sb.from('vw_meta_ad_perf_ui').select('ad_name,call_to_action,spend,roas,cvr_pct,avg_frequency,roas_change_pct,fatigue_flag').eq('brand_id',ASK.brand_id).order('spend',{ascending:false}).limit(10);
+            if(ra && ra.data && ra.data.length) compact.metaTopAds = ra.data;
+          }
+        }catch(e){}
         var jwt=''; if(typeof ASK.getJwt==='function'){ try{ jwt=await ASK.getJwt(); }catch(e){} } else if(ASK.jwt){ jwt=ASK.jwt; }
         var headers = jwt ? {'content-type':'application/json','authorization':'Bearer '+jwt} : {'content-type':'application/json','x-internal-secret':ASK.token||''};
         var cur = (typeof curSym==='function') ? curSym() : '£';
         var system = 'You are a senior D2C growth operator for '+(brand.name||'the brand')+' ('+((brand.markets||'')+' '+(brand.vertical||'')).trim()+') working the CTC "hierarchy of metrics". All monetary values are in '+cur+' — always use '+cur+', never $. '
-          + 'You are given the current Overview snapshot: Business (contribution-after-marketing = the arbiter, contribution margin, revenue vs plan + the '+cur+' shortfall); Customer (new-vs-returning mix, per-segment metrics, and acquisitionEconomics = CAC actual vs break-even vs target, ROAS/aMER actual vs target, repeat rate); Channels (per channel: role, spend, incremental revenue, contribution, iROAS vs targetIroas, marginalIroas, verdict — read a POSITIVE iROAS-minus-target gap as over-efficient / UNDER-spending, and a NEGATIVE gap as inefficient / OVER-spending); pre-computed insights per tier; and the single highest-priority action. '
-          + 'Write a SPECIFIC diagnostic read of 3-4 sentences (~70-90 words), plain prose — no lists, no headings, no markdown, no greeting. Follow the CTC logic and NAME NAMES: '
+          + 'You are given the current Overview snapshot: Business (contribution-after-marketing = the arbiter, contribution margin, revenue vs plan + the '+cur+' shortfall); Customer (new-vs-returning mix, per-segment metrics, and acquisitionEconomics = CAC actual vs break-even vs target, ROAS/aMER actual vs target, repeat rate); Channels (per channel: role, spend, incremental revenue, contribution, iROAS vs targetIroas, marginalIroas, verdict — read a POSITIVE iROAS-minus-target gap as over-efficient / UNDER-spending, and a NEGATIVE gap as inefficient / OVER-spending); when present, metaCampaigns and metaTopAds give the ACTUAL Meta campaign- and ad-level performance (name, spend, ROAS, CVR %, frequency, roas_change_pct vs the prior period, fatigue_flag); plus pre-computed insights per tier and the single highest-priority action. '
+          + 'Write a SPECIFIC diagnostic read of 3-4 sentences (~70-100 words), plain prose — no lists, no headings, no markdown, no greeting. Follow the CTC logic and NAME NAMES: '
           + '(1) Lead with the business result for this '+(tf||'')+' window — contribution-after-marketing and whether it is ahead or behind PLAN, with the '+cur+' gap. '
           + '(2) DECOMPOSE the gap: state whether it is a VOLUME problem (too little profitable spend / too few new customers) or an EFFICIENCY problem (CAC or iROAS off target) — say which. '
-          + '(3) PINPOINT the driver by name: the exact channel (quote its iROAS vs target and whether it is under- or over-spending) and/or the customer segment (new vs returning, with CAC vs target) causing the shortfall — lean on computedInsights and the channels table. '
-          + '(4) End on ONE specific lever: the precise reallocation or move, with the '+cur+' contribution impact if available. '
-          + 'Never say "hold course" if any channel is off its target or the business is behind plan. Be concrete, quantitative, operator-to-operator. Output only the read.';
+          + '(3) PINPOINT the driver by NAME, preferring the actual campaign/ad over the generic channel: quote the specific Meta campaign or ad/creative from metaCampaigns/metaTopAds that is dragging (with its ROAS, CVR, frequency and roas_change_pct vs prior) and/or the customer segment (new vs returning, CAC vs target); lean on computedInsights too. '
+          + '(4) End on ONE specific lever: the precise reallocation or creative/campaign move, with the '+cur+' contribution impact if available. '
+          + 'Never say "hold course" if any channel or campaign is off target or the business is behind plan. Be concrete, quantitative, operator-to-operator. Output only the read.';
         var user = 'Snapshot JSON:\n'+JSON.stringify(compact)+'\n\nWrite the diagnostic read now.';
         var resp = await fetch(ASK.endpoint, { method:'POST', headers, body: JSON.stringify({ system: system, messages:[{role:'user', content:user}], model:'claude-sonnet-4-5', brand_id: ASK.brand_id }) });
         if(!resp.ok){ throw new Error(String(resp.status)); }
