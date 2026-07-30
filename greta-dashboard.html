@@ -10,10 +10,19 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;550;600;650;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.8.1/prop-types.min.js"></script>
-<script src="https://unpkg.com/recharts@2.8.0/umd/Recharts.js"></script>
+<!-- perf: warm up the CDN + Supabase origins so the deferred libs and the first data
+     fetch don't each pay a fresh DNS+TLS round-trip on cold load. -->
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<link rel="preconnect" href="https://unpkg.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://awcncqvsnuhqyihpdgcx.supabase.co" crossorigin>
+<!-- perf: React/ReactDOM/prop-types/Recharts are only consumed by greta-app.js (deferred
+     below), so defer them too — they download in parallel during parse instead of blocking
+     it sequentially. supabase-js stays eager because the data-loader uses it during parse. -->
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/prop-types/15.8.1/prop-types.min.js"></script>
+<script defer src="https://unpkg.com/recharts@2.8.0/umd/Recharts.js"></script>
 <!-- Supabase SDK + live-data loader. Loader runs BEFORE static files so it
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
@@ -1114,14 +1123,14 @@
 <div id="root"></div>
 <script>/* de-frkl pre-eval gate: for non-frkl brands, clear static-only FRKL_* globals that frkl-app.js captures into module-level consts at load (FRKL_LINKS -> _linkKeys/_linkRe, FRKL_INSIGHTS -> INS) BEFORE the bundle reads them. Runs after the static frkl-*.js files. frkl keeps its demo snapshot; the data-loader still handles all render-time globals. */
 (function(){try{var s=window.OI_BRAND_SLUG||(window.parent&&window.parent!==window?window.parent.OI_BRAND_SLUG:null)||'frkl';if(s==='frkl')return;window.FRKL_LINKS={};window.FRKL_INSIGHTS={};}catch(e){}})();</script>
-<script src="./marketing-os.build.js?v=20260708160000"></script>
+<script defer src="./marketing-os.build.js?v=20260708160000"></script>
 <script>/* today-calendar.build.js serves both a standalone today.html deploy and this embedded
    nav-tab context. Setting MOS_EMBEDDED before it loads suppresses its self-mount (ReactDOM.render
    into #root) and instead exposes window.Today / window.Calendar as plain components for
    greta-app.jsx's mosView() to render — the same pattern marketing-os.build.js already uses for
    window.CommandCentre / window.DecisionLog. */
 window.MOS_EMBEDDED = true;</script>
-<script src="./today-calendar.build.js?v=20260720110730"></script>
-<script src="./greta-app.js?v=1785424398000"></script>
+<script defer src="./today-calendar.build.js?v=20260720110730"></script>
+<script defer src="./greta-app.js?v=1785425216000"></script>
 <script>/* perf: defer frkl static deep-tab data (CVR ~1.7MB, cohorts, promos, products) — not used by the Overview/landing. Background-load after paint; skip for non-frkl (de-frkl). */
 (function(){try{var slug=window.OI_BRAND_SLUG||(window.parent&&window.parent!==window?window.parent.OI_BRAND_SLUG:null)||"frkl";if(slug!=="frkl")return;var files=["greta-cvr.js","greta-cohorts.js","greta-discount-codes.js","greta-products.js","greta-patterns.js"],i=0;function next(){if(i>=files.length)return;var s=document.createElement("script");s.src="./"+files[i++]+"?v=202607060755";s.async=true;s.onload=next;s.onerror=next;document.head.appendChild(s);}var kick=function(){next();};if(window.requestIdleCallback){window.requestIdleCallback(kick,{timeout:1500});}else{setTimeout(kick,300);}}catch(e){}})();</script>

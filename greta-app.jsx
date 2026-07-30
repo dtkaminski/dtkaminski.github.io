@@ -12023,24 +12023,9 @@ function App(){
       {/* App bar — sticky, product chrome, workspace context */}
       <div className="appbar">
         <div className="appbar-inner">
-          <div className="brand">
-            <div className="brand-mark">
-              <svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" aria-label="Greta">
-                <defs>
-                  <linearGradient id="fpb" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#8B5CF6"/><stop offset="1" stopColor="#38BDF8"/></linearGradient>
-                  <linearGradient id="fgm" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#22D3A6"/><stop offset="1" stopColor="#5DE5C8"/></linearGradient>
-                </defs>
-                <rect x="49" y="30" width="138" height="41" rx="20.5" transform="rotate(-45 118 50.5)" fill="url(#fpb)"/>
-                <rect x="71" y="177" width="138" height="41" rx="20.5" transform="rotate(-45 140 197.5)" fill="url(#fgm)"/>
-                <circle cx="97" cy="132" r="24" fill="#0B132B"/>
-              </svg>
-            </div>
-            <div>
-              <div className="brand-name">greta</div>
-              <div className="brand-sub">{`Every part of your business, every week, with a ${curSym()} tag.`}</div>
-            </div>
-          </div>
-          <div style={{width:1, height:24, background:'var(--border-subtle)', margin:'0 var(--s-2)'}}/>
+          {/* Brand logo + tagline removed here — the app shell (app/index.html) already renders
+              the greta wordmark + tagline above, so showing it again produced a duplicate header.
+              The dashboard bar now starts at the workspace chip. */}
           <div className="workspace-chip">
             <div className="dot"/>
             <span>{OI_BRAND.name||'frkl'}</span>
