@@ -10414,7 +10414,7 @@ function OverviewSummary({d, tf}){
     // so the read can never show figures that no longer match the hero — a live data refresh
     // changes the signature → cache miss → regenerate, keeping the read and the hero in lockstep.
     var sig = Math.round(d.hero.cmAfterMkt||0)+'_'+Math.round((d.pacing&&d.pacing.revActual)||0);
-    var key = 'oi_ovsum4_'+(ASK.brand_id||'')+'_'+(tf||'')+'_'+(d.periodLabel||'')+'_'+sig;
+    var key = 'oi_ovsum5_'+(ASK.brand_id||'')+'_'+(tf||'')+'_'+(d.periodLabel||'')+'_'+sig;
     try{ var cached = sessionStorage.getItem(key); if(cached){ setTxt(cached); setErr(''); setLoading(false); return; } }catch(e){}
     var C = d.cacBlock || null;
     var compact = {
@@ -10457,7 +10457,7 @@ function OverviewSummary({d, tf}){
           + 'Write a SPECIFIC diagnostic read of 3-4 sentences (~70-100 words), plain prose — no lists, no headings, no markdown, no greeting. Follow the CTC logic and NAME NAMES: '
           + '(1) Lead with the business result for this '+(tf||'')+' window — contribution-after-marketing and whether it is ahead or behind PLAN, with the '+cur+' gap. '
           + '(2) DECOMPOSE the gap: state whether it is a VOLUME problem (too little profitable spend / too few new customers) or an EFFICIENCY problem (CAC or iROAS off target) — say which. '
-          + '(3) PINPOINT the driver by NAME, preferring the actual campaign/ad over the generic channel: quote the specific Meta campaign or ad/creative from metaCampaigns/metaTopAds, or the Google campaign from googleCampaigns (a profitable Google campaign with a high lost_to_budget_pct is an under-spend to fund; flag any googleWasteTerms bleeding spend at zero conversions), that is dragging — with the relevant numbers (ROAS, CVR, frequency, roas_change_pct, or lost_to_budget_pct) — and/or the customer segment (new vs returning, CAC vs target); lean on computedInsights too. '
+          + '(3) PINPOINT the driver by NAME, preferring the actual campaign/ad over the generic channel: quote the specific Meta campaign or ad/creative from metaCampaigns/metaTopAds, or the Google campaign from googleCampaigns. When a Google campaign is the culprit, ALSO cite its impression-share signal from googleCampaigns — a high lost_to_rank_pct means it is uncompetitive (efficiency: fix creative/bids or cut), a high lost_to_budget_pct on a profitable campaign means under-spend (volume: fund it) — and, if any exist, name one googleWasteTerms query bleeding spend at zero conversions. Quote the real numbers (ROAS, CVR, frequency, roas_change_pct, impression share). Also weigh the customer segment (new vs returning, CAC vs target); lean on computedInsights. '
           + '(4) End on ONE specific lever: the precise reallocation or creative/campaign move, with the '+cur+' contribution impact if available. '
           + 'Never say "hold course" if any channel or campaign is off target or the business is behind plan. Be concrete, quantitative, operator-to-operator. Output only the read.';
         var user = 'Snapshot JSON:\n'+JSON.stringify(compact)+'\n\nWrite the diagnostic read now.';
@@ -10491,7 +10491,7 @@ function OverviewSummary({d, tf}){
 function MetaAdDrilldown(){
   const [camps,setCamps]=React.useState(null);
   const [ads,setAds]=React.useState(null);
-  const [open,setOpen]=React.useState(false);
+  const [open,setOpen]=React.useState(function(){ try{ return sessionStorage.getItem('oi_dd_meta')==='1'; }catch(e){ return false; } });
   React.useEffect(function(){
     try{
       var sb=(window.FRKL_LIVE&&window.FRKL_LIVE.sb)||null;
@@ -10508,7 +10508,7 @@ function MetaAdDrilldown(){
   var td={textAlign:'right',fontFamily:GO_T.mono,fontSize:12,padding:'6px 8px',borderBottom:'1px solid '+GO_T.line};
   var tdL={textAlign:'left',fontSize:12,padding:'6px 8px',borderBottom:'1px solid '+GO_T.line};
   return (<div style={{marginTop:10}}>
-    <div onClick={function(){setOpen(!open);}} style={{cursor:'pointer',fontSize:10.5,color:GO_T.accent2,textTransform:'uppercase',letterSpacing:'.4px',margin:'0 2px 6px',userSelect:'none'}}>
+    <div onClick={function(){ var n=!open; setOpen(n); try{sessionStorage.setItem('oi_dd_meta', n?'1':'0');}catch(e){} }} style={{cursor:'pointer',fontSize:10.5,color:GO_T.accent2,textTransform:'uppercase',letterSpacing:'.4px',margin:'0 2px 6px',userSelect:'none'}}>
       {open?'▾':'▸'} Meta campaign &amp; ad detail — where the paid-social spend actually goes
     </div>
     {open && <div>
@@ -10547,7 +10547,7 @@ function MetaAdDrilldown(){
 function GoogleAdDrilldown(){
   const [camps,setCamps]=React.useState(null);
   const [waste,setWaste]=React.useState(null);
-  const [open,setOpen]=React.useState(false);
+  const [open,setOpen]=React.useState(function(){ try{ return sessionStorage.getItem('oi_dd_google')==='1'; }catch(e){ return false; } });
   React.useEffect(function(){
     try{
       var sb=(window.FRKL_LIVE&&window.FRKL_LIVE.sb)||null;
@@ -10564,7 +10564,7 @@ function GoogleAdDrilldown(){
   var td={textAlign:'right',fontFamily:GO_T.mono,fontSize:12,padding:'6px 8px',borderBottom:'1px solid '+GO_T.line};
   var tdL={textAlign:'left',fontSize:12,padding:'6px 8px',borderBottom:'1px solid '+GO_T.line};
   return (<div style={{marginTop:8}}>
-    <div onClick={function(){setOpen(!open);}} style={{cursor:'pointer',fontSize:10.5,color:GO_T.accent2,textTransform:'uppercase',letterSpacing:'.4px',margin:'0 2px 6px',userSelect:'none'}}>
+    <div onClick={function(){ var n=!open; setOpen(n); try{sessionStorage.setItem('oi_dd_google', n?'1':'0');}catch(e){} }} style={{cursor:'pointer',fontSize:10.5,color:GO_T.accent2,textTransform:'uppercase',letterSpacing:'.4px',margin:'0 2px 6px',userSelect:'none'}}>
       {open?'▾':'▸'} Google campaign &amp; search-term detail — impression share &amp; wasted spend
     </div>
     {open && <div>
