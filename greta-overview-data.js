@@ -62,7 +62,7 @@
       safeQ(sb.from('v_tenant_shopify_lineitems_daily').select('day, product_title, units, revenue').eq('brand_id', brandId).gte('day', cutoff).order('day', { ascending: false }).limit(1000), Q, []),
       safeQ(sb.from('vw_brand_action_board').select('external_id, description, step1, priority, category, cm_gbp').eq('brand_id', brandId).order('cm_gbp', { ascending: false, nullsFirst: false }).limit(30), Q, []),
       safeQ(sb.from('vw_channel_effect').select('channel_type, family, spend_30d, attributed_rev_30d, phi, incremental_rev_30d, cost_30d, contribution_30d, drives, rev_per_send').eq('brand_id', brandId), Q, []),
-      safeQ(sb.from('vw_channel_optimum').select('channel_type, avg_iroas, marginal_iroas, target_marginal_iroas, break_even_iroas, marginal_cm_per_pound, status').eq('brand_id', brandId), Q, []),
+      safeQ(sb.from('vw_channel_optimum').select('channel_type, avg_iroas, marginal_iroas, target_marginal_iroas, break_even_iroas, marginal_cm_per_pound, status, marginal_reason').eq('brand_id', brandId), Q, []),
       safeQ(sb.from('vw_email_breakdown').select('total_rev, total_orders, total_sends, campaign_rev, campaign_orders, flow_rev, flow_orders, rev_per_1k_sent').eq('brand_id', brandId).limit(1), Q, null),
       safeQ(sb.from('mos_business_goal').select('revenue_target, contribution_margin_target, spend_cap, period_start, period_end, confirmed').eq('brand_id', brandId).lte('period_start', new Date().toISOString().slice(0,10)).gte('period_end', new Date().toISOString().slice(0,10)).order('created_at', { ascending: false }).limit(1), Q, null),
       safeQ(sb.from('daily_forecast').select('day, revenue, spend, cm').eq('brand_id', brandId).order('day', { ascending: true }), Q, []),
@@ -103,7 +103,8 @@
       var rag = isEmail ? "g" : iroas == null ? "n" : (breakEven != null && iroas < breakEven) ? "r" : iroas >= tgt * 1.3 ? "g" : iroas < tgt ? "a" : "g";
       var verdict = isEmail ? ("returning" + (c.rev_per_send != null ? " · £" + f0(n(c.rev_per_send) * 1000) + "/1k sent" : ""))
         : status === "fix" ? "fix — avg below break-even" : status === "scale" ? "scale — marginal headroom"
-        : status === "ease" ? "ease — near saturation" : status === "hold" ? "at optimum"
+        : status === "ease" ? "ease — near saturation"
+        : status === "hold" ? (marg == null ? "profitable · marginal needs more history" : "at optimum")
         : (iroas != null && breakEven != null && iroas < breakEven ? "below break-even" : "on target");
       return { name: c.channel_type.replace(/_/g, " ").replace(/\b\w/g, function (m) { return m.toUpperCase(); }),
         family: c.family, acquisition: c.drives !== "returning", spend: spend, incRev: incRev, phi: phi,
