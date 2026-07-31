@@ -10512,6 +10512,7 @@ function MetaAdDrilldown(){
       {open?'▾':'▸'} Meta campaign &amp; ad detail — where the paid-social spend actually goes
     </div>
     {open && <div>
+      <div style={{fontSize:10,color:GO_T.dim,margin:'0 2px 8px',fontStyle:'italic'}}>ROAS below is raw / platform-reported; the Channel tier above uses incrementality-adjusted iROAS, so the numbers differ.</div>
       {camps && <div style={{marginBottom:12}}>
         <div style={{fontSize:10.5,color:GO_T.mut,margin:'0 2px 4px'}}>Campaigns · last 30 days</div>
         <table style={{width:'100%',borderCollapse:'collapse'}}>
@@ -10568,6 +10569,7 @@ function GoogleAdDrilldown(){
       {open?'▾':'▸'} Google campaign &amp; search-term detail — impression share &amp; wasted spend
     </div>
     {open && <div>
+      <div style={{fontSize:10,color:GO_T.dim,margin:'0 2px 8px',fontStyle:'italic'}}>ROAS below is raw / platform-reported; the Channel tier above uses incrementality-adjusted iROAS, so the numbers differ.</div>
       {camps && <div style={{marginBottom:12}}>
         <div style={{fontSize:10.5,color:GO_T.mut,margin:'0 2px 4px'}}>Campaigns · last 30 days · lost-to-budget = under-spend on demand you could capture</div>
         <table style={{width:'100%',borderCollapse:'collapse'}}>
