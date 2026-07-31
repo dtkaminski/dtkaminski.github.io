@@ -10443,17 +10443,21 @@ function OverviewSummary({d, tf}){
             if(rc && rc.data && rc.data.length) compact.metaCampaigns = rc.data;
             var ra = await sb.from('vw_meta_ad_perf_ui').select('ad_name,call_to_action,spend,roas,cvr_pct,avg_frequency,roas_change_pct,fatigue_flag').eq('brand_id',ASK.brand_id).order('spend',{ascending:false}).limit(10);
             if(ra && ra.data && ra.data.length) compact.metaTopAds = ra.data;
+            var gc = await sb.from('vw_google_campaign_perf_ui').select('campaign_name,channel_type,spend,roas,cvr_pct,impression_share_pct,lost_to_budget_pct,lost_to_rank_pct').eq('brand_id',ASK.brand_id).order('spend',{ascending:false}).limit(8);
+            if(gc && gc.data && gc.data.length) compact.googleCampaigns = gc.data;
+            var gw = await sb.from('vw_google_search_terms_ui').select('search_term,campaign_name,spend,conversions,roas').eq('brand_id',ASK.brand_id).eq('zero_conv_waste',true).order('spend',{ascending:false}).limit(8);
+            if(gw && gw.data && gw.data.length) compact.googleWasteTerms = gw.data;
           }
         }catch(e){}
         var jwt=''; if(typeof ASK.getJwt==='function'){ try{ jwt=await ASK.getJwt(); }catch(e){} } else if(ASK.jwt){ jwt=ASK.jwt; }
         var headers = jwt ? {'content-type':'application/json','authorization':'Bearer '+jwt} : {'content-type':'application/json','x-internal-secret':ASK.token||''};
         var cur = (typeof curSym==='function') ? curSym() : '£';
         var system = 'You are a senior D2C growth operator for '+(brand.name||'the brand')+' ('+((brand.markets||'')+' '+(brand.vertical||'')).trim()+') working the CTC "hierarchy of metrics". All monetary values are in '+cur+' — always use '+cur+', never $. '
-          + 'You are given the current Overview snapshot: Business (contribution-after-marketing = the arbiter, contribution margin, revenue vs plan + the '+cur+' shortfall); Customer (new-vs-returning mix, per-segment metrics, and acquisitionEconomics = CAC actual vs break-even vs target, ROAS/aMER actual vs target, repeat rate); Channels (per channel: role, spend, incremental revenue, contribution, iROAS vs targetIroas, marginalIroas, verdict — read a POSITIVE iROAS-minus-target gap as over-efficient / UNDER-spending, and a NEGATIVE gap as inefficient / OVER-spending); when present, metaCampaigns and metaTopAds give the ACTUAL Meta campaign- and ad-level performance (name, spend, ROAS, CVR %, frequency, roas_change_pct vs the prior period, fatigue_flag); plus pre-computed insights per tier and the single highest-priority action. '
+          + 'You are given the current Overview snapshot: Business (contribution-after-marketing = the arbiter, contribution margin, revenue vs plan + the '+cur+' shortfall); Customer (new-vs-returning mix, per-segment metrics, and acquisitionEconomics = CAC actual vs break-even vs target, ROAS/aMER actual vs target, repeat rate); Channels (per channel: role, spend, incremental revenue, contribution, iROAS vs targetIroas, marginalIroas, verdict — read a POSITIVE iROAS-minus-target gap as over-efficient / UNDER-spending, and a NEGATIVE gap as inefficient / OVER-spending); when present, metaCampaigns and metaTopAds give the ACTUAL Meta campaign- and ad-level performance (name, spend, ROAS, CVR %, frequency, roas_change_pct vs the prior period, fatigue_flag); googleCampaigns give Google Search/PMax performance including impression_share_pct and lost_to_budget_pct (a HIGH lost_to_budget_pct on a profitable campaign is the CLEAN PROOF of under-spending / a volume problem — quote it), and googleWasteTerms are search queries with spend but zero conversions; plus pre-computed insights per tier and the single highest-priority action. '
           + 'Write a SPECIFIC diagnostic read of 3-4 sentences (~70-100 words), plain prose — no lists, no headings, no markdown, no greeting. Follow the CTC logic and NAME NAMES: '
           + '(1) Lead with the business result for this '+(tf||'')+' window — contribution-after-marketing and whether it is ahead or behind PLAN, with the '+cur+' gap. '
           + '(2) DECOMPOSE the gap: state whether it is a VOLUME problem (too little profitable spend / too few new customers) or an EFFICIENCY problem (CAC or iROAS off target) — say which. '
-          + '(3) PINPOINT the driver by NAME, preferring the actual campaign/ad over the generic channel: quote the specific Meta campaign or ad/creative from metaCampaigns/metaTopAds that is dragging (with its ROAS, CVR, frequency and roas_change_pct vs prior) and/or the customer segment (new vs returning, CAC vs target); lean on computedInsights too. '
+          + '(3) PINPOINT the driver by NAME, preferring the actual campaign/ad over the generic channel: quote the specific Meta campaign or ad/creative from metaCampaigns/metaTopAds, or the Google campaign from googleCampaigns (a profitable Google campaign with a high lost_to_budget_pct is an under-spend to fund; flag any googleWasteTerms bleeding spend at zero conversions), that is dragging — with the relevant numbers (ROAS, CVR, frequency, roas_change_pct, or lost_to_budget_pct) — and/or the customer segment (new vs returning, CAC vs target); lean on computedInsights too. '
           + '(4) End on ONE specific lever: the precise reallocation or creative/campaign move, with the '+cur+' contribution impact if available. '
           + 'Never say "hold course" if any channel or campaign is off target or the business is behind plan. Be concrete, quantitative, operator-to-operator. Output only the read.';
         var user = 'Snapshot JSON:\n'+JSON.stringify(compact)+'\n\nWrite the diagnostic read now.';
@@ -10532,6 +10536,60 @@ function MetaAdDrilldown(){
             <td style={Object.assign({},td,{color:(a.roas_change_pct!=null?(a.roas_change_pct<0?GO_T.red:GO_T.green):GO_T.dim)})}>{a.roas_change_pct!=null?((a.roas_change_pct>0?'+':'')+a.roas_change_pct+'%'):'—'}</td>
             <td style={td}>{a.cvr_pct!=null?a.cvr_pct+'%':'—'}</td>
             <td style={Object.assign({},td,{color:(a.avg_frequency>=5?GO_T.red:GO_T.ink)})}>{a.avg_frequency!=null?a.avg_frequency.toFixed(1)+'×':'—'}</td>
+          </tr>);})}</tbody>
+        </table>
+      </div>}
+    </div>}
+  </div>);
+}
+// Google drill-down — campaign impression-share (lost-to-budget = under-spend proof) + wasteful
+// search terms (spend, zero conversions). Empty until the extended sync-google-ads runs.
+function GoogleAdDrilldown(){
+  const [camps,setCamps]=React.useState(null);
+  const [waste,setWaste]=React.useState(null);
+  const [open,setOpen]=React.useState(false);
+  React.useEffect(function(){
+    try{
+      var sb=(window.FRKL_LIVE&&window.FRKL_LIVE.sb)||null;
+      var b=(window.FRKL_LIVE&&window.FRKL_LIVE.brandId)||null;
+      if(!sb||!b) return;
+      sb.from('vw_google_campaign_perf_ui').select('campaign_name,channel_type,spend,roas,cvr_pct,impression_share_pct,lost_to_budget_pct').eq('brand_id',b).order('spend',{ascending:false}).then(function(r){ if(r&&r.data&&r.data.length) setCamps(r.data); });
+      sb.from('vw_google_search_terms_ui').select('search_term,campaign_name,spend,conversions,roas,zero_conv_waste').eq('brand_id',b).eq('zero_conv_waste',true).order('spend',{ascending:false}).limit(10).then(function(r){ if(r&&r.data&&r.data.length) setWaste(r.data); });
+    }catch(e){}
+  },[]);
+  if(!camps && !waste) return null;
+  var roasCol=function(v){ return v==null?GO_T.dim : (v>=1.5?GO_T.green : (v>=1.0?GO_T.amber : GO_T.red)); };
+  var th={textAlign:'right',color:GO_T.dim,fontWeight:500,fontSize:10,textTransform:'uppercase',letterSpacing:'.4px',padding:'6px 8px',borderBottom:'1px solid '+GO_T.line};
+  var thL=Object.assign({},th,{textAlign:'left'});
+  var td={textAlign:'right',fontFamily:GO_T.mono,fontSize:12,padding:'6px 8px',borderBottom:'1px solid '+GO_T.line};
+  var tdL={textAlign:'left',fontSize:12,padding:'6px 8px',borderBottom:'1px solid '+GO_T.line};
+  return (<div style={{marginTop:8}}>
+    <div onClick={function(){setOpen(!open);}} style={{cursor:'pointer',fontSize:10.5,color:GO_T.accent2,textTransform:'uppercase',letterSpacing:'.4px',margin:'0 2px 6px',userSelect:'none'}}>
+      {open?'▾':'▸'} Google campaign &amp; search-term detail — impression share &amp; wasted spend
+    </div>
+    {open && <div>
+      {camps && <div style={{marginBottom:12}}>
+        <div style={{fontSize:10.5,color:GO_T.mut,margin:'0 2px 4px'}}>Campaigns · last 30 days · lost-to-budget = under-spend on demand you could capture</div>
+        <table style={{width:'100%',borderCollapse:'collapse'}}>
+          <thead><tr><th style={thL}>Campaign</th><th style={th}>Spend</th><th style={th}>ROAS</th><th style={th}>CVR</th><th style={th}>Impr share</th><th style={th}>Lost {'→'} budget</th></tr></thead>
+          <tbody>{camps.map(function(c,i){return (<tr key={i}>
+            <td style={tdL}>{c.campaign_name}{c.channel_type?<span style={{color:GO_T.dim,fontSize:10}}> {'·'} {String(c.channel_type).toLowerCase()}</span>:null}</td>
+            <td style={td}>{GO_gbp(c.spend)}</td>
+            <td style={Object.assign({},td,{color:roasCol(c.roas)})}>{c.roas!=null?c.roas.toFixed(2)+'×':'—'}</td>
+            <td style={td}>{c.cvr_pct!=null?c.cvr_pct+'%':'—'}</td>
+            <td style={td}>{c.impression_share_pct!=null?c.impression_share_pct+'%':'—'}</td>
+            <td style={Object.assign({},td,{color:(c.lost_to_budget_pct>=10?GO_T.red:(c.lost_to_budget_pct>=3?GO_T.amber:GO_T.ink))})}>{c.lost_to_budget_pct!=null?c.lost_to_budget_pct+'%':'—'}</td>
+          </tr>);})}</tbody>
+        </table>
+      </div>}
+      {waste && <div>
+        <div style={{fontSize:10.5,color:GO_T.mut,margin:'0 2px 4px'}}>Wasteful search terms · spend, zero conversions (30d)</div>
+        <table style={{width:'100%',borderCollapse:'collapse'}}>
+          <thead><tr><th style={thL}>Search term</th><th style={thL}>Campaign</th><th style={th}>Spend</th></tr></thead>
+          <tbody>{waste.map(function(t,i){return (<tr key={i}>
+            <td style={tdL}>{t.search_term}</td>
+            <td style={Object.assign({},tdL,{color:GO_T.mut})}>{t.campaign_name||'—'}</td>
+            <td style={Object.assign({},td,{color:GO_T.red})}>{GO_gbp(t.spend)}</td>
           </tr>);})}</tbody>
         </table>
       </div>}
@@ -10681,6 +10739,7 @@ function GretaOverviewTiers(){
         {d.emailBlock && (function () { var E = d.emailBlock; var cell = function (k, v, sub) { return <div style={{ background: GO_T.panel, border: '1px solid ' + GO_T.line, borderRadius: 8, padding: '9px 11px', boxShadow: 'var(--shadow-panel)' }}><div style={{ fontSize: 10.5, color: GO_T.mut }}>{k}</div><div style={{ fontFamily: GO_T.mono, fontSize: 16, fontWeight: 600, marginTop: 2 }}>{v}</div><div style={{ fontSize: 10, color: GO_T.dim }}>{sub}</div></div>; }; return <div style={{ marginTop: 10 }}><div style={{ fontSize: 10.5, color: GO_T.dim, textTransform: 'uppercase', letterSpacing: '.4px', margin: '0 2px 6px' }}>Email breakdown · Klaviyo</div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(130px,1fr))', gap: 8 }}>{cell('Email revenue', GO_gbp(E.total_rev), E.total_orders + ' orders')}{cell('Campaign rev', GO_gbp(E.campaign_rev), E.campaign_orders + ' orders')}{cell('Flow rev', GO_gbp(E.flow_rev), E.flow_orders + ' orders')}{cell('Rev / 1k sent', GO_gbp(E.rev_per_1k_sent), Math.round(E.total_sends / 1000) + 'k sent')}</div></div>; })()}
         <GO_Insight i={d.insights.channel}/>
         <MetaAdDrilldown/>
+        <GoogleAdDrilldown/>
       </div>
     </div>);
 }
