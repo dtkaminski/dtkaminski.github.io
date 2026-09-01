@@ -2755,7 +2755,7 @@ function LtvCacCard({daily, gm, ordersPerCust}){
   );
 }
 
-function ContributionCard({rev, orders, paid, gm}){
+function ContributionCard({rev, orders, paid, gm, days}){
   // Fully-loaded contribution. COGS comes from live product margin; the variable
   // operating costs (packaging / fulfilment / shipping / payment fees / refunds)
   // aren't in any connected source — they're operator inputs, editable here and
@@ -2774,6 +2774,15 @@ function ContributionCard({rev, orders, paid, gm}){
   const refunds = (n('refundPct')/100)*rev;
   const contribution = grossProfit - packaging - fulfilment - shipping - payFees - refunds - paid;
   const cmPct = rev>0 ? contribution/rev : null;
+  // POAS — profit on ad spend: gross profit generated per £1 of paid media (break-even = 1.00×).
+  // The profit-first sibling of ROAS; unlike revenue-ROAS it already nets out COGS.
+  const poas = paid>0 ? grossProfit/paid : null;
+  // Net profit — complete the P&L: subtract fixed overheads, prorated from the monthly figure
+  // in the shared plan config (Settings → Business economics) across the selected window.
+  const fixedMonthly = (()=>{ try { const c = window.FRKL_PLAN && window.FRKL_PLAN.config; return (c && c.fixed_costs_monthly!=null) ? Number(c.fixed_costs_monthly) : null; } catch(e){ return null; } })();
+  const fixedWin = (fixedMonthly!=null && days>0) ? fixedMonthly*(days/30) : null;
+  const netProfit = fixedWin!=null ? contribution - fixedWin : null;
+  const netPct = (netProfit!=null && rev>0) ? netProfit/rev : null;
   const inStyle = {width:74, background:'var(--bg-base)', border:'1px solid var(--border-default)', borderRadius:5, color:'var(--text-primary)', fontSize:12.5, padding:'3px 7px', textAlign:'right', colorScheme:'light dark'};
   const ed = (k, suffix) => <span style={{color:'var(--text-faint)',fontSize:11,fontWeight:400}}> (<input type="text" inputMode="decimal" defaultValue={inp[k]} onChange={e=>set(k,e.target.value)} onFocus={e=>e.target.select()} style={inStyle}/>{suffix})</span>;
   return (<div className="card">
@@ -2792,12 +2801,28 @@ function ContributionCard({rev, orders, paid, gm}){
       <CmRow label={<span>− Refunds{ed('refundPct','%')}</span>} amount={'−'+GBP(refunds)} color="var(--text-muted)"/>
       <CmRow label="− Paid ad spend" amount={'−'+GBP(paid)} color="var(--text-muted)"/>
       <CmRow label="= Contribution after marketing" amount={GBP(contribution)} bold color={contribution>=0?'var(--good)':'var(--bad)'} top="2px solid var(--border-default)"/>
+      {fixedWin!=null
+        ? (<>
+            <CmRow label="− Fixed overheads (prorated)" amount={'−'+GBP(fixedWin)} color="var(--text-muted)"/>
+            <CmRow label="= Net profit" amount={GBP(netProfit)} bold color={netProfit>=0?'var(--good)':'var(--bad)'} top="2px solid var(--border-default)"/>
+          </>)
+        : (<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,padding:'7px 0',borderTop:'2px solid var(--border-default)',color:'var(--text-faint)',fontSize:12.5}}>
+            <span>= Net profit</span><span>Set monthly fixed costs in Settings → Business economics</span>
+          </div>)
+      }
       <div style={{display:'flex',justifyContent:'space-between',padding:'4px 0',fontWeight:700}}>
         <span>Contribution margin %</span><span style={{color:(cmPct||0)>=0?'var(--good)':'var(--bad)'}}>{PCT(cmPct)}</span>
       </div>
+      {netPct!=null && <div style={{display:'flex',justifyContent:'space-between',padding:'4px 0',fontWeight:700}}>
+        <span>Net profit margin</span><span style={{color:netPct>=0?'var(--good)':'var(--bad)'}}>{PCT(netPct)}</span>
+      </div>}
+      {poas!=null && <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 0 0',fontSize:12.5,color:'var(--text-secondary)'}}>
+        <span>POAS <span style={{color:'var(--text-faint)'}}>· profit on ad spend (gross profit ÷ spend)</span></span>
+        <span style={{fontVariantNumeric:'tabular-nums',fontWeight:700,color:poas>=1?'var(--good)':'var(--bad)'}}>{poas.toFixed(2)}× <span style={{color:'var(--text-faint)',fontWeight:400}}>· break-even 1.00×</span></span>
+      </div>}
     </div>
     <div className="note" style={{marginTop:10}}>
-      Edit the per-order costs + fee rate to your actuals — the waterfall recomputes live for the selected period. COGS is the blended product margin from live catalogue data. <b>Refunds:</b> Shopify net revenue here doesn't yet net out refunds, so they're subtracted in this line; capturing refunds in the Shopify sync will fold them into net revenue and make this exact.
+      Edit the per-order costs + fee rate to your actuals — the waterfall recomputes live for the selected period. COGS is the blended product margin from live catalogue data. <b>Net profit</b> prorates your monthly fixed costs (Settings → Business economics) across the window; <b>POAS</b> is gross profit ÷ paid spend — the profit-first sibling of ROAS, break-even at 1.00×. <b>Refunds:</b> Shopify net revenue here doesn't yet net out refunds, so they're subtracted in this line; capturing refunds in the Shopify sync will fold them into net revenue and make this exact.
     </div>
   </div>);
 }
@@ -3277,6 +3302,7 @@ function Overview({start, period, customActive}){
   const grossProfit = rev * gm;
   const contrib = grossProfit - paid;
   const cmPct = rev>0 ? contrib/rev : null;
+  const poas = paid>0 ? grossProfit/paid : null;   // profit on ad spend (gross profit ÷ spend); break-even 1.0
   const pContrib = (havePrior && pRev!=null && pPaid!=null) ? (pRev*gm - pPaid) : null;
   const seriesContrib = daily.map(d=>({d:d.dlabel, v: +((d.revenue*gm) - d.paid).toFixed(0)}));
   // LTV / CAC (estimates): repeat behaviour from retentionByMonth, windowed spend + AOV.
@@ -3320,7 +3346,7 @@ function Overview({start, period, customActive}){
   const allowableCac = ltv!=null ? ltv/TARGET_LTVCAC : null;                 // max CAC that still clears 3× LTV:CAC
   const firstOrderContrib = aov!=null ? aov*cmRateBeforeMkt : null;
   const paybackOrders = (cac!=null && firstOrderContrib>0) ? cac/firstOrderContrib : null;  // orders to recover CAC
-  const dxMetrics = {rev, orders, sessions, cvr, pCvr, paid, mer, pMer, cac, pCac, ltv, ltvCac, gm, contrib, pContrib, cmPct, returnRate, discLoad, pDiscLoad, returningPct, pRev,
+  const dxMetrics = {rev, orders, sessions, cvr, pCvr, paid, mer, pMer, poas, cac, pCac, ltv, ltvCac, gm, contrib, pContrib, cmPct, returnRate, discLoad, pDiscLoad, returningPct, pRev,
                      aov, breakEvenRoas, allowableCac, paybackOrders, cmRateBeforeMkt,
                      pSessions, pOrders, pPaid, havePrior};
   // ── Crux scorecard = stable business "vitals" on a FIXED trailing window, NOT the
@@ -3476,7 +3502,7 @@ function Overview({start, period, customActive}){
       {/* Below-the-fold operational charts — lazy-mounted so cold first-paint isn't
           blocked by mounting every Recharts at once (and never at 0-width). */}
       {/* Contribution margin — editable, fully-loaded operator P&L for the period */}
-      <LazyMount minHeight={360}><ContributionCard rev={rev} orders={orders} paid={paid} gm={gm}/></LazyMount>
+      <LazyMount minHeight={360}><ContributionCard rev={rev} orders={orders} paid={paid} gm={gm} days={Math.max(1, Math.round((Date.parse(end)-Date.parse(start))/86400000)+1)}/></LazyMount>
       {/* Margin bridge — why contribution moved vs prior period (volume/price/discount/returns/paid) */}
       <LazyMount minHeight={360}><MarginBridge cur={bridgeCur} pri={bridgePri} gm={gm}
         perOrderFixed={_cn('packaging')+_cn('fulfilment')+_cn('shipping')+_cn('payFixed')} payPct={_cn('payPct')/100}/></LazyMount>
