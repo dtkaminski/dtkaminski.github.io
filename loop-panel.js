@@ -17,8 +17,10 @@
  * vw_brand_curve_panel.can_show_point_estimate, never by this file.
  *
  * Views read:
- *   vw_funnel_leak        per-stage pound allocation + sigma vs own 12-month normal
- *   vw_funnel_cut_change  which cut localises a funnel change (share-weighted rank)
+ *   cache_funnel_loop     per-stage pound allocation + sigma vs own 12-month normal
+ *   cache_funnel_cut      which cut localises a funnel change (share-weighted rank)
+ *                         (both refreshed from vw_funnel_leak / vw_funnel_cut_change by
+ *                          fn_refresh_funnel_loop_cache() on the daily cron)
  *   vw_brand_curve_panel  elasticity, its interval, and the resolved abstention
  *   vw_brand_spend_curve_points   monthly (spend, new customers) for the response curve
  *   vw_brand_curve_history        point-in-time k, refitted each month
@@ -29,6 +31,14 @@
     useEffect,
     useMemo
   } = React;
+
+  // Read the CACHE tables, not the views. vw_funnel_leak recomputes the whole spine, the
+  // control bands and a lateral percentile on every call: ~5.4s in SQL and over 23s through
+  // PostgREST, which is far too slow for a panel. fn_refresh_funnel_loop_cache() materialises
+  // both on the daily cron, the same pattern as cache_customer_tier_periods. The views remain
+  // the source of truth and stay queryable for analysis.
+  const LEAK_SRC = 'cache_funnel_loop';
+  const CUT_SRC = 'cache_funnel_cut';
   function sbClient() {
     if (typeof window === 'undefined') return null;
     return window.sb || window.FRKL_LIVE && window.FRKL_LIVE.sb || null;
@@ -556,7 +566,7 @@
   /* ── the loop ───────────────────────────────────────────────────────── */
   function LoopView(props) {
     const brandId = props.brandId;
-    const [leak, leakErr] = useRows('vw_funnel_leak', brandId, {
+    const [leak, leakErr] = useRows(LEAK_SRC, brandId, {
       order: 'mo',
       asc: false
     });
@@ -568,7 +578,7 @@
       if (!leak || !month) return null;
       return leak.filter(r => r.mo === month).sort((a, b) => a.stage_no - b.stage_no);
     }, [leak, month]);
-    const [cuts] = useRows('vw_funnel_cut_change', brandId, month ? {
+    const [cuts] = useRows(CUT_SRC, brandId, month ? {
       eq: {
         mo: month
       }
