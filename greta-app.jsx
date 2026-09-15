@@ -7808,16 +7808,30 @@ function FreshnessChip(){
   const today = new Date();
   const lastDate = (rows) => { if(!rows||!rows.length) return null; const s=[...rows].filter(r=>r.date).sort((a,b)=>a.date<b.date?-1:1); return s.length?s[s.length-1].date:null; };
   const daysAgo = (iso) => iso==null?null:Math.floor((today-new Date(iso+'T00:00:00Z'))/86400000);
-  // When live connection rows exist, judge freshness by LAST SYNC of connected
-  // providers only — an unconnected source (or a day without orders) is not "stale".
+  // When live connection rows exist, judge freshness across ALL connected providers.
+  // A source with no connection row at all is absent, not stale.
   // Fallback to data-age across all sources for the static demo (no live rows).
-  const conns = (window.FRKL_LIVE && Array.isArray(window.FRKL_LIVE.connections)) ? window.FRKL_LIVE.connections.filter(c=>c.status==='active') : null;
+  // Do NOT filter to status==='active'. Filtering out the broken connectors removed exactly the
+  // sources that were stale, so the chip read "Live" while Shopify was 21d, Google Ads 26d and
+  // GA4 25d behind. A connector in error is the strongest stale signal there is, not an absence.
+  const conns = (window.FRKL_LIVE && Array.isArray(window.FRKL_LIVE.connections)) ? window.FRKL_LIVE.connections : null;
   const syncDaysAgo = (iso) => iso==null?null:Math.floor((today-new Date(iso))/86400000);
   let sources;
   if (conns && conns.length) {
     const defs=[['Shopify','shopify',D.shopify],['Meta','meta',D.metaDaily],['Google','google_ads',D.googleAds],['GA4','ga4',D.ga4],['Klaviyo','klaviyo',D.klaviyo]];
     sources = defs
-      .map(([name,provider,rows])=>{ const c=conns.find(x=>x.provider===provider); return c?{name, n: c.last_sync_at!=null ? syncDaysAgo(c.last_sync_at) : daysAgo(lastDate(rows))}:null; })
+      .map(([name,provider,rows])=>{
+        const c=conns.find(x=>x.provider===provider);
+        if(!c) return null;                       // never connected - absent, not stale
+        const dataAge = daysAgo(lastDate(rows));  // when data ARRIVED
+        const syncAge = c.last_sync_at!=null ? syncDaysAgo(c.last_sync_at) : null; // when the pipeline RAN
+        // Freshness is the OLDER of the two: a sync can run every 30 minutes and deliver nothing,
+        // which is exactly how three dead feeds went unreported for three weeks.
+        const n = (c.status!=='active')
+          ? dataAge
+          : (dataAge==null && syncAge==null ? null : Math.max(syncAge==null?0:syncAge, dataAge==null?0:dataAge));
+        return {name, n, broken: c.status!=='active', status: c.status};
+      })
       .filter(Boolean);
   }
   if (!sources || !sources.length) {
@@ -7825,10 +7839,10 @@ function FreshnessChip(){
       .map(([name,rows])=>({name,n:daysAgo(lastDate(rows))}));
   }
   const ageStr=(n)=> n==null?'no data':n===0?'today':n+'d';
-  const stale=sources.filter(s=>s.n==null||s.n>4), ageing=sources.filter(s=>s.n==null||s.n>1);
+  const stale=sources.filter(s=>s.broken||s.n==null||s.n>4), ageing=sources.filter(s=>s.n==null||s.n>1);
   const color=stale.length?'var(--bad)':ageing.length?'var(--warn)':'var(--good)';
   const label=stale.length?`${stale.length} stale`:ageing.length?`${ageing.length} ageing`:'Live';
-  const tip='Sync freshness (connected sources)\n'+sources.map(s=>`${s.name}: ${ageStr(s.n)}`).join('   ·   ')+'\n(click to manage connections)';
+  const tip='Sync freshness (connected sources)\n'+sources.map(s=>`${s.name}: ${ageStr(s.n)}${s.broken?' (sync failing)':''}`).join('   ·   ')+'\n(click to manage connections)';
   return (<button onClick={()=>window.__oiNav&&window.__oiNav('settings','connections')} title={tip} aria-label={`Data freshness: ${label}`}
     style={{display:'inline-flex',alignItems:'center',gap:6,height:30,padding:'0 10px',flexShrink:0,borderRadius:8,background:'var(--bg-card)',border:'1px solid var(--border-default)',color:'var(--text-secondary)',cursor:'pointer',fontSize:12,whiteSpace:'nowrap'}}>
     <span style={{width:7,height:7,borderRadius:'50%',background:color,display:'inline-block'}}/>
@@ -10939,6 +10953,160 @@ function GP_ChannelMix(p){
   );
 }
 
+
+// ── Spend curve (the "k curve") ────────────────────────────────────────────────────────────
+// The forecast models revenue as a Hill saturation R(S) = Vmax*S/(K+S); K is the
+// half-saturation spend. Operationally the brand meets it as its CAC elasticity beta — the
+// log-log slope of cost-per-customer on spend. beta -> 0 is a flat curve, beta -> 1 is severe
+// saturation.
+//
+// TWO LAYERS, deliberately separated, because they carry different certainty:
+//   MEASURED  — the monthly (spend, CAC) points and how many sat above contribution.
+//               No model. True regardless of whether the fit is identified.
+//   MODELLED  — where the profitable ceiling sits. Carries a 95% band and a `verdict`.
+//
+// When verdict = 'indeterminate' the current spend sits inside the identified ceiling range,
+// so we render the BAND and say we cannot yet call it. Drawing one confident line would
+// contradict vw_marginal_econ_gate, which already says "a wide range, not a target".
+function GP_SpendCurve(p) {
+  var c = p.curve, pts = (p.points || []).filter(function (d) { return Number(d.spend) > 0 && Number(d.cac) > 0; });
+  if (!c || pts.length < 6) return null;
+
+  var beta = Number(c.beta), cm = Number(c.cm_per_order), cur = Number(c.current_spend) || 0;
+  var aMid = Number(c.intercept_a), aLo = Number(c.intercept_a_ci_low), aHi = Number(c.intercept_a_ci_high);
+  var bLo = Number(c.ci_low), bHi = Number(c.ci_high);
+  var indet = c.verdict === 'indeterminate' || c.verdict === 'unknown';
+
+  var W = 620, H = 250, ML = 48, MR = 16, MT = 14, MB = 32;
+  var pw = W - ML - MR, ph = H - MT - MB;
+  var maxSpend = Math.max(cur, Math.max.apply(null, pts.map(function (d) { return Number(d.spend); })));
+  var maxCac = Math.max(cm, Math.max.apply(null, pts.map(function (d) { return Number(d.cac); })));
+  var x1 = maxSpend * 1.08, y1 = maxCac * 1.18;
+  var X = function (s) { return ML + (s / x1) * pw; };
+  var Y = function (v) { return MT + ph - (v / y1) * ph; };
+  var cac = function (s, a, b) { return Math.exp(a + b * Math.log(s)); };
+
+  // Sample the band. Taking min/max per x keeps the polygon simple: the two boundary curves
+  // CROSS at the data centroid (that is where the evidence is strongest), so a naive
+  // forward/reverse polygon would self-intersect.
+  var s0 = Math.max(200, maxSpend * 0.08), steps = 48, lo = [], hi = [], mid = [];
+  for (var i = 0; i <= steps; i++) {
+    var s = s0 + (x1 - s0) * (i / steps);
+    var a1 = cac(s, aLo, bLo), a2 = cac(s, aHi, bHi);
+    lo.push([X(s), Y(Math.min(a1, a2))]);
+    hi.push([X(s), Y(Math.max(a1, a2))]);
+    mid.push([X(s), Y(cac(s, aMid, beta))]);
+  }
+  var poly = hi.map(function (q) { return q.join(','); }).join(' ') + ' ' +
+             lo.slice().reverse().map(function (q) { return q.join(','); }).join(' ');
+  var line = function (arr) { return arr.map(function (q, i) { return (i ? 'L' : 'M') + q[0] + ' ' + q[1]; }).join(' '); };
+
+  var above = pts.filter(function (d) { return d.cac_above_contribution; });
+  var recent = pts.slice(-4);
+  var recentAbove = recent.filter(function (d) { return d.cac_above_contribution; }).length;
+
+  var chip = function (txt, col) {
+    return <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase',
+      color: col, border: '1px solid ' + col, borderRadius: 4, padding: '2px 6px' }}>{txt}</span>;
+  };
+  var tick = function (v) { return v >= 1000 ? '£' + Math.round(v / 1000) + 'k' : '£' + Math.round(v); };
+
+  return (
+    <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 12, padding: '16px 18px' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
+        <div style={{ fontSize: 11, letterSpacing: '.5px', textTransform: 'uppercase', color: GP_T.accent2 }}>Spend curve</div>
+        {indet ? chip('range, not a target', GP_T.amber)
+               : chip(c.verdict === 'over' ? 'over the ceiling' : 'under the ceiling',
+                      c.verdict === 'over' ? GP_T.red : GP_T.green)}
+      </div>
+      <div style={{ fontSize: 12, color: GP_T.mut, lineHeight: 1.6, maxWidth: 620, marginBottom: 14 }}>
+        Every pound of media buys customers at a rising price. This is that price, measured over{' '}
+        <b style={{ color: GP_T.ink }}>{c.n_months} months</b> across a{' '}
+        <b style={{ color: GP_T.ink }}>{Number(c.spend_range_x).toFixed(1)}×</b> spend range.
+      </div>
+
+      {/* MEASURED — no model involved */}
+      <div style={{ fontSize: 10.5, letterSpacing: '.4px', textTransform: 'uppercase', color: GP_T.dim, marginBottom: 8 }}>What you have measured</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10, marginBottom: 8 }}>
+        <GP_Metric k="A first order contributes" v={'£' + cm.toFixed(2)} />
+        <GP_Metric k="Last month's cost per customer" v={'£' + Number(pts[pts.length - 1].cac).toFixed(2)}
+          hi={pts[pts.length - 1].cac_above_contribution} sub={pts[pts.length - 1].month ? String(pts[pts.length - 1].month).slice(0, 7) : null} />
+        <GP_Metric k="Months above contribution" v={above.length + ' of ' + pts.length}
+          sub={recentAbove + ' of the last ' + recent.length} />
+      </div>
+      {recentAbove > 0 && (
+        <div style={{ fontSize: 12, color: GP_T.red, lineHeight: 1.6, marginBottom: 14 }}>
+          {recentAbove} of your last {recent.length} months cost more to acquire a customer than a first
+          order returns. That is measured, not modelled — it holds whatever the curve turns out to be.
+        </div>
+      )}
+
+      <svg viewBox={'0 0 ' + W + ' ' + H} width="100%" role="img"
+        aria-label={'Monthly ad spend against cost per new customer over ' + c.n_months + ' months, with the fitted curve and its 95% band'}
+        style={{ display: 'block', overflow: 'visible' }}>
+        {[0.25, 0.5, 0.75, 1].map(function (f, i) {
+          return <g key={i}>
+            <line x1={ML} x2={W - MR} y1={Y(y1 * f)} y2={Y(y1 * f)} stroke={GP_T.line} strokeWidth="1" />
+            <text x={ML - 8} y={Y(y1 * f) + 3.5} textAnchor="end" fontSize="10" fill={GP_T.dim} fontFamily={GP_T.mono}>{tick(y1 * f)}</text>
+          </g>;
+        })}
+        <polygon points={poly} fill={GP_T.accent} opacity="0.13" />
+        <path d={line(mid)} fill="none" stroke={GP_T.accent} strokeWidth="2" />
+        <line x1={ML} x2={W - MR} y1={Y(cm)} y2={Y(cm)} stroke={GP_T.red} strokeWidth="1.5" strokeDasharray="5 4" />
+        <text x={W - MR} y={Y(cm) - 6} textAnchor="end" fontSize="10" fill={GP_T.red}>a customer is worth £{cm.toFixed(0)}</text>
+        {cur > 0 && <line x1={X(cur)} x2={X(cur)} y1={MT} y2={MT + ph} stroke={GP_T.dim} strokeWidth="1.5" strokeDasharray="2 3" />}
+        {cur > 0 && <text x={X(cur) - 6} y={MT + 10} textAnchor="end" fontSize="10" fill={GP_T.dim}>now</text>}
+        {pts.map(function (d, i) {
+          var bad = !!d.cac_above_contribution;
+          return <circle key={i} cx={X(Number(d.spend))} cy={Y(Number(d.cac))} r="4"
+            fill={bad ? GP_T.red : GP_T.accent} opacity={bad ? 0.95 : 0.7}>
+            <title>{String(d.month).slice(0, 7) + ' · ' + GP_gbp(d.spend) + ' spend · £' + Number(d.cac).toFixed(2) + ' per customer'}</title>
+          </circle>;
+        })}
+        <line x1={ML} x2={W - MR} y1={MT + ph} y2={MT + ph} stroke={GP_T.line} strokeWidth="1" />
+        {[0.25, 0.5, 0.75, 1].map(function (f, i) {
+          return <text key={i} x={X(x1 * f)} y={H - 10} textAnchor="middle" fontSize="10" fill={GP_T.dim} fontFamily={GP_T.mono}>{tick(x1 * f)}</text>;
+        })}
+        <text x={ML} y={H - 10} textAnchor="start" fontSize="10" fill={GP_T.dim}>monthly spend →</text>
+      </svg>
+
+      {/* MODELLED — carries the band */}
+      <div style={{ fontSize: 10.5, letterSpacing: '.4px', textTransform: 'uppercase', color: GP_T.dim, margin: '14px 0 8px' }}>What the curve models</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10 }}>
+        <GP_Metric k="Curvature (β)" v={beta.toFixed(2)} sub={'95% ' + bLo.toFixed(2) + '–' + bHi.toFixed(2)} />
+        <GP_Metric k="The next customer costs" v={c.marginal_cac_now == null ? '—' : '£' + Number(c.marginal_cac_now).toFixed(2)}
+          hi={c.marginal_cac_now != null && Number(c.marginal_cac_now) > cm} sub={'at ' + GP_gbp(cur) + '/mo'} />
+        <GP_Metric k="Profitable ceiling" hi={!indet}
+          v={c.ceiling_low == null && c.ceiling_high == null ? '—'
+             : GP_gbp(c.ceiling_low != null ? c.ceiling_low : c.ceiling_mid) + '–' + GP_gbp(c.ceiling_high)}
+          sub={c.ci_admits_no_ceiling ? 'band also admits no ceiling' : 'where the next customer costs what one is worth'} />
+      </div>
+
+      <div style={{ fontSize: 12, color: GP_T.mut, lineHeight: 1.65, marginTop: 12 }}>
+        {indet ? (
+          <span>
+            Your spend of <b style={{ color: GP_T.ink }}>{GP_gbp(cur)}/mo</b> sits <b style={{ color: GP_T.ink }}>inside</b> that
+            range, so the curve cannot yet tell you which end you are on. Spend and discount depth move
+            together here (r² {Number(c.r2).toFixed(2)}), so the fit cannot separate them.{' '}
+            <b style={{ color: GP_T.ink }}>To narrow it:</b> hold discount steady and step spend deliberately
+            for a few weeks, or run a geo-holdout. More months alone will not do it.
+          </span>
+        ) : (
+          <span>
+            Your spend of <b style={{ color: GP_T.ink }}>{GP_gbp(cur)}/mo</b> is{' '}
+            <b style={{ color: c.verdict === 'over' ? GP_T.red : GP_T.green }}>
+              {c.verdict === 'over' ? 'above' : 'below'}
+            </b>{' '}the whole identified range, so this read holds across the band.
+          </span>
+        )}
+      </div>
+      {c.reason && (
+        <div style={{ fontSize: 11, color: GP_T.dim, marginTop: 8, lineHeight: 1.5 }}>Model gate: {c.reason}</div>
+      )}
+    </div>
+  );
+}
+
 function GretaPlanPanel() {
   var P = (typeof window !== 'undefined' && window.FRKL_PLAN) || { readiness: [], goal: null, period: { start: '', end: '' } };
   var s = React.useState(0), tick = s[0], setTick = s[1];
@@ -11139,6 +11307,8 @@ function GretaPlanPanel() {
         </div>
       ) : null}
 
+      <GP_SpendCurve curve={P.spendCurve} points={P.spendCurvePoints} />
+
       {/* goal setter */}
       <div style={{ background: 'linear-gradient(180deg,' + GP_T.panel + ',' + GP_T.panel2 + ')', border: '1px solid ' + GP_T.line, borderRadius: 12, padding: '16px 18px' }}>
         <div style={{ fontSize: 11, letterSpacing: '.5px', textTransform: 'uppercase', color: GP_T.accent2, marginBottom: 10 }}>Set the quarter goal</div>
@@ -11223,6 +11393,11 @@ const NAV = [
   { id:'conversion', label:'Conversion', icon:'pulse', subtabs:[
     { id:'cvr',  label:'CVR drivers',    component: () => <CvrDrivers/> },
     { id:'site', label:'Site & friction', component: (p) => <SiteStructure start={p.start}/> },
+    // 2026-09-15: the operating loop. Every funnel stage against its OWN trailing twelve-month
+    // normal (the first standard deviation anywhere in the model), the month's shortfall split
+    // across stages by log contribution so the five figures sum exactly to the gap, and the
+    // segment cut that localises whatever moved. Served by loop-panel.js via mosView.
+    { id:'loop', label:'The loop',       component: () => mosView('LoopView') },
   ]},
   { id:'forecast', label:'Spend forecast', icon:'trendUp', subtabs:[
     { id:'forecast', label:'Spend forecast', component: () => <ForecastPanel/> },
@@ -11577,6 +11752,11 @@ function BusinessEconomicsPanel(){
   const [csBusy, setCsBusy] = React.useState(false);
   const [gmMsg, setGmMsg] = React.useState(null);    // {text, kind}
   const [csMsg, setCsMsg] = React.useState(null);
+  // Cash / working-capital genome. Drives the 13-week projection and the fundable spend
+  // ceiling. Blank => NULL => the cash module ABSTAINS (no clamp, no cash figure shown).
+  const [cash, setCash] = React.useState({});
+  const [cashBusy, setCashBusy] = React.useState(false);
+  const [cashMsg, setCashMsg] = React.useState(null);
 
   const priors = priorsForVertical(config?.vertical);
 
@@ -11589,6 +11769,21 @@ function BusinessEconomicsPanel(){
       inventory_days:              cfg?.inventory_days != null ? String(cfg.inventory_days) : '',
       supplier_payment_terms_days: cfg?.supplier_payment_terms_days != null ? String(cfg.supplier_payment_terms_days) : '',
       discount_rate_annual:        cfg?.discount_rate_annual != null ? String(round2(Number(cfg.discount_rate_annual) * 100)) : '',
+    });
+    // supplier_deposit_pct is a FRACTION in the DB; the form shows it as a percentage.
+    setCash({
+      opening_cash:                cfg?.opening_cash != null ? String(cfg.opening_cash) : '',
+      opening_cash_as_of:          cfg?.opening_cash_as_of ? String(cfg.opening_cash_as_of).slice(0,10) : '',
+      cash_floor:                  cfg?.cash_floor != null ? String(cfg.cash_floor) : '',
+      facility_available:          cfg?.facility_available != null ? String(cfg.facility_available) : '',
+      inventory_cover_days_active: cfg?.inventory_cover_days_active != null ? String(cfg.inventory_cover_days_active) : '',
+      supplier_lead_time_weeks:    cfg?.supplier_lead_time_weeks != null ? String(cfg.supplier_lead_time_weeks) : '',
+      supplier_deposit_pct:        cfg?.supplier_deposit_pct != null ? String(round2(Number(cfg.supplier_deposit_pct) * 100)) : '',
+      supplier_deposit_lead_days:  cfg?.supplier_deposit_lead_days != null ? String(cfg.supplier_deposit_lead_days) : '',
+      supplier_payment_terms_days_cash: cfg?.supplier_payment_terms_days != null ? String(cfg.supplier_payment_terms_days) : '',
+      payout_lag_days:             cfg?.payout_lag_days != null ? String(cfg.payout_lag_days) : '',
+      fulfilment_terms_days:       cfg?.fulfilment_terms_days != null ? String(cfg.fulfilment_terms_days) : '',
+      opex_terms_days:             cfg?.opex_terms_days != null ? String(cfg.opex_terms_days) : '',
     });
     const savedVc = (cfg && cfg.variable_costs) || {};
     setVc(Object.fromEntries(['shipping','fulfilment','packaging','payPct','payFixed','refundPct']
@@ -11668,6 +11863,45 @@ function BusinessEconomicsPanel(){
     setConfig(data.config); seed(data.config);
     try { window.dispatchEvent(new Event('oi-config-updated')); } catch(e){}
     setCsMsg({ text:'Cost stack saved. Confirmed values now drive the model instead of category estimates.', kind:'ok' });
+  };
+
+  // The six the cash model treats as core. Without all of them it abstains entirely: no clamp
+  // on spend, and no cash number rendered anywhere in the app.
+  const cashReady = !!(config && config.opening_cash != null && config.opening_cash_as_of != null
+    && config.cash_floor != null && config.supplier_payment_terms_days != null
+    && config.inventory_days != null && config.supplier_lead_time_weeks != null);
+
+  const saveCash = async (e) => {
+    e.preventDefault();
+    if(cashBusy) return;
+    const patch = {};
+    const setNum = (col, raw, xform) => { const n = num(raw); if(n != null) patch[col] = xform ? xform(n) : n; };
+    setNum('opening_cash', cash.opening_cash);
+    setNum('cash_floor', cash.cash_floor);
+    setNum('facility_available', cash.facility_available);
+    setNum('inventory_cover_days_active', cash.inventory_cover_days_active);
+    setNum('supplier_lead_time_weeks', cash.supplier_lead_time_weeks);
+    setNum('supplier_deposit_pct', cash.supplier_deposit_pct, n => round4(n/100)); // % -> fraction
+    setNum('supplier_deposit_lead_days', cash.supplier_deposit_lead_days);
+    setNum('supplier_payment_terms_days', cash.supplier_payment_terms_days_cash);
+    setNum('payout_lag_days', cash.payout_lag_days);
+    setNum('fulfilment_terms_days', cash.fulfilment_terms_days);
+    setNum('opex_terms_days', cash.opex_terms_days);
+    if(cash.opening_cash_as_of) patch.opening_cash_as_of = cash.opening_cash_as_of;
+
+    if(!Object.keys(patch).length){ setCashMsg({ text:'Fill in at least one field to save.', kind:'err' }); return; }
+    setCashBusy(true); setCashMsg(null);
+    const { ok, data } = await save(patch);
+    setCashBusy(false);
+    if(!ok){ setCashMsg({ text:data.message||data.detail||data.error||'Save failed.', kind:'err' }); return; }
+    setConfig(data.config); seed(data.config);
+    try { window.dispatchEvent(new Event('oi-config-updated')); } catch(e){}
+    const nowReady = data.config && data.config.opening_cash != null && data.config.opening_cash_as_of != null
+      && data.config.cash_floor != null && data.config.supplier_payment_terms_days != null
+      && data.config.inventory_days != null && data.config.supplier_lead_time_weeks != null;
+    setCashMsg({ text: nowReady
+      ? 'Cash settings saved — the fundable spend ceiling switches on at the next engine run.'
+      : 'Saved. Still missing a core field, so spend is not capped on cash yet.', kind:'ok' });
   };
 
   if(!authed){
@@ -11810,11 +12044,115 @@ function BusinessEconomicsPanel(){
           </form>
           {msgBox(csMsg)}
         </div>
+
+        {/* ── Step 3 — Cash & working capital ── */}
+        {/* Feeds the 13-week cash projection and the fundable spend ceiling. Every field is
+            optional, but the model ABSTAINS until the six core ones are set: it will not put a
+            cash number on screen that rests on a guess. */}
+        <div className="card" style={{padding:'var(--s-7)'}}>
+          <div style={{display:'flex', alignItems:'baseline', gap:'var(--s-2)', flexWrap:'wrap', marginBottom:4}}>
+            <div style={{fontSize:15, fontWeight:650}}>Cash &amp; working capital</div>
+            <span style={{fontSize:10.5, fontWeight:700, letterSpacing:'.05em', textTransform:'uppercase',
+              color: cashReady ? 'var(--good)' : 'var(--text-faint)'}}>
+              {cashReady ? '● Cash ceiling is ON' : '○ Not set — spend is not capped on cash'}
+            </span>
+          </div>
+          <div className="meta" style={{fontSize:12.5, marginBottom:'var(--s-5)', lineHeight:1.6, maxWidth:660}}>
+            Your forecast says what spend is <em>profitable</em>. These say what is <em>affordable</em>.
+            The recommendation becomes the lower of the two. Until the first four are set, nothing is
+            capped and no cash figure appears anywhere — a cash model on guesses is worse than none.
+          </div>
+
+          <form onSubmit={saveCash} style={{display:'flex', flexDirection:'column', gap:'var(--s-6)'}}>
+
+            <div>
+              <div className="micro" style={{color:'var(--accent)', marginBottom:'var(--s-3)'}}>Cash position</div>
+              <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:'var(--s-4)'}}>
+                <Field label="Cash in bank" unit={curSym()} value={cash.opening_cash||''} onChange={v=>setCash(s=>({...s, opening_cash:v}))}
+                  saved={config?.opening_cash != null} fallback={{ label:'required', warn:true }}
+                  hint="The actual balance. Never estimated from Shopify — only you know this."/>
+                <div style={{display:'flex', flexDirection:'column', gap:5}}>
+                  <div style={{display:'flex', alignItems:'baseline', justifyContent:'space-between', gap:'var(--s-2)', minHeight:'2.6em'}}>
+                    <span style={{fontSize:12.5, fontWeight:600}}>Balance as at</span>
+                    <Tag saved={config?.opening_cash_as_of != null} fallback={{ label:'required', warn:true }}/>
+                  </div>
+                  <input type="date" value={cash.opening_cash_as_of||''} max={todayISO()}
+                    onChange={e=>setCash(s=>({...s, opening_cash_as_of:e.target.value}))} style={inputStyle}/>
+                  <div className="meta" style={{fontSize:11, lineHeight:1.45}}>
+                    Goes stale after 45 days — after that the model stops showing cash rather than trust it.
+                  </div>
+                </div>
+                <Field label="Minimum balance" unit={curSym()} value={cash.cash_floor||''} onChange={v=>setCash(s=>({...s, cash_floor:v}))}
+                  saved={config?.cash_floor != null} fallback={{ label:'required', warn:true }}
+                  hint="The floor you will not go below. Spend is capped to keep 13 weeks above it."/>
+                <Field label="Facility available" unit={curSym()} value={cash.facility_available||''} onChange={v=>setCash(s=>({...s, facility_available:v}))}
+                  saved={config?.facility_available != null} fallback={{ label:'assumes none' }}
+                  hint="Undrawn overdraft or line. Shown as headroom — never drawn automatically."/>
+              </div>
+            </div>
+
+            <div>
+              <div className="micro" style={{color:'var(--accent)', marginBottom:'var(--s-3)'}}>Stock &amp; suppliers</div>
+              <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:'var(--s-4)'}}>
+                <Field label="Cover you reorder to" unit="days" int value={cash.inventory_cover_days_active||''}
+                  onChange={v=>setCash(s=>({...s, inventory_cover_days_active:v}))}
+                  saved={config?.inventory_cover_days_active != null}
+                  fallback={{ label:'uses inventory days' }}
+                  hint="The range you actually reorder — not total stock. Slow movers are already bought, so counting them here would overstate future purchases."/>
+                <Field label="Supplier lead time" unit="wks" value={cash.supplier_lead_time_weeks||''}
+                  onChange={v=>setCash(s=>({...s, supplier_lead_time_weeks:v}))}
+                  saved={config?.supplier_lead_time_weeks != null} fallback={{ label:'required', warn:true }}
+                  hint="Order to goods landing. 45–60 days is roughly 6.5–8.5 weeks."/>
+                <Field label="Deposit" unit="%" value={cash.supplier_deposit_pct||''}
+                  onChange={v=>setCash(s=>({...s, supplier_deposit_pct:v}))}
+                  saved={config?.supplier_deposit_pct != null} fallback={{ label:'assumes 0%' }}
+                  hint="Share paid up front, e.g. 30 for 30%."/>
+                <Field label="Deposit paid before landing" unit="days" int value={cash.supplier_deposit_lead_days||''}
+                  onChange={v=>setCash(s=>({...s, supplier_deposit_lead_days:v}))}
+                  saved={config?.supplier_deposit_lead_days != null} fallback={{ label:'uses lead time' }}
+                  hint="How far ahead of the goods arriving the deposit leaves. This is where growth eats cash."/>
+                <Field label="Balance terms" unit="days" int value={cash.supplier_payment_terms_days_cash||''}
+                  onChange={v=>setCash(s=>({...s, supplier_payment_terms_days_cash:v}))}
+                  saved={config?.supplier_payment_terms_days != null} fallback={{ label:'required', warn:true }}
+                  hint="Days after landing you pay the balance. 0 = on shipment."/>
+              </div>
+            </div>
+
+            <div>
+              <div className="micro" style={{color:'var(--accent)', marginBottom:'var(--s-3)'}}>Timing</div>
+              <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px, 1fr))', gap:'var(--s-4)'}}>
+                <Field label="Payout lag" unit="days" value={cash.payout_lag_days||''}
+                  onChange={v=>setCash(s=>({...s, payout_lag_days:v}))}
+                  saved={config?.payout_lag_days != null} fallback={{ label:'assumes same day' }}
+                  hint="Days from sale to the money hitting your bank."/>
+                <Field label="Fulfilment terms" unit="days" int value={cash.fulfilment_terms_days||''}
+                  onChange={v=>setCash(s=>({...s, fulfilment_terms_days:v}))}
+                  saved={config?.fulfilment_terms_days != null} fallback={{ label:'assumes same week' }}
+                  hint="Days you have to pay your 3PL and carriers."/>
+                <Field label="Fixed-cost terms" unit="days" int value={cash.opex_terms_days||''}
+                  onChange={v=>setCash(s=>({...s, opex_terms_days:v}))}
+                  saved={config?.opex_terms_days != null} fallback={{ label:'assumes same week' }}
+                  hint="Blended terms on fixed costs — agencies on 30 days, subscriptions immediate."/>
+              </div>
+            </div>
+
+            <div style={{display:'flex', alignItems:'center', gap:'var(--s-3)', paddingTop:'var(--s-4)', borderTop:'1px solid var(--color-line, var(--border-subtle))'}}>
+              <button type="submit" className="btn-primary" disabled={cashBusy}
+                style={{padding:'9px 16px', fontSize:13, border:0, borderRadius:'var(--r-md)', cursor:cashBusy?'default':'pointer', fontFamily:'inherit', fontWeight:600, opacity:cashBusy?0.6:1}}>
+                {cashBusy ? 'Saving…' : 'Save cash settings'}
+              </button>
+              <span className="meta" style={{fontSize:11}}>Blank fields stay unset — the model abstains rather than guessing.</span>
+            </div>
+          </form>
+          {msgBox(cashMsg)}
+        </div>
+
       </>)}
     </div>
   );
 }
 // Small rounding helpers — keep stored fractions tidy (avoid 0.7699999 float noise).
+function todayISO(){ return new Date().toISOString().slice(0,10); }
 function round2(n){ return Math.round(Number(n) * 100) / 100; }
 function round4(n){ return Math.round(Number(n) * 10000) / 10000; }
 
