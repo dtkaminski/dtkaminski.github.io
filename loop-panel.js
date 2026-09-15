@@ -63,24 +63,44 @@
     const [err, setErr] = useState(null);
     const key = JSON.stringify(opts || {});
     useEffect(() => {
-      let alive = true;
-      const sb = sbClient();
-      if (!sb || !brandId) return;
-      let q = sb.from(view).select('*').eq('brand_id', brandId);
-      const o = opts || {};
-      if (o.eq) Object.keys(o.eq).forEach(k => {
-        q = q.eq(k, o.eq[k]);
-      });
-      if (o.order) q = q.order(o.order, {
-        ascending: o.asc !== false
-      });
-      if (o.limit) q = q.limit(o.limit);
-      q.then(r => {
-        if (!alive) return;
-        if (r.error) setErr(r.error.message);else setRows(r.data || []);
-      });
+      let alive = true,
+        timer = null,
+        tries = 0;
+      function run() {
+        const sb = sbClient();
+        // greta-data-loader.js installs the Supabase client asynchronously, so it is
+        // routinely absent when this panel first mounts. Returning here without a retry
+        // strands the panel on "Loading…" for ever, because none of this effect's deps
+        // change when the client later appears. So wait for it, with a cap.
+        if (!sb || !brandId) {
+          if (!alive) return;
+          if (++tries > 75) {
+            setErr('Supabase client never became available');
+            return;
+          }
+          timer = setTimeout(run, 400);
+          return;
+        }
+        let q = sb.from(view).select('*').eq('brand_id', brandId);
+        const o = opts || {};
+        if (o.eq) Object.keys(o.eq).forEach(k => {
+          q = q.eq(k, o.eq[k]);
+        });
+        if (o.order) q = q.order(o.order, {
+          ascending: o.asc !== false
+        });
+        if (o.limit) q = q.limit(o.limit);
+        q.then(r => {
+          if (!alive) return;
+          if (r.error) setErr(r.error.message);else setRows(r.data || []);
+        }).catch(e => {
+          if (alive) setErr(String(e && e.message || e));
+        });
+      }
+      run();
       return () => {
         alive = false;
+        if (timer) clearTimeout(timer);
       };
     }, [view, brandId, key]);
     return [rows, err];
