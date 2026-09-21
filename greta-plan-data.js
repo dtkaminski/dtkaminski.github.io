@@ -3,6 +3,7 @@
  * Exposes window.FRKL_PLAN = { ready, readiness[], goal, config, forecast, period, refresh(), derive(amt,basis), confirm(derived), saveEconomics(fields) }.
  *   readiness  ← vw_brand_plan_readiness (the completeness gate)
  *   forecast   ← vw_forecast_vs_goal (calendar-aware forecast for the period vs goal + the gap; SOT view, not recomputed)
+ *   spendCurve ← vw_brand_spend_curve (+ _points): the k curve, its 95% band and `verdict`
  *   channels   ← vw_channel_scoreboard (per-channel normalized iROAS vs break-even/target CAC, CM-first focus rank)
  *   derive()   ← rpc fn_derive_business_goal (preview targets from a CAM or revenue goal; 'auto' = run-rate)
  *   confirm()  ← upserts mos_business_goal (confirmed=true). USER-initiated only (a button), never automatic.
@@ -47,6 +48,15 @@
     if (cm && cm.data) window.FRKL_PLAN.channelMix = cm.data || [];
     var hh = await withTimeout(s.from('vw_brand_channel_health').select('*').eq('brand_id', b).limit(1), 10000);
     if (hh && hh.data) window.FRKL_PLAN.channelHealth = hh.data[0] || null;
+    // Spend curve (the k curve). Two feeds on purpose: the POINTS are measurement and stay
+    // plottable even when the fit is not identified; the CURVE is inference and carries its own
+    // band + verdict. A surface must honour `verdict` - see 0141/0142.
+    var sc = await withTimeout(s.from('vw_brand_spend_curve').select('*').eq('brand_id', b).limit(1), 10000);
+    if (sc && sc.data) window.FRKL_PLAN.spendCurve = sc.data[0] || null;
+    var sp = await withTimeout(s.from('vw_brand_spend_curve_points')
+      .select('month,spend,cac,new_customers,cm_per_order,cac_above_contribution,recency_rank')
+      .eq('brand_id', b).order('month', { ascending: true }), 10000);
+    if (sp && sp.data) window.FRKL_PLAN.spendCurvePoints = sp.data || [];
     window.dispatchEvent(new CustomEvent('frkl-plan-updated'));
   }
   async function derive(amount, basis) {
@@ -108,7 +118,7 @@
       return { ok: true };
     } catch (e) { if (window.console) console.warn('[plan] saveBands failed', e); return { ok: false, error: String((e && e.message) || e) }; }
   }
-  window.FRKL_PLAN = { ready: false, readiness: [], goal: null, config: null, forecast: null, channels: [], channelMix: [], channelHealth: null, period: PERIOD, refresh: refresh, derive: derive, confirm: confirm, saveEconomics: saveEconomics, deriveChannelPlan: deriveChannelPlan, saveBands: saveBands };
+  window.FRKL_PLAN = { ready: false, readiness: [], goal: null, config: null, forecast: null, channels: [], channelMix: [], channelHealth: null, spendCurve: null, spendCurvePoints: [], period: PERIOD, refresh: refresh, derive: derive, confirm: confirm, saveEconomics: saveEconomics, deriveChannelPlan: deriveChannelPlan, saveBands: saveBands };
   window.addEventListener('frkl-data-updated', refresh);
   var t = 0, iv = setInterval(function () { t++; if ((sb() && bid()) || t > 60) { clearInterval(iv); refresh(); } }, 500);
 })();

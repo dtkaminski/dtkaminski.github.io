@@ -22,6 +22,160 @@ function GP_Metric(p) {
   );
 }
 
+
+// ── Spend curve (the "k curve") ────────────────────────────────────────────────────────────
+// The forecast models revenue as a Hill saturation R(S) = Vmax*S/(K+S); K is the
+// half-saturation spend. Operationally the brand meets it as its CAC elasticity beta — the
+// log-log slope of cost-per-customer on spend. beta -> 0 is a flat curve, beta -> 1 is severe
+// saturation.
+//
+// TWO LAYERS, deliberately separated, because they carry different certainty:
+//   MEASURED  — the monthly (spend, CAC) points and how many sat above contribution.
+//               No model. True regardless of whether the fit is identified.
+//   MODELLED  — where the profitable ceiling sits. Carries a 95% band and a `verdict`.
+//
+// When verdict = 'indeterminate' the current spend sits inside the identified ceiling range,
+// so we render the BAND and say we cannot yet call it. Drawing one confident line would
+// contradict vw_marginal_econ_gate, which already says "a wide range, not a target".
+function GP_SpendCurve(p) {
+  var c = p.curve, pts = (p.points || []).filter(function (d) { return Number(d.spend) > 0 && Number(d.cac) > 0; });
+  if (!c || pts.length < 6) return null;
+
+  var beta = Number(c.beta), cm = Number(c.cm_per_order), cur = Number(c.current_spend) || 0;
+  var aMid = Number(c.intercept_a), aLo = Number(c.intercept_a_ci_low), aHi = Number(c.intercept_a_ci_high);
+  var bLo = Number(c.ci_low), bHi = Number(c.ci_high);
+  var indet = c.verdict === 'indeterminate' || c.verdict === 'unknown';
+
+  var W = 620, H = 250, ML = 48, MR = 16, MT = 14, MB = 32;
+  var pw = W - ML - MR, ph = H - MT - MB;
+  var maxSpend = Math.max(cur, Math.max.apply(null, pts.map(function (d) { return Number(d.spend); })));
+  var maxCac = Math.max(cm, Math.max.apply(null, pts.map(function (d) { return Number(d.cac); })));
+  var x1 = maxSpend * 1.08, y1 = maxCac * 1.18;
+  var X = function (s) { return ML + (s / x1) * pw; };
+  var Y = function (v) { return MT + ph - (v / y1) * ph; };
+  var cac = function (s, a, b) { return Math.exp(a + b * Math.log(s)); };
+
+  // Sample the band. Taking min/max per x keeps the polygon simple: the two boundary curves
+  // CROSS at the data centroid (that is where the evidence is strongest), so a naive
+  // forward/reverse polygon would self-intersect.
+  var s0 = Math.max(200, maxSpend * 0.08), steps = 48, lo = [], hi = [], mid = [];
+  for (var i = 0; i <= steps; i++) {
+    var s = s0 + (x1 - s0) * (i / steps);
+    var a1 = cac(s, aLo, bLo), a2 = cac(s, aHi, bHi);
+    lo.push([X(s), Y(Math.min(a1, a2))]);
+    hi.push([X(s), Y(Math.max(a1, a2))]);
+    mid.push([X(s), Y(cac(s, aMid, beta))]);
+  }
+  var poly = hi.map(function (q) { return q.join(','); }).join(' ') + ' ' +
+             lo.slice().reverse().map(function (q) { return q.join(','); }).join(' ');
+  var line = function (arr) { return arr.map(function (q, i) { return (i ? 'L' : 'M') + q[0] + ' ' + q[1]; }).join(' '); };
+
+  var above = pts.filter(function (d) { return d.cac_above_contribution; });
+  var recent = pts.slice(-4);
+  var recentAbove = recent.filter(function (d) { return d.cac_above_contribution; }).length;
+
+  var chip = function (txt, col) {
+    return <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase',
+      color: col, border: '1px solid ' + col, borderRadius: 4, padding: '2px 6px' }}>{txt}</span>;
+  };
+  var tick = function (v) { return v >= 1000 ? '£' + Math.round(v / 1000) + 'k' : '£' + Math.round(v); };
+
+  return (
+    <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 12, padding: '16px 18px' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
+        <div style={{ fontSize: 11, letterSpacing: '.5px', textTransform: 'uppercase', color: GP_T.accent2 }}>Spend curve</div>
+        {indet ? chip('range, not a target', GP_T.amber)
+               : chip(c.verdict === 'over' ? 'over the ceiling' : 'under the ceiling',
+                      c.verdict === 'over' ? GP_T.red : GP_T.green)}
+      </div>
+      <div style={{ fontSize: 12, color: GP_T.mut, lineHeight: 1.6, maxWidth: 620, marginBottom: 14 }}>
+        Every pound of media buys customers at a rising price. This is that price, measured over{' '}
+        <b style={{ color: GP_T.ink }}>{c.n_months} months</b> across a{' '}
+        <b style={{ color: GP_T.ink }}>{Number(c.spend_range_x).toFixed(1)}×</b> spend range.
+      </div>
+
+      {/* MEASURED — no model involved */}
+      <div style={{ fontSize: 10.5, letterSpacing: '.4px', textTransform: 'uppercase', color: GP_T.dim, marginBottom: 8 }}>What you have measured</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10, marginBottom: 8 }}>
+        <GP_Metric k="A first order contributes" v={'£' + cm.toFixed(2)} />
+        <GP_Metric k="Last month's cost per customer" v={'£' + Number(pts[pts.length - 1].cac).toFixed(2)}
+          hi={pts[pts.length - 1].cac_above_contribution} sub={pts[pts.length - 1].month ? String(pts[pts.length - 1].month).slice(0, 7) : null} />
+        <GP_Metric k="Months above contribution" v={above.length + ' of ' + pts.length}
+          sub={recentAbove + ' of the last ' + recent.length} />
+      </div>
+      {recentAbove > 0 && (
+        <div style={{ fontSize: 12, color: GP_T.red, lineHeight: 1.6, marginBottom: 14 }}>
+          {recentAbove} of your last {recent.length} months cost more to acquire a customer than a first
+          order returns. That is measured, not modelled — it holds whatever the curve turns out to be.
+        </div>
+      )}
+
+      <svg viewBox={'0 0 ' + W + ' ' + H} width="100%" role="img"
+        aria-label={'Monthly ad spend against cost per new customer over ' + c.n_months + ' months, with the fitted curve and its 95% band'}
+        style={{ display: 'block', overflow: 'visible' }}>
+        {[0.25, 0.5, 0.75, 1].map(function (f, i) {
+          return <g key={i}>
+            <line x1={ML} x2={W - MR} y1={Y(y1 * f)} y2={Y(y1 * f)} stroke={GP_T.line} strokeWidth="1" />
+            <text x={ML - 8} y={Y(y1 * f) + 3.5} textAnchor="end" fontSize="10" fill={GP_T.dim} fontFamily={GP_T.mono}>{tick(y1 * f)}</text>
+          </g>;
+        })}
+        <polygon points={poly} fill={GP_T.accent} opacity="0.13" />
+        <path d={line(mid)} fill="none" stroke={GP_T.accent} strokeWidth="2" />
+        <line x1={ML} x2={W - MR} y1={Y(cm)} y2={Y(cm)} stroke={GP_T.red} strokeWidth="1.5" strokeDasharray="5 4" />
+        <text x={W - MR} y={Y(cm) - 6} textAnchor="end" fontSize="10" fill={GP_T.red}>a customer is worth £{cm.toFixed(0)}</text>
+        {cur > 0 && <line x1={X(cur)} x2={X(cur)} y1={MT} y2={MT + ph} stroke={GP_T.dim} strokeWidth="1.5" strokeDasharray="2 3" />}
+        {cur > 0 && <text x={X(cur) - 6} y={MT + 10} textAnchor="end" fontSize="10" fill={GP_T.dim}>now</text>}
+        {pts.map(function (d, i) {
+          var bad = !!d.cac_above_contribution;
+          return <circle key={i} cx={X(Number(d.spend))} cy={Y(Number(d.cac))} r="4"
+            fill={bad ? GP_T.red : GP_T.accent} opacity={bad ? 0.95 : 0.7}>
+            <title>{String(d.month).slice(0, 7) + ' · ' + GP_gbp(d.spend) + ' spend · £' + Number(d.cac).toFixed(2) + ' per customer'}</title>
+          </circle>;
+        })}
+        <line x1={ML} x2={W - MR} y1={MT + ph} y2={MT + ph} stroke={GP_T.line} strokeWidth="1" />
+        {[0.25, 0.5, 0.75, 1].map(function (f, i) {
+          return <text key={i} x={X(x1 * f)} y={H - 10} textAnchor="middle" fontSize="10" fill={GP_T.dim} fontFamily={GP_T.mono}>{tick(x1 * f)}</text>;
+        })}
+        <text x={ML} y={H - 10} textAnchor="start" fontSize="10" fill={GP_T.dim}>monthly spend →</text>
+      </svg>
+
+      {/* MODELLED — carries the band */}
+      <div style={{ fontSize: 10.5, letterSpacing: '.4px', textTransform: 'uppercase', color: GP_T.dim, margin: '14px 0 8px' }}>What the curve models</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10 }}>
+        <GP_Metric k="Curvature (β)" v={beta.toFixed(2)} sub={'95% ' + bLo.toFixed(2) + '–' + bHi.toFixed(2)} />
+        <GP_Metric k="The next customer costs" v={c.marginal_cac_now == null ? '—' : '£' + Number(c.marginal_cac_now).toFixed(2)}
+          hi={c.marginal_cac_now != null && Number(c.marginal_cac_now) > cm} sub={'at ' + GP_gbp(cur) + '/mo'} />
+        <GP_Metric k="Profitable ceiling" hi={!indet}
+          v={c.ceiling_low == null && c.ceiling_high == null ? '—'
+             : GP_gbp(c.ceiling_low != null ? c.ceiling_low : c.ceiling_mid) + '–' + GP_gbp(c.ceiling_high)}
+          sub={c.ci_admits_no_ceiling ? 'band also admits no ceiling' : 'where the next customer costs what one is worth'} />
+      </div>
+
+      <div style={{ fontSize: 12, color: GP_T.mut, lineHeight: 1.65, marginTop: 12 }}>
+        {indet ? (
+          <span>
+            Your spend of <b style={{ color: GP_T.ink }}>{GP_gbp(cur)}/mo</b> sits <b style={{ color: GP_T.ink }}>inside</b> that
+            range, so the curve cannot yet tell you which end you are on. Spend and discount depth move
+            together here (r² {Number(c.r2).toFixed(2)}), so the fit cannot separate them.{' '}
+            <b style={{ color: GP_T.ink }}>To narrow it:</b> hold discount steady and step spend deliberately
+            for a few weeks, or run a geo-holdout. More months alone will not do it.
+          </span>
+        ) : (
+          <span>
+            Your spend of <b style={{ color: GP_T.ink }}>{GP_gbp(cur)}/mo</b> is{' '}
+            <b style={{ color: c.verdict === 'over' ? GP_T.red : GP_T.green }}>
+              {c.verdict === 'over' ? 'above' : 'below'}
+            </b>{' '}the whole identified range, so this read holds across the band.
+          </span>
+        )}
+      </div>
+      {c.reason && (
+        <div style={{ fontSize: 11, color: GP_T.dim, marginTop: 8, lineHeight: 1.5 }}>Model gate: {c.reason}</div>
+      )}
+    </div>
+  );
+}
+
 function GretaPlanPanel() {
   var P = (typeof window !== 'undefined' && window.FRKL_PLAN) || { readiness: [], goal: null, period: { start: '', end: '' } };
   var s = React.useState(0), tick = s[0], setTick = s[1];
@@ -218,6 +372,8 @@ function GretaPlanPanel() {
           </div>
         </div>
       ) : null}
+
+      <GP_SpendCurve curve={P.spendCurve} points={P.spendCurvePoints} />
 
       {/* goal setter */}
       <div style={{ background: 'linear-gradient(180deg,' + GP_T.panel + ',' + GP_T.panel2 + ')', border: '1px solid ' + GP_T.line, borderRadius: 12, padding: '16px 18px' }}>
