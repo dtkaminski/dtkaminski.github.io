@@ -7,7 +7,7 @@ window.FRKL_PATTERNS = {
    "kind": "money",
    "metric_id": null,
    "related_metric_id": null,
-   "description": "Bundle attach uplift (Pre-styled stacks): £94/mo opportunity (low conf.) — Lifting bundle attach from 0.8% → 5% on 337 orders × £7 AOV uplift = £94/mo",
+   "description": "Bundle attach uplift (Pre-styled stacks): £94/mo opportunity (low conf.) — Lifting bundle attach from 0.8% → 5% on 337 orders × £7 average order value uplift = £94/mo",
    "detected_at": "2026-06-09T10:52:20.26369+00:00",
    "window_start": null,
    "window_end": null,
@@ -16,7 +16,7 @@ window.FRKL_PATTERNS = {
    "effect_size": 94.0,
    "metadata": {
     "kind": "opportunity",
-    "basis": "Lifting bundle attach from 0.8% → 5% on 337 orders × £7 AOV uplift = £94/mo",
+    "basis": "Lifting bundle attach from 0.8% → 5% on 337 orders × £7 average order value uplift = £94/mo",
     "label": "Bundle attach uplift (Pre-styled stacks)",
     "confidence": "low",
     "synthetic_id": "synth-bundle-opportunity",
@@ -27,7 +27,7 @@ window.FRKL_PATTERNS = {
    "kind": "money",
    "metric_id": null,
    "related_metric_id": null,
-   "description": "Earrings collection expansion: £943/mo opportunity (low conf.) — Earrings only 2.3% of product revenue (1 SKU); growing to 10% adds £943/mo",
+   "description": "Earrings collection expansion: £943/mo opportunity (low conf.) — Earrings only 2.3% of product revenue (1 item); growing to 10% adds £943/mo",
    "detected_at": "2026-06-09T10:52:20.26369+00:00",
    "window_start": null,
    "window_end": null,
@@ -36,7 +36,7 @@ window.FRKL_PATTERNS = {
    "effect_size": 943.0,
    "metadata": {
     "kind": "opportunity",
-    "basis": "Earrings only 2.3% of product revenue (1 SKU); growing to 10% adds £943/mo",
+    "basis": "Earrings only 2.3% of product revenue (1 item); growing to 10% adds £943/mo",
     "label": "Earrings collection expansion",
     "confidence": "low",
     "synthetic_id": "synth-earrings-collection-gap",
@@ -87,7 +87,7 @@ window.FRKL_PATTERNS = {
    "kind": "money",
    "metric_id": null,
    "related_metric_id": null,
-   "description": "Lost sales from understocked bestsellers: £2,533/mo leakage (medium conf.) — 4 SKUs under 14d cover (incl. out-of-stock bestsellers); at current velocity = £2,533/mo of lost sales until reorders land",
+   "description": "Lost sales from understocked bestsellers: £2,533/mo leakage (medium conf.) — 4 items under 14d cover (incl. out-of-stock bestsellers); at current velocity = £2,533/mo of lost sales until reorders land",
    "detected_at": "2026-06-09T10:52:20.26369+00:00",
    "window_start": null,
    "window_end": null,
@@ -96,7 +96,7 @@ window.FRKL_PATTERNS = {
    "effect_size": 2533.0,
    "metadata": {
     "kind": "leakage",
-    "basis": "4 SKUs under 14d cover (incl. out-of-stock bestsellers); at current velocity = £2,533/mo of lost sales until reorders land",
+    "basis": "4 items under 14d cover (incl. out-of-stock bestsellers); at current velocity = £2,533/mo of lost sales until reorders land",
     "label": "Lost sales from understocked bestsellers",
     "confidence": "medium",
     "synthetic_id": "synth-inventory-critical-stockout",
@@ -107,7 +107,7 @@ window.FRKL_PATTERNS = {
    "kind": "money",
    "metric_id": null,
    "related_metric_id": null,
-   "description": "Capital tied up in overstock + dead SKUs: £3,633/mo at_risk (medium conf.) — £290,638 of capital locked in >180-day-cover + archived SKUs. At 15% annual cost of capital = monthly working-capital drag shown. The bigger story: this is ~18 months of DTC revenue tied up, liquidating it would free cash for replenishment + new SKUs.",
+   "description": "Capital tied up in overstock + dead items: £3,633/mo at_risk (medium conf.) — £290,638 of capital locked in >180-day-cover + archived items. At 15% annual cost of capital = monthly working-capital drag shown. The bigger story: this is ~18 months of DTC revenue tied up, liquidating it would free cash for replenishment + new items.",
    "detected_at": "2026-06-09T10:52:20.26369+00:00",
    "window_start": null,
    "window_end": null,
@@ -116,8 +116,8 @@ window.FRKL_PATTERNS = {
    "effect_size": 3633.0,
    "metadata": {
     "kind": "at_risk",
-    "basis": "£290,638 of capital locked in >180-day-cover + archived SKUs. At 15% annual cost of capital = monthly working-capital drag shown. The bigger story: this is ~18 months of DTC revenue tied up, liquidating it would free cash for replenishment + new SKUs.",
-    "label": "Capital tied up in overstock + dead SKUs",
+    "basis": "£290,638 of capital locked in >180-day-cover + archived items. At 15% annual cost of capital = monthly working-capital drag shown. The bigger story: this is ~18 months of DTC revenue tied up, liquidating it would free cash for replenishment + new items.",
+    "label": "Capital tied up in overstock + dead items",
     "confidence": "medium",
     "synthetic_id": "synth-inventory-overstock-capital",
     "monthly_impact_gbp": 3633.0
@@ -3707,7 +3707,7 @@ window.FRKL_PATTERNS = {
    "kind": "co_movement",
    "metric_id": "meta_roas_30d",
    "related_metric_id": "return_rate_30d",
-   "description": "[co-mover] Meta ROAS (30d) also moved up ~38.9% in the same window as action pulse-shopify-investigate-13-return-rate (Return rate (30d)). |z|=5.23.",
+   "description": "[co-mover] Meta return on ad spend (30d) also moved up ~38.9% in the same window as action pulse-shopify-investigate-13-return-rate (Return rate (30d)). |z|=5.23.",
    "detected_at": "2026-06-08T08:15:33.603992+00:00",
    "window_start": null,
    "window_end": null,
@@ -3799,7 +3799,7 @@ window.FRKL_PATTERNS = {
    "kind": "co_movement",
    "metric_id": "site_cvr_30d",
    "related_metric_id": "return_rate_30d",
-   "description": "[co-mover] Site CVR (30d) also moved up ~32.3% in the same window as action pulse-shopify-investigate-13-return-rate (Return rate (30d)). |z|=2.84.",
+   "description": "[co-mover] Site conversion rate (30d) also moved up ~32.3% in the same window as action pulse-shopify-investigate-13-return-rate (Return rate (30d)). |z|=2.84.",
    "detected_at": "2026-06-08T08:15:33.603992+00:00",
    "window_start": null,
    "window_end": null,
@@ -3822,7 +3822,7 @@ window.FRKL_PATTERNS = {
    "kind": "co_movement",
    "metric_id": "blended_mer_30d",
    "related_metric_id": "return_rate_30d",
-   "description": "[co-mover] Blended MER (30d) also moved up ~21.9% in the same window as action pulse-shopify-investigate-13-return-rate (Return rate (30d)). |z|=2.36.",
+   "description": "[co-mover] Blended sales per £ of ads (30d) also moved up ~21.9% in the same window as action pulse-shopify-investigate-13-return-rate (Return rate (30d)). |z|=2.36.",
    "detected_at": "2026-06-08T08:15:33.603992+00:00",
    "window_start": null,
    "window_end": null,
@@ -3875,7 +3875,7 @@ window.FRKL_PATTERNS = {
    "kind": "co_movement",
    "metric_id": "meta_roas_30d",
    "related_metric_id": "discount_rate_30d",
-   "description": "[co-mover] Meta ROAS (30d) also moved up ~38.9% in the same window as action atlas-economics-attack-36-discount-rate (Discount rate (30d)). |z|=5.23.",
+   "description": "[co-mover] Meta return on ad spend (30d) also moved up ~38.9% in the same window as action atlas-economics-attack-36-discount-rate (Discount rate (30d)). |z|=5.23.",
    "detected_at": "2026-06-08T08:15:33.603992+00:00",
    "window_start": null,
    "window_end": null,
@@ -3967,7 +3967,7 @@ window.FRKL_PATTERNS = {
    "kind": "co_movement",
    "metric_id": "site_cvr_30d",
    "related_metric_id": "discount_rate_30d",
-   "description": "[co-mover] Site CVR (30d) also moved up ~32.3% in the same window as action atlas-economics-attack-36-discount-rate (Discount rate (30d)). |z|=2.84.",
+   "description": "[co-mover] Site conversion rate (30d) also moved up ~32.3% in the same window as action atlas-economics-attack-36-discount-rate (Discount rate (30d)). |z|=2.84.",
    "detected_at": "2026-06-08T08:15:33.603992+00:00",
    "window_start": null,
    "window_end": null,
@@ -3990,7 +3990,7 @@ window.FRKL_PATTERNS = {
    "kind": "co_movement",
    "metric_id": "blended_mer_30d",
    "related_metric_id": "discount_rate_30d",
-   "description": "[co-mover] Blended MER (30d) also moved up ~21.9% in the same window as action atlas-economics-attack-36-discount-rate (Discount rate (30d)). |z|=2.36.",
+   "description": "[co-mover] Blended sales per £ of ads (30d) also moved up ~21.9% in the same window as action atlas-economics-attack-36-discount-rate (Discount rate (30d)). |z|=2.36.",
    "detected_at": "2026-06-08T08:15:33.603992+00:00",
    "window_start": null,
    "window_end": null,
@@ -4043,7 +4043,7 @@ window.FRKL_PATTERNS = {
    "kind": "co_movement",
    "metric_id": "meta_roas_30d",
    "related_metric_id": "discount_rate_30d",
-   "description": "[co-mover] Meta ROAS (30d) also moved up ~38.9% in the same window as action pulse-shopify-audit-discount-stacking-10 (Discount rate (30d)). |z|=5.23.",
+   "description": "[co-mover] Meta return on ad spend (30d) also moved up ~38.9% in the same window as action pulse-shopify-audit-discount-stacking-10 (Discount rate (30d)). |z|=5.23.",
    "detected_at": "2026-06-08T08:15:33.603992+00:00",
    "window_start": null,
    "window_end": null,
@@ -4135,7 +4135,7 @@ window.FRKL_PATTERNS = {
    "kind": "co_movement",
    "metric_id": "site_cvr_30d",
    "related_metric_id": "discount_rate_30d",
-   "description": "[co-mover] Site CVR (30d) also moved up ~32.3% in the same window as action pulse-shopify-audit-discount-stacking-10 (Discount rate (30d)). |z|=2.84.",
+   "description": "[co-mover] Site conversion rate (30d) also moved up ~32.3% in the same window as action pulse-shopify-audit-discount-stacking-10 (Discount rate (30d)). |z|=2.84.",
    "detected_at": "2026-06-08T08:15:33.603992+00:00",
    "window_start": null,
    "window_end": null,
@@ -4158,7 +4158,7 @@ window.FRKL_PATTERNS = {
    "kind": "co_movement",
    "metric_id": "blended_mer_30d",
    "related_metric_id": "discount_rate_30d",
-   "description": "[co-mover] Blended MER (30d) also moved up ~21.9% in the same window as action pulse-shopify-audit-discount-stacking-10 (Discount rate (30d)). |z|=2.36.",
+   "description": "[co-mover] Blended sales per £ of ads (30d) also moved up ~21.9% in the same window as action pulse-shopify-audit-discount-stacking-10 (Discount rate (30d)). |z|=2.36.",
    "detected_at": "2026-06-08T08:15:33.603992+00:00",
    "window_start": null,
    "window_end": null,
@@ -4265,7 +4265,7 @@ window.FRKL_PATTERNS = {
    "kind": "trend",
    "metric_id": "meta_roas_30d",
    "related_metric_id": null,
-   "description": "Meta ROAS (30d) trending down ~16.5% over 29 days (3.30× → 2.88×; p=0.030; unfavourable).",
+   "description": "Meta return on ad spend (30d) trending down ~16.5% over 29 days (3.30× → 2.88×; p=0.030; unfavourable).",
    "detected_at": "2026-06-08T08:15:24.71337+00:00",
    "window_start": "2026-05-10",
    "window_end": "2026-06-08",
@@ -4334,7 +4334,7 @@ window.FRKL_PATTERNS = {
    "kind": "trend",
    "metric_id": "google_roas_30d",
    "related_metric_id": null,
-   "description": "Google ROAS (30d) trending down ~36.6% over 29 days (6.09× → 4.77×; p=0.000; unfavourable).",
+   "description": "Google return on ad spend (30d) trending down ~36.6% over 29 days (6.09× → 4.77×; p=0.000; unfavourable).",
    "detected_at": "2026-06-08T08:15:24.71337+00:00",
    "window_start": "2026-05-10",
    "window_end": "2026-06-08",
@@ -4357,7 +4357,7 @@ window.FRKL_PATTERNS = {
    "kind": "trend",
    "metric_id": "blended_mer_7d",
    "related_metric_id": null,
-   "description": "Blended MER (7d) trending up ~201.2% over 29 days (3.00× → 3.75×; p=0.000; favourable).",
+   "description": "Blended sales per £ of ads (7d) trending up ~201.2% over 29 days (3.00× → 3.75×; p=0.000; favourable).",
    "detected_at": "2026-06-08T08:15:24.71337+00:00",
    "window_start": "2026-05-10",
    "window_end": "2026-06-08",
@@ -4380,7 +4380,7 @@ window.FRKL_PATTERNS = {
    "kind": "change_point",
    "metric_id": "blended_mer_7d",
    "related_metric_id": null,
-   "description": "Blended MER (7d) step-changed up (3.81× → 7.73×; |z|=1.90; favourable).",
+   "description": "Blended sales per £ of ads (7d) step-changed up (3.81× → 7.73×; |z|=1.90; favourable).",
    "detected_at": "2026-06-08T08:15:24.71337+00:00",
    "window_start": "2026-05-12",
    "window_end": "2026-06-08",
@@ -4401,7 +4401,7 @@ window.FRKL_PATTERNS = {
    "kind": "trend",
    "metric_id": "aov_30d",
    "related_metric_id": null,
-   "description": "AOV (30d) trending up ~8.3% over 29 days (£78 → £81; p=0.000; favourable).",
+   "description": "average order value (30d) trending up ~8.3% over 29 days (£78 → £81; p=0.000; favourable).",
    "detected_at": "2026-06-08T08:15:24.71337+00:00",
    "window_start": "2026-05-10",
    "window_end": "2026-06-08",
@@ -4424,7 +4424,7 @@ window.FRKL_PATTERNS = {
    "kind": "trend",
    "metric_id": "site_cvr_30d",
    "related_metric_id": null,
-   "description": "Site CVR (30d) trending down ~17.9% over 29 days (1.3% → 1.2%; p=0.003; unfavourable).",
+   "description": "Site conversion rate (30d) trending down ~17.9% over 29 days (1.3% → 1.2%; p=0.003; unfavourable).",
    "detected_at": "2026-06-08T08:15:24.71337+00:00",
    "window_start": "2026-05-10",
    "window_end": "2026-06-08",
@@ -4447,7 +4447,7 @@ window.FRKL_PATTERNS = {
    "kind": "trend",
    "metric_id": "atc_to_checkout_30d",
    "related_metric_id": null,
-   "description": "ATC → Checkout (30d) trending up ~13.6% over 29 days (21.7% → 23.1%; p=0.000; favourable).",
+   "description": "add-to-basket → Checkout (30d) trending up ~13.6% over 29 days (21.7% → 23.1%; p=0.000; favourable).",
    "detected_at": "2026-06-08T08:15:24.71337+00:00",
    "window_start": "2026-05-10",
    "window_end": "2026-06-08",
@@ -4580,7 +4580,7 @@ window.FRKL_PATTERNS = {
    "kind": "diagnosis",
    "metric_id": "aov_30d",
    "related_metric_id": null,
-   "description": "Diagnosis: AOV up 10%. Product-mix lever: bundles AOV £43 vs singles £37 — gap of £7/unit. Bundle attach rate currently 0.8%. Shifting attach +1pp = ~£7 per 100 orders. Likely cause: bundle attach up OR cross-sell pulling baskets up. Validate via per-order line-item count.",
+   "description": "Diagnosis: average order value up 10%. Product-mix lever: bundles average order value £43 vs singles £37 — gap of £7/unit. Bundle attach rate currently 0.8%. Shifting attach +1pp = ~£7 per 100 orders. Likely cause: bundle attach up OR cross-sell pulling baskets up. Validate via per-order line-item count.",
    "detected_at": "2026-05-27T18:42:37.383025+00:00",
    "window_start": null,
    "window_end": null,
@@ -4593,14 +4593,14 @@ window.FRKL_PATTERNS = {
     "parent_kind": "anomaly",
     "bundle_aov_gap": 6.660000000000004,
     "parent_pattern_id": "7b1fc7eb-0492-43b0-ab3a-8ad021b0ac64",
-    "parent_description": "AOV (30d) anomaly on 2026-05-27: £76 vs 28d avg £69 (|z|=3.59; favourable)."
+    "parent_description": "average order value (30d) anomaly on 2026-05-27: £76 vs 28d avg £69 (|z|=3.59; favourable)."
    }
   },
   {
    "kind": "diagnosis",
    "metric_id": "meta_roas_30d",
    "related_metric_id": null,
-   "description": "Diagnosis (creative health): <b>35% of spend on Below-avg conv-rank creatives</b> (£1563 of £4510). Direct contributor to ROAS decay. · <b>1 ads at freq ≥7×</b> consuming £905 (20% of spend). Saturated audience. · Ireland creative peaks at 6.2× frequency — likely the single biggest waste signal.",
+   "description": "Diagnosis (creative health): <b>35% of spend on Below-avg conv-rank creatives</b> (£1563 of £4510). Direct contributor to return on ad spend decay. · <b>1 ads at freq ≥7×</b> consuming £905 (20% of spend). Saturated audience. · Ireland creative peaks at 6.2× frequency — likely the single biggest waste signal.",
    "detected_at": "2026-05-27T18:42:37.383025+00:00",
    "window_start": null,
    "window_end": null,
@@ -4614,14 +4614,14 @@ window.FRKL_PATTERNS = {
     "fatigued_count": 1,
     "weak_conv_share": 0.3466,
     "parent_pattern_id": "6b5d905b-d2eb-437f-b8e6-edbc71faf97d",
-    "parent_description": "Meta ROAS (30d) step-changed down (3.48× → 2.38×; |z|=2.59; unfavourable)."
+    "parent_description": "Meta return on ad spend (30d) step-changed down (3.48× → 2.38×; |z|=2.59; unfavourable)."
    }
   },
   {
    "kind": "diagnosis",
    "metric_id": "aov_30d",
    "related_metric_id": null,
-   "description": "Diagnosis: AOV up 6%. Product-mix lever: bundles AOV £43 vs singles £37 — gap of £7/unit. Bundle attach rate currently 0.8%. Shifting attach +1pp = ~£7 per 100 orders. Likely cause: bundle attach up OR cross-sell pulling baskets up. Validate via per-order line-item count.",
+   "description": "Diagnosis: average order value up 6%. Product-mix lever: bundles average order value £43 vs singles £37 — gap of £7/unit. Bundle attach rate currently 0.8%. Shifting attach +1pp = ~£7 per 100 orders. Likely cause: bundle attach up OR cross-sell pulling baskets up. Validate via per-order line-item count.",
    "detected_at": "2026-05-27T18:42:37.383025+00:00",
    "window_start": null,
    "window_end": null,
@@ -4634,14 +4634,14 @@ window.FRKL_PATTERNS = {
     "parent_kind": "change_point",
     "bundle_aov_gap": 6.660000000000004,
     "parent_pattern_id": "c9af8d4d-0291-44c7-9975-93f930c3b08a",
-    "parent_description": "AOV (30d) step-changed up (£68 → £72; |z|=4.37; favourable)."
+    "parent_description": "average order value (30d) step-changed up (£68 → £72; |z|=4.37; favourable)."
    }
   },
   {
    "kind": "diagnosis",
    "metric_id": "meta_roas_30d",
    "related_metric_id": null,
-   "description": "Diagnosis (creative health): <b>35% of spend on Below-avg conv-rank creatives</b> (£1563 of £4510). Direct contributor to ROAS decay. · <b>1 ads at freq ≥7×</b> consuming £905 (20% of spend). Saturated audience. · Ireland creative peaks at 6.2× frequency — likely the single biggest waste signal.",
+   "description": "Diagnosis (creative health): <b>35% of spend on Below-avg conv-rank creatives</b> (£1563 of £4510). Direct contributor to return on ad spend decay. · <b>1 ads at freq ≥7×</b> consuming £905 (20% of spend). Saturated audience. · Ireland creative peaks at 6.2× frequency — likely the single biggest waste signal.",
    "detected_at": "2026-05-27T18:42:37.383025+00:00",
    "window_start": null,
    "window_end": null,
@@ -4655,7 +4655,7 @@ window.FRKL_PATTERNS = {
     "fatigued_count": 1,
     "weak_conv_share": 0.3466,
     "parent_pattern_id": "180d9fbe-3764-4828-9032-1e601c8cb526",
-    "parent_description": "Meta ROAS (30d) trending down ~63.6% over 36 days (3.60× → 1.83×; p=0.000; unfavourable). ⚠ Window includes 22% off weekend (April) — baseline may be distorted."
+    "parent_description": "Meta return on ad spend (30d) trending down ~63.6% over 36 days (3.60× → 1.83×; p=0.000; unfavourable). ⚠ Window includes 22% off weekend (April) — baseline may be distorted."
    }
   }
  ],
@@ -4745,7 +4745,7 @@ window.FRKL_PATTERNS = {
     "kind": "co_movement",
     "metric_id": "meta_roas_30d",
     "related_metric_id": "return_rate_30d",
-    "description": "[co-mover] Meta ROAS (30d) also moved up ~38.9% in the same window as action pulse-shopify-investigate-13-return-rate (Return rate (30d)). |z|=5.23.",
+    "description": "[co-mover] Meta return on ad spend (30d) also moved up ~38.9% in the same window as action pulse-shopify-investigate-13-return-rate (Return rate (30d)). |z|=5.23.",
     "detected_at": "2026-06-08T08:15:33.603992+00:00",
     "window_start": null,
     "window_end": null,
@@ -4837,7 +4837,7 @@ window.FRKL_PATTERNS = {
     "kind": "co_movement",
     "metric_id": "site_cvr_30d",
     "related_metric_id": "return_rate_30d",
-    "description": "[co-mover] Site CVR (30d) also moved up ~32.3% in the same window as action pulse-shopify-investigate-13-return-rate (Return rate (30d)). |z|=2.84.",
+    "description": "[co-mover] Site conversion rate (30d) also moved up ~32.3% in the same window as action pulse-shopify-investigate-13-return-rate (Return rate (30d)). |z|=2.84.",
     "detected_at": "2026-06-08T08:15:33.603992+00:00",
     "window_start": null,
     "window_end": null,
@@ -4860,7 +4860,7 @@ window.FRKL_PATTERNS = {
     "kind": "co_movement",
     "metric_id": "blended_mer_30d",
     "related_metric_id": "return_rate_30d",
-    "description": "[co-mover] Blended MER (30d) also moved up ~21.9% in the same window as action pulse-shopify-investigate-13-return-rate (Return rate (30d)). |z|=2.36.",
+    "description": "[co-mover] Blended sales per £ of ads (30d) also moved up ~21.9% in the same window as action pulse-shopify-investigate-13-return-rate (Return rate (30d)). |z|=2.36.",
     "detected_at": "2026-06-08T08:15:33.603992+00:00",
     "window_start": null,
     "window_end": null,
@@ -4913,7 +4913,7 @@ window.FRKL_PATTERNS = {
     "kind": "co_movement",
     "metric_id": "meta_roas_30d",
     "related_metric_id": "discount_rate_30d",
-    "description": "[co-mover] Meta ROAS (30d) also moved up ~38.9% in the same window as action pulse-shopify-audit-discount-stacking-10 (Discount rate (30d)). |z|=5.23.",
+    "description": "[co-mover] Meta return on ad spend (30d) also moved up ~38.9% in the same window as action pulse-shopify-audit-discount-stacking-10 (Discount rate (30d)). |z|=5.23.",
     "detected_at": "2026-06-08T08:15:33.603992+00:00",
     "window_start": null,
     "window_end": null,
@@ -5005,7 +5005,7 @@ window.FRKL_PATTERNS = {
     "kind": "co_movement",
     "metric_id": "site_cvr_30d",
     "related_metric_id": "discount_rate_30d",
-    "description": "[co-mover] Site CVR (30d) also moved up ~32.3% in the same window as action pulse-shopify-audit-discount-stacking-10 (Discount rate (30d)). |z|=2.84.",
+    "description": "[co-mover] Site conversion rate (30d) also moved up ~32.3% in the same window as action pulse-shopify-audit-discount-stacking-10 (Discount rate (30d)). |z|=2.84.",
     "detected_at": "2026-06-08T08:15:33.603992+00:00",
     "window_start": null,
     "window_end": null,
@@ -5028,7 +5028,7 @@ window.FRKL_PATTERNS = {
     "kind": "co_movement",
     "metric_id": "blended_mer_30d",
     "related_metric_id": "discount_rate_30d",
-    "description": "[co-mover] Blended MER (30d) also moved up ~21.9% in the same window as action pulse-shopify-audit-discount-stacking-10 (Discount rate (30d)). |z|=2.36.",
+    "description": "[co-mover] Blended sales per £ of ads (30d) also moved up ~21.9% in the same window as action pulse-shopify-audit-discount-stacking-10 (Discount rate (30d)). |z|=2.36.",
     "detected_at": "2026-06-08T08:15:33.603992+00:00",
     "window_start": null,
     "window_end": null,
@@ -5135,7 +5135,7 @@ window.FRKL_PATTERNS = {
     "kind": "trend",
     "metric_id": "meta_roas_30d",
     "related_metric_id": null,
-    "description": "Meta ROAS (30d) trending down ~16.5% over 29 days (3.30× → 2.88×; p=0.030; unfavourable).",
+    "description": "Meta return on ad spend (30d) trending down ~16.5% over 29 days (3.30× → 2.88×; p=0.030; unfavourable).",
     "detected_at": "2026-06-08T08:15:24.71337+00:00",
     "window_start": "2026-05-10",
     "window_end": "2026-06-08",
@@ -5204,7 +5204,7 @@ window.FRKL_PATTERNS = {
     "kind": "trend",
     "metric_id": "google_roas_30d",
     "related_metric_id": null,
-    "description": "Google ROAS (30d) trending down ~36.6% over 29 days (6.09× → 4.77×; p=0.000; unfavourable).",
+    "description": "Google return on ad spend (30d) trending down ~36.6% over 29 days (6.09× → 4.77×; p=0.000; unfavourable).",
     "detected_at": "2026-06-08T08:15:24.71337+00:00",
     "window_start": "2026-05-10",
     "window_end": "2026-06-08",
@@ -5227,7 +5227,7 @@ window.FRKL_PATTERNS = {
     "kind": "trend",
     "metric_id": "blended_mer_7d",
     "related_metric_id": null,
-    "description": "Blended MER (7d) trending up ~201.2% over 29 days (3.00× → 3.75×; p=0.000; favourable).",
+    "description": "Blended sales per £ of ads (7d) trending up ~201.2% over 29 days (3.00× → 3.75×; p=0.000; favourable).",
     "detected_at": "2026-06-08T08:15:24.71337+00:00",
     "window_start": "2026-05-10",
     "window_end": "2026-06-08",
@@ -5250,7 +5250,7 @@ window.FRKL_PATTERNS = {
     "kind": "change_point",
     "metric_id": "blended_mer_7d",
     "related_metric_id": null,
-    "description": "Blended MER (7d) step-changed up (3.81× → 7.73×; |z|=1.90; favourable).",
+    "description": "Blended sales per £ of ads (7d) step-changed up (3.81× → 7.73×; |z|=1.90; favourable).",
     "detected_at": "2026-06-08T08:15:24.71337+00:00",
     "window_start": "2026-05-12",
     "window_end": "2026-06-08",
@@ -5271,7 +5271,7 @@ window.FRKL_PATTERNS = {
     "kind": "trend",
     "metric_id": "aov_30d",
     "related_metric_id": null,
-    "description": "AOV (30d) trending up ~8.3% over 29 days (£78 → £81; p=0.000; favourable).",
+    "description": "average order value (30d) trending up ~8.3% over 29 days (£78 → £81; p=0.000; favourable).",
     "detected_at": "2026-06-08T08:15:24.71337+00:00",
     "window_start": "2026-05-10",
     "window_end": "2026-06-08",
@@ -5294,7 +5294,7 @@ window.FRKL_PATTERNS = {
     "kind": "trend",
     "metric_id": "site_cvr_30d",
     "related_metric_id": null,
-    "description": "Site CVR (30d) trending down ~17.9% over 29 days (1.3% → 1.2%; p=0.003; unfavourable).",
+    "description": "Site conversion rate (30d) trending down ~17.9% over 29 days (1.3% → 1.2%; p=0.003; unfavourable).",
     "detected_at": "2026-06-08T08:15:24.71337+00:00",
     "window_start": "2026-05-10",
     "window_end": "2026-06-08",
@@ -5317,7 +5317,7 @@ window.FRKL_PATTERNS = {
     "kind": "trend",
     "metric_id": "atc_to_checkout_30d",
     "related_metric_id": null,
-    "description": "ATC → Checkout (30d) trending up ~13.6% over 29 days (21.7% → 23.1%; p=0.000; favourable).",
+    "description": "add-to-basket → Checkout (30d) trending up ~13.6% over 29 days (21.7% → 23.1%; p=0.000; favourable).",
     "detected_at": "2026-06-08T08:15:24.71337+00:00",
     "window_start": "2026-05-10",
     "window_end": "2026-06-08",
@@ -5450,7 +5450,7 @@ window.FRKL_PATTERNS = {
     "kind": "diagnosis",
     "metric_id": "aov_30d",
     "related_metric_id": null,
-    "description": "Diagnosis: AOV up 6%. Product-mix lever: bundles AOV £43 vs singles £37 — gap of £7/unit. Bundle attach rate currently 0.8%. Shifting attach +1pp = ~£7 per 100 orders. Likely cause: bundle attach up OR cross-sell pulling baskets up. Validate via per-order line-item count.",
+    "description": "Diagnosis: average order value up 6%. Product-mix lever: bundles average order value £43 vs singles £37 — gap of £7/unit. Bundle attach rate currently 0.8%. Shifting attach +1pp = ~£7 per 100 orders. Likely cause: bundle attach up OR cross-sell pulling baskets up. Validate via per-order line-item count.",
     "detected_at": "2026-05-27T18:42:37.383025+00:00",
     "window_start": null,
     "window_end": null,
@@ -5463,14 +5463,14 @@ window.FRKL_PATTERNS = {
      "parent_kind": "change_point",
      "bundle_aov_gap": 6.660000000000004,
      "parent_pattern_id": "c9af8d4d-0291-44c7-9975-93f930c3b08a",
-     "parent_description": "AOV (30d) step-changed up (£68 → £72; |z|=4.37; favourable)."
+     "parent_description": "average order value (30d) step-changed up (£68 → £72; |z|=4.37; favourable)."
     }
    },
    {
     "kind": "diagnosis",
     "metric_id": "meta_roas_30d",
     "related_metric_id": null,
-    "description": "Diagnosis (creative health): <b>35% of spend on Below-avg conv-rank creatives</b> (£1563 of £4510). Direct contributor to ROAS decay. · <b>1 ads at freq ≥7×</b> consuming £905 (20% of spend). Saturated audience. · Ireland creative peaks at 6.2× frequency — likely the single biggest waste signal.",
+    "description": "Diagnosis (creative health): <b>35% of spend on Below-avg conv-rank creatives</b> (£1563 of £4510). Direct contributor to return on ad spend decay. · <b>1 ads at freq ≥7×</b> consuming £905 (20% of spend). Saturated audience. · Ireland creative peaks at 6.2× frequency — likely the single biggest waste signal.",
     "detected_at": "2026-05-27T18:42:37.383025+00:00",
     "window_start": null,
     "window_end": null,
@@ -5484,7 +5484,7 @@ window.FRKL_PATTERNS = {
      "fatigued_count": 1,
      "weak_conv_share": 0.3466,
      "parent_pattern_id": "180d9fbe-3764-4828-9032-1e601c8cb526",
-     "parent_description": "Meta ROAS (30d) trending down ~63.6% over 36 days (3.60× → 1.83×; p=0.000; unfavourable). ⚠ Window includes 22% off weekend (April) — baseline may be distorted."
+     "parent_description": "Meta return on ad spend (30d) trending down ~63.6% over 36 days (3.60× → 1.83×; p=0.000; unfavourable). ⚠ Window includes 22% off weekend (April) — baseline may be distorted."
     }
    }
   ],
@@ -5496,7 +5496,7 @@ window.FRKL_PATTERNS = {
     "kind": "money",
     "metric_id": null,
     "related_metric_id": null,
-    "description": "Capital tied up in overstock + dead SKUs: £3,633/mo at_risk (medium conf.) — £290,638 of capital locked in >180-day-cover + archived SKUs. At 15% annual cost of capital = monthly working-capital drag shown. The bigger story: this is ~18 months of DTC revenue tied up, liquidating it would free cash for replenishment + new SKUs.",
+    "description": "Capital tied up in overstock + dead items: £3,633/mo at_risk (medium conf.) — £290,638 of capital locked in >180-day-cover + archived items. At 15% annual cost of capital = monthly working-capital drag shown. The bigger story: this is ~18 months of DTC revenue tied up, liquidating it would free cash for replenishment + new items.",
     "detected_at": "2026-06-09T10:52:20.26369+00:00",
     "window_start": null,
     "window_end": null,
@@ -5505,8 +5505,8 @@ window.FRKL_PATTERNS = {
     "effect_size": 3633.0,
     "metadata": {
      "kind": "at_risk",
-     "basis": "£290,638 of capital locked in >180-day-cover + archived SKUs. At 15% annual cost of capital = monthly working-capital drag shown. The bigger story: this is ~18 months of DTC revenue tied up, liquidating it would free cash for replenishment + new SKUs.",
-     "label": "Capital tied up in overstock + dead SKUs",
+     "basis": "£290,638 of capital locked in >180-day-cover + archived items. At 15% annual cost of capital = monthly working-capital drag shown. The bigger story: this is ~18 months of DTC revenue tied up, liquidating it would free cash for replenishment + new items.",
+     "label": "Capital tied up in overstock + dead items",
      "confidence": "medium",
      "synthetic_id": "synth-inventory-overstock-capital",
      "monthly_impact_gbp": 3633.0
@@ -5526,7 +5526,7 @@ window.FRKL_PATTERNS = {
    "agent": "Pulse",
    "category": "finance",
    "priority": "P3",
-   "description": "Investigate the 13% return rate — sizing, expectation vs reality, or quality on specific SKUs.",
+   "description": "Investigate the 13% return rate — sizing, expectation vs reality, or quality on specific items.",
    "status": "done",
    "verdict": "hit",
    "predicted_metric_id": "return_rate_30d",
@@ -5564,7 +5564,7 @@ window.FRKL_PATTERNS = {
    "agent": "Pulse",
    "category": "finance",
    "priority": "P2",
-   "description": "Engineer AOV toward the £75 free-ship threshold via bundles / 'add one more charm' (cart already cross-sells).",
+   "description": "Engineer average order value toward the £75 free-ship threshold via bundles / 'add one more charm' (cart already cross-sells).",
    "status": "done",
    "verdict": "hit",
    "predicted_metric_id": "aov_30d",
@@ -5583,7 +5583,7 @@ window.FRKL_PATTERNS = {
    "agent": "Pulse",
    "category": "paid",
    "priority": "P2",
-   "description": "Hold UK frequency under 8x as you scale; watch ROAS daily, not weekly.",
+   "description": "Hold UK frequency under 8x as you scale; watch return on ad spend daily, not weekly.",
    "status": "done",
    "verdict": "miss",
    "predicted_metric_id": "uk_creative_max_freq",
@@ -6570,13 +6570,13 @@ window.FRKL_PATTERNS = {
    "agent": "Pulse",
    "category": "finance",
    "priority": "P3",
-   "description": "Investigate the 13% return rate — sizing, expectation vs reality, or quality on specific SKUs.",
+   "description": "Investigate the 13% return rate — sizing, expectation vs reality, or quality on specific items.",
    "status": "done",
    "external_id": "pulse-shopify-investigate-13-return-rate"
   },
   "pulse-cro-fix-discount-value-js": {
    "kind": "leakage",
-   "basis": "Est. 0.3pp CVR lift on cart-coupon fix; 21,645 monthly sessions × £81 AOV",
+   "basis": "Est. 0.3pp conversion rate lift on cart-coupon fix; 21,645 monthly sessions × £81 average order value",
    "confidence": "medium",
    "monthly_impact_gbp": 5270.0,
    "agent": "Pulse",
@@ -6588,13 +6588,13 @@ window.FRKL_PATTERNS = {
   },
   "pulse-cro-fix-judge-me-js": {
    "kind": "leakage",
-   "basis": "Est. 0.15pp CVR lift on 21,645 monthly sessions × £81 AOV",
+   "basis": "Est. 0.15pp conversion rate lift on 21,645 monthly sessions × £81 average order value",
    "confidence": "medium",
    "monthly_impact_gbp": 2635.0,
    "agent": "Pulse",
    "category": "site",
    "priority": "P1",
-   "description": "Fix the Judge.me JS error on PDPs (silently breaks the ATC button).",
+   "description": "Fix the Judge.me JS error on product pages (silently breaks the add-to-basket button).",
    "status": "open",
    "external_id": "pulse-cro-fix-judge-me-js"
   },
@@ -6612,7 +6612,7 @@ window.FRKL_PATTERNS = {
   },
   "pulse-meta-refresh-fatigued-ireland-creative": {
    "kind": "opportunity",
-   "basis": "Est. 35% ROAS recovery on £1043/mo IE spend at current MER 4.40×",
+   "basis": "Est. 35% return on ad spend recovery on £1043/mo IE spend at current sales per £ of ads 4.40×",
    "confidence": "low",
    "monthly_impact_gbp": 1608.0,
    "agent": "Pulse",
@@ -6624,13 +6624,13 @@ window.FRKL_PATTERNS = {
   },
   "pulse-shopify-engineer-aov-toward-75": {
    "kind": "opportunity",
-   "basis": "AOV already at £81 (target hit). Each additional £5 AOV on 337 orders/mo = £1,685/mo",
+   "basis": "average order value already at £81 (target hit). Each additional £5 average order value on 337 orders/mo = £1,685/mo",
    "confidence": "medium",
    "monthly_impact_gbp": 1685,
    "agent": "Pulse",
    "category": "finance",
    "priority": "P2",
-   "description": "Engineer AOV toward the £75 free-ship threshold via bundles / 'add one more charm' (cart already cross-sells).",
+   "description": "Engineer average order value toward the £75 free-ship threshold via bundles / 'add one more charm' (cart already cross-sells).",
    "status": "done",
    "external_id": "pulse-shopify-engineer-aov-toward-75"
   },
@@ -6656,21 +6656,21 @@ window.FRKL_PATTERNS = {
  "money_patterns": [
   {
    "kind": "opportunity",
-   "basis": "Lifting bundle attach from 0.8% → 5% on 337 orders × £7 AOV uplift = £94/mo",
+   "basis": "Lifting bundle attach from 0.8% → 5% on 337 orders × £7 average order value uplift = £94/mo",
    "label": "Bundle attach uplift (Pre-styled stacks)",
    "confidence": 0.35,
    "synthetic_id": "synth-bundle-opportunity",
    "monthly_impact_gbp": 94.0,
-   "description": "Bundle attach uplift (Pre-styled stacks): £94/mo opportunity (low conf.) — Lifting bundle attach from 0.8% → 5% on 337 orders × £7 AOV uplift = £94/mo"
+   "description": "Bundle attach uplift (Pre-styled stacks): £94/mo opportunity (low conf.) — Lifting bundle attach from 0.8% → 5% on 337 orders × £7 average order value uplift = £94/mo"
   },
   {
    "kind": "opportunity",
-   "basis": "Earrings only 2.3% of product revenue (1 SKU); growing to 10% adds £943/mo",
+   "basis": "Earrings only 2.3% of product revenue (1 item); growing to 10% adds £943/mo",
    "label": "Earrings collection expansion",
    "confidence": 0.35,
    "synthetic_id": "synth-earrings-collection-gap",
    "monthly_impact_gbp": 943.0,
-   "description": "Earrings collection expansion: £943/mo opportunity (low conf.) — Earrings only 2.3% of product revenue (1 SKU); growing to 10% adds £943/mo"
+   "description": "Earrings collection expansion: £943/mo opportunity (low conf.) — Earrings only 2.3% of product revenue (1 item); growing to 10% adds £943/mo"
   },
   {
    "kind": "at_risk",
@@ -6692,21 +6692,21 @@ window.FRKL_PATTERNS = {
   },
   {
    "kind": "leakage",
-   "basis": "4 SKUs under 14d cover (incl. out-of-stock bestsellers); at current velocity = £2,533/mo of lost sales until reorders land",
+   "basis": "4 items under 14d cover (incl. out-of-stock bestsellers); at current velocity = £2,533/mo of lost sales until reorders land",
    "label": "Lost sales from understocked bestsellers",
    "confidence": 0.6,
    "synthetic_id": "synth-inventory-critical-stockout",
    "monthly_impact_gbp": 2533.0,
-   "description": "Lost sales from understocked bestsellers: £2,533/mo leakage (medium conf.) — 4 SKUs under 14d cover (incl. out-of-stock bestsellers); at current velocity = £2,533/mo of lost sales until reorders land"
+   "description": "Lost sales from understocked bestsellers: £2,533/mo leakage (medium conf.) — 4 items under 14d cover (incl. out-of-stock bestsellers); at current velocity = £2,533/mo of lost sales until reorders land"
   },
   {
    "kind": "at_risk",
-   "basis": "£290,638 of capital locked in >180-day-cover + archived SKUs. At 15% annual cost of capital = monthly working-capital drag shown. The bigger story: this is ~18 months of DTC revenue tied up, liquidating it would free cash for replenishment + new SKUs.",
-   "label": "Capital tied up in overstock + dead SKUs",
+   "basis": "£290,638 of capital locked in >180-day-cover + archived items. At 15% annual cost of capital = monthly working-capital drag shown. The bigger story: this is ~18 months of DTC revenue tied up, liquidating it would free cash for replenishment + new items.",
+   "label": "Capital tied up in overstock + dead items",
    "confidence": 0.6,
    "synthetic_id": "synth-inventory-overstock-capital",
    "monthly_impact_gbp": 3633.0,
-   "description": "Capital tied up in overstock + dead SKUs: £3,633/mo at_risk (medium conf.) — £290,638 of capital locked in >180-day-cover + archived SKUs. At 15% annual cost of capital = monthly working-capital drag shown. The bigger story: this is ~18 months of DTC revenue tied up, liquidating it would free cash for replenishment + new SKUs."
+   "description": "Capital tied up in overstock + dead items: £3,633/mo at_risk (medium conf.) — £290,638 of capital locked in >180-day-cover + archived items. At 15% annual cost of capital = monthly working-capital drag shown. The bigger story: this is ~18 months of DTC revenue tied up, liquidating it would free cash for replenishment + new items."
   }
  ],
  "metrics": {
@@ -6726,7 +6726,7 @@ window.FRKL_PATTERNS = {
   },
   "meta_roas_30d": {
    "id": "meta_roas_30d",
-   "name": "Meta ROAS (30d)",
+   "name": "Meta return on ad spend (30d)",
    "unit": "ratio",
    "direction": "higher_better",
    "category": "paid"
@@ -6789,21 +6789,21 @@ window.FRKL_PATTERNS = {
   },
   "google_roas_30d": {
    "id": "google_roas_30d",
-   "name": "Google ROAS (30d)",
+   "name": "Google return on ad spend (30d)",
    "unit": "ratio",
    "direction": "higher_better",
    "category": "paid"
   },
   "blended_mer_30d": {
    "id": "blended_mer_30d",
-   "name": "Blended MER (30d)",
+   "name": "Blended sales per £ of ads (30d)",
    "unit": "ratio",
    "direction": "higher_better",
    "category": "finance"
   },
   "blended_mer_7d": {
    "id": "blended_mer_7d",
-   "name": "Blended MER (7d)",
+   "name": "Blended sales per £ of ads (7d)",
    "unit": "ratio",
    "direction": "higher_better",
    "category": "finance"
@@ -6831,28 +6831,28 @@ window.FRKL_PATTERNS = {
   },
   "aov_30d": {
    "id": "aov_30d",
-   "name": "AOV (30d)",
+   "name": "average order value (30d)",
    "unit": "gbp",
    "direction": "higher_better",
    "category": "finance"
   },
   "return_hotspot_count": {
    "id": "return_hotspot_count",
-   "name": "Return-hotspot SKU count",
+   "name": "Return-hotspot item count",
    "unit": "count",
    "direction": "lower_better",
    "category": "product"
   },
   "site_cvr_30d": {
    "id": "site_cvr_30d",
-   "name": "Site CVR (30d)",
+   "name": "Site conversion rate (30d)",
    "unit": "pct",
    "direction": "higher_better",
    "category": "site"
   },
   "atc_to_checkout_30d": {
    "id": "atc_to_checkout_30d",
-   "name": "ATC → Checkout (30d)",
+   "name": "add-to-basket → Checkout (30d)",
    "unit": "pct",
    "direction": "higher_better",
    "category": "site"
@@ -7041,7 +7041,7 @@ window.FRKL_PATTERNS = {
   },
   "aov_7d": {
    "id": "aov_7d",
-   "name": "AOV (7d)",
+   "name": "average order value (7d)",
    "unit": "gbp",
    "direction": "higher_better",
    "category": "finance"
@@ -7125,9 +7125,9 @@ window.FRKL_PATTERNS = {
     }
    }
   ],
-  "AOV (30d) anomaly on 2026-05-27: £76 vs 28d avg £69 (|z|=3.59; favourable).": [
+  "average order value (30d) anomaly on 2026-05-27: £76 vs 28d avg £69 (|z|=3.59; favourable).": [
    {
-    "description": "Diagnosis: AOV up 10%. Product-mix lever: bundles AOV £43 vs singles £37 — gap of £7/unit. Bundle attach rate currently 0.8%. Shifting attach +1pp = ~£7 per 100 orders. Likely cause: bundle attach up OR cross-sell pulling baskets up. Validate via per-order line-item count.",
+    "description": "Diagnosis: average order value up 10%. Product-mix lever: bundles average order value £43 vs singles £37 — gap of £7/unit. Bundle attach rate currently 0.8%. Shifting attach +1pp = ~£7 per 100 orders. Likely cause: bundle attach up OR cross-sell pulling baskets up. Validate via per-order line-item count.",
     "confidence": 0.6,
     "recipe": "aov-shift",
     "metadata": {
@@ -7136,13 +7136,13 @@ window.FRKL_PATTERNS = {
      "parent_kind": "anomaly",
      "bundle_aov_gap": 6.660000000000004,
      "parent_pattern_id": "7b1fc7eb-0492-43b0-ab3a-8ad021b0ac64",
-     "parent_description": "AOV (30d) anomaly on 2026-05-27: £76 vs 28d avg £69 (|z|=3.59; favourable)."
+     "parent_description": "average order value (30d) anomaly on 2026-05-27: £76 vs 28d avg £69 (|z|=3.59; favourable)."
     }
    }
   ],
-  "Meta ROAS (30d) step-changed down (3.48× → 2.38×; |z|=2.59; unfavourable).": [
+  "Meta return on ad spend (30d) step-changed down (3.48× → 2.38×; |z|=2.59; unfavourable).": [
    {
-    "description": "Diagnosis (creative health): <b>35% of spend on Below-avg conv-rank creatives</b> (£1563 of £4510). Direct contributor to ROAS decay. · <b>1 ads at freq ≥7×</b> consuming £905 (20% of spend). Saturated audience. · Ireland creative peaks at 6.2× frequency — likely the single biggest waste signal.",
+    "description": "Diagnosis (creative health): <b>35% of spend on Below-avg conv-rank creatives</b> (£1563 of £4510). Direct contributor to return on ad spend decay. · <b>1 ads at freq ≥7×</b> consuming £905 (20% of spend). Saturated audience. · Ireland creative peaks at 6.2× frequency — likely the single biggest waste signal.",
     "confidence": 0.75,
     "recipe": "meta-roas-degradation",
     "metadata": {
@@ -7152,13 +7152,13 @@ window.FRKL_PATTERNS = {
      "fatigued_count": 1,
      "weak_conv_share": 0.3466,
      "parent_pattern_id": "6b5d905b-d2eb-437f-b8e6-edbc71faf97d",
-     "parent_description": "Meta ROAS (30d) step-changed down (3.48× → 2.38×; |z|=2.59; unfavourable)."
+     "parent_description": "Meta return on ad spend (30d) step-changed down (3.48× → 2.38×; |z|=2.59; unfavourable)."
     }
    }
   ],
-  "AOV (30d) step-changed up (£68 → £72; |z|=4.37; favourable).": [
+  "average order value (30d) step-changed up (£68 → £72; |z|=4.37; favourable).": [
    {
-    "description": "Diagnosis: AOV up 6%. Product-mix lever: bundles AOV £43 vs singles £37 — gap of £7/unit. Bundle attach rate currently 0.8%. Shifting attach +1pp = ~£7 per 100 orders. Likely cause: bundle attach up OR cross-sell pulling baskets up. Validate via per-order line-item count.",
+    "description": "Diagnosis: average order value up 6%. Product-mix lever: bundles average order value £43 vs singles £37 — gap of £7/unit. Bundle attach rate currently 0.8%. Shifting attach +1pp = ~£7 per 100 orders. Likely cause: bundle attach up OR cross-sell pulling baskets up. Validate via per-order line-item count.",
     "confidence": 0.6,
     "recipe": "aov-shift",
     "metadata": {
@@ -7167,13 +7167,13 @@ window.FRKL_PATTERNS = {
      "parent_kind": "change_point",
      "bundle_aov_gap": 6.660000000000004,
      "parent_pattern_id": "c9af8d4d-0291-44c7-9975-93f930c3b08a",
-     "parent_description": "AOV (30d) step-changed up (£68 → £72; |z|=4.37; favourable)."
+     "parent_description": "average order value (30d) step-changed up (£68 → £72; |z|=4.37; favourable)."
     }
    }
   ],
-  "Meta ROAS (30d) trending down ~63.6% over 36 days (3.60× → 1.83×; p=0.000; unfavourable). ⚠ Window includes 22% off weekend (April) — baseline may be distorted.": [
+  "Meta return on ad spend (30d) trending down ~63.6% over 36 days (3.60× → 1.83×; p=0.000; unfavourable). ⚠ Window includes 22% off weekend (April) — baseline may be distorted.": [
    {
-    "description": "Diagnosis (creative health): <b>35% of spend on Below-avg conv-rank creatives</b> (£1563 of £4510). Direct contributor to ROAS decay. · <b>1 ads at freq ≥7×</b> consuming £905 (20% of spend). Saturated audience. · Ireland creative peaks at 6.2× frequency — likely the single biggest waste signal.",
+    "description": "Diagnosis (creative health): <b>35% of spend on Below-avg conv-rank creatives</b> (£1563 of £4510). Direct contributor to return on ad spend decay. · <b>1 ads at freq ≥7×</b> consuming £905 (20% of spend). Saturated audience. · Ireland creative peaks at 6.2× frequency — likely the single biggest waste signal.",
     "confidence": 0.75,
     "recipe": "meta-roas-degradation",
     "metadata": {
@@ -7183,7 +7183,7 @@ window.FRKL_PATTERNS = {
      "fatigued_count": 1,
      "weak_conv_share": 0.3466,
      "parent_pattern_id": "180d9fbe-3764-4828-9032-1e601c8cb526",
-     "parent_description": "Meta ROAS (30d) trending down ~63.6% over 36 days (3.60× → 1.83×; p=0.000; unfavourable). ⚠ Window includes 22% off weekend (April) — baseline may be distorted."
+     "parent_description": "Meta return on ad spend (30d) trending down ~63.6% over 36 days (3.60× → 1.83×; p=0.000; unfavourable). ⚠ Window includes 22% off weekend (April) — baseline may be distorted."
     }
    }
   ]

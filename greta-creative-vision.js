@@ -115,7 +115,7 @@ window.FRKL_CREATIVE_VISION = {
     "DPA serves a specific job (retargeting people who've seen a product on site). For that job, this works — the product image matches what they browsed.",
     "BUT — if any DPA spend is hitting cold prospecting audiences, it's wasted. White-background catalogue imagery looks identical to ANY jewellery brand. No frkl identity visible.",
     "No price, no offer, no copy — frkl's spend is just buying impressions for which the user has zero reason to remember the brand.",
-    "Static white-bg images at thumbnail size on mobile feed look like a Wish ad — wrong brand impression for a £75 AOV demi-fine brand."
+    "Static white-bg images at thumbnail size on mobile feed look like a Wish ad — wrong brand impression for a £75 average order value demi-fine brand."
    ],
    "next_iteration": "Verify DPA is restricted to retargeting audiences only. For prospecting, replace with the 'no accessories' or 'how your email finds me' format. For DPA itself: enable Meta's 'enhance' settings (lifestyle backgrounds, dynamic text overlay with price/offer). Add a hero charm/necklace lifestyle image to product feed instead of cutout."
   },

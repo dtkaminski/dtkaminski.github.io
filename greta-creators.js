@@ -5,7 +5,7 @@ window.FRKL_CREATORS = {
   "generated_at": "2026-05-27",
   "brand_brief": {
    "vertical": "demi-fine modular jewellery (base + style + charm)",
-   "price_points": "£20-£100 per piece, AOV £75-95 with bundles",
+   "price_points": "£20-£100 per piece, average order value £75-95 with bundles",
    "audience": "UK/IE women, 35-54 skew, 25-34 secondary",
    "vibe": "playful maximalist, customisable, gift-able, joy-first not luxury-cold",
    "current_winning_partners": [

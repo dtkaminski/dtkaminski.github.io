@@ -3,24 +3,24 @@
 window.FRKL_DX_ANALYST = {
   "30d": {
     "headline": "Conversion weakness and site friction likely explain the efficiency drop, not demand decay — address the site issues before scaling spend.",
-    "narrative": "The MER has dropped to 4.22× from 4.67×, but this is likely due to conversion issues rather than demand decay. The CVR is below target at 1.06%, and site friction metrics such as a high script error rate and low pages per session suggest that the site is a conversion blocker. Additionally, sale-price markdowns are not visible in discount totals, which may be affecting margin. The efficiency drop is likely a result of these conversion and site issues rather than a decline in demand.",
+    "narrative": "The sales per £ of ads has dropped to 4.22× from 4.67×, but this is likely due to conversion issues rather than demand decay. The conversion rate is below target at 1.06%, and site friction metrics such as a high script error rate and low pages per session suggest that the site is a conversion blocker. Additionally, sale-price markdowns are not visible in discount totals, which may be affecting margin. The efficiency drop is likely a result of these conversion and site issues rather than a decline in demand.",
     "findings": [
       {
         "area": "Efficiency",
-        "metric": "MER 4.22× (was 4.67×)",
+        "metric": "sales per £ of ads 4.22× (was 4.67×)",
         "verdict": "monitor",
         "confidence": "med",
-        "reasoning": "The drop in MER is likely due to conversion issues rather than demand decay. The CVR is below target, and site friction metrics suggest that the site is a conversion blocker.",
+        "reasoning": "The drop in sales per £ of ads is likely due to conversion issues rather than demand decay. The conversion rate is below target, and site friction metrics suggest that the site is a conversion blocker.",
         "recommendation": "Address site friction issues before scaling spend.",
         "gbp": null
       },
       {
         "area": "Conversion",
-        "metric": "CVR 1.06% vs 1.5% target",
+        "metric": "conversion rate 1.06% vs 1.5% target",
         "verdict": "act",
         "confidence": "high",
-        "reasoning": "The CVR is below target, and site friction metrics such as a high script error rate and low pages per session suggest that the site is a conversion blocker.",
-        "recommendation": "Reproduce the top error and address site friction issues to improve CVR.",
+        "reasoning": "The conversion rate is below target, and site friction metrics such as a high script error rate and low pages per session suggest that the site is a conversion blocker.",
+        "recommendation": "Reproduce the top error and address site friction issues to improve conversion rate.",
         "gbp": 6308
       },
       {

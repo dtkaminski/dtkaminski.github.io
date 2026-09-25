@@ -260,15 +260,15 @@
           rows: [
             { label: "Returning", rag: repeat >= 30 ? "g" : repeat >= 20 ? "a" : "r", cells: [
               { k: "Revenue", v: gbp(retRev) }, { k: "Orders", v: f0(oRet).toLocaleString("en-GB") },
-              { k: "AOV", v: gbp(retAov) }, { k: "Repeat rate", v: repeat + "%" } ] },
+              { k: "Average order", v: gbp(retAov) }, { k: "Repeat rate", v: repeat + "%" } ] },
             { label: "New", rag: "g", cells: [
               { k: "Revenue", v: gbp(newRev) }, { k: "Orders", v: f0(oNew).toLocaleString("en-GB") },
-              { k: "AOV", v: gbp(newAov) }, { k: "Weighted CAC", v: custNcac == null ? "—" : gbp(custNcac) },
-              { k: "aMER", v: custAmer == null ? "—" : custAmer.toFixed(2) + "×" } ] },
+              { k: "Average order", v: gbp(newAov) }, { k: "New-customer cost (weighted)", v: custNcac == null ? "—" : gbp(custNcac) },
+              { k: "Sales per £ of ads (new)", v: custAmer == null ? "—" : custAmer.toFixed(2) + "×" } ] },
             { label: "Paid · incremental", rag: pRev > pSpend ? "g" : "a", cells: [
-              { k: "iRevenue", v: gbp(pRev) }, { k: "iOrders", v: f0(pOrders).toLocaleString("en-GB") },
-              { k: "iAOV", v: gbp(newAov) }, { k: "iCAC", v: pOrders > 0 ? gbp(pSpend / pOrders) : "—" },
-              { k: "ipaMER", v: pSpend > 0 ? (pRev / pSpend).toFixed(2) + "×" : "—" } ] }
+              { k: "Revenue caused by ads", v: gbp(pRev) }, { k: "Orders caused by ads", v: f0(pOrders).toLocaleString("en-GB") },
+              { k: "Average order", v: gbp(newAov) }, { k: "Cost per new customer", v: pOrders > 0 ? gbp(pSpend / pOrders) : "—" },
+              { k: "Sales per £ of ads", v: pSpend > 0 ? (pRev / pSpend).toFixed(2) + "×" : "—" } ] }
           ]
         };
       })(),
@@ -277,7 +277,7 @@
       insights: {
         business: tierInsight(numsB, S.board, TIER_CATS.business, { text: numsB, action: hero.title, value: hero.value }),
         customer: tierInsight(numsC, S.board, TIER_CATS.customer, { text: numsC, action: repeat < 30 ? 'Turn on post-purchase & winback flows to lift repeat rate.' : 'Retention healthy — protect it.', value: 'retention' }),
-        channel: tierInsight(numsCh, S.board, TIER_CATS.channel, { text: numsCh, action: 'Reallocate from below-break-even channels.', value: 'iROAS' })
+        channel: tierInsight(numsCh, S.board, TIER_CATS.channel, { text: numsCh, action: 'Reallocate from below-break-even channels.', value: 'real return per £' })
       }
     };
   }
