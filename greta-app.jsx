@@ -13824,7 +13824,18 @@ function V3Today(p) {
   const frozen = React.useRef(null);
   if (h && !frozen.current) frozen.current = h;
   const [stale, setStale] = React.useState(false);
-  React.useEffect(() => { if (h && frozen.current && h !== frozen.current) setStale(true); }, [h]);
+  // Only a change in the NUMBERS counts as new: the "why" paragraph arrives seconds
+  // later on its own (fn_today_v2 is slow), and that must not look like the figures
+  // moved under the reader. Merge it in quietly; offer a refresh for anything else.
+  React.useEffect(() => {
+    if (!h || !frozen.current || h === frozen.current) return;
+    const f = frozen.current;
+    const sameNumbers = ['cm_after_marketing_30d','product_contribution_30d','paid_spend_30d',
+      'net_revenue_30d','cam_target_monthly','open_actions'].every(k => h[k] === f[k])
+      && (h.top_action && f.top_action ? h.top_action.external_id === f.top_action.external_id : h.top_action === f.top_action);
+    if (sameNumbers) { frozen.current = h; setStale(false); }
+    else setStale(true);
+  }, [h]);
   const d = frozen.current || h;
   const refresh = () => { frozen.current = window.GRETA_HEADLINE; setStale(false); };
 

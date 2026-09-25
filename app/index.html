@@ -293,7 +293,6 @@
                    || memberships[0].brand;
 
     document.getElementById('brand-chip').textContent = currentBrand.name;
-    document.getElementById('hero-brand').textContent = currentBrand.name;
 
     // Load connections
     const { data: connections } = await sb
@@ -303,7 +302,6 @@
     connByProvider = Object.fromEntries((connections || []).map(c => [c.provider, c]));
 
     renderOverview();
-    renderConnectionsTab();
     document.getElementById('loading').hidden = true;
   })();
 
@@ -338,7 +336,7 @@
     // so we pre-satisfy the dashboard's access gate via shared same-origin localStorage
     // (no passcode prompt). The embedded dashboard's loader reads live tenant data using
     // this same session.
-    const richUrl = '/greta-dashboard.html?v=1790347082623';
+    const richUrl = '/greta-dashboard.html?v=1790348937220';
     // The dashboard is the app: every connected brand renders it inline. The old
     // placeholder-panel path below this point was unreachable (the condition above
     // was always true) and was removed on 2026-09-25 with the panels it filled.
@@ -403,48 +401,8 @@
     }, 5000);
   }
 
-  function renderConnectionsTab() {
-    const PROVIDERS = [
-      {id:'shopify', name:'Shopify', icon:'S', installable:true},
-      {id:'meta', name:'Meta Ads', icon:'M', installable:true},
-      {id:'klaviyo', name:'Klaviyo', icon:'K', installable:true},
-      {id:'google_ads', name:'Google Ads', icon:'G', installable:true},
-      {id:'ga4', name:'Google Analytics 4', icon:'A', installable:true},
-      {id:'tiktok_ads', name:'TikTok Ads', icon:'T', installable:true},
-    ];
-    const list = document.getElementById('conn-list');
-    list.innerHTML = '';
-
-    PROVIDERS.forEach(p => {
-      const conn = connByProvider[p.id];
-      const isActive = conn && conn.status === 'active';
-      const card = document.createElement('div');
-      card.className = 'panel';
-      card.style.minHeight = '0';
-      card.innerHTML = `
-        <div style="display:flex; align-items:center; gap:var(--s-3);">
-          <div style="width:36px; height:36px; border-radius:var(--r-md); background:var(--bg-elevated); border:1px solid var(--border-default); display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; color:${isActive ? 'var(--good)' : 'var(--text-muted)'};">
-            ${p.icon}
-          </div>
-          <div style="flex:1;">
-            <div style="font-size:14px; font-weight:650;">${p.name}</div>
-            <div style="font-size:11.5px; color:${isActive ? 'var(--good)' : 'var(--text-muted)'}; font-weight:600; margin-top:2px;">
-              ${isActive ? `Connected · ${conn.account_label || ''}${conn.last_sync_at ? ` · synced ${new Date(conn.last_sync_at).toLocaleString()}` : ''}` : (p.installable ? 'Not connected' : 'Not available yet')}
-            </div>
-          </div>
-          <div>
-            ${isActive
-              ? `<a href="../auth/workspace.html" class="btn-ghost" style="padding:6px 12px; font-size:12px; text-decoration:none;" data-provider="${p.id}">Reconnect</a>`
-              : (p.installable
-                  ? `<a href="../auth/workspace.html" class="btn-primary" style="padding:6px 12px; font-size:12px; text-decoration:none;">Set up →</a>`
-                  : `<span class="meta" style="font-size:11px;">Coming soon</span>`)
-            }
-          </div>
-        </div>
-      `;
-      list.appendChild(card);
-    });
-  }
+  // renderConnectionsTab was removed on 2026-09-25 with the Connections tab: the
+  // provider list lives in the app at Settings > Connections & data.
 
   // The Customers tab moved into the dashboard on 2026-09-25 (Phase 2, one navigation):
   // it is now the CustomerSegments component at the head of Numbers > Customers, reading

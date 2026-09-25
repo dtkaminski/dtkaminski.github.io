@@ -94,8 +94,13 @@
       next_actions: acts.slice(1, 4),
       fetched_at: new Date().toISOString()
     };
-    // Why the headline moved (edge action today_why → fn_today_v2). Additive: if the
-    // action is not deployed yet the request 400s and Today simply omits the paragraph.
+    window.GRETA_HEADLINE = out;
+    try { window.dispatchEvent(new CustomEvent('greta-headline-updated')); } catch (e) {}
+
+    // Why the headline moved (edge action today_why → fn_today_v2). Fetched AFTER the
+    // headline is published, never before: the function takes ~16s on a live brand and
+    // the profit number must not wait on the paragraph. If the request fails, Today
+    // simply renders without it.
     try {
       var A = window.OI_ASK;
       if (A && A.endpoint && A.getJwt) {
@@ -105,19 +110,34 @@
           headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jwt },
           body: JSON.stringify({ action: 'today_why', brandId: b, brand_id: b })
         });
-        if (wr.ok) { var wj = await wr.json(); if (wj && wj.why) out.why = wj.why; if (wj && wj.period) out.why_period = wj.period; }
+        if (wr.ok) {
+          var wj = await wr.json();
+          if (wj && wj.why) {
+            out.why = wj.why;
+            out.why_period = wj.period || null;
+            window.GRETA_HEADLINE = Object.assign({}, out);
+            try { window.dispatchEvent(new CustomEvent('greta-headline-updated')); } catch (e) {}
+          }
+        }
       }
     } catch (e) { /* the paragraph is optional; never block the headline on it */ }
 
-    window.GRETA_HEADLINE = out;
     try { window.dispatchEvent(new CustomEvent('greta-headline-updated')); } catch (e) {}
     if (window.console) console.info('[headline-data] GRETA_HEADLINE built · after-ads £' + out.cm_after_marketing_30d + (derived ? ' · target derived' : ''));
   }
 
   function boot() { build().catch(function () {}); }
+  // The session and brand id arrive asynchronously (greta-data-loader resolves the
+  // membership after auth), so a fixed delay races it and exits silently — which is
+  // exactly what happened live on 2026-09-25. Poll for the brand id like the overview
+  // loader does, then build; keep listening for refreshes afterwards.
   if (typeof window !== 'undefined') {
     window.addEventListener('frkl-data-updated', boot);
-    if (document.readyState === 'complete' || document.readyState === 'interactive') setTimeout(boot, 1200);
-    else window.addEventListener('DOMContentLoaded', function () { setTimeout(boot, 1200); });
+    var tries = 0;
+    var iv = setInterval(function () {
+      tries++;
+      var ready = window.FRKL_LIVE && window.FRKL_LIVE.brandId && window.FRKL_LIVE.sb;
+      if (ready || tries > 60) { clearInterval(iv); if (ready) boot(); }
+    }, 500);
   }
 })();
