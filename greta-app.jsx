@@ -13084,7 +13084,7 @@ function V3AskBar({ dest }) {
         onBlur={()=>setTimeout(()=>setOpen(false), 180)}
         onKeyDown={e=>{ if (e.key === 'Enter') send(); }}
         placeholder="Ask Greta anything about your business…" aria-label="Ask Greta a question"/>
-      <button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={()=>send()}>Ask</button>
+      <button type="button" className="v3-btn v3-btn-p" onClick={()=>send()}>Ask</button>
     </div>
     {open && (<div className="v3-askbar-sug">
       <span className="v3-muted">Try:</span>
@@ -13098,8 +13098,8 @@ function V3Info({ k }) {
   const g = V3_GLOSSARY[k]; if (!g) return null;
   const [open, setOpen] = React.useState(false);
   return (<span className="v3-info-wrap">
-    <button type="button" className="v3-info" aria-label={'What is ' + g.label + '?'} aria-expanded={open}
-            onClick={(ev) => { ev.stopPropagation(); setOpen(o => !o); }}>i</button>
+    <button type="button" className="v3-tap" aria-label={'What is ' + g.label + '?'} aria-expanded={open}
+            onClick={(ev) => { ev.stopPropagation(); setOpen(o => !o); }}><span className="v3-info">i</span></button>
     {open && (<span className="v3-sheet" role="dialog" aria-label={g.label}>
       <b>{g.label}</b>
       <span><b>What it is:</b> {g.what}</span>
@@ -13125,8 +13125,9 @@ function V3Conf({ state, detail, fix }) {
   const c = V3_CONF[state] || V3_CONF.estimated;
   const [open, setOpen] = React.useState(false);
   return (<span className="v3-info-wrap">
-    <button type="button" className={'v3-conf v3-conf-' + (state || 'estimated')} onClick={(ev) => { ev.stopPropagation(); setOpen(o => !o); }} aria-expanded={open}>
-      <i aria-hidden="true"/>{c.label}
+    <button type="button" className="v3-tap" onClick={(ev) => { ev.stopPropagation(); setOpen(o => !o); }} aria-expanded={open}
+            aria-label={'How certain is this? ' + c.label}>
+      <span className={'v3-conf v3-conf-' + (state || 'estimated')}><i aria-hidden="true"/>{c.label}</span>
     </button>
     {open && (<span className="v3-sheet" role="dialog" aria-label={'Confidence: ' + c.label}>
       <b>{c.label}</b><span>{detail || c.why}</span>

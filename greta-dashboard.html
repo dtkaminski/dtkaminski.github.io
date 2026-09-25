@@ -36,7 +36,7 @@
 <script src="./greta-live-data.js?v=202607060755"></script>
 <script src="./greta-agent-insights.js?v=20260921a"></script>
 <script src="./greta-business-data.js?v=202607060755"></script>
-<script src="./greta-action-status.js?v=202607060755"></script>
+<script src="./greta-action-status.js?v=20260925c"></script>
 <script src="./greta-creators.js?v=20260921a"></script>
 <script src="./greta-creative-vision.js?v=202607060755"></script>
 <script src="./greta-links.js?v=202607060755"></script>
@@ -1168,13 +1168,22 @@
     width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--border-default); background: none;
     color: var(--text-muted); font-family: var(--font-mono, ui-monospace), monospace; font-size: 11px; line-height: 1; cursor: pointer;
     display: inline-flex; align-items: center; justify-content: center; padding: 0;
+    /* The dot stays 22px so it sits quietly beside the label, but the tap area is the
+       full 44px: the ::after below needs this positioning context to expand from. */
+    position: relative;
   }
-  .v3-info::after, .v3-conf::after { content: ""; position: absolute; inset: -11px; }  /* 44px touch target */
-  .v3-info:hover, .v3-conf:hover { border-color: var(--accent); color: var(--accent); }
+  /* The tap target is the button; the dot or chip inside it carries the look. This
+     keeps a 22px dot visually quiet while giving a finger the full 44px to aim at. */
+  .v3-tap {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-height: 44px; min-width: 44px; padding: 11px; margin: -11px;
+    background: none; border: 0; cursor: pointer; font: inherit; color: inherit;
+  }
+  .v3-tap + .v3-tap { margin-left: -4px; }
+  .v3-tap:hover .v3-info, .v3-tap:hover .v3-conf { border-color: var(--accent); color: var(--accent); }
   .v3-conf {
     display: inline-flex; align-items: center; gap: 6px; position: relative; padding: 3px 9px;
-    border: 1px solid var(--border-default); border-radius: 999px; background: none; cursor: pointer;
-    font-family: inherit; font-size: 11.5px; font-weight: 600; color: var(--text-muted);
+    border: 1px solid var(--border-default); border-radius: 999px; background: none; font-family: inherit; font-size: 11.5px; font-weight: 600; color: var(--text-muted);
   }
   .v3-conf i { width: 8px; height: 8px; display: inline-block; }
   .v3-conf-measured i { background: var(--good); }
@@ -1250,7 +1259,7 @@
   .v3-askbar-sug { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 8px 2px 0; font-size: 12px; }
   .v3-sug {
     border: 1px solid var(--border-default); background: var(--bg-card); color: var(--text-secondary);
-    border-radius: var(--radius-md); min-height: 36px; padding: 0 10px; font-family: var(--font-sans); font-size: 12px; cursor: pointer;
+    border-radius: var(--radius-md); min-height: 44px; padding: 0 12px; font-family: var(--font-sans); font-size: 12px; cursor: pointer;
   }
   .v3-sug:hover { border-color: var(--accent); color: var(--accent); }
   @media (max-width: 760px) {
@@ -1292,6 +1301,6 @@
 window.MOS_EMBEDDED = true;</script>
 <script defer src="./today-calendar.build.js?v=20260925b"></script>
 <script defer src="./loop-panel.js?v=20260921a"></script>
-<script defer src="./greta-app.js?v=1790350500290"></script>
+<script defer src="./greta-app.js?v=1790350843610"></script>
 <script>/* perf: defer frkl static deep-tab data (CVR ~1.7MB, cohorts, promos, products) — not used by the Overview/landing. Background-load after paint; skip for non-frkl (de-frkl). */
 (function(){try{var slug=window.OI_BRAND_SLUG||(window.parent&&window.parent!==window?window.parent.OI_BRAND_SLUG:null)||"frkl";if(slug!=="frkl")return;var files=["greta-cvr.js","greta-cohorts.js","greta-discount-codes.js","greta-products.js","greta-patterns.js"],i=0;function next(){if(i>=files.length)return;var s=document.createElement("script");s.src="./"+files[i++]+"?v=202607060755";s.async=true;s.onload=next;s.onerror=next;document.head.appendChild(s);}var kick=function(){next();};if(window.requestIdleCallback){window.requestIdleCallback(kick,{timeout:1500});}else{setTimeout(kick,300);}}catch(e){}})();</script>

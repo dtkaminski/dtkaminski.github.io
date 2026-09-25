@@ -316,7 +316,7 @@ window.FRKL_ACTION_STATUS = {
  },
  "frame-creative-update-frkl-brand-guidelines": {
   "status": "needs-input",
-  "evidence": "Manual confirmation required — confirm via /frkl-done frame-creative-update-frkl-brand-guidelines",
+  "evidence": "Needs you to confirm it was done",
   "agent": "Frame",
   "area": "creative",
   "text": "Update frkl's brand guidelines: codify the loud/colour-forward 'self-expression' voice as the brand, and define the 25–54 woman as the centre of gravity (not 18–24). This unblocks every downstream brief.",
@@ -371,7 +371,7 @@ window.FRKL_ACTION_STATUS = {
  },
  "atlas-economics-confirm-real-cogs-compute": {
   "status": "needs-input",
-  "evidence": "Manual confirmation required — confirm via /frkl-done atlas-economics-confirm-real-cogs-compute",
+  "evidence": "Needs you to confirm it was done",
   "agent": "Atlas",
   "area": "economics",
   "text": "Confirm a real COGS% and compute true contribution margin per order — investors ask this first; CAC payback is unknowable without it.",
@@ -484,7 +484,7 @@ window.FRKL_ACTION_STATUS = {
  },
  "sage-content-codify-one-frkl-voice": {
   "status": "needs-input",
-  "evidence": "Manual confirmation required — confirm via /frkl-done sage-content-codify-one-frkl-voice",
+  "evidence": "Needs you to confirm it was done",
   "agent": "Sage",
   "area": "content",
   "text": "Codify ONE frkl voice (the bold, colour-forward, self-expression one that converts) and apply it across ads, site, and email.",
