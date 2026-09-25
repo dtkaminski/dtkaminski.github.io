@@ -57,6 +57,17 @@
       .select('month,spend,cac,new_customers,cm_per_order,cac_above_contribution,recency_rank')
       .eq('brand_id', b).order('month', { ascending: true }), 10000);
     if (sp && sp.data) window.FRKL_PLAN.spendCurvePoints = sp.data || [];
+
+    // The three reads that explain the curve rather than just drawing it (0145). Live
+    // since September 2026 with no consumer until the V3 Growth plan mounted them:
+    // why it bends (auction vs conversion), how the read has changed, what would move it.
+    var cd = await withTimeout(s.from('vw_brand_curve_decomposition').select('*').eq('brand_id', b).limit(1), 10000);
+    if (cd && cd.data) window.FRKL_PLAN.curveDecomposition = cd.data[0] || null;
+    var ch2 = await withTimeout(s.from('vw_brand_curve_history').select('*').eq('brand_id', b).order('month', { ascending: true }), 10000);
+    if (ch2 && ch2.data) window.FRKL_PLAN.curveHistory = ch2.data || [];
+    var cl = await withTimeout(s.from('vw_brand_curve_levers').select('*').eq('brand_id', b), 10000);
+    if (cl && cl.data) window.FRKL_PLAN.curveLevers = cl.data || [];
+
     window.dispatchEvent(new CustomEvent('frkl-plan-updated'));
   }
   async function derive(amount, basis) {
@@ -85,16 +96,29 @@
       return { ok: true };
     } catch (e) { if (window.console) console.warn('[plan] confirm failed', e); return { ok: false, error: String((e && e.message) || e) }; }
   }
+  // ONE WRITER (Phase 2 decision 5, 2026-09-25): costs are saved through the
+  // save-brand-config edge function, the same route Settings uses, instead of this
+  // panel updating brand_config straight from the browser. The function validates the
+  // fields, checks brand membership and applies PATCH semantics (omitted = unchanged).
   async function saveEconomics(fields) {
-    var s = sb(), b = bid(); if (!s || !b || !fields) return { ok: false, error: 'no session' };
-    var patch = {};
-    if (fields.gross_margin != null && fields.gross_margin !== '') patch.gross_margin = Number(fields.gross_margin);
-    if (fields.fixed_costs_monthly != null && fields.fixed_costs_monthly !== '') patch.fixed_costs_monthly = Number(fields.fixed_costs_monthly);
-    if (fields.variable_costs && typeof fields.variable_costs === 'object') patch.variable_costs = fields.variable_costs;
-    if (!Object.keys(patch).length) return { ok: false, error: 'nothing to save' };
+    var b = bid(); if (!b || !fields) return { ok: false, error: 'no session' };
+    var ASK = (typeof window !== 'undefined' && window.OI_ASK) || null;
+    if (!ASK || !ASK.endpoint || !ASK.getJwt) return { ok: false, error: 'not signed in' };
+    var body = { brand_id: b };
+    if (fields.gross_margin != null && fields.gross_margin !== '') body.gross_margin = Number(fields.gross_margin);
+    if (fields.fixed_costs_monthly != null && fields.fixed_costs_monthly !== '') body.fixed_costs_monthly = Number(fields.fixed_costs_monthly);
+    if (fields.variable_costs && typeof fields.variable_costs === 'object') body.variable_costs = fields.variable_costs;
+    if (Object.keys(body).length < 2) return { ok: false, error: 'nothing to save' };
     try {
-      var res = await s.from('brand_config').update(patch).eq('brand_id', b);
-      if (res.error) throw res.error;
+      var jwt = await ASK.getJwt();
+      var base = String(ASK.endpoint).replace(/\/functions\/v1\/[^/]*$/, '/functions/v1');
+      var r = await fetch(base + '/save-brand-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jwt },
+        body: JSON.stringify(body)
+      });
+      var out = await r.json().catch(function () { return {}; });
+      if (!r.ok) throw new Error(out.error || ('save failed (' + r.status + ')'));
       await refresh();
       return { ok: true };
     } catch (e) { if (window.console) console.warn('[plan] saveEconomics failed', e); return { ok: false, error: String((e && e.message) || e) }; }
@@ -118,7 +142,7 @@
       return { ok: true };
     } catch (e) { if (window.console) console.warn('[plan] saveBands failed', e); return { ok: false, error: String((e && e.message) || e) }; }
   }
-  window.FRKL_PLAN = { ready: false, readiness: [], goal: null, config: null, forecast: null, channels: [], channelMix: [], channelHealth: null, spendCurve: null, spendCurvePoints: [], period: PERIOD, refresh: refresh, derive: derive, confirm: confirm, saveEconomics: saveEconomics, deriveChannelPlan: deriveChannelPlan, saveBands: saveBands };
+  window.FRKL_PLAN = { curveDecomposition: null, curveHistory: [], curveLevers: [], ready: false, readiness: [], goal: null, config: null, forecast: null, channels: [], channelMix: [], channelHealth: null, spendCurve: null, spendCurvePoints: [], period: PERIOD, refresh: refresh, derive: derive, confirm: confirm, saveEconomics: saveEconomics, deriveChannelPlan: deriveChannelPlan, saveBands: saveBands };
   window.addEventListener('frkl-data-updated', refresh);
   var t = 0, iv = setInterval(function () { t++; if ((sb() && bid()) || t > 60) { clearInterval(iv); refresh(); } }, 500);
 })();

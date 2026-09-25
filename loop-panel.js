@@ -574,6 +574,15 @@
       if (!leak || !leak.length) return null;
       return leak.reduce((m, r) => r.mo > m ? r.mo : m, leak[0].mo);
     }, [leak]);
+    // The newest month shown can trail the calendar when later months fail the data checks;
+    // say so, or the panel looks broken.
+    const monthLags = useMemo(() => {
+      if (!month) return false;
+      const d = new Date(),
+        lastComplete = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+      const lc = lastComplete.getFullYear() + '-' + String(lastComplete.getMonth() + 1).padStart(2, '0');
+      return String(month).slice(0, 7) < lc;
+    }, [month]);
     const stages = useMemo(() => {
       if (!leak || !month) return null;
       return leak.filter(r => r.mo === month).sort((a, b) => a.stage_no - b.stage_no);
@@ -613,7 +622,13 @@
       className: "lp-h"
     }, "Where the month went"), /*#__PURE__*/React.createElement("span", {
       className: "lp-asof"
-    }, month, " · each stage against its own twelve month normal")), /*#__PURE__*/React.createElement("p", {
+    }, month, " · each stage against its own twelve month normal")), monthLags && /*#__PURE__*/React.createElement("p", {
+      className: "lp-note"
+    }, String(month).slice(0, 7), " is the latest month whose site tracking passed Greta's quality checks. Later months are held back because their site analytics data was incomplete (for example, checkout events stopped recording); they appear here automatically once the data is reliable. ", window.__oiNav && /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      className: "tdy-linkbtn",
+      onClick: () => window.__oiNav('settings', 'connections')
+    }, "Check connections")), /*#__PURE__*/React.createElement("p", {
       className: "lp-answer"
     }, "The clearest break is ", /*#__PURE__*/React.createElement("b", null, oddest.metric), ", ", Math.abs(Number(oddest.sigma)).toFixed(1), ' ', "standard deviations below its own normal and worth ", /*#__PURE__*/React.createElement("b", null, money(Number(oddest.leak))), top && /*#__PURE__*/React.createElement("span", null, ", concentrated in ", /*#__PURE__*/React.createElement("b", null, top.value === '/' ? 'the home page' : top.value), ' ', "at ", signedPct(Number(top.ctc_chg)), " on the month"), ".", splitStory && /*#__PURE__*/React.createElement("span", null, " ", biggest.metric, " lost more in pounds, ", money(Number(biggest.leak)), ", but at", ' ', Math.abs(Number(biggest.sigma)).toFixed(1), " standard deviations that is ordinary month-to-month variation rather than something that broke."), gain.length > 0 && /*#__PURE__*/React.createElement("span", null, " ", gain.map(g => g.metric).join(' and '), " ran above normal and put", ' ', money(Math.abs(gain.reduce((t, g) => t + Number(g.leak), 0))), " back.")), /*#__PURE__*/React.createElement(LeakRing, {
       stages: stages,

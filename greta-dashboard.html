@@ -6,11 +6,12 @@
 <meta name="robots" content="noindex, nofollow">
 <title>greta</title>
 <script src="./gate.js"></script>
-<script>/* set theme before paint — no flash of the wrong theme */try{document.documentElement.dataset.theme=localStorage.getItem('oi_theme')||'light';}catch(e){document.documentElement.dataset.theme='light';}</script>
+<!-- One theme (design-tokens.css); the pre-paint theme switch was removed 2026-09-24. -->
 <style>/* dedupe the live indicator: the app-bar FreshnessChip is the single source of truth; hide the floating "Live · Xs ago" badge the data-loader injects on <body>. */#frkl-live-indicator{display:none!important;}</style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;550;600;650;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./design-tokens.css?v=20260924a">
 <!-- perf: warm up the CDN + Supabase origins so the deferred libs and the first data
      fetch don't each pay a fresh DNS+TLS round-trip on cold load. -->
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
@@ -31,11 +32,12 @@
 <script src="./greta-data-loader.js?v=20260707100634"></script>
 <script src="./greta-overview-data.js?v=1785493798000"></script>
 <script src="./greta-plan-data.js?v=1790002585000"></script>
+<script src="./greta-headline-data.js?v=20260923a"></script>
 <script src="./greta-live-data.js?v=202607060755"></script>
-<script src="./greta-agent-insights.js?v=202607060755"></script>
+<script src="./greta-agent-insights.js?v=20260921a"></script>
 <script src="./greta-business-data.js?v=202607060755"></script>
 <script src="./greta-action-status.js?v=202607060755"></script>
-<script src="./greta-creators.js?v=202607060755"></script>
+<script src="./greta-creators.js?v=20260921a"></script>
 <script src="./greta-creative-vision.js?v=202607060755"></script>
 <script src="./greta-links.js?v=202607060755"></script>
 <script src="./greta-diagnostic-analyst.js?v=202607060755"></script>
@@ -59,7 +61,8 @@
     --s-5: 20px; --s-6: 24px; --s-7: 32px; --s-8: 48px;
 
     /* Radius scale */
-    --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-full: 999px;
+    /* Containers are square (--radius-none); buttons and inputs take 4px (--radius-md). */
+    --r-sm: var(--radius-md); --r-md: var(--radius-none); --r-lg: var(--radius-none); --r-full: 999px;
 
     /* Type scale */
     --t-display: 23px; --t-h2: 16px; --t-h3: 14px;
@@ -67,44 +70,44 @@
 
     /* Surface — "ink" dark: a lifted cool-slate base (NOT pure black) with clear
        elevation layers, so cards read as surfaces, not console output. */
-    --bg-app:        #0d0f14;
-    --bg-card:       #15181f;
-    --bg-card-hover: #1b1f27;
-    --bg-input:      #0a0c10;
-    --bg-elevated:   #1e222b;
+    --bg-app:        var(--color-surface);
+    --bg-card:       var(--color-panel);
+    --bg-card-hover: var(--color-panel-hover);
+    --bg-input:      var(--color-input);
+    --bg-elevated:   var(--color-panel);
 
     /* Border — a touch more present so layers separate cleanly */
-    --border-subtle:  #242832;
-    --border-default: #313641;
+    --border-subtle:  var(--color-line);
+    --border-default: var(--color-line-strong);
 
     /* Text — softened top end (no pure white) for a calmer, premium contrast */
-    --text-primary:   #e8eaef;
-    --text-secondary: #aab0bd;
-    --text-muted:     #7d828f;
-    --text-faint:     #585e6a;
+    --text-primary:   var(--color-ink);
+    --text-secondary: #3D3A35;
+    --text-muted:     var(--color-muted);
+    --text-faint:     #79726A;
 
     /* Semantic — slightly desaturated so red/green read as signal, not neon */
-    --good:    #4ec98c;
-    --warn:    #e9a23b;
-    --bad:     #e96b73;
-    --accent:  #8B5CF6;   /* refined indigo — primary chrome only */
-    --accent-soft: #272d4f;
-    --accent-hover: #A78BFA;  /* lighter indigo for hover on solid accent (dark) */
+    --good:    var(--color-success);
+    --warn:    var(--color-warning);
+    --bad:     var(--color-danger);
+    --accent:  var(--color-accent);
+    --accent-soft: var(--color-accent-wash);
+    --accent-hover: #A63E00;
 
     /* Status surfaces (tinted backgrounds for pills/banners) */
-    --good-bg:   rgba(78,201,140,.11);
-    --warn-bg:   rgba(233,162,59,.11);
-    --bad-bg:    rgba(233,107,115,.11);
-    --accent-bg: rgba(139,92,246,.10);
+    --good-bg:   var(--color-success-wash);
+    --warn-bg:   var(--color-warning-wash);
+    --bad-bg:    var(--color-danger-wash);
+    --accent-bg: var(--color-accent-wash);
 
     /* Heatmap scale (IG cadence calendar) — poor→strong engagement */
-    --heat-empty: #1a1a22; --heat-none: #2b2b34; --heat-low: #7c2d12;
-    --heat-mid: #86870a; --heat-high: #15803d; --heat-ink: #9aa0ad;
+    --heat-empty: var(--color-sunken); --heat-none: #DFD8CE; --heat-low: #F0C9AE;
+    --heat-mid: #E8D49B; --heat-high: #A8D8BE; --heat-ink: var(--color-muted);
 
     /* Shadows — softer + slightly larger spread for a lifted, premium feel */
-    --shadow-sm: 0 1px 2px rgba(0,0,0,.35);
-    --shadow-md: 0 6px 18px rgba(0,0,0,.40);
-    --shadow-lg: 0 20px 44px rgba(0,0,0,.50);
+    --shadow-sm: var(--shadow-panel);
+    --shadow-md: var(--shadow-raised);
+    --shadow-lg: var(--shadow-raised);
 
     /* Motion */
     --motion-fast: 120ms ease;
@@ -112,50 +115,20 @@
     --appbar-h: 57px;
   }
 
-  /* ── Daylight (light) theme — token overrides; toggled via html[data-theme=light] ── */
-  html[data-theme="light"] {
-    /* ── Greta light cockpit (brand book) ── */
-    --bg-app:        #F1F5F9;
-    --bg-card:       #ffffff;
-    --bg-card-hover: #F8FAFC;
-    --bg-input:      #ffffff;
-    --bg-elevated:   #ffffff;
-    --border-subtle:  #E9EEF4;
-    --border-default: #D7DEE8;
-    --text-primary:   #0B132B;
-    --text-secondary: #334155;
-    --text-muted:     #64748B;
-    --text-faint:     #94A3B8;
-    --good:    #0E9E78;
-    --warn:    #B45309;
-    --bad:     #DC2626;
-    --accent:  #7C3AED;
-    --accent-soft: #EDE9FE;
-    --accent-hover: #6D28D9;  /* deeper indigo for hover on solid accent (light) */
-    --good-bg:   rgba(34,211,166,.12);
-    --warn-bg:   rgba(180,83,9,.10);
-    --bad-bg:    rgba(220,38,38,.08);
-    --accent-bg: rgba(124,58,237,.08);
-    --heat-empty: #EEF2F7; --heat-none: #DFE4EA; --heat-low: #F4CDBA;
-    --heat-mid: #F0E09C; --heat-high: #9FE6CE; --heat-ink: #5A606B;
-    --shadow-sm: 0 1px 2px rgba(11,19,43,.06);
-    --shadow-md: 0 6px 18px rgba(11,19,43,.08);
-    --shadow-lg: 0 20px 44px rgba(11,19,43,.12);
-  }
-  /* Recharts SVG adapts via its generated classes (var() can't be used in SVG attrs). */
-  html[data-theme="light"] .recharts-cartesian-grid line { stroke: #edeff3; }
-  html[data-theme="light"] .recharts-text,
-  html[data-theme="light"] .recharts-cartesian-axis-tick-value tspan { fill: #6a707b; }
-  html[data-theme="light"] .recharts-cartesian-axis-line,
-  html[data-theme="light"] .recharts-cartesian-axis-tick-line { stroke: #d7dbe2; }
-  /* App-bar is a hard-coded translucent near-black; flip it for light. */
-  html[data-theme="light"] .appbar { background: rgba(255,255,255,0.82); }
-  html { transition: background-color 160ms ease; color-scheme: dark; }
-  html[data-theme="light"] { color-scheme: light; }
+  /* ── One theme ─────────────────────────────────────────────────────────
+     Phase 2 decision 3 (approved 2026-09-23): the app renders in the
+     design-tokens.css palette, light only. The old dark values and the
+     data-theme toggle are gone; every colour above resolves to a token. */
+  html { color-scheme: light; }
+  /* Recharts draws SVG attributes, which cannot read var() — its generated
+     classes are styled here instead so charts follow the token palette. */
+  .recharts-cartesian-grid line { stroke: var(--color-line); }
+  .recharts-text, .recharts-cartesian-axis-tick-value tspan { fill: var(--color-muted); }
+  .recharts-cartesian-axis-line, .recharts-cartesian-axis-tick-line { stroke: var(--color-line-strong); }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: var(--font-sans);
     background: var(--bg-app); color: var(--text-primary);
     min-height: 100vh; font-feature-settings: 'ss01','cv11';
     -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
@@ -163,12 +136,16 @@
   ::-webkit-scrollbar { width: 8px; height: 8px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border-default); border-radius: var(--r-sm); }
-  ::-webkit-scrollbar-thumb:hover { background: #3a3a48; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--color-muted); }
+
+  button, .btn, .btn-primary, .btn-ghost, input, select, textarea, .v3-btn, .v3-nav-search, .v3-nav-item {
+    border-radius: var(--radius-md);
+  }
 
   /* ── App chrome ──────────────────────────────────────────────────────── */
   .appbar {
     position: sticky; top: 0; z-index: 50;
-    background: rgba(8,8,11,0.85); backdrop-filter: blur(12px);
+    background: rgba(245,242,237,0.88); backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border-subtle);
   }
   .appbar-inner {
@@ -1115,25 +1092,206 @@
   .modal button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
   .modal .hint { font-size: var(--t-meta); color: var(--text-muted); margin-top: var(--s-3); line-height: 1.5; }
   .copied { color: var(--good) !important; }
+
+  /* ═══ UI V3 — the Phase 2 restructure (approved 2026-09-23) ═══════════════
+     One nav, one destination, one profit number, tap-to-open explainers.
+     Values come from the app theme variables; the light design-tokens.css
+     migration is the next step and replaces this block's var() targets. */
+  .v3-root { --v3-nav-w: 232px; }
+  .v3-shell { display: flex; align-items: flex-start; max-width: 1800px; margin: 0 auto; }
+  .v3-nav {
+    position: sticky; top: var(--appbar-h); align-self: flex-start;
+    width: var(--v3-nav-w); flex-shrink: 0; height: calc(100vh - var(--appbar-h));
+    overflow-y: auto; padding: 16px 12px 24px; border-right: 1px solid var(--border-subtle);
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .v3-nav-search {
+    display: flex; align-items: center; gap: 9px; margin: 0 2px 14px; padding: 10px 11px; min-height: 44px;
+    border: 1px solid var(--border-default); border-radius: var(--r-md); background: var(--bg-card);
+    color: var(--text-muted); font-size: 12.5px; cursor: pointer; font-family: inherit; width: calc(100% - 4px);
+  }
+  .v3-nav-search kbd { margin-left: auto; font-size: 10.5px; color: var(--text-faint); font-family: inherit; }
+  .v3-nav-group {
+    font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-faint);
+    font-weight: 600; padding: 14px 10px 5px;
+  }
+  .v3-nav-group:first-of-type { padding-top: 2px; }
+  .v3-nav-item {
+    display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 8px 11px;
+    border: 0; border-radius: var(--r-md); background: none; color: var(--text-secondary);
+    font-family: inherit; font-size: 13.5px; font-weight: 500; text-align: left; cursor: pointer;
+  }
+  .v3-nav-item:hover { background: var(--bg-card); color: var(--text-primary); }
+  .v3-nav-item.active { background: var(--accent-bg); color: var(--accent); font-weight: 600; }
+  .v3-main { flex: 1; min-width: 0; padding: 22px 28px 40px; max-width: 1180px; }
+  .v3-page-head { margin-bottom: 20px; }
+  .v3-page-title { font-size: 22px; font-weight: 650; margin: 0 0 3px; letter-spacing: -0.01em; }
+  .v3-page-q { color: var(--text-muted); font-size: 13px; margin: 0; }
+
+  /* Today: one big number, both bases on screen */
+  .v3-today { display: flex; flex-direction: column; gap: 18px; }
+  .v3-hero { border-top: 2px solid var(--text-primary); padding-top: 14px; }
+  .v3-hero-lab { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--text-secondary); }
+  .v3-big { font-family: var(--font-mono, ui-monospace), monospace; font-size: 44px; line-height: 1.05; font-weight: 500; letter-spacing: -0.02em; margin: 8px 0 4px; }
+  .v3-big-muted { color: var(--text-faint); }
+  .v3-bar { position: relative; height: 6px; background: var(--bg-card); margin: 10px 0 7px; max-width: 520px; }
+  .v3-bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); }
+  .v3-bar b { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--text-primary); }
+  .v3-pace { font-size: 13px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .v3-pace.good { color: var(--good); } .v3-pace.bad { color: var(--bad); }
+  .v3-sub { font-size: 13px; color: var(--text-secondary); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+  .v3-muted { color: var(--text-muted); }
+  .v3-dot { width: 3px; height: 3px; border-radius: 50%; background: var(--text-faint); display: inline-block; }
+  .v3-refresh { margin-top: 10px; background: var(--accent-bg); border: 1px solid var(--accent); color: var(--accent); border-radius: var(--r-md); min-height: 44px; padding: 0 14px; font-family: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+  .v3-kick { font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--text-muted); font-weight: 600; margin-bottom: 6px; }
+  .v3-dofirst { border-top: 1px solid var(--border-subtle); padding-top: 14px; }
+  .v3-dofirst-t { font-size: 17px; font-weight: 600; line-height: 1.35; margin-bottom: 4px; }
+  .v3-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .v3-btn {
+    min-height: 44px; padding: 0 16px; border-radius: var(--r-md); border: 1px solid var(--border-default);
+    background: var(--bg-card); color: var(--text-primary); font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .v3-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .v3-btn-p { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .v3-btn-p:hover { color: #fff; opacity: .92; }
+  .v3-btn-sm { min-height: 36px; padding: 0 11px; font-size: 12px; font-weight: 500; }
+  .v3-next { border-top: 1px solid var(--border-subtle); padding-top: 14px; }
+  .v3-next-row { display: grid; grid-template-columns: 1.6rem 1fr auto; gap: 12px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--border-subtle); font-size: 13.5px; }
+  .v3-num { font-family: var(--font-mono, ui-monospace), monospace; color: var(--text-muted); font-size: 12.5px; }
+  .v3-note { border-left: 2px solid var(--accent); background: var(--accent-bg); padding: 10px 14px; font-size: 13px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .v3-anchor { display: block; height: 0; scroll-margin-top: 80px; }
+
+  /* Tap-to-open explainer and confidence sheets (never hover-only) */
+  .v3-info-wrap { position: relative; display: inline-flex; }
+  .v3-info {
+    width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--border-default); background: none;
+    color: var(--text-muted); font-family: var(--font-mono, ui-monospace), monospace; font-size: 11px; line-height: 1; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; padding: 0;
+  }
+  .v3-info::after, .v3-conf::after { content: ""; position: absolute; inset: -11px; }  /* 44px touch target */
+  .v3-info:hover, .v3-conf:hover { border-color: var(--accent); color: var(--accent); }
+  .v3-conf {
+    display: inline-flex; align-items: center; gap: 6px; position: relative; padding: 3px 9px;
+    border: 1px solid var(--border-default); border-radius: 999px; background: none; cursor: pointer;
+    font-family: inherit; font-size: 11.5px; font-weight: 600; color: var(--text-muted);
+  }
+  .v3-conf i { width: 8px; height: 8px; display: inline-block; }
+  .v3-conf-measured i { background: var(--good); }
+  .v3-conf-estimated i { background: var(--warn); }
+  .v3-conf-benchmark i { background: none; border: 2px solid var(--text-muted); }
+  .v3-conf-held i { background: var(--border-default); }
+  .v3-sheet {
+    position: absolute; top: calc(100% + 8px); left: 0; z-index: 60; width: min(320px, 78vw);
+    display: flex; flex-direction: column; gap: 7px; padding: 14px;
+    background: var(--bg-elevated, var(--bg-card)); border: 1px solid var(--border-default);
+    border-radius: var(--r-md); box-shadow: 0 8px 28px rgba(0,0,0,.28); font-size: 12.5px; line-height: 1.5;
+    color: var(--text-secondary); text-align: left; font-weight: 400; white-space: normal;
+  }
+  .v3-sheet b { color: var(--text-primary); }
+  .v3-sheet-tech { color: var(--text-faint); font-size: 11.5px; }
+  .v3-sheet-btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+
+  /* Progressive disclosure */
+  .v3-more { border-top: 1px solid var(--border-subtle); }
+  .v3-more-head {
+    display: flex; align-items: center; gap: 9px; width: 100%; min-height: 44px; padding: 10px 0;
+    background: none; border: 0; color: var(--text-secondary); font-family: inherit;
+    font-size: 13px; font-weight: 600; text-align: left; cursor: pointer;
+  }
+  .v3-more-head:hover { color: var(--text-primary); }
+  .v3-more-caret { color: var(--accent); font-size: 11px; }
+  .v3-more-body { padding-bottom: 8px; }
+
+  /* Mobile: five places, Ask in the middle */
+  .v3-mobile { display: none; }
+  @media (max-width: 760px) {
+    .v3-shell { display: block; }
+    .v3-nav { display: none; }
+    .v3-main { padding: 16px 16px 84px; max-width: none; }
+    .v3-big { font-size: 38px; }
+    .v3-mobile {
+      display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+      background: var(--bg-app); border-top: 1px solid var(--border-default);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    .v3-mb {
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+      min-height: 56px; background: none; border: 0; color: var(--text-muted); font-family: inherit; font-size: 10.5px; cursor: pointer;
+    }
+    .v3-mb.active { color: var(--accent); }
+    .v3-sheet { position: fixed; left: 12px; right: 12px; bottom: 76px; top: auto; width: auto; }
+  }
+
+
+  /* Getting started — the first-run path (Phase 2 §6) */
+  .v3-setup { border: 1px solid var(--accent); padding: 14px 16px; margin-bottom: 4px; background: var(--accent-bg); }
+  .v3-steps { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 2px; }
+  .v3-step { display: grid; grid-template-columns: 26px 1fr auto; gap: 12px; align-items: center; padding: 9px 0; border-top: 1px solid var(--border-subtle); }
+  .v3-step:first-child { border-top: 0; }
+  .v3-step-mark {
+    width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--border-default); color: var(--text-muted);
+    display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 12px;
+  }
+  .v3-step.done .v3-step-mark { background: var(--good); border-color: var(--good); color: var(--color-panel); }
+  .v3-step.next .v3-step-mark { border-color: var(--accent); color: var(--accent); }
+  .v3-step.done .v3-step-body b { color: var(--text-muted); font-weight: 500; }
+  .v3-step-body { display: grid; gap: 1px; font-size: 13px; min-width: 0; }
+  .v3-step-body .v3-muted { font-size: 12px; }
+
+  /* Ask Greta — permanent, on every screen (Phase 2 §7) */
+  .v3-askbar { position: sticky; top: var(--appbar-h); z-index: 20; background: var(--bg-app); padding: 10px 0 12px; margin-bottom: 4px; }
+  .v3-askbar-in { display: flex; align-items: center; gap: 10px; border: 1px solid var(--accent); background: var(--bg-card); padding: 6px 8px 6px 12px; color: var(--accent); }
+  .v3-askbar-in input {
+    flex: 1; min-width: 0; border: 0; background: none; outline: none; min-height: 40px;
+    font-family: var(--font-sans); font-size: 13.5px; color: var(--text-primary);
+  }
+  .v3-askbar-in input::placeholder { color: var(--text-muted); }
+  .v3-askbar-sug { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 8px 2px 0; font-size: 12px; }
+  .v3-sug {
+    border: 1px solid var(--border-default); background: var(--bg-card); color: var(--text-secondary);
+    border-radius: var(--radius-md); min-height: 36px; padding: 0 10px; font-family: var(--font-sans); font-size: 12px; cursor: pointer;
+  }
+  .v3-sug:hover { border-color: var(--accent); color: var(--accent); }
+  @media (max-width: 760px) {
+    .v3-askbar { position: static; padding-top: 4px; }
+    .v3-askbar-sug { display: none; }
+  }
+
+  /* Period control (Numbers pages) */
+  .v3-page-head-row { display: flex; gap: var(--s-4); align-items: flex-start; flex-wrap: wrap; }
+  .v3-page-head-row > div:first-child { flex: 1 1 260px; min-width: 0; }
+  .v3-period { display: flex; align-items: center; gap: 8px; font-size: 12.5px; flex-wrap: wrap; }
+  .v3-period select, .v3-period input {
+    font-family: var(--font-sans); font-size: 12.5px; min-height: 44px; padding: 0 10px;
+    border: 1px solid var(--border-default); background: var(--bg-card); color: var(--text-primary);
+  }
+  .v3-period-range { display: flex; align-items: center; gap: 6px; }
+
+  /* "What is happening" — the why block on Today */
+  .v3-why { border-top: 1px solid var(--border-subtle); padding-top: 14px; }
+  .v3-why-p { font-size: 14px; line-height: 1.6; margin: 0 0 6px; max-width: 70ch; }
+  .v3-why-list { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 3px; font-size: 12.5px; color: var(--text-secondary); }
+  .v3-why-list li { display: grid; grid-template-columns: 3rem 1fr; gap: 8px; }
 </style>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./marketing-os-tokens.css?v=20260713b">
-<link rel="stylesheet" href="./marketing-os.css?v=20260714b">
+<link rel="stylesheet" href="./marketing-os-tokens.css?v=20260924a">
+<link rel="stylesheet" href="./marketing-os.css?v=20260924a">
 <link rel="stylesheet" href="./loop-panel.css?v=20260915c">
 </head>
 <body>
 <div id="root"></div>
 <script>/* de-frkl pre-eval gate: for non-frkl brands, clear static-only FRKL_* globals that frkl-app.js captures into module-level consts at load (FRKL_LINKS -> _linkKeys/_linkRe, FRKL_INSIGHTS -> INS) BEFORE the bundle reads them. Runs after the static frkl-*.js files. frkl keeps its demo snapshot; the data-loader still handles all render-time globals. */
 (function(){try{var s=window.OI_BRAND_SLUG||(window.parent&&window.parent!==window?window.parent.OI_BRAND_SLUG:null)||'frkl';if(s==='frkl')return;window.FRKL_LINKS={};window.FRKL_INSIGHTS={};}catch(e){}})();</script>
-<script defer src="./marketing-os.build.js?v=20260708160000"></script>
+<script defer src="./marketing-os.build.js?v=20260921a"></script>
 <script>/* today-calendar.build.js serves both a standalone today.html deploy and this embedded
    nav-tab context. Setting MOS_EMBEDDED before it loads suppresses its self-mount (ReactDOM.render
    into #root) and instead exposes window.Today / window.Calendar as plain components for
    greta-app.jsx's mosView() to render — the same pattern marketing-os.build.js already uses for
    window.CommandCentre / window.DecisionLog. */
 window.MOS_EMBEDDED = true;</script>
-<script defer src="./today-calendar.build.js?v=20260720110730"></script>
-<script defer src="./loop-panel.js?v=20260915c"></script>
-<script defer src="./greta-app.js?v=1789472271697"></script>
+<script defer src="./today-calendar.build.js?v=20260925b"></script>
+<script defer src="./loop-panel.js?v=20260921a"></script>
+<script defer src="./greta-app.js?v=1790347082623"></script>
 <script>/* perf: defer frkl static deep-tab data (CVR ~1.7MB, cohorts, promos, products) — not used by the Overview/landing. Background-load after paint; skip for non-frkl (de-frkl). */
 (function(){try{var slug=window.OI_BRAND_SLUG||(window.parent&&window.parent!==window?window.parent.OI_BRAND_SLUG:null)||"frkl";if(slug!=="frkl")return;var files=["greta-cvr.js","greta-cohorts.js","greta-discount-codes.js","greta-products.js","greta-patterns.js"],i=0;function next(){if(i>=files.length)return;var s=document.createElement("script");s.src="./"+files[i++]+"?v=202607060755";s.async=true;s.onload=next;s.onerror=next;document.head.appendChild(s);}var kick=function(){next();};if(window.requestIdleCallback){window.requestIdleCallback(kick,{timeout:1500});}else{setTimeout(kick,300);}}catch(e){}})();</script>

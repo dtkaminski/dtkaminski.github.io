@@ -6,7 +6,7 @@
 <title>greta — Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;550;600;650;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../auth/auth.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
@@ -14,7 +14,7 @@
   body { background: var(--bg-app); }
   .app-bar {
     position: sticky; top: 0; z-index: 50;
-    background: rgba(255,255,255,0.85); backdrop-filter: blur(14px);
+    background: rgba(245,242,237,0.88); backdrop-filter: blur(14px);
     border-bottom: 1px solid var(--border-subtle);
   }
   .app-bar-inner {
@@ -99,11 +99,6 @@
   }
 
   /* ── Panel grid ────────────────────────────────────────────────────── */
-  .panel-grid {
-    display: grid; gap: var(--s-3); margin-top: var(--s-5);
-    grid-template-columns: 1fr 1fr;
-  }
-  @media (max-width: 720px) { .panel-grid { grid-template-columns: 1fr; } }
 
   .panel {
     background: var(--bg-card); border: 1px solid var(--border-subtle);
@@ -188,31 +183,15 @@
       <span id="brand-chip">loading…</span>
     </div>
     <div class="app-bar-spacer"></div>
-    <div class="app-tabs">
-      <div class="app-tab active" data-tab="overview">Overview</div>
-      <div class="app-tab" data-tab="intelligence">Intelligence</div>
-      <div class="app-tab" data-tab="customers">Customers</div>
-      <div class="app-tab" data-tab="connections">Connections</div>
-    </div>
-    <button id="theme-btn" class="btn-ghost" title="Toggle light / dark" aria-label="Toggle theme" style="padding:4px 9px; font-size:14px; line-height:1;">🌙</button>
+    <!-- The four top tabs were removed on 2026-09-25 (Phase 2, one navigation).
+         Overview is the app; Customers is now Numbers > Customers inside it;
+         Connections is Settings > Connections & data; the static Intelligence
+         tab was retired in favour of the live alerts on Home > Review. -->
     <button id="logout-btn" class="btn-ghost" style="padding: 5px 10px; font-size: 11.5px;">Log out</button>
   </div>
 </header>
-<script>
-  /* Single-bar theme toggle: applies to the shell AND the embedded dashboard iframe
-     (same-origin) and persists via oi_theme, which the iframe also reads on load. */
-  (function(){
-    var b=document.getElementById('theme-btn'); if(!b) return;
-    function cur(){ try{return localStorage.getItem('oi_theme')||'light';}catch(e){return 'light';} }
-    function apply(t){
-      document.documentElement.dataset.theme=t;
-      try{ var f=document.getElementById('rich-dash'); if(f&&f.contentDocument) f.contentDocument.documentElement.dataset.theme=t; }catch(e){}
-      b.textContent = (t==='dark') ? '☀️' : '🌙';
-    }
-    apply(cur());
-    b.addEventListener('click', function(){ var t=(cur()==='dark')?'light':'dark'; try{localStorage.setItem('oi_theme',t);}catch(e){} apply(t); });
-  })();
-</script>
+<!-- The light/dark toggle was removed on 2026-09-24 (Phase 2 decision 3): the app
+     renders in one palette, defined once in design-tokens.css. -->
 
 <div class="page">
   <div id="loading" style="text-align:center; padding:var(--s-8); color:var(--text-muted);">Loading your dashboard…</div>
@@ -256,137 +235,15 @@
     </div>
 
     <!-- Hero -->
-    <div class="hero-placeholder" id="hero-card">
-      <div class="hero-placeholder-bg"></div>
-      <div class="hero-content">
-        <div class="hero-eyebrow" id="hero-eyebrow">Monday brief</div>
-        <h1 class="hero-headline" id="hero-headline">Welcome to <span class="accent" id="hero-brand">your workspace</span></h1>
-        <p class="hero-sub" id="hero-sub">Your first Monday brief will land once Shopify is connected and the first 7 days of data have synced. Until then, here's the shape of what's coming.</p>
-      </div>
-    </div>
-
     <!-- Panel grid -->
-    <div class="panel-grid">
-      <div class="panel" id="panel-money">
-        <div class="panel-head">
-          <div class="panel-title">Money on the table</div>
-          <span class="panel-pill locked" id="panel-money-pill">Locked</span>
-        </div>
-        <div class="panel-body" id="panel-money-body">
-          <div class="panel-locked-msg">
-            <b>£/month at stake</b><br/>
-            Quantifies every finding the engines surface — leakage, at-risk, opportunity.
-            <br/>
-            <span style="display:inline-block; margin-top:var(--s-2);">Requires Shopify + at least one paid channel.</span>
-            <br/>
-            <a href="../auth/workspace.html" class="panel-locked-action">Connect Shopify →</a>
-          </div>
-        </div>
-      </div>
-
-      <div class="panel" id="panel-inventory">
-        <div class="panel-head">
-          <div class="panel-title">Inventory health</div>
-          <span class="panel-pill locked" id="panel-inventory-pill">Locked</span>
-        </div>
-        <div class="panel-body" id="panel-inventory-body">
-          <div class="panel-locked-msg">
-            <b>Days of cover per SKU</b><br/>
-            Flags critical low-stock + working capital trapped in overstock — days of cover per SKU and the cash tied up in slow movers.
-            <br/>
-            <a href="../auth/workspace.html" class="panel-locked-action">Connect Shopify →</a>
-          </div>
-        </div>
-      </div>
-
-      <div class="panel" id="panel-creative">
-        <div class="panel-head">
-          <div class="panel-title">Creative vision</div>
-          <span class="panel-pill locked">Requires Meta</span>
-        </div>
-        <div class="panel-body">
-          <div class="panel-locked-msg">
-            <b>Vision-AI scores per ad asset</b><br/>
-            Hook strength · visual hierarchy · claim quality · audience fit · brand consistency. The differentiator vs Triple Whale.
-            <br/>
-            <span style="color:var(--text-faint); display:inline-block; margin-top:var(--s-2); font-size:11.5px;">Meta OAuth coming next sprint.</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="panel" id="panel-email">
-        <div class="panel-head">
-          <div class="panel-title">Email attribution</div>
-          <span class="panel-pill locked">Requires Klaviyo</span>
-        </div>
-        <div class="panel-body">
-          <div class="panel-locked-msg">
-            <b>True attributed revenue (not gross)</b><br/>
-            Klaviyo's own dashboard reports gross-tracked. We pull AttributedFlow + AttributedCampaign so the £ figure is real.
-            <br/>
-            <span style="color:var(--text-faint); display:inline-block; margin-top:var(--s-2); font-size:11.5px;">Klaviyo connector coming next sprint.</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- Full live dashboard (embedded for brands whose rich view is wired up). -->
     <iframe id="rich-dash" title="Live dashboard" hidden
       style="width:100%; height:calc(100vh - 58px); border:0; background:var(--bg-app); display:block;"></iframe>
   </div>
 
   <!-- ── INTELLIGENCE TAB ───────────────────────────────────────────────── -->
-  <div id="tab-intelligence" class="tab-content" hidden>
-    <div class="state-banner info">
-      <div class="state-banner-icon">i</div>
-      <div class="state-banner-body">
-        <div class="state-banner-title">Intelligence engines run after the first 7 days of data</div>
-        <div class="state-banner-sub">Trend detection, divergence, money quantification and diagnostic recipes need ≥14 days of history to fire meaningfully. We deliberately refuse to surface low-confidence findings — see the intellectual-honesty layer.</div>
-      </div>
-    </div>
-
-    <div class="panel" style="min-height: 320px;">
-      <div class="panel-head">
-        <div class="panel-title">No active findings yet</div>
-        <span class="panel-pill pending">Pending data</span>
-      </div>
-      <div class="panel-body">
-        <div class="panel-locked-msg" style="max-width: 540px; margin: 0 auto;">
-          Engines that will fire as data accumulates:
-          <ul style="text-align: left; max-width: 380px; margin: var(--s-4) auto 0; padding-left: var(--s-5); color: var(--text-secondary); font-size: 12.5px; line-height: 1.7;">
-            <li><b style="color:var(--text-primary);">Trend engine</b> — slope detection with change-point + anomaly flagging (≥14 days)</li>
-            <li><b style="color:var(--text-primary);">Divergence engine</b> — when correlated channels decouple (≥14 days)</li>
-            <li><b style="color:var(--text-primary);">Money quantifier</b> — £/mo on every finding (with first action)</li>
-            <li><b style="color:var(--text-primary);">Diagnostic recipes</b> — auto-investigates the why (after first finding)</li>
-            <li><b style="color:var(--text-primary);">P(hit) calibration</b> — sample-size badges (after 3+ actions close)</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- ── CUSTOMERS TAB ──────────────────────────────────────────────────── -->
-  <div id="tab-customers" class="tab-content" hidden>
-    <h2 style="font-size:16px; font-weight:650; margin-bottom: var(--s-2);">Customers</h2>
-    <p class="meta" style="font-size:12.5px; margin-bottom: var(--s-5);">
-      Who your customers are, by value and loyalty — and reward the ones worth keeping. Names and consent are read live; nothing is stored in the page.
-    </p>
-    <div id="customers-root"></div>
-  </div>
-
   <!-- ── CONNECTIONS TAB ────────────────────────────────────────────────── -->
-  <div id="tab-connections" class="tab-content" hidden>
-    <h2 style="font-size:16px; font-weight:650; margin-bottom: var(--s-3);">Your data sources</h2>
-    <p class="meta" style="font-size:12.5px; margin-bottom: var(--s-5);">
-      Manage connections, reconnect when tokens expire, see sync history.
-    </p>
-    <div id="conn-list" style="display:flex; flex-direction:column; gap:var(--s-3);">
-      <!-- Filled by JS -->
-    </div>
-    <p class="meta" style="font-size:12px; margin-top:var(--s-5);">
-      Need more setup help? <a href="../auth/workspace.html">Open the onboarding home →</a>
-    </p>
-  </div>
 </div>
 
 <script>
@@ -399,15 +256,7 @@
   let currentToken = null;
   let connByProvider = {};
 
-  // ── Tab switching ──────────────────────────────────────────────────────
-  document.querySelectorAll('.app-tab').forEach(t => {
-    t.addEventListener('click', () => {
-      document.querySelectorAll('.app-tab').forEach(x => x.classList.remove('active'));
-      t.classList.add('active');
-      document.querySelectorAll('.tab-content').forEach(c => c.hidden = true);
-      document.getElementById(`tab-${t.dataset.tab}`).hidden = false;
-    });
-  });
+  // Tab switching removed with the tabs (2026-09-25): the dashboard is the app.
 
   // ── Logout ─────────────────────────────────────────────────────────────
   document.getElementById('logout-btn').addEventListener('click', async () => {
@@ -489,66 +338,36 @@
     // so we pre-satisfy the dashboard's access gate via shared same-origin localStorage
     // (no passcode prompt). The embedded dashboard's loader reads live tenant data using
     // this same session.
-    const richUrl = '/greta-dashboard.html?v=1789477000000';
-    if (richUrl) {
-      try { localStorage.setItem('oi_gate_v1', 'b8bd9e7d7fe04b396ddc52df76d65e84a99565fff0f22d805d6b13b4517bcdb5'); } catch (e) {}
-      // Activate the dashboard's "Ask the data" panel: same-origin iframe reads
-      // window.parent.OI_ASK. getJwt() returns a FRESH session token each send
-      // (supabase auto-refreshes it), so the relay's per-tenant auth never goes stale.
-      window.OI_ASK = {
-        endpoint: SUPABASE_URL + '/functions/v1/ask-data',
-        brand_id: currentBrand.id,
-        getJwt: async () => { const { data } = await sb.auth.getSession(); return data?.session?.access_token || ''; },
-      };
-      // Per-tenant brand identity for the embedded dashboard. The iframe's data loader
-      // (OI_BRAND_SLUG) and app copy/LLM prompts (OI_BRAND) read these via window.parent,
-      // mirroring OI_ASK. Without them the loader defaults to frkl's data and the copy
-      // renders frkl's name/vertical/markets. markets/seasonality live in brands.metadata.
-      window.OI_BRAND_SLUG = currentBrand.slug;
-      const _md = currentBrand.metadata || {};
-      window.OI_BRAND = {
-        name: currentBrand.name,
-        slug: currentBrand.slug,
-        vertical: currentBrand.vertical || 'DTC',
-        markets: Array.isArray(_md.primary_markets) ? _md.primary_markets.join('/') : (_md.markets || ''),
-        seasonality: _md.seasonality || 'No specific seasonality profile on record — treat seasonal claims cautiously.',
-      };
-      document.getElementById('hero-card').hidden = true;
-      const pg = document.querySelector('#tab-overview .panel-grid');
-      // .panel-grid sets display:grid, which overrides the [hidden] attribute
-      // (author rule beats the UA [hidden]{display:none}). Hide it explicitly.
-      if (pg) pg.style.display = 'none';
-      const page = document.querySelector('.page');
-      if (page) { page.style.maxWidth = 'none'; page.style.padding = '0'; }
-      const fr = document.getElementById('rich-dash');
-      if (fr) { if (!fr.getAttribute('src')) fr.setAttribute('src', richUrl); fr.hidden = false; }
-      return;
-    }
-
-    // Update hero
-    const synced = new Date(shop.last_sync_at);
-    document.getElementById('hero-eyebrow').textContent = 'Your dashboard';
-    document.getElementById('hero-headline').innerHTML = `<span class="accent">${currentBrand.name}</span> <span class="muted">is live.</span>`;
-    document.getElementById('hero-sub').innerHTML = `Last synced from ${shop.account_label} at <b style="color:var(--text-primary);">${synced.toLocaleString()}</b>. Findings populate as the engines run.`;
-
-    // Unlock Shopify-dependent panels
-    document.getElementById('panel-money-pill').textContent = 'Pending findings';
-    document.getElementById('panel-money-pill').className = 'panel-pill pending';
-    document.getElementById('panel-money-body').innerHTML = `
-      <div class="panel-locked-msg">
-        Money quantifier runs after the first algorithm pass.<br/>
-        Next algorithm run: <b>Monday</b> · expected to surface 5-10 £-tagged findings.
-      </div>
-    `;
-
-    document.getElementById('panel-inventory-pill').textContent = 'Live';
-    document.getElementById('panel-inventory-pill').className = 'panel-pill live';
-    document.getElementById('panel-inventory-body').innerHTML = `
-      <div class="panel-locked-msg">
-        Inventory data synced. <br/>
-        Panel UI ships in the next sprint — for now it lives in your <a href="#" style="color:var(--accent);">weekly brief email</a>.
-      </div>
-    `;
+    const richUrl = '/greta-dashboard.html?v=1790347082623';
+    // The dashboard is the app: every connected brand renders it inline. The old
+    // placeholder-panel path below this point was unreachable (the condition above
+    // was always true) and was removed on 2026-09-25 with the panels it filled.
+    try { localStorage.setItem('oi_gate_v1', 'b8bd9e7d7fe04b396ddc52df76d65e84a99565fff0f22d805d6b13b4517bcdb5'); } catch (e) {}
+    // Activate the dashboard's "Ask the data" panel: same-origin iframe reads
+    // window.parent.OI_ASK. getJwt() returns a FRESH session token each send
+    // (supabase auto-refreshes it), so the relay's per-tenant auth never goes stale.
+    window.OI_ASK = {
+      endpoint: SUPABASE_URL + '/functions/v1/ask-data',
+      brand_id: currentBrand.id,
+      getJwt: async () => { const { data } = await sb.auth.getSession(); return data?.session?.access_token || ''; },
+    };
+    // Per-tenant brand identity for the embedded dashboard. The iframe's data loader
+    // (OI_BRAND_SLUG) and app copy/LLM prompts (OI_BRAND) read these via window.parent,
+    // mirroring OI_ASK. Without them the loader defaults to frkl's data and the copy
+    // renders frkl's name/vertical/markets. markets/seasonality live in brands.metadata.
+    window.OI_BRAND_SLUG = currentBrand.slug;
+    const _md = currentBrand.metadata || {};
+    window.OI_BRAND = {
+      name: currentBrand.name,
+      slug: currentBrand.slug,
+      vertical: currentBrand.vertical || 'DTC',
+      markets: Array.isArray(_md.primary_markets) ? _md.primary_markets.join('/') : (_md.markets || ''),
+      seasonality: _md.seasonality || 'No specific seasonality profile on record — treat seasonal claims cautiously.',
+    };
+    const page = document.querySelector('.page');
+    if (page) { page.style.maxWidth = 'none'; page.style.padding = '0'; }
+    const fr = document.getElementById('rich-dash');
+    if (fr) { if (!fr.getAttribute('src')) fr.setAttribute('src', richUrl); fr.hidden = false; }
   }
 
   async function pollSyncProgress() {
@@ -565,7 +384,7 @@
       const txt = latest.status === 'success'
         ? `Synced <b>${latest.resource}</b> · ${latest.rows_synced ?? '?'} rows`
         : latest.status === 'error'
-        ? `Error syncing <b>${latest.resource}</b> — check Connections tab`
+        ? `Error syncing <b>${latest.resource}</b> — <a href="../auth/workspace.html" style="color:var(--accent);">open Connections</a>`
         : `Syncing <b>${latest.resource || 'data'}</b>…`;
       document.getElementById('sync-resource').innerHTML = txt;
     }
@@ -610,7 +429,7 @@
           <div style="flex:1;">
             <div style="font-size:14px; font-weight:650;">${p.name}</div>
             <div style="font-size:11.5px; color:${isActive ? 'var(--good)' : 'var(--text-muted)'}; font-weight:600; margin-top:2px;">
-              ${isActive ? `Connected · ${conn.account_label || ''}${conn.last_sync_at ? ` · synced ${new Date(conn.last_sync_at).toLocaleString()}` : ''}` : (p.installable ? 'Not connected' : 'Coming next sprint')}
+              ${isActive ? `Connected · ${conn.account_label || ''}${conn.last_sync_at ? ` · synced ${new Date(conn.last_sync_at).toLocaleString()}` : ''}` : (p.installable ? 'Not connected' : 'Not available yet')}
             </div>
           </div>
           <div>
@@ -627,136 +446,9 @@
     });
   }
 
-  // ── Customers tab: RFM + loyalty + consent-gated reward staging ──────────
-  // Reads live via the JWT-gated customer-intelligence / stage-reward functions
-  // (PII stays server-side: the browser only gets first name + last initial).
-  const CI_SEG = {
-    'Champion':           { c:'#34d399', blurb:'High value, frequent, recent — reward & protect' },
-    'Loyal':              { c:'#60a5fa', blurb:'Repeat & recent — nurture toward Champion' },
-    'At risk':            { c:'#fbbf24', blurb:'Were valuable, gone quiet — win back' },
-    'Promising (new)':    { c:'#a78bfa', blurb:'One order, recent — drive the 2nd purchase' },
-    'Dormant (one-time)': { c:'#94a3b8', blurb:'One order, lapsed — reactivation pool' },
-  };
-  const CI_LOY = {
-    full_price:      { label:'Full-price loyal', c:'#34d399', play:'The real VIPs — reward with non-discount perks' },
-    mixed:           { label:'Mixed',            c:'#fbbf24', play:'Nurture toward full price' },
-    discount_driven: { label:'Discount-driven',  c:'#f87171', play:'Loyal to the deal — test-wean, don’t send more codes' },
-  };
-  const CI_CUR_SYMS = { GBP:'£', USD:'$', EUR:'€', AUD:'A$', CAD:'C$', NZD:'NZ$', JPY:'¥' };
-  const ciGBP = n => n == null ? '—' : ((CI_CUR_SYMS[currentBrand && currentBrand.currency] || '£') + Math.round(n).toLocaleString());
-  const ciEsc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-
-  async function ciPost(fn, payload) {
-    const res = await fetch(`${SUPABASE_FNS}/${fn}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${currentToken}` },
-      body: JSON.stringify({ brandId: currentBrand.id, ...payload }),
-    });
-    if (!res.ok) throw new Error(`${fn} ${res.status}: ${(await res.text()).slice(0, 160)}`);
-    return res.json();
-  }
-
-  let customersBooted = false;
-  let ciState = { seg: null, consent: true, loyalty: '' };
-
-  async function renderCustomersTab() {
-    if (customersBooted) return; customersBooted = true;
-    const root = document.getElementById('customers-root');
-    if (!currentBrand || !currentToken) { root.innerHTML = '<div class="panel-locked-msg">Log in to view customers.</div>'; return; }
-    root.innerHTML = '<div class="meta" style="padding:var(--s-5);">Loading customer segments…</div>';
-    try { drawOverview(await ciPost('customer-intelligence', { action: 'overview' })); }
-    catch (e) { root.innerHTML = `<div class="state-banner warn"><div class="state-banner-icon">!</div><div class="state-banner-body"><div class="state-banner-title">Couldn’t load customers</div><div class="state-banner-sub">${ciEsc(e.message)}</div></div></div>`; }
-  }
-
-  function drawOverview(ov) {
-    const cards = ov.segments.map(s => {
-      const m = CI_SEG[s.segment] || { c: 'var(--accent)', blurb: '' };
-      return `<div class="ci-card" data-seg="${ciEsc(s.segment)}" style="cursor:pointer; flex:1 1 150px; padding:var(--s-4); border-radius:var(--r-md); background:var(--bg-card); border:1px solid var(--border-subtle);">
-        <div style="font-size:11px; font-weight:700; color:${m.c}; display:flex; align-items:center; gap:6px;"><span style="width:8px;height:8px;border-radius:50%;background:${m.c};"></span>${ciEsc(s.segment)}</div>
-        <div style="font-size:24px; font-weight:700; margin-top:4px;">${s.customers.toLocaleString()}</div>
-        <div class="meta" style="font-size:11px;">${ciGBP(s.netRevenue)} · ${s.revSharePct}% · avg ${ciGBP(s.avgValue)}</div>
-      </div>`;
-    }).join('');
-    const loy = (ov.championLoyalty || []).map(l => {
-      const m = CI_LOY[l.type]; return `<div style="flex:1 1 160px;"><div style="font-size:11px;font-weight:700;color:${m.c};">${m.label}: ${l.customers}</div><div class="meta" style="font-size:11px;">${ciGBP(l.netRevenue)} · ${m.play}</div></div>`;
-    }).join('');
-    document.getElementById('customers-root').innerHTML = `
-      <div class="meta" style="font-size:11.5px; margin-bottom:var(--s-3);">${ov.totals.customers.toLocaleString()} customers · ${ciGBP(ov.totals.netRevenue)} net</div>
-      <div style="display:flex; gap:var(--s-2); flex-wrap:wrap; margin-bottom:var(--s-4);">${cards}</div>
-      <div class="state-banner info" style="display:block;"><div style="font-weight:650; margin-bottom:6px;">Reward by loyalty, not blanket discount</div><div style="display:flex; gap:var(--s-4); flex-wrap:wrap;">${loy}</div></div>
-      <div id="ci-detail"></div>`;
-    document.querySelectorAll('#customers-root .ci-card').forEach(el => el.addEventListener('click', () => openSegment(el.dataset.seg)));
-  }
-
-  async function openSegment(seg) {
-    ciState = { seg, consent: true, loyalty: '' };
-    const d = document.getElementById('ci-detail');
-    d.innerHTML = '<div class="meta" style="padding:var(--s-4);">Loading…</div>';
-    try { drawSegment(await ciPost('customer-intelligence', { action: 'segment', segment: seg, limit: 200 })); }
-    catch (e) { d.innerHTML = `<div class="panel-locked-msg">${ciEsc(e.message)}</div>`; }
-  }
-
-  function drawSegment(res) {
-    const m = CI_SEG[res.segment] || { c: 'var(--accent)', blurb: '' };
-    const rows = res.people.slice(0, 25).map(p => `<tr>
-      <td style="padding:6px 8px;">${ciEsc(p.name)}</td><td style="padding:6px 8px;">${p.orders}</td>
-      <td style="padding:6px 8px;">${ciGBP(p.netRevenue)}</td><td style="padding:6px 8px;">${p.recencyDays}d</td>
-      <td style="padding:6px 8px;">${ciEsc(p.acquisitionChannel)}</td>
-      <td style="padding:6px 8px; color:${(CI_LOY[p.loyalty] || {}).c || 'inherit'};">${p.discountPct}%</td>
-      <td style="padding:6px 8px; color:${p.emailable ? 'var(--good)' : 'var(--text-faint)'};">${p.emailable ? '✓' : '—'}</td></tr>`).join('');
-    document.getElementById('ci-detail').innerHTML = `
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:var(--s-3); margin:var(--s-4) 0 var(--s-2);">
-        <div style="font-size:12px; font-weight:700; color:${m.c};">${ciEsc(res.segment)} — ${ciEsc(m.blurb)}</div>
-        <div style="display:flex; gap:var(--s-2); align-items:center; flex-wrap:wrap;">
-          <select id="ci-loyalty" class="meta" style="background:var(--bg-elevated); color:var(--text-secondary); border:1px solid var(--border-default); border-radius:6px; padding:4px 6px;">
-            <option value="">All loyalty types</option><option value="full_price">Full-price loyal</option><option value="mixed">Mixed</option><option value="discount_driven">Discount-driven</option>
-          </select>
-          <label class="meta" style="display:flex; gap:4px; align-items:center;"><input type="checkbox" id="ci-consent" checked> consented only</label>
-          <button id="ci-preview" class="btn-ghost" style="padding:5px 11px; font-size:12px;">Preview reward audience</button>
-        </div>
-      </div>
-      <div id="ci-stage"></div>
-      <div style="overflow:auto; border:1px solid var(--border-subtle); border-radius:var(--r-md); margin-top:var(--s-2);">
-        <table style="width:100%; border-collapse:collapse; font-size:12.5px;">
-          <thead><tr style="text-align:left; color:var(--text-muted);"><th style="padding:6px 8px;">Customer</th><th style="padding:6px 8px;">Orders</th><th style="padding:6px 8px;">Net spend</th><th style="padding:6px 8px;">Last</th><th style="padding:6px 8px;">Acquired</th><th style="padding:6px 8px;">Disc%</th><th style="padding:6px 8px;">Email</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>
-      ${res.count > 25 ? `<div class="meta" style="font-size:11px; margin-top:6px;">Showing top 25 of ${res.count} by spend.</div>` : ''}`;
-    document.getElementById('ci-loyalty').addEventListener('change', e => ciState.loyalty = e.target.value);
-    document.getElementById('ci-consent').addEventListener('change', e => ciState.consent = e.target.checked);
-    document.getElementById('ci-preview').addEventListener('click', previewReward);
-  }
-
-  async function previewReward() {
-    const stage = document.getElementById('ci-stage');
-    stage.innerHTML = '<div class="meta" style="padding:var(--s-2);">…</div>';
-    try {
-      const p = await ciPost('customer-intelligence', { action: 'stage_preview', segment: ciState.seg, requireConsent: ciState.consent, ...(ciState.loyalty ? { loyalty: ciState.loyalty } : {}) });
-      stage.innerHTML = `<div class="state-banner info" style="display:block; margin-bottom:var(--s-2);">
-        Would reach <b>${p.audienceReachable}</b> of ${p.audienceTotal} ${ciEsc(ciState.seg.toLowerCase())} customers worth <b>${ciGBP(p.audienceValue)}</b>${p.excludedNoConsent ? ` · ${p.excludedNoConsent} excluded (no consent)` : ''}.
-        <div style="margin-top:6px; display:flex; gap:var(--s-2); align-items:center; flex-wrap:wrap;">
-          <button id="ci-stage-btn" class="btn-primary" style="padding:5px 11px; font-size:12px;">Stage in Klaviyo →</button>
-          <span class="meta" style="font-size:11px;">Creates a Klaviyo list — nothing sent. You send from Klaviyo.</span>
-          <span id="ci-stage-result" class="meta" style="font-size:11.5px;"></span>
-        </div></div>`;
-      document.getElementById('ci-stage-btn').addEventListener('click', stageReward);
-    } catch (e) { stage.innerHTML = `<div class="panel-locked-msg">${ciEsc(e.message)}</div>`; }
-  }
-
-  async function stageReward() {
-    const out = document.getElementById('ci-stage-result');
-    const btn = document.getElementById('ci-stage-btn');
-    if (!confirm(`Stage these consented ${ciState.seg} customers as a Klaviyo list?\n\nThis creates a list in Klaviyo — no email is sent. You build and send the campaign yourself in Klaviyo.`)) return;
-    btn.disabled = true; out.style.color = 'var(--text-muted)'; out.textContent = 'Staging…';
-    try {
-      const r = await ciPost('stage-reward', { segment: ciState.seg, requireConsent: ciState.consent, ...(ciState.loyalty ? { loyalty: ciState.loyalty } : {}), confirm: true });
-      out.style.color = 'var(--good)';
-      out.textContent = `✓ Staged “${r.listName}” — ${r.profilesSubmitted} profiles imported. Build the campaign in Klaviyo.`;
-    } catch (e) { out.style.color = 'var(--warn)'; out.textContent = 'Couldn’t stage — ' + e.message; btn.disabled = false; }
-  }
-
-  document.querySelector('.app-tab[data-tab="customers"]').addEventListener('click', renderCustomersTab);
+  // The Customers tab moved into the dashboard on 2026-09-25 (Phase 2, one navigation):
+  // it is now the CustomerSegments component at the head of Numbers > Customers, reading
+  // the same customer-intelligence / stage-reward functions with the same consent gate.
 </script>
 </body>
 </html>

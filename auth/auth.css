@@ -1,38 +1,40 @@
-/* Shared styling for signup/login/workspace pages.
-   Reuses the design tokens from the dashboard so the visual rhythm carries through. */
+/* Shared styling for signup/login/workspace pages and the product shell.
+   Every value resolves to design-tokens.css (imported below) — Phase 3, 2026-09-24. */
+@import url("../design-tokens.css");
 
 :root {
-  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px;
-  --s-5: 20px; --s-6: 24px; --s-7: 32px; --s-8: 48px;
-  --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-xl: 20px; --r-full: 999px;
-  /* ── Greta light palette (brand book) ── */
-  --bg-app: #F1F5F9;
-  --bg-card: #FFFFFF;
-  --bg-card-hover: #F8FAFC;
-  --bg-input: #FFFFFF;
-  --bg-elevated: #F1F5F9;
-  --border-subtle: #E9EEF4;
-  --border-default: #D7DEE8;
-  --text-primary: #0B132B;
-  --text-secondary: #334155;
-  --text-muted: #64748B;
-  --text-faint: #94A3B8;
-  --good: #0E9E78;
-  --warn: #B45309;
-  --bad: #DC2626;
-  --accent: #7C3AED;
-  --accent-soft: #EDE9FE;
-  --good-bg: rgba(34,211,166,.12);
-  --warn-bg: rgba(180,83,9,.10);
-  --bad-bg: rgba(220,38,38,.08);
-  --accent-bg: rgba(124,58,237,.08);
-  --shadow-md: 0 1px 2px rgba(11,19,43,.04), 0 4px 14px rgba(11,19,43,.08);
-  --shadow-lg: 0 16px 36px rgba(11,19,43,.14);
-  --motion-fast: 120ms ease;
+  --s-1: var(--space-1); --s-2: var(--space-2); --s-3: var(--space-3); --s-4: var(--space-4);
+  --s-5: 20px; --s-6: var(--space-6); --s-7: var(--space-8); --s-8: var(--space-12);
+  /* Containers square, controls 4px. */
+  --r-sm: var(--radius-md); --r-md: var(--radius-none); --r-lg: var(--radius-none); --r-xl: var(--radius-none); --r-full: 999px;
+  --bg-app: var(--color-surface);
+  --bg-card: var(--color-panel);
+  --bg-card-hover: var(--color-panel-hover);
+  --bg-input: var(--color-input);
+  --bg-elevated: var(--color-panel);
+  --border-subtle: var(--color-line);
+  --border-default: var(--color-line-strong);
+  --text-primary: var(--color-ink);
+  --text-secondary: #3D3A35;
+  --text-muted: var(--color-muted);
+  --text-faint: #79726A;
+  --good: var(--color-success);
+  --warn: var(--color-warning);
+  --bad: var(--color-danger);
+  --accent: var(--color-accent);
+  --accent-soft: var(--color-accent-wash);
+  --good-bg: var(--color-success-wash);
+  --warn-bg: var(--color-warning-wash);
+  --bad-bg: var(--color-danger-wash);
+  --accent-bg: var(--color-accent-wash);
+  --shadow-md: var(--shadow-panel);
+  --shadow-lg: var(--shadow-raised);
+  --motion-fast: var(--transition-fast);
 }
+button, .btn, .btn-primary, .btn-ghost, input, select, textarea { border-radius: var(--radius-md); }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-sans);
   background: var(--bg-app); color: var(--text-primary);
   min-height: 100vh; font-feature-settings: 'ss01','cv11';
   -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;

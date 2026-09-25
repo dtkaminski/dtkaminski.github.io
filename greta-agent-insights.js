@@ -129,7 +129,7 @@ window.FRKL_INSIGHTS = {
     headline: "The copy that converts in ads never makes it to the homepage — and the abandoned-cart email gap is unwritten revenue.",
     analysis: [
       "The homepage hero is failing (50% scroll cliff at 15%, 1.07 pages/session) — yet the winning ad hook ('Minimal jewellery had its moment — colour, compliments, personality') would make a far stronger above-fold headline. The message that sells isn't on the site.",
-      "Voice mismatch (same flag Frame raised): stored frkl voice = 'quietly confident, not precious'; the converting voice = bold, colour, 'no rules'. Pick the louder one and codify it.",
+      "Voice mismatch (also flagged in the creative review): stored frkl voice = 'quietly confident, not precious'; the converting voice = bold, colour, 'no rules'. Pick the louder one and codify it.",
       "Email opens are healthy (33–51%) so deliverability/voice work — the gap is content: the abandoned-cart sequence isn't recovering the 67.8% ATC→checkout drop."
     ],
     actions: [
@@ -145,7 +145,7 @@ window.FRKL_INSIGHTS = {
     analysis: [
       "The demi-fine DTC pack (Missoma, Astrid & Miyu, Monica Vinader, Daisy, Otiumberg, Mejuri) all own MINIMAL/neutral/gold 'everyday luxury' — crowded and undifferentiated. frkl's colour + customisation + 'dopamine' angle is genuine whitespace: between Pandora (buildable but mass/dated) and Lovisa (colourful but cheap, no customisation).",
       "Closest threat = Abbott Lyon: aggressive Meta advertiser, affordable personalisation, similar AOV, UK-heavy. They'll outspend frkl on paid — frkl wins on colour/personality, not on generic 'personalised gifting'.",
-      "The brand-book 'neutral/quiet' tension (Frame + Sage both flagged) is also a COMPETITIVE risk: drift neutral and frkl becomes a worse Missoma in a fight it can't win. The colour edge is the moat."
+      "The brand-book 'neutral/quiet' tension (flagged in both the creative and content reviews) is also a COMPETITIVE risk: drift neutral and frkl becomes a worse Missoma in a fight it can't win. The colour edge is the moat."
     ],
     actions: [
       {id:"scout-competitive-defend-colour-dopamine-whitespace", p:"P1", text:"Defend the colour/'dopamine' whitespace in all creative — don't dilute toward the minimalist pack or compete with Abbott Lyon on generic 'personalised gifting'."},

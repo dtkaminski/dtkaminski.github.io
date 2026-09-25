@@ -54,9 +54,9 @@ window.FRKL_CREATORS = {
    "engagement_quality": 0.7,
    "composite": 0.83,
    "tier": "hero",
-   "reasoning": "**Highest-EV move in this list.** Run an internal audit of every IG account that tagged #myfrkl. Filter to those with 5k+ followers. These are warm customers who already buy + have audiences. Conversion likelihood is order-of-magnitude better than cold creators. Lux should own this.",
+   "reasoning": "**Highest-EV move in this list.** Run an internal audit of every IG account that tagged #myfrkl. Filter to those with 5k+ followers. These are warm customers who already buy + have audiences. Conversion likelihood is order-of-magnitude better than cold creators.",
    "verify_next": [
-    "Pull list of #myfrkl taggers (Lux skill or manual)",
+    "Pull list of #myfrkl taggers (from Instagram, or manually)",
     "Score each by follower count + engagement",
     "Run a 'champion' programme: free quarterly piece + 15% code"
    ],

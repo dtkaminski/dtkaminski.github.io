@@ -18,38 +18,11 @@
    every .tdy-*/.cg-*/.dw-*/.mc-*/.dc-*/.mos-* rule below picks up the correct
    values automatically, with no per-rule edits needed. */
 .mos-embed-scope {
-  --color-ink:     var(--text-primary, #141414);
-  --color-surface: var(--bg-app, #F5F2ED);
-  --color-panel:   var(--bg-card, #FFFFFF);
-  --color-accent:  var(--accent, #C84B00);
-  --color-muted:   var(--text-muted, #6B6B6B);
-  --color-line:    var(--border-default, #E0DCD6);
-  --color-success: var(--good, #1A7A4A);
-  --color-warning: var(--warn, #B45309);
-  --color-danger:  var(--bad, #B91C1C);
-
-  --font-sans: inherit;
-  --font-mono: 'DM Mono', ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
-
-  --text-xs:   var(--t-meta, 0.75rem);
-  --text-sm:   var(--t-body, 0.875rem);
-  --text-lg:   var(--t-h2, 1.125rem);
-
-  --radius-sm: var(--r-sm, 2px);
-  --radius-md: var(--r-md, 4px);
-
-  --space-1:  var(--s-1, 4px);
-  --space-2:  var(--s-2, 8px);
-  --space-3:  var(--s-3, 12px);
-  --space-4:  var(--s-4, 16px);
-  --space-6:  var(--s-6, 24px);
-  --space-8:  var(--s-7, 32px);
-  --space-12: var(--s-8, 48px);
-
-  --shadow-panel:  var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.07));
-  --shadow-raised: var(--shadow-md, 0 4px 12px rgba(0,0,0,0.10));
-  --transition-fast: var(--motion-fast, 150ms ease);
-  --transition-base: var(--motion-base, 180ms ease);
+  /* 2026-09-24: the remap was removed. The dashboard, the shell and these embeds now
+     all resolve the same design-tokens.css variables, so redefining the token names
+     from the app variables (which are themselves defined from the tokens) would be a
+     circular reference and resolve to nothing. The scope survives for its layout rules. */
+  display: block;
 }
 
 .mos-root {

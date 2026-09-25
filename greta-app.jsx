@@ -9,6 +9,48 @@ const GBP2 = n => n==null ? '—' : curSym() + n.toLocaleString('en-GB',{minimum
 const PCT = n => n==null ? '—' : (n*100).toFixed(1) + '%';
 const NUM = n => n==null ? '—' : Math.round(n).toLocaleString('en-GB');
 
+// ── Palette ──────────────────────────────────────────────────────────────────
+// Colour values for code that cannot use a CSS variable: Recharts writes SVG
+// presentation attributes, and inline styles are built as strings. PAL reads the
+// real values out of design-tokens.css at load, so the token file stays the single
+// source of truth. The fallbacks are only for a first paint before CSS resolves.
+const PAL = (function () {
+  const fb = {
+    ink: '#141414', muted: '#6B6B6B', faint: '#8C857C', line: '#E0DCD6',
+    panel: '#FFFFFF', surface: '#F5F2ED', accent: '#C84B00',
+    good: '#1A7A4A', warn: '#B45309', bad: '#B91C1C',
+    data3: '#2563EB', data4: '#7C3AED'
+  };
+  const map = {
+    ink: '--color-ink', muted: '--color-muted', faint: '--text-faint', line: '--color-line',
+    panel: '--color-panel', surface: '--color-surface', accent: '--color-accent',
+    good: '--color-success', warn: '--color-warning', bad: '--color-danger',
+    data3: '--color-data-3', data4: '--color-data-4'
+  };
+  const out = Object.assign({}, fb);
+  try {
+    const cs = getComputedStyle(document.documentElement);
+    Object.keys(map).forEach(k => { const v = cs.getPropertyValue(map[k]).trim(); if (v) out[k] = v; });
+  } catch (e) {}
+  return out;
+})();
+
+// SVG presentation attributes cannot resolve var(); colours arriving as props may still
+// be written as CSS variables, so normalise them to the token value on the way in.
+const SVG_VARS = { '--good':'good','--bad':'bad','--warn':'warn','--accent':'accent',
+  '--text-primary':'ink','--text-secondary':'muted','--text-muted':'muted','--text-faint':'faint',
+  '--border-default':'line','--border-subtle':'line','--color-line':'line','--bg-card':'panel',
+  '--bg-app':'surface','--bg-surface':'surface','--color-ink':'ink','--color-accent':'accent',
+  '--color-success':'good','--color-warning':'warn','--color-danger':'bad','--color-muted':'muted',
+  '--color-panel':'panel','--color-surface':'surface' };
+function svgCol(v, fb) {
+  if (typeof v !== 'string') return v == null ? fb : v;
+  const m = v.match(/^var\((--[a-z0-9-]+)/);
+  if (!m) return v;
+  const k = SVG_VARS[m[1]];
+  return k ? PAL[k] : (fb || PAL.ink);
+}
+
 // ── Canonical DTC AOV ────────────────────────────────────────────────────────
 // ONE definition of "AOV" for the whole app: DTC net sales ÷ DTC orders, over the
 // captured range. Every estimate/fallback must route through this so the dashboard
@@ -348,10 +390,10 @@ function findingNav(f){
 function NavChip({f}){
   const n = findingNav(f); if(!n) return null;
   return <button onClick={()=>window.__oiNav&&window.__oiNav(n.section,n.sub)} title={`Open ${n.label}`}
-    style={{fontSize:10.5,fontWeight:600,color:'#8B5CF6',background:'rgba(139,92,246,0.12)',border:'1px solid rgba(139,92,246,0.3)',borderRadius:999,padding:'1px 8px',cursor:'pointer',whiteSpace:'nowrap'}}>→ {n.label}</button>;
+    style={{fontSize:10.5,fontWeight:600,color:PAL.accent,background:'rgba(139,92,246,0.12)',border:'1px solid rgba(139,92,246,0.3)',borderRadius:999,padding:'1px 8px',cursor:'pointer',whiteSpace:'nowrap'}}>→ {n.label}</button>;
 }
 const sum = (arr,k) => arr.reduce((a,r)=>a+(r[k]||0),0);
-const COL = { meta:'#5b8def', google:'#f4a23b', revenue:'#4ade80', email:'#c084fc', sessions:'#38bdf8' };
+const COL = { meta:PAL.data3, google:PAL.warn, revenue:PAL.good, email:PAL.accent, sessions:PAL.data3 };
 
 // ── linkify ──────────────────────────────────────────────────────────────
 // Turn explicit URLs and known product mentions in free text into clickable
@@ -431,7 +473,17 @@ const AGENT_ROLE = {
   Scout: 'Competitive intelligence',
 };
 function agentRole(name){ return AGENT_ROLE[name] || null; }
-function agentTitle(name){ const r=agentRole(name); return r ? `${name} — ${r}` : (name||''); }
+// Internal agent codenames never render: show the remit instead ("Greta" for the rest).
+const AGENT_CODENAMES = ['Pulse','Frame','Atlas','Lux','Sage','Scout','Nova','Ivy','Clara','Orion','Crux'];
+function agentLabel(name){ if(!name) return name; return AGENT_ROLE[name] || (AGENT_CODENAMES.includes(name) ? 'Greta' : name); }
+function agentTitle(name){ return agentLabel(name)||''; }
+// Engine-written text can open with an internal routing tag such as "[Pulse/finance/P3] "; never render it.
+function scrubTag(s){ return typeof s==='string' ? s.replace(/^\s*\[(?:Pulse|Frame|Atlas|Lux|Sage|Scout|Nova|Ivy|Clara|Orion|Crux)(?:\/[^\]]*)?\]\s*/, '') : s; }
+// In-app link to the exact screen that fixes a prompt, so no instruction is a dead end.
+function GoLink({sec, sub, children}){
+  const go = () => window.__oiNav && window.__oiNav(sec, sub);
+  return <a className="txt-link" role="button" tabIndex={0} style={{cursor:'pointer'}} onClick={go} onKeyDown={e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); } }}>{children}</a>;
+}
 // Axis tick formatter that keeps precision on small-range axes (e.g. visibility
 // 0–3%): 1 dp under 10 so ticks stay distinct, integers above. Trailing .0 stripped.
 function niceTick(v){ if(v==null||isNaN(v)) return v; return (+(v).toFixed(Math.abs(v)<10?1:0)).toString(); }
@@ -582,10 +634,10 @@ function KPI({label, val, sub, badge, status, statusLabel, conf, series, seriesL
     ? (deltaColor === 'var(--text-muted)' ? 'var(--accent)' : deltaColor)
     : 'var(--accent)';
   // Resolve the CSS variable to a real hex for Recharts SVG stroke
-  const rechartsStroke = lineColor === 'var(--good)' ? '#4ade80'
-    : lineColor === 'var(--bad)' ? '#ef6b6f'
-    : lineColor === 'var(--accent)' ? '#8B5CF6'
-    : '#8B5CF6';
+  const rechartsStroke = lineColor === 'var(--good)' ? PAL.good
+    : lineColor === 'var(--bad)' ? PAL.bad
+    : lineColor === 'var(--accent)' ? PAL.accent
+    : PAL.accent;
   return (<div className={'card kpi' + (hasPop ? ' has-pop' : '')}>
     <div className="label">
       <span>{label}</span>
@@ -603,22 +655,22 @@ function KPI({label, val, sub, badge, status, statusLabel, conf, series, seriesL
           <div className="head">{seriesLabel || `${series.length}-day trend · vs prior period`}</div>
           <R.ResponsiveContainer width="100%" height={132}>
             <R.LineChart data={series} margin={{top:6,right:10,left:2,bottom:4}}>
-              <R.CartesianGrid stroke="#23232c" vertical={false}/>
-              <R.XAxis dataKey="d" tick={{fill:'#7e7e8a',fontSize:9}} interval={Math.ceil(series.length/5)} tickLine={false}/>
-              <R.YAxis tick={{fill:'#7e7e8a',fontSize:9}} width={34} domain={['auto','auto']}
+              <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
+              <R.XAxis dataKey="d" tick={{fill:PAL.muted,fontSize:9}} interval={Math.ceil(series.length/5)} tickLine={false}/>
+              <R.YAxis tick={{fill:PAL.muted,fontSize:9}} width={34} domain={['auto','auto']}
                        tickFormatter={v=> Math.abs(v)>=1000 ? (v/1000).toFixed(1)+'k' : (Math.abs(v)<10 ? v.toFixed(1) : Math.round(v))}/>
               <R.Tooltip contentStyle={{fontSize:10,background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:6,padding:'2px 6px'}} formatter={v=> typeof v==='number' ? (Math.abs(v)>=1000 ? Math.round(v).toLocaleString() : v.toFixed(2)) : v} labelFormatter={l=>l}/>
-              <R.Line type="monotone" dataKey="v" stroke={rechartsStroke} strokeWidth={2} dot={false} isAnimationActive={false}/>
+              <R.Line type="monotone" dataKey="v" stroke={svgCol(rechartsStroke)} strokeWidth={2} dot={false} isAnimationActive={false}/>
             </R.LineChart>
           </R.ResponsiveContainer>
         </div>)}
         {hasExplainer && (
           <div className="explainer">
-            {agent && <div className="agent" title={agentTitle(agent)}>◆ {agent}{agentRole(agent) && <span style={{fontWeight:500,color:'var(--text-faint)',marginLeft:6}}>· {agentRole(agent)}</span>}</div>}
+            {agent && <div className="agent">◆ {agentLabel(agent)}</div>}
             {observation && <div className="obs">{observation}</div>}
             {implication && <div className="imp">{implication}</div>}
             <div onClick={(e)=>{ e.stopPropagation(); if(window.__oiAsk) window.__oiAsk(`About "${label}"${val?` (currently ${val})`:''}: what's driving this, and what should I do about it?`); }}
-              style={{marginTop:8, fontSize:11, color:'#8B5CF6', cursor:'pointer', fontWeight:600}}>✦ Ask AI about this →</div>
+              style={{marginTop:8, fontSize:11, color:PAL.accent, cursor:'pointer', fontWeight:600}}>✦ Ask AI about this →</div>
           </div>
         )}
       </div>
@@ -646,47 +698,50 @@ function ImpactLine({impact, resolvedAt}){
 function MarkDoneModal({action, onClose}){
   const [note, setNote] = React.useState("");
   const [doneDate, setDoneDate] = React.useState(new Date().toISOString().slice(0,10));
-  const [copied, setCopied] = React.useState(false);
-  const escapedNote = note.replace(/"/g, '\\"');
-  const cmd = `/frkl-done ${action.id} --date ${doneDate}` + (note ? ` "${escapedNote}"` : '');
-  const copy = () => {
-    navigator.clipboard?.writeText(cmd).then(() => {
-      setCopied(true);
-      toast('Command copied', {kind:'good', body:'Paste it into any Cowork chat to persist this status.'});
-      setTimeout(() => setCopied(false), 2000);
-    });
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState("");
+  const ASK = (typeof window !== 'undefined' && window.OI_ASK) || null;
+
+  // Saves to the actions table through the marketing-os edge function — the same
+  // store the Today screen reads, so "done" sticks across devices and refreshes.
+  const save = async () => {
+    if (!ASK || !ASK.endpoint || !ASK.getJwt) { setErr('Sign in to save this.'); return; }
+    setBusy(true); setErr("");
+    try {
+      const jwt = await ASK.getJwt();
+      const res = await fetch(ASK.endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jwt },
+        body: JSON.stringify({ action: 'action_done', brandId: ASK.brand_id, brand_id: ASK.brand_id,
+                               external_id: action.id, note: note || null, completed_on: doneDate })
+      });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(out.error || ('could not save (' + res.status + ')'));
+      onClose();
+      toast('Marked done', {kind:'good', body:'Greta will check whether it worked and add the result to your track record.'});
+      try { window.dispatchEvent(new Event('frkl-data-updated')); } catch(e){}
+    } catch (e) {
+      setErr(String((e && e.message) || e));
+    } finally { setBusy(false); }
   };
-  // Local-only mark — writes a flag to localStorage so the dashboard remembers
-  // until the next refresh actually persists it server-side
-  const markLocal = () => {
-    const local = JSON.parse(localStorage.getItem('frkl-action-local-done')||'{}');
-    local[action.id] = {note, completedDate: doneDate, at: new Date().toISOString()};
-    localStorage.setItem('frkl-action-local-done', JSON.stringify(local));
-    onClose();
-    toast('Action marked done', {kind:'good', body:'Saved in this browser until the next data refresh.'});
-    setTimeout(() => location.reload(), 850);
-  };
+
   return (<div className="modal-bg" onClick={onClose}>
     <div className="modal" onClick={e=>e.stopPropagation()}>
-      <h3>Mark action as done</h3>
-      <div className="id">{action.id}</div>
-      <div className="actiontxt">{action.text}</div>
-      <label>Date completed <span style={{color:'var(--text-faint)',fontWeight:400}}>— when the change went live; business impact is measured from this date</span></label>
-      <input type="date" value={doneDate} max={new Date().toISOString().slice(0,10)} onChange={e=>setDoneDate(e.target.value)} style={{colorScheme:'light dark'}}/>
-      <label>Optional note (what did you do?)</label>
-      <input type="text" value={note} onChange={e=>setNote(e.target.value)} placeholder='e.g. "Confirmed COGS 32% with supplier, brand_config updated"' autoFocus/>
-      <label>Command to run in Cowork</label>
-      <div className="cmd">{cmd}</div>
+      <h3>Mark this done</h3>
+      <div className="actiontxt">{typeof scrubTag === 'function' ? scrubTag(action.text) : action.text}</div>
+      <label>When did it go live? <span style={{color:'var(--text-faint)',fontWeight:400}}>— Greta measures the result from this date</span></label>
+      <input type="date" value={doneDate} max={new Date().toISOString().slice(0,10)} onChange={e=>setDoneDate(e.target.value)}/>
+      <label>What did you do? <span style={{color:'var(--text-faint)',fontWeight:400}}>— optional, helps when you look back</span></label>
+      <input type="text" value={note} onChange={e=>setNote(e.target.value)} placeholder="e.g. confirmed product cost with the supplier" autoFocus/>
+      {err && <div style={{color:'var(--bad)', fontSize:12.5, marginTop:8}}>{err}</div>}
       <div className="row">
-        <button className="primary" onClick={copy}>
-          <span className={copied ? "copied" : ""}>{copied ? "✓ Copied!" : "Copy command"}</span>
-        </button>
-        <button onClick={markLocal}>Mark done locally</button>
+        <button className="primary" onClick={save} disabled={busy || !ASK}>{busy ? 'Saving…' : 'Mark done'}</button>
         <button onClick={onClose} style={{marginLeft:'auto'}}>Cancel</button>
       </div>
       <div className="hint">
-        <b>Recommended:</b> copy the command, paste it into any Cowork chat. The plugin will persist the status to the data files so it sticks across refreshes.<br/>
-        <b>"Mark done locally"</b> is a quick override that only persists in this browser until the next data refresh — useful for trying it out.
+        Marking it done closes it everywhere and starts the check: Greta compares what happens next
+        against what it predicted, and records whether the call was right on your track record.
+        {!ASK && <><br/><b>You are not signed in</b>, so this cannot be saved right now.</>}
       </div>
     </div>
   </div>);
@@ -794,15 +849,14 @@ function Insight({k}){
     return (<div className="card insight ia-collapsed" style={{marginTop:14}}>
       <div className="ia-dismissed">
         <Icon name={dismissed==='wrong'?'alert':'bell'} size={14}/>
-        <span><b>{d.agent}</b> · {dismissed==='wrong'?'flagged as not useful':'snoozed'} — {d.headline}</span>
+        <span><b>{agentLabel(d.agent)}</b> · {dismissed==='wrong'?'flagged as not useful':'snoozed'} — {d.headline}</span>
         <button onClick={()=>{ oiSnoozeRemove(d.headline); setDismissed(null); }}>Undo</button>
       </div>
     </div>);
   }
   return (<div className="card insight" style={{marginTop:14}}>
     <span style={{display:'inline-flex',alignItems:'baseline',gap:8,flexWrap:'wrap'}}>
-      <span className="agentbadge" title={agentTitle(d.agent)}>◆ {d.agent}</span>
-      {agentRole(d.agent) && <span style={{fontSize:11,color:'var(--text-faint)',fontWeight:500}}>{agentRole(d.agent)}</span>}
+      <span className="agentbadge">◆ {agentLabel(d.agent)}</span>
     </span>
     <div className="head">{d.headline}</div>
     <ul>{d.analysis.map((a,i)=><li key={i}>{a}</li>)}</ul>
@@ -895,8 +949,8 @@ function MoneyOnTablePanel(){
         const Row = (m,i)=>{
           return (<tr key={i}>
             <td style={{fontSize:12, maxWidth:320}}>
-              <span style={{fontWeight:550, color: m.source==='synthetic' ? 'var(--text-secondary)' : 'var(--text-primary)'}}>{m.description}</span>
-              <div className="meta" style={{fontSize:10}}>{m.agent || m.source} · {m.priority || ''} · {m.kind}</div>
+              <span style={{fontWeight:550, color: m.source==='synthetic' ? 'var(--text-secondary)' : 'var(--text-primary)'}}>{scrubTag(m.description)}</span>
+              <div className="meta" style={{fontSize:10}}>{agentLabel(m.agent) || m.source} · {m.priority || ''} · {m.kind}</div>
             </td>
             <td><MoneyBadge money={m}/></td>
             <td className="tl" style={{fontSize:10, textTransform:'uppercase', letterSpacing:.04, color:confColor(m.confidence), fontWeight:600}}>{tier(m.confidence)}</td>
@@ -929,12 +983,12 @@ function MoneyHeaderStrip(){
   if (!P || !P.money_rollup) return null;
   const r = P.money_rollup;
   return (
-    <div className="card" style={{marginBottom:14, padding:'10px 14px', borderLeft:'3px solid #4ade80', display:'flex',gap:18,alignItems:'center',flexWrap:'wrap'}}>
-      <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:.05,color:'#7b7b87',fontWeight:700}}>{`${curSym()} AT STAKE THIS MONTH`}</div>
-      <div style={{display:'flex',alignItems:'baseline',gap:6}}><span style={{fontSize:18,fontWeight:700,color:'#f87171'}}>{`${curSym()}`}{(r.leakage/1000).toFixed(1)}k</span><span className="muted" style={{fontSize:11}}>leaking</span></div>
-      <div style={{display:'flex',alignItems:'baseline',gap:6}}><span style={{fontSize:18,fontWeight:700,color:'#fbbf24'}}>{`${curSym()}`}{(r.at_risk/1000).toFixed(1)}k</span><span className="muted" style={{fontSize:11}}>at risk</span></div>
-      <div style={{display:'flex',alignItems:'baseline',gap:6}}><span style={{fontSize:18,fontWeight:700,color:'#4ade80'}}>{`${curSym()}`}{(r.opportunity/1000).toFixed(1)}k</span><span className="muted" style={{fontSize:11}}>opportunity</span></div>
-      <div style={{marginLeft:'auto',fontSize:11,color:'#7b7b87'}}>See <b>Intelligence</b> tab → Money on the table for breakdown</div>
+    <div className="card" style={{marginBottom:14, padding:'10px 14px', borderLeft:`3px solid ${PAL.good}`, display:'flex',gap:18,alignItems:'center',flexWrap:'wrap'}}>
+      <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:.05,color:PAL.muted,fontWeight:700}}>{`${curSym()} AT STAKE THIS MONTH`}</div>
+      <div style={{display:'flex',alignItems:'baseline',gap:6}}><span style={{fontSize:18,fontWeight:700,color:PAL.bad}}>{`${curSym()}`}{(r.leakage/1000).toFixed(1)}k</span><span className="muted" style={{fontSize:11}}>leaking</span></div>
+      <div style={{display:'flex',alignItems:'baseline',gap:6}}><span style={{fontSize:18,fontWeight:700,color:PAL.warn}}>{`${curSym()}`}{(r.at_risk/1000).toFixed(1)}k</span><span className="muted" style={{fontSize:11}}>at risk</span></div>
+      <div style={{display:'flex',alignItems:'baseline',gap:6}}><span style={{fontSize:18,fontWeight:700,color:PAL.good}}>{`${curSym()}`}{(r.opportunity/1000).toFixed(1)}k</span><span className="muted" style={{fontSize:11}}>opportunity</span></div>
+      <div style={{marginLeft:'auto',fontSize:11,color:PAL.muted}}>See <b>Intelligence</b> tab → Money on the table for breakdown</div>
     </div>
   );
 }
@@ -945,7 +999,7 @@ function PHitBadge({phit}){
   const conf = phit.confidence;
   const n = phit.sample_size;
   // Colours: green >60%, amber 30-60%, red <30%. Faded if confidence is low.
-  const color = v > 0.6 ? '#4ade80' : v >= 0.3 ? '#fbbf24' : '#f87171';
+  const color = v > 0.6 ? PAL.good : v >= 0.3 ? PAL.warn : PAL.bad;
   const opacity = conf === 'high' ? 1 : conf === 'medium' ? 0.85 : 0.55;
   const tooltip = `P(hit) = ${(v*100).toFixed(0)}% based on ${phit.source} (n=${n}, ${conf} confidence). `
     + (n === 0 ? 'No history yet — pure prior. Badges become meaningful once 3+ actions of this type have closed.'
@@ -1086,7 +1140,7 @@ function ActionBoard(){
         {why && <div className="sp-ev">{why}</div>}
         {isDone && st.impact && <ImpactLine impact={st.impact} resolvedAt={st.resolvedAt}/>}
         <div className="sp-cta">
-          <span className="sp-agent" title={agentTitle(a.agent)}>{a.agent}</span>
+          <span className="sp-agent">{agentLabel(a.agent)}</span>
           {!isDone && <button className="markbtn" onClick={()=>setModalAction(a)}>Mark done</button>}
         </div>
       </div>
@@ -1202,7 +1256,7 @@ function ActionBoard(){
         <span style={{fontSize:11,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-faint)'}}>Specialist agent review</span>
         <span style={{fontSize:11,color:stale?'var(--warn)':'var(--text-muted)'}}>· {run?`from ${run}${age!=null?` · ${age}d old`:''}`:'static'}{stale?' — needs an agent re-run; re-validate against the live read above':' — re-validate against the live read above'}</span>
       </div>); })()}
-      <div style={{fontSize:11,color:'var(--text-faint)',lineHeight:1.5,margin:'4px 0 2px'}}>The <b style={{color:'#4ade80'}}>%</b> next to a status is the <b>hit-rate</b> — how often this <i>type</i> of action has actually moved the metric before (<span style={{color:'#4ade80'}}>green &gt;60%</span> · <span style={{color:'#fbbf24'}}>amber 30–60%</span> · <span style={{color:'#f87171'}}>red &lt;30%</span>; a “?” = small sample). Hover it for the track record.</div>
+      <div style={{fontSize:11,color:'var(--text-faint)',lineHeight:1.5,margin:'4px 0 2px'}}>The <b style={{color:PAL.good}}>%</b> next to a status is the <b>hit-rate</b> — how often this <i>type</i> of action has actually moved the metric before (<span style={{color:PAL.good}}>green &gt;60%</span> · <span style={{color:PAL.warn}}>amber 30–60%</span> · <span style={{color:PAL.bad}}>red &lt;30%</span>; a “?” = small sample). Hover it for the track record.</div>
       <div style={{display:'flex', flexDirection:'column', gap:4}}>
         {groupList.map(({g, items, sum})=>(
           <div key={g}>
@@ -1323,9 +1377,9 @@ function DailyPanel(){
   const delta = (cur, prev) => prev ? (cur - prev) / prev : null;
   const fmtD = (d) => d==null ? '' : (d>=0?'↑':'↓') + Math.round(Math.abs(d)*100) + '%';
   const dColor = (d, good='up') => {
-    if (d==null || Math.abs(d) < 0.005) return '#7b7b87';
+    if (d==null || Math.abs(d) < 0.005) return PAL.muted;
     const isGood = good==='down' ? d<0 : d>0;
-    return isGood ? '#4ade80' : '#f87171';
+    return isGood ? PAL.good : PAL.bad;
   };
 
   // Anomalies
@@ -1602,7 +1656,7 @@ function ThisWeekHero(){
                 <div className="hero-action-text">{linkify(a.text)}</div>
                 <div className="hero-action-meta">
                   <span className={'pill ' + (a.p==='P1'?'red':a.p==='P2'?'amber':'grey')} style={{fontSize:9.5,padding:'1px 6px'}}>{a.p}</span>
-                  <span className="meta" style={{fontSize:10.5}} title={agentTitle(a.agent)}>{a.agent}</span>
+                  <span className="meta" style={{fontSize:10.5}}>{agentLabel(a.agent)}</span>
                   {Math.abs(a.money) >= 100 && <span style={{
                     fontSize:10.5, fontWeight:700, color: a.money < 0 ? 'var(--bad)' : 'var(--good)',
                   }}>{`${curSym()}`}{Math.abs(a.money/1000).toFixed(1)}k/mo</span>}
@@ -1749,7 +1803,7 @@ function PinMarker(props){
       <title>{props.tip}</title>
       <rect x={cx-10} y={top} width={20} height={18} fill="transparent"/>
       <text x={cx} y={top+12} textAnchor="middle" fontSize={13}>{props.icon}</text>
-      {props.n>1 ? <text x={cx+9} y={top+5} textAnchor="middle" fontSize={8} fill="var(--text-faint)" fontWeight={700}>{'+'+(props.n-1)}</text> : null}
+      {props.n>1 ? <text x={cx+9} y={top+5} textAnchor="middle" fontSize={8} fill={PAL.faint} fontWeight={700}>{'+'+(props.n-1)}</text> : null}
     </g>
   );
 }
@@ -2270,7 +2324,7 @@ function ConfigurableChart({dataset, dimensions, metrics, defaultMetric, default
     <select value={val} onChange={e=>set(e.target.value)} style={selStyle}>
       {opts.map(o=><option key={o.key} value={o.key}>{o.label}</option>)}
     </select>);
-  const segB = (active)=>({fontSize:11.5,fontWeight:600,padding:'5px 11px',borderRadius:6,cursor:'pointer',border:'1px solid '+(active?'#8B5CF6':'var(--border-subtle)'),background:active?'rgba(139,92,246,0.14)':'transparent',color:active?'#8B5CF6':'var(--text-muted)'});
+  const segB = (active)=>({fontSize:11.5,fontWeight:600,padding:'5px 11px',borderRadius:6,cursor:'pointer',border:'1px solid '+(active?PAL.accent:'var(--border-subtle)'),background:active?'rgba(139,92,246,0.14)':'transparent',color:active?PAL.accent:'var(--text-muted)'});
   const bar = ctype==='bar';
 
   return (<div className="card">
@@ -2289,16 +2343,16 @@ function ConfigurableChart({dataset, dimensions, metrics, defaultMetric, default
     </div>
     <R.ResponsiveContainer width="100%" height={bar?Math.max(220, rows.length*30+60):300}>
       <R.ComposedChart data={rows} layout={bar?'vertical':'horizontal'} margin={{top:6,right:24,left:14,bottom:16}}>
-        <R.CartesianGrid stroke="#1f1f27" horizontal={!bar} vertical={bar}/>
+        <R.CartesianGrid stroke={PAL.panel} horizontal={!bar} vertical={bar}/>
         {bar
-          ? (<><R.XAxis type="number" tickFormatter={fmt} tick={{fill:'#7e7e8a',fontSize:11}}/>
-               <R.YAxis type="category" dataKey="label" width={150} tick={{fill:'#7e7e8a',fontSize:11}}/></>)
-          : (<><R.XAxis dataKey="label" tick={{fill:'#7e7e8a',fontSize:11}} interval={0} angle={-20} textAnchor="end" height={60}/>
-               <R.YAxis tickFormatter={fmt} tick={{fill:'#7e7e8a',fontSize:11}}/></>)}
+          ? (<><R.XAxis type="number" tickFormatter={fmt} tick={{fill:PAL.muted,fontSize:11}}/>
+               <R.YAxis type="category" dataKey="label" width={150} tick={{fill:PAL.muted,fontSize:11}}/></>)
+          : (<><R.XAxis dataKey="label" tick={{fill:PAL.muted,fontSize:11}} interval={0} angle={-20} textAnchor="end" height={60}/>
+               <R.YAxis tickFormatter={fmt} tick={{fill:PAL.muted,fontSize:11}}/></>)}
         <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,boxShadow:'var(--shadow-md)'}} formatter={v=>fmt(v)}/>
         {bar
-          ? <R.Bar dataKey="val" name={M.label} fill={COL.revenue} radius={[0,4,4,0]}/>
-          : <R.Line dataKey="val" name={M.label} stroke={COL.revenue} strokeWidth={2.2} dot={false}/>}
+          ? <R.Bar dataKey="val" name={M.label} fill={svgCol(COL.revenue)} radius={[0,4,4,0]}/>
+          : <R.Line dataKey="val" name={M.label} stroke={svgCol(COL.revenue)} strokeWidth={2.2} dot={false}/>}
       </R.ComposedChart>
     </R.ResponsiveContainer>
     <ChartFooter
@@ -2643,7 +2697,7 @@ function LogEventModal({onClose, onSaved}){
       <input value={note} onChange={e=>setNote(e.target.value)} placeholder="e.g. 60-day payback horizon" style={{width:'100%',margin:'4px 0 16px',padding:'8px 10px',background:'transparent',border:'1px solid var(--border-subtle)',borderRadius:6,color:'var(--text-primary)'}}/>
       <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
         <button onClick={onClose} style={{padding:'8px 14px',background:'transparent',border:'1px solid var(--border-subtle)',borderRadius:6,color:'var(--text-secondary)',cursor:'pointer',fontWeight:600}}>Cancel</button>
-        <button onClick={save} disabled={!title.trim()||!starts} style={{padding:'8px 14px',background:(title.trim()&&starts)?'var(--accent)':'var(--border-subtle)',border:'none',borderRadius:6,color:'#fff',cursor:(title.trim()&&starts)?'pointer':'default',fontWeight:600}}>Log event</button>
+        <button onClick={save} disabled={!title.trim()||!starts} style={{padding:'8px 14px',background:(title.trim()&&starts)?'var(--accent)':'var(--border-subtle)',border:'none',borderRadius:6,color:PAL.panel,cursor:(title.trim()&&starts)?'pointer':'default',fontWeight:600}}>Log event</button>
       </div>
     </div>
   </div>);
@@ -2732,17 +2786,19 @@ function LtvCacCard({daily, gm, ordersPerCust}){
       </div>
       <R.ResponsiveContainer width="100%" height={312}>
         <R.ComposedChart data={rows} margin={{top:6,right:20,left:14,bottom:22}}>
-          <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
-          <R.XAxis dataKey="label" tick={{fill:'#7e7e8a',fontSize:11}} label={{value:'Week (starting)', position:'insideBottom', offset:-10, fill:'#6f6f7b', fontSize:11}}/>
-          <R.YAxis yAxisId="l" tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>curSym()+v} label={{value:`${curSym()} per customer`, angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
-          <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>v+'×'} label={{value:'LTV:CAC', angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
+          <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
+          <R.XAxis dataKey="label" tick={{fill:PAL.muted,fontSize:11}} label={{value:'Week (starting)', position:'insideBottom', offset:-10, fill:PAL.muted, fontSize:11}}/>
+          <R.YAxis yAxisId="l" tick={{fill:PAL.muted,fontSize:11}} tickFormatter={v=>curSym()+v} label={{value:`${curSym()} per customer`, angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:11}}/>
+          {/* right-hand axis retired with its series: one scale per chart */}
+          {false && <R.YAxis yAxisId="r" orientation="right" tick={{fill:PAL.muted,fontSize:11}} tickFormatter={v=>v+'×'} label={{value:'LTV:CAC', angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:11}}/>}
           <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,boxShadow:'var(--shadow-md)'}} formatter={(v,nm)=> nm==='LTV:CAC' ? v+'×' : GBP(v)} labelFormatter={l=>'Week of '+l}/>
           <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}}/>
-          <R.Line yAxisId="l" type="monotone" dataKey="ltv" name="LTV" stroke={COL.revenue} strokeWidth={2.2} dot={single?{r:3}:false}/>
-          <R.Line yAxisId="l" type="monotone" dataKey="cac" name="CAC" stroke={COL.meta} strokeWidth={2.2} dot={single?{r:3}:false}/>
-          <R.Line yAxisId="r" type="monotone" dataKey="ratio" name="LTV:CAC" stroke={COL.email} strokeWidth={2} strokeDasharray="4 3" dot={single?{r:3}:false}/>
-          <R.ReferenceLine yAxisId="r" y={3} stroke={COL.email} strokeDasharray="5 4" strokeOpacity={0.7}
-            label={{value:'3× target', position:'insideTopRight', fill:COL.email, fontSize:10.5}}/>
+          <R.Line yAxisId="l" type="monotone" dataKey="ltv" name="LTV" stroke={svgCol(COL.revenue)} strokeWidth={2.2} dot={single?{r:3}:false}/>
+          <R.Line yAxisId="l" type="monotone" dataKey="cac" name="CAC" stroke={svgCol(COL.meta)} strokeWidth={2.2} dot={single?{r:3}:false}/>
+          {/* The LTV:CAC ratio needed a second scale. It is the two lines above divided, and it is printed above the chart and in the table, so the chart keeps one honest scale. */}
+          {false && <R.Line yAxisId="r" type="monotone" dataKey="ratio" name="LTV:CAC" stroke={svgCol(COL.email)} strokeWidth={2} strokeDasharray="4 3" dot={single?{r:3}:false}/>}
+          {false && <R.ReferenceLine yAxisId="r" y={3} stroke={svgCol(COL.email)} strokeDasharray="5 4" strokeOpacity={0.7}
+            label={{value:'3× target', position:'insideTopRight', fill:COL.email, fontSize:10.5}}/>}
           <R.Brush {...brushProps('label')} />
         </R.ComposedChart>
       </R.ResponsiveContainer>
@@ -2807,7 +2863,7 @@ function ContributionCard({rev, orders, paid, gm, days}){
             <CmRow label="= Net profit" amount={GBP(netProfit)} bold color={netProfit>=0?'var(--good)':'var(--bad)'} top="2px solid var(--border-default)"/>
           </>)
         : (<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,padding:'7px 0',borderTop:'2px solid var(--border-default)',color:'var(--text-faint)',fontSize:12.5}}>
-            <span>= Net profit</span><span>Set monthly fixed costs in Settings → Business economics</span>
+            <span>= Net profit</span><span>Set monthly fixed costs in <GoLink sec="settings" sub="economics">Settings → Business economics</GoLink></span>
           </div>)
       }
       <div style={{display:'flex',justifyContent:'space-between',padding:'4px 0',fontWeight:700}}>
@@ -3013,20 +3069,20 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
         {tile(annLabel+' EBITDA', GBP(t.ebitda), PCT(t.ebitdaPct)+' margin', t.ebitda>=0?'var(--good)':'var(--bad)')}
         {tile('EBITDA break-even', beLabel, mode==='bottomup'?('repeat '+n('repeatRate').toFixed(0)+'%/mo'):('growth '+n('growthPct').toFixed(0)+'%/mo'))}
       </div>
-      {mode==='bottomup' && <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:10}}>Revenue mix: <b style={{color:'#8B5CF6'}}>New {pctOf(t.newRev)}%</b> · <b style={{color:'#6ee7b7'}}>Returning {pctOf(t.retRev)}%</b>{t.whRev>0?<> · <b style={{color:'#f59e0b'}}>Wholesale {pctOf(t.whRev)}%</b></>:''} — returning revenue compounds as the base grows.</div>}
+      {mode==='bottomup' && <div style={{fontSize:12,color:'var(--text-muted)',marginBottom:10}}>Revenue mix: <b style={{color:PAL.accent}}>New {pctOf(t.newRev)}%</b> · <b style={{color:PAL.good}}>Returning {pctOf(t.retRev)}%</b>{t.whRev>0?<> · <b style={{color:PAL.warn}}>Wholesale {pctOf(t.whRev)}%</b></>:''} — returning revenue compounds as the base grows.</div>}
       <R.ResponsiveContainer width="100%" height={250}>
         <R.ComposedChart data={rows} margin={{top:6,right:16,left:14,bottom:20}}>
-          <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
-          <R.XAxis dataKey="label" tick={{fill:'#7e7e8a',fontSize:11}} label={{value:'Month', position:'insideBottom', offset:-9, fill:'#6f6f7b', fontSize:11}}/>
-          <R.YAxis tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>curSym()+(Math.abs(v)>=1000?(v/1000).toFixed(0)+'k':v)} width={52}/>
+          <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
+          <R.XAxis dataKey="label" tick={{fill:PAL.muted,fontSize:11}} label={{value:'Month', position:'insideBottom', offset:-9, fill:PAL.muted, fontSize:11}}/>
+          <R.YAxis tick={{fill:PAL.muted,fontSize:11}} tickFormatter={v=>curSym()+(Math.abs(v)>=1000?(v/1000).toFixed(0)+'k':v)} width={52}/>
           <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} formatter={v=>GBP(v)}/>
           <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}}/>
           {mode==='bottomup' ? [
-            <R.Area key="n" type="monotone" dataKey="newRev" name="New" stackId="rev" stroke="#8B5CF6" fill="rgba(139,92,246,0.5)" strokeWidth={1}/>,
-            <R.Area key="r" type="monotone" dataKey="retRev" name="Returning" stackId="rev" stroke="#6ee7b7" fill="rgba(110,231,183,0.45)" strokeWidth={1}/>,
-            <R.Area key="w" type="monotone" dataKey="whRev" name="Wholesale" stackId="rev" stroke="#f59e0b" fill="rgba(245,158,11,0.4)" strokeWidth={1}/>
+            <R.Area key="n" type="monotone" dataKey="newRev" name="New" stackId="rev" stroke={PAL.accent} fill="rgba(139,92,246,0.5)" strokeWidth={1}/>,
+            <R.Area key="r" type="monotone" dataKey="retRev" name="Returning" stackId="rev" stroke={PAL.good} fill="rgba(110,231,183,0.45)" strokeWidth={1}/>,
+            <R.Area key="w" type="monotone" dataKey="whRev" name="Wholesale" stackId="rev" stroke={PAL.warn} fill="rgba(245,158,11,0.4)" strokeWidth={1}/>
           ] : (
-            <R.Area key="rev" type="monotone" dataKey="revenue" name="Revenue" stroke="#8B5CF6" fill="rgba(139,92,246,0.16)" strokeWidth={2}/>
+            <R.Area key="rev" type="monotone" dataKey="revenue" name="Revenue" stroke={PAL.accent} fill="rgba(139,92,246,0.16)" strokeWidth={2}/>
           )}
           <R.Line type="monotone" dataKey="ebitda" name="EBITDA" stroke="#f0f0f4" strokeWidth={2} strokeDasharray="4 3" dot={false}/>
         </R.ComposedChart>
@@ -3136,7 +3192,7 @@ function MobileToday(){
         {actions.length ? actions.map((a,i)=>(
           <div key={i} onClick={()=>window.__oiAsk&&window.__oiAsk(`How do I action this, and what's the expected impact: ${a.description}`)}
             style={{padding:'10px 12px',background:'var(--bg-elevated)',border:'1px solid var(--border-subtle)',borderRadius:10,cursor:'pointer'}}>
-            <div style={{fontSize:13,color:'var(--text-primary)',lineHeight:1.4}}>{a.description}</div>
+            <div style={{fontSize:13,color:'var(--text-primary)',lineHeight:1.4}}>{scrubTag(a.description)}</div>
             <div style={{fontSize:11,color:'var(--text-faint)',marginTop:5,display:'flex',gap:12,flexWrap:'wrap'}}>
               <span style={{color:kc(a.kind),fontWeight:600}}>{`~${curSym()}`}{Math.round(Math.abs(a.monthly_impact_gbp)).toLocaleString()}/mo</span>
               {a.priority && <span>⏱ {byWhen(a.priority)}</span>}
@@ -3146,7 +3202,7 @@ function MobileToday(){
         )) : <div className="muted" style={{fontSize:12}}>{`No high-${curSym()} actions open right now.`}</div>}
       </div>
       <button onClick={()=>window.__oiAsk&&window.__oiAsk(`What should I do today? Give me the top 3 actions, ranked by ${curSym()} impact.`)}
-        style={{marginTop:12,width:'100%',padding:'12px',background:'#c084fc',border:'none',borderRadius:10,color:'#fff',fontWeight:650,fontSize:14,cursor:'pointer'}}>✦ Ask: What should I do today?</button>
+        style={{marginTop:12,width:'100%',padding:'12px',background:PAL.accent,border:'none',borderRadius:10,color:PAL.panel,fontWeight:650,fontSize:14,cursor:'pointer'}}>✦ Ask: What should I do today?</button>
       <div style={{fontSize:11,color:'var(--text-faint)',textAlign:'center',marginTop:10}}>↓ Full dashboard below</div>
     </div>
   );
@@ -3159,16 +3215,16 @@ function WcSpark({data, color, fmt, axisFmt}){
   if(!data || data.filter(d=>d.v!=null).length < 2) return <div style={{height:66}}/>;
   return (<R.ResponsiveContainer width="100%" height={66}>
     <R.LineChart data={data} margin={{top:6, right:8, left:-6, bottom:0}}>
-      <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
-      <R.XAxis dataKey="x" tick={{fill:'#7e7e8a', fontSize:8.5}} interval={Math.ceil(data.length/3)} tickLine={false} axisLine={{stroke:'#2a2a34'}} minTickGap={6}/>
-      <R.YAxis tick={{fill:'#7e7e8a', fontSize:8.5}} width={34} tickCount={3} tickLine={false} axisLine={false} domain={['auto','auto']} tickFormatter={axisFmt||fmt}/>
+      <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
+      <R.XAxis dataKey="x" tick={{fill:PAL.muted, fontSize:8.5}} interval={Math.ceil(data.length/3)} tickLine={false} axisLine={{stroke:'#2a2a34'}} minTickGap={6}/>
+      <R.YAxis tick={{fill:PAL.muted, fontSize:8.5}} width={34} tickCount={3} tickLine={false} axisLine={false} domain={['auto','auto']} tickFormatter={axisFmt||fmt}/>
       <R.Tooltip cursor={{stroke:color, strokeWidth:1, strokeDasharray:'3 3'}} content={({active,payload,label})=>{
         if(!active||!payload||!payload.length) return null; const v=payload[0].value;
         return (<div style={{background:'var(--bg-elevated)', border:'1px solid var(--border-default)', borderRadius:8, fontSize:11, padding:'5px 9px', boxShadow:'var(--shadow-md)'}}>
           <div style={{color:'var(--text-faint)', fontSize:10, marginBottom:1}}>Week of {label}</div>
           <div style={{fontWeight:700, color:'var(--text-primary)'}}>{fmt?fmt(v):v}</div>
         </div>); }}/>
-      <R.Line type="monotone" dataKey="v" stroke={color} strokeWidth={1.8} dot={false} activeDot={{r:3, strokeWidth:0}} isAnimationActive={false}/>
+      <R.Line type="monotone" dataKey="v" stroke={svgCol(color)} strokeWidth={1.8} dot={false} activeDot={{r:3, strokeWidth:0}} isAnimationActive={false}/>
     </R.LineChart>
   </R.ResponsiveContainer>);
 }
@@ -3409,12 +3465,12 @@ function Overview({start, period, customActive}){
             <div style={{fontWeight:650, fontSize:14, marginBottom:3}}>Make the margin numbers exact <span style={{fontWeight:400, color:'var(--text-faint)', fontSize:12}}>· optional, ~5 min</span></div>
             <div className="micro" style={{color:'var(--text-secondary)', lineHeight:1.5}}>The read above already works on catalogue-estimate margins. Enter your real COGS + fulfilment once and contribution, CAC payback and LTV:CAC become exact — and carry a <b>✓ verified</b> badge for the raise.</div>
           </div>
-          <button onClick={()=>setCostsOpen(true)} className="btn-primary" style={{flexShrink:0}}>Set up costs →</button>
+          <button onClick={()=>{ if (UI_V3) { window.__oiGo && window.__oiGo('goal'); return; } setCostsOpen(true); }} className="btn-primary" style={{flexShrink:0}}>Set up costs →</button>
         </div>
       )}
       {costsVerified && (
         <div className="micro" style={{color:'var(--text-faint)', display:'flex', alignItems:'center', gap:8}}>
-          <MarginBadge/> margin figures are based on your entered costs · <span onClick={()=>setCostsOpen(true)} style={{color:'var(--accent)', cursor:'pointer'}}>edit costs</span>
+          <MarginBadge/> margin figures are based on your entered costs · <span onClick={()=>{ if (UI_V3) { window.__oiGo && window.__oiGo('goal'); return; } setCostsOpen(true); }} style={{color:'var(--accent)', cursor:'pointer'}}>edit costs</span>
         </div>
       )}
       {/* DO THIS NEXT — the action queue sits directly under the diagnosis (what's
@@ -3514,31 +3570,42 @@ function Overview({start, period, customActive}){
       <LazyMount minHeight={360}><div className="card">
         <div className="card-section-title">
           <h2 style={{margin:0}}>Paid spend vs Shopify revenue — daily</h2>
-          <span className="meta">Bars = paid spend (left axis) · Line = net revenue (right axis)</span>
+          <span className="meta">Spend above, revenue below — same dates, each on its own scale</span>
         </div>
-        <R.ResponsiveContainer width="100%" height={334}>
-          <R.ComposedChart data={daily} margin={{top:6,right:20,left:14,bottom:22}}>
-            <R.CartesianGrid stroke="#1f1f27" vertical={false} />
-            <R.XAxis dataKey="dlabel" tick={{fill:'#7e7e8a',fontSize:11}} interval={Math.ceil(daily.length/12)}
-                     label={{value:'Date', position:'insideBottom', offset:-10, fill:'#6f6f7b', fontSize:11}} />
-            <R.YAxis yAxisId="l" tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>curSym()+(v/1000).toFixed(0)+'k'}
-                     label={{value:`Paid spend (${curSym()})`, angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}} />
-            <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>curSym()+(v/1000).toFixed(1)+'k'}
-                     label={{value:`Net revenue (${curSym()})`, angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}} />
+        {/* Two scales, two charts (no dual axis): spend above, revenue below, linked by
+            syncId so the same day highlights in both. The event pins stay on the spend
+            chart, where a spike has a cause worth naming. */}
+        <R.ResponsiveContainer width="100%" height={196}>
+          <R.ComposedChart data={daily} syncId="spend-rev" margin={{top:6,right:20,left:14,bottom:4}}>
+            <R.CartesianGrid stroke={PAL.panel} vertical={false} />
+            <R.XAxis dataKey="dlabel" tick={false} tickLine={false} height={6} />
+            <R.YAxis tick={{fill:PAL.muted,fontSize:11}} tickFormatter={v=>curSym()+(v/1000).toFixed(0)+'k'}
+                     label={{value:`Paid spend (${curSym()})`, angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:11}} />
             <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,boxShadow:'var(--shadow-md)'}}
                        formatter={(v,n)=>[GBP(v),n]}
                        labelFormatter={(l,p)=> (p&&p[0]&&p[0].payload&&p[0].payload.date) ? p[0].payload.date : l} />
             <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}} />
-            <R.Bar yAxisId="l" dataKey="metaSpend" stackId="s" name="Meta spend" fill={COL.meta} />
-            <R.Bar yAxisId="l" dataKey="googleSpend" stackId="s" name="Google spend" fill={COL.google} />
-            <R.Line yAxisId="r" type="monotone" dataKey="revenue" name="Shopify net rev" stroke={COL.revenue} strokeWidth={2.4} dot={false} />
-            <R.Brush {...brushProps('dlabel')} />
-            {/* Event & sale pins: same hoverable markers as the CVR trend so spikes have a named cause. */}
+            <R.Bar dataKey="metaSpend" stackId="s" name="Meta spend" fill={svgCol(COL.meta)} />
+            <R.Bar dataKey="googleSpend" stackId="s" name="Google spend" fill={svgCol(COL.google)} />
             {(function(){ var pins=buildChartPins(daily.map(function(d){return {x:d.dlabel, date:d.date};}));
               return pins.map(function(p,i){ return (
-                <R.ReferenceLine key={'pin'+i} yAxisId="l" x={p.x} stroke="#8b8b99" strokeDasharray="3 3" strokeOpacity={0.55}
+                <R.ReferenceLine key={'pin'+i} x={p.x} stroke={PAL.muted} strokeDasharray="3 3" strokeOpacity={0.55}
                   label={<PinMarker icon={p.icon} n={p.n} tip={p.tip}/>}/>); });
             })()}
+          </R.ComposedChart>
+        </R.ResponsiveContainer>
+        <R.ResponsiveContainer width="100%" height={158}>
+          <R.ComposedChart data={daily} syncId="spend-rev" margin={{top:2,right:20,left:14,bottom:22}}>
+            <R.CartesianGrid stroke={PAL.panel} vertical={false} />
+            <R.XAxis dataKey="dlabel" tick={{fill:PAL.muted,fontSize:11}} interval={Math.ceil(daily.length/12)}
+                     label={{value:'Date', position:'insideBottom', offset:-10, fill:PAL.muted, fontSize:11}} />
+            <R.YAxis tick={{fill:PAL.muted,fontSize:11}} tickFormatter={v=>curSym()+(v/1000).toFixed(1)+'k'}
+                     label={{value:`Net revenue (${curSym()})`, angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:11}} />
+            <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,boxShadow:'var(--shadow-md)'}}
+                       formatter={(v,n)=>[GBP(v),n]}
+                       labelFormatter={(l,p)=> (p&&p[0]&&p[0].payload&&p[0].payload.date) ? p[0].payload.date : l} />
+            <R.Line type="monotone" dataKey="revenue" name="Shopify net rev" stroke={svgCol(COL.revenue)} strokeWidth={2.4} dot={false} />
+            <R.Brush {...brushProps('dlabel')} />
           </R.ComposedChart>
         </R.ResponsiveContainer>
         <div style={{fontSize:10.5,color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{BRUSH_HINT}</div>
@@ -3571,9 +3638,9 @@ function Overview({start, period, customActive}){
 
 // ── Fit engine (OMF + PMF) — renders window.FRKL_FIT in Channels › Cross-channel ──────────────
 function fitBand(b){ return b===2?'green':b===1?'amber':b===0?'red':'grey'; }
-function fitBandColor(b){ return b===2?'#34d399':b===1?'#fbbf24':b===0?'#f87171':'var(--text-faint)'; }
-function fitScoreColor(s){ return s==null?'var(--text-faint)':s>=70?'#34d399':s>=40?'#fbbf24':'#f87171'; }
-function fitConfColor(c){ return c==='high'?'#34d399':c==='medium'?'#fbbf24':'#f87171'; }
+function fitBandColor(b){ return b===2?PAL.good:b===1?PAL.warn:b===0?PAL.bad:'var(--text-faint)'; }
+function fitScoreColor(s){ return s==null?'var(--text-faint)':s>=70?PAL.good:s>=40?PAL.warn:PAL.bad; }
+function fitConfColor(c){ return c==='high'?PAL.good:c==='medium'?PAL.warn:PAL.bad; }
 function FitScore({label,value,sub}){
   return (<div style={{flex:1,textAlign:'center',padding:'14px 8px',borderRadius:'var(--r-sm)',background:'var(--bg-app)',border:'1px solid var(--border-subtle)'}}>
     <div style={{fontSize:34,fontWeight:800,lineHeight:1,color:fitScoreColor(value)}}>{value==null?'—':value}</div>
@@ -3659,7 +3726,7 @@ function FitCard({start, end}){
       <h2 style={{margin:0}}>Offer &amp; Product Market Fit</h2>
       <div style={{display:'flex',gap:6,alignItems:'center'}}>
         {source==='live'
-          ? <span className="pill" style={{background:'rgba(52,211,153,.13)',color:'#34d399'}} title={'Live engine output'+(FIT.window?` · window ${FIT.window.start} → ${FIT.window.end}`:'')}>live</span>
+          ? <span className="pill" style={{background:'rgba(52,211,153,.13)',color:PAL.good}} title={'Live engine output'+(FIT.window?` · window ${FIT.window.start} → ${FIT.window.end}`:'')}>live</span>
           : <span className="pill" style={{background:'rgba(148,148,160,.14)',color:'var(--text-faint)'}} title={(error?('Live fetch failed ('+error+') — showing cached snapshot. '):'')+'Log in to load your live engine output'}>cached</span>}
         <span className="pill" style={{background:fitConfColor(FIT.confidence)+'22',color:fitConfColor(FIT.confidence)}}>{FIT.confidence} confidence</span>
       </div>
@@ -3668,7 +3735,7 @@ function FitCard({start, end}){
       <FitScore label="Offer-market fit" value={omfHeadline} sub={diluted?'paid channels only':'CTR · landing CVR · CAC coverage'}/>
       <FitScore label="Product-market fit" value={b.pmfScore} sub="LTV:CAC · payback · retention"/>
     </div>
-    {diluted&&(<div className="note" style={{marginBottom:12,borderLeft:'3px solid #f5b544'}}><b>Paid-only offer fit.</b> Blended (incl. organic/direct) reads <b>{pomf.blendedOmfScore}</b> at {rx(pomf.blendedCacCoverageRatio)} CAC coverage — flattered by {pomf.excludedChannels.join(', ')} with no ad spend. On the paid channels you control, CAC coverage is {rx(pomf.cacCoverageRatio)}.</div>)}
+    {diluted&&(<div className="note" style={{marginBottom:12,borderLeft:`3px solid ${PAL.warn}`}}><b>Paid-only offer fit.</b> Blended (incl. organic/direct) reads <b>{pomf.blendedOmfScore}</b> at {rx(pomf.blendedCacCoverageRatio)} CAC coverage — flattered by {pomf.excludedChannels.join(', ')} with no ad spend. On the paid channels you control, CAC coverage is {rx(pomf.cacCoverageRatio)}.</div>)}
     <div style={{padding:'12px 14px',borderRadius:'var(--r-sm)',background:'var(--accent-bg)',border:'1px solid rgba(139,92,246,.25)',marginBottom:12}}>
       <div style={{fontWeight:700,color:'var(--text-primary)',marginBottom:4}}>{FIT.primaryDiagnosis}</div>
       <div style={{fontSize:'12.5px',lineHeight:1.5,color:'var(--text-secondary)'}}>{FIT.recommendedAction}</div>
@@ -3678,13 +3745,13 @@ function FitCard({start, end}){
       // already shown (diagnosis box / confidence pill), so render the rest — paid dilution, cash, scaling.
       const ins=((FIT.parameters&&FIT.parameters.insights)||[]).filter(i=>i.key!=='verdict'&&i.key!=='confidence');
       if(!ins.length) return null;
-      const sc={critical:'#f87171',warning:'#fbbf24',good:'#34d399',info:'var(--text-faint)'};
+      const sc={critical:PAL.bad,warning:PAL.warn,good:PAL.good,info:'var(--text-faint)'};
       const sl={critical:'Act now',warning:'Watch',good:'Good',info:'Note'};
       return (<div style={{marginBottom:12}}>
         <div className="micro" style={{color:'var(--text-muted)',marginBottom:6,fontWeight:600}}>WHAT TO ACT ON</div>
         {ins.map((i,idx)=>(<div key={i.key||idx} style={{borderLeft:'3px solid '+(sc[i.severity]||'var(--text-faint)'),background:'var(--bg-app)',borderRadius:'var(--r-sm)',padding:'10px 12px',marginBottom:6}}>
           <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap'}}>
-            <span className="pill" style={{background:(sc[i.severity]||'#888')+'22',color:sc[i.severity]||'var(--text-faint)',fontSize:10}}>{sl[i.severity]||i.severity}</span>
+            <span className="pill" style={{background:(sc[i.severity]||PAL.muted)+'22',color:sc[i.severity]||'var(--text-faint)',fontSize:10}}>{sl[i.severity]||i.severity}</span>
             <span style={{fontWeight:700,color:'var(--text-primary)'}}>{i.title}</span>
           </div>
           {i.detail&&<div style={{fontSize:'12px',color:'var(--text-secondary)',marginTop:4,lineHeight:1.5}}>{i.detail}</div>}
@@ -3782,8 +3849,8 @@ function GpSpark({ series, color }) {
   const d = pts.map((v, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1)).join(' ');
   return (
     <svg width={w} height={h} style={{ display: 'block' }} aria-hidden="true">
-      <path d={d} fill="none" stroke={color} strokeWidth="1.6" />
-      <circle cx={x(pts.length - 1)} cy={y(pts[pts.length - 1])} r="2.4" fill={color} />
+      <path d={d} fill="none" stroke={svgCol(color)} strokeWidth="1.6" />
+      <circle cx={x(pts.length - 1)} cy={y(pts[pts.length - 1])} r="2.4" fill={svgCol(color)} />
     </svg>
   );
 }
@@ -3818,7 +3885,7 @@ function GenomePanel() {
     return quals.length ? quals.join(' · ') : null;
   })();
   const accent = 'var(--accent)';
-  const good = '#34d399', warn = '#fbbf24', bad = '#f87171';
+  const good = PAL.good, warn = PAL.warn, bad = PAL.bad;
 
   // The headline insight: a profitable P&L can still be cash-negative once ad spend + the cash cycle
   // are counted. Surface it when EBITDA is positive but operating cash isn't.
@@ -3942,8 +4009,10 @@ function CrossChannel({start}){
     tiers=grp.map((g,i)=>{ const c=g.reduce((a,x)=>a+x.cost,0), v=g.reduce((a,x)=>a+x.val,0); return {label:['Low','Mid','High'][i], avgSpend:c/g.length, roas:c>0?v/c:null, n:g.length}; }); }
   const tierFalling = tiers && tiers[0].roas!=null && tiers[2].roas!=null && tiers[2].roas < tiers[0].roas*0.85;
   return (<div>
-    <FitCard start={start} end={ACTIVE_END}/>
-    <GenomePanel/>
+    {/* Fit scores, cash and the forward signal moved to Plan › Growth plan (V3, 2026-09-25)
+        so Marketing answers one question: which channels and ads earn their money. */}
+    {!UI_V3 && <FitCard start={start} end={ACTIVE_END}/>}
+    {!UI_V3 && <GenomePanel/>}
     <div className="card" style={{marginBottom:14}}>
       <h2>Channel revenue claims vs spend</h2>
       <table>
@@ -3959,9 +4028,9 @@ function CrossChannel({start}){
         <h2>Site funnel (GA4)</h2>
         {f.map(s=>(<div key={s.stage} style={{margin:'10px 0'}}>
           <div className="mrow"><span className="k">{s.stage}</span><span className="v">{NUM(s.v)} ({PCT(s.v/fmax)})</span></div>
-          <div style={{height:9,background:'#23232b',borderRadius:6,marginTop:4}}><div style={{height:9,width:(100*s.v/fmax)+'%',background:COL.sessions,borderRadius:6}}/></div>
+          <div style={{height:9,background:PAL.panel,borderRadius:6,marginTop:4}}><div style={{height:9,width:(100*s.v/fmax)+'%',background:COL.sessions,borderRadius:6}}/></div>
         </div>))}
-        <div className="muted" style={{marginTop:8}}>Add-to-cart → checkout is the steepest drop — a website-structure question for the next phase.</div>
+        <div className="muted" style={{marginTop:8}}>Add-to-cart → checkout is the steepest drop — see where shoppers stall in <GoLink sec="conversion" sub="site">Conversion → Site &amp; friction</GoLink>.</div>
       </div>
       <div className="card" style={{flex:'1 1 380px'}}>
         <h2>Paid effect &amp; incrementality</h2>
@@ -3977,12 +4046,12 @@ function CrossChannel({start}){
           <div className="micro" style={{color:'var(--text-muted)', marginBottom:4}}>Meta claimed ROAS by daily-spend tier {tierFalling?'— falling at higher spend (diminishing returns)':'— broadly flat across tiers'}:</div>
           <div style={{display:'flex', gap:8}}>
             {tiers.map((t,i)=>(<div key={i} style={{flex:1, textAlign:'center', fontSize:12}}>
-              <div style={{fontWeight:700, color: tierFalling&&i===2?'#f87171':'var(--text-primary)'}}>{t.roas!=null?t.roas.toFixed(1)+'×':'—'}</div>
+              <div style={{fontWeight:700, color: tierFalling&&i===2?PAL.bad:'var(--text-primary)'}}>{t.roas!=null?t.roas.toFixed(1)+'×':'—'}</div>
               <div className="micro" style={{color:'var(--text-faint)'}}>{t.label} · {GBP(t.avgSpend)}/d</div>
             </div>))}
           </div>
         </div>)}
-        <div className="note" style={{marginTop:6}}>Correlation isn't causation. To <b>measure</b> incrementality: log a 2-week geo-holdout in the event log (pause Meta in one region, hold another), then read the revenue gap here. {tiers?'':'Google Ads data will unlock true cross-channel allocation once linked.'}</div>
+        <div className="note" style={{marginTop:6}}>Correlation isn't causation. To <b>measure</b> incrementality: log a 2-week geo-holdout <GoLink sec="operate" sub="calendar">in the calendar</GoLink> (pause Meta in one region, hold another), then read the revenue gap here. {tiers?'':'Google Ads data will unlock true cross-channel allocation once linked.'}</div>
       </div>
     </div>
     <Insight k="economics" />
@@ -4020,7 +4089,7 @@ function AggTable({title, rows, lblCol}){
   return (<div className="card" style={{flex:'1 1 320px'}}>
     <h2>{title}</h2>
     <table><thead><tr><th>{lblCol}</th><th>Ads</th><th>Spend</th><th>ROAS</th><th>CTR</th><th>CPA</th></tr></thead><tbody>
-    {rows.map((r,i)=>(<tr key={i}><td>{r.key}</td><td>{r.count}</td><td>{GBP(r.spend)}</td><td style={{color:r.roas==null?'#888':r.roas>=2.5?'#4ade80':r.roas>=1.7?'#fbbf24':'#f87171'}}>{r.roas==null?'—':r.roas.toFixed(2)+'x'}</td><td>{PCT(r.ctr)}</td><td>{r.cpa==null?'—':GBP(r.cpa)}</td></tr>))}
+    {rows.map((r,i)=>(<tr key={i}><td>{r.key}</td><td>{r.count}</td><td>{GBP(r.spend)}</td><td style={{color:r.roas==null?PAL.muted:r.roas>=2.5?PAL.good:r.roas>=1.7?PAL.warn:PAL.bad}}>{r.roas==null?'—':r.roas.toFixed(2)+'x'}</td><td>{PCT(r.ctr)}</td><td>{r.cpa==null?'—':GBP(r.cpa)}</td></tr>))}
     </tbody></table>
   </div>);
 }
@@ -4063,7 +4132,7 @@ function DemoPanel(){
       <table><thead><tr><th>Age</th><th>Spend</th><th>% of spend</th><th>CTR</th><th>Purch</th><th>CPA</th><th>ROAS</th></tr></thead><tbody>
         {sortedAge.map((a,i)=>(<tr key={i}>
           <td>{a.key}</td><td>{GBP(a.cost)}</td><td>{PCT(totalSpend>0?a.cost/totalSpend:0)}</td><td>{PCT(a.ctr)}</td><td>{a.purch}</td><td>{a.cpa?GBP(a.cpa):'—'}</td>
-          <td style={{color:a.roas==null?'#888':a.roas>=2.5?'#4ade80':a.roas>=1.7?'#fbbf24':'#f87171'}}>{a.roas?a.roas.toFixed(2)+'x':'—'}</td>
+          <td style={{color:a.roas==null?PAL.muted:a.roas>=2.5?PAL.good:a.roas>=1.7?PAL.warn:PAL.bad}}>{a.roas?a.roas.toFixed(2)+'x':'—'}</td>
         </tr>))}
       </tbody></table>
       <div className="note" style={{marginTop:10}}>The algorithm has settled on <b>35–54 females</b> as the biggest spend bucket — but younger <b>25–34 females</b>{` often convert at higher ROAS per ${curSym()} when they do convert. `}<b>18–24 doesn't convert.</b> Almost zero male conversions across the whole library — male spend is wasted.</div>
@@ -4096,13 +4165,13 @@ function PlacementPanel(){
         <div style={{flex:'1 1 320px'}}>
           <h2 style={{fontSize:14}}>By placement (position)</h2>
           <table><thead><tr><th>Placement</th><th>Spend</th><th>CTR</th><th>Purch</th><th>ROAS</th></tr></thead><tbody>
-            {byPos.map((a,i)=>(<tr key={i}><td>{a.key.replace('instagram_','').replace('_',' ')}</td><td>{GBP(a.cost)}</td><td>{PCT(a.ctr)}</td><td>{a.purch}</td><td style={{color:a.roas==null?'#888':a.roas>=2.5?'#4ade80':a.roas>=1.7?'#fbbf24':'#f87171'}}>{a.roas?a.roas.toFixed(2)+'x':'—'}</td></tr>))}
+            {byPos.map((a,i)=>(<tr key={i}><td>{a.key.replace('instagram_','').replace('_',' ')}</td><td>{GBP(a.cost)}</td><td>{PCT(a.ctr)}</td><td>{a.purch}</td><td style={{color:a.roas==null?PAL.muted:a.roas>=2.5?PAL.good:a.roas>=1.7?PAL.warn:PAL.bad}}>{a.roas?a.roas.toFixed(2)+'x':'—'}</td></tr>))}
           </tbody></table>
         </div>
         <div style={{flex:'1 1 320px'}}>
           <h2 style={{fontSize:14}}>By device</h2>
           <table><thead><tr><th>Device</th><th>Spend</th><th>CTR</th><th>Purch</th><th>ROAS</th></tr></thead><tbody>
-            {byDevice.map((a,i)=>(<tr key={i}><td>{a.key.replace('_',' ')}</td><td>{GBP(a.cost)}</td><td>{PCT(a.ctr)}</td><td>{a.purch}</td><td style={{color:a.roas==null?'#888':a.roas>=2.5?'#4ade80':a.roas>=1.7?'#fbbf24':'#f87171'}}>{a.roas?a.roas.toFixed(2)+'x':'—'}</td></tr>))}
+            {byDevice.map((a,i)=>(<tr key={i}><td>{a.key.replace('_',' ')}</td><td>{GBP(a.cost)}</td><td>{PCT(a.ctr)}</td><td>{a.purch}</td><td style={{color:a.roas==null?PAL.muted:a.roas>=2.5?PAL.good:a.roas>=1.7?PAL.warn:PAL.bad}}>{a.roas?a.roas.toFixed(2)+'x':'—'}</td></tr>))}
           </tbody></table>
         </div>
       </div>
@@ -4137,7 +4206,7 @@ function HookRetention({rows}){
   if(!videos.length) return null;
   // normalise each curve to 3sv = 100
   const data=[{stage:'3s'},{stage:'25%'},{stage:'50%'},{stage:'75%'},{stage:'100%'}];
-  const palette=['#5b8def','#4ade80','#fbbf24','#c084fc','#f87171','#22d3ee'];
+  const palette=[PAL.data3,PAL.good,PAL.warn,PAL.accent,PAL.bad,'#22d3ee'];
   const names=[];
   videos.forEach((v,i)=>{
     const key='c'+i; names.push({key, name:v.name+(videos.filter(x=>x.name===v.name).length>1?' #'+(videos.slice(0,i+1).filter(x=>x.name===v.name).length):''), color:palette[i%palette.length]});
@@ -4153,14 +4222,14 @@ function HookRetention({rows}){
     <div className="muted" style={{marginBottom:8}}>Each line normalised to 100 at the highest milestone reached. Steeper drop = weaker hook.</div>
     <R.ResponsiveContainer width="100%" height={260}>
       <R.LineChart data={data} margin={{top:6,right:8,left:10,bottom:20}}>
-        <R.CartesianGrid stroke="#222229" vertical={false} />
-        <R.XAxis dataKey="stage" tick={{fill:'#6f6f7b',fontSize:11}} label={{value:'Video milestone', position:'insideBottom', offset:-8, fill:'#6f6f7b', fontSize:11}} />
-        <R.YAxis tick={{fill:'#6f6f7b',fontSize:11}} tickFormatter={v=>v+'%'} label={{value:'Retention (%)', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}} />
+        <R.CartesianGrid stroke={PAL.panel} vertical={false} />
+        <R.XAxis dataKey="stage" tick={{fill:PAL.muted,fontSize:11}} label={{value:'Video milestone', position:'insideBottom', offset:-8, fill:PAL.muted, fontSize:11}} />
+        <R.YAxis tick={{fill:PAL.muted,fontSize:11}} tickFormatter={v=>v+'%'} label={{value:'Retention (%)', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:11}} />
         <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} formatter={v=>v+'%'} />
-        {names.map(n=>(<R.Line key={n.key} type="monotone" dataKey={n.key} name={n.name} stroke={n.color} strokeWidth={2} dot={{r:3}} />))}
+        {names.map(n=>(<R.Line key={n.key} type="monotone" dataKey={n.key} name={n.name} stroke={svgCol(n.color)} strokeWidth={2} dot={{r:3}} />))}
       </R.LineChart>
     </R.ResponsiveContainer>
-    <div style={{marginTop:8,display:'flex',flexWrap:'wrap',gap:10}}>{names.map(n=>(<span key={n.key} style={{fontSize:11,color:'#b6b6c0'}}><span style={{display:'inline-block',width:10,height:10,background:n.color,borderRadius:2,marginRight:5,verticalAlign:'middle'}}/>{n.name}</span>))}</div>
+    <div style={{marginTop:8,display:'flex',flexWrap:'wrap',gap:10}}>{names.map(n=>(<span key={n.key} style={{fontSize:11,color:PAL.faint}}><span style={{display:'inline-block',width:10,height:10,background:n.color,borderRadius:2,marginRight:5,verticalAlign:'middle'}}/>{n.name}</span>))}</div>
   </div>);
 }
 
@@ -4190,34 +4259,34 @@ function CreativeVisionPanel(){
   if (!V || !Array.isArray(V.creatives)) return null;
   const cre = [...V.creatives].sort((a,b)=>(b.composite||0)-(a.composite||0));
   const avgComposite = cre.reduce((a,c)=>a+(c.composite||0),0) / Math.max(1,cre.length);
-  const SCORE_COLOR = (v) => v >= 4.0 ? '#4ade80' : v >= 3.0 ? '#fbbf24' : '#f87171';
+  const SCORE_COLOR = (v) => v >= 4.0 ? PAL.good : v >= 3.0 ? PAL.warn : PAL.bad;
   const insights = V.cross_creative_insights || {};
   const meta = V.meta || {};
   const refreshedAt = meta.generated_at_last_refresh || meta.generated_at;
-  return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid #c084fc'}}>
-    <h2>Creative vision analysis — Claude looks at the actual creative</h2>
+  return (<div className="card" style={{marginBottom:14, borderLeft:`3px solid ${PAL.accent}`}}>
+    <h2>Creative vision analysis — AI looks at the actual creative</h2>
     <div className="muted" style={{marginBottom:10, fontSize:12}}>
-      {meta.analyst || 'Claude vision'} scored each creative on hook strength, visual hierarchy, claim quality, audience fit, brand consistency. <b>This is what Triple Whale doesn't do</b> — most performance tools tell you which ad won; this tells you WHY at the asset level.
+      AI vision scored each creative on hook strength, visual hierarchy, claim quality, audience fit, brand consistency. <b>This is what Triple Whale doesn't do</b> — most performance tools tell you which ad won; this tells you WHY at the asset level.
       {refreshedAt && <span> · Last refresh: {new Date(refreshedAt).toLocaleString()}</span>}
       · Re-run with <code>python scripts/oi_creative_vision.py --force</code>
     </div>
     <div className="row" style={{marginBottom:10}}>
       <div className="card kpi" style={{borderLeft:`3px solid ${SCORE_COLOR(avgComposite)}`}}>
         <div className="label">Avg composite score</div>
-        <div className="val">{avgComposite.toFixed(2)}<span style={{fontSize:14,color:'#7b7b87'}}>/5</span></div>
+        <div className="val">{avgComposite.toFixed(2)}<span style={{fontSize:14,color:PAL.muted}}>/5</span></div>
         <div className="sub">across {cre.length} analysed creatives</div>
       </div>
-      <div className="card kpi" style={{borderLeft:'3px solid #4ade80'}}>
+      <div className="card kpi" style={{borderLeft:`3px solid ${PAL.good}`}}>
         <div className="label">Top scorer</div>
         <div className="val" style={{fontSize:14,lineHeight:1.2}}>{cre[0]?.name?.slice(0,32) || '—'}</div>
         <div className="sub">{cre[0]?.composite?.toFixed(2) || '—'} composite · {cre[0]?.verdict || ''}</div>
       </div>
-      <div className="card kpi" style={{borderLeft:'3px solid #f87171'}}>
+      <div className="card kpi" style={{borderLeft:`3px solid ${PAL.bad}`}}>
         <div className="label">Pause-or-rework</div>
         <div className="val">{(insights.pause_or_rework || []).length}</div>
         <div className="sub">composite ≤ 2.0 — wasted impressions</div>
       </div>
-      <div className="card kpi" style={{borderLeft:'3px solid #fbbf24'}}>
+      <div className="card kpi" style={{borderLeft:`3px solid ${PAL.warn}`}}>
         <div className="label">Need full asset</div>
         <div className="val">{(insights.need_more_data || []).length}</div>
         <div className="sub">scoring confidence low — pull video</div>
@@ -4229,7 +4298,7 @@ function CreativeVisionPanel(){
       const compColor = SCORE_COLOR(c.composite || 0);
       const scores = c.scores || {};
       return (<div className="creative" key={i} style={{borderLeft:`3px solid ${compColor}`}}>
-        {c.thumbnail ? (<img className="thumb" src={c.thumbnail} alt={c.name||''} onError={e=>{e.target.style.opacity=.2;}} />) : (<div className="thumb" style={{background:'#1a1a22'}}/>)}
+        {c.thumbnail ? (<img className="thumb" src={c.thumbnail} alt={c.name||''} onError={e=>{e.target.style.opacity=.2;}} />) : (<div className="thumb" style={{background:PAL.panel}}/>)}
         <div className="body">
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'start',gap:8,marginBottom:6}}>
             <span className="name" style={{fontSize:12,fontWeight:600,color:'var(--text-primary)'}}>{c.name}</span>
@@ -4243,22 +4312,22 @@ function CreativeVisionPanel(){
               return (<div key={k} className="mrow"><span className="k">{l}</span><span className="v" style={{color:c2,fontWeight:600}}>{v}/5 {'★'.repeat(v)}</span></div>);
             })}
           </div>
-          <div style={{fontSize:11,color:'#b6b6c0',lineHeight:1.45,marginBottom:8}}>
-            <b style={{color:'var(--text-primary)'}}>What Claude sees:</b> {c.what_i_see}
+          <div style={{fontSize:11,color:PAL.faint,lineHeight:1.45,marginBottom:8}}>
+            <b style={{color:'var(--text-primary)'}}>What the AI sees:</b> {c.what_i_see}
           </div>
-          <ul style={{margin:'0 0 8px 0',padding:'0 0 0 16px',fontSize:11,color:'#b6b6c0',lineHeight:1.5}}>
+          <ul style={{margin:'0 0 8px 0',padding:'0 0 0 16px',fontSize:11,color:PAL.faint,lineHeight:1.5}}>
             {(c.feedback||[]).map((f,j)=>(<li key={j}>{f}</li>))}
           </ul>
-          <div style={{padding:8,background:'var(--bg-app)',borderLeft:'2px solid #4ade80',borderRadius:'0 4px 4px 0',fontSize:11,color:'var(--text-secondary)'}}>
-            <b style={{color:'#4ade80'}}>Next iteration:</b> {c.next_iteration}
+          <div style={{padding:8,background:'var(--bg-app)',borderLeft:`2px solid ${PAL.good}`,borderRadius:'0 4px 4px 0',fontSize:11,color:'var(--text-secondary)'}}>
+            <b style={{color:PAL.good}}>Next iteration:</b> {c.next_iteration}
           </div>
         </div>
       </div>);
     })}
     </div>
     {/* Frame director brief */}
-    {(insights.frame_director_brief || []).length > 0 && (<div className="card" style={{marginBottom:0, borderLeft:'3px solid #fbbf24'}}>
-      <h2>Frame's brief to the creative team</h2>
+    {(insights.frame_director_brief || []).length > 0 && (<div className="card" style={{marginBottom:0, borderLeft:`3px solid ${PAL.warn}`}}>
+      <h2>Brief for the creative team</h2>
       <ol style={{margin:0,padding:'0 0 0 18px',fontSize:13,color:'var(--text-secondary)',lineHeight:1.7}}>
         {insights.frame_director_brief.map((b,i)=>(<li key={i} dangerouslySetInnerHTML={{__html: b.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')}}/>))}
       </ol>
@@ -4282,7 +4351,7 @@ function Creatives(){
       <KPI label="Creative spend" val={GBP(total.spend)} sub={`${NUM(total.purch)} purchases · CPA ${GBP(total.purch>0?total.spend/total.purch:null)}`}
         agent="Pulse" observation="Top 2 ads carry ~50% of the spend — Angela video + Stacks catalogue."
         implication="Spread budget across more proven winners so a single creative pause doesn't blow up the month." />
-      <KPI label="Blended creative ROAS" val={(total.val/total.spend).toFixed(2)+'x'} sub={`Claimed value ${GBP(total.val)}`}
+      <KPI label="Blended creative ROAS" val={total.spend>0?(total.val/total.spend).toFixed(2)+'x':'—'} sub={`Claimed value ${GBP(total.val)}`}
         agent="Atlas" observation="Platform-claimed — net of code discounts (~10% of DTC), sale-price markdowns and ~30% COGS it sits close to contribution breakeven."
         implication="Re-report on a contribution basis before any investor conversation; claimed ROAS overstates." />
       <KPI label="% spend on weak conv rank" val={PCT(total.spend>0?total.weakSpend/total.spend:0)} sub="ads flagged Below average by Meta"
@@ -4326,7 +4395,7 @@ function Creatives(){
               <div className="mrow"><span className="k">Spend</span><span className="v">{GBP(c.cost)}</span></div>
               <div className="mrow"><span className="k">CTR / CPM</span><span className="v">{PCT(c.linkCtr)} · {GBP2(c.cpm)}</span></div>
               <div className="mrow"><span className="k">ATC → IC → P</span><span className="v">{NUM(c.atc)} → {NUM(c.ic)} → {c.purchases==null?'—':c.purchases}</span></div>
-              <div className="mrow"><span className="k">ROAS</span><span className="v" style={{color:cls==='green'?'#4ade80':cls==='red'?'#f87171':'#e8e8ec'}}>{c.roas==null?'—':c.roas.toFixed(2)+'x'}</span></div>
+              <div className="mrow"><span className="k">ROAS</span><span className="v" style={{color:cls==='green'?PAL.good:cls==='red'?PAL.bad:PAL.ink}}>{c.roas==null?'—':c.roas.toFixed(2)+'x'}</span></div>
             </div>
           </div>
         </div>); })}
@@ -4350,7 +4419,7 @@ function Channels({start}){
       metrics={[{key:'revenue',label:'Revenue',fmt:GBP},{key:'purchases',label:'Purchases',fmt:NUM},{key:'sessions',label:'Sessions',fmt:NUM}]}
       defaultMetric="revenue" defaultSplit="channel" defaultChart="bar" defaultTopN={10}/>}
     <div className="row">
-    {box('Meta Ads',(<div>{line('Spend',GBP(sum(meta,'cost')))}{line('Impressions',NUM(sum(meta,'impressions')))}{line('Pixel purchases',NUM(sum(meta,'purchases')))}{line('Claimed value',GBP(sum(meta,'purchaseValue')))}{line('Claimed ROAS',(sum(meta,'purchaseValue')/sum(meta,'cost')).toFixed(2)+'x')}</div>))}
+    {box('Meta Ads',(<div>{line('Spend',GBP(sum(meta,'cost')))}{line('Impressions',NUM(sum(meta,'impressions')))}{line('Pixel purchases',NUM(sum(meta,'purchases')))}{line('Claimed value',GBP(sum(meta,'purchaseValue')))}{line('Claimed ROAS',sum(meta,'cost')>0?(sum(meta,'purchaseValue')/sum(meta,'cost')).toFixed(2)+'x':'—')}</div>))}
     {box('Google Ads',(<div>{line('Spend',GBP(sum(gads,'cost')))}{line('Clicks',NUM(sum(gads,'clicks')))}{line('Impressions',NUM(sum(gads,'impressions')))}{line('Conversions',NUM(sum(gads,'conversions')))}{line('Conv. value',GBP(sum(gads,'convValue')))}{line('CPC',GBP2(sum(gads,'cost')/Math.max(1,sum(gads,'clicks'))))}</div>))}
     {box('Klaviyo (email/SMS)',(<div>{line('Send days',klEmail.length)}{line('Recipients (sends)',NUM(sum(klEmail,'recipients')))}{line('Avg open rate',PCT(klEmail.reduce((a,r)=>a+(r.openRate>2?0:r.openRate||0),0)/Math.max(1,klEmail.filter(r=>r.openRate<=2).length)))}{line('Klaviyo-tracked orders',NUM(sum(kl,'orders')))}{line('Tracked order value (gross)',GBP(sum(kl,'orderValue')))}</div>))}
     {box('GA4 behaviour',(<div>{line('Sessions',NUM(sum(ga,'sessions')))}{line('Avg engagement rate',PCT(ga.reduce((a,r)=>a+(r.engagementRate||0),0)/Math.max(1,ga.length)))}{line('Add-to-carts',NUM(sum(ga,'addToCarts')))}{line('Checkouts',NUM(sum(ga,'checkouts')))}{line('Purchases',NUM(sum(ga,'purchases')))}</div>))}
@@ -4367,7 +4436,7 @@ function CreatorCandidatesPanel(){
   if (!C || !Array.isArray(C.candidates)) return null;
   const [tierFilter, setTierFilter] = useState('actionable');
   const [statusFilter, setStatusFilter] = useState('all');
-  const TIER_COLOR = {hero:'#4ade80', core:'#5b8def', longtail:'#fbbf24', pass:'#f87171'};
+  const TIER_COLOR = {hero:PAL.good, core:PAL.data3, longtail:PAL.warn, pass:PAL.bad};
 
   const candidates = C.candidates.filter(c => {
     if (tierFilter === 'actionable' && c.tier !== 'hero' && c.tier !== 'core') return false;
@@ -4381,28 +4450,28 @@ function CreatorCandidatesPanel(){
 
   return (
     <div style={{marginTop:14}}>
-      <div className="card" style={{marginBottom:14, borderLeft:'3px solid #38bdf8'}}>
+      <div className="card" style={{marginBottom:14, borderLeft:`3px solid ${PAL.data3}`}}>
         <h2>Creator candidate discovery — Tier B</h2>
         <div className="muted" style={{marginBottom:10, fontSize:12}}>
-          {summary.totalCandidates || 0} candidates scored by LLM against frkl's brand brief and current winning affiliates. Sources searched: Astrid &amp; Miyu ambassador roster · Modash UK micro-influencer listings · SheerLuxe / Marie Claire / Fashion Monitor curated lists · UK lifestyle podcast hosts. <b>Scores are inference, not measurement</b> — verify follower counts, audience demos and engagement via Heepsy / Modash before significant outreach.
+          {summary.totalCandidates || 0} candidates scored by AI against {OI_BRAND.name||'your brand'}'s brand brief and current winning affiliates. Sources searched: Astrid &amp; Miyu ambassador roster · Modash UK micro-influencer listings · SheerLuxe / Marie Claire / Fashion Monitor curated lists · UK lifestyle podcast hosts. <b>Scores are inference, not measurement</b> — verify follower counts, audience demos and engagement via Heepsy / Modash before significant outreach.
         </div>
         <div className="row" style={{marginBottom:8}}>
-          <div className="card kpi" style={{borderLeft:'3px solid #4ade80'}}>
+          <div className="card kpi" style={{borderLeft:`3px solid ${PAL.good}`}}>
             <div className="label">Hero candidates</div>
             <div className="val">{(summary.tierCounts && summary.tierCounts.hero) || 0}</div>
             <div className="sub">composite ≥ 0.80</div>
           </div>
-          <div className="card kpi" style={{borderLeft:'3px solid #5b8def'}}>
+          <div className="card kpi" style={{borderLeft:`3px solid ${PAL.data3}`}}>
             <div className="label">Core candidates</div>
             <div className="val">{(summary.tierCounts && summary.tierCounts.core) || 0}</div>
             <div className="sub">composite 0.65–0.80</div>
           </div>
-          <div className="card kpi" style={{borderLeft:'3px solid #fbbf24'}}>
+          <div className="card kpi" style={{borderLeft:`3px solid ${PAL.warn}`}}>
             <div className="label">Est. actionable reach</div>
             <div className="val">{(summary.actionableReachEst||0).toLocaleString()}</div>
             <div className="sub">summed followers of hero + core. Inferred.</div>
           </div>
-          <div className="card kpi" style={{borderLeft:'3px solid #c084fc'}}>
+          <div className="card kpi" style={{borderLeft:`3px solid ${PAL.accent}`}}>
             <div className="label">Avg actionable score</div>
             <div className="val">{((summary.actionableAvgComposite||0)*100).toFixed(0)}%</div>
             <div className="sub">brand × audience × engagement</div>
@@ -4430,7 +4499,7 @@ function CreatorCandidatesPanel(){
         </div>
         <table><thead><tr><th>Tier</th><th className="tl">Handle</th><th className="tl">Name / themes</th><th>Est. reach</th><th>Brand fit</th><th>Audience fit</th><th>Eng. quality</th><th>Composite</th><th className="tl">Status</th></tr></thead><tbody>
         {candidates.map((c,i) => {
-          const color = TIER_COLOR[c.tier] || '#7b7b87';
+          const color = TIER_COLOR[c.tier] || PAL.muted;
           return (<tr key={i}>
             <td><span className="pill" style={{background:color+'22',color:color,fontSize:10,padding:'2px 8px',borderRadius:4,fontWeight:700,textTransform:'uppercase'}}>{c.tier}</span></td>
             <td className="tl" style={{fontSize:11.5}}><code>{c.handle}</code></td>
@@ -4456,18 +4525,17 @@ function CreatorCandidatesPanel(){
           <div style={{display:'flex',flexDirection:'column',gap:10,maxHeight:520,overflowY:'auto'}}>
           {(C.candidates||[]).filter(c=>c.tier==='hero'||c.tier==='core').slice(0,12).map((c,i)=>(<div key={i} style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${TIER_COLOR[c.tier]}`,borderRadius:'0 6px 6px 0',fontSize:11.5}}>
             <div style={{fontWeight:600,marginBottom:4}}>{c.name} <span className="muted" style={{fontWeight:400}}>({c.handle})</span></div>
-            <div style={{color:'#b6b6c0',lineHeight:1.45}}>{c.reasoning}</div>
-            {(c.verify_next||[]).length>0 && <div style={{marginTop:6,fontSize:10,color:'#7b7b87'}}><b>Verify next:</b> {c.verify_next.join(' · ')}</div>}
+            <div style={{color:PAL.faint,lineHeight:1.45}}>{c.reasoning}</div>
+            {(c.verify_next||[]).length>0 && <div style={{marginTop:6,fontSize:10,color:PAL.muted}}><b>Verify next:</b> {c.verify_next.join(' · ')}</div>}
           </div>))}
           </div>
         </div>
         <div className="card" style={{flex:'1 1 280px'}}>
           <h2>How to use this</h2>
           <div style={{fontSize:12.5,lineHeight:1.6,color:'var(--text-secondary)'}}>
-            <p><b>Scores are inferred not measured.</b> They reflect what LLM reasoning can extract from public web signals — past partnerships, audience age cues, content themes, engagement signals quoted in articles.</p>
+            <p><b>Scores are inferred not measured.</b> They reflect what AI reasoning can extract from public web signals — past partnerships, audience age cues, content themes, engagement signals quoted in articles.</p>
             <p><b>Before outreaching at scale</b>{`, verify with a real creator-discovery tool (Heepsy ${curSym()}69/mo or Modash ${curSym()}150+/mo). Look for: actual follower count, UK audience %, age split, engagement rate, brand-overlap with frkl peers.`}</p>
-            <p><b>The highest-EV move</b> isn't in any external creator — it's an internal audit of <code>#myfrkl</code> tagged users. These are existing customers who already buy frkl AND have audiences. Brief Lux to pull that list.</p>
-            <p><b>To add a new candidate:</b> edit <code>creator_candidates.json</code> and re-run <code>python scripts/build_creators_data.py</code>. Status field tracks: prospect → contacted → active → declined.</p>
+            {DEMO && <p><b>The highest-EV move</b> isn't in any external creator — it's an internal audit of <code>#myfrkl</code> tagged users. These are existing customers who already buy frkl AND have audiences. Pull that list from Instagram.</p>}
           </div>
         </div>
       </div>
@@ -4491,7 +4559,7 @@ function AffiliatePanel(){
   const affShareDTC = dtcTotal ? totalAffRev / dtcTotal : 0;
   return (
     <div style={{marginTop:14}}>
-      <div className="card" style={{marginBottom:14, borderLeft:'3px solid #4ade80'}}>
+      <div className="card" style={{marginBottom:14, borderLeft:`3px solid ${PAL.good}`}}>
         <h2>Affiliates & creator partnerships — 90d</h2>
         <div className="muted" style={{marginBottom:10,fontSize:12}}>Tracked via Shopify discount-code attribution. Edit the code → creator mapping in <code>scripts/_affiliate_codes.txt</code>.</div>
         <div className="row" style={{marginBottom:8}}>
@@ -4515,13 +4583,13 @@ function AffiliatePanel(){
           <table><thead><tr><th>Code</th><th>Creator</th><th>Orders</th><th>Net rev</th><th>AOV</th><th>Discount %</th><th>{`${curSym()} given/order`}</th></tr></thead><tbody>
           {affs.map((a,i)=>{
             const tier = a.netSales > 5000 ? 'hero' : a.netSales > 1000 ? 'core' : a.netSales > 200 ? 'mid' : 'long-tail';
-            const tierColor = {hero:'#4ade80',core:'#5b8def',mid:'#fbbf24','long-tail':'#7b7b87'}[tier];
+            const tierColor = {hero:PAL.good,core:PAL.data3,mid:PAL.warn,'long-tail':PAL.muted}[tier];
             return (<tr key={i}>
               <td><span className="pill" style={{background:tierColor+'22',color:tierColor,fontSize:10,padding:'2px 6px',borderRadius:4,fontWeight:700}}>{a.code}</span></td>
               <td style={{fontSize:12,maxWidth:200}}>{a.label}{a.notes && <div className="muted" style={{fontSize:10}}>{a.notes}</div>}</td>
               <td><b>{a.orders}</b></td>
               <td><b>{GBP(a.netSales)}</b></td>
-              <td style={{color: a.aov>80?'#4ade80':a.aov>50?'#fbbf24':'#7b7b87'}}>{GBP(a.aov)}</td>
+              <td style={{color: a.aov>80?PAL.good:a.aov>50?PAL.warn:PAL.muted}}>{GBP(a.aov)}</td>
               <td>{PCT(a.discountPct)}</td>
               <td>{GBP(a.avgDiscountGivenPerOrder)}</td>
             </tr>);
@@ -4533,9 +4601,9 @@ function AffiliatePanel(){
           <table><thead><tr><th>Category</th><th>Codes</th><th>Orders</th><th>Net rev</th><th>AOV</th></tr></thead><tbody>
           {Object.entries(summary).filter(([_,s])=>s.orders>0).sort((a,b)=>(b[1].netSales||0)-(a[1].netSales||0)).map(([cat,s],i)=>{
             const LABELS = {affiliate:'Affiliate creators',campaign:'Promo campaigns',cs_adjustment:'Gifting / CS',auto_generated:'Auto-generated',bundle_ref:'Bundle ref',no_code:'No code',unclassified:'Unclassified'};
-            const COLORS = {affiliate:'#4ade80',campaign:'#fbbf24',cs_adjustment:'#c084fc',no_code:'#7b7b87',auto_generated:'#94a3b8',unclassified:'#f87171'};
+            const COLORS = {affiliate:PAL.good,campaign:PAL.warn,cs_adjustment:PAL.accent,no_code:PAL.muted,auto_generated:PAL.muted,unclassified:PAL.bad};
             return (<tr key={i}>
-              <td><span className="pill" style={{background:(COLORS[cat]||'#7b7b87')+'22',color:COLORS[cat]||'#7b7b87',fontSize:10,padding:'2px 6px',borderRadius:4,fontWeight:600}}>{LABELS[cat]||cat}</span></td>
+              <td><span className="pill" style={{background:(COLORS[cat]||PAL.muted)+'22',color:COLORS[cat]||PAL.muted,fontSize:10,padding:'2px 6px',borderRadius:4,fontWeight:600}}>{LABELS[cat]||cat}</span></td>
               <td>{s.codeCount}</td>
               <td>{s.orders}</td>
               <td>{GBP(s.netSales)}</td>
@@ -4545,7 +4613,7 @@ function AffiliatePanel(){
           </tbody></table>
         </div>
       </div>
-      <div className="note" style={{marginTop:14}}><b>Scout's read:</b> Creator partnerships are doing more work than the data has been crediting them for. HEYGIRL (Angela Scanlon) is genuinely the biggest single attribution lever you have — that's <b>one quarter of revenue from one relationship</b>. Diversification candidates: brief a discovery search for UK creators in the 35-54 lifestyle/jewellery space with engagement rates above 4% (matching Angela's audience profile). The other named affiliates (GMS, Boldly, Davidson, Nora, Charissa) all have signal but tiny volume — worth a deeper conversation per creator about content cadence and commercial terms.</div>
+      <div className="note" style={{marginTop:14}}><b>Greta's read:</b> Creator partnerships are doing more work than the data has been crediting them for. HEYGIRL (Angela Scanlon) is genuinely the biggest single attribution lever you have — that's <b>one quarter of revenue from one relationship</b>. Diversification candidates: brief a discovery search for UK creators in the 35-54 lifestyle/jewellery space with engagement rates above 4% (matching Angela's audience profile). The other named affiliates (GMS, Boldly, Davidson, Nora, Charissa) all have signal but tiny volume — worth a deeper conversation per creator about content cadence and commercial terms.</div>
     </div>
   );
 }
@@ -4615,15 +4683,17 @@ function Customers(){
         <h2>New vs returning orders — weekly</h2>
         <R.ResponsiveContainer width="100%" height={250}>
           <R.ComposedChart data={weeks} margin={{top:6,right:8,left:14,bottom:20}}>
-            <R.CartesianGrid stroke="#222229" vertical={false} />
-            <R.XAxis dataKey="label" tick={{fill:'#6f6f7b',fontSize:11}} label={{value:'Week', position:'insideBottom', offset:-8, fill:'#6f6f7b', fontSize:11}} />
-            <R.YAxis yAxisId="l" tick={{fill:'#6f6f7b',fontSize:11}} label={{value:'Orders', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}} />
-            <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#6f6f7b',fontSize:11}} tickFormatter={v=>v+'%'} domain={[0,80]} label={{value:'% returning', angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}} />
+            <R.CartesianGrid stroke={PAL.panel} vertical={false} />
+            <R.XAxis dataKey="label" tick={{fill:PAL.muted,fontSize:11}} label={{value:'Week', position:'insideBottom', offset:-8, fill:PAL.muted, fontSize:11}} />
+            <R.YAxis yAxisId="l" tick={{fill:PAL.muted,fontSize:11}} label={{value:'Orders', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:11}} />
+            {/* right-hand axis retired with its series: one scale per chart */}
+            {false && <R.YAxis yAxisId="r" orientation="right" tick={{fill:PAL.muted,fontSize:11}} tickFormatter={v=>v+'%'} domain={[0,80]} label={{value:'% returning', angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:11}} />}
             <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} />
             <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}} />
-            <R.Bar yAxisId="l" dataKey="new" stackId="o" name="New" fill={COL.sessions} />
-            <R.Bar yAxisId="l" dataKey="ret" stackId="o" name="Returning" fill={COL.revenue} />
-            <R.Line yAxisId="r" type="monotone" dataKey="retPct" name="% returning" stroke={COL.email} strokeWidth={2} dot={false} />
+            <R.Bar yAxisId="l" dataKey="new" stackId="o" name="New" fill={svgCol(COL.sessions)} />
+            <R.Bar yAxisId="l" dataKey="ret" stackId="o" name="Returning" fill={svgCol(COL.revenue)} />
+            {/* The share is the stack below read as a proportion; a second scale added nothing but a crossing point. */}
+            {false && <R.Line yAxisId="r" type="monotone" dataKey="retPct" name="% returning" stroke={svgCol(COL.email)} strokeWidth={2} dot={false} />}
           </R.ComposedChart>
         </R.ResponsiveContainer>
       </div>
@@ -4644,11 +4714,11 @@ function Customers(){
           <h2>Klaviyo list — daily net growth</h2>
           <R.ResponsiveContainer width="100%" height={200}>
             <R.BarChart data={listChart} margin={{top:6,right:8,left:14,bottom:18}}>
-              <R.CartesianGrid stroke="#222229" vertical={false} />
-              <R.XAxis dataKey="date" tick={{fill:'#6f6f7b',fontSize:10}} interval={Math.ceil(listChart.length/10)} label={{value:'Date', position:'insideBottom', offset:-6, fill:'#6f6f7b', fontSize:10}} />
-              <R.YAxis tick={{fill:'#6f6f7b',fontSize:10}} label={{value:'Net subs', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:10}} />
+              <R.CartesianGrid stroke={PAL.panel} vertical={false} />
+              <R.XAxis dataKey="date" tick={{fill:PAL.muted,fontSize:10}} interval={Math.ceil(listChart.length/10)} label={{value:'Date', position:'insideBottom', offset:-6, fill:PAL.muted, fontSize:10}} />
+              <R.YAxis tick={{fill:PAL.muted,fontSize:10}} label={{value:'Net subs', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:10}} />
               <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} />
-              <R.Bar dataKey="net" fill={COL.email} />
+              <R.Bar dataKey="net" fill={svgCol(COL.email)} />
             </R.BarChart>
           </R.ResponsiveContainer>
         </div>
@@ -4669,19 +4739,19 @@ function BundlesPanel(){
   const aovLift = (singles.aovPerUnit && bundlesAgg.aovPerUnit)
     ? ((bundlesAgg.aovPerUnit / singles.aovPerUnit) - 1) : null;
   return (
-    <div className="card" style={{marginBottom:14, borderLeft:'3px solid #c084fc'}}>
+    <div className="card" style={{marginBottom:14, borderLeft:`3px solid ${PAL.accent}`}}>
       <h2>Bundles & stacks — 90d</h2>
       {DEMO && <div className="muted" style={{marginBottom:10, fontSize:12}}>frkl's "stack" products are pre-styled bundles (base + style + charm). They unlock higher AOV but currently sell rarely. Two bundle tracking systems exist in Shopify: explicit "stack" SKUs and a hidden "Bundle for reference only" wrapper — both surfaced below.</div>}
       <div className="row" style={{marginBottom:10}}>
         <KPI label="Bundle revenue share" val={PCT(summary.bundleRevenueShare)} sub={`${curSym()}${NUM(bundlesAgg.netSales)} of ${curSym()}${NUM((singles.netSales||0)+(bundlesAgg.netSales||0)+(summary.giftCards?.netSales||0))} total products`}
           agent="Atlas" observation={`Bundles are only ${PCT(summary.bundleRevenueShare)} of product revenue. This is the single biggest AOV lever sitting unused.`}
-          implication="Brief Lux + Frame on a bundle merchandising push: stack-builder UX, social proof, gifting positioning. Worth pulling forward in Q3 plan." />
+          implication="Plan a bundle merchandising push: stack-builder UX, social proof, gifting positioning. Worth pulling forward in Q3 plan." />
         <KPI label="Bundle attach rate" val={PCT(summary.bundleAttachRate)} sub={`${bundlesAgg.units} bundle units of ${(singles.units||0)+(bundlesAgg.units||0)} total`}
           agent="Lux" observation="Less than 1% of customers buy a pre-styled stack. Either discovery's broken (no PDP cross-sell?) or the price gap to à la carte isn't compelling."
           implication={`Test a 'complete the stack' upsell on every PDP. Test a ${curSym()}10 bundle saving banner. Track delta in Site CVR.`} />
         <KPI label="Avg bundle price (per unit)" val={GBP(bundlesAgg.aovPerUnit)} sub={aovLift != null ? `${(aovLift*100).toFixed(0)}% vs single AOV ${curSym()}${NUM(singles.aovPerUnit)}` : '—'}
           agent="Frame" observation={aovLift > 0 ? `Bundle AOV per unit is ${(aovLift*100).toFixed(0)}% higher than singles. Each stack sale = one customer behaving like ${(1+aovLift).toFixed(1)} customers.` : 'Bundle pricing not yet outperforming singles — pricing strategy worth reviewing.'}
-          implication="Frame bundles to investor materials as the AOV play. Each percentage point of bundle attach rate moves blended AOV measurably." />
+          implication="Use bundles in investor materials as the average-order-value play. Each percentage point of bundle attach rate moves blended AOV measurably." />
         <KPI label="Bundle margin %" val={PCT(bundlesAgg.marginPct)} sub={`100% reflects missing bundle COGS in Shopify — true margin is component-weighted`}
           agent="Atlas" observation="COGS isn't tracked per bundle SKU in Shopify, so the margin figure here is artificial. Real bundle margin should match (or exceed) the weighted-average margin of its components."
           implication="One-off fix: add COGS to each bundle parent SKU in Shopify. ~30 min job, makes this number trustworthy." />
@@ -4692,7 +4762,7 @@ function BundlesPanel(){
           <div className="muted" style={{marginBottom:8, fontSize:12}}>Each row = a stack product set up as its own SKU. Sold as one purchase.</div>
           {explicitRows.length ? (<table><thead><tr><th>Type</th><th className="tl">Title</th><th>Units</th><th>Net rev</th><th>AOV</th><th>Returns</th></tr></thead><tbody>
           {explicitRows.map((b,i)=>(<tr key={i}>
-            <td><span className="pill" style={{background:'#c084fc22',color:'#c084fc',fontSize:10,padding:'2px 6px',borderRadius:4,fontWeight:600}}>{b.type}</span></td>
+            <td><span className="pill" style={{background:'#c084fc22',color:PAL.accent,fontSize:10,padding:'2px 6px',borderRadius:4,fontWeight:600}}>{b.type}</span></td>
             <td className="tl" style={{fontSize:12, maxWidth:280}}>{b.image && <img src={b.image} style={{width:22,height:22,borderRadius:4,verticalAlign:'middle',marginRight:8,objectFit:'cover'}} onError={e=>{e.target.style.opacity=.2;}}/>}{b.title}</td>
             <td>{b.units}</td>
             <td>{GBP(b.netSales)}</td>
@@ -4719,7 +4789,7 @@ function InventoryPanel(){
   const summary = B.inventorySummary || {};
   if (!inv.length) return null;
   const [tierFilter, setTierFilter] = useState('actionable');
-  const TIER_COLOR = {critical:'#f87171', low:'#fbbf24', healthy:'#4ade80', high:'#94a3b8', overstock:'#c084fc', archived_stock:'#7b7b87', no_stock_no_sales:'#3a3a44'};
+  const TIER_COLOR = {critical:PAL.bad, low:PAL.warn, healthy:PAL.good, high:PAL.muted, overstock:PAL.accent, archived_stock:PAL.muted, no_stock_no_sales:PAL.line};
   const TIER_LABEL = {critical:'CRITICAL <14d',low:'LOW <30d',healthy:'HEALTHY 30-90d',high:'HIGH 90-180d',overstock:'OVERSTOCK >180d',archived_stock:'ARCHIVED (dead)',no_stock_no_sales:'NO STOCK / NO SALES'};
   const filtered = tierFilter === 'all' ? inv :
                    tierFilter === 'actionable' ? inv.filter(r => r.coverTier === 'critical' || r.coverTier === 'low' || r.coverTier === 'overstock' || r.coverTier === 'archived_stock') :
@@ -4739,28 +4809,28 @@ function InventoryPanel(){
   const overstockValue = (summary.overstock || {}).totalValue || 0;
   const archivedValue = (summary.archived_stock || {}).totalValue || 0;
   return (
-    <div className="card" style={{marginBottom:14, borderLeft:'3px solid #fbbf24'}}>
+    <div className="card" style={{marginBottom:14, borderLeft:`3px solid ${PAL.warn}`}}>
       <h2>Inventory + stock cover (DTC velocity)</h2>
       <div className="muted" style={{marginBottom:10, fontSize:12}}>
         Days of cover = inventory ÷ daily 90-day velocity. Joined SKU-level via Shopify ProductNoTimeDimensions. <b>Capital tied up in &gt;180d cover SKUs is dead-money risk.</b>
       </div>
       <div className="row" style={{marginBottom:10}}>
-        <div className="card kpi" style={{borderLeft:'3px solid #f87171'}}>
+        <div className="card kpi" style={{borderLeft:`3px solid ${PAL.bad}`}}>
           <div className="label">Critical / out of stock</div>
           <div className="val">{(summary.critical||{}).skus||0}</div>
           <div className="sub">{(summary.critical||{}).totalQty||0} units left · running out in &lt;14 days</div>
         </div>
-        <div className="card kpi" style={{borderLeft:'3px solid #fbbf24'}}>
+        <div className="card kpi" style={{borderLeft:`3px solid ${PAL.warn}`}}>
           <div className="label">Healthy cover (30-90d)</div>
           <div className="val">{(summary.healthy||{}).skus||0}</div>
           <div className="sub">{(summary.healthy||{}).totalQty||0}{` units · ${curSym()}`}{NUM((summary.healthy||{}).totalValue)} on shelf</div>
         </div>
-        <div className="card kpi" style={{borderLeft:'3px solid #c084fc'}}>
+        <div className="card kpi" style={{borderLeft:`3px solid ${PAL.accent}`}}>
           <div className="label">Overstock (&gt;180d)</div>
           <div className="val">{(summary.overstock||{}).skus||0}</div>
           <div className="sub">{(summary.overstock||{}).totalQty||0} units · <b>{`${curSym()}`}{NUM(overstockValue)} tied up</b></div>
         </div>
-        <div className="card kpi" style={{borderLeft:'3px solid #7b7b87'}}>
+        <div className="card kpi" style={{borderLeft:`3px solid ${PAL.muted}`}}>
           <div className="label">Archived (dead stock)</div>
           <div className="val">{(summary.archived_stock||{}).skus||0}</div>
           <div className="sub">{(summary.archived_stock||{}).totalQty||0} units · <b>{`${curSym()}`}{NUM(archivedValue)}</b> at sell-value</div>
@@ -4783,7 +4853,7 @@ function InventoryPanel(){
       <div style={{maxHeight:560,overflowY:'auto'}}>
         <table className="sticky"><thead><tr><th>Tier</th><th className="tl">SKU / title</th><th className="tl">Type</th><th>Stock</th><th>Sold 90d</th><th>Days cover</th><th>{`Inv ${curSym()} value`}</th></tr></thead><tbody>
         {sorted.slice(0,80).map((r,i) => {
-          const color = TIER_COLOR[r.coverTier] || '#7b7b87';
+          const color = TIER_COLOR[r.coverTier] || PAL.muted;
           return (
             <tr key={i}>
               <td><span className="pill" style={{background:color+'22',color:color,fontSize:10,padding:'2px 6px',borderRadius:4,fontWeight:700,whiteSpace:'nowrap'}}>{TIER_LABEL[r.coverTier]||r.coverTier}</span></td>
@@ -4802,7 +4872,7 @@ function InventoryPanel(){
         </tbody></table>
       </div>
       {sorted.length > 80 && <div className="muted" style={{fontSize:11,marginTop:8}}>Showing 80 of {sorted.length}. Adjust filter to drill in.</div>}
-      {DEMO && <div className="note" style={{marginTop:14}}><b>Atlas read:</b> {critRows.length}{` SKUs are about to stock out — at current velocity that's roughly ${curSym()}`}{NUM(lostSalesEstMonthly)}/mo in lost sales if reorders don't land. Meanwhile <b>{`${curSym()}`}{NUM(overstockValue + archivedValue)} of capital is locked in slow-moving stock + archived SKUs</b>{`. For a brand at ${curSym()}16k/mo DTC revenue, that's ~18 months of working capital tied up. Most of the overstock is in `}<b>pre-styled stack SKUs</b> — connects directly to the Bundle attach finding (Products tab): bundles aren't selling, so the bundle-specific inventory is bloating. Liquidate the dead bundles + redirect capital to charm + necklace replenishment.</div>}
+      {DEMO && <div className="note" style={{marginTop:14}}><b>Greta's read:</b> {critRows.length}{` SKUs are about to stock out — at current velocity that's roughly ${curSym()}`}{NUM(lostSalesEstMonthly)}/mo in lost sales if reorders don't land. Meanwhile <b>{`${curSym()}`}{NUM(overstockValue + archivedValue)} of capital is locked in slow-moving stock + archived SKUs</b>{`. For a brand at ${curSym()}16k/mo DTC revenue, that's ~18 months of working capital tied up. Most of the overstock is in `}<b>pre-styled stack SKUs</b> — connects directly to the Bundle attach finding (Products tab): bundles aren't selling, so the bundle-specific inventory is bloating. Liquidate the dead bundles + redirect capital to charm + necklace replenishment.</div>}
     </div>
   );
 }
@@ -4810,16 +4880,16 @@ function InventoryPanel(){
 function CollectionsPanel(){
   const cols = B.productCollections || [];
   if (!cols.length) return null;
-  const COLOR = {'Necklaces':'#5b8def','Bracelets':'#c084fc','Earrings':'#4ade80','Charms':'#fbbf24','Accessories':'#38bdf8','Gift cards':'#94a3b8'};
+  const COLOR = {'Necklaces':PAL.data3,'Bracelets':PAL.accent,'Earrings':PAL.good,'Charms':PAL.warn,'Accessories':PAL.data3,'Gift cards':PAL.muted};
   const top = cols[0];
   const tinyCollections = cols.filter(c => c.skus <= 2 && c.netSales > 50);
   return (
-    <div className="card" style={{marginBottom:14, borderLeft:'3px solid #38bdf8'}}>
+    <div className="card" style={{marginBottom:14, borderLeft:`3px solid ${PAL.data3}`}}>
       <h2>Collections — revenue by product category (90d)</h2>
       <div className="muted" style={{marginBottom:10, fontSize:12}}>Buyer-facing category roll-up. Click any collection's top SKUs to find drilldown candidates. Bundles are surfaced separately above.</div>
       <table><thead><tr><th>Collection</th><th>SKUs</th><th>Units</th><th>Net rev</th><th>% rev</th><th>AOV/unit</th><th>Margin</th><th>Return</th><th className="tl">Top SKUs</th></tr></thead><tbody>
       {cols.map((c,i)=>{
-        const color = COLOR[c.collection] || '#7b7b87';
+        const color = COLOR[c.collection] || PAL.muted;
         return (<tr key={i}>
           <td><span className="pill" style={{background:color+'22',color:color,fontSize:11,padding:'3px 8px',borderRadius:4,fontWeight:700}}>{c.collection}</span></td>
           <td><b>{c.skus}</b>{c.skus<=2&&<span className="muted" style={{fontSize:10,marginLeft:4}}>thin range</span>}</td>
@@ -4841,11 +4911,11 @@ function CollectionsPanel(){
 function ProductTiersPanel(){
   const tiers = B.productTiers || [];
   if (!tiers.length) return null;
-  const colors = {base:'#5b8def', charm:'#fbbf24', style:'#4ade80'};
+  const colors = {base:PAL.data3, charm:PAL.warn, style:PAL.good};
   const labels = {base:'01: Base', charm:'02: Charm', style:'03: Style'};
   const total = tiers.reduce((a,t)=>a+(t.netSales||0),0);
   return (
-    <div className="card" style={{marginBottom:14, borderLeft:'3px solid #5b8def'}}>
+    <div className="card" style={{marginBottom:14, borderLeft:`3px solid ${PAL.data3}`}}>
       <h2>Component tiers — base / charm / style</h2>
       {DEMO && <div className="muted" style={{marginBottom:10, fontSize:12}}>frkl's modular system uses three tiers, encoded in the Shopify vendor field. A customer buys a base, layers a style, attaches charms — every charm raises AOV, every style raises margin.</div>}
       <table><thead><tr><th>Tier</th><th>SKUs</th><th>Units</th><th>Net revenue</th><th>% of rev</th><th>AOV / unit</th><th>Margin %</th><th>Return %</th></tr></thead><tbody>
@@ -5066,8 +5136,8 @@ function CvrDrivers(){
   const STAGES=['session→cart','cart→checkout','checkout→purchase'];
   const up = M.deltaCVR>=0, mixDom=M.mixDominant;
   const verdict = mixDom
-    ? {txt:'Traffic-mix shift', color:'#f5b544', sub:'mostly who you’re sending, not how the site converts'}
-    : {txt:(up?'Real site improvement':'Real site slowdown'), color:(up?'#4ade80':'#ef6b6f'), sub:'channels are converting differently — not just a mix artefact'};
+    ? {txt:'Traffic-mix shift', color:PAL.warn, sub:'mostly who you’re sending, not how the site converts'}
+    : {txt:(up?'Real site improvement':'Real site slowdown'), color:(up?PAL.good:PAL.bad), sub:'channels are converting differently — not just a mix artefact'};
   const maxAbs = Math.max(...drivers.map(d=>d.abs), 0.01);
 
   // ── Two-week comparator: default to the pair with the biggest CVR gap among
@@ -5081,7 +5151,7 @@ function CvrDrivers(){
   const [showDisc,setShowDisc] = useState(true);       // overlay total discount depth on the trend
   const gran = chartGran;                              // comparator follows the chart
   const panel = (chartGran==='day' ? seriesDaily : series);
-  const segBtn = (active)=>({fontSize:11.5,fontWeight:600,padding:'4px 10px',borderRadius:7,cursor:'pointer',border:'1px solid '+(active?'#8B5CF6':'var(--border-subtle)'),background:active?'rgba(139,92,246,0.14)':'transparent',color:active?'#8B5CF6':'var(--text-muted)'});
+  const segBtn = (active)=>({fontSize:11.5,fontWeight:600,padding:'4px 10px',borderRadius:7,cursor:'pointer',border:'1px solid '+(active?PAL.accent:'var(--border-subtle)'),background:active?'rgba(139,92,246,0.14)':'transparent',color:active?PAL.accent:'var(--text-muted)'});
   const _cbase = (chartGran==='day' ? seriesDaily : series);
   const _clast = _cbase.length ? _cbase[_cbase.length-1].w : null;
   const _ccut = (chartDays && _clast) ? new Date(new Date(_clast+'T00:00:00Z').getTime() - chartDays*86400000).toISOString().slice(0,10) : '0000';
@@ -5097,8 +5167,8 @@ function CvrDrivers(){
   const discDot = (props)=>{ const {cx,cy,payload}=props; const v=payload&&payload.trueDiscountIntensity;
     if(cx==null||cy==null||v==null||v<discThr) return null;
     return (<g key={'dd'+cx+'-'+cy} style={{pointerEvents:'none'}}>
-      <path d={`M${cx} ${cy-5} L${cx+5} ${cy} L${cx} ${cy+5} L${cx-5} ${cy} Z`} fill="#f5b544" stroke="var(--bg-card)" strokeWidth={1.2}/>
-      <text x={cx} y={cy-8} textAnchor="middle" fill="#f5b544" fontSize={9.5} fontWeight={700}>{Math.round(v)}%</text>
+      <path d={`M${cx} ${cy-5} L${cx+5} ${cy} L${cx} ${cy+5} L${cx-5} ${cy} Z`} fill={PAL.warn} stroke={PAL.panel} strokeWidth={1.2}/>
+      <text x={cx} y={cy-8} textAnchor="middle" fill={PAL.warn} fontSize={9.5} fontWeight={700}>{Math.round(v)}%</text>
     </g>); };
   // ── Discount lift: mean CVR on the deepest-discount periods vs all the rest,
   // over the visible range. A direct number for "do deep promos convert better?"
@@ -5296,27 +5366,27 @@ function CvrDrivers(){
   const fmtMetric=(k,v)=> fmtVal(cmType[k]||'pct', v);
   const cmpAskAI = ()=>{ if(!window.__oiAsk||!cA||!cB||!cmpStory) return; const S=cmpStory; const u=gran==='day'?'day':'week';
     const fld=(c)=>`CVR ${c.cvr}%, sessions ${NUM(c.sessions)} | funnel: session→cart ${c.s2c}%, cart→checkout ${c.c2co}%, checkout→purchase ${c.co2p}% | new-visitor ${c.newShare}%, paid ${c.paidShare}%, email ${c.emailShare}%, mobile ${c.mobileShare}%, bounce ${c.bounce}%, engagement ${c.engagement}% | discount(incl. sale) ${c.trueDiscountIntensity}%, free-ship ${c.freeShipShare}%, AOV ${GBP(c.aov)}`;
-    const prompt=`Act as my analyst. Compare these two ${u}s for frkl and explain what most likely drove the CVR difference. Use the identity CVR = session→cart × cart→checkout × checkout→purchase, and separate genuine site/offer/checkout levers from traffic-mix confounds (paid/new-visitor/device share).\n\nA · ${lbl(cA)} — ${fld(cA)}\nB · ${lbl(cB)} — ${fld(cB)}\n\nMy structural read: CVR moved ${S.up?'+':''}${S.pp}pp, mostly at ${S.lead?S.lead.label:'—'}${S.offset?` (partly offset by ${S.offset.label})`:''}. Moving with it: ${S.consistent.map(d=>cmLabel[d.k]).join(', ')||'little else'}. Against the grain: ${S.against.map(d=>cmLabel[d.k]).join(', ')||'none'}. Looks ${S.topKind||'unclear'}.\n\nDo you agree? Give the single most likely cause, the strongest confound to rule out, and one controlled test (holdout/A-B) that would confirm it.`;
+    const prompt=`Act as my analyst. Compare these two ${u}s for ${OI_BRAND.name||'my brand'} and explain what most likely drove the CVR difference. Use the identity CVR = session→cart × cart→checkout × checkout→purchase, and separate genuine site/offer/checkout levers from traffic-mix confounds (paid/new-visitor/device share).\n\nA · ${lbl(cA)} — ${fld(cA)}\nB · ${lbl(cB)} — ${fld(cB)}\n\nMy structural read: CVR moved ${S.up?'+':''}${S.pp}pp, mostly at ${S.lead?S.lead.label:'—'}${S.offset?` (partly offset by ${S.offset.label})`:''}. Moving with it: ${S.consistent.map(d=>cmLabel[d.k]).join(', ')||'little else'}. Against the grain: ${S.against.map(d=>cmLabel[d.k]).join(', ')||'none'}. Looks ${S.topKind||'unclear'}.\n\nDo you agree? Give the single most likely cause, the strongest confound to rule out, and one controlled test (holdout/A-B) that would confirm it.`;
     window.__oiAsk(prompt);
   };
 
-  const tile = (label,val,sub,accent) => (<div style={{flex:'1 1 170px',background:'var(--surface-1,#111116)',border:'1px solid var(--border-subtle,#23232b)',borderRadius:12,padding:'12px 14px'}}>
+  const tile = (label,val,sub,accent) => (<div style={{flex:'1 1 170px',background:`var(--surface-1,${PAL.panel})`,border:`1px solid var(--border-subtle,${PAL.panel})`,borderRadius:12,padding:'12px 14px'}}>
     <div style={{fontSize:11,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-faint)'}}>{label}</div>
     <div style={{fontSize:22,fontWeight:700,marginTop:3,color:accent||'var(--text-primary)'}}>{val}</div>
     <div style={{fontSize:11.5,color:'var(--text-muted)',marginTop:2}}>{sub}</div>
   </div>);
 
   const stageCard = (k) => { const now=M.stageNow[k], prev=M.stagePrev[k], dlt=M.stageMoves[k], contrib=Math.round((M.stageContribution[k]||0)*100); const isMover=k===M.moverStage; const good=dlt>=0;
-    return (<div key={k} style={{flex:'1 1 200px',background:isMover?'rgba(139,92,246,0.08)':'var(--surface-1,#111116)',border:'1px solid '+(isMover?'#3a4080':'var(--border-subtle,#23232b)'),borderRadius:12,padding:'11px 13px'}}>
-      <div style={{fontSize:12,fontWeight:600,color:'var(--text-secondary)'}}>{k}{isMover&&<span style={{marginLeft:6,fontSize:10,color:'#8B5CF6',fontWeight:700}}>BIGGEST MOVER</span>}</div>
-      <div style={{fontSize:18,fontWeight:700,marginTop:3}}>{prev}% <span style={{color:'var(--text-faint)'}}>→</span> {now}% <span style={{fontSize:12.5,color:good?'#4ade80':'#ef6b6f'}}>{dlt>=0?'+':''}{dlt}pp</span></div>
+    return (<div key={k} style={{flex:'1 1 200px',background:isMover?'rgba(139,92,246,0.08)':`var(--surface-1,${PAL.panel})`,border:'1px solid '+(isMover?'#3a4080':`var(--border-subtle,${PAL.panel})`),borderRadius:12,padding:'11px 13px'}}>
+      <div style={{fontSize:12,fontWeight:600,color:'var(--text-secondary)'}}>{k}{isMover&&<span style={{marginLeft:6,fontSize:10,color:PAL.accent,fontWeight:700}}>BIGGEST MOVER</span>}</div>
+      <div style={{fontSize:18,fontWeight:700,marginTop:3}}>{prev}% <span style={{color:'var(--text-faint)'}}>→</span> {now}% <span style={{fontSize:12.5,color:good?PAL.good:PAL.bad}}>{dlt>=0?'+':''}{dlt}pp</span></div>
       <div style={{fontSize:11.5,color:'var(--text-muted)',marginTop:2}}>{contrib>=0?contrib:0}% of the CVR change</div>
     </div>);
   };
 
-  const barCell = (d) => { const w=Math.round(d.abs/maxAbs*48); const pos=d.dir==='up'; const col=pos?'#4ade80':'#ef6b6f';
-    return (<div style={{position:'relative',height:16,background:'var(--surface-2,#15151b)',borderRadius:4}}>
-      <div style={{position:'absolute',left:'50%',top:0,bottom:0,width:1,background:'#3a3a44'}}/>
+  const barCell = (d) => { const w=Math.round(d.abs/maxAbs*48); const pos=d.dir==='up'; const col=pos?PAL.good:PAL.bad;
+    return (<div style={{position:'relative',height:16,background:`var(--surface-2,${PAL.panel})`,borderRadius:4}}>
+      <div style={{position:'absolute',left:'50%',top:0,bottom:0,width:1,background:PAL.line}}/>
       <div style={{position:'absolute',top:2,bottom:2,borderRadius:3,background:col,opacity:d.significant?0.95:0.4,left:(pos?50:(50-w))+'%',width:w+'%'}}/>
     </div>);
   };
@@ -5335,9 +5405,9 @@ function CvrDrivers(){
         <span className="meta">Crux · {M.lo} → {M.hi} · {M.days} days · GA4 × Shopify × Klaviyo × Meta</span>
       </div>
       <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:8}}>
-        {tile('GA4 funnel CVR (recent)', M.cvrNow+'%', `was ${M.cvrPrev}% · ${M.deltaCVR>=0?'+':''}${M.deltaCVR}pp`, up?'#4ade80':'#ef6b6f')}
+        {tile('GA4 funnel CVR (recent)', M.cvrNow+'%', `was ${M.cvrPrev}% · ${M.deltaCVR>=0?'+':''}${M.deltaCVR}pp`, up?PAL.good:PAL.bad)}
         {tile('What kind of move', verdict.txt, verdict.sub, verdict.color)}
-        {tile('Biggest funnel mover', M.moverStage, `${Math.round((M.stageContribution[M.moverStage]||0)*100)}% of the change`, '#8B5CF6')}
+        {tile('Biggest funnel mover', M.moverStage, `${Math.round((M.stageContribution[M.moverStage]||0)*100)}% of the change`, PAL.accent)}
       </div>
       {M.siteCvrNow!=null && (
         <div className="note" style={{marginBottom:14}}>
@@ -5352,49 +5422,63 @@ function CvrDrivers(){
         {[[0,'All'],[90,'90d'],[60,'60d'],[30,'30d'],[14,'14d']].map(([d,l])=>(<button key={l} onClick={()=>setChartDays(d)} style={segBtn(chartDays===d)}>{l}</button>))}
         <span style={{width:1,height:18,background:'var(--border-subtle)',margin:'0 6px'}}/>
         <span style={{fontSize:11,color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'.04em',marginRight:2}}>Overlay</span>
-        <button onClick={()=>setShowDisc(v=>!v)} title="Shade total discount depth (codes + sale prices) and flag the deepest-discount periods" style={{...segBtn(showDisc), border:'1px solid '+(showDisc?'#f5b544':'var(--border-subtle)'), background:showDisc?'rgba(245,181,68,0.14)':'transparent', color:showDisc?'#f5b544':'var(--text-muted)'}}>🏷️ Discounts</button>
+        <button onClick={()=>setShowDisc(v=>!v)} title="Shade total discount depth (codes + sale prices) and flag the deepest-discount periods" style={{...segBtn(showDisc), border:'1px solid '+(showDisc?PAL.warn:'var(--border-subtle)'), background:showDisc?'rgba(245,181,68,0.14)':'transparent', color:showDisc?PAL.warn:'var(--text-muted)'}}>🏷️ Discounts</button>
         <span style={{fontSize:11,color:'var(--text-faint)',marginLeft:4}}>{chartData.length} {chartGran==='day'?'days':'weeks'}{chartGran==='day'?' · daily CVR is noisier — read the trend, not single days':''}</span>
       </div>
       <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',margin:'2px 0 8px',padding:'7px 11px',borderRadius:9,background:'rgba(139,92,246,0.07)',border:'1px solid rgba(139,92,246,0.18)'}}>
-        <span style={{fontSize:12,fontWeight:600,color:'#8B5CF6'}}>📈 Click two points on the chart to compare them</span>
+        <span style={{fontSize:12,fontWeight:600,color:PAL.accent}}>📈 Click two points on the chart to compare them</span>
         <span style={{fontSize:12,color:'var(--text-muted)'}}>{cA&&cB
-          ? <>Comparing <b style={{color:'#8B5CF6'}}>A · {lbl(cA)}</b> <span style={{color:'var(--text-faint)'}}>vs</span> <b style={{color:'#4ade80'}}>B · {lbl(cB)}</b> — see table below.</>
-          : cA ? <>Picked <b style={{color:'#8B5CF6'}}>A · {lbl(cA)}</b> — now click another point for <b style={{color:'#4ade80'}}>B</b>.</>
-          : <>Click the first {chartGran==='day'?'day':'week'} to set <b style={{color:'#8B5CF6'}}>A</b>.</>}</span>
+          ? <>Comparing <b style={{color:PAL.accent}}>A · {lbl(cA)}</b> <span style={{color:'var(--text-faint)'}}>vs</span> <b style={{color:PAL.good}}>B · {lbl(cB)}</b> — see table below.</>
+          : cA ? <>Picked <b style={{color:PAL.accent}}>A · {lbl(cA)}</b> — now click another point for <b style={{color:PAL.good}}>B</b>.</>
+          : <>Click the first {chartGran==='day'?'day':'week'} to set <b style={{color:PAL.accent}}>A</b>.</>}</span>
         {(cmp.a||cmp.b) && <button onClick={()=>setCmp({a:null,b:null})} style={{fontSize:11.5,fontWeight:600,padding:'4px 10px',borderRadius:7,cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-muted)'}}>✕ Clear</button>}
         <button onClick={()=>setCmp(defaultPair(panel))} title="Auto-pick the clearest pair: similar traffic, biggest CVR gap" style={{fontSize:11.5,fontWeight:600,padding:'4px 10px',borderRadius:7,cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-muted)'}}>↻ Best pair</button>
       </div>
       <div style={{cursor:'pointer'}}>
       <R.ResponsiveContainer width="100%" height={288}>
-        <R.ComposedChart data={chartData} margin={{top:6,right:14,left:8,bottom:20}} onClick={(st)=>{ if(st && st.activeLabel!=null) pickPeriod(st.activeLabel); }}>
-          <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
-          <R.XAxis dataKey="w" tickFormatter={fmtWk} tick={{fill:'#7e7e8a',fontSize:10.5}} interval={Math.ceil(chartData.length/9)} tickMargin={8} label={{value:chartGran==='day'?'Day':'Week', position:'insideBottom', offset:-10, fill:'#6f6f7b', fontSize:11}}/>
-          <R.YAxis yAxisId="l" tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>v+'%'} label={{value:'CVR (sessions→order)', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
-          <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>(v/1000).toFixed(0)+'k'} label={{value:'Sessions', angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
+        <R.ComposedChart data={chartData} syncId="cvr-traffic" margin={{top:6,right:14,left:8,bottom:20}} onClick={(st)=>{ if(st && st.activeLabel!=null) pickPeriod(st.activeLabel); }}>
+          <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
+          <R.XAxis dataKey="w" tickFormatter={fmtWk} tick={{fill:PAL.muted,fontSize:10.5}} interval={Math.ceil(chartData.length/9)} tickMargin={8} label={{value:chartGran==='day'?'Day':'Week', position:'insideBottom', offset:-10, fill:PAL.muted, fontSize:11}}/>
+          <R.YAxis yAxisId="l" tick={{fill:PAL.muted,fontSize:11}} tickFormatter={v=>v+'%'} label={{value:'CVR (sessions→order)', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:11}}/>
+          {/* Sessions moved to their own chart below: a count and a rate share no scale. */}
+          {false && <R.YAxis yAxisId="r" orientation="right" tick={{fill:PAL.muted,fontSize:11}} tickFormatter={v=>(v/1000).toFixed(0)+'k'} label={{value:'Sessions', angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:11}}/>}
           {/* Hidden axis for the discount-depth overlay, scaled so the amber band sits in the lower ~45% — readable but never fighting the CVR line. */}
           <R.YAxis yAxisId="disc" hide domain={[0, (discMax||10)*2.2]}/>
           <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,fontSize:12,boxShadow:'var(--shadow-md)'}} labelFormatter={w=>(chartGran==='day'?'':'Week of ')+fmtWk(w)} formatter={(v,n)=> (n==='CVR'||n==='Discount depth')?v+'%':NUM(v)}/>
           <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}}/>
-          <R.Bar yAxisId="r" dataKey="sessions" name="Sessions" fill="#26262e" maxBarSize={30}/>
+          {false && <R.Bar yAxisId="r" dataKey="sessions" name="Sessions" fill={PAL.panel} maxBarSize={30}/>}
           {/* Total discount depth (codes + sale prices) as a soft amber band; amber diamonds flag the deepest periods. */}
-          {showDisc && <R.Area yAxisId="disc" type="monotone" dataKey="trueDiscountIntensity" name="Discount depth" stroke="#f5b544" strokeWidth={1.4} strokeOpacity={0.6} fill="#f5b544" fillOpacity={0.10} dot={discDot} activeDot={false} isAnimationActive={false} connectNulls/>}
+          {showDisc && <R.Area yAxisId="disc" type="monotone" dataKey="trueDiscountIntensity" name="Discount depth" stroke={PAL.warn} strokeWidth={1.4} strokeOpacity={0.6} fill={PAL.warn} fillOpacity={0.10} dot={discDot} activeDot={false} isAnimationActive={false} connectNulls/>}
           <R.Brush {...brushProps('w', fmtWk)} />
-          <R.Line yAxisId="l" type="monotone" dataKey="cvr" name="CVR" stroke="#8B5CF6" strokeWidth={2.5} dot={false}/>
+          <R.Line yAxisId="l" type="monotone" dataKey="cvr" name="CVR" stroke={PAL.accent} strokeWidth={2.5} dot={false}/>
           {/* Show, don't tell: the single CVR benchmark drawn on the chart so the gap is visible, not described. */}
-          <R.ReferenceLine yAxisId="l" y={CVR_BENCH*100} stroke="#8B5CF6" strokeDasharray="5 4" strokeOpacity={0.75}
-            label={{value:`${CVR_BENCH_LABEL} CVR target`, position:'insideTopRight', fill:'#8B5CF6', fontSize:10.5}}/>
+          <R.ReferenceLine yAxisId="l" y={CVR_BENCH*100} stroke={PAL.accent} strokeDasharray="5 4" strokeOpacity={0.75}
+            label={{value:`${CVR_BENCH_LABEL} CVR target`, position:'insideTopRight', fill:PAL.accent, fontSize:10.5}}/>
           {/* The two selected periods, marked where you clicked — A (blue) vs B (green). */}
-          {cmp.a && chartData.some(d=>d.w===cmp.a) && <R.ReferenceLine yAxisId="l" x={cmp.a} stroke="#8B5CF6" strokeWidth={2} strokeOpacity={0.95}
-            label={{value:'A', position:'top', fill:'#8B5CF6', fontSize:12.5, fontWeight:800}}/>}
-          {cmp.b && chartData.some(d=>d.w===cmp.b) && <R.ReferenceLine yAxisId="l" x={cmp.b} stroke="#4ade80" strokeWidth={2} strokeOpacity={0.95}
-            label={{value:'B', position:'top', fill:'#4ade80', fontSize:12.5, fontWeight:800}}/>}
+          {cmp.a && chartData.some(d=>d.w===cmp.a) && <R.ReferenceLine yAxisId="l" x={cmp.a} stroke={PAL.accent} strokeWidth={2} strokeOpacity={0.95}
+            label={{value:'A', position:'top', fill:PAL.accent, fontSize:12.5, fontWeight:800}}/>}
+          {cmp.b && chartData.some(d=>d.w===cmp.b) && <R.ReferenceLine yAxisId="l" x={cmp.b} stroke={PAL.good} strokeWidth={2} strokeOpacity={0.95}
+            label={{value:'B', position:'top', fill:PAL.good, fontSize:12.5, fontWeight:800}}/>}
           {/* Event & sale pins: logged events + major site-wide sales, snapped to chart buckets.
               Icon-only on the chart; full detail lives on hover so the chart stays calm. */}
           {(function(){ var pins=buildChartPins(chartData.map(function(d){return d.w;}));
             return pins.map(function(p,i){ return (
-              <R.ReferenceLine key={'pin'+i} yAxisId="l" x={p.x} stroke="#8b8b99" strokeDasharray="3 3" strokeOpacity={0.55}
+              <R.ReferenceLine key={'pin'+i} yAxisId="l" x={p.x} stroke={PAL.muted} strokeDasharray="3 3" strokeOpacity={0.55}
                 label={<PinMarker icon={p.icon} n={p.n} tip={p.tip}/>}/>); });
           })()}
+        </R.ComposedChart>
+      </R.ResponsiveContainer>
+      {/* Traffic underneath, same weeks, own scale — so "did conversion fall or did
+          traffic change?" is answered by reading down, not by a crossing point. */}
+      <R.ResponsiveContainer width="100%" height={120}>
+        <R.ComposedChart data={chartData} syncId="cvr-traffic" margin={{top:2,right:14,left:8,bottom:6}}>
+          <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
+          <R.XAxis dataKey="w" tickFormatter={fmtWk} tick={{fill:PAL.muted,fontSize:10.5}} interval={Math.ceil(chartData.length/9)} tickMargin={6}/>
+          <R.YAxis tick={{fill:PAL.muted,fontSize:11}} tickFormatter={v=>(v/1000).toFixed(0)+'k'}
+                   label={{value:'Sessions', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:11}}/>
+          <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,fontSize:12}}
+                     formatter={(v)=>[NUM(v),'Sessions']} labelFormatter={fmtWk}/>
+          <R.Bar dataKey="sessions" name="Sessions" fill={svgCol(COL.sessions)} maxBarSize={30}/>
         </R.ComposedChart>
       </R.ResponsiveContainer>
       </div>
@@ -5402,8 +5486,8 @@ function CvrDrivers(){
       {(function(){ var pins=buildChartPins(chartData.map(function(d){return d.w;})); if(!pins.length) return null; return (
         <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>🏷️ sales &amp; promos · 📌 your events — <span style={{color:'var(--text-muted)'}}>hover any marker for what it was</span></div>); })()}
       {showDisc && _dv.length>0 && <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>
-        <span style={{color:'#f5b544',fontWeight:600}}>◆ amber band = total discount depth</span> (codes + automatic + sale prices, % of sales) · <span style={{color:'#f5b544'}}>◆ diamonds</span> = the deepest {chartGran==='day'?'days':'weeks'} (≥{Math.round(discThr)}%, top quartile). Line up the amber peaks against CVR to see whether a deep promo actually moved conversion{chartGran==='day'?'':' — heavy always-on discounting can flatten the link, so look for the spikes'}.</div>}
-      {showDisc && discLift && (()=>{ const L=discLift; const big=Math.abs(L.pct||0)>=0.05; const pos=L.pp>=0; const col=!big?'var(--text-muted)':(pos?'#4ade80':'#ef6b6f');
+        <span style={{color:PAL.warn,fontWeight:600}}>◆ amber band = total discount depth</span> (codes + automatic + sale prices, % of sales) · <span style={{color:PAL.warn}}>◆ diamonds</span> = the deepest {chartGran==='day'?'days':'weeks'} (≥{Math.round(discThr)}%, top quartile). Line up the amber peaks against CVR to see whether a deep promo actually moved conversion{chartGran==='day'?'':' — heavy always-on discounting can flatten the link, so look for the spikes'}.</div>}
+      {showDisc && discLift && (()=>{ const L=discLift; const big=Math.abs(L.pct||0)>=0.05; const pos=L.pp>=0; const col=!big?'var(--text-muted)':(pos?PAL.good:PAL.bad);
         const unit=chartGran==='day'?'days':'weeks';
         const verdict = !big
           ? `Deep-discount ${unit} convert about the same as the rest — discounting isn't buying conversion here.`
@@ -5412,11 +5496,11 @@ function CvrDrivers(){
             : `Deep-discount ${unit} convert ${Math.abs(L.pct*100).toFixed(0)}% lower — promos aren't lifting conversion.`;
         return (<div style={{marginTop:10,padding:'11px 13px',borderRadius:10,background:'rgba(245,181,68,0.06)',border:'1px solid rgba(245,181,68,0.22)'}}>
           <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap',marginBottom:7}}>
-            <span style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#f5b544',fontWeight:700}}>◆ Discount lift</span>
+            <span style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:PAL.warn,fontWeight:700}}>◆ Discount lift</span>
             <span style={{fontSize:11.5,color:'var(--text-faint)'}}>mean CVR on the deepest-discount {unit} vs the rest · this range</span>
           </div>
           <div style={{display:'flex',gap:16,flexWrap:'wrap',alignItems:'center'}}>
-            <div><div style={{fontSize:10,color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'.03em'}}>Deepest {L.deepN} · avg {Math.round(L.deepDisc)}% off</div><div style={{fontSize:19,fontWeight:700,color:'#f5b544'}}>{L.deepCvr.toFixed(2)}%</div></div>
+            <div><div style={{fontSize:10,color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'.03em'}}>Deepest {L.deepN} · avg {Math.round(L.deepDisc)}% off</div><div style={{fontSize:19,fontWeight:700,color:PAL.warn}}>{L.deepCvr.toFixed(2)}%</div></div>
             <div style={{fontSize:15,color:'var(--text-faint)'}}>vs</div>
             <div><div style={{fontSize:10,color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'.03em'}}>Other {L.restN} · avg {Math.round(L.restDisc)}% off</div><div style={{fontSize:19,fontWeight:700}}>{L.restCvr.toFixed(2)}%</div></div>
             <div style={{fontSize:15,color:'var(--text-faint)'}}>→</div>
@@ -5438,7 +5522,7 @@ function CvrDrivers(){
         <span className="meta">click two points on the trend chart above — biggest differences flagged automatically</span></div>
       <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center',marginBottom:10}}>
         {cA && cB
-          ? <div style={{fontSize:12.5,color:'var(--text-muted)'}}>Comparing <b style={{color:'#8B5CF6'}}>{lbl(cA)}</b> <span style={{color:'var(--text-faint)'}}>vs</span> <b style={{color:'#4ade80'}}>{lbl(cB)}</b></div>
+          ? <div style={{fontSize:12.5,color:'var(--text-muted)'}}>Comparing <b style={{color:PAL.accent}}>{lbl(cA)}</b> <span style={{color:'var(--text-faint)'}}>vs</span> <b style={{color:PAL.good}}>{lbl(cB)}</b></div>
           : <div style={{fontSize:12.5,color:'var(--text-faint)'}}>↑ Click two points on the chart above to pick the {gran==='day'?'days':'weeks'} to compare.</div>}
         <button onClick={()=>setCmp(defaultPair(panel))} title="Auto-pick the clearest pair: similar traffic, biggest CVR gap" style={{fontSize:12,fontWeight:600,padding:'6px 12px',borderRadius:8,cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-muted)'}}>↻ Best pair</button>
         {(cmp.a||cmp.b) && <button onClick={()=>setCmp({a:null,b:null})} style={{fontSize:12,fontWeight:600,padding:'6px 12px',borderRadius:8,cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-muted)'}}>✕ Clear</button>}
@@ -5447,61 +5531,61 @@ function CvrDrivers(){
         <div style={{fontSize:10.5,textTransform:'uppercase',letterSpacing:'.04em',color:'var(--text-faint)',marginBottom:5}}>Cleanest tests — matched traffic, one lever differs <span title="Week pairs where traffic mix (new/paid/mobile share) and volume are near-identical, so the CVR gap is mostly attributable to the single lever shown. The lowest-confound comparisons in your data — the closest thing to a natural experiment." style={{cursor:'help',color:'var(--text-muted)'}}>ⓘ</span></div>
         <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{STAT.cleanPairs.map((p,i)=>{ const A=byW[p.a],B=byW[p.b]; if(!A||!B) return null; const f=(t,v)=> t==='pct'?Math.round(v)+'%': t==='gbp'?GBP(v): NUM(v);
           return (<button key={i} onClick={()=>setCmp({a:p.a,b:p.b})} title="Load this low-confound pair" style={{fontSize:11.5,padding:'5px 10px',borderRadius:8,cursor:'pointer',border:'1px solid rgba(110,231,183,0.3)',background:'rgba(110,231,183,0.08)',color:'var(--text-secondary)',textAlign:'left'}}>
-            <b style={{color:'#6ee7b7'}}>{p.lever.lab}</b> {f(p.lever.t,p.lever.a)}→{f(p.lever.t,p.lever.b)} <span style={{color:'var(--text-faint)'}}>· {fmtWk(p.a)} vs {fmtWk(p.b)} · ΔCVR {p.cvrGap.toFixed(2)}pp</span>
+            <b style={{color:PAL.good}}>{p.lever.lab}</b> {f(p.lever.t,p.lever.a)}→{f(p.lever.t,p.lever.b)} <span style={{color:'var(--text-faint)'}}>· {fmtWk(p.a)} vs {fmtWk(p.b)} · ΔCVR {p.cvrGap.toFixed(2)}pp</span>
           </button>); })}</div>
       </div>}
       {cA&&cB&&<>
         <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:12}}>
-          {tile(lbl(cA), cA.cvr+'%', `${NUM(cA.orders)}/${NUM(cA.sessions)} · 95% CI ${ciA?(ciA.lo*100).toFixed(2)+'–'+(ciA.hi*100).toFixed(2)+'%':'—'}`, cA.cvr>=cB.cvr?'#4ade80':'var(--text-primary)')}
-          {tile(lbl(cB), cB.cvr+'%', `${NUM(cB.orders)}/${NUM(cB.sessions)} · 95% CI ${ciB?(ciB.lo*100).toFixed(2)+'–'+(ciB.hi*100).toFixed(2)+'%':'—'}`, cB.cvr>=cA.cvr?'#4ade80':'var(--text-primary)')}
-          {tile('CVR gap', `${(Math.abs(cA.cvr-cB.cvr)).toFixed(2)}pp`, gapSig?(gapSig.p<0.05?`${pTxt(gapSig.p)} — a real difference`:`${pTxt(gapSig.p)} — within sampling noise`):'', gapSig?(gapSig.p<0.05?'#4ade80':'#f5b544'):'#8B5CF6')}
+          {tile(lbl(cA), cA.cvr+'%', `${NUM(cA.orders)}/${NUM(cA.sessions)} · 95% CI ${ciA?(ciA.lo*100).toFixed(2)+'–'+(ciA.hi*100).toFixed(2)+'%':'—'}`, cA.cvr>=cB.cvr?PAL.good:'var(--text-primary)')}
+          {tile(lbl(cB), cB.cvr+'%', `${NUM(cB.orders)}/${NUM(cB.sessions)} · 95% CI ${ciB?(ciB.lo*100).toFixed(2)+'–'+(ciB.hi*100).toFixed(2)+'%':'—'}`, cB.cvr>=cA.cvr?PAL.good:'var(--text-primary)')}
+          {tile('CVR gap', `${(Math.abs(cA.cvr-cB.cvr)).toFixed(2)}pp`, gapSig?(gapSig.p<0.05?`${pTxt(gapSig.p)} — a real difference`:`${pTxt(gapSig.p)} — within sampling noise`):'', gapSig?(gapSig.p<0.05?PAL.good:PAL.warn):PAL.accent)}
         </div>
         {movers.length>0 && <div style={{marginBottom:10}}>
           <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'var(--text-faint)',marginBottom:5}}>Biggest differences</div>
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{movers.map(m=>(<span key={m.k} style={{fontSize:12,background:'rgba(139,92,246,0.12)',border:'1px solid rgba(139,92,246,0.3)',borderRadius:999,padding:'3px 10px'}}><b>{m.l}</b> {fmtVal(m.t,m.a)} <span style={{color:'var(--text-faint)'}}>→</span> {fmtVal(m.t,m.b)}</span>))}</div>
         </div>}
         {/* Why the difference — deterministic read of the metric algorithm: funnel split + driver classification + confound-aware verdict, with a handoff to the live assistant. */}
-        {cmpStory && (()=>{ const S=cmpStory; const vcol = S.topKind==='site'||S.topKind==='checkout'?'#4ade80' : S.topKind==='offer'?'#f5b544' : S.topKind==='mix'||S.topKind==='device'?'#8B5CF6' : 'var(--text-muted)';
+        {cmpStory && (()=>{ const S=cmpStory; const vcol = S.topKind==='site'||S.topKind==='checkout'?PAL.good : S.topKind==='offer'?PAL.warn : S.topKind==='mix'||S.topKind==='device'?PAL.accent : 'var(--text-muted)';
           const u=gran==='day'?'day':'week';
           return (<div style={{marginBottom:12,padding:'13px 15px',borderRadius:12,background:'rgba(139,92,246,0.06)',border:'1px solid rgba(139,92,246,0.22)'}}>
             <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:8}}>
-              <span style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#8B5CF6',fontWeight:700}}>✦ Why the difference — likely drivers</span>
-              <span style={{fontSize:11,color:'var(--text-faint)'}} title={agentTitle('Pulse')}>◆ Pulse · auto-diagnosis from the metric model</span>
+              <span style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:PAL.accent,fontWeight:700}}>✦ Why the difference — likely drivers</span>
+              <span style={{fontSize:11,color:'var(--text-faint)'}} >◆ Auto-diagnosis from the metric model</span>
             </div>
             {gapSig && (gapSig.p<0.05
-              ? <div style={{fontSize:11.5,color:'#4ade80',marginBottom:8,fontWeight:600}}>✓ The CVR gap is statistically real ({pTxt(gapSig.p)}, two-proportion test) — worth explaining.</div>
-              : <div style={{fontSize:12,color:'#f5b544',marginBottom:8,padding:'7px 10px',borderRadius:8,background:'rgba(245,181,68,0.08)',border:'1px solid rgba(245,181,68,0.25)'}}>⚠ This CVR gap is within sampling noise ({pTxt(gapSig.p)}) — only {NUM(cA.orders)} vs {NUM(cB.orders)} orders on these {gran==='day'?'days':'weeks'}. Treat the read below as a weak hypothesis, not a finding; a wider-apart or higher-volume pair gives a cleaner signal.</div>)}
+              ? <div style={{fontSize:11.5,color:PAL.good,marginBottom:8,fontWeight:600}}>✓ The CVR gap is statistically real ({pTxt(gapSig.p)}, two-proportion test) — worth explaining.</div>
+              : <div style={{fontSize:12,color:PAL.warn,marginBottom:8,padding:'7px 10px',borderRadius:8,background:'rgba(245,181,68,0.08)',border:'1px solid rgba(245,181,68,0.25)'}}>⚠ This CVR gap is within sampling noise ({pTxt(gapSig.p)}) — only {NUM(cA.orders)} vs {NUM(cB.orders)} orders on these {gran==='day'?'days':'weeks'}. Treat the read below as a weak hypothesis, not a finding; a wider-apart or higher-volume pair gives a cleaner signal.</div>)}
             {S.tiny
               ? <div style={{fontSize:12.5,color:'var(--text-muted)'}}>CVR is essentially flat between these two ({S.pp>=0?'+':''}{S.pp}pp). The inputs below shifted but netted out — there's no real conversion difference to explain. Pick a wider-apart pair to see a driver story.</div>
               : <div style={{fontSize:12.5,color:'var(--text-secondary)',lineHeight:1.55}}>
-                  <div style={{marginBottom:6}}><b style={{color:'#8B5CF6'}}>1 · Where in the funnel.</b> The <b style={{color:S.up?'#4ade80':'#ef6b6f'}}>{S.up?'+':''}{S.pp}pp</b> move is mostly at <b>{S.lead.label}</b> ({Math.round(Math.min(Math.abs(S.lead.share),1)*100)}% of it{S.offset?<>, partly offset by <b>{S.offset.label}</b></>:''}) — {(+S.lead.a).toFixed(1)}% → {(+S.lead.b).toFixed(1)}%.</div>
-                  <div style={{marginBottom:6}}><b style={{color:'#8B5CF6'}}>2 · What moved with it.</b> {S.consistent.length
+                  <div style={{marginBottom:6}}><b style={{color:PAL.accent}}>1 · Where in the funnel.</b> The <b style={{color:S.up?PAL.good:PAL.bad}}>{S.up?'+':''}{S.pp}pp</b> move is mostly at <b>{S.lead.label}</b> ({Math.round(Math.min(Math.abs(S.lead.share),1)*100)}% of it{S.offset?<>, partly offset by <b>{S.offset.label}</b></>:''}) — {(+S.lead.a).toFixed(1)}% → {(+S.lead.b).toFixed(1)}%.</div>
+                  <div style={{marginBottom:6}}><b style={{color:PAL.accent}}>2 · What moved with it.</b> {S.consistent.length
                     ? <>{S.consistent.map((d,i)=><span key={d.k}>{i>0?'; ':''}<b>{cmLabel[d.k]}</b> {fmtMetric(d.k,d.a)}→{fmtMetric(d.k,d.b)} <span style={{color:'var(--text-faint)'}}>({d.phrase})</span></span>)}.</>
                     : <span style={{color:'var(--text-muted)'}}>nothing else moved much — the tracked inputs don't explain this gap, so suspect data noise or an untracked factor.</span>}</div>
-                  {S.against.length>0 && <div style={{marginBottom:6}}><b style={{color:'#8B5CF6'}}>3 · Against the grain.</b> {S.against.map((d,i)=><span key={d.k}>{i>0?'; ':''}<b>{cmLabel[d.k]}</b> {fmtMetric(d.k,d.a)}→{fmtMetric(d.k,d.b)}</span>)} usually push{S.against.length>1?'':'es'} CVR the other way — so the {S.up?'gain':'drop'} happened <i>despite</i> {S.against.length>1?'them':'it'}, which sharpens the diagnosis.</div>}
+                  {S.against.length>0 && <div style={{marginBottom:6}}><b style={{color:PAL.accent}}>3 · Against the grain.</b> {S.against.map((d,i)=><span key={d.k}>{i>0?'; ':''}<b>{cmLabel[d.k]}</b> {fmtMetric(d.k,d.a)}→{fmtMetric(d.k,d.b)}</span>)} usually push{S.against.length>1?'':'es'} CVR the other way — so the {S.up?'gain':'drop'} happened <i>despite</i> {S.against.length>1?'them':'it'}, which sharpens the diagnosis.</div>}
                   {S.verdict && <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--border-subtle)'}}><b style={{color:vcol}}>Likely driver:</b> <span style={{color:'var(--text-secondary)'}}>{S.verdict}</span> <span style={{color:'var(--text-faint)'}}>{sessClose?'Sessions are near-identical, so this is a relatively clean read.':'Sessions differ a lot here — volume itself shifts the mix, so read with care.'} Two periods is correlation, not proof.</span></div>}
                   {STAT.resid && STAT.resid.byW[cmp.b] && (()=>{ const rB=STAT.resid.byW[cmp.b]; const unexp=Math.abs(rB.z)>=1.3;
-                    return (<div style={{marginTop:6,fontSize:11.5,color:'var(--text-faint)'}}><b style={{color:unexp?'#8B5CF6':'var(--text-muted)'}}>Mix-adjusted:</b> after modelling CVR from traffic warmth (new-visitor share), {lbl(cB)} lands <b style={{color:rB.e>=0?'#4ade80':'#ef6b6f'}}>{rB.e>=0?'+':''}{rB.e.toFixed(2)}pp</b> vs expected ({(rB.exp).toFixed(2)}%) — {unexp?'a genuinely un-modelled move, the kind worth a controlled test':'about what the model predicts, so most of the gap is explained by the inputs'}.</div>); })()}
+                    return (<div style={{marginTop:6,fontSize:11.5,color:'var(--text-faint)'}}><b style={{color:unexp?PAL.accent:'var(--text-muted)'}}>Mix-adjusted:</b> after modelling CVR from traffic warmth (new-visitor share), {lbl(cB)} lands <b style={{color:rB.e>=0?PAL.good:PAL.bad}}>{rB.e>=0?'+':''}{rB.e.toFixed(2)}pp</b> vs expected ({(rB.exp).toFixed(2)}%) — {unexp?'a genuinely un-modelled move, the kind worth a controlled test':'about what the model predicts, so most of the gap is explained by the inputs'}.</div>); })()}
                 </div>}
-            <div onClick={cmpAskAI} style={{marginTop:9,fontSize:12,color:'#8B5CF6',cursor:'pointer',fontWeight:600}}>✦ Ask AI to dig deeper into this pair →</div>
+            <div onClick={cmpAskAI} style={{marginTop:9,fontSize:12,color:PAL.accent,cursor:'pointer',fontWeight:600}}>✦ Ask AI to dig deeper into this pair →</div>
           </div>); })()}
         <div style={{overflowX:'auto'}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:12.5}}>
           <thead><tr style={{textAlign:'left',color:'var(--text-faint)',fontSize:11,textTransform:'uppercase',letterSpacing:'.04em'}}>
             <th style={{padding:'5px 8px 5px 0'}}>Metric</th><th style={{padding:'5px 8px',textAlign:'right'}}>{lbl(cA)}</th><th style={{padding:'5px 8px',textAlign:'right'}}>{lbl(cB)}</th><th style={{padding:'5px 8px',textAlign:'right'}}>Δ</th></tr></thead>
           <tbody>{['Funnel stage','Traffic & behaviour','Device, geography & source','Checkout & payment','Commercial'].map(g=>(<React.Fragment key={g}>
-            <tr><td colSpan={4} style={{padding:'8px 0 3px',fontSize:10.5,textTransform:'uppercase',letterSpacing:'.05em',color:'#8B5CF6'}}>{g}</td></tr>
+            <tr><td colSpan={4} style={{padding:'8px 0 3px',fontSize:10.5,textTransform:'uppercase',letterSpacing:'.05em',color:PAL.accent}}>{g}</td></tr>
             {cmpRows.filter(r=>r.g===g).map(r=>{ const big=moverKeys.has(r.k); return (<tr key={r.k} style={{borderTop:'1px solid var(--border-subtle)',background:big?'rgba(139,92,246,0.06)':'transparent'}}>
-              <td style={{padding:'6px 8px 6px 8px',fontWeight:big?700:500,borderLeft:big?'2px solid #8B5CF6':'2px solid transparent'}}>{r.l}</td>
+              <td style={{padding:'6px 8px 6px 8px',fontWeight:big?700:500,borderLeft:big?`2px solid ${PAL.accent}`:'2px solid transparent'}}>{r.l}</td>
               <td style={{padding:'6px 8px',textAlign:'right',color:'var(--text-muted)'}}>{fmtVal(r.t,r.a)}</td>
               <td style={{padding:'6px 8px',textAlign:'right',fontWeight:big?700:500}}>{fmtVal(r.t,r.b)}</td>
-              <td style={{padding:'6px 8px',textAlign:'right',color:big?'#8B5CF6':'var(--text-faint)'}}>{dlt(r)}</td></tr>); })}
+              <td style={{padding:'6px 8px',textAlign:'right',color:big?PAL.accent:'var(--text-faint)'}}>{dlt(r)}</td></tr>); })}
           </React.Fragment>))}</tbody>
         </table></div>
 
         {Object.keys(cA.landing||{}).length>0 && (()=>{ const types=[...new Set([...Object.keys(cA.landing||{}),...Object.keys(cB.landing||{})])].sort((x,y)=>((cB.landing[y]||{}).share||0)-((cB.landing[x]||{}).share||0));
           return (<div style={{marginTop:14}}>
-            <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#8B5CF6',marginBottom:4}}>Landing pages — where they entered (share · CVR within type)</div>
+            <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:PAL.accent,marginBottom:4}}>Landing pages — where they entered (share · CVR within type)</div>
             <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:12.5}}>
               <thead><tr style={{textAlign:'left',color:'var(--text-faint)',fontSize:10.5,textTransform:'uppercase',letterSpacing:'.04em'}}><th style={{padding:'4px 8px 4px 0'}}>Type</th><th style={{padding:'4px 8px',textAlign:'right'}}>{lbl(cA)} share</th><th style={{padding:'4px 8px',textAlign:'right'}}>{lbl(cB)} share</th><th style={{padding:'4px 8px',textAlign:'right'}}>{lbl(cA)} CVR</th><th style={{padding:'4px 8px',textAlign:'right'}}>{lbl(cB)} CVR</th></tr></thead>
               <tbody>{types.map(t=>{ const A=cA.landing[t]||{}, B=cB.landing[t]||{}; const cg=(B.cvr||0)-(A.cvr||0); return (<tr key={t} style={{borderTop:'1px solid var(--border-subtle)'}}>
@@ -5509,27 +5593,27 @@ function CvrDrivers(){
                 <td style={{padding:'5px 8px',textAlign:'right',color:'var(--text-muted)'}}>{A.share!=null?A.share+'%':'—'}</td>
                 <td style={{padding:'5px 8px',textAlign:'right',color:'var(--text-muted)'}}>{B.share!=null?B.share+'%':'—'}</td>
                 <td style={{padding:'5px 8px',textAlign:'right',color:'var(--text-muted)'}}>{A.cvr!=null?A.cvr+'%':'—'}</td>
-                <td style={{padding:'5px 8px',textAlign:'right'}}><b>{B.cvr!=null?B.cvr+'%':'—'}</b> {A.cvr!=null&&B.cvr!=null&&<span style={{color:cg>=0?'#4ade80':'#ef6b6f',fontSize:11}}>{cg>=0?'+':''}{cg.toFixed(2)}</span>}</td></tr>); })}</tbody>
+                <td style={{padding:'5px 8px',textAlign:'right'}}><b>{B.cvr!=null?B.cvr+'%':'—'}</b> {A.cvr!=null&&B.cvr!=null&&<span style={{color:cg>=0?PAL.good:PAL.bad,fontSize:11}}>{cg>=0?'+':''}{cg.toFixed(2)}</span>}</td></tr>); })}</tbody>
             </table></div>
             <div style={{fontSize:11,color:'var(--text-faint)',marginTop:3}}>If the <b>share</b> is similar but <b>CVR moves inside every type</b>, the cause is site-wide (checkout/offer/tracking), not where people landed.</div>
           </div>); })()}
 
         {((cA.landTop||[]).length>0 || (cB.landTop||[]).length>0) && <div style={{marginTop:14}}>
-          <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#8B5CF6',marginBottom:4}}>Top landing pages — specific URLs (sessions · CVR)</div>
+          <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:PAL.accent,marginBottom:4}}>Top landing pages — specific URLs (sessions · CVR)</div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))',gap:16}}>
             {[[lbl(cA),cA.landTop||[]],[lbl(cB),cB.landTop||[]]].map((pair,i)=>(<div key={i}>
               <div style={{fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',marginBottom:2}}>{pair[0]}</div>
               {pair[1].length?pair[1].map(p=>(<div key={p.url} style={{display:'flex',justifyContent:'space-between',gap:8,padding:'4px 0',borderTop:'1px solid var(--border-subtle)',fontSize:12}}>
-                <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}} title={p.url}><span style={{color:'var(--text-primary)'}}>{p.url}</span>{p.oos&&<span style={{marginLeft:6,fontSize:9.5,fontWeight:700,color:'#ef6b6f',background:'rgba(239,107,111,0.15)',border:'1px solid rgba(239,107,111,0.4)',borderRadius:4,padding:'0 4px'}}>OOS</span>}</span>
-                <span style={{whiteSpace:'nowrap',color:'var(--text-muted)'}}>{NUM(p.sessions)} · <b style={{color:p.cvr>=1.5?'#4ade80':(p.cvr<0.4?'#ef6b6f':'var(--text-secondary)')}}>{p.cvr}%</b></span>
+                <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}} title={p.url}><span style={{color:'var(--text-primary)'}}>{p.url}</span>{p.oos&&<span style={{marginLeft:6,fontSize:9.5,fontWeight:700,color:PAL.bad,background:'rgba(239,107,111,0.15)',border:'1px solid rgba(239,107,111,0.4)',borderRadius:4,padding:'0 4px'}}>OOS</span>}</span>
+                <span style={{whiteSpace:'nowrap',color:'var(--text-muted)'}}>{NUM(p.sessions)} · <b style={{color:p.cvr>=1.5?PAL.good:(p.cvr<0.4?PAL.bad:'var(--text-secondary)')}}>{p.cvr}%</b></span>
               </div>)):<div style={{fontSize:12,color:'var(--text-muted)',padding:'4px 0'}}>—</div>}
             </div>))}
           </div>
-          <div style={{fontSize:11,color:'var(--text-faint)',marginTop:3}}>Watch for pages pulling big traffic at <b style={{color:'#ef6b6f'}}>near-zero CVR</b> — cold campaigns or <b style={{color:'#ef6b6f'}}>out-of-stock</b> PDPs leaking spend (e.g. an ad sending traffic to an OOS product). OOS = the product is currently out of stock.</div>
+          <div style={{fontSize:11,color:'var(--text-faint)',marginTop:3}}>Watch for pages pulling big traffic at <b style={{color:PAL.bad}}>near-zero CVR</b> — cold campaigns or <b style={{color:PAL.bad}}>out-of-stock</b> PDPs leaking spend (e.g. an ad sending traffic to an OOS product). OOS = the product is currently out of stock.</div>
         </div>}
 
         {((cA.topProducts||[]).length>0 || (cB.topProducts||[]).length>0) && <div style={{marginTop:14}}>
-          <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#8B5CF6',marginBottom:4}}>Top products purchased (web · units · % of units)</div>
+          <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:PAL.accent,marginBottom:4}}>Top products purchased (web · units · % of units)</div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:16}}>
             {[[lbl(cA),cA.topProducts||[]],[lbl(cB),cB.topProducts||[]]].map((pair,i)=>(<div key={i}>
               <div style={{fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',marginBottom:2}}>{pair[0]}</div>
@@ -5551,7 +5635,7 @@ function CvrDrivers(){
     <div className="card" style={{marginBottom:14}}>
       <div className="card-section-title"><h2 style={{margin:0}}>2 · Traffic mix, or the site itself?</h2>
         <span className="meta">controls the #1 confounder — a CVR move that's really just colder/warmer traffic</span></div>
-      <div className="note" style={{marginBottom:10}}>Of the <b>{M.deltaCVR>=0?'+':''}{M.deltaCVR}pp</b> change, <b style={{color:'#f5b544'}}>{M.mixEffect>=0?'+':''}{M.mixEffect}pp</b> is <b>traffic mix</b> (sending more/less of higher-converting channels) and <b style={{color:up?'#4ade80':'#ef6b6f'}}>{M.rateEffect>=0?'+':''}{M.rateEffect}pp</b> is <b>within-channel</b> (each channel converting differently). {mixDom?'So this is largely a mix shift — be careful calling it a site win.':<>So this is <b>real</b> — channels are genuinely converting {up?'better':'worse'}{channels.length&&Math.max(...channels.map(c=>c.shareNow-c.sharePrev))>3?', even against a rising paid-traffic share':''}.</>}</div>
+      <div className="note" style={{marginBottom:10}}>Of the <b>{M.deltaCVR>=0?'+':''}{M.deltaCVR}pp</b> change, <b style={{color:PAL.warn}}>{M.mixEffect>=0?'+':''}{M.mixEffect}pp</b> is <b>traffic mix</b> (sending more/less of higher-converting channels) and <b style={{color:up?PAL.good:PAL.bad}}>{M.rateEffect>=0?'+':''}{M.rateEffect}pp</b> is <b>within-channel</b> (each channel converting differently). {mixDom?'So this is largely a mix shift — be careful calling it a site win.':<>So this is <b>real</b> — channels are genuinely converting {up?'better':'worse'}{channels.length&&Math.max(...channels.map(c=>c.shareNow-c.sharePrev))>3?', even against a rising paid-traffic share':''}.</>}</div>
       <div style={{overflowX:'auto'}}>
       <table style={{width:'100%',borderCollapse:'collapse',fontSize:12.5}}>
         <thead><tr style={{textAlign:'left',color:'var(--text-faint)',fontSize:11,textTransform:'uppercase',letterSpacing:'.04em'}}>
@@ -5575,9 +5659,9 @@ function CvrDrivers(){
         <span className="meta">ranked by strength · green = moves with CVR, red = against · ⚑ = likely confounded by traffic mix</span></div>
       <div style={{marginTop:4}}>{drivers.map(d=>(<div key={d.key} style={{padding:'6px 0',borderTop:'1px solid var(--border-subtle)'}}>
         <div style={{display:'grid',gridTemplateColumns:'180px 1fr 118px',gap:10,alignItems:'center'}}>
-          <div style={{fontSize:12.5,fontWeight:600}}>{d.label}{d.confound&&<span title="moves with traffic mix — likely confounded" style={{marginLeft:5,fontSize:10,color:'#f5b544'}}>⚑</span>}</div>
+          <div style={{fontSize:12.5,fontWeight:600}}>{d.label}{d.confound&&<span title="moves with traffic mix — likely confounded" style={{marginLeft:5,fontSize:10,color:PAL.warn}}>⚑</span>}</div>
           {barCell(d)}
-          <div style={{fontSize:11.5,textAlign:'right'}}><b style={{color:d.dir==='up'?'#4ade80':'#ef6b6f'}}>{d.r>0?'+':''}{d.r.toFixed(2)}</b> <span style={{color:'var(--text-faint)'}}>n={d.n}{d.significant?'':' · ns'}</span></div>
+          <div style={{fontSize:11.5,textAlign:'right'}}><b style={{color:d.dir==='up'?PAL.good:PAL.bad}}>{d.r>0?'+':''}{d.r.toFixed(2)}</b> <span style={{color:'var(--text-faint)'}}>n={d.n}{d.significant?'':' · ns'}</span></div>
         </div>
         <div style={{fontSize:11,color:'var(--text-faint)',marginTop:2}}>{d.note}</div>
       </div>))}</div>
@@ -5586,31 +5670,31 @@ function CvrDrivers(){
 
     <div className="card" style={{marginTop:14}}>
       <div className="card-section-title"><h2 style={{margin:0}}>4 · Deeper signal <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>— what survives the confounds</span></h2>
-        <span className="meta">Pulse · partial correlations + an expected-CVR model{STAT.drivers[0]?` · n=${STAT.drivers[0].n} ${seriesDaily.length>=12?'days':'weeks'}`:''}</span></div>
+        <span className="meta">partial correlations + an expected-CVR model{STAT.drivers[0]?` · n=${STAT.drivers[0].n} ${seriesDaily.length>=12?'days':'weeks'}`:''}</span></div>
       {STAT.drivers.length>0 ? <>
-      <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#8B5CF6',marginBottom:6}}>Levers, mix-adjusted — independent link to CVR after holding new-visitor share constant</div>
+      <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:PAL.accent,marginBottom:6}}>Levers, mix-adjusted — independent link to CVR after holding new-visitor share constant</div>
       <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:12.5}}>
         <thead><tr style={{textAlign:'left',color:'var(--text-faint)',fontSize:10.5,textTransform:'uppercase',letterSpacing:'.04em'}}>
           <th style={{padding:'4px 8px 4px 0'}}>Lever</th><th style={{padding:'4px 8px',textAlign:'right'}}>Raw r</th><th style={{padding:'4px 8px',width:120}}>Mix-adjusted</th><th style={{padding:'4px 8px',textAlign:'right'}}>Adj r</th><th style={{padding:'4px 8px'}}></th></tr></thead>
-        <tbody>{STAT.drivers.map(d=>{ const w=Math.round(Math.min(Math.abs(d.adj),1)*46); const pos=d.adj>=0; const col=d.sig?(pos?'#4ade80':'#ef6b6f'):'var(--text-faint)';
+        <tbody>{STAT.drivers.map(d=>{ const w=Math.round(Math.min(Math.abs(d.adj),1)*46); const pos=d.adj>=0; const col=d.sig?(pos?PAL.good:PAL.bad):'var(--text-faint)';
           const collapsed=Math.abs(d.raw)>=0.12 && Math.abs(d.adj)<Math.abs(d.raw)*0.5;
           return (<tr key={d.k} style={{borderTop:'1px solid var(--border-subtle)'}}>
             <td style={{padding:'6px 8px 6px 0',fontWeight:600}}>{d.label}{!d.sig&&<span style={{color:'var(--text-faint)',fontWeight:400,fontSize:10.5}}> · ns</span>}</td>
             <td style={{padding:'6px 8px',textAlign:'right',color:'var(--text-faint)'}}>{d.raw>=0?'+':''}{d.raw.toFixed(2)}</td>
-            <td style={{padding:'6px 8px'}}><div style={{position:'relative',height:12,background:'var(--surface-2,#15151b)',borderRadius:3}}><div style={{position:'absolute',left:'50%',top:0,bottom:0,width:1,background:'#3a3a44'}}/><div style={{position:'absolute',top:2,bottom:2,borderRadius:2,background:col,left:(pos?50:(50-w))+'%',width:w+'%'}}/></div></td>
+            <td style={{padding:'6px 8px'}}><div style={{position:'relative',height:12,background:`var(--surface-2,${PAL.panel})`,borderRadius:3}}><div style={{position:'absolute',left:'50%',top:0,bottom:0,width:1,background:PAL.line}}/><div style={{position:'absolute',top:2,bottom:2,borderRadius:2,background:col,left:(pos?50:(50-w))+'%',width:w+'%'}}/></div></td>
             <td style={{padding:'6px 8px',textAlign:'right',fontWeight:700,color:col}}>{d.adj>=0?'+':''}{d.adj.toFixed(2)}</td>
-            <td style={{padding:'6px 8px',fontSize:10.5,color:collapsed?'#f5b544':'var(--text-faint)'}}>{collapsed?'mostly mix':(d.sig?'holds':'')}</td>
+            <td style={{padding:'6px 8px',fontSize:10.5,color:collapsed?PAL.warn:'var(--text-faint)'}}>{collapsed?'mostly mix':(d.sig?'holds':'')}</td>
           </tr>); })}</tbody>
       </table></div>
       <div className="note" style={{marginTop:8}}>Each lever's correlation with daily CVR <b>after partialling out new-visitor share</b> — the dominant traffic-mix confound (it alone correlates r≈−0.46 with CVR). Where the adjusted figure holds near the raw one, the signal is genuinely that lever; where it collapses toward 0 (<span style={{color:'#f5b544'}}>“mostly mix”</span>), the raw correlation was really just <i>who</i> visited. This is the honest read on what's actually moveable. “ns” = not significant at n shown.</div>
       </> : <div className="note">Not enough clean daily history yet to separate levers from traffic mix.</div>}
 
       {STAT.resid && <div style={{marginTop:16}}>
-        <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#8B5CF6',marginBottom:6}}>Unexplained CVR weeks — actual vs an expected-CVR model</div>
+        <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:PAL.accent,marginBottom:6}}>Unexplained CVR weeks — actual vs an expected-CVR model</div>
         {STAT.resid.list.length? <div style={{display:'flex',flexDirection:'column',gap:6}}>{STAT.resid.list.map(r=>{ const pos=r.e>=0;
-          return (<div key={r.w} style={{display:'flex',justifyContent:'space-between',gap:10,padding:'6px 10px',borderRadius:8,background:'var(--surface-1,#111116)',border:'1px solid var(--border-subtle)'}}>
+          return (<div key={r.w} style={{display:'flex',justifyContent:'space-between',gap:10,padding:'6px 10px',borderRadius:8,background:`var(--surface-1,${PAL.panel})`,border:'1px solid var(--border-subtle)'}}>
             <span><b>{fmtWk(r.w)}</b> <span style={{color:'var(--text-faint)'}}>actual {r.act.toFixed(2)}% vs expected {r.exp.toFixed(2)}%</span></span>
-            <span style={{fontWeight:700,color:pos?'#4ade80':'#ef6b6f'}}>{pos?'+':''}{r.e.toFixed(2)}pp unexplained</span>
+            <span style={{fontWeight:700,color:pos?PAL.good:PAL.bad}}>{pos?'+':''}{r.e.toFixed(2)}pp unexplained</span>
           </div>); })}</div>
           : <div className="note">No week deviates much from the model — over this window CVR is well-explained by traffic mix + discount, so there's no off-model anomaly to chase.</div>}
         <div className="note" style={{marginTop:8}}>Expected CVR is modelled from new-visitor share (how cold the week's traffic was); big residuals are weeks where <b>something other than traffic warmth</b> moved CVR — a site change, a tracking break, a one-off promo — i.e. the genuine “investigate this” list, already stripped of the mix confound. Click a flagged week on the chart above to compare it.</div>
@@ -5682,7 +5766,7 @@ const BRUSH_HINT = 'Drag the slider below to scroll · drag its handles to zoom 
 // drag a handle to zoom the date range. Must be a direct child of the chart.
 function brushProps(key, fmt){
   return { dataKey:key, height:24, travellerWidth:9, gap:1,
-           stroke:'var(--accent)', fill:'var(--bg-app)', tickFormatter:fmt };
+           stroke:PAL.accent, fill:PAL.surface, tickFormatter:fmt };
 }
 
 function ProductSignal(){
@@ -5692,7 +5776,7 @@ function ProductSignal(){
   const [lens,setLens] = useState('desire');   // Y-axis lens: desirability ↔ completion
   const [showAll,setShowAll] = useState(false); // ranked lists: top 3 ↔ up to 10
 
-  const COL={star:'#6ee7b7',gem:'#8B5CF6',dud:'#f87171',dead:'#6f6f7b',oos:'#f59e0b'};
+  const COL={star:PAL.good,gem:PAL.accent,dud:PAL.bad,dead:PAL.muted,oos:PAL.warn};
   const LBL={star:'Star',gem:'Hidden gem',dud:'Dud',dead:'Dead weight',oos:'Out of stock'};
   // Two lenses, same quadrant: Y = desire (view→cart) or completion (cart→purchase).
   // Plotting completion while keeping the desire-based colours makes the leak visible —
@@ -5706,7 +5790,7 @@ function ProductSignal(){
   const xMax = allPts.length ? Math.max(...allPts.map(p=>p.x)) : 100;
   const yMax = allPts.length ? Math.max(...allPts.map(p=>p.y)) : 100;
   const z = useChartZoom(0, +((xMax*1.08)||1).toFixed(2), 0, +((yMax*1.12)||1).toFixed(2));
-  const lensBtn=(id)=>(<button key={id} onClick={()=>setLens(id)} style={{fontSize:11.5,fontWeight:600,padding:'3px 11px',borderRadius:7,cursor:'pointer',border:'1px solid '+(lens===id?'#8B5CF6':'var(--border-subtle)'),background:lens===id?'rgba(139,92,246,0.14)':'transparent',color:lens===id?'#8B5CF6':'var(--text-muted)'}}>{LENS[id].short}</button>);
+  const lensBtn=(id)=>(<button key={id} onClick={()=>setLens(id)} style={{fontSize:11.5,fontWeight:600,padding:'3px 11px',borderRadius:7,cursor:'pointer',border:'1px solid '+(lens===id?PAL.accent:'var(--border-subtle)'),background:lens===id?'rgba(139,92,246,0.14)':'transparent',color:lens===id?PAL.accent:'var(--text-muted)'}}>{LENS[id].short}</button>);
 
   const oppRow = (p,accent) => (<div key={p.name} style={{display:'flex',gap:10,alignItems:'baseline',padding:'7px 0',borderTop:'1px solid var(--border-subtle)'}}>
     <span style={{width:7,height:7,borderRadius:'50%',background:accent,flexShrink:0,alignSelf:'center'}}/>
@@ -5740,7 +5824,7 @@ function ProductSignal(){
     <div className="card" style={{marginBottom:14}}>
       <div className="card-section-title">
         <h2 style={{margin:0}}>Product signals <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>— where each product leaks in the funnel</span></h2>
-        <span className="meta">Pulse · {gems.length} unseen gems · {pdpFix.length} PDP problems · {checkoutFix.length} checkout leaks · {restock.length} OOS in demand · view→cart = desire, cart→buy = completion</span>
+        <span className="meta">{gems.length} unseen gems · {pdpFix.length} PDP problems · {checkoutFix.length} checkout leaks · {restock.length} OOS in demand · view→cart = desire, cart→buy = completion</span>
       </div>
       <div style={{display:'flex',alignItems:'center',gap:8,margin:'2px 0 6px'}}>
         <span style={{fontSize:11,color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'.04em'}}>Y axis</span>
@@ -5751,12 +5835,12 @@ function ProductSignal(){
       <ZoomControls z={z}/>
       <R.ResponsiveContainer width="100%" height={300}>
         <R.ScatterChart margin={{top:10,right:20,left:10,bottom:24}}>
-          <R.CartesianGrid stroke="#1f1f27"/>
-          <R.XAxis type="number" dataKey="x" name="Visibility" unit="%" domain={[z.view[0],z.view[1]]} allowDataOverflow tickFormatter={niceTick} tick={{fill:'#7e7e8a',fontSize:11}} label={{value:'Visibility — % of all product views', position:'insideBottom', offset:-12, fill:'#6f6f7b', fontSize:11}}/>
-          <R.YAxis type="number" dataKey="y" name={L.short} unit="%" domain={[z.view[2],z.view[3]]} allowDataOverflow tickFormatter={niceTick} tick={{fill:'#7e7e8a',fontSize:11}} label={{value:L.label, angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
+          <R.CartesianGrid stroke={PAL.panel}/>
+          <R.XAxis type="number" dataKey="x" name="Visibility" unit="%" domain={[z.view[0],z.view[1]]} allowDataOverflow tickFormatter={niceTick} tick={{fill:PAL.muted,fontSize:11}} label={{value:'Visibility — % of all product views', position:'insideBottom', offset:-12, fill:PAL.muted, fontSize:11}}/>
+          <R.YAxis type="number" dataKey="y" name={L.short} unit="%" domain={[z.view[2],z.view[3]]} allowDataOverflow tickFormatter={niceTick} tick={{fill:PAL.muted,fontSize:11}} label={{value:L.label, angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:11}}/>
           <R.ZAxis type="number" dataKey="z" range={[25,320]} name="views"/>
-          <R.ReferenceLine x={medPct} stroke="#3a3a44" strokeDasharray="4 3"/>
-          <R.ReferenceLine y={+(L.ref*100).toFixed(1)} stroke="#3a3a44" strokeDasharray="4 3"/>
+          <R.ReferenceLine x={medPct} stroke={PAL.line} strokeDasharray="4 3"/>
+          <R.ReferenceLine y={+(L.ref*100).toFixed(1)} stroke={PAL.line} strokeDasharray="4 3"/>
           <R.Tooltip cursor={{strokeDasharray:'3 3'}} content={({payload})=>{ const p=payload&&payload[0]&&payload[0].payload; return p?(<div style={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:8,padding:'7px 10px',fontSize:12,boxShadow:'var(--shadow-md)'}}><b>{p.name}</b><br/>{NUM(p.z)} views · {p.x}% of views<br/>view→cart {p.d}% · cart→buy {p.c}%</div>):null; }}/>
           <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}}/>
           {series.map(s=> s.data.length>0 && <R.Scatter key={s.k} name={LBL[s.k]} data={s.data} fill={COL[s.k]} fillOpacity={0.75}/>)}
@@ -5769,15 +5853,15 @@ function ProductSignal(){
         : <>Top-left = wanted but unseen (merchandise) · top-right = stars · bottom-right = seen but unwanted (fix/stop). Dashed lines = site median visibility &amp; average view→cart.</>}</div>
       <div style={{fontSize:11.5,color:'var(--text-muted)',margin:'2px 0 10px',lineHeight:1.5}}>The <b style={{color:'var(--good)'}}>{`~${curSym()}/mo in green`}</b> is the <b>opportunity size</b> — estimated extra <b>gross profit per month</b> if this product closed the gap to the site's average funnel (for out-of-stock, the demand missed while it's unavailable). Margin-weighted at {PCT(gm)}{` and scaled to a month — a ceiling worth chasing, not a guaranteed gain. Only products worth ≥ ${curSym()}50/mo are listed.`}</div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(250px,1fr))',gap:16}}>
-        {oppCol('Unseen — visibility problem','#8B5CF6',gems,'None — visibility matches desire.')}
-        {oppCol('Browsed, not wanted — PDP problem','#f87171',pdpFix,'None flagged.')}
-        {oppCol('Wanted, not bought — checkout leak','#fbbf24',checkoutFix,'None — carts close at the site rate.')}
-        {oppCol('Restock — in demand, out of stock','#f59e0b',restock,'None.')}
+        {oppCol('Unseen — visibility problem',PAL.accent,gems,'None — visibility matches desire.')}
+        {oppCol('Browsed, not wanted — PDP problem',PAL.bad,pdpFix,'None flagged.')}
+        {oppCol('Wanted, not bought — checkout leak',PAL.warn,checkoutFix,'None — carts close at the site rate.')}
+        {oppCol('Restock — in demand, out of stock',PAL.warn,restock,'None.')}
       </div>
       {moreAvail && <div style={{marginTop:12,textAlign:'center'}}>
-        <button onClick={()=>setShowAll(!showAll)} style={{fontSize:12,fontWeight:600,padding:'6px 16px',borderRadius:8,cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'#8B5CF6'}}>{showAll?'Show fewer':`Show more — ${totalOpps} opportunities ≥ ${curSym()}50/mo`}</button>
+        <button onClick={()=>setShowAll(!showAll)} style={{fontSize:12,fontWeight:600,padding:'6px 16px',borderRadius:8,cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:PAL.accent}}>{showAll?'Show fewer':`Show more — ${totalOpps} opportunities ≥ ${curSym()}50/mo`}</button>
       </div>}
-      <div className="note" style={{marginTop:12}}>The full funnel, per product: <b>% of views = visibility</b>, <b>view→cart = desire</b> (do they want it once seen), <b>cart→purchase = completion</b> (do they close once they want it). Splitting the last two is the depth — a low-converting SKU is now diagnosed as either <b style={{color:'#f87171'}}>browsed-not-wanted</b> (fix the PDP/product) or <b style={{color:'#fbbf24'}}>wanted-not-bought</b>{` (fix price/shipping/trust/variant at checkout) — opposite fixes. Out-of-stock SKUs are separated (they can't convert); ${curSym()} is margin-weighted at `}{PCT(gm)}, scaled to /month. GA4 item-scoped ({META.products||PR.length} products) × Shopify price/stock.</div>
+      <div className="note" style={{marginTop:12}}>The full funnel, per product: <b>% of views = visibility</b>, <b>view→cart = desire</b> (do they want it once seen), <b>cart→purchase = completion</b> (do they close once they want it). Splitting the last two is the depth — a low-converting SKU is now diagnosed as either <b style={{color:PAL.bad}}>browsed-not-wanted</b> (fix the PDP/product) or <b style={{color:PAL.warn}}>wanted-not-bought</b>{` (fix price/shipping/trust/variant at checkout) — opposite fixes. Out-of-stock SKUs are separated (they can't convert); ${curSym()} is margin-weighted at `}{PCT(gm)}, scaled to /month. GA4 item-scoped ({META.products||PR.length} products) × Shopify price/stock.</div>
     </div>
   );
 }
@@ -5788,10 +5872,10 @@ function ProductSignal(){
 // MARKETING codes from SERVICE/goodwill codes (replacements, resends) that are £0-
 // revenue cost, not promotion. From Shopify order-level discount_codes over time.
 const DC_PATTERN = {
-  'always-on': {label:'Always-on', color:'#f59e0b', note:'runs constantly — structural margin'},
-  'recurring': {label:'Recurring', color:'#8B5CF6', note:'on & off over time'},
-  'spike':     {label:'Spike',     color:'#4ade80', note:'short campaign burst'},
-  'one-off':   {label:'One-off',   color:'#9aa0aa', note:'single day'},
+  'always-on': {label:'Always-on', color:PAL.warn, note:'runs constantly — structural margin'},
+  'recurring': {label:'Recurring', color:PAL.accent, note:'on & off over time'},
+  'spike':     {label:'Spike',     color:PAL.good, note:'short campaign burst'},
+  'one-off':   {label:'One-off',   color:PAL.muted, note:'single day'},
 };
 function fmtWk(iso){ const d=new Date(iso+'T00:00:00Z'); return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',timeZone:'UTC'}); }
 
@@ -5805,7 +5889,7 @@ function DCSpark({series, axis, color}){
   return (<svg width={W} height={H} style={{display:'block'}}>
     {vals.map((v,i)=>{ const h=v?Math.max(2,v/max*H):0; return (
       <rect key={i} x={i*(bw+gap)} y={H-h} width={bw} height={h} rx={0.6}
-        fill={v?color:'#26262e'} opacity={v?0.9:1}/> ); })}
+        fill={svgCol(v?color:PAL.panel)} opacity={v?0.9:1}/> ); })}
   </svg>);
 }
 
@@ -5823,16 +5907,16 @@ function DiscountCodeTracker(){
   const leak = M.alwaysOnLeak;
 
   // Palette for the stacked chart — top codes get distinct hues, Other grey, Service red.
-  const HUES = ['#f59e0b','#8B5CF6','#4ade80','#f472b6','#38bdf8','#c084fc'];
+  const HUES = [PAL.warn,PAL.accent,PAL.good,PAL.data4,PAL.data3,PAL.accent];
   const top = (M.topCodes||[]).map((c,i)=>({code:c, color:HUES[i%HUES.length]}));
-  const stackKeys = [...top, {code:'Other', color:'#3a3a44'}, {code:'Service', color:'#ef6b6f'}];
+  const stackKeys = [...top, {code:'Other', color:PAL.line}, {code:'Service', color:PAL.bad}];
   const weekly = DATA.weekly||[];
 
   const Badge = ({p}) => { const m=DC_PATTERN[p]||DC_PATTERN['recurring'];
     return <span style={{fontSize:10.5,fontWeight:650,letterSpacing:'.02em',color:m.color,
       background:m.color+'1f',border:'1px solid '+m.color+'40',padding:'1px 7px',borderRadius:999}}>{m.label}</span>; };
 
-  const tile = (label,val,sub,accent) => (<div style={{flex:'1 1 180px',background:'var(--surface-1,#111116)',border:'1px solid var(--border-subtle,#23232b)',borderRadius:12,padding:'12px 14px'}}>
+  const tile = (label,val,sub,accent) => (<div style={{flex:'1 1 180px',background:`var(--surface-1,${PAL.panel})`,border:`1px solid var(--border-subtle,${PAL.panel})`,borderRadius:12,padding:'12px 14px'}}>
     <div style={{fontSize:11,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-faint)'}}>{label}</div>
     <div style={{fontSize:22,fontWeight:700,marginTop:3,color:accent||'var(--text-primary)'}}>{val}</div>
     <div style={{fontSize:11.5,color:'var(--text-muted)',marginTop:2}}>{sub}</div>
@@ -5843,15 +5927,15 @@ function DiscountCodeTracker(){
       <div className="card" style={{marginBottom:14}}>
         <div className="card-section-title">
           <h2 style={{margin:0}}>Affiliate & discount codes <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>— over time</span></h2>
-          <span className="meta">Atlas · {Math.round((M.codedShare||0)*100)}% of orders use a code · spike vs constant · codes + automatic + markdowns · last {M.weeks||26}w · draft/exchange orders excluded</span>
+          <span className="meta">{Math.round((M.codedShare||0)*100)}% of orders use a code · spike vs constant · codes + automatic + markdowns · last {M.weeks||26}w · draft/exchange orders excluded</span>
         </div>
 
         <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:14}}>
           {tile('Full-price orders', Math.round((M.fullPriceShare||0)*100)+'%', `${NUM(M.fullPriceOrders)} orders · ${GBP(M.fullPriceRevenue)} (${Math.round((M.fullPriceRevenueShare||0)*100)}% of revenue)`, 'var(--good)')}
           {tile('Orders with a discount', Math.round((1-(M.fullPriceShare||0))*100)+'%', `${NUM(M.discountedOrders)} orders · ${GBP(M.discountedRevenue)} revenue`)}
-          {tile('Marketing discount', GBP(M.marketingDiscount), `${mkt.length} promo / affiliate codes`, '#8B5CF6')}
+          {tile('Marketing discount', GBP(M.marketingDiscount), `${mkt.length} promo / affiliate codes`, PAL.accent)}
           {tile('Draft orders excluded', String(M.draftOrdersExcluded||0), `exchanges/replacements · ${GBP(M.draftDiscountExcluded)} internal credits not counted as discount`, 'var(--text-muted)')}
-          {tile('Always-on codes', String(M.alwaysOnCount||0), leak?`${leak.code} = ${GBP(leak.discount)} given away`:'—', '#f59e0b')}
+          {tile('Always-on codes', String(M.alwaysOnCount||0), leak?`${leak.code} = ${GBP(leak.discount)} given away`:'—', PAL.warn)}
         </div>
 
         {(()=>{ const td=(M.marketingDiscount||0)+(M.automaticDiscount||0);
@@ -5866,26 +5950,26 @@ function DiscountCodeTracker(){
           ); })()}
 
         {(M.markdownEstimate>0 || M.automaticDiscount>0) && <div style={{background:'rgba(245,181,68,0.06)',border:'1px solid rgba(245,181,68,0.3)',borderRadius:12,padding:'11px 14px',marginBottom:14}}>
-          <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'#f5b544',fontWeight:700,marginBottom:5}}>{`Discounts beyond codes — not in the ${curSym()} above`}</div>
+          <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:PAL.warn,fontWeight:700,marginBottom:5}}>{`Discounts beyond codes — not in the ${curSym()} above`}</div>
           <div style={{display:'flex',gap:20,flexWrap:'wrap',fontSize:12.5,color:'var(--text-secondary)'}}>
             <div style={{flex:'1 1 240px'}}><b>Automatic (no code):</b> {GBP(M.automaticDiscount)} on {NUM(M.automaticOrders)} orders <span style={{color:'var(--text-faint)'}}>— in Shopify's discount totals, just not tied to a code.</span></div>
-            <div style={{flex:'1 1 320px'}}><b style={{color:'#ef6b6f'}}>Sale-price markdowns:</b> ~{GBP(M.markdownEstimate)} est. ({Math.round((M.markdownShareOfValue||0)*100)}% of sold value) · <b>{M.catalogOnSale}/{M.catalogActive}</b> of catalog on sale at ~{M.avgMarkdownPct}% off. <span style={{color:'var(--text-faint)'}}>Compare-at markdowns never enter Shopify's <code>total_discounts</code>{`, so they're invisible to the code/automatic figures — this is the true site-wide discount the ${curSym()} above misses. Estimated from web line-items × current compare-at price.`}</span></div>
+            <div style={{flex:'1 1 320px'}}><b style={{color:PAL.bad}}>Sale-price markdowns:</b> ~{GBP(M.markdownEstimate)} est. ({Math.round((M.markdownShareOfValue||0)*100)}% of sold value) · <b>{M.catalogOnSale}/{M.catalogActive}</b> of catalog on sale at ~{M.avgMarkdownPct}% off. <span style={{color:'var(--text-faint)'}}>Compare-at markdowns never enter Shopify's <code>total_discounts</code>{`, so they're invisible to the code/automatic figures — this is the true site-wide discount the ${curSym()} above misses. Estimated from web line-items × current compare-at price.`}</span></div>
           </div>
         </div>}
 
         <R.ResponsiveContainer width="100%" height={280}>
           <R.BarChart data={weekly} margin={{top:6,right:16,left:6,bottom:22}}>
-            <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
-            <R.XAxis dataKey="w" tickFormatter={fmtWk} tick={{fill:'#7e7e8a',fontSize:10.5}} interval={Math.ceil(axis.length/9)} tickMargin={8}
-              label={{value:'Week', position:'insideBottom', offset:-10, fill:'#6f6f7b', fontSize:11}}/>
-            <R.YAxis allowDecimals={false} tick={{fill:'#7e7e8a',fontSize:11}} label={{value:'Orders with a code', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
+            <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
+            <R.XAxis dataKey="w" tickFormatter={fmtWk} tick={{fill:PAL.muted,fontSize:10.5}} interval={Math.ceil(axis.length/9)} tickMargin={8}
+              label={{value:'Week', position:'insideBottom', offset:-10, fill:PAL.muted, fontSize:11}}/>
+            <R.YAxis allowDecimals={false} tick={{fill:PAL.muted,fontSize:11}} label={{value:'Orders with a code', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:11}}/>
             <R.Tooltip cursor={{fill:'rgba(139,92,246,0.06)'}} contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,fontSize:12}}
               labelFormatter={w=>'Week of '+fmtWk(w)} itemSorter={it=>-it.value}/>
             <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:11.5, paddingBottom:8}}/>
-            {stackKeys.map(k=> <R.Bar key={k.code} dataKey={k.code} stackId="a" fill={k.color} maxBarSize={26}/>) }
+            {stackKeys.map(k=> <R.Bar key={k.code} dataKey={k.code} stackId="a" fill={svgCol(k.color)} maxBarSize={26}/>) }
           </R.BarChart>
         </R.ResponsiveContainer>
-        <div style={{fontSize:11,color:'var(--text-faint)',margin:'2px 0 4px'}}>A steady band every week = an <b style={{color:'#f59e0b'}}>always-on</b> code (structural discount). A tall single-week bar = a <b style={{color:'#4ade80'}}>spike</b> (sale/launch). <span style={{color:'#ef6b6f'}}>Service</span> = goodwill codes (replacement/resend), shown for context — not promotion.</div>
+        <div style={{fontSize:11,color:'var(--text-faint)',margin:'2px 0 4px'}}>A steady band every week = an <b style={{color:PAL.warn}}>always-on</b> code (structural discount). A tall single-week bar = a <b style={{color:PAL.good}}>spike</b> (sale/launch). <span style={{color:PAL.bad}}>Service</span> = goodwill codes (replacement/resend), shown for context — not promotion.</div>
         <ChartFooter ask="From discount-code usage over time, which codes are always-on structural margin give-away vs one-off campaign spikes, and where should I tighten?"/>
       </div>
       <ConfigurableChart
@@ -5909,12 +5993,12 @@ function DiscountCodeTracker(){
             {tableMkt.map(c=>{ const m=DC_PATTERN[c.pattern]||DC_PATTERN['recurring'];
               return (<tr key={c.code} style={{borderTop:'1px solid var(--border-subtle)'}}>
               <td style={{padding:'8px 8px 8px 0',fontWeight:600,color:'var(--text-primary)'}}>{c.code}
-                {c.discountRate>=0.22 && <span title="heavy discount" style={{marginLeft:6,color:'#f59e0b',fontSize:11}}>⚠ deep</span>}</td>
+                {c.discountRate>=0.22 && <span title="heavy discount" style={{marginLeft:6,color:PAL.warn,fontSize:11}}>⚠ deep</span>}</td>
               <td style={{padding:'8px'}}><Badge p={c.pattern}/></td>
               <td style={{padding:'6px 8px'}}><DCSpark series={c.series} axis={axis} color={m.color}/></td>
               <td style={{padding:'8px',textAlign:'right'}}>{NUM(c.orders)}</td>
               <td style={{padding:'8px',textAlign:'right'}}>{GBP(c.revenue)}</td>
-              <td style={{padding:'8px',textAlign:'right',color:'#ef6b6f'}}>{GBP(c.discount)}</td>
+              <td style={{padding:'8px',textAlign:'right',color:PAL.bad}}>{GBP(c.discount)}</td>
               <td style={{padding:'8px',textAlign:'right'}}>{Math.round(c.discountRate*100)}%</td>
               <td style={{padding:'8px',whiteSpace:'nowrap',color:'var(--text-muted)',fontSize:11.5}}>{fmtWk(c.firstSeen)} → {fmtWk(c.lastSeen)}{c.recent?'':' · ended'}</td>
             </tr>); })}
@@ -6111,8 +6195,8 @@ function RestockAlertsPanel(){
       </button>}
       <div className="note" style={{marginTop:14}}>
         {data.nowCount+data.soonCount>0
-          ? <><b>Atlas read:</b> <b>{GBP(data.atRiskMonthly)}/mo</b> of revenue rides on {data.nowCount+data.soonCount} best-sellers you need to reorder within the week to land before they run out. {top ? <>Biggest: <b>{top.title}</b> — {reorderByLabel(top.slack).overdue?'order today':`order by ${reorderByLabel(top.slack).txt}`} or lose <b>{GBP(top.monthlyRev)}/mo</b> ({top.leadDays}d lead). </> : null}Place these before chasing new-SKU launches. Adjust lead times above if these don't match your suppliers.</>
-          : <><b>Atlas read:</b> no good sellers need an order placed right now — the watch list shows the next ones so you stay ahead of a stock-out.</>}
+          ? <><b>Greta's read:</b> <b>{GBP(data.atRiskMonthly)}/mo</b> of revenue rides on {data.nowCount+data.soonCount} best-sellers you need to reorder within the week to land before they run out. {top ? <>Biggest: <b>{top.title}</b> — {reorderByLabel(top.slack).overdue?'order today':`order by ${reorderByLabel(top.slack).txt}`} or lose <b>{GBP(top.monthlyRev)}/mo</b> ({top.leadDays}d lead). </> : null}Place these before chasing new-SKU launches. Adjust lead times above if these don't match your suppliers.</>
+          : <><b>Greta's read:</b> no good sellers need an order placed right now — the watch list shows the next ones so you stay ahead of a stock-out.</>}
       </div>
     </div>
   );
@@ -6159,7 +6243,7 @@ function Products(){
         <CollectionsPanel/>
         {returnHotspots.length>0&&(<div className="card" style={{marginBottom:14}}>
           <h2>Return-rate hotspots</h2>
-          <div className="muted" style={{marginBottom:8}}>SKUs returning ≥10% of units sold — likely sizing/quality/expectation issues per Lux's read.</div>
+          <div className="muted" style={{marginBottom:8}}>SKUs returning ≥10% of units sold — likely sizing/quality/expectation issues.</div>
           <table><thead><tr><th>Product</th><th>Sold</th><th>Returns</th><th>Rate</th></tr></thead><tbody>
             {returnHotspots.map((p,i)=>(<tr key={i}><td>{p.title}</td><td>{p.units}</td><td>{p.returns}</td><td><span className="pill red">{PCT(p.returnRate)}</span></td></tr>))}
           </tbody></table>
@@ -6210,7 +6294,7 @@ function Organic(){
   const isPaid=n=>/^Paid/.test(n);
   const paidRev=ch.filter(c=>isPaid(c.channel)).reduce((a,c)=>a+(c.revenue||0),0);
   const orgRev=total-paidRev;
-  const palette=['#5b8def','#c084fc','#4ade80','#fbbf24','#38bdf8','#f87171','#a3a3a3','#34d399','#fb923c','#818cf8','#6ee7b7','#fcd34d'];
+  const palette=[PAL.data3,PAL.accent,PAL.good,PAL.warn,PAL.data3,PAL.bad,'#a3a3a3',PAL.good,PAL.warn,'#818cf8',PAL.good,PAL.warn];
   const pieData=sortedCh.map((c,i)=>({name:c.channel,value:c.revenue||0,fill:palette[i%palette.length]}));
   return (
     <div>
@@ -6234,7 +6318,7 @@ function Organic(){
           <R.ResponsiveContainer width="100%" height={280}>
             <R.PieChart>
               <R.Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={100} paddingAngle={1}>
-                {pieData.map((p,i)=><R.Cell key={i} fill={p.fill}/>)}
+                {pieData.map((p,i)=><R.Cell key={i} fill={svgCol(p.fill)}/>)}
               </R.Pie>
               <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} formatter={v=>GBP(v)} />
             </R.PieChart>
@@ -6270,28 +6354,28 @@ function EmailAttributionPanel(){
     ? gap / a.grossFlowRevenue_90d_klaviyo_tracked
     : 0;
   return (
-    <div className="card" style={{marginBottom:14, borderLeft:'3px solid #4ade80'}}>
+    <div className="card" style={{marginBottom:14, borderLeft:`3px solid ${PAL.good}`}}>
       <h2>True email attribution (Klaviyo Attributed report types)</h2>
       <div className="muted" style={{marginBottom:10,fontSize:12}}>
         Pulled from <code>MetricExportAttributedFlow</code> + <code>MetricExportAttributedCampaign</code>. These are TRUE email-attributed orders within Klaviyo's attribution window (default: 5 days post-click). <b>This is the correct figure for "email channel revenue contribution".</b> The previous "gross Klaviyo-tracked" was every Shopify order Klaviyo's profiles touched — including orders the customer would have made anyway. {a.interpretation}
       </div>
       <div className="row" style={{marginBottom:10}}>
-        <div className="card kpi" style={{borderLeft:'3px solid #4ade80'}}>
+        <div className="card kpi" style={{borderLeft:`3px solid ${PAL.good}`}}>
           <div className="label">Attributed flow rev (90d)</div>
           <div className="val">{GBP(a.attributedFlowRevenue_90d)}</div>
           <div className="sub">{a.attributedFlowOrders_90d} orders directly attributable to email flows</div>
         </div>
-        <div className="card kpi" style={{borderLeft:'3px solid #5b8def'}}>
+        <div className="card kpi" style={{borderLeft:`3px solid ${PAL.data3}`}}>
           <div className="label">Attributed campaign rev (30d)</div>
           <div className="val">{GBP(a.attributedCampaignRevenue_30d)}</div>
           <div className="sub">{a.attributedCampaignOrders_30d} orders directly attributable to campaign sends</div>
         </div>
-        <div className="card kpi" style={{borderLeft: Math.abs(gapPct) > 0.3 ? '3px solid #fbbf24' : '3px solid #4ade80'}}>
+        <div className="card kpi" style={{borderLeft: Math.abs(gapPct) > 0.3 ? `3px solid ${PAL.warn}` : `3px solid ${PAL.good}`}}>
           <div className="label">Flow attribution gap</div>
           <div className="val">{GBP(gap)}</div>
           <div className="sub">{`vs gross tracked ${curSym()}`}{NUM(a.grossFlowRevenue_90d_klaviyo_tracked)} ({(gapPct*100).toFixed(0)}% gap)</div>
         </div>
-        <div className="card kpi" style={{borderLeft:'3px solid #c084fc'}}>
+        <div className="card kpi" style={{borderLeft:`3px solid ${PAL.accent}`}}>
           <div className="label">Attribution window</div>
           <div className="val" style={{fontSize:14,lineHeight:1.3}}>5d post-click</div>
           <div className="sub">Klaviyo default. Cross-channel attribution overlap is the residual.</div>
@@ -6322,7 +6406,7 @@ function EmailAttributionPanel(){
           <div className="muted" style={{fontSize:11, marginTop:6}}>Showing top {Math.min(15, campaigns30.length)} of {campaigns30.length} attributed campaigns.</div>
         </div>
       </div>
-      {DEMO && <div className="note" style={{marginTop:14}}><b>Atlas read:</b>{` for frkl, the gross-vs-attributed flow gap is ~${curSym()}`}{Math.abs(gap)} ({(gapPct*100).toFixed(0)}{`%) — Klaviyo's flow tracking is precise. So the ${curSym()}28k flow revenue claim that drives the "flows = 19× lift over campaigns" finding holds up. The Welcome Flow alone attributes ${curSym()}`}{NUM(flows[0]?.orderValue)} from {flows[0]?.orders} orders over 90d — the highest-leverage owned-audience surface frkl has.</div>}
+      {DEMO && <div className="note" style={{marginTop:14}}><b>Greta's read:</b>{` for frkl, the gross-vs-attributed flow gap is ~${curSym()}`}{Math.abs(gap)} ({(gapPct*100).toFixed(0)}{`%) — Klaviyo's flow tracking is precise. So the ${curSym()}28k flow revenue claim that drives the "flows = 19× lift over campaigns" finding holds up. The Welcome Flow alone attributes ${curSym()}`}{NUM(flows[0]?.orderValue)} from {flows[0]?.orders} orders over 90d — the highest-leverage owned-audience surface frkl has.</div>}
     </div>
   );
 }
@@ -6378,28 +6462,28 @@ function EmailHealthPanel(){
   const presentCount = flowChecklist.filter(f => f.present).length;
 
   return (
-    <div className="card" style={{marginBottom:14, borderLeft:'3px solid #c084fc'}}>
+    <div className="card" style={{marginBottom:14, borderLeft:`3px solid ${PAL.accent}`}}>
       <h2>Email programme health + flow gap audit</h2>
       <div className="muted" style={{marginBottom:10, fontSize:12}}>
-        Lux audit of deliverability signals, list growth, and flow coverage vs DTC best-practice inventory.
+        Audit of deliverability signals, list growth, and flow coverage vs DTC best-practice inventory.
       </div>
       <div className="row" style={{marginBottom:10}}>
-        <div className="card kpi" style={{borderLeft: mppFlag ? '3px solid #fbbf24' : '3px solid #4ade80'}}>
-          <div className="label">Open rates {mppFlag && <span style={{color:'#fbbf24',fontSize:10}}>⚠ MPP inflated</span>}</div>
+        <div className="card kpi" style={{borderLeft: mppFlag ? `3px solid ${PAL.warn}` : `3px solid ${PAL.good}`}}>
+          <div className="label">Open rates {mppFlag && <span style={{color:PAL.warn,fontSize:10}}>⚠ MPP inflated</span>}</div>
           <div className="val">{(campOpenW*100).toFixed(0)}% / {(flowOpenW*100).toFixed(0)}%</div>
           <div className="sub">campaigns / flows. {mppFlag ? 'Apple Mail Privacy Protection auto-fetches emails since iOS 15 — anything >50% is inflated. Click rate is the true engagement signal.' : 'Open rates look natural.'}</div>
         </div>
-        <div className="card kpi" style={{borderLeft:'3px solid #5b8def'}}>
+        <div className="card kpi" style={{borderLeft:`3px solid ${PAL.data3}`}}>
           <div className="label">Click rates (truth)</div>
           <div className="val">{(campClickW*100).toFixed(1)}% / {(flowClickW*100).toFixed(1)}%</div>
           <div className="sub">campaigns / flows · vs DTC benchmarks 2.5% campaigns / 5%+ flows</div>
         </div>
-        <div className="card kpi" style={{borderLeft:'3px solid #4ade80'}}>
+        <div className="card kpi" style={{borderLeft:`3px solid ${PAL.good}`}}>
           <div className="label">List net growth (60d)</div>
           <div className="val">+{NUM(netGrowth)}</div>
           <div className="sub">{NUM(subs)} subs · {NUM(unsubs)} unsubs · churn ~{(dailyChurnRate*1000).toFixed(2)}‰/day proxy</div>
         </div>
-        <div className="card kpi" style={{borderLeft: missingCritical > 0 ? '3px solid #f87171' : '3px solid #4ade80'}}>
+        <div className="card kpi" style={{borderLeft: missingCritical > 0 ? `3px solid ${PAL.bad}` : `3px solid ${PAL.good}`}}>
           <div className="label">Critical flow gaps</div>
           <div className="val">{missingCritical}</div>
           <div className="sub">{presentCount} of {flowChecklist.length} best-practice flows present</div>
@@ -6419,26 +6503,26 @@ function EmailHealthPanel(){
         <div className="card" style={{flex:'1 1 300px'}}>
           <h2>Deliverability + list health flags</h2>
           <div style={{display:'flex',flexDirection:'column',gap:10,fontSize:12.5}}>
-            {mppFlag && (<div style={{padding:10,background:'var(--bg-app)',borderLeft:'3px solid #fbbf24',borderRadius:'0 6px 6px 0'}}>
-              <div style={{fontWeight:600,marginBottom:3,color:'#fbbf24'}}>⚠ Apple MPP open-rate inflation</div>
+            {mppFlag && (<div style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${PAL.warn}`,borderRadius:'0 6px 6px 0'}}>
+              <div style={{fontWeight:600,marginBottom:3,color:PAL.warn}}>⚠ Apple MPP open-rate inflation</div>
               <div className="muted">Campaign opens {(campOpenW*100).toFixed(0)}%, flow opens {(flowOpenW*100).toFixed(0)}%. Real open rates are likely 25-40% lower. <b>Don't optimise on open rate</b>. Use click rate + order-attributed revenue as the true signals. Suppress "non-openers" segmentation that relies on opens; use "non-clickers" instead.</div>
             </div>)}
-            <div style={{padding:10,background:'var(--bg-app)',borderLeft:'3px solid #5b8def',borderRadius:'0 6px 6px 0'}}>
+            <div style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${PAL.data3}`,borderRadius:'0 6px 6px 0'}}>
               <div style={{fontWeight:600,marginBottom:3}}>List engagement decay risk</div>
               <div className="muted">No 30/60/90d engagement segmentation visible in current data. <b>Recommended:</b> create "actively engaged" (opened or clicked in last 30d) and "decayed" (no engagement 60d+) segments. Suppress decayed list from regular campaigns or reactivate via re-engagement series. Otherwise sender rep degrades over months.</div>
             </div>
-            <div style={{padding:10,background:'var(--bg-app)',borderLeft:'3px solid #f87171',borderRadius:'0 6px 6px 0'}}>
-              <div style={{fontWeight:600,marginBottom:3,color:'#f87171'}}>Bounce/spam complaint rate not tracked</div>
+            <div style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${PAL.bad}`,borderRadius:'0 6px 6px 0'}}>
+              <div style={{fontWeight:600,marginBottom:3,color:PAL.bad}}>Bounce/spam complaint rate not tracked</div>
               <div className="muted">Supermetrics' Klaviyo connector doesn't expose bounce or spam-complaint rates in current pull. <b>Manual check needed:</b> log into Klaviyo → Analytics → Deliverability. Bounce rate should be &lt;2%, spam complaints &lt;0.1%. Higher = deliverability is at risk.</div>
             </div>
-            <div style={{padding:10,background:'var(--bg-app)',borderLeft:'3px solid #c084fc',borderRadius:'0 6px 6px 0'}}>
+            <div style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${PAL.accent}`,borderRadius:'0 6px 6px 0'}}>
               <div style={{fontWeight:600,marginBottom:3}}>Top opportunity: win-back flow</div>
               <div className="muted">{`~35% of orders are returning customers, but there's no flow nurturing the lapsed segment. Building a win-back (trigger at 60-90d since purchase) likely adds ${curSym()}200-500/mo at current scale. Best-practice format: nostalgia trigger → product reminder → discount escalation.`}</div>
             </div>
           </div>
         </div>
       </div>
-      <div className="note" style={{marginTop:14}}><b>Lux's read:</b> the flow programme is fundamentally healthy (5 critical flows present, per-category welcomes is best-practice). The two missing critical flows are <b>win-back</b> and <b>review request</b> — both are 1-time builds with ongoing revenue. The MPP open-rate inflation isn't a problem per se, but means anyone optimising on opens (subject-line testing) is optimising for noise. Click-rate-as-truth is the right rule.</div>
+      <div className="note" style={{marginTop:14}}><b>Greta's read:</b> the flow programme is fundamentally healthy (5 critical flows present, per-category welcomes is best-practice). The two missing critical flows are <b>win-back</b> and <b>review request</b> — both are 1-time builds with ongoing revenue. The MPP open-rate inflation isn't a problem per se, but means anyone optimising on opens (subject-line testing) is optimising for noise. Click-rate-as-truth is the right rule.</div>
     </div>
   );
 }
@@ -6487,7 +6571,7 @@ function EmailHub(){
         </div>
         <div className="note" style={{marginTop:6}}>If broadcast revenue mostly rides on a code, that demand is <b>rented, not owned</b> — a margin risk. Build full-price email angles (new-in, restock, editorial, UGC) so campaigns aren't only "here's a discount", and reserve codes for genuine win-back.</div>
       </div>)}
-      <div className="card" style={{marginBottom:14, borderLeft:'3px solid #c084fc'}}>
+      <div className="card" style={{marginBottom:14, borderLeft:`3px solid ${PAL.accent}`}}>
         <h2>Email is the #1 revenue channel — and flows are doing the heavy lifting</h2>
         <div className="muted" style={{marginBottom:10,fontSize:12}}>Last 90 days · Klaviyo via Supermetrics. Campaigns = broadcasts. Flows = automated triggers (welcome, abandoned cart, browse abandonment, back-in-stock, birthday).</div>
         <div className="row">
@@ -6517,26 +6601,26 @@ function EmailHub(){
             <td>{PCT(f.clickRate)}</td>
             <td>{f.orders}</td>
             <td>{GBP(f.orderValue)}</td>
-            <td><b style={{color:f.revPerRecip>3?'#4ade80':f.revPerRecip>1?'#fbbf24':'#7b7b87'}}>{`${curSym()}`}{(f.revPerRecip||0).toFixed(2)}</b></td>
+            <td><b style={{color:f.revPerRecip>3?PAL.good:f.revPerRecip>1?PAL.warn:PAL.muted}}>{`${curSym()}`}{(f.revPerRecip||0).toFixed(2)}</b></td>
           </tr>))}
           </tbody></table>
         </div>
         <div className="card" style={{flex:'1 1 280px'}}>
           <h2>Quick wins</h2>
           <div style={{display:'flex',flexDirection:'column',gap:10,fontSize:12.5}}>
-            <div style={{padding:10,background:'var(--bg-app)',borderLeft:'3px solid #4ade80',borderRadius:'0 6px 6px 0'}}>
+            <div style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${PAL.good}`,borderRadius:'0 6px 6px 0'}}>
               <div style={{fontWeight:600,marginBottom:3}}>{`Back-in-Stock at ${curSym()}8.16/recipient`}</div>
               <div className="muted">Best-performing flow. Audit which products trigger it — expand to more SKUs.</div>
             </div>
-            <div style={{padding:10,background:'var(--bg-app)',borderLeft:'3px solid #4ade80',borderRadius:'0 6px 6px 0'}}>
+            <div style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${PAL.good}`,borderRadius:'0 6px 6px 0'}}>
               <div style={{fontWeight:600,marginBottom:3}}>{`NECKLACES Welcome at ${curSym()}6.65/recipient`}</div>
               <div className="muted">Per-category welcome flows crushing — replicate for new categories.</div>
             </div>
-            <div style={{padding:10,background:'var(--bg-app)',borderLeft:'3px solid #fbbf24',borderRadius:'0 6px 6px 0'}}>
+            <div style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${PAL.warn}`,borderRadius:'0 6px 6px 0'}}>
               <div style={{fontWeight:600,marginBottom:3}}>Happy Birthday flow = 0 revenue</div>
               <div className="muted">Open rate 41% but zero orders. Subject works, CTA doesn't. Test a stronger offer.</div>
             </div>
-            <div style={{padding:10,background:'var(--bg-app)',borderLeft:'3px solid #f87171',borderRadius:'0 6px 6px 0'}}>
+            <div style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${PAL.bad}`,borderRadius:'0 6px 6px 0'}}>
               <div style={{fontWeight:600,marginBottom:3}}>43 campaigns in 90d = 1 every 2 days</div>
               <div className="muted">High frequency. List fatigue likely — consider cutting low performers.</div>
             </div>
@@ -6545,16 +6629,25 @@ function EmailHub(){
       </div>
       <div className="card" style={{marginTop:14}}>
         <h2>Campaign sends by week</h2>
-        <R.ResponsiveContainer width="100%" height={220}>
-          <R.ComposedChart data={sendChart} margin={{top:6,right:12,left:14,bottom:18}}>
-            <R.CartesianGrid stroke="#222229" vertical={false} />
-            <R.XAxis dataKey="date" tick={{fill:'#6f6f7b',fontSize:10}} interval={Math.ceil(sendChart.length/12)} label={{value:'Date', position:'insideBottom', offset:-6, fill:'#6f6f7b', fontSize:10}} />
-            <R.YAxis yAxisId="l" tick={{fill:'#6f6f7b',fontSize:10}} label={{value:'Sends', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:10}} />
-            <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#6f6f7b',fontSize:10}} tickFormatter={v=>curSym()+(v/1000).toFixed(1)+'k'} label={{value:`Revenue (${curSym()})`, angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:10}} />
+        {/* Sends and revenue are a count and an amount: one chart each, same weeks,
+            linked by syncId, so "are we over-emailing?" is read down the pair. */}
+        <R.ResponsiveContainer width="100%" height={130}>
+          <R.ComposedChart data={sendChart} syncId="email-sends" margin={{top:6,right:12,left:14,bottom:4}}>
+            <R.CartesianGrid stroke={PAL.panel} vertical={false} />
+            <R.XAxis dataKey="date" tick={false} tickLine={false} height={6} />
+            <R.YAxis tick={{fill:PAL.muted,fontSize:10}} label={{value:'Sends', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:10}} />
             <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} />
             <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:11, paddingBottom:8}}/>
-            <R.Bar yAxisId="l" dataKey="sends" name="Campaign sends" fill={COL.email} />
-            <R.Line yAxisId="r" type="monotone" dataKey="revenue" name="Revenue" stroke={COL.revenue} strokeWidth={2} dot={false} />
+            <R.Bar dataKey="sends" name="Campaign sends" fill={svgCol(COL.email)} />
+          </R.ComposedChart>
+        </R.ResponsiveContainer>
+        <R.ResponsiveContainer width="100%" height={130}>
+          <R.ComposedChart data={sendChart} syncId="email-sends" margin={{top:2,right:12,left:14,bottom:18}}>
+            <R.CartesianGrid stroke={PAL.panel} vertical={false} />
+            <R.XAxis dataKey="date" tick={{fill:PAL.muted,fontSize:10}} interval={Math.ceil(sendChart.length/12)} label={{value:'Date', position:'insideBottom', offset:-6, fill:PAL.muted, fontSize:10}} />
+            <R.YAxis tick={{fill:PAL.muted,fontSize:10}} tickFormatter={v=>curSym()+(v/1000).toFixed(1)+'k'} label={{value:`Revenue (${curSym()})`, angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:10}} />
+            <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} />
+            <R.Line type="monotone" dataKey="revenue" name="Revenue" stroke={svgCol(COL.revenue)} strokeWidth={2} dot={false} />
           </R.ComposedChart>
         </R.ResponsiveContainer>
         <ChartFooter note="Are we over-emailing? Watch revenue-per-send falling as send volume climbs."
@@ -6573,12 +6666,12 @@ function EmailHub(){
           <td>{PCT(c.clickRate)}</td>
           <td>{c.orders}</td>
           <td>{GBP(c.orderValue)}</td>
-          <td><span style={{color:c.revPerRecip>0.2?'#4ade80':c.revPerRecip>0.05?'#e8e8ec':'#7b7b87'}}>{`${curSym()}`}{(c.revPerRecip||0).toFixed(2)}</span></td>
+          <td><span style={{color:c.revPerRecip>0.2?PAL.good:c.revPerRecip>0.05?PAL.ink:PAL.muted}}>{`${curSym()}`}{(c.revPerRecip||0).toFixed(2)}</span></td>
         </tr>))}
         </tbody></table>
         <div className="muted" style={{fontSize:11,marginTop:8}}>Showing 30 most recent of {camps.length} campaigns.</div>
       </div>
-      {DEMO && <div className="note" style={{marginTop:14}}><b>Lux's read:</b> the 19× revenue lift of flows over campaigns is the single biggest leverage finding in this dashboard. Every pound spent making flows smarter (segmentation, dynamic content, more triggers) returns multiples of any pound spent on the next broadcast. Three immediate moves: (1) audit Back-in-Stock — expand triggers to more SKUs; (2) replicate the NECKLACES per-category welcome flow for charms/bracelets/pre-styled (already exists for those — confirm performance match); (3) fix the Happy Birthday flow — open rate proves attention, offer must be stronger to convert.</div>}
+      {DEMO && <div className="note" style={{marginTop:14}}><b>Greta's read:</b> the 19× revenue lift of flows over campaigns is the single biggest leverage finding in this dashboard. Every pound spent making flows smarter (segmentation, dynamic content, more triggers) returns multiples of any pound spent on the next broadcast. Three immediate moves: (1) audit Back-in-Stock — expand triggers to more SKUs; (2) replicate the NECKLACES per-category welcome flow for charms/bracelets/pre-styled (already exists for those — confirm performance match); (3) fix the Happy Birthday flow — open rate proves attention, offer must be stronger to convert.</div>}
     </div>
   );
 }
@@ -6619,7 +6712,7 @@ function ContentCalendar(){
   const avgEngRate = posts.length ? posts.reduce((a,p)=>a+(p.engRate||0),0)/posts.length : 0;
   return (<div className="card" style={{marginTop:14}}>
     <h2>Content calendar — last 8 weeks</h2>
-    <div className="muted" style={{marginBottom:10,fontSize:12}}>Sage view: posting cadence + topic mix at a glance. Click any cell for the post; colour indicates engagement rate (reach-weighted).</div>
+    <div className="muted" style={{marginBottom:10,fontSize:12}}>Posting cadence + topic mix at a glance. Click any cell for the post; colour indicates engagement rate (reach-weighted).</div>
     <div className="row" style={{marginBottom:14}}>
       <div className="card kpi"><div className="label">Posts (60d)</div><div className="val">{posts.length}</div><div className="sub">{reelCount} reels · {feedCount} feed · {storyCount} stories</div></div>
       <div className="card kpi"><div className="label">Avg per week</div><div className="val">{avgPerWeek.toFixed(1)}</div><div className="sub">vs benchmark 4-5 for active DTC</div></div>
@@ -6644,9 +6737,9 @@ function ContentCalendar(){
               return (<td key={di} style={{width:50,height:48,background:colour,borderRadius:6,verticalAlign:'top',padding:4,cursor:hasContent?'pointer':'default',position:'relative'}} title={tooltip} onClick={()=>{ if(items[0]?.permalink) window.open(items[0].permalink,'_blank'); }}>
                 <div style={{fontSize:9,color:'var(--heat-ink)',fontWeight:600}}>{parseInt(date.slice(8,10))}</div>
                 {hasContent && (<div style={{position:'absolute',bottom:2,right:2,display:'flex',gap:2}}>
-                  {reels.length>0 && <span style={{fontSize:8,background:'#5b8def',color:'#fff',padding:'1px 3px',borderRadius:3,fontWeight:700}}>R{reels.length>1?reels.length:''}</span>}
-                  {carousel.length>0 && <span style={{fontSize:8,background:'#c084fc',color:'#fff',padding:'1px 3px',borderRadius:3,fontWeight:700}}>F{carousel.length>1?carousel.length:''}</span>}
-                  {stories.length>0 && <span style={{fontSize:8,background:'#fbbf24',color:'#000',padding:'1px 3px',borderRadius:3,fontWeight:700}}>S{stories.length>1?stories.length:''}</span>}
+                  {reels.length>0 && <span style={{fontSize:8,background:PAL.data3,color:PAL.panel,padding:'1px 3px',borderRadius:3,fontWeight:700}}>R{reels.length>1?reels.length:''}</span>}
+                  {carousel.length>0 && <span style={{fontSize:8,background:PAL.accent,color:PAL.panel,padding:'1px 3px',borderRadius:3,fontWeight:700}}>F{carousel.length>1?carousel.length:''}</span>}
+                  {stories.length>0 && <span style={{fontSize:8,background:PAL.warn,color:PAL.ink,padding:'1px 3px',borderRadius:3,fontWeight:700}}>S{stories.length>1?stories.length:''}</span>}
                 </div>)}
               </td>);
             })}
@@ -6661,13 +6754,13 @@ function ContentCalendar(){
       <span><span style={{display:'inline-block',width:10,height:10,background:'var(--heat-none)',borderRadius:2,marginRight:4,verticalAlign:'middle',border:'1px solid var(--border-subtle)'}}/>Posted, no reach data</span>
       <span><span style={{display:'inline-block',width:10,height:10,background:'var(--heat-empty)',borderRadius:2,marginRight:4,verticalAlign:'middle',border:'1px solid var(--border-subtle)'}}/>No content</span>
     </div>
-    <div className="note" style={{marginTop:14}}><b>Sage's read:</b> {avgPerWeek.toFixed(1)} posts/week is on the low side for a DTC brand fighting for organic reach — 4-5/week is the active competitor benchmark. The {storyCount === 0 ? 'complete absence of Stories' : storyCount + ' story in 60 days'} is the biggest organic blind spot — Stories are the daily-cadence touchpoint that competitors (Astrid &amp; Miyu, Abbott Lyon) use for behind-the-scenes, drops, and link-to-product. Brief Angela on a weekly Story cadence (3-5/week minimum).</div>
+    <div className="note" style={{marginTop:14}}><b>Greta's read:</b> {avgPerWeek.toFixed(1)} posts/week is on the low side for a DTC brand fighting for organic reach — 4-5/week is the active competitor benchmark. The {storyCount === 0 ? 'complete absence of Stories' : storyCount + ' story in 60 days'} is the biggest organic blind spot — Stories are the daily-cadence touchpoint that competitors (Astrid &amp; Miyu, Abbott Lyon) use for behind-the-scenes, drops, and link-to-product. Brief Angela on a weekly Story cadence (3-5/week minimum).</div>
   </div>);
 }
 
 function StoriesPanel(){
   const stories = B.igStories || [];
-  return (<div className="card" style={{marginTop:14, borderLeft:'3px solid #fbbf24'}}>
+  return (<div className="card" style={{marginTop:14, borderLeft:`3px solid ${PAL.warn}`}}>
     <h2>Instagram Stories — last 60 days</h2>
     {DEMO && <div className="muted" style={{marginBottom:10,fontSize:12}}>Stories are the daily-cadence organic surface. Competitors post 5-15/week; frkl posted {stories.length} in 60 days.</div>}
     {stories.length === 0 ? (<EmptyState icon="image"
@@ -6687,12 +6780,12 @@ function StoriesPanel(){
           <td>{s.shares}</td>
           <td>{s.tapsForward}</td>
           <td>{s.tapsBack}</td>
-          <td><b style={{color:completion>0.8?'#4ade80':completion>0.6?'#fbbf24':'#f87171'}}>{PCT(completion)}</b></td>
+          <td><b style={{color:completion>0.8?PAL.good:completion>0.6?PAL.warn:PAL.bad}}>{PCT(completion)}</b></td>
         </tr>);
       })}
       </tbody></table>
     )}
-    {DEMO && <div className="note" style={{marginTop:14}}><b>Frame's read:</b> the one Story posted on 2026-05-26 had 161 views, 122 reach, 93% completion (only 11 exits of 161 views) — strong signal that when frkl posts Stories, the audience watches. The opportunity: 0.5 stories/month is essentially "Stories are off". Move to 3-5/week. Use as: behind-the-scenes (campaign shoots, packing), new-product reveals, polls/quizzes, link-stickers to bestsellers. Each Story is essentially a free push notification to ~30% of your 37k followers.</div>}
+    {DEMO && <div className="note" style={{marginTop:14}}><b>Greta's read:</b> the one Story posted on 2026-05-26 had 161 views, 122 reach, 93% completion (only 11 exits of 161 views) — strong signal that when frkl posts Stories, the audience watches. The opportunity: 0.5 stories/month is essentially "Stories are off". Move to 3-5/week. Use as: behind-the-scenes (campaign shoots, packing), new-product reveals, polls/quizzes, link-stickers to bestsellers. Each Story is essentially a free push notification to ~30% of your 37k followers.</div>}
   </div>);
 }
 
@@ -6741,19 +6834,26 @@ function InstagramPanel(){
       <div className="row">
         <div className="card" style={{flex:'2 1 420px'}}>
           <h2>Daily growth — new followers + reach</h2>
-          <R.ResponsiveContainer width="100%" height={240}>
-            <R.ComposedChart data={dailyChart} margin={{top:6,right:10,left:14,bottom:18}}>
-              <R.CartesianGrid stroke="#222229" vertical={false} />
-              <R.XAxis dataKey="date" tick={{fill:'#6f6f7b',fontSize:10}} interval={Math.ceil(dailyChart.length/8)} label={{value:'Date', position:'insideBottom', offset:-6, fill:'#6f6f7b', fontSize:10}} />
-              <R.YAxis yAxisId="l" tick={{fill:'#6f6f7b',fontSize:10}} label={{value:'New followers', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:10}} />
-              <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#6f6f7b',fontSize:10}} tickFormatter={v=>(v/1000).toFixed(0)+'k'} label={{value:'Reach', angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:10}} />
+          <R.ResponsiveContainer width="100%" height={150}>
+            <R.ComposedChart syncId="ig-reach" data={dailyChart} margin={{top:6,right:10,left:14,bottom:18}}>
+              <R.CartesianGrid stroke={PAL.panel} vertical={false} />
+              <R.XAxis tickLine={false} dataKey="date" tick={false} interval={Math.ceil(dailyChart.length/8)}  />
+              <R.YAxis yAxisId="l" tick={{fill:PAL.muted,fontSize:10}} label={{value:'New followers', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:10}} />
               <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} />
               <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:11, paddingBottom:8}}/>
-              <R.Bar yAxisId="l" dataKey="new" name="New followers" fill={COL.email} />
-              <R.Line yAxisId="r" type="monotone" dataKey="reach" name="Reach" stroke={COL.sessions} strokeWidth={2} dot={false} />
+              <R.Bar yAxisId="l" dataKey="new" name="New followers" fill={svgCol(COL.email)} />
             </R.ComposedChart>
           </R.ResponsiveContainer>
-        </div>
+          <R.ResponsiveContainer width="100%" height={120}>
+            <R.ComposedChart syncId="ig-reach" data={dailyChart} margin={{top:6,right:10,left:14,bottom:18}}>
+              <R.CartesianGrid stroke={PAL.panel} vertical={false} />
+              <R.XAxis dataKey="date" tick={{fill:PAL.muted,fontSize:10}} interval={Math.ceil(dailyChart.length/8)} label={{value:'Date', position:'insideBottom', offset:-6, fill:PAL.muted, fontSize:10}} />
+              <R.YAxis yAxisId="l" orientation="left" tick={{fill:PAL.muted,fontSize:10}} tickFormatter={v=>(v/1000).toFixed(0)+'k'} label={{value:'Reach', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:10}} />
+              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} />
+              <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:11, paddingBottom:8}}/>
+              <R.Line yAxisId="l" type="monotone" dataKey="reach" name="Reach" stroke={svgCol(COL.sessions)} strokeWidth={2} dot={false} />
+            </R.ComposedChart>
+          </R.ResponsiveContainer>        </div>
         <div className="card" style={{flex:'1 1 320px'}}>
           <h2>Follower audience (age × gender)</h2>
           <div className="muted" style={{marginBottom:8,fontSize:12}}>{PCT(totalFemale/totalAudience)} female · {NUM(totalAudience)} followers with reported demographics</div>
@@ -6762,7 +6862,7 @@ function InstagramPanel(){
             <td>{r.age}</td>
             <td>{NUM(r.female)}</td>
             <td>{NUM(r.male+r.undef)}</td>
-            <td><span style={{display:'inline-block',width:80,background:'#23232b',borderRadius:4,height:8,position:'relative',marginRight:8,verticalAlign:'middle'}}><span style={{display:'block',width:(100*r.total/totalAudience)+'%',height:8,background:COL.email,borderRadius:4}}/></span>{PCT(r.total/totalAudience)}</td>
+            <td><span style={{display:'inline-block',width:80,background:PAL.panel,borderRadius:4,height:8,position:'relative',marginRight:8,verticalAlign:'middle'}}><span style={{display:'block',width:(100*r.total/totalAudience)+'%',height:8,background:COL.email,borderRadius:4}}/></span>{PCT(r.total/totalAudience)}</td>
           </tr>))}
           </tbody></table>
         </div>
@@ -6774,7 +6874,7 @@ function InstagramPanel(){
         {topPosts.slice(0,20).map((p,i)=>{
           const eng=(p.likes||0)+(p.comments||0)+(p.saves||0)+(p.shares||0);
           return (<div className="creative" key={i}>
-            {p.thumb?(<img className="thumb" src={p.thumb} alt={p.caption?.slice(0,30)} referrerPolicy="no-referrer" onError={e=>{e.target.style.opacity=.2;}} />):(<div className="thumb" style={{display:'flex',alignItems:'center',justifyContent:'center',color:'#5a5a64',fontSize:11,letterSpacing:1}}>{p.type==='CAROUSEL_ALBUM'?'CAROUSEL':p.type}</div>)}
+            {p.thumb?(<img className="thumb" src={p.thumb} alt={p.caption?.slice(0,30)} referrerPolicy="no-referrer" onError={e=>{e.target.style.opacity=.2;}} />):(<div className="thumb" style={{display:'flex',alignItems:'center',justifyContent:'center',color:PAL.muted,fontSize:11,letterSpacing:1}}>{p.type==='CAROUSEL_ALBUM'?'CAROUSEL':p.type}</div>)}
             <div className="body">
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'start',gap:8}}>
                 <a href={p.permalink} target="_blank" rel="noreferrer" className="name" style={{fontSize:12,fontWeight:600,color:'var(--text-primary)'}}>{p.date} · {p.product||p.type}</a>
@@ -6801,7 +6901,7 @@ function Competitors(){
   const comps=B.competitors||[];
   return (<div>
     <div className="card" style={{marginBottom:14}}>
-      <h2>Competitor matrix — Scout snapshot</h2>
+      <h2>Competitor matrix</h2>
       <div className="muted" style={{marginBottom:10}}>Category positioning for the {DEMO ? 'demi-fine / customisable jewellery' : (OI_BRAND.vertical || 'category')} space. Refresh via Chrome (Meta Ads Library + competitor stores) when warranted — the dashboard's a flag-board, not a live scraper.</div>
       <table><thead><tr><th>Brand</th><th className="tl">Position</th><th>AOV</th><th>Meta intensity</th><th>Threat</th><th className="tl">vs {OI_BRAND.name}</th></tr></thead><tbody>
       {comps.map((c,i)=>(<tr key={i}>
@@ -6828,17 +6928,17 @@ function SiteStructure({start}){
     <div className="row">
       <div className="card" style={{flex:'2 1 520px'}}>
         <h2>Funnel structure & friction</h2>
-        {SITE_STEPS.map((s,i)=>(<div key={i} style={{padding:'11px 0',borderBottom:i<SITE_STEPS.length-1?'1px solid #23232b':'none'}}>
+        {SITE_STEPS.map((s,i)=>(<div key={i} style={{padding:'11px 0',borderBottom:i<SITE_STEPS.length-1?`1px solid ${PAL.panel}`:'none'}}>
           <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:5}}><span className={'pill '+s.sev}>{s.step}</span></div>
-          <div style={{fontSize:12.5,color:'#b6b6c0',marginBottom:4}}><b style={{color:'#8a8a96',fontWeight:600}}>On the site:</b> {s.live}</div>
-          <div style={{fontSize:12.5,color:s.sev==='red'?'#f4a3a3':'#d8c89a'}}><b style={{color:'#8a8a96',fontWeight:600}}>Friction:</b> {s.issue}</div>
+          <div style={{fontSize:12.5,color:PAL.faint,marginBottom:4}}><b style={{color:PAL.muted,fontWeight:600}}>On the site:</b> {s.live}</div>
+          <div style={{fontSize:12.5,color:s.sev==='red'?PAL.bad:PAL.warn}}><b style={{color:PAL.muted,fontWeight:600}}>Friction:</b> {s.issue}</div>
         </div>))}
       </div>
       <div className="card" style={{flex:'1 1 320px'}}>
         <h2>GA4 funnel (selected window)</h2>
         {f.map(s=>(<div key={s.stage} style={{margin:'9px 0'}}>
           <div className="mrow"><span className="k">{s.stage}</span><span className="v">{NUM(s.v)} ({PCT(s.v/fmax)})</span></div>
-          <div style={{height:9,background:'#23232b',borderRadius:6,marginTop:4}}><div style={{height:9,width:(100*s.v/fmax)+'%',background:COL.sessions,borderRadius:6}}/></div>
+          <div style={{height:9,background:PAL.panel,borderRadius:6,marginTop:4}}><div style={{height:9,width:(100*s.v/fmax)+'%',background:COL.sessions,borderRadius:6}}/></div>
         </div>))}
         <div className="note" style={{marginTop:10,fontSize:12}}>Clarity confirms the killers: <b>ATC→checkout −67.8%</b> (vs 40–50% normal) and <b>checkout→complete −90%</b> (vs 50–60%).</div>
       </div>
@@ -6846,7 +6946,7 @@ function SiteStructure({start}){
     <div className="row" style={{marginTop:14}}>
       <div className="card" style={{flex:'1 1 360px'}}>
         <h2>Clarity behaviour vs benchmark</h2>
-        <table><thead><tr><th>Metric</th><th>frkl</th><th>Healthy</th></tr></thead><tbody>
+        <table><thead><tr><th>Metric</th><th>{OI_BRAND.name||'You'}</th><th>Healthy</th></tr></thead><tbody>
           {CLARITY.map((c,i)=>(<tr key={i}><td>{c.m}</td><td><span className={'pill '+c.sev}>{c.v}</span></td><td className="muted">{c.bench}</td></tr>))}
         </tbody></table>
       </div>
@@ -6909,8 +7009,8 @@ function IntelligencePanel(){
   const diagnosisCount = P.patterns.length - topLevelPatterns.length;
 
   // Use design-token-aligned palette: trends are accent, status patterns are semantic
-  const KIND_COLOR = {trend:'#8B5CF6', change_point:'#f5b544', anomaly:'#ef6b6f', association:'#8B5CF6', co_movement:'#7e7e8a', divergence:'#f5b544', money:'#4ade80', diagnosis:'#8B5CF6'};
-  const VERDICT_COLOR = {favourable:'#4ade80', unfavourable:'#ef6b6f', neutral:'#7e7e8a', hit:'#4ade80', miss:'#ef6b6f', inconclusive:'#7e7e8a'};
+  const KIND_COLOR = {trend:PAL.accent, change_point:PAL.warn, anomaly:PAL.bad, association:PAL.accent, co_movement:PAL.muted, divergence:PAL.warn, money:PAL.good, diagnosis:PAL.accent};
+  const VERDICT_COLOR = {favourable:PAL.good, unfavourable:PAL.bad, neutral:PAL.muted, hit:PAL.good, miss:PAL.bad, inconclusive:PAL.muted};
   const KIND_LABEL = {trend:'Trend', change_point:'Step change', anomaly:'Anomaly', association:'Action attribution', co_movement:'Co-mover', divergence:'Divergence', money:`${curSym()} finding`, diagnosis:'Diagnosis'};
 
   const filtered = topLevelPatterns.filter(p => {
@@ -6953,7 +7053,7 @@ function IntelligencePanel(){
           {p.confidence != null && <span>conf <b>{(p.confidence*100).toFixed(0)}%</b></span>}
         </div>
       </div>
-      <div className="pattern-card-desc">{p.description}</div>
+      <div className="pattern-card-desc">{scrubTag(p.description)}</div>
       {diagnoses.length > 0 && (<div className="pattern-diagnoses">
         {diagnoses.map((d, di) => (<div key={di} className="pattern-diagnosis">
           <div className="pattern-diagnosis-head">
@@ -7047,7 +7147,7 @@ function IntelligencePanel(){
                   borderLeft:`2px solid ${color}`, borderRadius:'0 var(--r-sm) var(--r-sm) 0',
                   fontSize:12, color:'var(--text-secondary)', lineHeight:1.5,
                 }}>
-                  {p.description}
+                  {scrubTag(p.description)}
                   {p._effect_delta_pct != null && <span style={{color, fontWeight:600, marginLeft:8}}>({p._effect_delta_pct>0?'+':''}{p._effect_delta_pct}%)</span>}
                 </div>)}
               />
@@ -7123,7 +7223,7 @@ function IntelligencePanel(){
                     {a.premiseStale && <span className="pill grey" title={a.reconcileNote||''} style={{fontSize:9.5}}>⚠ premise out of date</span>}
                   </div>
                   <div style={{display:'flex', flexWrap:'wrap', gap:12, marginTop:5, fontSize:10.5, color:'var(--text-faint)', alignItems:'baseline'}}>
-                    <span title="Owner">{a.owner || '—'}</span>
+                    <span title="Owner">{agentLabel(a.owner) || '—'}</span>
                     {a.gbp ? <span style={{color:kc, fontWeight:600}} title="Expected monthly impact">{`~${curSym()}`}{Math.round(Math.abs(a.gbp)).toLocaleString()}/mo</span> : null}
                     {a.successMetric && <span title="Success metric">✓ {a.successMetric}</span>}
                     {a.byWhen && <span title="Review by">⏱ {a.byWhen}</span>}
@@ -7153,7 +7253,7 @@ function IntelligencePanel(){
               const confColor = conf === 'high' ? 'var(--good)' : conf === 'medium' ? 'var(--warn)' : 'var(--text-muted)';
               const isRollup = s.category === 'ALL';
               return (<tr key={i} style={{background: isRollup ? 'rgba(255,255,255,0.02)' : undefined, fontWeight: isRollup ? 600 : 400}}>
-                <td><b>{s.agent}</b>{agentRole(s.agent) && <div className="meta" style={{fontSize:10}}>{agentRole(s.agent)}</div>}</td>
+                <td><b>{agentLabel(s.agent)}</b></td>
                 <td>{isRollup ? <span style={{color:'var(--text-muted)'}}>— all —</span> : s.category}</td>
                 <td>{s.total_closed}</td>
                 <td style={{color:'var(--good)'}}>{s.hits}</td>
@@ -7179,8 +7279,8 @@ function IntelligencePanel(){
               const goodLift = m.direction==='higher_better' ? lift>0 : m.direction==='lower_better' ? lift<0 : null;
               const liftColor = goodLift==null ? 'var(--text-muted)' : goodLift ? 'var(--good)' : 'var(--bad)';
               return (<tr key={i}>
-                <td title={agentTitle(a.agent)}><b>{a.agent}</b><br/><span className="meta" style={{fontSize:10}}>{agentRole(a.agent)||a.category} · {a.priority}</span></td>
-                <td style={{fontSize:12, maxWidth:280}}>{a.description}</td>
+                <td><b>{agentLabel(a.agent)}</b><br/><span className="meta" style={{fontSize:10}}>{a.category} · {a.priority}</span></td>
+                <td style={{fontSize:12, maxWidth:280}}>{scrubTag(a.description)}</td>
                 <td><span className="pill grey" style={{fontSize:10}}>{a.status}</span></td>
                 <td>{fmt(a.baseline_value)} → {fmt(a.observed_value)}</td>
                 <td>{fmt(a.counterfactual_delta)}</td>
@@ -7411,7 +7511,7 @@ function SynergyMatrix(){
   const synergies = P.patterns.filter(p => p.kind === 'synergy');
   if (!synergies.length) return null;
   // Group by (src, tgt) pair so each cell shows the best correlation across lags
-  const CHANNEL_COLORS = {meta:'#4267B2', google:'#fbbc05', site:'#4ade80', email:'#c084fc', shopify:'#f87171'};
+  const CHANNEL_COLORS = {meta:'#4267B2', google:'#fbbc05', site:PAL.good, email:PAL.accent, shopify:PAL.bad};
   // Build list of all metrics that appear in any synergy
   const metricsSet = new Set();
   synergies.forEach(s => {
@@ -7475,7 +7575,7 @@ function SynergyMatrix(){
     .sort((a,b) => Math.abs(b.r) - Math.abs(a.r))
     .slice(0, 10);
 
-  return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid #38bdf8'}}>
+  return (<div className="card" style={{marginBottom:14, borderLeft:`3px solid ${PAL.data3}`}}>
     <h2>Channel synergy matrix</h2>
     <div className="muted" style={{marginBottom:10, fontSize:12}}>
       Pearson correlation between daily series across 5 channels (Meta · Google · Email · Site · Shopify). Each cell = correlation between row (today) and column (today + best lag). Green = positive, red = negative. Same-channel pairs are blank (internal identities). Synergies persist to <code>patterns_brand</code> as kind="synergy".
@@ -7486,7 +7586,7 @@ function SynergyMatrix(){
         <thead>
           <tr><th></th>{metrics.map(m => {
             const ch = METRIC_CHANNEL[m];
-            return (<th key={m} style={{padding:'4px 6px', writingMode:'vertical-rl', textOrientation:'mixed', color:CHANNEL_COLORS[ch], fontWeight:600, fontSize:10, height:90, verticalAlign:'bottom'}}>{SHORT_LABEL[m]||m}<br/><span style={{color:'#7b7b87',fontSize:9,textTransform:'uppercase'}}>{ch}</span></th>);
+            return (<th key={m} style={{padding:'4px 6px', writingMode:'vertical-rl', textOrientation:'mixed', color:CHANNEL_COLORS[ch], fontWeight:600, fontSize:10, height:90, verticalAlign:'bottom'}}>{SHORT_LABEL[m]||m}<br/><span style={{color:PAL.muted,fontSize:9,textTransform:'uppercase'}}>{ch}</span></th>);
           })}</tr>
         </thead>
         <tbody>
@@ -7494,18 +7594,18 @@ function SynergyMatrix(){
             const srcCh = METRIC_CHANNEL[src];
             return (<tr key={src}>
               <td style={{padding:'2px 8px', color:CHANNEL_COLORS[srcCh], fontWeight:600, fontSize:11, whiteSpace:'nowrap'}}>
-                <span style={{color:'#7b7b87',fontSize:9,textTransform:'uppercase',marginRight:6}}>{srcCh}</span>{SHORT_LABEL[src]||src}
+                <span style={{color:PAL.muted,fontSize:9,textTransform:'uppercase',marginRight:6}}>{srcCh}</span>{SHORT_LABEL[src]||src}
               </td>
               {metrics.map(tgt => {
                 if (METRIC_CHANNEL[src] === METRIC_CHANNEL[tgt]) {
-                  return (<td key={tgt} style={{width:38, height:24, background:'#1a1a22'}}></td>);
+                  return (<td key={tgt} style={{width:38, height:24, background:PAL.panel}}></td>);
                 }
                 const k = src+'→'+tgt;
                 const r = pairR[k];
                 const lag = pairLag[k];
-                if (r == null) return (<td key={tgt} style={{width:38, height:24, background:'var(--bg-app)', textAlign:'center', color:'#3a3a44', fontSize:10}}>·</td>);
+                if (r == null) return (<td key={tgt} style={{width:38, height:24, background:'var(--bg-app)', textAlign:'center', color:PAL.line, fontSize:10}}>·</td>);
                 return (<td key={tgt} title={`${SHORT_LABEL[src]} → ${SHORT_LABEL[tgt]}: r=${r.toFixed(2)} at lag ${lag}d`}
-                  style={{width:38, height:24, background:rgb(r), textAlign:'center', fontWeight:600, color:Math.abs(r)>0.7?'#0a0a0e':'#e8e8ec', fontSize:10}}>
+                  style={{width:38, height:24, background:rgb(r), textAlign:'center', fontWeight:600, color:Math.abs(r)>0.7?PAL.panel:PAL.ink, fontSize:10}}>
                   {r.toFixed(2)}{lag > 0 ? <sup style={{fontSize:8,marginLeft:1}}>+{lag}d</sup> : ''}
                 </td>);
               })}
@@ -7526,17 +7626,17 @@ function SynergyMatrix(){
           <span style={{color:CHANNEL_COLORS[tgtCh], fontWeight:600}}>{SHORT_LABEL[p.tgt]||p.tgt}</span>
           <div className="muted" style={{fontSize:10}}>{srcCh} → {tgtCh}</div>
         </td>
-        <td><b style={{color:p.r>0?'#4ade80':'#f87171'}}>{p.r.toFixed(2)}</b></td>
+        <td><b style={{color:p.r>0?PAL.good:PAL.bad}}>{p.r.toFixed(2)}</b></td>
         <td>{p.lag === 0 ? <span className="muted">same day</span> : <b>+{p.lag}d</b>}</td>
         {['0','1','2','3','7'].map(L => {
           const r = p.full[L];
           if (r == null) return (<td key={L} className="muted">—</td>);
-          return (<td key={L} style={{background: rgb(r), color:Math.abs(r)>0.7?'#0a0a0e':'#e8e8ec', textAlign:'center', fontSize:11, fontWeight:600}}>{r.toFixed(2)}</td>);
+          return (<td key={L} style={{background: rgb(r), color:Math.abs(r)>0.7?PAL.panel:PAL.ink, textAlign:'center', fontSize:11, fontWeight:600}}>{r.toFixed(2)}</td>);
         })}
       </tr>);
     })}
     </tbody></table>
-    <div className="note" style={{marginTop:14}}><b>How to read this:</b> r=1.0 means perfect positive correlation, r=0 means none, r=-1.0 perfect inverse. The <b>"+Nd"</b> superscript means the target metric peaks N days <i>after</i> the source — a leading indicator. {topPairs.filter(p=>p.lag>0).length === 0 ? <span><b>Notable: every cross-channel pair's strongest correlation is at lag 0 (same day).</b> frkl's channels move in lockstep — there's no measurable "Channel X today predicts Channel Y in N days" structure. Likely cause: all channels respond to the same external drivers (campaign launches, news cycles, weather, day-of-week). To detect true lead-lag would need either intraday granularity, or longer history with more isolated channel pushes.</span> : <span>Look for lag &gt; 0 patterns — those are leading indicators worth treating as early-warning signals.</span>}</div>
+    <div className="note" style={{marginTop:14}}><b>How to read this:</b> r=1.0 means perfect positive correlation, r=0 means none, r=-1.0 perfect inverse. The <b>"+Nd"</b> superscript means the target metric peaks N days <i>after</i> the source — a leading indicator. {topPairs.filter(p=>p.lag>0).length === 0 ? <span><b>Notable: every cross-channel pair's strongest correlation is at lag 0 (same day).</b> {OI_BRAND.name||'Your brand'}'s channels move in lockstep — there's no measurable "Channel X today predicts Channel Y in N days" structure. Likely cause: all channels respond to the same external drivers (campaign launches, news cycles, weather, day-of-week). To detect true lead-lag would need either intraday granularity, or longer history with more isolated channel pushes.</span> : <span>Look for lag &gt; 0 patterns — those are leading indicators worth treating as early-warning signals.</span>}</div>
   </div>);
 }
 
@@ -7720,7 +7820,7 @@ ${ctxJson}`;
 
   // Action-oriented prompts first (what to do / not do / what changed), then the
   // analytical deep-dives. These are what a busy operator actually opens with.
-  const quickPrompts = [
+  const quickPrompts = UI_V3 ? V3_ASK_PROMPTS : [
     `What should I do today? Give me the top 3 actions, ranked by ${curSym()} impact.`,
     'What should I NOT do this week, and why?',
     'What changed since last week, and does any of it actually matter?',
@@ -7734,44 +7834,44 @@ ${ctxJson}`;
   ];
 
   return (<div>
-    <div className="card" style={{marginBottom:14, borderLeft:'3px solid #c084fc'}}>
+    <div className="card" style={{marginBottom:14, borderLeft:`3px solid ${PAL.accent}`}}>
       <h2>Ask the data</h2>
-      <div className="muted" style={{marginBottom:10, fontSize:12}}>Runs <b>securely server-side</b> — the LLM key stays on the server and never touches your browser. Your question goes with a compact summary of your live data ({Math.round(JSON.stringify(buildAskContext()).length/1024)}KB).</div>
+      <div className="muted" style={{marginBottom:10, fontSize:12}}>Runs <b>privately inside your workspace</b>. Your question goes with a compact summary of your live data ({Math.round(JSON.stringify(buildAskContext()).length/1024)}KB).</div>
       {!ASK && (<div style={{padding:12, background:'var(--bg-app)', borderRadius:8, marginBottom:10, border:'1px solid var(--border-default)'}}>
         <div style={{fontSize:13, color:'var(--text-primary)', lineHeight:1.5}}>🔒 Ask data runs inside your authenticated workspace, where the model key is held server-side (never in the browser). It isn't enabled in this public demo. The examples below show the questions it answers from your live data.</div>
       </div>)}
-      {ASK && (<div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,fontSize:11,color:'#7b7b87'}}>
-        <span>🔒 Server-side · key never in browser</span>
+      {ASK && (<div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,fontSize:11,color:PAL.muted}}>
+        <span>🔒 Private to your workspace</span>
         <select value={model} onChange={e=>setModel(e.target.value)} style={{background:'var(--bg-input)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:4, padding:'2px 6px', fontSize:11}}>
-          <option value="claude-sonnet-4-5">Sonnet 4.5 (best)</option>
-          <option value="claude-haiku-4-5">Haiku 4.5 (cheaper)</option>
+          <option value="claude-sonnet-4-5">Thorough answer</option>
+          <option value="claude-haiku-4-5">Quick answer</option>
         </select>
-        {history.length>0 && <a onClick={clearHistory} style={{cursor:'pointer',color:'#fbbf24'}}>clear chat</a>}
+        {history.length>0 && <a onClick={clearHistory} style={{cursor:'pointer',color:PAL.warn}}>clear chat</a>}
       </div>)}
       <div style={{display:'flex',gap:6,marginBottom:10}}>
         <textarea value={question} onChange={e=>setQuestion(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)) send(); }} placeholder={ASK?'Ask a question about the dataset… (Ctrl+Enter to send)':'Available in your authenticated workspace'} disabled={!ASK||loading} rows={2} style={{flex:1, padding:'10px 12px', background:'var(--bg-input)', border:'1px solid var(--border-default)', borderRadius:6, color:'var(--text-primary)', fontSize:13, fontFamily:'inherit', resize:'vertical'}} />
-        <button onClick={send} disabled={!ASK||loading||!question.trim()} style={{padding:'10px 18px', background: loading?'#404048':'#c084fc', border:'none', borderRadius:6, color:'#fff', fontWeight:600, cursor: loading?'wait':(ASK?'pointer':'not-allowed'), whiteSpace:'nowrap'}}>{loading?'Thinking…':'Ask'}</button>
+        <button onClick={send} disabled={!ASK||loading||!question.trim()} style={{padding:'10px 18px', background: loading?PAL.line:PAL.accent, border:'none', borderRadius:6, color:PAL.panel, fontWeight:600, cursor: loading?'wait':(ASK?'pointer':'not-allowed'), whiteSpace:'nowrap'}}>{loading?'Thinking…':'Ask'}</button>
       </div>
       <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:4}}>
         {quickPrompts.map((q,i)=>(<button key={i} onClick={()=>ASK&&setQuestion(q)} title={ASK?'':'Available in your workspace'} style={{padding:'4px 10px', background:'var(--bg-card)', border:'1px solid var(--border-default)', borderRadius:14, color:'var(--text-secondary)', fontSize:11, cursor:ASK?'pointer':'default', opacity:ASK?1:0.7}}>{q.length>60?q.slice(0,60)+'…':q}</button>))}
       </div>
-      {error && (<div style={{padding:10,background:'#3a1010',border:'1px solid #f87171',borderRadius:6,marginTop:10,color:'#fca5a5',fontSize:12}}>Error: {error}</div>)}
+      {error && (<div style={{padding:10,background:'#3a1010',border:`1px solid ${PAL.bad}`,borderRadius:6,marginTop:10,color:PAL.bad,fontSize:12}}>Error: {error}</div>)}
     </div>
     {history.length > 0 && (<div className="card">
       <h2>Conversation</h2>
       <div style={{display:'flex',flexDirection:'column',gap:12,maxHeight:600,overflowY:'auto'}}>
-        {history.slice().reverse().map((m,i)=>(<div key={i} style={{padding:12, background: m.role==='user'?'#1f1f2a':'#16161b', borderRadius:8, borderLeft:`3px solid ${m.role==='user'?'#5b8def':'#c084fc'}`}}>
-          <div style={{fontSize:10,color:'#7b7b87',marginBottom:6,textTransform:'uppercase',letterSpacing:.05,fontWeight:600,display:'flex',justifyContent:'space-between'}}>
-            <span>{m.role==='user'?'You':'Claude'}</span>
+        {history.slice().reverse().map((m,i)=>(<div key={i} style={{padding:12, background: m.role==='user'?PAL.panel:PAL.panel, borderRadius:8, borderLeft:`3px solid ${m.role==='user'?PAL.data3:PAL.accent}`}}>
+          <div style={{fontSize:10,color:PAL.muted,marginBottom:6,textTransform:'uppercase',letterSpacing:.05,fontWeight:600,display:'flex',justifyContent:'space-between'}}>
+            <span>{m.role==='user'?'You':'Greta'}</span>
             <span>{new Date(m.time).toLocaleString()}{m.usage?` · ${m.usage.input_tokens||0} in / ${m.usage.output_tokens||0} out${m.usage.cache_read_input_tokens?` · cached ${m.usage.cache_read_input_tokens}`:''}`:''}</span>
           </div>
           <div style={{fontSize:13, whiteSpace:'pre-wrap', lineHeight:1.5, color:'var(--text-primary)'}}>{m.content}</div>
           {m.role==='assistant' && (<div style={{marginTop:8, display:'flex', gap:8, alignItems:'center'}}>
             <button onClick={()=>{ if(aiSaveTask(m.content)) setSavedTasks(s=>({...s,[m.time]:true})); }} disabled={!!savedTasks[m.time]}
-              style={{padding:'4px 10px', background:savedTasks[m.time]?'transparent':'#1a1a22', border:'1px solid '+(savedTasks[m.time]?'var(--good)':'#30303a'), borderRadius:6, color:savedTasks[m.time]?'var(--good)':'#b6b6c0', fontSize:11, cursor:savedTasks[m.time]?'default':'pointer'}}>
+              style={{padding:'4px 10px', background:savedTasks[m.time]?'transparent':PAL.panel, border:'1px solid '+(savedTasks[m.time]?'var(--good)':'#30303a'), borderRadius:6, color:savedTasks[m.time]?'var(--good)':PAL.faint, fontSize:11, cursor:savedTasks[m.time]?'default':'pointer'}}>
               {savedTasks[m.time]?'✓ Saved to Weekly Board':'+ Save as task'}
             </button>
-            <span style={{fontSize:10.5, color:'#7b7b87'}}>turns this into a tracked action on the Board</span>
+            <span style={{fontSize:10.5, color:PAL.muted}}>turns this into a tracked action on the Board</span>
           </div>)}
         </div>))}
       </div>
@@ -7894,7 +7994,7 @@ function ConnectionHealthStrip(){
       })}
     </div>
     {critical.length > 0 && (<span style={{color:'var(--bad)', fontSize:11}}>
-      {critical.map(s=>s.name).join(', ')} hasn't updated in &gt;4d — reconnect in Settings → Connections
+      {critical.map(s=>s.name).join(', ')} hasn't updated in &gt;4d — reconnect in <GoLink sec="settings" sub="connections">Settings → Connections</GoLink>
     </span>)}
   </div>);
 }
@@ -8096,7 +8196,7 @@ function boardRag(spec, val, prev){
   if(good==null || Math.abs(ch)<0.02) return 'neutral';
   return good ? 'good' : 'bad';
 }
-const RAG_COL = {good:'var(--good)', warn:'var(--warn)', bad:'#f87171', neutral:'var(--text-faint)'};
+const RAG_COL = {good:'var(--good)', warn:'var(--warn)', bad:PAL.bad, neutral:'var(--text-faint)'};
 
 // Tiny inline sparkline of a metric's trailing weeks.
 function BoardSpark({vals, color}){
@@ -8106,8 +8206,8 @@ function BoardSpark({vals, color}){
   const pts = v.map((x,i)=>`${pad+(i/(v.length-1))*(w-2*pad)},${pad+(h-2*pad)-((x-min)/rng)*(h-2*pad)}`).join(' ');
   const lastX = pad+(w-2*pad), lastY = pad+(h-2*pad)-((v[v.length-1]-min)/rng)*(h-2*pad);
   return (<svg width={w} height={h} style={{display:'block'}}>
-    <polyline points={pts} fill="none" stroke={color} strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round"/>
-    <circle cx={lastX} cy={lastY} r={2.2} fill={color}/>
+    <polyline points={pts} fill="none" stroke={svgCol(color)} strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round"/>
+    <circle cx={lastX} cy={lastY} r={2.2} fill={svgCol(color)}/>
   </svg>);
 }
 
@@ -8167,7 +8267,7 @@ function WeeklyBoard(){
   const trend = weeks.map(w=>({x:w.label, date:w.weekEnding, revenue:Math.round(w.m.revenue), paid:Math.round(w.m.paid),
     mer:w.m.mer!=null?+w.m.mer.toFixed(2):null, cvr:w.m.cvr!=null?+(w.m.cvr*100).toFixed(2):null}));
   const pins = buildChartPins(weeks.map(w=>({x:w.label, date:w.weekEnding})));
-  const renderPins = () => pins.map((p,i)=>(<R.ReferenceLine key={'bp'+i} yAxisId="l" x={p.x} stroke="#8b8b99" strokeDasharray="3 3" strokeOpacity={0.5}
+  const renderPins = () => pins.map((p,i)=>(<R.ReferenceLine key={'bp'+i} yAxisId="l" x={p.x} stroke={PAL.muted} strokeDasharray="3 3" strokeOpacity={0.5}
     label={<PinMarker icon={p.icon} n={p.n} tip={p.tip}/>}/>));
 
   const openCount = actions.filter(a=>a.status!=='done').length;
@@ -8209,7 +8309,7 @@ function WeeklyBoard(){
             <p style={{margin:'0 0 10px', fontSize:16, lineHeight:1.5, color:'var(--text-primary)', fontWeight:500}}>{r.headline}</p>
             {r.narrative && <p style={{margin:'0 0 12px', fontSize:13.5, lineHeight:1.55, color:'var(--text-secondary)'}}>{r.narrative}</p>}
             {(r.findings||[]).length>0 && <div style={{display:'flex', flexDirection:'column', gap:7}}>
-              {r.findings.map(function(f,i){ var col = f.verdict==='act'?'#f87171':f.verdict==='monitor'?'var(--warn)':'var(--text-faint)';
+              {r.findings.map(function(f,i){ var col = f.verdict==='act'?PAL.bad:f.verdict==='monitor'?'var(--warn)':'var(--text-faint)';
                 return (
                   <div key={i} style={{display:'flex', gap:8, alignItems:'baseline', fontSize:13}}>
                     <span className="pill" style={{background:col+'22', color:col, fontSize:9.5, fontWeight:700, padding:'2px 7px', borderRadius:'var(--r-full)', textTransform:'uppercase', flexShrink:0}}>{f.verdict}</span>
@@ -8223,7 +8323,7 @@ function WeeklyBoard(){
         );
       })()}
       {/* Commentary — the report-card narrative: headline + what worked / what to watch / context */}
-      <div className="card board-commentary" style={{marginBottom:14, borderLeft:`3px solid ${commentary.verdict==='Strong week'?'var(--good)':commentary.verdict==='Tough week'?'#f87171':commentary.verdict==='Mixed week'?'var(--warn)':'var(--accent)'}`}}>
+      <div className="card board-commentary" style={{marginBottom:14, borderLeft:`3px solid ${commentary.verdict==='Strong week'?'var(--good)':commentary.verdict==='Tough week'?PAL.bad:commentary.verdict==='Mixed week'?'var(--warn)':'var(--accent)'}`}}>
         <div className="micro" style={{color:'var(--text-muted)', fontWeight:700, letterSpacing:'.05em', textTransform:'uppercase', marginBottom:6}}>This week in a nutshell</div>
         <p style={{margin:'0 0 14px', fontSize:16, lineHeight:1.5, color:'var(--text-primary)', fontWeight:500}}>{commentary.headline}</p>
         <div className="board-commentary-cols">
@@ -8232,7 +8332,7 @@ function WeeklyBoard(){
             {commentary.worked.length ? commentary.worked.map((t,i)=>(<div key={i} className="board-comm-line">{t}</div>)) : <div className="board-comm-line muted">Nothing stood out as a clear win this week.</div>}
           </div>
           <div>
-            <div className="board-comm-head" style={{color:'#f87171'}}>⚠ What to watch</div>
+            <div className="board-comm-head" style={{color:PAL.bad}}>⚠ What to watch</div>
             {commentary.watch.length ? commentary.watch.map((t,i)=>(<div key={i} className="board-comm-line">{t}</div>)) : <div className="board-comm-line muted">No material concerns flagged.</div>}
           </div>
           <div>
@@ -8258,10 +8358,10 @@ function WeeklyBoard(){
             </div>
             <div style={{fontSize:24, fontWeight:700, letterSpacing:'-.01em', margin:'4px 0 2px'}}>{spec.fmt(val)}</div>
             <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:6}}>
-              <span style={{fontSize:12, fontWeight:600, color: spec.better==='flat'||good==null ? 'var(--text-faint)' : (good?'var(--good)':'#f87171')}}>
+              <span style={{fontSize:12, fontWeight:600, color: spec.better==='flat'||good==null ? 'var(--text-faint)' : (good?'var(--good)':PAL.bad)}}>
                 {ch==null?'—':(ch>0?'▲ ':'▼ ')+Math.abs(ch*100).toFixed(ch>=0.1||ch<=-0.1?0:1)+'% WoW'}
               </span>
-              <BoardSpark vals={trail(spec.key, idx)} color={spec.better==='flat'?'#8b8b99':col}/>
+              <BoardSpark vals={trail(spec.key, idx)} color={spec.better==='flat'?PAL.muted:col}/>
             </div>
           </div>);
         })}
@@ -8283,7 +8383,7 @@ function WeeklyBoard(){
             </div>
             <div style={{fontSize:22, fontWeight:700, letterSpacing:'-.01em', margin:'4px 0 2px'}}>{spec.fmt(val)}</div>
             <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:6}}>
-              <span style={{fontSize:12, fontWeight:600, color: good==null ? 'var(--text-faint)' : (good?'var(--good)':'#f87171')}}>
+              <span style={{fontSize:12, fontWeight:600, color: good==null ? 'var(--text-faint)' : (good?'var(--good)':PAL.bad)}}>
                 {ch==null?'—':(ch>0?'▲ ':'▼ ')+Math.abs(ch*100).toFixed(ch>=0.1||ch<=-0.1?0:1)+'% WoW'}
               </span>
               <BoardSpark vals={trail(spec.key, idx)} color={col}/>
@@ -8295,35 +8395,48 @@ function WeeklyBoard(){
       <div className="row" style={{marginTop:14}}>
         <div className="card" style={{flex:'1 1 520px'}}>
           <div className="card-section-title"><h2 style={{margin:0}}>Revenue vs paid spend — weekly</h2><span className="meta">Bars = paid spend · Line = net revenue</span></div>
-          <R.ResponsiveContainer width="100%" height={230}>
-            <R.ComposedChart data={trend} margin={{top:18,right:16,left:6,bottom:6}}>
-              <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
-              <R.XAxis dataKey="x" tick={{fill:'#7e7e8a',fontSize:10}} interval={Math.ceil(trend.length/8)}/>
-              <R.YAxis yAxisId="l" tick={{fill:'#7e7e8a',fontSize:10}} tickFormatter={v=>curSym()+(v/1000).toFixed(0)+'k'}/>
-              <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#7e7e8a',fontSize:10}} tickFormatter={v=>curSym()+(v/1000).toFixed(0)+'k'}/>
+          <R.ResponsiveContainer width="100%" height={150}>
+            <R.ComposedChart syncId="wk-spend-rev" data={trend} margin={{top:18,right:16,left:6,bottom:6}}>
+              <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
+              <R.XAxis tickLine={false} dataKey="x" tick={false} interval={Math.ceil(trend.length/8)}/>
+              <R.YAxis yAxisId="l" tick={{fill:PAL.muted,fontSize:10}} tickFormatter={v=>curSym()+(v/1000).toFixed(0)+'k'}/>
               <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} formatter={(v,n)=>[GBP(v),n]}/>
-              <R.Bar yAxisId="l" dataKey="paid" name="Paid spend" fill={COL.meta} radius={[2,2,0,0]}/>
-              <R.Line yAxisId="r" type="monotone" dataKey="revenue" name="Net revenue" stroke={COL.revenue} strokeWidth={2.4} dot={false}/>
+              <R.Bar yAxisId="l" dataKey="paid" name="Paid spend" fill={svgCol(COL.meta)} radius={[2,2,0,0]}/>
               {renderPins()}
             </R.ComposedChart>
           </R.ResponsiveContainer>
-        </div>
+          <R.ResponsiveContainer width="100%" height={120}>
+            <R.ComposedChart syncId="wk-spend-rev" data={trend} margin={{top:18,right:16,left:6,bottom:6}}>
+              <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
+              <R.XAxis dataKey="x" tick={{fill:PAL.muted,fontSize:10}} interval={Math.ceil(trend.length/8)}/>
+              <R.YAxis yAxisId="l" orientation="left" tick={{fill:PAL.muted,fontSize:10}} tickFormatter={v=>curSym()+(v/1000).toFixed(0)+'k'}/>
+              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} formatter={(v,n)=>[GBP(v),n]}/>
+              <R.Line yAxisId="l" type="monotone" dataKey="revenue" name="Net revenue" stroke={svgCol(COL.revenue)} strokeWidth={2.4} dot={false}/>
+              {renderPins()}
+            </R.ComposedChart>
+          </R.ResponsiveContainer>        </div>
         <div className="card" style={{flex:'1 1 320px'}}>
           <div className="card-section-title"><h2 style={{margin:0}}>Efficiency — MER &amp; CVR</h2><span className="meta">MER (×) left · CVR (%) right</span></div>
-          <R.ResponsiveContainer width="100%" height={230}>
-            <R.ComposedChart data={trend} margin={{top:18,right:16,left:6,bottom:6}}>
-              <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
-              <R.XAxis dataKey="x" tick={{fill:'#7e7e8a',fontSize:10}} interval={Math.ceil(trend.length/6)}/>
-              <R.YAxis yAxisId="l" tick={{fill:'#7e7e8a',fontSize:10}} tickFormatter={v=>v+'×'}/>
-              <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#7e7e8a',fontSize:10}} tickFormatter={v=>v+'%'}/>
+          <R.ResponsiveContainer width="100%" height={130}>
+            <R.ComposedChart syncId="wk-mer-cvr" data={trend} margin={{top:18,right:16,left:6,bottom:6}}>
+              <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
+              <R.XAxis tickLine={false} dataKey="x" tick={false} interval={Math.ceil(trend.length/6)}/>
+              <R.YAxis yAxisId="l" tick={{fill:PAL.muted,fontSize:10}} tickFormatter={v=>v+'×'}/>
               <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}}/>
-              <R.ReferenceLine yAxisId="l" y={2} stroke="#a78bfa" strokeDasharray="5 4" strokeOpacity={0.7} label={{value:'MER 2×', position:'insideTopLeft', fill:'#a78bfa', fontSize:9.5}}/>
-              <R.ReferenceLine yAxisId="r" y={2} stroke="#38bdf8" strokeDasharray="5 4" strokeOpacity={0.6} label={{value:'CVR 2%', position:'insideTopRight', fill:'#38bdf8', fontSize:9.5}}/>
-              <R.Line yAxisId="l" type="monotone" dataKey="mer" name="MER" stroke="#a78bfa" strokeWidth={2.2} dot={false}/>
-              <R.Line yAxisId="r" type="monotone" dataKey="cvr" name="CVR %" stroke={COL.sessions} strokeWidth={2.2} dot={false}/>
+              <R.ReferenceLine yAxisId="l" y={2} stroke={PAL.accent} strokeDasharray="5 4" strokeOpacity={0.7} label={{value:'MER 2×', position:'insideTopLeft', fill:PAL.accent, fontSize:9.5}}/>
+              <R.Line yAxisId="l" type="monotone" dataKey="mer" name="MER" stroke={PAL.accent} strokeWidth={2.2} dot={false}/>
             </R.ComposedChart>
           </R.ResponsiveContainer>
-        </div>
+          <R.ResponsiveContainer width="100%" height={120}>
+            <R.ComposedChart syncId="wk-mer-cvr" data={trend} margin={{top:18,right:16,left:6,bottom:6}}>
+              <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
+              <R.XAxis dataKey="x" tick={{fill:PAL.muted,fontSize:10}} interval={Math.ceil(trend.length/6)}/>
+              <R.YAxis yAxisId="l" orientation="left" tick={{fill:PAL.muted,fontSize:10}} tickFormatter={v=>v+'%'}/>
+              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}}/>
+              <R.ReferenceLine yAxisId="l" y={2} stroke={PAL.data3} strokeDasharray="5 4" strokeOpacity={0.6} label={{value:'CVR 2%', position:'insideTopRight', fill:PAL.data3, fontSize:9.5}}/>
+              <R.Line yAxisId="l" type="monotone" dataKey="cvr" name="CVR %" stroke={svgCol(COL.sessions)} strokeWidth={2.2} dot={false}/>
+            </R.ComposedChart>
+          </R.ResponsiveContainer>        </div>
       </div>
       {/* Decisions log */}
       <div className="row" style={{marginTop:14}}>
@@ -8388,7 +8501,7 @@ function CohortsPanel(){
   const paybackOrders = (paidCac && firstContrib>0) ? paidCac/firstContrib : null;
   const curve = (C.pooledCurve||[]).map(p=>({m:'m'+p.m, rev:p.cumRevPerCust, contrib:+(p.cumRevPerCust*gm).toFixed(2), n:p.customersObserved}));
   const cacMonths = (C.cac && C.cac.byMonth || []).map(r=>({month:(r.month||'').slice(2), newCust:r.newCustomers, cac:r.cac, paid:r.spend>0}));
-  const ragRatio = ltvCacPaid==null?'var(--text-faint)':(ltvCacPaid>=3?'var(--good)':ltvCacPaid>=1?'var(--warn)':'#f87171');
+  const ragRatio = ltvCacPaid==null?'var(--text-faint)':(ltvCacPaid>=3?'var(--good)':ltvCacPaid>=1?'var(--warn)':PAL.bad);
   const badge = <MarginBadge/>;
 
   return (
@@ -8399,7 +8512,7 @@ function CohortsPanel(){
           <span className="meta">{C.totalCustomers} DTC customers · {C.windowFirst}→{C.windowLast} · real first-order cohorts</span>
         </div>
         <div className="micro" style={{color:'var(--text-secondary)', lineHeight:1.55}}>
-          Each customer is bucketed by the month of their <b>first order</b>, then we track what they go on to spend. {firstShare!=null && <>frkl banks <b style={{color:'var(--text-primary)'}}>{PCT(firstShare)}</b> of a customer's lifetime value in their <b>first order</b> — so every point of repeat purchase is almost pure upside, and retention is the biggest untapped lever.</>}
+          Each customer is bucketed by the month of their <b>first order</b>, then we track what they go on to spend. {firstShare!=null && <>{OI_BRAND.name||'You'} banks <b style={{color:'var(--text-primary)'}}>{PCT(firstShare)}</b> of a customer's lifetime value in their <b>first order</b> — so every point of repeat purchase is almost pure upside, and retention is the biggest untapped lever.</>}
         </div>
       </div>
       <div className="row" style={{marginBottom:14}}>
@@ -8414,15 +8527,15 @@ function CohortsPanel(){
           <div className="card-section-title"><h2 style={{margin:0}}>Lifetime value curve</h2><span className="meta">{`cumulative ${curSym()} per customer by months since first order`}</span></div>
           <R.ResponsiveContainer width="100%" height={292}>
             <R.ComposedChart data={curve} margin={{top:8,right:18,left:6,bottom:6}}>
-              <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
-              <R.XAxis dataKey="m" tick={{fill:'#7e7e8a',fontSize:11}}/>
-              <R.YAxis tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>curSym()+v}/>
+              <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
+              <R.XAxis dataKey="m" tick={{fill:PAL.muted,fontSize:11}}/>
+              <R.YAxis tick={{fill:PAL.muted,fontSize:11}} tickFormatter={v=>curSym()+v}/>
               <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,boxShadow:'var(--shadow-md)'}} formatter={(v,n)=>[GBP(v), n==='contrib'?'Contribution':'Revenue']}
                 labelFormatter={(l,p)=> l + (p&&p[0]&&p[0].payload? ' · '+p[0].payload.n+' customers observed':'')}/>
               <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}}/>
-              {paidCac!=null && <R.ReferenceLine y={paidCac} stroke="#a78bfa" strokeDasharray="5 4" strokeOpacity={0.8} label={{value:'paid CAC', position:'insideTopRight', fill:'#a78bfa', fontSize:10}}/>}
-              <R.Area type="monotone" dataKey="rev" name="Revenue" stroke={COL.revenue} fill={COL.revenue+'22'} strokeWidth={2}/>
-              <R.Line type="monotone" dataKey="contrib" name="Contribution" stroke="#a78bfa" strokeWidth={2.4} dot={false}/>
+              {paidCac!=null && <R.ReferenceLine y={paidCac} stroke={PAL.accent} strokeDasharray="5 4" strokeOpacity={0.8} label={{value:'paid CAC', position:'insideTopRight', fill:PAL.accent, fontSize:10}}/>}
+              <R.Area type="monotone" dataKey="rev" name="Revenue" stroke={svgCol(COL.revenue)} fill={COL.revenue+'22'} strokeWidth={2}/>
+              <R.Line type="monotone" dataKey="contrib" name="Contribution" stroke={PAL.accent} strokeWidth={2.4} dot={false}/>
               <R.Brush {...brushProps('m')} />
             </R.ComposedChart>
           </R.ResponsiveContainer>
@@ -8434,19 +8547,25 @@ function CohortsPanel(){
         </div>
         <div className="card" style={{flex:'1 1 300px'}}>
           <div className="card-section-title"><h2 style={{margin:0}}>CAC by acquisition month</h2><span className="meta">new customers vs paid CAC</span></div>
-          <R.ResponsiveContainer width="100%" height={292}>
-            <R.ComposedChart data={cacMonths} margin={{top:8,right:14,left:6,bottom:6}}>
-              <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
-              <R.XAxis dataKey="month" tick={{fill:'#7e7e8a',fontSize:10}}/>
-              <R.YAxis yAxisId="l" tick={{fill:'#7e7e8a',fontSize:10}}/>
-              <R.YAxis yAxisId="r" orientation="right" tick={{fill:'#7e7e8a',fontSize:10}} tickFormatter={v=>curSym()+v}/>
+          <R.ResponsiveContainer width="100%" height={150}>
+            <R.ComposedChart syncId="cohort-cac" data={cacMonths} margin={{top:8,right:14,left:6,bottom:6}}>
+              <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
+              <R.XAxis tickLine={false} dataKey="month" tick={false}/>
+              <R.YAxis yAxisId="l" tick={{fill:PAL.muted,fontSize:10}}/>
               <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,boxShadow:'var(--shadow-md)'}} formatter={(v,n)=> n==='cac'?[v!=null?GBP(v):'no paid spend','Paid CAC']:[NUM(v),'New customers']}/>
-              <R.Bar yAxisId="l" dataKey="newCust" name="New customers" fill={COL.sessions} radius={[2,2,0,0]}/>
-              <R.Line yAxisId="r" type="monotone" dataKey="cac" name="cac" stroke={COL.google} strokeWidth={2.2} dot={{r:2.5}} connectNulls/>
-              <R.Brush {...brushProps('month')} />
+              <R.Bar yAxisId="l" dataKey="newCust" name="New customers" fill={svgCol(COL.sessions)} radius={[2,2,0,0]}/>
             </R.ComposedChart>
           </R.ResponsiveContainer>
-          <div style={{fontSize:10.5,color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{BRUSH_HINT}</div>
+          <R.ResponsiveContainer width="100%" height={120}>
+            <R.ComposedChart syncId="cohort-cac" data={cacMonths} margin={{top:8,right:14,left:6,bottom:6}}>
+              <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
+              <R.XAxis dataKey="month" tick={{fill:PAL.muted,fontSize:10}}/>
+              <R.YAxis yAxisId="l" orientation="left" tick={{fill:PAL.muted,fontSize:10}} tickFormatter={v=>curSym()+v}/>
+              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,boxShadow:'var(--shadow-md)'}} formatter={(v,n)=> n==='cac'?[v!=null?GBP(v):'no paid spend','Paid CAC']:[NUM(v),'New customers']}/>
+              <R.Line yAxisId="l" type="monotone" dataKey="cac" name="cac" stroke={svgCol(COL.google)} strokeWidth={2.2} dot={{r:2.5}} connectNulls/>
+              <R.Brush {...brushProps('month')} />
+            </R.ComposedChart>
+          </R.ResponsiveContainer>          <div style={{fontSize:10.5,color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{BRUSH_HINT}</div>
           <div className="micro" style={{color:'var(--text-faint)', marginTop:4}}>Most early customers came via unpaid channels (organic/email) — paid CAC only applies where there was paid spend.</div>
           <ChartFooter note="Is acquisition getting more expensive over time?"
             ask="Looking at CAC by acquisition month, is paid CAC trending up, and what's driving it?"
@@ -8473,7 +8592,7 @@ function CohortsPanel(){
             {(C.byProduct||[]).map((p,i)=>{ const hot=p.repeatRate>=(C.repeatRate*1.3); const cold=p.repeatRate<=(C.repeatRate*0.5);
               return (<tr key={i}>
                 <td style={{maxWidth:200}}>{p.name}</td><td>{NUM(p.newCustomers)}</td>
-                <td style={{color: hot?'var(--good)':cold?'#f87171':'var(--text-primary)', fontWeight:hot||cold?700:400}}>{PCT(p.repeatRate)}</td>
+                <td style={{color: hot?'var(--good)':cold?PAL.bad:'var(--text-primary)', fontWeight:hot||cold?700:400}}>{PCT(p.repeatRate)}</td>
                 <td>{GBP(p.lifetimeRevPerCust)}</td>
               </tr>); })}
           </tbody></table>
@@ -8527,7 +8646,7 @@ function AdviceLedgerPanel(){
               <div style={{display:'flex', gap:8, alignItems:'baseline'}}>
                 <span style={{color:'var(--good)', fontWeight:700}}>✓</span>
                 <span style={{flex:1, fontSize:13, color:'var(--text-primary)'}}>{a.text}</span>
-                {a.agent && <span className="micro" style={{color:'var(--text-faint)'}} title={agentTitle(a.agent)}>{a.agent}{agentRole(a.agent)?` · ${agentRole(a.agent)}`:''}</span>}
+                {a.agent && <span className="micro" style={{color:'var(--text-faint)'}}>{agentLabel(a.agent)}</span>}
                 {when && <span className="micro" style={{color:'var(--text-faint)'}}>{when}</span>}
               </div>
               {moves.length
@@ -8552,7 +8671,7 @@ function StockThrottlePanel(){
     .slice(0, 6);
   if(!risk.length) return null;
   const critical = risk.filter(r=>r.coverTier==='critical');
-  return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid #f87171'}}>
+  return (<div className="card" style={{marginBottom:14, borderLeft:`3px solid ${PAL.bad}`}}>
     <div className="card-section-title">
       <h2 style={{margin:0, display:'inline-flex', alignItems:'center', gap:7}}><Icon name="alert" size={16} style={{color:'var(--bad)'}}/> Stock-out spend risk</h2>
       <StatusBadge kind={critical.length ? 'critical' : 'stock'} label={critical.length ? 'Critical' : 'Stock-constrained'}/>
@@ -8568,7 +8687,7 @@ function StockThrottlePanel(){
         <td style={{maxWidth:240}}><b>{(r.title||'').slice(0,40)}</b></td>
         <td>{NUM(r.inventoryQty)}</td>
         <td>{NUM(r.units90d)}</td>
-        <td><span style={{color: r.coverTier==='critical'?'#f87171':'var(--warn)', fontWeight:700}}>{r.daysOfCover==null||r.daysOfCover===999?'∞':r.daysOfCover+'d'}</span></td>
+        <td><span style={{color: r.coverTier==='critical'?PAL.bad:'var(--warn)', fontWeight:700}}>{r.daysOfCover==null||r.daysOfCover===999?'∞':r.daysOfCover+'d'}</span></td>
         <td className="micro" style={{color:'var(--text-secondary)'}}>{r.coverTier==='critical'?'Pull from paid · reorder now':'Reorder + watch spend'}</td>
       </tr>))}
     </tbody></table>
@@ -8609,11 +8728,11 @@ function CreativeFatiguePanel(){
     <div className="card kpi" style={{flex:'1 1 200px'}}>
       <div className="label">{label}</div>
       <div style={{display:'flex', gap:14, marginTop:4}}>
-        <div><div style={{fontSize:20, fontWeight:700, color:'#f87171'}}>{fmt(fat)}</div><div className="micro" style={{color:'var(--text-faint)'}}>fatigued ≥{FREQ}×</div></div>
+        <div><div style={{fontSize:20, fontWeight:700, color:PAL.bad}}>{fmt(fat)}</div><div className="micro" style={{color:'var(--text-faint)'}}>fatigued ≥{FREQ}×</div></div>
         <div><div style={{fontSize:20, fontWeight:700, color:'var(--good)'}}>{fmt(fresh)}</div><div className="micro" style={{color:'var(--text-faint)'}}>fresh</div></div>
       </div>
     </div>);
-  const toneCol = tone==='bad'?'#f87171':tone==='good'?'var(--good)':'var(--warn)';
+  const toneCol = tone==='bad'?PAL.bad:tone==='good'?'var(--good)':'var(--warn)';
   return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid '+toneCol}}>
     <div className="card-section-title"><h2 style={{margin:0}}>Creative fatigue → CPA</h2><span className="meta">{F.n} above {FREQ}× · {R.n} fresh ads</span></div>
     <div style={{fontSize:14, lineHeight:1.5, color:'var(--text-primary)', fontWeight:500, marginBottom:10}}>{headline}</div>
@@ -8762,7 +8881,7 @@ function ClarityFrictionPanel(){
   </div>);
   const manual = C.source==='manual';
   const f = C.friction || {};
-  const sev = s => s==='high'?'#f87171':s==='med'?'var(--warn)':'var(--text-muted)';
+  const sev = s => s==='high'?PAL.bad:s==='med'?'var(--warn)':'var(--text-muted)';
   const tiles = [
     {label:'Sessions w/ JS error', val: f.scriptError.pct!=null?f.scriptError.pct.toFixed(0)+'%':'—', bad: (f.scriptError.pct||0)>=10, sub: f.scriptError.count?`${NUM(f.scriptError.count)} script errors`:'of sessions hit a JS error'},
     {label:'Pages / session',      val: C.pagesPerSession!=null?C.pagesPerSession.toFixed(2):'—', bad:(C.pagesPerSession||9)<1.5, sub:'land-and-leave if < 1.5'},
@@ -8771,7 +8890,7 @@ function ClarityFrictionPanel(){
     {label:'Dead clicks',          val: f.deadClick.pct!=null?f.deadClick.pct.toFixed(1)+'%':'—', bad:(f.deadClick.pct||0)>=3, sub:'clicks that do nothing'},
     {label:'Active engagement',    val: C.engagement.activePct!=null?PCT(C.engagement.activePct):'—', bad:(C.engagement.activePct||1)<0.5, sub:'share of time actually active'},
   ];
-  return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid #f87171'}}>
+  return (<div className="card" style={{marginBottom:14, borderLeft:`3px solid ${PAL.bad}`}}>
     {uploader}
     <div className="card-section-title">
       <h2 style={{margin:0}}>Site friction — is the site the bottleneck?</h2>
@@ -8790,9 +8909,9 @@ function ClarityFrictionPanel(){
       </div>))}
     </div>)}
     <div className="board-grid">
-      {tiles.map((t,i)=>(<div key={i} className="card board-card" style={{borderLeft:'3px solid '+(t.bad?'#f87171':'var(--border-default)')}}>
+      {tiles.map((t,i)=>(<div key={i} className="card board-card" style={{borderLeft:'3px solid '+(t.bad?PAL.bad:'var(--border-default)')}}>
         <div className="micro" style={{color:'var(--text-muted)', fontWeight:600}}>{t.label}</div>
-        <div style={{fontSize:22, fontWeight:700, margin:'4px 0 2px', color:t.bad?'#f87171':'var(--text-primary)'}}>{t.val}</div>
+        <div style={{fontSize:22, fontWeight:700, margin:'4px 0 2px', color:t.bad?PAL.bad:'var(--text-primary)'}}>{t.val}</div>
         <div className="micro" style={{color:'var(--text-faint)'}}>{t.sub}</div>
       </div>))}
     </div>
@@ -8812,7 +8931,7 @@ function RetentionPanel(){
   const SEG = [
     {k:'due',     label:'Due now',  col:'var(--good)',  desc:'in the reorder window — nudge now'},
     {k:'overdue', label:'Overdue',  col:'var(--warn)',  desc:'past their window — slipping, win back'},
-    {k:'lapsed',  label:'Lapsed',   col:'#f87171',      desc:'>150 days — deep win-back'},
+    {k:'lapsed',  label:'Lapsed',   col:PAL.bad,      desc:'>150 days — deep win-back'},
   ];
   return (<div className="card" style={{marginBottom:14, borderLeft:'3px solid var(--accent)'}}>
     <div className="card-section-title">
@@ -8879,13 +8998,13 @@ function MarginBridge({cur, pri, gm, perOrderFixed, payPct}){
   const Tip = ({active, payload}) => { if(!active||!payload||!payload.length) return null; const d=payload[0].payload;
     return (<div style={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,padding:'7px 10px',fontSize:12}}>
       <div style={{fontWeight:700}}>{d.name}</div>
-      <div style={{color: d.isTotal?'var(--text-secondary)':(d.amt>=0?'var(--good)':'#f87171')}}>{d.isTotal?GBP(d.amt):(d.amt>=0?'+':'−')+GBP(Math.abs(d.amt))}</div>
+      <div style={{color: d.isTotal?'var(--text-secondary)':(d.amt>=0?'var(--good)':PAL.bad)}}>{d.isTotal?GBP(d.amt):(d.amt>=0?'+':'−')+GBP(Math.abs(d.amt))}</div>
     </div>); };
   // £ label above each bar — small steps on a big base are unreadable by height, so
   // we show the number. (recharts-text class lets the light-theme override recolour it.)
   const segLabel = (which)=>(p)=>{ const d=data[p.index]||{}; if(!(d[which]>0)) return null;   // only the row's real segment
     const txt = d.isTotal ? GBP(d.amt) : ((d.amt>=0?'+':'−')+GBP(Math.abs(d.amt)));
-    return (<text className="recharts-text" x={(p.x||0)+(p.width||0)/2} y={(p.y||0)-5} textAnchor="middle" fontSize="10.5" fontWeight="600" fill="#aab0bd">{txt}</text>); };
+    return (<text className="recharts-text" x={(p.x||0)+(p.width||0)/2} y={(p.y||0)-5} textAnchor="middle" fontSize="10.5" fontWeight="600" fill={PAL.faint}>{txt}</text>); };
   return (
     <div className="card" style={{marginBottom:14}}>
       <div className="card-section-title">
@@ -8894,13 +9013,13 @@ function MarginBridge({cur, pri, gm, perOrderFixed, payPct}){
       </div>
       <R.ResponsiveContainer width="100%" height={260}>
         <R.BarChart data={data} margin={{top:24,right:16,left:10,bottom:6}}>
-          <R.CartesianGrid stroke="#1f1f27" vertical={false}/>
-          <R.XAxis dataKey="name" tick={{fill:'#7e7e8a',fontSize:11}} interval={0}/>
-          <R.YAxis tick={{fill:'#7e7e8a',fontSize:11}} tickFormatter={v=>curSym()+(Math.abs(v)>=1000?(v/1000).toFixed(0)+'k':v)}/>
+          <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
+          <R.XAxis dataKey="name" tick={{fill:PAL.muted,fontSize:11}} interval={0}/>
+          <R.YAxis tick={{fill:PAL.muted,fontSize:11}} tickFormatter={v=>curSym()+(Math.abs(v)>=1000?(v/1000).toFixed(0)+'k':v)}/>
           <R.Tooltip cursor={{fill:'#ffffff08'}} content={<Tip/>}/>
           <R.Bar dataKey="base" stackId="s" fill="transparent" isAnimationActive={false}/>
-          <R.Bar dataKey="pos" stackId="s" isAnimationActive={false}>{data.map((d,i)=><R.Cell key={i} fill={d.isTotal?'#8B5CF6':'#4ade80'}/>)}<R.LabelList content={segLabel('pos')}/></R.Bar>
-          <R.Bar dataKey="neg" stackId="s" fill="#f87171" isAnimationActive={false}><R.LabelList content={segLabel('neg')}/></R.Bar>
+          <R.Bar dataKey="pos" stackId="s" isAnimationActive={false}>{data.map((d,i)=><R.Cell key={i} fill={svgCol(d.isTotal?PAL.accent:PAL.good)}/>)}<R.LabelList content={segLabel('pos')}/></R.Bar>
+          <R.Bar dataKey="neg" stackId="s" fill={PAL.bad} isAnimationActive={false}><R.LabelList content={segLabel('neg')}/></R.Bar>
         </R.BarChart>
       </R.ResponsiveContainer>
       <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>Fully-loaded contribution = net revenue × {PCT(gm)} margin − variable costs − paid media. Bars sum exactly to the change; green helped, red hurt.</div>
@@ -8935,10 +9054,10 @@ function ProductRetentionMatrix(){
   const pts = M.map(p=>({ x:+(p.retentionRate*100).toFixed(1), y:p.acquired, z:Math.max(1,Math.round(p.lifetimeRevPerCust*gm)),
     name:p.name, repeat:p.retentionRate, ltv:p.lifetimeRevPerCust, buyers:p.buyers }));
   const QMETA = {
-    hero:  {label:'Heroes',          col:'#4ade80', action:'acquire AND retain — advertise & feature these'},
-    gem:   {label:'Hidden gems',     col:'#38bdf8', action:'retain but few find them — scale acquisition'},
-    leaky: {label:'Leaky acquirers', col:'#f4a23b', action:"bring customers who don't return — add a post-purchase / cross-sell flow, not more spend"},
-    tail:  {label:'Long tail',       col:'#8b8b99', action:'low volume + low retention — deprioritise'},
+    hero:  {label:'Heroes',          col:PAL.good, action:'acquire AND retain — advertise & feature these'},
+    gem:   {label:'Hidden gems',     col:PAL.data3, action:'retain but few find them — scale acquisition'},
+    leaky: {label:'Leaky acquirers', col:PAL.warn, action:"bring customers who don't return — add a post-purchase / cross-sell flow, not more spend"},
+    tail:  {label:'Long tail',       col:PAL.muted, action:'low volume + low retention — deprioritise'},
   };
   const groups = {hero:[], gem:[], leaky:[], tail:[]};
   pts.forEach(p=>{ const hiR=p.x>=brandRep, hiV=p.y>=medAcq; groups[hiR&&hiV?'hero':hiR&&!hiV?'gem':!hiR&&hiV?'leaky':'tail'].push(p); });
@@ -8951,20 +9070,20 @@ function ProductRetentionMatrix(){
       <span className="meta">repeat rate × customers acquired · bubble = contribution LTV/customer</span>
     </div>
     <div className="micro" style={{color:'var(--text-secondary)', marginBottom:8, lineHeight:1.5}}>
-      Almost every frkl product is bought on a customer's <b>first</b> order, so the catalogue is acquisition-led across the board and <b>retention is the gap</b>. Below: which first products bring customers who come <i>back</i> (right) vs once-and-done (left). Dashed lines = brand-average repeat ({brandRep.toFixed(0)}%) and median acquisition volume.
+      {DEMO && <>Almost every frkl product is bought on a customer's <b>first</b> order, so the catalogue is acquisition-led across the board and <b>retention is the gap</b>. </>}Below: which first products bring customers who come <i>back</i> (right) vs once-and-done (left). Dashed lines = brand-average repeat ({brandRep.toFixed(0)}%) and median acquisition volume.
     </div>
     <div {...z.bind}>
     <ZoomControls z={z}/>
     <R.ResponsiveContainer width="100%" height={330}>
       <R.ScatterChart margin={{top:10,right:24,left:6,bottom:26}}>
-        <R.CartesianGrid stroke="#1f1f27"/>
-        <R.XAxis type="number" dataKey="x" name="Retention" unit="%" domain={[z.view[0],z.view[1]]} allowDataOverflow tickFormatter={niceTick} tick={{fill:'#7e7e8a',fontSize:11}}
-          label={{value:'Repeat rate of acquired customers →', position:'insideBottom', offset:-14, fill:'#6f6f7b', fontSize:11}}/>
-        <R.YAxis type="number" dataKey="y" name="Acquired" domain={[z.view[2],z.view[3]]} allowDataOverflow tickFormatter={niceTick} tick={{fill:'#7e7e8a',fontSize:11}}
-          label={{value:'Customers acquired', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:'#6f6f7b', fontSize:11}}/>
+        <R.CartesianGrid stroke={PAL.panel}/>
+        <R.XAxis type="number" dataKey="x" name="Retention" unit="%" domain={[z.view[0],z.view[1]]} allowDataOverflow tickFormatter={niceTick} tick={{fill:PAL.muted,fontSize:11}}
+          label={{value:'Repeat rate of acquired customers →', position:'insideBottom', offset:-14, fill:PAL.muted, fontSize:11}}/>
+        <R.YAxis type="number" dataKey="y" name="Acquired" domain={[z.view[2],z.view[3]]} allowDataOverflow tickFormatter={niceTick} tick={{fill:PAL.muted,fontSize:11}}
+          label={{value:'Customers acquired', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:11}}/>
         <R.ZAxis type="number" dataKey="z" range={[50,520]} name="LTV"/>
-        <R.ReferenceLine x={brandRep} stroke="#5a5a66" strokeDasharray="4 3"/>
-        <R.ReferenceLine y={medAcq} stroke="#5a5a66" strokeDasharray="4 3"/>
+        <R.ReferenceLine x={brandRep} stroke={PAL.muted} strokeDasharray="4 3"/>
+        <R.ReferenceLine y={medAcq} stroke={PAL.muted} strokeDasharray="4 3"/>
         <R.Tooltip cursor={{strokeDasharray:'3 3'}} content={<MatrixTip/>}/>
         {['hero','gem','leaky','tail'].map(k=> groups[k].length ? <R.Scatter key={k} name={QMETA[k].label} data={groups[k]} fill={QMETA[k].col} fillOpacity={0.78}/> : null)}
       </R.ScatterChart>
@@ -9007,7 +9126,7 @@ function RestockActionQueue(){
     <div className="card" style={{marginBottom:14, borderLeft:'3px solid '+(toOrder.length?'var(--warn)':'var(--accent)')}}>
       <div className="card-section-title" style={{marginBottom:6}}>
         <h2 style={{margin:0}}>Stock &amp; purchasing</h2>
-        <span className="meta">{oosNow>0?<b style={{color:'var(--bad)'}}>{oosNow} order today</b>:null}{oosNow>0?' · ':''}{toOrder.length} to order{awaiting.length?` · ${awaiting.length} awaiting stock`:''} · Atlas · finance &amp; commercial</span>
+        <span className="meta">{oosNow>0?<b style={{color:'var(--bad)'}}>{oosNow} order today</b>:null}{oosNow>0?' · ':''}{toOrder.length} to order{awaiting.length?` · ${awaiting.length} awaiting stock`:''} · finance &amp; commercial</span>
       </div>
       {toOrder.length>0 ? (<div style={{display:'flex',flexDirection:'column',gap:7}}>
         {/* Urgent (OOS-before-lead) rows always show; the non-urgent tail collapses to keep the queue scannable. */}
@@ -9016,10 +9135,10 @@ function RestockActionQueue(){
             <div key={idx} style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',padding:'8px 0',borderTop:idx?'1px solid var(--border-subtle)':'none'}}>
               <span style={{width:8,height:8,borderRadius:'50%',background:urgent?'var(--bad)':'var(--warn)',flexShrink:0}}/>
               <div style={{flex:1,minWidth:200}}>
-                <div style={{fontSize:13,color:'var(--text-primary)'}}>{l.basis==='forecast'?'Order for forecast':'Raise PO'} — <b>{NUM(l.qty)} units</b> of {l.p.title}{urgent && <span style={{marginLeft:6,fontSize:9.5,fontWeight:800,letterSpacing:'.03em',color:'#fff',background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}</div>
+                <div style={{fontSize:13,color:'var(--text-primary)'}}>{l.basis==='forecast'?'Order for forecast':'Raise PO'} — <b>{NUM(l.qty)} units</b> of {l.p.title}{urgent && <span style={{marginLeft:6,fontSize:9.5,fontWeight:800,letterSpacing:'.03em',color:PAL.panel,background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}</div>
                 <div style={{fontSize:11,color:'var(--text-faint)',marginTop:1}}>{l.supplier} · {urgent?`OOS in ~${Math.round(l.cover)}d — ${l.oosGap}d short of the ${l.lead}d lead`:(l.basis==='forecast'?`plan needs ${NUM(l.forecastUnits)}, have ${NUM(l.stock)}`:`runs out in ~${Math.round(l.cover)}d (lead ${l.lead}d)`)}{l.lineCost!=null?` · ~${curSym()}${k(l.lineCost)}`:''}{l.moqBumped?` · MOQ ${l.moq}`:''}</div>
               </div>
-              <button style={{...btn,background:'var(--accent)',color:'#fff',borderColor:'var(--accent)'}} onClick={()=>raise(l)}><Icon name="check" size={12}/> Mark PO raised</button>
+              <button style={{...btn,background:'var(--accent)',color:PAL.panel,borderColor:'var(--accent)'}} onClick={()=>raise(l)}><Icon name="check" size={12}/> Mark PO raised</button>
               <button style={btn} onClick={()=>window.__oiNav&&window.__oiNav('planning','plan')}>Open planner</button>
             </div>
           ); })}
@@ -9065,6 +9184,12 @@ function CommandMenu(){
   const [sel, setSel] = React.useState(0);
   const items = React.useMemo(() => {
     const list = [];
+    if (UI_V3) {
+      // One entry per destination — the palette can only offer places that exist.
+      V3_NAV.forEach(d => list.push({label: d.label, sub: d.group, v3: d.id, icon: d.icon}));
+      list.push({label:'Ask Greta a question', sub:'Act', v3:'ask', icon:'spark'});
+      return list;
+    }
     NAV.forEach(s => s.subtabs.forEach(t => list.push({label: t.label, sub: s.label, section: s.id, subId: t.id, icon: s.icon||'info'})));
     list.push({label:'Ask the AI analyst a question', sub:'AI Analyst', section:'home', subId:'ask', icon:'spark'});
     return list;
@@ -9080,7 +9205,7 @@ function CommandMenu(){
   }, []);
   const filtered = items.filter(it => (it.label+' '+it.sub).toLowerCase().includes(q.trim().toLowerCase()));
   if(!open) return null;
-  const go = (it) => { setOpen(false); if(window.__oiNav) window.__oiNav(it.section, it.subId); };
+  const go = (it) => { setOpen(false); if (it.v3 && window.__oiGo) window.__oiGo(it.v3); else if(window.__oiNav) window.__oiNav(it.section, it.subId); };
   const onKeyDown = (e) => {
     if(e.key==='ArrowDown'){ e.preventDefault(); setSel(s=>Math.min(s+1, filtered.length-1)); }
     else if(e.key==='ArrowUp'){ e.preventDefault(); setSel(s=>Math.max(s-1, 0)); }
@@ -9238,7 +9363,9 @@ function BusinessReview(){
   const moRev = recentW.length ? (recentW.reduce((s,w)=>s+(w.m.revenue||0),0)/recentW.length)*W2M : null;
   const moSpend = recentW.length ? (recentW.reduce((s,w)=>s+(w.m.paid||0),0)/recentW.length)*W2M : null;
   const moNet = (moRev!=null && gm!=null) ? moRev*gm - moSpend - overheads : null;
-  const editCash = ()=>setCashOpen(o=>!o);
+  // One store for cash too (decision 5): V3 sends this to Goal & costs, which saves
+  // through save-brand-config, instead of the browser-only oi_cash_v1 editor.
+  const editCash = ()=>{ if (UI_V3) { window.__oiGo && window.__oiGo('goal', 'economics'); return; } setCashOpen(o=>!o); };
   let runwayCard;
   if(!haveCash){
     runwayCard = { label:'Cash runway', value:'Set balance', status:'missing', statusLabel:'Needs input',
@@ -9299,7 +9426,7 @@ function BusinessReview(){
   const lbl = {display:'flex',flexDirection:'column',fontSize:11.5,fontWeight:600,color:'var(--text-secondary)'};
   const regRow = (accent) => (x,idx) => (<div key={idx} style={{display:'flex',gap:12,alignItems:'baseline',padding:'9px 0',borderTop:idx?'1px solid var(--border-subtle)':'none'}}>
     <div style={{flex:1,minWidth:0}}>
-      <div style={{fontSize:13,color:'var(--text-primary)',lineHeight:1.4}}>{x.description}</div>
+      <div style={{fontSize:13,color:'var(--text-primary)',lineHeight:1.4}}>{scrubTag(x.description)}</div>
       {x.basis && <div style={{fontSize:11,color:'var(--text-faint)',marginTop:2,lineHeight:1.4}}>{x.basis}</div>}
     </div>
     <div style={{textAlign:'right',flexShrink:0}}>
@@ -9310,7 +9437,7 @@ function BusinessReview(){
   const topMoves = [...risks,...opps].sort(byImpact).slice(0,3);
 
   if(!W){
-    return (<div className="card"><div className="muted" style={{fontSize:13}}>Business review needs at least one complete week of synced data. Connect your sources and check back once a full week has closed.</div></div>);
+    return (<div className="card"><div className="muted" style={{fontSize:13}}>Business review needs at least one complete week of synced data. <GoLink sec="settings" sub="connections">Connect your sources</GoLink> and check back once a full week has closed.</div></div>);
   }
 
   return (
@@ -9386,7 +9513,7 @@ function BusinessReview(){
           <span className="muted" style={{fontSize:12.5}}>{openActions} open in the queue</span>
           <button style={{...btn,marginLeft:'auto'}} onClick={()=>window.__oiNav&&window.__oiNav('actions','queue')}>Open action queue <Icon name="chevron" size={13}/></button>
         </div>
-        {topMoves.length>0 && <div className="muted" style={{fontSize:12.5,marginTop:9,lineHeight:1.55}}>Highest-value moves right now: {topMoves.map(m=>`${m.description} (~${curSym()}${k(Math.abs(m.monthly_impact_gbp))}/mo)`).join(' · ')}.</div>}
+        {topMoves.length>0 && <div className="muted" style={{fontSize:12.5,marginTop:9,lineHeight:1.55}}>Highest-value moves right now: {topMoves.map(m=>`${scrubTag(m.description)} (~${curSym()}${k(Math.abs(m.monthly_impact_gbp))}/mo)`).join(' · ')}.</div>}
       </div>
     </div>
   );
@@ -9415,7 +9542,7 @@ function PlanningHeader({active, embedded}){
   const pHint = embedded ? ' · jump ›' : (active!=='production'?' · open ›':'');
   const chip = (on)=>({flex:'1 1 190px',minWidth:172,padding:'10px 13px',borderRadius:10,background:on?'var(--accent-bg)':'var(--bg-elevated)',border:'1px solid '+(on?'var(--accent)':'var(--border-subtle)')});
   const lab = {fontSize:10,fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:4};
-  const sbtn = (id)=>({fontSize:11,fontWeight:700,padding:'5px 9px',borderRadius:7,cursor:'pointer',border:'1.5px solid '+(strat===id?'var(--accent)':'var(--border-default)'),background:strat===id?'var(--accent)':'transparent',color:strat===id?'#fff':'var(--text-secondary)'});
+  const sbtn = (id)=>({fontSize:11,fontWeight:700,padding:'5px 9px',borderRadius:7,cursor:'pointer',border:'1.5px solid '+(strat===id?'var(--accent)':'var(--border-default)'),background:strat===id?'var(--accent)':'transparent',color:strat===id?PAL.panel:'var(--text-secondary)'});
   const arrow = <div style={{display:'flex',alignItems:'center',color:'var(--text-faint)',fontSize:16,fontWeight:700}}>→</div>;
   return (
     <div className="card" style={{padding:'12px 14px',marginBottom:14}}>
@@ -9560,7 +9687,7 @@ function ProductionPlanner({embedded}={}){
         {plan.active && (<div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginTop:10,padding:'8px 12px',borderRadius:8,background:'var(--accent-bg)',border:'1px solid var(--border-subtle)'}}>
           <Icon name="trendUp" size={14} style={{color:'var(--accent)'}}/>
           <span style={{fontSize:12,color:'var(--text-secondary)'}}>Orders are sized to your demand plan — <b style={{color:'var(--text-primary)'}}>{plan.growthPct>=0?'+':''}{plan.growthPct.toFixed(0)}% vs run-rate</b> ({plan.mode==='growth'?'growth target':plan.mode==='units'?'units target':'revenue target'}), not flat velocity.</span>
-          <button style={{...btn,fontSize:11.5,padding:'4px 10px',marginLeft:'auto'}} onClick={()=>{ if(window.__oiOpenForecast){ window.__oiOpenForecast(); return; } const el=document.getElementById('plan-forecast'); if(el) el.scrollIntoView({behavior:'smooth'}); else if(window.__oiNav) window.__oiNav('planning','forecast'); }}>Adjust plan <Icon name="chevron" size={12}/></button>
+          <button style={{...btn,fontSize:11.5,padding:'4px 10px',marginLeft:'auto'}} onClick={()=>{ if(window.__oiOpenForecast){ window.__oiOpenForecast(); return; } const el=document.getElementById('plan-forecast'); if(el) el.scrollIntoView({behavior:'smooth'}); else if(window.__oiNav) window.__oiNav('planning','plan'); }}>Adjust plan <Icon name="chevron" size={12}/></button>
         </div>)}
       </div>
       {/* supplier master — per SKU, built up over time */}
@@ -9624,7 +9751,7 @@ function ProductionPlanner({embedded}={}){
               : <span style={{fontSize:11.5,fontWeight:700,color:'var(--warn)',background:'var(--warn-bg)',padding:'2px 9px',borderRadius:999}}>Pricing pending{po.total>0?` · ${curSym()}${po.total.toFixed(0)} so far`:''}</span>}
             <button style={smbtn} onClick={()=>copyPO(po)}><Icon name="clipboard" size={12}/> Copy</button>
             <button style={smbtn} onClick={()=>download(po)}><Icon name="report" size={12}/> CSV</button>
-            <button style={{...smbtn, background:'var(--accent)', color:'#fff', borderColor:'var(--accent)'}} onClick={()=>raisePO(po)}><Icon name="check" size={12}/> Mark PO raised</button>
+            <button style={{...smbtn, background:'var(--accent)', color:PAL.panel, borderColor:'var(--accent)'}} onClick={()=>raisePO(po)}><Icon name="check" size={12}/> Mark PO raised</button>
           </div>
         </div>
         {po.hasCost && (()=>{ const fd=iso=>{ try{ return new Date((iso||'')+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'}); }catch(e){ return iso; } }; return (
@@ -9640,7 +9767,7 @@ function ProductionPlanner({embedded}={}){
           <th style={th}>Product</th><th style={{...th,textAlign:'right'}}>Stock</th><th style={{...th,textAlign:'right'}}>Cover</th><th style={{...th,textAlign:'right'}}>Order qty</th><th style={{...th,textAlign:'right'}}>{`Unit ${curSym()}`}</th><th style={{...th,textAlign:'right'}}>{`Line ${curSym()}`}</th>
         </tr></thead><tbody>
           {po.lines.map((l,idx)=>(<tr key={idx}>
-            <td style={{...td,color:'var(--text-primary)'}}>{l.p.title}{l.oosBeforeLead && <span style={{marginLeft:6,fontSize:9.5,fontWeight:800,letterSpacing:'.03em',color:'#fff',background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}<div style={{fontSize:10.5,color:'var(--text-faint)'}}>{l.p.sku||'no SKU'} · {l.p.type}{l.oosBeforeLead?` · OOS gap ${l.oosGap}d`:''}{l.basis==='forecast'?` · plan needs ${NUM(l.forecastUnits)}`:''}{l.basis==='wave'&&l.nextWaveBy?` · next wave by ${l.nextWaveBy}`:''}{l.moqBumped?' · MOQ '+l.moq:''}</div></td>
+            <td style={{...td,color:'var(--text-primary)'}}>{l.p.title}{l.oosBeforeLead && <span style={{marginLeft:6,fontSize:9.5,fontWeight:800,letterSpacing:'.03em',color:PAL.panel,background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}<div style={{fontSize:10.5,color:'var(--text-faint)'}}>{l.p.sku||'no SKU'} · {l.p.type}{l.oosBeforeLead?` · OOS gap ${l.oosGap}d`:''}{l.basis==='forecast'?` · plan needs ${NUM(l.forecastUnits)}`:''}{l.basis==='wave'&&l.nextWaveBy?` · next wave by ${l.nextWaveBy}`:''}{l.moqBumped?' · MOQ '+l.moq:''}</div></td>
             <td style={{...td,textAlign:'right'}}>{NUM(l.p.inventoryQty)}</td>
             <td style={{...td,textAlign:'right',color:l.cover<=l.lead?'var(--bad)':'var(--warn)'}}>{Math.round(l.cover)}d</td>
             <td style={{...td,textAlign:'right',fontWeight:700,color:'var(--text-primary)'}}>{NUM(l.qty)}</td>
@@ -9777,7 +9904,7 @@ function DemandPlanner({embedded}={}){
   const savePack=()=>{ savePackagingConfig({avgItemsPerOrder:Number(packDraft.avgItemsPerOrder)||1.3, components:packDraft.components.filter(c=>c.name&&c.name.trim()).map(c=>({name:c.name.trim(), perItem:Number(c.perItem)||0, perOrder:Number(c.perOrder)||0, onHand:c.onHand==='' ? '' : (Number(c.onHand)||0), supplier:(c.supplier||'').trim(), moq:c.moq==='' ? '' : (Number(c.moq)||0), unitCost:c.unitCost==='' ? '' : (Number(c.unitCost)||0), leadDays:Number(c.leadDays)||30}))}); setPackOpen(false); toast('Packaging plan saved', {kind:'good'}); };
 
   const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:12.5,fontWeight:600,padding:'7px 13px',borderRadius:8,border:'1px solid var(--border-default)',background:'var(--bg-elevated)',color:'var(--text-primary)',cursor:'pointer'};
-  const seg = (active)=>({...btn, padding:'6px 12px', background:active?'var(--accent)':'var(--bg-elevated)', color:active?'#fff':'var(--text-secondary)', borderColor:active?'var(--accent)':'var(--border-default)'});
+  const seg = (active)=>({...btn, padding:'6px 12px', background:active?'var(--accent)':'var(--bg-elevated)', color:active?PAL.panel:'var(--text-secondary)', borderColor:active?'var(--accent)':'var(--border-default)'});
   const inp = {padding:'6px 9px',borderRadius:7,border:'1px solid var(--border-default)',background:'var(--bg-base)',color:'var(--text-primary)',fontSize:13};
   const th = {textAlign:'left',fontSize:10.5,fontWeight:700,letterSpacing:'.04em',textTransform:'uppercase',color:'var(--text-faint)',padding:'0 10px 7px 0',whiteSpace:'nowrap'};
   const td = {padding:'7px 10px 7px 0',fontSize:12.5,color:'var(--text-secondary)',borderTop:'1px solid var(--border-subtle)'};
@@ -9890,7 +10017,7 @@ function DemandPlanner({embedded}={}){
               : (o.needs && o.qty>0) ? <span style={{color:'var(--text-primary)',fontWeight:700}}>{NUM(o.qty)}</span>
               : <span style={{color:'var(--good)'}}>covered</span>;
             return (<tr key={idx}>
-            <td style={{...td,color:'var(--text-primary)'}}>{r.p.title}{r.oosBeforeLead && <span style={{marginLeft:6,fontSize:9.5,fontWeight:800,letterSpacing:'.03em',color:'#fff',background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}{focusM(r.p)!==1 && <span style={{marginLeft:6,fontSize:10,fontWeight:700,color:'var(--accent)',background:'var(--accent-bg)',padding:'1px 6px',borderRadius:999}}>↑{(focusM(r.p)%1?focusM(r.p).toFixed(2):focusM(r.p))}×</span>}<div style={{fontSize:10.5,color:'var(--text-faint)'}}>{r.p.type}</div></td>
+            <td style={{...td,color:'var(--text-primary)'}}>{r.p.title}{r.oosBeforeLead && <span style={{marginLeft:6,fontSize:9.5,fontWeight:800,letterSpacing:'.03em',color:PAL.panel,background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}{focusM(r.p)!==1 && <span style={{marginLeft:6,fontSize:10,fontWeight:700,color:'var(--accent)',background:'var(--accent-bg)',padding:'1px 6px',borderRadius:999}}>↑{(focusM(r.p)%1?focusM(r.p).toFixed(2):focusM(r.p))}×</span>}<div style={{fontSize:10.5,color:'var(--text-faint)'}}>{r.p.type}</div></td>
             <td style={{...td,textAlign:'right'}}>{NUM(Math.round(r.runMo))}</td>
             <td style={{...td,textAlign:'right'}}>{NUM(r.stock)}</td>
             <td style={{...td,textAlign:'right'}}>{r.daysToOOS===Infinity ? <span style={{color:'var(--text-faint)'}}>—</span> : <span style={{fontWeight:600,color: r.oosBeforeLead?'var(--bad)':(r.daysToOOS<r.lead*1.5?'var(--warn)':'var(--text-secondary)')}}>{Math.round(r.daysToOOS)}d{r.oosBeforeLead?` · gap ${r.oosGap}d`:''}</span>}<div style={{fontSize:10,color:'var(--text-faint)',display:'flex',alignItems:'center',gap:3,justifyContent:'flex-end',marginTop:2}}>{!r.leadSet && <span title={`Estimate — using the ${r.p.type||'type'} default of ${r.leadDefault}d. Set this SKU's real supplier lead.`} style={{color:'var(--warn)',fontSize:8,lineHeight:1}}>●</span>}<input type="number" min="0" defaultValue={r.leadSet?r.leadMake:''} key={'ld'+(r.leadSet?r.leadMake:'d')} placeholder={String(r.leadDefault)} title={`Production lead — days from order to shipment (per SKU). Blank uses the ${r.p.type||'type'} default of ${r.leadDefault}d. Set defaults in Reorder policy.`} onBlur={e=>{ if(e.target.value!=='') setSkuLead(skuKeyOf(r.p), e.target.value); }} style={{width:38,padding:'1px 4px',borderRadius:5,border:'1px solid '+(r.leadSet?'var(--border-default)':'var(--warn)'),background:'var(--bg-base)',color:'var(--text-secondary)',fontSize:10,textAlign:'right'}}/><span>d make{r.leadShip>0?` +${r.leadShip} ship = ${r.lead}`:' lead'}</span></div></td>
@@ -9902,7 +10029,7 @@ function DemandPlanner({embedded}={}){
         </tbody></table></div>
         <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',marginTop:10}}>
           {rows.length>12 && <button style={btn} onClick={()=>setShowAll(s=>!s)}>{showAll?'Show top 12':`Show all ${rows.length}`}</button>}
-          <button style={{...btn,background:'var(--accent)',color:'#fff',borderColor:'var(--accent)'}} onClick={()=>{ const el=document.getElementById('plan-pos'); if(el) el.scrollIntoView({behavior:'smooth'}); else if(window.__oiNav) window.__oiNav('planning','plan'); }}>Review &amp; raise POs ({RR.toOrder.length}) <Icon name="chevron" size={13}/></button>
+          <button style={{...btn,background:'var(--accent)',color:PAL.panel,borderColor:'var(--accent)'}} onClick={()=>{ const el=document.getElementById('plan-pos'); if(el) el.scrollIntoView({behavior:'smooth'}); else if(window.__oiNav) window.__oiNav('planning','plan'); }}>Review &amp; raise POs ({RR.toOrder.length}) <Icon name="chevron" size={13}/></button>
           {delistedCount>0 && <button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setShowDelisted(s=>!s)}>{showDelisted?'Hide delisted':`${delistedCount} delisted`}</button>}
           {rows.filter(r=>!r.leadSet).length>0 && <span style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:11.5,color:'var(--text-faint)'}} title="These products use the type's default lead — set each SKU's real supplier lead (the input in the Stockout-vs-lead column) for accurate order-by dates."><span style={{color:'var(--warn)',fontSize:8}}>●</span>{rows.filter(r=>!r.leadSet).length} on an estimated lead</span>}
         </div>
@@ -9975,7 +10102,7 @@ function SuppliersDirectory(){
       <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginBottom:12}}>
         <input value={newName} onChange={e=>setNewName(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') add(); }} placeholder="New supplier name…" style={{...inp,width:240}}/>
         <button style={btn} onClick={add}><Icon name="check" size={13}/> Add supplier</button>
-        <button style={{...btn,marginLeft:'auto',background:'var(--accent)',color:'#fff',borderColor:'var(--accent)'}} onClick={save}>Save all</button>
+        <button style={{...btn,marginLeft:'auto',background:'var(--accent)',color:PAL.panel,borderColor:'var(--accent)'}} onClick={save}>Save all</button>
       </div>
       {rows.length ? (<div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:980}}><thead><tr><th style={th}>Supplier</th><th style={{...th,textAlign:'right'}}>SKUs</th><th style={th}>Email</th><th style={th}>Phone</th><th style={th}>Address</th><th style={th} title="Deposit paid at order; the balance falls due at shipment">Deposit&nbsp;%</th><th style={th} title="Transit days from shipment to stock landing — added on top of the production lead">Transit&nbsp;d</th><th style={th}>Notes / terms</th></tr></thead><tbody>
         {rows.map(n=>{ const d=draft[n]||_blank; return (<tr key={n}>
@@ -10058,17 +10185,17 @@ function CashFlowPlan({tranches, plan, months}){
       {/* chart */}
       <div style={{color:tone, width:'100%'}}>
         <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{display:'block',overflow:'visible'}} preserveAspectRatio="xMidYMid meet">
-          {zeroIn && <line x1={padL} y1={Y(0)} x2={W-padR} y2={Y(0)} stroke="var(--bad)" strokeDasharray="4 4" strokeWidth="1" opacity="0.5"/>}
-          {zeroIn && <text x={padL-6} y={Y(0)+3} textAnchor="end" fontSize="9.5" fill="var(--text-faint)">{`${curSym()}0`}</text>}
-          <text x={padL-6} y={Y(hi-padv*0.5)+3} textAnchor="end" fontSize="9.5" fill="var(--text-faint)">{k(hi-padv*0.5)}</text>
+          {zeroIn && <line x1={padL} y1={Y(0)} x2={W-padR} y2={Y(0)} stroke={PAL.bad} strokeDasharray="4 4" strokeWidth="1" opacity="0.5"/>}
+          {zeroIn && <text x={padL-6} y={Y(0)+3} textAnchor="end" fontSize="9.5" fill={PAL.faint}>{`${curSym()}0`}</text>}
+          <text x={padL-6} y={Y(hi-padv*0.5)+3} textAnchor="end" fontSize="9.5" fill={PAL.faint}>{k(hi-padv*0.5)}</text>
           <path d={areaPath} fill="currentColor" opacity="0.08"/>
           <path d={linePath} fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinejoin="round"/>
           {series.map((s,i)=>(<g key={i}>
-            <circle cx={X(i)} cy={Y(s.bal)} r={i===trough.i?5:3.5} fill={s.bal<0?'var(--bad)':'currentColor'} stroke="var(--bg-surface)" strokeWidth="1.5"/>
-            {s.stock>0 && <text x={X(i)} y={Y(s.bal)-9} textAnchor="middle" fontSize="9" fill="var(--text-faint)">−{k(s.stock).replace(curSym(),curSym())}</text>}
-            <text x={X(i)} y={H-8} textAnchor="middle" fontSize="9.5" fill={i===trough.i?tone:'var(--text-faint)'} fontWeight={i===trough.i?700:400}>{s.label}</text>
+            <circle cx={X(i)} cy={Y(s.bal)} r={i===trough.i?5:3.5} fill={svgCol(s.bal<0?PAL.bad:'currentColor')} stroke={PAL.surface} strokeWidth="1.5"/>
+            {s.stock>0 && <text x={X(i)} y={Y(s.bal)-9} textAnchor="middle" fontSize="9" fill={PAL.faint}>−{k(s.stock).replace(curSym(),curSym())}</text>}
+            <text x={X(i)} y={H-8} textAnchor="middle" fontSize="9.5" fill={svgCol(i===trough.i?tone:PAL.faint)} fontWeight={i===trough.i?700:400}>{s.label}</text>
           </g>))}
-          <text x={X(trough.i)} y={Y(trough.bal)+ (trough.bal< (lo+hi)/2 ? 18 : -12)} textAnchor="middle" fontSize="10" fontWeight="700" fill={tone}>{k(trough.bal)}</text>
+          <text x={X(trough.i)} y={Y(trough.bal)+ (trough.bal< (lo+hi)/2 ? 18 : -12)} textAnchor="middle" fontSize="10" fontWeight="700" fill={svgCol(tone)}>{k(trough.bal)}</text>
         </svg>
       </div>
       <div style={{fontSize:11,color:'var(--text-faint)',marginTop:10,lineHeight:1.5}}>Revenue in from your demand plan ({plan&&plan.revenue>0?k(plan.revenue):'—'} over {months}mo, spread evenly, gross); stock paid via the landing plan (deposit on order, balance on shipment); opex = overheads + ad spend. Cash basis — COGS is the stock payments, not double-counted. Excludes tax, refunds &amp; one-offs. {!cashKnown && <span style={{color:'var(--warn)'}}>Set cash on hand above for an absolute balance.</span>}</div>
@@ -10150,8 +10277,8 @@ function PlanningView(){
   const headline = oosNow ? `Order today — ${oosNow} product${oosNow===1?'':'s'} at OOS risk` : toOrderN ? `${toOrderN} product${toOrderN===1?'':'s'} to reorder` : 'Stock is on track for your plan';
   const sub = toOrderN ? `${toOrderN} SKU${toOrderN===1?'':'s'} to order · ~${curSym()}${k(orderVal)} to commit${stockoutsUnderPlan?` · ${stockoutsUnderPlan} forecast to run out under the plan`:''}${awaiting?` · ${awaiting} awaiting stock`:''}`
     : (awaiting?`${awaiting} PO${awaiting===1?'':'s'} awaiting stock`:'Nothing to order right now — good sellers have cover for their lead times.');
-  const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:13,fontWeight:700,padding:'9px 15px',borderRadius:9,border:'none',background:'var(--accent)',color:'#fff',cursor:'pointer',whiteSpace:'nowrap'};
-  const sbtn = (id)=>({fontSize:11.5,fontWeight:700,padding:'5px 11px',borderRadius:7,cursor:'pointer',border:'1.5px solid '+(rc.strategy===id?'var(--accent)':'var(--border-default)'),background:rc.strategy===id?'var(--accent)':'transparent',color:rc.strategy===id?'#fff':'var(--text-secondary)'});
+  const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:13,fontWeight:700,padding:'9px 15px',borderRadius:9,border:'none',background:'var(--accent)',color:PAL.panel,cursor:'pointer',whiteSpace:'nowrap'};
+  const sbtn = (id)=>({fontSize:11.5,fontWeight:700,padding:'5px 11px',borderRadius:7,cursor:'pointer',border:'1.5px solid '+(rc.strategy===id?'var(--accent)':'var(--border-default)'),background:rc.strategy===id?'var(--accent)':'transparent',color:rc.strategy===id?PAL.panel:'var(--text-secondary)'});
   const lab = {fontSize:10,fontWeight:700,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:5};
   const goPOs = ()=>{ const el=document.getElementById('plan-pos'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); };
   return (
@@ -10203,7 +10330,7 @@ function PlanningView(){
         const pctOf = iso => Math.max(0, Math.min(100, oiDayDiff(today,iso)/spanDays*100));
         const ticks=[]; for(let i=0;i*30<=spanDays+2 && i<10;i++){ const d=oiAddDays(today,i*30); ticks.push({x:Math.min(100,(i*30)/spanDays*100), label:i===0?'now':(()=>{ try{ return new Date(d+'T00:00:00').toLocaleDateString('en-GB',{month:'short'}); }catch(e){ return ''; } })()}); }
         const dot=(x,color,size,filled,title)=>(<div title={title} style={{position:'absolute',left:x+'%',top:'50%',transform:'translate(-50%,-50%)',width:size,height:size,borderRadius:'50%',background:filled?color:'var(--bg-base)',border:'2px solid '+color,zIndex:2}}/>);
-        const toggle = (v,lbl)=>{ const on=planView===v; return <button key={v} onClick={()=>setPlanView(v)} style={{fontSize:11,fontWeight:700,padding:'4px 11px',borderRadius:6,cursor:'pointer',border:'none',background:on?'var(--accent)':'transparent',color:on?'#fff':'var(--text-muted)'}}>{lbl}</button>; };
+        const toggle = (v,lbl)=>{ const on=planView===v; return <button key={v} onClick={()=>setPlanView(v)} style={{fontSize:11,fontWeight:700,padding:'4px 11px',borderRadius:6,cursor:'pointer',border:'none',background:on?'var(--accent)':'transparent',color:on?PAL.panel:'var(--text-muted)'}}>{lbl}</button>; };
         return (
           <div className="card" style={{marginBottom:14}}>
             <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:4}}>
@@ -10220,7 +10347,7 @@ function PlanningView(){
             {rc.strategy==='staged' && wavesN>1 && <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:12}}>
               <span style={{fontSize:11,color:'var(--text-faint)',fontWeight:700,letterSpacing:'.03em',textTransform:'uppercase'}}>Wave split</span>
               {[['even','Even'],['front','Front-load'],['back','Back-load']].map(([kind,lbl])=>{ const on=splitName===kind;
-                return <button key={kind} onClick={()=>saveReorderConfig({...rc, waveSplit: wavePreset(kind, wavesN)})} title={kind==='front'?'Bigger first wave — buy into peak early':kind==='back'?'Smaller first wave, ramp later':'Equal waves'} style={{fontSize:11,fontWeight:700,padding:'4px 11px',borderRadius:7,cursor:'pointer',border:'1.5px solid '+(on?'var(--accent)':'var(--border-default)'),background:on?'var(--accent)':'transparent',color:on?'#fff':'var(--text-secondary)'}}>{lbl}</button>; })}
+                return <button key={kind} onClick={()=>saveReorderConfig({...rc, waveSplit: wavePreset(kind, wavesN)})} title={kind==='front'?'Bigger first wave — buy into peak early':kind==='back'?'Smaller first wave, ramp later':'Equal waves'} style={{fontSize:11,fontWeight:700,padding:'4px 11px',borderRadius:7,cursor:'pointer',border:'1.5px solid '+(on?'var(--accent)':'var(--border-default)'),background:on?'var(--accent)':'transparent',color:on?PAL.panel:'var(--text-secondary)'}}>{lbl}</button>; })}
               <span style={{fontSize:11,color:'var(--text-faint)'}}>{weights.map(w=>Math.round(w*100)+'%').join(' / ')}{splitName==='custom'?' · custom':''}</span>
             </div>}
             {lateWaves>0 && <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12,padding:'7px 11px',borderRadius:8,background:'rgba(248,113,113,.10)',border:'1px solid var(--bad)'}}>
@@ -10236,7 +10363,7 @@ function PlanningView(){
               {tranches.map(t=>{ const ox=pctOf((t.isNow||t.late)?today:t.orderISO), sx=pctOf(t.shipISO), lx=pctOf(t.landISO); return (
                 <div key={t.n} style={{display:'flex',alignItems:'center',gap:10,marginBottom:7}}>
                   <div style={{width:132,flexShrink:0}}>
-                    <div style={{fontSize:12,fontWeight:700,color:'var(--text-primary)'}}>{t.name} {t.late&&<span style={{fontSize:9.5,fontWeight:800,color:'#fff',background:'var(--bad)',padding:'1px 5px',borderRadius:999}}>LATE</span>}</div>
+                    <div style={{fontSize:12,fontWeight:700,color:'var(--text-primary)'}}>{t.name} {t.late&&<span style={{fontSize:9.5,fontWeight:800,color:PAL.panel,background:'var(--bad)',padding:'1px 5px',borderRadius:999}}>LATE</span>}</div>
                     <div style={{fontSize:10.5,color:'var(--text-faint)'}}>{hasDeposit?`${curSym()}${k(t.dep)} now · ${curSym()}${k(t.bal)} on ship`:`${curSym()}${k(t.val)}`}</div>
                   </div>
                   <div style={{position:'relative',flex:1,height:28,borderRadius:7,background:'var(--bg-elevated)'}}>
@@ -10301,7 +10428,7 @@ function PlanningView(){
 function mosView(name){
   const C = window[name];
   const A = window.OI_ASK || {};
-  if (!C) return React.createElement('div',{className:'note'}, name+' unavailable — marketing-os.build.js not loaded.');
+  if (!C) return React.createElement('div',{className:'note'}, 'This screen did not load. Refresh the page; if it keeps happening, contact support.');
   if (!A.brand_id) return React.createElement('div',{className:'note'}, 'Sign in to load the Marketing OS for your brand.');
   const apiBase = (A.endpoint||'').replace(/\/functions\/v1\/[^/]*$/, '');
   // .mos-embed-scope (marketing-os.css, 2026-07-13) remaps the component's own design tokens
@@ -10316,8 +10443,10 @@ function mosView(name){
 // read), detail out back. Reads window.FRKL_OVERVIEW[timeframe] once the loader feeds
 // it; until then falls back to the live frkl snapshot — but ONLY on brand frkl, so no
 // frkl values leak onto other brands (de-frkl rule). Namespaced GO_* to avoid collisions.
-const GO_T = { bg:'transparent', panel:'var(--color-panel)', panel2:'var(--color-surface)', line:'var(--color-line)', ink:'var(--color-ink)',
-  mut:'var(--color-muted)', dim:'#9a948c', accent:'var(--color-accent)', accent2:'var(--color-accent)', green:'var(--color-success)', amber:'var(--color-warning)', red:'var(--color-danger)',
+// These values land in SVG attributes as well as inline styles, so they read the
+// token values through PAL rather than var() — SVG attributes cannot resolve var().
+const GO_T = { bg:'transparent', panel:PAL.panel, panel2:PAL.surface, line:PAL.line, ink:PAL.ink,
+  mut:PAL.muted, dim:PAL.faint, accent:PAL.accent, accent2:PAL.accent, green:PAL.good, amber:PAL.warn, red:PAL.bad,
   mono:'var(--font-mono)' };
 const GO_gbp = n => (n==null?'—':'£'+Math.round(n).toLocaleString('en-GB'));
 const GO_pctv = n => (n==null?'':(n>0?'+':'')+n.toFixed(1)+'%');
@@ -10389,7 +10518,7 @@ const GO_FALLBACK = { monthly: {
 function GO_Dot(p){ return React.createElement('span',{style:Object.assign({width:7,height:7,borderRadius:'50%',display:'inline-block',background:GO_rag(p.r)},p.style||{})}); }
 
 function GO_Tile(p){ const t=p.t; const _sr=(t.series&&t.series.length>1)?t.series:null;
-  const _stroke=t.rag==='r'?'#e96b73':t.rag==='g'?'#4ec98c':'#8B5CF6';
+  const _stroke=t.rag==='r'?PAL.bad:t.rag==='g'?PAL.good:PAL.accent;
   const _statusTxt=t.rag==='g'?'On track':t.rag==='a'?'Watch':t.rag==='r'?'Off target':'—';
   return (
   <div className="go-tile" style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:8,padding:'14px 15px',position:'relative',boxShadow:'var(--shadow-panel)'}}>
@@ -10402,11 +10531,11 @@ function GO_Tile(p){ const t=p.t; const _sr=(t.series&&t.series.length>1)?t.seri
       <div className="go-head">{_sr?(t.k+' · trend over selected timeframe'):(t.k+' · detail')}</div>
       {_sr && <R.ResponsiveContainer width="100%" height={92}>
         <R.LineChart data={t.series} margin={{top:4,right:6,left:-6,bottom:0}}>
-          <R.CartesianGrid stroke="var(--color-line)" vertical={false}/>
+          <R.CartesianGrid stroke={PAL.line} vertical={false}/>
           <R.XAxis dataKey="d" tick={{fill:GO_T.dim,fontSize:8}} interval="preserveStartEnd" tickLine={false} axisLine={false}/>
           <R.YAxis tick={{fill:GO_T.dim,fontSize:8}} width={30} tickFormatter={function(v){return Math.abs(v)>=1000?(v/1000).toFixed(0)+'k':Math.round(v);}}/>
           <R.Tooltip contentStyle={{fontSize:10,background:'var(--color-panel)',border:'1px solid '+GO_T.line,borderRadius:6,padding:'2px 6px'}} labelStyle={{color:GO_T.dim}} formatter={function(v){return [GO_fmt(v,t.fmt),t.k];}}/>
-          <R.Line type="monotone" dataKey="v" stroke={_stroke} strokeWidth={2} dot={false} isAnimationActive={false}/>
+          <R.Line type="monotone" dataKey="v" stroke={svgCol(_stroke)} strokeWidth={2} dot={false} isAnimationActive={false}/>
         </R.LineChart>
       </R.ResponsiveContainer>}
       {t.d!=null && <div className="go-row"><span>Change vs prior</span><b style={{color:t.d>0?GO_T.green:t.d<0?GO_T.red:GO_T.mut}}>{GO_arrow(t.d)+' '+GO_pctv(t.d)}</b></div>}
@@ -10418,7 +10547,7 @@ function GO_Tile(p){ const t=p.t; const _sr=(t.series&&t.series.length>1)?t.seri
   </div>); }
 
 function GO_Insight(p){ const i=p.i; return (
-  <div style={{background:'var(--color-surface)',border:'1px solid #202742',borderRadius:11,padding:'15px 17px',marginTop:14}}>
+  <div style={{background:'var(--color-surface)',border:`1px solid ${PAL.panel}`,borderRadius:11,padding:'15px 17px',marginTop:14}}>
     <div style={{display:'flex',alignItems:'center',gap:8,fontSize:11,letterSpacing:'.5px',textTransform:'uppercase',color:GO_T.accent2,marginBottom:6}}>
       <span style={{width:14,height:14,borderRadius:4,background:'linear-gradient(135deg,'+GO_T.accent+',#5563d6)',display:'inline-block'}}/> greta reads this
     </div>
@@ -10430,7 +10559,7 @@ function GO_Insight(p){ const i=p.i; return (
 
 function GO_TierHead(p){ return (
   <div style={{display:'flex',alignItems:'baseline',gap:10,margin:'0 2px 16px'}}>
-    <span style={{fontFamily:GO_T.mono,fontSize:11,color:GO_T.accent2,border:'1px solid #2b3050',borderRadius:5,padding:'1px 6px'}}>{p.n}</span>
+    <span style={{fontFamily:GO_T.mono,fontSize:11,color:GO_T.accent2,border:`1px solid ${PAL.panel}`,borderRadius:5,padding:'1px 6px'}}>{p.n}</span>
     <h2 style={{fontSize:15,margin:0,letterSpacing:'.2px'}}>{p.title}</h2>
     <span style={{fontSize:12,color:GO_T.dim}}>{p.sub}</span>
   </div>); }
@@ -10648,7 +10777,9 @@ function GretaOverviewTiers(){
   },[]);
   const isFrkl = (typeof window!=='undefined' && window.OI_BRAND && window.OI_BRAND.slug==='frkl');
   const live = (typeof window!=='undefined' && window.FRKL_OVERVIEW) || null;
-  const src = live || (isFrkl ? GO_FALLBACK : null);
+  // The frkl fallback tiles were retired on 2026-09-25: with no live data every brand
+  // now sees the same 'connect your sources' state rather than another brand's numbers.
+  const src = live;
   const d = React.useMemo(()=> src ? (src[tf]||src.monthly||null) : null, [src,tf]);
 
   const wrap = { maxWidth:1180, margin:'0 auto', padding:'8px 4px 60px', background:GO_T.bg, color:GO_T.ink };
@@ -10656,14 +10787,14 @@ function GretaOverviewTiers(){
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:6,marginBottom:6}}>
       <div style={{fontSize:12.5,color:GO_T.dim}}>{d?('Snapshot · '):''}{d && <span style={{fontFamily:GO_T.mono}}>{d.periodLabel}</span>} {d?d.compareLabel:''}</div>
       <div style={{display:'inline-flex',background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:9,padding:3}}>
-        {GO_TIMEFRAMES.map(x=> <button key={x} onClick={()=>setTf(x)} style={{background:x===tf?GO_T.accent:'none',color:x===tf?'#fff':GO_T.mut,fontWeight:x===tf?600:400,border:0,fontSize:12.5,padding:'6px 12px',borderRadius:6,cursor:'pointer',textTransform:'capitalize'}}>{x}</button>)}
+        {GO_TIMEFRAMES.map(x=> <button key={x} onClick={()=>setTf(x)} style={{background:x===tf?GO_T.accent:'none',color:x===tf?PAL.panel:GO_T.mut,fontWeight:x===tf?600:400,border:0,fontSize:12.5,padding:'6px 12px',borderRadius:6,cursor:'pointer',textTransform:'capitalize'}}>{x}</button>)}
       </div>
     </div>);
 
   if(!d) return (
     <div style={wrap}>{toggle}
       <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:12,padding:'26px',textAlign:'center',color:GO_T.mut,marginTop:10}}>
-        Overview is loading this brand's live data. Connect Shopify, GA4, Meta, Google &amp; Klaviyo to populate the tiers.
+        Overview is loading this brand's live data. <GoLink sec="settings" sub="connections">Connect Shopify, GA4, Meta, Google &amp; Klaviyo</GoLink> to populate the tiers.
       </div>
     </div>);
 
@@ -10685,19 +10816,19 @@ function GretaOverviewTiers(){
           return (
           <div style={{marginTop:10, maxWidth:470}}>
             <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:5,flexWrap:'wrap'}}>
-              <span style={{display:'inline-flex',alignItems:'center',background:col,color:'#fff',fontSize:11,fontWeight:700,letterSpacing:'.4px',padding:'2px 10px',borderRadius:20}}>{lab.toUpperCase()}</span>
+              <span style={{display:'inline-flex',alignItems:'center',background:col,color:PAL.panel,fontSize:11,fontWeight:700,letterSpacing:'.4px',padding:'2px 10px',borderRadius:20}}>{lab.toUpperCase()}</span>
               <span style={{fontSize:12.5,color:GO_T.mut}}>{GO_gbp(d.pacing.revActual)+' of '+GO_gbp(d.pacing.revTarget)+' expected to date'+(pct!=null?(' · '+(pct>=0?'+':'')+pct+'%'):'')}</span>
             </div>
             <div style={{position:'relative',height:8,borderRadius:5,background:'var(--color-surface)',overflow:'hidden'}}>
               <div style={{position:'absolute',left:0,top:0,bottom:0,width:(fill/140*100)+'%',background:col,opacity:.9}}/>
               <div style={{position:'absolute',left:(100/140*100)+'%',top:-1,bottom:-1,width:2,background:GO_T.dim}}/>
             </div>
-            <div style={{fontSize:10.5,color:GO_T.dim,marginTop:4}}>{(d.pacing.goalConfirmed?'vs your confirmed plan':'vs auto-estimated target — confirm it in Plan')+' · the mark is exactly on pace'}</div>
+            <div style={{fontSize:10.5,color:GO_T.dim,marginTop:4}}>{d.pacing.goalConfirmed ? 'vs your confirmed plan · the mark is exactly on pace' : <>vs auto-estimated target — <GoLink sec="home" sub="plansetup">confirm it in Plan</GoLink> · the mark is exactly on pace</>}</div>
           </div>);
         })()}
         </div>
         <div style={{minWidth:300,flex:1,background:'var(--color-panel)',border:'1px solid '+GO_T.line,borderLeft:'3px solid '+GO_T.accent,borderRadius:10,padding:'13px 15px'}}>
-          <div><span style={{fontSize:10.5,fontFamily:GO_T.mono,letterSpacing:'.5px',color:GO_T.accent2,border:'1px solid #2b3050',borderRadius:5,padding:'1px 6px',marginRight:6}}>DO FIRST</span><span style={{fontSize:10.5,fontFamily:GO_T.mono,letterSpacing:'.5px',color:GO_T.red,border:'1px solid #4a2b2b',borderRadius:5,padding:'1px 6px'}}>{d.hero.action.value}</span></div>
+          <div><span style={{fontSize:10.5,fontFamily:GO_T.mono,letterSpacing:'.5px',color:GO_T.accent2,border:`1px solid ${PAL.panel}`,borderRadius:5,padding:'1px 6px',marginRight:6}}>DO FIRST</span><span style={{fontSize:10.5,fontFamily:GO_T.mono,letterSpacing:'.5px',color:GO_T.red,border:'1px solid #4a2b2b',borderRadius:5,padding:'1px 6px'}}>{d.hero.action.value}</span></div>
           <h3 style={{margin:'8px 0 5px',fontSize:15}}>{d.hero.action.title}</h3>
           <p style={{margin:0,color:GO_T.mut,fontSize:12.5}}>{d.hero.action.why}</p>
         </div>
@@ -10710,12 +10841,12 @@ function GretaOverviewTiers(){
         <GO_TierHead n="01" title="Business" sub="how the business is performing"/>
         <div style={{display:'grid',gap:12,gridTemplateColumns:'repeat(5,1fr)'}}>
           {d.business.map((t,i)=><GO_Tile key={i} t={t}/>)}
-          <div style={{background:'var(--color-surface)',border:'1px solid #202742',borderRadius:11,padding:'14px 15px'}}>
+          <div style={{background:'var(--color-surface)',border:`1px solid ${PAL.panel}`,borderRadius:11,padding:'14px 15px'}}>
             <div style={{fontSize:11.5,color:GO_T.mut}}>Best sellers →</div>
             <div style={{fontSize:12,color:GO_T.mut,marginTop:6,lineHeight:1.7}}>{d.bestSellers.map((s,i)=><div key={i}>{s.name} · {GO_gbp(s.rev)}</div>)}</div>
           </div>
         </div>
-        {d.pacing && d.pacing.days && d.pacing.days.length>0 && <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:8,padding:'10px 12px 4px',boxShadow:'var(--shadow-panel)',marginTop:10}}><div style={{fontSize:10.5,color:GO_T.dim,textTransform:'uppercase',letterSpacing:'.4px',marginBottom:6}}>Sales &amp; spend vs target</div><R.ResponsiveContainer width="100%" height={200}><R.ComposedChart data={d.pacing.days} margin={{top:5,right:8,left:0,bottom:0}}><R.CartesianGrid strokeDasharray="2 4" stroke="var(--color-line)"/><R.XAxis dataKey="date" tick={{fontSize:9,fill:'var(--color-muted)'}} interval="preserveStartEnd"/><R.YAxis tick={{fontSize:9,fill:'var(--color-muted)'}} width={44} tickFormatter={function(v){return '£'+Math.round(v/1000)+'k';}}/><R.Tooltip formatter={function(v){return '£'+Number(v).toLocaleString('en-GB');}}/><R.Bar dataKey="sales" name="Sales" fill="var(--color-success)" radius={[2,2,0,0]}/><R.Bar dataKey="spend" name="Spend" fill="var(--color-accent)" radius={[2,2,0,0]}/><R.Line dataKey="tSales" name="Target sales" stroke="var(--color-success)" strokeDasharray="4 3" dot={false} strokeWidth={1.5}/><R.Line dataKey="tSpend" name="Target spend" stroke="var(--color-accent)" strokeDasharray="4 3" dot={false} strokeWidth={1.5}/></R.ComposedChart></R.ResponsiveContainer></div>}
+        {d.pacing && d.pacing.days && d.pacing.days.length>0 && <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:8,padding:'10px 12px 4px',boxShadow:'var(--shadow-panel)',marginTop:10}}><div style={{fontSize:10.5,color:GO_T.dim,textTransform:'uppercase',letterSpacing:'.4px',marginBottom:6}}>Sales &amp; spend vs target</div><R.ResponsiveContainer width="100%" height={200}><R.ComposedChart data={d.pacing.days} margin={{top:5,right:8,left:0,bottom:0}}><R.CartesianGrid strokeDasharray="2 4" stroke={PAL.line}/><R.XAxis dataKey="date" tick={{fontSize:9,fill:'var(--color-muted)'}} interval="preserveStartEnd"/><R.YAxis tick={{fontSize:9,fill:'var(--color-muted)'}} width={44} tickFormatter={function(v){return '£'+Math.round(v/1000)+'k';}}/><R.Tooltip formatter={function(v){return '£'+Number(v).toLocaleString('en-GB');}}/><R.Bar dataKey="sales" name="Sales" fill={PAL.good} radius={[2,2,0,0]}/><R.Bar dataKey="spend" name="Spend" fill={PAL.accent} radius={[2,2,0,0]}/><R.Line dataKey="tSales" name="Target sales" stroke="var(--color-success)" strokeDasharray="4 3" dot={false} strokeWidth={1.5}/><R.Line dataKey="tSpend" name="Target spend" stroke={PAL.accent} strokeDasharray="4 3" dot={false} strokeWidth={1.5}/></R.ComposedChart></R.ResponsiveContainer></div>}
         <GO_Insight i={d.insights.business}/>
       </div>
 
@@ -10723,8 +10854,8 @@ function GretaOverviewTiers(){
         <GO_TierHead n="02" title="Customer" sub="returning · new · paid-incremental (CTC)"/>
         <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:8,padding:'13px 15px',boxShadow:'var(--shadow-panel)',marginBottom:10}}>
           <div style={{fontSize:11,color:GO_T.mut,marginBottom:6}}>New vs returning revenue</div>
-          <div style={{display:'flex',height:9,borderRadius:5,overflow:'hidden',marginBottom:6}}><div style={{width:d.customer.splitNew+'%',background:GO_T.accent}}/><div style={{width:d.customer.splitRet+'%',background:'#2563EB'}}/></div>
-          <div style={{fontFamily:GO_T.mono,fontSize:11.5}}><span style={{color:GO_T.accent}}>New {d.customer.splitNew}% · {GO_gbp(d.customer.newRev)}</span> &nbsp; <span style={{color:'#2563EB'}}>Ret {d.customer.splitRet}% · {GO_gbp(d.customer.retRev)}</span></div>
+          <div style={{display:'flex',height:9,borderRadius:5,overflow:'hidden',marginBottom:6}}><div style={{width:d.customer.splitNew+'%',background:GO_T.accent}}/><div style={{width:d.customer.splitRet+'%',background:PAL.data3}}/></div>
+          <div style={{fontFamily:GO_T.mono,fontSize:11.5}}><span style={{color:GO_T.accent}}>New {d.customer.splitNew}% · {GO_gbp(d.customer.newRev)}</span> &nbsp; <span style={{color:PAL.data3}}>Ret {d.customer.splitRet}% · {GO_gbp(d.customer.retRev)}</span></div>
         </div>
         {(d.customer.rows||[]).map(function(row,ri){return (
           <div key={ri} style={{marginTop:ri>0?20:2,marginBottom:6}}>
@@ -10792,8 +10923,9 @@ function GretaOverviewTiers(){
 // (CAM) or revenue and see the full derived target set (both units), then confirm it as the
 // plan of record (mos_business_goal.confirmed=true). Global-scope, GP_* namespaced. Data +
 // writes live in window.FRKL_PLAN (greta-plan-data.js). Confirm is user-initiated only.
-var GP_T = { bg:'transparent', panel:'var(--color-panel)', panel2:'var(--color-surface)', line:'var(--color-line)', ink:'var(--color-ink)',
-  mut:'var(--color-muted)', dim:'#9a948c', accent:'var(--color-accent)', accent2:'var(--color-accent)', green:'var(--color-success)', amber:'var(--color-warning)', red:'var(--color-danger)',
+// Same as GO_T: these values are used in the spend-curve SVG as well as in styles.
+var GP_T = { bg:'transparent', panel:PAL.panel, panel2:PAL.surface, line:PAL.line, ink:PAL.ink,
+  mut:PAL.muted, dim:PAL.faint, accent:PAL.accent, accent2:PAL.accent, green:PAL.good, amber:PAL.warn, red:PAL.bad,
   mono:'var(--font-mono)' };
 var GP_gbp = function (x) { return x == null ? '—' : '£' + Math.round(Number(x)).toLocaleString('en-GB'); };
 var GP_rag = function (s) { return s === 'ready' ? GP_T.green : s === 'unconfirmed' || s === 'stale' ? GP_T.amber : GP_T.red; };
@@ -10874,7 +11006,7 @@ function GP_ChannelHealth(p){
             <label style={{ fontSize:11, color:GP_T.mut }}>Email share &mdash; high (%)<input style={Object.assign({marginTop:4},inp)} value={f.emailHigh} onChange={function(e){setK('emailHigh',e.target.value);}}/></label>
           </div>
           <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:12 }}>
-            <button onClick={save} disabled={busy} style={{ borderRadius:8, padding:'8px 15px', fontSize:13, border:'1px solid '+GP_T.accent, background:GP_T.accent, color:'#fff', fontWeight:600, cursor:'pointer' }}>{busy?'Saving…':'Save band'}</button>
+            <button onClick={save} disabled={busy} style={{ borderRadius:8, padding:'8px 15px', fontSize:13, border:'1px solid '+GP_T.accent, background:GP_T.accent, color:PAL.panel, fontWeight:600, cursor:'pointer' }}>{busy?'Saving…':'Save band'}</button>
             <button onClick={function(){ setEdit(false); }} disabled={busy} style={{ borderRadius:8, padding:'8px 12px', fontSize:13, border:'1px solid '+GP_T.line, background:GP_T.panel, color:GP_T.ink, cursor:'pointer' }}>Cancel</button>
             {msg ? <span style={{ fontSize:12, color:GP_T.red }}>{msg}</span> : null}
           </div>
@@ -11028,8 +11160,8 @@ function GP_SpendCurve(p) {
       {/* MEASURED — no model involved */}
       <div style={{ fontSize: 10.5, letterSpacing: '.4px', textTransform: 'uppercase', color: GP_T.dim, marginBottom: 8 }}>What you have measured</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10, marginBottom: 8 }}>
-        <GP_Metric k="A first order contributes" v={'£' + cm.toFixed(2)} />
-        <GP_Metric k="Last month's cost per customer" v={'£' + Number(pts[pts.length - 1].cac).toFixed(2)}
+        <GP_Metric k="A first order contributes" v={isFinite(cm) ? '£' + cm.toFixed(2) : '—'} />
+        <GP_Metric k="Last month's cost per customer" v={isFinite(Number(pts[pts.length - 1].cac)) ? '£' + Number(pts[pts.length - 1].cac).toFixed(2) : '—'}
           hi={pts[pts.length - 1].cac_above_contribution} sub={pts[pts.length - 1].month ? String(pts[pts.length - 1].month).slice(0, 7) : null} />
         <GP_Metric k="Months above contribution" v={above.length + ' of ' + pts.length}
           sub={recentAbove + ' of the last ' + recent.length} />
@@ -11046,37 +11178,37 @@ function GP_SpendCurve(p) {
         style={{ display: 'block', overflow: 'visible' }}>
         {[0.25, 0.5, 0.75, 1].map(function (f, i) {
           return <g key={i}>
-            <line x1={ML} x2={W - MR} y1={Y(y1 * f)} y2={Y(y1 * f)} stroke={GP_T.line} strokeWidth="1" />
-            <text x={ML - 8} y={Y(y1 * f) + 3.5} textAnchor="end" fontSize="10" fill={GP_T.dim} fontFamily={GP_T.mono}>{tick(y1 * f)}</text>
+            <line x1={ML} x2={W - MR} y1={Y(y1 * f)} y2={Y(y1 * f)} stroke={svgCol(GP_T.line)} strokeWidth="1" />
+            <text x={ML - 8} y={Y(y1 * f) + 3.5} textAnchor="end" fontSize="10" fill={svgCol(GP_T.dim)} fontFamily={GP_T.mono}>{tick(y1 * f)}</text>
           </g>;
         })}
-        <polygon points={poly} fill={GP_T.accent} opacity="0.13" />
-        <path d={line(mid)} fill="none" stroke={GP_T.accent} strokeWidth="2" />
-        <line x1={ML} x2={W - MR} y1={Y(cm)} y2={Y(cm)} stroke={GP_T.red} strokeWidth="1.5" strokeDasharray="5 4" />
-        <text x={W - MR} y={Y(cm) - 6} textAnchor="end" fontSize="10" fill={GP_T.red}>a customer is worth £{cm.toFixed(0)}</text>
-        {cur > 0 && <line x1={X(cur)} x2={X(cur)} y1={MT} y2={MT + ph} stroke={GP_T.dim} strokeWidth="1.5" strokeDasharray="2 3" />}
-        {cur > 0 && <text x={X(cur) - 6} y={MT + 10} textAnchor="end" fontSize="10" fill={GP_T.dim}>now</text>}
+        <polygon points={poly} fill={svgCol(GP_T.accent)} opacity="0.13" />
+        <path d={line(mid)} fill="none" stroke={svgCol(GP_T.accent)} strokeWidth="2" />
+        <line x1={ML} x2={W - MR} y1={Y(cm)} y2={Y(cm)} stroke={svgCol(GP_T.red)} strokeWidth="1.5" strokeDasharray="5 4" />
+        <text x={W - MR} y={Y(cm) - 6} textAnchor="end" fontSize="10" fill={svgCol(GP_T.red)}>a customer is worth £{cm.toFixed(0)}</text>
+        {cur > 0 && <line x1={X(cur)} x2={X(cur)} y1={MT} y2={MT + ph} stroke={svgCol(GP_T.dim)} strokeWidth="1.5" strokeDasharray="2 3" />}
+        {cur > 0 && <text x={X(cur) - 6} y={MT + 10} textAnchor="end" fontSize="10" fill={svgCol(GP_T.dim)}>now</text>}
         {pts.map(function (d, i) {
           var bad = !!d.cac_above_contribution;
           return <circle key={i} cx={X(Number(d.spend))} cy={Y(Number(d.cac))} r="4"
-            fill={bad ? GP_T.red : GP_T.accent} opacity={bad ? 0.95 : 0.7}>
+            fill={svgCol(bad ? GP_T.red : GP_T.accent)} opacity={bad ? 0.95 : 0.7}>
             <title>{String(d.month).slice(0, 7) + ' · ' + GP_gbp(d.spend) + ' spend · £' + Number(d.cac).toFixed(2) + ' per customer'}</title>
           </circle>;
         })}
-        <line x1={ML} x2={W - MR} y1={MT + ph} y2={MT + ph} stroke={GP_T.line} strokeWidth="1" />
+        <line x1={ML} x2={W - MR} y1={MT + ph} y2={MT + ph} stroke={svgCol(GP_T.line)} strokeWidth="1" />
         {[0.25, 0.5, 0.75, 1].map(function (f, i) {
-          return <text key={i} x={X(x1 * f)} y={H - 10} textAnchor="middle" fontSize="10" fill={GP_T.dim} fontFamily={GP_T.mono}>{tick(x1 * f)}</text>;
+          return <text key={i} x={X(x1 * f)} y={H - 10} textAnchor="middle" fontSize="10" fill={svgCol(GP_T.dim)} fontFamily={GP_T.mono}>{tick(x1 * f)}</text>;
         })}
-        <text x={ML} y={H - 10} textAnchor="start" fontSize="10" fill={GP_T.dim}>monthly spend →</text>
+        <text x={ML} y={H - 10} textAnchor="start" fontSize="10" fill={svgCol(GP_T.dim)}>monthly spend →</text>
       </svg>
 
       {/* MODELLED — carries the band */}
       <div style={{ fontSize: 10.5, letterSpacing: '.4px', textTransform: 'uppercase', color: GP_T.dim, margin: '14px 0 8px' }}>What the curve models</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10 }}>
-        <GP_Metric k="Curvature (β)" v={beta.toFixed(2)} sub={'95% ' + bLo.toFixed(2) + '–' + bHi.toFixed(2)} />
-        <GP_Metric k="The next customer costs" v={c.marginal_cac_now == null ? '—' : '£' + Number(c.marginal_cac_now).toFixed(2)}
+        <GP_Metric k="How fast customers get dearer" v={beta.toFixed(2)} sub={'0 = no rise · 1 = costs rise as fast as spend · range ' + bLo.toFixed(2) + '–' + bHi.toFixed(2)} />
+        <GP_Metric k="The next customer costs you" v={c.marginal_cac_now == null ? '—' : '£' + Number(c.marginal_cac_now).toFixed(2)}
           hi={c.marginal_cac_now != null && Number(c.marginal_cac_now) > cm} sub={'at ' + GP_gbp(cur) + '/mo'} />
-        <GP_Metric k="Profitable ceiling" hi={!indet}
+        <GP_Metric k="Most you can spend and still profit" hi={!indet}
           v={c.ceiling_low == null && c.ceiling_high == null ? '—'
              : GP_gbp(c.ceiling_low != null ? c.ceiling_low : c.ceiling_mid) + '–' + GP_gbp(c.ceiling_high)}
           sub={c.ci_admits_no_ceiling ? 'band also admits no ceiling' : 'where the next customer costs what one is worth'} />
@@ -11107,7 +11239,288 @@ function GP_SpendCurve(p) {
   );
 }
 
-function GretaPlanPanel() {
+// ── Curve extensions, mounted 2026-09-25 ─────────────────────────────────────
+// Written in Sep 2026 and left in docs/UI-curve-constraint-history-levers.jsx with no
+// mount, so the engine could say why the curve bends, how the read has changed and
+// what would move it — and no screen ever said it. Adopted verbatim apart from this
+// note; the views (0145) have been live throughout.
+// ── Why the curve bends: auction or conversion ────────────────────────────────────────────────
+// CAC = CPC / customers-per-click is an IDENTITY, so beta splits exactly:
+//   beta = beta_CPC - beta_CVR.
+// Rendered as a diverging bar because the two legs can pull in OPPOSITE directions and that is
+// the most useful thing on the chart — frkl's auction leg is negative, meaning clicks get cheaper
+// as it scales, and 100% of its saturation is conversion decay. A stacked bar would hide the sign.
+function GP_CurveConstraint(p) {
+  var d = p.dec;
+  if (!d || d.dominant_constraint === 'no_saturation') return null;
+  var bCpc = Number(d.beta_cpc), bCvr = Number(d.beta_cvr);
+  var auction = bCpc, conversion = -bCvr;           // contributions, summing to beta
+  var beta = auction + conversion;
+  var indet = d.dominant_constraint === 'indeterminate';
+
+  var W = 620, H = 92, ML = 96, MR = 16;
+  var pw = W - ML - MR;
+  var lim = Math.max(Math.abs(auction), Math.abs(conversion), Math.abs(beta)) * 1.15 || 1;
+  var zero = ML + pw / 2;
+  var X = function (v) { return zero + (v / lim) * (pw / 2); };
+
+  var bar = function (label, val, y, col, t) {
+    var x0 = Math.min(X(0), X(val)), w = Math.abs(X(val) - X(0));
+    return (
+      <g>
+        <text x={ML - 10} y={y + 13} textAnchor="end" fontSize="11" fill={GP_T.mut}>{label}</text>
+        <rect x={x0} y={y} width={Math.max(w, 1)} height="18" fill={col} opacity={indet ? 0.35 : 0.85} rx="2" />
+        <text x={val >= 0 ? x0 + w + 6 : x0 - 6} y={y + 13} textAnchor={val >= 0 ? 'start' : 'end'}
+          fontSize="11" fontFamily={GP_T.mono} fill={GP_T.ink}>
+          {(val >= 0 ? '+' : '') + val.toFixed(2)}
+          {t != null && isFinite(t) ? <tspan fill={GP_T.dim}>{'  t ' + Number(t).toFixed(1)}</tspan> : null}
+        </text>
+      </g>
+    );
+  };
+
+  return (
+    <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 12,
+      padding: '16px 18px', marginTop: 12 }}>
+      <div style={{ fontSize: 11, letterSpacing: '.5px', textTransform: 'uppercase',
+        color: GP_T.accent2, marginBottom: 4 }}>Why the curve bends</div>
+      <div style={{ fontSize: 12, color: GP_T.mut, lineHeight: 1.6, maxWidth: 620, marginBottom: 12 }}>
+        Rising cost per customer has exactly two causes, and they have opposite fixes. Your CAC alone
+        cannot tell them apart — this splits it.
+      </div>
+
+      <svg viewBox={'0 0 ' + W + ' ' + H} width="100%" role="img"
+        aria-label="Saturation split into its auction and conversion components"
+        style={{ display: 'block', overflow: 'visible' }}>
+        <line x1={zero} x2={zero} y1="4" y2={H - 22} stroke={GP_T.line} strokeWidth="1" />
+        {bar('Auction (CPC)', auction, 6, auction > 0 ? GP_T.red : GP_T.green, d.t_auction)}
+        {bar('Conversion (CVR)', conversion, 34, conversion > 0 ? GP_T.red : GP_T.green, d.t_conversion)}
+        <line x1={ML} x2={W - MR} y1={62} y2={62} stroke={GP_T.line} strokeWidth="1" />
+        {bar('= your curve (β)', beta, 66, GP_T.accent, null)}
+      </svg>
+
+      <div style={{ fontSize: 12, color: GP_T.mut, lineHeight: 1.65, marginTop: 10 }}>
+        {indet ? (
+          <span>Neither leg is distinguishable from zero yet, so the cause is <b style={{ color: GP_T.ink }}>not
+            identified</b>. More months at distinct spend levels will separate them.</span>
+        ) : auction < 0 ? (
+          <span>
+            Your cost per click <b style={{ color: GP_T.green }}>falls</b> as you spend more — there is no
+            auction penalty at all. <b style={{ color: GP_T.ink }}>All</b> of your saturation is conversion:
+            the traffic you buy at the margin converts worse. Cheaper media will not raise your ceiling.
+          </span>
+        ) : (
+          <span>
+            Conversion accounts for <b style={{ color: GP_T.ink }}>{Math.round((conversion / beta) * 100)}%</b> of
+            your saturation, the auction <b style={{ color: GP_T.ink }}>{Math.round((auction / beta) * 100)}%</b>.
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Has the curve moved? ──────────────────────────────────────────────────────────────────────
+// EXPANDING window, never rolling. Overlapping rolling windows share most of their observations
+// and draw a smooth line that is mostly overlap, not signal. This plots what Greta could have said
+// at each month-end on the data it had then, so the honest reading is whether the ESTIMATE is
+// converging — which is NOT the same claim as "your curve changed".
+function GP_CurveHistory(p) {
+  var rows = (p.rows || []).filter(function (r) { return r.beta != null && r.ci_low != null; });
+  if (rows.length < 3) return null;
+
+  var W = 620, H = 200, ML = 44, MR = 16, MT = 14, MB = 34;
+  var pw = W - ML - MR, ph = H - MT - MB;
+  var lo = Math.min.apply(null, rows.map(function (r) { return Number(r.ci_low); }));
+  var hi = Math.max.apply(null, rows.map(function (r) { return Number(r.ci_high); }));
+  lo = Math.min(lo, -0.1); hi = Math.max(hi, 1.1);
+  var X = function (i) { return ML + (i / (rows.length - 1)) * pw; };
+  var Y = function (v) { return MT + ph - ((v - lo) / (hi - lo)) * ph; };
+
+  var band = rows.map(function (r, i) { return X(i) + ',' + Y(Number(r.ci_high)); }).join(' ') + ' ' +
+             rows.slice().reverse().map(function (r, i) {
+               return X(rows.length - 1 - i) + ',' + Y(Number(r.ci_low)); }).join(' ');
+  var line = rows.map(function (r, i) { return (i ? 'L' : 'M') + X(i) + ' ' + Y(Number(r.beta)); }).join(' ');
+
+  var first = rows[0], last = rows[rows.length - 1];
+  var narrowed = Number(last.ci_high) - Number(last.ci_low) < Number(first.ci_high) - Number(first.ci_low);
+
+  return (
+    <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 12,
+      padding: '16px 18px', marginTop: 12 }}>
+      <div style={{ fontSize: 11, letterSpacing: '.5px', textTransform: 'uppercase',
+        color: GP_T.accent2, marginBottom: 4 }}>How the read has changed</div>
+      <div style={{ fontSize: 12, color: GP_T.mut, lineHeight: 1.6, maxWidth: 620, marginBottom: 12 }}>
+        What Greta could have told you at each month-end, on the data it had then. The shaded band is
+        the 95% interval — watch it narrow as evidence accumulates.
+      </div>
+
+      <svg viewBox={'0 0 ' + W + ' ' + H} width="100%" role="img"
+        aria-label="Fitted curvature and its confidence interval at each month-end"
+        style={{ display: 'block', overflow: 'visible' }}>
+        {[0, 0.5, 1].map(function (v, i) {
+          return <g key={i}>
+            <line x1={ML} x2={W - MR} y1={Y(v)} y2={Y(v)} stroke={GP_T.line} strokeWidth="1"
+              strokeDasharray={v === 1 ? '4 4' : undefined} />
+            <text x={ML - 8} y={Y(v) + 3.5} textAnchor="end" fontSize="10" fill={GP_T.dim}
+              fontFamily={GP_T.mono}>{v.toFixed(1)}</text>
+          </g>;
+        })}
+        {/* above beta = 1 there is no finite ceiling at all */}
+        <text x={W - MR} y={Y(1) - 5} textAnchor="end" fontSize="9.5" fill={GP_T.dim}>
+          β ≥ 1 · no ceiling exists
+        </text>
+        <polygon points={band} fill={GP_T.accent} opacity="0.13" />
+        <path d={line} fill="none" stroke={GP_T.accent} strokeWidth="2" />
+        {rows.map(function (r, i) {
+          return <circle key={i} cx={X(i)} cy={Y(Number(r.beta))} r="2.6" fill={GP_T.accent}>
+            <title>{String(r.month).slice(0, 7) + ' · β ' + Number(r.beta).toFixed(2) +
+              ' (95% ' + Number(r.ci_low).toFixed(2) + '–' + Number(r.ci_high).toFixed(2) +
+              ') on ' + r.n + ' months'}</title>
+          </circle>;
+        })}
+        <line x1={ML} x2={W - MR} y1={MT + ph} y2={MT + ph} stroke={GP_T.line} strokeWidth="1" />
+        <text x={ML} y={H - 10} fontSize="10" fill={GP_T.dim}>{String(first.month).slice(0, 7)}</text>
+        <text x={W - MR} y={H - 10} textAnchor="end" fontSize="10" fill={GP_T.dim}>
+          {String(last.month).slice(0, 7)}
+        </text>
+      </svg>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))',
+        gap: 10, marginTop: 12 }}>
+        <GP_Metric k="Interval then" v={(Number(first.ci_high) - Number(first.ci_low)).toFixed(2)}
+          sub={'on ' + first.n + ' months'} />
+        <GP_Metric k="Interval now" v={(Number(last.ci_high) - Number(last.ci_low)).toFixed(2)}
+          sub={'on ' + last.n + ' months'} />
+        <GP_Metric k="Curvature now" v={Number(last.beta).toFixed(2)}
+          sub={'95% ' + Number(last.ci_low).toFixed(2) + '–' + Number(last.ci_high).toFixed(2)} />
+      </div>
+
+      {/* The distinction this whole panel turns on. Do not soften it. */}
+      <div style={{ fontSize: 12, color: GP_T.mut, lineHeight: 1.65, marginTop: 12 }}>
+        {narrowed
+          ? <span>The interval is <b style={{ color: GP_T.ink }}>narrowing</b> — the estimate is getting
+              sharper as months accumulate. That is a statement about what Greta knows, <b
+              style={{ color: GP_T.ink }}>not</b> evidence that your curve itself has moved; a formal
+              test for that is not significant on this data.</span>
+          : <span>The interval has <b style={{ color: GP_T.ink }}>stopped narrowing</b>. More months of
+              the same spending pattern will not sharpen this — it needs deliberate variation in spend,
+              or a geo-holdout.</span>}
+      </div>
+    </div>
+  );
+}
+
+// ── What moves the curve ──────────────────────────────────────────────────────────────────────
+// Two tiers, deliberately separated, because they carry different certainty:
+//   CERTAIN — what the lever does to CM or CAC. Arithmetic on the CM identity, no beta.
+//   BANDED  — what that does to affordable spend. Needs beta, inherits its whole interval.
+function GP_CurveLevers(p) {
+  var levers = (p.levers || []).filter(function (l) { return l.ceiling_multiplier_mid != null; });
+  if (levers.length < 2) return null;
+  levers = levers.slice().sort(function (a, b) {
+    return Number(b.ceiling_multiplier_mid) - Number(a.ceiling_multiplier_mid); });
+  var max = Number(levers[0].ceiling_multiplier_mid) - 1;
+  var LABEL = { aov: 'Average order value', gross_margin: 'Gross margin', refund_rate: 'Refund rate',
+    per_order_costs: 'Per-order costs', cvr: 'Conversion rate', cpc: 'Cost per click' };
+
+  return (
+    <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 12,
+      padding: '16px 18px', marginTop: 12 }}>
+      <div style={{ fontSize: 11, letterSpacing: '.5px', textTransform: 'uppercase',
+        color: GP_T.accent2, marginBottom: 4 }}>What moves it</div>
+      <div style={{ fontSize: 12, color: GP_T.mut, lineHeight: 1.6, maxWidth: 620, marginBottom: 14 }}>
+        The ceiling is where the curve meets what a customer is worth. You can move the{' '}
+        <b style={{ color: GP_T.ink }}>line</b> up (worth more) or the{' '}
+        <b style={{ color: GP_T.ink }}>curve</b> down (cost less). Each row is a 10% improvement in
+        one thing, holding everything else fixed.
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '0 14px',
+        alignItems: 'center', fontSize: 10.5, letterSpacing: '.4px', textTransform: 'uppercase',
+        color: GP_T.dim, paddingBottom: 6, borderBottom: '1px solid ' + GP_T.line }}>
+        <div>Lever</div><div style={{ textAlign: 'right' }}>Certain effect</div>
+        <div style={{ textAlign: 'right' }}>Affordable spend</div>
+      </div>
+
+      {levers.map(function (l, i) {
+        var gain = Number(l.ceiling_multiplier_mid) - 1;
+        var certain = l.cm_effect_pct != null
+          ? 'margin +' + (Number(l.cm_effect_pct) * 100).toFixed(1) + '%'
+          : 'CAC ' + (Number(l.cac_effect_pct) * 100).toFixed(1) + '%';
+        return (
+          <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto',
+            gap: '0 14px', alignItems: 'center', padding: '9px 0',
+            borderBottom: '1px solid ' + GP_T.line }}>
+            <div>
+              <div style={{ fontSize: 12.5, color: GP_T.ink }}>{LABEL[l.lever] || l.lever}</div>
+              <div style={{ fontSize: 10.5, color: GP_T.dim, marginTop: 2 }}>
+                moves the {l.moves === 'line' ? 'line' : 'curve'}
+              </div>
+              <div style={{ height: 3, marginTop: 5, background: GP_T.line, borderRadius: 2 }}>
+                <div style={{ height: 3, width: Math.max(2, (gain / max) * 100) + '%',
+                  background: GP_T.accent, borderRadius: 2 }} />
+              </div>
+            </div>
+            <div style={{ textAlign: 'right', fontSize: 12, fontFamily: GP_T.mono, color: GP_T.mut }}>
+              {certain}
+            </div>
+            <div style={{ textAlign: 'right', fontSize: 13.5, fontFamily: GP_T.mono, color: GP_T.ink }}>
+              +{Math.round(gain * 100)}%
+            </div>
+          </div>
+        );
+      })}
+
+      <div style={{ fontSize: 11.5, color: GP_T.dim, lineHeight: 1.6, marginTop: 12 }}>
+        <b style={{ color: GP_T.mut }}>Certain effect</b> is arithmetic — it holds whatever your curve
+        turns out to be. <b style={{ color: GP_T.mut }}>Affordable spend</b> is modelled through β and
+        carries its full interval{p.ciAdmitsNoCeiling ? ', which here is open at the flat end' : ''}.
+        These are not independent dials: bundling that lifts order value often costs conversion.
+      </div>
+    </div>
+  );
+}
+
+// Split for UI V3 (2026-09-25): `show` picks which half renders — 'goal' (readiness,
+// costs and the quarter goal) or 'growth' (forecast, channel targets, spend curve).
+// Default 'all' keeps the original combined panel for the pre-V3 app.
+// Costs used to be typed into three other places that only ever saved to this browser
+// (the cost modal, the profit-breakdown card, the cash editor). Those surfaces now send
+// people here, so anything they left behind is offered back as a suggestion — filled into
+// the form, never saved on their behalf.
+function GP_BrowserCosts({ econ, setEcon }) {
+  var stash = React.useMemo(function () {
+    try {
+      var c = JSON.parse(localStorage.getItem('frkl-contrib-inputs') || '{}') || {};
+      var cash = JSON.parse(localStorage.getItem('oi_cash_v1') || 'null');
+      var keys = ['shipping', 'packaging', 'fulfilment', 'payPct', 'payFixed', 'refundPct'];
+      var found = keys.filter(function (k) { return c[k] != null && c[k] !== ''; });
+      if (!found.length && !(cash && cash.fixed)) return null;
+      return { c: c, cash: cash, found: found };
+    } catch (e) { return null; }
+  }, []);
+  var d = React.useState(false), done = d[0], setDone = d[1];
+  if (!stash || done || !econ) return null;
+  var use = function () {
+    var next = Object.assign({}, econ);
+    stash.found.forEach(function (k) { if (!next[k]) next[k] = String(stash.c[k]); });
+    if (stash.cash && stash.cash.fixed && !next.fixed) next.fixed = String(stash.cash.fixed);
+    setEcon(next); setDone(true);
+  };
+  return (
+    <div style={{ border: '1px solid ' + GP_T.accent, background: 'var(--accent-bg)', padding: '10px 12px', marginBottom: 12, fontSize: 12.5, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+      <span>Costs were saved in this browser before ({stash.found.join(', ') || 'monthly overheads'}). They were never sent to Greta.</span>
+      <button onClick={use} style={{ minHeight: 36, padding: '0 12px', border: '1px solid ' + GP_T.accent, background: GP_T.accent, color: '#fff', borderRadius: 'var(--radius-md)', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Fill them in</button>
+      <button onClick={function () { setDone(true); }} style={{ minHeight: 36, padding: '0 12px', border: '1px solid ' + GP_T.line, background: 'transparent', color: GP_T.mut, borderRadius: 'var(--radius-md)', fontFamily: 'inherit', fontSize: 12.5, cursor: 'pointer' }}>Ignore</button>
+    </div>
+  );
+}
+
+function GretaPlanPanel({ show } = {}) {
+  var SHOW = show || 'all';
+  var isGoal = SHOW === 'all' || SHOW === 'goal';
+  var isGrowth = SHOW === 'all' || SHOW === 'growth';
   var P = (typeof window !== 'undefined' && window.FRKL_PLAN) || { readiness: [], goal: null, period: { start: '', end: '' } };
   var s = React.useState(0), tick = s[0], setTick = s[1];
   var b = React.useState('cam'), basis = b[0], setBasis = b[1];
@@ -11168,7 +11581,7 @@ function GretaPlanPanel() {
 
   var wrap = { maxWidth: 1180, margin: '0 auto', padding: '10px 6px 60px', background: GP_T.bg, color: GP_T.ink };
   var input = { background: 'var(--color-surface)', border: '1px solid ' + GP_T.line, borderRadius: 8, color: GP_T.ink, fontFamily: GP_T.mono, fontSize: 16, padding: '8px 11px', width: 160 };
-  var seg = function (on) { return { background: on ? GP_T.accent : 'none', color: on ? '#fff' : GP_T.mut, fontWeight: on ? 600 : 400, border: 0, fontSize: 12.5, padding: '7px 13px', borderRadius: 6, cursor: 'pointer' }; };
+  var seg = function (on) { return { background: on ? GP_T.accent : 'none', color: on ? PAL.panel : GP_T.mut, fontWeight: on ? 600 : 400, border: 0, fontSize: 12.5, padding: '7px 13px', borderRadius: 6, cursor: 'pointer' }; };
   var cfg = (window.FRKL_PLAN && window.FRKL_PLAN.config) || null;
   var perDays = (P.period && P.period.start && P.period.end) ? Math.max(1, Math.round((new Date(P.period.end) - new Date(P.period.start)) / 864e5) + 1) : 90;
   var fixedForPeriod = cfg && cfg.fixed_costs_monthly ? Number(cfg.fixed_costs_monthly) * (perDays / 30) : 0;
@@ -11179,13 +11592,13 @@ function GretaPlanPanel() {
   return (
     <div style={wrap}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 4 }}>
-        <h2 style={{ fontSize: 16, margin: 0 }}>Plan</h2>
+        <h2 style={{ fontSize: 16, margin: 0 }}>{SHOW === 'growth' ? 'Your growth plan' : SHOW === 'goal' ? 'Your goal and costs' : 'Plan'}</h2>
         <span style={{ fontSize: 12.5, color: GP_T.dim }}>quarter {P.period.start} – {P.period.end}</span>
       </div>
-      <div style={{ fontSize: 12, color: GP_T.dim, marginBottom: 14 }}>Confirm your economics, set a goal, and the targets below drive pace &amp; the action queue.</div>
+      <div style={{ fontSize: 12, color: GP_T.dim, marginBottom: 14 }}>{SHOW === 'growth' ? 'What the plan forecasts, which channels earn their money, and how far your spend can go.' : 'Confirm what things cost you and set your goal — these drive pace and the ranked actions.'}</div>
 
       {/* readiness gate */}
-      <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 12, padding: '14px 16px', marginBottom: 16 }}>
+      {isGoal && (<div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 12, padding: '14px 16px', marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <div style={{ fontSize: 11, letterSpacing: '.5px', textTransform: 'uppercase', color: GP_T.accent2 }}>Data readiness</div>
           <div style={{ fontSize: 12, color: blocking.length ? GP_T.amber : GP_T.green }}>{readyCount}/{readiness.length} ready{blocking.length ? ' · ' + blocking.length + ' blocking targets' : ' · plan-ready ✓'}</div>
@@ -11208,17 +11621,18 @@ function GretaPlanPanel() {
             );
           })}
         </div>
-      </div>
+      </div>)}
 
-      <GP_ChannelHealth h={P.channelHealth}/>
-      <GP_ChannelMix mix={P.channelMix}/>
+      {isGrowth && (<GP_ChannelHealth h={P.channelHealth}/>)}
+      {isGrowth && (<GP_ChannelMix mix={P.channelMix}/>)}
 
       {/* economics editor — operating costs feed Operating Profit on the Overview */}
-      <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 12, padding: '14px 16px', marginBottom: 16 }}>
+      {isGoal && (<div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 12, padding: '14px 16px', marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
           <div style={{ fontSize: 11, letterSpacing: '.5px', textTransform: 'uppercase', color: GP_T.accent2 }}>Operating economics</div>
           <span style={{ fontSize: 11.5, color: GP_T.dim }}>feeds contribution &amp; Operating Profit</span>
         </div>
+        <GP_BrowserCosts econ={econ} setEcon={setEcon} />
         <div style={{ fontSize: 12, color: GP_T.dim, marginBottom: 12 }}>Fixed (operating) costs are your monthly overhead — rent, salaries, software. Operating Profit = contribution-after-marketing − fixed costs.</div>
         {econ ? (
           <div>
@@ -11234,7 +11648,7 @@ function GretaPlanPanel() {
               })}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14 }}>
-              <button onClick={saveEcon} disabled={busy} style={{ borderRadius: 8, padding: '9px 16px', fontSize: 13, border: '1px solid ' + GP_T.accent, background: GP_T.accent, color: '#fff', fontWeight: 600, cursor: 'pointer' }}>{busy ? '…' : 'Save economics'}</button>
+              <button onClick={saveEcon} disabled={busy} style={{ borderRadius: 8, padding: '9px 16px', fontSize: 13, border: '1px solid ' + GP_T.accent, background: GP_T.accent, color: PAL.panel, fontWeight: 600, cursor: 'pointer' }}>{busy ? '…' : 'Save economics'}</button>
               {ecMsg === 'ok' && <span style={{ color: GP_T.green, fontSize: 12.5 }}>✓ Saved — Operating Profit now uses these costs.</span>}
               {ecMsg && ecMsg.indexOf('err') === 0 && <span style={{ color: GP_T.red, fontSize: 12.5 }}>{ecMsg.slice(4)}</span>}
               <span style={{ fontSize: 11, color: GP_T.dim }}>Gross margin &amp; variable costs recompute your contribution ratio.</span>
@@ -11243,10 +11657,10 @@ function GretaPlanPanel() {
         ) : (
           <div style={{ fontSize: 12.5, color: GP_T.dim }}>Loading economics…</div>
         )}
-      </div>
+      </div>)}
 
       {/* forecast vs goal — the calendar's impact on the plan (reads vw_forecast_vs_goal, SOT) */}
-      {P.forecast && (
+      {isGrowth && P.forecast && (
         <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 12, padding: '14px 16px', marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <div style={{ fontSize: 11, letterSpacing: '.5px', textTransform: 'uppercase', color: GP_T.accent2 }}>Forecast vs goal</div>
@@ -11254,17 +11668,17 @@ function GretaPlanPanel() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 12 }}>
             <GP_Metric k="Forecast revenue" v={GP_gbp(P.forecast.forecast_revenue_period)} sub={'target ' + GP_gbp(P.forecast.revenue_target)} />
-            <GP_Metric k="Forecast CAM" v={GP_gbp(P.forecast.forecast_cm_period)} hi={true} sub={'target ' + GP_gbp(P.forecast.contribution_margin_target)} />
+            <GP_Metric k="Forecast profit after ads" v={GP_gbp(P.forecast.forecast_cm_period)} hi={true} sub={'target ' + GP_gbp(P.forecast.contribution_margin_target)} />
             <GP_Metric k="From the calendar" v={GP_gbp(P.forecast.forecast_event_revenue_period)} sub={'CM ' + GP_gbp(P.forecast.forecast_event_cm_period)} />
             <GP_Metric k="Revenue gap" v={GP_gbp(P.forecast.revenue_gap)} sub={Number(P.forecast.revenue_gap) >= 0 ? 'ahead of plan' : 'behind — add events'} />
-            <GP_Metric k="CAM gap" v={GP_gbp(P.forecast.cm_gap)} sub={Number(P.forecast.cm_gap) >= 0 ? 'ahead' : 'behind plan'} />
+            <GP_Metric k="Profit gap" v={GP_gbp(P.forecast.cm_gap)} sub={Number(P.forecast.cm_gap) >= 0 ? 'ahead' : 'behind plan'} />
           </div>
-          <div style={{ fontSize: 11, color: GP_T.dim, marginTop: 8 }}>Events with no expected figure are benchmark-seeded (flagged, not measured). Add promos/launches to the calendar to lift the forecast toward the goal.</div>
+          <div style={{ fontSize: 11, color: GP_T.dim, marginTop: 8 }}>Events with no expected figure are benchmark-seeded (flagged, not measured). <GoLink sec="operate" sub="calendar">Add promos/launches to the calendar</GoLink> to lift the forecast toward the goal.</div>
         </div>
       )}
 
       {/* channel efficiency vs targets — CTC: CM-first, normalized iROAS, fix before scale */}
-      {P.channels && P.channels.length ? (
+      {isGrowth && P.channels && P.channels.length ? (
         <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 12, padding: '14px 16px', marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <div style={{ fontSize: 11, letterSpacing: '.5px', textTransform: 'uppercase', color: GP_T.accent2 }}>Channel efficiency vs targets</div>
@@ -11307,18 +11721,23 @@ function GretaPlanPanel() {
         </div>
       ) : null}
 
-      <GP_SpendCurve curve={P.spendCurve} points={P.spendCurvePoints} />
+      {isGrowth && (<GP_SpendCurve curve={P.spendCurve} points={P.spendCurvePoints} />)}
+      {/* What the engine already knew about that curve but never showed (views live since 0145). */}
+      {isGrowth && (<GP_CurveConstraint dec={P.curveDecomposition} beta={P.spendCurve && P.spendCurve.beta} />)}
+      {isGrowth && (<GP_CurveHistory rows={P.curveHistory} />)}
+      {isGrowth && (<GP_CurveLevers levers={P.curveLevers} verdict={P.spendCurve && P.spendCurve.verdict}
+                                    ciAdmitsNoCeiling={!!(P.spendCurve && P.spendCurve.band_admits_no_ceiling)} />)}
 
       {/* goal setter */}
-      <div style={{ background: 'linear-gradient(180deg,' + GP_T.panel + ',' + GP_T.panel2 + ')', border: '1px solid ' + GP_T.line, borderRadius: 12, padding: '16px 18px' }}>
+      {isGoal && (<div style={{ background: 'linear-gradient(180deg,' + GP_T.panel + ',' + GP_T.panel2 + ')', border: '1px solid ' + GP_T.line, borderRadius: 12, padding: '16px 18px' }}>
         <div style={{ fontSize: 11, letterSpacing: '.5px', textTransform: 'uppercase', color: GP_T.accent2, marginBottom: 10 }}>Set the quarter goal</div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div style={{ display: 'inline-flex', background: 'var(--color-surface)', border: '1px solid ' + GP_T.line, borderRadius: 8, padding: 3 }}>
-            <button onClick={function () { setBasis('cam'); }} style={seg(basis === 'cam')}>Contribution (CAM)</button>
+            <button onClick={function () { setBasis('cam'); }} style={seg(basis === 'cam')}>Profit after ads</button>
             <button onClick={function () { setBasis('revenue'); }} style={seg(basis === 'revenue')}>Revenue</button>
           </div>
           <div>
-            <div style={{ fontSize: 11, color: GP_T.mut, marginBottom: 4 }}>{basis === 'cam' ? 'Contribution-after-marketing goal' : 'Revenue goal'} (£)</div>
+            <div style={{ fontSize: 11, color: GP_T.mut, marginBottom: 4 }}>{basis === 'cam' ? 'Profit-after-ads goal' : 'Revenue goal'} (£)</div>
             <input style={input} value={amount} onChange={function (e) { setAmount(e.target.value.replace(/[^0-9.]/g, '')); }} placeholder={basis === 'cam' ? 'e.g. 25000' : 'e.g. 90000'} />
           </div>
           <button onClick={calc} disabled={busy} style={{ borderRadius: 8, padding: '9px 15px', fontSize: 13, border: '1px solid ' + GP_T.line, background: GP_T.panel, color: GP_T.ink, cursor: 'pointer' }}>{busy ? '…' : 'Calculate'}</button>
@@ -11329,8 +11748,8 @@ function GretaPlanPanel() {
           <div style={{ marginTop: 16 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 12 }}>
               <GP_Metric k="Revenue target" v={GP_gbp(derived.revenue_target)} />
-              <GP_Metric k="Contribution (product)" v={GP_gbp(derived.product_cm_target)} sub={'× ' + Math.round((derived.cm_ratio_used || 0) * 100) + '%'} />
-              <GP_Metric k="Contribution after mktg" v={GP_gbp(derived.cam_target)} hi={true} sub="the arbiter (CAM)" />
+              <GP_Metric k="Profit before ads" v={GP_gbp(derived.product_cm_target)} sub={'× ' + Math.round((derived.cm_ratio_used || 0) * 100) + '%'} />
+              <GP_Metric k="Profit after ads" v={GP_gbp(derived.cam_target)} hi={true} sub="the number Today paces against" />
               <GP_Metric k="Spend cap" v={GP_gbp(derived.spend_cap)} sub={'MER ' + derived.mer_target} />
               <GP_Metric k="New customers" v={Math.round(derived.new_customer_target).toLocaleString('en-GB')} sub={'aMER ' + derived.amer_used} />
               <GP_Metric k="Returning (baseline)" v={GP_gbp(derived.returning_revenue_target)} />
@@ -11344,14 +11763,14 @@ function GretaPlanPanel() {
               </div>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
-              <button onClick={confirm} disabled={busy} style={{ borderRadius: 8, padding: '9px 16px', fontSize: 13, border: '1px solid ' + GP_T.accent, background: GP_T.accent, color: '#fff', fontWeight: 600, cursor: 'pointer' }}>Confirm as plan of record</button>
+              <button onClick={confirm} disabled={busy} style={{ borderRadius: 8, padding: '9px 16px', fontSize: 13, border: '1px solid ' + GP_T.accent, background: GP_T.accent, color: PAL.panel, fontWeight: 600, cursor: 'pointer' }}>Confirm as plan of record</button>
               {msg === 'ok' && <span style={{ color: GP_T.green, fontSize: 12.5 }}>✓ Confirmed — this is now your plan; pace &amp; RAG-vs-target are live.</span>}
               {msg && msg.indexOf('err') === 0 && <span style={{ color: GP_T.red, fontSize: 12.5 }}>{msg.slice(4)}</span>}
               <span style={{ fontSize: 11, color: GP_T.dim }}>Confirming derives from live economics (cm {Math.round((derived.cm_ratio_used || 0) * 100)}%, aMER {derived.amer_used}).</span>
             </div>
           </div>
         )}
-      </div>
+      </div>)}
     </div>
   );
 }
@@ -11446,6 +11865,7 @@ const RAIL = [
   { group:'Overview', label:'Trends & alerts',   icon:'alert',     section:'intel' },
   { group:'Act',      label:'Actions',           icon:'clipboard', section:'actions' },
   { group:'Act',      label:'Ask',               icon:'spark',     section:'home',     sub:'ask' },
+  { group:'Act',      label:'Daily Ops',         icon:'clipboard', section:'operate' },
   { group:'Growth',   label:'Channels',          icon:'trendUp',   section:'channels' },
   { group:'Growth',   label:'Conversion',        icon:'pulse',     section:'conversion' },
   { group:'Growth',   label:'Spend forecast',    icon:'trendUp',   section:'forecast' },
@@ -11453,7 +11873,6 @@ const RAIL = [
   { group:'Customers',label:'Competitors',       icon:'search',    section:'market' },
   { group:'Products & supply', label:'Products & stock', icon:'box',   section:'commerce' },
   { group:'Products & supply', label:'Plan & supply',    icon:'truck', section:'planning' },
-  { group:'Act',      label:'Daily Ops',         icon:'clipboard', section:'operate' },
   { group:'',         label:'Settings',          icon:'sliders',   section:'settings', pin:true },
 ];
 const NAV_BY_ID = Object.fromEntries(NAV.map(s=>[s.id, s]));
@@ -11665,8 +12084,6 @@ function ConnectionsPanel(){
         {!authed && <div style={{marginTop:'var(--s-3)', fontSize:11.5, color:'var(--text-muted)'}}>You need to be signed in to connect a store.</div>}
         <div className="hint">
           <b>What happens next:</b> Shopify shows you the requested scopes. After approving, you'll land back here with a "Connected" confirmation. The first data sync runs immediately and Monday-morning refreshes from then on.
-          <br/><br/>
-          <b>Need to set up the Shopify Partner App first?</b> See <code style={{fontSize:11}}>saas/oauth-setup-shopify.md</code> for the one-time admin setup.
         </div>
       </div>
     </div>)}
@@ -12341,7 +12758,7 @@ function TeamPanel(){
 
 // ── Global plan rail (persistent right-hand targets panel), rendered once in the app shell ──
 const PR_T = { line:'var(--color-line)', panel:'var(--color-panel)', surf:'var(--color-surface)', ink:'var(--color-ink)',
-  mut:'var(--color-muted)', dim:'#9a948c', accent:'var(--color-accent)', green:'var(--color-success)', amber:'var(--color-warning)', red:'var(--color-danger)', mono:'var(--font-mono)' };
+  mut:'var(--color-muted)', dim:PAL.faint, accent:'var(--color-accent)', green:'var(--color-success)', amber:'var(--color-warning)', red:'var(--color-danger)', mono:'var(--font-mono)' };
 const PR_num = v => (v==null||v===''||isNaN(Number(v))) ? null : Number(v);
 const PR_gbp = n => { const v=PR_num(n); return v==null?'—':'£'+Math.round(v).toLocaleString('en-GB'); };
 const PR_gbpk = n => { const v=PR_num(n); if(v==null) return '—'; const a=Math.abs(v); return a>=1000 ? '£'+(v/1000).toFixed(a>=10000?0:1)+'k' : '£'+Math.round(v); };
@@ -12443,7 +12860,7 @@ function GretaPlanRail(){
           <div style={{fontSize:12, color:PR_T.mut, lineHeight:1.5, marginBottom:11}}>
             Greta needs a target to tell you whether you’re on track. Set one and this panel tracks your pace every day.
           </div>
-          <button onClick={openPlan} style={{width:'100%', padding:'9px 12px', fontSize:12.5, fontWeight:650, border:0, borderRadius:8, background:PR_T.accent, color:'#fff', cursor:'pointer'}}>Set your goal →</button>
+          <button onClick={openPlan} style={{width:'100%', padding:'9px 12px', fontSize:12.5, fontWeight:650, border:0, borderRadius:8, background:PR_T.accent, color:PAL.panel, cursor:'pointer'}}>Set your goal →</button>
         </div>
       </div>
     );
@@ -12516,7 +12933,7 @@ function GretaPlanRail(){
         <div style={{...card, borderColor:'var(--color-warning)'}}>
           <div style={{fontSize:12.5, fontWeight:650, marginBottom:3}}>{ended?'This quarter has ended':'Quarter ends in '+daysLeft+' days'}</div>
           <div style={{fontSize:11.5, color:PR_T.mut, lineHeight:1.5, marginBottom:9}}>Set next quarter’s goal so Greta keeps tracking your pace without a gap.</div>
-          <button onClick={openPlan} style={{width:'100%', padding:'8px 12px', fontSize:12, fontWeight:650, border:0, borderRadius:8, background:'var(--color-warning)', color:'#fff', cursor:'pointer'}}>Set next quarter’s goal →</button>
+          <button onClick={openPlan} style={{width:'100%', padding:'8px 12px', fontSize:12, fontWeight:650, border:0, borderRadius:8, background:'var(--color-warning)', color:PAL.panel, cursor:'pointer'}}>Set next quarter’s goal →</button>
         </div>
       )}
     </div>
@@ -12525,8 +12942,1114 @@ function GretaPlanRail(){
 if (typeof window!=='undefined') window.GretaPlanRail = GretaPlanRail;
 
 
+// ═══════════════════════════════════════════════════════════════════════════
+// UI V3 — the Phase 2 restructure (approved 2026-09-23).
+// One navigation: 5 groups, 16 destinations, each appearing exactly once.
+// Reversible: set window.GRETA_UI_V3 = false before load to restore the
+// rail + sub-tab app. Old deep links (__oiNav(section, sub)) are re-routed by
+// V3_ROUTE so every existing call site keeps working.
+// ═══════════════════════════════════════════════════════════════════════════
+const UI_V3 = (typeof window === 'undefined') || window.GRETA_UI_V3 !== false;
+
+const V3_NAV = [
+  { group: 'Home',     id: 'today',       label: 'Today',              icon: 'home',      q: 'Am I on track, and what do I do now?' },
+  { group: 'Home',     id: 'review',      label: 'Review',             icon: 'report',    q: 'What changed, and why?' },
+  { group: 'Act',      id: 'actions',     label: 'Actions',            icon: 'clipboard', q: 'What should I do, in order of £?' },
+  { group: 'Act',      id: 'calendar',    label: 'Calendar',           icon: 'calendar',  q: 'What is planned, and what did past events do?' },
+  { group: 'Act',      id: 'ask',         label: 'Ask Greta',          icon: 'spark',     q: 'Ask anything about your business, in plain English.' },
+  { group: 'Plan',     id: 'goal',        label: 'Goal & costs',       icon: 'sliders',   q: 'What am I aiming for, and what do things cost me?' },
+  { group: 'Plan',     id: 'growth',      label: 'Growth plan',        icon: 'trendUp',   q: 'How much more should I spend, and what would change that?' },
+  { group: 'Plan',     id: 'stock',       label: 'Stock & orders',     icon: 'truck',     q: 'What runs out, what do I reorder, and what is on order?' },
+  { group: 'Numbers',  id: 'profit',      label: 'Profit & sales',     icon: 'report',    q: 'Where does my money come from, and where does it go?' },
+  { group: 'Numbers',  id: 'marketing',   label: 'Marketing',          icon: 'trendUp',   q: 'Which channels and ads earn their money?' },
+  { group: 'Numbers',  id: 'website',     label: 'Website',            icon: 'pulse',     q: 'Where do shoppers drop off, and why?' },
+  { group: 'Numbers',  id: 'customers',   label: 'Customers',          icon: 'users',     q: 'Who buys, who comes back, and what are they worth?' },
+  { group: 'Numbers',  id: 'products',    label: 'Products',           icon: 'box',       q: 'Which products earn, and which leak?' },
+  { group: 'Numbers',  id: 'competitors', label: 'Competitors',        icon: 'search',    q: 'Who am I up against?' },
+  { group: 'Settings', id: 'settings',    label: 'Connections & data', icon: 'sliders',   q: 'Is my data connected, and can I trust it?' },
+  { group: 'Settings', id: 'team',        label: 'Team',               icon: 'users',     q: 'Who else can see this workspace?' },
+];
+const V3_BY_ID = Object.fromEntries(V3_NAV.map(d => [d.id, d]));
+// Mobile: five places. Ask sits in the middle; "More" opens the palette.
+const V3_MOBILE = [
+  { id: 'today', label: 'Today', icon: 'home' },
+  { id: 'actions', label: 'Actions', icon: 'clipboard' },
+  { id: 'ask', label: 'Ask', icon: 'spark' },
+  { id: 'profit', label: 'Numbers', icon: 'report' },
+];
+// Old (section, sub) → new destination [, section anchor]. Keeps 16 deep-link
+// call sites, the ⌘K palette and every "open X" button working unchanged.
+const V3_ROUTE = {
+  'home/overview-tiers': ['today'], 'home/plansetup': ['goal'], 'home/owner-today': ['today'],
+  'home/overview': ['profit'], 'home/ask': ['ask'],
+  'board/weekly': ['review', 'week'], 'review/review': ['review', 'quarter'], 'intel/intel': ['review', 'alerts'],
+  'actions/queue': ['actions'],
+  'channels/cross': ['marketing'], 'channels/channels': ['marketing', 'detail'], 'channels/creatives': ['marketing', 'creative'],
+  'channels/email': ['marketing', 'email'], 'channels/organic': ['marketing', 'organic'],
+  'conversion/cvr': ['website', 'cvr'], 'conversion/site': ['website', 'friction'], 'conversion/loop': ['website'],
+  'forecast/forecast': ['growth', 'forecast'],
+  'audience/customers': ['customers'], 'audience/cohorts': ['customers', 'cohorts'],
+  'market/competitors': ['competitors'],
+  'commerce/products': ['products'], 'commerce/promos': ['products', 'promos'],
+  'planning/plan': ['stock'], 'planning/suppliers': ['stock', 'suppliers'],
+  'operate/calendar': ['calendar'], 'operate/command': ['actions'], 'operate/decisions': ['actions', 'decisions'],
+  'settings/connections': ['settings'], 'settings/economics': ['goal'], 'settings/team': ['team'],
+};
+function v3Route(sec, sub) {
+  const k = sub ? sec + '/' + sub : sec;
+  if (V3_ROUTE[k]) return V3_ROUTE[k];
+  const hit = Object.keys(V3_ROUTE).find(x => x.split('/')[0] === sec);
+  return hit ? V3_ROUTE[hit] : ['today'];
+}
+
+// ── Plain-language layer ──────────────────────────────────────────────────
+// One glossary, one sheet, opened by tap (never hover). Each metric: what it is,
+// why it matters, what good looks like — one sentence each, no acronym first.
+const V3_GLOSSARY = {
+  profit_after_ads: { label: 'Profit after ads', tech: 'contribution after marketing (CAM)',
+    what: 'Sales minus product costs, per-order costs and ad spend.',
+    why: 'It is what the business actually keeps from trading, before rent and salaries.',
+    good: 'Rising, and ahead of your goal line for this point in the quarter.' },
+  profit_before_ads: { label: 'Profit before ads', tech: 'product contribution',
+    what: 'What your sales earned after product and order costs, before paying for ads.',
+    why: 'It shows whether the products themselves make money, separately from how you market them.',
+    good: 'A steady share of sales — if it falls, costs or discounts are rising.' },
+  ad_spend: { label: 'Ad spend', tech: 'paid spend',
+    what: 'What you spent on Meta and Google ads in the period.',
+    why: 'It is the cost you control day to day, and the one that eats profit fastest.',
+    good: 'Growing more slowly than the profit it brings in.' },
+  sales: { label: 'Sales', tech: 'net revenue',
+    what: 'What customers paid after discounts and refunds, excluding tax and shipping.',
+    why: 'Every other number is measured against it.',
+    good: 'Growing against the previous 30 days and against your goal.' },
+  pace: { label: 'Pace', tech: 'pace vs plan',
+    what: 'Where your profit stands against the share of the goal you should have reached by today.',
+    why: 'It turns a quarterly goal into a daily read on whether you are ahead or behind.',
+    good: 'At or above the goal line, in pounds.' },
+};
+// The strongest feature for a non-expert owner, so it gets a permanent home: a bar at
+// the top of every screen, the middle tab on mobile, and the same starter questions in
+// both places. Written the way an owner would ask them — no MER, no CM, no iROAS.
+const V3_ASK_PROMPTS = [
+  'What should I do today? Give me the top three, biggest £ first.',
+  'What should I NOT do this week, and why?',
+  'What changed since last week, and does it actually matter?',
+  'Which one thing would most improve my profit after ads?',
+  'Is it safe to spend more on Meta this week? Check stock cover first.',
+  'Which products are about to run out, and what should I reorder?',
+  'Which email is earning the most per person it reaches?',
+  'Which channels are growing, and which are slipping?',
+];
+// The pages that read a window get a control to set it. Before this the app held
+// period state that nothing could change, so every one of them was stuck on 30 days.
+const V3_PERIOD_PAGES = ['profit', 'marketing', 'website', 'customers', 'products'];
+function V3Period({ period, setPeriod, rangeStart, rangeEnd, setRangeStart, setRangeEnd, customActive }) {
+  const [openCustom, setOpenCustom] = React.useState(!!customActive);
+  return (<div className="v3-period">
+    <label htmlFor="v3-period-sel" className="v3-muted">Showing</label>
+    <select id="v3-period-sel" value={customActive ? 'custom' : period}
+            onChange={e => {
+              if (e.target.value === 'custom') { setOpenCustom(true); return; }
+              setRangeStart(''); setRangeEnd(''); setOpenCustom(false); setPeriod(e.target.value);
+            }}>
+      {PERIODS.map(p => <option key={p.key} value={p.key}>{p.label}</option>)}
+      <option value="custom">Custom dates…</option>
+    </select>
+    {(openCustom || customActive) && (<span className="v3-period-range">
+      <input type="date" value={rangeStart} max={rangeEnd || undefined} onChange={e => setRangeStart(e.target.value)} aria-label="From"/>
+      <span className="v3-muted">to</span>
+      <input type="date" value={rangeEnd} min={rangeStart || undefined} onChange={e => setRangeEnd(e.target.value)} aria-label="To"/>
+      {customActive && <button type="button" className="v3-btn v3-btn-sm" onClick={() => { setRangeStart(''); setRangeEnd(''); setOpenCustom(false); }}>Clear</button>}
+    </span>)}
+  </div>);
+}
+function V3AskBar({ dest }) {
+  const [q, setQ] = React.useState('');
+  const [open, setOpen] = React.useState(false);
+  const send = (text) => {
+    const t = (text != null ? text : q).trim();
+    if (!t) { window.__oiGo && window.__oiGo('ask'); return; }
+    setQ(''); setOpen(false);
+    if (window.__oiAsk) window.__oiAsk(t); else window.__oiGo && window.__oiGo('ask');
+  };
+  if (dest === 'ask') return null;          // never ask twice on the Ask screen itself
+  return (<div className="v3-askbar">
+    <div className="v3-askbar-in">
+      <Icon name="spark" size={15}/>
+      <input
+        value={q} onChange={e=>setQ(e.target.value)} onFocus={()=>setOpen(true)}
+        onBlur={()=>setTimeout(()=>setOpen(false), 180)}
+        onKeyDown={e=>{ if (e.key === 'Enter') send(); }}
+        placeholder="Ask Greta anything about your business…" aria-label="Ask Greta a question"/>
+      <button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={()=>send()}>Ask</button>
+    </div>
+    {open && (<div className="v3-askbar-sug">
+      <span className="v3-muted">Try:</span>
+      {V3_ASK_PROMPTS.slice(0, 4).map((p, i) => (
+        <button key={i} type="button" className="v3-sug" onMouseDown={(e)=>{ e.preventDefault(); send(p); }}>{p}</button>
+      ))}
+    </div>)}
+  </div>);
+}
+function V3Info({ k }) {
+  const g = V3_GLOSSARY[k]; if (!g) return null;
+  const [open, setOpen] = React.useState(false);
+  return (<span className="v3-info-wrap">
+    <button type="button" className="v3-info" aria-label={'What is ' + g.label + '?'} aria-expanded={open}
+            onClick={(ev) => { ev.stopPropagation(); setOpen(o => !o); }}>i</button>
+    {open && (<span className="v3-sheet" role="dialog" aria-label={g.label}>
+      <b>{g.label}</b>
+      <span><b>What it is:</b> {g.what}</span>
+      <span><b>Why it matters:</b> {g.why}</span>
+      <span><b>What good looks like:</b> {g.good}</span>
+      <span className="v3-sheet-tech">Also called: {g.tech}</span>
+      <span className="v3-sheet-btns">
+        <button type="button" className="v3-btn v3-btn-sm" onClick={() => { setOpen(false); if (window.__oiAsk) window.__oiAsk('Explain my ' + g.label.toLowerCase() + ' — what is driving it right now?'); }}>Ask Greta about this</button>
+        <button type="button" className="v3-btn v3-btn-sm" onClick={() => setOpen(false)}>Close</button>
+      </span>
+    </span>)}
+  </span>);
+}
+// ── One confidence signal ────────────────────────────────────────────────
+// Four states replace the 18 vocabularies found in the audit. Detail on tap.
+const V3_CONF = {
+  measured:  { label: 'Measured',        why: 'Calculated from your own connected data.' },
+  estimated: { label: 'Estimated',       why: 'Worked out from the costs you entered, not yet checked against your own results.' },
+  benchmark: { label: 'Benchmark',       why: 'An industry figure, not yet confirmed for your brand. A test would measure it.' },
+  held:      { label: 'Not enough data', why: 'Greta holds back rather than guess.' },
+};
+function V3Conf({ state, detail, fix }) {
+  const c = V3_CONF[state] || V3_CONF.estimated;
+  const [open, setOpen] = React.useState(false);
+  return (<span className="v3-info-wrap">
+    <button type="button" className={'v3-conf v3-conf-' + (state || 'estimated')} onClick={(ev) => { ev.stopPropagation(); setOpen(o => !o); }} aria-expanded={open}>
+      <i aria-hidden="true"/>{c.label}
+    </button>
+    {open && (<span className="v3-sheet" role="dialog" aria-label={'Confidence: ' + c.label}>
+      <b>{c.label}</b><span>{detail || c.why}</span>
+      {fix && <span className="v3-sheet-btns"><button type="button" className="v3-btn v3-btn-sm" onClick={() => { setOpen(false); window.__oiNav && window.__oiNav(fix[0], fix[1]); }}>{fix[2]}</button></span>}
+      <span className="v3-sheet-btns"><button type="button" className="v3-btn v3-btn-sm" onClick={() => setOpen(false)}>Close</button></span>
+    </span>)}
+  </span>);
+}
+// ── Progressive disclosure ───────────────────────────────────────────────
+// Analyst depth is demoted, never deleted. Open/closed is remembered per viewer.
+function V3More({ id, label, children, defaultOpen }) {
+  const key = 'greta_v3_open_' + id;
+  const [open, setOpen] = React.useState(() => {
+    try { const v = localStorage.getItem(key); if (v != null) return v === '1'; } catch (e) {}
+    return !!defaultOpen;
+  });
+  const toggle = () => setOpen(o => { try { localStorage.setItem(key, o ? '0' : '1'); } catch (e) {} return !o; });
+  return (<section className="v3-more">
+    <button type="button" className="v3-more-head" onClick={toggle} aria-expanded={open}>
+      <span className="v3-more-caret" aria-hidden="true">{open ? '▾' : '▸'}</span>{label}
+    </button>
+    {open && <div className="v3-more-body">{children}</div>}
+  </section>);
+}
+
+// ── Today (V3) ───────────────────────────────────────────────────────────
+// The one profit number, both bases on screen (decision 1): profit after ads is
+// the single big figure; profit before ads, ad spend and sales sit on the line
+// beneath it. Read from vw_brand_headline — never recomputed here.
+function useV3Headline() {
+  const [h, setH] = React.useState(() => (typeof window !== 'undefined' && window.GRETA_HEADLINE) || null);
+  React.useEffect(() => {
+    const on = () => setH(window.GRETA_HEADLINE || null);
+    window.addEventListener('greta-headline-updated', on);
+    if (window.GRETA_HEADLINE) setH(window.GRETA_HEADLINE);
+    return () => window.removeEventListener('greta-headline-updated', on);
+  }, []);
+  return h;
+}
+function v3Gbp(v) { return v == null ? '—' : '£' + Math.round(Number(v)).toLocaleString('en-GB'); }
+// Engine action text is written for an analyst: a category prefix, then the claim,
+// then the arithmetic in brackets. Split it so the owner reads a sentence first and
+// the workings sit underneath. The text itself is never invented here.
+const V3_CATS = ['total','site','finance','ops','product','paid','creative','retention','cx','stock','email','organic'];
+function v3ActionText(raw) {
+  let s = scrubTag(String(raw || '')).trim();
+  const c = s.indexOf(': ');
+  if (c > 0 && c < 14 && V3_CATS.includes(s.slice(0, c).toLowerCase())) s = s.slice(c + 2);
+  let detail = '';
+  const b = s.indexOf(' (');
+  if (b > 0 && s.trim().endsWith(')')) { detail = s.slice(b + 2, s.length - 1); s = s.slice(0, b); }
+  const d = s.indexOf(' — ');
+  if (d > 0) { detail = (detail ? s.slice(d + 3) + ' · ' + detail : s.slice(d + 3)); s = s.slice(0, d); }
+  s = s.charAt(0).toUpperCase() + s.slice(1);
+  return { main: s.replace(/\.$/, ''), detail: detail };
+}
+// First run (Phase 2, §6): four steps to a first answer. Each step reads what the
+// database already knows — never a guess in the browser — and links to the one screen
+// that completes it. It disappears once all four are done.
+function V3Setup({ s }) {
+  if (!s) return null;
+  const steps = [
+    { done: s.connected > 0 && s.has_revenue, label: 'Connect your data',
+      hint: s.connected > 0 ? s.connected + ' of ' + s.connected_total + ' sources connected' : 'Start with Shopify — everything else builds on it',
+      go: ['settings'], cta: 'Connect' },
+    { done: s.has_economics, label: 'Confirm what things cost you',
+      hint: 'Product cost, shipping, packaging and fees — this turns sales into profit',
+      go: ['goal'], cta: 'Enter costs' },
+    { done: s.goal_confirmed, label: 'Confirm your goal',
+      hint: 'Greta estimates one from your trading; you adjust it rather than invent it',
+      go: ['goal'], cta: 'Confirm goal' },
+    { done: s.has_action, label: 'See your first action',
+      hint: 'The one thing worth doing, priced in pounds', go: ['today'], cta: 'Show me' },
+  ];
+  const left = steps.filter(x => !x.done).length;
+  if (!left) return null;
+  const next = steps.findIndex(x => !x.done);
+  return (<section className="v3-setup">
+    <div className="v3-kick">Getting started · {steps.length - left} of {steps.length} done</div>
+    <ol className="v3-steps">
+      {steps.map((x, i) => (
+        <li key={i} className={'v3-step' + (x.done ? ' done' : '') + (i === next ? ' next' : '')}>
+          <span className="v3-step-mark" aria-hidden="true">{x.done ? '✓' : i + 1}</span>
+          <span className="v3-step-body">
+            <b>{x.label}</b>
+            <span className="v3-muted">{x.hint}</span>
+          </span>
+          {!x.done && i === next && (
+            <button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo(x.go[0], x.go[1])}>{x.cta}</button>
+          )}
+        </li>
+      ))}
+    </ol>
+  </section>);
+}
+
+// ── Customer segments (ported from the shell's Customers tab, 2026-09-25) ──────
+// This was the one genuinely live customer surface, but it lived in the product shell
+// outside the app, which is why "Customers" existed twice with different numbers. It
+// now leads the Customers page, so the shell can drop its tabs and the app keeps one
+// navigation. Same edge function, same actions, same capabilities: segment cards, the
+// people table, the loyalty filter, the consent toggle, the reward preview and staging.
+const CSEG = {
+  'Champion':           { tone: 'good',   blurb: 'High value, frequent, recent — reward and protect' },
+  'Loyal':              { tone: 'accent', blurb: 'Repeat and recent — nurture toward Champion' },
+  'At risk':            { tone: 'warn',   blurb: 'Were valuable, gone quiet — win them back' },
+  'Promising (new)':    { tone: 'accent', blurb: 'One order, recent — drive the second purchase' },
+  'Dormant (one-time)': { tone: 'muted',  blurb: 'One order, lapsed — reactivation pool' },
+};
+const CLOY = {
+  full_price:      { label: 'Full-price loyal', tone: 'good', play: 'The real VIPs — reward with perks, not discounts' },
+  mixed:           { label: 'Mixed',            tone: 'warn', play: 'Nurture toward full price' },
+  discount_driven: { label: 'Discount-driven',  tone: 'bad',  play: 'Loyal to the deal — wean them off, do not send more codes' },
+};
+const CTONE = { good: 'var(--good)', warn: 'var(--warn)', bad: 'var(--bad)', accent: 'var(--accent)', muted: 'var(--text-muted)' };
+
+function ciFetch(fn, payload) {
+  const A = (typeof window !== 'undefined' && window.OI_ASK) || null;
+  if (!A || !A.endpoint || !A.getJwt) return Promise.reject(new Error('Sign in to see your customers.'));
+  const base = String(A.endpoint).replace(/\/functions\/v1\/[^/]*$/, '/functions/v1');
+  return A.getJwt().then(jwt => fetch(base + '/' + fn, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jwt },
+    body: JSON.stringify(Object.assign({ brandId: A.brand_id }, payload)),
+  })).then(async r => {
+    if (!r.ok) throw new Error((await r.text()).slice(0, 160) || ('request failed (' + r.status + ')'));
+    return r.json();
+  });
+}
+
+function CustomerSegments(){
+  const [ov, setOv] = React.useState(null);
+  const [err, setErr] = React.useState('');
+  const [seg, setSeg] = React.useState(null);
+  const [rows, setRows] = React.useState(null);
+  const [loyalty, setLoyalty] = React.useState('');
+  const [consent, setConsent] = React.useState(true);
+  const [preview, setPreview] = React.useState(null);
+  const [staged, setStaged] = React.useState(null);
+  const [busy, setBusy] = React.useState('');
+
+  React.useEffect(() => {
+    let alive = true;
+    ciFetch('customer-intelligence', { action: 'overview' })
+      .then(d => { if (alive) setOv(d); })
+      .catch(e => { if (alive) setErr(String(e.message || e)); });
+    return () => { alive = false; };
+  }, []);
+
+  const openSeg = (name) => {
+    setSeg(name); setRows(null); setPreview(null); setStaged(null); setBusy('rows');
+    ciFetch('customer-intelligence', { action: 'segment', segment: name, limit: 200 })
+      .then(d => setRows(d)).catch(e => setErr(String(e.message || e))).finally(() => setBusy(''));
+  };
+  const previewReward = () => {
+    setBusy('preview'); setStaged(null);
+    ciFetch('customer-intelligence', Object.assign({ action: 'stage_preview', segment: seg, requireConsent: consent }, loyalty ? { loyalty } : {}))
+      .then(p => setPreview(p)).catch(e => setPreview({ error: String(e.message || e) })).finally(() => setBusy(''));
+  };
+  const stage = () => {
+    if (!window.confirm('Create a Klaviyo list of these ' + seg + ' customers?\n\nNothing is sent — you build and send the campaign in Klaviyo.')) return;
+    setBusy('stage');
+    ciFetch('stage-reward', Object.assign({ segment: seg, requireConsent: consent, confirm: true }, loyalty ? { loyalty } : {}))
+      .then(r => setStaged({ ok: true, t: 'Staged “' + r.listName + '” — ' + r.profilesSubmitted + ' people imported. Build the campaign in Klaviyo.' }))
+      .catch(e => setStaged({ ok: false, t: 'Could not stage it — ' + String(e.message || e) }))
+      .finally(() => setBusy(''));
+  };
+
+  if (err && !ov) return (<div className="card"><h2>Your customers</h2><div className="muted" style={{fontSize:13}}>{err}</div></div>);
+  if (!ov) return (<div className="card"><h2>Your customers</h2><div className="muted" style={{fontSize:13}}>Loading your customers…</div></div>);
+
+  const t = ov.totals || {};
+  return (<div className="card">
+    <div className="card-section-title"><h2 style={{margin:0}}>Your customers</h2>
+      <span className="meta">{(t.customers||0).toLocaleString('en-GB')} customers · {GBP(t.netRevenue)} lifetime · grouped by how recently and how often they buy</span></div>
+
+    <div style={{display:'flex', gap:8, flexWrap:'wrap', marginTop:10}}>
+      {(ov.segments||[]).map(s => {
+        const m = CSEG[s.segment] || { tone:'accent', blurb:'' };
+        const on = seg === s.segment;
+        return (<button key={s.segment} type="button" onClick={()=>openSeg(s.segment)}
+          style={{flex:'1 1 160px', textAlign:'left', padding:'12px 14px', cursor:'pointer', fontFamily:'inherit',
+                  background: on ? 'var(--accent-bg)' : 'var(--bg-card)',
+                  border:'1px solid ' + (on ? 'var(--accent)' : 'var(--border-default)'), borderRadius:'var(--radius-md)'}}>
+          <div style={{fontSize:11.5, fontWeight:700, color:CTONE[m.tone], display:'flex', alignItems:'center', gap:6}}>
+            <span style={{width:8, height:8, borderRadius:'50%', background:CTONE[m.tone], display:'inline-block'}}/>{s.segment}
+          </div>
+          <div style={{fontSize:22, fontWeight:700, marginTop:4, fontFamily:'var(--font-mono)'}}>{(s.customers||0).toLocaleString('en-GB')}</div>
+          <div className="meta" style={{fontSize:11}}>{GBP(s.netRevenue)} · {s.revSharePct}% of sales · avg {GBP(s.avgValue)}</div>
+        </button>);
+      })}
+    </div>
+
+    {(ov.championLoyalty||[]).length > 0 && (<div className="note" style={{marginTop:12}}>
+      <b>Reward loyalty, not discount habit.</b> Your best customers split three ways, and each needs a different offer:
+      <div style={{display:'flex', gap:14, flexWrap:'wrap', marginTop:8}}>
+        {(ov.championLoyalty||[]).map(l => { const m = CLOY[l.type] || {label:l.type, tone:'muted', play:''};
+          return (<div key={l.type} style={{flex:'1 1 170px'}}>
+            <div style={{fontSize:11.5, fontWeight:700, color:CTONE[m.tone]}}>{m.label}: {(l.customers||0).toLocaleString('en-GB')}</div>
+            <div className="micro" style={{color:'var(--text-secondary)'}}>{m.play}</div>
+          </div>);
+        })}
+      </div>
+    </div>)}
+
+    {seg && (<div style={{marginTop:14}}>
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:10, marginBottom:8}}>
+        <div style={{fontSize:13, fontWeight:700}}>{seg} <span className="muted" style={{fontWeight:400}}>— {(CSEG[seg]||{}).blurb}</span></div>
+        <div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
+          <select value={loyalty} onChange={e=>setLoyalty(e.target.value)} style={{minHeight:36, fontFamily:'inherit', fontSize:12, padding:'0 8px', background:'var(--bg-card)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--radius-md)'}}>
+            <option value="">Every loyalty type</option>
+            <option value="full_price">Full-price loyal</option>
+            <option value="mixed">Mixed</option>
+            <option value="discount_driven">Discount-driven</option>
+          </select>
+          <label className="micro" style={{display:'flex', gap:5, alignItems:'center', cursor:'pointer'}}>
+            <input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/> only people who agreed to email
+          </label>
+          <button type="button" className="v3-btn v3-btn-sm" onClick={previewReward} disabled={busy==='preview'}>
+            {busy==='preview' ? 'Checking…' : 'Who would this reach?'}
+          </button>
+        </div>
+      </div>
+
+      {preview && (preview.error
+        ? <div className="note" style={{color:'var(--bad)'}}>{preview.error}</div>
+        : (<div className="note" style={{marginBottom:8}}>
+            Would reach <b>{preview.audienceReachable}</b> of {preview.audienceTotal} {String(seg).toLowerCase()} customers, worth <b>{GBP(preview.audienceValue)}</b>
+            {preview.excludedNoConsent ? <span className="muted"> · {preview.excludedNoConsent} excluded for not agreeing to email</span> : null}
+            <div style={{display:'flex', gap:10, alignItems:'center', flexWrap:'wrap', marginTop:8}}>
+              <button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={stage} disabled={busy==='stage'}>
+                {busy==='stage' ? 'Staging…' : 'Create the list in Klaviyo'}
+              </button>
+              <span className="micro muted">This only creates the list. Nothing is sent — you write and send the campaign in Klaviyo.</span>
+            </div>
+            {staged && <div className="micro" style={{marginTop:6, color: staged.ok ? 'var(--good)' : 'var(--warn)'}}>{staged.t}</div>}
+          </div>))}
+
+      {busy === 'rows' ? <div className="muted" style={{fontSize:13}}>Loading…</div> : (rows && (<>
+        <div style={{overflowX:'auto'}}>
+          <table><thead><tr><th>Customer</th><th>Orders</th><th>Spent</th><th>Last order</th><th>Came from</th><th>Average discount</th><th>Emailable</th></tr></thead>
+            <tbody>{(rows.people||[]).slice(0,25).map((p,i)=>(<tr key={i}>
+              <td>{p.name}</td><td>{p.orders}</td><td>{GBP(p.netRevenue)}</td><td>{p.recencyDays}d ago</td>
+              <td>{p.acquisitionChannel}</td>
+              <td style={{color: CTONE[(CLOY[p.loyalty]||{}).tone] || 'inherit'}}>{p.discountPct}%</td>
+              <td style={{color: p.emailable ? 'var(--good)' : 'var(--text-faint)'}}>{p.emailable ? '✓' : '—'}</td>
+            </tr>))}</tbody></table>
+        </div>
+        {rows.count > 25 && <div className="micro muted" style={{marginTop:6}}>Showing the top 25 of {rows.count} by spend.</div>}
+      </>))}
+    </div>)}
+  </div>);
+}
+
+// ── Data health (first render, 2026-09-25) ───────────────────────────────────
+// Three engine reads that have been live for months with nothing rendering them
+// (Phase 1 audit §4, rows 23–25): whether each source is current, whether two sources
+// that should agree have stopped agreeing, and how much of yesterday's business your
+// site analytics actually saw. Silence here is the dangerous state: a brand can read
+// a confident conversion rate that is simply missing a third of its orders.
+//   vw_brand_source_freshness      — per source: last date, days stale, status
+//   vw_source_agreement_alert      — pairs that should track each other and no longer do
+//   vw_measurement_integrity_daily — GA4 purchases vs Shopify orders, by day
+function DataHealth(){
+  const [rows, setRows] = React.useState(null);
+  const [agree, setAgree] = React.useState(null);
+  const [cover, setCover] = React.useState(null);
+  const [err, setErr] = React.useState('');
+
+  React.useEffect(() => {
+    let alive = true;
+    const sb = (typeof window !== 'undefined' && window.FRKL_LIVE && window.FRKL_LIVE.sb) || window.sb;
+    const brand = (window.FRKL_LIVE && window.FRKL_LIVE.brandId) || (window.OI_ASK && window.OI_ASK.brand_id);
+    if (!sb || !brand) { setErr('Sign in to see where your data comes from.'); return; }
+    const since = new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10);
+    Promise.all([
+      sb.from('vw_brand_source_freshness').select('source, feeds, last_date, stale_days, status, likely_systemic').eq('brand_id', brand),
+      sb.from('vw_source_agreement_alert').select('broken_pairs, drifting_pairs, pairs_checked, broken_detail, as_of').eq('brand_id', brand).limit(1),
+      sb.from('vw_measurement_integrity_daily').select('day, shopify_orders, ga4_purchases, order_coverage').eq('brand_id', brand).gte('day', since).order('day', { ascending: false }),
+    ]).then(([f, a, c]) => {
+      if (!alive) return;
+      setRows((f && f.data) || []);
+      setAgree((a && a.data && a.data[0]) || null);
+      setCover((c && c.data) || []);
+    }).catch(e => alive && setErr(String(e.message || e)));
+    return () => { alive = false; };
+  }, []);
+
+  if (err) return (<div className="card"><h2>Where your numbers come from</h2><div className="muted" style={{fontSize:13}}>{err}</div></div>);
+  if (!rows) return (<div className="card"><h2>Where your numbers come from</h2><div className="muted" style={{fontSize:13}}>Checking your sources…</div></div>);
+
+  const stale = rows.filter(r => r.status !== 'current');
+  const systemic = rows.some(r => r.likely_systemic);
+  const covered = (cover || []).filter(c => c.order_coverage != null);
+  const latest = covered[0];
+  const avg = covered.length ? covered.reduce((a, c) => a + Number(c.order_coverage), 0) / covered.length : null;
+  const pct = v => v == null ? '—' : Math.round(Number(v) * 100) + '%';
+
+  return (<div className="card">
+    <div className="card-section-title"><h2 style={{margin:0}}>Where your numbers come from</h2>
+      <span className="meta">Every source Greta reads, whether it is current, and whether they agree with each other</span></div>
+
+    <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(230px,1fr))', gap:8, marginTop:10}}>
+      {rows.map(r => {
+        const ok = r.status === 'current';
+        const tone = ok ? 'var(--good)' : (Number(r.stale_days) > 4 ? 'var(--bad)' : 'var(--warn)');
+        return (<div key={r.source} style={{border:'1px solid var(--border-default)', padding:'10px 12px'}}>
+          <div style={{display:'flex', alignItems:'center', gap:7, fontSize:13, fontWeight:600}}>
+            <span style={{width:8, height:8, borderRadius:'50%', background:tone, display:'inline-block'}}/>{r.source}
+          </div>
+          <div className="micro" style={{color:'var(--text-secondary)', marginTop:3}}>
+            {ok ? 'Up to date' : (Number(r.stale_days) === 1 ? 'A day behind' : Math.round(Number(r.stale_days)) + ' days behind')}
+            {r.last_date ? ' · last ' + String(r.last_date).slice(0, 10) : ''}
+          </div>
+        </div>);
+      })}
+    </div>
+
+    {stale.length > 0 && (<div className="note" style={{marginTop:10}}>
+      {systemic
+        ? <><b>Several feeds stopped on the same day.</b> That usually means one connection dropped rather than {stale.length} separate problems.</>
+        : <><b>{stale.length} {stale.length === 1 ? 'source is' : 'sources are'} behind.</b> Numbers that use {stale.length === 1 ? 'it' : 'them'} will be understated until {stale.length === 1 ? 'it catches' : 'they catch'} up.</>}
+      <div style={{marginTop:8}}>
+        <button type="button" className="v3-btn v3-btn-sm" onClick={()=>window.__oiGo && window.__oiGo('settings')}>Reconnect a source</button>
+      </div>
+    </div>)}
+
+    {agree && Number(agree.broken_pairs) > 0 && (<div className="note" style={{marginTop:10}}>
+      <b>Two sources that normally agree have stopped agreeing.</b>{' '}
+      {agree.broken_detail ? String(agree.broken_detail) : ''}
+      <div className="micro muted" style={{marginTop:4}}>
+        One of them is probably mis-reporting. Until it is fixed, prefer the Shopify figure — it is the money that actually arrived.
+      </div>
+    </div>)}
+
+    {latest && (<div style={{marginTop:12, borderTop:'1px solid var(--border-subtle)', paddingTop:10}}>
+      <div style={{fontSize:13, fontWeight:600, marginBottom:3}}>Does your site analytics see every order?</div>
+      <div className="micro" style={{color:'var(--text-secondary)'}}>
+        On {String(latest.day).slice(0,10)} your site analytics recorded <b>{latest.ga4_purchases}</b> of the <b>{latest.shopify_orders}</b> orders Shopify took
+        {' '}(<b style={{color: Number(latest.order_coverage) < 0.9 ? 'var(--warn)' : 'var(--good)'}}>{pct(latest.order_coverage)}</b>).
+        {avg != null && <> Over the last fortnight it averaged {pct(avg)}.</>}
+      </div>
+      {avg != null && avg < 0.9 && (<div className="micro" style={{color:'var(--text-secondary)', marginTop:6}}>
+        Conversion rates are calculated from this, so while coverage is below 100% every conversion
+        rate on the Website page reads lower than reality. The gap is tracking, not shoppers.
+      </div>)}
+    </div>)}
+  </div>);
+}
+
+// ── Two reallocation reads, rendered for the first time (2026-09-25) ──────────
+// Both have been computed and live since migrations 0148/0149 with nothing showing
+// them (Phase 1 audit §4, rows 27–28). Each answers the same shape of question: you
+// are already paying for this traffic, and a measurable slice of it goes somewhere
+// that converts worse than the rest. Both figures are CEILINGS, not forecasts — the
+// number you would get if the worse group performed like the better one, which no
+// reallocation achieves in full. The copy says so rather than implying a promise.
+function useOneRow(view, cols){
+  const [row, setRow] = React.useState(undefined);   // undefined = loading, null = none
+  React.useEffect(() => {
+    let alive = true;
+    const sb = (typeof window !== 'undefined' && window.FRKL_LIVE && window.FRKL_LIVE.sb) || window.sb;
+    const brand = (window.FRKL_LIVE && window.FRKL_LIVE.brandId) || (window.OI_ASK && window.OI_ASK.brand_id);
+    if (!sb || !brand) { setRow(null); return; }
+    sb.from(view).select(cols).eq('brand_id', brand).limit(1)
+      .then(r => { if (alive) setRow((r && r.data && r.data[0]) || null); })
+      .catch(() => alive && setRow(null));
+    return () => { alive = false; };
+  }, [view, cols]);
+  return row;
+}
+
+function CreativeReallocation(){
+  const d = useOneRow('vw_creative_reallocation',
+    'n_worse, n_better, reallocatable_spend, reallocatable_share, worse_cvr, better_cvr, implied_extra_purchases_upper, implied_contribution_upper');
+  if (d === undefined || !d || !Number(d.reallocatable_spend)) return null;
+  const pct = v => v == null ? '—' : (Number(v) * 100).toFixed(1) + '%';
+  return (<div className="card">
+    <div className="card-section-title"><h2 style={{margin:0}}>Spend sitting on the weaker ads</h2>
+      <span className="meta">Same budget, different split — an upper bound, not a forecast</span></div>
+    <div style={{fontSize:13.5, lineHeight:1.6, marginTop:8}}>
+      <b>{GBP(d.reallocatable_spend)}</b> of your ad spend{d.reallocatable_share ? ' (' + Math.round(Number(d.reallocatable_share) * 100) + '% of the total)' : ''}
+      {' '}is running on <b>{d.n_worse}</b> {Number(d.n_worse) === 1 ? 'ad that converts' : 'ads that convert'} at {pct(d.worse_cvr)},
+      while <b>{d.n_better}</b> {Number(d.n_better) === 1 ? 'converts' : 'convert'} at {pct(d.better_cvr)}.
+    </div>
+    {Number(d.implied_contribution_upper) > 0 && (<div className="note" style={{marginTop:10}}>
+      If the weaker ads performed like the better ones, that spend would be worth up to
+      {' '}<b>{GBP(d.implied_contribution_upper)}</b> more profit
+      {d.implied_extra_purchases_upper ? ' (about ' + Math.round(Number(d.implied_extra_purchases_upper)) + ' more orders)' : ''}.
+      <div className="micro muted" style={{marginTop:4}}>
+        A ceiling, not a promise: moving budget changes what the winning ads are shown to, so expect a
+        share of it. Pause the weakest first and watch the cost per order before shifting the rest.
+      </div>
+    </div>)}
+  </div>);
+}
+
+function ProductTrafficMisallocation(){
+  const d = useOneRow('vw_product_traffic_misallocation',
+    'n_worse, n_better, worse_views, worse_traffic_share, worse_cvr, better_cvr, worse_atc_rate, better_atc_rate, implied_extra_purchases_upper, implied_contribution_upper, failing_step');
+  if (d === undefined || !d || !Number(d.worse_views)) return null;
+  const pct = v => v == null ? '—' : (Number(v) * 100).toFixed(1) + '%';
+  const step = String(d.failing_step || '').replace(/_/g, ' ');
+  const stepPlain = step === 'add to cart' ? 'shoppers look but do not add to the basket'
+    : step === 'checkout' ? 'shoppers add to the basket but do not start checkout'
+    : step ? 'shoppers drop out at ' + step : '';
+  return (<div className="card">
+    <div className="card-section-title"><h2 style={{margin:0}}>Traffic going to products that cannot convert it</h2>
+      <span className="meta">Where your existing visitors land — an upper bound, not a forecast</span></div>
+    <div style={{fontSize:13.5, lineHeight:1.6, marginTop:8}}>
+      <b>{Math.round(Number(d.worse_traffic_share || 0) * 100)}%</b> of product views
+      {' '}({Math.round(Number(d.worse_views)).toLocaleString('en-GB')} visits) go to <b>{d.n_worse}</b> products converting at {pct(d.worse_cvr)},
+      against {pct(d.better_cvr)} on your other {d.n_better}.
+      {stepPlain ? <> The step that fails is where <b>{stepPlain}</b>.</> : null}
+    </div>
+    {Number(d.implied_contribution_upper) > 0 && (<div className="note" style={{marginTop:10}}>
+      Pointing that traffic at products that convert would be worth up to <b>{GBP(d.implied_contribution_upper)}</b>
+      {d.implied_extra_purchases_upper ? ' (about ' + Math.round(Number(d.implied_extra_purchases_upper)) + ' more orders)' : ''}.
+      <div className="micro muted" style={{marginTop:4}}>
+        A ceiling, not a promise. The cheapest version is a merchandising change — what the home page,
+        navigation and ads point at — before touching the product pages themselves.
+      </div>
+    </div>)}
+  </div>);
+}
+
+// ── Do your cost inputs match reality? (first render, 2026-09-25) ─────────────
+// vw_brand_config_drift (0143) has compared every typed cost against what the data
+// actually shows since September and nothing rendered it, so a brand could run its
+// whole model on a refund rate that stopped being true months ago. Shown where the
+// costs are entered, because that is where it is fixed.
+function CostDrift(){
+  const [rows, setRows] = React.useState(null);
+  React.useEffect(() => {
+    let alive = true;
+    const sb = (typeof window !== 'undefined' && window.FRKL_LIVE && window.FRKL_LIVE.sb) || window.sb;
+    const brand = (window.FRKL_LIVE && window.FRKL_LIVE.brandId) || (window.OI_ASK && window.OI_ASK.brand_id);
+    if (!sb || !brand) { setRows([]); return; }
+    sb.from('vw_brand_config_drift')
+      .select('input_key, unit, config_value, realised_value, realised_basis, n, verifiable, unverifiable_reason, drift_pct, status')
+      .eq('brand_id', brand)
+      .then(r => { if (alive) setRows((r && r.data) || []); })
+      .catch(() => alive && setRows([]));
+    return () => { alive = false; };
+  }, []);
+  if (!rows || !rows.length) return null;
+  const LABEL = {
+    gross_margin: 'Gross margin', refund_rate: 'Refund rate', shipping: 'Shipping per order',
+    packaging: 'Packaging per order', fulfilment: 'Fulfilment per order', payment_pct: 'Payment fee',
+    payment_fixed: 'Payment fee per order', discount_rate: 'Discount rate', aov: 'Average order value',
+  };
+  const fmt = (v, unit) => v == null ? '—'
+    : unit === 'pct' ? (Number(v) * (Math.abs(Number(v)) <= 1 ? 100 : 1)).toFixed(1) + '%'
+    : unit === 'gbp' ? GBP(v) : String(v);
+  const off = rows.filter(r => r.verifiable && r.status && r.status !== 'ok');
+  const checked = rows.filter(r => r.verifiable).length;
+  return (<div className="card" style={{marginTop:14}}>
+    <div className="card-section-title"><h2 style={{margin:0}}>Do these match what actually happened?</h2>
+      <span className="meta">{checked} of {rows.length} can be checked against your own data</span></div>
+    {off.length === 0
+      ? <div className="micro" style={{color:'var(--text-secondary)', marginTop:8}}>Everything Greta can check lines up with what you entered.</div>
+      : (<div style={{marginTop:8}}>
+          <div style={{overflowX:'auto'}}>
+            <table><thead><tr><th>Cost</th><th>You entered</th><th>Your data shows</th><th>Based on</th></tr></thead>
+              <tbody>{off.map((r,i)=>(<tr key={i}>
+                <td>{LABEL[r.input_key] || String(r.input_key).replace(/_/g,' ')}</td>
+                <td>{fmt(r.config_value, r.unit)}</td>
+                <td style={{color:'var(--warn)'}}>{fmt(r.realised_value, r.unit)}</td>
+                <td className="muted">{r.realised_basis || ''}{r.n ? ' · ' + r.n + ' orders' : ''}</td>
+              </tr>))}</tbody></table>
+          </div>
+          <div className="micro" style={{color:'var(--text-secondary)', marginTop:6}}>
+            Profit is calculated from the figures you entered, so while these differ, every profit
+            number is off by the same gap. Update them above, or leave them if you know why they differ.
+          </div>
+        </div>)}
+    {rows.some(r => !r.verifiable) && (<div className="micro muted" style={{marginTop:6}}>
+      {rows.filter(r=>!r.verifiable).length} cannot be checked yet{rows.find(r=>!r.verifiable && r.unverifiable_reason) ? ' — ' + rows.find(r=>!r.verifiable && r.unverifiable_reason).unverifiable_reason : ''}.
+    </div>)}
+  </div>);
+}
+
+// ── Per-channel detail (first render, 2026-09-25) ────────────────────────────
+// Three engine reads that have been live since 0146 with no surface (Phase 1 audit
+// §4, rows 6–8). Each answers a question the channel table cannot:
+//   vw_channel_saturation_legs   — WHY a channel saturates. CAC is an identity, so it
+//                                  splits across the funnel: ad prices, click rate,
+//                                  add-to-cart, checkout, purchase, plus frequency.
+//                                  Rising frequency with a falling add-to-cart leg is
+//                                  audience exhaustion — a different fix from bidding.
+//   vw_channel_auction_headroom  — whether more budget buys anything, or whether the
+//                                  impressions are lost to rank (quality/bid), not money.
+//   vw_channel_roas_evidence     — whether the return can be measured at all: the range
+//                                  across specifications against the smallest effect the
+//                                  data could detect. A range spanning break-even means
+//                                  "we cannot tell yet", which is a finding, not a gap.
+function ChannelDetail({ channel, breakEven }){
+  const [legs, setLegs] = React.useState(undefined);
+  const [head, setHead] = React.useState(undefined);
+  const [ev, setEv] = React.useState(undefined);
+  React.useEffect(() => {
+    let alive = true;
+    const sb = (typeof window !== 'undefined' && window.FRKL_LIVE && window.FRKL_LIVE.sb) || window.sb;
+    const brand = (window.FRKL_LIVE && window.FRKL_LIVE.brandId) || (window.OI_ASK && window.OI_ASK.brand_id);
+    if (!sb || !brand || !channel) { setLegs(null); setHead(null); setEv(null); return; }
+    const one = (view, cols, set) => sb.from(view).select(cols).eq('brand_id', brand).eq('channel', channel).limit(1)
+      .then(r => { if (alive) set((r && r.data && r.data[0]) || null); })
+      .catch(() => alive && set(null));
+    one('vw_channel_saturation_legs', 'n_weeks, beta_cpm, beta_ctr, beta_atc, se_atc, beta_chk, beta_pur, beta_cac, beta_frequency, se_frequency', setLegs);
+    one('vw_channel_auction_headroom', 'impression_share, lost_to_budget, lost_to_rank', setHead);
+    one('vw_channel_roas_evidence', 'n_weeks, roas_low, roas_high, minimum_detectable_roas, se_best_spec', setEv);
+    return () => { alive = false; };
+  }, [channel]);
+
+  if (legs === undefined && head === undefined && ev === undefined) return <div className="micro muted">Loading…</div>;
+  const pct = v => v == null ? '—' : Math.round(Number(v) * (Math.abs(Number(v)) <= 1 ? 100 : 1)) + '%';
+  const sig = (b, se) => b != null && se ? Math.abs(Number(b) / Number(se)) >= 2 : false;
+  const out = [];
+
+  if (legs && legs.beta_atc != null) {
+    const exhausted = Number(legs.beta_atc) < 0 && sig(legs.beta_atc, legs.se_atc) && Number(legs.beta_frequency) > 0;
+    out.push(<div key="legs" style={{marginBottom:10}}>
+      <div style={{fontSize:12.5, fontWeight:600, marginBottom:2}}>Why it gets dearer as you spend</div>
+      <div className="micro" style={{color:'var(--text-secondary)', lineHeight:1.55}}>
+        {exhausted
+          ? <>The same people are seeing the ads more often ({'frequency rises'}), and fewer of them add to the basket.
+             That is audience exhaustion: <b>widen who you target</b> rather than bidding harder or rewriting the ad.</>
+          : Number(legs.beta_cpm) > 0
+            ? <>Ad prices rise as you spend more, while the funnel holds up. That is auction pressure:
+               look at bidding and timing rather than the creative.</>
+            : <>No single leg stands out yet over {legs.n_weeks} weeks of data, so the cause is not settled.</>}
+      </div>
+    </div>);
+  }
+  if (head && head.lost_to_budget != null) {
+    const budget = Number(head.lost_to_budget), rank = Number(head.lost_to_rank);
+    out.push(<div key="head" style={{marginBottom:10}}>
+      <div style={{fontSize:12.5, fontWeight:600, marginBottom:2}}>Would more budget buy anything?</div>
+      <div className="micro" style={{color:'var(--text-secondary)', lineHeight:1.55}}>
+        You appear in {pct(head.impression_share)} of the auctions you could. You miss {pct(budget)} for being
+        out of budget and {pct(rank)} for rank.
+        {' '}{rank > budget * 3
+          ? <b>More money buys almost nothing here — the gap is rank, which is bids, quality and relevance.</b>
+          : budget > 0.1 ? <b>There is real headroom: you are capped by budget, not by rank.</b> : null}
+      </div>
+    </div>);
+  }
+  if (ev && ev.roas_low != null) {
+    const lo = Number(ev.roas_low), hi = Number(ev.roas_high), mde = Number(ev.minimum_detectable_roas);
+    const be = breakEven != null ? Number(breakEven) : null;
+    const straddles = be != null && lo <= be && hi >= be;
+    out.push(<div key="ev" style={{marginBottom:2}}>
+      <div style={{fontSize:12.5, fontWeight:600, marginBottom:2}}>Can its return be measured yet?</div>
+      <div className="micro" style={{color:'var(--text-secondary)', lineHeight:1.55}}>
+        Across {ev.n_weeks} weeks the return lands somewhere between <b>{lo.toFixed(2)}×</b> and <b>{hi.toFixed(2)}×</b>
+        {be != null ? <> against a break-even of {be.toFixed(2)}×</> : null}.
+        {straddles
+          ? <> That range includes break-even, so <b>Greta cannot yet say whether this channel pays.</b> A holdout test settles it; more months of the same trading will not.</>
+          : hi < (be || 0) ? <> The whole range sits below break-even.</> : <> The whole range clears break-even.</>}
+        {isFinite(mde) && mde > 0 ? <> The smallest effect this much data could detect is {mde.toFixed(2)}×.</> : null}
+      </div>
+      {straddles && (<div style={{marginTop:6}}>
+        <button type="button" className="v3-btn v3-btn-sm" onClick={()=>window.__oiGo && window.__oiGo('calendar')}>Plan a test</button>
+      </div>)}
+    </div>);
+  }
+  if (!out.length) return <div className="micro muted">Not enough history on this channel yet.</div>;
+  return <div>{out}</div>;
+}
+
+// The channel table rows become expandable: the summary stays one line, the evidence
+// is one tap away rather than on a screen nobody opens.
+function ChannelDetailList({ channels }){
+  const [open, setOpen] = React.useState(null);
+  const rows = (channels || []).filter(c => c && (c.channel_type || c.channel));
+  if (!rows.length) return null;
+  return (<div className="card" style={{marginTop:14}}>
+    <div className="card-section-title"><h2 style={{margin:0}}>Why each channel behaves the way it does</h2>
+      <span className="meta">The evidence behind the verdict — tap a channel</span></div>
+    <div style={{marginTop:6}}>
+      {rows.map((c, i) => {
+        const name = String(c.channel_type || c.channel);
+        const isOpen = open === name;
+        return (<div key={i} style={{borderTop: i ? '1px solid var(--border-subtle)' : 'none'}}>
+          <button type="button" onClick={()=>setOpen(isOpen ? null : name)} aria-expanded={isOpen}
+            style={{display:'flex', alignItems:'center', gap:9, width:'100%', minHeight:44, padding:'10px 0',
+                    background:'none', border:0, color:'var(--text-primary)', fontFamily:'inherit', fontSize:13.5, fontWeight:600, textAlign:'left', cursor:'pointer'}}>
+            <span style={{color:'var(--accent)', fontSize:11}}>{isOpen ? '▾' : '▸'}</span>
+            {name.replace(/_/g, ' ')}
+            {c.status ? <span className="micro muted" style={{marginLeft:'auto', textTransform:'uppercase', letterSpacing:'.04em'}}>{c.status}</span> : null}
+          </button>
+          {isOpen && <div style={{paddingBottom:10}}><ChannelDetail channel={name} breakEven={c.break_even_iroas}/></div>}
+        </div>);
+      })}
+    </div>
+  </div>);
+}
+
+// ── Cash ceiling (first render, 2026-09-25) ──────────────────────────────────
+// vw_brand_cash_gate and vw_brand_cash_13w have been live for months with nothing
+// rendering them (Phase 1 audit §4, row 11). The engine answers a question no other
+// panel does: the plan may be profitable and still not survivable, because stock is
+// paid for before the sales arrive. It abstains when the cash inputs are missing —
+// and abstention is the point, so this renders the ask rather than a guess.
+function CashCeiling(){
+  const [gate, setGate] = React.useState(undefined);
+  const [weeks, setWeeks] = React.useState([]);
+  React.useEffect(() => {
+    let alive = true;
+    const sb = (typeof window !== 'undefined' && window.FRKL_LIVE && window.FRKL_LIVE.sb) || window.sb;
+    const brand = (window.FRKL_LIVE && window.FRKL_LIVE.brandId) || (window.OI_ASK && window.OI_ASK.brand_id);
+    if (!sb || !brand) { setGate(null); return; }
+    sb.from('vw_brand_cash_gate')
+      .select('readiness, binding, missing_inputs, s_profit_weekly, s_cash_weekly, s_recommended, min_cash, min_cash_week, funding_gap, first_breach_week_start, cash_floor, reason')
+      .eq('brand_id', brand).limit(1)
+      .then(r => { if (alive) setGate((r && r.data && r.data[0]) || null); })
+      .catch(() => alive && setGate(null));
+    sb.from('vw_brand_cash_13w').select('week_start, closing_cash, breach, headroom').eq('brand_id', brand).order('w', { ascending: true })
+      .then(r => { if (alive) setWeeks((r && r.data) || []); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  if (gate === undefined) return null;
+  const missing = gate && gate.readiness !== 'ready';
+  return (<div className="card" style={{marginTop:14}}>
+    <div className="card-section-title"><h2 style={{margin:0}}>Can you afford the plan?</h2>
+      <span className="meta">Profit and cash are different questions — stock is paid for before the sales arrive</span></div>
+    {(!gate || missing) ? (<div style={{marginTop:8}}>
+      <div className="micro" style={{color:'var(--text-secondary)', lineHeight:1.55}}>
+        Greta will not guess at this one. Add your cash on hand, the balance you never want to go below,
+        and your supplier terms, and it will work out the most you can spend a week without running out
+        — which is often lower than the most you can spend profitably.
+        {gate && gate.missing_inputs ? <><br/><span className="muted">Still needed: {String(gate.missing_inputs).replace(/[{}"]/g,'').replace(/,/g, ', ')}</span></> : null}
+      </div>
+      <div style={{marginTop:8}}>
+        <button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={()=>window.__oiGo && window.__oiGo('goal','economics')}>Add your cash figures</button>
+      </div>
+    </div>) : (<div style={{marginTop:8}}>
+      <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:10}}>
+        <GP_Metric k="Most you can spend a week" v={GP_gbp(gate.s_recommended)} hi={true}
+          sub={gate.binding === 'cash' ? 'limited by cash, not profit' : 'limited by profit'} />
+        <GP_Metric k="Profit alone would allow" v={GP_gbp(gate.s_profit_weekly)} />
+        <GP_Metric k="Cash alone would allow" v={GP_gbp(gate.s_cash_weekly)} />
+        <GP_Metric k="Lowest cash you reach" v={GP_gbp(gate.min_cash)}
+          sub={gate.min_cash_week ? 'week of ' + String(gate.min_cash_week).slice(0,10) : null} />
+      </div>
+      {Number(gate.funding_gap) > 0 && (<div className="note" style={{marginTop:10}}>
+        <b>You would need {GP_gbp(gate.funding_gap)} more cash</b> to run this plan through the stock
+        purchases it implies{gate.first_breach_week_start ? ', first falling short in the week of ' + String(gate.first_breach_week_start).slice(0,10) : ''}.
+        Either raise it, slow the spend, or move the stock order later.
+      </div>)}
+      {weeks.length > 0 && (<div className="micro muted" style={{marginTop:8}}>
+        Based on the next {weeks.length} weeks of expected receipts and payments.
+        {weeks.some(w => w.breach) ? ' Weeks below your floor are counted in the gap above.' : ' No week falls below your floor.'}
+      </div>)}
+    </div>)}
+  </div>);
+}
+
+// What is happening, and why — built from fn_today_v2's structured fields rather than
+// its narrative string, which is written for an analyst ("Profit after marketing (CAM)
+// down 8.5%… ad spend moved it £-407"). Same facts, owner's words.
+function V3Why({ why, period }){
+  if (!why) return null;
+  const rev = Number(why.effect_revenue_gbp), spend = Number(why.effect_spend_gbp);
+  const b = why.breakdown || {};
+  const money = (v) => '£' + Math.abs(Math.round(Number(v))).toLocaleString('en-GB');
+  const bits = [];
+  if (isFinite(rev) && rev !== 0) bits.push(rev < 0 ? 'Sales fell, taking ' + money(rev) + ' off your profit' : 'Sales rose, adding ' + money(rev));
+  if (isFinite(spend) && spend !== 0) bits.push(spend < 0 ? 'ad spend went up, costing another ' + money(spend) : 'ad spend came down, saving ' + money(spend));
+  const what = why.what ? String(why.what).replace(/_/g, ' ') : null;
+  const who = why.who ? String(why.who) : null;
+  return (<div className="v3-why">
+    <div className="v3-kick">What is happening{period && period.label ? ' · ' + period.label : ''}</div>
+    <p className="v3-why-p">
+      {bits.length ? bits.join(', and ') : 'Profit held broadly steady'}
+      {what ? <>. The driver was <b>{what}</b>{who ? <> — mostly <b>{who}</b> customers</> : null}</> : null}.
+      {isFinite(Number(b.aov_gbp)) && Number(b.aov_gbp) !== 0
+        ? <> Order value {Number(b.aov_gbp) > 0 ? 'helped' : 'hurt'} by {money(b.aov_gbp)}.</> : null}
+    </p>
+    {why.data_integrity_flag && (<p className="v3-why-p v3-muted">
+      Some of this is uncertain: your site tracking is incomplete, so traffic and conversion are
+      withheld rather than guessed. <button type="button" className="v3-btn v3-btn-sm" onClick={()=>window.__oiGo && window.__oiGo('settings')}>Check your data</button>
+    </p>)}
+    {(why.change_events || []).length > 0 && (<ul className="v3-why-list">
+      {(why.change_events || []).slice(0, 3).map((e, i) => (
+        <li key={i}><span className="v3-num">{String(e.date || '').slice(5)}</span> {e.label}</li>
+      ))}
+    </ul>)}
+  </div>);
+}
+
+function V3Today(p) {
+  const h = useV3Headline();
+  const D0 = (typeof window !== 'undefined' && window.FRKL_OVERVIEW) || null;
+  // Session-stable: the headline and top action are fixed at first render and
+  // only change when the reader asks, so numbers never swap under them.
+  const frozen = React.useRef(null);
+  if (h && !frozen.current) frozen.current = h;
+  const [stale, setStale] = React.useState(false);
+  React.useEffect(() => { if (h && frozen.current && h !== frozen.current) setStale(true); }, [h]);
+  const d = frozen.current || h;
+  const refresh = () => { frozen.current = window.GRETA_HEADLINE; setStale(false); };
+
+  if (!d) return (<div className="v3-hero"><div className="v3-hero-lab">Profit after ads · last 30 days</div>
+    <div className="v3-big">—</div><div className="v3-sub">Loading your live numbers…</div></div>);
+
+  const cam = d.cm_after_marketing_30d, prod = d.product_contribution_30d, spend = d.paid_spend_30d, sales = d.net_revenue_30d;
+  const gate = d.can_show_cm === false;
+  const camTarget = d.cam_target_monthly;               // null when the goal is stored on the other basis
+  const confirmed = d.plan_status === 'confirmed';
+  const pacePos = camTarget ? (cam / camTarget) : null;
+  const diff = camTarget != null ? cam - camTarget : null;
+  const top = d.top_action, next = (d.next_actions || []);
+
+  return (<div className="v3-today">
+    <V3Setup s={d.setup}/>
+    {gate ? (
+      <div className="v3-hero">
+        <div className="v3-hero-lab">Profit after ads · last 30 days <V3Info k="profit_after_ads"/></div>
+        <div className="v3-big v3-big-muted">—</div>
+        <div className="v3-sub">Enter what your products and orders cost you, and Greta can show profit and rank your actions by pounds.</div>
+        <div className="v3-btns"><button type="button" className="v3-btn v3-btn-p" onClick={() => window.__oiNav && window.__oiNav('settings', 'economics')}>Enter your costs</button></div>
+      </div>
+    ) : (
+      <div className="v3-hero">
+        <div className="v3-hero-lab">Profit after ads · last 30 days <V3Info k="profit_after_ads"/>
+          <V3Conf state={d.cm_source === 'fit_engine' ? 'measured' : 'estimated'}
+                  detail={d.cm_source === 'fit_engine' ? 'Calculated from your own product and order costs.' : 'Calculated from the cost figures you entered; Greta has not checked them against your own results yet.'}
+                  fix={['settings', 'economics', 'Check your costs']}/>
+        </div>
+        <div className="v3-big">{v3Gbp(cam)}</div>
+        {camTarget != null ? (<>
+          <div className="v3-bar" aria-hidden="true"><i style={{ width: Math.max(2, Math.min(100, (pacePos || 0) * 66)) + '%' }}/><b style={{ left: '66%' }}/></div>
+          <div className={'v3-pace ' + (diff >= 0 ? 'good' : 'bad')}>
+            {diff >= 0 ? v3Gbp(Math.abs(diff)) + ' ahead of' : v3Gbp(Math.abs(diff)) + ' behind'} your monthly goal
+            <span className="v3-muted"> · goal {v3Gbp(camTarget)} a month</span>
+            {d.target_is_derived && <V3Conf state="estimated"
+              detail={'Your goal is saved as profit BEFORE ads, so Greta worked this target out by taking your ad budget off it. Re-save the goal as profit after ads and this becomes your own figure.'}
+              fix={['home', 'plansetup', 'Open Goal & costs']}/>}
+          </div>
+        </>) : (
+          <div className="v3-pace">
+            <span className="v3-muted">{confirmed ? 'Your goal is saved as profit before ads, so Greta cannot pace this number against it yet.' : 'Your goal is still an estimate, so pace is hidden.'}</span>
+            <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav('home', 'plansetup')}>Set your goal</button>
+          </div>
+        )}
+        <div className="v3-sub">
+          <span>{v3Gbp(prod)} before ads <V3Info k="profit_before_ads"/></span>
+          <span className="v3-dot"/><span>{v3Gbp(spend)} on ads <V3Info k="ad_spend"/></span>
+          <span className="v3-dot"/><span>{v3Gbp(sales)} sales <V3Info k="sales"/></span>
+        </div>
+        {stale && <button type="button" className="v3-refresh" onClick={refresh}>New numbers are available — show them</button>}
+      </div>
+    )}
+
+    {top ? (
+      <div className="v3-dofirst">
+        <div className="v3-kick">Do this first{top.cm_gbp ? ' · worth about ' + v3Gbp(top.cm_gbp) + ' a month' : ''}</div>
+        <div className="v3-dofirst-t">{v3ActionText(top.description).main}</div>
+        {v3ActionText(top.description).detail && <div className="v3-sub">{v3ActionText(top.description).detail}</div>}
+        {top.step1 && <div className="v3-sub">First step: {scrubTag(top.step1)}</div>}
+        <div className="v3-btns">
+          <button type="button" className="v3-btn v3-btn-p" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>Start</button>
+          <button type="button" className="v3-btn" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>Mark done</button>
+          <button type="button" className="v3-btn" onClick={() => window.__oiAsk && window.__oiAsk('Why is this the most important thing to do: ' + scrubTag(top.description))}>Why?</button>
+        </div>
+      </div>
+    ) : (
+      <div className="v3-dofirst"><div className="v3-kick">Do this first</div>
+        <div className="v3-dofirst-t">Nothing needs you today.</div>
+        <div className="v3-sub">Greta checks again with tomorrow's data.</div></div>
+    )}
+
+    {next.length > 0 && (<div className="v3-next">
+      <div className="v3-kick">Then, in order</div>
+      {next.map((a, i) => (<div key={a.external_id || i} className="v3-next-row">
+        <span className="v3-num">{i + 2}</span>
+        <span>{v3ActionText(a.description).main}</span>
+        <span className="v3-num">{a.cm_gbp ? v3Gbp(a.cm_gbp) + '/mo' : ''}</span>
+      </div>))}
+      <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>See all {d.open_actions || ''} actions</button>
+    </div>)}
+
+    <V3Why why={d.why} period={d.why_period}/>
+    <V3More id="today-changed" label="What changed this week"><WhatChangedStrip/></V3More>
+    <V3More id="today-detail" label="Channels, stock and track record">{mosView('Today')}</V3More>
+    <V3More id="today-tiers" label="Business, customer and channel numbers"><GretaOverviewTiers/></V3More>
+  </div>);
+}
+
+// ── The 16 destinations ──────────────────────────────────────────────────
+// Every page: a lead block a novice reads first, then analyst depth demoted
+// into named sections. Nothing from the old sub-tabs is dropped.
+const V3_PAGES = {
+  today: (p) => <V3Today {...p}/>,
+  review: (p) => (<>
+    <V3Anchor id="week"/><WeeklyBoard/>
+    <V3More id="rev-quarter" label="This quarter — the board pack"><V3Anchor id="quarter"/><BusinessReview/></V3More>
+    <V3More id="rev-alerts" label="Alerts — what changed and why"><V3Anchor id="alerts"/><IntelligencePanel/></V3More>
+  </>),
+  actions: (p) => (<>
+    <ActionsView/>
+    <V3More id="act-decisions" label="Decisions and results"><V3Anchor id="decisions"/>{mosView('DecisionLog')}</V3More>
+  </>),
+  calendar: (p) => mosView('Calendar'),
+  ask: (p) => <AskPanel/>,
+  goal: (p) => (<>
+    <GretaPlanPanel show="goal"/>
+    <CostDrift/>
+    <V3More id="goal-econ" label="All your costs, cash and terms"><V3Anchor id="economics"/><BusinessEconomicsPanel/></V3More>
+  </>),
+  growth: (p) => (<>
+    <V3Anchor id="forecast"/>
+    <GretaPlanPanel show="growth"/>
+    <CashCeiling/>
+    <V3More id="growth-fit" label="Offer and product fit, cash and forward signal"><FitCard start={p.start} end={ACTIVE_END}/><GenomePanel/></V3More>
+  </>),
+  stock: (p) => (<>
+    {/* The server-side stock plan (vw_stock_demand_plan / fn_stock_gate): what runs out,
+        when to reorder, how many, what it costs a day. Built into the embed and never
+        mounted until now — the page below still runs its own browser-side estimate. */}
+    {mosView('PerformanceStock')}
+    <PlanningView/>
+    <V3More id="stock-suppliers" label="Suppliers"><V3Anchor id="suppliers"/><SuppliersDirectory/></V3More>
+  </>),
+  profit: (p) => <Overview start={p.start} period={p.period} customActive={p.customActive}/>,
+  marketing: (p) => (<>
+    <CrossChannel start={p.start}/>
+    <CreativeReallocation/>
+    <ChannelDetailList channels={(typeof window!=='undefined' && window.FRKL_PLAN && window.FRKL_PLAN.channels) || []}/>
+    <V3More id="mk-detail" label="Channel detail and platform totals"><V3Anchor id="detail"/><Channels start={p.start}/></V3More>
+    <V3More id="mk-creative" label="Creative"><V3Anchor id="creative"/><Creatives/></V3More>
+    <V3More id="mk-email" label="Email"><V3Anchor id="email"/><EmailHub/></V3More>
+    <V3More id="mk-organic" label="Organic and social"><V3Anchor id="organic"/><Organic/></V3More>
+  </>),
+  website: (p) => (<>
+    {mosView('LoopView')}
+    <V3More id="web-cvr" label="What moves conversion"><V3Anchor id="cvr"/><CvrDrivers/></V3More>
+    <V3More id="web-friction" label="Site structure and friction"><V3Anchor id="friction"/><SiteStructure start={p.start}/></V3More>
+  </>),
+  customers: (p) => (<>
+    <CustomerSegments/>
+    <Customers/>
+    <V3More id="cust-cohorts" label="Cohorts and lifetime value"><V3Anchor id="cohorts"/><CohortsPanel/></V3More>
+  </>),
+  products: (p) => (<>
+    <ProductTrafficMisallocation/>
+    <Products/>
+    <V3More id="prod-promos" label="Promotions and discount codes"><V3Anchor id="promos"/><DiscountCodeTracker/></V3More>
+  </>),
+  competitors: (p) => (<>
+    {mosView('PerformanceCompetitors')}
+    {/* The static "Scout snapshot" was retired on 2026-09-25: it was frkl's, hardcoded,
+        and the live researched list above replaces it for every brand. */}
+  </>),
+  settings: (p) => (<>
+    <ConnectionsPanel/>
+    <DataHealth/>
+  </>),
+  team: (p) => <TeamPanel/>,
+};
+// Anchor target for a deep link that used to open a sub-tab.
+function V3Anchor({ id }) {
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    if (window.__oiV3Anchor === id && ref.current) {
+      window.__oiV3Anchor = null;
+      setTimeout(() => { try { ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }, 60);
+    }
+  });
+  return <span ref={ref} id={'v3-' + id} className="v3-anchor"/>;
+}
+
+function V3App({ dest, go, children, start, periodCtl }) {
+  const d = V3_BY_ID[dest] || V3_NAV[0];
+  return (<div className="v3-root">
+    <div className="v3-shell">
+      <nav className="v3-nav" aria-label="Main">
+        <button type="button" className="v3-nav-search" onClick={() => window.__oiCommandOpen && window.__oiCommandOpen()}>
+          <Icon name="search" size={14}/> Search… <kbd>⌘K</kbd>
+        </button>
+        {(() => { let prev = null; return V3_NAV.map(e => {
+          const head = e.group !== prev ? <div key={'h' + e.group} className="v3-nav-group">{e.group}</div> : null;
+          prev = e.group;
+          return (<React.Fragment key={e.id}>{head}
+            <button type="button" className={'v3-nav-item' + (e.id === dest ? ' active' : '')} onClick={() => go(e.id)} aria-current={e.id === dest ? 'page' : undefined}>
+              <Icon name={e.icon} size={17}/>{e.label}
+            </button>
+          </React.Fragment>);
+        }); })()}
+      </nav>
+      <main className="v3-main">
+        <V3AskBar dest={dest}/>
+        <header className="v3-page-head">
+          <div className="v3-page-head-row">
+            <div>
+              <h1 className="v3-page-title">{d.label}</h1>
+              <p className="v3-page-q">{d.q}</p>
+            </div>
+            {V3_PERIOD_PAGES.indexOf(dest) >= 0 ? periodCtl : null}
+          </div>
+        </header>
+        <BrandAgeBanner/>
+        <MarginNudge/>
+        {children}
+      </main>
+    </div>
+    <nav className="v3-mobile" aria-label="Main (mobile)">
+      {V3_MOBILE.map(e => (
+        <button key={e.id} type="button" className={'v3-mb' + (e.id === dest ? ' active' : '')} onClick={() => go(e.id)}>
+          <Icon name={e.icon} size={19}/><span>{e.label}</span>
+        </button>
+      ))}
+      <button type="button" className="v3-mb" onClick={() => window.__oiCommandOpen && window.__oiCommandOpen()}>
+        <Icon name="search" size={19}/><span>More</span>
+      </button>
+    </nav>
+  </div>);
+}
+
 function App(){
   const [section, setSection] = useState('home');
+  // V3: one destination at a time, no sub-tab state. Old (section, sub) deep links
+  // are translated by v3Route, so every existing call site still lands somewhere real.
+  const [v3dest, setV3dest] = useState('today');
   const [subTabBySection, setSubTabBySection] = useState(
     Object.fromEntries(NAV.map(s => [s.id, s.subtabs[0].id]))
   );
@@ -12560,7 +14083,13 @@ function App(){
 
   // Global deep-link helper so findings can jump to their evidence tab (clickable cross-refs).
   React.useEffect(() => {
+    window.__oiGo = (dest, anchor) => {
+      setV3dest(dest);
+      window.__oiV3Anchor = anchor || null;
+      window.scrollTo({top: 0, behavior: 'smooth'});
+    };
     window.__oiNav = (sec, sub) => {
+      if (UI_V3) { const r = v3Route(sec, sub); window.__oiGo(r[0], r[1]); return; }
       setSection(sec);
       if (sub) setSubTabBySection(p => ({...p, [sec]: sub}));
       window.scrollTo({top: 0, behavior: 'smooth'});
@@ -12577,7 +14106,7 @@ function App(){
   // Scroll to top whenever section or sub-tab changes — premium-feel small touch
   React.useEffect(() => {
     window.scrollTo({top: 0, behavior: 'smooth'});
-  }, [section, activeSubId]);
+  }, [section, activeSubId, v3dest]);
 
   // Re-render whenever the live-data loader fetches fresh data from Supabase.
   // The loader mutates window.FRKL_* in place; bumping a state forces React to
@@ -12588,6 +14117,32 @@ function App(){
     window.addEventListener('frkl-data-updated', handler);
     return () => window.removeEventListener('frkl-data-updated', handler);
   }, []);
+
+  // ── V3 render: one nav, one destination, no sub-tab strip, no plan rail.
+  // The plan rail's goal/pace content lives on Today and Goal & costs; the sticky
+  // health bar folds into the Today headline (Phase 2 parity rows C032–C035, C038).
+  if (UI_V3) {
+    const page = (V3_PAGES[v3dest] || V3_PAGES.today)({start, period, customActive});
+    return (
+      <div>
+        <V3App dest={v3dest} go={(d)=>setV3dest(d)} start={start}
+               periodCtl={<V3Period period={period} setPeriod={setPeriod} rangeStart={rangeStart} rangeEnd={rangeEnd}
+                                    setRangeStart={setRangeStart} setRangeEnd={setRangeEnd} customActive={customActive}/>}>{page}</V3App>
+        <footer className="app-footer">
+          <div className="app-footer-brand"><span>greta</span></div>
+          <span className="app-footer-dot"/>
+          <span title={D.meta.source}>{(OI_BRAND.name||'your')} workspace · {(D.meta.source||'').split('—')[0].trim()||'Live data'}</span>
+          <span className="app-footer-dot"/>
+          <span>data updated {D.meta.captured}</span>
+          <div style={{flex:1}}/>
+          <span>Auto-updates daily</span>
+        </footer>
+        <ToastHost/>
+        <CommandMenu/>
+        <EvidenceDrawer/>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -12650,7 +14205,7 @@ function App(){
               </defs>
               <rect x="49" y="30" width="138" height="41" rx="20.5" transform="rotate(-45 118 50.5)" fill="url(#ffpb)"/>
               <rect x="71" y="177" width="138" height="41" rx="20.5" transform="rotate(-45 140 197.5)" fill="url(#ffgm)"/>
-              <circle cx="97" cy="132" r="24" fill="#0B132B"/>
+              <circle cx="97" cy="132" r="24" fill={PAL.ink}/>
             </svg>
           </div>
           <span>greta</span>
