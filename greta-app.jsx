@@ -477,6 +477,9 @@ function agentRole(name){ return AGENT_ROLE[name] || null; }
 const AGENT_CODENAMES = ['Pulse','Frame','Atlas','Lux','Sage','Scout','Nova','Ivy','Clara','Orion','Crux'];
 function agentLabel(name){ if(!name) return name; return AGENT_ROLE[name] || (AGENT_CODENAMES.includes(name) ? 'Greta' : name); }
 function agentTitle(name){ return agentLabel(name)||''; }
+// P1/P2/P3 are internal priority codes. They render as the timeframe they mean.
+const PRIORITY_WORD = { P1:'Do first', P2:'Do next', P3:'Later', P0:'Urgent' };
+function priorityWord(p){ return PRIORITY_WORD[String(p||'').toUpperCase()] || (p || ''); }
 // Engine-written text can open with an internal routing tag such as "[Pulse/finance/P3] "; never render it.
 function scrubTag(s){ return typeof s==='string' ? s.replace(/^\s*\[(?:Pulse|Frame|Atlas|Lux|Sage|Scout|Nova|Ivy|Clara|Orion|Crux)(?:\/[^\]]*)?\]\s*/, '') : s; }
 // In-app link to the exact screen that fixes a prompt, so no instruction is a dead end.
@@ -950,7 +953,7 @@ function MoneyOnTablePanel(){
           return (<tr key={i}>
             <td style={{fontSize:12, maxWidth:320}}>
               <span style={{fontWeight:550, color: m.source==='synthetic' ? 'var(--text-secondary)' : 'var(--text-primary)'}}>{scrubTag(m.description)}</span>
-              <div className="meta" style={{fontSize:10}}>{agentLabel(m.agent) || m.source} · {m.priority || ''} · {m.kind}</div>
+              <div className="meta" style={{fontSize:10}}>{agentLabel(m.agent) || m.source} · {priorityWord(m.priority)} · {m.kind}</div>
             </td>
             <td><MoneyBadge money={m}/></td>
             <td className="tl" style={{fontSize:10, textTransform:'uppercase', letterSpacing:.04, color:confColor(m.confidence), fontWeight:600}}>{tier(m.confidence)}</td>
@@ -1227,7 +1230,7 @@ function ActionBoard(){
     <div className="card">
       <div className="card-section-title">
         <h2 style={{margin:0}}>Action plan <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>{`— live read first, ranked by ${curSym()} impact`}</span></h2>
-        <span className="meta">Crux live read{liveRead&&liveRead.generatedAt?` (${liveRead.generatedAt.slice(0,10)})`:''} · {open.length} specialist items{contraCount>0?` · ${contraCount} contradicted by today's read`:''}</span>
+        <span className="meta">Greta's live read{liveRead&&liveRead.generatedAt?` (${liveRead.generatedAt.slice(0,10)})`:''} · {open.length} specialist items{contraCount>0?` · ${contraCount} contradicted by today's read`:''}</span>
       </div>
       <ActionConflictBanner/>
       {/* LIVE — from the diagnostic engine, always coherent with the diagnostic card */}
@@ -1235,7 +1238,7 @@ function ActionBoard(){
         <div style={{display:'flex',alignItems:'center',gap:9,borderBottom:'1px solid var(--border-subtle)',padding:'9px 0 7px'}}>
           <span style={{width:7,height:7,borderRadius:'50%',background:'var(--accent)'}}/>
           <span style={{fontWeight:700,color:'var(--text-primary)',fontSize:13.5}}>Now — live read</span>
-          <span style={{fontSize:11,color:'var(--text-faint)'}}>Crux · from today's diagnostic</span>
+          <span style={{fontSize:11,color:'var(--text-faint)'}}>From today's diagnostic</span>
         </div>
         {(()=>{
           const dir = liveSort.dir==='asc' ? 1 : -1;
@@ -1655,7 +1658,7 @@ function ThisWeekHero(){
               <div className="hero-action-body">
                 <div className="hero-action-text">{linkify(a.text)}</div>
                 <div className="hero-action-meta">
-                  <span className={'pill ' + (a.p==='P1'?'red':a.p==='P2'?'amber':'grey')} style={{fontSize:9.5,padding:'1px 6px'}}>{a.p}</span>
+                  <span className={'pill ' + (a.p==='P1'?'red':a.p==='P2'?'amber':'grey')} style={{fontSize:9.5,padding:'1px 6px'}}>{priorityWord(a.p)}</span>
                   <span className="meta" style={{fontSize:10.5}}>{agentLabel(a.agent)}</span>
                   {Math.abs(a.money) >= 100 && <span style={{
                     fontSize:10.5, fontWeight:700, color: a.money < 0 ? 'var(--bad)' : 'var(--good)',
@@ -2484,7 +2487,7 @@ function ScoresStrip({metrics, windowLabel}){
   if (histDays != null && histDays < 30) {
     return (<div style={{padding:'10px 12px',borderRadius:'var(--r-md)',background:'rgba(255,255,255,0.02)',border:'1px solid var(--border-subtle)',marginBottom:12}}>
       <div style={{display:'flex',alignItems:'center',gap:16,flexWrap:'wrap',fontSize:12,color:'var(--text-secondary)'}}>
-        <span style={{textTransform:'uppercase',letterSpacing:'.05em',fontSize:10,color:'var(--text-faint)'}}>Crux scorecard</span>
+        <span style={{textTransform:'uppercase',letterSpacing:'.05em',fontSize:10,color:'var(--text-faint)'}}>Business vitals</span>
         <span>Not scored yet — needs ≥30 days of trading history ({histDays}d so far). Scoring this early would over-claim; check back as data accumulates.</span>
       </div>
     </div>);
@@ -2508,7 +2511,7 @@ function ScoresStrip({metrics, windowLabel}){
     : 'it’s not safe to scale — the unit economics need work first';
   return (<div style={{padding:'10px 12px',borderRadius:'var(--r-md)',background:'rgba(255,255,255,0.02)',border:'1px solid var(--border-subtle)',marginBottom:12}}>
     <div style={{display:'flex',alignItems:'center',gap:16,flexWrap:'wrap',fontSize:12,color:'var(--text-secondary)'}}>
-      <span style={{textTransform:'uppercase',letterSpacing:'.05em',fontSize:10,color:'var(--text-faint)'}}>Crux scorecard{windowLabel?<span style={{textTransform:'none',letterSpacing:0,color:'var(--text-faint)',fontWeight:400}}> · {windowLabel} · independent of the date picker</span>:null}</span>
+      <span style={{textTransform:'uppercase',letterSpacing:'.05em',fontSize:10,color:'var(--text-faint)'}}>Business vitals{windowLabel?<span style={{textTransform:'none',letterSpacing:0,color:'var(--text-faint)',fontWeight:400}}> · {windowLabel} · independent of the date picker</span>:null}</span>
       <ScoreTip title="Health — is the engine sound?" lines={[
           "A 0–100 blend of your profit margins, ad efficiency, conversion rate, returns and discount discipline. Answers: are the fundamentals healthy?",
           "75+ strong · 55–74 okay · under 55 needs work.",
@@ -7279,7 +7282,7 @@ function IntelligencePanel(){
               const goodLift = m.direction==='higher_better' ? lift>0 : m.direction==='lower_better' ? lift<0 : null;
               const liftColor = goodLift==null ? 'var(--text-muted)' : goodLift ? 'var(--good)' : 'var(--bad)';
               return (<tr key={i}>
-                <td><b>{agentLabel(a.agent)}</b><br/><span className="meta" style={{fontSize:10}}>{a.category} · {a.priority}</span></td>
+                <td><b>{agentLabel(a.agent)}</b><br/><span className="meta" style={{fontSize:10}}>{a.category} · {priorityWord(a.priority)}</span></td>
                 <td style={{fontSize:12, maxWidth:280}}>{scrubTag(a.description)}</td>
                 <td><span className="pill grey" style={{fontSize:10}}>{a.status}</span></td>
                 <td>{fmt(a.baseline_value)} → {fmt(a.observed_value)}</td>
@@ -11061,7 +11064,7 @@ function GP_ChannelMix(p){
         <div style={{ fontSize:11, letterSpacing:'.5px', textTransform:'uppercase', color:GP_T.accent2 }}>Where revenue comes from &middot; last 30 days</div>
         <span style={{ fontSize:11.5, color:GP_T.dim }}>paid {Math.round(100*paidRev/total)}% &middot; non-paid {Math.round(100*(1-paidRev/total))}%</span>
       </div>
-      <div style={{ fontSize:12, color:GP_T.dim, marginBottom:10 }}>Shopify last-click attribution, reconciled to L1 revenue &mdash; the basis for bottom-up channel targets.</div>
+      <div style={{ fontSize:12, color:GP_T.dim, marginBottom:10 }}>Shopify last-click attribution, reconciled to your total Shopify sales &mdash; the basis for each channel's target.</div>
       {cur.map(function(r,i){
         var rev=Number(r.net_revenue), pct=rev/total*100;
         var pr=prior[r.channel], d=(pr && pr>0)?(rev/pr-1)*100:null;
@@ -13168,8 +13171,13 @@ function v3Gbp(v) { return v == null ? '—' : '£' + Math.round(Number(v)).toLo
 // then the arithmetic in brackets. Split it so the owner reads a sentence first and
 // the workings sit underneath. The text itself is never invented here.
 const V3_CATS = ['total','site','finance','ops','product','paid','creative','retention','cx','stock','email','organic'];
+function v3Money(s) {
+  // The engine writes amounts unformatted inside its own sentences; group them so a
+  // reader can take in £247,261 at a glance instead of counting digits.
+  return String(s).replace(/£(\d{4,})(?![\d,])/g, (m, n) => '£' + Number(n).toLocaleString('en-GB'));
+}
 function v3ActionText(raw) {
-  let s = scrubTag(String(raw || '')).trim();
+  let s = v3Money(scrubTag(String(raw || '')).trim());
   const c = s.indexOf(': ');
   if (c > 0 && c < 14 && V3_CATS.includes(s.slice(0, c).toLowerCase())) s = s.slice(c + 2);
   let detail = '';
@@ -13178,7 +13186,7 @@ function v3ActionText(raw) {
   const d = s.indexOf(' — ');
   if (d > 0) { detail = (detail ? s.slice(d + 3) + ' · ' + detail : s.slice(d + 3)); s = s.slice(0, d); }
   s = s.charAt(0).toUpperCase() + s.slice(1);
-  return { main: s.replace(/\.$/, ''), detail: detail };
+  return { main: s.replace(/\.$/, ''), detail: v3Money(detail) };
 }
 // First run (Phase 2, §6): four steps to a first answer. Each step reads what the
 // database already knows — never a guess in the browser — and links to the one screen
@@ -13896,7 +13904,11 @@ function V3Today(p) {
         <div className="v3-kick">Do this first{top.cm_gbp ? ' · worth about ' + v3Gbp(top.cm_gbp) + ' a month' : ''}</div>
         <div className="v3-dofirst-t">{v3ActionText(top.description).main}</div>
         {v3ActionText(top.description).detail && <div className="v3-sub">{v3ActionText(top.description).detail}</div>}
-        {top.step1 && <div className="v3-sub">First step: {scrubTag(top.step1)}</div>}
+        {top.step1
+          ? <div className="v3-sub">First step: {v3Money(scrubTag(top.step1))}</div>
+          : <div className="v3-sub">No first step recorded for this one.{' '}
+              <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiAsk && window.__oiAsk('What is the first thing I should do about this, in concrete steps: ' + v3ActionText(top.description).main)}>Ask Greta where to start</button>
+            </div>}
         <div className="v3-btns">
           <button type="button" className="v3-btn v3-btn-p" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>Start</button>
           <button type="button" className="v3-btn" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>Mark done</button>
