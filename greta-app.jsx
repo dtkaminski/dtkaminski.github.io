@@ -12918,7 +12918,11 @@ function GretaPlanRail(){
   const spend = PR_num(goal.spend_cap);
   const prodCM= PR_num(goal.contribution_margin_target);
   const newC  = PR_num(goal.new_customer_target);
-  const camTgt= (prodCM!=null && spend!=null) ? prodCM - spend : null;
+  // The stored after-ads target (0169). This used to subtract the spend cap unconditionally,
+  // which would have double-counted it the moment a goal was saved on the after-ads basis.
+  const camTgt= PR_num(goal.cam_target) != null ? PR_num(goal.cam_target)
+              : goal.cm_basis === 'after_marketing' ? prodCM
+              : (prodCM!=null && spend!=null) ? prodCM - spend : null;
   const cac   = (spend!=null && newC) ? spend/newC : null;
   const mer   = PR_num(goal.mer_target);
   const pacing = OV && ((OV.quarterly&&OV.quarterly.pacing) || (OV.monthly&&OV.monthly.pacing) || (OV.yearly&&OV.yearly.pacing)) || null;
@@ -12951,9 +12955,9 @@ function GretaPlanRail(){
       </div>
       <div style={card}>
         <div style={{fontSize:10.5, letterSpacing:'.5px', textTransform:'uppercase', color:PR_T.accent, marginBottom:2}}>Targets · this quarter</div>
-        <PR_Row label="Contribution (after mktg)" value={PR_gbp(camTgt)} hi={true}/>
+        <PR_Row label="Profit after ads" value={PR_gbp(camTgt)} hi={true}/>
         <PR_Row label="Revenue" value={PR_gbp(rev)}/>
-        <PR_Row label="Ad spend cap" value={PR_gbp(spend)} sub={mer!=null?('MER '+mer):null}/>
+        <PR_Row label="Ad spend cap" value={PR_gbp(spend)} sub={mer!=null?('sales per £ of ads '+mer):null}/>
         <PR_Row label="Target new-customer cost" value={cac==null?'—':'£'+cac.toFixed(2)} sub="cap ÷ new custs"/>
         {newC!=null && <PR_Row label="New customers" value={PR_int(newC)}/>}
       </div>
@@ -13899,9 +13903,11 @@ function V3Today(p) {
 
   const cam = d.cm_after_marketing_30d, prod = d.product_contribution_30d, spend = d.paid_spend_30d, sales = d.net_revenue_30d;
   const gate = d.can_show_cm === false;
-  const camTarget = d.cam_target_monthly;               // null when the goal is stored on the other basis
+  const camTarget = d.cam_target_monthly;               // stored since 0169; null when there is no after-ads target
   const confirmed = d.plan_status === 'confirmed';
-  const pacePos = camTarget ? (cam / camTarget) : null;
+  // Guard the divisor, not the truthiness: a zero target used to hide the bar while the
+  // pounds-ahead line underneath kept rendering off the same number.
+  const pacePos = (camTarget != null && camTarget > 0) ? (cam / camTarget) : null;
   const diff = camTarget != null ? cam - camTarget : null;
   const top = d.top_action, next = (d.next_actions || []);
 
@@ -13928,12 +13934,12 @@ function V3Today(p) {
             {diff >= 0 ? v3Gbp(Math.abs(diff)) + ' ahead of' : v3Gbp(Math.abs(diff)) + ' behind'} your monthly goal
             <span className="v3-muted"> · goal {v3Gbp(camTarget)} a month</span>
             {d.target_is_derived && <V3Conf state="estimated"
-              detail={'Your goal is saved as profit BEFORE ads, so Greta worked this target out by taking your ad budget off it. Re-save the goal as profit after ads and this becomes your own figure.'}
+              detail={'Nobody has confirmed a profit-after-ads goal, so Greta worked this one out by taking your ad budget off your profit target. That assumes you spend the budget in full. Confirm a goal and this becomes your own figure.'}
               fix={['home', 'plansetup', 'Open Goal & costs']}/>}
           </div>
         </>) : (
           <div className="v3-pace">
-            <span className="v3-muted">{confirmed ? 'Your goal is saved as profit before ads, so Greta cannot pace this number against it yet.' : 'Your goal is still an estimate, so pace is hidden.'}</span>
+            <span className="v3-muted">{confirmed ? 'Your goal has no profit-after-ads figure and no ad budget to work one out from, so Greta will not guess at your pace.' : 'Your goal is still an estimate, so pace is hidden.'}</span>
             <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav('home', 'plansetup')}>Set your goal</button>
           </div>
         )}

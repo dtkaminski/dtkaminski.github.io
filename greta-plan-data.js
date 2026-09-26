@@ -84,7 +84,15 @@
       brand_id: b, period_start: PERIOD.start, period_end: PERIOD.end,
       revenue_target: d.revenue_target, contribution_margin_target: d.product_cm_target, gross_margin_target: d.gross_margin_target,
       spend_cap: d.spend_cap, mer_target: d.mer_target, new_customer_target: d.new_customer_target, returning_revenue_target: d.returning_revenue_target,
+      // cm_basis describes which figure contribution_margin_target holds, and it still holds the
+      // PRODUCT one — vw_forecast_vs_goal converts off that, so this must not change. The
+      // after-ads figure now has its own column (0169) instead of being derived in the browser
+      // from the spend cap, or recorded only in the note below.
       cm_basis: 'product_contribution', confirmed: true, status: 'active',
+      // The owner saw this exact number on the panel ("Profit after ads · the number Today
+      // paces against") before pressing Confirm, so it is a commitment, not a conversion.
+      cam_target: d.cam_target == null ? null : Math.round(d.cam_target),
+      cam_target_source: d.cam_target == null ? null : 'owner_confirmed',
       notes: 'Confirmed ' + new Date().toISOString().slice(0, 10) + ' · CAM (after-marketing) target £' + Math.round(d.cam_target)
     };
     try {

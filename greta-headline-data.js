@@ -8,12 +8,13 @@
  *   secondary line — both bases on screen, one big number. Nothing is recomputed here:
  *   every figure is read from the view (FRONTEND-SOT-SPEC render-the-view rule).
  *
- * PACING: vw_brand_headline.cm_target_monthly follows the goal's stored basis
- *   (cm_basis). When the goal is stored on the product-contribution basis we cannot
- *   pace the after-ads number against it, so cam_target_monthly is derived as
- *   (quarter product target − quarter spend cap) ÷ 3 and flagged target_is_derived.
- *   When the goal is re-saved on the after-ads basis this derivation drops out.
- *   Greta abstains rather than guess: no spend cap → no pace, and Today says why.
+ * PACING: vw_brand_headline.cam_target_monthly is the after-ads target, stored since
+ *   migration 0169. Nothing is worked out here any more — the browser used to compute
+ *   (quarter product target − quarter spend cap) ÷ 3 itself, which put the basis
+ *   arithmetic somewhere no other reader could see it. cam_target_source says whether
+ *   the owner confirmed that figure or it was converted off the spend cap, and Today
+ *   only calls it estimated in the second case. Greta abstains rather than guess: no
+ *   after-ads target → no pace, and Today says why.
  *
  * Publishes: window.GRETA_HEADLINE + 'greta-headline-updated'. Never throws.
  */
@@ -45,28 +46,17 @@
     var today = new Date().toISOString().slice(0, 10);
 
     var res = await Promise.all([
-      safeQ(sb.from('vw_brand_headline').select('period_start, period_end, cm_basis, plan_status, cm_target_quarter, cm_target_monthly, net_revenue_30d, paid_spend_30d, product_contribution_30d, cm_after_marketing_30d, pace_pct_of_plan, open_actions').eq('brand_id', b).limit(1), 10000, null),
+      safeQ(sb.from('vw_brand_headline').select('period_start, period_end, cm_basis, plan_status, cm_target_quarter, cm_target_monthly, cam_target_quarter, cam_target_monthly, cam_target_source, net_revenue_30d, paid_spend_30d, product_contribution_30d, cm_after_marketing_30d, pace_pct_after_ads, open_actions').eq('brand_id', b).limit(1), 10000, null),
       safeQ(sb.from('vw_brand_readiness').select('has_revenue, has_economics, can_show_cm, cm_source, gate_message, can_rank_actions').eq('brand_id', b).limit(1), 8000, null),
       safeQ(sb.from('vw_brand_action_board').select('external_id, description, step1, priority, category, cm_gbp').eq('brand_id', b).order('cm_gbp', { ascending: false, nullsFirst: false }).limit(4), 10000, []),
-      safeQ(sb.from('mos_business_goal').select('spend_cap, contribution_margin_target, cm_basis, confirmed, period_start, period_end').eq('brand_id', b).lte('period_start', today).gte('period_end', today).order('created_at', { ascending: false }).limit(1), 8000, null),
       safeQ(sb.from('connections').select('provider, status').eq('brand_id', b), 8000, [])
     ]);
 
     var h = (res[0] && res[0][0]) || null;
     var rd = (res[1] && res[1][0]) || null;
     var acts = res[2] || [];
-    var goal = (res[3] && res[3][0]) || null;
-    var conns = res[4] || [];
+    var conns = res[3] || [];
     if (!h) return;
-
-    // The target on the headline's own basis, or derived from the stored plan.
-    var camTarget = null, derived = false;
-    if (h.cm_basis === 'after_marketing') {
-      camTarget = num(h.cm_target_monthly);
-    } else if (goal && goal.contribution_margin_target != null && goal.spend_cap != null) {
-      var q = Number(goal.contribution_margin_target) - Number(goal.spend_cap);
-      if (isFinite(q)) { camTarget = Math.round(q / 3); derived = true; }
-    }
 
     var out = {
       period_start: h.period_start, period_end: h.period_end,
@@ -75,8 +65,11 @@
       paid_spend_30d: num(h.paid_spend_30d),
       product_contribution_30d: num(h.product_contribution_30d),
       cm_after_marketing_30d: num(h.cm_after_marketing_30d),
-      cam_target_monthly: camTarget,
-      target_is_derived: derived,
+      cam_target_monthly: num(h.cam_target_monthly),
+      cam_target_source: h.cam_target_source || null,
+      pace_pct_after_ads: num(h.pace_pct_after_ads),
+      // Kept as the screen's own word for it: "we worked this out, you did not agree to it".
+      target_is_derived: h.cam_target_source === 'converted_from_product_basis',
       open_actions: h.open_actions,
       can_show_cm: rd ? rd.can_show_cm !== false : true,
       cm_source: rd ? rd.cm_source : null,
