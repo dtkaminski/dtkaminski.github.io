@@ -1,6 +1,8 @@
 /*
  * greta-plan-data.js — Plan/target setup data layer. Load AFTER greta-data-loader.js.
- * Exposes window.FRKL_PLAN = { ready, readiness[], goal, config, forecast, period, refresh(), derive(amt,basis), confirm(derived), saveEconomics(fields) }.
+ * Exposes window.FRKL_PLAN = { ready, readiness[], goal, config, forecast, period, refresh(), loadDetail(), derive(amt,basis), confirm(derived), saveEconomics(fields) }.
+ * refresh() is the cheap core (goal, config, readiness). loadDetail() is the Growth-plan feeds
+ * (forecast, channels, curve) and is called ONLY when that screen opens - see the note on it.
  *   readiness  ← vw_brand_plan_readiness (the completeness gate)
  *   forecast   ← vw_forecast_vs_goal (calendar-aware forecast for the period vs goal + the gap; SOT view, not recomputed)
  *   spendCurve ← vw_brand_spend_curve (+ _points): the k curve, its 95% band and `verdict`
@@ -40,6 +42,27 @@
     if (rd && rd.data) window.FRKL_PLAN.readiness = rd.data || [];
     window.FRKL_PLAN.ready = true;
     window.dispatchEvent(new CustomEvent('frkl-plan-updated'));
+  }
+
+  // ── Growth-plan detail, loaded only when that screen is open (2026-09-29) ─────
+  // These nine reads used to run on every page load, whatever screen you were on. Two of them
+  // are ruinous: measured as `authenticated` on a quiet database, vw_channel_scoreboard takes
+  // 26,248ms and vw_forecast_vs_goal 10,616ms. They held PostgREST connections for half a
+  // minute and starved the reads the visible screen actually needed — pg_stat_activity during a
+  // page load showed seven concurrent sessions, none of them belonging to the screen on show,
+  // while Today sat on "—" for over a minute.
+  //
+  // Every one of them is consumed inside an `isGrowth &&` block in greta-app.jsx and rendered
+  // nowhere else, so nothing outside the Growth plan loses anything by waiting.
+  //
+  // This is a stopgap, not the fix: those two views are still far too slow for the screen that
+  // does need them. It stops them being everyone else's problem.
+  var detailState = 'idle';   // idle → loading → done
+  async function loadDetail() {
+    if (detailState !== 'idle') return;
+    detailState = 'loading';
+    var s = sb(), b = bid();
+    if (!s || !b) { detailState = 'idle'; return; }
     var fc = await withTimeout(s.from('vw_forecast_vs_goal').select('*').eq('brand_id', b).limit(1), 12000);
     if (fc && fc.data) window.FRKL_PLAN.forecast = fc.data[0] || null;
     var ch = await withTimeout(s.from('vw_channel_scoreboard').select('channel_type,spend_30d,avg_iroas,phi,break_even_iroas,target_marginal_iroas,break_even_reported_roas,target_reported_roas,target_is_ltv_adjusted,ltv_share,ltv_status,marginal_cac,max_cac_first_order,status,action,focus_rank,phi_is_assumed,planned_spend,spend_pace_pct_of_plan,plan_target_iroas,plan_target_cac,plan_confirmed').eq('brand_id', b).order('focus_rank', { ascending: true }), 12000);
@@ -68,6 +91,7 @@
     var cl = await withTimeout(s.from('vw_brand_curve_levers').select('*').eq('brand_id', b), 10000);
     if (cl && cl.data) window.FRKL_PLAN.curveLevers = cl.data || [];
 
+    detailState = 'done';
     window.dispatchEvent(new CustomEvent('frkl-plan-updated'));
   }
   async function derive(amount, basis) {
@@ -150,7 +174,10 @@
       return { ok: true };
     } catch (e) { if (window.console) console.warn('[plan] saveBands failed', e); return { ok: false, error: String((e && e.message) || e) }; }
   }
-  window.FRKL_PLAN = { curveDecomposition: null, curveHistory: [], curveLevers: [], ready: false, readiness: [], goal: null, config: null, forecast: null, channels: [], channelMix: [], channelHealth: null, spendCurve: null, spendCurvePoints: [], period: PERIOD, refresh: refresh, derive: derive, confirm: confirm, saveEconomics: saveEconomics, deriveChannelPlan: deriveChannelPlan, saveBands: saveBands };
-  window.addEventListener('frkl-data-updated', refresh);
+  window.FRKL_PLAN = { curveDecomposition: null, curveHistory: [], curveLevers: [], ready: false, readiness: [], goal: null, config: null, forecast: null, channels: [], channelMix: [], channelHealth: null, spendCurve: null, spendCurvePoints: [], period: PERIOD, refresh: refresh, loadDetail: loadDetail, derive: derive, confirm: confirm, saveEconomics: saveEconomics, deriveChannelPlan: deriveChannelPlan, saveBands: saveBands };
+  window.addEventListener('frkl-data-updated', function () {
+    refresh();
+    if (detailState === 'done') { detailState = 'idle'; loadDetail(); }
+  });
   var t = 0, iv = setInterval(function () { t++; if ((sb() && bid()) || t > 60) { clearInterval(iv); refresh(); } }, 500);
 })();

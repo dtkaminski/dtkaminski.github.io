@@ -11571,6 +11571,12 @@ function GretaPlanPanel({ show } = {}) {
   var isGoal = SHOW === 'all' || SHOW === 'goal';
   var isGrowth = SHOW === 'all' || SHOW === 'growth';
   var P = (typeof window !== 'undefined' && window.FRKL_PLAN) || { readiness: [], goal: null, period: { start: '', end: '' } };
+  // The Growth feeds are fetched here rather than on page load: two of them take 26s and 10s,
+  // and they were holding connections on every screen, not just this one. Asking for them when
+  // this panel actually mounts costs nothing anywhere else. Idempotent in the loader.
+  React.useEffect(function () {
+    if (isGrowth && window.FRKL_PLAN && window.FRKL_PLAN.loadDetail) window.FRKL_PLAN.loadDetail();
+  }, [isGrowth]);
   var s = React.useState(0), tick = s[0], setTick = s[1];
   var b = React.useState('cam'), basis = b[0], setBasis = b[1];
   var a = React.useState(''), amount = a[0], setAmount = a[1];
