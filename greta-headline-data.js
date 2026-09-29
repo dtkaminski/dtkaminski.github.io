@@ -76,21 +76,28 @@
   async function build() {
     var sb = sbClient(), b = brandId();
     if (!sb || !b) return;
-    // ONE request, not four (0184). vw_brand_today returns the headline, the readiness gate, the
-    // active-connection count and the top four actions as a single row. Server-side the four
-    // reads total ~700ms; each PostgREST round trip costs 250-600ms warm and more cold, so the
-    // requests cost more than the queries did. Every field is the same one this used to read.
-    // Retry, because the whole screen now rests on this one read. Measured through PostgREST the
-    // statement averages 1.7s, but the edge log has it at 9.8s and once 35.9s — the excess is
-    // queueing behind the ~60 other requests the page fires, not the query. With four reads a slow
-    // one only degraded Today; with one it blanks it, so a single timeout must not be the end of it.
-    // Each attempt gets a longer cap; three attempts cover ~50s, past the worst yet observed.
-    // First attempt is GENEROUS on purpose. A 12s cap was measured timing out on a cold read and
-    // the retry then pushed the first paint to ~50s — giving up at 12s cost far more than waiting
-    // would have. Warm the statement is ~1.4s; cold through PostgREST it can pass 12s, and there is
-    // nothing else competing for that first read, so there is no reason to be impatient with it.
-    // The client_error_log row that caught this is the whole point of reporting failures.
-    var rows = null;
+    // ONE row, not four requests (0184): vw_brand_today carries the headline, the readiness gate,
+    // the connection count and the top four actions together.
+    //
+    // FAST PATH (0200). The composed view costs ~2,054ms server-side — its own parts only total
+    // 490ms, the rest is four joins and two laterals re-evaluated per read — and through PostgREST
+    // it has been seen at 9.8s and once 35.9s. Cached, the same row is a single-key lookup at 9ms.
+    // An 18-second first paint disqualifies the product however it looks, so Today reads the cache.
+    var rows = null, asOf = null;
+    var cached = await safeQ(
+      sb.from('cache_brand_today').select('payload,refreshed_at').eq('brand_id', b).limit(1),
+      8000, null, 'cache_brand_today');
+    var c0 = cached && cached[0];
+    if (c0 && c0.payload) {
+      var age = Date.now() - new Date(c0.refreshed_at).getTime();
+      // 26h, so a single missed cron still serves rather than falling back to the slow path
+      if (age >= 0 && age < 26 * 3600 * 1000) { rows = [c0.payload]; asOf = c0.refreshed_at; }
+    }
+
+    // LIVE FALLBACK. A brand that has just connected has no cached row yet, and a cron can fail;
+    // either way the screen must be correct, just slower. First attempt is generous on purpose —
+    // a 12s cap was measured timing out and the retry pushed first paint to ~50s, so giving up
+    // early cost far more than waiting.
     for (var attempt = 0; attempt < 3 && !rows; attempt++) {
       if (attempt) await new Promise(function (r) { setTimeout(r, 1500 * attempt); });
       rows = await safeQ(sb.from('vw_brand_today').select('*').eq('brand_id', b).limit(1), 22000 + attempt * 9000, null, 'vw_brand_today');
@@ -155,6 +162,8 @@
       },
       top_action: acts[0] || null,
       next_actions: acts.slice(1, 4),
+      // when the cached row was built, so the screen can say how fresh it is rather than imply now
+      data_as_of: asOf,
       fetched_at: new Date().toISOString()
     };
     window.GRETA_HEADLINE = out;
