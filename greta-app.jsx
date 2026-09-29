@@ -9298,7 +9298,7 @@ function V3ActionBoard(){
                       onClick={() => setOpen(isOpen ? null : r.external_id)}>
                 <span className="v3-rank-n">{i + 1}</span>
                 <span className="v3-rank-body">
-                  <span className="v3-rank-desc">{r.description}</span>
+                  <span className={'v3-rank-desc' + (isOpen ? '' : ' clamp')}>{r.description}</span>
                   <span className="v3-rank-bar" aria-hidden="true">
                     <i style={{ width: Math.max(1.5, (gbp / max) * 100) + '%' }}/>
                   </span>
@@ -9319,6 +9319,94 @@ function V3ActionBoard(){
           );
         })}
       </ol>
+    </div>
+  );
+}
+
+// ── Stock runway ─────────────────────────────────────────────────────────
+// "OOS in ~9d — 33d short of the 42d lead" is a sentence describing a picture. Every SKU has the
+// same shape — how long the stock lasts, how long resupply takes, and the gap between them — and
+// thirty of those sentences in a column cannot be compared at a glance, which is the only thing
+// the operator actually wants to do.
+//
+// Drawn on one shared scale so the bars are comparable to each other: the filled bar is days of
+// cover left, the tick is when stock would arrive if it were ordered today. Tick beyond the bar
+// means a gap with nothing to sell, and the width of that overhang IS the shortfall.
+//
+// Lead time is not stored, but it is implied exactly: reorder_by_date is the last day to order,
+// so lead = days_to_stockout + (today − reorder_by_date). Nothing estimated, nothing invented.
+function V3StockRunway(){
+  const [rows, setRows] = React.useState(null);
+  const [err, setErr] = React.useState(null);
+
+  React.useEffect(() => {
+    let dead = false;
+    const go = () => {
+      const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
+      if (!sb || !b) return false;
+      sb.from('vw_stock_demand_plan')
+        .select('sku,product_title,on_hand,projected_days_to_stockout,reorder_by_date,suggested_order_units,cm_at_risk_before_resupply,stock_status')
+        .eq('brand_id', b).order('cm_at_risk_before_resupply', { ascending: false }).limit(12)
+        .then(r => {
+          if (dead) return;
+          if (r && r.error) { setErr(r.error.message || 'could not load'); return; }
+          setRows(((r && r.data) || []).filter(x => x.projected_days_to_stockout != null));
+        }, () => { if (!dead) setErr('could not load'); });
+      return true;
+    };
+    if (!go()) {
+      const iv = setInterval(() => { if (go()) clearInterval(iv); }, 500);
+      setTimeout(() => clearInterval(iv), 30000);
+      return () => { dead = true; clearInterval(iv); };
+    }
+    return () => { dead = true; };
+  }, []);
+
+  if (err) return <div className="v3-empty">Greta could not load your stock runway just now. {err}</div>;
+  if (rows === null) return <div className="v3-empty">Working out what runs out first…</div>;
+  if (!rows.length) return null;
+
+  const today = new Date();
+  const items = rows.map(r => {
+    const dts  = Math.max(0, Math.round(Number(r.projected_days_to_stockout) || 0));
+    const late = r.reorder_by_date
+      ? Math.round((today - new Date(r.reorder_by_date + 'T00:00:00')) / 86400000) : 0;
+    const lead = Math.max(dts + Math.max(late, 0), dts);
+    return { ...r, dts, late: Math.max(late, 0), lead, risk: Math.round(Number(r.cm_at_risk_before_resupply) || 0) };
+  });
+  const scale = Math.max(30, ...items.map(i => Math.max(i.lead, i.dts))) || 30;
+
+  return (
+    <div className="v3-runway">
+      <div className="v3-runway-head">
+        <h2 className="v3-runway-title">What runs out first</h2>
+        <span className="v3-runway-key">
+          <i className="v3-runway-key-bar"/> days of stock left
+          <i className="v3-runway-key-tick"/> when a new order would land
+        </span>
+      </div>
+      <ul className="v3-runway-list">
+        {items.map(it => (
+          <li key={it.sku} className={'v3-runway-row' + (it.dts <= 0 ? ' out' : '')}>
+            <span className="v3-runway-name" title={it.sku}>{it.product_title || it.sku}</span>
+            <span className="v3-runway-track" role="img"
+                  aria-label={(it.dts <= 0 ? 'Out of stock now' : it.dts + ' days of stock left')
+                              + (it.late > 0 ? ', the order was due ' + it.late + ' days ago' : '')}>
+              <i className="v3-runway-bar" style={{ width: Math.max(1, (it.dts / scale) * 100) + '%' }}/>
+              {it.lead > it.dts && (
+                <i className="v3-runway-gap"
+                   style={{ left: (it.dts / scale) * 100 + '%', width: ((it.lead - it.dts) / scale) * 100 + '%' }}/>
+              )}
+              <i className="v3-runway-tick" style={{ left: Math.min(99.5, (it.lead / scale) * 100) + '%' }}/>
+            </span>
+            <span className="v3-runway-say">
+              {it.dts <= 0 ? 'out now' : 'out in ' + it.dts + 'd'}
+              {it.late > 0 && <em> · order was due {it.late}d ago</em>}
+            </span>
+            <span className="v3-runway-risk">{it.risk > 0 ? v3Gbp(it.risk) : '—'}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -14264,6 +14352,9 @@ const V3_PAGES = {
     {/* The server-side stock plan (vw_stock_demand_plan / fn_stock_gate): what runs out,
         when to reorder, how many, what it costs a day. Built into the embed and never
         mounted until now — the page below still runs its own browser-side estimate. */}
+    {/* The runway leads: thirty "OOS in ~9d — 33d short of the 42d lead" sentences cannot be
+        compared at a glance, and comparing them is the whole job. */}
+    <V3StockRunway/>
     {mosView('PerformanceStock')}
     <PlanningView/>
     <V3More id="stock-suppliers" label="Suppliers"><V3Anchor id="suppliers"/><SuppliersDirectory/></V3More>

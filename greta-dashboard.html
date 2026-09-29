@@ -1186,6 +1186,41 @@
     border: 1px solid var(--border-default); border-radius: 999px; background: none; font-family: inherit; font-size: 11.5px; font-weight: 600; color: var(--text-muted);
   }
   .v3-conf i { width: 8px; height: 8px; display: inline-block; }
+  /* ── Stock runway ───────────────────────────────────────────────────────────────────────────
+     One shared scale across every row so the bars mean something against each other. Filled bar =
+     cover left, hatched overhang = the window with nothing to sell, tick = when a new order lands.
+     Colour is doing work, not decoration: accent while there is cover, danger once it runs out. */
+  .v3-runway { margin-bottom: var(--space-5, 20px); }
+  .v3-runway-head { display: flex; align-items: baseline; justify-content: space-between;
+                    flex-wrap: wrap; gap: var(--space-2, 8px); padding-bottom: var(--space-3, 12px); }
+  .v3-runway-title { margin: 0; font-family: var(--font-sans); font-size: var(--text-base, 15px); color: var(--color-ink); }
+  .v3-runway-key { display: flex; align-items: center; gap: 6px; font-family: var(--font-sans);
+                   font-size: var(--text-xs, 11px); color: var(--color-muted); }
+  .v3-runway-key-bar { display: inline-block; width: 14px; height: 4px; background: var(--color-accent); }
+  .v3-runway-key-tick { display: inline-block; width: 2px; height: 10px; background: var(--color-ink); margin-left: var(--space-2, 8px); }
+  .v3-runway-list { list-style: none; margin: 0; padding: 0; }
+  .v3-runway-row { display: grid; grid-template-columns: minmax(0,1.1fr) minmax(0,1.6fr) auto auto;
+                   gap: var(--space-3, 12px); align-items: center;
+                   padding: var(--space-2, 8px) 0; border-top: 1px solid var(--color-line); }
+  .v3-runway-row:last-child { border-bottom: 1px solid var(--color-line); }
+  .v3-runway-name { font-family: var(--font-sans); font-size: var(--text-sm, 13px); color: var(--color-ink);
+                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .v3-runway-track { position: relative; height: 8px; background: var(--color-sunken, #EFEAE3); }
+  .v3-runway-bar { position: absolute; left: 0; top: 0; height: 100%; background: var(--color-accent); }
+  .v3-runway-row.out .v3-runway-bar { background: var(--color-danger); }
+  .v3-runway-gap { position: absolute; top: 0; height: 100%;
+                   background-image: repeating-linear-gradient(135deg, var(--color-danger) 0 2px, transparent 2px 5px);
+                   opacity: .55; }
+  .v3-runway-tick { position: absolute; top: -2px; width: 2px; height: 12px; background: var(--color-ink); }
+  .v3-runway-say { font-family: var(--font-sans); font-size: var(--text-xs, 11px); color: var(--color-muted); white-space: nowrap; }
+  .v3-runway-say em { font-style: normal; color: var(--color-danger); }
+  .v3-runway-risk { font-family: var(--font-mono); font-size: var(--text-sm, 13px); color: var(--color-ink); text-align: right; }
+  @media (max-width: 680px) {
+    .v3-runway-row { grid-template-columns: 1fr auto; grid-template-areas: "name risk" "track track" "say say"; }
+    .v3-runway-name { grid-area: name; } .v3-runway-track { grid-area: track; }
+    .v3-runway-say { grid-area: say; } .v3-runway-risk { grid-area: risk; }
+  }
+
   /* ── The ranked action board ────────────────────────────────────────────────────────────────
      One list, ordered by money, with the bar carrying the comparison so the eye does the ranking
      instead of the reader. Rows are separated by a hairline, not boxed — per the house rules there
@@ -1219,6 +1254,11 @@
   .v3-rank-desc { display: block; font-family: var(--font-sans); font-size: var(--text-sm, 13px);
                   color: var(--color-ink); line-height: 1.45;
                   transition: color var(--transition-fast, .15s) ease; }
+  /* Some descriptions run to several hundred characters — a narrative, a data caveat and a list of
+     coincident changes in one string. Unclamped, one row owns the screen and the ranking stops
+     being scannable. Two lines closed, everything on open. */
+  .v3-rank-desc.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+                        overflow: hidden; }
   .v3-rank-bar { display: block; height: 3px; background: var(--color-sunken, #EFEAE3); margin: 6px 0 4px; }
   .v3-rank-bar i { display: block; height: 100%; background: var(--color-accent);
                    transition: width var(--transition-base, .25s) ease; }
@@ -1417,6 +1457,6 @@ window.MOS_EMBEDDED = true;</script>
    save-brand-config had been reading two relations that were never created. */</script>
 <script defer src="./cost-entry.build.js?v=20260929c"></script>
 <script defer src="./loop-panel.js?v=20260921a"></script>
-<script defer src="./greta-app.js?v=1790687213760"></script>
+<script defer src="./greta-app.js?v=1790687511326"></script>
 <script>/* perf: defer frkl static deep-tab data (CVR ~1.7MB, cohorts, promos, products) — not used by the Overview/landing. Background-load after paint; skip for non-frkl (de-frkl). */
 (function(){try{var slug=window.OI_BRAND_SLUG||(window.parent&&window.parent!==window?window.parent.OI_BRAND_SLUG:null)||"frkl";if(slug!=="frkl")return;var files=["greta-cvr.js","greta-cohorts.js","greta-discount-codes.js","greta-products.js","greta-patterns.js"],i=0;function next(){if(i>=files.length)return;var s=document.createElement("script");s.src="./"+files[i++]+"?v=20260925f";s.async=true;s.onload=next;s.onerror=next;document.head.appendChild(s);}var kick=function(){next();};if(window.requestIdleCallback){window.requestIdleCallback(kick,{timeout:1500});}else{setTimeout(kick,300);}}catch(e){}})();</script>
