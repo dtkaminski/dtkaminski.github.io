@@ -2557,7 +2557,9 @@ function ScoreTip({valueNode, title, lines}){
   const [show, setShow] = React.useState(false);
   return (<span style={{position:'relative', cursor:'help', display:'inline-flex', alignItems:'center', gap:4}}
       onMouseEnter={()=>setShow(true)} onMouseLeave={()=>setShow(false)}>
-    {valueNode}<span style={{fontSize:9, opacity:.5}} aria-hidden="true">&#9432;</span>
+    {/* &#9432; is a text glyph that renders as a serif circled-i on most systems, next to
+        an icon set drawn at 1.7px stroke. Same <Icon name="info"> as everywhere else. */}
+    {valueNode}<span style={{opacity:.55, display:'inline-flex'}} aria-hidden="true"><Icon name="info" size={11}/></span>
     {show && <div role="tooltip" style={{position:'absolute', top:'calc(100% + 8px)', left:0, zIndex:60, width:300,
         background:'var(--bg-elevated)', border:'1px solid var(--border-default)', borderRadius:'var(--r-md)',
         padding:'11px 13px', boxShadow:'var(--shadow-lg)', textAlign:'left', whiteSpace:'normal', fontWeight:400,
@@ -2608,28 +2610,45 @@ function ScoresStrip({metrics, windowLabel}){
   const scaleWord = s.scale.score>=80?'the economics support spending more to grow'
     : s.scale.score>=55?'it’s not safe to scale spend yet — clear the blockers first'
     : 'it’s not safe to scale — the unit economics need work first';
-  return (<div style={{padding:'10px 12px',borderRadius:'var(--r-md)',background:'var(--color-sunken)',border:'1px solid var(--border-subtle)',marginBottom:12}}>
-    <div style={{display:'flex',alignItems:'center',gap:16,flexWrap:'wrap',fontSize:12,color:'var(--text-secondary)'}}>
-      <span style={{textTransform:'uppercase',letterSpacing:'.05em',fontSize:10,color:'var(--text-faint)'}}>Business vitals{windowLabel?<span style={{textTransform:'none',letterSpacing:0,color:'var(--text-faint)',fontWeight:400}}> · {windowLabel} · independent of the date picker</span>:null}</span>
-      {partial && <span style={{fontSize:11,color:'var(--warn)',fontWeight:600}}>Partly scored — missing {s.missing.join(' and ')}</span>}
-      <ScoreTip title="Health — is the engine sound?" lines={[
+  // Three scores read as a sentence of debug output: "Health 86/100 · Strong · Scale-readiness
+  // 50/100 · Not yet · Growth Contracting", all at 12px in a single wrapped flex row. They are
+  // the vitals of the business and they were the least legible thing on the page. Laid out as
+  // three stats now - label, figure, band - separated by rules rather than boxed, per the
+  // whitespace-over-cards rule, so they can be compared at a glance.
+  const stat = (label, node, tip) => (
+    <div className="v3-vital">
+      <div className="v3-vital-lab">{label}{tip}</div>
+      {node}
+    </div>
+  );
+  return (<div className="v3-vitals">
+    <div className="v3-vitals-head">
+      <span className="v3-vitals-eyebrow">Business vitals{windowLabel?<span className="v3-muted"> · {windowLabel} · independent of the date picker</span>:null}</span>
+      {partial && <span className="v3-vitals-partial">Partly scored — missing {s.missing.join(' and ')}</span>}
+      <button onClick={()=>setOpen(o=>!o)} className="v3-vitals-detail">{open?'Hide detail':'Detail'}</button>
+    </div>
+    <div className="v3-vitals-row">
+      {stat('Health', <>
+          <div className="v3-vital-val" style={{color:tone(s.health.score)}}>{s.health.score}<span className="v3-vital-of">/100</span></div>
+          <div className="v3-vital-band">{s.health.band}</div></>,
+        <ScoreTip title="Health — is the engine sound?" lines={[
           "A 0–100 blend of your profit margins, ad efficiency, conversion rate, returns and discount discipline. Answers: are the fundamentals healthy?",
           "75+ strong · 55–74 okay · under 55 needs work.",
-          w0?`Weakest right now: ${w0.label} — ${w0.detail}.`:'' ]}
-        valueNode={<span>Health <b style={{color:tone(s.health.score),fontSize:14,fontFamily:'var(--font-mono)'}}>{s.health.score}</b><span style={{color:'var(--text-faint)'}}>/100 · {s.health.band}</span></span>}/>
-      <ScoreTip title="Scale-readiness — safe to spend more?" lines={[
-          "The share of 'safe to scale' checks you pass — e.g. cost to win a customer (cost per new customer) under your limit, profitable per order, fast payback, conversion not slipping.",
+          w0?`Weakest right now: ${w0.label} — ${w0.detail}.`:'' ]} valueNode={null}/>)}
+      {stat('Safe to scale', <>
+          <div className="v3-vital-val" style={{color:tone(s.scale.score)}}>{s.scale.score}<span className="v3-vital-of">/100</span></div>
+          <div className="v3-vital-band">{s.scale.band}</div></>,
+        <ScoreTip title="Scale-readiness — safe to spend more?" lines={[
+          "The share of 'safe to scale' checks you pass — e.g. cost to win a customer under your limit, profitable per order, fast payback, conversion not slipping.",
           "80+ ready · 55–79 conditional (fix blockers first) · under 55 not yet.",
-          s.scale.fails.length?`Blocking: ${s.scale.fails.slice(0,3).join('; ')}.`:'All checks pass.' ]}
-        valueNode={<span>Scale-readiness <b style={{color:tone(s.scale.score),fontSize:14,fontFamily:'var(--font-mono)'}}>{s.scale.score}</b><span style={{color:'var(--text-faint)'}}>/100 · {s.scale.band}</span></span>}/>
-      <ScoreTip title="Growth quality — is the growth profitable?" lines={[
+          s.scale.fails.length?`Blocking: ${s.scale.fails.slice(0,3).join('; ')}.`:'All checks pass.' ]} valueNode={null}/>)}
+      {stat('Growth quality', <div className="v3-vital-word" style={{color:gTone(s.growth.band)}}>{s.growth.band}</div>,
+        <ScoreTip title="Growth quality — is the growth profitable?" lines={[
           "Whether recent revenue growth came with profit growth.",
-          "'Low-quality growth' = sales up but profit (contribution = revenue minus product + ad costs) flat or down — usually rising ad costs or heavier discounting.",
-          s.growth.signals.length?('Latest: '+s.growth.signals.join(' · ')):'' ]}
-        valueNode={<span>Growth <b style={{color:gTone(s.growth.band)}}>{s.growth.band}</b></span>}/>
-      <button onClick={()=>setOpen(o=>!o)} style={{marginLeft:'auto',background:'transparent',border:'none',color:'var(--accent)',cursor:'pointer',fontSize:11.5,fontWeight:600}}>{open?'Hide detail':'Detail'}</button>
+          "'Low-quality growth' = sales up but profit flat or down — usually rising ad costs or heavier discounting.",
+          s.growth.signals.length?('Latest: '+s.growth.signals.join(' · ')):'' ]} valueNode={null}/>)}
     </div>
-    <div style={{marginTop:8,fontSize:12.5,color:'var(--text-secondary)',lineHeight:1.55,borderTop:'1px solid var(--border-subtle)',paddingTop:8}}>
+    <div className="v3-vitals-plain">
       The business is <b style={{color:tone(s.health.score)}}>{healthWord}</b> (Health {s.health.score}/100){s.growth.band!=='Insufficient history'?<> and right now it&rsquo;s <b style={{color:gTone(s.growth.band)}}>{growthPlain}</b></>:''}. On growing, {scaleWord}.
     </div>
     {open && (<div style={{marginTop:7,fontSize:12,color:'var(--text-secondary)',lineHeight:1.55}}>
@@ -4441,7 +4460,12 @@ function CreativeVisionPanel(){
             {[['hook_strength','Hook'],['visual_hierarchy','Visual'],['claim_quality','Claim'],['audience_fit','Audience'],['brand_consistency','Brand']].map(([k,l]) => {
               const v = scores[k] || 0;
               const c2 = SCORE_COLOR(v);
-              return (<div key={k} className="mrow"><span className="k">{l}</span><span className="v" style={{color:c2,fontWeight:600}}>{v}/5 {'★'.repeat(v)}</span></div>);
+              return (<div key={k} className="mrow"><span className="k">{l}</span><span className="v" style={{color:c2,fontWeight:600,display:'inline-flex',alignItems:'center',gap:6}}>
+      {v}/5
+      <span className="v3-rate" role="img" aria-label={v + ' out of 5'}>
+        {[1,2,3,4,5].map(n => <i key={n} className={n <= v ? 'on' : ''} style={n <= v ? {background:c2} : undefined}/>)}
+      </span>
+    </span></div>);
             })}
           </div>
           <div style={{fontSize:11,color:PAL.faint,lineHeight:1.45,marginBottom:8}}>
@@ -10876,7 +10900,7 @@ function mosView(name){
   const C = window[name];
   const A = window.OI_ASK || {};
   if (!C) return React.createElement('div',{className:'note'}, 'This screen did not load. Refresh the page; if it keeps happening, contact support.');
-  if (!A.brand_id) return React.createElement('div',{className:'note'}, 'Sign in to load the Marketing OS for your brand.');
+  if (!A.brand_id) return React.createElement('div',{className:'note'}, 'Sign in to see this for your brand.');
   const apiBase = (A.endpoint||'').replace(/\/functions\/v1\/[^/]*$/, '');
   // .mos-embed-scope (marketing-os.css, 2026-07-13) remaps the component's own design tokens
   // onto Greta's real :root theme variables, so it renders styled instead of bare/unstyled.
@@ -13534,9 +13558,30 @@ function V3Period({ period, setPeriod, rangeStart, rangeEnd, setRangeStart, setR
     </span>)}
   </div>);
 }
+// A sticky element cannot style itself on "am I pinned" in CSS, so a zero-height sentinel
+// above it reports when it leaves the viewport. Cheap, and it keeps the rule off the bar
+// until there is actually content passing underneath.
+function useStuck(ref) {
+  React.useEffect(() => {
+    const el = ref.current; if (!el || !('IntersectionObserver' in window)) return;
+    const sentinel = document.createElement('div');
+    sentinel.style.cssText = 'height:1px;margin-bottom:-1px;pointer-events:none';
+    el.parentNode.insertBefore(sentinel, el);
+    const io = new IntersectionObserver(
+      ([e]) => el.classList.toggle('stuck', !e.isIntersecting), { threshold: 1 });
+    io.observe(sentinel);
+    return () => { io.disconnect(); sentinel.remove(); };
+  }, [ref]);
+}
+
 function V3AskBar({ dest }) {
   const [q, setQ] = React.useState('');
   const [open, setOpen] = React.useState(false);
+  // Hooks run unconditionally, above the `dest === 'ask'` early return below. Putting
+  // them after it meant two fewer hooks on the Ask screen than on every other one, which
+  // is React error #300 and took the whole shell down with it.
+  const barRef = React.useRef(null);
+  useStuck(barRef);
   const send = (text) => {
     const t = (text != null ? text : q).trim();
     if (!t) { window.__oiGo && window.__oiGo('ask'); return; }
@@ -13544,7 +13589,7 @@ function V3AskBar({ dest }) {
     if (window.__oiAsk) window.__oiAsk(t); else window.__oiGo && window.__oiGo('ask');
   };
   if (dest === 'ask') return null;          // never ask twice on the Ask screen itself
-  return (<div className="v3-askbar">
+  return (<div className="v3-askbar" ref={barRef}>
     <div className="v3-askbar-in">
       <Icon name="spark" size={15}/>
       <input
@@ -13768,7 +13813,9 @@ function V3More({ id, label, children, defaultOpen }) {
   const toggle = () => setOpen(o => { try { localStorage.setItem(key, o ? '0' : '1'); } catch (e) {} return !o; });
   return (<section className="v3-more">
     <button type="button" className="v3-more-head" onClick={toggle} aria-expanded={open}>
-      <span className="v3-more-caret" aria-hidden="true">{open ? '▾' : '▸'}</span>{label}
+      {/* The chevron was a text glyph, the one place the product still drew an affordance
+          in a typeface rather than with the icon set. Same <Icon> as the nav, rotated. */}
+      <span className={'v3-more-caret' + (open ? ' open' : '')} aria-hidden="true"><Icon name="chevron" size={13}/></span>{label}
     </button>
     {open && <div className="v3-more-body">{children}</div>}
   </section>);
@@ -14226,7 +14273,8 @@ function CostDrift(){
       .catch(() => alive && setRows([]));
     return () => { alive = false; };
   }, []);
-  if (!rows || !rows.length) return null;
+  if (rows === null) return <V3SkeletonRows n={2}/>;   // pending, not empty
+  if (!rows.length) return null;
   const LABEL = {
     gross_margin: 'Gross margin', refund_rate: 'Refund rate', shipping: 'Shipping per order',
     packaging: 'Packaging per order', fulfilment: 'Fulfilment per order', payment_pct: 'Payment fee',
@@ -14403,7 +14451,7 @@ function CashCeiling(){
     return () => { alive = false; };
   }, []);
 
-  if (gate === undefined) return null;
+  if (gate === undefined) return <V3SkeletonRows n={3}/>;   // pending, not empty
   const missing = gate && gate.readiness !== 'ready';
   return (<div className="card" style={{marginTop:14}}>
     <div className="card-section-title"><h2 style={{margin:0}}>Can you afford the plan?</h2>
@@ -14578,7 +14626,7 @@ function V3Today(p) {
             {d.pace_is_reliable === false
               ? <>Too close to call — {v3Gbp(d.unreported_spend)} of ad spend has not come through yet</>
               : <>{diff >= 0 ? v3Gbp(Math.abs(diff)) + ' ahead of' : v3Gbp(Math.abs(diff)) + ' behind'} your monthly goal</>}
-            <span className="v3-muted"> · goal {v3Gbp(camTarget)} a month</span>
+            <span className="v3-muted v3-pace-goal"><span className="v3-sep" aria-hidden="true"> · </span>goal {v3Gbp(camTarget)} a month</span>
             {d.target_is_derived && <V3Conf state="probably"
               detail={'Nobody has confirmed a profit-after-ads goal, so Greta worked this one out by taking your ad budget off your profit target. That assumes you spend the budget in full. Confirm a goal and this becomes your own figure.'}
               fix={['home', 'plansetup', 'Open Goal & costs']}/>}

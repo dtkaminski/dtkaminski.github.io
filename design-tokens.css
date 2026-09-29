@@ -67,6 +67,8 @@
        wash   a panel tint you can put body text on
        wash-2 a pill or chip that has to separate from a tinted panel behind it
        line   the matching hairline, strong enough to read at 1px */
+  /* The shadow that tells you a table has more columns off-screen. */
+  --color-scroll-cue:     rgba(22, 21, 15, 0.13);
   --color-accent-wash-2:  rgba(194, 65, 12, 0.12);
   --color-accent-line:    rgba(194, 65, 12, 0.24);
   --color-success-wash-2: rgba(21, 128, 61, 0.12);
