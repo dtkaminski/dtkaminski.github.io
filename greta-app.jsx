@@ -11903,6 +11903,10 @@ const NAV = [
   { id:'settings',label:'Settings',     icon:'sliders', subtabs:[
     { id:'connections', label:'Connections', component: () => <ConnectionsPanel/> },
     { id:'economics',   label:'Business economics', component: () => <BusinessEconomicsPanel/> },
+    // The only place a brand can enter per-variant landed cost — unit, freight and duty. Business
+    // economics above sets the BLENDED gross margin; this sets what things actually cost, which is
+    // what moves the profit number from Estimated to Measured. Its backend was broken until 0188.
+    { id:'costs',       label:'Product costs', component: () => mosView('CostEntry') },
     { id:'team',        label:'Team',        component: () => <TeamPanel/> },
   ]},
 ];
@@ -13941,7 +13945,7 @@ function V3Today(p) {
                     : (d.cogs_gap_reason
                         ? d.cogs_gap_reason + ' Until then Greta uses the margin in your settings.'
                         : 'Worked out from the margin in your settings, not from your own product costs.')}
-                  fix={['settings', 'economics', 'Enter your costs']}/>
+                  fix={['settings', 'costs', 'Enter your product costs']}/>
         </div>
         <div className="v3-big">{v3Gbp(cam)}</div>
         {camTarget != null ? (<>
