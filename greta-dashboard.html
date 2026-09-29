@@ -1540,8 +1540,13 @@
   .v3-step-body .v3-muted { font-size: 12px; }
 
   /* Ask Greta — permanent, on every screen (Phase 2 §7) */
-  .v3-askbar { position: sticky; top: var(--appbar-h); z-index: 20; background: var(--bg-app); padding: 10px 0 12px; margin-bottom: 4px; }
-  .v3-askbar-in { display: flex; align-items: center; gap: 10px; border: 1px solid var(--accent); background: var(--bg-card); padding: 6px 8px 6px 12px; color: var(--accent); }
+  .v3-askbar { position: sticky; top: var(--appbar-h); z-index: 20; background: var(--color-panel);
+               padding: 0 0 var(--space-5); margin-bottom: 0; }
+  .v3-askbar-in { display: flex; align-items: center; gap: 10px; border: 1px solid var(--color-line);
+                  border-radius: var(--radius-md); background: var(--color-chrome);
+                  padding: 6px 8px 6px 12px; color: var(--color-faint);
+                  transition: border-color var(--transition-fast), background var(--transition-fast); }
+  .v3-askbar-in:focus-within { border-color: var(--color-accent); background: var(--color-panel); }
   .v3-askbar-in input {
     flex: 1; min-width: 0; border: 0; background: none; outline: none; min-height: 40px;
     font-family: var(--font-sans); font-size: 13.5px; color: var(--text-primary);
