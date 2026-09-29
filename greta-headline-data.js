@@ -204,6 +204,10 @@
   // exactly what happened live on 2026-09-25. Poll for the brand id like the overview
   // loader does, then build; keep listening for refreshes afterwards.
   if (typeof window !== 'undefined') {
+    // 'frkl-brand-ready' fires the moment the brand is known, BEFORE the loader's ~24-request
+    // bulk refresh. Booting there rather than waiting for the 500ms poll tick (or for the whole
+    // refresh to finish) is what keeps Today's read out of the queue behind it.
+    window.addEventListener('frkl-brand-ready', boot);
     window.addEventListener('frkl-data-updated', boot);
     var tries = 0;
     var iv = setInterval(function () {

@@ -237,6 +237,14 @@
       },
     };
 
+    // Let Today off the line FIRST. Its one read is the only thing standing between the operator
+    // and a number, and refresh() below fires ~24 requests that it would otherwise queue behind.
+    // The cached row is a 9ms query server-side, but measured through PostgREST while competing
+    // with that storm it took 585ms, 1,908ms and 3,820ms on three consecutive loads. Same query,
+    // same data — the variance is all contention. Announcing the brand before the bulk read costs
+    // nothing and gives the headline a clear runway.
+    try { window.dispatchEvent(new CustomEvent('frkl-brand-ready')); } catch (e) {}
+
     // 4. First fetch immediately, then poll
     await refresh();
     setInterval(refresh, POLL_INTERVAL_MS);
