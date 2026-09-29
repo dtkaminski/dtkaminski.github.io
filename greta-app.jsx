@@ -13057,6 +13057,9 @@ const V3_ROUTE = {
   'planning/plan': ['stock'], 'planning/suppliers': ['stock', 'suppliers'],
   'operate/calendar': ['calendar'], 'operate/command': ['actions'], 'operate/decisions': ['actions', 'decisions'],
   'settings/connections': ['settings'], 'settings/economics': ['goal'], 'settings/team': ['team'],
+  // V3 has no Settings group with subtabs, so an unmapped key silently falls through to the first
+  // 'settings/*' match — which is why the cost chip's fix button landed on Connections & data.
+  'settings/costs': ['goal', 'costs'],
 };
 function v3Route(sec, sub) {
   const k = sub ? sec + '/' + sub : sec;
@@ -14030,6 +14033,13 @@ const V3_PAGES = {
   goal: (p) => (<>
     <GretaPlanPanel show="goal"/>
     <CostDrift/>
+    {/* The only place a brand can enter per-variant landed cost. Business economics below sets the
+        BLENDED margin; this sets what things actually cost, which is what moves the profit number
+        from Estimated to Measured (0192). Open by default, because the confidence chip on Today
+        sends people straight here and a collapsed section would strand them one click short. */}
+    <V3More id="goal-costs" label="Product costs — unit, freight and duty" defaultOpen>
+      <V3Anchor id="costs"/>{mosView('CostEntry')}
+    </V3More>
     <V3More id="goal-econ" label="All your costs, cash and terms"><V3Anchor id="economics"/><BusinessEconomicsPanel/></V3More>
   </>),
   growth: (p) => (<>
