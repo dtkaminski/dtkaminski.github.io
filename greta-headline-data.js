@@ -85,6 +85,15 @@
       open_actions: h.open_actions,
       can_show_cm: rd ? rd.can_show_cm !== false : true,
       cm_source: rd ? rd.cm_source : null,
+      // What the profit number is actually built on (0192). cm_source does NOT answer this:
+      // 'fit_engine' means the engine derived margin from the CONFIGURED gross margin, not from
+      // the brand's own costs, and Today used to call that "Measured". cogs_basis is 'measured'
+      // only when realized COGS covers >=80% of revenue AND those costs include freight or duty.
+      cogs_basis: h.cogs_basis || 'blended',
+      cogs_coverage_90d: num(h.cogs_coverage_90d),
+      cogs_landed_complete: h.cogs_landed_complete === true,
+      cogs_realized_margin_pct: num(h.cogs_realized_margin_pct),
+      cogs_gap_reason: h.cogs_gap_reason || null,
       gate_message: rd ? rd.gate_message : null,
       // First-run state: what is still needed before Greta can answer properly.
       setup: {

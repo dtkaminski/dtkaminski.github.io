@@ -13929,9 +13929,19 @@ function V3Today(p) {
     ) : (
       <div className="v3-hero">
         <div className="v3-hero-lab">Profit after ads · last 30 days <V3Info k="profit_after_ads"/>
-          <V3Conf state={d.cm_source === 'fit_engine' ? 'measured' : 'estimated'}
-                  detail={d.cm_source === 'fit_engine' ? 'Calculated from your own product and order costs.' : 'Calculated from the cost figures you entered; Greta has not checked them against your own results yet.'}
-                  fix={['settings', 'economics', 'Check your costs']}/>
+          {/* The basis comes from the server (0192), not from cm_source. This chip used to read
+              cm_source === 'fit_engine' as "Measured — calculated from your own product and order
+              costs", which was exactly backwards: fit_engine means the engine derived margin from
+              the CONFIGURED gross margin and never touched the cost tables. Measured is now earned
+              — 80% of revenue costed AND those costs carrying freight or duty — and when it is not
+              earned Today says so in the brand's own numbers rather than in the abstract. */}
+          <V3Conf state={d.cogs_basis === 'measured' ? 'measured' : (d.cm_source === 'none' ? 'held' : 'estimated')}
+                  detail={d.cogs_basis === 'measured'
+                    ? 'Measured from your own product and order costs.'
+                    : (d.cogs_gap_reason
+                        ? d.cogs_gap_reason + ' Until then Greta uses the margin in your settings.'
+                        : 'Worked out from the margin in your settings, not from your own product costs.')}
+                  fix={['settings', 'economics', 'Enter your costs']}/>
         </div>
         <div className="v3-big">{v3Gbp(cam)}</div>
         {camTarget != null ? (<>
