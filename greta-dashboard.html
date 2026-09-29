@@ -1169,7 +1169,7 @@
   .v3-big-muted { color: var(--text-faint); }
   /* Thinner than the money flow below it (12px). Two full-width bars of the same weight, stacked
      and meaning different things, gave the eye no way to tell which one to read first. */
-  .v3-bar { position: relative; height: 3px; background: var(--bg-card); margin: 10px 0 7px; max-width: 520px; }
+  .v3-bar { position: relative; height: 4px; background: var(--color-sunken); margin: var(--space-4) 0 var(--space-2); max-width: 520px; }
   .v3-bar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); }
   .v3-bar b { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--text-primary); }
   .v3-pace { font-size: 13px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -1434,7 +1434,7 @@
      --font-sans on every label. Colour carries meaning and nothing else — accent for what the
      owner keeps, muted for what left the business — so the eye lands on the kept share first.
      A feed that has gone quiet is drawn hatched, so an understated bar looks understated. */
-  .v3-flow { margin-top: var(--space-4, 16px); border-top: 1px solid var(--color-line); padding-top: var(--space-3, 12px); }
+  .v3-flow { margin-top: var(--space-6); border-top: 1px solid var(--color-line); padding-top: var(--space-4); }
   .v3-flow-top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3, 12px);
                  width: 100%; background: none; border: 0; padding: 0 0 var(--space-2, 8px); cursor: pointer; text-align: left; }
   .v3-flow-top-lab { font-family: var(--font-sans); font-size: var(--text-xs, 11px); letter-spacing: .04em;
@@ -1447,10 +1447,10 @@
      at the visually heaviest end. */
   .v3-flow-track { display: flex; gap: 2px; width: 100%; height: 12px; border-radius: var(--radius-none, 0); background: var(--color-sunken, #EFEAE3); }
   .v3-flow-seg { display: block; height: 100%; transition: width var(--transition-base, .25s) ease; }
-  .v3-flow-cogs { background: var(--text-faint, #8C857C); opacity: .55; }
+  .v3-flow-cogs  { background: var(--color-line-strong); }
   .v3-flow-spend { background: var(--color-muted); }
-  .v3-flow-keep { background: var(--color-accent); }
-  .v3-flow-soft { background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.55) 0 3px, transparent 3px 6px); }
+  .v3-flow-keep  { background: var(--color-accent); }
+  .v3-flow-soft { background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.62) 0 3px, transparent 3px 6px); }
   .v3-flow-legend { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3, 12px); margin-top: var(--space-3, 12px); }
   .v3-flow-item { display: grid; grid-template-columns: auto 1fr; grid-template-areas: "dot val" "lab lab" "pct pct";
                   gap: 2px var(--space-2, 8px); align-items: center; background: none; border: 0; padding: 0;
@@ -1458,7 +1458,7 @@
   .v3-flow-item:hover { border-top-color: var(--color-line-strong, var(--color-line)); }
   .v3-flow-item:hover .v3-flow-lab { color: var(--color-ink); }
   .v3-flow-dot { grid-area: dot; width: 8px; height: 8px; display: block; }
-  .v3-flow-dot.v3-flow-cogs { opacity: .55; }
+
   .v3-flow-val { grid-area: val; font-family: var(--font-mono); font-size: var(--text-base, 15px); color: var(--color-ink); }
   .v3-flow-lab { grid-area: lab; font-family: var(--font-sans); font-size: var(--text-xs, 11px); color: var(--color-muted);
                  transition: color var(--transition-fast, .15s) ease; }
