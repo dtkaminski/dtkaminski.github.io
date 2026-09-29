@@ -85,10 +85,15 @@
     // queueing behind the ~60 other requests the page fires, not the query. With four reads a slow
     // one only degraded Today; with one it blanks it, so a single timeout must not be the end of it.
     // Each attempt gets a longer cap; three attempts cover ~50s, past the worst yet observed.
+    // First attempt is GENEROUS on purpose. A 12s cap was measured timing out on a cold read and
+    // the retry then pushed the first paint to ~50s — giving up at 12s cost far more than waiting
+    // would have. Warm the statement is ~1.4s; cold through PostgREST it can pass 12s, and there is
+    // nothing else competing for that first read, so there is no reason to be impatient with it.
+    // The client_error_log row that caught this is the whole point of reporting failures.
     var rows = null;
     for (var attempt = 0; attempt < 3 && !rows; attempt++) {
       if (attempt) await new Promise(function (r) { setTimeout(r, 1500 * attempt); });
-      rows = await safeQ(sb.from('vw_brand_today').select('*').eq('brand_id', b).limit(1), 12000 + attempt * 9000, null, 'vw_brand_today');
+      rows = await safeQ(sb.from('vw_brand_today').select('*').eq('brand_id', b).limit(1), 22000 + attempt * 9000, null, 'vw_brand_today');
     }
     var h = (rows && rows[0]) || null;
     // Say so rather than sit on an em-dash forever: Today reads this to explain itself.
