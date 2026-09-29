@@ -347,13 +347,42 @@ function leadDaysFor(type, cfg){
   const d = Number(cfg.default);
   return isFinite(d) && d>0 ? d : 30;
 }
-// Best-available gross margin: verified operator value → tenant config → catalogue → 0.6.
+// ONE contribution ratio for the whole app (2026-09-29).
+//
+// Contribution ratio = product contribution ÷ net revenue: what is left of a sale after
+// product costs AND per-order variable costs (packaging, fulfilment, shipping, payment
+// fees, returns). It is NOT brand_config.gross_margin, which stops at product cost.
+// Substituting one for the other is what made Profit & sales render £17,884 of
+// "contribution" directly beneath a money flow that said £10,456 — the same 30 days,
+// 71% apart, both labelled the same thing. frkl's two figures: 0.568 vs 0.777.
+//
+// Server-derived only, in the order the values become available:
+//   1. GRETA_HEADLINE — product_contribution_30d ÷ net_revenue_30d, i.e. the exact
+//      arithmetic Today renders, so the two screens cannot disagree by construction.
+//      Available before React mounts thanks to the localStorage seed.
+//   2. OI_CM_RATIO — vw_brand_cm.cm_ratio, published by greta-overview-data.js.
+// Returns null when neither is known. Callers MUST abstain on null: a constant here
+// (this used to be 0.6, and 0 in Overview) is an invented number wearing the brand's
+// own figures, which is the one thing the confidence ladder exists to prevent.
+function oiCmRatio(){
+  if(typeof window==='undefined') return null;
+  const h = window.GRETA_HEADLINE;
+  if(h){
+    const rev = Number(h.net_revenue_30d), prod = Number(h.product_contribution_30d);
+    if(isFinite(rev) && rev > 0 && isFinite(prod) && prod !== 0) return prod / rev;
+  }
+  const r = Number(window.OI_CM_RATIO);
+  return (isFinite(r) && r > 0) ? r : null;
+}
+// Blended GROSS margin (revenue − product cost), for the few places that genuinely mean
+// gross and not contribution. Verified operator value → tenant config → catalogue → null.
+// The 0.6 fallback was removed on 2026-09-29: an unknown margin must read as unknown.
 function oiGrossMargin(){
   const u = userGrossMargin(); if(u!=null) return u;
   if(typeof window!=='undefined' && window.OI_CONFIG && window.OI_CONFIG.grossMargin) return window.OI_CONFIG.grossMargin;
   const meta = (typeof window!=='undefined' && window.FRKL_PRODUCTS_META) || {};
   if(meta.grossMargin) return meta.grossMargin;
-  return 0.6;
+  return null;
 }
 // Re-render hook: any component showing a margin number can subscribe so badges
 // + figures update the instant costs are saved.
@@ -2450,6 +2479,16 @@ function computeScores(m){
   const wsum = f.reduce((a,x)=>a+x.w,0) || 1;
   const health = Math.round(100 * f.reduce((a,x)=>a+x.s*x.w,0)/wsum);
   const weakest = [...f].sort((a,b)=>a.s-b.s).slice(0,2);
+  // A score built on half the factors is not the same score, and must not be shown as one.
+  // Before 2026-09-29 a brand that had not entered costs got cmPct = -adSpend/revenue and
+  // ltvCac = 0, which drove 50% of the weight to zero and read as "under real strain" --
+  // the product marking the operator down for a question it had not asked them yet.
+  // Those inputs are null now, `add` skips them, and this reports the hole instead.
+  const missing = [
+    m.cmRatio==null ? 'your product and order costs' : null,
+    (m.cac==null && m.paid>0) ? 'how many customers were new' : null,
+  ].filter(Boolean);
+  const coverage = Math.round(100 * wsum / 1.00);
 
   const gates = [
     {k:'cost per new customer below allowable', pass:(m.cac!=null&&m.allowableCac!=null)? m.cac<=m.allowableCac : null},
@@ -2464,7 +2503,7 @@ function computeScores(m){
   const scale = Math.round(100*passed/(gates.length||1));
   const fails = gates.filter(g=>!g.pass).map(g=>g.k);
 
-  const signals = []; let band = 'Insufficient history';
+  const signals = []; let band = (m.cmRatio==null) ? 'Insufficient history' : 'Insufficient history';
   if(m.pRev!=null && m.pContrib!=null){
     const revUp = m.rev > m.pRev*1.02, revDown = m.rev < m.pRev*0.98;
     const contribUp = m.contrib > m.pContrib;
@@ -2489,9 +2528,10 @@ function computeScores(m){
   const passed2 = gates.filter(g=>g.pass).length;
   const scale2 = Math.round(100*passed2/(gates.length||1));
   return {
-    health:{score:health, band: health>=75?'Strong':health>=55?'Healthy':'Needs work', weakest},
+    health:{score:health, band: health>=75?'Strong':health>=55?'Healthy':'Needs work', weakest, coverage},
     scale:{score:scale2, band: scale2>=80?'Ready to scale':scale2>=55?'Conditional':'Not yet', fails, gates:gates.length},
     growth:{band, signals},
+    missing,
   };
 }
 // Hover explainer for a single Crux score — plain-English so a non-expert grasps
@@ -2533,6 +2573,9 @@ function ScoresStrip({metrics, windowLabel}){
   }
   const s = computeScores(metrics);
   const [open, setOpen] = React.useState(false);
+  // Scored on a subset? Say so where the numbers are, not in a tooltip. An owner reading
+  // "Health 62" has no way to know it was averaged over six factors instead of eight.
+  const partial = s.missing && s.missing.length > 0;
   const tone = v => v>=75?'var(--good)':v>=55?'var(--warn)':'var(--bad)';
   const gTone = b => (b==='Healthy growth'||b==='Efficient consolidation')?'var(--good)':(b==='Low-quality growth'||b==='Contracting')?'var(--bad)':'var(--text-muted)';
   const w0 = s.health.weakest[0];
@@ -2551,6 +2594,7 @@ function ScoresStrip({metrics, windowLabel}){
   return (<div style={{padding:'10px 12px',borderRadius:'var(--r-md)',background:'rgba(255,255,255,0.02)',border:'1px solid var(--border-subtle)',marginBottom:12}}>
     <div style={{display:'flex',alignItems:'center',gap:16,flexWrap:'wrap',fontSize:12,color:'var(--text-secondary)'}}>
       <span style={{textTransform:'uppercase',letterSpacing:'.05em',fontSize:10,color:'var(--text-faint)'}}>Business vitals{windowLabel?<span style={{textTransform:'none',letterSpacing:0,color:'var(--text-faint)',fontWeight:400}}> · {windowLabel} · independent of the date picker</span>:null}</span>
+      {partial && <span style={{fontSize:11,color:'var(--warn)',fontWeight:600}}>Partly scored — missing {s.missing.join(' and ')}</span>}
       <ScoreTip title="Health — is the engine sound?" lines={[
           "A 0–100 blend of your profit margins, ad efficiency, conversion rate, returns and discount discipline. Answers: are the fundamentals healthy?",
           "75+ strong · 55–74 okay · under 55 needs work.",
@@ -3389,20 +3433,30 @@ function Overview({start, period, customActive}){
   const _rbm = B.retentionByMonth || [];
   const _ret = _rbm.reduce((a,m)=>a+(m.ret||0),0), _tot = _rbm.reduce((a,m)=>a+(m.total||0),0);
   const returningPct = _tot>0 ? _ret/_tot : null;
-  // Contribution margin (after marketing): gross profit (net rev × blended product
-  // margin) − paid ad spend. COGS-based; excludes shipping/payment fees/returns
-  // until those inputs land. Windowed via rev/paid; prior-period comparable.
-  // Per-tenant config gross margin wins when present (set by the authenticated boot); else live catalogue margin.
-  // Prefer the operator's verified gross margin; else tenant config; else live catalogue margin.
-  const gm = userGrossMargin() != null ? userGrossMargin()
-    : (((typeof window!=='undefined' && window.OI_CONFIG && window.OI_CONFIG.grossMargin) || grossMargin) || 0);
-  const cogs = rev * (1 - gm);
-  const grossProfit = rev * gm;
-  const contrib = grossProfit - paid;
-  const cmPct = rev>0 ? contrib/rev : null;
-  const poas = paid>0 ? grossProfit/paid : null;   // profit on ad spend (gross profit ÷ spend); break-even 1.0
-  const pContrib = (havePrior && pRev!=null && pPaid!=null) ? (pRev*gm - pPaid) : null;
-  const seriesContrib = daily.map(d=>({d:d.dlabel, v: +((d.revenue*gm) - d.paid).toFixed(0)}));
+  // Contribution after marketing, on the SERVER's contribution ratio (2026-09-29).
+  //
+  // This block used to read brand_config.gross_margin and call the result "contribution".
+  // Gross margin stops at product cost; contribution also carries packaging, fulfilment,
+  // shipping, payment fees and returns. On frkl that is 0.777 against a true 0.568, so
+  // this page rendered £17,884 of contribution immediately beneath a V3MoneyFlow reading
+  // £10,456 from the same 30 days — two numbers, one screen, 71% apart, both called
+  // contribution. oiCmRatio() is derived from the row Today renders, so the 30-day figures
+  // now reconcile exactly and every other window shares their basis.
+  //
+  // null means unknown, and unknown must stay unknown: the old `|| 0` turned a missing
+  // margin into contribution = −ad spend, which then scored the brand badly in Business
+  // vitals for not having told us its costs. Every derived figure below is null-guarded
+  // and the strip says what is missing instead of inventing a number.
+  const cmr = oiCmRatio();
+  const gmGross = oiGrossMargin();                 // genuinely gross, for the COGS line only
+  const gm = cmr;                                  // every "contribution" figure on this page
+  const cogs = (gmGross!=null) ? rev * (1 - gmGross) : null;
+  const grossProfit = (gm!=null) ? rev * gm : null;
+  const contrib = (gm!=null) ? grossProfit - paid : null;
+  const cmPct = (contrib!=null && rev>0) ? contrib/rev : null;
+  const poas = (grossProfit!=null && paid>0) ? grossProfit/paid : null;   // profit on ad spend; break-even 1.0
+  const pContrib = (gm!=null && havePrior && pRev!=null && pPaid!=null) ? (pRev*gm - pPaid) : null;
+  const seriesContrib = (gm!=null) ? daily.map(d=>({d:d.dlabel, v: +((d.revenue*gm) - d.paid).toFixed(0)})) : [];
   // LTV / CAC (estimates): repeat behaviour from retentionByMonth, windowed spend + AOV.
   const _new = _rbm.reduce((a,m)=>a+(m.new||0),0);
   const ordersPerCust = _new>0 ? _tot/_new : null;               // orders per acquired customer
@@ -3417,7 +3471,7 @@ function Overview({start, period, customActive}){
   // Real series wherever the data supports one; gross margin is a structural
   // catalogue constant so its line is deliberately flat (stability, not a bug).
   const seriesDiscVal = daily.map(d=>({d:d.dlabel, v:+((d.discounts||0)).toFixed(0)}));
-  const seriesGM      = (gm? daily.map(d=>({d:d.dlabel, v:+(gm*100).toFixed(1)})) : null);
+  const seriesGM      = (gmGross? daily.map(d=>({d:d.dlabel, v:+(gmGross*100).toFixed(1)})) : null);
   const seriesCAC     = (ordersPerCust>0) ? daily.map(d=>({d:d.dlabel, v: d.orders>0 ? +((d.paid*ordersPerCust)/d.orders).toFixed(0) : 0})) : null;
   const seriesLTV     = (ordersPerCust>0 && gm) ? daily.map(d=>({d:d.dlabel, v: d.orders>0 ? +((d.revenue/d.orders)*gm*ordersPerCust).toFixed(0) : 0})) : null;
   const seriesReturn  = shop.map(r=>({d:(r.date||'').slice(5), v: r.totalSales>0 ? +(100*(r.returns||0)/r.totalSales).toFixed(2) : 0}));
@@ -3437,14 +3491,18 @@ function Overview({start, period, customActive}){
   // Variable cost rate from the contribution card's saved inputs (per-order + %).
   const _ci = (()=>{ try { return {packaging:'0.50',fulfilment:'2.00',shipping:'3.50',payPct:'1.5',payFixed:'0.25',refundPct:'7.4', ...(JSON.parse(localStorage.getItem('frkl-contrib-inputs')||'{}'))}; } catch(e){ return {}; } })();
   const _cn = k => { const f=parseFloat(String(_ci[k]==null?'':_ci[k]).replace(',','.').replace(/[^0-9.]/g,'')); return isFinite(f)?f:0; };
-  const varCostRate = aov>0 ? ((_cn('packaging')+_cn('fulfilment')+_cn('shipping')+_cn('payFixed'))/aov + _cn('payPct')/100 + _cn('refundPct')/100) : 0;
-  const cmRateBeforeMkt = Math.max(0.01, gm - varCostRate);                 // per-order contribution margin, pre-marketing
-  const breakEvenRoas = 1/cmRateBeforeMkt;                                   // revenue ÷ spend to break even on an order
+  // cmr already nets off packaging, fulfilment, shipping, payment fees and returns — it is
+  // the per-order contribution rate. The old line took gross margin and subtracted a
+  // localStorage estimate of those same costs (varCostRate, removed with it): keeping that
+  // on top of cmr would charge them twice. The costs card still shows the operator that
+  // breakdown from its own inputs; this page no longer needs to recompute it.
+  const cmRateBeforeMkt = cmr;                                               // per-order contribution margin, pre-marketing
+  const breakEvenRoas = (cmr!=null && cmr>0) ? 1/cmr : null;                 // revenue ÷ spend to break even on an order
   const TARGET_LTVCAC = 3;
   const allowableCac = ltv!=null ? ltv/TARGET_LTVCAC : null;                 // max CAC that still clears 3× LTV:CAC
-  const firstOrderContrib = aov!=null ? aov*cmRateBeforeMkt : null;
+  const firstOrderContrib = (aov!=null && cmRateBeforeMkt!=null) ? aov*cmRateBeforeMkt : null;
   const paybackOrders = (cac!=null && firstOrderContrib>0) ? cac/firstOrderContrib : null;  // orders to recover CAC
-  const dxMetrics = {rev, orders, sessions, cvr, pCvr, paid, mer, pMer, poas, cac, pCac, ltv, ltvCac, gm, contrib, pContrib, cmPct, returnRate, discLoad, pDiscLoad, returningPct, pRev,
+  const dxMetrics = {rev, orders, sessions, cvr, pCvr, paid, mer, pMer, poas, cac, pCac, ltv, ltvCac, gm:gmGross, cmRatio:cmr, contrib, pContrib, cmPct, returnRate, discLoad, pDiscLoad, returningPct, pRev,
                      aov, breakEvenRoas, allowableCac, paybackOrders, cmRateBeforeMkt,
                      pSessions, pOrders, pPaid, havePrior};
   // ── Crux scorecard = stable business "vitals" on a FIXED trailing window, NOT the
@@ -3462,12 +3520,13 @@ function Overview({start, period, customActive}){
     const pr=sum(pS,'netSales'), po=sum(pS,'orders'), pses=sum(pA,'sessions'), ppd=sum(pM,'cost')+sum(pG,'cost'), pgs=sum(pS,'totalSales'), pda=sum(pS,'discounts');
     const _aov=o>0?r/o:null, _nc=ordersPerCust?o/ordersPerCust:null, _cac=(_nc&&_nc>0)?pd/_nc:null;
     const _pnc=ordersPerCust&&po?po/ordersPerCust:null, _pcac=(_pnc&&_pnc>0)?ppd/_pnc:null;
-    const _ltv=(_aov!=null&&ordersPerCust!=null)?_aov*gm*ordersPerCust:null, _contrib=r*gm-pd;
-    const _vcr=_aov>0?((_cn('packaging')+_cn('fulfilment')+_cn('shipping')+_cn('payFixed'))/_aov + _cn('payPct')/100 + _cn('refundPct')/100):0;
-    const _cmr=Math.max(0.01, gm-_vcr), _beroas=1/_cmr, _foc=_aov!=null?_aov*_cmr:null;
+    const _ltv=(_aov!=null&&ordersPerCust!=null&&gm!=null)?_aov*gm*ordersPerCust:null;
+    const _contrib=(gm!=null)?r*gm-pd:null;
+    const _cmr=gm, _beroas=(gm!=null&&gm>0)?1/gm:null, _foc=(_aov!=null&&_cmr!=null)?_aov*_cmr:null;
     return {rev:r, orders:o, sessions:ses, paid:pd, cvr:ses>0?o/ses:null, pCvr:pses>0?po/pses:null,
             mer:pd>0?r/pd:null, cac:_cac, pCac:_pcac, ltv:_ltv, ltvCac:(_ltv!=null&&_cac)?_ltv/_cac:null,
-            gm, contrib:_contrib, pContrib:pr*gm-ppd, cmPct:r>0?_contrib/r:null, returnRate,
+            gm:gmGross, cmRatio:gm, contrib:_contrib, pContrib:(gm!=null)?pr*gm-ppd:null,
+            cmPct:(_contrib!=null&&r>0)?_contrib/r:null, returnRate,
             discLoad:gs>0?da/gs:null, pDiscLoad:pgs>0?pda/pgs:null, pRev:pr,
             aov:_aov, breakEvenRoas:_beroas, allowableCac:_ltv!=null?_ltv/TARGET_LTVCAC:null,
             paybackOrders:(_cac!=null&&_foc>0)?_cac/_foc:null, cmRateBeforeMkt:_cmr, havePrior:pS.length>0};
@@ -4997,8 +5056,11 @@ function computeProductSignals(){
   const PR = (typeof window!=='undefined' && window.FRKL_PRODUCTS) || [];
   const META = (typeof window!=='undefined' && window.FRKL_PRODUCTS_META) || {};
   if(!PR.length) return null;
-  const gm = userGrossMargin() != null ? userGrossMargin()
-    : (((typeof window!=='undefined' && window.OI_CONFIG && window.OI_CONFIG.grossMargin) || META.grossMargin || 0.6));
+  // Every £ this engine emits is a contribution figure, so it prices on the server's
+  // contribution ratio. The old `|| 0.6` invented a margin for any brand without config
+  // and then ranked its products by the money that invention produced.
+  const gm = oiCmRatio();
+  if(gm == null) return null;
   const monthly = 30 / (META.windowDays || 90);
   const totV = PR.reduce((a,p)=>a+p.views,0) || 1;
   const totAtc = PR.reduce((a,p)=>a+p.atc,0), totPur = PR.reduce((a,p)=>a+p.purchases,0);
@@ -8547,7 +8609,13 @@ function CohortsPanel(){
   if(!C || !C.totalCustomers){
     return (<div className="card"><h2>Acquisition cohorts</h2><div className="muted">No customer-level order history yet — connect Shopify to build cohorts.</div></div>);
   }
-  const gm = oiGrossMargin();
+  const gm = oiCmRatio();
+  if(gm == null){
+    return (<div className="card"><h2>Acquisition cohorts</h2><div className="muted">
+      Greta can show what each customer is worth once it knows what your products and orders cost you — lifetime value is revenue × your margin, and guessing the margin would make every figure here wrong.
+      <button type="button" className="v3-btn v3-btn-sm" style={{marginLeft:8}} onClick={()=>window.__oiNav && window.__oiNav('settings','costs')}>Enter your costs</button>
+    </div></div>);
+  }
   const lifetimeRev = C.lifetimeRevPerCust, firstOrderRev = C.firstOrderRevPerCust;
   const firstShare = lifetimeRev>0 ? firstOrderRev/lifetimeRev : null;
   const contribLTV = lifetimeRev * gm;
@@ -9105,7 +9173,8 @@ function ProductRetentionMatrix(){
   const C = (typeof window!=='undefined' && window.FRKL_COHORTS) || null;
   const M = (C && C.productMatrix) || [];
   if(!M.length) return null;
-  const gm = oiGrossMargin();
+  const gm = oiCmRatio();
+  if(gm == null) return null;
   const brandRep = (C.brandRepeatRate || 0) * 100;
   const acqSorted = M.map(p=>p.acquired).sort((a,b)=>a-b);
   const medAcq = acqSorted[Math.floor(acqSorted.length/2)] || 0;
@@ -9471,7 +9540,13 @@ function V3ChannelScoreboard(){
 
   if (err) return <div className="v3-empty">Greta could not load your channel scoreboard just now — refreshing usually sorts it.</div>;
   if (rows === null) return <V3SkeletonRows n={4}/>;
-  if (!rows.length) return null;
+  if (!rows.length) return (
+    <div className="v3-score v3-enter">
+      <div className="v3-score-head"><h2 className="v3-score-title">Which channels earn their money</h2></div>
+      <p className="v3-note">No channel has spent anything in the last 30 days, so there is nothing to rank yet.
+        Once a channel is running, this compares what each one returns against what it needs to return to
+        break even on your margin — and that comparison is the fastest read on this page.</p>
+    </div>);
 
   const nice = (p, c) => String(c || p || '').replace(/_/g, ' ').replace(/^(meta|google|tiktok)\s*/i, '').trim() || p;
   const scale = Math.max(...rows.map(r => Math.max(Number(r.avg_iroas) || 0, Number(r.target_marginal_iroas) || 0)), 1) * 1.15;
@@ -9582,7 +9657,7 @@ function BusinessReview(){
   const P = (typeof window!=='undefined' && window.FRKL_PATTERNS) || {};
   const C = (typeof window!=='undefined' && window.FRKL_COHORTS) || {};
   const B = (typeof window!=='undefined' && window.FRKL_BUSINESS) || {};
-  const gm = oiGrossMargin();
+  const gm = oiCmRatio();          // contribution ratio: every figure below it is a profit figure
   const cc0 = cashConfig();
   const [cashOpen, setCashOpen] = useState(false);
   const [cashDraft, setCashDraft] = useState(cc0.cash||'');
@@ -13578,10 +13653,30 @@ function V3Figure({ children, label, window: win, inputs, note, basis, fix }) {
 // solid, so "this bar is smaller than the truth" is visible rather than only readable.
 function V3MoneyFlow({ d, note }) {
   const sales = Number(d.net_revenue_30d) || 0;
-  const prod  = Number(d.product_contribution_30d) || 0;
   const spend = Number(d.paid_spend_30d) || 0;
-  const kept  = Number(d.cm_after_marketing_30d) || 0;
   if (sales <= 0) return null;
+  // `|| 0` on the two profit figures turned "we do not know" into "you keep nothing".
+  // A brand that has not entered costs was shown a flow reading "£0 · What you keep",
+  // which is a false statement about their business rather than a missing input. Unknown
+  // gets said, and gets the one button that resolves it.
+  const prodRaw = d.product_contribution_30d, keptRaw = d.cm_after_marketing_30d;
+  if (prodRaw == null || keptRaw == null) {
+    return (
+      <div className="v3-flow">
+        <div className="v3-flow-top">
+          <span className="v3-flow-top-lab">Every £100 of sales{note ? ' · ' + note : ''}</span>
+          <span className="v3-flow-top-val">{v3Gbp(sales)} in</span>
+        </div>
+        <p className="v3-note">{v3Gbp(spend)} of that went on ads. Greta cannot yet show what you keep,
+          because it does not know what your products and orders cost you — and a guess here would be
+          wrong by whatever your real margin is.</p>
+        <div className="v3-btns">
+          <button type="button" className="v3-btn v3-btn-p v3-btn-sm"
+                  onClick={() => window.__oiNav && window.__oiNav('settings', 'costs')}>Enter your costs</button>
+        </div>
+      </div>);
+  }
+  const prod = Number(prodRaw), kept = Number(keptRaw);
   const cogs = Math.max(sales - prod, 0);
   const pct  = (v) => Math.max(0, Math.min(100, (v / sales) * 100));
   const go   = (sec, sub) => () => window.__oiNav && window.__oiNav(sec, sub);
@@ -14046,7 +14141,20 @@ function CreativeReallocation(){
 function ProductTrafficMisallocation(){
   const d = useOneRow('vw_product_traffic_misallocation',
     'n_worse, n_better, worse_views, worse_traffic_share, worse_cvr, better_cvr, worse_atc_rate, better_atc_rate, implied_extra_purchases_upper, implied_contribution_upper, failing_step');
-  if (d === undefined || !d || !Number(d.worse_views)) return null;
+  // Leads the Products page, so it cannot silently disappear: a page that opens on a
+  // raw table has not answered its own question ("which products earn, and which leak?").
+  // undefined is still loading; a clean result is a real finding and gets said out loud,
+  // because "we checked and found nothing" and "we never looked" must not look the same.
+  if (d === undefined) return <V3SkeletonRows n={2}/>;
+  if (!d || !Number(d.worse_views)) return (
+    <div className="card">
+      <div className="card-section-title"><h2 style={{margin:0}}>Where your visitors land</h2></div>
+      <div style={{fontSize:13.5, lineHeight:1.6, marginTop:8}}>
+        Checked, and nothing to move: your traffic is not concentrated on products that convert worse
+        than the rest of the range. Growth here has to come from the products themselves or from more
+        visitors, not from redirecting the visitors you already have.
+      </div>
+    </div>);
   const pct = v => v == null ? '—' : (Number(v) * 100).toFixed(1) + '%';
   const step = String(d.failing_step || '').replace(/_/g, ' ');
   const stepPlain = step === 'add to cart' ? 'shoppers look but do not add to the basket'
@@ -14376,14 +14484,26 @@ function V3Today(p) {
 
   return (<div className="v3-today">
     <V3Setup s={d.setup}/>
-    {gate ? (
+    {gate ? (() => {
+      // The gate has TWO reasons and used to give one answer. 0202 made can_show_cm
+      // require revenue as well as a margin source, which is right -- but this branch
+      // still said "enter what your products cost you" to a brand whose shop Greta
+      // cannot see, where entering costs fixes precisely nothing. Ask for the thing
+      // that is actually missing, and ask for sales first: costs on top of no sales
+      // still gets you no profit figure.
+      const noSales = d.setup && d.setup.has_revenue === false;
+      return (
       <div className="v3-hero">
         <div className="v3-hero-lab">Profit after ads · last 30 days <V3Info k="profit_after_ads"/></div>
         <div className="v3-big v3-big-muted">—</div>
-        <div className="v3-sub">Enter what your products and orders cost you, and Greta can show profit and rank your actions by pounds.</div>
-        <div className="v3-btns"><button type="button" className="v3-btn v3-btn-p" onClick={() => window.__oiNav && window.__oiNav('settings', 'economics')}>Enter your costs</button></div>
-      </div>
-    ) : (
+        <div className="v3-sub">{noSales
+          ? 'Greta cannot see any sales in the last 30 days. If you have been trading, the shop connection has probably dropped — reconnecting takes about a minute and your history comes back with it.'
+          : 'Enter what your products and orders cost you, and Greta can show profit and rank your actions by pounds.'}</div>
+        <div className="v3-btns">{noSales
+          ? <button type="button" className="v3-btn v3-btn-p" onClick={() => window.__oiNav && window.__oiNav('settings', 'connections')}>Check your connections</button>
+          : <button type="button" className="v3-btn v3-btn-p" onClick={() => window.__oiNav && window.__oiNav('settings', 'economics')}>Enter your costs</button>}</div>
+      </div>);
+    })() : (
       <div className="v3-hero">
         <div className="v3-hero-lab">Profit after ads · last 30 days <V3Info k="profit_after_ads"/>
           {/* The basis comes from the server (0192), not from cm_source. This chip used to read
@@ -14392,7 +14512,11 @@ function V3Today(p) {
               the CONFIGURED gross margin and never touched the cost tables. Measured is now earned
               — 80% of revenue costed AND those costs carrying freight or duty — and when it is not
               earned Today says so in the brand's own numbers rather than in the abstract. */}
-          <V3Conf state={d.cm_source === 'none' ? 'held' : (d.trust_level || 'probably')}
+          {/* A confidence badge on an em-dash is worse than no badge: it says Greta is
+              fairly sure of a number it has not got. 0202 makes this unreachable through
+              the readiness gate, but the rule belongs next to the render too -- no figure,
+              no claim about the figure. */}
+          <V3Conf state={(cam == null || d.cm_source === 'none') ? 'held' : (d.trust_level || 'probably')}
                   detail={v3TrustWhy(d)}
                   fix={d.spend_is_stale
                     ? ['settings', 'connections', 'Reconnect ' + (d.stale_feeds ? String(d.stale_feeds).split(' since')[0] : 'your ads')]
@@ -14600,6 +14724,44 @@ function useV3NavSignals() {
   return sig;
 }
 
+// The one number the whole product is about, carried onto every other page.
+//
+// The 16 destinations each answer a good question, but once you leave Today nothing
+// on screen says what you are trying to move. An operator reading channel iROAS or
+// stock cover is three clicks from the profit figure those numbers exist to change,
+// and has to remember it. That is the difference between a tour of dashboards and a
+// journey through one business.
+//
+// So: profit after ads and the pace sentence, in one line, on every page but Today
+// (where the hero already says it) -- same values, same formatter and same wording
+// as V3Today, read from the same GRETA_HEADLINE row, so the thread can never say
+// something the hero does not. Click it to go back to the top of the story.
+function V3Thread({ dest, go }) {
+  const h = useV3Headline();
+  if (!h || dest === 'today') return null;
+  if (h.can_show_cm === false) return null;
+  const cam = h.cm_after_marketing_30d;
+  if (cam == null) return null;
+  const target = h.cam_target_monthly;
+  const diff = target != null ? cam - target : null;
+  const unreliable = h.pace_is_reliable === false;
+  return (
+    <button type="button" className="v3-thread" onClick={() => go('today')}
+            title="Back to Today">
+      <span className="v3-thread-lab">Profit after ads</span>
+      <span className="v3-thread-val">{v3Gbp(cam)}</span>
+      <span className="v3-muted">last 30 days</span>
+      {diff != null && (
+        <span className={'v3-thread-pace' + (unreliable ? '' : diff >= 0 ? ' good' : ' bad')}>
+          {unreliable
+            ? 'pace too close to call'
+            : (diff >= 0 ? v3Gbp(Math.abs(diff)) + ' ahead' : v3Gbp(Math.abs(diff)) + ' behind')}
+        </span>
+      )}
+    </button>
+  );
+}
+
 function V3App({ dest, go, children, start, periodCtl }) {
   const d = V3_BY_ID[dest] || V3_NAV[0];
   const sig = useV3NavSignals();
@@ -14633,6 +14795,7 @@ function V3App({ dest, go, children, start, periodCtl }) {
             </div>
             {V3_PERIOD_PAGES.indexOf(dest) >= 0 ? periodCtl : null}
           </div>
+          <V3Thread dest={dest} go={go}/>
         </header>
         <BrandAgeBanner/>
         <MarginNudge/>

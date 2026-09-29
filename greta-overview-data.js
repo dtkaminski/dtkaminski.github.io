@@ -26,7 +26,7 @@
 
   var n = function (x) { return Number(x || 0); };
   var f0 = function (x) { return Math.round(x); };
-  var gbp = function (x) { return '£' + f0(x).toLocaleString('en-GB'); };
+  var gbp = function (x) { return x == null ? '—' : '£' + f0(x).toLocaleString('en-GB'); };
   var cmk = function (v) { return '£' + (Math.abs(v) >= 1000 ? (v / 1000).toFixed(1) + 'k' : String(f0(v))); };
   function trim(s, m) { s = String(s || ''); return s.length > m ? s.slice(0, m - 1) + '…' : s; }
   function maxDate(a, k) { var m = null, i; for (i = 0; i < (a || []).length; i++) { var d = a[i][k]; if (d && (!m || d > m)) m = d; } return m; }
@@ -76,7 +76,12 @@
     var cmRow = Array.isArray(r[0]) ? r[0][0] : r[0];
     var econRow = Array.isArray(r[1]) ? r[1][0] : r[1];
     var aovRow = Array.isArray(r[15]) ? r[15][0] : r[15];
-    return { cmRatio: (cmRow && cmRow.cm_ratio) || 0.6, aov: (aovRow && aovRow.aov) || 55, econ: econRow || {}, iroas: r[2] || [], tgts: r[3] || [], nvr: r[4] || [], items: r[5] || [], board: r[6] || [], effect: r[7] || [], optimum: r[8] || [], email: (Array.isArray(r[9]) ? r[9][0] : r[9]) || null, goal: (Array.isArray(r[10]) ? r[10][0] : r[10]) || null, forecast: r[11] || [], config: (Array.isArray(r[12]) ? r[12][0] : r[12]) || null, cac: (Array.isArray(r[13]) ? r[13][0] : r[13]) || null, tier: (Array.isArray(r[14]) ? r[14][0] : r[14]) || null };
+    // 2026-09-29: `|| 0.6` and `|| 55` were silent constants presented as the brand's own
+    // figures -- and `||` also fired on a legitimate 0. Both are null now; the tiers below
+    // abstain rather than publish an invented margin, and window.OI_CM_RATIO is the single
+    // value greta-app.jsx's oiCmRatio() falls back to when the headline has not landed yet.
+    return { cmRatio: (cmRow && cmRow.cm_ratio != null) ? Number(cmRow.cm_ratio) : null,
+             aov: (aovRow && aovRow.aov != null) ? Number(aovRow.aov) : null, econ: econRow || {}, iroas: r[2] || [], tgts: r[3] || [], nvr: r[4] || [], items: r[5] || [], board: r[6] || [], effect: r[7] || [], optimum: r[8] || [], email: (Array.isArray(r[9]) ? r[9][0] : r[9]) || null, goal: (Array.isArray(r[10]) ? r[10][0] : r[10]) || null, forecast: r[11] || [], config: (Array.isArray(r[12]) ? r[12][0] : r[12]) || null, cac: (Array.isArray(r[13]) ? r[13][0] : r[13]) || null, tier: (Array.isArray(r[14]) ? r[14][0] : r[14]) || null };
   }
 
   function topSellers(items, s, e) {
@@ -152,8 +157,13 @@
     var metaSp = sumR(D.metaDaily || [], 'date', w.cs, w.ce, function (r) { return n(r.cost); });
     var googleSp = sumR(D.googleAds || [], 'date', w.cs, w.ce, function (r) { return n(r.cost); });
     var spend = metaSp + googleSp;
-    var productCM = S.cmRatio * rev, productCMp = S.cmRatio * revP, CAM = productCM - spend;
-    var fixedMonthly = n(S.config && S.config.fixed_costs_monthly), fixedWin = fixedMonthly * (days / 30), opProfit = CAM - fixedWin;
+    // cmRatio is null until the server knows it. Null propagates: every profit figure below
+    // renders as "— needs your costs" rather than as a number built on a house default.
+    var cmR = (S.cmRatio != null && S.cmRatio > 0) ? S.cmRatio : null;
+    var productCM = cmR != null ? cmR * rev : null, productCMp = cmR != null ? cmR * revP : null;
+    var CAM = productCM != null ? productCM - spend : null;
+    var fixedMonthly = n(S.config && S.config.fixed_costs_monthly), fixedWin = fixedMonthly * (days / 30);
+    var opProfit = CAM != null ? CAM - fixedWin : null;
     var mer = spend > 0 ? rev / spend : null;
     var cvr = sess > 0 ? ord / sess * 100 : null, cvrP = sessP > 0 ? ordP / sessP * 100 : null;
     var discRate = rev > 0 ? disc / rev * 100 : 0, retRate = rev > 0 ? ret / rev * 100 : 0;
@@ -189,8 +199,9 @@
     var sp30 = sumR(D.metaDaily || [], 'date', m30.cs, m30.ce, function (r) { return n(r.cost); }) + sumR(D.googleAds || [], 'date', m30.cs, m30.ce, function (r) { return n(r.cost); });
     var spendReconcile = sp30 > 0 ? Math.abs(ch.channelSpend - sp30) / sp30 : 0;
     var hero = heroFromBoard(S.board, heroDerived({ revenue: r30, discounts: d30, discRate: r30 > 0 ? d30 / r30 * 100 : 0, sessions: s30, aov: o30 > 0 ? r30 / o30 : 0, cvr: s30 > 0 ? o30 / s30 * 100 : null }, ch.rows, S.cmRatio));
-    var productCM30 = S.cmRatio * r30, CAM30 = productCM30 - sp30, breakEvenTxt = ch.breakEven != null ? ch.breakEven.toFixed(2) : '—';
-    var numsB = 'Revenue ' + (delta(rev, revP) == null ? '—' : (delta(rev, revP) >= 0 ? 'up ' : 'down ') + Math.abs(delta(rev, revP)).toFixed(0) + '%') + ', CVR ' + (cvr == null ? '—' : cvr.toFixed(2) + '% vs ' + CVR_BENCH + '%') + '; product CM ' + gbp(productCM) + ' → CAM ' + gbp(CAM) + ' after ' + gbp(spend) + ' spend.';
+    var productCM30 = cmR != null ? cmR * r30 : null, CAM30 = productCM30 != null ? productCM30 - sp30 : null;
+    var breakEvenTxt = ch.breakEven != null ? ch.breakEven.toFixed(2) : '—';
+    var numsB = 'Revenue ' + (delta(rev, revP) == null ? '—' : (delta(rev, revP) >= 0 ? 'up ' : 'down ') + Math.abs(delta(rev, revP)).toFixed(0) + '%') + ', CVR ' + (cvr == null ? '—' : cvr.toFixed(2) + '% vs ' + CVR_BENCH + '%') + (cmR == null ? '; profit not shown — product and order costs not set.' : '; product CM ' + gbp(productCM) + ' → CAM ' + gbp(CAM) + ' after ' + gbp(spend) + ' spend.');
     var numsC = 'New ' + splitNew + '% / returning ' + (100 - splitNew).toFixed(0) + '% of L1 revenue (' + gbp(newRev) + ' / ' + gbp(retRev) + '); repeat ' + repeat + '%.';
     var numsCh = 'Trailing 30d · break-even iROAS ' + breakEvenTxt + '; paid contribution ' + gbp(ch.paidContribution) + '; channel spend ' + gbp(ch.channelSpend) + ' vs L1 ' + gbp(sp30) + (spendReconcile > 0.10 ? ' ⚠' : ' ✓') + '.';
     var pacing = (function () {
@@ -234,12 +245,12 @@
       pacing: pacing,
       cacBlock: cacBlock,
       periodLabel: LBL[tf][0] + ' · ' + w.cs + ' – ' + w.ce, compareLabel: LBL[tf][1],
-      hero: { cmAfterMkt: CAM, cm: productCM, cmPct: +(S.cmRatio * 100).toFixed(1), spend: spend, opProfit: opProfit, fixedMonthly: fixedMonthly, targetEstimated: !(S.goal && S.goal.confirmed === true), action: hero },
+      hero: { cmAfterMkt: CAM, cm: productCM, cmPct: cmR != null ? +(cmR * 100).toFixed(1) : null, cmKnown: cmR != null, spend: spend, opProfit: opProfit, fixedMonthly: fixedMonthly, targetEstimated: !(S.goal && S.goal.confirmed === true), action: hero },
       business: [
         tile('Revenue', rev, 'gbp', delta(rev, revP), 'vs ' + gbp(revP), ragTrend(delta(rev, revP)), 'Shopify truth (L1)', _revSeries),
-        tile('Contribution (product)', productCM, 'gbp', delta(productCM, productCMp), '= rev × ' + (S.cmRatio * 100).toFixed(1) + '%', ragTrend(delta(productCM, productCMp)), 'before ad spend'),
-        tile('Contribution after mktg', CAM, 'gbp', null, '= product CM − spend', CAM >= 0 ? 'g' : 'r', 'CAM'),
-        tile('Operating profit', opProfit, 'gbp', null, fixedMonthly > 0 ? '= CAM − fixed ' + gbp(fixedWin) : 'set fixed costs in Plan', fixedMonthly <= 0 ? 'n' : opProfit >= 0 ? 'g' : 'r', fixedMonthly > 0 ? 'after £' + f0(fixedMonthly) + '/mo' : '—'),
+        tile('Contribution (product)', productCM, 'gbp', delta(productCM, productCMp), cmR != null ? '= rev × ' + (cmR * 100).toFixed(1) + '%' : 'enter your product and order costs', cmR == null ? 'n' : ragTrend(delta(productCM, productCMp)), 'before ad spend'),
+        tile('Contribution after mktg', CAM, 'gbp', null, cmR == null ? 'enter your product and order costs' : '= product CM − spend', cmR == null ? 'n' : CAM >= 0 ? 'g' : 'r', 'CAM'),
+        tile('Operating profit', opProfit, 'gbp', null, cmR == null ? 'enter your product and order costs' : fixedMonthly > 0 ? '= CAM − fixed ' + gbp(fixedWin) : 'set fixed costs in Plan', (cmR == null || fixedMonthly <= 0) ? 'n' : opProfit >= 0 ? 'g' : 'r', fixedMonthly > 0 ? 'after £' + f0(fixedMonthly) + '/mo' : '—'),
         tile('Ad spend', spend, 'gbp', null, 'Meta ' + gbp(metaSp) + ' · Google ' + gbp(googleSp), 'a', mer != null ? 'MER ' + mer.toFixed(2) : '', _spendSeries),
         tile('Conversion rate', cvr, 'pct1', delta(cvr, cvrP), cvrP != null ? 'vs ' + cvrP.toFixed(2) + '%' : '', cvr == null ? 'n' : cvr >= CVR_BENCH ? 'g' : cvr >= 1.2 ? 'a' : 'r', 'benchmark ' + CVR_BENCH + '%'),
         tile('Sessions', sess, 'int', delta(sess, sessP), 'vs ' + f0(sessP).toLocaleString('en-GB'), ragTrend(delta(sess, sessP)), 'GA4', _sessSeries),
@@ -287,9 +298,13 @@
     try {
       var L = window.FRKL_LIVE, D = window.FRKL_DATA;
       if (!L || !L.brandId || !D || !D.shopify || !D.shopify.length) { return; }
-      var S = _supp || { cmRatio: 0.6, econ: {}, iroas: [], tgts: [], nvr: [], items: [], board: [] };
+      var S = _supp || { cmRatio: null, econ: {}, iroas: [], tgts: [], nvr: [], items: [], board: [] };
       var out = {};
       Object.keys(TF).forEach(function (tf) { try { var b = buildTf(tf, D, S); if (b) out[tf] = b; } catch (e) { if (window.console) console.warn('[overview-data] buildTf ' + tf, e); } });
+      // The single contribution ratio greta-app.jsx's oiCmRatio() reads when the headline
+      // has not landed yet. Publishing it here rather than letting four call sites each
+      // invent their own is the whole point of the 2026-09-29 margin unification.
+      window.OI_CM_RATIO = (_supp && _supp.cmRatio != null && _supp.cmRatio > 0) ? Number(_supp.cmRatio) : null;
       if (Object.keys(out).length) { window.FRKL_OVERVIEW = out; window.dispatchEvent(new CustomEvent('frkl-overview-updated')); if (window.console) console.info('[overview-data] FRKL_OVERVIEW built', Object.keys(out).length, 'timeframes · supp=' + (_supp ? 'yes' : 'pending')); }
     } catch (e) { if (window.console) console.warn('[overview-data] rebuild failed', e); }
   }

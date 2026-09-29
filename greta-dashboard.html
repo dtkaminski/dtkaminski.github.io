@@ -29,23 +29,30 @@
      can override window.FRKL_* with live data when a session exists.
      Falls back to the static snapshots when no session / Supabase unreachable. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="./greta-data-loader.js?v=20260929e"></script>
-<script src="./greta-overview-data.js?v=20260925f"></script>
-<script src="./greta-plan-data.js?v=20260929a"></script>
-<script src="./greta-headline-data.js?v=20260929n"></script>
-<script src="./greta-live-data.js?v=20260925f"></script>
-<script src="./greta-agent-insights.js?v=20260925f"></script>
-<script src="./greta-business-data.js?v=20260925f"></script>
-<script src="./greta-action-status.js?v=20260925f"></script>
-<script src="./greta-creators.js?v=20260925f"></script>
-<script src="./greta-creative-vision.js?v=20260925f"></script>
-<script src="./greta-links.js?v=20260925f"></script>
-<script src="./greta-diagnostic-analyst.js?v=20260925f"></script>
-<script src="./greta-events.js?v=20260925f"></script>
-<script src="./greta-retention.js?v=20260925f"></script>
-<script src="./greta-clarity.js?v=20260925f"></script>
-<script src="./greta-board-read.js?v=20260925f"></script>
-<script src="./greta-benchmarks.js?v=20260925f"></script>
+<!-- PERF 2026-09-29: every one of these was a BLOCKING <script> in <head> â 692 KB parsed
+     before the browser could paint anything, on every load, for every tenant. `defer` keeps
+     document order (deferred scripts execute in the order they appear, all of them before
+     DOMContentLoaded, which is when greta-data-loader's bootstrap/neutralise runs and well
+     before greta-app.js needs the globals) while taking them off the critical path.
+     greta-defrkl-gate.js MUST stay last in this list and before greta-app.js: see its header. -->
+<script defer src="./greta-data-loader.js?v=20260929e"></script>
+<script defer src="./greta-overview-data.js?v=20260929f"></script>
+<script defer src="./greta-plan-data.js?v=20260929a"></script>
+<script defer src="./greta-headline-data.js?v=20260929n"></script>
+<script defer src="./greta-live-data.js?v=20260925f"></script>
+<script defer src="./greta-agent-insights.js?v=20260925f"></script>
+<script defer src="./greta-business-data.js?v=20260925f"></script>
+<script defer src="./greta-action-status.js?v=20260925f"></script>
+<script defer src="./greta-creators.js?v=20260925f"></script>
+<script defer src="./greta-creative-vision.js?v=20260925f"></script>
+<script defer src="./greta-links.js?v=20260925f"></script>
+<script defer src="./greta-diagnostic-analyst.js?v=20260925f"></script>
+<script defer src="./greta-events.js?v=20260925f"></script>
+<script defer src="./greta-retention.js?v=20260925f"></script>
+<script defer src="./greta-clarity.js?v=20260925f"></script>
+<script defer src="./greta-board-read.js?v=20260925f"></script>
+<script defer src="./greta-benchmarks.js?v=20260925f"></script>
+<script defer src="./greta-defrkl-gate.js?v=20260929a"></script>
 <!-- frkl-fit.js (static per-brand fit snapshot) intentionally NOT loaded: it baked in one
      brand's OMF/PMF and would render for every tenant / the unauthed demo. Fit now comes
      live from the assess-fit edge function per brand (useFitResult); with no snapshot the
@@ -1565,6 +1572,22 @@
 
   /* Period control (Numbers pages) */
   .v3-page-head-row { display: flex; gap: var(--s-4); align-items: flex-start; flex-wrap: wrap; }
+  /* The thread back to the headline: on every page but Today, the number all of this
+     is meant to move. Quiet by default -- it is context, not a call to action -- and
+     numbers in mono like every other figure in the product. */
+  .v3-thread { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap;
+    margin-top: var(--space-3); padding: var(--space-2) var(--space-3);
+    background: var(--color-surface); border: 0; border-left: 2px solid var(--color-line-strong);
+    border-radius: var(--radius-none); cursor: pointer; text-align: left; width: 100%;
+    font-family: var(--font-sans); font-size: var(--text-xs); color: var(--color-muted); }
+  .v3-thread:hover { border-left-color: var(--color-accent); background: var(--color-panel-hover); }
+  .v3-thread-lab { text-transform: uppercase; letter-spacing: .05em; color: var(--color-faint); }
+  .v3-thread-val { font-family: var(--font-mono); font-size: var(--text-sm); font-weight: 500;
+    color: var(--color-ink); }
+  .v3-thread-pace { font-family: var(--font-mono); }
+  .v3-thread-pace.good { color: var(--color-success); }
+  .v3-thread-pace.bad  { color: var(--color-danger); }
+  @media (max-width: 640px) { .v3-thread { font-size: var(--text-xs); } }
   .v3-page-head-row > div:first-child { flex: 1 1 260px; min-width: 0; }
   .v3-period { display: flex; align-items: center; gap: 8px; font-size: 12.5px; flex-wrap: wrap; }
   .v3-period select, .v3-period input {
@@ -1586,8 +1609,9 @@
 </head>
 <body>
 <div id="root"></div>
-<script>/* de-frkl pre-eval gate: for non-frkl brands, clear static-only FRKL_* globals that frkl-app.js captures into module-level consts at load (FRKL_LINKS -> _linkKeys/_linkRe, FRKL_INSIGHTS -> INS) BEFORE the bundle reads them. Runs after the static frkl-*.js files. frkl keeps its demo snapshot; the data-loader still handles all render-time globals. */
-(function(){try{var s=window.OI_BRAND_SLUG||(window.parent&&window.parent!==window?window.parent.OI_BRAND_SLUG:null)||'frkl';if(s==='frkl')return;window.FRKL_LINKS={};window.FRKL_INSIGHTS={};}catch(e){}})();</script>
+<!-- de-frkl pre-eval gate moved to ./greta-defrkl-gate.js (deferred, in the head above).
+     It has to run AFTER the static snapshots and BEFORE greta-app.js; as an inline script
+     here it ran during parse, which is before every deferred script, so it cleared nothing. -->
 <script defer src="./marketing-os.build.js?v=20260921a"></script>
 <script>/* today-calendar.build.js serves both a standalone today.html deploy and this embedded
    nav-tab context. Setting MOS_EMBEDDED before it loads suppresses its self-mount (ReactDOM.render
@@ -1604,6 +1628,6 @@ window.MOS_EMBEDDED = true;</script>
    save-brand-config had been reading two relations that were never created. */</script>
 <script defer src="./cost-entry.build.js?v=20260929c"></script>
 <script defer src="./loop-panel.js?v=20260921a"></script>
-<script defer src="./greta-app.js?v=1790691160505"></script>
+<script defer src="./greta-app.js?v=1790696335527"></script>
 <script>/* perf: defer frkl static deep-tab data (CVR ~1.7MB, cohorts, promos, products) — not used by the Overview/landing. Background-load after paint; skip for non-frkl (de-frkl). */
 (function(){try{var slug=window.OI_BRAND_SLUG||(window.parent&&window.parent!==window?window.parent.OI_BRAND_SLUG:null)||"frkl";if(slug!=="frkl")return;var files=["greta-cvr.js","greta-cohorts.js","greta-discount-codes.js","greta-products.js","greta-patterns.js"],i=0;function next(){if(i>=files.length)return;var s=document.createElement("script");s.src="./"+files[i++]+"?v=20260925f";s.async=true;s.onload=next;s.onerror=next;document.head.appendChild(s);}var kick=function(){next();};if(window.requestIdleCallback){window.requestIdleCallback(kick,{timeout:1500});}else{setTimeout(kick,300);}}catch(e){}})();</script>
