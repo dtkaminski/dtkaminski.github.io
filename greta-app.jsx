@@ -1676,7 +1676,7 @@ function ThisWeekHero(){
             explain="Everything money-tagged this week — leaking + at-risk + opportunity. These are illustrative estimates that can overlap, so they're not strictly additive. Read it as where to look, not a guaranteed sum."
             total={[{c:'var(--bad)',k:'Leaking now',v:r.leakage},{c:'var(--warn)',k:'At risk',v:r.at_risk},{c:'var(--good)',k:'Opportunity',v:r.opportunity}]}/>
         </div>
-        <div className="micro" style={{color:'var(--text-faint)',marginTop:'var(--s-2)'}}>Illustrative — each line is a money-tagged <i>estimate</i>, not a guaranteed recovery, and findings can overlap so the total isn't strictly additive. Treat it as where to look, not a forecast.</div>
+        <div className="v3-note" style={{marginTop:'var(--s-2)'}}>Illustrative — each line is a money-tagged <i>estimate</i>, not a guaranteed recovery, and findings can overlap so the total isn't strictly additive. Treat it as where to look, not a forecast.</div>
 
         <div className="hero-grid">
           <div className="hero-col">
@@ -9176,7 +9176,7 @@ function RestockActionQueue(){
   React.useEffect(()=>{ if(ackKeys.length){ ackKeys.forEach(key=>clearPoStatus(key)); toast('Stock landed', {kind:'good', body:`${ackKeys.length} PO${ackKeys.length>1?'s':''} closed — stock is back in Shopify.`}); } }, [ackKeys.join(',')]);
   if(!toOrder.length && !awaiting.length) return null;
 
-  const k = v=>{ v=Math.abs(Math.round(v)); return v>=1000?(v/1000).toFixed(v>=10000?0:1).replace(/\.0$/,'')+'k':''+v; };
+  const k = v3Amount;
   const btn = {display:'inline-flex',alignItems:'center',gap:5,fontSize:11.5,fontWeight:600,padding:'5px 11px',borderRadius:7,border:'1px solid var(--border-default)',background:'var(--bg-elevated)',color:'var(--text-primary)',cursor:'pointer',whiteSpace:'nowrap'};
   const raise = (l)=>{ setPoStatus(l.key, {status:'ordered', qty:l.qty, raisedAt:oiToday(), baselineQty:l.p.inventoryQty||0, lead:l.lead, supplier:l.supplier, title:l.p.title}); toast('PO marked raised', {kind:'good', body:l.p.title+' · awaiting stock'}); };
 
@@ -9194,14 +9194,14 @@ function RestockActionQueue(){
               <span style={{width:8,height:8,borderRadius:'50%',background:urgent?'var(--bad)':'var(--warn)',flexShrink:0}}/>
               <div style={{flex:1,minWidth:200}}>
                 <div style={{fontSize:13,color:'var(--text-primary)'}}>{l.basis==='forecast'?'Order for forecast':'Raise PO'} — <b>{NUM(l.qty)} units</b> of {l.p.title}{urgent && <span style={{marginLeft:6,fontSize:9.5,fontWeight:800,letterSpacing:'.03em',color:PAL.panel,background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}</div>
-                <div style={{fontSize:11,color:'var(--text-faint)',marginTop:1}}>{l.supplier} · {urgent?`OOS in ~${Math.round(l.cover)}d — ${l.oosGap}d short of the ${l.lead}d lead`:(l.basis==='forecast'?`plan needs ${NUM(l.forecastUnits)}, have ${NUM(l.stock)}`:`runs out in ~${Math.round(l.cover)}d (lead ${l.lead}d)`)}{l.lineCost!=null?` · ~${curSym()}${k(l.lineCost)}`:''}{l.moqBumped?` · minimum order quantity ${l.moq}`:''}</div>
+                <div style={{fontSize:11,color:'var(--text-faint)',marginTop:1}}>{l.supplier} · {urgent?`OOS in ~${Math.round(l.cover)}d — ${l.oosGap}d short of the ${l.lead}d lead`:(l.basis==='forecast'?`plan needs ${NUM(l.forecastUnits)}, have ${NUM(l.stock)}`:`runs out in ~${Math.round(l.cover)}d (lead ${l.lead}d)`)}{l.lineCost!=null?` · ${curSym()}${k(l.lineCost)}`:''}{l.moqBumped?` · minimum order quantity ${l.moq}`:''}</div>
               </div>
               <button style={{...btn,background:'var(--accent)',color:PAL.panel,borderColor:'var(--accent)'}} onClick={()=>raise(l)}><Icon name="check" size={12}/> Mark PO raised</button>
               <button style={btn} onClick={()=>window.__oiNav&&window.__oiNav('planning','plan')}>Open planner</button>
             </div>
           ); })}
         {(()=>{ const rest=toOrder.filter(l=>!l.oosBeforeLead); if(!rest.length) return null;
-          if(!showAllToOrder){ const restVal=rest.reduce((a,l)=>a+(l.lineCost||0),0); return (<button onClick={()=>setShowAllToOrder(true)} style={{...btn,alignSelf:'flex-start',marginTop:4}}>Show {rest.length}more to order{restVal>0?` · ~${curSym()}${k(restVal)}`:''}</button>); }
+          if(!showAllToOrder){ const restVal=rest.reduce((a,l)=>a+(l.lineCost||0),0); return (<button onClick={()=>setShowAllToOrder(true)} style={{...btn,alignSelf:'flex-start',marginTop:4}}>Show {rest.length}more to order{restVal>0?` · ${curSym()}${k(restVal)}`:''}</button>); }
           return (<a className="txt-link" onClick={()=>setShowAllToOrder(false)} style={{cursor:'pointer',fontSize:11.5,marginTop:4,alignSelf:'flex-start'}}>Show less</a>); })()}
         {showAllToOrder && toOrder.length>12 && <div style={{fontSize:11.5,color:'var(--text-faint)',paddingTop:6}}><a className="txt-link" onClick={()=>window.__oiNav&&window.__oiNav('planning','plan')} style={{cursor:'pointer'}}>+ {toOrder.length-12} more in the planner</a></div>}
       </div>) : <div className="muted" style={{fontSize:12.5,padding:'2px 0'}}>Nothing to order right now — {awaiting.length} PO{awaiting.length===1?'':'s'} awaiting stock below.</div>}
@@ -9506,7 +9506,7 @@ function BusinessReview(){
   const gbpK = v=>curSym()+(Math.abs(v)>=1000?(v/1000).toFixed(1).replace(/\.0$/,'')+'k':Math.round(v));
   const pct0 = v=>v!=null?(v*100).toFixed(0)+'%':'—';
   const pct1 = v=>v!=null?(v*100).toFixed(1)+'%':'—';
-  const k = v=>{ v=Math.abs(Math.round(v)); return v>=1000?(v/1000).toFixed(v>=10000?0:1).replace(/\.0$/,'')+'k':''+v; };
+  const k = v3Amount;
 
   // ── £-tagged registers: live findings only (≥£50/mo, not already done) ──
   const confTier = c => typeof c==='number' ? (c>=0.66?'high':c>=0.45?'med':'low') : (c==='high'?'high':c==='medium'?'med':'low');
@@ -9781,7 +9781,7 @@ function PlanningHeader({active, embedded}){
   usePlanningTick();
   const R = planReorder();
   const dc = demandConfig(); const rc = reorderConfig();
-  const k = v=>{ v=Math.abs(Math.round(v)); return v>=1000?(v/1000).toFixed(v>=10000?0:1).replace(/\.0$/,'')+'k':''+v; };
+  const k = v3Amount;
   const months = (R.plan&&R.plan.months)||3;
   const strat = R.strategy; const STRAT={jit:'Just-in-time',bulk:'Bulk upfront',staged:'Staged waves'};
   const growthPct = R.plan?R.plan.growthPct:0;
@@ -9844,7 +9844,7 @@ function ProductionPlanner({embedded}={}){
   const [setOpen, setSetOpen] = useState(false);
   const types = [...new Set(inv.map(p=>p.type).filter(Boolean))].sort();
 
-  const k = v=>{ v=Math.abs(Math.round(v)); return v>=1000?(v/1000).toFixed(v>=10000?0:1).replace(/\.0$/,'')+'k':''+v; };
+  const k = v3Amount;
 
   const bySupplier = {};
   toOrder.forEach(l=>{ (bySupplier[l.supplier]=bySupplier[l.supplier]||[]).push(l); });
@@ -10470,7 +10470,7 @@ function PlanningView(){
   const [planView, setPlanView] = useState('timeline');   // landing plan: timeline | table
   React.useEffect(()=>{ window.__oiOpenForecast = ()=>{ setShowForecast(true); setTimeout(()=>{ const el=document.getElementById('plan-forecast'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }, 60); }; return ()=>{ try{ delete window.__oiOpenForecast; }catch(e){} }; }, []);
   const R = planReorder(); const dc = demandConfig(); const rc = reorderConfig();
-  const k = v=>{ v=Math.abs(Math.round(v)); return v>=1000?(v/1000).toFixed(v>=10000?0:1).replace(/\.0$/,'')+'k':''+v; };
+  const k = v3Amount;
   const months = (R.plan&&R.plan.months)||3;
   const oosNow = R.oosNow, toOrderN = R.toOrder.length, awaiting = R.awaiting.length;
   const orderVal = R.toOrder.reduce((t,l)=>t+(l.lineCost||0),0);
@@ -13578,6 +13578,12 @@ function useV3Headline() {
   return h;
 }
 function v3Gbp(v) { return v == null ? '—' : '£' + Math.round(Number(v)).toLocaleString('en-GB'); }
+// One money rule for operator-facing amounts. Five copies of the same local formatter switched
+// shape by magnitude — 0dp over 10k, 1dp between 1k and 10k, raw below — so one list could read
+// "~£968 · ~£10k · ~£1.3k": three formats and a tilde on each. Uncertainty is carried by the
+// confidence ladder now, not by hedging every figure. Compact forms stay only on chart axes,
+// where space genuinely demands them.
+function v3Amount(v) { return Math.abs(Math.round(Number(v) || 0)).toLocaleString('en-GB'); }
 // Engine action text is written for an analyst: a category prefix, then the claim,
 // then the arithmetic in brackets. Split it so the owner reads a sentence first and
 // the workings sit underneath. The text itself is never invented here.
