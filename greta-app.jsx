@@ -587,15 +587,17 @@ function fmtDelta(d){ if(d==null) return null; const pct = Math.abs(d*100); if (
 // updates so it flips the instant the operator verifies their costs.
 function MarginBadge({onSetup}){
   const verified = useCostTick();
+  // Same ladder as the confidence chip. This used to say "verified" / "est.", a second vocabulary
+  // for the same question, which left the product describing one number two different ways.
   const tip = verified
-    ? 'Based on your entered costs — verified.'
-    : 'Estimated from catalogue defaults. Enter your real costs to make this accurate.';
+    ? 'Direct — from the costs you entered.'
+    : 'Probably — worked out from catalogue defaults. Enter your real costs and this becomes Direct.';
   return (<span title={tip} onClick={(!verified && onSetup) ? (e=>{e.stopPropagation(); onSetup();}) : undefined}
     style={{display:'inline-flex', alignItems:'center', gap:3, fontSize:9, fontWeight:700, letterSpacing:'.03em', textTransform:'uppercase',
             padding:'1px 6px', borderRadius:'var(--r-full)', cursor:(!verified && onSetup)?'pointer':'help', whiteSpace:'nowrap',
             background: verified?'var(--good-bg)':'var(--warn-bg)', color: verified?'var(--good)':'var(--warn)',
             border:'1px solid '+(verified?'rgba(74,222,128,.3)':'rgba(245,181,68,.3)')}}>
-    {verified ? '✓ verified' : '~ est.'}
+    {verified ? 'Direct' : 'Probably'}
   </span>);
 }
 
@@ -13178,12 +13180,45 @@ function V3Info({ k }) {
 }
 // ── One confidence signal ────────────────────────────────────────────────
 // Four states replace the 18 vocabularies found in the audit. Detail on tap.
+// One ladder, answering the only question the operator is actually asking: how hard can I lean on
+// this? Earlier wording described where a number came from — Measured / Estimated / Benchmark —
+// which reads like a lab note and tells you nothing about what to do with it. These are plain
+// steers, and anything that weakens a number moves it DOWN a rung rather than adding a second badge
+// to decode. Old keys are kept as aliases so nothing silently falls back to the wrong rung.
 const V3_CONF = {
-  measured:  { label: 'Measured',        why: 'Calculated from your own connected data.' },
-  estimated: { label: 'Estimated',       why: 'Worked out from the costs you entered, not yet checked against your own results.' },
-  benchmark: { label: 'Benchmark',       why: 'An industry figure, not yet confirmed for your brand. A test would measure it.' },
-  held:      { label: 'Not enough data', why: 'Greta holds back rather than guess.' },
+  direct:   { label: 'Direct',          why: 'Counted straight from your own data. Lean on it.' },
+  likely:   { label: 'Likely',          why: 'Mostly your own data, with one part filled in. Safe to act on.' },
+  probably: { label: 'Probably',        why: 'Part your data, part the figures you gave us. Right in direction — check before a big bet.' },
+  possible: { label: 'Possible',        why: 'Mostly an assumption. Worth knowing, not worth betting on.' },
+  outside:  { label: 'Outside chance',  why: 'A long shot until something tests it.' },
+  held:     { label: 'Not yet',         why: 'Greta would rather say nothing than guess.' },
+  // aliases from the previous vocabulary
+  measured:  { label: 'Direct',         why: 'Counted straight from your own data. Lean on it.' },
+  estimated: { label: 'Probably',       why: 'Part your data, part the figures you gave us. Right in direction — check before a big bet.' },
+  benchmark: { label: 'Possible',       why: 'An industry figure, not your brand’s. Worth knowing, not worth betting on.' },
 };
+// Why the steer is where it is, in the brand's own numbers and in plain words. Two things can pull
+// the profit number down a rung, and the operator should be told which — "Probably" with no reason
+// is just a shrug. Spend comes first because a missing feed is both more urgent and fixable in one
+// click, where costs are a sit-down job.
+function v3TrustWhy(d) {
+  const bits = [];
+  if (d.spend_is_stale) {
+    const who = d.stale_feeds ? String(d.stale_feeds).split(' since')[0] : 'One of your ad accounts';
+    const gbp = Number(d.unreported_spend) > 0 ? ' — about ' + v3Gbp(d.unreported_spend) + ' of spend' : '';
+    bits.push(who + ' stopped reporting ' + (d.spend_stale_days || 0) + ' days ago' + gbp +
+              ' is missing, so profit after ads reads higher than it will once that lands.');
+  }
+  if (d.cogs_basis === 'measured') {
+    if (!bits.length) bits.push('Counted from your own product and order costs.');
+  } else {
+    bits.push(d.cogs_gap_reason
+      ? d.cogs_gap_reason + ' Until then Greta uses the margin in your settings.'
+      : 'Your margin comes from the figure in your settings, not from your own product costs.');
+  }
+  return bits.join(' ');
+}
+
 function V3Conf({ state, detail, fix }) {
   const c = V3_CONF[state] || V3_CONF.estimated;
   const [open, setOpen] = React.useState(false);
@@ -13942,21 +13977,26 @@ function V3Today(p) {
               the CONFIGURED gross margin and never touched the cost tables. Measured is now earned
               — 80% of revenue costed AND those costs carrying freight or duty — and when it is not
               earned Today says so in the brand's own numbers rather than in the abstract. */}
-          <V3Conf state={d.cogs_basis === 'measured' ? 'measured' : (d.cm_source === 'none' ? 'held' : 'estimated')}
-                  detail={d.cogs_basis === 'measured'
-                    ? 'Measured from your own product and order costs.'
-                    : (d.cogs_gap_reason
-                        ? d.cogs_gap_reason + ' Until then Greta uses the margin in your settings.'
-                        : 'Worked out from the margin in your settings, not from your own product costs.')}
-                  fix={['settings', 'costs', 'Enter your product costs']}/>
+          <V3Conf state={d.cm_source === 'none' ? 'held' : (d.trust_level || 'probably')}
+                  detail={v3TrustWhy(d)}
+                  fix={d.spend_is_stale
+                    ? ['settings', 'connections', 'Reconnect ' + (d.stale_feeds ? String(d.stale_feeds).split(' since')[0] : 'your ads')]
+                    : ['settings', 'costs', 'Enter your product costs']}/>
         </div>
         <div className="v3-big">{v3Gbp(cam)}</div>
         {camTarget != null ? (<>
           <div className="v3-bar" aria-hidden="true"><i style={{ width: Math.max(2, Math.min(100, (pacePos || 0) * 66)) + '%' }}/><b style={{ left: '66%' }}/></div>
-          <div className={'v3-pace ' + (diff >= 0 ? 'good' : 'bad')}>
-            {diff >= 0 ? v3Gbp(Math.abs(diff)) + ' ahead of' : v3Gbp(Math.abs(diff)) + ' behind'} your monthly goal
+          {/* The pace sentence is the one the operator acts on, so it must not claim a cushion the
+              data cannot support. frkl read "£3,150 ahead" while Meta had not reported for ten
+              days; the missing spend was about £2,238, so the real cushion was closer to £900 and
+              the claim was out by roughly five times. When unreported spend could swallow half the
+              gap, Greta says it is too close to call rather than picking a side. */}
+          <div className={'v3-pace ' + (d.pace_is_reliable === false ? '' : (diff >= 0 ? 'good' : 'bad'))}>
+            {d.pace_is_reliable === false
+              ? <>Too close to call — {v3Gbp(d.unreported_spend)} of ad spend has not come through yet</>
+              : <>{diff >= 0 ? v3Gbp(Math.abs(diff)) + ' ahead of' : v3Gbp(Math.abs(diff)) + ' behind'} your monthly goal</>}
             <span className="v3-muted"> · goal {v3Gbp(camTarget)} a month</span>
-            {d.target_is_derived && <V3Conf state="estimated"
+            {d.target_is_derived && <V3Conf state="probably"
               detail={'Nobody has confirmed a profit-after-ads goal, so Greta worked this one out by taking your ad budget off your profit target. That assumes you spend the budget in full. Confirm a goal and this becomes your own figure.'}
               fix={['home', 'plansetup', 'Open Goal & costs']}/>}
           </div>

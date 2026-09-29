@@ -97,6 +97,16 @@
       cogs_landed_complete: h.cogs_landed_complete === true,
       cogs_realized_margin_pct: num(h.cogs_realized_margin_pct),
       cogs_gap_reason: h.cogs_gap_reason || null,
+      // How hard the operator can lean on the number, on one ladder (0196):
+      // direct > likely > probably > possible > outside chance. Stale ad spend and unmeasured
+      // costs each pull it down a rung; pace_is_reliable is false when the spend that has not
+      // come through could swallow half the claimed gap to goal.
+      trust_level: h.trust_level || 'probably',
+      spend_is_stale: h.spend_is_stale === true,
+      spend_stale_days: num(h.spend_stale_days),
+      unreported_spend: num(h.unreported_spend),
+      stale_feeds: h.stale_feeds || null,
+      pace_is_reliable: h.pace_is_reliable !== false,
       gate_message: rd ? rd.gate_message : null,
       // First-run state: what is still needed before Greta can answer properly.
       setup: {
