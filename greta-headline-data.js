@@ -33,13 +33,44 @@
   }
   function num(x) { return x == null ? null : Number(x); }
 
-  async function safeQ(q, ms, def) {
+  // Swallowing a failed read is right — one slow query must not blank the screen — but it cannot
+  // be the end of the story. Three failures found on 2026-09-29 had been running for MONTHS with
+  // no visible symptom: the cost panel 404ing, the engine's realized-COGS path no-op'ing, and
+  // Meta's token expired for ten days. All three were found by reading edge logs, not by using the
+  // product. A failure nobody learns about is indistinguishable from a feature never built.
+  //
+  // So the read still degrades quietly for the operator, and quietly TELLS US. Deduped per session
+  // per source, so one broken panel is one row per session rather than one per render, and every
+  // path is wrapped — reporting an error must never itself throw.
+  var reported = {};
+  function reportFailure(source, kind, detail) {
+    try {
+      if (reported[source]) return;
+      reported[source] = 1;
+      var sb = sbClient(), b = brandId();
+      if (!sb || !b) return;
+      sb.from('client_error_log').insert({
+        brand_id: b, kind: kind, source: String(source).slice(0, 120),
+        detail: detail ? String(detail).slice(0, 500) : null,
+        screen: 'today'
+      }).then(function () {}, function () {});
+    } catch (e) { /* never let telemetry break the screen */ }
+  }
+  if (typeof window !== 'undefined') window.FRKL_REPORT_FAILURE = reportFailure;
+
+  async function safeQ(q, ms, def, source) {
+    var label = source || 'unknown';
     try {
       return await Promise.race([
-        Promise.resolve(q).then(function (r) { return (r && !r.error && r.data != null) ? r.data : def; }).catch(function () { return def; }),
-        new Promise(function (res) { setTimeout(function () { res(def); }, ms); })
+        Promise.resolve(q).then(function (r) {
+          if (r && r.error) { reportFailure(label, 'read_failed', r.error.message || r.error.code); return def; }
+          return (r && r.data != null) ? r.data : def;
+        }).catch(function (e) { reportFailure(label, 'read_failed', e && e.message); return def; }),
+        new Promise(function (res) {
+          setTimeout(function () { reportFailure(label, 'read_timeout', 'no response in ' + ms + 'ms'); res(def); }, ms);
+        })
       ]);
-    } catch (e) { return def; }
+    } catch (e) { reportFailure(label, 'read_failed', e && e.message); return def; }
   }
 
   async function build() {
@@ -57,7 +88,7 @@
     var rows = null;
     for (var attempt = 0; attempt < 3 && !rows; attempt++) {
       if (attempt) await new Promise(function (r) { setTimeout(r, 1500 * attempt); });
-      rows = await safeQ(sb.from('vw_brand_today').select('*').eq('brand_id', b).limit(1), 12000 + attempt * 9000, null);
+      rows = await safeQ(sb.from('vw_brand_today').select('*').eq('brand_id', b).limit(1), 12000 + attempt * 9000, null, 'vw_brand_today');
     }
     var h = (rows && rows[0]) || null;
     // Say so rather than sit on an em-dash forever: Today reads this to explain itself.
