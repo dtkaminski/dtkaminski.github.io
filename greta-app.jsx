@@ -19,7 +19,7 @@ const PAL = (function () {
     ink: '#141414', muted: '#6B6B6B', faint: '#8C857C', line: '#E0DCD6',
     panel: '#FFFFFF', surface: '#F5F2ED', accent: '#C84B00',
     good: '#1A7A4A', warn: '#B45309', bad: '#B91C1C',
-    data3: '#2563EB', data4: '#7C3AED'
+    data3: '#1D4ED8', data4: '#6D28D9'
   };
   const map = {
     ink: '--color-ink', muted: '--color-muted', faint: '--text-faint', line: '--color-line',
@@ -34,6 +34,17 @@ const PAL = (function () {
   } catch (e) {}
   return out;
 })();
+
+// Chart fills need a real colour string: an SVG `fill` attribute cannot resolve var(),
+// which is why the area charts carried literal rgba(139,92,246,...) violets long after the
+// palette moved to burnt orange. palAlpha() derives the tint from the live token instead, so
+// a chart can never drift from the UI around it again.
+function palAlpha(hex, a) {
+  const h = String(hex || '').trim().replace('#', '');
+  if (h.length < 6) return hex;
+  const n = parseInt(h.slice(0, 6), 16);
+  return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+}
 
 // SVG presentation attributes cannot resolve var(); colours arriving as props may still
 // be written as CSS variables, so normalise them to the token value on the way in.
@@ -419,7 +430,7 @@ function findingNav(f){
 function NavChip({f}){
   const n = findingNav(f); if(!n) return null;
   return <button onClick={()=>window.__oiNav&&window.__oiNav(n.section,n.sub)} title={`Open ${n.label}`}
-    style={{fontSize:10.5,fontWeight:600,color:PAL.accent,background:'rgba(139,92,246,0.12)',border:'1px solid rgba(139,92,246,0.3)',borderRadius:999,padding:'1px 8px',cursor:'pointer',whiteSpace:'nowrap'}}>→ {n.label}</button>;
+    style={{fontSize:'var(--text-xs)',fontWeight:600,color:PAL.accent,background:'none',border:0,borderBottom:'1px solid var(--color-accent-line)',borderRadius:'var(--radius-none)',padding:'0 0 1px',cursor:'pointer',whiteSpace:'nowrap'}}>{n.label}</button>;
 }
 const sum = (arr,k) => arr.reduce((a,r)=>a+(r[k]||0),0);
 const COL = { meta:PAL.data3, google:PAL.warn, revenue:PAL.good, email:PAL.accent, sessions:PAL.data3 };
@@ -625,7 +636,7 @@ function MarginBadge({onSetup}){
     style={{display:'inline-flex', alignItems:'center', gap:3, fontSize:9, fontWeight:700, letterSpacing:'.03em', textTransform:'uppercase',
             padding:'1px 6px', borderRadius:'var(--r-full)', cursor:(!verified && onSetup)?'pointer':'help', whiteSpace:'nowrap',
             background: verified?'var(--good-bg)':'var(--warn-bg)', color: verified?'var(--good)':'var(--warn)',
-            border:'1px solid '+(verified?'rgba(74,222,128,.3)':'rgba(245,181,68,.3)')}}>
+            border:'1px solid '+(verified?'var(--color-success-line)':'var(--color-warning-wash)')}}>
     {verified ? 'Direct' : 'Probably'}
   </span>);
 }
@@ -737,11 +748,11 @@ function KPI({label, val, sub, badge, status, statusLabel, conf, series, seriesL
         </div>)}
         {hasExplainer && (
           <div className="explainer">
-            {agent && <div className="agent">◆ {agentLabel(agent)}</div>}
+            {agent && <div className="agent">{agentLabel(agent)}</div>}
             {observation && <div className="obs">{observation}</div>}
             {implication && <div className="imp">{implication}</div>}
             <div onClick={(e)=>{ e.stopPropagation(); if(window.__oiAsk) window.__oiAsk(`About "${label}"${val?` (currently ${val})`:''}: what's driving this, and what should I do about it?`); }}
-              style={{marginTop:8, fontSize:11, color:PAL.accent, cursor:'pointer', fontWeight:600}}>✦ Ask AI about this →</div>
+              style={{marginTop:8, fontSize:11, color:PAL.accent, cursor:'pointer', fontWeight:600}}>Ask Greta about this</div>
           </div>
         )}
       </div>
@@ -753,7 +764,7 @@ const INS = window.FRKL_INSIGHTS || {};
 const STATUS = window.FRKL_ACTION_STATUS || {};
 function pClass(p){ return p==='P1'?'red':p==='P2'?'amber':'grey'; }
 function statusBadge(s){
-  if (s === "verified-done") return ["done","✓ DONE"];
+  if (s === "verified-done") return ["done","DONE"];
   if (s === "needs-chrome")  return ["chrome","◐ chrome"];
   if (s === "needs-input")   return ["input","? input"];
   if (s === "open")          return ["open","○ open"];
@@ -865,7 +876,7 @@ function ActionContract({vf}){
   const predict = 'Predicts '+vf.metric_label+' '+dir+mag+win;
   let result=null, rc='var(--text-faint)';
   if(vf.verdict){
-    const V = {hit:['✓ hit','var(--good)'], miss:['✗ miss','var(--bad)'], flat:['– no move','var(--text-muted)']}[vf.verdict] || ['',''];
+    const V = {hit:['hit','var(--good)'], miss:['miss','var(--bad)'], flat:['– no move','var(--text-muted)']}[vf.verdict] || ['',''];
     rc = V[1];
     result = oiVfmt(vf.baseline_value, vf.metric_format)+' → '+oiVfmt(vf.current_value, vf.metric_format)+' · '+V[0];
   } else if(vf.current_value!=null){
@@ -880,7 +891,7 @@ function TrackRecord({compact}){
   const V = useVerify();
   const s = V.score;
   if(!s) return null;
-  const box = {display:'flex', alignItems:'center', gap:8, fontSize:12, padding:compact?'6px 10px':'8px 12px', border:'1px solid var(--color-line, #23252d)', borderRadius:6, background:'rgba(124,140,255,0.06)', margin: compact?'0 0 8px':'0 0 12px'};
+  const box = {display:'flex', alignItems:'center', gap:8, fontSize:12, padding:compact?'6px 10px':'8px 12px', border:'1px solid var(--color-line, #23252d)', borderRadius:6, background:'var(--color-accent-wash)', margin: compact?'0 0 8px':'0 0 12px'};
   if(!s.graded){
     if(s.predicted_total>0) return (<div style={box}><span style={{color:'var(--accent)',fontWeight:700}}>◎ Verification loop live</span><span style={{color:'var(--text-muted)'}}>{s.predicted_total} predictions tracked · first grades pending</span></div>);
     return null;
@@ -927,7 +938,7 @@ function Insight({k}){
   }
   return (<div className="card insight" style={{marginTop:14}}>
     <span style={{display:'inline-flex',alignItems:'baseline',gap:8,flexWrap:'wrap'}}>
-      <span className="agentbadge">◆ {agentLabel(d.agent)}</span>
+      <span className="agentbadge">{agentLabel(d.agent)}</span>
     </span>
     <div className="head">{plainWords(d.headline)}</div>
     <ul>{d.analysis.map((a,i)=><li key={i}>{plainWords(a)}</li>)}</ul>
@@ -1132,7 +1143,7 @@ function ActionConflictBanner(){
   if (!conflicts.length) return null;
   return (<div className="card alert-warn" style={{marginBottom:'var(--s-3)'}}>
     <div className="micro" style={{color:'var(--warn)', marginBottom:'var(--s-3)'}}>
-      ⚠ {conflicts.length} contradictory goal pair{conflicts.length>1?'s':''} open — pick one
+      {conflicts.length} contradictory goal pair{conflicts.length>1?'s':''} open — pick one
     </div>
     {conflicts.map((c,i) => (<div key={i} style={{
       marginTop: i ? 'var(--s-4)' : 0,
@@ -1207,7 +1218,7 @@ function ActionBoard(){
       </div>
       <div>
         <div className="sp-text" style={{textDecoration:contra?'line-through':'none',textDecorationColor:'var(--bad)'}}>{linkify(a.text)}</div>
-        {contra && <div style={{fontSize:11,color:'var(--bad)',marginTop:2}}>⚠ Today's live read contradicts this (ad frequency is healthy — fatigue ruled out). Re-validate before acting.</div>}
+        {contra && <div style={{fontSize:11,color:'var(--bad)',marginTop:2}}>Today's live read contradicts this (ad frequency is healthy — fatigue ruled out). Re-validate before acting.</div>}
         {why && <div className="sp-ev">{why}</div>}
         {isDone && st.impact && <ImpactLine impact={st.impact} resolvedAt={st.resolvedAt}/>}
         <div className="sp-cta">
@@ -1249,9 +1260,9 @@ function ActionBoard(){
   const renderLive = (f, i) => {
     const vs = verdictStyle(f.verdict);
     const CONF = {
-      high: {lbl:'High confidence',   fg:'var(--good)',       bg:'rgba(110,231,183,0.12)'},
-      med:  {lbl:'Medium confidence', fg:'var(--warn)',       bg:'rgba(245,158,11,0.12)'},
-      low:  {lbl:'Low · validate',    fg:'var(--text-muted)', bg:'rgba(255,255,255,0.06)'},
+      high: {lbl:'Likely',   fg:'var(--color-success)', bg:'var(--color-success-wash-2)'},
+      med:  {lbl:'Probably', fg:'var(--color-warning)', bg:'var(--color-warning-wash)'},
+      low:  {lbl:'Possible', fg:'var(--color-muted)',   bg:'var(--color-sunken)'},
     };
     const cf = CONF[f.confidence || 'med'] || CONF.med;
     // £ impact: right-aligned, magnitude only; muted for "expected" (context, not opportunity).
@@ -1507,7 +1518,7 @@ function DailyPanel(){
       <KPI label="MTD pacing" val={GBP(mtdSpend)} sub={`Day ${dayOfMonth}/${daysInMonth} · proj. EOM ${GBP(projSpend)} spend · ${GBP(projRev)} rev`} series={sMTD} seriesLabel="Cumulative MTD spend" />
     </div>
     {anomalies.length > 0 && (<div>
-      <div className="micro" style={{color:'var(--warn)', marginBottom:'var(--s-2)'}}>⚠ Flags — {anomalies.length}</div>
+      <div className="micro" style={{color:'var(--warn)', marginBottom:'var(--s-2)'}}>Flags — {anomalies.length}</div>
       <div style={{display:'flex', flexDirection:'column', gap:'var(--s-1)'}}>
         {anomalies.map((a,i)=>{
           const c = a.sev==='red' ? 'var(--bad)' : a.sev==='amber' ? 'var(--warn)' : 'var(--good)';
@@ -1515,7 +1526,7 @@ function DailyPanel(){
         })}
       </div>
     </div>)}
-    {anomalies.length === 0 && <div style={{fontSize:12, padding:'10px 14px', background:'var(--good-bg)', color:'var(--good)', borderRadius:'var(--r-sm)', fontWeight:550}}>✓ No anomalies detected vs 7-day baseline.</div>}
+    {anomalies.length === 0 && <div style={{fontSize:12, padding:'10px 14px', background:'var(--good-bg)', color:'var(--good)', borderRadius:'var(--r-sm)', fontWeight:550}}>No anomalies detected vs 7-day baseline.</div>}
   </div>);
 }
 
@@ -1603,7 +1614,7 @@ function SetupProgressCard(){
   return (
     <div className="card" style={{display:'flex', alignItems:'center', gap:'var(--s-4)', flexWrap:'wrap',
         padding:'var(--s-4) var(--s-5)', marginBottom:'var(--s-4)',
-        border:'1px solid rgba(124,58,237,0.35)', background:'var(--accent-bg, rgba(124,58,237,0.06))'}}>
+        border:'1px solid var(--color-accent-line)', background:'var(--accent-bg, var(--color-accent-wash))'}}>
       <div style={{flex:'1 1 260px', minWidth:0}}>
         <div style={{display:'flex', alignItems:'center', gap:'var(--s-3)', marginBottom:4}}>
           <span style={{fontSize:10, fontWeight:700, letterSpacing:'.06em', textTransform:'uppercase', color:'var(--accent)'}}>Setup</span>
@@ -1795,13 +1806,17 @@ function detectPromoWindows(rows){
 // price changes, deliberate spend changes…). Sourced from window.FRKL_EVENTS
 // (generated from OI) merged with anything the operator logged live (localStorage).
 const EVENT_META = {
-  promo:        {label:'Promo',         icon:'🏷️'},
-  launch:       {label:'Launch',        icon:'🚀'},
-  price_change: {label:'Price change',  icon:'💷'},
-  spend_change: {label:'Spend change',  icon:'📈'},
-  stockout:     {label:'Stockout',      icon:'📦'},
-  pr:           {label:'PR / influencer', icon:'📣'},
-  other:        {label:'Event',         icon:'📌'},
+  // Seven emoji were doing the job of a categorical colour scale. They render differently on
+  // every OS, cannot inherit the palette, and are the loudest signal that a UI was assembled
+  // rather than designed. A drawn marker in the brand's own series colours instead, with the
+  // detail in the tooltip -- which is how every real analytics product draws an annotation.
+  promo:        {label:'Promo',           tone:'accent'},
+  launch:       {label:'Launch',          tone:'good'},
+  price_change: {label:'Price change',    tone:'data4'},
+  spend_change: {label:'Spend change',    tone:'data3'},
+  stockout:     {label:'Stockout',        tone:'bad'},
+  pr:           {label:'PR / influencer', tone:'warn'},
+  other:        {label:'Event',           tone:'muted'},
 };
 function loadBrandEvents(){
   let evs = (typeof window!=='undefined' && Array.isArray(window.FRKL_EVENTS)) ? window.FRKL_EVENTS.slice() : [];
@@ -1838,7 +1853,7 @@ function buildChartPins(buckets){
   const pins = [];
   // 1) operator-logged ground-truth events
   loadBrandEvents().forEach(e=>{ const x = snap(e.startsOn); if(x==null) return; const mt = EVENT_META[e.type]||EVENT_META.other;
-    pins.push({x, icon:mt.icon, title:(e.title||mt.label), date:e.startsOn, detail:mt.label}); });
+    pins.push({x, tone:mt.tone, title:(e.title||mt.label), date:e.startsOn, detail:mt.label}); });
   // 2) major site-wide sales derived from discount codes — exclude always-on (standing/affiliate)
   //    codes; keep concentrated campaigns with meaningful £. Pin at each code's peak-discount week.
   const codes = (typeof window!=='undefined' && window.FRKL_DISCOUNT_CODES && window.FRKL_DISCOUNT_CODES.codes) || [];
@@ -1852,7 +1867,7 @@ function buildChartPins(buckets){
       let pk=null; (c.series||[]).forEach(p=>{ if(!pk || p.d>pk.d) pk=p; });
       if(!pk) return; const x = snap(pk.w); if(x==null) return;
       const rate = c.discountRate!=null ? Math.round(c.discountRate*100)+'% off' : 'sale';
-      pins.push({x, icon:'🏷️', title:c.code, date:pk.w, sale:true,
+      pins.push({x, tone:'accent', title:c.code, date:pk.w, sale:true,
         detail:`${rate} · ${curSym()}${Math.round(c.discount)} given · ${c.orders} orders`});
     });
   // 3) collapse pins landing in the same bucket so markers never crowd; sale leads the badge
@@ -1860,8 +1875,8 @@ function buildChartPins(buckets){
   pins.forEach(p=>{ (byX[p.x] = byX[p.x] || []).push(p); });
   return Object.keys(byX).map(x=>{
     const g = byX[x], head = g.find(p=>p.sale) || g[0];
-    const tip = g.map(p=> `${p.icon} ${p.title}${p.detail? ' — '+p.detail : ''}  (${(p.date||'').slice(5)})`).join('\n');
-    return {x, icon:head.icon, n:g.length, tip};
+    const tip = g.map(p=> `${p.title}${p.detail? ' — '+p.detail : ''}  (${(p.date||'').slice(5)})`).join('\n');
+    return {x, tone:head.tone, n:g.length, tip};
   });
 }
 
@@ -1873,7 +1888,9 @@ function PinMarker(props){
     <g style={{cursor:'help'}}>
       <title>{props.tip}</title>
       <rect x={cx-10} y={top} width={20} height={18} fill="transparent"/>
-      <text x={cx} y={top+12} textAnchor="middle" fontSize={13}>{props.icon}</text>
+      {/* Filled dot in the type's own colour, ringed in the panel colour so it stays
+          legible where it overlaps a plotted line. */}
+      <circle cx={cx} cy={top+8} r={4} fill={PAL[props.tone] || PAL.muted} stroke={PAL.panel} strokeWidth={1.5}/>
       {props.n>1 ? <text x={cx+9} y={top+5} textAnchor="middle" fontSize={8} fill={PAL.faint} fontWeight={700}>{'+'+(props.n-1)}</text> : null}
     </g>
   );
@@ -2007,14 +2024,14 @@ function runDiagnostic(m, ctx){
 function ContextConsidered({dx}){
   const evs = dx.eventLines || [];
   if(!dx.context.length && !dx.notes.length && !evs.length) return null;
-  const srcStyle = s => s==='inferred' ? {fg:'var(--text-muted)',bg:'rgba(255,255,255,0.05)',lbl:'detected'}
-                       : s==='shopify' ? {fg:'var(--accent)',bg:'rgba(139,92,246,0.12)',lbl:'shopify'}
-                       : {fg:'var(--good)',bg:'rgba(110,231,183,0.10)',lbl:'logged'};
-  return (<div style={{marginTop:12,padding:'10px 14px',borderRadius:'var(--r-md)',background:'rgba(255,255,255,0.02)',border:'1px solid var(--border-subtle)'}}>
+  const srcStyle = s => s==='inferred' ? {fg:'var(--text-muted)',bg:'var(--color-surface)',lbl:'detected'}
+                       : s==='shopify' ? {fg:'var(--accent)',bg:'var(--color-accent-wash-2)',lbl:'shopify'}
+                       : {fg:'var(--good)',bg:'var(--color-success-wash-2)',lbl:'logged'};
+  return (<div style={{marginTop:12,padding:'10px 14px',borderRadius:'var(--r-md)',background:'var(--color-sunken)',border:'1px solid var(--border-subtle)'}}>
     <div style={{fontSize:11,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:6}}>Context considered</div>
     {evs.map((e,i)=>{ const ss=srcStyle(e.source); const em=(EVENT_META[e.type]||EVENT_META.other); return (
       <div key={'e'+i} style={{fontSize:12.5,color:'var(--text-secondary)',lineHeight:1.5,marginBottom:4,display:'flex',gap:8,alignItems:'center'}}>
-        <span>{em.icon}</span><span style={{color:'var(--text-primary)'}}>{e.text}</span>
+        <span aria-hidden="true" style={{width:7,height:7,borderRadius:'50%',flex:'0 0 auto',background:PAL[em.tone]||PAL.muted}}/><span style={{color:'var(--text-primary)'}}>{e.text}</span>
         <span style={{fontSize:9.5,fontWeight:700,letterSpacing:'.05em',color:ss.fg,background:ss.bg,padding:'1px 6px',borderRadius:999,textTransform:'uppercase'}}>{ss.lbl}</span>
       </div>);})}
     {dx.notes.map((n,i)=>(<div key={'n'+i} style={{fontSize:12.5,color:'var(--text-secondary)',lineHeight:1.5,marginBottom:4,display:'flex',gap:8}}><span style={{color:'var(--text-faint)'}}>·</span><span>{n}</span></div>))}
@@ -2032,9 +2049,9 @@ function ContextConsidered({dx}){
 // Layer 2 — the LLM analyst's read (from diagnostic-analyst edge fn, generated at
 // snapshot time). Reasons over the evidence bundle with confidence + blindspots.
 function verdictStyle(v){
-  if(v==='act')      return {label:'ACT NOW', bg:'rgba(255,99,99,0.12)',  fg:'var(--bad)'};
-  if(v==='monitor')  return {label:'MONITOR', bg:'rgba(139,92,246,0.12)', fg:'var(--accent)'};
-  return {label:'EXPECTED', bg:'rgba(255,255,255,0.05)', fg:'var(--text-muted)'};   // 'expected'
+  if(v==='act')      return {label:'ACT NOW', bg:'var(--color-danger-wash)',  fg:'var(--bad)'};
+  if(v==='monitor')  return {label:'MONITOR', bg:'var(--color-accent-wash-2)', fg:'var(--accent)'};
+  return {label:'EXPECTED', bg:'var(--color-surface)', fg:'var(--text-muted)'};   // 'expected'
 }
 function Disclosure({label, open, onToggle}){
   return (<button onClick={onToggle} style={{display:'flex',alignItems:'center',gap:7,width:'100%',background:'transparent',border:'none',borderTop:'1px solid var(--border-subtle)',padding:'10px 0 2px',cursor:'pointer',color:'var(--text-secondary)',fontSize:12.5,fontWeight:600,textAlign:'left'}}>
@@ -2045,9 +2062,9 @@ function Disclosure({label, open, onToggle}){
 // low = a hypothesis to validate (never presented as a command).
 function confChip(level){
   const m = {
-    high: {lbl:'High confidence', fg:'var(--good)', bg:'rgba(110,231,183,0.12)'},
-    med:  {lbl:'Medium confidence', fg:'var(--warn)', bg:'rgba(245,158,11,0.12)'},
-    low:  {lbl:'Low · validate first', fg:'var(--text-muted)', bg:'rgba(255,255,255,0.06)'},
+    high: {lbl:'Likely',   fg:'var(--color-success)', bg:'var(--color-success-wash-2)'},
+    med:  {lbl:'Probably', fg:'var(--color-warning)', bg:'var(--color-warning-wash)'},
+    low:  {lbl:'Possible', fg:'var(--color-muted)',   bg:'var(--color-sunken)'},
   };
   const c = m[level] || m.med;
   return <span style={{fontSize:9,fontWeight:700,letterSpacing:'.04em',color:c.fg,background:c.bg,padding:'2px 7px',borderRadius:999,whiteSpace:'nowrap'}}>{c.lbl}</span>;
@@ -2099,12 +2116,12 @@ function PlaybookHint({text}){
     <button onClick={()=>setOpen(o=>!o)} style={{display:'inline-flex',alignItems:'center',gap:6,background:'transparent',border:'none',padding:0,cursor:'pointer',color:'var(--accent)',fontSize:12.5,fontWeight:600}}>
       <span style={{display:'inline-flex',transform:open?'rotate(90deg)':'none',transition:'transform 120ms'}}><Icon name="chevron" size={12}/></span>{open?'Hide steps':'Show me how →'}
     </button>
-    {open && (<div style={{marginTop:6,padding:'10px 14px',borderRadius:'var(--r-md)',background:'rgba(255,255,255,0.02)',border:'1px solid var(--border-subtle)'}}>
+    {open && (<div style={{marginTop:6,padding:'10px 14px',borderRadius:'var(--r-md)',background:'var(--color-sunken)',border:'1px solid var(--border-subtle)'}}>
       <div style={{fontSize:12,fontWeight:700,color:'var(--text-primary)',marginBottom:6}}>{pb.title}</div>
       <ol style={{margin:0,paddingLeft:18,fontSize:12.5,color:'var(--text-secondary)',lineHeight:1.6}}>
         {pb.steps.map((s,i)=><li key={i} style={{marginBottom:4}}>{s}</li>)}
       </ol>
-      {pb.caution && <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:7,lineHeight:1.5}}>⚠ {pb.caution}</div>}
+      {pb.caution && <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:7,lineHeight:1.5}}>{pb.caution}</div>}
     </div>)}
   </div>);
 }
@@ -2281,7 +2298,7 @@ function InsightActions({title, why, recommendation, agent, askQ, caveat, confid
   return (<div className="insight-actions">
     <button className="ia-btn primary" onClick={evidence}><Icon name="info" size={13}/>View evidence</button>
     <button className="ia-btn" onClick={()=>aiSaveTask(recommendation||title)}><Icon name="clipboard" size={13}/>Create task</button>
-    <button className="ia-btn" onClick={()=>window.__oiAsk && window.__oiAsk(askQ||('Explain this finding: '+title))}><Icon name="spark" size={13}/>Ask AI</button>
+    <button className="ia-btn" onClick={()=>window.__oiAsk && window.__oiAsk(askQ||('Explain this finding: '+title))}><Icon name="spark" size={13}/>Ask Greta</button>
     <button className="ia-btn" onClick={()=>{ oiSnoozeAdd(title); toast('Snoozed', {body:'Hidden from your view.'}); onSnooze && onSnooze(); }}><Icon name="bell" size={13}/>Snooze</button>
     <button className="ia-btn" onClick={()=>{ oiFeedbackAdd(title); toast('Flagged as not useful', {kind:'warn', body:'Thanks — this tunes future insights.'}); onWrong && onWrong(); }}><Icon name="alert" size={13}/>Mark wrong</button>
   </div>);
@@ -2350,7 +2367,7 @@ function ChartFooter({note, ask, rows, columns}){
       {note && <span className="cf-note">{note}</span>}
       {!note && <span style={{flex:1}}/>}
       {hasTable && <button className="cf-btn" onClick={()=>setTbl(v=>!v)}><Icon name="clipboard" size={12}/>{tbl?'Hide table':'View as table'}</button>}
-      {ask && <button className="cf-btn" onClick={()=>window.__oiAsk && window.__oiAsk(ask)}><Icon name="spark" size={12}/>Ask AI about this</button>}
+      {ask && <button className="cf-btn" onClick={()=>window.__oiAsk && window.__oiAsk(ask)}><Icon name="spark" size={12}/>Ask Greta</button>}
     </div>
     {tbl && hasTable && (<div className="cf-table-wrap">
       <table><thead><tr>{columns.map((c,i)=>(<th key={i} className={c.right?'':'tl'}>{c.label}</th>))}</tr></thead>
@@ -2395,7 +2412,7 @@ function ConfigurableChart({dataset, dimensions, metrics, defaultMetric, default
     <select value={val} onChange={e=>set(e.target.value)} style={selStyle}>
       {opts.map(o=><option key={o.key} value={o.key}>{o.label}</option>)}
     </select>);
-  const segB = (active)=>({fontSize:11.5,fontWeight:600,padding:'5px 11px',borderRadius:6,cursor:'pointer',border:'1px solid '+(active?PAL.accent:'var(--border-subtle)'),background:active?'rgba(139,92,246,0.14)':'transparent',color:active?PAL.accent:'var(--text-muted)'});
+  const segB = (active)=>({fontSize:11.5,fontWeight:600,padding:'5px 11px',borderRadius:6,cursor:'pointer',border:'1px solid '+(active?PAL.accent:'var(--border-subtle)'),background:active?'var(--color-accent-wash-2)':'transparent',color:active?PAL.accent:'var(--text-muted)'});
   const bar = ctype==='bar';
 
   return (<div className="card">
@@ -2457,7 +2474,7 @@ function DataFreshness(){
       <span style={{color:'var(--text-secondary)'}}>{x.name}</span>
       <span style={{color:tone(x)}}>{label(x)}</span>
     </span>))}
-    {flagged && <span style={{color:'var(--warn)'}}>⚠ estimated/stale channels aren't a live read — reconnect to refresh</span>}
+    {flagged && <span style={{color:'var(--warn)'}}>estimated/stale channels aren't a live read — reconnect to refresh</span>}
   </div>);
 }
 // ── Crux — commercial-intelligence synthesis: composite scores across the team ──
@@ -2564,7 +2581,7 @@ function ScoresStrip({metrics, windowLabel}){
     return Math.round((new Date(ds[ds.length-1]) - new Date(ds[0]))/86400000) + 1;
   } catch(e){ return null; } })();
   if (histDays != null && histDays < 30) {
-    return (<div style={{padding:'10px 12px',borderRadius:'var(--r-md)',background:'rgba(255,255,255,0.02)',border:'1px solid var(--border-subtle)',marginBottom:12}}>
+    return (<div style={{padding:'10px 12px',borderRadius:'var(--r-md)',background:'var(--color-sunken)',border:'1px solid var(--border-subtle)',marginBottom:12}}>
       <div style={{display:'flex',alignItems:'center',gap:16,flexWrap:'wrap',fontSize:12,color:'var(--text-secondary)'}}>
         <span style={{textTransform:'uppercase',letterSpacing:'.05em',fontSize:10,color:'var(--text-faint)'}}>Business vitals</span>
         <span>Not scored yet — needs ≥30 days of trading history ({histDays}d so far). Scoring this early would over-claim; check back as data accumulates.</span>
@@ -2591,7 +2608,7 @@ function ScoresStrip({metrics, windowLabel}){
   const scaleWord = s.scale.score>=80?'the economics support spending more to grow'
     : s.scale.score>=55?'it’s not safe to scale spend yet — clear the blockers first'
     : 'it’s not safe to scale — the unit economics need work first';
-  return (<div style={{padding:'10px 12px',borderRadius:'var(--r-md)',background:'rgba(255,255,255,0.02)',border:'1px solid var(--border-subtle)',marginBottom:12}}>
+  return (<div style={{padding:'10px 12px',borderRadius:'var(--r-md)',background:'var(--color-sunken)',border:'1px solid var(--border-subtle)',marginBottom:12}}>
     <div style={{display:'flex',alignItems:'center',gap:16,flexWrap:'wrap',fontSize:12,color:'var(--text-secondary)'}}>
       <span style={{textTransform:'uppercase',letterSpacing:'.05em',fontSize:10,color:'var(--text-faint)'}}>Business vitals{windowLabel?<span style={{textTransform:'none',letterSpacing:0,color:'var(--text-faint)',fontWeight:400}}> · {windowLabel} · independent of the date picker</span>:null}</span>
       {partial && <span style={{fontSize:11,color:'var(--warn)',fontWeight:600}}>Partly scored — missing {s.missing.join(' and ')}</span>}
@@ -2599,12 +2616,12 @@ function ScoresStrip({metrics, windowLabel}){
           "A 0–100 blend of your profit margins, ad efficiency, conversion rate, returns and discount discipline. Answers: are the fundamentals healthy?",
           "75+ strong · 55–74 okay · under 55 needs work.",
           w0?`Weakest right now: ${w0.label} — ${w0.detail}.`:'' ]}
-        valueNode={<span>Health <b style={{color:tone(s.health.score),fontSize:14}}>{s.health.score}</b><span style={{color:'var(--text-faint)'}}>/100 · {s.health.band}</span></span>}/>
+        valueNode={<span>Health <b style={{color:tone(s.health.score),fontSize:14,fontFamily:'var(--font-mono)'}}>{s.health.score}</b><span style={{color:'var(--text-faint)'}}>/100 · {s.health.band}</span></span>}/>
       <ScoreTip title="Scale-readiness — safe to spend more?" lines={[
           "The share of 'safe to scale' checks you pass — e.g. cost to win a customer (cost per new customer) under your limit, profitable per order, fast payback, conversion not slipping.",
           "80+ ready · 55–79 conditional (fix blockers first) · under 55 not yet.",
           s.scale.fails.length?`Blocking: ${s.scale.fails.slice(0,3).join('; ')}.`:'All checks pass.' ]}
-        valueNode={<span>Scale-readiness <b style={{color:tone(s.scale.score),fontSize:14}}>{s.scale.score}</b><span style={{color:'var(--text-faint)'}}>/100 · {s.scale.band}</span></span>}/>
+        valueNode={<span>Scale-readiness <b style={{color:tone(s.scale.score),fontSize:14,fontFamily:'var(--font-mono)'}}>{s.scale.score}</b><span style={{color:'var(--text-faint)'}}>/100 · {s.scale.band}</span></span>}/>
       <ScoreTip title="Growth quality — is the growth profitable?" lines={[
           "Whether recent revenue growth came with profit growth.",
           "'Low-quality growth' = sales up but profit (contribution = revenue minus product + ad costs) flat or down — usually rising ad costs or heavier discounting.",
@@ -2613,7 +2630,7 @@ function ScoresStrip({metrics, windowLabel}){
       <button onClick={()=>setOpen(o=>!o)} style={{marginLeft:'auto',background:'transparent',border:'none',color:'var(--accent)',cursor:'pointer',fontSize:11.5,fontWeight:600}}>{open?'Hide detail':'Detail'}</button>
     </div>
     <div style={{marginTop:8,fontSize:12.5,color:'var(--text-secondary)',lineHeight:1.55,borderTop:'1px solid var(--border-subtle)',paddingTop:8}}>
-      <b style={{color:'var(--text-primary)'}}>In plain terms:</b> the business is <b style={{color:tone(s.health.score)}}>{healthWord}</b> (Health {s.health.score}/100){s.growth.band!=='Insufficient history'?<> and right now it&rsquo;s <b style={{color:gTone(s.growth.band)}}>{growthPlain}</b></>:''}. On growing, {scaleWord}.
+      The business is <b style={{color:tone(s.health.score)}}>{healthWord}</b> (Health {s.health.score}/100){s.growth.band!=='Insufficient history'?<> and right now it&rsquo;s <b style={{color:gTone(s.growth.band)}}>{growthPlain}</b></>:''}. On growing, {scaleWord}.
     </div>
     {open && (<div style={{marginTop:7,fontSize:12,color:'var(--text-secondary)',lineHeight:1.55}}>
       <div><b style={{color:'var(--text-primary)'}}>Weakest fundamentals:</b> {s.health.weakest.map(w=>`${w.label} — ${w.detail}`).join('; ')||'—'}.</div>
@@ -2649,7 +2666,7 @@ function ChangeBridgeBody({metrics:m}){
     </div>
     {items.map((it,i)=>(<div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'4px 0'}}>
       <span style={{width:130,fontSize:12,color:'var(--text-secondary)',flexShrink:0}}>{it.label}</span>
-      <div style={{flex:1,height:14,position:'relative',background:'rgba(255,255,255,0.03)',borderRadius:4,minWidth:100}}>
+      <div style={{flex:1,height:14,position:'relative',background:'var(--color-sunken)',borderRadius:4,minWidth:100}}>
         <div style={{position:'absolute',left:'50%',top:0,bottom:0,width:1,background:'var(--border-default)'}}/>
         <div style={{position:'absolute',top:3,bottom:3,borderRadius:3,background:col(it.v),left: it.v>=0?'50%':`${50 - 50*Math.abs(it.v)/max}%`, width:`${50*Math.abs(it.v)/max}%`}}/>
       </div>
@@ -2684,19 +2701,19 @@ function AnalystRead({read, dx, metrics, onLog, logUI}){
     <div className="card">
       {logUI}
       <div className="card-section-title">
-        <h2 style={{margin:0}}>What to do next <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>— operator diagnostic</span></h2>
+        <h2 style={{margin:0}}>What to do next</h2>
         <div style={{display:'flex',alignItems:'center',gap:10}}>
-          <span className="meta">AI analyst{read.generatedAt?` · ${read.generatedAt.slice(0,10)}`:''}</span>
+          <span className="meta">{read.generatedAt?`as of ${read.generatedAt.slice(0,10)}`:''}</span>
           {onLog && <LogEventButton onClick={onLog}/>}
         </div>
       </div>
       {/* TIER 1 — THE MOVE (framing + accent shift by confidence) */}
       {move && (
-      <div style={{padding:'14px 16px',borderRadius:'var(--r-md)',background:moveLow?'rgba(255,255,255,0.03)':'rgba(139,92,246,0.07)',border:'1px solid '+(moveLow?'var(--border-default)':'var(--border-subtle)')}}>
+      <div style={{padding:'14px 16px',borderRadius:'var(--r-md)',background:moveLow?'var(--color-sunken)':'var(--color-accent-wash)',border:'1px solid '+(moveLow?'var(--border-default)':'var(--border-subtle)')}}>
         <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
           <span style={{fontSize:10,fontWeight:700,letterSpacing:'.07em',textTransform:'uppercase',color:moveLow?'var(--text-muted)':'var(--accent)'}}>{moveLow?'Top hypothesis · validate first':'Do this next'}</span>
           {confChip(conf(move))}
-          {move.gbp>0 && <span style={{marginLeft:'auto',fontWeight:700,color:'var(--good)',whiteSpace:'nowrap'}}>~{GBP(move.gbp)}{moveLow?' if confirmed':' on the table'}</span>}
+          {move.gbp>0 && <span style={{marginLeft:'auto',fontWeight:700,color:'var(--good)',whiteSpace:'nowrap'}}>{GBP(move.gbp)}{moveLow?' if confirmed':' on the table'}</span>}
         </div>
         <div style={{fontSize:16,fontWeight:700,color:'var(--text-primary)',marginTop:6,lineHeight:1.45}}>{moveLow?'Test this: ':''}{plainWords(move.recommendation)}</div>
         <div style={{fontSize:12.5,color:'var(--text-secondary)',marginTop:6,lineHeight:1.5}}><span style={{color:'var(--text-faint)'}}>Why · </span>{move.metric}</div>
@@ -2712,12 +2729,12 @@ function AnalystRead({read, dx, metrics, onLog, logUI}){
             {confChip(conf(x))}
           </div>
           <div style={{flex:1,minWidth:0,fontSize:13,color:low?'var(--text-secondary)':'var(--text-primary)',lineHeight:1.5}}><b>{x.area}.</b> {low?'Worth checking: ':''}{x.recommendation}{x.metric && <div style={{fontSize:11.5,color:'var(--text-faint)',marginTop:1}}>{plainWords(x.metric)}</div>}</div>
-          <div style={{width:64,textAlign:'right',flexShrink:0,fontWeight:700,color:'var(--good)',whiteSpace:'nowrap',fontSize:12.5}}>{x.gbp>0?'~'+GBP(x.gbp):''}</div>
+          <div style={{width:64,textAlign:'right',flexShrink:0,fontWeight:700,color:'var(--good)',whiteSpace:'nowrap',fontSize:12.5}}>{x.gbp>0?GBP(x.gbp):''}</div>
           <div style={{flexShrink:0}}><NavChip f={x}/></div>
         </div>
       );})}
       {/* TIER 3 — the thinking (folded) */}
-      <Disclosure label="Show the thinking" open={showWhy} onToggle={()=>setShowWhy(s=>!s)}/>
+      <Disclosure label="How Greta worked this out" open={showWhy} onToggle={()=>setShowWhy(s=>!s)}/>
       {showWhy && (
         <div style={{padding:'8px 0 0 18px'}}>
           <div style={{fontSize:13,color:'var(--text-primary)',fontWeight:600,lineHeight:1.5}}>{plainWords(read.headline)}</div>
@@ -2727,7 +2744,7 @@ function AnalystRead({read, dx, metrics, onLog, logUI}){
             {findings.map((x,i)=>(<div key={i} style={{fontSize:12.5,color:'var(--text-secondary)',lineHeight:1.5,marginBottom:5}}><b style={{color:'var(--text-primary)'}}>{x.area}{x.confidence?` · ${x.confidence} confidence`:''}.</b> {x.reasoning}</div>))}
           </div>
           {(read.blindspots||[]).length>0 && (
-            <div style={{marginTop:10,padding:'10px 14px',borderRadius:'var(--r-md)',background:'rgba(255,255,255,0.02)',border:'1px solid var(--border-subtle)'}}>
+            <div style={{marginTop:10,padding:'10px 14px',borderRadius:'var(--r-md)',background:'var(--color-sunken)',border:'1px solid var(--border-subtle)'}}>
               <div style={{fontSize:11,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:6}}>What I can't see yet</div>
               {read.blindspots.map((b,i)=>(<div key={i} style={{fontSize:12,color:'var(--text-secondary)',lineHeight:1.5,display:'flex',gap:8,marginBottom:3}}><span style={{color:'var(--text-faint)'}}>·</span><span>{b}</span></div>))}
             </div>
@@ -2765,7 +2782,7 @@ function LogEventModal({onClose, onSaved}){
       <div style={{fontSize:12.5,color:'var(--text-secondary)',marginBottom:16,lineHeight:1.5}}>Tell the diagnostic what happened — it'll factor this into the read straight away (e.g. a deliberate spend test stops an sales per £ of ads dip reading as fatigue).</div>
       <label style={{fontSize:11,color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'.05em'}}>Type</label>
       <select value={type} onChange={e=>setType(e.target.value)} style={{width:'100%',margin:'4px 0 12px',padding:'8px 10px',background:'transparent',border:'1px solid var(--border-subtle)',borderRadius:6,color:'var(--text-primary)',colorScheme:'light dark'}}>
-        {Object.keys(EVENT_META).map(k=><option key={k} value={k}>{EVENT_META[k].icon} {EVENT_META[k].label}</option>)}
+        {Object.keys(EVENT_META).map(k=><option key={k} value={k}>{EVENT_META[k].label}</option>)}
       </select>
       <label style={{fontSize:11,color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'.05em'}}>Title</label>
       <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="e.g. Scaled Meta prospecting +40% (growth test)" style={{width:'100%',margin:'4px 0 12px',padding:'8px 10px',background:'transparent',border:'1px solid var(--border-subtle)',borderRadius:6,color:'var(--text-primary)'}}/>
@@ -2803,7 +2820,7 @@ function DiagnosticCard({metrics, context, period, onLogEvent}){
   const sevColor = s => s==='red'?'var(--bad)':'var(--warn)';
   if (!dx.findings.length) return (<div className="card">
     {logUI}
-    <div className="card-section-title"><h2 style={{margin:0}}>Operator diagnostic <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>— what the numbers say right now</span></h2><div style={{display:'flex',alignItems:'center',gap:10}}><span className="meta">Live cross-metric read</span><LogEventButton onClick={()=>setLogOpen(true)}/></div></div>
+    <div className="card-section-title"><h2 style={{margin:0}}>What the numbers say right now</h2><div style={{display:'flex',alignItems:'center',gap:10}}><span className="meta">Live cross-metric read</span><LogEventButton onClick={()=>setLogOpen(true)}/></div></div>
     <div className="note">No binding constraint this period — funnel, margin and unit economics are all within healthy ranges. Keep scaling while customer lifetime value:cost per new customer holds above 3×.</div>
     <ContextConsidered dx={dx}/>
   </div>);
@@ -2812,10 +2829,10 @@ function DiagnosticCard({metrics, context, period, onLogEvent}){
     <div className="card">
       {logUI}
       <div className="card-section-title">
-        <h2 style={{margin:0}}>Operator diagnostic <span style={{color:'var(--text-faint)',fontWeight:400,fontSize:13}}>— what the numbers say right now</span></h2>
-        <div style={{display:'flex',alignItems:'center',gap:10}}><span className="meta">Live cross-metric read{dx.inPlay>0?` · ~${GBP(dx.inPlay)} contribution in play`:''}</span><LogEventButton onClick={()=>setLogOpen(true)}/></div>
+        <h2 style={{margin:0}}>What the numbers say right now</h2>
+        <div style={{display:'flex',alignItems:'center',gap:10}}><span className="meta">Live cross-metric read{dx.inPlay>0?` · ${GBP(dx.inPlay)} contribution in play`:''}</span><LogEventButton onClick={()=>setLogOpen(true)}/></div>
       </div>
-      <div style={{padding:'12px 16px',borderRadius:'var(--r-md)',background:'rgba(139,92,246,0.06)',border:'1px solid var(--border-subtle)',marginBottom:14}}>
+      <div style={{padding:'12px 16px',borderRadius:'var(--r-md)',background:'var(--color-accent-wash)',border:'1px solid var(--border-subtle)',marginBottom:14}}>
         <div style={{fontSize:11,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-faint)'}}>Biggest lever</div>
         <div style={{fontSize:16,fontWeight:700,color:'var(--text-primary)',marginTop:2}}>{top.title}</div>
         <div style={{fontSize:13,color:'var(--text-secondary)',marginTop:4,lineHeight:1.5}}>{top.evidence}</div>
@@ -2827,7 +2844,7 @@ function DiagnosticCard({metrics, context, period, onLogEvent}){
             <div style={{flex:1}}>
               <div style={{display:'flex',justifyContent:'space-between',gap:10,alignItems:'baseline'}}>
                 <span style={{fontWeight:600,color:'var(--text-primary)'}}>{x.area}: {plainWords(x.metric)}</span>
-                {x.gbp>0 && <span style={{fontWeight:700,color:'var(--good)',whiteSpace:'nowrap'}}>~{GBP(x.gbp)}</span>}
+                {x.gbp>0 && <span style={{fontWeight:700,color:'var(--good)',whiteSpace:'nowrap'}}>{GBP(x.gbp)}</span>}
               </div>
               <div style={{fontSize:13,color:'var(--text-secondary)',marginTop:3,lineHeight:1.5}}>→ {x.action}</div>
             </div>
@@ -3088,12 +3105,12 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
       {pre&&<span>{pre}</span>}<input type="text" inputMode="decimal" defaultValue={inp[k]} onChange={e=>set(k,e.target.value)} onFocus={e=>e.target.select()} style={inStyle}/>{suf&&<span>{suf}</span>}
     </span>
   </label>);
-  const tile = (label,val,sub,col)=>(<div style={{flex:'1 1 130px',padding:'10px 12px',borderRadius:'var(--r-md)',background:'rgba(255,255,255,0.02)',border:'1px solid var(--border-subtle)'}}>
+  const tile = (label,val,sub,col)=>(<div style={{flex:'1 1 130px',padding:'10px 12px',borderRadius:'var(--r-md)',background:'var(--color-sunken)',border:'1px solid var(--border-subtle)'}}>
     <div style={{fontSize:10.5,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-faint)'}}>{label}</div>
     <div style={{fontSize:18,fontWeight:700,color:col||'var(--text-primary)',marginTop:2}}>{val}</div>
     {sub&&<div style={{fontSize:11,color:'var(--text-muted)',marginTop:1}}>{sub}</div>}
   </div>);
-  const modeBtn = (key,label)=>(<button onClick={()=>set('mode',key)} style={{padding:'5px 11px',borderRadius:6,border:'1px solid '+(mode===key?'var(--accent)':'var(--border-subtle)'),background:mode===key?'rgba(139,92,246,0.14)':'transparent',color:mode===key?'var(--text-primary)':'var(--text-muted)',fontSize:12,fontWeight:600,cursor:'pointer'}}>{label}</button>);
+  const modeBtn = (key,label)=>(<button onClick={()=>set('mode',key)} style={{padding:'5px 11px',borderRadius:6,border:'1px solid '+(mode===key?'var(--accent)':'var(--border-subtle)'),background:mode===key?'var(--color-accent-wash-2)':'transparent',color:mode===key?'var(--text-primary)':'var(--text-muted)',fontSize:12,fontWeight:600,cursor:'pointer'}}>{label}</button>);
   const annLabel = rows.length===12 ? 'Year 1' : rows.length+'-month';
 
   return (
@@ -3164,11 +3181,11 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
           <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} formatter={v=>GBP(v)}/>
           <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:12, paddingBottom:8}}/>
           {mode==='bottomup' ? [
-            <R.Area key="n" type="monotone" dataKey="newRev" name="New" stackId="rev" stroke={PAL.accent} fill="rgba(139,92,246,0.5)" strokeWidth={1}/>,
-            <R.Area key="r" type="monotone" dataKey="retRev" name="Returning" stackId="rev" stroke={PAL.good} fill="rgba(110,231,183,0.45)" strokeWidth={1}/>,
-            <R.Area key="w" type="monotone" dataKey="whRev" name="Wholesale" stackId="rev" stroke={PAL.warn} fill="rgba(245,158,11,0.4)" strokeWidth={1}/>
+            <R.Area key="n" type="monotone" dataKey="newRev" name="New" stackId="rev" stroke={PAL.accent} fill={palAlpha(PAL.accent, 0.50)} strokeWidth={1}/>,
+            <R.Area key="r" type="monotone" dataKey="retRev" name="Returning" stackId="rev" stroke={PAL.good} fill={palAlpha(PAL.good, 0.45)} strokeWidth={1}/>,
+            <R.Area key="w" type="monotone" dataKey="whRev" name="Wholesale" stackId="rev" stroke={PAL.warn} fill="var(--color-warning-wash)" strokeWidth={1}/>
           ] : (
-            <R.Area key="rev" type="monotone" dataKey="revenue" name="Revenue" stroke={PAL.accent} fill="rgba(139,92,246,0.16)" strokeWidth={2}/>
+            <R.Area key="rev" type="monotone" dataKey="revenue" name="Revenue" stroke={PAL.accent} fill={palAlpha(PAL.accent, 0.16)} strokeWidth={2}/>
           )}
           <R.Line type="monotone" dataKey="ebitda" name="Operating profit" stroke="#f0f0f4" strokeWidth={2} strokeDasharray="4 3" dot={false}/>
         </R.ComposedChart>
@@ -3280,8 +3297,8 @@ function MobileToday(){
             style={{padding:'10px 12px',background:'var(--bg-elevated)',border:'1px solid var(--border-subtle)',borderRadius:10,cursor:'pointer'}}>
             <div style={{fontSize:13,color:'var(--text-primary)',lineHeight:1.4}}>{scrubTag(a.description)}</div>
             <div style={{fontSize:11,color:'var(--text-faint)',marginTop:5,display:'flex',gap:12,flexWrap:'wrap'}}>
-              <span style={{color:kc(a.kind),fontWeight:600}}>{`~${curSym()}`}{Math.round(Math.abs(a.monthly_impact_gbp)).toLocaleString()}/mo</span>
-              {a.priority && <span>⏱ {byWhen(a.priority)}</span>}
+              <span style={{color:kc(a.kind),fontWeight:600}}>{`${curSym()}`}{Math.round(Math.abs(a.monthly_impact_gbp)).toLocaleString()}/mo</span>
+              {a.priority && <span>{byWhen(a.priority)}</span>}
               <span style={{color:'var(--accent)'}}>tap to ask →</span>
             </div>
           </div>
@@ -3577,7 +3594,7 @@ function Overview({start, period, customActive}){
         <div className="card" style={{borderLeft:'3px solid var(--accent)', display:'flex', alignItems:'center', gap:16, flexWrap:'wrap'}}>
           <div style={{flex:'1 1 420px'}}>
             <div style={{fontWeight:650, fontSize:14, marginBottom:3}}>Make the margin numbers exact <span style={{fontWeight:400, color:'var(--text-faint)', fontSize:12}}>· optional, ~5 min</span></div>
-            <div className="micro" style={{color:'var(--text-secondary)', lineHeight:1.5}}>The read above already works on catalogue-estimate margins. Enter your real product cost + fulfilment once and contribution, cost per new customer payback and customer lifetime value:cost per new customer become exact — and carry a <b>✓ verified</b> badge for the raise.</div>
+            <div className="micro" style={{color:'var(--text-secondary)', lineHeight:1.5}}>The read above already works on catalogue-estimate margins. Enter your real product cost + fulfilment once and contribution, cost per new customer payback and customer lifetime value:cost per new customer become exact — and carry a <b>verified</b> badge for the raise.</div>
           </div>
           <button onClick={()=>{ if (UI_V3) { window.__oiGo && window.__oiGo('goal'); return; } setCostsOpen(true); }} className="btn-primary" style={{flexShrink:0}}>Set up costs →</button>
         </div>
@@ -3606,7 +3623,7 @@ function Overview({start, period, customActive}){
         </div>
         <div className="row">
           <KPI label="Paid ad spend" val={GBP(paid)} sub={`Meta ${GBP(sum(meta,'cost'))} · Google ${GBP(sum(gads,'cost'))}`} series={seriesPaid} current={paid} prior={pPaid}
-            agent="Pulse" observation={OI_BRAND.slug==='frkl' ? `Up ~46% on prior period as Meta scaled from ~${curSym()}100 to ~${curSym()}170/day from 13 April.` : undefined}
+            agent="Pulse" observation={OI_BRAND.slug==='frkl' ? `Up ~46% on prior period as Meta scaled from ${curSym()}100 to ${curSym()}170/day from 13 April.` : undefined}
             implication={OI_BRAND.slug==='frkl' ? "Don't push further until Ireland frequency drops below 8× and the cart-checkout JS error is fixed." : undefined} />
           <KPI label="Shopify net revenue" val={GBP(rev)} sub={`${NUM(orders)} orders · average order value ${GBP(orders?rev/orders:null)}`} series={seriesRev} current={rev} prior={pRev} goodDirection="up"
             agent="Atlas" observation={`Draft/exchange orders are excluded. ~${discLoad!=null?Math.round(discLoad*100):10}% of DTC gross sales went out as code/automatic discounts, with sale-price markdowns on top — see Promotions for the full load.`}
@@ -3705,7 +3722,7 @@ function Overview({start, period, customActive}){
             {(function(){ var pins=buildChartPins(daily.map(function(d){return {x:d.dlabel, date:d.date};}));
               return pins.map(function(p,i){ return (
                 <R.ReferenceLine key={'pin'+i} x={p.x} stroke={PAL.muted} strokeDasharray="3 3" strokeOpacity={0.55}
-                  label={<PinMarker icon={p.icon} n={p.n} tip={p.tip}/>}/>); });
+                  label={<PinMarker tone={p.tone} n={p.n} tip={p.tip}/>}/>); });
             })()}
           </R.ComposedChart>
         </R.ResponsiveContainer>
@@ -3725,7 +3742,7 @@ function Overview({start, period, customActive}){
         </R.ResponsiveContainer>
         <div style={{fontSize:10.5,color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{BRUSH_HINT}</div>
         {(function(){ var pins=buildChartPins(daily.map(function(d){return {x:d.dlabel, date:d.date};})); if(!pins.length) return null; return (
-          <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>🏷️ sales &amp; promos · 📌 your events — <span style={{color:'var(--text-muted)'}}>hover any marker for what it was</span></div>); })()}
+          <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>Dots mark sales and promos, and events you logged — <span style={{color:'var(--text-muted)'}}>hover any marker for what it was</span></div>); })()}
         <ChartFooter note="Does paid spend track with revenue? Watch for spend rising while revenue flattens — that's efficiency slipping."
           ask="Looking at daily paid spend vs Shopify revenue, is my paid media still efficient, and what changed?"
           rows={daily} columns={[
@@ -3841,8 +3858,8 @@ function FitCard({start, end}){
       <h2 style={{margin:0}}>Offer &amp; Product Market Fit</h2>
       <div style={{display:'flex',gap:6,alignItems:'center'}}>
         {source==='live'
-          ? <span className="pill" style={{background:'rgba(52,211,153,.13)',color:PAL.good}} title={'Live engine output'+(FIT.window?` · window ${FIT.window.start} → ${FIT.window.end}`:'')}>live</span>
-          : <span className="pill" style={{background:'rgba(148,148,160,.14)',color:'var(--text-faint)'}} title={(error?('Live fetch failed ('+error+') — showing cached snapshot. '):'')+'Log in to load your live engine output'}>cached</span>}
+          ? <span className="pill" style={{background:'var(--color-success-wash-2)',color:PAL.good}} title={'Live engine output'+(FIT.window?` · window ${FIT.window.start} → ${FIT.window.end}`:'')}>live</span>
+          : <span className="pill" style={{background:'var(--color-sunken)',color:'var(--text-faint)'}} title={(error?('Live fetch failed ('+error+') — showing cached snapshot. '):'')+'Log in to load your live engine output'}>cached</span>}
         <span className="pill" style={{background:fitConfColor(FIT.confidence)+'22',color:fitConfColor(FIT.confidence)}}>{FIT.confidence} confidence</span>
       </div>
     </div>
@@ -3851,7 +3868,7 @@ function FitCard({start, end}){
       <FitScore label="Product-market fit" value={b.pmfScore} sub="customer lifetime value:cost per new customer · payback · retention"/>
     </div>
     {diluted&&(<div className="note" style={{marginBottom:12,borderLeft:`3px solid ${PAL.warn}`}}><b>Paid-only offer fit.</b> Blended (incl. organic/direct) reads <b>{pomf.blendedOmfScore}</b> at {rx(pomf.blendedCacCoverageRatio)} cost per new customer coverage — flattered by {pomf.excludedChannels.join(', ')} with no ad spend. On the paid channels you control, cost per new customer coverage is {rx(pomf.cacCoverageRatio)}.</div>)}
-    <div style={{padding:'12px 14px',borderRadius:'var(--r-sm)',background:'var(--accent-bg)',border:'1px solid rgba(139,92,246,.25)',marginBottom:12}}>
+    <div style={{padding:'12px 14px',borderRadius:'var(--r-sm)',background:'var(--accent-bg)',border:'1px solid var(--color-accent-line)',marginBottom:12}}>
       <div style={{fontWeight:700,color:'var(--text-primary)',marginBottom:4}}>{FIT.primaryDiagnosis}</div>
       <div style={{fontSize:'12.5px',lineHeight:1.5,color:'var(--text-secondary)'}}>{FIT.recommendedAction}</div>
     </div>
@@ -3938,7 +3955,7 @@ function GpSrc({ source, label }) {
       fontSize: 10, padding: '1px 6px', marginLeft: 6, verticalAlign: 'middle',
       background: brand ? 'var(--accent-bg)' : 'transparent',
       color: brand ? 'var(--accent)' : 'var(--text-faint)',
-      border: '1px solid ' + (brand ? 'rgba(139,92,246,.35)' : 'var(--border-subtle)'),
+      border: '1px solid ' + (brand ? 'var(--color-accent-line)' : 'var(--border-subtle)'),
     }}>{brand ? 'your number' : 'prior'}</span>
   );
 }
@@ -4025,7 +4042,7 @@ function GenomePanel() {
       </div>
 
       {cashTrap && (
-        <div style={{ padding: '11px 13px', borderRadius: 'var(--r-sm)', background: 'rgba(251,191,36,.10)', border: '1px solid rgba(251,191,36,.30)', marginTop: 12 }}>
+        <div style={{ padding: '11px 13px', borderRadius: 'var(--r-sm)', background: 'var(--color-warning-wash)', border: '1px solid var(--color-warning-wash)', marginTop: 12 }}>
           <div style={{ fontWeight: 700, color: warn, marginBottom: 3 }}>operating profit-positive, cash-negative</div>
           <div className="micro" style={{ color: 'var(--text-secondary)' }}>
             The window clears {gpGBP0(pr.operatingProfitWindow)} of operating profit, but once ad spend is netted in, monthly operating cash is {gpGBP0(tj.monthlyNetOperatingCash)} and {gpGBP0(cc.workingCapitalRequired)} sits locked in the {gpDays(cc.cccDays)} cash cycle. Unit-profitable, cash-trapped.
@@ -4066,7 +4083,7 @@ function GenomePanel() {
             <>
               <div className="mrow"><span className="k">Marginal cost per new customer (next customer)</span><span className="v">{gpGBP2(me.marginalCac)}</span></div>
               <div className="mrow"><span className="k">Avg cost per new customer (now)</span><span className="v">{gpGBP2(me.averageCac)}</span></div>
-              <div className="mrow"><span className="k">Profitable spend ceiling{(gate && gate.s_star_status === 'provisional') ? <span className="pill" style={{ marginLeft: 6, fontSize: 9, background: 'rgba(251,191,36,.12)', color: warn, border: '1px solid rgba(251,191,36,.35)' }}>PROVISIONAL</span> : null}</span><span className="v">{(gate && gate.s_star_status === 'provisional') ? '~' : ''}{gpGBP0(me.profitableSpendCeiling)}/mo</span></div>
+              <div className="mrow"><span className="k">Profitable spend ceiling{(gate && gate.s_star_status === 'provisional') ? <span className="pill" style={{ marginLeft: 6, fontSize: 9, background: 'var(--color-warning-wash)', color: warn, border: '1px solid var(--color-warning-wash)' }}>PROVISIONAL</span> : null}</span><span className="v">{(gate && gate.s_star_status === 'provisional') ? '~' : ''}{gpGBP0(me.profitableSpendCeiling)}/mo</span></div>
               <div className="mrow"><span className="k">Headroom vs current</span><span className="v" style={{ color: (me.spendHeadroom ?? 0) >= 0 ? good : bad }}>{gpPCT(me.spendHeadroomPct, 0)}</span></div>
               {(gate && gate.s_star_status === 'provisional') ? <div className="micro" style={{ color: warn, marginTop: 4 }}>{gate.reason}</div> : null}
             </>
@@ -4151,7 +4168,7 @@ function CrossChannel({start}){
         <h2>Paid effect &amp; incrementality</h2>
         <div className="micro" style={{color:'var(--text-muted)', marginBottom:6}}>Spend↔revenue correlation by lag (revenue responds with a delay, so same-day understates paid).</div>
         <div style={{display:'flex', gap:8, marginBottom:10}}>
-          {lagCorr.map(l=>(<div key={l.lag} style={{flex:1, textAlign:'center', padding:'8px 4px', borderRadius:'var(--r-sm)', background: bestLag&&l.lag===bestLag.lag?'var(--accent-bg)':'var(--bg-app)', border:'1px solid '+(bestLag&&l.lag===bestLag.lag?'rgba(139,92,246,.35)':'var(--border-subtle)')}}>
+          {lagCorr.map(l=>(<div key={l.lag} style={{flex:1, textAlign:'center', padding:'8px 4px', borderRadius:'var(--r-sm)', background: bestLag&&l.lag===bestLag.lag?'var(--accent-bg)':'var(--bg-app)', border:'1px solid '+(bestLag&&l.lag===bestLag.lag?'var(--color-accent-line)':'var(--border-subtle)')}}>
             <div style={{fontSize:18, fontWeight:700, color: bestLag&&l.lag===bestLag.lag?'var(--accent)':'var(--text-primary)'}}>{l.r==null?'—':l.r.toFixed(2)}</div>
             <div className="micro" style={{color:'var(--text-faint)'}}>+{l.lag}d</div>
           </div>))}
@@ -4321,7 +4338,7 @@ function HookRetention({rows}){
   if(!videos.length) return null;
   // normalise each curve to 3sv = 100
   const data=[{stage:'3s'},{stage:'25%'},{stage:'50%'},{stage:'75%'},{stage:'100%'}];
-  const palette=[PAL.data3,PAL.good,PAL.warn,PAL.accent,PAL.bad,'#22d3ee'];
+  const palette=[PAL.data3,PAL.good,PAL.warn,PAL.accent,PAL.bad,PAL.data3];
   const names=[];
   videos.forEach((v,i)=>{
     const key='c'+i; names.push({key, name:v.name+(videos.filter(x=>x.name===v.name).length>1?' #'+(videos.slice(0,i+1).filter(x=>x.name===v.name).length):''), color:palette[i%palette.length]});
@@ -4379,9 +4396,9 @@ function CreativeVisionPanel(){
   const meta = V.meta || {};
   const refreshedAt = meta.generated_at_last_refresh || meta.generated_at;
   return (<div className="card" style={{marginBottom:14, borderLeft:`3px solid ${PAL.accent}`}}>
-    <h2>Creative vision analysis — AI looks at the actual creative</h2>
+    <h2>Creative analysis — what is actually in the frame</h2>
     <div className="muted" style={{marginBottom:10, fontSize:12}}>
-      AI vision scored each creative on hook strength, visual hierarchy, claim quality, audience fit, brand consistency. <b>This is what Triple Whale doesn't do</b> — most performance tools tell you which ad won; this tells you WHY at the asset level.
+      Each creative is scored on hook strength, visual hierarchy, claim quality, audience fit and brand consistency — so you can see why an ad won, not just that it did. Scored at the asset level.
       {refreshedAt && <span> · Last refresh: {new Date(refreshedAt).toLocaleString()}</span>}
       · Re-run with <code>python scripts/oi_creative_vision.py --force</code>
     </div>
@@ -4568,7 +4585,7 @@ function CreatorCandidatesPanel(){
       <div className="card" style={{marginBottom:14, borderLeft:`3px solid ${PAL.data3}`}}>
         <h2>Creator candidate discovery — Tier B</h2>
         <div className="muted" style={{marginBottom:10, fontSize:12}}>
-          {summary.totalCandidates || 0} candidates scored by AI against {OI_BRAND.name||'your brand'}'s brand brief and current winning affiliates. Sources searched: Astrid &amp; Miyu ambassador roster · Modash UK micro-influencer listings · SheerLuxe / Marie Claire / Fashion Monitor curated lists · UK lifestyle podcast hosts. <b>Scores are inference, not measurement</b> — verify follower counts, audience demos and engagement via Heepsy / Modash before significant outreach.
+          {summary.totalCandidates || 0} candidates scored against {OI_BRAND.name||'your brand'}'s brand brief and current winning affiliates. Sources searched: Astrid &amp; Miyu ambassador roster · Modash UK micro-influencer listings · SheerLuxe / Marie Claire / Fashion Monitor curated lists · UK lifestyle podcast hosts. <b>Scores are inference, not measurement</b> — verify follower counts, audience demos and engagement via Heepsy / Modash before significant outreach.
         </div>
         <div className="row" style={{marginBottom:8}}>
           <div className="card kpi" style={{borderLeft:`3px solid ${PAL.good}`}}>
@@ -4648,7 +4665,7 @@ function CreatorCandidatesPanel(){
         <div className="card" style={{flex:'1 1 280px'}}>
           <h2>How to use this</h2>
           <div style={{fontSize:12.5,lineHeight:1.6,color:'var(--text-secondary)'}}>
-            <p><b>Scores are inferred not measured.</b> They reflect what AI reasoning can extract from public web signals — past partnerships, audience age cues, content themes, engagement signals quoted in articles.</p>
+            <p><b>Scores are inferred, not measured.</b> They are read from public web signals — past partnerships, audience age cues, content themes and engagement quoted in articles — so treat them as a shortlist to check, not a ranking to act on.</p>
             <p><b>Before outreaching at scale</b>{`, verify with a real creator-discovery tool (Heepsy ${curSym()}69/mo or Modash ${curSym()}150+/mo). Look for: actual follower count, UK audience %, age split, engagement rate, brand-overlap with frkl peers.`}</p>
             {DEMO && <p><b>The highest-EV move</b> isn't in any external creator — it's an internal audit of <code>#myfrkl</code> tagged users. These are existing customers who already buy frkl AND have audiences. Pull that list from Instagram.</p>}
           </div>
@@ -5153,7 +5170,7 @@ function discountFindings(){
     area:'Promotions',
     metric:`${leak.code} — always-on ${ratePct}% code, every week on ${NUM(full.orders)} orders`,
     verdict:'act', confidence:'med',
-    reasoning:`"${leak.code}" has run continuously since ${fmtWk(full.firstSeen)} (${full.activeDays} active days) — not a campaign, a standing discount. It gives away ~${GBP(perMonth)}/mo of margin (${GBP(full.discount)} over the window). Some of those orders would convert at full price; the open question is how many.`,
+    reasoning:`"${leak.code}" has run continuously since ${fmtWk(full.firstSeen)} (${full.activeDays} active days) — not a campaign, a standing discount. It gives away ${GBP(perMonth)}/mo of margin (${GBP(full.discount)} over the window). Some of those orders would convert at full price; the open question is how many.`,
     recommendation:`Decide if this is a deliberate evergreen offer or a default capping margin. Test it: gate it behind email signup, or run a 2-week holdout, and watch whether orders hold. If they do, you've recovered the margin; if they drop, it's load-bearing demand.`,
     gbp: perMonth, _discount:true,
   }];
@@ -5174,7 +5191,7 @@ function markdownFindings(){
     area:'Margin',
     metric:`Sale-price markdowns — ${D.catalogOnSale}/${D.catalogActive} of catalogue at ~${D.avgMarkdownPct}% off (~${Math.round((D.markdownShareOfValue||0)*100)}% of sold value)`,
     verdict:'act', confidence:'med',
-    reasoning:`Compare-at markdowns never enter Shopify's total_discounts, so the headline discount load (codes + automatic ≈ ${GBP(codeAuto)}) understates the real giveaway. Markdowns add ~${GBP(md)} over the window — the true discount load is materially higher than the code figure. A margin lever hiding from the discount reports.`,
+    reasoning:`Compare-at markdowns never enter Shopify's total_discounts, so the headline discount load (codes + automatic ≈ ${GBP(codeAuto)}) understates the real giveaway. Markdowns add ${GBP(md)} over the window — the true discount load is materially higher than the code figure. A margin lever hiding from the discount reports.`,
     recommendation:`Review the markdown/clearance strategy — it's a bigger margin lever than your codes. Tighten deep markdowns on full-demand items; reserve them for genuine clearance. Full breakdown on Promotions.`,
     gbp: perMonth, _markdown:true,
   }];
@@ -5269,7 +5286,7 @@ function CvrDrivers(){
   const [showDisc,setShowDisc] = useState(true);       // overlay total discount depth on the trend
   const gran = chartGran;                              // comparator follows the chart
   const panel = (chartGran==='day' ? seriesDaily : series);
-  const segBtn = (active)=>({fontSize:11.5,fontWeight:600,padding:'4px 10px',borderRadius:7,cursor:'pointer',border:'1px solid '+(active?PAL.accent:'var(--border-subtle)'),background:active?'rgba(139,92,246,0.14)':'transparent',color:active?PAL.accent:'var(--text-muted)'});
+  const segBtn = (active)=>({fontSize:11.5,fontWeight:600,padding:'4px 10px',borderRadius:7,cursor:'pointer',border:'1px solid '+(active?PAL.accent:'var(--border-subtle)'),background:active?'var(--color-accent-wash-2)':'transparent',color:active?PAL.accent:'var(--text-muted)'});
   const _cbase = (chartGran==='day' ? seriesDaily : series);
   const _clast = _cbase.length ? _cbase[_cbase.length-1].w : null;
   const _ccut = (chartDays && _clast) ? new Date(new Date(_clast+'T00:00:00Z').getTime() - chartDays*86400000).toISOString().slice(0,10) : '0000';
@@ -5495,7 +5512,7 @@ function CvrDrivers(){
   </div>);
 
   const stageCard = (k) => { const now=M.stageNow[k], prev=M.stagePrev[k], dlt=M.stageMoves[k], contrib=Math.round((M.stageContribution[k]||0)*100); const isMover=k===M.moverStage; const good=dlt>=0;
-    return (<div key={k} style={{flex:'1 1 200px',background:isMover?'rgba(139,92,246,0.08)':`var(--surface-1,${PAL.panel})`,border:'1px solid '+(isMover?'#3a4080':`var(--border-subtle,${PAL.panel})`),borderRadius:12,padding:'11px 13px'}}>
+    return (<div key={k} style={{flex:'1 1 200px',background:isMover?'var(--color-accent-wash)':`var(--surface-1,${PAL.panel})`,border:'1px solid '+(isMover?PAL.line:`var(--border-subtle,${PAL.panel})`),borderRadius:12,padding:'11px 13px'}}>
       <div style={{fontSize:12,fontWeight:600,color:'var(--text-secondary)'}}>{k}{isMover&&<span style={{marginLeft:6,fontSize:10,color:PAL.accent,fontWeight:700}}>BIGGEST MOVER</span>}</div>
       <div style={{fontSize:18,fontWeight:700,marginTop:3}}>{prev}% <span style={{color:'var(--text-faint)'}}>→</span> {now}% <span style={{fontSize:12.5,color:good?PAL.good:PAL.bad}}>{dlt>=0?'+':''}{dlt}pp</span></div>
       <div style={{fontSize:11.5,color:'var(--text-muted)',marginTop:2}}>{contrib>=0?contrib:0}% of the conversion rate change</div>
@@ -5540,11 +5557,11 @@ function CvrDrivers(){
         {[[0,'All'],[90,'90d'],[60,'60d'],[30,'30d'],[14,'14d']].map(([d,l])=>(<button key={l} onClick={()=>setChartDays(d)} style={segBtn(chartDays===d)}>{l}</button>))}
         <span style={{width:1,height:18,background:'var(--border-subtle)',margin:'0 6px'}}/>
         <span style={{fontSize:11,color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'.04em',marginRight:2}}>Overlay</span>
-        <button onClick={()=>setShowDisc(v=>!v)} title="Shade total discount depth (codes + sale prices) and flag the deepest-discount periods" style={{...segBtn(showDisc), border:'1px solid '+(showDisc?PAL.warn:'var(--border-subtle)'), background:showDisc?'rgba(245,181,68,0.14)':'transparent', color:showDisc?PAL.warn:'var(--text-muted)'}}>🏷️ Discounts</button>
+        <button onClick={()=>setShowDisc(v=>!v)} title="Shade total discount depth (codes + sale prices) and flag the deepest-discount periods" style={{...segBtn(showDisc), border:'1px solid '+(showDisc?PAL.warn:'var(--border-subtle)'), background:showDisc?'var(--color-warning-wash)':'transparent', color:showDisc?PAL.warn:'var(--text-muted)'}}>🏷️ Discounts</button>
         <span style={{fontSize:11,color:'var(--text-faint)',marginLeft:4}}>{chartData.length} {chartGran==='day'?'days':'weeks'}{chartGran==='day'?' · daily conversion rate is noisier — read the trend, not single days':''}</span>
       </div>
-      <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',margin:'2px 0 8px',padding:'7px 11px',borderRadius:9,background:'rgba(139,92,246,0.07)',border:'1px solid rgba(139,92,246,0.18)'}}>
-        <span style={{fontSize:12,fontWeight:600,color:PAL.accent}}>📈 Click two points on the chart to compare them</span>
+      <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',margin:'2px 0 8px',padding:'7px 11px',borderRadius:9,background:'var(--color-accent-wash)',border:'1px solid var(--color-accent-line)'}}>
+        <span style={{fontSize:12,fontWeight:600,color:PAL.accent}}>Click two points on the chart to compare them</span>
         <span style={{fontSize:12,color:'var(--text-muted)'}}>{cA&&cB
           ? <>Comparing <b style={{color:PAL.accent}}>A · {lbl(cA)}</b> <span style={{color:'var(--text-faint)'}}>vs</span> <b style={{color:PAL.good}}>B · {lbl(cB)}</b> — see table below.</>
           : cA ? <>Picked <b style={{color:PAL.accent}}>A · {lbl(cA)}</b> — now click another point for <b style={{color:PAL.good}}>B</b>.</>
@@ -5582,7 +5599,7 @@ function CvrDrivers(){
           {(function(){ var pins=buildChartPins(chartData.map(function(d){return d.w;}));
             return pins.map(function(p,i){ return (
               <R.ReferenceLine key={'pin'+i} yAxisId="l" x={p.x} stroke={PAL.muted} strokeDasharray="3 3" strokeOpacity={0.55}
-                label={<PinMarker icon={p.icon} n={p.n} tip={p.tip}/>}/>); });
+                label={<PinMarker tone={p.tone} n={p.n} tip={p.tip}/>}/>); });
           })()}
         </R.ComposedChart>
       </R.ResponsiveContainer>
@@ -5602,9 +5619,9 @@ function CvrDrivers(){
       </div>
       <div style={{fontSize:10.5,color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{BRUSH_HINT}</div>
       {(function(){ var pins=buildChartPins(chartData.map(function(d){return d.w;})); if(!pins.length) return null; return (
-        <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>🏷️ sales &amp; promos · 📌 your events — <span style={{color:'var(--text-muted)'}}>hover any marker for what it was</span></div>); })()}
+        <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>Dots mark sales and promos, and events you logged — <span style={{color:'var(--text-muted)'}}>hover any marker for what it was</span></div>); })()}
       {showDisc && _dv.length>0 && <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>
-        <span style={{color:PAL.warn,fontWeight:600}}>◆ amber band = total discount depth</span> (codes + automatic + sale prices, % of sales) · <span style={{color:PAL.warn}}>◆ diamonds</span> = the deepest {chartGran==='day'?'days':'weeks'} (≥{Math.round(discThr)}%, top quartile). Line up the amber peaks against conversion rate to see whether a deep promo actually moved conversion{chartGran==='day'?'':' — heavy always-on discounting can flatten the link, so look for the spikes'}.</div>}
+        <span style={{color:PAL.warn,fontWeight:600}}>Amber band = total discount depth</span> (codes + automatic + sale prices, % of sales) · <span style={{color:PAL.warn}}>◆ diamonds</span> = the deepest {chartGran==='day'?'days':'weeks'} (≥{Math.round(discThr)}%, top quartile). Line up the amber peaks against conversion rate to see whether a deep promo actually moved conversion{chartGran==='day'?'':' — heavy always-on discounting can flatten the link, so look for the spikes'}.</div>}
       {showDisc && discLift && (()=>{ const L=discLift; const big=Math.abs(L.pct||0)>=0.05; const pos=L.pp>=0; const col=!big?'var(--text-muted)':(pos?PAL.good:PAL.bad);
         const unit=chartGran==='day'?'days':'weeks';
         const verdict = !big
@@ -5612,9 +5629,9 @@ function CvrDrivers(){
           : pos
             ? `Deep-discount ${unit} convert ${Math.abs(L.pct*100).toFixed(0)}% higher — worth a look, but check it isn't just traffic mix or seasonality.`
             : `Deep-discount ${unit} convert ${Math.abs(L.pct*100).toFixed(0)}% lower — promos aren't lifting conversion.`;
-        return (<div style={{marginTop:10,padding:'11px 13px',borderRadius:10,background:'rgba(245,181,68,0.06)',border:'1px solid rgba(245,181,68,0.22)'}}>
+        return (<div style={{marginTop:10,padding:'11px 13px',borderRadius:10,background:'var(--color-warning-wash)',border:'1px solid var(--color-warning-wash)'}}>
           <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap',marginBottom:7}}>
-            <span style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:PAL.warn,fontWeight:700}}>◆ Discount lift</span>
+            <span style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:PAL.warn,fontWeight:700}}>Discount lift</span>
             <span style={{fontSize:11.5,color:'var(--text-faint)'}}>mean conversion rate on the deepest-discount {unit} vs the rest · this range</span>
           </div>
           <div style={{display:'flex',gap:16,flexWrap:'wrap',alignItems:'center'}}>
@@ -5648,7 +5665,7 @@ function CvrDrivers(){
       {gran==='week' && STAT.cleanPairs && STAT.cleanPairs.length>0 && <div style={{marginBottom:12}}>
         <div style={{fontSize:10.5,textTransform:'uppercase',letterSpacing:'.04em',color:'var(--text-faint)',marginBottom:5}}>Cleanest tests — matched traffic, one lever differs <span title="Week pairs where traffic mix (new/paid/mobile share) and volume are near-identical, so the CVR gap is mostly attributable to the single lever shown. The lowest-confound comparisons in your data — the closest thing to a natural experiment." style={{cursor:'help',color:'var(--text-muted)'}}>ⓘ</span></div>
         <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{STAT.cleanPairs.map((p,i)=>{ const A=byW[p.a],B=byW[p.b]; if(!A||!B) return null; const f=(t,v)=> t==='pct'?Math.round(v)+'%': t==='gbp'?GBP(v): NUM(v);
-          return (<button key={i} onClick={()=>setCmp({a:p.a,b:p.b})} title="Load this low-confound pair" style={{fontSize:11.5,padding:'5px 10px',borderRadius:8,cursor:'pointer',border:'1px solid rgba(110,231,183,0.3)',background:'rgba(110,231,183,0.08)',color:'var(--text-secondary)',textAlign:'left'}}>
+          return (<button key={i} onClick={()=>setCmp({a:p.a,b:p.b})} title="Load this low-confound pair" style={{fontSize:11.5,padding:'5px 10px',borderRadius:8,cursor:'pointer',border:'1px solid var(--color-success-line)',background:'var(--color-success-wash)',color:'var(--text-secondary)',textAlign:'left'}}>
             <b style={{color:PAL.good}}>{p.lever.lab}</b> {f(p.lever.t,p.lever.a)}→{f(p.lever.t,p.lever.b)} <span style={{color:'var(--text-faint)'}}>· {fmtWk(p.a)} vs {fmtWk(p.b)} · conversion rate gap {p.cvrGap.toFixed(2)}pp</span>
           </button>); })}</div>
       </div>}
@@ -5660,19 +5677,19 @@ function CvrDrivers(){
         </div>
         {movers.length>0 && <div style={{marginBottom:10}}>
           <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:'var(--text-faint)',marginBottom:5}}>Biggest differences</div>
-          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{movers.map(m=>(<span key={m.k} style={{fontSize:12,background:'rgba(139,92,246,0.12)',border:'1px solid rgba(139,92,246,0.3)',borderRadius:999,padding:'3px 10px'}}><b>{m.l}</b> {fmtVal(m.t,m.a)} <span style={{color:'var(--text-faint)'}}>→</span> {fmtVal(m.t,m.b)}</span>))}</div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{movers.map(m=>(<span key={m.k} style={{fontSize:12,background:'var(--color-accent-wash-2)',border:'1px solid var(--color-accent-line)',borderRadius:999,padding:'3px 10px'}}><b>{m.l}</b> {fmtVal(m.t,m.a)} <span style={{color:'var(--text-faint)'}}>→</span> {fmtVal(m.t,m.b)}</span>))}</div>
         </div>}
         {/* Why the difference — deterministic read of the metric algorithm: funnel split + driver classification + confound-aware verdict, with a handoff to the live assistant. */}
         {cmpStory && (()=>{ const S=cmpStory; const vcol = S.topKind==='site'||S.topKind==='checkout'?PAL.good : S.topKind==='offer'?PAL.warn : S.topKind==='mix'||S.topKind==='device'?PAL.accent : 'var(--text-muted)';
           const u=gran==='day'?'day':'week';
-          return (<div style={{marginBottom:12,padding:'13px 15px',borderRadius:12,background:'rgba(139,92,246,0.06)',border:'1px solid rgba(139,92,246,0.22)'}}>
+          return (<div style={{marginBottom:12,padding:'13px 15px',borderRadius:12,background:'var(--color-accent-wash)',border:'1px solid var(--color-accent-line)'}}>
             <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:8}}>
-              <span style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:PAL.accent,fontWeight:700}}>✦ Why the difference — likely drivers</span>
-              <span style={{fontSize:11,color:'var(--text-faint)'}} >◆ Auto-diagnosis from the metric model</span>
+              <span style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:PAL.accent,fontWeight:700}}>Why the difference — likely drivers</span>
+              <span style={{fontSize:11,color:'var(--text-faint)'}} >Derived from the metric model</span>
             </div>
             {gapSig && (gapSig.p<0.05
-              ? <div style={{fontSize:11.5,color:PAL.good,marginBottom:8,fontWeight:600}}>✓ The conversion rate gap is statistically real ({pTxt(gapSig.p)}, two-proportion test) — worth explaining.</div>
-              : <div style={{fontSize:12,color:PAL.warn,marginBottom:8,padding:'7px 10px',borderRadius:8,background:'rgba(245,181,68,0.08)',border:'1px solid rgba(245,181,68,0.25)'}}>⚠ This conversion rate gap is within sampling noise ({pTxt(gapSig.p)}) — only {NUM(cA.orders)} vs {NUM(cB.orders)} orders on these {gran==='day'?'days':'weeks'}. Treat the read below as a weak hypothesis, not a finding; a wider-apart or higher-volume pair gives a cleaner signal.</div>)}
+              ? <div style={{fontSize:11.5,color:PAL.good,marginBottom:8,fontWeight:600}}>The conversion rate gap is statistically real ({pTxt(gapSig.p)}, two-proportion test) — worth explaining.</div>
+              : <div style={{fontSize:12,color:PAL.warn,marginBottom:8,padding:'7px 10px',borderRadius:8,background:'var(--color-warning-wash)',border:'1px solid var(--color-warning-wash)'}}>This conversion rate gap is within sampling noise ({pTxt(gapSig.p)}) — only {NUM(cA.orders)} vs {NUM(cB.orders)} orders on these {gran==='day'?'days':'weeks'}. Treat the read below as a weak hypothesis, not a finding; a wider-apart or higher-volume pair gives a cleaner signal.</div>)}
             {S.tiny
               ? <div style={{fontSize:12.5,color:'var(--text-muted)'}}>CVR is essentially flat between these two ({S.pp>=0?'+':''}{S.pp}pp). The inputs below shifted but netted out — there's no real conversion difference to explain. Pick a wider-apart pair to see a driver story.</div>
               : <div style={{fontSize:12.5,color:'var(--text-secondary)',lineHeight:1.55}}>
@@ -5685,7 +5702,7 @@ function CvrDrivers(){
                   {STAT.resid && STAT.resid.byW[cmp.b] && (()=>{ const rB=STAT.resid.byW[cmp.b]; const unexp=Math.abs(rB.z)>=1.3;
                     return (<div style={{marginTop:6,fontSize:11.5,color:'var(--text-faint)'}}><b style={{color:unexp?PAL.accent:'var(--text-muted)'}}>Mix-adjusted:</b> after modelling conversion rate from traffic warmth (new-visitor share), {lbl(cB)} lands <b style={{color:rB.e>=0?PAL.good:PAL.bad}}>{rB.e>=0?'+':''}{rB.e.toFixed(2)}pp</b> vs expected ({(rB.exp).toFixed(2)}%) — {unexp?'a genuinely un-modelled move, the kind worth a controlled test':'about what the model predicts, so most of the gap is explained by the inputs'}.</div>); })()}
                 </div>}
-            <div onClick={cmpAskAI} style={{marginTop:9,fontSize:12,color:PAL.accent,cursor:'pointer',fontWeight:600}}>✦ Ask AI to dig deeper into this pair →</div>
+            <div onClick={cmpAskAI} style={{marginTop:9,fontSize:12,color:PAL.accent,cursor:'pointer',fontWeight:600}}>Ask Greta about this pair</div>
           </div>); })()}
         <div style={{overflowX:'auto'}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:12.5}}>
@@ -5693,7 +5710,7 @@ function CvrDrivers(){
             <th style={{padding:'5px 8px 5px 0'}}>Metric</th><th style={{padding:'5px 8px',textAlign:'right'}}>{lbl(cA)}</th><th style={{padding:'5px 8px',textAlign:'right'}}>{lbl(cB)}</th><th style={{padding:'5px 8px',textAlign:'right'}}>Δ</th></tr></thead>
           <tbody>{['Funnel stage','Traffic & behaviour','Device, geography & source','Checkout & payment','Commercial'].map(g=>(<React.Fragment key={g}>
             <tr><td colSpan={4} style={{padding:'8px 0 3px',fontSize:10.5,textTransform:'uppercase',letterSpacing:'.05em',color:PAL.accent}}>{g}</td></tr>
-            {cmpRows.filter(r=>r.g===g).map(r=>{ const big=moverKeys.has(r.k); return (<tr key={r.k} style={{borderTop:'1px solid var(--border-subtle)',background:big?'rgba(139,92,246,0.06)':'transparent'}}>
+            {cmpRows.filter(r=>r.g===g).map(r=>{ const big=moverKeys.has(r.k); return (<tr key={r.k} style={{borderTop:'1px solid var(--border-subtle)',background:big?'var(--color-accent-wash)':'transparent'}}>
               <td style={{padding:'6px 8px 6px 8px',fontWeight:big?700:500,borderLeft:big?`2px solid ${PAL.accent}`:'2px solid transparent'}}>{r.l}</td>
               <td style={{padding:'6px 8px',textAlign:'right',color:'var(--text-muted)'}}>{fmtVal(r.t,r.a)}</td>
               <td style={{padding:'6px 8px',textAlign:'right',fontWeight:big?700:500}}>{fmtVal(r.t,r.b)}</td>
@@ -5722,7 +5739,7 @@ function CvrDrivers(){
             {[[lbl(cA),cA.landTop||[]],[lbl(cB),cB.landTop||[]]].map((pair,i)=>(<div key={i}>
               <div style={{fontSize:11.5,fontWeight:600,color:'var(--text-secondary)',marginBottom:2}}>{pair[0]}</div>
               {pair[1].length?pair[1].map(p=>(<div key={p.url} style={{display:'flex',justifyContent:'space-between',gap:8,padding:'4px 0',borderTop:'1px solid var(--border-subtle)',fontSize:12}}>
-                <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}} title={p.url}><span style={{color:'var(--text-primary)'}}>{p.url}</span>{p.oos&&<span style={{marginLeft:6,fontSize:9.5,fontWeight:700,color:PAL.bad,background:'rgba(239,107,111,0.15)',border:'1px solid rgba(239,107,111,0.4)',borderRadius:4,padding:'0 4px'}}>OOS</span>}</span>
+                <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}} title={p.url}><span style={{color:'var(--text-primary)'}}>{p.url}</span>{p.oos&&<span style={{marginLeft:6,fontSize:9.5,fontWeight:700,color:PAL.bad,background:'var(--color-danger-wash)',border:'1px solid var(--color-danger-wash)',borderRadius:4,padding:'0 4px'}}>OOS</span>}</span>
                 <span style={{whiteSpace:'nowrap',color:'var(--text-muted)'}}>{NUM(p.sessions)} · <b style={{color:p.cvr>=1.5?PAL.good:(p.cvr<0.4?PAL.bad:'var(--text-secondary)')}}>{p.cvr}%</b></span>
               </div>)):<div style={{fontSize:12,color:'var(--text-muted)',padding:'4px 0'}}>—</div>}
             </div>))}
@@ -5774,7 +5791,7 @@ function CvrDrivers(){
     {showStats && (<div>
     <div className="card">
       <div className="card-section-title"><h2 style={{margin:0}}>3 · What moves the share of visitors who buy</h2>
-        <span className="meta">ranked by strength · green = moves with conversion rate, red = against · ⚑ = likely confounded by traffic mix</span></div>
+        <span className="meta">ranked by strength · green = moves with conversion rate, red = against · flagged = likely confounded by traffic mix</span></div>
       <div style={{marginTop:4}}>{drivers.map(d=>(<div key={d.key} style={{padding:'6px 0',borderTop:'1px solid var(--border-subtle)'}}>
         <div style={{display:'grid',gridTemplateColumns:'180px 1fr 118px',gap:10,alignItems:'center'}}>
           <div style={{fontSize:12.5,fontWeight:600}}>{d.label}{d.confound&&<span title="moves with traffic mix — likely confounded" style={{marginLeft:5,fontSize:10,color:PAL.warn}}>⚑</span>}</div>
@@ -5908,7 +5925,7 @@ function ProductSignal(){
   const xMax = allPts.length ? Math.max(...allPts.map(p=>p.x)) : 100;
   const yMax = allPts.length ? Math.max(...allPts.map(p=>p.y)) : 100;
   const z = useChartZoom(0, +((xMax*1.08)||1).toFixed(2), 0, +((yMax*1.12)||1).toFixed(2));
-  const lensBtn=(id)=>(<button key={id} onClick={()=>setLens(id)} style={{fontSize:11.5,fontWeight:600,padding:'3px 11px',borderRadius:7,cursor:'pointer',border:'1px solid '+(lens===id?PAL.accent:'var(--border-subtle)'),background:lens===id?'rgba(139,92,246,0.14)':'transparent',color:lens===id?PAL.accent:'var(--text-muted)'}}>{LENS[id].short}</button>);
+  const lensBtn=(id)=>(<button key={id} onClick={()=>setLens(id)} style={{fontSize:11.5,fontWeight:600,padding:'3px 11px',borderRadius:7,cursor:'pointer',border:'1px solid '+(lens===id?PAL.accent:'var(--border-subtle)'),background:lens===id?'var(--color-accent-wash-2)':'transparent',color:lens===id?PAL.accent:'var(--text-muted)'}}>{LENS[id].short}</button>);
 
   const oppRow = (p,accent) => (<div key={p.name} style={{display:'flex',gap:10,alignItems:'baseline',padding:'7px 0',borderTop:'1px solid var(--border-subtle)'}}>
     <span style={{width:7,height:7,borderRadius:'50%',background:accent,flexShrink:0,alignSelf:'center'}}/>
@@ -5921,7 +5938,7 @@ function ProductSignal(){
       <div style={{fontSize:11.5,color:'var(--text-muted)',marginTop:1}}>{NUM(p.views)} views · {p.pctViews}% of views · view→cart {(p.viewToAtc*100).toFixed(1)}% · cart→buy {(p.atcToPurch*100).toFixed(0)}%{p.price?` · ${curSym()}${p.price}`:''}</div>
       <div style={{fontSize:12,color:'var(--text-secondary)',marginTop:2}}>→ {p.move}</div>
     </div>
-    {p.gbp>=50 && <span style={{fontWeight:700,color:'var(--good)',whiteSpace:'nowrap'}}>~{GBP(p.gbp)}/mo</span>}
+    {p.gbp>=50 && <span style={{fontWeight:700,color:'var(--good)',whiteSpace:'nowrap'}}>{GBP(p.gbp)}/mo</span>}
   </div>);
 
   // A funnel-stage column: header (with count) + up to CAP rows + "+N more".
@@ -5969,7 +5986,7 @@ function ProductSignal(){
       <div style={{fontSize:11,color:'var(--text-faint)',margin:'2px 0 12px'}}>{lens==='completion'
         ? <>Y = cart→purchase. Dots <b>below the dashed line buy worse than the site average once carted</b> — a checkout/commitment problem, not a desire one. X = visibility. Bubble = views.</>
         : <>Top-left = wanted but unseen (merchandise) · top-right = stars · bottom-right = seen but unwanted (fix/stop). Dashed lines = site median visibility &amp; average view→cart.</>}</div>
-      <div style={{fontSize:11.5,color:'var(--text-muted)',margin:'2px 0 10px',lineHeight:1.5}}>The <b style={{color:'var(--good)'}}>{`~${curSym()}/mo in green`}</b> is the <b>opportunity size</b> — estimated extra <b>gross profit per month</b> if this product closed the gap to the site's average funnel (for out-of-stock, the demand missed while it's unavailable). Margin-weighted at {PCT(gm)}{` and scaled to a month — a ceiling worth chasing, not a guaranteed gain. Only products worth ≥ ${curSym()}50/mo are listed.`}</div>
+      <div style={{fontSize:11.5,color:'var(--text-muted)',margin:'2px 0 10px',lineHeight:1.5}}>The <b style={{color:'var(--good)'}}>{`${curSym()}/mo in green`}</b> is the <b>opportunity size</b> — estimated extra <b>gross profit per month</b> if this product closed the gap to the site's average funnel (for out-of-stock, the demand missed while it's unavailable). Margin-weighted at {PCT(gm)}{` and scaled to a month — a ceiling worth chasing, not a guaranteed gain. Only products worth ≥ ${curSym()}50/mo are listed.`}</div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(250px,1fr))',gap:16}}>
         {oppCol('Unseen — visibility problem',PAL.accent,gems,'None — visibility matches desire.')}
         {oppCol('Browsed, not wanted — product page problem',PAL.bad,pdpFix,'None flagged.')}
@@ -6060,14 +6077,14 @@ function DiscountCodeTracker(){
           const gr=(M.fullPriceRevenue||0)+(M.discountedRevenue||0);
           const inten=gr?Math.round(td/gr*100):0, pen=Math.round((1-(M.fullPriceShare||0))*100), avg=(M.discountedOrders)?td/M.discountedOrders:0;
           return (
-            <div style={{background:'var(--accent-bg)',border:'1px solid rgba(139,92,246,0.25)',borderRadius:12,padding:'11px 14px',marginBottom:14,fontSize:12.5,color:'var(--text-secondary)',lineHeight:1.55}}>
+            <div style={{background:'var(--accent-bg)',border:'1px solid var(--color-accent-line)',borderRadius:12,padding:'11px 14px',marginBottom:14,fontSize:12.5,color:'var(--text-secondary)',lineHeight:1.55}}>
               <b style={{color:'var(--text-primary)'}}>How often vs how deep —</b>these two figures look like they disagree but they measure different things:
                         <span style={{display:'inline'}}> <b style={{color:'var(--text-primary)'}}>{pen}%</b> of orders carry a discount (how <i>often</i>), but the average is only <b style={{color:'var(--text-primary)'}}>{GBP(avg)}</b> off — so across all sales discounts come to only <b style={{color:'var(--text-primary)'}}>~{inten}%</b> of revenue (how <i>deep</i>). Frequent but shallow: lots of small codes, not deep cuts.</span>
               <span style={{color:'var(--text-faint)',display:'block',marginTop:4}}>The Home <i>“Discount depth”</i> tile (~{inten}{`%) is the ${curSym()}-weighted view; the `}<i>“Orders with a discount”</i> tile above ({pen}%) is the order-count view. Same data, different denominators — not a discrepancy.</span>
             </div>
           ); })()}
 
-        {(M.markdownEstimate>0 || M.automaticDiscount>0) && <div style={{background:'rgba(245,181,68,0.06)',border:'1px solid rgba(245,181,68,0.3)',borderRadius:12,padding:'11px 14px',marginBottom:14}}>
+        {(M.markdownEstimate>0 || M.automaticDiscount>0) && <div style={{background:'var(--color-warning-wash)',border:'1px solid var(--color-warning-wash)',borderRadius:12,padding:'11px 14px',marginBottom:14}}>
           <div style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.04em',color:PAL.warn,fontWeight:700,marginBottom:5}}>{`Discounts beyond codes — not in the ${curSym()} above`}</div>
           <div style={{display:'flex',gap:20,flexWrap:'wrap',fontSize:12.5,color:'var(--text-secondary)'}}>
             <div style={{flex:'1 1 240px'}}><b>Automatic (no code):</b> {GBP(M.automaticDiscount)} on {NUM(M.automaticOrders)} orders <span style={{color:'var(--text-faint)'}}>— in Shopify's discount totals, just not tied to a code.</span></div>
@@ -6081,7 +6098,7 @@ function DiscountCodeTracker(){
             <R.XAxis dataKey="w" tickFormatter={fmtWk} tick={{fill:PAL.muted,fontSize:10.5}} interval={Math.ceil(axis.length/9)} tickMargin={8}
               label={{value:'Week', position:'insideBottom', offset:-10, fill:PAL.muted, fontSize:11}}/>
             <R.YAxis allowDecimals={false} tick={{fill:PAL.muted,fontSize:11}} label={{value:'Orders with a code', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:11}}/>
-            <R.Tooltip cursor={{fill:'rgba(139,92,246,0.06)'}} contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,fontSize:12}}
+            <R.Tooltip cursor={{fill:palAlpha(PAL.accent,0.06)}} contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,fontSize:12}}
               labelFormatter={w=>'Week of '+fmtWk(w)} itemSorter={it=>-it.value}/>
             <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:11.5, paddingBottom:8}}/>
             {stackKeys.map(k=> <R.Bar key={k.code} dataKey={k.code} stackId="a" fill={svgCol(k.color)} maxBarSize={26}/>) }
@@ -6111,7 +6128,7 @@ function DiscountCodeTracker(){
             {tableMkt.map(c=>{ const m=DC_PATTERN[c.pattern]||DC_PATTERN['recurring'];
               return (<tr key={c.code} style={{borderTop:'1px solid var(--border-subtle)'}}>
               <td style={{padding:'8px 8px 8px 0',fontWeight:600,color:'var(--text-primary)'}}>{c.code}
-                {c.discountRate>=0.22 && <span title="heavy discount" style={{marginLeft:6,color:PAL.warn,fontSize:11}}>⚠ deep</span>}</td>
+                {c.discountRate>=0.22 && <span title="heavy discount" style={{marginLeft:6,color:PAL.warn,fontSize:11}}>deep</span>}</td>
               <td style={{padding:'8px'}}><Badge p={c.pattern}/></td>
               <td style={{padding:'6px 8px'}}><DCSpark series={c.series} axis={axis} color={m.color}/></td>
               <td style={{padding:'8px',textAlign:'right'}}>{NUM(c.orders)}</td>
@@ -6247,7 +6264,7 @@ function RestockAlertsPanel(){
           <StatusBadge kind={data.nowCount>0 ? 'action' : 'watch'} label={data.nowCount>0 ? 'Action required' : 'Watch'}/>
         </div>
         <button className="btn-ghost" style={{padding:'4px 10px',fontSize:11.5}} onClick={()=>setEditLead(v=>!v)}>
-          {editLead?'Done':'⚙ Lead times'}
+          {editLead?'Done':'Lead times'}
         </button>
       </div>
       <div className="muted" style={{margin:'8px 0 10px', fontSize:12}}>
@@ -6412,7 +6429,7 @@ function Organic(){
   const isPaid=n=>/^Paid/.test(n);
   const paidRev=ch.filter(c=>isPaid(c.channel)).reduce((a,c)=>a+(c.revenue||0),0);
   const orgRev=total-paidRev;
-  const palette=[PAL.data3,PAL.accent,PAL.good,PAL.warn,PAL.data3,PAL.bad,'#a3a3a3',PAL.good,PAL.warn,'#818cf8',PAL.good,PAL.warn];
+  const palette=[PAL.data3,PAL.accent,PAL.good,PAL.warn,PAL.data3,PAL.bad,'#a3a3a3',PAL.good,PAL.warn,PAL.data4,PAL.good,PAL.warn];
   const pieData=sortedCh.map((c,i)=>({name:c.channel,value:c.revenue||0,fill:palette[i%palette.length]}));
   return (
     <div>
@@ -6524,7 +6541,7 @@ function EmailAttributionPanel(){
           <div className="muted" style={{fontSize:11, marginTop:6}}>Showing top {Math.min(15, campaigns30.length)} of {campaigns30.length} attributed campaigns.</div>
         </div>
       </div>
-      {DEMO && <div className="note" style={{marginTop:14}}><b>Greta's read:</b>{` for frkl, the gross-vs-attributed flow gap is ~${curSym()}`}{Math.abs(gap)} ({(gapPct*100).toFixed(0)}{`%) — Klaviyo's flow tracking is precise. So the ${curSym()}28k flow revenue claim that drives the "flows = 19× lift over campaigns" finding holds up. The Welcome Flow alone attributes ${curSym()}`}{NUM(flows[0]?.orderValue)} from {flows[0]?.orders} orders over 90d — the highest-leverage owned-audience surface frkl has.</div>}
+      {DEMO && <div className="note" style={{marginTop:14}}><b>Greta's read:</b>{` for frkl, the gross-vs-attributed flow gap is ${curSym()}`}{Math.abs(gap)} ({(gapPct*100).toFixed(0)}{`%) — Klaviyo's flow tracking is precise. So the ${curSym()}28k flow revenue claim that drives the "flows = 19× lift over campaigns" finding holds up. The Welcome Flow alone attributes ${curSym()}`}{NUM(flows[0]?.orderValue)} from {flows[0]?.orders} orders over 90d — the highest-leverage owned-audience surface frkl has.</div>}
     </div>
   );
 }
@@ -6587,7 +6604,7 @@ function EmailHealthPanel(){
       </div>
       <div className="row" style={{marginBottom:10}}>
         <div className="card kpi" style={{borderLeft: mppFlag ? `3px solid ${PAL.warn}` : `3px solid ${PAL.good}`}}>
-          <div className="label">Open rates {mppFlag && <span style={{color:PAL.warn,fontSize:10}}>⚠ MPP inflated</span>}</div>
+          <div className="label">Open rates {mppFlag && <span style={{color:PAL.warn,fontSize:10}}>MPP inflated</span>}</div>
           <div className="val">{(campOpenW*100).toFixed(0)}% / {(flowOpenW*100).toFixed(0)}%</div>
           <div className="sub">campaigns / flows. {mppFlag ? 'Apple Mail Privacy Protection auto-fetches emails since iOS 15 — anything >50% is inflated. Click rate is the true engagement signal.' : 'Open rates look natural.'}</div>
         </div>
@@ -6622,7 +6639,7 @@ function EmailHealthPanel(){
           <h2>Deliverability + list health flags</h2>
           <div style={{display:'flex',flexDirection:'column',gap:10,fontSize:12.5}}>
             {mppFlag && (<div style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${PAL.warn}`,borderRadius:'0 6px 6px 0'}}>
-              <div style={{fontWeight:600,marginBottom:3,color:PAL.warn}}>⚠ Apple MPP open-rate inflation</div>
+              <div style={{fontWeight:600,marginBottom:3,color:PAL.warn}}>Apple MPP open-rate inflation</div>
               <div className="muted">Campaign opens {(campOpenW*100).toFixed(0)}%, flow opens {(flowOpenW*100).toFixed(0)}%. Real open rates are likely 25-40% lower. <b>Don't optimise on open rate</b>. Use click rate + order-attributed revenue as the true signals. Suppress "non-openers" segmentation that relies on opens; use "non-clickers" instead.</div>
             </div>)}
             <div style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${PAL.data3}`,borderRadius:'0 6px 6px 0'}}>
@@ -6884,7 +6901,7 @@ function StoriesPanel(){
     {stories.length === 0 ? (<EmptyState icon="image"
       title="No Instagram Stories in the last 60 days"
       body="Stories are the daily-cadence organic touchpoint — they outperform Feed for product link-outs and live-feel community signals. Competitors post 5–15 a week; a consistent Stories habit is one of the cheapest reach levers you have."
-      cta="Ask AI for a Stories plan" ctaOnClick={()=>window.__oiAsk && window.__oiAsk('I post no Instagram Stories. Give me a simple weekly Stories cadence and content plan to lift organic reach.')}/>) : (
+      cta="Ask Greta for a Stories plan" ctaOnClick={()=>window.__oiAsk && window.__oiAsk('I post no Instagram Stories. Give me a simple weekly Stories cadence and content plan to lift organic reach.')}/>) : (
       <table><thead><tr><th>Date</th><th>Type</th><th>Views</th><th>Reach</th><th>Exits</th><th>Replies</th><th>Shares</th><th>Tap fwd</th><th>Tap back</th><th>Completion</th></tr></thead><tbody>
       {stories.map((s,i)=>{
         const completion = s.views ? 1 - (s.exits||0)/s.views : null;
@@ -7113,7 +7130,7 @@ function IntelligencePanel(){
     return (<div className="card"><EmptyState icon="spark"
       title="Intelligence is still warming up"
       body="No patterns have been detected yet. The intelligence engine surfaces trends, step-changes and anomalies once a few days of synced data are in — check back after the next daily refresh, or ask the analyst directly in the meantime."
-      cta="Ask the AI analyst" ctaOnClick={()=>window.__oiAsk && window.__oiAsk('What are the most important things happening in my business right now?')}/></div>);
+      cta="Ask Greta" ctaOnClick={()=>window.__oiAsk && window.__oiAsk('What are the most important things happening in my business right now?')}/></div>);
   }
   const metrics = P.metrics || {};
   const [kindFilter, setKindFilter] = useState('all');
@@ -7338,13 +7355,13 @@ function IntelligencePanel(){
                 <div style={{flex:1, minWidth:0}}>
                   <div style={{display:'flex', alignItems:'baseline', gap:8, flexWrap:'wrap'}}>
                     <span style={{fontSize:12.5, color: a.premiseStale?'var(--text-muted)':'var(--text-primary)', lineHeight:1.4, textDecoration:a.premiseStale?'line-through':'none'}}>{a.text || a.id}</span>
-                    {a.premiseStale && <span className="pill grey" title={a.reconcileNote||''} style={{fontSize:9.5}}>⚠ premise out of date</span>}
+                    {a.premiseStale && <span className="pill grey" title={a.reconcileNote||''} style={{fontSize:9.5}}>premise out of date</span>}
                   </div>
                   <div style={{display:'flex', flexWrap:'wrap', gap:12, marginTop:5, fontSize:10.5, color:'var(--text-faint)', alignItems:'baseline'}}>
                     <span title="Owner">{agentLabel(a.owner) || '—'}</span>
-                    {a.gbp ? <span style={{color:kc, fontWeight:600}} title="Expected monthly impact">{`~${curSym()}`}{Math.round(Math.abs(a.gbp)).toLocaleString()}/mo</span> : null}
-                    {a.successMetric && <span title="Success metric">✓ {a.successMetric}</span>}
-                    {a.byWhen && <span title="Review by">⏱ {a.byWhen}</span>}
+                    {a.gbp ? <span style={{color:kc, fontWeight:600}} title="Expected monthly impact">{`${curSym()}`}{Math.round(Math.abs(a.gbp)).toLocaleString()}/mo</span> : null}
+                    {a.successMetric && <span title="Success metric">{a.successMetric}</span>}
+                    {a.byWhen && <span title="Review by">{a.byWhen}</span>}
                     <span title="P(hit) confidence · sample size">{a.confidence} (n={a.sample_size})</span>
                   </div>
                 </div>
@@ -7370,7 +7387,7 @@ function IntelligencePanel(){
               const conf = s.total_closed >= 8 ? 'high' : s.total_closed >= 3 ? 'medium' : 'low';
               const confColor = conf === 'high' ? 'var(--good)' : conf === 'medium' ? 'var(--warn)' : 'var(--text-muted)';
               const isRollup = s.category === 'ALL';
-              return (<tr key={i} style={{background: isRollup ? 'rgba(255,255,255,0.02)' : undefined, fontWeight: isRollup ? 600 : 400}}>
+              return (<tr key={i} style={{background: isRollup ? 'var(--color-sunken)' : undefined, fontWeight: isRollup ? 600 : 400}}>
                 <td><b>{agentLabel(s.agent)}</b></td>
                 <td>{isRollup ? <span style={{color:'var(--text-muted)'}}>— all —</span> : s.category}</td>
                 <td>{s.total_closed}</td>
@@ -7673,8 +7690,8 @@ function SynergyMatrix(){
   const rgb = (r) => {
     // Diverging colour: green for positive, red for negative, intensity by |r|
     const abs = Math.abs(r);
-    if (r >= 0) return `rgba(74,222,128,${0.15 + abs * 0.6})`;
-    return `rgba(248,113,113,${0.15 + abs * 0.6})`;
+    if (r >= 0) return palAlpha(PAL.good, 0.15 + abs * 0.6);
+    return palAlpha(PAL.bad, 0.15 + abs * 0.6);
   };
   // Top 8 cross-channel synergies as a separate "leaderboard" with full lag profile
   const topPairs = [...new Set(synergies.map(s => {
@@ -7845,6 +7862,9 @@ function buildAskContext(){
   return ctx;
 }
 
+// Answer depth -> the model that serves it. The only place a model id appears on the
+// client, and it never reaches the markup.
+const ASK_MODEL = { thorough: 'claude-sonnet-4-5', quick: 'claude-haiku-4-5' };
 function AskPanel(){
   // Server-side relay (ask-data edge fn). The authenticated workspace injects
   // window.OI_ASK = {endpoint, brand_id, getJwt}. When this dashboard runs inside
@@ -7858,11 +7878,18 @@ function AskPanel(){
   const [history, setHistory] = useState(()=>{ try { return JSON.parse(localStorage.getItem('frkl_ask_history')||'[]'); } catch { return []; } });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [model, setModel] = useState(()=>localStorage.getItem('frkl_ask_model')||'claude-sonnet-4-5');
+  // The owner picks how much thinking they want, not which model does it. Kept as
+  // 'thorough' | 'quick' in state and storage so no model id reaches the DOM; ASK_MODEL
+  // maps it at the call site, leaving the request body unchanged.
+  const [depth, setDepth] = useState(() => {
+    const v = localStorage.getItem('frkl_ask_depth');
+    return (v === 'quick' || v === 'thorough') ? v : 'thorough';
+  });
+  const model = ASK_MODEL[depth] || ASK_MODEL.thorough;
   const [savedTasks, setSavedTasks] = useState({});   // message time → saved-to-board
   const clearHistory = () => { localStorage.removeItem('frkl_ask_history'); setHistory([]); };
   React.useEffect(()=>{ localStorage.setItem('frkl_ask_history', JSON.stringify(history.slice(-30))); }, [history]);
-  React.useEffect(()=>{ localStorage.setItem('frkl_ask_model', model); }, [model]);
+  React.useEffect(()=>{ localStorage.setItem('frkl_ask_depth', depth); }, [depth]);
   // "Ask about this" — a card stashed a question via window.__oiAsk; prefill it here.
   React.useEffect(()=>{
     const consume = () => { try { const q = window.__oiAskPending; if(q){ window.__oiAskPending = null; setQuestion(q); } } catch(e){} };
@@ -7953,16 +7980,16 @@ ${ctxJson}`;
 
   return (<div>
     <div className="card" style={{marginBottom:14, borderLeft:`3px solid ${PAL.accent}`}}>
-      <h2>Ask the data</h2>
-      <div className="muted" style={{marginBottom:10, fontSize:12}}>Runs <b>privately inside your workspace</b>. Your question goes with a compact summary of your live data ({Math.round(JSON.stringify(buildAskContext()).length/1024)}KB).</div>
+      <h2>Ask Greta</h2>
+      <div className="muted" style={{marginBottom:10, fontSize:12}}>Runs <b>privately inside your workspace</b>, on a summary of your live data. Nothing leaves it.</div>
       {!ASK && (<div style={{padding:12, background:'var(--bg-app)', borderRadius:8, marginBottom:10, border:'1px solid var(--border-default)'}}>
-        <div style={{fontSize:13, color:'var(--text-primary)', lineHeight:1.5}}>🔒 Ask data runs inside your authenticated workspace, where the model key is held server-side (never in the browser). It isn't enabled in this public demo. The examples below show the questions it answers from your live data.</div>
+        <div style={{fontSize:13, color:'var(--text-primary)', lineHeight:1.5}}>Ask runs inside your authenticated workspace, where the model key is held server-side (never in the browser). It isn't enabled in this public demo. The examples below show the questions it answers from your live data.</div>
       </div>)}
       {ASK && (<div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,fontSize:11,color:PAL.muted}}>
-        <span>🔒 Private to your workspace</span>
-        <select value={model} onChange={e=>setModel(e.target.value)} style={{background:'var(--bg-input)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:4, padding:'2px 6px', fontSize:11}}>
-          <option value="claude-sonnet-4-5">Thorough answer</option>
-          <option value="claude-haiku-4-5">Quick answer</option>
+        <span>Private to your workspace</span>
+        <select value={depth} onChange={e=>setDepth(e.target.value)} aria-label="Answer depth" style={{background:'var(--bg-input)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:4, padding:'2px 6px', fontSize:11}}>
+          <option value="thorough">Thorough answer</option>
+          <option value="quick">Quick answer</option>
         </select>
         {history.length>0 && <a onClick={clearHistory} style={{cursor:'pointer',color:PAL.warn}}>clear chat</a>}
       </div>)}
@@ -7987,7 +8014,7 @@ ${ctxJson}`;
           {m.role==='assistant' && (<div style={{marginTop:8, display:'flex', gap:8, alignItems:'center'}}>
             <button onClick={()=>{ if(aiSaveTask(m.content)) setSavedTasks(s=>({...s,[m.time]:true})); }} disabled={!!savedTasks[m.time]}
               style={{padding:'4px 10px', background:savedTasks[m.time]?'transparent':PAL.panel, border:'1px solid '+(savedTasks[m.time]?'var(--good)':'#30303a'), borderRadius:6, color:savedTasks[m.time]?'var(--good)':PAL.faint, fontSize:11, cursor:savedTasks[m.time]?'default':'pointer'}}>
-              {savedTasks[m.time]?'✓ Saved to Weekly Board':'+ Save as task'}
+              {savedTasks[m.time]?'Saved to Weekly Board':'+ Save as task'}
             </button>
             <span style={{fontSize:10.5, color:PAL.muted}}>turns this into a tracked action on the Board</span>
           </div>)}
@@ -8011,7 +8038,7 @@ function BrandAgeBanner(){
   const bgVar = sev === 'critical' ? 'var(--bad-bg)' : sev === 'high' ? 'var(--warn-bg)' : 'var(--bg-card)';
   return (
     <div className="status-banner" style={{background: bgVar, borderColor: colorVar + '40', marginBottom: 'var(--s-3)'}}>
-      <span className="status-banner-tag" style={{color: colorVar}}>⚠ Thin data · {days}d</span>
+      <span className="status-banner-tag" style={{color: colorVar}}>Thin data · {days}d</span>
       <span className="status-banner-body">{`
       Fewer than 60 days of trading history. Trends, diffs and ${curSym()} quantifications are `}<b>directional only</b>. Forecasts not meaningful at this scale.
       </span>
@@ -8094,7 +8121,7 @@ function ConnectionHealthStrip(){
   const critical = sources.filter(s => s.last == null || daysAgo(s.last) > 4);
   const headColor = critical.length ? 'var(--bad)' : issues.length ? 'var(--warn)' : 'var(--good)';
   const headBg = critical.length ? 'var(--bad-bg)' : issues.length ? 'var(--warn-bg)' : 'var(--good-bg)';
-  const headLabel = critical.length ? '⚠ Stale' : issues.length ? '◐ Ageing' : '✓ Fresh';
+  const headLabel = critical.length ? 'Stale' : issues.length ? 'Ageing' : 'Fresh';
   return (<div className="status-banner" style={{background: headBg, borderColor: headColor + '40', marginBottom: 'var(--s-3)'}}>
     <span className="status-banner-tag" style={{color: headColor}}>{headLabel}</span>
     <div style={{display:'flex', gap:'var(--s-4)', alignItems:'center', flexWrap:'wrap', flex:1}}>
@@ -8218,7 +8245,7 @@ function weekCommentary(W, prev){
     else if(eCh!=null && eCh>=0.15) worked.push({sev:0.6, text:`Email engagement up — open rate ${PCT(m.emailOpenRate)} (${fp(eCh)} WoW).`}); }
 
   // Context: events, sales, data caveats
-  loadBrandEvents().forEach(e=>{ if(e.startsOn>=W.weekStart && e.startsOn<=W.weekEnding){ const mt=EVENT_META[e.type]||EVENT_META.other; context.push({sev:2, text:`${mt.icon} ${e.title||mt.label} ran (${(e.startsOn||'').slice(5)}).`}); }});
+  loadBrandEvents().forEach(e=>{ if(e.startsOn>=W.weekStart && e.startsOn<=W.weekEnding){ const mt=EVENT_META[e.type]||EVENT_META.other; context.push({sev:2, text:`${e.title||mt.label} ran (${(e.startsOn||'').slice(5)}).`}); }});
   ((window.FRKL_DISCOUNT_CODES && window.FRKL_DISCOUNT_CODES.codes)||[]).filter(c=>c && c.pattern!=='always-on' && (c.discount||0)>=120).forEach(c=>{ let pk=null;(c.series||[]).forEach(x=>{if(!pk||x.d>pk.d)pk=x;}); if(pk && pk.w>=W.weekStart && pk.w<=W.weekEnding) context.push({sev:1.8, text:`🏷️ ${c.code} sale ran — ${c.discountRate!=null?Math.round(c.discountRate*100)+'% off':'sale'}, ${curSym()}${Math.round(c.discount)} given.`}); });
   if(W.partial) context.push({sev:3, text:`Week still in progress — ${W.days}/7 days captured so far.`});
   else if(prev && prev.partial) context.push({sev:1, text:`Prior week was partial, so week-on-week comparisons are muted.`});
@@ -8386,7 +8413,7 @@ function WeeklyBoard(){
     mer:w.m.mer!=null?+w.m.mer.toFixed(2):null, cvr:w.m.cvr!=null?+(w.m.cvr*100).toFixed(2):null}));
   const pins = buildChartPins(weeks.map(w=>({x:w.label, date:w.weekEnding})));
   const renderPins = () => pins.map((p,i)=>(<R.ReferenceLine key={'bp'+i} yAxisId="l" x={p.x} stroke={PAL.muted} strokeDasharray="3 3" strokeOpacity={0.5}
-    label={<PinMarker icon={p.icon} n={p.n} tip={p.tip}/>}/>));
+    label={<PinMarker tone={p.tone} n={p.n} tip={p.tip}/>}/>));
 
   const openCount = actions.filter(a=>a.status!=='done').length;
   const doneThisWeek = actions.filter(a=>a.status==='done' && a.doneWeek===W.weekEnding);
@@ -8421,8 +8448,8 @@ function WeeklyBoard(){
         return (
           <div className="card" style={{marginBottom:14, borderLeft:'3px solid var(--accent)'}}>
             <div className="card-section-title">
-              <h2 style={{margin:0}}>✦ Analyst read</h2>
-              <span className="meta">AI · last 7 days to {br.asOf} · {r.model||'llm'}</span>
+              <h2 style={{margin:0}}>The read</h2>
+              <span className="meta">last 7 days to {br.asOf}</span>
             </div>
             <p style={{margin:'0 0 10px', fontSize:16, lineHeight:1.5, color:'var(--text-primary)', fontWeight:500}}>{r.headline}</p>
             {r.narrative && <p style={{margin:'0 0 12px', fontSize:13.5, lineHeight:1.55, color:'var(--text-secondary)'}}>{r.narrative}</p>}
@@ -8436,7 +8463,7 @@ function WeeklyBoard(){
                 ); })}
             </div>}
             {(r.blindspots||[]).length>0 && <div className="micro" style={{color:'var(--text-faint)', marginTop:10}}>Blind spots: {r.blindspots.join(' · ')}</div>}
-            <div className="micro" style={{color:'var(--text-faint)', marginTop:8, fontStyle:'italic'}}>{`AI-written from your data; ${curSym()} figures grounded against the dataset. The rule-based read below is the deterministic baseline.`}</div>
+            <div className="micro" style={{color:'var(--text-faint)', marginTop:8, fontStyle:'italic'}}>{`Written from your own data. Every ${curSym()} figure is checked against it.`}</div>
           </div>
         );
       })()}
@@ -8446,15 +8473,15 @@ function WeeklyBoard(){
         <p style={{margin:'0 0 14px', fontSize:16, lineHeight:1.5, color:'var(--text-primary)', fontWeight:500}}>{commentary.headline}</p>
         <div className="board-commentary-cols">
           <div>
-            <div className="board-comm-head" style={{color:'var(--good)'}}>✓ What worked</div>
+            <div className="board-comm-head" style={{color:'var(--good)'}}>What worked</div>
             {commentary.worked.length ? commentary.worked.map((t,i)=>(<div key={i} className="board-comm-line">{t}</div>)) : <div className="board-comm-line muted">Nothing stood out as a clear win this week.</div>}
           </div>
           <div>
-            <div className="board-comm-head" style={{color:PAL.bad}}>⚠ What to watch</div>
+            <div className="board-comm-head" style={{color:PAL.bad}}>What to watch</div>
             {commentary.watch.length ? commentary.watch.map((t,i)=>(<div key={i} className="board-comm-line">{t}</div>)) : <div className="board-comm-line muted">No material concerns flagged.</div>}
           </div>
           <div>
-            <div className="board-comm-head" style={{color:'var(--text-muted)'}}>📌 Context</div>
+            <div className="board-comm-head" style={{color:'var(--text-muted)'}}>Context</div>
             {commentary.context.length ? commentary.context.map((t,i)=>(<div key={i} className="board-comm-line">{t}</div>)) : <div className="board-comm-line muted">No logged events or sales this week.</div>}
           </div>
         </div>
@@ -8472,7 +8499,7 @@ function WeeklyBoard(){
           return (<div key={spec.key} className="card board-card" style={{borderLeft:`3px solid ${col}`}}>
             <div className="micro" style={{color:'var(--text-muted)', fontWeight:600, display:'flex', justifyContent:'space-between'}}>
               <span>{spec.label}</span>
-              {tip && <span title={tip} style={{cursor:'help', color:'var(--text-faint)'}}>ⓘ</span>}
+              {tip && <span title={tip} style={{cursor:'help', color:'var(--text-faint)', display:'inline-flex'}}><Icon name="info" size={12}/></span>}
             </div>
             <div style={{fontSize:24, fontWeight:700, letterSpacing:'-.01em', margin:'4px 0 2px'}}>{spec.fmt(val)}</div>
             <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:6}}>
@@ -8497,7 +8524,7 @@ function WeeklyBoard(){
           return (<div key={spec.key} className="card board-card" style={{borderLeft:`3px solid ${col}`}}>
             <div className="micro" style={{color:'var(--text-muted)', fontWeight:600, display:'flex', justifyContent:'space-between'}}>
               <span>{spec.label}</span>
-              {tip && <span title={tip} style={{cursor:'help', color:'var(--text-faint)'}}>ⓘ</span>}
+              {tip && <span title={tip} style={{cursor:'help', color:'var(--text-faint)', display:'inline-flex'}}><Icon name="info" size={12}/></span>}
             </div>
             <div style={{fontSize:22, fontWeight:700, letterSpacing:'-.01em', margin:'4px 0 2px'}}>{spec.fmt(val)}</div>
             <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:6}}>
@@ -8585,7 +8612,7 @@ function WeeklyBoard(){
               style={{flex:1, background:'var(--bg-app)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--r-sm)', padding:'8px 10px', fontSize:13}}/>
             <button onClick={addAction} className="board-nav-btn" style={{flexShrink:0}}>+ Add</button>
           </div>
-          {doneThisWeek.length>0 && <div className="micro" style={{color:'var(--good)', marginTop:8}}>✓ {doneThisWeek.length} completed this week</div>}
+          {doneThisWeek.length>0 && <div className="micro" style={{color:'var(--good)', marginTop:8}}>{doneThisWeek.length} completed this week</div>}
         </div>
       </div>
     </div>
@@ -9026,7 +9053,7 @@ function ClarityFrictionPanel(){
       </span>
     </div>
     {!manual && C.thinData && (<div className="note" style={{marginBottom:10, borderLeft:'3px solid var(--warn)'}}>
-      ⚠ Only {C.windowDays||C.days} days of Clarity data — these are <b>medium-confidence, directional</b> signals (capped: none shown as high). Reproduce a flagged issue before committing dev time; the picture firms up as the window grows past a week.
+      Only {C.windowDays||C.days} days of Clarity data — these are <b>medium-confidence, directional</b> signals (capped: none shown as high). Reproduce a flagged issue before committing dev time; the picture firms up as the window grows past a week.
     </div>)}
     {C.flags && C.flags.length>0 && (<div style={{display:'flex', flexDirection:'column', gap:6, marginBottom:10}}>
       {C.flags.map((fl,i)=>(<div key={i} style={{display:'flex', gap:8, alignItems:'baseline', fontSize:13.5}}>
@@ -9611,7 +9638,7 @@ function CommandMenu(){
       return list;
     }
     NAV.forEach(s => s.subtabs.forEach(t => list.push({label: t.label, sub: s.label, section: s.id, subId: t.id, icon: s.icon||'info'})));
-    list.push({label:'Ask the AI analyst a question', sub:'AI Analyst', section:'home', subId:'ask', icon:'spark'});
+    list.push({label:'Ask Greta a question', sub:'Ask Greta', section:'home', subId:'ask', icon:'spark'});
     return list;
   }, []);
   React.useEffect(() => {
@@ -9633,7 +9660,7 @@ function CommandMenu(){
   };
   return (<div className="cmd-bg" onClick={()=>setOpen(false)}>
     <div className="cmd-box" onClick={e=>e.stopPropagation()}>
-      <input className="cmd-input" autoFocus placeholder="Jump to a page, or ask the AI analyst…"
+      <input className="cmd-input" autoFocus placeholder="Jump to a page, or ask Greta…"
         value={q} onChange={e=>{ setQ(e.target.value); setSel(0); }} onKeyDown={onKeyDown}/>
       <div className="cmd-list">
         {filtered.length ? filtered.map((it,i)=>(
@@ -9826,9 +9853,9 @@ function BusinessReview(){
     L.push('DURABILITY:');                           durD.forEach(d=>L.push('  • '+d.read));
     L.push('');
     L.push(`TOP RISKS (${curSym()}${k(atRisk)}/mo exposed):`);
-    (risks.length?risks:[{description:'None flagged'}]).slice(0,5).forEach(x=>L.push('  • '+x.description+(x.monthly_impact_gbp?` (~${curSym()}${k(Math.abs(x.monthly_impact_gbp))}/mo)`:'')));
+    (risks.length?risks:[{description:'None flagged'}]).slice(0,5).forEach(x=>L.push('  • '+x.description+(x.monthly_impact_gbp?` (${curSym()}${k(Math.abs(x.monthly_impact_gbp))}/mo)`:'')));
     L.push(`TOP OPPORTUNITIES (${curSym()}${k(upside)}/mo identified):`);
-    (opps.length?opps:[{description:'None flagged'}]).slice(0,5).forEach(x=>L.push('  • '+x.description+(x.monthly_impact_gbp?` (~${curSym()}${k(Math.abs(x.monthly_impact_gbp))}/mo)`:'')));
+    (opps.length?opps:[{description:'None flagged'}]).slice(0,5).forEach(x=>L.push('  • '+x.description+(x.monthly_impact_gbp?` (${curSym()}${k(Math.abs(x.monthly_impact_gbp))}/mo)`:'')));
     const text=L.join('\n');
     try{ (navigator.clipboard&&navigator.clipboard.writeText(text)); }catch(e){}
     toast('Briefing copied', {kind:'good', body:'Paste into your notes or board pack.'});
@@ -9850,7 +9877,7 @@ function BusinessReview(){
       {x.basis && <div style={{fontSize:11,color:'var(--text-faint)',marginTop:2,lineHeight:1.4}}>{x.basis}</div>}
     </div>
     <div style={{textAlign:'right',flexShrink:0}}>
-      <div style={{fontWeight:700,fontSize:13.5,color:accent,whiteSpace:'nowrap'}}>{`~${curSym()}`}{k(Math.abs(x.monthly_impact_gbp))}/mo</div>
+      <div style={{fontWeight:700,fontSize:13.5,color:accent,whiteSpace:'nowrap'}}>{`${curSym()}`}{k(Math.abs(x.monthly_impact_gbp))}/mo</div>
       <div style={{marginTop:4}}>{confChip(confTier(x.confidence))}</div>
     </div>
   </div>);
@@ -9869,8 +9896,8 @@ function BusinessReview(){
       {/* TL;DR — the main points across the business, in five lines */}
       {(()=>{ const tl=[];
         tl.push({t:`${overall.label}: ${curSym()}${k(atRisk)}/mo of contribution exposed vs ${curSym()}${k(upside)}/mo of identified upside · ${openActions} actions open.`, c: overall.kind==='action'?'var(--bad)':overall.kind==='watch'?'var(--warn)':'var(--good)'});
-        if(risks[0]) tl.push({t:`Biggest risk — ${risks[0].description} (~${curSym()}${k(Math.abs(risks[0].monthly_impact_gbp))}/mo).`, c:'var(--bad)'});
-        if(opps[0]) tl.push({t:`Biggest opportunity — ${opps[0].description} (~${curSym()}${k(Math.abs(opps[0].monthly_impact_gbp))}/mo).`, c:'var(--good)'});
+        if(risks[0]) tl.push({t:`Biggest risk — ${risks[0].description} (${curSym()}${k(Math.abs(risks[0].monthly_impact_gbp))}/mo).`, c:'var(--bad)'});
+        if(opps[0]) tl.push({t:`Biggest opportunity — ${opps[0].description} (${curSym()}${k(Math.abs(opps[0].monthly_impact_gbp))}/mo).`, c:'var(--good)'});
         tl.push({t:`Unit economics: ${ltvCac!=null?ltvCac.toFixed(1)+'× contribution customer lifetime value:cost per new customer':'customer lifetime value:cost per new customer pending cost data'}, repeat rate ${repeat!=null?pct1(repeat):'—'}${ltvCac!=null?` — ${ltvCac>=3?'healthy':'below the 3× target'}`:''}.`, c: (ltvCac!=null&&ltvCac>=3)?'var(--good)':'var(--warn)'});
         if(slowCapital>50000) tl.push({t:`${curSym()}${k(slowCapital)} of capital tied up in slow-moving stock${topChan&&topShare!=null?`; ${topChan.channel} drives ${pct0(topShare)} of revenue`:''}.`, c:'var(--warn)'});
         return (<div className="card" style={{borderLeft:'3px solid var(--text-faint)'}}>
@@ -9933,7 +9960,7 @@ function BusinessReview(){
           <span className="muted" style={{fontSize:12.5}}>{openActions} open in the queue</span>
           <button style={{...btn,marginLeft:'auto'}} onClick={()=>window.__oiNav&&window.__oiNav('actions','queue')}>Open action queue <Icon name="chevron" size={13}/></button>
         </div>
-        {topMoves.length>0 && <div className="muted" style={{fontSize:12.5,marginTop:9,lineHeight:1.55}}>Highest-value moves right now: {topMoves.map(m=>`${scrubTag(m.description)} (~${curSym()}${k(Math.abs(m.monthly_impact_gbp))}/mo)`).join(' · ')}.</div>}
+        {topMoves.length>0 && <div className="muted" style={{fontSize:12.5,marginTop:9,lineHeight:1.55}}>Highest-value moves right now: {topMoves.map(m=>`${scrubTag(m.description)} (${curSym()}${k(Math.abs(m.monthly_impact_gbp))}/mo)`).join(' · ')}.</div>}
       </div>
     </div>
   );
@@ -10695,7 +10722,7 @@ function PlanningView(){
   const lateWaves = tranches.filter(t=>t.late).length;
   const heroColor = oosNow ? 'var(--bad)' : toOrderN ? 'var(--warn)' : 'var(--good)';
   const headline = oosNow ? `Order today — ${oosNow} product${oosNow===1?'':'s'} at OOS risk` : toOrderN ? `${toOrderN} product${toOrderN===1?'':'s'} to reorder` : 'Stock is on track for your plan';
-  const sub = toOrderN ? `${toOrderN} item${toOrderN===1?'':'s'} to order · ~${curSym()}${k(orderVal)} to commit${stockoutsUnderPlan?` · ${stockoutsUnderPlan} forecast to run out under the plan`:''}${awaiting?` · ${awaiting} awaiting stock`:''}`
+  const sub = toOrderN ? `${toOrderN} item${toOrderN===1?'':'s'} to order · ${curSym()}${k(orderVal)} to commit${stockoutsUnderPlan?` · ${stockoutsUnderPlan} forecast to run out under the plan`:''}${awaiting?` · ${awaiting} awaiting stock`:''}`
     : (awaiting?`${awaiting} PO${awaiting===1?'':'s'} awaiting stock`:'Nothing to order right now — good sellers have cover for their lead times.');
   const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:13,fontWeight:700,padding:'9px 15px',borderRadius:9,border:'none',background:'var(--accent)',color:PAL.panel,cursor:'pointer',whiteSpace:'nowrap'};
   const sbtn = (id)=>({fontSize:11.5,fontWeight:700,padding:'5px 11px',borderRadius:7,cursor:'pointer',border:'1.5px solid '+(rc.strategy===id?'var(--accent)':'var(--border-default)'),background:rc.strategy===id?'var(--accent)':'transparent',color:rc.strategy===id?PAL.panel:'var(--text-secondary)'});
@@ -10728,8 +10755,8 @@ function PlanningView(){
             {['jit','bulk','staged'].map(id=>{ const on=rc.strategy===id; const c=stratCmp[id]; const dep=hasDeposit&&c.dep<c.val-0.5;
               return (
                 <button key={id} onClick={()=>saveReorderConfig({...rc,strategy:id})} style={{textAlign:'left',flex:'1 1 160px',minWidth:148,padding:'9px 12px',borderRadius:9,cursor:'pointer',border:'1.5px solid '+(on?'var(--accent)':'var(--border-default)'),background:on?'var(--accent-bg)':'var(--bg-elevated)'}}>
-                  <div style={{fontSize:12.5,fontWeight:700,color:on?'var(--accent)':'var(--text-primary)'}}>{on?'✓ ':''}{STRAT[id]}</div>
-                  <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>{c.count?(dep?`${curSym()}${k(c.dep)} deposit now · ${curSym()}${k(c.val)} total`:`~${curSym()}${k(c.val)} to commit now`):'nothing to order'} · {stratDesc[id]}</div>
+                  <div style={{fontSize:12.5,fontWeight:700,color:on?'var(--accent)':'var(--text-primary)'}}>{''}{STRAT[id]}</div>
+                  <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2}}>{c.count?(dep?`${curSym()}${k(c.dep)} deposit now · ${curSym()}${k(c.val)} total`:`${curSym()}${k(c.val)} to commit now`):'nothing to order'} · {stratDesc[id]}</div>
                 </button>
               ); })}
           </div>
@@ -10770,7 +10797,7 @@ function PlanningView(){
                 return <button key={kind} onClick={()=>saveReorderConfig({...rc, waveSplit: wavePreset(kind, wavesN)})} title={kind==='front'?'Bigger first wave — buy into peak early':kind==='back'?'Smaller first wave, ramp later':'Equal waves'} style={{fontSize:11,fontWeight:700,padding:'4px 11px',borderRadius:7,cursor:'pointer',border:'1.5px solid '+(on?'var(--accent)':'var(--border-default)'),background:on?'var(--accent)':'transparent',color:on?PAL.panel:'var(--text-secondary)'}}>{lbl}</button>; })}
               <span style={{fontSize:11,color:'var(--text-faint)'}}>{weights.map(w=>Math.round(w*100)+'%').join(' / ')}{splitName==='custom'?' · custom':''}</span>
             </div>}
-            {lateWaves>0 && <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12,padding:'7px 11px',borderRadius:8,background:'rgba(248,113,113,.10)',border:'1px solid var(--bad)'}}>
+            {lateWaves>0 && <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12,padding:'7px 11px',borderRadius:8,background:'var(--color-danger-wash)',border:'1px solid var(--bad)'}}>
               <Icon name="alert" size={13} style={{color:'var(--bad)'}}/>
               <span style={{fontSize:12,color:'var(--text-secondary)'}}>{lateWaves} wave{lateWaves===1?'':'s'} should already be on order — the {leadTotalRep}d lead is longer than the gap between waves. Order {lateWaves===1?'it':'them'} now, front-load Wave 1, or widen the wave count.</span>
             </div>}
@@ -12082,7 +12109,7 @@ function GretaPlanPanel({ show } = {}) {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14 }}>
               <button onClick={saveEcon} disabled={busy} style={{ borderRadius: 8, padding: '9px 16px', fontSize: 13, border: '1px solid ' + GP_T.accent, background: GP_T.accent, color: PAL.panel, fontWeight: 600, cursor: 'pointer' }}>{busy ? '…' : 'Save economics'}</button>
-              {ecMsg === 'ok' && <span style={{ color: GP_T.green, fontSize: 12.5 }}>✓ Saved — Operating Profit now uses these costs.</span>}
+              {ecMsg === 'ok' && <span style={{ color: GP_T.green, fontSize: 12.5 }}>Saved — Operating Profit now uses these costs.</span>}
               {ecMsg && ecMsg.indexOf('err') === 0 && <span style={{ color: GP_T.red, fontSize: 12.5 }}>{ecMsg.slice(4)}</span>}
               <span style={{ fontSize: 11, color: GP_T.dim }}>Gross margin &amp; variable costs recompute your contribution ratio.</span>
             </div>
@@ -12197,7 +12224,7 @@ function GretaPlanPanel({ show } = {}) {
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
               <button onClick={confirm} disabled={busy} style={{ borderRadius: 8, padding: '9px 16px', fontSize: 13, border: '1px solid ' + GP_T.accent, background: GP_T.accent, color: PAL.panel, fontWeight: 600, cursor: 'pointer' }}>Confirm as plan of record</button>
-              {msg === 'ok' && <span style={{ color: GP_T.green, fontSize: 12.5 }}>✓ Confirmed — this is now your plan; pace &amp; RAG-vs-target are live.</span>}
+              {msg === 'ok' && <span style={{ color: GP_T.green, fontSize: 12.5 }}>Confirmed — this is now your plan; pace &amp; RAG-vs-target are live.</span>}
               {msg && msg.indexOf('err') === 0 && <span style={{ color: GP_T.red, fontSize: 12.5 }}>{msg.slice(4)}</span>}
               <span style={{ fontSize: 11, color: GP_T.dim }}>Confirming derives from live economics (cm {Math.round((derived.cm_ratio_used || 0) * 100)}%, aMER {derived.amer_used}).</span>
             </div>
@@ -12219,7 +12246,7 @@ const NAV = [
     // Daily Ops > Today — so the app's single most important screen wasn't where its own label said it was.
     { id:'owner-today', label:'Today',      component: () => mosView('Today') },
     { id:'overview',    label:'Details',    component: (p) => <Overview start={p.start} period={p.period} customActive={p.customActive}/> },
-    { id:'ask',         label:'AI Analyst', component: () => <AskPanel/> },
+    { id:'ask',         label:'Ask Greta', component: () => <AskPanel/> },
   ]},
   { id:'board',   label:'What changed', icon:'calendar', subtabs:[
     { id:'weekly',   label:'What changed', component: () => <WeeklyBoard/> },
@@ -12771,8 +12798,8 @@ function BusinessEconomicsPanel(){
   const inputStyle = { width:'100%', padding:'9px 12px', fontSize:13, fontFamily:'JetBrains Mono, ui-monospace, monospace', color:'var(--text-primary)', background:'var(--bg-input)', border:'1px solid var(--border-default)', borderRadius:'var(--r-md)' };
   const msgBox = (m) => m && (<div style={{marginTop:'var(--s-3)', padding:'10px 14px', borderRadius:'var(--r-md)', fontSize:13,
     color: m.kind==='ok'?'var(--good)':'var(--bad)',
-    background: m.kind==='ok'?'rgba(74,222,128,0.08)':'rgba(248,113,113,0.08)',
-    border:'1px solid '+(m.kind==='ok'?'rgba(74,222,128,0.35)':'rgba(248,113,113,0.35)')}}>{m.text}</div>);
+    background: m.kind==='ok'?'var(--color-success-wash)':'var(--color-danger-wash)',
+    border:'1px solid '+(m.kind==='ok'?'var(--color-success-line)':'var(--color-danger-wash)')}}>{m.text}</div>);
 
   // Provenance chip: 'your number' when the config has a stored value, else the fallback the engine uses.
   const Tag = ({ saved, fallback }) => (
@@ -13045,7 +13072,7 @@ function MarginNudge(){
     <div style={{
         display:'flex', alignItems:'center', gap:'var(--s-4)', marginBottom:'var(--s-5)',
         padding:'12px var(--s-5)', borderRadius:'var(--r-md)',
-        background:'rgba(251,191,36,0.08)', border:'1px solid var(--warn)',
+        background:'var(--color-warning-wash)', border:'1px solid var(--warn)',
       }}>
       <div style={{flex:1, minWidth:0}}>
         <div style={{fontSize:13.5, fontWeight:650, marginBottom:2}}>Your numbers are switched off</div>
@@ -13164,8 +13191,8 @@ function TeamPanel(){
 
       {msg && (<div style={{marginTop:'var(--s-3)', padding:'10px 14px', borderRadius:'var(--r-md)', fontSize:13,
         color: msg.kind==='ok'?'var(--good)':'var(--bad)',
-        background: msg.kind==='ok'?'rgba(74,222,128,0.08)':'rgba(248,113,113,0.08)',
-        border:'1px solid '+(msg.kind==='ok'?'rgba(74,222,128,0.35)':'rgba(248,113,113,0.35)')}}>{msg.text}</div>)}
+        background: msg.kind==='ok'?'var(--color-success-wash)':'var(--color-danger-wash)',
+        border:'1px solid '+(msg.kind==='ok'?'var(--color-success-line)':'var(--color-danger-wash)')}}>{msg.text}</div>)}
 
       {/* Member list */}
       <div style={{marginTop:'var(--s-5)'}}>
@@ -14762,9 +14789,56 @@ function V3Thread({ dest, go }) {
   );
 }
 
+// Mono on the figures the stylesheet cannot reach.
+//
+// The house rule is mono for anything countable and sans for language. In the deep pages
+// most figures live in table cells, and CSS has no way to tell "GBP 1,317" from "Gold Charm
+// Necklace" -- so a blanket `td { font-family: mono }` would set every product name in a
+// typewriter face, and doing it properly in JSX is a class on several hundred call sites.
+//
+// This tags leaf elements whose ENTIRE text is a figure, and the stylesheet does the rest
+// via .oi-num. Presentation only: it adds one class, never changes text or structure. Cheap
+// and safe to re-run -- leaves only, skips anything already tagged, bails on long strings
+// before the regex, and is rAF-debounced so a burst of renders costs one pass. If React
+// rewrites a className the next pass puts it back.
+// A figure, a short date (06-13, 2026-09-29) or a figure with a unit. Anything with a
+// letter run in it is language and is left alone.
+const OI_NUM_RE = /^([-+]?[£$€]?\s?[\d,]+(\.\d+)?\s?(%|pp|x|×|\/mo|\/day|\/100|d|k|m)?|\d{1,4}-\d{1,2}(-\d{1,2})?)$/i;
+function tagFigures(root) {
+  if (!root) return;
+  const els = root.querySelectorAll('td,th,span,b,strong,div,em,i,tspan');
+  for (let i = 0; i < els.length; i++) {
+    const el = els[i];
+    if (el.firstElementChild) continue;                 // leaves only
+    if (el.classList.contains('oi-num')) continue;
+    const t = el.textContent;
+    if (!t || t.length > 24) continue;
+    const s = t.trim();
+    if (s.length < 1 || !OI_NUM_RE.test(s)) continue;
+    el.classList.add('oi-num');
+  }
+}
+function useFigureTypography(dep) {
+  React.useEffect(() => {
+    const main = document.querySelector('.v3-main') || document.querySelector('main');
+    if (!main) return;
+    // A timer, not requestAnimationFrame: rAF is paused while the tab is hidden, so a
+    // dashboard opened in a background tab would render every figure in the wrong face
+    // until it was looked at. 50ms coalesces a burst of renders into one pass.
+    let t = 0;
+    const run = () => { t = 0; try { tagFigures(main); } catch (e) {} };
+    const schedule = () => { if (!t) t = setTimeout(run, 50); };
+    schedule();
+    const mo = new MutationObserver(schedule);
+    mo.observe(main, { childList: true, subtree: true });
+    return () => { mo.disconnect(); if (t) clearTimeout(t); };
+  }, [dep]);
+}
+
 function V3App({ dest, go, children, start, periodCtl }) {
   const d = V3_BY_ID[dest] || V3_NAV[0];
   const sig = useV3NavSignals();
+  useFigureTypography(dest);
   return (<div className="v3-root">
     <div className="v3-shell">
       <nav className="v3-nav" aria-label="Main">
@@ -14970,7 +15044,7 @@ function App(){
           <div className="brand-mark" style={{width:18, height:18}}>
             <svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" aria-label="Greta">
               <defs>
-                <linearGradient id="ffpb" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#8B5CF6"/><stop offset="1" stopColor="#38BDF8"/></linearGradient>
+                <linearGradient id="ffpb" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor={PAL.accent}/><stop offset="1" stopColor={PAL.data4}/></linearGradient>
                 <linearGradient id="ffgm" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#22D3A6"/><stop offset="1" stopColor="#5DE5C8"/></linearGradient>
               </defs>
               <rect x="49" y="30" width="138" height="41" rx="20.5" transform="rotate(-45 118 50.5)" fill="url(#ffpb)"/>

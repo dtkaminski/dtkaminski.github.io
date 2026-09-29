@@ -58,6 +58,20 @@
   --color-warning-wash: rgba(180, 83, 9, 0.10);
   --color-danger-wash:  rgba(180, 35, 24, 0.07);
 
+  /* Two wash strengths and a tint line, added 2026-09-29. The app carried ~24 literal
+     rgba(139,92,246,...) violets and a handful of rgba(110,231,183,...) mints - Tailwind's
+     violet-500 and emerald-300, left over from a dark theme this palette replaced. On a warm
+     cream canvas they read as a different product bolted on, which is what made the
+     "what to do next" panel look like it came from somewhere else. These give the same
+     emphasis levels in the brand's own colour so nothing needs a literal again.
+       wash   a panel tint you can put body text on
+       wash-2 a pill or chip that has to separate from a tinted panel behind it
+       line   the matching hairline, strong enough to read at 1px */
+  --color-accent-wash-2:  rgba(194, 65, 12, 0.12);
+  --color-accent-line:    rgba(194, 65, 12, 0.24);
+  --color-success-wash-2: rgba(21, 128, 61, 0.12);
+  --color-success-line:   rgba(21, 128, 61, 0.26);
+
   /* Categorical series. Orange leads; the rest are chosen to stay legible
      side by side and to survive greyscale. */
   --color-data-1: #C2410C;
