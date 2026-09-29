@@ -134,7 +134,13 @@
     try {
       if (window.GRETA_HEADLINE) return;
       var o = lsReadSlug();
-      if (o) publish(o.payload, o.as_of, true);
+      if (o) {
+        publish(o.payload, o.as_of, true);
+        // Record when the number actually reached the page. An external observer cannot be
+        // installed early enough to catch a sub-second paint -- navigation commits after the
+        // observer is attached -- so the app reports it instead of us guessing from outside.
+        try { window.GRETA_SEED_MS = Math.round(performance.now()); } catch (e2) {}
+      }
     } catch (e) {}
   }
 
