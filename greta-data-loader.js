@@ -116,6 +116,60 @@
     // frozen), so it can't be cleared from here — needs an inline gate before frkl-app.js or a rebuild.
   }
 
+  // Collapses duplicate reads. Measured on the live Today load: ~60 REST requests across 37
+  // relations, with vw_brand_action_board fetched 4x, tenant_klaviyo_metrics_daily 5x, and
+  // brand_config and mos_business_goal 3x each — every panel asks for what it needs without
+  // knowing another panel just asked for the same thing. The duplicates are not free: the edge
+  // log shows requests waiting several seconds longer than Postgres took to answer them, because
+  // they queue behind each other, so the copies slow down the reads that actually matter.
+  //
+  // Two mechanisms, both read-only and both conservative:
+  //   in-flight  — an identical GET issued while one is outstanding shares that response
+  //   short TTL  — an identical GET within 15s reuses the last one, which covers the boot storm
+  //                and panel switches without holding data long enough to look stale
+  //
+  // The cache key includes Range and Prefer, because supabase-js sends .range() as a header, not
+  // in the URL — keying on the URL alone would serve page 1 to a request asking for page 2. Any
+  // non-GET drops everything, so a write is never followed by a cached pre-write read. Responses
+  // are cloned on the way in and out: a body can only be consumed once.
+  function makeDedupeFetch() {
+    const inflight = new Map(), done = new Map(), TTL = 15000;
+    const hdr = (init, input, name) => {
+      let h = (init && init.headers) || (input && input.headers) || null;
+      if (!h) return '';
+      try {
+        if (typeof h.get === 'function') return h.get(name) || '';
+        const k = Object.keys(h).find(x => x.toLowerCase() === name);
+        return k ? String(h[k]) : '';
+      } catch (e) { return ''; }
+    };
+    return function dedupeFetch(input, init) {
+      const url = typeof input === 'string' ? input : ((input && input.url) || String(input));
+      const method = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
+
+      if (method !== 'GET' || url.indexOf('/rest/v1/') === -1) {
+        if (method !== 'GET') { inflight.clear(); done.clear(); }
+        return fetch(input, init);
+      }
+
+      const key = url + '\n' + hdr(init, input, 'range') + '\n' + hdr(init, input, 'prefer');
+      const hit = done.get(key);
+      if (hit && (Date.now() - hit.at) < TTL) return Promise.resolve(hit.res.clone());
+
+      let p = inflight.get(key);
+      if (p) return p.then(r => r.clone());
+
+      p = fetch(input, init).then(r => {
+        inflight.delete(key);
+        if (r && r.ok) { try { done.set(key, { at: Date.now(), res: r.clone() }); } catch (e) {} }
+        return r;
+      }).catch(e => { inflight.delete(key); throw e; });
+
+      inflight.set(key, p);
+      return p.then(r => r.clone());
+    };
+  }
+
   async function bootstrap() {
     // De-frkl static-only globals before anything renders live (frkl is a no-op).
     neutraliseStaticOnlyForNonFrkl();
@@ -127,7 +181,8 @@
       return;
     }
 
-    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY,
+      { global: { fetch: makeDedupeFetch() } });
     window.FRKL_LIVE.sb = sb;
 
     // 2. Check for active session (set if the user logged in via the same-origin /auth/login.html).
