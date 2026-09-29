@@ -9221,16 +9221,120 @@ function RestockActionQueue(){
   );
 }
 
+// ── The ranked board ─────────────────────────────────────────────────────
+// Actions promised "everything worth doing, ranked by £ impact" and delivered neither. It rendered
+// the restock queue first — category order, not money order, with the top row carrying no £ at all
+// — and below it a board built from STATIC legacy globals (FRKL_INSIGHTS / FRKL_PATTERNS), while
+// Today's actions come from the live vw_brand_action_board. Two sources for one idea, so the two
+// screens disagreed about what mattered most.
+//
+// One list, one source, ordered by money, with the bar drawn so relative size is SEEN rather than
+// read down a column of numbers. Category becomes a filter instead of a grouping, because grouping
+// is what buried the £5,648 profit action under ten stock POs. Rows open in place: a number you
+// cannot interrogate is decoration, and the playbook explaining the figure is right there (0199).
+function V3ActionBoard(){
+  const [rows, setRows] = React.useState(null);
+  const [err, setErr] = React.useState(null);
+  const [cat, setCat] = React.useState('all');
+  const [open, setOpen] = React.useState(null);
+
+  React.useEffect(() => {
+    let dead = false;
+    const go = () => {
+      const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
+      if (!sb || !b) return false;
+      sb.from('vw_brand_action_board')
+        .select('external_id,description,priority,category,origin,cm_gbp,step1,playbook,days_open')
+        .eq('brand_id', b).order('cm_gbp', { ascending: false })
+        .then(r => {
+          if (dead) return;
+          if (r && r.error) { setErr(r.error.message || 'could not load'); return; }
+          setRows((r && r.data) || []);
+        }, () => { if (!dead) setErr('could not load'); });
+      return true;
+    };
+    if (!go()) {
+      const iv = setInterval(() => { if (go()) clearInterval(iv); }, 500);
+      setTimeout(() => clearInterval(iv), 30000);
+      return () => { dead = true; clearInterval(iv); };
+    }
+    return () => { dead = true; };
+  }, []);
+
+  if (err) return <div className="v3-empty">Greta could not load your actions just now. {err}</div>;
+  if (rows === null) return <div className="v3-empty">Working out what is worth doing…</div>;
+  if (!rows.length) return <div className="v3-empty">Nothing worth doing right now — Greta will raise something when it is.</div>;
+
+  const cats = [...new Set(rows.map(r => r.category).filter(Boolean))].sort();
+  const shown = cat === 'all' ? rows : rows.filter(r => r.category === cat);
+  const max = Math.max(...rows.map(r => Number(r.cm_gbp) || 0), 1);
+  const total = shown.reduce((a, r) => a + (Number(r.cm_gbp) || 0), 0);
+
+  return (
+    <div className="v3-board">
+      <div className="v3-board-head">
+        <span className="v3-board-total">{v3Gbp(total)}<span className="v3-board-total-lab"> a month across {shown.length} action{shown.length === 1 ? '' : 's'}</span></span>
+      </div>
+      <div className="v3-chips" role="tablist" aria-label="Filter actions by area">
+        <button type="button" role="tab" aria-selected={cat === 'all'}
+                className={'v3-chip' + (cat === 'all' ? ' on' : '')} onClick={() => setCat('all')}>
+          All <span className="v3-chip-n">{rows.length}</span>
+        </button>
+        {cats.map(c => (
+          <button key={c} type="button" role="tab" aria-selected={cat === c}
+                  className={'v3-chip' + (cat === c ? ' on' : '')} onClick={() => setCat(c)}>
+            {c} <span className="v3-chip-n">{rows.filter(r => r.category === c).length}</span>
+          </button>
+        ))}
+      </div>
+      <ol className="v3-rank">
+        {shown.map((r, i) => {
+          const gbp = Number(r.cm_gbp) || 0;
+          const isOpen = open === r.external_id;
+          const play = Array.isArray(r.playbook) ? r.playbook : [];
+          return (
+            <li key={r.external_id} className={'v3-rank-row' + (isOpen ? ' open' : '')}>
+              <button type="button" className="v3-rank-hit" aria-expanded={isOpen}
+                      onClick={() => setOpen(isOpen ? null : r.external_id)}>
+                <span className="v3-rank-n">{i + 1}</span>
+                <span className="v3-rank-body">
+                  <span className="v3-rank-desc">{r.description}</span>
+                  <span className="v3-rank-bar" aria-hidden="true">
+                    <i style={{ width: Math.max(1.5, (gbp / max) * 100) + '%' }}/>
+                  </span>
+                  <span className="v3-rank-meta">
+                    {r.category || 'general'}{r.days_open > 0 ? ' · open ' + r.days_open + 'd' : ''}
+                  </span>
+                </span>
+                <span className="v3-rank-gbp">{v3Gbp(gbp)}<span className="v3-rank-per">/mo</span></span>
+              </button>
+              {isOpen && (
+                <div className="v3-rank-why">
+                  {play.length
+                    ? <ol className="v3-rank-steps">{play.map((s, j) => <li key={j}>{String(s)}</li>)}</ol>
+                    : <p className="v3-rank-nosteps">{r.step1 || 'Greta has no further detail on this one yet.'}</p>}
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
 function ActionsView(){
   return (
     <div>
       <div className="card-section-title" style={{marginBottom:12}}>
         <h2 style={{margin:0}}>Actions</h2>
-        <span className="meta">{`Everything worth doing, ranked by ${curSym()} impact — work the queue, mark items done as you go`}</span>
+        <span className="meta">{`Everything worth doing, ranked by ${curSym()} impact — open any row to see why`}</span>
       </div>
-      <RestockActionQueue/>
-      <ActionBoard/>
-      <AdviceLedgerPanel/>
+      <V3ActionBoard/>
+      {/* Restock keeps its own queue, but BELOW the ranked list and collapsed: it is a different
+          job (what to order, by date) and it was drowning the money ranking when it led. */}
+      <V3More id="act-restock" label="Stock and purchasing — what to order, by date"><RestockActionQueue/></V3More>
+      <V3More id="act-legacy" label="Earlier specialist review"><ActionBoard/><AdviceLedgerPanel/></V3More>
     </div>
   );
 }
