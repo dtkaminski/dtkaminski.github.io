@@ -16,6 +16,8 @@
  *   only calls it estimated in the second case. Greta abstains rather than guess: no
  *   after-ads target → no pace, and Today says why.
  *
+ * ONE READ: vw_brand_today (0184) carries the headline, the readiness gate, the connection
+ * count and the top four actions in a single row. It replaced four separate requests.
  * Publishes: window.GRETA_HEADLINE + 'greta-headline-updated'. Never throws.
  */
 (function () {
@@ -43,20 +45,15 @@
   async function build() {
     var sb = sbClient(), b = brandId();
     if (!sb || !b) return;
-    var today = new Date().toISOString().slice(0, 10);
-
-    var res = await Promise.all([
-      safeQ(sb.from('vw_brand_headline').select('period_start, period_end, cm_basis, plan_status, cm_target_quarter, cm_target_monthly, cam_target_quarter, cam_target_monthly, cam_target_source, net_revenue_30d, paid_spend_30d, product_contribution_30d, cm_after_marketing_30d, pace_pct_after_ads, open_actions').eq('brand_id', b).limit(1), 10000, null),
-      safeQ(sb.from('vw_brand_readiness').select('has_revenue, has_economics, can_show_cm, cm_source, gate_message, can_rank_actions').eq('brand_id', b).limit(1), 8000, null),
-      safeQ(sb.from('vw_brand_action_board').select('external_id, description, step1, priority, category, cm_gbp').eq('brand_id', b).order('cm_gbp', { ascending: false, nullsFirst: false }).limit(4), 10000, []),
-      safeQ(sb.from('connections').select('provider, status').eq('brand_id', b), 8000, [])
-    ]);
-
-    var h = (res[0] && res[0][0]) || null;
-    var rd = (res[1] && res[1][0]) || null;
-    var acts = res[2] || [];
-    var conns = res[3] || [];
+    // ONE request, not four (0184). vw_brand_today returns the headline, the readiness gate, the
+    // active-connection count and the top four actions as a single row. Server-side the four
+    // reads total ~700ms; each PostgREST round trip costs 250-600ms warm and more cold, so the
+    // requests cost more than the queries did. Every field is the same one this used to read.
+    var rows = await safeQ(sb.from('vw_brand_today').select('*').eq('brand_id', b).limit(1), 12000, null);
+    var h = (rows && rows[0]) || null;
     if (!h) return;
+    var rd = h;                                   // readiness fields are on the same row now
+    var acts = Array.isArray(h.top_actions) ? h.top_actions : [];
 
     var out = {
       period_start: h.period_start, period_end: h.period_end,
@@ -76,7 +73,7 @@
       gate_message: rd ? rd.gate_message : null,
       // First-run state: what is still needed before Greta can answer properly.
       setup: {
-        connected: conns.filter(function (c) { return c.status === 'active'; }).length,
+        connected: Number(h.active_connections) || 0,
         connected_total: 5,
         has_revenue: rd ? rd.has_revenue !== false : false,
         has_economics: rd ? rd.has_economics === true : false,
@@ -116,7 +113,7 @@
     } catch (e) { /* the paragraph is optional; never block the headline on it */ }
 
     try { window.dispatchEvent(new CustomEvent('greta-headline-updated')); } catch (e) {}
-    if (window.console) console.info('[headline-data] GRETA_HEADLINE built · after-ads £' + out.cm_after_marketing_30d + (derived ? ' · target derived' : ''));
+    if (window.console) console.info('[headline-data] GRETA_HEADLINE built · after-ads £' + out.cm_after_marketing_30d + (out.target_is_derived ? ' · target derived' : ''));
   }
 
   function boot() { build().catch(function () {}); }
