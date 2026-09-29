@@ -9232,6 +9232,21 @@ function RestockActionQueue(){
 // read down a column of numbers. Category becomes a filter instead of a grouping, because grouping
 // is what buried the £5,648 profit action under ten stock POs. Rows open in place: a number you
 // cannot interrogate is decoration, and the playbook explaining the figure is right there (0199).
+// Holds the shape of what is coming, so the layout does not jump when it lands and the wait reads
+// as loading rather than broken. Rows, not a spinner: a spinner says "something is happening", a
+// skeleton says "a ranked list is happening".
+function V3SkeletonRows({ n }) {
+  return (<div aria-hidden="true">
+    {Array.from({ length: n || 4 }).map((_, i) => (
+      <div className="v3-skel-row" key={i}>
+        <span className="v3-skel v3-skel-n"/>
+        <span className="v3-skel-lines"><span className="v3-skel"/><span className="v3-skel"/></span>
+        <span className="v3-skel v3-skel-gbp"/>
+      </div>
+    ))}
+  </div>);
+}
+
 function V3ActionBoard(){
   const [rows, setRows] = React.useState(null);
   const [err, setErr] = React.useState(null);
@@ -9261,9 +9276,9 @@ function V3ActionBoard(){
     return () => { dead = true; };
   }, []);
 
-  if (err) return <div className="v3-empty">Greta could not load your actions just now. {err}</div>;
-  if (rows === null) return <div className="v3-empty">Working out what is worth doing…</div>;
-  if (!rows.length) return <div className="v3-empty">Nothing worth doing right now — Greta will raise something when it is.</div>;
+  if (err) return <div className="v3-empty">Greta could not load your actions just now — refreshing usually sorts it. If it keeps happening, Greta has logged the reason and will raise it here.</div>;
+  if (rows === null) return <V3SkeletonRows n={5}/>;
+  if (!rows.length) return <div className="v3-empty">Nothing needs doing right now. Greta raises something here as soon as it is worth your time.</div>;
 
   const cats = [...new Set(rows.map(r => r.category).filter(Boolean))].sort();
   const shown = cat === 'all' ? rows : rows.filter(r => r.category === cat);
@@ -9271,7 +9286,7 @@ function V3ActionBoard(){
   const total = shown.reduce((a, r) => a + (Number(r.cm_gbp) || 0), 0);
 
   return (
-    <div className="v3-board">
+    <div className="v3-board v3-enter">
       <div className="v3-board-head">
         <span className="v3-board-total">{v3Gbp(total)}<span className="v3-board-total-lab"> a month across {shown.length} action{shown.length === 1 ? '' : 's'}</span></span>
       </div>
@@ -9368,8 +9383,8 @@ function V3StockRunway(){
     return () => { dead = true; };
   }, []);
 
-  if (err) return <div className="v3-empty">Greta could not load your stock runway just now. {err}</div>;
-  if (rows === null) return <div className="v3-empty">Working out what runs out first…</div>;
+  if (err) return <div className="v3-empty">Greta could not load your stock runway just now — refreshing usually sorts it.</div>;
+  if (rows === null) return <V3SkeletonRows n={4}/>;
   if (!rows.length) return null;
 
   const today = new Date();
@@ -9383,7 +9398,7 @@ function V3StockRunway(){
   const scale = Math.max(30, ...items.map(i => Math.max(i.lead, i.dts))) || 30;
 
   return (
-    <div className="v3-runway">
+    <div className="v3-runway v3-enter">
       <div className="v3-runway-head">
         <h2 className="v3-runway-title">What runs out first</h2>
         <span className="v3-runway-key">
@@ -13498,7 +13513,7 @@ function V3MoneyFlow({ d, note }) {
   const go   = (sec, sub) => () => window.__oiNav && window.__oiNav(sec, sub);
 
   const steps = [
-    { key: 'cogs',  label: 'What the products cost', value: cogs,  tone: 'spend', onGo: go('settings', 'costs') },
+    { key: 'cogs',  label: 'What the products cost', value: cogs,  tone: 'cogs',  onGo: go('settings', 'costs') },
     { key: 'ads',   label: 'What you spent on ads',  value: spend, tone: 'spend', onGo: go('channels', 'cross'), soft: d.spend_is_stale },
     { key: 'kept',  label: 'What you keep',          value: kept,  tone: 'keep',  onGo: go('home', 'plansetup') },
   ];
