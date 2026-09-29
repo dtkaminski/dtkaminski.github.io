@@ -14001,7 +14001,7 @@ function V3Today(p) {
         <span>{v3ActionText(a.description).main}</span>
         <span className="v3-num">{a.cm_gbp ? v3Gbp(a.cm_gbp) + '/mo' : ''}</span>
       </div>))}
-      <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>See all {d.open_actions || ''} actions</button>
+      <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>See all {d.board_actions != null ? d.board_actions : (d.open_actions || '')} actions</button>
     </div>)}
 
     <V3Why why={d.why} period={d.why_period}/>

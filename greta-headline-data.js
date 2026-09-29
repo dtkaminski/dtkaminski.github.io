@@ -83,6 +83,9 @@
       // Kept as the screen's own word for it: "we worked this out, you did not agree to it".
       target_is_derived: h.cam_target_source === 'converted_from_product_basis',
       open_actions: h.open_actions,
+      // What the queue will actually render (0195). open_actions counts every open row; the board
+      // filters out descriptive/unfalsifiable ones, so "See all 47" used to open a list of 20.
+      board_actions: h.board_actions,
       can_show_cm: rd ? rd.can_show_cm !== false : true,
       cm_source: rd ? rd.cm_source : null,
       // What the profit number is actually built on (0192). cm_source does NOT answer this:
