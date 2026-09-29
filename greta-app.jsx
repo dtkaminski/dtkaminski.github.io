@@ -9313,7 +9313,7 @@ function V3ActionBoard(){
                       onClick={() => setOpen(isOpen ? null : r.external_id)}>
                 <span className="v3-rank-n">{i + 1}</span>
                 <span className="v3-rank-body">
-                  <span className={'v3-rank-desc' + (isOpen ? '' : ' clamp')}>{r.description}</span>
+                  <span className={'v3-rank-desc' + (isOpen ? '' : ' clamp')}>{v3Tidy(r.description)}</span>
                   <span className="v3-rank-bar" aria-hidden="true">
                     <i style={{ width: Math.max(1.5, (gbp / max) * 100) + '%' }}/>
                   </span>
@@ -9326,8 +9326,8 @@ function V3ActionBoard(){
               {isOpen && (
                 <div className="v3-rank-why">
                   {play.length
-                    ? <ol className="v3-rank-steps">{play.map((s, j) => <li key={j}>{String(s)}</li>)}</ol>
-                    : <p className="v3-rank-nosteps">{r.step1 || 'Greta has no further detail on this one yet.'}</p>}
+                    ? <ol className="v3-rank-steps">{play.map((s, j) => <li key={j}>{v3Tidy(s)}</li>)}</ol>
+                    : <p className="v3-rank-nosteps">{v3Tidy(r.step1) || 'Greta has no further detail on this one yet.'}</p>}
                 </div>
               )}
             </li>
@@ -9510,10 +9510,9 @@ function V3ChannelScoreboard(){
 function ActionsView(){
   return (
     <div>
-      <div className="card-section-title" style={{marginBottom:12}}>
-        <h2 style={{margin:0}}>Actions</h2>
-        <span className="meta">{`Everything worth doing, ranked by ${curSym()} impact — open any row to see why`}</span>
-      </div>
+      {/* No heading here: the page head one line above already reads "Actions / What should I do,
+          in order of £?". Saying it twice is the kind of thing that makes a product feel unedited. */}
+      <p className="v3-note" style={{margin:'0 0 12px'}}>Everything worth doing, ranked by {curSym()} impact — open any row to see why.</p>
       <V3ActionBoard/>
       {/* Restock keeps its own queue, but BELOW the ranked list and collapsed: it is a different
           job (what to order, by date) and it was drowning the money ranking when it led. */}
@@ -13678,6 +13677,14 @@ function v3Amount(v) { return Math.abs(Math.round(Number(v) || 0)).toLocaleStrin
 // then the arithmetic in brackets. Split it so the owner reads a sentence first and
 // the workings sit underneath. The text itself is never invented here.
 const V3_CATS = ['total','site','finance','ops','product','paid','creative','retention','cx','stock','email','organic'];
+// Last line of defence on engine-written text. fn_money_gbp fixed the causal emitter, but others
+// still write "~£249584" and "~£1893" — ungrouped, and hedged with a tilde on every figure. Rather
+// than chase each emitter, normalise where it is rendered: group the thousands and drop the tilde,
+// because uncertainty is the confidence ladder's job and hedging every number says nothing.
+function v3Tidy(s) {
+  if (s == null) return s;
+  return v3Money(String(s)).replace(/~\s*(?=[£$€]?\d)/g, '');
+}
 function v3Money(s) {
   // The engine writes amounts unformatted inside its own sentences; group them so a
   // reader can take in £247,261 at a glance instead of counting digits.
