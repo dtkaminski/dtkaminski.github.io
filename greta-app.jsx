@@ -13219,6 +13219,64 @@ function v3TrustWhy(d) {
   return bits.join(' ');
 }
 
+// ── Where the money goes ─────────────────────────────────────────────────
+// The headline answers "how much", and the three figures under it used to answer "out of what" as
+// a run-on sentence: "£20,186 before ads · £9,730 on ads · £35,540 sales". Three numbers in a row
+// with no relationship shown, when the relationship IS the story — every one of them is a step on
+// the same path from a sale to what the owner keeps.
+//
+// So it is drawn as that path. The arithmetic is exact and already on the row, no new reads and
+// nothing recomputed: sales − product costs = before ads, − ad spend = after ads.
+// frkl: 35,540 − 15,354 = 20,186 − 9,730 = 10,456.
+//
+// Every segment is a way in, because a number you cannot interrogate is decoration: product costs
+// open the cost panel, ads open Marketing, sales open Profit & sales. Ad spend carries the
+// confidence flag from 0196 — when a feed has gone quiet the segment is drawn hatched rather than
+// solid, so "this bar is smaller than the truth" is visible rather than only readable.
+function V3MoneyFlow({ d }) {
+  const sales = Number(d.net_revenue_30d) || 0;
+  const prod  = Number(d.product_contribution_30d) || 0;
+  const spend = Number(d.paid_spend_30d) || 0;
+  const kept  = Number(d.cm_after_marketing_30d) || 0;
+  if (sales <= 0) return null;
+  const cogs = Math.max(sales - prod, 0);
+  const pct  = (v) => Math.max(0, Math.min(100, (v / sales) * 100));
+  const go   = (sec, sub) => () => window.__oiNav && window.__oiNav(sec, sub);
+
+  const steps = [
+    { key: 'cogs',  label: 'What the products cost', value: cogs,  tone: 'spend', onGo: go('settings', 'costs') },
+    { key: 'ads',   label: 'What you spent on ads',  value: spend, tone: 'spend', onGo: go('channels', 'cross'), soft: d.spend_is_stale },
+    { key: 'kept',  label: 'What you keep',          value: kept,  tone: 'keep',  onGo: go('home', 'plansetup') },
+  ];
+
+  return (
+    <div className="v3-flow">
+      <button type="button" className="v3-flow-top" onClick={go('home', 'overview')}>
+        <span className="v3-flow-top-lab">Every £100 of sales</span>
+        <span className="v3-flow-top-val">{v3Gbp(sales)} in</span>
+      </button>
+      <div className="v3-flow-track" role="img"
+           aria-label={'Of ' + v3Gbp(sales) + ' in sales, ' + v3Gbp(cogs) + ' went on product costs, '
+                       + v3Gbp(spend) + ' on ads, leaving ' + v3Gbp(kept) + '.'}>
+        {steps.map(s => (
+          <i key={s.key} className={'v3-flow-seg v3-flow-' + s.tone + (s.soft ? ' v3-flow-soft' : '')}
+             style={{ width: pct(s.value) + '%' }}/>
+        ))}
+      </div>
+      <div className="v3-flow-legend">
+        {steps.map(s => (
+          <button key={s.key} type="button" className="v3-flow-item" onClick={s.onGo}>
+            <span className={'v3-flow-dot v3-flow-' + s.tone + (s.soft ? ' v3-flow-soft' : '')} aria-hidden="true"/>
+            <span className="v3-flow-val">{v3Gbp(s.value)}</span>
+            <span className="v3-flow-lab">{s.label}{s.soft ? ' · missing days' : ''}</span>
+            <span className="v3-flow-pct">{Math.round(pct(s.value))}%</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function V3Conf({ state, detail, fix }) {
   const c = V3_CONF[state] || V3_CONF.estimated;
   const [open, setOpen] = React.useState(false);
@@ -14006,11 +14064,7 @@ function V3Today(p) {
             <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav('home', 'plansetup')}>Set your goal</button>
           </div>
         )}
-        <div className="v3-sub">
-          <span>{v3Gbp(prod)} before ads <V3Info k="profit_before_ads"/></span>
-          <span className="v3-dot"/><span>{v3Gbp(spend)} on ads <V3Info k="ad_spend"/></span>
-          <span className="v3-dot"/><span>{v3Gbp(sales)} sales <V3Info k="sales"/></span>
-        </div>
+        <V3MoneyFlow d={d}/>
         {stale && <button type="button" className="v3-refresh" onClick={refresh}>New numbers are available — show them</button>}
       </div>
     )}

@@ -1186,6 +1186,40 @@
     border: 1px solid var(--border-default); border-radius: 999px; background: none; font-family: inherit; font-size: 11.5px; font-weight: 600; color: var(--text-muted);
   }
   .v3-conf i { width: 8px; height: 8px; display: inline-block; }
+  /* ── Where the money goes ───────────────────────────────────────────────────────────────────
+     One proportional track, not three cards. Per the house rules: no panel/shadow stack, square
+     containers, whitespace and a hairline rule instead of boxes, --font-mono on every figure and
+     --font-sans on every label. Colour carries meaning and nothing else — accent for what the
+     owner keeps, muted for what left the business — so the eye lands on the kept share first.
+     A feed that has gone quiet is drawn hatched, so an understated bar looks understated. */
+  .v3-flow { margin-top: var(--space-4, 16px); border-top: 1px solid var(--color-line); padding-top: var(--space-3, 12px); }
+  .v3-flow-top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3, 12px);
+                 width: 100%; background: none; border: 0; padding: 0 0 var(--space-2, 8px); cursor: pointer; text-align: left; }
+  .v3-flow-top-lab { font-family: var(--font-sans); font-size: var(--text-xs, 11px); letter-spacing: .04em;
+                     text-transform: uppercase; color: var(--color-muted); }
+  .v3-flow-top-val { font-family: var(--font-mono); font-size: var(--text-sm, 13px); color: var(--color-ink); }
+  .v3-flow-track { display: flex; width: 100%; height: 10px; overflow: hidden; border-radius: var(--radius-none, 0); background: var(--color-sunken, #EFEAE3); }
+  .v3-flow-seg { display: block; height: 100%; transition: width var(--transition-base, .25s) ease; }
+  .v3-flow-spend { background: var(--color-muted); }
+  .v3-flow-seg.v3-flow-spend + .v3-flow-seg.v3-flow-spend { box-shadow: inset 1px 0 0 var(--color-panel); }
+  .v3-flow-keep { background: var(--color-accent); }
+  .v3-flow-soft { background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.55) 0 3px, transparent 3px 6px); }
+  .v3-flow-legend { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-3, 12px); margin-top: var(--space-3, 12px); }
+  .v3-flow-item { display: grid; grid-template-columns: auto 1fr; grid-template-areas: "dot val" "lab lab" "pct pct";
+                  gap: 2px var(--space-2, 8px); align-items: center; background: none; border: 0; padding: 0;
+                  text-align: left; cursor: pointer; border-top: 1px solid transparent; }
+  .v3-flow-item:hover { border-top-color: var(--color-line-strong, var(--color-line)); }
+  .v3-flow-item:hover .v3-flow-lab { color: var(--color-ink); }
+  .v3-flow-dot { grid-area: dot; width: 8px; height: 8px; display: block; }
+  .v3-flow-val { grid-area: val; font-family: var(--font-mono); font-size: var(--text-base, 15px); color: var(--color-ink); }
+  .v3-flow-lab { grid-area: lab; font-family: var(--font-sans); font-size: var(--text-xs, 11px); color: var(--color-muted);
+                 transition: color var(--transition-fast, .15s) ease; }
+  .v3-flow-pct { grid-area: pct; font-family: var(--font-mono); font-size: var(--text-xs, 11px); color: var(--text-faint, var(--color-muted)); }
+  @media (max-width: 680px) {
+    .v3-flow-legend { grid-template-columns: 1fr; gap: var(--space-2, 8px); }
+    .v3-flow-item { grid-template-columns: auto 1fr auto; grid-template-areas: "dot val pct" "lab lab lab"; }
+  }
+
   /* One ladder: Direct > Likely > Probably > Possible > Outside chance, then "Not yet" for the
      cases Greta refuses to answer. The dot fades as the steer weakens, so the rung reads at a
      glance without having to parse the word. Old class names kept — older cached bundles still
@@ -1317,6 +1351,6 @@ window.MOS_EMBEDDED = true;</script>
    save-brand-config had been reading two relations that were never created. */</script>
 <script defer src="./cost-entry.build.js?v=20260929c"></script>
 <script defer src="./loop-panel.js?v=20260921a"></script>
-<script defer src="./greta-app.js?v=1790684390276"></script>
+<script defer src="./greta-app.js?v=1790686475198"></script>
 <script>/* perf: defer frkl static deep-tab data (CVR ~1.7MB, cohorts, promos, products) — not used by the Overview/landing. Background-load after paint; skip for non-frkl (de-frkl). */
 (function(){try{var slug=window.OI_BRAND_SLUG||(window.parent&&window.parent!==window?window.parent.OI_BRAND_SLUG:null)||"frkl";if(slug!=="frkl")return;var files=["greta-cvr.js","greta-cohorts.js","greta-discount-codes.js","greta-products.js","greta-patterns.js"],i=0;function next(){if(i>=files.length)return;var s=document.createElement("script");s.src="./"+files[i++]+"?v=20260925f";s.async=true;s.onload=next;s.onerror=next;document.head.appendChild(s);}var kick=function(){next();};if(window.requestIdleCallback){window.requestIdleCallback(kick,{timeout:1500});}else{setTimeout(kick,300);}}catch(e){}})();</script>
