@@ -49,9 +49,24 @@
     // active-connection count and the top four actions as a single row. Server-side the four
     // reads total ~700ms; each PostgREST round trip costs 250-600ms warm and more cold, so the
     // requests cost more than the queries did. Every field is the same one this used to read.
-    var rows = await safeQ(sb.from('vw_brand_today').select('*').eq('brand_id', b).limit(1), 12000, null);
+    // Retry, because the whole screen now rests on this one read. Measured through PostgREST the
+    // statement averages 1.7s, but the edge log has it at 9.8s and once 35.9s — the excess is
+    // queueing behind the ~60 other requests the page fires, not the query. With four reads a slow
+    // one only degraded Today; with one it blanks it, so a single timeout must not be the end of it.
+    // Each attempt gets a longer cap; three attempts cover ~50s, past the worst yet observed.
+    var rows = null;
+    for (var attempt = 0; attempt < 3 && !rows; attempt++) {
+      if (attempt) await new Promise(function (r) { setTimeout(r, 1500 * attempt); });
+      rows = await safeQ(sb.from('vw_brand_today').select('*').eq('brand_id', b).limit(1), 12000 + attempt * 9000, null);
+    }
     var h = (rows && rows[0]) || null;
-    if (!h) return;
+    // Say so rather than sit on an em-dash forever: Today reads this to explain itself.
+    if (!h) {
+      window.GRETA_HEADLINE_ERROR = 'slow';
+      try { window.dispatchEvent(new CustomEvent('greta-headline-updated')); } catch (e) {}
+      return;
+    }
+    window.GRETA_HEADLINE_ERROR = null;
     var rd = h;                                   // readiness fields are on the same row now
     var acts = Array.isArray(h.top_actions) ? h.top_actions : [];
 
