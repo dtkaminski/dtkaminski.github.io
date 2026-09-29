@@ -3491,13 +3491,26 @@ function Overview({start, period, customActive}){
       {/* Per-channel freshness moved to the app-bar FreshnessChip (was duplicated here). */}
       {/* Hero — the answer to "what should I look at right now" */}
       <SetupProgressCard/>
-      <ThisWeekHero/>
-      <TrackRecord/>
+      {/* This page asks "Where does my money come from, and where does it go?" and used to open
+          with a weekly briefing, a track record and an action queue — all three of which have
+          their own destinations in V3 (Review, Review, Actions). The page never answered its own
+          question. The money flow is that answer, so it leads; the briefing is demoted to a
+          collapsed section below rather than deleted, because the content is good, just misplaced.
+          Figures come from the same row Today reads, so the two screens cannot disagree. */}
+      <div className="v3-profit-lead">
+        <V3MoneyFlow d={(typeof window !== 'undefined' && window.GRETA_HEADLINE) || {}} note="last 30 days"/>
+      </div>
       {/* Crux verdict: compact scorecard strip + the diagnostic (with the £-bridge nested in its "thinking") */}
       <ScoresStrip metrics={cruxMetrics} windowLabel={`last ${CRUX_DAYS} days`}/>
       <DiagnosticCard metrics={dxMetrics} context={dxContext} period={customActive?null:period} onLogEvent={()=>setEvTick(t=>t+1)}/>
-      {/* WHAT CHANGED — the weekly diff, so the founder sees the movers before the deep-dive. */}
-      <WhatChangedStrip/>
+      {/* The weekly briefing, kept but demoted — it answers "what changed this week", which is
+          Review's question, not this page's. Collapsed by default so the money read is what the
+          page opens with. */}
+      <V3More id="profit-weekly" label="This week's briefing — what changed and what it is worth">
+        <ThisWeekHero/>
+        <TrackRecord/>
+        <WhatChangedStrip/>
+      </V3More>
       {/* Prove-value-first onboarding nudge: the read above already works on
           catalogue-estimate margins — now offer the one ~5-min input that makes the
           margin figures exact. Placed AFTER the value, framed as "make it exact". */}
@@ -3515,12 +3528,13 @@ function Overview({start, period, customActive}){
           <MarginBadge/> margin figures are based on your entered costs · <span onClick={()=>{ if (UI_V3) { window.__oiGo && window.__oiGo('goal'); return; } setCostsOpen(true); }} style={{color:'var(--accent)', cursor:'pointer'}}>edit costs</span>
         </div>
       )}
-      {/* DO THIS NEXT — the action queue sits directly under the diagnosis (what's
-          happening + why → what to do), not buried beneath the analysis charts. */}
-      <div className="section-eyebrow" style={{display:'flex',alignItems:'center',gap:8,margin:'4px 0 -4px',fontSize:11,fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--accent)'}}>
-        <span style={{width:3,height:14,background:'var(--accent)',borderRadius:2}}/>Do this next
-      </div>
-      <ActionBoard/>
+      {/* The ranked queue used to render here in full, above the money read. It is the Actions
+          destination's whole job, and Today already carries the top four, so a third copy pushed
+          this page's own answer into third place. A one-line pointer instead: it teaches where
+          things live rather than duplicating them. */}
+      <button type="button" className="v3-xref" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>
+        Everything worth doing, ranked by £ <span className="v3-xref-go">on Actions →</span>
+      </button>
       {/* COMMERCIAL HEALTH */}
       <div className="section-eyebrow" style={{display:'flex',alignItems:'center',gap:8,margin:'8px 0 -4px',fontSize:11,fontWeight:700,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--text-muted)'}}>
         <span style={{width:3,height:14,background:'var(--text-faint)',borderRadius:2}}/>Commercial health
@@ -13233,7 +13247,7 @@ function v3TrustWhy(d) {
 // open the cost panel, ads open Marketing, sales open Profit & sales. Ad spend carries the
 // confidence flag from 0196 — when a feed has gone quiet the segment is drawn hatched rather than
 // solid, so "this bar is smaller than the truth" is visible rather than only readable.
-function V3MoneyFlow({ d }) {
+function V3MoneyFlow({ d, note }) {
   const sales = Number(d.net_revenue_30d) || 0;
   const prod  = Number(d.product_contribution_30d) || 0;
   const spend = Number(d.paid_spend_30d) || 0;
@@ -13252,7 +13266,7 @@ function V3MoneyFlow({ d }) {
   return (
     <div className="v3-flow">
       <button type="button" className="v3-flow-top" onClick={go('home', 'overview')}>
-        <span className="v3-flow-top-lab">Every £100 of sales</span>
+        <span className="v3-flow-top-lab">Every £100 of sales{note ? ' · ' + note : ''}</span>
         <span className="v3-flow-top-val">{v3Gbp(sales)} in</span>
       </button>
       <div className="v3-flow-track" role="img"
