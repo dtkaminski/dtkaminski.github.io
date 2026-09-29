@@ -9346,7 +9346,13 @@ function V3StockRunway(){
       if (!sb || !b) return false;
       sb.from('vw_stock_demand_plan')
         .select('sku,product_title,on_hand,projected_days_to_stockout,reorder_by_date,suggested_order_units,cm_at_risk_before_resupply,stock_status')
-        .eq('brand_id', b).order('cm_at_risk_before_resupply', { ascending: false }).limit(12)
+        // NULLs sort FIRST on a descending PostgREST order, so this returned the twelve LEAST
+        // urgent SKUs — "out in 784d", no money at risk — and a 784-day scale that flattened every
+        // bar to nothing. Ask only for rows with money actually at risk, nulls last.
+        .eq('brand_id', b)
+        .gt('cm_at_risk_before_resupply', 0)
+        .order('cm_at_risk_before_resupply', { ascending: false, nullsFirst: false })
+        .limit(12)
         .then(r => {
           if (dead) return;
           if (r && r.error) { setErr(r.error.message || 'could not load'); return; }
