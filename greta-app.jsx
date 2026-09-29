@@ -13431,6 +13431,48 @@ function v3TrustWhy(d) {
   return bits.join(' ');
 }
 
+// ── Drill into a figure ──────────────────────────────────────────────────
+// V3Info answers "what is this metric" from a glossary. Nothing answered the question an operator
+// actually asks of a number on their own dashboard: where did THIS come from — what went into it,
+// over what window, and how much should I trust it. Without that, a figure is something to believe
+// or not, which is the difference between a report and a tool.
+//
+// One pattern, established here and reusable: pass the parts, get the same sheet every time. It
+// deliberately does NOT compute anything — the caller hands over figures it already renders, so a
+// drill-down can never disagree with the number it explains.
+function V3Figure({ children, label, window: win, inputs, note, basis, fix }) {
+  const [open, setOpen] = React.useState(false);
+  const conf = basis && V3_CONF[basis] ? V3_CONF[basis] : null;
+  return (<span className="v3-fig-wrap">
+    <button type="button" className="v3-fig-hit" aria-expanded={open}
+            aria-label={'How ' + label + ' is worked out'}
+            onClick={(ev) => { ev.stopPropagation(); setOpen(o => !o); }}>
+      {children}<span className="v3-fig-cue" aria-hidden="true"/>
+    </button>
+    {open && (<span className="v3-sheet v3-sheet-fig" role="dialog" aria-label={'How ' + label + ' is worked out'}>
+      <b>{label}</b>
+      {win && <span className="v3-sheet-tech">{win}</span>}
+      {inputs && inputs.length > 0 && (
+        <span className="v3-fig-rows">
+          {inputs.map((row, i) => (
+            <span className="v3-fig-row" key={i}>
+              <span className="v3-fig-row-lab">{row[0]}</span>
+              <span className="v3-fig-row-val">{row[1]}</span>
+            </span>
+          ))}
+        </span>
+      )}
+      {conf && <span><b>{conf.label}:</b> {note || conf.why}</span>}
+      {!conf && note && <span>{note}</span>}
+      <span className="v3-sheet-btns">
+        {fix && <button type="button" className="v3-btn v3-btn-sm"
+                        onClick={() => { setOpen(false); window.__oiNav && window.__oiNav(fix[0], fix[1]); }}>{fix[2]}</button>}
+        <button type="button" className="v3-btn v3-btn-sm" onClick={() => setOpen(false)}>Close</button>
+      </span>
+    </span>)}
+  </span>);
+}
+
 // ── Where the money goes ─────────────────────────────────────────────────
 // The headline answers "how much", and the three figures under it used to answer "out of what" as
 // a run-on sentence: "£20,186 before ads · £9,730 on ads · £35,540 sales". Three numbers in a row
@@ -14253,7 +14295,24 @@ function V3Today(p) {
                     ? ['settings', 'connections', 'Reconnect ' + (d.stale_feeds ? String(d.stale_feeds).split(' since')[0] : 'your ads')]
                     : ['settings', 'costs', 'Enter your product costs']}/>
         </div>
-        <div className="v3-big">{v3Gbp(cam)}</div>
+        {/* The one number the product is built on is now openable: what went into it, over what
+            window, and how far to lean on it. Every figure here is one the headline already
+            renders, so the explanation cannot drift from the number it explains. */}
+        <div className="v3-big">
+          <V3Figure label="Profit after ads" window="Last 30 days"
+                    basis={d.cm_source === 'none' ? 'held' : (d.trust_level || 'probably')}
+                    note={v3TrustWhy(d)}
+                    inputs={[
+                      ['Sales', v3Gbp(sales)],
+                      ['What the products cost', '−' + v3Gbp(Math.max((Number(sales)||0) - (Number(prod)||0), 0))],
+                      ['Profit before ads', v3Gbp(prod)],
+                      ['What you spent on ads', '−' + v3Gbp(spend)],
+                      ['What you keep', v3Gbp(cam)]
+                    ]}
+                    fix={d.spend_is_stale ? ['settings', 'connections', 'Reconnect your ads'] : ['settings', 'costs', 'Enter your product costs']}>
+            {v3Gbp(cam)}
+          </V3Figure>
+        </div>
         {camTarget != null ? (<>
           <div className="v3-bar" aria-hidden="true"><i style={{ width: Math.max(2, Math.min(100, (pacePos || 0) * 66)) + '%' }}/><b style={{ left: '66%' }}/></div>
           {/* The pace sentence is the one the operator acts on, so it must not claim a cushion the
