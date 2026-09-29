@@ -14493,8 +14493,31 @@ function V3Anchor({ id }) {
   return <span ref={ref} id={'v3-' + id} className="v3-anchor"/>;
 }
 
+// The nav is the only thing on every screen, so it is the cheapest place to make the product feel
+// connected rather than like sixteen separate pages. Both signals come from GRETA_HEADLINE, which
+// Today has already loaded — no extra request, and nothing renders until there is something true
+// to say.
+function useV3NavSignals() {
+  const [sig, setSig] = React.useState(() => ({}));
+  React.useEffect(() => {
+    const read = () => {
+      const h = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || null;
+      if (!h) return;
+      setSig({
+        actions: Number(h.board_actions) || 0,
+        feedAlert: h.spend_is_stale === true,
+      });
+    };
+    read();
+    window.addEventListener('greta-headline-updated', read);
+    return () => window.removeEventListener('greta-headline-updated', read);
+  }, []);
+  return sig;
+}
+
 function V3App({ dest, go, children, start, periodCtl }) {
   const d = V3_BY_ID[dest] || V3_NAV[0];
+  const sig = useV3NavSignals();
   return (<div className="v3-root">
     <div className="v3-shell">
       <nav className="v3-nav" aria-label="Main">
@@ -14504,9 +14527,13 @@ function V3App({ dest, go, children, start, periodCtl }) {
         {(() => { let prev = null; return V3_NAV.map(e => {
           const head = e.group !== prev ? <div key={'h' + e.group} className="v3-nav-group">{e.group}</div> : null;
           prev = e.group;
+          const n = e.id === 'actions' ? sig.actions : 0;
+          const alert = e.id === 'settings' && sig.feedAlert;
           return (<React.Fragment key={e.id}>{head}
             <button type="button" className={'v3-nav-item' + (e.id === dest ? ' active' : '')} onClick={() => go(e.id)} aria-current={e.id === dest ? 'page' : undefined}>
               <Icon name={e.icon} size={17}/>{e.label}
+              {n > 0 && <span className="v3-nav-n" aria-label={n + ' actions worth doing'}>{n}</span>}
+              {alert && <span className="v3-nav-alert" aria-label="A data source has stopped reporting"/>}
             </button>
           </React.Fragment>);
         }); })()}
