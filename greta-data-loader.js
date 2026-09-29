@@ -245,6 +245,17 @@
     // nothing and gives the headline a clear runway.
     try { window.dispatchEvent(new CustomEvent('frkl-brand-ready')); } catch (e) {}
 
+    // ...and then WAIT for that one read to be away before flooding the pool. Measured: the cached
+    // Today row is a 9ms query that took 2,181ms when it went out alongside this refresh, and
+    // ~330ms when it did not. Same query, same row — the difference is twenty-four siblings.
+    // Capped, because the headline must never be able to block the rest of the dashboard.
+    try {
+      await Promise.race([
+        window.GRETA_TODAY_INFLIGHT || Promise.resolve(),
+        new Promise(function (r) { setTimeout(r, 1500); })
+      ]);
+    } catch (e) { /* the bulk read proceeds regardless */ }
+
     // 4. First fetch immediately, then poll
     await refresh();
     setInterval(refresh, POLL_INTERVAL_MS);

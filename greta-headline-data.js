@@ -73,6 +73,107 @@
     } catch (e) { reportFailure(label, 'read_failed', e && e.message); return def; }
   }
 
+  // ── Instant paint ──────────────────────────────────────────────────────────────────────────
+  // Measured phases on a warm load: DOM ready 282ms, React shell mounted 956ms, data 2,976ms.
+  // React was mounted and WAITING for two full seconds. So the number has to be in hand before the
+  // app mounts, not after — no request can win that race, however fast the query is.
+  //
+  // The last payload is kept in localStorage per brand and republished synchronously at boot, so
+  // React's FIRST render already has a number in it. The live read still runs and replaces it a
+  // moment later. Same data the 26h server cache holds, so this widens an existing staleness
+  // window rather than inventing one, and data_as_of still reports when it was actually built.
+  //
+  // Keyed by brand. A shared browser must never be shown another brand's figures, so the key
+  // carries the brand id and a mismatched or unparseable entry is discarded rather than trusted.
+  var LS_KEY = 'greta_today_v1';
+  function lsRead(b) {
+    try {
+      var raw = localStorage.getItem(LS_KEY + ':' + b);
+      if (!raw) return null;
+      var o = JSON.parse(raw);
+      if (!o || o.brand_id !== b || !o.payload) return null;
+      if (!(Date.now() - o.at < 26 * 3600 * 1000)) return null;   // same bound as the server cache
+      return o;
+    } catch (e) { return null; }
+  }
+  function lsWrite(b, payload, asOf) {
+    try {
+      localStorage.setItem(LS_KEY + ':' + b,
+        JSON.stringify({ brand_id: b, payload: payload, as_of: asOf || null, at: Date.now() }));
+    } catch (e) { /* private mode, quota, disabled — the live path still works */ }
+  }
+
+  // One mapping, used by both the instant localStorage paint and the live read, so a seeded
+  // screen and a fresh one can never disagree about shape.
+  function toHeadline(h, asOfArg) {
+      var rd = h;                                   // readiness fields are on the same row now
+      var acts = Array.isArray(h.top_actions) ? h.top_actions : [];
+
+      var out = {
+        period_start: h.period_start, period_end: h.period_end,
+        cm_basis: h.cm_basis, plan_status: h.plan_status,
+        net_revenue_30d: num(h.net_revenue_30d),
+        paid_spend_30d: num(h.paid_spend_30d),
+        product_contribution_30d: num(h.product_contribution_30d),
+        cm_after_marketing_30d: num(h.cm_after_marketing_30d),
+        cam_target_monthly: num(h.cam_target_monthly),
+        cam_target_source: h.cam_target_source || null,
+        pace_pct_after_ads: num(h.pace_pct_after_ads),
+        // Kept as the screen's own word for it: "we worked this out, you did not agree to it".
+        target_is_derived: h.cam_target_source === 'converted_from_product_basis',
+        open_actions: h.open_actions,
+        // What the queue will actually render (0195). open_actions counts every open row; the board
+        // filters out descriptive/unfalsifiable ones, so "See all 47" used to open a list of 20.
+        board_actions: h.board_actions,
+        can_show_cm: rd ? rd.can_show_cm !== false : true,
+        cm_source: rd ? rd.cm_source : null,
+        // What the profit number is actually built on (0192). cm_source does NOT answer this:
+        // 'fit_engine' means the engine derived margin from the CONFIGURED gross margin, not from
+        // the brand's own costs, and Today used to call that "Measured". cogs_basis is 'measured'
+        // only when realized COGS covers >=80% of revenue AND those costs include freight or duty.
+        cogs_basis: h.cogs_basis || 'blended',
+        cogs_coverage_90d: num(h.cogs_coverage_90d),
+        cogs_landed_complete: h.cogs_landed_complete === true,
+        cogs_realized_margin_pct: num(h.cogs_realized_margin_pct),
+        cogs_gap_reason: h.cogs_gap_reason || null,
+        // How hard the operator can lean on the number, on one ladder (0196):
+        // direct > likely > probably > possible > outside chance. Stale ad spend and unmeasured
+        // costs each pull it down a rung; pace_is_reliable is false when the spend that has not
+        // come through could swallow half the claimed gap to goal.
+        trust_level: h.trust_level || 'probably',
+        spend_is_stale: h.spend_is_stale === true,
+        spend_stale_days: num(h.spend_stale_days),
+        unreported_spend: num(h.unreported_spend),
+        stale_feeds: h.stale_feeds || null,
+        pace_is_reliable: h.pace_is_reliable !== false,
+        gate_message: rd ? rd.gate_message : null,
+        // First-run state: what is still needed before Greta can answer properly.
+        setup: {
+          connected: Number(h.active_connections) || 0,
+          connected_total: 5,
+          has_revenue: rd ? rd.has_revenue !== false : false,
+          has_economics: rd ? rd.has_economics === true : false,
+          goal_confirmed: h.plan_status === 'confirmed',
+          has_action: !!acts[0]
+        },
+        top_action: acts[0] || null,
+        next_actions: acts.slice(1, 4),
+        // when the cached row was built, so the screen can say how fresh it is rather than imply now
+        data_as_of: asOfArg,
+        fetched_at: new Date().toISOString()
+      };
+      return out;
+  }
+
+  function publish(h, asOfArg, seeded) {
+    var out = toHeadline(h, asOfArg);
+    out.from_cache = !!seeded;
+    window.GRETA_HEADLINE_ERROR = null;
+    window.GRETA_HEADLINE = out;
+    try { window.dispatchEvent(new CustomEvent('greta-headline-updated')); } catch (e) {}
+    return out;
+  }
+
   async function build() {
     var sb = sbClient(), b = brandId();
     if (!sb || !b) return;
@@ -83,10 +184,19 @@
     // 490ms, the rest is four joins and two laterals re-evaluated per read — and through PostgREST
     // it has been seen at 9.8s and once 35.9s. Cached, the same row is a single-key lookup at 9ms.
     // An 18-second first paint disqualifies the product however it looks, so Today reads the cache.
+    // Paint from the last known payload first — synchronous, no request, no await.
+    var seeded = lsRead(b);
+    if (seeded && !window.GRETA_HEADLINE) { publish(seeded.payload, seeded.as_of, true); }
+
     var rows = null, asOf = null;
+    // Announce that the live read is on the wire, so the data loader can hold its bulk refresh
+    // until this one request is away rather than flooding the pool alongside it.
+    var releaseInflight;
+    window.GRETA_TODAY_INFLIGHT = new Promise(function (r) { releaseInflight = r; });
     var cached = await safeQ(
       sb.from('cache_brand_today').select('payload,refreshed_at').eq('brand_id', b).limit(1),
       8000, null, 'cache_brand_today');
+    try { releaseInflight && releaseInflight(); } catch (e) {}
     var c0 = cached && cached[0];
     if (c0 && c0.payload) {
       var age = Date.now() - new Date(c0.refreshed_at).getTime();
@@ -103,70 +213,18 @@
       rows = await safeQ(sb.from('vw_brand_today').select('*').eq('brand_id', b).limit(1), 22000 + attempt * 9000, null, 'vw_brand_today');
     }
     var h = (rows && rows[0]) || null;
-    // Say so rather than sit on an em-dash forever: Today reads this to explain itself.
     if (!h) {
-      window.GRETA_HEADLINE_ERROR = 'slow';
-      try { window.dispatchEvent(new CustomEvent('greta-headline-updated')); } catch (e) {}
+      // Nothing live — if the instant paint already put a number on screen, leave it there rather
+      // than replacing a real figure with an em-dash.
+      if (!window.GRETA_HEADLINE) {
+        window.GRETA_HEADLINE_ERROR = 'slow';
+        try { window.dispatchEvent(new CustomEvent('greta-headline-updated')); } catch (e) {}
+      }
       return;
     }
-    window.GRETA_HEADLINE_ERROR = null;
-    var rd = h;                                   // readiness fields are on the same row now
-    var acts = Array.isArray(h.top_actions) ? h.top_actions : [];
+    var out = publish(h, asOf, false);
+    lsWrite(b, h, asOf);
 
-    var out = {
-      period_start: h.period_start, period_end: h.period_end,
-      cm_basis: h.cm_basis, plan_status: h.plan_status,
-      net_revenue_30d: num(h.net_revenue_30d),
-      paid_spend_30d: num(h.paid_spend_30d),
-      product_contribution_30d: num(h.product_contribution_30d),
-      cm_after_marketing_30d: num(h.cm_after_marketing_30d),
-      cam_target_monthly: num(h.cam_target_monthly),
-      cam_target_source: h.cam_target_source || null,
-      pace_pct_after_ads: num(h.pace_pct_after_ads),
-      // Kept as the screen's own word for it: "we worked this out, you did not agree to it".
-      target_is_derived: h.cam_target_source === 'converted_from_product_basis',
-      open_actions: h.open_actions,
-      // What the queue will actually render (0195). open_actions counts every open row; the board
-      // filters out descriptive/unfalsifiable ones, so "See all 47" used to open a list of 20.
-      board_actions: h.board_actions,
-      can_show_cm: rd ? rd.can_show_cm !== false : true,
-      cm_source: rd ? rd.cm_source : null,
-      // What the profit number is actually built on (0192). cm_source does NOT answer this:
-      // 'fit_engine' means the engine derived margin from the CONFIGURED gross margin, not from
-      // the brand's own costs, and Today used to call that "Measured". cogs_basis is 'measured'
-      // only when realized COGS covers >=80% of revenue AND those costs include freight or duty.
-      cogs_basis: h.cogs_basis || 'blended',
-      cogs_coverage_90d: num(h.cogs_coverage_90d),
-      cogs_landed_complete: h.cogs_landed_complete === true,
-      cogs_realized_margin_pct: num(h.cogs_realized_margin_pct),
-      cogs_gap_reason: h.cogs_gap_reason || null,
-      // How hard the operator can lean on the number, on one ladder (0196):
-      // direct > likely > probably > possible > outside chance. Stale ad spend and unmeasured
-      // costs each pull it down a rung; pace_is_reliable is false when the spend that has not
-      // come through could swallow half the claimed gap to goal.
-      trust_level: h.trust_level || 'probably',
-      spend_is_stale: h.spend_is_stale === true,
-      spend_stale_days: num(h.spend_stale_days),
-      unreported_spend: num(h.unreported_spend),
-      stale_feeds: h.stale_feeds || null,
-      pace_is_reliable: h.pace_is_reliable !== false,
-      gate_message: rd ? rd.gate_message : null,
-      // First-run state: what is still needed before Greta can answer properly.
-      setup: {
-        connected: Number(h.active_connections) || 0,
-        connected_total: 5,
-        has_revenue: rd ? rd.has_revenue !== false : false,
-        has_economics: rd ? rd.has_economics === true : false,
-        goal_confirmed: h.plan_status === 'confirmed',
-        has_action: !!acts[0]
-      },
-      top_action: acts[0] || null,
-      next_actions: acts.slice(1, 4),
-      // when the cached row was built, so the screen can say how fresh it is rather than imply now
-      data_as_of: asOf,
-      fetched_at: new Date().toISOString()
-    };
-    window.GRETA_HEADLINE = out;
     try { window.dispatchEvent(new CustomEvent('greta-headline-updated')); } catch (e) {}
 
     // Why the headline moved (edge action today_why → fn_today_v2). Fetched AFTER the
