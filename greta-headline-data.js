@@ -98,9 +98,44 @@
   }
   function lsWrite(b, payload, asOf) {
     try {
-      localStorage.setItem(LS_KEY + ':' + b,
-        JSON.stringify({ brand_id: b, payload: payload, as_of: asOf || null, at: Date.now() }));
+      var rec = JSON.stringify({ brand_id: b, payload: payload, as_of: asOf || null, at: Date.now() });
+      localStorage.setItem(LS_KEY + ':' + b, rec);
+      // ...and under the SLUG, which is known from the URL before auth resolves anything. Keying
+      // only by brand id meant the seed had to wait for the membership round trip (~550ms) and then
+      // race React's mount (~670ms) — a race it won only sometimes, which is why paint measured
+      // 552ms on one load and 1,696ms on the next. The slug copy makes it deterministic.
+      var sl = brandSlug();
+      if (sl) localStorage.setItem(LS_KEY + ':slug:' + sl, rec);
     } catch (e) { /* private mode, quota, disabled — the live path still works */ }
+  }
+
+  // Same resolution order the data loader uses: own window, then the /app shell, then frkl.
+  function brandSlug() {
+    try {
+      var p = (window.parent && window.parent !== window) ? window.parent.OI_BRAND_SLUG : null;
+      return window.OI_BRAND_SLUG || p || 'frkl';
+    } catch (e) { return window.OI_BRAND_SLUG || 'frkl'; }
+  }
+
+  function lsReadSlug() {
+    try {
+      var raw = localStorage.getItem(LS_KEY + ':slug:' + brandSlug());
+      if (!raw) return null;
+      var o = JSON.parse(raw);
+      if (!o || !o.payload) return null;
+      if (!(Date.now() - o.at < 26 * 3600 * 1000)) return null;
+      return o;
+    } catch (e) { return null; }
+  }
+
+  // Paint at script-eval time — no auth, no request, nothing to wait for. React's first render
+  // then already has a number in it, rather than mounting empty and filling in later.
+  function seedNow() {
+    try {
+      if (window.GRETA_HEADLINE) return;
+      var o = lsReadSlug();
+      if (o) publish(o.payload, o.as_of, true);
+    } catch (e) {}
   }
 
   // One mapping, used by both the instant localStorage paint and the live read, so a seeded
@@ -262,6 +297,7 @@
   // exactly what happened live on 2026-09-25. Poll for the brand id like the overview
   // loader does, then build; keep listening for refreshes afterwards.
   if (typeof window !== 'undefined') {
+    seedNow();
     // 'frkl-brand-ready' fires the moment the brand is known, BEFORE the loader's ~24-request
     // bulk refresh. Booting there rather than waiting for the 500ms poll tick (or for the whole
     // refresh to finish) is what keeps Today's read out of the queue behind it.
