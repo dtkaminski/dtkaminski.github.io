@@ -9432,6 +9432,81 @@ function V3StockRunway(){
   );
 }
 
+// ── Channel scoreboard ───────────────────────────────────────────────────
+// Marketing asks "Which channels and ads earn their money?" and the answer is a comparison, so it
+// is drawn as one: every channel on the same iROAS scale with its break-even target marked, so
+// "this one pays and that one doesn't" is seen rather than worked out from two columns of decimals.
+//
+// The target tick matters more than the bar. A channel at 1.14x looks fine in isolation; against a
+// 0.93x target it is barely clearing, and against 3.14x elsewhere it is the obvious place to look.
+// Spend is the row weight, because a channel that fails at £328 is not the same problem as one
+// that fails at £6,354.
+function V3ChannelScoreboard(){
+  const [rows, setRows] = React.useState(null);
+  const [err, setErr] = React.useState(null);
+
+  React.useEffect(() => {
+    let dead = false;
+    const go = () => {
+      const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
+      if (!sb || !b) return false;
+      sb.from('vw_channel_scoreboard')
+        .select('platform,channel_type,spend_30d,avg_iroas,target_marginal_iroas,status,action')
+        .eq('brand_id', b).gt('spend_30d', 0)
+        .order('spend_30d', { ascending: false, nullsFirst: false }).limit(8)
+        .then(r => {
+          if (dead) return;
+          if (r && r.error) { setErr(r.error.message || 'x'); return; }
+          setRows((r && r.data) || []);
+        }, () => { if (!dead) setErr('x'); });
+      return true;
+    };
+    if (!go()) {
+      const iv = setInterval(() => { if (go()) clearInterval(iv); }, 500);
+      setTimeout(() => clearInterval(iv), 30000);
+      return () => { dead = true; clearInterval(iv); };
+    }
+    return () => { dead = true; };
+  }, []);
+
+  if (err) return <div className="v3-empty">Greta could not load your channel scoreboard just now — refreshing usually sorts it.</div>;
+  if (rows === null) return <V3SkeletonRows n={4}/>;
+  if (!rows.length) return null;
+
+  const nice = (p, c) => String(c || p || '').replace(/_/g, ' ').replace(/^(meta|google|tiktok)\s*/i, '').trim() || p;
+  const scale = Math.max(...rows.map(r => Math.max(Number(r.avg_iroas) || 0, Number(r.target_marginal_iroas) || 0)), 1) * 1.15;
+
+  return (
+    <div className="v3-score v3-enter">
+      <div className="v3-score-head">
+        <h2 className="v3-score-title">Which channels earn their money</h2>
+        <span className="v3-score-key">bar is what it returns · tick is what it needs</span>
+      </div>
+      <ul className="v3-score-list">
+        {rows.map(r => {
+          const iroas = Number(r.avg_iroas) || 0;
+          const target = Number(r.target_marginal_iroas) || 0;
+          const pays = target > 0 ? iroas >= target : null;
+          return (
+            <li key={r.platform + r.channel_type} className={'v3-score-row' + (pays === false ? ' under' : '')}>
+              <span className="v3-score-name">{nice(r.platform, r.channel_type)}</span>
+              <span className="v3-score-track" role="img"
+                    aria-label={nice(r.platform, r.channel_type) + ' returns ' + iroas.toFixed(2)
+                                + ' against a target of ' + target.toFixed(2)}>
+                <i className="v3-score-bar" style={{ width: Math.max(1, (iroas / scale) * 100) + '%' }}/>
+                <i className="v3-score-tick" style={{ left: Math.min(99, (target / scale) * 100) + '%' }}/>
+              </span>
+              <span className="v3-score-x">{iroas.toFixed(2)}&times;</span>
+              <span className="v3-score-spend">{v3Gbp(r.spend_30d)}</span>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="v3-note">Each bar is return per £ of spend over 30 days; the tick is the return that channel needs to break even on your margin. Bars short of their tick are losing money on the last pound spent.</p>
+    </div>
+  );
+}
+
 function ActionsView(){
   return (
     <div>
@@ -14447,6 +14522,9 @@ const V3_PAGES = {
   </>),
   profit: (p) => <Overview start={p.start} period={p.period} customActive={p.customActive}/>,
   marketing: (p) => (<>
+    {/* The page asks which channels earn their money; that answer is a comparison, so it leads as
+        one instead of arriving after two scrolling panels of per-channel detail. */}
+    <V3ChannelScoreboard/>
     <CrossChannel start={p.start}/>
     <CreativeReallocation/>
     <ChannelDetailList channels={(typeof window!=='undefined' && window.FRKL_PLAN && window.FRKL_PLAN.channels) || []}/>

@@ -1259,6 +1259,36 @@
   .v3-fig-row-lab { font-family: var(--font-sans); font-size: var(--text-xs, 11px); color: var(--color-muted); }
   .v3-fig-row-val { font-family: var(--font-mono); font-size: var(--text-sm, 13px); color: var(--color-ink); }
 
+  /* ── Channel scoreboard ─────────────────────────────────────────────────────────────────────
+     One shared iROAS scale so channels are comparable, with each channel's break-even marked. The
+     tick carries more meaning than the bar: 1.14x looks fine alone and is barely clearing against
+     a 0.93x target. Accent when it clears, danger when it does not. */
+  .v3-score { margin-bottom: var(--space-5, 20px); }
+  .v3-score-head { display: flex; align-items: baseline; justify-content: space-between;
+                   flex-wrap: wrap; gap: var(--space-2, 8px); padding-bottom: var(--space-3, 12px); }
+  .v3-score-title { margin: 0; font-family: var(--font-sans); font-size: var(--text-base, 15px); color: var(--color-ink); }
+  .v3-score-key { font-family: var(--font-sans); font-size: var(--text-xs, 11px); color: var(--color-muted); }
+  .v3-score-list { list-style: none; margin: 0; padding: 0; }
+  .v3-score-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.7fr) auto auto;
+                  gap: var(--space-3, 12px); align-items: center;
+                  padding: var(--space-2, 8px) 0; border-top: 1px solid var(--color-line); }
+  .v3-score-row:last-child { border-bottom: 1px solid var(--color-line); }
+  .v3-score-name { font-family: var(--font-sans); font-size: var(--text-sm, 13px); color: var(--color-ink);
+                   text-transform: capitalize; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .v3-score-track { position: relative; height: 8px; background: var(--color-sunken, #EFEAE3); }
+  .v3-score-bar { position: absolute; left: 0; top: 0; height: 100%; background: var(--color-accent);
+                  transition: width var(--transition-base, .25s) ease; }
+  .v3-score-row.under .v3-score-bar { background: var(--color-danger); }
+  .v3-score-tick { position: absolute; top: -3px; width: 2px; height: 14px; background: var(--color-ink); }
+  .v3-score-x { font-family: var(--font-mono); font-size: var(--text-sm, 13px); color: var(--color-ink); }
+  .v3-score-row.under .v3-score-x { color: var(--color-danger); }
+  .v3-score-spend { font-family: var(--font-mono); font-size: var(--text-xs, 11px); color: var(--color-muted); text-align: right; }
+  @media (max-width: 680px) {
+    .v3-score-row { grid-template-columns: 1fr auto auto; grid-template-areas: "name x spend" "track track track"; }
+    .v3-score-name { grid-area: name; } .v3-score-track { grid-area: track; }
+    .v3-score-x { grid-area: x; } .v3-score-spend { grid-area: spend; }
+  }
+
   /* ── Stock runway ───────────────────────────────────────────────────────────────────────────
      One shared scale across every row so the bars mean something against each other. Filled bar =
      cover left, hatched overhang = the window with nothing to sell, tick = when a new order lands.
@@ -1536,6 +1566,6 @@ window.MOS_EMBEDDED = true;</script>
    save-brand-config had been reading two relations that were never created. */</script>
 <script defer src="./cost-entry.build.js?v=20260929c"></script>
 <script defer src="./loop-panel.js?v=20260921a"></script>
-<script defer src="./greta-app.js?v=1790690039154"></script>
+<script defer src="./greta-app.js?v=1790690263783"></script>
 <script>/* perf: defer frkl static deep-tab data (CVR ~1.7MB, cohorts, promos, products) — not used by the Overview/landing. Background-load after paint; skip for non-frkl (de-frkl). */
 (function(){try{var slug=window.OI_BRAND_SLUG||(window.parent&&window.parent!==window?window.parent.OI_BRAND_SLUG:null)||"frkl";if(slug!=="frkl")return;var files=["greta-cvr.js","greta-cohorts.js","greta-discount-codes.js","greta-products.js","greta-patterns.js"],i=0;function next(){if(i>=files.length)return;var s=document.createElement("script");s.src="./"+files[i++]+"?v=20260925f";s.async=true;s.onload=next;s.onerror=next;document.head.appendChild(s);}var kick=function(){next();};if(window.requestIdleCallback){window.requestIdleCallback(kick,{timeout:1500});}else{setTimeout(kick,300);}}catch(e){}})();</script>
