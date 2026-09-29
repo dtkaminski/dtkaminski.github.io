@@ -1,57 +1,125 @@
+/* Greta design tokens
+ * ────────────────────────────────────────────────────────────────────────────
+ * Every visual value in the product resolves here. The app's own legacy names
+ * (--accent, --text-primary, --bg-card, --border-subtle…) alias these, so one
+ * change lands on all sixteen screens at once.
+ *
+ * REVISED 2026-09-29. The previous palette was a warm cream canvas (#F5F2ED)
+ * behind white panels, with beige rules (#E0DCD6). Two problems: the canvas and
+ * the panel were four percent apart in luminance, so the working surface never
+ * separated from the page and everything read as one flat sheet of stationery;
+ * and the warm greys pulled contrast down until labels, values and headings all
+ * sat in the same visual band.
+ *
+ * The fix is separation and contrast, not decoration:
+ *   canvas      a clearly darker neutral, so white content lifts off it
+ *   panel       true white, the only place work happens
+ *   rules       cool-neutral and a step stronger, so structure is legible
+ *   ink         near-black with real steps down to muted and faint
+ *   accent      one confident burnt orange, carried over from the brand mark
+ *
+ * Neutrals are very slightly warm so the orange never looks bolted on, but they
+ * are neutral enough to read as a product surface rather than paper.
+ */
 :root {
-  --color-ink:      #141414;
-  --color-surface:  #F5F2ED;
-  --color-panel:    #FFFFFF;
-  --color-accent:   #C84B00;
-  --color-muted:    #6B6B6B;
-  --color-line:     #E0DCD6;
-  --color-success:  #1A7A4A;
-  --color-warning:  #B45309;
-  --color-danger:   #B91C1C;
-  --color-data-1:   #C84B00;
-  --color-data-2:   #1A7A4A;
-  --color-data-3:   #2563EB;
-  --color-data-4:   #7C3AED;
+  /* ── Ink ────────────────────────────────────────────────────────────────
+     Four real steps. The old set had ink and muted only 40% of the way apart,
+     which is why a label and its value looked like the same information. */
+  --color-ink:      #16150F;   /* headings, figures — near-black, faintly warm  */
+  --color-muted:    #57544D;   /* labels, secondary prose — passes AA on panel  */
+  --color-faint:    #8A867E;   /* units, counts, timestamps                     */
 
-  /* Surface variants — added 2026-09-24 for the Greta app restyle (Phase 3).
-     Hover/sunken grounds and the tinted washes that status pills and banners sit on. */
-  --color-panel-hover: #FAF8F5;
-  --color-sunken:      #EDE8E0;
-  --color-input:       #FFFFFF;
-  --color-accent-wash: rgba(200, 75, 0, 0.08);
-  --color-success-wash:rgba(26, 122, 74, 0.10);
-  --color-warning-wash:rgba(180, 83, 9, 0.10);
-  --color-danger-wash: rgba(185, 28, 28, 0.08);
-  --color-line-strong: #CFC8BE;
+  /* ── Surfaces ───────────────────────────────────────────────────────────
+     Canvas sits ~5% below panel, which is enough to read as depth without a
+     shadow on every box. Chrome is between the two so the nav is its own place. */
+  --color-surface:  #F2F1ED;   /* app canvas                                    */
+  --color-chrome:   #F8F7F4;   /* nav + app bar                                 */
+  --color-panel:    #FFFFFF;   /* content                                       */
+  --color-panel-hover: #FBFAF8;
+  --color-sunken:   #EAE8E3;   /* track/rail behind a bar                       */
+  --color-input:    #FFFFFF;
 
+  /* ── Lines ──────────────────────────────────────────────────────────────
+     Cooler and stronger than the old beige, so a hairline actually divides. */
+  --color-line:        #E3E1DC;
+  --color-line-strong: #CFCCC5;
+
+  /* ── Accent + semantics ─────────────────────────────────────────────────
+     One accent, used for the thing that matters on a screen and nothing else.
+     Deepened from #C84B00 so it holds against white without vibrating. */
+  --color-accent:      #C2410C;
+  --color-accent-hover:#9A3412;
+  --color-success:     #15803D;
+  --color-warning:     #B45309;
+  --color-danger:      #B42318;
+
+  --color-accent-wash:  rgba(194, 65, 12, 0.07);
+  --color-success-wash: rgba(21, 128, 61, 0.09);
+  --color-warning-wash: rgba(180, 83, 9, 0.10);
+  --color-danger-wash:  rgba(180, 35, 24, 0.07);
+
+  /* Categorical series. Orange leads; the rest are chosen to stay legible
+     side by side and to survive greyscale. */
+  --color-data-1: #C2410C;
+  --color-data-2: #15803D;
+  --color-data-3: #1D4ED8;
+  --color-data-4: #6D28D9;
+  --color-data-5: #B45309;
+
+  /* ── Type ───────────────────────────────────────────────────────────────
+     DM Sans for language, DM Mono for anything countable. Numbers in mono is a
+     deliberate signal: a figure you can compare down a column is a different
+     kind of thing from a sentence. */
   --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-mono: 'DM Mono', 'Fira Code', ui-monospace, monospace;
+  --font-mono: 'DM Mono', ui-monospace, 'Fira Code', monospace;
 
-  --text-xs:   0.75rem;
-  --text-sm:   0.875rem;
-  --text-base: 1rem;
-  --text-lg:   1.125rem;
-  --text-xl:   1.5rem;
-  --text-2xl:  2rem;
-  --text-data: 2.5rem;
+  --text-xs:      0.6875rem;  /* 11 — eyebrows, units, counts                  */
+  --text-sm:      0.8125rem;  /* 13 — body, table cells                        */
+  --text-base:    0.9375rem;  /* 15 — emphasis, row titles                     */
+  --text-lg:      1.125rem;   /* 18 — section heads                            */
+  --text-xl:      1.5rem;     /* 24 — page titles                              */
+  --text-2xl:     2rem;       /* 32 — panel figures                            */
+  --text-data:    2.75rem;    /* 44 — the one number a screen is about         */
+  --text-display: 3.25rem;    /* 52 — Today's hero                             */
 
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semi:   600;
+
+  /* Tracking tightens as type grows — large text set at 0 looks loose. */
+  --tracking-tight: -0.022em;
+  --tracking-snug:  -0.012em;
+  --tracking-wide:   0.06em;   /* uppercase eyebrows only                      */
+
+  --leading-tight: 1.15;
+  --leading-snug:  1.35;
+  --leading-body:  1.55;
+
+  /* ── Shape ──────────────────────────────────────────────────────────────
+     Containers stay square; only things you press get a radius. */
   --radius-none: 0px;
   --radius-sm:   2px;
-  --radius-md:   4px;
+  --radius-md:   5px;
+  --radius-full: 999px;
 
+  /* ── Space — 4px rhythm ─────────────────────────────────────────────── */
   --space-1:  4px;
   --space-2:  8px;
   --space-3:  12px;
   --space-4:  16px;
+  --space-5:  20px;
   --space-6:  24px;
   --space-8:  32px;
   --space-10: 40px;
   --space-12: 48px;
   --space-16: 64px;
 
-  --shadow-panel:  0 1px 3px rgba(0,0,0,0.07);
-  --shadow-raised: 0 4px 12px rgba(0,0,0,0.10);
+  /* ── Elevation ──────────────────────────────────────────────────────────
+     Barely there. The canvas/panel step does the separating; shadow only marks
+     something genuinely floating, like an open sheet. */
+  --shadow-panel:  0 1px 2px rgba(22, 21, 15, 0.04);
+  --shadow-raised: 0 8px 24px -6px rgba(22, 21, 15, 0.14), 0 2px 6px rgba(22, 21, 15, 0.05);
 
-  --transition-fast: 150ms ease;
-  --transition-base: 250ms ease;
+  --transition-fast: 120ms cubic-bezier(.2,0,.2,1);
+  --transition-base: 200ms cubic-bezier(.2,0,.2,1);
 }
