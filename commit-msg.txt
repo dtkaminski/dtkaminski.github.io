@@ -1,42 +1,16 @@
-Fix three ways the unverified group did not render as intended
+The demoted-row tag reads "unchecked"
 
-Checked the board's CSS against the real stylesheet rather than the markup I had in my
-head, and three of my own rules were wrong. All CSS; greta-app.jsx is untouched and
-greta-app.js is unchanged.
+.v3-rank-meta applies text-transform: capitalize, so "· not re-checked" rendered as
+"Not Re-Checked" — three capitals on a row whose other segments are single words
+("Product · Open 85d"). Consistent with the rule, but it shouted next to sentence-case
+copy everywhere else. One word capitalizes to "Unchecked".
 
-THE SECOND HEADLINE LINE WAS NOT A SECOND LINE. .v3-board-head is
-`display:flex; align-items:baseline; justify-content:space-between`, so `display:block`
-on a flex child is ignored for layout: "£1,985 more sits in 4 actions nothing has
-re-checked" rendered to the RIGHT of "£4,547 a month across 9 live actions", on the same
-baseline, pushed apart by space-between. The head now wraps and the line takes
-`flex: 0 0 100%`, which is what actually puts it underneath.
+The break label above the group keeps its full phrase. It is an uppercase eyebrow by
+design, where "NOT RE-CHECKED" reads as a heading rather than a shout, and it is the
+place the distinction is actually explained.
 
-IT ALSO MISSED AA. --color-faint is #726E66, which is 4.49:1 on the #F2F1ED canvas —
-under 4.5:1 at 11px, by a hair. The board has no background of its own, so it inherits
---bg-app, which resolves to --color-surface; I had reasoned about it as if it sat on a
-white panel, where the same colour is 5.08:1 and passes. Now --color-muted: 6.68:1 on
-the canvas, 7.55:1 on panel. Quietness comes from the 11px size and the sans face, not
-from a colour that only just works.
-
-THE BREAK LABEL COLLIDED WITH ITS OWN SENTENCE. .v3-kick carries margin-bottom and sets
-no display, and all five other uses of it in the app are on a div. Mine is a span, so
-the margin was dropped on an inline box and "NOT RE-CHECKED" sat on the line below it.
-Scoped display:block rather than touching the JSX, so the bundle does not move.
-
-Also: the divider used --color-line, the same colour as every row border, so a section
-boundary rendered as one more row separator. --color-line-strong now. It is still a
-hairline (1.42:1 against 1.16:1) and the real separation is the 24px margin, the 16px
-padding and the label — which is the intended design, a rule and a label rather than a
-card — but at identical weight it was working against itself.
-
-Verified: every piece of text I added is now at least 6.68:1 against both the canvas and
-a panel, both style blocks balance, and each of the seven selectors resolves once. The
-grouping logic was checked separately against the live 13 rows — one break, unverified a
-contiguous tail, money conserved at £4,547 live and £1,985 unverified, money order
-preserved inside each group by the stable sort.
-
-I could not screenshot this: rendering the harness needed a local server and that
-permission was declined, so everything here is from reading the cascade and computing
-the contrast. A render check is still worth doing.
+Verified in a rendered harness against the real stylesheet before and after: the tag
+sits in the meta line, the sentence below the label still clears it by 6px, and no
+other copy moved.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>

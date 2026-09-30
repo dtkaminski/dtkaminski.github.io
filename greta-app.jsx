@@ -9585,7 +9585,7 @@ function V3ActionBoard(){
                   </span>
                   <span className="v3-rank-meta">
                     {r.category || 'general'}{r.days_open > 0 ? ' · open ' + r.days_open + 'd' : ''}
-                    {unver ? ' · not re-checked' : ''}
+                    {unver ? ' · unchecked' : ''}
                   </span>
                 </span>
                 <span className="v3-rank-gbp">{v3Gbp(gbp)}<span className="v3-rank-per">/mo</span></span>

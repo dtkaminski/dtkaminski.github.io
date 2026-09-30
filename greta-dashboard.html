@@ -1140,14 +1140,21 @@
      One nav, one destination, one profit number, tap-to-open explainers.
      Values come from the app theme variables; the light design-tokens.css
      migration is the next step and replaces this block's var() targets. */
-  .v3-root { --v3-nav-w: 232px; }
+  /* Nothing renders a .appbar — greta-app.jsx does not contain the string, in V3 or in
+     the legacy shell behind GRETA_UI_V3=false — and on the /app path this whole thing is
+     an iframe that already starts below the shell's own 58px bar. But the nav and the ask
+     bar were both still pinning at --appbar-h: 57px. So the sidebar floated 57px below
+     the sheet it sits beside, ran 57px taller than its own viewport, and the ask bar hung
+     mid-page with content scrolling up through the strip above it and shearing off at its
+     top edge. A V3-owned offset, so the legacy rails and health bar keep --appbar-h. */
+  .v3-root { --v3-nav-w: 232px; --v3-top: 0px; }
   .v3-shell { display: flex; align-items: flex-start; max-width: 1800px; margin: 0 auto; }
   /* The nav is CHROME, not content: its own surface, so the working sheet to its right reads as
      the place where the job happens. Previously both sat on the same cream and the product looked
      like one undifferentiated document. */
   .v3-nav {
-    position: sticky; top: var(--appbar-h); align-self: flex-start;
-    width: var(--v3-nav-w); flex-shrink: 0; height: calc(100vh - var(--appbar-h));
+    position: sticky; top: var(--v3-top); align-self: flex-start;
+    width: var(--v3-nav-w); flex-shrink: 0; height: calc(100vh - var(--v3-top));
     overflow-y: auto; padding: var(--space-4) var(--space-3) var(--space-6);
     background: var(--color-chrome); border-right: 1px solid var(--color-line);
     display: flex; flex-direction: column; gap: 1px;
@@ -1635,8 +1642,8 @@
      bar looked broken rather than pinned. Padding both sides plus a hairline underneath
      gives it an edge to be pinned AT, and the rule only appears once there is something
      scrolled beneath it. */
-  .v3-askbar { position: sticky; top: var(--appbar-h); z-index: 20; background: var(--color-panel);
-               padding: var(--space-3) 0 var(--space-4); margin-bottom: 0;
+  .v3-askbar { position: sticky; top: var(--v3-top); z-index: 20; background: var(--color-panel);
+               margin: 0 calc(-1 * var(--space-8)); padding: var(--space-3) var(--space-8) var(--space-4);
                border-bottom: 1px solid transparent;
                transition: border-color var(--transition-fast, .15s) ease; }
   .v3-askbar.stuck { border-bottom-color: var(--color-line); }
@@ -1657,7 +1664,8 @@
   }
   .v3-sug:hover { border-color: var(--accent); color: var(--accent); }
   @media (max-width: 760px) {
-    .v3-askbar { position: static; padding-top: var(--space-2); }
+    /* The sheet's gutter is 16px here, not 32 — drop the full bleed with it. */
+    .v3-askbar { position: static; margin: 0; padding: var(--space-2) 0 var(--space-3); }
     .v3-askbar-sug { display: none; }
     /* At 375px the placeholder ran under the Ask button and was sheared off mid-word.
        Let the input shrink and the button keep its own width. */
@@ -1820,6 +1828,6 @@ window.MOS_EMBEDDED = true;</script>
    save-brand-config had been reading two relations that were never created. */</script>
 <script defer src="./cost-entry.build.js?v=20260929c"></script>
 <script defer src="./loop-panel.js?v=20260921a"></script>
-<script defer src="./greta-app.js?v=1790772545212"></script>
+<script defer src="./greta-app.js?v=1790773034908"></script>
 <script>/* perf: defer frkl static deep-tab data (CVR ~1.7MB, cohorts, promos, products) — not used by the Overview/landing. Background-load after paint; skip for non-frkl (de-frkl). */
 (function(){try{var slug=window.OI_BRAND_SLUG||(window.parent&&window.parent!==window?window.parent.OI_BRAND_SLUG:null)||"frkl";if(slug!=="frkl")return;var files=["greta-cvr.js","greta-cohorts.js","greta-discount-codes.js","greta-products.js","greta-patterns.js"],i=0;function next(){if(i>=files.length)return;var s=document.createElement("script");s.src="./"+files[i++]+"?v=20260925f";s.async=true;s.onload=next;s.onerror=next;document.head.appendChild(s);}var kick=function(){next();};if(window.requestIdleCallback){window.requestIdleCallback(kick,{timeout:1500});}else{setTimeout(kick,300);}}catch(e){}})();</script>
