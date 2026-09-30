@@ -15513,6 +15513,29 @@ function App(){
     } catch (e) {}
   }, []);
 
+  // The arrival itself was never counted. Both other page_view call sites sit in navigation
+  // handlers, so a session that landed on Today and stayed there wrote nothing at all: no
+  // denominator for time-to-first-action, and vw_product_activation undercounting sessions
+  // by every visitor who never changed page. Found the hard way -- signed in, three minutes
+  // on Today, product_events still empty.
+  //
+  // Guarded on window rather than a module-level flag because greta-app.js is a classic
+  // top-level script sharing one global scope with the embeds, and a new top-level binding
+  // there is how cost-entry.build.js took the whole app down. Once per tab is the right
+  // grain: the tracker's session id is per-tab too, so a remount is the same visit and must
+  // not read as a second arrival, while navigating away and back is a real page_view and
+  // still fires through __oiGo.
+  //
+  // brand_id has not resolved this early. track() queues and flushes on frkl-brand-ready,
+  // which is precisely what that queue was built for -- the first page_view of a session
+  // fires while membership is still in flight.
+  React.useEffect(() => {
+    if (window.__oiArrivalSeen) return;
+    try { window.__oiArrivalSeen = true; } catch (e) {}
+    // v3dest is deliberately read once, as the landing destination, not tracked as a dep.
+    track('page_view', { dest: v3dest, arrival: true }, v3dest);
+  }, []);
+
   // Global deep-link helper so findings can jump to their evidence tab (clickable cross-refs).
   React.useEffect(() => {
     window.__oiGo = (dest, anchor) => {

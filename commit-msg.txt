@@ -1,31 +1,34 @@
-One action, one Mark done
+Count the arrival, not just the navigation
 
-The Today page rendered the top action twice. Greta's own hero has Start and Mark
-done; the nested "Channels, stock and track record" panel is the marketing-os Today
-component, which renders its own "do this first" with the same action and its own
-pair of buttons. The two did not share state — V3Done sets a local topDone, the
-embed's act() reloads only itself — so closing the action in one place left the
-other still offering to close it, and a person who used both wrote two action_done
-rows for one closed action.
+page_view had two call sites and both were inside navigation handlers — window.__oiGo
+and the go={} prop. Nothing fired on arrival. A session that signed in, landed on
+Today and stayed there wrote no events at all: no denominator for
+time_to_first_action, and vw_product_activation.sessions undercounting by every
+visitor who never changed page.
 
-Not an instrumentation double-fire, which is what I went looking for: greta-app.js
-has exactly one track('action_done') call site and the embed bundle has exactly
-one, they reach the server by different paths (actionVerb's direct fetch vs the
-embed's fetcher), neither calls the other, and nothing writes product_events
-server-side. Two buttons, not two events per click. But two buttons for one action
-is still wrong, and the hero belongs upstairs where the page already put it.
+Found the hard way. Dan signed in at 11:25, the dashboard loaded clean — brand_users,
+user_brand_ids, vw_brand_action_board, cache_brand_today all 200, 206 requests in
+twenty minutes — and product_events was still empty three minutes later. I had read
+that emptiness as "nobody has used the app yet" for most of the day. It was my own
+instrumentation gap.
 
-So mosView takes an extra-props argument and Today is mounted with
-{ hideHero: true }, which drops the panel's "do this first" block. The abstention
-and nothing-open notices stay: they only render when there is no top action, and
-nothing above them explains why the read is silent.
+So the V3 shell now fires one page_view on first mount with the landing destination,
+tagged arrival:true so an arrival is separable from a navigation in analysis.
 
-The owner-today nav destination still calls mosView('Today') bare, so the
-standalone screen keeps its hero.
+Guarded on window.__oiArrivalSeen rather than a module-level flag: greta-app.js is a
+classic top-level script sharing one global scope with the embeds, and a new
+top-level binding there is exactly how cost-entry.build.js took the whole app down on
+29 Sep. Once per tab is the right grain — the tracker's session id is per-tab too, so
+a remount is the same visit and must not read as a second arrival, while navigating
+away and back is a real page_view and still fires through __oiGo.
 
-Verified: both bundles rebuild byte-identical from source at this HEAD, node --check
-passes, and the compiled guard is !(e.hideHero&&T)&&Fragment — the branch is gated,
-not removed. today-calendar.build.js cache-bust bumped to 20260930b; build-app.mjs
-does not touch that one and a returning visitor would have kept the stale embed.
+The event lands before brand_id resolves, which is what greta-track.js's pending
+queue was built for: it holds and flushes on frkl-brand-ready. That path is already
+proven — an earlier visit this morning fired five tracker POSTs, which PostgREST
+rejected with 404 only because its schema cache did not yet have the table. It does
+now; the 401s that followed prove the relation resolves.
+
+Verified: node --check passes, the hook sits between two existing effects rather than
+below a conditional return, and the compiled form is the guarded single-fire.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
