@@ -1891,6 +1891,7 @@ function PinMarker(props){
       {/* Filled dot in the type's own colour, ringed in the panel colour so it stays
           legible where it overlaps a plotted line. */}
       <circle cx={cx} cy={top+8} r={4} fill={PAL[props.tone] || PAL.muted} stroke={PAL.panel} strokeWidth={1.5}/>
+      {/* SVG presentation attribute, not a style property: fontWeight here cannot resolve var(), so this weight stays numeric. Same rule as chart colours going through PAL. */}
       {props.n>1 ? <text x={cx+9} y={top+5} textAnchor="middle" fontSize={8} fill={PAL.faint} fontWeight={700}>{'+'+(props.n-1)}</text> : null}
     </g>
   );
@@ -5441,6 +5442,7 @@ function CvrDrivers(){
     if(cx==null||cy==null||v==null||v<discThr) return null;
     return (<g key={'dd'+cx+'-'+cy} style={{pointerEvents:'none'}}>
       <path d={`M${cx} ${cy-5} L${cx+5} ${cy} L${cx} ${cy+5} L${cx-5} ${cy} Z`} fill={PAL.warn} stroke={PAL.panel} strokeWidth={1.2}/>
+      {/* SVG presentation attribute, not a style property: fontWeight here cannot resolve var(), so this weight stays numeric. Same rule as chart colours going through PAL. */}
       <text x={cx} y={cy-8} textAnchor="middle" fill={PAL.warn} fontSize={9.5} fontWeight={700}>{Math.round(v)}%</text>
     </g>); };
   // ── Discount lift: mean CVR on the deepest-discount periods vs all the rest,
@@ -9295,6 +9297,7 @@ function MarginBridge({cur, pri, gm, perOrderFixed, payPct}){
   // we show the number. (recharts-text class lets the light-theme override recolour it.)
   const segLabel = (which)=>(p)=>{ const d=data[p.index]||{}; if(!(d[which]>0)) return null;   // only the row's real segment
     const txt = d.isTotal ? GBP(d.amt) : ((d.amt>=0?'+':'−')+GBP(Math.abs(d.amt)));
+    {/* SVG presentation attribute, not a style property: fontWeight here cannot resolve var(), so this weight stays numeric. Same rule as chart colours going through PAL. */}
     return (<text className="recharts-text" x={(p.x||0)+(p.width||0)/2} y={(p.y||0)-5} textAnchor="middle" fontSize="10.5" fontWeight="600" fill={PAL.faint}>{txt}</text>); };
   return (
     <div className="card" style={{marginBottom:14}}>
@@ -10825,6 +10828,7 @@ function CashFlowPlan({tranches, plan, months}){
           {series.map((s,i)=>(<g key={i}>
             <circle cx={X(i)} cy={Y(s.bal)} r={i===trough.i?5:3.5} fill={svgCol(s.bal<0?PAL.bad:'currentColor')} stroke={PAL.surface} strokeWidth="1.5"/>
             {s.stock>0 && <text x={X(i)} y={Y(s.bal)-9} textAnchor="middle" fontSize="9" fill={PAL.faint}>−{k(s.stock).replace(curSym(),curSym())}</text>}
+            {/* SVG presentation attribute, not a style property: fontWeight here cannot resolve var(), so this weight stays numeric. Same rule as chart colours going through PAL. */}
             <text x={X(i)} y={H-8} textAnchor="middle" fontSize="9.5" fill={svgCol(i===trough.i?tone:PAL.faint)} fontWeight={i===trough.i?700:400}>{s.label}</text>
           </g>))}
           <text x={X(trough.i)} y={Y(trough.bal)+ (trough.bal< (lo+hi)/2 ? 18 : -12)} textAnchor="middle" fontSize="10" fontWeight="700" fill={svgCol(tone)}>{k(trough.bal)}</text>

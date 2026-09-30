@@ -1,34 +1,28 @@
-Tokenise the eleven computed font weights
+Say why five font weights stay numeric
 
-I reported one hardcoded weight left in greta-app.jsx, at line 1766. There were
-eleven. The scan that found it matched `fontWeight:` followed by a literal or the words
-bold/normal, and line 1766 is `fontWeight:bold?700:400` — it showed up only because the
-prop controlling it happens to be called `bold`. Every other computed weight, written
-`isRollup ? 600 : 400` or `hot||cold?700:400`, has a condition where the literal sits
-and was invisible to that pattern. The correct scan is every `fontWeight:` whose value
-contains a digit anywhere.
+Correction to the previous commit, which claimed greta-app.jsx has no numeric font
+weight anywhere. Five remain, and they are correct:
 
-All eleven now use tokens on both branches:
+  1894  fontWeight={700}                      <text> on a timeline marker
+  5444  fontWeight={700}                      <text> on a funnel node
+  9298  fontWeight="600"                      <text> recharts bar label
+  10828 fontWeight={i===trough.i?700:400}     <text> cash-trough axis labels
+  10830 fontWeight="700"                      <text> cash-trough balance
 
-  1766  bold              700/400 -> bold/normal
-  5852  big               700/500 -> bold/medium
-  5854  big               700/500 -> bold/medium
-  7528  isRollup          600/400 -> semi/normal
-  8884  hot||cold         700/400 -> bold/normal
-  11019 t.isNow||t.late   700/400 -> bold/normal
-  11429 x===tf            600/400 -> semi/normal
-  12229 on                600/400 -> semi/normal
-  12289 hi                600/400 -> semi/normal
-  13721 hi                700/500 -> bold/medium
-  13840 isCur             700/400 -> bold/normal
+They are SVG presentation attributes, not CSS style properties, and SVG attributes
+cannot resolve var() — the same rule that forces chart colours through PAL instead of
+var(). Tokenising them would silently drop every one to default weight, and since they
+sit in charts nobody reads closely, it would not be obvious.
 
-Exact, every one: each number maps to the token holding that same value, so nothing
-renders differently. The regex stops the condition at a comma, brace or colon so it
-cannot run past the property it belongs to, and the eleven replacements were asserted
-rather than assumed.
+They were invisible to my scans because JSX spells an attribute fontWeight={700}, while
+every pattern I used looked for the style-object form fontWeight: 700. Two different
+spellings of the same property, and only one of them can take a token.
 
-greta-app.jsx now has no numeric font weight anywhere — verified with the prefix-safe
-scan, which is what the earlier check should have been. The minified bundle keeps all
-eleven ternaries with tokens on both arms.
+So each site now carries a one-line reason. CLAUDE.md bans hardcoded visual values, so
+the next person to sweep this file will find these and be right to question them; the
+comment is there to stop the answer being a regression.
+
+greta-app.js is byte-identical to the previous commit — JSX comments are compile-time
+only — so no rebuild and no cache-bust is included.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
