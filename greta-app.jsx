@@ -14893,6 +14893,79 @@ function CashCeiling(){
 // What is happening, and why — built from fn_today_v2's structured fields rather than
 // its narrative string, which is written for an analyst ("Profit after marketing (CAM)
 // down 8.5%… ad spend moved it £-407"). Same facts, owner's words.
+// ── Tracking integrity ───────────────────────────────────────────────────
+// The note under "what is happening" said "your site tracking is incomplete" and offered
+// "Check your data", pointing at the Settings root. Two things were wrong with it.
+//
+// A GA4 tag lives on the operator's own site, so no screen in this product can fix one —
+// the button promised a remedy it did not have, and the vaguest destination in the app to
+// go and not find it. And frkl's tracking is not currently broken at all:
+// vw_brand_tracking_state has it RECOVERING, recording again since 24 Sep, with
+// comparisons clean from 23 Nov. There was nothing to check. A warning that survives its
+// own cause, attached to a button that cannot act on it, is how a product teaches people
+// to ignore its warnings.
+//
+// So read the state and say the true thing for it. Recovered gets the dates and no button,
+// because there is nothing to press. Broken says plainly that the fix is on their own site,
+// and offers the coverage figures as evidence rather than dressing them up as a cure.
+function V3TrackingNote() {
+  const [st, setSt] = React.useState(undefined);   // undefined = loading, null = unknown
+  React.useEffect(() => {
+    let alive = true;
+    const sb = (typeof window !== 'undefined' && window.FRKL_LIVE && window.FRKL_LIVE.sb) || null;
+    const brand = (typeof window !== 'undefined' && ((window.FRKL_LIVE && window.FRKL_LIVE.brandId)
+      || (window.OI_ASK && window.OI_ASK.brand_id))) || null;
+    if (!sb || !brand) { setSt(null); return; }
+    sb.from('vw_brand_tracking_state')
+      .select('source, state, broke_on, fixed_on, comparisons_clean_from')
+      .eq('brand_id', brand).eq('source', 'ga4').limit(1)
+      .then(r => { if (alive) setSt((r && r.data && r.data[0]) || null); },
+            () => { if (alive) setSt(null); });
+    return () => { alive = false; };
+  }, []);
+
+  // Three letters, always. en-GB's short month renders September as "Sept", which put
+  // "24 Sept" next to the engine's own "23 Nov" in the same sentence — and the engine
+  // writes these dates as FMDD Mon everywhere else it names one.
+  const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const dm = (iso) => {
+    if (!iso) return null;
+    const d = new Date(String(iso).slice(0, 10) + 'T00:00:00Z');
+    return isNaN(d) ? null : d.getUTCDate() + ' ' + MON[d.getUTCMonth()];
+  };
+  const coverage = (
+    <button type="button" className="v3-btn v3-btn-sm"
+            onClick={() => window.__oiNav && window.__oiNav('settings', 'connections')}>See the coverage</button>
+  );
+
+  // Recording again. Dates, and the date the comparisons stop carrying the outage — only
+  // while that is still in the future, because a clause about a day that has passed is
+  // just another sentence to disbelieve.
+  if (st && st.fixed_on && st.state !== 'broken') {
+    const clean = st.comparisons_clean_from;
+    const stillDirty = clean && new Date(String(clean).slice(0, 10) + 'T00:00:00Z') > new Date();
+    return (<p className="v3-why-p v3-muted">
+      Your site tracking was broken until {dm(st.fixed_on)} and has been recording since — there is
+      nothing to fix.{stillDirty ? ' Comparisons that still reach back into those days stay unreliable until ' + dm(clean) + '.' : ''}
+    </p>);
+  }
+
+  if (st && st.state === 'broken') {
+    return (<p className="v3-why-p v3-muted">
+      Your site tracking is not recording every visit{st.broke_on ? ', and has not since ' + dm(st.broke_on) : ''}, so traffic
+      and conversion are withheld rather than guessed. The tag sits on your own site, so this is one
+      Greta cannot fix from here. {coverage}
+    </p>);
+  }
+
+  // Loading, or no window on record while the cached read still flags one. Claim neither
+  // state; the sentence is true either way and the evidence is still worth offering.
+  return (<p className="v3-why-p v3-muted">
+    Some of this is uncertain: your site tracking is incomplete, so traffic and conversion are
+    withheld rather than guessed. {st === undefined ? null : coverage}
+  </p>);
+}
+
 function V3Why({ why, period }){
   if (!why) return null;
   const rev = Number(why.effect_revenue_gbp), spend = Number(why.effect_spend_gbp);
@@ -14911,10 +14984,7 @@ function V3Why({ why, period }){
       {isFinite(Number(b.aov_gbp)) && Number(b.aov_gbp) !== 0
         ? <> Order value {Number(b.aov_gbp) > 0 ? 'helped' : 'hurt'} by {money(b.aov_gbp)}.</> : null}
     </p>
-    {why.data_integrity_flag && (<p className="v3-why-p v3-muted">
-      Some of this is uncertain: your site tracking is incomplete, so traffic and conversion are
-      withheld rather than guessed. <button type="button" className="v3-btn v3-btn-sm" onClick={()=>window.__oiGo && window.__oiGo('settings')}>Check your data</button>
-    </p>)}
+    {why.data_integrity_flag && <V3TrackingNote/>}
     {(why.change_events || []).length > 0 && (<ul className="v3-why-list">
       {(why.change_events || []).slice(0, 3).map((e, i) => (
         <li key={i}><span className="v3-num">{String(e.date || '').slice(5)}</span> {e.label}</li>
