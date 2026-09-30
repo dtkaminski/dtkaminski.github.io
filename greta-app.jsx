@@ -9563,9 +9563,10 @@ function V3ActionBoard(){
                   was built to remove. Before this the board was read-only: a ranked list
                   of things you could look at and not one you could act on or close. */}
               <div className="v3-rank-fix">
-                {connProvider(r.external_id) && <V3Fix provider={connProvider(r.external_id)} small/>}
-                <V3Done ext={r.external_id} small
-                        onDone={() => setRows(rs => rs.filter(x => x.external_id !== r.external_id))}/>
+                {connProvider(r.external_id)
+                  ? <V3Fix provider={connProvider(r.external_id)} small/>
+                  : <V3Done ext={r.external_id} small
+                            onDone={() => setRows(rs => rs.filter(x => x.external_id !== r.external_id))}/>}
               </div>
               {isOpen && (
                 <div className="v3-rank-why">
@@ -15021,9 +15022,19 @@ function V3Today(p) {
           {connProvider(top.external_id)
             ? <V3Fix provider={connProvider(top.external_id)}/>
             : <V3Steps ext={top.external_id} step1={top.step1}/>}
-          <V3Done ext={top.external_id} onDone={() => setTopDone(true)}/>
+          {/* No Mark done on a connection action. Whether a feed is reporting is a fact
+              Greta checks every fifteen minutes, so taking the operator's word for it is
+              the one case where the button is worse than useless: a manual 'done' is held
+              against the emitter for 30 days, which would mean pressing it on a dead feed
+              goes blind on that spend for a month. fn_emit_connection_actions withdraws
+              this action itself the moment the connection is healthy again. */}
+          {!connProvider(top.external_id) && <V3Done ext={top.external_id} onDone={() => setTopDone(true)}/>}
           <button type="button" className="v3-btn" onClick={() => window.__oiAsk && window.__oiAsk('Why is this the most important thing to do: ' + scrubTag(top.description))}>Why?</button>
         </div>)}
+        {/* Say why there is nothing to press here, or the gap reads as an oversight. */}
+        {!topDone && connProvider(top.external_id) && (
+          <div className="v3-sub">Greta clears this one herself as soon as the feed reports again — there is nothing to mark off.</div>
+        )}
       </div>
     ) : (
       <div className="v3-dofirst"><div className="v3-kick">Do this first</div>
