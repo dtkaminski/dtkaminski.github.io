@@ -12526,6 +12526,37 @@ function connProvider(externalId) {
   const m = /^connection-([a-z0-9_]+)$/.exec(String(externalId || ''));
   return m && CONN_OAUTH[m[1]] ? m[1] : null;
 }
+// Two other places in the product know a source is broken, and neither of them holds a
+// provider slug: the headline carries stale_feeds as display text ("Meta since 19 Sep")
+// and vw_brand_source_freshness names FEEDS rather than connections ("meta_ads_ad_level",
+// "shopify_orders"). Both are one hop from the thing that can actually be reconnected, so
+// the hop happens once here instead of in every call site that wants to offer the fix.
+const CONN_FEED = {
+  meta_ads: 'meta', meta_ads_ad_level: 'meta',
+  shopify_orders: 'shopify',
+  ga4_daily: 'ga4', ga4_items: 'ga4',
+  google_ads: 'google_ads', klaviyo: 'klaviyo',
+  // gsc rides on a Google grant this product never asks for on its own — there is no
+  // connect-start branch for it, so no button rather than one that cannot work.
+};
+function connFromFeed(feed) {
+  const p = CONN_FEED[String(feed || '').trim().toLowerCase()];
+  return p && CONN_OAUTH[p] ? p : null;
+}
+function connFromLabel(text) {
+  const s = String(text || '');
+  // Longest label wins, because "Google Analytics" and "Google Ads" share a first word
+  // and a stale-feeds string can name more than one source.
+  const hits = Object.keys(CONN_LABEL)
+    .filter(p => CONN_OAUTH[p] && s.indexOf(CONN_LABEL[p]) > -1)
+    .sort((a, b) => CONN_LABEL[b].length - CONN_LABEL[a].length);
+  return hits[0] || null;
+}
+function connExists(provider) {
+  const rows = (typeof window !== 'undefined' && window.FRKL_LIVE && window.FRKL_LIVE.connections) || [];
+  return rows.some(r => r.provider === provider);
+}
+
 // Shopify's authorize URL is per-shop, so connect-start needs the domain. The live
 // connection row already holds it; asking the operator to retype it would be the same
 // friction in a smaller box.
@@ -14023,6 +14054,18 @@ function v3TrustWhy(d) {
 // One pattern, established here and reusable: pass the parts, get the same sheet every time. It
 // deliberately does NOT compute anything — the caller hands over figures it already renders, so a
 // drill-down can never disagree with the number it explains.
+// A `fix` is either a [section, sub, label] deep link or, where the remedy is a single
+// call, the control that performs it. A sheet that names the problem and then sends you
+// somewhere else to solve it is the long way round; a sheet that solves it is the point.
+// An element is rendered as-is and does NOT close the sheet — it either navigates away
+// itself or needs to show its own error where the reader is looking.
+function v3FixNode(fix, close) {
+  if (!fix) return null;
+  if (React.isValidElement(fix)) return fix;
+  return (<button type="button" className="v3-btn v3-btn-sm"
+                  onClick={() => { if (close) close(); window.__oiNav && window.__oiNav(fix[0], fix[1]); }}>{fix[2]}</button>);
+}
+
 function V3Figure({ children, label, window: win, inputs, note, basis, fix }) {
   const [open, setOpen] = React.useState(false);
   const conf = basis && V3_CONF[basis] ? V3_CONF[basis] : null;
@@ -14048,8 +14091,7 @@ function V3Figure({ children, label, window: win, inputs, note, basis, fix }) {
       {conf && <span><b>{conf.label}:</b> {note || conf.why}</span>}
       {!conf && note && <span>{note}</span>}
       <span className="v3-sheet-btns">
-        {fix && <button type="button" className="v3-btn v3-btn-sm"
-                        onClick={() => { setOpen(false); window.__oiNav && window.__oiNav(fix[0], fix[1]); }}>{fix[2]}</button>}
+        {v3FixNode(fix, () => setOpen(false))}
         <button type="button" className="v3-btn v3-btn-sm" onClick={() => setOpen(false)}>Close</button>
       </span>
     </span>)}
@@ -14144,7 +14186,7 @@ function V3Conf({ state, detail, fix }) {
     </button>
     {open && (<span className="v3-sheet" role="dialog" aria-label={'Confidence: ' + c.label}>
       <b>{c.label}</b><span>{detail || c.why}</span>
-      {fix && <span className="v3-sheet-btns"><button type="button" className="v3-btn v3-btn-sm" onClick={() => { setOpen(false); window.__oiNav && window.__oiNav(fix[0], fix[1]); }}>{fix[2]}</button></span>}
+      {fix && <span className="v3-sheet-btns">{v3FixNode(fix, () => setOpen(false))}</span>}
       <span className="v3-sheet-btns"><button type="button" className="v3-btn v3-btn-sm" onClick={() => setOpen(false)}>Close</button></span>
     </span>)}
   </span>);
@@ -14489,8 +14531,16 @@ function DataHealth(){
       {systemic
         ? <><b>Several feeds stopped on the same day.</b> That usually means one connection dropped rather than {stale.length} separate problems.</>
         : <><b>{stale.length} {stale.length === 1 ? 'source is' : 'sources are'} behind.</b> Numbers that use {stale.length === 1 ? 'it' : 'them'} will be understated until {stale.length === 1 ? 'it catches' : 'they catch'} up.</>}
-      <div style={{marginTop:8}}>
-        <button type="button" className="v3-btn v3-btn-sm" onClick={()=>window.__oiGo && window.__oiGo('settings')}>Reconnect a source</button>
+      {/* This panel already knows exactly WHICH feeds stopped, and offered "Reconnect a
+          source" pointing at the Settings root — the vaguest CTA in the product, one
+          level above the screen that could even have helped. Name them and start them. */}
+      <div style={{marginTop:8, display:'flex', flexWrap:'wrap', gap:8, alignItems:'center'}}>
+        {(() => {
+          const provs = [...new Set(stale.map(r => connFromFeed(r.source)).filter(Boolean))];
+          return provs.length
+            ? provs.map(p => <V3Fix key={p} provider={p} small/>)
+            : <button type="button" className="v3-btn v3-btn-sm" onClick={()=>window.__oiGo && window.__oiGo('settings')}>Reconnect a source</button>;
+        })()}
       </div>
     </div>)}
 
@@ -14913,6 +14963,18 @@ function V3Today(p) {
   const pacePos = (camTarget != null && camTarget > 0) ? (cam / camTarget) : null;
   const diff = camTarget != null ? cam - camTarget : null;
   const top = d.top_action, next = (d.next_actions || []);
+  // The profit figure and its confidence badge describe the same broken state and used to
+  // offer two different sentences for it — "Reconnect Meta" on one, "Reconnect your ads" on
+  // the other — and both of them only navigated to Settings. One remedy, computed once, and
+  // it is the button that performs it whenever the stale feed names a source we can start.
+  // Where it does not (Klaviyo's API key, Search Console), the deep link stays: better to
+  // point at the screen that can help than to offer a button that cannot.
+  const staleProv = d.spend_is_stale ? connFromLabel(d.stale_feeds) : null;
+  const trustFix = !d.spend_is_stale
+    ? ['settings', 'costs', 'Enter your product costs']
+    : staleProv
+      ? <V3Fix provider={staleProv} small/>
+      : ['settings', 'connections', 'Reconnect your ads'];
 
   return (<div className="v3-today">
     <V3Reconnected/>
@@ -14932,8 +14994,12 @@ function V3Today(p) {
         <div className="v3-sub">{noSales
           ? 'Greta cannot see any sales in the last 30 days. If you have been trading, the shop connection has probably dropped — reconnecting takes about a minute and your history comes back with it.'
           : 'Enter what your products and orders cost you, and Greta can show profit and rank your actions by pounds.'}</div>
+        {/* The sentence above says reconnecting takes about a minute, and then the button
+            used to offer a screen. It is the shop that is missing, so it is the shop the
+            button connects — worded for whether there has ever been one. V3Fix falls back
+            to Settings by itself when no stored domain exists to start Shopify with. */}
         <div className="v3-btns">{noSales
-          ? <button type="button" className="v3-btn v3-btn-p" onClick={() => window.__oiNav && window.__oiNav('settings', 'connections')}>Check your connections</button>
+          ? <V3Fix provider="shopify" label={connExists('shopify') ? 'Reconnect Shopify' : 'Connect Shopify'}/>
           : <button type="button" className="v3-btn v3-btn-p" onClick={() => window.__oiNav && window.__oiNav('settings', 'economics')}>Enter your costs</button>}</div>
       </div>);
     })() : (
@@ -14951,9 +15017,7 @@ function V3Today(p) {
               no claim about the figure. */}
           <V3Conf state={(cam == null || d.cm_source === 'none') ? 'held' : (d.trust_level || 'probably')}
                   detail={v3TrustWhy(d)}
-                  fix={d.spend_is_stale
-                    ? ['settings', 'connections', 'Reconnect ' + (d.stale_feeds ? String(d.stale_feeds).split(' since')[0] : 'your ads')]
-                    : ['settings', 'costs', 'Enter your product costs']}/>
+                  fix={trustFix}/>
         </div>
         {/* The one number the product is built on is now openable: what went into it, over what
             window, and how far to lean on it. Every figure here is one the headline already
@@ -14969,7 +15033,7 @@ function V3Today(p) {
                       ['What you spent on ads', '−' + v3Gbp(spend)],
                       ['What you keep', v3Gbp(cam)]
                     ]}
-                    fix={d.spend_is_stale ? ['settings', 'connections', 'Reconnect your ads'] : ['settings', 'costs', 'Enter your product costs']}>
+                    fix={trustFix}>
             {v3Gbp(cam)}
           </V3Figure>
         </div>
