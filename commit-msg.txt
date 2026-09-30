@@ -1,28 +1,35 @@
-Tokenise the business-event modal's shadow and control radii
+Finish the modal sweep: two radii and a dead fallback
 
-Two hardcoded values left in BizEventModal, both dark-theme residue sitting next to the
---surface-1 fallback fixed in 0e9dafc.
+Checked all five modals for what the business-event one had. Most of it was already
+clean.
 
-box-shadow was 0 20px 60px rgba(0,0,0,0.5) — a 50%-opacity black cast 60px under a white
-dialog, which is a shadow drawn for a near-black surface. Now --shadow-raised, the token
-for elevated content: two layers at 14% and 5% of the ink colour rather than one heavy
-black one. --shadow-panel would have been wrong, and is what I first suggested: that one
-is a 1px hairline for flat panels, and a dialog floating over a scrim is raised.
+The four class-based modals share .modal / .modal-bg in greta-dashboard.html, and those
+rules were right all along: var(--bg-card), var(--border-default), var(--r-lg) which
+maps to --radius-none, and var(--shadow-lg) which maps to --shadow-raised — the same
+token I reached for by hand in 356e4f1. The drawer is clean on the same three. The
+marketing-os embed has no modals and no hardcoded radius or shadow at all.
 
-border-radius was a literal 6 on all seven controls — the select, four inputs and both
-buttons. CLAUDE.md puts buttons and inputs on --radius-md, which is 5px. The panel keeps
-var(--r-lg), which maps to --radius-none, so containers stay square.
+Three things left:
 
-Scoped by finding the modal's own opening and closing lines rather than a line number.
-The first attempt used start+30 and picked up a borderRadius:6 from the next component;
-the assertion caught it and nothing was written. borderRadius:6 appears elsewhere in this
-file and is deliberately untouched.
+- A textarea in the connect-a-source modal at borderRadius:6. It is an input, so
+  --radius-md, same as the seven controls in 356e4f1.
+- An inline <code> chip at borderRadius:4. Neither a container nor a control, so
+  --radius-sm (2px) rather than --radius-md (5px) — numerically --radius-md is the
+  closer of the two, but 5px on a chip with 1px 5px of padding reads as a pill, and
+  --radius-sm is the step the system provides for small inline things.
+- background:'var(--surface-1,#15151c)' on the business-event modal. 0e9dafc fixed that
+  modal by defining --surface-1, so the fallback is now unreachable — but leaving the
+  literal in place means deleting one alias silently returns a black dialog at 1.01:1
+  contrast. The fallback is gone; the var stands on its own.
 
-Rendered and measured, not assumed: panel rgb(255,255,255), radius 0px, shadow resolving
-to rgba(22,21,15,0.14) 0 8px 24px -6px plus rgba(22,21,15,0.05) 0 2px 6px, and all four
-control types at 5px. Containers square, controls --radius-md — the rule, both halves.
+The six other --surface-* references keep their fallbacks, because those fall back to
+PAL.panel, which is the right colour rather than a dark-theme ghost.
 
-Note for whoever is in this file next: it is LF now, not CRLF. It changed under me
-mid-edit and a script assuming CRLF split it into one line and aborted.
+Also verified there is no unresolved custom property left anywhere: 125 defined across
+the five stylesheets, 115 referenced across those plus greta-app.jsx, zero unresolved.
+That class of bug is closed, not just this instance of it.
+
+The one remaining dark hex in the file, #141414 in the PAL map, stays: PAL exists to
+give SVG attributes concrete values, because SVG cannot resolve var().
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>

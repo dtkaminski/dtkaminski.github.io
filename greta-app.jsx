@@ -2871,7 +2871,7 @@ function LogEventModal({onClose, onSaved}){
     onClose();
   };
   return (<div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
-    <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface-1,#15151c)',border:'1px solid var(--border-default)',borderRadius:'var(--r-lg,12px)',padding:'20px 22px',width:'min(440px,100%)',boxShadow:'var(--shadow-raised)'}}>
+    <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface-1)',border:'1px solid var(--border-default)',borderRadius:'var(--r-lg,12px)',padding:'20px 22px',width:'min(440px,100%)',boxShadow:'var(--shadow-raised)'}}>
       <div style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',marginBottom:4}}>Log a business event</div>
       <div style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)',marginBottom:16,lineHeight:1.5}}>Tell the diagnostic what happened — it'll factor this into the read straight away (e.g. a deliberate spend test stops an sales per £ of ads dip reading as fatigue).</div>
       <label style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)'}}>Type</label>
@@ -9140,7 +9140,7 @@ function ClarityUploadModal({onClose, onSaved}){
       <input type="file" accept=".csv,text/csv,text/plain" onChange={onFile} style={{margin:'4px 0 12px'}}/>
       <label>…or paste CSV</label>
       <textarea value={text} onChange={e=>setText(e.target.value)} rows={7} placeholder={CLARITY_TEMPLATE}
-        style={{width:'100%', margin:'4px 0 6px', padding:'9px 11px', background:'var(--bg-input)', border:'1px solid var(--border-default)', borderRadius:6, color:'var(--text-primary)', fontSize:'var(--text-sm)', fontFamily:'ui-monospace,Menlo,monospace', resize:'vertical'}}/>
+        style={{width:'100%', margin:'4px 0 6px', padding:'9px 11px', background:'var(--bg-input)', border:'1px solid var(--border-default)', borderRadius:'var(--radius-md)', color:'var(--text-primary)', fontSize:'var(--text-sm)', fontFamily:'ui-monospace,Menlo,monospace', resize:'vertical'}}/>
       <div style={{display:'flex', gap:8, alignItems:'center', marginBottom:10}}>
         <button onClick={parseNow}>Preview</button>
         <button className="btn-ghost" onClick={()=>{ try{navigator.clipboard.writeText(CLARITY_TEMPLATE);}catch(e){} toast('Template copied',{body:'Paste into a spreadsheet, fill the values.'}); }}>Copy template</button>
@@ -12982,7 +12982,7 @@ function ConnectionsPanel(){
       <div className="modal" onClick={e=>e.stopPropagation()}>
         <h3>Connect Shopify via OAuth</h3>
         <div style={{fontSize:'var(--text-sm)', color:'var(--text-muted)', marginTop:6, marginBottom:'var(--s-4)', lineHeight:1.5}}>
-          Enter your full shop domain (the <code style={{background:'var(--bg-input)',padding:'1px 5px',borderRadius:4,fontSize:'var(--text-xs)'}}>.myshopify.com</code> one, not your custom domain).
+          Enter your full shop domain (the <code style={{background:'var(--bg-input)',padding:'1px 5px',borderRadius:'var(--radius-sm)',fontSize:'var(--text-xs)'}}>.myshopify.com</code> one, not your custom domain).
           You'll be redirected to Shopify to approve read-only access to orders, products, inventory and discounts.
         </div>
         <label>Shop domain</label>
