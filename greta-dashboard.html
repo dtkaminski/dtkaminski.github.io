@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./design-tokens.css?v=20260929e">
+<link rel="stylesheet" href="./design-tokens.css?v=1790758025">
 <!-- perf: warm up the CDN + Supabase origins so the deferred libs and the first data
      fetch don't each pay a fresh DNS+TLS round-trip on cold load. -->
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
@@ -52,6 +52,7 @@
 <script defer src="./greta-clarity.js?v=20260925f"></script>
 <script defer src="./greta-board-read.js?v=20260925f"></script>
 <script defer src="./greta-benchmarks.js?v=20260925f"></script>
+<script defer src="./greta-track.js?v=20260930a"></script>
 <script defer src="./greta-defrkl-gate.js?v=20260929a"></script>
 <!-- frkl-fit.js (static per-brand fit snapshot) intentionally NOT loaded: it baked in one
      brand's OMF/PMF and would render for every tenant / the unauthed demo. Fit now comes
@@ -1640,6 +1641,36 @@
 
   /* Business vitals: three stats, not a sentence of debug output. Rules between them
      instead of three boxes, per whitespace-over-cards. */
+  /* FOCUS. Nothing in the product drew one: all 20 focusable elements on Today returned
+     no outline and no box-shadow on :focus, so a keyboard user had no way to tell where
+     they were. That is WCAG 2.4.7 failed outright, and it also makes the app unusable
+     one-handed on a desktop. :focus-visible so a mouse click does not leave a ring behind,
+     and an offset so the ring sits outside the control rather than on its edge. */
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+  /* On the accent-filled primary button the ring has to sit against the button, not
+     against the page, or it disappears into the fill. */
+  .v3-btn-p:focus-visible, .v3-sug:focus-visible {
+    outline-color: var(--color-ink);
+  }
+  /* The nav is on chrome, which is close enough to the accent at 2px to muddy it. */
+  .v3-nav-item:focus-visible, .v3-mb:focus-visible {
+    outline-offset: -2px;
+  }
+  /* Keyboard users land on the nav before the content on every page. */
+  .v3-skip {
+    position: absolute; left: var(--space-3); top: -100px; z-index: 100;
+    background: var(--color-panel); color: var(--color-ink);
+    border: 1px solid var(--color-accent); border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-3); font-family: var(--font-sans);
+    font-size: var(--text-sm); text-decoration: none;
+    transition: top var(--transition-fast, .15s) ease;
+  }
+  .v3-skip:focus { top: var(--space-3); }
+
   .v3-vitals { border-top: 1px solid var(--color-line); border-bottom: 1px solid var(--color-line);
     padding: var(--space-4) 0; margin-bottom: var(--space-4); }
   .v3-vitals-head { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap;
@@ -1733,7 +1764,7 @@
    greta-app.jsx's mosView() to render — the same pattern marketing-os.build.js already uses for
    window.CommandCentre / window.DecisionLog. */
 window.MOS_EMBEDDED = true;</script>
-<script defer src="./today-calendar.build.js?v=20260929c"></script>
+<script defer src="./today-calendar.build.js?v=20260930a"></script>
 <script>/* cost-entry.build.js — CostEntry.jsx bundled on its own rather than folded into
    marketing-os.build.js, which has drifted from its source and is patched by hand. Same
    window.<Component> contract mosView() already uses. It is the only surface in the product where
@@ -1742,6 +1773,6 @@ window.MOS_EMBEDDED = true;</script>
    save-brand-config had been reading two relations that were never created. */</script>
 <script defer src="./cost-entry.build.js?v=20260929c"></script>
 <script defer src="./loop-panel.js?v=20260921a"></script>
-<script defer src="./greta-app.js?v=1790702257059"></script>
+<script defer src="./greta-app.js?v=1790758282577"></script>
 <script>/* perf: defer frkl static deep-tab data (CVR ~1.7MB, cohorts, promos, products) — not used by the Overview/landing. Background-load after paint; skip for non-frkl (de-frkl). */
 (function(){try{var slug=window.OI_BRAND_SLUG||(window.parent&&window.parent!==window?window.parent.OI_BRAND_SLUG:null)||"frkl";if(slug!=="frkl")return;var files=["greta-cvr.js","greta-cohorts.js","greta-discount-codes.js","greta-products.js","greta-patterns.js"],i=0;function next(){if(i>=files.length)return;var s=document.createElement("script");s.src="./"+files[i++]+"?v=20260925f";s.async=true;s.onload=next;s.onerror=next;document.head.appendChild(s);}var kick=function(){next();};if(window.requestIdleCallback){window.requestIdleCallback(kick,{timeout:1500});}else{setTimeout(kick,300);}}catch(e){}})();</script>

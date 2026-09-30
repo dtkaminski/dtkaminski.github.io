@@ -27,7 +27,13 @@
      which is why a label and its value looked like the same information. */
   --color-ink:      #16150F;   /* headings, figures — near-black, faintly warm  */
   --color-muted:    #57544D;   /* labels, secondary prose — passes AA on panel  */
-  --color-faint:    #8A867E;   /* units, counts, timestamps                     */
+  /* Darkened from #8A867E on 2026-09-30. At 11px — which is where this token actually
+     gets used, on nav group labels, units and timestamps — it measured 3.38:1 against the
+     nav chrome and 3.63:1 against panel, where WCAG AA needs 4.5:1. The sidebar's own
+     structure ("HOME", "ACT", "PLAN") was the least readable text in the product. #726E66
+     is the lightest value that clears 4.5 on both surfaces, so it stays clearly tertiary
+     against --color-muted while being legible. */
+  --color-faint:    #726E66;   /* units, counts, timestamps — AA at 11px           */
 
   /* ── Surfaces ───────────────────────────────────────────────────────────
      Canvas sits ~5% below panel, which is enough to read as depth without a

@@ -13585,6 +13585,7 @@ function V3AskBar({ dest }) {
   const send = (text) => {
     const t = (text != null ? text : q).trim();
     if (!t) { window.__oiGo && window.__oiGo('ask'); return; }
+    track('ask_used', { from: 'askbar', chars: t.length });
     setQ(''); setOpen(false);
     if (window.__oiAsk) window.__oiAsk(t); else window.__oiGo && window.__oiGo('ask');
   };
@@ -13834,6 +13835,11 @@ function useV3Headline() {
     return () => window.removeEventListener('greta-headline-updated', on);
   }, []);
   return h;
+}
+// Fire-and-forget. greta-track.js may not have loaded (it is deferred) and analytics
+// must never be load-bearing, so every call site goes through this.
+function track(name, props, surface) {
+  try { window.greta && window.greta.track && window.greta.track(name, props, surface); } catch (e) {}
 }
 function v3Gbp(v) { return v == null ? '—' : '£' + Math.round(Number(v)).toLocaleString('en-GB'); }
 // One money rule for operator-facing amounts. Five copies of the same local formatter switched
@@ -14888,6 +14894,9 @@ function V3App({ dest, go, children, start, periodCtl }) {
   const sig = useV3NavSignals();
   useFigureTypography(dest);
   return (<div className="v3-root">
+    {/* First thing in the tab order on every page: the nav has 16 items and a keyboard
+        user had to walk all of them to reach the content. */}
+    <a className="v3-skip" href="#v3-content">Skip to content</a>
     <div className="v3-shell">
       <nav className="v3-nav" aria-label="Main">
         <button type="button" className="v3-nav-search" onClick={() => window.__oiCommandOpen && window.__oiCommandOpen()}>
@@ -14907,7 +14916,7 @@ function V3App({ dest, go, children, start, periodCtl }) {
           </React.Fragment>);
         }); })()}
       </nav>
-      <main className="v3-main">
+      <main className="v3-main" id="v3-content" tabIndex={-1}>
         <V3AskBar dest={dest}/>
         <header className="v3-page-head">
           <div className="v3-page-head-row">
@@ -14977,6 +14986,7 @@ function App(){
   React.useEffect(() => {
     window.__oiGo = (dest, anchor) => {
       setV3dest(dest);
+      track('page_view', { dest: dest }, dest);
       window.__oiV3Anchor = anchor || null;
       window.scrollTo({top: 0, behavior: 'smooth'});
     };
@@ -15017,7 +15027,7 @@ function App(){
     const page = (V3_PAGES[v3dest] || V3_PAGES.today)({start, period, customActive});
     return (
       <div>
-        <V3App dest={v3dest} go={(d)=>setV3dest(d)} start={start}
+        <V3App dest={v3dest} go={(d)=>{ setV3dest(d); track('page_view', { dest: d }, d); }} start={start}
                periodCtl={<V3Period period={period} setPeriod={setPeriod} rangeStart={rangeStart} rangeEnd={rangeEnd}
                                     setRangeStart={setRangeStart} setRangeEnd={setRangeEnd} customActive={customActive}/>}>{page}</V3App>
         <footer className="app-footer">
