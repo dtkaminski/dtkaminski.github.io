@@ -9563,10 +9563,12 @@ function V3ActionBoard(){
                   was built to remove. Before this the board was read-only: a ranked list
                   of things you could look at and not one you could act on or close. */}
               <div className="v3-rank-fix">
-                {connProvider(r.external_id)
-                  ? <V3Fix provider={connProvider(r.external_id)} small/>
-                  : <V3Done ext={r.external_id} small
-                            onDone={() => setRows(rs => rs.filter(x => x.external_id !== r.external_id))}/>}
+                {connProvider(r.external_id) ? <V3Fix provider={connProvider(r.external_id)} small/> : (<>
+                  <V3Done ext={r.external_id} small
+                          onDone={() => setRows(rs => rs.filter(x => x.external_id !== r.external_id))}/>
+                  <V3Skip ext={r.external_id} small
+                          onDone={() => setRows(rs => rs.filter(x => x.external_id !== r.external_id))}/>
+                </>)}
               </div>
               {isOpen && (
                 <div className="v3-rank-why">
@@ -12697,7 +12699,7 @@ async function actionVerb(verb, externalId, extra) {
 // cron — but it means a mis-click buries a live problem for a month, and there is no
 // un-done verb. So the button asks once. No modal: a confirm step people meet on every
 // row has to cost one click, not a dialog.
-function V3Done({ ext, small, onDone }) {
+function V3Decide({ ext, verb, event, label, confirmLabel, small, onDone }) {
   const [armed, setArmed] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState('');
@@ -12707,20 +12709,36 @@ function V3Done({ ext, small, onDone }) {
     if (!armed) { setArmed(true); setErr(''); return; }
     setBusy(true); setErr('');
     try {
-      await actionVerb('action_done', ext);
-      track('action_done', { external_id: ext }, 'today');
+      await actionVerb(verb, ext);
+      track(event, { external_id: ext }, 'today');
       if (onDone) onDone();
     } catch (e) { setErr(String((e && e.message) || e)); setBusy(false); setArmed(false); }
   };
   return (<>
     <button type="button" className={cls} disabled={busy} onClick={go}>
-      {busy ? 'Saving…' : armed ? 'Yes — mark it done' : 'Mark done'}
+      {busy ? 'Saving…' : armed ? confirmLabel : label}
     </button>
     {armed && !busy && (
       <button type="button" className={cls} onClick={() => setArmed(false)}>Cancel</button>
     )}
     {err && <span className="v3-fix-err" role="alert">{err}</span>}
   </>);
+}
+function V3Done({ ext, small, onDone }) {
+  return <V3Decide ext={ext} verb="action_done" event="action_done"
+                   label="Mark done" confirmLabel="Yes — mark it done" small={small} onDone={onDone}/>;
+}
+// Not done. Declined — and the difference is the whole point of having two verbs rather
+// than one: done says the work happened and invites Greta to check whether it worked,
+// skip says the operator read it and chose not to. Grading one as the other would fill
+// the track record with outcomes nobody attempted.
+//
+// The status, the 30-day cooldown and the trigger that protects it have all existed since
+// September; 35 rows already sit in 'skipped', every one written by the engine's own
+// autoclose paths. No surface has ever been able to write one. This is the missing half.
+function V3Skip({ ext, small, onDone }) {
+  return <V3Decide ext={ext} verb="action_skip" event="action_skipped"
+                   label="Skip" confirmLabel="Yes — skip it" small={small} onDone={onDone}/>;
 }
 
 // What action_start actually returns is the playbook — it changes no state, and never
@@ -15005,7 +15023,7 @@ function V3Today(p) {
   // the session by design (numbers must not swap under the reader), so it cannot report
   // the close itself — and leaving the action sitting there after a confirmed write is
   // exactly the "did that do anything?" this change exists to end.
-  const [topDone, setTopDone] = React.useState(false);
+  const [topDone, setTopDone] = React.useState(null);   // null | 'done' | 'skipped'
   // Only a change in the NUMBERS counts as new: the "why" paragraph arrives seconds
   // later on its own (fn_today_v2 is slow), and that must not look like the figures
   // moved under the reader. Merge it in quietly; offer a refresh for anything else.
@@ -15146,8 +15164,11 @@ function V3Today(p) {
             </div>}
         {topDone ? (
           <div className="v3-sub v3-resolved" role="status">
-            Marked done. Greta checks whether it worked and adds the result to your track record —
-            and will not raise it again for 30 days unless it gets materially worse.
+            {topDone === 'skipped'
+              ? <>Skipped. Greta will not raise it again for 30 days unless it gets materially worse,
+                  and will not grade it — you did not say it was done, so there is no outcome to check.</>
+              : <>Marked done. Greta checks whether it worked and adds the result to your track record —
+                  and will not raise it again for 30 days unless it gets materially worse.</>}
           </div>
         ) : (<div className="v3-btns">
           {/* Every button here now does what it says. Two of the three used to navigate to
@@ -15162,7 +15183,11 @@ function V3Today(p) {
               against the emitter for 30 days, which would mean pressing it on a dead feed
               goes blind on that spend for a month. fn_emit_connection_actions withdraws
               this action itself the moment the connection is healthy again. */}
-          {!connProvider(top.external_id) && <V3Done ext={top.external_id} onDone={() => setTopDone(true)}/>}
+          {/* Skip is offered on the same terms as done, and withheld on the same ones. A
+              dead feed is not a matter of opinion, so declining it would suppress a
+              measured fact for 30 days exactly as marking it done would. */}
+          {!connProvider(top.external_id) && <V3Done ext={top.external_id} onDone={() => setTopDone('done')}/>}
+          {!connProvider(top.external_id) && <V3Skip ext={top.external_id} onDone={() => setTopDone('skipped')}/>}
           <button type="button" className="v3-btn" onClick={() => window.__oiAsk && window.__oiAsk('Why is this the most important thing to do: ' + scrubTag(top.description))}>Why?</button>
         </div>)}
         {/* Say why there is nothing to press here, or the gap reads as an oversight. */}
