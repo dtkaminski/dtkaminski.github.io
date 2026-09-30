@@ -3808,11 +3808,11 @@ function Overview({start, period, customActive}){
             implication="Judge against contribution-customer lifetime value — keep scaling only while customer lifetime value:cost per new customer stays at 3×+." />
           <KPI label="Customer value" val={GBP(ltv)} sub={ltvBasis
               ? `contribution · ${ltvBasis} · vs cost per new customer ${ltvCac?ltvCac.toFixed(1)+'×':'—'}`
-              : 'needs a cohort curve — connect Shopify and let a month of orders land'} badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesLTV} seriesLabel="Contribution/customer · by day" goodDirection="up"
+              : 'not measured yet'} badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesLTV} seriesLabel="Contribution/customer · by day" goodDirection="up"
             agent="Atlas"
             observation={ltvBasis
               ? `Contribution per acquired customer, integrated from the cohort curve over the ${ltvBasis}. The horizon stops where the curve stops observing half the starting cohort, because past that point it is only the survivors talking about themselves.`
-              : 'Contribution per acquired customer, from the cohort curve. Needs a month of order history before it can be measured.'}
+              : 'Contribution per acquired customer, integrated from the cohort curve. Not available on this workspace yet — either there is not enough order history, or the measurement has not been switched on for your account.'}
             implication={ltvTopdown!=null && ltvGap!=null
               ? `Cross-checked against MER × cost per new customer — the same quantity derived a completely different way: ${GBP(ltvTopdown)} of revenue per customer, ${Math.abs(ltvGap*100).toFixed(1)}% ${ltvGap>=0?'above':'below'} the cohort read. A small, stable gap is a calibration constant; a widening one means the cohort model has broken. Keep scaling only while this figure stays 3× your cost per new customer.`
               : 'The customer-value to acquisition-cost ratio is the unit-economics headline — 3×+ is the target to defend.'}
@@ -12595,26 +12595,19 @@ function V3Fix({ provider, label, small }) {
   </>);
 }
 
-// After the round trip. The callback lands with ?connected=<provider>; say plainly that
-// it worked and what happens next, because nothing visible changes for up to two hours
-// (invoke_sync_all_providers runs every two hours) and the action itself only clears
-// when fn_emit_connection_actions next runs. Silence here reads as "it didn't work".
+// After the round trip. Say plainly that it worked and what happens next, because
+// nothing visible changes for up to two hours (invoke_sync_all_providers runs every
+// two hours) and the action itself only clears when fn_emit_connection_actions next
+// runs. Without this the operator finishes a one-click fix and finds the same red
+// sentence they just acted on, which reads as "it didn't work".
+//
+// The ?connected=<provider> param is read and stripped ONCE, by the app-level
+// source_connected effect that runs long before Today has numbers to render. That
+// effect publishes the provider on window; this reads it. Two readers of one param
+// means whichever runs first wins, and it would not be this one.
 function V3Reconnected() {
-  const [prov, setProv] = React.useState(null);
-  React.useEffect(() => {
-    let p = null;
-    try { p = new URL((window.top || window).location.href).searchParams.get('connected'); } catch (e) { p = null; }
-    if (!p || !CONN_LABEL[p]) return;
-    setProv(p);
-    track('reconnect_finished', { provider: p }, 'today');
-    // Read once: a refresh an hour later should not re-announce it.
-    try {
-      const u = new URL((window.top || window).location.href);
-      u.searchParams.delete('connected');
-      (window.top || window).history.replaceState({}, '', u.toString());
-    } catch (e) {}
-  }, []);
-  if (!prov) return null;
+  const prov = (typeof window !== 'undefined' && window.GRETA_JUST_CONNECTED) || null;
+  if (!prov || !CONN_LABEL[prov]) return null;
   return (<div className="v3-note" role="status">
     {CONN_LABEL[prov]} is reconnected. The missing days come in with the next sync, within two hours —
     this action clears itself once they land.
@@ -15241,6 +15234,10 @@ function App(){
     // The brand id arrives with the membership round trip, which usually lands after this
     // effect; track() queues until then, so firing immediately is safe.
     track('source_connected', { provider: provider }, 'settings');
+    // Today announces the reconnection (V3Reconnected). It renders long after this
+    // effect has stripped the param, so the provider is handed forward rather than
+    // read twice — one reader, one strip, no race over who gets there first.
+    try { window.GRETA_JUST_CONNECTED = provider; } catch (e) {}
     try {
       const u = new URL(window.location.href);
       u.searchParams.delete('connected');
