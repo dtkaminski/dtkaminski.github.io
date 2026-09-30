@@ -1,16 +1,31 @@
-feat(dashboard): add Sign out to the greta app bar
+One action, one Mark done
 
-The only logout lived in the /app shell header, which is hidden once the rich
-dashboard iframe takes over — so a signed-in user had no visible way to sign
-out. Add a "Sign out" button to the dashboard app bar (far right), shown only
-in an authenticated workspace (OI_ASK present; hidden in the public demo where
-there's no session to end).
+The Today page rendered the top action twice. Greta's own hero has Start and Mark
+done; the nested "Channels, stock and track record" panel is the marketing-os Today
+component, which renders its own "do this first" with the same action and its own
+pair of buttons. The two did not share state — V3Done sets a local topDone, the
+embed's act() reloads only itself — so closing the action in one place left the
+other still offering to close it, and a person who used both wrote two action_done
+rows for one closed action.
 
-On click: end the Supabase session (window.FRKL_LIVE.sb.auth.signOut(), with a
-belt-and-braces localStorage clear of the sb-*-auth-token + demo passcode gate
-so logout holds even if the client instance isn't reachable), then send the top
-window (this dashboard runs in a same-origin iframe) to the homepage (/).
+Not an instrumentation double-fire, which is what I went looking for: greta-app.js
+has exactly one track('action_done') call site and the embed bundle has exactly
+one, they reach the server by different paths (actionVerb's direct fetch vs the
+embed's fetcher), neither calls the other, and nothing writes product_events
+server-side. Two buttons, not two events per click. But two buttons for one action
+is still wrong, and the hero belongs upstairs where the page already put it.
 
-Rebuilt frkl-app.js via build-app.mjs.
+So mosView takes an extra-props argument and Today is mounted with
+{ hideHero: true }, which drops the panel's "do this first" block. The abstention
+and nothing-open notices stay: they only render when there is no top action, and
+nothing above them explains why the read is silent.
 
-Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+The owner-today nav destination still calls mosView('Today') bare, so the
+standalone screen keeps its hero.
+
+Verified: both bundles rebuild byte-identical from source at this HEAD, node --check
+passes, and the compiled guard is !(e.hideHero&&T)&&Fragment — the branch is gated,
+not removed. today-calendar.build.js cache-bust bumped to 20260930b; build-app.mjs
+does not touch that one and a returning visitor would have kept the stale embed.
+
+Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>

@@ -11021,7 +11021,7 @@ function PlanningView(){
 // auth via window.OI_ASK. Today/Calendar are the canonical owner-screen upgrade (2026-07-13);
 // per FRONTEND-SOT-SPEC-2026-07-10.md, Command Centre is deprecated in favour of Today but is
 // left wired below until Dan confirms cutover.
-function mosView(name){
+function mosView(name, extra){
   const C = window[name];
   const A = window.OI_ASK || {};
   if (!C) return React.createElement('div',{className:'note'}, 'This screen did not load. Refresh the page; if it keeps happening, contact support.');
@@ -11030,7 +11030,7 @@ function mosView(name){
   // .mos-embed-scope (marketing-os.css, 2026-07-13) remaps the component's own design tokens
   // onto Greta's real :root theme variables, so it renders styled instead of bare/unstyled.
   return React.createElement('div', { className: 'mos-embed-scope' },
-    React.createElement(C, { brandId: A.brand_id, apiBase: apiBase, getToken: A.getJwt }));
+    React.createElement(C, { brandId: A.brand_id, apiBase: apiBase, getToken: A.getJwt, ...(extra || {}) }));
 }
 
 // ── Overview tiers (Business → Customer → Channel) ───────────────────────────
@@ -15188,7 +15188,9 @@ function V3Today(p) {
 
     <V3Why why={d.why} period={d.why_period}/>
     <V3More id="today-changed" label="What changed this week"><WhatChangedStrip/></V3More>
-    <V3More id="today-detail" label="Channels, stock and track record">{mosView('Today')}</V3More>
+    {/* hideHero: the panel's own "do this first" is the same action as the hero above, and
+        its Mark done wrote a second action_done for one closed action. See dashboard_app.jsx. */}
+    <V3More id="today-detail" label="Channels, stock and track record">{mosView('Today', { hideHero: true })}</V3More>
     <V3More id="today-tiers" label="Business, customer and channel numbers"><GretaOverviewTiers/></V3More>
   </div>);
 }
