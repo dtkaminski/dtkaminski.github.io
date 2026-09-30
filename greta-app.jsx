@@ -9557,13 +9557,16 @@ function V3ActionBoard(){
                 </span>
                 <span className="v3-rank-gbp">{v3Gbp(gbp)}<span className="v3-rank-per">/mo</span></span>
               </button>
-              {/* A connection row carries its own remedy. It sits OUTSIDE the row's
-                  expander button — a button inside a button is invalid — and outside
-                  the open/closed state, because making someone open a row to find the
-                  one-click fix is the friction this was built to remove. */}
-              {connProvider(r.external_id) && (
-                <div className="v3-rank-fix"><V3Fix provider={connProvider(r.external_id)} small/></div>
-              )}
+              {/* Every row's controls. They sit OUTSIDE the expander button — a button
+                  inside a button is invalid — and outside the open/closed state, because
+                  making someone open a row to find the one-click fix is the friction this
+                  was built to remove. Before this the board was read-only: a ranked list
+                  of things you could look at and not one you could act on or close. */}
+              <div className="v3-rank-fix">
+                {connProvider(r.external_id) && <V3Fix provider={connProvider(r.external_id)} small/>}
+                <V3Done ext={r.external_id} small
+                        onDone={() => setRows(rs => rs.filter(x => x.external_id !== r.external_id))}/>
+              </div>
               {isOpen && (
                 <div className="v3-rank-why">
                   {play.length
@@ -12614,6 +12617,113 @@ function V3Reconnected() {
   </div>);
 }
 
+// ── Action verbs ───────────────────────────────────────────────────────────
+// action_start and action_done have been live on the marketing-os function since Today
+// was built. Nothing in V3 ever called either one. The hero's Start and Mark done both
+// ran __oiNav('actions','queue'), and the queue they land on renders rows that only
+// expand — no done, no skip, no start anywhere on the ranked board. The single Mark
+// done button that does exist sits inside the collapsed "Earlier specialist review"
+// section, and that board is built from the static FRKL_DX_ANALYST globals rather than
+// vw_brand_action_board, so an engine-raised action could not be closed from anywhere.
+//
+// It was worse than missing. That legacy button posts to OI_ASK.endpoint — which is
+// ask-data, the LLM relay — so it answered {error:"no_messages"} and the modal failed
+// in place. marketing-os is its SIBLING under /functions/v1, which is the whole bug in
+// one line: the verb was being posted to the endpoint next door.
+//
+// Live proof before this change: across 93 actions, zero rows carried closed_by='owner'
+// and mos_decision_log held zero "Marked done from Today". No operator decision had ever
+// reached the database. The ranking has been running on emitter output alone — which is
+// also why the board fills with rows nothing withdraws, and why 0203 had to filter by age.
+async function actionVerb(verb, externalId, extra) {
+  const ASK = getOIAsk();
+  if (!ASK || !ASK.endpoint || typeof ASK.getJwt !== 'function' || !ASK.brand_id) {
+    throw new Error('Sign in to update this action.');
+  }
+  let jwt = '';
+  try { jwt = await ASK.getJwt(); } catch (e) { jwt = ''; }
+  if (!jwt) throw new Error('Your session expired — refresh the page and sign in again.');
+  let r, out;
+  try {
+    r = await fetch(String(ASK.endpoint).replace(/\/[^/]*$/, '') + '/marketing-os', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + jwt },
+      body: JSON.stringify({
+        action: verb, brandId: ASK.brand_id, brand_id: ASK.brand_id,
+        external_id: externalId, ...(extra || {}),
+      }),
+    });
+    out = await r.json().catch(() => ({}));
+  } catch (e) { throw new Error('Could not reach the server. Try again.'); }
+  if (!r.ok || out.error) throw new Error(out.error || ('could not save (' + r.status + ')'));
+  return out;
+}
+
+// Closing an action is not a small thing: fn_respect_operator_decision holds a manual
+// 'done' against every emitter for 30 days unless the money grows by half again. That is
+// the right behaviour — a decision the operator made should not be undone overnight by a
+// cron — but it means a mis-click buries a live problem for a month, and there is no
+// un-done verb. So the button asks once. No modal: a confirm step people meet on every
+// row has to cost one click, not a dialog.
+function V3Done({ ext, small, onDone }) {
+  const [armed, setArmed] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState('');
+  if (!ext) return null;
+  const cls = 'v3-btn' + (small ? ' v3-btn-sm' : '');
+  const go = async () => {
+    if (!armed) { setArmed(true); setErr(''); return; }
+    setBusy(true); setErr('');
+    try {
+      await actionVerb('action_done', ext);
+      track('action_done', { external_id: ext }, 'today');
+      if (onDone) onDone();
+    } catch (e) { setErr(String((e && e.message) || e)); setBusy(false); setArmed(false); }
+  };
+  return (<>
+    <button type="button" className={cls} disabled={busy} onClick={go}>
+      {busy ? 'Saving…' : armed ? 'Yes — mark it done' : 'Mark done'}
+    </button>
+    {armed && !busy && (
+      <button type="button" className={cls} onClick={() => setArmed(false)}>Cancel</button>
+    )}
+    {err && <span className="v3-fix-err" role="alert">{err}</span>}
+  </>);
+}
+
+// What action_start actually returns is the playbook — it changes no state, and never
+// has. So the button that carries its name now does what it does: fetches the steps and
+// shows them. The hero only ever had room for step 1; the rest existed and was unreachable
+// without leaving the screen.
+function V3Steps({ ext, step1 }) {
+  const [steps, setSteps] = React.useState(null);
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState('');
+  if (!ext) return null;
+  const go = async () => {
+    setBusy(true); setErr('');
+    try {
+      const out = await actionVerb('action_start', ext);
+      track('action_started', { external_id: ext }, 'today');
+      setSteps(Array.isArray(out.playbook) ? out.playbook : []);
+    } catch (e) { setErr(String((e && e.message) || e)); }
+    finally { setBusy(false); }
+  };
+  if (steps) {
+    // step1 is already on screen above; repeating it as item one reads as a stutter.
+    const rest = steps.filter(s => String(s || '').trim() !== String(step1 || '').trim());
+    return rest.length
+      ? <ol className="v3-steps">{rest.map((s, i) => <li key={i}>{v3Tidy(s)}</li>)}</ol>
+      : <p className="v3-sub">That is the only step Greta has recorded for this one.</p>;
+  }
+  return (<>
+    <button type="button" className="v3-btn" disabled={busy} onClick={go}>
+      {busy ? 'Fetching…' : 'Show the steps'}
+    </button>
+    {err && <span className="v3-fix-err" role="alert">{err}</span>}
+  </>);
+}
+
 // ── Connections panel — shows OAuth status per source + install actions ─────
 function ConnectionsPanel(){
   // Authenticated connect flow: POST connect-start with the user's JWT. connect-start
@@ -14770,6 +14880,11 @@ function V3Today(p) {
   const frozen = React.useRef(null);
   if (h && !frozen.current) frozen.current = h;
   const [stale, setStale] = React.useState(false);
+  // Marking the hero action done resolves it here and now. The headline is frozen for
+  // the session by design (numbers must not swap under the reader), so it cannot report
+  // the close itself — and leaving the action sitting there after a confirmed write is
+  // exactly the "did that do anything?" this change exists to end.
+  const [topDone, setTopDone] = React.useState(false);
   // Only a change in the NUMBERS counts as new: the "why" paragraph arrives seconds
   // later on its own (fn_today_v2 is slow), and that must not look like the figures
   // moved under the reader. Merge it in quietly; offer a refresh for anything else.
@@ -14894,16 +15009,21 @@ function V3Today(p) {
           : <div className="v3-sub">No first step recorded for this one.{' '}
               <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiAsk && window.__oiAsk('What is the first thing I should do about this, in concrete steps: ' + v3ActionText(top.description).main)}>Ask Greta where to start</button>
             </div>}
-        <div className="v3-btns">
-          {/* When the top action is a dead connection, "Start" was the wrong verb and the
-              wrong destination: it sent the operator to a ranked list of actions to read
-              the one they were already reading. The fix is one call, so it is one button. */}
+        {topDone ? (
+          <div className="v3-sub v3-resolved" role="status">
+            Marked done. Greta checks whether it worked and adds the result to your track record —
+            and will not raise it again for 30 days unless it gets materially worse.
+          </div>
+        ) : (<div className="v3-btns">
+          {/* Every button here now does what it says. Two of the three used to navigate to
+              the action queue: one to read the sentence already on screen, the other to a
+              board with no way to close anything. */}
           {connProvider(top.external_id)
             ? <V3Fix provider={connProvider(top.external_id)}/>
-            : <button type="button" className="v3-btn v3-btn-p" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>Start</button>}
-          <button type="button" className="v3-btn" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>Mark done</button>
+            : <V3Steps ext={top.external_id} step1={top.step1}/>}
+          <V3Done ext={top.external_id} onDone={() => setTopDone(true)}/>
           <button type="button" className="v3-btn" onClick={() => window.__oiAsk && window.__oiAsk('Why is this the most important thing to do: ' + scrubTag(top.description))}>Why?</button>
-        </div>
+        </div>)}
       </div>
     ) : (
       <div className="v3-dofirst"><div className="v3-kick">Do this first</div>
