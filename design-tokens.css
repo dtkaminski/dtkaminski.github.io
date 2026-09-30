@@ -109,6 +109,16 @@
   --weight-semi:   600;
   --weight-bold:   700;
 
+  /* Reading measure. Prose in the sheet was simply filling it: a median line of 146
+     characters at 1600px and a worst of 217, against a comfortable maximum of about 75.
+     Long measure is why a dense page reads as a wall even when every sentence in it is
+     short — the eye loses its place on the return sweep.
+
+     54ch, not 75ch: `ch` is the advance of the digit zero, and DM Sans sets its digits
+     far wider than its average lowercase letter, so 72ch measured out at about 105 real
+     characters. 54ch lands at roughly 78. */
+  --measure: 54ch;
+
   /* Tracking tightens as type grows — large text set at 0 looks loose. */
   --tracking-tight: -0.022em;
   --tracking-snug:  -0.012em;

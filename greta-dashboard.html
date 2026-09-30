@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./design-tokens.css?v=1790774159">
+<link rel="stylesheet" href="./design-tokens.css?v=1790774860">
 <!-- perf: warm up the CDN + Supabase origins so the deferred libs and the first data
      fetch don't each pay a fresh DNS+TLS round-trip on cold load. -->
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
@@ -1222,6 +1222,22 @@
     background: var(--color-panel); border: 1px solid var(--color-line);
     box-shadow: var(--shadow-panel);
   }
+  /* ── Reading measure ──────────────────────────────────────────────
+     Only prose is capped. Tables, charts, bars and the ranked boards are comparisons
+     across a width and keep all of it, which is why this is a list of the classes that
+     actually carry sentences rather than a blanket rule on the sheet. Prose lists are
+     unclassed; the layout lists all carry a class, which is what :not([class]) uses to
+     tell them apart. */
+  .v3-main p,
+  .v3-main ul:not([class]) > li,
+  .v3-main ol:not([class]) > li,
+  .v3-main .note, .v3-main .v3-note, .v3-main .hint, .v3-main .v3-empty,
+  .v3-main .ev, .v3-main .sub, .v3-main .muted, .v3-main .micro,
+  .v3-main .explainer .imp, .v3-main .explainer .obs,
+  .v3-main .actionrow .t, .v3-main .v3-dofirst-t,
+  .v3-main .card.insight .head, .v3-main .card.insight p,
+  .v3-page-q { max-width: var(--measure); }
+
   .v3-page-head { margin-bottom: var(--space-6); padding-bottom: var(--space-4);
                   border-bottom: 1px solid var(--color-line); }
   .v3-page-title { font-size: var(--text-xl); font-weight: var(--weight-semi); margin: 0 0 2px;
