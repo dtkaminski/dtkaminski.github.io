@@ -15475,7 +15475,10 @@ function tagProse(root) {
     // track, a tinted panel. Twelve words of prose is already a strong filter; this
     // is the rest of it.
     if (cs.backgroundImage !== 'none') continue;
-    if (parseFloat(cs.borderTopWidth) || parseFloat(cs.borderLeftWidth)) continue;
+    // A LEFT border is the accent bar on a callout, which is drawn to a width. A TOP
+    // border is a hairline between stacked things, which is the house separator and
+    // sits on plenty of ordinary paragraphs - .board-comm-line among them.
+    if (parseFloat(cs.borderLeftWidth)) continue;
     if (el.closest('table')) continue;
     el.classList.add('v3-prose');
   }
