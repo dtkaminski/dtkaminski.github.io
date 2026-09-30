@@ -8,6 +8,36 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;550;600;650;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./auth.css">
+<script>
+  // ── Return the operator to wherever the reconnect started ────────────────
+  // FIRST thing on the page, ahead of the Supabase bundle, the stylesheet and the fonts.
+  // This decides only whether we are staying, and it needs nothing but localStorage and
+  // the query string — so making it wait on a CDN download meant every reconnect paid for
+  // a page it was about to leave. It runs on parse and redirects before the rest loads.
+  //
+  // Every OAuth callback redirects to ONE dashboard_url for every brand, and that URL is
+  // this setup page. Fine the first time someone connects a source; wrong after a
+  // one-click reconnect from the Today board, which is where the operator was and where
+  // their action still is.
+  //
+  // The value is OURS, not the provider's: written by us immediately before leaving, read
+  // only on our own origin, used once, deleted on read, expired after fifteen minutes and
+  // required to be same-origin before it is followed — so it cannot become an open
+  // redirect. Anything failing those checks falls through and the page loads as normal.
+  (function returnAfterConnect() {
+    try {
+      var provider = new URLSearchParams(window.location.search).get('connected');
+      if (!provider) return;
+      var saved = JSON.parse(window.localStorage.getItem('greta_return_after_connect') || 'null');
+      window.localStorage.removeItem('greta_return_after_connect');
+      if (!saved || !saved.url || !(Date.now() - (saved.at || 0) < 15 * 60 * 1000)) return;
+      var target = new URL(saved.url, window.location.origin);
+      if (target.origin !== window.location.origin) return;
+      target.searchParams.set('connected', provider);
+      window.location.replace(target.toString());
+    } catch (_) { /* stay on this page */ }
+  })();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
   /* Workspace-specific overlays on top of auth.css */
@@ -382,31 +412,8 @@
   const SUPABASE_FNS = `${SUPABASE_URL}/functions/v1`;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
-  // ── Return the operator to wherever the reconnect started ────────────────
-  // Every OAuth callback redirects to ONE dashboard_url for every brand, and that URL
-  // is this setup page. Fine after signup, wrong after a one-click reconnect from the
-  // Today board: the operator pressed a button on Today and landed on a page they have
-  // not seen since they joined, with their own action still open behind it.
-  //
-  // The dashboard stores where it left from immediately before redirecting to the
-  // provider. This is OUR value, not the provider's: read only from our own origin,
-  // used once, deleted on read, expired after fifteen minutes, and required to be
-  // same-origin before it is followed — so it cannot become an open redirect.
-  (function returnAfterConnect() {
-    const provider = new URLSearchParams(window.location.search).get('connected');
-    if (!provider) return;
-    let saved = null;
-    try {
-      saved = JSON.parse(window.localStorage.getItem('greta_return_after_connect') || 'null');
-      window.localStorage.removeItem('greta_return_after_connect');
-    } catch (_) { return; }
-    if (!saved || !saved.url || !(Date.now() - (saved.at || 0) < 15 * 60 * 1000)) return;
-    let target;
-    try { target = new URL(saved.url, window.location.origin); } catch (_) { return; }
-    if (target.origin !== window.location.origin) return;
-    target.searchParams.set('connected', provider);
-    window.location.replace(target.toString());
-  })();
+  // The reconnect return hop now runs in <head>, before the Supabase bundle loads —
+  // it only needs localStorage and the query string, so it should not wait on a CDN.
 
   // Connection definitions — required vs optional, what unlocks, auth flow type
   const CONNECTIONS = [
