@@ -1,43 +1,42 @@
-Say which actions are still live and which nobody has checked
+Define --weight-bold and land the type-token sweep
 
-The Actions board ranked a JS error found on 16 April alongside a feed that broke
-yesterday, both as live P1s, with nothing on screen to tell them apart. 0209 added the
-distinction server-side; this is the half that shows it.
+Replaces every hardcoded font size and weight in greta-app.jsx with a design token:
+1,051 var(--text-*) references and 418 var(--weight-*). CLAUDE.md has banned hardcoded
+px type since the design system landed; this is the file finally complying.
 
-Three changes, all in V3ActionBoard.
+The sweep was written in a previous session and left uncommitted because it could not
+ship. It referenced var(--weight-bold) 182 times and no such token existed --
+design-tokens.css defined normal/medium/semi and stopped. Shipping it would have
+resolved 182 font-weight declarations to nothing, so 182 elements would have silently
+dropped to inherited weight. --weight-bold: 700 is added here, continuing the existing
+400/500/600 scale.
 
-The query asks for verification and unverified_reason, and regroups client-side. That
-regrouping is not redundant: vw_brand_action_board sorts unverified last, but this call
-passes .order('cm_gbp'), and PostgREST replaces the view's ORDER BY with the client's.
-Without the re-sort the migration would have changed nothing visible here and looked
-like a fix that did nothing. Array.prototype.sort is stable, so money order inside each
-group is still the server's.
+IT IS NOT A NO-OP RENAME, and the collapse is the point. The file carried nine distinct
+numeric weights; there are now four tokens:
 
-The headline total splits. It read "GBP 8,519 a month across 14 actions" by summing
-everything; GBP 1,985 of that sits in four claims raised 85 and 167 days ago that
-nothing has re-checked. Live work and unverified money are different claims and adding
-them together is how a board comes to read as bigger than the work actually in front of
-you. Now: "GBP 6,534 a month across 10 live actions", with the rest on its own quieter
-line saying what it is.
+  400              -> --weight-normal   38 sites, exact
+  450, 500, 550    -> --weight-medium   15 sites
+  600, 650         -> --weight-semi    183 sites
+  700, 750, 800    -> --weight-bold    182 sites
 
-And the list breaks once, above the first demoted row, with a label and a sentence --
-because a list that simply gets quieter towards the bottom reads as ranking, not as a
-change of meaning. Demoted rows mute their description and bar and add "not re-checked"
-to the meta line; opening one shows unverified_reason, which is written by the view so
-the age in the sentence cannot drift from the age on the row.
+So 24 places previously set to 800 now render at 700, and the 450/550/650/750 strays
+round to the nearest step. An arbitrary nine-step weight scale reached by nudging
+individual components is exactly the debt the token system exists to remove, so this is
+a deliberate normalisation rather than drift -- but 800 did exist, and if any of those
+24 need to stay heavier the answer is a --weight-heavy token, not a number back in the
+component.
 
-Nothing is hidden and nothing is dropped. The money is still there and still counted;
-it just stops competing for the top of the list with work that has evidence behind it.
+Font sizes collapse the same way, including quoted values like '12.5px' that were
+outside any scale.
 
-CSS uses existing tokens only -- color-faint, color-muted, color-line, color-line-strong,
-space-1/3/4/6, text-xs/sm -- with 1px and 2px borders matching the convention already in
-that stylesheet.
+Verified as a pure token migration before committing: normalising every weight and size
+token on both sides leaves 200 differing lines, all of them whitespace (fontSize:SS
+versus fontSize: SS) or quoted-px sizes. No logic, no markup, no copy changed. Every
+token the file now references resolves in design-tokens.css. node --check passes and
+greta-app.js rebuilds byte-identically from this source.
 
-NOT included: the other session's in-progress token sweep, which is sitting uncommitted
-in greta-app.jsx in this working tree. It rewrites 183 hardcoded font weights to
-var(--weight-*), but --weight-bold is referenced 182 times and is not defined in
-design-tokens.css or anywhere else, so committing it now would ship 182 elements
-silently losing their bold weight. This commit was rebuilt from HEAD plus only my seven
-edits, and their work has been restored to the working tree untouched.
+Recovered from a scratchpad copy. The sweep disappeared from the working tree during
+this session -- most likely a sync to origin after my previous push, which discards
+unstaged work -- and that copy was the only one left.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
