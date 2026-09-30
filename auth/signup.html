@@ -99,7 +99,7 @@
   const SUPABASE_URL = 'https://awcncqvsnuhqyihpdgcx.supabase.co';
   const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_6NLIq1JL_LZIMjez3FmnVQ_JIVw3-A2';
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
-  let signupEmail = '', signupSlug = '';
+  let signupEmail = '', signupSlug = '', signupBrandId = null;
 
   const form = document.getElementById('signup-form');
   const submitBtn = document.getElementById('submit-btn');
@@ -225,6 +225,7 @@
 
       signupEmail = data.user.email;
       signupSlug = data.brand.slug;
+      signupBrandId = data.brand.id;
       document.getElementById('success-email').textContent = signupEmail;
       document.getElementById('success-brand').textContent = data.brand.name;
       // Send the login code — same robust flow as login, no fragile invite link.
@@ -256,6 +257,26 @@
       verifyBtn.disabled = false; verifyBtn.querySelector('.btn-label').textContent = 'Verify & enter workspace';
       return;
     }
+    // Activation step 1. Written only now: product_events requires an authenticated
+    // member, and until the code is verified the visitor is neither. It also keeps the
+    // funnel honest -- a submitted form that never reaches the inbox is not a signup.
+    try {
+      if (signupBrandId) {
+        let sid = null;
+        try {
+          sid = sessionStorage.getItem('greta_sid');
+          if (!sid) { sid = Math.random().toString(36).slice(2) + Date.now().toString(36);
+                      sessionStorage.setItem('greta_sid', sid); }
+        } catch (e) {}
+        const { data: u } = await sb.auth.getUser();
+        await sb.from('product_events').insert({
+          brand_id: signupBrandId,
+          user_id: (u && u.user && u.user.id) || null,
+          name: 'signup', surface: 'signup', session_id: sid,
+          props: { slug: signupSlug }
+        });
+      }
+    } catch (e) { /* analytics must never block entry to the workspace */ }
     window.location.href = './workspace.html?brand=' + encodeURIComponent(signupSlug);
   });
 

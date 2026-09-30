@@ -14982,6 +14982,25 @@ function App(){
     window.scrollTo({top: 0, behavior: 'smooth'});
   };
 
+  // A completed OAuth round trip is the single most important activation step, and it is
+  // only observable here: the provider redirects to oauth-*-callback, which is server-side
+  // and carries no session, and it hands back ?connected=<provider>. Recorded once and the
+  // param is then stripped, so a refresh or a bookmarked URL cannot double-count it.
+  React.useEffect(() => {
+    let provider = null;
+    try { provider = new URLSearchParams(window.location.search).get('connected'); } catch (e) {}
+    if (!provider) return;
+    // The brand id arrives with the membership round trip, which usually lands after this
+    // effect; track() queues until then, so firing immediately is safe.
+    track('source_connected', { provider: provider }, 'settings');
+    try {
+      const u = new URL(window.location.href);
+      u.searchParams.delete('connected');
+      u.searchParams.delete('shop');
+      window.history.replaceState({}, '', u.toString());
+    } catch (e) {}
+  }, []);
+
   // Global deep-link helper so findings can jump to their evidence tab (clickable cross-refs).
   React.useEffect(() => {
     window.__oiGo = (dest, anchor) => {
