@@ -15443,6 +15443,43 @@ function tagFigures(root) {
     el.classList.add('oi-num');
   }
 }
+// Prose gets its measure the same way figures get their typeface: by looking at the
+// text, because CSS cannot. A paragraph and a layout row are both an unclassed <div>
+// with an inline style, and the sentences that were still running to 217 characters are
+// all written that way. Same test as tagFigures - leaves only, judged on content - with
+// two extra guards, because capping the width of something that is actually laying out
+// its siblings would break a column.
+var PROSE_MIN_CHARS = 72, PROSE_MIN_WORDS = 12;
+function tagProse(root) {
+  if (!root) return;
+  const els = root.querySelectorAll('div,p,li');
+  for (let i = 0; i < els.length; i++) {
+    const el = els[i];
+    if (el.classList.contains('v3-prose')) continue;
+    const t = el.textContent;
+    if (!t || t.length < PROSE_MIN_CHARS) continue;
+    const s = t.trim();
+    if (s.length < PROSE_MIN_CHARS || s.split(/\s+/).length < PROSE_MIN_WORDS) continue;
+    // A paragraph may contain <b> or <a>; it does not contain blocks.
+    let lays = false;
+    for (let c = el.firstElementChild; c; c = c.nextElementSibling) {
+      const d = getComputedStyle(c).display;
+      if (d === 'block' || d === 'flex' || d === 'grid' || d === 'table' || d === 'list-item') { lays = true; break; }
+    }
+    if (lays) continue;
+    const cs = getComputedStyle(el);
+    if (cs.display !== 'block') continue;
+    // Skipping every flex and grid child was too blunt: the description under a step
+    // heading and the text beside a bullet are exactly the things that needed capping.
+    // What must not be capped is something the layout DRAWS to a width - a bar, a
+    // track, a tinted panel. Twelve words of prose is already a strong filter; this
+    // is the rest of it.
+    if (cs.backgroundImage !== 'none') continue;
+    if (parseFloat(cs.borderTopWidth) || parseFloat(cs.borderLeftWidth)) continue;
+    if (el.closest('table')) continue;
+    el.classList.add('v3-prose');
+  }
+}
 function useFigureTypography(dep) {
   React.useEffect(() => {
     const main = document.querySelector('.v3-main') || document.querySelector('main');
@@ -15451,7 +15488,7 @@ function useFigureTypography(dep) {
     // dashboard opened in a background tab would render every figure in the wrong face
     // until it was looked at. 50ms coalesces a burst of renders into one pass.
     let t = 0;
-    const run = () => { t = 0; try { tagFigures(main); } catch (e) {} };
+    const run = () => { t = 0; try { tagFigures(main); } catch (e) {} try { tagProse(main); } catch (e) {} };
     const schedule = () => { if (!t) t = setTimeout(run, 50); };
     schedule();
     const mo = new MutationObserver(schedule);
