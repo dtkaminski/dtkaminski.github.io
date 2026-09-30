@@ -13616,7 +13616,7 @@ function TeamPanel(){
   if(!authed){
     return (<div className="card" style={{padding:'var(--s-7)'}}>
       <div style={{fontSize:'var(--text-base)', fontWeight:'var(--weight-bold)', marginBottom:'var(--s-2)'}}>Team</div>
-      <div className="meta" style={{lineHeight:1.6, maxWidth:520}}>
+      <div className="meta" style={{lineHeight:1.6, maxWidth:'var(--measure)'}}>
         Inviting teammates is available in your live, signed-in workspace. This is the public demo, so team management is read-only here.
       </div>
     </div>);
@@ -15452,7 +15452,10 @@ function tagFigures(root) {
 var PROSE_MIN_CHARS = 72, PROSE_MIN_WORDS = 12;
 function tagProse(root) {
   if (!root) return;
-  const els = root.querySelectorAll('div,p,li');
+  // span too: a <span style="display:block"> is a paragraph, and two of the longest
+  // lines left in the product were exactly that. The display test below is what keeps
+  // an ordinary inline span out.
+  const els = root.querySelectorAll('div,p,li,span,section,article');
   for (let i = 0; i < els.length; i++) {
     const el = els[i];
     if (el.classList.contains('v3-prose')) continue;

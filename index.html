@@ -85,6 +85,21 @@
   .nav-cta { margin-left: auto; display: flex; gap: var(--s-2); align-items: center; }
   @media (max-width: 720px) {
     .nav-links { display: none; }
+    /* Hiding the links is not enough: brand + "See live demo" + "Log in" + "Get started"
+       is about 460px of content, and the row ran off the right edge of a 375px screen
+       with the primary call to action the part that got cut. Wrap it onto its own line
+       instead — the same thing the app bar does at its breakpoint. Nothing is hidden,
+       because deciding which call to action a phone does not deserve is not a layout
+       decision. */
+    /* Two wrapped rows is 173px of nav. Pinned, that is a fifth of a phone screen
+       given to navigation on a page whose job is to be read, so it scrolls away here
+       and the hero gets the viewport. */
+    .nav { position: static; }
+    .nav-inner { flex-wrap: wrap; gap: var(--s-3); row-gap: var(--s-3); }
+    /* The three together are still wider than 375px, so the row wraps as well. Each
+       button keeps its own label on one line; what gives is the row, not the word. */
+    .nav-cta { margin-left: 0; width: 100%; flex-wrap: wrap; gap: var(--s-2); }
+    .nav-cta .btn { white-space: nowrap; }
   }
 
   /* ── Buttons ─────────────────────────────────────────────────────────── */
