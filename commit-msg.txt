@@ -1,28 +1,42 @@
-Say why five font weights stay numeric
+Fix three ways the unverified group did not render as intended
 
-Correction to the previous commit, which claimed greta-app.jsx has no numeric font
-weight anywhere. Five remain, and they are correct:
+Checked the board's CSS against the real stylesheet rather than the markup I had in my
+head, and three of my own rules were wrong. All CSS; greta-app.jsx is untouched and
+greta-app.js is unchanged.
 
-  1894  fontWeight={700}                      <text> on a timeline marker
-  5444  fontWeight={700}                      <text> on a funnel node
-  9298  fontWeight="600"                      <text> recharts bar label
-  10828 fontWeight={i===trough.i?700:400}     <text> cash-trough axis labels
-  10830 fontWeight="700"                      <text> cash-trough balance
+THE SECOND HEADLINE LINE WAS NOT A SECOND LINE. .v3-board-head is
+`display:flex; align-items:baseline; justify-content:space-between`, so `display:block`
+on a flex child is ignored for layout: "£1,985 more sits in 4 actions nothing has
+re-checked" rendered to the RIGHT of "£4,547 a month across 9 live actions", on the same
+baseline, pushed apart by space-between. The head now wraps and the line takes
+`flex: 0 0 100%`, which is what actually puts it underneath.
 
-They are SVG presentation attributes, not CSS style properties, and SVG attributes
-cannot resolve var() — the same rule that forces chart colours through PAL instead of
-var(). Tokenising them would silently drop every one to default weight, and since they
-sit in charts nobody reads closely, it would not be obvious.
+IT ALSO MISSED AA. --color-faint is #726E66, which is 4.49:1 on the #F2F1ED canvas —
+under 4.5:1 at 11px, by a hair. The board has no background of its own, so it inherits
+--bg-app, which resolves to --color-surface; I had reasoned about it as if it sat on a
+white panel, where the same colour is 5.08:1 and passes. Now --color-muted: 6.68:1 on
+the canvas, 7.55:1 on panel. Quietness comes from the 11px size and the sans face, not
+from a colour that only just works.
 
-They were invisible to my scans because JSX spells an attribute fontWeight={700}, while
-every pattern I used looked for the style-object form fontWeight: 700. Two different
-spellings of the same property, and only one of them can take a token.
+THE BREAK LABEL COLLIDED WITH ITS OWN SENTENCE. .v3-kick carries margin-bottom and sets
+no display, and all five other uses of it in the app are on a div. Mine is a span, so
+the margin was dropped on an inline box and "NOT RE-CHECKED" sat on the line below it.
+Scoped display:block rather than touching the JSX, so the bundle does not move.
 
-So each site now carries a one-line reason. CLAUDE.md bans hardcoded visual values, so
-the next person to sweep this file will find these and be right to question them; the
-comment is there to stop the answer being a regression.
+Also: the divider used --color-line, the same colour as every row border, so a section
+boundary rendered as one more row separator. --color-line-strong now. It is still a
+hairline (1.42:1 against 1.16:1) and the real separation is the 24px margin, the 16px
+padding and the label — which is the intended design, a rule and a label rather than a
+card — but at identical weight it was working against itself.
 
-greta-app.js is byte-identical to the previous commit — JSX comments are compile-time
-only — so no rebuild and no cache-bust is included.
+Verified: every piece of text I added is now at least 6.68:1 against both the canvas and
+a panel, both style blocks balance, and each of the seven selectors resolves once. The
+grouping logic was checked separately against the live 13 rows — one break, unverified a
+contiguous tail, money conserved at £4,547 live and £1,985 unverified, money order
+preserved inside each group by the stable sort.
+
+I could not screenshot this: rendering the harness needed a local server and that
+permission was declined, so everything here is from reading the cascade and computing
+the contrast. A render check is still worth doing.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>

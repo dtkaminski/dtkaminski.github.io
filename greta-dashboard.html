@@ -1400,18 +1400,28 @@
      the bar, so scanning is size-first. */
   .v3-board { margin-top: var(--space-2, 8px); }
   .v3-board-head { display: flex; align-items: baseline; justify-content: space-between;
-                   padding-bottom: var(--space-3, 12px); }
+                   flex-wrap: wrap; padding-bottom: var(--space-3, 12px); }
   .v3-board-total { font-family: var(--font-mono); font-size: var(--text-lg, 20px); color: var(--color-ink); }
   .v3-board-total-lab { font-family: var(--font-sans); font-size: var(--text-xs, 11px); color: var(--color-muted); }
   /* Unverified money is stated, never merged into the headline: a second line rather than a
-     bigger first one. Muted because it is not work you can pick up today. */
-  .v3-board-unver { display: block; margin-top: var(--space-1, 4px); font-family: var(--font-sans);
-                    font-size: var(--text-xs, 11px); color: var(--color-faint); }
+     bigger first one. flex-basis 100% is what actually puts it on its own line — the parent is a
+     space-between flex row, so display:block alone left it sitting beside the total. Muted, not
+     faint: faint is #726E66, which is 4.49:1 on the #F2F1ED canvas and misses AA by a hair at
+     11px. Quietness comes from the size and the sans face instead. */
+  .v3-board-unver { flex: 0 0 100%; margin-top: var(--space-1, 4px); font-family: var(--font-sans);
+                    font-size: var(--text-xs, 11px); color: var(--color-muted); }
 
   /* The break that tells the reader the list changed meaning. A rule and a label, not a card:
      this is a section boundary, not elevated content. */
   .v3-rank-break { display: block; list-style: none; margin-top: var(--space-6, 24px);
-                   padding-top: var(--space-4, 16px); border-top: 1px solid var(--color-line); }
+                   padding-top: var(--space-4, 16px);
+                   /* line-strong, because every row border is already --color-line: at the same
+                      weight this boundary reads as one more row, which is the opposite of the
+                      point. */
+                   border-top: 1px solid var(--color-line-strong); }
+  /* .v3-kick carries margin-bottom and no display, and every other use of it in the app is on a
+     div. This one is a span, so the margin was being dropped and the label sat on the sentence. */
+  .v3-rank-break .v3-kick { display: block; }
   .v3-rank-break .v3-sub { display: block; max-width: 62ch; }
   /* Demoted rows read quieter without going invisible — the money is still real. */
   .v3-rank-row.unver .v3-rank-desc { color: var(--color-muted); }
