@@ -49,6 +49,27 @@
 
   .page { max-width: 1180px; margin: 0 auto; padding: var(--s-6); }
 
+  /* ── The frame's height ────────────────────────────────────────────────
+     It was calc(100vh - 58px), against an .app-bar that measures 60.75px — so the
+     dashboard overflowed the viewport by about 3px and the outer page kept a permanent
+     sliver of scroll behind a sticky bar. And no fixed number can be right anyway:
+     .app-bar-inner wraps below 760px, which makes the bar taller on exactly the screens
+     with least room. So nothing is measured. The shell is a column, the bar is its
+     natural height, and the frame takes the rest — at every width, with no magic number
+     and nothing to keep in sync. Scoped to .page--dash, added when the dashboard is
+     revealed, so every other state on this page lays out exactly as before.
+
+     Two things this has to be careful about. The column is on body.has-dash, not body,
+     because every other state on this page (loading, no session, not connected) still
+     wants the ordinary block flow. And .page carries `margin: 0 auto`, which in a flex
+     container stops being "centre a full-width box" and becomes "shrink to fit and
+     centre" — that collapsed the sheet to the iframe's intrinsic 300px. */
+  body.has-dash { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
+  .page--dash { flex: 1 1 auto; width: 100%; margin-inline: 0;
+                display: flex; flex-direction: column; min-height: 0; }
+  .page--dash > .tab-content { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+  .page--dash #rich-dash { flex: 1 1 auto; min-height: 0; }
+
   /* ── State banners ─────────────────────────────────────────────────── */
   .state-banner {
     display: flex; align-items: center; gap: var(--s-4);
@@ -238,7 +259,7 @@
     <!-- Panel grid -->
     <!-- Full live dashboard (embedded for brands whose rich view is wired up). -->
     <iframe id="rich-dash" title="Live dashboard" hidden
-      style="width:100%; height:calc(100vh - 58px); border:0; background:var(--bg-app); display:block;"></iframe>
+      style="width:100%; border:0; background:var(--bg-app); display:block;"></iframe>
   </div>
 
   <!-- ── INTELLIGENCE TAB ───────────────────────────────────────────────── -->
@@ -363,7 +384,7 @@
       seasonality: _md.seasonality || 'No specific seasonality profile on record — treat seasonal claims cautiously.',
     };
     const page = document.querySelector('.page');
-    if (page) { page.style.maxWidth = 'none'; page.style.padding = '0'; }
+    if (page) { page.style.maxWidth = 'none'; page.style.padding = '0'; page.classList.add('page--dash'); document.body.classList.add('has-dash'); }
     const fr = document.getElementById('rich-dash');
     if (fr) { if (!fr.getAttribute('src')) fr.setAttribute('src', richUrl); fr.hidden = false; }
   }
