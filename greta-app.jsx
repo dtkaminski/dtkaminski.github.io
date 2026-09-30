@@ -741,7 +741,7 @@ function KPI({label, val, sub, badge, status, statusLabel, conf, series, seriesL
               <R.XAxis dataKey="d" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} interval={Math.ceil(series.length/5)} tickLine={false}/>
               <R.YAxis tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} width={34} domain={['auto','auto']}
                        tickFormatter={v=> Math.abs(v)>=1000 ? (v/1000).toFixed(1)+'k' : (Math.abs(v)<10 ? v.toFixed(1) : Math.round(v))}/>
-              <R.Tooltip contentStyle={{fontSize:'var(--text-xs)',background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:6,padding:'2px 6px'}} formatter={v=> typeof v==='number' ? (Math.abs(v)>=1000 ? Math.round(v).toLocaleString() : v.toFixed(2)) : v} labelFormatter={l=>l}/>
+              <R.Tooltip contentStyle={{fontSize:'var(--text-xs)',background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',padding:'2px 6px'}} formatter={v=> typeof v==='number' ? (Math.abs(v)>=1000 ? Math.round(v).toLocaleString() : v.toFixed(2)) : v} labelFormatter={l=>l}/>
               <R.Line type="monotone" dataKey="v" stroke={svgCol(rechartsStroke)} strokeWidth={2} dot={false} isAnimationActive={false}/>
             </R.LineChart>
           </R.ResponsiveContainer>
@@ -891,7 +891,7 @@ function TrackRecord({compact}){
   const V = useVerify();
   const s = V.score;
   if(!s) return null;
-  const box = {display:'flex', alignItems:'center', gap:8, fontSize:'var(--text-sm)', padding:compact?'6px 10px':'8px 12px', border:'1px solid var(--color-line, #23252d)', borderRadius:6, background:'var(--color-accent-wash)', margin: compact?'0 0 8px':'0 0 12px'};
+  const box = {display:'flex', alignItems:'center', gap:8, fontSize:'var(--text-sm)', padding:compact?'6px 10px':'8px 12px', border:'1px solid var(--color-line, #23252d)', borderRadius:'var(--radius-md)', background:'var(--color-accent-wash)', margin: compact?'0 0 8px':'0 0 12px'};
   if(!s.graded){
     if(s.predicted_total>0) return (<div style={box}><span style={{color:'var(--accent)',fontWeight:'var(--weight-bold)'}}>◎ Verification loop live</span><span style={{color:'var(--text-muted)'}}>{s.predicted_total} predictions tracked · first grades pending</span></div>);
     return null;
@@ -1090,7 +1090,7 @@ function PHitBadge({phit}){
     display:'inline-block',
     minWidth:46, textAlign:'center',
     fontSize:'var(--text-xs)', fontWeight:'var(--weight-bold)',
-    padding:'2px 6px', borderRadius:4,
+    padding:'2px 6px', borderRadius:'var(--radius-md)',
     background: color + '22', color, border: `1px solid ${color}55`,
     opacity, letterSpacing:'var(--tracking-wide)',
     cursor:'help',
@@ -1345,7 +1345,7 @@ function ActionBoard(){
             <button onClick={()=>setOpenGroups(o=>({...o,[g]:!o[g]}))} style={{display:'flex',alignItems:'center',gap:9,width:'100%',background:'transparent',border:'none',borderBottom:'1px solid var(--border-subtle)',padding:'9px 0 7px',cursor:'pointer',textAlign:'left',marginTop:6}}>
               <span style={{color:'var(--text-faint)',display:'inline-flex',transform:openGroups[g]?'rotate(90deg)':'none',transition:'transform 120ms'}}><Icon name="chevron" size={12}/></span>
               <span style={{fontWeight:'var(--weight-bold)',color:'var(--text-primary)',fontSize:'var(--text-sm)'}}>{g}</span>
-              <span style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',background:'var(--border-subtle)',borderRadius:999,padding:'1px 7px'}}>{items.length}</span>
+              <span style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',background:'var(--border-subtle)',borderRadius:'var(--radius-full)',padding:'1px 7px'}}>{items.length}</span>
               {sum>0 && <span style={{marginLeft:'auto',fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',color:'var(--text-secondary)'}}>~{gbpShort(sum)}/mo</span>}
             </button>
             {openGroups[g] && <><SpecialistHead/>{items.map(renderRow)}</>}
@@ -1522,7 +1522,7 @@ function DailyPanel(){
       <div style={{display:'flex', flexDirection:'column', gap:'var(--s-1)'}}>
         {anomalies.map((a,i)=>{
           const c = a.sev==='red' ? 'var(--bad)' : a.sev==='amber' ? 'var(--warn)' : 'var(--good)';
-          return (<div key={i} style={{fontSize:'var(--text-sm)', padding:'8px 12px', borderLeft:`2px solid ${c}`, background:'var(--bg-elevated)', borderRadius:'0 var(--r-sm) var(--r-sm) 0', color:'var(--text-secondary)', lineHeight:1.5}}>{linkify(a.text)}</div>);
+          return (<div key={i} style={{fontSize:'var(--text-sm)', padding:'8px 12px', borderLeft:`2px solid ${c}`, background:'var(--bg-elevated)', borderRadius:'var(--radius-none) var(--r-sm) var(--r-sm) var(--radius-none)', color:'var(--text-secondary)', lineHeight:1.5}}>{linkify(a.text)}</div>);
         })}
       </div>
     </div>)}
@@ -2033,7 +2033,7 @@ function ContextConsidered({dx}){
     {evs.map((e,i)=>{ const ss=srcStyle(e.source); const em=(EVENT_META[e.type]||EVENT_META.other); return (
       <div key={'e'+i} style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)',lineHeight:1.5,marginBottom:4,display:'flex',gap:8,alignItems:'center'}}>
         <span aria-hidden="true" style={{width:7,height:7,borderRadius:'50%',flex:'0 0 auto',background:PAL[em.tone]||PAL.muted}}/><span style={{color:'var(--text-primary)'}}>{e.text}</span>
-        <span style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',color:ss.fg,background:ss.bg,padding:'1px 6px',borderRadius:999,textTransform:'uppercase'}}>{ss.lbl}</span>
+        <span style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',color:ss.fg,background:ss.bg,padding:'1px 6px',borderRadius:'var(--radius-full)',textTransform:'uppercase'}}>{ss.lbl}</span>
       </div>);})}
     {dx.notes.map((n,i)=>(<div key={'n'+i} style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)',lineHeight:1.5,marginBottom:4,display:'flex',gap:8}}><span style={{color:'var(--text-faint)'}}>·</span><span>{n}</span></div>))}
     {dx.context.map((x,i)=>(<div key={'c'+i} style={{display:'flex',gap:8,alignItems:'flex-start',marginTop:6}}>
@@ -2068,7 +2068,7 @@ function confChip(level){
     low:  {lbl:'Possible', fg:'var(--color-muted)',   bg:'var(--color-sunken)'},
   };
   const c = m[level] || m.med;
-  return <span style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',color:c.fg,background:c.bg,padding:'2px 7px',borderRadius:999,whiteSpace:'nowrap'}}>{c.lbl}</span>;
+  return <span style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',color:c.fg,background:c.bg,padding:'2px 7px',borderRadius:'var(--radius-full)',whiteSpace:'nowrap'}}>{c.lbl}</span>;
 }
 // Close the loop: a recommendation isn't useful to a non-expert unless they know
 // HOW. Keyword-match an action to a step-by-step playbook (works on live LLM text too).
@@ -2138,7 +2138,7 @@ function ThemeToggle(){
   const next = theme==='light' ? 'dark' : 'light';
   return (<button onClick={()=>set(next)} title={`Switch to ${next} theme`} aria-label="Toggle colour theme"
     style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,flexShrink:0,
-      borderRadius:8, background:'var(--bg-card)', border:'1px solid var(--border-default)',
+      borderRadius:'var(--radius-md)', background:'var(--bg-card)', border:'1px solid var(--border-default)',
       color:'var(--text-secondary)', cursor:'pointer', fontSize:'var(--text-base)', lineHeight:1}}>
     {theme==='light' ? <Icon name="moon" size={15}/> : <Icon name="sun" size={15}/>}
   </button>);
@@ -2310,7 +2310,7 @@ function Skeleton({height}){
   return (<div className="skeleton-card" style={{minHeight: height||320}}>
     <div className="sk-bar" style={{width:'34%', height:13, marginBottom:9}}/>
     <div className="sk-bar" style={{width:'52%', height:10, marginBottom:22, opacity:.7}}/>
-    <div className="sk-bar" style={{width:'100%', height:(height||320)-110, borderRadius:8, opacity:.5}}/>
+    <div className="sk-bar" style={{width:'100%', height:(height||320)-110, borderRadius:'var(--radius-md)', opacity:.5}}/>
   </div>);
 }
 
@@ -2408,12 +2408,12 @@ function ConfigurableChart({dataset, dimensions, metrics, defaultMetric, default
     return Object.values(g).sort((a,b)=> order==='desc' ? b.val-a.val : a.val-b.val).slice(0, topN);
   }, [dataset, metric, split, order, topN]);
 
-  const selStyle = {background:'var(--bg-app)',color:'var(--text-primary)',border:'1px solid var(--border-default)',borderRadius:6,padding:'4px 8px',fontSize:'var(--text-sm)',fontFamily:'inherit',cursor:'pointer'};
+  const selStyle = {background:'var(--bg-app)',color:'var(--text-primary)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',padding:'4px 8px',fontSize:'var(--text-sm)',fontFamily:'inherit',cursor:'pointer'};
   const sel = (val,set,opts) => (
     <select value={val} onChange={e=>set(e.target.value)} style={selStyle}>
       {opts.map(o=><option key={o.key} value={o.key}>{o.label}</option>)}
     </select>);
-  const segB = (active)=>({fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',padding:'5px 11px',borderRadius:6,cursor:'pointer',border:'1px solid '+(active?PAL.accent:'var(--border-subtle)'),background:active?'var(--color-accent-wash-2)':'transparent',color:active?PAL.accent:'var(--text-muted)'});
+  const segB = (active)=>({fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',padding:'5px 11px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1px solid '+(active?PAL.accent:'var(--border-subtle)'),background:active?'var(--color-accent-wash-2)':'transparent',color:active?PAL.accent:'var(--text-muted)'});
   const bar = ctype==='bar';
 
   return (<div className="card">
@@ -2438,7 +2438,7 @@ function ConfigurableChart({dataset, dimensions, metrics, defaultMetric, default
                <R.YAxis type="category" dataKey="label" width={150} tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}}/></>)
           : (<><R.XAxis dataKey="label" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} interval={0} angle={-20} textAnchor="end" height={60}/>
                <R.YAxis tickFormatter={fmt} tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}}/></>)}
-        <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,boxShadow:'var(--shadow-md)'}} formatter={v=>fmt(v)}/>
+        <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',boxShadow:'var(--shadow-md)'}} formatter={v=>fmt(v)}/>
         {bar
           ? <R.Bar dataKey="val" name={M.label} fill={svgCol(COL.revenue)} radius={[0,4,4,0]}/>
           : <R.Line dataKey="val" name={M.label} stroke={svgCol(COL.revenue)} strokeWidth={2.2} dot={false}/>}
@@ -2759,9 +2759,9 @@ function ChangeBridgeBody({metrics:m}){
     </div>
     {items.map((it,i)=>(<div key={i} style={{display:'flex',alignItems:'center',gap:10,padding:'4px 0'}}>
       <span style={{width:130,fontSize:'var(--text-sm)',color:'var(--text-secondary)',flexShrink:0}}>{it.label}</span>
-      <div style={{flex:1,height:14,position:'relative',background:'var(--color-sunken)',borderRadius:4,minWidth:100}}>
+      <div style={{flex:1,height:14,position:'relative',background:'var(--color-sunken)',borderRadius:'var(--radius-md)',minWidth:100}}>
         <div style={{position:'absolute',left:'50%',top:0,bottom:0,width:1,background:'var(--border-default)'}}/>
-        <div style={{position:'absolute',top:3,bottom:3,borderRadius:3,background:col(it.v),left: it.v>=0?'50%':`${50 - 50*Math.abs(it.v)/max}%`, width:`${50*Math.abs(it.v)/max}%`}}/>
+        <div style={{position:'absolute',top:3,bottom:3,borderRadius:'var(--radius-sm)',background:col(it.v),left: it.v>=0?'50%':`${50 - 50*Math.abs(it.v)/max}%`, width:`${50*Math.abs(it.v)/max}%`}}/>
       </div>
       <span style={{width:80,textAlign:'right',fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',color:col(it.v),flexShrink:0}}>{it.v>=0?'+':'−'}{GBP(Math.abs(it.v))}</span>
       <span style={{width:130,fontSize:'var(--text-xs)',color:'var(--text-faint)',flexShrink:0}}>{it.note}</span>
@@ -2818,7 +2818,7 @@ function AnalystRead({read, dx, metrics, onLog, logUI}){
       {showMore && rest.map((x,i)=>{ const vs=verdictStyle(x.verdict); const low=conf(x)==='low'; return (
         <div key={i} style={{display:'flex',gap:10,alignItems:'baseline',padding:'9px 0 9px 18px',borderTop:i?'1px solid var(--border-subtle)':'none'}}>
           <div style={{display:'flex',gap:6,flexShrink:0,width:142,flexWrap:'wrap'}}>
-            <span style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',color:vs.fg,background:vs.bg,padding:'2px 6px',borderRadius:999,height:'fit-content'}}>{vs.label}</span>
+            <span style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',color:vs.fg,background:vs.bg,padding:'2px 6px',borderRadius:'var(--radius-full)',height:'fit-content'}}>{vs.label}</span>
             {confChip(conf(x))}
           </div>
           <div style={{flex:1,minWidth:0,fontSize:'var(--text-sm)',color:low?'var(--text-secondary)':'var(--text-primary)',lineHeight:1.5}}><b>{x.area}.</b> {low?'Worth checking: ':''}{x.recommendation}{x.metric && <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:1}}>{plainWords(x.metric)}</div>}</div>
@@ -2901,7 +2901,7 @@ function LogEventModal({onClose, onSaved}){
 }
 function LogEventButton({onClick}){
   return (<button onClick={onClick} title="Log a promo, launch, price change or spend test"
-    style={{background:'transparent',border:'1px solid var(--border-subtle)',borderRadius:6,color:'var(--text-secondary)',cursor:'pointer',fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',padding:'4px 9px',whiteSpace:'nowrap'}}>+ Log event</button>);
+    style={{background:'transparent',border:'1px solid var(--border-subtle)',borderRadius:'var(--radius-md)',color:'var(--text-secondary)',cursor:'pointer',fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',padding:'4px 9px',whiteSpace:'nowrap'}}>+ Log event</button>);
 }
 
 function DiagnosticCard({metrics, context, period, onLogEvent}){
@@ -2988,7 +2988,7 @@ function LtvCacCard({daily, gm, ordersPerCust}){
           <R.YAxis yAxisId="l" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>curSym()+v} label={{value:`${curSym()} per customer`, angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:'var(--text-xs)'}}/>
           {/* right-hand axis retired with its series: one scale per chart */}
           {false && <R.YAxis yAxisId="r" orientation="right" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>v+'×'} label={{value:'Customer value:New-customer cost', angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:'var(--text-xs)'}}/>}
-          <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,boxShadow:'var(--shadow-md)'}} formatter={(v,nm)=> nm==='LTV:CAC' ? v+'×' : GBP(v)} labelFormatter={l=>'Week of '+l}/>
+          <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',boxShadow:'var(--shadow-md)'}} formatter={(v,nm)=> nm==='LTV:CAC' ? v+'×' : GBP(v)} labelFormatter={l=>'Week of '+l}/>
           <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:'var(--text-sm)', paddingBottom:8}}/>
           <R.Line yAxisId="l" type="monotone" dataKey="ltv" name="Customer value" stroke={svgCol(COL.revenue)} strokeWidth={2.2} dot={single?{r:3}:false}/>
           <R.Line yAxisId="l" type="monotone" dataKey="cac" name="New-customer cost" stroke={svgCol(COL.meta)} strokeWidth={2.2} dot={single?{r:3}:false}/>
@@ -3036,7 +3036,7 @@ function ContributionCard({rev, orders, paid, gm, days}){
   const fixedWin = (fixedMonthly!=null && days>0) ? fixedMonthly*(days/30) : null;
   const netProfit = fixedWin!=null ? contribution - fixedWin : null;
   const netPct = (netProfit!=null && rev>0) ? netProfit/rev : null;
-  const inStyle = {width:74, background:'var(--bg-base)', border:'1px solid var(--border-default)', borderRadius:5, color:'var(--text-primary)', fontSize:'var(--text-sm)', padding:'3px 7px', textAlign:'right', colorScheme:'light dark'};
+  const inStyle = {width:74, background:'var(--bg-base)', border:'1px solid var(--border-default)', borderRadius:'var(--radius-md)', color:'var(--text-primary)', fontSize:'var(--text-sm)', padding:'3px 7px', textAlign:'right', colorScheme:'light dark'};
   const ed = (k, suffix) => <span style={{color:'var(--text-faint)',fontSize:'var(--text-xs)',fontWeight:'var(--weight-normal)'}}> (<input type="text" inputMode="decimal" defaultValue={inp[k]} onChange={e=>set(k,e.target.value)} onFocus={e=>e.target.select()} style={inStyle}/>{suffix})</span>;
   return (<div className="card">
     <div className="card-section-title">
@@ -3191,7 +3191,7 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
   };
   const downside = scen(0.4,0.85), upside = scen(1.6,1.15);
 
-  const inStyle = {width:80, background:'var(--bg-base)', border:'1px solid var(--border-default)', borderRadius:5, color:'var(--text-primary)', fontSize:'var(--text-sm)', padding:'4px 7px', textAlign:'right', colorScheme:'light dark'};
+  const inStyle = {width:80, background:'var(--bg-base)', border:'1px solid var(--border-default)', borderRadius:'var(--radius-md)', color:'var(--text-primary)', fontSize:'var(--text-sm)', padding:'4px 7px', textAlign:'right', colorScheme:'light dark'};
   const seasStyle = {...inStyle, width:40, padding:'3px 4px'};
   const fld = (k,label,pre,suf)=>(<label style={{display:'flex',flexDirection:'column',gap:3,fontSize:'var(--text-xs)',color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)'}}>
     <span>{label}</span>
@@ -3204,7 +3204,7 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
     <div style={{fontSize:'var(--text-lg)',fontWeight:'var(--weight-bold)',color:col||'var(--text-primary)',marginTop:2}}>{val}</div>
     {sub&&<div style={{fontSize:'var(--text-xs)',color:'var(--text-muted)',marginTop:1}}>{sub}</div>}
   </div>);
-  const modeBtn = (key,label)=>(<button onClick={()=>set('mode',key)} style={{padding:'5px 11px',borderRadius:6,border:'1px solid '+(mode===key?'var(--accent)':'var(--border-subtle)'),background:mode===key?'var(--color-accent-wash-2)':'transparent',color:mode===key?'var(--text-primary)':'var(--text-muted)',fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)',cursor:'pointer'}}>{label}</button>);
+  const modeBtn = (key,label)=>(<button onClick={()=>set('mode',key)} style={{padding:'5px 11px',borderRadius:'var(--radius-md)',border:'1px solid '+(mode===key?'var(--accent)':'var(--border-subtle)'),background:mode===key?'var(--color-accent-wash-2)':'transparent',color:mode===key?'var(--text-primary)':'var(--text-muted)',fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)',cursor:'pointer'}}>{label}</button>);
   const annLabel = rows.length===12 ? 'Year 1' : rows.length+'-month';
 
   return (
@@ -3272,7 +3272,7 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
           <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
           <R.XAxis dataKey="label" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} label={{value:'Month', position:'insideBottom', offset:-9, fill:PAL.muted, fontSize:'var(--text-xs)'}}/>
           <R.YAxis tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>curSym()+(Math.abs(v)>=1000?(v/1000).toFixed(0)+'k':v)} width={52}/>
-          <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} formatter={v=>GBP(v)}/>
+          <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)'}} formatter={v=>GBP(v)}/>
           <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:'var(--text-sm)', paddingBottom:8}}/>
           {mode==='bottomup' ? [
             <R.Area key="n" type="monotone" dataKey="newRev" name="New" stackId="rev" stroke={PAL.accent} fill={palAlpha(PAL.accent, 0.50)} strokeWidth={1}/>,
@@ -3388,7 +3388,7 @@ function MobileToday(){
       <div style={{display:'flex',flexDirection:'column',gap:8}}>
         {actions.length ? actions.map((a,i)=>(
           <div key={i} onClick={()=>window.__oiAsk&&window.__oiAsk(`How do I action this, and what's the expected impact: ${a.description}`)}
-            style={{padding:'10px 12px',background:'var(--bg-elevated)',border:'1px solid var(--border-subtle)',borderRadius:10,cursor:'pointer'}}>
+            style={{padding:'10px 12px',background:'var(--bg-elevated)',border:'1px solid var(--border-subtle)',borderRadius:'var(--radius-md)',cursor:'pointer'}}>
             <div style={{fontSize:'var(--text-sm)',color:'var(--text-primary)',lineHeight:1.4}}>{scrubTag(a.description)}</div>
             <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:5,display:'flex',gap:12,flexWrap:'wrap'}}>
               <span style={{color:kc(a.kind),fontWeight:'var(--weight-semi)'}}>{`${curSym()}`}{Math.round(Math.abs(a.monthly_impact_gbp)).toLocaleString()}/mo</span>
@@ -3399,7 +3399,7 @@ function MobileToday(){
         )) : <div className="muted" style={{fontSize:'var(--text-sm)'}}>{`No high-${curSym()} actions open right now.`}</div>}
       </div>
       <button onClick={()=>window.__oiAsk&&window.__oiAsk(`What should I do today? Give me the top 3 actions, ranked by ${curSym()} impact.`)}
-        style={{marginTop:12,width:'100%',padding:'12px',background:PAL.accent,border:'none',borderRadius:10,color:PAL.panel,fontWeight:'var(--weight-bold)',fontSize:'var(--text-base)',cursor:'pointer'}}>✦ Ask: What should I do today?</button>
+        style={{marginTop:12,width:'100%',padding:'12px',background:PAL.accent,border:'none',borderRadius:'var(--radius-md)',color:PAL.panel,fontWeight:'var(--weight-bold)',fontSize:'var(--text-base)',cursor:'pointer'}}>✦ Ask: What should I do today?</button>
       <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textAlign:'center',marginTop:10}}>↓ Full dashboard below</div>
     </div>
   );
@@ -3417,7 +3417,7 @@ function WcSpark({data, color, fmt, axisFmt}){
       <R.YAxis tick={{fill:PAL.muted, fontSize:'var(--text-xs)'}} width={34} tickCount={3} tickLine={false} axisLine={false} domain={['auto','auto']} tickFormatter={axisFmt||fmt}/>
       <R.Tooltip cursor={{stroke:color, strokeWidth:1, strokeDasharray:'3 3'}} content={({active,payload,label})=>{
         if(!active||!payload||!payload.length) return null; const v=payload[0].value;
-        return (<div style={{background:'var(--bg-elevated)', border:'1px solid var(--border-default)', borderRadius:8, fontSize:'var(--text-xs)', padding:'5px 9px', boxShadow:'var(--shadow-md)'}}>
+        return (<div style={{background:'var(--bg-elevated)', border:'1px solid var(--border-default)', borderRadius:'var(--radius-md)', fontSize:'var(--text-xs)', padding:'5px 9px', boxShadow:'var(--shadow-md)'}}>
           <div style={{color:'var(--text-faint)', fontSize:'var(--text-xs)', marginBottom:1}}>Week of {label}</div>
           <div style={{fontWeight:'var(--weight-bold)', color:'var(--text-primary)'}}>{fmt?fmt(v):v}</div>
         </div>); }}/>
@@ -3469,7 +3469,7 @@ function WhatChangedStrip(){
   };
   return (<div>
     <div className="section-eyebrow" style={{display:'flex',alignItems:'center',gap:8,margin:'4px 0 -4px',fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-muted)'}}>
-      <span style={{width:3,height:14,background:'var(--text-faint)',borderRadius:2}}/>What changed · week of {W.label}
+      <span style={{width:3,height:14,background:'var(--text-faint)',borderRadius:'var(--radius-sm)'}}/>What changed · week of {W.label}
     </div>
     <div className="card">
       <div className="muted" style={{fontSize:'var(--text-sm)', marginBottom:11}}>Latest complete week vs the one before — the movers worth a look. Independent of the date picker above.</div>
@@ -3740,7 +3740,7 @@ function Overview({start, period, customActive}){
       </button>
       {/* COMMERCIAL HEALTH */}
       <div className="section-eyebrow" style={{display:'flex',alignItems:'center',gap:8,margin:'8px 0 -4px',fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-muted)'}}>
-        <span style={{width:3,height:14,background:'var(--text-faint)',borderRadius:2}}/>Commercial health
+        <span style={{width:3,height:14,background:'var(--text-faint)',borderRadius:'var(--radius-sm)'}}/>Commercial health
       </div>
       {/* KPI strip — collapsed by default, hover for full agent commentary */}
       <div>
@@ -3847,7 +3847,7 @@ function Overview({start, period, customActive}){
             <R.XAxis dataKey="dlabel" tick={false} tickLine={false} height={6} />
             <R.YAxis tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>curSym()+(v/1000).toFixed(0)+'k'}
                      label={{value:`Paid spend (${curSym()})`, angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:'var(--text-xs)'}} />
-            <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,boxShadow:'var(--shadow-md)'}}
+            <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',boxShadow:'var(--shadow-md)'}}
                        formatter={(v,n)=>[GBP(v),n]}
                        labelFormatter={(l,p)=> (p&&p[0]&&p[0].payload&&p[0].payload.date) ? p[0].payload.date : l} />
             <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:'var(--text-sm)', paddingBottom:8}} />
@@ -3867,7 +3867,7 @@ function Overview({start, period, customActive}){
                      label={{value:'Date', position:'insideBottom', offset:-10, fill:PAL.muted, fontSize:'var(--text-xs)'}} />
             <R.YAxis tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>curSym()+(v/1000).toFixed(1)+'k'}
                      label={{value:`Net revenue (${curSym()})`, angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:'var(--text-xs)'}} />
-            <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,boxShadow:'var(--shadow-md)'}}
+            <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',boxShadow:'var(--shadow-md)'}}
                        formatter={(v,n)=>[GBP(v),n]}
                        labelFormatter={(l,p)=> (p&&p[0]&&p[0].payload&&p[0].payload.date) ? p[0].payload.date : l} />
             <R.Line type="monotone" dataKey="revenue" name="Shopify net rev" stroke={svgCol(COL.revenue)} strokeWidth={2.4} dot={false} />
@@ -3889,7 +3889,7 @@ function Overview({start, period, customActive}){
       {/* PLANNING & DEEP-DIVE — forecast + unit-economics-over-time are board/planning
           artifacts, not "what's happening this week", so they live behind a toggle. */}
       <div className="section-eyebrow" style={{display:'flex',alignItems:'center',gap:8,margin:'8px 0 -4px',fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-muted)'}}>
-        <span style={{width:3,height:14,background:'var(--text-faint)',borderRadius:2}}/>Planning &amp; deep-dive
+        <span style={{width:3,height:14,background:'var(--text-faint)',borderRadius:'var(--radius-sm)'}}/>Planning &amp; deep-dive
       </div>
       <button onClick={()=>setShowPlanning(s=>!s)} className="show-more">
         {showPlanning ? '↑ Hide planning & forecast' : '↓ Planning & forecast — customer lifetime value:cost per new customer trend + Year-1 P&L'}
@@ -4294,7 +4294,7 @@ function CrossChannel({start}){
         <h2>Site funnel (GA4)</h2>
         {f.map(s=>(<div key={s.stage} style={{margin:'10px 0'}}>
           <div className="mrow"><span className="k">{s.stage}</span><span className="v">{NUM(s.v)} ({PCT(s.v/fmax)})</span></div>
-          <div style={{height:9,background:PAL.panel,borderRadius:6,marginTop:4}}><div style={{height:9,width:(100*s.v/fmax)+'%',background:COL.sessions,borderRadius:6}}/></div>
+          <div style={{height:9,background:PAL.panel,borderRadius:'var(--radius-md)',marginTop:4}}><div style={{height:9,width:(100*s.v/fmax)+'%',background:COL.sessions,borderRadius:'var(--radius-md)'}}/></div>
         </div>))}
         <div className="muted" style={{marginTop:8}}>Add-to-cart → checkout is the steepest drop — see where shoppers stall in <GoLink sec="conversion" sub="site">Conversion → Site &amp; friction</GoLink>.</div>
       </div>
@@ -4491,11 +4491,11 @@ function HookRetention({rows}){
         <R.CartesianGrid stroke={PAL.panel} vertical={false} />
         <R.XAxis dataKey="stage" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} label={{value:'Video milestone', position:'insideBottom', offset:-8, fill:PAL.muted, fontSize:'var(--text-xs)'}} />
         <R.YAxis tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>v+'%'} label={{value:'Retention (%)', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:'var(--text-xs)'}} />
-        <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} formatter={v=>v+'%'} />
+        <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)'}} formatter={v=>v+'%'} />
         {names.map(n=>(<R.Line key={n.key} type="monotone" dataKey={n.key} name={n.name} stroke={svgCol(n.color)} strokeWidth={2} dot={{r:3}} />))}
       </R.LineChart>
     </R.ResponsiveContainer>
-    <div style={{marginTop:8,display:'flex',flexWrap:'wrap',gap:10}}>{names.map(n=>(<span key={n.key} style={{fontSize:'var(--text-xs)',color:PAL.faint}}><span style={{display:'inline-block',width:10,height:10,background:n.color,borderRadius:2,marginRight:5,verticalAlign:'middle'}}/>{n.name}</span>))}</div>
+    <div style={{marginTop:8,display:'flex',flexWrap:'wrap',gap:10}}>{names.map(n=>(<span key={n.key} style={{fontSize:'var(--text-xs)',color:PAL.faint}}><span style={{display:'inline-block',width:10,height:10,background:n.color,borderRadius:'var(--radius-sm)',marginRight:5,verticalAlign:'middle'}}/>{n.name}</span>))}</div>
   </div>);
 }
 
@@ -4589,7 +4589,7 @@ function CreativeVisionPanel(){
           <ul style={{margin:'0 0 8px 0',padding:'0 0 0 16px',fontSize:'var(--text-xs)',color:PAL.faint,lineHeight:1.5}}>
             {(c.feedback||[]).map((f,j)=>(<li key={j}>{f}</li>))}
           </ul>
-          <div style={{padding:8,background:'var(--bg-app)',borderLeft:`2px solid ${PAL.good}`,borderRadius:'0 4px 4px 0',fontSize:'var(--text-xs)',color:'var(--text-secondary)'}}>
+          <div style={{padding:8,background:'var(--bg-app)',borderLeft:`2px solid ${PAL.good}`,borderRadius:'var(--radius-none) var(--radius-md) var(--radius-md) var(--radius-none)',fontSize:'var(--text-xs)',color:'var(--text-secondary)'}}>
             <b style={{color:PAL.good}}>Next iteration:</b> {c.next_iteration}
           </div>
         </div>
@@ -4750,7 +4750,7 @@ function CreatorCandidatesPanel(){
         </div>
         <div style={{display:'flex',gap:10,alignItems:'center',marginBottom:10,flexWrap:'wrap'}}>
           <span className="muted" style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',fontWeight:'var(--weight-bold)'}}>FILTER</span>
-          <select value={tierFilter} onChange={e=>setTierFilter(e.target.value)} style={{background:'var(--bg-input)',color:'var(--text-primary)',border:'1px solid var(--border-default)',borderRadius:4,padding:'4px 8px',fontSize:'var(--text-sm)'}}>
+          <select value={tierFilter} onChange={e=>setTierFilter(e.target.value)} style={{background:'var(--bg-input)',color:'var(--text-primary)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',padding:'4px 8px',fontSize:'var(--text-sm)'}}>
             <option value="actionable">Actionable (hero + core)</option>
             <option value="all">All tiers</option>
             <option value="hero">Hero only</option>
@@ -4758,7 +4758,7 @@ function CreatorCandidatesPanel(){
             <option value="longtail">Longtail</option>
             <option value="pass">Pass (audience/budget mismatch)</option>
           </select>
-          <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)} style={{background:'var(--bg-input)',color:'var(--text-primary)',border:'1px solid var(--border-default)',borderRadius:4,padding:'4px 8px',fontSize:'var(--text-sm)'}}>
+          <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)} style={{background:'var(--bg-input)',color:'var(--text-primary)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',padding:'4px 8px',fontSize:'var(--text-sm)'}}>
             <option value="all">All statuses</option>
             <option value="prospect">Prospect</option>
             <option value="contacted">Contacted</option>
@@ -4772,7 +4772,7 @@ function CreatorCandidatesPanel(){
         {candidates.map((c,i) => {
           const color = TIER_COLOR[c.tier] || PAL.muted;
           return (<tr key={i}>
-            <td><span className="pill" style={{background:color+'22',color:color,fontSize:'var(--text-xs)',padding:'2px 8px',borderRadius:4,fontWeight:'var(--weight-bold)',textTransform:'uppercase'}}>{c.tier}</span></td>
+            <td><span className="pill" style={{background:color+'22',color:color,fontSize:'var(--text-xs)',padding:'2px 8px',borderRadius:'var(--radius-md)',fontWeight:'var(--weight-bold)',textTransform:'uppercase'}}>{c.tier}</span></td>
             <td className="tl" style={{fontSize:'var(--text-xs)'}}><code>{c.handle}</code></td>
             <td className="tl" style={{fontSize:'var(--text-xs)',maxWidth:280}}>
               <b>{c.name}</b>
@@ -4794,7 +4794,7 @@ function CreatorCandidatesPanel(){
           <h2>Top reasoning notes</h2>
           <div className="muted" style={{marginBottom:8,fontSize:'var(--text-xs)'}}>Why each hero/core candidate ranks where they do. Click handle in table above for details.</div>
           <div style={{display:'flex',flexDirection:'column',gap:10,maxHeight:520,overflowY:'auto'}}>
-          {(C.candidates||[]).filter(c=>c.tier==='hero'||c.tier==='core').slice(0,12).map((c,i)=>(<div key={i} style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${TIER_COLOR[c.tier]}`,borderRadius:'0 6px 6px 0',fontSize:'var(--text-xs)'}}>
+          {(C.candidates||[]).filter(c=>c.tier==='hero'||c.tier==='core').slice(0,12).map((c,i)=>(<div key={i} style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${TIER_COLOR[c.tier]}`,borderRadius:'var(--radius-none) var(--radius-md) var(--radius-md) var(--radius-none)',fontSize:'var(--text-xs)'}}>
             <div style={{fontWeight:'var(--weight-semi)',marginBottom:4}}>{c.name} <span className="muted" style={{fontWeight:'var(--weight-normal)'}}>({c.handle})</span></div>
             <div style={{color:PAL.faint,lineHeight:1.45}}>{c.reasoning}</div>
             {(c.verify_next||[]).length>0 && <div style={{marginTop:6,fontSize:'var(--text-xs)',color:PAL.muted}}><b>Verify next:</b> {c.verify_next.join(' · ')}</div>}
@@ -4856,7 +4856,7 @@ function AffiliatePanel(){
             const tier = a.netSales > 5000 ? 'hero' : a.netSales > 1000 ? 'core' : a.netSales > 200 ? 'mid' : 'long-tail';
             const tierColor = {hero:PAL.good,core:PAL.data3,mid:PAL.warn,'long-tail':PAL.muted}[tier];
             return (<tr key={i}>
-              <td><span className="pill" style={{background:tierColor+'22',color:tierColor,fontSize:'var(--text-xs)',padding:'2px 6px',borderRadius:4,fontWeight:'var(--weight-bold)'}}>{a.code}</span></td>
+              <td><span className="pill" style={{background:tierColor+'22',color:tierColor,fontSize:'var(--text-xs)',padding:'2px 6px',borderRadius:'var(--radius-md)',fontWeight:'var(--weight-bold)'}}>{a.code}</span></td>
               <td style={{fontSize:'var(--text-sm)',maxWidth:200}}>{a.label}{a.notes && <div className="muted" style={{fontSize:'var(--text-xs)'}}>{a.notes}</div>}</td>
               <td><b>{a.orders}</b></td>
               <td><b>{GBP(a.netSales)}</b></td>
@@ -4874,7 +4874,7 @@ function AffiliatePanel(){
             const LABELS = {affiliate:'Affiliate creators',campaign:'Promo campaigns',cs_adjustment:'Gifting / CS',auto_generated:'Auto-generated',bundle_ref:'Bundle ref',no_code:'No code',unclassified:'Unclassified'};
             const COLORS = {affiliate:PAL.good,campaign:PAL.warn,cs_adjustment:PAL.accent,no_code:PAL.muted,auto_generated:PAL.muted,unclassified:PAL.bad};
             return (<tr key={i}>
-              <td><span className="pill" style={{background:(COLORS[cat]||PAL.muted)+'22',color:COLORS[cat]||PAL.muted,fontSize:'var(--text-xs)',padding:'2px 6px',borderRadius:4,fontWeight:'var(--weight-semi)'}}>{LABELS[cat]||cat}</span></td>
+              <td><span className="pill" style={{background:(COLORS[cat]||PAL.muted)+'22',color:COLORS[cat]||PAL.muted,fontSize:'var(--text-xs)',padding:'2px 6px',borderRadius:'var(--radius-md)',fontWeight:'var(--weight-semi)'}}>{LABELS[cat]||cat}</span></td>
               <td>{s.codeCount}</td>
               <td>{s.orders}</td>
               <td>{GBP(s.netSales)}</td>
@@ -4959,7 +4959,7 @@ function Customers(){
             <R.YAxis yAxisId="l" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} label={{value:'Orders', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:'var(--text-xs)'}} />
             {/* right-hand axis retired with its series: one scale per chart */}
             {false && <R.YAxis yAxisId="r" orientation="right" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>v+'%'} domain={[0,80]} label={{value:'% returning', angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:'var(--text-xs)'}} />}
-            <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} />
+            <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)'}} />
             <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:'var(--text-sm)', paddingBottom:8}} />
             <R.Bar yAxisId="l" dataKey="new" stackId="o" name="New" fill={svgCol(COL.sessions)} />
             <R.Bar yAxisId="l" dataKey="ret" stackId="o" name="Returning" fill={svgCol(COL.revenue)} />
@@ -4988,7 +4988,7 @@ function Customers(){
               <R.CartesianGrid stroke={PAL.panel} vertical={false} />
               <R.XAxis dataKey="date" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} interval={Math.ceil(listChart.length/10)} label={{value:'Date', position:'insideBottom', offset:-6, fill:PAL.muted, fontSize:'var(--text-xs)'}} />
               <R.YAxis tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} label={{value:'Net subs', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:'var(--text-xs)'}} />
-              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} />
+              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)'}} />
               <R.Bar dataKey="net" fill={svgCol(COL.email)} />
             </R.BarChart>
           </R.ResponsiveContainer>
@@ -5033,8 +5033,8 @@ function BundlesPanel(){
           <div className="muted" style={{marginBottom:8, fontSize:'var(--text-sm)'}}>Each row = a stack product set up as its own item. Sold as one purchase.</div>
           {explicitRows.length ? (<table><thead><tr><th>Type</th><th className="tl">Title</th><th>Units</th><th>Net rev</th><th>Average order</th><th>Returns</th></tr></thead><tbody>
           {explicitRows.map((b,i)=>(<tr key={i}>
-            <td><span className="pill" style={{background:'#c084fc22',color:PAL.accent,fontSize:'var(--text-xs)',padding:'2px 6px',borderRadius:4,fontWeight:'var(--weight-semi)'}}>{b.type}</span></td>
-            <td className="tl" style={{fontSize:'var(--text-sm)', maxWidth:280}}>{b.image && <img src={b.image} style={{width:22,height:22,borderRadius:4,verticalAlign:'middle',marginRight:8,objectFit:'cover'}} onError={e=>{e.target.style.opacity=.2;}}/>}{b.title}</td>
+            <td><span className="pill" style={{background:'#c084fc22',color:PAL.accent,fontSize:'var(--text-xs)',padding:'2px 6px',borderRadius:'var(--radius-md)',fontWeight:'var(--weight-semi)'}}>{b.type}</span></td>
+            <td className="tl" style={{fontSize:'var(--text-sm)', maxWidth:280}}>{b.image && <img src={b.image} style={{width:22,height:22,borderRadius:'var(--radius-md)',verticalAlign:'middle',marginRight:8,objectFit:'cover'}} onError={e=>{e.target.style.opacity=.2;}}/>}{b.title}</td>
             <td>{b.units}</td>
             <td>{GBP(b.netSales)}</td>
             <td>{GBP(b.units ? b.netSales/b.units : null)}</td>
@@ -5109,7 +5109,7 @@ function InventoryPanel(){
       </div>
       <div style={{display:'flex',gap:10,alignItems:'center',marginBottom:10,flexWrap:'wrap'}}>
         <span className="muted" style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',fontWeight:'var(--weight-bold)'}}>FILTER</span>
-        <select value={tierFilter} onChange={e=>setTierFilter(e.target.value)} style={{background:'var(--bg-input)',color:'var(--text-primary)',border:'1px solid var(--border-default)',borderRadius:4,padding:'4px 8px',fontSize:'var(--text-sm)'}}>
+        <select value={tierFilter} onChange={e=>setTierFilter(e.target.value)} style={{background:'var(--bg-input)',color:'var(--text-primary)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',padding:'4px 8px',fontSize:'var(--text-sm)'}}>
           <option value="actionable">Actionable (critical + low + overstock + archived)</option>
           <option value="all">All tiers</option>
           <option value="critical">Critical only (&lt;14d)</option>
@@ -5127,7 +5127,7 @@ function InventoryPanel(){
           const color = TIER_COLOR[r.coverTier] || PAL.muted;
           return (
             <tr key={i}>
-              <td><span className="pill" style={{background:color+'22',color:color,fontSize:'var(--text-xs)',padding:'2px 6px',borderRadius:4,fontWeight:'var(--weight-bold)',whiteSpace:'nowrap'}}>{TIER_LABEL[r.coverTier]||r.coverTier}</span></td>
+              <td><span className="pill" style={{background:color+'22',color:color,fontSize:'var(--text-xs)',padding:'2px 6px',borderRadius:'var(--radius-md)',fontWeight:'var(--weight-bold)',whiteSpace:'nowrap'}}>{TIER_LABEL[r.coverTier]||r.coverTier}</span></td>
               <td className="tl" style={{fontSize:'var(--text-xs)',maxWidth:280}}>
                 <b>{r.title}</b>
                 {r.sku && <div className="muted" style={{fontSize:'var(--text-xs)'}}><code>{r.sku}</code></div>}
@@ -5162,7 +5162,7 @@ function CollectionsPanel(){
       {cols.map((c,i)=>{
         const color = COLOR[c.collection] || PAL.muted;
         return (<tr key={i}>
-          <td><span className="pill" style={{background:color+'22',color:color,fontSize:'var(--text-xs)',padding:'3px 8px',borderRadius:4,fontWeight:'var(--weight-bold)'}}>{c.collection}</span></td>
+          <td><span className="pill" style={{background:color+'22',color:color,fontSize:'var(--text-xs)',padding:'3px 8px',borderRadius:'var(--radius-md)',fontWeight:'var(--weight-bold)'}}>{c.collection}</span></td>
           <td><b>{c.skus}</b>{c.skus<=2&&<span className="muted" style={{fontSize:'var(--text-xs)',marginLeft:4}}>thin range</span>}</td>
           <td>{NUM(c.units)}</td>
           <td><b>{GBP(c.netSales)}</b></td>
@@ -5191,7 +5191,7 @@ function ProductTiersPanel(){
       {DEMO && <div className="muted" style={{marginBottom:10, fontSize:'var(--text-sm)'}}>frkl's modular system uses three tiers, encoded in the Shopify vendor field. A customer buys a base, layers a style, attaches charms — every charm raises average order value, every style raises margin.</div>}
       <table><thead><tr><th>Tier</th><th>items</th><th>Units</th><th>Net revenue</th><th>% of rev</th><th>Average per unit</th><th>Margin %</th><th>Return %</th></tr></thead><tbody>
         {tiers.map((t,i)=>(<tr key={i}>
-          <td><span className="pill" style={{background:colors[t.tier]+'22',color:colors[t.tier],fontSize:'var(--text-xs)',padding:'2px 8px',borderRadius:4,fontWeight:'var(--weight-bold)',textTransform:'uppercase'}}>{labels[t.tier]||t.tier}</span></td>
+          <td><span className="pill" style={{background:colors[t.tier]+'22',color:colors[t.tier],fontSize:'var(--text-xs)',padding:'2px 8px',borderRadius:'var(--radius-md)',fontWeight:'var(--weight-bold)',textTransform:'uppercase'}}>{labels[t.tier]||t.tier}</span></td>
           <td>{t.skus}</td>
           <td>{NUM(t.units)}</td>
           <td><b>{GBP(t.netSales)}</b></td>
@@ -5425,7 +5425,7 @@ function CvrDrivers(){
   const [showDisc,setShowDisc] = useState(true);       // overlay total discount depth on the trend
   const gran = chartGran;                              // comparator follows the chart
   const panel = (chartGran==='day' ? seriesDaily : series);
-  const segBtn = (active)=>({fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',padding:'4px 10px',borderRadius:7,cursor:'pointer',border:'1px solid '+(active?PAL.accent:'var(--border-subtle)'),background:active?'var(--color-accent-wash-2)':'transparent',color:active?PAL.accent:'var(--text-muted)'});
+  const segBtn = (active)=>({fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',padding:'4px 10px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1px solid '+(active?PAL.accent:'var(--border-subtle)'),background:active?'var(--color-accent-wash-2)':'transparent',color:active?PAL.accent:'var(--text-muted)'});
   const _cbase = (chartGran==='day' ? seriesDaily : series);
   const _clast = _cbase.length ? _cbase[_cbase.length-1].w : null;
   const _ccut = (chartDays && _clast) ? new Date(new Date(_clast+'T00:00:00Z').getTime() - chartDays*86400000).toISOString().slice(0,10) : '0000';
@@ -5645,14 +5645,14 @@ function CvrDrivers(){
     window.__oiAsk(prompt);
   };
 
-  const tile = (label,val,sub,accent) => (<div style={{flex:'1 1 170px',background:`var(--surface-1,${PAL.panel})`,border:`1px solid var(--border-subtle,${PAL.panel})`,borderRadius:12,padding:'12px 14px'}}>
+  const tile = (label,val,sub,accent) => (<div style={{flex:'1 1 170px',background:`var(--surface-1,${PAL.panel})`,border:`1px solid var(--border-subtle,${PAL.panel})`,borderRadius:'var(--radius-md)',padding:'12px 14px'}}>
     <div style={{fontSize:'var(--text-xs)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)'}}>{label}</div>
     <div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',marginTop:3,color:accent||'var(--text-primary)'}}>{val}</div>
     <div style={{fontSize:'var(--text-xs)',color:'var(--text-muted)',marginTop:2}}>{sub}</div>
   </div>);
 
   const stageCard = (k) => { const now=M.stageNow[k], prev=M.stagePrev[k], dlt=M.stageMoves[k], contrib=Math.round((M.stageContribution[k]||0)*100); const isMover=k===M.moverStage; const good=dlt>=0;
-    return (<div key={k} style={{flex:'1 1 200px',background:isMover?'var(--color-accent-wash)':`var(--surface-1,${PAL.panel})`,border:'1px solid '+(isMover?PAL.line:`var(--border-subtle,${PAL.panel})`),borderRadius:12,padding:'11px 13px'}}>
+    return (<div key={k} style={{flex:'1 1 200px',background:isMover?'var(--color-accent-wash)':`var(--surface-1,${PAL.panel})`,border:'1px solid '+(isMover?PAL.line:`var(--border-subtle,${PAL.panel})`),borderRadius:'var(--radius-md)',padding:'11px 13px'}}>
       <div style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)',color:'var(--text-secondary)'}}>{k}{isMover&&<span style={{marginLeft:6,fontSize:'var(--text-xs)',color:PAL.accent,fontWeight:'var(--weight-bold)'}}>BIGGEST MOVER</span>}</div>
       <div style={{fontSize:'var(--text-lg)',fontWeight:'var(--weight-bold)',marginTop:3}}>{prev}% <span style={{color:'var(--text-faint)'}}>→</span> {now}% <span style={{fontSize:'var(--text-sm)',color:good?PAL.good:PAL.bad}}>{dlt>=0?'+':''}{dlt}pp</span></div>
       <div style={{fontSize:'var(--text-xs)',color:'var(--text-muted)',marginTop:2}}>{contrib>=0?contrib:0}% of the conversion rate change</div>
@@ -5660,9 +5660,9 @@ function CvrDrivers(){
   };
 
   const barCell = (d) => { const w=Math.round(d.abs/maxAbs*48); const pos=d.dir==='up'; const col=pos?PAL.good:PAL.bad;
-    return (<div style={{position:'relative',height:16,background:`var(--surface-2,${PAL.panel})`,borderRadius:4}}>
+    return (<div style={{position:'relative',height:16,background:`var(--surface-2,${PAL.panel})`,borderRadius:'var(--radius-md)'}}>
       <div style={{position:'absolute',left:'50%',top:0,bottom:0,width:1,background:PAL.line}}/>
-      <div style={{position:'absolute',top:2,bottom:2,borderRadius:3,background:col,opacity:d.significant?0.95:0.4,left:(pos?50:(50-w))+'%',width:w+'%'}}/>
+      <div style={{position:'absolute',top:2,bottom:2,borderRadius:'var(--radius-sm)',background:col,opacity:d.significant?0.95:0.4,left:(pos?50:(50-w))+'%',width:w+'%'}}/>
     </div>);
   };
 
@@ -5700,14 +5700,14 @@ function CvrDrivers(){
         <button onClick={()=>setShowDisc(v=>!v)} title="Shade total discount depth (codes + sale prices) and flag the deepest-discount periods" style={{...segBtn(showDisc), border:'1px solid '+(showDisc?PAL.warn:'var(--border-subtle)'), background:showDisc?'var(--color-warning-wash)':'transparent', color:showDisc?PAL.warn:'var(--text-muted)'}}>🏷️ Discounts</button>
         <span style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginLeft:4}}>{chartData.length} {chartGran==='day'?'days':'weeks'}{chartGran==='day'?' · daily conversion rate is noisier — read the trend, not single days':''}</span>
       </div>
-      <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',margin:'2px 0 8px',padding:'7px 11px',borderRadius:9,background:'var(--color-accent-wash)',border:'1px solid var(--color-accent-line)'}}>
+      <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',margin:'2px 0 8px',padding:'7px 11px',borderRadius:'var(--radius-md)',background:'var(--color-accent-wash)',border:'1px solid var(--color-accent-line)'}}>
         <span style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)',color:PAL.accent}}>Click two points on the chart to compare them</span>
         <span style={{fontSize:'var(--text-sm)',color:'var(--text-muted)'}}>{cA&&cB
           ? <>Comparing <b style={{color:PAL.accent}}>A · {lbl(cA)}</b> <span style={{color:'var(--text-faint)'}}>vs</span> <b style={{color:PAL.good}}>B · {lbl(cB)}</b> — see table below.</>
           : cA ? <>Picked <b style={{color:PAL.accent}}>A · {lbl(cA)}</b> — now click another point for <b style={{color:PAL.good}}>B</b>.</>
           : <>Click the first {chartGran==='day'?'day':'week'} to set <b style={{color:PAL.accent}}>A</b>.</>}</span>
-        {(cmp.a||cmp.b) && <button onClick={()=>setCmp({a:null,b:null})} style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',padding:'4px 10px',borderRadius:7,cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-muted)'}}>✕ Clear</button>}
-        <button onClick={()=>setCmp(defaultPair(panel))} title="Auto-pick the clearest pair: similar traffic, biggest conversion rate gap" style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',padding:'4px 10px',borderRadius:7,cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-muted)'}}>↻ Best pair</button>
+        {(cmp.a||cmp.b) && <button onClick={()=>setCmp({a:null,b:null})} style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',padding:'4px 10px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-muted)'}}>✕ Clear</button>}
+        <button onClick={()=>setCmp(defaultPair(panel))} title="Auto-pick the clearest pair: similar traffic, biggest conversion rate gap" style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',padding:'4px 10px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-muted)'}}>↻ Best pair</button>
       </div>
       <div style={{cursor:'pointer'}}>
       <R.ResponsiveContainer width="100%" height={288}>
@@ -5719,7 +5719,7 @@ function CvrDrivers(){
           {false && <R.YAxis yAxisId="r" orientation="right" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>(v/1000).toFixed(0)+'k'} label={{value:'Sessions', angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:'var(--text-xs)'}}/>}
           {/* Hidden axis for the discount-depth overlay, scaled so the amber band sits in the lower ~45% — readable but never fighting the CVR line. */}
           <R.YAxis yAxisId="disc" hide domain={[0, (discMax||10)*2.2]}/>
-          <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,fontSize:'var(--text-sm)',boxShadow:'var(--shadow-md)'}} labelFormatter={w=>(chartGran==='day'?'':'Week of ')+fmtWk(w)} formatter={(v,n)=> (n==='CVR'||n==='Discount depth')?v+'%':NUM(v)}/>
+          <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',fontSize:'var(--text-sm)',boxShadow:'var(--shadow-md)'}} labelFormatter={w=>(chartGran==='day'?'':'Week of ')+fmtWk(w)} formatter={(v,n)=> (n==='CVR'||n==='Discount depth')?v+'%':NUM(v)}/>
           <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:'var(--text-sm)', paddingBottom:8}}/>
           {false && <R.Bar yAxisId="r" dataKey="sessions" name="Sessions" fill={PAL.panel} maxBarSize={30}/>}
           {/* Total discount depth (codes + sale prices) as a soft amber band; amber diamonds flag the deepest periods. */}
@@ -5751,7 +5751,7 @@ function CvrDrivers(){
           <R.XAxis dataKey="w" tickFormatter={fmtWk} tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} interval={Math.ceil(chartData.length/9)} tickMargin={6}/>
           <R.YAxis tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>(v/1000).toFixed(0)+'k'}
                    label={{value:'Sessions', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:'var(--text-xs)'}}/>
-          <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,fontSize:'var(--text-sm)'}}
+          <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',fontSize:'var(--text-sm)'}}
                      formatter={(v)=>[NUM(v),'Sessions']} labelFormatter={fmtWk}/>
           <R.Bar dataKey="sessions" name="Sessions" fill={svgCol(COL.sessions)} maxBarSize={30}/>
         </R.ComposedChart>
@@ -5769,7 +5769,7 @@ function CvrDrivers(){
           : pos
             ? `Deep-discount ${unit} convert ${Math.abs(L.pct*100).toFixed(0)}% higher — worth a look, but check it isn't just traffic mix or seasonality.`
             : `Deep-discount ${unit} convert ${Math.abs(L.pct*100).toFixed(0)}% lower — promos aren't lifting conversion.`;
-        return (<div style={{marginTop:10,padding:'11px 13px',borderRadius:10,background:'var(--color-warning-wash)',border:'1px solid var(--color-warning-wash)'}}>
+        return (<div style={{marginTop:10,padding:'11px 13px',borderRadius:'var(--radius-md)',background:'var(--color-warning-wash)',border:'1px solid var(--color-warning-wash)'}}>
           <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap',marginBottom:7}}>
             <span style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',color:PAL.warn,fontWeight:'var(--weight-bold)'}}>Discount lift</span>
             <span style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>mean conversion rate on the deepest-discount {unit} vs the rest · this range</span>
@@ -5799,13 +5799,13 @@ function CvrDrivers(){
         {cA && cB
           ? <div style={{fontSize:'var(--text-sm)',color:'var(--text-muted)'}}>Comparing <b style={{color:PAL.accent}}>{lbl(cA)}</b> <span style={{color:'var(--text-faint)'}}>vs</span> <b style={{color:PAL.good}}>{lbl(cB)}</b></div>
           : <div style={{fontSize:'var(--text-sm)',color:'var(--text-faint)'}}>↑ Click two points on the chart above to pick the {gran==='day'?'days':'weeks'} to compare.</div>}
-        <button onClick={()=>setCmp(defaultPair(panel))} title="Auto-pick the clearest pair: similar traffic, biggest conversion rate gap" style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)',padding:'6px 12px',borderRadius:8,cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-muted)'}}>↻ Best pair</button>
-        {(cmp.a||cmp.b) && <button onClick={()=>setCmp({a:null,b:null})} style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)',padding:'6px 12px',borderRadius:8,cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-muted)'}}>✕ Clear</button>}
+        <button onClick={()=>setCmp(defaultPair(panel))} title="Auto-pick the clearest pair: similar traffic, biggest conversion rate gap" style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)',padding:'6px 12px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-muted)'}}>↻ Best pair</button>
+        {(cmp.a||cmp.b) && <button onClick={()=>setCmp({a:null,b:null})} style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)',padding:'6px 12px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-muted)'}}>✕ Clear</button>}
       </div>
       {gran==='week' && STAT.cleanPairs && STAT.cleanPairs.length>0 && <div style={{marginBottom:12}}>
         <div style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',color:'var(--text-faint)',marginBottom:5}}>Cleanest tests — matched traffic, one lever differs <span title="Week pairs where traffic mix (new/paid/mobile share) and volume are near-identical, so the CVR gap is mostly attributable to the single lever shown. The lowest-confound comparisons in your data — the closest thing to a natural experiment." style={{cursor:'help',color:'var(--text-muted)'}}>ⓘ</span></div>
         <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{STAT.cleanPairs.map((p,i)=>{ const A=byW[p.a],B=byW[p.b]; if(!A||!B) return null; const f=(t,v)=> t==='pct'?Math.round(v)+'%': t==='gbp'?GBP(v): NUM(v);
-          return (<button key={i} onClick={()=>setCmp({a:p.a,b:p.b})} title="Load this low-confound pair" style={{fontSize:'var(--text-xs)',padding:'5px 10px',borderRadius:8,cursor:'pointer',border:'1px solid var(--color-success-line)',background:'var(--color-success-wash)',color:'var(--text-secondary)',textAlign:'left'}}>
+          return (<button key={i} onClick={()=>setCmp({a:p.a,b:p.b})} title="Load this low-confound pair" style={{fontSize:'var(--text-xs)',padding:'5px 10px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1px solid var(--color-success-line)',background:'var(--color-success-wash)',color:'var(--text-secondary)',textAlign:'left'}}>
             <b style={{color:PAL.good}}>{p.lever.lab}</b> {f(p.lever.t,p.lever.a)}→{f(p.lever.t,p.lever.b)} <span style={{color:'var(--text-faint)'}}>· {fmtWk(p.a)} vs {fmtWk(p.b)} · conversion rate gap {p.cvrGap.toFixed(2)}pp</span>
           </button>); })}</div>
       </div>}
@@ -5817,19 +5817,19 @@ function CvrDrivers(){
         </div>
         {movers.length>0 && <div style={{marginBottom:10}}>
           <div style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',color:'var(--text-faint)',marginBottom:5}}>Biggest differences</div>
-          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{movers.map(m=>(<span key={m.k} style={{fontSize:'var(--text-sm)',background:'var(--color-accent-wash-2)',border:'1px solid var(--color-accent-line)',borderRadius:999,padding:'3px 10px'}}><b>{m.l}</b> {fmtVal(m.t,m.a)} <span style={{color:'var(--text-faint)'}}>→</span> {fmtVal(m.t,m.b)}</span>))}</div>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{movers.map(m=>(<span key={m.k} style={{fontSize:'var(--text-sm)',background:'var(--color-accent-wash-2)',border:'1px solid var(--color-accent-line)',borderRadius:'var(--radius-full)',padding:'3px 10px'}}><b>{m.l}</b> {fmtVal(m.t,m.a)} <span style={{color:'var(--text-faint)'}}>→</span> {fmtVal(m.t,m.b)}</span>))}</div>
         </div>}
         {/* Why the difference — deterministic read of the metric algorithm: funnel split + driver classification + confound-aware verdict, with a handoff to the live assistant. */}
         {cmpStory && (()=>{ const S=cmpStory; const vcol = S.topKind==='site'||S.topKind==='checkout'?PAL.good : S.topKind==='offer'?PAL.warn : S.topKind==='mix'||S.topKind==='device'?PAL.accent : 'var(--text-muted)';
           const u=gran==='day'?'day':'week';
-          return (<div style={{marginBottom:12,padding:'13px 15px',borderRadius:12,background:'var(--color-accent-wash)',border:'1px solid var(--color-accent-line)'}}>
+          return (<div style={{marginBottom:12,padding:'13px 15px',borderRadius:'var(--radius-md)',background:'var(--color-accent-wash)',border:'1px solid var(--color-accent-line)'}}>
             <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:8}}>
               <span style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',color:PAL.accent,fontWeight:'var(--weight-bold)'}}>Why the difference — likely drivers</span>
               <span style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}} >Derived from the metric model</span>
             </div>
             {gapSig && (gapSig.p<0.05
               ? <div style={{fontSize:'var(--text-xs)',color:PAL.good,marginBottom:8,fontWeight:'var(--weight-semi)'}}>The conversion rate gap is statistically real ({pTxt(gapSig.p)}, two-proportion test) — worth explaining.</div>
-              : <div style={{fontSize:'var(--text-sm)',color:PAL.warn,marginBottom:8,padding:'7px 10px',borderRadius:8,background:'var(--color-warning-wash)',border:'1px solid var(--color-warning-wash)'}}>This conversion rate gap is within sampling noise ({pTxt(gapSig.p)}) — only {NUM(cA.orders)} vs {NUM(cB.orders)} orders on these {gran==='day'?'days':'weeks'}. Treat the read below as a weak hypothesis, not a finding; a wider-apart or higher-volume pair gives a cleaner signal.</div>)}
+              : <div style={{fontSize:'var(--text-sm)',color:PAL.warn,marginBottom:8,padding:'7px 10px',borderRadius:'var(--radius-md)',background:'var(--color-warning-wash)',border:'1px solid var(--color-warning-wash)'}}>This conversion rate gap is within sampling noise ({pTxt(gapSig.p)}) — only {NUM(cA.orders)} vs {NUM(cB.orders)} orders on these {gran==='day'?'days':'weeks'}. Treat the read below as a weak hypothesis, not a finding; a wider-apart or higher-volume pair gives a cleaner signal.</div>)}
             {S.tiny
               ? <div style={{fontSize:'var(--text-sm)',color:'var(--text-muted)'}}>CVR is essentially flat between these two ({S.pp>=0?'+':''}{S.pp}pp). The inputs below shifted but netted out — there's no real conversion difference to explain. Pick a wider-apart pair to see a driver story.</div>
               : <div style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)',lineHeight:1.55}}>
@@ -5879,7 +5879,7 @@ function CvrDrivers(){
             {[[lbl(cA),cA.landTop||[]],[lbl(cB),cB.landTop||[]]].map((pair,i)=>(<div key={i}>
               <div style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',color:'var(--text-secondary)',marginBottom:2}}>{pair[0]}</div>
               {pair[1].length?pair[1].map(p=>(<div key={p.url} style={{display:'flex',justifyContent:'space-between',gap:8,padding:'4px 0',borderTop:'1px solid var(--border-subtle)',fontSize:'var(--text-sm)'}}>
-                <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}} title={p.url}><span style={{color:'var(--text-primary)'}}>{p.url}</span>{p.oos&&<span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',color:PAL.bad,background:'var(--color-danger-wash)',border:'1px solid var(--color-danger-wash)',borderRadius:4,padding:'0 4px'}}>OOS</span>}</span>
+                <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}} title={p.url}><span style={{color:'var(--text-primary)'}}>{p.url}</span>{p.oos&&<span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',color:PAL.bad,background:'var(--color-danger-wash)',border:'1px solid var(--color-danger-wash)',borderRadius:'var(--radius-md)',padding:'0 4px'}}>OOS</span>}</span>
                 <span style={{whiteSpace:'nowrap',color:'var(--text-muted)'}}>{NUM(p.sessions)} · <b style={{color:p.cvr>=1.5?PAL.good:(p.cvr<0.4?PAL.bad:'var(--text-secondary)')}}>{p.cvr}%</b></span>
               </div>)):<div style={{fontSize:'var(--text-sm)',color:'var(--text-muted)',padding:'4px 0'}}>—</div>}
             </div>))}
@@ -5922,7 +5922,7 @@ function CvrDrivers(){
       </table></div>
     </div>
 
-    <button onClick={()=>setShowStats(s=>!s)} style={{display:'flex',alignItems:'center',gap:8,width:'100%',background:'transparent',border:'1px solid var(--border-subtle)',borderRadius:10,padding:'11px 14px',cursor:'pointer',textAlign:'left',marginBottom:showStats?0:14}}>
+    <button onClick={()=>setShowStats(s=>!s)} style={{display:'flex',alignItems:'center',gap:8,width:'100%',background:'transparent',border:'1px solid var(--border-subtle)',borderRadius:'var(--radius-md)',padding:'11px 14px',cursor:'pointer',textAlign:'left',marginBottom:showStats?0:14}}>
       <span style={{color:'var(--text-faint)',display:'inline-flex',transform:showStats?'rotate(90deg)':'none',transition:'transform 120ms'}}><Icon name="chevron" size={13}/></span>
       <span style={{fontWeight:'var(--weight-bold)',color:'var(--text-primary)',fontSize:'var(--text-sm)'}}>Show the statistics</span>
       <span className="muted" style={{fontSize:'var(--text-xs)'}}>correlation scan + mix-adjusted partial correlations — methodology, on demand</span>
@@ -5956,7 +5956,7 @@ function CvrDrivers(){
           return (<tr key={d.k} style={{borderTop:'1px solid var(--border-subtle)'}}>
             <td style={{padding:'6px 8px 6px 0',fontWeight:'var(--weight-semi)'}}>{d.label}{!d.sig&&<span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)',fontSize:'var(--text-xs)'}}> · ns</span>}</td>
             <td style={{padding:'6px 8px',textAlign:'right',color:'var(--text-faint)'}}>{d.raw>=0?'+':''}{d.raw.toFixed(2)}</td>
-            <td style={{padding:'6px 8px'}}><div style={{position:'relative',height:12,background:`var(--surface-2,${PAL.panel})`,borderRadius:3}}><div style={{position:'absolute',left:'50%',top:0,bottom:0,width:1,background:PAL.line}}/><div style={{position:'absolute',top:2,bottom:2,borderRadius:2,background:col,left:(pos?50:(50-w))+'%',width:w+'%'}}/></div></td>
+            <td style={{padding:'6px 8px'}}><div style={{position:'relative',height:12,background:`var(--surface-2,${PAL.panel})`,borderRadius:'var(--radius-sm)'}}><div style={{position:'absolute',left:'50%',top:0,bottom:0,width:1,background:PAL.line}}/><div style={{position:'absolute',top:2,bottom:2,borderRadius:'var(--radius-sm)',background:col,left:(pos?50:(50-w))+'%',width:w+'%'}}/></div></td>
             <td style={{padding:'6px 8px',textAlign:'right',fontWeight:'var(--weight-bold)',color:col}}>{d.adj>=0?'+':''}{d.adj.toFixed(2)}</td>
             <td style={{padding:'6px 8px',fontSize:'var(--text-xs)',color:collapsed?PAL.warn:'var(--text-faint)'}}>{collapsed?'mostly mix':(d.sig?'holds':'')}</td>
           </tr>); })}</tbody>
@@ -5967,7 +5967,7 @@ function CvrDrivers(){
       {STAT.resid && <div style={{marginTop:16}}>
         <div style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',color:PAL.accent,marginBottom:6}}>Unexplained conversion rate weeks — actual vs an expected-conversion rate model</div>
         {STAT.resid.list.length? <div style={{display:'flex',flexDirection:'column',gap:6}}>{STAT.resid.list.map(r=>{ const pos=r.e>=0;
-          return (<div key={r.w} style={{display:'flex',justifyContent:'space-between',gap:10,padding:'6px 10px',borderRadius:8,background:`var(--surface-1,${PAL.panel})`,border:'1px solid var(--border-subtle)'}}>
+          return (<div key={r.w} style={{display:'flex',justifyContent:'space-between',gap:10,padding:'6px 10px',borderRadius:'var(--radius-md)',background:`var(--surface-1,${PAL.panel})`,border:'1px solid var(--border-subtle)'}}>
             <span><b>{fmtWk(r.w)}</b> <span style={{color:'var(--text-faint)'}}>actual {r.act.toFixed(2)}% vs expected {r.exp.toFixed(2)}%</span></span>
             <span style={{fontWeight:'var(--weight-bold)',color:pos?PAL.good:PAL.bad}}>{pos?'+':''}{r.e.toFixed(2)}pp unexplained</span>
           </div>); })}</div>
@@ -6027,7 +6027,7 @@ function useChartZoom(fx0, fx1, fy0, fy1){
            style:{ cursor:'grab', position:'relative', userSelect:'none' } } };
 }
 function ZoomControls({z}){
-  const b={width:27,height:27,display:'inline-flex',alignItems:'center',justifyContent:'center',border:'1px solid var(--border-default)',background:'var(--bg-card)',color:'var(--text-secondary)',borderRadius:7,cursor:'pointer',fontSize:'var(--text-base)',lineHeight:1,fontFamily:'inherit'};
+  const b={width:27,height:27,display:'inline-flex',alignItems:'center',justifyContent:'center',border:'1px solid var(--border-default)',background:'var(--bg-card)',color:'var(--text-secondary)',borderRadius:'var(--radius-md)',cursor:'pointer',fontSize:'var(--text-base)',lineHeight:1,fontFamily:'inherit'};
   return (<div style={{position:'absolute',top:4,right:8,display:'flex',gap:5,zIndex:3}}>
     <button title="Zoom out" style={b} onClick={z.zoomOut}>–</button>
     <button title="Zoom in" style={b} onClick={z.zoomIn}>+</button>
@@ -6065,7 +6065,7 @@ function ProductSignal(){
   const xMax = allPts.length ? Math.max(...allPts.map(p=>p.x)) : 100;
   const yMax = allPts.length ? Math.max(...allPts.map(p=>p.y)) : 100;
   const z = useChartZoom(0, +((xMax*1.08)||1).toFixed(2), 0, +((yMax*1.12)||1).toFixed(2));
-  const lensBtn=(id)=>(<button key={id} onClick={()=>setLens(id)} style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',padding:'3px 11px',borderRadius:7,cursor:'pointer',border:'1px solid '+(lens===id?PAL.accent:'var(--border-subtle)'),background:lens===id?'var(--color-accent-wash-2)':'transparent',color:lens===id?PAL.accent:'var(--text-muted)'}}>{LENS[id].short}</button>);
+  const lensBtn=(id)=>(<button key={id} onClick={()=>setLens(id)} style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',padding:'3px 11px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1px solid '+(lens===id?PAL.accent:'var(--border-subtle)'),background:lens===id?'var(--color-accent-wash-2)':'transparent',color:lens===id?PAL.accent:'var(--text-muted)'}}>{LENS[id].short}</button>);
 
   const oppRow = (p,accent) => (<div key={p.name} style={{display:'flex',gap:10,alignItems:'baseline',padding:'7px 0',borderTop:'1px solid var(--border-subtle)'}}>
     <span style={{width:7,height:7,borderRadius:'50%',background:accent,flexShrink:0,alignSelf:'center'}}/>
@@ -6116,7 +6116,7 @@ function ProductSignal(){
           <R.ZAxis type="number" dataKey="z" range={[25,320]} name="views"/>
           <R.ReferenceLine x={medPct} stroke={PAL.line} strokeDasharray="4 3"/>
           <R.ReferenceLine y={+(L.ref*100).toFixed(1)} stroke={PAL.line} strokeDasharray="4 3"/>
-          <R.Tooltip cursor={{strokeDasharray:'3 3'}} content={({payload})=>{ const p=payload&&payload[0]&&payload[0].payload; return p?(<div style={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:8,padding:'7px 10px',fontSize:'var(--text-sm)',boxShadow:'var(--shadow-md)'}}><b>{p.name}</b><br/>{NUM(p.z)} views · {p.x}% of views<br/>view→cart {p.d}% · cart→buy {p.c}%</div>):null; }}/>
+          <R.Tooltip cursor={{strokeDasharray:'3 3'}} content={({payload})=>{ const p=payload&&payload[0]&&payload[0].payload; return p?(<div style={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',padding:'7px 10px',fontSize:'var(--text-sm)',boxShadow:'var(--shadow-md)'}}><b>{p.name}</b><br/>{NUM(p.z)} views · {p.x}% of views<br/>view→cart {p.d}% · cart→buy {p.c}%</div>):null; }}/>
           <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:'var(--text-sm)', paddingBottom:8}}/>
           {series.map(s=> s.data.length>0 && <R.Scatter key={s.k} name={LBL[s.k]} data={s.data} fill={COL[s.k]} fillOpacity={0.75}/>)}
         </R.ScatterChart>
@@ -6134,7 +6134,7 @@ function ProductSignal(){
         {oppCol('Restock — in demand, out of stock',PAL.warn,restock,'None.')}
       </div>
       {moreAvail && <div style={{marginTop:12,textAlign:'center'}}>
-        <button onClick={()=>setShowAll(!showAll)} style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)',padding:'6px 16px',borderRadius:8,cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:PAL.accent}}>{showAll?'Show fewer':`Show more — ${totalOpps} opportunities ≥ ${curSym()}50/mo`}</button>
+        <button onClick={()=>setShowAll(!showAll)} style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)',padding:'6px 16px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:PAL.accent}}>{showAll?'Show fewer':`Show more — ${totalOpps} opportunities ≥ ${curSym()}50/mo`}</button>
       </div>}
       <div className="note" style={{marginTop:12}}>The full funnel, per product: <b>% of views = visibility</b>, <b>view→cart = desire</b> (do they want it once seen), <b>cart→purchase = completion</b> (do they close once they want it). Splitting the last two is the depth — a low-converting item is now diagnosed as either <b style={{color:PAL.bad}}>browsed-not-wanted</b> (fix the product page/product) or <b style={{color:PAL.warn}}>wanted-not-bought</b>{` (fix price/shipping/trust/variant at checkout) — opposite fixes. Out-of-stock items are separated (they can't convert); ${curSym()} is margin-weighted at `}{PCT(gm)}, scaled to /month. GA4 item-scoped ({META.products||PR.length} products) × Shopify price/stock.</div>
     </div>
@@ -6189,9 +6189,9 @@ function DiscountCodeTracker(){
 
   const Badge = ({p}) => { const m=DC_PATTERN[p]||DC_PATTERN['recurring'];
     return <span style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',color:m.color,
-      background:m.color+'1f',border:'1px solid '+m.color+'40',padding:'1px 7px',borderRadius:999}}>{m.label}</span>; };
+      background:m.color+'1f',border:'1px solid '+m.color+'40',padding:'1px 7px',borderRadius:'var(--radius-full)'}}>{m.label}</span>; };
 
-  const tile = (label,val,sub,accent) => (<div style={{flex:'1 1 180px',background:`var(--surface-1,${PAL.panel})`,border:`1px solid var(--border-subtle,${PAL.panel})`,borderRadius:12,padding:'12px 14px'}}>
+  const tile = (label,val,sub,accent) => (<div style={{flex:'1 1 180px',background:`var(--surface-1,${PAL.panel})`,border:`1px solid var(--border-subtle,${PAL.panel})`,borderRadius:'var(--radius-md)',padding:'12px 14px'}}>
     <div style={{fontSize:'var(--text-xs)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)'}}>{label}</div>
     <div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',marginTop:3,color:accent||'var(--text-primary)'}}>{val}</div>
     <div style={{fontSize:'var(--text-xs)',color:'var(--text-muted)',marginTop:2}}>{sub}</div>
@@ -6217,14 +6217,14 @@ function DiscountCodeTracker(){
           const gr=(M.fullPriceRevenue||0)+(M.discountedRevenue||0);
           const inten=gr?Math.round(td/gr*100):0, pen=Math.round((1-(M.fullPriceShare||0))*100), avg=(M.discountedOrders)?td/M.discountedOrders:0;
           return (
-            <div style={{background:'var(--accent-bg)',border:'1px solid var(--color-accent-line)',borderRadius:12,padding:'11px 14px',marginBottom:14,fontSize:'var(--text-sm)',color:'var(--text-secondary)',lineHeight:1.55}}>
+            <div style={{background:'var(--accent-bg)',border:'1px solid var(--color-accent-line)',borderRadius:'var(--radius-md)',padding:'11px 14px',marginBottom:14,fontSize:'var(--text-sm)',color:'var(--text-secondary)',lineHeight:1.55}}>
               <b style={{color:'var(--text-primary)'}}>How often vs how deep —</b>these two figures look like they disagree but they measure different things:
                         <span style={{display:'inline'}}> <b style={{color:'var(--text-primary)'}}>{pen}%</b> of orders carry a discount (how <i>often</i>), but the average is only <b style={{color:'var(--text-primary)'}}>{GBP(avg)}</b> off — so across all sales discounts come to only <b style={{color:'var(--text-primary)'}}>~{inten}%</b> of revenue (how <i>deep</i>). Frequent but shallow: lots of small codes, not deep cuts.</span>
               <span style={{color:'var(--text-faint)',display:'block',marginTop:4}}>The Home <i>“Discount depth”</i> tile (~{inten}{`%) is the ${curSym()}-weighted view; the `}<i>“Orders with a discount”</i> tile above ({pen}%) is the order-count view. Same data, different denominators — not a discrepancy.</span>
             </div>
           ); })()}
 
-        {(M.markdownEstimate>0 || M.automaticDiscount>0) && <div style={{background:'var(--color-warning-wash)',border:'1px solid var(--color-warning-wash)',borderRadius:12,padding:'11px 14px',marginBottom:14}}>
+        {(M.markdownEstimate>0 || M.automaticDiscount>0) && <div style={{background:'var(--color-warning-wash)',border:'1px solid var(--color-warning-wash)',borderRadius:'var(--radius-md)',padding:'11px 14px',marginBottom:14}}>
           <div style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',color:PAL.warn,fontWeight:'var(--weight-bold)',marginBottom:5}}>{`Discounts beyond codes — not in the ${curSym()} above`}</div>
           <div style={{display:'flex',gap:20,flexWrap:'wrap',fontSize:'var(--text-sm)',color:'var(--text-secondary)'}}>
             <div style={{flex:'1 1 240px'}}><b>Automatic (no code):</b> {GBP(M.automaticDiscount)} on {NUM(M.automaticOrders)} orders <span style={{color:'var(--text-faint)'}}>— in Shopify's discount totals, just not tied to a code.</span></div>
@@ -6238,7 +6238,7 @@ function DiscountCodeTracker(){
             <R.XAxis dataKey="w" tickFormatter={fmtWk} tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} interval={Math.ceil(axis.length/9)} tickMargin={8}
               label={{value:'Week', position:'insideBottom', offset:-10, fill:PAL.muted, fontSize:'var(--text-xs)'}}/>
             <R.YAxis allowDecimals={false} tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} label={{value:'Orders with a code', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:'var(--text-xs)'}}/>
-            <R.Tooltip cursor={{fill:palAlpha(PAL.accent,0.06)}} contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,fontSize:'var(--text-sm)'}}
+            <R.Tooltip cursor={{fill:palAlpha(PAL.accent,0.06)}} contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',fontSize:'var(--text-sm)'}}
               labelFormatter={w=>'Week of '+fmtWk(w)} itemSorter={it=>-it.value}/>
             <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:'var(--text-xs)', paddingBottom:8}}/>
             {stackKeys.map(k=> <R.Bar key={k.code} dataKey={k.code} stackId="a" fill={svgCol(k.color)} maxBarSize={26}/>) }
@@ -6395,7 +6395,7 @@ function RestockAlertsPanel(){
   };
   const top = data.alerts.find(a=>a.urgency!=='watch') || data.alerts[0];
   const leadInput = (val, onCh) => (<input type="number" min="0" value={val==null?'':val} onChange={e=>onCh(e.target.value)}
-    style={{width:52,background:'var(--bg-app)',color:'var(--text-primary)',border:'1px solid var(--border-default)',borderRadius:5,padding:'3px 6px',fontSize:'var(--text-sm)',fontFamily:'inherit'}}/>);
+    style={{width:52,background:'var(--bg-app)',color:'var(--text-primary)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',padding:'3px 6px',fontSize:'var(--text-sm)',fontFamily:'inherit'}}/>);
   return (
     <div className="card" style={{marginBottom:14, borderLeft:'3px solid var(--bad)'}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8}}>
@@ -6451,7 +6451,7 @@ function RestockAlertsPanel(){
         </tr></thead><tbody>
         {sorted.map((r,i)=>{ const u=U[r.urgency]; const rb=reorderByLabel(r.slack);
           return (<tr key={i}>
-            <td><span className="pill" style={{background:u.bg,color:u.fg,fontSize:'var(--text-xs)',padding:'2px 7px',borderRadius:4,fontWeight:'var(--weight-bold)',whiteSpace:'nowrap'}}>{r.urgency==='now' ? `Restock or lose ${GBP(r.monthlyRev)}/mo` : u.lbl}</span></td>
+            <td><span className="pill" style={{background:u.bg,color:u.fg,fontSize:'var(--text-xs)',padding:'2px 7px',borderRadius:'var(--radius-md)',fontWeight:'var(--weight-bold)',whiteSpace:'nowrap'}}>{r.urgency==='now' ? `Restock or lose ${GBP(r.monthlyRev)}/mo` : u.lbl}</span></td>
             <td className="tl" style={{fontSize:'var(--text-sm)',maxWidth:260}}>
               <b>{r.title}</b>
               {(r.type||r.sku) && <div className="muted" style={{fontSize:'var(--text-xs)'}}>{r.type||''}{r.type&&r.sku?' · ':''}{r.sku?<code>{r.sku}</code>:''} · {r.leadDays}d lead</div>}
@@ -6542,7 +6542,7 @@ function Products(){
           <table><thead><tr><th className="tc">#</th><th className="tl">Product</th><th className="tl">Item</th><th>Units</th><th>Returns</th><th>Net rev</th><th>Gross profit</th><th>Margin</th></tr></thead><tbody>
           {sorted.slice(0,30).map((p,i)=>(<tr key={i}>
             <td className="tc muted">{i+1}</td>
-            <td className="tl" style={{maxWidth:300}}>{p.image&&<img src={p.image} style={{width:22,height:22,borderRadius:4,verticalAlign:'middle',marginRight:8,objectFit:'cover',background:'var(--bg-elevated)'}} onError={e=>{e.target.style.opacity=.2;}}/>}{p.title}</td>
+            <td className="tl" style={{maxWidth:300}}>{p.image&&<img src={p.image} style={{width:22,height:22,borderRadius:'var(--radius-md)',verticalAlign:'middle',marginRight:8,objectFit:'cover',background:'var(--bg-elevated)'}} onError={e=>{e.target.style.opacity=.2;}}/>}{p.title}</td>
             <td className="tl"><span className="muted" style={{fontSize:'var(--text-xs)'}}>{p.sku||'—'}</span></td>
             <td>{p.units}</td>
             <td><span className={'pill '+((p.returnRate||0)>=0.1?'red':(p.returnRate||0)>=0.05?'amber':'grey')}>{p.returns}</span></td>
@@ -6595,7 +6595,7 @@ function Organic(){
               <R.Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={100} paddingAngle={1}>
                 {pieData.map((p,i)=><R.Cell key={i} fill={svgCol(p.fill)}/>)}
               </R.Pie>
-              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} formatter={v=>GBP(v)} />
+              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)'}} formatter={v=>GBP(v)} />
             </R.PieChart>
           </R.ResponsiveContainer>
         </div>
@@ -6770,7 +6770,7 @@ function EmailHealthPanel(){
           <table><thead><tr><th>Flow</th><th className="tl">Status</th><th className="tl">Notes</th></tr></thead><tbody>
           {flowChecklist.map((f,i)=>(<tr key={i}>
             <td style={{fontSize:'var(--text-sm)'}}>{f.label} {f.critical && <span className="muted" style={{fontSize:'var(--text-xs)',marginLeft:4}}>critical</span>}</td>
-            <td className="tl">{f.present ? <span className="pill" style={{background:'var(--good-bg)',color:'var(--good)',fontSize:'var(--text-xs)',padding:'2px 6px',borderRadius:4,fontWeight:'var(--weight-bold)'}}>PRESENT</span> : <span className="pill" style={{background:'var(--bad-bg)',color:'var(--bad)',fontSize:'var(--text-xs)',padding:'2px 6px',borderRadius:4,fontWeight:'var(--weight-bold)'}}>GAP</span>}</td>
+            <td className="tl">{f.present ? <span className="pill" style={{background:'var(--good-bg)',color:'var(--good)',fontSize:'var(--text-xs)',padding:'2px 6px',borderRadius:'var(--radius-md)',fontWeight:'var(--weight-bold)'}}>PRESENT</span> : <span className="pill" style={{background:'var(--bad-bg)',color:'var(--bad)',fontSize:'var(--text-xs)',padding:'2px 6px',borderRadius:'var(--radius-md)',fontWeight:'var(--weight-bold)'}}>GAP</span>}</td>
             <td className="muted tl" style={{fontSize:'var(--text-xs)',maxWidth:340}}>{f.present ? (f.present_detail || '—') : (f.gap_text || 'Not detected in current flow list.')}</td>
           </tr>))}
           </tbody></table>
@@ -6778,19 +6778,19 @@ function EmailHealthPanel(){
         <div className="card" style={{flex:'1 1 300px'}}>
           <h2>Deliverability + list health flags</h2>
           <div style={{display:'flex',flexDirection:'column',gap:10,fontSize:'var(--text-sm)'}}>
-            {mppFlag && (<div style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${PAL.warn}`,borderRadius:'0 6px 6px 0'}}>
+            {mppFlag && (<div style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${PAL.warn}`,borderRadius:'var(--radius-none) var(--radius-md) var(--radius-md) var(--radius-none)'}}>
               <div style={{fontWeight:'var(--weight-semi)',marginBottom:3,color:PAL.warn}}>Apple MPP open-rate inflation</div>
               <div className="muted">Campaign opens {(campOpenW*100).toFixed(0)}%, flow opens {(flowOpenW*100).toFixed(0)}%. Real open rates are likely 25-40% lower. <b>Don't optimise on open rate</b>. Use click rate + order-attributed revenue as the true signals. Suppress "non-openers" segmentation that relies on opens; use "non-clickers" instead.</div>
             </div>)}
-            <div style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${PAL.data3}`,borderRadius:'0 6px 6px 0'}}>
+            <div style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${PAL.data3}`,borderRadius:'var(--radius-none) var(--radius-md) var(--radius-md) var(--radius-none)'}}>
               <div style={{fontWeight:'var(--weight-semi)',marginBottom:3}}>List engagement decay risk</div>
               <div className="muted">No 30/60/90d engagement segmentation visible in current data. <b>Recommended:</b> create "actively engaged" (opened or clicked in last 30d) and "decayed" (no engagement 60d+) segments. Suppress decayed list from regular campaigns or reactivate via re-engagement series. Otherwise sender rep degrades over months.</div>
             </div>
-            <div style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${PAL.bad}`,borderRadius:'0 6px 6px 0'}}>
+            <div style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${PAL.bad}`,borderRadius:'var(--radius-none) var(--radius-md) var(--radius-md) var(--radius-none)'}}>
               <div style={{fontWeight:'var(--weight-semi)',marginBottom:3,color:PAL.bad}}>Bounce/spam complaint rate not tracked</div>
               <div className="muted">Supermetrics' Klaviyo connector doesn't expose bounce or spam-complaint rates in current pull. <b>Manual check needed:</b> log into Klaviyo → Analytics → Deliverability. Bounce rate should be &lt;2%, spam complaints &lt;0.1%. Higher = deliverability is at risk.</div>
             </div>
-            <div style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${PAL.accent}`,borderRadius:'0 6px 6px 0'}}>
+            <div style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${PAL.accent}`,borderRadius:'var(--radius-none) var(--radius-md) var(--radius-md) var(--radius-none)'}}>
               <div style={{fontWeight:'var(--weight-semi)',marginBottom:3}}>Top opportunity: win-back flow</div>
               <div className="muted">{`~35% of orders are returning customers, but there's no flow nurturing the lapsed segment. Building a win-back (trigger at 60-90d since purchase) likely adds ${curSym()}200-500/mo at current scale. Best-practice format: nostalgia trigger → product reminder → discount escalation.`}</div>
             </div>
@@ -6883,19 +6883,19 @@ function EmailHub(){
         <div className="card" style={{flex:'1 1 280px'}}>
           <h2>Quick wins</h2>
           <div style={{display:'flex',flexDirection:'column',gap:10,fontSize:'var(--text-sm)'}}>
-            <div style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${PAL.good}`,borderRadius:'0 6px 6px 0'}}>
+            <div style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${PAL.good}`,borderRadius:'var(--radius-none) var(--radius-md) var(--radius-md) var(--radius-none)'}}>
               <div style={{fontWeight:'var(--weight-semi)',marginBottom:3}}>{`Back-in-Stock at ${curSym()}8.16/recipient`}</div>
               <div className="muted">Best-performing flow. Audit which products trigger it — expand to more items.</div>
             </div>
-            <div style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${PAL.good}`,borderRadius:'0 6px 6px 0'}}>
+            <div style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${PAL.good}`,borderRadius:'var(--radius-none) var(--radius-md) var(--radius-md) var(--radius-none)'}}>
               <div style={{fontWeight:'var(--weight-semi)',marginBottom:3}}>{`NECKLACES Welcome at ${curSym()}6.65/recipient`}</div>
               <div className="muted">Per-category welcome flows crushing — replicate for new categories.</div>
             </div>
-            <div style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${PAL.warn}`,borderRadius:'0 6px 6px 0'}}>
+            <div style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${PAL.warn}`,borderRadius:'var(--radius-none) var(--radius-md) var(--radius-md) var(--radius-none)'}}>
               <div style={{fontWeight:'var(--weight-semi)',marginBottom:3}}>Happy Birthday flow = 0 revenue</div>
               <div className="muted">Open rate 41% but zero orders. Subject works, CTA doesn't. Test a stronger offer.</div>
             </div>
-            <div style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${PAL.bad}`,borderRadius:'0 6px 6px 0'}}>
+            <div style={{padding:10,background:'var(--bg-app)',borderLeft:`3px solid ${PAL.bad}`,borderRadius:'var(--radius-none) var(--radius-md) var(--radius-md) var(--radius-none)'}}>
               <div style={{fontWeight:'var(--weight-semi)',marginBottom:3}}>43 campaigns in 90d = 1 every 2 days</div>
               <div className="muted">High frequency. List fatigue likely — consider cutting low performers.</div>
             </div>
@@ -6911,7 +6911,7 @@ function EmailHub(){
             <R.CartesianGrid stroke={PAL.panel} vertical={false} />
             <R.XAxis dataKey="date" tick={false} tickLine={false} height={6} />
             <R.YAxis tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} label={{value:'Sends', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:'var(--text-xs)'}} />
-            <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} />
+            <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)'}} />
             <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:'var(--text-xs)', paddingBottom:8}}/>
             <R.Bar dataKey="sends" name="Campaign sends" fill={svgCol(COL.email)} />
           </R.ComposedChart>
@@ -6921,7 +6921,7 @@ function EmailHub(){
             <R.CartesianGrid stroke={PAL.panel} vertical={false} />
             <R.XAxis dataKey="date" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} interval={Math.ceil(sendChart.length/12)} label={{value:'Date', position:'insideBottom', offset:-6, fill:PAL.muted, fontSize:'var(--text-xs)'}} />
             <R.YAxis tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>curSym()+(v/1000).toFixed(1)+'k'} label={{value:`Revenue (${curSym()})`, angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:'var(--text-xs)'}} />
-            <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} />
+            <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)'}} />
             <R.Line type="monotone" dataKey="revenue" name="Revenue" stroke={svgCol(COL.revenue)} strokeWidth={2} dot={false} />
           </R.ComposedChart>
         </R.ResponsiveContainer>
@@ -7009,12 +7009,12 @@ function ContentCalendar(){
               const maxEng = items.reduce((a,i)=>Math.max(a,i.engRate||0),0);
               const colour = !hasContent ? 'var(--heat-empty)' : maxEng>0.06 ? 'var(--heat-high)' : maxEng>0.03 ? 'var(--heat-mid)' : maxEng>0.01 ? 'var(--heat-low)' : 'var(--heat-none)';
               const tooltip = items.map(i=>`${i._kind==='story'?'STORY':i.type} · ${(i.caption||'').slice(0,40)}`).join('\n');
-              return (<td key={di} style={{width:50,height:48,background:colour,borderRadius:6,verticalAlign:'top',padding:4,cursor:hasContent?'pointer':'default',position:'relative'}} title={tooltip} onClick={()=>{ if(items[0]?.permalink) window.open(items[0].permalink,'_blank'); }}>
+              return (<td key={di} style={{width:50,height:48,background:colour,borderRadius:'var(--radius-md)',verticalAlign:'top',padding:4,cursor:hasContent?'pointer':'default',position:'relative'}} title={tooltip} onClick={()=>{ if(items[0]?.permalink) window.open(items[0].permalink,'_blank'); }}>
                 <div style={{fontSize:'var(--text-xs)',color:'var(--heat-ink)',fontWeight:'var(--weight-semi)'}}>{parseInt(date.slice(8,10))}</div>
                 {hasContent && (<div style={{position:'absolute',bottom:2,right:2,display:'flex',gap:2}}>
-                  {reels.length>0 && <span style={{fontSize:'var(--text-xs)',background:PAL.data3,color:PAL.panel,padding:'1px 3px',borderRadius:3,fontWeight:'var(--weight-bold)'}}>R{reels.length>1?reels.length:''}</span>}
-                  {carousel.length>0 && <span style={{fontSize:'var(--text-xs)',background:PAL.accent,color:PAL.panel,padding:'1px 3px',borderRadius:3,fontWeight:'var(--weight-bold)'}}>F{carousel.length>1?carousel.length:''}</span>}
-                  {stories.length>0 && <span style={{fontSize:'var(--text-xs)',background:PAL.warn,color:PAL.ink,padding:'1px 3px',borderRadius:3,fontWeight:'var(--weight-bold)'}}>S{stories.length>1?stories.length:''}</span>}
+                  {reels.length>0 && <span style={{fontSize:'var(--text-xs)',background:PAL.data3,color:PAL.panel,padding:'1px 3px',borderRadius:'var(--radius-sm)',fontWeight:'var(--weight-bold)'}}>R{reels.length>1?reels.length:''}</span>}
+                  {carousel.length>0 && <span style={{fontSize:'var(--text-xs)',background:PAL.accent,color:PAL.panel,padding:'1px 3px',borderRadius:'var(--radius-sm)',fontWeight:'var(--weight-bold)'}}>F{carousel.length>1?carousel.length:''}</span>}
+                  {stories.length>0 && <span style={{fontSize:'var(--text-xs)',background:PAL.warn,color:PAL.ink,padding:'1px 3px',borderRadius:'var(--radius-sm)',fontWeight:'var(--weight-bold)'}}>S{stories.length>1?stories.length:''}</span>}
                 </div>)}
               </td>);
             })}
@@ -7023,11 +7023,11 @@ function ContentCalendar(){
       </table>
     </div>
     <div style={{marginTop:10,display:'flex',gap:14,fontSize:'var(--text-xs)',color:'var(--text-muted)',flexWrap:'wrap'}}>
-      <span><span style={{display:'inline-block',width:10,height:10,background:'var(--heat-high)',borderRadius:2,marginRight:4,verticalAlign:'middle'}}/>Breakout (&gt;6% eng)</span>
-      <span><span style={{display:'inline-block',width:10,height:10,background:'var(--heat-mid)',borderRadius:2,marginRight:4,verticalAlign:'middle'}}/>Strong (3-6%)</span>
-      <span><span style={{display:'inline-block',width:10,height:10,background:'var(--heat-low)',borderRadius:2,marginRight:4,verticalAlign:'middle'}}/>Low (1-3%)</span>
-      <span><span style={{display:'inline-block',width:10,height:10,background:'var(--heat-none)',borderRadius:2,marginRight:4,verticalAlign:'middle',border:'1px solid var(--border-subtle)'}}/>Posted, no reach data</span>
-      <span><span style={{display:'inline-block',width:10,height:10,background:'var(--heat-empty)',borderRadius:2,marginRight:4,verticalAlign:'middle',border:'1px solid var(--border-subtle)'}}/>No content</span>
+      <span><span style={{display:'inline-block',width:10,height:10,background:'var(--heat-high)',borderRadius:'var(--radius-sm)',marginRight:4,verticalAlign:'middle'}}/>Breakout (&gt;6% eng)</span>
+      <span><span style={{display:'inline-block',width:10,height:10,background:'var(--heat-mid)',borderRadius:'var(--radius-sm)',marginRight:4,verticalAlign:'middle'}}/>Strong (3-6%)</span>
+      <span><span style={{display:'inline-block',width:10,height:10,background:'var(--heat-low)',borderRadius:'var(--radius-sm)',marginRight:4,verticalAlign:'middle'}}/>Low (1-3%)</span>
+      <span><span style={{display:'inline-block',width:10,height:10,background:'var(--heat-none)',borderRadius:'var(--radius-sm)',marginRight:4,verticalAlign:'middle',border:'1px solid var(--border-subtle)'}}/>Posted, no reach data</span>
+      <span><span style={{display:'inline-block',width:10,height:10,background:'var(--heat-empty)',borderRadius:'var(--radius-sm)',marginRight:4,verticalAlign:'middle',border:'1px solid var(--border-subtle)'}}/>No content</span>
     </div>
     <div className="note" style={{marginTop:14}}><b>Greta's read:</b> {avgPerWeek.toFixed(1)} posts/week is on the low side for a DTC brand fighting for organic reach — 4-5/week is the active competitor benchmark. The {storyCount === 0 ? 'complete absence of Stories' : storyCount + ' story in 60 days'} is the biggest organic blind spot — Stories are the daily-cadence touchpoint that competitors (Astrid &amp; Miyu, Abbott Lyon) use for behind-the-scenes, drops, and link-to-product. Brief Angela on a weekly Story cadence (3-5/week minimum).</div>
   </div>);
@@ -7114,7 +7114,7 @@ function InstagramPanel(){
               <R.CartesianGrid stroke={PAL.panel} vertical={false} />
               <R.XAxis tickLine={false} dataKey="date" tick={false} interval={Math.ceil(dailyChart.length/8)}  />
               <R.YAxis yAxisId="l" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} label={{value:'New followers', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:'var(--text-xs)'}} />
-              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} />
+              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)'}} />
               <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:'var(--text-xs)', paddingBottom:8}}/>
               <R.Bar yAxisId="l" dataKey="new" name="New followers" fill={svgCol(COL.email)} />
             </R.ComposedChart>
@@ -7124,7 +7124,7 @@ function InstagramPanel(){
               <R.CartesianGrid stroke={PAL.panel} vertical={false} />
               <R.XAxis dataKey="date" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} interval={Math.ceil(dailyChart.length/8)} label={{value:'Date', position:'insideBottom', offset:-6, fill:PAL.muted, fontSize:'var(--text-xs)'}} />
               <R.YAxis yAxisId="l" orientation="left" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>(v/1000).toFixed(0)+'k'} label={{value:'Reach', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:'var(--text-xs)'}} />
-              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} />
+              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)'}} />
               <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:'var(--text-xs)', paddingBottom:8}}/>
               <R.Line yAxisId="l" type="monotone" dataKey="reach" name="Reach" stroke={svgCol(COL.sessions)} strokeWidth={2} dot={false} />
             </R.ComposedChart>
@@ -7137,7 +7137,7 @@ function InstagramPanel(){
             <td>{r.age}</td>
             <td>{NUM(r.female)}</td>
             <td>{NUM(r.male+r.undef)}</td>
-            <td><span style={{display:'inline-block',width:80,background:PAL.panel,borderRadius:4,height:8,position:'relative',marginRight:8,verticalAlign:'middle'}}><span style={{display:'block',width:(100*r.total/totalAudience)+'%',height:8,background:COL.email,borderRadius:4}}/></span>{PCT(r.total/totalAudience)}</td>
+            <td><span style={{display:'inline-block',width:80,background:PAL.panel,borderRadius:'var(--radius-md)',height:8,position:'relative',marginRight:8,verticalAlign:'middle'}}><span style={{display:'block',width:(100*r.total/totalAudience)+'%',height:8,background:COL.email,borderRadius:'var(--radius-md)'}}/></span>{PCT(r.total/totalAudience)}</td>
           </tr>))}
           </tbody></table>
         </div>
@@ -7213,7 +7213,7 @@ function SiteStructure({start}){
         <h2>GA4 funnel (selected window)</h2>
         {f.map(s=>(<div key={s.stage} style={{margin:'9px 0'}}>
           <div className="mrow"><span className="k">{s.stage}</span><span className="v">{NUM(s.v)} ({PCT(s.v/fmax)})</span></div>
-          <div style={{height:9,background:PAL.panel,borderRadius:6,marginTop:4}}><div style={{height:9,width:(100*s.v/fmax)+'%',background:COL.sessions,borderRadius:6}}/></div>
+          <div style={{height:9,background:PAL.panel,borderRadius:'var(--radius-md)',marginTop:4}}><div style={{height:9,width:(100*s.v/fmax)+'%',background:COL.sessions,borderRadius:'var(--radius-md)'}}/></div>
         </div>))}
         <div className="note" style={{marginTop:10,fontSize:'var(--text-sm)'}}>Clarity confirms the killers: <b>basket→checkout −67.8%</b> (vs 40–50% normal) and <b>checkout→complete −90%</b> (vs 50–60%).</div>
       </div>
@@ -7419,7 +7419,7 @@ function IntelligencePanel(){
                 moreLabel={label.toLowerCase()}
                 renderItem={(p, i) => (<div key={i} style={{
                   padding:'8px 12px', background:'var(--bg-elevated)',
-                  borderLeft:`2px solid ${color}`, borderRadius:'0 var(--r-sm) var(--r-sm) 0',
+                  borderLeft:`2px solid ${color}`, borderRadius:'var(--radius-none) var(--r-sm) var(--r-sm) var(--radius-none)',
                   fontSize:'var(--text-sm)', color:'var(--text-secondary)', lineHeight:1.5,
                 }}>
                   {scrubTag(p.description)}
@@ -7536,7 +7536,7 @@ function IntelligencePanel(){
                 <td className="muted">{s.inconclusive}</td>
                 <td>{s.hit_rate != null ? <b>{(s.hit_rate * 100).toFixed(0)}%</b> : '—'}</td>
                 <td>{s.avg_attributed_lift != null ? s.avg_attributed_lift.toFixed(3) : '—'}</td>
-                <td><span style={{fontSize:'var(--text-xs)', padding:'2px 6px', borderRadius:4, color:confColor, fontWeight:'var(--weight-semi)', textTransform:'uppercase'}}>{conf} (n={s.total_closed})</span></td>
+                <td><span style={{fontSize:'var(--text-xs)', padding:'2px 6px', borderRadius:'var(--radius-md)', color:confColor, fontWeight:'var(--weight-semi)', textTransform:'uppercase'}}>{conf} (n={s.total_closed})</span></td>
               </tr>);
             })}
             </tbody></table>
@@ -7738,7 +7738,7 @@ function ForecastPanel(){
           </tbody>
         </table>
         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'var(--s-3)', marginTop:'var(--s-4)'}}>
-          <div style={{padding:'var(--s-3)', background:'var(--bg-elevated)', borderLeft:'2px solid var(--warn)', borderRadius:'0 var(--r-sm) var(--r-sm) 0'}}>
+          <div style={{padding:'var(--s-3)', background:'var(--bg-elevated)', borderLeft:'2px solid var(--warn)', borderRadius:'var(--radius-none) var(--r-sm) var(--r-sm) var(--radius-none)'}}>
             <div className="micro" style={{color:'var(--warn)', marginBottom:'var(--s-2)'}}>NOT included</div>
             <ul style={{fontSize:'var(--text-sm)', color:'var(--text-secondary)', lineHeight:1.6, paddingLeft:'var(--s-4)', margin:0}}>
               <li>Organic / direct traffic (you marked "{organicAssumption}")</li>
@@ -7748,7 +7748,7 @@ function ForecastPanel(){
               <li>Creative-fatigue degradation mid-period</li>
             </ul>
           </div>
-          <div style={{padding:'var(--s-3)', background:'var(--bg-elevated)', borderLeft:'2px solid var(--accent)', borderRadius:'0 var(--r-sm) var(--r-sm) 0'}}>
+          <div style={{padding:'var(--s-3)', background:'var(--bg-elevated)', borderLeft:'2px solid var(--accent)', borderRadius:'var(--radius-none) var(--r-sm) var(--r-sm) var(--radius-none)'}}>
             <div className="micro" style={{color:'var(--accent)', marginBottom:'var(--s-2)'}}>Stress-test this</div>
             <div style={{fontSize:'var(--text-sm)', color:'var(--text-secondary)', lineHeight:1.6}}>
               Re-run with ROAS at your <b>worst</b> 30-day rate, then your <b>best</b>. The gap between those two forecasts is the planning range — not the central case. Use the scenario buttons at the top to swap quickly.
@@ -8122,30 +8122,30 @@ ${ctxJson}`;
     <div className="card" style={{marginBottom:14, borderLeft:`3px solid ${PAL.accent}`}}>
       <h2>Ask Greta</h2>
       <div className="muted" style={{marginBottom:10, fontSize:'var(--text-sm)'}}>Runs <b>privately inside your workspace</b>, on a summary of your live data. Nothing leaves it.</div>
-      {!ASK && (<div style={{padding:12, background:'var(--bg-app)', borderRadius:8, marginBottom:10, border:'1px solid var(--border-default)'}}>
+      {!ASK && (<div style={{padding:12, background:'var(--bg-app)', borderRadius:'var(--radius-md)', marginBottom:10, border:'1px solid var(--border-default)'}}>
         <div style={{fontSize:'var(--text-sm)', color:'var(--text-primary)', lineHeight:1.5}}>Ask runs inside your authenticated workspace, where the model key is held server-side (never in the browser). It isn't enabled in this public demo. The examples below show the questions it answers from your live data.</div>
       </div>)}
       {ASK && (<div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,fontSize:'var(--text-xs)',color:PAL.muted}}>
         <span>Private to your workspace</span>
-        <select value={depth} onChange={e=>setDepth(e.target.value)} aria-label="Answer depth" style={{background:'var(--bg-input)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:4, padding:'2px 6px', fontSize:'var(--text-xs)'}}>
+        <select value={depth} onChange={e=>setDepth(e.target.value)} aria-label="Answer depth" style={{background:'var(--bg-input)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--radius-md)', padding:'2px 6px', fontSize:'var(--text-xs)'}}>
           <option value="thorough">Thorough answer</option>
           <option value="quick">Quick answer</option>
         </select>
         {history.length>0 && <a onClick={clearHistory} style={{cursor:'pointer',color:PAL.warn}}>clear chat</a>}
       </div>)}
       <div style={{display:'flex',gap:6,marginBottom:10}}>
-        <textarea value={question} onChange={e=>setQuestion(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)) send(); }} placeholder={ASK?'Ask a question about the dataset… (Ctrl+Enter to send)':'Available in your authenticated workspace'} disabled={!ASK||loading} rows={2} style={{flex:1, padding:'10px 12px', background:'var(--bg-input)', border:'1px solid var(--border-default)', borderRadius:6, color:'var(--text-primary)', fontSize:'var(--text-sm)', fontFamily:'inherit', resize:'vertical'}} />
-        <button onClick={send} disabled={!ASK||loading||!question.trim()} style={{padding:'10px 18px', background: loading?PAL.line:PAL.accent, border:'none', borderRadius:6, color:PAL.panel, fontWeight:'var(--weight-semi)', cursor: loading?'wait':(ASK?'pointer':'not-allowed'), whiteSpace:'nowrap'}}>{loading?'Thinking…':'Ask'}</button>
+        <textarea value={question} onChange={e=>setQuestion(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)) send(); }} placeholder={ASK?'Ask a question about the dataset… (Ctrl+Enter to send)':'Available in your authenticated workspace'} disabled={!ASK||loading} rows={2} style={{flex:1, padding:'10px 12px', background:'var(--bg-input)', border:'1px solid var(--border-default)', borderRadius:'var(--radius-md)', color:'var(--text-primary)', fontSize:'var(--text-sm)', fontFamily:'inherit', resize:'vertical'}} />
+        <button onClick={send} disabled={!ASK||loading||!question.trim()} style={{padding:'10px 18px', background: loading?PAL.line:PAL.accent, border:'none', borderRadius:'var(--radius-md)', color:PAL.panel, fontWeight:'var(--weight-semi)', cursor: loading?'wait':(ASK?'pointer':'not-allowed'), whiteSpace:'nowrap'}}>{loading?'Thinking…':'Ask'}</button>
       </div>
       <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:4}}>
-        {quickPrompts.map((q,i)=>(<button key={i} onClick={()=>ASK&&setQuestion(q)} title={ASK?'':'Available in your workspace'} style={{padding:'4px 10px', background:'var(--bg-card)', border:'1px solid var(--border-default)', borderRadius:14, color:'var(--text-secondary)', fontSize:'var(--text-xs)', cursor:ASK?'pointer':'default', opacity:ASK?1:0.7}}>{q.length>60?q.slice(0,60)+'…':q}</button>))}
+        {quickPrompts.map((q,i)=>(<button key={i} onClick={()=>ASK&&setQuestion(q)} title={ASK?'':'Available in your workspace'} style={{padding:'4px 10px', background:'var(--bg-card)', border:'1px solid var(--border-default)', borderRadius:'var(--radius-md)', color:'var(--text-secondary)', fontSize:'var(--text-xs)', cursor:ASK?'pointer':'default', opacity:ASK?1:0.7}}>{q.length>60?q.slice(0,60)+'…':q}</button>))}
       </div>
-      {error && (<div style={{padding:10,background:'#3a1010',border:`1px solid ${PAL.bad}`,borderRadius:6,marginTop:10,color:PAL.bad,fontSize:'var(--text-sm)'}}>Error: {error}</div>)}
+      {error && (<div style={{padding:10,background:'#3a1010',border:`1px solid ${PAL.bad}`,borderRadius:'var(--radius-md)',marginTop:10,color:PAL.bad,fontSize:'var(--text-sm)'}}>Error: {error}</div>)}
     </div>
     {history.length > 0 && (<div className="card">
       <h2>Conversation</h2>
       <div style={{display:'flex',flexDirection:'column',gap:12,maxHeight:600,overflowY:'auto'}}>
-        {history.slice().reverse().map((m,i)=>(<div key={i} style={{padding:12, background: m.role==='user'?PAL.panel:PAL.panel, borderRadius:8, borderLeft:`3px solid ${m.role==='user'?PAL.data3:PAL.accent}`}}>
+        {history.slice().reverse().map((m,i)=>(<div key={i} style={{padding:12, background: m.role==='user'?PAL.panel:PAL.panel, borderRadius:'var(--radius-md)', borderLeft:`3px solid ${m.role==='user'?PAL.data3:PAL.accent}`}}>
           <div style={{fontSize:'var(--text-xs)',color:PAL.muted,marginBottom:6,textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',fontWeight:'var(--weight-semi)',display:'flex',justifyContent:'space-between'}}>
             <span>{m.role==='user'?'You':'Greta'}</span>
             <span>{new Date(m.time).toLocaleString()}{m.usage?` · ${m.usage.input_tokens||0} in / ${m.usage.output_tokens||0} out${m.usage.cache_read_input_tokens?` · cached ${m.usage.cache_read_input_tokens}`:''}`:''}</span>
@@ -8153,7 +8153,7 @@ ${ctxJson}`;
           <div style={{fontSize:'var(--text-sm)', whiteSpace:'pre-wrap', lineHeight:1.5, color:'var(--text-primary)'}}>{m.content}</div>
           {m.role==='assistant' && (<div style={{marginTop:8, display:'flex', gap:8, alignItems:'center'}}>
             <button onClick={()=>{ if(aiSaveTask(m.content)) setSavedTasks(s=>({...s,[m.time]:true})); }} disabled={!!savedTasks[m.time]}
-              style={{padding:'4px 10px', background:savedTasks[m.time]?'transparent':PAL.panel, border:'1px solid '+(savedTasks[m.time]?'var(--good)':'#30303a'), borderRadius:6, color:savedTasks[m.time]?'var(--good)':PAL.faint, fontSize:'var(--text-xs)', cursor:savedTasks[m.time]?'default':'pointer'}}>
+              style={{padding:'4px 10px', background:savedTasks[m.time]?'transparent':PAL.panel, border:'1px solid '+(savedTasks[m.time]?'var(--good)':'#30303a'), borderRadius:'var(--radius-md)', color:savedTasks[m.time]?'var(--good)':PAL.faint, fontSize:'var(--text-xs)', cursor:savedTasks[m.time]?'default':'pointer'}}>
               {savedTasks[m.time]?'Saved to Weekly Board':'+ Save as task'}
             </button>
             <span style={{fontSize:'var(--text-xs)', color:PAL.muted}}>turns this into a tracked action on the Board</span>
@@ -8229,7 +8229,7 @@ function FreshnessChip(){
   const label=stale.length?`${stale.length} stale`:ageing.length?`${ageing.length} ageing`:'Live';
   const tip='Sync freshness (connected sources)\n'+sources.map(s=>`${s.name}: ${ageStr(s.n)}${s.broken?' (sync failing)':''}`).join('   ·   ')+'\n(click to manage connections)';
   return (<button onClick={()=>window.__oiNav&&window.__oiNav('settings','connections')} title={tip} aria-label={`Data freshness: ${label}`}
-    style={{display:'inline-flex',alignItems:'center',gap:6,height:30,padding:'0 10px',flexShrink:0,borderRadius:8,background:'var(--bg-card)',border:'1px solid var(--border-default)',color:'var(--text-secondary)',cursor:'pointer',fontSize:'var(--text-sm)',whiteSpace:'nowrap'}}>
+    style={{display:'inline-flex',alignItems:'center',gap:6,height:30,padding:'0 10px',flexShrink:0,borderRadius:'var(--radius-md)',background:'var(--bg-card)',border:'1px solid var(--border-default)',color:'var(--text-secondary)',cursor:'pointer',fontSize:'var(--text-sm)',whiteSpace:'nowrap'}}>
     <span style={{width:7,height:7,borderRadius:'50%',background:color,display:'inline-block'}}/>
     <span style={{fontWeight:'var(--weight-semi)'}}>{label}</span>
   </button>);
@@ -8685,7 +8685,7 @@ function WeeklyBoard(){
               <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
               <R.XAxis tickLine={false} dataKey="x" tick={false} interval={Math.ceil(trend.length/8)}/>
               <R.YAxis yAxisId="l" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>curSym()+(v/1000).toFixed(0)+'k'}/>
-              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} formatter={(v,n)=>[GBP(v),n]}/>
+              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)'}} formatter={(v,n)=>[GBP(v),n]}/>
               <R.Bar yAxisId="l" dataKey="paid" name="Paid spend" fill={svgCol(COL.meta)} radius={[2,2,0,0]}/>
               {renderPins()}
             </R.ComposedChart>
@@ -8695,7 +8695,7 @@ function WeeklyBoard(){
               <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
               <R.XAxis dataKey="x" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} interval={Math.ceil(trend.length/8)}/>
               <R.YAxis yAxisId="l" orientation="left" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>curSym()+(v/1000).toFixed(0)+'k'}/>
-              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}} formatter={(v,n)=>[GBP(v),n]}/>
+              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)'}} formatter={(v,n)=>[GBP(v),n]}/>
               <R.Line yAxisId="l" type="monotone" dataKey="revenue" name="Net revenue" stroke={svgCol(COL.revenue)} strokeWidth={2.4} dot={false}/>
               {renderPins()}
             </R.ComposedChart>
@@ -8707,7 +8707,7 @@ function WeeklyBoard(){
               <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
               <R.XAxis tickLine={false} dataKey="x" tick={false} interval={Math.ceil(trend.length/6)}/>
               <R.YAxis yAxisId="l" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>v+'×'}/>
-              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}}/>
+              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)'}}/>
               <R.ReferenceLine yAxisId="l" y={2} stroke={PAL.accent} strokeDasharray="5 4" strokeOpacity={0.7} label={{value:'Sales per £ of ads 2×', position:'insideTopLeft', fill:PAL.accent, fontSize:'var(--text-xs)'}}/>
               <R.Line yAxisId="l" type="monotone" dataKey="mer" name="Sales per £ of ads" stroke={PAL.accent} strokeWidth={2.2} dot={false}/>
             </R.ComposedChart>
@@ -8717,7 +8717,7 @@ function WeeklyBoard(){
               <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
               <R.XAxis dataKey="x" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} interval={Math.ceil(trend.length/6)}/>
               <R.YAxis yAxisId="l" orientation="left" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>v+'%'}/>
-              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10}}/>
+              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)'}}/>
               <R.ReferenceLine yAxisId="l" y={2} stroke={PAL.data3} strokeDasharray="5 4" strokeOpacity={0.6} label={{value:'Visitors who buy 2%', position:'insideTopRight', fill:PAL.data3, fontSize:'var(--text-xs)'}}/>
               <R.Line yAxisId="l" type="monotone" dataKey="cvr" name="Visitors who buy" stroke={svgCol(COL.sessions)} strokeWidth={2.2} dot={false}/>
             </R.ComposedChart>
@@ -8821,7 +8821,7 @@ function CohortsPanel(){
               <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
               <R.XAxis dataKey="m" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}}/>
               <R.YAxis tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>curSym()+v}/>
-              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,boxShadow:'var(--shadow-md)'}} formatter={(v,n)=>[GBP(v), n==='contrib'?'Contribution':'Revenue']}
+              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',boxShadow:'var(--shadow-md)'}} formatter={(v,n)=>[GBP(v), n==='contrib'?'Contribution':'Revenue']}
                 labelFormatter={(l,p)=> l + (p&&p[0]&&p[0].payload? ' · '+p[0].payload.n+' customers observed':'')}/>
               <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:'var(--text-sm)', paddingBottom:8}}/>
               {paidCac!=null && <R.ReferenceLine y={paidCac} stroke={PAL.accent} strokeDasharray="5 4" strokeOpacity={0.8} label={{value:'paid New-customer cost', position:'insideTopRight', fill:PAL.accent, fontSize:'var(--text-xs)'}}/>}
@@ -8843,7 +8843,7 @@ function CohortsPanel(){
               <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
               <R.XAxis tickLine={false} dataKey="month" tick={false}/>
               <R.YAxis yAxisId="l" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}}/>
-              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,boxShadow:'var(--shadow-md)'}} formatter={(v,n)=> n==='cac'?[v!=null?GBP(v):'no paid spend','Paid cost per new customer']:[NUM(v),'New customers']}/>
+              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',boxShadow:'var(--shadow-md)'}} formatter={(v,n)=> n==='cac'?[v!=null?GBP(v):'no paid spend','Paid cost per new customer']:[NUM(v),'New customers']}/>
               <R.Bar yAxisId="l" dataKey="newCust" name="New customers" fill={svgCol(COL.sessions)} radius={[2,2,0,0]}/>
             </R.ComposedChart>
           </R.ResponsiveContainer>
@@ -8852,7 +8852,7 @@ function CohortsPanel(){
               <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
               <R.XAxis dataKey="month" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}}/>
               <R.YAxis yAxisId="l" orientation="left" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>curSym()+v}/>
-              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,boxShadow:'var(--shadow-md)'}} formatter={(v,n)=> n==='cac'?[v!=null?GBP(v):'no paid spend','Paid cost per new customer']:[NUM(v),'New customers']}/>
+              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',boxShadow:'var(--shadow-md)'}} formatter={(v,n)=> n==='cac'?[v!=null?GBP(v):'no paid spend','Paid cost per new customer']:[NUM(v),'New customers']}/>
               <R.Line yAxisId="l" type="monotone" dataKey="cac" name="cac" stroke={svgCol(COL.google)} strokeWidth={2.2} dot={{r:2.5}} connectNulls/>
               <R.Brush {...brushProps('month')} />
             </R.ComposedChart>
@@ -9289,7 +9289,7 @@ function MarginBridge({cur, pri, gm, perOrderFixed, payPct}){
   });
   const delta = Cc - C0, dpct = C0!==0 ? delta/Math.abs(C0) : null;
   const Tip = ({active, payload}) => { if(!active||!payload||!payload.length) return null; const d=payload[0].payload;
-    return (<div style={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:10,padding:'7px 10px',fontSize:'var(--text-sm)'}}>
+    return (<div style={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',padding:'7px 10px',fontSize:'var(--text-sm)'}}>
       <div style={{fontWeight:'var(--weight-bold)'}}>{d.name}</div>
       <div style={{color: d.isTotal?'var(--text-secondary)':(d.amt>=0?'var(--good)':PAL.bad)}}>{d.isTotal?GBP(d.amt):(d.amt>=0?'+':'−')+GBP(Math.abs(d.amt))}</div>
     </div>); };
@@ -9330,7 +9330,7 @@ function MarginBridge({cur, pri, gm, perOrderFixed, payPct}){
 function MatrixTip({active, payload}){
   if(!active || !payload || !payload.length) return null;
   const d = payload[0].payload;
-  return (<div style={{background:'var(--bg-elevated)', border:'1px solid var(--border-default)', borderRadius:10, padding:'8px 10px', fontSize:'var(--text-sm)', boxShadow:'var(--shadow-md)', color:'var(--text-primary)'}}>
+  return (<div style={{background:'var(--bg-elevated)', border:'1px solid var(--border-default)', borderRadius:'var(--radius-md)', padding:'8px 10px', fontSize:'var(--text-sm)', boxShadow:'var(--shadow-md)', color:'var(--text-primary)'}}>
     <div style={{fontWeight:'var(--weight-bold)', marginBottom:3}}>{d.name}</div>
     <div style={{color:'var(--text-secondary)'}}>{NUM(d.buyers)} buyers · {NUM(d.y)} acquired on 1st order</div>
     <div style={{color:'var(--text-secondary)'}}>Repeat {(d.repeat*100).toFixed(0)}% · customer lifetime value {GBP(d.ltv)}/cust</div>
@@ -9414,7 +9414,7 @@ function RestockActionQueue(){
   if(!toOrder.length && !awaiting.length) return null;
 
   const k = v3Amount;
-  const btn = {display:'inline-flex',alignItems:'center',gap:5,fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',padding:'5px 11px',borderRadius:7,border:'1px solid var(--border-default)',background:'var(--bg-elevated)',color:'var(--text-primary)',cursor:'pointer',whiteSpace:'nowrap'};
+  const btn = {display:'inline-flex',alignItems:'center',gap:5,fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',padding:'5px 11px',borderRadius:'var(--radius-md)',border:'1px solid var(--border-default)',background:'var(--bg-elevated)',color:'var(--text-primary)',cursor:'pointer',whiteSpace:'nowrap'};
   const raise = (l)=>{ setPoStatus(l.key, {status:'ordered', qty:l.qty, raisedAt:oiToday(), baselineQty:l.p.inventoryQty||0, lead:l.lead, supplier:l.supplier, title:l.p.title}); toast('PO marked raised', {kind:'good', body:l.p.title+' · awaiting stock'}); };
 
   return (
@@ -9430,7 +9430,7 @@ function RestockActionQueue(){
             <div key={idx} style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',padding:'8px 0',borderTop:idx?'1px solid var(--border-subtle)':'none'}}>
               <span style={{width:8,height:8,borderRadius:'50%',background:urgent?'var(--bad)':'var(--warn)',flexShrink:0}}/>
               <div style={{flex:1,minWidth:200}}>
-                <div style={{fontSize:'var(--text-sm)',color:'var(--text-primary)'}}>{l.basis==='forecast'?'Order for forecast':'Raise PO'} — <b>{NUM(l.qty)} units</b> of {l.p.title}{urgent && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',color:PAL.panel,background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}</div>
+                <div style={{fontSize:'var(--text-sm)',color:'var(--text-primary)'}}>{l.basis==='forecast'?'Order for forecast':'Raise PO'} — <b>{NUM(l.qty)} units</b> of {l.p.title}{urgent && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',color:PAL.panel,background:'var(--bad)',padding:'1px 7px',borderRadius:'var(--radius-full)'}}>ORDER TODAY</span>}</div>
                 <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:1}}>{l.supplier} · {urgent?`OOS in ~${Math.round(l.cover)}d — ${l.oosGap}d short of the ${l.lead}d lead`:(l.basis==='forecast'?`plan needs ${NUM(l.forecastUnits)}, have ${NUM(l.stock)}`:`runs out in ~${Math.round(l.cover)}d (lead ${l.lead}d)`)}{l.lineCost!=null?` · ${curSym()}${k(l.lineCost)}`:''}{l.moqBumped?` · minimum order quantity ${l.moq}`:''}</div>
               </div>
               <button style={{...btn,background:'var(--accent)',color:PAL.panel,borderColor:'var(--accent)'}} onClick={()=>raise(l)}><Icon name="check" size={12}/> Mark PO raised</button>
@@ -10049,15 +10049,15 @@ function BusinessReview(){
     toast('Briefing copied', {kind:'good', body:'Paste into your notes or board pack.'});
   };
 
-  const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)',padding:'7px 13px',borderRadius:8,border:'1px solid var(--border-default)',background:'var(--bg-elevated)',color:'var(--text-primary)',cursor:'pointer'};
-  const Eyebrow = ({children}) => (<div style={{display:'flex',alignItems:'center',gap:8,margin:'20px 0 9px',fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-muted)'}}><span style={{width:3,height:14,background:'var(--text-faint)',borderRadius:2}}/>{children}</div>);
+  const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)',padding:'7px 13px',borderRadius:'var(--radius-md)',border:'1px solid var(--border-default)',background:'var(--bg-elevated)',color:'var(--text-primary)',cursor:'pointer'};
+  const Eyebrow = ({children}) => (<div style={{display:'flex',alignItems:'center',gap:8,margin:'20px 0 9px',fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-muted)'}}><span style={{width:3,height:14,background:'var(--text-faint)',borderRadius:'var(--radius-sm)'}}/>{children}</div>);
   const RvCard = (c,idx) => (<div key={idx} className="wc-item" onClick={c.onClick} style={c.onClick?{cursor:'pointer'}:undefined} title={c.onClick?'Click to edit':undefined}>
     <div className="wc-top"><span className="wc-label">{c.label}</span>{c.status&&<StatusBadge kind={c.status} label={c.statusLabel}/>}</div>
     <div className="wc-val">{c.value}{c.change!=null && <span className="wc-ch" style={{color:c.changeColor}}>{c.change}</span>}</div>
     {c.series ? <WcSpark data={c.series} color={c.color} fmt={c.fmt} axisFmt={c.axisFmt}/>
               : (c.sub && <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:7,lineHeight:1.45}}>{c.sub}</div>)}
   </div>);
-  const inp = {width:120,marginTop:4,padding:'6px 9px',borderRadius:7,border:'1px solid var(--border-default)',background:'var(--bg-base)',color:'var(--text-primary)',fontSize:'var(--text-sm)'};
+  const inp = {width:120,marginTop:4,padding:'6px 9px',borderRadius:'var(--radius-md)',border:'1px solid var(--border-default)',background:'var(--bg-base)',color:'var(--text-primary)',fontSize:'var(--text-sm)'};
   const lbl = {display:'flex',flexDirection:'column',fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',color:'var(--text-secondary)'};
   const regRow = (accent) => (x,idx) => (<div key={idx} style={{display:'flex',gap:12,alignItems:'baseline',padding:'9px 0',borderTop:idx?'1px solid var(--border-subtle)':'none'}}>
     <div style={{flex:1,minWidth:0}}>
@@ -10175,9 +10175,9 @@ function PlanningHeader({active, embedded}){
   const onPOs = embedded ? ()=>jump('plan-pos') : (active==='production'?undefined:()=>go('production'));
   const fHint = embedded ? ' · jump ›' : (active!=='forecast'?' · edit ›':'');
   const pHint = embedded ? ' · jump ›' : (active!=='production'?' · open ›':'');
-  const chip = (on)=>({flex:'1 1 190px',minWidth:172,padding:'10px 13px',borderRadius:10,background:on?'var(--accent-bg)':'var(--bg-elevated)',border:'1px solid '+(on?'var(--accent)':'var(--border-subtle)')});
+  const chip = (on)=>({flex:'1 1 190px',minWidth:172,padding:'10px 13px',borderRadius:'var(--radius-md)',background:on?'var(--accent-bg)':'var(--bg-elevated)',border:'1px solid '+(on?'var(--accent)':'var(--border-subtle)')});
   const lab = {fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:4};
-  const sbtn = (id)=>({fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',padding:'5px 9px',borderRadius:7,cursor:'pointer',border:'1.5px solid '+(strat===id?'var(--accent)':'var(--border-default)'),background:strat===id?'var(--accent)':'transparent',color:strat===id?PAL.panel:'var(--text-secondary)'});
+  const sbtn = (id)=>({fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',padding:'5px 9px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1.5px solid '+(strat===id?'var(--accent)':'var(--border-default)'),background:strat===id?'var(--accent)':'transparent',color:strat===id?PAL.panel:'var(--text-secondary)'});
   const arrow = <div style={{display:'flex',alignItems:'center',color:'var(--text-faint)',fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)'}}>→</div>;
   return (
     <div className="card" style={{padding:'12px 14px',marginBottom:14}}>
@@ -10286,9 +10286,9 @@ function ProductionPlanner({embedded}={}){
     const lc=leadConfig(); const bt={...(lc.byType||{})}; Object.keys(leadDraft.byType).forEach(t=>{ const v=leadDraft.byType[t]; if(v===''||v==null) delete bt[t]; else if(isFinite(Number(v))) bt[t]=Number(v); }); saveLeadConfig({...lc, default:Number(leadDraft.def)||30, byType:bt});
     setSetOpen(false); toast('Reorder policy saved', {kind:'good'}); };
 
-  const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)',padding:'7px 13px',borderRadius:8,border:'1px solid var(--border-default)',background:'var(--bg-elevated)',color:'var(--text-primary)',cursor:'pointer'};
+  const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)',padding:'7px 13px',borderRadius:'var(--radius-md)',border:'1px solid var(--border-default)',background:'var(--bg-elevated)',color:'var(--text-primary)',cursor:'pointer'};
   const smbtn = {...btn, fontSize:'var(--text-xs)', padding:'5px 10px'};
-  const inp = {padding:'5px 8px',borderRadius:6,border:'1px solid var(--border-default)',background:'var(--bg-base)',color:'var(--text-primary)',fontSize:'var(--text-sm)'};
+  const inp = {padding:'5px 8px',borderRadius:'var(--radius-md)',border:'1px solid var(--border-default)',background:'var(--bg-base)',color:'var(--text-primary)',fontSize:'var(--text-sm)'};
   const th = {textAlign:'left',fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',padding:'0 10px 7px 0',whiteSpace:'nowrap'};
   const td = {padding:'7px 10px 7px 0',fontSize:'var(--text-sm)',color:'var(--text-secondary)',borderTop:'1px solid var(--border-subtle)',verticalAlign:'top'};
 
@@ -10319,7 +10319,7 @@ function ProductionPlanner({embedded}={}){
             ? <>Ordering the forecast in <b>{waves} waves</b>; each order covers lead + one wave, and the next wave's order-by date is shown per line.</>
             : <>Lean / just-in-time — reorder triggers when cover falls within <b>lead + {safety}d safety</b>, ordering up to <b>{coverDays}d beyond lead</b>, rounded to minimum order quantity.</>}
           {approaching>0?` ${approaching} more will cross the trigger soon.`:''} Drafts only — nothing is sent to suppliers automatically.</div>
-        {plan.active && (<div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginTop:10,padding:'8px 12px',borderRadius:8,background:'var(--accent-bg)',border:'1px solid var(--border-subtle)'}}>
+        {plan.active && (<div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginTop:10,padding:'8px 12px',borderRadius:'var(--radius-md)',background:'var(--accent-bg)',border:'1px solid var(--border-subtle)'}}>
           <Icon name="trendUp" size={14} style={{color:'var(--accent)'}}/>
           <span style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)'}}>Orders are sized to your demand plan — <b style={{color:'var(--text-primary)'}}>{plan.growthPct>=0?'+':''}{plan.growthPct.toFixed(0)}% vs run-rate</b> ({plan.mode==='growth'?'growth target':plan.mode==='units'?'units target':'revenue target'}), not flat velocity.</span>
           <button style={{...btn,fontSize:'var(--text-xs)',padding:'4px 10px',marginLeft:'auto'}} onClick={()=>{ if(window.__oiOpenForecast){ window.__oiOpenForecast(); return; } const el=document.getElementById('plan-forecast'); if(el) el.scrollIntoView({behavior:'smooth'}); else if(window.__oiNav) window.__oiNav('planning','plan'); }}>Adjust plan <Icon name="chevron" size={12}/></button>
@@ -10383,14 +10383,14 @@ function ProductionPlanner({embedded}={}){
           <div><span style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{po.supplier}</span> <span className="muted" style={{fontSize:'var(--text-sm)'}}>· {po.lines.length} line{po.lines.length===1?'':'s'} · {NUM(po.units)} units</span>{(po.email||po.notes) && <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:2}}>{po.email}{po.email&&po.notes?' · ':''}{po.notes}</div>}</div>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
             {po.hasCost ? <span style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{`${curSym()}`}{po.total.toFixed(2)}</span>
-              : <span style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',color:'var(--warn)',background:'var(--warn-bg)',padding:'2px 9px',borderRadius:999}}>Pricing pending{po.total>0?` · ${curSym()}${po.total.toFixed(0)} so far`:''}</span>}
+              : <span style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',color:'var(--warn)',background:'var(--warn-bg)',padding:'2px 9px',borderRadius:'var(--radius-full)'}}>Pricing pending{po.total>0?` · ${curSym()}${po.total.toFixed(0)} so far`:''}</span>}
             <button style={smbtn} onClick={()=>copyPO(po)}><Icon name="clipboard" size={12}/> Copy</button>
             <button style={smbtn} onClick={()=>download(po)}><Icon name="report" size={12}/> CSV</button>
             <button style={{...smbtn, background:'var(--accent)', color:PAL.panel, borderColor:'var(--accent)'}} onClick={()=>raisePO(po)}><Icon name="check" size={12}/> Mark PO raised</button>
           </div>
         </div>
         {po.hasCost && (()=>{ const fd=iso=>{ try{ return new Date((iso||'')+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'}); }catch(e){ return iso; } }; return (
-          <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'center',fontSize:'var(--text-xs)',color:'var(--text-muted)',margin:'0 0 10px',padding:'7px 11px',borderRadius:8,background:'var(--bg-elevated)'}}>
+          <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'center',fontSize:'var(--text-xs)',color:'var(--text-muted)',margin:'0 0 10px',padding:'7px 11px',borderRadius:'var(--radius-md)',background:'var(--bg-elevated)'}}>
             {po.hasDeposit
               ? <span><b style={{color:'var(--text-primary)'}}>{`${curSym()}`}{k(po.deposit)} deposit now</b>{po.depPct!=null?` (${po.depPct}%)`:''} · <b style={{color:'var(--text-primary)'}}>{`${curSym()}`}{k(po.balance)}</b> on shipment</span>
               : <span><b style={{color:'var(--text-primary)'}}>{`${curSym()}`}{k(po.total)}</b> due now</span>}
@@ -10402,7 +10402,7 @@ function ProductionPlanner({embedded}={}){
           <th style={th}>Product</th><th style={{...th,textAlign:'right'}}>Stock</th><th style={{...th,textAlign:'right'}}>Cover</th><th style={{...th,textAlign:'right'}}>Order qty</th><th style={{...th,textAlign:'right'}}>{`Unit ${curSym()}`}</th><th style={{...th,textAlign:'right'}}>{`Line ${curSym()}`}</th>
         </tr></thead><tbody>
           {po.lines.map((l,idx)=>(<tr key={idx}>
-            <td style={{...td,color:'var(--text-primary)'}}>{l.p.title}{l.oosBeforeLead && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',color:PAL.panel,background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{l.p.sku||'no SKU'} · {l.p.type}{l.oosBeforeLead?` · OOS gap ${l.oosGap}d`:''}{l.basis==='forecast'?` · plan needs ${NUM(l.forecastUnits)}`:''}{l.basis==='wave'&&l.nextWaveBy?` · next wave by ${l.nextWaveBy}`:''}{l.moqBumped?' · MOQ '+l.moq:''}</div></td>
+            <td style={{...td,color:'var(--text-primary)'}}>{l.p.title}{l.oosBeforeLead && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',color:PAL.panel,background:'var(--bad)',padding:'1px 7px',borderRadius:'var(--radius-full)'}}>ORDER TODAY</span>}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{l.p.sku||'no SKU'} · {l.p.type}{l.oosBeforeLead?` · OOS gap ${l.oosGap}d`:''}{l.basis==='forecast'?` · plan needs ${NUM(l.forecastUnits)}`:''}{l.basis==='wave'&&l.nextWaveBy?` · next wave by ${l.nextWaveBy}`:''}{l.moqBumped?' · MOQ '+l.moq:''}</div></td>
             <td style={{...td,textAlign:'right'}}>{NUM(l.p.inventoryQty)}</td>
             <td style={{...td,textAlign:'right',color:l.cover<=l.lead?'var(--bad)':'var(--warn)'}}>{Math.round(l.cover)}d</td>
             <td style={{...td,textAlign:'right',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{NUM(l.qty)}</td>
@@ -10538,9 +10538,9 @@ function DemandPlanner({embedded}={}){
   const rmComp=(i)=>setPackDraft(d=>({...d, components:d.components.filter((_,j)=>j!==i)}));
   const savePack=()=>{ savePackagingConfig({avgItemsPerOrder:Number(packDraft.avgItemsPerOrder)||1.3, components:packDraft.components.filter(c=>c.name&&c.name.trim()).map(c=>({name:c.name.trim(), perItem:Number(c.perItem)||0, perOrder:Number(c.perOrder)||0, onHand:c.onHand==='' ? '' : (Number(c.onHand)||0), supplier:(c.supplier||'').trim(), moq:c.moq==='' ? '' : (Number(c.moq)||0), unitCost:c.unitCost==='' ? '' : (Number(c.unitCost)||0), leadDays:Number(c.leadDays)||30}))}); setPackOpen(false); toast('Packaging plan saved', {kind:'good'}); };
 
-  const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)',padding:'7px 13px',borderRadius:8,border:'1px solid var(--border-default)',background:'var(--bg-elevated)',color:'var(--text-primary)',cursor:'pointer'};
+  const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)',padding:'7px 13px',borderRadius:'var(--radius-md)',border:'1px solid var(--border-default)',background:'var(--bg-elevated)',color:'var(--text-primary)',cursor:'pointer'};
   const seg = (active)=>({...btn, padding:'6px 12px', background:active?'var(--accent)':'var(--bg-elevated)', color:active?PAL.panel:'var(--text-secondary)', borderColor:active?'var(--accent)':'var(--border-default)'});
-  const inp = {padding:'6px 9px',borderRadius:7,border:'1px solid var(--border-default)',background:'var(--bg-base)',color:'var(--text-primary)',fontSize:'var(--text-sm)'};
+  const inp = {padding:'6px 9px',borderRadius:'var(--radius-md)',border:'1px solid var(--border-default)',background:'var(--bg-base)',color:'var(--text-primary)',fontSize:'var(--text-sm)'};
   const th = {textAlign:'left',fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',padding:'0 10px 7px 0',whiteSpace:'nowrap'};
   const td = {padding:'7px 10px 7px 0',fontSize:'var(--text-sm)',color:'var(--text-secondary)',borderTop:'1px solid var(--border-subtle)'};
 
@@ -10589,10 +10589,10 @@ function DemandPlanner({embedded}={}){
         {byMonth && (<div style={{marginTop:14}}>
           <div style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-muted)',marginBottom:8}}>Monthly plan — set each month ({targetMode==='units'?'units':`${curSym()} revenue`}); blank = run-rate</div>
           <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
-            {monthlyPlan.map((m,i)=>(<div key={i} style={{minWidth:118,flex:'1 1 118px',maxWidth:170,border:'1px solid var(--border-subtle)',borderRadius:9,padding:'9px 11px',background:'var(--bg-elevated)'}}>
+            {monthlyPlan.map((m,i)=>(<div key={i} style={{minWidth:118,flex:'1 1 118px',maxWidth:170,border:'1px solid var(--border-subtle)',borderRadius:'var(--radius-md)',padding:'9px 11px',background:'var(--bg-elevated)'}}>
               <div style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)',marginBottom:5}}>{m.label}</div>
               <input type="number" style={{...inp,width:'100%',boxSizing:'border-box'}} value={monthly[i]!=null?monthly[i]:''} onChange={e=>setMonth(i,e.target.value)} placeholder={(targetMode==='units'?'':curSym())+NUM(Math.round(baseMo))}/>
-              <div style={{height:30,display:'flex',alignItems:'flex-end',marginTop:7}}><div style={{width:'100%',height:Math.max(3,Math.round(28*m.rev/maxMonthRev)),background:m.set?'var(--accent)':'var(--border-default)',borderRadius:'3px 3px 0 0'}}/></div>
+              <div style={{height:30,display:'flex',alignItems:'flex-end',marginTop:7}}><div style={{width:'100%',height:Math.max(3,Math.round(28*m.rev/maxMonthRev)),background:m.set?'var(--accent)':'var(--border-default)',borderRadius:'var(--radius-sm) var(--radius-sm) var(--radius-none) var(--radius-none)'}}/></div>
               <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:4}}>{NUM(Math.ceil(m.units))}{` u · ${curSym()}`}{k(m.rev)}</div>
             </div>))}
           </div>
@@ -10652,10 +10652,10 @@ function DemandPlanner({embedded}={}){
               : (o.needs && o.qty>0) ? <span style={{color:'var(--text-primary)',fontWeight:'var(--weight-bold)'}}>{NUM(o.qty)}</span>
               : <span style={{color:'var(--good)'}}>covered</span>;
             return (<tr key={idx}>
-            <td style={{...td,color:'var(--text-primary)'}}>{r.p.title}{r.oosBeforeLead && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',color:PAL.panel,background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}{focusM(r.p)!==1 && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',color:'var(--accent)',background:'var(--accent-bg)',padding:'1px 6px',borderRadius:999}}>↑{(focusM(r.p)%1?focusM(r.p).toFixed(2):focusM(r.p))}×</span>}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{r.p.type}</div></td>
+            <td style={{...td,color:'var(--text-primary)'}}>{r.p.title}{r.oosBeforeLead && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',color:PAL.panel,background:'var(--bad)',padding:'1px 7px',borderRadius:'var(--radius-full)'}}>ORDER TODAY</span>}{focusM(r.p)!==1 && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',color:'var(--accent)',background:'var(--accent-bg)',padding:'1px 6px',borderRadius:'var(--radius-full)'}}>↑{(focusM(r.p)%1?focusM(r.p).toFixed(2):focusM(r.p))}×</span>}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{r.p.type}</div></td>
             <td style={{...td,textAlign:'right'}}>{NUM(Math.round(r.runMo))}</td>
             <td style={{...td,textAlign:'right'}}>{NUM(r.stock)}</td>
-            <td style={{...td,textAlign:'right'}}>{r.daysToOOS===Infinity ? <span style={{color:'var(--text-faint)'}}>—</span> : <span style={{fontWeight:'var(--weight-semi)',color: r.oosBeforeLead?'var(--bad)':(r.daysToOOS<r.lead*1.5?'var(--warn)':'var(--text-secondary)')}}>{Math.round(r.daysToOOS)}d{r.oosBeforeLead?` · gap ${r.oosGap}d`:''}</span>}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',display:'flex',alignItems:'center',gap:3,justifyContent:'flex-end',marginTop:2}}>{!r.leadSet && <span title={`Estimate — using the ${r.p.type||'type'} default of ${r.leadDefault}d. Set this item's real supplier lead.`} style={{color:'var(--warn)',fontSize:'var(--text-xs)',lineHeight:1}}>●</span>}<input type="number" min="0" defaultValue={r.leadSet?r.leadMake:''} key={'ld'+(r.leadSet?r.leadMake:'d')} placeholder={String(r.leadDefault)} title={`Production lead — days from order to shipment (per item). Blank uses the ${r.p.type||'type'} default of ${r.leadDefault}d. Set defaults in Reorder policy.`} onBlur={e=>{ if(e.target.value!=='') setSkuLead(skuKeyOf(r.p), e.target.value); }} style={{width:38,padding:'1px 4px',borderRadius:5,border:'1px solid '+(r.leadSet?'var(--border-default)':'var(--warn)'),background:'var(--bg-base)',color:'var(--text-secondary)',fontSize:'var(--text-xs)',textAlign:'right'}}/><span>d make{r.leadShip>0?` +${r.leadShip} ship = ${r.lead}`:' lead'}</span></div></td>
+            <td style={{...td,textAlign:'right'}}>{r.daysToOOS===Infinity ? <span style={{color:'var(--text-faint)'}}>—</span> : <span style={{fontWeight:'var(--weight-semi)',color: r.oosBeforeLead?'var(--bad)':(r.daysToOOS<r.lead*1.5?'var(--warn)':'var(--text-secondary)')}}>{Math.round(r.daysToOOS)}d{r.oosBeforeLead?` · gap ${r.oosGap}d`:''}</span>}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',display:'flex',alignItems:'center',gap:3,justifyContent:'flex-end',marginTop:2}}>{!r.leadSet && <span title={`Estimate — using the ${r.p.type||'type'} default of ${r.leadDefault}d. Set this item's real supplier lead.`} style={{color:'var(--warn)',fontSize:'var(--text-xs)',lineHeight:1}}>●</span>}<input type="number" min="0" defaultValue={r.leadSet?r.leadMake:''} key={'ld'+(r.leadSet?r.leadMake:'d')} placeholder={String(r.leadDefault)} title={`Production lead — days from order to shipment (per item). Blank uses the ${r.p.type||'type'} default of ${r.leadDefault}d. Set defaults in Reorder policy.`} onBlur={e=>{ if(e.target.value!=='') setSkuLead(skuKeyOf(r.p), e.target.value); }} style={{width:38,padding:'1px 4px',borderRadius:'var(--radius-md)',border:'1px solid '+(r.leadSet?'var(--border-default)':'var(--warn)'),background:'var(--bg-base)',color:'var(--text-secondary)',fontSize:'var(--text-xs)',textAlign:'right'}}/><span>d make{r.leadShip>0?` +${r.leadShip} ship = ${r.lead}`:' lead'}</span></div></td>
             <td style={{...td,textAlign:'right',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{NUM(Math.ceil(r.plan))}</td>
             <td style={{...td,textAlign:'right',fontWeight:'var(--weight-semi)',color: r.short?'var(--bad)':'var(--good)'}}>{r.short?'−'+NUM(Math.ceil(-r.end)):NUM(Math.floor(r.end))}</td>
             <td style={{...td,textAlign:'right'}}>{oCell}</td>
@@ -10670,7 +10670,7 @@ function DemandPlanner({embedded}={}){
         </div>
         {showDelisted && delistedCount>0 && <div style={{marginTop:10,paddingTop:10,borderTop:'1px solid var(--border-subtle)'}}>
           <div style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:6}}>Delisted — excluded from the plan &amp; POs</div>
-          <div style={{display:'flex',flexWrap:'wrap',gap:8}}>{inv.filter(p=>(p.dailyVelocity||0)>0 && del[p.sku||p.title]).map((p,i)=>(<span key={i} style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:'var(--text-sm)',color:'var(--text-secondary)',background:'var(--bg-elevated)',border:'1px solid var(--border-subtle)',borderRadius:999,padding:'3px 6px 3px 11px'}}>{p.title}<button style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',color:'var(--accent)',background:'none',border:'none',cursor:'pointer'}} onClick={()=>{ setDelisted(skuKeyOf(p), false); toast('Relisted', {kind:'good', body:p.title}); }}>Relist</button></span>))}</div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:8}}>{inv.filter(p=>(p.dailyVelocity||0)>0 && del[p.sku||p.title]).map((p,i)=>(<span key={i} style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:'var(--text-sm)',color:'var(--text-secondary)',background:'var(--bg-elevated)',border:'1px solid var(--border-subtle)',borderRadius:'var(--radius-full)',padding:'3px 6px 3px 11px'}}>{p.title}<button style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',color:'var(--accent)',background:'none',border:'none',cursor:'pointer'}} onClick={()=>{ setDelisted(skuKeyOf(p), false); toast('Relisted', {kind:'good', body:p.title}); }}>Relist</button></span>))}</div>
         </div>}
         {(stockouts>0||oosRisk>0) && <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:9,lineHeight:1.5}}><b>Stockout vs lead</b> is days of cover at the planned rate against production lead time — <span style={{color:'var(--bad)'}}>red</span> means it runs out <b>before</b> a reorder placed today could land ({oosRisk} product{oosRisk===1?'':'s'} · ~{Math.round(rows.filter(r=>r.oosBeforeLead).reduce((t,r)=>t+r.oosGap,0)/Math.max(1,oosRisk))}d avg gap), so it needs ordering now or it'll go OOS. Edit each product's <b>make lead</b> inline in this column (blank = the type default, set in Reorder policy); transit is per-supplier. The <b>Order</b> column is what each triggers under your <b>{STRAT_SHORT[RR.strategy]||'JIT'}</b> strategy. Stock is consumed <b>FIFO</b> — current stock first, on-order isn't counted as available until it lands, so the OOS gap is the real shortfall window.</div>}
       </div>
@@ -10724,8 +10724,8 @@ function SuppliersDirectory(){
   const set = (n,f,v)=>setDraft(d=>({...d,[n]:{...(d[n]||_blank),[f]:v}}));
   const save = ()=>{ const all={...suppliersAll()}; Object.keys(draft).forEach(n=>{ const x=draft[n]||{}; all[n]={name:n, email:x.email||'', phone:x.phone||'', address:x.address||'', notes:x.notes||'', depositPct:x.depositPct===''||x.depositPct==null?'':Number(x.depositPct), shipDays:x.shipDays===''||x.shipDays==null?'':Number(x.shipDays)}; }); saveSuppliersAll(all); toast('Suppliers saved', {kind:'good'}); };
   const add = ()=>{ const n=newName.trim(); if(!n) return; setDraft(d=>d[n]?d:({...d,[n]:{..._blank}})); registerSupplier(n); setNewName(''); };
-  const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)',padding:'7px 13px',borderRadius:8,border:'1px solid var(--border-default)',background:'var(--bg-elevated)',color:'var(--text-primary)',cursor:'pointer'};
-  const inp = {padding:'6px 9px',borderRadius:7,border:'1px solid var(--border-default)',background:'var(--bg-base)',color:'var(--text-primary)',fontSize:'var(--text-sm)'};
+  const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)',padding:'7px 13px',borderRadius:'var(--radius-md)',border:'1px solid var(--border-default)',background:'var(--bg-elevated)',color:'var(--text-primary)',cursor:'pointer'};
+  const inp = {padding:'6px 9px',borderRadius:'var(--radius-md)',border:'1px solid var(--border-default)',background:'var(--bg-base)',color:'var(--text-primary)',fontSize:'var(--text-sm)'};
   const th = {textAlign:'left',fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',padding:'0 10px 7px 0',whiteSpace:'nowrap'};
   const td = {padding:'8px 10px 8px 0',fontSize:'var(--text-sm)',color:'var(--text-secondary)',borderTop:'1px solid var(--border-subtle)',verticalAlign:'top'};
   return (<div>
@@ -10794,7 +10794,7 @@ function CashFlowPlan({tranches, plan, months}){
   const linePath = series.map((s,i)=>`${i?'L':'M'}${X(i).toFixed(1)} ${Y(s.bal).toFixed(1)}`).join(' ');
   const areaPath = linePath+` L${X(projLen-1).toFixed(1)} ${Y(lo).toFixed(1)} L${X(0).toFixed(1)} ${Y(lo).toFixed(1)} Z`;
   const zeroIn = lo<0 && hi>0;
-  const inp = {padding:'5px 8px',borderRadius:7,border:'1px solid var(--border-default)',background:'var(--bg-base)',color:'var(--text-primary)',fontSize:'var(--text-sm)',width:110};
+  const inp = {padding:'5px 8px',borderRadius:'var(--radius-md)',border:'1px solid var(--border-default)',background:'var(--bg-base)',color:'var(--text-primary)',fontSize:'var(--text-sm)',width:110};
   const lab = {fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:5};
   const tone = !cashKnown ? 'var(--text-secondary)' : trough.bal<0 ? 'var(--bad)' : trough.bal < Math.max(overM*1.5, (cashKnown?startCash*0.2:0)) ? 'var(--warn)' : 'var(--good)';
   const verdict = !cashKnown
@@ -10913,8 +10913,8 @@ function PlanningView(){
   const headline = oosNow ? `Order today — ${oosNow} product${oosNow===1?'':'s'} at OOS risk` : toOrderN ? `${toOrderN} product${toOrderN===1?'':'s'} to reorder` : 'Stock is on track for your plan';
   const sub = toOrderN ? `${toOrderN} item${toOrderN===1?'':'s'} to order · ${curSym()}${k(orderVal)} to commit${stockoutsUnderPlan?` · ${stockoutsUnderPlan} forecast to run out under the plan`:''}${awaiting?` · ${awaiting} awaiting stock`:''}`
     : (awaiting?`${awaiting} PO${awaiting===1?'':'s'} awaiting stock`:'Nothing to order right now — good sellers have cover for their lead times.');
-  const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',padding:'9px 15px',borderRadius:9,border:'none',background:'var(--accent)',color:PAL.panel,cursor:'pointer',whiteSpace:'nowrap'};
-  const sbtn = (id)=>({fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',padding:'5px 11px',borderRadius:7,cursor:'pointer',border:'1.5px solid '+(rc.strategy===id?'var(--accent)':'var(--border-default)'),background:rc.strategy===id?'var(--accent)':'transparent',color:rc.strategy===id?PAL.panel:'var(--text-secondary)'});
+  const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',padding:'9px 15px',borderRadius:'var(--radius-md)',border:'none',background:'var(--accent)',color:PAL.panel,cursor:'pointer',whiteSpace:'nowrap'};
+  const sbtn = (id)=>({fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',padding:'5px 11px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1.5px solid '+(rc.strategy===id?'var(--accent)':'var(--border-default)'),background:rc.strategy===id?'var(--accent)':'transparent',color:rc.strategy===id?PAL.panel:'var(--text-secondary)'});
   const lab = {fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:5};
   const goPOs = ()=>{ const el=document.getElementById('plan-pos'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); };
   return (
@@ -10943,14 +10943,14 @@ function PlanningView(){
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
             {['jit','bulk','staged'].map(id=>{ const on=rc.strategy===id; const c=stratCmp[id]; const dep=hasDeposit&&c.dep<c.val-0.5;
               return (
-                <button key={id} onClick={()=>saveReorderConfig({...rc,strategy:id})} style={{textAlign:'left',flex:'1 1 160px',minWidth:148,padding:'9px 12px',borderRadius:9,cursor:'pointer',border:'1.5px solid '+(on?'var(--accent)':'var(--border-default)'),background:on?'var(--accent-bg)':'var(--bg-elevated)'}}>
+                <button key={id} onClick={()=>saveReorderConfig({...rc,strategy:id})} style={{textAlign:'left',flex:'1 1 160px',minWidth:148,padding:'9px 12px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1.5px solid '+(on?'var(--accent)':'var(--border-default)'),background:on?'var(--accent-bg)':'var(--bg-elevated)'}}>
                   <div style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',color:on?'var(--accent)':'var(--text-primary)'}}>{''}{STRAT[id]}</div>
                   <div style={{fontSize:'var(--text-xs)',color:'var(--text-muted)',marginTop:2}}>{c.count?(dep?`${curSym()}${k(c.dep)} deposit now · ${curSym()}${k(c.val)} total`:`${curSym()}${k(c.val)} to commit now`):'nothing to order'} · {stratDesc[id]}</div>
                 </button>
               ); })}
           </div>
           <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:8,lineHeight:1.5}}>{stratExplain[rc.strategy]}</div>
-          {recStrat!==rc.strategy && <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginTop:8,padding:'7px 11px',borderRadius:8,background:'var(--accent-bg)',border:'1px solid var(--border-subtle)'}}>
+          {recStrat!==rc.strategy && <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginTop:8,padding:'7px 11px',borderRadius:'var(--radius-md)',background:'var(--accent-bg)',border:'1px solid var(--border-subtle)'}}>
             <Icon name="spark" size={13} style={{color:'var(--accent)'}}/>
             <span style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)'}}>Suggested: <b style={{color:'var(--text-primary)'}}>{STRAT[recStrat]}</b> — {recWhy}.</span>
             <button style={{...btn,fontSize:'var(--text-xs)',padding:'5px 11px',marginLeft:'auto'}} onClick={()=>saveReorderConfig({...rc,strategy:recStrat})}>Use {STRAT[recStrat]}</button>
@@ -10966,13 +10966,13 @@ function PlanningView(){
         const pctOf = iso => Math.max(0, Math.min(100, oiDayDiff(today,iso)/spanDays*100));
         const ticks=[]; for(let i=0;i*30<=spanDays+2 && i<10;i++){ const d=oiAddDays(today,i*30); ticks.push({x:Math.min(100,(i*30)/spanDays*100), label:i===0?'now':(()=>{ try{ return new Date(d+'T00:00:00').toLocaleDateString('en-GB',{month:'short'}); }catch(e){ return ''; } })()}); }
         const dot=(x,color,size,filled,title)=>(<div title={title} style={{position:'absolute',left:x+'%',top:'50%',transform:'translate(-50%,-50%)',width:size,height:size,borderRadius:'50%',background:filled?color:'var(--bg-base)',border:'2px solid '+color,zIndex:2}}/>);
-        const toggle = (v,lbl)=>{ const on=planView===v; return <button key={v} onClick={()=>setPlanView(v)} style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',padding:'4px 11px',borderRadius:6,cursor:'pointer',border:'none',background:on?'var(--accent)':'transparent',color:on?PAL.panel:'var(--text-muted)'}}>{lbl}</button>; };
+        const toggle = (v,lbl)=>{ const on=planView===v; return <button key={v} onClick={()=>setPlanView(v)} style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',padding:'4px 11px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'none',background:on?'var(--accent)':'transparent',color:on?PAL.panel:'var(--text-muted)'}}>{lbl}</button>; };
         return (
           <div className="card" style={{marginBottom:14}}>
             <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:4}}>
               <div style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>Stock landing plan</div>
               <span className="muted" style={{fontSize:'var(--text-xs)'}}>{STRAT[rc.strategy]} · lead {leadTotalRep}d ({leadMakeRep}d make + {leadTotalRep-leadMakeRep}d transit)</span>
-              <div style={{marginLeft:'auto',display:'flex',gap:3,background:'var(--bg-elevated)',borderRadius:8,padding:3}}>{toggle('timeline','Timeline')}{toggle('table','Table')}</div>
+              <div style={{marginLeft:'auto',display:'flex',gap:3,background:'var(--bg-elevated)',borderRadius:'var(--radius-md)',padding:3}}>{toggle('timeline','Timeline')}{toggle('table','Table')}</div>
             </div>
             <div style={{fontSize:'var(--text-sm)',color:'var(--text-muted)',marginBottom:10,lineHeight:1.5}}>
               {hasDeposit
@@ -10983,10 +10983,10 @@ function PlanningView(){
             {rc.strategy==='staged' && wavesN>1 && <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:12}}>
               <span style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase'}}>Wave split</span>
               {[['even','Even'],['front','Front-load'],['back','Back-load']].map(([kind,lbl])=>{ const on=splitName===kind;
-                return <button key={kind} onClick={()=>saveReorderConfig({...rc, waveSplit: wavePreset(kind, wavesN)})} title={kind==='front'?'Bigger first wave — buy into peak early':kind==='back'?'Smaller first wave, ramp later':'Equal waves'} style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',padding:'4px 11px',borderRadius:7,cursor:'pointer',border:'1.5px solid '+(on?'var(--accent)':'var(--border-default)'),background:on?'var(--accent)':'transparent',color:on?PAL.panel:'var(--text-secondary)'}}>{lbl}</button>; })}
+                return <button key={kind} onClick={()=>saveReorderConfig({...rc, waveSplit: wavePreset(kind, wavesN)})} title={kind==='front'?'Bigger first wave — buy into peak early':kind==='back'?'Smaller first wave, ramp later':'Equal waves'} style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',padding:'4px 11px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1.5px solid '+(on?'var(--accent)':'var(--border-default)'),background:on?'var(--accent)':'transparent',color:on?PAL.panel:'var(--text-secondary)'}}>{lbl}</button>; })}
               <span style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{weights.map(w=>Math.round(w*100)+'%').join(' / ')}{splitName==='custom'?' · custom':''}</span>
             </div>}
-            {lateWaves>0 && <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12,padding:'7px 11px',borderRadius:8,background:'var(--color-danger-wash)',border:'1px solid var(--bad)'}}>
+            {lateWaves>0 && <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12,padding:'7px 11px',borderRadius:'var(--radius-md)',background:'var(--color-danger-wash)',border:'1px solid var(--bad)'}}>
               <Icon name="alert" size={13} style={{color:'var(--bad)'}}/>
               <span style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)'}}>{lateWaves} wave{lateWaves===1?'':'s'} should already be on order — the {leadTotalRep}d lead is longer than the gap between waves. Order {lateWaves===1?'it':'them'} now, front-load Wave 1, or widen the wave count.</span>
             </div>}
@@ -10999,11 +10999,11 @@ function PlanningView(){
               {tranches.map(t=>{ const ox=pctOf((t.isNow||t.late)?today:t.orderISO), sx=pctOf(t.shipISO), lx=pctOf(t.landISO); return (
                 <div key={t.n} style={{display:'flex',alignItems:'center',gap:10,marginBottom:7}}>
                   <div style={{width:132,flexShrink:0}}>
-                    <div style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{t.name} {t.late&&<span style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',color:PAL.panel,background:'var(--bad)',padding:'1px 5px',borderRadius:999}}>LATE</span>}</div>
+                    <div style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{t.name} {t.late&&<span style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',color:PAL.panel,background:'var(--bad)',padding:'1px 5px',borderRadius:'var(--radius-full)'}}>LATE</span>}</div>
                     <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{hasDeposit?`${curSym()}${k(t.dep)} now · ${curSym()}${k(t.bal)} on ship`:`${curSym()}${k(t.val)}`}</div>
                   </div>
-                  <div style={{position:'relative',flex:1,height:28,borderRadius:7,background:'var(--bg-elevated)'}}>
-                    <div style={{position:'absolute',left:ox+'%',width:Math.max(0,lx-ox)+'%',top:'50%',height:3,transform:'translateY(-50%)',background:t.late?'var(--bad)':'var(--accent)',opacity:.45,borderRadius:2}}/>
+                  <div style={{position:'relative',flex:1,height:28,borderRadius:'var(--radius-md)',background:'var(--bg-elevated)'}}>
+                    <div style={{position:'absolute',left:ox+'%',width:Math.max(0,lx-ox)+'%',top:'50%',height:3,transform:'translateY(-50%)',background:t.late?'var(--bad)':'var(--accent)',opacity:.45,borderRadius:'var(--radius-sm)'}}/>
                     {dot(ox, t.late?'var(--bad)':'var(--text-muted)',12,false,'Order '+(t.isNow?'now':t.late?'now (was due '+fmtD(t.orderISO)+')':fmtD(t.orderISO)))}
                     {dot(sx,'var(--warn)',10,true,'Ships '+fmtD(t.shipISO)+(hasDeposit?` · balance ${curSym()}`+k(t.bal)+' due':''))}
                     {dot(lx,'var(--good)',15,true,'Lands '+fmtD(t.landISO))}
@@ -11037,7 +11037,7 @@ function PlanningView(){
       {/* Cash impact — forward balance projection from the plan's commitments */}
       {tranches.length>0 && <CashFlowPlan tranches={tranches} plan={R.plan} months={months}/>}
       {/* ① Forecast & demand — collapsed by default (config + detail), opened on demand */}
-      <button onClick={()=>setShowForecast(s=>!s)} style={{display:'flex',alignItems:'center',gap:10,width:'100%',background:'transparent',border:'1px solid var(--border-subtle)',borderRadius:10,padding:'11px 14px',cursor:'pointer',textAlign:'left',marginBottom:showForecast?12:14}}>
+      <button onClick={()=>setShowForecast(s=>!s)} style={{display:'flex',alignItems:'center',gap:10,width:'100%',background:'transparent',border:'1px solid var(--border-subtle)',borderRadius:'var(--radius-md)',padding:'11px 14px',cursor:'pointer',textAlign:'left',marginBottom:showForecast?12:14}}>
         <span style={{color:'var(--text-faint)',display:'inline-flex',transform:showForecast?'rotate(90deg)':'none',transition:'transform 120ms'}}><Icon name="chevron" size={13}/></span>
         <span style={{fontWeight:'var(--weight-bold)',color:'var(--text-primary)',fontSize:'var(--text-sm)'}}>Forecast &amp; demand plan</span>
         <span className="muted" style={{fontSize:'var(--text-xs)'}}>{fLabel} · per-product demand, focus/promotions, by-month shaping &amp; packaging</span>
@@ -11046,7 +11046,7 @@ function PlanningView(){
       {showForecast && <div id="plan-forecast"><DemandPlanner embedded/></div>}
       {/* ③ Purchase orders — the action surface, always visible */}
       <div style={{display:'flex',alignItems:'center',gap:10,margin:'8px 0 12px'}}>
-        <span style={{width:3,height:16,background:'var(--accent)',borderRadius:2}}/>
+        <span style={{width:3,height:16,background:'var(--accent)',borderRadius:'var(--radius-sm)'}}/>
         <span style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-secondary)'}}>③ Purchase orders</span>
         <span className="muted" style={{fontSize:'var(--text-xs)'}}>sized to your forecast, under your strategy</span>
       </div>
@@ -11164,7 +11164,7 @@ function GO_Tile(p){ const t=p.t; const _sr=(t.series&&t.series.length>1)?t.seri
   const _stroke=t.rag==='r'?PAL.bad:t.rag==='g'?PAL.good:PAL.accent;
   const _statusTxt=t.rag==='g'?'On track':t.rag==='a'?'Watch':t.rag==='r'?'Off target':'—';
   return (
-  <div className="go-tile" style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:8,padding:'14px 15px',position:'relative',boxShadow:'var(--shadow-panel)'}}>
+  <div className="go-tile" style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:'var(--radius-md)',padding:'14px 15px',position:'relative',boxShadow:'var(--shadow-panel)'}}>
     {t.rag && <GO_Dot r={t.rag} style={{position:'absolute',top:12,right:12}}/>}
     <div style={{fontSize:'var(--text-xs)',color:GO_T.mut,display:'flex',alignItems:'center',gap:5}}>{t.k}<span className="go-dot" style={{width:4,height:4,borderRadius:'50%',background:GO_T.accent,display:'inline-block'}}/></div>
     <div style={{fontFamily:GO_T.mono,fontSize:'var(--text-xl)',fontWeight:'var(--weight-semi)',margin:'8px 0 4px',letterSpacing:'var(--tracking-tight)',fontVariantNumeric:'tabular-nums'}}>{GO_fmt(t.v,t.fmt)}</div>
@@ -11177,7 +11177,7 @@ function GO_Tile(p){ const t=p.t; const _sr=(t.series&&t.series.length>1)?t.seri
           <R.CartesianGrid stroke={PAL.line} vertical={false}/>
           <R.XAxis dataKey="d" tick={{fill:GO_T.dim,fontSize:'var(--text-xs)'}} interval="preserveStartEnd" tickLine={false} axisLine={false}/>
           <R.YAxis tick={{fill:GO_T.dim,fontSize:'var(--text-xs)'}} width={30} tickFormatter={function(v){return Math.abs(v)>=1000?(v/1000).toFixed(0)+'k':Math.round(v);}}/>
-          <R.Tooltip contentStyle={{fontSize:'var(--text-xs)',background:'var(--color-panel)',border:'1px solid '+GO_T.line,borderRadius:6,padding:'2px 6px'}} labelStyle={{color:GO_T.dim}} formatter={function(v){return [GO_fmt(v,t.fmt),t.k];}}/>
+          <R.Tooltip contentStyle={{fontSize:'var(--text-xs)',background:'var(--color-panel)',border:'1px solid '+GO_T.line,borderRadius:'var(--radius-md)',padding:'2px 6px'}} labelStyle={{color:GO_T.dim}} formatter={function(v){return [GO_fmt(v,t.fmt),t.k];}}/>
           <R.Line type="monotone" dataKey="v" stroke={svgCol(_stroke)} strokeWidth={2} dot={false} isAnimationActive={false}/>
         </R.LineChart>
       </R.ResponsiveContainer>}
@@ -11190,19 +11190,19 @@ function GO_Tile(p){ const t=p.t; const _sr=(t.series&&t.series.length>1)?t.seri
   </div>); }
 
 function GO_Insight(p){ const i=p.i; return (
-  <div style={{background:'var(--color-surface)',border:`1px solid ${PAL.panel}`,borderRadius:11,padding:'15px 17px',marginTop:14}}>
+  <div style={{background:'var(--color-surface)',border:`1px solid ${PAL.panel}`,borderRadius:'var(--radius-md)',padding:'15px 17px',marginTop:14}}>
     <div style={{display:'flex',alignItems:'center',gap:8,fontSize:'var(--text-xs)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:GO_T.accent2,marginBottom:6}}>
-      <span style={{width:14,height:14,borderRadius:4,background:'linear-gradient(135deg,'+GO_T.accent+',#5563d6)',display:'inline-block'}}/> greta reads this
+      <span style={{width:14,height:14,borderRadius:'var(--radius-md)',background:'linear-gradient(135deg,'+GO_T.accent+',#5563d6)',display:'inline-block'}}/> greta reads this
     </div>
     <p style={{margin:'0 0 8px',fontSize:'var(--text-sm)',color:'var(--color-ink)'}}>{i.text}</p>
-    <div style={{fontSize:'var(--text-sm)',background:'#FBEEE6',border:'1px solid #263056',borderRadius:8,padding:'8px 11px',display:'flex',justifyContent:'space-between',gap:12,alignItems:'center'}}>
+    <div style={{fontSize:'var(--text-sm)',background:'#FBEEE6',border:'1px solid #263056',borderRadius:'var(--radius-md)',padding:'8px 11px',display:'flex',justifyContent:'space-between',gap:12,alignItems:'center'}}>
       <span>{i.action}</span><b style={{color:GO_T.accent2,fontFamily:GO_T.mono}}>{i.value}</b>
     </div>
   </div>); }
 
 function GO_TierHead(p){ return (
   <div style={{display:'flex',alignItems:'baseline',gap:10,margin:'0 2px 16px'}}>
-    <span style={{fontFamily:GO_T.mono,fontSize:'var(--text-xs)',color:GO_T.accent2,border:`1px solid ${PAL.panel}`,borderRadius:5,padding:'1px 6px'}}>{p.n}</span>
+    <span style={{fontFamily:GO_T.mono,fontSize:'var(--text-xs)',color:GO_T.accent2,border:`1px solid ${PAL.panel}`,borderRadius:'var(--radius-md)',padding:'1px 6px'}}>{p.n}</span>
     <h2 style={{fontSize:'var(--text-base)',margin:0,letterSpacing:'var(--tracking-wide)'}}>{p.title}</h2>
     <span style={{fontSize:'var(--text-sm)',color:GO_T.dim}}>{p.sub}</span>
   </div>); }
@@ -11287,7 +11287,7 @@ function OverviewSummary({d, tf}){
 
   if(err==='nollm') return null;   // public / no-auth workspace: no relay, skip silently
   return (
-    <div style={{background:GO_T.panel, border:'1px solid '+GO_T.line, borderLeft:'3px solid '+GO_T.accent, borderRadius:10, padding:'13px 16px', margin:'2px 0 6px'}}>
+    <div style={{background:GO_T.panel, border:'1px solid '+GO_T.line, borderLeft:'3px solid '+GO_T.accent, borderRadius:'var(--radius-md)', padding:'13px 16px', margin:'2px 0 6px'}}>
       <div style={{fontSize:'var(--text-xs)', fontWeight:'var(--weight-bold)', letterSpacing:'var(--tracking-wide)', textTransform:'uppercase', color:GO_T.accent, marginBottom:5}}>Performance read</div>
       {(loading && !txt)
         ? <div style={{fontSize:'var(--text-sm)', color:GO_T.mut, fontStyle:'italic'}}>Reading the numbers…</div>
@@ -11429,14 +11429,14 @@ function GretaOverviewTiers(){
   const toggle = (
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:6,marginBottom:6}}>
       <div style={{fontSize:'var(--text-sm)',color:GO_T.dim}}>{d?('Snapshot · '):''}{d && <span style={{fontFamily:GO_T.mono}}>{d.periodLabel}</span>} {d?d.compareLabel:''}</div>
-      <div style={{display:'inline-flex',background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:9,padding:3}}>
-        {GO_TIMEFRAMES.map(x=> <button key={x} onClick={()=>setTf(x)} style={{background:x===tf?GO_T.accent:'none',color:x===tf?PAL.panel:GO_T.mut,fontWeight:x===tf?'var(--weight-semi)':'var(--weight-normal)',border:0,fontSize:'var(--text-sm)',padding:'6px 12px',borderRadius:6,cursor:'pointer',textTransform:'capitalize'}}>{x}</button>)}
+      <div style={{display:'inline-flex',background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:'var(--radius-md)',padding:3}}>
+        {GO_TIMEFRAMES.map(x=> <button key={x} onClick={()=>setTf(x)} style={{background:x===tf?GO_T.accent:'none',color:x===tf?PAL.panel:GO_T.mut,fontWeight:x===tf?'var(--weight-semi)':'var(--weight-normal)',border:0,fontSize:'var(--text-sm)',padding:'6px 12px',borderRadius:'var(--radius-md)',cursor:'pointer',textTransform:'capitalize'}}>{x}</button>)}
       </div>
     </div>);
 
   if(!d) return (
     <div style={wrap}>{toggle}
-      <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:12,padding:'26px',textAlign:'center',color:GO_T.mut,marginTop:10}}>
+      <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:'var(--radius-md)',padding:'26px',textAlign:'center',color:GO_T.mut,marginTop:10}}>
         Overview is loading this brand's live data. <GoLink sec="settings" sub="connections">Connect Shopify, GA4, Meta, Google &amp; Klaviyo</GoLink> to populate the tiers.
       </div>
     </div>);
@@ -11445,7 +11445,7 @@ function GretaOverviewTiers(){
     <div style={wrap}>
       {toggle}
       <TrackRecord/>
-      <div style={{background:'linear-gradient(180deg,'+GO_T.panel+','+GO_T.panel2+')',border:'1px solid '+GO_T.line,borderRadius:14,padding:'20px 24px',margin:'8px 0 6px',display:'flex',justifyContent:'space-between',gap:24,flexWrap:'wrap'}}>
+      <div style={{background:'linear-gradient(180deg,'+GO_T.panel+','+GO_T.panel2+')',border:'1px solid '+GO_T.line,borderRadius:'var(--radius-md)',padding:'20px 24px',margin:'8px 0 6px',display:'flex',justifyContent:'space-between',gap:24,flexWrap:'wrap'}}>
         <div>
           <div style={{fontSize:'var(--text-xs)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:GO_T.dim}}>Contribution after marketing · this period</div>
           <div style={{fontFamily:GO_T.mono,fontSize:'var(--text-data)',fontWeight:'var(--weight-semi)',margin:'4px 0 2px',letterSpacing:'var(--tracking-tight)'}}>{GO_gbp(d.hero.cmAfterMkt)}</div>
@@ -11459,10 +11459,10 @@ function GretaOverviewTiers(){
           return (
           <div style={{marginTop:10, maxWidth:470}}>
             <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:5,flexWrap:'wrap'}}>
-              <span style={{display:'inline-flex',alignItems:'center',background:col,color:PAL.panel,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',padding:'2px 10px',borderRadius:20}}>{lab.toUpperCase()}</span>
+              <span style={{display:'inline-flex',alignItems:'center',background:col,color:PAL.panel,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',padding:'2px 10px',borderRadius:'var(--radius-md)'}}>{lab.toUpperCase()}</span>
               <span style={{fontSize:'var(--text-sm)',color:GO_T.mut}}>{GO_gbp(d.pacing.revActual)+' of '+GO_gbp(d.pacing.revTarget)+' expected to date'+(pct!=null?(' · '+(pct>=0?'+':'')+pct+'%'):'')}</span>
             </div>
-            <div style={{position:'relative',height:8,borderRadius:5,background:'var(--color-surface)',overflow:'hidden'}}>
+            <div style={{position:'relative',height:8,borderRadius:'var(--radius-md)',background:'var(--color-surface)',overflow:'hidden'}}>
               <div style={{position:'absolute',left:0,top:0,bottom:0,width:(fill/140*100)+'%',background:col,opacity:.9}}/>
               <div style={{position:'absolute',left:(100/140*100)+'%',top:-1,bottom:-1,width:2,background:GO_T.dim}}/>
             </div>
@@ -11470,8 +11470,8 @@ function GretaOverviewTiers(){
           </div>);
         })()}
         </div>
-        <div style={{minWidth:300,flex:1,background:'var(--color-panel)',border:'1px solid '+GO_T.line,borderLeft:'3px solid '+GO_T.accent,borderRadius:10,padding:'13px 15px'}}>
-          <div><span style={{fontSize:'var(--text-xs)',fontFamily:GO_T.mono,letterSpacing:'var(--tracking-wide)',color:GO_T.accent2,border:`1px solid ${PAL.panel}`,borderRadius:5,padding:'1px 6px',marginRight:6}}>DO FIRST</span><span style={{fontSize:'var(--text-xs)',fontFamily:GO_T.mono,letterSpacing:'var(--tracking-wide)',color:GO_T.red,border:'1px solid #4a2b2b',borderRadius:5,padding:'1px 6px'}}>{d.hero.action.value}</span></div>
+        <div style={{minWidth:300,flex:1,background:'var(--color-panel)',border:'1px solid '+GO_T.line,borderLeft:'3px solid '+GO_T.accent,borderRadius:'var(--radius-md)',padding:'13px 15px'}}>
+          <div><span style={{fontSize:'var(--text-xs)',fontFamily:GO_T.mono,letterSpacing:'var(--tracking-wide)',color:GO_T.accent2,border:`1px solid ${PAL.panel}`,borderRadius:'var(--radius-md)',padding:'1px 6px',marginRight:6}}>DO FIRST</span><span style={{fontSize:'var(--text-xs)',fontFamily:GO_T.mono,letterSpacing:'var(--tracking-wide)',color:GO_T.red,border:'1px solid #4a2b2b',borderRadius:'var(--radius-md)',padding:'1px 6px'}}>{d.hero.action.value}</span></div>
           <h3 style={{margin:'8px 0 5px',fontSize:'var(--text-base)'}}>{d.hero.action.title}</h3>
           <p style={{margin:0,color:GO_T.mut,fontSize:'var(--text-sm)'}}>{d.hero.action.why}</p>
         </div>
@@ -11484,34 +11484,34 @@ function GretaOverviewTiers(){
         <GO_TierHead n="01" title="Business" sub="how the business is performing"/>
         <div style={{display:'grid',gap:12,gridTemplateColumns:'repeat(5,1fr)'}}>
           {d.business.map((t,i)=><GO_Tile key={i} t={t}/>)}
-          <div style={{background:'var(--color-surface)',border:`1px solid ${PAL.panel}`,borderRadius:11,padding:'14px 15px'}}>
+          <div style={{background:'var(--color-surface)',border:`1px solid ${PAL.panel}`,borderRadius:'var(--radius-md)',padding:'14px 15px'}}>
             <div style={{fontSize:'var(--text-xs)',color:GO_T.mut}}>Best sellers →</div>
             <div style={{fontSize:'var(--text-sm)',color:GO_T.mut,marginTop:6,lineHeight:1.7}}>{d.bestSellers.map((s,i)=><div key={i}>{s.name} · {GO_gbp(s.rev)}</div>)}</div>
           </div>
         </div>
-        {d.pacing && d.pacing.days && d.pacing.days.length>0 && <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:8,padding:'10px 12px 4px',boxShadow:'var(--shadow-panel)',marginTop:10}}><div style={{fontSize:'var(--text-xs)',color:GO_T.dim,textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',marginBottom:6}}>Sales &amp; spend vs target</div><R.ResponsiveContainer width="100%" height={200}><R.ComposedChart data={d.pacing.days} margin={{top:5,right:8,left:0,bottom:0}}><R.CartesianGrid strokeDasharray="2 4" stroke={PAL.line}/><R.XAxis dataKey="date" tick={{fontSize:'var(--text-xs)',fill:'var(--color-muted)'}} interval="preserveStartEnd"/><R.YAxis tick={{fontSize:'var(--text-xs)',fill:'var(--color-muted)'}} width={44} tickFormatter={function(v){return '£'+Math.round(v/1000)+'k';}}/><R.Tooltip formatter={function(v){return '£'+Number(v).toLocaleString('en-GB');}}/><R.Bar dataKey="sales" name="Sales" fill={PAL.good} radius={[2,2,0,0]}/><R.Bar dataKey="spend" name="Spend" fill={PAL.accent} radius={[2,2,0,0]}/><R.Line dataKey="tSales" name="Target sales" stroke="var(--color-success)" strokeDasharray="4 3" dot={false} strokeWidth={1.5}/><R.Line dataKey="tSpend" name="Target spend" stroke={PAL.accent} strokeDasharray="4 3" dot={false} strokeWidth={1.5}/></R.ComposedChart></R.ResponsiveContainer></div>}
+        {d.pacing && d.pacing.days && d.pacing.days.length>0 && <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:'var(--radius-md)',padding:'10px 12px 4px',boxShadow:'var(--shadow-panel)',marginTop:10}}><div style={{fontSize:'var(--text-xs)',color:GO_T.dim,textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',marginBottom:6}}>Sales &amp; spend vs target</div><R.ResponsiveContainer width="100%" height={200}><R.ComposedChart data={d.pacing.days} margin={{top:5,right:8,left:0,bottom:0}}><R.CartesianGrid strokeDasharray="2 4" stroke={PAL.line}/><R.XAxis dataKey="date" tick={{fontSize:'var(--text-xs)',fill:'var(--color-muted)'}} interval="preserveStartEnd"/><R.YAxis tick={{fontSize:'var(--text-xs)',fill:'var(--color-muted)'}} width={44} tickFormatter={function(v){return '£'+Math.round(v/1000)+'k';}}/><R.Tooltip formatter={function(v){return '£'+Number(v).toLocaleString('en-GB');}}/><R.Bar dataKey="sales" name="Sales" fill={PAL.good} radius={[2,2,0,0]}/><R.Bar dataKey="spend" name="Spend" fill={PAL.accent} radius={[2,2,0,0]}/><R.Line dataKey="tSales" name="Target sales" stroke="var(--color-success)" strokeDasharray="4 3" dot={false} strokeWidth={1.5}/><R.Line dataKey="tSpend" name="Target spend" stroke={PAL.accent} strokeDasharray="4 3" dot={false} strokeWidth={1.5}/></R.ComposedChart></R.ResponsiveContainer></div>}
         <GO_Insight i={d.insights.business}/>
       </div>
 
       <div style={{margin:'28px 0 10px'}}>
         <GO_TierHead n="02" title="Customer" sub="returning · new · paid-incremental (CTC)"/>
-        <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:8,padding:'13px 15px',boxShadow:'var(--shadow-panel)',marginBottom:10}}>
+        <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:'var(--radius-md)',padding:'13px 15px',boxShadow:'var(--shadow-panel)',marginBottom:10}}>
           <div style={{fontSize:'var(--text-xs)',color:GO_T.mut,marginBottom:6}}>New vs returning revenue</div>
-          <div style={{display:'flex',height:9,borderRadius:5,overflow:'hidden',marginBottom:6}}><div style={{width:d.customer.splitNew+'%',background:GO_T.accent}}/><div style={{width:d.customer.splitRet+'%',background:PAL.data3}}/></div>
+          <div style={{display:'flex',height:9,borderRadius:'var(--radius-md)',overflow:'hidden',marginBottom:6}}><div style={{width:d.customer.splitNew+'%',background:GO_T.accent}}/><div style={{width:d.customer.splitRet+'%',background:PAL.data3}}/></div>
           <div style={{fontFamily:GO_T.mono,fontSize:'var(--text-xs)'}}><span style={{color:GO_T.accent}}>New {d.customer.splitNew}% · {GO_gbp(d.customer.newRev)}</span> &nbsp; <span style={{color:PAL.data3}}>Ret {d.customer.splitRet}% · {GO_gbp(d.customer.retRev)}</span></div>
         </div>
         {(d.customer.rows||[]).map(function(row,ri){return (
           <div key={ri} style={{marginTop:ri>0?20:2,marginBottom:6}}>
             <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 0 10px',paddingBottom:7,borderBottom:'1px solid '+GO_T.line}}><GO_Dot r={row.rag}/> <span style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',color:GO_T.ink,letterSpacing:'var(--tracking-wide)'}}>{row.label}</span></div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:12}}>
-              {row.cells.map(function(c,ci){var ex=GO_EXPLAIN[c.k];return <div key={ci} className="go-tile" style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:8,padding:'14px 15px',boxShadow:'var(--shadow-panel)'}}><div style={{fontSize:'var(--text-xs)',color:GO_T.mut}}>{c.k}</div><div style={{fontFamily:GO_T.mono,fontSize:'var(--text-xl)',fontWeight:'var(--weight-semi)',margin:'8px 0 4px'}}>{c.v}</div>{ex&&<div className="go-pop"><div className="go-head">{row.label} · {c.k}</div><div style={{fontSize:'var(--text-xs)',color:GO_T.mut,lineHeight:1.5}}>{ex}</div></div>}</div>;})}
+              {row.cells.map(function(c,ci){var ex=GO_EXPLAIN[c.k];return <div key={ci} className="go-tile" style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:'var(--radius-md)',padding:'14px 15px',boxShadow:'var(--shadow-panel)'}}><div style={{fontSize:'var(--text-xs)',color:GO_T.mut}}>{c.k}</div><div style={{fontFamily:GO_T.mono,fontSize:'var(--text-xl)',fontWeight:'var(--weight-semi)',margin:'8px 0 4px'}}>{c.v}</div>{ex&&<div className="go-pop"><div className="go-head">{row.label} · {c.k}</div><div style={{fontSize:'var(--text-xs)',color:GO_T.mut,lineHeight:1.5}}>{ex}</div></div>}</div>;})}
             </div>
           </div>);})}
                 {d.cacBlock && (function(){ var C=d.cacBlock;
           var g2=function(x){return x==null?"—":"£"+Number(x).toFixed(2);};
           var rx=function(x){return x==null?"—":Number(x).toFixed(2)+"×";};
           var col=C.rag==="g"?GO_T.green:C.rag==="a"?GO_T.amber:C.rag==="r"?GO_T.red:GO_T.dim;
-          var cell=function(k,v,sub,hi){var ex=GO_EXPLAIN[(String(v).indexOf("×")>=0?"return on ad spend:":"cost per new customer:")+k]||GO_EXPLAIN[k]||"";return <div className="go-tile" style={{background:GO_T.panel,border:"1px solid "+(hi||GO_T.line),borderRadius:8,padding:"14px 15px",boxShadow:"var(--shadow-panel)"}}><div style={{fontSize:'var(--text-xs)',color:GO_T.mut}}>{k}</div><div style={{fontFamily:GO_T.mono,fontSize:'var(--text-xl)',fontWeight:'var(--weight-semi)',margin:"8px 0 4px"}}>{v}</div><div style={{fontSize:'var(--text-xs)',color:GO_T.dim}}>{sub}</div>{ex&&<div className="go-pop"><div className="go-head">{k}</div><div style={{fontSize:'var(--text-xs)',color:GO_T.mut,lineHeight:1.5}}>{ex}</div></div>}</div>;};
+          var cell=function(k,v,sub,hi){var ex=GO_EXPLAIN[(String(v).indexOf("×")>=0?"return on ad spend:":"cost per new customer:")+k]||GO_EXPLAIN[k]||"";return <div className="go-tile" style={{background:GO_T.panel,border:"1px solid "+(hi||GO_T.line),borderRadius:'var(--radius-md)',padding:"14px 15px",boxShadow:"var(--shadow-panel)"}}><div style={{fontSize:'var(--text-xs)',color:GO_T.mut}}>{k}</div><div style={{fontFamily:GO_T.mono,fontSize:'var(--text-xl)',fontWeight:'var(--weight-semi)',margin:"8px 0 4px"}}>{v}</div><div style={{fontSize:'var(--text-xs)',color:GO_T.dim}}>{sub}</div>{ex&&<div className="go-pop"><div className="go-head">{k}</div><div style={{fontSize:'var(--text-xs)',color:GO_T.mut,lineHeight:1.5}}>{ex}</div></div>}</div>;};
           var ltvSub=C.opc.toFixed(2)+" orders/cust"+(C.repeatPct!=null?" · "+C.repeatPct+"% repeat":"");
           var tgtSub=C.goalConfirmed?"from your goal":"profit-safe default";
           return <div style={{marginTop:2,marginBottom:6}}>
@@ -11537,7 +11537,7 @@ function GretaOverviewTiers(){
 
       <div style={{margin:'28px 0 10px'}}>
         <GO_TierHead n="03" title="Channel" sub="avg vs marginal real return on ad spend — where the next £ goes (CTC)"/>
-        <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:11,padding:'2px 4px',overflowX:'auto'}}>
+        <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:'var(--radius-md)',padding:'2px 4px',overflowX:'auto'}}>
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:'var(--text-sm)'}}>
             <thead><tr>{['Channel','Spend','Incr rev','CM','iROAS','Marginal','Verdict'].map((h,i)=><th key={i} style={{textAlign:i===0?'left':'right',color:GO_T.dim,fontWeight:'var(--weight-medium)',fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{h}</th>)}</tr></thead>
             <tbody>{d.channel.map((c,i)=>(
@@ -11552,7 +11552,7 @@ function GretaOverviewTiers(){
               </tr>))}</tbody>
           </table>
         </div>
-        {d.emailBlock && (function () { var E = d.emailBlock; var cell = function (k, v, sub) { return <div style={{ background: GO_T.panel, border: '1px solid ' + GO_T.line, borderRadius: 8, padding: '9px 11px', boxShadow: 'var(--shadow-panel)' }}><div style={{ fontSize: 'var(--text-xs)', color: GO_T.mut }}>{k}</div><div style={{ fontFamily: GO_T.mono, fontSize: 'var(--text-base)', fontWeight:'var(--weight-semi)', marginTop: 2 }}>{v}</div><div style={{ fontSize: 'var(--text-xs)', color: GO_T.dim }}>{sub}</div></div>; }; return <div style={{ marginTop: 10 }}><div style={{ fontSize: 'var(--text-xs)', color: GO_T.dim, textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)', margin: '0 2px 6px' }}>Email breakdown · Klaviyo</div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(130px,1fr))', gap: 8 }}>{cell('Email revenue', GO_gbp(E.total_rev), E.total_orders + ' orders')}{cell('Campaign rev', GO_gbp(E.campaign_rev), E.campaign_orders + ' orders')}{cell('Flow rev', GO_gbp(E.flow_rev), E.flow_orders + ' orders')}{cell('Rev / 1k sent', GO_gbp(E.rev_per_1k_sent), Math.round(E.total_sends / 1000) + 'k sent')}</div></div>; })()}
+        {d.emailBlock && (function () { var E = d.emailBlock; var cell = function (k, v, sub) { return <div style={{ background: GO_T.panel, border: '1px solid ' + GO_T.line, borderRadius: 'var(--radius-md)', padding: '9px 11px', boxShadow: 'var(--shadow-panel)' }}><div style={{ fontSize: 'var(--text-xs)', color: GO_T.mut }}>{k}</div><div style={{ fontFamily: GO_T.mono, fontSize: 'var(--text-base)', fontWeight:'var(--weight-semi)', marginTop: 2 }}>{v}</div><div style={{ fontSize: 'var(--text-xs)', color: GO_T.dim }}>{sub}</div></div>; }; return <div style={{ marginTop: 10 }}><div style={{ fontSize: 'var(--text-xs)', color: GO_T.dim, textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)', margin: '0 2px 6px' }}>Email breakdown · Klaviyo</div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(130px,1fr))', gap: 8 }}>{cell('Email revenue', GO_gbp(E.total_rev), E.total_orders + ' orders')}{cell('Campaign rev', GO_gbp(E.campaign_rev), E.campaign_orders + ' orders')}{cell('Flow rev', GO_gbp(E.flow_rev), E.flow_orders + ' orders')}{cell('Rev / 1k sent', GO_gbp(E.rev_per_1k_sent), Math.round(E.total_sends / 1000) + 'k sent')}</div></div>; })()}
         <GO_Insight i={d.insights.channel}/>
         <MetaAdDrilldown/>
         <GoogleAdDrilldown/>
@@ -11577,7 +11577,7 @@ function GP_Dot(p) { return React.createElement('span', { style: { width: 8, hei
 
 function GP_Metric(p) {
   return (
-    <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 10, padding: '12px 14px' }}>
+    <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 'var(--radius-md)', padding: '12px 14px' }}>
       <div style={{ fontSize: 'var(--text-xs)', color: GP_T.mut }}>{p.k}</div>
       <div style={{ fontFamily: GP_T.mono, fontSize: 'var(--text-lg)', fontWeight:'var(--weight-semi)', marginTop: 4, color: p.hi ? GP_T.accent2 : GP_T.ink }}>{p.v}</div>
       {p.sub && <div style={{ fontSize: 'var(--text-xs)', color: GP_T.dim, marginTop: 3 }}>{p.sub}</div>}
@@ -11599,7 +11599,7 @@ function GP_Why(p){
         {open?'▾':'▸'} Why are these the targets?
       </button>
       {open && (
-        <div style={{ marginTop:8, background:'var(--color-surface)', border:'1px solid '+GP_T.line, borderRadius:10, padding:'2px 14px 12px' }}>
+        <div style={{ marginTop:8, background:'var(--color-surface)', border:'1px solid '+GP_T.line, borderRadius:'var(--radius-md)', padding:'2px 14px 12px' }}>
           <div style={line}><span><b style={{color:GP_T.ink}}>Revenue target</b> — your contribution goal grossed back up by your contribution margin. <span style={num}>{GP_gbp(d.cam_target)}</span> CAM &divide; {cmPct}% margin, plus the returning-customer baseline, &asymp; <span style={num}>{GP_gbp(d.revenue_target)}</span>.</span></div>
           <div style={line}><span><b style={{color:GP_T.ink}}>Ad spend cap</b> — the revenue you must <i>buy</i>, &divide; your sales per £ of ads target. At sales per £ of ads <span style={num}>{d.mer_target}</span> (revenue &divide; ad spend), the plan needs at most <span style={num}>{GP_gbp(d.spend_cap)}</span> of spend.</span></div>
           <div style={line}><span><b style={{color:GP_T.ink}}>New customers</b> — new-customer revenue &divide; sales per £ of ads for new customers <span style={num}>{d.amer_used}</span> (how much revenue each &pound;1 of acquisition spend brings). That lands at <span style={num}>{nc}</span> new customers this quarter.</span></div>
@@ -11632,12 +11632,12 @@ function GP_ChannelHealth(p){
   function setK(k,v){ setF(function(o){ var n=Object.assign({},o); n[k]=v.replace(/[^0-9.]/g,''); return n; }); }
   function save(){ if(!window.FRKL_PLAN||!window.FRKL_PLAN.saveBands) return; setBusy(true); setMsg(null);
     window.FRKL_PLAN.saveBands(f).then(function(r){ setBusy(false); if(r.ok){ setEdit(false); } else { setMsg(r.error||'failed'); } }); }
-  var inp = { background:'var(--color-surface)', border:'1px solid '+GP_T.line, borderRadius:7, color:GP_T.ink, fontFamily:GP_T.mono, fontSize:'var(--text-sm)', padding:'6px 8px', width:'100%', boxSizing:'border-box' };
+  var inp = { background:'var(--color-surface)', border:'1px solid '+GP_T.line, borderRadius:'var(--radius-md)', color:GP_T.ink, fontFamily:GP_T.mono, fontSize:'var(--text-sm)', padding:'6px 8px', width:'100%', boxSizing:'border-box' };
   return (
-    <div style={{ background: GP_T.panel, border:'1px solid '+GP_T.line, borderRadius:12, padding:'14px 16px', marginBottom:16 }}>
+    <div style={{ background: GP_T.panel, border:'1px solid '+GP_T.line, borderRadius:'var(--radius-md)', padding:'14px 16px', marginBottom:16 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
         <div style={{ fontSize:'var(--text-xs)', letterSpacing:'var(--tracking-wide)', textTransform:'uppercase', color:GP_T.accent2 }}>Retention balance &middot; new vs returning</div>
-        <span style={{ fontSize:'var(--text-xs)', color:GP_T.dim }}>{h.category} &middot; {h.band_source==='brand_override'?'custom band':'category default'}{!edit ? <button onClick={openEdit} style={{ marginLeft:8, fontSize:'var(--text-xs)', color:GP_T.mut, background:'none', border:'1px solid '+GP_T.line, borderRadius:6, padding:'2px 7px', cursor:'pointer' }}>Edit band</button> : null}</span>
+        <span style={{ fontSize:'var(--text-xs)', color:GP_T.dim }}>{h.category} &middot; {h.band_source==='brand_override'?'custom band':'category default'}{!edit ? <button onClick={openEdit} style={{ marginLeft:8, fontSize:'var(--text-xs)', color:GP_T.mut, background:'none', border:'1px solid '+GP_T.line, borderRadius:'var(--radius-md)', padding:'2px 7px', cursor:'pointer' }}>Edit band</button> : null}</span>
       </div>
       {edit && f ? (
         <div style={{ marginTop:8 }}>
@@ -11649,8 +11649,8 @@ function GP_ChannelHealth(p){
             <label style={{ fontSize:'var(--text-xs)', color:GP_T.mut }}>Email share &mdash; high (%)<input style={Object.assign({marginTop:4},inp)} value={f.emailHigh} onChange={function(e){setK('emailHigh',e.target.value);}}/></label>
           </div>
           <div style={{ display:'flex', alignItems:'center', gap:10, marginTop:12 }}>
-            <button onClick={save} disabled={busy} style={{ borderRadius:8, padding:'8px 15px', fontSize:'var(--text-sm)', border:'1px solid '+GP_T.accent, background:GP_T.accent, color:PAL.panel, fontWeight:'var(--weight-semi)', cursor:'pointer' }}>{busy?'Saving…':'Save band'}</button>
-            <button onClick={function(){ setEdit(false); }} disabled={busy} style={{ borderRadius:8, padding:'8px 12px', fontSize:'var(--text-sm)', border:'1px solid '+GP_T.line, background:GP_T.panel, color:GP_T.ink, cursor:'pointer' }}>Cancel</button>
+            <button onClick={save} disabled={busy} style={{ borderRadius:'var(--radius-md)', padding:'8px 15px', fontSize:'var(--text-sm)', border:'1px solid '+GP_T.accent, background:GP_T.accent, color:PAL.panel, fontWeight:'var(--weight-semi)', cursor:'pointer' }}>{busy?'Saving…':'Save band'}</button>
+            <button onClick={function(){ setEdit(false); }} disabled={busy} style={{ borderRadius:'var(--radius-md)', padding:'8px 12px', fontSize:'var(--text-sm)', border:'1px solid '+GP_T.line, background:GP_T.panel, color:GP_T.ink, cursor:'pointer' }}>Cancel</button>
             {msg ? <span style={{ fontSize:'var(--text-sm)', color:GP_T.red }}>{msg}</span> : null}
           </div>
         </div>
@@ -11658,8 +11658,8 @@ function GP_ChannelHealth(p){
         <div style={{ fontSize:'var(--text-sm)', color:GP_T.dim }}>{h.guidance}</div>
       ) : (
         <div>
-          <div style={{ position:'relative', height:10, borderRadius:5, background:'var(--color-surface)', margin:'12px 0 5px' }}>
-            <div style={{ position:'absolute', left:clamp(lo)+'%', width:(clamp(hi)-clamp(lo))+'%', top:0, bottom:0, background:GP_T.green, opacity:0.28, borderRadius:5 }}/>
+          <div style={{ position:'relative', height:10, borderRadius:'var(--radius-md)', background:'var(--color-surface)', margin:'12px 0 5px' }}>
+            <div style={{ position:'absolute', left:clamp(lo)+'%', width:(clamp(hi)-clamp(lo))+'%', top:0, bottom:0, background:GP_T.green, opacity:0.28, borderRadius:'var(--radius-md)' }}/>
             <div style={{ position:'absolute', left:'calc('+clamp(ret)+'% - 1px)', top:-3, bottom:-3, width:2, background:ragCol }}/>
           </div>
           <div style={{ display:'flex', justifyContent:'space-between', fontSize:'var(--text-xs)', color:GP_T.dim }}>
@@ -11699,7 +11699,7 @@ function GP_ChannelMix(p){
   var PAID = {paid_social:1, paid_search:1};
   var paidRev = cur.reduce(function(a,r){ return a + (PAID[r.channel]?Number(r.net_revenue):0); },0);
   return (
-    <div style={{ background: GP_T.panel, border:'1px solid '+GP_T.line, borderRadius:12, padding:'14px 16px', marginBottom:16 }}>
+    <div style={{ background: GP_T.panel, border:'1px solid '+GP_T.line, borderRadius:'var(--radius-md)', padding:'14px 16px', marginBottom:16 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
         <div style={{ fontSize:'var(--text-xs)', letterSpacing:'var(--tracking-wide)', textTransform:'uppercase', color:GP_T.accent2 }}>Where revenue comes from &middot; last 30 days</div>
         <span style={{ fontSize:'var(--text-xs)', color:GP_T.dim }}>paid {Math.round(100*paidRev/total)}% &middot; non-paid {Math.round(100*(1-paidRev/total))}%</span>
@@ -11716,7 +11716,7 @@ function GP_ChannelMix(p){
               <span style={{ fontWeight:'var(--weight-semi)' }}>{LBL[r.channel]||r.channel}{r.channel==='referral' && Number(r.orders_with_discount)>0 ? <span style={{ color:GP_T.dim, fontWeight:'var(--weight-normal)' }}> &middot; {r.orders_with_discount} coded</span> : null}</span>
               <span style={{ fontFamily:GP_T.mono }}>{GP_gbp(rev)} <span style={{ color:GP_T.dim }}>({pct.toFixed(0)}%)</span>{d!=null ? <span style={{ color:d>=0?GP_T.green:GP_T.red, marginLeft:6 }}>{(d>=0?'▲':'▼')+Math.abs(d).toFixed(0)+'%'}</span> : null}</span>
             </div>
-            <div style={{ position:'relative', height:5, borderRadius:3, background:'var(--color-surface)', margin:'5px 0 3px', overflow:'hidden' }}>
+            <div style={{ position:'relative', height:5, borderRadius:'var(--radius-sm)', background:'var(--color-surface)', margin:'5px 0 3px', overflow:'hidden' }}>
               <div style={{ position:'absolute', left:0, top:0, bottom:0, width:pct+'%', background:col, opacity:0.8 }}/>
             </div>
             <div style={{ fontSize:'var(--text-xs)', color:GP_T.dim }}>{r.new_orders} new &middot; {r.returning_orders} returning ({ret}% ret) &middot; average order value {GP_gbp(r.aov)}</div>
@@ -11782,12 +11782,12 @@ function GP_SpendCurve(p) {
 
   var chip = function (txt, col) {
     return <span style={{ fontSize: 'var(--text-xs)', fontWeight:'var(--weight-bold)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase',
-      color: col, border: '1px solid ' + col, borderRadius: 4, padding: '2px 6px' }}>{txt}</span>;
+      color: col, border: '1px solid ' + col, borderRadius: 'var(--radius-md)', padding: '2px 6px' }}>{txt}</span>;
   };
   var tick = function (v) { return v >= 1000 ? '£' + Math.round(v / 1000) + 'k' : '£' + Math.round(v); };
 
   return (
-    <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 12, padding: '16px 18px' }}>
+    <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 'var(--radius-md)', padding: '16px 18px' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
         <div style={{ fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: GP_T.accent2 }}>Spend curve</div>
         {indet ? chip('range, not a target', GP_T.amber)
@@ -11923,7 +11923,7 @@ function GP_CurveConstraint(p) {
   };
 
   return (
-    <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 12,
+    <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 'var(--radius-md)',
       padding: '16px 18px', marginTop: 12 }}>
       <div style={{ fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase',
         color: GP_T.accent2, marginBottom: 4 }}>Why the curve bends</div>
@@ -11989,7 +11989,7 @@ function GP_CurveHistory(p) {
   var narrowed = Number(last.ci_high) - Number(last.ci_low) < Number(first.ci_high) - Number(first.ci_low);
 
   return (
-    <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 12,
+    <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 'var(--radius-md)',
       padding: '16px 18px', marginTop: 12 }}>
       <div style={{ fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase',
         color: GP_T.accent2, marginBottom: 4 }}>How the read has changed</div>
@@ -12068,7 +12068,7 @@ function GP_CurveLevers(p) {
     per_order_costs: 'Per-order costs', cvr: 'Conversion rate', cpc: 'Cost per click' };
 
   return (
-    <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 12,
+    <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 'var(--radius-md)',
       padding: '16px 18px', marginTop: 12 }}>
       <div style={{ fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase',
         color: GP_T.accent2, marginBottom: 4 }}>What moves it</div>
@@ -12100,9 +12100,9 @@ function GP_CurveLevers(p) {
               <div style={{ fontSize: 'var(--text-xs)', color: GP_T.dim, marginTop: 2 }}>
                 moves the {l.moves === 'line' ? 'line' : 'curve'}
               </div>
-              <div style={{ height: 3, marginTop: 5, background: GP_T.line, borderRadius: 2 }}>
+              <div style={{ height: 3, marginTop: 5, background: GP_T.line, borderRadius: 'var(--radius-sm)' }}>
                 <div style={{ height: 3, width: Math.max(2, (gain / max) * 100) + '%',
-                  background: GP_T.accent, borderRadius: 2 }} />
+                  background: GP_T.accent, borderRadius: 'var(--radius-sm)' }} />
               </div>
             </div>
             <div style={{ textAlign: 'right', fontSize: 'var(--text-sm)', fontFamily: GP_T.mono, color: GP_T.mut }}>
@@ -12229,8 +12229,8 @@ function GretaPlanPanel({ show } = {}) {
   function setE(k, val) { setEcon(function (o) { var n = Object.assign({}, o); n[k] = val.replace(/[^0-9.]/g, ''); return n; }); }
 
   var wrap = { maxWidth: 1180, margin: '0 auto', padding: '10px 6px 60px', background: GP_T.bg, color: GP_T.ink };
-  var input = { background: 'var(--color-surface)', border: '1px solid ' + GP_T.line, borderRadius: 8, color: GP_T.ink, fontFamily: GP_T.mono, fontSize: 'var(--text-base)', padding: '8px 11px', width: 160 };
-  var seg = function (on) { return { background: on ? GP_T.accent : 'none', color: on ? PAL.panel : GP_T.mut, fontWeight: on ? 'var(--weight-semi)' : 'var(--weight-normal)', border: 0, fontSize: 'var(--text-sm)', padding: '7px 13px', borderRadius: 6, cursor: 'pointer' }; };
+  var input = { background: 'var(--color-surface)', border: '1px solid ' + GP_T.line, borderRadius: 'var(--radius-md)', color: GP_T.ink, fontFamily: GP_T.mono, fontSize: 'var(--text-base)', padding: '8px 11px', width: 160 };
+  var seg = function (on) { return { background: on ? GP_T.accent : 'none', color: on ? PAL.panel : GP_T.mut, fontWeight: on ? 'var(--weight-semi)' : 'var(--weight-normal)', border: 0, fontSize: 'var(--text-sm)', padding: '7px 13px', borderRadius: 'var(--radius-md)', cursor: 'pointer' }; };
   var cfg = (window.FRKL_PLAN && window.FRKL_PLAN.config) || null;
   var perDays = (P.period && P.period.start && P.period.end) ? Math.max(1, Math.round((new Date(P.period.end) - new Date(P.period.start)) / 864e5) + 1) : 90;
   var fixedForPeriod = cfg && cfg.fixed_costs_monthly ? Number(cfg.fixed_costs_monthly) * (perDays / 30) : 0;
@@ -12247,7 +12247,7 @@ function GretaPlanPanel({ show } = {}) {
       <div style={{ fontSize: 'var(--text-sm)', color: GP_T.dim, marginBottom: 14 }}>{SHOW === 'growth' ? 'What the plan forecasts, which channels earn their money, and how far your spend can go.' : 'Confirm what things cost you and set your goal — these drive pace and the ranked actions.'}</div>
 
       {/* readiness gate */}
-      {isGoal && (<div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 12, padding: '14px 16px', marginBottom: 16 }}>
+      {isGoal && (<div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 'var(--radius-md)', padding: '14px 16px', marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <div style={{ fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: GP_T.accent2 }}>Data readiness</div>
           <div style={{ fontSize: 'var(--text-sm)', color: blocking.length ? GP_T.amber : GP_T.green }}>{readyCount}/{readiness.length} ready{blocking.length ? ' · ' + blocking.length + ' blocking targets' : ' · plan-ready ✓'}</div>
@@ -12276,7 +12276,7 @@ function GretaPlanPanel({ show } = {}) {
       {isGrowth && (<GP_ChannelMix mix={P.channelMix}/>)}
 
       {/* economics editor — operating costs feed Operating Profit on the Overview */}
-      {isGoal && (<div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 12, padding: '14px 16px', marginBottom: 16 }}>
+      {isGoal && (<div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 'var(--radius-md)', padding: '14px 16px', marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
           <div style={{ fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: GP_T.accent2 }}>Operating economics</div>
           <span style={{ fontSize: 'var(--text-xs)', color: GP_T.dim }}>feeds contribution &amp; Operating Profit</span>
@@ -12291,13 +12291,13 @@ function GretaPlanPanel({ show } = {}) {
                 return (
                   <div key={f[0]}>
                     <div style={{ fontSize: 'var(--text-xs)', color: hi ? GP_T.accent2 : GP_T.mut, marginBottom: 4, fontWeight: hi ? 'var(--weight-semi)' : 'var(--weight-normal)' }}>{f[1]} <span style={{ color: GP_T.dim }}>({f[2]})</span></div>
-                    <input style={{ background: 'var(--color-surface)', border: '1px solid ' + (hi ? GP_T.accent : GP_T.line), borderRadius: 8, color: GP_T.ink, fontFamily: GP_T.mono, fontSize: 'var(--text-base)', padding: '7px 9px', width: '100%', boxSizing: 'border-box' }} value={econ[f[0]]} onChange={function (e) { setE(f[0], e.target.value); }} />
+                    <input style={{ background: 'var(--color-surface)', border: '1px solid ' + (hi ? GP_T.accent : GP_T.line), borderRadius: 'var(--radius-md)', color: GP_T.ink, fontFamily: GP_T.mono, fontSize: 'var(--text-base)', padding: '7px 9px', width: '100%', boxSizing: 'border-box' }} value={econ[f[0]]} onChange={function (e) { setE(f[0], e.target.value); }} />
                   </div>
                 );
               })}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14 }}>
-              <button onClick={saveEcon} disabled={busy} style={{ borderRadius: 8, padding: '9px 16px', fontSize: 'var(--text-sm)', border: '1px solid ' + GP_T.accent, background: GP_T.accent, color: PAL.panel, fontWeight:'var(--weight-semi)', cursor: 'pointer' }}>{busy ? '…' : 'Save economics'}</button>
+              <button onClick={saveEcon} disabled={busy} style={{ borderRadius: 'var(--radius-md)', padding: '9px 16px', fontSize: 'var(--text-sm)', border: '1px solid ' + GP_T.accent, background: GP_T.accent, color: PAL.panel, fontWeight:'var(--weight-semi)', cursor: 'pointer' }}>{busy ? '…' : 'Save economics'}</button>
               {ecMsg === 'ok' && <span style={{ color: GP_T.green, fontSize: 'var(--text-sm)' }}>Saved — Operating Profit now uses these costs.</span>}
               {ecMsg && ecMsg.indexOf('err') === 0 && <span style={{ color: GP_T.red, fontSize: 'var(--text-sm)' }}>{ecMsg.slice(4)}</span>}
               <span style={{ fontSize: 'var(--text-xs)', color: GP_T.dim }}>Gross margin &amp; variable costs recompute your contribution ratio.</span>
@@ -12310,7 +12310,7 @@ function GretaPlanPanel({ show } = {}) {
 
       {/* forecast vs goal — the calendar's impact on the plan (reads vw_forecast_vs_goal, SOT) */}
       {isGrowth && P.forecast && (
-        <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 12, padding: '14px 16px', marginBottom: 16 }}>
+        <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 'var(--radius-md)', padding: '14px 16px', marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <div style={{ fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: GP_T.accent2 }}>Forecast vs goal</div>
             <div style={{ fontSize: 'var(--text-xs)', color: GP_T.dim }}>calendar-driven · covers {P.forecast.forecast_covers_from} – {P.forecast.forecast_covers_to}{Number(P.forecast.uncovered_days) > 0 ? ' · ' + P.forecast.uncovered_days + 'd beyond horizon' : ''}</div>
@@ -12328,10 +12328,10 @@ function GretaPlanPanel({ show } = {}) {
 
       {/* channel efficiency vs targets — CTC: CM-first, normalized iROAS, fix before scale */}
       {isGrowth && P.channels && P.channels.length ? (
-        <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 12, padding: '14px 16px', marginBottom: 16 }}>
+        <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 'var(--radius-md)', padding: '14px 16px', marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <div style={{ fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: GP_T.accent2 }}>Channel efficiency vs targets</div>
-            <button onClick={function () { window.FRKL_PLAN.deriveChannelPlan(true); }} style={{ fontSize: 'var(--text-xs)', color: GP_T.mut, background: 'none', border: '1px solid ' + GP_T.line, borderRadius: 6, padding: '4px 9px', cursor: 'pointer' }}>{(P.channels[0] && P.channels[0].plan_confirmed) ? 'Re-derive plan from goal' : 'Set plan from goal'}</button>
+            <button onClick={function () { window.FRKL_PLAN.deriveChannelPlan(true); }} style={{ fontSize: 'var(--text-xs)', color: GP_T.mut, background: 'none', border: '1px solid ' + GP_T.line, borderRadius: 'var(--radius-md)', padding: '4px 9px', cursor: 'pointer' }}>{(P.channels[0] && P.channels[0].plan_confirmed) ? 'Re-derive plan from goal' : 'Set plan from goal'}</button>
           </div>
           <table style={{ width: '100%', fontSize: 'var(--text-sm)', borderCollapse: 'collapse' }}>
             <thead><tr style={{ color: GP_T.mut, fontSize: 'var(--text-xs)' }}>
@@ -12378,10 +12378,10 @@ function GretaPlanPanel({ show } = {}) {
                                     ciAdmitsNoCeiling={!!(P.spendCurve && P.spendCurve.band_admits_no_ceiling)} />)}
 
       {/* goal setter */}
-      {isGoal && (<div style={{ background: 'linear-gradient(180deg,' + GP_T.panel + ',' + GP_T.panel2 + ')', border: '1px solid ' + GP_T.line, borderRadius: 12, padding: '16px 18px' }}>
+      {isGoal && (<div style={{ background: 'linear-gradient(180deg,' + GP_T.panel + ',' + GP_T.panel2 + ')', border: '1px solid ' + GP_T.line, borderRadius: 'var(--radius-md)', padding: '16px 18px' }}>
         <div style={{ fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: GP_T.accent2, marginBottom: 10 }}>Set the quarter goal</div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <div style={{ display: 'inline-flex', background: 'var(--color-surface)', border: '1px solid ' + GP_T.line, borderRadius: 8, padding: 3 }}>
+          <div style={{ display: 'inline-flex', background: 'var(--color-surface)', border: '1px solid ' + GP_T.line, borderRadius: 'var(--radius-md)', padding: 3 }}>
             <button onClick={function () { setBasis('cam'); }} style={seg(basis === 'cam')}>Profit after ads</button>
             <button onClick={function () { setBasis('revenue'); }} style={seg(basis === 'revenue')}>Revenue</button>
           </div>
@@ -12389,7 +12389,7 @@ function GretaPlanPanel({ show } = {}) {
             <div style={{ fontSize: 'var(--text-xs)', color: GP_T.mut, marginBottom: 4 }}>{basis === 'cam' ? 'Profit-after-ads goal' : 'Revenue goal'} (£)</div>
             <input style={input} value={amount} onChange={function (e) { setAmount(e.target.value.replace(/[^0-9.]/g, '')); }} placeholder={basis === 'cam' ? 'e.g. 25000' : 'e.g. 90000'} />
           </div>
-          <button onClick={calc} disabled={busy} style={{ borderRadius: 8, padding: '9px 15px', fontSize: 'var(--text-sm)', border: '1px solid ' + GP_T.line, background: GP_T.panel, color: GP_T.ink, cursor: 'pointer' }}>{busy ? '…' : 'Calculate'}</button>
+          <button onClick={calc} disabled={busy} style={{ borderRadius: 'var(--radius-md)', padding: '9px 15px', fontSize: 'var(--text-sm)', border: '1px solid ' + GP_T.line, background: GP_T.panel, color: GP_T.ink, cursor: 'pointer' }}>{busy ? '…' : 'Calculate'}</button>
           <span style={{ fontSize: 'var(--text-xs)', color: GP_T.dim }}>leave blank + Calculate for the run-rate baseline</span>
         </div>
 
@@ -12412,7 +12412,7 @@ function GretaPlanPanel({ show } = {}) {
               </div>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
-              <button onClick={confirm} disabled={busy} style={{ borderRadius: 8, padding: '9px 16px', fontSize: 'var(--text-sm)', border: '1px solid ' + GP_T.accent, background: GP_T.accent, color: PAL.panel, fontWeight:'var(--weight-semi)', cursor: 'pointer' }}>Confirm as plan of record</button>
+              <button onClick={confirm} disabled={busy} style={{ borderRadius: 'var(--radius-md)', padding: '9px 16px', fontSize: 'var(--text-sm)', border: '1px solid ' + GP_T.accent, background: GP_T.accent, color: PAL.panel, fontWeight:'var(--weight-semi)', cursor: 'pointer' }}>Confirm as plan of record</button>
               {msg === 'ok' && <span style={{ color: GP_T.green, fontSize: 'var(--text-sm)' }}>Confirmed — this is now your plan; pace &amp; RAG-vs-target are live.</span>}
               {msg && msg.indexOf('err') === 0 && <span style={{ color: GP_T.red, fontSize: 'var(--text-sm)' }}>{msg.slice(4)}</span>}
               <span style={{ fontSize: 'var(--text-xs)', color: GP_T.dim }}>Confirming derives from live economics (cm {Math.round((derived.cm_ratio_used || 0) * 100)}%, aMER {derived.amer_used}).</span>
@@ -13711,7 +13711,7 @@ function PR_Bar({ pct }){
   const rag = PR_rag(pct);
   return (
     <div style={{marginTop:6}}>
-      <div style={{position:'relative', height:7, borderRadius:4, background:'var(--color-surface)', overflow:'hidden'}}>
+      <div style={{position:'relative', height:7, borderRadius:'var(--radius-md)', background:'var(--color-surface)', overflow:'hidden'}}>
         <div style={{position:'absolute', left:0, top:0, bottom:0, width:(v==null?0:(v/140*100))+'%', background:rag.col, opacity:.85}}/>
         <div style={{position:'absolute', left:(100/140*100)+'%', top:-1, bottom:-1, width:1.5, background:PR_T.dim}}/>
       </div>
@@ -13757,7 +13757,7 @@ function GretaPlanRail(){
     return (
       <div style={{padding:'8px 2px'}}>
         <button onClick={()=>setCollapsed(false)} title="Show plan"
-          style={{writingMode:'vertical-rl', transform:'rotate(180deg)', background:PR_T.panel, border:'1px solid '+PR_T.line, borderRadius:8, color:PR_T.mut, cursor:'pointer', fontSize:'var(--text-xs)', fontWeight:'var(--weight-bold)', letterSpacing:'var(--tracking-wide)', padding:'10px 5px'}}>‹ PLAN</button>
+          style={{writingMode:'vertical-rl', transform:'rotate(180deg)', background:PR_T.panel, border:'1px solid '+PR_T.line, borderRadius:'var(--radius-md)', color:PR_T.mut, cursor:'pointer', fontSize:'var(--text-xs)', fontWeight:'var(--weight-bold)', letterSpacing:'var(--tracking-wide)', padding:'10px 5px'}}>‹ PLAN</button>
       </div>
     );
   }
@@ -13767,7 +13767,7 @@ function GretaPlanRail(){
       {collapseBtn}
     </div>
   );
-  const card = { background:PR_T.panel, border:'1px solid '+PR_T.line, borderRadius:12, padding:'13px 14px' };
+  const card = { background:PR_T.panel, border:'1px solid '+PR_T.line, borderRadius:'var(--radius-md)', padding:'13px 14px' };
 
   if(!P.ready && !goal){
     return (<div style={{display:'flex', flexDirection:'column', gap:10}}>{head}<div style={card}><div style={{fontSize:'var(--text-sm)', color:PR_T.mut}}>Loading your plan…</div></div></div>);
@@ -13781,7 +13781,7 @@ function GretaPlanRail(){
           <div style={{fontSize:'var(--text-sm)', color:PR_T.mut, lineHeight:1.5, marginBottom:11}}>
             Greta needs a target to tell you whether you’re on track. Set one and this panel tracks your pace every day.
           </div>
-          <button onClick={openPlan} style={{width:'100%', padding:'9px 12px', fontSize:'var(--text-sm)', fontWeight:'var(--weight-bold)', border:0, borderRadius:8, background:PR_T.accent, color:PAL.panel, cursor:'pointer'}}>Set your goal →</button>
+          <button onClick={openPlan} style={{width:'100%', padding:'9px 12px', fontSize:'var(--text-sm)', fontWeight:'var(--weight-bold)', border:0, borderRadius:'var(--radius-md)', background:PR_T.accent, color:PAL.panel, cursor:'pointer'}}>Set your goal →</button>
         </div>
       </div>
     );
@@ -13815,7 +13815,7 @@ function GretaPlanRail(){
               <span style={{fontSize:'var(--text-base)', fontWeight:'var(--weight-bold)', color:rag.col}}>{rag.label}</span>
             </div>
           </div>
-          <button onClick={openPlan} style={{fontSize:'var(--text-xs)', color:PR_T.mut, background:'none', border:'1px solid '+PR_T.line, borderRadius:6, padding:'3px 8px', cursor:'pointer'}}>Edit</button>
+          <button onClick={openPlan} style={{fontSize:'var(--text-xs)', color:PR_T.mut, background:'none', border:'1px solid '+PR_T.line, borderRadius:'var(--radius-md)', padding:'3px 8px', cursor:'pointer'}}>Edit</button>
         </div>
         {pacing && <React.Fragment>
           <PR_Bar pct={pacing.pacePct}/>
@@ -13843,7 +13843,7 @@ function GretaPlanRail(){
               <div key={i} style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, padding:'5px 0', borderTop:i?'1px solid '+PR_T.line:'none', opacity:isPast?0.55:1}}>
                 <span style={{display:'flex', alignItems:'center', gap:6, fontSize:'var(--text-sm)', fontWeight:isCur?'var(--weight-bold)':'var(--weight-normal)', color:isCur?PR_T.ink:PR_T.mut}}>
                   {isCur && <span style={{width:6, height:6, borderRadius:'50%', background:PR_T.accent, display:'inline-block'}}/>}
-                  {m.label}{isCur && <span style={{fontSize:'var(--text-xs)', color:PR_T.accent, border:'1px solid '+PR_T.line, borderRadius:4, padding:'0 4px'}}>now</span>}
+                  {m.label}{isCur && <span style={{fontSize:'var(--text-xs)', color:PR_T.accent, border:'1px solid '+PR_T.line, borderRadius:'var(--radius-md)', padding:'0 4px'}}>now</span>}
                 </span>
                 <span style={{fontFamily:PR_T.mono, fontSize:'var(--text-sm)', color:isCur?PR_T.ink:PR_T.dim}}>
                   {PR_gbpk(rev!=null?rev*share:null)} <span style={{color:PR_T.dim}}>rev</span>
@@ -13858,7 +13858,7 @@ function GretaPlanRail(){
         <div style={{...card, borderColor:'var(--color-warning)'}}>
           <div style={{fontSize:'var(--text-sm)', fontWeight:'var(--weight-bold)', marginBottom:3}}>{ended?'This quarter has ended':'Quarter ends in '+daysLeft+' days'}</div>
           <div style={{fontSize:'var(--text-xs)', color:PR_T.mut, lineHeight:1.5, marginBottom:9}}>Set next quarter’s goal so Greta keeps tracking your pace without a gap.</div>
-          <button onClick={openPlan} style={{width:'100%', padding:'8px 12px', fontSize:'var(--text-sm)', fontWeight:'var(--weight-bold)', border:0, borderRadius:8, background:'var(--color-warning)', color:PAL.panel, cursor:'pointer'}}>Set next quarter’s goal →</button>
+          <button onClick={openPlan} style={{width:'100%', padding:'8px 12px', fontSize:'var(--text-sm)', fontWeight:'var(--weight-bold)', border:0, borderRadius:'var(--radius-md)', background:'var(--color-warning)', color:PAL.panel, cursor:'pointer'}}>Set next quarter’s goal →</button>
         </div>
       )}
     </div>
@@ -15718,7 +15718,7 @@ function App(){
             prev = e.group;
             return (<React.Fragment key={i}>
               {head}
-              <div className={'nav-item' + (railActive(e) ? ' active' : '')} onClick={()=>goRail(e)} style={e.pin?{marginTop:'auto',borderTop:'1px solid var(--border-subtle)',borderRadius:0,paddingTop:'13px',marginLeft:2,marginRight:2}:undefined}>
+              <div className={'nav-item' + (railActive(e) ? ' active' : '')} onClick={()=>goRail(e)} style={e.pin?{marginTop:'auto',borderTop:'1px solid var(--border-subtle)',borderRadius:'var(--radius-none)',paddingTop:'13px',marginLeft:2,marginRight:2}:undefined}>
                 <Icon name={e.icon||'info'} size={17}/>{e.label}
               </div>
             </React.Fragment>);

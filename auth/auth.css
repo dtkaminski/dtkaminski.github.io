@@ -52,7 +52,7 @@ body {
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 code {
-  background: var(--bg-input); padding: 1px 6px; border-radius: 4px;
+  background: var(--bg-input); padding: 1px 6px; border-radius: var(--radius-md);
   font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: var(--text-xs);
   color: var(--text-primary);
 }

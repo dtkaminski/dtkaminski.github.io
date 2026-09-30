@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./design-tokens.css?v=1790775272">
+<link rel="stylesheet" href="./design-tokens.css?v=1790775405">
 <!-- perf: warm up the CDN + Supabase origins so the deferred libs and the first data
      fetch don't each pay a fresh DNS+TLS round-trip on cold load. -->
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
@@ -591,7 +591,7 @@
   }
   .nav-cmd:hover { color: var(--text-secondary); border-color: var(--text-faint); }
   .nav-cmd kbd { margin-left: auto; font-size: var(--text-xs); background: var(--bg-app); border: 1px solid var(--border-subtle);
-    border-radius: 4px; padding: 1px 5px; color: var(--text-faint); font-family: inherit; }
+    border-radius: var(--radius-md); padding: 1px 5px; color: var(--text-faint); font-family: inherit; }
   .nav-label { font-size: var(--text-xs); font-weight: var(--weight-bold); letter-spacing: var(--tracking-wide); text-transform: uppercase;
     color: var(--text-faint); padding: 10px 11px 5px; }
   .nav-item {
@@ -617,7 +617,7 @@
   @media (max-width: 1200px) { .plan-rail { display: none; } }
   .icon-btn {
     display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; flex-shrink: 0;
-    border-radius: 8px; background: var(--bg-card); border: 1px solid var(--border-default);
+    border-radius: var(--radius-md); background: var(--bg-card); border: 1px solid var(--border-default);
     color: var(--text-secondary); cursor: pointer; transition: all var(--motion-fast);
   }
   .icon-btn:hover { color: var(--text-primary); border-color: var(--text-faint); }
@@ -645,7 +645,7 @@
   .cmd-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1100;
     display: flex; align-items: flex-start; justify-content: center; padding-top: 12vh; backdrop-filter: blur(2px); }
   .cmd-box { width: min(560px, 92vw); background: var(--bg-elevated); border: 1px solid var(--border-default);
-    border-radius: 13px; box-shadow: var(--shadow-lg); overflow: hidden; }
+    border-radius: var(--radius-md); box-shadow: var(--shadow-lg); overflow: hidden; }
   .cmd-input { width: 100%; border: none; border-bottom: 1px solid var(--border-subtle); background: transparent;
     color: var(--text-primary); font-size: var(--text-base); padding: 15px 17px; outline: none; font-family: inherit; }
   .cmd-input::placeholder { color: var(--text-faint); }
@@ -712,7 +712,7 @@
 
   /* ── Empty states ─────────────────────────────────────────────────────── */
   .empty-state { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 32px 24px; }
-  .empty-state .es-ic { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+  .empty-state .es-ic { width: 44px; height: 44px; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center;
     background: var(--accent-bg); color: var(--accent); margin-bottom: 14px; }
   .empty-state .es-title { font-size: var(--text-base); font-weight: var(--weight-bold); color: var(--text-primary); margin-bottom: 6px; }
   .empty-state .es-body { font-size: var(--text-sm); color: var(--text-secondary); line-height: 1.55; max-width: 460px; margin-bottom: 16px; }
@@ -936,7 +936,7 @@
   }
   .why-pill {
     background: var(--accent-bg); color: var(--accent);
-    font-size: var(--text-xs); padding: 1px 6px; border-radius: 3px;
+    font-size: var(--text-xs); padding: 1px 6px; border-radius: var(--radius-sm);
     font-weight: var(--weight-bold); letter-spacing: var(--tracking-wide); text-transform: uppercase;
   }
   .pattern-diagnosis-body { font-size: var(--text-sm); color: var(--text-secondary); line-height: 1.5; }
@@ -1021,7 +1021,7 @@
     flex-wrap: wrap;
   }
   .status-banner code {
-    background: var(--bg-card); padding: 2px 6px; border-radius: 4px;
+    background: var(--bg-card); padding: 2px 6px; border-radius: var(--radius-md);
     font-family: var(--font-mono); font-size: var(--text-xs);
     color: var(--text-primary);
   }
@@ -1309,7 +1309,7 @@
   .v3-tap:hover .v3-info, .v3-tap:hover .v3-conf { border-color: var(--accent); color: var(--accent); }
   .v3-conf {
     display: inline-flex; align-items: center; gap: 6px; position: relative; padding: 3px 9px;
-    border: 1px solid var(--border-default); border-radius: 999px; background: none; font-family: inherit; font-size: var(--text-xs); font-weight: var(--weight-semi); color: var(--text-muted);
+    border: 1px solid var(--border-default); border-radius: var(--radius-full); background: none; font-family: inherit; font-size: var(--text-xs); font-weight: var(--weight-semi); color: var(--text-muted);
   }
   .v3-conf i { width: 8px; height: 8px; display: inline-block; }
   /* .micro uppercases, which is right for a three-word eyebrow and wrong for a sentence — it turned
@@ -1870,6 +1870,6 @@ window.MOS_EMBEDDED = true;</script>
    save-brand-config had been reading two relations that were never created. */</script>
 <script defer src="./cost-entry.build.js?v=20260929c"></script>
 <script defer src="./loop-panel.js?v=20260921a"></script>
-<script defer src="./greta-app.js?v=1790775276369"></script>
+<script defer src="./greta-app.js?v=1790775408764"></script>
 <script>/* perf: defer frkl static deep-tab data (CVR ~1.7MB, cohorts, promos, products) — not used by the Overview/landing. Background-load after paint; skip for non-frkl (de-frkl). */
 (function(){try{var slug=window.OI_BRAND_SLUG||(window.parent&&window.parent!==window?window.parent.OI_BRAND_SLUG:null)||"frkl";if(slug!=="frkl")return;var files=["greta-cvr.js","greta-cohorts.js","greta-discount-codes.js","greta-products.js","greta-patterns.js"],i=0;function next(){if(i>=files.length)return;var s=document.createElement("script");s.src="./"+files[i++]+"?v=20260925f";s.async=true;s.onload=next;s.onerror=next;document.head.appendChild(s);}var kick=function(){next();};if(window.requestIdleCallback){window.requestIdleCallback(kick,{timeout:1500});}else{setTimeout(kick,300);}}catch(e){}})();</script>
