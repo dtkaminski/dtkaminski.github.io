@@ -9,8 +9,8 @@
 .lp-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap;
   gap: var(--space-3); border-top: 1px solid var(--color-line); padding-top: var(--space-4);
   margin-bottom: var(--space-4); }
-.lp-h  { font-size: var(--text-lg); font-weight: 600; margin: 0; }
-.lp-h3 { font-size: var(--text-sm); font-weight: 600; margin: 0 0 var(--space-1); }
+.lp-h  { font-size: var(--text-lg); font-weight: var(--weight-semi); margin: 0; }
+.lp-h3 { font-size: var(--text-sm); font-weight: var(--weight-semi); margin: 0 0 var(--space-1); }
 .lp-asof { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-muted); }
 .lp-section { border-top: 1px solid var(--color-line); padding-top: var(--space-4); margin-top: var(--space-8); }
 .lp-empty { font-size: var(--text-sm); color: var(--color-muted); padding: var(--space-6) 0; max-width: 60ch; }
@@ -45,13 +45,13 @@
 /* halos keep every label readable wherever it lands on the ring */
 .lp-amt, .lp-amtw, .lp-stage, .lp-metric, .lp-val {
   paint-order: stroke fill; stroke: var(--color-panel); stroke-linejoin: round; }
-.lp-amt   { font-family: var(--font-mono); font-size: 14px; font-weight: 600; stroke-width: 4px; }
+.lp-amt   { font-family: var(--font-mono); font-size: 14px; font-weight: var(--weight-semi); stroke-width: 4px; }
 .lp-amtw  { font-family: var(--font-mono); font-size: 10px; letter-spacing: .06em;
   text-transform: uppercase; opacity: .85; stroke-width: 3.5px; }
-.lp-stage { font-size: 15px; font-weight: 600; fill: var(--color-ink); stroke-width: 4px; }
+.lp-stage { font-size: 15px; font-weight: var(--weight-semi); fill: var(--color-ink); stroke-width: 4px; }
 .lp-metric{ font-family: var(--font-mono); font-size: 10.5px; fill: var(--color-muted); stroke-width: 3.5px; }
 .lp-val   { font-family: var(--font-mono); font-size: 11.5px; fill: var(--color-ink); stroke-width: 3.5px; }
-.lp-sev-bad   { fill: var(--color-danger);  font-weight: 600; }
+.lp-sev-bad   { fill: var(--color-danger);  font-weight: var(--weight-semi); }
 .lp-sev-watch { fill: var(--color-warning); }
 .lp-sev-good  { fill: var(--color-success); }
 .lp-sev-flat  { fill: var(--color-muted); }
@@ -59,7 +59,7 @@
 .lp-hub    { fill: var(--color-surface); stroke: var(--color-accent); stroke-width: 2; }
 .lp-hub-r  { stroke: var(--color-accent); stroke-width: 1; opacity: .35; }
 .lp-hub-k  { font-family: var(--font-mono); font-size: 10px; letter-spacing: .14em; fill: var(--color-accent); }
-.lp-hub-n  { font-family: var(--font-mono); font-size: 34px; font-weight: 600; fill: var(--color-ink); }
+.lp-hub-n  { font-family: var(--font-mono); font-size: 34px; font-weight: var(--weight-semi); fill: var(--color-ink); }
 .lp-hub-s  { font-size: 12px; fill: var(--color-ink); }
 .lp-hub-s2 { font-size: 11.5px; fill: var(--color-muted); }
 
@@ -68,7 +68,7 @@
 .lp-cut  { padding: var(--space-3) var(--space-3) var(--space-2); border-radius: var(--radius-sm); }
 .lp-cut-win { background: color-mix(in srgb, var(--color-accent) 6%, transparent); }
 .lp-cut-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); }
-.lp-cut-name { font-size: var(--text-sm); font-weight: 600; }
+.lp-cut-name { font-size: var(--text-sm); font-weight: var(--weight-semi); }
 .lp-cut-disp { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-muted); }
 .lp-cut-track { position: relative; height: 44px; margin: var(--space-1) 0; padding: 0 22px;
   border-bottom: 1px solid var(--color-line); }
@@ -80,7 +80,7 @@
 .lp-dot:hover { opacity: 1; }
 .lp-cut-legend { display: flex; gap: var(--space-4); flex-wrap: wrap;
   font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-muted); }
-.lp-cut-legend b { color: var(--color-ink); font-weight: 500; }
+.lp-cut-legend b { color: var(--color-ink); font-weight: var(--weight-medium); }
 
 /* ---- curve ---- */
 .lp-hero { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px;
@@ -90,8 +90,8 @@
 @media (max-width: 720px) { .lp-hero { grid-template-columns: 1fr; } }
 .lp-k { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase;
   color: var(--color-muted); display: block; margin-bottom: var(--space-1); }
-.lp-n { font-family: var(--font-mono); font-size: 26px; font-weight: 600; line-height: 1.1; display: block; }
-.lp-n-abstain { font-size: 15px; color: var(--color-muted); font-weight: 500; }
+.lp-n { font-family: var(--font-mono); font-size: 26px; font-weight: var(--weight-semi); line-height: 1.1; display: block; }
+.lp-n-abstain { font-size: 15px; color: var(--color-muted); font-weight: var(--weight-medium); }
 .lp-d { font-size: var(--text-xs); color: var(--color-muted); display: block;
   margin-top: var(--space-2); line-height: 1.45; }
 .lp-fig { margin: 0 0 var(--space-6); }
@@ -115,5 +115,5 @@
 
 .lp-inflow { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap;
   padding: var(--space-2) 0 var(--space-3); }
-.lp-inflow-n { font-family: var(--font-mono); font-size: 19px; font-weight: 600; color: var(--color-ink); }
+.lp-inflow-n { font-family: var(--font-mono); font-size: 19px; font-weight: var(--weight-semi); color: var(--color-ink); }
 .lp-inflow-d { font-size: var(--text-xs); color: var(--color-muted); max-width: 62ch; }

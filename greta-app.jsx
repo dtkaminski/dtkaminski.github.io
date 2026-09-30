@@ -1031,7 +1031,7 @@ function MoneyOnTablePanel(){
         const Row = (m,i)=>{
           return (<tr key={i}>
             <td style={{fontSize:'var(--text-sm)', maxWidth:320}}>
-              <span style={{fontWeight:'var(--weight-medium)', color: m.source==='synthetic' ? 'var(--text-secondary)' : 'var(--text-primary)'}}>{scrubTag(m.description)}</span>
+              <span style={{fontWeight:'var(--weight-semi)', color: m.source==='synthetic' ? 'var(--text-secondary)' : 'var(--text-primary)'}}>{scrubTag(m.description)}</span>
               <div className="meta" style={{fontSize:'var(--text-xs)'}}>{agentLabel(m.agent) || m.source} · {priorityWord(m.priority)} · {m.kind}</div>
             </td>
             <td><MoneyBadge money={m}/></td>
@@ -1526,7 +1526,7 @@ function DailyPanel(){
         })}
       </div>
     </div>)}
-    {anomalies.length === 0 && <div style={{fontSize:'var(--text-sm)', padding:'10px 14px', background:'var(--good-bg)', color:'var(--good)', borderRadius:'var(--r-sm)', fontWeight:'var(--weight-medium)'}}>No anomalies detected vs 7-day baseline.</div>}
+    {anomalies.length === 0 && <div style={{fontSize:'var(--text-sm)', padding:'10px 14px', background:'var(--good-bg)', color:'var(--good)', borderRadius:'var(--r-sm)', fontWeight:'var(--weight-semi)'}}>No anomalies detected vs 7-day baseline.</div>}
   </div>);
 }
 
@@ -1568,7 +1568,7 @@ function HeroStat({valK, color, label, explain, items, total, alignRight}){
           {total ? (
             <div style={{marginTop:10, display:'flex', flexDirection:'column', gap:5}}>
               {total.map((t,i)=>(<div key={i} style={{display:'flex', justifyContent:'space-between', fontSize:'var(--text-sm)'}}>
-                <span style={{color:t.c}}>{t.k}</span><span style={{color:t.c, fontWeight:'var(--weight-semi)'}}>{money(t.v)}</span></div>))}
+                <span style={{color:t.c}}>{t.k}</span><span style={{color:t.c, fontWeight:'var(--weight-bold)'}}>{money(t.v)}</span></div>))}
             </div>
           ) : (items && items.length ? (
             <div style={{marginTop:10}}>
@@ -1576,8 +1576,8 @@ function HeroStat({valK, color, label, explain, items, total, alignRight}){
               {items.map((it,i)=>(
                 <div key={i} style={{padding:'5px 0', borderTop:i?'1px solid var(--border-subtle)':'none'}}>
                   <div style={{display:'flex', justifyContent:'space-between', gap:10, fontSize:'var(--text-sm)'}}>
-                    <span style={{color:'var(--text-primary)', fontWeight:'var(--weight-medium)'}}>{it.label}</span>
-                    <span style={{color, fontWeight:'var(--weight-semi)', whiteSpace:'nowrap'}}>{money(it.monthly_impact_gbp)}</span>
+                    <span style={{color:'var(--text-primary)', fontWeight:'var(--weight-semi)'}}>{it.label}</span>
+                    <span style={{color, fontWeight:'var(--weight-bold)', whiteSpace:'nowrap'}}>{money(it.monthly_impact_gbp)}</span>
                   </div>
                   {it.basis && <div className="micro" style={{color:'var(--text-faint)', marginTop:2, lineHeight:1.4}}>{it.basis}</div>}
                 </div>
@@ -2565,7 +2565,7 @@ function ScoreTip({valueNode, title, lines}){
         background:'var(--bg-elevated)', border:'1px solid var(--border-default)', borderRadius:'var(--r-md)',
         padding:'11px 13px', boxShadow:'var(--shadow-lg)', textAlign:'left', whiteSpace:'normal', fontWeight:'var(--weight-normal)',
         color:'var(--text-secondary)', fontSize:'var(--text-sm)', lineHeight:1.5}}>
-      <div style={{fontWeight:'var(--weight-semi)', color:'var(--text-primary)', marginBottom:5}}>{title}</div>
+      <div style={{fontWeight:'var(--weight-bold)', color:'var(--text-primary)', marginBottom:5}}>{title}</div>
       {lines.filter(Boolean).map((ln,i)=><div key={i} style={{marginTop:i?5:0}}>{ln}</div>)}
     </div>}
   </span>);
@@ -3399,7 +3399,7 @@ function MobileToday(){
         )) : <div className="muted" style={{fontSize:'var(--text-sm)'}}>{`No high-${curSym()} actions open right now.`}</div>}
       </div>
       <button onClick={()=>window.__oiAsk&&window.__oiAsk(`What should I do today? Give me the top 3 actions, ranked by ${curSym()} impact.`)}
-        style={{marginTop:12,width:'100%',padding:'12px',background:PAL.accent,border:'none',borderRadius:10,color:PAL.panel,fontWeight:'var(--weight-semi)',fontSize:'var(--text-base)',cursor:'pointer'}}>✦ Ask: What should I do today?</button>
+        style={{marginTop:12,width:'100%',padding:'12px',background:PAL.accent,border:'none',borderRadius:10,color:PAL.panel,fontWeight:'var(--weight-bold)',fontSize:'var(--text-base)',cursor:'pointer'}}>✦ Ask: What should I do today?</button>
       <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textAlign:'center',marginTop:10}}>↓ Full dashboard below</div>
     </div>
   );
@@ -3720,7 +3720,7 @@ function Overview({start, period, customActive}){
       {!costsVerified && (
         <div className="card" style={{borderLeft:'3px solid var(--accent)', display:'flex', alignItems:'center', gap:16, flexWrap:'wrap'}}>
           <div style={{flex:'1 1 420px'}}>
-            <div style={{fontWeight:'var(--weight-semi)', fontSize:'var(--text-base)', marginBottom:3}}>Make the margin numbers exact <span style={{fontWeight:'var(--weight-normal)', color:'var(--text-faint)', fontSize:'var(--text-sm)'}}>· optional, ~5 min</span></div>
+            <div style={{fontWeight:'var(--weight-bold)', fontSize:'var(--text-base)', marginBottom:3}}>Make the margin numbers exact <span style={{fontWeight:'var(--weight-normal)', color:'var(--text-faint)', fontSize:'var(--text-sm)'}}>· optional, ~5 min</span></div>
             <div className="micro" style={{color:'var(--text-secondary)', lineHeight:1.5}}>The read above already works on catalogue-estimate margins. Enter your real product cost + fulfilment once and contribution, cost per new customer payback and customer lifetime value:cost per new customer become exact — and carry a <b>verified</b> badge for the raise.</div>
           </div>
           <button onClick={()=>{ if (UI_V3) { window.__oiGo && window.__oiGo('goal'); return; } setCostsOpen(true); }} className="btn-primary" style={{flexShrink:0}}>Set up costs →</button>
@@ -3909,7 +3909,7 @@ function fitScoreColor(s){ return s==null?'var(--text-faint)':s>=70?PAL.good:s>=
 function fitConfColor(c){ return c==='high'?PAL.good:c==='medium'?PAL.warn:PAL.bad; }
 function FitScore({label,value,sub}){
   return (<div style={{flex:1,textAlign:'center',padding:'14px 8px',borderRadius:'var(--r-sm)',background:'var(--bg-app)',border:'1px solid var(--border-subtle)'}}>
-    <div style={{fontSize:'var(--text-2xl)',fontWeight:'var(--weight-heavy)',lineHeight:1,color:fitScoreColor(value)}}>{value==null?'—':value}</div>
+    <div style={{fontSize:'var(--text-2xl)',fontWeight:'var(--weight-bold)',lineHeight:1,color:fitScoreColor(value)}}>{value==null?'—':value}</div>
     <div className="micro" style={{color:'var(--text-muted)',marginTop:6,fontWeight:'var(--weight-semi)'}}>{label}</div>
     <div className="micro" style={{color:'var(--text-faint)'}}>{sub}</div>
   </div>);
@@ -4097,7 +4097,7 @@ function GpSrc({ source, label }) {
 function GpStat({ label, value, sub, accent, src }) {
   return (
     <div style={{ flex: 1, minWidth: 124, padding: '12px 12px', borderRadius: 'var(--r-sm)', background: 'var(--bg-app)', border: '1px solid var(--border-subtle)' }}>
-      <div className="micro" style={{ color: 'var(--text-muted)', fontWeight: 'var(--weight-semi)', marginBottom: 7 }}>{label}{src}</div>
+      <div className="micro" style={{ color: 'var(--text-muted)', fontWeight:'var(--weight-semi)', marginBottom: 7 }}>{label}{src}</div>
       <div className="v" style={{ fontSize: 'var(--text-xl)', lineHeight: 1, color: accent || 'var(--text-primary)' }}>{value}</div>
       {sub && <div className="micro" style={{ color: 'var(--text-faint)', marginTop: 6 }}>{sub}</div>}
     </div>
@@ -4177,7 +4177,7 @@ function GenomePanel() {
 
       {cashTrap && (
         <div style={{ padding: '11px 13px', borderRadius: 'var(--r-sm)', background: 'var(--color-warning-wash)', border: '1px solid var(--color-warning-wash)', marginTop: 12 }}>
-          <div style={{ fontWeight: 'var(--weight-bold)', color: warn, marginBottom: 3 }}>operating profit-positive, cash-negative</div>
+          <div style={{ fontWeight:'var(--weight-bold)', color: warn, marginBottom: 3 }}>operating profit-positive, cash-negative</div>
           <div className="micro" style={{ color: 'var(--text-secondary)' }}>
             The window clears {gpGBP0(pr.operatingProfitWindow)} of operating profit, but once ad spend is netted in, monthly operating cash is {gpGBP0(tj.monthlyNetOperatingCash)} and {gpGBP0(cc.workingCapitalRequired)} sits locked in the {gpDays(cc.cccDays)} cash cycle. Unit-profitable, cash-trapped.
           </div>
@@ -4187,30 +4187,30 @@ function GenomePanel() {
       {/* Genome breakdowns + sources. */}
       <div className="row" style={{ marginTop: 12 }}>
         <div style={{ flex: '1 1 240px' }}>
-          <div className="micro" style={{ color: 'var(--text-muted)', marginBottom: 6, fontWeight: 'var(--weight-semi)' }}>CASH CYCLE (days)</div>
+          <div className="micro" style={{ color: 'var(--text-muted)', marginBottom: 6, fontWeight:'var(--weight-semi)' }}>CASH CYCLE (days)</div>
           <div className="mrow"><span className="k">Inventory held<GpSrc source={cc.inventoryDays.source} /></span><span className="v">{gpDays(cc.inventoryDays.days)}</span></div>
           <div className="mrow"><span className="k">+ Settlement lag<GpSrc source={cc.settlementLagDays.source} /></span><span className="v">{gpDays(cc.settlementLagDays.days)}</span></div>
           <div className="mrow"><span className="k">− Supplier terms (DPO)<GpSrc source={cc.supplierPaymentDays.source} /></span><span className="v">{gpDays(cc.supplierPaymentDays.days)}</span></div>
-          <div className="mrow" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 6, marginTop: 2 }}><span className="k" style={{ fontWeight: 'var(--weight-bold)' }}>= Cash conversion cycle</span><span className="v" style={{ fontWeight: 'var(--weight-bold)' }}>{gpDays(cc.cccDays)}</span></div>
+          <div className="mrow" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 6, marginTop: 2 }}><span className="k" style={{ fontWeight:'var(--weight-bold)' }}>= Cash conversion cycle</span><span className="v" style={{ fontWeight:'var(--weight-bold)' }}>{gpDays(cc.cccDays)}</span></div>
         </div>
         <div style={{ flex: '1 1 240px' }}>
-          <div className="micro" style={{ color: 'var(--text-muted)', marginBottom: 6, fontWeight: 'var(--weight-semi)' }}>PROFIT &amp; customer lifetime value</div>
+          <div className="micro" style={{ color: 'var(--text-muted)', marginBottom: 6, fontWeight:'var(--weight-semi)' }}>PROFIT &amp; customer lifetime value</div>
           <div className="mrow"><span className="k">Contribution (window)</span><span className="v">{gpGBP0(pr.contributionWindow)}</span></div>
           <div className="mrow"><span className="k">− Fixed costs<GpSrc source={pr.fixedCostsSource} /></span><span className="v">{gpGBP0(pr.fixedCostsWindow)}</span></div>
-          <div className="mrow" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 6, marginTop: 2 }}><span className="k" style={{ fontWeight: 'var(--weight-bold)' }}>= operating profit</span><span className="v" style={{ fontWeight: 'var(--weight-bold)', color: (pr.operatingProfitWindow ?? 0) >= 0 ? good : bad }}>{gpGBP0(pr.operatingProfitWindow)}</span></div>
+          <div className="mrow" style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 6, marginTop: 2 }}><span className="k" style={{ fontWeight:'var(--weight-bold)' }}>= operating profit</span><span className="v" style={{ fontWeight:'var(--weight-bold)', color: (pr.operatingProfitWindow ?? 0) >= 0 ? good : bad }}>{gpGBP0(pr.operatingProfitWindow)}</span></div>
           <div className="mrow"><span className="k">Discount rate<GpSrc source={dl.discountRateSource} /></span><span className="v">{gpPCT(dl.discountRateAnnual, 0)}/yr</span></div>
           <div className="mrow"><span className="k">customer lifetime value haircut (discounting)</span><span className="v">{gpGBP2(dl.discountHaircut)}</span></div>
         </div>
       </div>
 
       {/* The forward signal: marginal economics + trajectories. */}
-      <div className="micro" style={{ color: 'var(--text-muted)', margin: '16px 0 8px', fontWeight: 'var(--weight-semi)' }}>FORWARD SIGNAL <span style={{ color: 'var(--text-faint)', fontWeight: 'var(--weight-normal)' }}>· projected from the fitted curves</span></div>
+      <div className="micro" style={{ color: 'var(--text-muted)', margin: '16px 0 8px', fontWeight:'var(--weight-semi)' }}>FORWARD SIGNAL <span style={{ color: 'var(--text-faint)', fontWeight:'var(--weight-normal)' }}>· projected from the fitted curves</span></div>
       <div className="row">
         <div style={{ flex: '1 1 240px' }}>
           {me.status === 'ok' ? (
             (gate && gate.s_star_status === 'suppress') ? (
               <div style={{ padding: '12px 13px', borderRadius: 'var(--r-sm)', background: 'var(--bg-app)', border: '1px dashed var(--border-subtle)' }}>
-                <div style={{ fontWeight: 'var(--weight-semi)', color: 'var(--text-secondary)', marginBottom: 4 }}>Spend ceiling — not yet reliable</div>
+                <div style={{ fontWeight:'var(--weight-semi)', color: 'var(--text-secondary)', marginBottom: 4 }}>Spend ceiling — not yet reliable</div>
                 <div className="micro" style={{ color: 'var(--text-faint)' }}>{gate.reason}</div>
               </div>
             ) : (
@@ -4224,7 +4224,7 @@ function GenomePanel() {
             )
           ) : (
             <div style={{ padding: '12px 13px', borderRadius: 'var(--r-sm)', background: 'var(--bg-app)', border: '1px dashed var(--border-subtle)' }}>
-              <div style={{ fontWeight: 'var(--weight-semi)', color: 'var(--text-secondary)', marginBottom: 4 }}>Marginal cost per new customer &amp; spend ceiling — not yet available</div>
+              <div style={{ fontWeight:'var(--weight-semi)', color: 'var(--text-secondary)', marginBottom: 4 }}>Marginal cost per new customer &amp; spend ceiling — not yet available</div>
               <div className="micro" style={{ color: 'var(--text-faint)' }}>{me.note || 'Needs a fitted cost per new customer-elasticity curve (≥3 aligned spend/cost per new customer months). No number shown rather than a guessed one.'}</div>
             </div>
           )}
@@ -5731,9 +5731,9 @@ function CvrDrivers(){
             label={{value:`${CVR_BENCH_LABEL} conversion rate target`, position:'insideTopRight', fill:PAL.accent, fontSize:'var(--text-xs)'}}/>
           {/* The two selected periods, marked where you clicked — A (blue) vs B (green). */}
           {cmp.a && chartData.some(d=>d.w===cmp.a) && <R.ReferenceLine yAxisId="l" x={cmp.a} stroke={PAL.accent} strokeWidth={2} strokeOpacity={0.95}
-            label={{value:'A', position:'top', fill:PAL.accent, fontSize:'var(--text-sm)', fontWeight:'var(--weight-heavy)'}}/>}
+            label={{value:'A', position:'top', fill:PAL.accent, fontSize:'var(--text-sm)', fontWeight:'var(--weight-bold)'}}/>}
           {cmp.b && chartData.some(d=>d.w===cmp.b) && <R.ReferenceLine yAxisId="l" x={cmp.b} stroke={PAL.good} strokeWidth={2} strokeOpacity={0.95}
-            label={{value:'B', position:'top', fill:PAL.good, fontSize:'var(--text-sm)', fontWeight:'var(--weight-heavy)'}}/>}
+            label={{value:'B', position:'top', fill:PAL.good, fontSize:'var(--text-sm)', fontWeight:'var(--weight-bold)'}}/>}
           {/* Event & sale pins: logged events + major site-wide sales, snapped to chart buckets.
               Icon-only on the chart; full detail lives on hover so the chart stays calm. */}
           {(function(){ var pins=buildChartPins(chartData.map(function(d){return d.w;}));
@@ -5779,7 +5779,7 @@ function CvrDrivers(){
             <div style={{fontSize:'var(--text-base)',color:'var(--text-faint)'}}>vs</div>
             <div><div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'.03em'}}>Other {L.restN} · avg {Math.round(L.restDisc)}% off</div><div style={{fontSize:'var(--text-lg)',fontWeight:'var(--weight-bold)'}}>{L.restCvr.toFixed(2)}%</div></div>
             <div style={{fontSize:'var(--text-base)',color:'var(--text-faint)'}}>→</div>
-            <div><div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'.03em'}}>Lift</div><div style={{fontSize:'var(--text-lg)',fontWeight:'var(--weight-heavy)',color:col}}>{L.pp>=0?'+':''}{L.pp.toFixed(2)}pp{L.pct!=null?` (${L.pp>=0?'+':''}${Math.round(L.pct*100)}%)`:''}</div></div>
+            <div><div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'.03em'}}>Lift</div><div style={{fontSize:'var(--text-lg)',fontWeight:'var(--weight-bold)',color:col}}>{L.pp>=0?'+':''}{L.pp.toFixed(2)}pp{L.pct!=null?` (${L.pp>=0?'+':''}${Math.round(L.pct*100)}%)`:''}</div></div>
           </div>
           <div style={{fontSize:'var(--text-xs)',color:'var(--text-muted)',marginTop:8}}>{verdict} <span style={{color:'var(--text-faint)'}}>Observational, not causal — deep-discount {unit} can also differ in traffic mix, season and email volume. Click a deep-discount point vs a normal one below to inspect a specific pair.</span></div>
         </div>); })()}
@@ -6188,7 +6188,7 @@ function DiscountCodeTracker(){
   const weekly = DATA.weekly||[];
 
   const Badge = ({p}) => { const m=DC_PATTERN[p]||DC_PATTERN['recurring'];
-    return <span style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',letterSpacing:'.02em',color:m.color,
+    return <span style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'.02em',color:m.color,
       background:m.color+'1f',border:'1px solid '+m.color+'40',padding:'1px 7px',borderRadius:999}}>{m.label}</span>; };
 
   const tile = (label,val,sub,accent) => (<div style={{flex:'1 1 180px',background:`var(--surface-1,${PAL.panel})`,border:`1px solid var(--border-subtle,${PAL.panel})`,borderRadius:12,padding:'12px 14px'}}>
@@ -8273,7 +8273,7 @@ function ConnectionHealthStrip(){
           title={s.last ? `Latest ${s.name} data: ${s.last} (${s.count} rows)` : `No ${s.name} data loaded`}
           style={{display:'flex', gap:6, alignItems:'center', cursor:'help', fontSize:'var(--text-xs)'}}>
           <span style={{display:'inline-block', width:6, height:6, borderRadius:'var(--r-full)', background:c}}/>
-          <b style={{color:'var(--text-secondary)', fontWeight:'var(--weight-medium)'}}>{s.name}</b>
+          <b style={{color:'var(--text-secondary)', fontWeight:'var(--weight-semi)'}}>{s.name}</b>
           <span style={{color:c, fontWeight:'var(--weight-semi)'}}>{label}</span>
         </span>);
       })}
@@ -9430,7 +9430,7 @@ function RestockActionQueue(){
             <div key={idx} style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',padding:'8px 0',borderTop:idx?'1px solid var(--border-subtle)':'none'}}>
               <span style={{width:8,height:8,borderRadius:'50%',background:urgent?'var(--bad)':'var(--warn)',flexShrink:0}}/>
               <div style={{flex:1,minWidth:200}}>
-                <div style={{fontSize:'var(--text-sm)',color:'var(--text-primary)'}}>{l.basis==='forecast'?'Order for forecast':'Raise PO'} — <b>{NUM(l.qty)} units</b> of {l.p.title}{urgent && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-heavy)',letterSpacing:'.03em',color:PAL.panel,background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}</div>
+                <div style={{fontSize:'var(--text-sm)',color:'var(--text-primary)'}}>{l.basis==='forecast'?'Order for forecast':'Raise PO'} — <b>{NUM(l.qty)} units</b> of {l.p.title}{urgent && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'.03em',color:PAL.panel,background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}</div>
                 <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:1}}>{l.supplier} · {urgent?`OOS in ~${Math.round(l.cover)}d — ${l.oosGap}d short of the ${l.lead}d lead`:(l.basis==='forecast'?`plan needs ${NUM(l.forecastUnits)}, have ${NUM(l.stock)}`:`runs out in ~${Math.round(l.cover)}d (lead ${l.lead}d)`)}{l.lineCost!=null?` · ${curSym()}${k(l.lineCost)}`:''}{l.moqBumped?` · minimum order quantity ${l.moq}`:''}</div>
               </div>
               <button style={{...btn,background:'var(--accent)',color:PAL.panel,borderColor:'var(--accent)'}} onClick={()=>raise(l)}><Icon name="check" size={12}/> Mark PO raised</button>
@@ -10090,7 +10090,7 @@ function BusinessReview(){
         if(slowCapital>50000) tl.push({t:`${curSym()}${k(slowCapital)} of capital tied up in slow-moving stock${topChan&&topShare!=null?`; ${topChan.channel} drives ${pct0(topShare)} of revenue`:''}.`, c:'var(--warn)'});
         return (<div className="card" style={{borderLeft:'3px solid var(--text-faint)'}}>
           <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:8}}>
-            <span style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-heavy)',letterSpacing:'.06em',color:'var(--text-primary)'}}>TL;DR</span>
+            <span style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',letterSpacing:'.06em',color:'var(--text-primary)'}}>TL;DR</span>
             <span className="muted" style={{fontSize:'var(--text-xs)'}}>the main points across the business right now</span>
             <button style={{...btn,marginLeft:'auto',fontSize:'var(--text-xs)',padding:'5px 11px'}} onClick={copyBriefing}><Icon name="clipboard" size={12}/> Copy briefing</button>
           </div>
@@ -10302,11 +10302,11 @@ function ProductionPlanner({embedded}={}){
       {/* summary + controls */}
       <div className="card">
         <div style={{display:'flex',gap:22,flexWrap:'wrap',alignItems:'flex-end'}}>
-          <div title="Run out before a reorder placed today could land — order these now"><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-heavy)',color: oosNow?'var(--bad)':'var(--good)'}}>{oosNow}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>order today (OOS risk)</div></div>
-          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-heavy)',color: toOrder.length?'var(--warn)':'var(--good)'}}>{toOrder.length}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>items to reorder now</div></div>
-          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-heavy)',color:'var(--text-primary)'}}>{NUM(toOrder.reduce((t,l)=>t+l.qty,0))}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>units across all POs</div></div>
-          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-heavy)',color:'var(--text-primary)'}}>{totalValue>0?curSym()+k(totalValue):'—'}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>draft order value{missingCost?' (partial)':''}</div></div>
-          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-heavy)',color: awaiting.length?'var(--accent)':'var(--text-faint)'}}>{awaiting.length}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>awaiting stock</div></div>
+          <div title="Run out before a reorder placed today could land — order these now"><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color: oosNow?'var(--bad)':'var(--good)'}}>{oosNow}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>order today (OOS risk)</div></div>
+          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color: toOrder.length?'var(--warn)':'var(--good)'}}>{toOrder.length}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>items to reorder now</div></div>
+          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{NUM(toOrder.reduce((t,l)=>t+l.qty,0))}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>units across all POs</div></div>
+          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{totalValue>0?curSym()+k(totalValue):'—'}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>draft order value{missingCost?' (partial)':''}</div></div>
+          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color: awaiting.length?'var(--accent)':'var(--text-faint)'}}>{awaiting.length}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>awaiting stock</div></div>
           <div style={{marginLeft:'auto',display:'flex',gap:8,flexWrap:'wrap'}}>
             <button style={btn} onClick={()=>setSupOpen(o=>!o)}><Icon name="sliders" size={13}/> Supplier master</button>
             <button style={btn} onClick={()=>setSetOpen(o=>!o)}><Icon name="sliders" size={13}/> Reorder policy</button>
@@ -10382,7 +10382,7 @@ function ProductionPlanner({embedded}={}){
         <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:8}}>
           <div><span style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{po.supplier}</span> <span className="muted" style={{fontSize:'var(--text-sm)'}}>· {po.lines.length} line{po.lines.length===1?'':'s'} · {NUM(po.units)} units</span>{(po.email||po.notes) && <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:2}}>{po.email}{po.email&&po.notes?' · ':''}{po.notes}</div>}</div>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-            {po.hasCost ? <span style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-heavy)',color:'var(--text-primary)'}}>{`${curSym()}`}{po.total.toFixed(2)}</span>
+            {po.hasCost ? <span style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{`${curSym()}`}{po.total.toFixed(2)}</span>
               : <span style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',color:'var(--warn)',background:'var(--warn-bg)',padding:'2px 9px',borderRadius:999}}>Pricing pending{po.total>0?` · ${curSym()}${po.total.toFixed(0)} so far`:''}</span>}
             <button style={smbtn} onClick={()=>copyPO(po)}><Icon name="clipboard" size={12}/> Copy</button>
             <button style={smbtn} onClick={()=>download(po)}><Icon name="report" size={12}/> CSV</button>
@@ -10402,7 +10402,7 @@ function ProductionPlanner({embedded}={}){
           <th style={th}>Product</th><th style={{...th,textAlign:'right'}}>Stock</th><th style={{...th,textAlign:'right'}}>Cover</th><th style={{...th,textAlign:'right'}}>Order qty</th><th style={{...th,textAlign:'right'}}>{`Unit ${curSym()}`}</th><th style={{...th,textAlign:'right'}}>{`Line ${curSym()}`}</th>
         </tr></thead><tbody>
           {po.lines.map((l,idx)=>(<tr key={idx}>
-            <td style={{...td,color:'var(--text-primary)'}}>{l.p.title}{l.oosBeforeLead && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-heavy)',letterSpacing:'.03em',color:PAL.panel,background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{l.p.sku||'no SKU'} · {l.p.type}{l.oosBeforeLead?` · OOS gap ${l.oosGap}d`:''}{l.basis==='forecast'?` · plan needs ${NUM(l.forecastUnits)}`:''}{l.basis==='wave'&&l.nextWaveBy?` · next wave by ${l.nextWaveBy}`:''}{l.moqBumped?' · MOQ '+l.moq:''}</div></td>
+            <td style={{...td,color:'var(--text-primary)'}}>{l.p.title}{l.oosBeforeLead && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'.03em',color:PAL.panel,background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{l.p.sku||'no SKU'} · {l.p.type}{l.oosBeforeLead?` · OOS gap ${l.oosGap}d`:''}{l.basis==='forecast'?` · plan needs ${NUM(l.forecastUnits)}`:''}{l.basis==='wave'&&l.nextWaveBy?` · next wave by ${l.nextWaveBy}`:''}{l.moqBumped?' · MOQ '+l.moq:''}</div></td>
             <td style={{...td,textAlign:'right'}}>{NUM(l.p.inventoryQty)}</td>
             <td style={{...td,textAlign:'right',color:l.cover<=l.lead?'var(--bad)':'var(--warn)'}}>{Math.round(l.cover)}d</td>
             <td style={{...td,textAlign:'right',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{NUM(l.qty)}</td>
@@ -10632,12 +10632,12 @@ function DemandPlanner({embedded}={}){
       {/* summary */}
       <div className="card">
         <div style={{display:'flex',gap:24,flexWrap:'wrap',alignItems:'flex-end'}}>
-          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-heavy)',color:'var(--text-primary)'}}>{NUM(Math.ceil(totalUnits))}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>units planned · {months}mo</div></div>
-          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-heavy)',color:'var(--text-primary)'}}>{`${curSym()}`}{k(totalRev)}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>projected revenue</div></div>
-          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-heavy)',color: impliedGrowth>=0?'var(--good)':'var(--bad)'}}>{impliedGrowth>=0?'+':''}{impliedGrowth.toFixed(0)}%</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>vs run-rate</div></div>
-          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-heavy)',color: stockouts?'var(--warn)':'var(--good)'}}>{stockouts}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>will stock out</div></div>
-          <div title="Products that run out before a reorder placed today could arrive, given production lead time"><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-heavy)',color: oosRisk?'var(--bad)':'var(--good)'}}>{oosRisk}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>OOS before lead</div></div>
-          {toProduce>0 && <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-heavy)',color:'var(--text-primary)'}}>{NUM(Math.ceil(toProduce))}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>units short to produce</div></div>}
+          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{NUM(Math.ceil(totalUnits))}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>units planned · {months}mo</div></div>
+          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{`${curSym()}`}{k(totalRev)}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>projected revenue</div></div>
+          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color: impliedGrowth>=0?'var(--good)':'var(--bad)'}}>{impliedGrowth>=0?'+':''}{impliedGrowth.toFixed(0)}%</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>vs run-rate</div></div>
+          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color: stockouts?'var(--warn)':'var(--good)'}}>{stockouts}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>will stock out</div></div>
+          <div title="Products that run out before a reorder placed today could arrive, given production lead time"><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color: oosRisk?'var(--bad)':'var(--good)'}}>{oosRisk}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>OOS before lead</div></div>
+          {toProduce>0 && <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{NUM(Math.ceil(toProduce))}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>units short to produce</div></div>}
         </div>
       </div>
       {/* demand plan table */}
@@ -10652,7 +10652,7 @@ function DemandPlanner({embedded}={}){
               : (o.needs && o.qty>0) ? <span style={{color:'var(--text-primary)',fontWeight:'var(--weight-bold)'}}>{NUM(o.qty)}</span>
               : <span style={{color:'var(--good)'}}>covered</span>;
             return (<tr key={idx}>
-            <td style={{...td,color:'var(--text-primary)'}}>{r.p.title}{r.oosBeforeLead && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-heavy)',letterSpacing:'.03em',color:PAL.panel,background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}{focusM(r.p)!==1 && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',color:'var(--accent)',background:'var(--accent-bg)',padding:'1px 6px',borderRadius:999}}>↑{(focusM(r.p)%1?focusM(r.p).toFixed(2):focusM(r.p))}×</span>}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{r.p.type}</div></td>
+            <td style={{...td,color:'var(--text-primary)'}}>{r.p.title}{r.oosBeforeLead && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'.03em',color:PAL.panel,background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}{focusM(r.p)!==1 && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',color:'var(--accent)',background:'var(--accent-bg)',padding:'1px 6px',borderRadius:999}}>↑{(focusM(r.p)%1?focusM(r.p).toFixed(2):focusM(r.p))}×</span>}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{r.p.type}</div></td>
             <td style={{...td,textAlign:'right'}}>{NUM(Math.round(r.runMo))}</td>
             <td style={{...td,textAlign:'right'}}>{NUM(r.stock)}</td>
             <td style={{...td,textAlign:'right'}}>{r.daysToOOS===Infinity ? <span style={{color:'var(--text-faint)'}}>—</span> : <span style={{fontWeight:'var(--weight-semi)',color: r.oosBeforeLead?'var(--bad)':(r.daysToOOS<r.lead*1.5?'var(--warn)':'var(--text-secondary)')}}>{Math.round(r.daysToOOS)}d{r.oosBeforeLead?` · gap ${r.oosGap}d`:''}</span>}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',display:'flex',alignItems:'center',gap:3,justifyContent:'flex-end',marginTop:2}}>{!r.leadSet && <span title={`Estimate — using the ${r.p.type||'type'} default of ${r.leadDefault}d. Set this item's real supplier lead.`} style={{color:'var(--warn)',fontSize:'var(--text-xs)',lineHeight:1}}>●</span>}<input type="number" min="0" defaultValue={r.leadSet?r.leadMake:''} key={'ld'+(r.leadSet?r.leadMake:'d')} placeholder={String(r.leadDefault)} title={`Production lead — days from order to shipment (per item). Blank uses the ${r.p.type||'type'} default of ${r.leadDefault}d. Set defaults in Reorder policy.`} onBlur={e=>{ if(e.target.value!=='') setSkuLead(skuKeyOf(r.p), e.target.value); }} style={{width:38,padding:'1px 4px',borderRadius:5,border:'1px solid '+(r.leadSet?'var(--border-default)':'var(--warn)'),background:'var(--bg-base)',color:'var(--text-secondary)',fontSize:'var(--text-xs)',textAlign:'right'}}/><span>d make{r.leadShip>0?` +${r.leadShip} ship = ${r.lead}`:' lead'}</span></div></td>
@@ -10805,7 +10805,7 @@ function CashFlowPlan({tranches, plan, months}){
   return (
     <div className="card" style={{marginBottom:14, borderLeft:'3px solid '+tone}}>
       <div style={{display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap',marginBottom:6}}>
-        <div style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-heavy)',color:'var(--text-primary)'}}>Cash impact of this plan</div>
+        <div style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>Cash impact of this plan</div>
         <span className="muted" style={{fontSize:'var(--text-xs)'}}>projected balance over {projLen} months · stock payments on their due dates</span>
       </div>
       <div style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)',marginBottom:12,lineHeight:1.5}}>{verdict}</div>
@@ -10928,7 +10928,7 @@ function PlanningView(){
         <div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
           <div style={{flex:'1 1 320px',minWidth:0}}>
             <div style={lab}>What to do now</div>
-            <div style={{fontSize:'var(--text-lg)',fontWeight:'var(--weight-heavy)',color:heroColor,lineHeight:1.2}}>{headline}</div>
+            <div style={{fontSize:'var(--text-lg)',fontWeight:'var(--weight-bold)',color:heroColor,lineHeight:1.2}}>{headline}</div>
             <div style={{fontSize:'var(--text-sm)',color:'var(--text-muted)',marginTop:4,lineHeight:1.45}}>{sub}</div>
           </div>
           {toOrderN>0 && <button style={btn} onClick={goPOs}>Review &amp; raise POs <Icon name="chevron" size={14}/></button>}
@@ -10970,7 +10970,7 @@ function PlanningView(){
         return (
           <div className="card" style={{marginBottom:14}}>
             <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:4}}>
-              <div style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-heavy)',color:'var(--text-primary)'}}>Stock landing plan</div>
+              <div style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>Stock landing plan</div>
               <span className="muted" style={{fontSize:'var(--text-xs)'}}>{STRAT[rc.strategy]} · lead {leadTotalRep}d ({leadMakeRep}d make + {leadTotalRep-leadMakeRep}d transit)</span>
               <div style={{marginLeft:'auto',display:'flex',gap:3,background:'var(--bg-elevated)',borderRadius:8,padding:3}}>{toggle('timeline','Timeline')}{toggle('table','Table')}</div>
             </div>
@@ -10999,7 +10999,7 @@ function PlanningView(){
               {tranches.map(t=>{ const ox=pctOf((t.isNow||t.late)?today:t.orderISO), sx=pctOf(t.shipISO), lx=pctOf(t.landISO); return (
                 <div key={t.n} style={{display:'flex',alignItems:'center',gap:10,marginBottom:7}}>
                   <div style={{width:132,flexShrink:0}}>
-                    <div style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{t.name} {t.late&&<span style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-heavy)',color:PAL.panel,background:'var(--bad)',padding:'1px 5px',borderRadius:999}}>LATE</span>}</div>
+                    <div style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{t.name} {t.late&&<span style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',color:PAL.panel,background:'var(--bad)',padding:'1px 5px',borderRadius:999}}>LATE</span>}</div>
                     <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{hasDeposit?`${curSym()}${k(t.dep)} now · ${curSym()}${k(t.bal)} on ship`:`${curSym()}${k(t.val)}`}</div>
                   </div>
                   <div style={{position:'relative',flex:1,height:28,borderRadius:7,background:'var(--bg-elevated)'}}>
@@ -11552,7 +11552,7 @@ function GretaOverviewTiers(){
               </tr>))}</tbody>
           </table>
         </div>
-        {d.emailBlock && (function () { var E = d.emailBlock; var cell = function (k, v, sub) { return <div style={{ background: GO_T.panel, border: '1px solid ' + GO_T.line, borderRadius: 8, padding: '9px 11px', boxShadow: 'var(--shadow-panel)' }}><div style={{ fontSize: 'var(--text-xs)', color: GO_T.mut }}>{k}</div><div style={{ fontFamily: GO_T.mono, fontSize: 'var(--text-base)', fontWeight: 'var(--weight-semi)', marginTop: 2 }}>{v}</div><div style={{ fontSize: 'var(--text-xs)', color: GO_T.dim }}>{sub}</div></div>; }; return <div style={{ marginTop: 10 }}><div style={{ fontSize: 'var(--text-xs)', color: GO_T.dim, textTransform: 'uppercase', letterSpacing: '.4px', margin: '0 2px 6px' }}>Email breakdown · Klaviyo</div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(130px,1fr))', gap: 8 }}>{cell('Email revenue', GO_gbp(E.total_rev), E.total_orders + ' orders')}{cell('Campaign rev', GO_gbp(E.campaign_rev), E.campaign_orders + ' orders')}{cell('Flow rev', GO_gbp(E.flow_rev), E.flow_orders + ' orders')}{cell('Rev / 1k sent', GO_gbp(E.rev_per_1k_sent), Math.round(E.total_sends / 1000) + 'k sent')}</div></div>; })()}
+        {d.emailBlock && (function () { var E = d.emailBlock; var cell = function (k, v, sub) { return <div style={{ background: GO_T.panel, border: '1px solid ' + GO_T.line, borderRadius: 8, padding: '9px 11px', boxShadow: 'var(--shadow-panel)' }}><div style={{ fontSize: 'var(--text-xs)', color: GO_T.mut }}>{k}</div><div style={{ fontFamily: GO_T.mono, fontSize: 'var(--text-base)', fontWeight:'var(--weight-semi)', marginTop: 2 }}>{v}</div><div style={{ fontSize: 'var(--text-xs)', color: GO_T.dim }}>{sub}</div></div>; }; return <div style={{ marginTop: 10 }}><div style={{ fontSize: 'var(--text-xs)', color: GO_T.dim, textTransform: 'uppercase', letterSpacing: '.4px', margin: '0 2px 6px' }}>Email breakdown · Klaviyo</div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(130px,1fr))', gap: 8 }}>{cell('Email revenue', GO_gbp(E.total_rev), E.total_orders + ' orders')}{cell('Campaign rev', GO_gbp(E.campaign_rev), E.campaign_orders + ' orders')}{cell('Flow rev', GO_gbp(E.flow_rev), E.flow_orders + ' orders')}{cell('Rev / 1k sent', GO_gbp(E.rev_per_1k_sent), Math.round(E.total_sends / 1000) + 'k sent')}</div></div>; })()}
         <GO_Insight i={d.insights.channel}/>
         <MetaAdDrilldown/>
         <GoogleAdDrilldown/>
@@ -11579,7 +11579,7 @@ function GP_Metric(p) {
   return (
     <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius: 10, padding: '12px 14px' }}>
       <div style={{ fontSize: 'var(--text-xs)', color: GP_T.mut }}>{p.k}</div>
-      <div style={{ fontFamily: GP_T.mono, fontSize: 'var(--text-lg)', fontWeight: 'var(--weight-semi)', marginTop: 4, color: p.hi ? GP_T.accent2 : GP_T.ink }}>{p.v}</div>
+      <div style={{ fontFamily: GP_T.mono, fontSize: 'var(--text-lg)', fontWeight:'var(--weight-semi)', marginTop: 4, color: p.hi ? GP_T.accent2 : GP_T.ink }}>{p.v}</div>
       {p.sub && <div style={{ fontSize: 'var(--text-xs)', color: GP_T.dim, marginTop: 3 }}>{p.sub}</div>}
     </div>
   );
@@ -11781,7 +11781,7 @@ function GP_SpendCurve(p) {
   var recentAbove = recent.filter(function (d) { return d.cac_above_contribution; }).length;
 
   var chip = function (txt, col) {
-    return <span style={{ fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-bold)', letterSpacing: '.05em', textTransform: 'uppercase',
+    return <span style={{ fontSize: 'var(--text-xs)', fontWeight:'var(--weight-bold)', letterSpacing: '.05em', textTransform: 'uppercase',
       color: col, border: '1px solid ' + col, borderRadius: 4, padding: '2px 6px' }}>{txt}</span>;
   };
   var tick = function (v) { return v >= 1000 ? '£' + Math.round(v / 1000) + 'k' : '£' + Math.round(v); };
@@ -12154,7 +12154,7 @@ function GP_BrowserCosts({ econ, setEcon }) {
   return (
     <div style={{ border: '1px solid ' + GP_T.accent, background: 'var(--accent-bg)', padding: '10px 12px', marginBottom: 12, fontSize: 'var(--text-sm)', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
       <span>Costs were saved in this browser before ({stash.found.join(', ') || 'monthly overheads'}). They were never sent to Greta.</span>
-      <button onClick={use} style={{ minHeight: 36, padding: '0 12px', border: '1px solid ' + GP_T.accent, background: GP_T.accent, color: '#fff', borderRadius: 'var(--radius-md)', fontFamily: 'inherit', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semi)', cursor: 'pointer' }}>Fill them in</button>
+      <button onClick={use} style={{ minHeight: 36, padding: '0 12px', border: '1px solid ' + GP_T.accent, background: GP_T.accent, color: '#fff', borderRadius: 'var(--radius-md)', fontFamily: 'inherit', fontSize: 'var(--text-sm)', fontWeight:'var(--weight-semi)', cursor: 'pointer' }}>Fill them in</button>
       <button onClick={function () { setDone(true); }} style={{ minHeight: 36, padding: '0 12px', border: '1px solid ' + GP_T.line, background: 'transparent', color: GP_T.mut, borderRadius: 'var(--radius-md)', fontFamily: 'inherit', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>Ignore</button>
     </div>
   );
@@ -12297,7 +12297,7 @@ function GretaPlanPanel({ show } = {}) {
               })}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14 }}>
-              <button onClick={saveEcon} disabled={busy} style={{ borderRadius: 8, padding: '9px 16px', fontSize: 'var(--text-sm)', border: '1px solid ' + GP_T.accent, background: GP_T.accent, color: PAL.panel, fontWeight: 'var(--weight-semi)', cursor: 'pointer' }}>{busy ? '…' : 'Save economics'}</button>
+              <button onClick={saveEcon} disabled={busy} style={{ borderRadius: 8, padding: '9px 16px', fontSize: 'var(--text-sm)', border: '1px solid ' + GP_T.accent, background: GP_T.accent, color: PAL.panel, fontWeight:'var(--weight-semi)', cursor: 'pointer' }}>{busy ? '…' : 'Save economics'}</button>
               {ecMsg === 'ok' && <span style={{ color: GP_T.green, fontSize: 'var(--text-sm)' }}>Saved — Operating Profit now uses these costs.</span>}
               {ecMsg && ecMsg.indexOf('err') === 0 && <span style={{ color: GP_T.red, fontSize: 'var(--text-sm)' }}>{ecMsg.slice(4)}</span>}
               <span style={{ fontSize: 'var(--text-xs)', color: GP_T.dim }}>Gross margin &amp; variable costs recompute your contribution ratio.</span>
@@ -12335,13 +12335,13 @@ function GretaPlanPanel({ show } = {}) {
           </div>
           <table style={{ width: '100%', fontSize: 'var(--text-sm)', borderCollapse: 'collapse' }}>
             <thead><tr style={{ color: GP_T.mut, fontSize: 'var(--text-xs)' }}>
-              <th style={{ textAlign: 'left', fontWeight: 'var(--weight-normal)' }}>Channel</th>
-              <th style={{ textAlign: 'right', fontWeight: 'var(--weight-normal)' }}>Spend 30d</th>
-              <th style={{ textAlign: 'right', fontWeight: 'var(--weight-normal)' }}>Real return per £</th>
-              <th style={{ textAlign: 'right', fontWeight: 'var(--weight-normal)' }}>New-customer cost</th>
-              <th style={{ textAlign: 'right', fontWeight: 'var(--weight-normal)' }}>Planned</th>
-              <th style={{ textAlign: 'right', fontWeight: 'var(--weight-normal)' }}>Pace</th>
-              <th style={{ textAlign: 'right', fontWeight: 'var(--weight-normal)', paddingLeft: 10 }}>Verdict</th>
+              <th style={{ textAlign: 'left', fontWeight:'var(--weight-normal)' }}>Channel</th>
+              <th style={{ textAlign: 'right', fontWeight:'var(--weight-normal)' }}>Spend 30d</th>
+              <th style={{ textAlign: 'right', fontWeight:'var(--weight-normal)' }}>Real return per £</th>
+              <th style={{ textAlign: 'right', fontWeight:'var(--weight-normal)' }}>New-customer cost</th>
+              <th style={{ textAlign: 'right', fontWeight:'var(--weight-normal)' }}>Planned</th>
+              <th style={{ textAlign: 'right', fontWeight:'var(--weight-normal)' }}>Pace</th>
+              <th style={{ textAlign: 'right', fontWeight:'var(--weight-normal)', paddingLeft: 10 }}>Verdict</th>
             </tr></thead>
             <tbody>
               {P.channels.map(function (c, i) {
@@ -12412,7 +12412,7 @@ function GretaPlanPanel({ show } = {}) {
               </div>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
-              <button onClick={confirm} disabled={busy} style={{ borderRadius: 8, padding: '9px 16px', fontSize: 'var(--text-sm)', border: '1px solid ' + GP_T.accent, background: GP_T.accent, color: PAL.panel, fontWeight: 'var(--weight-semi)', cursor: 'pointer' }}>Confirm as plan of record</button>
+              <button onClick={confirm} disabled={busy} style={{ borderRadius: 8, padding: '9px 16px', fontSize: 'var(--text-sm)', border: '1px solid ' + GP_T.accent, background: GP_T.accent, color: PAL.panel, fontWeight:'var(--weight-semi)', cursor: 'pointer' }}>Confirm as plan of record</button>
               {msg === 'ok' && <span style={{ color: GP_T.green, fontSize: 'var(--text-sm)' }}>Confirmed — this is now your plan; pace &amp; RAG-vs-target are live.</span>}
               {msg && msg.indexOf('err') === 0 && <span style={{ color: GP_T.red, fontSize: 'var(--text-sm)' }}>{msg.slice(4)}</span>}
               <span style={{ fontSize: 'var(--text-xs)', color: GP_T.dim }}>Confirming derives from live economics (cm {Math.round((derived.cm_ratio_used || 0) * 100)}%, aMER {derived.amer_used}).</span>
@@ -12941,7 +12941,7 @@ function ConnectionsPanel(){
 
             <div style={{flex:1, minWidth:0}}>
               <div style={{display:'flex', alignItems:'baseline', gap:'var(--s-3)', marginBottom:4}}>
-                <span style={{fontSize:'var(--text-base)', fontWeight:'var(--weight-semi)'}}>{s.name}</span>
+                <span style={{fontSize:'var(--text-base)', fontWeight:'var(--weight-bold)'}}>{s.name}</span>
                 {conn && <span style={{fontSize:'var(--text-xs)', color:'var(--good)', fontWeight:'var(--weight-bold)'}}>Connected{conn.account_label ? ` · ${conn.account_label}` : ''}</span>}
                 <span style={{display:'inline-flex', alignItems:'center', gap:5, fontSize:'var(--text-xs)', color:c, fontWeight:'var(--weight-semi)'}}>
                   <span style={{width:6, height:6, borderRadius:'var(--r-full)', background:c}}/>
@@ -13244,7 +13244,7 @@ function BusinessEconomicsPanel(){
 
   if(!authed){
     return (<div className="card" style={{padding:'var(--s-7)'}}>
-      <div style={{fontSize:'var(--text-base)', fontWeight:'var(--weight-semi)', marginBottom:'var(--s-2)'}}>Business economics</div>
+      <div style={{fontSize:'var(--text-base)', fontWeight:'var(--weight-bold)', marginBottom:'var(--s-2)'}}>Business economics</div>
       <div className="meta" style={{lineHeight:1.6, maxWidth:520}}>
         Your margin and cost stack live in your signed-in workspace. This is the public demo, so economics is read-only here.
       </div>
@@ -13293,7 +13293,7 @@ function BusinessEconomicsPanel(){
         {/* ── Step 1 — Gross margin (the gate) ── */}
         <div className="card" style={{padding:'var(--s-7)', borderTop: marginSet ? undefined : '2px solid var(--warn)'}}>
           <div style={{display:'flex', alignItems:'baseline', gap:'var(--s-2)', flexWrap:'wrap', marginBottom:4}}>
-            <div style={{fontSize:'var(--text-base)', fontWeight:'var(--weight-semi)'}}>Gross margin</div>
+            <div style={{fontSize:'var(--text-base)', fontWeight:'var(--weight-bold)'}}>Gross margin</div>
             <span style={{fontSize:'var(--text-xs)', fontWeight:'var(--weight-bold)', letterSpacing:'.05em', textTransform:'uppercase', color: marginSet?'var(--good)':'var(--warn)'}}>
               {marginSet ? '● Numbers are ON' : '○ Required — numbers are OFF'}
             </span>
@@ -13321,7 +13321,7 @@ function BusinessEconomicsPanel(){
 
         {/* ── Step 2 — Cost stack + cash cycle (optional, sharpens the model) ── */}
         <div className="card" style={{padding:'var(--s-7)'}}>
-          <div style={{fontSize:'var(--text-base)', fontWeight:'var(--weight-semi)', marginBottom:4}}>Cost stack & cash cycle</div>
+          <div style={{fontSize:'var(--text-base)', fontWeight:'var(--weight-bold)', marginBottom:4}}>Cost stack & cash cycle</div>
           <div className="meta" style={{fontSize:'var(--text-sm)', marginBottom:'var(--s-5)', lineHeight:1.6, maxWidth:640}}>
             Optional, but each number you confirm replaces a {priors.label.toLowerCase()} category estimate with your own — sharpening contribution, cash-cycle and profitability. Leave a field blank and the estimate stands.
           </div>
@@ -13389,7 +13389,7 @@ function BusinessEconomicsPanel(){
             cash number on screen that rests on a guess. */}
         <div className="card" style={{padding:'var(--s-7)'}}>
           <div style={{display:'flex', alignItems:'baseline', gap:'var(--s-2)', flexWrap:'wrap', marginBottom:4}}>
-            <div style={{fontSize:'var(--text-base)', fontWeight:'var(--weight-semi)'}}>Cash &amp; working capital</div>
+            <div style={{fontSize:'var(--text-base)', fontWeight:'var(--weight-bold)'}}>Cash &amp; working capital</div>
             <span style={{fontSize:'var(--text-xs)', fontWeight:'var(--weight-bold)', letterSpacing:'.05em', textTransform:'uppercase',
               color: cashReady ? 'var(--good)' : 'var(--text-faint)'}}>
               {cashReady ? '● Cash ceiling is ON' : '○ Not set — spend is not capped on cash'}
@@ -13532,7 +13532,7 @@ function MarginNudge(){
         background:'var(--color-warning-wash)', border:'1px solid var(--warn)',
       }}>
       <div style={{flex:1, minWidth:0}}>
-        <div style={{fontSize:'var(--text-sm)', fontWeight:'var(--weight-semi)', marginBottom:2}}>Your numbers are switched off</div>
+        <div style={{fontSize:'var(--text-sm)', fontWeight:'var(--weight-bold)', marginBottom:2}}>Your numbers are switched off</div>
         <div className="meta" style={{fontSize:'var(--text-sm)', lineHeight:1.5}}>{`
         Confirm your gross margin — the one figure we can’t read from Shopify — and the engine starts valuing every recommendation in ${curSym()}.
       `}</div>
@@ -13615,7 +13615,7 @@ function TeamPanel(){
 
   if(!authed){
     return (<div className="card" style={{padding:'var(--s-7)'}}>
-      <div style={{fontSize:'var(--text-base)', fontWeight:'var(--weight-semi)', marginBottom:'var(--s-2)'}}>Team</div>
+      <div style={{fontSize:'var(--text-base)', fontWeight:'var(--weight-bold)', marginBottom:'var(--s-2)'}}>Team</div>
       <div className="meta" style={{lineHeight:1.6, maxWidth:520}}>
         Inviting teammates is available in your live, signed-in workspace. This is the public demo, so team management is read-only here.
       </div>
@@ -13625,7 +13625,7 @@ function TeamPanel(){
   return (<div style={{display:'flex', flexDirection:'column', gap:'var(--s-7)'}}>
     {/* Invite */}
     <div className="card" style={{padding:'var(--s-7)'}}>
-      <div style={{fontSize:'var(--text-base)', fontWeight:'var(--weight-semi)', marginBottom:4}}>Team</div>
+      <div style={{fontSize:'var(--text-base)', fontWeight:'var(--weight-bold)', marginBottom:4}}>Team</div>
       <div className="meta" style={{fontSize:'var(--text-sm)', marginBottom:'var(--s-5)'}}>
         Everyone with access to this workspace. {canManage ? 'Invite a teammate by email — they get a magic-link and land straight here.' : 'Only an owner or admin can change the team.'}
       </div>
@@ -13662,7 +13662,7 @@ function TeamPanel(){
               {(m.email||'?').trim().charAt(0)||'?'}
             </div>
             <div style={{minWidth:0, flex:1}}>
-              <div style={{fontSize:'var(--text-sm)', fontWeight:'var(--weight-medium)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+              <div style={{fontSize:'var(--text-sm)', fontWeight:'var(--weight-semi)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
                 {m.email}{m.is_self && <span className="meta" style={{fontWeight:'var(--weight-medium)'}}> (you)</span>}
               </div>
               <div className="meta" style={{fontSize:'var(--text-xs)'}}>Added {new Date(m.created_at).toLocaleDateString()}</div>
@@ -13777,11 +13777,11 @@ function GretaPlanRail(){
       <div style={{display:'flex', flexDirection:'column', gap:10}}>
         {head}
         <div style={{...card, borderColor:'var(--color-warning)'}}>
-          <div style={{fontSize:'var(--text-sm)', fontWeight:'var(--weight-semi)', marginBottom:4}}>No goal set for this quarter</div>
+          <div style={{fontSize:'var(--text-sm)', fontWeight:'var(--weight-bold)', marginBottom:4}}>No goal set for this quarter</div>
           <div style={{fontSize:'var(--text-sm)', color:PR_T.mut, lineHeight:1.5, marginBottom:11}}>
             Greta needs a target to tell you whether you’re on track. Set one and this panel tracks your pace every day.
           </div>
-          <button onClick={openPlan} style={{width:'100%', padding:'9px 12px', fontSize:'var(--text-sm)', fontWeight:'var(--weight-semi)', border:0, borderRadius:8, background:PR_T.accent, color:PAL.panel, cursor:'pointer'}}>Set your goal →</button>
+          <button onClick={openPlan} style={{width:'100%', padding:'9px 12px', fontSize:'var(--text-sm)', fontWeight:'var(--weight-bold)', border:0, borderRadius:8, background:PR_T.accent, color:PAL.panel, cursor:'pointer'}}>Set your goal →</button>
         </div>
       </div>
     );
@@ -13856,9 +13856,9 @@ function GretaPlanRail(){
       )}
       {(ended || (daysLeft!=null && daysLeft<=10)) && (
         <div style={{...card, borderColor:'var(--color-warning)'}}>
-          <div style={{fontSize:'var(--text-sm)', fontWeight:'var(--weight-semi)', marginBottom:3}}>{ended?'This quarter has ended':'Quarter ends in '+daysLeft+' days'}</div>
+          <div style={{fontSize:'var(--text-sm)', fontWeight:'var(--weight-bold)', marginBottom:3}}>{ended?'This quarter has ended':'Quarter ends in '+daysLeft+' days'}</div>
           <div style={{fontSize:'var(--text-xs)', color:PR_T.mut, lineHeight:1.5, marginBottom:9}}>Set next quarter’s goal so Greta keeps tracking your pace without a gap.</div>
-          <button onClick={openPlan} style={{width:'100%', padding:'8px 12px', fontSize:'var(--text-sm)', fontWeight:'var(--weight-semi)', border:0, borderRadius:8, background:'var(--color-warning)', color:PAL.panel, cursor:'pointer'}}>Set next quarter’s goal →</button>
+          <button onClick={openPlan} style={{width:'100%', padding:'8px 12px', fontSize:'var(--text-sm)', fontWeight:'var(--weight-bold)', border:0, borderRadius:8, background:'var(--color-warning)', color:PAL.panel, cursor:'pointer'}}>Set next quarter’s goal →</button>
         </div>
       )}
     </div>
