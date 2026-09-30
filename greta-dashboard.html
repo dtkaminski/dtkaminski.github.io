@@ -82,7 +82,18 @@
     --bg-card:       var(--color-panel);
     --bg-card-hover: var(--color-panel-hover);
     --bg-input:      var(--color-input);
+    /* Legacy name from the dark theme, still used by nine input and control styles in
+       greta-app.jsx. It was the only --bg-* alias never mapped, so those backgrounds
+       resolved to nothing and computed to transparent. Inputs, so it takes the input
+       colour the design system already defines. */
+    --bg-base:       var(--color-input);
     --bg-elevated:   var(--color-panel);
+    /* Same oversight, and this one was visible: seven uses in greta-app.jsx, six
+       falling back to the panel colour and one -- the modal at greta-app.jsx:2874 --
+       to #15151c, a leftover from the dark theme. Undefined, that modal painted
+       near-black and then set dark ink text on it. */
+    --surface-1:     var(--color-panel);
+    --surface-2:     var(--color-panel);
 
     /* Border — a touch more present so layers separate cleanly */
     --border-subtle:  var(--color-line);

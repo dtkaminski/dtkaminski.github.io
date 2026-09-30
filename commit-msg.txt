@@ -1,16 +1,31 @@
-The demoted-row tag reads "unchecked"
+Map the three --bg/--surface aliases that were never defined
 
-.v3-rank-meta applies text-transform: capitalize, so "· not re-checked" rendered as
-"Not Re-Checked" — three capitals on a row whose other segments are single words
-("Product · Open 85d"). Consistent with the rule, but it shouted next to sentence-case
-copy everywhere else. One word capitalizes to "Unchecked".
+greta-dashboard.html carries a block mapping every legacy dark-theme variable onto a
+design token — --bg-app, --bg-card, --bg-card-hover, --bg-input, --bg-elevated,
+--border-*, --text-*. Three names in use were missing from it, so they resolved to
+nothing.
 
-The break label above the group keeps its full phrase. It is an uppercase eyebrow by
-design, where "NOT RE-CHECKED" reads as a heading rather than a shout, and it is the
-place the distinction is actually explained.
+--bg-base, nine uses, all input and control styles (five are literally `const inp =
+{...}`). An unresolved custom property makes the whole declaration invalid at computed
+value time, so `background: var(--bg-base)` fell back to transparent rather than to
+anything. Mapped to --color-input, which is what the design system already defines for
+exactly these controls and what the adjacent --bg-input alias uses.
 
-Verified in a rendered harness against the real stylesheet before and after: the tag
-sits in the meta line, the sentence below the label still clears it by 6px, and no
-other copy moved.
+--surface-1 and --surface-2, seven uses. Six carry an inline fallback to the panel
+colour so they were fine, but the seventh — the modal at greta-app.jsx:2874 — falls
+back to #15151c, a leftover from the dark theme. Undefined, that modal painted itself
+near-black and then set --text-primary, near-black ink, on top of it. Both mapped to
+--color-panel, which matches the six working fallbacks and fixes the seventh.
+
+Fixed in the alias block rather than in greta-app.jsx: it is one line per name against
+nine and seven call sites, it needs no rebuild, and it keeps me out of a file another
+session is actively editing. The block exists for precisely this.
+
+Verified: every var() referenced in greta-app.jsx now resolves in design-tokens.css,
+greta-dashboard.html or marketing-os-tokens.css — there were three, there are none —
+and both style blocks still balance.
+
+Not included: app/index.html in this working tree has the other session's in-progress
+flex frame-height fix.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
