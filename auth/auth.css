@@ -1,6 +1,6 @@
 /* Shared styling for signup/login/workspace pages and the product shell.
    Every value resolves to design-tokens.css (imported below) — Phase 3, 2026-09-24. */
-@import url("../design-tokens.css?v=1790774159");
+@import url("../design-tokens.css?v=1790778430");
 
 :root {
   --s-1: var(--space-1); --s-2: var(--space-2); --s-3: var(--space-3); --s-4: var(--space-4);
@@ -15,9 +15,9 @@
   --border-subtle: var(--color-line);
   --border-default: var(--color-line-strong);
   --text-primary: var(--color-ink);
-  --text-secondary: #3D3A35;
+  --text-secondary: var(--color-secondary);
   --text-muted: var(--color-muted);
-  --text-faint: #79726A;
+  --text-faint: var(--color-faint);
   --good: var(--color-success);
   --warn: var(--color-warning);
   --bad: var(--color-danger);
@@ -45,9 +45,13 @@ body {
   min-height: 100vh; font-feature-settings: 'ss01','cv11';
   -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
   line-height: 1.5;
+  /* One soft accent glow behind the card. It used to be two — a violet-500 wash and a
+     mint one, both Tailwind leftovers from a dark theme this palette replaced, and both
+     in colours the product does not otherwise contain. Two off-palette glows is what
+     made the first screen anyone sees look like a different product to the one behind
+     it. The second is gone; the first is the brand's own wash. */
   background-image:
-    radial-gradient(900px 400px at 50% -100px, rgba(139,92,246,0.10), transparent 60%),
-    radial-gradient(700px 300px at 10% 30%, rgba(34,211,166,0.06), transparent 60%);
+    radial-gradient(900px 400px at 50% -100px, var(--color-accent-wash), transparent 60%);
 }
 a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
@@ -138,7 +142,7 @@ input[type=text], input[type=email], select {
 }
 input[type=text]:focus, input[type=email]:focus, select:focus {
   outline: none; border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(124,58,237,0.15);
+  box-shadow: 0 0 0 3px var(--color-accent-wash-2);
 }
 input::placeholder { color: var(--text-faint); }
 .row { display: flex; gap: var(--s-3); }
@@ -151,9 +155,10 @@ input::placeholder { color: var(--text-faint); }
   font-size: var(--text-base); font-weight: var(--weight-semi); font-family: inherit;
   display: inline-flex; align-items: center; justify-content: center;
   transition: background var(--motion-fast); text-decoration: none;
-  box-shadow: 0 2px 8px rgba(124,58,237,0.2);
+  /* No coloured glow under the primary button. It was violet-600 at 0.2, and the app's
+     own buttons carry no shadow at all. */
 }
-.btn-primary:hover { background: #6D28D9; text-decoration: none; }
+.btn-primary:hover { background: var(--color-accent-hover); text-decoration: none; }
 .btn-primary:disabled { background: var(--border-default); border-color: var(--border-default); cursor: not-allowed; opacity: 0.6; box-shadow: none; }
 .btn-ghost {
   padding: 10px 16px; border-radius: var(--r-sm);
@@ -166,7 +171,7 @@ input::placeholder { color: var(--text-faint); }
 
 /* ── Error / success ─────────────────────────────────────────────────── */
 .error-box {
-  background: var(--bad-bg); border: 1px solid rgba(239,107,111,.3);
+  background: var(--bad-bg); border: 1px solid var(--color-danger-line);
   border-radius: var(--r-sm); padding: 10px 14px;
   font-size: var(--text-sm); color: var(--bad); line-height: 1.5;
 }
@@ -219,7 +224,7 @@ input::placeholder { color: var(--text-faint); }
 }
 .checklist-item:hover:not(.disabled):not(.done) { border-color: var(--accent); }
 .checklist-item.disabled { opacity: 0.55; }
-.checklist-item.done { border-color: rgba(74,222,128,0.25); }
+.checklist-item.done { border-color: var(--color-success-line); }
 .checklist-num {
   width: 26px; height: 26px; border-radius: var(--r-full);
   background: var(--accent-bg); color: var(--accent);
@@ -244,7 +249,7 @@ input::placeholder { color: var(--text-faint); }
 
 /* ── Modal (reused for Shopify connect) ──────────────────────────────── */
 .modal-bg {
-  position: fixed; inset: 0; background: rgba(0,0,0,.65);
+  position: fixed; inset: 0; background: var(--color-scrim);
   backdrop-filter: blur(4px);
   z-index: 1000; display: flex; align-items: center; justify-content: center;
   padding: var(--s-5);

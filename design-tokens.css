@@ -79,6 +79,15 @@
   --color-accent-line:    rgba(194, 65, 12, 0.24);
   --color-success-wash-2: rgba(21, 128, 61, 0.12);
   --color-success-line:   rgba(21, 128, 61, 0.26);
+  --color-danger-line:    rgba(180, 35, 24, 0.26);
+
+  /* The step between ink and muted. Both greta-dashboard.html and auth.css had their own
+     literal for this (#3A3832 and #3D3A35) — the same job, two values, neither a token. */
+  --color-secondary:      #3A3832;
+
+  /* What sits behind a modal. Ink, not pure black, so it matches everything else that
+     dims rather than blackens (see --color-scroll-cue). */
+  --color-scrim:          rgba(22, 21, 15, 0.55);
 
   /* Categorical series. Orange leads; the rest are chosen to stay legible
      side by side and to survive greyscale. */
