@@ -1763,7 +1763,7 @@ function HeroChangeRow({color, count, label}){
 // re-renders — otherwise React remounts the whole subtree on every keystroke
 // and the focused input is destroyed (only the first character would land).
 function CmRow({label, amount, bold, color, top}){
-  return (<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,padding:'7px 0',borderTop: top||'1px solid var(--border-subtle)', fontWeight:bold?700:400, color:color||'var(--text-secondary)'}}>
+  return (<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,padding:'7px 0',borderTop: top||'1px solid var(--border-subtle)', fontWeight:bold?'var(--weight-bold)':'var(--weight-normal)', color:color||'var(--text-secondary)'}}>
     <span style={{display:'flex',alignItems:'center'}}>{label}</span>
     <span style={{fontVariantNumeric:'tabular-nums',whiteSpace:'nowrap'}}>{amount}</span>
   </div>);
@@ -5849,9 +5849,9 @@ function CvrDrivers(){
           <tbody>{['Funnel stage','Traffic & behaviour','Device, geography & source','Checkout & payment','Commercial'].map(g=>(<React.Fragment key={g}>
             <tr><td colSpan={4} style={{padding:'8px 0 3px',fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'.05em',color:PAL.accent}}>{g}</td></tr>
             {cmpRows.filter(r=>r.g===g).map(r=>{ const big=moverKeys.has(r.k); return (<tr key={r.k} style={{borderTop:'1px solid var(--border-subtle)',background:big?'var(--color-accent-wash)':'transparent'}}>
-              <td style={{padding:'6px 8px 6px 8px',fontWeight:big?700:500,borderLeft:big?`2px solid ${PAL.accent}`:'2px solid transparent'}}>{r.l}</td>
+              <td style={{padding:'6px 8px 6px 8px',fontWeight:big?'var(--weight-bold)':'var(--weight-medium)',borderLeft:big?`2px solid ${PAL.accent}`:'2px solid transparent'}}>{r.l}</td>
               <td style={{padding:'6px 8px',textAlign:'right',color:'var(--text-muted)'}}>{fmtVal(r.t,r.a)}</td>
-              <td style={{padding:'6px 8px',textAlign:'right',fontWeight:big?700:500}}>{fmtVal(r.t,r.b)}</td>
+              <td style={{padding:'6px 8px',textAlign:'right',fontWeight:big?'var(--weight-bold)':'var(--weight-medium)'}}>{fmtVal(r.t,r.b)}</td>
               <td style={{padding:'6px 8px',textAlign:'right',color:big?PAL.accent:'var(--text-faint)'}}>{dlt(r)}</td></tr>); })}
           </React.Fragment>))}</tbody>
         </table></div>
@@ -7525,7 +7525,7 @@ function IntelligencePanel(){
               const conf = s.total_closed >= 8 ? 'high' : s.total_closed >= 3 ? 'medium' : 'low';
               const confColor = conf === 'high' ? 'var(--good)' : conf === 'medium' ? 'var(--warn)' : 'var(--text-muted)';
               const isRollup = s.category === 'ALL';
-              return (<tr key={i} style={{background: isRollup ? 'var(--color-sunken)' : undefined, fontWeight: isRollup ? 600 : 400}}>
+              return (<tr key={i} style={{background: isRollup ? 'var(--color-sunken)' : undefined, fontWeight: isRollup ? 'var(--weight-semi)' : 'var(--weight-normal)'}}>
                 <td><b>{agentLabel(s.agent)}</b></td>
                 <td>{isRollup ? <span style={{color:'var(--text-muted)'}}>— all —</span> : s.category}</td>
                 <td>{s.total_closed}</td>
@@ -8881,7 +8881,7 @@ function CohortsPanel(){
             {(C.byProduct||[]).map((p,i)=>{ const hot=p.repeatRate>=(C.repeatRate*1.3); const cold=p.repeatRate<=(C.repeatRate*0.5);
               return (<tr key={i}>
                 <td style={{maxWidth:200}}>{p.name}</td><td>{NUM(p.newCustomers)}</td>
-                <td style={{color: hot?'var(--good)':cold?PAL.bad:'var(--text-primary)', fontWeight:hot||cold?700:400}}>{PCT(p.repeatRate)}</td>
+                <td style={{color: hot?'var(--good)':cold?PAL.bad:'var(--text-primary)', fontWeight:hot||cold?'var(--weight-bold)':'var(--weight-normal)'}}>{PCT(p.repeatRate)}</td>
                 <td>{GBP(p.lifetimeRevPerCust)}</td>
               </tr>); })}
           </tbody></table>
@@ -11016,7 +11016,7 @@ function PlanningView(){
             </tr></thead><tbody>
               {tranches.map(t=>(<tr key={t.n}>
                 <td style={{...tdL,color:'var(--text-primary)',fontWeight:'var(--weight-semi)'}}>{t.name}</td>
-                <td style={{...tdL,color:t.isNow?'var(--accent)':t.late?'var(--bad)':'var(--text-secondary)',fontWeight:t.isNow||t.late?700:400}}>{t.isNow?'now':t.late?`${fmtD(t.orderISO)} · now (late)`:fmtD(t.orderISO)}</td>
+                <td style={{...tdL,color:t.isNow?'var(--accent)':t.late?'var(--bad)':'var(--text-secondary)',fontWeight:t.isNow||t.late?'var(--weight-bold)':'var(--weight-normal)'}}>{t.isNow?'now':t.late?`${fmtD(t.orderISO)} · now (late)`:fmtD(t.orderISO)}</td>
                 <td style={{...tdL,textAlign:'right',color:'var(--text-primary)'}}>{t.val>0?`${curSym()}${k(t.dep)}`:'—'}</td>
                 {hasDeposit&&<td style={{...tdL,textAlign:'right',color:'var(--text-muted)'}}>{t.bal>0?`${curSym()}${k(t.bal)}`:'—'}</td>}
                 <td style={tdL}>{fmtD(t.shipISO)}</td>
@@ -11426,7 +11426,7 @@ function GretaOverviewTiers(){
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:6,marginBottom:6}}>
       <div style={{fontSize:'var(--text-sm)',color:GO_T.dim}}>{d?('Snapshot · '):''}{d && <span style={{fontFamily:GO_T.mono}}>{d.periodLabel}</span>} {d?d.compareLabel:''}</div>
       <div style={{display:'inline-flex',background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:9,padding:3}}>
-        {GO_TIMEFRAMES.map(x=> <button key={x} onClick={()=>setTf(x)} style={{background:x===tf?GO_T.accent:'none',color:x===tf?PAL.panel:GO_T.mut,fontWeight:x===tf?600:400,border:0,fontSize:'var(--text-sm)',padding:'6px 12px',borderRadius:6,cursor:'pointer',textTransform:'capitalize'}}>{x}</button>)}
+        {GO_TIMEFRAMES.map(x=> <button key={x} onClick={()=>setTf(x)} style={{background:x===tf?GO_T.accent:'none',color:x===tf?PAL.panel:GO_T.mut,fontWeight:x===tf?'var(--weight-semi)':'var(--weight-normal)',border:0,fontSize:'var(--text-sm)',padding:'6px 12px',borderRadius:6,cursor:'pointer',textTransform:'capitalize'}}>{x}</button>)}
       </div>
     </div>);
 
@@ -12226,7 +12226,7 @@ function GretaPlanPanel({ show } = {}) {
 
   var wrap = { maxWidth: 1180, margin: '0 auto', padding: '10px 6px 60px', background: GP_T.bg, color: GP_T.ink };
   var input = { background: 'var(--color-surface)', border: '1px solid ' + GP_T.line, borderRadius: 8, color: GP_T.ink, fontFamily: GP_T.mono, fontSize: 'var(--text-base)', padding: '8px 11px', width: 160 };
-  var seg = function (on) { return { background: on ? GP_T.accent : 'none', color: on ? PAL.panel : GP_T.mut, fontWeight: on ? 600 : 400, border: 0, fontSize: 'var(--text-sm)', padding: '7px 13px', borderRadius: 6, cursor: 'pointer' }; };
+  var seg = function (on) { return { background: on ? GP_T.accent : 'none', color: on ? PAL.panel : GP_T.mut, fontWeight: on ? 'var(--weight-semi)' : 'var(--weight-normal)', border: 0, fontSize: 'var(--text-sm)', padding: '7px 13px', borderRadius: 6, cursor: 'pointer' }; };
   var cfg = (window.FRKL_PLAN && window.FRKL_PLAN.config) || null;
   var perDays = (P.period && P.period.start && P.period.end) ? Math.max(1, Math.round((new Date(P.period.end) - new Date(P.period.start)) / 864e5) + 1) : 90;
   var fixedForPeriod = cfg && cfg.fixed_costs_monthly ? Number(cfg.fixed_costs_monthly) * (perDays / 30) : 0;
@@ -12286,7 +12286,7 @@ function GretaPlanPanel({ show } = {}) {
                 var hi = f[0] === 'fixed';
                 return (
                   <div key={f[0]}>
-                    <div style={{ fontSize: 'var(--text-xs)', color: hi ? GP_T.accent2 : GP_T.mut, marginBottom: 4, fontWeight: hi ? 600 : 400 }}>{f[1]} <span style={{ color: GP_T.dim }}>({f[2]})</span></div>
+                    <div style={{ fontSize: 'var(--text-xs)', color: hi ? GP_T.accent2 : GP_T.mut, marginBottom: 4, fontWeight: hi ? 'var(--weight-semi)' : 'var(--weight-normal)' }}>{f[1]} <span style={{ color: GP_T.dim }}>({f[2]})</span></div>
                     <input style={{ background: 'var(--color-surface)', border: '1px solid ' + (hi ? GP_T.accent : GP_T.line), borderRadius: 8, color: GP_T.ink, fontFamily: GP_T.mono, fontSize: 'var(--text-base)', padding: '7px 9px', width: '100%', boxSizing: 'border-box' }} value={econ[f[0]]} onChange={function (e) { setE(f[0], e.target.value); }} />
                   </div>
                 );
@@ -13718,7 +13718,7 @@ function PR_Row({ label, value, sub, hi }){
   return (
     <div style={{display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8, padding:'5px 0', borderTop:'1px solid '+PR_T.line}}>
       <span style={{fontSize:'var(--text-xs)', color:PR_T.mut}}>{label}{sub && <span style={{color:PR_T.dim, fontSize:'var(--text-xs)'}}> · {sub}</span>}</span>
-      <span style={{fontFamily:PR_T.mono, fontSize:'var(--text-sm)', fontWeight:hi?700:500, color:hi?PR_T.accent:PR_T.ink}}>{value}</span>
+      <span style={{fontFamily:PR_T.mono, fontSize:'var(--text-sm)', fontWeight:hi?'var(--weight-bold)':'var(--weight-medium)', color:hi?PR_T.accent:PR_T.ink}}>{value}</span>
     </div>
   );
 }
@@ -13837,7 +13837,7 @@ function GretaPlanRail(){
             const isCur=i===curIdx, isPast=today>m.to;
             return (
               <div key={i} style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, padding:'5px 0', borderTop:i?'1px solid '+PR_T.line:'none', opacity:isPast?0.55:1}}>
-                <span style={{display:'flex', alignItems:'center', gap:6, fontSize:'var(--text-sm)', fontWeight:isCur?700:400, color:isCur?PR_T.ink:PR_T.mut}}>
+                <span style={{display:'flex', alignItems:'center', gap:6, fontSize:'var(--text-sm)', fontWeight:isCur?'var(--weight-bold)':'var(--weight-normal)', color:isCur?PR_T.ink:PR_T.mut}}>
                   {isCur && <span style={{width:6, height:6, borderRadius:'50%', background:PR_T.accent, display:'inline-block'}}/>}
                   {m.label}{isCur && <span style={{fontSize:'var(--text-xs)', color:PR_T.accent, border:'1px solid '+PR_T.line, borderRadius:4, padding:'0 4px'}}>now</span>}
                 </span>

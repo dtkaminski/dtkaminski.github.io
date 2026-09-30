@@ -1,28 +1,34 @@
-Give 800 its own step instead of rounding it to bold
+Tokenise the eleven computed font weights
 
-The previous commit collapsed nine numeric font weights onto four tokens, which meant
-24 elements set to 800 started rendering at 700. That was the one value change in an
-otherwise mechanical rename, and it did not need to be: 800 was a real step being used
-deliberately, not a stray.
+I reported one hardcoded weight left in greta-app.jsx, at line 1766. There were
+eleven. The scan that found it matched `fontWeight:` followed by a literal or the words
+bold/normal, and line 1766 is `fontWeight:bold?700:400` — it showed up only because the
+prop controlling it happens to be called `bold`. Every other computed weight, written
+`isRollup ? 600 : 400` or `hot||cold?700:400`, has a condition where the literal sits
+and was invisible to that pattern. The correct scan is every `fontWeight:` whose value
+contains a digit anywhere.
 
-So --weight-heavy: 800 is added and those 24 sites now reference it.
+All eleven now use tokens on both branches:
 
-Identifying them had to be positional, not textual. By the time the sweep landed all of
-them said var(--weight-bold), indistinguishable from the 163 that were genuinely 700,
-and 18 lines in the file carry more than one fontWeight. So the 24 were recovered by
-mapping 80828e8 (the last commit before the sweep) line by line against the current
-file -- both are exactly 15,752 lines -- pairing the nth numeric weight on each old line
-with the nth token on the new one, and rewriting only where the old value was 800 and
-the new token was bold. All 24 matched that shape; none was already something else.
+  1766  bold              700/400 -> bold/normal
+  5852  big               700/500 -> bold/medium
+  5854  big               700/500 -> bold/medium
+  7528  isRollup          600/400 -> semi/normal
+  8884  hot||cold         700/400 -> bold/normal
+  11019 t.isNow||t.late   700/400 -> bold/normal
+  11429 x===tf            600/400 -> semi/normal
+  12229 on                600/400 -> semi/normal
+  12289 hi                600/400 -> semi/normal
+  13721 hi                700/500 -> bold/medium
+  13840 isCur             700/400 -> bold/normal
 
-Verified by resolving every token back to its number and diffing against the
-pre-sweep file. 398 of 423 sites are now exact, including all 24 at 800. The only
-remaining deltas are the four genuine strays -- one 450 and five 550 to 500, eighteen
-650 to 600, one 750 to 700 -- which stay rounded, because a weight scale with nine steps
-reached by nudging single components is the debt the tokens exist to remove.
+Exact, every one: each number maps to the token holding that same value, so nothing
+renders differently. The regex stops the condition at a comma, brace or colon so it
+cannot run past the property it belongs to, and the eleven replacements were asserted
+rather than assumed.
 
-One site is untouched and still hardcoded: line 1766 is fontWeight:bold?700:400, a
-ternary on a local variable rather than a literal, so it needs a small refactor rather
-than a substitution.
+greta-app.jsx now has no numeric font weight anywhere — verified with the prefix-safe
+scan, which is what the earlier check should have been. The minified bundle keeps all
+eleven ternaries with tokens on both arms.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
