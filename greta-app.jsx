@@ -2408,7 +2408,7 @@ function ConfigurableChart({dataset, dimensions, metrics, defaultMetric, default
     return Object.values(g).sort((a,b)=> order==='desc' ? b.val-a.val : a.val-b.val).slice(0, topN);
   }, [dataset, metric, split, order, topN]);
 
-  const selStyle = {background:'var(--bg-app)',color:'var(--text-primary)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',padding:'4px 8px',fontSize:'var(--text-sm)',fontFamily:'inherit',cursor:'pointer'};
+  const selStyle = {backgroundColor: 'var(--bg-app)',color:'var(--text-primary)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',padding:'4px 8px',fontSize:'var(--text-sm)',fontFamily:'inherit',cursor:'pointer'};
   const sel = (val,set,opts) => (
     <select value={val} onChange={e=>set(e.target.value)} style={selStyle}>
       {opts.map(o=><option key={o.key} value={o.key}>{o.label}</option>)}
@@ -2875,7 +2875,7 @@ function LogEventModal({onClose, onSaved}){
       <div style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',marginBottom:4}}>Log a business event</div>
       <div style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)',marginBottom:16,lineHeight:1.5}}>Tell the diagnostic what happened — it'll factor this into the read straight away (e.g. a deliberate spend test stops an sales per £ of ads dip reading as fatigue).</div>
       <label style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)'}}>Type</label>
-      <select value={type} onChange={e=>setType(e.target.value)} style={{width:'100%',margin:'4px 0 12px',padding:'8px 10px',background:'transparent',border:'1px solid var(--border-subtle)',borderRadius:'var(--radius-md)',color:'var(--text-primary)',colorScheme:'light dark'}}>
+      <select value={type} onChange={e=>setType(e.target.value)} style={{width:'100%',margin:'4px 0 12px',padding:'8px 10px',backgroundColor: 'transparent',border:'1px solid var(--border-subtle)',borderRadius:'var(--radius-md)',color:'var(--text-primary)',colorScheme:'light dark'}}>
         {Object.keys(EVENT_META).map(k=><option key={k} value={k}>{EVENT_META[k].label}</option>)}
       </select>
       <label style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)'}}>Title</label>
@@ -3721,7 +3721,7 @@ function Overview({start, period, customActive}){
         <div className="card" style={{borderLeft:'3px solid var(--accent)', display:'flex', alignItems:'center', gap:16, flexWrap:'wrap'}}>
           <div style={{flex:'1 1 420px'}}>
             <div style={{fontWeight:'var(--weight-bold)', fontSize:'var(--text-base)', marginBottom:3}}>Make the margin numbers exact <span style={{fontWeight:'var(--weight-normal)', color:'var(--text-faint)', fontSize:'var(--text-sm)'}}>· optional, ~5 min</span></div>
-            <div className="micro" style={{color:'var(--text-secondary)', lineHeight:1.5}}>The read above already works on catalogue-estimate margins. Enter your real product cost + fulfilment once and contribution, cost per new customer payback and customer lifetime value:cost per new customer become exact — and carry a <b>verified</b> badge for the raise.</div>
+            <div className="fine" style={{color:'var(--text-secondary)', lineHeight:1.5}}>The read above already works on catalogue-estimate margins. Enter your real product cost + fulfilment once and contribution, cost per new customer payback and customer lifetime value:cost per new customer become exact — and carry a <b>verified</b> badge for the raise.</div>
           </div>
           <button onClick={()=>{ if (UI_V3) { window.__oiGo && window.__oiGo('goal'); return; } setCostsOpen(true); }} className="btn-primary" style={{flexShrink:0}}>Set up costs →</button>
         </div>
@@ -4163,7 +4163,7 @@ function GenomePanel() {
         <h2 style={{ margin: 0 }}>Cash, profitability &amp; forward signal</h2>
         <span className="pill" style={{ background: 'var(--bg-app)', color: 'var(--text-faint)', border: '1px solid var(--border-subtle)' }}>shadow · not scored</span>
       </div>
-      <div className="micro" style={{ color: 'var(--text-faint)', margin: '4px 0 12px' }}>
+      <div className="fine" style={{ color: 'var(--text-faint)', margin: '4px 0 12px' }}>
         Computed from the fitted curves &amp; your economics - what the OMF/PMF score can't see: when cash moves, and whether the business (not the order) makes money.
       </div>
 
@@ -4237,7 +4237,7 @@ function GenomePanel() {
         </div>
       </div>
 
-      <div className="micro" style={{ color: 'var(--text-faint)', marginTop: 10 }}>
+      <div className="fine" style={{ color: 'var(--text-faint)', marginTop: 10 }}>
         Projection assumes spend flat, retention curve holds, costs constant; paid-attributed orders only. Shadow layer — reported, not yet gating any verdict.
       </div>
     </div>
@@ -4300,16 +4300,16 @@ function CrossChannel({start}){
       </div>
       <div className="card" style={{flex:'1 1 380px'}}>
         <h2>Paid effect &amp; incrementality</h2>
-        <div className="micro" style={{color:'var(--text-muted)', marginBottom:6}}>Spend↔revenue correlation by lag (revenue responds with a delay, so same-day understates paid).</div>
+        <div className="fine" style={{color:'var(--text-muted)', marginBottom:6}}>Spend↔revenue correlation by lag (revenue responds with a delay, so same-day understates paid).</div>
         <div style={{display:'flex', gap:8, marginBottom:10}}>
           {lagCorr.map(l=>(<div key={l.lag} style={{flex:1, textAlign:'center', padding:'8px 4px', borderRadius:'var(--r-sm)', background: bestLag&&l.lag===bestLag.lag?'var(--accent-bg)':'var(--bg-app)', border:'1px solid '+(bestLag&&l.lag===bestLag.lag?'var(--color-accent-line)':'var(--border-subtle)')}}>
             <div style={{fontSize:'var(--text-lg)', fontWeight:'var(--weight-bold)', color: bestLag&&l.lag===bestLag.lag?'var(--accent)':'var(--text-primary)'}}>{l.r==null?'—':l.r.toFixed(2)}</div>
             <div className="micro" style={{color:'var(--text-faint)'}}>+{l.lag}d</div>
           </div>))}
         </div>
-        {bestLag && <div className="micro" style={{color:'var(--text-secondary)', marginBottom:10}}>Strongest at a <b>{bestLag.lag}-day lag</b> (r={bestLag.r.toFixed(2)}) — judge paid on a few-day window, not same-day return on ad spend.</div>}
+        {bestLag && <div className="fine" style={{color:'var(--text-secondary)', marginBottom:10}}>Strongest at a <b>{bestLag.lag}-day lag</b> (r={bestLag.r.toFixed(2)}) — judge paid on a few-day window, not same-day return on ad spend.</div>}
         {tiers && (<div style={{marginBottom:8}}>
-          <div className="micro" style={{color:'var(--text-muted)', marginBottom:4}}>Meta claimed return on ad spend by daily-spend tier {tierFalling?'— falling at higher spend (diminishing returns)':'— broadly flat across tiers'}:</div>
+          <div className="fine" style={{color:'var(--text-muted)', marginBottom:4}}>Meta claimed return on ad spend by daily-spend tier {tierFalling?'— falling at higher spend (diminishing returns)':'— broadly flat across tiers'}:</div>
           <div style={{display:'flex', gap:8}}>
             {tiers.map((t,i)=>(<div key={i} style={{flex:1, textAlign:'center', fontSize:'var(--text-sm)'}}>
               <div style={{fontWeight:'var(--weight-bold)', color: tierFalling&&i===2?PAL.bad:'var(--text-primary)'}}>{t.roas!=null?t.roas.toFixed(1)+'×':'—'}</div>
@@ -4750,7 +4750,7 @@ function CreatorCandidatesPanel(){
         </div>
         <div style={{display:'flex',gap:10,alignItems:'center',marginBottom:10,flexWrap:'wrap'}}>
           <span className="muted" style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',fontWeight:'var(--weight-bold)'}}>FILTER</span>
-          <select value={tierFilter} onChange={e=>setTierFilter(e.target.value)} style={{background:'var(--bg-input)',color:'var(--text-primary)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',padding:'4px 8px',fontSize:'var(--text-sm)'}}>
+          <select value={tierFilter} onChange={e=>setTierFilter(e.target.value)} style={{backgroundColor: 'var(--bg-input)',color:'var(--text-primary)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',padding:'4px 8px',fontSize:'var(--text-sm)'}}>
             <option value="actionable">Actionable (hero + core)</option>
             <option value="all">All tiers</option>
             <option value="hero">Hero only</option>
@@ -4758,7 +4758,7 @@ function CreatorCandidatesPanel(){
             <option value="longtail">Longtail</option>
             <option value="pass">Pass (audience/budget mismatch)</option>
           </select>
-          <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)} style={{background:'var(--bg-input)',color:'var(--text-primary)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',padding:'4px 8px',fontSize:'var(--text-sm)'}}>
+          <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)} style={{backgroundColor: 'var(--bg-input)',color:'var(--text-primary)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',padding:'4px 8px',fontSize:'var(--text-sm)'}}>
             <option value="all">All statuses</option>
             <option value="prospect">Prospect</option>
             <option value="contacted">Contacted</option>
@@ -5109,7 +5109,7 @@ function InventoryPanel(){
       </div>
       <div style={{display:'flex',gap:10,alignItems:'center',marginBottom:10,flexWrap:'wrap'}}>
         <span className="muted" style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',fontWeight:'var(--weight-bold)'}}>FILTER</span>
-        <select value={tierFilter} onChange={e=>setTierFilter(e.target.value)} style={{background:'var(--bg-input)',color:'var(--text-primary)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',padding:'4px 8px',fontSize:'var(--text-sm)'}}>
+        <select value={tierFilter} onChange={e=>setTierFilter(e.target.value)} style={{backgroundColor: 'var(--bg-input)',color:'var(--text-primary)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',padding:'4px 8px',fontSize:'var(--text-sm)'}}>
           <option value="actionable">Actionable (critical + low + overstock + archived)</option>
           <option value="all">All tiers</option>
           <option value="critical">Critical only (&lt;14d)</option>
@@ -7770,7 +7770,7 @@ function FInput({label, required, optional, value, setValue, placeholder, type, 
       {label} {required && <span style={{color:'var(--bad)'}}>*</span>} {optional && <span className="meta" style={{textTransform:'none', letterSpacing:0, fontWeight:'var(--weight-normal)'}}>(optional)</span>}
     </label>
     {isSelect ? (
-      <select value={value} onChange={e=>setValue(e.target.value)} style={{width:'100%', background:'var(--bg-input)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--r-sm)', padding:'8px 10px', fontSize:'var(--text-sm)', fontFamily:'inherit'}}>
+      <select value={value} onChange={e=>setValue(e.target.value)} style={{width:'100%', backgroundColor: 'var(--bg-input)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--r-sm)', padding:'8px 10px', fontSize:'var(--text-sm)', fontFamily:'inherit'}}>
         {options.map(opt => <option key={opt} value={opt}>{optionLabels ? optionLabels(opt) : opt}</option>)}
       </select>
     ) : (
@@ -8127,7 +8127,7 @@ ${ctxJson}`;
       </div>)}
       {ASK && (<div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,fontSize:'var(--text-xs)',color:PAL.muted}}>
         <span>Private to your workspace</span>
-        <select value={depth} onChange={e=>setDepth(e.target.value)} aria-label="Answer depth" style={{background:'var(--bg-input)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--radius-md)', padding:'2px 6px', fontSize:'var(--text-xs)'}}>
+        <select value={depth} onChange={e=>setDepth(e.target.value)} aria-label="Answer depth" style={{backgroundColor: 'var(--bg-input)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--radius-md)', padding:'2px 6px', fontSize:'var(--text-xs)'}}>
           <option value="thorough">Thorough answer</option>
           <option value="quick">Quick answer</option>
         </select>
@@ -8566,14 +8566,14 @@ function WeeklyBoard(){
         <div>
           <div className="micro" style={{color:'var(--accent)', fontWeight:'var(--weight-bold)', letterSpacing:'var(--tracking-wide)', textTransform:'uppercase'}}>Weekly board · report card</div>
           <h1 style={{margin:'4px 0 2px', fontSize:'var(--text-xl)'}}>Week of {W.weekStart} <span style={{color:'var(--text-muted)', fontWeight:'var(--weight-medium)', fontSize:'var(--text-base)'}}>→ {W.weekEnding}</span></h1>
-          <div className="micro" style={{color:'var(--text-faint)'}}>
+          <div className="fine" style={{color:'var(--text-faint)'}}>
             {W.partial ? <span style={{color:'var(--warn)'}}>● In progress — {W.days}/7 days so far</span> : <span>Completed week · frozen from daily data</span>}
             {' · for the Monday 3pm review'}
           </div>
         </div>
         <div style={{display:'flex', alignItems:'center', gap:8}}>
           <button onClick={()=>setIdx(i=>Math.max(0,i-1))} disabled={idx<=0} className="board-nav-btn">◀ Prev</button>
-          <select value={idx} onChange={e=>setIdx(+e.target.value)} style={{background:'var(--bg-card)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--r-sm)', padding:'7px 10px', fontSize:'var(--text-sm)'}}>
+          <select value={idx} onChange={e=>setIdx(+e.target.value)} style={{backgroundColor: 'var(--bg-card)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--r-sm)', padding:'7px 10px', fontSize:'var(--text-sm)'}}>
             {weeks.map((w,i)=>(<option key={w.weekStart} value={i}>{w.label}{w.partial?' (in progress)':''}</option>))}
           </select>
           <button onClick={()=>setIdx(i=>Math.min(weeks.length-1,i+1))} disabled={idx>=weeks.length-1} className="board-nav-btn">Next ▶</button>
@@ -8602,8 +8602,8 @@ function WeeklyBoard(){
                   </div>
                 ); })}
             </div>}
-            {(r.blindspots||[]).length>0 && <div className="micro" style={{color:'var(--text-faint)', marginTop:10}}>Blind spots: {r.blindspots.join(' · ')}</div>}
-            <div className="micro" style={{color:'var(--text-faint)', marginTop:8, fontStyle:'italic'}}>{`Written from your own data. Every ${curSym()} figure is checked against it.`}</div>
+            {(r.blindspots||[]).length>0 && <div className="fine" style={{color:'var(--text-faint)', marginTop:10}}>Blind spots: {r.blindspots.join(' · ')}</div>}
+            <div className="fine" style={{color:'var(--text-faint)', marginTop:8, fontStyle:'italic'}}>{`Written from your own data. Every ${curSym()} figure is checked against it.`}</div>
           </div>
         );
       })()}
@@ -8727,7 +8727,7 @@ function WeeklyBoard(){
       <div className="row" style={{marginTop:14}}>
         <div className="card" style={{flex:'1 1 420px'}}>
           <h2 style={{marginTop:0}}>Meeting notes</h2>
-          <div className="micro" style={{color:'var(--text-faint)', marginBottom:8}}>Week of {W.weekStart} → {W.weekEnding} · decisions, context, anything to remember</div>
+          <div className="fine" style={{color:'var(--text-faint)', marginBottom:8}}>Week of {W.weekStart} → {W.weekEnding} · decisions, context, anything to remember</div>
           <textarea value={notes[W.weekEnding]||''} onChange={e=>setNote(e.target.value)} placeholder={`What did we decide? e.g. 'Pausing the 22% sitewide code — margin too thin. Brief on mobile checkout fix by Friday. Test free-ship threshold at ${curSym()}75.'`}
             style={{width:'100%', minHeight:150, background:'var(--bg-app)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--r-sm)', padding:10, fontSize:'var(--text-sm)', fontFamily:'inherit', resize:'vertical'}}/>
         </div>
@@ -8831,7 +8831,7 @@ function CohortsPanel(){
             </R.ComposedChart>
           </R.ResponsiveContainer>
           <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{BRUSH_HINT}</div>
-          <div className="micro" style={{color:'var(--text-faint)', marginTop:4}}>Later months average fewer, older customers (shown on hover) — the curve is observed value to date, not a projection.</div>
+          <div className="fine" style={{color:'var(--text-faint)', marginTop:4}}>Later months average fewer, older customers (shown on hover) — the curve is observed value to date, not a projection.</div>
           <ChartFooter note="What a customer is worth over time — and when they pay back cost per new customer."
             ask="From the lifetime-value curve, how long until an average customer pays back paid cost per new customer, and what does that mean for how aggressively I can acquire?"
             rows={curve} columns={[{key:'m',label:'Months since 1st order'},{key:'rev',label:'Cumulative rev/cust',right:true,fmt:v=>GBP(v)},{key:'contrib',label:'Cumulative contribution/cust',right:true,fmt:v=>GBP(v)}]}/>
@@ -8857,7 +8857,7 @@ function CohortsPanel(){
               <R.Brush {...brushProps('month')} />
             </R.ComposedChart>
           </R.ResponsiveContainer>          <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{BRUSH_HINT}</div>
-          <div className="micro" style={{color:'var(--text-faint)', marginTop:4}}>Most early customers came via unpaid channels (organic/email) — paid cost per new customer only applies where there was paid spend.</div>
+          <div className="fine" style={{color:'var(--text-faint)', marginTop:4}}>Most early customers came via unpaid channels (organic/email) — paid cost per new customer only applies where there was paid spend.</div>
           <ChartFooter note="Is acquisition getting more expensive over time?"
             ask="Looking at New-customer cost, by the month they joined, is paid cost per new customer trending up, and what's driving it?"
             rows={cacMonths} columns={[{key:'month',label:'Month'},{key:'newCust',label:'New customers',right:true,fmt:v=>NUM(v)},{key:'cac',label:'Paid New-customer cost',right:true,fmt:v=>v!=null?GBP(v):'—'}]}/>
@@ -9231,7 +9231,7 @@ function RetentionPanel(){
       <h2 style={{margin:0}}>Retention worklist — who to nudge, and when</h2>
       <span className="meta">median reorder interval {med} days · ~{R.repeatCustomers} repeat customers</span>
     </div>
-    <div className="micro" style={{color:'var(--text-secondary)', marginBottom:10, lineHeight:1.55}}>
+    <div className="fine" style={{color:'var(--text-secondary)', marginBottom:10, lineHeight:1.55}}>
       Repeat customers reorder about every <b>{med} days</b> (a quarter within {R.p25} days, three quarters within {R.p75}). That's your replenishment trigger — a flow firing around day {med} catches customers at peak intent. <b style={{color:'var(--text-primary)'}}>{GBP(R.atStake)}</b> of <b>realistically recoverable</b> reorder value is in the due + overdue pools{R.atStakeGross?<span> (the {GBP(R.atStakeGross)} gross × your {Math.round((R.repeatRate||0)*100)}% repeat rate — most overdue customers won't return)</span>:null}.
     </div>
     <div className="row" style={{marginBottom:10}}>
@@ -10057,7 +10057,7 @@ function BusinessReview(){
     {c.series ? <WcSpark data={c.series} color={c.color} fmt={c.fmt} axisFmt={c.axisFmt}/>
               : (c.sub && <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:7,lineHeight:1.45}}>{c.sub}</div>)}
   </div>);
-  const inp = {width:120,marginTop:4,padding:'6px 9px',borderRadius:'var(--radius-md)',border:'1px solid var(--border-default)',background:'var(--bg-base)',color:'var(--text-primary)',fontSize:'var(--text-sm)'};
+  const inp = {width:120,marginTop:4,padding:'6px 9px',borderRadius:'var(--radius-md)',border:'1px solid var(--border-default)',backgroundColor: 'var(--bg-base)',color:'var(--text-primary)',fontSize:'var(--text-sm)'};
   const lbl = {display:'flex',flexDirection:'column',fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',color:'var(--text-secondary)'};
   const regRow = (accent) => (x,idx) => (<div key={idx} style={{display:'flex',gap:12,alignItems:'baseline',padding:'9px 0',borderTop:idx?'1px solid var(--border-subtle)':'none'}}>
     <div style={{flex:1,minWidth:0}}>
@@ -10288,7 +10288,7 @@ function ProductionPlanner({embedded}={}){
 
   const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)',padding:'7px 13px',borderRadius:'var(--radius-md)',border:'1px solid var(--border-default)',background:'var(--bg-elevated)',color:'var(--text-primary)',cursor:'pointer'};
   const smbtn = {...btn, fontSize:'var(--text-xs)', padding:'5px 10px'};
-  const inp = {padding:'5px 8px',borderRadius:'var(--radius-md)',border:'1px solid var(--border-default)',background:'var(--bg-base)',color:'var(--text-primary)',fontSize:'var(--text-sm)'};
+  const inp = {padding:'5px 8px',borderRadius:'var(--radius-md)',border:'1px solid var(--border-default)',backgroundColor: 'var(--bg-base)',color:'var(--text-primary)',fontSize:'var(--text-sm)'};
   const th = {textAlign:'left',fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',padding:'0 10px 7px 0',whiteSpace:'nowrap'};
   const td = {padding:'7px 10px 7px 0',fontSize:'var(--text-sm)',color:'var(--text-secondary)',borderTop:'1px solid var(--border-subtle)',verticalAlign:'top'};
 
@@ -10540,7 +10540,7 @@ function DemandPlanner({embedded}={}){
 
   const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)',padding:'7px 13px',borderRadius:'var(--radius-md)',border:'1px solid var(--border-default)',background:'var(--bg-elevated)',color:'var(--text-primary)',cursor:'pointer'};
   const seg = (active)=>({...btn, padding:'6px 12px', background:active?'var(--accent)':'var(--bg-elevated)', color:active?PAL.panel:'var(--text-secondary)', borderColor:active?'var(--accent)':'var(--border-default)'});
-  const inp = {padding:'6px 9px',borderRadius:'var(--radius-md)',border:'1px solid var(--border-default)',background:'var(--bg-base)',color:'var(--text-primary)',fontSize:'var(--text-sm)'};
+  const inp = {padding:'6px 9px',borderRadius:'var(--radius-md)',border:'1px solid var(--border-default)',backgroundColor: 'var(--bg-base)',color:'var(--text-primary)',fontSize:'var(--text-sm)'};
   const th = {textAlign:'left',fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',padding:'0 10px 7px 0',whiteSpace:'nowrap'};
   const td = {padding:'7px 10px 7px 0',fontSize:'var(--text-sm)',color:'var(--text-secondary)',borderTop:'1px solid var(--border-subtle)'};
 
@@ -10725,7 +10725,7 @@ function SuppliersDirectory(){
   const save = ()=>{ const all={...suppliersAll()}; Object.keys(draft).forEach(n=>{ const x=draft[n]||{}; all[n]={name:n, email:x.email||'', phone:x.phone||'', address:x.address||'', notes:x.notes||'', depositPct:x.depositPct===''||x.depositPct==null?'':Number(x.depositPct), shipDays:x.shipDays===''||x.shipDays==null?'':Number(x.shipDays)}; }); saveSuppliersAll(all); toast('Suppliers saved', {kind:'good'}); };
   const add = ()=>{ const n=newName.trim(); if(!n) return; setDraft(d=>d[n]?d:({...d,[n]:{..._blank}})); registerSupplier(n); setNewName(''); };
   const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)',padding:'7px 13px',borderRadius:'var(--radius-md)',border:'1px solid var(--border-default)',background:'var(--bg-elevated)',color:'var(--text-primary)',cursor:'pointer'};
-  const inp = {padding:'6px 9px',borderRadius:'var(--radius-md)',border:'1px solid var(--border-default)',background:'var(--bg-base)',color:'var(--text-primary)',fontSize:'var(--text-sm)'};
+  const inp = {padding:'6px 9px',borderRadius:'var(--radius-md)',border:'1px solid var(--border-default)',backgroundColor: 'var(--bg-base)',color:'var(--text-primary)',fontSize:'var(--text-sm)'};
   const th = {textAlign:'left',fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',padding:'0 10px 7px 0',whiteSpace:'nowrap'};
   const td = {padding:'8px 10px 8px 0',fontSize:'var(--text-sm)',color:'var(--text-secondary)',borderTop:'1px solid var(--border-subtle)',verticalAlign:'top'};
   return (<div>
@@ -10794,7 +10794,7 @@ function CashFlowPlan({tranches, plan, months}){
   const linePath = series.map((s,i)=>`${i?'L':'M'}${X(i).toFixed(1)} ${Y(s.bal).toFixed(1)}`).join(' ');
   const areaPath = linePath+` L${X(projLen-1).toFixed(1)} ${Y(lo).toFixed(1)} L${X(0).toFixed(1)} ${Y(lo).toFixed(1)} Z`;
   const zeroIn = lo<0 && hi>0;
-  const inp = {padding:'5px 8px',borderRadius:'var(--radius-md)',border:'1px solid var(--border-default)',background:'var(--bg-base)',color:'var(--text-primary)',fontSize:'var(--text-sm)',width:110};
+  const inp = {padding:'5px 8px',borderRadius:'var(--radius-md)',border:'1px solid var(--border-default)',backgroundColor: 'var(--bg-base)',color:'var(--text-primary)',fontSize:'var(--text-sm)',width:110};
   const lab = {fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:5};
   const tone = !cashKnown ? 'var(--text-secondary)' : trough.bal<0 ? 'var(--bad)' : trough.bal < Math.max(overM*1.5, (cashKnown?startCash*0.2:0)) ? 'var(--warn)' : 'var(--good)';
   const verdict = !cashKnown
@@ -10939,7 +10939,7 @@ function PlanningView(){
         </div>
         {/* ② Strategy — compare the trade-off, pick, see the recommendation */}
         <div style={{marginTop:14}}>
-          <div style={lab}>② Strategy — how to commit against the forecast</div>
+          <div style={lab}>② Strategy<span style={{textTransform:'none',letterSpacing:'var(--tracking-snug)',fontWeight:'var(--weight-normal)',color:'var(--text-muted)'}}> — how to commit against the forecast</span></div>
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
             {['jit','bulk','staged'].map(id=>{ const on=rc.strategy===id; const c=stratCmp[id]; const dep=hasDeposit&&c.dep<c.val-0.5;
               return (
@@ -11632,7 +11632,7 @@ function GP_ChannelHealth(p){
   function setK(k,v){ setF(function(o){ var n=Object.assign({},o); n[k]=v.replace(/[^0-9.]/g,''); return n; }); }
   function save(){ if(!window.FRKL_PLAN||!window.FRKL_PLAN.saveBands) return; setBusy(true); setMsg(null);
     window.FRKL_PLAN.saveBands(f).then(function(r){ setBusy(false); if(r.ok){ setEdit(false); } else { setMsg(r.error||'failed'); } }); }
-  var inp = { background:'var(--color-surface)', border:'1px solid '+GP_T.line, borderRadius:'var(--radius-md)', color:GP_T.ink, fontFamily:GP_T.mono, fontSize:'var(--text-sm)', padding:'6px 8px', width:'100%', boxSizing:'border-box' };
+  var inp = { backgroundColor: 'var(--color-surface)', border:'1px solid '+GP_T.line, borderRadius:'var(--radius-md)', color:GP_T.ink, fontFamily:GP_T.mono, fontSize:'var(--text-sm)', padding:'6px 8px', width:'100%', boxSizing:'border-box' };
   return (
     <div style={{ background: GP_T.panel, border:'1px solid '+GP_T.line, borderRadius:'var(--radius-md)', padding:'14px 16px', marginBottom:16 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
@@ -13635,7 +13635,7 @@ function TeamPanel(){
           placeholder="teammate@yourbrand.com" autoComplete="off"
           style={{flex:'1 1 240px', minWidth:0, padding:'9px 12px', fontSize:'var(--text-sm)', fontFamily:'inherit', color:'var(--text-primary)', background:'var(--bg-input)', border:'1px solid var(--border-default)', borderRadius:'var(--r-md)'}}/>
         <select value={role} onChange={e=>setRole(e.target.value)} aria-label="Role"
-          style={{padding:'9px 12px', fontSize:'var(--text-sm)', fontFamily:'inherit', color:'var(--text-primary)', background:'var(--bg-input)', border:'1px solid var(--border-default)', borderRadius:'var(--r-md)'}}>
+          style={{padding:'9px 12px', fontSize:'var(--text-sm)', fontFamily:'inherit', color:'var(--text-primary)', backgroundColor: 'var(--bg-input)', border:'1px solid var(--border-default)', borderRadius:'var(--r-md)'}}>
           <option value="member">Member — full access</option>
           <option value="viewer">Viewer — read only</option>
           {isOwner && <option value="admin">Admin — can manage team</option>}
@@ -14474,7 +14474,7 @@ function CustomerSegments(){
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:10, marginBottom:8}}>
         <div style={{fontSize:'var(--text-sm)', fontWeight:'var(--weight-bold)'}}>{seg} <span className="muted" style={{fontWeight:'var(--weight-normal)'}}>— {(CSEG[seg]||{}).blurb}</span></div>
         <div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
-          <select value={loyalty} onChange={e=>setLoyalty(e.target.value)} style={{minHeight:36, fontFamily:'inherit', fontSize:'var(--text-sm)', padding:'0 8px', background:'var(--bg-card)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--radius-md)'}}>
+          <select value={loyalty} onChange={e=>setLoyalty(e.target.value)} style={{minHeight:36, fontFamily:'inherit', fontSize:'var(--text-sm)', padding:'0 8px', backgroundColor: 'var(--bg-card)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--radius-md)'}}>
             <option value="">Every loyalty type</option>
             <option value="full_price">Full-price loyal</option>
             <option value="mixed">Mixed</option>
@@ -14615,7 +14615,7 @@ function DataHealth(){
         {' '}(<b style={{color: Number(latest.order_coverage) < 0.9 ? 'var(--warn)' : 'var(--good)'}}>{pct(latest.order_coverage)}</b>).
         {avg != null && <> Over the last fortnight it averaged {pct(avg)}.</>}
       </div>
-      {avg != null && avg < 0.9 && (<div className="micro" style={{color:'var(--text-secondary)', marginTop:6}}>
+      {avg != null && avg < 0.9 && (<div className="fine" style={{color:'var(--text-secondary)', marginTop:6}}>
         Conversion rates are calculated from this, so while coverage is below 100% every conversion
         rate on the Website page reads lower than reality. The gap is tracking, not shoppers.
       </div>)}
@@ -14747,7 +14747,7 @@ function CostDrift(){
     <div className="card-section-title"><h2 style={{margin:0}}>Do these match what actually happened?</h2>
       <span className="meta">{checked} of {rows.length} can be checked against your own data</span></div>
     {off.length === 0
-      ? <div className="micro" style={{color:'var(--text-secondary)', marginTop:8}}>Everything Greta can check lines up with what you entered.</div>
+      ? <div className="fine" style={{color:'var(--text-secondary)', marginTop:8}}>Everything Greta can check lines up with what you entered.</div>
       : (<div style={{marginTop:8}}>
           <div style={{overflowX:'auto'}}>
             <table><thead><tr><th>Cost</th><th>You entered</th><th>Your data shows</th><th>Based on</th></tr></thead>
@@ -14758,7 +14758,7 @@ function CostDrift(){
                 <td className="muted">{r.realised_basis || ''}{r.n ? ' · ' + r.n + ' orders' : ''}</td>
               </tr>))}</tbody></table>
           </div>
-          <div className="micro" style={{color:'var(--text-secondary)', marginTop:6}}>
+          <div className="fine" style={{color:'var(--text-secondary)', marginTop:6}}>
             Profit is calculated from the figures you entered, so while these differ, every profit
             number is off by the same gap. Update them above, or leave them if you know why they differ.
           </div>
@@ -14915,7 +14915,7 @@ function CashCeiling(){
     <div className="card-section-title"><h2 style={{margin:0}}>Can you afford the plan?</h2>
       <span className="meta">Profit and cash are different questions — stock is paid for before the sales arrive</span></div>
     {(!gate || missing) ? (<div style={{marginTop:8}}>
-      <div className="micro" style={{color:'var(--text-secondary)', lineHeight:1.55}}>
+      <div className="fine" style={{color:'var(--text-secondary)', lineHeight:1.55}}>
         Greta will not guess at this one. Add your cash on hand, the balance you never want to go below,
         and your supplier terms, and it will work out the most you can spend a week without running out
         — which is often lower than the most you can spend profitably.

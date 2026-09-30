@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./design-tokens.css?v=1790775405">
+<link rel="stylesheet" href="./design-tokens.css?v=1790775750">
 <!-- perf: warm up the CDN + Supabase origins so the deferred libs and the first data
      fetch don't each pay a fresh DNS+TLS round-trip on cold load. -->
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
@@ -178,6 +178,29 @@
      a bold line was asking for a weight that does not exist, same as --weight-heavy was.
      Measured: 8 elements computing to 900 across the sixteen destinations. */
   b, strong { font-weight: var(--weight-bold); }
+
+  /* Small print that is a sentence, not a label. Same size and colour as .micro,
+     sentence case, and without the tracking that spaces caps out. */
+  .fine {
+    font-family: var(--font-sans); font-size: var(--text-xs);
+    line-height: var(--leading-body); color: var(--color-muted);
+    letter-spacing: 0; text-transform: none; font-weight: var(--weight-normal);
+    max-width: var(--measure);
+  }
+
+  /* An eyebrow can be uppercase; the qualifier trailing it is a phrase, not a label.
+     "BUSINESS VITALS · LAST 30 DAYS · INDEPENDENT OF THE DATE PICKER" was one caps run. */
+  .v3-vitals-eyebrow .v3-muted { text-transform: none; letter-spacing: 0; }
+
+  /* One caret, drawn, instead of sixteen screens of operating system. */
+  select {
+    -webkit-appearance: none; -moz-appearance: none; appearance: none;
+    background-image: var(--caret-down);
+    background-repeat: no-repeat;
+    background-position: right var(--space-3) center;
+    padding-right: var(--space-8);
+  }
+  select::-ms-expand { display: none; }
 
   .v3-root, .card, table { font-variant-numeric: tabular-nums; }
   .oi-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
@@ -953,7 +976,9 @@
     letter-spacing: var(--tracking-wide); text-transform: uppercase; margin-right: var(--s-1);
   }
   .toolbar select {
-    background: var(--bg-input); color: var(--text-primary);
+    /* background-color, not the `background` shorthand: the shorthand resets
+       background-image and takes the drawn caret off with it. */
+    background-color: var(--bg-input); color: var(--text-primary);
     border: 1px solid var(--border-default); border-radius: var(--r-sm);
     padding: 4px 8px; font-size: var(--text-sm); font-family: inherit;
     cursor: pointer;
@@ -1779,7 +1804,14 @@
   .v3-vitals-detail { margin-left: auto; background: none; border: 0; cursor: pointer;
     color: var(--color-accent); font-size: var(--text-xs); font-weight: var(--weight-semi);
     font-family: var(--font-sans); padding: 0; }
-  .v3-vitals-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-5); }
+  /* Subgrid, so the three vitals share row bands and their figures share a baseline.
+     Health and Safe to scale are 32px numbers; Growth quality is a 15px phrase, and the
+     three were only aligned at the TOP of their boxes — a 12px baseline step across one
+     row, which is enough to make the third column look like it belongs to another block. */
+  .v3-vitals-row { display: grid; grid-template-columns: repeat(3, 1fr);
+                   grid-template-rows: auto auto auto; gap: var(--space-5); }
+  .v3-vital { display: grid; grid-template-rows: subgrid; grid-row: span 3;
+              align-items: baseline; align-content: start; }
   .v3-vital + .v3-vital { border-left: 1px solid var(--color-line); padding-left: var(--space-5); }
   .v3-vital-lab { display: flex; align-items: center; gap: var(--space-1);
     font-size: var(--text-xs); color: var(--color-muted); margin-bottom: var(--space-2); }
@@ -1834,7 +1866,8 @@
   .v3-period { display: flex; align-items: center; gap: 8px; font-size: var(--text-sm); flex-wrap: wrap; }
   .v3-period select, .v3-period input {
     font-family: var(--font-sans); font-size: var(--text-sm); min-height: 44px; padding: 0 10px;
-    border: 1px solid var(--border-default); background: var(--bg-card); color: var(--text-primary);
+    border: 1px solid var(--border-default); color: var(--text-primary);
+    background-color: var(--bg-card);   /* see .toolbar select — the shorthand kills the caret */
   }
   .v3-period-range { display: flex; align-items: center; gap: 6px; }
 
@@ -1870,6 +1903,6 @@ window.MOS_EMBEDDED = true;</script>
    save-brand-config had been reading two relations that were never created. */</script>
 <script defer src="./cost-entry.build.js?v=20260929c"></script>
 <script defer src="./loop-panel.js?v=20260921a"></script>
-<script defer src="./greta-app.js?v=1790775408764"></script>
+<script defer src="./greta-app.js?v=1790775885509"></script>
 <script>/* perf: defer frkl static deep-tab data (CVR ~1.7MB, cohorts, promos, products) — not used by the Overview/landing. Background-load after paint; skip for non-frkl (de-frkl). */
 (function(){try{var slug=window.OI_BRAND_SLUG||(window.parent&&window.parent!==window?window.parent.OI_BRAND_SLUG:null)||"frkl";if(slug!=="frkl")return;var files=["greta-cvr.js","greta-cohorts.js","greta-discount-codes.js","greta-products.js","greta-patterns.js"],i=0;function next(){if(i>=files.length)return;var s=document.createElement("script");s.src="./"+files[i++]+"?v=20260925f";s.async=true;s.onload=next;s.onerror=next;document.head.appendChild(s);}var kick=function(){next();};if(window.requestIdleCallback){window.requestIdleCallback(kick,{timeout:1500});}else{setTimeout(kick,300);}}catch(e){}})();</script>
