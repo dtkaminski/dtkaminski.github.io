@@ -71,7 +71,12 @@
       // Canonical CTC customer-30d spine (single source for the Customer tier's split + ncac/amer).
       safeQ(sb.from('vw_customer_tier_periods').select('window_label, net_sales, new_net, returning_net, new_customers, returning_customers, paid_spend, amer, ncac, new_rev_share, returning_rev_share').eq('brand_id', brandId).eq('window_label', 'current_30d').limit(1), Q, null),
       // Canonical Shopify-truth net AOV (NOT brand_parameter_profile.aov, which is a stale fit-engine value).
-      safeQ(sb.from('vw_brand_aov').select('aov').eq('brand_id', brandId).eq('window_label', 'current_30d').limit(1), Q, null)
+      safeQ(sb.from('vw_brand_aov').select('aov').eq('brand_id', brandId).eq('window_label', 'current_30d').limit(1), Q, null),
+      // Measured CAC + cohort LTV on a coverage-checked horizon (0206). Replaces the
+      // in-window orders-per-customer arithmetic Overview used to do off the static
+      // FRKL_BUSINESS snapshot, which was frkl-only and counted old cohorts' returning
+      // revenue against newly acquired customers.
+      safeQ(sb.from('vw_brand_unit_economics').select('new_customers, cac, ltv_rev, ltv_contribution, ltv_horizon_months, ltv_coverage, ltv_cohort_n, ltv_cohort_base_n, ltv_rev_topdown, topdown_vs_cohort_gap, ltv_cac, allowable_cac, first_order_contribution, payback_orders, ltv_basis').eq('brand_id', brandId).limit(1), Q, null)
     ]);
     var cmRow = Array.isArray(r[0]) ? r[0][0] : r[0];
     var econRow = Array.isArray(r[1]) ? r[1][0] : r[1];
@@ -81,7 +86,7 @@
     // abstain rather than publish an invented margin, and window.OI_CM_RATIO is the single
     // value greta-app.jsx's oiCmRatio() falls back to when the headline has not landed yet.
     return { cmRatio: (cmRow && cmRow.cm_ratio != null) ? Number(cmRow.cm_ratio) : null,
-             aov: (aovRow && aovRow.aov != null) ? Number(aovRow.aov) : null, econ: econRow || {}, iroas: r[2] || [], tgts: r[3] || [], nvr: r[4] || [], items: r[5] || [], board: r[6] || [], effect: r[7] || [], optimum: r[8] || [], email: (Array.isArray(r[9]) ? r[9][0] : r[9]) || null, goal: (Array.isArray(r[10]) ? r[10][0] : r[10]) || null, forecast: r[11] || [], config: (Array.isArray(r[12]) ? r[12][0] : r[12]) || null, cac: (Array.isArray(r[13]) ? r[13][0] : r[13]) || null, tier: (Array.isArray(r[14]) ? r[14][0] : r[14]) || null };
+             aov: (aovRow && aovRow.aov != null) ? Number(aovRow.aov) : null, econ: econRow || {}, iroas: r[2] || [], tgts: r[3] || [], nvr: r[4] || [], items: r[5] || [], board: r[6] || [], effect: r[7] || [], optimum: r[8] || [], email: (Array.isArray(r[9]) ? r[9][0] : r[9]) || null, goal: (Array.isArray(r[10]) ? r[10][0] : r[10]) || null, forecast: r[11] || [], config: (Array.isArray(r[12]) ? r[12][0] : r[12]) || null, cac: (Array.isArray(r[13]) ? r[13][0] : r[13]) || null, tier: (Array.isArray(r[14]) ? r[14][0] : r[14]) || null, unit: (Array.isArray(r[16]) ? r[16][0] : r[16]) || null };
   }
 
   function topSellers(items, s, e) {
@@ -305,6 +310,10 @@
       // has not landed yet. Publishing it here rather than letting four call sites each
       // invent their own is the whole point of the 2026-09-29 margin unification.
       window.OI_CM_RATIO = (_supp && _supp.cmRatio != null && _supp.cmRatio > 0) ? Number(_supp.cmRatio) : null;
+      // Measured unit economics for every tenant (0206). Overview reads this instead of
+      // deriving CAC and LTV from the static FRKL_BUSINESS snapshot, which existed only
+      // for frkl and put the wrong orders-per-customer under LTV.
+      window.OI_UNIT_ECON = (_supp && _supp.unit) ? _supp.unit : null;
       if (Object.keys(out).length) { window.FRKL_OVERVIEW = out; window.dispatchEvent(new CustomEvent('frkl-overview-updated')); if (window.console) console.info('[overview-data] FRKL_OVERVIEW built', Object.keys(out).length, 'timeframes · supp=' + (_supp ? 'yes' : 'pending')); }
     } catch (e) { if (window.console) console.warn('[overview-data] rebuild failed', e); }
   }

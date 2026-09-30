@@ -2663,6 +2663,79 @@ function ScoresStrip({metrics, windowLabel}){
 // revenue change vs prior period into traffic / conversion / order-value effects
 // (exact, additive: Revenue = Sessions × CVR × AOV), then translates to contribution.
 // This is spec §5 (variance) + §6 (£) + §11 (causal narrative) made visible. Owned by Crux.
+// Volume or efficiency — the anatomy's weekly verdict, and the one decomposition the
+// product did not have.
+//
+//   dR = (Sa - Sf) * mf  +  Sa * (ma - mf)
+//        ^^^^^^^^^^^^^^     ^^^^^^^^^^^^^^
+//        volume             efficiency          where m = R / S
+//
+// The two terms sum to the revenue change exactly, every time, which is the point: the
+// verdict is arithmetic rather than an opinion. ChangeBridgeBody next to this answers a
+// different question -- traffic vs conversion vs basket -- and both are worth having.
+// This one asks whether the media bought more, or bought better.
+//
+// A note on using MER as the rate: the same anatomy is emphatic that MER must never be a
+// TARGET, because it rises as a brand ages and falls as it scales for reasons unrelated to
+// media quality. That objection does not apply here. Nothing is being targeted; MER is
+// only the height of the rectangle in a revenue = spend x rate identity, which is the
+// anatomy's own framing of the split.
+function MediaSplitBody({metrics:m}){
+  const Sf = m.pPaid, Sa = m.paid, Rf = m.pRev, Ra = m.rev;
+  if (!m.havePrior || Sf == null || Sa == null || Rf == null || Ra == null) return null;
+  if (!(Sf > 0) || !(Sa > 0)) return null;            // no rate without spend on both sides
+  const mf = Rf / Sf, ma = Ra / Sa;
+  const volume     = (Sa - Sf) * mf;
+  const efficiency = Sa * (ma - mf);
+  const dRev = Ra - Rf;
+  // Contribution is the arbiter when the two disagree, so it is stated, not implied.
+  const cmr = m.cmRatio;
+  const dContrib = cmr != null ? (dRev * cmr - (Sa - Sf)) : null;
+  const verdict = Math.abs(volume) >= Math.abs(efficiency) ? 'volume' : 'efficiency';
+  const rows = [
+    { k:'volume',     label:'Volume',     v:volume,
+      note:`spend ${GBP(Sf)} → ${GBP(Sa)} at the old rate of ${mf.toFixed(2)}×` },
+    { k:'efficiency', label:'Efficiency', v:efficiency,
+      note:`rate ${mf.toFixed(2)}× → ${ma.toFixed(2)}× on ${GBP(Sa)} of spend` },
+  ];
+  const max = Math.max(1, ...rows.map(r=>Math.abs(r.v)));
+  const col = v => v >= 0 ? 'var(--color-success)' : 'var(--color-danger)';
+  return (<div style={{marginTop:10,paddingTop:10,borderTop:'1px solid var(--border-subtle)'}}>
+    <div style={{fontSize:11,letterSpacing:'.05em',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:7}}>
+      Volume or efficiency · revenue {dRev>=0?'up':'down'} {GBP(Math.abs(dRev))} vs prior period
+    </div>
+    {rows.map(r=>(
+      <div key={r.k} style={{display:'flex',alignItems:'center',gap:10,marginBottom:6}}>
+        <span style={{width:74,fontSize:12.5,fontWeight:600,color:r.k===verdict?'var(--color-ink)':'var(--color-muted)'}}>{r.label}</span>
+        <span style={{flex:1,height:10,background:'var(--color-sunken)',position:'relative',display:'block'}}>
+          <i style={{position:'absolute',top:0,bottom:0,left:r.v>=0?'50%':'auto',right:r.v<0?'50%':'auto',
+                     width:(Math.abs(r.v)/max*50)+'%',background:col(r.v),display:'block'}}/>
+          <i style={{position:'absolute',top:-2,bottom:-2,left:'50%',width:1,background:'var(--color-line-strong)',display:'block'}}/>
+        </span>
+        <span className="oi-num" style={{width:86,textAlign:'right',fontWeight:600,color:col(r.v)}}>
+          {r.v>=0?'+':'−'}{GBP(Math.abs(r.v))}
+        </span>
+      </div>
+    ))}
+    {rows.map(r=>(<div key={r.k+'n'} style={{fontSize:11.5,color:'var(--color-muted)',marginLeft:84,marginBottom:2}}>{r.label}: {r.note}</div>))}
+    <div style={{marginTop:8,fontSize:12.5,color:'var(--text-secondary)',lineHeight:1.55}}>
+      <b style={{color:'var(--color-ink)'}}>{verdict==='volume'?'A volume move.':'An efficiency move.'}</b>{' '}
+      {verdict==='volume'
+        ? 'The rate roughly held — there was simply more or less of it. Levers: spend, audiences, placements, or a tracking or delivery outage.'
+        : 'The rate itself moved. Levers: creative, offer, landing page and product-page conversion, audience quality, bid structure.'}
+      {dContrib != null && (
+        <> {' '}Profit after ads {dContrib>=0?'rose':'fell'} {GBP(Math.abs(dContrib))} over the same period
+        {((dRev>=0) !== (dContrib>=0))
+          ? <> — <b style={{color:'var(--color-warning)'}}>revenue and profit disagree, so profit wins the argument.</b></>
+          : '.'}</>
+      )}
+    </div>
+    <div style={{marginTop:6,fontSize:11,color:'var(--text-faint)'}}>
+      The two add to {(volume+efficiency)<0?'−':''}{GBP(Math.abs(volume+efficiency))}, which is the revenue change exactly. Not an estimate.
+    </div>
+  </div>);
+}
+
 function ChangeBridgeBody({metrics:m}){
   if(!m.havePrior || !(m.pSessions>0) || !(m.pOrders>0) || m.pRev==null) return null;
   const S0=m.pSessions, S1=m.sessions, C0=m.pOrders/m.pSessions, C1=m.cvr||0, A0=m.pRev/m.pOrders, A1=m.aov||0;
@@ -2759,6 +2832,7 @@ function AnalystRead({read, dx, metrics, onLog, logUI}){
           <div style={{fontSize:13,color:'var(--text-primary)',fontWeight:600,lineHeight:1.5}}>{plainWords(read.headline)}</div>
           <div style={{fontSize:12.5,color:'var(--text-secondary)',marginTop:6,lineHeight:1.55}}>{read.narrative}</div>
           {metrics && <ChangeBridgeBody metrics={metrics}/>}
+          {metrics && <MediaSplitBody metrics={metrics}/>}
           <div style={{marginTop:10}}>
             {findings.map((x,i)=>(<div key={i} style={{fontSize:12.5,color:'var(--text-secondary)',lineHeight:1.5,marginBottom:5}}><b style={{color:'var(--text-primary)'}}>{x.area}{x.confidence?` · ${x.confidence} confidence`:''}.</b> {x.reasoning}</div>))}
           </div>
@@ -3494,14 +3568,39 @@ function Overview({start, period, customActive}){
   const pContrib = (gm!=null && havePrior && pRev!=null && pPaid!=null) ? (pRev*gm - pPaid) : null;
   const seriesContrib = (gm!=null) ? daily.map(d=>({d:d.dlabel, v: +((d.revenue*gm) - d.paid).toFixed(0)})) : [];
   // LTV / CAC (estimates): repeat behaviour from retentionByMonth, windowed spend + AOV.
+  // ── Unit economics, measured (0206) ─────────────────────────────────────────
+  // This block used to derive everything from FRKL_BUSINESS.retentionByMonth: a static
+  // snapshot that neutraliseStaticOnlyForNonFrkl() empties, so CAC, LTV, LTV:CAC, payback
+  // and allowable CAC were all null for every tenant except frkl, and half the
+  // Scale-readiness gates quietly dropped out of the score.
+  //
+  // It also used one orders-per-customer for two jobs. The anatomy is explicit that three
+  // measures share that name and "LTV usually sits on the smallest; CPA implies the
+  // largest" -- and the largest (1.995 on frkl, vs 1.600 observed lifetime) was the one
+  // under LTV. Worse, in-window AOV x in-window OPC counts returning revenue from OLD
+  // cohorts against NEWLY acquired customers, which is the double-count the anatomy warns
+  // about: returning revenue is owned exactly once.
+  //
+  // vw_brand_unit_economics gives measured NCAC and a cohort-integrated LTV on a horizon
+  // that still observes half the starting cohort -- month 10 on frkl, because the tail is
+  // survivorship-biased (5,831 customers at m0, 667 by m23, with cum revenue climbing 29%
+  // over that stretch purely from who is left). It cross-checks against MER x CAC, the
+  // anatomy's free LTV: -3.0% apart on frkl, which is two independent methods agreeing.
+  const UE = (typeof window !== 'undefined' && window.OI_UNIT_ECON) || null;
   const _new = _rbm.reduce((a,m)=>a+(m.new||0),0);
-  const ordersPerCust = _new>0 ? _tot/_new : null;               // orders per acquired customer
+  // Kept for the CPA-side arithmetic only, where the in-window measure is the correct one.
+  const ordersPerCust = _new>0 ? _tot/_new : null;
   const aov = orders>0 ? rev/orders : null;
-  const newCust = ordersPerCust ? orders/ordersPerCust : null;   // windowed new customers
-  const cac = (newCust && newCust>0) ? paid/newCust : null;
+  const newCust = UE && UE.new_customers != null ? Number(UE.new_customers)
+                : (ordersPerCust ? orders/ordersPerCust : null);
+  const cac = UE && UE.cac != null ? Number(UE.cac)
+            : ((newCust && newCust>0) ? paid/newCust : null);
   const pNewCust = (havePrior && ordersPerCust && pOrders) ? pOrders/ordersPerCust : null;
   const pCac = (havePrior && pNewCust && pNewCust>0 && pPaid!=null) ? pPaid/pNewCust : null;
-  const ltv = (aov!=null && ordersPerCust!=null) ? aov*gm*ordersPerCust : null;  // contribution LTV
+  const ltv = UE && UE.ltv_contribution != null ? Number(UE.ltv_contribution) : null;
+  const ltvBasis = UE && UE.ltv_basis ? UE.ltv_basis : null;
+  const ltvTopdown = UE && UE.ltv_rev_topdown != null ? Number(UE.ltv_rev_topdown) : null;
+  const ltvGap = UE && UE.topdown_vs_cohort_gap != null ? Number(UE.topdown_vs_cohort_gap) : null;
   const ltvCac = (ltv!=null && cac) ? ltv/cac : null;
   // ── Hover-graph trends for the remaining headline KPIs ──
   // Real series wherever the data supports one; gross margin is a structural
@@ -3535,10 +3634,12 @@ function Overview({start, period, customActive}){
   const cmRateBeforeMkt = cmr;                                               // per-order contribution margin, pre-marketing
   const breakEvenRoas = (cmr!=null && cmr>0) ? 1/cmr : null;                 // revenue ÷ spend to break even on an order
   const TARGET_LTVCAC = 3;
-  const allowableCac = ltv!=null ? ltv/TARGET_LTVCAC : null;                 // max CAC that still clears 3× LTV:CAC
-  const firstOrderContrib = (aov!=null && cmRateBeforeMkt!=null) ? aov*cmRateBeforeMkt : null;
+  const allowableCac = UE && UE.allowable_cac != null ? Number(UE.allowable_cac)
+                     : (ltv!=null ? ltv/TARGET_LTVCAC : null);
+  const firstOrderContrib = UE && UE.first_order_contribution != null ? Number(UE.first_order_contribution)
+                          : ((aov!=null && cmRateBeforeMkt!=null) ? aov*cmRateBeforeMkt : null);
   const paybackOrders = (cac!=null && firstOrderContrib>0) ? cac/firstOrderContrib : null;  // orders to recover CAC
-  const dxMetrics = {rev, orders, sessions, cvr, pCvr, paid, mer, pMer, poas, cac, pCac, ltv, ltvCac, gm:gmGross, cmRatio:cmr, contrib, pContrib, cmPct, returnRate, discLoad, pDiscLoad, returningPct, pRev,
+  const dxMetrics = {rev, orders, sessions, cvr, pCvr, paid, mer, pMer, poas, cac, pCac, ltv, ltvCac, ltvBasis, ltvTopdown, ltvGap, gm:gmGross, cmRatio:cmr, contrib, pContrib, cmPct, returnRate, discLoad, pDiscLoad, returningPct, pRev,
                      aov, breakEvenRoas, allowableCac, paybackOrders, cmRateBeforeMkt,
                      pSessions, pOrders, pPaid, havePrior};
   // ── Crux scorecard = stable business "vitals" on a FIXED trailing window, NOT the
@@ -3554,9 +3655,13 @@ function Overview({start, period, customActive}){
     const pM=inRangeBounded(D.metaDaily,cp.start,cp.end), pG=inRangeBounded(D.googleAds,cp.start,cp.end), pS=inRangeBounded(D.shopify,cp.start,cp.end), pA=inRangeBounded(D.ga4,cp.start,cp.end);
     const r=sum(cS,'netSales'), o=sum(cS,'orders'), ses=sum(cA,'sessions'), pd=sum(cM,'cost')+sum(cG,'cost'), gs=sum(cS,'totalSales'), da=sum(cS,'discounts');
     const pr=sum(pS,'netSales'), po=sum(pS,'orders'), pses=sum(pA,'sessions'), ppd=sum(pM,'cost')+sum(pG,'cost'), pgs=sum(pS,'totalSales'), pda=sum(pS,'discounts');
-    const _aov=o>0?r/o:null, _nc=ordersPerCust?o/ordersPerCust:null, _cac=(_nc&&_nc>0)?pd/_nc:null;
+    const _aov=o>0?r/o:null, _nc=ordersPerCust?o/ordersPerCust:null;
+    const _cac = (UE && UE.cac != null) ? Number(UE.cac) : ((_nc&&_nc>0)?pd/_nc:null);
     const _pnc=ordersPerCust&&po?po/ordersPerCust:null, _pcac=(_pnc&&_pnc>0)?ppd/_pnc:null;
-    const _ltv=(_aov!=null&&ordersPerCust!=null&&gm!=null)?_aov*gm*ordersPerCust:null;
+    // Same measured source as the page above, so the vitals strip and the KPI grid can
+    // never quote two different LTVs. Falls back only when the view has no cohort yet.
+    const _ltv = (UE && UE.ltv_contribution != null) ? Number(UE.ltv_contribution)
+               : ((_aov!=null&&ordersPerCust!=null&&gm!=null)?_aov*gm*ordersPerCust:null);
     const _contrib=(gm!=null)?r*gm-pd:null;
     const _cmr=gm, _beroas=(gm!=null&&gm>0)?1/gm:null, _foc=(_aov!=null&&_cmr!=null)?_aov*_cmr:null;
     return {rev:r, orders:o, sessions:ses, paid:pd, cvr:ses>0?o/ses:null, pCvr:pses>0?po/pses:null,
@@ -3564,7 +3669,9 @@ function Overview({start, period, customActive}){
             gm:gmGross, cmRatio:gm, contrib:_contrib, pContrib:(gm!=null)?pr*gm-ppd:null,
             cmPct:(_contrib!=null&&r>0)?_contrib/r:null, returnRate,
             discLoad:gs>0?da/gs:null, pDiscLoad:pgs>0?pda/pgs:null, pRev:pr,
-            aov:_aov, breakEvenRoas:_beroas, allowableCac:_ltv!=null?_ltv/TARGET_LTVCAC:null,
+            aov:_aov, breakEvenRoas:_beroas,
+            allowableCac: (UE && UE.allowable_cac != null) ? Number(UE.allowable_cac)
+                        : (_ltv!=null?_ltv/TARGET_LTVCAC:null),
             paybackOrders:(_cac!=null&&_foc>0)?_cac/_foc:null, cmRateBeforeMkt:_cmr, havePrior:pS.length>0};
   })();
   // Evidence layer: trailing-90d series for event detection + decomposition vs prior.
@@ -3696,12 +3803,19 @@ function Overview({start, period, customActive}){
           <KPI label="Profit after ads" val={GBP(contrib)} sub="gross profit − paid media · full breakdown below" badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesContrib} current={contrib} prior={pContrib} goodDirection="up"
             agent="Atlas" observation="Net revenue × blended product margin, minus paid ad spend — before packaging/fulfilment/fees. The fully-loaded figure is in the Contribution margin card."
             implication="This is what the raise hinges on; hold it by balancing discount load (margin) against sales per £ of ads (cost per new customer)." />
-          <KPI label="New-customer cost (estimated)" val={GBP(cac)} sub={`${NUM(newCust)} new customers · paid spend ÷ new`} badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesCAC} seriesLabel="Spend ÷ new customers · by day" current={cac} prior={pCac} goodDirection="down"
-            agent="Pulse" observation="Paid ad spend ÷ estimated new customers (new-customer share derived from repeat-purchase data)."
+          <KPI label="New-customer cost" val={GBP(cac)} sub={`${NUM(newCust)} new customers · measured, not inferred`} badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesCAC} seriesLabel="Spend ÷ new customers · by day" current={cac} prior={pCac} goodDirection="down"
+            agent="Pulse" observation="Paid ad spend ÷ new customers, both counted directly from your orders — no longer inferred from a repeat-purchase ratio."
             implication="Judge against contribution-customer lifetime value — keep scaling only while customer lifetime value:cost per new customer stays at 3×+." />
-          <KPI label="Customer value (estimated)" val={GBP(ltv)} sub={`contribution · ${ordersPerCust?ordersPerCust.toFixed(1):'—'} orders/customer · customer lifetime value:cost per new customer ${ltvCac?ltvCac.toFixed(1)+'×':'—'}`} badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesLTV} seriesLabel="Contribution/customer · by day" goodDirection="up"
-            agent="Atlas" observation="Estimated contribution per acquired customer: AOV × gross margin × repeat orders per customer."
-            implication="The customer lifetime value:cost per new customer ratio is the unit-economics headline for the raise — 3×+ is the target to defend."
+          <KPI label="Customer value" val={GBP(ltv)} sub={ltvBasis
+              ? `contribution · ${ltvBasis} · vs cost per new customer ${ltvCac?ltvCac.toFixed(1)+'×':'—'}`
+              : 'needs a cohort curve — connect Shopify and let a month of orders land'} badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesLTV} seriesLabel="Contribution/customer · by day" goodDirection="up"
+            agent="Atlas"
+            observation={ltvBasis
+              ? `Contribution per acquired customer, integrated from the cohort curve over the ${ltvBasis}. The horizon stops where the curve stops observing half the starting cohort, because past that point it is only the survivors talking about themselves.`
+              : 'Contribution per acquired customer, from the cohort curve. Needs a month of order history before it can be measured.'}
+            implication={ltvTopdown!=null && ltvGap!=null
+              ? `Cross-checked against MER × cost per new customer — the same quantity derived a completely different way: ${GBP(ltvTopdown)} of revenue per customer, ${Math.abs(ltvGap*100).toFixed(1)}% ${ltvGap>=0?'above':'below'} the cohort read. A small, stable gap is a calibration constant; a widening one means the cohort model has broken. Keep scaling only while this figure stays 3× your cost per new customer.`
+              : 'The customer-value to acquisition-cost ratio is the unit-economics headline — 3×+ is the target to defend.'}
             benchmark="ltv_cac" bmValue={ltvCac} />
           </MoreKpis>
         </div>
@@ -9443,6 +9557,13 @@ function V3ActionBoard(){
                 </span>
                 <span className="v3-rank-gbp">{v3Gbp(gbp)}<span className="v3-rank-per">/mo</span></span>
               </button>
+              {/* A connection row carries its own remedy. It sits OUTSIDE the row's
+                  expander button — a button inside a button is invalid — and outside
+                  the open/closed state, because making someone open a row to find the
+                  one-click fix is the friction this was built to remove. */}
+              {connProvider(r.external_id) && (
+                <div className="v3-rank-fix"><V3Fix provider={connProvider(r.external_id)} small/></div>
+              )}
               {isOpen && (
                 <div className="v3-rank-why">
                   {play.length
@@ -12372,17 +12493,144 @@ const MOBILE_NAV = [
   { label:'Products', icon:'box',       section:'commerce' },
 ];
 
+// ── One-click reconnect ────────────────────────────────────────────────────
+// A dead connection is the only action Greta raises that the product can finish by
+// itself, and it was the most expensive one to act on. "Meta stopped reporting on
+// 19 Sep. Reconnect it to bring the missing days in." — and then Start went to the
+// action queue (which says nothing about connections), Settings → Connections showed
+// Meta with a "Manage →" link OUT of the dashboard to workspace.html, and only there
+// was there a button that actually begins OAuth. Five clicks and two pages to do the
+// thing the sentence asked for, on the action ranked first by money.
+//
+// connect-start is already the whole job in one call: it verifies owner/admin on the
+// brand, arms install_state and returns the provider's authorize_url. It has also been
+// safe to press on a WORKING connection since the 2026-07-22 incident fix — a live
+// token is preserved until a callback succeeds — so an abandoned attempt costs nothing.
+// The button therefore belongs next to the sentence, not three screens away from it.
+const CONN_LABEL = {
+  meta: 'Meta', google_ads: 'Google Ads', ga4: 'Google Analytics',
+  shopify: 'Shopify', klaviyo: 'Klaviyo', instagram: 'Instagram', tiktok_ads: 'TikTok Ads',
+};
+// Only what connect-start can actually start on its own. Klaviyo is an API key and
+// Instagram arrives attached to Meta; a one-click button on either would be a button
+// that lies, so those keep routing to the screen that can ask for what they need.
+const CONN_OAUTH = { meta: 1, google_ads: 1, ga4: 1, shopify: 1 };
+// fn_emit_connection_actions writes external_id as 'connection-' || provider (0197).
+// That is the only thing about the action vw_brand_action_board carries — and it is
+// enough to know which provider the sentence is about.
+function connProvider(externalId) {
+  const m = /^connection-([a-z0-9_]+)$/.exec(String(externalId || ''));
+  return m && CONN_OAUTH[m[1]] ? m[1] : null;
+}
+// Shopify's authorize URL is per-shop, so connect-start needs the domain. The live
+// connection row already holds it; asking the operator to retype it would be the same
+// friction in a smaller box.
+function connShopDomain() {
+  const rows = (typeof window !== 'undefined' && window.FRKL_LIVE && window.FRKL_LIVE.connections) || [];
+  const row = rows.find(r => r.provider === 'shopify' && /\.myshopify\.com$/i.test(String(r.account_identifier || '')));
+  return row ? String(row.account_identifier).toLowerCase() : '';
+}
+async function startConnect(provider, opts) {
+  const ASK = getOIAsk();
+  if (!ASK || !ASK.endpoint || typeof ASK.getJwt !== 'function') throw new Error('Sign in to reconnect this source.');
+  let jwt = '';
+  try { jwt = await ASK.getJwt(); } catch (e) { jwt = ''; }
+  if (!jwt) throw new Error('Your session expired — refresh the page and sign in again.');
+  let r, data;
+  try {
+    r = await fetch(String(ASK.endpoint).replace(/\/[^/]*$/, '') + '/connect-start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + jwt },
+      body: JSON.stringify({ provider, brand: (OI_BRAND && OI_BRAND.slug) || 'frkl', ...(opts || {}) }),
+    });
+    data = await r.json().catch(() => ({}));
+  } catch (e) { throw new Error('Could not reach the server. Try again.'); }
+  if (!r.ok || !data.authorize_url) throw new Error(data.message || data.error || 'Could not start the reconnection.');
+  // Remember where this started. Every provider callback redirects to ONE fixed
+  // dashboard_url for every brand — the workspace setup page — so without this the
+  // operator finishes a one-click fix on a screen they have not seen since signup.
+  // The value is one we wrote ourselves immediately before leaving, read back on our
+  // own origin, used once, and same-origin-checked before it is followed.
+  try {
+    window.localStorage.setItem('greta_return_after_connect', JSON.stringify({
+      url: (window.top || window).location.href, at: Date.now(),
+    }));
+  } catch (e) {}
+  (window.top || window).location.href = data.authorize_url;   // leaves the page
+}
+
+// The button itself. Renders nothing without a provider it can genuinely start, so a
+// surface can hand it any action's external_id and get a button only when there is one
+// worth pressing.
+function V3Fix({ provider, label, small }) {
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState('');
+  if (!provider) return null;
+  const name = CONN_LABEL[provider] || provider;
+  const go = async () => {
+    setBusy(true); setErr('');
+    const opts = {};
+    if (provider === 'shopify') {
+      const shop = connShopDomain();
+      // No stored domain means this shop was never connected through OAuth, and
+      // connect-start cannot build an authorize URL without one. Send the operator to
+      // the screen that can ask for it rather than failing in place.
+      if (!shop) {
+        setBusy(false);
+        if (window.__oiNav) window.__oiNav('settings', 'connections');
+        return;
+      }
+      opts.shop = shop;
+    }
+    track('reconnect_started', { provider }, 'action');
+    try { await startConnect(provider, opts); }          // navigates away on success
+    catch (e) { setErr(String((e && e.message) || e)); setBusy(false); }
+  };
+  return (<>
+    <button type="button" className={'v3-btn v3-btn-p' + (small ? ' v3-btn-sm' : '')}
+            disabled={busy} onClick={go}>
+      {busy ? 'Opening ' + name + '…' : (label || 'Reconnect ' + name)}
+    </button>
+    {err && <span className="v3-fix-err" role="alert">{err}</span>}
+  </>);
+}
+
+// After the round trip. The callback lands with ?connected=<provider>; say plainly that
+// it worked and what happens next, because nothing visible changes for up to two hours
+// (invoke_sync_all_providers runs every two hours) and the action itself only clears
+// when fn_emit_connection_actions next runs. Silence here reads as "it didn't work".
+function V3Reconnected() {
+  const [prov, setProv] = React.useState(null);
+  React.useEffect(() => {
+    let p = null;
+    try { p = new URL((window.top || window).location.href).searchParams.get('connected'); } catch (e) { p = null; }
+    if (!p || !CONN_LABEL[p]) return;
+    setProv(p);
+    track('reconnect_finished', { provider: p }, 'today');
+    // Read once: a refresh an hour later should not re-announce it.
+    try {
+      const u = new URL((window.top || window).location.href);
+      u.searchParams.delete('connected');
+      (window.top || window).history.replaceState({}, '', u.toString());
+    } catch (e) {}
+  }, []);
+  if (!prov) return null;
+  return (<div className="v3-note" role="status">
+    {CONN_LABEL[prov]} is reconnected. The missing days come in with the next sync, within two hours —
+    this action clears itself once they land.
+  </div>);
+}
+
 // ── Connections panel — shows OAuth status per source + install actions ─────
 function ConnectionsPanel(){
   // Authenticated connect flow: POST connect-start with the user's JWT. connect-start
   // verifies brand_users owner/admin membership, stamps the initiator, and returns the
   // provider authorize_url we navigate to — replacing the old unauthenticated GET
-  // oauth-*-install (whose &brand= slug was spoofable). The functions base is derived
-  // from OI_ASK.endpoint (no hardcoded project); the brand slug from OI_BRAND.
+  // oauth-*-install (whose &brand= slug was spoofable). The call itself lives in
+  // startConnect, shared with the action board; this only needs to know whether there
+  // is a session to make it with.
   const ASK = getOIAsk();
   const authed = !!(ASK && ASK.brand_id && typeof ASK.getJwt==='function' && ASK.endpoint);
-  const fnBase = authed ? ASK.endpoint.replace(/\/[^/]*$/, '') : '';
-  const brandSlug = (OI_BRAND && OI_BRAND.slug) || 'frkl';
 
   // Derive "live" status from the existing data-recency signal until we have
   // an authenticated client-side query against the connections table.
@@ -12443,7 +12691,9 @@ function ConnectionsPanel(){
   const sevVar = (n) => n == null ? 'var(--text-muted)' : n <= 1 ? 'var(--good)' : n <= 4 ? 'var(--warn)' : 'var(--bad)';
   const sevLabel = (n) => n == null ? 'No data' : n <= 1 ? 'Fresh' : n <= 4 ? 'Ageing' : 'Stale';
 
-  const [shopDomain, setShopDomain] = useState('');
+  // Prefilled from the stored domain when there is one: a reconnect should not make
+  // anyone retype the shop they are already connected to.
+  const [shopDomain, setShopDomain] = useState(() => connShopDomain());
   const [showShopifyForm, setShowShopifyForm] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [connectErr, setConnectErr] = useState('');
@@ -12452,30 +12702,15 @@ function ConnectionsPanel(){
   // Start the OAuth flow through the authenticated connect-start endpoint, then send the
   // TOP window (this dashboard is a same-origin iframe) to Shopify's consent screen. The
   // callback refuses to activate any connection whose initiator isn't an authorized owner.
+  // Shares startConnect with the action-board buttons, so the return path is remembered
+  // the same way here as it is there.
   const startShopifyConnect = async () => {
     if (!authed) { setConnectErr('Sign in to connect a store.'); return; }
     if (!shopValid) { setConnectErr('Enter a valid *.myshopify.com domain.'); return; }
     setConnecting(true); setConnectErr('');
-    let jwt = '';
-    try { jwt = await ASK.getJwt(); } catch (e) { jwt = ''; }
-    if (!jwt) { setConnectErr('Your session expired — refresh the page and sign in again.'); setConnecting(false); return; }
-    try {
-      const r = await fetch(fnBase + '/connect-start', {
-        method: 'POST',
-        headers: { 'Content-Type':'application/json', 'Authorization':'Bearer '+jwt },
-        body: JSON.stringify({ provider:'shopify', brand: brandSlug, shop: shopDomain.trim().toLowerCase() }),
-      });
-      const data = await r.json().catch(()=>({}));
-      if (!r.ok || !data.authorize_url) {
-        setConnectErr(data.message || data.error || 'Could not start the Shopify connection.');
-        setConnecting(false);
-        return;
-      }
-      (window.top || window).location.href = data.authorize_url;  // leaves the page → no need to clear `connecting`
-    } catch (e) {
-      setConnectErr('Could not reach the server. Try again.');
-      setConnecting(false);
-    }
+    track('reconnect_started', { provider: 'shopify' }, 'settings');
+    try { await startConnect('shopify', { shop: shopDomain.trim().toLowerCase() }); }  // leaves the page on success
+    catch (e) { setConnectErr(String((e && e.message) || e)); setConnecting(false); }
   };
 
   return (<div style={{display:'flex', flexDirection:'column', gap:'var(--s-7)'}}>
@@ -12526,6 +12761,11 @@ function ConnectionsPanel(){
               <div className="meta" style={{fontSize:12}}>{s.description}</div>
             </div>
 
+            {/* Every OAuth source connects from HERE now. Only Shopify was ever
+                installable in place; Meta, Google Ads and GA4 showed "Manage →" and
+                "Set up →", both of which left the dashboard for the signup workspace
+                page to press a button connect-start could have been given directly.
+                That detour is most of what made a dead feed expensive to fix. */}
             <div style={{flexShrink:0}}>
               {s.installable ? (
                 <button className="btn-primary" style={{padding:'7px 14px', fontSize:12.5, border:0, borderRadius:'var(--r-sm)', cursor:'pointer', fontFamily:'inherit', fontWeight:600}}
@@ -12534,6 +12774,8 @@ function ConnectionsPanel(){
                 </button>
               ) : !s.provider ? (
                 <span className="meta" style={{fontSize:11, fontStyle:'italic'}}>{s.comingSoon}</span>
+              ) : CONN_OAUTH[s.provider] ? (
+                <V3Fix provider={s.provider} small label={conn ? 'Reconnect' : 'Connect via OAuth'}/>
               ) : conn ? (
                 <a href="/auth/workspace.html" target="_top" className="meta" style={{fontSize:12, textDecoration:'none'}}>Manage →</a>
               ) : (
@@ -14564,6 +14806,7 @@ function V3Today(p) {
   const top = d.top_action, next = (d.next_actions || []);
 
   return (<div className="v3-today">
+    <V3Reconnected/>
     <V3Setup s={d.setup}/>
     {gate ? (() => {
       // The gate has TWO reasons and used to give one answer. 0202 made can_show_cm
@@ -14659,7 +14902,12 @@ function V3Today(p) {
               <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiAsk && window.__oiAsk('What is the first thing I should do about this, in concrete steps: ' + v3ActionText(top.description).main)}>Ask Greta where to start</button>
             </div>}
         <div className="v3-btns">
-          <button type="button" className="v3-btn v3-btn-p" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>Start</button>
+          {/* When the top action is a dead connection, "Start" was the wrong verb and the
+              wrong destination: it sent the operator to a ranked list of actions to read
+              the one they were already reading. The fix is one call, so it is one button. */}
+          {connProvider(top.external_id)
+            ? <V3Fix provider={connProvider(top.external_id)}/>
+            : <button type="button" className="v3-btn v3-btn-p" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>Start</button>}
           <button type="button" className="v3-btn" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>Mark done</button>
           <button type="button" className="v3-btn" onClick={() => window.__oiAsk && window.__oiAsk('Why is this the most important thing to do: ' + scrubTag(top.description))}>Why?</button>
         </div>
