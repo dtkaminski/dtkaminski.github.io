@@ -3908,7 +3908,7 @@ function fitScoreColor(s){ return s==null?'var(--text-faint)':s>=70?PAL.good:s>=
 function fitConfColor(c){ return c==='high'?PAL.good:c==='medium'?PAL.warn:PAL.bad; }
 function FitScore({label,value,sub}){
   return (<div style={{flex:1,textAlign:'center',padding:'14px 8px',borderRadius:'var(--r-sm)',background:'var(--bg-app)',border:'1px solid var(--border-subtle)'}}>
-    <div style={{fontSize:'var(--text-2xl)',fontWeight:'var(--weight-bold)',lineHeight:1,color:fitScoreColor(value)}}>{value==null?'—':value}</div>
+    <div style={{fontSize:'var(--text-2xl)',fontWeight:'var(--weight-heavy)',lineHeight:1,color:fitScoreColor(value)}}>{value==null?'—':value}</div>
     <div className="micro" style={{color:'var(--text-muted)',marginTop:6,fontWeight:'var(--weight-semi)'}}>{label}</div>
     <div className="micro" style={{color:'var(--text-faint)'}}>{sub}</div>
   </div>);
@@ -5729,9 +5729,9 @@ function CvrDrivers(){
             label={{value:`${CVR_BENCH_LABEL} conversion rate target`, position:'insideTopRight', fill:PAL.accent, fontSize:'var(--text-xs)'}}/>
           {/* The two selected periods, marked where you clicked — A (blue) vs B (green). */}
           {cmp.a && chartData.some(d=>d.w===cmp.a) && <R.ReferenceLine yAxisId="l" x={cmp.a} stroke={PAL.accent} strokeWidth={2} strokeOpacity={0.95}
-            label={{value:'A', position:'top', fill:PAL.accent, fontSize:'var(--text-sm)', fontWeight:'var(--weight-bold)'}}/>}
+            label={{value:'A', position:'top', fill:PAL.accent, fontSize:'var(--text-sm)', fontWeight:'var(--weight-heavy)'}}/>}
           {cmp.b && chartData.some(d=>d.w===cmp.b) && <R.ReferenceLine yAxisId="l" x={cmp.b} stroke={PAL.good} strokeWidth={2} strokeOpacity={0.95}
-            label={{value:'B', position:'top', fill:PAL.good, fontSize:'var(--text-sm)', fontWeight:'var(--weight-bold)'}}/>}
+            label={{value:'B', position:'top', fill:PAL.good, fontSize:'var(--text-sm)', fontWeight:'var(--weight-heavy)'}}/>}
           {/* Event & sale pins: logged events + major site-wide sales, snapped to chart buckets.
               Icon-only on the chart; full detail lives on hover so the chart stays calm. */}
           {(function(){ var pins=buildChartPins(chartData.map(function(d){return d.w;}));
@@ -5777,7 +5777,7 @@ function CvrDrivers(){
             <div style={{fontSize:'var(--text-base)',color:'var(--text-faint)'}}>vs</div>
             <div><div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'.03em'}}>Other {L.restN} · avg {Math.round(L.restDisc)}% off</div><div style={{fontSize:'var(--text-lg)',fontWeight:'var(--weight-bold)'}}>{L.restCvr.toFixed(2)}%</div></div>
             <div style={{fontSize:'var(--text-base)',color:'var(--text-faint)'}}>→</div>
-            <div><div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'.03em'}}>Lift</div><div style={{fontSize:'var(--text-lg)',fontWeight:'var(--weight-bold)',color:col}}>{L.pp>=0?'+':''}{L.pp.toFixed(2)}pp{L.pct!=null?` (${L.pp>=0?'+':''}${Math.round(L.pct*100)}%)`:''}</div></div>
+            <div><div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'.03em'}}>Lift</div><div style={{fontSize:'var(--text-lg)',fontWeight:'var(--weight-heavy)',color:col}}>{L.pp>=0?'+':''}{L.pp.toFixed(2)}pp{L.pct!=null?` (${L.pp>=0?'+':''}${Math.round(L.pct*100)}%)`:''}</div></div>
           </div>
           <div style={{fontSize:'var(--text-xs)',color:'var(--text-muted)',marginTop:8}}>{verdict} <span style={{color:'var(--text-faint)'}}>Observational, not causal — deep-discount {unit} can also differ in traffic mix, season and email volume. Click a deep-discount point vs a normal one below to inspect a specific pair.</span></div>
         </div>); })()}
@@ -9427,7 +9427,7 @@ function RestockActionQueue(){
             <div key={idx} style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',padding:'8px 0',borderTop:idx?'1px solid var(--border-subtle)':'none'}}>
               <span style={{width:8,height:8,borderRadius:'50%',background:urgent?'var(--bad)':'var(--warn)',flexShrink:0}}/>
               <div style={{flex:1,minWidth:200}}>
-                <div style={{fontSize:'var(--text-sm)',color:'var(--text-primary)'}}>{l.basis==='forecast'?'Order for forecast':'Raise PO'} — <b>{NUM(l.qty)} units</b> of {l.p.title}{urgent && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'.03em',color:PAL.panel,background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}</div>
+                <div style={{fontSize:'var(--text-sm)',color:'var(--text-primary)'}}>{l.basis==='forecast'?'Order for forecast':'Raise PO'} — <b>{NUM(l.qty)} units</b> of {l.p.title}{urgent && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-heavy)',letterSpacing:'.03em',color:PAL.panel,background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}</div>
                 <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:1}}>{l.supplier} · {urgent?`OOS in ~${Math.round(l.cover)}d — ${l.oosGap}d short of the ${l.lead}d lead`:(l.basis==='forecast'?`plan needs ${NUM(l.forecastUnits)}, have ${NUM(l.stock)}`:`runs out in ~${Math.round(l.cover)}d (lead ${l.lead}d)`)}{l.lineCost!=null?` · ${curSym()}${k(l.lineCost)}`:''}{l.moqBumped?` · minimum order quantity ${l.moq}`:''}</div>
               </div>
               <button style={{...btn,background:'var(--accent)',color:PAL.panel,borderColor:'var(--accent)'}} onClick={()=>raise(l)}><Icon name="check" size={12}/> Mark PO raised</button>
@@ -10087,7 +10087,7 @@ function BusinessReview(){
         if(slowCapital>50000) tl.push({t:`${curSym()}${k(slowCapital)} of capital tied up in slow-moving stock${topChan&&topShare!=null?`; ${topChan.channel} drives ${pct0(topShare)} of revenue`:''}.`, c:'var(--warn)'});
         return (<div className="card" style={{borderLeft:'3px solid var(--text-faint)'}}>
           <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:8}}>
-            <span style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',letterSpacing:'.06em',color:'var(--text-primary)'}}>TL;DR</span>
+            <span style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-heavy)',letterSpacing:'.06em',color:'var(--text-primary)'}}>TL;DR</span>
             <span className="muted" style={{fontSize:'var(--text-xs)'}}>the main points across the business right now</span>
             <button style={{...btn,marginLeft:'auto',fontSize:'var(--text-xs)',padding:'5px 11px'}} onClick={copyBriefing}><Icon name="clipboard" size={12}/> Copy briefing</button>
           </div>
@@ -10299,11 +10299,11 @@ function ProductionPlanner({embedded}={}){
       {/* summary + controls */}
       <div className="card">
         <div style={{display:'flex',gap:22,flexWrap:'wrap',alignItems:'flex-end'}}>
-          <div title="Run out before a reorder placed today could land — order these now"><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color: oosNow?'var(--bad)':'var(--good)'}}>{oosNow}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>order today (OOS risk)</div></div>
-          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color: toOrder.length?'var(--warn)':'var(--good)'}}>{toOrder.length}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>items to reorder now</div></div>
-          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{NUM(toOrder.reduce((t,l)=>t+l.qty,0))}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>units across all POs</div></div>
-          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{totalValue>0?curSym()+k(totalValue):'—'}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>draft order value{missingCost?' (partial)':''}</div></div>
-          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color: awaiting.length?'var(--accent)':'var(--text-faint)'}}>{awaiting.length}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>awaiting stock</div></div>
+          <div title="Run out before a reorder placed today could land — order these now"><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-heavy)',color: oosNow?'var(--bad)':'var(--good)'}}>{oosNow}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>order today (OOS risk)</div></div>
+          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-heavy)',color: toOrder.length?'var(--warn)':'var(--good)'}}>{toOrder.length}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>items to reorder now</div></div>
+          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-heavy)',color:'var(--text-primary)'}}>{NUM(toOrder.reduce((t,l)=>t+l.qty,0))}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>units across all POs</div></div>
+          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-heavy)',color:'var(--text-primary)'}}>{totalValue>0?curSym()+k(totalValue):'—'}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>draft order value{missingCost?' (partial)':''}</div></div>
+          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-heavy)',color: awaiting.length?'var(--accent)':'var(--text-faint)'}}>{awaiting.length}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>awaiting stock</div></div>
           <div style={{marginLeft:'auto',display:'flex',gap:8,flexWrap:'wrap'}}>
             <button style={btn} onClick={()=>setSupOpen(o=>!o)}><Icon name="sliders" size={13}/> Supplier master</button>
             <button style={btn} onClick={()=>setSetOpen(o=>!o)}><Icon name="sliders" size={13}/> Reorder policy</button>
@@ -10379,7 +10379,7 @@ function ProductionPlanner({embedded}={}){
         <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:8}}>
           <div><span style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{po.supplier}</span> <span className="muted" style={{fontSize:'var(--text-sm)'}}>· {po.lines.length} line{po.lines.length===1?'':'s'} · {NUM(po.units)} units</span>{(po.email||po.notes) && <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:2}}>{po.email}{po.email&&po.notes?' · ':''}{po.notes}</div>}</div>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-            {po.hasCost ? <span style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{`${curSym()}`}{po.total.toFixed(2)}</span>
+            {po.hasCost ? <span style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-heavy)',color:'var(--text-primary)'}}>{`${curSym()}`}{po.total.toFixed(2)}</span>
               : <span style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',color:'var(--warn)',background:'var(--warn-bg)',padding:'2px 9px',borderRadius:999}}>Pricing pending{po.total>0?` · ${curSym()}${po.total.toFixed(0)} so far`:''}</span>}
             <button style={smbtn} onClick={()=>copyPO(po)}><Icon name="clipboard" size={12}/> Copy</button>
             <button style={smbtn} onClick={()=>download(po)}><Icon name="report" size={12}/> CSV</button>
@@ -10399,7 +10399,7 @@ function ProductionPlanner({embedded}={}){
           <th style={th}>Product</th><th style={{...th,textAlign:'right'}}>Stock</th><th style={{...th,textAlign:'right'}}>Cover</th><th style={{...th,textAlign:'right'}}>Order qty</th><th style={{...th,textAlign:'right'}}>{`Unit ${curSym()}`}</th><th style={{...th,textAlign:'right'}}>{`Line ${curSym()}`}</th>
         </tr></thead><tbody>
           {po.lines.map((l,idx)=>(<tr key={idx}>
-            <td style={{...td,color:'var(--text-primary)'}}>{l.p.title}{l.oosBeforeLead && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'.03em',color:PAL.panel,background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{l.p.sku||'no SKU'} · {l.p.type}{l.oosBeforeLead?` · OOS gap ${l.oosGap}d`:''}{l.basis==='forecast'?` · plan needs ${NUM(l.forecastUnits)}`:''}{l.basis==='wave'&&l.nextWaveBy?` · next wave by ${l.nextWaveBy}`:''}{l.moqBumped?' · MOQ '+l.moq:''}</div></td>
+            <td style={{...td,color:'var(--text-primary)'}}>{l.p.title}{l.oosBeforeLead && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-heavy)',letterSpacing:'.03em',color:PAL.panel,background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{l.p.sku||'no SKU'} · {l.p.type}{l.oosBeforeLead?` · OOS gap ${l.oosGap}d`:''}{l.basis==='forecast'?` · plan needs ${NUM(l.forecastUnits)}`:''}{l.basis==='wave'&&l.nextWaveBy?` · next wave by ${l.nextWaveBy}`:''}{l.moqBumped?' · MOQ '+l.moq:''}</div></td>
             <td style={{...td,textAlign:'right'}}>{NUM(l.p.inventoryQty)}</td>
             <td style={{...td,textAlign:'right',color:l.cover<=l.lead?'var(--bad)':'var(--warn)'}}>{Math.round(l.cover)}d</td>
             <td style={{...td,textAlign:'right',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{NUM(l.qty)}</td>
@@ -10629,12 +10629,12 @@ function DemandPlanner({embedded}={}){
       {/* summary */}
       <div className="card">
         <div style={{display:'flex',gap:24,flexWrap:'wrap',alignItems:'flex-end'}}>
-          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{NUM(Math.ceil(totalUnits))}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>units planned · {months}mo</div></div>
-          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{`${curSym()}`}{k(totalRev)}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>projected revenue</div></div>
-          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color: impliedGrowth>=0?'var(--good)':'var(--bad)'}}>{impliedGrowth>=0?'+':''}{impliedGrowth.toFixed(0)}%</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>vs run-rate</div></div>
-          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color: stockouts?'var(--warn)':'var(--good)'}}>{stockouts}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>will stock out</div></div>
-          <div title="Products that run out before a reorder placed today could arrive, given production lead time"><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color: oosRisk?'var(--bad)':'var(--good)'}}>{oosRisk}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>OOS before lead</div></div>
-          {toProduce>0 && <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{NUM(Math.ceil(toProduce))}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>units short to produce</div></div>}
+          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-heavy)',color:'var(--text-primary)'}}>{NUM(Math.ceil(totalUnits))}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>units planned · {months}mo</div></div>
+          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-heavy)',color:'var(--text-primary)'}}>{`${curSym()}`}{k(totalRev)}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>projected revenue</div></div>
+          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-heavy)',color: impliedGrowth>=0?'var(--good)':'var(--bad)'}}>{impliedGrowth>=0?'+':''}{impliedGrowth.toFixed(0)}%</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>vs run-rate</div></div>
+          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-heavy)',color: stockouts?'var(--warn)':'var(--good)'}}>{stockouts}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>will stock out</div></div>
+          <div title="Products that run out before a reorder placed today could arrive, given production lead time"><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-heavy)',color: oosRisk?'var(--bad)':'var(--good)'}}>{oosRisk}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>OOS before lead</div></div>
+          {toProduce>0 && <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-heavy)',color:'var(--text-primary)'}}>{NUM(Math.ceil(toProduce))}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>units short to produce</div></div>}
         </div>
       </div>
       {/* demand plan table */}
@@ -10649,7 +10649,7 @@ function DemandPlanner({embedded}={}){
               : (o.needs && o.qty>0) ? <span style={{color:'var(--text-primary)',fontWeight:'var(--weight-bold)'}}>{NUM(o.qty)}</span>
               : <span style={{color:'var(--good)'}}>covered</span>;
             return (<tr key={idx}>
-            <td style={{...td,color:'var(--text-primary)'}}>{r.p.title}{r.oosBeforeLead && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'.03em',color:PAL.panel,background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}{focusM(r.p)!==1 && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',color:'var(--accent)',background:'var(--accent-bg)',padding:'1px 6px',borderRadius:999}}>↑{(focusM(r.p)%1?focusM(r.p).toFixed(2):focusM(r.p))}×</span>}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{r.p.type}</div></td>
+            <td style={{...td,color:'var(--text-primary)'}}>{r.p.title}{r.oosBeforeLead && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-heavy)',letterSpacing:'.03em',color:PAL.panel,background:'var(--bad)',padding:'1px 7px',borderRadius:999}}>ORDER TODAY</span>}{focusM(r.p)!==1 && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',color:'var(--accent)',background:'var(--accent-bg)',padding:'1px 6px',borderRadius:999}}>↑{(focusM(r.p)%1?focusM(r.p).toFixed(2):focusM(r.p))}×</span>}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{r.p.type}</div></td>
             <td style={{...td,textAlign:'right'}}>{NUM(Math.round(r.runMo))}</td>
             <td style={{...td,textAlign:'right'}}>{NUM(r.stock)}</td>
             <td style={{...td,textAlign:'right'}}>{r.daysToOOS===Infinity ? <span style={{color:'var(--text-faint)'}}>—</span> : <span style={{fontWeight:'var(--weight-semi)',color: r.oosBeforeLead?'var(--bad)':(r.daysToOOS<r.lead*1.5?'var(--warn)':'var(--text-secondary)')}}>{Math.round(r.daysToOOS)}d{r.oosBeforeLead?` · gap ${r.oosGap}d`:''}</span>}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',display:'flex',alignItems:'center',gap:3,justifyContent:'flex-end',marginTop:2}}>{!r.leadSet && <span title={`Estimate — using the ${r.p.type||'type'} default of ${r.leadDefault}d. Set this item's real supplier lead.`} style={{color:'var(--warn)',fontSize:'var(--text-xs)',lineHeight:1}}>●</span>}<input type="number" min="0" defaultValue={r.leadSet?r.leadMake:''} key={'ld'+(r.leadSet?r.leadMake:'d')} placeholder={String(r.leadDefault)} title={`Production lead — days from order to shipment (per item). Blank uses the ${r.p.type||'type'} default of ${r.leadDefault}d. Set defaults in Reorder policy.`} onBlur={e=>{ if(e.target.value!=='') setSkuLead(skuKeyOf(r.p), e.target.value); }} style={{width:38,padding:'1px 4px',borderRadius:5,border:'1px solid '+(r.leadSet?'var(--border-default)':'var(--warn)'),background:'var(--bg-base)',color:'var(--text-secondary)',fontSize:'var(--text-xs)',textAlign:'right'}}/><span>d make{r.leadShip>0?` +${r.leadShip} ship = ${r.lead}`:' lead'}</span></div></td>
@@ -10802,7 +10802,7 @@ function CashFlowPlan({tranches, plan, months}){
   return (
     <div className="card" style={{marginBottom:14, borderLeft:'3px solid '+tone}}>
       <div style={{display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap',marginBottom:6}}>
-        <div style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>Cash impact of this plan</div>
+        <div style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-heavy)',color:'var(--text-primary)'}}>Cash impact of this plan</div>
         <span className="muted" style={{fontSize:'var(--text-xs)'}}>projected balance over {projLen} months · stock payments on their due dates</span>
       </div>
       <div style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)',marginBottom:12,lineHeight:1.5}}>{verdict}</div>
@@ -10924,7 +10924,7 @@ function PlanningView(){
         <div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
           <div style={{flex:'1 1 320px',minWidth:0}}>
             <div style={lab}>What to do now</div>
-            <div style={{fontSize:'var(--text-lg)',fontWeight:'var(--weight-bold)',color:heroColor,lineHeight:1.2}}>{headline}</div>
+            <div style={{fontSize:'var(--text-lg)',fontWeight:'var(--weight-heavy)',color:heroColor,lineHeight:1.2}}>{headline}</div>
             <div style={{fontSize:'var(--text-sm)',color:'var(--text-muted)',marginTop:4,lineHeight:1.45}}>{sub}</div>
           </div>
           {toOrderN>0 && <button style={btn} onClick={goPOs}>Review &amp; raise POs <Icon name="chevron" size={14}/></button>}
@@ -10966,7 +10966,7 @@ function PlanningView(){
         return (
           <div className="card" style={{marginBottom:14}}>
             <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:4}}>
-              <div style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>Stock landing plan</div>
+              <div style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-heavy)',color:'var(--text-primary)'}}>Stock landing plan</div>
               <span className="muted" style={{fontSize:'var(--text-xs)'}}>{STRAT[rc.strategy]} · lead {leadTotalRep}d ({leadMakeRep}d make + {leadTotalRep-leadMakeRep}d transit)</span>
               <div style={{marginLeft:'auto',display:'flex',gap:3,background:'var(--bg-elevated)',borderRadius:8,padding:3}}>{toggle('timeline','Timeline')}{toggle('table','Table')}</div>
             </div>
@@ -10995,7 +10995,7 @@ function PlanningView(){
               {tranches.map(t=>{ const ox=pctOf((t.isNow||t.late)?today:t.orderISO), sx=pctOf(t.shipISO), lx=pctOf(t.landISO); return (
                 <div key={t.n} style={{display:'flex',alignItems:'center',gap:10,marginBottom:7}}>
                   <div style={{width:132,flexShrink:0}}>
-                    <div style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{t.name} {t.late&&<span style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',color:PAL.panel,background:'var(--bad)',padding:'1px 5px',borderRadius:999}}>LATE</span>}</div>
+                    <div style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{t.name} {t.late&&<span style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-heavy)',color:PAL.panel,background:'var(--bad)',padding:'1px 5px',borderRadius:999}}>LATE</span>}</div>
                     <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{hasDeposit?`${curSym()}${k(t.dep)} now · ${curSym()}${k(t.bal)} on ship`:`${curSym()}${k(t.val)}`}</div>
                   </div>
                   <div style={{position:'relative',flex:1,height:28,borderRadius:7,background:'var(--bg-elevated)'}}>

@@ -108,6 +108,10 @@
   --weight-medium: 500;
   --weight-semi:   600;
   --weight-bold:   700;
+  /* 800 existed in greta-app.jsx on 24 elements before the type-token sweep collapsed
+     the scale. Kept as its own step rather than rounded to bold, so the sweep stays a
+     rename and nothing renders lighter than it did. */
+  --weight-heavy:  800;
 
   /* Tracking tightens as type grows — large text set at 0 looks loose. */
   --tracking-tight: -0.022em;

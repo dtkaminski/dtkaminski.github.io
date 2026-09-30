@@ -1,42 +1,28 @@
-Define --weight-bold and land the type-token sweep
+Give 800 its own step instead of rounding it to bold
 
-Replaces every hardcoded font size and weight in greta-app.jsx with a design token:
-1,051 var(--text-*) references and 418 var(--weight-*). CLAUDE.md has banned hardcoded
-px type since the design system landed; this is the file finally complying.
+The previous commit collapsed nine numeric font weights onto four tokens, which meant
+24 elements set to 800 started rendering at 700. That was the one value change in an
+otherwise mechanical rename, and it did not need to be: 800 was a real step being used
+deliberately, not a stray.
 
-The sweep was written in a previous session and left uncommitted because it could not
-ship. It referenced var(--weight-bold) 182 times and no such token existed --
-design-tokens.css defined normal/medium/semi and stopped. Shipping it would have
-resolved 182 font-weight declarations to nothing, so 182 elements would have silently
-dropped to inherited weight. --weight-bold: 700 is added here, continuing the existing
-400/500/600 scale.
+So --weight-heavy: 800 is added and those 24 sites now reference it.
 
-IT IS NOT A NO-OP RENAME, and the collapse is the point. The file carried nine distinct
-numeric weights; there are now four tokens:
+Identifying them had to be positional, not textual. By the time the sweep landed all of
+them said var(--weight-bold), indistinguishable from the 163 that were genuinely 700,
+and 18 lines in the file carry more than one fontWeight. So the 24 were recovered by
+mapping 80828e8 (the last commit before the sweep) line by line against the current
+file -- both are exactly 15,752 lines -- pairing the nth numeric weight on each old line
+with the nth token on the new one, and rewriting only where the old value was 800 and
+the new token was bold. All 24 matched that shape; none was already something else.
 
-  400              -> --weight-normal   38 sites, exact
-  450, 500, 550    -> --weight-medium   15 sites
-  600, 650         -> --weight-semi    183 sites
-  700, 750, 800    -> --weight-bold    182 sites
+Verified by resolving every token back to its number and diffing against the
+pre-sweep file. 398 of 423 sites are now exact, including all 24 at 800. The only
+remaining deltas are the four genuine strays -- one 450 and five 550 to 500, eighteen
+650 to 600, one 750 to 700 -- which stay rounded, because a weight scale with nine steps
+reached by nudging single components is the debt the tokens exist to remove.
 
-So 24 places previously set to 800 now render at 700, and the 450/550/650/750 strays
-round to the nearest step. An arbitrary nine-step weight scale reached by nudging
-individual components is exactly the debt the token system exists to remove, so this is
-a deliberate normalisation rather than drift -- but 800 did exist, and if any of those
-24 need to stay heavier the answer is a --weight-heavy token, not a number back in the
-component.
-
-Font sizes collapse the same way, including quoted values like '12.5px' that were
-outside any scale.
-
-Verified as a pure token migration before committing: normalising every weight and size
-token on both sides leaves 200 differing lines, all of them whitespace (fontSize:SS
-versus fontSize: SS) or quoted-px sizes. No logic, no markup, no copy changed. Every
-token the file now references resolves in design-tokens.css. node --check passes and
-greta-app.js rebuilds byte-identically from this source.
-
-Recovered from a scratchpad copy. The sweep disappeared from the working tree during
-this session -- most likely a sync to origin after my previous push, which discards
-unstaged work -- and that copy was the only one left.
+One site is untouched and still hardcoded: line 1766 is fontWeight:bold?700:400, a
+ternary on a local variable rather than a literal, so it needs a small refactor rather
+than a substitution.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>
