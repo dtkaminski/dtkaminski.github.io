@@ -42,6 +42,9 @@
   --color-chrome:   #F8F7F4;   /* nav + app bar                                 */
   --color-panel:    #FFFFFF;   /* content                                       */
   --color-panel-hover: #FBFAF8;
+  /* Chrome behind a backdrop-filter: the nav that sits over scrolling content. Warm,
+     because white at 85% over this canvas reads cool and slightly blue. */
+  --color-chrome-blur: rgba(248, 247, 244, 0.86);
   --color-sunken:   #EAE8E3;   /* track/rail behind a bar                       */
   --color-input:    #FFFFFF;
 
