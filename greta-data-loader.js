@@ -674,7 +674,9 @@
 
     const styles = {
       'initialising': { bg: 'rgba(126,126,138,0.10)', border: 'rgba(126,126,138,0.3)', dot: '#7e7e8a', text: '#b1b1bc', label: 'Initialising…' },
-      'static-only':  { bg: 'rgba(126,126,138,0.10)', border: 'rgba(126,126,138,0.3)', dot: '#7e7e8a', text: '#b1b1bc', label: 'Static · log in for live' },
+      // #b1b1bc on the light canvas measured 1.89:1 -- the least readable text on the
+      // whole site. Dark-theme leftovers; tokens now.
+      'static-only':  { bg: 'var(--color-sunken,#EAE8E3)', border: 'var(--color-line-strong,#CFCCC5)', dot: 'var(--color-faint,#726E66)', text: 'var(--color-muted,#57544D)', label: 'Static · log in for live' },
       'live':         { bg: 'rgba(74,222,128,0.10)',  border: 'rgba(74,222,128,0.35)', dot: '#4ade80', text: '#4ade80', label: `Live · ${ageLabel || 'fresh'}`,  pulse: true },
       'stale':        { bg: 'rgba(245,181,68,0.10)',  border: 'rgba(245,181,68,0.35)', dot: '#f5b544', text: '#f5b544', label: `Stale · ${ageLabel || ''}` },
       'error':        { bg: 'rgba(239,107,111,0.10)', border: 'rgba(239,107,111,0.35)', dot: '#ef6b6f', text: '#ef6b6f', label: 'Live data error' },

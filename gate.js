@@ -26,20 +26,26 @@
   function build() {
     var ov = document.createElement("div");
     ov.id = "oi-gate";
+    // The first screen anyone sees, and it was the last one still wearing the old dark
+    // theme: near-black canvas, a #7c8cff indigo that is in no palette this product uses,
+    // and Inter — which the design rules ban outright. It also failed contrast twice
+    // ("Unlock" at 2.98:1, the hint text at 1.89:1). Same tokens as the product now, with
+    // a var() fallback on each because gate.js is deliberately the first script on the
+    // page and must still render if the stylesheet has not arrived.
     ov.setAttribute("style", [
       "position:fixed", "inset:0", "z-index:2147483647",
-      "background:#08080b", "color:#f1f1f4",
+      "background:var(--color-surface,#F2F1ED)", "color:var(--color-ink,#16150F)",
       "display:flex", "align-items:center", "justify-content:center",
-      "font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif"
+      "font-family:var(--font-sans,'DM Sans',ui-sans-serif,system-ui,sans-serif)"
     ].join(";"));
     ov.innerHTML =
       '<div style="width:320px;max-width:88vw;text-align:center">' +
-        '<div style="font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#7c8cff;margin-bottom:18px">Operator Intelligence</div>' +
-        '<div style="font-size:15px;color:#b1b1bc;margin-bottom:18px">Enter the access code to view this workspace.</div>' +
-        '<input id="oi-gate-input" type="password" autocomplete="off" placeholder="Access code" ' +
-          'style="width:100%;padding:11px 13px;border-radius:8px;border:1px solid #2a2a34;background:#111116;color:#f1f1f4;font-size:14px;outline:none;text-align:center" />' +
-        '<button id="oi-gate-btn" style="width:100%;margin-top:10px;padding:11px;border:0;border-radius:8px;background:#7c8cff;color:#fff;font-weight:600;font-size:14px;cursor:pointer">Unlock</button>' +
-        '<div id="oi-gate-err" style="height:16px;margin-top:10px;font-size:12px;color:#ff7c7c"></div>' +
+        '<div style="font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent,#C2410C);margin-bottom:18px">Greta</div>' +
+        '<div style="font-size:15px;color:var(--color-muted,#57544D);margin-bottom:18px">Enter the access code to view this workspace.</div>' +
+        '<input id="oi-gate-input" type="password" autocomplete="off" placeholder="Access code" aria-label="Access code" ' +
+          'style="width:100%;padding:11px 13px;border-radius:var(--radius-md,5px);border:1px solid var(--color-line-strong,#CFCCC5);background:var(--color-panel,#fff);color:var(--color-ink,#16150F);font-size:14px;text-align:center;font-family:inherit" />' +
+        '<button id="oi-gate-btn" style="width:100%;margin-top:10px;padding:11px;border:0;border-radius:var(--radius-md,5px);background:var(--color-accent,#C2410C);color:var(--color-panel,#fff);font-weight:600;font-size:14px;cursor:pointer;font-family:inherit">Unlock</button>' +
+        '<div id="oi-gate-err" role="alert" style="height:16px;margin-top:10px;font-size:12px;color:var(--color-danger,#B42318)"></div>' +
       '</div>';
     document.body.appendChild(ov);
 
