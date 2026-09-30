@@ -445,8 +445,11 @@
 
   async function fetchConnections(sb, brandId) {
     try {
+      // account_identifier carries the shop domain for Shopify, which connect-start
+      // needs to build an authorize URL. Without it a one-click Shopify reconnect has
+      // to stop and ask for a domain the row already holds.
       const { data } = await sb.from('connections')
-        .select('provider, status, account_label, last_sync_at, last_error')
+        .select('provider, status, account_identifier, account_label, last_sync_at, last_error')
         .eq('brand_id', brandId);
       return data || [];
     } catch (e) { return []; }

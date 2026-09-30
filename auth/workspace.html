@@ -382,6 +382,32 @@
   const SUPABASE_FNS = `${SUPABASE_URL}/functions/v1`;
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
+  // ── Return the operator to wherever the reconnect started ────────────────
+  // Every OAuth callback redirects to ONE dashboard_url for every brand, and that URL
+  // is this setup page. Fine after signup, wrong after a one-click reconnect from the
+  // Today board: the operator pressed a button on Today and landed on a page they have
+  // not seen since they joined, with their own action still open behind it.
+  //
+  // The dashboard stores where it left from immediately before redirecting to the
+  // provider. This is OUR value, not the provider's: read only from our own origin,
+  // used once, deleted on read, expired after fifteen minutes, and required to be
+  // same-origin before it is followed — so it cannot become an open redirect.
+  (function returnAfterConnect() {
+    const provider = new URLSearchParams(window.location.search).get('connected');
+    if (!provider) return;
+    let saved = null;
+    try {
+      saved = JSON.parse(window.localStorage.getItem('greta_return_after_connect') || 'null');
+      window.localStorage.removeItem('greta_return_after_connect');
+    } catch (_) { return; }
+    if (!saved || !saved.url || !(Date.now() - (saved.at || 0) < 15 * 60 * 1000)) return;
+    let target;
+    try { target = new URL(saved.url, window.location.origin); } catch (_) { return; }
+    if (target.origin !== window.location.origin) return;
+    target.searchParams.set('connected', provider);
+    window.location.replace(target.toString());
+  })();
+
   // Connection definitions — required vs optional, what unlocks, auth flow type
   const CONNECTIONS = [
     { id:'shopify', name:'Shopify', icon:'S', required:true, authType:'oauth',
