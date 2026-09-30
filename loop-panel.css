@@ -30,7 +30,7 @@
   .lp-ch   { min-width: 560px; }
   .lp-chwrap { box-shadow: inset -12px 0 12px -12px rgba(0,0,0,.22); padding-bottom: 18px; }
   .lp-chwrap::after { content: "swipe sideways to see all of it"; position: absolute; left: 10px;
-    bottom: 3px; font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .07em;
+    bottom: 3px; font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: var(--tracking-wide);
     text-transform: uppercase; color: var(--color-muted); }
 }
 
@@ -45,12 +45,12 @@
 /* halos keep every label readable wherever it lands on the ring */
 .lp-amt, .lp-amtw, .lp-stage, .lp-metric, .lp-val {
   paint-order: stroke fill; stroke: var(--color-panel); stroke-linejoin: round; }
-.lp-amt   { font-family: var(--font-mono); font-size: 14px; font-weight: var(--weight-semi); stroke-width: 4px; }
-.lp-amtw  { font-family: var(--font-mono); font-size: 10px; letter-spacing: .06em;
+.lp-amt   { font-family: var(--font-mono); font-size: var(--text-base); font-weight: var(--weight-semi); stroke-width: 4px; }
+.lp-amtw  { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: var(--tracking-wide);
   text-transform: uppercase; opacity: .85; stroke-width: 3.5px; }
-.lp-stage { font-size: 15px; font-weight: var(--weight-semi); fill: var(--color-ink); stroke-width: 4px; }
-.lp-metric{ font-family: var(--font-mono); font-size: 10.5px; fill: var(--color-muted); stroke-width: 3.5px; }
-.lp-val   { font-family: var(--font-mono); font-size: 11.5px; fill: var(--color-ink); stroke-width: 3.5px; }
+.lp-stage { font-size: var(--text-base); font-weight: var(--weight-semi); fill: var(--color-ink); stroke-width: 4px; }
+.lp-metric{ font-family: var(--font-mono); font-size: var(--text-xs); fill: var(--color-muted); stroke-width: 3.5px; }
+.lp-val   { font-family: var(--font-mono); font-size: var(--text-xs); fill: var(--color-ink); stroke-width: 3.5px; }
 .lp-sev-bad   { fill: var(--color-danger);  font-weight: var(--weight-semi); }
 .lp-sev-watch { fill: var(--color-warning); }
 .lp-sev-good  { fill: var(--color-success); }
@@ -58,10 +58,10 @@
 .lp-in { stroke: var(--color-muted); stroke-width: 2; opacity: .7; color: var(--color-muted); }
 .lp-hub    { fill: var(--color-surface); stroke: var(--color-accent); stroke-width: 2; }
 .lp-hub-r  { stroke: var(--color-accent); stroke-width: 1; opacity: .35; }
-.lp-hub-k  { font-family: var(--font-mono); font-size: 10px; letter-spacing: .14em; fill: var(--color-accent); }
-.lp-hub-n  { font-family: var(--font-mono); font-size: 34px; font-weight: var(--weight-semi); fill: var(--color-ink); }
-.lp-hub-s  { font-size: 12px; fill: var(--color-ink); }
-.lp-hub-s2 { font-size: 11.5px; fill: var(--color-muted); }
+.lp-hub-k  { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: var(--tracking-wide); fill: var(--color-accent); }
+.lp-hub-n  { font-family: var(--font-mono); font-size: var(--text-2xl); font-weight: var(--weight-semi); fill: var(--color-ink); }
+.lp-hub-s  { font-size: var(--text-sm); fill: var(--color-ink); }
+.lp-hub-s2 { font-size: var(--text-xs); fill: var(--color-muted); }
 
 /* ---- cuts ---- */
 .lp-cuts { margin-top: var(--space-4); }
@@ -88,20 +88,20 @@
   border-radius: var(--radius-sm); margin: 0 0 var(--space-6); overflow: hidden; }
 .lp-hero > div { background: var(--color-panel); padding: var(--space-3) var(--space-4); }
 @media (max-width: 720px) { .lp-hero { grid-template-columns: 1fr; } }
-.lp-k { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase;
+.lp-k { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: var(--tracking-wide); text-transform: uppercase;
   color: var(--color-muted); display: block; margin-bottom: var(--space-1); }
-.lp-n { font-family: var(--font-mono); font-size: 26px; font-weight: var(--weight-semi); line-height: 1.1; display: block; }
-.lp-n-abstain { font-size: 15px; color: var(--color-muted); font-weight: var(--weight-medium); }
+.lp-n { font-family: var(--font-mono); font-size: var(--text-xl); font-weight: var(--weight-semi); line-height: 1.1; display: block; }
+.lp-n-abstain { font-size: var(--text-base); color: var(--color-muted); font-weight: var(--weight-medium); }
 .lp-d { font-size: var(--text-xs); color: var(--color-muted); display: block;
   margin-top: var(--space-2); line-height: 1.45; }
 .lp-fig { margin: 0 0 var(--space-6); }
 
 .lp-grid    { stroke: var(--color-line); stroke-width: 1; }
 .lp-rule    { stroke: var(--color-muted); stroke-width: 1; stroke-dasharray: 6 5; opacity: .7; }
-.lp-rulelab { font-family: var(--font-mono); font-size: 9.5px; fill: var(--color-muted);
+.lp-rulelab { font-family: var(--font-mono); font-size: var(--text-xs); fill: var(--color-muted);
   paint-order: stroke fill; stroke: var(--color-panel); stroke-width: 3.5px; stroke-linejoin: round; }
-.lp-tick    { font-family: var(--font-mono); font-size: 10px; fill: var(--color-muted); }
-.lp-axlab   { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .1em;
+.lp-tick    { font-family: var(--font-mono); font-size: var(--text-xs); fill: var(--color-muted); }
+.lp-axlab   { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: var(--tracking-wide);
   text-transform: uppercase; fill: var(--color-muted); }
 .lp-ribbon  { fill: var(--color-accent); opacity: .12; }
 .lp-ribedge { fill: none; stroke: var(--color-accent); stroke-width: 1; stroke-dasharray: 3 4; opacity: .4; }
@@ -115,5 +115,5 @@
 
 .lp-inflow { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap;
   padding: var(--space-2) 0 var(--space-3); }
-.lp-inflow-n { font-family: var(--font-mono); font-size: 19px; font-weight: var(--weight-semi); color: var(--color-ink); }
+.lp-inflow-n { font-family: var(--font-mono); font-size: var(--text-lg); font-weight: var(--weight-semi); color: var(--color-ink); }
 .lp-inflow-d { font-size: var(--text-xs); color: var(--color-muted); max-width: 62ch; }

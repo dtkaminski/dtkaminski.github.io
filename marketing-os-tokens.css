@@ -3,4 +3,4 @@
    canonical design-tokens.css, so the embeds, the dashboard and the shell all read
    one palette and one type pair. Keeping a second copy is what let the embeds drift
    to Inter while the app used the token face. */
-@import url("./design-tokens.css?v=1790772489");
+@import url("./design-tokens.css?v=1790774159");
