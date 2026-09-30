@@ -1403,6 +1403,23 @@
                    padding-bottom: var(--space-3, 12px); }
   .v3-board-total { font-family: var(--font-mono); font-size: var(--text-lg, 20px); color: var(--color-ink); }
   .v3-board-total-lab { font-family: var(--font-sans); font-size: var(--text-xs, 11px); color: var(--color-muted); }
+  /* Unverified money is stated, never merged into the headline: a second line rather than a
+     bigger first one. Muted because it is not work you can pick up today. */
+  .v3-board-unver { display: block; margin-top: var(--space-1, 4px); font-family: var(--font-sans);
+                    font-size: var(--text-xs, 11px); color: var(--color-faint); }
+
+  /* The break that tells the reader the list changed meaning. A rule and a label, not a card:
+     this is a section boundary, not elevated content. */
+  .v3-rank-break { display: block; list-style: none; margin-top: var(--space-6, 24px);
+                   padding-top: var(--space-4, 16px); border-top: 1px solid var(--color-line); }
+  .v3-rank-break .v3-sub { display: block; max-width: 62ch; }
+  /* Demoted rows read quieter without going invisible — the money is still real. */
+  .v3-rank-row.unver .v3-rank-desc { color: var(--color-muted); }
+  .v3-rank-row.unver .v3-rank-bar i { background: var(--color-faint); }
+  .v3-rank-unver { margin: 0 0 var(--space-3, 12px); font-family: var(--font-sans);
+                   font-size: var(--text-sm, 13px); color: var(--color-muted); line-height: 1.6;
+                   border-left: 2px solid var(--color-line-strong);
+                   padding-left: var(--space-3, 12px); }
 
   .v3-chips { display: flex; flex-wrap: wrap; gap: var(--space-2, 8px); padding-bottom: var(--space-3, 12px); }
   .v3-chip { font-family: var(--font-sans); font-size: var(--text-xs, 11px); color: var(--color-muted);
@@ -1787,6 +1804,6 @@ window.MOS_EMBEDDED = true;</script>
    save-brand-config had been reading two relations that were never created. */</script>
 <script defer src="./cost-entry.build.js?v=20260929c"></script>
 <script defer src="./loop-panel.js?v=20260921a"></script>
-<script defer src="./greta-app.js?v=1790768446078"></script>
+<script defer src="./greta-app.js?v=1790770533625"></script>
 <script>/* perf: defer frkl static deep-tab data (CVR ~1.7MB, cohorts, promos, products) — not used by the Overview/landing. Background-load after paint; skip for non-frkl (de-frkl). */
 (function(){try{var slug=window.OI_BRAND_SLUG||(window.parent&&window.parent!==window?window.parent.OI_BRAND_SLUG:null)||"frkl";if(slug!=="frkl")return;var files=["greta-cvr.js","greta-cohorts.js","greta-discount-codes.js","greta-products.js","greta-patterns.js"],i=0;function next(){if(i>=files.length)return;var s=document.createElement("script");s.src="./"+files[i++]+"?v=20260925f";s.async=true;s.onload=next;s.onerror=next;document.head.appendChild(s);}var kick=function(){next();};if(window.requestIdleCallback){window.requestIdleCallback(kick,{timeout:1500});}else{setTimeout(kick,300);}}catch(e){}})();</script>

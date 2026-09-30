@@ -1,34 +1,43 @@
-Count the arrival, not just the navigation
+Say which actions are still live and which nobody has checked
 
-page_view had two call sites and both were inside navigation handlers — window.__oiGo
-and the go={} prop. Nothing fired on arrival. A session that signed in, landed on
-Today and stayed there wrote no events at all: no denominator for
-time_to_first_action, and vw_product_activation.sessions undercounting by every
-visitor who never changed page.
+The Actions board ranked a JS error found on 16 April alongside a feed that broke
+yesterday, both as live P1s, with nothing on screen to tell them apart. 0209 added the
+distinction server-side; this is the half that shows it.
 
-Found the hard way. Dan signed in at 11:25, the dashboard loaded clean — brand_users,
-user_brand_ids, vw_brand_action_board, cache_brand_today all 200, 206 requests in
-twenty minutes — and product_events was still empty three minutes later. I had read
-that emptiness as "nobody has used the app yet" for most of the day. It was my own
-instrumentation gap.
+Three changes, all in V3ActionBoard.
 
-So the V3 shell now fires one page_view on first mount with the landing destination,
-tagged arrival:true so an arrival is separable from a navigation in analysis.
+The query asks for verification and unverified_reason, and regroups client-side. That
+regrouping is not redundant: vw_brand_action_board sorts unverified last, but this call
+passes .order('cm_gbp'), and PostgREST replaces the view's ORDER BY with the client's.
+Without the re-sort the migration would have changed nothing visible here and looked
+like a fix that did nothing. Array.prototype.sort is stable, so money order inside each
+group is still the server's.
 
-Guarded on window.__oiArrivalSeen rather than a module-level flag: greta-app.js is a
-classic top-level script sharing one global scope with the embeds, and a new
-top-level binding there is exactly how cost-entry.build.js took the whole app down on
-29 Sep. Once per tab is the right grain — the tracker's session id is per-tab too, so
-a remount is the same visit and must not read as a second arrival, while navigating
-away and back is a real page_view and still fires through __oiGo.
+The headline total splits. It read "GBP 8,519 a month across 14 actions" by summing
+everything; GBP 1,985 of that sits in four claims raised 85 and 167 days ago that
+nothing has re-checked. Live work and unverified money are different claims and adding
+them together is how a board comes to read as bigger than the work actually in front of
+you. Now: "GBP 6,534 a month across 10 live actions", with the rest on its own quieter
+line saying what it is.
 
-The event lands before brand_id resolves, which is what greta-track.js's pending
-queue was built for: it holds and flushes on frkl-brand-ready. That path is already
-proven — an earlier visit this morning fired five tracker POSTs, which PostgREST
-rejected with 404 only because its schema cache did not yet have the table. It does
-now; the 401s that followed prove the relation resolves.
+And the list breaks once, above the first demoted row, with a label and a sentence --
+because a list that simply gets quieter towards the bottom reads as ranking, not as a
+change of meaning. Demoted rows mute their description and bar and add "not re-checked"
+to the meta line; opening one shows unverified_reason, which is written by the view so
+the age in the sentence cannot drift from the age on the row.
 
-Verified: node --check passes, the hook sits between two existing effects rather than
-below a conditional return, and the compiled form is the guarded single-fire.
+Nothing is hidden and nothing is dropped. The money is still there and still counted;
+it just stops competing for the top of the list with work that has evidence behind it.
+
+CSS uses existing tokens only -- color-faint, color-muted, color-line, color-line-strong,
+space-1/3/4/6, text-xs/sm -- with 1px and 2px borders matching the convention already in
+that stylesheet.
+
+NOT included: the other session's in-progress token sweep, which is sitting uncommitted
+in greta-app.jsx in this working tree. It rewrites 183 hardcoded font weights to
+var(--weight-*), but --weight-bold is referenced 182 times and is not defined in
+design-tokens.css or anywhere else, so committing it now would ship 182 elements
+silently losing their bold weight. This commit was rebuilt from HEAD plus only my seven
+edits, and their work has been restored to the working tree untouched.
 
 Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>

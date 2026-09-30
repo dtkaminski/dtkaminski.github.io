@@ -9493,12 +9493,19 @@ function V3ActionBoard(){
       const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
       if (!sb || !b) return false;
       sb.from('vw_brand_action_board')
-        .select('external_id,description,priority,category,origin,cm_gbp,step1,playbook,days_open')
+        .select('external_id,description,priority,category,origin,cm_gbp,step1,playbook,days_open,verification,unverified_reason')
         .eq('brand_id', b).order('cm_gbp', { ascending: false })
         .then(r => {
           if (dead) return;
           if (r && r.error) { setErr(r.error.message || 'could not load'); return; }
-          setRows((r && r.data) || []);
+          // vw_brand_action_board already sorts unverified claims last, but PostgREST replaces
+          // the view's ORDER BY with the .order() above, so the grouping is reapplied here or
+          // the change shows up nowhere. Array sort is stable, so money order inside each
+          // group is still the server's.
+          const data = ((r && r.data) || []).slice()
+            .sort((x, y) => (x.verification === 'unverified' ? 1 : 0)
+                          - (y.verification === 'unverified' ? 1 : 0));
+          setRows(data);
         }, () => { if (!dead) setErr('could not load'); });
       return true;
     };
@@ -9517,12 +9524,21 @@ function V3ActionBoard(){
   const cats = [...new Set(rows.map(r => r.category).filter(Boolean))].sort();
   const shown = cat === 'all' ? rows : rows.filter(r => r.category === cat);
   const max = Math.max(...rows.map(r => Number(r.cm_gbp) || 0), 1);
-  const total = shown.reduce((a, r) => a + (Number(r.cm_gbp) || 0), 0);
+  // Split the headline. A month of live work is a different claim from money sitting in
+  // something raised in April that nothing has confirmed since; adding them together is how a
+  // board comes to read as bigger than the work actually in front of you.
+  const liveRows = shown.filter(r => r.verification !== 'unverified');
+  const unverRows = shown.filter(r => r.verification === 'unverified');
+  const total = liveRows.reduce((a, r) => a + (Number(r.cm_gbp) || 0), 0);
+  const unverTotal = unverRows.reduce((a, r) => a + (Number(r.cm_gbp) || 0), 0);
 
   return (
     <div className="v3-board v3-enter">
       <div className="v3-board-head">
-        <span className="v3-board-total">{v3Gbp(total)}<span className="v3-board-total-lab"> a month across {shown.length} action{shown.length === 1 ? '' : 's'}</span></span>
+        <span className="v3-board-total">{v3Gbp(total)}<span className="v3-board-total-lab"> a month across {liveRows.length} live action{liveRows.length === 1 ? '' : 's'}</span></span>
+        {unverRows.length > 0 && (
+          <span className="v3-board-unver">{v3Gbp(unverTotal)} more sits in {unverRows.length} action{unverRows.length === 1 ? '' : 's'} nothing has re-checked</span>
+        )}
       </div>
       <div className="v3-chips" role="tablist" aria-label="Filter actions by area">
         <button type="button" role="tab" aria-selected={cat === 'all'}
@@ -9541,8 +9557,21 @@ function V3ActionBoard(){
           const gbp = Number(r.cm_gbp) || 0;
           const isOpen = open === r.external_id;
           const play = Array.isArray(r.playbook) ? r.playbook : [];
+          const unver = r.verification === 'unverified';
+          // One break, above the first demoted row, so the reader knows the list changed
+          // meaning rather than just getting quieter towards the bottom.
+          const startsUnver = unver && (i === 0 || shown[i - 1].verification !== 'unverified');
           return (
-            <li key={r.external_id} className={'v3-rank-row' + (isOpen ? ' open' : '')}>
+            <React.Fragment key={r.external_id}>
+            {startsUnver && (
+              <li className="v3-rank-break">
+                <span className="v3-kick">Not re-checked</span>
+                <span className="v3-sub">Greta raised these more than 30 days ago and nothing since has
+                  confirmed they are still true. They keep their value and stay on the list, but sit
+                  outside the ranked work until something verifies them.</span>
+              </li>
+            )}
+            <li className={'v3-rank-row' + (isOpen ? ' open' : '') + (unver ? ' unver' : '')}>
               <button type="button" className="v3-rank-hit" aria-expanded={isOpen}
                       onClick={() => setOpen(isOpen ? null : r.external_id)}>
                 <span className="v3-rank-n">{i + 1}</span>
@@ -9553,6 +9582,7 @@ function V3ActionBoard(){
                   </span>
                   <span className="v3-rank-meta">
                     {r.category || 'general'}{r.days_open > 0 ? ' · open ' + r.days_open + 'd' : ''}
+                    {unver ? ' · not re-checked' : ''}
                   </span>
                 </span>
                 <span className="v3-rank-gbp">{v3Gbp(gbp)}<span className="v3-rank-per">/mo</span></span>
@@ -9572,12 +9602,16 @@ function V3ActionBoard(){
               </div>
               {isOpen && (
                 <div className="v3-rank-why">
+                  {/* Server-written, so the age in this sentence cannot drift from the age on
+                      the row. vw_brand_action_board.unverified_reason. */}
+                  {r.unverified_reason && <p className="v3-rank-unver">{r.unverified_reason}</p>}
                   {play.length
                     ? <ol className="v3-rank-steps">{play.map((s, j) => <li key={j}>{v3Tidy(s)}</li>)}</ol>
                     : <p className="v3-rank-nosteps">{v3Tidy(r.step1) || 'Greta has no further detail on this one yet.'}</p>}
                 </div>
               )}
             </li>
+            </React.Fragment>
           );
         })}
       </ol>
