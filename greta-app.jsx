@@ -3032,75 +3032,61 @@ function LtvCacCard({daily, gm, ordersPerCust}){
   );
 }
 
-function ContributionCard({rev, orders, paid, gm, days}){
-  // Fully-loaded contribution. COGS comes from live product margin; the variable
-  // operating costs (packaging / fulfilment / shipping / payment fees / refunds)
-  // aren't in any connected source — they're operator inputs, editable here and
-  // saved to the browser. rev/orders/paid are period-windowed.
-  // Inputs are stored as the RAW TEXT the user typed (so "0.", "1.5", "" all work);
-  // parsed to numbers only at compute time. This avoids the wipe-on-keystroke bug.
-  const DEFAULTS = {packaging:'0.50', fulfilment:'2.00', shipping:'3.50', payPct:'1.5', payFixed:'0.25', refundPct:'7.4'};
-  const [inp, setInp] = useState(()=>{ try { return {...DEFAULTS, ...(JSON.parse(localStorage.getItem('frkl-contrib-inputs')||'{}'))}; } catch(e){ return DEFAULTS; } });
-  // Store the raw typed text untouched (uncontrolled input → React never reverts
-  // what you type). Parse leniently at compute time, accepting comma decimals.
-  const set = (k,v)=>{ const next={...inp,[k]:v}; setInp(next); try{localStorage.setItem('frkl-contrib-inputs',JSON.stringify(next));}catch(e){} };
-  const n = k => { const f = parseFloat(String(inp[k]==null?'':inp[k]).replace(',','.').replace(/[^0-9.]/g,'')); return isFinite(f) ? f : 0; };
-  const cogs = rev*(1-gm), grossProfit = rev*gm;
-  const packaging = n('packaging')*orders, fulfilment = n('fulfilment')*orders, shipping = n('shipping')*orders;
-  const payFees = (n('payPct')/100)*rev + n('payFixed')*orders;
-  const refunds = (n('refundPct')/100)*rev;
-  const contribution = grossProfit - packaging - fulfilment - shipping - payFees - refunds - paid;
-  const cmPct = rev>0 ? contribution/rev : null;
-  // POAS — profit on ad spend: gross profit generated per £1 of paid media (break-even = 1.00×).
-  // The profit-first sibling of ROAS; unlike revenue-ROAS it already nets out COGS.
-  const poas = paid>0 ? grossProfit/paid : null;
-  // Net profit — complete the P&L: subtract fixed overheads, prorated from the monthly figure
-  // in the shared plan config (Settings → Business economics) across the selected window.
+function ContributionCard({rev, orders, paid, cmr, gross, days}){
+  // Where the money goes, as one chain: sales → product cost → order costs → profit before ads
+  // → ad spend → what you keep → overheads → net profit. Every step is the server's own margin
+  // (vw_brand_cm via GRETA_HEADLINE), so "profit before ads" here IS Today's figure for the same
+  // window, not a second estimate of it.
+  //
+  // It used to take the CONTRIBUTION ratio (already net of shipping, packaging and fees), label
+  // 1 − it "product cost", then subtract frkl's default per-order costs (£0.50 / £2.00 / £3.50,
+  // 7.4% refunds) a second time from inputs saved only in this browser. Order costs were counted
+  // twice for every brand, with frkl's numbers for every brand, and the page disagreed with
+  // Today. With no margin at all it showed product cost at 100% and a loss — a false statement
+  // about a brand that simply had not entered its costs. Unknown now says so.
+  if (cmr == null || !(rev > 0)) return (<div className="card">
+    <div className="card-section-title"><h2 style={{margin:0}}>Where the money goes</h2></div>
+    <p className="v3-note">Greta needs to know what your products and orders cost you before she can show what is left after them — a guess here would be wrong by exactly your real margin.</p>
+    <button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs')}>Enter your costs</button>
+  </div>);
+  const g = (gross != null && gross >= cmr) ? gross : null;          // gross margin, if known and coherent
+  const productCost = g != null ? rev * (1 - g) : null;
+  const orderCosts  = g != null ? rev * (g - cmr) : null;
+  const beforeAds = rev * cmr;
+  const kept = beforeAds - (paid || 0);
   const fixedMonthly = (()=>{ try { const c = window.FRKL_PLAN && window.FRKL_PLAN.config; return (c && c.fixed_costs_monthly!=null) ? Number(c.fixed_costs_monthly) : null; } catch(e){ return null; } })();
   const fixedWin = (fixedMonthly!=null && days>0) ? fixedMonthly*(days/30) : null;
-  const netProfit = fixedWin!=null ? contribution - fixedWin : null;
-  const netPct = (netProfit!=null && rev>0) ? netProfit/rev : null;
-  const inStyle = {width:74, background:'var(--bg-base)', border:'1px solid var(--border-default)', borderRadius:'var(--radius-md)', color:'var(--text-primary)', fontSize:'var(--text-sm)', padding:'3px 7px', textAlign:'right', colorScheme:'light dark'};
-  const ed = (k, suffix) => <span style={{color:'var(--text-faint)',fontSize:'var(--text-xs)',fontWeight:'var(--weight-normal)'}}> (<input type="text" inputMode="decimal" defaultValue={inp[k]} onChange={e=>set(k,e.target.value)} onFocus={e=>e.target.select()} style={inStyle}/>{suffix})</span>;
+  const net = fixedWin!=null ? kept - fixedWin : null;
+  const pct = v => rev > 0 ? Math.round((v / rev) * 100) + 'p in every £1' : '';
+  const line = (label, v, opts) => <CmRow label={label} amount={(opts && opts.neg ? '−' : '') + GBP(Math.abs(v))}
+    bold={opts && opts.bold} color={opts && opts.color || 'var(--text-muted)'} top={opts && opts.top}/>;
   return (<div className="card">
     <div className="card-section-title">
-      <h2 style={{margin:0}}>Contribution margin <span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)',fontSize:'var(--text-sm)'}}>— fully loaded · {NUM(orders)} orders</span></h2>
-      <span className="meta">product cost from your live margin of {PCT(gm)} · the per-order costs below are saved on this device only — set them for everyone in Goal & costs</span>
+      <h2 style={{margin:0}}>Where the money goes <span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)',fontSize:'var(--text-sm)'}}>— {NUM(orders)} orders in this period</span></h2>
+      <span className="meta">costs from Goal &amp; costs · same margin as Today</span>
     </div>
     <div style={{maxWidth:620,fontSize:'var(--text-base)'}}>
-      <CmRow label="Net revenue" amount={GBP(rev)} bold color="var(--text-primary)" top="none"/>
-      <CmRow label={`− product cost (${PCT(1-gm)})`} amount={'−'+GBP(cogs)} color="var(--text-muted)"/>
-      <CmRow label="= Gross profit" amount={GBP(grossProfit)} bold color="var(--good)"/>
-      <CmRow label={<span>− Packaging{ed('packaging','/order')}</span>} amount={'−'+GBP(packaging)} color="var(--text-muted)"/>
-      <CmRow label={<span>− Fulfilment{ed('fulfilment','/order')}</span>} amount={'−'+GBP(fulfilment)} color="var(--text-muted)"/>
-      <CmRow label={<span>− Shipping{ed('shipping','/order')}</span>} amount={'−'+GBP(shipping)} color="var(--text-muted)"/>
-      <CmRow label={<span>− Payment fees{ed('payPct','%')}{ed('payFixed','/order')}</span>} amount={'−'+GBP(payFees)} color="var(--text-muted)"/>
-      <CmRow label={<span>− Refunds{ed('refundPct','%')}</span>} amount={'−'+GBP(refunds)} color="var(--text-muted)"/>
-      <CmRow label="− Paid ad spend" amount={'−'+GBP(paid)} color="var(--text-muted)"/>
-      <CmRow label="= Contribution after marketing" amount={GBP(contribution)} bold color={contribution>=0?'var(--good)':'var(--bad)'} top="2px solid var(--border-default)"/>
+      {line('Sales', rev, {bold:true, color:'var(--text-primary)', top:'none'})}
+      {g != null ? (<>
+        {line('− What the products cost · ' + pct(productCost), productCost, {neg:true})}
+        {line('− Shipping, packaging and fees · ' + pct(orderCosts), orderCosts, {neg:true})}
+      </>) : line('− Products, shipping, packaging and fees · ' + pct(rev - beforeAds), rev - beforeAds, {neg:true})}
+      {line('= Profit before ads', beforeAds, {bold:true, color:'var(--text-primary)'})}
+      {line('− What you spent on ads · ' + pct(paid || 0), paid || 0, {neg:true})}
+      {line('= What you keep · ' + pct(kept), kept, {bold:true, color: kept >= 0 ? 'var(--good)' : 'var(--bad)', top:'2px solid var(--border-default)'})}
       {fixedWin!=null
         ? (<>
-            <CmRow label="− Fixed overheads (prorated)" amount={'−'+GBP(fixedWin)} color="var(--text-muted)"/>
-            <CmRow label="= Net profit" amount={GBP(netProfit)} bold color={netProfit>=0?'var(--good)':'var(--bad)'} top="2px solid var(--border-default)"/>
+            {line('− Overheads (rent, wages, software) for this period', fixedWin, {neg:true})}
+            {line('= Net profit', net, {bold:true, color: net >= 0 ? 'var(--good)' : 'var(--bad)', top:'2px solid var(--border-default)'})}
           </>)
         : (<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,padding:'7px 0',borderTop:'2px solid var(--border-default)',color:'var(--text-faint)',fontSize:'var(--text-sm)'}}>
-            <span>= Net profit</span><span>Set monthly fixed costs in <GoLink sec="settings" sub="economics">Settings → Business economics</GoLink></span>
-          </div>)
-      }
-      <div style={{display:'flex',justifyContent:'space-between',padding:'4px 0',fontWeight:'var(--weight-bold)'}}>
-        <span>Contribution margin %</span><span style={{color:(cmPct||0)>=0?'var(--good)':'var(--bad)'}}>{PCT(cmPct)}</span>
-      </div>
-      {netPct!=null && <div style={{display:'flex',justifyContent:'space-between',padding:'4px 0',fontWeight:'var(--weight-bold)'}}>
-        <span>Net profit margin</span><span style={{color:netPct>=0?'var(--good)':'var(--bad)'}}>{PCT(netPct)}</span>
-      </div>}
-      {poas!=null && <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'6px 0 0',fontSize:'var(--text-sm)',color:'var(--text-secondary)'}}>
-        <span>profit per £ of ad spend <span style={{color:'var(--text-faint)'}}>· profit on ad spend (gross profit ÷ spend)</span></span>
-        <span style={{fontVariantNumeric:'tabular-nums',fontWeight:'var(--weight-bold)',color:poas>=1?'var(--good)':'var(--bad)'}}>{poas.toFixed(2)}× <span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)'}}>· break-even 1.00×</span></span>
-      </div>}
+            <span>= Net profit</span><span>Add your monthly overheads in <GoLink sec="settings" sub="economics">Goal &amp; costs</GoLink> to see this</span>
+          </div>)}
     </div>
-    <div className="note" style={{marginTop:10}}>
-      Edit the per-order costs + fee rate to your actuals — the waterfall recomputes live for the selected period. COGS is the blended product margin from live catalogue data. <b>Net profit</b> prorates your monthly fixed costs (Settings → Business economics) across the window; <b>profit per £ of ad spend</b> is gross profit ÷ paid spend — the profit-first sibling of return on ad spend, break-even at 1.00×. <b>Refunds:</b> Shopify net revenue here doesn't yet net out refunds, so they're subtracted in this line; capturing refunds in the Shopify sync will fold them into net revenue and make this exact.
-    </div>
+    <p className="v3-note" style={{marginTop:10}}>
+      Each £1 of ads has to earn back more than £1 of profit before ads to pay for itself:
+      {paid > 0 ? <> here it brings in <b>{(beforeAds / paid).toFixed(2)}×</b>, {beforeAds / paid >= 1 ? 'so ads are paying their way overall.' : 'so ads are costing more than they earn overall.'}</> : ' you have no ad spend in this period.'}
+    </p>
   </div>);
 }
 
@@ -3852,7 +3838,7 @@ function Overview({start, period, customActive}){
       {/* Below-the-fold operational charts — lazy-mounted so cold first-paint isn't
           blocked by mounting every Recharts at once (and never at 0-width). */}
       {/* Contribution margin — editable, fully-loaded operator P&L for the period */}
-      <LazyMount minHeight={360}><ContributionCard rev={rev} orders={orders} paid={paid} gm={gm} days={Math.max(1, Math.round((Date.parse(end)-Date.parse(start))/86400000)+1)}/></LazyMount>
+      <LazyMount minHeight={360}><ContributionCard rev={rev} orders={orders} paid={paid} cmr={gm} gross={gmGross} days={Math.max(1, Math.round((Date.parse(end)-Date.parse(start))/86400000)+1)}/></LazyMount>
       {/* Margin bridge — why contribution moved vs prior period (volume/price/discount/returns/paid) */}
       <LazyMount minHeight={360}><MarginBridge cur={bridgeCur} pri={bridgePri} gm={gm}
         perOrderFixed={_cn('packaging')+_cn('fulfilment')+_cn('shipping')+_cn('payFixed')} payPct={_cn('payPct')/100}/></LazyMount>
