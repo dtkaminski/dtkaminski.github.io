@@ -485,6 +485,15 @@ function refreshRealBounds(){
   REAL_START = lo || undefined; REAL_END = hi || undefined;
 }
 refreshRealBounds();
+
+// One way to write a day for an owner: "27 Sep", or "27 Sep 2026" when the year matters.
+// "09-27" and "2026-06-29 → 2026-07-05" are database keys, not dates a person reads.
+const V3_MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function v3Day(iso, withYear){
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+  if (!m) return iso || '';
+  return (+m[3]) + ' ' + V3_MON[+m[2] - 1] + (withYear ? ' ' + m[1] : '');
+}
 // ── Canonical benchmarks (single source of truth — must match scripts/oi_db.py BENCHMARKS).
 // Site CVR = Shopify orders ÷ GA4 sessions; one benchmark everywhere so the dashboard
 // never shows the same KPI against two different targets.
@@ -732,7 +741,8 @@ function KPI({label, val, sub, badge, status, statusLabel, conf, series, seriesL
     : lineColor === 'var(--bad)' ? PAL.bad
     : lineColor === 'var(--accent)' ? PAL.accent
     : PAL.accent;
-  return (<div className={'card kpi' + (hasPop ? ' has-pop' : '')}>
+  // Focusable when it has a popout: a tap focuses it on touch screens, where hover never fires.
+  return (<div className={'card kpi' + (hasPop ? ' has-pop' : '')} tabIndex={hasPop ? 0 : undefined}>
     <div className="label">
       <span>{label}</span>
       {status && <StatusBadge kind={status} label={statusLabel}/>}
@@ -2558,7 +2568,9 @@ function computeScores(m){
   const passed2 = gates.filter(g=>g.pass).length;
   const scale2 = Math.round(100*passed2/(gates.length||1));
   return {
-    health:{score:health, band: health>=75?'Strong':health>=55?'Healthy':'Needs work', weakest, coverage},
+    // The middle band is drawn amber and the sentence beside it says "okay, with some soft spots";
+    // calling it "Healthy" made the label, the colour and the sentence disagree about one number.
+    health:{score:health, band: health>=75?'Strong':health>=55?'Some soft spots':'Needs work', weakest, coverage},
     scale:{score:scale2, band: scale2>=80?'Ready to scale':scale2>=55?'Conditional':'Not yet', fails, gates:gates.length},
     growth:{band, signals},
     missing,
@@ -3717,7 +3729,11 @@ function Overview({start, period, customActive}){
       </div>
       {/* Crux verdict: compact scorecard strip + the diagnostic (with the £-bridge nested in its "thinking") */}
       <ScoresStrip metrics={cruxMetrics} windowLabel={`last ${CRUX_DAYS} days`}/>
-      <DiagnosticCard metrics={dxMetrics} context={dxContext} period={customActive?null:period} onLogEvent={()=>setEvTick(t=>t+1)}/>
+      {/* V3: no second "what to do next" here. The diagnostic picked its own "biggest lever" from
+          browser-side rules (and, for frkl, a July analyst read), so Profit & sales led with a
+          different first action from Today and Actions. Ranking is the board's job; the pointer
+          below sends people there. */}
+      {!UI_V3 && <DiagnosticCard metrics={dxMetrics} context={dxContext} period={customActive?null:period} onLogEvent={()=>setEvTick(t=>t+1)}/>}
       {/* The weekly briefing, kept but demoted — it answers "what changed this week", which is
           Review's question, not this page's. Collapsed by default so the money read is what the
           page opens with. */}
@@ -3786,7 +3802,7 @@ function Overview({start, period, customActive}){
             agent="Atlas" observation={`Code + automatic discount as a share of DTC gross sales (draft/exchange orders excluded). This excludes sale-price markdowns${_mdPct?`, which add ~${_mdPct}% of value on top`:''} — the full load is on the Promotions tab.`}
             implication="Audit always-on codes + affiliate rates; protect full-price demand. The true load incl. markdowns is materially higher — see Promotions."
             benchmark="discount_load" bmValue={discLoad} />
-          <KPI label="Contribution margin" val={cmPct!=null?PCT(cmPct):'—'} sub="net rev × margin − ad spend, net of returns · ≥10% healthy" badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesContrib} seriesLabel={`Contribution ${curSym()} · by day`} current={contrib} prior={pContrib} goodDirection="up"
+          <KPI label="Profit after ads (% of sales)" val={cmPct!=null?PCT(cmPct):'—'} sub="what you keep from each £ of sales, after product costs and ads · 10% or more is healthy" badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesContrib} seriesLabel={`Contribution ${curSym()} · by day`} current={contrib} prior={pContrib} goodDirection="up"
             status={cmPct==null?undefined:cmPct>=0.10?'healthy':cmPct>=0.05?'watch':'margin'} statusLabel={cmPct==null?undefined:cmPct>=0.10?'Healthy':cmPct>=0.05?'Watch':'Margin risk'}
             agent="Atlas" observation="Whether the growth is actually profitable — net revenue × product margin minus paid media, as a share of revenue. Returns are already netted out of revenue. The single best read on profitable vs vanity growth."
             implication="Below 10% means scaling just amplifies a thin engine — fix discount load, returns and cost per new customer before adding spend."
@@ -8464,7 +8480,11 @@ function boardWeeks(){
     return {
       weekStart: ws, weekEnding: we, days: rows.length,
       partial: rows.length < 7 || we > REAL_END,
-      label: ws.slice(5)+' – '+we.slice(5),
+      // "In progress" only for the week still running. The first week of history is short
+      // because the data starts mid-week, not because it is happening now — it used to be
+      // labelled "(in progress)" in January.
+      inProgress: we > REAL_END,
+      label: v3Day(ws)+' – '+v3Day(we),
       metaSpend, googleSpend,
       m: {
         revenue, paid, orders, sessions, emailRev, returns,
@@ -8544,7 +8564,13 @@ const ACTION_META = {
 function WeeklyBoard(){
   const weeks = useMemo(boardWeeks, [(typeof window!=='undefined' && window.FRKL_LIVE && window.FRKL_LIVE.lastFetchAt) || 0]);  // recompute when live data arrives (was [] → froze frkl static)
   const lastCompleteIdx = (()=>{ for(let i=weeks.length-1;i>=0;i--){ if(!weeks[i].partial) return i; } return weeks.length-1; })();
-  const [idx, setIdx] = useState(lastCompleteIdx<0?0:lastCompleteIdx);
+  const [idx, setIdxRaw] = useState(lastCompleteIdx<0?0:lastCompleteIdx);
+  // The first render sees the static snapshot's weeks; live weeks arrive a moment later. Until
+  // the reader picks a week themselves, follow the latest complete one — the board opened on
+  // the week of 29 Jun for three months because this index was fixed at first render.
+  const picked = React.useRef(false);
+  const setIdx = v => { picked.current = true; setIdxRaw(v); };
+  React.useEffect(() => { if (!picked.current && lastCompleteIdx >= 0) setIdxRaw(lastCompleteIdx); }, [weeks.length, lastCompleteIdx]);
   const [actions, setActions] = useState(boardLoadActions);
   const [notes, setNotes] = useState(boardLoadNotes);
   const [newAction, setNewAction] = useState('');
@@ -8584,16 +8610,17 @@ function WeeklyBoard(){
       <div className="card" style={{marginBottom:14, display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap'}}>
         <div>
           <div className="micro" style={{color:'var(--accent)', fontWeight:'var(--weight-bold)', letterSpacing:'var(--tracking-wide)', textTransform:'uppercase'}}>Weekly board · report card</div>
-          <h1 style={{margin:'4px 0 2px', fontSize:'var(--text-xl)'}}>Week of {W.weekStart} <span style={{color:'var(--text-muted)', fontWeight:'var(--weight-medium)', fontSize:'var(--text-base)'}}>→ {W.weekEnding}</span></h1>
+          <h1 style={{margin:'4px 0 2px', fontSize:'var(--text-xl)'}}>Week of {v3Day(W.weekStart)} <span style={{color:'var(--text-muted)', fontWeight:'var(--weight-medium)', fontSize:'var(--text-base)'}}>→ {v3Day(W.weekEnding, true)}</span></h1>
           <div className="fine" style={{color:'var(--text-faint)'}}>
-            {W.partial ? <span style={{color:'var(--warn)'}}>● In progress — {W.days}/7 days so far</span> : <span>Completed week · frozen from daily data</span>}
-            {' · for the Monday 3pm review'}
+            {W.inProgress ? <span style={{color:'var(--warn)'}}>● In progress — {W.days} of 7 days so far</span>
+              : W.partial ? <span>Part week — your data starts {v3Day(W.weekStart)}</span>
+              : <span>Completed week</span>}
           </div>
         </div>
         <div style={{display:'flex', alignItems:'center', gap:8}}>
           <button onClick={()=>setIdx(i=>Math.max(0,i-1))} disabled={idx<=0} className="board-nav-btn">◀ Prev</button>
           <select value={idx} onChange={e=>setIdx(+e.target.value)} style={{backgroundColor: 'var(--bg-card)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--r-sm)', padding:'7px 10px', fontSize:'var(--text-sm)'}}>
-            {weeks.map((w,i)=>(<option key={w.weekStart} value={i}>{w.label}{w.partial?' (in progress)':''}</option>))}
+            {weeks.map((w,i)=>(<option key={w.weekStart} value={i}>{w.label}{w.inProgress?' (in progress)':''}</option>))}
           </select>
           <button onClick={()=>setIdx(i=>Math.min(weeks.length-1,i+1))} disabled={idx>=weeks.length-1} className="board-nav-btn">Next ▶</button>
           <button onClick={()=>window.print()} className="board-nav-btn" title="Print / save this week as a PDF board pack">⎙ Print</button>
@@ -9503,41 +9530,66 @@ function V3SkeletonRows({ n }) {
   </div>);
 }
 
+// ── One board, read once, shared ─────────────────────────────────────────
+// Today's hero, its "Then, in order", the "See all N" link, the nav badge and the Actions page
+// used to read two different things: Today the 08:55 cache_brand_today snapshot, Actions the
+// live view. Any emitter that ran after 08:55 split them — on 2026-10-01 the same necklace action
+// read "70.2% CM, £794/mo" on Today and "70.4% gross margin, £696/mo" on Actions, and Today said
+// 13 actions where Actions listed 12. Now there is one fetch of vw_brand_action_board per page
+// load, and every one of those surfaces renders from it. The cache still paints Today instantly;
+// the live board replaces it the moment it lands.
+const V3_BOARD = { rows: null, err: null, loading: false, subs: new Set() };
+function v3BoardNotify(){ V3_BOARD.subs.forEach(f => { try { f(); } catch(e){} }); }
+function v3BoardLoad(){
+  if (V3_BOARD.loading || V3_BOARD.rows) return true;
+  const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
+  if (!sb || !b) return false;
+  V3_BOARD.loading = true;
+  sb.from('vw_brand_action_board')
+    .select('external_id,description,priority,category,origin,cm_gbp,step1,playbook,days_open,verification,unverified_reason')
+    .eq('brand_id', b).order('cm_gbp', { ascending: false, nullsFirst: false })
+    .then(r => {
+      V3_BOARD.loading = false;
+      if (r && r.error) { V3_BOARD.err = r.error.message || 'could not load'; v3BoardNotify(); return; }
+      // vw_brand_action_board already sorts unverified claims last, but PostgREST
+      // replaces the view's ORDER BY with the .order() above, so the grouping has to be
+      // reapplied here or the change would look like it did nothing. Array sort is
+      // stable, so the money order inside each group is the server's.
+      V3_BOARD.rows = ((r && r.data) || []).slice()
+        .sort((x, y) => (x.verification === 'unverified' ? 1 : 0) - (y.verification === 'unverified' ? 1 : 0));
+      V3_BOARD.err = null;
+      v3BoardNotify();
+    }, () => { V3_BOARD.loading = false; V3_BOARD.err = 'could not load'; v3BoardNotify(); });
+  return true;
+}
+// Closing a row anywhere closes it everywhere: the badge, Today's list and the board agree.
+function v3BoardDrop(ext){
+  if (!V3_BOARD.rows) return;
+  V3_BOARD.rows = V3_BOARD.rows.filter(x => x.external_id !== ext);
+  v3BoardNotify();
+}
+function useV3Board(){
+  const [, bump] = React.useState(0);
+  React.useEffect(() => {
+    const f = () => bump(n => n + 1);
+    V3_BOARD.subs.add(f);
+    let iv = null;
+    if (!v3BoardLoad()) {
+      iv = setInterval(() => { if (v3BoardLoad()) { clearInterval(iv); iv = null; } }, 500);
+      setTimeout(() => { if (iv) clearInterval(iv); }, 30000);
+    }
+    return () => { V3_BOARD.subs.delete(f); if (iv) clearInterval(iv); };
+  }, []);
+  return { rows: V3_BOARD.rows, err: V3_BOARD.err };
+}
+// Rows Greta has checked recently, in money order. The unchecked ones keep their place on the
+// board but never lead Today.
+function v3LiveRows(rows){ return (rows || []).filter(r => r.verification !== 'unverified'); }
+
 function V3ActionBoard(){
-  const [rows, setRows] = React.useState(null);
-  const [err, setErr] = React.useState(null);
+  const { rows, err } = useV3Board();
   const [cat, setCat] = React.useState('all');
   const [open, setOpen] = React.useState(null);
-
-  React.useEffect(() => {
-    let dead = false;
-    const go = () => {
-      const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
-      if (!sb || !b) return false;
-      sb.from('vw_brand_action_board')
-        .select('external_id,description,priority,category,origin,cm_gbp,step1,playbook,days_open,verification,unverified_reason')
-        .eq('brand_id', b).order('cm_gbp', { ascending: false })
-        .then(r => {
-          if (dead) return;
-          if (r && r.error) { setErr(r.error.message || 'could not load'); return; }
-          // vw_brand_action_board already sorts unverified claims last, but PostgREST
-          // replaces the view's ORDER BY with the .order() above, so the grouping has to be
-          // reapplied here or the change would look like it did nothing. Array sort is
-          // stable, so the money order inside each group is the server's.
-          const data = ((r && r.data) || []).slice()
-            .sort((x, y) => (x.verification === 'unverified' ? 1 : 0)
-                          - (y.verification === 'unverified' ? 1 : 0));
-          setRows(data);
-        }, () => { if (!dead) setErr('could not load'); });
-      return true;
-    };
-    if (!go()) {
-      const iv = setInterval(() => { if (go()) clearInterval(iv); }, 500);
-      setTimeout(() => clearInterval(iv), 30000);
-      return () => { dead = true; clearInterval(iv); };
-    }
-    return () => { dead = true; };
-  }, []);
 
   if (err) return <div className="v3-empty">Greta could not load your actions just now — refreshing usually sorts it. If it keeps happening, Greta has logged the reason and will raise it here.</div>;
   if (rows === null) return <V3SkeletonRows n={5}/>;
@@ -9616,10 +9668,8 @@ function V3ActionBoard(){
                   of things you could look at and not one you could act on or close. */}
               <div className="v3-rank-fix">
                 {connProvider(r.external_id) ? <V3Fix provider={connProvider(r.external_id)} small/> : (<>
-                  <V3Done ext={r.external_id} small
-                          onDone={() => setRows(rs => rs.filter(x => x.external_id !== r.external_id))}/>
-                  <V3Skip ext={r.external_id} small
-                          onDone={() => setRows(rs => rs.filter(x => x.external_id !== r.external_id))}/>
+                  <V3Done ext={r.external_id} small onDone={() => v3BoardDrop(r.external_id)}/>
+                  <V3Skip ext={r.external_id} small onDone={() => v3BoardDrop(r.external_id)}/>
                 </>)}
               </div>
               {isOpen && (
@@ -14200,8 +14250,8 @@ function V3MoneyFlow({ d, note }) {
     return (
       <div className="v3-flow">
         <div className="v3-flow-top">
-          <span className="v3-flow-top-lab">Every £100 of sales{note ? ' · ' + note : ''}</span>
-          <span className="v3-flow-top-val">{v3Gbp(sales)} in</span>
+          <span className="v3-flow-top-lab">Where each £1 of sales goes{note ? ' · ' + note : ''}</span>
+          <span className="v3-flow-top-val">{v3Gbp(sales)} of sales</span>
         </div>
         <p className="v3-note">{v3Gbp(spend)} of that went on ads. Greta cannot yet show what you keep,
           because it does not know what your products and orders cost you — and a guess here would be
@@ -14226,8 +14276,8 @@ function V3MoneyFlow({ d, note }) {
   return (
     <div className="v3-flow">
       <button type="button" className="v3-flow-top" onClick={go('home', 'overview')}>
-        <span className="v3-flow-top-lab">Every £100 of sales{note ? ' · ' + note : ''}</span>
-        <span className="v3-flow-top-val">{v3Gbp(sales)} in</span>
+        <span className="v3-flow-top-lab">Where each £1 of sales goes{note ? ' · ' + note : ''}</span>
+        <span className="v3-flow-top-val">{v3Gbp(sales)} of sales</span>
       </button>
       <div className="v3-flow-track" role="img"
            aria-label={'Of ' + v3Gbp(sales) + ' in sales, ' + v3Gbp(cogs) + ' went on product costs, '
@@ -14243,7 +14293,7 @@ function V3MoneyFlow({ d, note }) {
             <span className={'v3-flow-dot v3-flow-' + s.tone + (s.soft ? ' v3-flow-soft' : '')} aria-hidden="true"/>
             <span className="v3-flow-val">{v3Gbp(s.value)}</span>
             <span className="v3-flow-lab">{s.label}{s.soft ? ' · missing days' : ''}</span>
-            <span className="v3-flow-pct">{Math.round(pct(s.value))}%</span>
+            <span className="v3-flow-pct">{Math.round(pct(s.value))}p in every £1</span>
           </button>
         ))}
       </div>
@@ -15062,7 +15112,7 @@ function V3Why({ why, period }){
     {why.data_integrity_flag && <V3TrackingNote/>}
     {(why.change_events || []).length > 0 && (<ul className="v3-why-list">
       {(why.change_events || []).slice(0, 3).map((e, i) => (
-        <li key={i}><span className="v3-num">{String(e.date || '').slice(5)}</span> {e.label}</li>
+        <li key={i}><span className="v3-num">{v3Day(e.date)}</span> {e.label}</li>
       ))}
     </ul>)}
   </div>);
@@ -15070,6 +15120,7 @@ function V3Why({ why, period }){
 
 function V3Today(p) {
   const h = useV3Headline();
+  const board = useV3Board();   // above every early return — see the hooks note in measuring-the-ui
   const D0 = (typeof window !== 'undefined' && window.FRKL_OVERVIEW) || null;
   // Session-stable: the headline and top action are fixed at first render and
   // only change when the reader asks, so numbers never swap under them.
@@ -15081,6 +15132,11 @@ function V3Today(p) {
   // the close itself — and leaving the action sitting there after a confirmed write is
   // exactly the "did that do anything?" this change exists to end.
   const [topDone, setTopDone] = React.useState(null);   // null | 'done' | 'skipped'
+  // The closed action stays in the hero with its confirmation while it leaves the shared
+  // board, so the badge and "See all" count drop at once and the next row does not jump up
+  // under the message meant for this one.
+  const closedTop = React.useRef(null);
+  const closeTop = (row, how) => { closedTop.current = row; setTopDone(how); if (row) v3BoardDrop(row.external_id); };
   // Only a change in the NUMBERS counts as new: the "why" paragraph arrives seconds
   // later on its own (fn_today_v2 is slow), and that must not look like the figures
   // moved under the reader. Merge it in quietly; offer a refresh for anything else.
@@ -15107,7 +15163,11 @@ function V3Today(p) {
   // pounds-ahead line underneath kept rendering off the same number.
   const pacePos = (camTarget != null && camTarget > 0) ? (cam / camTarget) : null;
   const diff = camTarget != null ? cam - camTarget : null;
-  const top = d.top_action, next = (d.next_actions || []);
+  // The cache paints first; the live board, once it has landed, is what every list reads.
+  const liveRows = board.rows ? v3LiveRows(board.rows) : null;
+  const top = (topDone && closedTop.current) ? closedTop.current : (liveRows ? (liveRows[0] || null) : d.top_action);
+  const next = liveRows ? liveRows.slice(1, 4) : (d.next_actions || []);
+  const boardCount = board.rows ? board.rows.length : (d.board_actions != null ? d.board_actions : d.open_actions);
   // The profit figure and its confidence badge describe the same broken state and used to
   // offer two different sentences for it — "Reconnect Meta" on one, "Reconnect your ads" on
   // the other — and both of them only navigated to Settings. One remedy, computed once, and
@@ -15243,8 +15303,8 @@ function V3Today(p) {
           {/* Skip is offered on the same terms as done, and withheld on the same ones. A
               dead feed is not a matter of opinion, so declining it would suppress a
               measured fact for 30 days exactly as marking it done would. */}
-          {!connProvider(top.external_id) && <V3Done ext={top.external_id} onDone={() => setTopDone('done')}/>}
-          {!connProvider(top.external_id) && <V3Skip ext={top.external_id} onDone={() => setTopDone('skipped')}/>}
+          {!connProvider(top.external_id) && <V3Done ext={top.external_id} onDone={() => closeTop(top, 'done')}/>}
+          {!connProvider(top.external_id) && <V3Skip ext={top.external_id} onDone={() => closeTop(top, 'skipped')}/>}
           <button type="button" className="v3-btn" onClick={() => window.__oiAsk && window.__oiAsk('Why is this the most important thing to do: ' + scrubTag(top.description))}>Why?</button>
         </div>)}
         {/* Say why there is nothing to press here, or the gap reads as an oversight. */}
@@ -15265,7 +15325,7 @@ function V3Today(p) {
         <span>{v3ActionText(a.description).main}</span>
         <span className="v3-num">{a.cm_gbp ? v3Gbp(a.cm_gbp) + '/mo' : ''}</span>
       </div>))}
-      <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>See all {d.board_actions != null ? d.board_actions : (d.open_actions || '')} actions</button>
+      <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>See all {boardCount || ''} actions</button>
     </div>)}
 
     <V3Why why={d.why} period={d.why_period}/>
@@ -15379,6 +15439,7 @@ function V3Anchor({ id }) {
 // to say.
 function useV3NavSignals() {
   const [sig, setSig] = React.useState(() => ({}));
+  const board = useV3Board();
   React.useEffect(() => {
     const read = () => {
       const h = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || null;
@@ -15392,7 +15453,8 @@ function useV3NavSignals() {
     window.addEventListener('greta-headline-updated', read);
     return () => window.removeEventListener('greta-headline-updated', read);
   }, []);
-  return sig;
+  // Same count as the Actions page lists, once the board has landed.
+  return board.rows ? { ...sig, actions: board.rows.length } : sig;
 }
 
 // The one number the whole product is about, carried onto every other page.
