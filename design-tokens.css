@@ -105,6 +105,19 @@
   --color-data-5: #8B5E83;   /* mauve                                    */
   --color-data-quiet: #CBC6BC;
 
+  /* ── Brand (Greta Route 3, approved 2026-10-01) ─────────────────────────
+     The logo's own colours. For the logo and nothing else — they are not UI
+     colours and not chart series. The wordmark is ink on light surfaces and
+     off white on dark ones; the four lobes never change. See greta-logo.css. */
+  --color-brand-forest:     #2E4B43;
+  --color-brand-purple:     #8B6FAE;
+  --color-brand-terracotta: #D67A5B;
+  --color-brand-stone:      #D8CFC4;
+  --color-wordmark:         var(--color-ink);
+  --color-wordmark-on-dark: #F8F6F2;
+  /* The face the approved logo artwork is set in. */
+  --font-wordmark: Arial, Helvetica, 'Liberation Sans', sans-serif;
+
   /* ── Type ───────────────────────────────────────────────────────────────
      DM Sans for language, DM Mono for anything countable. Numbers in mono is a
      deliberate signal: a figure you can compare down a column is a different

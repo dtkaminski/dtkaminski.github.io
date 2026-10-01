@@ -1,0 +1,20 @@
+/* The Greta logo (Route 3, approved 2026-10-01) — mark + wordmark, drawn inline as one SVG.
+   Source masters: brand/greta-logo-horizontal-{light,dark}.svg.
+
+   The four lobes keep their brand colours on every surface. Only the wordmark changes:
+   it follows `color`, which is --color-wordmark (ink) by default and
+   --color-wordmark-on-dark (off white) inside anything marked .on-dark.
+
+   Size it with --logo-height on the logo or any ancestor; the width follows the
+   artwork's aspect ratio. */
+.greta-logo {
+  display: block; flex-shrink: 0;
+  height: var(--logo-height, var(--space-6)); width: auto;
+  color: var(--color-wordmark);
+}
+.on-dark .greta-logo, .greta-logo.on-dark { color: var(--color-wordmark-on-dark); }
+.greta-logo .gl-purple     { stroke: var(--color-brand-purple); }
+.greta-logo .gl-forest     { stroke: var(--color-brand-forest); }
+.greta-logo .gl-terracotta { stroke: var(--color-brand-terracotta); }
+.greta-logo .gl-stone      { stroke: var(--color-brand-stone); }
+.greta-logo .gl-word       { fill: currentColor; font-family: var(--font-wordmark); }

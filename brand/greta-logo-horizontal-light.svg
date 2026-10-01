@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="930" height="260" viewBox="0 0 930 260">
+
+<g transform="translate(46 44) scale(1.32)"><g><path d="M 43.494 43.494 A 29 29 0 0 1 90.283 51.744" fill="none" stroke="#8B6FAE" stroke-width="27" stroke-linecap="round"/>
+<path d="M 43.494 84.506 A 29 29 0 0 1 51.744 37.717" fill="none" stroke="#2E4B43" stroke-width="27" stroke-linecap="round"/>
+<path d="M 84.506 84.506 A 29 29 0 0 1 37.717 76.256" fill="none" stroke="#D67A5B" stroke-width="27" stroke-linecap="round"/>
+<path d="M 84.506 43.494 A 29 29 0 0 1 76.256 90.283" fill="none" stroke="#D8CFC4" stroke-width="27" stroke-linecap="round"/></g></g>
+<text x="245" y="154" fill="#0B1412" font-family="Inter Display, Inter, Arial, sans-serif"
+      font-size="112" font-weight="600" letter-spacing="-5">Greta</text>
+
+</svg>
