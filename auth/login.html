@@ -79,9 +79,13 @@
     } catch (e) {}
     return '';
   }
-  const NEXT = safeNext();
+  // Logging in means "take me to my dashboard". It used to default to the workspace setup page,
+  // so a returning, fully-connected owner met an "Open dashboard →" button on every login. The
+  // app shell already sends anyone without a workspace to setup and shows a connect banner when
+  // Shopify is missing, so /app/ is the right default for everyone.
+  const NEXT = safeNext() || '/app/';
 
-  // If we already have a session, skip straight to the destination (next if given, else workspace).
+  // If we already have a session, skip straight to the destination.
   (async () => {
     const { data } = await sb.auth.getSession();
     if (data?.session) {
