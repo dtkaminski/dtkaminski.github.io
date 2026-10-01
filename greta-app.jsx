@@ -9813,100 +9813,6 @@ function V3ActionBoard(){
   );
 }
 
-// ── Stock runway ─────────────────────────────────────────────────────────
-// "OOS in ~9d — 33d short of the 42d lead" is a sentence describing a picture. Every SKU has the
-// same shape — how long the stock lasts, how long resupply takes, and the gap between them — and
-// thirty of those sentences in a column cannot be compared at a glance, which is the only thing
-// the operator actually wants to do.
-//
-// Drawn on one shared scale so the bars are comparable to each other: the filled bar is days of
-// cover left, the tick is when stock would arrive if it were ordered today. Tick beyond the bar
-// means a gap with nothing to sell, and the width of that overhang IS the shortfall.
-//
-// Lead time is not stored, but it is implied exactly: reorder_by_date is the last day to order,
-// so lead = days_to_stockout + (today − reorder_by_date). Nothing estimated, nothing invented.
-function V3StockRunway(){
-  const [rows, setRows] = React.useState(null);
-  const [err, setErr] = React.useState(null);
-
-  React.useEffect(() => {
-    let dead = false;
-    const go = () => {
-      const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
-      if (!sb || !b) return false;
-      sb.from('vw_stock_demand_plan')
-        .select('sku,product_title,on_hand,projected_days_to_stockout,reorder_by_date,suggested_order_units,cm_at_risk_before_resupply,stock_status')
-        // NULLs sort FIRST on a descending PostgREST order, so this returned the twelve LEAST
-        // urgent SKUs — "out in 784d", no money at risk — and a 784-day scale that flattened every
-        // bar to nothing. Ask only for rows with money actually at risk, nulls last.
-        .eq('brand_id', b)
-        .gt('cm_at_risk_before_resupply', 0)
-        .order('cm_at_risk_before_resupply', { ascending: false, nullsFirst: false })
-        .limit(12)
-        .then(r => {
-          if (dead) return;
-          if (r && r.error) { setErr(r.error.message || 'could not load'); return; }
-          setRows(((r && r.data) || []).filter(x => x.projected_days_to_stockout != null));
-        }, () => { if (!dead) setErr('could not load'); });
-      return true;
-    };
-    if (!go()) {
-      const iv = setInterval(() => { if (go()) clearInterval(iv); }, 500);
-      setTimeout(() => clearInterval(iv), 30000);
-      return () => { dead = true; clearInterval(iv); };
-    }
-    return () => { dead = true; };
-  }, []);
-
-  if (err) return <div className="v3-empty">Greta could not load your stock runway just now — refreshing usually sorts it.</div>;
-  if (rows === null) return <V3SkeletonRows n={4}/>;
-  if (!rows.length) return null;
-
-  const today = new Date();
-  const items = rows.map(r => {
-    const dts  = Math.max(0, Math.round(Number(r.projected_days_to_stockout) || 0));
-    const late = r.reorder_by_date
-      ? Math.round((today - new Date(r.reorder_by_date + 'T00:00:00')) / 86400000) : 0;
-    const lead = Math.max(dts + Math.max(late, 0), dts);
-    return { ...r, dts, late: Math.max(late, 0), lead, risk: Math.round(Number(r.cm_at_risk_before_resupply) || 0) };
-  });
-  const scale = Math.max(30, ...items.map(i => Math.max(i.lead, i.dts))) || 30;
-
-  return (
-    <div className="v3-runway v3-enter">
-      <div className="v3-runway-head">
-        <h2 className="v3-runway-title">What runs out first</h2>
-        <span className="v3-runway-key">
-          <i className="v3-runway-key-bar"/> days of stock left
-          <i className="v3-runway-key-tick"/> when a new order would land
-        </span>
-      </div>
-      <ul className="v3-runway-list">
-        {items.map(it => (
-          <li key={it.sku} className={'v3-runway-row' + (it.dts <= 0 ? ' out' : '')}>
-            <span className="v3-runway-name" title={it.sku}>{it.product_title || it.sku}</span>
-            <span className="v3-runway-track" role="img"
-                  aria-label={(it.dts <= 0 ? 'Out of stock now' : it.dts + ' days of stock left')
-                              + (it.late > 0 ? ', the order was due ' + it.late + ' days ago' : '')}>
-              <i className="v3-runway-bar" style={{ width: Math.max(1, (it.dts / scale) * 100) + '%' }}/>
-              {it.lead > it.dts && (
-                <i className="v3-runway-gap"
-                   style={{ left: (it.dts / scale) * 100 + '%', width: ((it.lead - it.dts) / scale) * 100 + '%' }}/>
-              )}
-              <i className="v3-runway-tick" style={{ left: Math.min(99.5, (it.lead / scale) * 100) + '%' }}/>
-            </span>
-            <span className="v3-runway-say">
-              {it.dts <= 0 ? 'out now' : 'out in ' + it.dts + 'd'}
-              {it.late > 0 && <em> · order was due {it.late}d ago</em>}
-            </span>
-            <span className="v3-runway-risk">{it.risk > 0 ? v3Gbp(it.risk) : '—'}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
 // ── Channel scoreboard ───────────────────────────────────────────────────
 // Marketing asks "Which channels and ads earn their money?" and the answer is a comparison, so it
 // is drawn as one: every channel on the same iROAS scale with its break-even target marked, so
@@ -10636,7 +10542,7 @@ function ProductionPlanner({embedded}={}){
         </tbody></table></div>
         <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:9,lineHeight:1.5}}>These won't show as reminders. Each auto-closes when its Shopify stock rises on the next data sync — or mark it received manually.</div>
       </div>)}
-      {pos.length===0 && awaiting.length===0 && (<div className="card"><div style={{display:'flex',alignItems:'center',gap:10}}><StatusBadge kind="healthy" label="Stock healthy"/><span className="muted" style={{fontSize:'var(--text-sm)'}}>No products are within their reorder window right now. {approaching>0?`${approaching} will cross it soon — check back, or tighten the safety days.`:'Good sellers all have enough cover for their lead times.'}</span></div></div>)}
+      {pos.length===0 && awaiting.length===0 && R.lines.some(l=>!l.isPackaging) && (<div className="card"><div style={{display:'flex',alignItems:'center',gap:10}}><StatusBadge kind="healthy" label="Stock healthy"/><span className="muted" style={{fontSize:'var(--text-sm)'}}>No products are within their reorder window right now. {approaching>0?`${approaching} will cross it soon — check back, or tighten the safety days.`:'Good sellers all have enough cover for their lead times.'}</span></div></div>)}
     </div>
   );
 }
@@ -11115,9 +11021,14 @@ function PlanningView(){
     }
   }
   const lateWaves = tranches.filter(t=>t.late).length;
-  const heroColor = oosNow ? 'var(--bad)' : toOrderN ? 'var(--warn)' : 'var(--good)';
-  const headline = oosNow ? `Order today — ${oosNow} product${oosNow===1?'':'s'} at OOS risk` : toOrderN ? `${toOrderN} product${toOrderN===1?'':'s'} to reorder` : 'Stock is on track for your plan';
-  const sub = toOrderN ? `${toOrderN} item${toOrderN===1?'':'s'} to order · ${curSym()}${k(orderVal)} to commit${stockoutsUnderPlan?` · ${stockoutsUnderPlan} forecast to run out under the plan`:''}${awaiting?` · ${awaiting} awaiting stock`:''}`
+  // No product has a sales rate to plan from (live brands get a catalogue without velocity) —
+  // an empty plan is not a healthy one, so it must not say "on track" while the server's stock
+  // plan at the top of the page lists products that have already run out.
+  const noVel = !R.lines.some(l=>!l.isPackaging);
+  const heroColor = noVel ? 'var(--color-muted)' : oosNow ? 'var(--bad)' : toOrderN ? 'var(--warn)' : 'var(--good)';
+  const headline = noVel ? 'Nothing to plan orders from yet' : oosNow ? `Order today — ${oosNow} product${oosNow===1?'':'s'} at risk of running out` : toOrderN ? `${toOrderN} product${toOrderN===1?'':'s'} to reorder` : 'Stock is on track for your plan';
+  const sub = noVel ? 'This planner sizes purchase orders from each product’s recent sales rate, which it does not have for your shop yet. The list at the top of the page is Greta’s stock plan — use that for what to order.'
+    : toOrderN ? `${toOrderN} item${toOrderN===1?'':'s'} to order · ${curSym()}${k(orderVal)} to commit${stockoutsUnderPlan?` · ${stockoutsUnderPlan} forecast to run out under the plan`:''}${awaiting?` · ${awaiting} awaiting stock`:''}`
     : (awaiting?`${awaiting} PO${awaiting===1?'':'s'} awaiting stock`:'Nothing to order right now — good sellers have cover for their lead times.');
   const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',padding:'9px 15px',borderRadius:'var(--radius-md)',border:'none',background:'var(--accent)',color:PAL.panel,cursor:'pointer',whiteSpace:'nowrap'};
   const sbtn = (id)=>({fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',padding:'5px 11px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1.5px solid '+(rc.strategy===id?'var(--accent)':'var(--border-default)'),background:rc.strategy===id?'var(--accent)':'transparent',color:rc.strategy===id?PAL.panel:'var(--text-secondary)'});
@@ -15998,6 +15909,127 @@ function V3Growth() {
   </div>);
 }
 
+// ── Stock & orders (V3 lead) ─────────────────────────────────────────────────
+// One read of the server's stock plan (vw_stock_demand_plan / fn_stock_gate) answers the page's
+// two questions together: what runs out before a new order could land, and where cash is sitting
+// in stock that will not sell for months. It replaces the runway that read the same view for
+// twelve rows, and it is the authority on this page — the browser-side planner below it has no
+// sales rate for live brands and used to call that "on track".
+function v3Sentence(s) { s = String(s || '').trim(); return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+function v3Cover(weeks) {
+  const w = Number(weeks);
+  if (!isFinite(w) || w <= 0) return FMT_NONE;
+  if (w >= 104) return 'about ' + Math.round(w / 52) + ' years';
+  if (w >= 9) return 'about ' + Math.round(w / 4.345) + ' months';
+  return Math.round(w) + ' weeks';
+}
+function V3Stock() {
+  const q = useV3Rows('stock-plan', (sb, b) => sb.from('vw_stock_demand_plan')
+    .select('sku,product_title,on_hand,weekly_velocity,weeks_of_cover,stock_status,inventory_stale,projected_days_to_stockout,reorder_by_date,suggested_order_units,lost_cm_per_day,cm_at_risk_before_resupply,trapped_cash')
+    .eq('brand_id', b).limit(3000));
+  const [allRisk, setAllRisk] = React.useState(false);
+  if (q.err) return <div className="v3-empty">Greta could not load your stock plan just now — refreshing usually sorts it.</div>;
+  if (!q.rows) return <V3SkeletonRows n={5}/>;
+  const rows = q.rows;
+  if (!rows.length) return (<div className="v3-empty">No products with stock levels yet. Once Shopify inventory syncs, this shows what runs out first and where cash is tied up.</div>);
+
+  const num = v => Number(v) || 0;
+  const out = rows.filter(r => r.stock_status === 'stockout');
+  const low = rows.filter(r => r.stock_status === 'low_cover');
+  const slow = rows.filter(r => r.stock_status === 'overstock' && num(r.trapped_cash) > 0)
+    .sort((a, b) => num(b.trapped_cash) - num(a.trapped_cash));
+  const dead = rows.filter(r => r.stock_status === 'no_velocity' && num(r.on_hand) > 0);
+  const risk = out.concat(low).reduce((a, r) => a + num(r.cm_at_risk_before_resupply), 0);
+  const lostDay = out.reduce((a, r) => a + num(r.lost_cm_per_day), 0);
+  const trapped = slow.reduce((a, r) => a + num(r.trapped_cash), 0);
+  const stale = rows.some(r => r.inventory_stale);
+  const n = out.length + low.length;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+
+  // What runs out: everything out or short of its lead time, worst money first.
+  const runway = out.concat(low).map(r => {
+    const days = Math.max(0, Math.round(num(r.projected_days_to_stockout)));
+    const by = r.reorder_by_date ? new Date(r.reorder_by_date + 'T00:00:00') : null;
+    const overdue = by ? by <= today : true;
+    const late = by ? Math.max(0, Math.round((today - by) / 864e5)) : 0;
+    return { ...r, days, overdue, late, by: r.reorder_by_date, risk: num(r.cm_at_risk_before_resupply), units: num(r.suggested_order_units) };
+  }).sort((a, b) => b.risk - a.risk || a.days - b.days);
+  const shown = allRisk ? runway : runway.slice(0, 10);
+  // When every row is already past its order-by date the instruction is the same for all of
+  // them, so it is said once in the heading rather than as a column of red.
+  const allDue = runway.length > 0 && runway.every(r => r.overdue);
+  // One scale for every bar: days of stock left against the time until a new order would land.
+  const span = Math.max(14, ...runway.map(r => r.days + r.late)) || 14;
+
+  const stat = (lab, val, foot) => (<div className="v3-stat" key={lab}>
+    <div className="v3-stat-lab"><span>{lab}</span></div>
+    <div className="v3-stat-val">{val}</div>
+    <div className="v3-stat-foot"><span className="v3-muted">{foot}</span></div>
+  </div>);
+
+  const head = n ? (n === 1 ? 'One product is' : fmtCount(n) + ' products are') + ' out of stock or will run out before a new order could arrive.'
+    : 'Nothing runs out before a new order could arrive.';
+  const sub = (n ? 'Together that puts ' + fmtMoney(risk) + ' of profit at risk before they are back'
+      + (lostDay > 0 ? ' — the ones already out are costing about ' + fmtMoney(lostDay) + ' a day' : '') + '. Order from the top of the list down.'
+      : 'Every product that sells has enough stock to cover its supplier’s lead time.')
+    + (trapped > 0 ? ' Separately, ' + fmtMoney(trapped) + ' of cash is sitting in stock that will take months to sell.' : '');
+
+  return (<div className="v3-page-stack">
+    <section>
+      <div className="v3-kick">What needs attention</div>
+      <p className="v3-verdict">{head}</p>
+      <p className="v3-note v3-measure">{sub}</p>
+      {stale && <p className="micro muted">Stock counts have not refreshed from Shopify recently, so check the shelf before ordering.</p>}
+      <div className="v3-stat-grid v3-gap-top">
+        {stat('Out of stock now', fmtCount(out.length), lostDay > 0 ? fmtMoney(lostDay) + ' of profit lost a day' : 'products')}
+        {stat('Run out before a restock', fmtCount(low.length), 'order these today')}
+        {stat('Profit at risk before restock', fmtMoney(risk), 'if nothing is ordered')}
+        {stat('Cash in slow stock', fmtMoney(trapped), fmtCount(slow.length) + ' products with months of stock')}
+      </div>
+    </section>
+
+    {runway.length > 0 && (<section className="v3-sec">
+      <h2 className="v3-sec-title">What runs out first{allDue && <span className="v3-muted">order all of these today</span>}</h2>
+      <p className="v3-legend v3-rw-key"><i className="v3-rw-key-bar"/>Days of stock left <i className="v3-rw-key-gap"/>Days with nothing to sell before a new order lands</p>
+      <table className="v3-rw">
+        <thead><tr><th className="t-text">Product</th><th className="t-text v3-rw-trackh">Stock left</th>{!allDue && <th>Order</th>}<th>Suggested order</th><th>Profit at risk</th></tr></thead>
+        <tbody>{shown.map(r => (<tr key={r.sku}>
+          <td className="t-text v3-rw-name" title={r.sku}>{v3Sentence(r.product_title || r.sku)}</td>
+          <td className="t-text v3-rw-trackc"><div className="v3-rw-cell">
+            <span className="v3-rw-track" role="img" aria-label={(r.days ? r.days + ' days of stock left' : 'Out of stock') + (r.late ? ', ' + r.late + ' days with nothing to sell' : '')}>
+              {r.days > 0 && <i className="v3-rw-bar" style={{ width: (r.days / span * 100) + '%' }}/>}
+              {r.late > 0 && <i className="v3-rw-gap" style={{ left: (r.days / span * 100) + '%', width: (r.late / span * 100) + '%' }}/>}
+            </span>
+            <span className="v3-rw-days">{r.days ? r.days + (r.days === 1 ? ' day' : ' days') : 'Out now'}</span>
+          </div></td>
+          {!allDue && <td className={r.overdue ? 'v3-rw-now' : 'v3-muted'}>{r.overdue ? 'Today' : 'By ' + v3Day(r.by)}</td>}
+          <td>{r.units > 0 ? fmtCount(r.units) + ' units' : FMT_NONE}</td>
+          <td>{r.risk > 0 ? fmtMoney(r.risk) : FMT_NONE}</td>
+        </tr>))}</tbody>
+      </table>
+      {runway.length > 10 && (<button className="v3-btn v3-btn-q v3-btn-sm" onClick={() => setAllRisk(v => !v)}>
+        {allRisk ? 'Show the top 10' : 'Show all ' + runway.length}</button>)}
+      <p className="micro muted v3-measure">Suggested units cover your supplier’s lead time plus a safety margin. Profit at risk is what these products would have earned between running out and the new stock landing.</p>
+    </section>)}
+
+    {slow.length > 0 && (<section className="v3-sec">
+      <h2 className="v3-sec-title">Where cash is sitting</h2>
+      <p className="v3-note v3-measure">{fmtMoney(trapped)} is tied up in stock beyond what you will sell in the next few months. A bundle, a gift-with-purchase or a quiet price test frees it without a sitewide discount.</p>
+      <table className="v3-rw v3-slow">
+        <thead><tr><th className="t-text">Product</th><th>In stock</th><th>Sells a week</th><th>Lasts</th><th>Cash tied up</th></tr></thead>
+        <tbody>{slow.slice(0, 8).map(r => (<tr key={r.sku}>
+          <td className="t-text v3-rw-name" title={r.sku}>{v3Sentence(r.product_title || r.sku)}</td>
+          <td>{fmtCount(r.on_hand)}</td>
+          <td>{num(r.weekly_velocity) >= 1 ? fmtCount(Math.round(num(r.weekly_velocity))) : num(r.weekly_velocity).toFixed(1)}</td>
+          <td>{v3Cover(r.weeks_of_cover)}</td>
+          <td>{fmtMoney(r.trapped_cash)}</td>
+        </tr>))}</tbody>
+      </table>
+      {dead.length > 0 && <p className="micro muted v3-measure">{fmtCount(dead.length)} more products have {fmtCount(dead.reduce((a, r) => a + num(r.on_hand), 0))} units in stock and no recent sales — worth a look before the next order goes in.</p>}
+    </section>)}
+  </div>);
+}
+
 // ── Customers (V3, live) ─────────────────────────────────────────────────────
 function V3Customers() {
   const tier = useV3Rows('cust-tier', (sb, b) => sb.from('vw_customer_tier_periods')
@@ -16176,11 +16208,11 @@ const V3_PAGES = {
     {/* The server-side stock plan (vw_stock_demand_plan / fn_stock_gate): what runs out,
         when to reorder, how many, what it costs a day. Built into the embed and never
         mounted until now — the page below still runs its own browser-side estimate. */}
-    {/* The runway leads: thirty "OOS in ~9d — 33d short of the 42d lead" sentences cannot be
-        compared at a glance, and comparing them is the whole job. */}
-    <V3StockRunway/>
-    {mosView('PerformanceStock')}
-    <PlanningView/>
+    {/* The server stock plan leads (V3Stock): what runs out before a restock could land, and
+        where cash is sitting. The browser-side planner and the full table sit behind it. */}
+    <V3Stock/>
+    <V3More id="stock-plan" label="Purchase orders, forecast and ordering strategy"><PlanningView/></V3More>
+    <V3More id="stock-all" label="Every product — stock, cover and sales rate">{mosView('PerformanceStock')}</V3More>
     <V3More id="stock-suppliers" label="Suppliers"><V3Anchor id="suppliers"/><SuppliersDirectory/></V3More>
   </>),
   profit: (p) => <Overview start={p.start} period={p.period} customActive={p.customActive}/>,

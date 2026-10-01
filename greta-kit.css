@@ -450,3 +450,25 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-levers-track i { display: block; height: 100%; background: var(--color-accent); }
 .v3-levers-v { font-family: var(--font-figure); font-weight: var(--weight-semi); text-align: right; color: var(--color-ink); }
 @media (max-width: 760px) { .v3-levers li { grid-template-columns: 1fr 6rem; } .v3-levers-track { grid-column: 1 / -1; grid-row: 2; } }
+
+/* ── Stock: what runs out first, where cash is sitting ───────────────────── */
+.v3-rw-key { margin: 0 0 var(--space-3); }
+.v3-rw-key-bar { width: var(--space-4) !important; height: var(--space-1) !important; border-radius: 0 !important; background: var(--color-data-3); }
+.v3-rw-key-gap { width: var(--space-4) !important; height: var(--space-1) !important; border-radius: 0 !important;
+  background: repeating-linear-gradient(135deg, var(--color-danger) 0 2px, transparent 2px 4px); }
+.v3-main table.v3-rw { width: 100%; }
+.v3-main table.v3-rw td, .v3-main table.v3-rw th { padding-top: var(--space-3); padding-bottom: var(--space-3); white-space: nowrap; }
+.v3-main table.v3-rw td.v3-rw-name { white-space: normal; min-width: 12rem; max-width: 20rem; color: var(--color-ink); }
+.v3-rw-trackh, .v3-rw-trackc { width: 34%; }
+.v3-rw-cell { display: flex; align-items: center; gap: var(--space-3); min-width: 10rem; }
+.v3-rw-track { position: relative; flex: 1; height: var(--space-2); background: var(--color-sunken); border-radius: var(--radius-sm); overflow: hidden; }
+.v3-rw-bar { position: absolute; left: 0; top: 0; bottom: 0; background: var(--color-data-3); }
+.v3-rw-gap { position: absolute; top: 0; bottom: 0; background: repeating-linear-gradient(135deg, var(--color-danger) 0 2px, transparent 2px 4px); opacity: .7; }
+.v3-rw-days { min-width: 4.5rem; text-align: right; font-family: var(--font-figure); font-size: var(--text-sm); color: var(--color-muted); }
+.v3-main td.v3-rw-now { color: var(--color-ink); font-weight: var(--weight-semi); }
+@media (max-width: 760px) {
+  .v3-rw-trackc .v3-rw-track { display: none; }
+  .v3-rw-trackh, .v3-rw-trackc { width: auto; }
+  .v3-rw-cell { min-width: 0; }
+  .v3-main table.v3-rw { display: block; overflow-x: auto; }
+}
