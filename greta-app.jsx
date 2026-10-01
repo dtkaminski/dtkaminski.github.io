@@ -3065,7 +3065,7 @@ function ContributionCard({rev, orders, paid, gm, days}){
   return (<div className="card">
     <div className="card-section-title">
       <h2 style={{margin:0}}>Contribution margin <span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)',fontSize:'var(--text-sm)'}}>— fully loaded · {NUM(orders)} orders</span></h2>
-      <span className="meta">product cost from live product margin {PCT(gm)} · variable costs editable (saved in your browser)</span>
+      <span className="meta">product cost from your live margin of {PCT(gm)} · the per-order costs below are saved on this device only — set them for everyone in Goal & costs</span>
     </div>
     <div style={{maxWidth:620,fontSize:'var(--text-base)'}}>
       <CmRow label="Net revenue" amount={GBP(rev)} bold color="var(--text-primary)" top="none"/>
@@ -3239,7 +3239,7 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
       </div>
       {/* Assumptions — all number inputs at the TOP, before the outputs */}
       <div style={{marginTop:6}}>
-        <div style={{fontSize:'var(--text-xs)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:8}}>Assumptions <span style={{textTransform:'none',letterSpacing:0,color:'var(--text-muted)'}}>· seeded from last 30 days · saved in your browser · edit to recompute below</span></div>
+        <div style={{fontSize:'var(--text-xs)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:8}}>Assumptions <span style={{textTransform:'none',letterSpacing:0,color:'var(--text-muted)'}}>· started from your last 30 days · saved on this device only · edit to recompute below</span></div>
         <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:8}}>
           {mode==='topdown' ? (<>
             {fld('startRevenue','Start revenue',curSym())}
@@ -4315,7 +4315,7 @@ function CrossChannel({start}){
         {channels.map(c=>(<tr key={c.name}><td><span className="pill" style={{background:c.color+'22',color:c.color}}>{c.name}</span></td><td>{c.spend?GBP(c.spend):'—'}</td><td>{GBP(c.claimed)}</td><td>{c.spend?(c.claimed/c.spend).toFixed(2)+'x':'—'}</td><td>{PCT(rev?c.claimed/rev:null)}</td></tr>))}
         </tbody>
       </table>
-      <div className="note" style={{marginTop:12}}>Platform-claimed revenue is <b>double-counted</b> — Meta + Google each claim conversions the other (and email) also touched, so claims sum to more than Shopify's actual net. That gap is exactly why the next step is incrementality. (Klaviyo email-attributed revenue needs its attributed report types — a follow-up pull — so it's left out here rather than mislabeled.)</div>
+      <div className="note" style={{marginTop:12}}>Platform-claimed revenue is <b>double-counted</b> — Meta + Google each claim conversions the other (and email) also touched, so claims sum to more than Shopify's actual net. That gap is exactly why the next step is incrementality. Email is not in this table yet: Greta does not read Klaviyo's own sales figures, and would rather leave email out than guess at it.</div>
     </div>
     <div className="row">
       <div className="card" style={{flex:'1 1 380px'}}>
@@ -9887,8 +9887,20 @@ function V3ChannelScoreboard(){
         break even on your margin — and that comparison is the fastest read on this page.</p>
     </div>);
 
-  const nice = (p, c) => String(c || p || '').replace(/_/g, ' ').replace(/^(meta|google|tiktok)\s*/i, '').trim() || p;
+  // Channel names an owner recognises ("Meta prospecting", "Google Performance Max"), not the
+  // campaign keys the scoreboard is keyed on ("facebook_acquisition", "pmax").
+  const nice = (p, c) => V3_CH[String(c || '').toLowerCase()]
+    || (String(c || p || '').replace(/_/g, ' ').replace(/^(meta|google|tiktok|facebook)\s*/i, '').trim().replace(/^./, x => x.toUpperCase()) || p);
   const scale = Math.max(...rows.map(r => Math.max(Number(r.avg_iroas) || 0, Number(r.target_marginal_iroas) || 0)), 1) * 1.15;
+  // The verdict in one sentence, so nobody has to read eight bars to get it.
+  const judged = rows.filter(r => Number(r.target_marginal_iroas) > 0);
+  const under = judged.filter(r => (Number(r.avg_iroas) || 0) < Number(r.target_marginal_iroas));
+  const underSpend = under.reduce((a, r) => a + (Number(r.spend_30d) || 0), 0);
+  const verdict = !judged.length ? null
+    : !under.length ? 'Every channel is earning back what it costs you.'
+    : (judged.length - under.length) + ' of ' + judged.length + ' channels earn back what they cost. '
+      + under.map(r => nice(r.platform, r.channel_type)).join(' and ') + (under.length === 1 ? ' does not' : ' do not')
+      + ' — that is ' + v3Gbp(underSpend) + ' of your last 30 days’ ad spend going on sales that lose money once the products are paid for.';
 
   return (
     <div className="v3-score v3-enter">
@@ -9896,6 +9908,7 @@ function V3ChannelScoreboard(){
         <h2 className="v3-score-title">Which channels earn their money</h2>
         <span className="v3-score-key">bar is what it returns · tick is what it needs</span>
       </div>
+      {verdict && <p className="v3-score-verdict">{verdict}</p>}
       <ul className="v3-score-list">
         {rows.map(r => {
           const iroas = Number(r.avg_iroas) || 0;
@@ -11698,6 +11711,23 @@ var GP_gbp = function (x) { return x == null ? '—' : '£' + Math.round(Number(
 var GP_rag = function (s) { return s === 'ready' ? GP_T.green : s === 'unconfirmed' || s === 'stale' ? GP_T.amber : GP_T.red; };
 
 function GP_Dot(p) { return React.createElement('span', { style: { width: 8, height: 8, borderRadius: '50%', display: 'inline-block', background: p.c } }); }
+// vw_brand_plan_readiness names its checks for an analyst ("Paid efficiency (φ/iROAS)", "Cohort
+// LTV"). The view keeps its keys; the owner reads these.
+const GP_PLAIN_ITEM = {
+  'Gross margin': 'What you keep after product cost',
+  'Variable costs': 'Shipping, packaging and fees per order',
+  'Fixed costs / month': 'Monthly overheads (rent, wages, software)',
+  'Discount rate (annual)': 'Cost of money, for valuing future sales',
+  'Contribution margin %': 'Profit after product and order costs, as % of sales',
+  'New-customer CAC': 'Cost to win a new customer',
+  'Cohort LTV': 'What a customer is worth over time',
+  'Returning-revenue run-rate': 'Sales from returning customers',
+  'Quarter goal set': 'A goal for this quarter',
+  'Goal confirmed as plan': 'Goal confirmed',
+  'Paid efficiency (φ/iROAS)': 'What each ad channel really earns',
+  'Email data (for email effect)': 'Email data',
+  'Sales feed fresh': 'Sales data up to date',
+};
 
 function GP_Metric(p) {
   return (
@@ -12374,7 +12404,7 @@ function GretaPlanPanel({ show } = {}) {
       {isGoal && (<div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius:'var(--radius-none)', padding: '14px 16px', marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <div style={{ fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: GP_T.accent2 }}>Data readiness</div>
-          <div style={{ fontSize: 'var(--text-sm)', color: blocking.length ? GP_T.amber : GP_T.green }}>{readyCount}/{readiness.length} ready{blocking.length ? ' · ' + blocking.length + ' blocking targets' : ' · plan-ready ✓'}</div>
+          <div style={{ fontSize: 'var(--text-sm)', color: blocking.length ? GP_T.amber : GP_T.green }}>{readyCount} of {readiness.length} ready{blocking.length ? ' · ' + blocking.length + ' still needed before Greta can set targets' : ' · ready to plan'}</div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: '6px 22px' }}>
           {Object.keys(sections).map(function (sec) {
@@ -12385,7 +12415,7 @@ function GretaPlanPanel({ show } = {}) {
                   return (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0', fontSize: 'var(--text-sm)' }}>
                       <GP_Dot c={GP_rag(r.status)} />
-                      <span style={{ flex: 1 }}>{r.item}{r.blocks_targets ? '' : ' ·'}</span>
+                      <span style={{ flex: 1 }}>{GP_PLAIN_ITEM[r.item] || r.item}{r.blocks_targets ? '' : ' ·'}</span>
                       <span style={{ color: GP_T.dim, fontSize: 'var(--text-xs)' }}>{r.detail}</span>
                     </div>
                   );
@@ -12446,7 +12476,7 @@ function GretaPlanPanel({ show } = {}) {
             <GP_Metric k="Revenue gap" v={GP_gbp(P.forecast.revenue_gap)} sub={Number(P.forecast.revenue_gap) >= 0 ? 'ahead of plan' : 'behind — add events'} />
             <GP_Metric k="Profit gap" v={GP_gbp(P.forecast.cm_gap)} sub={Number(P.forecast.cm_gap) >= 0 ? 'ahead' : 'behind plan'} />
           </div>
-          <div style={{ fontSize: 'var(--text-xs)', color: GP_T.dim, marginTop: 8 }}>Events with no expected figure are benchmark-seeded (flagged, not measured). <GoLink sec="operate" sub="calendar">Add promos/launches to the calendar</GoLink> to lift the forecast toward the goal.</div>
+          <div style={{ fontSize: 'var(--text-xs)', color: GP_T.dim, marginTop: 8 }}>Where a planned event has no expected figure of its own, Greta uses a typical figure for brands like yours and marks it as an estimate. <GoLink sec="operate" sub="calendar">Add promos/launches to the calendar</GoLink> to lift the forecast toward the goal.</div>
         </div>
       )}
 

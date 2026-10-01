@@ -398,7 +398,7 @@
         const days = (window.FRKL_DATA.shopify || []).map(r => r.date).filter(Boolean).sort();
         window.FRKL_DATA.meta = {
           ...(window.FRKL_DATA.meta || {}),
-          source: 'Supabase live',
+          source: 'Live data',
           captured: new Date().toISOString().slice(0, 16).replace('T', ' '),
           currency: window.FRKL_DATA.meta?.currency || 'GBP',
           range: days.length ? { start: days[0], end: days[days.length - 1] } : window.FRKL_DATA.meta?.range,
