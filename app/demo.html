@@ -4,121 +4,86 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title>See Greta live — demo workspace</title>
+<title>See Greta on your own data</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;550;600;650;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../design-tokens.css?v=1790853500">
+<!-- This page was the last surface in its own design system: Inter, a violet accent, a white card
+     with a drop shadow on slate, rounded everything. It now uses the product's tokens like the
+     landing page. It also stopped selling things a buyer cannot use: an internal eval score
+     ("54.5/62"), "six specialists" beside "8 business functions", and "~10 min to first insight"
+     when the first ranked actions in fact arrive the morning after Shopify is connected. -->
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    background: #F1F5F9; color: #0B132B; min-height: 100vh;
-    -webkit-font-smoothing: antialiased;
-    display: flex; flex-direction: column;
-  }
-  .demo-banner {
-    position: sticky; top: 0; z-index: 100;
-    background: rgba(139,92,246,0.10); backdrop-filter: blur(14px);
-    border-bottom: 1px solid rgba(124,58,237,0.22);
-    padding: 12px 24px;
-    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-    font-size: 13px;
-  }
-  .demo-tag {
-    font-size: 10.5px; font-weight: 700; letter-spacing: .08em;
-    text-transform: uppercase; color: #7C3AED;
-    background: rgba(124,58,237,0.10); padding: 3px 9px; border-radius: 999px;
-  }
-  .demo-text { color: #334155; }
-  .demo-text b { color: #0B132B; font-weight: 600; }
-  .demo-back {
-    margin-left: auto; color: #7C3AED; text-decoration: none;
-    font-weight: 600; font-size: 12.5px;
-  }
-  .demo-back:hover { text-decoration: underline; }
-
-  .wrap { flex: 1; display: flex; align-items: center; justify-content: center; padding: 48px 24px; }
-  .card {
-    max-width: 620px; width: 100%;
-    background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 14px;
-    padding: 40px; text-align: center;
-    box-shadow: 0 1px 2px rgba(11,19,43,0.04), 0 12px 32px -12px rgba(11,19,43,0.12);
-  }
-  .card .eyebrow {
-    font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase;
-    color: #7C3AED; margin-bottom: 14px;
-  }
-  .card h1 { font-size: 26px; font-weight: 650; letter-spacing: -.02em; margin-bottom: 14px; line-height: 1.2; }
-  .card h1 .accent { color: #7C3AED; }
-  .card p { color: #334155; line-height: 1.65; margin-bottom: 14px; font-size: 15px; }
-  .card p.small { font-size: 13px; color: #64748B; }
-
-  .stat-row {
-    display: flex; gap: 0; justify-content: center; flex-wrap: wrap;
-    margin: 26px 0 30px; border-top: 1px solid #EEF2F7; border-bottom: 1px solid #EEF2F7;
-  }
-  .stat { padding: 18px 22px; }
-  .stat + .stat { border-left: 1px solid #EEF2F7; }
-  .stat-val { font-size: 22px; font-weight: 700; color: #0B132B; letter-spacing: -.01em; }
-  .stat-val.accent { color: #7C3AED; }
-  .stat-label { font-size: 11.5px; color: #64748B; margin-top: 3px; }
-
-  .ctas { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 4px; }
-  .btn {
-    padding: 12px 22px; text-decoration: none; font-weight: 600; font-size: 14px;
-    border-radius: 8px; transition: all 120ms ease; display: inline-block;
-  }
-  .btn-primary { background: #7C3AED; color: #fff; }
-  .btn-primary:hover { background: #6D28D9; }
-  .btn-ghost { background: #fff; color: #334155; border: 1px solid #CBD5E1; }
-  .btn-ghost:hover { border-color: #7C3AED; color: #7C3AED; }
+  body { font-family: var(--font-sans); background: var(--color-surface); color: var(--color-ink);
+         min-height: 100vh; -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; }
+  .bar { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap;
+         padding: var(--space-3) var(--space-6); border-bottom: 1px solid var(--color-line);
+         background: var(--color-chrome); font-size: var(--text-sm); color: var(--color-muted); }
+  .bar b { color: var(--color-ink); font-weight: var(--weight-semi); }
+  .bar a { margin-left: auto; color: var(--color-accent); text-decoration: none; font-weight: var(--weight-semi); }
+  .bar a:hover { text-decoration: underline; }
+  main { flex: 1; width: 100%; max-width: 640px; margin: 0 auto; padding: var(--space-12) var(--space-4); }
+  .eyebrow { font-size: var(--text-xs); font-weight: var(--weight-semi); letter-spacing: var(--tracking-wide);
+             text-transform: uppercase; color: var(--color-accent); margin-bottom: var(--space-3); }
+  h1 { font-size: var(--text-2xl); font-weight: var(--weight-semi); letter-spacing: var(--tracking-tight);
+       line-height: var(--leading-tight); margin-bottom: var(--space-4); }
+  p { color: var(--color-muted); line-height: var(--leading-body); font-size: var(--text-base); margin-bottom: var(--space-4); }
+  p b { color: var(--color-ink); font-weight: var(--weight-semi); }
+  ul.sees { list-style: none; margin: var(--space-6) 0; border-top: 1px solid var(--color-line); }
+  ul.sees li { padding: var(--space-4) 0; border-bottom: 1px solid var(--color-line); }
+  ul.sees .k { display: block; font-weight: var(--weight-semi); color: var(--color-ink); margin-bottom: var(--space-1); }
+  ul.sees .v { display: block; color: var(--color-muted); font-size: var(--text-sm); line-height: var(--leading-body); }
+  .facts { display: flex; flex-wrap: wrap; gap: var(--space-6); margin: var(--space-6) 0 var(--space-8); }
+  .fact .fv { font-family: var(--font-sans); font-weight: var(--weight-semi); font-size: var(--text-lg); color: var(--color-ink); }
+  .fact .fl { font-size: var(--text-xs); color: var(--color-muted); margin-top: var(--space-1); }
+  .ctas { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+  .btn { padding: var(--space-3) var(--space-5); text-decoration: none; font-weight: var(--weight-semi);
+         font-size: var(--text-sm); border-radius: var(--radius-md); display: inline-block;
+         transition: background var(--transition-fast), border-color var(--transition-fast); }
+  .btn-primary { background: var(--color-accent); color: var(--color-panel); }
+  .btn-primary:hover { background: var(--color-accent-hover); }
+  .btn-ghost { background: var(--color-panel); color: var(--color-ink); border: 1px solid var(--color-line-strong); }
+  .btn-ghost:hover { border-color: var(--color-accent); color: var(--color-accent); }
+  .small { font-size: var(--text-sm); margin-top: var(--space-6); }
 </style>
 </head>
 <body>
 
-<div class="demo-banner">
-  <span class="demo-tag">Demo</span>
-  <span class="demo-text">Greta runs on <b>your</b> connected data — there's no generic sandbox to click through. Here's the fastest way to see it live.</span>
-  <a href="/" class="demo-back">← Back to site</a>
+<div class="bar">
+  <span>There is no sample shop to click through — <b>Greta works on your own numbers.</b></span>
+  <a href="/">← Back to site</a>
 </div>
 
-<div class="wrap">
-  <div class="card">
-    <div class="eyebrow">See it on your own data</div>
-    <h1>The live workspace runs on <span class="accent">real brand data</span>, not a canned tour.</h1>
-    <p>
-      Greta's six specialists observe, diagnose and hand you £-tagged actions from <b>your</b> Shopify, Meta,
-      Klaviyo, Google and GA4 — so the most honest demo is the one on your own numbers. Create your account
-      free and connect Shopify in about 30 seconds; the team starts on your data and your first brief lands
-      the Monday after.
-    </p>
+<main>
+  <div class="eyebrow">See it on your own data</div>
+  <h1>The demo is your shop.</h1>
+  <p>Connect Shopify — read-only, nothing in your store changes — and Greta reads your sales overnight.
+    The next morning you see:</p>
 
-    <div class="stat-row">
-      <div class="stat">
-        <div class="stat-val accent">54.5/62</div>
-        <div class="stat-label">combined capability + edge-case eval</div>
-      </div>
-      <div class="stat">
-        <div class="stat-val">~10 min</div>
-        <div class="stat-label">connection to first insight</div>
-      </div>
-      <div class="stat">
-        <div class="stat-val">8</div>
-        <div class="stat-label">business functions, one screen</div>
-      </div>
-    </div>
+  <ul class="sees">
+    <li><span class="k">Where each £1 of sales goes</span>
+        <span class="v">How much goes on your products, how much on ads, and how much you keep — the number everything else is there to move.</span></li>
+    <li><span class="k">The one thing to do first</span>
+        <span class="v">Ranked by the pounds it is worth to you, with the steps, and how sure Greta is.</span></li>
+    <li><span class="k">Which ads pay for themselves</span>
+        <span class="v">Each channel against the return it needs to break even on your own margin. Add Meta and Google to see this.</span></li>
+  </ul>
 
-    <div class="ctas">
-      <a href="/auth/signup.html" class="btn btn-primary">Create your account free →</a>
-      <a href="/contact.html" class="btn btn-ghost">Book a live walkthrough →</a>
-    </div>
-
-    <p class="small" style="margin-top:22px;">
-      Prefer to see it before connecting anything? A live walkthrough on the design-partner brand's data is
-      available on request — no card, no commitment.
-    </p>
+  <div class="facts">
+    <div class="fact"><div class="fv">Read-only</div><div class="fl">never changes your store or ads</div></div>
+    <div class="fact"><div class="fv">Next morning</div><div class="fl">first ranked actions</div></div>
+    <div class="fact"><div class="fv">Every Monday</div><div class="fl">a written brief</div></div>
   </div>
-</div>
+
+  <div class="ctas">
+    <a href="/auth/signup.html" class="btn btn-primary">Create your workspace →</a>
+    <a href="/contact.html" class="btn btn-ghost">Book a walkthrough</a>
+  </div>
+
+  <p class="small">Rather see it before connecting anything? Book a walkthrough and we will take you through a working workspace.</p>
+</main>
 
 </body>
 </html>

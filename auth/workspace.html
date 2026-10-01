@@ -259,7 +259,7 @@
       <div class="progress-card-inner">
         <div class="progress-eyebrow">Welcome to Greta</div>
         <h1 class="progress-headline" id="welcome-headline">Let's get <span id="welcome-brand">your workspace</span> producing findings.</h1>
-        <p class="progress-sub" id="welcome-sub">Connect Shopify in 30 seconds and you'll have your first £-quantified findings within an hour. Everything else can wait.</p>
+        <p class="progress-sub" id="welcome-sub">Connect Shopify and your sales history starts loading straight away. Greta works through it overnight, so your first ranked actions are waiting the next morning — and a written brief follows every Monday.</p>
 
         <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width: 0%;"></div></div>
         <div class="progress-row">
@@ -277,14 +277,6 @@
       </div>
     </div>
 
-    <!-- ── DEMO BANNER (only when not yet connected) ──────────────────── -->
-    <div class="demo-banner" id="demo-banner" hidden>
-      <span style="color:var(--text-secondary);">
-        Want to see what the dashboard looks like with real data first?
-      </span>
-      <a href="/app/demo.html" class="btn-ghost" target="_blank">Open frkl demo workspace →</a>
-    </div>
-
     <!-- ── CONNECTION GRID ─────────────────────────────────────────────── -->
     <h2 style="font-size:16px; margin: var(--s-7) 0 var(--s-3); font-weight:650;">Data sources</h2>
     <p class="meta" style="font-size:12.5px; margin-bottom:var(--s-2);">
@@ -294,30 +286,27 @@
       <!-- Filled by JS -->
     </div>
 
-    <!-- ── WHAT YOU'LL SEE ─────────────────────────────────────────────── -->
+    <!-- ── WHAT YOU'LL SEE ──────────────────────────────────────────────
+         This used to be a design partner's live figures ("£30.7k/mo in play", "£295k locked in
+         stock") with a link into their workspace. Shown to every new brand, it leaked a
+         customer's numbers and set expectations from someone else's business. It now says what
+         Greta will work out from THIS brand's data, with no figures it does not have yet. -->
     <div class="preview-card">
-      <h2 style="font-size:16px; margin: 0 0 var(--s-2); font-weight:650;">What your dashboard looks like when it's full</h2>
-      <p class="meta" style="font-size:12.5px;">A live example from our design partner, frkl (DTC jewellery, £16k/mo)</p>
+      <h2 style="font-size:16px; margin: 0 0 var(--s-2); font-weight:650;">What Greta works out from your data</h2>
       <div class="preview-grid">
         <div class="preview-tile">
-          <div class="preview-tile-eyebrow">Monday hero</div>
-          <div class="preview-tile-headline" style="color:var(--accent);">£30.7k/mo</div>
-          <div class="preview-tile-sub">in play this week. Across leaking now (£20.6k), at risk (£6.9k), opportunity (£3.2k).</div>
+          <div class="preview-tile-eyebrow">What you keep</div>
+          <div class="preview-tile-sub">Of every £1 you sell, how much goes on products, how much on ads, and how much is left — the number everything else is there to move.</div>
         </div>
         <div class="preview-tile">
-          <div class="preview-tile-eyebrow">Inventory finding</div>
-          <div class="preview-tile-headline" style="color:var(--bad);">£295k</div>
-          <div class="preview-tile-sub">working capital locked in 82 overstocked SKUs while 4 SKUs are stocking out.</div>
+          <div class="preview-tile-eyebrow">Do this first</div>
+          <div class="preview-tile-sub">One action at a time, ranked by the pounds it is worth to you, with the steps and how sure Greta is.</div>
         </div>
         <div class="preview-tile">
-          <div class="preview-tile-eyebrow">Creative score</div>
-          <div class="preview-tile-headline" style="color:var(--good);">4.8 / 5</div>
-          <div class="preview-tile-sub">'How your email finds me' meme reel — gold-standard formula. Brief: replicate.</div>
+          <div class="preview-tile-eyebrow">What your ads earn</div>
+          <div class="preview-tile-sub">Each channel against the return it needs to break even on your margin — so you can see which ones pay for themselves.</div>
         </div>
       </div>
-      <p style="text-align:center; margin-top:var(--s-5);">
-        <a href="/app/demo.html" class="btn-ghost" target="_blank" style="padding:8px 14px; font-size:13px;">Open the full frkl demo →</a>
-      </p>
     </div>
 
     <!-- ── WORKSPACE DETAILS ──────────────────────────────────────────── -->
@@ -589,7 +578,13 @@
       .select('id, provider, status, account_label, last_sync_at')
       .eq('brand_id', currentBrand.id);
 
-    const connByProvider = Object.fromEntries((connections || []).map(c => [c.provider, c]));
+    // One card per provider, showing its HEALTHIEST row. A re-auth leaves the old row behind, and
+    // Object.fromEntries kept whichever came last — so frkl's Google Ads read "Error · reconnect
+    // needed" from an orphaned row while its active connection synced every morning.
+    const RANK = { active: 0, pending: 1, expired: 2, error: 3 };
+    const connByProvider = {};
+    (connections || []).forEach(c => { const cur = connByProvider[c.provider];
+      if (!cur || (RANK[c.status] ?? 9) < (RANK[cur.status] ?? 9)) connByProvider[c.provider] = c; });
     renderConnections(connByProvider);
     renderProgress(connByProvider);
     renderTeam();
@@ -611,7 +606,7 @@
     const banner = document.createElement('div');
     banner.setAttribute('role', 'status');
     banner.style.cssText = 'display:flex;align-items:center;gap:10px;background:rgba(74,222,128,0.10);border:1px solid rgba(74,222,128,0.35);color:var(--good,#4ade80);border-radius:10px;padding:12px 16px;margin-bottom:16px;font-size:14px;';
-    banner.innerHTML = `<span style="font-size:16px;">✓</span><span style="color:var(--text-primary,#fff);"><b>${name} connected.</b> Pulling your last 90 days now — first findings land within a few minutes.</span>`;
+    banner.innerHTML = `<span style="font-size:16px;">✓</span><span style="color:var(--text-primary,#fff);"><b>${name} connected.</b> Your sales history is loading now. Greta works through it overnight — your first ranked actions are ready tomorrow morning.</span>`;
     view.insertBefore(banner, view.firstChild);
     // Clean the URL so a refresh doesn't re-flash the banner.
     try { window.history.replaceState({}, '', window.location.pathname); } catch (_) {}
@@ -688,7 +683,6 @@
 
     // Next-step CTA logic
     const cta = document.getElementById('next-step-cta');
-    const demoBanner = document.getElementById('demo-banner');
     const shopifyActive = connByProvider['shopify']?.status === 'active';
 
     if (!shopifyActive) {
@@ -698,7 +692,6 @@
       document.getElementById('next-step-title').textContent = 'Connect Shopify (~30 seconds)';
       document.getElementById('next-step-btn').textContent = 'Connect Shopify →';
       document.getElementById('next-step-btn').onclick = openShopifyModal;
-      demoBanner.hidden = false;
     } else {
       // Shopify connected — push to open the dashboard
       cta.hidden = false;
@@ -706,11 +699,10 @@
       document.getElementById('next-step-title').textContent = `Open the ${currentBrand.name} dashboard`;
       document.getElementById('next-step-btn').textContent = 'Open dashboard →';
       document.getElementById('next-step-btn').onclick = () => { window.location.href = `/app/?brand=${currentBrand.slug}`; };
-      demoBanner.hidden = true;
 
       // Update headline + sub
-      document.getElementById('welcome-headline').innerHTML = `${currentBrand.name} is set up. <span style="color:var(--good);">First findings ready.</span>`;
-      document.getElementById('welcome-sub').textContent = 'Your weekly brief lands every Monday morning. Add more sources below to enrich the findings (Meta unlocks paid intelligence, Klaviyo unlocks email attribution).';
+      document.getElementById('welcome-headline').innerHTML = `${currentBrand.name} is connected.`;
+      document.getElementById('welcome-sub').textContent = 'Greta reads your sales every night and ranks what is worth doing, in pounds. A written brief lands every Monday. Adding Meta and Google shows what your ads really earn; Klaviyo shows what email brings back.';
     }
 
     // Compute next brief day

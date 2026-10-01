@@ -222,7 +222,7 @@
       <div class="state-banner-icon">!</div>
       <div class="state-banner-body">
         <div class="state-banner-title">Not logged in</div>
-        <div class="state-banner-sub">Your session has expired. Log back in to continue.</div>
+        <div class="state-banner-sub">Log in to see your workspace.</div>
       </div>
       <div class="state-banner-action">
         <a href="../auth/login.html" class="btn-primary">Log in →</a>
@@ -292,6 +292,12 @@
     currentToken = session?.access_token || null;
 
     if (!session) {
+      // No session goes straight to log in and comes back here afterwards. The page used to stop
+      // on "Your session has expired" with a Log out button beside it — wrong for someone who has
+      // never logged in, and a dead end for everyone else. The banner stays as the fallback if
+      // the redirect is blocked.
+      try { window.location.replace('../auth/login.html?next=' + encodeURIComponent(location.pathname + location.search)); } catch (e) {}
+      document.getElementById('logout-btn').hidden = true;
       document.getElementById('loading').hidden = true;
       document.getElementById('no-session').hidden = false;
       document.querySelectorAll('.tab-content').forEach(c => c.hidden = true);
