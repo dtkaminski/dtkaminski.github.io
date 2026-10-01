@@ -35,7 +35,7 @@ function fmtPctN(n) {
 }
 function fmtCount(n) { return fmtOk(n) ? (Number(n) < 0 ? '−' : '') + Math.round(Math.abs(Number(n))).toLocaleString('en-GB') : FMT_NONE; }
 const GBP = n => fmtMoney(n);
-const GBP2 = n => fmtMoney(n);
+const GBP2 = n => fmtMoney(n, 2);   // pence matter: CPC, CPA, revenue per recipient
 const PCT = n => fmtPctN(n);
 const NUM = n => fmtCount(n);
 
@@ -4404,7 +4404,7 @@ function CrossChannel({start}){
           <div className="mrow"><span className="k">{s.stage}</span><span className="v">{NUM(s.v)} ({PCT(s.v/fmax)})</span></div>
           <div style={{height:9,background:PAL.panel,borderRadius:'var(--radius-none)',marginTop:4}}><div style={{height:9,width:(100*s.v/fmax)+'%',background:COL.sessions,borderRadius:'var(--radius-none)'}}/></div>
         </div>))}
-        <div className="muted" style={{marginTop:8}}>Add-to-cart → checkout is the steepest drop — see where shoppers stall in <GoLink sec="conversion" sub="site">Conversion → Site &amp; friction</GoLink>.</div>
+        <div className="muted" style={{marginTop:8}}>Add-to-cart → checkout is the steepest drop — see where shoppers stall in <GoLink sec="conversion" sub="site">Website, under site structure and friction</GoLink>.</div>
       </div>
       <div className="card" style={{flex:'1 1 380px'}}>
         <h2>Paid effect &amp; incrementality</h2>
@@ -4716,13 +4716,16 @@ function CreativeVisionPanel(){
 
 function Creatives(){
   const [sort,setSort]=useState('cost');
-  const rows=D.creatives;
+  const rows=D.creatives||[];
   const total={spend:0,impr:0,reach:0,atc:0,purch:0,val:0,weakSpend:0};
   rows.forEach(r=>{ total.spend+=r.cost||0; total.impr+=r.impressions||0; total.reach+=r.reach||0; total.atc+=r.atc||0; total.purch+=r.purchases||0; total.val+=r.purchaseValue||0; if(r.qualConv&&r.qualConv.indexOf('Below')===0) total.weakSpend+=r.cost||0; });
   const sortedCards=[...rows].sort((a,b)=>(b[sort]||0)-(a[sort]||0));
   return (<div>
     <CreativeVisionPanel/>
     <CreativeFatiguePanel/>
+    {/* Everything below reads the retired ad-level snapshot (frkl's, with frkl's own notes —
+        "Angela video", "10 active ads"). Shown only when there are rows to back it. */}
+    {rows.length > 0 ? (<>
     <div className="row" style={{marginBottom:14}}>
       <KPI label="Active ads (30d)" val={rows.length} sub={`${NUM(total.impr)} impressions · reach ${NUM(total.reach)}`}
         agent="Pulse" observation="10 active ads is a small library for this spend level — concentration risk on a couple of creatives."
@@ -4781,6 +4784,7 @@ function Creatives(){
     </div>
     <div className="note" style={{marginTop:14}}>The two biggest spenders (Angela | Video and All Videos | Flexi) have <b>below-average Meta conversion-rate ranking</b> — they drive purchases but Meta judges the post-click weak (landing/audience mismatch). 'Stacks Catalogue UK' at 7.6× frequency is the most fatigued. Image URLs from Meta CDN expire ~24h after the pull — regenerate the data file for fresh images.</div>
     <Insight k="creative" />
+    </>) : (<p className="v3-empty">Per-ad detail — spend, purchases and which creatives carry the account — appears here once Meta’s ad-level data has synced. The two panels above already read it live.</p>)}
   </div>);
 }
 
@@ -4992,7 +4996,7 @@ function AffiliatePanel(){
           </tbody></table>
         </div>
       </div>
-      <div className="note" style={{marginTop:14}}><b>Greta's read:</b> Creator partnerships are doing more work than the data has been crediting them for. HEYGIRL (Angela Scanlon) is genuinely the biggest single attribution lever you have — that's <b>one quarter of revenue from one relationship</b>. Diversification candidates: brief a discovery search for UK creators in the 35-54 lifestyle/jewellery space with engagement rates above 4% (matching Angela's audience profile). The other named affiliates (GMS, Boldly, Davidson, Nora, Charissa) all have signal but tiny volume — worth a deeper conversation per creator about content cadence and commercial terms.</div>
+      {DEMO && <div className="note" style={{marginTop:14}}><b>Greta's read:</b> Creator partnerships are doing more work than the data has been crediting them for. HEYGIRL (Angela Scanlon) is genuinely the biggest single attribution lever you have — that's <b>one quarter of revenue from one relationship</b>. Diversification candidates: brief a discovery search for UK creators in the 35-54 lifestyle/jewellery space with engagement rates above 4% (matching Angela's audience profile). The other named affiliates (GMS, Boldly, Davidson, Nora, Charissa) all have signal but tiny volume — worth a deeper conversation per creator about content cadence and commercial terms.</div>}
     </div>
   );
 }
@@ -6676,6 +6680,8 @@ function Products(){
 
 function Organic(){
   const ch=B.channelMix||[];
+  // Reads the retired GA4 channel snapshot; empty, it printed "£0 of £0" and "undefined purchases".
+  if (!ch.length) return (<p className="v3-empty">Organic and direct traffic detail appears here once your site analytics channel data has synced. Where your sales came from by channel is on the Growth plan page.</p>);
   const total=ch.reduce((a,c)=>a+(c.revenue||0),0);
   const sortedCh=[...ch].sort((a,b)=>(b.revenue||0)-(a.revenue||0));
   const isPaid=n=>/^Paid/.test(n);
@@ -6735,7 +6741,8 @@ function EmailAttributionPanel(){
   const a = B.emailAttribution;
   const flows = B.attributedFlows || [];
   const campaigns30 = B.attributedCampaigns_30d || [];
-  if (!a) return null;
+  // A retired snapshot leaves {} here, which passed `!a` and printed "£0 … (0% gap)".
+  if (!a || a.attributedFlowRevenue_90d == null) return null;
   const gap = (a.grossFlowRevenue_90d_klaviyo_tracked || 0) - (a.attributedFlowRevenue_90d || 0);
   const gapPct = a.grossFlowRevenue_90d_klaviyo_tracked
     ? gap / a.grossFlowRevenue_90d_klaviyo_tracked
@@ -6917,7 +6924,8 @@ function EmailHealthPanel(){
 function EmailHub(){
   const camps = (B.emailCampaigns||[]).filter(c=>c.recipients);
   const flows = (B.emailFlows||[]).filter(c=>c.recipients);
-  const summary = B.emailSummary || {campaigns:{}, flows:{}};
+  const _es = B.emailSummary || {};   // retired snapshots leave this as {} — never assume its halves
+  const summary = { campaigns: _es.campaigns || {}, flows: _es.flows || {} };
   const campSorted = [...camps].sort((a,b)=>(b.revPerRecip||0)-(a.revPerRecip||0));
   const flowSorted = [...flows].sort((a,b)=>(b.revPerRecip||0)-(a.revPerRecip||0));
   const campByDate = [...camps].sort((a,b)=>(a.sendDate<b.sendDate?1:-1));
@@ -6958,6 +6966,10 @@ function EmailHub(){
         </div>
         <div className="note" style={{marginTop:6}}>If broadcast revenue mostly rides on a code, that demand is <b>rented, not owned</b> — a margin risk. Build full-price email angles (new-in, restock, editorial, UGC) so campaigns aren't only "here's a discount", and reserve codes for genuine win-back.</div>
       </div>)}
+      {/* The cards below read the per-campaign / per-flow snapshot, which is retired for every
+          brand (and was frkl's own). Their heading claimed "Email is the #1 revenue channel" whatever
+          the data said, and empty data printed "undefined messages". Shown only with real rows. */}
+      {(camps.length > 0 || flows.length > 0) ? (<>
       <div className="card" style={{marginBottom:14}}>
         <h2>Email is the #1 revenue channel — and flows are doing the heavy lifting</h2>
         <div className="muted" style={{marginBottom:10,fontSize:'var(--text-sm)'}}>Last 90 days · Klaviyo via Supermetrics. Campaigns = broadcasts. Flows = automated triggers (welcome, abandoned cart, browse abandonment, back-in-stock, birthday).</div>
@@ -7058,6 +7070,7 @@ function EmailHub(){
         </tbody></table>
         <div className="muted" style={{fontSize:'var(--text-xs)',marginTop:8}}>Showing 30 most recent of {camps.length} campaigns.</div>
       </div>
+      </>) : (<p className="v3-empty">Campaign and flow detail — revenue per recipient, open and click rates, send cadence — appears here once Klaviyo has synced your campaigns and flows. The email channel's results on this page come from your orders in the meantime.</p>)}
       {DEMO && <div className="note" style={{marginTop:14}}><b>Greta's read:</b> the 19× revenue lift of flows over campaigns is the single biggest leverage finding in this dashboard. Every pound spent making flows smarter (segmentation, dynamic content, more triggers) returns multiples of any pound spent on the next broadcast. Three immediate moves: (1) audit Back-in-Stock — expand triggers to more items; (2) replicate the NECKLACES per-category welcome flow for charms/bracelets/pre-styled (already exists for those — confirm performance match); (3) fix the Happy Birthday flow — open rate proves attention, offer must be stronger to convert.</div>}
     </div>
   );
@@ -7179,6 +7192,7 @@ function StoriesPanel(){
 function InstagramPanel(){
   React.useEffect(()=>{const t=setTimeout(()=>window.dispatchEvent(new Event('resize')),80);return ()=>clearTimeout(t);},[]);
   const snap=B.igSnapshot||{}; const daily=B.igDaily||[]; const audience=B.igAudience||[]; const posts=B.igPosts||[];
+  if (!daily.length && !posts.length && !audience.length) return (<p className="v3-empty">Instagram is not connected yet. Followers, reach and your best posts appear here once Instagram's organic data is switched on for your Meta connection.</p>);
   const totalNew=daily.reduce((a,r)=>a+(r.newFollowers||0),0);
   const avgReach=daily.reduce((a,r)=>a+(r.reach||0),0)/Math.max(1,daily.length);
   const avgViews=daily.reduce((a,r)=>a+(r.profileViews||0),0)/Math.max(1,daily.length);
@@ -7312,27 +7326,31 @@ function SiteStructure({start}){
   return (<div>
     <ClarityFrictionPanel/>
     {DEMO && <div className="note" style={{marginBottom:14}}>Funnel mapped live from myfrkl.com. The problem is <b>engagement and a broken cart→checkout step</b> — see the live Clarity friction signals above. Paid spend (Overview tab) lands on a homepage where most visitors drop before 15% scroll.</div>}
+    {/* SITE_STEPS, CLARITY and FIXES are a hand-made audit of frkl's own site (July 2026):
+        necklaces, Judge.me, "106 products". Every other brand was shown it as if it were theirs.
+        It renders for frkl only, labelled with its date; other brands get the live funnel. */}
     <div className="row">
-      <div className="card" style={{flex:'2 1 520px'}}>
-        <h2>Funnel structure & friction</h2>
+      {DEMO && <div className="card" style={{flex:'2 1 520px'}}>
+        <h2>Funnel structure & friction <span className="v3-muted" style={{fontWeight:'var(--weight-normal)',fontSize:'var(--text-sm)'}}>site audit, July 2026</span></h2>
         {SITE_STEPS.map((s,i)=>(<div key={i} style={{padding:'11px 0',borderBottom:i<SITE_STEPS.length-1?`1px solid ${PAL.panel}`:'none'}}>
           <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:5}}><span className={'pill '+s.sev}>{s.step}</span></div>
           <div style={{fontSize:'var(--text-sm)',color:PAL.faint,marginBottom:4}}><b style={{color:PAL.muted,fontWeight:'var(--weight-semi)'}}>On the site:</b> {s.live}</div>
           <div style={{fontSize:'var(--text-sm)',color:s.sev==='red'?PAL.bad:PAL.warn}}><b style={{color:PAL.muted,fontWeight:'var(--weight-semi)'}}>Friction:</b> {s.issue}</div>
         </div>))}
-      </div>
+      </div>}
       <div className="card" style={{flex:'1 1 320px'}}>
         <h2>GA4 funnel (selected window)</h2>
         {f.map(s=>(<div key={s.stage} style={{margin:'9px 0'}}>
           <div className="mrow"><span className="k">{s.stage}</span><span className="v">{NUM(s.v)} ({PCT(s.v/fmax)})</span></div>
           <div style={{height:9,background:PAL.panel,borderRadius:'var(--radius-none)',marginTop:4}}><div style={{height:9,width:(100*s.v/fmax)+'%',background:COL.sessions,borderRadius:'var(--radius-none)'}}/></div>
         </div>))}
-        <div className="note" style={{marginTop:10,fontSize:'var(--text-sm)'}}>Clarity confirms the killers: <b>basket→checkout −67.8%</b> (vs 40–50% normal) and <b>checkout→complete −90%</b> (vs 50–60%).</div>
+        {DEMO && <div className="note" style={{marginTop:10,fontSize:'var(--text-sm)'}}>Clarity confirms the killers: <b>basket→checkout −67.8%</b> (vs 40–50% normal) and <b>checkout→complete −90%</b> (vs 50–60%).</div>}
       </div>
     </div>
-    <div className="row" style={{marginTop:14}}>
+    {!DEMO && <p className="v3-empty">A step-by-step walk through your site — what shoppers see at each step and where they stall — appears here after Greta’s site audit. The funnel above is live from your site analytics.</p>}
+    {DEMO && <div className="row" style={{marginTop:14}}>
       <div className="card" style={{flex:'1 1 360px'}}>
-        <h2>Clarity behaviour vs benchmark</h2>
+        <h2>Clarity behaviour vs benchmark <span className="v3-muted" style={{fontWeight:'var(--weight-normal)',fontSize:'var(--text-sm)'}}>site audit, July 2026</span></h2>
         <table><thead><tr><th>Metric</th><th>{OI_BRAND.name||'You'}</th><th>Healthy</th></tr></thead><tbody>
           {CLARITY.map((c,i)=>(<tr key={i}><td>{c.m}</td><td><span className={'pill '+c.sev}>{c.v}</span></td><td className="muted">{c.bench}</td></tr>))}
         </tbody></table>
@@ -7341,7 +7359,7 @@ function SiteStructure({start}){
         <h2>Prioritised fixes</h2>
         {FIXES.map((x,i)=>(<div key={i} className="mrow" style={{margin:'8px 0',alignItems:'start'}}><span className="k" style={{maxWidth:'82%'}}>{x.fix}</span><span className={'pill '+(x.p==='P1'?'red':'amber')}>{priorityWord(x.p)}</span></div>))}
       </div>
-    </div>
+    </div>}
     <Insight k="cro" />
     <Insight k="content" />
   </div>);
@@ -8398,7 +8416,7 @@ function ConnectionHealthStrip(){
       })}
     </div>
     {critical.length > 0 && (<span style={{color:'var(--bad)', fontSize:'var(--text-xs)'}}>
-      {critical.map(s=>s.name).join(', ')} hasn't updated in &gt;4d — reconnect in <GoLink sec="settings" sub="connections">Settings → Connections</GoLink>
+      {critical.map(s=>s.name).join(', ')} hasn't updated in &gt;4d — reconnect in <GoLink sec="settings" sub="connections">Connections &amp; data</GoLink>
     </span>)}
   </div>);
 }
@@ -8865,7 +8883,7 @@ function WeeklyBoard(){
           <div style={{display:'flex', gap:6}}>
             <input value={newAction} onChange={e=>setNewAction(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')addAction();}} placeholder="Add an action…"
               style={{flex:1, background:'var(--bg-app)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--r-sm)', padding:'8px 10px', fontSize:'var(--text-sm)'}}/>
-            <button onClick={addAction} className="board-nav-btn" style={{flexShrink:0}}>+ Add</button>
+            <button type="button" onClick={addAction} disabled={!newAction.trim()} className="v3-btn v3-btn-sm" style={{flexShrink:0}}>Add</button>
           </div>
           {doneThisWeek.length>0 && <div className="micro" style={{color:'var(--good)', marginTop:8}}>{doneThisWeek.length} completed this week</div>}
         </div>
@@ -9924,6 +9942,8 @@ function ActionsView(){
   );
 }
 
+// The shortcut hint in the platform's own words: ⌘K on a Mac, Ctrl K everywhere else.
+const V3_KBD = (typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent || '')) ? '⌘K' : 'Ctrl K';
 // Command menu (⌘K / Ctrl-K) — jump to any page or the AI analyst from anywhere.
 function CommandMenu(){
   const [open, setOpen] = React.useState(false);
@@ -9986,6 +10006,10 @@ function BusinessReview(){
   const P = (typeof window!=='undefined' && window.FRKL_PATTERNS) || {};
   const C = (typeof window!=='undefined' && window.FRKL_COHORTS) || {};
   const B = (typeof window!=='undefined' && window.FRKL_BUSINESS) || {};
+  // Stock and customer counts come from the live views Stock & orders and Customers read (same
+  // cached request). They used to come from inventorySummary / FRKL_COHORTS, which are empty for
+  // live brands, so this board said "0 items · Covered" and "£0 · Lean" while products were out.
+  const stockQ = useV3Rows('stock-plan', V3_STOCK_Q), retQ = useV3Rows('cust-ret', V3_RET_Q);
   const gm = oiCmRatio();          // contribution ratio: every figure below it is a profit figure
   const cc0 = cashConfig();
   const [cashOpen, setCashOpen] = useState(false);
@@ -10033,10 +10057,13 @@ function BusinessReview(){
   const paidShare = chanTotal? chans.filter(c=>/^Paid/i.test(c.channel||'')).reduce((s,c)=>s+(c.revenue||0),0)/chanTotal : null;
 
   // ── inventory / capital ──
-  const inv = B.inventorySummary||{};
-  const sk = t=> (inv[t]&&inv[t].skus)||0;
-  const slowCapital = ((inv.overstock&&inv.overstock.totalValue)||0)+((inv.archived_stock&&inv.archived_stock.totalValue)||0);
-  const lowCover = sk('critical')+sk('low');
+  const sp = stockQ.rows;   // null while loading
+  const spCount = st => sp ? sp.filter(r => r.stock_status === st).length : 0;
+  const sk = t => t === 'critical' ? spCount('stockout') : t === 'low' ? spCount('low_cover')
+    : t === 'overstock' ? (sp ? sp.filter(r => r.stock_status === 'overstock' && Number(r.trapped_cash) > 0).length : 0) : 0;
+  const slowCapital = sp ? sp.filter(r => r.stock_status === 'overstock').reduce((a, r) => a + (Number(r.trapped_cash) || 0), 0) : null;
+  const lowCover = sk('critical') + sk('low');
+  const custBase = retQ.rows && retQ.rows[0] && retQ.rows[0].customers != null ? Number(retQ.rows[0].customers) : null;
 
   // ── HORIZON 1 — Now (trading, this week vs last) ──
   const NOW_SPECS=[
@@ -10072,9 +10099,9 @@ function BusinessReview(){
       status:'info', statusLabel:'Monetization',
       series: trail('aov'), color:'var(--accent)', fmt:v=>GBP(v), axisFmt:fmtMoneyK,
       read:`average order value ${W&&W.m.aov!=null?GBP(W.m.aov):'—'} (8-week trend)` },
-    { label:'Stock cover risk', value: lowCover+(lowCover===1?' item':' items'),
-      status: sk('critical')>0?'watch':'healthy', statusLabel: sk('critical')>0?'Restock needed':'Covered',
-      sub:`${sk('critical')} critical · ${sk('low')} low — sellers near stockout`,
+    { label:'Stock cover risk', value: sp ? lowCover+(lowCover===1?' item':' items') : '—',
+      status: !sp ? 'missing' : lowCover>0?'watch':'healthy', statusLabel: !sp ? '—' : lowCover>0?'Restock needed':'Covered',
+      sub: sp ? `${sk('critical')} out of stock · ${sk('low')} run out before a restock` : 'Loading the stock plan…',
       read:`${lowCover} items at low/critical stock cover (${sk('critical')} critical)` },
   ];
 
@@ -10085,19 +10112,19 @@ function BusinessReview(){
       status:'info', statusLabel:'Acquisition',
       series: newCustSeries, color:'var(--accent)', fmt:v=>NUM(v), axisFmt:v=>Math.round(v),
       read:`New customers/mo ${newCustLatest!=null?NUM(newCustLatest):'—'} (latest month)` },
-    { label:'Customer base', value: NUM(C.totalCustomers||0),
-      status:'info', statusLabel:'To date',
-      sub:'Total DTC customers acquired across the analysis window',
-      read:`Customer base ${NUM(C.totalCustomers||0)} customers` },
+    { label:'Customer base', value: custBase!=null ? NUM(custBase) : '—',
+      status: custBase!=null ? 'info' : 'missing', statusLabel:'To date',
+      sub:'Everyone who has ordered from you',
+      read:`Customer base ${custBase!=null ? NUM(custBase) : '—'} customers` },
     { label:'Revenue concentration', value: topShare!=null?pct0(topShare):'—',
       status: topShare==null?'missing':(topShare>0.45?'watch':'healthy'),
       statusLabel: topShare==null?'—':(topShare>0.45?'Concentrated':'Diversified'),
       sub: topChan?`${topChan.channel} is the largest revenue channel${paidShare!=null?` · paid = ${pct0(paidShare)} of revenue`:''}`:'—',
       read:`Revenue concentration: ${topChan?topChan.channel:'—'} ${topShare!=null?pct0(topShare):''}${paidShare!=null?`, paid ${pct0(paidShare)} of revenue`:''}` },
-    { label:'Capital in slow stock', value: GBP(Math.round(slowCapital)),
-      status: slowCapital>50000?'watch':'healthy', statusLabel: slowCapital>50000?'Cash tied up':'Lean',
-      sub:`${sk('overstock')} overstocked items (>180d cover) valued at cost`,
-      read:`${curSym()}${k(slowCapital)} capital tied in slow-moving stock (${sk('overstock')} overstocked items)` },
+    { label:'Capital in slow stock', value: slowCapital!=null ? GBP(Math.round(slowCapital)) : '—',
+      status: slowCapital==null ? 'missing' : slowCapital>5000?'watch':'healthy', statusLabel: slowCapital==null ? '—' : slowCapital>5000?'Cash tied up':'Lean',
+      sub: slowCapital!=null ? `${sk('overstock')} products with months of stock, valued at cost` : 'Loading the stock plan…',
+      read:`${slowCapital!=null ? curSym()+k(slowCapital) : '—'} capital tied in slow-moving stock (${sk('overstock')} overstocked products)` },
   ];
 
   // ── Cash runway — cash on hand ÷ net monthly burn (run-rate from last 4 weeks) ──
@@ -10287,8 +10314,8 @@ function PlanningHeader({active, embedded}){
   // in the merged tab, chips scroll to sections; otherwise they cross-navigate
   const onForecast = embedded ? ()=>jump('plan-forecast') : (active==='forecast'?undefined:()=>go('forecast'));
   const onPOs = embedded ? ()=>jump('plan-pos') : (active==='production'?undefined:()=>go('production'));
-  const fHint = embedded ? ' · jump ›' : (active!=='forecast'?' · edit ›':'');
-  const pHint = embedded ? ' · jump ›' : (active!=='production'?' · open ›':'');
+  const fHint = embedded ? ' · open' : (active!=='forecast'?' · edit':'');
+  const pHint = embedded ? ' · open' : (active!=='production'?' · open':'');
   const chip = (on)=>({flex:'1 1 190px',minWidth:172,padding:'10px 13px',borderRadius:'var(--radius-md)',background:on?'var(--accent-bg)':'var(--bg-elevated)',border:'1px solid '+(on?'var(--accent)':'var(--border-subtle)')});
   const lab = {fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:4};
   const sbtn = (id)=>({fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',padding:'5px 9px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1.5px solid '+(strat===id?'var(--accent)':'var(--border-default)'),background:strat===id?'var(--accent)':'transparent',color:strat===id?PAL.panel:'var(--text-secondary)'});
@@ -10427,7 +10454,7 @@ function ProductionPlanner({embedded}={}){
           </div>
         </div>
         <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:11,lineHeight:1.5}}>
-          Strategy: <b style={{color:'var(--text-secondary)'}}>{STRAT[strategy]}</b> · <a className="txt-link" style={{cursor:'pointer'}} onClick={()=>setSetOpen(o=>!o)}>change</a>. {strategy==='bulk'
+          Strategy: <b style={{color:'var(--text-secondary)'}}>{STRAT[strategy]}</b> · <button type="button" className="txt-link v3-linkbtn" onClick={()=>setSetOpen(o=>!o)}>change</button>. {strategy==='bulk'
             ? <>Provisioning the full <b>{Math.round((horizonDays/30.4))}-month</b> demand plan upfront — each product's order is its planned demand (split by historic mix) net of stock, then rounded to minimum order quantity.</>
             : strategy==='staged'
             ? <>Ordering the forecast in <b>{waves} waves</b>; each order covers lead + one wave, and the next wave's order-by date is shown per line.</>
@@ -11053,7 +11080,7 @@ function PlanningView(){
           {toOrderN>0 && <button style={btn} onClick={goPOs}>Review &amp; raise POs <Icon name="chevron" size={14}/></button>}
         </div>
         <div style={{marginTop:14,paddingTop:12,borderTop:'1px solid var(--border-subtle)'}}>
-          <div style={lab}>① Forecast <a className="txt-link" style={{cursor:'pointer',textTransform:'none',letterSpacing:0,fontWeight:'var(--weight-semi)'}} onClick={()=>window.__oiOpenForecast&&window.__oiOpenForecast()}>· {showForecast?'editing below':'edit ›'}</a></div>
+          <div style={lab}>① Forecast <button type="button" className="txt-link v3-linkbtn" style={{textTransform:'none',letterSpacing:0,fontWeight:'var(--weight-semi)'}} onClick={()=>window.__oiOpenForecast&&window.__oiOpenForecast()}>· {showForecast?'editing below':'edit'}</button></div>
           <div style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{fLabel}</div>
         </div>
         {/* ② Strategy — compare the trade-off, pick, see the recommendation */}
@@ -11585,7 +11612,7 @@ function GretaOverviewTiers(){
               <div style={{position:'absolute',left:0,top:0,bottom:0,width:(fill/140*100)+'%',background:col,opacity:.9}}/>
               <div style={{position:'absolute',left:(100/140*100)+'%',top:-1,bottom:-1,width:2,background:GO_T.dim}}/>
             </div>
-            <div style={{fontSize:'var(--text-xs)',color:GO_T.dim,marginTop:4}}>{d.pacing.goalConfirmed ? 'vs your confirmed plan · the mark is exactly on pace' : <>vs auto-estimated target — <GoLink sec="home" sub="plansetup">confirm it in Plan</GoLink> · the mark is exactly on pace</>}</div>
+            <div style={{fontSize:'var(--text-xs)',color:GO_T.dim,marginTop:4}}>{d.pacing.goalConfirmed ? 'vs your confirmed plan · the mark is exactly on pace' : <>vs auto-estimated target — <GoLink sec="home" sub="plansetup">confirm it in Goal &amp; costs</GoLink> · the mark is exactly on pace</>}</div>
           </div>);
         })()}
         </div>
@@ -12428,6 +12455,7 @@ function GretaPlanPanel({ show } = {}) {
 
       {/* economics editor — operating costs feed Operating Profit on the Overview */}
       {isGoal && (<div style={{ borderTop: '1px solid ' + GP_T.line, padding: 'var(--space-6) 0', marginBottom: 16 }}>
+        <V3Anchor id="margin"/>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
           <div style={{ fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: GP_T.accent2 }}>What things cost you</div>
           <span style={{ fontSize: 'var(--text-xs)', color: GP_T.dim }}>used in every profit figure</span>
@@ -13680,8 +13708,8 @@ function MarginNudge(){
         Confirm your gross margin — the one figure we can’t read from Shopify — and the engine starts valuing every recommendation in ${curSym()}.
       `}</div>
       </div>
-      <button className="btn-primary" onClick={()=>window.__oiNav&&window.__oiNav('settings','economics')}
-        style={{flexShrink:0, padding:'8px 14px', fontSize:'var(--text-sm)', border:0, borderRadius:'var(--r-md)', cursor:'pointer', fontFamily:'inherit', fontWeight:'var(--weight-semi)'}}>
+      {/* Straight to the margin field — on Goal & costs itself this used to do nothing at all. */}
+      <button type="button" className="v3-btn v3-btn-p" onClick={()=>window.__oiGo&&window.__oiGo('goal','margin')} style={{flexShrink:0}}>
         Confirm gross margin →
       </button>
       <button onClick={()=>setDismissed(true)} title="Dismiss for now" aria-label="Dismiss"
@@ -13893,8 +13921,8 @@ function GretaPlanRail(){
     qLabel='Q'+(Math.floor(qs.getUTCMonth()/3)+1)+' '+qs.getUTCFullYear();
   }
   const collapseBtn = (
-    <button onClick={()=>setCollapsed(true)} title="Hide plan"
-      style={{background:'none', border:'none', color:PR_T.dim, cursor:'pointer', fontSize:'var(--text-base)', lineHeight:1, padding:2}}>›</button>
+    <button type="button" onClick={()=>setCollapsed(true)} title="Hide plan" aria-label="Hide plan"
+      style={{background:'none', border:'none', color:PR_T.dim, cursor:'pointer', lineHeight:1, padding:'var(--space-1)'}}><Icon name="chevron" size={14}/></button>
   );
   if(collapsed){
     return (
@@ -14346,7 +14374,7 @@ function V3MoneyFlow({ d, note }) {
   const steps = [
     { key: 'cogs',  label: 'What the products cost', value: cogs,  tone: 'cogs',  onGo: go('settings', 'costs') },
     { key: 'ads',   label: 'What you spent on ads',  value: spend, tone: 'spend', onGo: go('channels', 'cross'), soft: d.spend_is_stale },
-    { key: 'kept',  label: 'What you keep',          value: kept,  tone: 'keep',  onGo: go('home', 'plansetup') },
+    { key: 'kept',  label: 'What you keep',          value: kept,  tone: 'keep',  onGo: go('home', 'overview') },   // the profit breakdown, not goal setup
   ];
 
   return (
@@ -14394,11 +14422,43 @@ function V3Conf({ state, detail, fix }) {
 }
 // ── Progressive disclosure ───────────────────────────────────────────────
 // Analyst depth is demoted, never deleted. Open/closed is remembered per viewer.
+// ── One failing panel must not blank the app ─────────────────────────────────
+// With no boundary, a single panel that throws while rendering (on 2026-10-01: EmailHub reading
+// a retired snapshot) unmounted the whole React tree and left a blank page. This contains the
+// failure to the section that raised it, says so in one line, offers a retry, and reports it
+// through the same client_error_log path the data reads use.
+class V3Boundary extends React.Component {
+  constructor(p) { super(p); this.state = { err: null }; }
+  static getDerivedStateFromError(err) { return { err }; }
+  componentDidCatch(err) {
+    try { if (window.FRKL_REPORT_FAILURE) window.FRKL_REPORT_FAILURE('render:' + (this.props.where || 'section'), 'render_failed', String((err && err.message) || err)); } catch (e) {}
+    try { console.error('[greta] ' + (this.props.where || 'section') + ' failed to render', err); } catch (e) {}
+  }
+  componentDidUpdate(prev) { if (prev.resetKey !== this.props.resetKey && this.state.err) this.setState({ err: null }); }
+  render() {
+    if (!this.state.err) return this.props.children;
+    return (<div className="v3-empty v3-boundary" role="alert">
+      {this.props.label || 'This section'} could not be shown just now. The rest of the page is unaffected.{' '}
+      <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => this.setState({ err: null })}>Try again</button>
+    </div>);
+  }
+}
+
 function V3More({ id, label, children, defaultOpen }) {
   const key = 'greta_v3_open_' + id;
+  // A deep link ("open the suppliers list", "see the forecast") targets a V3Anchor that sits
+  // inside a section like this one. Closed, the anchor is not in the DOM, so the jump used to
+  // land at the top of the page with the target folded away. The section opens itself instead.
+  const holds = (a) => !!a && React.Children.toArray(children).some(c => c && c.type === V3Anchor && c.props.id === a);
   const [open, setOpen] = React.useState(() => {
+    if (typeof window !== 'undefined' && holds(window.__oiV3Anchor)) return true;
     try { const v = localStorage.getItem(key); if (v != null) return v === '1'; } catch (e) {}
     return !!defaultOpen;
+  });
+  React.useEffect(() => {
+    const on = () => { if (holds(window.__oiV3Anchor)) setOpen(true); };
+    window.addEventListener('oi-v3-anchor', on);
+    return () => window.removeEventListener('oi-v3-anchor', on);
   });
   const toggle = () => setOpen(o => { try { localStorage.setItem(key, o ? '0' : '1'); } catch (e) {} return !o; });
   return (<section className="v3-more">
@@ -14407,7 +14467,7 @@ function V3More({ id, label, children, defaultOpen }) {
           in a typeface rather than with the icon set. Same <Icon> as the nav, rotated. */}
       <span className={'v3-more-caret' + (open ? ' open' : '')} aria-hidden="true"><Icon name="chevron" size={13}/></span>{label}
     </button>
-    {open && <div className="v3-more-body">{children}</div>}
+    {open && <div className="v3-more-body"><V3Boundary where={'more:' + id} label={'“' + label + '”'}>{children}</V3Boundary></div>}
   </section>);
 }
 
@@ -15700,6 +15760,12 @@ function useV3Rows(key, build) {
   const q = V3_Q[key] || {};
   return { rows: q.rows || null, err: q.err || null };
 }
+// Shared builders, so pages that read the same view share one cached request (useV3Rows keys).
+const V3_STOCK_Q = (sb, b) => sb.from('vw_stock_demand_plan')
+    .select('sku,product_title,on_hand,weekly_velocity,weeks_of_cover,stock_status,inventory_stale,projected_days_to_stockout,reorder_by_date,suggested_order_units,lost_cm_per_day,cm_at_risk_before_resupply,trapped_cash')
+    .eq('brand_id', b).limit(3000);
+const V3_RET_Q = (sb, b) => sb.from('v_tenant_retention_summary')
+  .select('customers,orders_per_customer,repeat_rate,repeat_rate_90d,median_days_between_orders').eq('brand_id', b).limit(1);
 function v3Monday(iso) { const d = new Date(iso + 'T00:00:00Z'); const k = (d.getUTCDay() + 6) % 7; d.setUTCDate(d.getUTCDate() - k); return d.toISOString().slice(0, 10); }
 
 // ── Growth plan (V3 lead) ────────────────────────────────────────────────────
@@ -15916,9 +15982,7 @@ function v3Cover(weeks) {
   return Math.round(w) + ' weeks';
 }
 function V3Stock() {
-  const q = useV3Rows('stock-plan', (sb, b) => sb.from('vw_stock_demand_plan')
-    .select('sku,product_title,on_hand,weekly_velocity,weeks_of_cover,stock_status,inventory_stale,projected_days_to_stockout,reorder_by_date,suggested_order_units,lost_cm_per_day,cm_at_risk_before_resupply,trapped_cash')
-    .eq('brand_id', b).limit(3000));
+  const q = useV3Rows('stock-plan', V3_STOCK_Q);
   const [allRisk, setAllRisk] = React.useState(false);
   if (q.err) return <div className="v3-empty">Greta could not load your stock plan just now — refreshing usually sorts it.</div>;
   if (!q.rows) return <V3SkeletonRows n={5}/>;
@@ -16149,8 +16213,7 @@ function V3Customers() {
     .eq('brand_id', b).eq('window_label', 'current_30d').limit(1));
   const ue = useV3Rows('cust-ue', (sb, b) => sb.from('vw_brand_unit_economics')
     .select('cac,ltv_contribution,ltv_rev,ltv_horizon_months,ltv_cac,payback_orders,first_order_contribution').eq('brand_id', b).limit(1));
-  const ret = useV3Rows('cust-ret', (sb, b) => sb.from('v_tenant_retention_summary')
-    .select('customers,orders_per_customer,repeat_rate,repeat_rate_90d,median_days_between_orders').eq('brand_id', b).limit(1));
+  const ret = useV3Rows('cust-ret', V3_RET_Q);
   const nvr = useV3Rows('cust-nvr', (sb, b) => sb.from('vw_daily_new_vs_returning')
     .select('order_date,customer_type,net_revenue').eq('brand_id', b).eq('ledger', 'dtc')
     .gte('order_date', v3IsoAdd(REAL_END || new Date().toISOString().slice(0, 10), -98)).order('order_date', { ascending: true }).limit(1000));
@@ -16376,10 +16439,25 @@ const V3_PAGES = {
 function V3Anchor({ id }) {
   const ref = React.useRef(null);
   React.useEffect(() => {
-    if (window.__oiV3Anchor === id && ref.current) {
-      window.__oiV3Anchor = null;
-      setTimeout(() => { try { ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {} }, 60);
-    }
+    const go = () => {
+      if (window.__oiV3Anchor === id && ref.current) {
+        window.__oiV3Anchor = null;
+        // The page above the anchor is usually still loading, so its position moves after the
+        // first scroll. Re-align as it settles — unless the person has started scrolling.
+        let touched = false;
+        const stop = () => { touched = true; };
+        ['wheel', 'touchmove', 'keydown'].forEach(ev => window.addEventListener(ev, stop, { once: true, passive: true }));
+        [60, 700, 1600, 3000].forEach((ms, i) => setTimeout(() => {
+          if (touched || !ref.current) return;
+          const top = ref.current.getBoundingClientRect().top;
+          if (i === 0 || Math.abs(top) > 24) { try { ref.current.scrollIntoView({ behavior: i === 0 ? 'smooth' : 'auto', block: 'start' }); } catch (e) {} }
+        }, ms));
+      }
+    };
+    go();
+    // A jump on the page already open does not re-render this anchor, so it listens as well.
+    window.addEventListener('oi-v3-anchor', go);
+    return () => window.removeEventListener('oi-v3-anchor', go);
   });
   return <span ref={ref} id={'v3-' + id} className="v3-anchor"/>;
 }
@@ -16546,7 +16624,7 @@ function V3App({ dest, go, children, start, periodCtl }) {
     <div className="v3-shell">
       <nav className="v3-nav" aria-label="Main">
         <button type="button" className="v3-nav-search" onClick={() => window.__oiCommandOpen && window.__oiCommandOpen()}>
-          <Icon name="search" size={14}/> Search… <kbd>⌘K</kbd>
+          <Icon name="search" size={14}/> Search… <kbd>{V3_KBD}</kbd>
         </button>
         {(() => { let prev = null; return V3_NAV.map(e => {
           const head = e.group !== prev ? <div key={'h' + e.group} className="v3-nav-group">{e.group}</div> : null;
@@ -16687,6 +16765,7 @@ function App(){
       track('page_view', { dest: dest }, dest);
       window.__oiV3Anchor = anchor || null;
       window.scrollTo({top: 0, behavior: 'smooth'});
+      if (anchor) setTimeout(() => { try { window.dispatchEvent(new Event('oi-v3-anchor')); } catch (e) {} }, 0);
     };
     window.__oiNav = (sec, sub) => {
       if (UI_V3) { const r = v3Route(sec, sub); window.__oiGo(r[0], r[1]); return; }
@@ -16727,7 +16806,7 @@ function App(){
       <div>
         <V3App dest={v3dest} go={(d)=>{ setV3dest(d); track('page_view', { dest: d }, d); }} start={start}
                periodCtl={<V3Period period={period} setPeriod={setPeriod} rangeStart={rangeStart} rangeEnd={rangeEnd}
-                                    setRangeStart={setRangeStart} setRangeEnd={setRangeEnd} customActive={customActive}/>}>{page}</V3App>
+                                    setRangeStart={setRangeStart} setRangeEnd={setRangeEnd} customActive={customActive}/>}><V3Boundary where={'page:' + v3dest} resetKey={v3dest} label="This page">{page}</V3Boundary></V3App>
         <footer className="app-footer">
           <div className="app-footer-brand"><span>greta</span></div>
           <span className="app-footer-dot"/>
@@ -16752,7 +16831,7 @@ function App(){
       <div className="app-shell">
         <nav className="sidebar">
           <button className="nav-cmd" onClick={()=>window.__oiCommandOpen&&window.__oiCommandOpen()}>
-            <Icon name="search" size={14}/> Search… <kbd>⌘K</kbd>
+            <Icon name="search" size={14}/> Search… <kbd>{V3_KBD}</kbd>
           </button>
           {(()=>{ let prev=null; return RAIL.map((e,i) => {
             const head = (e.group && e.group!==prev) ? <div className="nav-label">{e.group}</div> : null;

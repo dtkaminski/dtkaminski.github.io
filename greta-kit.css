@@ -535,3 +535,8 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-prompt:hover:not(:disabled) { border-color: var(--color-ink); color: var(--color-ink); }
 .v3-prompt:disabled { cursor: default; opacity: .7; }
 .v3-dot.v3-dot-tight { margin-right: 0; }
+
+/* A link-styled button: for in-text actions that do something rather than go somewhere. */
+.v3-linkbtn { background: none; border: 0; padding: 0; font: inherit; color: var(--color-accent); cursor: pointer;
+  text-decoration: underline; text-underline-offset: 2px; }
+.v3-linkbtn:hover { color: var(--color-accent-hover); }
