@@ -22,7 +22,9 @@ function fmtMoneyK(n) {
   if (!fmtOk(n)) return FMT_NONE;
   const v = Number(n), a = Math.abs(v), sign = v < 0 ? '−' : '';
   if (a >= 1e6) return sign + curSym() + (a / 1e6).toFixed(a >= 1e7 ? 0 : 1).replace(/\.0$/, '') + 'm';
-  if (a >= 1e3) return sign + curSym() + (a / 1e3).toFixed(a >= 1e4 ? 0 : 1).replace(/\.0$/, '') + 'k';
+  // One decimal below £100k unless it is a whole thousand: axis steps of 3,500 used to print
+  // £3.5k, £7k, £11k (10,500 rounded), which misreads the scale.
+  if (a >= 1e3) return sign + curSym() + (a / 1e3).toFixed(a >= 1e5 ? 0 : 1).replace(/\.0$/, '') + 'k';
   return sign + curSym() + Math.round(a);
 }
 // Rates: one decimal under 10%, whole numbers above — "1.3%", "45%".
@@ -16030,6 +16032,126 @@ function V3Stock() {
   </div>);
 }
 
+// ── Website (V3 lead) ────────────────────────────────────────────────────────
+// The funnel loop (cache_funnel_loop) already splits a month's shortfall across five stages so
+// the parts add up exactly. It was drawn as a ring with 7px labels; the same numbers read at a
+// glance as a bridge from "every stage at its normal" to what the month made, which is the shape
+// the Profit page already uses. The ring and its traffic-slice strip move behind "The detail".
+function v3StageVal(fmt, v) {
+  if (v == null) return FMT_NONE;
+  if (fmt === 'rate') return fmtPctN(Number(v));
+  if (fmt === 'money') return fmtMoney(Number(v), 2);
+  return fmtCount(Number(v));
+}
+function V3Website() {
+  const loop = useV3Rows('web-loop', (sb, b) => sb.from('cache_funnel_loop')
+    .select('mo,stage_no,stage,metric,fmt,v,mu,sigma,potential,actual,leak')
+    .eq('brand_id', b).order('mo', { ascending: false }).order('stage_no', { ascending: true }).limit(10));
+  const rows = loop.rows || [];
+  const mo = rows.length ? rows[0].mo : null;
+  const stages = rows.filter(r => r.mo === mo).sort((a, b) => a.stage_no - b.stage_no);
+  const cut = useV3Rows('web-cut-' + (mo || 'none'), (sb, b) => mo ? sb.from('cache_funnel_cut')
+    .select('dim,value,ctc_chg,is_thin,cut_rank').eq('brand_id', b).eq('mo', mo).eq('cut_rank', 1)
+    .order('ctc_chg', { ascending: true, nullsFirst: false }).limit(5) : Promise.resolve({ data: [] }));
+
+  if (loop.err) return null;            // the loop below says what went wrong in its own words
+  if (!loop.rows) return <V3SkeletonRows n={4}/>;
+  if (stages.length < 3) return null;
+
+  const potential = Number(stages[0].potential), actual = Number(stages[0].actual);
+  const monthName = v3Month(mo, 'long');
+  const lastFull = (() => { const d = new Date(); return new Date(Date.UTC(d.getFullYear(), d.getMonth() - 1, 1)).toISOString().slice(0, 7); })();
+  const lags = String(mo).slice(0, 7) < lastFull;
+  const losses = stages.filter(s => Number(s.leak) > 0);
+  // The most abnormal loss is the finding, not the largest: a big number inside normal
+  // variation is not something that broke (same rule as the loop panel).
+  const odd = losses.length ? losses.reduce((w, s) => (Number(s.sigma) < Number(w.sigma) ? s : w), losses[0]) : null;
+  const top = odd && odd.metric === 'cart to checkout'
+    ? ((cut.rows || []).filter(c => !c.is_thin && c.ctc_chg != null)[0] || null) : null;
+  const spread = sig => { const a = Math.abs(Number(sig)); return a >= 3 ? 'far outside' : a >= 2 ? 'well outside' : a >= 1 ? 'a little outside' : 'within'; };
+
+  const head = odd && Math.abs(Number(odd.sigma)) >= 2
+    ? 'Fewer shoppers than usual made it from ' + odd.metric.replace(/ to /, ' to ') + ' in ' + monthName + '.'
+    : actual >= potential ? 'Every stage of the site ran at or above its normal in ' + monthName + '.'
+    : 'Nothing on the site broke in ' + monthName + ' — the shortfall is ordinary month-to-month variation.';
+  const sub = odd ? (lpOddLine(odd, top) + ' ' + (actual < potential
+      ? 'Altogether the site made ' + fmtMoney(potential - actual) + ' less profit before ads than it would have with every stage at its normal.'
+      : 'Altogether the site made ' + fmtMoney(actual - potential) + ' more than it would have with every stage at its normal.')) : '';
+  function lpOddLine(o, t) {
+    return v3Sentence(o.metric) + ' was ' + v3StageVal(o.fmt, o.v) + ' against a normal ' + v3StageVal(o.fmt, o.mu)
+      + ' — ' + spread(o.sigma) + ' its usual range — and cost about ' + fmtMoney(o.leak) + '.'
+      + (t ? ' Most of it happened on ' + (t.value === '/' ? 'the home page' : t.value) + ', where it fell ' + fmtPctN(Math.abs(Number(t.ctc_chg))) + '.' : '');
+  }
+
+  // Bridge: normal → each stage's effect → what the month made.
+  let run = potential;
+  const bars = [{ name: 'At normal', base: 0, val: potential, kind: 'total' }];
+  stages.forEach(s => {
+    const d = -Number(s.leak);            // a positive leak is profit lost
+    const lo = Math.min(run, run + d);
+    bars.push({ name: s.stage, base: lo, val: Math.abs(d), kind: d < 0 ? 'down' : 'up', delta: d, metric: s.metric });
+    run += d;
+  });
+  bars.push({ name: monthName.split(' ')[0], base: 0, val: actual, kind: 'total' });
+  const colour = k => (k === 'total' ? PAL.data3 : k === 'down' ? PAL.bad : PAL.good);
+  const tip = ({ active, payload }) => {
+    if (!active || !payload || !payload.length) return null;
+    const p = payload[0].payload;
+    return (<div className="v3-tip"><b>{p.name}{p.metric ? ' · ' + p.metric : ''}</b>
+      <span>{p.kind === 'total' ? 'Profit before ads' : 'Effect on profit'} <em>{p.kind === 'total' ? fmtMoney(p.val) : (p.delta >= 0 ? '+' : '−') + fmtMoney(Math.abs(p.delta))}</em></span></div>);
+  };
+
+  return (<div className="v3-page-stack">
+    <section>
+      <div className="v3-kick">Where shoppers dropped off · {monthName}</div>
+      <p className="v3-verdict">{head}</p>
+      {sub && <p className="v3-note v3-measure">{sub}</p>}
+      {lags && <p className="micro muted v3-measure">{monthName} is the latest month whose site tracking passed Greta’s checks; later months appear once their checkout events are complete.</p>}
+    </section>
+
+    <figure className="v3-chart v3-chart-solo">
+      <figcaption><span className="v3-chart-title">From a normal month to {monthName}</span>
+        <span className="v3-legend"><i style={{ background: PAL.bad }}/>Cost profit <i style={{ background: PAL.good }}/>Added profit</span></figcaption>
+      <R.ResponsiveContainer width="100%" height={240}>
+        <R.BarChart data={bars} margin={{ top: 20, right: 8, left: 0, bottom: 0 }}>
+          <R.CartesianGrid/>
+          <R.XAxis dataKey="name" interval={0}/>
+          <R.YAxis tickFormatter={fmtMoneyK}/>
+          <R.Tooltip content={tip} cursor={false}/>
+          <R.Bar dataKey="base" stackId="w" fill="transparent" isAnimationActive={false}/>
+          <R.Bar dataKey="val" stackId="w" radius={[2, 2, 0, 0]}>
+            {bars.map((b, i) => <R.Cell key={i} fill={colour(b.kind)}/>)}
+            <R.LabelList dataKey="val" position="top" className="v3-bar-label"
+              content={({ x, y, width, index }) => {
+                const b = bars[index]; if (!b) return null;
+                const t = b.kind === 'total' ? fmtMoney(b.val) : (b.delta >= 0 ? '+' : '−') + fmtMoney(Math.abs(b.delta));
+                return <text x={x + width / 2} y={y - 6} textAnchor="middle" className="v3-bar-label">{t}</text>;
+              }}/>
+          </R.Bar>
+        </R.BarChart>
+      </R.ResponsiveContainer>
+    </figure>
+
+    <section className="v3-sec">
+      <h2 className="v3-sec-title">Each stage against its normal</h2>
+      <table className="v3-rw">
+        <thead><tr><th className="t-text">Stage</th><th className="t-text">Measured by</th><th>{monthName.split(' ')[0]}</th><th>Normal</th><th>Effect on profit</th></tr></thead>
+        <tbody>{stages.map(s => {
+          const d = -Number(s.leak), odd2 = Math.abs(Number(s.sigma)) >= 2;
+          return (<tr key={s.stage_no}>
+            <td className="t-text v3-rw-name">{s.stage}{odd2 && <span className={'v3-flag' + (d >= 0 ? ' good' : '')}>{Number(s.sigma) < 0 ? 'unusually low' : 'unusually high'}</span>}</td>
+            <td className="t-text v3-muted">{v3Sentence(s.metric)}</td>
+            <td>{v3StageVal(s.fmt, s.v)}</td>
+            <td className="v3-muted">{v3StageVal(s.fmt, s.mu)}</td>
+            <td className={d < 0 ? 'v3-down' : 'v3-up'}>{(d >= 0 ? '+' : '−') + fmtMoney(Math.abs(d))}</td>
+          </tr>);
+        })}</tbody>
+      </table>
+      <p className="micro muted v3-measure">Normal is each stage’s own average over the twelve months before. The effects add up exactly to the gap between a normal month and this one, and no stage is counted twice.</p>
+    </section>
+  </div>);
+}
+
 // ── Customers (V3, live) ─────────────────────────────────────────────────────
 function V3Customers() {
   const tier = useV3Rows('cust-tier', (sb, b) => sb.from('vw_customer_tier_periods')
@@ -16229,7 +16351,8 @@ const V3_PAGES = {
     <V3More id="mk-organic" label="Organic and social"><V3Anchor id="organic"/><Organic/></V3More>
   </>),
   website: (p) => (<>
-    {mosView('LoopView')}
+    <V3Website/>
+    <V3More id="web-loop" label="The detail — the loop, and which slice of traffic it happened in">{mosView('LoopView')}</V3More>
     <V3More id="web-cvr" label="What moves conversion"><V3Anchor id="cvr"/><CvrDrivers/></V3More>
     <V3More id="web-friction" label="Site structure and friction"><V3Anchor id="friction"/><SiteStructure start={p.start}/></V3More>
   </>),

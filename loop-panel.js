@@ -52,6 +52,12 @@
   const count = n => n === null || n === undefined || !isFinite(n) ? '—' : Number(n).toLocaleString('en-GB');
   const pct1 = n => n === null || n === undefined || !isFinite(n) ? '—' : (n * 100).toFixed(1) + '%';
   const signedPct = n => n === null || n === undefined || !isFinite(n) ? '—' : (n >= 0 ? '+' : '−') + Math.abs(n * 100).toFixed(0) + '%';
+  // Owner language for the loop's statistics (2026-10-01): months by name, how far outside its
+  // normal a stage ran in words rather than standard deviations, and a capital where a sentence
+  // opens on a metric name ("add to cart rate lost more...").
+  const lpMonth = (m) => { const d = new Date(String(m).slice(0, 7) + '-01T00:00:00Z'); return isNaN(d) ? String(m) : d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' }); };
+  const lpSpread = (sig) => { const a = Math.abs(Number(sig)); return a >= 3 ? 'far outside its normal range' : a >= 2 ? 'well outside its normal range' : 'within its normal month-to-month swing'; };
+  const lpCap = (s) => { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); };
   const signedMoney = n => n === null || n === undefined || !isFinite(n) ? '—' : (n >= 0 ? '−' : '+') + money(Math.abs(n)); // a positive leak is money LOST
 
   function fmtStage(v, fmt) {
@@ -622,20 +628,20 @@
       className: "lp-h"
     }, "Where the month went"), /*#__PURE__*/React.createElement("span", {
       className: "lp-asof"
-    }, month, " · each stage against its own twelve month normal")), monthLags && /*#__PURE__*/React.createElement("p", {
+    }, lpMonth(month), " · each stage against its own twelve-month normal")), monthLags && /*#__PURE__*/React.createElement("p", {
       className: "lp-note"
-    }, String(month).slice(0, 7), " is the latest month whose site tracking passed Greta's quality checks. Later months are held back because their site analytics data was incomplete (for example, checkout events stopped recording); they appear here automatically once the data is reliable. ", window.__oiNav && /*#__PURE__*/React.createElement("button", {
+    }, lpMonth(month), " is the latest month whose site tracking passed Greta's quality checks. Later months are held back because their site analytics data was incomplete (for example, checkout events stopped recording); they appear here automatically once the data is reliable. ", window.__oiNav && /*#__PURE__*/React.createElement("button", {
       type: "button",
       className: "tdy-linkbtn",
       onClick: () => window.__oiNav('settings', 'connections')
     }, "Check connections")), /*#__PURE__*/React.createElement("p", {
       className: "lp-answer"
-    }, "The clearest break is ", /*#__PURE__*/React.createElement("b", null, oddest.metric), ", ", Math.abs(Number(oddest.sigma)).toFixed(1), ' ', "standard deviations below its own normal and worth ", /*#__PURE__*/React.createElement("b", null, money(Number(oddest.leak))), top && /*#__PURE__*/React.createElement("span", null, ", concentrated in ", /*#__PURE__*/React.createElement("b", null, top.value === '/' ? 'the home page' : top.value), ' ', "at ", signedPct(Number(top.ctc_chg)), " on the month"), ".", splitStory && /*#__PURE__*/React.createElement("span", null, " ", biggest.metric, " lost more in pounds, ", money(Number(biggest.leak)), ", but at", ' ', Math.abs(Number(biggest.sigma)).toFixed(1), " standard deviations that is ordinary month-to-month variation rather than something that broke."), gain.length > 0 && /*#__PURE__*/React.createElement("span", null, " ", gain.map(g => g.metric).join(' and '), " ran above normal and put", ' ', money(Math.abs(gain.reduce((t, g) => t + Number(g.leak), 0))), " back.")), /*#__PURE__*/React.createElement(LeakRing, {
+    }, "The clearest break is ", /*#__PURE__*/React.createElement("b", null, oddest.metric), ", ", lpSpread(oddest.sigma), " and worth ", /*#__PURE__*/React.createElement("b", null, money(Number(oddest.leak))), top && /*#__PURE__*/React.createElement("span", null, ", concentrated in ", /*#__PURE__*/React.createElement("b", null, top.value === '/' ? 'the home page' : top.value), ' ', "at ", signedPct(Number(top.ctc_chg)), " on the month"), ".", splitStory && /*#__PURE__*/React.createElement("span", null, " ", lpCap(biggest.metric), " lost more in pounds, ", money(Number(biggest.leak)), Math.abs(Number(biggest.sigma)) < 2 ? ", but that is within its normal month-to-month swing, not something that broke." : ", and that is " + lpSpread(biggest.sigma) + " too."), gain.length > 0 && /*#__PURE__*/React.createElement("span", null, " ", lpCap(gain.map(g => g.metric).join(' and ')), " ran above normal and put", ' ', money(Math.abs(gain.reduce((t, g) => t + Number(g.leak), 0))), " back.")), /*#__PURE__*/React.createElement(LeakRing, {
       stages: stages,
       geometry: geometry
     }), /*#__PURE__*/React.createElement("p", {
       className: "lp-note"
-    }, "The pipe enters carrying what this brand would produce with every stage at its own twelve month normal, and narrows at each join. The five figures sum exactly to the difference between that and what the month actually produced, allocated by log contribution so no stage is double counted and the order they are drawn in does not change the answer."), cutRows && cutRows.length > 0 && /*#__PURE__*/React.createElement("div", {
+    }, "The ring starts with what the month would have made with every stage at its own twelve-month normal, and narrows or widens at each stage. The five figures add up exactly to the gap between that and what the month actually made, and no stage is counted twice."), cutRows && cutRows.length > 0 && /*#__PURE__*/React.createElement("div", {
       className: "lp-section"
     }, /*#__PURE__*/React.createElement("h3", {
       className: "lp-h3"

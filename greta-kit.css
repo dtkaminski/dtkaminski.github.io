@@ -497,3 +497,9 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-main .cg-scen { border-color: var(--color-line); border-radius: var(--radius-none); }
 .v3-main .cg-proj-cell { font-family: var(--font-figure); }
 .v3-main .cg-foot { font-size: var(--text-xs); color: var(--color-muted); max-width: 68ch; margin-top: var(--space-3); line-height: var(--leading-body); }
+
+/* ── Bridge labels and stage flags (Website) ─────────────────────────────── */
+.v3-bar-label { font-family: var(--font-figure); font-size: var(--text-xs); font-weight: var(--weight-semi); fill: var(--color-ink); }
+.v3-flag { display: inline-block; margin-left: var(--space-2); padding: 0 var(--space-2); border-radius: var(--radius-sm);
+  background: var(--color-danger-wash); color: var(--color-danger); font-size: var(--text-xs); font-weight: var(--weight-normal); vertical-align: middle; }
+.v3-flag.good { background: var(--color-success-wash); color: var(--color-success); }
