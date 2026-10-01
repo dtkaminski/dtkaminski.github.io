@@ -4947,24 +4947,28 @@ function Customers(){
   const retPctSeries    = weeks.map(w=>({d:w.label, v:+w.retPct.toFixed(1)}));
   const retRevPctSeries = weeks.map(w=>({d:w.label, v:+w.retRevPct.toFixed(1)}));
   const listNetSeries   = listChart.map(r=>({d:r.date, v:r.net}));
+  // Each block renders only from data it actually has. B is a static snapshot: empty for every
+  // brand but frkl, and retired for frkl too once it is weeks old — and these tiles divided
+  // zero by zero into "NaN%", "£0 of £0" and "+0" rather than saying nothing.
+  const hasRet = (totalNew + totalRet) > 0, hasList = list.length > 0, hasGeo = geo.length > 0;
   return (
     <div>
       <RetentionPanel/>
-      <div className="row" style={{marginBottom:14}}>
-        <KPI label="% orders from returning" val={PCT((totalRet)/(totalNew+totalRet))} sub={`${NUM(totalRet)} returning / ${NUM(totalNew)} new (90d)`} series={retPctSeries} seriesLabel="Returning order share · by week"
+      {(hasRet || hasList || hasGeo) && <div className="row" style={{marginBottom:14}}>
+        {hasRet && <KPI label="% orders from returning" val={PCT((totalRet)/(totalNew+totalRet))} sub={`${NUM(totalRet)} returning / ${NUM(totalNew)} new (90d)`} series={retPctSeries} seriesLabel="Returning order share · by week"
           agent="Lux" observation="38.7% repeat is healthier than Clarity's 95% new-visitor stat suggested — buyers ARE coming back."
-          implication="The repeat customer is real but undermonetised — post-purchase + restyle flows would lift customer lifetime value materially." />
-        <KPI label="Returning revenue share" val={PCT((totalRetRev)/(totalNewRev+totalRetRev))} sub={`${curSym()}${NUM(totalRetRev)} of ${curSym()}${NUM(totalNewRev+totalRetRev)}`} series={retRevPctSeries} seriesLabel="Returning revenue share · by week"
+          implication="The repeat customer is real but undermonetised — post-purchase + restyle flows would lift customer lifetime value materially." />}
+        {hasRet && <KPI label="Returning revenue share" val={PCT((totalRetRev)/(totalNewRev+totalRetRev))} sub={`${curSym()}${NUM(totalRetRev)} of ${curSym()}${NUM(totalNewRev+totalRetRev)}`} series={retRevPctSeries} seriesLabel="Returning revenue share · by week"
           agent="Atlas" observation="29.6% of revenue from returning customers comes with zero acquisition cost — highest-margin slice."
-          implication={`Every ${curSym()}1 of retention spend likely returns more than every ${curSym()}1 of paid acquisition right now.`} />
-        <KPI label="Net list growth (90d)" val={'+'+NUM(subsTotal-unsubsTotal)} sub={`${NUM(subsTotal)} new − ${NUM(unsubsTotal)} unsub`} series={listNetSeries} seriesLabel="Net list growth · by day"
+          implication={`Every ${curSym()}1 of retention spend likely returns more than every ${curSym()}1 of paid acquisition right now.`} />}
+        {hasList && <KPI label="Net list growth (90d)" val={'+'+NUM(subsTotal-unsubsTotal)} sub={`${NUM(subsTotal)} new − ${NUM(unsubsTotal)} unsub`} series={listNetSeries} seriesLabel="Net list growth · by day"
           agent="Sage" observation="~26 new subs/day with <5 unsubs — acquisition is filling the funnel cleanly."
-          implication="The list is healthy; the gap is monetisation — abandoned-cart + welcome series are the levers, not more sign-ups." />
-        <KPI label="Markets" val={geo.length+'+'} sub={`UK ${PCT(geo[0]?.netSales/geo.reduce((a,b)=>a+b.netSales,0))} · IE ${PCT((geo[1]?.netSales||0)/geo.reduce((a,b)=>a+b.netSales,0))}`}
+          implication="The list is healthy; the gap is monetisation — abandoned-cart + welcome series are the levers, not more sign-ups." />}
+        {hasGeo && <KPI label="Markets" val={geo.length+'+'} sub={`UK ${PCT(geo[0]?.netSales/geo.reduce((a,b)=>a+b.netSales,0))} · IE ${PCT((geo[1]?.netSales||0)/geo.reduce((a,b)=>a+b.netSales,0))}`}
           agent="Scout" observation={OI_BRAND.slug==='frkl' ? `UK 66% / Ireland 30% — Ireland is genuinely a second home market, and average order value is ${curSym()}6 higher there.` : undefined}
-          implication={OI_BRAND.slug==='frkl' ? "An IE-specific creative + landing test could capitalise on the higher-average order value behaviour you're already seeing." : undefined} />
-      </div>
-      <div className="card" style={{marginBottom:14}}>
+          implication={OI_BRAND.slug==='frkl' ? "An IE-specific creative + landing test could capitalise on the higher-average order value behaviour you're already seeing." : undefined} />}
+      </div>}
+      {hasRet && <div className="card" style={{marginBottom:14}}>
         <h2>New vs returning orders — weekly</h2>
         <R.ResponsiveContainer width="100%" height={250}>
           <R.ComposedChart data={weeks} margin={{top:6,right:8,left:14,bottom:20}}>
@@ -4981,21 +4985,21 @@ function Customers(){
             {false && <R.Line yAxisId="r" type="monotone" dataKey="retPct" name="% returning" stroke={svgCol(COL.email)} strokeWidth={2} dot={false} />}
           </R.ComposedChart>
         </R.ResponsiveContainer>
-      </div>
-      <ConfigurableChart
+      </div>}
+      {hasGeo && <ConfigurableChart
         title="Explore markets — Shopify settlement"
         dataset={(geo||[]).map(g=>({country:g.country||'(unknown)', region:/kingdom|^uk$|^gb$/i.test(g.country||'')?'UK':/ireland|^ie$/i.test(g.country||'')?'Ireland':'Rest of world', revenue:g.netSales||0, orders:g.orders||0}))}
         dimensions={[{key:'country',label:'Country'},{key:'region',label:'Region (UK/IE/RoW)'}]}
         metrics={[{key:'revenue',label:'Net revenue',fmt:GBP},{key:'orders',label:'Orders',fmt:NUM}]}
-        defaultMetric="revenue" defaultSplit="country" defaultChart="bar" defaultTopN={10}/>
-      <div className="row">
-        <div className="card" style={{flex:'1 1 360px'}}>
+        defaultMetric="revenue" defaultSplit="country" defaultChart="bar" defaultTopN={10}/>}
+      {(hasGeo || hasList) && <div className="row">
+        {hasGeo && <div className="card" style={{flex:'1 1 360px'}}>
           <h2>Markets — top 10</h2>
           <table><thead><tr><th>Country</th><th>Orders</th><th>Net rev</th><th>Average order</th></tr></thead><tbody>
           {geo.map((g,i)=>(<tr key={i}><td>{g.country||'(unknown)'}</td><td>{NUM(g.orders)}</td><td>{GBP(g.netSales)}</td><td>{GBP(g.aov)}</td></tr>))}
           </tbody></table>
-        </div>
-        <div className="card" style={{flex:'1 1 360px'}}>
+        </div>}
+        {hasList && <div className="card" style={{flex:'1 1 360px'}}>
           <h2>Klaviyo list — daily net growth</h2>
           <R.ResponsiveContainer width="100%" height={200}>
             <R.BarChart data={listChart} margin={{top:6,right:8,left:14,bottom:18}}>
@@ -5006,9 +5010,9 @@ function Customers(){
               <R.Bar dataKey="net" fill={svgCol(COL.email)} />
             </R.BarChart>
           </R.ResponsiveContainer>
-        </div>
-      </div>
-      {OI_BRAND.slug==='frkl' && <div className="note" style={{marginTop:14}}>The big spike of returning customers <b>late April</b>{` (Apr 22–28) is the cohort responding to Meta re-scaling on Apr 13 — and the email flow firing on that traffic. Ireland's average order value (${curSym()}71) is meaningfully higher than the UK's (${curSym()}65). The list is net-positive every single day — Klaviyo has product-market fit for acquisition; the gap is monetisation of the list with proper attributed reporting.`}</div>}
+        </div>}
+      </div>}
+      {OI_BRAND.slug==='frkl' && hasRet && <div className="note" style={{marginTop:14}}>The big spike of returning customers <b>late April</b>{` (Apr 22–28) is the cohort responding to Meta re-scaling on Apr 13 — and the email flow firing on that traffic. Ireland's average order value (${curSym()}71) is meaningfully higher than the UK's (${curSym()}65). The list is net-positive every single day — Klaviyo has product-market fit for acquisition; the gap is monetisation of the list with proper attributed reporting.`}</div>}
     </div>
   );
 }
