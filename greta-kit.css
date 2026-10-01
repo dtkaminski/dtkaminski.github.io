@@ -167,7 +167,7 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
   box-shadow: 0 0 0 1px var(--color-line); }
 
 /* ── Inputs ──────────────────────────────────────────────────────────────── */
-.v3-main input[type="text"], .v3-main input[type="number"], .v3-main input[type="email"], .v3-main input[type="date"],
+.v3-main input[type="text"], .v3-main input[type="number"], .v3-main input[type="email"], .v3-main input[type="date"], .v3-main input[type="search"],
 .v3-main input:not([type]), .v3-main select, .v3-main textarea {
   font-family: var(--font-figure); font-size: var(--text-sm); color: var(--color-ink);
   background: var(--color-panel); border: 1px solid var(--color-line-strong); border-radius: var(--radius-md);
@@ -758,3 +758,31 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-main .gp-wrap div:has(> table) { overflow-x: auto; }
 .v3-main .go-tile { min-width: 0; }
 @media (max-width: 720px) { .v3-main .go-tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
+
+/* Cost lines that can be a fixed amount per order or a share of sales: the label carries a small
+   two-way switch, the input carries the unit (currency before, % after). */
+.v3-field-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap;
+  font-size: var(--text-sm); color: var(--color-muted); line-height: var(--leading-tight); }
+.v3-main .v3-unit { display: inline-flex; border: 1px solid var(--color-line-strong); border-radius: var(--radius-md); overflow: hidden; }
+.v3-main .v3-unit button { min-height: 0 !important; height: auto; padding: var(--space-1) var(--space-2); font: inherit; font-size: var(--text-xs);
+  color: var(--color-muted); background: var(--color-panel); border: 0; border-radius: 0 !important; cursor: pointer; white-space: nowrap; }
+.v3-main .v3-unit button + button { border-left: 1px solid var(--color-line-strong); }
+.v3-main .v3-unit button[aria-pressed="true"] { color: var(--color-ink); background: var(--color-surface); font-weight: var(--weight-semi); }
+.v3-main .v3-affix[data-post="% of sales"] input { padding-right: calc(var(--space-3) + 9ch); }
+
+/* Product costs (Goal & costs). A product list with a cost per row, edited in place. */
+.v3-main .v3-search { width: 100%; max-width: 24rem; margin-bottom: var(--space-4); font-family: var(--font-sans); }
+.v3-main .v3-costs th:not(.t-text), .v3-main .v3-costs td:not(.t-text) { text-align: right; white-space: nowrap; }
+.v3-main .v3-costs td:last-child { width: 1%; }
+.v3-cost-src { display: block; font-size: var(--text-xs); }
+.v3-main .v3-cost-edit td { background: var(--color-surface); padding: var(--space-4) var(--space-3) !important; text-align: left !important; white-space: normal !important; }
+.v3-cost-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+.v3-check { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-ink); cursor: pointer; }
+.v3-check input { width: auto; min-height: 0; height: auto; accent-color: var(--color-accent); }
+.v3-main .v3-ok { color: var(--color-success); }
+.v3-main .v3-bad { color: var(--color-danger); }
+.v3-main .v3-chips-plain .v3-chip { text-transform: none; }
+/* Steps inside the cash drawer sit on the page edge like every other section — no inset card. */
+.v3-main .v3-econ-step { padding: 0 0 var(--space-6); }
+.v3-main .v3-econ-step + .v3-econ-step { border-top: 1px solid var(--color-line); padding-top: var(--space-6); }
+.v3-main .v3-check + .v3-note { margin-top: var(--space-2); }

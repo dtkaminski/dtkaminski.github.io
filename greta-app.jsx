@@ -131,7 +131,19 @@ function dtcAov(){
 // Contribution card already uses — extended with a gross-margin % and a verified
 // flag. (Per-tenant server-side persistence is the v2; local-first today.)
 const COST_DEFAULTS = {gmPct:'', packaging:'0.50', fulfilment:'2.00', shipping:'3.50', payPct:'1.5', payFixed:'0.25', refundPct:'7.4'};
+// The brand's saved costs (Goal & costs → brand_config.variable_costs, 0221) are the source. Lines a
+// brand entered as % of sales fold into payPct, the one revenue-proportional rate these older
+// calculators know; "other" per-order costs fold into packaging. The browser copy below is only the
+// signed-out demo's fallback — it used to be every card's source, pre-filled with frkl's numbers.
 function costConfig(){
+  const c = typeof window !== 'undefined' && window.FRKL_PLAN && window.FRKL_PLAN.config;
+  if (c) {
+    const v = c.variable_costs || {}, f = k => Number(v[k]) || 0;
+    return { gmPct: c.gross_margin != null ? String(Math.round(Number(c.gross_margin) * 1000) / 10) : '',
+      packaging: String(f('packaging') + f('other')), fulfilment: String(f('fulfilment')), shipping: String(f('shipping')),
+      payPct: String(f('payPct') + f('shippingPct') + f('fulfilmentPct') + f('packagingPct') + f('otherPct')),
+      payFixed: String(f('payFixed')), refundPct: String(f('refundPct')), verified: c.gross_margin != null };
+  }
   try { return {...COST_DEFAULTS, ...(JSON.parse(localStorage.getItem('frkl-contrib-inputs')||'{}'))}; }
   catch(e){ return {...COST_DEFAULTS}; }
 }
@@ -3266,7 +3278,7 @@ function pnlTotals(rows){
 }
 function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
   const COST_DEFAULTS = {packaging:'0.50', fulfilment:'2.00', shipping:'3.50', payPct:'1.5', payFixed:'0.25', refundPct:'7.4'};
-  let contribSaved = {}; try { contribSaved = JSON.parse(localStorage.getItem('frkl-contrib-inputs')||'{}'); } catch(e){}
+  const contribSaved = costConfig();   // the brand's saved costs, not a browser-only copy
   // Seed the driver tree from live data so defaults reproduce roughly the current run-rate.
   const retShare = (returningPct!=null && returningPct>0 && returningPct<1) ? returningPct : 0.3;
   const newOrders = Math.max(1, Math.round((orders||1)*(1-retShare)));
@@ -3753,7 +3765,7 @@ function Overview({start, period, customActive}){
   })();
   // ── Unit economics (Atlas): break-even ROAS, allowable CAC, first-order payback ──
   // Variable cost rate from the contribution card's saved inputs (per-order + %).
-  const _ci = (()=>{ try { return {packaging:'0.50',fulfilment:'2.00',shipping:'3.50',payPct:'1.5',payFixed:'0.25',refundPct:'7.4', ...(JSON.parse(localStorage.getItem('frkl-contrib-inputs')||'{}'))}; } catch(e){ return {}; } })();
+  const _ci = costConfig();   // the brand's saved costs (Goal & costs), not a browser-only copy
   const _cn = k => { const f=parseFloat(String(_ci[k]==null?'':_ci[k]).replace(',','.').replace(/[^0-9.]/g,'')); return isFinite(f)?f:0; };
   // cmr already nets off packaging, fulfilment, shipping, payment fees and returns — it is
   // the per-order contribution rate. The old line took gross margin and subtracted a
@@ -3857,12 +3869,12 @@ function Overview({start, period, customActive}){
             <div style={{fontWeight:'var(--weight-bold)', fontSize:'var(--text-base)', marginBottom:3}}>Make the margin numbers exact <span style={{fontWeight:'var(--weight-normal)', color:'var(--text-faint)', fontSize:'var(--text-sm)'}}>· optional, ~5 min</span></div>
             <div className="fine" style={{color:'var(--text-secondary)', lineHeight:1.5}}>The read above already works on catalogue-estimate margins. Enter your real product cost + fulfilment once and contribution, cost per new customer payback and customer lifetime value:cost per new customer become exact — and carry a <b>verified</b> badge for the raise.</div>
           </div>
-          <button onClick={()=>{ if (UI_V3) { window.__oiGo && window.__oiGo('goal'); return; } setCostsOpen(true); }} className="btn-primary" style={{flexShrink:0}}>Set up costs →</button>
+          <button onClick={()=>{ if (UI_V3) { window.__oiGo && window.__oiGo('goal', 'margin'); return; } window.__oiGo && window.__oiGo('goal', 'margin'); }} className="btn-primary" style={{flexShrink:0}}>Set up costs →</button>
         </div>
       )}
       {costsVerified && (
         <div className="micro" style={{color:'var(--text-faint)', display:'flex', alignItems:'center', gap:8}}>
-          <MarginBadge/> margin figures are based on your entered costs · <span onClick={()=>{ if (UI_V3) { window.__oiGo && window.__oiGo('goal'); return; } setCostsOpen(true); }} style={{color:'var(--accent)', cursor:'pointer'}}>edit costs</span>
+          <MarginBadge/> margin figures are based on your entered costs · <span onClick={()=>{ if (UI_V3) { window.__oiGo && window.__oiGo('goal', 'margin'); return; } window.__oiGo && window.__oiGo('goal', 'margin'); }} style={{color:'var(--accent)', cursor:'pointer'}}>edit costs</span>
         </div>
       )}
       {/* The ranked queue used to render here in full, above the money read. It is the Actions
@@ -3908,7 +3920,7 @@ function Overview({start, period, customActive}){
             agent="Atlas" observation={`Code + automatic discount as a share of DTC gross sales (draft/exchange orders excluded). This excludes sale-price markdowns${_mdPct?`, which add ~${_mdPct}% of value on top`:''} — the full load is on the Promotions tab.`}
             implication="Audit always-on codes + affiliate rates; protect full-price demand. The true load incl. markdowns is materially higher — see Promotions."
             benchmark="discount_load" bmValue={discLoad} />
-          <KPI label="Profit after ads (% of sales)" val={cmPct!=null?PCT(cmPct):'—'} sub="what you keep from each £ of sales, after product costs and ads · 10% or more is healthy" badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesContrib} seriesLabel={`Contribution ${curSym()} · by day`} current={contrib} prior={pContrib} goodDirection="up"
+          <KPI label="Profit after ads (% of sales)" val={cmPct!=null?PCT(cmPct):'—'} sub="what you keep from each £ of sales, after product costs and ads · 10% or more is healthy" badge={<MarginBadge onSetup={()=>{ window.__oiGo && window.__oiGo('goal', 'margin'); }}/>} series={seriesContrib} seriesLabel={`Contribution ${curSym()} · by day`} current={contrib} prior={pContrib} goodDirection="up"
             status={cmPct==null?undefined:cmPct>=0.10?'healthy':cmPct>=0.05?'watch':'margin'} statusLabel={cmPct==null?undefined:cmPct>=0.10?'Healthy':cmPct>=0.05?'Watch':'Margin risk'}
             agent="Atlas" observation="Whether the growth is actually profitable — net revenue × product margin minus paid media, as a share of revenue. Returns are already netted out of revenue. The single best read on profitable vs vanity growth."
             implication="Below 10% means scaling just amplifies a thin engine — fix discount load, returns and cost per new customer before adding spend."
@@ -3918,7 +3930,7 @@ function Overview({start, period, customActive}){
             agent="Atlas" observation="How many orders it takes to recover the paid cost of acquiring a customer, at your margin. Under ~2 orders = a healthy cash cycle that funds reinvestment."
             implication="This is the lever on cash flow — faster payback frees working capital. Watch it as you scale spend; if it stretches past 2, growth starts eating cash." />
           <MoreKpis count={8}>
-          <KPI label="Gross margin" val={PCT(gm)} sub={costsVerified?"Your entered gross margin":"product cost-based · catalogue estimate"} badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesGM} seriesLabel="Catalogue margin · structurally stable"
+          <KPI label="Gross margin" val={PCT(gm)} sub={costsVerified?"Your entered gross margin":"product cost-based · catalogue estimate"} badge={<MarginBadge onSetup={()=>{ window.__oiGo && window.__oiGo('goal', 'margin'); }}/>} series={seriesGM} seriesLabel="Catalogue margin · structurally stable"
             agent="Atlas" observation="Blended product margin across the live catalogue, after cost of goods."
             implication="This is the contribution base for the raise — defend it by keeping discount load in check."
             benchmark="gross_margin" bmValue={gm} />
@@ -3935,15 +3947,15 @@ function Overview({start, period, customActive}){
           <KPI label="Returning customers" val={PCT(returningPct)} sub="share of orders · trailing months" series={seriesReturning} seriesLabel="Repeat-order share · by month" goodDirection="up"
             agent="Lux" observation="Repeat-purchase share — the cheapest revenue you have and a read on brand love."
             implication="Lift with post-purchase flows + a reason to come back; it compounds faster than paid." />
-          <KPI label="Profit after ads" val={GBP(contrib)} sub="gross profit − paid media · full breakdown below" badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesContrib} current={contrib} prior={pContrib} goodDirection="up"
+          <KPI label="Profit after ads" val={GBP(contrib)} sub="gross profit − paid media · full breakdown below" badge={<MarginBadge onSetup={()=>{ window.__oiGo && window.__oiGo('goal', 'margin'); }}/>} series={seriesContrib} current={contrib} prior={pContrib} goodDirection="up"
             agent="Atlas" observation="Net revenue × blended product margin, minus paid ad spend — before packaging/fulfilment/fees. The fully-loaded figure is in the Contribution margin card."
             implication="This is what the raise hinges on; hold it by balancing discount load (margin) against sales per £ of ads (cost per new customer)." />
-          <KPI label="New-customer cost" val={GBP(cac)} sub={`${NUM(newCust)} new customers · measured, not inferred`} badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesCAC} seriesLabel="Spend ÷ new customers · by day" current={cac} prior={pCac} goodDirection="down"
+          <KPI label="New-customer cost" val={GBP(cac)} sub={`${NUM(newCust)} new customers · measured, not inferred`} badge={<MarginBadge onSetup={()=>{ window.__oiGo && window.__oiGo('goal', 'margin'); }}/>} series={seriesCAC} seriesLabel="Spend ÷ new customers · by day" current={cac} prior={pCac} goodDirection="down"
             agent="Pulse" observation="Paid ad spend ÷ new customers, both counted directly from your orders — no longer inferred from a repeat-purchase ratio."
             implication="Judge against contribution-customer lifetime value — keep scaling only while customer lifetime value:cost per new customer stays at 3×+." />
           <KPI label="Customer value" val={GBP(ltv)} sub={ltvBasis
               ? `contribution · ${ltvBasis} · vs cost per new customer ${ltvCac?ltvCac.toFixed(1)+'×':'—'}`
-              : 'not measured yet'} badge={<MarginBadge onSetup={()=>setCostsOpen(true)}/>} series={seriesLTV} seriesLabel="Contribution/customer · by day" goodDirection="up"
+              : 'not measured yet'} badge={<MarginBadge onSetup={()=>{ window.__oiGo && window.__oiGo('goal', 'margin'); }}/>} series={seriesLTV} seriesLabel="Contribution/customer · by day" goodDirection="up"
             agent="Atlas"
             observation={ltvBasis
               ? `Contribution per acquired customer, integrated from the cohort curve over the ${ltvBasis}. The horizon stops where the curve stops observing half the starting cohort, because past that point it is only the survivors talking about themselves.`
@@ -12361,6 +12373,11 @@ function GP_CurveLevers(p) {
 // (the cost modal, the profit-breakdown card, the cash editor). Those surfaces now send
 // people here, so anything they left behind is offered back as a suggestion — filled into
 // the form, never saved on their behalf.
+// The per-order lines a brand may enter as £ per order or as % of sales, and every variable_costs
+// key this page owns. One definition: SQL reads the same keys through fn_vc_per_order / fn_vc_pct.
+var GP_LINES = ['shipping', 'packaging', 'fulfilment', 'other'];
+var GP_VC_KEYS = ['payPct', 'payFixed', 'refundPct'].concat(GP_LINES, GP_LINES.map(function (k) { return k + 'Pct'; }));
+var GP_LINE_LABEL = { shipping: 'Shipping', packaging: 'Packaging', fulfilment: 'Pick, pack and dispatch', other: 'Other per-order costs' };
 function GP_BrowserCosts({ econ, setEcon }) {
   var stash = React.useMemo(function () {
     try {
@@ -12421,13 +12438,19 @@ function GretaPlanPanel({ show } = {}) {
     var c = window.FRKL_PLAN && (window.FRKL_PLAN.config || (window.FRKL_PLAN.configLoaded ? {} : null));
     if (c && econ === null) {
       var v = c.variable_costs || {};
-      setEcon({
+      var next = {
         gm: c.gross_margin != null ? String(Math.round(c.gross_margin * 1000) / 10) : '',
         fixed: c.fixed_costs_monthly != null ? String(c.fixed_costs_monthly) : '',
-        shipping: v.shipping != null ? String(v.shipping) : '', packaging: v.packaging != null ? String(v.packaging) : '',
-        fulfilment: v.fulfilment != null ? String(v.fulfilment) : '', payPct: v.payPct != null ? String(v.payPct) : '',
-        payFixed: v.payFixed != null ? String(v.payFixed) : '', refundPct: v.refundPct != null ? String(v.refundPct) : ''
+        payPct: v.payPct != null ? String(v.payPct) : '', payFixed: v.payFixed != null ? String(v.payFixed) : '',
+        refundPct: v.refundPct != null ? String(v.refundPct) : ''
+      };
+      // Shipping, packaging, dispatch and other are each stored as £ per order OR % of sales (0221).
+      GP_LINES.forEach(function (k) {
+        var pct = v[k + 'Pct'];
+        next[k + 'U'] = pct != null ? 'pct' : 'gbp';
+        next[k] = pct != null ? String(pct) : (v[k] != null ? String(v[k]) : '');
       });
+      setEcon(next);
     }
   }, [tick]);
 
@@ -12451,8 +12474,19 @@ function GretaPlanPanel({ show } = {}) {
     if (!econ) return;
     setBusy(true); setEcMsg(null);
     var base = (window.FRKL_PLAN.config && window.FRKL_PLAN.config.variable_costs) || {};
-    var vc = Object.assign({}, base);
-    ['shipping', 'packaging', 'fulfilment', 'payPct', 'payFixed', 'refundPct'].forEach(function (k) { if (econ[k] !== '' && econ[k] != null) vc[k] = Number(econ[k]); });
+    // The blob is replaced whole, so rebuild every key this form owns (a line switched from £ to %
+    // must lose its £ key) and keep anything else that is in there.
+    var vc = {};
+    Object.keys(base).forEach(function (k) { if (GP_VC_KEYS.indexOf(k) < 0) vc[k] = base[k]; });
+    var bad = null;
+    ['payPct', 'payFixed', 'refundPct'].forEach(function (k) { if (econ[k] !== '' && econ[k] != null) vc[k] = Number(econ[k]); });
+    GP_LINES.forEach(function (k) {
+      if (econ[k] === '' || econ[k] == null) return;
+      var n = Number(econ[k]);
+      if (econ[k + 'U'] === 'pct') { if (n > 100) bad = 'A percentage of sales can’t be more than 100.'; vc[k + 'Pct'] = n; } else vc[k] = n;
+    });
+    ['payPct', 'refundPct'].forEach(function (k) { if (vc[k] > 100) bad = 'A percentage of sales can’t be more than 100.'; });
+    if (bad) { setBusy(false); setEcMsg('err:' + bad); return; }
     var fields = { gross_margin: econ.gm === '' ? null : Number(econ.gm) / 100, fixed_costs_monthly: econ.fixed === '' ? null : Number(econ.fixed), variable_costs: vc };
     window.FRKL_PLAN.saveEconomics(fields).then(function (res) { setBusy(false); setEcMsg(res.ok ? 'ok' : ('err:' + (res.error || 'failed'))); });
   }
@@ -12517,14 +12551,47 @@ function GretaPlanPanel({ show } = {}) {
         <div style={{ fontSize: 'var(--text-sm)', color: GP_T.dim, marginBottom: 'var(--space-3)' }}>Overheads are what you pay every month whatever you sell — rent, wages, software. Operating profit is your profit after ads, less these.</div>
         {econ ? (
           <div>
-            {/* Two even rows of four: one-line labels, the unit inside the box (£ before, % after),
-                so every input sits on the same line whatever its label says. */}
+            {/* One place for what the business and each order cost (0221). Units sit inside the box:
+                currency before, % after. */}
             <div className="v3-form-grid">
-              {[['gm', 'Kept after product cost', '', '%'], ['fixed', 'Overheads a month', '£', ''], ['shipping', 'Shipping per order', '£', ''], ['packaging', 'Packaging per order', '£', ''],
-                ['fulfilment', 'Dispatch per order', '£', ''], ['payPct', 'Payment fee', '', '%'], ['payFixed', 'Payment fee per order', '£', ''], ['refundPct', 'Refund rate', '', '%']].map(function (f) {
+              {[['gm', 'Margin on products without a cost', '', '%'], ['fixed', 'Overheads a month', '£', '']].map(function (f) {
                 return (
                   <label key={f[0]} className="v3-field">
-                    <span title={f[1]}>{f[1]}</span>
+                    <span>{f[1]}</span>
+                    <span className="v3-affix" data-pre={f[2] ? curSym() : undefined} data-post={f[3] || undefined}>
+                      <input className="oi-num" inputMode="decimal" value={econ[f[0]]} onChange={function (e) { setE(f[0], e.target.value); }} />
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+            <p className="v3-note v3-measure">Product costs come from Shopify, one product at a time, under “Product costs” below. The margin here only fills in for products that have no cost yet.</p>
+
+            <h3 className="v3-sub v3-gap-top">Each order</h3>
+            <p className="v3-note v3-measure">Enter each one the way your invoices show it — a fixed amount per order, or a share of sales.</p>
+            <div className="v3-form-grid">
+              {GP_LINES.map(function (k) {
+                var pct = econ[k + 'U'] === 'pct';
+                var setU = function (u) { setEcon(function (o) { var n = Object.assign({}, o); n[k + 'U'] = u; return n; }); };
+                return (
+                  <div key={k} className="v3-field">
+                    <span className="v3-field-head"><span>{GP_LINE_LABEL[k]}</span>
+                      <span className="v3-unit" role="group" aria-label={GP_LINE_LABEL[k] + ': per order or share of sales'}>
+                        <button type="button" aria-pressed={!pct} onClick={function () { setU('gbp'); }}>{curSym()} per order</button>
+                        <button type="button" aria-pressed={pct} onClick={function () { setU('pct'); }}>% of sales</button>
+                      </span></span>
+                    <span className="v3-affix" data-pre={pct ? undefined : curSym()} data-post={pct ? '%' : undefined}>
+                      <input className="oi-num" inputMode="decimal" aria-label={GP_LINE_LABEL[k]} value={econ[k]} onChange={function (e) { setE(k, e.target.value); }} />
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="v3-form-grid v3-gap-top">
+              {[['payPct', 'Payment fee', '', '%'], ['payFixed', 'Payment fee per order', '£', ''], ['refundPct', 'Refunds', '', '% of sales']].map(function (f) {
+                return (
+                  <label key={f[0]} className="v3-field">
+                    <span>{f[1]}</span>
                     <span className="v3-affix" data-pre={f[2] ? curSym() : undefined} data-post={f[3] || undefined}>
                       <input className="oi-num" inputMode="decimal" value={econ[f[0]]} onChange={function (e) { setE(f[0], e.target.value); }} />
                     </span>
@@ -12742,7 +12809,7 @@ const NAV = [
     // The only place a brand can enter per-variant landed cost — unit, freight and duty. Business
     // economics above sets the BLENDED gross margin; this sets what things actually cost, which is
     // what moves the profit number from Estimated to Measured. Its backend was broken until 0188.
-    { id:'costs',       label:'Product costs', component: () => mosView('CostEntry') },
+    { id:'costs',       label:'Product costs', component: () => <V3ProductCosts/> },
     { id:'team',        label:'Team',        component: () => <TeamPanel/> },
   ]},
 ];
@@ -13301,6 +13368,163 @@ function priorsForVertical(v){
   return CATEGORY_PRIORS.default;
 }
 
+// ── Product costs ──────────────────────────────────────────────────────────
+// What each product costs to buy, from Shopify's "Cost per item", with the brand's own figure where it
+// differs. Every variant is listed (the old form only listed hand-entered ones, so a 51%-costed range
+// read "No variant costs yet"). An edit is the brand's: the sync skips anything costed here (0221),
+// and "Use Shopify's cost" hands it back. Freight and duty sit on top of Shopify's cost.
+function V3ProductCosts(){
+  const ASK = getOIAsk();
+  const authed = !!(ASK && ASK.brand_id && typeof ASK.getJwt === 'function' && ASK.endpoint);
+  const cfgUrl = authed ? ASK.endpoint.replace(/\/[^/]*$/, '') + '/save-brand-config' : '';
+  const [d, setD] = React.useState(undefined);            // undefined loading · false failed · object
+  const [q, setQ] = React.useState('');
+  const [filter, setFilter] = React.useState('all');
+  const [limit, setLimit] = React.useState(25);
+  const [edit, setEdit] = React.useState(null);           // { variant_id, unit, freight, duty }
+  const [busy, setBusy] = React.useState(false);
+  const [msg, setMsg] = React.useState(null);
+  const [prof, setProf] = React.useState(null);           // returns restocked, agency fee, shipping income
+  const call = async (method, body) => {
+    const jwt = await ASK.getJwt();
+    if (!jwt) return { ok: false, data: { message: 'Your session expired — refresh and sign in again.' } };
+    const r = await fetch(method === 'GET' ? cfgUrl + '?brand_id=' + encodeURIComponent(ASK.brand_id) : cfgUrl, method === 'GET'
+      ? { headers: { Authorization: 'Bearer ' + jwt } }
+      : { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jwt }, body: JSON.stringify({ brand_id: ASK.brand_id, ...body }) });
+    const data = await r.json().catch(() => ({}));
+    return { ok: r.ok, data };
+  };
+  const load = async () => {
+    try {
+      const { ok, data } = await call('GET');
+      if (!ok) { setD(false); return; }
+      setD(data);
+      const cp = data.cost_profile || {};
+      setProf({ restock: cp.restock_rate != null ? String(Math.round(Number(cp.restock_rate) * 1000) / 10) : '',
+        agency: cp.agency_fee_per_month != null ? String(cp.agency_fee_per_month) : '', shipIncome: cp.shipping_income_in_revenue !== false });
+    } catch (e) { setD(false); }
+  };
+  React.useEffect(() => { if (authed) load(); else setD(false); }, []);   // eslint-disable-line
+
+  if (!authed) return <div className="v3-empty">{v3NoBrand('your product costs')}</div>;
+  if (d === undefined) return <V3SkeletonRows n={4}/>;
+  if (d === false) return <div className="v3-empty">Greta couldn’t load your product costs just now. Refreshing the page usually sorts it.</div>;
+
+  const skuCost = {}; (d.sku_costs || []).forEach(r => { skuCost[r.sku] = r; });
+  const varCost = {}; (d.variant_costs || []).forEach(r => { varCost[r.variant_id] = r; });
+  const rows = (d.variant_catalog || []).map(v => {
+    const vc = varCost[v.variant_id], sc = v.sku ? skuCost[v.sku] : null;
+    const mine = (vc && vc.source !== 'shopify') ? vc : (sc && sc.source === 'manual' ? sc : null);
+    const shop = (vc && vc.source === 'shopify') ? vc : (sc && sc.source !== 'manual' ? sc : null);
+    return { ...v, mine, shop, cur: mine || shop, status: mine ? 'yours' : shop ? 'shopify' : 'missing' };
+  });
+  const n = k => rows.filter(r => r.status === k).length;
+  const cov = d.cogs_coverage && d.cogs_coverage.coverage_pct;
+  const gm = d.config && d.config.gross_margin != null ? Math.round(Number(d.config.gross_margin) * 1000) / 10 : null;
+  const needle = q.trim().toLowerCase();
+  const shown = rows
+    .filter(r => filter === 'all' || (filter === 'missing' ? r.status === 'missing' : r.status === 'yours'))
+    .filter(r => !needle || [r.product_title, r.variant_title, r.sku].some(x => String(x || '').toLowerCase().includes(needle)))
+    .sort((a, b) => (a.status === 'missing') - (b.status === 'missing') || String(a.product_title).localeCompare(String(b.product_title)));
+  const num = s => { const x = parseFloat(String(s).trim()); return isFinite(x) ? x : null; };
+  const label = r => v3Sentence(r.product_title || 'Untitled') + (r.variant_title && r.variant_title !== 'Default Title' ? ' — ' + r.variant_title : '');
+
+  const save = async (r) => {
+    const unit = num(edit.unit);
+    if (unit == null || unit < 0) { setMsg({ kind: 'err', text: 'Enter what one unit costs you, in ' + curSym() + '.' }); return; }
+    setBusy(true); setMsg(null);
+    const { ok, data } = await call('POST', { variant_costs: [{ variant_id: r.variant_id, unit_cost: unit,
+      freight: num(edit.freight) || 0, duty: num(edit.duty) || 0, sku: r.sku || undefined,
+      product_title: r.product_title || undefined, variant_title: r.variant_title || undefined }] });
+    setBusy(false);
+    if (!ok) { setMsg({ kind: 'err', text: data.message || data.error || 'Could not save that cost.' }); return; }
+    setEdit(null); setMsg({ kind: 'ok', text: 'Saved. Profit figures use this cost from now on.' }); load();
+  };
+  const revert = async (r) => {
+    setBusy(true); setMsg(null);
+    const { ok, data } = await call('POST', { revert_costs: [{ variant_id: r.variant_id, sku: r.sku || undefined }] });
+    setBusy(false);
+    if (!ok) { setMsg({ kind: 'err', text: data.message || data.error || 'Could not change that cost.' }); return; }
+    setEdit(null); setMsg({ kind: 'ok', text: r.shop ? 'Back to Shopify’s cost.' : 'Cost removed — this product uses your margin again.' }); load();
+  };
+  const saveProf = async () => {
+    const restock = prof.restock === '' ? 0 : num(prof.restock), agency = prof.agency === '' ? null : num(prof.agency);
+    if (restock == null || restock < 0 || restock > 100) { setMsg({ kind: 'err', text: 'Returns put back into stock is a percentage between 0 and 100.' }); return; }
+    setBusy(true); setMsg(null);
+    const cp = { restock_rate: restock / 100, shipping_income_in_revenue: !!prof.shipIncome };
+    if (agency != null) cp.agency_fee_per_month = agency;
+    const { ok, data } = await call('POST', { cost_profile: cp });
+    setBusy(false);
+    setMsg(ok ? { kind: 'ok', text: 'Saved.' } : { kind: 'err', text: data.message || data.error || 'Could not save.' });
+  };
+  const money = x => x == null ? FMT_NONE : fmtMoney(x, 2);
+
+  return (<div className="v3-page-stack">
+    <section>
+      <p className="v3-lede">Shopify gives a cost for <b>{fmtCount(n('shopify') + n('yours'))}</b> of your {fmtCount(rows.length)} products
+        {cov != null && <>, covering <b>{fmtPctN(cov / 100)}</b> of the last 90 days’ sales</>}.
+        {n('missing') > 0 && <> The other {fmtCount(n('missing'))} use your margin{gm != null ? ' of ' + gm + '%' : ''} until they have one.</>}</p>
+      <p className="v3-note v3-measure">Costs come from “Cost per item” in Shopify and refresh every half hour. Change one here if Shopify’s is wrong, or add freight and duty on top — your figure stays until you hand it back.</p>
+      <div className="v3-chips v3-chips-plain" role="tablist" aria-label="Show products">
+        {[['all', 'All', rows.length], ['missing', 'No cost yet', n('missing')], ['yours', 'Your costs', n('yours')]].map(f => (
+          <button key={f[0]} type="button" role="tab" aria-selected={filter === f[0]} className={'v3-chip' + (filter === f[0] ? ' on' : '')}
+            onClick={() => { setFilter(f[0]); setLimit(25); }}>{f[1]} <span className="v3-chip-n">{f[2]}</span></button>))}
+      </div>
+      <input className="v3-search" type="search" placeholder="Find a product" aria-label="Find a product" value={q} onChange={e => { setQ(e.target.value); setLimit(25); }}/>
+      {msg && <p className={msg.kind === 'ok' ? 'v3-note v3-ok' : 'v3-note v3-bad'} role="status">{msg.text}</p>}
+      {!shown.length ? <div className="v3-empty">{needle ? 'No products match “' + q.trim() + '”.' : filter === 'yours' ? 'You haven’t changed any of Shopify’s costs.' : 'Every product has a cost.'}</div> : (
+      <table className="v3-ptable v3-costs">
+        <thead><tr><th className="t-text">Product</th><th>Price</th><th>Cost</th><th>Freight + duty</th><th>Landed</th><th/></tr></thead>
+        <tbody>{shown.slice(0, limit).map(r => {
+          const c = r.cur, open = edit && edit.variant_id === r.variant_id;
+          return (<React.Fragment key={r.variant_id}>
+            <tr>
+              <td className="t-text"><span className="v3-ptitle">{label(r)}</span>
+                <span className="v3-muted v3-cost-src">{r.status === 'yours' ? 'Your cost' : r.status === 'shopify' ? 'From Shopify' : 'No cost yet'}</span></td>
+              <td>{money(r.price)}</td>
+              <td>{c ? money(c.unit_cost) : FMT_NONE}</td>
+              <td>{c && (Number(c.freight) || Number(c.duty)) ? money((Number(c.freight) || 0) + (Number(c.duty) || 0)) : FMT_NONE}</td>
+              <td>{c ? money(c.landed_cost != null ? c.landed_cost : Number(c.unit_cost) + (Number(c.freight) || 0) + (Number(c.duty) || 0)) : FMT_NONE}</td>
+              <td><button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => setEdit(open ? null : { variant_id: r.variant_id,
+                unit: c ? String(c.unit_cost) : '', freight: c && c.freight ? String(c.freight) : '', duty: c && c.duty ? String(c.duty) : '' })}>
+                {open ? 'Close' : c ? 'Edit' : 'Add cost'}</button></td>
+            </tr>
+            {open && (<tr className="v3-cost-edit"><td colSpan={6}>
+              <div className="v3-form-grid">
+                {[['unit', 'Cost of one unit'], ['freight', 'Freight per unit'], ['duty', 'Duty per unit']].map(f => (
+                  <label key={f[0]} className="v3-field"><span>{f[1]}</span>
+                    <span className="v3-affix" data-pre={curSym()}><input className="oi-num" inputMode="decimal" value={edit[f[0]]}
+                      onChange={e => { const v = e.target.value.replace(/[^0-9.]/g, ''); setEdit(o => ({ ...o, [f[0]]: v })); }}/></span></label>))}
+              </div>
+              <div className="v3-cost-actions">
+                <button type="button" className="v3-btn v3-btn-p" disabled={busy} onClick={() => save(r)}>{busy ? 'Saving…' : 'Save cost'}</button>
+                {r.mine && <button type="button" className="v3-btn v3-btn-q" disabled={busy} onClick={() => revert(r)}>{r.shop ? 'Use Shopify’s cost (' + money(r.shop.unit_cost) + ')' : 'Remove my cost'}</button>}
+              </div>
+            </td></tr>)}
+          </React.Fragment>);
+        })}</tbody>
+      </table>)}
+      {shown.length > limit && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => setLimit(l => l + 50)}>Show {Math.min(50, shown.length - limit)} more of {shown.length}</button>}
+    </section>
+
+    {prof && (<section className="v3-sec">
+      <h2 className="v3-sec-title">Returns and agency</h2>
+      <div className="v3-form-grid">
+        <label className="v3-field"><span>Returns put back into stock</span>
+          <span className="v3-affix" data-post="%"><input className="oi-num" inputMode="decimal" value={prof.restock}
+            onChange={e => { const v = e.target.value.replace(/[^0-9.]/g, ''); setProf(o => ({ ...o, restock: v })); }}/></span></label>
+        <label className="v3-field"><span>Agency fee a month</span>
+          <span className="v3-affix" data-pre={curSym()}><input className="oi-num" inputMode="decimal" value={prof.agency}
+            onChange={e => { const v = e.target.value.replace(/[^0-9.]/g, ''); setProf(o => ({ ...o, agency: v })); }}/></span></label>
+      </div>
+      <label className="v3-check v3-gap-top"><input type="checkbox" checked={prof.shipIncome} onChange={e => { const v = e.target.checked; setProf(o => ({ ...o, shipIncome: v })); }}/>
+        <span>Shipping you charge customers counts as sales</span></label>
+      <p className="v3-note v3-measure">Returned items that go back into stock are added back at cost. The agency fee counts towards what a new customer costs you.</p>
+      <button type="button" className="v3-btn v3-btn-p v3-gap-top" disabled={busy} onClick={saveProf}>{busy ? 'Saving…' : 'Save'}</button>
+    </section>)}
+  </div>);
+}
+
 function BusinessEconomicsPanel(){
   const ASK = getOIAsk();
   const authed = !!(ASK && ASK.brand_id && typeof ASK.getJwt==='function' && ASK.endpoint);
@@ -13411,16 +13635,11 @@ function BusinessEconomicsPanel(){
     // Genome: only send fields the operator actually filled with a valid number. Blank/invalid stays
     // NULL ⇒ engine keeps its prior (source 'prior'). A supplied value flips it to 'brand-entered'.
     const setNum = (col, raw, xform) => { const n = num(raw); if(n != null) patch[col] = xform ? xform(n) : n; };
-    setNum('fixed_costs_monthly', genome.fixed_costs_monthly);
     setNum('inventory_days', genome.inventory_days);
     setNum('supplier_payment_terms_days', genome.supplier_payment_terms_days);
     setNum('discount_rate_annual', genome.discount_rate_annual, n => round4(n/100)); // % → fraction
-    // variable_costs is a jsonb blob (wholesale replace): build it from every valid non-blank key.
-    const vcOut = {};
-    for(const k of ['shipping','fulfilment','packaging','payPct','payFixed','refundPct']){
-      const n = num(vc[k]); if(n != null) vcOut[k] = n;
-    }
-    if(Object.keys(vcOut).length) patch.variable_costs = vcOut;
+    // variable_costs and overheads are owned by "What things cost you" (0221). This save must never
+    // send them: the blob is replaced whole, and an old copy here would wipe what was entered there.
 
     if(!Object.keys(patch).length){ setCsMsg({ text:'Fill in at least one cost to save.', kind:'err' }); return; }
     setCsBusy(true); setCsMsg(null);
@@ -13429,7 +13648,7 @@ function BusinessEconomicsPanel(){
     if(!ok){ setCsMsg({ text:data.message||data.detail||data.error||'Save failed.', kind:'err' }); return; }
     setConfig(data.config); seed(data.config);
     try { window.dispatchEvent(new Event('oi-config-updated')); } catch(e){}
-    setCsMsg({ text:'Cost stack saved. Confirmed values now drive the model instead of category estimates.', kind:'ok' });
+    setCsMsg({ text:'Saved. Your own figures now drive the cash cycle instead of category estimates.', kind:'ok' });
   };
 
   // The six the cash model treats as core. Without all of them it abstains entirely: no clamp
@@ -13517,74 +13736,20 @@ function BusinessEconomicsPanel(){
       {loadErr && <div className="meta" style={{fontSize:'var(--text-sm)', color:'var(--bad)'}}>{loadErr}</div>}
       {!loading && !loadErr && (<>
 
-        {/* ── Step 1 — Gross margin (the gate) ── */}
-        <div className="card" style={{padding:'var(--s-7)', borderTop: marginSet ? undefined : '2px solid var(--warn)'}}>
-          <div style={{display:'flex', alignItems:'baseline', gap:'var(--s-2)', flexWrap:'wrap', marginBottom:4}}>
-            <h3 className="v3-econ-title">Gross margin</h3>
-            <span className="v3-econ-tag" data-tone={marginSet ? 'good' : 'warn'}>
-              {marginSet ? 'Numbers are on' : 'Required — numbers are off'}
-            </span>
-          </div>
-          <div className="meta" style={{fontSize:'var(--text-sm)', marginBottom:'var(--s-5)', lineHeight:1.6, maxWidth:640}}>
-            {marginSet
-              ? 'This is the one number your engine can’t read from Shopify. It’s set — every model runs on it.'
-              : 'Until you set this, the engine can’t value anything and skips your brand entirely. It’s product cost-based: what it costs to make or buy the product, as a % of its price. One number switches everything on.'}
-          </div>
-          <form onSubmit={saveMargin} style={{display:'flex', gap:'var(--s-2)', flexWrap:'wrap', alignItems:'center', paddingTop:'var(--s-4)', borderTop:'1px solid var(--color-line, var(--border-subtle))'}}>
-            <span className="v3-affix" data-post="%" style={{flex:'0 1 12.5rem'}}>
-              <input className="oi-num" type="number" inputMode="decimal" step="any" min="1" max="99" value={gm} onChange={e=>setGm(e.target.value)}
-                placeholder={'e.g. ' + priors.grossMarginPct} autoFocus={!marginSet} style={inputStyle}/>
-            </span>
-            <button type="submit" className="btn-primary" disabled={gmBusy}
-              style={{padding:'9px 16px', fontSize:'var(--text-sm)', border:0, borderRadius:'var(--r-md)', cursor:gmBusy?'default':'pointer', fontFamily:'inherit', fontWeight:'var(--weight-semi)', opacity:gmBusy?0.6:1}}>
-              {gmBusy ? 'Saving…' : (marginSet ? 'Update margin' : 'Switch on my numbers →')}
-            </button>
-            <span className="meta" style={{fontSize:'var(--text-xs)'}}>{priors.label} brands typically sit around {priors.grossMarginPct}%.</span>
-          </form>
-          {msgBox(gmMsg)}
-        </div>
-
+        {/* Gross margin, overheads and per-order costs live in "What things cost you" at the top of
+            Goal & costs — the one place for them (0221). This panel keeps cash, stock and terms. */}
         {/* ── Step 2 — Cost stack + cash cycle (optional, sharpens the model) ── */}
-        <div className="card" style={{padding:'var(--s-7)'}}>
-          <h3 className="v3-econ-title" style={{marginBottom:'var(--s-1)'}}>Cost stack &amp; cash cycle</h3>
+        <div className="v3-econ-step">
+          <h3 className="v3-econ-title" style={{marginBottom:'var(--s-1)'}}>Cash cycle</h3>
           <div className="meta" style={{fontSize:'var(--text-sm)', marginBottom:'var(--s-5)', lineHeight:1.6, maxWidth:640}}>
-            Optional, but each number you confirm replaces a {priors.label} category estimate with your own — sharpening contribution, cash-cycle and profitability. Leave a field blank and the estimate stands.
+            Optional, but each number you confirm replaces a {priors.label} category estimate with your own — sharpening the cash cycle and customer lifetime value. Leave a field blank and the estimate stands.
           </div>
 
           <form onSubmit={saveCostStack} style={{display:'flex', flexDirection:'column', gap:'var(--s-6)'}}>
 
-            {/* Per-order variable costs */}
-            <div>
-              <h3 className="v3-sub">Per-order costs</h3>
-              <div className="v3-form-grid v3-form-grid--n">
-                <Field label="Shipping" unit={curSym()} int={false} value={vc.shipping||''} onChange={v=>setVc(s=>({...s, shipping:v}))}
-                  placeholder={'~'+priors.vc.shipping} saved={config?.variable_costs?.shipping != null}
-                  fallback={{ label:`assumes ${curSym()}0`, warn:true }} hint="Outbound delivery you pay per order."/>
-                <Field label="Fulfilment / pick-pack" unit={curSym()} value={vc.fulfilment||''} onChange={v=>setVc(s=>({...s, fulfilment:v}))}
-                  placeholder={'~'+priors.vc.fulfilment} saved={config?.variable_costs?.fulfilment != null}
-                  fallback={{ label:`assumes ${curSym()}0`, warn:true }} hint="3PL / warehouse handling per order."/>
-                <Field label="Packaging" unit={curSym()} value={vc.packaging||''} onChange={v=>setVc(s=>({...s, packaging:v}))}
-                  placeholder={'~'+priors.vc.packaging} saved={config?.variable_costs?.packaging != null}
-                  fallback={{ label:`assumes ${curSym()}0`, warn:true }} hint="Boxes, inserts, mailers per order."/>
-                <Field label="Payment processing" unit="%" value={vc.payPct||''} onChange={v=>setVc(s=>({...s, payPct:v}))}
-                  placeholder={'~'+priors.vc.payPct} saved={config?.variable_costs?.payPct != null}
-                  fallback={{ label:'assumes 0%', warn:true }} hint="Gateway rate, e.g. 2.4 for 2.4%."/>
-                <Field label="Payment fixed fee" unit={curSym()} value={vc.payFixed||''} onChange={v=>setVc(s=>({...s, payFixed:v}))}
-                  placeholder={'~'+priors.vc.payFixed} saved={config?.variable_costs?.payFixed != null}
-                  fallback={{ label:`assumes ${curSym()}0`, warn:true }} hint={`Flat fee per transaction, e.g. ${curSym()}0.25.`}/>
-                <Field label="Refund / return rate" unit="%" value={vc.refundPct||''} onChange={v=>setVc(s=>({...s, refundPct:v}))}
-                  placeholder={'~'+priors.vc.refundPct} saved={config?.variable_costs?.refundPct != null}
-                  fallback={{ label:'assumes 0%', warn:true }} hint="% of order value refunded, e.g. 7.4."/>
-              </div>
-            </div>
-
             {/* Cash cycle + fixed base */}
             <div>
-              <h3 className="v3-sub">Cash cycle & fixed base</h3>
               <div className="v3-form-grid v3-form-grid--n">
-                <Field label="Monthly fixed costs" unit={`${curSym()}/mo`} value={genome.fixed_costs_monthly||''} onChange={v=>setGenome(s=>({...s, fixed_costs_monthly:v}))}
-                  placeholder={'~'+priors.fixedCostsMonthly} saved={config?.fixed_costs_monthly != null}
-                  fallback={{ label:`est. ${curSym()}`+priors.fixedCostsMonthly.toLocaleString() }} hint="Rent, salaries, software — anything that doesn’t scale per order."/>
                 <Field label="Inventory days (DIO)" unit="days" int value={genome.inventory_days||''} onChange={v=>setGenome(s=>({...s, inventory_days:v}))}
                   placeholder={'~'+priors.inventoryDays} saved={config?.inventory_days != null}
                   fallback={{ label:'est. '+priors.inventoryDays+'d' }} hint="Avg days stock is held before it sells."/>
@@ -13600,7 +13765,7 @@ function BusinessEconomicsPanel(){
             <div style={{display:'flex', alignItems:'center', gap:'var(--s-3)', paddingTop:'var(--s-4)', borderTop:'1px solid var(--color-line, var(--border-subtle))'}}>
               <button type="submit" className="btn-primary" disabled={csBusy}
                 style={{padding:'9px 16px', fontSize:'var(--text-sm)', border:0, borderRadius:'var(--r-md)', cursor:csBusy?'default':'pointer', fontFamily:'inherit', fontWeight:'var(--weight-semi)', opacity:csBusy?0.6:1}}>
-                {csBusy ? 'Saving…' : 'Save cost stack'}
+                {csBusy ? 'Saving…' : 'Save timing'}
               </button>
               <span className="meta" style={{fontSize:'var(--text-xs)'}}>Blank fields keep the category estimate — nothing is overwritten.</span>
             </div>
@@ -13612,7 +13777,7 @@ function BusinessEconomicsPanel(){
         {/* Feeds the 13-week cash projection and the fundable spend ceiling. Every field is
             optional, but the model ABSTAINS until the six core ones are set: it will not put a
             cash number on screen that rests on a guess. */}
-        <div className="card" style={{padding:'var(--s-7)'}}>
+        <div className="v3-econ-step">
           <div style={{display:'flex', alignItems:'baseline', gap:'var(--s-2)', flexWrap:'wrap', marginBottom:4}}>
             <h3 className="v3-econ-title">Cash &amp; working capital</h3>
             <span className="v3-econ-tag" data-tone={cashReady ? 'good' : undefined}>
@@ -13753,12 +13918,12 @@ function MarginNudge(){
       <div style={{flex:1, minWidth:0}}>
         <div style={{fontSize:'var(--text-sm)', fontWeight:'var(--weight-bold)', marginBottom:2}}>Your numbers are switched off</div>
         <div className="meta" style={{fontSize:'var(--text-sm)', lineHeight:1.5}}>{`
-        Confirm your gross margin — the one figure we can’t read from Shopify — and the engine starts valuing every recommendation in ${curSym()}.
+        Add what each order costs and a margin for products without a Shopify cost, and the engine starts valuing every recommendation in ${curSym()}.
       `}</div>
       </div>
       {/* Straight to the margin field — on Goal & costs itself this used to do nothing at all. */}
       <button type="button" className="v3-btn v3-btn-p" onClick={()=>window.__oiGo&&window.__oiGo('goal','margin')} style={{flexShrink:0}}>
-        Confirm gross margin →
+        Add your costs →
       </button>
       <button onClick={()=>setDismissed(true)} title="Dismiss for now" aria-label="Dismiss"
         style={{flexShrink:0, background:'none', border:0, cursor:'pointer', color:'var(--text-muted)', fontSize:'var(--text-base)', lineHeight:1, padding:'4px 6px'}}><Icon name="close" size={14}/></button>
@@ -16469,10 +16634,10 @@ const V3_PAGES = {
         BLENDED margin; this sets what things actually cost, which is what moves the profit number
         from Estimated to Measured (0192). Open by default, because the confidence chip on Today
         sends people straight here and a collapsed section would strand them one click short. */}
-    <V3More id="goal-costs" label="Product costs — unit, freight and duty" defaultOpen>
-      <V3Anchor id="costs"/>{mosView('CostEntry')}
+    <V3More id="goal-costs" label="Product costs" defaultOpen>
+      <V3Anchor id="costs"/><V3ProductCosts/>
     </V3More>
-    <V3More id="goal-econ" label="All your costs, cash and terms"><V3Anchor id="economics"/><BusinessEconomicsPanel/></V3More>
+    <V3More id="goal-econ" label="Cash, stock and supplier terms"><V3Anchor id="economics"/><BusinessEconomicsPanel/></V3More>
   </>),
   growth: (p) => (<>
     <V3Growth/>
