@@ -8236,25 +8236,25 @@ ${ctxJson}`;
 
   return (<div>
     <div className="card" style={{marginBottom:14}}>
-      <h2>Ask Greta</h2>
-      <div className="muted" style={{marginBottom:10, fontSize:'var(--text-sm)'}}>Answers from a summary of <b>your live data</b>, which is sent to Greta's AI model to write the reply.</div>
+      {!UI_V3 && <h2>Ask Greta</h2>}
+      <p className="v3-note v3-measure" style={{marginTop:0}}>Greta answers from a summary of your live data, which is sent to her AI model to write the reply. Private to your workspace.</p>
       {!ASK && (<div style={{padding:12, background:'var(--bg-app)', borderRadius:'var(--radius-none)', marginBottom:10, border:'1px solid var(--border-default)'}}>
         <div style={{fontSize:'var(--text-sm)', color:'var(--text-primary)', lineHeight:1.5}}>Ask runs inside your authenticated workspace, where the model key is held server-side (never in the browser). It isn't enabled in this public demo. The examples below show the questions it answers from your live data.</div>
       </div>)}
-      {ASK && (<div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10,fontSize:'var(--text-xs)',color:PAL.muted}}>
-        <span>Private to your workspace</span>
-        <select value={depth} onChange={e=>setDepth(e.target.value)} aria-label="Answer depth" style={{backgroundColor: 'var(--bg-input)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--radius-md)', padding:'2px 6px', fontSize:'var(--text-xs)'}}>
-          <option value="thorough">Thorough answer</option>
-          <option value="quick">Quick answer</option>
-        </select>
-        {history.length>0 && <a onClick={clearHistory} style={{cursor:'pointer',color:PAL.warn}}>clear chat</a>}
-      </div>)}
-      <div style={{display:'flex',gap:6,marginBottom:10}}>
-        <textarea value={question} onChange={e=>setQuestion(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)) send(); }} placeholder={ASK?'Ask a question about the dataset… (Ctrl+Enter to send)':'Available in your authenticated workspace'} disabled={!ASK||loading} rows={2} style={{flex:1, padding:'10px 12px', background:'var(--bg-input)', border:'1px solid var(--border-default)', borderRadius:'var(--radius-md)', color:'var(--text-primary)', fontSize:'var(--text-sm)', fontFamily:'inherit', resize:'vertical'}} />
-        <button onClick={send} disabled={!ASK||loading||!question.trim()} style={{padding:'10px 18px', background: loading?PAL.line:PAL.accent, border:'none', borderRadius:'var(--radius-md)', color:PAL.panel, fontWeight:'var(--weight-semi)', cursor: loading?'wait':(ASK?'pointer':'not-allowed'), whiteSpace:'nowrap'}}>{loading?'Thinking…':'Ask'}</button>
+      <div className="v3-ask-box">
+        <textarea value={question} onChange={e=>setQuestion(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)) send(); }}
+          placeholder={ASK?'Ask about your sales, ads, stock or customers… (Ctrl+Enter to send)':'Available in your authenticated workspace'} disabled={!ASK||loading} rows={3}/>
+        <div className="v3-ask-bar">
+          {ASK && (<div className="v3-seg" role="group" aria-label="Answer depth">
+            <button type="button" aria-pressed={depth==='thorough'} onClick={()=>setDepth('thorough')}>Thorough</button>
+            <button type="button" aria-pressed={depth==='quick'} onClick={()=>setDepth('quick')}>Quick</button>
+          </div>)}
+          {ASK && history.length>0 && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={clearHistory}>Clear the conversation</button>}
+          <button type="button" className="v3-btn v3-btn-p" onClick={send} disabled={!ASK||loading||!question.trim()}>{loading?'Thinking…':'Ask Greta'}</button>
+        </div>
       </div>
-      <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:4}}>
-        {quickPrompts.map((q,i)=>(<button key={i} onClick={()=>ASK&&setQuestion(q)} title={ASK?'':'Available in your workspace'} style={{padding:'4px 10px', background:'var(--bg-card)', border:'1px solid var(--border-default)', borderRadius:'var(--radius-md)', color:'var(--text-secondary)', fontSize:'var(--text-xs)', cursor:ASK?'pointer':'default', opacity:ASK?1:0.7}}>{q.length>60?q.slice(0,60)+'…':q}</button>))}
+      <div className="v3-prompts" aria-label="Questions to start with">
+        {quickPrompts.map((q,i)=>(<button type="button" key={i} className="v3-prompt" onClick={()=>ASK&&setQuestion(q)} disabled={!ASK} title={ASK?'':'Available in your workspace'}>{q}</button>))}
       </div>
       {error && (<div role="alert" style={{padding:'var(--space-3)',background:'var(--color-danger-wash)',borderTop:'1px solid var(--color-danger-line)',marginTop:'var(--space-3)',color:'var(--text-primary)',fontSize:'var(--text-sm)',display:'flex',alignItems:'center',gap:'var(--space-3)',flexWrap:'wrap'}}>
         <span style={{flex:1,minWidth:200}}>{error}</span>
@@ -8267,7 +8267,7 @@ ${ctxJson}`;
         {history.slice().reverse().map((m,i)=>(<div key={i} style={{padding:12, background: m.role==='user'?PAL.panel:PAL.panel, borderRadius:'var(--radius-none)'}}>
           <div style={{fontSize:'var(--text-xs)',color:PAL.muted,marginBottom:6,textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',fontWeight:'var(--weight-semi)',display:'flex',justifyContent:'space-between'}}>
             <span>{m.role==='user'?'You':'Greta'}</span>
-            <span>{new Date(m.time).toLocaleString()}{m.usage?` · ${m.usage.input_tokens||0} in / ${m.usage.output_tokens||0} out${m.usage.cache_read_input_tokens?` · cached ${m.usage.cache_read_input_tokens}`:''}`:''}</span>
+            <span>{new Date(m.time).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}{!UI_V3 && m.usage?` · ${m.usage.input_tokens||0} in / ${m.usage.output_tokens||0} out${m.usage.cache_read_input_tokens?` · cached ${m.usage.cache_read_input_tokens}`:''}`:''}</span>
           </div>
           <div style={{fontSize:'var(--text-sm)', whiteSpace:'pre-wrap', lineHeight:1.5, color:'var(--text-primary)'}}>{m.content}</div>
           {m.role==='assistant' && (<div style={{marginTop:8, display:'flex', gap:8, alignItems:'center'}}>
@@ -12793,7 +12793,7 @@ async function startConnect(provider, opts) {
 // The button itself. Renders nothing without a provider it can genuinely start, so a
 // surface can hand it any action's external_id and get a button only when there is one
 // worth pressing.
-function V3Fix({ provider, label, small }) {
+function V3Fix({ provider, label, small, quiet }) {
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState('');
   if (!provider) return null;
@@ -12818,7 +12818,7 @@ function V3Fix({ provider, label, small }) {
     catch (e) { setErr(String((e && e.message) || e)); setBusy(false); }
   };
   return (<>
-    <button type="button" className={'v3-btn v3-btn-p' + (small ? ' v3-btn-sm' : '')}
+    <button type="button" className={'v3-btn' + (quiet ? '' : ' v3-btn-p') + (small ? ' v3-btn-sm' : '')}
             disabled={busy} onClick={go}>
       {busy ? 'Opening ' + name + '…' : (label || 'Reconnect ' + name)}
     </button>
@@ -13063,11 +13063,7 @@ function ConnectionsPanel(){
   return (<div style={{display:'flex', flexDirection:'column', gap:'var(--s-7)'}}>
 
     <section>
-      <ZoneHeader
-        number="01"
-        title="Data sources"
-        meta="Each source connects via direct OAuth — no Supermetrics seat required"
-      />
+      <h2 className="v3-sec-title">Data sources <span className="v3-muted">read-only, revocable at any time, synced daily</span></h2>
 
       <div style={{display:'flex', flexDirection:'column', gap:'var(--s-3)'}}>
         {sources.map(s => {
@@ -13084,28 +13080,19 @@ function ConnectionsPanel(){
           const ageStr = s.last == null ? '—' : dataN === 0 ? 'today' : dataN === 1 ? '1 day ago' : dataN + ' days ago';
           const syncStr = syncMs == null ? null : syncMs < 3600000 ? 'just now' : syncMs < 86400000 ? Math.floor(syncMs/3600000) + 'h ago' : syncN + 'd ago';
 
-          return (<div key={s.id} className="card" style={{
-            display:'flex', alignItems:'center', gap:'var(--s-4)',
-            padding:'var(--s-4) var(--s-5)',
-          }}>
-            <div style={{
-              width:42, height:42, borderRadius:'var(--r-md)',
-              background:'var(--bg-elevated)', border:'1px solid var(--border-default)',
-              display:'flex', alignItems:'center', justifyContent:'center',
-              fontSize:'var(--text-lg)', fontWeight:'var(--weight-bold)', color:'var(--text-muted)', flexShrink:0,
-            }}>{s.icon}</div>
+          const fresh = !!conn && syncN != null && syncN <= 1;
+          return (<div key={s.id} className="v3-conn-row">
+            <div className="v3-conn-mark" aria-hidden="true">{s.icon}</div>
 
-            <div style={{flex:1, minWidth:0}}>
-              <div style={{display:'flex', alignItems:'baseline', gap:'var(--s-3)', marginBottom:4}}>
-                <span style={{fontSize:'var(--text-base)', fontWeight:'var(--weight-bold)'}}>{s.name}</span>
-                {conn && <span style={{fontSize:'var(--text-xs)', color:'var(--good)', fontWeight:'var(--weight-bold)'}}>Connected{conn.account_label ? ` · ${conn.account_label}` : ''}</span>}
-                <span style={{display:'inline-flex', alignItems:'center', gap:5, fontSize:'var(--text-xs)', color:c, fontWeight:'var(--weight-semi)'}}>
-                  <span style={{width:6, height:6, borderRadius:'var(--r-full)', background:c}}/>
-                  {lbl}
-                </span>
-                <span className="meta" style={{fontSize:'var(--text-xs)'}}>{conn && syncStr ? `· synced ${syncStr} ` : ''}· {s.id === 'shopify' ? 'last order' : 'last data'} {ageStr}</span>
+            <div className="v3-conn-body">
+              <div className="v3-conn-name">{s.name}
+                <span className="v3-conn-state" style={{color:c}}><i style={{background:c}}/>{lbl}</span>
               </div>
-              <div className="meta" style={{fontSize:'var(--text-sm)'}}>{s.description}</div>
+              {(conn || s.last != null) && <div className="v3-conn-meta">
+                {conn ? 'Connected' + (conn.account_label ? ' · ' + conn.account_label : '') + (syncStr ? ' · synced ' + syncStr : '') + ' · ' : ''}
+                {s.id === 'shopify' ? 'last order' : 'last data'} {ageStr}
+              </div>}
+              <div className="v3-conn-desc">{s.description}</div>
             </div>
 
             {/* Every OAuth source connects from HERE now. Only Shopify was ever
@@ -13115,14 +13102,14 @@ function ConnectionsPanel(){
                 That detour is most of what made a dead feed expensive to fix. */}
             <div style={{flexShrink:0}}>
               {s.installable ? (
-                <button className="btn-primary" style={{padding:'7px 14px', fontSize:'var(--text-sm)', border:0, borderRadius:'var(--r-sm)', cursor:'pointer', fontFamily:'inherit', fontWeight:'var(--weight-semi)'}}
+                <button type="button" className={'v3-btn v3-btn-sm' + (fresh ? '' : ' v3-btn-p')}
                   onClick={() => setShowShopifyForm(true)}>
-                  {conn ? 'Reconnect' : 'Connect via OAuth'}
+                  {conn ? 'Reconnect' : 'Connect'}
                 </button>
               ) : !s.provider ? (
-                <span className="meta" style={{fontSize:'var(--text-xs)', fontStyle:'italic'}}>{s.comingSoon}</span>
+                <span className="v3-conn-meta">{s.comingSoon}</span>
               ) : CONN_OAUTH[s.provider] ? (
-                <V3Fix provider={s.provider} small label={conn ? 'Reconnect' : 'Connect via OAuth'}/>
+                <V3Fix provider={s.provider} small quiet={fresh} label={conn ? 'Reconnect' : 'Connect'}/>
               ) : conn ? (
                 <a href="/auth/workspace.html" target="_top" className="meta" style={{fontSize:'var(--text-sm)', textDecoration:'none'}}>Manage →</a>
               ) : (
@@ -13165,7 +13152,7 @@ function ConnectionsPanel(){
       </div>
     </div>)}
 
-    <section>
+    {!UI_V3 && (    <section>
       <ZoneHeader
         number="02"
         title="How direct OAuth works"
@@ -13190,7 +13177,7 @@ function ConnectionsPanel(){
           </div>
         </div>
       </div>
-    </section>
+    </section>)}
 
   </div>);
 }
@@ -13781,7 +13768,7 @@ function TeamPanel(){
   return (<div style={{display:'flex', flexDirection:'column', gap:'var(--s-7)'}}>
     {/* Invite */}
     <div className="card" style={{padding:'var(--s-7)'}}>
-      <div style={{fontSize:'var(--text-base)', fontWeight:'var(--weight-bold)', marginBottom:4}}>Team</div>
+      {!UI_V3 && <div style={{fontSize:'var(--text-base)', fontWeight:'var(--weight-bold)', marginBottom:4}}>Team</div>}
       <div className="meta" style={{fontSize:'var(--text-sm)', marginBottom:'var(--s-5)'}}>
         Everyone with access to this workspace. {canManage ? 'Invite a teammate by email — they get a magic-link and land straight here.' : 'Only an owner or admin can change the team.'}
       </div>
@@ -14832,30 +14819,33 @@ function DataHealth(){
 
   const stale = rows.filter(r => r.status !== 'current');
   const systemic = rows.some(r => r.likely_systemic);
-  const covered = (cover || []).filter(c => c.order_coverage != null);
+  // Judge coverage on the last COMPLETE day. Today's partial day read "0 of the 1 orders
+  // Shopify took (0%)" at breakfast — a false alarm about tracking that was fine.
+  const todayIso = (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
+  const covered = (cover || []).filter(c => c.order_coverage != null && String(c.day).slice(0, 10) < todayIso);
   const latest = covered[0];
+  const SRC = { shopify_orders: 'Shopify orders', meta_ads: 'Meta ads', meta_ads_ad_level: 'Meta ads, by ad', google_ads: 'Google ads',
+    ga4_daily: 'Site analytics', ga4_items: 'Site analytics, by product', klaviyo: 'Klaviyo email', gsc: 'Google search', tiktok_ads: 'TikTok ads' };
+  const srcName = k => SRC[k] || v3Sentence(String(k || '').replace(/_/g, ' '));
   const avg = covered.length ? covered.reduce((a, c) => a + Number(c.order_coverage), 0) / covered.length : null;
   const pct = v => v == null ? '—' : Math.round(Number(v) * 100) + '%';
 
   return (<div className="card">
     <div className="card-section-title"><h2 style={{margin:0}}>Where your numbers come from</h2>
-      <span className="meta">Every source Greta reads, whether it is current, and whether they agree with each other</span></div>
+      <span className="meta">Every feed Greta reads, whether it is current, and whether they agree with each other</span></div>
 
-    <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(230px,1fr))', gap:8, marginTop:10}}>
-      {rows.map(r => {
+    <table className="v3-rw v3-feeds">
+      <thead><tr><th className="t-text">Feed</th><th className="t-text">Status</th><th>Latest data</th></tr></thead>
+      <tbody>{rows.map(r => {
         const ok = r.status === 'current';
-        const tone = ok ? 'var(--good)' : (Number(r.stale_days) > 4 ? 'var(--bad)' : 'var(--warn)');
-        return (<div key={r.source} style={{border:'1px solid var(--border-default)', padding:'10px 12px'}}>
-          <div style={{display:'flex', alignItems:'center', gap:7, fontSize:'var(--text-sm)', fontWeight:'var(--weight-semi)'}}>
-            <span style={{width:8, height:8, borderRadius:'50%', background:tone, display:'inline-block'}}/>{r.source}
-          </div>
-          <div className="micro" style={{color:'var(--text-secondary)', marginTop:3}}>
-            {ok ? 'Up to date' : (Number(r.stale_days) === 1 ? 'A day behind' : Math.round(Number(r.stale_days)) + ' days behind')}
-            {r.last_date ? ' · last ' + String(r.last_date).slice(0, 10) : ''}
-          </div>
-        </div>);
-      })}
-    </div>
+        const tone = ok ? 'var(--color-success)' : (Number(r.stale_days) > 4 ? 'var(--color-danger)' : 'var(--color-warning)');
+        return (<tr key={r.source}>
+          <td className="t-text v3-rw-name">{srcName(r.source)}</td>
+          <td className="t-text"><span className="v3-conn-state" style={{color: tone}}><i style={{background: tone}}/>{ok ? 'Up to date' : (Number(r.stale_days) === 1 ? 'A day behind' : Math.round(Number(r.stale_days)) + ' days behind')}</span></td>
+          <td className="v3-muted">{r.last_date ? v3Day(String(r.last_date).slice(0, 10), true) : FMT_NONE}</td>
+        </tr>);
+      })}</tbody>
+    </table>
 
     {stale.length > 0 && (<div className="note" style={{marginTop:10}}>
       {systemic
@@ -14885,8 +14875,8 @@ function DataHealth(){
     {latest && (<div style={{marginTop:12, borderTop:'1px solid var(--border-subtle)', paddingTop:10}}>
       <div style={{fontSize:'var(--text-sm)', fontWeight:'var(--weight-semi)', marginBottom:3}}>Does your site analytics see every order?</div>
       <div className="micro" style={{color:'var(--text-secondary)'}}>
-        On {String(latest.day).slice(0,10)} your site analytics recorded <b>{latest.ga4_purchases}</b> of the <b>{latest.shopify_orders}</b> orders Shopify took
-        {' '}(<b style={{color: Number(latest.order_coverage) < 0.9 ? 'var(--warn)' : 'var(--good)'}}>{pct(latest.order_coverage)}</b>).
+        On {v3Day(String(latest.day).slice(0, 10))} your site analytics recorded <b>{fmtCount(latest.ga4_purchases)}</b> of the <b>{fmtCount(latest.shopify_orders)}</b> orders Shopify took
+        {' '}(<b className={Number(latest.order_coverage) < 0.9 ? 'v3-down' : 'v3-up'}>{pct(latest.order_coverage)}</b>).
         {avg != null && <> Over the last fortnight it averaged {pct(avg)}.</>}
       </div>
       {avg != null && avg < 0.9 && (<div className="fine" style={{color:'var(--text-secondary)', marginTop:6}}>
@@ -16371,7 +16361,8 @@ const V3_PAGES = {
     <V3More id="prod-promos" label="Promotions and discount codes"><V3Anchor id="promos"/><DiscountCodeTracker/></V3More>
   </>),
   competitors: (p) => (<>
-    {mosView('PerformanceCompetitors')}
+    {/* The embed opens with its own "Competitors" title under the page head that already says it. */}
+    <div className="v3-embed-notitle">{mosView('PerformanceCompetitors')}</div>
     {/* The static "Scout snapshot" was retired on 2026-09-25: it was frkl's, hardcoded,
         and the live researched list above replaces it for every brand. */}
   </>),
