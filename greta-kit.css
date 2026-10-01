@@ -106,7 +106,7 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 
 /* ── Type roles ──────────────────────────────────────────────────────────── */
 /* One eyebrow. */
-.v3-kick, .micro, .section-eyebrow, .card-eyebrow, .v3-vitals-eyebrow, .v3-hero-lab {
+.v3-kick, .section-eyebrow, .card-eyebrow, .v3-vitals-eyebrow, .v3-hero-lab {
   font-family: var(--font-sans); font-size: var(--text-xs); font-weight: var(--weight-semi);
   letter-spacing: var(--tracking-wide); text-transform: uppercase; color: var(--color-muted);
 }
@@ -337,3 +337,27 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .recharts-yAxis > .recharts-label, .recharts-xAxis > .recharts-label,
 .recharts-yAxis .recharts-cartesian-axis-label, .recharts-xAxis .recharts-cartesian-axis-label { display: none; }
 .recharts-yAxis text.recharts-label, .recharts-xAxis text.recharts-label { display: none; }
+
+/* Tables read like statements: the first column names the row, every column after it is a
+   figure and right-aligns — header and cells together, so a header never sits over the
+   wrong edge of its numbers. A table that needs a second text column opts out with .t-text. */
+.v3-main table th:not(:first-child), .v3-main table td:not(:first-child) { text-align: right; }
+.v3-main table th.t-text, .v3-main table td.t-text { text-align: left; }
+.v3-main table td:not(:first-child) { font-family: var(--font-figure); }
+
+/* Channel scoreboard: the bar says pass or fail, not just "a channel". */
+.v3-score-row { padding: var(--space-3) 0; border-bottom: 1px solid var(--color-line); }
+.v3-score-row:last-child { border-bottom: 0; }
+.v3-score-track { height: 10px; border-radius: var(--radius-sm); background: var(--color-sunken); }
+.v3-score-bar { background: var(--color-success); border-radius: var(--radius-sm); }
+.v3-score-row.under .v3-score-bar { background: var(--color-danger); }
+.v3-score-row.under .v3-score-x { color: var(--color-danger); font-weight: var(--weight-semi); }
+.v3-score-tick { width: 2px; height: 18px; top: -4px; background: var(--color-ink); }
+.v3-score-x { font-size: var(--text-base); font-weight: var(--weight-semi); }
+.v3-score-verdict { font-size: var(--text-base); margin-bottom: var(--space-4); }
+
+/* .micro holds sentences as often as labels across the legacy components ("A ceiling, not a
+   promise: moving budget changes…"), so it is small sentence-case text, never caps. Eyebrows
+   that should be uppercase use .v3-kick. Inline textTransform on a .micro is overridden too. */
+.v3-main .micro { font-family: var(--font-sans); font-size: var(--text-xs); color: var(--color-muted);
+  text-transform: none !important; letter-spacing: 0 !important; font-weight: var(--weight-normal); line-height: var(--leading-body); }
