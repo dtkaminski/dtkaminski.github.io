@@ -156,6 +156,15 @@
       var v = window[k];
       if (v && ageDays(asOfOf(Array.isArray(v) ? { items: v } : v)) > STALE_AFTER_DAYS) { window[k] = null; retired.push(k); }
     });
+    // Findings and £ registers (Review's "£X exposed across N risks"). Live writes carry
+    // _source:'live'; anything else is the bundled snapshot. If a live copy exists, restore it
+    // (the idle-loaded snapshot file overwrote it); if not, an old snapshot shows nothing rather
+    // than June's figures as this week's.
+    var PAT = window.FRKL_PATTERNS;
+    if (PAT && PAT._source !== 'live') {
+      if (window.FRKL_LIVE.patternsLive) { window.FRKL_PATTERNS = window.FRKL_LIVE.patternsLive; retired.push('FRKL_PATTERNS→live'); }
+      else if (ageDays(asOfOf({ generated_at: PAT.generated_at }) || asOfOf(PAT)) > STALE_AFTER_DAYS) { window.FRKL_PATTERNS = {}; retired.push('FRKL_PATTERNS'); }
+    }
     // Products: the list carries no date of its own; its meta does.
     if (window.FRKL_PRODUCTS && ageDays(asOfOf(window.FRKL_PRODUCTS_META)) > STALE_AFTER_DAYS) {
       window.FRKL_PRODUCTS = null; window.FRKL_PRODUCTS_META = {}; retired.push('FRKL_PRODUCTS');
@@ -183,7 +192,39 @@
         if (Array.isArray(DATA[k]) && DATA[k].length) { DATA[k] = []; retired.push('FRKL_DATA.' + k); }
       });
     }
-    window.FRKL_LIVE.retiredSnapshots = retired;
+    window.FRKL_LIVE.retiredSnapshots = (window.FRKL_LIVE.retiredSnapshots || []).concat(retired);
+  }
+  // A live load that FAILED before any succeeded. The bundled snapshot is all that is on screen,
+  // so retire every old part of it — including the five channel series a success would have
+  // overwritten — and stop the footer calling it live. Run once the page has finished loading:
+  // a fast failure (401, 500) lands before the later snapshot scripts (board read, discount
+  // codes) have run, and those used to survive and show July's figures as this week's.
+  // The frkl-only snapshot files load at idle, after the page — so after any one-off retirement.
+  // Re-run the age check when they land; it only ever clears data older than STALE_AFTER_DAYS.
+  (function () {
+    var again = function () { try { retireStaleSnapshots(); dispatchUpdate(); } catch (e) {} };
+    if (window.FRKL_SNAPSHOTS_LOADED) setTimeout(again, 0); else window.addEventListener('frkl-snapshots-loaded', again, { once: true });
+  })();
+  function retireOnFailure() {
+    if (window.FRKL_LIVE.lastFetchAt) return;            // a live load landed; keep last-good
+    var run = function () {
+      try {
+        retireStaleSnapshots();
+        var DATA = window.FRKL_DATA;
+        if (DATA) {
+          // Every dated series, not a fixed list of names (the real keys are metaDaily, googleAds,
+          // ga4, klaviyo, shopify — a hand list of 'meta'/'google' missed two and Review kept
+          // drawing July's weekly board).
+          Object.keys(DATA).forEach(function (k) {
+            var rows = DATA[k];
+            if (Array.isArray(rows) && rows.length && ageDays(asOfOf({ items: rows })) > STALE_AFTER_DAYS) { DATA[k] = []; window.FRKL_LIVE.retiredSnapshots.push('FRKL_DATA.' + k); }
+          });
+          DATA.meta = Object.assign({}, DATA.meta || {}, { source: 'Live data unavailable', captured: null });
+        }
+        dispatchUpdate();
+      } catch (e) {}
+    };
+    if (document.readyState === 'complete') run(); else window.addEventListener('load', run, { once: true });
   }
 
   // Collapses duplicate reads. Measured on the live Today load: ~60 REST requests across 37
@@ -279,12 +320,15 @@
       .eq('user_id', sessionData.session.user.id);
     if (memErr) {
       console.warn('[frkl-live] brand_users query failed', memErr);
+      // A signed-in owner whose load failed must not be shown the old snapshot as if it were today.
+      retireOnFailure();
       setStatus('error', memErr.message);
       return;
     }
     const frkl = (memberships || []).find(m => m.brand?.slug === BRAND_SLUG);
     if (!frkl) {
       console.warn(`[frkl-live] logged-in user is not a member of the '${BRAND_SLUG}' brand — see saas/multi-tenant-auth.md for the SQL to backfill.`);
+      retireOnFailure();
       setStatus('static-only', 'no membership');
       return;
     }
@@ -371,6 +415,9 @@
           generated_at: patterns.generated_at || new Date().toISOString(),
           _source: 'live',
         };
+        // Kept so a snapshot file that loads later (greta-patterns.js is fetched at idle) cannot
+        // replace this with June's findings — retireStaleSnapshots puts it back.
+        window.FRKL_LIVE.patternsLive = window.FRKL_PATTERNS;
       }
 
       // ── Action statuses — replace with the brand's own live map (empty => {}), never merge frkl's. ──
@@ -415,8 +462,11 @@
       dispatchUpdate();
     } catch (err) {
       console.warn('[frkl-live] refresh failed', err);
+      // "Last-good" only means something once a live load has landed. Before that, what is on
+      // screen is the bundled snapshot — retire whatever of it is old rather than let it pass as
+      // current (an outage used to put July's numbers on Website, Stock and Products, unlabelled).
+      retireOnFailure();
       setStatus('error', err?.message || String(err));
-      // Don't dispatch — keep showing last-good state
     }
   }
 
@@ -721,6 +771,8 @@
     window.FRKL_LIVE.lastError = error;
     window.FRKL_LIVE.enabled = (status === 'live');
     renderIndicator();
+    // Screens waiting on live data listen for this to stop saying "loading" when it never will.
+    try { window.dispatchEvent(new CustomEvent('frkl-live-status', { detail: { status: status } })); } catch (e) {}
   }
 
   function renderIndicator() {

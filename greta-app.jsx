@@ -6,6 +6,15 @@ const R = Recharts;
 const v3AxisDay = v => { const s = String(v); return /^\d{4}-\d\d-\d\d$/.test(s) ? v3Day(s) : /^\d\d-\d\d$/.test(s) ? v3Day(new Date().getFullYear() + '-' + s) : v; };
 if (R.XAxis && R.XAxis.defaultProps) R.XAxis.defaultProps.tickFormatter = v3AxisDay;
 if (R.Tooltip && R.Tooltip.defaultProps) R.Tooltip.defaultProps.labelFormatter = v3AxisDay;
+// When a screen has no brand to read, say why. A signed-in owner whose workspace failed to load
+// was told to "sign in", and on Team that this was "the public demo".
+function v3NoBrand(what) {
+  const L = (typeof window !== 'undefined' && window.FRKL_LIVE) || {};
+  if (L.session && L.status === 'error') return 'Greta couldn’t load your workspace just now, so ' + what + ' can’t be shown. Refreshing the page usually sorts it.';
+  if (L.session && L.lastError === 'no membership') return 'Your account isn’t linked to this brand yet, so ' + what + ' can’t be shown. Ask the brand’s owner to invite you.';
+  if (L.session) return 'Your workspace is still loading.';
+  return 'Sign in to see ' + what + '.';
+}
 const D = window.FRKL_DATA;
 const _CUR_SYM = { GBP:'£', USD:'$', EUR:'€', AUD:'A$', CAD:'C$', NZD:'NZ$', JPY:'¥' };
 const curSym = () => _CUR_SYM[(typeof window!=='undefined' && window.OI_CURRENCY)] || '£';
@@ -543,7 +552,11 @@ let REAL_END, REAL_START;
 function refreshRealBounds(){
   let lo = null, hi = null;
   for (const r of (D.shopify || [])) { const d = r && r.date; if (!d) continue; if (lo === null || d < lo) lo = d; if (hi === null || d > hi) hi = d; }
-  REAL_START = lo || undefined; REAL_END = hi || undefined;
+  // No sales rows (a brand with no orders yet, or a load that failed) left both undefined, and
+  // periodRange threw "Invalid time value" at the App root — a blank app with no boundary to
+  // catch it. Anchor on today instead; every figure for the range is then honestly empty.
+  if (!hi) { const t = new Date(); hi = t.toISOString().slice(0, 10); t.setUTCFullYear(t.getUTCFullYear() - 1); lo = t.toISOString().slice(0, 10); }
+  REAL_START = lo; REAL_END = hi;
 }
 refreshRealBounds();
 
@@ -8549,18 +8562,22 @@ function weekCommentary(W, prev){
 
   // Headline verdict
   let verdict;
-  if(rCh!=null && rCh>=0.1 && (m.mer==null||m.mer>=2)) verdict='Strong week';
+  // No revenue figure, or no sales at all, is never a "Steady week" — that read £0 as calm.
+  if(m.revenue==null) verdict='No sales figures for this week yet';
+  else if(!(Number(m.revenue)>0)) verdict = W.partial ? 'No sales yet this week' : 'No sales recorded this week';
+  else if(rCh!=null && rCh>=0.1 && (m.mer==null||m.mer>=2)) verdict='Strong week';
   else if(rCh!=null && rCh<=-0.12) verdict='Tough week';
   else if(m.mer!=null && m.mer<2) verdict='Mixed week';
   else verdict='Steady week';
   const hp=[];
-  hp.push(rCh!=null ? `revenue ${rCh>=0?'up':'down'} ${fp(rCh)} to ${GBP(m.revenue)}` : `revenue ${GBP(m.revenue)}`);
+  if(m.revenue!=null && Number(m.revenue)>0) hp.push(rCh!=null ? `revenue ${rCh>=0?'up':'down'} ${fp(rCh)} to ${GBP(m.revenue)}` : `revenue ${GBP(m.revenue)}`);
+  else if(m.revenue!=null && !W.partial) hp.push('check the Shopify connection on Connections & data');
   if(m.mer!=null) hp.push(`sales per £ of ads ${m.mer.toFixed(1)}×`);
   if(m.cvr!=null) hp.push(`conversion rate ${PCT(m.cvr)}`);
   // The watch-out must add something: when the biggest worry is the revenue move the headline
   // has just stated, take the next one ("revenue down 53% … Main watch-out — revenue fell 53%").
   const topWatch = watch.slice().sort((a,b)=>b.sev-a.sev).find(x => !(rCh!=null && /^revenue\b/i.test(x.text)));
-  const headline = `${verdict}: ${hp.join(', ')}.` + (topWatch ? ` Main watch-out — ${lc(plainWk(topWatch.text))}` : '');
+  const headline = verdict + (hp.length ? ': ' + hp.join(', ') : '') + '.' + (topWatch ? ` Main watch-out — ${lc(plainWk(topWatch.text))}` : '');
 
   return {headline, verdict, worked:top(worked,5), watch:top(watch,5), context:top(context,4)};
 }
@@ -8701,7 +8718,13 @@ function WeeklyBoard(){
   const [notes, setNotes] = useState(boardLoadNotes);
   const [newAction, setNewAction] = useState('');
 
-  if(!weeks.length) return (<div className="card"><h2>Weekly board</h2><div className="muted">No data yet — connect a source to start logging weeks.</div></div>);
+  if(!weeks.length) {
+    // "Connect a source" is only right when nothing is connected; a failed load is not that.
+    const L = window.FRKL_LIVE || {};
+    const why = (L.session && /^(error|static-only)$/.test(L.status || '')) ? v3NoBrand('the weekly board')
+      : 'No weeks yet — they start once Shopify has a full week of orders.';
+    return (<div className="card"><h2>Weekly board</h2><div className="muted">{why}</div></div>);
+  }
 
   const W = weeks[idx], prev = weeks[idx-1] || null;
   const trail = (key, upto) => weeks.slice(Math.max(0,upto-9), upto+1).map(w=>w.m[key]);
@@ -8736,7 +8759,7 @@ function WeeklyBoard(){
       <div className="card" style={{marginBottom:14, display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap'}}>
         <div>
           <div className="v3-kick">Weekly board · report card</div>
-          <h1 style={{margin:'4px 0 2px', fontSize:'var(--text-xl)'}}>Week of {v3Day(W.weekStart)} <span style={{color:'var(--text-muted)', fontWeight:'var(--weight-medium)', fontSize:'var(--text-base)'}}>→ {v3Day(W.weekEnding, true)}</span></h1>
+          <h1 style={{margin:'4px 0 2px', fontSize:'var(--text-xl)'}}>Week of {v3Day(W.weekStart)} <span style={{color:'var(--text-muted)', fontWeight:'var(--weight-medium)', fontSize:'var(--text-base)'}}>– {v3Day(W.weekEnding, true)}</span></h1>
           <div className="fine" style={{color:'var(--text-faint)'}}>
             {W.inProgress ? <span style={{color:'var(--warn)'}}>● In progress — {W.days} of 7 days so far</span>
               : W.partial ? <span>Part week — your data starts {v3Day(W.weekStart)}</span>
@@ -10079,7 +10102,12 @@ function BusinessReview(){
   const spCount = st => sp ? sp.filter(r => r.stock_status === st).length : 0;
   const sk = t => t === 'critical' ? spCount('stockout') : t === 'low' ? spCount('low_cover')
     : t === 'overstock' ? (sp ? sp.filter(r => r.stock_status === 'overstock' && Number(r.trapped_cash) > 0).length : 0) : 0;
-  const slowCapital = sp ? sp.filter(r => r.stock_status === 'overstock').reduce((a, r) => a + (Number(r.trapped_cash) || 0), 0) : null;
+  // Cash in overstock is only valued where a product cost is known (trapped_cash is NULL without
+  // one). Summing NULLs as £0 called a costless range "Lean"; count what could not be valued.
+  const overRows = sp ? sp.filter(r => r.stock_status === 'overstock') : [];
+  const overValued = overRows.filter(r => r.trapped_cash != null && isFinite(Number(r.trapped_cash)));
+  const overUnvalued = overRows.length - overValued.length;
+  const slowCapital = !sp ? null : (overRows.length && !overValued.length) ? null : overValued.reduce((a, r) => a + Number(r.trapped_cash), 0);
   const lowCover = sk('critical') + sk('low');
   const custBase = retQ.rows && retQ.rows[0] && retQ.rows[0].customers != null ? Number(retQ.rows[0].customers) : null;
 
@@ -10140,8 +10168,9 @@ function BusinessReview(){
       sub: topChan?`${topChan.channel} is the largest revenue channel${paidShare!=null?` · paid = ${pct0(paidShare)} of revenue`:''}`:'—',
       read:`Revenue concentration: ${topChan?topChan.channel:'—'} ${topShare!=null?pct0(topShare):''}${paidShare!=null?`, paid ${pct0(paidShare)} of revenue`:''}` },
     { label:'Capital in slow stock', value: slowCapital!=null ? GBP(Math.round(slowCapital)) : '—',
-      status: slowCapital==null ? 'missing' : slowCapital>5000?'watch':'healthy', statusLabel: slowCapital==null ? '—' : slowCapital>5000?'Cash tied up':'Lean',
-      sub: slowCapital!=null ? `${sk('overstock')} products with months of stock, valued at cost` : spWait,
+      status: slowCapital==null ? 'missing' : slowCapital>5000?'watch':(overUnvalued ? 'info' : 'healthy'), statusLabel: slowCapital==null ? '—' : slowCapital>5000?'Cash tied up':(overUnvalued ? 'Part-valued' : 'Lean'),
+      sub: (sp && overRows.length && !overValued.length) ? `${overRows.length} products with months of stock — enter product costs to value them`
+         : slowCapital!=null ? `${sk('overstock')} products with months of stock, valued at cost` + (overUnvalued ? ` (${overUnvalued} without a cost not counted)` : '') : spWait,
       read:`${slowCapital!=null ? curSym()+k(slowCapital) : '—'} capital tied in slow-moving stock (${sk('overstock')} overstocked products)` },
   ];
 
@@ -10183,10 +10212,14 @@ function BusinessReview(){
 
   // overall posture — factual: benchmark breaches in trading + material risk
   const breaches = nowD.filter(d=>d.sp.bench!=null && d.rag==='bad').length;
+  // The £ findings are only known once the live write lands (_source:'live'). Before that, zero
+  // risks is "not loaded yet", not "on track" — the board used to call an empty register calm.
+  const moneyKnown = P._source === 'live';
   const overall = breaches>=2 ? {kind:'action',label:'Action required'}
                 : (breaches===1 || atRisk>2000) ? {kind:'watch',label:'Watch'}
+                : !moneyKnown ? {kind:'info',label:'Still loading'}
                 : {kind:'healthy',label:'On track'};
-  const verdictSentence = `${curSym()}${k(atRisk)}/mo of contribution is exposed across ${risks.length} flagged risk${risks.length===1?'':'s'}, against ${curSym()}${k(upside)}/mo of identified upside across ${opps.length} opportunit${opps.length===1?'y':'ies'}. ${openActions} actions are open in the queue. `
+  const verdictSentence = (moneyKnown ? '' : 'Greta’s £ findings are still loading. ') + (!moneyKnown ? '' : `${curSym()}${k(atRisk)}/mo of contribution is exposed across ${risks.length} flagged risk${risks.length===1?'':'s'}, against ${curSym()}${k(upside)}/mo of identified upside across ${opps.length} opportunit${opps.length===1?'y':'ies'}. ${openActions} actions are open in the queue. `)
     + `Unit economics: ${ltvCac!=null?ltvCac.toFixed(1)+'× contribution customer lifetime value:cost per new customer':'customer lifetime value:cost per new customer pending cost data'}, repeat rate ${repeat!=null?pct1(repeat):'—'}. `
     + `${topChan&&topShare!=null?`${topChan.channel} drives ${pct0(topShare)} of revenue`:''}${slowCapital>50000?`, with ${curSym()}${k(slowCapital)} of capital tied in slow-moving stock`:''}.`;
 
@@ -11229,7 +11262,7 @@ function mosView(name, extra){
   const C = window[name];
   const A = window.OI_ASK || {};
   if (!C) return React.createElement('div',{className:'note'}, 'This screen did not load. Refresh the page; if it keeps happening, contact support.');
-  if (!A.brand_id) return React.createElement('div',{className:'note'}, 'Sign in to see this for your brand.');
+  if (!A.brand_id) return React.createElement('div',{className:'note'}, v3NoBrand('this page'));
   const apiBase = (A.endpoint||'').replace(/\/functions\/v1\/[^/]*$/, '');
   // .mos-embed-scope (marketing-os.css, 2026-07-13) remaps the component's own design tokens
   // onto Greta's real :root theme variables, so it renders styled instead of bare/unstyled.
@@ -12097,7 +12130,8 @@ function GP_CurveConstraint(p) {
   var bCpc = Number(d.beta_cpc), bCvr = Number(d.beta_cvr);
   var auction = bCpc, conversion = -bCvr;           // contributions, summing to beta
   var beta = auction + conversion;
-  var indet = d.dominant_constraint === 'indeterminate';
+  // A zero or missing curve can't be split into shares ("NaN% of your saturation"): treat it as unidentified.
+  var indet = d.dominant_constraint === 'indeterminate' || !(Math.abs(beta) > 0) || !isFinite(beta);
 
   var W = 620, H = 92, ML = 96, MR = 16;
   var pw = W - ML - MR;
@@ -12383,7 +12417,8 @@ function GretaPlanPanel({ show } = {}) {
   }, []);
 
   React.useEffect(function () {
-    var c = window.FRKL_PLAN && window.FRKL_PLAN.config;
+    // A brand with no saved costs has no config row: start it on an empty form, not "Loading…".
+    var c = window.FRKL_PLAN && (window.FRKL_PLAN.config || (window.FRKL_PLAN.configLoaded ? {} : null));
     if (c && econ === null) {
       var v = c.variable_costs || {};
       setEcon({
@@ -12425,6 +12460,8 @@ function GretaPlanPanel({ show } = {}) {
 
   // No inset of its own: the page sets the edges, and every section sits on them (it was 6px in).
   var wrap = { color: GP_T.ink };
+  // The plan feed never starts when the workspace did not load, so "Loading…" would wait for ever.
+  var gpLiveDown = !!(window.FRKL_LIVE && window.FRKL_LIVE.session && !window.FRKL_LIVE.brandId && /^(error|static-only)$/.test(window.FRKL_LIVE.status || ''));
   var cfg = (window.FRKL_PLAN && window.FRKL_PLAN.config) || null;
   var perDays = (P.period && P.period.start && P.period.end) ? Math.max(1, Math.round((new Date(P.period.end) - new Date(P.period.start)) / 864e5) + 1) : 90;
   var fixedForPeriod = cfg && cfg.fixed_costs_monthly ? Number(cfg.fixed_costs_monthly) * (perDays / 30) : 0;
@@ -12441,7 +12478,10 @@ function GretaPlanPanel({ show } = {}) {
       {isGoal && (<div style={{ borderTop: '1px solid ' + GP_T.line, padding: 'var(--space-6) 0', marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <h2 className="v3-sec-title gp-h">Data readiness</h2>
-          <div style={{ fontSize: 'var(--text-sm)', color: blocking.length ? GP_T.amber : GP_T.green }}>{readyCount} of {readiness.length} ready{blocking.length ? ' · ' + blocking.length + ' still needed before Greta can set targets' : ' · ready to plan'}</div>
+          {/* "0 of 0 ready · ready to plan" was what a failed read looked like. */}
+          {readiness.length
+            ? <div style={{ fontSize: 'var(--text-sm)', color: blocking.length ? GP_T.amber : GP_T.green }}>{readyCount} of {readiness.length} ready{blocking.length ? ' · ' + blocking.length + ' still needed before Greta can set targets' : ' · ready to plan'}</div>
+            : <div style={{ fontSize: 'var(--text-sm)', color: GP_T.dim }}>{gpLiveDown ? 'Couldn’t check your data' : (window.FRKL_PLAN && window.FRKL_PLAN.readinessErr) ? 'Couldn’t check your data just now' : 'Checking your data…'}</div>}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: '6px 22px' }}>
           {Object.keys(sections).map(function (sec) {
@@ -12500,7 +12540,7 @@ function GretaPlanPanel({ show } = {}) {
             </div>
           </div>
         ) : (
-          <div style={{ fontSize: 'var(--text-sm)', color: GP_T.dim }}>Loading economics…</div>
+          <div style={{ fontSize: 'var(--text-sm)', color: GP_T.dim }}>{gpLiveDown ? v3NoBrand('your costs') : (window.FRKL_PLAN && window.FRKL_PLAN.configErr) ? 'Greta couldn’t load your costs just now. Refreshing the page usually sorts it.' : 'Loading your costs…'}</div>
         )}
       </div>)}
 
@@ -13796,7 +13836,8 @@ function TeamPanel(){
     return (<div className="card" style={{padding:'var(--s-7)'}}>
       <div style={{fontSize:'var(--text-base)', fontWeight:'var(--weight-bold)', marginBottom:'var(--s-2)'}}>Team</div>
       <div className="meta" style={{lineHeight:1.6, maxWidth:'var(--measure)'}}>
-        Inviting teammates is available in your live, signed-in workspace. This is the public demo, so team management is read-only here.
+        {(window.FRKL_LIVE && window.FRKL_LIVE.session) ? v3NoBrand('your team')
+          : 'Inviting teammates is available in your live, signed-in workspace. This is the public demo, so team management is read-only here.'}
       </div>
     </div>);
   }
@@ -14268,9 +14309,12 @@ function v3TrustWhy(d) {
   const bits = [];
   if (d.spend_is_stale) {
     const who = d.stale_feeds ? String(d.stale_feeds).split(' since')[0] : 'One of your ad accounts';
-    const gbp = Number(d.unreported_spend) > 0 ? ' — about ' + v3Gbp(d.unreported_spend) + ' of spend' : '';
-    bits.push(who + ' stopped reporting ' + (d.spend_stale_days || 0) + ' days ago' + gbp +
-              ' is missing, so profit after ads reads higher than it will once that lands.');
+    const n = Number(d.spend_stale_days) || 0;
+    const when = n <= 0 ? 'today' : n === 1 ? 'yesterday' : n + ' days ago';
+    // "…stopped reporting 3 days ago is missing" read as one broken sentence when there was no £.
+    bits.push(who + ' stopped reporting ' + when + ', so ' +
+              (Number(d.unreported_spend) > 0 ? 'about ' + v3Gbp(d.unreported_spend) + ' of ad spend is missing' : 'some ad spend is missing') +
+              ' and profit after ads reads higher than it will once that lands.');
   }
   if (d.cogs_basis === 'measured') {
     if (!bits.length) bits.push('Counted from your own product and order costs.');
@@ -14469,13 +14513,19 @@ function V3More({ id, label, children, defaultOpen }) {
     return () => window.removeEventListener('oi-v3-anchor', on);
   });
   const toggle = () => setOpen(o => { try { localStorage.setItem(key, o ? '0' : '1'); } catch (e) {} return !o; });
+  const L = typeof window !== 'undefined' && window.FRKL_LIVE;
+  const liveFailed = !!(L && L.session && !L.lastFetchAt && /^(error|static-only)$/.test(L.status || ''));
   return (<section className="v3-more">
     <button type="button" className="v3-more-head" onClick={toggle} aria-expanded={open}>
       {/* The chevron was a text glyph, the one place the product still drew an affordance
           in a typeface rather than with the icon set. Same <Icon> as the nav, rotated. */}
       <span className={'v3-more-caret' + (open ? ' open' : '')} aria-hidden="true"><Icon name="chevron" size={13}/></span>{label}
     </button>
-    {open && <div className="v3-more-body"><V3Boundary where={'more:' + id} label={'“' + label + '”'}>{children}</V3Boundary></div>}
+    {open && <div className="v3-more-body">{liveFailed
+      // The detail panels draw from live data; when it never arrived they drew tables of £0 and
+      // 0.0% — and one diagnosed "the steepest drop" from all-zero rows. Say it once instead.
+      ? <p className="v3-empty">These details need your live data, which didn’t load. Refreshing the page usually sorts it.</p>
+      : <V3Boundary where={'more:' + id} label={'“' + label + '”'}>{children}</V3Boundary>}</div>}
   </section>);
 }
 
@@ -14712,7 +14762,7 @@ const CTONE = { good: 'var(--good)', warn: 'var(--warn)', bad: 'var(--bad)', acc
 
 function ciFetch(fn, payload) {
   const A = (typeof window !== 'undefined' && window.OI_ASK) || null;
-  if (!A || !A.endpoint || !A.getJwt) return Promise.reject(new Error('Sign in to see your customers.'));
+  if (!A || !A.endpoint || !A.getJwt) return Promise.reject(new Error(v3NoBrand('your customers')));
   const base = String(A.endpoint).replace(/\/functions\/v1\/[^/]*$/, '/functions/v1');
   return A.getJwt().then(jwt => fetch(base + '/' + fn, {
     method: 'POST',
@@ -14867,7 +14917,7 @@ function DataHealth(){
     let alive = true;
     const sb = (typeof window !== 'undefined' && window.FRKL_LIVE && window.FRKL_LIVE.sb) || window.sb;
     const brand = (window.FRKL_LIVE && window.FRKL_LIVE.brandId) || (window.OI_ASK && window.OI_ASK.brand_id);
-    if (!sb || !brand) { setErr('Sign in to see where your data comes from.'); return; }
+    if (!sb || !brand) { setErr(v3NoBrand('where your data comes from')); return; }
     const since = new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10);
     Promise.all([
       sb.from('vw_brand_source_freshness').select('source, feeds, last_date, stale_days, status, likely_systemic').eq('brand_id', brand),
@@ -14905,11 +14955,14 @@ function DataHealth(){
     <table className="v3-rw v3-feeds">
       <thead><tr><th className="t-text">Feed</th><th className="t-text">Status</th><th>Latest data</th></tr></thead>
       <tbody>{rows.map(r => {
-        const ok = r.status === 'current';
-        const tone = ok ? 'var(--color-success)' : (Number(r.stale_days) > 4 ? 'var(--color-danger)' : 'var(--color-warning)');
+        // Never say "Up to date" beside a date that says otherwise: trust the date as well as the label.
+        const lag = r.last_date ? Math.floor((Date.now() - Date.parse(String(r.last_date).slice(0, 10) + 'T00:00:00Z')) / 864e5) : null;
+        const ok = r.status === 'current' && !(lag > 3);
+        const behind = Number(r.stale_days) || lag || 0;
+        const tone = ok ? 'var(--color-success)' : (behind > 4 ? 'var(--color-danger)' : 'var(--color-warning)');
         return (<tr key={r.source}>
           <td className="t-text v3-rw-name">{srcName(r.source)}</td>
-          <td className="t-text"><span className="v3-conn-state" style={{color: tone}}><i style={{background: tone}}/>{ok ? 'Up to date' : (Number(r.stale_days) === 1 ? 'A day behind' : Math.round(Number(r.stale_days)) + ' days behind')}</span></td>
+          <td className="t-text"><span className="v3-conn-state" style={{color: tone}}><i style={{background: tone}}/>{ok ? 'Up to date' : (behind === 1 ? 'A day behind' : Math.round(behind) + ' days behind')}</span></td>
           <td className="v3-muted">{r.last_date ? v3Day(String(r.last_date).slice(0, 10), true) : FMT_NONE}</td>
         </tr>);
       })}</tbody>
@@ -14963,15 +15016,17 @@ function DataHealth(){
 // number you would get if the worse group performed like the better one, which no
 // reallocation achieves in full. The copy says so rather than implying a promise.
 function useOneRow(view, cols){
-  const [row, setRow] = React.useState(undefined);   // undefined = loading, null = none
+  // undefined = loading, null = read fine and there is no row, false = could not read. The last
+  // two used to be the same null, so a failed read was announced as a clean "nothing to move".
+  const [row, setRow] = React.useState(undefined);
   React.useEffect(() => {
     let alive = true;
     const sb = (typeof window !== 'undefined' && window.FRKL_LIVE && window.FRKL_LIVE.sb) || window.sb;
     const brand = (window.FRKL_LIVE && window.FRKL_LIVE.brandId) || (window.OI_ASK && window.OI_ASK.brand_id);
-    if (!sb || !brand) { setRow(null); return; }
+    if (!sb || !brand) { setRow(false); return; }
     sb.from(view).select(cols).eq('brand_id', brand).limit(1)
-      .then(r => { if (alive) setRow((r && r.data && r.data[0]) || null); })
-      .catch(() => alive && setRow(null));
+      .then(r => { if (alive) setRow(r && r.error ? false : ((r && r.data && r.data[0]) || null)); })
+      .catch(() => alive && setRow(false));
     return () => { alive = false; };
   }, [view, cols]);
   return row;
@@ -15010,6 +15065,7 @@ function ProductTrafficMisallocation(){
   // undefined is still loading; a clean result is a real finding and gets said out loud,
   // because "we checked and found nothing" and "we never looked" must not look the same.
   if (d === undefined) return <V3SkeletonRows n={2}/>;
+  if (d === false) return <div className="v3-empty">Greta couldn’t check where your visitors land just now. Refreshing the page usually sorts it.</div>;
   if (!d || !Number(d.worse_views)) return (
     <div className="card">
       <div className="card-section-title"><h2 style={{margin:0}}>Where your visitors land</h2></div>
@@ -15502,6 +15558,16 @@ function V3HeroTrend({ sales, prod }) {
 
 function V3Today(p) {
   const h = useV3Headline();
+  // The loader flags a headline that never arrived (GRETA_HEADLINE_ERROR); nothing listened, so
+  // Today said "Loading your live numbers…" for ever. Hold the flag in state so the hero can say so.
+  const [hErr, setHErr] = React.useState(() => (typeof window !== 'undefined' && window.GRETA_HEADLINE_ERROR) || null);
+  const [, bumpLive] = React.useState(0);
+  React.useEffect(() => {
+    const on = () => { setHErr(window.GRETA_HEADLINE_ERROR || null); bumpLive(n => n + 1); };
+    window.addEventListener('greta-headline-updated', on); window.addEventListener('frkl-live-status', on);
+    const t = setTimeout(on, 12000);
+    return () => { window.removeEventListener('greta-headline-updated', on); window.removeEventListener('frkl-live-status', on); clearTimeout(t); };
+  }, []);
   const board = useV3Board();   // above every early return — see the hooks note in measuring-the-ui
   const D0 = (typeof window !== 'undefined' && window.FRKL_OVERVIEW) || null;
   // Session-stable: the headline and top action are fixed at first render and
@@ -15538,8 +15604,13 @@ function V3Today(p) {
   const d = frozen.current || h;
   const refresh = () => { frozen.current = window.GRETA_HEADLINE; setStale(false); };
 
+  const liveDown = typeof window !== 'undefined' && window.FRKL_LIVE && /^(error|static-only)$/.test(window.FRKL_LIVE.status || '');
   if (!d) return (<div className="v3-hero"><div className="v3-hero-lab">Profit after ads · last 30 days</div>
-    <div className="v3-big">—</div><div className="v3-sub">Loading your live numbers…</div></div>);
+    <div className="v3-big">—</div>
+    {(hErr || liveDown)
+      ? <><div className="v3-sub">{liveDown ? v3NoBrand('your numbers') : 'Greta couldn’t load your numbers just now.'}</div>
+          {!(window.FRKL_LIVE && window.FRKL_LIVE.lastError === 'no membership') && <button type="button" className="v3-btn v3-btn-sm v3-gap-top" onClick={() => location.reload()}>Try again</button>}</>
+      : <div className="v3-sub">Loading your live numbers…</div>}</div>);
 
   const cam = d.cm_after_marketing_30d, prod = d.product_contribution_30d, spend = d.paid_spend_30d, sales = d.net_revenue_30d;
   const gate = d.can_show_cm === false;
