@@ -63,14 +63,10 @@
     detailState = 'loading';
     var s = sb(), b = bid();
     if (!s || !b) { detailState = 'idle'; return; }
-    var fc = await withTimeout(s.from('vw_forecast_vs_goal').select('*').eq('brand_id', b).limit(1), 12000);
-    if (fc && fc.data) window.FRKL_PLAN.forecast = fc.data[0] || null;
-    var ch = await withTimeout(s.from('vw_channel_scoreboard').select('channel_type,spend_30d,avg_iroas,phi,break_even_iroas,target_marginal_iroas,break_even_reported_roas,target_reported_roas,target_is_ltv_adjusted,ltv_share,ltv_status,marginal_cac,max_cac_first_order,status,action,focus_rank,phi_is_assumed,planned_spend,spend_pace_pct_of_plan,plan_target_iroas,plan_target_cac,plan_confirmed').eq('brand_id', b).order('focus_rank', { ascending: true }), 12000);
-    if (ch && ch.data) window.FRKL_PLAN.channels = ch.data || [];
-    var cm = await withTimeout(s.from('vw_channel_revenue_mix').select('window_label,channel,orders,net_revenue,aov,new_orders,returning_orders,new_revenue,returning_revenue,orders_with_discount,pct_of_revenue').eq('brand_id', b), 10000);
-    if (cm && cm.data) window.FRKL_PLAN.channelMix = cm.data || [];
-    var hh = await withTimeout(s.from('vw_brand_channel_health').select('*').eq('brand_id', b).limit(1), 10000);
-    if (hh && hh.data) window.FRKL_PLAN.channelHealth = hh.data[0] || null;
+    // Light reads first, and the screen is told after each group, so the Growth plan's lead
+    // (cost per customer by month, why it bends, what moves it, sales by channel) paints while
+    // the two slow views below are still running instead of waiting the full half-minute.
+    var ping = function () { window.dispatchEvent(new CustomEvent('frkl-plan-updated')); };
     // Spend curve (the k curve). Two feeds on purpose: the POINTS are measurement and stay
     // plottable even when the fit is not identified; the CURVE is inference and carries its own
     // band + verdict. A surface must honour `verdict` - see 0141/0142.
@@ -80,16 +76,28 @@
       .select('month,spend,cac,new_customers,cm_per_order,cac_above_contribution,recency_rank')
       .eq('brand_id', b).order('month', { ascending: true }), 10000);
     if (sp && sp.data) window.FRKL_PLAN.spendCurvePoints = sp.data || [];
+    ping();
+    var cm = await withTimeout(s.from('vw_channel_revenue_mix').select('window_label,channel,orders,net_revenue,aov,new_orders,returning_orders,new_revenue,returning_revenue,orders_with_discount,pct_of_revenue').eq('brand_id', b), 10000);
+    if (cm && cm.data) window.FRKL_PLAN.channelMix = cm.data || [];
 
     // The three reads that explain the curve rather than just drawing it (0145). Live
     // since September 2026 with no consumer until the V3 Growth plan mounted them:
     // why it bends (auction vs conversion), how the read has changed, what would move it.
     var cd = await withTimeout(s.from('vw_brand_curve_decomposition').select('*').eq('brand_id', b).limit(1), 10000);
     if (cd && cd.data) window.FRKL_PLAN.curveDecomposition = cd.data[0] || null;
-    var ch2 = await withTimeout(s.from('vw_brand_curve_history').select('*').eq('brand_id', b).order('month', { ascending: true }), 10000);
-    if (ch2 && ch2.data) window.FRKL_PLAN.curveHistory = ch2.data || [];
     var cl = await withTimeout(s.from('vw_brand_curve_levers').select('*').eq('brand_id', b), 10000);
     if (cl && cl.data) window.FRKL_PLAN.curveLevers = cl.data || [];
+    ping();
+    var ch2 = await withTimeout(s.from('vw_brand_curve_history').select('*').eq('brand_id', b).order('month', { ascending: true }), 10000);
+    if (ch2 && ch2.data) window.FRKL_PLAN.curveHistory = ch2.data || [];
+    var hh = await withTimeout(s.from('vw_brand_channel_health').select('*').eq('brand_id', b).limit(1), 10000);
+    if (hh && hh.data) window.FRKL_PLAN.channelHealth = hh.data[0] || null;
+    ping();
+    var fc = await withTimeout(s.from('vw_forecast_vs_goal').select('*').eq('brand_id', b).limit(1), 12000);
+    if (fc && fc.data) window.FRKL_PLAN.forecast = fc.data[0] || null;
+    ping();
+    var ch = await withTimeout(s.from('vw_channel_scoreboard').select('channel_type,spend_30d,avg_iroas,phi,break_even_iroas,target_marginal_iroas,break_even_reported_roas,target_reported_roas,target_is_ltv_adjusted,ltv_share,ltv_status,marginal_cac,max_cac_first_order,status,action,focus_rank,phi_is_assumed,planned_spend,spend_pace_pct_of_plan,plan_target_iroas,plan_target_cac,plan_confirmed').eq('brand_id', b).order('focus_rank', { ascending: true }), 12000);
+    if (ch && ch.data) window.FRKL_PLAN.channels = ch.data || [];
 
     detailState = 'done';
     window.dispatchEvent(new CustomEvent('frkl-plan-updated'));

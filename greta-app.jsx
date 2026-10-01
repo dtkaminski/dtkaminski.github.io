@@ -15799,6 +15799,205 @@ function useV3Rows(key, build) {
 }
 function v3Monday(iso) { const d = new Date(iso + 'T00:00:00Z'); const k = (d.getUTCDay() + 6) % 7; d.setUTCDate(d.getUTCDate() - k); return d.toISOString().slice(0, 10); }
 
+// ── Growth plan (V3 lead) ────────────────────────────────────────────────────
+// The page asks "how much more should I spend?". The engine has answered that since 0141
+// (spend curve, its points, why it bends, what moves it) but only as an analyst's notebook
+// of β, t-stats and φ. This leads with the measured part a brand owner can act on — what a
+// new customer costs against what their first order earns, month by month — and keeps the
+// modelled curve behind "The detail". Every figure here is a live read through FRKL_PLAN.
+const V3_MIX_NAME = { direct: 'Direct and unattributed', email: 'Email', paid_social: 'Paid social', paid_search: 'Paid search',
+  referral: 'Referral and codes', organic_social: 'Organic social', organic_search: 'Organic search', sms: 'SMS', affiliate: 'Affiliates' };
+// The loader stamps meta.captured as UTC "YYYY-MM-DD HH:MM"; people read their own clock.
+function v3Stamp(s) {
+  const d = new Date(String(s).replace(' ', 'T') + ':00Z');
+  if (isNaN(d)) return String(s || '');
+  const iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  return v3Day(iso) + ', ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+function v3Month(iso, yr) {
+  const d = new Date(String(iso).slice(0, 10) + 'T00:00:00Z');
+  if (isNaN(d)) return '';
+  const m = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getUTCMonth()];   // en-GB says "Sept"
+  return yr === 'long' ? m + ' ' + d.getUTCFullYear() : yr ? m + ' ’' + String(d.getUTCFullYear()).slice(2) : m;
+}
+// Subscribes to the plan feed and asks for the Growth-only reads (they are deferred until a
+// screen needs them — see loadDetail in greta-plan-data.js).
+function useV3Plan() {
+  const [, bump] = React.useState(0);
+  React.useEffect(() => {
+    const on = () => bump(n => n + 1);
+    window.addEventListener('frkl-plan-updated', on);
+    let iv = setInterval(() => {
+      if (window.FRKL_PLAN && window.FRKL_LIVE && window.FRKL_LIVE.sb) {
+        clearInterval(iv); iv = null;
+        if (window.FRKL_PLAN.loadDetail) window.FRKL_PLAN.loadDetail();
+      }
+    }, 400);
+    return () => { window.removeEventListener('frkl-plan-updated', on); if (iv) clearInterval(iv); };
+  }, []);
+  return (typeof window !== 'undefined' && window.FRKL_PLAN) || {};
+}
+function V3Growth() {
+  const P = useV3Plan();
+  const sc = P.spendCurve || null;
+  const pts = (P.spendCurvePoints || []).filter(p => Number(p.spend) > 0 && p.cac != null);
+  const cm = sc && sc.cm_per_order != null ? Number(sc.cm_per_order) : (pts.length ? Number(pts[pts.length - 1].cm_per_order) : null);
+  const last = pts.length ? pts[pts.length - 1] : null;
+  const back = pts.length > 6 ? pts[pts.length - 6] : (pts.length > 1 ? pts[0] : null);
+  const over = pts.filter(p => p.cac_above_contribution).length;
+
+  // The answer, in the owner's terms. Measured first (last month's cost per customer against
+  // a first order's profit); the model only adds a clause when its verdict is decided.
+  let head = null, sub = null;
+  if (last && cm) {
+    const cac = Number(last.cac), room = cm - cac;
+    const edge = room < cm * 0.15;
+    head = cac >= cm ? 'A new customer now costs more than their first order earns you.'
+      : edge ? 'You are at the edge: a new customer costs about what their first order earns.'
+      : 'There is room to grow: a new customer costs well under what their first order earns.';
+    const rose = back && Number(last.spend) > Number(back.spend) * 1.3 && cac > Number(back.cac) * 1.2;
+    sub = (rose ? 'Since ' + v3Month(back.month, 'long') + ' your monthly ad spend went from ' + fmtMoney(back.spend) + ' to ' + fmtMoney(last.spend)
+          + ', and the cost of each new customer from ' + fmtMoney(back.cac, 2) + ' to ' + fmtMoney(cac, 2) + '. ' : '')
+      + (cac >= cm ? 'Spending more will make each extra customer dearer still. Fix what converts before adding budget.'
+        : edge ? 'More budget now buys customers who only pay back if they order again. Step up slowly and watch this number.'
+        : 'Each extra customer still pays back on their first order. Raise spend in steps and watch the cost per customer.')
+      + (sc && sc.verdict === 'over' ? ' Your spend history suggests you are already past the most you can spend at a profit.'
+        : sc && sc.verdict === 'under' ? ' Your spend history suggests there is room to spend more at a profit.' : '');
+  }
+
+  // Why it bends, in one sentence, only when the split is actually identified.
+  const dec = P.curveDecomposition;
+  let why = null;
+  if (dec && dec.dominant_constraint && dec.dominant_constraint !== 'indeterminate' && dec.dominant_constraint !== 'no_saturation') {
+    const auction = Number(dec.beta_cpc), conversion = -Number(dec.beta_cvr);
+    why = conversion > auction
+      ? 'The cost is rising because the extra visitors you buy convert worse' + (auction <= 0 ? ' — your ad prices have not gone up at all' : '') + '. Better product pages and offers will do more than cheaper ads.'
+      : 'The cost is rising because ads get dearer as you buy more of them. New audiences and fresh creative will do more than site changes.';
+  }
+  const LEV = { aov: 'Raise the average order', gross_margin: 'Improve product margin', refund_rate: 'Cut refunds',
+    per_order_costs: 'Cut per-order costs', cvr: 'Convert more visitors', cpc: 'Pay less per click' };
+  const levers = (P.curveLevers || []).filter(l => l.ceiling_multiplier_mid != null)
+    .sort((a, b) => Number(b.ceiling_multiplier_mid) - Number(a.ceiling_multiplier_mid)).slice(0, 4);
+  const levMax = levers.length ? Number(levers[0].ceiling_multiplier_mid) - 1 : 0;
+
+  // Where sales came from, last 30 days, as one share bar.
+  const mixNow = (P.channelMix || []).filter(m => m.window_label === 'current_30d' && Number(m.net_revenue) > 0)
+    .sort((a, b) => Number(b.net_revenue) - Number(a.net_revenue));
+  const mixPrev = {};
+  (P.channelMix || []).filter(m => m.window_label === 'prior_30d').forEach(m => { mixPrev[m.channel] = Number(m.net_revenue) || 0; });
+  const mixTot = mixNow.reduce((a, m) => a + Number(m.net_revenue), 0);
+  const mixCol = [PAL.data1, PAL.data3, PAL.data2, PAL.data4, PAL.data5, PAL.quiet, PAL.quiet, PAL.quiet];
+  const paidShare = mixTot ? mixNow.filter(m => /^paid_/.test(m.channel)).reduce((a, m) => a + Number(m.net_revenue), 0) / mixTot : null;
+
+  const fc = P.forecast || null, g = P.goal || null;
+  const hasGoal = !!(g && (g.revenue_target || g.cam_target));
+  const stat = (lab, val, foot) => (<div className="v3-stat" key={lab}>
+    <div className="v3-stat-lab"><span>{lab}</span></div>
+    <div className="v3-stat-val">{val}</div>
+    <div className="v3-stat-foot"><span className="v3-muted">{foot}</span></div>
+  </div>);
+  const cacTip = ({ active, payload }) => (!active || !payload || !payload.length) ? null : (<div className="v3-tip"><b>{v3Month(payload[0].payload.month, 'long')}</b>
+    <span>Cost per new customer <em>{fmtMoney(payload[0].payload.cac, 2)}</em></span>
+    <span>New customers <em>{fmtCount(payload[0].payload.new_customers)}</em></span>
+    <span>Ad spend <em>{fmtMoney(payload[0].payload.spend)}</em></span></div>);
+
+  if (!sc && !pts.length && !mixNow.length && !fc) return <V3SkeletonRows n={4}/>;
+  return (<div className="v3-page-stack">
+    {head && (<section>
+      <div className="v3-kick">Should you spend more on ads?</div>
+      <p className="v3-verdict">{head}</p>
+      {sub && <p className="v3-note v3-measure">{sub}</p>}
+      <div className="v3-stat-grid v3-gap-top">
+        {stat('A new customer cost you', fmtMoney(last.cac, 2), 'in ' + v3Month(last.month, 'long') + (back ? ', from ' + fmtMoney(back.cac, 2) + ' in ' + v3Month(back.month) : ''))}
+        {stat('A first order earns you', fmtMoney(cm, 2), 'after product and order costs')}
+        {stat('Monthly ad spend', fmtMoney(last.spend), back ? 'from ' + fmtMoney(back.spend) + ' in ' + v3Month(back.month) : 'last full month')}
+        {stat('Months a customer cost more than they earned', over + ' of ' + pts.length, 'since ' + v3Month(pts[0].month, 'long'))}
+      </div>
+    </section>)}
+
+    {pts.length >= 4 && cm && (<div className="v3-chart-pair">
+      <figure className="v3-chart">
+        <figcaption><span className="v3-chart-title">What a new customer costs, by month</span>
+          <span className="v3-legend"><i style={{ background: PAL.accent }}/>Cost per new customer <i className="dash"/>What a first order earns</span></figcaption>
+        <R.ResponsiveContainer width="100%" height={240}>
+          <R.ComposedChart data={pts} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <defs><linearGradient id="v3CacFill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={PAL.accent} stopOpacity={0.14}/><stop offset="100%" stopColor={PAL.accent} stopOpacity={0}/></linearGradient></defs>
+            <R.CartesianGrid/>
+            <R.XAxis dataKey="month" tickFormatter={m => v3Month(m, true)} interval="preserveStartEnd"/>
+            <R.YAxis tickFormatter={v => fmtMoney(v)} domain={[0, dataMax => Math.ceil(Math.max(dataMax, cm) * 1.15 / 10) * 10]}/>
+            <R.Tooltip content={cacTip}/>
+            <R.ReferenceLine y={cm} stroke={PAL.muted} strokeDasharray="4 4"/>
+            <R.Area type="monotone" dataKey="cac" stroke={PAL.accent} fill="url(#v3CacFill)"/>
+          </R.ComposedChart>
+        </R.ResponsiveContainer>
+      </figure>
+      <figure className="v3-chart">
+        <figcaption><span className="v3-chart-title">Ad spend, by month</span></figcaption>
+        <R.ResponsiveContainer width="100%" height={240}>
+          <R.BarChart data={pts} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+            <R.CartesianGrid/>
+            <R.XAxis dataKey="month" tickFormatter={m => v3Month(m, true)} interval="preserveStartEnd"/>
+            <R.YAxis tickFormatter={fmtMoneyK}/>
+            <R.Tooltip content={cacTip}/>
+            <R.Bar dataKey="spend" fill={PAL.data3} radius={[2, 2, 0, 0]}/>
+          </R.BarChart>
+        </R.ResponsiveContainer>
+      </figure>
+    </div>)}
+
+    {(why || levers.length >= 2) && (<section className="v3-sec">
+      <h2 className="v3-sec-title">What would let you spend more</h2>
+      {why && <p className="v3-note v3-measure">{why}</p>}
+      {levers.length >= 2 && <p className="v3-levers-head"><span>Improve one thing by 10%</span><span>and you could spend</span></p>}
+      {levers.length >= 2 && (<ul className="v3-levers">
+        {levers.map(l => {
+          const gain = Number(l.ceiling_multiplier_mid) - 1;
+          return (<li key={l.lever}>
+            <span className="v3-levers-name">{LEV[l.lever] || String(l.lever).replace(/_/g, ' ')}</span>
+            <span className="v3-levers-track"><i style={{ width: Math.max(2, levMax > 0 ? (gain / levMax) * 100 : 0) + '%' }}/></span>
+            <span className="v3-levers-v">+{Math.round(gain * 100)}% more</span>
+          </li>);
+        })}
+      </ul>)}
+      {levers.length >= 2 && <p className="micro muted v3-measure">More, that is, before a new customer costs more than their first order earns — holding everything else as it is. Modelled from your own months, so read it as a ranking rather than a promise.</p>}
+    </section>)}
+
+    {mixNow.length >= 2 && mixTot > 0 && (<section className="v3-sec">
+      <h2 className="v3-sec-title">Where your sales came from <span className="v3-muted">last 30 days</span></h2>
+      {paidShare != null && <p className="v3-note v3-measure">Ads brought in {fmtPctN(paidShare)} of sales directly. The rest came from people who found you another way — typing your name, an email, a friend’s code.</p>}
+      <div className="v3-share" role="img" aria-label="Share of sales by channel">
+        {mixNow.map((m, i) => <i key={m.channel} style={{ width: (Number(m.net_revenue) / mixTot * 100) + '%', background: mixCol[i] }}/>)}
+      </div>
+      <table className="v3-share-table"><tbody>
+        {mixNow.map((m, i) => {
+          const prev = mixPrev[m.channel], ch = prev > 0 ? Number(m.net_revenue) / prev - 1 : null;
+          return (<tr key={m.channel}>
+            <td className="t-text"><i className="v3-dot" style={{ background: mixCol[i] }}/>{V3_MIX_NAME[m.channel] || String(m.channel).replace(/_/g, ' ')}</td>
+            <td>{fmtMoney(m.net_revenue)}</td>
+            <td className="v3-muted">{fmtPctN(Number(m.net_revenue) / mixTot)}</td>
+            <td className={ch == null ? 'v3-muted' : ch >= 0 ? 'v3-up' : 'v3-down'}>{ch == null ? 'new this month' : (ch >= 0 ? '+' : '−') + fmtPctN(Math.abs(ch))}</td>
+          </tr>);
+        })}
+      </tbody></table>
+      <p className="micro muted">Change is against the 30 days before. Shopify credits each order to the last thing the customer clicked.</p>
+    </section>)}
+
+    {fc && Number(fc.forecast_revenue_period) > 0 && (<section className="v3-sec">
+      <h2 className="v3-sec-title">The next few weeks <span className="v3-muted">{v3Day(fc.forecast_covers_from)} – {v3Day(fc.forecast_covers_to, true)}</span></h2>
+      <div className="v3-stat-grid">
+        {stat('Forecast sales', fmtMoney(fc.forecast_revenue_period), hasGoal && g.revenue_target ? 'goal for the quarter ' + fmtMoney(g.revenue_target) : 'from your trend and calendar')}
+        {stat('Forecast profit after ads', fmtMoney(fc.forecast_cm_period), hasGoal && g.cam_target ? 'goal for the quarter ' + fmtMoney(g.cam_target) : 'what you keep after products and ads')}
+        {Number(fc.forecast_spend_period) > 0 && stat('Ad spend at your current pace', fmtMoney(fc.forecast_spend_period), 'over the same weeks')}
+        {Number(fc.forecast_event_revenue_period) > 0 && stat('From planned promotions', fmtMoney(fc.forecast_event_revenue_period), 'already in your calendar')}
+      </div>
+      {!hasGoal && (<p className="v3-note">No goal is set for this quarter, so there is no gap to show yet.{' '}
+        <button className="v3-btn v3-btn-q v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('goal')}>Set a goal</button></p>)}
+      {Number(fc.uncovered_days) > 0 && <p className="micro muted">Greta forecasts about four weeks ahead; the rest of the quarter fills in as it gets closer.</p>}
+    </section>)}
+  </div>);
+}
+
 // ── Customers (V3, live) ─────────────────────────────────────────────────────
 function V3Customers() {
   const tier = useV3Rows('cust-tier', (sb, b) => sb.from('vw_customer_tier_periods')
@@ -15966,9 +16165,11 @@ const V3_PAGES = {
     <V3More id="goal-econ" label="All your costs, cash and terms"><V3Anchor id="economics"/><BusinessEconomicsPanel/></V3More>
   </>),
   growth: (p) => (<>
-    <V3Anchor id="forecast"/>
-    <GretaPlanPanel show="growth"/>
+    <V3Growth/>
     <CashCeiling/>
+    <V3More id="growth-detail" label="The detail — channel targets, the spend curve and what moves it">
+      <V3Anchor id="forecast"/><GretaPlanPanel show="growth"/>
+    </V3More>
     <V3More id="growth-fit" label="Offer and product fit, cash and forward signal"><FitCard start={p.start} end={ACTIVE_END}/><GenomePanel/></V3More>
   </>),
   stock: (p) => (<>
@@ -16386,7 +16587,7 @@ function App(){
           <span className="app-footer-dot"/>
           <span title={D.meta.source}>{(OI_BRAND.name||'your')} workspace · {(D.meta.source||'').split('—')[0].trim()||'Live data'}</span>
           <span className="app-footer-dot"/>
-          <span>data updated {D.meta.captured}</span>
+          {D.meta.captured && <span>Updated {v3Stamp(D.meta.captured)}</span>}
           <div style={{flex:1}}/>
           <span>Auto-updates daily</span>
         </footer>
@@ -16466,7 +16667,7 @@ function App(){
         <span className="app-footer-dot"/>
         <span title={D.meta.source}>{(OI_BRAND.name||'frkl')} workspace · {(D.meta.source||'').split('—')[0].trim()||'Live data'}</span>
         <span className="app-footer-dot"/>
-        <span>data updated {D.meta.captured}</span>
+        {D.meta.captured && <span>Updated {v3Stamp(D.meta.captured)}</span>}
         <div style={{flex:1}}/>
         <span>Auto-updates daily</span>
       </footer>
