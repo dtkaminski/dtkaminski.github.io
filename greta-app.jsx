@@ -9545,9 +9545,13 @@ function v3BoardLoad(){
   const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
   if (!sb || !b) return false;
   V3_BOARD.loading = true;
-  sb.from('vw_brand_action_board')
-    .select('external_id,description,priority,category,origin,cm_gbp,step1,playbook,days_open,verification,unverified_reason')
-    .eq('brand_id', b).order('cm_gbp', { ascending: false, nullsFirst: false })
+  const COLS = 'external_id,description,priority,category,origin,cm_gbp,step1,playbook,days_open,verification,unverified_reason';
+  // money_* arrive with migration 0218. Until it is applied the view has no such columns and
+  // PostgREST rejects the whole select, so ask once with them and fall back without.
+  const ask = (cols) => sb.from('vw_brand_action_board').select(cols)
+    .eq('brand_id', b).order('cm_gbp', { ascending: false, nullsFirst: false });
+  ask(COLS + ',money_basis,money_assumption,money_confidence')
+    .then(r => (r && r.error && /money_/.test(r.error.message || '')) ? ask(COLS) : r)
     .then(r => {
       V3_BOARD.loading = false;
       if (r && r.error) { V3_BOARD.err = r.error.message || 'could not load'; v3BoardNotify(); return; }
@@ -9582,6 +9586,21 @@ function useV3Board(){
   }, []);
   return { rows: V3_BOARD.rows, err: V3_BOARD.err };
 }
+// Emitters grade their own figures in their own words ("high", "medium", "directional",
+// "Probably"). One ladder on screen (confidence-ladder): anything resting on a stated
+// assumption is at most Possible, whatever the emitter called it.
+function v3MoneyConf(row){
+  if (!row) return null;
+  const c = String(row.money_confidence || '').toLowerCase();
+  let rung = V3_CONF[c] ? c
+    : /^(high|strong)/.test(c) ? 'likely'
+    : /^(med|moderate)/.test(c) ? 'probably'
+    : /^(low|directional|weak)/.test(c) ? 'possible'
+    : null;
+  if (row.money_assumption && rung && ['direct', 'likely', 'probably'].includes(rung)) rung = 'possible';
+  if (row.money_assumption && !rung) rung = 'possible';
+  return rung;
+}
 // Rows Greta has checked recently, in money order. The unchecked ones keep their place on the
 // board but never lead Today.
 function v3LiveRows(rows){ return (rows || []).filter(r => r.verification !== 'unverified'); }
@@ -9590,6 +9609,7 @@ function V3ActionBoard(){
   const { rows, err } = useV3Board();
   const [cat, setCat] = React.useState('all');
   const [open, setOpen] = React.useState(null);
+  const [showSmall, setShowSmall] = React.useState(false);
 
   if (err) return <div className="v3-empty">Greta could not load your actions just now — refreshing usually sorts it. If it keeps happening, Greta has logged the reason and will raise it here.</div>;
   if (rows === null) return <V3SkeletonRows n={5}/>;
@@ -9605,6 +9625,17 @@ function V3ActionBoard(){
   const unverRows = shown.filter(r => r.verification === 'unverified');
   const total = liveRows.reduce((a, r) => a + (Number(r.cm_gbp) || 0), 0);
   const unverTotal = unverRows.reduce((a, r) => a + (Number(r.cm_gbp) || 0), 0);
+  // A £ floor relative to the business: anything worth under half a percent of a month's sales
+  // folds below the ranked work. On frkl a £105/mo "hidden hero" resting on four units sold sat
+  // among the top six; at £22k a month that is noise beside a £1,024 decision. The floor scales,
+  // so a £5k-a-month brand still sees its £40 items.
+  const sales30 = Number(((typeof window !== 'undefined' && window.GRETA_HEADLINE) || {}).net_revenue_30d) || 0;
+  const floor = Math.max(50, Math.round(sales30 * 0.005));
+  // When everything is small, nothing is: the floor only folds rows when bigger work remains above it.
+  const aboveFloor = liveRows.filter(r => (Number(r.cm_gbp) || 0) >= floor);
+  const bigRows = aboveFloor.length ? aboveFloor : liveRows;
+  const smallRows = aboveFloor.length ? liveRows.filter(r => (Number(r.cm_gbp) || 0) < floor) : [];
+  const ordered = [...bigRows, ...(showSmall ? smallRows : []), ...unverRows];
 
   return (
     <div className="v3-board v3-enter">
@@ -9627,14 +9658,17 @@ function V3ActionBoard(){
         ))}
       </div>
       <ol className="v3-rank">
-        {shown.map((r, i) => {
+        {ordered.map((r, i) => {
           const gbp = Number(r.cm_gbp) || 0;
           const isOpen = open === r.external_id;
           const play = Array.isArray(r.playbook) ? r.playbook : [];
           const unver = r.verification === 'unverified';
+          const conf = v3MoneyConf(r);
           // One break, above the first demoted row, so the reader knows the list changed
           // meaning rather than just getting quieter.
-          const startsUnver = unver && (i === 0 || shown[i - 1].verification !== 'unverified');
+          const startsUnver = unver && (i === 0 || ordered[i - 1].verification !== 'unverified');
+          // The fold sits after the last row above the floor.
+          const foldHere = smallRows.length > 0 && i === bigRows.length - 1 + (showSmall ? smallRows.length : 0);
           return (
             <React.Fragment key={r.external_id}>
             {startsUnver && (
@@ -9657,6 +9691,7 @@ function V3ActionBoard(){
                   </span>
                   <span className="v3-rank-meta">
                     {r.category || 'general'}{r.days_open > 0 ? ' · open ' + r.days_open + 'd' : ''}
+                    {conf ? ' · ' + V3_CONF[conf].label.toLowerCase() : ''}
                     {unver ? ' · unchecked' : ''}
                   </span>
                 </span>
@@ -9678,14 +9713,31 @@ function V3ActionBoard(){
                   {/* Server-written, so the age in this sentence cannot drift from the age in
                       the row. vw_brand_action_board.unverified_reason. */}
                   {r.unverified_reason && <p className="v3-rank-unver">{r.unverified_reason}</p>}
-                  {/* The engine's own sentence, with its working, for anyone who wants it. */}
-                  <p className="v3-rank-raw"><span className="v3-kick">Greta's working</span>{v3Tidy(r.description)}</p>
                   {play.length
                     ? <ol className="v3-rank-steps">{play.map((s, j) => <li key={j}>{v3Tidy(s)}</li>)}</ol>
                     : <p className="v3-rank-nosteps">{v3Tidy(r.step1) || 'Greta has no further detail on this one yet.'}</p>}
+                  {/* How the £ was reached, and what it leans on — the difference between a figure
+                      measured from the brand's own orders and a benchmark applied to its traffic
+                      (0218). Then the engine's own sentence, for anyone who wants the working. */}
+                  {(r.money_basis || r.money_assumption || conf) && (
+                    <p className="v3-rank-raw"><span className="v3-kick">How Greta got to {v3Gbp(gbp)}</span>
+                      {r.money_basis ? v3Tidy(scrubTag(r.money_basis)) + '. ' : ''}
+                      {r.money_assumption ? 'It ' + v3Tidy(scrubTag(r.money_assumption)).replace(/^It\s+/i, '') + '. ' : ''}
+                      {conf ? V3_CONF[conf].label + ': ' + V3_CONF[conf].why : ''}
+                    </p>
+                  )}
+                  <p className="v3-rank-raw"><span className="v3-kick">Greta's working</span>{v3Tidy(r.description)}</p>
                 </div>
               )}
             </li>
+            {foldHere && (
+              <li className="v3-rank-break">
+                <button type="button" className="v3-btn v3-btn-sm" onClick={() => setShowSmall(s => !s)} aria-expanded={showSmall}>
+                  {showSmall ? 'Hide' : 'Show'} {smallRows.length} smaller item{smallRows.length === 1 ? '' : 's'}
+                </button>
+                <span className="v3-sub">Each worth under {v3Gbp(floor)} a month — half a percent of your monthly sales.</span>
+              </li>
+            )}
             </React.Fragment>
           );
         })}
@@ -14471,7 +14523,8 @@ function v3PlainAction(row){
   if ((x = id.match(/^greta_forecast:([^:]+):(efficiency|volume)$/))) {
     const ch = v3Ch(x[1]), ahead = /ahead of forecast/i.test(raw);
     const a = raw.match(/actual £([\d,.]+) vs expected £([\d,.]+)/);
-    return P(ch + (ahead ? ' is beating' : ' is behind') + ' its forecast' + (x[2] === 'volume' ? ' on sales' : ' on return per £'),
+    const subj = x[1] === 'total' ? 'Your paid channels overall are' : ch + ' is';
+    return P(subj + (ahead ? ' beating' : ' behind') + ' forecast' + (x[2] === 'volume' ? ' on sales' : ' on sales per £ of ads'),
       a ? 'It brought in £' + a[1] + ' against £' + a[2] + ' expected.' : raw);
   }
   if (id === 'optim-realloc-marginal' && (x = m(/Shift ~?£([\d,]+)\/mo from (.+?) \(.*?\) to (.+?) \(/))) {
