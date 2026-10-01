@@ -3498,7 +3498,9 @@ function WcSpark({data, color, fmt, axisFmt}){
 }
 
 function WhatChangedStrip(){
-  const weeks = useMemo(boardWeeks, [(typeof window!=='undefined' && window.FRKL_LIVE && window.FRKL_LIVE.lastFetchAt) || 0]);  // recompute when live data arrives (was [] → froze frkl static)
+  // Recompute when the data itself changes (row count / last day), not only on a fetch
+  // timestamp: the timestamp could tick before the bounds did, freezing the board on 5 July.
+  const weeks = useMemo(boardWeeks, [(typeof window!=='undefined' && window.FRKL_LIVE && window.FRKL_LIVE.lastFetchAt) || 0, (D.shopify || []).length, ((D.shopify || [])[(D.shopify || []).length - 1] || {}).date]);
   if(!weeks.length) return null;
   let i = weeks.length-1; while(i>0 && weeks[i].partial) i--;
   const W = weeks[i], prev = weeks[i-1];
@@ -3510,7 +3512,7 @@ function WhatChangedStrip(){
     {key:'orders',        label:'Orders',              fmt:v=>NUM(v),                              axisFmt:v=>Math.round(v),    better:'up'},
     {key:'aov',           label:'Average order',                 fmt:v=>GBP(v),                              axisFmt:fmtMoneyK, better:'up'},
     {key:'cvr',           label:'Conversion rate',     fmt:v=>v!=null?(v*100).toFixed(2)+'%':'—',  axisFmt:v=>(v*100).toFixed(1)+'%', better:'up',   bench:CVR_BENCH},
-    {key:'mer',           label:'Blended Claimed return',        fmt:v=>v!=null?v.toFixed(2)+'×':'—',         axisFmt:v=>v.toFixed(1)+'×', better:'up',   bench:3},
+    {key:'mer',           label:'Sales per £ of ads',        fmt:v=>v!=null?v.toFixed(2)+'×':'—',         axisFmt:v=>v.toFixed(1)+'×', better:'up',   bench:3},
     {key:'paid',          label:'Paid spend',          fmt:v=>GBP(v),                              axisFmt:gbpK,                better:'flat'},
     {key:'discountDepth', label:'Discount depth',      fmt:v=>v!=null?(v*100).toFixed(1)+'%':'—',  axisFmt:pct0,                better:'down'},
     {key:'returnRate',    label:'Return rate',         fmt:v=>v!=null?(v*100).toFixed(1)+'%':'—',  axisFmt:pct0,                better:'down'},
@@ -8398,8 +8400,8 @@ const BOARD_METRICS = [
 const _xRoas = v => v==null ? '—' : v.toFixed(1)+'×';
 const BOARD_METRICS2 = [
   {key:'returnRate',   label:'Return rate',     fmt:PCT, better:'down', bench:0.08, benchTip:'Watch > 8%', note:'90-day blended return rate (returns ÷ units). Returns post asynchronously so can\'t be reliably dated to a single week — shown as a stable blend rather than a misleading weekly 0%.'},
-  {key:'metaRoas',     label:'Meta Claimed return',       fmt:_xRoas, better:'up', bench:2, note:'Meta-claimed purchase value ÷ Meta spend. Platform-claimed (overlaps other channels), not incremental.'},
-  {key:'googleRoas',   label:'Google Claimed return',     fmt:_xRoas, better:'up', bench:2, note:'Google-claimed conversion value ÷ Google spend. Platform-claimed, not incremental.'},
+  {key:'metaRoas',     label:'Meta’s claimed return',       fmt:_xRoas, better:'up', bench:2, note:'Meta-claimed purchase value ÷ Meta spend. Platform-claimed (overlaps other channels), not incremental.'},
+  {key:'googleRoas',   label:'Google’s claimed return',     fmt:_xRoas, better:'up', bench:2, note:'Google-claimed conversion value ÷ Google spend. Platform-claimed, not incremental.'},
   {key:'atcRate',      label:'Add-to-cart rate',fmt:PCT, better:'up', note:'GA4 add-to-carts ÷ sessions — top-of-funnel intent.'},
   {key:'checkoutRate', label:'Reached checkout',fmt:PCT, better:'up', note:'GA4 checkouts ÷ sessions — mid-funnel progression.'},
   {key:'emailClickRate',label:'Email click rate',fmt:PCT, better:'up', note:'Klaviyo clicks ÷ recipients — content/offer resonance.'},
@@ -8477,7 +8479,9 @@ function weekCommentary(W, prev){
   else if(prev && prev.partial) context.push({sev:1, text:`Prior week was partial, so week-on-week comparisons are muted.`});
   if(!p && !W.partial) context.push({sev:1, text:`No comparable prior week — first full week in range.`});
 
-  const top = (arr,n) => arr.sort((a,b)=>b.sev-a.sev).slice(0,n).map(x=>x.text);
+  // "WoW" is analyst shorthand; an owner reads "on last week".
+  const plainWk = t => String(t).replace(/\bWoW\b/g, 'on last week');
+  const top = (arr,n) => arr.sort((a,b)=>b.sev-a.sev).slice(0,n).map(x=>plainWk(x.text));
 
   // Headline verdict
   let verdict;
@@ -8489,8 +8493,10 @@ function weekCommentary(W, prev){
   hp.push(rCh!=null ? `revenue ${rCh>=0?'up':'down'} ${fp(rCh)} to ${GBP(m.revenue)}` : `revenue ${GBP(m.revenue)}`);
   if(m.mer!=null) hp.push(`sales per £ of ads ${m.mer.toFixed(1)}×`);
   if(m.cvr!=null) hp.push(`conversion rate ${PCT(m.cvr)}`);
-  const topWatch = watch.slice().sort((a,b)=>b.sev-a.sev)[0];
-  const headline = `${verdict}: ${hp.join(', ')}.` + (topWatch ? ` Main watch-out — ${lc(topWatch.text)}` : '');
+  // The watch-out must add something: when the biggest worry is the revenue move the headline
+  // has just stated, take the next one ("revenue down 53% … Main watch-out — revenue fell 53%").
+  const topWatch = watch.slice().sort((a,b)=>b.sev-a.sev).find(x => !(rCh!=null && /^revenue\b/i.test(x.text)));
+  const headline = `${verdict}: ${hp.join(', ')}.` + (topWatch ? ` Main watch-out — ${lc(plainWk(topWatch.text))}` : '');
 
   return {headline, verdict, worked:top(worked,5), watch:top(watch,5), context:top(context,4)};
 }
@@ -8498,6 +8504,9 @@ function weekCommentary(W, prev){
 // Build the full weekly history (Mon–Sun buckets) from the daily snapshot,
 // independent of the page's period selector (uses the real data bounds).
 function boardWeeks(){
+  // Bounds first: this can run before App has re-read them after a live refresh, and with a
+  // stale REAL_END every week after it reads as unfinished.
+  refreshRealBounds();
   const map = {};
   const touch = d => (map[d] = map[d] || {date:d, metaSpend:0, googleSpend:0, metaValue:0, googleValue:0, revenue:0, sessions:0, addToCarts:0, checkouts:0, emailRev:0, emailRecipients:0, emailOpens:0, emailClicks:0, orders:0, discounts:0, returns:0, totalSales:0});
   inRangeBounded(D.metaDaily, REAL_START, REAL_END).forEach(r=>{const m=touch(r.date); m.metaSpend += r.cost||0; m.metaValue += r.purchaseValue||0;});
@@ -8613,7 +8622,9 @@ const ACTION_META = {
 };
 
 function WeeklyBoard(){
-  const weeks = useMemo(boardWeeks, [(typeof window!=='undefined' && window.FRKL_LIVE && window.FRKL_LIVE.lastFetchAt) || 0]);  // recompute when live data arrives (was [] → froze frkl static)
+  // Recompute when the data itself changes (row count / last day), not only on a fetch
+  // timestamp: the timestamp could tick before the bounds did, freezing the board on 5 July.
+  const weeks = useMemo(boardWeeks, [(typeof window!=='undefined' && window.FRKL_LIVE && window.FRKL_LIVE.lastFetchAt) || 0, (D.shopify || []).length, ((D.shopify || [])[(D.shopify || []).length - 1] || {}).date]);
   const lastCompleteIdx = (()=>{ for(let i=weeks.length-1;i>=0;i--){ if(!weeks[i].partial) return i; } return weeks.length-1; })();
   const [idx, setIdxRaw] = useState(lastCompleteIdx<0?0:lastCompleteIdx);
   // The first render sees the static snapshot's weeks; live weeks arrive a moment later. Until
@@ -8669,12 +8680,12 @@ function WeeklyBoard(){
           </div>
         </div>
         <div style={{display:'flex', alignItems:'center', gap:8}}>
-          <button onClick={()=>setIdx(i=>Math.max(0,i-1))} disabled={idx<=0} className="board-nav-btn">◀ Prev</button>
-          <select value={idx} onChange={e=>setIdx(+e.target.value)} style={{backgroundColor: 'var(--bg-card)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--r-sm)', padding:'7px 10px', fontSize:'var(--text-sm)'}}>
+          <button onClick={()=>setIdx(i=>Math.max(0,i-1))} disabled={idx<=0} className="board-nav-btn" aria-label="Previous week"><Icon name="chevronLeft" size={15}/></button>
+          <select value={idx} onChange={e=>setIdx(+e.target.value)} aria-label="Choose a week">
             {weeks.map((w,i)=>(<option key={w.weekStart} value={i}>{w.label}{w.inProgress?' (in progress)':''}</option>))}
           </select>
-          <button onClick={()=>setIdx(i=>Math.min(weeks.length-1,i+1))} disabled={idx>=weeks.length-1} className="board-nav-btn">Next ▶</button>
-          <button onClick={()=>window.print()} className="board-nav-btn" title="Print / save this week as a PDF board pack">⎙ Print</button>
+          <button onClick={()=>setIdx(i=>Math.min(weeks.length-1,i+1))} disabled={idx>=weeks.length-1} className="board-nav-btn" aria-label="Next week"><Icon name="chevron" size={15}/></button>
+          <button onClick={()=>window.print()} className="board-nav-btn" title="Print or save this week as a PDF"><Icon name="print" size={15}/> Print</button>
         </div>
       </div>
       {/* LLM analyst read (last 7d) — shown on the latest week; rule-based read below is the deterministic baseline */}
@@ -8723,108 +8734,84 @@ function WeeklyBoard(){
           </div>
         </div>
       </div>
-      {/* Scorecard grid */}
-      <div className="board-grid">
-        {BOARD_METRICS.map(spec=>{
-          const val=W.m[spec.key];
-          // A partial prior week is not a fair baseline — suppress WoW against it.
-          const pv=(prev && !prev.partial) ? prev.m[spec.key] : null;
-          const rag=boardRag(spec, val, pv), col=RAG_COL[rag];
-          let ch=null; if(pv!=null && pv!==0 && val!=null) ch=(val-pv)/Math.abs(pv);
-          const good = ch==null?null:((ch>0)===(spec.better!=='down'));
-          const tip = spec.benchTip || spec.note;
-          return (<div key={spec.key} className="card board-card" style={{}}>
-            <div className="micro" style={{color:'var(--text-muted)', fontWeight:'var(--weight-semi)', display:'flex', justifyContent:'space-between'}}>
-              <span>{spec.label}</span>
-              {tip && <span title={tip} style={{cursor:'help', color:'var(--text-faint)', display:'inline-flex'}}><Icon name="info" size={12}/></span>}
-            </div>
-            <div style={{fontSize:'var(--text-xl)', fontWeight:'var(--weight-bold)', letterSpacing:'var(--tracking-snug)', margin:'4px 0 2px'}}>{spec.fmt(val)}</div>
-            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:6}}>
-              <span style={{fontSize:'var(--text-sm)', fontWeight:'var(--weight-semi)', color: spec.better==='flat'||good==null ? 'var(--text-faint)' : (good?'var(--good)':PAL.bad)}}>
-                {ch==null?'—':(ch>0?'▲ ':'▼ ')+Math.abs(ch*100).toFixed(ch>=0.1||ch<=-0.1?0:1)+'% WoW'}
-              </span>
-              <BoardSpark vals={trail(spec.key, idx)} color={spec.better==='flat'?PAL.muted:col}/>
-            </div>
-          </div>);
-        })}
-      </div>
-      {/* Supporting metrics — channel + funnel detail behind the headline KPIs */}
-      <div className="micro" style={{color:'var(--text-faint)', fontWeight:'var(--weight-bold)', letterSpacing:'var(--tracking-wide)', textTransform:'uppercase', margin:'18px 2px 8px'}}>Supporting metrics</div>
-      <div className="board-grid">
-        {BOARD_METRICS2.map(spec=>{
+      {/* Scorecard: one stat tile for every metric. Label, figure, the change on last week in
+          the colour of whether it is good, and the last ten weeks as a line. A partial prior week
+          is not a fair baseline, so no change is claimed against it. */}
+      {(() => {
+        const tile = (spec) => {
           const val=W.m[spec.key];
           const pv=(prev && !prev.partial) ? prev.m[spec.key] : null;
           const rag=boardRag(spec, val, pv), col=RAG_COL[rag];
           let ch=null; if(pv!=null && pv!==0 && val!=null) ch=(val-pv)/Math.abs(pv);
           const good = ch==null?null:((ch>0)===(spec.better!=='down'));
+          const tone = spec.better==='flat' || good==null ? 'flat' : (good ? 'good' : 'bad');
           const tip = spec.benchTip || spec.note;
-          return (<div key={spec.key} className="card board-card" style={{}}>
-            <div className="micro" style={{color:'var(--text-muted)', fontWeight:'var(--weight-semi)', display:'flex', justifyContent:'space-between'}}>
-              <span>{spec.label}</span>
-              {tip && <span title={tip} style={{cursor:'help', color:'var(--text-faint)', display:'inline-flex'}}><Icon name="info" size={12}/></span>}
-            </div>
-            <div style={{fontSize:'var(--text-xl)', fontWeight:'var(--weight-bold)', letterSpacing:'var(--tracking-snug)', margin:'4px 0 2px'}}>{spec.fmt(val)}</div>
-            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:6}}>
-              <span style={{fontSize:'var(--text-sm)', fontWeight:'var(--weight-semi)', color: good==null ? 'var(--text-faint)' : (good?'var(--good)':PAL.bad)}}>
-                {ch==null?'—':(ch>0?'▲ ':'▼ ')+Math.abs(ch*100).toFixed(ch>=0.1||ch<=-0.1?0:1)+'% WoW'}
-              </span>
-              <BoardSpark vals={trail(spec.key, idx)} color={col}/>
+          return (<div key={spec.key} className="v3-stat">
+            <div className="v3-stat-lab"><span>{spec.label}</span>
+              {tip && <span title={tip} className="v3-stat-info"><Icon name="info" size={12}/></span>}</div>
+            <div className="v3-stat-val">{spec.fmt(val)}</div>
+            <div className="v3-stat-foot">
+              {ch==null ? <span className="v3-stat-ch flat">No comparison</span>
+                : <span className={'v3-stat-ch ' + tone}><Icon name={ch>0?'arrowUp':'arrowDown'} size={11} stroke={2.4}/>{fmtPctN(Math.abs(ch))}<span className="v3-muted"> vs last week</span></span>}
+              <BoardSpark vals={trail(spec.key, idx)} color={tone==='good'?PAL.good:tone==='bad'?PAL.bad:PAL.muted}/>
             </div>
           </div>);
-        })}
-      </div>
-      {/* Trend strip */}
-      <div className="row" style={{marginTop:14}}>
-        <div className="card" style={{flex:'1 1 520px'}}>
-          <div className="card-section-title"><h2 style={{margin:0}}>Revenue vs paid spend — weekly</h2><span className="meta">Bars = paid spend · Line = net revenue</span></div>
-          <R.ResponsiveContainer width="100%" height={150}>
-            <R.ComposedChart syncId="wk-spend-rev" data={trend} margin={{top:18,right:16,left:6,bottom:6}}>
-              <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
-              <R.XAxis tickLine={false} dataKey="x" tick={false} interval={Math.ceil(trend.length/8)}/>
-              <R.YAxis yAxisId="l" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={fmtMoneyK}/>
-              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)'}} formatter={(v,n)=>[GBP(v),n]}/>
-              <R.Bar yAxisId="l" dataKey="paid" name="Paid spend" fill={svgCol(COL.meta)} radius={[2,2,0,0]}/>
-              {renderPins()}
-            </R.ComposedChart>
-          </R.ResponsiveContainer>
-          <R.ResponsiveContainer width="100%" height={120}>
-            <R.ComposedChart syncId="wk-spend-rev" data={trend} margin={{top:18,right:16,left:6,bottom:6}}>
-              <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
-              <R.XAxis dataKey="x" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} interval={Math.ceil(trend.length/8)}/>
-              <R.YAxis yAxisId="l" orientation="left" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={fmtMoneyK}/>
-              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)'}} formatter={(v,n)=>[GBP(v),n]}/>
-              <R.Line yAxisId="l" type="monotone" dataKey="revenue" name="Net revenue" stroke={svgCol(COL.revenue)} strokeWidth={2.4} dot={false}/>
-              {renderPins()}
-            </R.ComposedChart>
-          </R.ResponsiveContainer>        </div>
-        <div className="card" style={{flex:'1 1 320px'}}>
-          <div className="card-section-title"><h2 style={{margin:0}}>Efficiency — sales per £ of ads, and visitors who buy</h2><span className="meta">sales per £ of ads (×) left · conversion rate (%) right</span></div>
-          <R.ResponsiveContainer width="100%" height={130}>
-            <R.ComposedChart syncId="wk-mer-cvr" data={trend} margin={{top:18,right:16,left:6,bottom:6}}>
-              <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
-              <R.XAxis tickLine={false} dataKey="x" tick={false} interval={Math.ceil(trend.length/6)}/>
-              <R.YAxis yAxisId="l" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>v+'×'}/>
-              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)'}}/>
-              <R.ReferenceLine yAxisId="l" y={2} stroke={PAL.accent} strokeDasharray="5 4" strokeOpacity={0.7} label={{value:'Sales per £ of ads 2×', position:'insideTopLeft', fill:PAL.accent, fontSize:'var(--text-xs)'}}/>
-              <R.Line yAxisId="l" type="monotone" dataKey="mer" name="Sales per £ of ads" stroke={PAL.accent} strokeWidth={2.2} dot={false}/>
-            </R.ComposedChart>
-          </R.ResponsiveContainer>
-          <R.ResponsiveContainer width="100%" height={120}>
-            <R.ComposedChart syncId="wk-mer-cvr" data={trend} margin={{top:18,right:16,left:6,bottom:6}}>
-              <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
-              <R.XAxis dataKey="x" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} interval={Math.ceil(trend.length/6)}/>
-              <R.YAxis yAxisId="l" orientation="left" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>v+'%'}/>
-              <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)'}}/>
-              <R.ReferenceLine yAxisId="l" y={2} stroke={PAL.data3} strokeDasharray="5 4" strokeOpacity={0.6} label={{value:'Visitors who buy 2%', position:'insideTopRight', fill:PAL.data3, fontSize:'var(--text-xs)'}}/>
-              <R.Line yAxisId="l" type="monotone" dataKey="cvr" name="Visitors who buy" stroke={svgCol(COL.sessions)} strokeWidth={2.2} dot={false}/>
-            </R.ComposedChart>
-          </R.ResponsiveContainer>        </div>
-      </div>
+        };
+        return (<>
+          <div className="v3-stat-grid">{BOARD_METRICS.map(tile)}</div>
+          <div className="v3-kick v3-sub-head">Supporting metrics</div>
+          <div className="v3-stat-grid">{BOARD_METRICS2.map(tile)}</div>
+        </>);
+      })()}
+      {/* Trend: the thirteen weeks up to the one being reviewed. This used to plot every week
+          since 2024 — 120-odd bars squeezed into a barcode — across four stacked strips with
+          their own scales. A weekly review needs the quarter around the week, on one scale. */}
+      {(() => {
+        const t13 = trend.slice(Math.max(0, idx - 12), idx + 1);
+        const tip = ({ active, payload, label }) => {
+          if (!active || !payload || !payload.length) return null;
+          const p = payload[0].payload;
+          return (<div className="v3-tip"><b>Week of {label}</b>
+            {p.revenue != null && <span>Sales <em>{fmtMoney(p.revenue)}</em></span>}
+            {p.paid != null && <span>Ad spend <em>{fmtMoney(p.paid)}</em></span>}
+            {p.mer != null && <span>Sales per £ of ads <em>{p.mer.toFixed(2)}×</em></span>}</div>);
+        };
+        return (<div className="v3-chart-pair">
+          <figure className="v3-chart">
+            <figcaption><span className="v3-chart-title">Sales and ad spend</span>
+              <span className="v3-legend"><i style={{ background: PAL.accent }}/>Sales <i style={{ background: PAL.data3 }}/>Ad spend</span></figcaption>
+            <R.ResponsiveContainer width="100%" height={220}>
+              <R.ComposedChart data={t13} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+                <R.CartesianGrid/>
+                <R.XAxis dataKey="x" tickFormatter={v => String(v).split(' – ')[0]} interval="preserveStartEnd"/>
+                <R.YAxis tickFormatter={fmtMoneyK}/>
+                <R.Tooltip content={tip}/>
+                <R.Bar dataKey="revenue" name="Sales" fill={PAL.accent} radius={[2, 2, 0, 0]}/>
+                <R.Line type="monotone" dataKey="paid" name="Ad spend" stroke={PAL.data3}/>
+              </R.ComposedChart>
+            </R.ResponsiveContainer>
+          </figure>
+          <figure className="v3-chart">
+            <figcaption><span className="v3-chart-title">Sales per £ of ads</span>
+              <span className="v3-legend"><i className="dash"/>2× — where most brands break even</span></figcaption>
+            <R.ResponsiveContainer width="100%" height={220}>
+              <R.ComposedChart data={t13} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+                <R.CartesianGrid/>
+                <R.XAxis dataKey="x" tickFormatter={v => String(v).split(' – ')[0]} interval="preserveStartEnd"/>
+                <R.YAxis tickFormatter={v => v + '×'} domain={[0, 'auto']}/>
+                <R.Tooltip content={tip}/>
+                <R.ReferenceLine y={2} stroke={PAL.muted} strokeDasharray="4 4"/>
+                <R.Line type="monotone" dataKey="mer" name="Sales per £ of ads" stroke={PAL.accent}/>
+              </R.ComposedChart>
+            </R.ResponsiveContainer>
+          </figure>
+        </div>);
+      })()}
       {/* Decisions log */}
       <div className="row" style={{marginTop:14}}>
         <div className="card" style={{flex:'1 1 420px'}}>
           <h2 style={{marginTop:0}}>Meeting notes</h2>
-          <div className="fine" style={{color:'var(--text-faint)', marginBottom:8}}>Week of {W.weekStart} → {W.weekEnding} · decisions, context, anything to remember</div>
+          <div className="fine" style={{color:'var(--text-faint)', marginBottom:8}}>Week of {v3Day(W.weekStart)} – {v3Day(W.weekEnding)} · decisions, context, anything to remember</div>
           <textarea value={notes[W.weekEnding]||''} onChange={e=>setNote(e.target.value)} placeholder={`What did we decide? e.g. 'Pausing the 22% sitewide code — margin too thin. Brief on mobile checkout fix by Friday. Test free-ship threshold at ${curSym()}75.'`}
             style={{width:'100%', minHeight:150, background:'var(--bg-app)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--r-sm)', padding:10, fontSize:'var(--text-sm)', fontFamily:'inherit', resize:'vertical'}}/>
         </div>
@@ -8840,8 +8827,8 @@ function WeeklyBoard(){
               <div key={a.id} style={{display:'flex', alignItems:'center', gap:8, padding:'7px 9px', background:'var(--bg-app)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-none)'}}>
                 <button onClick={()=>cycleAction(a)} title="Click to advance status" style={{cursor:'pointer', flexShrink:0, border:'1px solid '+meta.col, color:meta.col, background:'transparent', borderRadius:'var(--r-full)', fontSize:'var(--text-xs)', fontWeight:'var(--weight-bold)', padding:'2px 8px'}}>{meta.label}</button>
                 <span style={{flex:1, fontSize:'var(--text-sm)', textDecoration: a.status==='done'?'line-through':'none', color: a.status==='done'?'var(--text-faint)':'var(--text-primary)'}}>{a.text}</span>
-                <span className="micro" style={{color:'var(--text-faint)', flexShrink:0}} title={'Raised week ending '+a.raised}>{(a.raised||'').slice(5)}</span>
-                <button onClick={()=>delAction(a)} title="Remove" style={{cursor:'pointer', border:'none', background:'transparent', color:'var(--text-faint)', fontSize:'var(--text-base)', lineHeight:1}}>×</button>
+                <span className="micro" style={{color:'var(--text-faint)', flexShrink:0}} title={'Raised week ending '+v3Day(a.raised, true)}>{v3Day(a.raised)}</span>
+                <button onClick={()=>delAction(a)} title="Remove" aria-label="Remove" className="v3-btn v3-btn-q v3-btn-sm"><Icon name="close" size={13}/></button>
               </div>); })}
           </div>
           <div style={{display:'flex', gap:6}}>
@@ -10056,7 +10043,9 @@ function CommandMenu(){
 // cohorts, channelMix, inventorySummary) — no projections, no fabrication.
 function BusinessReview(){
   useCostTick();
-  const weeks = useMemo(boardWeeks, [(typeof window!=='undefined' && window.FRKL_LIVE && window.FRKL_LIVE.lastFetchAt) || 0]);  // recompute when live data arrives (was [] → froze frkl static)
+  // Recompute when the data itself changes (row count / last day), not only on a fetch
+  // timestamp: the timestamp could tick before the bounds did, freezing the board on 5 July.
+  const weeks = useMemo(boardWeeks, [(typeof window!=='undefined' && window.FRKL_LIVE && window.FRKL_LIVE.lastFetchAt) || 0, (D.shopify || []).length, ((D.shopify || [])[(D.shopify || []).length - 1] || {}).date]);
   const P = (typeof window!=='undefined' && window.FRKL_PATTERNS) || {};
   const C = (typeof window!=='undefined' && window.FRKL_COHORTS) || {};
   const B = (typeof window!=='undefined' && window.FRKL_BUSINESS) || {};
@@ -10117,7 +10106,7 @@ function BusinessReview(){
     {key:'revenue',       label:'Revenue',         fmt:v=>GBP(v),                             axisFmt:gbpK,                     better:'up'},
     {key:'orders',        label:'Orders',          fmt:v=>NUM(v),                             axisFmt:v=>Math.round(v),         better:'up'},
     {key:'cvr',           label:'Conversion rate', fmt:v=>v!=null?(v*100).toFixed(2)+'%':'—', axisFmt:v=>(v*100).toFixed(1)+'%',better:'up',  bench:CVR_BENCH},
-    {key:'mer',           label:'Blended Claimed return',    fmt:v=>v!=null?v.toFixed(2)+'×':'—',        axisFmt:v=>v.toFixed(1)+'×',      better:'up',  bench:3},
+    {key:'mer',           label:'Sales per £ of ads',    fmt:v=>v!=null?v.toFixed(2)+'×':'—',        axisFmt:v=>v.toFixed(1)+'×',      better:'up',  bench:3},
     {key:'discountDepth', label:'Discount depth',  fmt:v=>v!=null?(v*100).toFixed(1)+'%':'—', axisFmt:pct0,                     better:'down'},
   ];
   const nowD = (W&&prev) ? NOW_SPECS.map(sp=>{
