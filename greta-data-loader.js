@@ -116,6 +116,76 @@
     // frozen), so it can't be cleared from here — needs an inline gate before frkl-app.js or a rebuild.
   }
 
+  // ── Stale snapshots stop posing as live ────────────────────────────────────
+  // The static greta-*.js files are frkl's curated extras: cohorts, retention, conversion,
+  // discount codes, product views, the weekly board read, the diagnostic read, specialist
+  // insights, creative and creator scoring. Nothing regenerates them, and the loader never
+  // overrides them. On 2026-10-01 eleven of them stopped between May and July while the pill
+  // said "live", so Profit & sales led with a July "do this next", Review quoted a July week, and
+  // the same KPI showed two values on one screen. A signed-in owner is reading live numbers;
+  // anything older than the action board's own freshness rule (21 days, 0203) is retired
+  // the same way a new tenant's are — each panel falls to its empty state — rather than
+  // shown beside live data it contradicts. With no session (public demo) nothing changes:
+  // there the whole page is the snapshot, so it agrees with itself.
+  var STALE_AFTER_DAYS = 21;
+  var ISO_DAY = /20\d\d-\d\d-\d\d/g;
+  function asOfOf(v) {
+    if (!v || typeof v !== 'object') return null;
+    var m = v.meta || v._meta || {};
+    var named = [v.asOf, v.as_of, v.weekEnding, v.generated, v.generatedAt, v.captured, v.windowLast,
+      v.specialistRunAt, m.asOf, m.as_of, m.generatedAt, m.generated, m.captured, m.hi, m.end, m.windowEnd];
+    for (var i = 0; i < named.length; i++) {
+      var s = typeof named[i] === 'string' ? named[i].match(ISO_DAY) : null;
+      if (s) return s[0];
+    }
+    // No declared date: the newest past date inside it is the best evidence of when it was made.
+    var today = new Date().toISOString().slice(0, 10), best = null;
+    var found = (JSON.stringify(v) || '').match(ISO_DAY) || [];
+    for (var j = 0; j < found.length; j++) { if (found[j] <= today && (!best || found[j] > best)) best = found[j]; }
+    return best;
+  }
+  function ageDays(day) {
+    if (!day) return Infinity;
+    return Math.floor((Date.now() - Date.parse(day + 'T00:00:00Z')) / 86400000);
+  }
+  function retireStaleSnapshots() {
+    var retired = [];
+    // Render-time globals: components read window.X fresh, so null is enough.
+    ['FRKL_COHORTS', 'FRKL_RETENTION', 'FRKL_CREATIVE_VISION', 'FRKL_CREATORS', 'FRKL_CLARITY',
+     'FRKL_CVR', 'FRKL_DISCOUNT_CODES', 'FRKL_BOARD_READ', 'FRKL_DX_ANALYST', 'FRKL_EVENTS'].forEach(function (k) {
+      var v = window[k];
+      if (v && ageDays(asOfOf(Array.isArray(v) ? { items: v } : v)) > STALE_AFTER_DAYS) { window[k] = null; retired.push(k); }
+    });
+    // Products: the list carries no date of its own; its meta does.
+    if (window.FRKL_PRODUCTS && ageDays(asOfOf(window.FRKL_PRODUCTS_META)) > STALE_AFTER_DAYS) {
+      window.FRKL_PRODUCTS = null; window.FRKL_PRODUCTS_META = {}; retired.push('FRKL_PRODUCTS');
+    }
+    // Module-captured objects (const B / const INS in the bundle hold these references):
+    // mutate in place, exactly as neutraliseStaticOnlyForNonFrkl does.
+    var BUS = window.FRKL_BUSINESS;
+    if (BUS && typeof BUS === 'object' && Object.keys(BUS).length && ageDays(asOfOf(BUS)) > STALE_AFTER_DAYS) { emptyAllKeys(BUS); retired.push('FRKL_BUSINESS'); }
+    var INS = window.FRKL_INSIGHTS;
+    var insAsOf = asOfOf(window.FRKL_INSIGHTS_META) || asOfOf(INS);
+    if (INS && typeof INS === 'object' && Object.keys(INS).length && ageDays(insAsOf) > STALE_AFTER_DAYS) {
+      Object.keys(INS).forEach(function (k) { delete INS[k]; }); retired.push('FRKL_INSIGHTS');
+    }
+    // FRKL_DATA's static extras — the per-sales-channel Shopify splits and the creative / demo
+    // tables. The five live channel keys are what the loader just wrote, so they are never touched.
+    var DATA = window.FRKL_DATA;
+    if (DATA) {
+      ['shopifyAll', 'shopifyByChannel', 'shopifyWholesale', 'shopifyGifting', 'shopifyOther'].forEach(function (k) {
+        var rows = DATA[k];
+        if (Array.isArray(rows) && rows.length && ageDays(asOfOf({ items: rows })) > STALE_AFTER_DAYS) { DATA[k] = []; retired.push('FRKL_DATA.' + k); }
+      });
+      // Undated and never refreshed: nothing can show these are current, so they don't sit
+      // beside numbers that are.
+      ['creatives', 'demoAgeGender', 'demoPlacement'].forEach(function (k) {
+        if (Array.isArray(DATA[k]) && DATA[k].length) { DATA[k] = []; retired.push('FRKL_DATA.' + k); }
+      });
+    }
+    window.FRKL_LIVE.retiredSnapshots = retired;
+  }
+
   // Collapses duplicate reads. Measured on the live Today load: ~60 REST requests across 37
   // relations, with vw_brand_action_board fetched 4x, tenant_klaviyo_metrics_daily 5x, and
   // brand_config and mos_business_goal 3x each — every panel asks for what it needs without
@@ -323,14 +393,18 @@
         window.FRKL_BUSINESS.inventorySummary = inventory.summary;
       }
       if (window.FRKL_DATA) {
-        // Update meta block so the timestamp surfaces in the UI
+        // Update meta block so the timestamp surfaces in the UI. The range is the live one: it
+        // used to keep the static snapshot's 2026-01-15 → 2026-07-05, which Ask passed to the model.
+        const days = (window.FRKL_DATA.shopify || []).map(r => r.date).filter(Boolean).sort();
         window.FRKL_DATA.meta = {
           ...(window.FRKL_DATA.meta || {}),
           source: 'Supabase live',
           captured: new Date().toISOString().slice(0, 16).replace('T', ' '),
           currency: window.FRKL_DATA.meta?.currency || 'GBP',
+          range: days.length ? { start: days[0], end: days[days.length - 1] } : window.FRKL_DATA.meta?.range,
         };
       }
+      retireStaleSnapshots();
 
       // Expose connection + sync state for the dashboard's existing health strip
       window.FRKL_LIVE.connections = connections;
