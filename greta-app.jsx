@@ -1,6 +1,11 @@
 
 const { useState, useMemo } = React;
 const R = Recharts;
+// Charts: a date-shaped category ("2026-09-27" or "09-27") prints as "27 Sep" on every axis and
+// tooltip that does not bring its own formatter. Anything else passes through untouched.
+const v3AxisDay = v => { const s = String(v); return /^\d{4}-\d\d-\d\d$/.test(s) ? v3Day(s) : /^\d\d-\d\d$/.test(s) ? v3Day(new Date().getFullYear() + '-' + s) : v; };
+if (R.XAxis && R.XAxis.defaultProps) R.XAxis.defaultProps.tickFormatter = v3AxisDay;
+if (R.Tooltip && R.Tooltip.defaultProps) R.Tooltip.defaultProps.labelFormatter = v3AxisDay;
 const D = window.FRKL_DATA;
 const _CUR_SYM = { GBP:'£', USD:'$', EUR:'€', AUD:'A$', CAD:'C$', NZD:'NZ$', JPY:'¥' };
 const curSym = () => _CUR_SYM[(typeof window!=='undefined' && window.OI_CURRENCY)] || '£';
@@ -10067,7 +10072,10 @@ function BusinessReview(){
   const paidShare = chanTotal? chans.filter(c=>/^Paid/i.test(c.channel||'')).reduce((s,c)=>s+(c.revenue||0),0)/chanTotal : null;
 
   // ── inventory / capital ──
-  const sp = stockQ.rows;   // null while loading
+  // A stale feed makes every row 'unknown', which would count as nothing at risk; show it as unknown.
+  const spStale = !!(stockQ.rows && stockQ.rows.some(r => r.inventory_stale));
+  const sp = spStale ? null : stockQ.rows;   // null while loading or when the counts are out of date
+  const spWait = spStale ? 'Stock counts are out of date' : 'Loading the stock plan…';
   const spCount = st => sp ? sp.filter(r => r.stock_status === st).length : 0;
   const sk = t => t === 'critical' ? spCount('stockout') : t === 'low' ? spCount('low_cover')
     : t === 'overstock' ? (sp ? sp.filter(r => r.stock_status === 'overstock' && Number(r.trapped_cash) > 0).length : 0) : 0;
@@ -10111,7 +10119,7 @@ function BusinessReview(){
       read:`average order value ${W&&W.m.aov!=null?GBP(W.m.aov):'—'} (8-week trend)` },
     { label:'Stock cover risk', value: sp ? lowCover+(lowCover===1?' item':' items') : '—',
       status: !sp ? 'missing' : lowCover>0?'watch':'healthy', statusLabel: !sp ? '—' : lowCover>0?'Restock needed':'Covered',
-      sub: sp ? `${sk('critical')} out of stock · ${sk('low')} run out before a restock` : 'Loading the stock plan…',
+      sub: sp ? `${sk('critical')} out of stock · ${sk('low')} run out before a restock` : spWait,
       read:`${lowCover} items at low/critical stock cover (${sk('critical')} critical)` },
   ];
 
@@ -10133,7 +10141,7 @@ function BusinessReview(){
       read:`Revenue concentration: ${topChan?topChan.channel:'—'} ${topShare!=null?pct0(topShare):''}${paidShare!=null?`, paid ${pct0(paidShare)} of revenue`:''}` },
     { label:'Capital in slow stock', value: slowCapital!=null ? GBP(Math.round(slowCapital)) : '—',
       status: slowCapital==null ? 'missing' : slowCapital>5000?'watch':'healthy', statusLabel: slowCapital==null ? '—' : slowCapital>5000?'Cash tied up':'Lean',
-      sub: slowCapital!=null ? `${sk('overstock')} products with months of stock, valued at cost` : 'Loading the stock plan…',
+      sub: slowCapital!=null ? `${sk('overstock')} products with months of stock, valued at cost` : spWait,
       read:`${slowCapital!=null ? curSym()+k(slowCapital) : '—'} capital tied in slow-moving stock (${sk('overstock')} overstocked products)` },
   ];
 
@@ -11636,7 +11644,9 @@ function GretaOverviewTiers(){
 
       <div style={{margin:'28px 0 10px'}}>
         <GO_TierHead n="01" title="Business" sub="how the business is performing"/>
-        <div style={{display:'grid',gap:12,gridTemplateColumns:'repeat(5,1fr)'}}>
+        {/* Column count follows the tile count (+1 for Best sellers) so every row is full:
+            twelve tiles in five columns left a row of two and overflowed a laptop-width column. */}
+        <div className="go-tile-grid" data-cols={GO_cols(d.business.length+1)} style={{display:'grid',gap:12,gridTemplateColumns:'repeat('+GO_cols(d.business.length+1)+',minmax(0,1fr))'}}>
           {d.business.map((t,i)=><GO_Tile key={i} t={t}/>)}
           <div style={{background:'var(--color-surface)',border:`1px solid ${PAL.panel}`,borderRadius:'var(--radius-none)',padding:'14px 15px'}}>
             <div style={{fontSize:'var(--text-xs)',color:GO_T.mut}}>Best sellers →</div>
@@ -15759,9 +15769,15 @@ function useV3Rows(key, build) {
   return { rows: q.rows || null, err: q.err || null };
 }
 // Shared builders, so pages that read the same view share one cached request (useV3Rows keys).
-const V3_STOCK_Q = (sb, b) => sb.from('vw_stock_demand_plan')
-    .select('sku,product_title,on_hand,weekly_velocity,weeks_of_cover,stock_status,inventory_stale,projected_days_to_stockout,reorder_by_date,suggested_order_units,lost_cm_per_day,cm_at_risk_before_resupply,trapped_cash')
-    .eq('brand_id', b).limit(3000);
+// last_sold_on arrives with migration 0219. Until it is applied PostgREST rejects the whole
+// select, so ask once with it and fall back without (the board does the same for money_*).
+// Columns for a tile grid of n tiles, chosen so the last row is full (12 → 4, 9 → 3, 10 → 5).
+function GO_cols(n){ return n%4===0?4:n%3===0?3:n%5===0?5:4; }
+const V3_STOCK_COLS = 'sku,product_title,on_hand,weekly_velocity,weeks_of_cover,stock_status,inventory_stale,projected_days_to_stockout,reorder_by_date,suggested_order_units,lost_cm_per_day,cm_at_risk_before_resupply,trapped_cash';
+const V3_STOCK_Q = (sb, b) => {
+  const ask = cols => sb.from('vw_stock_demand_plan').select(cols).eq('brand_id', b).limit(3000);
+  return ask(V3_STOCK_COLS + ',last_sold_on').then(r => (r && r.error && /last_sold_on/.test(r.error.message || '')) ? ask(V3_STOCK_COLS) : r);
+};
 const V3_RET_Q = (sb, b) => sb.from('v_tenant_retention_summary')
   .select('customers,orders_per_customer,repeat_rate,repeat_rate_90d,median_days_between_orders').eq('brand_id', b).limit(1);
 function v3Monday(iso) { const d = new Date(iso + 'T00:00:00Z'); const k = (d.getUTCDay() + 6) % 7; d.setUTCDate(d.getUTCDate() - k); return d.toISOString().slice(0, 10); }
@@ -15986,6 +16002,17 @@ function V3Stock() {
   if (!q.rows) return <V3SkeletonRows n={5}/>;
   const rows = q.rows;
   if (!rows.length) return (<div className="v3-empty">No products with stock levels yet. Once Shopify inventory syncs, this shows what runs out first and where cash is tied up.</div>);
+  // The view marks the whole brand stale after 48h without a products sync, and every row then
+  // reads 'unknown' — which, counted, says "nothing runs out". Say what is actually known.
+  if (rows.some(r => r.inventory_stale)) return (<div className="v3-page-stack">
+    <section>
+      <div className="v3-kick">What needs attention</div>
+      <p className="v3-verdict">Greta can’t tell what runs out right now.</p>
+      <p className="v3-note v3-measure">Stock counts have not refreshed from Shopify in over two days. A plan built on old counts could tell you to reorder something you have just restocked, or miss something that sold out yesterday, so the plan is held until the counts are current.</p>
+      <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('settings')}>
+        Check the Shopify connection <span className="v3-xref-go">on Connections &amp; data →</span></button>
+    </section>
+  </div>);
 
   const num = v => Number(v) || 0;
   const out = rows.filter(r => r.stock_status === 'stockout');
@@ -15996,7 +16023,6 @@ function V3Stock() {
   const risk = out.concat(low).reduce((a, r) => a + num(r.cm_at_risk_before_resupply), 0);
   const lostDay = out.reduce((a, r) => a + num(r.lost_cm_per_day), 0);
   const trapped = slow.reduce((a, r) => a + num(r.trapped_cash), 0);
-  const stale = rows.some(r => r.inventory_stale);
   const n = out.length + low.length;
   const today = new Date(); today.setHours(0, 0, 0, 0);
 
@@ -16006,12 +16032,15 @@ function V3Stock() {
     const by = r.reorder_by_date ? new Date(r.reorder_by_date + 'T00:00:00') : null;
     const overdue = by ? by <= today : true;
     const late = by ? Math.max(0, Math.round((today - by) / 864e5)) : 0;
-    return { ...r, days, overdue, late, by: r.reorder_by_date, risk: num(r.cm_at_risk_before_resupply), units: num(r.suggested_order_units) };
+    // Out for over four weeks: no sale in the window the selling rate is measured over, so there
+    // is no rate to size an order or price the loss. Say when it last sold instead of guessing.
+    const longOut = r.stock_status === 'stockout' && !(num(r.weekly_velocity) > 0);
+    return { ...r, days, overdue, late, longOut, by: r.reorder_by_date, risk: num(r.cm_at_risk_before_resupply), units: num(r.suggested_order_units) };
   }).sort((a, b) => b.risk - a.risk || a.days - b.days);
   const shown = allRisk ? runway : runway.slice(0, 10);
   // When every row is already past its order-by date the instruction is the same for all of
   // them, so it is said once in the heading rather than as a column of red.
-  const allDue = runway.length > 0 && runway.every(r => r.overdue);
+  const allDue = runway.length > 0 && runway.every(r => r.overdue && !r.longOut);
   // One scale for every bar: days of stock left against the time until a new order would land.
   const span = Math.max(14, ...runway.map(r => r.days + r.late)) || 14;
 
@@ -16033,7 +16062,6 @@ function V3Stock() {
       <div className="v3-kick">What needs attention</div>
       <p className="v3-verdict">{head}</p>
       <p className="v3-note v3-measure">{sub}</p>
-      {stale && <p className="micro muted">Stock counts have not refreshed from Shopify recently, so check the shelf before ordering.</p>}
       <div className="v3-stat-grid v3-gap-top">
         {stat('Out of stock now', fmtCount(out.length), lostDay > 0 ? fmtMoney(lostDay) + ' of profit lost a day' : 'products')}
         {stat('Run out before a restock', fmtCount(low.length), 'order these today')}
@@ -16054,16 +16082,16 @@ function V3Stock() {
               {r.days > 0 && <i className="v3-rw-bar" style={{ width: (r.days / span * 100) + '%' }}/>}
               {r.late > 0 && <i className="v3-rw-gap" style={{ left: (r.days / span * 100) + '%', width: (r.late / span * 100) + '%' }}/>}
             </span>
-            <span className="v3-rw-days">{r.days ? r.days + (r.days === 1 ? ' day' : ' days') : 'Out now'}</span>
+            <span className="v3-rw-days">{r.longOut ? (r.last_sold_on ? 'Last sold ' + v3Day(r.last_sold_on) : 'Out for weeks') : r.days ? r.days + (r.days === 1 ? ' day' : ' days') : 'Out now'}</span>
           </div></td>
-          {!allDue && <td className={r.overdue ? 'v3-rw-now' : 'v3-muted'}>{r.overdue ? 'Today' : 'By ' + v3Day(r.by)}</td>}
+          {!allDue && <td className={r.longOut ? 'v3-muted' : r.overdue ? 'v3-rw-now' : 'v3-muted'}>{r.longOut ? 'Your call' : r.overdue ? 'Today' : 'By ' + v3Day(r.by)}</td>}
           <td>{r.units > 0 ? fmtCount(r.units) + ' units' : FMT_NONE}</td>
           <td>{r.risk > 0 ? fmtMoney(r.risk) : FMT_NONE}</td>
         </tr>))}</tbody>
       </table>
       {runway.length > 10 && (<button className="v3-btn v3-btn-q v3-btn-sm" onClick={() => setAllRisk(v => !v)}>
         {allRisk ? 'Show the top 10' : 'Show all ' + runway.length}</button>)}
-      <p className="micro muted v3-measure">Suggested units cover your supplier’s lead time plus a safety margin. Profit at risk is what these products would have earned between running out and the new stock landing.</p>
+      <p className="micro muted v3-measure">Suggested units cover your supplier’s lead time plus a safety margin. Profit at risk is what these products would have earned between running out and the new stock landing. Products out for more than four weeks show when they last sold: Greta hasn’t seen them sell recently, so it can’t size an order for them.</p>
     </section>)}
 
     {slow.length > 0 && (<section className="v3-sec">
@@ -16304,7 +16332,7 @@ function V3Customers() {
 // ── Products (V3, live) ──────────────────────────────────────────────────────
 function V3Products() {
   const perf = useV3Rows('prod-perf', (sb, b) => sb.from('vw_product_performance')
-    .select('product_title,rev_28d,rev_prior_28d,units_now,units_prior,share_now,stock_constrained,performance_flag')
+    .select('product_title,rev_28d,rev_prior_28d,units_now,units_prior,share_now,stock_constrained,inventory_stale,performance_flag')
     .eq('brand_id', b).order('rev_28d', { ascending: false, nullsFirst: false }).limit(200));
   const [showAll, setShowAll] = React.useState(false);
   if (!perf.rows && !perf.err) return <V3SkeletonRows n={6}/>;
@@ -16321,11 +16349,17 @@ function V3Products() {
   const up = movers.filter(x => x.d > 0).sort((a, b) => b.d - a.d).slice(0, 4);
   const down = movers.filter(x => x.d < 0).sort((a, b) => a.d - b.d).slice(0, 4);
   const top5share = total > 0 ? top.slice(0, 5).reduce((a, x) => a + Number(x.rev_28d), 0) / total : null;
+  // With a stale feed every variant reads 'unknown', so no product would carry a stock badge —
+  // which looks exactly like "nothing is short". Say so instead of showing a clean list.
+  const stockStale = rows.some(x => x.inventory_stale);
   return (<div className="v3-page-stack">
     <section>
       <div className="v3-kick">Last 28 days</div>
       <p className="v3-lede">{fmtMoney(total)} of product sales across {fmtCount(top.length)} products.
         {top5share != null && <> Your top five bring in <b>{fmtPctN(top5share)}</b> of it.</>}</p>
+      {stockStale && <p className="v3-note v3-measure">Stock counts have not refreshed from Shopify in over two days, so low-stock warnings are hidden until they do.</p>}
+      {stockStale && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('settings')}>
+        Check the Shopify connection <span className="v3-xref-go">on Connections &amp; data →</span></button>}
       <table className="v3-ptable">
         <thead><tr><th>Product</th><th className="t-text">Sales</th><th>Change</th><th>Units</th></tr></thead>
         <tbody>{shown.map((x, i) => { const c = ch(x); return (<tr key={i}>

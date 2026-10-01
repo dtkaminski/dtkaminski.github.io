@@ -744,3 +744,17 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
    a short rule under a full-width one. Spacing alone separates it. */
 .v3-main .v3-vitals-plain { border-top: 0 !important; padding-top: 0 !important; }
 .v3-main .hero-stat-label, .v3-main .stat-strip-label { white-space: nowrap; }
+
+/* Embedded legacy panels scroll inside their own box when a table is wider than the column.
+   Without this a 7-column SKU table pushed the whole page sideways and clipped the nav. */
+.v3-main .mos-embed-scope { overflow-x: auto; }
+/* Goal-grid hover detail: tiles in the last two columns open their popover leftwards. Hidden
+   popovers still take layout room, so a right-edge one made Today scroll sideways by 166px. */
+.v3-main .go-tile-grid[data-cols="3"] > .go-tile:nth-child(3n) .go-pop,
+.v3-main .go-tile-grid[data-cols="4"] > .go-tile:nth-child(4n) .go-pop,
+.v3-main .go-tile-grid[data-cols="5"] > .go-tile:nth-child(5n+4) .go-pop,
+.v3-main .go-tile-grid[data-cols="5"] > .go-tile:nth-child(5n) .go-pop { left: auto; right: 0; }
+/* The channel plan table on Growth plan is wider than its column at laptop widths. */
+.v3-main .gp-wrap div:has(> table) { overflow-x: auto; }
+.v3-main .go-tile { min-width: 0; }
+@media (max-width: 720px) { .v3-main .go-tile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
