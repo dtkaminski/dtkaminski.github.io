@@ -534,3 +534,4 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
   padding: var(--space-2) var(--space-3); font: inherit; font-size: var(--text-sm); text-align: left; cursor: pointer; line-height: var(--leading-snug); }
 .v3-prompt:hover:not(:disabled) { border-color: var(--color-ink); color: var(--color-ink); }
 .v3-prompt:disabled { cursor: default; opacity: .7; }
+.v3-dot.v3-dot-tight { margin-right: 0; }

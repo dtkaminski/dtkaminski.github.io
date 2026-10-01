@@ -15,6 +15,8 @@ const HTML = join(DIR, 'greta-dashboard.html');
 let html = readFileSync(HTML, 'utf8');
 const v = String(Date.now());
 html = html.replace(/(greta-app\.js\?v=)[^"]+/, `$1${v}`);
+// The kit stylesheet changes alongside the JSX more often than not; bump it too.
+html = html.replace(/(greta-kit\.css\?v=)[^"]+/, `$1${v}`);
 writeFileSync(HTML, html);
 
 // Also bump the app-shell's pointer to greta-dashboard.html — otherwise returning
@@ -25,3 +27,13 @@ shell = shell.replace(/(greta-dashboard\.html\?v=)[^'"]+/, `$1${v}`);
 writeFileSync(SHELL, shell);
 
 console.log(`built greta-app.js (${size} chars) · cache-bust v=${v} (dashboard + shell)`);
+
+// Design-debt ratchet (ui-lint.mjs): report, never block — other sessions build here too.
+try {
+  const { execFileSync } = await import('node:child_process');
+  execFileSync(process.execPath, [join(DIR, 'ui-lint.mjs'), '--check'], { cwd: DIR, stdio: 'pipe' });
+} catch (e) {
+  const out = String((e && e.stdout) || '') + String((e && e.stderr) || '');
+  const NL = String.fromCharCode(10);
+  if (out) console.warn('ui-lint: design debt went up —' + NL + out.split(NL).filter(l => /^✖|went up/.test(l)).join(NL));
+}

@@ -818,7 +818,7 @@ function KPI({label, val, sub, badge, status, statusLabel, conf, series, seriesL
       <div className="kpi-pop">
         {hasSpark && (<div>
           <div className="head">{seriesLabel || `${series.length}-day trend · vs prior period`}</div>
-          <R.ResponsiveContainer width="100%" height={132}>
+          <R.ResponsiveContainer width="100%" height={160}>
             <R.LineChart data={series} margin={{top:6,right:10,left:2,bottom:4}}>
               <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
               <R.XAxis dataKey="d" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} interval={Math.ceil(series.length/5)} tickLine={false}/>
@@ -1378,7 +1378,7 @@ function ActionBoard(){
   const liveHeadCell = (key, label, right) => {
     const active = liveSort.key===key;
     return (<button className={'live-hcell'+(active?' active':'')+(right?' right':'')} onClick={()=>onLiveSort(key)} title={`Sort by ${label.toLowerCase()}`}>
-      {label}<span className="caret">{active ? (liveSort.dir==='asc'?'▲':'▼') : '↕'}</span>
+      {label}<span className="caret">{active ? <Icon name={liveSort.dir==='asc'?'arrowUp':'arrowDown'} size={12}/> : <Icon name="arrowDown" size={12} style={{opacity:.3}}/>}</span>
     </button>);
   };
   const LiveHead = () => (<div className="live-head">
@@ -1392,7 +1392,7 @@ function ActionBoard(){
     <div className="card">
       <div className="card-section-title">
         <h2 style={{margin:0}}>Action plan <span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)',fontSize:'var(--text-sm)'}}>{`— live read first, ranked by ${curSym()} impact`}</span></h2>
-        <span className="meta">Greta's live read{liveRead&&liveRead.generatedAt?` (${liveRead.generatedAt.slice(0,10)})`:''} · {open.length} specialist items{contraCount>0?` · ${contraCount} contradicted by today's read`:''}</span>
+        <span className="meta">Greta's live read{liveRead&&liveRead.generatedAt?` (${v3Day(liveRead.generatedAt.slice(0,10))})`:''} · {open.length} specialist items{contraCount>0?` · ${contraCount} contradicted by today's read`:''}</span>
       </div>
       <ActionConflictBanner/>
       {/* LIVE — from the diagnostic engine, always coherent with the diagnostic card */}
@@ -2903,7 +2903,7 @@ function AnalystRead({read, dx, metrics, onLog, logUI}){
       <div className="card-section-title">
         <h2 style={{margin:0}}>What to do next</h2>
         <div style={{display:'flex',alignItems:'center',gap:10}}>
-          <span className="meta">{read.generatedAt?`as of ${read.generatedAt.slice(0,10)}`:''}</span>
+          <span className="meta">{read.generatedAt?`as of ${v3Day(read.generatedAt.slice(0,10), true)}`:''}</span>
           {onLog && <LogEventButton onClick={onLog}/>}
         </div>
       </div>
@@ -3088,7 +3088,7 @@ function LtvCacCard({daily, gm, ordersPerCust}){
         <h2 style={{margin:0}}>customer lifetime value : cost per new customer over time <span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)',fontSize:'var(--text-sm)'}}>— weekly · est.</span></h2>
         <span className="meta">This period: cost per new customer {GBP(cacT)} · customer lifetime value {GBP(ltvT)} · ratio <b style={{color:(ratioT||0)>=3?'var(--good)':(ratioT||0)>=1?'var(--warn)':'var(--bad)'}}>{ratioT?ratioT.toFixed(1)+'×':'—'}</b> · target 3×+</span>
       </div>
-      <R.ResponsiveContainer width="100%" height={312}>
+      <R.ResponsiveContainer width="100%" height={240}>
         <R.ComposedChart data={rows} margin={{top:6,right:20,left:14,bottom:22}}>
           <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
           <R.XAxis dataKey="label" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} label={{value:'Week (starting)', position:'insideBottom', offset:-10, fill:PAL.muted, fontSize:'var(--text-xs)'}}/>
@@ -3360,7 +3360,7 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
         {tile('operating profit break-even', beLabel, mode==='bottomup'?('repeat '+n('repeatRate').toFixed(0)+'%/mo'):('growth '+n('growthPct').toFixed(0)+'%/mo'))}
       </div>
       {mode==='bottomup' && <div style={{fontSize:'var(--text-sm)',color:'var(--text-muted)',marginBottom:10}}>Revenue mix: <b style={{color:PAL.accent}}>New {pctOf(t.newRev)}%</b> · <b style={{color:PAL.good}}>Returning {pctOf(t.retRev)}%</b>{t.whRev>0?<> · <b style={{color:PAL.warn}}>Wholesale {pctOf(t.whRev)}%</b></>:''} — returning revenue compounds as the base grows.</div>}
-      <R.ResponsiveContainer width="100%" height={250}>
+      <R.ResponsiveContainer width="100%" height={240}>
         <R.ComposedChart data={rows} margin={{top:6,right:16,left:14,bottom:20}}>
           <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
           <R.XAxis dataKey="label" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} label={{value:'Month', position:'insideBottom', offset:-9, fill:PAL.muted, fontSize:'var(--text-xs)'}}/>
@@ -3502,11 +3502,11 @@ function MobileToday(){
 // Reuses the weekly-board data model (boardWeeks/boardRag); picker-independent.
 // Mini trend chart for the What-changed cards — axes + hover detail (not a bare sparkline).
 function WcSpark({data, color, fmt, axisFmt}){
-  if(!data || data.filter(d=>d.v!=null).length < 2) return <div style={{height:66}}/>;
-  return (<R.ResponsiveContainer width="100%" height={66}>
+  if(!data || data.filter(d=>d.v!=null).length < 2) return <div style={{height:64}}/>;
+  return (<R.ResponsiveContainer width="100%" height={64}>
     <R.LineChart data={data} margin={{top:6, right:8, left:-6, bottom:0}}>
       <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
-      <R.XAxis dataKey="x" tick={{fill:PAL.muted, fontSize:'var(--text-xs)'}} interval={Math.ceil(data.length/3)} tickLine={false} axisLine={{stroke:'#2a2a34'}} minTickGap={6}/>
+      <R.XAxis dataKey="x" tick={{fill:PAL.muted, fontSize:'var(--text-xs)'}} interval={Math.ceil(data.length/3)} tickLine={false} axisLine={false} minTickGap={6}/>
       <R.YAxis tick={{fill:PAL.muted, fontSize:'var(--text-xs)'}} width={34} tickCount={3} tickLine={false} axisLine={false} domain={['auto','auto']} tickFormatter={axisFmt||fmt}/>
       <R.Tooltip cursor={{stroke:color, strokeWidth:1, strokeDasharray:'3 3'}} content={({active,payload,label})=>{
         if(!active||!payload||!payload.length) return null; const v=payload[0].value;
@@ -3949,7 +3949,7 @@ function Overview({start, period, customActive}){
         {/* Two scales, two charts (no dual axis): spend above, revenue below, linked by
             syncId so the same day highlights in both. The event pins stay on the spend
             chart, where a spike has a cause worth naming. */}
-        <R.ResponsiveContainer width="100%" height={196}>
+        <R.ResponsiveContainer width="100%" height={160}>
           <R.ComposedChart data={daily} syncId="spend-rev" margin={{top:6,right:20,left:14,bottom:4}}>
             <R.CartesianGrid stroke={PAL.panel} vertical={false} />
             <R.XAxis dataKey="dlabel" tick={false} tickLine={false} height={6} />
@@ -3968,7 +3968,7 @@ function Overview({start, period, customActive}){
             })()}
           </R.ComposedChart>
         </R.ResponsiveContainer>
-        <R.ResponsiveContainer width="100%" height={158}>
+        <R.ResponsiveContainer width="100%" height={160}>
           <R.ComposedChart data={daily} syncId="spend-rev" margin={{top:2,right:20,left:14,bottom:22}}>
             <R.CartesianGrid stroke={PAL.panel} vertical={false} />
             <R.XAxis dataKey="dlabel" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} interval={Math.ceil(daily.length/12)}
@@ -4594,7 +4594,7 @@ function HookRetention({rows}){
   return (<div className="card">
     <h2>Hook retention — video drop-off after the 3s view</h2>
     <div className="muted" style={{marginBottom:8}}>Each line normalised to 100 at the highest milestone reached. Steeper drop = weaker hook.</div>
-    <R.ResponsiveContainer width="100%" height={260}>
+    <R.ResponsiveContainer width="100%" height={240}>
       <R.LineChart data={data} margin={{top:6,right:8,left:10,bottom:20}}>
         <R.CartesianGrid stroke={PAL.panel} vertical={false} />
         <R.XAxis dataKey="stage" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} label={{value:'Video milestone', position:'insideBottom', offset:-8, fill:PAL.muted, fontSize:'var(--text-xs)'}} />
@@ -5064,7 +5064,7 @@ function Customers(){
       </div>}
       {hasRet && <div className="card" style={{marginBottom:14}}>
         <h2>New vs returning orders — weekly</h2>
-        <R.ResponsiveContainer width="100%" height={250}>
+        <R.ResponsiveContainer width="100%" height={240}>
           <R.ComposedChart data={weeks} margin={{top:6,right:8,left:14,bottom:20}}>
             <R.CartesianGrid stroke={PAL.panel} vertical={false} />
             <R.XAxis dataKey="label" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} label={{value:'Week', position:'insideBottom', offset:-8, fill:PAL.muted, fontSize:'var(--text-xs)'}} />
@@ -5095,7 +5095,7 @@ function Customers(){
         </div>}
         {hasList && <div className="card" style={{flex:'1 1 360px'}}>
           <h2>Klaviyo list — daily net growth</h2>
-          <R.ResponsiveContainer width="100%" height={200}>
+          <R.ResponsiveContainer width="100%" height={160}>
             <R.BarChart data={listChart} margin={{top:6,right:8,left:14,bottom:18}}>
               <R.CartesianGrid stroke={PAL.panel} vertical={false} />
               <R.XAxis dataKey="date" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} interval={Math.ceil(listChart.length/10)} label={{value:'Date', position:'insideBottom', offset:-6, fill:PAL.muted, fontSize:'var(--text-xs)'}} />
@@ -5822,7 +5822,7 @@ function CvrDrivers(){
         <button onClick={()=>setCmp(defaultPair(panel))} title="Auto-pick the clearest pair: similar traffic, biggest conversion rate gap" style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',padding:'4px 10px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-muted)'}}>↻ Best pair</button>
       </div>
       <div style={{cursor:'pointer'}}>
-      <R.ResponsiveContainer width="100%" height={288}>
+      <R.ResponsiveContainer width="100%" height={240}>
         <R.ComposedChart data={chartData} syncId="cvr-traffic" margin={{top:6,right:14,left:8,bottom:20}} onClick={(st)=>{ if(st && st.activeLabel!=null) pickPeriod(st.activeLabel); }}>
           <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
           <R.XAxis dataKey="w" tickFormatter={fmtWk} tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} interval={Math.ceil(chartData.length/9)} tickMargin={8} label={{value:chartGran==='day'?'Day':'Week', position:'insideBottom', offset:-10, fill:PAL.muted, fontSize:'var(--text-xs)'}}/>
@@ -5857,7 +5857,7 @@ function CvrDrivers(){
       </R.ResponsiveContainer>
       {/* Traffic underneath, same weeks, own scale — so "did conversion fall or did
           traffic change?" is answered by reading down, not by a crossing point. */}
-      <R.ResponsiveContainer width="100%" height={120}>
+      <R.ResponsiveContainer width="100%" height={160}>
         <R.ComposedChart data={chartData} syncId="cvr-traffic" margin={{top:2,right:14,left:8,bottom:6}}>
           <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
           <R.XAxis dataKey="w" tickFormatter={fmtWk} tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} interval={Math.ceil(chartData.length/9)} tickMargin={6}/>
@@ -6073,7 +6073,7 @@ function CvrDrivers(){
             <td style={{padding:'6px 8px',fontSize:'var(--text-xs)',color:collapsed?PAL.warn:'var(--text-faint)'}}>{collapsed?'mostly mix':(d.sig?'holds':'')}</td>
           </tr>); })}</tbody>
       </table></div>
-      <div className="note" style={{marginTop:8}}>Each lever's correlation with daily conversion rate <b>after partialling out new-visitor share</b> — the dominant traffic-mix confound (it alone correlates r≈−0.46 with conversion rate). Where the adjusted figure holds near the raw one, the signal is genuinely that lever; where it collapses toward 0 (<span style={{color:'#f5b544'}}>“mostly mix”</span>), the raw correlation was really just <i>who</i> visited. This is the honest read on what's actually moveable. “ns” = not significant at n shown.</div>
+      <div className="note" style={{marginTop:8}}>Each lever's correlation with daily conversion rate <b>after partialling out new-visitor share</b> — the dominant traffic-mix confound (it alone correlates r≈−0.46 with conversion rate). Where the adjusted figure holds near the raw one, the signal is genuinely that lever; where it collapses toward 0 (<span style={{color:'var(--color-warning)'}}>“mostly mix”</span>), the raw correlation was really just <i>who</i> visited. This is the honest read on what's actually moveable. “ns” = not significant at n shown.</div>
       </> : <div className="note">Not enough clean daily history yet to separate levers from traffic mix.</div>}
 
       {STAT.resid && <div style={{marginTop:16}}>
@@ -6220,7 +6220,7 @@ function ProductSignal(){
       </div>
       <div {...z.bind}>
       <ZoomControls z={z}/>
-      <R.ResponsiveContainer width="100%" height={300}>
+      <R.ResponsiveContainer width="100%" height={240}>
         <R.ScatterChart margin={{top:10,right:20,left:10,bottom:24}}>
           <R.CartesianGrid stroke={PAL.panel}/>
           <R.XAxis type="number" dataKey="x" name="Visibility" unit="%" domain={[z.view[0],z.view[1]]} allowDataOverflow tickFormatter={niceTick} tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} label={{value:'Visibility — % of all product views', position:'insideBottom', offset:-12, fill:PAL.muted, fontSize:'var(--text-xs)'}}/>
@@ -6344,7 +6344,7 @@ function DiscountCodeTracker(){
           </div>
         </div>}
 
-        <R.ResponsiveContainer width="100%" height={280}>
+        <R.ResponsiveContainer width="100%" height={240}>
           <R.BarChart data={weekly} margin={{top:6,right:16,left:6,bottom:22}}>
             <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
             <R.XAxis dataKey="w" tickFormatter={fmtWk} tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} interval={Math.ceil(axis.length/9)} tickMargin={8}
@@ -6503,7 +6503,7 @@ function RestockAlertsPanel(){
   const th = (key,label,right) => {
     const active = sort.key===key;
     return (<th onClick={()=>onSort(key)} style={{cursor:'pointer',whiteSpace:'nowrap',textAlign:right?'right':'left',userSelect:'none',color:active?'var(--text-primary)':undefined}}
-      title={`Sort by ${label.toLowerCase()}`}>{label} <span style={{fontSize:'var(--text-xs)',opacity:active?1:.4}}>{active?(sort.dir==='asc'?'▲':'▼'):'↕'}</span></th>);
+      title={`Sort by ${label.toLowerCase()}`}>{label} <span style={{opacity:active?1:.3}}><Icon name={active && sort.dir==='asc'?'arrowUp':'arrowDown'} size={12} style={{verticalAlign:'-2px'}}/></span></th>);
   };
   const top = data.alerts.find(a=>a.urgency!=='watch') || data.alerts[0];
   const leadInput = (val, onCh) => (<input type="number" min="0" value={val==null?'':val} onChange={e=>onCh(e.target.value)}
@@ -6702,7 +6702,7 @@ function Organic(){
       <div className="row">
         <div className="card" style={{flex:'1 1 340px'}}>
           <h2>Revenue share by channel (GA4 attribution)</h2>
-          <R.ResponsiveContainer width="100%" height={280}>
+          <R.ResponsiveContainer width="100%" height={240}>
             <R.PieChart>
               <R.Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={100} paddingAngle={1}>
                 {pieData.map((p,i)=><R.Cell key={i} fill={svgCol(p.fill)}/>)}
@@ -7018,7 +7018,7 @@ function EmailHub(){
         <h2>Campaign sends by week</h2>
         {/* Sends and revenue are a count and an amount: one chart each, same weeks,
             linked by syncId, so "are we over-emailing?" is read down the pair. */}
-        <R.ResponsiveContainer width="100%" height={130}>
+        <R.ResponsiveContainer width="100%" height={160}>
           <R.ComposedChart data={sendChart} syncId="email-sends" margin={{top:6,right:12,left:14,bottom:4}}>
             <R.CartesianGrid stroke={PAL.panel} vertical={false} />
             <R.XAxis dataKey="date" tick={false} tickLine={false} height={6} />
@@ -7028,7 +7028,7 @@ function EmailHub(){
             <R.Bar dataKey="sends" name="Campaign sends" fill={svgCol(COL.email)} />
           </R.ComposedChart>
         </R.ResponsiveContainer>
-        <R.ResponsiveContainer width="100%" height={130}>
+        <R.ResponsiveContainer width="100%" height={160}>
           <R.ComposedChart data={sendChart} syncId="email-sends" margin={{top:2,right:12,left:14,bottom:18}}>
             <R.CartesianGrid stroke={PAL.panel} vertical={false} />
             <R.XAxis dataKey="date" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} interval={Math.ceil(sendChart.length/12)} label={{value:'Date', position:'insideBottom', offset:-6, fill:PAL.muted, fontSize:'var(--text-xs)'}} />
@@ -7221,7 +7221,7 @@ function InstagramPanel(){
       <div className="row">
         <div className="card" style={{flex:'2 1 420px'}}>
           <h2>Daily growth — new followers + reach</h2>
-          <R.ResponsiveContainer width="100%" height={150}>
+          <R.ResponsiveContainer width="100%" height={160}>
             <R.ComposedChart syncId="ig-reach" data={dailyChart} margin={{top:6,right:10,left:14,bottom:18}}>
               <R.CartesianGrid stroke={PAL.panel} vertical={false} />
               <R.XAxis tickLine={false} dataKey="date" tick={false} interval={Math.ceil(dailyChart.length/8)}  />
@@ -7231,7 +7231,7 @@ function InstagramPanel(){
               <R.Bar yAxisId="l" dataKey="new" name="New followers" fill={svgCol(COL.email)} />
             </R.ComposedChart>
           </R.ResponsiveContainer>
-          <R.ResponsiveContainer width="100%" height={120}>
+          <R.ResponsiveContainer width="100%" height={160}>
             <R.ComposedChart syncId="ig-reach" data={dailyChart} margin={{top:6,right:10,left:14,bottom:18}}>
               <R.CartesianGrid stroke={PAL.panel} vertical={false} />
               <R.XAxis dataKey="date" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} interval={Math.ceil(dailyChart.length/8)} label={{value:'Date', position:'insideBottom', offset:-6, fill:PAL.muted, fontSize:'var(--text-xs)'}} />
@@ -8811,7 +8811,7 @@ function WeeklyBoard(){
           <figure className="v3-chart">
             <figcaption><span className="v3-chart-title">Sales and ad spend</span>
               <span className="v3-legend"><i style={{ background: PAL.accent }}/>Sales <i style={{ background: PAL.data3 }}/>Ad spend</span></figcaption>
-            <R.ResponsiveContainer width="100%" height={220}>
+            <R.ResponsiveContainer width="100%" height={240}>
               <R.ComposedChart data={t13} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
                 <R.CartesianGrid/>
                 <R.XAxis dataKey="x" tickFormatter={v => String(v).split(' – ')[0]} interval="preserveStartEnd"/>
@@ -8825,7 +8825,7 @@ function WeeklyBoard(){
           <figure className="v3-chart">
             <figcaption><span className="v3-chart-title">Sales per £ of ads</span>
               <span className="v3-legend"><i className="dash"/>2× — where most brands break even</span></figcaption>
-            <R.ResponsiveContainer width="100%" height={220}>
+            <R.ResponsiveContainer width="100%" height={240}>
               <R.ComposedChart data={t13} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
                 <R.CartesianGrid/>
                 <R.XAxis dataKey="x" tickFormatter={v => String(v).split(' – ')[0]} interval="preserveStartEnd"/>
@@ -8931,7 +8931,7 @@ function CohortsPanel(){
       <div className="row">
         <div className="card" style={{flex:'2 1 480px'}}>
           <div className="card-section-title"><h2 style={{margin:0}}>Lifetime value curve</h2><span className="meta">{`cumulative ${curSym()} per customer by months since first order`}</span></div>
-          <R.ResponsiveContainer width="100%" height={292}>
+          <R.ResponsiveContainer width="100%" height={240}>
             <R.ComposedChart data={curve} margin={{top:8,right:18,left:6,bottom:6}}>
               <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
               <R.XAxis dataKey="m" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}}/>
@@ -8953,7 +8953,7 @@ function CohortsPanel(){
         </div>
         <div className="card" style={{flex:'1 1 300px'}}>
           <div className="card-section-title"><h2 style={{margin:0}}>New-customer cost, by the month they joined</h2><span className="meta">new customers vs paid cost per new customer</span></div>
-          <R.ResponsiveContainer width="100%" height={150}>
+          <R.ResponsiveContainer width="100%" height={160}>
             <R.ComposedChart syncId="cohort-cac" data={cacMonths} margin={{top:8,right:14,left:6,bottom:6}}>
               <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
               <R.XAxis tickLine={false} dataKey="month" tick={false}/>
@@ -8962,7 +8962,7 @@ function CohortsPanel(){
               <R.Bar yAxisId="l" dataKey="newCust" name="New customers" fill={svgCol(COL.sessions)} radius={[2,2,0,0]}/>
             </R.ComposedChart>
           </R.ResponsiveContainer>
-          <R.ResponsiveContainer width="100%" height={120}>
+          <R.ResponsiveContainer width="100%" height={160}>
             <R.ComposedChart syncId="cohort-cac" data={cacMonths} margin={{top:8,right:14,left:6,bottom:6}}>
               <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
               <R.XAxis dataKey="month" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}}/>
@@ -9052,7 +9052,7 @@ function AdviceLedgerPanel(){
             const watched = a.impact ? Object.keys(a.impact) : [];
             return (<div key={a.id} style={{padding:'8px 10px', background:'var(--bg-app)', border:'1px solid var(--border-subtle)', borderRadius:'var(--radius-none)'}}>
               <div style={{display:'flex', gap:8, alignItems:'baseline'}}>
-                <span style={{color:'var(--good)', fontWeight:'var(--weight-bold)'}}>✓</span>
+                <Icon name="check" size={14} style={{color:'var(--color-success)', verticalAlign:'-2px'}}/>
                 <span style={{flex:1, fontSize:'var(--text-sm)', color:'var(--text-primary)'}}>{plainWords(a.text)}</span>
                 {a.agent && <span className="micro" style={{color:'var(--text-faint)'}}>{agentLabel(a.agent)}</span>}
                 {when && <span className="micro" style={{color:'var(--text-faint)'}}>{when}</span>}
@@ -9312,7 +9312,7 @@ function ClarityFrictionPanel(){
     </div>)}
     {C.flags && C.flags.length>0 && (<div style={{display:'flex', flexDirection:'column', gap:6, marginBottom:10}}>
       {C.flags.map((fl,i)=>(<div key={i} style={{display:'flex', gap:8, alignItems:'baseline', fontSize:'var(--text-sm)'}}>
-        <span style={{color:sev(fl.sev), fontWeight:'var(--weight-bold)'}}>{fl.sev==='high'?'▲':'•'}</span>
+        <span className="v3-dot" style={{background:sev(fl.sev)}}/>
         <span style={{color:'var(--text-secondary)'}}>{fl.text}</span>
       </div>))}
     </div>)}
@@ -9420,7 +9420,7 @@ function MarginBridge({cur, pri, gm, perOrderFixed, payPct}){
         <h2 style={{margin:0}}>What moved your profit after ads <span style={{fontWeight:'var(--weight-normal)',color:'var(--text-faint)',fontSize:'var(--text-sm)'}}>— against the period before</span></h2>
         <span className="meta" style={{display:'inline-flex',alignItems:'center',gap:6}}><MarginBadge/> {delta>=0?'+':'−'}{GBP(Math.abs(delta))}{dpct!=null?` (${(dpct>=0?'+':'')}${(dpct*100).toFixed(0)}%)`:''}</span>
       </div>
-      <R.ResponsiveContainer width="100%" height={260}>
+      <R.ResponsiveContainer width="100%" height={240}>
         <R.BarChart data={data} margin={{top:24,right:16,left:10,bottom:6}}>
           <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
           <R.XAxis dataKey="name" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} interval={0}/>
@@ -9484,7 +9484,7 @@ function ProductRetentionMatrix(){
     </div>
     <div {...z.bind}>
     <ZoomControls z={z}/>
-    <R.ResponsiveContainer width="100%" height={330}>
+    <R.ResponsiveContainer width="100%" height={240}>
       <R.ScatterChart margin={{top:10,right:24,left:6,bottom:26}}>
         <R.CartesianGrid stroke={PAL.panel}/>
         <R.XAxis type="number" dataKey="x" name="Retention" unit="%" domain={[z.view[0],z.view[1]]} allowDataOverflow tickFormatter={niceTick} tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}}
@@ -10458,7 +10458,7 @@ function ProductionPlanner({embedded}={}){
             <datalist id="oi-supplier-names">{supplierNamesInUse().map(n=><option key={n} value={n}/>)}</datalist>
             <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:680}}><thead><tr><th style={th}>Product</th><th style={th}>Supplier / manufacturer</th><th style={th}>Minimum order</th><th style={th}>{`Unit ${curSym()} `}<span style={{fontWeight:'var(--weight-normal)',textTransform:'none'}}>(blank = quote)</span></th><th style={th}>Lead (days)</th></tr></thead><tbody>
               {visible.map(p=>{ const key=skuKeyOf(p); const d=supDraft[key]||{supplier:'',moq:'',unitCost:'',lead:''}; const set=!!(d.supplier&&d.supplier.trim()); return (<tr key={key}>
-                <td style={{...td,color:'var(--text-primary)'}}>{set?'':<span style={{color:'var(--warn)',marginRight:4}}>●</span>}{p.title}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{p.sku||'no SKU'} · {p.type}</div></td>
+                <td style={{...td,color:'var(--text-primary)'}}>{set?'':<span className="v3-dot" style={{background:'var(--color-warning)'}}/>}{p.title}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{p.sku||'no SKU'} · {p.type}</div></td>
                 <td style={td}><input list="oi-supplier-names" style={{...inp,width:190}} value={d.supplier} onChange={e=>setSup(key,'supplier',e.target.value)} placeholder="Pick or type a new supplier"/></td>
                 <td style={td}><input type="number" style={{...inp,width:64}} value={d.moq} onChange={e=>setSup(key,'moq',e.target.value)} placeholder="0"/></td>
                 <td style={td}><input type="number" style={{...inp,width:72}} value={d.unitCost} onChange={e=>setSup(key,'unitCost',e.target.value)} placeholder="quote"/></td>
@@ -10769,7 +10769,7 @@ function DemandPlanner({embedded}={}){
             <td style={{...td,color:'var(--text-primary)'}}>{r.p.title}{r.oosBeforeLead && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',color:PAL.panel,background:'var(--bad)',padding:'1px 7px',borderRadius:'var(--radius-full)'}}>ORDER TODAY</span>}{focusM(r.p)!==1 && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',color:'var(--accent)',background:'var(--accent-bg)',padding:'1px 6px',borderRadius:'var(--radius-full)'}}>↑{(focusM(r.p)%1?focusM(r.p).toFixed(2):focusM(r.p))}×</span>}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{r.p.type}</div></td>
             <td style={{...td,textAlign:'right'}}>{NUM(Math.round(r.runMo))}</td>
             <td style={{...td,textAlign:'right'}}>{NUM(r.stock)}</td>
-            <td style={{...td,textAlign:'right'}}>{r.daysToOOS===Infinity ? <span style={{color:'var(--text-faint)'}}>—</span> : <span style={{fontWeight:'var(--weight-semi)',color: r.oosBeforeLead?'var(--bad)':(r.daysToOOS<r.lead*1.5?'var(--warn)':'var(--text-secondary)')}}>{Math.round(r.daysToOOS)}d{r.oosBeforeLead?` · gap ${r.oosGap}d`:''}</span>}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',display:'flex',alignItems:'center',gap:3,justifyContent:'flex-end',marginTop:2}}>{!r.leadSet && <span title={`Estimate — using the ${r.p.type||'type'} default of ${r.leadDefault}d. Set this item's real supplier lead.`} style={{color:'var(--warn)',fontSize:'var(--text-xs)',lineHeight:1}}>●</span>}<input type="number" min="0" defaultValue={r.leadSet?r.leadMake:''} key={'ld'+(r.leadSet?r.leadMake:'d')} placeholder={String(r.leadDefault)} title={`Production lead — days from order to shipment (per item). Blank uses the ${r.p.type||'type'} default of ${r.leadDefault}d. Set defaults in Reorder policy.`} onBlur={e=>{ if(e.target.value!=='') setSkuLead(skuKeyOf(r.p), e.target.value); }} style={{width:38,padding:'1px 4px',borderRadius:'var(--radius-md)',border:'1px solid '+(r.leadSet?'var(--border-default)':'var(--warn)'),background:'var(--bg-base)',color:'var(--text-secondary)',fontSize:'var(--text-xs)',textAlign:'right'}}/><span>d make{r.leadShip>0?` +${r.leadShip} ship = ${r.lead}`:' lead'}</span></div></td>
+            <td style={{...td,textAlign:'right'}}>{r.daysToOOS===Infinity ? <span style={{color:'var(--text-faint)'}}>—</span> : <span style={{fontWeight:'var(--weight-semi)',color: r.oosBeforeLead?'var(--bad)':(r.daysToOOS<r.lead*1.5?'var(--warn)':'var(--text-secondary)')}}>{Math.round(r.daysToOOS)}d{r.oosBeforeLead?` · gap ${r.oosGap}d`:''}</span>}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',display:'flex',alignItems:'center',gap:3,justifyContent:'flex-end',marginTop:2}}>{!r.leadSet && <span title={`Estimate — using the ${r.p.type||'type'} default of ${r.leadDefault}d. Set this item's real supplier lead.`} className="v3-dot v3-dot-tight" style={{background:'var(--color-warning)'}}/>}<input type="number" min="0" defaultValue={r.leadSet?r.leadMake:''} key={'ld'+(r.leadSet?r.leadMake:'d')} placeholder={String(r.leadDefault)} title={`Production lead — days from order to shipment (per item). Blank uses the ${r.p.type||'type'} default of ${r.leadDefault}d. Set defaults in Reorder policy.`} onBlur={e=>{ if(e.target.value!=='') setSkuLead(skuKeyOf(r.p), e.target.value); }} style={{width:38,padding:'1px 4px',borderRadius:'var(--radius-md)',border:'1px solid '+(r.leadSet?'var(--border-default)':'var(--warn)'),background:'var(--bg-base)',color:'var(--text-secondary)',fontSize:'var(--text-xs)',textAlign:'right'}}/><span>d make{r.leadShip>0?` +${r.leadShip} ship = ${r.lead}`:' lead'}</span></div></td>
             <td style={{...td,textAlign:'right',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{NUM(Math.ceil(r.plan))}</td>
             <td style={{...td,textAlign:'right',fontWeight:'var(--weight-semi)',color: r.short?'var(--bad)':'var(--good)'}}>{r.short?'−'+NUM(Math.ceil(-r.end)):NUM(Math.floor(r.end))}</td>
             <td style={{...td,textAlign:'right'}}>{oCell}</td>
@@ -10780,7 +10780,7 @@ function DemandPlanner({embedded}={}){
           {rows.length>12 && <button style={btn} onClick={()=>setShowAll(s=>!s)}>{showAll?'Show top 12':`Show all ${rows.length}`}</button>}
           <button style={{...btn,background:'var(--accent)',color:PAL.panel,borderColor:'var(--accent)'}} onClick={()=>{ const el=document.getElementById('plan-pos'); if(el) el.scrollIntoView({behavior:'smooth'}); else if(window.__oiNav) window.__oiNav('planning','plan'); }}>Review &amp; raise POs ({RR.toOrder.length}) <Icon name="chevron" size={13}/></button>
           {delistedCount>0 && <button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setShowDelisted(s=>!s)}>{showDelisted?'Hide delisted':`${delistedCount} delisted`}</button>}
-          {rows.filter(r=>!r.leadSet).length>0 && <span style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:'var(--text-xs)',color:'var(--text-faint)'}} title="These products use the type's default lead — set each item's real supplier lead (the input in the Stockout-vs-lead column) for accurate order-by dates."><span style={{color:'var(--warn)',fontSize:'var(--text-xs)'}}>●</span>{rows.filter(r=>!r.leadSet).length} on an estimated lead</span>}
+          {rows.filter(r=>!r.leadSet).length>0 && <span style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:'var(--text-xs)',color:'var(--text-faint)'}} title="These products use the type's default lead — set each item's real supplier lead (the input in the Stockout-vs-lead column) for accurate order-by dates."><span className="v3-dot v3-dot-tight" style={{background:'var(--color-warning)'}}/>{rows.filter(r=>!r.leadSet).length} on an estimated lead</span>}
         </div>
         {showDelisted && delistedCount>0 && <div style={{marginTop:10,paddingTop:10,borderTop:'1px solid var(--border-subtle)'}}>
           <div style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:6}}>Delisted — excluded from the plan &amp; POs</div>
@@ -11206,7 +11206,7 @@ const GO_T = { bg:'transparent', panel:PAL.panel, panel2:PAL.surface, line:PAL.l
 const GO_gbp = n => fmtMoney(n);
 const GO_pctv = n => (n==null?'':(n>0?'+':'')+n.toFixed(1)+'%');
 const GO_rag = r => r==='g'?GO_T.green:r==='a'?GO_T.amber:r==='r'?GO_T.red:GO_T.dim;
-const GO_arrow = d => d==null?'▬':d>0.5?'▲':d<-0.5?'▼':'▬';
+const GO_arrow = d => d==null?'':d>0.05?'+':d<-0.05?'−':'';   // sign only; colour carries direction
 const GO_fmt = (v,f) => f==='gbp'?GO_gbp(v):f==='gbp2'?fmtMoney(v,2):f==='int'?Math.round(v).toLocaleString('en-GB')
   :f==='pct1'?(v!=null?v.toFixed(2)+'%':'—'):f==='x'?(v!=null?v.toFixed(1)+'×':'—'):v;
 const GO_TIMEFRAMES = ['daily','weekly','monthly','quarterly','yearly'];
@@ -11287,11 +11287,11 @@ function GO_Tile(p){ const t=p.t; const _sr=(t.series&&t.series.length>1)?t.seri
     {t.rag && <GO_Dot r={t.rag} style={{position:'absolute',top:12,right:12}}/>}
     <div style={{fontSize:'var(--text-xs)',color:GO_T.mut,display:'flex',alignItems:'center',gap:5}}>{t.k}<span className="go-dot" style={{width:4,height:4,borderRadius:'50%',background:GO_T.accent,display:'inline-block'}}/></div>
     <div style={{fontFamily:GO_T.mono,fontSize:'var(--text-xl)',fontWeight:'var(--weight-semi)',margin:'8px 0 4px',letterSpacing:'var(--tracking-tight)',fontVariantNumeric:'tabular-nums'}}>{GO_fmt(t.v,t.fmt)}</div>
-    <div style={{fontFamily:GO_T.mono,fontSize:'var(--text-xs)',color:t.d>0?GO_T.green:t.d<0?GO_T.red:GO_T.mut}}>{t.d!=null?GO_arrow(t.d)+' '+GO_pctv(Math.abs(t.d)).replace('+','')+' ':''}<span style={{color:GO_T.dim}}>{t.cmp}</span></div>
+    <div style={{fontFamily:GO_T.mono,fontSize:'var(--text-xs)',color:t.d>0?GO_T.green:t.d<0?GO_T.red:GO_T.mut}}>{t.d!=null?GO_arrow(t.d)+GO_pctv(Math.abs(t.d)).replace('+','')+' ':''}<span style={{color:GO_T.dim}}>{t.cmp}</span></div>
     {t.tgt && <div style={{fontSize:'var(--text-xs)',color:GO_T.dim,marginTop:5}}>{t.tgt}</div>}
     <div className="go-pop">
       <div className="go-head">{_sr?(t.k+' · trend over selected timeframe'):(t.k+' · detail')}</div>
-      {_sr && <R.ResponsiveContainer width="100%" height={92}>
+      {_sr && <R.ResponsiveContainer width="100%" height={64}>
         <R.LineChart data={t.series} margin={{top:4,right:6,left:-6,bottom:0}}>
           <R.CartesianGrid stroke={PAL.line} vertical={false}/>
           <R.XAxis dataKey="d" tick={{fill:GO_T.dim,fontSize:'var(--text-xs)'}} interval="preserveStartEnd" tickLine={false} axisLine={false}/>
@@ -11300,7 +11300,7 @@ function GO_Tile(p){ const t=p.t; const _sr=(t.series&&t.series.length>1)?t.seri
           <R.Line type="monotone" dataKey="v" stroke={svgCol(_stroke)} strokeWidth={2} dot={false} isAnimationActive={false}/>
         </R.LineChart>
       </R.ResponsiveContainer>}
-      {t.d!=null && <div className="go-row"><span>Change vs prior</span><b style={{color:t.d>0?GO_T.green:t.d<0?GO_T.red:GO_T.mut}}>{GO_arrow(t.d)+' '+GO_pctv(t.d)}</b></div>}
+      {t.d!=null && <div className="go-row"><span>Change vs prior</span><b style={{color:t.d>0?GO_T.green:t.d<0?GO_T.red:GO_T.mut}}>{GO_pctv(t.d).replace('-','−')}</b></div>}
       {t.cmp && <div className="go-row"><span>Detail</span><b>{t.cmp}</b></div>}
       {t.tgt && <div className="go-row"><span>Target</span><b>{t.tgt}</b></div>}
       <div className="go-row"><span>Status</span><b style={{color:GO_rag(t.rag)}}>{_statusTxt}</b></div>
@@ -11440,7 +11440,7 @@ function MetaAdDrilldown(){
   var tdL={textAlign:'left',fontSize:'var(--text-sm)',padding:'6px 8px',borderBottom:'1px solid '+GO_T.line};
   return (<div style={{marginTop:10}}>
     <div onClick={function(){ var n=!open; setOpen(n); try{sessionStorage.setItem('oi_dd_meta', n?'1':'0');}catch(e){} }} style={{cursor:'pointer',fontSize:'var(--text-xs)',color:GO_T.accent2,textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',margin:'0 2px 6px',userSelect:'none'}}>
-      {open?'▾':'▸'} Meta campaign &amp; ad detail — where the paid-social spend actually goes
+      <Icon name="chevron" size={12} style={{transform:open?'rotate(90deg)':'none', transition:'transform .15s', verticalAlign:'-1px', marginRight:'var(--space-2)'}}/>Meta campaign &amp; ad detail — where the paid-social spend actually goes
     </div>
     {open && <div>
       <div style={{fontSize:'var(--text-xs)',color:GO_T.dim,margin:'0 2px 8px',fontStyle:'italic'}}>return on ad spend below is raw / platform-reported; the Channel tier above uses incrementality-adjusted real return on ad spend, so the numbers differ.</div>
@@ -11497,7 +11497,7 @@ function GoogleAdDrilldown(){
   var tdL={textAlign:'left',fontSize:'var(--text-sm)',padding:'6px 8px',borderBottom:'1px solid '+GO_T.line};
   return (<div style={{marginTop:8}}>
     <div onClick={function(){ var n=!open; setOpen(n); try{sessionStorage.setItem('oi_dd_google', n?'1':'0');}catch(e){} }} style={{cursor:'pointer',fontSize:'var(--text-xs)',color:GO_T.accent2,textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',margin:'0 2px 6px',userSelect:'none'}}>
-      {open?'▾':'▸'} Google campaign &amp; search-term detail — impression share &amp; wasted spend
+      <Icon name="chevron" size={12} style={{transform:open?'rotate(90deg)':'none', transition:'transform .15s', verticalAlign:'-1px', marginRight:'var(--space-2)'}}/>Google campaign &amp; search-term detail — impression share &amp; wasted spend
     </div>
     {open && <div>
       <div style={{fontSize:'var(--text-xs)',color:GO_T.dim,margin:'0 2px 8px',fontStyle:'italic'}}>return on ad spend below is raw / platform-reported; the Channel tier above uses incrementality-adjusted real return on ad spend, so the numbers differ.</div>
@@ -11608,7 +11608,7 @@ function GretaOverviewTiers(){
             <div style={{fontSize:'var(--text-sm)',color:GO_T.mut,marginTop:6,lineHeight:1.7}}>{d.bestSellers.map((s,i)=><div key={i}>{s.name} · {GO_gbp(s.rev)}</div>)}</div>
           </div>
         </div>
-        {d.pacing && d.pacing.days && d.pacing.days.length>0 && <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:'var(--radius-none)',padding:'10px 12px 4px',boxShadow:'var(--shadow-panel)',marginTop:10}}><div style={{fontSize:'var(--text-xs)',color:GO_T.dim,textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',marginBottom:6}}>Sales &amp; spend vs target</div><R.ResponsiveContainer width="100%" height={200}><R.ComposedChart data={d.pacing.days} margin={{top:5,right:8,left:0,bottom:0}}><R.CartesianGrid strokeDasharray="2 4" stroke={PAL.line}/><R.XAxis dataKey="date" tick={{fontSize:'var(--text-xs)',fill:'var(--color-muted)'}} interval="preserveStartEnd"/><R.YAxis tick={{fontSize:'var(--text-xs)',fill:'var(--color-muted)'}} width={44} tickFormatter={function(v){return '£'+Math.round(v/1000)+'k';}}/><R.Tooltip formatter={function(v){return '£'+Number(v).toLocaleString('en-GB');}}/><R.Bar dataKey="sales" name="Sales" fill={PAL.good} radius={[2,2,0,0]}/><R.Bar dataKey="spend" name="Spend" fill={PAL.accent} radius={[2,2,0,0]}/><R.Line dataKey="tSales" name="Target sales" stroke="var(--color-success)" strokeDasharray="4 3" dot={false} strokeWidth={1.5}/><R.Line dataKey="tSpend" name="Target spend" stroke={PAL.accent} strokeDasharray="4 3" dot={false} strokeWidth={1.5}/></R.ComposedChart></R.ResponsiveContainer></div>}
+        {d.pacing && d.pacing.days && d.pacing.days.length>0 && <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:'var(--radius-none)',padding:'10px 12px 4px',boxShadow:'var(--shadow-panel)',marginTop:10}}><div style={{fontSize:'var(--text-xs)',color:GO_T.dim,textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',marginBottom:6}}>Sales &amp; spend vs target</div><R.ResponsiveContainer width="100%" height={160}><R.ComposedChart data={d.pacing.days} margin={{top:5,right:8,left:0,bottom:0}}><R.CartesianGrid strokeDasharray="2 4" stroke={PAL.line}/><R.XAxis dataKey="date" tick={{fontSize:'var(--text-xs)',fill:'var(--color-muted)'}} interval="preserveStartEnd"/><R.YAxis tick={{fontSize:'var(--text-xs)',fill:'var(--color-muted)'}} width={44} tickFormatter={function(v){return '£'+Math.round(v/1000)+'k';}}/><R.Tooltip formatter={function(v){return '£'+Number(v).toLocaleString('en-GB');}}/><R.Bar dataKey="sales" name="Sales" fill={PAL.good} radius={[2,2,0,0]}/><R.Bar dataKey="spend" name="Spend" fill={PAL.accent} radius={[2,2,0,0]}/><R.Line dataKey="tSales" name="Target sales" stroke="var(--color-success)" strokeDasharray="4 3" dot={false} strokeWidth={1.5}/><R.Line dataKey="tSpend" name="Target spend" stroke={PAL.accent} strokeDasharray="4 3" dot={false} strokeWidth={1.5}/></R.ComposedChart></R.ResponsiveContainer></div>}
         <GO_Insight i={d.insights.business}/>
       </div>
 
@@ -11749,7 +11749,7 @@ function GP_Why(p){
   return (
     <div style={{ marginTop:12 }}>
       <button onClick={function(){ setOpen(!open); }} style={{ background:'none', border:'none', color:GP_T.accent2, fontSize:'var(--text-sm)', fontWeight:'var(--weight-semi)', cursor:'pointer', padding:0, fontFamily:'inherit' }}>
-        {open?'▾':'▸'} Why are these the targets?
+        <Icon name="chevron" size={12} style={{transform:open?'rotate(90deg)':'none', transition:'transform .15s', verticalAlign:'-1px', marginRight:'var(--space-2)'}}/>Why are these the targets?
       </button>
       {open && (
         <div style={{ marginTop:8, background:'var(--color-surface)', border:'1px solid '+GP_T.line, borderRadius:'var(--radius-none)', padding:'2px 14px 12px' }}>
@@ -11819,13 +11819,13 @@ function GP_ChannelHealth(p){
             <span>0%</span><span>healthy {Math.round(lo)}&ndash;{Math.round(hi)}% returning</span><span>{SCALE}%</span>
           </div>
           <div style={{ fontSize:'var(--text-sm)', color:ragCol, fontWeight:'var(--weight-semi)', margin:'11px 0 5px' }}>
-            {ret.toFixed(0)}% returning / {(100-ret).toFixed(0)}% new{d!=null ? <span style={{ fontSize:'var(--text-xs)', color:GP_T.dim, fontWeight:'var(--weight-normal)' }}> &middot; {(d>=0?'▲':'▼')+Math.abs(d).toFixed(0)+'pts vs prior 30d'}</span> : null}
+            {ret.toFixed(0)}% returning / {(100-ret).toFixed(0)}% new{d!=null ? <span style={{ fontSize:'var(--text-xs)', color:GP_T.dim, fontWeight:'var(--weight-normal)' }}> &middot; {(d>=0?'+':'−')+Math.abs(d).toFixed(0)+' pts on the 30 days before'}</span> : null}
           </div>
           <div style={{ fontSize:'var(--text-sm)', color:GP_T.mut, lineHeight:1.55 }}>{h.guidance}</div>
           <div style={{ display:'flex', gap:20, marginTop:11, paddingTop:10, borderTop:'1px solid '+GP_T.line, flexWrap:'wrap' }}>
             <div>
               <div style={{ fontSize:'var(--text-xs)', color:GP_T.dim }}>Email &middot; last-click</div>
-              <div style={{ fontFamily:GP_T.mono, fontSize:'var(--text-base)' }}>{emailLc!=null?emailLc.toFixed(1)+'%':'—'}{ed!=null ? <span style={{ fontSize:'var(--text-xs)', color:ed>=0?GP_T.green:GP_T.red, marginLeft:5 }}>{(ed>=0?'▲':'▼')+Math.abs(ed).toFixed(1)}</span> : null}</div>
+              <div style={{ fontFamily:GP_T.mono, fontSize:'var(--text-base)' }}>{emailLc!=null?emailLc.toFixed(1)+'%':'—'}{ed!=null ? <span style={{ fontSize:'var(--text-xs)', color:ed>=0?GP_T.green:GP_T.red, marginLeft:5 }}>{(ed>=0?'+':'−')+Math.abs(ed).toFixed(1)}</span> : null}</div>
               <div style={{ fontSize:'var(--text-xs)', color:GP_T.dim }}>target {Math.round(Number(h.email_low))}&ndash;{Math.round(Number(h.email_high))}%</div>
             </div>
             <div>
@@ -11867,7 +11867,7 @@ function GP_ChannelMix(p){
           <div key={i} style={{ padding:'7px 0', borderTop:'1px solid '+GP_T.line }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8, fontSize:'var(--text-sm)' }}>
               <span style={{ fontWeight:'var(--weight-semi)' }}>{LBL[r.channel]||r.channel}{r.channel==='referral' && Number(r.orders_with_discount)>0 ? <span style={{ color:GP_T.dim, fontWeight:'var(--weight-normal)' }}> &middot; {r.orders_with_discount} coded</span> : null}</span>
-              <span style={{ fontFamily:GP_T.mono }}>{GP_gbp(rev)} <span style={{ color:GP_T.dim }}>({pct.toFixed(0)}%)</span>{d!=null ? <span style={{ color:d>=0?GP_T.green:GP_T.red, marginLeft:6 }}>{(d>=0?'▲':'▼')+Math.abs(d).toFixed(0)+'%'}</span> : null}</span>
+              <span style={{ fontFamily:GP_T.mono }}>{GP_gbp(rev)} <span style={{ color:GP_T.dim }}>({pct.toFixed(0)}%)</span>{d!=null ? <span style={{ color:d>=0?GP_T.green:GP_T.red, marginLeft:6 }}>{(d>=0?'+':'−')+Math.abs(d).toFixed(0)+'%'}</span> : null}</span>
             </div>
             <div style={{ position:'relative', height:5, borderRadius:'var(--radius-sm)', background:'var(--color-surface)', margin:'5px 0 3px', overflow:'hidden' }}>
               <div style={{ position:'absolute', left:0, top:0, bottom:0, width:pct+'%', background:col, opacity:0.8 }}/>
@@ -12307,7 +12307,7 @@ function GP_BrowserCosts({ econ, setEcon }) {
   return (
     <div style={{ border: '1px solid ' + GP_T.accent, background: 'var(--accent-bg)', padding: '10px 12px', marginBottom: 12, fontSize: 'var(--text-sm)', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
       <span>Costs were saved in this browser before ({stash.found.join(', ') || 'monthly overheads'}). They were never sent to Greta.</span>
-      <button onClick={use} style={{ minHeight: 36, padding: '0 12px', border: '1px solid ' + GP_T.accent, background: GP_T.accent, color: '#fff', borderRadius: 'var(--radius-md)', fontFamily: 'inherit', fontSize: 'var(--text-sm)', fontWeight:'var(--weight-semi)', cursor: 'pointer' }}>Fill them in</button>
+      <button onClick={use} style={{ minHeight: 36, padding: '0 12px', border: '1px solid ' + GP_T.accent, background: GP_T.accent, color: PAL.panel, borderRadius: 'var(--radius-md)', fontFamily: 'inherit', fontSize: 'var(--text-sm)', fontWeight:'var(--weight-semi)', cursor: 'pointer' }}>Fill them in</button>
       <button onClick={function () { setDone(true); }} style={{ minHeight: 36, padding: '0 12px', border: '1px solid ' + GP_T.line, background: 'transparent', color: GP_T.mut, borderRadius: 'var(--radius-md)', fontFamily: 'inherit', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>Ignore</button>
     </div>
   );
@@ -13406,7 +13406,7 @@ function BusinessEconomicsPanel(){
     <span style={{ fontSize:'var(--text-xs)', fontWeight:'var(--weight-bold)', letterSpacing:'var(--tracking-wide)', textTransform:'uppercase',
       color: saved ? 'var(--good)' : (fallback.warn ? 'var(--warn)' : 'var(--text-muted)'),
       whiteSpace:'nowrap' }}>
-      {saved ? '● your number' : '○ ' + fallback.label}
+      {saved ? 'Your number' : fallback.label}
     </span>
   );
 
@@ -13685,7 +13685,7 @@ function MarginNudge(){
         Confirm gross margin →
       </button>
       <button onClick={()=>setDismissed(true)} title="Dismiss for now" aria-label="Dismiss"
-        style={{flexShrink:0, background:'none', border:0, cursor:'pointer', color:'var(--text-muted)', fontSize:'var(--text-base)', lineHeight:1, padding:'4px 6px'}}>✕</button>
+        style={{flexShrink:0, background:'none', border:0, cursor:'pointer', color:'var(--text-muted)', fontSize:'var(--text-base)', lineHeight:1, padding:'4px 6px'}}><Icon name="close" size={14}/></button>
     </div>
   );
 }
@@ -13812,7 +13812,7 @@ function TeamPanel(){
             </div>
             <span style={{flexShrink:0, fontSize:'var(--text-xs)', fontWeight:'var(--weight-bold)', letterSpacing:'var(--tracking-wide)', textTransform:'uppercase', color:roleColor(m.role), padding:'4px 9px', border:'1px solid var(--border-default)', borderRadius:'var(--r-full)'}}>{m.role}</span>
             {canRemove && <button onClick={()=>removeMember(m)} title={m.is_self?'Leave workspace':'Remove'}
-              style={{flexShrink:0, background:'none', border:0, cursor:'pointer', color:'var(--text-muted)', fontSize:'var(--text-base)', lineHeight:1, padding:'4px 6px', borderRadius:'var(--r-md)'}}>✕</button>}
+              style={{flexShrink:0, background:'none', border:0, cursor:'pointer', color:'var(--text-muted)', fontSize:'var(--text-base)', lineHeight:1, padding:'4px 6px', borderRadius:'var(--r-md)'}}><Icon name="close" size={14}/></button>}
           </div>);
         })}
       </div>
@@ -14771,7 +14771,7 @@ function CustomerSegments(){
               <td>{p.name}</td><td>{p.orders}</td><td>{GBP(p.netRevenue)}</td><td>{p.recencyDays}d ago</td>
               <td>{p.acquisitionChannel}</td>
               <td style={{color: CTONE[(CLOY[p.loyalty]||{}).tone] || 'inherit'}}>{p.discountPct}%</td>
-              <td style={{color: p.emailable ? 'var(--good)' : 'var(--text-faint)'}}>{p.emailable ? '✓' : '—'}</td>
+              <td style={{color: p.emailable ? 'var(--color-success)' : 'var(--text-faint)'}}>{p.emailable ? <Icon name="check" size={14} title="Can be emailed"/> : '—'}</td>
             </tr>))}</tbody></table>
         </div>
         {rows.count > 25 && <div className="micro muted" style={{marginTop:6}}>Showing the top 25 of {rows.count} by spend.</div>}
@@ -15150,7 +15150,7 @@ function ChannelDetailList({ channels }){
           <button type="button" onClick={()=>setOpen(isOpen ? null : name)} aria-expanded={isOpen}
             style={{display:'flex', alignItems:'center', gap:9, width:'100%', minHeight:44, padding:'10px 0',
                     background:'none', border:0, color:'var(--text-primary)', fontFamily:'inherit', fontSize:'var(--text-sm)', fontWeight:'var(--weight-semi)', textAlign:'left', cursor:'pointer'}}>
-            <span style={{color:'var(--accent)', fontSize:'var(--text-xs)'}}>{isOpen ? '▾' : '▸'}</span>
+            <span style={{color:'var(--color-muted)'}}><Icon name="chevron" size={12} style={{transform:isOpen?'rotate(90deg)':'none', transition:'transform .15s', verticalAlign:'-1px', marginRight:'var(--space-2)'}}/></span>
             {name.replace(/_/g, ' ')}
             {c.status ? <span className="micro muted" style={{marginLeft:'auto', textTransform:'uppercase', letterSpacing:'var(--tracking-wide)'}}>{c.status}</span> : null}
           </button>
@@ -15416,7 +15416,7 @@ function V3HeroTrend({ sales, prod }) {
   };
   return (<figure className="v3-hero-trend" aria-label={'Profit after ads by week, last ' + data.length + ' weeks'}>
     <figcaption><span className="v3-kick">By week</span><span className="v3-muted">last {data.length} weeks · latest <b className="oi-num">{fmtMoney(last.v)}</b></span></figcaption>
-    <R.ResponsiveContainer width="100%" height={132}>
+    <R.ResponsiveContainer width="100%" height={160}>
       <R.AreaChart data={data} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
         <defs><linearGradient id="v3HeroFill" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={PAL.accent} stopOpacity={0.18}/><stop offset="100%" stopColor={PAL.accent} stopOpacity={0}/>
@@ -16218,7 +16218,7 @@ function V3Customers() {
       <figure className="v3-chart">
         <figcaption><span className="v3-chart-title">What a customer spends over time</span>
           <span className="v3-muted">average sales per customer, from their first order</span></figcaption>
-        <R.ResponsiveContainer width="100%" height={220}>
+        <R.ResponsiveContainer width="100%" height={240}>
           <R.AreaChart data={cv} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <defs><linearGradient id="v3CvFill" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={PAL.accent} stopOpacity={0.16}/><stop offset="100%" stopColor={PAL.accent} stopOpacity={0}/></linearGradient></defs>
