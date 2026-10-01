@@ -167,7 +167,7 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
   box-shadow: 0 0 0 1px var(--color-line); }
 
 /* ── Inputs ──────────────────────────────────────────────────────────────── */
-.v3-main input[type="text"], .v3-main input[type="number"], .v3-main input[type="email"],
+.v3-main input[type="text"], .v3-main input[type="number"], .v3-main input[type="email"], .v3-main input[type="date"],
 .v3-main input:not([type]), .v3-main select, .v3-main textarea {
   font-family: var(--font-figure); font-size: var(--text-sm); color: var(--color-ink);
   background: var(--color-panel); border: 1px solid var(--color-line-strong); border-radius: var(--radius-md);
@@ -540,3 +540,207 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-linkbtn { background: none; border: 0; padding: 0; font: inherit; color: var(--color-accent); cursor: pointer;
   text-decoration: underline; text-underline-offset: 2px; }
 .v3-linkbtn:hover { color: var(--color-accent-hover); }
+
+/* ══ Consistency layer (2026-10-01) ══════════════════════════════════════════
+   Measured across all 16 pages with every section open: 42 heading/label styles and 32 button
+   styles. Most of it is inline style in legacy panels, which only !important can reach, so these
+   rules are deliberately few and scoped to .v3-main. The target system:
+     page title 26 · section title 18 · sub-title 15 · ONE small-caps label · ONE table header ·
+     buttons 36 (primary / secondary) or 30 (small), radius-md · pills for filters. */
+
+/* Headings */
+.v3-main h2, .v3-main .card h2, .v3-main h2.section, .v3-main .card-section-title h2, .v3-main .v3-sec-title,
+.v3-main .v3-score-title {
+  font-size: var(--text-lg) !important; font-weight: var(--weight-semi) !important; letter-spacing: -0.01em !important;
+  text-transform: none !important; color: var(--color-ink) !important; line-height: var(--leading-snug) !important; }
+.v3-main h3, .v3-main .lp-h3 {
+  font-size: var(--text-base) !important; font-weight: var(--weight-semi) !important; letter-spacing: 0 !important;
+  text-transform: none !important; color: var(--color-ink) !important; }
+.v3-main .gp-h { margin: 0 0 var(--space-2); }
+
+/* One small-caps label: size, weight and tracking everywhere; colour muted unless it carries a
+   status (green / red / amber stay — that colour is the message). */
+.v3-main [style*="text-transform: uppercase"], .v3-main th, .v3-main .go-head {
+  font-size: var(--text-xs) !important; font-weight: var(--weight-semi) !important; letter-spacing: 0.06em !important; }
+.v3-main th,
+.v3-main [style*="text-transform: uppercase"][style*="color: var(--accent)"],
+.v3-main [style*="text-transform: uppercase"][style*="rgb(194, 65, 12)"],
+.v3-main [style*="text-transform: uppercase"][style*="color: rgb(114, 110, 102)"],
+.v3-main [style*="text-transform: uppercase"][style*="var(--text-faint)"],
+.v3-main [style*="text-transform: uppercase"][style*="var(--text-muted)"] { color: var(--color-muted) !important; }
+.v3-main th { text-transform: uppercase; }
+
+/* Buttons: two heights, one radius. Pills (radius-full) and tile-buttons keep their shape. */
+.v3-main .btn, .v3-main .btn-primary, .v3-main .btn-secondary, .v3-main .btn-ghost, .v3-main .board-nav-btn,
+.v3-main .v3-btn, .v3-main .mc-today-btn, .v3-main .cg-add {
+  min-height: 36px; border-radius: var(--radius-md) !important; font-size: var(--text-sm) !important; }
+.v3-main .v3-btn-sm, .v3-main .btn-sm { min-height: 30px; font-size: var(--text-xs) !important; }
+.v3-main button[style*="border-radius: 0"], .v3-main button[style*="border-radius: var(--radius-none)"],
+.v3-main button[style*="border-radius: var(--r-md)"], .v3-main button[style*="border-radius: var(--r-sm)"] { border-radius: var(--radius-md) !important; }
+
+/* Forms: four even columns, one-line labels, unit inside the box. */
+.v3-form-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4) var(--space-5); max-width: 960px; }
+@media (max-width: 900px) { .v3-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 420px) { .v3-form-grid { grid-template-columns: minmax(0, 1fr); } }
+.v3-field { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.v3-field > span:first-child { font-size: var(--text-sm); color: var(--color-muted); line-height: var(--leading-tight); }
+/* Label and input share row tracks across the grid row, so a label that wraps to two lines
+   pushes every input in that row down together — never a truncated label, never a staggered input. */
+@supports (grid-template-rows: subgrid) {
+  .v3-form-grid > .v3-field { display: grid; grid-row: span 2; grid-template-rows: subgrid; row-gap: var(--space-1); align-items: end; }
+  /* Business economics fields: label + provenance, input, hint. Same idea over three tracks. */
+  .v3-form-grid > .v3-econ-field { display: grid; grid-row: span 3; grid-template-rows: subgrid; row-gap: var(--space-1); }
+  .v3-econ-field > .v3-econ-head { align-self: end; }
+}
+.v3-econ-field { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.v3-econ-head { display: flex; flex-direction: column; gap: 0; line-height: var(--leading-tight); }
+.v3-econ-head > span:first-child { font-size: var(--text-sm); font-weight: var(--weight-semi); color: var(--color-ink); }
+/* Where a number came from: one quiet line under the label, sentence case — never a shouting chip. */
+.v3-econ-tag { font-size: var(--text-xs); color: var(--color-muted); margin-top: var(--space-1); }
+.v3-econ-tag[data-tone="good"] { color: var(--color-success); }
+.v3-econ-tag[data-tone="warn"] { color: var(--color-warning); }
+/* Each step's title, with its status in sentence case beside it (the econ tag's tone carries on/off). */
+.v3-main .v3-econ-title { font-size: var(--text-lg) !important; font-weight: var(--weight-semi) !important; margin: 0; }
+.v3-econ-title + .v3-econ-tag { margin-top: 0; }
+/* Number fields carry their unit as an affix; the browser's spinner arrows collided with it. */
+.v3-main input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+.v3-main input[type="number"]::-webkit-inner-spin-button, .v3-main input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.v3-econ-hint { font-size: var(--text-xs); color: var(--color-muted); line-height: var(--leading-snug); }
+.v3-main .v3-affix[data-post="days"] input, .v3-main .v3-affix[data-post="wks"] input, .v3-main .v3-affix[data-post="/mo"] input {
+  padding-right: calc(var(--space-3) + 4.5ch); }
+.v3-affix { position: relative; display: block; }
+.v3-main .v3-affix input { width: 100%; }
+.v3-main .v3-affix[data-pre] input { padding-left: calc(var(--space-3) + 1.25ch); }
+.v3-main .v3-affix[data-post] input { padding-right: calc(var(--space-3) + 1.5ch); }
+.v3-affix[data-pre]::before, .v3-affix[data-post]::after { position: absolute; top: 50%; transform: translateY(-50%);
+  color: var(--color-muted); font-size: var(--text-sm); pointer-events: none; }
+.v3-affix[data-pre]::before { content: attr(data-pre); left: var(--space-3); }
+.v3-affix[data-post]::after { content: attr(data-post); right: var(--space-3); }
+
+/* Stat grids for the counts the first rule set did not cover — still no orphan tile. */
+.v3-stat-grid:has(> :nth-child(5):last-child),
+.v3-stat-grid:has(> :nth-child(10):last-child) { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.v3-stat-grid:has(> :nth-child(7):last-child) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.v3-stat-grid:has(> :nth-child(9):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 1100px) {
+  .v3-stat-grid:has(> :nth-child(5):last-child), .v3-stat-grid:has(> :nth-child(10):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .v3-stat-grid:has(> :nth-child(5):last-child), .v3-stat-grid:has(> :nth-child(7):last-child),
+  .v3-stat-grid:has(> :nth-child(9):last-child), .v3-stat-grid:has(> :nth-child(10):last-child) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Columns that line up row to row: each scoreboard row is its own grid, so `auto` columns gave
+   every row a different width and the figures zig-zagged down the list. */
+.v3-main .v3-score-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr) 4.5rem 5.5rem !important; }
+.v3-main .v3-score-x, .v3-main .v3-score-spend { text-align: right; }
+@media (max-width: 680px) { .v3-main .v3-score-row { grid-template-columns: 1fr 4.5rem 5.5rem !important; } }
+
+/* The boxed stat strip becomes one even row of figures on a hairline, like every other stat. */
+.v3-main .stat-strip { display: grid !important; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-6);
+  background: none !important; border: 0 !important; border-top: 1px solid var(--color-line) !important; border-radius: 0 !important; padding: var(--space-4) 0 !important; }
+.v3-main .stat-strip-divider { display: none; }
+.v3-main .stat-strip-val { font-family: var(--font-figure); font-weight: var(--weight-semi) !important; }
+@media (max-width: 640px) { .v3-main .stat-strip { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* "What changed" cards: same no-orphan counts as the stat grid. */
+.v3-main .wc-grid:has(> :nth-child(5):last-child), .v3-main .wc-grid:has(> :nth-child(10):last-child) { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.v3-main .wc-grid:has(> :nth-child(3):last-child), .v3-main .wc-grid:has(> :nth-child(6):last-child),
+.v3-main .wc-grid:has(> :nth-child(9):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.v3-main .wc-grid:has(> :nth-child(4):last-child), .v3-main .wc-grid:has(> :nth-child(7):last-child),
+.v3-main .wc-grid:has(> :nth-child(8):last-child) { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 1100px) { .v3-main .wc-grid:has(> :nth-child(5):last-child), .v3-main .wc-grid:has(> :nth-child(10):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .v3-main .wc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
+.v3-main .wc-val { font-weight: var(--weight-semi) !important; }
+
+/* Figures: one weight. Legacy bold figures drop to the semibold every stat uses. */
+.v3-main .oi-num[style*="font-weight: var(--weight-bold)"], .v3-main .kpi .val, .v3-main .ov-stat-value { font-weight: var(--weight-semi) !important; }
+
+/* Decorative numbering and agent names do not need the accent. */
+.v3-main .zone-number { display: none; }
+.v3-main .explainer .agent { color: var(--color-muted) !important; }
+.v3-main .toolbar label { font-weight: var(--weight-semi) !important; letter-spacing: 0.06em !important; }
+.v3-main .tdy-sec { font-size: var(--text-base) !important; text-transform: none !important; letter-spacing: 0 !important;
+  color: var(--color-ink) !important; font-weight: var(--weight-semi) !important; }
+
+/* Inputs: one field style everywhere — white, hairline, radius-md, 36 tall. */
+.v3-main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+.v3-main select, .v3-main textarea:not(.v3-ask-box textarea) {
+  border-radius: var(--radius-md) !important; background-color: var(--color-panel) !important; }
+.v3-main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), .v3-main select { min-height: 36px; }
+
+/* Buttons styled inline: small type → 30 tall, regular type → 36 tall. Tabs inside embeds round. */
+.v3-main button[style*="px solid"][style*="font-size: var(--text-xs)"] { min-height: 30px !important; }
+.v3-main button[style*="px solid"]:not([style*="font-size: var(--text-xs)"]) { min-height: 36px !important; }
+.v3-main .show-more, .v3-main .tdy-btn, .v3-main .btn-primary { min-height: 36px !important; padding-top: 0 !important; padding-bottom: 0 !important;
+  display: inline-flex; align-items: center; justify-content: center; }
+.v3-main .nav-item { border-radius: var(--radius-md) !important; }
+.v3-main .seg button, .v3-main .mc-arrow { min-height: 30px; }
+.v3-main .mc-arrow, .v3-main .mc-today-btn, .v3-main .cg-add { min-height: 36px !important; }
+
+/* Form groups whose size varies: columns follow the field count, so no field sits alone. */
+.v3-form-grid--n { max-width: none; }
+.v3-form-grid--n:has(> :nth-child(2):last-child) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.v3-form-grid--n:has(> :nth-child(3):last-child), .v3-form-grid--n:has(> :nth-child(5):last-child),
+.v3-form-grid--n:has(> :nth-child(6):last-child), .v3-form-grid--n:has(> :nth-child(9):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.v3-form-grid--n:has(> :nth-child(1):last-child) { grid-template-columns: minmax(0, 24rem); }
+@media (max-width: 900px) { .v3-form-grid--n { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
+@media (max-width: 420px) { .v3-form-grid--n { grid-template-columns: minmax(0, 1fr) !important; } }
+.v3-main .v3-sub { font-size: var(--text-base); font-weight: var(--weight-semi); color: var(--color-ink); margin: 0 0 var(--space-3); }
+
+/* Fields are exactly 36 tall (min-height alone let padding and borders make 37 and 39). */
+.v3-main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), .v3-main select {
+  height: 36px; box-sizing: border-box; padding-top: 0 !important; padding-bottom: 0 !important; }
+/* Last bold variants: commentary heads, zone titles, tags, hero figures, inline big figures. */
+.v3-main .board-comm-head, .v3-main .pattern-card-tag, .v3-main .explainer .agent, .v3-main .v3-flow-top-lab { font-weight: var(--weight-semi) !important; }
+.v3-main .zone-title { font-size: var(--text-lg) !important; font-weight: var(--weight-semi) !important; }
+.v3-main .hero-stat-val, .v3-main .hero-headline span { font-weight: var(--weight-semi) !important; font-family: var(--font-figure); }
+.v3-main [style*="font-weight: var(--weight-bold)"][style*="font-size: var(--text-lg)"],
+.v3-main [style*="font-weight: var(--weight-bold)"][style*="font-size: var(--text-xl)"],
+.v3-main [style*="font-weight: var(--weight-bold)"][style*="font-size: var(--text-2xl)"] { font-weight: var(--weight-semi) !important; }
+.v3-main .v3-prompt { min-height: 36px; display: inline-flex; align-items: center; padding-top: var(--space-1); padding-bottom: var(--space-1); }
+/* Inline-styled buttons serialise their border several ways, so match on padding + type size:
+   small type → 30, regular → 36. Link-style buttons (padding 0) are left alone. */
+.v3-main button[style*="padding"]:not([style*="padding: 0"]):not([style*="padding:0"])[style*="font-size: var(--text-xs)"] { min-height: 30px !important; }
+.v3-main button[style*="padding"]:not([style*="padding: 0"]):not([style*="padding:0"])[style*="font-size: var(--text-sm)"],
+.v3-main button[style*="padding"]:not([style*="padding: 0"]):not([style*="padding:0"])[style*="font-size: var(--text-base)"] { min-height: 36px !important; }
+.v3-main .show-more { height: 36px; }
+.v3-main .lr-pill { font-weight: var(--weight-semi) !important; }
+
+/* ══ Vertical rhythm ═══════════════════════════════════════════════════════
+   Measured gaps between top-level blocks ran 0–71px on legacy pages (Goal & costs: 71, 39, 10,
+   65, 4, 12, 40, 60). One rule: 32 between blocks; consecutive "detail" disclosures stack flush. */
+.v3-main > :not(.v3-page-head):not(.v3-more):not(.v3-skip):not(style):not(script) { margin-top: 0 !important; margin-bottom: var(--space-8) !important; }
+.v3-main > .v3-more { margin-top: 0 !important; margin-bottom: 0 !important; }
+.v3-main > :not(.v3-more) + .v3-more { margin-top: 0 !important; }
+.v3-page-stack > * { margin-top: 0 !important; margin-bottom: 0 !important; }
+.v3-main .v3-page-stack > .v3-chart-pair { margin: 0 !important; }
+.v3-main > .row { gap: var(--space-6) !important; }
+.v3-main > .row > .card { margin: 0 !important; }
+
+/* Goal & costs / Growth plan panel: title and its line together, then 32 between sections. */
+.gp-wrap > * { margin-top: 0 !important; margin-bottom: 0 !important; }
+.gp-wrap > * + * { margin-top: var(--space-8) !important; }
+.gp-wrap > :nth-child(2) { margin-top: var(--space-1) !important; }
+/* Channel name chips in tables were tinted with each channel's chart colour (Meta grey, Google
+   amber) — identity colour belongs in charts; in a table it just reads as two different chips. */
+.v3-main .pill[style*="background: rgba"] { background: var(--color-sunken) !important; color: var(--color-secondary) !important; }
+
+/* Vitals: a 3-row subgrid held four parts (label, value, gauge, band), so the band was drawn on
+   top of the gauge. Four rows keep the subgrid — and so the shared baseline across columns. */
+.v3-main .v3-vitals-row { grid-template-rows: auto auto auto auto !important; row-gap: var(--space-2) !important; }
+.v3-main .v3-vital { grid-row: span 4 !important; align-content: start; }
+/* .v3-note is prose. The shell made it a flex row (a callout with an icon), which split any
+   sentence holding an <i> or <b> into separate columns — ", not a guaranteed recovery" on a line
+   of its own. */
+.v3-main .v3-note { display: block !important; }
+/* The weekly briefing: no violet wash, and its four figures on one even row. */
+.v3-main .hero-bg { display: none; }
+.v3-main .hero-stats { display: grid !important; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-6) !important; }
+.v3-main .hero-stat-divider { display: none; }
+@media (max-width: 640px) { .v3-main .hero-stats { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.v3-main .v3-vital .v3-gauge { width: 100%; align-self: center; }
+/* The verdict under the vitals had its own hairline that stopped at its text width (max-width),
+   a short rule under a full-width one. Spacing alone separates it. */
+.v3-main .v3-vitals-plain { border-top: 0 !important; padding-top: 0 !important; }
+.v3-main .hero-stat-label, .v3-main .stat-strip-label { white-space: nowrap; }

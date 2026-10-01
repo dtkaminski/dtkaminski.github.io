@@ -128,7 +128,7 @@
   function heroFromBoard(board, fallback) {
     var top = (board || []).filter(function (a) { return a.cm_gbp != null; })[0];
     if (!top) return fallback;
-    return { value: cmk(n(top.cm_gbp)) + '/mo CM', title: top.description, why: trim(top.step1 || ('Priority ' + (top.priority || '') + ' · ' + (top.category || '')), 150), source: 'action-board:' + top.external_id };
+    return { value: cmk(n(top.cm_gbp)) + '/mo profit', title: top.description, why: trim(top.step1 || ('Priority ' + (top.priority || '') + ' · ' + (top.category || '')), 150), source: 'action-board:' + top.external_id };
   }
   function heroDerived(m30, chan, cmRatio) {
     var cands = [];
@@ -137,12 +137,12 @@
     (chan || []).forEach(function (c) { if (c.iroas != null && c.contribution < 0 && c.spend > 0) cands.push({ v: -c.contribution, title: 'Cut ' + c.name + ' — iROAS ' + c.iroas.toFixed(2), why: c.name + ' below break-even.' }); });
     cands.sort(function (a, b) { return b.v - a.v; });
     var t = cands[0] || { v: 0, title: 'Hold course', why: 'No single lever dominates.' };
-    return { value: cmk(t.v) + '/mo CM', title: t.title, why: t.why, source: 'derived' };
+    return { value: cmk(t.v) + '/mo profit', title: t.title, why: t.why, source: 'derived' };
   }
   function tierInsight(nums, board, cats, fb) {
     var a = boardTop(board, cats);
     if (!a) return fb;
-    return { text: nums + ' Top lever: ' + trim(a.description, 92), action: trim(a.step1 || a.description, 130), value: cmk(n(a.cm_gbp)) + '/mo CM' };
+    return { text: nums + ' Top lever: ' + trim(a.description, 92), action: trim(a.step1 || a.description, 130), value: cmk(n(a.cm_gbp)) + '/mo profit' };
   }
 
   function buildTf(tf, D, S) {
@@ -206,9 +206,9 @@
     var hero = heroFromBoard(S.board, heroDerived({ revenue: r30, discounts: d30, discRate: r30 > 0 ? d30 / r30 * 100 : 0, sessions: s30, aov: o30 > 0 ? r30 / o30 : 0, cvr: s30 > 0 ? o30 / s30 * 100 : null }, ch.rows, S.cmRatio));
     var productCM30 = cmR != null ? cmR * r30 : null, CAM30 = productCM30 != null ? productCM30 - sp30 : null;
     var breakEvenTxt = ch.breakEven != null ? ch.breakEven.toFixed(2) : '—';
-    var numsB = 'Revenue ' + (delta(rev, revP) == null ? '—' : (delta(rev, revP) >= 0 ? 'up ' : 'down ') + Math.abs(delta(rev, revP)).toFixed(0) + '%') + ', CVR ' + (cvr == null ? '—' : cvr.toFixed(2) + '% vs ' + CVR_BENCH + '%') + (cmR == null ? '; profit not shown — product and order costs not set.' : '; product CM ' + gbp(productCM) + ' → CAM ' + gbp(CAM) + ' after ' + gbp(spend) + ' spend.');
-    var numsC = 'New ' + splitNew + '% / returning ' + (100 - splitNew).toFixed(0) + '% of L1 revenue (' + gbp(newRev) + ' / ' + gbp(retRev) + '); repeat ' + repeat + '%.';
-    var numsCh = 'Trailing 30d · break-even iROAS ' + breakEvenTxt + '; paid contribution ' + gbp(ch.paidContribution) + '; channel spend ' + gbp(ch.channelSpend) + ' vs L1 ' + gbp(sp30) + (spendReconcile > 0.10 ? ' ⚠' : ' ✓') + '.';
+    var numsB = 'Sales ' + (delta(rev, revP) == null ? '—' : (delta(rev, revP) >= 0 ? 'up ' : 'down ') + Math.abs(delta(rev, revP)).toFixed(0) + '%') + ', conversion ' + (cvr == null ? '—' : cvr.toFixed(2) + '% vs ' + CVR_BENCH + '%') + (cmR == null ? '; profit not shown — product and order costs not set.' : '; profit before ads ' + gbp(productCM) + ', after ads ' + gbp(CAM) + ' once ' + gbp(spend) + ' spend.');
+    var numsC = 'New ' + splitNew + '% / returning ' + (100 - splitNew).toFixed(0) + '% of sales (' + gbp(newRev) + ' / ' + gbp(retRev) + '); repeat ' + repeat + '%.';
+    var numsCh = 'Last 30 days · ads break even at ' + breakEvenTxt + '× real return; profit from paid channels ' + gbp(ch.paidContribution) + '; channel spend ' + gbp(ch.channelSpend) + ' vs ' + gbp(sp30) + ' in total' + (spendReconcile > 0.10 ? ' (the two disagree by more than 10%)' : '') + '.';
     var pacing = (function () {
       var g = S.goal; if (!g || !g.period_start) return null;
       var gDays = Math.max(1, Math.round((new Date(g.period_end) - new Date(g.period_start)) / 864e5) + 1);
@@ -252,14 +252,14 @@
       periodLabel: LBL[tf][0] + ' · ' + w.cs + ' – ' + w.ce, compareLabel: LBL[tf][1],
       hero: { cmAfterMkt: CAM, cm: productCM, cmPct: cmR != null ? +(cmR * 100).toFixed(1) : null, cmKnown: cmR != null, spend: spend, opProfit: opProfit, fixedMonthly: fixedMonthly, targetEstimated: !(S.goal && S.goal.confirmed === true), action: hero },
       business: [
-        tile('Revenue', rev, 'gbp', delta(rev, revP), 'vs ' + gbp(revP), ragTrend(delta(rev, revP)), 'Shopify truth (L1)', _revSeries),
-        tile('Contribution (product)', productCM, 'gbp', delta(productCM, productCMp), cmR != null ? '= rev × ' + (cmR * 100).toFixed(1) + '%' : 'enter your product and order costs', cmR == null ? 'n' : ragTrend(delta(productCM, productCMp)), 'before ad spend'),
-        tile('Contribution after mktg', CAM, 'gbp', null, cmR == null ? 'enter your product and order costs' : '= product CM − spend', cmR == null ? 'n' : CAM >= 0 ? 'g' : 'r', 'CAM'),
-        tile('Operating profit', opProfit, 'gbp', null, cmR == null ? 'enter your product and order costs' : fixedMonthly > 0 ? '= CAM − fixed ' + gbp(fixedWin) : 'set fixed costs in Plan', (cmR == null || fixedMonthly <= 0) ? 'n' : opProfit >= 0 ? 'g' : 'r', fixedMonthly > 0 ? 'after £' + f0(fixedMonthly) + '/mo' : '—'),
+        tile('Sales', rev, 'gbp', delta(rev, revP), 'vs ' + gbp(revP), ragTrend(delta(rev, revP)), 'from Shopify', _revSeries),
+        tile('Profit before ads', productCM, 'gbp', delta(productCM, productCMp), cmR != null ? '= rev × ' + (cmR * 100).toFixed(1) + '%' : 'enter your product and order costs', cmR == null ? 'n' : ragTrend(delta(productCM, productCMp)), 'before ad spend'),
+        tile('Profit after ads', CAM, 'gbp', null, cmR == null ? 'enter your product and order costs' : '= profit before ads − ad spend', cmR == null ? 'n' : CAM >= 0 ? 'g' : 'r', 'after ads'),
+        tile('Operating profit', opProfit, 'gbp', null, cmR == null ? 'enter your product and order costs' : fixedMonthly > 0 ? '= profit after ads − overheads ' + gbp(fixedWin) : 'set fixed costs in Plan', (cmR == null || fixedMonthly <= 0) ? 'n' : opProfit >= 0 ? 'g' : 'r', fixedMonthly > 0 ? 'after £' + f0(fixedMonthly) + '/mo' : '—'),
         tile('Ad spend', spend, 'gbp', null, 'Meta ' + gbp(metaSp) + ' · Google ' + gbp(googleSp), 'a', mer != null ? 'MER ' + mer.toFixed(2) : '', _spendSeries),
         tile('Conversion rate', cvr, 'pct1', delta(cvr, cvrP), cvrP != null ? 'vs ' + cvrP.toFixed(2) + '%' : '', cvr == null ? 'n' : cvr >= CVR_BENCH ? 'g' : cvr >= 1.2 ? 'a' : 'r', 'benchmark ' + CVR_BENCH + '%'),
         tile('Sessions', sess, 'int', delta(sess, sessP), 'vs ' + f0(sessP).toLocaleString('en-GB'), ragTrend(delta(sess, sessP)), 'GA4', _sessSeries),
-        tile('AOV', aov, 'gbp', delta(aov, aovP), 'net ÷ orders', ragTrend(delta(aov, aovP)), 'vs ' + gbp(aovP)),
+        tile('Average order value', aov, 'gbp', delta(aov, aovP), 'net ÷ orders', ragTrend(delta(aov, aovP)), 'vs ' + gbp(aovP)),
         tile('Discounts', disc, 'gbp', null, discRate.toFixed(1) + '% of revenue', discRate > 25 ? 'r' : discRate > 20 ? 'a' : 'g', 'target <20%', _discSeries),
         tile('Returns', ret, 'gbp', null, retRate.toFixed(1) + '% of revenue', retRate > 15 ? 'r' : retRate > 8 ? 'a' : 'g', 'healthy <8%'),
         tile('Orders', ord, 'int', delta(ord, ordP), 'vs ' + f0(ordP).toLocaleString('en-GB'), ragTrend(delta(ord, ordP)), 'MER ' + (mer != null ? mer.toFixed(2) : '—'), _ordSeries)

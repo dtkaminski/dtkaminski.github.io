@@ -36,7 +36,7 @@
      before greta-app.js needs the globals) while taking them off the critical path.
      greta-defrkl-gate.js MUST stay last in this list and before greta-app.js: see its header. -->
 <script defer src="./greta-data-loader.js?v=1790853688"></script>
-<script defer src="./greta-overview-data.js?v=20260929f"></script>
+<script defer src="./greta-overview-data.js?v=20261001b"></script>
 <script defer src="./greta-plan-data.js?v=20261001b"></script>
 <script defer src="./greta-headline-data.js?v=20260929n"></script>
 <script defer src="./greta-live-data.js?v=20260925f"></script>
@@ -1864,7 +1864,7 @@
   .v3-why-list { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 3px; font-size: var(--text-sm); color: var(--text-secondary); }
   .v3-why-list li { display: grid; grid-template-columns: 3rem 1fr; gap: 8px; }
 </style>
-<link rel="stylesheet" href="./greta-kit.css?v=1790863709847">
+<link rel="stylesheet" href="./greta-kit.css?v=1790866644076">
 <link rel="stylesheet" href="./marketing-os-tokens.css?v=20260924a">
 <link rel="stylesheet" href="./marketing-os.css?v=1790774159">
 <link rel="stylesheet" href="./loop-panel.css?v=1790774159">
@@ -1881,15 +1881,15 @@
    greta-app.jsx's mosView() to render — the same pattern marketing-os.build.js already uses for
    window.CommandCentre / window.DecisionLog. */
 window.MOS_EMBEDDED = true;</script>
-<script defer src="./today-calendar.build.js?v=20261001d"></script>
+<script defer src="./today-calendar.build.js?v=20261001e"></script>
 <script>/* cost-entry.build.js — CostEntry.jsx bundled on its own rather than folded into
    marketing-os.build.js, which has drifted from its source and is patched by hand. Same
    window.<Component> contract mosView() already uses. It is the only surface in the product where
    a brand can enter per-variant landed cost including freight and duty, which is what moves the
    profit number from Estimated to Measured (0192). Its backend only started working with 0188 --
    save-brand-config had been reading two relations that were never created. */</script>
-<script defer src="./cost-entry.build.js?v=20260929c"></script>
+<script defer src="./cost-entry.build.js?v=20261001b"></script>
 <script defer src="./loop-panel.js?v=20261001a"></script>
-<script defer src="./greta-app.js?v=1790863709847"></script>
+<script defer src="./greta-app.js?v=1790866644076"></script>
 <script>/* perf: defer frkl static deep-tab data (CVR ~1.7MB, cohorts, promos, products) — not used by the Overview/landing. Background-load after paint; skip for non-frkl (de-frkl). */
 (function(){try{var slug=window.OI_BRAND_SLUG||(window.parent&&window.parent!==window?window.parent.OI_BRAND_SLUG:null)||"frkl";if(slug!=="frkl")return;var files=["greta-cvr.js","greta-cohorts.js","greta-discount-codes.js","greta-products.js","greta-patterns.js"],i=0;function next(){if(i>=files.length)return;var s=document.createElement("script");s.src="./"+files[i++]+"?v=20260925f";s.async=true;s.onload=next;s.onerror=next;document.head.appendChild(s);}var kick=function(){next();};if(window.requestIdleCallback){window.requestIdleCallback(kick,{timeout:1500});}else{setTimeout(kick,300);}}catch(e){}})();</script>
