@@ -472,3 +472,28 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
   .v3-rw-cell { min-width: 0; }
   .v3-main table.v3-rw { display: block; overflow-x: auto; }
 }
+
+/* ── Calendar (today-calendar.build.js) on the kit ───────────────────────────
+   The bundle injects its own <style> after this sheet, so every rule here is scoped under
+   .v3-main to out-rank it. Structure and copy changes live in the bundle's source. */
+.v3-main .cg-main.tg-view { background: none; padding: 0; }
+.v3-main .mc-top { margin-bottom: var(--space-4); }
+.v3-main .mc-arrow { border-radius: var(--radius-md); min-width: var(--space-8); min-height: var(--space-8); display: inline-flex; align-items: center; justify-content: center; }
+.v3-main .mc-month { font-size: var(--text-xl); font-weight: var(--weight-semi); letter-spacing: -0.01em; }
+.v3-main .mc-today-btn, .v3-main .cg-add { border-radius: var(--radius-md); min-height: var(--space-8); }
+.v3-main .cg-add { background: var(--color-accent); color: var(--color-panel); border-color: var(--color-accent); font-weight: var(--weight-semi); }
+.v3-main .cg-add:hover { background: var(--color-accent-hover); border-color: var(--color-accent-hover); }
+.v3-main .tg-scroll { border: 1px solid var(--color-line); border-radius: var(--radius-none); background: var(--color-panel); }
+.v3-main .tg-headrow { background: var(--color-panel); border-bottom: 1px solid var(--color-line); }
+.v3-main .tg-day .dn { font-family: var(--font-figure); }
+.v3-main .cg-pc-head { background: var(--color-surface); }
+/* An empty group says so with its count; the "— nothing this month" row under it was noise. */
+.v3-main .tg-lane:has(> .tg-llabel-empty) { display: none; }
+.v3-main .cg-count { margin-left: var(--space-2); color: var(--color-faint); font-family: var(--font-figure); font-weight: var(--weight-normal); }
+.v3-main .cg-act-lane .cg-act-label { text-transform: none; letter-spacing: 0; font-family: var(--font-sans); font-size: var(--text-xs); color: var(--color-faint); }
+.v3-main .cg-var-banner { border-radius: var(--radius-none); font-size: var(--text-sm); padding: var(--space-2) var(--space-3); }
+.v3-main .cg-var-banner.ahead { background: var(--color-success-wash); border-color: var(--color-success-line); color: var(--color-success); }
+.v3-main .cg-var-banner.behind { background: var(--color-danger-wash); border-color: var(--color-danger-line); color: var(--color-danger); }
+.v3-main .cg-scen { border-color: var(--color-line); border-radius: var(--radius-none); }
+.v3-main .cg-proj-cell { font-family: var(--font-figure); }
+.v3-main .cg-foot { font-size: var(--text-xs); color: var(--color-muted); max-width: 68ch; margin-top: var(--space-3); line-height: var(--leading-body); }
