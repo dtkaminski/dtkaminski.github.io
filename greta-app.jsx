@@ -13410,8 +13410,10 @@ function V3ProductCosts(){
   if (d === undefined) return <V3SkeletonRows n={4}/>;
   if (d === false) return <div className="v3-empty">Greta couldn’t load your product costs just now. Refreshing the page usually sorts it.</div>;
 
-  const skuCost = {}; (d.sku_costs || []).forEach(r => { skuCost[r.sku] = r; });
-  const varCost = {}; (d.variant_costs || []).forEach(r => { varCost[r.variant_id] = r; });
+  // Rows arrive newest first; keep the first per key. (Before 0221 the server sent every day's row
+  // per SKU, and keeping the last meant showing the oldest cost.)
+  const skuCost = {}; (d.sku_costs || []).forEach(r => { if (!(r.sku in skuCost)) skuCost[r.sku] = r; });
+  const varCost = {}; (d.variant_costs || []).forEach(r => { if (!(r.variant_id in varCost)) varCost[r.variant_id] = r; });
   const rows = (d.variant_catalog || []).map(v => {
     const vc = varCost[v.variant_id], sc = v.sku ? skuCost[v.sku] : null;
     const mine = (vc && vc.source !== 'shopify') ? vc : (sc && sc.source === 'manual' ? sc : null);
