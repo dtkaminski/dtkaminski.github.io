@@ -797,16 +797,21 @@ function KPI({label, val, sub, badge, status, statusLabel, conf, series, seriesL
     : PAL.accent;
   // Focusable when it has a popout: a tap focuses it on touch screens, where hover never fires.
   return (<div className={'card kpi' + (hasPop ? ' has-pop' : '')} tabIndex={hasPop ? 0 : undefined}>
+    {/* The label owns its line. Status and confidence badges used to share it, which wrapped
+        "Profit after ads (% of sales)" over four lines beside two pills; they sit under the
+        figure now, with the benchmark, as one row of chips. */}
     <div className="label">
       <span>{label}</span>
-      {status && <StatusBadge kind={status} label={statusLabel}/>}
-      {badge}
       {hasPop && <span className="info-dot"/>}
     </div>
     <div className="val">{val}{delta!=null && <span className="delta" style={{color:deltaColor}}>{fmtDelta(delta)}</span>}</div>
-    {sub && <div className="sub">{sub}{conf && <span style={{marginLeft:7}}>{confChip(conf)}</span>}</div>}
-    {!sub && conf && <div className="sub">{confChip(conf)}</div>}
-    {benchmark && <div className="sub" style={{marginTop:6}}><Benchmark metric={benchmark} value={bmValue}/></div>}
+    {(status || badge || conf || benchmark) && <div className="kpi-chips">
+      {status && <StatusBadge kind={status} label={statusLabel}/>}
+      {badge}
+      {conf && confChip(conf)}
+      {benchmark && <Benchmark metric={benchmark} value={bmValue}/>}
+    </div>}
+    {sub && <div className="sub">{sub}</div>}
     {hasPop && (
       <div className="kpi-pop">
         {hasSpark && (<div>
@@ -1496,7 +1501,11 @@ function ChannelStreamPanel(){
 function DailyPanel(){
   // "Today" view — what's happening right now, anomalies overnight, pacing through the month
   const meta = D.metaDaily || [], gads = D.googleAds || [], ga = D.ga4 || [], shop = D.shopify || [], kl = D.klaviyo || [];
-  const dates = [...new Set([...shop.map(r=>r.date)])].sort();
+  // The latest COMPLETE day. Today's row is still filling (a morning shows £5 of sales against
+  // £151 of spend), and reading it as a full day raised "sales per £ of ads dropped 97%" and
+  // "revenue −99%" alarms every morning.
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const dates = [...new Set([...shop.map(r=>r.date)])].filter(d => d < todayIso).sort();
   const latest = dates[dates.length-1];
   if (!latest) return null;
   const find = (rows) => rows.find(r => r.date === latest) || {};
@@ -1584,14 +1593,14 @@ function DailyPanel(){
 
   return (<div className="card">
     <div className="card-section-title">
-      <h2 style={{margin:0}}>Today's view</h2>
-      <span className="meta">Latest day in data: <b style={{color:'var(--text-secondary)'}}>{latest}</b> · data auto-updates daily</span>
+      <h2 style={{margin:0}}>Last full day — {v3Day(latest)}</h2>
+      <span className="meta">compared with the 7 days before it</span>
     </div>
     <div className="row" style={{marginBottom:'var(--s-4)'}}>
-      <KPI label="Latest-day spend" val={GBP(ySpend)} sub={`7d avg ${GBP(pSpendAvg)}`} series={sSpend} seriesLabel="Daily spend · last 14 days" current={ySpend} prior={pSpendAvg} />
-      <KPI label="Latest-day revenue" val={GBP(yRev)} sub={`${NUM(yOrders)} orders · 7d avg ${GBP(pRevAvg)}`} series={sRev} seriesLabel="Daily revenue · last 14 days" current={yRev} prior={pRevAvg} goodDirection="up" />
-      <KPI label="Sales per £ of ads (latest day)" val={yMER?yMER.toFixed(2)+'×':'—'} sub={`7d avg ${pMERavg?pMERavg.toFixed(2)+'×':'—'}`} series={sMER} seriesLabel="Daily sales per £ of ads · last 14 days" current={yMER} prior={pMERavg} goodDirection="up" />
-      <KPI label="MTD pacing" val={GBP(mtdSpend)} sub={`Day ${dayOfMonth}/${daysInMonth} · proj. EOM ${GBP(projSpend)} spend · ${GBP(projRev)} rev`} series={sMTD} seriesLabel="Cumulative MTD spend" />
+      <KPI label="Ad spend" val={GBP(ySpend)} sub={`7d avg ${GBP(pSpendAvg)}`} series={sSpend} seriesLabel="Daily spend · last 14 days" current={ySpend} prior={pSpendAvg} />
+      <KPI label="Sales" val={GBP(yRev)} sub={`${NUM(yOrders)} orders · 7d avg ${GBP(pRevAvg)}`} series={sRev} seriesLabel="Daily revenue · last 14 days" current={yRev} prior={pRevAvg} goodDirection="up" />
+      <KPI label="Sales per £ of ads" val={yMER?yMER.toFixed(2)+'×':'—'} sub={`7d avg ${pMERavg?pMERavg.toFixed(2)+'×':'—'}`} series={sMER} seriesLabel="Daily sales per £ of ads · last 14 days" current={yMER} prior={pMERavg} goodDirection="up" />
+      <KPI label="Ad spend this month" val={GBP(mtdSpend)} sub={`Day ${dayOfMonth}/${daysInMonth} · proj. EOM ${GBP(projSpend)} spend · ${GBP(projRev)} rev`} series={sMTD} seriesLabel="Cumulative MTD spend" />
     </div>
     {anomalies.length > 0 && (<div>
       <div className="micro" style={{color:'var(--warn)', marginBottom:'var(--s-2)'}}>Flags — {anomalies.length}</div>
@@ -2658,6 +2667,15 @@ function ScoreTip({valueNode, title, lines}){
 // Compact one-line scorecard (Crux) — sits at the top of the diagnostic verdict.
 // Each score hovers to a plain-English explainer; a "plain terms" line under the row
 // translates all three into one sentence a first-time user can act on.
+// A 0–100 score as a gauge: the fill carries the verdict colour, ticks mark the band edges,
+// so the digits can stay in ink and the colour says one thing once.
+function V3Gauge({ v, marks, col }) {
+  const x = Math.max(0, Math.min(100, Number(v) || 0));
+  return (<div className="v3-gauge" role="img" aria-label={x + ' out of 100'}>
+    <i style={{ width: x + '%', background: col }}/>
+    {(marks || []).map(m => <b key={m} style={{ left: m + '%' }}/>)}
+  </div>);
+}
 function ScoresStrip({metrics, windowLabel}){
   // Thin-data guard: scoring a near-empty store returns 100/100 (no negative
   // signal), which over-claims badly. Below 30 days of trading history, say so
@@ -2715,14 +2733,16 @@ function ScoresStrip({metrics, windowLabel}){
     </div>
     <div className="v3-vitals-row">
       {stat('Health', <>
-          <div className="v3-vital-val" style={{color:tone(s.health.score)}}>{s.health.score}<span className="v3-vital-of">/100</span></div>
+          <div className="v3-vital-val">{s.health.score}<span className="v3-vital-of">/100</span></div>
+          <V3Gauge v={s.health.score} marks={[55, 75]} col={tone(s.health.score)}/>
           <div className="v3-vital-band">{s.health.band}</div></>,
         <ScoreTip title="Health — is the engine sound?" lines={[
           "A 0–100 blend of your profit margins, ad efficiency, conversion rate, returns and discount discipline. Answers: are the fundamentals healthy?",
           "75+ strong · 55–74 okay · under 55 needs work.",
           w0?`Weakest right now: ${w0.label} — ${w0.detail}.`:'' ]} valueNode={null}/>)}
       {stat('Safe to scale', <>
-          <div className="v3-vital-val" style={{color:tone(s.scale.score)}}>{s.scale.score}<span className="v3-vital-of">/100</span></div>
+          <div className="v3-vital-val">{s.scale.score}<span className="v3-vital-of">/100</span></div>
+          <V3Gauge v={s.scale.score} marks={[55, 80]} col={tone(s.scale.score)}/>
           <div className="v3-vital-band">{s.scale.band}</div></>,
         <ScoreTip title="Scale-readiness — safe to spend more?" lines={[
           "The share of 'safe to scale' checks you pass — e.g. cost to win a customer under your limit, profitable per order, fast payback, conversion not slipping.",
@@ -3572,8 +3592,13 @@ function Overview({start, period, customActive}){
   const prior = priorPeriod(start, end);
   const meta = inRangeBounded(D.metaDaily,start,end), gads = inRangeBounded(D.googleAds,start,end), shop = inRangeBounded(D.shopify,start,end), ga = inRangeBounded(D.ga4,start,end), kl = inRangeBounded(D.klaviyo,start,end);
   const pMeta = inRangeBounded(D.metaDaily,prior.start,prior.end), pGads = inRangeBounded(D.googleAds,prior.start,prior.end), pShop = inRangeBounded(D.shopify,prior.start,prior.end), pGa = inRangeBounded(D.ga4,prior.start,prior.end), pKl = inRangeBounded(D.klaviyo,prior.start,prior.end);
-  const paid = sum(meta,'cost')+sum(gads,'cost');
-  const rev = sum(shop,'netSales');
+  // The default "last 30 days" uses the headline's own sales and spend (cache_brand_today), so
+  // Profit & sales says exactly what Today says. Computed from the live feeds instead, an ad sync
+  // landing after the 08:55 cache made the two pages disagree by tens of pounds ("what you keep"
+  // £2,563 here, £2,632 on Today). Any other period is computed from the feeds.
+  const H0 = (!customActive && period === '30d' && typeof window !== 'undefined' && window.GRETA_HEADLINE) || null;
+  const paid = (H0 && H0.paid_spend_30d != null) ? Number(H0.paid_spend_30d) : sum(meta,'cost')+sum(gads,'cost');
+  const rev = (H0 && H0.net_revenue_30d != null) ? Number(H0.net_revenue_30d) : sum(shop,'netSales');
   const orders = sum(shop,'orders');
   const sessions = sum(ga,'sessions');
   const purch = sum(ga,'purchases');
@@ -3794,7 +3819,9 @@ function Overview({start, period, customActive}){
       {/* Prove-value-first onboarding nudge: the read above already works on
           catalogue-estimate margins — now offer the one ~5-min input that makes the
           margin figures exact. Placed AFTER the value, framed as "make it exact". */}
-      {!costsVerified && (
+      {/* V3: Getting started on Today owns "enter your costs", from the server's has_economics;
+          this nudge read a per-browser flag and showed on brands whose costs were already set. */}
+      {!UI_V3 && !costsVerified && (
         <div className="card" style={{display:'flex', alignItems:'center', gap:16, flexWrap:'wrap'}}>
           <div style={{flex:'1 1 420px'}}>
             <div style={{fontWeight:'var(--weight-bold)', fontSize:'var(--text-base)', marginBottom:3}}>Make the margin numbers exact <span style={{fontWeight:'var(--weight-normal)', color:'var(--text-faint)', fontSize:'var(--text-sm)'}}>· optional, ~5 min</span></div>
@@ -3826,7 +3853,7 @@ function Overview({start, period, customActive}){
           <span className="meta">Last {daily.length} days · vs prior period · hover any card for the full read</span>
         </div>
         <div className="row">
-          <KPI label="Paid ad spend" val={GBP(paid)} sub={`Meta ${GBP(sum(meta,'cost'))} · Google ${GBP(sum(gads,'cost'))}`} series={seriesPaid} current={paid} prior={pPaid}
+          <KPI label="Paid ad spend" val={GBP(paid)} sub={(() => { const m = sum(meta,'cost'), g = sum(gads,'cost'), t = m + g; return t > 0 ? `Meta ${fmtPctN(m / t)} · Google ${fmtPctN(g / t)}` : ''; })()} series={seriesPaid} current={paid} prior={pPaid}
             agent="Pulse" observation={OI_BRAND.slug==='frkl' ? `Up ~46% on prior period as Meta scaled from ${curSym()}100 to ${curSym()}170/day from 13 April.` : undefined}
             implication={OI_BRAND.slug==='frkl' ? "Don't push further until Ireland frequency drops below 8× and the cart-checkout JS error is fixed." : undefined} />
           <KPI label="Shopify net revenue" val={GBP(rev)} sub={`${NUM(orders)} orders · average order value ${GBP(orders?rev/orders:null)}`} series={seriesRev} current={rev} prior={pRev} goodDirection="up"
@@ -3903,8 +3930,10 @@ function Overview({start, period, customActive}){
       {/* Contribution margin — editable, fully-loaded operator P&L for the period */}
       <LazyMount minHeight={360}><ContributionCard rev={rev} orders={orders} paid={paid} cmr={gm} gross={gmGross} days={Math.max(1, Math.round((Date.parse(end)-Date.parse(start))/86400000)+1)}/></LazyMount>
       {/* Margin bridge — why contribution moved vs prior period (volume/price/discount/returns/paid) */}
-      <LazyMount minHeight={360}><MarginBridge cur={bridgeCur} pri={bridgePri} gm={gm}
-        perOrderFixed={_cn('packaging')+_cn('fulfilment')+_cn('shipping')+_cn('payFixed')} payPct={_cn('payPct')/100}/></LazyMount>
+      {/* gm here is the server's contribution ratio — already net of shipping, packaging and fees —
+          so no per-order costs are taken off again. With them (and frkl's device-only defaults)
+          the bridge ended on "Now £406" beside a £2,632 hero. */}
+      <LazyMount minHeight={360}><MarginBridge cur={bridgeCur} pri={bridgePri} gm={gm} perOrderFixed={0} payPct={0}/></LazyMount>
       {/* Channel stream chart */}
       <LazyMount minHeight={340}><ChannelStreamPanel/></LazyMount>
       {/* Today's view — the pacing + anomaly tile */}
@@ -9386,7 +9415,7 @@ function MarginBridge({cur, pri, gm, perOrderFixed, payPct}){
   return (
     <div className="card" style={{marginBottom:14}}>
       <div className="card-section-title">
-        <h2 style={{margin:0}}>Why contribution moved <span style={{fontWeight:'var(--weight-normal)',color:'var(--text-faint)',fontSize:'var(--text-sm)'}}>— vs prior period</span></h2>
+        <h2 style={{margin:0}}>What moved your profit after ads <span style={{fontWeight:'var(--weight-normal)',color:'var(--text-faint)',fontSize:'var(--text-sm)'}}>— against the period before</span></h2>
         <span className="meta" style={{display:'inline-flex',alignItems:'center',gap:6}}><MarginBadge/> {delta>=0?'+':'−'}{GBP(Math.abs(delta))}{dpct!=null?` (${(dpct>=0?'+':'')}${(dpct*100).toFixed(0)}%)`:''}</span>
       </div>
       <R.ResponsiveContainer width="100%" height={260}>
@@ -9394,13 +9423,13 @@ function MarginBridge({cur, pri, gm, perOrderFixed, payPct}){
           <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
           <R.XAxis dataKey="name" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} interval={0}/>
           <R.YAxis tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={fmtMoneyK}/>
-          <R.Tooltip cursor={{fill:'#ffffff08'}} content={<Tip/>}/>
+          <R.Tooltip content={<Tip/>}/>
           <R.Bar dataKey="base" stackId="s" fill="transparent" isAnimationActive={false}/>
-          <R.Bar dataKey="pos" stackId="s" isAnimationActive={false}>{data.map((d,i)=><R.Cell key={i} fill={svgCol(d.isTotal?PAL.accent:PAL.good)}/>)}<R.LabelList content={segLabel('pos')}/></R.Bar>
-          <R.Bar dataKey="neg" stackId="s" fill={PAL.bad} isAnimationActive={false}><R.LabelList content={segLabel('neg')}/></R.Bar>
+          <R.Bar dataKey="pos" stackId="s" isAnimationActive={false} radius={[2,2,0,0]}>{data.map((d,i)=><R.Cell key={i} fill={d.isTotal?PAL.data3:PAL.good}/>)}<R.LabelList content={segLabel('pos')}/></R.Bar>
+          <R.Bar dataKey="neg" stackId="s" fill={PAL.bad} isAnimationActive={false} radius={[2,2,0,0]}><R.LabelList content={segLabel('neg')}/></R.Bar>
         </R.BarChart>
       </R.ResponsiveContainer>
-      <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>Fully-loaded contribution = net revenue × {PCT(gm)} margin − variable costs − paid media. Bars sum exactly to the change; green helped, red hurt.</div>
+      <p className="v3-note" style={{marginTop:'var(--space-2)'}}>Profit after ads is sales × {PCT(gm)} (what is left after product and order costs) minus ad spend. The bars add up exactly to the change: green helped, red hurt.</p>
       <ChartFooter note="Which lever moved contribution most this period — and was it volume, margin, or spend?"
         ask="From the contribution bridge, what drove the change in contribution most, and is it something I can act on?"
         rows={rows} columns={[{key:'name',label:'Driver'},{key:'delta',label:'Δ contribution',right:true,fmt:(v,r)=>r.total!=null?GBP(r.total):(v>=0?'+':'−')+GBP(Math.abs(v))}]}/>

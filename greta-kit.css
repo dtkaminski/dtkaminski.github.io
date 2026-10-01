@@ -313,3 +313,27 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .board-commentary-cols { gap: var(--space-8); }
 .board-comm-head { font-size: var(--text-xs); letter-spacing: var(--tracking-wide); text-transform: uppercase; }
 .board-comm-line { font-size: var(--text-sm); color: var(--color-secondary); padding: var(--space-2) 0; }
+
+/* ── KPI chips row & vitals gauges ───────────────────────────────────────── */
+.kpi .label { display: flex; align-items: center; gap: var(--space-2); }
+.kpi-chips { display: flex; flex-wrap: wrap; gap: var(--space-1); margin: var(--space-2) 0 var(--space-1); }
+.kpi .sub { margin-top: var(--space-1); }
+.v3-vitals { border-top: 1px solid var(--color-line); padding-top: var(--space-5); }
+.v3-vital-val { font-family: var(--font-figure); font-size: var(--text-2xl); font-weight: var(--weight-semi);
+  color: var(--color-ink); letter-spacing: -0.02em; }
+.v3-vital-of { font-size: var(--text-sm); color: var(--color-faint); font-weight: var(--weight-normal); margin-left: 2px; }
+.v3-vital-word { font-size: var(--text-lg); font-weight: var(--weight-semi); }
+.v3-vital-band { font-size: var(--text-xs); color: var(--color-muted); margin-top: var(--space-2); }
+.v3-gauge { position: relative; height: 6px; background: var(--color-sunken); border-radius: var(--radius-full);
+  margin-top: var(--space-2); max-width: 220px; }
+.v3-gauge i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: var(--radius-full); }
+.v3-gauge b { position: absolute; top: -3px; width: 1px; height: 12px; background: var(--color-line-strong); }
+.section-eyebrow { border: 0; padding-left: 0; }
+.section-eyebrow::before { display: none; }
+
+/* Axis titles ("Paid spend (£)", "Week", "Date") are rotated into the tick labels on half the
+   charts; the tick format already carries the unit (£, ×, %) and the chart title names the
+   measure, so axis titles go. Reference-line and bar labels are unaffected. */
+.recharts-yAxis > .recharts-label, .recharts-xAxis > .recharts-label,
+.recharts-yAxis .recharts-cartesian-axis-label, .recharts-xAxis .recharts-cartesian-axis-label { display: none; }
+.recharts-yAxis text.recharts-label, .recharts-xAxis text.recharts-label { display: none; }
