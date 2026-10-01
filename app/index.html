@@ -12,29 +12,46 @@
 <style>
   /* ── App shell ─────────────────────────────────────────────────────── */
   body { background: var(--bg-app); }
+  /* One compact bar: mark, the workspace you are in (a switcher when you belong to more
+     than one), and your account. No tagline — the product is the dashboard below it. */
   .app-bar {
     position: sticky; top: 0; z-index: 50;
-    background: rgba(245,242,237,0.88); backdrop-filter: blur(14px);
-    border-bottom: 1px solid var(--border-subtle);
+    background: var(--color-chrome-blur); backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--color-line);
   }
   .app-bar-inner {
-    max-width: 1180px; margin: 0 auto;
-    padding: var(--s-3) var(--s-6);
-    display: flex; align-items: center; gap: var(--s-4);
+    padding: var(--space-2) var(--space-6);
+    display: flex; align-items: center; gap: var(--space-4); min-height: var(--space-12);
   }
-  .app-bar .brand { margin-bottom: 0; }
-  .app-bar .divider { width: 1px; height: 22px; background: var(--border-subtle); }
+  .app-bar .brand { margin-bottom: 0; gap: var(--space-2); }
+  .app-bar .brand-mark { width: var(--space-6); height: var(--space-6); }
+  .app-bar .brand-mark svg { width: var(--space-6); height: var(--space-6); }
+  .app-bar .divider { width: 1px; height: var(--space-5); background: var(--color-line); }
   .workspace-chip {
-    display: inline-flex; align-items: center; gap: var(--s-2);
-    padding: 5px 11px; border-radius: var(--r-md);
-    background: var(--bg-card); border: 1px solid var(--border-default);
-    font-size: 12px; font-weight: 550; color: var(--text-secondary);
+    display: inline-flex; align-items: center; gap: var(--space-2);
+    font-size: var(--text-sm); font-weight: var(--weight-semi); color: var(--color-ink);
   }
-  .workspace-chip .dot {
-    width: 6px; height: 6px; border-radius: var(--r-full); background: var(--good);
-    box-shadow: 0 0 6px rgba(74,222,128,.6);
+  .workspace-chip .dot { width: var(--space-2); height: var(--space-2); border-radius: var(--radius-full); background: var(--color-success); }
+  .workspace-chip select {
+    font: inherit; color: inherit; background: none; border: 1px solid var(--color-line);
+    border-radius: var(--radius-md); padding: var(--space-1) var(--space-6) var(--space-1) var(--space-2); cursor: pointer;
   }
   .app-bar-spacer { flex: 1; }
+  .acct { position: relative; }
+  .acct > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    width: var(--space-8); height: var(--space-8); border-radius: var(--radius-full);
+    background: var(--color-ink); color: var(--color-panel); font-size: var(--text-sm); font-weight: var(--weight-semi); }
+  .acct > summary::-webkit-details-marker { display: none; }
+  .acct > summary:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+  .acct-menu { position: absolute; right: 0; top: calc(100% + var(--space-2)); min-width: 15rem; z-index: 60;
+    background: var(--color-panel); border: 1px solid var(--color-line); border-radius: var(--radius-md);
+    box-shadow: var(--shadow-panel); padding: var(--space-2); }
+  .acct-who { padding: var(--space-2) var(--space-3) var(--space-3); border-bottom: 1px solid var(--color-line); margin-bottom: var(--space-1);
+    font-size: var(--text-sm); color: var(--color-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .acct-who b { display: block; color: var(--color-ink); font-weight: var(--weight-semi); }
+  .acct-menu button { display: block; width: 100%; text-align: left; font: inherit; font-size: var(--text-sm); color: var(--color-ink);
+    background: none; border: 0; border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); cursor: pointer; }
+  .acct-menu button:hover { background: var(--color-sunken); }
   .app-tabs { display: flex; gap: var(--s-1); }
   .app-tab {
     padding: 6px 12px; border-radius: var(--r-sm); cursor: pointer;
@@ -76,7 +93,7 @@
     padding: var(--s-4) var(--s-5); border-radius: var(--r-md);
     border: 1px solid; margin-bottom: var(--s-5);
   }
-  .state-banner.info { background: var(--accent-bg); border-color: rgba(124,58,237,0.3); }
+  .state-banner.info { background: var(--color-accent-wash); border-color: var(--color-accent-line); }
   .state-banner.warn { background: var(--warn-bg); border-color: rgba(245,181,68,0.3); }
   .state-banner.good { background: var(--good-bg); border-color: rgba(74,222,128,0.3); }
   .state-banner-icon {
@@ -92,71 +109,6 @@
   .state-banner-sub { font-size: 12.5px; color: var(--text-secondary); line-height: 1.5; }
   .state-banner-action { flex-shrink: 0; }
   .state-banner-action .btn-primary { padding: 8px 14px; font-size: 12.5px; }
-
-  /* ── Hero placeholder ──────────────────────────────────────────────── */
-  .hero-placeholder {
-    background: var(--bg-card); border: 1px solid var(--border-subtle);
-    border-radius: var(--r-lg); padding: var(--s-7) var(--s-8);
-    position: relative; overflow: hidden;
-  }
-  .hero-placeholder-bg {
-    position: absolute; inset: 0; pointer-events: none;
-    background: radial-gradient(700px 300px at 0% 0%, rgba(139,92,246,0.10), transparent 60%);
-  }
-  .hero-content { position: relative; }
-  .hero-eyebrow {
-    font-size: 10.5px; font-weight: 700; letter-spacing: .08em;
-    text-transform: uppercase; color: var(--accent); margin-bottom: var(--s-3);
-  }
-  .hero-headline {
-    font-size: 30px; font-weight: 650; letter-spacing: -.02em;
-    line-height: 1.1; margin-bottom: var(--s-3);
-  }
-  .hero-headline .accent { color: var(--accent); }
-  .hero-headline .muted { color: var(--text-muted); font-weight: 500; }
-  .hero-sub {
-    font-size: 15px; color: var(--text-secondary); max-width: 580px;
-    line-height: 1.55; margin-bottom: var(--s-5);
-  }
-
-  /* ── Panel grid ────────────────────────────────────────────────────── */
-
-  .panel {
-    background: var(--bg-card); border: 1px solid var(--border-subtle);
-    border-radius: var(--r-md); padding: var(--s-5);
-    display: flex; flex-direction: column; gap: var(--s-3);
-    min-height: 180px;
-  }
-  .panel-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); }
-  .panel-title { font-size: 14px; font-weight: 650; }
-  .panel-pill {
-    font-size: 10px; font-weight: 700; letter-spacing: .04em;
-    text-transform: uppercase; padding: 2px 8px; border-radius: var(--r-full);
-  }
-  .panel-pill.locked {
-    background: var(--bg-elevated); color: var(--text-muted);
-    border: 1px solid var(--border-default);
-  }
-  .panel-pill.live { background: var(--good-bg); color: var(--good); }
-  .panel-pill.pending { background: var(--warn-bg); color: var(--warn); }
-  .panel-body { flex: 1; display: flex; flex-direction: column; justify-content: center; }
-  .panel-locked-msg {
-    color: var(--text-muted); font-size: 12.5px; line-height: 1.6; text-align: center;
-    padding: var(--s-4) var(--s-3);
-  }
-  .panel-locked-msg b { color: var(--text-secondary); font-weight: 600; }
-  .panel-locked-action {
-    display: inline-block; margin-top: var(--s-3);
-    padding: 6px 12px; font-size: 11.5px; font-weight: 600;
-    background: var(--accent-bg); color: var(--accent);
-    border: 1px solid rgba(124,58,237,0.3);
-    border-radius: var(--r-sm); text-decoration: none;
-    transition: all var(--motion-fast);
-  }
-  .panel-locked-action:hover { background: rgba(124,58,237,0.15); text-decoration: none; }
-
-  .panel-stat-val { font-size: 28px; font-weight: 650; letter-spacing: -.015em; line-height: 1; }
-  .panel-stat-sub { font-size: 12px; color: var(--text-muted); margin-top: var(--s-2); }
 
   /* ── First-sync progress card ──────────────────────────────────────── */
   .sync-progress {
@@ -193,14 +145,11 @@
           <circle cx="97" cy="132" r="24" fill="#16150F"/>
         </svg>
       </div>
-      <div>
-        <div class="brand-name" style="font-size:19px; line-height:1;">greta</div>
-        <div class="meta" style="font-size:10.5px; margin-top:1px;">Every part of your business, every week.</div>
-      </div>
+      <div class="brand-name">greta</div>
     </a>
     <div class="divider"></div>
-    <div class="workspace-chip">
-      <div class="dot"></div>
+    <div class="workspace-chip" title="Your workspace">
+      <div class="dot" aria-hidden="true"></div>
       <span id="brand-chip">loading…</span>
     </div>
     <div class="app-bar-spacer"></div>
@@ -208,7 +157,15 @@
          Overview is the app; Customers is now Numbers > Customers inside it;
          Connections is Settings > Connections & data; the static Intelligence
          tab was retired in favour of the live alerts on Home > Review. -->
-    <button id="logout-btn" class="btn-ghost" style="padding: 5px 10px; font-size: 11.5px;">Log out</button>
+    <details class="acct" id="acct" hidden>
+      <summary id="acct-initial" aria-label="Your account">·</summary>
+      <div class="acct-menu" role="menu">
+        <div class="acct-who"><b id="acct-brand"></b><span id="acct-email"></span></div>
+        <button type="button" role="menuitem" id="acct-settings">Connections &amp; data</button>
+        <button type="button" role="menuitem" id="acct-team">Team</button>
+        <button type="button" role="menuitem" id="logout-btn">Log out</button>
+      </div>
+    </details>
   </div>
 </header>
 <!-- The light/dark toggle was removed on 2026-09-24 (Phase 2 decision 3): the app
@@ -279,11 +236,21 @@
 
   // Tab switching removed with the tabs (2026-09-25): the dashboard is the app.
 
-  // ── Logout ─────────────────────────────────────────────────────────────
+  // ── Account menu ───────────────────────────────────────────────────────
   document.getElementById('logout-btn').addEventListener('click', async () => {
     await sb.auth.signOut();
     window.location.href = '../auth/login.html';
   });
+  // Settings and Team live inside the dashboard; open them there rather than reload.
+  const openInApp = (dest) => {
+    document.getElementById('acct').open = false;
+    const fr = document.getElementById('rich-dash');
+    try { if (fr && fr.contentWindow && fr.contentWindow.__oiGo) { fr.contentWindow.__oiGo(dest); return; } } catch (e) {}
+  };
+  document.getElementById('acct-settings').addEventListener('click', () => openInApp('settings'));
+  document.getElementById('acct-team').addEventListener('click', () => openInApp('team'));
+  document.addEventListener('click', (e) => { const a = document.getElementById('acct'); if (a.open && !a.contains(e.target)) a.open = false; });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') document.getElementById('acct').open = false; });
 
   // ── Boot ───────────────────────────────────────────────────────────────
   (async () => {
@@ -297,7 +264,6 @@
       // never logged in, and a dead end for everyone else. The banner stays as the fallback if
       // the redirect is blocked.
       try { window.location.replace('../auth/login.html?next=' + encodeURIComponent(location.pathname + location.search)); } catch (e) {}
-      document.getElementById('logout-btn').hidden = true;
       document.getElementById('loading').hidden = true;
       document.getElementById('no-session').hidden = false;
       document.querySelectorAll('.tab-content').forEach(c => c.hidden = true);
@@ -319,7 +285,26 @@
     currentBrand = (wantSlug && memberships.find(m => m.brand.slug === wantSlug)?.brand)
                    || memberships[0].brand;
 
-    document.getElementById('brand-chip').textContent = currentBrand.name;
+    // The workspace chip is a switcher when you belong to more than one brand.
+    const chip = document.getElementById('brand-chip');
+    if (memberships.length > 1) {
+      const sel = document.createElement('select');
+      sel.setAttribute('aria-label', 'Switch workspace');
+      memberships.map(m => m.brand).sort((a, b) => String(a.name).localeCompare(String(b.name))).forEach(b => {
+        const o = document.createElement('option'); o.value = b.slug; o.textContent = b.name;
+        if (b.id === currentBrand.id) o.selected = true;
+        sel.appendChild(o);
+      });
+      sel.addEventListener('change', () => { const u = new URL(location.href); u.searchParams.set('brand', sel.value); location.href = u.toString(); });
+      chip.replaceChildren(sel);
+    } else {
+      chip.textContent = currentBrand.name;
+    }
+    const email = (session.user && session.user.email) || '';
+    document.getElementById('acct-initial').textContent = (email.charAt(0) || '·').toUpperCase();
+    document.getElementById('acct-email').textContent = email;
+    document.getElementById('acct-brand').textContent = currentBrand.name;
+    document.getElementById('acct').hidden = false;
 
     // Load connections
     const { data: connections } = await sb
