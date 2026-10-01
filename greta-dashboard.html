@@ -1541,6 +1541,18 @@
      being scannable. Two lines closed, everything on open. */
   .v3-rank-desc.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
                         overflow: hidden; }
+  /* The plain title leads in ink at weight; the one-line why sits under it in the muted voice,
+     clamped closed like the description used to be. The engine's own sentence moves into the
+     open row as "Greta's working". */
+  .v3-rank-desc { font-weight: var(--weight-semi, 600); }
+  .v3-rank-plain { display: block; margin-top: 2px; font-family: var(--font-sans); font-size: var(--text-sm, 13px);
+                   color: var(--color-muted); line-height: 1.45; }
+  .v3-rank-plain.clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .v3-rank-raw { margin: var(--space-3, 12px) 0 0; padding-top: var(--space-2, 8px); border-top: 1px solid var(--color-line);
+                 font-family: var(--font-sans); font-size: var(--text-xs, 11px); color: var(--color-muted); line-height: 1.5; }
+  .v3-rank-raw .v3-kick { display: block; margin-bottom: 2px; }
+  .v3-why-open { margin-top: var(--space-3, 12px); padding-top: var(--space-3, 12px); border-top: 1px solid var(--color-line); }
+  .v3-why-open .v3-note { margin: var(--space-1, 4px) 0 var(--space-2, 8px); }
   .v3-rank-bar { display: block; height: 3px; background: var(--color-sunken, #EFEAE3); margin: 6px 0 4px; }
   .v3-rank-bar i { display: block; height: 100%; background: var(--color-accent);
                    transition: width var(--transition-base, .25s) ease; }
@@ -1906,6 +1918,6 @@ window.MOS_EMBEDDED = true;</script>
    save-brand-config had been reading two relations that were never created. */</script>
 <script defer src="./cost-entry.build.js?v=20260929c"></script>
 <script defer src="./loop-panel.js?v=20260921a"></script>
-<script defer src="./greta-app.js?v=1790852866453"></script>
+<script defer src="./greta-app.js?v=1790853134815"></script>
 <script>/* perf: defer frkl static deep-tab data (CVR ~1.7MB, cohorts, promos, products) — not used by the Overview/landing. Background-load after paint; skip for non-frkl (de-frkl). */
 (function(){try{var slug=window.OI_BRAND_SLUG||(window.parent&&window.parent!==window?window.parent.OI_BRAND_SLUG:null)||"frkl";if(slug!=="frkl")return;var files=["greta-cvr.js","greta-cohorts.js","greta-discount-codes.js","greta-products.js","greta-patterns.js"],i=0;function next(){if(i>=files.length)return;var s=document.createElement("script");s.src="./"+files[i++]+"?v=20260925f";s.async=true;s.onload=next;s.onerror=next;document.head.appendChild(s);}var kick=function(){next();};if(window.requestIdleCallback){window.requestIdleCallback(kick,{timeout:1500});}else{setTimeout(kick,300);}}catch(e){}})();</script>

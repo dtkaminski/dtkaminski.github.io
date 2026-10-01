@@ -9650,7 +9650,8 @@ function V3ActionBoard(){
                       onClick={() => setOpen(isOpen ? null : r.external_id)}>
                 <span className="v3-rank-n">{i + 1}</span>
                 <span className="v3-rank-body">
-                  <span className={'v3-rank-desc' + (isOpen ? '' : ' clamp')}>{v3Tidy(r.description)}</span>
+                  <span className="v3-rank-desc">{v3PlainAction(r).title}</span>
+                  {v3PlainAction(r).why && <span className={'v3-rank-plain' + (isOpen ? '' : ' clamp')}>{v3PlainAction(r).why}</span>}
                   <span className="v3-rank-bar" aria-hidden="true">
                     <i style={{ width: Math.max(1.5, (gbp / max) * 100) + '%' }}/>
                   </span>
@@ -9677,6 +9678,8 @@ function V3ActionBoard(){
                   {/* Server-written, so the age in this sentence cannot drift from the age in
                       the row. vw_brand_action_board.unverified_reason. */}
                   {r.unverified_reason && <p className="v3-rank-unver">{r.unverified_reason}</p>}
+                  {/* The engine's own sentence, with its working, for anyone who wants it. */}
+                  <p className="v3-rank-raw"><span className="v3-kick">Greta's working</span>{v3Tidy(r.description)}</p>
                   {play.length
                     ? <ol className="v3-rank-steps">{play.map((s, j) => <li key={j}>{v3Tidy(s)}</li>)}</ol>
                     : <p className="v3-rank-nosteps">{v3Tidy(r.step1) || 'Greta has no further detail on this one yet.'}</p>}
@@ -14390,14 +14393,116 @@ function v3ActionText(raw) {
   s = s.charAt(0).toUpperCase() + s.slice(1);
   return { main: s.replace(/\.$/, ''), detail: v3Money(detail) };
 }
+// ── Actions in an owner's words ───────────────────────────────────────────
+// Emitters write for an analyst: "Margin drain: the mega necklace gold earns 70.2% CM, 20.6pp
+// below your Necklace median. On £3600/28d…". An owner without a D2C background needs the
+// instruction first, then one sentence on why it is worth money in terms of where the money
+// goes — product margin, what ads buy, how many visitors buy, who comes back, how deep the
+// discount is. Each family below keeps the emitter's own figures (pulled out of its sentence,
+// never recomputed) and changes only the words. The emitter's full sentence stays one tap away
+// in the row. Anything unrecognised falls back to v3ActionText, so a new emitter is never
+// hidden — it just reads the way it did before.
+const V3_CH = { meta: 'Meta', facebook: 'Meta', google: 'Google', google_ads: 'Google Ads', google_brand: 'Google brand search',
+  google_pmax: 'Google Performance Max', facebook_acquisition: 'Meta prospecting', facebook_retargeting: 'Meta retargeting',
+  total: 'All paid channels', tiktok: 'TikTok', klaviyo: 'Email', shopify: 'Shopify', ga4: 'Google Analytics' };
+function v3Ch(k){ return V3_CH[String(k || '').toLowerCase()] || String(k || '').replace(/_/g, ' '); }
+function v3PlainAction(row){
+  const id = String((row && row.external_id) || '');
+  const raw = v3Tidy(scrubTag(String((row && row.description) || ''))).trim();
+  const fallback = v3ActionText(row && row.description);
+  const m = (re) => raw.match(re);
+  const P = (t, why) => ({ title: t, why: why || '', raw });
+  let x;
+  if (/^measure-saturation-/.test(id) && (x = m(/£\s*([\d,.]+)\s*vs\s*£?\s*([\d,.]+)/))) {
+    const ch = v3Ch(id.split('-').pop());
+    return P('Test spending less on ' + ch + ' for two weeks',
+      'Your last pounds on ' + ch + ' are winning new customers at about £' + x[1] + ' each, against about £' + x[2] + ' when you spend less. A two-week pull-back shows what that extra spend really earns before you put more in.');
+  }
+  if (/^product-margin_drain-/.test(id) && (x = m(/the (.+?) earns ([\d.]+)% (?:gross margin|CM),? ([\d.]+)pp below your (.+?) median/i))) {
+    return P('Check the price or cost of ' + x[1],
+      'It keeps ' + x[2] + 'p of every £1 after product cost — ' + x[3] + 'p less than your typical ' + x[4].toLowerCase() + '. Raising the price or cutting what it costs you would bring it in line with the rest of the range.');
+  }
+  if (/^product-hero_underexposed/.test(id) && (x = m(/Hidden hero: (.+?) earns ([\d.]+)% gross margin/i))) {
+    return P('Show ' + x[1] + ' to more shoppers',
+      'It keeps ' + x[2] + 'p of every £1 after product cost and its sales are growing, but few people see it. More space on the site and in bundles turns that margin into profit.');
+  }
+  if (/^pulse-cro-fix-/.test(id)) {
+    // "Fix the discount_value JS error on the cart Checkout button — it blocks cart→checkout."
+    // "Fix the Judge.me JS error on PDPs (silently breaks the ATC button)."
+    const where = (raw.match(/ on (?:the )?(.+?)(?: —| \(|\.|$)/) || [])[1];
+    const plainWhere = where ? where.replace(/\bPDPs?\b/i, 'product pages').replace(/\bcart\b/i, 'basket').replace(/Checkout/, 'checkout') : 'your site';
+    const blocks = /cart\s*→\s*checkout/i.test(raw) ? 'stops shoppers getting from their basket to checkout'
+      : /\bATC\b|add[- ]to[- ](?:cart|basket|bag)/i.test(raw) ? 'can stop the add-to-basket button working'
+      : 'gets in the way of buying';
+    return P('Fix a site error on the ' + plainWhere,
+      'A broken script on the ' + plainWhere + ' ' + blocks + '. Every shopper who hits it is a sale lost after you have already paid to bring them in.');
+  }
+  if (id === 'synth-creative-waste') return P('Stop spending on ads that have never made a sale',
+    'Some ads are taking budget without a single purchase. Check their tracking first — a broken pixel looks the same as a bad ad — then switch off the ones that are genuinely not selling.');
+  if (/^synth-weak-conv-rank-(\w+)-spend/.test(id)) { const ch = v3Ch(id.match(/^synth-weak-conv-rank-(\w+)-spend/)[1]);
+    return P('Move ' + ch + ' budget away from ads that rarely sell', 'Part of your ' + ch + ' spend sits on ads that convert worst. Shifting it to the ads that sell gets more orders from the same budget.'); }
+  // What this emitter measures is share of revenue, not demand — so the why says that and
+  // tells the owner to check for demand before investing, which is the playbook's own first step.
+  if ((x = id.match(/^synth-(.+)-collection-gap$/))) return P('See whether a bigger ' + x[1].replace(/-/g, ' ') + ' range would sell',
+    x[1].charAt(0).toUpperCase() + x[1].slice(1).replace(/-/g, ' ') + ' are a small slice of what you sell, from very few products. Look for signs people want more — searches, product views — before adding to the range.');
+  // Matched on the figures, not the words: plainWords has already turned "CAC" into
+  // "cost per new customer" by the time this runs.
+  if (id === 'discount-depth-inversion' && (x = m(/(\d+)% or more below list carry £([\d,.]+).*?of £([\d,.]+).*?they are (\d+)%/i))) {
+    return P('Cut back on discounts of ' + x[1] + '% or more',
+      'An order sold that cheaply leaves about £' + x[2] + ' once the product and order costs are paid, but winning a new customer costs you about £' + x[3] + ' — and ' + x[4] + '% of your orders are sold that way.');
+  }
+  if (id === 'discount-dependency') return P('Bring markdown customers back at full price',
+    'Customers who first bought on markdown mostly buy on markdown again. Their next offer should be something other than a deeper discount.');
+  if ((x = id.match(/^paid-landing-(\w+)/)) && (x = [x[1], ...(raw.match(/(\d+) new customers/) || [])])) {
+    const ch = v3Ch(x[0]);
+    return P('Point ' + ch + ' ads at products that can pay for a new customer',
+      (x[2] ? x[2] + ' new customers' : 'Many new customers') + ' came from ' + ch + ' ads landing on products too cheap to cover what it cost to win them on the first order. Send that traffic to products that earn back their customer.');
+  }
+  if (id === 'product-repeat-drivers') return P('Lead new-customer ads with the products people come back for',
+    'People whose first order is one of these products come back far more often than average, so each new customer is worth more.');
+  if ((x = id.match(/^metric-tree-(\w+)/)) && (x = [x[1], ...(raw.match(/from £([\d,.]+) to £([\d,.]+)/) || [])]) && x[2]) {
+    const ch = v3Ch(x[0]);
+    return P('Find out why each ' + ch + ' sale costs more', ch + ' now costs about £' + x[3] + ' per sale, up from £' + x[2] + '. The breakdown below shows which step got worse.');
+  }
+  if (/^diagnosis-/.test(id) && (x = m(/^Why (.+?) moved/i))) return P('Why ' + x[1] + ' changed', raw.replace(/^Why .+? moved, ranked by evidence:\s*/i, 'Most likely first: '));
+  if (/^connection-/.test(id)) { const p = id.replace(/^connection-/, ''); return P('Reconnect ' + (CONN_LABEL[p] || v3Ch(p)), raw); }
+  if (/^data-health-/.test(id)) return P('Some numbers did not load', 'Part of a screen could not load its data, so a figure there may be missing rather than zero. Refreshing usually fixes it.');
+  if (id === 'tracking-coverage') return P('Check your site tracking', raw);
+  if ((x = id.match(/^greta_forecast:([^:]+):(efficiency|volume)$/))) {
+    const ch = v3Ch(x[1]), ahead = /ahead of forecast/i.test(raw);
+    const a = raw.match(/actual £([\d,.]+) vs expected £([\d,.]+)/);
+    return P(ch + (ahead ? ' is beating' : ' is behind') + ' its forecast' + (x[2] === 'volume' ? ' on sales' : ' on return per £'),
+      a ? 'It brought in £' + a[1] + ' against £' + a[2] + ' expected.' : raw);
+  }
+  if (id === 'optim-realloc-marginal' && (x = m(/Shift ~?£([\d,]+)\/mo from (.+?) \(.*?\) to (.+?) \(/))) {
+    return P('Move £' + x[1] + ' a month from ' + x[2] + ' to ' + x[3],
+      'The next pound on ' + x[3] + ' earns more than the last pound on ' + x[2] + '. Re-check after two weeks and repeat until they even out.');
+  }
+  return { title: fallback.main, why: fallback.detail, raw };
+}
+
 // First run (Phase 2, §6): four steps to a first answer. Each step reads what the
 // database already knows — never a guess in the browser — and links to the one screen
 // that completes it. It disappears once all four are done.
 function V3Setup({ s }) {
   if (!s) return null;
+  // Count SOURCES, not connection rows. active_connections counts rows, and a re-auth leaves
+  // the old one behind: frkl has three Google Ads rows (active, error, pending) and two GA4,
+  // so the card read "6 of 5 sources connected" against a hardcoded 5. A source is connected
+  // when any of its rows is active; it needs attention only when none is.
+  const conns = (typeof window !== 'undefined' && window.FRKL_LIVE && window.FRKL_LIVE.connections) || null;
+  const best = {};
+  (conns || []).forEach(c => { if (!c || !c.provider) return;
+    best[c.provider] = (best[c.provider] === 'active' || c.status === 'active') ? 'active' : (best[c.provider] || c.status); });
+  const liveSrc = Object.keys(best).filter(p => best[p] === 'active');
+  const brokenSrc = Object.keys(best).filter(p => best[p] === 'error' || best[p] === 'expired');
+  const nConn = conns ? liveSrc.length : s.connected;
   const steps = [
-    { done: s.connected > 0 && s.has_revenue, label: 'Connect your data',
-      hint: s.connected > 0 ? s.connected + ' of ' + s.connected_total + ' sources connected' : 'Start with Shopify — everything else builds on it',
+    { done: nConn > 0 && s.has_revenue && !brokenSrc.length, label: 'Connect your data',
+      hint: nConn > 0
+        ? nConn + (nConn === 1 ? ' source' : ' sources') + ' connected'
+          + (brokenSrc.length ? ' · ' + brokenSrc.map(p => CONN_LABEL[p] || p).join(', ') + ' needs reconnecting' : '')
+        : 'Start with Shopify — everything else builds on it',
       go: ['settings'], cta: 'Connect' },
     { done: s.has_economics, label: 'Confirm what things cost you',
       hint: 'Product cost, shipping, packaging and fees — this turns sales into profit',
@@ -15136,6 +15241,10 @@ function V3Today(p) {
   // board, so the badge and "See all" count drop at once and the next row does not jump up
   // under the message meant for this one.
   const closedTop = React.useRef(null);
+  // "Why?" opens Greta's working here, under the action. It used to navigate to Ask Greta with
+  // the question pre-filled, which took the owner off the page to read a reason the board
+  // already holds — and when Ask was down, nowhere at all.
+  const [whyOpen, setWhyOpen] = React.useState(false);
   const closeTop = (row, how) => { closedTop.current = row; setTopDone(how); if (row) v3BoardDrop(row.external_id); };
   // Only a change in the NUMBERS counts as new: the "why" paragraph arrives seconds
   // later on its own (fn_today_v2 is slow), and that must not look like the figures
@@ -15272,8 +15381,8 @@ function V3Today(p) {
     {top ? (
       <div className="v3-dofirst">
         <div className="v3-kick">Do this first{top.cm_gbp ? ' · worth about ' + v3Gbp(top.cm_gbp) + ' a month' : ''}</div>
-        <div className="v3-dofirst-t">{v3ActionText(top.description).main}</div>
-        {v3ActionText(top.description).detail && <div className="v3-sub">{v3ActionText(top.description).detail}</div>}
+        <div className="v3-dofirst-t">{v3PlainAction(top).title}</div>
+        {v3PlainAction(top).why && <div className="v3-sub">{v3PlainAction(top).why}</div>}
         {top.step1
           ? <div className="v3-sub">First step: {v3Money(scrubTag(top.step1))}</div>
           : <div className="v3-sub">No first step recorded for this one.{' '}
@@ -15305,8 +15414,16 @@ function V3Today(p) {
               measured fact for 30 days exactly as marking it done would. */}
           {!connProvider(top.external_id) && <V3Done ext={top.external_id} onDone={() => closeTop(top, 'done')}/>}
           {!connProvider(top.external_id) && <V3Skip ext={top.external_id} onDone={() => closeTop(top, 'skipped')}/>}
-          <button type="button" className="v3-btn" onClick={() => window.__oiAsk && window.__oiAsk('Why is this the most important thing to do: ' + scrubTag(top.description))}>Why?</button>
+          <button type="button" className="v3-btn" aria-expanded={whyOpen} onClick={() => setWhyOpen(o => !o)}>{whyOpen ? 'Hide why' : 'Why?'}</button>
         </div>)}
+        {whyOpen && !topDone && (
+          <div className="v3-why-open">
+            <div className="v3-kick">Greta's working</div>
+            <p className="v3-note">{v3PlainAction(top).raw}</p>
+            {top.cm_gbp ? <p className="v3-note">Ranked first because it is worth the most of anything Greta has checked recently: about {v3Gbp(top.cm_gbp)} a month in profit after product costs.</p> : null}
+            <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiAsk && window.__oiAsk('Explain this action and how I should go about it: ' + scrubTag(top.description))}>Ask a follow-up</button>
+          </div>
+        )}
         {/* Say why there is nothing to press here, or the gap reads as an oversight. */}
         {!topDone && connProvider(top.external_id) && (
           <div className="v3-sub">Greta clears this one herself as soon as the feed reports again — there is nothing to mark off.</div>
@@ -15322,7 +15439,7 @@ function V3Today(p) {
       <div className="v3-kick">Then, in order</div>
       {next.map((a, i) => (<div key={a.external_id || i} className="v3-next-row">
         <span className="v3-num">{i + 2}</span>
-        <span>{v3ActionText(a.description).main}</span>
+        <span>{v3PlainAction(a).title}</span>
         <span className="v3-num">{a.cm_gbp ? v3Gbp(a.cm_gbp) + '/mo' : ''}</span>
       </div>))}
       <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>See all {boardCount || ''} actions</button>
