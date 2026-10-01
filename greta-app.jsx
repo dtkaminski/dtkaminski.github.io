@@ -471,8 +471,20 @@ function linkify(text){
 // the chosen "to" date for a custom between-two-dates range. App sets ACTIVE_END
 // synchronously at the top of each render (before panels read it), so inRange /
 // startFor / dataEndOf transparently respect a custom end with no prop-threading.
-const REAL_END = (() => { const ds=(D.shopify||[]).map(r=>r.date).sort(); return ds[ds.length-1]; })();
-const REAL_START = (() => { const ds=(D.shopify||[]).map(r=>r.date).sort(); return ds[0]; })();
+//
+// These were consts computed once at bundle-eval — from the STATIC snapshot, because the live
+// loader replaces D.shopify afterwards. Every client-side window therefore ended on the
+// snapshot's last day (2026-07-05) for three months: Profit & sales showed June's £18,205
+// against the server's £22,157, Review opened on the week of 29 Jun, and the KPI trends ran
+// to 07-04, all under a "live" label. They now follow whatever D.shopify holds, so a "last 30
+// days" here ends on the same day as fn_brand_window() and the headline it feeds.
+let REAL_END, REAL_START;
+function refreshRealBounds(){
+  let lo = null, hi = null;
+  for (const r of (D.shopify || [])) { const d = r && r.date; if (!d) continue; if (lo === null || d < lo) lo = d; if (hi === null || d > hi) hi = d; }
+  REAL_START = lo || undefined; REAL_END = hi || undefined;
+}
+refreshRealBounds();
 // ── Canonical benchmarks (single source of truth — must match scripts/oi_db.py BENCHMARKS).
 // Site CVR = Shopify orders ÷ GA4 sessions; one benchmark everywhere so the dashboard
 // never shows the same KPI against two different targets.
@@ -8089,15 +8101,19 @@ ${ctxJson}`;
         : { 'content-type': 'application/json', 'x-internal-secret': ASK.token || '' };   // server/cron
       const resp = await fetch(ASK.endpoint, {
         method: 'POST', headers,
-        body: JSON.stringify({ system: systemPrompt, messages: apiMessages, model, brand_id: ASK.brand_id }),
+        body: JSON.stringify({ system: systemPrompt, messages: apiMessages, model, depth, brand_id: ASK.brand_id }),
       });
-      if (!resp.ok) { const txt = await resp.text(); throw new Error(`${resp.status}: ${txt.slice(0,300)}`); }
+      // The relay returns an owner-readable `message` on failure; a raw status/JSON blob is
+      // never shown (it used to print the provider's 404 straight onto the page).
+      const ASK_FAIL = "Greta couldn't answer just now. Your data is fine — try again in a minute.";
+      if (!resp.ok) { let m = ''; try { m = (await resp.json()).message || ''; } catch(_){} throw new Error(m || ASK_FAIL); }
       const data = await resp.json();
-      if (data.error) throw new Error(data.detail || data.error);
+      if (data.error) throw new Error(data.message || ASK_FAIL);
       setHistory(h=>[...h, {role:'assistant', content:data.text || '(no response)', time:Date.now(), usage:data.usage||{}}]);
     } catch (e) {
       setError(e.message || String(e));
       setHistory(h=>h.slice(0,-1)); // drop the user message on failure
+      setQuestion(q);               // ...but keep their words in the box so a retry is one click
     } finally {
       setLoading(false);
     }
@@ -8121,7 +8137,7 @@ ${ctxJson}`;
   return (<div>
     <div className="card" style={{marginBottom:14, borderLeft:`3px solid ${PAL.accent}`}}>
       <h2>Ask Greta</h2>
-      <div className="muted" style={{marginBottom:10, fontSize:'var(--text-sm)'}}>Runs <b>privately inside your workspace</b>, on a summary of your live data. Nothing leaves it.</div>
+      <div className="muted" style={{marginBottom:10, fontSize:'var(--text-sm)'}}>Answers from a summary of <b>your live data</b>, which is sent to Greta's AI model to write the reply.</div>
       {!ASK && (<div style={{padding:12, background:'var(--bg-app)', borderRadius:'var(--radius-none)', marginBottom:10, border:'1px solid var(--border-default)'}}>
         <div style={{fontSize:'var(--text-sm)', color:'var(--text-primary)', lineHeight:1.5}}>Ask runs inside your authenticated workspace, where the model key is held server-side (never in the browser). It isn't enabled in this public demo. The examples below show the questions it answers from your live data.</div>
       </div>)}
@@ -8140,7 +8156,10 @@ ${ctxJson}`;
       <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:4}}>
         {quickPrompts.map((q,i)=>(<button key={i} onClick={()=>ASK&&setQuestion(q)} title={ASK?'':'Available in your workspace'} style={{padding:'4px 10px', background:'var(--bg-card)', border:'1px solid var(--border-default)', borderRadius:'var(--radius-md)', color:'var(--text-secondary)', fontSize:'var(--text-xs)', cursor:ASK?'pointer':'default', opacity:ASK?1:0.7}}>{q.length>60?q.slice(0,60)+'…':q}</button>))}
       </div>
-      {error && (<div style={{padding:10,background:'#3a1010',border:`1px solid ${PAL.bad}`,borderRadius:'var(--radius-none)',marginTop:10,color:PAL.bad,fontSize:'var(--text-sm)'}}>Error: {error}</div>)}
+      {error && (<div role="alert" style={{padding:'var(--space-3)',background:'var(--color-danger-wash)',borderTop:'1px solid var(--color-danger-line)',marginTop:'var(--space-3)',color:'var(--text-primary)',fontSize:'var(--text-sm)',display:'flex',alignItems:'center',gap:'var(--space-3)',flexWrap:'wrap'}}>
+        <span style={{flex:1,minWidth:200}}>{error}</span>
+        <button className="v3-btn" onClick={send} disabled={loading||!question.trim()}>Try again</button>
+      </div>)}
     </div>
     {history.length > 0 && (<div className="card">
       <h2>Conversation</h2>
@@ -15572,6 +15591,9 @@ function App(){
   const [rangeStart, setRangeStart] = useState('');
   const [rangeEnd, setRangeEnd] = useState('');
   const customActive = !!(rangeStart && rangeEnd && rangeStart <= rangeEnd);
+  // Re-read the data bounds first: the live loader may have replaced D.shopify since the last
+  // render (it fires frkl-data-updated, which re-renders App).
+  refreshRealBounds();
   // Resolve the active window (named period or custom range), then set it BEFORE
   // computing start / rendering panels so every panel reads the same window.
   const win = customActive ? {start: rangeStart, end: rangeEnd} : periodRange(period);
