@@ -1,0 +1,278 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Greta kit — the presentation layer every screen shares (2026-10-01)
+   ─────────────────────────────────────────────────────────────────────────────
+   Linked after greta-dashboard.html's own <style>, so it is the last word on how a
+   card, a figure, a table, a badge, a button and a chart look. Before this the app
+   was three products in one frame: 3 of 41 page components were V3-native, 28
+   legacy components drew boxes with inline styles, 6 embeds brought their own type
+   and colour. Re-skinning the shared primitives here moves all of them at once.
+
+   Principles (Visual Overhaul Plan, §2):
+     · one canvas, almost no boxes — a section is a title, whitespace and a hairline
+     · figures in the figure face (Geist, tabular), big where they matter
+     · colour carries meaning: accent = your action / what you keep;
+       green/red = better/worse only; series get the categorical palette
+     · charts quiet: no axis lines, light dashed grid, one tooltip
+   Everything resolves to design-tokens.css. */
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+html { font-variant-numeric: tabular-nums lining-nums; }
+body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--color-ink);
+       -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+/* Figures: the figure face everywhere a number is the content. */
+.oi-num, .v3-num, .v3-big, .kpi .val, .stat-val, .v3-flow-val, .v3-rank-gbp, .v3-score-x,
+.v3-score-spend, .v3-thread-val, .v3-board-total, .v3-fig-row-val, .v3-vital-val {
+  font-family: var(--font-figure); font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* ── Shell ────────────────────────────────────────────────────────────────── */
+/* Content sits full-bleed on white, not on a bordered sheet floating on grey: the nav is
+   the only chrome, so the working area reads as the page rather than a card on a desk. */
+.v3-root { background: var(--color-panel); }
+.v3-shell { max-width: none; }
+.v3-main {
+  max-width: 1240px; margin: 0 auto; border: 0; box-shadow: none; background: transparent;
+  padding: var(--space-10) var(--space-12) var(--space-16);
+}
+.v3-nav { scrollbar-width: none; }
+.v3-nav::-webkit-scrollbar { display: none; }
+.v3-nav-group { font-weight: var(--weight-semi); padding-top: var(--space-6); }
+.v3-nav-item { min-height: 36px; }
+.v3-nav-n { font-family: var(--font-figure); background: var(--color-sunken); color: var(--color-muted);
+            padding: 1px 7px; border-radius: var(--radius-full); font-size: var(--text-xs); }
+@media (max-width: 760px) {
+  .v3-main { padding: var(--space-5) var(--space-4) calc(var(--space-16) + var(--space-6)); }
+}
+
+/* Page head: one pattern on all sixteen pages. */
+.v3-page-head { border-bottom: 0; margin-bottom: var(--space-8); padding-bottom: 0; }
+.v3-page-title { font-size: var(--text-xl); font-weight: var(--weight-semi); letter-spacing: var(--tracking-tight); }
+.v3-page-q { font-size: var(--text-base); margin-top: var(--space-1); }
+.v3-page-head-row { align-items: flex-end; justify-content: space-between; }
+/* The thread back to the headline: a quiet line, not a grey box on every page. */
+.v3-thread { background: none; border: 0; padding: 0; margin-top: var(--space-3); font-size: var(--text-sm); width: auto; }
+.v3-thread:hover { background: none; }
+.v3-thread:hover .v3-thread-val { color: var(--color-accent); }
+.v3-thread-lab { text-transform: none; letter-spacing: 0; color: var(--color-muted); }
+.v3-thread-val { font-size: var(--text-sm); font-weight: var(--weight-semi); }
+
+/* Ask lives on Today and in the nav (⌘K); it no longer sticks above every page. */
+.v3-askbar { position: static; margin: 0 0 var(--space-8); padding: 0; border: 0; }
+.v3-askbar-in { background: var(--color-panel); border-color: var(--color-line-strong); padding: 4px 4px 4px 14px; }
+.v3-askbar-in input { min-height: 40px; font-size: var(--text-base); }
+
+/* ── Sections: the end of box soup ───────────────────────────────────────── */
+/* A .card is a section: a hairline above, room around, no frame. A card inside a card
+   is just content. Raised surfaces (.v3-raised) are kept for the few things that float
+   or invite a click. */
+.v3-main .card {
+  background: transparent; border: 0; border-top: 1px solid var(--color-line);
+  border-radius: var(--radius-none); box-shadow: none;
+  padding: var(--space-6) 0 var(--space-6); margin-bottom: 0;
+}
+.v3-main .card .card { border-top: 0; padding: var(--space-3) 0 0; }
+.v3-main .card h2, .v3-main h2.section, .v3-main .card-section-title h2 {
+  font-family: var(--font-sans); font-size: var(--text-lg); font-weight: var(--weight-semi);
+  letter-spacing: var(--tracking-snug); color: var(--color-ink); margin: 0 0 var(--space-4);
+}
+.v3-main .card h3 { font-size: var(--text-base); font-weight: var(--weight-semi); margin: 0 0 var(--space-2); }
+.v3-main .card-section-title { margin-bottom: var(--space-4); }
+.v3-main .card-section-title h2 { margin: 0; }
+.v3-main .card[class*="alert-"] { border-left: 0; padding-left: 0; }
+.v3-main .row { gap: var(--space-6); }
+
+/* Raised: for the one thing on a page that asks you to act. */
+.v3-raised { background: var(--color-panel); border: 1px solid var(--color-line);
+             box-shadow: var(--shadow-panel); padding: var(--space-6); }
+
+/* ── KPI / stat ──────────────────────────────────────────────────────────── */
+.v3-main .card.kpi { border-top: 1px solid var(--color-line); padding: var(--space-4) 0 var(--space-3); }
+.v3-main .card .card.kpi { border-top: 1px solid var(--color-line); padding: var(--space-4) 0 var(--space-3); }
+.kpi .label { font-size: var(--text-xs); color: var(--color-muted); font-weight: var(--weight-medium);
+              letter-spacing: 0.02em; text-transform: none; }
+.kpi .val { font-size: var(--text-2xl); font-weight: var(--weight-semi); letter-spacing: -0.02em;
+            color: var(--color-ink); line-height: 1.1; margin-top: var(--space-2); }
+.kpi .val .delta { font-family: var(--font-figure); font-size: var(--text-xs); font-weight: var(--weight-semi);
+                   letter-spacing: 0; vertical-align: 0.5em; white-space: nowrap; }
+.kpi .sub { font-size: var(--text-xs); color: var(--color-muted); line-height: 1.45; }
+/* Explanations open on click (focus), never on hover: a list you move the pointer across
+   should not throw panels over itself. */
+.kpi:hover .kpi-pop { opacity: 0; visibility: hidden; pointer-events: none; }
+.kpi:focus-within .kpi-pop { opacity: 1; visibility: visible; pointer-events: auto; }
+.kpi.has-pop { cursor: pointer; }
+.kpi-pop { background: var(--color-panel); border: 1px solid var(--color-line); border-radius: var(--radius-md);
+           box-shadow: var(--shadow-raised); }
+
+/* ── Type roles ──────────────────────────────────────────────────────────── */
+/* One eyebrow. */
+.v3-kick, .micro, .section-eyebrow, .card-eyebrow, .v3-vitals-eyebrow, .v3-hero-lab {
+  font-family: var(--font-sans); font-size: var(--text-xs); font-weight: var(--weight-semi);
+  letter-spacing: var(--tracking-wide); text-transform: uppercase; color: var(--color-muted);
+}
+.muted { color: var(--color-muted); }
+.note, .v3-main .note {
+  font-size: var(--text-sm); color: var(--color-muted); line-height: var(--leading-body);
+  background: none; border: 0; padding: 0;
+}
+/* The intro / caveat line: words, not a peach box. */
+.v3-note { background: none; border: 0; padding: 0; color: var(--color-muted);
+           font-size: var(--text-sm); line-height: var(--leading-body); margin-bottom: var(--space-4); }
+
+/* ── Tables ──────────────────────────────────────────────────────────────── */
+.v3-main table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+.v3-main th { font-family: var(--font-sans); font-size: var(--text-xs); font-weight: var(--weight-semi);
+              color: var(--color-muted); text-align: left; padding: var(--space-2) var(--space-3) var(--space-2) 0;
+              border-bottom: 1px solid var(--color-line-strong); background: none; white-space: nowrap; }
+.v3-main td { padding: var(--space-3) var(--space-3) var(--space-3) 0; border-bottom: 1px solid var(--color-line);
+              color: var(--color-ink); vertical-align: baseline; }
+.v3-main tr:last-child td { border-bottom: 0; }
+.v3-main tbody tr:hover td { background: var(--color-panel-hover); }
+
+/* ── Badges: one shape ───────────────────────────────────────────────────── */
+.pill, .sbadge, .v3-conf, .chip, .badge, .bm-chip {
+  display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 7px;
+  border-radius: var(--radius-sm); border: 0; font-family: var(--font-sans); font-size: var(--text-xs);
+  font-weight: var(--weight-medium); letter-spacing: 0; text-transform: none; white-space: nowrap;
+  background: var(--color-sunken); color: var(--color-muted);
+}
+.sbadge.good { background: var(--color-success-wash); color: var(--color-success); }
+.sbadge.warn { background: var(--color-warning-wash); color: var(--color-warning); }
+.sbadge.bad  { background: var(--color-danger-wash);  color: var(--color-danger); }
+.sbadge .dot { width: 6px; height: 6px; }
+
+/* ── Buttons: primary, secondary, quiet ──────────────────────────────────── */
+.v3-btn, .btn, .btn-ghost, .board-nav-btn, .btn-secondary {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  min-height: 36px; padding: 0 var(--space-4); border-radius: var(--radius-md);
+  border: 1px solid var(--color-line-strong); background: var(--color-panel); color: var(--color-ink);
+  font-family: var(--font-sans); font-size: var(--text-sm); font-weight: var(--weight-medium);
+  cursor: pointer; transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+.v3-btn:hover, .btn-ghost:hover, .board-nav-btn:hover:not(:disabled) { border-color: var(--color-ink); background: var(--color-panel); color: var(--color-ink); }
+.v3-btn-p, .btn-primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-panel);
+  border-radius: var(--radius-md); font-weight: var(--weight-semi); min-height: 36px; padding: 0 var(--space-4); }
+.v3-btn-p:hover, .btn-primary:hover { background: var(--color-accent-hover); border-color: var(--color-accent-hover); color: var(--color-panel); }
+.v3-btn-q { border-color: transparent; background: none; color: var(--color-muted); padding: 0 var(--space-2); }
+.v3-btn-q:hover { color: var(--color-ink); background: var(--color-sunken); border-color: transparent; }
+.v3-btn-sm { min-height: 30px; padding: 0 var(--space-3); font-size: var(--text-xs); }
+
+/* ── Inputs ──────────────────────────────────────────────────────────────── */
+.v3-main input[type="text"], .v3-main input[type="number"], .v3-main input[type="email"],
+.v3-main input:not([type]), .v3-main select, .v3-main textarea {
+  font-family: var(--font-figure); font-size: var(--text-sm); color: var(--color-ink);
+  background: var(--color-panel); border: 1px solid var(--color-line-strong); border-radius: var(--radius-md);
+  min-height: 36px; padding: 0 var(--space-3);
+}
+.v3-main textarea { padding: var(--space-2) var(--space-3); font-family: var(--font-sans); }
+.v3-main select { font-family: var(--font-sans); padding-right: var(--space-8); }
+.v3-main input:focus, .v3-main select:focus, .v3-main textarea:focus {
+  outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 3px var(--color-accent-wash-2);
+}
+.v3-main label { font-size: var(--text-xs); color: var(--color-muted); font-weight: var(--weight-medium); }
+
+/* ── Charts ──────────────────────────────────────────────────────────────── */
+/* SVG presentation attributes lose to CSS, so axis text, grids and the tooltip are
+   themed here for all thirty charts; greta-app.jsx sets the behavioural defaults. */
+.recharts-wrapper { font-family: var(--font-figure); }
+.recharts-cartesian-axis-tick-value, .recharts-cartesian-axis-tick text, .recharts-text {
+  font-family: var(--font-figure); font-size: 12px; fill: var(--color-faint);
+}
+.recharts-cartesian-axis-line, .recharts-cartesian-axis-tick-line { display: none; }
+.recharts-cartesian-grid-horizontal line { stroke: var(--color-line); stroke-dasharray: 2 4; }
+.recharts-cartesian-grid-vertical line { display: none; }
+.recharts-reference-line line { stroke: var(--color-line-strong); stroke-dasharray: 4 4; }
+.recharts-label { font-family: var(--font-sans); font-size: 11px; fill: var(--color-muted); }
+.recharts-legend-wrapper { font-family: var(--font-sans); }
+.recharts-legend-item-text { color: var(--color-muted) !important; font-size: var(--text-xs); }
+.recharts-default-tooltip {
+  background: var(--color-panel) !important; border: 1px solid var(--color-line) !important;
+  border-radius: var(--radius-md) !important; box-shadow: var(--shadow-raised);
+  padding: var(--space-2) var(--space-3) !important; font-size: var(--text-xs);
+}
+.recharts-tooltip-label { font-family: var(--font-sans); font-weight: var(--weight-semi); color: var(--color-ink);
+  margin-bottom: var(--space-1) !important; }
+.recharts-tooltip-item { padding: 1px 0 !important; color: var(--color-muted) !important; }
+.recharts-tooltip-item-value { color: var(--color-ink); font-family: var(--font-figure); font-weight: var(--weight-semi); }
+.recharts-brush rect { stroke: var(--color-line); }
+
+/* ── Money strip & figure hero (Today, Profit) ───────────────────────────── */
+.v3-big { font-weight: var(--weight-semi); letter-spacing: -0.035em; line-height: 1; color: var(--color-ink); }
+.v3-flow-track { height: 14px; gap: 3px; background: none; }
+.v3-flow-seg { border-radius: var(--radius-sm); }
+.v3-flow-pct { font-family: var(--font-figure); color: var(--color-muted); }
+.v3-flow-top-val { font-family: var(--font-figure); font-weight: var(--weight-semi); }
+
+/* ── Disclosure ──────────────────────────────────────────────────────────── */
+.v3-more { border-top: 1px solid var(--color-line); }
+.v3-more-head { font-size: var(--text-sm); font-weight: var(--weight-semi); color: var(--color-ink); padding: var(--space-4) 0; }
+.v3-more-body { padding-bottom: var(--space-6); }
+
+/* ── Today ───────────────────────────────────────────────────────────────── */
+.v3-today { gap: var(--space-8); }
+/* Setup, once nearly done: one line. */
+.v3-setup-slim { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4); background: var(--color-surface); font-size: var(--text-sm); }
+.v3-setup-meter { display: inline-flex; gap: 3px; }
+.v3-setup-meter i { width: 18px; height: 4px; background: var(--color-line-strong); border-radius: var(--radius-full); }
+.v3-setup-meter i.on { background: var(--color-success); }
+.v3-setup-txt { flex: 1; min-width: 220px; }
+.v3-setup-slim .v3-btn { margin-left: auto; }
+.v3-setup { background: var(--color-surface); border: 0; padding: var(--space-5) var(--space-6); }
+.v3-step-mark { display: inline-flex; align-items: center; justify-content: center; }
+
+/* Hero: the figure and its trend side by side. */
+.v3-hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: var(--space-10);
+  align-items: end; margin-bottom: var(--space-8); }
+.v3-hero-main .v3-big { font-size: var(--text-display); margin: var(--space-2) 0 var(--space-3); }
+.v3-delta-line { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; font-size: var(--text-sm);
+  margin-bottom: var(--space-3); }
+.v3-delta-chip { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px;
+  border-radius: var(--radius-sm); font-family: var(--font-figure); font-weight: var(--weight-semi); font-size: var(--text-xs); }
+.v3-delta-line.good .v3-delta-chip { background: var(--color-success-wash); color: var(--color-success); }
+.v3-delta-line.bad  .v3-delta-chip { background: var(--color-danger-wash);  color: var(--color-danger); }
+.v3-hero-trend { margin: 0; min-width: 0; }
+.v3-hero-trend figcaption { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3);
+  font-size: var(--text-xs); margin-bottom: var(--space-1); }
+.v3-hero-trend figcaption .v3-kick { margin: 0; }
+@media (max-width: 900px) { .v3-hero-grid { grid-template-columns: 1fr; gap: var(--space-5); } }
+
+/* A chart tooltip of our own (custom content). */
+.v3-tip { display: grid; gap: 2px; background: var(--color-panel); border: 1px solid var(--color-line);
+  border-radius: var(--radius-md); box-shadow: var(--shadow-raised); padding: var(--space-2) var(--space-3);
+  font-family: var(--font-sans); font-size: var(--text-xs); color: var(--color-muted); min-width: 160px; }
+.v3-tip b { color: var(--color-ink); font-weight: var(--weight-semi); margin-bottom: 2px; }
+.v3-tip span { display: flex; justify-content: space-between; gap: var(--space-4); }
+.v3-tip em { font-style: normal; font-family: var(--font-figure); color: var(--color-ink); font-weight: var(--weight-semi); }
+
+/* Do this first + then, in order. */
+.v3-act-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--space-8); align-items: start; }
+@media (max-width: 900px) { .v3-act-grid { grid-template-columns: 1fr; } }
+.v3-dofirst.v3-raised { border-top: 1px solid var(--color-line); padding: var(--space-6); }
+.v3-dofirst .v3-kick { color: var(--color-accent); }
+.v3-dofirst-t { font-size: var(--text-lg); line-height: var(--leading-snug); letter-spacing: var(--tracking-snug); margin: var(--space-1) 0 var(--space-2); }
+.v3-dofirst .v3-btns { margin-top: var(--space-5); gap: var(--space-2); }
+.v3-next { border-top: 0; padding-top: 0; }
+.v3-next-row { grid-template-columns: 1.4rem 1fr auto; padding: var(--space-3) 0; font-size: var(--text-sm); }
+.v3-next-row .v3-num:first-child { color: var(--color-faint); }
+.v3-next-row .v3-num:last-child { color: var(--color-ink); font-weight: var(--weight-semi); }
+.v3-next .v3-btn-q { margin-top: var(--space-2); padding-left: 0; }
+.v3-why-open { border-top: 1px solid var(--color-line); }
+
+/* What moved your profit: diverging bars from a centre line. */
+.v3-why { border-top: 1px solid var(--color-line); padding-top: var(--space-6); }
+.v3-moves { display: grid; gap: var(--space-2); margin: var(--space-4) 0 var(--space-5); max-width: 760px; }
+.v3-move { display: grid; grid-template-columns: 180px minmax(0, 1fr) 110px; align-items: center; gap: var(--space-4); font-size: var(--text-sm); }
+.v3-move-lab { color: var(--color-ink); }
+.v3-move-track { position: relative; height: 14px; }
+.v3-move-track::before { content: ''; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px; background: var(--color-line-strong); }
+.v3-move-track i { position: absolute; top: 0; height: 100%; border-radius: var(--radius-sm); }
+.v3-move-track i.neg { right: 50%; background: var(--color-danger); opacity: .78; }
+.v3-move-track i.pos { left: 50%;  background: var(--color-success); opacity: .78; }
+.v3-move-v { font-family: var(--font-figure); font-weight: var(--weight-semi); text-align: right; }
+.v3-move-v.neg { color: var(--color-danger); } .v3-move-v.pos { color: var(--color-success); }
+.v3-move-total { border-top: 1px solid var(--color-line); padding-top: var(--space-2); margin-top: var(--space-1); }
+.v3-move-total .v3-move-lab { font-weight: var(--weight-semi); }
+.v3-move-total .v3-move-track i { opacity: 1; }
+@media (max-width: 640px) { .v3-move { grid-template-columns: 1fr 90px; } .v3-move-track { grid-column: 1 / -1; order: 3; } }
+.v3-why-p { font-size: var(--text-base); line-height: var(--leading-body); max-width: 68ch; color: var(--color-secondary); }

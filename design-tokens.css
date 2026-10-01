@@ -92,29 +92,45 @@
      dims rather than blackens (see --color-scroll-cue). */
   --color-scrim:          rgba(22, 21, 15, 0.55);
 
-  /* Categorical series. Orange leads; the rest are chosen to stay legible
-     side by side and to survive greyscale. */
-  --color-data-1: #C2410C;
-  --color-data-2: #15803D;
-  --color-data-3: #1D4ED8;
-  --color-data-4: #6D28D9;
-  --color-data-5: #B45309;
+  /* Categorical series (revised 2026-10-01). The old set reused the semantic green and
+     amber and added a royal blue and a violet — the blue CLAUDE.md bans, the violet a
+     dark-theme leftover — so a "revenue" line read as "good" and channels looked like a
+     different product. These are for telling series apart and nothing else: muted,
+     warm-compatible, distinct in greyscale, never green/red so they cannot be misread
+     as good/bad. --color-data-quiet is the "prior period / everything else" series. */
+  --color-data-1: #C2410C;   /* accent — the series the page is about   */
+  --color-data-2: #0F766E;   /* deep teal                                */
+  --color-data-3: #475569;   /* slate                                    */
+  --color-data-4: #A16207;   /* ochre                                    */
+  --color-data-5: #8B5E83;   /* mauve                                    */
+  --color-data-quiet: #CBC6BC;
 
   /* ── Type ───────────────────────────────────────────────────────────────
      DM Sans for language, DM Mono for anything countable. Numbers in mono is a
      deliberate signal: a figure you can compare down a column is a different
      kind of thing from a sentence. */
   --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-mono: 'DM Mono', ui-monospace, 'Fira Code', monospace;
+  /* The figure face (2026-10-01). DM Mono at display size made the profit hero read like a
+     terminal, and DM Sans as Google serves it has NO tabular figures (a "1111" sets at half
+     the width of "8888"), so money never lined up in a column. Geist has true tabular,
+     lining figures and the same geometric build as DM Sans. --font-mono keeps its name so
+     every "numbers use --font-mono" rule and call site carries over; it now means "the
+     face for figures", and tabular-nums is switched on at the root. --font-code is the
+     real monospace, for the rare literal code string. */
+  --font-figure: 'Geist', 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-figure);
+  --font-code: 'DM Mono', ui-monospace, 'Fira Code', monospace;
 
-  --text-xs:      0.6875rem;  /* 11 — eyebrows, units, counts                  */
-  --text-sm:      0.8125rem;  /* 13 — body, table cells                        */
+  /* Lifted one step at the small end (2026-10-01): 88% of all text in the product was set
+     at 11 or 13px, which is what made dense screens read as cramped and cheap. */
+  --text-xs:      0.75rem;    /* 12 — eyebrows, units, counts                  */
+  --text-sm:      0.875rem;   /* 14 — body, table cells                        */
   --text-base:    0.9375rem;  /* 15 — emphasis, row titles                     */
   --text-lg:      1.125rem;   /* 18 — section heads                            */
-  --text-xl:      1.5rem;     /* 24 — page titles                              */
+  --text-xl:      1.625rem;   /* 26 — page titles                              */
   --text-2xl:     2rem;       /* 32 — panel figures                            */
   --text-data:    2.75rem;    /* 44 — the one number a screen is about         */
-  --text-display: 3.25rem;    /* 52 — Today's hero                             */
+  --text-display: 3.5rem;     /* 56 — Today's hero                             */
 
   --weight-normal: 400;
   --weight-medium: 500;
