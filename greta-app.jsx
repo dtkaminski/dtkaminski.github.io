@@ -11798,12 +11798,29 @@ const GP_PLAIN_ITEM = {
   'Sales feed fresh': 'Sales data up to date',
 };
 
+// The view's detail column is shorthand ("set 78%", "86 returning-days (90d)"). Say the
+// answer instead; anything unrecognised falls through with money and dates formatted.
+function GP_plainDetail(r) {
+  var d = String(r.detail || '');
+  var m;
+  if (r.status !== 'ready' && !r.blocks_targets) return 'Optional';
+  if (d === 'set') return 'Entered';
+  if ((m = d.match(/^set (\d+(?:\.\d+)?)%$/))) return m[1] + '%';
+  if ((m = d.match(/^(\d+) returning-days \((\d+)d\)$/))) return 'Repeat orders on ' + m[1] + ' of the last ' + m[2] + ' days';
+  if ((m = d.match(/^(\d+) paid channels modelled$/))) return m[1] + ' channels measured';
+  if (d === 'no goal for current quarter') return 'Not set';
+  if (d === 'set a goal first') return 'After the goal';
+  if ((m = d.match(/^(\w+) to (\d{4}-\d{2}-\d{2})$/))) return m[1] + ', to ' + v3Day(m[2], true);
+  return v3Money(d).replace(/(\d{4})-(\d{2})-(\d{2})/g, function (x) { return v3Day(x, true); });
+}
+
+// The kit's stat tile; hi marks the figures the plan is steered by (accent, not a second style).
 function GP_Metric(p) {
   return (
-    <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius:'var(--radius-none)', padding: '12px 14px' }}>
-      <div style={{ fontSize: 'var(--text-xs)', color: GP_T.mut }}>{p.k}</div>
-      <div style={{ fontFamily: GP_T.mono, fontSize: 'var(--text-lg)', fontWeight:'var(--weight-semi)', marginTop: 4, color: p.hi ? GP_T.accent2 : GP_T.ink }}>{p.v}</div>
-      {p.sub && <div style={{ fontSize: 'var(--text-xs)', color: GP_T.dim, marginTop: 3 }}>{p.sub}</div>}
+    <div className="v3-stat">
+      <div className="v3-stat-lab"><span>{p.k}</span></div>
+      <div className="v3-stat-val" style={p.hi ? { color: 'var(--color-accent)' } : undefined}>{p.v}</div>
+      {p.sub && <div className="v3-stat-foot"><span className="v3-muted">{p.sub}</span></div>}
     </div>
   );
 }
@@ -12010,7 +12027,7 @@ function GP_SpendCurve(p) {
   var tick = function (v) { return fmtMoneyK(v); };
 
   return (
-    <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius:'var(--radius-none)', padding: '16px 18px' }}>
+    <div style={{ borderTop: '1px solid ' + GP_T.line, padding: 'var(--space-6) 0' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
         <div style={{ fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: GP_T.accent2 }}>Spend curve</div>
         {indet ? chip('range, not a target', GP_T.amber)
@@ -12146,7 +12163,7 @@ function GP_CurveConstraint(p) {
   };
 
   return (
-    <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius:'var(--radius-none)',
+    <div style={{ borderTop: '1px solid ' + GP_T.line,
       padding: '16px 18px', marginTop: 12 }}>
       <div style={{ fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase',
         color: GP_T.accent2, marginBottom: 4 }}>Why the curve bends</div>
@@ -12212,7 +12229,7 @@ function GP_CurveHistory(p) {
   var narrowed = Number(last.ci_high) - Number(last.ci_low) < Number(first.ci_high) - Number(first.ci_low);
 
   return (
-    <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius:'var(--radius-none)',
+    <div style={{ borderTop: '1px solid ' + GP_T.line,
       padding: '16px 18px', marginTop: 12 }}>
       <div style={{ fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase',
         color: GP_T.accent2, marginBottom: 4 }}>How the read has changed</div>
@@ -12291,7 +12308,7 @@ function GP_CurveLevers(p) {
     per_order_costs: 'Per-order costs', cvr: 'Conversion rate', cpc: 'Cost per click' };
 
   return (
-    <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius:'var(--radius-none)',
+    <div style={{ borderTop: '1px solid ' + GP_T.line,
       padding: '16px 18px', marginTop: 12 }}>
       <div style={{ fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase',
         color: GP_T.accent2, marginBottom: 4 }}>What moves it</div>
@@ -12452,8 +12469,6 @@ function GretaPlanPanel({ show } = {}) {
   function setE(k, val) { setEcon(function (o) { var n = Object.assign({}, o); n[k] = val.replace(/[^0-9.]/g, ''); return n; }); }
 
   var wrap = { maxWidth: 1180, margin: '0 auto', padding: '10px 6px 60px', background: GP_T.bg, color: GP_T.ink };
-  var input = { background: 'var(--color-surface)', border: '1px solid ' + GP_T.line, borderRadius: 'var(--radius-md)', color: GP_T.ink, fontFamily: GP_T.mono, fontSize: 'var(--text-base)', padding: '8px 11px', width: 160 };
-  var seg = function (on) { return { background: on ? GP_T.accent : 'none', color: on ? PAL.panel : GP_T.mut, fontWeight: on ? 'var(--weight-semi)' : 'var(--weight-normal)', border: 0, fontSize: 'var(--text-sm)', padding: '7px 13px', borderRadius: 'var(--radius-md)', cursor: 'pointer' }; };
   var cfg = (window.FRKL_PLAN && window.FRKL_PLAN.config) || null;
   var perDays = (P.period && P.period.start && P.period.end) ? Math.max(1, Math.round((new Date(P.period.end) - new Date(P.period.start)) / 864e5) + 1) : 90;
   var fixedForPeriod = cfg && cfg.fixed_costs_monthly ? Number(cfg.fixed_costs_monthly) * (perDays / 30) : 0;
@@ -12465,12 +12480,12 @@ function GretaPlanPanel({ show } = {}) {
     <div style={wrap}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 4 }}>
         <h2 style={{ fontSize: 'var(--text-base)', margin: 0 }}>{SHOW === 'growth' ? 'Your growth plan' : SHOW === 'goal' ? 'Your goal and costs' : 'Plan'}</h2>
-        <span style={{ fontSize: 'var(--text-sm)', color: GP_T.dim }}>quarter {P.period.start} – {P.period.end}</span>
+        <span style={{ fontSize: 'var(--text-sm)', color: GP_T.dim }}>{v3Day(P.period.start)} – {v3Day(P.period.end, true)}</span>
       </div>
       <div style={{ fontSize: 'var(--text-sm)', color: GP_T.dim, marginBottom: 14 }}>{SHOW === 'growth' ? 'What the plan forecasts, which channels earn their money, and how far your spend can go.' : 'Confirm what things cost you and set your goal — these drive pace and the ranked actions.'}</div>
 
       {/* readiness gate */}
-      {isGoal && (<div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius:'var(--radius-none)', padding: '14px 16px', marginBottom: 16 }}>
+      {isGoal && (<div style={{ borderTop: '1px solid ' + GP_T.line, padding: 'var(--space-6) 0', marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <div style={{ fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: GP_T.accent2 }}>Data readiness</div>
           <div style={{ fontSize: 'var(--text-sm)', color: blocking.length ? GP_T.amber : GP_T.green }}>{readyCount} of {readiness.length} ready{blocking.length ? ' · ' + blocking.length + ' still needed before Greta can set targets' : ' · ready to plan'}</div>
@@ -12483,9 +12498,9 @@ function GretaPlanPanel({ show } = {}) {
                 {sections[sec].map(function (r, i) {
                   return (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0', fontSize: 'var(--text-sm)' }}>
-                      <GP_Dot c={GP_rag(r.status)} />
-                      <span style={{ flex: 1 }}>{GP_PLAIN_ITEM[r.item] || r.item}{r.blocks_targets ? '' : ' ·'}</span>
-                      <span style={{ color: GP_T.dim, fontSize: 'var(--text-xs)' }}>{r.detail}</span>
+                      <GP_Dot c={r.status !== 'ready' && !r.blocks_targets ? 'var(--color-line-strong)' : GP_rag(r.status)} />
+                      <span style={{ flex: 1 }}>{GP_PLAIN_ITEM[r.item] || r.item}</span>
+                      <span className="oi-num" style={{ color: GP_T.dim, fontSize: 'var(--text-xs)' }}>{GP_plainDetail(r)}</span>
                     </div>
                   );
                 })}
@@ -12499,31 +12514,30 @@ function GretaPlanPanel({ show } = {}) {
       {isGrowth && (<GP_ChannelMix mix={P.channelMix}/>)}
 
       {/* economics editor — operating costs feed Operating Profit on the Overview */}
-      {isGoal && (<div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius:'var(--radius-none)', padding: '14px 16px', marginBottom: 16 }}>
+      {isGoal && (<div style={{ borderTop: '1px solid ' + GP_T.line, padding: 'var(--space-6) 0', marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-          <div style={{ fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: GP_T.accent2 }}>Operating economics</div>
-          <span style={{ fontSize: 'var(--text-xs)', color: GP_T.dim }}>feeds contribution &amp; Operating Profit</span>
+          <div style={{ fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: GP_T.accent2 }}>What things cost you</div>
+          <span style={{ fontSize: 'var(--text-xs)', color: GP_T.dim }}>used in every profit figure</span>
         </div>
         <GP_BrowserCosts econ={econ} setEcon={setEcon} />
-        <div style={{ fontSize: 'var(--text-sm)', color: GP_T.dim, marginBottom: 12 }}>Fixed (operating) costs are your monthly overhead — rent, salaries, software. Operating Profit = contribution-after-marketing − fixed costs.</div>
+        <div style={{ fontSize: 'var(--text-sm)', color: GP_T.dim, marginBottom: 'var(--space-3)' }}>Overheads are what you pay every month whatever you sell — rent, wages, software. Operating profit is your profit after ads, less these.</div>
         {econ ? (
           <div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 12 }}>
-              {[['gm', 'Gross margin', '%'], ['fixed', 'Operating (fixed) costs', '£ / month'], ['shipping', 'Shipping', '£ / order'], ['packaging', 'Packaging', '£ / order'], ['fulfilment', 'Fulfilment', '£ / order'], ['payPct', 'Payment fee', '%'], ['payFixed', 'Payment fixed', '£ / order'], ['refundPct', 'Refund rate', '%']].map(function (f) {
-                var hi = f[0] === 'fixed';
+              {[['gm', 'Kept after product cost', '%'], ['fixed', 'Monthly overheads', '£ a month'], ['shipping', 'Shipping', '£ an order'], ['packaging', 'Packaging', '£ an order'], ['fulfilment', 'Packing and dispatch', '£ an order'], ['payPct', 'Payment fee', '%'], ['payFixed', 'Payment fee per order', '£'], ['refundPct', 'Refund rate', '%']].map(function (f) {
                 return (
                   <div key={f[0]}>
-                    <div style={{ fontSize: 'var(--text-xs)', color: hi ? GP_T.accent2 : GP_T.mut, marginBottom: 4, fontWeight: hi ? 'var(--weight-semi)' : 'var(--weight-normal)' }}>{f[1]} <span style={{ color: GP_T.dim }}>({f[2]})</span></div>
-                    <input style={{ background: 'var(--color-surface)', border: '1px solid ' + (hi ? GP_T.accent : GP_T.line), borderRadius: 'var(--radius-md)', color: GP_T.ink, fontFamily: GP_T.mono, fontSize: 'var(--text-base)', padding: '7px 9px', width: '100%', boxSizing: 'border-box' }} value={econ[f[0]]} onChange={function (e) { setE(f[0], e.target.value); }} />
+                    <div style={{ fontSize: 'var(--text-xs)', color: GP_T.mut, marginBottom: 'var(--space-1)' }}>{f[1]} <span style={{ color: GP_T.dim }}>({f[2]})</span></div>
+                    <input className="oi-num" inputMode="decimal" style={{ width: '100%' }} value={econ[f[0]]} onChange={function (e) { setE(f[0], e.target.value); }} />
                   </div>
                 );
               })}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14 }}>
-              <button onClick={saveEcon} disabled={busy} style={{ borderRadius: 'var(--radius-md)', padding: '9px 16px', fontSize: 'var(--text-sm)', border: '1px solid ' + GP_T.accent, background: GP_T.accent, color: PAL.panel, fontWeight:'var(--weight-semi)', cursor: 'pointer' }}>{busy ? '…' : 'Save economics'}</button>
-              {ecMsg === 'ok' && <span style={{ color: GP_T.green, fontSize: 'var(--text-sm)' }}>Saved — Operating Profit now uses these costs.</span>}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginTop: 'var(--space-4)', flexWrap: 'wrap' }}>
+              <button className="v3-btn v3-btn-p" onClick={saveEcon} disabled={busy}>{busy ? 'Saving…' : 'Save costs'}</button>
+              {ecMsg === 'ok' && <span style={{ color: GP_T.green, fontSize: 'var(--text-sm)' }}>Saved — every profit figure now uses these costs.</span>}
               {ecMsg && ecMsg.indexOf('err') === 0 && <span style={{ color: GP_T.red, fontSize: 'var(--text-sm)' }}>{ecMsg.slice(4)}</span>}
-              <span style={{ fontSize: 'var(--text-xs)', color: GP_T.dim }}>Gross margin &amp; variable costs recompute your contribution ratio.</span>
+              
             </div>
           </div>
         ) : (
@@ -12533,7 +12547,7 @@ function GretaPlanPanel({ show } = {}) {
 
       {/* forecast vs goal — the calendar's impact on the plan (reads vw_forecast_vs_goal, SOT) */}
       {isGrowth && P.forecast && (
-        <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius:'var(--radius-none)', padding: '14px 16px', marginBottom: 16 }}>
+        <div style={{ borderTop: '1px solid ' + GP_T.line, padding: 'var(--space-6) 0', marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <div style={{ fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: GP_T.accent2 }}>Forecast vs goal</div>
             <div style={{ fontSize: 'var(--text-xs)', color: GP_T.dim }}>calendar-driven · covers {P.forecast.forecast_covers_from} – {P.forecast.forecast_covers_to}{Number(P.forecast.uncovered_days) > 0 ? ' · ' + P.forecast.uncovered_days + 'd beyond horizon' : ''}</div>
@@ -12551,7 +12565,7 @@ function GretaPlanPanel({ show } = {}) {
 
       {/* channel efficiency vs targets — CTC: CM-first, normalized iROAS, fix before scale */}
       {isGrowth && P.channels && P.channels.length ? (
-        <div style={{ background: GP_T.panel, border: '1px solid ' + GP_T.line, borderRadius:'var(--radius-none)', padding: '14px 16px', marginBottom: 16 }}>
+        <div style={{ borderTop: '1px solid ' + GP_T.line, padding: 'var(--space-6) 0', marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
             <div style={{ fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: GP_T.accent2 }}>Channel efficiency vs targets</div>
             <button onClick={function () { window.FRKL_PLAN.deriveChannelPlan(true); }} style={{ fontSize: 'var(--text-xs)', color: GP_T.mut, background: 'none', border: '1px solid ' + GP_T.line, borderRadius: 'var(--radius-md)', padding: '4px 9px', cursor: 'pointer' }}>{(P.channels[0] && P.channels[0].plan_confirmed) ? 'Re-derive plan from goal' : 'Set plan from goal'}</button>
@@ -12601,44 +12615,50 @@ function GretaPlanPanel({ show } = {}) {
                                     ciAdmitsNoCeiling={!!(P.spendCurve && P.spendCurve.band_admits_no_ceiling)} />)}
 
       {/* goal setter */}
-      {isGoal && (<div style={{ background: 'linear-gradient(180deg,' + GP_T.panel + ',' + GP_T.panel2 + ')', border: '1px solid ' + GP_T.line, borderRadius:'var(--radius-none)', padding: '16px 18px' }}>
-        <div style={{ fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: GP_T.accent2, marginBottom: 10 }}>Set the quarter goal</div>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <div style={{ display: 'inline-flex', background: 'var(--color-surface)', border: '1px solid ' + GP_T.line, borderRadius:'var(--radius-none)', padding: 3 }}>
-            <button onClick={function () { setBasis('cam'); }} style={seg(basis === 'cam')}>Profit after ads</button>
-            <button onClick={function () { setBasis('revenue'); }} style={seg(basis === 'revenue')}>Revenue</button>
+      {isGoal && (<div className="v3-raised" style={{ padding: 'var(--space-6)' }}>
+        <h2 style={{ margin: '0 0 var(--space-1)' }}>Set this quarter’s goal</h2>
+        <p className="micro muted" style={{ margin: '0 0 var(--space-4)' }}>Pick what you want to aim for. Greta works out the sales, ad budget and new customers it takes.</p>
+        <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <div className="v3-seg" role="group" aria-label="Goal basis">
+            <button aria-pressed={basis === 'cam'} onClick={function () { setBasis('cam'); }}>Profit after ads</button>
+            <button aria-pressed={basis === 'revenue'} onClick={function () { setBasis('revenue'); }}>Sales</button>
           </div>
           <div>
-            <div style={{ fontSize: 'var(--text-xs)', color: GP_T.mut, marginBottom: 4 }}>{basis === 'cam' ? 'Profit-after-ads goal' : 'Revenue goal'} (£)</div>
-            <input style={input} value={amount} onChange={function (e) { setAmount(e.target.value.replace(/[^0-9.]/g, '')); }} placeholder={basis === 'cam' ? 'e.g. 25000' : 'e.g. 90000'} />
+            <div style={{ fontSize: 'var(--text-xs)', color: GP_T.mut, marginBottom: 'var(--space-1)' }}>{basis === 'cam' ? 'Profit after ads' : 'Sales'} for the quarter (£)</div>
+            <input className="oi-num" inputMode="decimal" value={amount} onChange={function (e) { setAmount(e.target.value.replace(/[^0-9.]/g, '')); }} placeholder={basis === 'cam' ? 'e.g. 25000' : 'e.g. 90000'} />
           </div>
-          <button onClick={calc} disabled={busy} style={{ borderRadius: 'var(--radius-md)', padding: '9px 15px', fontSize: 'var(--text-sm)', border: '1px solid ' + GP_T.line, background: GP_T.panel, color: GP_T.ink, cursor: 'pointer' }}>{busy ? '…' : 'Calculate'}</button>
-          <span style={{ fontSize: 'var(--text-xs)', color: GP_T.dim }}>leave blank + Calculate for the run-rate baseline</span>
+          <button className="v3-btn" onClick={calc} disabled={busy}>{busy ? 'Working it out…' : 'Work out the plan'}</button>
+          <span style={{ fontSize: 'var(--text-xs)', color: GP_T.dim }}>Leave it blank to see where your current pace lands.</span>
         </div>
 
-        {derived && (
-          <div style={{ marginTop: 16 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 12 }}>
-              <GP_Metric k="Revenue target" v={GP_gbp(derived.revenue_target)} />
-              <GP_Metric k="Profit before ads" v={GP_gbp(derived.product_cm_target)} sub={'× ' + Math.round((derived.cm_ratio_used || 0) * 100) + '%'} />
+        {/* Only render targets Greta actually derived. When the derivation returns nothing the tiles
+            used to print "NaN", "MER undefined" and "aMER undefined" — a new brand saw that first. */}
+        {derived && derived.revenue_target == null && (
+          <p className="v3-note" style={{ marginTop: 'var(--space-4)' }}>Greta could not work a goal out from your trading yet — it needs a few weeks of sales and ad spend. You can still type the goal you have in mind above.</p>
+        )}
+        {derived && derived.revenue_target != null && (
+          <div style={{ marginTop: 'var(--space-5)' }}>
+            <div className="v3-stat-grid">
+              <GP_Metric k="Sales" v={GP_gbp(derived.revenue_target)} sub="for the quarter" />
+              <GP_Metric k="Profit before ads" v={GP_gbp(derived.product_cm_target)} sub={derived.cm_ratio_used != null ? fmtPctN(derived.cm_ratio_used) + ' of sales' : ''} />
               <GP_Metric k="Profit after ads" v={GP_gbp(derived.cam_target)} hi={true} sub="the number Today paces against" />
-              <GP_Metric k="Spend cap" v={GP_gbp(derived.spend_cap)} sub={'MER ' + derived.mer_target} />
-              <GP_Metric k="New customers" v={Math.round(derived.new_customer_target).toLocaleString('en-GB')} sub={'aMER ' + derived.amer_used} />
-              <GP_Metric k="Returning (baseline)" v={GP_gbp(derived.returning_revenue_target)} />
-              <GP_Metric k="Target new-customer cost" v={fmtMoney(targetCac, 2)} hi={true} sub="spend cap ÷ new custs" />
-              <GP_Metric k="Operating profit" v={opTarget == null ? '—' : GP_gbp(opTarget)} sub={fixedForPeriod > 0 ? 'CAM − ' + GP_gbp(fixedForPeriod) + ' fixed' : 'set fixed costs above'} />
+              <GP_Metric k="Ad budget" v={GP_gbp(derived.spend_cap)} sub={derived.mer_target != null ? Number(derived.mer_target).toFixed(1) + '× sales per £ of ads' : ''} />
+              <GP_Metric k="New customers" v={fmtCount(derived.new_customer_target)} sub={derived.amer_used != null ? Number(derived.amer_used).toFixed(1) + '× new-customer sales per £ of ads' : ''} />
+              <GP_Metric k="Sales from returning customers" v={GP_gbp(derived.returning_revenue_target)} sub="at your current rate" />
+              <GP_Metric k="Most to pay for a new customer" v={fmtMoney(targetCac, 2)} hi={true} sub="ad budget ÷ new customers" />
+              <GP_Metric k="Operating profit" v={opTarget == null ? '—' : GP_gbp(opTarget)} sub={fixedForPeriod > 0 ? 'after ' + GP_gbp(fixedForPeriod) + ' of overheads' : 'add your overheads above'} />
             </div>
             <GP_Why d={derived} cac={targetCac}/>
             {g && (
-              <div style={{ fontSize: 'var(--text-xs)', color: GP_T.dim, marginTop: 8 }}>
-                Current {g.confirmed ? 'confirmed' : 'provisional'} goal: revenue {GP_gbp(g.revenue_target)} · product CM {GP_gbp(g.contribution_margin_target)} · spend cap {GP_gbp(g.spend_cap)} · MER {g.mer_target}
+              <div style={{ fontSize: 'var(--text-xs)', color: GP_T.dim, marginTop: 'var(--space-2)' }}>
+                Current goal ({g.confirmed ? 'confirmed' : 'not yet confirmed'}): sales {GP_gbp(g.revenue_target)} · profit before ads {GP_gbp(g.contribution_margin_target)} · ad budget {GP_gbp(g.spend_cap)}
               </div>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
-              <button onClick={confirm} disabled={busy} style={{ borderRadius: 'var(--radius-md)', padding: '9px 16px', fontSize: 'var(--text-sm)', border: '1px solid ' + GP_T.accent, background: GP_T.accent, color: PAL.panel, fontWeight:'var(--weight-semi)', cursor: 'pointer' }}>Confirm as plan of record</button>
-              {msg === 'ok' && <span style={{ color: GP_T.green, fontSize: 'var(--text-sm)' }}>Confirmed — this is now your plan; pace &amp; RAG-vs-target are live.</span>}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginTop: 'var(--space-4)', flexWrap: 'wrap' }}>
+              <button className="v3-btn v3-btn-p" onClick={confirm} disabled={busy}>Make this my plan</button>
+              {msg === 'ok' && <span style={{ color: GP_T.green, fontSize: 'var(--text-sm)' }}>Done — Today now tracks your pace against this plan.</span>}
               {msg && msg.indexOf('err') === 0 && <span style={{ color: GP_T.red, fontSize: 'var(--text-sm)' }}>{msg.slice(4)}</span>}
-              <span style={{ fontSize: 'var(--text-xs)', color: GP_T.dim }}>Confirming derives from live economics (cm {Math.round((derived.cm_ratio_used || 0) * 100)}%, aMER {derived.amer_used}).</span>
+              <span style={{ fontSize: 'var(--text-xs)', color: GP_T.dim }}>Worked out from what you keep after product and order costs ({fmtPctN(derived.cm_ratio_used)}) and what a £ of ads brings in from new customers ({derived.amer_used != null ? Number(derived.amer_used).toFixed(1) + '×' : '—'}).</span>
             </div>
           </div>
         )}
@@ -15074,38 +15094,50 @@ function CostDrift(){
   }, []);
   if (rows === null) return <V3SkeletonRows n={2}/>;   // pending, not empty
   if (!rows.length) return null;
+  // vw_brand_config_drift keys mix snake and camel case (they are brand_config keys) and
+  // its units are fraction / percent / money_order / money_month.
   const LABEL = {
-    gross_margin: 'Gross margin', refund_rate: 'Refund rate', shipping: 'Shipping per order',
-    packaging: 'Packaging per order', fulfilment: 'Fulfilment per order', payment_pct: 'Payment fee',
-    payment_fixed: 'Payment fee per order', discount_rate: 'Discount rate', aov: 'Average order value',
+    gross_margin: 'What you keep after product cost', refundPct: 'Refund rate', refund_rate: 'Refund rate',
+    shipping: 'Shipping', packaging: 'Packaging', fulfilment: 'Fulfilment', payPct: 'Payment fee',
+    payment_pct: 'Payment fee', payFixed: 'Payment fee per order', payment_fixed: 'Payment fee per order',
+    fixed_costs_monthly: 'Monthly overheads', discount_rate: 'Discount rate', aov: 'Average order value',
   };
-  const fmt = (v, unit) => v == null ? '—'
-    : unit === 'pct' ? (Number(v) * (Math.abs(Number(v)) <= 1 ? 100 : 1)).toFixed(1) + '%'
-    : unit === 'gbp' ? GBP(v) : String(v);
+  const name = k => LABEL[k] || String(k).replace(/_/g,' ');
+  const fmt = (v, unit) => {
+    if (v == null) return FMT_NONE;
+    const n = Number(v);
+    if (unit === 'fraction') return fmtPctN(n);
+    if (unit === 'percent' || unit === 'pct') return fmtPctN(n / 100);
+    if (unit === 'money_order') return fmtMoney(n, 2) + ' an order';
+    if (unit === 'money_month') return fmtMoney(n) + ' a month';
+    if (unit === 'gbp') return fmtMoney(n, 2);
+    return String(v);
+  };
   const off = rows.filter(r => r.verifiable && r.status && r.status !== 'ok');
   const checked = rows.filter(r => r.verifiable).length;
-  return (<div className="card" style={{marginTop:14}}>
+  return (<div className="card">
     <div className="card-section-title"><h2 style={{margin:0}}>Do these match what actually happened?</h2>
       <span className="meta">{checked} of {rows.length} can be checked against your own data</span></div>
     {off.length === 0
       ? <div className="fine" style={{color:'var(--text-secondary)', marginTop:8}}>Everything Greta can check lines up with what you entered.</div>
       : (<div style={{marginTop:8}}>
           <div style={{overflowX:'auto'}}>
-            <table><thead><tr><th>Cost</th><th>You entered</th><th>Your data shows</th><th>Based on</th></tr></thead>
+            <table><thead><tr><th>Cost</th><th>You entered</th><th>Your data shows</th><th className="t-text">Based on</th></tr></thead>
               <tbody>{off.map((r,i)=>(<tr key={i}>
-                <td>{LABEL[r.input_key] || String(r.input_key).replace(/_/g,' ')}</td>
+                <td>{name(r.input_key)}</td>
                 <td>{fmt(r.config_value, r.unit)}</td>
-                <td style={{color:'var(--warn)'}}>{fmt(r.realised_value, r.unit)}</td>
-                <td className="muted">{r.realised_basis || ''}{r.n ? ' · ' + r.n + ' orders' : ''}</td>
+                <td className="v3-down">{fmt(r.realised_value, r.unit)}</td>
+                <td className="muted t-text">{r.n ? 'Last 12 months, ' + fmtCount(r.n) + ' orders' : 'Your orders'}</td>
               </tr>))}</tbody></table>
           </div>
           <div className="fine" style={{color:'var(--text-secondary)', marginTop:6}}>
-            Profit is calculated from the figures you entered, so while these differ, every profit
-            number is off by the same gap. Update them above, or leave them if you know why they differ.
+            Profit uses the figures you entered, so while these differ every profit number carries the
+            same gap. Update them above, or leave them if you know why they differ.
           </div>
         </div>)}
-    {rows.some(r => !r.verifiable) && (<div className="micro muted" style={{marginTop:6}}>
-      {rows.filter(r=>!r.verifiable).length} cannot be checked yet{rows.find(r=>!r.verifiable && r.unverifiable_reason) ? ' — ' + rows.find(r=>!r.verifiable && r.unverifiable_reason).unverifiable_reason : ''}.
+    {rows.some(r => !r.verifiable) && (<div className="micro muted" style={{marginTop:'var(--space-2)'}}>
+      Greta can’t check {rows.filter(r=>!r.verifiable).map(r => name(r.input_key).toLowerCase()).join(', ')} yet —
+      nothing connected records what you actually pay for these, so your figures are used as entered.
     </div>)}
   </div>);
 }
