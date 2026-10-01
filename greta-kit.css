@@ -361,3 +361,25 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
    that should be uppercase use .v3-kick. Inline textTransform on a .micro is overridden too. */
 .v3-main .micro { font-family: var(--font-sans); font-size: var(--text-xs); color: var(--color-muted);
   text-transform: none !important; letter-spacing: 0 !important; font-weight: var(--weight-normal); line-height: var(--leading-body); }
+
+/* ── Page stack, facts, product table ───────────────────────────────────── */
+.v3-page-stack { display: flex; flex-direction: column; gap: var(--space-8); margin-bottom: var(--space-8); }
+.v3-chart-solo { border-top: 1px solid var(--color-line); padding-top: var(--space-6); }
+.v3-lede { font-size: var(--text-base); color: var(--color-secondary); margin: var(--space-1) 0 var(--space-5); max-width: 68ch; }
+.v3-facts { display: grid; gap: var(--space-5); align-content: start; padding-top: var(--space-6); }
+.v3-facts > div { display: grid; gap: 2px; }
+.v3-facts-v { font-family: var(--font-figure); font-size: var(--text-xl); font-weight: var(--weight-semi); color: var(--color-ink); letter-spacing: -0.015em; }
+.v3-facts-l { font-size: var(--text-sm); color: var(--color-muted); line-height: var(--leading-snug); max-width: 40ch; }
+.v3-ptable td:first-child { max-width: 360px; }
+.v3-ptitle { margin-right: var(--space-2); }
+.v3-ptable td.t-text { width: 42%; }
+.v3-pbar { display: inline-block; vertical-align: middle; width: calc(100% - 84px); height: 8px; background: var(--color-sunken); border-radius: var(--radius-sm); position: relative; }
+.v3-pbar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--color-accent); border-radius: var(--radius-sm); }
+.v3-pval { display: inline-block; width: 76px; text-align: right; font-family: var(--font-figure); font-weight: var(--weight-semi); margin-left: 8px; vertical-align: middle; }
+.v3-up { color: var(--color-success); } .v3-down { color: var(--color-danger); }
+.v3-movers { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-10); border-top: 1px solid var(--color-line); padding-top: var(--space-6); }
+@media (max-width: 760px) { .v3-movers { grid-template-columns: 1fr; gap: var(--space-6); } }
+.v3-mover { display: flex; justify-content: space-between; gap: var(--space-4); padding: var(--space-2) 0; border-bottom: 1px solid var(--color-line); font-size: var(--text-sm); }
+.v3-mover b { font-family: var(--font-figure); font-weight: var(--weight-semi); white-space: nowrap; }
+.v3-main td.v3-up, .v3-main .v3-up { color: var(--color-success); }
+.v3-main td.v3-down, .v3-main .v3-down { color: var(--color-danger); }
