@@ -299,8 +299,10 @@
   // The loader's own listener retires the old files first; this one runs after it and puts the
   // live objects back.
   window.addEventListener('frkl-snapshots-loaded', function () { apply(); try { window.dispatchEvent(new CustomEvent('frkl-data-updated', { detail: { liveSnapshots: true } })); } catch (e) {} });
-  window.addEventListener('frkl-brand-ready', build);
-  window.addEventListener('frkl-data-updated', function (e) { if (e && e.detail && e.detail.liveSnapshots) return; build(); });
-  build();
+  // Only after the main live read has landed: these are ~20 more requests, and starting them at
+  // brand-ready put them in the queue ahead of the figures every screen is waiting for.
+  var ready = function () { return !!(window.FRKL_LIVE && window.FRKL_LIVE.lastFetchAt); };
+  window.addEventListener('frkl-data-updated', function (e) { if (e && e.detail && e.detail.liveSnapshots) return; if (ready()) build(); });
+  if (ready()) build();
   window.OI_LIVE_SNAPSHOTS = { rebuild: function () { var b = bid(); if (b) delete built[b]; return build(); }, built: built };
 })();

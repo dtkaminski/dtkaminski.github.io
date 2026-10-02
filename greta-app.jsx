@@ -13293,6 +13293,11 @@ function ConnectionsPanel(){
 
   const sevVar = (n) => n == null ? 'var(--text-muted)' : n <= 1 ? 'var(--good)' : n <= 4 ? 'var(--warn)' : 'var(--bad)';
   const sevLabel = (n) => n == null ? 'No data' : n <= 1 ? 'Fresh' : n <= 4 ? 'Ageing' : 'Stale';
+  // Signed in, but the live read has not landed yet. Without this the rows fell back to the
+  // bundled July data and said every source was "Stale · last order 89 days ago" with a Connect
+  // button, for as long as the live read took (30s on a slow load) — on connections that were fine.
+  const _L = typeof window !== 'undefined' && window.FRKL_LIVE;
+  const checking = !!(_L && _L.session && !_L.lastFetchAt && !/^(error|static-only)$/.test(_L.status || ''));
 
   // Prefilled from the stored domain when there is one: a reconnect should not make
   // anyone retype the shop they are already connected to.
@@ -13337,6 +13342,16 @@ function ConnectionsPanel(){
           const syncStr = syncMs == null ? null : syncMs < 3600000 ? 'just now' : syncMs < 86400000 ? Math.floor(syncMs/3600000) + 'h ago' : syncN + 'd ago';
 
           const fresh = !!conn && syncN != null && syncN <= 1;
+          if (checking && s.provider) return (<div key={s.id} className="v3-conn-row">
+            <div className="v3-conn-mark" aria-hidden="true">{s.icon}</div>
+            <div className="v3-conn-body">
+              <div className="v3-conn-name">{s.name}
+                <span className="v3-conn-state" style={{color:'var(--text-muted)'}}><i style={{background:'var(--text-muted)'}}/>Checking…</span>
+              </div>
+              <div className="v3-conn-meta">Checking the live connection</div>
+              <div className="v3-conn-desc">{s.description}</div>
+            </div>
+          </div>);
           return (<div key={s.id} className="v3-conn-row">
             <div className="v3-conn-mark" aria-hidden="true">{s.icon}</div>
 

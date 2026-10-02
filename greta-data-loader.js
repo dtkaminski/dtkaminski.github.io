@@ -278,7 +278,10 @@
       let p = inflight.get(key);
       if (p) return p.then(r => r.clone());
 
+      const _t0 = Date.now();
       p = fetch(input, init).then(r => {
+        const T = window.FRKL_LIVE && window.FRKL_LIVE.timings, d = Date.now() - _t0;
+        if (T && d > T.fetchMax) { T.fetchMax = d; T.fetchSlowest = (url.split('/rest/v1/')[1] || '').split('?')[0]; }
         inflight.delete(key);
         if (r && r.ok) { try { done.set(key, { at: Date.now(), res: r.clone() }); } catch (e) {} }
         return r;
@@ -304,6 +307,20 @@
       { global: { fetch: makeDedupeFetch() } });
     window.FRKL_LIVE.sb = sb;
 
+    // Where a slow load spends its time. Every query first asks the auth client for the token
+    // (getSession), which waits on a lock shared by every tab and frame on this origin; the fetch
+    // wrapper times the network part. Reads timed out daily ("no response in 8000ms" on a 9ms query)
+    // and the database was never the slow part — so measure the two halves separately.
+    const T = window.FRKL_LIVE.timings = { start: Date.now(), authMax: 0, authSlow: 0, fetchMax: 0, fetchSlowest: null };
+    try {
+      const _gs = sb.auth.getSession.bind(sb.auth);
+      sb.auth.getSession = async function () {
+        const t = Date.now();
+        try { return await _gs.apply(null, arguments); }
+        finally { const d = Date.now() - t; if (d > T.authMax) T.authMax = d; if (d > 2000) T.authSlow++; }
+      };
+    } catch (e) { /* timing only */ }
+
     // 2. Check for active session (set if the user logged in via the same-origin /auth/login.html).
     const { data: sessionData } = await sb.auth.getSession();
     if (!sessionData?.session) {
@@ -320,6 +337,7 @@
       return;
     }
     window.FRKL_LIVE.session = sessionData.session;
+    T.session = Date.now() - T.start;
 
     // 3. Resolve user's brand membership for frkl
     const { data: memberships, error: memErr } = await sb
@@ -341,6 +359,7 @@
       return;
     }
     window.FRKL_LIVE.brandId = frkl.brand_id;
+    T.membership = Date.now() - T.start;
     // Currency for the dashboard formatters (they read window.OI_CURRENCY at render).
     window.OI_CURRENCY = (frkl.brand && frkl.brand.currency) || 'GBP';
 
@@ -467,8 +486,10 @@
       window.FRKL_LIVE.recent_sync = syncLog;
 
       setStatus('live', null);
+      const firstLoad = !window.FRKL_LIVE.lastFetchAt;
       window.FRKL_LIVE.lastFetchAt = new Date();
       dispatchUpdate();
+      if (firstLoad) reportSlowLoad(sb, brandId);
     } catch (err) {
       console.warn('[frkl-live] refresh failed', err);
       // "Last-good" only means something once a live load has landed. Before that, what is on
@@ -477,6 +498,22 @@
       retireOnFailure();
       setStatus('error', err?.message || String(err));
     }
+  }
+
+  // A first load over 10s is written to client_error_log with its breakdown, so the next slow
+  // load says whether the time went on the auth lock, the network, or the queries. Once per page.
+  function reportSlowLoad(sb, brandId) {
+    try {
+      const T = window.FRKL_LIVE.timings; if (!T || T.reported) return;
+      T.loaded = Date.now() - T.start;
+      if (T.loaded < 10000) return;
+      T.reported = true;
+      const detail = 'total=' + T.loaded + 'ms session=' + (T.session || '?') + ' membership=' + (T.membership || '?') +
+        ' authMax=' + T.authMax + ' authSlow=' + T.authSlow + ' fetchMax=' + T.fetchMax + ' (' + (T.fetchSlowest || '?') + ')' +
+        ' frame=' + (window.parent !== window ? 'iframe' : 'top') + ' hidden=' + (document.hidden ? 1 : 0);
+      sb.from('client_error_log').insert({ brand_id: brandId, kind: 'read_timeout', source: 'dashboard_load', detail: detail.slice(0, 500), screen: 'load' })
+        .then(function () {}, function () {});
+    } catch (e) { /* telemetry never breaks the page */ }
   }
 
   // ── Per-resource fetchers (each returns an empty array on miss, never throws) ──
