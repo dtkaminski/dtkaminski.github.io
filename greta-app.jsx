@@ -15948,6 +15948,19 @@ function V3Today(p) {
        </div>
         <V3MoneyFlow d={d}/>
         {stale && <button type="button" className="v3-refresh" onClick={refresh}>New numbers are available — show them</button>}
+        {/* The live read failed and the figures above are the last ones this browser saw. Say
+            when they are from, rather than let a day-old number read as this morning's. */}
+        {d.refresh_failed && (() => {
+          const t = d.data_as_of ? new Date(d.data_as_of) : null;
+          const when = t && isFinite(t.getTime())
+            ? (t.toDateString() === new Date().toDateString() ? '' : t.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) + ', ')
+              + t.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+            : null;
+          return (<div className="v3-pace">
+            <span className="v3-muted">Couldn’t refresh — {when ? 'these figures are from ' + when : 'these are the last figures Greta had'}.</span>
+            <button type="button" className="v3-btn v3-btn-sm" onClick={() => location.reload()}>Try again</button>
+          </div>);
+        })()}
       </div>
     )}
 

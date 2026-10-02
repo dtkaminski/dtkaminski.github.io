@@ -260,6 +260,12 @@
       if (!window.GRETA_HEADLINE) {
         window.GRETA_HEADLINE_ERROR = 'slow';
         try { window.dispatchEvent(new CustomEvent('greta-headline-updated')); } catch (e) {}
+      } else {
+        // ...but say so. The figure on screen is the last one this browser saw (up to 26h old),
+        // and it used to sit there unlabelled as if it were current. A new object, so the screen
+        // re-renders; the numbers are unchanged, so Today does not offer "new numbers".
+        window.GRETA_HEADLINE = Object.assign({}, window.GRETA_HEADLINE, { refresh_failed: true });
+        try { window.dispatchEvent(new CustomEvent('greta-headline-updated')); } catch (e) {}
       }
       return;
     }
