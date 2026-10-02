@@ -953,3 +953,48 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
   .v3-walk-take li { grid-template-columns: 1fr; gap: var(--space-1); }
   body.v3-walking .v3-main { padding-bottom: calc(var(--size-dock) + var(--size-mobile-nav) + var(--space-8)); }
 }
+
+/* Quarter plan, explained (GP_PlanBreakdown): hairline sections, figures in mono, warnings as a
+   plain list above. Replaces the "Why are these the targets?" box. */
+.gp-plan { margin-top: var(--space-5); }
+.gp-plan-flags { list-style: none; margin: 0 0 var(--space-4); padding: 0; }
+.gp-plan-flags li { padding: var(--space-2) 0 var(--space-2) var(--space-3); border-left: 2px solid var(--color-warning);
+  font-size: var(--text-sm); line-height: var(--leading-body); color: var(--color-ink); }
+.gp-plan-flags li + li { margin-top: var(--space-2); }
+.gp-plan-sec { border-top: 1px solid var(--color-line); padding-top: var(--space-4); margin-top: var(--space-4); }
+.gp-plan-h { font-size: var(--text-base); font-weight: var(--weight-semi); margin: 0 0 var(--space-2); }
+.gp-plan-say { font-size: var(--text-sm); line-height: var(--leading-body); color: var(--color-muted); margin: var(--space-2) 0 0; max-width: calc(var(--measure) * 1.6); }
+.gp-plan-say b { color: var(--color-ink); font-weight: var(--weight-semi); font-family: var(--font-mono); }
+.gp-plan-tbl { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+.gp-plan-tbl th, .gp-plan-tbl td { text-align: right; padding: var(--space-2) var(--space-3); border-top: 1px solid var(--color-line);
+  font-weight: var(--weight-normal); text-transform: none; letter-spacing: normal; }
+.gp-plan-tbl td { font-family: var(--font-mono); color: var(--color-ink); }
+.gp-plan-tbl thead th { border-top: 0; font-size: var(--text-xs); font-weight: var(--weight-medium); color: var(--color-muted); }
+.gp-plan-tbl th[scope="row"], .gp-plan-tbl thead th:first-child { text-align: left; padding-left: 0; }
+.gp-plan-tbl tr > :last-child { padding-right: 0; }
+.gp-plan-total th, .gp-plan-total td { font-weight: var(--weight-semi); border-top: 1px solid var(--color-line-strong); }
+.gp-plan-peak th[scope="row"] { font-weight: var(--weight-semi); }
+.gp-plan-tag { display: inline-block; margin-left: var(--space-2); padding: 0 var(--space-2); font-size: var(--text-xs);
+  color: var(--color-accent); border: 1px solid var(--color-accent-line); border-radius: var(--radius-sm); }
+.gp-plan-tag-warn { color: var(--color-warning); border-color: var(--color-warning); }
+/* In the month column the tags stack under the name, so two of them never widen the table into a scroll. */
+.gp-plan-tbl th[scope="row"] .gp-plan-tag { display: table; margin: var(--space-1) 0 0; }
+.gp-plan-tbl thead th, .gp-plan-tbl th[scope="row"] { white-space: normal; }
+.gp-pos { color: var(--color-success) !important; }
+.gp-neg { color: var(--color-danger) !important; }
+.gp-plan-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
+.gp-plan-stats > div { display: grid; gap: var(--space-1); }
+.gp-plan-k { font-size: var(--text-xs); color: var(--color-muted); }
+.gp-plan-v { font-family: var(--font-mono); font-size: var(--text-lg); font-weight: var(--weight-semi); color: var(--color-ink); }
+.gp-plan-sub { font-size: var(--text-xs); color: var(--color-faint); }
+.gp-plan-season { margin: var(--space-2) 0 0; }
+.gp-plan-season svg { display: block; width: 100%; max-width: calc(var(--space-16) * 8); height: var(--space-16); }
+.gp-plan-season figcaption { display: flex; justify-content: space-between; max-width: calc(var(--space-16) * 8);
+  font-size: var(--text-xs); color: var(--color-faint); margin-top: var(--space-1); }
+.gp-plan-more { margin-top: var(--space-4); background: none; border: 0; padding: 0; cursor: pointer; font: inherit;
+  font-size: var(--text-sm); font-weight: var(--weight-semi); color: var(--color-accent); display: inline-flex; align-items: center; gap: var(--space-2); }
+.gp-plan-how { margin-top: var(--space-2); }
+@media (max-width: 760px) {
+  .gp-plan-stats { grid-template-columns: 1fr; }
+  .gp-plan-tbl th, .gp-plan-tbl td { padding-left: var(--space-1); padding-right: var(--space-1); }
+}

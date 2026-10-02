@@ -11943,30 +11943,135 @@ function GP_Metric(p) {
   );
 }
 
-function GP_Why(p){
-  var st = React.useState(false), open = st[0], setOpen = st[1];
-  var d = p.d; if(!d) return null;
-  var cac = p.cac;
-  var cmPct = Math.round((d.cm_ratio_used||0)*100);
-  var nc = Math.round(d.new_customer_target||0).toLocaleString('en-GB');
-  var line = { display:'flex', gap:8, padding:'7px 0', borderTop:'1px solid '+GP_T.line, fontSize:'var(--text-sm)', color:GP_T.mut, lineHeight:1.55 };
-  var num = { fontFamily:GP_T.mono, color:GP_T.ink, fontWeight:'var(--weight-semi)' };
-  return (
-    <div style={{ marginTop:12 }}>
-      <button onClick={function(){ setOpen(!open); }} style={{ background:'none', border:'none', color:GP_T.accent2, fontSize:'var(--text-sm)', fontWeight:'var(--weight-semi)', cursor:'pointer', padding:0, fontFamily:'inherit' }}>
-        <Icon name="chevron" size={12} style={{transform:open?'rotate(90deg)':'none', transition:'transform .15s', verticalAlign:'-1px', marginRight:'var(--space-2)'}}/>Why are these the targets?
-      </button>
-      {open && (
-        <div style={{ marginTop:8, background:'var(--color-surface)', border:'1px solid '+GP_T.line, borderRadius:'var(--radius-none)', padding:'2px 14px 12px' }}>
-          <div style={line}><span><b style={{color:GP_T.ink}}>Revenue target</b> — your contribution goal grossed back up by your contribution margin. <span style={num}>{GP_gbp(d.cam_target)}</span> CAM &divide; {cmPct}% margin, plus the returning-customer baseline, &asymp; <span style={num}>{GP_gbp(d.revenue_target)}</span>.</span></div>
-          <div style={line}><span><b style={{color:GP_T.ink}}>Ad spend cap</b> — the revenue you must <i>buy</i>, &divide; your sales per £ of ads target. At sales per £ of ads <span style={num}>{d.mer_target}</span> (revenue &divide; ad spend), the plan needs at most <span style={num}>{GP_gbp(d.spend_cap)}</span> of spend.</span></div>
-          <div style={line}><span><b style={{color:GP_T.ink}}>New customers</b> — new-customer revenue &divide; sales per £ of ads for new customers <span style={num}>{d.amer_used}</span> (how much revenue each &pound;1 of acquisition spend brings). That lands at <span style={num}>{nc}</span> new customers this quarter.</span></div>
-          <div style={line}><span><b style={{color:GP_T.ink}}>Target cost per new customer</b> — the spend cap shared across those customers: <span style={num}>{GP_gbp(d.spend_cap)}</span> &divide; <span style={num}>{nc}</span> = <span style={num}>{cac==null?'—':'£'+cac.toFixed(2)}</span>. Pay more than this per new customer and you slip behind the profit plan; pay less and you have room to scale.</span></div>
-          <div style={{ fontSize:'var(--text-xs)', color:GP_T.dim, marginTop:9, lineHeight:1.5 }}>Every figure derives from your confirmed economics (contribution margin {cmPct}%, aMER {d.amer_used}). Change those on the economics panel above and the targets move with them.</div>
-        </div>
-      )}
-    </div>
-  );
+// ── The plan, explained ───────────────────────────────────────────────────────
+// Where the quarter's sales come from (returning customers at no ad cost, new customers bought with
+// the budget), what each new customer earns against what it costs, the months — the season and
+// Black Friday — last year's same quarter, the seasonal pattern used and every caveat the model
+// raised. All figures are fn_plan_quarter's (0232); nothing is recomputed here. It replaces
+// "Why are these the targets?", whose text was written for the profit basis and printed
+// "−£163 ÷ 60% + £25,865 ≈ £150,000" on the sales basis.
+const GP_FLAG_TEXT = {
+  beyond_spend_seen: 'At least one month asks for more than 1.5× the most you have ever spent on ads in a month. Greta extends your spend curve to get there, so treat that month as a stretch, not a forecast.',
+  below_spend_seen: 'At least one month plans less than half the least you have ever spent in a month — below anything the curve has seen.',
+  capped_at_spend_seen: 'Greta stopped the growth at three times your biggest month of ad spend: beyond that the curve is guesswork, not evidence.',
+  goal_above_max: 'That profit is beyond what Greta can see a way to this quarter, so the plan below is the most profitable one instead.',
+  met_by_returning: 'Returning customers alone are on course to reach this, so no ad budget is needed for it.',
+  no_ad_history: 'There is no ad-spend history yet, so new-customer sales are carried at their current rate and no budget is planned.',
+  short_base: 'There are fewer than three full months of trading behind this, so the starting point is thin.'
+};
+const GP_MONTH_NAME = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+function gpMonthName(iso) { return GP_MONTH_NAME[Number(String(iso).slice(5, 7)) - 1] || ''; }
+
+function GP_PlanBreakdown({ d }) {
+  const st = React.useState(false), open = st[0], setOpen = st[1];
+  if (!d || !d.breakdown) return null;   // an old-shaped result (server not updated) renders no breakdown
+  const b = d.breakdown, s = d.seasonality || {}, months = d.months || [], ly = d.last_year, ceil = d.ceiling, inp = d.inputs || {};
+  const flags = (d.flags || []).filter(f => GP_FLAG_TEXT[f]);
+  const retShare = d.revenue_target > 0 ? b.returning_sales / d.revenue_target : null;
+  const newPays = b.new_profit_after_ads >= 0;
+  const peak = months.length ? months.reduce((a, m) => (Number(m.sales) > Number(a.sales) ? m : a), months[0]) : null;
+  const doubling = inp.beta != null ? Math.pow(2, Number(inp.beta)) : null;
+  const planMonths = months.map(m => Number(String(m.month).slice(5, 7)));
+  const idx = (s.months || []).map(m => Number(m.sales_idx));
+  const hi = Math.max(1, ...idx);
+  const basisLine = d.basis === 'revenue'
+    ? <>You asked for <b>{GP_gbp(d.goal)}</b> of sales. Returning customers bring <b>{GP_gbp(b.returning_sales)}</b> on their own — their recent rate, adjusted for the season. The other <b>{GP_gbp(b.new_sales)}</b> has to come from new customers, and Greta found the ad budget that buys it, given how your new-customer sales respond to spend and when demand peaks.</>
+    : d.basis === 'cam' && (d.flags || []).indexOf('goal_above_max') >= 0
+    ? <>You asked for <b>{GP_gbp(d.goal)}</b> of profit after ads. That is more than any budget reaches this quarter, so Greta planned the budget that makes the most: past it, each extra pound of ads brings back less than a pound of profit.</>
+    : d.basis === 'cam'
+    ? <>You asked for <b>{GP_gbp(d.goal)}</b> of profit after ads, and Greta treats it as a floor: this is the most growth that still clears it — the biggest budget at which profit after ads stays at your goal{(d.flags || []).indexOf('capped_at_spend_seen') >= 0 ? ', stopped at three times your biggest month of spend' : ''}.</>
+    : <>No goal set, so this carries your recent ad spend — about <b>{GP_gbp(inp.base_monthly_spend)}</b> a month — through the quarter, spread toward the months where it buys most.</>;
+
+  return (<div className="gp-plan">
+    {flags.length > 0 && (<ul className="gp-plan-flags" aria-label="What to bear in mind">
+      {flags.map(f => <li key={f}>{GP_FLAG_TEXT[f]}</li>)}
+    </ul>)}
+
+    <section className="gp-plan-sec">
+      <h3 className="gp-plan-h">Where the {GP_gbp(d.revenue_target)} comes from</h3>
+      <table className="gp-plan-tbl">
+        <thead><tr><th scope="col"/><th scope="col">Sales</th><th scope="col">Profit before ads</th><th scope="col">Ads</th><th scope="col">Profit after ads</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Returning customers</th><td>{GP_gbp(b.returning_sales)}</td><td>{GP_gbp(b.returning_profit)}</td><td>—</td><td>{GP_gbp(b.returning_profit)}</td></tr>
+          <tr><th scope="row">New customers</th><td>{GP_gbp(b.new_sales)}</td><td>{GP_gbp(b.new_profit_before_ads)}</td><td>−{GP_gbp(b.ads)}</td>
+            <td className={newPays ? 'gp-pos' : 'gp-neg'}>{GP_gbp(b.new_profit_after_ads)}</td></tr>
+          <tr className="gp-plan-total"><th scope="row">The quarter</th><td>{GP_gbp(d.revenue_target)}</td><td>{GP_gbp(d.product_cm_target)}</td><td>−{GP_gbp(d.spend_cap)}</td><td>{GP_gbp(d.cam_target)}</td></tr>
+        </tbody>
+      </table>
+      <p className="gp-plan-say">{retShare != null ? 'Returning customers bring ' + fmtPctN(retShare) + ' of the sales and ' + GP_gbp(b.returning_profit) + ' of profit at no ad cost. ' : ''}
+        {b.ads > 0 ? (newPays
+          ? 'New customers cover their own ads with ' + GP_gbp(b.new_profit_after_ads) + ' to spare.'
+          : 'New customers cost ' + GP_gbp(-b.new_profit_after_ads) + ' more in ads than their first orders earn this quarter — the return comes when they buy again.') : ''}</p>
+    </section>
+
+    {b.cost_per_new_customer != null && (<section className="gp-plan-sec">
+      <h3 className="gp-plan-h">Each new customer</h3>
+      <div className="gp-plan-stats">
+        <div><span className="gp-plan-k">First order</span><span className="gp-plan-v">{fmtMoney(b.new_aov, 2)}</span><span className="gp-plan-sub">{fmtMoney(b.first_order_profit, 2)} profit before ads</span></div>
+        <div><span className="gp-plan-k">Average cost to win one</span><span className="gp-plan-v">{fmtMoney(b.cost_per_new_customer, 2)}</span><span className="gp-plan-sub">ad budget ÷ new customers</span></div>
+        <div><span className="gp-plan-k">Cost of the last ones bought</span><span className="gp-plan-v">{fmtMoney(b.marginal_cost_per_new_customer, 2)}</span><span className="gp-plan-sub">each extra £ of ads buys fewer</span></div>
+      </div>
+      <p className="gp-plan-say">{b.first_order_profit >= b.cost_per_new_customer
+        ? 'On average a new customer pays for themselves on the first order. '
+        : 'On average a new customer costs more than their first order earns, so the plan relies on them coming back. '}
+        {b.marginal_cost_per_new_customer > b.first_order_profit
+          ? 'The last customers the budget buys cost ' + fmtMoney(b.marginal_cost_per_new_customer, 2) + ' each — more than the ' + fmtMoney(b.first_order_profit, 2) + ' their first order earns. That is the edge of what is worth buying.'
+          : 'Even the last customers the budget buys earn back their cost on the first order, so there is room to spend more.'}</p>
+    </section>)}
+
+    {months.length > 0 && (<section className="gp-plan-sec">
+      <h3 className="gp-plan-h">Month by month</h3>
+      <table className="gp-plan-tbl">
+        <thead><tr><th scope="col">Month</th><th scope="col">Sales</th><th scope="col">From returning</th><th scope="col">New customers</th><th scope="col">Ad budget</th><th scope="col">Profit after ads</th></tr></thead>
+        <tbody>{months.map(m => {
+          const mo = Number(String(m.month).slice(5, 7)), isPeak = peak && m.month === peak.month && Number(m.season_new) >= 1.25;
+          return (<tr key={m.month} className={isPeak ? 'gp-plan-peak' : undefined}>
+            <th scope="row">{gpMonthName(m.month)}{mo === 11 && isPeak ? <span className="gp-plan-tag">Black Friday</span> : isPeak ? <span className="gp-plan-tag">Peak</span> : null}
+              {Number(m.spend_vs_max_seen) > 1.5 && <span className="gp-plan-tag gp-plan-tag-warn">beyond your biggest month</span>}</th>
+            <td>{GP_gbp(m.sales)}</td><td>{GP_gbp(m.returning)}</td><td>{fmtCount(m.new_customers)}</td><td>{GP_gbp(m.spend)}</td>
+            <td className={Number(m.cam) < 0 ? 'gp-neg' : undefined}>{GP_gbp(m.cam)}</td>
+          </tr>);
+        })}</tbody>
+      </table>
+      <p className="gp-plan-say">The budget is spread toward the months where a pound of ads buys most{peak ? ', so ' + gpMonthName(peak.month) + ' gets ' + fmtPctN(Number(peak.spend) / Math.max(1, d.spend_cap)) + ' of it' : ''}. Today paces against these months, so a quiet month is not read as falling behind.</p>
+    </section>)}
+
+    {ly && (<section className="gp-plan-sec">
+      <h3 className="gp-plan-h">The same months last year</h3>
+      <p className="gp-plan-say">{GP_gbp(ly.sales)} of sales on {GP_gbp(ly.spend)} of ads, about {GP_gbp(ly.cam)} of profit after ads at today’s margin.
+        {ly.sales > 0 ? ' This plan is ' + fmtPctN(d.revenue_target / ly.sales - 1) + (d.revenue_target >= ly.sales ? ' more' : ' less') + ' in sales' + (ly.spend > 0 ? ' on ' + v3WalkDp(d.spend_cap / ly.spend, 1) + '× the ad spend.' : '.') : ''}</p>
+    </section>)}
+
+    <section className="gp-plan-sec">
+      <h3 className="gp-plan-h">The seasonal pattern behind it</h3>
+      {idx.length === 12 && (<figure className="gp-plan-season">
+        <svg viewBox="0 0 240 64" preserveAspectRatio="none" role="img" aria-label="Sales by month of the year against an average month">
+          <line x1="0" x2="240" y1={64 - 64 / hi} y2={64 - 64 / hi} stroke={PAL.line} strokeWidth="1"/>
+          {idx.map((v, i) => {
+            const h = Math.max(1, v / hi * 64), on = planMonths.indexOf(i + 1) >= 0;
+            return <rect key={i} x={i * 20 + 2} y={64 - h} width="16" height={h} fill={on ? PAL.accent : PAL.quiet}><title>{GP_MONTH_NAME[i] + ': ' + v3WalkDp(v, 2) + '× an average month'}</title></rect>;
+          })}
+        </svg>
+        <figcaption><span>Jan</span><span>Sales against an average month · this quarter highlighted</span><span>Dec</span></figcaption>
+      </figure>)}
+      <p className="gp-plan-say">{s.source === 'own'
+        ? 'Worked out from your own ' + (s.years || '') + ' years of trading, with your growth taken out so a good year does not read as a busy season.'
+        : s.source === 'blended'
+          ? 'Worked out from your first year of trading, blended with a typical UK online-retail pattern because one year is thin evidence. It sharpens as your history builds.'
+          : 'Greta does not have a full year of your trading yet, so this uses a typical UK online-retail pattern — soft spring and summer, a lift into October, a November and December peak. It is replaced by your own pattern once you have a year.'}
+        {' '}How far to lean on it: <b>{(V3_CONF[s.confidence] && V3_CONF[s.confidence].label) || s.confidence}</b>{s.year_to_year_spread != null && Number(s.year_to_year_spread) > 0.35 ? ' — your years differ quite a lot from each other' : ''}.</p>
+      {doubling != null && <p className="gp-plan-say">Doubling the ad budget buys about {v3WalkDp(doubling, 2)}× the new-customer sales, not 2× — {inp.beta_source === 'measured' ? 'measured from your own spend history' : 'a standard assumption until Greta can measure yours'}. The starting point is your last {inp.base_months} full month{inp.base_months === 1 ? '' : 's'} ({inp.base_from ? gpMonthName(inp.base_from) : ''} to {inp.base_to ? gpMonthName(inp.base_to) : ''}) with the season taken out.</p>}
+      {ceil && ceil.best_cam != null && <p className="gp-plan-say">The most profit after ads Greta can see this quarter is about <b>{GP_gbp(ceil.best_cam)}</b>, at about {GP_gbp(ceil.best_spend)} of ads and {GP_gbp(ceil.best_sales)} of sales. Spending past that buys sales but costs profit.</p>}
+    </section>
+
+    <button type="button" className="gp-plan-more" aria-expanded={open} onClick={() => setOpen(!open)}>
+      <Icon name="chevron" size={12} style={{ transform: open ? 'rotate(90deg)' : 'none' }}/> How Greta worked this out
+    </button>
+    {open && (<div className="gp-plan-how">
+      <p className="gp-plan-say">{basisLine}</p>
+      <p className="gp-plan-say">Every pound of sales keeps {fmtPctN(d.cm_ratio_used)} after product and order costs — that is profit before ads. Profit after ads is that, less the ad budget. New customers are counted at a new customer’s order value ({fmtMoney(b.new_aov, 2)}), not the average across all orders.</p>
+    </div>)}
+  </div>);
 }
 
 function GP_ChannelHealth(p){
@@ -12803,7 +12908,7 @@ function GretaPlanPanel({ show } = {}) {
         {/* Only render targets Greta actually derived. When the derivation returns nothing the tiles
             used to print "NaN", "MER undefined" and "aMER undefined" — a new brand saw that first. */}
         {derived && derived.revenue_target == null && (
-          <p className="v3-note" style={{ marginTop: 'var(--space-4)' }}>Greta could not work a goal out from your trading yet — it needs a few weeks of sales and ad spend. You can still type the goal you have in mind above.</p>
+          <p className="v3-note" style={{ marginTop: 'var(--space-4)' }}>{derived.message || 'Greta could not work a goal out from your trading yet — it needs a full month of sales.'} You can still type the goal you have in mind above.</p>
         )}
         {derived && derived.revenue_target != null && (
           <div style={{ marginTop: 'var(--space-5)' }}>
@@ -12814,10 +12919,10 @@ function GretaPlanPanel({ show } = {}) {
               <GP_Metric k="Ad budget" v={GP_gbp(derived.spend_cap)} sub={derived.mer_target != null ? Number(derived.mer_target).toFixed(1) + '× sales per £ of ads' : ''} />
               <GP_Metric k="New customers" v={fmtCount(derived.new_customer_target)} sub={derived.amer_used != null ? Number(derived.amer_used).toFixed(1) + '× new-customer sales per £ of ads' : ''} />
               <GP_Metric k="Sales from returning customers" v={GP_gbp(derived.returning_revenue_target)} sub="at your current rate" />
-              <GP_Metric k="Most to pay for a new customer" v={fmtMoney(targetCac, 2)} hi={true} sub="ad budget ÷ new customers" />
+              <GP_Metric k="Average cost per new customer" v={fmtMoney(targetCac, 2)} hi={true} sub="ad budget ÷ new customers" />
               <GP_Metric k="Operating profit" v={opTarget == null ? '—' : GP_gbp(opTarget)} sub={fixedForPeriod > 0 ? 'after ' + GP_gbp(fixedForPeriod) + ' of overheads' : 'add your overheads above'} />
             </div>
-            <GP_Why d={derived} cac={targetCac}/>
+            <GP_PlanBreakdown d={derived}/>
             {g && (
               <div style={{ fontSize: 'var(--text-xs)', color: GP_T.dim, marginTop: 'var(--space-2)' }}>
                 Current goal ({g.confirmed ? 'confirmed' : 'not yet confirmed'}): sales {GP_gbp(g.revenue_target)} · profit before ads {GP_gbp(g.contribution_margin_target)} · ad budget {GP_gbp(g.spend_cap)}
@@ -12827,7 +12932,7 @@ function GretaPlanPanel({ show } = {}) {
               <button className="v3-btn v3-btn-p" onClick={confirm} disabled={busy}>Make this my plan</button>
               {msg === 'ok' && <span style={{ color: GP_T.green, fontSize: 'var(--text-sm)' }}>Done — Today now tracks your pace against this plan.</span>}
               {msg && msg.indexOf('err') === 0 && <span style={{ color: GP_T.red, fontSize: 'var(--text-sm)' }}>{msg.slice(4)}</span>}
-              <span style={{ fontSize: 'var(--text-xs)', color: GP_T.dim }}>Worked out from what you keep after product and order costs ({fmtPctN(derived.cm_ratio_used)}) and what a £ of ads brings in from new customers ({derived.amer_used != null ? Number(derived.amer_used).toFixed(1) + '×' : '—'}).</span>
+              <span style={{ fontSize: 'var(--text-xs)', color: GP_T.dim }}>{derived.months ? 'Confirming stores the month-by-month plan, and Today paces against it.' : 'Worked out from what you keep after product and order costs (' + fmtPctN(derived.cm_ratio_used) + ').'}</span>
             </div>
           </div>
         )}

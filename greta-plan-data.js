@@ -7,8 +7,11 @@
  *   forecast   ← vw_forecast_vs_goal (calendar-aware forecast for the period vs goal + the gap; SOT view, not recomputed)
  *   spendCurve ← vw_brand_spend_curve (+ _points): the k curve, its 95% band and `verdict`
  *   channels   ← vw_channel_scoreboard (per-channel normalized iROAS vs break-even/target CAC, CM-first focus rank)
- *   derive()   ← rpc fn_derive_business_goal (preview targets from a CAM or revenue goal; 'auto' = run-rate)
- *   confirm()  ← upserts mos_business_goal (confirmed=true). USER-initiated only (a button), never automatic.
+ *   derive()   ← rpc fn_plan_quarter (0232: the seasonal month-by-month plan from a CAM or revenue goal;
+ *                'auto' = today's spend carried through the quarter). Falls back to fn_derive_business_goal.
+ *   confirm()  ← rpc fn_confirm_quarter_goal (re-runs the plan on the server, closes the ended quarter's
+ *                goal, stores the months for Today's pace). USER-initiated only (a button), never automatic.
+ *                Falls back to the old browser upsert when the server function is not there yet.
  * Reuses FRKL_LIVE.sb; recomputes on 'frkl-data-updated'; fires 'frkl-plan-updated'; never throws.
  */
 (function () {
@@ -107,16 +110,41 @@
     detailState = 'done';
     window.dispatchEvent(new CustomEvent('frkl-plan-updated'));
   }
+  // A missing function (migration not applied yet) is the one error worth falling back on.
+  function isMissingFn(err) { var m = String((err && (err.message || err.code)) || ''); return /PGRST202|does not exist|schema cache|Could not find the function/i.test(m); }
   async function derive(amount, basis) {
     var s = sb(), b = bid(); if (!s || !b) return null;
+    var goal = (amount == null || amount === '') ? null : Number(amount);
     try {
-      var r = await s.rpc('fn_derive_business_goal', { p_brand: b, p_start: PERIOD.start, p_end: PERIOD.end, p_goal: (amount == null || amount === '') ? null : Number(amount), p_basis: basis || 'auto' });
-      if (r.error) throw r.error;
-      return (r.data && r.data[0]) || (Array.isArray(r.data) ? null : r.data) || null;
+      var r = await s.rpc('fn_plan_quarter', { p_brand: b, p_start: PERIOD.start, p_end: PERIOD.end, p_goal: goal, p_basis: basis || 'auto' });
+      if (r.error && !isMissingFn(r.error)) throw r.error;
+      if (!r.error) {
+        var j = r.data;
+        // ok:false carries the reason (no complete month of trading yet, …) — the panel says so.
+        return j && j.ok === false ? { revenue_target: null, reason: j.reason, message: j.message } : (j || null);
+      }
+      var o = await s.rpc('fn_derive_business_goal', { p_brand: b, p_start: PERIOD.start, p_end: PERIOD.end, p_goal: goal, p_basis: basis || 'auto' });
+      if (o.error) throw o.error;
+      return (o.data && o.data[0]) || (Array.isArray(o.data) ? null : o.data) || null;
     } catch (e) { if (window.console) console.warn('[plan] derive failed', e); return null; }
   }
   async function confirm(d) {
     var s = sb(), b = bid(); if (!s || !b || !d) return { ok: false, error: 'no session' };
+    // The seasonal plan is confirmed on the server: it re-runs the same plan (so the stored targets
+    // are the model's, not whatever the browser holds), closes the goal of a quarter that has ended
+    // — one active goal per brand, so an un-closed Q3 used to block every Q4 confirm — and stores
+    // the months so Today paces against them.
+    if (d.breakdown && d.basis) {
+      try {
+        var c = await s.rpc('fn_confirm_quarter_goal', { p_brand: b, p_start: PERIOD.start, p_end: PERIOD.end, p_goal: d.goal == null ? null : Number(d.goal), p_basis: d.basis });
+        if (c.error && !isMissingFn(c.error)) throw c.error;
+        if (!c.error) {
+          if (!c.data || c.data.ok === false) throw new Error((c.data && c.data.reason) || 'could not confirm');
+          await refresh();
+          return { ok: true };
+        }
+      } catch (e) { if (window.console) console.warn('[plan] confirm failed', e); return { ok: false, error: String((e && e.message) || e) }; }
+    }
     var row = {
       brand_id: b, period_start: PERIOD.start, period_end: PERIOD.end,
       revenue_target: d.revenue_target, contribution_margin_target: d.product_cm_target, gross_margin_target: d.gross_margin_target,
