@@ -16033,9 +16033,6 @@ function V3Today(p) {
     </div>)}
     </div>
 
-    {/* Walkthroughs: the guided way through the rest of the app, by area and horizon. */}
-    <V3WalkLauncher/>
-
     <V3Why why={d.why} period={d.why_period}/>
     {/* Two drawers used to follow. "What changed this week" repeated Review's lead. "Business,
         customer and channel numbers" (GretaOverviewTiers) recomputed everything in the browser on
@@ -17187,7 +17184,6 @@ const V3_WALK_STEP = {
     const say = [under.length
       ? under.length + ' of your ' + sc.length + ' ad channels are returning less than they need to break even — ' + under.map(r => v3ChanName(r.platform, r.channel_type)).join(', ') + '.'
       : 'All ' + sc.length + ' of your ad channels are returning at least what they need to break even.'];
-    say.push('The scoreboard on this page shows each one against its own break-even line: the tick matters more than the bar.');
     return { say, list: { head: ['Channel', 'Returns', 'Needs', 'Spend'], rows: sc.map(r => [v3ChanName(r.platform, r.channel_type),
       r.avg_iroas != null ? Number(r.avg_iroas).toFixed(2) + '×' : '—', r.break_even_iroas != null ? Number(r.break_even_iroas).toFixed(2) + '×' : '—',
       v3Gbp(r.spend_30d), r.avg_iroas != null && r.break_even_iroas != null ? (Number(r.avg_iroas) < Number(r.break_even_iroas) ? 'bad' : 'good') : null]) },
@@ -17371,14 +17367,92 @@ function V3WalkActs({ rows, head }) {
   </div>);
 }
 
+// ── The tour ─────────────────────────────────────────────────────────────────
+// A walkthrough is a guided tour of the app itself, not a report about it. Each stop opens the
+// page, finds the real panel that answers the stop's question, scrolls to it, lights it and dims
+// the rest, and puts a caption beside it: what the panel is and how to read it, what it says for
+// this business over the chosen horizon, and what to do. The menu item for the page is marked too,
+// so the owner learns where things live and can come back without the guide.
+//
+// The spotlight never blocks the page — the panel stays live, so "tap a segment to open it" can be
+// tried there and then. Targets are found by a selector plus a phrase from the panel's own title,
+// so no page had to change to be toured; if a panel is not on screen for this brand (no data yet),
+// the caption says so and the stop still reads.
+const V3_WALK_TOUR = {
+  profit: { dest: 'today', target: { sel: '.v3-hero' },
+    what: 'The big number is your profit after ads over the last 30 days — what the business kept after product costs and ad spend. Tap it to see exactly what went into it; the bar underneath is your pace against your goal.' },
+  sales: { dest: 'profit', target: { sel: '.v3-flow' },
+    what: 'This bar is every £1 of sales and where it went: product costs, order costs and ads come out, and the last segment is what you keep. Tap any segment to open the page behind it.' },
+  customers: { dest: 'customers', target: { sel: 'figure.v3-chart', has: 'New and returning' }, fallback: { sel: '.v3-stat-grid' },
+    what: 'Sales split by who placed them, week by week: first-time customers against people who have bought before. A healthy shop grows both; a business living on new customers alone has to keep paying to replace them.' },
+  efficiency: { dest: 'marketing', target: { sel: '.v3-score' },
+    what: 'Every ad channel on one scale. The bar is what each £1 of spend brings back; the tick is what it needs to bring back to pay for itself at your margins. A bar short of its tick is losing money, whatever the platform reports.' },
+  spend: { dest: 'profit', target: { sel: '.v3-flow' },
+    what: 'The ads segment of this bar is how many pence of every £1 of sales went on ads over the last 30 days. Tap it to open Marketing, where the spend is split by channel.' },
+  channels: { dest: 'marketing', target: { sel: '.v3-score' },
+    what: 'Read the tick before the bar: it is the return each channel needs to break even. Rows are ordered by spend, because falling short at £300 is not the same as at £6,000.' },
+  creative: { dest: 'marketing', target: { sel: '.card', has: 'Spend sitting on the weaker ads' }, fallback: { sel: '.v3-score' },
+    what: 'Ads that are still getting budget while converting worse than your others. Moving that money to your stronger ads is usually the cheapest improvement on the page.' },
+  stock: { dest: 'stock', target: { sel: '.v3-sec', has: 'What runs out first' }, fallback: { sel: '.v3-verdict' },
+    what: 'Each row is a product: the solid bar is the days of stock left, the hatched part is days you would have nothing to sell before a new order could land. The longer the hatching, the more it costs you.' },
+  reorder: { dest: 'stock', target: { sel: '.v3-sec', has: 'What runs out first' }, fallback: { sel: '.v3-verdict' },
+    what: 'The same table, read for ordering: the tick on each row is when an order placed today would arrive. Anything whose bar ends before its tick needs ordering now.' },
+  cash: { dest: 'stock', target: { sel: '.v3-sec', has: 'Where cash is sitting' }, fallback: { sel: '.v3-stat-grid' },
+    what: 'Money tied up in stock that will not sell through soon. It is cash you have already spent and cannot use for ads or new lines until it sells.' },
+  leaks: { dest: 'products', target: { sel: '.v3-more', has: 'Promotions and discount codes' },
+    what: 'Every discount code, what it was used for and what it cost you, sits behind this heading. Open it to see which codes earn their keep.' },
+  topProducts: { dest: 'products', target: { sel: '.v3-ptable' },
+    what: 'Your products ranked by sales over the last 28 days. The bar is size, the change column is against the 28 days before, and a "Low stock" tag means sales may be held back by stock rather than demand.' },
+  movers: { dest: 'products', target: { sel: '.v3-movers' }, fallback: { sel: '.v3-ptable' },
+    what: 'What gained and lost the most in pounds. Before acting on a faller, check it against stock — a product that ran out looks exactly like one that stopped selling.' },
+  traffic: { dest: 'website', target: { sel: 'figure.v3-chart' }, fallback: { sel: '.v3-sec', has: 'Each stage against its normal' },
+    what: 'Your shop as a funnel — visits, product views, baskets, checkouts, orders — against a normal month. The stage that has slipped furthest is where buyers are being lost.' },
+  retention: { dest: 'customers', target: { sel: 'figure.v3-chart', has: 'What a customer spends over time' }, fallback: { sel: '.v3-stat-grid' },
+    what: 'How much the average customer has spent with you as the months go by after their first order. The steeper the early climb, the more a new customer is really worth.' },
+  newProducts: { dest: 'products', target: { sel: '.v3-ptable' },
+    what: 'Your products ranked by sales. A change marked "New" had no sales in the period before — that is where launches show up first.' },
+  adFit: { dest: 'products', target: { sel: '.v3-ptable' },
+    what: 'Not every product can win a new customer on an ad by itself. Greta checks each one: can its first order pay back what an ad costs, or does it earn its place as an add-on or a repeat buy?' },
+};
+Object.keys(V3_WALK_TOUR).forEach(k => { if (V3_WALK_STEP[k]) Object.assign(V3_WALK_STEP[k], V3_WALK_TOUR[k]); });
+// Stops that read today's state rather than the chosen periods, and stops whose lit panel already
+// lists the rows — the caption interprets those panels instead of copying them.
+['channels', 'stock', 'reorder', 'cash', 'retention', 'adFit'].forEach(k => { V3_WALK_STEP[k].now = true; });
+['channels', 'stock', 'reorder', 'cash'].forEach(k => { V3_WALK_STEP[k].onPage = true; });
+V3_WALK_STEP.creative = Object.assign({ q: 'Is money sitting on weak ads?', cat: 'paid', build: X => {
+  const rows = v3LiveRows(X.board || []).filter(r => r.category === 'paid' && /creative|never convert|weak/i.test(String(r.external_id) + ' ' + String(r.description)));
+  if (!rows.length) return { say: ['Greta has not flagged any ad that is taking budget without earning it.'] };
+  const t = rows.reduce((s, r) => s + (Number(r.cm_gbp) || 0), 0);
+  return { say: [rows.length + (rows.length === 1 ? ' fix here is' : ' fixes here are') + ' worth about ' + v3Gbp(t) + ' a month: ' + rows.map(r => v3PlainAction(r).title.replace(/\.$/, '')).join('; ') + '.'] };
+}, now: true }, V3_WALK_TOUR.creative);
+Object.assign(V3_WALK_END, { target: { sel: '.v3-board' }, fallback: { sel: '.v3-main .v3-page-head' },
+  what: 'Every action Greta has, biggest pound value first. The chips at the top filter by area; open a row to see the steps, and press Mark done when it is done — Greta then checks whether it worked.' });
+V3_WALKS.find(w => w.id === 'business').steps = ['profit', 'sales', 'customers', 'efficiency', 'stock'];
+V3_WALKS.find(w => w.id === 'paid').steps = ['spend', 'channels', 'creative', 'profit'];
+
+function v3TourFind(t) {
+  if (!t) return null;
+  const root = document.querySelector('.v3-main') || document;
+  const all = [...root.querySelectorAll(t.sel)];
+  const hit = t.has ? all.find(e => (e.textContent || '').indexOf(t.has) >= 0) : all[0];
+  return hit && hit.getBoundingClientRect().height > 0 ? hit : null;
+}
+// The menu item for the page being toured, so the owner sees where it lives.
+function v3TourNav(dest) {
+  const lab = V3_BY_ID[dest] && V3_BY_ID[dest].label;
+  document.querySelectorAll('.v3-nav-item.v3-tour-here').forEach(e => e.classList.remove('v3-tour-here'));
+  if (!lab) return;
+  const it = [...document.querySelectorAll('.v3-nav-item')].find(e => (e.textContent || '').trim().indexOf(lab) === 0);
+  if (it) it.classList.add('v3-tour-here');
+}
+
 // The guide. Mounted in the shell so it survives navigation; it renders nothing until a walkthrough
 // is running, and the reads below only start once one is.
 function V3WalkDock() {
   const w = useV3Walk();
   React.useEffect(() => {
-    const b = document.body.classList;
-    b.toggle('v3-walking', !!w.id && !w.min);
-    b.toggle('v3-walking-min', !!w.id && !!w.min);
+    document.body.classList.toggle('v3-walking', !!w.id && !w.min);
+    if (!w.id || w.min) document.querySelectorAll('.v3-nav-item.v3-tour-here').forEach(e => e.classList.remove('v3-tour-here'));
   });
   if (!w.id) return null;
   return <V3Boundary where="walkthrough" resetKey={w.id + ':' + w.step} label="The walkthrough"><V3WalkRun w={w}/></V3Boundary>;
@@ -17402,119 +17476,235 @@ function V3WalkRun({ w }) {
   const i = Math.max(0, Math.min(w.step, steps.length - 1));
   const sid = steps[i];
   const def = sid === 'end' ? V3_WALK_END : V3_WALK_STEP[sid];
-  const bodyRef = React.useRef(null);
+  const cardRef = React.useRef(null);
+  const elRef = React.useRef(null);
+  const lastDest = React.useRef(null);   // smooth-scroll only when the next stop is on the same page
+  // spot: the lit rectangle (viewport px) · mode: where the caption sits · found: false once we gave up
+  const [pos, setPos] = React.useState(() => ({ spot: null, mode: window.innerWidth <= 760 ? 'sheet' : 'corner', card: null, arrow: null, found: null }));
+  // The comparison tables sit behind "Show the numbers", so the pop-out stays small enough to sit
+  // beside the panel it is talking about.
+  const [nums, setNums] = React.useState(false);
 
-  // Each stop opens the page that holds its evidence; the guide narrates over it.
+  // Arrive: open the page, wait for the panel to render, scroll it into view, then keep the
+  // spotlight on it as the page settles or the owner scrolls.
   React.useEffect(() => {
-    if (window.__oiGo) window.__oiGo(def.dest, def.anchor || null);
-    if (bodyRef.current) bodyRef.current.scrollTop = 0;
-  }, [w.id, sid]);
+    if (w.min) return;
+    elRef.current = null;
+    setPos(p => ({ spot: null, mode: p.mode, card: null, arrow: null, found: null }));
+    setNums(false);
+    // Same page only if the owner has not wandered off it between stops (the page stays live).
+    const tNow = document.querySelector('.v3-page-title');
+    const samePage = lastDest.current === def.dest && !!tNow && !!V3_BY_ID[def.dest] && tNow.textContent === V3_BY_ID[def.dest].label;
+    lastDest.current = def.dest;
+    if (window.__oiGo && !samePage) window.__oiGo(def.dest, null);
+    v3TourNav(def.dest);
+    let dead = false, tries = 0;
+    // The caption pops out beside the lit panel — under it when there is room, over it when there
+    // is room there, otherwise in the corner — and on a phone it rises from the bottom. The page
+    // itself never moves or narrows for it.
+    const place = () => {
+      v3TourNav(def.dest);   // the nav re-renders its classes, so keep re-marking the item
+      const el = elRef.current, vw = window.innerWidth, vh = window.innerHeight, phone = vw <= 760;
+      if (!el || !el.isConnected) { const m = phone ? 'sheet' : 'corner'; setPos(p => p.mode === m ? p : { ...p, mode: m }); return; }
+      const r = el.getBoundingClientRect(), pad = 8, gap = 16;
+      const spot = { top: Math.round(r.top - pad), left: Math.round(r.left - pad), width: Math.round(r.width + pad * 2), height: Math.round(r.height + pad * 2) };
+      const c = cardRef.current, cw = c ? c.offsetWidth : 384, ch = c ? c.offsetHeight : 320;
+      let mode = phone ? 'sheet' : 'corner', card = null, arrow = null;
+      if (!phone) {
+        const left = Math.round(Math.max(16, Math.min(r.left, vw - cw - 16)));
+        arrow = Math.round(Math.max(16, Math.min(r.left + 40 - left, cw - 32)));
+        // Beside the panel whenever at least a short pop-out fits; it scrolls inside if it must.
+        const below = vh - (spot.top + spot.height + gap) - 16, above = spot.top - gap - 16, MIN = 260;
+        if (below >= Math.min(ch, MIN)) { mode = 'below'; card = { top: spot.top + spot.height + gap, left, max: Math.round(below) }; }
+        else if (above >= Math.min(ch, MIN)) { mode = 'above'; const hgt = Math.min(ch, above); card = { top: Math.round(spot.top - gap - hgt), left, max: Math.round(above) }; }
+      }
+      setPos(p => {
+        const same = p.spot && p.spot.top === spot.top && p.spot.left === spot.left && p.spot.height === spot.height
+          && p.spot.width === spot.width && p.mode === mode && p.arrow === arrow
+          && (!!p.card === !!card) && (!card || (p.card.top === card.top && p.card.left === card.left && p.card.max === card.max));
+        return same ? p : { spot, mode, card, arrow, found: true };
+      });
+    };
+    const onPage = () => { const t = document.querySelector('.v3-page-title'); return !!t && !!V3_BY_ID[def.dest] && t.textContent === V3_BY_ID[def.dest].label; };
+    const arrive = () => {
+      // The page we came from can hold the same kind of panel (Today has a money flow too), so
+      // only look once the page we asked for is the one on screen.
+      const el = onPage() ? (v3TourFind(def.target) || v3TourFind(def.fallback)) : null;
+      if (!el) {
+        if (++tries > 50) { if (!dead) setPos({ spot: null, mode: window.innerWidth <= 760 ? 'sheet' : 'corner', card: null, arrow: null, found: false }); return; }
+        return setTimeout(() => { if (!dead) arrive(); }, 200);
+      }
+      elRef.current = el;
+      const sticky = document.querySelector('.v3-askbar');
+      const off = 24 + (sticky && getComputedStyle(sticky).position === 'sticky' ? sticky.offsetHeight : 0);
+      const align = smooth => {
+        const top = el.getBoundingClientRect().top - off;
+        if (Math.abs(top) > 24) window.scrollTo({ top: Math.max(0, window.scrollY + top), behavior: smooth ? 'smooth' : 'auto' });
+      };
+      // A new page jumps straight to the panel; a stop further down the same page glides there,
+      // so the owner sees where it sits relative to the last one.
+      align(samePage);
+      // The page above the panel is usually still loading, so its position moves after the first
+      // scroll. Re-align as it settles (as V3Anchor does) — unless the owner has started scrolling.
+      let touched = false;
+      const stop = () => { touched = true; };
+      ['wheel', 'touchmove', 'keydown'].forEach(ev => window.addEventListener(ev, stop, { once: true, passive: true }));
+      [700, 1600, 3000].forEach(ms => setTimeout(() => { if (!dead && !touched && el.isConnected) align(false); }, ms));
+      setTimeout(() => { if (!dead) place(); }, 40);
+    };
+    const t0 = setTimeout(arrive, 120);
+    const iv = setInterval(place, 150);
+    const key = e => { if (e.key === 'Escape') v3WalkSet({ min: true }); };
+    window.addEventListener('scroll', place, { passive: true });
+    window.addEventListener('resize', place);
+    window.addEventListener('keydown', key);
+    return () => { dead = true; clearTimeout(t0); clearInterval(iv); window.removeEventListener('scroll', place);
+      window.removeEventListener('resize', place); window.removeEventListener('keydown', key); };
+  }, [w.id, sid, w.min]);
+
+  const end = () => { document.querySelectorAll('.v3-nav-item.v3-tour-here').forEach(e => e.classList.remove('v3-tour-here')); v3WalkEnd(false); };
+  const go = k => v3WalkSet({ step: k });
+
+  if (w.min) return (<button type="button" className="v3-tour-resume" onClick={() => v3WalkSet({ min: false })}>
+    Resume walkthrough · stop {i + 1} of {steps.length}</button>);
 
   const data = cmp.rows && !Array.isArray(cmp.rows) ? cmp.rows : null;
   const P = data && data.periods;
   const X = P && P.cur ? { P, N: v3WalkNames(h, P), h, prods: data.products || [], stock: stock.rows,
-    score: score.rows, ret: ret.rows ? (ret.rows[0] || {}) : null, npd: npd.rows } : null;
+    score: score.rows, ret: ret.rows ? (ret.rows[0] || {}) : null, npd: npd.rows, board: board.rows } : null;
   const live = v3LiveRows(board.rows || []);
   const inCats = (r, cats) => !cats || cats.indexOf(r.category) >= 0;
-  const go = k => v3WalkSet({ step: k });
-  const out = X && sid !== 'end' ? def.build(X) : null;
+  let out = null;
+  if (X && sid !== 'end') { try { out = def.build(X); } catch (e) { out = { say: ['Greta could not read this one just now.'] }; } }
   const stepActs = def.cat ? live.filter(r => r.category === def.cat).slice(0, 2) : [];
+  const page = V3_BY_ID[def.dest];
 
-  let body;
+  let says;
   if (cmp.err) {
-    body = <p className="v3-walk-say">{/fn_brand_period_compare|schema cache|does not exist/i.test(cmp.err)
-      ? 'Walkthroughs need a server update that has not been switched on yet. Your other pages are unaffected.'
+    says = <p className="v3-walk-say">{/fn_brand_period_compare|schema cache|does not exist/i.test(cmp.err)
+      ? 'The comparisons for this walkthrough need a server update that has not been switched on yet. The tour of the page still works.'
       : 'Greta couldn’t load the comparison just now.'}</p>;
-  } else if (!X) {
-    body = <V3SkeletonRows n={3}/>;
+  } else if (!X || (out && out.loading)) {
+    says = <V3SkeletonRows n={2}/>;
   } else if (sid === 'end') {
     const take = walk.steps.map(s => { let o = null; try { o = V3_WALK_STEP[s].build(X); } catch (e) {}
-      return o && o.say && o.say[0] && !o.loading ? [V3_WALK_STEP[s].q, o.say[0]] : null; }).filter(Boolean);
+      return o && o.say && o.say[0] && !o.loading ? [V3_WALK_STEP[s].q, o.say[0], s] : null; }).filter(Boolean);
     const acts = live.filter(r => inCats(r, walk.cats)).slice(0, 5);
     const ask = 'I just walked through ' + walk.label.toLowerCase() + ', ' + H.sub + ' (' + X.N.line + '). ' + take.map(t => t[1]).join(' ') + ' What should I do first, and why?';
-    body = (<>
-      <h2 className="v3-walk-q">What you learned, and what to do</h2>
-      <p className="v3-walk-line">{X.N.line}</p>
+    says = (<>
       <ul className="v3-walk-take">{take.map((t, k) => (<li key={k}><button type="button" className="v3-walk-link" onClick={() => go(k)}>{t[0]}</button><span>{t[1]}</span></li>))}</ul>
       {acts.length
         ? <V3WalkActs rows={acts} head="Do these, biggest £ first"/>
-        : <>{walk.cats && walk.cats.length === 0
-              ? <p className="v3-note">Greta has no open actions about customers. The biggest ones on the board overall are below.</p>
-              : <p className="v3-note">Nothing on the board belongs to this area right now.</p>}
+        : <><p className="v3-note">{walk.cats && walk.cats.length === 0 ? 'Greta has no open actions about customers. The biggest ones overall:' : 'Nothing on the board belongs to this area right now. The biggest ones overall:'}</p>
             <V3WalkActs rows={live.slice(0, 3)} head="The biggest actions overall"/></>}
       <div className="v3-btns">
-        <button type="button" className="v3-btn v3-btn-p" onClick={() => { v3WalkEnd(false); window.__oiGo && window.__oiGo('actions'); }}>Open the action board</button>
-        <button type="button" className="v3-btn" onClick={() => { v3WalkEnd(false); window.__oiAsk && window.__oiAsk(ask); }}>Ask Greta a follow-up</button>
-        <button type="button" className="v3-btn v3-btn-q" onClick={() => v3WalkEnd(true)}>Back to Today</button>
+        <button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={end}>Finish here</button>
+        <button type="button" className="v3-btn v3-btn-sm" onClick={() => { end(); window.__oiAsk && window.__oiAsk(ask); }}>Ask Greta a follow-up</button>
       </div>
     </>);
-  } else if (out && out.loading) {
-    body = <><h2 className="v3-walk-q">{def.q}</h2><V3SkeletonRows n={3}/></>;
   } else {
-    body = (<>
-      <h2 className="v3-walk-q">{def.q}</h2>
-      <p className="v3-walk-line">{X.N.line}</p>
+    says = (<>
       {out.say.map((s, k) => <p key={k} className={'v3-walk-say' + (k === 0 ? ' lead' : '')}>{s}</p>)}
-      {out.tbl && !out.held && <V3WalkTable X={X} rows={out.tbl}/>}
-      {out.ptbl && <V3WalkProducts X={X} rows={out.ptbl}/>}
-      {out.list && <V3WalkList list={out.list}/>}
+      {((out.tbl && !out.held) || out.ptbl || (out.list && !(def.onPage && pos.found))) && (
+        <button type="button" className="v3-walk-link v3-tour-more" aria-expanded={nums} onClick={() => setNums(n => !n)}>
+          {nums ? 'Hide the numbers' : 'Show the numbers'}</button>)}
+      {nums && out.tbl && !out.held && <V3WalkTable X={X} rows={out.tbl}/>}
+      {nums && out.ptbl && <V3WalkProducts X={X} rows={out.ptbl}/>}
+      {nums && out.list && !(def.onPage && pos.found) && <V3WalkList list={out.list}/>}
       {out.note && <p className="v3-note">{out.note}</p>}
       {out.fix && <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav(out.fix[0], out.fix[1])}>{out.fix[2]}</button>}
-      <V3WalkActs rows={stepActs} head="What to do about it"/>
     </>);
   }
 
-  return (<aside className={'v3-walk-dock' + (w.min ? ' min' : '')} aria-label={'Walkthrough: ' + walk.label}>
-    <div className="v3-walk-head">
-      <div className="v3-walk-title">
-        <span className="v3-kick">Walkthrough</span>
-        <span className="v3-walk-name">{walk.label}</span>
+  return (<>
+    {pos.spot && (() => {
+      // Four plain panels dim everything around the lit rectangle; none of them takes clicks.
+      const t = Math.max(0, pos.spot.top), l = Math.max(0, pos.spot.left), bt = pos.spot.top + pos.spot.height, rt = pos.spot.left + pos.spot.width;
+      return (<div aria-hidden="true">
+        <i className="v3-tour-dim" style={{ top: 0, left: 0, right: 0, height: t }}/>
+        <i className="v3-tour-dim" style={{ top: Math.max(0, bt), left: 0, right: 0, bottom: 0 }}/>
+        <i className="v3-tour-dim" style={{ top: t, left: 0, width: l, height: Math.max(0, bt - t) }}/>
+        <i className="v3-tour-dim" style={{ top: t, left: rt, right: 0, height: Math.max(0, bt - t) }}/>
+        <div className="v3-tour-spot" style={{ top: pos.spot.top, left: pos.spot.left, width: pos.spot.width, height: pos.spot.height }}>
+          <span className="v3-tour-tag">{i + 1}</span></div>
+      </div>);
+    })()}
+    {pos.found === false && <div className="v3-tour-scrim" aria-hidden="true"/>}
+    <aside ref={cardRef} className={'v3-tour-card v3-tour-' + pos.mode} role="dialog" aria-label={'Walkthrough: ' + walk.label}
+      style={pos.card ? { top: pos.card.top, left: pos.card.left, maxHeight: pos.card.max } : undefined}>
+      {pos.card && pos.arrow != null && <i className={'v3-tour-arrow ' + (pos.mode === 'above' ? 'down' : 'up')} style={{ left: pos.arrow }} aria-hidden="true"/>}
+      <div className="v3-tour-top">
+        <span className="v3-kick">{walk.label} · {i + 1} of {steps.length}</span>
+        <div className="v3-seg v3-walk-h" role="group" aria-label="Compare over">
+          {V3_WALK_H.map(o => <button key={o.id} type="button" aria-pressed={o.id === h} title={o.label + ' — ' + o.sub + ', and against last year'}
+            onClick={() => v3WalkSetHorizon(o.id)}>{o.short}</button>)}
+        </div>
+        <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => v3WalkSet({ min: true })}>Hide</button>
+        <button type="button" className="v3-btn v3-btn-q v3-btn-sm" aria-label="End walkthrough" onClick={end}><Icon name="close" size={14}/></button>
       </div>
-      <ol className="v3-walk-steps" aria-label="Stops">
-        {steps.map((s, k) => (<li key={s}><button type="button" aria-current={k === i ? 'step' : undefined}
-          className={'v3-walk-dot' + (k < i ? ' done' : '')} onClick={() => go(k)}
-          title={(s === 'end' ? V3_WALK_END : V3_WALK_STEP[s]).q}>{k + 1}</button></li>))}
-      </ol>
-      <div className="v3-seg v3-walk-h" role="group" aria-label="Compare over">
-        {V3_WALK_H.map(o => <button key={o.id} type="button" aria-pressed={o.id === h} title={o.label + ' — ' + o.sub + ', and against last year'}
-          onClick={() => v3WalkSetHorizon(o.id)}>{o.short}</button>)}
+      <div className="v3-tour-body">
+        <h2 className="v3-walk-q">{sid === 'end' ? 'What you learned, and what to do' : def.q}</h2>
+        {page && <p className="v3-tour-where">You are on <b>{page.label}</b> — it lives in the menu under {page.group}.</p>}
+        {pos.found === false
+          ? <p className="v3-note">This part of {page ? page.label : 'the page'} is not showing for your data yet, so there is nothing to point at — here is what Greta can tell you.</p>
+          : def.what && <div className="v3-tour-sec"><div className="v3-tour-h">What you are looking at</div><p className="v3-walk-say">{def.what}</p></div>}
+        <div className="v3-tour-sec">
+          {sid !== 'end' && <div className="v3-tour-h">What it says{def.now ? ' · right now' : X ? ' · ' + X.N.line : ''}</div>}
+          {says}
+        </div>
+        {stepActs.length > 0 && <V3WalkActs rows={stepActs} head="What to do about it"/>}
       </div>
-      <button type="button" className="v3-btn v3-btn-q v3-btn-sm" aria-expanded={!w.min} onClick={() => v3WalkSet({ min: !w.min })}>{w.min ? 'Show' : 'Hide'}</button>
-      <button type="button" className="v3-btn v3-btn-q v3-btn-sm" aria-label="End walkthrough" onClick={() => v3WalkEnd(false)}><Icon name="close" size={14}/></button>
-    </div>
-    {!w.min && <div className="v3-walk-body" ref={bodyRef}>{body}</div>}
-    {!w.min && sid !== 'end' && (<div className="v3-walk-foot">
-      <button type="button" className="v3-btn v3-btn-sm" disabled={i === 0} onClick={() => go(i - 1)}>Back</button>
-      <span className="v3-walk-of">{i + 1} of {steps.length}</span>
-      <button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={() => go(i + 1)}>
-        {steps[i + 1] === 'end' ? 'What to do' : <>Next<span className="v3-walk-nextq">: {V3_WALK_STEP[steps[i + 1]].q}</span></>} <Icon name="arrowRight" size={13}/>
-      </button>
-    </div>)}
-  </aside>);
+      <div className="v3-tour-foot">
+        <button type="button" className="v3-btn v3-btn-sm" disabled={i === 0} onClick={() => go(i - 1)}>Back</button>
+        <ol className="v3-walk-steps" aria-label="Stops">
+          {steps.map((s, k) => (<li key={s}><button type="button" aria-current={k === i ? 'step' : undefined}
+            className={'v3-walk-dot' + (k < i ? ' done' : '')} onClick={() => go(k)}
+            title={(s === 'end' ? V3_WALK_END : V3_WALK_STEP[s]).q}>{k + 1}</button></li>))}
+        </ol>
+        {sid !== 'end' && <button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={() => go(i + 1)}>
+          {steps[i + 1] === 'end' ? 'What to do' : 'Next'} <Icon name="arrowRight" size={13}/></button>}
+      </div>
+    </aside>
+  </>);
 }
 
-// On Today: pick an area and a horizon, and the guide starts. One click, no setup screen.
-function V3WalkLauncher() {
+// On Today: one floating button. It pops the picker out over the page — nothing is built into the
+// page and nothing on it moves. Pick a horizon and an area and the tour starts.
+function V3WalkFab({ dest }) {
   const w = useV3Walk();
+  const [open, setOpen] = React.useState(false);
   const [h, setH] = React.useState(v3WalkHorizon);
-  return (<section className="v3-walk-launch" aria-labelledby="v3-walk-launch-t">
-    <div className="v3-walk-launch-head">
-      <div>
-        <h2 className="v3-walk-launch-t" id="v3-walk-launch-t">Walk me through</h2>
-        <p className="v3-note">Pick an area and Greta takes you through it page by page: what happened against the period before and the same time last year, and what to do about it.</p>
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    if (!open) return;
+    const off = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    const key = e => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', off);
+    window.addEventListener('keydown', key);
+    return () => { document.removeEventListener('mousedown', off); window.removeEventListener('keydown', key); };
+  }, [open]);
+  if (w.id || dest !== 'today') return null;
+  return (<div className="v3-walk-fab" ref={ref}>
+    {open && (<div className="v3-walk-pop" role="dialog" aria-labelledby="v3-walk-pop-t">
+      <div className="v3-walk-pop-head">
+        <h2 className="v3-walk-pop-t" id="v3-walk-pop-t">Walk me through</h2>
+        <button type="button" className="v3-btn v3-btn-q v3-btn-sm" aria-label="Close" onClick={() => setOpen(false)}><Icon name="close" size={14}/></button>
       </div>
+      <p className="v3-note">Greta takes you round the app panel by panel: what each one shows, what it says against the period before and the same time last year, and what to do about it.</p>
       <div className="v3-seg" role="group" aria-label="Compare over">
         {V3_WALK_H.map(o => <button key={o.id} type="button" aria-pressed={h === o.id} title={o.sub + ', and against last year'} onClick={() => setH(o.id)}>
           {o.label}<span className="v3-walk-hsub">{o.short}</span></button>)}
       </div>
-    </div>
-    <div className="v3-walk-pick">
-      {V3_WALKS.map(x => (<button key={x.id} type="button" className={'v3-walk-opt' + (w.id === x.id ? ' on' : '')} onClick={() => v3WalkStart(x.id, h)}>
-        <span className="v3-walk-opt-t">{x.label}</span>
-        <span className="v3-walk-opt-q">{x.q}</span>
-      </button>))}
-    </div>
-  </section>);
+      <div className="v3-walk-pick">
+        {V3_WALKS.map(x => (<button key={x.id} type="button" className="v3-walk-opt" onClick={() => { setOpen(false); v3WalkStart(x.id, h); }}>
+          <span className="v3-walk-opt-t">{x.label}</span>
+          <span className="v3-walk-opt-q">{x.q}</span>
+        </button>))}
+      </div>
+    </div>)}
+    <button type="button" className="v3-walk-fab-btn" aria-expanded={open} onClick={() => setOpen(o => !o)}>
+      <Icon name="spark" size={15}/> Walk me through</button>
+  </div>);
 }
 
 function V3App({ dest, go, children, start, periodCtl }) {
@@ -17575,6 +17765,7 @@ function V3App({ dest, go, children, start, periodCtl }) {
       </button>
     </nav>
     <V3WalkDock/>
+    <V3WalkFab dest={dest}/>
   </div>);
 }
 
