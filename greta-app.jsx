@@ -16971,8 +16971,10 @@ function useFigureTypography(dep) {
 const V3_WALK_H = [
   { id: 'week',    label: 'Short term',  short: 'Week',    sub: 'week on week' },
   { id: 'month',   label: 'Medium term', short: 'Month',   sub: 'month on month' },
-  { id: 'quarter', label: 'Long term',   short: 'Quarter', sub: 'quarter on quarter' },
+  { id: 'quarter', label: 'Medium term', short: 'Quarter', sub: 'quarter on quarter' },
+  { id: 'year',    label: 'Long term',   short: 'Year',    sub: 'the last 12 months against the 12 before' },
 ];
+const V3_WALK_HGROUPS = ['Short term', 'Medium term', 'Long term'];
 const V3_WALKS = [
   { id: 'business',  label: 'The whole business', q: 'How is the business trading?',
     steps: ['sales', 'profit', 'customers', 'efficiency', 'stock'], cats: null },
@@ -17021,6 +17023,11 @@ function v3WalkStart(id, horizon) {
 }
 function v3WalkEnd(toToday) {
   const id = V3_WALK.id;
+  if (V3_WALK.savedRange !== undefined && window.__oiSetRange) {
+    const r = V3_WALK.savedRange || {};
+    window.__oiSetRange(r.s || '', r.e || '', r.p);
+  }
+  V3_WALK.savedRange = undefined;
   v3WalkSet({ id: null, step: 0, min: false });
   try { track('walkthrough_end', { walk: id }, 'today'); } catch (e) {}
   if (toToday && window.__oiGo) window.__oiGo('today');
@@ -17056,6 +17063,12 @@ function v3WalkNames(h, P) {
     return { cur: 'the week of ' + c, prev: 'the week before', ly: 'the same week last year',
              lyPair: 'the same two weeks last year', col: ['Week of ' + c, 'Week before', 'Last year'],
              line: 'Week of ' + c + ' (Mon–Sun), against the week before and the same week last year' };
+  }
+  if (h === 'year') {
+    const span = x => mon(x.start).slice(0, 3) + ' ' + yr(x.start) + '–' + mon(x.end).slice(0, 3) + ' ' + yr(x.end);
+    return { cur: 'the last 12 months', prev: 'the 12 months before', ly: 'two years ago', lyPair: null,
+             col: ['Last 12 months', '12 months before', 'Two years ago'],
+             line: span(P.cur) + ', against the 12 months before (' + span(P.prev) + ')' };
   }
   if (h === 'quarter') {
     const c = qtr(P.cur), p = qtr(P.prev), l = qtr(P.ly) + ' ' + yr(P.ly.start);
@@ -17367,6 +17380,271 @@ function V3WalkActs({ rows, head }) {
   </div>);
 }
 
+// ── What it means for the business ──────────────────────────────────────────
+// The D2C anatomy, applied to the chosen periods (docs/framework/d2c-metric-relationships.md,
+// anatomy.html): sales = orders × order value (= visits × conversion × order value when GA4 is
+// clean); profit after ads = sales × margin − ad spend, so its share of sales = margin − 1/MER and
+// ads pay for themselves above 1/margin of sales per £1; a new customer pays back when the first
+// order's profit covers what it cost to win; lifetime profit against that cost is the scale test.
+// Every figure is one the server already counted (0230, vw_brand_unit_economics) — this only works
+// out which of them moved and says what that is worth in pounds.
+// One decimal formatter for the walkthrough's sentences (the house rule: no bare toFixed).
+const v3WalkDp = (v, d) => Number(v).toLocaleString('en-GB', { minimumFractionDigits: d, maximumFractionDigits: d });
+const v3WalkPct = v => (v == null || !isFinite(v)) ? '—' : fmtPctN(v);
+const v3WalkX = v => (v == null || !isFinite(v)) ? '—' : v3WalkDp(v, 2) + '×';
+const v3WalkSigned = v => (v >= 0 ? '+' : '−') + v3Gbp(Math.abs(v));
+function v3WalkBreakEven(X) { return X.cm > 0 ? 1 / X.cm : null; }
+// Visits × conversion × order value, when both periods' GA4 can be trusted (ChangeBridge's
+// split, on Shopify orders ÷ GA4 sessions — the canonical site conversion).
+function v3WalkBridge(X) {
+  const c = X.P.cur, p = X.P.prev;
+  if (!c.ga_ok || !p.ga_ok || !(c.sessions > 0) || !(p.sessions > 0) || !(c.orders > 0) || !(p.orders > 0)) return null;
+  const S0 = Number(p.sessions), S1 = Number(c.sessions), C0 = p.orders / S0, C1 = c.orders / S1, A0 = Number(p.aov), A1 = Number(c.aov);
+  return [['visits', (S1 - S0) * C0 * A0], ['conversion', S1 * (C1 - C0) * A0], ['order value', S1 * C1 * (A1 - A0)]];
+}
+function v3WalkMeansSales(X) {
+  const c = X.P.cur, p = X.P.prev, out = [];
+  if (!p.has_history) return out;
+  const d = c.net_revenue - p.net_revenue;
+  if (X.cm > 0 && Math.abs(d) > 0) out.push('Your products keep about ' + Math.round(X.cm * 100) + 'p of every £1 of sales after product and order costs, so the '
+    + v3Gbp(Math.abs(d)) + (d < 0 ? ' drop' : ' rise') + ' in sales is about ' + v3Gbp(Math.abs(d * X.cm)) + ' of profit before ads ' + (d < 0 ? 'lost.' : 'gained.'));
+  const br = v3WalkBridge(X);
+  if (br) {
+    const top = br.slice().sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))[0];
+    out.push('Split by where it came from: ' + br.map(x => x[0] + ' ' + v3WalkSigned(x[1])).join(', ') + '. The biggest part was ' + top[0] + '.');
+  } else if (!c.ga_ok || !p.ga_ok) {
+    out.push('Greta cannot split this into visits and conversion for these periods — website tracking (GA4) was broken in part of them — so the orders and order value split is the one to trust.');
+  }
+  return out;
+}
+function v3WalkMeansProfit(X) {
+  const c = X.P.cur, p = X.P.prev, out = [], be = v3WalkBreakEven(X);
+  if (!(c.net_revenue > 0) || X.cm == null) return out;
+  const adShare = c.paid_spend / c.net_revenue, keep = c.cm_after_marketing / c.net_revenue;
+  out.push('Out of every £1 of sales in ' + X.N.cur + ', your products kept ' + Math.round(X.cm * 100) + 'p, ads took ' + Math.round(adShare * 100)
+    + 'p, and the business kept ' + Math.round(keep * 100) + 'p — ' + v3Gbp(c.cm_after_marketing) + '.');
+  if (be && c.sales_per_ad_pound != null) out.push('Taking all sales against all ad spend, the business covers its ads while each £1 of ads is matched by at least £' + v3WalkDp(be, 2) + ' of sales. In ' + X.N.cur + ' it was £'
+    + v3WalkDp(c.sales_per_ad_pound, 2) + (c.sales_per_ad_pound >= be
+      ? ' — covered, but that includes repeat and organic sales, so it does not show that every channel earns its spend.'
+      : ' — not covered: ad spend is costing more than all the sales it sits against.'));
+  if (p.has_history && p.cm_after_marketing != null) {
+    const vol = X.cm * (c.net_revenue - p.net_revenue), sp = -(c.paid_spend - p.paid_spend), tot = c.cm_after_marketing - p.cm_after_marketing;
+    out.push('Against ' + X.N.prev + ', profit after ads moved ' + v3WalkSigned(tot) + ': ' + v3WalkSigned(vol) + ' from sales and ' + v3WalkSigned(sp) + ' from ad spend.');
+  }
+  return out;
+}
+function v3WalkMeansCustomers(X) {
+  const c = X.P.cur, out = [], ue = X.ue;
+  if (c.new_orders > 0 && c.cost_per_new_customer != null && X.cm > 0) {
+    const foc = (c.new_revenue / c.new_orders) * X.cm, cac = Number(c.cost_per_new_customer);
+    out.push('Winning a new customer cost about ' + v3Gbp(cac) + ' of ad spend in ' + X.N.cur + ' (all ad spend over new customers). Their first order brings about '
+      + v3Gbp(foc) + ' of profit before ads, so ' + (foc >= cac ? 'they pay for themselves on the first order.' : 'it takes about ' + v3WalkDp(cac / foc, 1) + ' orders to earn back what they cost.'));
+  }
+  if (ue && ue.ltv_contribution != null && ue.ltv_cac != null) out.push('Over ' + (ue.ltv_horizon_months || 12) + ' months the average customer earns you about ' + v3Gbp(ue.ltv_contribution)
+    + ' of profit — ' + v3WalkDp(ue.ltv_cac, 1) + '× what one costs to win today. ' + (ue.ltv_cac >= 3 ? 'That is healthy room to spend on growth.' : ue.ltv_cac >= 2 ? 'Workable, but there is little room to pay more for customers.' : 'That is thin: growth bought on ads barely pays back.'));
+  return out;
+}
+function v3WalkMeansEfficiency(X) {
+  const c = X.P.cur, p = X.P.prev, out = [], be = v3WalkBreakEven(X);
+  if (be && c.sales_per_ad_pound != null) out.push('At your margin the business needs £' + v3WalkDp(be, 2) + ' of sales for every £1 of ads just to cover them; ' + X.N.cur + ' ran at £' + v3WalkDp(c.sales_per_ad_pound, 2)
+    + (c.sales_per_ad_pound >= be ? '. That is all sales, repeat and organic included — whether each channel earns its own spend is the scoreboard\u2019s job.' : ', so ads cost more than all the sales they sit against.'));
+  if (p.has_history && c.paid_spend > 0 && p.paid_spend > 0) {
+    const mc = c.new_revenue / c.paid_spend, mp = p.new_revenue / p.paid_spend;
+    const vol = (c.paid_spend - p.paid_spend) * mp, eff = c.paid_spend * (mc - mp);
+    out.push('New-customer sales moved ' + v3WalkSigned(c.new_revenue - p.new_revenue) + ': ' + v3WalkSigned(vol) + ' from spending ' + (c.paid_spend >= p.paid_spend ? 'more' : 'less')
+      + ', and ' + v3WalkSigned(eff) + ' because each £1 worked ' + (mc >= mp ? 'harder.' : 'less hard.') + (vol > 0 && eff < 0 && Math.abs(eff) > vol * 0.5 ? ' Most of the extra spend was soaked up rather than turned into customers.' : ''));
+  }
+  return out;
+}
+function v3WalkMeansStock(X) {
+  const rows = X.stock || [], c = X.P.cur, out = [];
+  const risk = rows.reduce((s, r) => s + (Number(r.cm_at_risk_before_resupply) || 0), 0);
+  const perDay = rows.filter(r => Number(r.cm_at_risk_before_resupply) > 0).reduce((s, r) => s + (Number(r.lost_cm_per_day) || 0), 0);
+  if (risk > 0 && c.cm_after_marketing > 0) out.push('The ' + v3Gbp(risk) + ' at risk is about ' + fmtPctN(risk / (c.cm_after_marketing * 30 / c.days)) + ' of a month’s profit after ads at ' + X.N.cur + '’s rate.');
+  if (perDay > 0) out.push('While they are out, each day costs about ' + v3Gbp(perDay) + ' of profit — and ad spend pointed at them keeps running.');
+  return out;
+}
+function v3WalkMeansCash(X) {
+  const rows = X.stock || [], c = X.P.cur, out = [];
+  const tot = rows.reduce((s, r) => s + (Number(r.trapped_cash) || 0), 0);
+  if (tot > 0 && c.paid_spend > 0) out.push('That ' + v3Gbp(tot) + ' would fund about ' + Math.round(tot / (c.paid_spend / c.days * 7)) + ' weeks of ad spend at ' + X.N.cur + '’s rate. Cash on the shelf is growth you have already paid for and cannot use.');
+  return out;
+}
+function v3WalkMeansLeaks(X) {
+  const c = X.P.cur, p = X.P.prev, out = [];
+  if (c.discount_rate == null) return out;
+  const gross = c.net_revenue / (1 - c.discount_rate);
+  out.push('A discount comes straight off profit. On ' + v3Gbp(gross) + ' of full-price sales in ' + X.N.cur + ', each point of discount is about ' + v3Gbp(gross * 0.01) + '.');
+  if (p.has_history && p.discount_rate != null) {
+    const d = c.discount_rate - p.discount_rate;
+    if (Math.abs(d) >= 0.005) out.push('Against ' + X.N.prev + ' the discount rate moved ' + (d > 0 ? 'up' : 'down') + ' ' + v3WalkDp(Math.abs(d) * 100, 1) + ' points — about ' + v3Gbp(Math.abs(d) * gross)
+      + (d > 0 ? ' of profit given away.' : ' of profit kept.'));
+  }
+  if (c.return_rate != null && c.return_rate > 0) out.push('Refunds took ' + v3Gbp(c.return_rate * c.net_revenue) + ' back out of sales in ' + X.N.cur + '.');
+  return out;
+}
+function v3WalkMeansProducts(X) {
+  const pr = (X.prods || []).filter(p => Number(p.cur_rev) > 0).sort((a, b) => Number(b.cur_rev) - Number(a.cur_rev)), all = Number(X.P.cur.net_revenue) || 0, out = [];
+  if (pr.length && all > 0) {
+    const s1 = pr[0].cur_rev / all;
+    out.push(v3WalkTitle(pr[0].title) + ' alone was ' + fmtPctN(Math.min(s1, 1)) + ' of sales in ' + X.N.cur + (s1 > 0.15 ? '. A stock-out or a bad review on it is a business-level risk, not a product one.' : '.'));
+  }
+  return out;
+}
+function v3WalkMeansRetention(X) {
+  const c = X.P.cur, ue = X.ue, out = [];
+  const tot = Number(c.new_revenue) + Number(c.returning_revenue);
+  if (tot > 0) out.push('Repeat customers made ' + fmtPctN(c.returning_revenue / tot) + ' of sales in ' + X.N.cur + ' at no ad cost — every point of that is profit that did not have to be bought.');
+  if (ue && ue.payback_orders != null) out.push('A new customer pays back after about ' + v3WalkDp(ue.payback_orders, 1) + ' orders (today’s figure)' + (ue.payback_orders <= 2 ? ', so the second order is where the profit starts.' : ' — a slow payback, so retention is where the money is.'));
+  return out;
+}
+function v3WalkMeansAdFit(X) {
+  const ue = X.ue, out = [];
+  if (ue && ue.cac != null) out.push('To win a customer on an ad, a product’s first order has to bring in at least ' + v3Gbp(ue.cac) + ' of profit — today’s cost of a new customer. Below that, it belongs in baskets and emails, not in cold ads.');
+  return out;
+}
+// The chart each stop draws from the series, and what the panel it lights always shows.
+const V3_WALK_VIEW = {
+  sales:       { chart: ['net_revenue', v3Gbp, 'Sales'], means: v3WalkMeansSales },
+  profit:      { chart: ['cm_after_marketing', v3Gbp, 'Profit after ads'], means: v3WalkMeansProfit },
+  customers:   { chart: ['new_orders', fmtCount, 'New customers'], means: v3WalkMeansCustomers },
+  efficiency:  { chart: ['sales_per_ad_pound', n => fmtMoney(n, 2), 'Sales per £1 of ads'], means: v3WalkMeansEfficiency, why: true },
+  spend:       { chart: ['paid_spend', v3Gbp, 'Ad spend'], means: v3WalkMeansEfficiency },
+  channels:    { chart: ['sales_per_ad_pound', n => fmtMoney(n, 2), 'Sales per £1 of ads'], means: null, why: true },
+  creative:    { chart: ['paid_spend', v3Gbp, 'Ad spend'], means: null, why: true },
+  stock:       { chart: null, means: v3WalkMeansStock },
+  reorder:     { chart: null, means: v3WalkMeansStock },
+  cash:        { chart: null, means: v3WalkMeansCash },
+  leaks:       { chart: ['discount_rate', v3WalkPct, 'Discount rate'], means: v3WalkMeansLeaks },
+  topProducts: { chart: ['net_revenue', v3Gbp, 'Sales'], means: v3WalkMeansProducts },
+  movers:      { chart: ['net_revenue', v3Gbp, 'Sales'], means: v3WalkMeansProducts },
+  traffic:     { chart: ['sessions', fmtCount, 'Visits'], means: v3WalkMeansSales },
+  retention:   { chart: ['returning_revenue', v3Gbp, 'Sales from repeat customers'], means: v3WalkMeansRetention },
+  newProducts: { chart: ['net_revenue', v3Gbp, 'Sales'], means: v3WalkMeansProducts },
+  adFit:       { chart: null, means: v3WalkMeansAdFit },
+};
+// What the lit panel always shows, whatever the horizon — so the pop-out never pretends a fixed
+// 30-day panel has changed when the owner switches to a year.
+const V3_WALK_PANEL = {
+  profit: 'the last 30 days', sales: 'the last 30 days', spend: 'the last 30 days', customers: 'week by week',
+  efficiency: 'the last 30 days', channels: 'the last 30 days', creative: 'recent weeks', stock: 'today', reorder: 'today',
+  cash: 'today', topProducts: 'the last 28 days', movers: 'the last 28 days', newProducts: 'the last 28 days', adFit: 'the last 28 days',
+  traffic: 'this month against a normal month', retention: 'every customer since their first order',
+};
+function v3WalkGrain(h) { return h === 'week' ? 'week' : h === 'quarter' ? 'quarter' : h === 'year' ? '12 months' : 'month'; }
+function v3WalkBucket(h, b) {
+  if (!b) return '';
+  const mo = iso => V3_MON[Number(String(iso).slice(5, 7)) - 1], yy = iso => '’' + String(iso).slice(2, 4);
+  if (h === 'week') return v3Day(b.start);
+  if (h === 'quarter') return 'Q' + (Math.floor((Number(String(b.start).slice(5, 7)) - 1) / 3) + 1) + ' ' + yy(b.start);
+  if (h === 'year') return mo(b.start) + ' ' + yy(b.start) + '–' + mo(b.end) + ' ' + yy(b.end);
+  return mo(b.start) + ' ' + yy(b.start);
+}
+// The pop-out's own picture, drawn from the run of periods at the chosen grain: the current
+// period in the accent colour, the same period last year marked, gaps where data is missing or
+// untrustworthy. It redraws when the owner switches horizon, which a fixed 30-day panel cannot.
+function V3WalkChart({ X, metric }) {
+  const [key, fmt, label] = metric;
+  const S = X.series || [];
+  if (S.length < 2) return null;
+  const ok = b => b && b.has_history && !(key === 'sessions' && !b.ga_ok);
+  const vals = S.map(b => (ok(b) && b[key] != null && isFinite(Number(b[key]))) ? Number(b[key]) : null);
+  const hi = Math.max(0, ...vals.filter(v => v != null)), lo = Math.min(0, ...vals.filter(v => v != null));
+  if (hi === lo) return null;
+  const W = 300, H = 64, gap = S.length > 9 ? 2 : 6, bw = (W - gap * (S.length - 1)) / S.length;
+  const y0 = H * hi / (hi - lo), sc = H / (hi - lo);
+  const last = S.length - 1, lyIdx = X.P.ly ? S.findIndex(b => b && b.start === X.P.ly.start) : -1;
+  return (<figure className="v3-walk-chart">
+    <svg viewBox={'0 0 ' + W + ' ' + H} preserveAspectRatio="none" role="img"
+         aria-label={label + ' by ' + v3WalkGrain(X.h) + ', ' + v3WalkBucket(X.h, S[0]) + ' to ' + v3WalkBucket(X.h, S[last])}>
+      <line x1="0" x2={W} y1={y0} y2={y0} stroke={PAL.line} strokeWidth="1"/>
+      {vals.map((v, i) => {
+        const x = i * (bw + gap);
+        if (v == null) return <rect key={i} x={x} y={y0 - 2} width={bw} height="2" fill={PAL.line}/>;
+        const h = Math.max(1, Math.abs(v) * sc);
+        return <rect key={i} x={x} y={v >= 0 ? y0 - h : y0} width={bw} height={h}
+          fill={i === last ? PAL.accent : i === lyIdx ? PAL.data3 : PAL.quiet}><title>{v3WalkBucket(X.h, S[i]) + ': ' + fmt(v)}</title></rect>;
+      })}
+    </svg>
+    <figcaption>
+      <span>{v3WalkBucket(X.h, S[0])}</span>
+      <span className="v3-walk-chart-t">{label}{X.h === 'year' ? ', 12 months at a time' : ' by ' + v3WalkGrain(X.h)}</span>
+      <span>{v3WalkBucket(X.h, S[last])}</span>
+    </figcaption>
+    <div className="v3-walk-chart-key">
+      <span><i className="k-cur"/>{X.N.cur} {fmt(vals[last])}</span>
+      {lyIdx >= 0 && vals[lyIdx] != null && <span><i className="k-ly"/>{X.N.ly} {fmt(vals[lyIdx])}</span>}
+    </div>
+  </figure>);
+}
+
+// ── Why a channel is below break-even ──────────────────────────────────────
+// fn_channel_diagnosis (0231): the change in a channel's reported return split exactly into
+// order value × purchases per click ÷ (cost per 1,000 views ÷ click-through), each in pounds of
+// profit, plus the checks that turn "what moved" into "why": did extra spend buy anything, would
+// more budget even buy reach, did people searching for the brand by name convert less too (then
+// it is the site, not the channel), and how much of the platform's claim Greta counts as real.
+const V3_DRIVER = {
+  cvr: ['Purchases per click', v => v3WalkPct(v)], ctr: ['Click-through', v => v3WalkPct(v)],
+  cpm: ['Cost per 1,000 views', v => fmtMoney(v, 2)], aov: ['Order value', v => v3Gbp(v)],
+};
+function V3WalkWhy({ X, diag, focus }) {
+  if (!diag) return <V3SkeletonRows n={2}/>;
+  const chs = diag.channels || {};
+  const below = Object.keys(chs).filter(k => {
+    const x = chs[k].context; return x && x.avg_iroas != null && x.break_even_iroas != null && Number(x.avg_iroas) < Number(x.break_even_iroas);
+  }).sort((a, b) => (Number((chs[b].periods.cur || {}).spend) || 0) - (Number((chs[a].periods.cur || {}).spend) || 0));
+  if (!below.length) return <p className="v3-walk-say">No ad channel is below break-even, so there is nothing to diagnose here.</p>;
+  const brand = chs.google_brand && chs.google_brand.periods;
+  return (<>{below.slice(0, focus ? 1 : 2).map(k => {
+    const ch = chs[k], c = ch.periods.cur || {}, p = ch.periods.prev || {}, d = ch.drivers, x = ch.context || {};
+    const name = v3ChanName(x.platform, k);
+    if (!c.has_detail || !p.has_detail || !d) return (<div key={k} className="v3-why-ch">
+      <div className="v3-tour-h">Why {name} is below break-even</div>
+      <p className="v3-walk-say">Greta’s campaign-level detail does not cover all of {X.N.prev}, so it cannot split this change yet. Switch to Week or Month to see the drivers.</p>
+    </div>);
+    const terms = ['cvr', 'ctr', 'cpm', 'aov'].map(t => ({ t, v: Number(d[t]), gbp: Number((d.gbp || {})[t]) || 0 }))
+      .sort((a, b) => Math.abs(b.gbp) - Math.abs(a.gbp));
+    const mx = Math.max(1, ...terms.map(t => Math.abs(t.gbp)));
+    const hurt = terms.filter(t => t.gbp < 0), help = terms.filter(t => t.gbp > 0);
+    const fromTo = t => {
+      const f = V3_DRIVER[t.t][1], before = p[t.t], after = c[t.t];
+      return V3_DRIVER[t.t][0].toLowerCase() + ' ' + (Number(after) > Number(before) ? 'rose' : 'fell') + ' from ' + f(before) + ' to ' + f(after);
+    };
+    const checks = [];
+    if (d.spend_growth > 0.2 && d.value_growth < d.spend_growth / 2) checks.push('Spend went up ' + fmtPctN(d.spend_growth) + ' but the sales ' + (x.platform === 'google' ? 'Google' : 'Meta') + ' credits went up ' + fmtPctN(Math.max(0, d.value_growth))
+      + ': the extra ' + v3Gbp(d.extra_spend) + ' brought in ' + v3Gbp(Math.max(0, d.extra_value)) + '. The extra budget bought pricier, less ready-to-buy clicks.');
+    if (c.lost_to_rank != null && c.lost_to_budget != null) checks.push(c.lost_to_rank > c.lost_to_budget
+      ? 'It showed in ' + fmtPctN(c.impression_share) + ' of the auctions it could enter, losing ' + fmtPctN(c.lost_to_rank) + ' to ad rank and only ' + fmtPctN(c.lost_to_budget) + ' to budget — so more money will not buy more reach. Better bids, a sharper product feed and stronger assets would.'
+      : 'It lost ' + fmtPctN(c.lost_to_budget) + ' of its auctions to budget — reach is limited by spend, not by ad quality.');
+    if (k.indexOf('facebook') === 0 && c.frequency != null && p.frequency != null && c.frequency > p.frequency * 1.15 && d.ctr < 0)
+      checks.push('The same people saw the ads ' + v3WalkDp(c.frequency, 1) + ' times on average, up from ' + v3WalkDp(p.frequency, 1) + ', while click-through fell — the creative is wearing out.');
+    if (c.atc_rate != null && p.atc_rate != null && c.atc_rate < p.atc_rate * 0.8)
+      checks.push('Fewer people who clicked added to basket (' + v3WalkPct(p.atc_rate) + ' → ' + v3WalkPct(c.atc_rate) + ') — the landing page or the offer is not landing.');
+    if (k !== 'google_brand' && brand && brand.cur && brand.prev && brand.cur.has_detail && brand.prev.has_detail && brand.cur.cvr != null && brand.prev.cvr != null && brand.cur.cvr < brand.prev.cvr * 0.75)
+      checks.push('Even people searching for you by name converted less (' + v3WalkPct(brand.prev.cvr) + ' → ' + v3WalkPct(brand.cur.cvr) + '). They are the most ready-to-buy visitors you have, so part of this is the site, not the channel — check the open site fixes first.');
+    if (x.phi != null && x.phi_source !== 'measured') checks.push('Greta counts about ' + fmtPctN(x.phi) + ' of the sales ' + (x.platform === 'google' ? 'Google' : 'Meta') + ' claims as truly caused by these ads — a standard figure for this kind of campaign, not yet measured for you. That is why it needs about '
+      + v3WalkX(x.break_even_reported_roas) + ' in the platform’s own numbers to break even. A two-week holdout would measure it.');
+    if (x.saturation_read === 'still scaling efficiently' && d.spend_growth > 0.2) checks.push('Over the longer run this platform has scaled well for you, so this looks like a recent problem with this campaign rather than a ceiling.');
+    return (<div key={k} className="v3-why-ch">
+      <div className="v3-tour-h">Why {name} is below break-even</div>
+      <p className="v3-walk-say lead">{(x.platform === 'google' ? 'Google' : 'Meta')} reports its return went from {v3WalkX(p.roas_reported)} in {X.N.prev} to {v3WalkX(c.roas_reported)} in {X.N.cur}.
+        {hurt.length ? ' The main reason: ' + fromTo(hurt[0]) + ', worth about ' + v3Gbp(Math.abs(hurt[0].gbp)) + ' of profit.' : ''}</p>
+      <ul className="v3-why-drivers" aria-label="What moved the return">
+        {terms.map(t => (<li key={t.t}>
+          <span>{V3_DRIVER[t.t][0]}</span>
+          <span className="v3-why-ft">{V3_DRIVER[t.t][1](p[t.t])} → {V3_DRIVER[t.t][1](c[t.t])}</span>
+          <span className="v3-why-track"><i className={t.gbp < 0 ? 'neg' : 'pos'} style={{ width: (Math.abs(t.gbp) / mx * 100) + '%' }}/></span>
+          <span className={'v3-why-gbp ' + (t.gbp < 0 ? 'neg' : 'pos')}>{v3WalkSigned(t.gbp)}</span>
+        </li>))}
+      </ul>
+      {help.length > 0 && hurt.length > 0 && <p className="v3-note">{help.map(fromTo).join('; ').replace(/^./, s => s.toUpperCase())}, which helped — but not enough to cover the rest.</p>}
+      {checks.length > 0 && <ul className="v3-why-checks">{checks.map((s, i) => <li key={i}>{s}</li>)}</ul>}
+      <p className="v3-note">The drivers are counted by {x.platform === 'google' ? 'Google' : 'Meta'}; the reasons are Greta’s reading of them.</p>
+    </div>);
+  })}</>);
+}
+
 // ── The tour ─────────────────────────────────────────────────────────────────
 // A walkthrough is a guided tour of the app itself, not a report about it. Each stop opens the
 // page, finds the real panel that answers the stop's question, scrolls to it, lights it and dims
@@ -17471,11 +17749,24 @@ function V3WalkRun({ w }) {
   const npd = useV3Rows('walk-npd', (sb, b) => sb.from('vw_product_npd_verdict')
     .select('title,revenue,paid:verdict->>paid_status').eq('brand_id', b)
     .order('revenue', { ascending: false, nullsFirst: false }).limit(300));
+  const ue = useV3Rows('cust-ue', V3_UE_Q);
+  // Channel diagnosis is per horizon; campaign-level detail cannot cover a year yet, and the
+  // pop-out says so rather than asking.
+  const diag = useV3Rows('walk-diag-' + h, (sb, b) => sb.rpc('fn_channel_diagnosis', { p_brand_id: b, p_horizon: h }));
   const board = useV3Board();
   const steps = walk.steps.concat(['end']);
   const i = Math.max(0, Math.min(w.step, steps.length - 1));
   const sid = steps[i];
   const def = sid === 'end' ? V3_WALK_END : V3_WALK_STEP[sid];
+  // The pages that have a date control follow the walkthrough: the owner sees the page itself for
+  // the period being discussed, not the last 30 days. Restored when the walkthrough ends.
+  const follows = V3_PERIOD_PAGES.indexOf(def.dest) >= 0;
+  const curP = cmp.rows && !Array.isArray(cmp.rows) && cmp.rows.periods ? cmp.rows.periods.cur : null;
+  React.useEffect(() => {
+    if (!curP || !follows || !window.__oiSetRange) return;
+    if (V3_WALK.savedRange === undefined && window.__oiGetRange) V3_WALK.savedRange = window.__oiGetRange();
+    window.__oiSetRange(curP.start, curP.end);
+  }, [sid, h, curP && curP.start, follows]);
   const cardRef = React.useRef(null);
   const elRef = React.useRef(null);
   const lastDest = React.useRef(null);   // smooth-scroll only when the next stop is on the same page
@@ -17571,7 +17862,12 @@ function V3WalkRun({ w }) {
   const data = cmp.rows && !Array.isArray(cmp.rows) ? cmp.rows : null;
   const P = data && data.periods;
   const X = P && P.cur ? { P, N: v3WalkNames(h, P), h, prods: data.products || [], stock: stock.rows,
-    score: score.rows, ret: ret.rows ? (ret.rows[0] || {}) : null, npd: npd.rows, board: board.rows } : null;
+    score: score.rows, ret: ret.rows ? (ret.rows[0] || {}) : null, npd: npd.rows, board: board.rows,
+    series: data.series || [], cm: data.cm_ratio != null ? Number(data.cm_ratio) : null,
+    ue: ue.rows ? (ue.rows[0] || null) : null } : null;
+  const view = V3_WALK_VIEW[sid] || {};
+  let means = [];
+  if (X && view.means) { try { means = view.means(X) || []; } catch (e) { means = []; } }
   const live = v3LiveRows(board.rows || []);
   const inCats = (r, cats) => !cats || cats.indexOf(r.category) >= 0;
   let out = null;
@@ -17647,11 +17943,22 @@ function V3WalkRun({ w }) {
         {page && <p className="v3-tour-where">You are on <b>{page.label}</b> — it lives in the menu under {page.group}.</p>}
         {pos.found === false
           ? <p className="v3-note">This part of {page ? page.label : 'the page'} is not showing for your data yet, so there is nothing to point at — here is what Greta can tell you.</p>
-          : def.what && <div className="v3-tour-sec"><div className="v3-tour-h">What you are looking at</div><p className="v3-walk-say">{def.what}</p></div>}
+          : def.what && <div className="v3-tour-sec"><div className="v3-tour-h">What you are looking at</div><p className="v3-walk-say">{def.what}</p>
+              {X && sid !== 'end' && <p className="v3-tour-view">{follows
+                ? <>The page is now set to {X.N.cur}{V3_WALK_PANEL[sid] ? <>; this panel always shows {V3_WALK_PANEL[sid]}</> : null}.</>
+                : V3_WALK_PANEL[sid] ? <>This panel always shows {V3_WALK_PANEL[sid]}{view.chart ? '; the chart below follows your choice.' : '.'}</> : null}</p>}</div>}
         <div className="v3-tour-sec">
           {sid !== 'end' && <div className="v3-tour-h">What it says{def.now ? ' · right now' : X ? ' · ' + X.N.line : ''}</div>}
+          {X && view.chart && !cmp.err && <V3WalkChart X={X} metric={view.chart}/>}
           {says}
         </div>
+        {X && means.length > 0 && <div className="v3-tour-sec"><div className="v3-tour-h">What it means for the business</div>
+          {means.map((m, k) => <p key={k} className="v3-walk-say">{m}</p>)}</div>}
+        {X && view.why && <div className="v3-tour-sec">
+          {h === 'year'
+            ? <p className="v3-walk-say">Campaign-level ad detail does not go back a full two years yet, so Greta can explain why a channel moved for a week, month or quarter, not a year.</p>
+            : diag.err ? <p className="v3-note">Greta could not load the channel detail just now.</p>
+            : <V3WalkWhy X={X} diag={diag.rows && !Array.isArray(diag.rows) ? diag.rows : null} focus={sid === 'efficiency'}/>}</div>}
         {stepActs.length > 0 && <V3WalkActs rows={stepActs} head="What to do about it"/>}
       </div>
       <div className="v3-tour-foot">
@@ -17691,9 +17998,12 @@ function V3WalkFab({ dest }) {
         <button type="button" className="v3-btn v3-btn-q v3-btn-sm" aria-label="Close" onClick={() => setOpen(false)}><Icon name="close" size={14}/></button>
       </div>
       <p className="v3-note">Greta takes you round the app panel by panel: what each one shows, what it says against the period before and the same time last year, and what to do about it.</p>
-      <div className="v3-seg" role="group" aria-label="Compare over">
-        {V3_WALK_H.map(o => <button key={o.id} type="button" aria-pressed={h === o.id} title={o.sub + ', and against last year'} onClick={() => setH(o.id)}>
-          {o.label}<span className="v3-walk-hsub">{o.short}</span></button>)}
+      <div className="v3-walk-hgroups" role="group" aria-label="Compare over">
+        {V3_WALK_HGROUPS.map(g => (<div key={g} className="v3-walk-hgroup">
+          <span className="v3-walk-hlab">{g}</span>
+          <div className="v3-seg">{V3_WALK_H.filter(o => o.label === g).map(o => <button key={o.id} type="button" aria-pressed={h === o.id}
+            title={o.sub + (o.id === 'year' ? '' : ', and against last year')} onClick={() => setH(o.id)}>{o.short}</button>)}</div>
+        </div>))}
       </div>
       <div className="v3-walk-pick">
         {V3_WALKS.map(x => (<button key={x.id} type="button" className="v3-walk-opt" onClick={() => { setOpen(false); v3WalkStart(x.id, h); }}>
@@ -17853,6 +18163,12 @@ function App(){
     // v3dest is deliberately read once, as the landing destination, not tracked as a dep.
     track('page_view', { dest: v3dest, arrival: true }, v3dest);
   }, []);
+
+  // The walkthrough sets the date range on the pages that have one, and restores it afterwards.
+  React.useEffect(() => {
+    window.__oiSetRange = (s, e, p) => { setRangeStart(s || ''); setRangeEnd(e || ''); if (p) setPeriod(p); };
+    window.__oiGetRange = () => ({ s: rangeStart, e: rangeEnd, p: period });
+  }, [rangeStart, rangeEnd, period]);
 
   // Global deep-link helper so findings can jump to their evidence tab (clickable cross-refs).
   React.useEffect(() => {

@@ -917,6 +917,37 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-walk-pop .v3-seg { margin-bottom: var(--space-3); }
 .v3-walk-pop .v3-walk-pick { grid-template-columns: 1fr; }
 
+/* Walkthrough pop-out: the horizon picker grouped short / medium / long, the pop-out's own chart
+   (redrawn for the chosen horizon), what the lit panel always shows, and why a channel moved. */
+.v3-walk-hgroups { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-bottom: var(--space-3); }
+.v3-walk-hgroup { display: grid; gap: var(--space-1); }
+.v3-walk-hlab { font-size: var(--text-xs); font-weight: var(--weight-semi); color: var(--color-muted); }
+.v3-tour-view { font-size: var(--text-xs); color: var(--color-muted); margin: var(--space-1) 0 0; }
+.v3-walk-chart { margin: var(--space-2) 0 var(--space-3); }
+.v3-walk-chart svg { display: block; width: 100%; height: var(--space-16); }
+.v3-walk-chart figcaption { display: flex; justify-content: space-between; gap: var(--space-2); margin-top: var(--space-1);
+  font-size: var(--text-xs); color: var(--color-faint); font-family: var(--font-mono); }
+.v3-walk-chart figcaption .v3-walk-chart-t { font-family: var(--font-sans); color: var(--color-muted); }
+.v3-walk-chart-key { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-1); font-size: var(--text-xs); color: var(--color-muted); }
+.v3-walk-chart-key span { display: inline-flex; align-items: center; gap: var(--space-1); font-family: var(--font-mono); }
+.v3-walk-chart-key i { display: inline-block; width: var(--space-2); height: var(--space-2); }
+.v3-walk-chart-key .k-cur { background: var(--color-accent); }
+.v3-walk-chart-key .k-ly { background: var(--color-data-3); }
+.v3-why-ch + .v3-why-ch { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--color-line); }
+.v3-why-drivers { list-style: none; margin: var(--space-2) 0; padding: 0; }
+.v3-why-drivers li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-1) var(--space-2); align-items: center;
+  padding: var(--space-2) 0; border-top: 1px solid var(--color-line); font-size: var(--text-sm); }
+.v3-why-ft { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-muted); text-align: right; }
+.v3-why-track { height: var(--space-1); background: var(--color-sunken); }
+.v3-why-track i { display: block; height: 100%; }
+.v3-why-track i.neg { background: var(--color-danger); }
+.v3-why-track i.pos { background: var(--color-success); }
+.v3-why-gbp { font-family: var(--font-mono); font-weight: var(--weight-semi); text-align: right; }
+.v3-why-gbp.neg { color: var(--color-danger); }
+.v3-why-gbp.pos { color: var(--color-success); }
+.v3-why-checks { margin: var(--space-2) 0; padding-left: var(--space-4); font-size: var(--text-sm); line-height: var(--leading-body); }
+.v3-why-checks li + li { margin-top: var(--space-1); }
+
 @media (max-width: 760px) {
   .v3-walk-fab, .v3-tour-resume { right: var(--space-4); bottom: calc(var(--size-mobile-nav) + var(--space-4)); }
   .v3-walk-take li { grid-template-columns: 1fr; gap: var(--space-1); }
