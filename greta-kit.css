@@ -786,3 +786,15 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-main .v3-econ-step { padding: 0 0 var(--space-6); }
 .v3-main .v3-econ-step + .v3-econ-step { border-top: 1px solid var(--color-line); padding-top: var(--space-6); }
 .v3-main .v3-check + .v3-note { margin-top: var(--space-2); }
+
+/* Narrow screens. A table wider than its column scrolls inside its own box (the page itself never
+   scrolls sideways — Stock, Website, Marketing and Product costs did on a tablet), the overview's
+   Daily…Yearly switch wraps instead of cutting off "Yearly", and the £/% switch meets the 24px
+   minimum touch size. */
+.v3-main :not(.v3-main):not(td):not(th):has(> table) { overflow-x: auto; }
+.v3-main .go-tf { flex-wrap: wrap; max-width: 100%; }
+.v3-main .v3-unit button { min-height: 24px !important; }
+.v3-main .sbadge { white-space: normal; max-width: 100%; }
+/* Last line of defence: nothing in the page column can make the page scroll sideways. clip (not
+   hidden) creates no scroll container, so sticky headers keep working. */
+.v3-main { overflow-x: clip; }

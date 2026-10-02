@@ -165,6 +165,9 @@
       var out = await r.json().catch(function () { return {}; });
       if (!r.ok) throw new Error(out.error || ('save failed (' + r.status + ')'));
       await refresh();
+      // The "numbers are switched off" banner and anything else keyed to brand_config re-check on
+      // this; the costs form used to save without telling them, so the banner never cleared.
+      try { window.dispatchEvent(new Event('oi-config-updated')); } catch (e) {}
       return { ok: true };
     } catch (e) { if (window.console) console.warn('[plan] saveEconomics failed', e); return { ok: false, error: String((e && e.message) || e) }; }
   }

@@ -11636,7 +11636,7 @@ function GretaOverviewTiers(){
   const toggle = (
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:6,marginBottom:6}}>
       <div style={{fontSize:'var(--text-sm)',color:GO_T.dim}}>{d?('Snapshot · '):''}{d && <span style={{fontFamily:GO_T.mono}}>{d.periodLabel}</span>} {d?d.compareLabel:''}</div>
-      <div style={{display:'inline-flex',background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:'var(--radius-none)',padding:3}}>
+      <div className="go-tf" style={{display:'inline-flex',background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:'var(--radius-none)',padding:3}}>
         {GO_TIMEFRAMES.map(x=> <button key={x} onClick={()=>setTf(x)} style={{background:x===tf?GO_T.accent:'none',color:x===tf?PAL.panel:GO_T.mut,fontWeight:x===tf?'var(--weight-semi)':'var(--weight-normal)',border:0,fontSize:'var(--text-sm)',padding:'6px 12px',borderRadius:'var(--radius-md)',cursor:'pointer',textTransform:'capitalize'}}>{x}</button>)}
       </div>
     </div>);
