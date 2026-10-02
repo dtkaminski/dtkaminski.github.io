@@ -13581,6 +13581,24 @@ const CATEGORY_PRIORS = {
   default:   { label:'DTC (general)',grossMarginPct:60, fixedCostsMonthly:12000, inventoryDays:75,  supplierDays:30, discountRatePct:15, vc:{ shipping:4.5, fulfilment:2.5, packaging:0.8, payPct:2.4, payFixed:0.25, refundPct:5 } },
 };
 // Map a free-text vertical → a prior set (loose keyword match, defaults to DTC general).
+// How the business is funded sets the discount rate (0234): borrowing → the rate the brand pays,
+// own cash → the Bank of England rate (what the cash would earn instead), investors → the return they
+// expect. The answer is the brand's; the rate it implies is shown and can be typed over.
+const ECON_FUNDING = [
+  { id: 'own_cash', label: 'Our own cash' },
+  { id: 'borrowing', label: 'A loan or overdraft' },
+  { id: 'investors', label: 'Investors' },
+];
+// 0.0375 → "3.75%": rates are entered to two decimals, so show what was entered.
+function econRatePct(r) { return r == null ? '—' : (Math.round(Number(r) * 10000) / 100) + '%'; }
+const ECON_INV_WHY = {
+  stale_feed: 'Greta measures this once your Shopify products are syncing.',
+  no_costs: 'Add your product costs and Greta measures this from your stock.',
+  low_cost_coverage: 'Too few products have a cost to measure this yet. Add costs and Greta measures it.',
+  too_little_history: 'Greta measures this after four weeks of sales.',
+  no_stock: 'Average days stock is held before it sells.',
+};
+
 function priorsForVertical(v){
   const s = String(v||'').toLowerCase();
   if(/jewel|ring|neckl/.test(s)) return CATEGORY_PRIORS.jewellery;
@@ -13773,6 +13791,27 @@ function BusinessEconomicsPanel(){
   const [cash, setCash] = React.useState({});
   const [cashBusy, setCashBusy] = React.useState(false);
   const [cashMsg, setCashMsg] = React.useState(null);
+  // Measured stock days and the funding answer (0234) are read from the database directly: the
+  // edge function's config read does not carry them.
+  const [gen, setGen] = React.useState(null);
+  const [fundPick, setFundPick] = React.useState(null);
+  const [fundRate, setFundRate] = React.useState('');
+  const [fundBusy, setFundBusy] = React.useState(false);
+  const [fundMsg, setFundMsg] = React.useState(null);
+  const [rateOpen, setRateOpen] = React.useState(false);
+  const genomeSb = () => window.FRKL_LIVE && window.FRKL_LIVE.sb;
+  const loadGen = async () => {
+    const s = genomeSb(); if (!s || !authed) return null;
+    try { const r = await s.rpc('fn_brand_genome', { p_brand: ASK.brand_id }); if (!r.error && r.data) { setGen(r.data); return r.data; } } catch (e) {}
+    return null;
+  };
+  React.useEffect(() => {
+    loadGen().then(g => {
+      if (!g) return;
+      setFundPick(g.funding_source || null);
+      setFundRate(g.borrowing_rate_annual != null ? String(round2(Number(g.borrowing_rate_annual) * 100)) : '');
+    });
+  }, []);   // eslint-disable-line
 
   const priors = priorsForVertical(config?.vertical);
 
@@ -13875,6 +13914,40 @@ function BusinessEconomicsPanel(){
     setCsMsg({ text:'Saved. Your own figures now drive the cash cycle instead of category estimates.', kind:'ok' });
   };
 
+  // Answering "how is the business funded" stores the answer and the rate it implies, server side.
+  const setFunding = async (src) => {
+    const s = genomeSb(); if (!s || fundBusy) return;
+    let rate = null;
+    if (src === 'borrowing') {
+      const n = num(fundRate);
+      if (n == null || n < 0 || n >= 100) { setFundMsg({ text: 'Enter the yearly rate you pay, for example 9.5.', kind: 'err' }); return; }
+      rate = round4(n / 100);
+    }
+    setFundBusy(true); setFundMsg(null);
+    let res = null;
+    try { const r = await s.rpc('fn_set_brand_funding', { p_brand: ASK.brand_id, p_source: src, p_rate: rate }); if (r.error) throw r.error; res = r.data; }
+    catch (e) { res = { ok: false, reason: String((e && e.message) || e) }; }
+    setFundBusy(false);
+    if (!res || !res.ok) { setFundMsg({ text: res && res.reason === 'rate_needed' ? 'Enter the yearly rate you pay, for example 9.5.' : 'Could not save that. Try again.', kind: 'err' }); return; }
+    setConfig(c => ({ ...(c || {}), discount_rate_annual: res.rate }));
+    setGenome(g => ({ ...g, discount_rate_annual: String(round2(res.rate * 100)) }));
+    await loadGen();
+    try { window.dispatchEvent(new Event('oi-config-updated')); } catch (e) {}
+    setFundMsg({ text: 'Saved. Greta uses it from the next engine run.', kind: 'ok' });
+  };
+  // Back to the measured stock days (it then follows the stock nightly).
+  const useMeasuredDays = async () => {
+    const s = genomeSb(); if (!s) return;
+    let d = null;
+    try { const r = await s.rpc('fn_use_measured_inventory_days', { p_brand: ASK.brand_id }); if (!r.error) d = r.data; } catch (e) {}
+    if (!d || !d.ok) { setCsMsg({ text: 'Could not switch to the measured figure. Try again.', kind: 'err' }); return; }
+    setConfig(c => ({ ...(c || {}), inventory_days: d.days }));
+    setGenome(g => ({ ...g, inventory_days: String(d.days) }));
+    await loadGen();
+    try { window.dispatchEvent(new Event('oi-config-updated')); } catch (e) {}
+    setCsMsg({ text: 'Using the measured figure. It follows your stock from now on.', kind: 'ok' });
+  };
+
   // The six the cash model treats as core. Without all of them it abstains entirely: no clamp
   // on spend, and no cash number rendered anywhere in the app.
   const cashReady = !!(config && config.opening_cash != null && config.opening_cash_as_of != null
@@ -13930,6 +14003,30 @@ function BusinessEconomicsPanel(){
     background: m.kind==='ok'?'var(--color-success-wash)':'var(--color-danger-wash)',
     border:'1px solid '+(m.kind==='ok'?'var(--color-success-line)':'var(--color-danger-wash)')}}>{m.text}</div>);
 
+  // Stock days: the brand's own number, the measured one, or the category estimate.
+  const invM = (gen && gen.inventory_measure) || null;
+  const invOk = !!(invM && invM.ok);
+  const invSrc = (gen && gen.inventory_days_source) || (config?.inventory_days != null ? 'entered' : null);
+  const invDiffers = invOk && invSrc === 'entered' && config?.inventory_days != null
+    && Math.abs(Number(config.inventory_days) - invM.days) > 0.1 * invM.days;
+  const invHint = invOk ? (<>
+      Measured from your stock: <span className="v3-econ-fig">{fmtMoney(invM.stock_at_cost)}</span> at cost, selling <span className="v3-econ-fig">{fmtMoney(invM.cogs_per_day)}</span> a day
+      at cost over the {invM.window_days >= 365 ? 'last year' : 'last ' + invM.window_days + ' days'}.
+      {invM.skus_without_cost > 0 ? ' ' + invM.skus_without_cost + ' products without a cost are left out.' : ''}
+      {invDiffers && <> <button type="button" className="v3-econ-use" onClick={useMeasuredDays}>Use measured: <span className="v3-econ-fig">{invM.days}</span> days</button></>}
+    </>) : (invM && ECON_INV_WHY[invM.reason]) || 'Average days stock is held before it sells.';
+  // Discount rate: where it came from, and what it is.
+  const dSrc = (gen && gen.discount_rate_source) || (config?.discount_rate_annual != null ? 'entered' : null);
+  const dRate = gen && gen.discount_rate_annual != null ? Number(gen.discount_rate_annual) : (config?.discount_rate_annual != null ? Number(config.discount_rate_annual) : null);
+  const ref = (gen && gen.reference) || {};
+  const dTag = { entered: 'Your number', borrowing: 'Your borrowing rate', savings: 'Bank of England rate', investors: 'Investor return' }[dSrc] || ('Est. ' + priors.discountRatePct + '%');
+  const dWhy = { entered: 'the rate you entered', borrowing: 'the rate you pay to borrow',
+    savings: ((ref.savings && ref.savings.label) || 'the Bank of England rate') + ', what your cash would earn instead',
+    investors: ((ref.investors && ref.investors.label) || 'a typical return investors expect') + '. Use a different rate if yours expect more or less' }[dSrc];
+  const dSay = dSrc && dRate != null
+    ? <>Repeat orders that arrive later are valued at <span className="v3-econ-fig">{econRatePct(dRate)}</span> a year: {dWhy}.</>
+    : <>Greta uses <span className="v3-econ-fig">{priors.discountRatePct}%</span> for now, an estimate for {priors.label} brands. Pick how you are funded and it uses your real cost of money. It only discounts repeat orders that arrive later, so it moves profit per customer a little.</>;
+
   // Provenance chip: 'your number' when the config has a stored value, else the fallback the engine uses.
   const Tag = ({ saved, fallback }) => (
     <span className="v3-econ-tag" data-tone={saved ? 'good' : (fallback.warn ? 'warn' : undefined)}>
@@ -13975,13 +14072,36 @@ function BusinessEconomicsPanel(){
             <div>
               <div className="v3-form-grid v3-form-grid--n">
                 <Field label="Days stock is held" unit="days" int value={genome.inventory_days||''} onChange={v=>setGenome(s=>({...s, inventory_days:v}))}
-                  placeholder={'~'+priors.inventoryDays} saved={config?.inventory_days != null}
-                  fallback={{ label:'est. '+priors.inventoryDays+'d' }} hint="Avg days stock is held before it sells."/>
+                  placeholder={invOk ? String(invM.days) : '~'+priors.inventoryDays} saved={invSrc === 'entered'}
+                  fallback={{ label: invSrc === 'measured' || invOk ? 'Measured' : 'est. '+priors.inventoryDays+'d' }} hint={invHint}/>
                 {/* Supplier payment terms are asked once, as "Balance terms" under Stock & suppliers below —
                     this field saved the same column from a second form with a second button. */}
-                <Field label="Annual discount rate" unit="%" value={genome.discount_rate_annual||''} onChange={v=>setGenome(s=>({...s, discount_rate_annual:v}))}
-                  placeholder={'~'+priors.discountRatePct} saved={config?.discount_rate_annual != null}
-                  fallback={{ label:'est. '+priors.discountRatePct+'%' }} hint="What money costs you — used to value repeat orders that arrive later."/>
+              </div>
+
+              {/* The discount rate is what money costs the brand. No connected source records that, so it
+                  comes from the one fact the brand knows: how the business is funded. */}
+              <div className="v3-econ-field v3-fund">
+                <div className="v3-econ-head"><span>How the business is funded</span>
+                  <span className="v3-econ-tag" data-tone={dSrc ? 'good' : undefined}>{dTag}</span></div>
+                <div className="v3-seg" role="group" aria-label="How the business is funded">
+                  {ECON_FUNDING.map(o => <button key={o.id} type="button" aria-pressed={fundPick === o.id} disabled={fundBusy}
+                    onClick={() => { setFundPick(o.id); setFundMsg(null); if (o.id !== 'borrowing') setFunding(o.id); }}>{o.label}</button>)}
+                </div>
+                {fundPick === 'borrowing' && (<div className="v3-fund-rate">
+                  <span className="v3-affix" data-post="%"><input className="oi-num" type="number" inputMode="decimal" step="any" min="0"
+                    aria-label="Yearly rate you pay" placeholder="e.g. 9.5" value={fundRate} onChange={e => setFundRate(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); setFunding('borrowing'); } }}/></span>
+                  <button type="button" className="v3-btn" disabled={fundBusy} onClick={() => setFunding('borrowing')}>{fundBusy ? 'Saving…' : 'Use this rate'}</button>
+                </div>)}
+                <div className="v3-econ-hint v3-measure">{dSay}</div>
+                {fundMsg && <div className="v3-econ-hint" data-tone={fundMsg.kind}>{fundMsg.text}</div>}
+                <button type="button" className="v3-econ-use" onClick={() => setRateOpen(o => !o)}>{rateOpen ? 'Hide the rate' : 'Use a different rate'}</button>
+                {rateOpen && (<div className="v3-fund-rate">
+                  <span className="v3-affix" data-post="%"><input className="oi-num" type="number" inputMode="decimal" step="any" min="0"
+                    aria-label="Annual discount rate" placeholder={String(dRate != null ? round2(dRate * 100) : priors.discountRatePct)}
+                    value={genome.discount_rate_annual||''} onChange={e => { const v = e.target.value; setGenome(s => ({ ...s, discount_rate_annual: v })); }}/></span>
+                  <span className="v3-econ-hint">Saved with Save timing below.</span>
+                </div>)}
               </div>
             </div>
 

@@ -998,3 +998,17 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
   .gp-plan-stats { grid-template-columns: 1fr; }
   .gp-plan-tbl th, .gp-plan-tbl td { padding-left: var(--space-1); padding-right: var(--space-1); }
 }
+
+/* Cash cycle (0234): the funding question that sets the discount rate, and the measured stock days. */
+.v3-fund { margin-top: var(--space-5); }
+/* Outside the field grid, so the head sits at the start, not aligned to the end of a shared row. */
+.v3-fund > .v3-econ-head { align-self: stretch; }
+.v3-fund .v3-seg { align-self: flex-start; flex-wrap: wrap; margin-top: var(--space-2); }
+.v3-fund-rate { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-top: var(--space-2); }
+.v3-fund-rate .v3-affix { width: calc(var(--space-16) * 2); }
+.v3-econ-use { align-self: flex-start; background: none; border: 0; padding: 0; margin-top: var(--space-1); cursor: pointer; font: inherit;
+  font-size: var(--text-xs); font-weight: var(--weight-semi); color: var(--color-accent); }
+.v3-econ-hint .v3-econ-use { display: inline; margin-top: 0; }
+.v3-econ-fig { font-family: var(--font-mono); color: var(--color-ink); }
+.v3-econ-hint[data-tone="ok"] { color: var(--color-success); }
+.v3-econ-hint[data-tone="err"] { color: var(--color-danger); }
