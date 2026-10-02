@@ -47,6 +47,8 @@ function fmtPctN(n) {
   const p = Number(n) * 100, a = Math.abs(p);
   return (p < 0 ? '−' : '') + (a < 10 ? a.toFixed(1) : Math.round(a).toString()) + '%';
 }
+// A multiple (sales per £ of ads, frequency): 2.41×. One placeholder for unknown.
+function fmtTimes(n, dp) { return fmtOk(n) ? Number(n).toFixed(dp == null ? 2 : dp) + '×' : FMT_NONE; }
 function fmtCount(n) { return fmtOk(n) ? (Number(n) < 0 ? '−' : '') + Math.round(Math.abs(Number(n))).toLocaleString('en-GB') : FMT_NONE; }
 const GBP = n => fmtMoney(n);
 const GBP2 = n => fmtMoney(n, 2);   // pence matter: CPC, CPA, revenue per recipient
@@ -3723,12 +3725,16 @@ function Overview({start, period, customActive}){
   const _dc = (window.FRKL_DISCOUNT_CODES||{}).meta || {};   // OI discount context (draft-excluded, markdown-aware)
   const _mdPct = _dc.markdownShareOfValue!=null ? Math.round(_dc.markdownShareOfValue*100) : null;
   // Business-snapshot KPIs (COGS-based, trailing 90d — not period-windowed)
-  const B = window.FRKL_BUSINESS || {};
+  const B = window.FRKL_BUSINESS || (window.FRKL_BUSINESS = {});
   const _prod = B.products || [];
   const _gp = _prod.reduce((a,p)=>a+(p.grossProfit||0),0), _ns = _prod.reduce((a,p)=>a+(p.netSales||0),0);
   const grossMargin = _ns>0 ? _gp/_ns : null;
-  const _units = _prod.reduce((a,p)=>a+(p.units||0),0), _rets = _prod.reduce((a,p)=>a+(p.returns||0),0);
-  const returnRate = _units>0 ? _rets/_units : null;
+  // Refunded orders over the last 30 days (vw_brand_returns). The card divided per-product returned
+  // units by units sold from frkl's July snapshot, which reads "0 of 0 units" once that is retired.
+  const _rq = useV3Rows('brand-returns', V3_RETURNS_Q);
+  const _rcur = (_rq.rows || []).find(r => r.window_label === 'current_30d'), _rpri = (_rq.rows || []).find(r => r.window_label === 'prior_30d');
+  const returnRate = _rcur && _rcur.return_rate_pct != null ? Number(_rcur.return_rate_pct) / 100 : null;
+  const pReturnRate = _rpri && _rpri.return_rate_pct != null ? Number(_rpri.return_rate_pct) / 100 : null;
   const _rbm = B.retentionByMonth || [];
   const _ret = _rbm.reduce((a,m)=>a+(m.ret||0),0), _tot = _rbm.reduce((a,m)=>a+(m.total||0),0);
   const returningPct = _tot>0 ? _ret/_tot : null;
@@ -3956,12 +3962,17 @@ function Overview({start, period, customActive}){
             agent="Pulse" observation={_vs('Ad spend', paid, pPaid, 'sales', rev, pRev)} />
           <KPI label="Shopify net revenue" val={GBP(rev)} sub={`${NUM(orders)} orders · average order value ${GBP(orders?rev/orders:null)}`} series={seriesRev} current={rev} prior={pRev} goodDirection="up"
             agent="Atlas" observation={discLoad != null ? `${fmtPctN(discLoad)} of sales went out as code or automatic discounts; sale-price markdowns come on top — see Promotions for the full picture.` : undefined} />
-          <KPI label="Sales per £ of ads" val={mer?mer.toFixed(2)+'x':'—'} sub="net revenue ÷ paid spend" series={seriesMER} current={mer} prior={pMer} goodDirection="up"
-            agent="Atlas" observation={_vs('Sales', rev, pRev, 'ad spend', paid, pPaid)}
-            benchmark="blended_mer" bmValue={mer} />
-          <KPI label="Sessions (GA4)" val={NUM(sessions)} sub={`Site conversion rate ${PCT(cvr)} (orders ÷ sessions, on days analytics recorded)`} series={seriesSessions} current={sessions} prior={pSessions} goodDirection="up"
+          {/* Measured against the brand's own break-even (1 ÷ margin after costs), the line Review and
+              the weekly board use. It showed an industry "3× jewellery" here, so the same figure was
+              "below target" on one page and above break-even on another. */}
+          {(() => { const be = v3MerBreakEven(); const st = (mer == null || be == null) ? null : mer >= be * 1.3 ? 'healthy' : mer >= be ? 'watch' : 'action';
+            return <KPI label="Sales per £ of ads" val={fmtTimes(mer, 2)} sub={be ? `net revenue ÷ paid spend · break-even ${fmtTimes(be, 2)}` : 'net revenue ÷ paid spend · break-even needs your costs'} series={seriesMER} current={mer} prior={pMer} goodDirection="up"
+              status={st || undefined} statusLabel={st === 'healthy' ? 'Above break-even' : st === 'watch' ? 'Just above break-even' : st === 'action' ? 'Below break-even' : undefined}
+              agent="Atlas" observation={_vs('Sales', rev, pRev, 'ad spend', paid, pPaid)} />; })()}
+          <KPI label="Sessions (GA4)" val={NUM(sessions)} sub={(() => { const gd = ga.filter(g => Number(g.sessions) > 0).length, nd = daily.length;
+              return (gd < nd ? `${gd} of ${nd} days have reliable analytics · ` : '') + `site conversion rate ${PCT(cvr)} on those days`; })()} series={seriesSessions} current={sessions} prior={pSessions} goodDirection="up"
             agent="Pulse" observation={_vs('Visits', sessions, pSessions, 'ad spend', paid, pPaid)} />
-          <KPI label="Klaviyo-tracked orders" val={GBP(emailRev)} sub="gross order value — not email-attributed" series={seriesEmail} current={emailRev} prior={pEmailRev} goodDirection="up"
+          <KPI label="Orders Klaviyo saw" val={GBP(emailRev)} sub="every order Klaviyo recorded, including VAT and shipping — not sales from email" series={seriesEmail} current={emailRev} prior={(pKl.length >= Math.max(3, Math.floor(kl.length * 0.8))) ? pEmailRev : null} goodDirection="up"
             agent="Lux" observation={_vs('Orders Klaviyo saw', emailRev, pEmailRev, 'sales', rev, pRev)} />
           <KPI label="Visitors who buy" val={PCT(cvr)} sub="orders ÷ sessions, on the days analytics recorded" series={seriesCVR} current={cvr} prior={pCvr} goodDirection="up"
             status={cvr==null?undefined:cvr>=CVR_BENCH?'healthy':cvr>=CVR_BENCH*0.8?'watch':'action'} statusLabel={cvr==null?undefined:cvr>=CVR_BENCH?'Healthy':cvr>=CVR_BENCH*0.8?'Watch':'Below target'}
@@ -3985,8 +3996,8 @@ function Overview({start, period, customActive}){
             agent="Atlas" observation="Blended product margin across the live catalogue, after cost of goods."
             implication="Every profit figure builds on this — discounts eat straight into it."
             benchmark="gross_margin" bmValue={gm} />
-          <KPI label="Return rate" val={PCT(returnRate)} sub={`${NUM(_rets)} of ${NUM(_units)} units · 90d`} series={seriesReturn} seriesLabel="Refunds ÷ sales · by day" goodDirection="down"
-            agent="Lux" observation={`Share of shipped units returned — watch by item for sizing/quality hotspots. (Card is unit-based over 90d; trend is refund-${curSym()} share of sales by day.)`}
+          <KPI label="Return rate" val={PCT(returnRate)} sub={_rcur ? `${NUM(_rcur.refunded_orders)} of ${NUM(_rcur.orders)} orders refunded · last 30 days` : 'refunded orders · last 30 days'} series={seriesReturn} seriesLabel="Refunds ÷ sales · by day" current={returnRate} prior={pReturnRate} goodDirection="down"
+            agent="Lux" observation={`Share of orders refunded in full or in part. The trend is refunds as a share of sales, by day.`}
             implication="A point of return rate is pure margin; flag any item materially above this blended rate."
             benchmark="return_rate" bmValue={returnRate} />
           <KPI label="Orders with a discount" val={_dc.fullPriceShare!=null?PCT(1-_dc.fullPriceShare):'—'} sub="share of orders using a code/auto discount — how often, not how deep · drafts excluded" goodDirection="down"
@@ -4876,7 +4887,36 @@ function Creatives(){
     </div>
     <div className="note" style={{marginTop:14}}>The two biggest spenders (Angela | Video and All Videos | Flexi) have <b>below-average Meta conversion-rate ranking</b> — they drive purchases but Meta judges the post-click weak (landing/audience mismatch). 'Stacks Catalogue UK' at 7.6× frequency is the most fatigued. Image URLs from Meta CDN expire ~24h after the pull — regenerate the data file for fresh images.</div>
     <Insight k="creative" />
-    </>) : (<p className="v3-empty">Per-ad detail — spend, purchases and which creatives carry the account — appears here once Meta’s ad-level data has synced. The two panels above already read it live.</p>)}
+    </>) : <V3AdTable/>}
+  </div>);
+}
+// Per-ad spend and results from the live Meta sync (vw_creative_performance, ads that spent in the
+// last 30 days). This sat behind "appears here once Meta's ad-level data has synced" while the
+// sync had already written every ad: the section above is built on frkl's retired July snapshot.
+const V3_ADS_Q = (sb, b) => sb.from('vw_creative_performance')
+  .select('entity_id,entity_name,last_day,days_live,spend,purchases,purchase_value,max_frequency,roas_platform,verdict')
+  .eq('brand_id', b).gte('last_day', v3IsoAdd(new Date().toISOString().slice(0, 10), -30)).order('spend', { ascending: false }).limit(50);
+function V3AdTable(){
+  const q = useV3Rows('ads-30d', V3_ADS_Q);
+  if (!q.rows) return <p className="v3-empty">Loading your ads…</p>;
+  const rows = q.rows.filter(r => Number(r.spend) > 0);
+  if (!rows.length) return <p className="v3-empty">No Meta ads have spent in the last 30 days.</p>;
+  const tot = rows.reduce((a, r) => a + Number(r.spend), 0);
+  const VERDICT = { winner: 'Doing well', better: 'Better than average', loser: 'Underperforming', worse: 'Worse than average', indistinguishable: 'Average', fatigued: 'Tiring', learning: 'Too new to judge' };
+  return (<div>
+    <div className="v3-sub">{NUM(rows.length)} ads ran in the last 30 days. Spend and results are since each ad launched; return is what Meta claims, before product costs.</div>
+    <table>
+      <thead><tr><th className="t-text">Ad</th><th>Spend since launch</th><th>Share</th><th>Purchases</th><th>Claimed return</th><th>Frequency</th><th className="t-text">Read</th></tr></thead>
+      <tbody>{rows.map(r => (<tr key={r.entity_id}>
+        <td className="t-text">{r.entity_name}</td>
+        <td>{GBP(Number(r.spend))}</td>
+        <td>{fmtPctN(Number(r.spend) / tot)}</td>
+        <td>{NUM(Number(r.purchases) || 0)}</td>
+        <td>{fmtTimes(r.roas_platform, 2)}</td>
+        <td>{fmtTimes(r.max_frequency, 1)}</td>
+        <td className="t-text">{VERDICT[r.verdict] || v3Sentence(String(r.verdict || '—').replace(/_/g, ' '))}</td>
+      </tr>))}</tbody>
+    </table>
   </div>);
 }
 
@@ -5117,7 +5157,7 @@ const FIXES = [
   {fix:'Add Apple Pay to express checkout', p:'P2'},
   {fix:'Rework hero to a value prop + product CTA above the 15% scroll cliff', p:'P2'},
 ];
-const B = window.FRKL_BUSINESS || {};
+const B = window.FRKL_BUSINESS || (window.FRKL_BUSINESS = {});
 
 function Customers(){
   const ret=B.returning||[]; const months=B.retentionByMonth||[]; const geo=B.geo||[]; const list=B.listGrowth||[];
@@ -5613,7 +5653,9 @@ function CvrDrivers(){
   const D = (typeof window!=='undefined' && window.FRKL_CVR) || null;
   if(!D || !D.meta || D.meta.insufficient) return (
     <div className="card"><div className="card-section-title"><h2 style={{margin:0}}>Conversion rate — drivers</h2></div>
-    <div className="note">Needs ~3 weeks of daily GA4 history to decompose. {D&&D.meta?`Have ${D.meta.days||0} days.`:'No GA4 daily data yet.'}</div></div>);
+    <div className="note">{D&&D.meta
+      ? `Needs 21 days of reliable analytics to split conversion into traffic mix and site performance. Greta has ${D.meta.days||0}${D.meta.lo?` (since ${D.meta.lo})`:''} — days when GA4 tracking was broken are left out. This fills in by itself.`
+      : 'Loading your analytics…'}</div></div>);
   const M=D.meta, series=D.series||[], channels=D.channels||[], drivers=D.drivers||[];
   const STAGES=['session→cart','cart→checkout','checkout→purchase'];
   const up = M.deltaCVR>=0, mixDom=M.mixDominant;
@@ -6692,24 +6734,27 @@ function Products(){
   const sorted=[...products].sort((a,b)=>(b[sort]||0)-(a[sort]||0));
   const totalUnits=products.reduce((a,p)=>a+(p.units||0),0);
   const totalRev=products.reduce((a,p)=>a+(p.netSales||0),0);
-  const totalProfit=products.reduce((a,p)=>a+(p.grossProfit||0),0);
-  const blendedMargin=totalRev>0?totalProfit/totalRev:0;
+  const _costed=products.filter(p=>p.grossProfit!=null);
+  const totalProfit=_costed.reduce((a,p)=>a+(p.grossProfit||0),0);
+  const _costedRev=_costed.reduce((a,p)=>a+(p.netSales||0),0);
+  const blendedMargin=_costedRev>0?totalProfit/_costedRev:null;
+  const _hasReturns=products.some(p=>p.returns!=null);
   const returnHotspots=[...products].filter(p=>(p.returnRate||0)>=0.1&&(p.units||0)>=10).sort((a,b)=>(b.returnRate||0)-(a.returnRate||0));
   // This drawer is built on the per-product snapshot (FRKL_BUSINESS.products). With none it printed
   // "0+ items · Blended gross margin 0.0%" as if those were figures; say what is missing instead.
-  if (!products.length) return (<div className="v3-empty">Per-product margin and returns need a product snapshot Greta does not have yet. Sales by product are above; product costs live in <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs')}>Goal &amp; costs <span className="v3-xref-go">→</span></button></div>);
+  if (!products.length) return (<div className="v3-empty">No product sales in the last 28 days yet. Product costs live in <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs')}>Goal &amp; costs <span className="v3-xref-go">→</span></button></div>);
   return (
     <div>
       <div className="row" style={{marginBottom:14}}>
-        <KPI label="items sold (90d)" val={products.length+'+'} sub={`${NUM(totalUnits)} units · ${curSym()}${NUM(totalRev)} net`}
+        <KPI label="Products sold · last 28 days" val={NUM(products.length)} sub={`${NUM(totalUnits)} units · ${GBP(totalRev)} net, ex-VAT`}
           agent="Atlas" />
         <KPI label="Top seller" val={sorted[0]?.title?.slice(0,28)||'—'} sub={`${sorted[0]?.units||0} units · ${curSym()}${NUM(sorted[0]?.netSales)} · ${PCT(sorted[0]?.marginPct)} margin`}
           agent="Frame" observation={DEMO ? `The mega necklace gold is the hero (117 units, ${curSym()}8.7k) but has the lowest margin (~58%) and 8.5% returns.` : undefined}
           implication={DEMO ? "Heavy reliance on one item = concentration risk. Find the next hero — and root-cause why this one returns." : undefined} />
-        <KPI label="Blended gross margin" val={PCT(blendedMargin)} sub={`${curSym()}${NUM(totalProfit)} GP / ${curSym()}${NUM(totalRev)} net`}
+        <KPI label="Gross margin, products with a cost" val={PCT(blendedMargin)} sub={`${GBP(totalProfit)} gross profit on ${GBP(_costedRev)} · ${totalRev>0?Math.round(_costedRev/totalRev*100):0}% of sales have a cost`}
           agent="Atlas" observation={DEMO ? "78% blended GM is excellent for jewellery — the charms (80–93% margin) are the cash cow." : undefined}
           implication="Discounts and sale-price markdowns come off this — see Promotions for the full load." />
-        <KPI label="Return-rate hotspots" val={returnHotspots.length} sub={`items with ≥10% returns (sold ≥10)`}
+        <KPI label="Return-rate hotspots" val={_hasReturns?returnHotspots.length:'—'} sub={_hasReturns?`items with ≥10% returns (sold ≥10)`:'returns are not recorded per product yet'}
           agent="Lux" observation={DEMO ? "12 items have ≥10% return rates — 'love is pain charm' hits 22% — that's a CX signal, not a quality fluke." : undefined}
           implication="Add a post-purchase survey + product page sizing/expectation copy to the top 3 hotspots before adding any new items." />
       </div>
@@ -6925,30 +6970,35 @@ function EmailHealthPanel(){
   // Map existing frkl flow names to "categories"
   const flowNames = flows.map(f => (f.name || '').toLowerCase());
   const has = (kw) => flowNames.some(n => kw.some(k => n.includes(k)));
+  // What a present flow actually earned in the last 30 days (live, from Klaviyo).
+  const earned = (kw) => { const f = flows.find(x => kw.some(k => (x.name || '').toLowerCase().includes(k))); return f ? f.revenue : null; };
+  const earnedTxt = (kw) => { const r = earned(kw); return r == null ? 'Live.' : r > 0 ? `Live · ${GBP(r)} in the last 30 days.` : `Live but earned ${curSym()}0 in the last 30 days — check its trigger and call to action.`; };
+  const noKlaviyo = !camps.length && !flows.length;
   const flowChecklist = [
     {label: "Welcome (per-category)", present: has(['welcome']), critical: true,
-     present_detail: has(['necklaces welcome','bracelets welcome','charms welcome']) ? 'Per-category welcomes detected (NECKLACES, BRACELETS, CHARMS, PRE-STYLED) — best practice.' : 'Single welcome flow only — consider per-category.'},
+     present_detail: flows.filter(f => /welcome/i.test(f.name || '')).length > 1 ? 'More than one welcome flow — per-category welcomes are best practice.' : 'Single welcome flow — consider one per product category.'},
     {label: "Browse abandonment", present: has(['browse abandon']), critical: true},
     {label: "Cart abandonment", present: has(['abandoned cart','cart abandon']), critical: true},
     {label: "Back-in-stock", present: has(['back in stock','back-in-stock']), critical: true},
     {label: "Post-purchase / shipping", present: has(['post purchase','post-purchase','first time purchaser']), critical: true},
-    {label: "Birthday", present: has(['birthday']), critical: false,
-     present_detail: `Present but earning ${curSym()}0 — flow is broken (subject works, CTA fails).`},
-    {label: "Win-back (lapsed 60-90d)", present: has(['win back','win-back','lapsed','we miss you']), critical: true,
-     gap_text: `MISSING. For a brand where ~35% of orders are returning, this is the highest-leverage missing flow. Trigger at 60-90d since last purchase with a ${curSym()}-off return code.`},
+    {label: "Birthday", present: has(['birthday']), critical: false, present_detail: earnedTxt(['birthday'])},
+    {label: "Win-back (lapsed 60-90d)", present: has(['win back','win-back','winback','lapsed','we miss you']), critical: true,
+     gap_text: `Missing. Usually the highest-value flow to add: trigger 60–90 days after the last purchase, with a reason to come back.`},
     {label: "Replenishment / repurchase nudge", present: has(['replenish','repurchase','time to restock']), critical: false,
-     gap_text: "MISSING. Less critical for jewellery (not consumable) but a 'complete your stack' replenishment nudge for prior charm-buyers would convert."},
+     gap_text: "Missing. Most useful for products people run out of; for others, a 'complete the set' nudge to past buyers does the same job."},
     {label: "VIP / 2nd+ purchaser", present: has(['vip','loyalty','existing customer']) || flowNames.some(n=>n.includes('existing customer')), critical: false,
      present_detail: "Existing Customer welcome variant present — partial VIP coverage."},
     {label: "Review request (post-shipping)", present: has(['review','rating','judge']), critical: true,
-     gap_text: "MISSING from this view. If reviews already auto-trigger via Judge.me that's fine — but isn't being tracked here. Worth confirming with the team."},
+     gap_text: "Not found in Klaviyo. If a reviews app (Judge.me, Okendo, Yotpo) sends these, that is fine — it just is not visible here."},
     {label: "Anniversary (first-purchase 12mo)", present: has(['anniversary']), critical: false,
-     gap_text: "MISSING. Trigger 12mo after first purchase to re-engage now-dormant first-time buyers."},
+     gap_text: "Missing. Trigger 12 months after the first purchase to re-engage first-time buyers who went quiet."},
   ];
 
   const missingCritical = flowChecklist.filter(f => f.critical && !f.present).length;
   const presentCount = flowChecklist.filter(f => f.present).length;
 
+  if (noKlaviyo) return (<div className="card" style={{marginBottom:14}}><h2>Email programme health</h2>
+    <div className="muted" style={{fontSize:'var(--text-sm)'}}>No Klaviyo flows or campaigns have synced for this brand. Connect Klaviyo in Connections and this fills in.</div></div>);
   return (
     <div className="card" style={{marginBottom:14}}>
       <h2>Email programme health + flow gap audit</h2>
@@ -6968,8 +7018,8 @@ function EmailHealthPanel(){
         </div>
         <div className="card kpi" style={{}}>
           <div className="label">List net growth (60d)</div>
-          <div className="val">+{NUM(netGrowth)}</div>
-          <div className="sub">{NUM(subs)} subs · {NUM(unsubs)} unsubs · churn ~{(dailyChurnRate*1000).toFixed(2)}‰/day proxy</div>
+          <div className="val">{list.length ? (netGrowth >= 0 ? '+' : '−') + NUM(Math.abs(netGrowth)) : '—'}</div>
+          <div className="sub">{list.length ? `${NUM(subs)} subs · ${NUM(unsubs)} unsubs · churn ~${(dailyChurnRate*1000).toFixed(2)}‰/day proxy` : 'subscriber counts are not synced from Klaviyo yet'}</div>
         </div>
         <div className="card kpi" style={{}}>
           <div className="label">Critical flow gaps</div>
@@ -7001,16 +7051,18 @@ function EmailHealthPanel(){
             </div>
             <div style={{padding:10,background:'var(--bg-app)',borderRadius:'var(--radius-none) var(--radius-md) var(--radius-md) var(--radius-none)'}}>
               <div style={{fontWeight:'var(--weight-semi)',marginBottom:3,color:PAL.bad}}>Bounce/spam complaint rate not tracked</div>
-              <div className="muted">Supermetrics' Klaviyo connector doesn't expose bounce or spam-complaint rates in current pull. <b>Manual check needed:</b> log into Klaviyo → Analytics → Deliverability. Bounce rate should be &lt;2%, spam complaints &lt;0.1%. Higher = deliverability is at risk.</div>
+              <div className="muted">Greta does not receive bounce or spam-complaint rates from Klaviyo. <b>Manual check needed:</b> log into Klaviyo → Analytics → Deliverability. Bounce rate should be &lt;2%, spam complaints &lt;0.1%. Higher = deliverability is at risk.</div>
             </div>
             <div style={{padding:10,background:'var(--bg-app)',borderRadius:'var(--radius-none) var(--radius-md) var(--radius-md) var(--radius-none)'}}>
               <div style={{fontWeight:'var(--weight-semi)',marginBottom:3}}>Top opportunity: win-back flow</div>
-              <div className="muted">{`~35% of orders are returning customers, but there's no flow nurturing the lapsed segment. Building a win-back (trigger at 60-90d since purchase) likely adds ${curSym()}200-500/mo at current scale. Best-practice format: nostalgia trigger → product reminder → discount escalation.`}</div>
+              <div className="muted">{has(['win back','win-back','winback','lapsed','we miss you'])
+                ? 'A win-back flow is live. Check it triggers 60–90 days after the last purchase, and compare its revenue with the post-purchase flow.'
+                : `No live flow nurtures customers who have gone quiet. A win-back (trigger 60–90 days after the last purchase: a reminder, then the product, then an offer) is usually the highest-value flow to add.`}</div>
             </div>
           </div>
         </div>
       </div>
-      <div className="note" style={{marginTop:14}}><b>Greta's read:</b> the flow programme is fundamentally healthy (5 critical flows present, per-category welcomes is best-practice). The two missing critical flows are <b>win-back</b> and <b>review request</b> — both are 1-time builds with ongoing revenue. The MPP open-rate inflation isn't a problem per se, but means anyone optimising on opens (subject-line testing) is optimising for noise. Click-rate-as-truth is the right rule.</div>
+      {DEMO && <div className="note" style={{marginTop:14}}><b>Greta's read:</b> the flow programme is fundamentally healthy (5 critical flows present, per-category welcomes is best-practice). The two missing critical flows are <b>win-back</b> and <b>review request</b> — both are 1-time builds with ongoing revenue. The MPP open-rate inflation isn't a problem per se, but means anyone optimising on opens (subject-line testing) is optimising for noise. Click-rate-as-truth is the right rule.</div>}
     </div>
   );
 }
@@ -7068,11 +7120,11 @@ function EmailHub(){
         <h2>Email is the #1 revenue channel — and flows are doing the heavy lifting</h2>
         <div className="muted" style={{marginBottom:10,fontSize:'var(--text-sm)'}}>Last 90 days · Klaviyo via Supermetrics. Campaigns = broadcasts. Flows = automated triggers (welcome, abandoned cart, browse abandonment, back-in-stock, birthday).</div>
         <div className="row">
-          <KPI label="Flow revenue (90d)" val={GBP(summary.flows.orderValue)} sub={`${summary.flows.messages} messages · ${NUM(summary.flows.recipients)} recipients`}
-            agent="Lux" observation={`Flows generate ${PCT(flowShare)} of email revenue from just ${summary.flows.messages} message templates.`}
+          <KPI label="Flow revenue (30d)" val={GBP(summary.flows.orderValue)} sub={summary.flows.messages ? `${summary.flows.messages} live flows · ${NUM(summary.flows.recipients)} recipients` : 'no flow results from Klaviyo yet'}
+            agent="Lux" observation={summary.flows.messages ? `Flows bring in ${PCT(flowShare)} of email revenue from ${summary.flows.messages} live flows.` : undefined}
             implication={DEMO ? "This is the highest-margin marketing activity frkl runs. Investment in flow optimisation = direct revenue." : undefined} />
-          <KPI label="Campaign revenue (90d)" val={GBP(summary.campaigns.orderValue)} sub={`${summary.campaigns.messages} sends · ${NUM(summary.campaigns.recipients)} total recipients`} series={sendChart.map(w=>({d:w.date, v:Math.round(w.revenue)}))} seriesLabel="Campaign revenue · by send date"
-            agent="Lux" observation={`${summary.campaigns.messages} broadcasts producing ${GBP(summary.campaigns.orderValue)} — less revenue than 15 flow messages.`}
+          <KPI label="Campaign revenue (90d)" val={GBP(summary.campaigns.orderValue)} sub={summary.campaigns.messages ? `${summary.campaigns.messages} sends · ${NUM(summary.campaigns.recipients)} total recipients` : 'no campaigns sent in the last 90 days'} series={sendChart.map(w=>({d:w.date, v:Math.round(w.revenue)}))} seriesLabel="Campaign revenue · by send date"
+            agent="Lux" observation={summary.campaigns.messages ? `${summary.campaigns.messages} campaigns brought in ${GBP(summary.campaigns.orderValue)}, against ${GBP(summary.flows.orderValue)} from flows in 30 days.` : undefined}
             implication="Send cadence is high; revenue per send isn't. Either cut the 50% lowest-performing or differentiate angles." />
           <KPI label="Flow rev per recipient" val={fmtMoney(summary.flows.revPerRecip||0, 2)} sub={`vs ${curSym()}${(summary.campaigns.revPerRecip||0).toFixed(2)} for campaigns — ${lift}× lift`}
             agent="Atlas" observation={`Each flow recipient is worth ${lift}× more than a campaign recipient.`}
@@ -8420,7 +8472,7 @@ function BrandAgeBanner(){
 // Compact app-bar freshness chip — replaces the full-width banner on every screen.
 // One dot + status; per-channel ages on hover; click → Connections. Detail deferred.
 function FreshnessChip(){
-  const B = window.FRKL_BUSINESS || {};
+  const B = window.FRKL_BUSINESS || (window.FRKL_BUSINESS = {});
   const today = new Date();
   const lastDate = (rows) => { if(!rows||!rows.length) return null; const s=[...rows].filter(r=>r.date).sort((a,b)=>a.date<b.date?-1:1); return s.length?s[s.length-1].date:null; };
   const daysAgo = (iso) => iso==null?null:Math.floor((today-new Date(iso+'T00:00:00Z'))/86400000);
@@ -9094,7 +9146,7 @@ function CohortsPanel(){
               <R.Brush {...brushProps('month')} />
             </R.ComposedChart>
           </R.ResponsiveContainer>          <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{BRUSH_HINT}</div>
-          <div className="fine" style={{color:'var(--text-faint)', marginTop:4}}>Most early customers came via unpaid channels (organic/email) — paid cost per new customer only applies where there was paid spend.</div>
+          <div className="fine" style={{color:'var(--text-faint)', marginTop:4}}>Paid cost per new customer only applies to months with paid spend.</div>
           <ChartFooter note="Is acquisition getting more expensive over time?"
             ask="Looking at New-customer cost, by the month they joined, is paid cost per new customer trending up, and what's driving it?"
             rows={cacMonths} columns={[{key:'month',label:'Month'},{key:'newCust',label:'New customers',right:true,fmt:v=>NUM(v)},{key:'cac',label:'Paid New-customer cost',right:true,fmt:v=>v!=null?GBP(v):'—'}]}/>
@@ -9114,7 +9166,7 @@ function CohortsPanel(){
               ? `Discount-acquired customers repeat at least as well (${PCT(d.repeatRate)} vs ${PCT(f.repeatRate)}) — the usual "discount buyers churn" worry doesn't hold here, so first-order codes look like a fair acquisition cost.`
               : `Discount-acquired customers repeat less (${PCT(d.repeatRate)} vs ${PCT(f.repeatRate)}) — those codes are buying lower-quality customers; tighten first-order discounting.`}</div>; })()}
         </div>
-        <div className="card" style={{flex:'1 1 380px'}}>
+        {(C.byProduct||[]).length > 0 && <div className="card" style={{flex:'1 1 380px'}}>
           <h2 style={{marginTop:0}}>Which products acquire customers that come back</h2>
           <table><thead><tr><th>Acquisition product</th><th>New custs</th><th>Repeat</th><th>{`Lifetime ${curSym()}/cust`}</th></tr></thead><tbody>
             {(C.byProduct||[]).map((p,i)=>{ const hot=p.repeatRate>=(C.repeatRate*1.3); const cold=p.repeatRate<=(C.repeatRate*0.5);
@@ -9125,7 +9177,7 @@ function CohortsPanel(){
               </tr>); })}
           </tbody></table>
           <div className="note" style={{marginTop:10}}>Green = retains above the {PCT(C.repeatRate)} brand average (advertise these to acquire); red = acquires but doesn't retain (needs a follow-up flow, not more spend). Full acquisition-vs-retention matrix lands in the Products view.</div>
-        </div>
+        </div>}
       </div>
       <div className="micro" style={{color:'var(--text-faint)', marginTop:12, lineHeight:1.5}}>
         {C.notes && <><b>Read carefully:</b> {C.notes.channel} {C.notes.google}</>}
@@ -9405,7 +9457,7 @@ function ClarityFrictionPanel(){
   if(!C || !C.available) return (<div className="card" style={{marginBottom:14}}>
     <EmptyState icon="info"
       title="No Microsoft Clarity data yet"
-      body="Clarity shows whether the site itself is the conversion bottleneck — JavaScript errors, dead/rage clicks, scroll depth and engagement. The daily sync isn't wired yet, so upload a quick CSV of the headline numbers from your Clarity dashboard to light this up."
+      body="Clarity shows whether the site itself is the conversion bottleneck — JavaScript errors, dead/rage clicks, scroll depth and engagement. Connect Clarity in Connections and the daily sync fills this in, or upload a CSV of the headline numbers."
       cta="Upload Clarity CSV" ctaOnClick={()=>setUpload(true)}/>
     {uploader}
   </div>);
@@ -16089,6 +16141,7 @@ const V3_NEWMO_Q = (sb, b) => sb.from('vw_daily_new_vs_returning').select('order
 // Break-even sales per £ of ads: the point where profit before ads pays for the ads (1 ÷ margin after
 // costs). Review and the weekly board measured against 2× and 3× — two made-up lines for one metric.
 function v3MerBreakEven(){ const c = oiCmRatio(); return (c != null && c > 0) ? 1 / c : null; }
+const V3_RETURNS_Q = (sb, b) => sb.from('vw_brand_returns').select('window_label,orders,refunded_orders,return_rate_pct').eq('brand_id', b);
 const V3_RET_Q = (sb, b) => sb.from('v_tenant_retention_summary')
   .select('customers,orders_per_customer,repeat_rate,repeat_rate_90d,median_days_between_orders').eq('brand_id', b).limit(1);
 function v3Monday(iso) { const d = new Date(iso + 'T00:00:00Z'); const k = (d.getUTCDay() + 6) % 7; d.setUTCDate(d.getUTCDate() - k); return d.toISOString().slice(0, 10); }

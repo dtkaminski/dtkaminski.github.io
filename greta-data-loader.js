@@ -154,6 +154,8 @@
     ['FRKL_COHORTS', 'FRKL_RETENTION', 'FRKL_CREATIVE_VISION', 'FRKL_CREATORS', 'FRKL_CLARITY',
      'FRKL_CVR', 'FRKL_DISCOUNT_CODES', 'FRKL_BOARD_READ', 'FRKL_DX_ANALYST', 'FRKL_EVENTS'].forEach(function (k) {
       var v = window[k];
+      // greta-live-snapshots.js rebuilds some of these from the live views; those are current.
+      if (v && v._source === 'live') return;
       if (v && ageDays(asOfOf(Array.isArray(v) ? { items: v } : v)) > STALE_AFTER_DAYS) { window[k] = null; retired.push(k); }
     });
     // Findings and £ registers (Review's "£X exposed across N risks"). Live writes carry
@@ -194,6 +196,7 @@
       // Undated and never refreshed: nothing can show these are current, so they don't sit
       // beside numbers that are.
       ['creatives', 'demoAgeGender', 'demoPlacement'].forEach(function (k) {
+        if ((window.FRKL_LIVE.liveDataKeys || []).indexOf(k) >= 0) return;   // rebuilt live
         if (Array.isArray(DATA[k]) && DATA[k].length) { DATA[k] = []; retired.push('FRKL_DATA.' + k); }
       });
     }
