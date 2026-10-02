@@ -172,11 +172,37 @@ function saveLeadConfig(next){ try { localStorage.setItem('oi_lead_times', JSON.
 // Cash on hand + monthly overheads (salaries/rent/tools — NOT ad spend or COGS,
 // which the run-rate already captures). localStorage-first like cost config;
 // reuses the 'oi-costs-updated' event so subscribed cards refresh on save.
-function cashConfig(){
+function cashConfigLocal(){
   try { const s = JSON.parse(localStorage.getItem('oi_cash_v1')||'null'); if(s && typeof s==='object') return {cash:s.cash!=null?s.cash:'', overheads:s.overheads!=null?s.overheads:'', adSpend:s.adSpend!=null?s.adSpend:''}; } catch(e){}
   return {cash:'', overheads:'', adSpend:''};
 }
-function saveCashConfig(next){ try { localStorage.setItem('oi_cash_v1', JSON.stringify(next)); window.dispatchEvent(new Event('oi-costs-updated')); } catch(e){} }
+// Signed in, cash and overheads are the brand's saved figures (Goal & costs); only the cash-flow
+// plan's what-if ad budget stays in the browser. Review, the forecast and the cash-flow plan each
+// read their own browser copy before, so three screens could quote three different balances.
+function cashConfig(){
+  const loc = cashConfigLocal(), live = cashConfigLive();
+  return live ? { cash: live.cash, overheads: live.overheads, adSpend: loc.adSpend, asOf: live.asOf } : loc;
+}
+// Cash and overheads come from Goal & costs (brand_config.opening_cash / fixed_costs_monthly). The
+// browser copy below is only the signed-out demo's: Review's runway read it while its "Set balance"
+// button sent people to the server form, so the card never filled in.
+function cashConfigLive(){
+  const c = typeof window !== 'undefined' && window.FRKL_PLAN && window.FRKL_PLAN.config;
+  if (!c) return null;
+  return { cash: c.opening_cash != null ? String(c.opening_cash) : '', overheads: c.fixed_costs_monthly != null ? String(c.fixed_costs_monthly) : '', asOf: c.opening_cash_as_of || null };
+}
+function saveCashConfig(next){
+  const P = typeof window !== 'undefined' && window.FRKL_PLAN;
+  if (P && P.config && typeof P.saveEconomics === 'function') {
+    const prev = cashConfigLive() || {}, f = {};
+    if (next.cash !== '' && next.cash != null && String(next.cash) !== String(prev.cash)) { f.opening_cash = next.cash; f.opening_cash_as_of = new Date().toISOString().slice(0, 10); }
+    if (next.overheads !== '' && next.overheads != null && String(next.overheads) !== String(prev.overheads)) f.fixed_costs_monthly = next.overheads;
+    if (Object.keys(f).length) P.saveEconomics(f).then(function(){ try { window.dispatchEvent(new Event('oi-costs-updated')); } catch(e){} });
+    try { localStorage.setItem('oi_cash_v1', JSON.stringify({ ...cashConfigLocal(), adSpend: next.adSpend != null ? next.adSpend : '' })); window.dispatchEvent(new Event('oi-costs-updated')); } catch(e){}
+    return;
+  }
+  try { localStorage.setItem('oi_cash_v1', JSON.stringify(next)); window.dispatchEvent(new Event('oi-costs-updated')); } catch(e){}
+}
 
 // ── Supplier / MOQ / unit-cost (per product type) + reorder policy ───────────
 // Powers the Production / PO planner. Lead time comes from leadConfig (per type);
@@ -740,17 +766,24 @@ function fmtDelta(d){ if(d==null) return null; const pct = Math.abs(d*100); if (
 // updates so it flips the instant the operator verifies their costs.
 function MarginBadge({onSetup}){
   const verified = useCostTick();
-  // Same ladder as the confidence chip. This used to say "verified" / "est.", a second vocabulary
-  // for the same question, which left the product describing one number two different ways.
-  const tip = verified
-    ? 'Direct — from the costs you entered.'
-    : 'Probably — worked out from catalogue defaults. Enter your real costs and this becomes Direct.';
-  return (<span title={tip} onClick={(!verified && onSetup) ? (e=>{e.stopPropagation(); onSetup();}) : undefined}
+  const [, bump] = React.useState(0);
+  React.useEffect(()=>{ const h=()=>bump(x=>x+1); window.addEventListener('greta-headline-updated', h); return ()=>window.removeEventListener('greta-headline-updated', h); }, []);
+  // The server's rung for the profit number — the one Today's chip shows. This badge worked its own
+  // answer out from the browser ("Direct" once a margin was typed) while Today said "Probably" about
+  // the same figure. Only the signed-out demo, with no headline, falls back to the local check.
+  const H = typeof window !== 'undefined' && window.GRETA_HEADLINE;
+  const rung = (H && (H.trust_level || H.cm_source))
+    ? (H.cm_source === 'none' ? 'held' : (V3_CONF[H.trust_level] ? H.trust_level : 'probably'))
+    : (verified ? 'direct' : 'probably');
+  const conf = V3_CONF[rung];
+  const good = rung === 'direct' || rung === 'likely', faint = rung === 'outside' || rung === 'held';
+  const canFix = !good && onSetup;
+  return (<span title={conf.label + ' — ' + conf.why} onClick={canFix ? (e=>{e.stopPropagation(); onSetup();}) : undefined}
     style={{display:'inline-flex', alignItems:'center', gap:3, fontSize:'var(--text-xs)', fontWeight:'var(--weight-bold)', letterSpacing:'var(--tracking-wide)', textTransform:'uppercase',
-            padding:'1px 6px', borderRadius:'var(--r-full)', cursor:(!verified && onSetup)?'pointer':'help', whiteSpace:'nowrap',
-            background: verified?'var(--good-bg)':'var(--warn-bg)', color: verified?'var(--good)':'var(--warn)',
-            border:'1px solid '+(verified?'var(--color-success-line)':'var(--color-warning-wash)')}}>
-    {verified ? 'Direct' : 'Probably'}
+            padding:'1px 6px', borderRadius:'var(--r-full)', cursor:canFix?'pointer':'help', whiteSpace:'nowrap',
+            background: good?'var(--good-bg)':faint?'transparent':'var(--warn-bg)', color: good?'var(--good)':faint?'var(--text-faint)':'var(--warn)',
+            border:'1px solid '+(good?'var(--color-success-line)':faint?'var(--border-default)':'var(--color-warning-wash)')}}>
+    {conf.label}
   </span>);
 }
 
@@ -2617,15 +2650,17 @@ function DataFreshness(){
 // economics), Lux (retention) etc. into three whole-business scores. Deterministic.
 function clamp01(x){ return Math.max(0, Math.min(1, x)); }
 function computeScores(m){
-  const beRoas = m.breakEvenRoas || 2;
+  // Break-even comes from the brand's own margin after costs. It used to fall back to an invented 2×,
+  // so a brand with no costs entered was scored and gated against a line that was never theirs.
+  const beRoas = (m.breakEvenRoas != null && m.breakEvenRoas > 0) ? m.breakEvenRoas : null;
   const f = [];
   const add = (label, val, w, detail) => { if(val!=null && isFinite(val)) f.push({label, s:clamp01(val), w, detail}); };
-  add('Contribution margin', m.cmPct!=null ? m.cmPct/0.10 : null, 0.20, m.cmPct!=null?`${(m.cmPct*100).toFixed(0)}% (≥10% healthy)`:'');
-  add('Marketing efficiency', m.mer!=null ? m.mer/(beRoas*2) : null, 0.15, m.mer!=null?`sales per £ of ads ${m.mer.toFixed(1)}× vs ${beRoas.toFixed(1)}× break-even`:'');
-  add('cost per new customer vs allowable', (m.cac && m.allowableCac) ? m.allowableCac/m.cac : null, 0.15, (m.cac&&m.allowableCac)?`${curSym()}${Math.round(m.cac)} vs ${curSym()}${Math.round(m.allowableCac)} allowable`:'');
-  add('LTV:CAC', m.ltvCac!=null ? m.ltvCac/3 : null, 0.15, m.ltvCac!=null?`${m.ltvCac.toFixed(1)}× (3× target)`:'');
+  add('Profit after ads', m.cmPct!=null ? m.cmPct/0.10 : null, 0.20, m.cmPct!=null?`${(m.cmPct*100).toFixed(0)}% of sales (≥10% healthy)`:'');
+  add('Marketing efficiency', (m.mer!=null && beRoas) ? m.mer/(beRoas*2) : null, 0.15, (m.mer!=null && beRoas)?`sales per £ of ads ${m.mer.toFixed(1)}× vs ${beRoas.toFixed(1)}× break-even`:'');
+  add('New-customer cost vs what you can afford', (m.cac && m.allowableCac) ? m.allowableCac/m.cac : null, 0.15, (m.cac&&m.allowableCac)?`${curSym()}${Math.round(m.cac)} vs ${curSym()}${Math.round(m.allowableCac)} allowable`:'');
+  add('Customer value ÷ new-customer cost', m.ltvCac!=null ? m.ltvCac/3 : null, 0.15, m.ltvCac!=null?`${m.ltvCac.toFixed(1)}× (aim for 3×)`:'');
   add('Gross margin', m.gm ? m.gm/0.6 : null, 0.10, m.gm?`${(m.gm*100).toFixed(0)}%`:'');
-  add('Conversion rate', m.cvr!=null ? m.cvr/CVR_BENCH : null, 0.10, m.cvr!=null?`${(m.cvr*100).toFixed(2)}% (${CVR_BENCH_LABEL} target)`:'');
+  add('Visitors who buy', m.cvr!=null ? m.cvr/CVR_BENCH : null, 0.10, m.cvr!=null?`${(m.cvr*100).toFixed(2)}% (${CVR_BENCH_LABEL} target)`:'');
   add('Discount discipline', m.discLoad!=null ? 1-Math.max(0,m.discLoad-0.10)/0.10 : null, 0.08, m.discLoad!=null?`${(m.discLoad*100).toFixed(0)}% load (≤10% ideal · 20% ceiling)`:'');
   add('Returns', m.returnRate!=null ? 1-m.returnRate/0.10 : null, 0.07, m.returnRate!=null?`${(m.returnRate*100).toFixed(1)}%`:'');
   const wsum = f.reduce((a,x)=>a+x.w,0) || 1;
@@ -2643,11 +2678,11 @@ function computeScores(m){
   const coverage = Math.round(100 * wsum / 1.00);
 
   const gates = [
-    {k:'cost per new customer below allowable', pass:(m.cac!=null&&m.allowableCac!=null)? m.cac<=m.allowableCac : null},
-    {k:'sales per £ of ads above break-even', pass:(m.mer!=null)? m.mer>=beRoas*1.3 : null},
-    {k:'Contribution positive', pass:(m.contrib!=null)? m.contrib>0 : null},
+    {k:'New-customer cost below what you can afford', pass:(m.cac!=null&&m.allowableCac!=null)? m.cac<=m.allowableCac : null},
+    {k:'Sales per £ of ads above break-even', pass:(m.mer!=null && beRoas)? m.mer>=beRoas*1.3 : null},
+    {k:'Profit after ads positive', pass:(m.contrib!=null)? m.contrib>0 : null},
     {k:'Payback ≤ 2 orders', pass:(m.paybackOrders!=null)? m.paybackOrders<=2 : null},
-    {k:'customer lifetime value:cost per new customer ≥ 3×', pass:(m.ltvCac!=null)? m.ltvCac>=3 : null},
+    {k:'Customer value ÷ new-customer cost ≥ 3×', pass:(m.ltvCac!=null)? m.ltvCac>=3 : null},
     {k:'Conversion not falling', pass:(m.cvr!=null&&m.pCvr!=null)? m.cvr>=m.pCvr*0.9 : null},
     {k:'Gross margin ≥ 40%', pass:(m.gm!=null)? m.gm>=0.4 : null},
   ].filter(g=>g.pass!=null);
@@ -2893,7 +2928,7 @@ function ChangeBridgeBody({metrics:m}){
   const dContrib=dRev*gm - dSpend;
   const items=[
     {label:'Traffic (sessions)', v:eS, note:`${NUM(S0)}→${NUM(S1)} sessions`},
-    {label:'Conversion rate', v:eC, note:`${(C0*100).toFixed(2)}%→${(C1*100).toFixed(2)}%`},
+    {label:'Visitors who buy', v:eC, note:`${(C0*100).toFixed(2)}%→${(C1*100).toFixed(2)}%`},
     {label:'Order value (Average order)', v:eA, note:`${GBP(A0)}→${GBP(A1)}`},
   ].sort((a,b)=>Math.abs(b.v)-Math.abs(a.v));
   const max=Math.max(1,...items.map(i=>Math.abs(i.v)));
@@ -3200,10 +3235,10 @@ function ContributionCard({rev, orders, paid, cmr, gross, days}){
       {fixedWin!=null
         ? (<>
             {line('− Overheads (rent, wages, software) for this period', fixedWin, {neg:true})}
-            {line('= Net profit', net, {bold:true, color: net >= 0 ? 'var(--good)' : 'var(--bad)', top:'2px solid var(--border-default)'})}
+            {line('= Operating profit', net, {bold:true, color: net >= 0 ? 'var(--good)' : 'var(--bad)', top:'2px solid var(--border-default)'})}
           </>)
         : (<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,padding:'7px 0',borderTop:'2px solid var(--border-default)',color:'var(--text-faint)',fontSize:'var(--text-sm)'}}>
-            <span>= Net profit</span><span>Add your monthly overheads in <GoLink sec="settings" sub="economics">Goal &amp; costs</GoLink> to see this</span>
+            <span>= Operating profit</span><span>Add your monthly overheads in <GoLink sec="settings" sub="economics">Goal &amp; costs</GoLink> to see this</span>
           </div>)}
     </div>
     <p className="v3-note" style={{marginTop:10}}>
@@ -3291,7 +3326,7 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
   const baseSeed = Math.round(retOrdersNow / (repeatSeed/100));
   const nowMonth = (()=>{ try { return new Date().getMonth()+1; } catch(e){ return 6; } })();
   const seed = {
-    mode:'bottomup', horizon:'12', startMonth:String(nowMonth), gmPct:((gm||0.77)*100).toFixed(1), fixedOpex:(()=>{ try{ const o=cashConfig().overheads; return (o!=null&&o!=='')?String(o):'0'; }catch(e){ return '0'; } })(),
+    mode:'bottomup', horizon:'12', startMonth:String(nowMonth), gmPct:(gm != null ? (gm*100).toFixed(1) : ''), fixedOpex:(()=>{ try{ const o=cashConfig().overheads; return (o!=null&&o!=='')?String(o):'0'; }catch(e){ return '0'; } })(),
     aov:String(aovN), newAov:String(aovN), returnAov:String(aovN),
     startRevenue:String(Math.round(rev||0)), growthPct:'4', targetMER:(paid>0?(rev/paid):4.5).toFixed(2),
     startSpend:String(Math.round(paid||0)), spendGrowthPct:'4', cac:String(Math.round(cacSeed)),
@@ -3299,12 +3334,19 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
     repeatRate:String(repeatSeed), churnPct:'3', startBase:String(baseSeed),
     wholesale:'0', wholesaleGrowthPct:'0',
   };
-  FC_SEASON.forEach((v,j)=>{ seed['seas'+j] = String(v); });
+  // The brand's own seasonality (brand_config.seasonality, 12 monthly factors) — every brand used to
+  // get frkl's "UK jewellery" curve. Flat when none is set.
+  const _cfgSeas = (window.FRKL_PLAN && window.FRKL_PLAN.config && Array.isArray(window.FRKL_PLAN.config.seasonality) && window.FRKL_PLAN.config.seasonality.length === 12) ? window.FRKL_PLAN.config.seasonality : null;
+  (_cfgSeas || FC_SEASON.map(() => 1)).forEach((v,j)=>{ seed['seas'+j] = String(v); });
   const DEFAULTS = {...COST_DEFAULTS, ...contribSaved, ...seed};
-  const [inp, setInp] = useState(()=>{ try { return {...DEFAULTS, ...(JSON.parse(localStorage.getItem('frkl-forecast-inputs')||'{}'))}; } catch(e){ return DEFAULTS; } });
+  // Only what the owner changed is remembered, per brand. The whole input set used to be saved on
+  // the first edit, so the seed never followed the live numbers again (and brands shared it).
+  const _fcKey = 'greta-forecast-edits:' + ((window.FRKL_LIVE && window.FRKL_LIVE.brandId) || (OI_BRAND && OI_BRAND.slug) || 'demo');
+  const [edits, setEdits] = useState(()=>{ try { return JSON.parse(localStorage.getItem(_fcKey)||'{}') || {}; } catch(e){ return {}; } });
+  const inp = {...DEFAULTS, ...edits};
   const [showAdv, setShowAdv] = useState(false);
   const [showWork, setShowWork] = useState(false);
-  const set = (k,v)=>{ const next={...inp,[k]:v}; setInp(next); try{localStorage.setItem('frkl-forecast-inputs',JSON.stringify(next));}catch(e){} };
+  const set = (k,v)=>{ const next={...edits,[k]:v}; setEdits(next); try{localStorage.setItem(_fcKey,JSON.stringify(next));}catch(e){} };
   const nOf = obj => k => { const f = parseFloat(String(obj[k]==null?'':obj[k]).replace(',','.').replace(/[^0-9.]/g,'')); return isFinite(f)?f:0; };
   const n = nOf(inp);
   const mode = inp.mode==='topdown' ? 'topdown' : 'bottomup';
@@ -3358,7 +3400,7 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
           </>) : (<>
             {fld('startSpend','Paid spend /mo',curSym())}
             {fld('spendGrowthPct','Spend growth /mo',null,'%')}
-            {fld('cac','CAC',curSym())}
+            {fld('cac','New-customer cost',curSym())}
             {fld('newAov','New average order value',curSym())}
             {fld('organicNew','Organic new /mo',null,'cust')}
             {fld('organicGrowthPct','Organic growth /mo',null,'%')}
@@ -3396,7 +3438,7 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
       <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:6}}>
         {tile(annLabel+' revenue', GBP(t.revenue), null)}
         {tile(annLabel+' contribution', GBP(t.contribution), PCT(t.cmPct)+' margin', t.contribution>=0?'var(--good)':'var(--bad)')}
-        {tile(annLabel+' EBITDA', GBP(t.ebitda), PCT(t.ebitdaPct)+' margin', t.ebitda>=0?'var(--good)':'var(--bad)')}
+        {tile(annLabel+' operating profit', GBP(t.ebitda), PCT(t.ebitdaPct)+' of sales', t.ebitda>=0?'var(--good)':'var(--bad)')}
         {tile('operating profit break-even', beLabel, mode==='bottomup'?('repeat '+n('repeatRate').toFixed(0)+'%/mo'):('growth '+n('growthPct').toFixed(0)+'%/mo'))}
       </div>
       {mode==='bottomup' && <div style={{fontSize:'var(--text-sm)',color:'var(--text-muted)',marginBottom:10}}>Revenue mix: <b style={{color:PAL.accent}}>New {pctOf(t.newRev)}%</b> · <b style={{color:PAL.good}}>Returning {pctOf(t.retRev)}%</b>{t.whRev>0?<> · <b style={{color:PAL.warn}}>Wholesale {pctOf(t.whRev)}%</b></>:''} — returning revenue compounds as the base grows.</div>}
@@ -3427,7 +3469,7 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
             <th style={{fontWeight:'var(--weight-semi)',padding:'4px 8px'}}>Upside</th>
           </tr></thead>
           <tbody>
-            {[['Revenue','revenue'],['Contribution','contribution'],['EBITDA','ebitda']].map(([lab,key])=>(
+            {[['Sales','revenue'],['Profit after ads','contribution'],['Operating profit','ebitda']].map(([lab,key])=>(
               <tr key={key} style={{borderTop:'1px solid var(--border-subtle)',textAlign:'right'}}>
                 <td style={{textAlign:'left',padding:'5px 0',color:'var(--text-secondary)'}}>{lab}</td>
                 <td style={{padding:'5px 8px',color:'var(--text-muted)'}}>{GBP(downside[key])}</td>
@@ -3573,7 +3615,7 @@ function WhatChangedStrip(){
     {key:'revenue',       label:'Revenue',             fmt:v=>GBP(v),                              axisFmt:gbpK,                better:'up'},
     {key:'orders',        label:'Orders',              fmt:v=>NUM(v),                              axisFmt:v=>Math.round(v),    better:'up'},
     {key:'aov',           label:'Average order',                 fmt:v=>GBP(v),                              axisFmt:fmtMoneyK, better:'up'},
-    {key:'cvr',           label:'Conversion rate',     fmt:v=>v!=null?(v*100).toFixed(2)+'%':'—',  axisFmt:v=>(v*100).toFixed(1)+'%', better:'up',   bench:CVR_BENCH},
+    {key:'cvr',           label:'Visitors who buy',    fmt:v=>v!=null?(v*100).toFixed(2)+'%':'—',  axisFmt:v=>(v*100).toFixed(1)+'%', better:'up',   bench:CVR_BENCH},
     {key:'mer',           label:'Sales per £ of ads',        fmt:v=>v!=null?v.toFixed(2)+'×':'—',         axisFmt:v=>v.toFixed(1)+'×', better:'up',   bench:3},
     {key:'paid',          label:'Paid spend',          fmt:v=>GBP(v),                              axisFmt:gbpK,                better:'flat'},
     {key:'discountDepth', label:'Discount depth',      fmt:v=>v!=null?(v*100).toFixed(1)+'%':'—',  axisFmt:pct0,                better:'down'},
@@ -3659,8 +3701,14 @@ function Overview({start, period, customActive}){
   const seriesEmail   = daily.map(d=>({d:d.dlabel, v:d.emailRev}));
   // ── Additional headline KPIs ──
   const pOrders = havePrior ? sum(pShop,'orders') : null;
-  const cvr  = sessions>0 ? orders/sessions : null;
-  const pCvr = (havePrior && pSessions>0) ? pOrders/pSessions : null;
+  // Conversion over the days analytics actually recorded: orders on those days ÷ their sessions. A
+  // month of orders over a week of sessions (tracking was down until 24 Sep) read 6.8% "Healthy";
+  // the same days' orders read ~1.1%, which is what the server reports too.
+  const _cvrOn = (shopRows, gaRows) => { const byDay = {}; (gaRows||[]).forEach(g => { if (Number(g.sessions) > 0) byDay[g.date] = (byDay[g.date]||0) + Number(g.sessions); });
+    let o = 0, ss = 0; (shopRows||[]).forEach(r => { if (byDay[r.date] != null) o += Number(r.orders)||0; });
+    Object.values(byDay).forEach(v => { ss += v; }); return ss > 0 ? o / ss : null; };
+  const cvr  = _cvrOn(shop, ga);
+  const pCvr = havePrior ? _cvrOn(pShop, pGa) : null;
   const seriesCVR = daily.map(d=>({d:d.dlabel, v: d.sessions>0 ? +(100*d.orders/d.sessions).toFixed(2) : 0}));
   const grossSales = sum(shop,'totalSales');
   const discAmt = sum(shop,'discounts');
@@ -3748,6 +3796,13 @@ function Overview({start, period, customActive}){
   // catalogue constant so its line is deliberately flat (stability, not a bug).
   const seriesDiscVal = daily.map(d=>({d:d.dlabel, v:+((d.discounts||0)).toFixed(0)}));
   const seriesGM      = (gmGross? daily.map(d=>({d:d.dlabel, v:+(gmGross*100).toFixed(1)})) : null);
+  // Commentary is worked out from this page's own numbers. It used to be frkl's April story typed in
+  // ("Down ~14%: revenue grew slower than spend (27% vs 46%)", "Up ~32%", "fix the cart JS error")
+  // and every brand saw it, every month.
+  const _chg = (a, b) => (a != null && b != null && b > 0) ? (a - b) / b : null;
+  const _pc = x => x == null ? null : (x >= 0 ? 'up ' : 'down ') + fmtPctN(Math.abs(x));
+  const _vs = (lab1, a1, b1, lab2, a2, b2) => { const x = _pc(_chg(a1, b1)), y = _pc(_chg(a2, b2));
+    return (x && y) ? `${lab1} ${x}, ${lab2} ${y} on the period before.` : undefined; };
   const seriesCAC     = (ordersPerCust>0) ? daily.map(d=>({d:d.dlabel, v: d.orders>0 ? +((d.paid*ordersPerCust)/d.orders).toFixed(0) : 0})) : null;
   const seriesLTV     = (ordersPerCust>0 && gm) ? daily.map(d=>({d:d.dlabel, v: d.orders>0 ? +((d.revenue/d.orders)*gm*ordersPerCust).toFixed(0) : 0})) : null;
   const seriesReturn  = shop.map(r=>({d:(r.date||'').slice(5), v: r.totalSales>0 ? +(100*(r.returns||0)/r.totalSales).toFixed(2) : 0}));
@@ -3833,7 +3888,7 @@ function Overview({start, period, customActive}){
       {isMobile && <MobileToday/>}
       {/* Per-channel freshness moved to the app-bar FreshnessChip (was duplicated here). */}
       {/* Hero — the answer to "what should I look at right now" */}
-      <SetupProgressCard/>
+      {/* SetupProgressCard repeated Today's setup steps and its button left the app; removed. */}
       {/* This page asks "Where does my money come from, and where does it go?" and used to open
           with a weekly briefing, a track record and an action queue — all three of which have
           their own destinations in V3 (Review, Review, Actions). The page never answered its own
@@ -3853,11 +3908,8 @@ function Overview({start, period, customActive}){
       {/* The weekly briefing, kept but demoted — it answers "what changed this week", which is
           Review's question, not this page's. Collapsed by default so the money read is what the
           page opens with. */}
-      <V3More id="profit-weekly" label="This week's briefing — what changed and what it is worth">
-        <ThisWeekHero/>
-        <TrackRecord/>
-        <WhatChangedStrip/>
-      </V3More>
+      {/* "This week's briefing" (static insights, the track record and the weekly strip) answered
+          Review's question with frkl's July read; Review leads with the live weekly board. Removed. */}
       {/* Prove-value-first onboarding nudge: the read above already works on
           catalogue-estimate margins — now offer the one ~5-min input that makes the
           margin figures exact. Placed AFTER the value, framed as "make it exact". */}
@@ -3894,27 +3946,26 @@ function Overview({start, period, customActive}){
           <h2 style={{margin:0}}>Headline KPIs</h2>
           <span className="meta">Last {daily.length} days · vs prior period · hover any card for the full read</span>
         </div>
+        {/* When the daily detail never arrived, the headline figures still show (they come from the
+            morning summary) beside 0 orders and 0 sessions. Say so, rather than let the zeros read as
+            a real day. The notice that used to say this lived in a drawer that has since gone. */}
+        {(() => { const L = window.FRKL_LIVE; return !!(L && L.session && !L.lastFetchAt && /^(error|static-only)$/.test(L.status || '')); })() &&
+          <p className="v3-empty">Your daily detail didn’t load, so only the headline figures are filled in below. Refreshing the page usually sorts it.</p>}
         <div className="row">
           <KPI label="Paid ad spend" val={GBP(paid)} sub={(() => { const m = sum(meta,'cost'), g = sum(gads,'cost'), t = m + g; return t > 0 ? `Meta ${fmtPctN(m / t)} · Google ${fmtPctN(g / t)}` : ''; })()} series={seriesPaid} current={paid} prior={pPaid}
-            agent="Pulse" observation={OI_BRAND.slug==='frkl' ? `Up ~46% on prior period as Meta scaled from ${curSym()}100 to ${curSym()}170/day from 13 April.` : undefined}
-            implication={OI_BRAND.slug==='frkl' ? "Don't push further until Ireland frequency drops below 8× and the cart-checkout JS error is fixed." : undefined} />
+            agent="Pulse" observation={_vs('Ad spend', paid, pPaid, 'sales', rev, pRev)} />
           <KPI label="Shopify net revenue" val={GBP(rev)} sub={`${NUM(orders)} orders · average order value ${GBP(orders?rev/orders:null)}`} series={seriesRev} current={rev} prior={pRev} goodDirection="up"
-            agent="Atlas" observation={`Draft/exchange orders are excluded. ~${discLoad!=null?Math.round(discLoad*100):10}% of DTC gross sales went out as code/automatic discounts, with sale-price markdowns on top — see Promotions for the full load.`}
-            implication="Confirm a real product cost% so this becomes a defensible contribution number for the raise." />
+            agent="Atlas" observation={discLoad != null ? `${fmtPctN(discLoad)} of sales went out as code or automatic discounts; sale-price markdowns come on top — see Promotions for the full picture.` : undefined} />
           <KPI label="Sales per £ of ads" val={mer?mer.toFixed(2)+'x':'—'} sub="net revenue ÷ paid spend" series={seriesMER} current={mer} prior={pMer} goodDirection="up"
-            agent="Atlas" observation="Down ~14%: revenue grew slower than spend (27% vs 46%), so each pound of ad earns less."
-            implication="Classic diminishing returns from scaling into a fatigued audience — pause scaling, fix creative + site first."
+            agent="Atlas" observation={_vs('Sales', rev, pRev, 'ad spend', paid, pPaid)}
             benchmark="blended_mer" bmValue={mer} />
-          <KPI label="Sessions (GA4)" val={NUM(sessions)} sub={`Site conversion rate ${PCT(sessions?orders/sessions:null)} (orders ÷ sessions)`} series={seriesSessions} current={sessions} prior={pSessions} goodDirection="up"
-            agent="Pulse" observation={`Sessions grew far slower than spend. Site conversion rate (Shopify orders ÷ GA4 sessions) is ${sessions?PCT(orders/sessions):'—'} vs the ${CVR_BENCH_LABEL} target.`}
-            implication="Spend is buying impressions, not visits. Site fixes (cart JS, sticky checkout) unlock more revenue than more spend." />
+          <KPI label="Sessions (GA4)" val={NUM(sessions)} sub={`Site conversion rate ${PCT(cvr)} (orders ÷ sessions, on days analytics recorded)`} series={seriesSessions} current={sessions} prior={pSessions} goodDirection="up"
+            agent="Pulse" observation={_vs('Visits', sessions, pSessions, 'ad spend', paid, pPaid)} />
           <KPI label="Klaviyo-tracked orders" val={GBP(emailRev)} sub="gross order value — not email-attributed" series={seriesEmail} current={emailRev} prior={pEmailRev} goodDirection="up"
-            agent="Lux" observation="Up ~32% — email is keeping pace with the paid scale-up."
-            implication="Highest-leverage moment to switch on attributed reporting + a real abandoned-cart sequence." />
-          <KPI label="Visitors who buy" val={PCT(cvr)} sub={`${NUM(orders)} orders ÷ ${NUM(sessions)} sessions`} series={seriesCVR} current={cvr} prior={pCvr} goodDirection="up"
+            agent="Lux" observation={_vs('Orders Klaviyo saw', emailRev, pEmailRev, 'sales', rev, pRev)} />
+          <KPI label="Visitors who buy" val={PCT(cvr)} sub="orders ÷ sessions, on the days analytics recorded" series={seriesCVR} current={cvr} prior={pCvr} goodDirection="up"
             status={cvr==null?undefined:cvr>=CVR_BENCH?'healthy':cvr>=CVR_BENCH*0.8?'watch':'action'} statusLabel={cvr==null?undefined:cvr>=CVR_BENCH?'Healthy':cvr>=CVR_BENCH*0.8?'Watch':'Below target'}
             agent="Pulse" observation={`Site conversion rate (Shopify orders ÷ GA4 sessions) is the single biggest revenue lever — against the ${CVR_BENCH_LABEL} target, more spend just buys more bounces.`}
-            implication="Fix the cart→checkout JS error and sticky-checkout before scaling spend further."
             benchmark="site_cvr" bmValue={cvr} />
           <KPI label="Discount depth" val={PCT(discLoad)} sub={`${curSym()} off ÷ ${curSym()} of sales — how deep, not how many orders · drafts excluded`} series={seriesDisc} current={discLoad} prior={pDiscLoad} goodDirection="down"
             agent="Atlas" observation={`Code + automatic discount as a share of DTC gross sales (draft/exchange orders excluded). This excludes sale-price markdowns${_mdPct?`, which add ~${_mdPct}% of value on top`:''} — the full load is on the Promotions tab.`}
@@ -3930,9 +3981,9 @@ function Overview({start, period, customActive}){
             agent="Atlas" observation="How many orders it takes to recover the paid cost of acquiring a customer, at your margin. Under ~2 orders = a healthy cash cycle that funds reinvestment."
             implication="This is the lever on cash flow — faster payback frees working capital. Watch it as you scale spend; if it stretches past 2, growth starts eating cash." />
           <MoreKpis count={8}>
-          <KPI label="Gross margin" val={PCT(gm)} sub={costsVerified?"Your entered gross margin":"product cost-based · catalogue estimate"} badge={<MarginBadge onSetup={()=>{ window.__oiGo && window.__oiGo('goal', 'margin'); }}/>} series={seriesGM} seriesLabel="Catalogue margin · structurally stable"
+          <KPI label="Gross margin" val={PCT(gmGross)} sub="after product cost, before order costs and ads" badge={<MarginBadge onSetup={()=>{ window.__oiGo && window.__oiGo('goal', 'margin'); }}/>} series={seriesGM} seriesLabel="Catalogue margin · structurally stable"
             agent="Atlas" observation="Blended product margin across the live catalogue, after cost of goods."
-            implication="This is the contribution base for the raise — defend it by keeping discount load in check."
+            implication="Every profit figure builds on this — discounts eat straight into it."
             benchmark="gross_margin" bmValue={gm} />
           <KPI label="Return rate" val={PCT(returnRate)} sub={`${NUM(_rets)} of ${NUM(_units)} units · 90d`} series={seriesReturn} seriesLabel="Refunds ÷ sales · by day" goodDirection="down"
             agent="Lux" observation={`Share of shipped units returned — watch by item for sizing/quality hotspots. (Card is unit-based over 90d; trend is refund-${curSym()} share of sales by day.)`}
@@ -3948,14 +3999,13 @@ function Overview({start, period, customActive}){
             agent="Lux" observation="Repeat-purchase share — the cheapest revenue you have and a read on brand love."
             implication="Lift with post-purchase flows + a reason to come back; it compounds faster than paid." />
           <KPI label="Profit after ads" val={GBP(contrib)} sub="gross profit − paid media · full breakdown below" badge={<MarginBadge onSetup={()=>{ window.__oiGo && window.__oiGo('goal', 'margin'); }}/>} series={seriesContrib} current={contrib} prior={pContrib} goodDirection="up"
-            agent="Atlas" observation="Net revenue × blended product margin, minus paid ad spend — before packaging/fulfilment/fees. The fully-loaded figure is in the Contribution margin card."
-            implication="This is what the raise hinges on; hold it by balancing discount load (margin) against sales per £ of ads (cost per new customer)." />
+            agent="Atlas" observation="Sales × what you keep after product and order costs, minus ad spend — the same figure Today leads with." />
           <KPI label="New-customer cost" val={GBP(cac)} sub={`${NUM(newCust)} new customers · measured, not inferred`} badge={<MarginBadge onSetup={()=>{ window.__oiGo && window.__oiGo('goal', 'margin'); }}/>} series={seriesCAC} seriesLabel="Spend ÷ new customers · by day" current={cac} prior={pCac} goodDirection="down"
             agent="Pulse" observation="Paid ad spend ÷ new customers, both counted directly from your orders — no longer inferred from a repeat-purchase ratio."
             implication="Judge against contribution-customer lifetime value — keep scaling only while customer lifetime value:cost per new customer stays at 3×+." />
           <KPI label="Customer value" val={GBP(ltv)} sub={ltvBasis
               ? `contribution · ${ltvBasis} · vs cost per new customer ${ltvCac?ltvCac.toFixed(1)+'×':'—'}`
-              : 'not measured yet'} badge={<MarginBadge onSetup={()=>{ window.__oiGo && window.__oiGo('goal', 'margin'); }}/>} series={seriesLTV} seriesLabel="Contribution/customer · by day" goodDirection="up"
+              : 'not measured yet'} badge={<MarginBadge onSetup={()=>{ window.__oiGo && window.__oiGo('goal', 'margin'); }}/>} series={seriesLTV} seriesLabel="Customer value · by day" goodDirection="up"
             agent="Atlas"
             observation={ltvBasis
               ? `Contribution per acquired customer, integrated from the cohort curve over the ${ltvBasis}. The horizon stops where the curve stops observing half the starting cohort, because past that point it is only the survivors talking about themselves.`
@@ -4040,11 +4090,13 @@ function Overview({start, period, customActive}){
         <span style={{width:3,height:14,background:'var(--text-faint)',borderRadius:'var(--radius-sm)'}}/>Planning &amp; deep-dive
       </div>
       <button onClick={()=>setShowPlanning(s=>!s)} className="show-more">
-        {showPlanning ? '↑ Hide planning & forecast' : '↓ Planning & forecast — customer lifetime value:cost per new customer trend + Year-1 P&L'}
+        {showPlanning ? '↑ Hide the forecast' : '↓ A year-one forecast you can adjust'}
       </button>
       {showPlanning && (<div style={{display:'flex', flexDirection:'column', gap:'var(--s-5)', marginTop:'var(--s-4)'}}>
-        <LtvCacCard daily={daily} gm={gm} ordersPerCust={ordersPerCust}/>
-        <ForecastCard rev={rev} orders={orders} paid={paid} gm={gm} aov={orders?rev/orders:83} cac={cac} returningPct={returningPct}/>
+        {/* LtvCacCard sat here: customer value ÷ new-customer cost by a method 0206 retired as a double
+            count. The page's own "Customer value" figure is the measured one. The forecast now gets
+            true gross margin — it subtracts order costs itself, so the after-costs ratio counted them twice. */}
+        <ForecastCard rev={rev} orders={orders} paid={paid} gm={gmGross} aov={orders?rev/orders:null} cac={cac} returningPct={returningPct}/>
       </div>)}
     </div>
   );
@@ -4190,7 +4242,7 @@ function FitCard({start, end}){
       </div>
     </div>
     {FIT.channels&&FIT.channels.length>1&&(<table style={{marginTop:14}}>
-      <thead><tr><th>Channel</th><th>OMF</th><th>PMF</th><th>Cost covered by customer value</th><th>Customer value vs cost</th></tr></thead>
+      <thead><tr><th>Channel</th><th>Offer fit</th><th>Product fit</th><th>Cost covered by customer value</th><th>Customer value vs cost</th></tr></thead>
       <tbody>{FIT.channels.map(c=>(<tr key={c.channel}>
         <td><span className="pill" style={{background:(COL[c.channel]||'var(--accent)')+'22',color:COL[c.channel]||'var(--accent)'}}>{c.channel}</span></td>
         <td style={{color:fitScoreColor(c.omfScore)}}>{c.omfScore??'—'}</td>
@@ -4312,7 +4364,7 @@ function GenomePanel() {
         <span className="pill" style={{ background: 'var(--bg-app)', color: 'var(--text-faint)', border: '1px solid var(--border-subtle)' }}>shadow · not scored</span>
       </div>
       <div className="fine" style={{ color: 'var(--text-faint)', margin: '4px 0 12px' }}>
-        Computed from the fitted curves &amp; your economics - what the OMF/PMF score can't see: when cash moves, and whether the business (not the order) makes money.
+        Computed from the fitted curves &amp; your economics - what the offer and product fit scores can't see: when cash moves, and whether the business (not the order) makes money.
       </div>
 
       {/* The four genome magnitudes. */}
@@ -4843,10 +4895,10 @@ function Channels({start}){
       defaultMetric="revenue" defaultSplit="channel" defaultChart="bar" defaultTopN={10}/>}
     <div className="row">
     {box('Meta Ads',(<div>{line('Spend',GBP(sum(meta,'cost')))}{line('Impressions',NUM(sum(meta,'impressions')))}{line('Pixel purchases',NUM(sum(meta,'purchases')))}{line('Claimed value',GBP(sum(meta,'purchaseValue')))}{line('Claimed return',sum(meta,'cost')>0?(sum(meta,'purchaseValue')/sum(meta,'cost')).toFixed(2)+'x':'—')}</div>))}
-    {box('Google Ads',(<div>{line('Spend',GBP(sum(gads,'cost')))}{line('Clicks',NUM(sum(gads,'clicks')))}{line('Impressions',NUM(sum(gads,'impressions')))}{line('Conversions',NUM(sum(gads,'conversions')))}{line('Conv. value',GBP(sum(gads,'convValue')))}{line('CPC',GBP2(sum(gads,'cost')/Math.max(1,sum(gads,'clicks'))))}</div>))}
-    {box('Klaviyo (email/SMS)',(<div>{line('Send days',klEmail.length)}{line('Recipients (sends)',NUM(sum(klEmail,'recipients')))}{line('Avg open rate',PCT(klEmail.reduce((a,r)=>a+(r.openRate>2?0:r.openRate||0),0)/Math.max(1,klEmail.filter(r=>r.openRate<=2).length)))}{line('Klaviyo-tracked orders',NUM(sum(kl,'orders')))}{line('Tracked order value (gross)',GBP(sum(kl,'orderValue')))}</div>))}
+    {box('Google Ads',(<div>{line('Spend',GBP(sum(gads,'cost')))}{line('Clicks',NUM(sum(gads,'clicks')))}{line('Impressions',NUM(sum(gads,'impressions')))}{line('Conversions',NUM(sum(gads,'conversions')))}{line('Conv. value',GBP(sum(gads,'convValue')))}{line('CPC',sum(gads,'clicks')>0?GBP2(sum(gads,'cost')/sum(gads,'clicks')):'—')}</div>))}
+    {box('Klaviyo (email/SMS)',(<div>{line('Send days',klEmail.length)}{line('Recipients (sends)',NUM(sum(klEmail,'recipients')))}{line('Avg open rate',klEmail.some(r=>r.openRate!=null&&r.openRate<=2)?PCT(klEmail.reduce((a,r)=>a+(r.openRate>2?0:r.openRate||0),0)/klEmail.filter(r=>r.openRate!=null&&r.openRate<=2).length):'—')}{line('Klaviyo-tracked orders',NUM(sum(kl,'orders')))}{line('Tracked order value (gross)',GBP(sum(kl,'orderValue')))}</div>))}
     {box('GA4 behaviour',(<div>{line('Sessions',NUM(sum(ga,'sessions')))}{line('Avg engagement rate',PCT(ga.reduce((a,r)=>a+(r.engagementRate||0),0)/Math.max(1,ga.length)))}{line('Add-to-carts',NUM(sum(ga,'addToCarts')))}{line('Checkouts',NUM(sum(ga,'checkouts')))}{line('Purchases',NUM(sum(ga,'purchases')))}</div>))}
-    {box('Shopify (revenue truth)',(<div>{line('Net revenue',GBP(sum(shop,'netSales')))}{line('Total sales',GBP(sum(shop,'totalSales')))}{line('Orders',NUM(sum(shop,'orders')))}{line('Average order',GBP(sum(shop,'netSales')/Math.max(1,sum(shop,'orders'))))}{line('Discounts',GBP(sum(shop,'discounts')))}{line('Returns',GBP(sum(shop,'returns')))}</div>))}
+    {box('Shopify (revenue truth)',(<div>{line('Net revenue',GBP(sum(shop,'netSales')))}{line('Total sales',GBP(sum(shop,'totalSales')))}{line('Orders',NUM(sum(shop,'orders')))}{line('Average order',sum(shop,'orders')>0?GBP(sum(shop,'netSales')/sum(shop,'orders')):'—')}{line('Discounts',GBP(sum(shop,'discounts')))}{line('Returns',GBP(sum(shop,'returns')))}</div>))}
     </div>
     <AffiliatePanel/>
     <CreatorCandidatesPanel/>
@@ -6643,18 +6695,20 @@ function Products(){
   const totalProfit=products.reduce((a,p)=>a+(p.grossProfit||0),0);
   const blendedMargin=totalRev>0?totalProfit/totalRev:0;
   const returnHotspots=[...products].filter(p=>(p.returnRate||0)>=0.1&&(p.units||0)>=10).sort((a,b)=>(b.returnRate||0)-(a.returnRate||0));
+  // This drawer is built on the per-product snapshot (FRKL_BUSINESS.products). With none it printed
+  // "0+ items · Blended gross margin 0.0%" as if those were figures; say what is missing instead.
+  if (!products.length) return (<div className="v3-empty">Per-product margin and returns need a product snapshot Greta does not have yet. Sales by product are above; product costs live in <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs')}>Goal &amp; costs <span className="v3-xref-go">→</span></button></div>);
   return (
     <div>
       <div className="row" style={{marginBottom:14}}>
         <KPI label="items sold (90d)" val={products.length+'+'} sub={`${NUM(totalUnits)} units · ${curSym()}${NUM(totalRev)} net`}
-          agent="Atlas" observation="200+ items sold in 90d but the top 40 carry most of the volume — long tail of low-velocity stock."
-          implication="Trim the tail. Focus inventory + creative on the top 20 to lift margin and shorten the cash cycle." />
+          agent="Atlas" />
         <KPI label="Top seller" val={sorted[0]?.title?.slice(0,28)||'—'} sub={`${sorted[0]?.units||0} units · ${curSym()}${NUM(sorted[0]?.netSales)} · ${PCT(sorted[0]?.marginPct)} margin`}
           agent="Frame" observation={DEMO ? `The mega necklace gold is the hero (117 units, ${curSym()}8.7k) but has the lowest margin (~58%) and 8.5% returns.` : undefined}
           implication={DEMO ? "Heavy reliance on one item = concentration risk. Find the next hero — and root-cause why this one returns." : undefined} />
         <KPI label="Blended gross margin" val={PCT(blendedMargin)} sub={`${curSym()}${NUM(totalProfit)} GP / ${curSym()}${NUM(totalRev)} net`}
           agent="Atlas" observation={DEMO ? "78% blended GM is excellent for jewellery — the charms (80–93% margin) are the cash cow." : undefined}
-          implication="Investors will love this number once product cost is confirmed and the true discount load — code + automatic + sale-price markdowns, draft orders excluded — is netted out (see Promotions)." />
+          implication="Discounts and sale-price markdowns come off this — see Promotions for the full load." />
         <KPI label="Return-rate hotspots" val={returnHotspots.length} sub={`items with ≥10% returns (sold ≥10)`}
           agent="Lux" observation={DEMO ? "12 items have ≥10% return rates — 'love is pain charm' hits 22% — that's a CX signal, not a quality fluke." : undefined}
           implication="Add a post-purchase survey + product page sizing/expectation copy to the top 3 hotspots before adding any new items." />
@@ -8475,11 +8529,11 @@ function ConnectionHealthStrip(){
 const BOARD_METRICS = [
   {key:'revenue',       label:'Net revenue',    fmt:GBP, better:'up'},
   {key:'paid',          label:'Paid spend',     fmt:GBP, better:'flat'},
-  {key:'mer',           label:'Sales per £ of ads',            fmt:v=>v==null?'—':v.toFixed(2)+'×', better:'up',   bench:2,    benchTip:'Target ≥ 2.0×'},
+  {key:'mer',           label:'Sales per £ of ads',            fmt:v=>v==null?'—':v.toFixed(2)+'×', better:'up',   get bench(){ return v3MerBreakEven(); }, get benchTip(){ const b = v3MerBreakEven(); return b ? 'Break-even ' + b.toFixed(2) + '× — below it, ads cost more than the profit they bring' : 'Break-even needs your costs'; }},
   {key:'orders',        label:'Orders',         fmt:NUM, better:'up'},
   {key:'aov',           label:'Average order',            fmt:GBP, better:'up'},
   {key:'sessions',      label:'Sessions',       fmt:NUM, better:'up'},
-  {key:'cvr',           label:'Visitors who buy',            fmt:PCT, better:'up',   bench:0.02, benchTip:'Target ≥ 2% (DTC)'},
+  {key:'cvr',           label:'Visitors who buy',            fmt:PCT, better:'up',   bench:CVR_BENCH, benchTip:'Benchmark ' + CVR_BENCH_LABEL},
   {key:'discountDepth', label:'Discount depth', fmt:PCT, better:'down', bench:0.10, benchTip:'Lower is better · watch > 10%'},
   {key:'emailOpenRate', label:'Email open rate', fmt:PCT, better:'up', note:'Klaviyo opens ÷ recipients — list-engagement signal. (Attributed email revenue is shown in Channels → Email; it over-counts vs net because Klaviyo credits the same order to multiple emails/flows, so it is deliberately kept off this scorecard.)'},
 ];
@@ -8990,7 +9044,7 @@ function CohortsPanel(){
         </div>
       </div>
       <div className="row" style={{marginBottom:14}}>
-        <CohortStat label="Profit per customer, lifetime" val={GBP(contribLTV)} sub={`${GBP(lifetimeRev)} revenue × ${PCT(gm)} margin · observed to date`} badge={badge} accent="var(--good)"/>
+        <CohortStat label="Customer value" val={GBP(contribLTV)} sub={`${GBP(lifetimeRev)} revenue × ${PCT(gm)} margin · observed to date`} badge={badge} accent="var(--good)"/>
         <CohortStat label="New-customer cost (paid ads)" val={paidCac!=null?GBP(paidCac):'—'} sub={`spend ÷ new customers · ${C.cac.paidMonths||0} paid month(s) · blended ${blendedCac!=null?GBP(blendedCac):'—'} understates (incl. ${curSym()}0-spend cohorts)`} accent="var(--accent)"/>
         <CohortStat label="Customer value vs cost (paid ads)" val={ltvCacPaid!=null?ltvCacPaid.toFixed(1)+'×':'—'} sub="contribution customer lifetime value ÷ paid cost per new customer · target 3×+" badge={badge} accent={ragRatio}/>
         <CohortStat label="First-order payback" val={paybackOrders!=null?(paybackOrders<=1?'1st order':paybackOrders.toFixed(1)+' orders'):'—'} sub="orders to recover paid cost per new customer" badge={badge}/>
@@ -9902,13 +9956,16 @@ function V3ChannelScoreboard(){
       const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
       if (!sb || !b) return false;
       sb.from('vw_channel_scoreboard')
-        .select('platform,channel_type,spend_30d,avg_iroas,target_marginal_iroas,status,action')
+        .select('platform,channel_type,spend_30d,avg_iroas,break_even_iroas,target_marginal_iroas,status,action')
         .eq('brand_id', b).gt('spend_30d', 0)
         .order('spend_30d', { ascending: false, nullsFirst: false }).limit(8)
         .then(r => {
           if (dead) return;
           if (r && r.error) { setErr(r.error.message || 'x'); return; }
-          setRows((r && r.data) || []);
+          // The tick is break-even (what a channel must return for its sales to cover the ads at your
+          // margin) — the copy says "needs to return to break even", but the line drawn was the lower
+          // marginal target (1.23× vs 1.66× for frkl), so channels in between read as paying their way.
+          setRows(((r && r.data) || []).map(x => ({ ...x, target_marginal_iroas: x.break_even_iroas != null ? x.break_even_iroas : x.target_marginal_iroas })));
         }, () => { if (!dead) setErr('x'); });
       return true;
     };
@@ -10060,6 +10117,11 @@ function BusinessReview(){
   // cached request). They used to come from inventorySummary / FRKL_COHORTS, which are empty for
   // live brands, so this board said "0 items · Covered" and "£0 · Lean" while products were out.
   const stockQ = useV3Rows('stock-plan', V3_STOCK_Q), retQ = useV3Rows('cust-ret', V3_RET_Q);
+  // Customer value, repeat, new customers and the channel split read the same live views Customers
+  // and Growth plan use. They came from FRKL_COHORTS / FRKL_BUSINESS — frkl's July snapshot, empty for
+  // every other brand — so this board said "Needs cost + cohort data" next to a measured figure.
+  const ueQ = useV3Rows('cust-ue', V3_UE_Q), mixQ = useV3Rows('rev-mix', V3_MIX_Q), newMoQ = useV3Rows('new-mo', V3_NEWMO_Q);
+  const board = useV3Board();
   const gm = oiCmRatio();          // contribution ratio: every figure below it is a profit figure
   const cc0 = cashConfig();
   const [cashOpen, setCashOpen] = useState(false);
@@ -10088,23 +10150,25 @@ function BusinessReview(){
   const roll = P.money_rollup||{};
   const atRisk = (roll.leakage||0)+(roll.at_risk||0);
   const upside = roll.opportunity||0;
-  const openActions = Object.values((typeof window!=='undefined'&&window.FRKL_ACTION_STATUS)||{}).filter(s=> s && !DONE.has(s.status)).length;
+  // The same rows the Actions page and the nav badge count.
+  const openActions = (board && board.rows) ? board.rows.length : Object.values((typeof window!=='undefined'&&window.FRKL_ACTION_STATUS)||{}).filter(s=> s && !DONE.has(s.status)).length;
 
   // ── cohort / engine reads ──
-  const repeat = C.repeatRate;
-  const opc = C.ordersPerCustomer;
-  const paidCac = C.cac && C.cac.paid;
-  const ltvPerCust = C.lifetimeRevPerCust;
-  const contribLTV = (ltvPerCust!=null && gm!=null) ? ltvPerCust*gm : null;
-  const ltvCac = (contribLTV!=null && paidCac) ? contribLTV/paidCac : null;
-  const newCustSeries = ((C.cac&&C.cac.byMonth)||[]).map(m=>({x:(m.month||'').slice(5), v:m.newCustomers}));
+  const _ret = retQ.rows && retQ.rows[0], _ue = ueQ.rows && ueQ.rows[0];
+  const repeat = _ret && _ret.repeat_rate != null ? Number(_ret.repeat_rate) : null;
+  const opc = _ret && _ret.orders_per_customer != null ? Number(_ret.orders_per_customer) : null;
+  const paidCac = _ue && _ue.cac != null ? Number(_ue.cac) : null;
+  const contribLTV = _ue && _ue.ltv_contribution != null ? Number(_ue.ltv_contribution) : null;
+  const ltvCac = _ue && _ue.ltv_cac != null ? Number(_ue.ltv_cac) : ((contribLTV!=null && paidCac) ? contribLTV/paidCac : null);
+  const newCustSeries = (() => { const by = {}; (newMoQ.rows || []).forEach(r => { const m = String(r.order_date).slice(0, 7); by[m] = (by[m] || 0) + (Number(r.orders) || 0); });
+    return Object.keys(by).sort().slice(0, -1).map(m => ({ x: m.slice(5), v: by[m] })); })();   // last month is partial
 
   // ── channel concentration ──
-  const chans = (B.channelMix||[]).slice().sort((a,b)=>(b.revenue||0)-(a.revenue||0));
+  const chans = (mixQ.rows||[]).map(c=>({channel:v3Sentence(String(c.channel||'').replace(/_/g,' ')), revenue:Number(c.net_revenue)||0})).filter(c=>c.revenue>0).sort((a,b)=>b.revenue-a.revenue);
   const chanTotal = chans.reduce((s,c)=>s+(c.revenue||0),0);
   const topChan = chans[0];
   const topShare = (topChan&&chanTotal)? topChan.revenue/chanTotal : null;
-  const paidShare = chanTotal? chans.filter(c=>/^Paid/i.test(c.channel||'')).reduce((s,c)=>s+(c.revenue||0),0)/chanTotal : null;
+  const paidShare = chanTotal? chans.filter(c=>/paid|meta|google|tiktok/i.test(c.channel||'')).reduce((s,c)=>s+(c.revenue||0),0)/chanTotal : null;
 
   // ── inventory / capital ──
   // A stale feed makes every row 'unknown', which would count as nothing at risk; show it as unknown.
@@ -10127,8 +10191,8 @@ function BusinessReview(){
   const NOW_SPECS=[
     {key:'revenue',       label:'Revenue',         fmt:v=>GBP(v),                             axisFmt:gbpK,                     better:'up'},
     {key:'orders',        label:'Orders',          fmt:v=>NUM(v),                             axisFmt:v=>Math.round(v),         better:'up'},
-    {key:'cvr',           label:'Conversion rate', fmt:v=>v!=null?(v*100).toFixed(2)+'%':'—', axisFmt:v=>(v*100).toFixed(1)+'%',better:'up',  bench:CVR_BENCH},
-    {key:'mer',           label:'Sales per £ of ads',    fmt:v=>v!=null?v.toFixed(2)+'×':'—',        axisFmt:v=>v.toFixed(1)+'×',      better:'up',  bench:3},
+    {key:'cvr',           label:'Visitors who buy', fmt:v=>v!=null?(v*100).toFixed(2)+'%':'—', axisFmt:v=>(v*100).toFixed(1)+'%',better:'up',  bench:CVR_BENCH},
+    {key:'mer',           label:'Sales per £ of ads',    fmt:v=>v!=null?v.toFixed(2)+'×':'—',        axisFmt:v=>v.toFixed(1)+'×',      better:'up',  bench:v3MerBreakEven()},
     {key:'discountDepth', label:'Discount depth',  fmt:v=>v!=null?(v*100).toFixed(1)+'%':'—', axisFmt:pct0,                     better:'down'},
   ];
   const nowD = (W&&prev) ? NOW_SPECS.map(sp=>{
@@ -10143,15 +10207,15 @@ function BusinessReview(){
   // ── HORIZON 2 — The engine (is the machine strengthening) ──
   const merNow = W&&W.m.mer;
   const engineD = [
-    { label:'Contribution Customer value : New-customer cost', value: ltvCac!=null?ltvCac.toFixed(1)+'×':'—',
+    { label:'Customer value ÷ new-customer cost', value: ltvCac!=null?ltvCac.toFixed(1)+'×':'—',
       status: ltvCac==null?'missing':(ltvCac>=3?'healthy':ltvCac>=2?'watch':'action'),
       statusLabel: ltvCac==null?'Needs data':(ltvCac>=3?'Healthy':ltvCac>=2?'Watch':'Below 2×'),
-      sub: ltvCac!=null?`Contribution customer lifetime value ${curSym()}${NUM(Math.round(contribLTV))} ÷ paid cost per new customer ${curSym()}${NUM(Math.round(paidCac))} · target ≥3×`:'Needs cost + cohort data',
-      read:`Contribution customer lifetime value:cost per new customer ${ltvCac!=null?ltvCac.toFixed(1)+'×':'—'} (target ≥3×)` },
+      sub: ltvCac!=null?`What a customer is worth ${contribLTV!=null?curSym()+NUM(Math.round(contribLTV)):'—'} ÷ what one costs to win ${paidCac!=null?curSym()+NUM(Math.round(paidCac)):'—'} · aim for 3× or more`:(ueQ.rows ? 'Not measured yet — needs a few months of repeat orders' : 'Loading…'),
+      read:`Customer value ÷ new-customer cost ${ltvCac!=null?ltvCac.toFixed(1)+'×':'—'} (aim ≥3×)` },
     { label:'Repeat purchase rate', value: repeat!=null?pct1(repeat):'—',
       status: repeat==null?'missing':(repeat>=0.25?'healthy':repeat>=0.12?'watch':'action'),
       statusLabel: repeat==null?'—':(repeat>=0.25?'Healthy':repeat>=0.12?'Building':'Low'),
-      sub:`${opc?opc.toFixed(2):'—'} orders/customer · ${NUM(C.totalCustomers||0)} customers to date`,
+      sub:`${opc?opc.toFixed(2):'—'} orders per customer · ${custBase!=null?NUM(custBase):'—'} customers to date`,
       read:`Repeat rate ${repeat!=null?pct1(repeat):'—'}, ${opc?opc.toFixed(2):'—'} orders/customer` },
     { label:'Average order value', value: W&&W.m.aov!=null?GBP(W.m.aov):'—',
       status:'info', statusLabel:'Monetization',
@@ -10204,7 +10268,7 @@ function BusinessReview(){
   let runwayCard;
   if(!haveCash){
     runwayCard = { label:'Cash runway', value:'Set balance', status:'missing', statusLabel:'Needs input',
-      sub:'Enter cash on hand + monthly overheads →', onClick:editCash, read:'Cash runway: not set' };
+      sub:'Add cash in bank and monthly overheads in Goal & costs →', onClick:editCash, read:'Cash runway: not set' };
   } else if(moNet==null){
     runwayCard = { label:'Cash runway', value:'—', status:'missing', statusLabel:'Needs data',
       sub:'Not enough weekly revenue history to estimate burn', onClick:editCash, read:'Cash runway: insufficient data' };
@@ -10216,7 +10280,7 @@ function BusinessReview(){
     const months = cashBal/(-moNet);
     runwayCard = { label:'Cash runway', value: months>=24?'24+ mo':months.toFixed(1)+' mo',
       status: months<6?'action':months<12?'watch':'healthy', statusLabel: months<6?'Under 6 months':months<12?'Under 12 months':'12+ months',
-      sub:`${curSym()}${k(cashBal)} ÷ ${curSym()}${k(-moNet)}/mo net burn (rev×GM − ad spend − overheads)`, onClick:editCash,
+      sub:`${curSym()}${k(cashBal)} ÷ ${curSym()}${k(-moNet)}/mo burn (profit before ads − ad spend − overheads)`, onClick:editCash,
       read:`Cash runway ${months.toFixed(1)} months (${curSym()}${k(cashBal)} ÷ ${curSym()}${k(-moNet)}/mo net burn)` };
   }
   durD.push(runwayCard);
@@ -11654,7 +11718,7 @@ function GretaOverviewTiers(){
       <TrackRecord/>
       <div style={{background:'linear-gradient(180deg,'+GO_T.panel+','+GO_T.panel2+')',border:'1px solid '+GO_T.line,borderRadius:'var(--radius-none)',padding:'20px 24px',margin:'8px 0 6px',display:'flex',justifyContent:'space-between',gap:24,flexWrap:'wrap'}}>
         <div>
-          <div style={{fontSize:'var(--text-xs)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:GO_T.dim}}>Contribution after marketing · this period</div>
+          <div style={{fontSize:'var(--text-xs)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:GO_T.dim}}>Profit after ads · this period</div>
           <div style={{fontFamily:GO_T.mono,fontSize:'var(--text-data)',fontWeight:'var(--weight-semi)',margin:'4px 0 2px',letterSpacing:'var(--tracking-tight)'}}>{GO_gbp(d.hero.cmAfterMkt)}</div>
           <div style={{fontSize:'var(--text-sm)',color:GO_T.mut}}>CM {GO_gbp(d.hero.cm)} ({d.hero.cmPct}%) − ad spend {GO_gbp(d.hero.spend)}{d.hero.targetEstimated && <span style={{color:GO_T.amber}}> · target auto-estimated — not yet confirmed</span>}</div>
         {d.hero.opProfit!=null && d.hero.fixedMonthly>0 && <div style={{fontSize:'var(--text-sm)',marginTop:2,color:(d.hero.opProfit>=0?GO_T.green:GO_T.red)}}>{'Operating profit '+GO_gbp(d.hero.opProfit)+' · after '+GO_gbp(d.hero.fixedMonthly)+'/mo fixed costs'}</div>}
@@ -11727,7 +11791,7 @@ function GretaOverviewTiers(){
             <div style={{fontSize:'var(--text-xs)',color:GO_T.dim,textTransform:"uppercase",letterSpacing:'var(--tracking-wide)',margin:"0 2px 6px"}}>Acquisition efficiency · break-even &amp; optimal</div>
             <div style={{fontSize:'var(--text-xs)',color:GO_T.mut,margin:"0 2px 4px"}}>cost per new customer — most you can pay per new customer</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:12,marginBottom:9}}>
-              {cell("Actual cost per new customer (paid)",g2(C.cac.actual),"spend ÷ new custs",col)}
+              {cell("New-customer cost (paid)",g2(C.cac.actual),"spend ÷ new custs",col)}
               {cell("Break-even · 1st order",g2(C.cac.first),"CM-positive on order 1")}
               {cell("Break-even · lifetime",g2(C.cac.ltv),ltvSub)}
               {cell("Target / optimal cost per new customer",g2(C.cac.target),tgtSub)}
@@ -11786,12 +11850,12 @@ function GP_Dot(p) { return React.createElement('span', { style: { width: 8, hei
 // vw_brand_plan_readiness names its checks for an analyst ("Paid efficiency (φ/iROAS)", "Cohort
 // LTV"). The view keeps its keys; the owner reads these.
 const GP_PLAIN_ITEM = {
-  'Gross margin': 'What you keep after product cost',
+  'Gross margin': 'Margin on products without a cost',
   'Variable costs': 'Per-order costs',
   'Fixed costs / month': 'Monthly overheads',
   'Discount rate (annual)': 'Cost of money',
   'Contribution margin %': 'Profit before ads, % of sales',
-  'New-customer CAC': 'Cost to win a new customer',
+  'New-customer CAC': 'New-customer cost',
   'Cohort LTV': 'What a customer is worth over time',
   'Returning-revenue run-rate': 'Sales from returning customers',
   'Quarter goal set': 'A goal for this quarter',
@@ -12307,7 +12371,7 @@ function GP_CurveLevers(p) {
     return Number(b.ceiling_multiplier_mid) - Number(a.ceiling_multiplier_mid); });
   var max = Number(levers[0].ceiling_multiplier_mid) - 1;
   var LABEL = { aov: 'Average order value', gross_margin: 'Gross margin', refund_rate: 'Refund rate',
-    per_order_costs: 'Per-order costs', cvr: 'Conversion rate', cpc: 'Cost per click' };
+    per_order_costs: 'Per-order costs', cvr: 'Visitors who buy', cpc: 'Cost per click' };
 
   return (
     <div style={{ borderTop: '1px solid ' + GP_T.line,
@@ -12331,7 +12395,7 @@ function GP_CurveLevers(p) {
         var gain = Number(l.ceiling_multiplier_mid) - 1;
         var certain = l.cm_effect_pct != null
           ? 'margin +' + (Number(l.cm_effect_pct) * 100).toFixed(1) + '%'
-          : 'CAC ' + (Number(l.cac_effect_pct) * 100).toFixed(1) + '%';
+          : 'new-customer cost ' + (Number(l.cac_effect_pct) >= 0 ? '+' : '−') + (Math.abs(Number(l.cac_effect_pct)) * 100).toFixed(1) + '%';
         return (
           <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto',
             gap: '0 14px', alignItems: 'center', padding: '9px 0',
@@ -12385,7 +12449,7 @@ function GP_BrowserCosts({ econ, setEcon }) {
       var cash = JSON.parse(localStorage.getItem('oi_cash_v1') || 'null');
       var keys = ['shipping', 'packaging', 'fulfilment', 'payPct', 'payFixed', 'refundPct'];
       var found = keys.filter(function (k) { return c[k] != null && c[k] !== ''; });
-      if (!found.length && !(cash && cash.fixed)) return null;
+      if (!found.length && !(cash && cash.overheads)) return null;
       return { c: c, cash: cash, found: found };
     } catch (e) { return null; }
   }, []);
@@ -12394,7 +12458,7 @@ function GP_BrowserCosts({ econ, setEcon }) {
   var use = function () {
     var next = Object.assign({}, econ);
     stash.found.forEach(function (k) { if (!next[k]) next[k] = String(stash.c[k]); });
-    if (stash.cash && stash.cash.fixed && !next.fixed) next.fixed = String(stash.cash.fixed);
+    if (stash.cash && stash.cash.overheads && !next.fixed) next.fixed = String(stash.cash.overheads);
     setEcon(next); setDone(true);
   };
   return (
@@ -12538,7 +12602,7 @@ function GretaPlanPanel({ show } = {}) {
       </div>)}
 
       {isGrowth && (<GP_ChannelHealth h={P.channelHealth}/>)}
-      {isGrowth && (<GP_ChannelMix mix={P.channelMix}/>)}
+      {/* "Where revenue comes from" repeated the lead section's "Where your sales came from" (same view). */}
 
       {/* economics editor — operating costs feed Operating Profit on the Overview */}
       {isGoal && (<div style={{ borderTop: '1px solid ' + GP_T.line, padding: 'var(--space-6) 0', marginBottom: 16 }}>
@@ -12611,24 +12675,9 @@ function GretaPlanPanel({ show } = {}) {
         )}
       </div>)}
 
-      {/* forecast vs goal — the calendar's impact on the plan (reads vw_forecast_vs_goal, SOT) */}
-      {isGrowth && P.forecast && (
-        <div style={{ borderTop: '1px solid ' + GP_T.line, padding: 'var(--space-6) 0', marginBottom: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <h2 className="v3-sec-title gp-h">Forecast vs goal</h2>
-            <div style={{ fontSize: 'var(--text-xs)', color: GP_T.dim }}>calendar-driven · covers {P.forecast.forecast_covers_from} – {P.forecast.forecast_covers_to}{Number(P.forecast.uncovered_days) > 0 ? ' · ' + P.forecast.uncovered_days + 'd beyond horizon' : ''}</div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(150px,1fr))', gap: 12 }}>
-            <GP_Metric k="Forecast revenue" v={GP_gbp(P.forecast.forecast_revenue_period)} sub={'target ' + GP_gbp(P.forecast.revenue_target)} />
-            <GP_Metric k="Forecast profit after ads" v={GP_gbp(P.forecast.forecast_cm_period)} hi={true} sub={'target ' + GP_gbp(P.forecast.contribution_margin_target)} />
-            <GP_Metric k="From the calendar" v={GP_gbp(P.forecast.forecast_event_revenue_period)} sub={'CM ' + GP_gbp(P.forecast.forecast_event_cm_period)} />
-            <GP_Metric k="Revenue gap" v={GP_gbp(P.forecast.revenue_gap)} sub={Number(P.forecast.revenue_gap) >= 0 ? 'ahead of plan' : 'behind — add events'} />
-            <GP_Metric k="Profit gap" v={GP_gbp(P.forecast.cm_gap)} sub={Number(P.forecast.cm_gap) >= 0 ? 'ahead' : 'behind plan'} />
-          </div>
-          <div style={{ fontSize: 'var(--text-xs)', color: GP_T.dim, marginTop: 8 }}>Where a planned event has no expected figure of its own, Greta uses a typical figure for brands like yours and marks it as an estimate. <GoLink sec="operate" sub="calendar">Add promos/launches to the calendar</GoLink> to lift the forecast toward the goal.</div>
-        </div>
-      )}
-
+      {/* "Forecast vs goal" used to repeat here, comparing the after-ads forecast with the BEFORE-ads
+          target (contribution_margin_target). The lead section of Growth plan shows it once, against
+          the after-ads goal. Removed 2026-10-02. */}
       {/* channel efficiency vs targets — CTC: CM-first, normalized iROAS, fix before scale */}
       {isGrowth && P.channels && P.channels.length ? (
         <div style={{ borderTop: '1px solid ' + GP_T.line, padding: 'var(--space-6) 0', marginBottom: 16 }}>
@@ -12657,10 +12706,13 @@ function GretaPlanPanel({ show } = {}) {
                     <td style={{ textAlign: 'left', padding: '4px 0' }}>{String(c.channel_type).replace(/_/g, ' ')}</td>
                     <td style={{ textAlign: 'right', fontFamily: GP_T.mono }}>{GP_gbp(c.spend_30d)}</td>
                     <td style={{ textAlign: 'right', fontFamily: GP_T.mono, color: col }}>{Number(c.avg_iroas).toFixed(2)}×</td>
-                    <td style={{ textAlign: 'right', fontFamily: GP_T.mono, color: c.plan_target_cac != null && c.plan_target_cac > 100 ? GP_T.red : GP_T.dim }}>{fmtMoney(c.plan_target_cac, 2)}</td>
+                    {/* The measured cost of a new customer on this channel, red above what one is worth on the
+                        first order (or the plan's own cap). It showed the plan's TARGET under this heading,
+                        coloured against a fixed £100. */}
+                    <td style={{ textAlign: 'right', fontFamily: GP_T.mono, color: (function () { var cap = c.plan_target_cac != null ? Number(c.plan_target_cac) : (c.max_cac_first_order != null ? Number(c.max_cac_first_order) : null); return (c.marginal_cac != null && cap != null && Number(c.marginal_cac) > cap) ? GP_T.red : GP_T.dim; })() }}>{c.marginal_cac == null ? '—' : fmtMoney(c.marginal_cac, 2)}</td>
                     <td style={{ textAlign: 'right', fontFamily: GP_T.mono }}>{c.planned_spend == null ? '—' : GP_gbp(c.planned_spend)}</td>
                     <td style={{ textAlign: 'right', fontFamily: GP_T.mono, color: paceCol }}>{pace == null ? '—' : pace + '%'}</td>
-                    <td style={{ textAlign: 'right', color: col, textTransform: 'uppercase', fontSize: 'var(--text-xs)', paddingLeft: 10 }}>{c.status}</td>
+                    <td style={{ textAlign: 'right', color: col, fontSize: 'var(--text-xs)', paddingLeft: 10 }}>{({ fix: 'Fix first', scale: 'Spend more', ease: 'Ease off', hold: 'Hold' })[c.status] || v3Sentence(String(c.status || '—').replace(/_/g, ' '))}</td>
                   </tr>
                 );
               })}
@@ -13638,7 +13690,6 @@ function BusinessEconomicsPanel(){
     // NULL ⇒ engine keeps its prior (source 'prior'). A supplied value flips it to 'brand-entered'.
     const setNum = (col, raw, xform) => { const n = num(raw); if(n != null) patch[col] = xform ? xform(n) : n; };
     setNum('inventory_days', genome.inventory_days);
-    setNum('supplier_payment_terms_days', genome.supplier_payment_terms_days);
     setNum('discount_rate_annual', genome.discount_rate_annual, n => round4(n/100)); // % → fraction
     // variable_costs and overheads are owned by "What things cost you" (0221). This save must never
     // send them: the blob is replaced whole, and an old copy here would wipe what was entered there.
@@ -13752,15 +13803,14 @@ function BusinessEconomicsPanel(){
             {/* Cash cycle + fixed base */}
             <div>
               <div className="v3-form-grid v3-form-grid--n">
-                <Field label="Inventory days (DIO)" unit="days" int value={genome.inventory_days||''} onChange={v=>setGenome(s=>({...s, inventory_days:v}))}
+                <Field label="Days stock is held" unit="days" int value={genome.inventory_days||''} onChange={v=>setGenome(s=>({...s, inventory_days:v}))}
                   placeholder={'~'+priors.inventoryDays} saved={config?.inventory_days != null}
                   fallback={{ label:'est. '+priors.inventoryDays+'d' }} hint="Avg days stock is held before it sells."/>
-                <Field label="Supplier terms (DPO)" unit="days" int value={genome.supplier_payment_terms_days||''} onChange={v=>setGenome(s=>({...s, supplier_payment_terms_days:v}))}
-                  placeholder={'~'+priors.supplierDays} saved={config?.supplier_payment_terms_days != null}
-                  fallback={{ label:'est. '+priors.supplierDays+'d' }} hint="Days you have to pay suppliers. 0 = pay upfront."/>
+                {/* Supplier payment terms are asked once, as "Balance terms" under Stock & suppliers below —
+                    this field saved the same column from a second form with a second button. */}
                 <Field label="Annual discount rate" unit="%" value={genome.discount_rate_annual||''} onChange={v=>setGenome(s=>({...s, discount_rate_annual:v}))}
                   placeholder={'~'+priors.discountRatePct} saved={config?.discount_rate_annual != null}
-                  fallback={{ label:'est. '+priors.discountRatePct+'%' }} hint="Cost of capital used to discount future customer lifetime value."/>
+                  fallback={{ label:'est. '+priors.discountRatePct+'%' }} hint="What money costs you — used to value repeat orders that arrive later."/>
               </div>
             </div>
 
@@ -15291,7 +15341,7 @@ function CostDrift(){
   // vw_brand_config_drift keys mix snake and camel case (they are brand_config keys) and
   // its units are fraction / percent / money_order / money_month.
   const LABEL = {
-    gross_margin: 'What you keep after product cost', refundPct: 'Refund rate', refund_rate: 'Refund rate',
+    gross_margin: 'Margin on products without a cost', refundPct: 'Refund rate', refund_rate: 'Refund rate',
     shipping: 'Shipping', packaging: 'Packaging', fulfilment: 'Fulfilment', payPct: 'Payment fee',
     payment_pct: 'Payment fee', payFixed: 'Payment fee per order', payment_fixed: 'Payment fee per order',
     fixed_costs_monthly: 'Monthly overheads', discount_rate: 'Discount rate', aov: 'Average order value',
@@ -15428,7 +15478,10 @@ function ChannelDetail({ channel, breakEven }){
 // is one tap away rather than on a screen nobody opens.
 function ChannelDetailList({ channels }){
   const [open, setOpen] = React.useState(null);
-  const rows = (channels || []).filter(c => c && (c.channel_type || c.channel));
+  // Loads the plan detail itself (it was only ever loaded by Growth plan, so on Marketing this list
+  // stayed empty unless Growth plan had been opened first) and re-renders when it lands.
+  const P = useV3Plan();
+  const rows = ((P.channels && P.channels.length ? P.channels : channels) || []).filter(c => c && (c.channel_type || c.channel));
   if (!rows.length) return null;
   return (<div className="card" style={{marginTop:14}}>
     <div className="card-section-title"><h2 style={{margin:0}}>Why each channel behaves the way it does</h2>
@@ -15862,7 +15915,7 @@ function V3Today(p) {
                       ['What the products cost', '−' + v3Gbp(Math.max((Number(sales)||0) - (Number(prod)||0), 0))],
                       ['Profit before ads', v3Gbp(prod)],
                       ['What you spent on ads', '−' + v3Gbp(spend)],
-                      ['What you keep', v3Gbp(cam)]
+                      ['Profit after ads', v3Gbp(cam)]
                     ]}
                     fix={trustFix}>
             {v3Gbp(cam)}
@@ -15969,12 +16022,12 @@ function V3Today(p) {
     </div>
 
     <V3Why why={d.why} period={d.why_period}/>
-    <V3More id="today-changed" label="What changed this week"><WhatChangedStrip/></V3More>
-    {/* The embedded legacy "Today" (today-calendar.build.js) used to sit here as "Channels,
-        stock and track record": a second "Today" heading, a different profit figure (£3,535
-        "of — target" against the hero's £2,632), an off-palette chart and a third copy of the
-        action list. Removed 2026-10-01; channels live on Marketing, stock on Stock & orders. */}
-    <V3More id="today-tiers" label="Business, customer and channel numbers"><GretaOverviewTiers/></V3More>
+    {/* Two drawers used to follow. "What changed this week" repeated Review's lead. "Business,
+        customer and channel numbers" (GretaOverviewTiers) recomputed everything in the browser on
+        its own window: profit after ads £3,124 under a hero saying £3,350, ad spend £10,249 vs
+        £10,022, and conversion 6.59% "On track" over a week of sessions after a tracking gap (the
+        server's honest figure is 1.09%). Every part of it lives on its own page — channels on
+        Marketing, customers on Customers, the track record on Profit & sales. Removed 2026-10-02. */}
   </div>);
 }
 
@@ -16016,6 +16069,14 @@ const V3_STOCK_Q = (sb, b) => {
   const ask = cols => sb.from('vw_stock_demand_plan').select(cols).eq('brand_id', b).limit(3000);
   return ask(V3_STOCK_COLS + ',last_sold_on').then(r => (r && r.error && /last_sold_on/.test(r.error.message || '')) ? ask(V3_STOCK_COLS) : r);
 };
+const V3_UE_Q = (sb, b) => sb.from('vw_brand_unit_economics')
+    .select('cac,ltv_contribution,ltv_rev,ltv_horizon_months,ltv_cac,payback_orders,first_order_contribution').eq('brand_id', b).limit(1);
+const V3_MIX_Q = (sb, b) => sb.from('vw_channel_revenue_mix').select('window_label,channel,net_revenue').eq('brand_id', b).eq('window_label', 'current_30d');
+const V3_NEWMO_Q = (sb, b) => sb.from('vw_daily_new_vs_returning').select('order_date,orders').eq('brand_id', b).eq('ledger', 'dtc')
+    .eq('customer_type', 'new').gte('order_date', v3IsoAdd(new Date().toISOString().slice(0, 10), -400)).order('order_date', { ascending: true }).limit(2000);
+// Break-even sales per £ of ads: the point where profit before ads pays for the ads (1 ÷ margin after
+// costs). Review and the weekly board measured against 2× and 3× — two made-up lines for one metric.
+function v3MerBreakEven(){ const c = oiCmRatio(); return (c != null && c > 0) ? 1 / c : null; }
 const V3_RET_Q = (sb, b) => sb.from('v_tenant_retention_summary')
   .select('customers,orders_per_customer,repeat_rate,repeat_rate_90d,median_days_between_orders').eq('brand_id', b).limit(1);
 function v3Monday(iso) { const d = new Date(iso + 'T00:00:00Z'); const k = (d.getUTCDay() + 6) % 7; d.setUTCDate(d.getUTCDate() - k); return d.toISOString().slice(0, 10); }
@@ -16118,7 +16179,7 @@ function V3Growth() {
     <div className="v3-stat-foot"><span className="v3-muted">{foot}</span></div>
   </div>);
   const cacTip = ({ active, payload }) => (!active || !payload || !payload.length) ? null : (<div className="v3-tip"><b>{v3Month(payload[0].payload.month, 'long')}</b>
-    <span>Cost per new customer <em>{fmtMoney(payload[0].payload.cac, 2)}</em></span>
+    <span>New-customer cost <em>{fmtMoney(payload[0].payload.cac, 2)}</em></span>
     <span>New customers <em>{fmtCount(payload[0].payload.new_customers)}</em></span>
     <span>Ad spend <em>{fmtMoney(payload[0].payload.spend)}</em></span></div>);
 
@@ -16129,7 +16190,7 @@ function V3Growth() {
       <p className="v3-verdict">{head}</p>
       {sub && <p className="v3-note v3-measure">{sub}</p>}
       <div className="v3-stat-grid v3-gap-top">
-        {stat('A new customer cost you', fmtMoney(last.cac, 2), 'in ' + v3Month(last.month, 'long') + (back ? ', from ' + fmtMoney(back.cac, 2) + ' in ' + v3Month(back.month) : ''))}
+        {stat('New-customer cost', fmtMoney(last.cac, 2), 'in ' + v3Month(last.month, 'long') + (back ? ', from ' + fmtMoney(back.cac, 2) + ' in ' + v3Month(back.month) : ''))}
         {stat('A first order earns you', fmtMoney(cm, 2), 'after product and order costs')}
         {stat('Monthly ad spend', fmtMoney(last.spend), back ? 'from ' + fmtMoney(back.spend) + ' in ' + v3Month(back.month) : 'last full month')}
         {stat('Months a customer cost more than they earned', over + ' of ' + pts.length, 'since ' + v3Month(pts[0].month, 'long'))}
@@ -16139,7 +16200,7 @@ function V3Growth() {
     {pts.length >= 4 && cm && (<div className="v3-chart-pair">
       <figure className="v3-chart">
         <figcaption><span className="v3-chart-title">What a new customer costs, by month</span>
-          <span className="v3-legend"><i style={{ background: PAL.accent }}/>Cost per new customer <i className="dash"/>What a first order earns</span></figcaption>
+          <span className="v3-legend"><i style={{ background: PAL.accent }}/>New-customer cost <i className="dash"/>What a first order earns</span></figcaption>
         <R.ResponsiveContainer width="100%" height={240}>
           <R.ComposedChart data={pts} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <defs><linearGradient id="v3CacFill" x1="0" y1="0" x2="0" y2="1">
@@ -16475,8 +16536,7 @@ function V3Customers() {
   const tier = useV3Rows('cust-tier', (sb, b) => sb.from('vw_customer_tier_periods')
     .select('window_label,new_customers,returning_customers,new_net,returning_net,net_sales,ncac,returning_rev_share')
     .eq('brand_id', b).eq('window_label', 'current_30d').limit(1));
-  const ue = useV3Rows('cust-ue', (sb, b) => sb.from('vw_brand_unit_economics')
-    .select('cac,ltv_contribution,ltv_rev,ltv_horizon_months,ltv_cac,payback_orders,first_order_contribution').eq('brand_id', b).limit(1));
+  const ue = useV3Rows('cust-ue', V3_UE_Q);
   const ret = useV3Rows('cust-ret', V3_RET_Q);
   const nvr = useV3Rows('cust-nvr', (sb, b) => sb.from('vw_daily_new_vs_returning')
     .select('order_date,customer_type,net_revenue').eq('brand_id', b).eq('ledger', 'dtc')
@@ -16521,7 +16581,7 @@ function V3Customers() {
         {t && stat('New customers', fmtCount(t.new_customers), fmtMoney(t.new_net) + ' of sales')}
         {t && stat('Returning customers', fmtCount(t.returning_customers), fmtMoney(t.returning_net) + ' of sales')}
         {t && stat('Sales from returning customers', fmtPctN(t.returning_rev_share), 'cost nothing to win back')}
-        {t && t.ncac != null && stat('Cost to win a new customer', fmtMoney(t.ncac), 'ad spend ÷ new customers')}
+        {t && t.ncac != null && stat('New-customer cost', fmtMoney(t.ncac), 'ad spend ÷ new customers')}
         {u && u.ltv_contribution != null && stat('What a customer is worth', fmtMoney(u.ltv_contribution),
           'profit over ' + (u.ltv_horizon_months || 12) + ' months', 'Profit after product and order costs that a typical new customer brings in over their first ' + (u.ltv_horizon_months || 12) + ' months, from your own cohorts.')}
         {u && u.payback_orders != null && stat('Orders to pay back', Number(u.payback_orders).toFixed(1), 'before a new customer is profitable')}
@@ -16656,8 +16716,10 @@ const V3_PAGES = {
     {/* The server stock plan leads (V3Stock): what runs out before a restock could land, and
         where cash is sitting. The browser-side planner and the full table sit behind it. */}
     <V3Stock/>
+    {/* The planner reads live stock (vw_sku_stock_cover) for every brand since 2026-10-02. A third
+        per-product list — the marketing-os "Every product" table, with its own status bands — sat
+        here too and could disagree with both; removed. */}
     <V3More id="stock-plan" label="Purchase orders, forecast and ordering strategy"><PlanningView/></V3More>
-    <V3More id="stock-all" label="Every product — stock, cover and sales rate">{mosView('PerformanceStock')}</V3More>
     <V3More id="stock-suppliers" label="Suppliers"><V3Anchor id="suppliers"/><SuppliersDirectory/></V3More>
   </>),
   profit: (p) => <Overview start={p.start} period={p.period} customActive={p.customActive}/>,

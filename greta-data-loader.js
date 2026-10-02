@@ -172,7 +172,12 @@
     // Module-captured objects (const B / const INS in the bundle hold these references):
     // mutate in place, exactly as neutraliseStaticOnlyForNonFrkl does.
     var BUS = window.FRKL_BUSINESS;
-    if (BUS && typeof BUS === 'object' && Object.keys(BUS).length && ageDays(asOfOf(BUS)) > STALE_AFTER_DAYS) { emptyAllKeys(BUS); retired.push('FRKL_BUSINESS'); }
+    if (BUS && typeof BUS === 'object' && Object.keys(BUS).length && ageDays(asOfOf(BUS)) > STALE_AFTER_DAYS) {
+      // Keys the live load wrote (stock) are current even though the rest of the object is old.
+      var keep = {}; (window.FRKL_LIVE.liveBusinessKeys || []).forEach(function (k) { if (k in BUS) keep[k] = BUS[k]; });
+      emptyAllKeys(BUS); Object.keys(keep).forEach(function (k) { BUS[k] = keep[k]; });
+      retired.push('FRKL_BUSINESS');
+    }
     var INS = window.FRKL_INSIGHTS;
     var insAsOf = asOfOf(window.FRKL_INSIGHTS_META) || asOfOf(INS);
     if (INS && typeof INS === 'object' && Object.keys(INS).length && ageDays(insAsOf) > STALE_AFTER_DAYS) {
@@ -433,11 +438,12 @@
         window.FRKL_DATA.ga4 = dailyGa4;
         window.FRKL_DATA.klaviyo = klaviyoDaily;
       }
-      // Live catalogue → inventory panel (non-frkl only; frkl keeps its backend-computed inventory
-      // that carries real 90d velocity + cover tiers, which a catalogue-only view can't reproduce).
-      if (BRAND_SLUG !== 'frkl' && window.FRKL_BUSINESS && inventory) {
+      // Live stock → inventory panels and the purchase-order planner, for every brand (frkl too:
+      // the feed now carries its sales rate, which was the reason frkl kept a snapshot).
+      if (window.FRKL_BUSINESS && inventory && inventory.items.length) {
         window.FRKL_BUSINESS.inventory = inventory.items;
         window.FRKL_BUSINESS.inventorySummary = inventory.summary;
+        window.FRKL_LIVE.liveBusinessKeys = ['inventory', 'inventorySummary'];   // retirement keeps these
       }
       if (window.FRKL_DATA) {
         // Update meta block so the timestamp surfaces in the UI. The range is the live one: it
@@ -607,20 +613,29 @@
   // Catalogue → inventory rows for the Inventory panel. No order line-item velocity is available
   // client-side, so units90d/velocity are 0 and cover is ∞; tier is stock-based (in-stock=healthy,
   // out=no_stock_no_sales). Enough to SHOW the store's real catalogue + stock + capital-at-value.
+  // Live stock per SKU from vw_sku_stock_cover (Shopify stock + 28-day sales rate), in the shape the
+  // inventory panels and the purchase-order planner read. It used to be catalogue-only (no sales
+  // rate), so frkl kept a July snapshot instead — and once old snapshots were retired the planner
+  // read "0 SKUs tracked". Tiers follow the panels' own bands: <14d critical, <30d low, ≤90d
+  // healthy, ≤180d high, beyond that (or stock with no sales) overstock.
   async function fetchInventory(sb, brandId) {
     try {
-      const { data } = await sb.from('tenant_shopify_products')
-        .select('title, product_type, status, inventory_quantity, price, variant_count')
-        .eq('brand_id', brandId)
-        .order('inventory_quantity', { ascending: false });
-      const items = (data || []).map(p => {
-        const qty = Number(p.inventory_quantity || 0);
-        const val = qty * Number(p.price || 0);
-        const tier = (p.status && p.status !== 'active') ? 'archived_stock' : (qty <= 0 ? 'no_stock_no_sales' : 'healthy');
-        return { title: p.title, sku: '', type: p.product_type || '', inventoryQty: qty,
-                 units90d: 0, dailyVelocity: 0, daysOfCover: null, inventoryValue: val,
-                 coverTier: tier, status: (p.status || '').toUpperCase() };
-      });
+      const { data, error } = await sb.from('vw_sku_stock_cover')
+        .select('sku, product_title, on_hand, weekly_velocity, weeks_of_cover, stock_status, unit_price, landed_cost, rev_28d')
+        .eq('brand_id', brandId).limit(5000);
+      if (error) return { items: [], summary: {} };
+      const items = (data || []).map(r => {
+        const qty = Number(r.on_hand || 0), wk = Number(r.weekly_velocity || 0), daily = wk / 7;
+        const days = daily > 0 ? qty / daily : null;
+        const unit = r.landed_cost != null ? Number(r.landed_cost) : Number(r.unit_price || 0);
+        const tier = r.stock_status === 'unknown_stale_feed' ? 'unknown'
+          : (daily > 0 && qty <= 0) || r.stock_status === 'stockout' ? 'critical'
+          : days == null ? (qty > 0 ? 'overstock' : 'no_stock_no_sales')
+          : days < 14 ? 'critical' : days < 30 ? 'low' : days <= 90 ? 'healthy' : days <= 180 ? 'high' : 'overstock';
+        return { title: r.product_title || r.sku, sku: r.sku || '', type: '', inventoryQty: qty,
+                 units90d: Math.round(daily * 90), dailyVelocity: daily, daysOfCover: days == null ? null : Math.round(days),
+                 inventoryValue: Math.max(0, qty) * unit, coverTier: tier, status: 'ACTIVE' };
+      }).sort((x, y) => y.inventoryQty - x.inventoryQty);
       const summary = {};
       items.forEach(it => { const k = it.coverTier;
         if (!summary[k]) summary[k] = { skus: 0, totalQty: 0, totalValue: 0 };

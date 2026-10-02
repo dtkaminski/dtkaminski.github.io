@@ -61,6 +61,8 @@
   const signedMoney = n => n === null || n === undefined || !isFinite(n) ? '—' : (n >= 0 ? '−' : '+') + money(Math.abs(n)); // a positive leak is money LOST
 
   function fmtStage(v, fmt) {
+    if (v == null || v === '' || !isFinite(Number(v))) return '—';   // unknown, not £0.00
+    v = Number(v);
     if (fmt === 'rate') return pct1(v);
     if (fmt === 'money') return money(v, 2);
     return count(Math.round(v));
@@ -267,7 +269,7 @@
       x: x.sx.toFixed(0),
       y: (x.sy + 25).toFixed(0),
       textAnchor: "middle"
-    }, fmtStage(Number(x.row.v), x.row.fmt) + ' · normal ' + fmtStage(Number(x.row.mu), x.row.fmt)))), /*#__PURE__*/React.createElement("rect", {
+    }, fmtStage(x.row.v, x.row.fmt) + ' · normal ' + fmtStage(x.row.mu, x.row.fmt)))), /*#__PURE__*/React.createElement("rect", {
       className: "lp-hub",
       x: RING.CX - 150,
       y: RING.CY - 88,

@@ -36,7 +36,7 @@
     // rail and Plan tab render; the heavy scoreboard/forecast views fill in afterwards.
     var g = await withTimeout(s.from('mos_business_goal').select('*').eq('brand_id', b).lte('period_start', PERIOD.end).gte('period_end', PERIOD.start).order('created_at', { ascending: false }).limit(1), 8000);
     if (g && g.data) window.FRKL_PLAN.goal = g.data[0] || null;
-    var cfg = await withTimeout(s.from('brand_config').select('gross_margin, variable_costs, fixed_costs_monthly, inventory_days, discount_rate_annual').eq('brand_id', b).limit(1), 8000);
+    var cfg = await withTimeout(s.from('brand_config').select('gross_margin, variable_costs, fixed_costs_monthly, inventory_days, discount_rate_annual, seasonality, opening_cash, opening_cash_as_of, benchmarks').eq('brand_id', b).limit(1), 8000);
     if (cfg && cfg.data) window.FRKL_PLAN.config = cfg.data[0] || null;
     // Say which reads failed, so a screen can tell "you have not set this" from "we could not load
     // it" — both used to leave null behind, and the costs form waited on it for ever.
@@ -153,6 +153,8 @@
     if (fields.gross_margin != null && fields.gross_margin !== '') body.gross_margin = Number(fields.gross_margin);
     if (fields.fixed_costs_monthly != null && fields.fixed_costs_monthly !== '') body.fixed_costs_monthly = Number(fields.fixed_costs_monthly);
     if (fields.variable_costs && typeof fields.variable_costs === 'object') body.variable_costs = fields.variable_costs;
+    if (fields.opening_cash != null && fields.opening_cash !== '') body.opening_cash = Number(fields.opening_cash);
+    if (fields.opening_cash_as_of) body.opening_cash_as_of = String(fields.opening_cash_as_of);
     if (Object.keys(body).length < 2) return { ok: false, error: 'nothing to save' };
     try {
       var jwt = await ASK.getJwt();
