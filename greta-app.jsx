@@ -9989,8 +9989,7 @@ function V3ChannelScoreboard(){
 
   // Channel names an owner recognises ("Meta prospecting", "Google Performance Max"), not the
   // campaign keys the scoreboard is keyed on ("facebook_acquisition", "pmax").
-  const nice = (p, c) => V3_CH[String(c || '').toLowerCase()]
-    || (String(c || p || '').replace(/_/g, ' ').replace(/^(meta|google|tiktok|facebook)\s*/i, '').trim().replace(/^./, x => x.toUpperCase()) || p);
+  const nice = v3ChanName;   // one naming rule, shared with the walkthrough
   const scale = Math.max(...rows.map(r => Math.max(Number(r.avg_iroas) || 0, Number(r.target_marginal_iroas) || 0)), 1) * 1.15;
   // The verdict in one sentence, so nobody has to read eight bars to get it.
   const judged = rows.filter(r => Number(r.target_marginal_iroas) > 0);
@@ -16021,6 +16020,9 @@ function V3Today(p) {
     </div>)}
     </div>
 
+    {/* Walkthroughs: the guided way through the rest of the app, by area and horizon. */}
+    <V3WalkLauncher/>
+
     <V3Why why={d.why} period={d.why_period}/>
     {/* Two drawers used to follow. "What changed this week" repeated Review's lead. "Business,
         customer and channel numbers" (GretaOverviewTiers) recomputed everything in the browser on
@@ -16945,6 +16947,563 @@ function useFigureTypography(dep) {
   }, [dep]);
 }
 
+// ── Walkthroughs ─────────────────────────────────────────────────────────────
+// A dashboard shows; a walkthrough tells. The owner picks an area and a horizon on Today, and a
+// guide docked to the foot of the screen walks the app page by page: one question per stop, the
+// answer in a sentence, the figures against the period before AND the same period last year, and
+// the actions that belong to that stop. It ends on one ranked list of what to do.
+//
+// Every comparison comes from ONE server call, fn_brand_period_compare (0227): complete periods
+// (last full week / month / quarter), so a part-week is never set against a whole one, plus the
+// same move a year earlier, so a drop can be read against the season. The guide counts nothing
+// itself — it only words what the server counted. Where a window is unusable (GA4 break, ad days
+// missing, no history yet) the step says so rather than comparing across the hole.
+const V3_WALK_H = [
+  { id: 'week',    label: 'Short term',  short: 'Week',    sub: 'week on week' },
+  { id: 'month',   label: 'Medium term', short: 'Month',   sub: 'month on month' },
+  { id: 'quarter', label: 'Long term',   short: 'Quarter', sub: 'quarter on quarter' },
+];
+const V3_WALKS = [
+  { id: 'business',  label: 'The whole business', q: 'How is the business trading?',
+    steps: ['sales', 'profit', 'customers', 'efficiency', 'stock'], cats: null },
+  { id: 'products',  label: 'Products', q: 'Which products carry the business, and which are slipping?',
+    steps: ['topProducts', 'movers', 'leaks', 'stock'], cats: ['product'] },
+  { id: 'marketing', label: 'Marketing', q: 'Is marketing bringing in the right customers?',
+    steps: ['traffic', 'customers', 'efficiency', 'retention'], cats: ['site', 'paid'] },
+  { id: 'paid',      label: 'Paid ads', q: 'Are the ads paying for themselves?',
+    steps: ['spend', 'channels', 'profit'], cats: ['paid'] },
+  { id: 'customers', label: 'Customers', q: 'Are customers coming back, and what are they worth?',
+    steps: ['customers', 'retention', 'sales'], cats: [] },
+  { id: 'stock',     label: 'Stock & operations', q: 'Will anything run out, and is cash stuck on the shelf?',
+    steps: ['stock', 'reorder', 'cash', 'leaks'], cats: ['product'] },
+  { id: 'npd',       label: 'New products', q: 'Are new products earning their place?',
+    steps: ['newProducts', 'adFit', 'stock'], cats: ['product'] },
+];
+
+// Store: one walkthrough at a time, shared by the launcher on Today and the dock in the shell.
+// The position survives a reload (sessionStorage); the chosen horizon is remembered per viewer.
+const V3_WALK = (() => {
+  let s = null;
+  try { s = JSON.parse(sessionStorage.getItem('greta_walk') || 'null'); } catch (e) {}
+  return { id: (s && s.id) || null, step: (s && s.step) || 0, horizon: (s && s.horizon) || null, min: false, subs: new Set() };
+})();
+function v3WalkSet(patch) {
+  Object.assign(V3_WALK, patch);
+  try {
+    if (V3_WALK.id) sessionStorage.setItem('greta_walk', JSON.stringify({ id: V3_WALK.id, step: V3_WALK.step, horizon: V3_WALK.horizon }));
+    else sessionStorage.removeItem('greta_walk');
+  } catch (e) {}
+  V3_WALK.subs.forEach(f => { try { f(); } catch (e) {} });
+}
+function v3WalkHorizon() {
+  if (V3_WALK.horizon) return V3_WALK.horizon;
+  try { const h = localStorage.getItem('greta_walk_h'); if (V3_WALK_H.some(o => o.id === h)) return h; } catch (e) {}
+  return 'month';
+}
+function v3WalkSetHorizon(h) {
+  try { localStorage.setItem('greta_walk_h', h); } catch (e) {}
+  v3WalkSet({ horizon: h });
+}
+function v3WalkStart(id, horizon) {
+  try { localStorage.setItem('greta_walk_h', horizon); } catch (e) {}
+  v3WalkSet({ id: id, step: 0, horizon: horizon, min: false });
+  try { track('walkthrough_start', { walk: id, horizon: horizon }, 'today'); } catch (e) {}
+}
+function v3WalkEnd(toToday) {
+  const id = V3_WALK.id;
+  v3WalkSet({ id: null, step: 0, min: false });
+  try { track('walkthrough_end', { walk: id }, 'today'); } catch (e) {}
+  if (toToday && window.__oiGo) window.__oiGo('today');
+}
+function useV3Walk() {
+  const [, bump] = React.useState(0);
+  React.useEffect(() => {
+    const f = () => bump(n => n + 1);
+    V3_WALK.subs.add(f);
+    return () => { V3_WALK.subs.delete(f); };
+  }, []);
+  return V3_WALK;
+}
+
+// ── Wording ──
+const V3_MONTH_FULL = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+function v3WalkChg(c, p) {
+  const a = Number(c), b = Number(p);
+  if (c == null || p == null || !isFinite(a) || !isFinite(b) || b === 0) return null;
+  return (a - b) / Math.abs(b);
+}
+// "up 12%", "down 44%", "flat". Under 2% either way is noise, not news.
+function v3WalkMove(x) {
+  if (x == null) return null;
+  return Math.abs(x) < 0.02 ? 'flat' : (x > 0 ? 'up ' : 'down ') + fmtPctN(Math.abs(x));
+}
+function v3WalkNames(h, P) {
+  const mon = iso => V3_MONTH_FULL[Number(String(iso).slice(5, 7)) - 1] || '';
+  const yr = iso => String(iso).slice(0, 4);
+  const qtr = x => mon(x.start).slice(0, 3) + '–' + mon(x.end).slice(0, 3);
+  if (h === 'week') {
+    const c = v3Day(P.cur.start);
+    return { cur: 'the week of ' + c, prev: 'the week before', ly: 'the same week last year',
+             lyPair: 'the same two weeks last year', col: ['Week of ' + c, 'Week before', 'Last year'],
+             line: 'Week of ' + c + ' (Mon–Sun), against the week before and the same week last year' };
+  }
+  if (h === 'quarter') {
+    const c = qtr(P.cur), p = qtr(P.prev), l = qtr(P.ly) + ' ' + yr(P.ly.start);
+    return { cur: c, prev: p, ly: l, lyPair: qtr(P.lyprev) + ' to ' + l, col: [c, p, l],
+             line: c + ' ' + yr(P.cur.start) + ', against ' + p + ' and against ' + l };
+  }
+  const c = mon(P.cur.start), p = mon(P.prev.start), l = mon(P.ly.start) + ' ' + yr(P.ly.start);
+  return { cur: c, prev: p, ly: l, lyPair: mon(P.lyprev.start) + ' to ' + l, col: [c, p, l],
+           line: c + ' ' + yr(P.cur.start) + ', against ' + p + ' and against ' + l };
+}
+// "Sales were £28,313 in September — down 44% on August, and up 104% on September 2025."
+function v3WalkVs(X, key) {
+  const { P, N } = X, bits = [];
+  const a = P.prev.has_history ? v3WalkMove(v3WalkChg(P.cur[key], P.prev[key])) : null;
+  const b = P.ly.has_history ? v3WalkMove(v3WalkChg(P.cur[key], P.ly[key])) : null;
+  if (a) bits.push(a + ' on ' + N.prev);
+  if (b) bits.push(b + ' on ' + N.ly);
+  return bits.length ? ' — ' + bits.join(', and ') : '';
+}
+// Is the move from last period normal for the time of year? Set it against the same move a year ago.
+function v3WalkSeason(X, key) {
+  const { P, N } = X;
+  if (!P.lyprev || !P.lyprev.has_history) return null;
+  const now = v3WalkChg(P.cur[key], P.prev[key]), then = v3WalkChg(P.ly[key], P.lyprev[key]);
+  if (now == null || then == null || Math.abs(now) < 0.05) return null;
+  const was = 'Last year the same move (' + N.lyPair + ') was ' + v3WalkMove(then);
+  const d = now - then;
+  if (Math.abs(d) < 0.08) return was + ', so most of this is the time of year, not a problem.';
+  return was + (d < 0 ? ', so this is worse than the season explains.' : ', so this is better than the season alone would give you.');
+}
+// Ad spend is only as good as the days that reported. Name the gap rather than compare across it.
+function v3WalkGaps(X) {
+  const { P, N } = X, out = [];
+  const ran = k => ['cur', 'prev', 'ly'].some(j => P[j] && Number(P[j][k]) > 0);
+  [['cur', N.cur], ['prev', N.prev], ['ly', N.ly]].forEach(([k, nm]) => {
+    const x = P[k];
+    if (!x || !x.has_history) return;
+    if (ran('meta_spend') && x.meta_days < x.days) out.push('Meta has figures for ' + x.meta_days + ' of ' + x.days + ' days in ' + nm);
+    if (ran('google_spend') && x.google_days < x.days) out.push('Google Ads has figures for ' + x.google_days + ' of ' + x.days + ' days in ' + nm);
+  });
+  return out.length ? out.join('; ') + '. If ads ran on the missing days, spend there reads low and profit after ads high.' : null;
+}
+// A scoreboard row is a platform AND a channel type (Meta prospecting, Meta retargeting…), so the
+// platform alone names two rows the same. The scoreboard's own rule, lifted so both say the same.
+function v3ChanName(p, c) {
+  return V3_CH[String(c || '').toLowerCase()]
+    || (String(c || p || '').replace(/_/g, ' ').replace(/^(meta|google|tiktok|facebook)\s*/i, '').trim().replace(/^./, x => x.toUpperCase()) || p);
+}
+const v3WalkG2 = n => fmtMoney(n, 2);
+const v3WalkTitle = t => { const s = String(t || '').trim(); return s ? s.charAt(0).toUpperCase() + s.slice(1) : 'Unnamed product'; };
+
+// ── The stops ──
+// Each builds { say: [sentences], tbl?: [rows], list?: {head, rows}, note? } from the context X.
+// say[0] is the takeaway: the summary collects it, so it must stand on its own.
+const V3_WALK_STEP = {
+  sales: { q: 'Are sales growing?', dest: 'profit', build: X => {
+    const { P } = X, c = P.cur;
+    const say = ['Sales were ' + v3Gbp(c.net_revenue) + ' in ' + X.N.cur + v3WalkVs(X, 'net_revenue') + '.'];
+    const s = v3WalkSeason(X, 'net_revenue'); if (s) say.push(s);
+    const o = v3WalkChg(c.orders, P.prev.orders), a = v3WalkChg(c.aov, P.prev.aov);
+    if (o != null && a != null && (Math.abs(o) >= 0.05 || Math.abs(a) >= 0.05))
+      say.push(Math.abs(o) >= Math.abs(a)
+        ? 'The change came from the number of orders (' + v3WalkMove(o) + '), more than from what each order was worth (' + v3WalkMove(a) + ').'
+        : 'The change came from what each order was worth (' + v3WalkMove(a) + '), more than from the number of orders (' + v3WalkMove(o) + ').');
+    return { say, tbl: [['Sales', 'net_revenue', v3Gbp, 'up'], ['Orders', 'orders', fmtCount, 'up'], ['Average order', 'aov', v3Gbp, 'up']] };
+  } },
+  profit: { q: 'Is the business making money after ads?', dest: 'profit', build: X => {
+    const { P } = X, c = P.cur;
+    if (c.cm_after_marketing == null) return { say: ['Greta needs to know what your products cost before she can show profit for past periods.'],
+      fix: ['goal', 'costs', 'Enter your product costs'] };
+    const say = ['Profit after ads was ' + v3Gbp(c.cm_after_marketing) + ' in ' + X.N.cur + v3WalkVs(X, 'cm_after_marketing') + '.'];
+    const sp = v3WalkChg(c.paid_spend, P.prev.paid_spend), sa = v3WalkChg(c.net_revenue, P.prev.net_revenue);
+    if (sp != null && sa != null) {
+      say.push('Ad spend went ' + v3WalkMove(sp) + ' while sales went ' + v3WalkMove(sa) + '.');
+      if (sp - sa > 0.1) say.push('Spend grew faster than the sales it brought in — that gap is what came off profit.');
+      else if (sa - sp > 0.1) say.push('Sales outgrew spend, which is the shape you want.');
+    }
+    const gaps = v3WalkGaps(X);
+    return { say, tbl: [['Profit after ads', 'cm_after_marketing', v3Gbp, 'up'], ['Ad spend', 'paid_spend', v3Gbp, null],
+                        ['Sales per £1 of ads', 'sales_per_ad_pound', v3WalkG2, 'up']],
+      note: 'Every period is costed at today’s margin, so the year-ago profit is a close estimate rather than a count.' + (gaps ? ' ' + gaps : '') };
+  } },
+  customers: { q: 'Are you winning new customers and keeping old ones?', dest: 'customers', build: X => {
+    const { P } = X, c = P.cur;
+    const say = [fmtCount(c.new_orders) + ' new customers ordered in ' + X.N.cur + v3WalkVs(X, 'new_orders') + '.'];
+    const s = v3WalkSeason(X, 'new_orders'); if (s) say.push(s);
+    const tot = Number(c.new_revenue) + Number(c.returning_revenue);
+    if (tot > 0) say.push('Customers who had bought before brought in ' + v3Gbp(c.returning_revenue) + ' — ' + fmtPctN(c.returning_revenue / tot) + ' of sales' + v3WalkVs(X, 'returning_revenue') + '.');
+    return { say, tbl: [['New customers', 'new_orders', fmtCount, 'up'], ['Repeat orders', 'returning_orders', fmtCount, 'up'],
+                        ['Sales from repeat customers', 'returning_revenue', v3Gbp, 'up']] };
+  } },
+  efficiency: { q: 'Is ad money working as hard as it did?', dest: 'marketing', cat: 'paid', build: X => {
+    const { P } = X, c = P.cur;
+    if (!(Number(c.paid_spend) > 0)) return { say: ['No ad spend was recorded in ' + X.N.cur + ', so there is nothing to measure here.'] };
+    const say = ['Each £1 of ads came back as ' + v3WalkG2(c.sales_per_ad_pound) + ' of sales in ' + X.N.cur
+      + ', against ' + v3WalkG2(P.prev.sales_per_ad_pound) + ' in ' + X.N.prev
+      + (P.ly.has_history && P.ly.sales_per_ad_pound != null ? ' and ' + v3WalkG2(P.ly.sales_per_ad_pound) + ' in ' + X.N.ly : '') + '.'];
+    if (c.cost_per_new_customer != null) say.push('Spread over new customers, ads cost about ' + v3Gbp(c.cost_per_new_customer) + ' for each one' + v3WalkVs(X, 'cost_per_new_customer') + '.');
+    const sc = X.score;
+    if (sc && sc.length) {
+      const under = sc.filter(r => r.avg_iroas != null && r.break_even_iroas != null && Number(r.avg_iroas) < Number(r.break_even_iroas));
+      say.push(under.length
+        ? 'Over the last 30 days, ' + under.length + ' of ' + sc.length + ' ad channels returned less than they need to break even: ' + under.map(r => v3ChanName(r.platform, r.channel_type)).join(', ') + '.'
+        : 'Over the last 30 days, every ad channel returned at least what it needs to break even.');
+    }
+    return { say, tbl: [['Sales per £1 of ads', 'sales_per_ad_pound', v3WalkG2, 'up'], ['Cost per new customer', 'cost_per_new_customer', v3Gbp, 'down'],
+                        ['Ad spend', 'paid_spend', v3Gbp, null]], note: v3WalkGaps(X) };
+  } },
+  spend: { q: 'What did the ad spend buy?', dest: 'marketing', cat: 'paid', build: X => {
+    const { P } = X, c = P.cur;
+    if (!(Number(c.paid_spend) > 0)) return { say: ['No ad spend was recorded in ' + X.N.cur + '.'] };
+    const parts = [['Meta', c.meta_spend], ['Google', c.google_spend], ['TikTok', c.tiktok_spend]].filter(x => Number(x[1]) > 0);
+    const say = ['You spent ' + v3Gbp(c.paid_spend) + ' on ads in ' + X.N.cur + v3WalkVs(X, 'paid_spend') + '.'];
+    if (parts.length > 1) say.push(parts[0][0] + ' took ' + v3Gbp(parts[0][1]) + ' of it, ' + parts.slice(1).map(x => x[0] + ' ' + v3Gbp(x[1])).join(' and ') + '.');
+    say.push('It came back as ' + v3WalkG2(c.sales_per_ad_pound) + ' of sales per £1' + v3WalkVs(X, 'sales_per_ad_pound')
+      + (c.cost_per_new_customer != null ? ', at about ' + v3Gbp(c.cost_per_new_customer) + ' per new customer.' : '.'));
+    return { say, tbl: [['Ad spend', 'paid_spend', v3Gbp, null], ['Meta', 'meta_spend', v3Gbp, null], ['Google', 'google_spend', v3Gbp, null],
+                        ['Sales per £1 of ads', 'sales_per_ad_pound', v3WalkG2, 'up'], ['Cost per new customer', 'cost_per_new_customer', v3Gbp, 'down']],
+      note: v3WalkGaps(X) };
+  } },
+  channels: { q: 'Which channels pay their way?', dest: 'marketing', cat: 'paid', build: X => {
+    const sc = X.score;
+    if (!sc) return { loading: true };
+    if (!sc.length) return { say: ['Greta has no ad channel with spend in the last 30 days to score.'] };
+    const under = sc.filter(r => r.avg_iroas != null && r.break_even_iroas != null && Number(r.avg_iroas) < Number(r.break_even_iroas));
+    const say = [under.length
+      ? under.length + ' of your ' + sc.length + ' ad channels are returning less than they need to break even — ' + under.map(r => v3ChanName(r.platform, r.channel_type)).join(', ') + '.'
+      : 'All ' + sc.length + ' of your ad channels are returning at least what they need to break even.'];
+    say.push('The scoreboard on this page shows each one against its own break-even line: the tick matters more than the bar.');
+    return { say, list: { head: ['Channel', 'Returns', 'Needs', 'Spend'], rows: sc.map(r => [v3ChanName(r.platform, r.channel_type),
+      r.avg_iroas != null ? Number(r.avg_iroas).toFixed(2) + '×' : '—', r.break_even_iroas != null ? Number(r.break_even_iroas).toFixed(2) + '×' : '—',
+      v3Gbp(r.spend_30d), r.avg_iroas != null && r.break_even_iroas != null ? (Number(r.avg_iroas) < Number(r.break_even_iroas) ? 'bad' : 'good') : null]) },
+      note: 'Last 30 days, whatever the horizon: channel returns need a month of spend to read.' };
+  } },
+  stock: { q: 'Will anything run out?', dest: 'stock', build: X => {
+    const rows = X.stock;
+    if (!rows) return { loading: true };
+    if (!rows.length) return { say: ['Greta has no stock levels for your products yet.'], fix: ['settings', null, 'Check your connections'] };
+    const risk = rows.filter(r => Number(r.cm_at_risk_before_resupply) > 0)
+      .sort((a, b) => Number(b.cm_at_risk_before_resupply) - Number(a.cm_at_risk_before_resupply));
+    const at = risk.reduce((s, r) => s + Number(r.cm_at_risk_before_resupply), 0);
+    const say = [risk.length
+      ? risk.length + (risk.length === 1 ? ' product runs' : ' products run') + ' out before a restock could arrive, putting about ' + v3Gbp(at) + ' of profit at risk.'
+      : 'Nothing is set to run out before a restock could arrive.'];
+    return { say, list: risk.length ? { head: ['Product', 'Runs out', 'At risk'], rows: risk.slice(0, 5).map(r => [v3WalkTitle(r.product_title),
+      r.projected_days_to_stockout != null ? (Number(r.projected_days_to_stockout) <= 0 ? 'Out now' : 'in ' + Math.round(r.projected_days_to_stockout) + ' days') : '—',
+      v3Gbp(r.cm_at_risk_before_resupply), 'bad']) } : null,
+      note: 'Stock is today’s reading, whatever the horizon.' };
+  } },
+  reorder: { q: 'What needs ordering?', dest: 'stock', build: X => {
+    const rows = X.stock;
+    if (!rows) return { loading: true };
+    const lim = v3IsoAdd(new Date().toISOString().slice(0, 10), 14);
+    const due = rows.filter(r => r.reorder_by_date && r.reorder_by_date <= lim && Number(r.suggested_order_units) > 0)
+      .sort((a, b) => String(a.reorder_by_date).localeCompare(String(b.reorder_by_date)));
+    const say = [due.length
+      ? due.length + (due.length === 1 ? ' product needs' : ' products need') + ' ordering in the next two weeks to land before they run out.'
+      : 'Nothing needs ordering in the next two weeks.'];
+    return { say, list: due.length ? { head: ['Product', 'Order by', 'Units'], rows: due.slice(0, 6).map(r => [v3WalkTitle(r.product_title),
+      v3Day(r.reorder_by_date), fmtCount(r.suggested_order_units), r.reorder_by_date < new Date().toISOString().slice(0, 10) ? 'bad' : null]) } : null };
+  } },
+  cash: { q: 'Is cash stuck on the shelf?', dest: 'stock', build: X => {
+    const rows = X.stock;
+    if (!rows) return { loading: true };
+    const slow = rows.filter(r => Number(r.trapped_cash) > 0).sort((a, b) => Number(b.trapped_cash) - Number(a.trapped_cash));
+    const tot = slow.reduce((s, r) => s + Number(r.trapped_cash), 0);
+    const say = [slow.length
+      ? 'About ' + v3Gbp(tot) + ' of cash is sitting in stock that will not sell through soon, across ' + slow.length + ' products.'
+      : 'No cash is tied up in slow stock.'];
+    if (slow.length) say.push('The top five hold ' + v3Gbp(slow.slice(0, 5).reduce((s, r) => s + Number(r.trapped_cash), 0)) + ' of it — a bundle, a feature or a gentle markdown frees it faster than waiting.');
+    return { say, list: slow.length ? { head: ['Product', 'Weeks of cover', 'Cash held'], rows: slow.slice(0, 5).map(r => [v3WalkTitle(r.product_title),
+      r.weeks_of_cover != null ? fmtCount(r.weeks_of_cover) : '—', v3Gbp(r.trapped_cash), null]) } : null };
+  } },
+  leaks: { q: 'Are discounts and refunds eating sales?', dest: 'products', anchor: 'promos', build: X => {
+    const { P } = X, c = P.cur;
+    const say = [];
+    if (c.discount_rate != null) say.push('Discounts took ' + fmtPctN(c.discount_rate) + ' off full-price sales in ' + X.N.cur
+      + ', against ' + fmtPctN(P.prev.discount_rate) + ' in ' + X.N.prev + (P.ly.has_history ? ' and ' + fmtPctN(P.ly.discount_rate) + ' in ' + X.N.ly : '') + '.');
+    if (c.return_rate != null) say.push('Refunds came to ' + fmtPctN(c.return_rate) + ' of sales, against ' + fmtPctN(P.prev.return_rate) + ' in ' + X.N.prev + '.');
+    if (!say.length) say.push('There were no sales in ' + X.N.cur + ' to measure discounts or refunds against.');
+    return { say, tbl: [['Discounts', 'discount_rate', fmtPctN, 'down', true], ['Refunds', 'return_rate', fmtPctN, 'down', true]],
+      note: 'Discounts are as Shopify records them, so customer-service adjustments count too.' };
+  } },
+  topProducts: { q: 'Which products carry the business?', dest: 'products', cat: 'product', build: X => {
+    const pr = (X.prods || []).filter(p => Number(p.cur_rev) > 0).sort((a, b) => Number(b.cur_rev) - Number(a.cur_rev)).slice(0, 5);
+    if (!pr.length) return { say: ['No product sales were recorded in ' + X.N.cur + '.'] };
+    const top = pr.reduce((s, p) => s + Number(p.cur_rev), 0), all = Number(X.P.cur.net_revenue) || 0;
+    const lead = pr[0], lm = v3WalkMove(v3WalkChg(lead.cur_rev, lead.prev_rev));
+    const say = ['Your five best sellers made ' + v3Gbp(top) + ' in ' + X.N.cur + (all > 0 ? ' — about ' + fmtPctN(Math.min(top / all, 1)) + ' of sales' : '') + '.',
+      v3WalkTitle(lead.title) + ' led with ' + v3Gbp(lead.cur_rev) + (lm ? ', ' + lm + ' on ' + X.N.prev : '') + '.'];
+    return { say, ptbl: pr };
+  } },
+  movers: { q: 'What is rising, and what is slipping?', dest: 'products', cat: 'product', build: X => {
+    const pr = (X.prods || []).map(p => ({ ...p, d: Number(p.cur_rev) - Number(p.prev_rev) }));
+    const up = pr.filter(p => p.d > 0).sort((a, b) => b.d - a.d).slice(0, 3), dn = pr.filter(p => p.d < 0).sort((a, b) => a.d - b.d).slice(0, 3);
+    if (!up.length && !dn.length) return { say: ['Nothing moved much between ' + X.N.prev + ' and ' + X.N.cur + '.'] };
+    const say = [];
+    if (dn.length) say.push('The biggest fall was ' + v3WalkTitle(dn[0].title) + ', ' + v3Gbp(Math.abs(dn[0].d)) + ' less than ' + X.N.prev + '.');
+    if (up.length) say.push('The biggest gain was ' + v3WalkTitle(up[0].title) + ', ' + v3Gbp(up[0].d) + ' more.');
+    say.push('Check the fallers against stock first: a product that ran out looks exactly like one that stopped selling.');
+    return { say, list: { head: ['Product', 'Change', 'Now'], rows: dn.concat(up).map(p => [v3WalkTitle(p.title),
+      (p.d > 0 ? '+' : '') + v3Gbp(p.d), v3Gbp(p.cur_rev), p.d < 0 ? 'bad' : 'good']) },
+      note: 'Among your 20 best-selling products across the two periods.' };
+  } },
+  traffic: { q: 'Is the website turning visitors into buyers?', dest: 'website', cat: 'site', build: X => {
+    const { P } = X, c = P.cur;
+    if (!c.ga_ok || !P.prev.ga_ok) return { say: ['Your website tracking (GA4) was broken during part of this window, so Greta will not compare visits or conversion across it.',
+      'Try the other horizons: a window clear of the break compares cleanly.'], held: true };
+    const say = [fmtCount(c.sessions) + ' visits in ' + X.N.cur + v3WalkVs(X, 'sessions') + '.'];
+    if (c.cvr != null) say.push(fmtPctN(c.cvr) + ' of visits ended in an order' + (P.prev.cvr != null ? ', against ' + fmtPctN(P.prev.cvr) + ' in ' + X.N.prev : '') + '.');
+    return { say, tbl: [['Visits', 'sessions', fmtCount, 'up'], ['Conversion', 'cvr', fmtPctN, 'up', true]] };
+  } },
+  retention: { q: 'Do customers come back?', dest: 'customers', build: X => {
+    const r = X.ret;
+    if (!r) return { loading: true };
+    if (r.repeat_rate == null) return { say: ['Greta does not have enough order history to measure repeat buying yet.'] };
+    const say = [fmtPctN(r.repeat_rate) + ' of your ' + fmtCount(r.customers) + ' customers have ordered more than once.'];
+    if (r.median_days_between_orders != null) say.push('The typical gap before a second order is ' + fmtCount(r.median_days_between_orders) + ' days — the window for a nudge.');
+    if (r.repeat_rate_90d != null) say.push(fmtPctN(r.repeat_rate_90d) + ' come back within 90 days.');
+    return { say, note: 'Across every customer you have had, not just ' + X.N.cur + ': repeat buying takes months to show.' };
+  } },
+  newProducts: { q: 'What is new, and is it selling?', dest: 'products', cat: 'product', build: X => {
+    const pr = (X.prods || []).filter(p => Number(p.cur_rev) > 0 && Number(p.ly_rev) === 0).sort((a, b) => Number(b.cur_rev) - Number(a.cur_rev));
+    if (!X.P.ly.has_history) return { say: ['Greta needs a year of sales to tell new products from old ones.'] };
+    if (!pr.length) return { say: ['None of your best sellers in ' + X.N.cur + ' is new since ' + X.N.ly + '.'] };
+    const tot = pr.reduce((s, p) => s + Number(p.cur_rev), 0), all = Number(X.P.cur.net_revenue) || 0;
+    const say = [pr.length + ' of your best sellers in ' + X.N.cur + ' did not sell at all in ' + X.N.ly + ' — together ' + v3Gbp(tot)
+      + (all > 0 ? ', ' + fmtPctN(Math.min(tot / all, 1)) + ' of sales' : '') + '.'];
+    const slip = pr.filter(p => v3WalkChg(p.cur_rev, p.prev_rev) != null && v3WalkChg(p.cur_rev, p.prev_rev) < -0.2);
+    if (slip.length) say.push(slip.length + ' of them sold less than in ' + X.N.prev + ' — early fade, or stock running thin.');
+    return { say, ptbl: pr.slice(0, 6) };
+  } },
+  adFit: { q: 'Which products can carry ad spend?', dest: 'products', cat: 'product', build: X => {
+    const rows = X.npd;
+    if (!rows) return { loading: true };
+    const by = k => rows.filter(r => r.paid === k);
+    const yes = by('yes'), test = by('test_with_holdout'), no = by('no');
+    if (!yes.length && !test.length && !no.length) return { say: ['Greta has not yet checked which products can pay back an ad on their own.'] };
+    const say = ['Greta checked which products can pay back an ad on their own first order: ' + yes.length + ' can, '
+      + test.length + (test.length === 1 ? ' is' : ' are') + ' worth a test with a holdout, and ' + no.length + ' cannot.',
+      'The ones that cannot still earn — as add-ons to a basket or as repeat buys — so sell them to customers you already have, not to cold audiences.'];
+    return { say, list: { head: ['Product', 'Ads', 'Sales'], rows: yes.slice(0, 3).map(r => [v3WalkTitle(r.title), 'Can carry ads', v3Gbp(r.revenue), 'good'])
+      .concat(no.slice(0, 3).map(r => [v3WalkTitle(r.title), 'Not on ads', v3Gbp(r.revenue), 'bad'])) } };
+  } },
+};
+const V3_WALK_END = { q: 'What to do now', dest: 'actions' };
+
+function V3WalkTable({ X, rows }) {
+  const { P, N } = X;
+  const cell = (r, k) => {
+    const [, key, fmt, better, isRate] = r;
+    if (!P[k] || !P[k].has_history) return <td className="v3-walk-d">—</td>;
+    const c = P.cur[key], o = P[k][key];
+    if (c == null || o == null) return <td className="v3-walk-d">—</td>;
+    const d = isRate ? (Number(c) - Number(o)) : v3WalkChg(c, o);
+    const txt = d == null ? '—' : isRate
+      ? (Math.abs(d) < 0.0005 ? 'same' : (d > 0 ? '+' : '−') + (Math.abs(d) * 100).toFixed(1) + ' pts')
+      : (Math.abs(d) < 0.02 ? 'flat' : (d > 0 ? '+' : '−') + fmtPctN(Math.abs(d)));
+    const tone = d == null || !better || Math.abs(d) < (isRate ? 0.0005 : 0.02) ? '' : ((d > 0) === (better === 'up') ? ' good' : ' bad');
+    return <td className="v3-walk-d"><span className={'v3-walk-chg' + tone}>{txt}</span><span className="v3-walk-was">{fmt(o)}</span></td>;
+  };
+  return (<table className="v3-walk-tbl">
+    <thead><tr><th scope="col"/><th scope="col">{N.col[0]}</th><th scope="col">vs {N.col[1]}</th><th scope="col">vs {N.col[2]}</th></tr></thead>
+    <tbody>{rows.map(r => (<tr key={r[1]}>
+      <th scope="row">{r[0]}</th>
+      <td className="v3-walk-v">{r[2](P.cur[r[1]])}</td>
+      {cell(r, 'prev')}{cell(r, 'ly')}
+    </tr>))}</tbody>
+  </table>);
+}
+function V3WalkProducts({ X, rows }) {
+  const { N } = X;
+  const chg = (c, o, has) => {
+    if (!has) return <td className="v3-walk-d">—</td>;
+    const d = v3WalkChg(c, o);
+    const txt = Number(o) === 0 ? (Number(c) > 0 ? 'new' : '—') : (Math.abs(d) < 0.02 ? 'flat' : (d > 0 ? '+' : '−') + fmtPctN(Math.abs(d)));
+    const tone = Number(o) === 0 || Math.abs(d) < 0.02 ? '' : (d > 0 ? ' good' : ' bad');
+    return <td className="v3-walk-d"><span className={'v3-walk-chg' + tone}>{txt}</span><span className="v3-walk-was">{v3Gbp(o)}</span></td>;
+  };
+  return (<table className="v3-walk-tbl">
+    <thead><tr><th scope="col">Product</th><th scope="col">{N.col[0]}</th><th scope="col">vs {N.col[1]}</th><th scope="col">vs {N.col[2]}</th></tr></thead>
+    <tbody>{rows.map(p => (<tr key={p.title}>
+      <th scope="row">{v3WalkTitle(p.title)}</th>
+      <td className="v3-walk-v">{v3Gbp(p.cur_rev)}</td>
+      {chg(p.cur_rev, p.prev_rev, X.P.prev.has_history)}{chg(p.cur_rev, p.ly_rev, X.P.ly.has_history)}
+    </tr>))}</tbody>
+  </table>);
+}
+function V3WalkList({ list }) {
+  return (<table className="v3-walk-tbl v3-walk-list">
+    <thead><tr>{list.head.map((h, i) => <th key={i} scope="col">{h}</th>)}</tr></thead>
+    <tbody>{list.rows.map((r, i) => {
+      const tone = r[list.head.length];
+      return (<tr key={i}>
+        <th scope="row">{r[0]}</th>
+        {r.slice(1, list.head.length).map((v, j) => <td key={j} className={'v3-walk-v' + (j === list.head.length - 2 && tone ? ' v3-walk-' + tone : '')}>{v}</td>)}
+      </tr>);
+    })}</tbody>
+  </table>);
+}
+function V3WalkActs({ rows, head }) {
+  if (!rows.length) return null;
+  return (<div className="v3-walk-acts">
+    <div className="v3-kick">{head}</div>
+    {rows.map((a, i) => (<div key={a.external_id || i} className="v3-walk-act">
+      <span className="v3-num">{i + 1}</span>
+      <span>{v3PlainAction(a).title}</span>
+      <span className="v3-num">{a.cm_gbp ? v3Gbp(a.cm_gbp) + '/mo' : ''}</span>
+    </div>))}
+  </div>);
+}
+
+// The guide. Mounted in the shell so it survives navigation; it renders nothing until a walkthrough
+// is running, and the reads below only start once one is.
+function V3WalkDock() {
+  const w = useV3Walk();
+  React.useEffect(() => {
+    const b = document.body.classList;
+    b.toggle('v3-walking', !!w.id && !w.min);
+    b.toggle('v3-walking-min', !!w.id && !!w.min);
+  });
+  if (!w.id) return null;
+  return <V3Boundary where="walkthrough" resetKey={w.id + ':' + w.step} label="The walkthrough"><V3WalkRun w={w}/></V3Boundary>;
+}
+function V3WalkRun({ w }) {
+  const walk = V3_WALKS.find(x => x.id === w.id) || V3_WALKS[0];
+  const h = w.horizon || v3WalkHorizon();
+  const H = V3_WALK_H.find(o => o.id === h) || V3_WALK_H[1];
+  // All reads up front and unconditional (hooks), shared with the pages through useV3Rows keys.
+  const cmp = useV3Rows('walk-' + h, (sb, b) => sb.rpc('fn_brand_period_compare', { p_brand_id: b, p_horizon: h }));
+  const stock = useV3Rows('stock-plan', V3_STOCK_Q);
+  const ret = useV3Rows('cust-ret', V3_RET_Q);
+  const score = useV3Rows('walk-score', (sb, b) => sb.from('vw_channel_scoreboard')
+    .select('platform,channel_type,spend_30d,avg_iroas,break_even_iroas').eq('brand_id', b).gt('spend_30d', 0)
+    .order('spend_30d', { ascending: false, nullsFirst: false }).limit(8));
+  const npd = useV3Rows('walk-npd', (sb, b) => sb.from('vw_product_npd_verdict')
+    .select('title,revenue,paid:verdict->>paid_status').eq('brand_id', b)
+    .order('revenue', { ascending: false, nullsFirst: false }).limit(300));
+  const board = useV3Board();
+  const steps = walk.steps.concat(['end']);
+  const i = Math.max(0, Math.min(w.step, steps.length - 1));
+  const sid = steps[i];
+  const def = sid === 'end' ? V3_WALK_END : V3_WALK_STEP[sid];
+  const bodyRef = React.useRef(null);
+
+  // Each stop opens the page that holds its evidence; the guide narrates over it.
+  React.useEffect(() => {
+    if (window.__oiGo) window.__oiGo(def.dest, def.anchor || null);
+    if (bodyRef.current) bodyRef.current.scrollTop = 0;
+  }, [w.id, sid]);
+
+  const data = cmp.rows && !Array.isArray(cmp.rows) ? cmp.rows : null;
+  const P = data && data.periods;
+  const X = P && P.cur ? { P, N: v3WalkNames(h, P), h, prods: data.products || [], stock: stock.rows,
+    score: score.rows, ret: ret.rows ? (ret.rows[0] || {}) : null, npd: npd.rows } : null;
+  const live = v3LiveRows(board.rows || []);
+  const inCats = (r, cats) => !cats || cats.indexOf(r.category) >= 0;
+  const go = k => v3WalkSet({ step: k });
+  const out = X && sid !== 'end' ? def.build(X) : null;
+  const stepActs = def.cat ? live.filter(r => r.category === def.cat).slice(0, 2) : [];
+
+  let body;
+  if (cmp.err) {
+    body = <p className="v3-walk-say">{/fn_brand_period_compare|schema cache|does not exist/i.test(cmp.err)
+      ? 'Walkthroughs need a server update that has not been switched on yet. Your other pages are unaffected.'
+      : 'Greta couldn’t load the comparison just now.'}</p>;
+  } else if (!X) {
+    body = <V3SkeletonRows n={3}/>;
+  } else if (sid === 'end') {
+    const take = walk.steps.map(s => { let o = null; try { o = V3_WALK_STEP[s].build(X); } catch (e) {}
+      return o && o.say && o.say[0] && !o.loading ? [V3_WALK_STEP[s].q, o.say[0]] : null; }).filter(Boolean);
+    const acts = live.filter(r => inCats(r, walk.cats)).slice(0, 5);
+    const ask = 'I just walked through ' + walk.label.toLowerCase() + ', ' + H.sub + ' (' + X.N.line + '). ' + take.map(t => t[1]).join(' ') + ' What should I do first, and why?';
+    body = (<>
+      <h2 className="v3-walk-q">What you learned, and what to do</h2>
+      <p className="v3-walk-line">{X.N.line}</p>
+      <ul className="v3-walk-take">{take.map((t, k) => (<li key={k}><button type="button" className="v3-walk-link" onClick={() => go(k)}>{t[0]}</button><span>{t[1]}</span></li>))}</ul>
+      {acts.length
+        ? <V3WalkActs rows={acts} head="Do these, biggest £ first"/>
+        : <>{walk.cats && walk.cats.length === 0
+              ? <p className="v3-note">Greta has no open actions about customers. The biggest ones on the board overall are below.</p>
+              : <p className="v3-note">Nothing on the board belongs to this area right now.</p>}
+            <V3WalkActs rows={live.slice(0, 3)} head="The biggest actions overall"/></>}
+      <div className="v3-btns">
+        <button type="button" className="v3-btn v3-btn-p" onClick={() => { v3WalkEnd(false); window.__oiGo && window.__oiGo('actions'); }}>Open the action board</button>
+        <button type="button" className="v3-btn" onClick={() => { v3WalkEnd(false); window.__oiAsk && window.__oiAsk(ask); }}>Ask Greta a follow-up</button>
+        <button type="button" className="v3-btn v3-btn-q" onClick={() => v3WalkEnd(true)}>Back to Today</button>
+      </div>
+    </>);
+  } else if (out && out.loading) {
+    body = <><h2 className="v3-walk-q">{def.q}</h2><V3SkeletonRows n={3}/></>;
+  } else {
+    body = (<>
+      <h2 className="v3-walk-q">{def.q}</h2>
+      <p className="v3-walk-line">{X.N.line}</p>
+      {out.say.map((s, k) => <p key={k} className={'v3-walk-say' + (k === 0 ? ' lead' : '')}>{s}</p>)}
+      {out.tbl && !out.held && <V3WalkTable X={X} rows={out.tbl}/>}
+      {out.ptbl && <V3WalkProducts X={X} rows={out.ptbl}/>}
+      {out.list && <V3WalkList list={out.list}/>}
+      {out.note && <p className="v3-note">{out.note}</p>}
+      {out.fix && <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav(out.fix[0], out.fix[1])}>{out.fix[2]}</button>}
+      <V3WalkActs rows={stepActs} head="What to do about it"/>
+    </>);
+  }
+
+  return (<aside className={'v3-walk-dock' + (w.min ? ' min' : '')} aria-label={'Walkthrough: ' + walk.label}>
+    <div className="v3-walk-head">
+      <div className="v3-walk-title">
+        <span className="v3-kick">Walkthrough</span>
+        <span className="v3-walk-name">{walk.label}</span>
+      </div>
+      <ol className="v3-walk-steps" aria-label="Stops">
+        {steps.map((s, k) => (<li key={s}><button type="button" aria-current={k === i ? 'step' : undefined}
+          className={'v3-walk-dot' + (k < i ? ' done' : '')} onClick={() => go(k)}
+          title={(s === 'end' ? V3_WALK_END : V3_WALK_STEP[s]).q}>{k + 1}</button></li>))}
+      </ol>
+      <div className="v3-seg v3-walk-h" role="group" aria-label="Compare over">
+        {V3_WALK_H.map(o => <button key={o.id} type="button" aria-pressed={o.id === h} title={o.label + ' — ' + o.sub + ', and against last year'}
+          onClick={() => v3WalkSetHorizon(o.id)}>{o.short}</button>)}
+      </div>
+      <button type="button" className="v3-btn v3-btn-q v3-btn-sm" aria-expanded={!w.min} onClick={() => v3WalkSet({ min: !w.min })}>{w.min ? 'Show' : 'Hide'}</button>
+      <button type="button" className="v3-btn v3-btn-q v3-btn-sm" aria-label="End walkthrough" onClick={() => v3WalkEnd(false)}><Icon name="close" size={14}/></button>
+    </div>
+    {!w.min && <div className="v3-walk-body" ref={bodyRef}>{body}</div>}
+    {!w.min && sid !== 'end' && (<div className="v3-walk-foot">
+      <button type="button" className="v3-btn v3-btn-sm" disabled={i === 0} onClick={() => go(i - 1)}>Back</button>
+      <span className="v3-walk-of">{i + 1} of {steps.length}</span>
+      <button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={() => go(i + 1)}>
+        {steps[i + 1] === 'end' ? 'What to do' : <>Next<span className="v3-walk-nextq">: {V3_WALK_STEP[steps[i + 1]].q}</span></>} <Icon name="arrowRight" size={13}/>
+      </button>
+    </div>)}
+  </aside>);
+}
+
+// On Today: pick an area and a horizon, and the guide starts. One click, no setup screen.
+function V3WalkLauncher() {
+  const w = useV3Walk();
+  const [h, setH] = React.useState(v3WalkHorizon);
+  return (<section className="v3-walk-launch" aria-labelledby="v3-walk-launch-t">
+    <div className="v3-walk-launch-head">
+      <div>
+        <h2 className="v3-walk-launch-t" id="v3-walk-launch-t">Walk me through</h2>
+        <p className="v3-note">Pick an area and Greta takes you through it page by page: what happened against the period before and the same time last year, and what to do about it.</p>
+      </div>
+      <div className="v3-seg" role="group" aria-label="Compare over">
+        {V3_WALK_H.map(o => <button key={o.id} type="button" aria-pressed={h === o.id} title={o.sub + ', and against last year'} onClick={() => setH(o.id)}>
+          {o.label}<span className="v3-walk-hsub">{o.short}</span></button>)}
+      </div>
+    </div>
+    <div className="v3-walk-pick">
+      {V3_WALKS.map(x => (<button key={x.id} type="button" className={'v3-walk-opt' + (w.id === x.id ? ' on' : '')} onClick={() => v3WalkStart(x.id, h)}>
+        <span className="v3-walk-opt-t">{x.label}</span>
+        <span className="v3-walk-opt-q">{x.q}</span>
+      </button>))}
+    </div>
+  </section>);
+}
+
 function V3App({ dest, go, children, start, periodCtl }) {
   const d = V3_BY_ID[dest] || V3_NAV[0];
   const sig = useV3NavSignals();
@@ -17002,6 +17561,7 @@ function V3App({ dest, go, children, start, periodCtl }) {
         <Icon name="search" size={19}/><span>More</span>
       </button>
     </nav>
+    <V3WalkDock/>
   </div>);
 }
 
