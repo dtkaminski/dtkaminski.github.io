@@ -8253,6 +8253,11 @@ function buildAskContext(){
         'Today (latest date) may be a partial day — caveat any "today" answers (see dataQuality).',
       ],
       dataQuality,
+      // The render contract (0240, fn_brand_readout): canonical figures with window, population and
+      // confidence rung; source coverage and tracking breaks; the ranked board and what is held back;
+      // the exact cost-tree splits; and the rules a narrator follows. Null until it loads or before
+      // 0240 is applied, in which case the model works from the arrays as before.
+      readout: (typeof window !== 'undefined' && window.GRETA_READOUT) || null,
     },
     metaDaily: D.metaDaily || [],
     googleAds: D.googleAds || [],
@@ -8318,9 +8323,20 @@ function AskPanel(){
     if (!ASK || !question.trim() || loading) return;
     setLoading(true); setError('');
     const q = question.trim();
+    // Load the server readout once per page before the first question; a failure leaves it null.
+    if (!window.GRETA_READOUT) {
+      try {
+        const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb;
+        const b = (window.FRKL_LIVE && window.FRKL_LIVE.brandId) || ASK.brand_id;
+        if (sb && b) {
+          const rr = await sb.rpc('fn_brand_readout', { p_brand_id: b });
+          if (rr && !rr.error && rr.data && rr.data.state === 'ok') window.GRETA_READOUT = rr.data;
+        }
+      } catch (e) {}
+    }
     const ctx = buildAskContext();
     const ctxJson = JSON.stringify(ctx);
-    const systemPrompt = `You are a senior D2C commercial analyst, growth strategist and operator for ${OI_BRAND.name}, a ${OI_BRAND.markets} DTC ${OI_BRAND.vertical} brand. Seasonality to keep in mind: ${OI_BRAND.seasonality}. You are given the brand's live marketing dataset (last ~90 days, captured ${ctx._meta.captured}). Answer using ONLY the data provided. Show the calculation when possible (e.g. "${curSym()}X / ${curSym()}Y = Z%"). Quote specific numbers and dates. If the question cannot be answered from the data, say so clearly and state what data would be needed.
+    const systemPrompt = `You are a senior D2C commercial analyst, growth strategist and operator for ${OI_BRAND.name}, a ${OI_BRAND.markets} DTC ${OI_BRAND.vertical} brand. Seasonality to keep in mind: ${OI_BRAND.seasonality}. You are given the brand's live marketing dataset (last ~90 days, captured ${ctx._meta.captured}). Answer using ONLY the data provided. When _meta.readout is present it is the canonical source and you follow _meta.readout.rules: quote its headline figures exactly as given, with their window and population, and never recompute them from the daily arrays; say how hard the owner can lean on a figure using its rung (direct, likely, probably, possible, outside chance); never compare or total across days that readout.coverage or readout.tracking marks missing or unusable; never recommend an action listed in readout.held; when a cost per result moved, name the stage readout.cost_trees says moved and the stages it rules out; where readout.conflicts lists a disagreement, use the canonical figure and say so. Show the calculation when possible (e.g. "${curSym()}X / ${curSym()}Y = Z%"). Quote specific numbers and dates. If the question cannot be answered from the data, say so clearly and state what data would be needed.
 
 CORE RULE: never diagnose a performance movement until you have checked for confounding factors. Do not just describe what changed — explain what most likely CAUSED it, the evidence, the caveats, and the next action. A naive read ("revenue up = healthy", "return on ad spend down = pause ads", "email up = send more", "average order value up = better") is a failure. Your job is to stop the founder making the wrong call because a metric moved without context.
 
@@ -9789,21 +9805,27 @@ function v3BoardLoad(){
   if (!sb || !b) return false;
   V3_BOARD.loading = true;
   const COLS = 'external_id,description,priority,category,origin,cm_gbp,step1,playbook,days_open,verification,unverified_reason';
-  // money_* arrive with migration 0218. Until it is applied the view has no such columns and
-  // PostgREST rejects the whole select, so ask once with them and fall back without.
-  const ask = (cols) => sb.from('vw_brand_action_board').select(cols)
-    .eq('brand_id', b).order('cm_gbp', { ascending: false, nullsFirst: false });
-  ask(COLS + ',money_basis,money_assumption,money_confidence')
-    .then(r => (r && r.error && /money_/.test(r.error.message || '')) ? ask(COLS) : r)
+  const MONEY = ',money_basis,money_assumption,money_confidence';
+  // 0237: the board ranks by evidence x money. board_rank is the order (re-checked first, the
+  // act lane before the test lane, then pounds x how hard they can be leaned on), rung is the
+  // server's one-ladder verdict, evidence_reasons says what moved it. PostgREST replaces the
+  // view's ORDER BY with .order(), so order by board_rank here. Before 0237 is applied the
+  // columns do not exist and PostgREST rejects the select: fall back a step at a time.
+  const EVIDENCE = ',rung,lane,board_rank,evidence_reasons,money_is_sales';
+  const ask = (cols, byRank) => sb.from('vw_brand_action_board').select(cols)
+    .eq('brand_id', b).order(byRank ? 'board_rank' : 'cm_gbp', byRank ? { ascending: true } : { ascending: false, nullsFirst: false });
+  ask(COLS + MONEY + EVIDENCE, true)
+    .then(r => (r && r.error && /rung|lane|board_rank|evidence_reasons|money_is_sales/.test(r.error.message || '')) ? ask(COLS + MONEY, false) : r)
+    .then(r => (r && r.error && /money_/.test(r.error.message || '')) ? ask(COLS, false) : r)
     .then(r => {
       V3_BOARD.loading = false;
       if (r && r.error) { V3_BOARD.err = r.error.message || 'could not load'; v3BoardNotify(); return; }
-      // vw_brand_action_board already sorts unverified claims last, but PostgREST
-      // replaces the view's ORDER BY with the .order() above, so the grouping has to be
-      // reapplied here or the change would look like it did nothing. Array sort is
-      // stable, so the money order inside each group is the server's.
-      V3_BOARD.rows = ((r && r.data) || []).slice()
-        .sort((x, y) => (x.verification === 'unverified' ? 1 : 0) - (y.verification === 'unverified' ? 1 : 0));
+      const rows = ((r && r.data) || []).slice();
+      // With board_rank the server order is final. Without it, reapply "unverified last"
+      // (PostgREST dropped the view's ORDER BY); the sort is stable, so money order holds.
+      V3_BOARD.ranked = rows.length > 0 && rows[0].board_rank != null;
+      V3_BOARD.rows = V3_BOARD.ranked ? rows
+        : rows.sort((x, y) => (x.verification === 'unverified' ? 1 : 0) - (y.verification === 'unverified' ? 1 : 0));
       V3_BOARD.err = null;
       v3BoardNotify();
     }, () => { V3_BOARD.loading = false; V3_BOARD.err = 'could not load'; v3BoardNotify(); });
@@ -9834,6 +9856,9 @@ function useV3Board(){
 // assumption is at most Possible, whatever the emitter called it.
 function v3MoneyConf(row){
   if (!row) return null;
+  // 0236/0237: the evidence gate owns the rung (window, coverage, volume, margin, stage rules,
+  // track record). Read it; never re-derive it here.
+  if (row.rung) return row.rung === 'outside_chance' ? 'outside' : row.rung;
   const c = String(row.money_confidence || '').toLowerCase();
   let rung = V3_CONF[c] ? c
     : /^(high|strong)/.test(c) ? 'likely'
@@ -9910,10 +9935,21 @@ function V3ActionBoard(){
           // One break, above the first demoted row, so the reader knows the list changed
           // meaning rather than just getting quieter.
           const startsUnver = unver && (i === 0 || ordered[i - 1].verification !== 'unverified');
+          // 0237: the server ranks the act lane before the test lane. Mark where the list stops
+          // being "do this" and starts being "worth testing", once, like the unverified break.
+          const startsTest = V3_BOARD.ranked && !unver && r.lane === 'test'
+            && (i === 0 || ordered[i - 1].lane !== 'test' || ordered[i - 1].verification === 'unverified');
           // The fold sits after the last row above the floor.
           const foldHere = smallRows.length > 0 && i === bigRows.length - 1 + (showSmall ? smallRows.length : 0);
           return (
             <React.Fragment key={r.external_id}>
+            {startsTest && (
+              <li className="v3-rank-break">
+                <span className="v3-kick">Worth testing</span>
+                <span className="v3-sub">The evidence behind these is not yet strong enough to act on outright.
+                  Each one says why. Try them where they are cheap to undo.</span>
+              </li>
+            )}
             {startsUnver && (
               <li className="v3-rank-break">
                 <span className="v3-kick">Not re-checked</span>
@@ -9967,7 +10003,15 @@ function V3ActionBoard(){
                       {r.money_basis ? v3Tidy(scrubTag(r.money_basis)) + '. ' : ''}
                       {r.money_assumption ? 'It ' + v3Tidy(scrubTag(r.money_assumption)).replace(/^It\s+/i, '') + '. ' : ''}
                       {conf ? V3_CONF[conf].label + ': ' + V3_CONF[conf].why : ''}
+                      {r.money_is_sales ? ' This figure is sales, not profit: Greta does not know your margin yet.' : ''}
                     </p>
+                  )}
+                  {/* What moved the rung, in the gate's own words (0236): a break in the window,
+                      missing days, too few results, a blended margin, an untested channel. */}
+                  {Array.isArray(r.evidence_reasons) && r.evidence_reasons.some(x => x && x.text) && (
+                    <div className="v3-rank-raw"><span className="v3-kick">Why {conf ? V3_CONF[conf].label.toLowerCase() : 'this steer'}</span>
+                      <ul className="v3-rank-steps">{r.evidence_reasons.filter(x => x && x.text).map((x, j) => <li key={j}>{v3Tidy(x.text)}</li>)}</ul>
+                    </div>
                   )}
                   <p className="v3-rank-raw"><span className="v3-kick">Greta's working</span>{v3Tidy(r.description)}</p>
                 </div>
@@ -9985,6 +10029,44 @@ function V3ActionBoard(){
           );
         })}
       </ol>
+      <V3HeldActions/>
+    </div>
+  );
+}
+
+// ── Held back, and why ───────────────────────────────────────────────────
+// The evidence gate (0236) keeps an action off the board when what it rests on cannot carry it:
+// a comparison across a tracking break, a rate on fewer than 20 results, spend added past what a
+// new customer is worth. Dropping those silently would be its own kind of dishonesty, so they are
+// listed with the reason, closed by default. Renders nothing until 0237 is applied or when none.
+function V3HeldActions(){
+  const [rows, setRows] = React.useState(null);
+  const [openList, setOpenList] = React.useState(false);
+  React.useEffect(() => {
+    let alive = true;
+    const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
+    if (!sb || !b) return;
+    sb.from('vw_brand_actions_held').select('external_id,description,cm_gbp,held_because')
+      .eq('brand_id', b).order('cm_gbp', { ascending: false, nullsFirst: false })
+      .then(r => { if (alive) setRows((r && !r.error && r.data) || []); }, () => { if (alive) setRows([]); });
+    return () => { alive = false; };
+  }, []);
+  if (!rows || !rows.length) return null;
+  return (
+    <div className="v3-rank-why">
+      <button type="button" className="v3-btn v3-btn-sm" aria-expanded={openList} onClick={() => setOpenList(o => !o)}>
+        {openList ? 'Hide' : 'Show'} {rows.length} held back
+      </button>
+      {openList && (
+        <ul className="v3-rank-steps">
+          {rows.map(h => (
+            <li key={h.external_id}>
+              <span className="v3-rank-desc">{v3PlainAction(h).title}</span>
+              <span className="v3-sub"> Held because: {(Array.isArray(h.held_because) ? h.held_because : []).map(v3Tidy).join(' ')}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

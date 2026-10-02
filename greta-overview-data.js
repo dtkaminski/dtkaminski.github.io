@@ -60,7 +60,10 @@
       safeQ(sb.from('vw_channel_iroas_targets').select('channel_type, target_true_iroas').eq('brand_id', brandId), Q, []),
       safeQ(sb.from('vw_daily_new_vs_returning').select('order_date, customer_type, orders, net_revenue').eq('brand_id', brandId).eq('ledger', 'dtc').gte('order_date', cutoff).order('order_date', { ascending: false }).limit(1000), Q, []),
       safeQ(sb.from('v_tenant_shopify_lineitems_daily').select('day, product_title, units, revenue').eq('brand_id', brandId).gte('day', cutoff).order('day', { ascending: false }).limit(1000), Q, []),
-      safeQ(sb.from('vw_brand_action_board').select('external_id, description, step1, priority, category, cm_gbp').eq('brand_id', brandId).order('cm_gbp', { ascending: false, nullsFirst: false }).limit(30), Q, []),
+      // 0237: the board's own order (evidence x money) via board_rank; before 0237 the column does
+      // not exist, the ranked read fails to null, and the money order is used as before.
+      safeQ(sb.from('vw_brand_action_board').select('external_id, description, step1, priority, category, cm_gbp, rung, lane').eq('brand_id', brandId).order('board_rank', { ascending: true }).limit(30), Q, null)
+        .then(function (rows) { return rows != null ? rows : safeQ(sb.from('vw_brand_action_board').select('external_id, description, step1, priority, category, cm_gbp').eq('brand_id', brandId).order('cm_gbp', { ascending: false, nullsFirst: false }).limit(30), Q, []); }),
       safeQ(sb.from('vw_channel_effect').select('channel_type, family, spend_30d, attributed_rev_30d, phi, incremental_rev_30d, cost_30d, contribution_30d, drives, rev_per_send').eq('brand_id', brandId), Q, []),
       safeQ(sb.from('vw_channel_optimum').select('channel_type, avg_iroas, marginal_iroas, target_marginal_iroas, break_even_iroas, marginal_cm_per_pound, status, marginal_reason').eq('brand_id', brandId), Q, []),
       safeQ(sb.from('vw_email_breakdown').select('total_rev, total_orders, total_sends, campaign_rev, campaign_orders, flow_rev, flow_orders, rev_per_1k_sent').eq('brand_id', brandId).limit(1), Q, null),
