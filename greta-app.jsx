@@ -17579,7 +17579,7 @@ const V3_WALK_VIEW = {
   efficiency:  { chart: ['sales_per_ad_pound', n => fmtMoney(n, 2), 'Sales per £1 of ads'], means: v3WalkMeansEfficiency, why: true },
   spend:       { chart: ['paid_spend', v3Gbp, 'Ad spend'], means: v3WalkMeansEfficiency },
   channels:    { chart: ['sales_per_ad_pound', n => fmtMoney(n, 2), 'Sales per £1 of ads'], means: null, why: true },
-  creative:    { chart: ['paid_spend', v3Gbp, 'Ad spend'], means: null, why: true },
+  creative:    { chart: ['paid_spend', v3Gbp, 'Ad spend'], means: null },
   stock:       { chart: null, means: v3WalkMeansStock },
   reorder:     { chart: null, means: v3WalkMeansStock },
   cash:        { chart: null, means: v3WalkMeansCash },
@@ -17680,8 +17680,11 @@ function V3WalkWhy({ X, diag, focus }) {
       return V3_DRIVER[t.t][0].toLowerCase() + ' ' + (Number(after) > Number(before) ? 'rose' : 'fell') + ' from ' + f(before) + ' to ' + f(after);
     };
     const checks = [];
-    if (d.spend_growth > 0.2 && d.value_growth < d.spend_growth / 2) checks.push('Spend went up ' + fmtPctN(d.spend_growth) + ' but the sales ' + (x.platform === 'google' ? 'Google' : 'Meta') + ' credits went up ' + fmtPctN(Math.max(0, d.value_growth))
-      + ': the extra ' + v3Gbp(d.extra_spend) + ' brought in ' + v3Gbp(Math.max(0, d.extra_value)) + '. The extra budget bought pricier, less ready-to-buy clicks.');
+    const plat = x.platform === 'google' ? 'Google' : 'Meta';
+    if (d.spend_growth > 0.2 && d.value_growth < 0) checks.push('Spend went up ' + fmtPctN(d.spend_growth) + ' while the sales ' + plat + ' credits fell ' + fmtPctN(-d.value_growth)
+      + ': the extra ' + v3Gbp(d.extra_spend) + ' of spend came with ' + v3Gbp(-d.extra_value) + ' less in sales. The extra budget bought pricier, less ready-to-buy clicks.');
+    else if (d.spend_growth > 0.2 && d.value_growth < d.spend_growth / 2) checks.push('Spend went up ' + fmtPctN(d.spend_growth) + ' but the sales ' + plat + ' credits went up only ' + fmtPctN(d.value_growth)
+      + ': the extra ' + v3Gbp(d.extra_spend) + ' brought in ' + v3Gbp(d.extra_value) + '. The extra budget bought pricier, less ready-to-buy clicks.');
     if (c.lost_to_rank != null && c.lost_to_budget != null) checks.push(c.lost_to_rank > c.lost_to_budget
       ? 'It showed in ' + fmtPctN(c.impression_share) + ' of the auctions it could enter, losing ' + fmtPctN(c.lost_to_rank) + ' to ad rank and only ' + fmtPctN(c.lost_to_budget) + ' to budget — so more money will not buy more reach. Better bids, a sharper product feed and stronger assets would.'
       : 'It lost ' + fmtPctN(c.lost_to_budget) + ' of its auctions to budget — reach is limited by spend, not by ad quality.');
@@ -17691,8 +17694,11 @@ function V3WalkWhy({ X, diag, focus }) {
       checks.push('Fewer people who clicked added to basket (' + v3WalkPct(p.atc_rate) + ' → ' + v3WalkPct(c.atc_rate) + ') — the landing page or the offer is not landing.');
     if (k !== 'google_brand' && brand && brand.cur && brand.prev && brand.cur.has_detail && brand.prev.has_detail && brand.cur.cvr != null && brand.prev.cvr != null && brand.cur.cvr < brand.prev.cvr * 0.75)
       checks.push('Even people searching for you by name converted less (' + v3WalkPct(brand.prev.cvr) + ' → ' + v3WalkPct(brand.cur.cvr) + '). They are the most ready-to-buy visitors you have, so part of this is the site, not the channel — check the open site fixes first.');
-    if (x.phi != null && x.phi_source !== 'measured') checks.push('Greta counts about ' + fmtPctN(x.phi) + ' of the sales ' + (x.platform === 'google' ? 'Google' : 'Meta') + ' claims as truly caused by these ads — a standard figure for this kind of campaign, not yet measured for you. That is why it needs about '
-      + v3WalkX(x.break_even_reported_roas) + ' in the platform’s own numbers to break even. A two-week holdout would measure it.');
+    if (x.phi != null && x.phi_source !== 'measured') checks.push((Number(x.phi) < 1
+        ? 'Greta counts about ' + fmtPctN(x.phi) + ' of the sales ' + plat + ' claims as truly caused by these ads'
+        : 'Greta reckons these ads cause about ' + fmtPctN(x.phi - 1) + ' more sales than ' + plat + ' reports, because it misses some (other devices, later orders)')
+      + ' — a standard figure for this kind of campaign, not yet measured for you. So it needs about '
+      + v3WalkX(x.break_even_reported_roas) + ' in ' + plat + '’s own numbers to break even. A two-week holdout would measure it.');
     if (x.saturation_read === 'still scaling efficiently' && d.spend_growth > 0.2) checks.push('Over the longer run this platform has scaled well for you, so this looks like a recent problem with this campaign rather than a ceiling.');
     return (<div key={k} className="v3-why-ch">
       <div className="v3-tour-h">Why {name} is below break-even</div>
