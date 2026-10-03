@@ -10169,6 +10169,55 @@ function V3ActionBoard(){
         })}
       </ol>
       <V3HeldActions/>
+      <V3Findings/>
+    </div>
+  );
+}
+
+// ── What Greta found ─────────────────────────────────────────────────────
+// The board lists what is worth doing in pounds. Channel diagnoses and cost-tree splits carry no
+// pound figure, so until 0245 they reached no screen at all -- the corrected Google finding ("the
+// biggest stage is impressions per click, not clicks per conversion") was only in Ask Greta. They
+// are listed here, strongest evidence first, each opening onto Greta's reasons for its steer.
+const V3_RUNG_ORDER = { direct: 0, likely: 1, probably: 2, possible: 3, outside_chance: 4 };
+function V3Findings(){
+  const [rows, setRows] = React.useState(null);
+  const [open, setOpen] = React.useState(null);
+  React.useEffect(() => {
+    let alive = true;
+    const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
+    if (!sb || !b) return;
+    sb.from('vw_brand_findings').select('external_id,description,category,rung,evidence_reasons,days_open').eq('brand_id', b)
+      .then(r => { if (alive) setRows((r && !r.error && r.data) || []); }, () => { if (alive) setRows([]); });
+    return () => { alive = false; };
+  }, []);
+  if (!rows || !rows.length) return null;
+  const sorted = rows.slice().sort((x, y) => ((V3_RUNG_ORDER[x.rung] ?? 9) - (V3_RUNG_ORDER[y.rung] ?? 9)) || String(x.external_id).localeCompare(String(y.external_id)));
+  return (
+    <div className="v3-rank-why">
+      <span className="v3-kick">What Greta found</span>
+      <span className="v3-sub"> What moved and why, where there is no pound figure to rank it by. Strongest evidence first.</span>
+      <ul className="v3-rank-steps">
+        {sorted.map(f => {
+          const pa = v3PlainAction(f);
+          const conf = v3MoneyConf(f);
+          const isOpen = open === f.external_id;
+          const reasons = Array.isArray(f.evidence_reasons) ? f.evidence_reasons.filter(x => x && x.text) : [];
+          return (<li key={f.external_id}>
+            <button type="button" className="v3-rank-hit" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : f.external_id)}>
+              <span className="v3-rank-body">
+                <span className="v3-rank-desc">{pa.title}</span>
+                <span className="v3-rank-meta">{f.category || 'general'}{conf ? ' · ' + V3_CONF[conf].label.toLowerCase() : ''}</span>
+              </span>
+            </button>
+            {isOpen && (<div className="v3-rank-why">
+              {pa.why && <p className="v3-rank-plain">{pa.why}</p>}
+              {reasons.length > 0 && (<div className="v3-rank-raw"><span className="v3-kick">Why {conf ? V3_CONF[conf].label.toLowerCase() : 'this steer'}</span>
+                <ul className="v3-rank-steps">{reasons.map((x, j) => <li key={j}>{v3Tidy(x.text)}</li>)}</ul></div>)}
+            </div>)}
+          </li>);
+        })}
+      </ul>
     </div>
   );
 }
@@ -18157,6 +18206,12 @@ function V3WalkWhy({ X, diag, focus }) {
     };
     const checks = [];
     const plat = x.platform === 'google' ? 'Google' : 'Meta';
+    // 0245: the drivers above come from the platform's own conversion count. When that count moved
+    // differently from the orders the shop recorded from the platform, the driver that looks biggest
+    // can be the wrong one (frkl, Aug -> Sep: Google showed conversion rate falling; against real
+    // orders the change was in impressions per click). Say so first, before reading the drivers.
+    const countChanged = x.count_check && x.count_check.state === 'changed' && x.count_check.text;
+    if (countChanged) checks.push(x.count_check.text);
     if (d.spend_growth > 0.2 && d.value_growth < 0) checks.push('Spend went up ' + fmtPctN(d.spend_growth) + ' while the sales ' + plat + ' credits fell ' + fmtPctN(-d.value_growth)
       + ': the extra ' + v3Gbp(d.extra_spend) + ' of spend came with ' + v3Gbp(-d.extra_value) + ' less in sales. The extra budget bought pricier, less ready-to-buy clicks.');
     else if (d.spend_growth > 0.2 && d.value_growth < d.spend_growth / 2) checks.push('Spend went up ' + fmtPctN(d.spend_growth) + ' but the sales ' + plat + ' credits went up only ' + fmtPctN(d.value_growth)
@@ -18190,7 +18245,9 @@ function V3WalkWhy({ X, diag, focus }) {
       </ul>
       {help.length > 0 && hurt.length > 0 && <p className="v3-note">{help.map(fromTo).join('; ').replace(/^./, s => s.toUpperCase())}, which helped — but not enough to cover the rest.</p>}
       {checks.length > 0 && <ul className="v3-why-checks">{checks.map((s, i) => <li key={i}>{s}</li>)}</ul>}
-      <p className="v3-note">The drivers are counted by {x.platform === 'google' ? 'Google' : 'Meta'}; the reasons are Greta’s reading of them.</p>
+      <p className="v3-note">{countChanged
+        ? 'The drivers are counted by ' + plat + ', and ' + plat + '’s count moved differently from your real orders this time — read them with the first point above in mind.'
+        : 'The drivers are counted by ' + plat + '; the reasons are Greta’s reading of them.'}</p>
     </div>);
   })}</>);
 }
