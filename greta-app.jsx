@@ -4887,7 +4887,7 @@ function Creatives(){
     </div>
     <div className="note" style={{marginTop:14}}>The two biggest spenders (Angela | Video and All Videos | Flexi) have <b>below-average Meta conversion-rate ranking</b> — they drive purchases but Meta judges the post-click weak (landing/audience mismatch). 'Stacks Catalogue UK' at 7.6× frequency is the most fatigued. Image URLs from Meta CDN expire ~24h after the pull — regenerate the data file for fresh images.</div>
     <Insight k="creative" />
-    </>) : <V3AdTable/>}
+    </>) : <V3AdRead/>}
   </div>);
 }
 // Per-ad spend and results from the live Meta sync (vw_creative_performance, ads that spent in the
@@ -4896,6 +4896,138 @@ function Creatives(){
 const V3_ADS_Q = (sb, b) => sb.from('vw_creative_performance')
   .select('entity_id,entity_name,last_day,days_live,spend,purchases,purchase_value,max_frequency,roas_platform,verdict')
   .eq('brand_id', b).gte('last_day', v3IsoAdd(new Date().toISOString().slice(0, 10), -30)).order('spend', { ascending: false }).limit(50);
+// The read (0246, vw_ad_read): each ad's last 28 complete days against its own 56 before, allowing
+// for how every other ad moved, and against every other ad now. The table above it summed 180 days
+// and called frkl's biggest ad "Average" while its last month ran at a quarter of its summer return.
+// Until 0246 is applied the view is missing and the old table shows instead.
+const V3_AD_READ_Q = (sb, b) => sb.from('vw_ad_read')
+  .select('ad_id,ad_name,state,driver,confidence,mostly_view_through,has_baseline,drift_measured,spend_28d,purchases_28d,purchases_prior_56d,return_28d,return_prior_56d,cost_per_purchase_28d,cost_per_purchase_prior_56d,spend_share_28d,own_change,account_drift,rest_change,rest_cost_per_purchase_28d,spend_prior_56d,cpm_28d,cpm_prior,ctr_28d,ctr_prior,cvr_28d,cvr_prior,value_per_purchase_28d,value_per_purchase_prior,profit_28d,shortfall_28d,frequency_7d,frequency_7d_3wk_ago,view_share_28d,attribution_measured,weekly')
+  .eq('brand_id', b).gt('spend_28d', 0).order('spend_28d', { ascending: false, nullsFirst: false }).limit(80);
+const V3_AD_STATE = {
+  breaking_down: { label: 'Breaking down',       tone: 'bad',  rank: 0 },
+  behind:        { label: 'Behind the rest',     tone: 'bad',  rank: 0 },
+  tiring:        { label: 'Tiring',              tone: 'warn', rank: 0 },
+  improving:     { label: 'Earning more',        tone: 'good', rank: 1 },
+  ahead:         { label: 'Ahead of the rest',   tone: 'good', rank: 1 },
+  holding:       { label: 'Holding',             tone: null,   rank: 2 },
+  too_little:    { label: 'Too little to judge', tone: null,   rank: 3 },
+  stopped:       { label: 'Stopped',             tone: null,   rank: 4 },
+};
+const V3_AD_CONF = { 'Likely': 'likely', 'Probably': 'probably', 'Possible': 'possible', 'Outside chance': 'outside', 'Not yet': 'held' };
+const v3AdGbp = v => (Number(v) < 0 ? '−' : '') + curSym() + v3Amount(v);
+const v3AdGbp2 = v => fmtOk(v) ? curSym() + Number(v).toFixed(2) : FMT_NONE;
+// The money an ad is costing or making, for ranking: what it fell short by, or what it lost.
+const v3AdStake = r => Math.max(Number(r.shortfall_28d) || 0, -(Number(r.profit_28d) || 0));
+// The read in the brand's own numbers: what moved, against what, which step of the funnel, and what
+// it cost. Every figure is the view's; nothing is recomputed here.
+function v3AdWhy(r) {
+  const n = x => Number(x), ok = fmtOk;
+  const by = x => fmtPctN(Math.abs(1 - n(x)));
+  const up = ok(r.return_28d) && ok(r.return_prior_56d) && n(r.return_28d) > n(r.return_prior_56d);
+  const s = [];
+  const acct = r.drift_measured && ok(r.account_drift)
+    ? (n(r.account_drift) < 0.9 ? 'each pound bought ' + by(r.account_drift) + ' fewer purchases across the rest of the account'
+      : n(r.account_drift) > 1.1 ? 'each pound bought ' + by(r.account_drift) + ' more purchases across the rest of the account'
+      : 'the rest of the account held steady')
+    : null;
+  const step = {
+    conversion: [up ? 'More of the people who click go on to buy' : 'Fewer of the people who click go on to buy', PCT(r.cvr_prior), PCT(r.cvr_28d)],
+    clicks:     [up ? 'More of the people who see it click' : 'Fewer of the people who see it click', PCT(r.ctr_prior), PCT(r.ctr_28d)],
+    cost:       [up ? 'Each 1,000 views costs less' : 'Each 1,000 views costs more', v3AdGbp2(r.cpm_prior), v3AdGbp2(r.cpm_28d)],
+    basket:     [up ? 'Each purchase is worth more' : 'Each purchase is worth less', v3AdGbp2(r.value_per_purchase_prior), v3AdGbp2(r.value_per_purchase_28d)],
+  }[r.driver];
+  if (r.state === 'breaking_down' || r.state === 'improving') {
+    s.push('Return ' + (up ? 'rose' : 'fell') + ' from ' + fmtTimes(r.return_prior_56d) + ' to ' + fmtTimes(r.return_28d) + ' over the last 28 days' + (acct ? ', while ' + acct : '') + '.');
+    if (ok(r.own_change)) s.push((acct && r.drift_measured ? 'Allowing for that, it' : 'It') + ' buys ' + by(r.own_change) + (n(r.own_change) < 1 ? ' fewer' : ' more') + ' purchases per pound than in its own previous 8 weeks.');
+    if (step) s.push(step[0] + ' (' + step[1] + ' → ' + step[2] + ').');
+  } else if (r.state === 'tiring') {
+    s.push('Fewer of the people who see it click (' + PCT(r.ctr_prior) + ' → ' + PCT(r.ctr_28d) + '). Purchases per pound have held so far; a falling click rate is usually the first sign the creative is wearing out.');
+  } else if (r.state === 'behind' || r.state === 'ahead') {
+    s.push('Each purchase costs ' + v3AdGbp2(r.cost_per_purchase_28d) + ' here against ' + v3AdGbp2(r.rest_cost_per_purchase_28d) + ' across every other ad in the same 28 days.');
+  } else if (r.state === 'holding') {
+    s.push(r.has_baseline ? 'In line with its own previous 8 weeks and with the rest of the account.' : 'Too new to compare with its own past; in line with the rest of the account.');
+  } else if (r.state === 'too_little') {
+    s.push(NUM(r.purchases_28d) + (n(r.purchases_28d) === 1 ? ' purchase' : ' purchases') + ' in 28 days is too few to tell a change from chance.');
+  } else if (r.state === 'stopped') {
+    s.push('No spend in the last 7 days.');
+  }
+  if (r.state !== 'stopped' && ok(r.profit_28d)) {
+    s.push((n(r.profit_28d) < 0 ? 'It lost ' : 'It made ') + curSym() + v3Amount(r.profit_28d) + ' over 28 days after product costs.');
+    if (ok(r.shortfall_28d) && Math.round(n(r.shortfall_28d)) !== 0) {
+      const vs = (r.state === 'behind' || r.state === 'ahead') ? 'the rest of the account’s rate' : 'its own past rate';
+      s.push(n(r.shortfall_28d) > 0 ? 'That is ' + curSym() + v3Amount(r.shortfall_28d) + ' less than ' + vs + ' would have made.'
+                                     : 'That is ' + curSym() + v3Amount(r.shortfall_28d) + ' more than ' + vs + ' would have made.');
+    }
+  }
+  if (ok(r.frequency_7d)) s.push('In the last week each person reached saw it ' + fmtTimes(r.frequency_7d, 1) + (ok(r.frequency_7d_3wk_ago) ? ' (' + fmtTimes(r.frequency_7d_3wk_ago, 1) + ' three weeks before).' : '.'));
+  if (r.attribution_measured && ok(r.view_share_28d) && n(r.view_share_28d) >= 0.25)
+    s.push(PCT(r.view_share_28d) + ' of the return Meta claims for it comes from people who saw it and never clicked.');
+  return s;
+}
+function V3AdRead(){
+  const q = useV3Rows('ad-read', V3_AD_READ_Q);
+  const [open, setOpen] = React.useState(null);
+  if (q.err) return <V3AdTable/>;
+  if (!q.rows) return <p className="v3-empty">Loading your ads…</p>;
+  const all = q.rows;
+  if (!all.length) return <p className="v3-empty">No Meta ads have spent in the last 28 days.</p>;
+  const live = all.filter(r => r.state !== 'stopped');
+  const stopped = all.length - live.length;
+  const sorted = live.slice().sort((a, b) => {
+    const ra = (V3_AD_STATE[a.state] || V3_AD_STATE.holding).rank, rb = (V3_AD_STATE[b.state] || V3_AD_STATE.holding).rank;
+    if (ra !== rb) return ra - rb;
+    if (ra === 0) return v3AdStake(b) - v3AdStake(a);
+    return (Number(b.spend_28d) || 0) - (Number(a.spend_28d) || 0);
+  });
+  // The account's own move, from the same rows: purchases per pound now against the 8 weeks before.
+  const sum = k => all.reduce((t, r) => t + (Number(r[k]) || 0), 0);
+  const nowRate = sum('spend_28d') > 0 ? sum('purchases_28d') / sum('spend_28d') : null;
+  const prevRate = sum('spend_prior_56d') > 0 ? sum('purchases_prior_56d') / sum('spend_prior_56d') : null;
+  const drift = nowRate != null && prevRate ? nowRate / prevRate : null;
+  return (<div>
+    <div className="v3-sub">{NUM(live.length)} ads are spending. Each is read on its last 28 days against its own previous 8 weeks, allowing for how every other ad moved, and against every other ad now. Return is what Meta claims; profit is after product costs, on Meta’s count of purchases.</div>
+    {drift != null && Math.abs(1 - drift) >= 0.1 && <div className="v3-sub">Across the account each pound bought {fmtPctN(Math.abs(1 - drift))} {drift < 1 ? 'fewer' : 'more'} purchases than in the 8 weeks before. Each ad is read with that allowed for.</div>}
+    <table>
+      <thead><tr><th className="tl">Ad</th><th>Spend, 28 days</th><th>Share</th><th>Purchases</th><th>Return, before → now</th><th className="tl">12 weeks</th><th className="tl">Read</th></tr></thead>
+      <tbody>{sorted.map(r => {
+        const st = V3_AD_STATE[r.state] || V3_AD_STATE.holding;
+        const col = st.tone ? RAG_COL[st.tone] : 'var(--text-faint)';
+        const isOpen = open === r.ad_id;
+        const conf = V3_AD_CONF[r.confidence] || 'held';
+        const why = isOpen ? v3AdWhy(r) : null;
+        const weekly = Array.isArray(r.weekly) ? r.weekly : [];
+        const trend = weekly.map(w => Number(w.spend) > 0 ? Number(w.value) / Number(w.spend) : null);
+        const funnel = [
+          ['Cost per 1,000 views', v3AdGbp2(r.cpm_prior), v3AdGbp2(r.cpm_28d)],
+          ['Click rate', PCT(r.ctr_prior), PCT(r.ctr_28d)],
+          ['Click → purchase', PCT(r.cvr_prior), PCT(r.cvr_28d)],
+          ['Value per purchase', v3AdGbp2(r.value_per_purchase_prior), v3AdGbp2(r.value_per_purchase_28d)],
+          ['Cost per purchase', v3AdGbp2(r.cost_per_purchase_prior_56d), v3AdGbp2(r.cost_per_purchase_28d)],
+        ];
+        return (<React.Fragment key={r.ad_id}>
+          <tr>
+            <td className="tl"><button type="button" className="v3-tap" style={{ justifyContent: 'flex-start', textAlign: 'left' }} aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : r.ad_id)}>{r.ad_name}</button></td>
+            <td className="oi-num">{v3AdGbp(r.spend_28d)}</td>
+            <td className="oi-num">{fmtPctN(r.spend_share_28d)}</td>
+            <td className="oi-num">{NUM(r.purchases_28d)}</td>
+            <td className="oi-num">{r.has_baseline && fmtOk(r.return_prior_56d) ? fmtTimes(r.return_prior_56d) + ' → ' : ''}{fmtTimes(r.return_28d)}</td>
+            <td className="tl"><BoardSpark vals={trend} color={col}/></td>
+            <td className="tl"><span style={{ color: st.tone ? col : undefined }}>{st.label}</span> <V3Conf state={conf} detail={'Meta counted ' + NUM(r.purchases_28d) + ' purchases for this ad in the last 28 days and ' + NUM(r.purchases_prior_56d) + ' in the 8 weeks before. A read from one platform’s own count never reaches Direct.' + (r.mostly_view_through ? ' More than half of what Meta claims here is people who only saw the ad, so it sits a rung lower.' : '')}/></td>
+          </tr>
+          {isOpen && (<tr><td className="tl" colSpan={7}>
+            {/* Sticky and held to a reading measure: on a phone the table scrolls sideways, and the
+                explanation must stay in view rather than run off under the scroll. */}
+            <div style={{ position: 'sticky', left: 0, maxWidth: 'min(var(--measure), 66vw)' }}>
+              <p className="v3-rank-plain">{why.join(' ')}</p>
+              {r.has_baseline && (<ul className="v3-rank-steps">{funnel.map(([k, a, b]) => <li key={k}>{k}: <span className="oi-num">{a} → {b}</span></li>)}</ul>)}
+            </div>
+          </td></tr>)}
+        </React.Fragment>);
+      })}</tbody>
+    </table>
+    {stopped > 0 && <div className="v3-sub">{NUM(stopped)} {stopped === 1 ? 'ad that spent in the last 28 days has' : 'ads that spent in the last 28 days have'} not spent this week and {stopped === 1 ? 'is' : 'are'} not shown.</div>}
+  </div>);
+}
 function V3AdTable(){
   const q = useV3Rows('ads-30d', V3_ADS_Q);
   if (!q.rows) return <p className="v3-empty">Loading your ads…</p>;
