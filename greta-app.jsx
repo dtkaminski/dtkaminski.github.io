@@ -3940,7 +3940,7 @@ function Overview({start, period, customActive}){
           this page's own answer into third place. A one-line pointer instead: it teaches where
           things live rather than duplicating them. */}
       <button type="button" className="v3-xref" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>
-        Everything worth doing, ranked by £ <span className="v3-xref-go">on Actions →</span>
+        Everything worth doing, in order <span className="v3-xref-go">on Actions →</span>
       </button>
       {/* COMMERCIAL HEALTH */}
       <div className="section-eyebrow" style={{display:'flex',alignItems:'center',gap:8,margin:'8px 0 -4px',fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-muted)'}}>
@@ -9901,9 +9901,16 @@ function V3ActionBoard(){
   const floor = Math.max(50, Math.round(sales30 * 0.005));
   // When everything is small, nothing is: the floor only folds rows when bigger work remains above it.
   const aboveFloor = liveRows.filter(r => (Number(r.cm_gbp) || 0) >= floor);
-  const bigRows = aboveFloor.length ? aboveFloor : liveRows;
-  const smallRows = aboveFloor.length ? liveRows.filter(r => (Number(r.cm_gbp) || 0) < floor) : [];
-  const ordered = [...bigRows, ...(showSmall ? smallRows : []), ...unverRows];
+  const isSmall = (r) => aboveFloor.length > 0 && (Number(r.cm_gbp) || 0) < floor;
+  const bigRows = liveRows.filter(r => !isSmall(r));
+  const smallRows = liveRows.filter(isSmall);
+  // On the evidence-ranked board (0237) a small item keeps its place in its lane: folding it to the
+  // end put £93 and £75 actions Greta is fairly sure of below the "worth testing" ones. So small rows
+  // hide in place and, shown, come back where the server ranked them. Unranked, as before.
+  const liveShown = V3_BOARD.ranked
+    ? liveRows.filter(r => showSmall || !isSmall(r))
+    : [...bigRows, ...(showSmall ? smallRows : [])];
+  const ordered = [...liveShown, ...unverRows];
 
   return (
     <div className="v3-board v3-enter">
@@ -9939,8 +9946,8 @@ function V3ActionBoard(){
           // being "do this" and starts being "worth testing", once, like the unverified break.
           const startsTest = V3_BOARD.ranked && !unver && r.lane === 'test'
             && (i === 0 || ordered[i - 1].lane !== 'test' || ordered[i - 1].verification === 'unverified');
-          // The fold sits after the last row above the floor.
-          const foldHere = smallRows.length > 0 && i === bigRows.length - 1 + (showSmall ? smallRows.length : 0);
+          // The fold sits after the last live row shown.
+          const foldHere = smallRows.length > 0 && i === liveShown.length - 1;
           return (
             <React.Fragment key={r.external_id}>
             {startsTest && (
@@ -10170,9 +10177,9 @@ function V3ChannelScoreboard(){
 function ActionsView(){
   return (
     <div>
-      {/* No heading here: the page head one line above already reads "Actions / What should I do,
-          in order of £?". Saying it twice is the kind of thing that makes a product feel unedited. */}
-      <p className="v3-note" style={{margin:'0 0 12px'}}>Everything worth doing, ranked by {curSym()} impact — open any row to see why.</p>
+      {/* No heading here: the page head one line above already reads "Actions / What should I do
+          first?". Saying it twice is the kind of thing that makes a product feel unedited. */}
+      <p className="v3-note" style={{margin:'0 0 12px'}}>Everything worth doing, ranked by how sure Greta is and what it is worth — open any row to see why.</p>
       <V3ActionBoard/>
       {/* Restock keeps its own queue, but BELOW the ranked list and collapsed: it is a different
           job (what to order, by date) and it was drowning the money ranking when it led. */}
@@ -14689,7 +14696,7 @@ const UI_V3 = (typeof window === 'undefined') || window.GRETA_UI_V3 !== false;
 const V3_NAV = [
   { group: 'Home',     id: 'today',       label: 'Today',              icon: 'home',      q: 'Am I on track, and what do I do now?' },
   { group: 'Home',     id: 'review',      label: 'Review',             icon: 'report',    q: 'What changed, and why?' },
-  { group: 'Act',      id: 'actions',     label: 'Actions',            icon: 'clipboard', q: 'What should I do, in order of £?' },
+  { group: 'Act',      id: 'actions',     label: 'Actions',            icon: 'clipboard', q: 'What should I do first?' },
   { group: 'Act',      id: 'calendar',    label: 'Calendar',           icon: 'calendar',  q: 'What is planned, and what did past events do?' },
   { group: 'Act',      id: 'ask',         label: 'Ask Greta',          icon: 'spark',     q: 'Ask anything about your business, in plain English.' },
   { group: 'Plan',     id: 'goal',        label: 'Goal & costs',       icon: 'sliders',   q: 'What am I aiming for, and what do things cost me?' },
@@ -15245,7 +15252,14 @@ function v3PlainAction(row){
     const ch = v3Ch(x[0]);
     return P('Find out why each ' + ch + ' sale costs more', ch + ' now costs about £' + x[3] + ' per sale, up from £' + x[2] + '. The breakdown below shows which step got worse.');
   }
-  if (/^diagnosis-/.test(id) && (x = m(/^Why (.+?) moved/i))) return P('Why ' + x[1] + ' changed', raw.replace(/^Why .+? moved, ranked by evidence:\s*/i, 'Most likely first: '));
+  // The diagnosis engine names its metric in its own vocabulary ("carts that reach checkout (ga4)",
+  // "meta clicks that add to cart"). Owners never see a source code: drop the bracketed tag and
+  // name the platform properly.
+  if (/^diagnosis-/.test(id) && (x = m(/^Why (.+?) moved/i))) {
+    const named = (s) => s.replace(/\s*\((?:ga4|meta|google_ads|google|shopify|klaviyo)\)/gi, '')
+      .replace(/\bGA4\b/g, 'Google Analytics').replace(/\bmeta\b/g, 'Meta').replace(/\bgoogle\b/g, 'Google');
+    return P('Why ' + named(x[1]) + ' changed', named(raw.replace(/^Why .+? moved, ranked by evidence:\s*/i, 'Most likely first: ')));
+  }
   if (/^connection-/.test(id)) { const p = id.replace(/^connection-/, ''); return P('Reconnect ' + (CONN_LABEL[p] || v3Ch(p)), raw); }
   if (/^data-health-/.test(id)) return P('Some numbers did not load', 'Part of a screen could not load its data, so a figure there may be missing rather than zero. Refreshing usually fixes it.');
   if (id === 'tracking-coverage') return P('Check your site tracking', raw);
