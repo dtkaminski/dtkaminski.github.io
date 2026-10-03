@@ -16098,6 +16098,19 @@ function v3DailyMoney() {
   (D.googleAds || []).forEach(r => put(r.date, 'a', r.cost));
   return byDay;
 }
+// Are D.shopify / D.metaDaily / D.googleAds the brand's current numbers yet? On first paint they
+// still hold the bundled snapshot (it ends in early July), and the live loader swaps them a few
+// seconds later -- so the weekly chart drew April-June with "latest £1,937", then redrew as July-
+// September with "latest £98", and the "vs the 30 days before" figure changed under the reader.
+// 'live': the loader has replaced them. 'static-only': the public demo, where the snapshot IS the
+// data. No loader on the page: static by design. Anything else (still loading, or the load
+// failed): not current, so the trend and the change wait rather than show July as now.
+function v3DailyCurrent() {
+  const L = typeof window !== 'undefined' ? window.FRKL_LIVE : null;
+  if (!L) return 'ready';
+  if (L.status === 'live' || L.status === 'static-only') return 'ready';
+  return L.status === 'error' ? 'failed' : 'loading';
+}
 function v3IsoAdd(iso, n) { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
 function v3WindowProfit(byDay, from, to, cmr) {
   let s = 0, a = 0, days = 0;
@@ -16107,7 +16120,7 @@ function v3WindowProfit(byDay, from, to, cmr) {
 
 function V3HeroDelta({ cam, sales, prod }) {
   const cmr = (Number(sales) > 0 && prod != null) ? Number(prod) / Number(sales) : null;
-  if (cam == null || cmr == null || !REAL_END) return null;
+  if (cam == null || cmr == null || !REAL_END || v3DailyCurrent() !== 'ready') return null;
   const prior = v3WindowProfit(v3DailyMoney(), v3IsoAdd(REAL_END, -59), v3IsoAdd(REAL_END, -30), cmr);
   if (prior.days < 25) return null;
   const diff = Number(cam) - prior.profit;
@@ -16121,8 +16134,9 @@ function V3HeroDelta({ cam, sales, prod }) {
 
 function V3HeroTrend({ sales, prod }) {
   const cmr = (Number(sales) > 0 && prod != null) ? Number(prod) / Number(sales) : null;
+  const current = v3DailyCurrent();
   const data = React.useMemo(() => {
-    if (cmr == null || !REAL_END) return [];
+    if (cmr == null || !REAL_END || current !== 'ready') return [];
     const byDay = v3DailyMoney();
     // Twelve complete Monday–Sunday weeks: the running week is partial and would always dip.
     const end = new Date(REAL_END + 'T00:00:00Z'); const dow = end.getUTCDay();
@@ -16134,7 +16148,16 @@ function V3HeroTrend({ sales, prod }) {
       if (r.days >= 5) out.push({ wk: v3Day(from), v: Math.round(r.profit), sales: Math.round(r.sales), spend: Math.round(r.spend) });
     }
     return out;
-  }, [cmr, REAL_END, (D.shopify || []).length]);
+  }, [cmr, REAL_END, (D.shopify || []).length, current]);
+  // Until the daily feeds are current, hold the chart's own space -- an empty frame at the same
+  // height -- so nothing jumps when the real weeks arrive, and nothing old is drawn as now.
+  if (current !== 'ready' && cmr != null) {
+    return (<figure className="v3-hero-trend" aria-busy={current === 'loading'} aria-label="Profit after ads by week">
+      <figcaption><span className="v3-kick">By week</span>
+        <span className="v3-muted">{current === 'failed' ? 'the weekly figures could not load just now' : 'loading the latest weeks…'}</span></figcaption>
+      <R.ResponsiveContainer width="100%" height={160}><R.AreaChart data={[]} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}/></R.ResponsiveContainer>
+    </figure>);
+  }
   if (data.length < 4) return null;
   const last = data[data.length - 1];
   const tip = ({ active, payload }) => {
