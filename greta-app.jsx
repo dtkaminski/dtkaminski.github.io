@@ -4904,7 +4904,7 @@ const V3_ADS_Q = (sb, b) => sb.from('vw_creative_performance')
 // slower than 25s, says so in a sentence rather than leaving 'Loading your ads' up for good.
 const v3Within = (p, ms) => Promise.race([p, new Promise(res => setTimeout(() => res({ error: { message: 'timed out' } }), ms))]);
 const V3_AD_READ_Q = (sb, b) => v3Within(sb.from('cache_ad_read')
-  .select('ad_id,ad_name,state,driver,confidence,mostly_view_through,has_baseline,drift_measured,spend_28d,purchases_28d,purchases_prior_56d,return_28d,return_prior_56d,cost_per_purchase_28d,cost_per_purchase_prior_56d,spend_share_28d,own_change,account_drift,rest_change,rest_cost_per_purchase_28d,spend_prior_56d,cpm_28d,cpm_prior,ctr_28d,ctr_prior,cvr_28d,cvr_prior,value_per_purchase_28d,value_per_purchase_prior,profit_28d,shortfall_28d,frequency_7d,frequency_7d_3wk_ago,view_share_28d,attribution_measured,weekly,refreshed_at')
+  .select('ad_id,ad_name,state,driver,confidence,mostly_view_through,has_baseline,drift_measured,spend_28d,purchases_28d,purchases_prior_56d,return_28d,return_prior_56d,cost_per_purchase_28d,cost_per_purchase_prior_56d,spend_share_28d,own_change,account_drift,rest_change,rest_cost_per_purchase_28d,spend_prior_56d,cpm_28d,cpm_prior,ctr_28d,ctr_prior,cvr_28d,cvr_prior,value_per_purchase_28d,value_per_purchase_prior,profit_28d,shortfall_28d,cm_per_order,frequency_7d,frequency_7d_3wk_ago,view_share_28d,attribution_measured,weekly,refreshed_at')
   .eq('brand_id', b).gt('spend_28d', 0).order('spend_28d', { ascending: false, nullsFirst: false }).limit(80), 25000);
 const V3_AD_STATE = {
   breaking_down: { label: 'Breaking down',       tone: 'bad',  rank: 0 },
@@ -15831,28 +15831,67 @@ function useOneRow(view, cols){
   return row;
 }
 
+// Rebuilt 2026-10-04 on the per-ad read (cache_ad_read, 0246/0247). It used to read
+// vw_creative_reallocation, which sits on vw_creative_performance's 180-day click-to-purchase
+// test: it named one weak ad and claimed up to £10,871 while the read beside it showed two ads
+// breaking down this month. It now shares the Creative table's request (same useV3Rows key) and
+// takes every figure from the read: weak = breaking down against its own past or behind the
+// rest; healthy = holding, earning more or ahead. Profit and shortfall are the read's own (Meta's
+// count of purchases, after product costs). The move estimate is still a ceiling, and says so.
 function CreativeReallocation(){
-  const d = useOneRow('vw_creative_reallocation',
-    'n_worse, n_better, reallocatable_spend, reallocatable_share, worse_cvr, better_cvr, implied_extra_purchases_upper, implied_contribution_upper');
-  if (d === undefined || !d || !Number(d.reallocatable_spend)) return null;
-  const pct = v => v == null ? '—' : (Number(v) * 100).toFixed(1) + '%';
-  return (<div className="card">
-    <div className="card-section-title"><h2 style={{margin:0}}>Spend sitting on the weaker ads</h2>
-      <span className="meta">Same budget, different split — an upper bound, not a forecast</span></div>
+  const q = useV3Rows('ad-read', V3_AD_READ_Q);
+  if (!q.rows || !q.rows.length) return null;
+  const n = x => Number(x) || 0;
+  const live = q.rows.filter(r => r.state !== 'stopped' && n(r.spend_28d) > 0);
+  const weak = live.filter(r => r.state === 'breaking_down' || r.state === 'behind').sort((x, y) => v3AdStake(y) - v3AdStake(x));
+  const tiring = live.filter(r => r.state === 'tiring');
+  const healthy = live.filter(r => r.state === 'holding' || r.state === 'improving' || r.state === 'ahead');
+  const total = live.reduce((t, r) => t + n(r.spend_28d), 0);
+  const go = () => { try { window.__oiGo && window.__oiGo('marketing', 'creative'); } catch (e) {} };
+  const head = (<div className="card-section-title"><h2 style={{margin:0}}>Spend sitting on the weaker ads</h2>
+    <span className="meta">Last 28 days, on Meta’s count of purchases, after product costs</span></div>);
+  if (!weak.length) return (<div className="card">{head}
     <div style={{fontSize:'var(--text-sm)', lineHeight:1.6, marginTop:8}}>
-      <b>{GBP(d.reallocatable_spend)}</b> of your ad spend{d.reallocatable_share ? ' (' + Math.round(Number(d.reallocatable_share) * 100) + '% of the total)' : ''}
-      {' '}is running on <b>{d.n_worse}</b> {Number(d.n_worse) === 1 ? 'ad that converts' : 'ads that convert'} at {pct(d.worse_cvr)},
-      while <b>{d.n_better}</b> {Number(d.n_better) === 1 ? 'converts' : 'convert'} at {pct(d.better_cvr)}.
+      None of your spending ads has broken down in the last 28 days{tiring.length ? '; ' + NUM(tiring.length) + (tiring.length === 1 ? ' is' : ' are') + ' tiring — fewer people click, though purchases have held so far' : ''}.
+    </div></div>);
+  const wSpend = weak.reduce((t, r) => t + n(r.spend_28d), 0);
+  const wPurch = weak.reduce((t, r) => t + n(r.purchases_28d), 0);
+  const wProfit = weak.reduce((t, r) => t + n(r.profit_28d), 0);
+  const wShort = weak.reduce((t, r) => t + Math.max(0, n(r.shortfall_28d)), 0);
+  const hSpend = healthy.reduce((t, r) => t + n(r.spend_28d), 0);
+  const hPurch = healthy.reduce((t, r) => t + n(r.purchases_28d), 0);
+  const cm = n((weak.find(r => fmtOk(r.cm_per_order)) || {}).cm_per_order);
+  // At the healthy ads' purchases per pound, what the weak ads' money would have bought instead.
+  // Needs a healthy pool worth comparing with (20+ purchases), else it is left unsaid.
+  const hCpp = hPurch >= 20 && hSpend > 0 ? hSpend / hPurch : null;
+  const extra = hCpp ? Math.max(0, wSpend / hCpp - wPurch) : 0;
+  const names = weak.slice(0, 3).map(r => r.ad_name);
+  const nameList = names.length === 1 ? names[0] : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+  return (<div className="card">{head}
+    <div style={{fontSize:'var(--text-sm)', lineHeight:1.6, marginTop:8}}>
+      <b className="oi-num">{v3AdGbp(wSpend)}</b> of your ad spend{total > 0 ? ' (' + fmtPctN(wSpend / total) + ' of it)' : ''} went on
+      {' '}<b>{NUM(weak.length)}</b> {weak.length === 1 ? 'ad that has' : 'ads that have'} broken down: {nameList}{weak.length > 3 ? ' and ' + NUM(weak.length - 3) + ' more' : ''}.
+      {' '}{wProfit < 0 ? <>Together they lost <b className="oi-num">{curSym() + v3Amount(wProfit)}</b></> : <>Together they made <b className="oi-num">{curSym() + v3Amount(wProfit)}</b></>}
+      {wShort > 0 ? <> — <span className="oi-num">{curSym() + v3Amount(wShort)}</span> less than their own earlier rates would have made</> : null}.
+      {tiring.length > 0 && <> {NUM(tiring.length)} more {tiring.length === 1 ? 'is' : 'are'} tiring: fewer people click, though purchases have held so far.</>}
     </div>
-    {Number(d.implied_contribution_upper) > 0 && (<div className="note" style={{marginTop:10}}>
-      If the weaker ads performed like the better ones, that spend would be worth up to
-      {' '}<b>{GBP(d.implied_contribution_upper)}</b> more profit
-      {d.implied_extra_purchases_upper ? ' (about ' + Math.round(Number(d.implied_extra_purchases_upper)) + ' more orders)' : ''}.
+    {/* When the ads holding up also pay more for a purchase than a purchase earns, moving money
+        between ads cannot fix it, and a ceiling would point the operator at the wrong lever. */}
+    {hCpp && cm > 0 && hCpp > cm && (<div className="note" style={{marginTop:10}}>
+      Moving it to your other ads would not fix this: the ones holding up pay <span className="oi-num">{v3AdGbp2(hCpp)}</span> for a
+      {' '}purchase too, and a purchase earns <span className="oi-num">{v3AdGbp2(cm)}</span> after product costs. The lever is new
+      creative or less spend, not a different split.
+    </div>)}
+    {hCpp && extra >= 1 && cm > 0 && hCpp <= cm && (<div className="note" style={{marginTop:10}}>
+      Your ads that are holding up bought a purchase for every <span className="oi-num">{v3AdGbp2(hCpp)}</span>. At that rate the same
+      {' '}<span className="oi-num">{v3AdGbp(wSpend)}</span> would have bought about <b className="oi-num">{NUM(extra)}</b> more purchases,
+      worth up to <b className="oi-num">{curSym() + v3Amount(extra * cm)}</b> after product costs.
       <div className="micro muted" style={{marginTop:4}}>
-        A ceiling, not a promise: moving budget changes what the winning ads are shown to, so expect a
-        share of it. Pause the weakest first and watch the cost per order before shifting the rest.
+        A ceiling, not a promise: more budget changes who the stronger ads are shown to, so expect a
+        share of it. Cut the weakest first and watch the cost per purchase before moving the rest.
       </div>
     </div>)}
+    <div style={{marginTop:10}}><button type="button" className="v3-btn v3-btn-sm" onClick={go}>See each ad</button></div>
   </div>);
 }
 
@@ -18291,7 +18330,7 @@ const V3_WALK_TOUR = {
   channels: { dest: 'marketing', target: { sel: '.v3-score' },
     what: 'Read the tick before the bar: it is the return each channel needs to break even. Rows are ordered by spend, because falling short at £300 is not the same as at £6,000.' },
   creative: { dest: 'marketing', target: { sel: '.card', has: 'Spend sitting on the weaker ads' }, fallback: { sel: '.v3-score' },
-    what: 'Ads that are still getting budget while converting worse than your others. Moving that money to your stronger ads is usually the cheapest improvement on the page.' },
+    what: 'Ads whose last 28 days have broken down, against their own past or against your other ads, and what that money cost you — and whether moving it to the ads that are holding up would actually help.' },
   stock: { dest: 'stock', target: { sel: '.v3-sec', has: 'What runs out first' }, fallback: { sel: '.v3-verdict' },
     what: 'Each row is a product: the solid bar is the days of stock left, the hatched part is days you would have nothing to sell before a new order could land. The longer the hatching, the more it costs you.' },
   reorder: { dest: 'stock', target: { sel: '.v3-sec', has: 'What runs out first' }, fallback: { sel: '.v3-verdict' },
