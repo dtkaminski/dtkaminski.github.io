@@ -1,7 +1,7 @@
 // frkl-data-loader.js
 // ────────────────────────────────────────────────────────────────────────────
 // Live data layer for the frkl dashboard. Replaces the "open file, see snapshot"
-// model with "open file, see what's in Supabase right now, refresh every 60s."
+// model with "open file, see what's in Supabase right now, refresh every 15 minutes."
 //
 // HOW IT WORKS
 //   1. Loads BEFORE the static window.FRKL_* JS files so it can override them.
@@ -11,7 +11,7 @@
 //      RLS-protected tables and populates window.FRKL_* from live data.
 //   4. Falls back gracefully to whatever the static files later set if there's
 //      no session / Supabase is unreachable / queries error.
-//   5. Polls every 60s for fresh data. Dispatches 'frkl-data-updated' on the
+//   5. Polls every 15 min for fresh data (paused while the tab is hidden). Dispatches 'frkl-data-updated' on the
 //      window so the React app can re-render.
 //   6. Renders a freshness indicator in the page header.
 //
@@ -32,7 +32,12 @@
     catch (e) { return null; }
   })();
   const BRAND_SLUG = (typeof window !== 'undefined' && (window.OI_BRAND_SLUG || parentSlug)) || 'frkl';
-  const POLL_INTERVAL_MS = 60_000; // 60 seconds
+  // 15 minutes, not 60s. One pass is ~40 reads and, with the listeners it wakes, about a minute
+  // of database CPU: at 60s one open tab kept a core busy around the clock (2026-10-04: one tab
+  // sent 16,830 reads in a day and page loads took 155s). Nothing read here changes faster than
+  // Shopify's 30-minute sync. See startPolling() for the hidden-tab pause.
+  const POLL_INTERVAL_MS = 15 * 60_000;
+  const RESUME_AFTER_MS = 5 * 60_000;  // coming back to a tab with older data refreshes it at once
 
   // Public surface — accessed by the dashboard to query liveness state
   window.FRKL_LIVE = {
@@ -399,10 +404,33 @@
 
     // 4. First fetch immediately, then poll
     await refresh();
-    setInterval(refresh, POLL_INTERVAL_MS);
+    startPolling();
   }
 
-  // ── Main refresh — runs at boot then every 60s ───────────────────────────
+  // ── Polling ──────────────────────────────────────────────────────────────
+  // Was setInterval(refresh, 60s): it ran in hidden tabs too, and once a pass took longer than
+  // the interval the next one started on top of it. Now the next pass is scheduled only after
+  // this one finishes, and nothing runs while the tab is hidden (an iframe sees the top
+  // window's visibility, so this holds inside /app too).
+  let pollTimer = null, polling = false;
+  function schedulePoll(ms) { clearTimeout(pollTimer); pollTimer = setTimeout(poll, Math.max(0, ms)); }
+  async function poll() {
+    if (polling || document.hidden) return;   // a hidden tab resumes on visibilitychange
+    polling = true;
+    try { await refresh(); } finally { polling = false; }
+    if (!document.hidden) schedulePoll(POLL_INTERVAL_MS);
+  }
+  function startPolling() {
+    schedulePoll(POLL_INTERVAL_MS);
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) { clearTimeout(pollTimer); return; }
+      const last = window.FRKL_LIVE.lastFetchAt;
+      const age = last ? Date.now() - last.getTime() : Infinity;
+      if (age >= RESUME_AFTER_MS) poll(); else schedulePoll(POLL_INTERVAL_MS - age);
+    });
+  }
+
+  // ── Main refresh — runs at boot then every 15 min while visible ───────────────────────────
 
   async function refresh() {
     const sb = window.FRKL_LIVE.sb;
@@ -852,9 +880,9 @@
     const ageMs = lastFetch ? Date.now() - lastFetch.getTime() : null;
     let ageLabel = lastFetch ? formatAge(ageMs) : null;
 
-    // Determine effective status (live but stale > 5 min → stale)
+    // Determine effective status (live but older than two polls → stale)
     let effective = status;
-    if (status === 'live' && ageMs > 5 * 60 * 1000) effective = 'stale';
+    if (status === 'live' && ageMs > 2 * POLL_INTERVAL_MS) effective = 'stale';
 
     const styles = {
       'initialising': { bg: 'rgba(126,126,138,0.10)', border: 'rgba(126,126,138,0.3)', dot: '#7e7e8a', text: '#b1b1bc', label: 'Initialising…' },
