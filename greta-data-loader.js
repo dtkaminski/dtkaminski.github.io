@@ -272,7 +272,11 @@
       const method = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
 
       if (method !== 'GET' || url.indexOf('/rest/v1/') === -1) {
-        if (method !== 'GET') { inflight.clear(); done.clear(); }
+        // Any write empties the cache, so a read never follows it with pre-write data -- except
+        // the ones that change nothing a read here returns: analytics events, the error log and
+        // the user_brand_ids lookup (an RPC, so a POST). Those fire a dozen times during start-up
+        // and each one used to wipe the cache, so the same heavy views went out twice per load.
+        if (method !== 'GET' && !/\/rest\/v1\/(product_events|client_error_log|rpc\/user_brand_ids)(\?|$)/.test(url)) { inflight.clear(); done.clear(); }
         return fetch(input, init);
       }
 

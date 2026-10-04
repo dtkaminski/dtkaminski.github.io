@@ -320,11 +320,25 @@
       if (Object.keys(out).length) { window.FRKL_OVERVIEW = out; window.dispatchEvent(new CustomEvent('frkl-overview-updated')); if (window.console) console.info('[overview-data] FRKL_OVERVIEW built', Object.keys(out).length, 'timeframes · supp=' + (_supp ? 'yes' : 'pending')); }
     } catch (e) { if (window.console) console.warn('[overview-data] rebuild failed', e); }
   }
+  // 'frkl-data-updated' fires four to six times during start-up (the loader's boot, its refresh,
+  // the live-snapshot module twice), and each used to send all twelve supplementary reads -- the
+  // heaviest views on the page -- again. They do not depend on the event, so they go out at most
+  // once per 5 minutes per brand (a 15-minute poll still refreshes them); a rebuild from the
+  // loader's data still happens on every event.
+  var SUPP_FRESH_MS = 5 * 60 * 1000, _suppAt = 0, _suppBrand = null, _suppP = null;
   async function refreshSupp() {
     var L = window.FRKL_LIVE;
     if (!L || !L.brandId || !window.FRKL_DATA || !window.FRKL_DATA.shopify || !window.FRKL_DATA.shopify.length) return;
     rebuild(); // build business tier immediately from loader data
-    if (L.sb) { try { _supp = await fetchSupp(L.sb, L.brandId); } catch (e) { if (window.console) console.warn('[overview-data] supp fetch failed', e); } rebuild(); }
+    if (!L.sb) return;
+    if (_suppP && _suppBrand === L.brandId) { await _suppP; return; }
+    if (_supp && _suppBrand === L.brandId && Date.now() - _suppAt < SUPP_FRESH_MS) return;
+    _suppBrand = L.brandId;
+    _suppP = (async function () {
+      try { _supp = await fetchSupp(L.sb, L.brandId); _suppAt = Date.now(); } catch (e) { if (window.console) console.warn('[overview-data] supp fetch failed', e); }
+      rebuild();
+    })();
+    try { await _suppP; } finally { _suppP = null; }
   }
   window.addEventListener('frkl-data-updated', refreshSupp);
   var tries = 0, iv = setInterval(function () { tries++; if ((window.FRKL_LIVE && window.FRKL_LIVE.brandId && window.FRKL_DATA && window.FRKL_DATA.shopify && window.FRKL_DATA.shopify.length) || tries > 60) { clearInterval(iv); refreshSupp(); } }, 500);

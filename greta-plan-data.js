@@ -221,7 +221,14 @@
     } catch (e) { if (window.console) console.warn('[plan] saveBands failed', e); return { ok: false, error: String((e && e.message) || e) }; }
   }
   window.FRKL_PLAN = { curveDecomposition: null, curveHistory: [], curveLevers: [], ready: false, readiness: [], goal: null, config: null, forecast: null, channels: [], channelMix: [], channelHealth: null, spendCurve: null, spendCurvePoints: [], period: PERIOD, refresh: refresh, loadDetail: loadDetail, derive: derive, confirm: confirm, saveEconomics: saveEconomics, deriveChannelPlan: deriveChannelPlan, saveBands: saveBands };
+  // The plan reads do not depend on the loader's data, and 'frkl-data-updated' fires four to six
+  // times during start-up -- each one sent goal, config and vw_brand_plan_readiness (8-16s) again,
+  // and reloaded the whole Growth-plan detail if it had been opened. At most once per 5 minutes
+  // from the event; refresh() called directly (after a save) still runs every time.
+  var PLAN_FRESH_MS = 5 * 60 * 1000, _planEvtAt = Date.now();
   window.addEventListener('frkl-data-updated', function () {
+    if (Date.now() - _planEvtAt < PLAN_FRESH_MS) return;
+    _planEvtAt = Date.now();
     refresh();
     if (detailState === 'done') { detailState = 'idle'; loadDetail(); }
   });

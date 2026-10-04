@@ -314,7 +314,14 @@
     // bulk refresh. Booting there rather than waiting for the 500ms poll tick (or for the whole
     // refresh to finish) is what keeps Today's read out of the queue behind it.
     window.addEventListener('frkl-brand-ready', boot);
-    window.addEventListener('frkl-data-updated', boot);
+    // The Today row is a daily cache; re-reading it on each of the four to six start-up
+    // 'frkl-data-updated' events only queued copies ahead of the reads a screen is waiting for.
+    var lastEvt = 0;
+    window.addEventListener('frkl-data-updated', function (e) {
+      if (e && e.detail && e.detail.liveSnapshots) return;
+      if (Date.now() - lastEvt < 60 * 1000) return;
+      lastEvt = Date.now(); boot();
+    });
     var tries = 0;
     var iv = setInterval(function () {
       tries++;
