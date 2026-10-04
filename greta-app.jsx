@@ -4901,11 +4901,11 @@ const V3_ADS_Q = (sb, b) => sb.from('vw_creative_performance')
 // and called frkl's biggest ad "Average" while its last month ran at a quarter of its summer return.
 // The page reads cache_ad_read (0247), refreshed by sync-meta after each pull: the view itself takes
 // over a minute under row-level security, past PostgREST's 15s limit. A missing cache, or any read
-// slower than 12s, falls back to the old table rather than leaving 'Loading your ads' up for good.
+// slower than 25s, says so in a sentence rather than leaving 'Loading your ads' up for good.
 const v3Within = (p, ms) => Promise.race([p, new Promise(res => setTimeout(() => res({ error: { message: 'timed out' } }), ms))]);
 const V3_AD_READ_Q = (sb, b) => v3Within(sb.from('cache_ad_read')
   .select('ad_id,ad_name,state,driver,confidence,mostly_view_through,has_baseline,drift_measured,spend_28d,purchases_28d,purchases_prior_56d,return_28d,return_prior_56d,cost_per_purchase_28d,cost_per_purchase_prior_56d,spend_share_28d,own_change,account_drift,rest_change,rest_cost_per_purchase_28d,spend_prior_56d,cpm_28d,cpm_prior,ctr_28d,ctr_prior,cvr_28d,cvr_prior,value_per_purchase_28d,value_per_purchase_prior,profit_28d,shortfall_28d,frequency_7d,frequency_7d_3wk_ago,view_share_28d,attribution_measured,weekly,refreshed_at')
-  .eq('brand_id', b).gt('spend_28d', 0).order('spend_28d', { ascending: false, nullsFirst: false }).limit(80), 12000);
+  .eq('brand_id', b).gt('spend_28d', 0).order('spend_28d', { ascending: false, nullsFirst: false }).limit(80), 25000);
 const V3_AD_STATE = {
   breaking_down: { label: 'Breaking down',       tone: 'bad',  rank: 0 },
   behind:        { label: 'Behind the rest',     tone: 'bad',  rank: 0 },
@@ -4967,10 +4967,17 @@ function v3AdWhy(r) {
     s.push(PCT(r.view_share_28d) + ' of the return Meta claims for it comes from people who saw it and never clicked.');
   return s;
 }
+// A failed read is cached for the session (useV3Rows), so retrying asks under a new key.
+function V3AdRetry({ why, onRetry }) {
+  return (<p className="v3-empty">Your ads did not load just now{why}. <button type="button" className="v3-btn v3-btn-sm" onClick={onRetry}>Try again</button></p>);
+}
 function V3AdRead(){
-  const q = useV3Rows('ad-read', V3_AD_READ_Q);
+  const [tries, setTries] = React.useState(0);
+  const q = useV3Rows('ad-read' + (tries ? ':' + tries : ''), V3_AD_READ_Q);
   const [open, setOpen] = React.useState(null);
-  if (q.err) return <V3AdTable/>;
+  // The cache not existing yet (before 0247) falls back to the old table; anything else is said plainly.
+  if (q.err && /cache_ad_read|PGRST205|does not exist|Could not find/i.test(q.err)) return <V3AdTable/>;
+  if (q.err) return <V3AdRetry why={/timed out/.test(q.err) ? ' — the data service is slow at the moment' : ''} onRetry={() => setTries(t => t + 1)}/>;
   if (!q.rows) return <p className="v3-empty">Loading your ads…</p>;
   const all = q.rows;
   if (!all.length) return <p className="v3-empty">No Meta ads have spent in the last 28 days.</p>;
@@ -5034,7 +5041,9 @@ function V3AdRead(){
   </div>);
 }
 function V3AdTable(){
-  const q = useV3Rows('ads-30d', V3_ADS_Q);
+  const [tries, setTries] = React.useState(0);
+  const q = useV3Rows('ads-30d' + (tries ? ':' + tries : ''), V3_ADS_Q);
+  if (q.err) return <V3AdRetry why="" onRetry={() => setTries(t => t + 1)}/>;
   if (!q.rows) return <p className="v3-empty">Loading your ads…</p>;
   const rows = q.rows.filter(r => Number(r.spend) > 0);
   if (!rows.length) return <p className="v3-empty">No Meta ads have spent in the last 30 days.</p>;
