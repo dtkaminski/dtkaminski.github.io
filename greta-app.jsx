@@ -4899,10 +4899,13 @@ const V3_ADS_Q = (sb, b) => sb.from('vw_creative_performance')
 // The read (0246, vw_ad_read): each ad's last 28 complete days against its own 56 before, allowing
 // for how every other ad moved, and against every other ad now. The table above it summed 180 days
 // and called frkl's biggest ad "Average" while its last month ran at a quarter of its summer return.
-// Until 0246 is applied the view is missing and the old table shows instead.
-const V3_AD_READ_Q = (sb, b) => sb.from('vw_ad_read')
-  .select('ad_id,ad_name,state,driver,confidence,mostly_view_through,has_baseline,drift_measured,spend_28d,purchases_28d,purchases_prior_56d,return_28d,return_prior_56d,cost_per_purchase_28d,cost_per_purchase_prior_56d,spend_share_28d,own_change,account_drift,rest_change,rest_cost_per_purchase_28d,spend_prior_56d,cpm_28d,cpm_prior,ctr_28d,ctr_prior,cvr_28d,cvr_prior,value_per_purchase_28d,value_per_purchase_prior,profit_28d,shortfall_28d,frequency_7d,frequency_7d_3wk_ago,view_share_28d,attribution_measured,weekly')
-  .eq('brand_id', b).gt('spend_28d', 0).order('spend_28d', { ascending: false, nullsFirst: false }).limit(80);
+// The page reads cache_ad_read (0247), refreshed by sync-meta after each pull: the view itself takes
+// over a minute under row-level security, past PostgREST's 15s limit. A missing cache, or any read
+// slower than 12s, falls back to the old table rather than leaving 'Loading your ads' up for good.
+const v3Within = (p, ms) => Promise.race([p, new Promise(res => setTimeout(() => res({ error: { message: 'timed out' } }), ms))]);
+const V3_AD_READ_Q = (sb, b) => v3Within(sb.from('cache_ad_read')
+  .select('ad_id,ad_name,state,driver,confidence,mostly_view_through,has_baseline,drift_measured,spend_28d,purchases_28d,purchases_prior_56d,return_28d,return_prior_56d,cost_per_purchase_28d,cost_per_purchase_prior_56d,spend_share_28d,own_change,account_drift,rest_change,rest_cost_per_purchase_28d,spend_prior_56d,cpm_28d,cpm_prior,ctr_28d,ctr_prior,cvr_28d,cvr_prior,value_per_purchase_28d,value_per_purchase_prior,profit_28d,shortfall_28d,frequency_7d,frequency_7d_3wk_ago,view_share_28d,attribution_measured,weekly,refreshed_at')
+  .eq('brand_id', b).gt('spend_28d', 0).order('spend_28d', { ascending: false, nullsFirst: false }).limit(80), 12000);
 const V3_AD_STATE = {
   breaking_down: { label: 'Breaking down',       tone: 'bad',  rank: 0 },
   behind:        { label: 'Behind the rest',     tone: 'bad',  rank: 0 },
@@ -4984,8 +4987,10 @@ function V3AdRead(){
   const nowRate = sum('spend_28d') > 0 ? sum('purchases_28d') / sum('spend_28d') : null;
   const prevRate = sum('spend_prior_56d') > 0 ? sum('purchases_prior_56d') / sum('spend_prior_56d') : null;
   const drift = nowRate != null && prevRate ? nowRate / prevRate : null;
+  const asOf = all[0] && all[0].refreshed_at, stale = asOf && (Date.now() - new Date(asOf).getTime()) > 36 * 3600e3;
   return (<div>
     <div className="v3-sub">{NUM(live.length)} ads are spending. Each is read on its last 28 days against its own previous 8 weeks, allowing for how every other ad moved, and against every other ad now. Return is what Meta claims; profit is after product costs, on Meta’s count of purchases.</div>
+    {stale && <div className="v3-sub">Read as of {v3Day(String(asOf).slice(0, 10))}; Meta has not synced since.</div>}
     {drift != null && Math.abs(1 - drift) >= 0.1 && <div className="v3-sub">Across the account each pound bought {fmtPctN(Math.abs(1 - drift))} {drift < 1 ? 'fewer' : 'more'} purchases than in the 8 weeks before. Each ad is read with that allowed for.</div>}
     <table>
       <thead><tr><th className="tl">Ad</th><th>Spend, 28 days</th><th>Share</th><th>Purchases</th><th>Return, before → now</th><th className="tl">12 weeks</th><th className="tl">Read</th></tr></thead>
