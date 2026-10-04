@@ -5000,7 +5000,7 @@ function V3AdRead(){
     {stale && <div className="v3-sub">Read as of {v3Day(String(asOf).slice(0, 10))}; Meta has not synced since.</div>}
     {drift != null && Math.abs(1 - drift) >= 0.1 && <div className="v3-sub">Across the account each pound bought {fmtPctN(Math.abs(1 - drift))} {drift < 1 ? 'fewer' : 'more'} purchases than in the 8 weeks before. Each ad is read with that allowed for.</div>}
     <table>
-      <thead><tr><th className="tl">Ad</th><th>Spend, 28 days</th><th>Share</th><th>Purchases</th><th>Return, before → now</th><th className="tl">12 weeks</th><th className="tl">Read</th></tr></thead>
+      <thead><tr><th className="tl">Ad</th><th className="tl">Read</th><th>Spend, 28 days</th><th>Share</th><th>Purchases</th><th>Return, before → now</th><th className="tl">12 weeks</th></tr></thead>
       <tbody>{sorted.map(r => {
         const st = V3_AD_STATE[r.state] || V3_AD_STATE.holding;
         const col = st.tone ? RAG_COL[st.tone] : 'var(--text-faint)';
@@ -5019,12 +5019,12 @@ function V3AdRead(){
         return (<React.Fragment key={r.ad_id}>
           <tr>
             <td className="tl"><button type="button" className="v3-tap" style={{ justifyContent: 'flex-start', textAlign: 'left' }} aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : r.ad_id)}>{r.ad_name}</button></td>
+            <td className="tl"><span style={{ color: st.tone ? col : undefined }}>{st.label}</span><br/><V3Conf state={conf} detail={'Meta counted ' + NUM(r.purchases_28d) + ' purchases for this ad in the last 28 days and ' + NUM(r.purchases_prior_56d) + ' in the 8 weeks before. A read from one platform’s own count never reaches Direct.' + (r.mostly_view_through ? ' More than half of what Meta claims here is people who only saw the ad, so it sits a rung lower.' : '')}/></td>
             <td className="oi-num">{v3AdGbp(r.spend_28d)}</td>
             <td className="oi-num">{fmtPctN(r.spend_share_28d)}</td>
             <td className="oi-num">{NUM(r.purchases_28d)}</td>
             <td className="oi-num">{r.has_baseline && fmtOk(r.return_prior_56d) ? fmtTimes(r.return_prior_56d) + ' → ' : ''}{fmtTimes(r.return_28d)}</td>
             <td className="tl"><BoardSpark vals={trend} color={col}/></td>
-            <td className="tl"><span style={{ color: st.tone ? col : undefined }}>{st.label}</span> <V3Conf state={conf} detail={'Meta counted ' + NUM(r.purchases_28d) + ' purchases for this ad in the last 28 days and ' + NUM(r.purchases_prior_56d) + ' in the 8 weeks before. A read from one platform’s own count never reaches Direct.' + (r.mostly_view_through ? ' More than half of what Meta claims here is people who only saw the ad, so it sits a rung lower.' : '')}/></td>
           </tr>
           {isOpen && (<tr><td className="tl" colSpan={7}>
             {/* Sticky and held to a reading measure: on a phone the table scrolls sideways, and the
