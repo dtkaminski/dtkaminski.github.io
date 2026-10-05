@@ -15451,8 +15451,15 @@ function CustomerSegments(){
       .finally(() => setBusy(''));
   };
 
-  if (err && !ov) return (<div className="card"><h2>Your customers</h2><div className="muted" style={{fontSize:'var(--text-sm)'}}>{err}</div></div>);
+  // Guard on a real field, not on having a reply: an empty or stubbed reply ({}) used to render
+  // "0 customers · — lifetime" for a brand with thousands, and a function error printed its raw JSON.
+  const segs = (ov && Array.isArray(ov.segments)) ? ov.segments.filter(x => Number(x.customers) > 0) : [];
+  const noneYet = /no customers in scope/i.test(err);
+  if (err && !segs.length) return (<div className="card"><h2>Your customers</h2><div className="v3-empty">{noneYet
+    ? 'No customers to group yet. Segments appear once your first orders have synced from Shopify.'
+    : 'Greta couldn’t group your customers just now. Refreshing the page usually sorts it.'}</div></div>);
   if (!ov) return (<div className="card"><h2>Your customers</h2><div className="muted" style={{fontSize:'var(--text-sm)'}}>Loading your customers…</div></div>);
+  if (!segs.length) return (<div className="card"><h2>Your customers</h2><div className="v3-empty">Greta couldn’t group your customers just now. Refreshing the page usually sorts it.</div></div>);
 
   const t = ov.totals || {};
   return (<div className="card">
@@ -15460,7 +15467,7 @@ function CustomerSegments(){
       <span className="meta">{(t.customers||0).toLocaleString('en-GB')} customers · {GBP(t.netRevenue)} lifetime · grouped by how recently and how often they buy</span></div>
 
     <div style={{display:'flex', gap:8, flexWrap:'wrap', marginTop:10}}>
-      {(ov.segments||[]).map(s => {
+      {segs.map(s => {
         const m = CSEG[s.segment] || { tone:'accent', blurb:'' };
         const on = seg === s.segment;
         return (<button key={s.segment} type="button" onClick={()=>openSeg(s.segment)}
