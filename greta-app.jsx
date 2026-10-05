@@ -14870,7 +14870,7 @@ function TeamPanel(){
     e.preventDefault();
     if(busy) return;
     setBusy(true); setMsg(null);
-    const { ok, data } = await call('invite', { email: email.trim(), role, redirect_to: 'https://operatorintelligence.com/auth/workspace.html' });
+    const { ok, data } = await call('invite', { email: email.trim(), role, redirect_to: (() => { try { return (window.top || window).location.origin; } catch (_) { return window.location.origin; } })() + '/auth/workspace.html' });
     setBusy(false);
     if(!ok){ setMsg({ text:data.detail||data.message||data.error||'Invite failed.', kind:'err' }); return; }
     setMsg({ text:data.message||'Invite sent.', kind:'ok' });
@@ -19767,6 +19767,138 @@ function V3DataTrust() {
   </section></div>);
 }
 
+// ── Team (V3, rebuilt 2026-10-05) ────────────────────────────────────────────────────────────────
+// The page listed email, role and the date someone was added. It could not say who still uses the
+// workspace (frkl's viewer had not signed in for twelve weeks), offered "Viewer — read only" when
+// viewers could change costs and the goal (0268 makes it true), sent invites to a domain that does not
+// resolve, and could not change a role. Now: who has access and who has not used it, each person's role
+// (changeable), last sign-in and what they have done in Greta (fn_team_activity, 0268), and invites that
+// land on this app.
+const V3_ROLE_HELP = [
+  ['viewer', 'Viewer', 'sees everything, changes nothing'],
+  ['member', 'Member', 'acts on the board, edits the plan, costs and settings'],
+  ['admin', 'Admin', 'also invites and removes people'],
+];
+function v3Ago(iso) {
+  if (!iso) return null;
+  const d = Math.floor((Date.now() - Date.parse(iso)) / 864e5);
+  return d <= 0 ? 'today' : d === 1 ? 'yesterday' : d < 14 ? d + ' days ago' : d < 60 ? Math.round(d / 7) + ' weeks ago' : Math.round(d / 30) + ' months ago';
+}
+function V3Team() {
+  const ASK = getOIAsk();
+  const authed = !!(ASK && ASK.brand_id && typeof ASK.getJwt === 'function' && ASK.endpoint);
+  const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = (window.FRKL_LIVE && window.FRKL_LIVE.brandId) || (ASK && ASK.brand_id);
+  const inviteUrl = authed ? ASK.endpoint.replace(/\/[^/]*$/, '') + '/invite-member' : '';
+  const [rows, setRows] = React.useState(null), [err, setErr] = React.useState('');
+  const [email, setEmail] = React.useState(''), [role, setRole] = React.useState('member');
+  const [busy, setBusy] = React.useState(false), [msg, setMsg] = React.useState(null);
+  const call = async (action, extra) => {
+    const jwt = await ASK.getJwt();
+    if (!jwt) return { ok: false, data: { detail: 'Your session expired — refresh the page and sign in again.' } };
+    const r = await fetch(inviteUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jwt },
+      body: JSON.stringify({ brand_id: ASK.brand_id, action, ...(extra || {}) }) });
+    return { ok: r.ok, data: await r.json().catch(() => ({})) };
+  };
+  // fn_team_activity (0268) has sign-ins and what each person has done; before it, the invite
+  // function's list (no activity).
+  const load = async () => {
+    setErr('');
+    const r = sb && b ? await sb.rpc('fn_team_activity', { p_brand: b }) : { error: { message: 'no client' } };
+    if (!r.error && Array.isArray(r.data)) { setRows(r.data.map(m => ({ ...m, activity: true }))); return; }
+    const { ok, data } = await call('list');
+    if (!ok || !data.members) { setErr(data.detail || data.error || 'Could not load the team just now.'); setRows([]); return; }
+    setRows(data.members.map(m => ({ user_id: m.user_id, email: m.email, role: m.role, added: m.created_at, is_self: m.is_self, activity: false })));
+  };
+  React.useEffect(() => { if (authed) load(); }, []);   // eslint-disable-line
+
+  if (!authed) return <div className="v3-empty">{(window.FRKL_LIVE && window.FRKL_LIVE.session) ? v3NoBrand('your team') : 'Team management is available in your signed-in workspace.'}</div>;
+  if (!rows) return <V3SkeletonRows n={3}/>;
+  if (err && !rows.length) return (<div className="v3-page-stack"><section><div className="v3-kick">Who has access</div><p className="v3-note v3-bad">{err}</p>
+    <button type="button" className="v3-btn v3-btn-sm" onClick={load}>Try again</button></section></div>);
+  const me = rows.find(r => r.is_self) || {};
+  const canManage = me.role === 'owner' || me.role === 'admin';
+  const canTarget = m => !m.is_self && canManage && (me.role === 'owner' ? m.role !== 'owner' : (m.role === 'member' || m.role === 'viewer'));
+  const brandName = String((typeof OI_BRAND !== 'undefined' && OI_BRAND && OI_BRAND.name) || 'this workspace').replace(/\.+$/, '');
+  // gone quiet: signed in, but not for a month; an invite not accepted after a week is its own case
+  const stale = rows.filter(r => r.activity && !r.is_self && r.last_sign_in_at && Date.now() - Date.parse(r.last_sign_in_at) > 30 * 864e5);
+  const pending = rows.filter(r => r.activity && !r.is_self && !r.last_sign_in_at && Date.now() - Date.parse(r.added) > 7 * 864e5);
+  const verdict = rows.length <= 1 ? 'Only you can see ' + brandName + '.'
+    : fmtCount(rows.length) + ' people can see ' + brandName + '.' + (stale.length
+      ? ' ' + (stale.length === 1 ? stale[0].email + ' hasn’t signed in since ' + v3Day(String(stale[0].last_sign_in_at).slice(0, 10), true) : fmtCount(stale.length) + ' people haven’t signed in for over a month') + ' — remove access that is no longer needed.'
+      : rows.every(r => r.activity) && !pending.length ? ' Everyone has signed in within the last month.' : '')
+    + (pending.length ? ' ' + (pending.length === 1 ? pending[0].email + ' hasn’t accepted their invite' : fmtCount(pending.length) + ' invites haven’t been accepted') + ' — send it again, or remove it.' : '');
+
+  const invite = async (e) => {
+    e.preventDefault(); if (busy) return;
+    setBusy(true); setMsg(null);
+    // the invite lands on this app's own workspace page (the function accepts only the app's origins)
+    let origin = ''; try { origin = (window.top || window).location.origin; } catch (_) { origin = window.location.origin; }
+    const { ok, data } = await call('invite', { email: email.trim(), role, redirect_to: origin + '/auth/workspace.html' });
+    setBusy(false);
+    if (!ok) { setMsg({ kind: 'err', text: data.detail || data.message || data.error || 'The invite did not go out.' }); return; }
+    setMsg({ kind: 'ok', text: data.message || 'Invite sent.' }); setEmail(''); load();
+  };
+  const changeRole = async (m, next) => {
+    setMsg(null);
+    const { ok, data } = await call('update_role', { target_user_id: m.user_id, role: next });
+    if (!ok) { setMsg({ kind: 'err', text: data.detail || data.error || 'Could not change that role.' }); return; }
+    setMsg({ kind: 'ok', text: m.email + ' is now ' + (V3_ROLE_HELP.find(r => r[0] === next) || [, next])[1].toLowerCase() + '.' }); load();
+  };
+  const remove = async (m) => {
+    const ask = m.is_self ? 'Leave this workspace? You will lose access immediately.' : 'Remove ' + m.email + ' from ' + brandName + '?';
+    if (!window.confirm(ask)) return;
+    const { ok, data } = await call('remove', { target_user_id: m.user_id });
+    if (!ok) { setMsg({ kind: 'err', text: data.detail || data.error || 'Could not remove them.' }); return; }
+    if (m.is_self) { try { (window.top || window).location.href = '/auth/login.html'; } catch (_) { window.location.href = '/auth/login.html'; } return; }
+    setMsg({ kind: 'ok', text: m.email + ' no longer has access.' }); load();
+  };
+  const did = m => {
+    if (!m.activity) return FMT_NONE;
+    const bits = [];
+    if (m.decisions_30d) bits.push(fmtCount(m.decisions_30d) + (m.decisions_30d === 1 ? ' decision' : ' decisions'));
+    if (m.notes) bits.push(fmtCount(m.notes) + (m.notes === 1 ? ' note' : ' notes'));
+    if (m.questions_30d) bits.push(fmtCount(m.questions_30d) + (m.questions_30d === 1 ? ' question' : ' questions'));
+    return bits.length ? bits.join(' · ') : 'nothing yet';
+  };
+
+  return (<div className="v3-page-stack">
+    <section>
+      <div className="v3-kick">Who has access</div>
+      <p className="v3-verdict">{verdict}</p>
+      {err && <p className="v3-note v3-bad">{err}</p>}
+      <table className="v3-rw">
+        <thead><tr><th className="t-text">Person</th><th className="t-text">Role</th><th className="t-text">Last signed in</th><th className="t-text">In Greta, last 30 days</th><th/></tr></thead>
+        <tbody>{rows.map(m => (<tr key={m.user_id}>
+          <td className="t-text v3-rw-name">{m.email}{m.is_self ? <span className="v3-muted"> (you)</span> : null}</td>
+          <td className="t-text">{canTarget(m)
+            ? <select value={m.role} aria-label={'Role for ' + m.email} onChange={e => changeRole(m, e.target.value)}>
+                {V3_ROLE_HELP.filter(r => r[0] !== 'admin' || me.role === 'owner').map(r => <option key={r[0]} value={r[0]}>{r[1]}</option>)}
+              </select>
+            : v3Sentence(m.role)}</td>
+          <td className="t-text">{m.activity ? (m.last_sign_in_at ? v3Ago(m.last_sign_in_at) : <span className="v3-down">never — invite not accepted</span>) : FMT_NONE}</td>
+          <td className="t-text v3-muted">{did(m)}</td>
+          <td>{(canTarget(m) || (m.is_self && m.role !== 'owner')) && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => remove(m)}>{m.is_self ? 'Leave' : 'Remove'}</button>}</td>
+        </tr>))}</tbody>
+      </table>
+      <p className="micro muted v3-measure">Decisions are actions marked done or skipped on the board (recorded from 5 Oct 2026); notes are the weekly review’s; questions are asked of Greta.</p>
+    </section>
+
+    {canManage && (<section className="v3-sec">
+      <h2 className="v3-sec-title">Invite someone</h2>
+      <form className="v3-comp-add" onSubmit={invite}>
+        <input className="v3-search" type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="name@yourbrand.com" aria-label="Email" autoComplete="off"/>
+        <select value={role} onChange={e => setRole(e.target.value)} aria-label="Role">
+          {V3_ROLE_HELP.filter(r => r[0] !== 'admin' || me.role === 'owner').map(r => <option key={r[0]} value={r[0]}>{r[1]}</option>)}
+        </select>
+        <button type="submit" className="v3-btn v3-btn-p" disabled={busy || !email.trim()}>{busy ? 'Sending…' : 'Send invite'}</button>
+      </form>
+      <ul className="v3-rank-steps">{V3_ROLE_HELP.map(r => (<li key={r[0]}><span className="v3-rank-desc"><b>{r[1]}</b> — {r[2]}.</span></li>))}</ul>
+      <p className="micro muted v3-measure">They get an email with a sign-in link that opens this workspace. Only an owner can make someone an admin.</p>
+    </section>)}
+    {msg && <p className={msg.kind === 'ok' ? 'v3-note v3-ok' : 'v3-note v3-bad'} role="status">{msg.text}</p>}
+  </div>);
+}
+
 const V3_PAGES = {
   today: (p) => <V3Today {...p}/>,
   review: (p) => (<>
@@ -19892,7 +20024,7 @@ const V3_PAGES = {
     <ConnectionsPanel/>
     <DataHealth/>
   </>),
-  team: (p) => <TeamPanel/>,
+  team: (p) => (UI_V3 ? <V3Team/> : <TeamPanel/>),
 };
 // Anchor target for a deep link that used to open a sub-tab.
 function V3Anchor({ id }) {
