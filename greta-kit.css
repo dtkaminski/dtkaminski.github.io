@@ -1050,3 +1050,21 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-incr-call.v3-incr-cut { color: var(--color-danger); }
 .v3-incr-call.v3-incr-pays { color: var(--color-success); }
 .v3-incr-call.v3-incr-test { color: var(--color-warning); font-weight: var(--weight-semi); }
+/* ── Profit & sales lead: the money chain ─────────────────────────────────── */
+/* One row per step, a bar sized against sales, the figure, and pence in the pound. A negative
+   subtotal turns red and keeps its minus: the old waterfall printed a loss without one. */
+.v3-chain { list-style: none; margin: var(--space-5) 0 0; padding: 0; max-width: 760px; }
+.v3-chain li { display: grid; grid-template-columns: minmax(11rem, 1.2fr) 2fr 7rem 7rem; align-items: center; gap: var(--space-4);
+  padding: var(--space-2) 0; border-top: 1px solid var(--color-line); font-size: var(--text-sm); color: var(--color-secondary); }
+.v3-chain-track { height: var(--space-2); background: var(--color-sunken); border-radius: var(--radius-sm); overflow: hidden; }
+.v3-chain-track i { display: block; height: 100%; background: var(--color-data-quiet); }
+.v3-chain-in .v3-chain-track i { background: var(--color-data-3); }
+.v3-chain-sub .v3-chain-track i, .v3-chain-total .v3-chain-track i { background: var(--color-success); }
+.v3-chain li.neg .v3-chain-track i { background: var(--color-danger); }
+.v3-chain-v { font-family: var(--font-figure); font-weight: var(--weight-semi); text-align: right; color: var(--color-ink); }
+.v3-chain-p { font-size: var(--text-xs); color: var(--color-muted); text-align: right; }
+.v3-chain-sub, .v3-chain-total { color: var(--color-ink); }
+.v3-chain-sub .v3-chain-k, .v3-chain-total .v3-chain-k { font-weight: var(--weight-semi); }
+.v3-chain li.v3-chain-total { border-top: 2px solid var(--color-ink); }
+.v3-chain li.neg .v3-chain-v { color: var(--color-danger); }
+@media (max-width: 760px) { .v3-chain li { grid-template-columns: 1fr auto; } .v3-chain-track { grid-column: 1 / -1; grid-row: 2; } .v3-chain-p { display: none; } }

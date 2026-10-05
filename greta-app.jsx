@@ -3131,7 +3131,7 @@ function ContributionCard({rev, orders, paid, cmr, gross, days}){
   const fixedWin = (fixedMonthly!=null && days>0) ? fixedMonthly*(days/30) : null;
   const net = fixedWin!=null ? kept - fixedWin : null;
   const pct = v => rev > 0 ? Math.round((v / rev) * 100) + 'p in every £1' : '';
-  const line = (label, v, opts) => <CmRow label={label} amount={(opts && opts.neg ? '−' : '') + GBP(Math.abs(v))}
+  const line = (label, v, opts) => <CmRow label={label} amount={opts && opts.neg ? '−' + GBP(Math.abs(v)) : GBP(v)}
     bold={opts && opts.bold} color={opts && opts.color || 'var(--text-muted)'} top={opts && opts.top}/>;
   return (<div className="card">
     <div className="card-section-title">
@@ -3540,6 +3540,191 @@ function WhatChangedStrip(){
   </div>);
 }
 
+// ── Profit & sales lead (V3) — anatomy Stage 1, the P&L chain, read against a fair yardstick ───
+// The page asks "where does my money come from, and where does it go?". It used to answer with the
+// last 30 days against the 30 before — for frkl a window that was 89% summer sale — so an ordinary
+// month read as "sales −42%, profit −83%", a business losing £8k a month after overheads was scored
+// "fundamentally sound", and the loss itself printed without its minus sign.
+//
+// Now, every figure per brand from the server:
+//   last 30 days     GRETA_HEADLINE (sales, ad spend, profit before ads) so this page and Today agree
+//   history          cache_daily_cm_ladder: net sales and ad spend per day, cut into 30-day windows
+//                    ending on the same day. Profit after ads in every window = sales × the headline's
+//                    margin after product and order costs − ad spend, one margin for the whole series.
+//   typical month    the MEDIAN of the six windows before this one: one sale window cannot move it
+//   overheads        brand_config.fixed_costs_monthly — each brand's own; missing → ask, never assume
+// The change against a typical month splits exactly: margin × (sales − typical sales) is what sales
+// did, (typical spend − spend) is what ad spend did. The larger one is the headline.
+const V3_DAYS_IN_MONTH = 365 / 12;
+function V3ProfitLead() {
+  const H = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || null;
+  const lad = useV3Rows('profit-ladder', (sb, b) => sb.from('cache_daily_cm_ladder')
+    .select('day,net_sales,paid_spend').eq('brand_id', b)
+    .gte('day', v3IsoAdd(new Date().toISOString().slice(0, 10), -400)).order('day', { ascending: true }).limit(1000));
+  const cfg = useV3Rows('profit-overheads', (sb, b) => sb.from('brand_config').select('fixed_costs_monthly').eq('brand_id', b).limit(1));
+  const mix = useV3Rows('cust-tier', (sb, b) => sb.from('vw_customer_tier_periods')
+    .select('window_label,new_customers,returning_customers,new_net,returning_net,net_sales,ncac,returning_rev_share')
+    .eq('brand_id', b).eq('window_label', 'current_30d').limit(1));
+  const sales = H && H.net_revenue_30d != null ? Number(H.net_revenue_30d) : null;
+  const spend = H && H.paid_spend_30d != null ? Number(H.paid_spend_30d) : null;
+  const before = H && H.product_contribution_30d != null ? Number(H.product_contribution_30d) : null;
+  const cmr = sales > 0 && before != null ? before / sales : null;
+  const ohRow = (cfg.rows || [])[0] || null;
+  const ohMonth = ohRow && ohRow.fixed_costs_monthly != null && Number(ohRow.fixed_costs_monthly) > 0 ? Number(ohRow.fixed_costs_monthly) : null;
+  const oh30 = ohMonth != null ? ohMonth * 30 / V3_DAYS_IN_MONTH : null;
+
+  const d = React.useMemo(() => {
+    if (!lad.rows || cmr == null) return null;
+    const today = new Date().toISOString().slice(0, 10);
+    const rows = lad.rows.filter(r => String(r.day).slice(0, 10) < today);
+    if (rows.length < 60) return null;
+    const end = String(rows[rows.length - 1].day).slice(0, 10);
+    const byDay = {}; rows.forEach(r => { byDay[String(r.day).slice(0, 10)] = r; });
+    const wins = [];
+    for (let i = 0; i < 13; i++) {
+      const e = v3IsoAdd(end, -30 * i), s = v3IsoAdd(e, -29);
+      let sl = 0, sp = 0, n = 0;
+      for (let k = 0; k < 30; k++) { const r = byDay[v3IsoAdd(s, k)]; if (r) { sl += Number(r.net_sales) || 0; sp += Number(r.paid_spend) || 0; n++; } }
+      if (n < 25) break;                       // a window with missing days is not a month
+      wins.unshift({ s, e, sales: sl, spend: sp, kept: sl * cmr - sp, label: v3Day(e) });
+    }
+    if (wins.length < 4) return null;
+    const med = a => { const x = a.slice().sort((p, q) => p - q), m = Math.floor(x.length / 2); return x.length % 2 ? x[m] : (x[m - 1] + x[m]) / 2; };
+    const prev = wins.slice(Math.max(0, wins.length - 7), wins.length - 1);
+    const typ = { sales: med(prev.map(w => w.sales)), spend: med(prev.map(w => w.spend)) };
+    typ.kept = typ.sales * cmr - typ.spend;
+    const lyEnd = v3IsoAdd(end, -364);
+    let ly = null; { let sl = 0, sp = 0, n = 0; for (let k = 0; k < 30; k++) { const r = byDay[v3IsoAdd(lyEnd, -29 + k)]; if (r) { sl += Number(r.net_sales) || 0; sp += Number(r.paid_spend) || 0; n++; } } if (n >= 25) ly = { sales: sl, spend: sp, kept: sl * cmr - sp }; }
+    return { wins, typ, ly, n: prev.length };
+  }, [lad.rows, cmr]);
+
+  if (!H) return <V3SkeletonRows n={4}/>;
+  if (cmr == null) return (<section className="v3-sec">
+    <div className="v3-kick">Last 30 days</div>
+    <p className="v3-verdict">Greta needs your costs before she can say what you keep.</p>
+    <p className="v3-note v3-measure">Enter what your products and orders cost, and this page shows where each pound of sales goes, what a typical month looks like, and what has changed.</p>
+    <button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs')}>Enter your costs</button>
+  </section>);
+  if (lad.err || cfg.err) return null;
+  if (!lad.rows || !cfg.rows) return <V3SkeletonRows n={4}/>;
+
+  const kept = before - spend;
+  const op = oh30 != null ? kept - oh30 : null;
+  const T = d && d.typ;
+  const salesEff = T ? cmr * (sales - T.sales) : null, spendEff = T ? -(spend - T.spend) : null;
+  const dKept = T ? kept - T.kept : null;
+  const chg = (a, b) => b > 0 ? a / b - 1 : null;
+  const sChg = T ? chg(sales, T.sales) : null, pChg = T ? chg(spend, T.spend) : null;
+  const salesWord = sChg == null ? '' : Math.abs(sChg) < 0.1 ? 'normal for you' : (sChg > 0 ? 'up ' : 'down ') + fmtPctN(Math.abs(sChg)) + ' on a typical month';
+  const spendWord = pChg == null ? '' : pChg >= 0.5 ? fmtTimes(spend / T.spend, 1) + ' a typical month' : (pChg >= 0 ? 'up ' : 'down ') + fmtPctN(Math.abs(pChg));
+  const moved = T && Math.abs(dKept) >= Math.max(500, Math.abs(T.kept) * 0.1);
+  const lead = !T ? null : !moved ? 'A typical month: sales were ' + salesWord + ' and you kept ' + fmtMoney(kept) + ' after ads.'
+    : Math.abs(spendEff) >= Math.abs(salesEff)
+      ? (spendEff < 0 ? 'Sales are ' + salesWord + ', but ad spend is ' + spendWord + ' — that is what took your profit.'
+                      : 'Ad spend is ' + spendWord + ' and sales are ' + salesWord + ' — the lower spend is what lifted your profit.')
+      : (salesEff < 0 ? 'Sales are ' + salesWord + ' — that is what took your profit.' : 'Sales are ' + salesWord + ' — that is what lifted your profit.');
+  // Break-even on overheads, both ways round.
+  const maxSpend = oh30 != null ? before - oh30 : null;
+  const needSales = oh30 != null ? (oh30 + spend) / cmr : null;
+  const extra = T ? spend - T.spend : 0;
+
+  const chain = [
+    { k: 'Sales', v: sales, kind: 'in' },
+    { k: 'Product and order costs', v: -(sales - before), kind: 'out' },
+    { k: 'Ad spend', v: -spend, kind: 'out' },
+    { k: 'Kept after ads', v: kept, kind: 'sub' },
+  ];
+  if (oh30 != null) { chain.push({ k: 'Overheads — rent, wages, software', v: -oh30, kind: 'out' }); chain.push({ k: 'Operating profit', v: op, kind: 'total' }); }
+  const per = v => sales > 0 ? Math.round(Math.abs(v) / sales * 100) + 'p in every £1' : '';
+
+  const t30 = (mix.rows || [])[0] || null;
+  const newNet = t30 ? Number(t30.new_net) || 0 : 0, retNet = t30 ? Number(t30.returning_net) || 0 : 0, mixTot = newNet + retNet;
+
+  const tip = ({ active, payload }) => {
+    if (!active || !payload || !payload.length) return null;
+    const p = payload[0].payload;
+    return (<div className="v3-tip"><b>30 days to {v3Day(p.e, true)}</b>
+      <span>Sales <em>{fmtMoney(p.sales)}</em></span><span>Ad spend <em>{fmtMoney(p.spend)}</em></span>
+      <span>Kept after ads <em>{fmtMoney(p.kept)}</em></span>{oh30 != null && <span>Overheads <em>{fmtMoney(oh30)}</em></span>}</div>);
+  };
+  return (<div className="v3-page-stack">
+    <section className="v3-sec v3-profit-head">
+      <div className="v3-kick">Last 30 days · against a typical month for you</div>
+      <p className="v3-verdict">{lead || 'You kept ' + fmtMoney(kept) + ' after ads on ' + fmtMoney(sales) + ' of sales.'}</p>
+      {T && <p className="v3-note v3-measure">
+        A typical month — the middle of your last {fmtCount(d.n)} — is {fmtMoney(T.sales)} of sales on {fmtMoney(T.spend)} of ads, keeping {fmtMoney(T.kept)}.
+        {' '}This month: {fmtMoney(sales)} on {fmtMoney(spend)}, keeping {fmtMoney(kept)}.
+        {moved && <> Against typical, sales {salesEff >= 0 ? 'added' : 'cost you'} {fmtMoney(Math.abs(salesEff))} and ad spend {spendEff >= 0 ? 'added' : 'cost you'} {fmtMoney(Math.abs(spendEff))}.</>}
+        {d.ly && <> The same 30 days last year: {fmtMoney(d.ly.sales)} of sales{d.ly.sales > 0 ? ' (' + (sales >= d.ly.sales ? '+' : '−') + fmtPctN(Math.abs(sales / d.ly.sales - 1)) + ' now)' : ''}.</>}
+      </p>}
+      <ul className="v3-chain" aria-label="Where each pound of sales went">
+        {chain.map(r => (<li key={r.k} className={'v3-chain-' + r.kind + (r.v < 0 && r.kind !== 'out' ? ' neg' : '')}>
+          <span className="v3-chain-k">{r.kind === 'out' ? '− ' : r.kind === 'sub' || r.kind === 'total' ? '= ' : ''}{r.k}</span>
+          <span className="v3-chain-track"><i style={{ width: Math.min(100, sales > 0 ? Math.abs(r.v) / sales * 100 : 0) + '%' }}/></span>
+          <span className="v3-chain-v">{fmtMoney(r.v)}</span>
+          <span className="v3-chain-p">{r.kind === 'in' ? '' : (r.v < 0 && r.kind !== 'out' ? '−' : '') + per(r.v)}</span>
+        </li>))}
+      </ul>
+      {oh30 == null && <p className="v3-note v3-measure">Add your monthly overheads — rent, wages, software — and Greta will show whether what you keep covers them, and the ad spend you can afford.{' '}
+        <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('goal', 'economics')}>Add overheads</button></p>}
+    </section>
+
+    {d && (<figure className="v3-chart v3-chart-solo">
+      <figcaption><span className="v3-chart-title">Sales, ad spend and what you kept, 30 days at a time</span>
+        <span className="v3-legend"><i style={{ background: PAL.quiet }}/>Sales <i style={{ background: PAL.accent }}/>Ad spend <i style={{ background: PAL.ink }}/>Kept after ads{oh30 != null && <> <i className="dash"/>Overheads</>}</span></figcaption>
+      <R.ResponsiveContainer width="100%" height={240}>
+        <R.ComposedChart data={d.wins} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <R.CartesianGrid/>
+          <R.XAxis dataKey="label" interval="preserveStartEnd"/>
+          <R.YAxis tickFormatter={fmtMoneyK}/>
+          <R.Tooltip content={tip} cursor={false}/>
+          <R.Bar dataKey="sales" fill={PAL.quiet} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
+          <R.Bar dataKey="spend" fill={PAL.accent} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
+          <R.Line dataKey="kept" type="monotone" stroke={PAL.ink} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
+          {oh30 != null && <R.ReferenceLine y={oh30} stroke={PAL.muted} strokeDasharray="4 3"/>}
+          <R.ReferenceLine y={0} stroke={PAL.line}/>
+        </R.ComposedChart>
+      </R.ResponsiveContainer>
+      <p className="micro muted v3-measure">Each point is 30 days ending on the date shown. Kept after ads = sales × {fmtPctN(cmr)} (what is left after product and order costs) − ad spend.{oh30 != null ? ' When the line sits under the dashed overheads line, the business made a loss those 30 days.' : ''}</p>
+    </figure>)}
+
+    {(extra > Math.max(250, (T ? T.spend : 0) * 0.2) || (op != null && op < 0)) && (<section className="v3-sec">
+      <h2 className="v3-sec-title">What to do about it</h2>
+      <ol className="v3-moves">
+        {T && extra > Math.max(250, T.spend * 0.2) && (<li>
+          <b>Bring ad spend back toward {fmtMoney(T.spend)} a month.</b>
+          {' '}You are spending {fmtMoney(extra)} more than in a typical month, and sales are {salesWord}{sChg != null && sChg <= 0.1 ? ', so the extra spend has not bought extra sales' : ''}.
+          {' '}If sales hold, that is up to {fmtMoney(extra)} a month back. Marketing shows which channels lose money on any reading — cut those first.
+          {' '}<button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('marketing')}>See which channels</button>
+          {' '}<V3Conf state="probably" detail="The spend and sales are measured. That cutting the extra spend would not cost sales is the assumption — it held over the months shown, where spend rose and sales did not."/>
+        </li>)}
+        {op != null && op < 0 && (<li>
+          <b>Cover your overheads.</b>
+          {' '}After {fmtMoney(ohMonth)} a month of overheads, these 30 days made a loss of {fmtMoney(Math.abs(op))}.
+          {maxSpend > 0
+            ? <> At today’s sales, ads can cost at most {fmtMoney(maxSpend)} a month for the business to break even; at today’s ad spend it needs {fmtMoney(needSales)} of sales.</>
+            : <> Even with no ads, today’s sales leave {fmtMoney(Math.abs(maxSpend))} of overheads uncovered; at today’s ad spend it needs {fmtMoney(needSales)} of sales.</>}
+          {' '}The other levers are a bigger order and more customers coming back.
+          {' '}<button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('products')}>Raise order value</button>
+          {' '}<button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('customers')}>Bring customers back</button>
+        </li>)}
+      </ol>
+    </section>)}
+
+    {mixTot > 0 && (<section className="v3-sec">
+      <h2 className="v3-sec-title">Where the sales came from <span className="v3-muted">last 30 days</span></h2>
+      <div className="v3-share" role="img" aria-label="Sales from new and returning customers">
+        <i style={{ width: (newNet / mixTot * 100) + '%', background: PAL.data3 }}/><i style={{ width: (retNet / mixTot * 100) + '%', background: PAL.accent }}/>
+      </div>
+      <table className="v3-share-table"><tbody>
+        <tr><td className="t-text"><i className="v3-dot" style={{ background: PAL.data3 }}/>New customers · {fmtCount(t30.new_customers)}</td><td>{fmtMoney(newNet)}</td><td className="v3-muted">{fmtPctN(newNet / mixTot)}</td></tr>
+        <tr><td className="t-text"><i className="v3-dot" style={{ background: PAL.accent }}/>Returning customers · {fmtCount(t30.returning_customers)}</td><td>{fmtMoney(retNet)}</td><td className="v3-muted">{fmtPctN(retNet / mixTot)}</td></tr>
+      </tbody></table>
+      <p className="v3-note v3-measure">{t30.ncac != null ? 'Each new customer cost ' + fmtMoney(t30.ncac) + ' in ads to win. ' : ''}What each ad channel actually caused is on Marketing; what customers are worth over time is on Customers.</p>
+    </section>)}
+  </div>);
+}
+
 function Overview({start, period, customActive}){
   const isMobile = useIsMobile();
   const [evTick, setEvTick] = useState(0);   // bump to re-read the operator event log
@@ -3761,6 +3946,11 @@ function Overview({start, period, customActive}){
   const priEvents = brandEvents.filter(e=>eventOverlaps(e, prior.start, prior.end));
   const dxContext = buildEvidence({mer, pMer, paid, pPaid, rev, pRev, orders, pOrders, discLoad, pDiscLoad, histDaily,
                                    events:{current:curEvents, prior:priEvents, all:brandEvents}});
+  // Conversion is judged only when analytics recorded most of the period; overheads are the brand's
+  // own saved figure, prorated to the period.
+  const cvrReliable = (() => { const gd = ga.filter(g => Number(g.sessions) > 0).length; return daily.length > 0 && gd >= daily.length * 0.8; })();
+  const ohWin = (() => { try { const c = window.FRKL_PLAN && window.FRKL_PLAN.config; const m = c && c.fixed_costs_monthly != null ? Number(c.fixed_costs_monthly) : null;
+    return m > 0 ? m * Math.max(1, Math.round((Date.parse(end) - Date.parse(start)) / 86400000) + 1) / (365 / 12) : null; } catch (e) { return null; } })();
   return (
     <div style={{display:'flex', flexDirection:'column', gap:'var(--s-5)'}}>
       {costsOpen && <CostSetupModal catalogueGm={grossMargin} onClose={()=>setCostsOpen(false)}/>}
@@ -3778,11 +3968,14 @@ function Overview({start, period, customActive}){
           question. The money flow is that answer, so it leads; the briefing is demoted to a
           collapsed section below rather than deleted, because the content is good, just misplaced.
           Figures come from the same row Today reads, so the two screens cannot disagree. */}
-      <div className="v3-profit-lead">
+      {/* The lead answers the page question against a typical month, not the 30 days before (2026-10-05). */}
+      {UI_V3 ? <V3ProfitLead/> : (<div className="v3-profit-lead">
         <V3MoneyFlow d={(typeof window !== 'undefined' && window.GRETA_HEADLINE) || {}} note="last 30 days"/>
-      </div>
+      </div>)}
       {/* Crux verdict: compact scorecard strip + the diagnostic (with the £-bridge nested in its "thinking") */}
-      <ScoresStrip metrics={cruxMetrics} windowLabel={`last ${CRUX_DAYS} days`}/>
+      {/* Health / safe-to-scale scores are benchmark ratios capped at full marks with no overheads in
+          them: they scored frkl 84/100 "fundamentally sound" in a month that lost 8k after overheads. Off in V3. */}
+      {!UI_V3 && <ScoresStrip metrics={cruxMetrics} windowLabel={`last ${CRUX_DAYS} days`}/>}
       {/* V3: no second "what to do next" here. The diagnostic picked its own "biggest lever" from
           browser-side rules (and, for frkl, a July analyst read), so Profit & sales led with a
           different first action from Today and Actions. Ranking is the board's job; the pointer
@@ -3819,6 +4012,8 @@ function Overview({start, period, customActive}){
       <button type="button" className="v3-xref" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>
         Everything worth doing, in order <span className="v3-xref-go">on Actions →</span>
       </button>
+      {/* Everything driven by the period picker sits behind one disclosure: the lead above is the answer. */}
+      <V3More id="profit-detail" label="The detail for the period you pick — every figure, what moved, day by day">
       {/* COMMERCIAL HEALTH */}
       <div className="section-eyebrow" style={{display:'flex',alignItems:'center',gap:8,margin:'8px 0 -4px',fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-muted)'}}>
         <span style={{width:3,height:14,background:'var(--text-faint)',borderRadius:'var(--radius-sm)'}}/>Commercial health
@@ -3849,10 +4044,10 @@ function Overview({start, period, customActive}){
           <KPI label="Sessions (GA4)" val={NUM(sessions)} sub={(() => { const gd = ga.filter(g => Number(g.sessions) > 0).length, nd = daily.length;
               return (gd < nd ? `${gd} of ${nd} days have reliable analytics · ` : '') + `site conversion rate ${PCT(cvr)} on those days`; })()} series={seriesSessions} current={sessions} prior={pSessions} goodDirection="up"
             agent="Pulse" observation={_vs('Visits', sessions, pSessions, 'ad spend', paid, pPaid)} />
-          <KPI label="Orders Klaviyo saw" val={GBP(emailRev)} sub="every order Klaviyo recorded, including VAT and shipping — not sales from email" series={seriesEmail} current={emailRev} prior={(pKl.length >= Math.max(3, Math.floor(kl.length * 0.8))) ? pEmailRev : null} goodDirection="up"
-            agent="Lux" observation={_vs('Orders Klaviyo saw', emailRev, pEmailRev, 'sales', rev, pRev)} />
+          {!UI_V3 && <KPI label="Orders Klaviyo saw" val={GBP(emailRev)} sub="every order Klaviyo recorded, including VAT and shipping — not sales from email" series={seriesEmail} current={emailRev} prior={(pKl.length >= Math.max(3, Math.floor(kl.length * 0.8))) ? pEmailRev : null} goodDirection="up"
+            agent="Lux" observation={_vs('Orders Klaviyo saw', emailRev, pEmailRev, 'sales', rev, pRev)} />}
           <KPI label="Visitors who buy" val={PCT(cvr)} sub="orders ÷ sessions, on the days analytics recorded" series={seriesCVR} current={cvr} prior={pCvr} goodDirection="up"
-            status={cvr==null?undefined:cvr>=CVR_BENCH?'healthy':cvr>=CVR_BENCH*0.8?'watch':'action'} statusLabel={cvr==null?undefined:cvr>=CVR_BENCH?'Healthy':cvr>=CVR_BENCH*0.8?'Watch':'Below target'}
+            status={(cvr==null||!cvrReliable)?undefined:cvr>=CVR_BENCH?'healthy':cvr>=CVR_BENCH*0.8?'watch':'action'} statusLabel={cvr==null?undefined:!cvrReliable?'Too few tracked days':cvr>=CVR_BENCH?'Healthy':cvr>=CVR_BENCH*0.8?'Watch':'Below target'}
             agent="Pulse" observation={`Site conversion rate (Shopify orders ÷ GA4 sessions) is the single biggest revenue lever — against the ${CVR_BENCH_LABEL} target, more spend just buys more bounces.`}
             benchmark="site_cvr" bmValue={cvr} />
           <KPI label="Discount depth" val={PCT(discLoad)} sub={`${curSym()} off ÷ ${curSym()} of sales — how deep, not how many orders · drafts excluded`} series={seriesDisc} current={discLoad} prior={pDiscLoad} goodDirection="down"
@@ -3860,7 +4055,7 @@ function Overview({start, period, customActive}){
             implication="Audit always-on codes + affiliate rates; protect full-price demand. The true load incl. markdowns is materially higher — see Promotions."
             benchmark="discount_load" bmValue={discLoad} />
           <KPI label="Profit after ads (% of sales)" val={cmPct!=null?PCT(cmPct):'—'} sub="what you keep from each £ of sales, after product costs and ads · 10% or more is healthy" badge={<MarginBadge onSetup={()=>{ window.__oiGo && window.__oiGo('goal', 'margin'); }}/>} series={seriesContrib} seriesLabel={`Contribution ${curSym()} · by day`} current={contrib} prior={pContrib} goodDirection="up"
-            status={cmPct==null?undefined:cmPct>=0.10?'healthy':cmPct>=0.05?'watch':'margin'} statusLabel={cmPct==null?undefined:cmPct>=0.10?'Healthy':cmPct>=0.05?'Watch':'Margin risk'}
+            status={cmPct==null?undefined:ohWin!=null?(contrib>=ohWin?'healthy':contrib>0?'watch':'margin'):cmPct>=0.10?'healthy':cmPct>=0.05?'watch':'margin'} statusLabel={cmPct==null?undefined:ohWin!=null?(contrib>=ohWin?'Covers overheads':contrib>0?'Short of overheads':'Loss after ads'):cmPct>=0.10?'Healthy':cmPct>=0.05?'Watch':'Margin risk'}
             agent="Atlas" observation="Whether the growth is actually profitable — net revenue × product margin minus paid media, as a share of revenue. Returns are already netted out of revenue. The single best read on profitable vs vanity growth."
             implication="Below 10% means scaling just amplifies a thin engine — fix discount load, returns and cost per new customer before adding spend."
             benchmark="contribution_margin" bmValue={cmPct} />
@@ -3908,7 +4103,7 @@ function Overview({start, period, customActive}){
       {/* Below-the-fold operational charts — lazy-mounted so cold first-paint isn't
           blocked by mounting every Recharts at once (and never at 0-width). */}
       {/* Contribution margin — editable, fully-loaded operator P&L for the period */}
-      <LazyMount minHeight={360}><ContributionCard rev={rev} orders={orders} paid={paid} cmr={gm} gross={gmGross} days={Math.max(1, Math.round((Date.parse(end)-Date.parse(start))/86400000)+1)}/></LazyMount>
+      {!UI_V3 && <LazyMount minHeight={360}><ContributionCard rev={rev} orders={orders} paid={paid} cmr={gm} gross={gmGross} days={Math.max(1, Math.round((Date.parse(end)-Date.parse(start))/86400000)+1)}/></LazyMount>}
       {/* Margin bridge — why contribution moved vs prior period (volume/price/discount/returns/paid) */}
       {/* gm here is the server's contribution ratio — already net of shipping, packaging and fees —
           so no per-order costs are taken off again. With them (and frkl's device-only defaults)
@@ -3972,6 +4167,7 @@ function Overview({start, period, customActive}){
             {key:'revenue', label:'Net revenue', right:true, fmt:v=>GBP(v)},
           ]}/>
       </div></LazyMount>
+      </V3More>
       {/* PLANNING & DEEP-DIVE — forecast + unit-economics-over-time are board/planning
           artifacts, not "what's happening this week", so they live behind a toggle. */}
       <div className="section-eyebrow" style={{display:'flex',alignItems:'center',gap:8,margin:'8px 0 -4px',fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-muted)'}}>
