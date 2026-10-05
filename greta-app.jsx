@@ -3558,9 +3558,7 @@ function WhatChangedStrip(){
 const V3_DAYS_IN_MONTH = 365 / 12;
 function V3ProfitLead() {
   const H = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || null;
-  const lad = useV3Rows('profit-ladder', (sb, b) => sb.from('cache_daily_cm_ladder')
-    .select('day,net_sales,paid_spend').eq('brand_id', b)
-    .gte('day', v3IsoAdd(new Date().toISOString().slice(0, 10), -400)).order('day', { ascending: true }).limit(1000));
+  const lad = useV3Rows('profit-ladder', V3_LADDER_Q);
   const cfg = useV3Rows('profit-overheads', (sb, b) => sb.from('brand_config').select('fixed_costs_monthly').eq('brand_id', b).limit(1));
   const mix = useV3Rows('cust-tier', (sb, b) => sb.from('vw_customer_tier_periods')
     .select('window_label,new_customers,returning_customers,new_net,returning_net,net_sales,ncac,returning_rev_share')
@@ -6640,6 +6638,7 @@ function DCSpark({series, axis, color}){
 
 function DiscountCodeTracker(){
   const DATA = (typeof window!=='undefined' && window.FRKL_DISCOUNT_CODES) || null;
+  const ue = useV3Rows('cust-ue', V3_UE_Q);   // first-order profit, to size a deep first-order code
   if(!DATA || !DATA.codes || !DATA.codes.length) return (
     <div className="card"><div className="card-section-title"><h2 style={{margin:0}}>Affiliate & discount codes</h2></div>
     <div className="note">No coded orders found in the window. Once Shopify orders carry discount codes, this fills in.</div></div>);
@@ -6667,8 +6666,24 @@ function DiscountCodeTracker(){
     <div style={{fontSize:'var(--text-xs)',color:'var(--text-muted)',marginTop:2}}>{sub}</div>
   </div>);
 
+  // The verdict the tracker never gave: how much of all ordering runs through codes that never stop,
+  // the one carrying most of it (a code that common has usually spread past its audience), and what a
+  // deep first-order code costs against what a first order makes.
+  const allOrders = (M.fullPriceOrders || 0) + (M.discountedOrders || 0);
+  const always = mkt.filter(c => c.pattern === 'always-on').sort((a, b) => b.orders - a.orders);
+  const alwaysOrders = always.reduce((a, c) => a + (c.orders || 0), 0);
+  const deep = mkt.filter(c => (c.discountRate || 0) >= 0.2 && c.orders >= 20).sort((a, b) => b.discount - a.discount)[0] || null;
+  const U = (ue.rows || [])[0] || null, firstProfit = U && Number(U.first_order_contribution) > 0 ? Number(U.first_order_contribution) : null;
+  const verdict = UI_V3 && allOrders > 0 && always.length > 0 ? (<section className="v3-sec" style={{marginBottom:14}}>
+    <p className="v3-verdict">{fmtPctN(alwaysOrders / allOrders)} of your orders use a code that never stops.</p>
+    <ol className="v3-moves">
+      <li><b>Check where {always[0].code} is being used.</b> It is on {fmtCount(always[0].orders)} orders — {fmtPctN(always[0].orders / allOrders)} of every order in {M.weeks || 26} weeks — and has given away {fmtMoney(always[0].discount)}. A code that common has usually spread past the people it was made for, to coupon sites and browser extensions. If those orders are not its audience, retire it or replace it with one that expires.</li>
+      {deep && <li><b>Size {deep.code} against what a first order makes.</b> It takes {fmtPctN(deep.discountRate)} off, {fmtMoney(deep.discount / Math.max(1, deep.orders))} an order on average{firstProfit ? <> — against the {fmtMoney(firstProfit)} a first order makes after costs</> : null}. Keep it only where it wins customers who would not have bought without it.</li>}
+    </ol>
+  </section>) : null;
   return (
     <div>
+      {verdict}
       <div className="card" style={{marginBottom:14}}>
         <div className="card-section-title">
           <h2 style={{margin:0}}>Affiliate & discount codes <span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)',fontSize:'var(--text-sm)'}}>— over time</span></h2>
@@ -6690,7 +6705,7 @@ function DiscountCodeTracker(){
             <div style={{background:'var(--accent-bg)',border:'1px solid var(--color-accent-line)',borderRadius:'var(--radius-none)',padding:'11px 14px',marginBottom:14,fontSize:'var(--text-sm)',color:'var(--text-secondary)',lineHeight:1.55}}>
               <b style={{color:'var(--text-primary)'}}>How often vs how deep —</b>these two figures look like they disagree but they measure different things:
                         <span style={{display:'inline'}}> <b style={{color:'var(--text-primary)'}}>{pen}%</b> of orders carry a discount (how <i>often</i>), but the average is only <b style={{color:'var(--text-primary)'}}>{GBP(avg)}</b> off — so across all sales discounts come to only <b style={{color:'var(--text-primary)'}}>~{inten}%</b> of revenue (how <i>deep</i>). Frequent but shallow: lots of small codes, not deep cuts.</span>
-              <span style={{color:'var(--text-faint)',display:'block',marginTop:4}}>The Home <i>“Discount depth”</i> tile (~{inten}{`%) is the ${curSym()}-weighted view; the `}<i>“Orders with a discount”</i> tile above ({pen}%) is the order-count view. Same data, different denominators — not a discrepancy.</span>
+              <span style={{color:'var(--text-faint)',display:'block',marginTop:4}}>The <i>“Discount depth”</i> figure on Profit &amp; sales (~{inten}{`%) is the ${curSym()}-weighted view; the `}<i>“Orders with a discount”</i> tile above ({pen}%) is the order-count view. Same data, different denominators — not a discrepancy.</span>
             </div>
           ); })()}
 
@@ -6698,7 +6713,7 @@ function DiscountCodeTracker(){
           <div style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',color:PAL.warn,fontWeight:'var(--weight-bold)',marginBottom:5}}>{`Discounts beyond codes — not in the ${curSym()} above`}</div>
           <div style={{display:'flex',gap:20,flexWrap:'wrap',fontSize:'var(--text-sm)',color:'var(--text-secondary)'}}>
             <div style={{flex:'1 1 240px'}}><b>Automatic (no code):</b> {GBP(M.automaticDiscount)} on {NUM(M.automaticOrders)} orders <span style={{color:'var(--text-faint)'}}>— in Shopify's discount totals, just not tied to a code.</span></div>
-            <div style={{flex:'1 1 320px'}}><b style={{color:PAL.bad}}>Sale-price markdowns:</b> ~{GBP(M.markdownEstimate)} est. ({Math.round((M.markdownShareOfValue||0)*100)}% of sold value) · <b>{M.catalogOnSale}/{M.catalogActive}</b> of catalog on sale at ~{M.avgMarkdownPct}% off. <span style={{color:'var(--text-faint)'}}>Compare-at markdowns never enter Shopify's <code>total_discounts</code>{`, so they're invisible to the code/automatic figures — this is the true site-wide discount the ${curSym()} above misses. Estimated from web line-items × current compare-at price.`}</span></div>
+            <div style={{flex:'1 1 320px'}}><b style={{color:PAL.bad}}>Sale-price markdowns:</b> ~{GBP(M.markdownEstimate)} est. ({Math.round((M.markdownShareOfValue||0)*100)}% of sold value) · {M.catalogActive > 0 && M.avgMarkdownPct != null ? <><b>{M.catalogOnSale}/{M.catalogActive}</b> of catalog on sale at ~{M.avgMarkdownPct}% off.</> : null} <span style={{color:'var(--text-faint)'}}>Compare-at markdowns never enter Shopify's <code>total_discounts</code>{`, so they're invisible to the code/automatic figures — this is the true site-wide discount the ${curSym()} above misses. Estimated from web line-items × current compare-at price.`}</span></div>
           </div>
         </div>}
 
@@ -6950,7 +6965,7 @@ function RestockAlertsPanel(){
 function Products(){
   const products=B.products||[];
   const [sort,setSort]=useState('units');
-  const [pview,setPview]=useState('stock');
+  const [pview,setPview]=useState(UI_V3 ? 'performance' : 'stock');
   const sorted=[...products].sort((a,b)=>(b[sort]||0)-(a[sort]||0));
   const totalUnits=products.reduce((a,p)=>a+(p.units||0),0);
   const totalRev=products.reduce((a,p)=>a+(p.netSales||0),0);
@@ -6980,9 +6995,10 @@ function Products(){
       </div>
       {/* Three jobs split into subtabs — Stock (ops) · Performance (analytics) · Bundles (merch) */}
       <div className="seg" style={{marginBottom:14}}>
-        {[['stock','Stock'],['performance','Performance'],['bundles','Bundles']].map(([k,l])=>(<button key={k} className={pview===k?'on':''} onClick={()=>setPview(k)}>{l}</button>))}
+        {[['stock','Stock'],['performance','Performance'],['bundles','Bundles']].filter(([k])=>!(UI_V3 && k==='stock')).map(([k,l])=>(<button key={k} className={pview===k?'on':''} onClick={()=>setPview(k)}>{l}</button>))}
       </div>
-      {pview==='stock' && (<div>
+      {UI_V3 && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('stock')}>What runs out and what to reorder <span className="v3-xref-go">on Stock &amp; orders →</span></button>}
+      {!UI_V3 && pview==='stock' && (<div>
         <RestockAlertsPanel/>
         <StockThrottlePanel/>
         <InventoryPanel/>
@@ -16751,6 +16767,7 @@ function V3Today(p) {
 const V3_Q = {};
 function useV3Rows(key, build) {
   const [, bump] = React.useState(0);
+  const [tries, setTries] = React.useState(0);
   React.useEffect(() => {
     if (V3_Q[key] && (V3_Q[key].rows || V3_Q[key].err || V3_Q[key].p)) { if (V3_Q[key].p) V3_Q[key].p.then(() => bump(n => n + 1)); return; }
     let iv = null, dead = false;
@@ -16765,9 +16782,9 @@ function useV3Rows(key, build) {
     };
     if (!go()) { iv = setInterval(() => { if (go()) { clearInterval(iv); iv = null; } }, 500); setTimeout(() => iv && clearInterval(iv), 30000); }
     return () => { dead = true; if (iv) clearInterval(iv); };
-  }, [key]);
+  }, [key, tries]);
   const q = V3_Q[key] || {};
-  return { rows: q.rows || null, err: q.err || null };
+  return { rows: q.rows || null, err: q.err || null, retry: () => { delete V3_Q[key]; setTries(t => t + 1); } };
 }
 // Shared builders, so pages that read the same view share one cached request (useV3Rows keys).
 // last_sold_on arrives with migration 0219. Until it is applied PostgREST rejects the whole
@@ -17469,50 +17486,125 @@ function V3Customers() {
 }
 
 // ── Products (V3, live) ──────────────────────────────────────────────────────
+// A read that failed says so and offers to try again. Before this, a statement timeout during a
+// Shopify sync made the Products table say "Greta has not seen enough product sales yet" — false —
+// and the sections below it vanish without a word.
+function V3LoadFailed({ what, onRetry }) {
+  return (<div className="v3-empty">Greta couldn’t load {what} just now — the database was busy.{' '}
+    {onRetry && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={onRetry}>Try again</button>}</div>);
+}
+const V3_LADDER_Q = (sb, b) => sb.from('cache_daily_cm_ladder')
+  .select('day,net_sales,paid_spend').eq('brand_id', b)
+  .gte('day', v3IsoAdd(new Date().toISOString().slice(0, 10), -400)).order('day', { ascending: true }).limit(1000);
+
+// ── Products (V3, live) — which products earn, and which leak (anatomy Stage 3) ─────────────────
+// Per brand, last 28 days against the 28 before:
+//   vw_product_performance    sales and units per product, both windows
+//   vw_product_contribution   per SKU: sales, what the product cost, payment fees → kept; list price
+//                             (summed to the product). Shipping and packing are per order, not per
+//                             product, so "kept" here is higher than the profit on Profit & sales.
+//   stock plan (shared key)   on hand and weekly sales per product, all variants together
+//   tenant_shopify_products   when the product was created, so "New" means new
+//   cache_daily_cm_ladder     whether the 28 days before were a sale: total sales against the median
+//                             of the six 28-day windows before them
+// The leaks are named with their money: products that sold and are now out of stock, products sold at
+// a loss, and discounting landing on the best sellers. Movers carry their reason.
 function V3Products() {
   const perf = useV3Rows('prod-perf', (sb, b) => sb.from('vw_product_performance')
-    .select('product_title,rev_28d,rev_prior_28d,units_now,units_prior,share_now,stock_constrained,inventory_stale,performance_flag')
+    .select('shopify_product_id,product_title,rev_28d,rev_prior_28d,units_now,units_prior,share_now,stock_constrained,inventory_stale,performance_flag')
     .eq('brand_id', b).order('rev_28d', { ascending: false, nullsFirst: false }).limit(200));
+  const pc = useV3Rows('prod-contrib', (sb, b) => sb.from('vw_product_contribution')
+    .select('shopify_product_id,product_title,units,realized_rev,contribution_gbp,ref_price,cost_is_actual').eq('brand_id', b).limit(1000));
+  const stock = useV3Rows('stock-plan', V3_STOCK_Q);
+  const made = useV3Rows('prod-created', (sb, b) => sb.from('tenant_shopify_products').select('shopify_product_id,created_at_shopify').eq('brand_id', b).limit(3000));
+  const lad = useV3Rows('profit-ladder', V3_LADDER_Q);
   const [showAll, setShowAll] = React.useState(false);
-  if (!perf.rows && !perf.err) return <V3SkeletonRows n={6}/>;
-  const rows = (perf.rows || []).filter(x => Number(x.rev_28d) > 0 || Number(x.rev_prior_28d) > 0);
-  if (!rows.length) return <div className="v3-empty">Greta has not seen enough product sales yet to rank your range.</div>;
-  const tidy = s => { const t = String(s || '').trim(); return t.charAt(0).toUpperCase() + t.slice(1); };
-  const total = rows.reduce((a, x) => a + (Number(x.rev_28d) || 0), 0);
-  const top = rows.filter(x => Number(x.rev_28d) > 0);
+  const d = React.useMemo(() => {
+    if (!perf.rows) return null;
+    const rows = perf.rows.filter(x => Number(x.rev_28d) > 0 || Number(x.rev_prior_28d) > 0);
+    // kept and list value per product, from its SKUs
+    const C = {}; (pc.rows || []).forEach(r => { const k = String(r.shopify_product_id || r.product_title); const o = C[k] || (C[k] = { rev: 0, kept: 0, list: 0, listed: 0 });
+      const rev = Number(r.realized_rev) || 0, u = Number(r.units) || 0; o.rev += rev; o.kept += Number(r.contribution_gbp) || 0;
+      if (Number(r.ref_price) > 0 && u > 0) { o.list += u * Number(r.ref_price); o.listed += rev; } });
+    // stock per product: all variants together, stale feeds say nothing
+    const S = {}; (stock.rows || []).forEach(s => { const k = String(s.product_title || '').trim().toLowerCase(); if (!k || s.inventory_stale) return;
+      const o = S[k] || (S[k] = { oh: 0, v: 0 }); o.oh += Math.max(0, Number(s.on_hand) || 0); o.v += Number(s.weekly_velocity) || 0; });
+    const born = {}; (made.rows || []).forEach(r => { if (r.created_at_shopify) born[String(r.shopify_product_id)] = String(r.created_at_shopify).slice(0, 10); });
+    const today = new Date().toISOString().slice(0, 10), recent = v3IsoAdd(today, -56);
+    const list = rows.map(x => {
+      const k = String(x.shopify_product_id || x.product_title), c = C[k] || null, st = S[String(x.product_title || '').trim().toLowerCase()] || null;
+      const now = Number(x.rev_28d) || 0, was = Number(x.rev_prior_28d) || 0;
+      const isNew = !!(born[String(x.shopify_product_id)] && born[String(x.shopify_product_id)] >= recent);
+      const out = !!(st && st.oh === 0 && (st.v > 0 || was > 0));
+      return { title: v3Title(x.product_title), now, was, units: Number(x.units_now) || 0, d: now - was, ch: was > 0 ? now / was - 1 : null,
+        kept: c ? c.kept : null, margin: c && c.rev > 0 ? c.kept / c.rev : null, off: c && c.list > 0 ? 1 - c.listed / c.list : null,
+        out, low: !out && !!x.stock_constrained, isNew, back: !isNew && was <= 0 && now > 0 };
+    });
+    const total = list.reduce((a, x) => a + x.now, 0), keptTot = list.reduce((a, x) => a + (x.kept || 0), 0), keptRev = list.filter(x => x.kept != null).reduce((a, x) => a + x.now, 0);
+    // Was the 28 days before a sale? Its total against the median of the six 28-day windows before it.
+    let sale = null;
+    if (lad.rows && lad.rows.length > 200) {
+      const by = {}; lad.rows.forEach(r => { by[String(r.day).slice(0, 10)] = Number(r.net_sales) || 0; });
+      const sumW = e => { let s = 0, n = 0; for (let i = 0; i < 28; i++) { const v = by[v3IsoAdd(e, -i)]; if (v != null) { s += v; n++; } } return n >= 24 ? s : null; };
+      const end = v3IsoAdd(today, -1), prevEnd = v3IsoAdd(end, -28);
+      const prior = sumW(prevEnd), base = v3Med([1, 2, 3, 4, 5, 6].map(i => sumW(v3IsoAdd(prevEnd, -28 * i))));
+      if (prior != null && base > 0 && prior / base >= 1.25) sale = prior / base - 1;
+    }
+    const outSold = list.filter(x => x.out && x.was > 0).sort((a, b) => b.was - a.was);
+    const losers = list.filter(x => x.kept != null && x.kept < 0 && x.now > 100);
+    const top5 = list.slice().sort((a, b) => b.now - a.now).slice(0, 5).filter(x => x.margin != null);
+    // The discounted best seller that keeps least, against the median of the other four.
+    const disc = top5.filter(x => x.off != null && x.off >= 0.05).sort((a, b) => a.margin - b.margin)[0] || null;
+    const restMed = disc ? v3Med(top5.filter(x => x !== disc).map(x => x.margin)) : null;
+    return { list, total, keptTot, keptRev, sale, outSold, losers, disc, restMed,
+      top5share: total > 0 ? list.slice(0, 5).reduce((a, x) => a + x.now, 0) / total : null };
+  }, [perf.rows, pc.rows, stock.rows, made.rows, lad.rows]);
+
+  if (perf.err) return <V3LoadFailed what="your product sales" onRetry={perf.retry}/>;
+  if (!perf.rows) return <V3SkeletonRows n={6}/>;
+  if (!d || !d.list.length) return <div className="v3-empty">Greta has not seen any product sales in the last eight weeks yet.</div>;
+  const top = d.list.filter(x => x.now > 0);
   const shown = showAll ? top : top.slice(0, 12);
-  const mx = Math.max(1, ...top.map(x => Number(x.rev_28d) || 0));
-  const ch = x => (Number(x.rev_prior_28d) > 0) ? (Number(x.rev_28d) - Number(x.rev_prior_28d)) / Number(x.rev_prior_28d) : null;
-  const movers = rows.filter(x => Number(x.rev_prior_28d) > 50 || Number(x.rev_28d) > 50)
-    .map(x => ({ ...x, d: (Number(x.rev_28d) || 0) - (Number(x.rev_prior_28d) || 0) }));
+  const mx = Math.max(1, ...top.map(x => x.now));
+  const margin = d.keptRev > 0 ? d.keptTot / d.keptRev : null;
+  const reason = x => x.out ? 'out of stock' : x.isNew ? 'new' : x.back ? 'no sales the 28 days before' : (d.sale != null && x.d < 0) ? 'against a sale' : '';
+  const movers = top.concat(d.list.filter(x => x.now <= 0)).filter(x => Math.abs(x.d) > 50);
   const up = movers.filter(x => x.d > 0).sort((a, b) => b.d - a.d).slice(0, 4);
   const down = movers.filter(x => x.d < 0).sort((a, b) => a.d - b.d).slice(0, 4);
-  const top5share = total > 0 ? top.slice(0, 5).reduce((a, x) => a + Number(x.rev_28d), 0) / total : null;
-  // With a stale feed every variant reads 'unknown', so no product would carry a stock badge —
-  // which looks exactly like "nothing is short". Say so instead of showing a clean list.
-  const stockStale = rows.some(x => x.inventory_stale);
+  const leaks = [];
+  if (d.outSold.length) leaks.push(<li key="out"><b>Out of stock: {d.outSold.slice(0, 3).map(x => x.title).join(', ')}{d.outSold.length > 3 ? ' and ' + fmtCount(d.outSold.length - 3) + ' more' : ''}.</b>{' '}
+    {d.outSold.length === 1 ? 'It' : 'They'} sold {fmtMoney(d.outSold.reduce((a, x) => a + x.was, 0))} in the 28 days before{d.sale != null ? ' (a sale period)' : ''} and {d.outSold.length === 1 ? 'has' : 'have'} nothing to sell now.{' '}
+    <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('stock')}>Open Stock &amp; orders</button></li>);
+  if (d.losers.length) leaks.push(<li key="loss"><b>Sold at a loss: {v3Names(d.losers.slice(0, 3).map(x => x.title))}.</b> After what {d.losers.length === 1 ? 'it costs' : 'they cost'}, {d.losers.length === 1 ? 'it' : 'they'} lost {fmtMoney(Math.abs(d.losers.reduce((a, x) => a + x.kept, 0)))} in 28 days — check the price and the cost entered.</li>);
+  if (d.disc && d.restMed != null && d.disc.margin < d.restMed) leaks.push(<li key="disc"><b>Discounting lands on {d.disc.title}.</b> It sells at {fmtPctN(d.disc.off)} under its list price on average and keeps {fmtPctN(d.disc.margin)} of its sales, against {fmtPctN(d.restMed)} for the rest of your top five. Codes go where demand already is — Promotions below shows which ones.</li>);
+  leaks.push(<li key="aov"><b>Heroes that leave alone.</b> Every order that adds a second product makes more — the hero section below names which products and sizes it.</li>);
   return (<div className="v3-page-stack">
-    <section>
-      <div className="v3-kick">Last 28 days</div>
-      <p className="v3-lede">{fmtMoney(total)} of product sales across {fmtCount(top.length)} products.
-        {top5share != null && <> Your top five bring in <b>{fmtPctN(top5share)}</b> of it.</>}</p>
-      {stockStale && <p className="v3-note v3-measure">Stock counts have not refreshed from Shopify in over two days, so low-stock warnings are hidden until they do.</p>}
-      {stockStale && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('settings')}>
-        Check the Shopify connection <span className="v3-xref-go">on Connections &amp; data →</span></button>}
+    <section className="v3-sec">
+      <div className="v3-kick">Last 28 days · which products earn, and which leak</div>
+      <p className="v3-verdict">{margin != null
+        ? (d.losers.length ? fmtCount(d.losers.length) + (d.losers.length === 1 ? ' product sold at a loss; ' : ' products sold at a loss; ') + 'the rest kept ' + fmtPctN(margin) + ' of their sales after what they cost.'
+          : 'No product sells at a loss: your products kept ' + fmtPctN(margin) + ' of their sales after what they cost. The leaks are around them.')
+        : fmtMoney(d.total) + ' of product sales across ' + fmtCount(top.length) + ' products.'}</p>
+      <p className="v3-note v3-measure">{fmtMoney(d.total)} of product sales across {fmtCount(top.length)} products{d.top5share != null ? '; your top five bring in ' + fmtPctN(d.top5share) + ' of it' : ''}. “Kept” is after the product’s own cost and payment fees; shipping and packing are per order, so the profit on Profit &amp; sales is lower.</p>
+      <ol className="v3-moves">{leaks}</ol>
+    </section>
+    <section className="v3-sec">
+      {d.sale != null && <p className="v3-note v3-measure">The 28 days before ran {fmtPctN(d.sale)} above a typical 28 days — a sale — so most products fall against them. Changes marked “against a sale” are that, not the product.</p>}
       <table className="v3-ptable">
-        <thead><tr><th>Product</th><th className="t-text">Sales</th><th>Change</th><th>Units</th></tr></thead>
-        <tbody>{shown.map((x, i) => { const c = ch(x); return (<tr key={i}>
-          <td><span className="v3-ptitle">{tidy(x.product_title)}</span>{x.stock_constrained && <span className="sbadge warn">Low stock</span>}</td>
-          <td className="t-text"><span className="v3-pbar"><i style={{ width: (Number(x.rev_28d) / mx * 100) + '%' }}/></span><span className="v3-pval">{fmtMoney(x.rev_28d)}</span></td>
-          <td className={c == null ? '' : c >= 0 ? 'v3-up' : 'v3-down'}>{c == null ? 'New' : (c >= 0 ? '+' : '−') + fmtPctN(Math.abs(c))}</td>
-          <td>{fmtCount(x.units_now)}</td>
-        </tr>); })}</tbody>
+        <thead><tr><th>Product</th><th className="t-text">Sales</th><th>Kept</th><th>Change</th><th>Units</th></tr></thead>
+        <tbody>{shown.map((x, i) => (<tr key={i}>
+          <td><span className="v3-ptitle">{x.title}</span>{x.out ? <span className="sbadge bad">Out of stock</span> : x.low ? <span className="sbadge warn">Low stock</span> : null}</td>
+          <td className="t-text"><span className="v3-pbar"><i style={{ width: (x.now / mx * 100) + '%' }}/></span><span className="v3-pval">{fmtMoney(x.now)}</span></td>
+          <td className={x.kept != null && x.kept < 0 ? 'v3-down' : ''}>{x.kept != null ? fmtMoney(x.kept) : FMT_NONE}</td>
+          <td className={x.ch == null ? 'v3-muted' : x.ch >= 0 ? 'v3-up' : 'v3-down'}>{x.ch != null ? (x.ch >= 0 ? '+' : '−') + fmtPctN(Math.abs(x.ch)) : x.isNew ? 'New' : 'None before'}</td>
+          <td>{fmtCount(x.units)}</td>
+        </tr>))}</tbody>
       </table>
       {top.length > 12 && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => setShowAll(s => !s)}>{showAll ? 'Show top 12' : 'Show all ' + top.length + ' products'}</button>}
     </section>
     {(up.length > 0 || down.length > 0) && (<div className="v3-movers">
-      <section><div className="v3-kick">Rising</div>{up.map((x, i) => <div key={i} className="v3-mover"><span>{tidy(x.product_title)}</span><b className="v3-up">+{fmtMoney(x.d)}</b></div>)}</section>
-      <section><div className="v3-kick">Falling</div>{down.map((x, i) => <div key={i} className="v3-mover"><span>{tidy(x.product_title)}</span><b className="v3-down">{fmtMoney(x.d)}</b></div>)}</section>
+      <section><div className="v3-kick">Rising</div>{up.map((x, i) => <div key={i} className="v3-mover"><span>{x.title}{reason(x) && <span className="v3-muted"> · {reason(x)}</span>}</span><b className="v3-up">+{fmtMoney(x.d)}</b></div>)}</section>
+      <section><div className="v3-kick">Falling</div>{down.map((x, i) => <div key={i} className="v3-mover"><span>{x.title}{reason(x) && <span className="v3-muted"> · {reason(x)}</span>}</span><b className="v3-down">{fmtMoney(x.d)}</b></div>)}</section>
     </div>)}
   </div>);
 }
@@ -17599,7 +17691,7 @@ function V3Heroes() {
     return { short, sell, total, n50, n80, strip, heroes, hasHero, target, best, aovHeroes, ltvUp, ltvDown, brandBack, allFirsts };
   }, [facts.rows, hero.rows, stock.rows]);
 
-  if (facts.err) return null;
+  if (facts.err) return <V3LoadFailed what="your hero products" onRetry={facts.retry}/>;
   if (!facts.rows || (!hero.rows && !hero.err)) return <V3SkeletonRows n={4}/>;
   if (!d) return null;
   const top = d.sell[0], L = (ue.rows || [])[0] || null;
@@ -17714,7 +17806,7 @@ function V3ProductAttention() {
       from: f.rows[0].period_start, to: f.rows[0].period_end };
   }, [f.rows, facts.rows]);
 
-  if (f.err || facts.err) return null;
+  if (f.err || facts.err) return <V3LoadFailed what="which products get seen" onRetry={() => { if (f.err) f.retry(); if (facts.err) facts.retry(); }}/>;
   if (!f.rows || !facts.rows) return <V3SkeletonRows n={3}/>;
   if (!d) return null;
   const small = d.monthRev > 0 && d.prize < d.monthRev * 0.03;
