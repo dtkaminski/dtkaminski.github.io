@@ -1012,3 +1012,39 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-econ-fig { font-family: var(--font-mono); color: var(--color-ink); }
 .v3-econ-hint[data-tone="ok"] { color: var(--color-success); }
 .v3-econ-hint[data-tone="err"] { color: var(--color-danger); }
+
+/* ── White space grid (Products) ─────────────────────────────────────────── */
+/* Type × price band. Shade is sales per product listed (an accent layer whose strength is set
+   per cell through --a), so the eye lands on where each product earns most; a dashed blank is a
+   price nothing is listed at, and an accent-dashed blank next to a row's best cell is the gap. */
+.v3-range-wrap { overflow-x: auto; }
+.v3-main table.v3-range { border-collapse: separate; border-spacing: var(--space-1); width: 100%; min-width: 560px; }
+.v3-main table.v3-range th { font-size: var(--text-xs); font-weight: var(--weight-normal); color: var(--color-muted);
+  text-align: center; white-space: nowrap; padding: 0 var(--space-1) var(--space-1); border: 0; }
+.v3-main table.v3-range th.t-text { text-align: left; }
+.v3-main table.v3-range td { border: 0; }
+.v3-main table.v3-range td.v3-range-type { font-size: var(--text-sm); color: var(--color-ink); white-space: nowrap; padding: 0 var(--space-3) 0 0; vertical-align: middle; }
+.v3-main table.v3-range td.v3-range-cell { position: relative; text-align: center; vertical-align: middle;
+  padding: var(--space-2) var(--space-1); background: var(--color-sunken); border-radius: var(--radius-none); }
+.v3-range-cell > i { position: absolute; inset: 0; background: var(--color-accent); opacity: calc(var(--a, 0) * 0.42); }
+.v3-main table.v3-range td.v3-range-cell.best { box-shadow: inset 0 0 0 1.5px var(--color-ink); }
+.v3-main table.v3-range td.v3-range-cell.empty { background: none; box-shadow: inset 0 0 0 1px var(--color-line); }
+.v3-main table.v3-range td.v3-range-cell.gap { box-shadow: inset 0 0 0 1.5px var(--color-accent); background: var(--color-accent-wash); }
+.v3-range-v, .v3-range-n { position: relative; display: block; color: var(--color-ink); }
+.v3-range-v { font-family: var(--font-figure); font-size: var(--text-sm); font-weight: var(--weight-semi); }
+.v3-range-n { font-family: var(--font-sans); font-size: var(--text-xs); }
+.v3-range-cell.dead .v3-range-v { color: var(--color-danger); }
+.v3-range-gap { font-family: var(--font-sans); font-size: var(--text-xs); font-weight: var(--weight-semi); color: var(--color-accent); }
+
+/* ── Claimed against caused (Marketing) ──────────────────────────────────── */
+/* Rides the scoreboard row: same grid, same track, same break-even tick. A ring marks the
+   platform's figure, a filled dot what the channel caused, a rule joins them so the direction
+   of the correction is read before the numbers are. */
+.v3-incr-row .v3-score-track { background: var(--color-sunken); }
+.v3-incr-seg { position: absolute; top: 50%; height: 2px; transform: translateY(-50%); background: var(--color-muted); }
+.v3-incr-rep, .v3-incr-true { position: absolute; top: 50%; width: var(--space-3); height: var(--space-3);
+  border-radius: var(--radius-full); transform: translate(-50%, -50%); box-sizing: border-box; }
+.v3-incr-rep { background: var(--color-panel); border: 2px solid var(--color-muted); }
+.v3-incr-true { background: var(--color-success); border: 2px solid var(--color-panel); }
+.v3-score-row.under .v3-incr-true { background: var(--color-danger); }
+.v3-incr-row .v3-score-x { white-space: nowrap; }

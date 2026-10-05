@@ -17182,6 +17182,351 @@ function V3Products() {
   </div>);
 }
 
+// ── Desire against visibility (Products) ─────────────────────────────────────
+// vw_ga4_product_funnel: the last 90 days of GA4 item events. Across is each product's share of
+// all product views (how much the shop puts it in front of people); up is view→basket (how much
+// they want it once they see it). A dot is coloured only when its basket rate sits clearly apart
+// from the site's — two standard errors on a binomial test against the site rate — because a dot
+// inside the noise is not a finding, and a median split on its own would label half the range by
+// construction. Across is a log scale: views run from 150 to several thousand, and a linear axis
+// piles nearly every product onto the left edge.
+const V3_DESIRE_KIND = {
+  quiet: { label: 'Not clearly different', col: () => PAL.quiet },
+  star:  { label: 'Wanted and shown', col: () => PAL.data3 },
+  drag:  { label: 'Shown a lot, rarely wanted', col: () => PAL.bad },
+  gem:   { label: 'Wanted, rarely shown', col: () => PAL.good },
+};
+function V3ProductDesire() {
+  const f = useV3Rows('prod-desire', (sb, b) => sb.from('vw_ga4_product_funnel')
+    .select('item_name,period_start,period_end,views,add_to_carts,revenue,traffic_share,atc_rate,site_atc_rate')
+    .eq('brand_id', b).gte('views', 150).order('views', { ascending: false, nullsFirst: false }).limit(400));
+  const d = React.useMemo(() => {
+    const rows = (f.rows || []).filter(x => Number(x.views) > 0 && Number(x.traffic_share) > 0 && x.atc_rate != null);
+    if (rows.length < 8) return null;
+    const site = Number(rows[0].site_atc_rate);
+    if (!(site > 0 && site < 1)) return null;
+    const shares = rows.map(x => Number(x.traffic_share)).sort((a, b) => a - b);
+    const med = shares[Math.floor(shares.length / 2)];
+    const pts = rows.map(x => {
+      const v = Number(x.views), y = Number(x.atc_rate), z = (y - site) / Math.sqrt(site * (1 - site) / v);
+      const hi = Number(x.traffic_share) >= med;
+      return { name: v3Sentence(x.item_name), x: Number(x.traffic_share), y, views: v, rev: Number(x.revenue) || 0, z,
+        kind: z >= 2 ? (hi ? 'star' : 'gem') : (z <= -2 && hi) ? 'drag' : 'quiet' };
+    });
+    const gems = pts.filter(p => p.kind === 'gem').sort((a, b) => b.z - a.z);
+    const drags = pts.filter(p => p.kind === 'drag').sort((a, b) => b.views - a.views);
+    const sum = (a, k) => a.reduce((s, p) => s + p[k], 0);
+    const lo = shares[0] * 0.85, hi = shares[shares.length - 1] * 1.15;
+    const ticks = [0.0005, 0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5].filter(t => t >= lo && t <= hi);
+    // Up runs to the next 10% above the highest basket rate; left to Recharts, an 'auto' domain
+    // on this data drew 0–400% and pressed every dot onto the floor.
+    const yMax = Math.min(1, Math.ceil(Math.max(...pts.map(p => p.y)) * 10) / 10 || 0.1);
+    const yTicks = []; for (let t = 0; t <= yMax + 1e-9; t += yMax > 0.5 ? 0.2 : 0.1) yTicks.push(Math.round(t * 10) / 10);
+    return { site, med, pts, gems, drags, lo, hi, ticks, yMax, yTicks, gemShare: sum(gems, 'x'), dragShare: sum(drags, 'x'),
+      from: rows[0].period_start, to: rows[0].period_end };
+  }, [f.rows]);
+
+  if (f.err) return null;          // the misallocation read below says it in its own words
+  if (!f.rows) return <V3SkeletonRows n={3}/>;
+  if (!d) return null;             // too few products with enough views to say anything
+  const head = d.drags.length
+    ? fmtPctN(d.dragShare) + ' of product views go to products shoppers rarely add to the basket.'
+    : d.gems.length ? fmtCount(d.gems.length) + ' products shoppers want more than most are rarely shown.'
+    : 'No product is clearly over- or under-shown for how much shoppers want it.';
+  const sub = d.gems.length
+    ? fmtCount(d.gems.length) + (d.gems.length === 1 ? ' product is' : ' products are') + ' added to the basket more often than the site’s '
+      + fmtPctN(d.site) + ' of views, yet ' + (d.gems.length === 1 ? 'it gets ' : 'they get ') + fmtPctN(d.gemShare)
+      + ' of views between them. Moving them up the home page, collections and ads is the cheapest test on this page.'
+    : 'Basket rates are measured against the site’s ' + fmtPctN(d.site) + ' of views.';
+  const tip = ({ active, payload }) => {
+    if (!active || !payload || !payload.length) return null;
+    const p = payload[0].payload;
+    return (<div className="v3-tip"><b>{p.name}</b>
+      <span>Share of product views <em>{fmtPctN(p.x)}</em></span>
+      <span>Views added to the basket <em>{fmtPctN(p.y)}</em></span>
+      <span>Views <em>{fmtCount(p.views)}</em></span>
+      <span>Sales <em>{fmtMoney(p.rev)}</em></span></div>);
+  };
+  const kinds = Object.keys(V3_DESIRE_KIND);
+  return (<div className="v3-page-stack">
+    <section className="v3-sec">
+      <div className="v3-kick">Desire against visibility · {v3Day(d.from)} to {v3Day(d.to)}</div>
+      <p className="v3-verdict">{head}</p>
+      <p className="v3-note v3-measure">{sub}</p>
+      <figure className="v3-chart">
+        <figcaption><span className="v3-chart-title">How often each product is shown, against how often it is wanted</span>
+          <span className="v3-legend">{kinds.slice().reverse().map(k => <React.Fragment key={k}><i style={{ background: V3_DESIRE_KIND[k].col() }}/>{V3_DESIRE_KIND[k].label} </React.Fragment>)}</span></figcaption>
+        <R.ResponsiveContainer width="100%" height={240}>
+          <R.ScatterChart margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <R.CartesianGrid/>
+            <R.XAxis type="number" dataKey="x" scale="log" domain={[d.lo, d.hi]} allowDataOverflow ticks={d.ticks} tickFormatter={fmtPctN}/>
+            <R.YAxis type="number" dataKey="y" domain={[0, d.yMax]} ticks={d.yTicks} allowDataOverflow tickFormatter={fmtPctN}/>
+            <R.ZAxis range={[36, 36]}/>
+            <R.ReferenceLine y={d.site} stroke={PAL.muted} strokeDasharray="4 3"/>
+            <R.ReferenceLine x={d.med} stroke={PAL.muted} strokeDasharray="4 3"/>
+            <R.Tooltip content={tip} cursor={false}/>
+            {kinds.map(k => <R.Scatter key={k} data={d.pts.filter(p => p.kind === k)} fill={V3_DESIRE_KIND[k].col()} isAnimationActive={false}/>)}
+          </R.ScatterChart>
+        </R.ResponsiveContainer>
+        <p className="micro muted v3-measure">Across: share of all product views (log scale). Up: share of views added to the basket. The dashed lines are the site average and the typical product. Products with fewer than 150 views are left out.</p>
+      </figure>
+    </section>
+    {(d.gems.length > 0 || d.drags.length > 0) && (<div className="v3-movers">
+      <section><div className="v3-kick">Wanted, rarely shown · added to basket</div>
+        {d.gems.length ? d.gems.slice(0, 5).map((p, i) => <div key={i} className="v3-mover"><span>{p.name}</span><b className="v3-up">{fmtPctN(p.y)}</b></div>)
+          : <div className="v3-mover"><span className="v3-muted">None clearly</span></div>}</section>
+      <section><div className="v3-kick">Shown a lot, rarely wanted · share of views</div>
+        {d.drags.length ? d.drags.slice(0, 5).map((p, i) => <div key={i} className="v3-mover"><span>{p.name}</span><b className="v3-down">{fmtPctN(p.x)}</b></div>)
+          : <div className="v3-mover"><span className="v3-muted">None clearly</span></div>}</section>
+    </div>)}
+  </div>);
+}
+
+// ── White space in the range (Products) ──────────────────────────────────────
+// vw_product_npd_facts: every active product, its price today and its last 365 days of sales.
+// Rows are product types, columns price bands, and each cell is what a product listed there
+// sold on average — so a dark cell holding one or two products is where each product earns
+// most, and a blank cell is a price you do not offer. The finding is a blank cell next to a
+// row's best band: the range stops where it was earning most. That is a place to try a product,
+// not proof of demand, and it carries the Possible rung to say so.
+function v3PriceBands(prices) {
+  const s = prices.filter(p => p > 0).sort((a, b) => a - b);
+  if (!s.length) return [];
+  const p95 = s[Math.floor(0.95 * (s.length - 1))];
+  const step = [5, 10, 20, 25, 50, 100, 200, 500, 1000].find(x => Math.ceil(p95 / x) <= 7) || 1000;
+  const k = Math.max(1, Math.ceil(p95 / step)), c = curSym(), out = [];
+  for (let i = 0; i < k; i++) out.push({ lo: i * step, hi: (i + 1) * step, label: i === 0 ? 'Under ' + c + step : c + (i * step) + '–' + ((i + 1) * step) });
+  if (s[s.length - 1] >= k * step) out.push({ lo: k * step, hi: Infinity, label: c + (k * step) + '+' });
+  return out;
+}
+function V3RangeGaps() {
+  const q = useV3Rows('prod-range', (sb, b) => sb.from('vw_product_npd_facts')
+    .select('product_type,price_now_inc_tax,units,revenue').eq('brand_id', b).eq('status', 'active').limit(3000));
+  const d = React.useMemo(() => {
+    const rows = (q.rows || []).filter(x => Number(x.price_now_inc_tax) > 0 && !/gift ?card/i.test(String(x.product_type || '')));
+    if (rows.length < 6) return null;
+    const bands = v3PriceBands(rows.map(x => Number(x.price_now_inc_tax)));
+    if (bands.length < 2) return null;
+    const by = {};
+    rows.forEach(x => {
+      const t = String(x.product_type || '').trim() || 'Other', p = Number(x.price_now_inc_tax);
+      const i = bands.findIndex(b => p >= b.lo && p < b.hi);
+      const r = by[t] || (by[t] = { type: t, n: 0, rev: 0, units: 0, cells: bands.map(() => ({ n: 0, rev: 0 })) });
+      r.n++; r.rev += Number(x.revenue) || 0; r.units += Number(x.units) || 0;
+      if (i >= 0) { r.cells[i].n++; r.cells[i].rev += Number(x.revenue) || 0; }
+    });
+    const types = Object.values(by).sort((a, b) => b.rev - a.rev);
+    let maxPer = 0;
+    types.forEach(r => r.cells.forEach(c => { c.per = c.n ? c.rev / c.n : 0; if (c.per > maxPer) maxPer = c.per; }));
+    // Only types that carry real sales get a gap: an untyped product or a four-item accessories row
+    // has a "best band" by accident, and one stray gap there makes the real ones read as noise.
+    const totalRev = types.reduce((a, r) => a + r.rev, 0);
+    const gaps = [];
+    types.forEach(r => {
+      if (r.rev <= 0 || r.type === 'Other' || r.n < 5 || r.rev < totalRev * 0.03) return;
+      let best = -1;
+      r.cells.forEach((c, i) => { if (c.n && c.rev >= r.rev * 0.1 && (best < 0 || c.per > r.cells[best].per)) best = i; });
+      if (best < 0) return;
+      r.best = best;
+      [best + 1, best - 1].forEach(j => { if (j >= 0 && j < bands.length && !r.cells[j].n) { r.cells[j].gap = true; gaps.push({ type: r.type, band: bands[j], up: j > best, per: r.cells[best].per }); } });
+    });
+    const dead = types.filter(r => r.n >= 3 && r.rev <= 0);
+    return { bands, types, maxPer, gaps, dead };
+  }, [q.rows]);
+
+  if (q.err) return null;
+  if (!q.rows) return <V3SkeletonRows n={3}/>;
+  if (!d) return null;
+  // A gap is weaker evidence when the only things already listed at that price, in any type, have
+  // not sold (frkl: necklace stacks fill the band above its best necklaces and sold none) — say so.
+  const coldBand = g => { const j = d.bands.indexOf(g.band); let n = 0, rev = 0;
+    d.types.forEach(r => { if (r.type !== g.type) { n += r.cells[j].n; rev += r.cells[j].rev; } }); return n > 0 && rev <= 0; };
+  const gapLine = g => g.type + ' at ' + g.band.label + (coldBand(g) ? ' (what is listed at that price has not sold)' : '');
+  const gapsUp = d.gaps.filter(g => g.up);
+  const head = d.gaps.length
+    ? (gapsUp.length === d.gaps.length
+        ? 'In ' + fmtCount(d.gaps.length) + (d.gaps.length === 1 ? ' product type' : ' product types') + ' your range stops just above the price that earns most per product.'
+        : fmtCount(d.gaps.length) + (d.gaps.length === 1 ? ' price point sits' : ' price points sit') + ' empty next to the band that earns most per product.')
+    : 'Every product type has products either side of the price that earns it most.';
+  const deadN = d.dead.reduce((a, r) => a + r.n, 0);
+  return (<div className="v3-page-stack"><section className="v3-sec">
+    <div className="v3-kick">White space in the range · last 12 months</div>
+    <p className="v3-verdict">{head}</p>
+    {d.gaps.length > 0 && <p className="v3-note v3-measure">Worth trying one product in: {d.gaps.map(gapLine).join('; ')}.
+      {' '}A gap next to your best price is a place to test, not a forecast. <V3Conf state="possible" detail="Your sales show which price earns most per product in each type. Whether a new product in an empty band would sell is untested — try one product there before building a line."/></p>}
+    {d.dead.length > 0 && <p className="v3-note v3-measure">{d.dead.map(r => r.type).join(', ')}: {fmtCount(deadN)} products listed and no sales recorded against them in a year. They take space on the site without earning.</p>}
+    <figure className="v3-chart">
+      <figcaption><span className="v3-chart-title">What a product sells, by type and price</span>
+        <span className="v3-legend">darker = more sales per product · dashed = nothing listed at that price</span></figcaption>
+      <div className="v3-range-wrap">
+        <table className="v3-range">
+          <thead><tr><th className="t-text">Type</th>{d.bands.map(b => <th key={b.label}>{b.label}</th>)}</tr></thead>
+          <tbody>{d.types.map(r => (<tr key={r.type}>
+            <td className="v3-range-type">{r.type}</td>
+            {r.cells.map((c, i) => c.n
+              ? (<td key={i} className={'v3-range-cell' + (i === r.best ? ' best' : '') + (c.rev <= 0 ? ' dead' : '')}
+                     title={fmtCount(c.n) + (c.n === 1 ? ' product, ' : ' products, ') + fmtMoney(c.rev) + ' of sales in 12 months'}
+                     style={{ '--a': d.maxPer > 0 ? Math.sqrt(c.per / d.maxPer) : 0 }}>
+                  <i aria-hidden="true"/>
+                  <span className="v3-range-v">{fmtMoneyK(c.per)}</span>
+                  <span className="v3-range-n">{fmtCount(c.n)} {c.n === 1 ? 'product' : 'products'}</span>
+                </td>)
+              : (<td key={i} className={'v3-range-cell empty' + (c.gap ? ' gap' : '')}>{c.gap ? <span className="v3-range-gap">Gap</span> : null}</td>))}
+          </tr>))}</tbody>
+        </table>
+      </div>
+      <p className="micro muted v3-measure">Each cell is sales over the last 12 months divided by the products listed there today, at today’s price. The outlined cell in each row is the price that earns most per product.</p>
+    </figure>
+  </section></div>);
+}
+
+// ── What the customers you already have will spend (Customers) ───────────────
+// Expected returning-customer sales by month, from two of the brand's own reads: how many
+// customers it won each month (vw_acq_cohort_base) and what a customer spends in each month
+// after their first order (vw_cohort_decay — customers who started one to two years ago, so
+// every month of their first year is observed). For each month: every customer won before it ×
+// what customers like them spent that many months in. Beyond month 12 it holds the month 10–12
+// average. The same arithmetic is run over the last twelve months and drawn against what
+// actually happened, so the forward line is shown with its own track record rather than alone.
+function v3MonthAdd(iso, n) { const d = new Date(String(iso).slice(0, 7) + '-01T00:00:00Z'); d.setUTCMonth(d.getUTCMonth() + n); return d.toISOString().slice(0, 10); }
+function V3ReturningBaseline() {
+  const cur = new Date().toISOString().slice(0, 7) + '-01';
+  const base = useV3Rows('cust-cohort-base', (sb, b) => sb.from('vw_acq_cohort_base')
+    .select('cohort_month,customers').eq('brand_id', b).order('cohort_month', { ascending: true }).limit(600));
+  const decay = useV3Rows('cust-decay', (sb, b) => sb.from('vw_cohort_decay')
+    .select('month_offset,rev_per_customer').eq('brand_id', b).order('month_offset', { ascending: true }));
+  const act = useV3Rows('cust-ret-monthly', (sb, b) => sb.from('vw_daily_new_vs_returning')
+    .select('order_date,net_revenue').eq('brand_id', b).eq('ledger', 'dtc').eq('customer_type', 'returning')
+    .gte('order_date', v3MonthAdd(cur, -12)).order('order_date', { ascending: true }).limit(1000));
+  const d = React.useMemo(() => {
+    const r = {}; (decay.rows || []).forEach(x => { r[Number(x.month_offset)] = Number(x.rev_per_customer) || 0; });
+    if (!base.rows || !act.rows || [10, 11, 12].some(k => r[k] == null)) return null;
+    const tail = (r[10] + r[11] + r[12]) / 3;
+    const per = k => (k >= 1 && k <= 12 ? (r[k] || 0) : k > 12 ? tail : 0);
+    const mIdx = iso => { const s = String(iso); return Number(s.slice(0, 4)) * 12 + Number(s.slice(5, 7)) - 1; };
+    const cohorts = base.rows.map(x => ({ m: mIdx(x.cohort_month), n: Number(x.customers) || 0 })).filter(c => c.m <= mIdx(cur));
+    if (!cohorts.length) return null;
+    const expect = iso => { const m = mIdx(iso); return cohorts.reduce((s, c) => s + (c.m < m ? c.n * per(m - c.m) : 0), 0); };
+    const actual = {}; act.rows.forEach(x => { const k = String(x.order_date).slice(0, 7); actual[k] = (actual[k] || 0) + (Number(x.net_revenue) || 0); });
+    const months = [];
+    for (let i = -12; i <= 5; i++) {
+      const iso = v3MonthAdd(cur, i), e = Math.round(expect(iso));
+      months.push({ iso, label: v3Month(iso, true), exp: e, past: i < 0, act: i < 0 ? Math.round(actual[iso.slice(0, 7)] || 0) : null, fc: i >= 0 ? e : null });
+    }
+    const past = months.filter(m => m.past), ahead = months.filter(m => !m.past);
+    const sum = (a, k) => a.reduce((s, m) => s + (m[k] || 0), 0);
+    return { months, ahead, next6: sum(ahead, 'exp'), a12: sum(past, 'act'), e12: sum(past, 'exp'),
+      peaks: past.filter(m => m.exp > 0 && m.act >= m.exp * 1.5).sort((a, b) => b.act / b.exp - a.act / a.exp).slice(0, 3) };
+  }, [base.rows, decay.rows, act.rows, cur]);
+
+  if (base.err || decay.err || act.err) return null;
+  if (!base.rows || !decay.rows || !act.rows) return <V3SkeletonRows n={3}/>;
+  if (!d || d.next6 <= 0) return null;   // under a year of history: no curve to project from
+  const first = d.ahead[0].exp, last = d.ahead[d.ahead.length - 1].exp;
+  const tip = ({ active, payload }) => {
+    if (!active || !payload || !payload.length) return null;
+    const p = payload[0].payload;
+    return (<div className="v3-tip"><b>{v3Month(p.iso, 'long')}</b>
+      {p.past && <span>Returning customers spent <em>{fmtMoney(p.act)}</em></span>}
+      <span>Expected from customers already won <em>{fmtMoney(p.exp)}</em></span></div>);
+  };
+  return (<div className="v3-page-stack"><section className="v3-sec">
+    <div className="v3-kick">The customers you already have · next six months</div>
+    <p className="v3-verdict">Customers you have already won are expected to spend {fmtMoney(d.next6)} over the next six months.</p>
+    <p className="v3-note v3-measure">That is the starting point for each month before anyone new buys: {fmtMoney(Math.min(first, last))} to {fmtMoney(Math.max(first, last))} a month,
+      {last < first ? ' easing as older customers buy less often.' : ' rising as recent customers come back.'}
+      {' '}Checked against the last twelve months, the same arithmetic expected {fmtMoney(d.e12)} and they spent {fmtMoney(d.a12)}.
+      {d.peaks.length > 0 && <> The extra came in {d.peaks.map(m => v3Month(m.iso, 'long')).join(', ').replace(/, ([^,]*)$/, ' and $1')}, when sales ran well above the line — the line is an ordinary month, not one with a sale in it.</>}
+      {' '}<V3Conf state="likely" detail="Built from your own customers: how many you won each month, and what customers like them spent in each month after their first order. Beyond a customer’s first year it assumes they keep spending at their month 10 to 12 rate."/></p>
+    <figure className="v3-chart">
+      <figcaption><span className="v3-chart-title">Returning customers’ sales by month</span>
+        <span className="v3-legend"><i style={{ background: PAL.accent }}/>What they spent <i style={{ background: palAlpha(PAL.accent, 0.3) }}/>Expected ahead <i className="dash"/>Expected from customers already won</span></figcaption>
+      <R.ResponsiveContainer width="100%" height={240}>
+        <R.ComposedChart data={d.months} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <R.CartesianGrid/>
+          <R.XAxis dataKey="label" interval="preserveStartEnd"/>
+          <R.YAxis tickFormatter={fmtMoneyK}/>
+          <R.Tooltip content={tip} cursor={false}/>
+          <R.Bar dataKey="act" stackId="m" fill={PAL.accent} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
+          <R.Bar dataKey="fc" stackId="m" fill={palAlpha(PAL.accent, 0.3)} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
+          <R.Line dataKey="exp" type="monotone" stroke={PAL.ink} strokeWidth={1.5} strokeDasharray="4 3" dot={false} isAnimationActive={false}/>
+        </R.ComposedChart>
+      </R.ResponsiveContainer>
+      <p className="micro muted v3-measure">Sales from customers on their second order or later, after discounts and refunds. Customers you win from now on come on top of this.</p>
+    </figure>
+  </section></div>);
+}
+
+// ── What ads caused, against what they claim (Marketing) ─────────────────────
+// vw_calendar_channel_incrementality: each channel's platform-reported return and φ, the share of
+// it the channel actually caused (from a holdout when one has run, a published prior when not).
+// Break-even comes from the scoreboard above, so this and the scoreboard draw the same tick. The
+// view's own status/verdict text is not used: it is cached from an older break-even and can call
+// a channel "losing money" while its caused return sits above the line.
+function V3Incrementality() {
+  const inc = useV3Rows('mk-incr', (sb, b) => sb.from('vw_calendar_channel_incrementality')
+    .select('platform,channel_type,spend_30d,reported_iroas,phi,true_iroas,break_even_iroas,n_tests')
+    .eq('brand_id', b).order('spend_30d', { ascending: false, nullsFirst: false }).limit(8));
+  const sc = useV3Rows('mk-incr-be', (sb, b) => sb.from('vw_channel_scoreboard')
+    .select('channel_type,break_even_iroas').eq('brand_id', b).limit(20));
+  if (inc.err) return null;
+  if (!inc.rows || (!sc.rows && !sc.err)) return <V3SkeletonRows n={3}/>;
+  const beOf = {}; (sc.rows || []).forEach(x => { if (x.break_even_iroas != null) beOf[x.channel_type] = Number(x.break_even_iroas); });
+  const rows = inc.rows.filter(x => Number(x.spend_30d) > 0 && x.reported_iroas != null && x.true_iroas != null)
+    .map(x => ({ ...x, rep: Number(x.reported_iroas), tru: Number(x.true_iroas), spend: Number(x.spend_30d),
+      be: beOf[x.channel_type] != null ? beOf[x.channel_type] : (x.break_even_iroas != null ? Number(x.break_even_iroas) : null) }));
+  if (!rows.length) return null;
+  const nice = v3ChanName;
+  const claimed = rows.reduce((a, r) => a + r.spend * r.rep, 0), caused = rows.reduce((a, r) => a + r.spend * r.tru, 0);
+  const tested = rows.filter(r => Number(r.n_tests) > 0).length;
+  const conf = tested === rows.length ? 'likely' : tested ? 'probably' : 'possible';
+  const scale = Math.max(...rows.map(r => Math.max(r.rep, r.tru, r.be || 0)), 1) * 1.15;
+  const pos = v => Math.min(99, Math.max(1, v / scale * 100));
+  const flipDown = rows.filter(r => r.be != null && r.rep >= r.be && r.tru < r.be);
+  const flipUp = rows.filter(r => r.be != null && r.rep < r.be && r.tru >= r.be);
+  const names = a => a.map(r => nice(r.platform, r.channel_type)).join(', ').replace(/, ([^,]*)$/, ' and $1');
+  // The net gap hides two opposite corrections (frkl: three channels over-claim £1.8k, prospecting
+  // under-claims £1.4k, net £382), so each direction is said on its own.
+  const overR = rows.filter(r => r.rep > r.tru), underR = rows.filter(r => r.tru > r.rep);
+  const over = overR.reduce((a, r) => a + r.spend * (r.rep - r.tru), 0), underC = underR.reduce((a, r) => a + r.spend * (r.tru - r.rep), 0);
+  const head = caused < claimed
+    ? 'Your ads claim ' + fmtMoney(claimed) + ' of sales; Greta puts what they caused at ' + fmtMoney(caused) + '.'
+    : 'Your ads caused more than they claim: ' + fmtMoney(caused) + ' of sales against ' + fmtMoney(claimed) + ' reported.';
+  return (<div className="v3-score v3-enter">
+    <div className="v3-score-head">
+      <h2 className="v3-score-title">What your ads caused, against what they claim</h2>
+      <span className="v3-score-key">ring is what the platform reports · dot is what it caused · tick is break-even</span>
+    </div>
+    <p className="v3-score-verdict">{head}
+      {over > 0 && <> {names(overR)} claim{overR.length === 1 ? 's' : ''} {fmtMoney(over)} of sales that would probably have come anyway, from people already on their way to buy.</>}
+      {underC > 0 && <> {names(underR)} {underR.length === 1 ? 'earns' : 'earn'} {fmtMoney(underC)} more than {underR.length === 1 ? 'it reports' : 'they report'}.</>}
+      {' '}<V3Conf state={conf} detail={tested ? 'Channels with a holdout test use your own result; the rest use published studies of similar channels.' : 'No holdout test has run on these channels yet, so the share each one really caused comes from published studies of similar channels, not your own data.'}/></p>
+    {(flipDown.length > 0 || flipUp.length > 0) && <p className="v3-note v3-measure">
+      {flipDown.length > 0 && <>{names(flipDown)} {flipDown.length === 1 ? 'looks' : 'look'} as if {flipDown.length === 1 ? 'it pays' : 'they pay'} on the platform’s figures, but not on what {flipDown.length === 1 ? 'it' : 'they'} caused. </>}
+      {flipUp.length > 0 && <>{names(flipUp)} {flipUp.length === 1 ? 'does' : 'do'} the reverse: below break-even on the platform’s figures, above it on what {flipUp.length === 1 ? 'it' : 'they'} caused.</>}
+    </p>}
+    <ul className="v3-score-list">
+      {rows.map(r => {
+        const under = r.be != null && r.tru < r.be, a = pos(Math.min(r.rep, r.tru)), b = pos(Math.max(r.rep, r.tru));
+        return (<li key={r.platform + r.channel_type} className={'v3-score-row v3-incr-row' + (under ? ' under' : '')}>
+          <span className="v3-score-name">{nice(r.platform, r.channel_type)}</span>
+          <span className="v3-score-track" role="img"
+                aria-label={nice(r.platform, r.channel_type) + ': reported ' + fmtTimes(r.rep) + ', caused ' + fmtTimes(r.tru) + (r.be != null ? ', break-even ' + fmtTimes(r.be) : '')}>
+            <i className="v3-incr-seg" style={{ left: a + '%', width: (b - a) + '%' }}/>
+            {r.be != null && <i className="v3-score-tick" style={{ left: pos(r.be) + '%' }}/>}
+            <i className="v3-incr-rep" style={{ left: pos(r.rep) + '%' }}/>
+            <i className="v3-incr-true" style={{ left: pos(r.tru) + '%' }}/>
+          </span>
+          <span className="v3-score-x">{fmtTimes(r.rep)} → {fmtTimes(r.tru)}</span>
+          <span className="v3-score-spend">{v3Gbp(r.spend)}</span>
+        </li>);
+      })}
+    </ul>
+    {tested < rows.length && <p className="v3-note">A two-week holdout — pausing a channel in one region while another carries on — replaces the estimate with your own number.{' '}
+      <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('calendar')}>Plan a holdout test</button></p>}
+  </div>);
+}
+
 const V3_PAGES = {
   today: (p) => <V3Today {...p}/>,
   review: (p) => (<>
@@ -17233,6 +17578,7 @@ const V3_PAGES = {
     {/* The page asks which channels earn their money; that answer is a comparison, so it leads as
         one instead of arriving after two scrolling panels of per-channel detail. */}
     <V3ChannelScoreboard/>
+    <V3Incrementality/>
     <CrossChannel start={p.start}/>
     <CreativeReallocation/>
     <ChannelDetailList channels={(typeof window!=='undefined' && window.FRKL_PLAN && window.FRKL_PLAN.channels) || []}/>
@@ -17252,12 +17598,15 @@ const V3_PAGES = {
   // so they sit behind a disclosure rather than leading the page.
   customers: (p) => (<>
     <V3Customers/>
+    <V3ReturningBaseline/>
     <CustomerSegments/>
     <V3More id="cust-more" label="More customer detail"><Customers/><V3Anchor id="cohorts"/><CohortsPanel/></V3More>
   </>),
   products: (p) => (<>
     <V3Products/>
+    <V3ProductDesire/>
     <ProductTrafficMisallocation/>
+    <V3RangeGaps/>
     <V3More id="prod-more" label="More product detail"><Products/></V3More>
     <V3More id="prod-promos" label="Promotions and discount codes"><V3Anchor id="promos"/><DiscountCodeTracker/></V3More>
   </>),
