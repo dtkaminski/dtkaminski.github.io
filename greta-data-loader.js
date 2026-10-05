@@ -706,7 +706,8 @@
           : days < 14 ? 'critical' : days < 30 ? 'low' : days <= 90 ? 'healthy' : days <= 180 ? 'high' : 'overstock';
         return { title: r.product_title || r.sku, sku: r.sku || '', type: '', inventoryQty: qty,
                  units90d: Math.round(daily * 90), dailyVelocity: daily, daysOfCover: days == null ? null : Math.round(days),
-                 inventoryValue: Math.max(0, qty) * unit, coverTier: tier, status: 'ACTIVE' };
+                 inventoryValue: Math.max(0, qty) * unit, coverTier: tier, status: 'ACTIVE',
+                 costPerItem: r.landed_cost != null ? Number(r.landed_cost) : null };
       }).sort((x, y) => y.inventoryQty - x.inventoryQty);
       const summary = {};
       items.forEach(it => { const k = it.coverTier;
