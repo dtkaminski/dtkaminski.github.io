@@ -1128,95 +1128,6 @@ function MoneyBadge({money}){
   }}>{fmt}/mo</span>);
 }
 
-function MoneyOnTablePanel(){
-  const P = window.FRKL_PATTERNS || {};
-  if (!P || !P.money_rollup) return null;
-  const rollup = P.money_rollup;
-  const am = P.action_money || {};
-  const mp = P.money_patterns || [];
-  const items = [
-    ...Object.values(am).map(m => ({...m, source: 'action'})),
-    ...mp.map(m => ({
-      external_id: m.synthetic_id, agent: 'synthetic', priority: '—',
-      description: m.label, basis: m.basis,
-      monthly_impact_gbp: m.monthly_impact_gbp,
-      kind: m.kind, confidence: m.confidence,
-      status: 'open',
-      source: 'synthetic',
-    }))
-  ].filter(x => x.monthly_impact_gbp && Math.abs(x.monthly_impact_gbp) >= 50)
-   .sort((a,b) => Math.abs(b.monthly_impact_gbp) - Math.abs(a.monthly_impact_gbp));
-  return (
-    <div className="card">
-      <div className="card-section-title">
-        <h2 style={{margin:0}}>Money on the table</h2>
-        <span className="meta">{`${curSym()}/mo at stake · conservative estimates · total is illustrative (items overlap)`}</span>
-      </div>
-      <div className="stat-strip" style={{marginBottom:'var(--s-4)'}}>
-        <div className="stat-strip-item">
-          <div className="stat-strip-val" style={{color:'var(--bad)'}}>{`${curSym()}`}{(rollup.leakage/1000).toFixed(1)}k<span style={{fontSize:'var(--text-xs)', color:'var(--text-muted)', marginLeft:3}}>/mo</span></div>
-          <div className="stat-strip-label">Leaking now</div>
-        </div>
-        <div className="stat-strip-divider"/>
-        <div className="stat-strip-item">
-          <div className="stat-strip-val" style={{color:'var(--warn)'}}>{`${curSym()}`}{(rollup.at_risk/1000).toFixed(1)}k<span style={{fontSize:'var(--text-xs)', color:'var(--text-muted)', marginLeft:3}}>/mo</span></div>
-          <div className="stat-strip-label">At risk</div>
-        </div>
-        <div className="stat-strip-divider"/>
-        <div className="stat-strip-item">
-          <div className="stat-strip-val" style={{color:'var(--good)'}}>{`${curSym()}`}{(rollup.opportunity/1000).toFixed(1)}k<span style={{fontSize:'var(--text-xs)', color:'var(--text-muted)', marginLeft:3}}>/mo</span></div>
-          <div className="stat-strip-label">Opportunity</div>
-        </div>
-        <div className="stat-strip-divider"/>
-        <div className="stat-strip-item">
-          <div className="stat-strip-val">{`${curSym()}`}{(rollup.total/1000).toFixed(1)}k<span style={{fontSize:'var(--text-xs)', color:'var(--text-muted)', marginLeft:3}}>/mo</span></div>
-          <div className="stat-strip-label">In total</div>
-        </div>
-      </div>
-      {(() => {
-        // Separate EVIDENCED findings from HYPOTHESES (unvalidated opportunities) so
-        // speculation never sits beside grounded leakage. Synthetic opportunities and
-        // low-confidence items are hypotheses; everything else is evidenced.
-        const tier = (c) => typeof c === 'number' ? (c >= 0.66 ? 'high' : c >= 0.45 ? 'medium' : 'low') : (c || 'low');
-        const isHyp = (m) => m.source === 'synthetic' || tier(m.confidence) === 'low';
-        const evidenced = items.filter(m => !isHyp(m));
-        const hypotheses = items.filter(isHyp);
-        const confColor = (c) => { const t=tier(c); return t==='high'?'var(--good)':t==='medium'?'var(--warn)':'var(--text-muted)'; };
-        const Row = (m,i)=>{
-          return (<tr key={i}>
-            <td style={{fontSize:'var(--text-sm)', maxWidth:320}}>
-              <span style={{fontWeight:'var(--weight-semi)', color: m.source==='synthetic' ? 'var(--text-secondary)' : 'var(--text-primary)'}}>{scrubTag(m.description)}</span>
-              <div className="meta" style={{fontSize:'var(--text-xs)'}}>{[
-                agentLabel(m.agent) || (m.source === 'synthetic' ? 'Estimated' : m.source),
-                m.priority && m.priority !== '—' ? priorityWord(m.priority) : null,
-                ({ at_risk: 'At risk', leakage: 'Leaking now', opportunity: 'Opportunity' })[m.kind] || (m.kind ? String(m.kind).replace(/_/g, ' ') : null),
-              ].filter(Boolean).join(' · ')}</div>
-            </td>
-            <td><MoneyBadge money={m}/></td>
-            <td className="tl" style={{fontSize:'var(--text-xs)', textTransform:'uppercase', letterSpacing:'var(--tracking-wide)', color:confColor(m.confidence), fontWeight:'var(--weight-semi)'}}>{tier(m.confidence)}</td>
-            <td className="meta tl" style={{fontSize:'var(--text-xs)', maxWidth:320}}>{m.basis}</td>
-            <td className="tl"><span className="pill grey" style={{fontSize:'var(--text-xs)'}}>{m.status||'open'}</span></td>
-          </tr>);
-        };
-        return (
-          <>
-            <table><thead><tr><th>Evidenced finding</th><th>{`${curSym()}/mo impact`}</th><th className="tl">Confidence</th><th className="tl">Basis</th><th className="tl">Status</th></tr></thead>
-              <tbody>{evidenced.map(Row)}</tbody></table>
-            {hypotheses.length > 0 && (<div style={{marginTop:'var(--s-5)'}}>
-              <div className="card-section-title" style={{marginBottom:6}}>
-                <h3 style={{margin:0, fontSize:'var(--text-sm)', color:'var(--text-muted)'}}>Hypotheses — unvalidated upside</h3>
-                <span className="meta" style={{fontSize:'var(--text-xs)'}}>low-confidence estimates · test before committing budget, don't bank them</span>
-              </div>
-              <table style={{opacity:0.85}}><thead><tr><th>Hypothesis</th><th>{`${curSym()}/mo if it works`}</th><th className="tl">Confidence</th><th className="tl">Assumption</th><th className="tl">Status</th></tr></thead>
-                <tbody>{hypotheses.map(Row)}</tbody></table>
-            </div>)}
-          </>
-        );
-      })()}
-    </div>
-  );
-}
-
 function MoneyHeaderStrip(){
   // Compact strip for the Overview tab. Headline £ numbers only.
   const P = window.FRKL_PATTERNS || {};
@@ -2505,21 +2416,23 @@ function StickyHealthBar(){
     onScroll();
     return ()=>window.removeEventListener('scroll', onScroll);
   }, []);
-  const P = (typeof window!=='undefined' && window.FRKL_PATTERNS) || {};
-  const roll = P.money_rollup || {};
-  const atStake = (roll.leakage||0) + (roll.at_risk||0);
-  let openCount = 0;
-  try {
-    const st = window.FRKL_ACTION_STATUS || {};
-    const local = JSON.parse(localStorage.getItem('frkl-action-local-done')||'{}');
-    openCount = Object.keys(st).filter(id=>{ const s=(st[id]||{}).status; return s!=='verified-done' && s!=='done' && !local[id]; }).length;
-  } catch(e){}
-  const status = (roll.leakage>0) ? {kind:'action', label:'Action required'} : (roll.at_risk>0) ? {kind:'watch', label:'Watch'} : {kind:'healthy', label:'Healthy'};
+  // The board's rows, like Today and Actions. This bar used to total money_rollup (every action
+  // ever raised, skipped and done included) and count FRKL_ACTION_STATUS, so it could say
+  // "Action required · £190k/mo at stake" over a board of three.
+  const { rows } = useV3Board();
+  const live = v3LiveRows(rows);
+  const atStake = live.reduce((a, r) => a + (Number(r.cm_gbp) || 0), 0);
+  const openCount = (rows || []).length;
+  const actNow = live.filter(r => r.lane !== 'test').length;
+  const status = rows === null ? {kind:'info', label:'Loading'}
+    : actNow > 0 ? {kind:'action', label:'Action required'}
+    : live.length > 0 ? {kind:'watch', label:'Worth testing'}
+    : {kind:'healthy', label:'Healthy'};
   return (
     <div className={'health-bar'+(show?' show':'')} aria-hidden={!show}>
       <div className="health-bar-inner">
         <StatusBadge kind={status.kind} label={status.label}/>
-        {atStake>0 && <span className="hb-metric"><b>{fmtMoneyK(atStake)}</b>/mo at stake</span>}
+        {atStake>0 && <span className="hb-metric"><b>{fmtMoneyK(atStake)}</b>/mo on the board</span>}
         {openCount>0 && <span className="hb-metric"><b>{openCount}</b> open action{openCount===1?'':'s'}</span>}
         <span className="hb-spacer"/>
         <button className="ia-btn primary" onClick={()=>window.__oiNav && window.__oiNav('actions','queue')}><Icon name="clipboard" size={13}/>Review actions</button>
@@ -3542,46 +3455,6 @@ function LazyMount({minHeight, children}){
   return <div ref={ref}>{shown ? children : <Skeleton height={minHeight||320}/>}</div>;
 }
 
-// Mobile "Today" — a 60-second check-in: £ in play, the health verdict, the top 3
-// £-ranked open actions (tap → ask the AI how), and one Ask button. Reads globals
-// directly so it has no dependency on Overview internals.
-function MobileToday(){
-  const P = (typeof window!=='undefined' && window.FRKL_PATTERNS) || {};
-  const dx = ((typeof window!=='undefined' && window.FRKL_DX_ANALYST) || {})['30d'] || {};
-  const rollup = P.money_rollup || {};
-  const am = P.action_money || {};
-  const byWhen = p => ({P1:'this week', P2:'next 2 weeks', P3:'this month'})[p] || '';
-  const kc = k => k==='opportunity'?'var(--good)':k==='at_risk'?'var(--warn)':'var(--bad)';
-  const actions = Object.values(am)
-    .filter(a => a && a.status!=='done' && a.status!=='verified-done' && Math.abs(a.monthly_impact_gbp||0) >= 50)
-    .sort((a,b)=> Math.abs(b.monthly_impact_gbp||0) - Math.abs(a.monthly_impact_gbp||0))
-    .slice(0,3);
-  return (
-    <div className="card" style={{marginBottom:14}}>
-      <div style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--accent)',marginBottom:6}}>Today</div>
-      {rollup.total!=null && <div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',lineHeight:1.2}}>{`${curSym()}`}{(Math.round((rollup.total||0)/100)/10)}k/mo in play</div>}
-      {dx.headline && <div style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)',margin:'6px 0 12px',lineHeight:1.5}}>{plainWords(dx.headline)}</div>}
-      <div style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-muted)',marginBottom:6}}>Do this next</div>
-      <div style={{display:'flex',flexDirection:'column',gap:8}}>
-        {actions.length ? actions.map((a,i)=>(
-          <div key={i} onClick={()=>window.__oiAsk&&window.__oiAsk(`How do I action this, and what's the expected impact: ${a.description}`)}
-            style={{padding:'10px 12px',background:'var(--bg-elevated)',border:'1px solid var(--border-subtle)',borderRadius:'var(--radius-none)',cursor:'pointer'}}>
-            <div style={{fontSize:'var(--text-sm)',color:'var(--text-primary)',lineHeight:1.4}}>{scrubTag(a.description)}</div>
-            <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:5,display:'flex',gap:12,flexWrap:'wrap'}}>
-              <span style={{color:kc(a.kind),fontWeight:'var(--weight-semi)'}}>{`${curSym()}`}{Math.round(Math.abs(a.monthly_impact_gbp)).toLocaleString()}/mo</span>
-              {a.priority && <span>{byWhen(a.priority)}</span>}
-              <span style={{color:'var(--accent)'}}>tap to ask →</span>
-            </div>
-          </div>
-        )) : <div className="muted" style={{fontSize:'var(--text-sm)'}}>{`No high-${curSym()} actions open right now.`}</div>}
-      </div>
-      <button onClick={()=>window.__oiAsk&&window.__oiAsk(`What should I do today? Give me the top 3 actions, ranked by ${curSym()} impact.`)}
-        style={{marginTop:12,width:'100%',padding:'12px',background:PAL.accent,border:'none',borderRadius:'var(--radius-md)',color:PAL.panel,fontWeight:'var(--weight-bold)',fontSize:'var(--text-base)',cursor:'pointer'}}>✦ Ask: What should I do today?</button>
-      <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textAlign:'center',marginTop:10}}>↓ Full dashboard below</div>
-    </div>
-  );
-}
-
 // "What changed" — latest complete week vs the one before, the movers worth a look.
 // Reuses the weekly-board data model (boardWeeks/boardRag); picker-independent.
 // Mini trend chart for the What-changed cards — axes + hover detail (not a bare sparkline).
@@ -3791,7 +3664,7 @@ function Overview({start, period, customActive}){
   const cac = UE && UE.cac != null ? Number(UE.cac)
             : ((newCust && newCust>0) ? paid/newCust : null);
   const pNewCust = (havePrior && ordersPerCust && pOrders) ? pOrders/ordersPerCust : null;
-  const pCac = (havePrior && pNewCust && pNewCust>0 && pPaid!=null) ? pPaid/pNewCust : null;
+  const pCac = (UE && UE.cac != null) ? null : ((havePrior && pNewCust && pNewCust>0 && pPaid!=null) ? pPaid/pNewCust : null);
   const ltv = UE && UE.ltv_contribution != null ? Number(UE.ltv_contribution) : null;
   const ltvBasis = UE && UE.ltv_basis ? UE.ltv_basis : null;
   const ltvTopdown = UE && UE.ltv_rev_topdown != null ? Number(UE.ltv_rev_topdown) : null;
@@ -3859,7 +3732,10 @@ function Overview({start, period, customActive}){
     const pr=sum(pS,'netSales'), po=sum(pS,'orders'), pses=sum(pA,'sessions'), ppd=sum(pM,'cost')+sum(pG,'cost'), pgs=sum(pS,'totalSales'), pda=sum(pS,'discounts');
     const _aov=o>0?r/o:null, _nc=ordersPerCust?o/ordersPerCust:null;
     const _cac = (UE && UE.cac != null) ? Number(UE.cac) : ((_nc&&_nc>0)?pd/_nc:null);
-    const _pnc=ordersPerCust&&po?po/ordersPerCust:null, _pcac=(_pnc&&_pnc>0)?ppd/_pnc:null;
+    // A prior cost per new customer worked out from orders ÷ orders-per-customer is not comparable with
+    // the server's measured figure: comparing them flagged "cost per new customer rising" from the method
+    // change alone. With the measured figure there is no like-for-like prior here, so none is shown.
+    const _pnc=ordersPerCust&&po?po/ordersPerCust:null, _pcac=(UE && UE.cac != null) ? null : ((_pnc&&_pnc>0)?ppd/_pnc:null);
     // Same measured source as the page above, so the vitals strip and the KPI grid can
     // never quote two different LTVs. Falls back only when the view has no cohort yet.
     const _ltv = (UE && UE.ltv_contribution != null) ? Number(UE.ltv_contribution)
@@ -3890,8 +3766,9 @@ function Overview({start, period, customActive}){
       {costsOpen && <CostSetupModal catalogueGm={grossMargin} onClose={()=>setCostsOpen(false)}/>}
       {/* Cost-setup prompt deliberately lives BELOW the hero + diagnosis (prove value
           first, then ask for the ~5-min margin input) — see after DiagnosticCard. */}
-      {/* Mobile "Today" — 60-second check-in at the very top on narrow screens. */}
-      {isMobile && <MobileToday/>}
+      {/* The mobile "Today" card that sat here totalled every action ever raised (skipped, done and
+          July seeds: ~£190k/mo "in play") and listed its own top three. Today itself, which mobile
+          opens on, shows the one board. Removed 2026-10-05. */}
       {/* Per-channel freshness moved to the app-bar FreshnessChip (was duplicated here). */}
       {/* Hero — the answer to "what should I look at right now" */}
       {/* SetupProgressCard repeated Today's setup steps and its button left the app; removed. */}
@@ -4011,15 +3888,15 @@ function Overview({start, period, customActive}){
             implication="Lift with post-purchase flows + a reason to come back; it compounds faster than paid." />
           <KPI label="Profit after ads" val={GBP(contrib)} sub="gross profit − paid media · full breakdown below" badge={<MarginBadge onSetup={()=>{ window.__oiGo && window.__oiGo('goal', 'margin'); }}/>} series={seriesContrib} current={contrib} prior={pContrib} goodDirection="up"
             agent="Atlas" observation="Sales × what you keep after product and order costs, minus ad spend — the same figure Today leads with." />
-          <KPI label="New-customer cost" val={GBP(cac)} sub={`${NUM(newCust)} new customers · measured, not inferred`} badge={<MarginBadge onSetup={()=>{ window.__oiGo && window.__oiGo('goal', 'margin'); }}/>} series={seriesCAC} seriesLabel="Spend ÷ new customers · by day" current={cac} prior={pCac} goodDirection="down"
-            agent="Pulse" observation="Paid ad spend ÷ new customers, both counted directly from your orders — no longer inferred from a repeat-purchase ratio."
-            implication="Judge against contribution-customer lifetime value — keep scaling only while customer lifetime value:cost per new customer stays at 3×+." />
+          <KPI label="New-customer cost" val={GBP(cac)} sub={`last 90 days · ${NUM(newCust)} new customers${allowableCac!=null?` · most one can cost ${GBP(allowableCac)}`:''}`} badge={<MarginBadge onSetup={()=>{ window.__oiGo && window.__oiGo('goal', 'margin'); }}/>} series={seriesCAC} seriesLabel="Spend ÷ new customers · by day" current={cac} prior={pCac} goodDirection="down"
+            agent="Pulse" observation="All ad spend over the last 90 days (including any agency fee) ÷ first-time customers counted from your orders — the same figure Ask Greta quotes and the action board checks spend against."
+            implication="The most a new customer can cost is what their first order plus a year of repeat orders earns you. Under that, spend pays back within a year; 3× under it is the healthier target." />
           <KPI label="Customer value" val={GBP(ltv)} sub={ltvBasis
               ? `contribution · ${ltvBasis} · vs cost per new customer ${ltvCac?ltvCac.toFixed(1)+'×':'—'}`
               : 'not measured yet'} badge={<MarginBadge onSetup={()=>{ window.__oiGo && window.__oiGo('goal', 'margin'); }}/>} series={seriesLTV} seriesLabel="Customer value · by day" goodDirection="up"
             agent="Atlas"
             observation={ltvBasis
-              ? `Contribution per acquired customer, integrated from the cohort curve over the ${ltvBasis}. The horizon stops where the curve stops observing half the starting cohort, because past that point it is only the survivors talking about themselves.`
+              ? `Profit per acquired customer: ${ltvBasis}.`
               : 'Contribution per acquired customer, integrated from the cohort curve. Not available on this workspace yet — either there is not enough order history, or the measurement has not been switched on for your account.'}
             implication={ltvTopdown!=null && ltvGap!=null
               ? `Cross-checked against MER × cost per new customer — the same quantity derived a completely different way: ${GBP(ltvTopdown)} of revenue per customer, ${Math.abs(ltvGap*100).toFixed(1)}% ${ltvGap>=0?'above':'below'} the cohort read. A small, stable gap is a calibration constant; a widening one means the cohort model has broken. Keep scaling only while this figure stays 3× your cost per new customer.`
@@ -7764,37 +7641,6 @@ function IntelligencePanel(){
     </div>);
   };
 
-  // P(hit) action rows
-  const phitRows = (() => {
-    if (!P.action_phit) return [];
-    const all = Object.entries(P.action_phit).map(([id, ph]) => {
-      let match = null;
-      if (window.FRKL_INSIGHTS) {
-        for (const area of Object.values(window.FRKL_INSIGHTS)) {
-          const found = (area.actions || []).find(a => a.id === id);
-          if (found) { match = {...found, agent: area.agent}; break; }
-        }
-      }
-      const st = (window.FRKL_ACTION_STATUS || {})[id] || {};
-      const mon = (P.action_money || {})[id] || {};
-      // Prefer the reconciled live copy from action-status over the (possibly stale)
-      // specialist text, and carry the contradiction flag through.
-      const liveText = st.text || (match && match.text);
-      // Completeness: expected £ impact, success metric (watch metric → target), and a
-      // by-when horizon derived from priority — so every action is executable.
-      const watchM = Array.isArray(st.watch) && st.watch.length ? st.watch[0] : null;
-      const successMetric = watchM ? (watchM.replace(/_/g,' ') + (st.target!=null ? ` → ${st.target}` : '')) : null;
-      const byWhen = {P1:'this week', P2:'next 2 weeks', P3:'this month'}[(match&&match.p)||st.priority] || null;
-      return {id, ...ph, ...(match || {}), ...(liveText?{text:liveText}:{}), status: st.status || 'unknown',
-              gbp: mon.monthly_impact_gbp || null, kind: mon.kind || null, basis: mon.basis || null,
-              successMetric, byWhen, owner: (match&&match.agent)||st.agent||null,
-              premiseStale: !!st.premiseStale, reconcileNote: st.reconcileNote || null};
-    });
-    // Stale-premise actions (the live metric no longer supports them) sink to the bottom.
-    return all.filter(a => a.status !== 'verified-done' && a.status !== 'done')
-              .sort((a,b) => (a.premiseStale?1:0) - (b.premiseStale?1:0) || (b.phit || 0) - (a.phit || 0));
-  })();
-
   return (
     <div style={{display:'flex', flexDirection:'column', gap:'var(--s-7)'}}>
       {/* Track record — closes the loop on acted-on advice */}
@@ -7894,43 +7740,11 @@ function IntelligencePanel(){
         <ZoneHeader
           number="03"
           title="What to do"
-          meta={`${phitRows.length} open actions · ${curSym()}${((P.money_rollup?.total || 0)/1000).toFixed(1)}k/mo at stake`}
+          meta="The same actions as Today and the Actions page, in the same order"
         />
-        <MoneyOnTablePanel/>
-        {phitRows.length > 0 && (<div style={{marginTop:'var(--s-4)'}}>
-          <div className="card-section-title">
-            <h2 style={{margin:0}}>Open actions, ranked by P(hit)</h2>
-            <span className="meta">Bayesian estimate per agent + category, with sample size badges</span>
-          </div>
-          <Collapsible
-            items={phitRows}
-            initialCount={6}
-            moreLabel="open actions"
-            renderItem={(a, i) => { const kc = a.kind==='opportunity'?'var(--good)':a.kind==='at_risk'?'var(--warn)':'var(--bad)'; return (
-              <div key={i} style={{
-                display:'flex', alignItems:'flex-start', gap:'var(--s-3)',
-                padding:'var(--s-3) var(--s-4)', background:'var(--bg-elevated)',
-                border:'1px solid var(--border-subtle)', borderRadius:'var(--r-md)',
-              }}>
-                <div style={{flexShrink:0, marginTop:2}}><PHitBadge phit={a}/></div>
-                <span className={'pill '+(a.p === 'P1' ? 'red' : a.p === 'P2' ? 'amber' : 'grey')} style={{fontSize:'var(--text-xs)', flexShrink:0, marginTop:2}}>{priorityWord(a.p)}</span>
-                <div style={{flex:1, minWidth:0}}>
-                  <div style={{display:'flex', alignItems:'baseline', gap:8, flexWrap:'wrap'}}>
-                    <span style={{fontSize:'var(--text-sm)', color: a.premiseStale?'var(--text-muted)':'var(--text-primary)', lineHeight:1.4, textDecoration:a.premiseStale?'line-through':'none'}}>{a.text || a.id}</span>
-                    {a.premiseStale && <span className="pill grey" title={a.reconcileNote||''} style={{fontSize:'var(--text-xs)'}}>premise out of date</span>}
-                  </div>
-                  <div style={{display:'flex', flexWrap:'wrap', gap:12, marginTop:5, fontSize:'var(--text-xs)', color:'var(--text-faint)', alignItems:'baseline'}}>
-                    <span title="Owner">{agentLabel(a.owner) || '—'}</span>
-                    {a.gbp ? <span style={{color:kc, fontWeight:'var(--weight-semi)'}} title="Expected monthly impact">{`${curSym()}`}{Math.round(Math.abs(a.gbp)).toLocaleString()}/mo</span> : null}
-                    {a.successMetric && <span title="Success metric">{a.successMetric}</span>}
-                    {a.byWhen && <span title="Review by">{a.byWhen}</span>}
-                    <span title="P(hit) confidence · sample size">{a.confidence} (n={a.sample_size})</span>
-                  </div>
-                </div>
-              </div>
-            ); }}
-          />
-        </div>)}
+        {/* This zone used to total every action ever raised ("£Xk/mo at stake", skipped and done
+            included) and rank its own copy by a P(hit) score. One board everywhere: removed 2026-10-05. */}
+        <V3BoardDigest/>
       </section>
       {/* Advanced detail — collapsible by default, for reference */}
       <section>
@@ -10019,6 +9833,27 @@ function v3MoneyConf(row){
 // board but never lead Today.
 function v3LiveRows(rows){ return (rows || []).filter(r => r.verification !== 'unverified'); }
 
+// The board, in its own order, for drawers that summarise "what to do" (Review's Alerts). Those
+// drawers each kept a copy of every action ever raised, ranked their own way and totalled with
+// skipped and done ones; this renders the one list instead and links to it.
+function V3BoardDigest({ n = 5 }){
+  const { rows, err } = useV3Board();
+  if (err) return <div className="v3-empty">Greta could not load your actions just now — refreshing usually sorts it.</div>;
+  if (rows === null) return <V3SkeletonRows n={3}/>;
+  const live = v3LiveRows(rows);
+  if (!live.length) return <div className="v3-empty">Nothing needs doing right now. Greta raises something here as soon as it is worth your time.</div>;
+  const total = live.reduce((a, r) => a + (Number(r.cm_gbp) || 0), 0);
+  return (<div className="v3-next">
+    <div className="v3-kick">{v3Gbp(total)} a month across {live.length} action{live.length === 1 ? '' : 's'} Greta has checked</div>
+    {live.slice(0, n).map((a, i) => (<div key={a.external_id || i} className="v3-next-row">
+      <span className="v3-num">{i + 1}</span>
+      <span>{v3PlainAction(a).title}</span>
+      <span className="v3-num">{a.cm_gbp ? v3Gbp(a.cm_gbp) + '/mo' : ''}</span>
+    </div>))}
+    <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>Open the action board <Icon name="arrowRight" size={13}/></button>
+  </div>);
+}
+
 function V3ActionBoard(){
   const { rows, err } = useV3Board();
   const [cat, setCat] = React.useState('all');
@@ -10472,19 +10307,20 @@ function BusinessReview(){
   const pct1 = v=>v!=null?(v*100).toFixed(1)+'%':'—';
   const k = v3Amount;
 
-  // ── £-tagged registers: live findings only (≥£50/mo, not already done) ──
-  const confTier = c => typeof c==='number' ? (c>=0.66?'high':c>=0.45?'med':'low') : (c==='high'?'high':c==='medium'?'med':'low');
+  // ── £ registers: the board's rows, in the board's order ──
+  // These used to total every action ever raised (P.action_money + money_patterns), including ones
+  // the operator skipped or finished and July seeds nothing re-checks: £190k/mo "exposed" beside a
+  // board of three. Now the pack reads the same evidence-gated rows as Today and Actions, split by
+  // the board's own lanes, each with its rung.
   const DONE = new Set(['done','verified-done','dismissed','wont-do']);
-  const items = [
-    ...Object.values(P.action_money||{}).map(m=>({description:m.description, basis:m.basis, monthly_impact_gbp:m.monthly_impact_gbp, kind:m.kind, confidence:m.confidence, status:m.status})),
-    ...((P.money_patterns||[]).map(m=>({description:m.label||m.description, basis:m.basis, monthly_impact_gbp:m.monthly_impact_gbp, kind:m.kind, confidence:m.confidence, status:'open'}))),
-  ].filter(x=> x.monthly_impact_gbp && Math.abs(x.monthly_impact_gbp)>=50 && !DONE.has(x.status) && (x.description||'').trim());
-  const byImpact = (a,b)=>Math.abs(b.monthly_impact_gbp)-Math.abs(a.monthly_impact_gbp);
-  const risks = items.filter(x=>x.kind==='leakage'||x.kind==='at_risk').sort(byImpact);
-  const opps  = items.filter(x=>x.kind==='opportunity').sort(byImpact);
-  const roll = P.money_rollup||{};
-  const atRisk = (roll.leakage||0)+(roll.at_risk||0);
-  const upside = roll.opportunity||0;
+  const items = v3LiveRows(board && board.rows)
+    .filter(r => (Number(r.cm_gbp) || 0) > 0)
+    .map(r => ({description: v3PlainAction(r).title, basis: r.money_basis, monthly_impact_gbp: Number(r.cm_gbp),
+                rung: v3MoneyConf(r), lane: r.lane}));
+  const risks = items.filter(x => x.lane !== 'test');   // act now
+  const opps  = items.filter(x => x.lane === 'test');   // worth testing
+  const atRisk = risks.reduce((a, x) => a + x.monthly_impact_gbp, 0);
+  const upside = opps.reduce((a, x) => a + x.monthly_impact_gbp, 0);
   // The same rows the Actions page and the nav badge count.
   const openActions = (board && board.rows) ? board.rows.length : Object.values((typeof window!=='undefined'&&window.FRKL_ACTION_STATUS)||{}).filter(s=> s && !DONE.has(s.status)).length;
 
@@ -10625,12 +10461,12 @@ function BusinessReview(){
   const breaches = nowD.filter(d=>d.sp.bench!=null && d.rag==='bad').length;
   // The £ findings are only known once the live write lands (_source:'live'). Before that, zero
   // risks is "not loaded yet", not "on track" — the board used to call an empty register calm.
-  const moneyKnown = P._source === 'live';
+  const moneyKnown = !!(board && board.rows);
   const overall = breaches>=2 ? {kind:'action',label:'Action required'}
                 : (breaches===1 || atRisk>2000) ? {kind:'watch',label:'Watch'}
                 : !moneyKnown ? {kind:'info',label:'Still loading'}
                 : {kind:'healthy',label:'On track'};
-  const verdictSentence = (moneyKnown ? '' : 'Greta’s £ findings are still loading. ') + (!moneyKnown ? '' : `${curSym()}${k(atRisk)}/mo of contribution is exposed across ${risks.length} flagged risk${risks.length===1?'':'s'}, against ${curSym()}${k(upside)}/mo of identified upside across ${opps.length} opportunit${opps.length===1?'y':'ies'}. ${openActions} actions are open in the queue. `)
+  const verdictSentence = (moneyKnown ? '' : 'Greta’s £ findings are still loading. ') + (!moneyKnown ? '' : `${risks.length} action${risks.length===1?'':'s'} to act on now, worth about ${curSym()}${k(atRisk)}/mo, and ${opps.length} worth testing (${curSym()}${k(upside)}/mo). ${openActions} actions are open in the queue. `)
     + `Unit economics: ${ltvCac!=null?ltvCac.toFixed(1)+'× contribution customer lifetime value:cost per new customer':'customer lifetime value:cost per new customer pending cost data'}, repeat rate ${repeat!=null?pct1(repeat):'—'}. `
     + `${topChan&&topShare!=null?`${topChan.channel} drives ${pct0(topShare)} of revenue`:''}${slowCapital>50000?`, with ${curSym()}${k(slowCapital)} of capital tied in slow-moving stock`:''}.`;
 
@@ -10643,10 +10479,10 @@ function BusinessReview(){
     L.push('THE ENGINE:');                           engineD.forEach(d=>L.push('  • '+d.read));
     L.push('DURABILITY:');                           durD.forEach(d=>L.push('  • '+d.read));
     L.push('');
-    L.push(`TOP RISKS (${curSym()}${k(atRisk)}/mo exposed):`);
-    (risks.length?risks:[{description:'None flagged'}]).slice(0,5).forEach(x=>L.push('  • '+x.description+(x.monthly_impact_gbp?` (${curSym()}${k(Math.abs(x.monthly_impact_gbp))}/mo)`:'')));
-    L.push(`TOP OPPORTUNITIES (${curSym()}${k(upside)}/mo identified):`);
-    (opps.length?opps:[{description:'None flagged'}]).slice(0,5).forEach(x=>L.push('  • '+x.description+(x.monthly_impact_gbp?` (${curSym()}${k(Math.abs(x.monthly_impact_gbp))}/mo)`:'')));
+    L.push(`ACT ON NOW (${curSym()}${k(atRisk)}/mo):`);
+    (risks.length?risks:[{description:'Nothing on the board'}]).slice(0,5).forEach(x=>L.push('  • '+x.description+(x.monthly_impact_gbp?` (${curSym()}${k(Math.abs(x.monthly_impact_gbp))}/mo${x.rung?', '+x.rung:''})`:'')));
+    L.push(`WORTH TESTING (${curSym()}${k(upside)}/mo):`);
+    (opps.length?opps:[{description:'Nothing on the board'}]).slice(0,5).forEach(x=>L.push('  • '+x.description+(x.monthly_impact_gbp?` (${curSym()}${k(Math.abs(x.monthly_impact_gbp))}/mo${x.rung?', '+x.rung:''})`:'')));
     const text=L.join('\n');
     try{ (navigator.clipboard&&navigator.clipboard.writeText(text)); }catch(e){}
     toast('Briefing copied', {kind:'good', body:'Paste into your notes or board pack.'});
@@ -10669,10 +10505,10 @@ function BusinessReview(){
     </div>
     <div style={{textAlign:'right',flexShrink:0}}>
       <div style={{fontWeight:'var(--weight-bold)',fontSize:'var(--text-sm)',color:accent,whiteSpace:'nowrap'}}>{`${curSym()}`}{k(Math.abs(x.monthly_impact_gbp))}/mo</div>
-      <div style={{marginTop:4}}>{confChip(confTier(x.confidence))}</div>
+      {x.rung && <div style={{marginTop:4}}><V3Conf state={x.rung}/></div>}
     </div>
   </div>);
-  const topMoves = [...risks,...opps].sort(byImpact).slice(0,3);
+  const topMoves = items.slice(0,3);   // board order: evidence x money, act lane first
 
   if(!W){
     return (<div className="card"><div className="muted" style={{fontSize:'var(--text-sm)'}}>Business review needs at least one complete week of synced data. <GoLink sec="settings" sub="connections">Connect your sources</GoLink> and check back once a full week has closed.</div></div>);
@@ -10686,9 +10522,9 @@ function BusinessReview(){
       </div>
       {/* TL;DR — the main points across the business, in five lines */}
       {(()=>{ const tl=[];
-        tl.push({t:`${overall.label}: ${curSym()}${k(atRisk)}/mo of contribution exposed vs ${curSym()}${k(upside)}/mo of identified upside · ${openActions} actions open.`, c: overall.kind==='action'?'var(--bad)':overall.kind==='watch'?'var(--warn)':'var(--good)'});
-        if(risks[0]) tl.push({t:`Biggest risk — ${plainWords(risks[0].description)} (${curSym()}${k(Math.abs(risks[0].monthly_impact_gbp))}/mo).`, c:'var(--bad)'});
-        if(opps[0]) tl.push({t:`Biggest opportunity — ${opps[0].description} (${curSym()}${k(Math.abs(opps[0].monthly_impact_gbp))}/mo).`, c:'var(--good)'});
+        tl.push({t:`${overall.label}: ${curSym()}${k(atRisk)}/mo to act on now, ${curSym()}${k(upside)}/mo worth testing · ${openActions} actions open.`, c: overall.kind==='action'?'var(--bad)':overall.kind==='watch'?'var(--warn)':'var(--good)'});
+        if(risks[0]) tl.push({t:`First on the board — ${risks[0].description} (${curSym()}${k(Math.abs(risks[0].monthly_impact_gbp))}/mo).`, c:'var(--bad)'});
+        if(opps[0]) tl.push({t:`First to test — ${opps[0].description} (${curSym()}${k(Math.abs(opps[0].monthly_impact_gbp))}/mo).`, c:'var(--good)'});
         tl.push({t:`Unit economics: ${ltvCac!=null?ltvCac.toFixed(1)+'× contribution customer lifetime value:cost per new customer':'customer lifetime value:cost per new customer pending cost data'}, repeat rate ${repeat!=null?pct1(repeat):'—'}${ltvCac!=null?` — ${ltvCac>=3?'healthy':'below the 3× target'}`:''}.`, c: (ltvCac!=null&&ltvCac>=3)?'var(--good)':'var(--warn)'});
         if(slowCapital>50000) tl.push({t:`${curSym()}${k(slowCapital)} of capital tied up in slow-moving stock${topChan&&topShare!=null?`; ${topChan.channel} drives ${pct0(topShare)} of revenue`:''}.`, c:'var(--warn)'});
         return (<div className="card" style={{}}>
@@ -10727,21 +10563,21 @@ function BusinessReview(){
         <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:10,lineHeight:1.5}}>Overheads = salaries, rent, software — costs <b>not</b> already in ad spend or product cost. Runway = cash ÷ (monthly gross profit − ad spend − overheads), using your last {recentW.length||4} complete weeks as the run-rate. A factual estimate; it ignores one-off inventory purchases and working-capital timing.</div>
       </div>)}
       {/* Risk & opportunity registers */}
-      <Eyebrow>Risks & opportunities · quantified</Eyebrow>
+      <Eyebrow>The action board · quantified</Eyebrow>
       <div className="row">
         <div className="card" style={{flex:'1 1 340px', minWidth:0, borderTop:'3px solid var(--bad)'}}>
           <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:8,marginBottom:4}}>
-            <span style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>Risk register</span>
-            <span style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',color:'var(--bad)',whiteSpace:'nowrap'}}>{`${curSym()}`}{k(atRisk)}/mo exposed</span>
+            <span style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>Act on now</span>
+            <span style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',color:'var(--bad)',whiteSpace:'nowrap'}}>{`${curSym()}`}{k(atRisk)}/mo</span>
           </div>
-          {risks.length ? risks.slice(0,6).map(regRow('var(--bad)')) : <div className="muted" style={{fontSize:'var(--text-sm)',padding:'8px 0'}}>No material risks flagged — leakage and at-risk revenue are within normal range.</div>}
+          {risks.length ? risks.slice(0,6).map(regRow('var(--bad)')) : <div className="muted" style={{fontSize:'var(--text-sm)',padding:'8px 0'}}>{moneyKnown ? 'Nothing Greta has checked needs acting on right now.' : 'Loading the action board…'}</div>}
         </div>
         <div className="card" style={{flex:'1 1 340px', minWidth:0, borderTop:'3px solid var(--good)'}}>
           <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:8,marginBottom:4}}>
-            <span style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>Opportunity register</span>
-            <span style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',color:'var(--good)',whiteSpace:'nowrap'}}>{`${curSym()}`}{k(upside)}/mo identified</span>
+            <span style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>Worth testing</span>
+            <span style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',color:'var(--good)',whiteSpace:'nowrap'}}>{`${curSym()}`}{k(upside)}/mo</span>
           </div>
-          {opps.length ? opps.slice(0,6).map(regRow('var(--good)')) : <div className="muted" style={{fontSize:'var(--text-sm)',padding:'8px 0'}}>No quantified upside flagged right now — check back as new signals land.</div>}
+          {opps.length ? opps.slice(0,6).map(regRow('var(--good)')) : <div className="muted" style={{fontSize:'var(--text-sm)',padding:'8px 0'}}>{moneyKnown ? 'Nothing to test on the board right now.' : 'Loading the action board…'}</div>}
         </div>
       </div>
       {/* Decisions */}
@@ -10751,7 +10587,7 @@ function BusinessReview(){
           <span className="muted" style={{fontSize:'var(--text-sm)'}}>{openActions} open in the queue</span>
           <button style={{...btn,marginLeft:'auto'}} onClick={()=>window.__oiNav&&window.__oiNav('actions','queue')}>Open action queue <Icon name="chevron" size={13}/></button>
         </div>
-        {topMoves.length>0 && <div className="muted" style={{fontSize:'var(--text-sm)',marginTop:9,lineHeight:1.55}}>Highest-value moves right now: {topMoves.map(m=>`${scrubTag(m.description)} (${curSym()}${k(Math.abs(m.monthly_impact_gbp))}/mo)`).join(' · ')}.</div>}
+        {topMoves.length>0 && <div className="muted" style={{fontSize:'var(--text-sm)',marginTop:9,lineHeight:1.55}}>First on the board: {topMoves.map(m=>`${scrubTag(m.description)} (${curSym()}${k(Math.abs(m.monthly_impact_gbp))}/mo)`).join(' · ')}.</div>}
       </div>
     </div>
   );
@@ -15401,9 +15237,13 @@ function v3PlainAction(row){
     return P('Test spending less on ' + ch + ' for two weeks',
       'Your last pounds on ' + ch + ' are winning new customers at about £' + x[1] + ' each, against about £' + x[2] + ' when you spend less. A two-week pull-back shows what that extra spend really earns before you put more in.');
   }
-  if (/^product-margin_drain-/.test(id) && (x = m(/the (.+?) earns ([\d.]+)% (?:gross margin|CM),? ([\d.]+)pp below your (.+?) median/i))) {
-    return P('Check the price or cost of ' + x[1],
-      'It keeps ' + x[2] + 'p of every £1 after product cost — ' + x[3] + 'p less than your typical ' + x[4].toLowerCase() + '. Raising the price or cutting what it costs you would bring it in line with the rest of the range.');
+  // 0251 (like-for-like margin) writes the action first and the evidence after it; 0250 (cost per
+  // real order) writes the evidence first and ends on the action. Title = the action, why = the rest.
+  if (/^product-margin_drain-/.test(id) && (x = m(/^(.+?\.)\s+([\s\S]+)$/))) {
+    return P(x[1].replace(/\.$/, ''), x[2]);
+  }
+  if (/^order-cost-/.test(id) && (x = m(/^([\s\S]+\.)\s+([^.]+(?:\.\d[^.]*)*)\.?$/))) {
+    return P(x[2].replace(/\.$/, ''), x[1]);
   }
   if (/^product-hero_underexposed/.test(id) && (x = m(/Hidden hero: (.+?) earns ([\d.]+)% gross margin/i))) {
     return P('Show ' + x[1] + ' to more shoppers',
@@ -16652,7 +16492,11 @@ function V3Today(p) {
           <div className="v3-why-open">
             <div className="v3-kick">Greta's working</div>
             <p className="v3-note">{v3PlainAction(top).raw}</p>
-            {top.cm_gbp ? <p className="v3-note">Ranked first because it is worth the most of anything Greta has checked recently: about {v3Gbp(top.cm_gbp)} a month in profit after product costs.</p> : null}
+            {top.cm_gbp ? <p className="v3-note">{V3_BOARD.ranked
+              ? <>Ranked first on how sure Greta is and what it is worth together: {top.rung ? <>{String((V3_CONF[v3MoneyConf(top)] || {}).label || top.rung).toLowerCase()} it holds, </> : null}worth about {v3Gbp(top.cm_gbp)} a month{top.money_is_sales ? ' in sales' : ''}. A bigger figure Greta is less sure of sits lower.</>
+              : <>Ranked first because it is worth the most of anything Greta has checked recently: about {v3Gbp(top.cm_gbp)} a month.</>}</p> : null}
+            {Array.isArray(top.evidence_reasons) && top.evidence_reasons.length > 0 && (
+              <ul className="v3-note">{top.evidence_reasons.map((x, i) => <li key={i}>{(x && x.text) || String(x)}</li>)}</ul>)}
             <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiAsk && window.__oiAsk('Explain this action and how I should go about it: ' + scrubTag(top.description))}>Ask a follow-up</button>
           </div>
         )}
@@ -16792,9 +16636,12 @@ function V3Growth() {
   if (last && cm) {
     const cac = Number(last.cac), room = cm - cac;
     const edge = room < cm * 0.15;
-    head = cac >= cm ? 'A new customer now costs more than their first order earns you.'
-      : edge ? 'You are at the edge: a new customer costs about what their first order earns.'
-      : 'There is room to grow: a new customer costs well under what their first order earns.';
+    // One month's read, so say which month: the 90-day cost of a new customer on Profit & sales and in
+    // Ask Greta is a different window, and "now" made the two read as a contradiction.
+    const inMonth = 'In ' + v3Month(last.month, 'long') + ', ';
+    head = cac >= cm ? inMonth + 'a new customer cost more than their first order earned you.'
+      : edge ? inMonth + 'you were at the edge: a new customer cost about what their first order earned.'
+      : inMonth + 'there was room to grow: a new customer cost well under what their first order earned.';
     const rose = back && Number(last.spend) > Number(back.spend) * 1.3 && cac > Number(back.cac) * 1.2;
     sub = (rose ? 'Since ' + v3Month(back.month, 'long') + ' your monthly ad spend went from ' + fmtMoney(back.spend) + ' to ' + fmtMoney(last.spend)
           + ', and the cost of each new customer from ' + fmtMoney(back.cac, 2) + ' to ' + fmtMoney(cac, 2) + '. ' : '')
@@ -17239,7 +17086,8 @@ function V3Customers() {
         {t && stat('New customers', fmtCount(t.new_customers), fmtMoney(t.new_net) + ' of sales')}
         {t && stat('Returning customers', fmtCount(t.returning_customers), fmtMoney(t.returning_net) + ' of sales')}
         {t && stat('Sales from returning customers', fmtPctN(t.returning_rev_share), 'cost nothing to win back')}
-        {t && t.ncac != null && stat('New-customer cost', fmtMoney(t.ncac), 'ad spend ÷ new customers')}
+        {t && t.ncac != null && stat('New-customer cost', fmtMoney(t.ncac),
+          'ad spend ÷ new customers, these 30 days' + (u && u.cac != null ? ' (over 90 days: ' + fmtMoney(u.cac) + ')' : ''))}
         {u && u.ltv_contribution != null && stat('What a customer is worth', fmtMoney(u.ltv_contribution),
           'profit over ' + (u.ltv_horizon_months || 12) + ' months', 'Profit after product and order costs that a typical new customer brings in over their first ' + (u.ltv_horizon_months || 12) + ' months, from your own cohorts.')}
         {u && u.payback_orders != null && stat('Orders to pay back', Number(u.payback_orders).toFixed(1), 'before a new customer is profitable')}
