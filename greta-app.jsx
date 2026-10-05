@@ -19427,6 +19427,225 @@ function V3ReviewNotes({ weekStart, range }) {
   </section>);
 }
 
+// ── Competitors (V3, rebuilt 2026-10-05) ─────────────────────────────────────────────────────────
+// The page was the marketing-os embed: a table of researched competitors that was empty for every
+// brand (the research function needed an Anthropic key that does not exist, and nothing called it),
+// and that would have shown only name, domain and date if it had run. Now:
+//   1. Where you meet competitors -- read from the brand's own accounts, no research needed: searches
+//      for your name that go to someone else (Google brand campaign impression share), how much of
+//      your search traffic already knew you and where you sit on searches for what you sell (Search
+//      Console), the Shopping auction against your break-even, searches for your name week by week,
+//      and what the Meta auction charges now, a year ago and last November.
+//   2. Who you are up against -- the brand's own list (tenant_competitor_intel), researched on request
+//      by competitor-intel (Groq web search; sources kept only when the search retrieved them;
+//      confidence capped by independent sources), every field shown with its sources.
+const V3_COMP_Q = (sb, b) => sb.from('tenant_competitor_intel').select('id,name,domain,profile,sources,confidence,model,refreshed_at').eq('brand_id', b).order('name').limit(50);
+const V3_COMP_FIELDS = [
+  ['positioning', 'What they sell and how they pitch it'],
+  ['price_range', 'Prices'],
+  ['ad_strategy', 'Their ads'],
+  ['ad_reach_demographics', 'Who their ads reach'],
+  ['target_demographics', 'Who they aim at (Greta’s inference)'],
+  ['sentiment', 'What customers say'],
+  ['distribution', 'Where they sell'],
+  ['social', 'Social'],
+  ['financials', 'Size'],
+];
+const v3NotFound = v => !v || /^\s*not found\.?\s*$/i.test(String(v));
+const v3Host = u => { try { return new URL(/^https?:/i.test(u) ? u : 'https://' + u).hostname.replace(/^www\./, ''); } catch (e) { return String(u || ''); } };
+
+function V3Competitors() {
+  const today = new Date().toISOString().slice(0, 10);
+  const comps = useV3Rows('comp-list', V3_COMP_Q);
+  const gads = useV3Rows('comp-gads', (sb, b) => sb.from('tenant_google_ads_daily')
+    .select('entity_name,advertising_channel_type,date,spend,clicks,conversion_value,search_impression_share,search_rank_lost_is,search_budget_lost_is')
+    .eq('brand_id', b).eq('level', 'campaign').gte('date', v3IsoAdd(today, -90)).limit(3000));
+  const gsc = useV3Rows('comp-gsc', (sb, b) => sb.from('tenant_gsc_daily').select('date,segment,clicks,impressions,position')
+    .eq('brand_id', b).gte('date', v3IsoAdd(today, -91)).limit(2000));
+  const meta = useV3Rows('comp-meta', (sb, b) => sb.from('tenant_meta_insights_daily').select('date,spend,impressions')
+    .eq('brand_id', b).eq('level', 'account').gte('date', v3IsoAdd(today, -430)).limit(1000));
+  const num = v => Number(v) || 0;
+  const H = window.GRETA_HEADLINE || {};
+  const cmr = num(H.net_revenue_30d) > 0 && H.product_contribution_30d != null ? num(H.product_contribution_30d) / num(H.net_revenue_30d) : null;
+  const be = cmr ? 1 / cmr : null;
+
+  // Google: campaigns over 90 days
+  const camp = React.useMemo(() => {
+    const by = {};
+    (gads.rows || []).forEach(r => { const k = r.entity_name || '?', o = by[k] || (by[k] = { name: k, ch: r.advertising_channel_type, spend: 0, clicks: 0, value: 0, is: [], rank: [], budget: [] });
+      o.spend += num(r.spend); o.clicks += num(r.clicks); o.value += num(r.conversion_value);
+      if (r.search_impression_share != null) o.is.push(num(r.search_impression_share));
+      if (r.search_rank_lost_is != null) o.rank.push(num(r.search_rank_lost_is));
+      if (r.search_budget_lost_is != null) o.budget.push(num(r.search_budget_lost_is)); });
+    const avg = a => a.length ? a.reduce((s, v) => s + v, 0) / a.length : null;
+    return Object.values(by).map(o => ({ ...o, is: avg(o.is), rank: avg(o.rank), budget: avg(o.budget) }));
+  }, [gads.rows]);
+  const brandC = camp.filter(c => c.ch === 'SEARCH' && /brand/i.test(c.name) && c.is != null && c.clicks > 0).sort((a, b) => b.clicks - a.clicks)[0] || null;
+  const shop = camp.filter(c => /PERFORMANCE_MAX|SHOPPING/.test(String(c.ch)) && c.is != null && c.spend > 0).sort((a, b) => b.spend - a.spend)[0] || null;
+
+  // Search Console: last 90 days, and searches for your name week by week
+  const S = React.useMemo(() => {
+    const rows = gsc.rows || []; if (!rows.length) return null;
+    const t = { br: 0, nb: 0, nbImp: 0, nbPos: 0 }; const wk = {};
+    rows.forEach(r => { const c = num(r.clicks);
+      if (r.segment === 'branded') { t.br += c; const k = v3Monday(String(r.date).slice(0, 10)); wk[k] = (wk[k] || 0) + c; }
+      else { t.nb += c; t.nbImp += num(r.impressions); t.nbPos += num(r.position) * num(r.impressions); } });
+    const weeks = Object.keys(wk).sort().map(k => ({ start: k, label: v3Day(k), clicks: wk[k] })).filter(w => w.start <= v3IsoAdd(today, -7));
+    const head = weeks.slice(0, 4).map(w => w.clicks), tail = weeks.slice(-4).map(w => w.clicks);
+    return { ...t, pos: t.nbImp > 0 ? t.nbPos / t.nbImp : null, ctr: t.nbImp > 0 ? t.nb / t.nbImp : null, share: t.br + t.nb > 0 ? t.br / (t.br + t.nb) : null,
+      weeks, typical: v3Med(weeks.map(w => w.clicks)), move: head.length >= 3 && tail.length >= 3 && v3Med(head) > 0 ? v3Med(tail) / v3Med(head) - 1 : null,
+      since: v3Iso10(rows.reduce((m, r) => (String(r.date) < m ? String(r.date) : m), '9999')) };
+  }, [gsc.rows]);
+
+  // Meta: cost per 1,000 views by month
+  const M = React.useMemo(() => {
+    const by = {}; (meta.rows || []).forEach(r => { const k = String(r.date).slice(0, 7), o = by[k] || (by[k] = { m: k, spend: 0, imp: 0 }); o.spend += num(r.spend); o.imp += num(r.impressions); });
+    const list = Object.values(by).filter(o => o.imp > 1000).sort((a, b) => a.m < b.m ? -1 : 1).map(o => ({ ...o, cpm: o.spend / o.imp * 1000, label: gpMonthName(o.m + '-01').slice(0, 3) + ' ' + o.m.slice(2, 4) }));
+    if (list.length < 2) return null;
+    const cur = today.slice(0, 7), full = list.filter(o => o.m < cur), last = full[full.length - 1];
+    const ly = last ? list.find(o => o.m === String(Number(last.m.slice(0, 4)) - 1) + last.m.slice(4)) : null;
+    const nov = [...list].reverse().find(o => o.m.slice(5) === '11' && o.m < cur) || null;
+    const oct = nov ? list.find(o => o.m === nov.m.slice(0, 5) + '10') : null;
+    return { list: list.slice(-13), last, ly, nov, oct };
+  }, [meta.rows, today]);
+
+  const loading = !comps.rows && !comps.err;
+  const reads = [];
+  if (brandC) {
+    const lost = Math.max(0, 1 - brandC.is), extra = brandC.is > 0 ? (brandC.clicks / brandC.is - brandC.clicks) / 3 : 0, cpc = brandC.clicks > 0 ? brandC.spend / brandC.clicks : null;
+    reads.push({ k: 'name', lead: lost >= 0.05, head: fmtPctN(lost) + ' of the searches for your name show someone else’s ad instead of yours.',
+      body: <>Your “{brandC.name}” campaign shows on {fmtPctN(brandC.is)} of the searches it could enter{brandC.rank != null ? <>; the rest is lost {brandC.budget != null && brandC.budget < 0.02 ? 'on bid rank, not budget' : <>{fmtPctN(brandC.rank)} on bid rank and {fmtPctN(brandC.budget || 0)} on budget</>}</> : null}. These are people looking for you by name. Winning the rest is about {fmtCount(Math.round(extra))} more clicks a month for about {fmtMoney(extra * (cpc || 0))}, at today’s {fmtMoney(cpc, 2)} a click — raise that campaign’s bid or target impression share.</>,
+      conf: 'direct' });
+  }
+  if (S && S.share != null) {
+    reads.push({ k: 'search', head: fmtPctN(S.share) + ' of the people who reach you from Google search already knew your name.',
+      body: <>Since {v3Day(S.since)}, {fmtCount(S.br)} search clicks came from searches for your name and {fmtCount(S.nb)} from searches for what you sell. On those, you sit at position {S.pos != null ? S.pos.toFixed(1) : FMT_NONE} on average and get {S.ctr != null ? fmtPctN(S.ctr, 1) : FMT_NONE} of the clicks: the brands above you are where a new customer lands. The way in is pages that answer those searches — collections and guides — rather than paying for them.</>,
+      conf: 'direct' });
+  }
+  if (shop) {
+    const ret = shop.spend > 0 ? shop.value / shop.spend : null, under = be && ret != null && ret < be;
+    reads.push({ k: 'shop', head: under ? 'In Shopping you lose most auctions on bid, and outbidding would not pay.' : 'In Shopping you lose most auctions on bid.',
+      body: <>“{shop.name}” shows in {fmtPctN(shop.is)} of the auctions it could enter and loses {fmtPctN(shop.rank || 0)} on rank{shop.budget > 0.05 ? <> and {fmtPctN(shop.budget)} on budget</> : null}. It returns {fmtTimes(ret, 2)} by Google’s own count{be ? <> against your {fmtTimes(be, 2)} break-even</> : null}{under ? ' — bidding up to beat competitors there would cost more than it earns. Fix what it sells first (Products) before chasing rank.' : ' — there is room to bid for more of them.'}</>,
+      conf: 'likely' });
+  }
+  if (M && M.last && M.ly) {
+    const ch = M.last.cpm / M.ly.cpm - 1, spike = M.nov && M.oct ? M.nov.cpm / M.oct.cpm - 1 : null;
+    reads.push({ k: 'meta', head: 'Meta charged ' + fmtMoney(M.last.cpm, 2) + ' per 1,000 views in ' + gpMonthName(M.last.m + '-01') + (Math.abs(ch) < 0.05 ? ', about what it did a year ago.' : ', ' + fmtPctN(Math.abs(ch)) + (ch > 0 ? ' more' : ' less') + ' than a year ago.'),
+      body: <>The Meta auction is where you bid against every brand chasing the same people; its price is the competition you can measure. {M.nov ? <>Last November it was {fmtMoney(M.nov.cpm, 2)}{spike != null ? <> — {Math.abs(spike) < 0.1 ? 'barely above' : fmtPctN(Math.abs(spike)) + (spike > 0 ? ' above' : ' below')} October</> : null} — so plan Black Friday’s ads at about that, not double.</> : null}</>,
+      conf: 'direct' });
+  }
+  // the verdict says where the ground is, across the reads; each read then says it in full
+  const vb = [];
+  if (brandC && 1 - brandC.is >= 0.05) vb.push(fmtPctN(1 - brandC.is) + ' of the searches for your name');
+  if (S && S.share != null && S.share >= 0.75) vb.push('almost all of the searches for what you sell');
+  const verdict = vb.length ? 'Competitors take ' + vb.join(', and ') + '.' + (vb.length === 2 ? ' Your name is the cheaper ground to win back.' : '') : reads.length ? reads[0].head : null;
+  const tipW = ({ active, payload }) => { if (!active || !payload || !payload.length) return null; const p = payload[0].payload;
+    return (<div className="v3-tip"><b>Week of {v3Day(p.start, true)}</b><span>Searches for your name <em>{fmtCount(p.clicks)} clicks</em></span></div>); };
+  const tipM = ({ active, payload }) => { if (!active || !payload || !payload.length) return null; const p = payload[0].payload;
+    return (<div className="v3-tip"><b>{gpMonthName(p.m + '-01')} {p.m.slice(0, 4)}</b><span>Per 1,000 views <em>{fmtMoney(p.cpm, 2)}</em></span><span>Spend <em>{fmtMoney(p.spend)}</em></span></div>); };
+
+  return (<div className="v3-page-stack">
+    <section>
+      <div className="v3-kick">Where you meet competitors</div>
+      {gads.err && gsc.err && meta.err ? <V3LoadFailed what="your ad and search accounts" onRetry={() => { gads.retry(); gsc.retry(); meta.retry(); }}/>
+        : !gads.rows || !gsc.rows || !meta.rows ? <V3SkeletonRows n={4}/>
+        : !reads.length ? <div className="v3-empty">Greta reads where you meet competitors from your Google Ads, Search Console and Meta accounts. Connect them on Connections &amp; data and this fills in.</div>
+        : (<>
+          <p className="v3-verdict">{verdict}</p>
+          <ol className="v3-moves">{reads.map(r => (<li key={r.k}><b>{r.head}</b> {r.body} <V3Conf state={r.conf} detail={r.k === 'shop' ? 'Your own account’s auction data; the return is as Google counts it, which usually runs above your real orders.' : 'Counted straight from your own account.'}/></li>))}</ol>
+          {!S && <p className="micro muted v3-measure">Connect Search Console on Connections &amp; data to see how much of your search traffic already knew you, and where you sit on searches for what you sell.</p>}
+        </>)}
+    </section>
+
+    {(S && S.weeks.length >= 4) || M ? (<div className="v3-chart-pair">
+      {S && S.weeks.length >= 4 && (<figure className="v3-chart">
+        <figcaption><span className="v3-chart-title">Searches for your name, by week</span>
+          <span className="v3-legend">{S.move == null ? '' : Math.abs(S.move) < 0.1 ? 'Steady at about ' + fmtCount(Math.round(S.typical)) + ' clicks a week' : (S.move > 0 ? 'Up ' : 'Down ') + fmtPctN(Math.abs(S.move)) + ' on the first month'}</span></figcaption>
+        <R.ResponsiveContainer width="100%" height={240}>
+          <R.ComposedChart data={S.weeks} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+            <R.CartesianGrid/><R.XAxis dataKey="label" interval="preserveStartEnd"/><R.YAxis domain={[0, 'auto']}/>
+            <R.Tooltip content={tipW} cursor={false}/>
+            <R.Bar dataKey="clicks" fill={PAL.accent} isAnimationActive={false}/>
+          </R.ComposedChart>
+        </R.ResponsiveContainer>
+        <p className="micro muted">The one direct measure of how many people go looking for you by name. Search Console, clicks from searches containing your brand.</p>
+      </figure>)}
+      {M && (<figure className="v3-chart">
+        <figcaption><span className="v3-chart-title">What Meta charges per 1,000 views, by month</span></figcaption>
+        <R.ResponsiveContainer width="100%" height={240}>
+          <R.ComposedChart data={M.list} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+            <R.CartesianGrid/><R.XAxis dataKey="label" interval="preserveStartEnd"/><R.YAxis tickFormatter={v => curSym() + v} domain={[0, 'auto']}/>
+            <R.Tooltip content={tipM} cursor={false}/>
+            <R.Line type="monotone" dataKey="cpm" stroke={PAL.accent} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
+          </R.ComposedChart>
+        </R.ResponsiveContainer>
+        <p className="micro muted">Your Meta account’s cost per 1,000 impressions. It rises when more brands bid for the same people.</p>
+      </figure>)}
+    </div>) : null}
+
+    <V3CompetitorList q={comps} loading={loading}/>
+  </div>);
+}
+
+// The brand's own list of competitors, each researched on request.
+function V3CompetitorList({ q, loading }) {
+  const [name, setName] = React.useState(''), [site, setSite] = React.useState('');
+  const [busy, setBusy] = React.useState(null), [msg, setMsg] = React.useState(null), [open, setOpen] = React.useState({});
+  const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
+  const rows = q.rows || [];
+  // your average order over the last 30 days, to set their prices against
+  const aov = (() => { const H = window.GRETA_HEADLINE || {}, from = v3IsoAdd(new Date().toISOString().slice(0, 10), -30);
+    const o = ((window.FRKL_DATA && window.FRKL_DATA.shopify) || []).filter(r => r && r.date >= from).reduce((a, r) => a + (Number(r.orders) || 0), 0);
+    return o > 0 && Number(H.net_revenue_30d) > 0 ? Number(H.net_revenue_30d) / o : null; })();
+  const add = async () => {
+    const n = name.trim(); if (!n || !sb || !b) return;
+    if (rows.some(r => String(r.name).toLowerCase() === n.toLowerCase())) { setMsg(n + ' is already on the list.'); return; }
+    setBusy('add'); setMsg(null);
+    const r = await sb.from('tenant_competitor_intel').insert({ brand_id: b, name: n.slice(0, 120), domain: site.trim() ? v3Host(site.trim()) : null, profile: {}, sources: [] });
+    setBusy(null);
+    if (r.error) { setMsg('Could not add ' + n + ' just now.'); return; }
+    setName(''); setSite(''); q.retry();
+  };
+  const remove = async (row) => { if (!sb) return; const r = await sb.from('tenant_competitor_intel').delete().eq('id', row.id); if (!r.error) q.retry(); else setMsg('Could not remove ' + row.name + ' just now.'); };
+  const research = async (row) => {
+    setBusy(row.id); setMsg(null);
+    try { await ciFetch('competitor-intel', { action: 'refresh', id: row.id }); setOpen(o => ({ ...o, [row.id]: true })); q.retry(); }
+    catch (e) { const t = String(e && e.message || ''); setMsg(/not_authorized/.test(t) ? 'Only an owner or admin can run research.' : 'Research on ' + row.name + ' did not complete — try again in a minute.'); }
+    setBusy(null);
+  };
+  const researched = r => r.profile && !v3NotFound(r.profile.positioning) && r.profile._meta;
+  const confState = c => (c === 'high' ? 'likely' : c === 'medium' ? 'probably' : 'possible');
+  return (<section className="v3-sec">
+    <h2 className="v3-sec-title">Who you’re up against</h2>
+    <p className="v3-note v3-measure">Your list, kept in the workspace. Greta researches each one from the open web on request — what they sell and charge, their ads, what customers say — and keeps only sources her search actually opened. Treat it as a briefing to check, not a fact sheet.</p>
+    {q.err ? <div className="v3-empty">Your competitor list could not load just now.</div> : loading ? <V3SkeletonRows n={3}/> : rows.length === 0
+      ? <div className="v3-empty">No competitors listed yet. Add the brands your customers compare you with — Greta researches each one.</div>
+      : (<ul className="v3-rank-steps">{rows.map(r => { const p = r.profile || {}, done = researched(r), m = p._meta || {};
+        const found = V3_COMP_FIELDS.filter(([f]) => !v3NotFound(p[f])), missing = V3_COMP_FIELDS.filter(([f]) => v3NotFound(p[f]));
+        return (<li key={r.id}>
+          <span className="v3-rank-desc"><b>{r.name}</b>{r.domain ? <> · <a href={'https://' + v3Host(r.domain)} target="_blank" rel="noreferrer">{v3Host(r.domain)}</a></> : null}</span>
+          <span className="v3-sub"> {done ? 'researched ' + v3Day(m.researched_at, true) : 'not researched yet'}</span>
+          {done && <> <V3Conf state={confState(r.confidence)} detail={fmtCount(m.independent_sources || 0) + ' independent source' + (m.independent_sources === 1 ? '' : 's') + ' besides their own site. From the open web — check anything you act on.'}/></>}
+          <div className="v3-btn-row">
+            <button type="button" className="v3-btn v3-btn-sm" disabled={!!busy} onClick={() => research(r)}>{busy === r.id ? 'Researching… (up to a minute)' : done ? 'Research again' : 'Research'}</button>
+            {done && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => setOpen(o => ({ ...o, [r.id]: !o[r.id] }))}>{open[r.id] ? 'Hide' : 'Show what Greta found'}</button>}
+            <button type="button" className="v3-btn v3-btn-q v3-btn-sm" disabled={!!busy} onClick={() => remove(r)}>Remove</button>
+          </div>
+          {done && open[r.id] && (<div className="v3-gap-top">
+            <dl className="v3-defs">{found.map(([f, lab]) => (<React.Fragment key={f}><dt>{lab}</dt><dd>{p[f]}{f === 'price_range' && aov ? <span className="v3-sub"> · your average order is {fmtMoney(aov)}</span> : null}</dd></React.Fragment>))}</dl>
+            {missing.length > 0 && <p className="micro muted">Not found: {missing.map(([, lab]) => lab.replace(/ \(.*\)$/, '').toLowerCase()).join(', ')}.</p>}
+            {(r.sources || []).length > 0 && <p className="micro muted">Sources: {(r.sources || []).slice(0, 8).map((u, i) => (<React.Fragment key={i}>{i ? ', ' : ''}<a href={u} target="_blank" rel="noreferrer">{v3Host(u)}</a></React.Fragment>))}{m.unverified_sources_dropped > 0 ? <> · {fmtCount(m.unverified_sources_dropped)} link{m.unverified_sources_dropped === 1 ? '' : 's'} the research named but never opened left out</> : null}</p>}
+          </div>)}
+        </li>); })}</ul>)}
+    <div className="v3-comp-add v3-gap-top">
+        <input className="v3-search" type="text" placeholder="Competitor name" aria-label="Competitor name" value={name} maxLength={120} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') add(); }}/>
+        <input className="v3-search" type="text" placeholder="Their website (optional)" aria-label="Their website" value={site} maxLength={200} onChange={e => setSite(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') add(); }}/>
+        <button type="button" className="v3-btn v3-btn-p" disabled={!name.trim() || busy === 'add'} onClick={add}>{busy === 'add' ? 'Adding…' : 'Add'}</button>
+    </div>
+    {msg && <p className="v3-note">{msg}</p>}
+  </section>);
+}
+
 const V3_PAGES = {
   today: (p) => <V3Today {...p}/>,
   review: (p) => (<>
@@ -19538,8 +19757,10 @@ const V3_PAGES = {
     <V3More id="prod-promos" label="Promotions and discount codes"><V3Anchor id="promos"/><DiscountCodeTracker/></V3More>
   </>),
   competitors: (p) => (<>
-    {/* The embed opens with its own "Competitors" title under the page head that already says it. */}
-    <div className="v3-embed-notitle">{mosView('PerformanceCompetitors')}</div>
+    {/* Rebuilt 2026-10-05 (V3Competitors): where you meet competitors, read from your own Google,
+        Search Console and Meta accounts, then your own list, researched on request. The embed it
+        replaces listed researched competitors -- none, for any brand, since research never ran. */}
+    <V3Competitors/>
     {/* The static "Scout snapshot" was retired on 2026-09-25: it was frkl's, hardcoded,
         and the live researched list above replaces it for every brand. */}
   </>),
