@@ -1068,3 +1068,6 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-chain li.v3-chain-total { border-top: 2px solid var(--color-ink); }
 .v3-chain li.neg .v3-chain-v { color: var(--color-danger); }
 @media (max-width: 760px) { .v3-chain li { grid-template-columns: 1fr auto; } .v3-chain-track { grid-column: 1 / -1; grid-row: 2; } .v3-chain-p { display: none; } }
+/* ── Email read (Marketing) ─────────────────────────────────────────────── */
+.v3-main table.v3-email-table { margin-top: var(--space-4); max-width: 760px; }
+.v3-main table.v3-email-table td.t-text { max-width: 26rem; }

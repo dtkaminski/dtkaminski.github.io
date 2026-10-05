@@ -4565,15 +4565,16 @@ function CrossChannel({start}){
     {!UI_V3 && <GenomePanel/>}
     <div className="card" style={{marginBottom:14}}>
       <h2>Channel revenue claims vs spend</h2>
+      {UI_V3 && <p className="v3-note">For the period you pick, from each platform's own daily figures — so spend can differ by a few pounds from the 30-day figures above, which come from the morning summary.</p>}
       <table>
         <thead><tr><th>Channel</th><th>Spend</th><th>Claimed revenue</th><th>Claimed return</th><th>% of Shopify net</th></tr></thead>
         <tbody>
         {channels.map(c=>(<tr key={c.name}><td><span className="pill" style={{background:c.color+'22',color:c.color}}>{c.name}</span></td><td>{c.spend?GBP(c.spend):'—'}</td><td>{GBP(c.claimed)}</td><td>{c.spend?(c.claimed/c.spend).toFixed(2)+'x':'—'}</td><td>{PCT(rev?c.claimed/rev:null)}</td></tr>))}
         </tbody>
       </table>
-      <div className="note" style={{marginTop:12}}>Platform-claimed revenue is <b>double-counted</b> — Meta + Google each claim conversions the other (and email) also touched, so claims sum to more than Shopify's actual net. That gap is exactly why the next step is incrementality. Email is not in this table yet: Greta does not read Klaviyo's own sales figures, and would rather leave email out than guess at it.</div>
+      <div className="note" style={{marginTop:12}}>Platform-claimed revenue is <b>double-counted</b> — Meta + Google each claim conversions the other (and email) also touched, so claims sum to more than Shopify's actual net. That gap is exactly why the next step is incrementality. {UI_V3 ? 'Email is read on its own above: Klaviyo credits any order that followed an opened email, which is not comparable with these.' : 'Email is not in this table yet: Greta does not read Klaviyo\x27s own sales figures, and would rather leave email out than guess at it.'}</div>
     </div>
-    <div className="row">
+    {!UI_V3 && (<div className="row">
       <div className="card" style={{flex:'1 1 380px'}}>
         <h2>Site funnel (GA4)</h2>
         {f.map(s=>(<div key={s.stage} style={{margin:'10px 0'}}>
@@ -4603,9 +4604,9 @@ function CrossChannel({start}){
         </div>)}
         <div className="note" style={{marginTop:6}}>Correlation isn't causation. To <b>measure</b> incrementality: log a 2-week geo-holdout <GoLink sec="operate" sub="calendar">in the calendar</GoLink> (pause Meta in one region, hold another), then read the revenue gap here. {tiers?'':'Google Ads data will unlock true cross-channel allocation once linked.'}</div>
       </div>
-    </div>
-    <Insight k="economics" />
-    <Insight k="competitive" />
+    </div>)}
+    {!UI_V3 && <Insight k="economics" />}
+    {!UI_V3 && <Insight k="competitive" />}
   </div>);
 }
 
@@ -16159,8 +16160,10 @@ function ChannelDetailList({ channels }){
             style={{display:'flex', alignItems:'center', gap:9, width:'100%', minHeight:44, padding:'10px 0',
                     background:'none', border:0, color:'var(--text-primary)', fontFamily:'inherit', fontSize:'var(--text-sm)', fontWeight:'var(--weight-semi)', textAlign:'left', cursor:'pointer'}}>
             <span style={{color:'var(--color-muted)'}}><Icon name="chevron" size={12} style={{transform:isOpen?'rotate(90deg)':'none', transition:'transform .15s', verticalAlign:'-1px', marginRight:'var(--space-2)'}}/></span>
-            {name.replace(/_/g, ' ')}
-            {c.status ? <span className="micro muted" style={{marginLeft:'auto', textTransform:'uppercase', letterSpacing:'var(--tracking-wide)'}}>{c.status}</span> : null}
+            {UI_V3 ? v3ChanName(c.platform, name) : name.replace(/_/g, ' ')}
+            {/* The status came from cache_channel_optimum, priced against an older break-even ("ease" beside
+                a channel the table above sends to test). The table above carries the verdict now. */}
+            {!UI_V3 && c.status ? <span className="micro muted" style={{marginLeft:'auto', textTransform:'uppercase', letterSpacing:'var(--tracking-wide)'}}>{c.status}</span> : null}
           </button>
           {isOpen && <div style={{paddingBottom:10}}><ChannelDetail channel={name} breakEven={c.break_even_iroas}/></div>}
         </div>);
@@ -17803,7 +17806,7 @@ function V3Incrementality() {
   const pos = v => Math.min(99, Math.max(1, v / scale * 100));
   return (<div className="v3-score v3-enter">
     <div className="v3-score-head">
-      <h2 className="v3-score-title">Which of these verdicts would survive a test</h2>
+      <h2 className="v3-score-title">Which channels earn their money</h2>
       <span className="v3-score-key">ring is what the platform reports · dot is what it likely caused · tick is break-even</span>
     </div>
     <p className="v3-score-verdict">
@@ -17832,6 +17835,167 @@ function V3Incrementality() {
     {test.length > 0 && <p className="v3-note">A two-week holdout on {test[0].name} — pausing it in one region while another carries on — replaces the borrowed figure with your own and settles the {fmtMoney(test[0].spend)} a month.{' '}
       <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('calendar')}>Plan the {test[0].name} test</button></p>}
   </div>);
+}
+
+// ── Marketing lead (V3) — anatomy Stage 5: what the spend is buying ─────────────────────────
+// The page asks which channels and ads earn their money. The first answer is the brand-level one
+// the channel table cannot give: as spend went up, did new customers come with it? Per brand, from
+// the server:
+//   vw_cac_elasticity_fit_input  spend and new customers by calendar month (the current, partial
+//                                month is left out)
+//   vw_calendar_channel_actuals  daily spend by platform, summed to months, to show where it went
+//   vw_brand_unit_economics      allowable_cac: the most a new customer can cost — first-order profit
+//                                plus a year of repeat profit (0252's one ceiling)
+// Cost of the extra customers = change in median monthly spend ÷ change in median new customers,
+// last three complete months against the three before. Medians, so one sale month cannot carry it;
+// said only when spend moved by more than 15%.
+function V3MarketingLead() {
+  const mo = useV3Rows('mk-months', (sb, b) => sb.from('vw_cac_elasticity_fit_input')
+    .select('month,spend,new_customers').eq('brand_id', b).order('month', { ascending: false }).limit(24));
+  const act = useV3Rows('mk-platform-months', (sb, b) => sb.from('vw_calendar_channel_actuals')
+    .select('day,platform,spend').eq('brand_id', b).gt('spend', 0)
+    .gte('day', v3IsoAdd(new Date().toISOString().slice(0, 10), -365)).order('day', { ascending: false }).limit(1000));
+  const ue = useV3Rows('mk-ue', (sb, b) => sb.from('vw_brand_unit_economics').select('cac,allowable_cac').eq('brand_id', b).limit(1));
+  const d = React.useMemo(() => {
+    if (!mo.rows || !act.rows) return null;
+    const cur = new Date().toISOString().slice(0, 7);
+    const months = mo.rows.map(r => ({ m: String(r.month).slice(0, 7), spend: Number(r.spend) || 0, nc: Number(r.new_customers) || 0 }))
+      .filter(r => r.m < cur).sort((a, b) => a.m < b.m ? -1 : 1).slice(-12);
+    if (months.length < 6) return null;
+    const plat = {}; const names = new Set();
+    act.rows.forEach(r => { const m = String(r.day).slice(0, 7), p = String(r.platform || 'other').toLowerCase(); names.add(p);
+      const o = plat[m] || (plat[m] = {}); o[p] = (o[p] || 0) + (Number(r.spend) || 0); });
+    const ps = [...names].sort((a, b) => months.reduce((s, x) => s + ((plat[x.m] || {})[b] || 0), 0) - months.reduce((s, x) => s + ((plat[x.m] || {})[a] || 0), 0));
+    const rows = months.map(x => { const o = { ...x, label: v3Month(x.m + '-01', true) }; ps.forEach(p => { o['p_' + p] = Math.round((plat[x.m] || {})[p] || 0); }); return o; });
+    const med = a => { const s = a.slice().sort((p, q) => p - q), k = Math.floor(s.length / 2); return s.length % 2 ? s[k] : (s[k - 1] + s[k]) / 2; };
+    const last = months.slice(-3), prev = months.slice(-6, -3);
+    const L = { spend: med(last.map(x => x.spend)), nc: med(last.map(x => x.nc)) }, P = { spend: med(prev.map(x => x.spend)), nc: med(prev.map(x => x.nc)) };
+    const dSpend = L.spend - P.spend, dNc = L.nc - P.nc;
+    const platMed = p => ({ now: med(last.map(x => (plat[x.m] || {})[p] || 0)), was: med(prev.map(x => (plat[x.m] || {})[p] || 0)) });
+    const moves = ps.map(p => ({ p, ...platMed(p) })).map(x => ({ ...x, d: x.now - x.was })).sort((a, b) => b.d - a.d);
+    return { rows, ps, L, P, dSpend, dNc, moves, lastLab: v3Month(last[0].m + '-01') + '–' + v3Month(last[2].m + '-01'), prevLab: v3Month(prev[0].m + '-01') + '–' + v3Month(prev[2].m + '-01') };
+  }, [mo.rows, act.rows]);
+
+  if (mo.err || act.err) return null;
+  if (!mo.rows || !act.rows) return <V3SkeletonRows n={4}/>;
+  if (!d) return null;
+  const U = (ue.rows || [])[0] || null, ceil = U && Number(U.allowable_cac) > 0 ? Number(U.allowable_cac) : null;
+  const moved = d.P.spend > 0 && Math.abs(d.dSpend) > d.P.spend * 0.15;
+  const per = moved && d.dSpend > 0 && d.dNc > 0 ? d.dSpend / d.dNc : null;
+  const up = d.moves.filter(x => x.d > 0);
+  const nice = p => v3ChanName(p, p);
+  const head = !moved ? 'Ad spend has held steady: ' + fmtMoney(d.L.spend) + ' a month for ' + fmtCount(d.L.nc) + ' new customers.'
+    : d.dSpend > 0 && d.dNc <= 0 ? 'You are spending ' + fmtMoney(d.dSpend) + ' a month more than in ' + d.prevLab + ', and winning no more new customers.'
+    : d.dSpend > 0 ? 'The extra ' + fmtMoney(d.dSpend) + ' a month of ads has bought about ' + fmtCount(d.dNc) + ' more new customers a month — ' + fmtMoney(per) + ' each.'
+    : 'You are spending ' + fmtMoney(Math.abs(d.dSpend)) + ' a month less than in ' + d.prevLab + (d.dNc >= 0 ? ', and new customers have held up.' : ', and winning ' + fmtCount(Math.abs(d.dNc)) + ' fewer new customers a month.');
+  const cols = [PAL.data1, PAL.data2, PAL.data4, PAL.data5, PAL.data3];
+  const tip = ({ active, payload }) => {
+    if (!active || !payload || !payload.length) return null;
+    const p = payload[0].payload;
+    return (<div className="v3-tip"><b>{v3Month(p.m + '-01', 'long')}</b>
+      {d.ps.map(k => <span key={k}>{nice(k)} <em>{fmtMoney(p['p_' + k])}</em></span>)}
+      <span>New customers <em>{fmtCount(p.nc)}</em></span><span>Cost each <em>{p.nc > 0 ? fmtMoney(p.spend / p.nc) : FMT_NONE}</em></span></div>);
+  };
+  return (<div className="v3-page-stack"><section className="v3-sec">
+    <div className="v3-kick">What the ad spend is buying · {d.lastLab} against {d.prevLab}</div>
+    <p className="v3-verdict">{head}</p>
+    <p className="v3-note v3-measure">
+      {moved ? <>A typical month in {d.lastLab}: {fmtMoney(d.L.spend)} of ads for {fmtCount(d.L.nc)} new customers. In {d.prevLab}: {fmtMoney(d.P.spend)} for {fmtCount(d.P.nc)}. </> : null}
+      {moved && up.length > 0 && <>Most of the increase went to {up.slice(0, 2).map(x => nice(x.p) + ' (' + fmtMoney(x.was) + ' → ' + fmtMoney(x.now) + ' a month)').join(' and ')}. </>}
+      {ceil != null && <>A new customer is worth at most {fmtMoney(ceil)} to you — their first order plus a year of repeat profit{per != null ? (per > ceil ? ', so the extra customers cost more than they are worth.' : ', so the extra customers still pay their way.') : (moved && d.dSpend > 0 && d.dNc <= 0 ? ', and the extra spend bought none.' : '.')}</>}
+      {' '}<V3Conf state="likely" detail="Spend and new customers are counted from your own ad accounts and Shopify orders, by calendar month. Comparing medians of three months keeps one sale month from deciding it; other things changed too (season, offers), so read it as what the spend bought alongside them."/></p>
+    <figure className="v3-chart">
+      <figcaption><span className="v3-chart-title">Ad spend by channel, and new customers, by month</span>
+        <span className="v3-legend">{d.ps.map((k, i) => <React.Fragment key={k}><i style={{ background: cols[i % cols.length] }}/>{nice(k)} </React.Fragment>)}<i style={{ background: PAL.ink }}/>New customers</span></figcaption>
+      <R.ResponsiveContainer width="100%" height={240}>
+        <R.ComposedChart data={d.rows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <R.CartesianGrid/>
+          <R.XAxis dataKey="label" interval="preserveStartEnd"/>
+          <R.YAxis yAxisId="s" tickFormatter={fmtMoneyK}/>
+          <R.YAxis yAxisId="c" orientation="right" tickFormatter={v => fmtCount(v)}/>
+          <R.Tooltip content={tip} cursor={false}/>
+          {d.ps.map((k, i) => <R.Bar key={k} yAxisId="s" dataKey={'p_' + k} stackId="sp" fill={cols[i % cols.length]} isAnimationActive={false}/>)}
+          <R.Line yAxisId="c" dataKey="nc" type="monotone" stroke={PAL.ink} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
+        </R.ComposedChart>
+      </R.ResponsiveContainer>
+      <p className="micro muted v3-measure">Bars are ad spend (left scale), the line is first-time customers (right scale). A new customer is anyone whose first order fell in that month, however they found you.</p>
+    </figure>
+  </section></div>);
+}
+
+// ── Email, the channel you own (Marketing) ─────────────────────────────────────────────────
+// Klaviyo's own figures, read for what they can honestly say. Its attributed sales count anyone who
+// opened or clicked an email before buying, so set against Shopify sales they over-claim; that is
+// stated, not used. What email does control is lifecycle coverage — which flows are live, which are
+// built but switched off — and how hard each live flow works per person it reaches. Flow types are
+// read from the flow's name and trigger, so this works for any brand's naming.
+const V3_FLOW_TYPES = [
+  ['welcome', /welcome/i, 'Welcome'], ['cart', /abandon(ed)?\s*cart|cart\s*reminder/i, 'Abandoned cart'],
+  ['checkout', /checkout/i, 'Abandoned checkout'], ['browse', /browse/i, 'Browse abandonment'],
+  ['post', /post[\s-]?purchase|thank\s?you/i, 'Post-purchase'], ['winback', /win\s?back|lapsed|we\s?miss/i, 'Winback'],
+  ['upsell', /upsell|cross[\s-]?sell|ordered .* (upsell|to)/i, 'Upsell after an order'], ['stock', /back\s?in\s?stock/i, 'Back in stock'],
+  ['replenish', /replenish|refill/i, 'Replenishment'], ['review', /review/i, 'Review request'],
+  ['birthday', /birthday/i, 'Birthday'], ['loyalty', /loyalty|referral|vip/i, 'Loyalty and referral'],
+];
+function v3FlowType(name, trig) { const s = String(name || '') + ' ' + String(trig || ''); const t = V3_FLOW_TYPES.find(x => x[1].test(s)); return t ? t[0] : 'other'; }
+function V3EmailRead() {
+  const fl = useV3Rows('mk-flows', (sb, b) => sb.from('tenant_klaviyo_flows')
+    .select('name,status,trigger_type,recipients_30d,attributed_revenue_30d,attributed_orders_30d').eq('brand_id', b).limit(300));
+  const ca = useV3Rows('mk-camps', (sb, b) => sb.from('tenant_klaviyo_campaigns')
+    .select('name,send_time,recipients,attributed_revenue,attributed_orders').eq('brand_id', b)
+    .gte('send_time', v3IsoAdd(new Date().toISOString().slice(0, 10), -30)).order('send_time', { ascending: false }).limit(200));
+  const seg = useV3Rows('mk-atrisk', (sb, b) => sb.from('v_tenant_customer_segment_stats')
+    .select('segment,customers,emailable').eq('brand_id', b).eq('segment', 'At risk'));
+  const ret = useV3Rows('cust-ret', V3_RET_Q);
+  if (fl.err) return null;
+  if (!fl.rows || !ca.rows) return <V3SkeletonRows n={3}/>;
+  if (!fl.rows.length) return null;    // no Klaviyo connected: the Email section below says so
+  const H = window.GRETA_HEADLINE || {}, shop = Number(H.net_revenue_30d) || 0;
+  const live = fl.rows.filter(f => String(f.status).toLowerCase() === 'live').map(f => ({ ...f, t: v3FlowType(f.name, f.trigger_type),
+    reach: Number(f.recipients_30d) || 0, rev: Number(f.attributed_revenue_30d) || 0 }));
+  const liveTypes = new Set(live.map(f => f.t));
+  const draftOnly = [...new Set(fl.rows.filter(f => String(f.status).toLowerCase() !== 'live').map(f => v3FlowType(f.name, f.trigger_type)))]
+    .filter(t => t !== 'other' && !liveTypes.has(t));
+  const label = t => (V3_FLOW_TYPES.find(x => x[0] === t) || [, , t])[2];
+  const camps = ca.rows.filter(c => Number(c.recipients) > 0);
+  const campRev = camps.reduce((a, c) => a + (Number(c.attributed_revenue) || 0), 0), flowRev = live.reduce((a, f) => a + f.rev, 0);
+  const claimed = campRev + flowRev, claimShare = shop > 0 ? claimed / shop : null;
+  const ppl = live.filter(f => f.reach >= 50).map(f => ({ ...f, per: f.rev / f.reach }));
+  const medPer = (() => { const s = ppl.map(f => f.per).sort((a, b) => a - b); return s.length ? s[Math.floor(s.length / 2)] : null; })();
+  const post = ppl.find(f => f.t === 'post');
+  const weakPost = post && medPer != null && post.per < medPer * 0.2;
+  // The segment comes back split by loyalty type: add the parts.
+  const atRisk = (seg.rows || []).length ? (seg.rows || []).reduce((a, r) => ({ customers: a.customers + (Number(r.customers) || 0), emailable: a.emailable + (Number(r.emailable) || 0) }), { customers: 0, emailable: 0 }) : null;
+  const R0 = (ret.rows || [])[0] || null, gap = R0 && R0.median_days_between_orders != null ? Number(R0.median_days_between_orders) : null;
+  const priority = ['winback', 'upsell', 'post', 'replenish', 'cart', 'checkout', 'browse', 'welcome'];
+  const missing = draftOnly.filter(t => priority.includes(t)).sort((a, b) => priority.indexOf(a) - priority.indexOf(b));
+  const head = missing.length
+    ? 'Email has flows built for ' + v3Names(missing.slice(0, 3).map(t => label(t).toLowerCase())) + ', and none of them is switched on.'
+    : weakPost ? 'Your post-purchase email reaches people at the moment a second order is won, and earns almost nothing.'
+    : 'Your email flows cover the main moments; the gains are in how hard each one works.';
+  return (<div className="v3-page-stack"><section className="v3-sec">
+    <div className="v3-kick">Email, the channel you own · last 30 days</div>
+    <p className="v3-verdict">{head}</p>
+    {claimShare != null && claimShare > 0.5 && <p className="v3-note v3-measure">Klaviyo credits email with {fmtMoney(claimed)} of sales — {fmtPctN(claimShare)} of everything you sold. It counts anyone who opened an email before buying, so that is not what email caused, and Greta does not add it to anything. The useful read is below: what is switched on, and what each flow earns per person it reaches.</p>}
+    <ol className="v3-moves">
+      {missing.includes('winback') && (<li><b>Switch on the winback flow.</b>{' '}
+        {atRisk ? <>{fmtCount(atRisk.customers)} customers have gone quiet after buying well — {fmtCount(atRisk.emailable)} of them can be emailed — and nothing writes to them automatically.</> : 'Customers who have gone quiet get nothing automatically.'}
+        {' '}<button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('customers')}>See them on Customers</button></li>)}
+      {missing.includes('upsell') && (<li><b>Switch on the upsell flows.</b>{' '}They follow an order with the product that usually goes with it — the same add-on move Products sizes for your hero products, sent after the order instead of before it.
+        {' '}<button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('products')}>See the add-ons on Products</button></li>)}
+      {weakPost && (<li><b>Rework the post-purchase flow.</b>{' '}It reached {fmtCount(post.reach)} people and earned {fmtMoney(post.rev)} — {fmtMoney(post.per, 2)} a person, against {fmtMoney(medPer, 2)} for your typical live flow.
+        {gap != null ? <> Second orders usually come {fmtCount(gap)} days after the first, so that is when it should give a reason to buy again.</> : null}</li>)}
+      {missing.filter(t => !['winback', 'upsell'].includes(t)).length > 0 && (<li><b>Also built and switched off:</b> {v3Names(missing.filter(t => !['winback', 'upsell'].includes(t)).map(t => label(t).toLowerCase()))}.</li>)}
+    </ol>
+    <table className="v3-rw v3-email-table">
+      <thead><tr><th className="t-text">Live flow</th><th>People reached</th><th>Sales Klaviyo credits</th><th>Per person</th></tr></thead>
+      <tbody>{ppl.sort((a, b) => b.rev - a.rev).slice(0, 8).map((f, i) => (<tr key={i}>
+        <td className="t-text">{label(f.t) === 'other' ? f.name : label(f.t)}<span className="v3-muted"> · {String(f.name).replace(/^[A-Z]{1,3}\s*\|\s*/, '')}</span></td>
+        <td>{fmtCount(f.reach)}</td><td>{fmtMoney(f.rev)}</td><td className={f === post && weakPost ? 'v3-down' : ''}>{fmtMoney(f.per, 2)}</td>
+      </tr>))}</tbody>
+    </table>
+    {camps.length > 0 && <p className="micro muted v3-measure">{fmtCount(camps.length)} campaigns went out in the last 30 days to {fmtCount(camps.reduce((a, c) => a + Number(c.recipients), 0))} inboxes in total; Klaviyo credits them with {fmtMoney(campRev)}. Per-campaign detail is in the Email section below.</p>}
+  </section></div>);
 }
 
 const V3_PAGES = {
@@ -17882,13 +18046,19 @@ const V3_PAGES = {
   </>),
   profit: (p) => <Overview start={p.start} period={p.period} customActive={p.customActive}/>,
   marketing: (p) => (<>
-    {/* The page asks which channels earn their money; that answer is a comparison, so it leads as
-        one instead of arriving after two scrolling panels of per-channel detail. */}
-    <V3ChannelScoreboard/>
+    {/* Rebuilt 2026-10-05 around what the spend buys: the brand-level read first (spend against new
+        customers), then one channel table with a verdict that survives the assumption, then the ads to
+        switch off, then email. The scoreboard merged into the channel table; the lag correlation, the
+        spend-tier "diminishing returns" read (its own numbers did not fall) and the GA4 funnel (Website's,
+        on 11 of 30 tracked days) are gone. Platform claims and per-channel evidence sit behind the detail. */}
+    <V3MarketingLead/>
     <V3Incrementality/>
-    <CrossChannel start={p.start}/>
     <CreativeReallocation/>
-    <ChannelDetailList channels={(typeof window!=='undefined' && window.FRKL_PLAN && window.FRKL_PLAN.channels) || []}/>
+    <V3EmailRead/>
+    <V3More id="mk-why" label="The detail — what each platform claims, and why each channel behaves as it does">
+      <CrossChannel start={p.start}/>
+      <ChannelDetailList channels={(typeof window!=='undefined' && window.FRKL_PLAN && window.FRKL_PLAN.channels) || []}/>
+    </V3More>
     <V3More id="mk-detail" label="Channel detail and platform totals"><V3Anchor id="detail"/><Channels start={p.start}/></V3More>
     <V3More id="mk-creative" label="Creative"><V3Anchor id="creative"/><Creatives/></V3More>
     <V3More id="mk-email" label="Email"><V3Anchor id="email"/><EmailHub/></V3More>
