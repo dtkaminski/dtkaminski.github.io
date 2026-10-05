@@ -39,7 +39,7 @@
     // rail and Plan tab render; the heavy scoreboard/forecast views fill in afterwards.
     var g = await withTimeout(s.from('mos_business_goal').select('*').eq('brand_id', b).lte('period_start', PERIOD.end).gte('period_end', PERIOD.start).order('created_at', { ascending: false }).limit(1), 8000);
     if (g && g.data) window.FRKL_PLAN.goal = g.data[0] || null;
-    var cfg = await withTimeout(s.from('brand_config').select('gross_margin, variable_costs, fixed_costs_monthly, inventory_days, discount_rate_annual, seasonality, opening_cash, opening_cash_as_of, benchmarks').eq('brand_id', b).limit(1), 8000);
+    var cfg = await withTimeout(s.from('brand_config').select('gross_margin, variable_costs, fixed_costs_monthly, inventory_days, discount_rate_annual, seasonality, opening_cash, opening_cash_as_of, benchmarks, supplier_lead_time_weeks, cash_floor').eq('brand_id', b).limit(1), 8000);
     if (cfg && cfg.data) window.FRKL_PLAN.config = cfg.data[0] || null;
     // Say which reads failed, so a screen can tell "you have not set this" from "we could not load
     // it" — both used to leave null behind, and the costs form waited on it for ever.

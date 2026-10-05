@@ -160,13 +160,22 @@ function userGrossMargin(){ const c = costConfig(); const v = parseFloat(c.gmPct
 // and the urgency bands (a slow-to-restock SKU needs ordering far earlier than a
 // fast one at the same days-of-cover). Editable per product type; defaults are
 // estimates until the operator confirms them. localStorage-first like cost config.
-const LEAD_DEFAULTS = { default: 30, byType: { Charm: 14, Necklace: 42, Bracelet: 42, Earring: 21 } };
+// The default is the brand's own supplier lead time (Goal & costs, brand_config.supplier_lead_time_weeks)
+// when it has one: the planner used 30 days, and 14-42 by product type made up for frkl, beside a stock
+// plan using 28 and an entered 7.5 weeks. Per-type overrides typed into the planner still win.
+const LEAD_DEFAULTS = { default: 30, byType: {} };
+function brandLeadDays(){
+  const c = typeof window !== 'undefined' && window.FRKL_PLAN && window.FRKL_PLAN.config;
+  const w = c && c.supplier_lead_time_weeks != null ? Number(c.supplier_lead_time_weeks) : null;
+  return w > 0 ? Math.round(w * 7) : null;
+}
 function leadConfig(){
+  const brand = brandLeadDays();
   try {
     const s = JSON.parse(localStorage.getItem('oi_lead_times') || 'null');
-    if(s && typeof s==='object') return { default: s.default!=null?s.default:LEAD_DEFAULTS.default, byType: {...(s.byType||{})} };
+    if(s && typeof s==='object') return { default: brand != null ? brand : (s.default!=null?s.default:LEAD_DEFAULTS.default), byType: {...(s.byType||{})} };
   } catch(e){}
-  return { default: LEAD_DEFAULTS.default, byType: {...LEAD_DEFAULTS.byType} };
+  return { default: brand != null ? brand : LEAD_DEFAULTS.default, byType: {...LEAD_DEFAULTS.byType} };
 }
 function saveLeadConfig(next){ try { localStorage.setItem('oi_lead_times', JSON.stringify(next)); window.dispatchEvent(new Event('oi-leadtimes-updated')); } catch(e){} }
 
@@ -12263,6 +12272,8 @@ function GP_plainDetail(r) {
   if ((m = d.match(/^(\d+) returning-days \((\d+)d\)$/))) return m[1] + ' of ' + m[2] + ' days';
   if ((m = d.match(/^(\d+) paid channels modelled$/))) return m[1] + ' measured';
   if (d === 'no goal for current quarter') return 'Not set';
+  if (d === 'goal exists for this period') return 'Set';
+  if (d === 'confirmed') return 'Yes';
   if (d === 'set a goal first') return 'After the goal';
   if ((m = d.match(/^(\w+) to (\d{4}-\d{2}-\d{2})$/))) return m[1] + ', to ' + v3Day(m[2], true);
   return v3Money(d).replace(/(\d{4})-(\d{2})-(\d{2})/g, function (x) { return v3Day(x, true); });
@@ -12966,6 +12977,18 @@ function GretaPlanPanel({ show } = {}) {
   var SHOW = show || 'all';
   var isGoal = SHOW === 'all' || SHOW === 'goal';
   var isGrowth = SHOW === 'all' || SHOW === 'growth';
+  // V3 shows readiness on its own at the foot of Goal & costs (show="readiness"); the goal half no
+  // longer opens on a checklist.
+  var isReady = SHOW === 'all' || SHOW === 'readiness' || (SHOW === 'goal' && !UI_V3);
+  // The baseline rows quoted vw_brand_plan_readiness's own figures — the fit engine's 57% margin, a
+  // £20 customer and a £49 customer value — beside pages showing 61%, £39 and £59. Show the app's.
+  var ueQ = useV3Rows('cust-ue', V3_UE_Q);
+  var UE = (ueQ.rows || [])[0] || null;
+  var canon = {
+    'Contribution margin %': oiCmRatio() != null ? fmtPctN(oiCmRatio()) : null,
+    'New-customer CAC': UE && Number(UE.cac) > 0 ? fmtMoney(UE.cac) + ' · last 90 days' : null,
+    'Cohort LTV': UE && Number(UE.ltv_contribution) > 0 ? fmtMoney(UE.ltv_contribution) + ' · first year' : null
+  };
   var P = (typeof window !== 'undefined' && window.FRKL_PLAN) || { readiness: [], goal: null, period: { start: '', end: '' } };
   // The Growth feeds are fetched here rather than on page load: two of them take 26s and 10s,
   // and they were holding connections on every screen, not just this one. Asking for them when
@@ -12985,7 +13008,10 @@ function GretaPlanPanel({ show } = {}) {
   React.useEffect(function () {
     var h = function () { setTick(function (x) { return x + 1; }); };
     window.addEventListener('frkl-plan-updated', h);
-    if (window.FRKL_PLAN && !derived) window.FRKL_PLAN.derive(null, 'auto').then(function (r) { if (r) setDerived(r); });
+    // In V3 the page lead (V3GoalLead) already runs the pace plan; a second and third copy here (one per
+    // mounted half) ran fn_plan_quarter four times at once and timed out under load. The setter works
+    // the plan out when asked.
+    if (window.FRKL_PLAN && !derived && !UI_V3) window.FRKL_PLAN.derive(null, 'auto').then(function (r) { if (r) setDerived(r); });
     return function () { window.removeEventListener('frkl-plan-updated', h); };
   }, []);
 
@@ -13062,10 +13088,10 @@ function GretaPlanPanel({ show } = {}) {
   return (
     <div style={wrap} className="gp-wrap">
       {/* The page head already names the page and asks its question; this only says which period. */}
-      <div className="v3-kick">This quarter · {v3Day(P.period.start)} – {v3Day(P.period.end, true)}</div>
+      {!(UI_V3 && SHOW !== 'growth') && <div className="v3-kick">This quarter · {v3Day(P.period.start)} – {v3Day(P.period.end, true)}</div>}
 
       {/* readiness gate */}
-      {isGoal && (<div style={{ borderTop: '1px solid ' + GP_T.line, padding: 'var(--space-6) 0', marginBottom: 16 }}>
+      {isReady && (<div style={{ borderTop: '1px solid ' + GP_T.line, padding: 'var(--space-6) 0', marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <h2 className="v3-sec-title gp-h">Data readiness</h2>
           {/* "0 of 0 ready · ready to plan" was what a failed read looked like. */}
@@ -13083,7 +13109,7 @@ function GretaPlanPanel({ show } = {}) {
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '3px 0', fontSize: 'var(--text-sm)' }}>
                       <GP_Dot c={r.status !== 'ready' && !r.blocks_targets ? 'var(--color-line-strong)' : GP_rag(r.status)} />
                       <span style={{ flex: 1 }}>{GP_PLAIN_ITEM[r.item] || r.item}</span>
-                      <span className="oi-num" style={{ color: GP_T.dim, fontSize: 'var(--text-xs)', whiteSpace: 'nowrap' }}>{GP_plainDetail(r)}</span>
+                      <span className="oi-num" style={{ color: GP_T.dim, fontSize: 'var(--text-xs)', whiteSpace: 'nowrap' }}>{(UI_V3 && r.status === 'ready' && canon[r.item]) || GP_plainDetail(r)}</span>
                     </div>
                   );
                 })}
@@ -13097,7 +13123,7 @@ function GretaPlanPanel({ show } = {}) {
       {/* "Where revenue comes from" repeated the lead section's "Where your sales came from" (same view). */}
 
       {/* economics editor — operating costs feed Operating Profit on the Overview */}
-      {isGoal && (<div style={{ borderTop: '1px solid ' + GP_T.line, padding: 'var(--space-6) 0', marginBottom: 16 }}>
+      {isGoal && SHOW !== 'readiness' && (<div style={{ borderTop: '1px solid ' + GP_T.line, padding: 'var(--space-6) 0', marginBottom: 16 }}>
         <V3Anchor id="margin"/>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
           <h2 className="v3-sec-title gp-h">What things cost you</h2>
@@ -13226,7 +13252,8 @@ function GretaPlanPanel({ show } = {}) {
 
       {/* goal setter */}
       {isGoal && (<div className="v3-raised" style={{ padding: 'var(--space-6)' }}>
-        <h2 style={{ margin: '0 0 var(--space-1)' }}>Set this quarter’s goal</h2>
+        <V3Anchor id="goal-set"/>
+        <h2 style={{ margin: '0 0 var(--space-1)' }}>{UI_V3 && g ? 'Change this quarter’s goal' : 'Set this quarter’s goal'}</h2>
         <p className="micro muted" style={{ margin: '0 0 var(--space-4)' }}>Pick what you want to aim for. Greta works out the sales, ad budget and new customers it takes.</p>
         <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div className="v3-seg" role="group" aria-label="Goal basis">
@@ -13259,7 +13286,7 @@ function GretaPlanPanel({ show } = {}) {
               <GP_Metric k="Operating profit" v={opTarget == null ? '—' : GP_gbp(opTarget)} sub={fixedForPeriod > 0 ? 'after ' + GP_gbp(fixedForPeriod) + ' of overheads' : 'add your overheads above'} />
             </div>
             <GP_PlanBreakdown d={derived}/>
-            {g && (
+            {g && !UI_V3 && (
               <div style={{ fontSize: 'var(--text-xs)', color: GP_T.dim, marginTop: 'var(--space-2)' }}>
                 Current goal ({g.confirmed ? 'confirmed' : 'not yet confirmed'}): sales {GP_gbp(g.revenue_target)} · profit before ads {GP_gbp(g.contribution_margin_target)} · ad budget {GP_gbp(g.spend_cap)}
               </div>
@@ -16792,9 +16819,13 @@ function useV3Rows(key, build) {
 // Columns for a tile grid of n tiles, chosen so the last row is full (12 → 4, 9 → 3, 10 → 5).
 function GO_cols(n){ return n%4===0?4:n%3===0?3:n%5===0?5:4; }
 const V3_STOCK_COLS = 'sku,product_title,on_hand,weekly_velocity,weeks_of_cover,stock_status,inventory_stale,projected_days_to_stockout,reorder_by_date,suggested_order_units,lost_cm_per_day,cm_at_risk_before_resupply,trapped_cash';
+// lead_days and runs_out_before_restock arrive with 0259 (the brand's own lead time); until then the
+// select falls back and the page works from brand_config's lead time itself.
 const V3_STOCK_Q = (sb, b) => {
   const ask = cols => sb.from('vw_stock_demand_plan').select(cols).eq('brand_id', b).limit(3000);
-  return ask(V3_STOCK_COLS + ',last_sold_on').then(r => (r && r.error && /last_sold_on/.test(r.error.message || '')) ? ask(V3_STOCK_COLS) : r);
+  return ask(V3_STOCK_COLS + ',last_sold_on,lead_days,runs_out_before_restock')
+    .then(r => (r && r.error && /lead_days|runs_out/.test(r.error.message || '')) ? ask(V3_STOCK_COLS + ',last_sold_on') : r)
+    .then(r => (r && r.error && /last_sold_on/.test(r.error.message || '')) ? ask(V3_STOCK_COLS) : r);
 };
 const V3_UE_Q = (sb, b) => sb.from('vw_brand_unit_economics')
     .select('cac,ltv_contribution,ltv_rev,ltv_horizon_months,ltv_cac,payback_orders,first_order_contribution').eq('brand_id', b).limit(1);
@@ -17028,6 +17059,7 @@ function v3Cover(weeks) {
 function V3Stock() {
   const q = useV3Rows('stock-plan', V3_STOCK_Q);
   const cq = useV3Rows('stock-cost', V3_COST_Q);   // landed cost per SKU, to price the orders
+  const lq = useV3Rows('brand-cfg', V3_BCFG_Q);    // the brand's supplier lead time
   const [allRisk, setAllRisk] = React.useState(false);
   if (q.err) return <div className="v3-empty">Greta could not load your stock plan just now — refreshing usually sorts it.</div>;
   if (!q.rows) return <V3SkeletonRows n={5}/>;
@@ -17046,8 +17078,13 @@ function V3Stock() {
   </div>);
 
   const num = v => Number(v) || 0;
+  const todayIso = new Date().toISOString().slice(0, 10);
   const out = rows.filter(r => r.stock_status === 'stockout');
-  const low = rows.filter(r => r.stock_status === 'low_cover');
+  // "Runs out before a restock" is against the brand's lead time: 0259's flag, or worked out here from
+  // days left when the view predates it. 'low_cover' alone is a fixed four weeks.
+  const L = v3Lead(lq.rows), hasFlag = rows.some(r => r.runs_out_before_restock != null);
+  const low = rows.filter(r => r.stock_status !== 'stockout' && (hasFlag ? r.runs_out_before_restock
+    : (r.stock_status === 'low_cover' || (num(r.weekly_velocity) > 0 && r.projected_days_to_stockout != null && num(r.projected_days_to_stockout) < L.days))));
   const slow = rows.filter(r => r.stock_status === 'overstock' && num(r.trapped_cash) > 0)
     .sort((a, b) => num(b.trapped_cash) - num(a.trapped_cash));
   // Bundle listings (frkl's stacks) sell as their parts, so their own listing never "sells".
@@ -17063,14 +17100,15 @@ function V3Stock() {
   // What runs out: everything out or short of its lead time, worst money first.
   const runway = out.concat(low).map(r => {
     const days = Math.max(0, Math.round(num(r.projected_days_to_stockout)));
-    const by = r.reorder_by_date ? new Date(r.reorder_by_date + 'T00:00:00') : null;
+    const byIso = r.lead_days != null ? r.reorder_by_date : (r.projected_days_to_stockout != null ? v3IsoAdd(todayIso, num(r.projected_days_to_stockout) - L.days) : null);
+    const by = byIso ? new Date(byIso + 'T00:00:00') : null;
     const overdue = by ? by <= today : true;
     const late = by ? Math.max(0, Math.round((today - by) / 864e5)) : 0;
     // Out for over four weeks: no sale in the window the selling rate is measured over, so there
     // is no rate to size an order or price the loss. Say when it last sold instead of guessing.
     const longOut = r.stock_status === 'stockout' && !(num(r.weekly_velocity) > 0);
     const units = num(r.suggested_order_units);
-    return { ...r, days, overdue, late, longOut, by: r.reorder_by_date, risk: num(r.cm_at_risk_before_resupply), units, cost: units > 0 && cs[r.sku] ? units * cs[r.sku] : null };
+    return { ...r, days, overdue, late, longOut, by: byIso, risk: num(r.cm_at_risk_before_resupply), units, cost: units > 0 && cs[r.sku] ? units * cs[r.sku] : null };
   }).sort((a, b) => b.risk - a.risk || a.days - b.days);
   const orderCost = runway.reduce((a, r) => a + (r.cost || 0), 0), allPriced = runway.every(r => !(r.units > 0) || r.cost != null);
   const shown = allRisk ? runway : runway.slice(0, 10);
@@ -17130,7 +17168,10 @@ function V3Stock() {
       </table>
       {runway.length > 10 && (<button className="v3-btn v3-btn-q v3-btn-sm" onClick={() => setAllRisk(v => !v)}>
         {allRisk ? 'Show the top 10' : 'Show all ' + runway.length}</button>)}
-      <p className="micro muted v3-measure">Greta assumes {V3_LEAD_DAYS} days from order to stock arriving, for every product — no supplier lead times are set — and suggests eight weeks of stock at today’s pace: ordinary weeks, not the next peak (sized above when one is coming). Costs are your landed cost per unit. Profit at risk is what these products would have earned between running out and the new stock landing. Products out for more than four weeks show when they last sold: Greta hasn’t seen them sell recently, so it can’t size an order for them.</p>
+      <p className="micro muted v3-measure">{L.entered
+        ? <>Order-by dates use your supplier lead time: {L.weeks} weeks ({L.days} days) from order to stock arriving, from Goal &amp; costs.</>
+        : <>Greta assumes {L.days} days from order to stock arriving, for every product — add your supplier lead time under Goal &amp; costs so the dates are yours.</>}
+        {' '}Suggested orders are eight weeks of stock at today’s pace{hasFlag ? ' for after the order lands' : ''}: ordinary weeks, not the next peak (sized above when one is coming). Costs are your landed cost per unit. Profit at risk is what these products would have earned between running out and the new stock landing. Products out for more than four weeks show when they last sold: Greta hasn’t seen them sell recently, so it can’t size an order for them.</p>
     </section>)}
 
     {slow.length > 0 && (<section className="v3-sec">
@@ -17893,8 +17934,11 @@ function V3ReturningBaseline() {
   const ue = useV3Rows('cust-ue', V3_UE_Q);
   const aov = useV3Rows('cust-aov', (sb, b) => sb.from('vw_brand_aov').select('window_label,new_aov').eq('brand_id', b));
   const g0 = (goal.rows || [])[0] || null;
+  // The quarter plan at the goal (shared with Goal & costs): its spend carries the season.
+  const gp = useV3Rows(g0 && Number(g0.revenue_target) > 0 ? 'goal-plan-' + String(g0.period_start).slice(0, 10) + '-' + Number(g0.revenue_target) : 'goal-plan-none',
+    g0 && Number(g0.revenue_target) > 0 ? v3PlanQ(String(g0.period_start).slice(0, 10), String(g0.period_end).slice(0, 10), Number(g0.revenue_target)) : () => Promise.resolve({ data: [] }));
   const soFar = useV3Rows('cust-goal-sofar-' + (g0 ? g0.period_start : 'none'), (sb, b) => g0 ? sb.from('vw_daily_new_vs_returning')
-    .select('net_revenue').eq('brand_id', b).eq('ledger', 'dtc').gte('order_date', g0.period_start).lte('order_date', today).limit(1000) : Promise.resolve({ data: [] }));
+    .select('net_revenue').eq('brand_id', b).eq('ledger', 'dtc').gte('order_date', g0.period_start).lt('order_date', today).limit(1000) : Promise.resolve({ data: [] }));
   const d = React.useMemo(() => {
     const r = {}; (decay.rows || []).forEach(x => { r[Number(x.month_offset)] = Number(x.rev_per_customer) || 0; });
     if (!base.rows || !act.rows || [10, 11, 12].some(k => r[k] == null)) return null;
@@ -17926,13 +17970,19 @@ function V3ReturningBaseline() {
       const firstValue = A && Number(A.new_aov) > 0 ? Number(A.new_aov) : null, ncac = L && Number(L.cac) > 0 ? Number(L.cac) : null;
       const daysLeft = Math.max(1, (new Date(end) - new Date(today)) / 864e5 + 1);
       const spendNow = window.GRETA_HEADLINE && Number(window.GRETA_HEADLINE.paid_spend_30d) > 0 ? Number(window.GRETA_HEADLINE.paid_spend_30d) : null;
-      const customers = firstValue && fromNew > 0 ? fromNew / firstValue : null, spend = customers && ncac ? customers * ncac : null;
-      plan = { target: Number(g0.revenue_target), start: g0.period_start, end, done, remaining, existing, fromNew, firstValue, ncac, customers, spend,
-        spendMonth: spend ? spend / daysLeft * 30 : null, spendNow };
+      const customers = firstValue && fromNew > 0 ? fromNew / firstValue : null;
+      // Ad spend still to come in the goal plan: months ahead, the current one pro rata. The plan's
+      // spend follows the season (Black Friday's customers come cheaper); a flat 90-day cost per
+      // customer here read £25k a month against the plan's £13k.
+      const GP = (gp.rows || [])[0] || null;
+      const spend = GP && Array.isArray(GP.months) ? Math.max(0, Number(GP.spend_cap) - v3PlanToDate(GP.months, 'spend', today)) : null;
+      const avgCac = GP && GP.breakdown && Number(GP.breakdown.cost_per_new_customer) > 0 ? Number(GP.breakdown.cost_per_new_customer) : null;
+      plan = { target: Number(g0.revenue_target), start: g0.period_start, end, done, remaining, existing, fromNew, firstValue, ncac: avgCac || ncac, customers, spend,
+        spendMonth: spend ? spend / daysLeft * 30 : null, spendNow, seasonal: !!avgCac };
     }
     return { months, ahead, next6: sum(ahead, 'exp'), a12: sum(past, 'act'), e12: sum(past, 'exp'), peaks,
       peakLift: peaks.reduce((a, m) => a + (m.act - m.exp), 0), plan };
-  }, [base.rows, decay.rows, act.rows, goal.rows, soFar.rows, ue.rows, aov.rows, cur, today]);
+  }, [base.rows, decay.rows, act.rows, goal.rows, soFar.rows, ue.rows, aov.rows, gp.rows, cur, today]);
 
   if (base.err || decay.err || act.err) return null;
   if (!base.rows || !decay.rows || !act.rows) return <V3SkeletonRows n={3}/>;
@@ -17982,11 +18032,11 @@ function V3ReturningBaseline() {
       <div className="v3-stat"><div className="v3-stat-lab"><span>Has to come from new customers</span></div><div className="v3-stat-val">{fmtMoney(P.fromNew)}</div>
         <div className="v3-stat-foot"><span className="v3-muted">{P.customers ? 'about ' + fmtCount(P.customers) + ' first orders at ' + fmtMoney(P.firstValue) : 'first orders and their early repeats'}</span></div></div>
       {P.spendMonth != null && <div className="v3-stat"><div className="v3-stat-lab"><span>Ad spend that takes, a month</span></div><div className="v3-stat-val">{fmtMoney(P.spendMonth)}</div>
-        <div className="v3-stat-foot"><span className="v3-muted">at {fmtMoney(P.ncac)} a new customer{P.spendNow ? '; you spend ' + fmtMoney(P.spendNow) + ' now' : ''}</span></div></div>}
+        <div className="v3-stat-foot"><span className="v3-muted">{P.seasonal ? 'the quarter plan, ' + fmtMoney(P.ncac) + ' a new customer on average with Black Friday' : 'at ' + fmtMoney(P.ncac) + ' a new customer'}{P.spendNow ? '; you spend ' + fmtMoney(P.spendNow) + ' now' : ''}</span></div></div>}
     </div>
     <p className="v3-note v3-measure">
       {P.spendNow && P.spendMonth > P.spendNow * 1.2
-        ? <>At today’s order value and cost of a new customer, the goal needs {fmtTimes(P.spendMonth / P.spendNow, 1)} your current ad spend. Three things shrink that gap before spend does: </>
+        ? <>{P.seasonal ? 'The quarter plan puts ' : 'At today’s order value and cost of a new customer, the goal needs '}{fmtTimes(P.spendMonth / P.spendNow, 1)} your current ad spend{P.seasonal ? ' into the rest of the goal' : ''}. Three things shrink that gap before spend does: </>
         : <>Three things make the goal cheaper to reach: </>}
       a bigger first order (every pound added to it cuts the new customers you need), a reason for existing customers to come back
       {d.peakLift > 0 ? ' — your sale months added ' + fmtMoney(d.peakLift) + ' from them alone' : ''}, and a second order sooner.
@@ -18344,7 +18394,7 @@ function V3Retention() {
 // landed cost (vw_sku_cost_resolved). It shows the order for last year's peak, and the same scaled by
 // this year's growth, with the date the order has to go in. Any brand with a dated window and a year of
 // history gets it; anything missing and it says nothing.
-const V3_LEAD_DAYS = 28;   // vw_stock_demand_plan's fixed order-to-arrival time
+const V3_LEAD_DAYS = 28;   // the stock plan's assumption when a brand has entered no lead time (v3Lead)
 const V3_COST_Q = (sb, b) => sb.from('vw_sku_cost_resolved').select('sku,cost_resolved').eq('brand_id', b).limit(5000);
 const v3IsBundle = t => /\b(stack|bundle|gift ?set|set of|kit)\b/i.test(String(t || ''));
 function V3StockPeak() {
@@ -18354,6 +18404,8 @@ function V3StockPeak() {
   const lad = useV3Rows('profit-ladder', V3_LADDER_Q);
   const stock = useV3Rows('stock-plan', V3_STOCK_Q);
   const cost = useV3Rows('stock-cost', V3_COST_Q);
+  const lq = useV3Rows('brand-cfg', V3_BCFG_Q);
+  const L = v3Lead(lq.rows);
   const [grow, setGrow] = React.useState(false);
   // pick the first upcoming window that ran at least twice a normal pace last year
   const peak = React.useMemo(() => {
@@ -18372,12 +18424,12 @@ function V3StockPeak() {
       if (ratio != null && ratio >= 2) {
         let now = 0, ly = 0, n1 = 0, n2 = 0; for (let i = 1; i <= 30; i++) { const a = by[v3IsoAdd(today, -i)], c = by[v3IsoAdd(today, -i - 364)]; if (a != null) { now += a; n1++; } if (c != null) { ly += c; n2++; } }
         const growth = n1 >= 25 && n2 >= 25 && ly > 0 ? Math.max(-0.5, Math.min(1, now / ly - 1)) : null;
-        return { ...e, days, lyS, lyE, lySales: ws, normal, ratio, growth, orderBy: v3IsoAdd(e.start, -V3_LEAD_DAYS),
+        return { ...e, days, lyS, lyE, lySales: ws, normal, ratio, growth, orderBy: v3IsoAdd(e.start, -L.days),
           until: Math.max(0, Math.round((new Date(e.start) - new Date(today)) / 864e5)) };
       }
     }
     return null;
-  }, [cal.rows, lad.rows, today]);
+  }, [cal.rows, lad.rows, today, L.days]);
   const ly = useV3Rows('stock-peak-ly-' + (peak ? peak.lyS : 'none'), (sb, b) => peak ? sb.from('v_tenant_shopify_lineitems_daily')
     .select('day,product_title,units').eq('brand_id', b).gte('day', peak.lyS).lte('day', peak.lyE).gt('units', 0).limit(1000) : Promise.resolve({ data: [] }));
   const d = React.useMemo(() => {
@@ -18408,7 +18460,7 @@ function V3StockPeak() {
   return (<div className="v3-page-stack"><section className="v3-sec">
     <div className="v3-kick">The next peak · {peak.title} · {v3Day(peak.start)}–{v3Day(peak.end, true)}</div>
     <p className="v3-verdict">{peak.title} starts on {v3Day(peak.start)}. {late
-      ? 'An order placed today would not land before it — ask your suppliers what can arrive sooner.'
+      ? 'To land in time, the order had to go in by ' + v3Day(peak.orderBy) + '. One placed today lands around ' + v3Day(v3IsoAdd(today, L.days)) + ', after it starts — so what is in stock now is what you can sell. Ask your suppliers what can arrive sooner.'
       : 'To have the stock in time, the order goes in by ' + v3Day(peak.orderBy) + '.'}</p>
     <p className="v3-note v3-measure">The same {fmtCount(peak.days)} days last year sold {fmtMoney(peak.lySales)} — {fmtTimes(peak.ratio, 0)} a normal pace for the weeks before.
       {' '}The reorder list below covers ordinary weeks, so it does not stock for this.
@@ -18430,8 +18482,241 @@ function V3StockPeak() {
           <td>{r[k] > 0 && r[kc] != null ? fmtMoney(r[kc]) : FMT_NONE}</td></>)}
       </tr>))}</tbody>
     </table>
-    <p className="micro muted v3-measure">Order-by assumes the stock plan’s {V3_LEAD_DAYS} days from order to stock arriving, for every product. Bundle listings are left out: they sell as their parts. Costs are your landed cost per unit.</p>
+    <p className="micro muted v3-measure">{L.entered ? <>Order-by uses your supplier lead time of {L.weeks} weeks ({L.days} days), from Goal &amp; costs.</> : <>Order-by assumes {L.days} days from order to stock arriving, for every product — add your supplier lead time under Goal &amp; costs.</>} Bundle listings are left out: they sell as their parts. Costs are your landed cost per unit.</p>
   </section></div>);
+}
+
+// ── Goal & costs (V3) ────────────────────────────────────────────────────────────────────────────
+// The page asked "what am I aiming for, and what do things cost me?" and answered with forms: the
+// confirmed goal was loaded and never drawn, the readiness list quoted a fit-engine margin, cost and
+// customer value no other page used, and the drift table said a cost was off without saying by how
+// much. It now leads with the goal and where today's pace lands, then the costs that are off, each with
+// what it does to profit and the fix. The forms stay below.
+//
+// The plan is fn_plan_quarter (0232) throughout: own seasonality, returning customers at their recent
+// rate, new-customer sales rising with ad spend along the measured curve. Its average cost of a new
+// customer is a quarter's average, Black Friday included (frkl's November 2025: £7.95 a customer
+// against £39 for the last 90 days), so it is lower than the 90-day figure on Customers — both are
+// right, for different windows, and the page says which it is using.
+const V3_BCFG_Q = (sb, b) => sb.from('brand_config')
+  .select('supplier_lead_time_weeks,cash_floor,opening_cash,opening_cash_as_of,variable_costs').eq('brand_id', b).limit(1);
+// The brand's own order-to-arrival time (Cash, stock and supplier terms). 0259 puts the same figure in
+// vw_stock_demand_plan.lead_days; before it, and for a brand that has not entered one, the stock plan's
+// fixed 28 days.
+function v3Lead(rows) {
+  const w = rows && rows[0] ? Number(rows[0].supplier_lead_time_weeks) : null;
+  return w > 0 ? { days: Math.round(w * 7), weeks: w, entered: true } : { days: V3_LEAD_DAYS, weeks: null, entered: false };
+}
+const v3Iso10 = x => String(x).slice(0, 10);
+function v3Quarter(iso) {
+  const y = Number(iso.slice(0, 4)), q = Math.floor((Number(iso.slice(5, 7)) - 1) / 3);
+  const s = new Date(Date.UTC(y, q * 3, 1)), e = new Date(Date.UTC(y, q * 3 + 3, 0));
+  return { start: v3Iso10(s.toISOString()), end: v3Iso10(e.toISOString()) };
+}
+const V3_GOAL_Q = (sb, b) => {
+  const t = new Date().toISOString().slice(0, 10);
+  return sb.from('mos_business_goal')
+    .select('period_start,period_end,revenue_target,contribution_margin_target,cam_target,spend_cap,new_customer_target,confirmed,phasing')
+    .eq('brand_id', b).eq('status', 'active').lte('period_start', t).gte('period_end', t).order('created_at', { ascending: false }).limit(1);
+};
+// fn_plan_quarter returns one JSON object; useV3Rows wants rows. ok:false (under a month of trading)
+// comes back as no row.
+const v3PlanQ = (start, end, goal) => (sb, b) => sb.rpc('fn_plan_quarter', { p_brand: b, p_start: start, p_end: end, p_goal: goal, p_basis: goal == null ? 'auto' : 'revenue' })
+  .then(r => ({ data: r.data && r.data.ok !== false ? [r.data] : [], error: r.error }));
+function useV3Goal() {
+  const today = new Date().toISOString().slice(0, 10);
+  const goal = useV3Rows('goal-active', V3_GOAL_Q);
+  const g = goal.rows ? (goal.rows[0] || null) : undefined;
+  const per = g ? { start: v3Iso10(g.period_start), end: v3Iso10(g.period_end) } : v3Quarter(today);
+  const tgt = g && Number(g.revenue_target) > 0 ? Number(g.revenue_target) : null;
+  const pace = useV3Rows(g === undefined ? 'goal-pace-wait' : 'goal-pace-' + per.start, g === undefined ? () => Promise.resolve({ data: [] }) : v3PlanQ(per.start, per.end, null));
+  const atGoal = useV3Rows(tgt ? 'goal-plan-' + per.start + '-' + tgt : 'goal-plan-none', tgt ? v3PlanQ(per.start, per.end, tgt) : () => Promise.resolve({ data: [] }));
+  return { goal, g, per, tgt, pace, atGoal, today };
+}
+// What the plan expected by the end of yesterday: whole months, and the current month pro rata.
+function v3PlanToDate(months, key, today) {
+  let s = 0;
+  (months || []).forEach(m => {
+    const ms = String(m.month).slice(0, 10), me = v3IsoAdd(v3MonthAdd(ms, 1), -1);
+    const days = Math.round((new Date(me) - new Date(ms)) / 864e5) + 1;
+    const done = today > me ? days : today <= ms ? 0 : Math.round((new Date(today) - new Date(ms)) / 864e5);
+    s += (Number(m[key]) || 0) * done / days;
+  });
+  return s;
+}
+
+function V3GoalLead() {
+  const { goal, g, per, tgt, pace, atGoal, today } = useV3Goal();
+  const cfg = useV3Rows('brand-cfg', V3_BCFG_Q);
+  const ue = useV3Rows('cust-ue', V3_UE_Q);
+  const sofar = useV3Rows('goal-sofar-' + per.start, (sb, b) => sb.from('vw_daily_new_vs_returning').select('order_date,net_revenue')
+    .eq('brand_id', b).eq('ledger', 'dtc').gte('order_date', per.start).lt('order_date', today).limit(2000));
+  if (goal.err || pace.err) return <V3LoadFailed what="your goal and plan" onRetry={() => { if (goal.err) goal.retry(); if (pace.err) pace.retry(); }}/>;
+  if (!goal.rows || !pace.rows || !sofar.rows) return <V3SkeletonRows n={4}/>;
+  const P = pace.rows[0] || null, G = (atGoal.rows || [])[0] || null;
+  const L = v3Lead(cfg.rows), C = (cfg.rows || [])[0] || {}, U = (ue.rows || [])[0] || null;
+  const done = sofar.rows.reduce((a, r) => a + (Number(r.net_revenue) || 0), 0);
+  const range = v3Day(per.start) + ' – ' + v3Day(per.end, true);
+  const setGoal = <button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={() => { const el = document.getElementById('v3a-goal-set'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>{g ? 'Change the goal' : 'Set a goal'}</button>;
+  if (!P) return (<section>
+    <div className="v3-kick">This quarter · {range}</div>
+    <p className="v3-verdict">{g ? 'Your goal is ' + fmtMoney(tgt) + ' of sales this quarter.' : 'There is no goal for this quarter yet.'}</p>
+    <p className="v3-note v3-measure">Greta needs a full month of sales before it can say where your pace lands. {fmtMoney(done)} so far this quarter.</p>
+    <div className="v3-btn-row">{setGoal}</div>
+  </section>);
+
+  const ph = g && Array.isArray(g.phasing) && g.phasing.length ? g.phasing : null;
+  const exp = ph ? v3PlanToDate(ph, 'sales', today) : v3PlanToDate(P.months, 'sales', today);
+  const short = tgt ? tgt - Number(P.revenue_target) : null;
+  const maxSeen = P.inputs && Number(P.inputs.max_monthly_spend_seen) > 0 ? Number(P.inputs.max_monthly_spend_seen) : null;
+  const paceMo = {}; (P.months || []).forEach(m => { paceMo[String(m.month).slice(0, 7)] = m; });
+  const rows = (ph || P.months || []).map(m => { const k = String(m.month).slice(0, 7), p = paceMo[k] || {};
+    return { iso: String(m.month).slice(0, 10), goal: ph ? Number(m.sales) : null, gSpend: ph ? Number(m.spend) : null, pace: Number(p.sales), pSpend: Number(p.spend), x: ph && maxSeen ? Number(m.spend) / maxSeen : null }; });
+  const peak = ph ? rows.slice().sort((a, b) => b.gSpend - a.gSpend)[0] : rows.slice().sort((a, b) => b.pace - a.pace)[0];
+  const peakShare = ph && g.spend_cap > 0 ? peak.gSpend / Number(g.spend_cap) : null;
+  const B = (G || P).breakdown || {};
+  const mc = Number(B.marginal_cost_per_new_customer), fop = Number(B.first_order_profit);
+  const ltv = U && Number(U.ltv_contribution) > 0 ? Number(U.ltv_contribution) : null;
+  // Stock for the peak month has to land before it starts.
+  const onTrack = done >= exp * 0.95;
+  // The goal's profit on today's figures (the stored one used the margin of the day it was confirmed),
+  // against today's pace: what the extra ads buy in profit, not just in sales.
+  const gCam = G ? Number(G.cam_target) : (g ? Number(g.cam_target) : null);
+  const dCam = gCam != null ? gCam - Number(P.cam_target) : null;
+  const best = P.ceiling && Number(P.ceiling.best_spend) > 0 ? Number(P.ceiling.best_spend) : null;
+  const gSpend = g ? Number(g.spend_cap) : null;
+  const atBest = best && gSpend ? (gSpend > best * 1.05 ? 'past' : gSpend >= best * 0.95 ? 'at' : 'below') : null;
+  // An order placed today lands L days on; how much of the peak month it misses.
+  const arrive = v3IsoAdd(today, L.days), peakEnd = v3IsoAdd(v3MonthAdd(peak.iso, 1), -1);
+  const cashOff = C.cash_floor == null;
+
+  return (<div className="v3-page-stack"><section>
+    <div className="v3-kick">This quarter · {range}</div>
+    <p className="v3-verdict">{g
+      ? <>Your goal is {fmtMoney(tgt)} of sales this quarter. {short > 0
+          ? <>At today’s ad spend you land at about {fmtMoney(P.revenue_target)} — {fmtMoney(short)} short.</>
+          : <>At today’s ad spend you reach it: about {fmtMoney(P.revenue_target)}.</>}</>
+      : <>There is no goal for this quarter yet. At today’s ad spend you land at about {fmtMoney(P.revenue_target)} of sales.</>}</p>
+    <p className="v3-note v3-measure">
+      {fmtMoney(done)} so far, against {fmtMoney(exp)} the {g ? 'goal' : 'plan'} expects by now{onTrack ? ' — on track.' : ' — ' + fmtMoney(exp - done) + ' behind.'}
+      {g && short > 0 && <> The gap is ad spend in the peak: the goal plans {fmtMoney(g.spend_cap)} of ads, {fmtMoney(gSpend - Number(P.spend_cap))} more than today’s pace{peakShare != null ? <>, {fmtPctN(peakShare)} of it in {gpMonthName(peak.iso)}</> : null}.</>}
+      {g && short > 0 && dCam != null && <> Those extra ads buy about {fmtMoney(short)} more sales but {dCam > 0 ? 'only ' + fmtMoney(dCam) + ' more' : fmtMoney(-dCam) + ' less'} profit after ads{atBest === 'at' ? ' — the goal sits at the most profitable spend Greta can see, so aiming higher costs profit.' : atBest === 'past' ? ' — the goal is past the most profitable spend Greta can see (' + fmtMoney(best) + '), so its last pounds of ads cost more than they make.' : '.'}</>}
+      {!(g && short > 0) && best && <> The most profitable spend Greta can see is {fmtMoney(best)} of ads for about {fmtMoney(P.ceiling.best_sales)} of sales.</>}
+      {' '}<V3Conf state="probably" detail={'Greta’s quarter plan: your own seasonality from your sales history, returning customers at their last three months’ rate, and new-customer sales that rise with ad spend along your measured curve — each extra pound buys a little less. Its average new customer costs ' + (B.cost_per_new_customer ? fmtMoney(B.cost_per_new_customer, 2) : 'less') + ' because the quarter includes Black Friday, when new customers come cheaper; Customers shows the last 90 days.'}/></p>
+    <div className="v3-stat-grid v3-gap-top">
+      <div className="v3-stat"><div className="v3-stat-lab"><span>Sales so far</span></div><div className="v3-stat-val">{fmtMoney(done)}</div>
+        <div className="v3-stat-foot"><span className={onTrack ? 'v3-muted' : 'v3-down'}>{fmtMoney(exp)} expected by now</span></div></div>
+      <div className="v3-stat"><div className="v3-stat-lab"><span>Where today’s pace lands</span></div><div className="v3-stat-val">{fmtMoney(P.revenue_target)}</div>
+        <div className="v3-stat-foot"><span className="v3-muted">ads held at {fmtMoney(P.inputs && P.inputs.base_monthly_spend)} a month</span></div></div>
+      {g && <div className="v3-stat"><div className="v3-stat-lab"><span>Ads the goal takes</span></div><div className="v3-stat-val">{fmtMoney(g.spend_cap)}</div>
+        <div className="v3-stat-foot"><span className="v3-muted">{fmtMoney(peak.gSpend)} of it in {gpMonthName(peak.iso)}</span></div></div>}
+      {g && <div className="v3-stat"><div className="v3-stat-lab"><span>Profit after ads, the goal</span></div><div className="v3-stat-val">{fmtMoney(gCam)}</div>
+        <div className="v3-stat-foot"><span className="v3-muted">{fmtMoney(P.cam_target)} at today’s pace</span></div></div>}
+    </div>
+  </section>
+
+  <section className="v3-sec">
+    <h2 className="v3-sec-title">Month by month</h2>
+    <table className="v3-rw">
+      <thead><tr><th className="t-text">Month</th>{ph && <th>Goal</th>}<th>At today’s pace</th>{ph && <th>Ads in the goal</th>}<th>Ads at today’s pace</th>{ph && maxSeen && <th>Against your biggest month</th>}</tr></thead>
+      <tbody>{rows.map(r => (<tr key={r.iso}>
+        <td className="t-text">{gpMonthName(r.iso)}</td>
+        {ph && <td>{fmtMoney(r.goal)}</td>}
+        <td className={ph && r.pace < r.goal ? 'v3-down' : ''}>{fmtMoney(r.pace)}</td>
+        {ph && <td>{fmtMoney(r.gSpend)}</td>}
+        <td className="v3-muted">{fmtMoney(r.pSpend)}</td>
+        {ph && maxSeen && <td className={r.x > 1.5 ? 'v3-down' : 'v3-muted'}>{fmtTimes(r.x, 1)}</td>}
+      </tr>))}</tbody>
+    </table>
+    {ph && maxSeen && <p className="micro muted v3-measure">Your biggest month of ads so far was {fmtMoney(maxSeen)}. Past 1.5× that, Greta is extending your spend curve beyond anything it has seen.</p>}
+  </section>
+
+  {g && (<section className="v3-sec">
+    <h2 className="v3-sec-title">What reaching it takes</h2>
+    <ol className="v3-moves">
+      <li><b>Plan {gpMonthName(peak.iso)}’s ads now.</b> The goal puts {fmtMoney(peak.gSpend)} into {gpMonthName(peak.iso)}
+        {peak.x != null ? <> — {fmtTimes(peak.x, 1)} the most you have spent in a month</> : null}.
+        {mc > 0 && fop > 0 && <> At that spend the last new customers cost about {fmtMoney(mc)} each, against {fmtMoney(fop)} profit on their first order{ltv ? <> and {fmtMoney(ltv)} over a year</> : null}
+          {mc > fop ? ' — past the point where the first order pays for them, so watch cost per new customer weekly as spend climbs.' : mc >= fop * 0.9 ? ' — the first order only just pays for them; the profit is in their next orders.' : ' — still paid for by the first order.'}</>}</li>
+      <li><b>Stock for it.</b> {L.entered ? <>With your {L.weeks}-week lead time</> : <>At Greta’s assumed {L.days} days from order to arrival (add your lead time below)</>}, an order placed today lands around {v3Day(arrive)}
+          {arrive > peakEnd ? <> — after {gpMonthName(peak.iso)} ends, so all of it sells from the stock you hold now.</>
+            : arrive > peak.iso ? <> — most of {gpMonthName(peak.iso)} sells from the stock you hold now.</>
+            : <> — in time, if it goes in by {v3Day(v3IsoAdd(peak.iso, -L.days))}.</>}
+          {arrive > peak.iso && ' Check it covers last year’s peak, and ask suppliers what can arrive sooner.'}
+        {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('stock')}>What to order <span className="v3-xref-go">on Stock &amp; orders →</span></button></li>
+      {cashOff && <li><b>Check you can fund it.</b> The ads and the stock are paid for before the sales arrive. Greta can’t check that until you add the lowest balance you’ll let cash fall to.
+        {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'economics')}>Add it <span className="v3-xref-go">under Cash, stock and supplier terms →</span></button></li>}
+    </ol>
+  </section>)}
+  <div className="v3-btn-row">{setGoal}</div>
+  </div>);
+}
+
+// The costs every profit figure leans on, checked against trading where Greta can: each one says what
+// it does to profit and how to fix it. Replaces CostDrift on this page (V3), which listed "you entered /
+// your data shows" with no £ and no button.
+function V3CostsOff() {
+  const drift = useV3Rows('goal-drift', (sb, b) => sb.from('vw_brand_config_drift')
+    .select('input_key,unit,config_value,realised_value,verifiable,status').eq('brand_id', b));
+  const cq = useV3Rows('goal-cogs', (sb, b) => sb.from('vw_brand_cogs_quality')
+    .select('cogs_coverage_90d,cogs_landed_complete,realized_cogs_pct').eq('brand_id', b).limit(1));
+  const cfg = useV3Rows('brand-cfg', V3_BCFG_Q);
+  const [busy, setBusy] = React.useState(false), [msg, setMsg] = React.useState(null);
+  if (drift.err || cfg.err) return <V3LoadFailed what="your cost checks" onRetry={() => { if (drift.err) drift.retry(); if (cfg.err) cfg.retry(); }}/>;
+  if (!drift.rows || !cq.rows || !cfg.rows) return <V3SkeletonRows n={3}/>;
+  const C = cfg.rows[0] || {}, Q = cq.rows[0] || null, L = v3Lead(cfg.rows);
+  const H = window.GRETA_HEADLINE || {};
+  const mo = Number(H.net_revenue_30d) > 0 ? Number(H.net_revenue_30d) : null;   // last 30 days' sales
+  const today = new Date().toISOString().slice(0, 10);
+  const items = [];
+  let total = 0;
+  const rf = drift.rows.find(r => r.input_key === 'refundPct' && r.verifiable && r.status === 'drift');
+  if (rf) {
+    const was = Number(rf.config_value), is = Math.round(Number(rf.realised_value) * 10) / 10, gbp = mo ? (is - was) / 100 * mo : null;
+    if (gbp > 0) total += gbp;
+    const use = async () => {
+      setBusy(true); setMsg(null);
+      const vc = Object.assign({}, C.variable_costs || {}, { refundPct: is });
+      const r = window.FRKL_PLAN && window.FRKL_PLAN.saveEconomics ? await window.FRKL_PLAN.saveEconomics({ variable_costs: vc }) : { ok: false, error: 'not signed in' };
+      setBusy(false);
+      if (r.ok) { drift.retry(); cfg.retry(); setMsg({ ok: true, text: 'Saved — every profit figure now uses ' + fmtPctN(is / 100) + ' refunds.' }); }
+      else setMsg({ ok: false, text: r.error || 'Could not save.' });
+    };
+    items.push(<li key="rf"><b>Refunds are {fmtPctN(is / 100)} of sales; you entered {fmtPctN(was / 100)}.</b>
+      {' '}{gbp != null ? <>So every profit figure reads {fmtMoney(Math.abs(gbp))} a month too {gbp > 0 ? 'high' : 'low'}, at your last 30 days’ sales.</> : null}
+      {' '}Measured over the last 12 months of orders.
+      <div className="v3-btn-row"><button type="button" className="v3-btn v3-btn-p v3-btn-sm" disabled={busy} onClick={use}>{busy ? 'Saving…' : 'Use ' + fmtPctN(is / 100)}</button></div></li>);
+  }
+  const gm = drift.rows.find(r => r.input_key === 'gross_margin' && r.verifiable && r.status === 'drift');
+  if (gm) items.push(<li key="gm"><b>Products without a cost use a {fmtPctN(Number(gm.config_value))} margin; the ones with a cost make {fmtPctN(Number(gm.realised_value))}.</b> Update it under “What things cost you” below, or add the missing costs.</li>);
+  if (Q && Number(Q.cogs_coverage_90d) < 0.8) items.push(<li key="cov"><b>Only {fmtPctN(Number(Q.cogs_coverage_90d))} of your sales have a product cost.</b> The rest use your margin, so profit is an estimate until more products have one.
+    {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs')}>Add costs <span className="v3-xref-go">under Product costs →</span></button></li>);
+  else if (Q && Q.cogs_landed_complete === false) {
+    const per10 = mo && Number(Q.realized_cogs_pct) > 0 ? 0.1 * Number(Q.realized_cogs_pct) * mo : null;
+    items.push(<li key="fr"><b>None of your product costs include freight or duty.</b> Margins read high until they do
+      {per10 ? <> — every 10% that freight and duty add to what your products cost is about {fmtMoney(per10)} a month of profit you aren’t seeing</> : null}, and profit stays “Estimated”.
+      {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs')}>Add freight and duty <span className="v3-xref-go">under Product costs →</span></button></li>);
+  }
+  if (!L.entered) items.push(<li key="lt"><b>No supplier lead time.</b> Stock & orders assumes {L.days} days from order to arrival for every product, so its order-by dates may be late.
+    {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'economics')}>Add it <span className="v3-xref-go">under Cash, stock and supplier terms →</span></button></li>);
+  if (C.cash_floor == null) items.push(<li key="cf"><b>No minimum cash balance.</b> Without it Greta can’t check whether you can afford the plan — the ads and stock are paid for before the sales arrive.
+    {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'economics')}>Add it <span className="v3-xref-go">under Cash, stock and supplier terms →</span></button></li>);
+  if (C.opening_cash != null && C.opening_cash_as_of) {
+    const as = String(C.opening_cash_as_of).slice(0, 10), stale = v3IsoAdd(as, 45);
+    if (stale <= v3IsoAdd(today, 14)) items.push(<li key="cb"><b>Your cash balance is from {v3Day(as, true)}.</b> {stale < today ? 'Greta stopped using it on ' : 'Greta stops using it on '}{v3Day(stale)}{stale < today ? '.' : ', 45 days on.'} Update it with today’s balance.
+      {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'economics')}>Update it <span className="v3-xref-go">under Cash, stock and supplier terms →</span></button></li>);
+  }
+  const unchecked = drift.rows.filter(r => !r.verifiable).map(r => ({ fixed_costs_monthly: 'overheads', payPct: 'payment fees', payFixed: null, shipping: 'shipping', packaging: 'packaging', fulfilment: 'pick and pack' })[r.input_key]).filter(Boolean);
+  return (<section className="v3-sec">
+    <V3Anchor id="costs-off"/>
+    <h2 className="v3-sec-title">Costs to check</h2>
+    <p className="v3-verdict">{items.length
+      ? (items.length === 1 ? 'One thing' : fmtCount(items.length) + ' things') + ' in your costs need a look' + (total > 0 ? ' — profit reads about ' + fmtMoney(total) + ' a month too high.' : '.')
+      : 'Every cost Greta can check matches your trading.'}</p>
+    {items.length > 0 && <ol className="v3-moves">{items}</ol>}
+    {msg && <p className={'v3-note ' + (msg.ok ? 'v3-up' : 'v3-down')}>{msg.text}</p>}
+    {unchecked.length > 0 && <p className="micro muted v3-measure">Greta can’t check your {v3Names(unchecked)} against anything yet — nothing connected records what you pay for them — so they are used as you entered them.</p>}
+  </section>);
 }
 
 const V3_PAGES = {
@@ -18448,8 +18733,11 @@ const V3_PAGES = {
   calendar: (p) => mosView('Calendar'),
   ask: (p) => <AskPanel/>,
   goal: (p) => (<>
+    {/* Rebuilt 2026-10-05: the goal and where today's pace lands, the costs that are off with their £
+        and a fix, then the forms. Readiness moved to the foot and reads the app's own figures. */}
+    <V3GoalLead/>
+    <V3CostsOff/>
     <GretaPlanPanel show="goal"/>
-    <CostDrift/>
     {/* The only place a brand can enter per-variant landed cost. Business economics below sets the
         BLENDED margin; this sets what things actually cost, which is what moves the profit number
         from Estimated to Measured (0192). Open by default, because the confidence chip on Today
@@ -18458,6 +18746,7 @@ const V3_PAGES = {
       <V3Anchor id="costs"/><V3ProductCosts/>
     </V3More>
     <V3More id="goal-econ" label="Cash, stock and supplier terms"><V3Anchor id="economics"/><BusinessEconomicsPanel/></V3More>
+    <V3More id="goal-ready" label="What Greta checks before planning"><GretaPlanPanel show="readiness"/></V3More>
   </>),
   growth: (p) => (<>
     <V3Growth/>
