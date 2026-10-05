@@ -63,8 +63,10 @@
     var pps = sessions ? r2(ppsW / sessions) : null, sd = scroll.length ? Math.round(scroll.reduce(function (a, v) { return a + v; }, 0) / scroll.length) : null;
     var active = eng.t ? eng.a / eng.t : null;
     var flags = [];
-    if (se != null && se >= 10) flags.push({ sev: 'high', text: Math.round(se) + '% of sessions hit a JavaScript error — a likely conversion blocker. Reproduce the top error before scaling spend.' });
-    if (pps != null && pps < 1.5) flags.push({ sev: 'high', text: 'Only ' + pps.toFixed(2) + ' pages per session — visitors land and leave without browsing. A landing or product page problem, not a traffic one.' });
+    // Script errors: say where to look, not that they cost sales — many come from third-party tags.
+    // Pages per session: Clarity's figure (about 1.1 for frkl) conflicts with GA4's product views per
+    // visit, so it is not flagged until it can be checked.
+    if (se != null && se >= 10) flags.push({ sev: 'med', text: Math.round(se) + '% of sessions hit a JavaScript error. Clarity\'s error view names it and the pages it is on — check product, basket and checkout pages first.' });
     if (sd != null && sd < 50) flags.push({ sev: 'med', text: 'Average scroll depth is ' + sd + '% — what sits below that point is mostly unseen.' });
     if (ec != null && ec >= 2) flags.push({ sev: 'med', text: ec.toFixed(1) + '% of sessions click something broken (error clicks) — usually a dead button or failing widget.' });
     if (dc != null && dc >= 3) flags.push({ sev: 'med', text: dc.toFixed(1) + '% of sessions register dead clicks — taps that do nothing.' });

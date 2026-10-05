@@ -7704,16 +7704,16 @@ function SiteStructure({start}){
           <div style={{fontSize:'var(--text-sm)',color:s.sev==='red'?PAL.bad:PAL.warn}}><b style={{color:PAL.muted,fontWeight:'var(--weight-semi)'}}>Friction:</b> {s.issue}</div>
         </div>))}
       </div>}
-      <div className="card" style={{flex:'1 1 320px'}}>
+      {!UI_V3 && <div className="card" style={{flex:'1 1 320px'}}>
         <h2>GA4 funnel (selected window)</h2>
         {f.map(s=>(<div key={s.stage} style={{margin:'9px 0'}}>
           <div className="mrow"><span className="k">{s.stage}</span><span className="v">{NUM(s.v)} ({PCT(s.v/fmax)})</span></div>
           <div style={{height:9,background:PAL.panel,borderRadius:'var(--radius-none)',marginTop:4}}><div style={{height:9,width:(100*s.v/fmax)+'%',background:COL.sessions,borderRadius:'var(--radius-none)'}}/></div>
         </div>))}
         {DEMO && <div className="note" style={{marginTop:10,fontSize:'var(--text-sm)'}}>Clarity confirms the killers: <b>basket→checkout −67.8%</b> (vs 40–50% normal) and <b>checkout→complete −90%</b> (vs 50–60%).</div>}
-      </div>
+      </div>}
     </div>
-    {!DEMO && <p className="v3-empty">A step-by-step walk through your site — what shoppers see at each step and where they stall — appears here after Greta’s site audit. The funnel above is live from your site analytics.</p>}
+    {!DEMO && !UI_V3 && <p className="v3-empty">A step-by-step walk through your site — what shoppers see at each step and where they stall — appears here after Greta’s site audit. The funnel above is live from your site analytics.</p>}
     {DEMO && <div className="row" style={{marginTop:14}}>
       <div className="card" style={{flex:'1 1 360px'}}>
         <h2>Clarity behaviour vs benchmark <span className="v3-muted" style={{fontWeight:'var(--weight-normal)',fontSize:'var(--text-sm)'}}>site audit, July 2026</span></h2>
@@ -9639,12 +9639,12 @@ function ClarityFrictionPanel(){
   const sev = s => s==='high'?PAL.bad:s==='med'?'var(--warn)':'var(--text-muted)';
   const tiles = [
     {label:'Sessions w/ JS error', val: f.scriptError.pct!=null?f.scriptError.pct.toFixed(0)+'%':'—', bad: (f.scriptError.pct||0)>=10, sub: f.scriptError.count?`${NUM(f.scriptError.count)} script errors`:'of sessions hit a JS error'},
-    {label:'Pages / session',      val: C.pagesPerSession!=null?C.pagesPerSession.toFixed(2):'—', bad:(C.pagesPerSession||9)<1.5, sub:'land-and-leave if < 1.5'},
+    !UI_V3 && {label:'Pages / session',      val: C.pagesPerSession!=null?C.pagesPerSession.toFixed(2):'—', bad:(C.pagesPerSession||9)<1.5, sub:'land-and-leave if < 1.5'},
     {label:'Avg scroll depth',     val: C.scrollDepth!=null?C.scrollDepth+'%':'—', bad:(C.scrollDepth||100)<50, sub:'content below is unseen'},
     {label:'Error clicks',         val: f.errorClick.pct!=null?f.errorClick.pct.toFixed(1)+'%':'—', bad:(f.errorClick.pct||0)>=2, sub:'clicks on broken elements'},
     {label:'Dead clicks',          val: f.deadClick.pct!=null?f.deadClick.pct.toFixed(1)+'%':'—', bad:(f.deadClick.pct||0)>=3, sub:'clicks that do nothing'},
     {label:'Active engagement',    val: C.engagement.activePct!=null?PCT(C.engagement.activePct):'—', bad:(C.engagement.activePct||1)<0.5, sub:'share of time actually active'},
-  ];
+  ].filter(Boolean);
   return (<div className="card" style={{marginBottom:14}}>
     {uploader}
     <div className="card-section-title">
@@ -9670,7 +9670,7 @@ function ClarityFrictionPanel(){
         <div className="micro" style={{color:'var(--text-faint)'}}>{t.sub}</div>
       </div>))}
     </div>
-    <div className="note" style={{marginTop:12}}>When a quarter of sessions hit a JS error and visitors see ~1 page before leaving, more ad spend just buys more bounces. <b>Fix the site before scaling paid.</b> {C.notes && C.notes.window}</div>
+    <div className="note" style={{marginTop:12}}>{UI_V3 ? 'These are shares of visits, from Clarity. A high figure says where to look, not what it costs: check the error or the page in Clarity before changing anything.' : <>When a quarter of sessions hit a JS error and visitors see ~1 page before leaving, more ad spend just buys more bounces. <b>Fix the site before scaling paid.</b></>} {C.notes && C.notes.window}</div>
   </div>);
 }
 
@@ -17133,56 +17133,134 @@ function v3StageVal(fmt, v) {
   if (fmt === 'money') return fmtMoney(Number(v), 2);
   return fmtCount(Number(v));
 }
+// ── Website (V3) — where shoppers drop off, read only from data that is fit to read ──────────
+// Rebuilt 2026-10-05. The page led with a four-month-old month and a headline that was a tracking
+// artefact, never said that GA4 had been broken for most of a quarter, and kept the one current,
+// independent read (Clarity) in its last collapsed section. Now, per brand:
+//   1. Tracking state (vw_brand_tracking_state): when GA4 is unusable, say so with its dates and say
+//      what Greta reads instead.
+//   2. The site now (last 30 days against the 30 before): Microsoft Clarity visits and friction,
+//      Shopify orders. Orders per 100 Clarity visits is read only against itself — Clarity counts
+//      visits GA4's consent gate does not, so it is never compared with a GA4 rate.
+//   3. What to do: findings that come with a step the owner can take.
+//   4. The last month with clean tracking (cache_funnel_loop), with its age in the heading. Two
+//      neighbouring stages that move in opposite directions while their combined rate stays normal
+//      are a change in what was recorded at the boundary between them, not shoppers: they are read
+//      as one stage (June 2026: cart→checkout −3.2σ, checkout→purchase +2.1σ, cart→purchase normal).
+const V3_FRICTION = [
+  ['ScriptErrorCount', 'Hit a JavaScript error'], ['ErrorClickCount', 'Clicked something broken'],
+  ['DeadClickCount', 'Clicked something that did nothing'], ['QuickbackClick', 'Went back within seconds'],
+  ['RageClickCount', 'Clicked repeatedly in frustration'],
+];
+function v3MergeShifts(stages) {
+  const out = []; let i = 0;
+  while (i < stages.length) {
+    const a = stages[i], b = stages[i + 1];
+    const sa = Number(a.sigma), sb = b ? Number(b.sigma) : 0;
+    const comb = b ? (Number(a.v) * Number(b.v)) / (Number(a.mu) * Number(b.mu)) : null;
+    const rates = b && a.fmt !== 'money' && b.fmt !== 'money' && a.stage_no > 1;
+    if (rates && comb != null && isFinite(comb) && Math.abs(comb - 1) <= 0.15 && Math.sign(sa) !== Math.sign(sb) && (Math.abs(sa) >= 2 || Math.abs(sb) >= 2)) {
+      out.push({ stage: a.stage + ' and ' + b.stage.toLowerCase(), metric: (String(a.metric).split(' to ')[0] || a.metric) + ' to ' + (String(b.metric).split(' to ').pop() || b.metric),
+        fmt: a.fmt, v: Number(a.v) * Number(b.v), mu: Number(a.mu) * Number(b.mu), sigma: 0, leak: Number(a.leak) + Number(b.leak),
+        merged: [a, b], stage_no: a.stage_no });
+      i += 2;
+    } else { out.push(a); i += 1; }
+  }
+  return out;
+}
+const V3_STEP_WORDS = { 'sessions': 'getting visitors', 'add to cart rate': 'adding to the basket', 'cart to checkout': 'starting checkout',
+  'checkout to purchase': 'finishing checkout', 'cart to purchase': 'checking out', 'average order value': 'order value' };
+const v3Step = m => V3_STEP_WORDS[String(m || '').toLowerCase()] || String(m || '');
+const v3Per100 = v => fmtOk(v) ? (Number(v) * 100).toFixed(2) : FMT_NONE;   // orders per 100 visits
+const v3CountK = v => !fmtOk(v) ? FMT_NONE : Math.abs(Number(v)) >= 1000 ? fmtCount(Number(v) / 1000) + 'k' : fmtCount(v);
+const v3Fix2 = v => fmtOk(v) ? Number(v).toFixed(2) : FMT_NONE;
 function V3Website() {
-  const loop = useV3Rows('web-loop', (sb, b) => sb.from('cache_funnel_loop')
+  const today = new Date().toISOString().slice(0, 10);
+  const loop = useV3Rows('web-loop-13', (sb, b) => sb.from('cache_funnel_loop')
     .select('mo,stage_no,stage,metric,fmt,v,mu,sigma,potential,actual,leak')
-    .eq('brand_id', b).order('mo', { ascending: false }).order('stage_no', { ascending: true }).limit(10));
+    .eq('brand_id', b).order('mo', { ascending: false }).order('stage_no', { ascending: true }).limit(80));
+  const trk = useV3Rows('web-tracking', (sb, b) => sb.from('vw_brand_tracking_state')
+    .select('source,state,broke_on,fixed_on,comparisons_clean_from,severity').eq('brand_id', b));
+  const cl = useV3Rows('web-clarity', (sb, b) => sb.from('tenant_clarity_daily')
+    .select('date,metric_name,sessions_count,with_metric_pct,raw').eq('brand_id', b).eq('num_days', 1).eq('dim_value', 'all')
+    .in('metric_name', ['Traffic'].concat(V3_FRICTION.map(x => x[0]))).gte('date', v3IsoAdd(today, -125)).order('date', { ascending: false }).limit(1000));
+  const dev = useV3Rows('web-device', (sb, b) => sb.from('tenant_clarity_daily')
+    .select('date,dim_value,sessions_count').eq('brand_id', b).eq('num_days', 1).eq('metric_name', 'Device').gte('date', v3IsoAdd(today, -31)).limit(500));
+  const ord = useV3Rows('web-orders', (sb, b) => sb.from('v_tenant_shopify_daily_agg')
+    .select('day,order_count').eq('brand_id', b).gte('day', v3IsoAdd(today, -125)).limit(1000));
   const rows = loop.rows || [];
   const mo = rows.length ? rows[0].mo : null;
-  const stages = rows.filter(r => r.mo === mo).sort((a, b) => a.stage_no - b.stage_no);
+  const raw = rows.filter(r => r.mo === mo).sort((a, b) => a.stage_no - b.stage_no);
   const cut = useV3Rows('web-cut-' + (mo || 'none'), (sb, b) => mo ? sb.from('cache_funnel_cut')
     .select('dim,value,ctc_chg,is_thin,cut_rank').eq('brand_id', b).eq('mo', mo).eq('cut_rank', 1)
     .order('ctc_chg', { ascending: true, nullsFirst: false }).limit(5) : Promise.resolve({ data: [] }));
 
-  if (loop.err) return null;            // the loop below says what went wrong in its own words
-  if (!loop.rows) return <V3SkeletonRows n={4}/>;
-  if (stages.length < 3) return null;
+  const now = React.useMemo(() => {
+    if (!cl.rows || !ord.rows) return null;
+    const days = [...new Set(cl.rows.filter(r => r.metric_name === 'Traffic').map(r => String(r.date).slice(0, 10)))].sort();
+    if (days.length < 20) return null;
+    const end = days[days.length - 1];
+    const ordBy = {}; ord.rows.forEach(r => { const d = String(r.day).slice(0, 10); ordBy[d] = (ordBy[d] || 0) + (Number(r.order_count) || 0); });
+    const win = k => { const e = v3IsoAdd(end, -30 * k), s = v3IsoAdd(e, -29); return { s, e }; };
+    const inW = (d, w) => d >= w.s && d <= w.e;
+    const read = w => {
+      const tr = cl.rows.filter(r => r.metric_name === 'Traffic' && inW(String(r.date).slice(0, 10), w));
+      const nDays = tr.length; if (nDays < 25) return null;
+      const visits = tr.reduce((a, r) => { const x = r.raw || {}; return a + Math.max(0, (Number(x.totalSessionCount) || 0) - (Number(x.totalBotSessionCount) || 0)); }, 0);
+      let orders = 0; for (let k = 0; k < 30; k++) orders += ordBy[v3IsoAdd(w.s, k)] || 0;
+      const fr = {}; V3_FRICTION.forEach(([m]) => { let n = 0, s2 = 0; cl.rows.filter(r => r.metric_name === m && inW(String(r.date).slice(0, 10), w)).forEach(r => {
+        const sc = Number(r.sessions_count), p = Number(r.with_metric_pct); if (sc > 0 && isFinite(p)) { n += sc; s2 += sc * p; } }); fr[m] = n ? s2 / n / 100 : null; });
+      return { ...w, visits, orders, conv: visits > 0 ? orders / visits : null, fr };
+    };
+    const ws = [3, 2, 1, 0].map(k => read(win(k))).filter(Boolean);
+    if (!ws.length || ws[ws.length - 1].e !== end) return null;
+    const devs = {}; (dev.rows || []).forEach(r => { const k = String(r.dim_value || '').toLowerCase(); devs[k] = (devs[k] || 0) + (Number(r.sessions_count) || 0); });
+    const devTot = Object.values(devs).reduce((a, v) => a + v, 0);
+    // "Typical" is the median of the windows before this one: the window just before can hold a sale
+    // (frkl: 0.59 orders per 100 visits in the August sale, 0.38-0.41 either side of it).
+    const before = ws.slice(0, -1);
+    const med = a => { const x = a.filter(v => v != null).sort((p, q) => p - q); if (!x.length) return null; const m = Math.floor(x.length / 2); return x.length % 2 ? x[m] : (x[m - 1] + x[m]) / 2; };
+    const typ = before.length >= 2 ? { conv: med(before.map(w => w.conv)), fr: Object.fromEntries(V3_FRICTION.map(([m]) => [m, med(before.map(w => w.fr[m]))])), n: before.length }
+      : before.length === 1 ? { ...before[0], n: 1 } : null;
+    const cMax = Math.max(...ws.map(w => w.conv || 0)) * 100;
+    return { ws, cur: ws[ws.length - 1], prev: typ, cMax, mobile: devTot > 0 ? (devs.mobile || 0) / devTot : null };
+  }, [cl.rows, ord.rows, dev.rows]);
 
-  const potential = Number(stages[0].potential), actual = Number(stages[0].actual);
-  const monthName = v3Month(mo, 'long');
-  const lastFull = (() => { const d = new Date(); return new Date(Date.UTC(d.getFullYear(), d.getMonth() - 1, 1)).toISOString().slice(0, 7); })();
-  const lags = String(mo).slice(0, 7) < lastFull;
-  const losses = stages.filter(s => Number(s.leak) > 0);
-  // The most abnormal loss is the finding, not the largest: a big number inside normal
-  // variation is not something that broke (same rule as the loop panel).
-  const odd = losses.length ? losses.reduce((w, s) => (Number(s.sigma) < Number(w.sigma) ? s : w), losses[0]) : null;
-  const top = odd && odd.metric === 'cart to checkout'
-    ? ((cut.rows || []).filter(c => !c.is_thin && c.ctc_chg != null)[0] || null) : null;
-  const spread = sig => { const a = Math.abs(Number(sig)); return a >= 3 ? 'far outside' : a >= 2 ? 'well outside' : a >= 1 ? 'a little outside' : 'within'; };
+  if (!loop.rows && !loop.err) return <V3SkeletonRows n={4}/>;
+  const T = (trk.rows || []).find(r => r.source === 'ga4') || null;
+  const ga4Bad = !!(T && (T.severity === 'unusable' || /broken|recovering/.test(String(T.state || ''))));
+  const stages = v3MergeShifts(raw);
+  const potential = raw.length ? Number(raw[0].potential) : null, actual = raw.length ? Number(raw[0].actual) : null;
+  const monthName = mo ? v3Month(mo, 'long') : '';
+  const ageM = mo ? (Number(today.slice(0, 4)) * 12 + Number(today.slice(5, 7))) - (Number(String(mo).slice(0, 4)) * 12 + Number(String(mo).slice(5, 7))) : null;
+  const odd = stages.filter(s => !s.merged && Math.abs(Number(s.sigma)) >= 2 && Number(s.leak) > 0).sort((a, b) => Number(a.sigma) - Number(b.sigma))[0] || null;
+  const worst = odd || stages.filter(s => Number(s.leak) > 0).sort((a, b) => Number(b.leak) - Number(a.leak))[0] || null;
+  // Is the weak stage the lowest it has been in the year of months on file?
+  const lowest = worst && !worst.merged ? (() => { const vs = rows.filter(r => r.stage_no === worst.stage_no).map(r => Number(r.v)); return vs.length >= 6 && Number(worst.v) <= Math.min(...vs); })() : false;
+  const shift = stages.find(s => s.merged);
+  const top = worst && worst.metric === 'cart to checkout' && !worst.merged ? ((cut.rows || []).filter(c => !c.is_thin && c.ctc_chg != null)[0] || null) : null;
 
-  const head = odd && Math.abs(Number(odd.sigma)) >= 2
-    ? 'Fewer shoppers than usual made it from ' + odd.metric.replace(/ to /, ' to ') + ' in ' + monthName + '.'
-    : actual >= potential ? 'Every stage of the site ran at or above its normal in ' + monthName + '.'
-    : 'Nothing on the site broke in ' + monthName + ' — the shortfall is ordinary month-to-month variation.';
-  const sub = odd ? (lpOddLine(odd, top) + ' ' + (actual < potential
-      ? 'Altogether the site made ' + fmtMoney(potential - actual) + ' less profit before ads than it would have with every stage at its normal.'
-      : 'Altogether the site made ' + fmtMoney(actual - potential) + ' more than it would have with every stage at its normal.')) : '';
-  function lpOddLine(o, t) {
-    return v3Sentence(o.metric) + ' was ' + v3StageVal(o.fmt, o.v) + ' against a normal ' + v3StageVal(o.fmt, o.mu)
-      + ' — ' + spread(o.sigma) + ' its usual range — and cost about ' + fmtMoney(o.leak) + '.'
-      + (t ? ' Most of it happened on ' + (t.value === '/' ? 'the home page' : t.value) + ', where it fell ' + fmtPctN(Math.abs(Number(t.ctc_chg))) + '.' : '');
-  }
+  const C = now && now.cur, Pv = now && now.prev;
+  const convChg = C && Pv && Pv.conv > 0 ? C.conv / Pv.conv - 1 : null;
+  const se = C ? C.fr.ScriptErrorCount : null;
+  const rising = C && Pv ? V3_FRICTION.filter(([m]) => C.fr[m] != null && Pv.fr[m] != null && C.fr[m] >= Pv.fr[m] * 1.25 && C.fr[m] - Pv.fr[m] >= 0.005) : [];
+  const moves = [];
+  if (rising.length) moves.push(<li key="rise"><b>Find what changed on the site:</b> {v3Names(rising.map(([m, l]) => l.toLowerCase() + ' (' + fmtPctN(Pv.fr[m]) + ' → ' + fmtPctN(C.fr[m]) + ' of visits)'))}. A theme, app or tag change in the last month is the usual cause — Clarity’s recordings show where it happens.</li>);
+  if (se != null && se >= 0.1) moves.push(<li key="se"><b>Find the JavaScript error {fmtPctN(se)} of visits hit.</b> Clarity’s error view names it and the pages it happens on. Many come from third-party tags and do no harm; one on a product, basket or checkout page costs sales, so check those pages first.</li>);
+  if (now && now.mobile != null && now.mobile >= 0.7) moves.push(<li key="mob"><b>Buy something on your own shop on a phone, start to finish.</b> {fmtPctN(now.mobile)} of visits are on mobile, so that is the shop most customers see.</li>);
+  if (ga4Bad) moves.push(<li key="ga4"><b>Check your site analytics are recording add-to-basket and checkout steps.</b> Until they are, no screen can say which step of the site loses shoppers.{' '}
+    <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('settings')}>Open Connections &amp; data</button></li>);
+  if (worst && /add to cart/.test(String(worst.metric))) moves.push(<li key="atc"><b>Look at the product pages that get the most visits.</b> In the last clean month the step that lost most was adding to the basket; Products shows which products hold views without selling.{' '}
+    <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('products')}>Open Products</button></li>);
 
-  // Bridge: normal → each stage's effect → what the month made.
+  // Bridge: normal → each (merged) stage's effect → what the month made.
   let run = potential;
-  const bars = [{ name: 'At normal', base: 0, val: potential, kind: 'total' }];
-  stages.forEach(s => {
-    const d = -Number(s.leak);            // a positive leak is profit lost
-    const lo = Math.min(run, run + d);
-    bars.push({ name: s.stage, base: lo, val: Math.abs(d), kind: d < 0 ? 'down' : 'up', delta: d, metric: s.metric });
-    run += d;
-  });
-  bars.push({ name: monthName.split(' ')[0], base: 0, val: actual, kind: 'total' });
+  const bars = potential != null ? [{ name: 'At normal', base: 0, val: potential, kind: 'total' }] : [];
+  if (potential != null) {
+    stages.forEach(s => { const d = -Number(s.leak), lo = Math.min(run, run + d);
+      bars.push({ name: s.merged ? 'Checkout' : s.stage, base: lo, val: Math.abs(d), kind: d < 0 ? 'down' : 'up', delta: d, metric: s.metric }); run += d; });
+    bars.push({ name: monthName.split(' ')[0], base: 0, val: actual, kind: 'total' });
+  }
   const colour = k => (k === 'total' ? PAL.data3 : k === 'down' ? PAL.bad : PAL.good);
   const tip = ({ active, payload }) => {
     if (!active || !payload || !payload.length) return null;
@@ -17190,55 +17268,102 @@ function V3Website() {
     return (<div className="v3-tip"><b>{p.name}{p.metric ? ' · ' + p.metric : ''}</b>
       <span>{p.kind === 'total' ? 'Profit before ads' : 'Effect on profit'} <em>{p.kind === 'total' ? fmtMoney(p.val) : (p.delta >= 0 ? '+' : '−') + fmtMoney(Math.abs(p.delta))}</em></span></div>);
   };
+  const ctip = ({ active, payload }) => {
+    if (!active || !payload || !payload.length) return null;
+    const p = payload[0].payload;
+    return (<div className="v3-tip"><b>30 days to {v3Day(p.e, true)}</b><span>Visits <em>{fmtCount(p.visits)}</em></span><span>Orders <em>{fmtCount(p.orders)}</em></span>
+      <span>Orders per 100 visits <em>{v3Per100(p.conv)}</em></span></div>);
+  };
+  const head = C ? (convChg != null && Math.abs(convChg) >= 0.1
+      ? (convChg < 0 ? 'Fewer visits are turning into orders than usual: ' : 'More visits are turning into orders than usual: ') + v3Per100(C.conv) + ' orders per 100 visits, against a typical ' + v3Per100(Pv.conv) + '.'
+      : 'Visits are turning into orders at about the usual rate: ' + v3Per100(C.conv) + ' per 100, against a typical ' + v3Per100(Pv.conv) + '.')
+    : null;
 
   return (<div className="v3-page-stack">
-    <section>
-      <div className="v3-kick">Where shoppers dropped off · {monthName}</div>
+    {ga4Bad && (<section className="v3-sec">
+      <div className="v3-kick">Can Greta read your site right now?</div>
+      <p className="v3-verdict">Your site analytics stopped recording properly{T.broke_on ? ' on ' + v3Day(T.broke_on, true) : ''}{T.fixed_on ? ' and were fixed on ' + v3Day(T.fixed_on, true) : ', and are not fixed yet'}.</p>
+      <p className="v3-note v3-measure">{T.fixed_on
+        ? <>Step-by-step comparisons come back {T.comparisons_clean_from ? 'from ' + v3Day(T.comparisons_clean_from, true) : 'once there is enough clean data'}, when there is enough clean data to set against a normal month. </>
+        : <>Until the tag on your site records again, no screen can say which step loses shoppers. </>}
+        {now ? 'Until then this page reads your site from Microsoft Clarity, which tracks visits separately, and your Shopify orders.' : 'Until then this page has only your Shopify orders to go on.'}</p>
+    </section>)}
+
+    {C && (<section className="v3-sec">
+      <div className="v3-kick">Your site now · last 30 days · Clarity visits and Shopify orders</div>
       <p className="v3-verdict">{head}</p>
-      {sub && <p className="v3-note v3-measure">{sub}</p>}
-      {lags && <p className="micro muted v3-measure">{monthName} is the latest month whose site tracking passed Greta’s checks; later months appear once their checkout events are complete.</p>}
-    </section>
-
-    <figure className="v3-chart v3-chart-solo">
-      <figcaption><span className="v3-chart-title">From a normal month to {monthName}</span>
-        <span className="v3-legend"><i style={{ background: PAL.bad }}/>Cost profit <i style={{ background: PAL.good }}/>Added profit</span></figcaption>
-      <R.ResponsiveContainer width="100%" height={240}>
-        <R.BarChart data={bars} margin={{ top: 20, right: 8, left: 0, bottom: 0 }}>
-          <R.CartesianGrid/>
-          <R.XAxis dataKey="name" interval={0}/>
-          <R.YAxis tickFormatter={fmtMoneyK}/>
-          <R.Tooltip content={tip} cursor={false}/>
-          <R.Bar dataKey="base" stackId="w" fill="transparent" isAnimationActive={false}/>
-          <R.Bar dataKey="val" stackId="w" radius={[2, 2, 0, 0]}>
-            {bars.map((b, i) => <R.Cell key={i} fill={colour(b.kind)}/>)}
-            <R.LabelList dataKey="val" position="top" className="v3-bar-label"
-              content={({ x, y, width, index }) => {
-                const b = bars[index]; if (!b) return null;
-                const t = b.kind === 'total' ? fmtMoney(b.val) : (b.delta >= 0 ? '+' : '−') + fmtMoney(Math.abs(b.delta));
-                return <text x={x + width / 2} y={y - 6} textAnchor="middle" className="v3-bar-label">{t}</text>;
-              }}/>
-          </R.Bar>
-        </R.BarChart>
-      </R.ResponsiveContainer>
-    </figure>
-
-    <section className="v3-sec">
-      <h2 className="v3-sec-title">Each stage against its normal</h2>
+      <p className="v3-note v3-measure">{fmtCount(C.visits)} visits and {fmtCount(C.orders)} orders{now.mobile != null ? '; ' + fmtPctN(now.mobile) + ' of visits on a phone' : ''}. Clarity counts visits your analytics tag misses, so this rate is lower than a GA4 conversion rate and is only ever compared with itself.</p>
+      {now.ws.length >= 2 && (<figure className="v3-chart">
+        <figcaption><span className="v3-chart-title">Visits and orders per 100 visits, 30 days at a time</span>
+          <span className="v3-legend"><i style={{ background: PAL.quiet }}/>Visits <i style={{ background: PAL.ink }}/>Orders per 100 visits</span></figcaption>
+        <R.ResponsiveContainer width="100%" height={160}>
+          <R.ComposedChart data={now.ws.map(w => ({ ...w, label: v3Day(w.e), c100: w.conv != null ? Math.round(w.conv * 10000) / 100 : null }))} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <R.CartesianGrid/>
+            <R.XAxis dataKey="label"/>
+            <R.YAxis yAxisId="v" tickFormatter={v3CountK}/>
+            <R.YAxis yAxisId="c" orientation="right" allowDecimals domain={[0, Math.ceil(now.cMax * 12) / 10]} ticks={[0, Math.ceil(now.cMax * 12) / 20, Math.ceil(now.cMax * 12) / 10]} tickFormatter={v3Fix2}/>
+            <R.Tooltip content={ctip} cursor={false}/>
+            <R.Bar yAxisId="v" dataKey="visits" fill={PAL.quiet} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
+            <R.Line yAxisId="c" dataKey="c100" type="monotone" stroke={PAL.ink} strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false}/>
+          </R.ComposedChart>
+        </R.ResponsiveContainer>
+      </figure>)}
       <table className="v3-rw">
-        <thead><tr><th className="t-text">Stage</th><th className="t-text">Measured by</th><th>{monthName.split(' ')[0]}</th><th>Normal</th><th>Effect on profit</th></tr></thead>
-        <tbody>{stages.map(s => {
-          const d = -Number(s.leak), odd2 = Math.abs(Number(s.sigma)) >= 2;
-          return (<tr key={s.stage_no}>
-            <td className="t-text v3-rw-name">{s.stage}{odd2 && <span className={'v3-flag' + (d >= 0 ? ' good' : '')}>{Number(s.sigma) < 0 ? 'unusually low' : 'unusually high'}</span>}</td>
+        <thead><tr><th className="t-text">Share of visits that…</th><th>Last 30 days</th><th>{Pv && Pv.n > 1 ? 'Typical before' : '30 days before'}</th></tr></thead>
+        <tbody>{V3_FRICTION.map(([m, l]) => { const up = rising.some(r => r[0] === m); return (<tr key={m}>
+          <td className="t-text">{l.charAt(0).toLowerCase() + l.slice(1)}{up && <span className="v3-flag">up</span>}</td>
+          <td className={up ? 'v3-down' : ''}>{C.fr[m] != null ? fmtPctN(C.fr[m]) : FMT_NONE}</td>
+          <td className="v3-muted">{Pv && Pv.fr[m] != null ? fmtPctN(Pv.fr[m]) : FMT_NONE}</td></tr>); })}</tbody>
+      </table>
+    </section>)}
+
+    {moves.length > 0 && (<section className="v3-sec">
+      <h2 className="v3-sec-title">What to do</h2>
+      <ol className="v3-moves">{moves}</ol>
+    </section>)}
+
+    {stages.length >= 3 && (<section className="v3-sec">
+      <div className="v3-kick">Last month with clean site tracking · {monthName}{ageM != null && ageM >= 2 ? ' · ' + ageM + ' months ago' : ''}</div>
+      <p className="v3-verdict">{worst
+        ? (odd ? 'In ' + monthName + ', fewer shoppers than usual got past ' + v3Step(worst.metric) + '.' : 'In ' + monthName + ', the step that lost most was ' + v3Step(worst.metric) + '.')
+        : 'Every step of the site ran at or above its normal in ' + monthName + '.'}</p>
+      {worst && <p className="v3-note v3-measure">{v3Sentence(worst.metric)} was {v3StageVal(worst.fmt, worst.v)} against a normal {v3StageVal(worst.fmt, worst.mu)}{lowest ? ' — the lowest in the year on file' : ''}, about {fmtMoney(worst.leak)} of profit before ads.
+        {top ? ' Most of it happened on ' + (top.value === '/' ? 'the home page' : top.value) + ', where it fell ' + fmtPctN(Math.abs(Number(top.ctc_chg))) + '.' : ''}
+        {shift && <> {v3Sentence(shift.merged[0].metric)} and {shift.merged[1].metric} moved in opposite directions by matching amounts while {shift.metric} stayed normal — a change in what was recorded between them, not in shoppers — so they are read together as checkout.</>}
+        {potential != null && actual != null && <> Altogether the month made {fmtMoney(Math.abs(potential - actual))} {actual < potential ? 'less' : 'more'} profit before ads than it would have with every step at its normal.</>}</p>}
+      {bars.length > 2 && (<figure className="v3-chart">
+        <figcaption><span className="v3-chart-title">From a normal month to {monthName}</span>
+          <span className="v3-legend"><i style={{ background: PAL.bad }}/>Cost profit <i style={{ background: PAL.good }}/>Added profit</span></figcaption>
+        <R.ResponsiveContainer width="100%" height={240}>
+          <R.BarChart data={bars} margin={{ top: 20, right: 8, left: 0, bottom: 0 }}>
+            <R.CartesianGrid/>
+            <R.XAxis dataKey="name" interval={0}/>
+            <R.YAxis tickFormatter={fmtMoneyK}/>
+            <R.Tooltip content={tip} cursor={false}/>
+            <R.Bar dataKey="base" stackId="w" fill="transparent" isAnimationActive={false}/>
+            <R.Bar dataKey="val" stackId="w" radius={[2, 2, 0, 0]}>
+              {bars.map((b, i) => <R.Cell key={i} fill={colour(b.kind)}/>)}
+              <R.LabelList dataKey="val" position="top" className="v3-bar-label"
+                content={({ x, y, width, index }) => { const b = bars[index]; if (!b) return null;
+                  const t = b.kind === 'total' ? fmtMoney(b.val) : (b.delta >= 0 ? '+' : '−') + fmtMoney(Math.abs(b.delta));
+                  return <text x={x + width / 2} y={y - 6} textAnchor="middle" className="v3-bar-label">{t}</text>; }}/>
+            </R.Bar>
+          </R.BarChart>
+        </R.ResponsiveContainer>
+      </figure>)}
+      <table className="v3-rw">
+        <thead><tr><th className="t-text">Step</th><th className="t-text">Measured by</th><th>{monthName.split(' ')[0]}</th><th>Normal</th><th>Effect on profit</th></tr></thead>
+        <tbody>{stages.map((s, i) => { const d = -Number(s.leak), o = !s.merged && Math.abs(Number(s.sigma)) >= 2;
+          return (<tr key={i}>
+            <td className="t-text v3-rw-name">{s.merged ? 'Checkout' : s.stage}{o && <span className={'v3-flag' + (d >= 0 ? ' good' : '')}>{Number(s.sigma) < 0 ? 'unusually low' : 'unusually high'}</span>}{s.merged && <span className="v3-flag good">read together</span>}</td>
             <td className="t-text v3-muted">{v3Sentence(s.metric)}</td>
             <td>{v3StageVal(s.fmt, s.v)}</td>
             <td className="v3-muted">{v3StageVal(s.fmt, s.mu)}</td>
             <td className={d < 0 ? 'v3-down' : 'v3-up'}>{(d >= 0 ? '+' : '−') + fmtMoney(Math.abs(d))}</td>
-          </tr>);
-        })}</tbody>
+          </tr>); })}</tbody>
       </table>
-      <p className="micro muted v3-measure">Normal is each stage’s own average over the twelve months before. The effects add up exactly to the gap between a normal month and this one, and no stage is counted twice.</p>
-    </section>
+      <p className="micro muted v3-measure">Normal is each step’s own average over the twelve months before. The effects add up exactly to the gap between a normal month and this one, and no step is counted twice.</p>
+    </section>)}
   </div>);
 }
 
