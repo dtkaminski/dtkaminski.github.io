@@ -9253,7 +9253,7 @@ function CohortsPanel(){
   const firstContrib = firstOrderRev * gm;
   const paybackOrders = (paidCac && firstContrib>0) ? paidCac/firstContrib : null;
   const curve = (C.pooledCurve||[]).map(p=>({m:'m'+p.m, rev:p.cumRevPerCust, contrib:+(p.cumRevPerCust*gm).toFixed(2), n:p.customersObserved}));
-  const cacMonths = (C.cac && C.cac.byMonth || []).map(r=>({month:(r.month||'').slice(2), newCust:r.newCustomers, cac:r.cac, paid:r.spend>0}));
+  const cacMonths = (C.cac && C.cac.byMonth || []).map(r=>({month:r.month ? v3Month(r.month, true) : '', newCust:r.newCustomers, cac:r.cac, paid:r.spend>0}));
   const ragRatio = ltvCacPaid==null?'var(--text-faint)':(ltvCacPaid>=3?'var(--good)':ltvCacPaid>=1?'var(--warn)':PAL.bad);
   const badge = <MarginBadge/>;
 
@@ -9265,16 +9265,16 @@ function CohortsPanel(){
           <span className="meta">{C.totalCustomers} DTC customers · {C.windowFirst}→{C.windowLast} · real first-order cohorts</span>
         </div>
         <div className="micro" style={{color:'var(--text-secondary)', lineHeight:1.55}}>
-          Each customer is bucketed by the month of their <b>first order</b>, then we track what they go on to spend. {firstShare!=null && <>{OI_BRAND.name||'You'} banks <b style={{color:'var(--text-primary)'}}>{PCT(firstShare)}</b> of a customer's lifetime value in their <b>first order</b> — so every point of repeat purchase is almost pure upside, and retention is the biggest untapped lever.</>}
+          Each customer is bucketed by the month of their <b>first order</b>, then we track what they go on to spend. {firstShare!=null && <><b style={{color:'var(--text-primary)'}}>{PCT(firstShare)}</b> of what a customer has spent with {OI_BRAND.name||'you'} so far came with their <b>first order</b> — so the first order has to pay for winning a customer; repeat buying adds the rest.</>}
         </div>
       </div>
-      <div className="row" style={{marginBottom:14}}>
+      {!UI_V3 && <div className="row" style={{marginBottom:14}}>
         <CohortStat label="Customer value" val={GBP(contribLTV)} sub={`${GBP(lifetimeRev)} revenue × ${PCT(gm)} margin · observed to date`} badge={badge} accent="var(--good)"/>
         <CohortStat label="New-customer cost (paid ads)" val={paidCac!=null?GBP(paidCac):'—'} sub={`spend ÷ new customers · ${C.cac.paidMonths||0} paid month(s) · blended ${blendedCac!=null?GBP(blendedCac):'—'} understates (incl. ${curSym()}0-spend cohorts)`} accent="var(--accent)"/>
         <CohortStat label="Customer value vs cost (paid ads)" val={ltvCacPaid!=null?ltvCacPaid.toFixed(1)+'×':'—'} sub="contribution customer lifetime value ÷ paid cost per new customer · target 3×+" badge={badge} accent={ragRatio}/>
         <CohortStat label="First-order payback" val={paybackOrders!=null?(paybackOrders<=1?'1st order':paybackOrders.toFixed(1)+' orders'):'—'} sub="orders to recover paid cost per new customer" badge={badge}/>
         <CohortStat label="Repeat rate" val={PCT(C.repeatRate)} sub={`${C.ordersPerCustomer} orders / customer`}/>
-      </div>
+      </div>}
       <div className="row">
         <div className="card" style={{flex:'2 1 480px'}}>
           <div className="card-section-title"><h2 style={{margin:0}}>Lifetime value curve</h2><span className="meta">{`cumulative ${curSym()} per customer by months since first order`}</span></div>
@@ -9328,14 +9328,17 @@ function CohortsPanel(){
       <div className="row" style={{marginTop:14}}>
         <div className="card" style={{flex:'1 1 380px'}}>
           <h2 style={{marginTop:0}}>Discounted vs full-price acquisition</h2>
-          <table><thead><tr><th>First order</th><th>Customers</th><th>Repeat</th><th>Orders/cust</th><th>{`Lifetime ${curSym()}/cust`}</th></tr></thead><tbody>
+          <table><thead><tr><th>First order</th><th>Customers</th><th>Back within 6 months</th><th>Next order also discounted</th></tr></thead><tbody>
             {(C.byAcqType||[]).map((a,i)=>(<tr key={i}>
-              <td>{a.type}</td><td>{NUM(a.newCustomers)}</td><td>{PCT(a.repeatRate)}</td><td>{a.ordersPerCust}</td><td>{GBP(a.lifetimeRevPerCust)}</td>
+              <td>{a.type}</td><td>{NUM(a.newCustomers)}</td><td>{PCT(a.repeatRate)}</td><td>{a.nextDiscounted != null ? PCT(a.nextDiscounted) : '—'}</td>
             </tr>))}
           </tbody></table>
           {(()=>{ const d=(C.byAcqType||[]).find(a=>/Discount/.test(a.type)), f=(C.byAcqType||[]).find(a=>/Full/.test(a.type));
             if(!d||!f) return null; const better = d.repeatRate>=f.repeatRate;
-            return <div className="note" style={{marginTop:10}}>{better
+            const habit = d.nextDiscounted != null && f.nextDiscounted != null && d.nextDiscounted - f.nextDiscounted >= 0.1;
+            return <div className="note" style={{marginTop:10}}>{better && habit
+              ? `Discount-acquired customers come back about as often (${PCT(d.repeatRate)} vs ${PCT(f.repeatRate)}), but ${PCT(d.nextDiscounted)} of their next orders are discounted too, against ${PCT(f.nextDiscounted)} for full-price starters — the code they joined on sets the price they come back at. Win them back with something other than a deeper code.`
+              : better
               ? `Discount-acquired customers repeat at least as well (${PCT(d.repeatRate)} vs ${PCT(f.repeatRate)}) — the usual "discount buyers churn" worry doesn't hold here, so first-order codes look like a fair acquisition cost.`
               : `Discount-acquired customers repeat less (${PCT(d.repeatRate)} vs ${PCT(f.repeatRate)}) — those codes are buying lower-quality customers; tighten first-order discounting.`}</div>; })()}
         </div>
@@ -17376,7 +17379,7 @@ function V3Customers() {
   const ret = useV3Rows('cust-ret', V3_RET_Q);
   const nvr = useV3Rows('cust-nvr', (sb, b) => sb.from('vw_daily_new_vs_returning')
     .select('order_date,customer_type,net_revenue').eq('brand_id', b).eq('ledger', 'dtc')
-    .gte('order_date', v3IsoAdd(REAL_END || new Date().toISOString().slice(0, 10), -98)).order('order_date', { ascending: true }).limit(1000));
+    .gte('order_date', v3IsoAdd(new Date().toISOString().slice(0, 10), -98)).order('order_date', { ascending: true }).limit(1000));
   const curve = useV3Rows('cust-curve', (sb, b) => sb.from('v_tenant_cohort_curve')
     .select('offset_m,customers_observed,cum_rev_per_cust').eq('brand_id', b).order('offset_m', { ascending: true }));
 
@@ -17388,7 +17391,9 @@ function V3Customers() {
     const m = {};
     (nvr.rows || []).forEach(x => { const w = v3Monday(x.order_date); const o = m[w] || (m[w] = { wk: w, nw: 0, rt: 0 });
       if (x.customer_type === 'returning') o.rt += Number(x.net_revenue) || 0; else if (x.customer_type === 'new') o.nw += Number(x.net_revenue) || 0; });
-    const thisWk = v3Monday(REAL_END || new Date().toISOString().slice(0, 10));
+    // Today, not REAL_END: REAL_END is the snapshot date until the live data swaps in, and this memo
+    // only re-runs when its rows change, so it froze on a June week for frkl.
+    const thisWk = v3Monday(new Date().toISOString().slice(0, 10));
     return Object.values(m).filter(o => o.wk < thisWk).sort((a, b) => a.wk < b.wk ? -1 : 1).slice(-13)
       .map(o => ({ ...o, label: v3Day(o.wk), nw: Math.round(o.nw), rt: Math.round(o.rt) }));
   }, [nvr.rows]);
@@ -17416,7 +17421,6 @@ function V3Customers() {
       <div className="v3-stat-grid">
         {t && stat('New customers', fmtCount(t.new_customers), fmtMoney(t.new_net) + ' of sales')}
         {t && stat('Returning customers', fmtCount(t.returning_customers), fmtMoney(t.returning_net) + ' of sales')}
-        {t && stat('Sales from returning customers', fmtPctN(t.returning_rev_share), 'cost nothing to win back')}
         {t && t.ncac != null && stat('New-customer cost', fmtMoney(t.ncac),
           'ad spend ÷ new customers, these 30 days' + (u && u.cac != null ? ' (over 90 days: ' + fmtMoney(u.cac) + ')' : ''))}
         {u && u.ltv_contribution != null && stat('What a customer is worth', fmtMoney(u.ltv_contribution),
@@ -17975,27 +17979,22 @@ function V3Incrementality() {
 // last three complete months against the three before. Medians, so one sale month cannot carry it;
 // said only when spend moved by more than 15%.
 function V3MarketingLead() {
-  const mo = useV3Rows('mk-months', (sb, b) => sb.from('vw_cac_elasticity_fit_input')
-    .select('month,spend,new_customers').eq('brand_id', b).order('month', { ascending: false }).limit(24));
+  const mo = useV3Rows('mk-months', V3_MONTHS_Q);
   const act = useV3Rows('mk-platform-months', (sb, b) => sb.from('vw_calendar_channel_actuals')
     .select('day,platform,spend').eq('brand_id', b).gt('spend', 0)
     .gte('day', v3IsoAdd(new Date().toISOString().slice(0, 10), -365)).order('day', { ascending: false }).limit(1000));
   const ue = useV3Rows('mk-ue', (sb, b) => sb.from('vw_brand_unit_economics').select('cac,allowable_cac').eq('brand_id', b).limit(1));
   const d = React.useMemo(() => {
     if (!mo.rows || !act.rows) return null;
-    const cur = new Date().toISOString().slice(0, 7);
-    const months = mo.rows.map(r => ({ m: String(r.month).slice(0, 7), spend: Number(r.spend) || 0, nc: Number(r.new_customers) || 0 }))
-      .filter(r => r.m < cur).sort((a, b) => a.m < b.m ? -1 : 1).slice(-12);
-    if (months.length < 6) return null;
+    const X = v3ExtraCustomers(mo.rows);   // one rule for what the extra spend bought, shared with Customers
+    if (!X) return null;
+    const months = X.months;
     const plat = {}; const names = new Set();
     act.rows.forEach(r => { const m = String(r.day).slice(0, 7), p = String(r.platform || 'other').toLowerCase(); names.add(p);
       const o = plat[m] || (plat[m] = {}); o[p] = (o[p] || 0) + (Number(r.spend) || 0); });
     const ps = [...names].sort((a, b) => months.reduce((s, x) => s + ((plat[x.m] || {})[b] || 0), 0) - months.reduce((s, x) => s + ((plat[x.m] || {})[a] || 0), 0));
     const rows = months.map(x => { const o = { ...x, label: v3Month(x.m + '-01', true) }; ps.forEach(p => { o['p_' + p] = Math.round((plat[x.m] || {})[p] || 0); }); return o; });
-    const med = a => { const s = a.slice().sort((p, q) => p - q), k = Math.floor(s.length / 2); return s.length % 2 ? s[k] : (s[k - 1] + s[k]) / 2; };
-    const last = months.slice(-3), prev = months.slice(-6, -3);
-    const L = { spend: med(last.map(x => x.spend)), nc: med(last.map(x => x.nc)) }, P = { spend: med(prev.map(x => x.spend)), nc: med(prev.map(x => x.nc)) };
-    const dSpend = L.spend - P.spend, dNc = L.nc - P.nc;
+    const med = v3Med, last = X.last, prev = X.prev, L = X.L, P = X.P, dSpend = X.dSpend, dNc = X.dNc;
     const platMed = p => ({ now: med(last.map(x => (plat[x.m] || {})[p] || 0)), was: med(prev.map(x => (plat[x.m] || {})[p] || 0)) });
     const moves = ps.map(p => ({ p, ...platMed(p) })).map(x => ({ ...x, d: x.now - x.was })).sort((a, b) => b.d - a.d);
     return { rows, ps, L, P, dSpend, dNc, moves, lastLab: v3Month(last[0].m + '-01') + '–' + v3Month(last[2].m + '-01'), prevLab: v3Month(prev[0].m + '-01') + '–' + v3Month(prev[2].m + '-01') };
@@ -18064,8 +18063,7 @@ const V3_FLOW_TYPES = [
 ];
 function v3FlowType(name, trig) { const s = String(name || '') + ' ' + String(trig || ''); const t = V3_FLOW_TYPES.find(x => x[1].test(s)); return t ? t[0] : 'other'; }
 function V3EmailRead() {
-  const fl = useV3Rows('mk-flows', (sb, b) => sb.from('tenant_klaviyo_flows')
-    .select('name,status,trigger_type,recipients_30d,attributed_revenue_30d,attributed_orders_30d').eq('brand_id', b).limit(300));
+  const fl = useV3Rows('mk-flows', V3_FLOWS_Q);
   const ca = useV3Rows('mk-camps', (sb, b) => sb.from('tenant_klaviyo_campaigns')
     .select('name,send_time,recipients,attributed_revenue,attributed_orders').eq('brand_id', b)
     .gte('send_time', v3IsoAdd(new Date().toISOString().slice(0, 10), -30)).order('send_time', { ascending: false }).limit(200));
@@ -18086,7 +18084,7 @@ function V3EmailRead() {
   const campRev = camps.reduce((a, c) => a + (Number(c.attributed_revenue) || 0), 0), flowRev = live.reduce((a, f) => a + f.rev, 0);
   const claimed = campRev + flowRev, claimShare = shop > 0 ? claimed / shop : null;
   const ppl = live.filter(f => f.reach >= 50).map(f => ({ ...f, per: f.rev / f.reach }));
-  const medPer = (() => { const s = ppl.map(f => f.per).sort((a, b) => a - b); return s.length ? s[Math.floor(s.length / 2)] : null; })();
+  const medPer = v3Med(ppl.map(f => f.per));   // the same median Customers uses
   const post = ppl.find(f => f.t === 'post');
   const weakPost = post && medPer != null && post.per < medPer * 0.2;
   // The segment comes back split by loyalty type: add the parts.
@@ -18120,6 +18118,118 @@ function V3EmailRead() {
       </tr>))}</tbody>
     </table>
     {camps.length > 0 && <p className="micro muted v3-measure">{fmtCount(camps.length)} campaigns went out in the last 30 days to {fmtCount(camps.reduce((a, c) => a + Number(c.recipients), 0))} inboxes in total; Klaviyo credits them with {fmtMoney(campRev)}. Per-campaign detail is in the Email section below.</p>}
+  </section></div>);
+}
+
+// ── Shared: what the extra ad spend bought, one rule for Marketing and Customers ───────────────
+// Spend and new customers by calendar month (vw_cac_elasticity_fit_input), the current partial month
+// left out. The last three complete months against the three before, by median so one sale month
+// cannot carry it; "moved" only when spend changed by more than 15%.
+const V3_MONTHS_Q = (sb, b) => sb.from('vw_cac_elasticity_fit_input')
+  .select('month,spend,new_customers').eq('brand_id', b).order('month', { ascending: false }).limit(24);
+const V3_FLOWS_Q = (sb, b) => sb.from('tenant_klaviyo_flows')
+  .select('name,status,trigger_type,recipients_30d,attributed_revenue_30d,attributed_orders_30d').eq('brand_id', b).limit(300);
+function v3Med(a) { const s = a.filter(v => v != null && isFinite(v)).sort((p, q) => p - q), k = Math.floor(s.length / 2); return !s.length ? null : s.length % 2 ? s[k] : (s[k - 1] + s[k]) / 2; }
+function v3ExtraCustomers(rows) {
+  if (!rows) return null;
+  const cur = new Date().toISOString().slice(0, 7);
+  const months = rows.map(r => ({ m: String(r.month).slice(0, 7), spend: Number(r.spend) || 0, nc: Number(r.new_customers) || 0 }))
+    .filter(r => r.m < cur).sort((a, b) => a.m < b.m ? -1 : 1).slice(-12);
+  if (months.length < 6) return null;
+  const last = months.slice(-3), prev = months.slice(-6, -3);
+  const L = { spend: v3Med(last.map(x => x.spend)), nc: v3Med(last.map(x => x.nc)) }, P = { spend: v3Med(prev.map(x => x.spend)), nc: v3Med(prev.map(x => x.nc)) };
+  const dSpend = L.spend - P.spend, dNc = L.nc - P.nc, moved = P.spend > 0 && Math.abs(dSpend) > P.spend * 0.15;
+  return { months, last, prev, L, P, dSpend, dNc, moved, per: moved && dSpend > 0 && dNc > 0 ? dSpend / dNc : null,
+    lastLab: v3Month(last[0].m + '-01') + '–' + v3Month(last[2].m + '-01'), prevLab: v3Month(prev[0].m + '-01') + '–' + v3Month(prev[2].m + '-01') };
+}
+
+// ── Customers lead: what a customer is worth against what one costs (anatomy Stage 5) ───────────
+// One customer value (vw_brand_unit_economics.ltv_contribution — profit over a year, 0252's figure),
+// the average cost of a new customer (90 days) and this month's, how front-loaded the value is
+// (vw_cohort_frontload, standard basis: share of 12-month contribution on day 0), and the cost of the
+// extra customers the extra spend bought. The front-load share decides what retention can carry: it
+// is the cap on how much repeat buying can add, said as such.
+function V3CustomerValue() {
+  const ue = useV3Rows('cust-ue', V3_UE_Q);
+  const tier = useV3Rows('cust-tier', (sb, b) => sb.from('vw_customer_tier_periods')
+    .select('window_label,new_customers,returning_customers,new_net,returning_net,net_sales,ncac,returning_rev_share')
+    .eq('brand_id', b).eq('window_label', 'current_30d').limit(1));
+  const front = useV3Rows('cust-front', (sb, b) => sb.from('vw_cohort_frontload')
+    .select('in_standard_basis,bucket,pct_of_12m_value').eq('brand_id', b));
+  const mo = useV3Rows('mk-months', V3_MONTHS_Q);
+  if (ue.err) return null;
+  if (!ue.rows) return <V3SkeletonRows n={2}/>;
+  const u = ue.rows[0] || null;
+  if (!u || u.ltv_contribution == null || !(Number(u.cac) > 0)) return null;
+  const ltv = Number(u.ltv_contribution), cac = Number(u.cac), ratio = ltv / cac;
+  const t = (tier.rows || [])[0] || null, cac30 = t && Number(t.ncac) > 0 ? Number(t.ncac) : null;
+  const day0 = (() => { const r = (front.rows || []).find(x => x.in_standard_basis && /day 0/.test(String(x.bucket))); return r ? Number(r.pct_of_12m_value) / 100 : null; })();
+  const X = v3ExtraCustomers(mo.rows);
+  const head = ratio >= 3 ? 'Each new customer earns back ' + fmtTimes(ratio, 1) + ' what they cost to win — there is room to spend more.'
+    : ratio >= 1 ? 'A new customer is worth ' + fmtMoney(ltv) + ' in profit over a year and costs ' + fmtMoney(cac) + ' to win — ' + fmtTimes(ratio, 1) + ', where 3× leaves room to grow.'
+    : 'A new customer costs more to win (' + fmtMoney(cac) + ') than they are worth over a year (' + fmtMoney(ltv) + ').';
+  return (<div className="v3-page-stack"><section className="v3-sec">
+    <div className="v3-kick">What a customer is worth against what one costs</div>
+    <p className="v3-verdict">{head}</p>
+    <p className="v3-note v3-measure">
+      {day0 != null && <>{fmtPctN(day0)} of that value comes with the first order, so the first order has to pay for winning the customer; repeat buying adds the other {fmtPctN(1 - day0)} at most. </>}
+      {cac30 != null && Math.abs(cac30 / cac - 1) > 0.2 && <>In the last 30 days a new customer cost {fmtMoney(cac30)}. </>}
+      {X && X.per != null && <>The extra customers bought since {X.prevLab} cost {fmtMoney(X.per)} each{X.per > ltv ? ' — more than a customer is worth.' : ', still under what a customer is worth.'} </>}
+      {X && X.moved && X.dSpend > 0 && X.dNc <= 0 && <>The extra ad spend since {X.prevLab} has bought no extra customers. </>}
+      <V3Conf state="likely" detail="Customer value is a year of profit after product and order costs from your own customers; the cost is ad spend divided by new customers over 90 days. Both are counted, not modelled."/></p>
+    {X && (X.per != null || (X.moved && X.dSpend > 0)) && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('marketing')}>
+      Where the extra spend went <span className="v3-xref-go">on Marketing →</span></button>}
+  </section></div>);
+}
+
+// ── Keep them coming back (Customers) — the retention moves, each with its evidence ────────────
+//   win back    the At risk segment (v_tenant_customer_segment_stats, every loyalty split added up),
+//               how many can be emailed, and whether a winback flow is live, built or missing
+//   second order the usual gap between orders (v_tenant_retention_summary) and how the post-purchase
+//               flow earns per person reached against the brand's typical live flow
+//   discounts   vw_discount_dependency: how often the next order is discounted for customers who
+//               joined on a discount against those who paid full price, and the full-price Champions
+// A move shows only when its evidence is there.
+function V3Retention() {
+  const seg = useV3Rows('cust-segstats', (sb, b) => sb.from('v_tenant_customer_segment_stats')
+    .select('segment,loyalty,customers,emailable,net_revenue').eq('brand_id', b));
+  const ret = useV3Rows('cust-ret', V3_RET_Q);
+  const dep = useV3Rows('cust-discdep', (sb, b) => sb.from('vw_discount_dependency')
+    .select('first_on_markdown,customers,repeat_rate_180d,next_order_on_markdown_share').eq('brand_id', b));
+  const fl = useV3Rows('mk-flows', V3_FLOWS_Q);
+  const aov = useV3Rows('cust-aov-ret', (sb, b) => sb.from('vw_brand_aov').select('window_label,returning_aov').eq('brand_id', b));
+  if (!seg.rows && !seg.err) return <V3SkeletonRows n={3}/>;
+  const sum = (rows, k) => rows.reduce((a, r) => a + (Number(r[k]) || 0), 0);
+  const atRows = (seg.rows || []).filter(r => r.segment === 'At risk');
+  const at = atRows.length ? { n: sum(atRows, 'customers'), mail: sum(atRows, 'emailable') } : null;
+  const champFull = (seg.rows || []).filter(r => r.segment === 'Champion' && r.loyalty === 'full_price');
+  const champ = (seg.rows || []).filter(r => r.segment === 'Champion');
+  const R0 = (ret.rows || [])[0] || null, gap = R0 && R0.median_days_between_orders != null ? Number(R0.median_days_between_orders) : null;
+  const A = (aov.rows || []).find(r => r.window_label === 'current_90d') || (aov.rows || [])[0] || null, retAov = A && Number(A.returning_aov) > 0 ? Number(A.returning_aov) : null;
+  const flows = fl.rows || [];
+  const isLive = f => String(f.status).toLowerCase() === 'live';
+  const winLive = flows.some(f => isLive(f) && v3FlowType(f.name, f.trigger_type) === 'winback');
+  const winBuilt = !winLive && flows.some(f => v3FlowType(f.name, f.trigger_type) === 'winback');
+  const live = flows.filter(f => isLive(f) && Number(f.recipients_30d) >= 50).map(f => ({ t: v3FlowType(f.name, f.trigger_type), per: (Number(f.attributed_revenue_30d) || 0) / Number(f.recipients_30d), reach: Number(f.recipients_30d) }));
+  const medPer = v3Med(live.map(f => f.per)), post = live.find(f => f.t === 'post');
+  const d = (dep.rows || []).find(r => r.first_on_markdown === true), f0 = (dep.rows || []).find(r => r.first_on_markdown === false);
+  const habit = d && f0 && Number(d.next_order_on_markdown_share) - Number(f0.next_order_on_markdown_share) >= 0.1;
+  const moves = [];
+  if (at && at.n > 0) moves.push(<li key="win"><b>Win back {fmtCount(at.n)} customers who bought well and have gone quiet.</b>{' '}
+    {fmtCount(at.mail)} of them can be emailed{winBuilt ? ', and the winback email is built in Klaviyo but switched off' : !winLive && flows.length ? ', and no winback email is set up' : ''}.
+    {retAov ? ' Each one who orders again is worth about ' + fmtMoney(retAov) + ' of sales — your typical returning order.' : ''}{' '}
+    <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('customers', 'segments')}>Stage the list below</button></li>);
+  if (gap != null) moves.push(<li key="second"><b>Ask for the second order before day {fmtCount(gap)}.</b>{' '}
+    That is the usual gap between a customer’s orders{R0 && R0.repeat_rate != null ? ', and ' + fmtPctN(Number(R0.repeat_rate)) + ' of customers have ordered more than once' : ''}.
+    {post && medPer != null && post.per < medPer * 0.2 ? <> Your post-purchase email reaches {fmtCount(post.reach)} people a month and earns {fmtMoney(post.per, 2)} a person, against {fmtMoney(medPer, 2)} for your typical flow — give it a reason to come back, such as the add-on that goes with what they bought.</> : ' Time the follow-up email to land before then, with the add-on that goes with what they bought.'}{' '}
+    <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('products')}>See the add-ons on Products</button></li>);
+  if (habit) moves.push(<li key="disc"><b>Reward full-price customers with perks, not codes.</b>{' '}
+    Customers who joined on a discount come back about as often ({fmtPctN(Number(d.repeat_rate_180d))} within six months, against {fmtPctN(Number(f0.repeat_rate_180d))}), but {fmtPctN(Number(d.next_order_on_markdown_share))} of their next orders are discounted too, against {fmtPctN(Number(f0.next_order_on_markdown_share))} for those who paid full price — the code they joined on sets the price they come back at.
+    {champFull.length && champ.length ? ' ' + fmtCount(sum(champFull, 'customers')) + ' of your ' + fmtCount(sum(champ, 'customers')) + ' best customers buy at full price; a code is margin they did not need.' : ''}</li>);
+  if (!moves.length) return null;
+  return (<div className="v3-page-stack"><section className="v3-sec">
+    <h2 className="v3-sec-title">Keep them coming back</h2>
+    <ol className="v3-moves">{moves}</ol>
   </section></div>);
 }
 
@@ -18199,9 +18309,14 @@ const V3_PAGES = {
   // them were built on static snapshots — weeks old for frkl, empty for every other brand —
   // so they sit behind a disclosure rather than leading the page.
   customers: (p) => (<>
+    {/* Rebuilt 2026-10-05: a verdict on what a customer is worth against what one costs, then the
+        numbers, then the retention moves, then the segments panel that stages them, then the plan. */}
+    <V3CustomerValue/>
     <V3Customers/>
-    <V3ReturningBaseline/>
+    <V3Retention/>
+    <V3Anchor id="segments"/>
     <CustomerSegments/>
+    <V3ReturningBaseline/>
     <V3More id="cust-more" label="More customer detail"><Customers/><V3Anchor id="cohorts"/><CohortsPanel/></V3More>
   </>),
   products: (p) => (<>

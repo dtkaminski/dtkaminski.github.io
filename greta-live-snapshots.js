@@ -136,7 +136,7 @@
       q(function () { return s.from('v_tenant_retention_summary').select('customers,orders_per_customer,repeat_rate').eq('brand_id', b).limit(1); }),
       q(function () { return s.from('vw_brand_unit_economics').select('cac,ltv_rev').eq('brand_id', b).limit(1); }),
       q(function () { return s.from('vw_cac_elasticity_fit_input').select('month,spend,new_customers,cac').eq('brand_id', b).order('month'); }),
-      q(function () { return s.from('vw_discount_dependency').select('first_on_markdown,customers,repeat_rate_180d').eq('brand_id', b); }),
+      q(function () { return s.from('vw_discount_dependency').select('first_on_markdown,customers,repeat_rate_180d,next_order_on_markdown_share').eq('brand_id', b); }),
       q(function () { return s.from('vw_acq_cohort_base').select('cohort_month').eq('brand_id', b).order('cohort_month').limit(1); })
     ]);
     var curve = res[0], ret = res[1] && res[1][0], ue = res[2] && res[2][0], months = res[3] || [], dep = res[4] || [], first = res[5] && res[5][0];
@@ -153,7 +153,7 @@
       cac: { paid: ue && ue.cac != null ? num(ue.cac) : null, blended: newAll ? r2(spendAll / newAll) : null, paidMonths: paidMonths.length,
         byMonth: months.map(function (m) { return { month: m.month, newCustomers: num(m.new_customers), spend: num(m.spend), cac: num(m.spend) > 0 ? r2(num(m.cac)) : null }; }) },
       byAcqType: dep.filter(function (d) { return d.first_on_markdown != null; }).map(function (d) {
-        return { type: d.first_on_markdown ? 'Discounted first order' : 'Full-price first order', newCustomers: num(d.customers), repeatRate: num(d.repeat_rate_180d), ordersPerCust: null, lifetimeRevPerCust: null }; }),
+        return { type: d.first_on_markdown ? 'Discounted first order' : 'Full-price first order', newCustomers: num(d.customers), repeatRate: num(d.repeat_rate_180d), nextDiscounted: num(d.next_order_on_markdown_share), ordersPerCust: null, lifetimeRevPerCust: null }; }),
       byProduct: [], notes: null };
   }
 
