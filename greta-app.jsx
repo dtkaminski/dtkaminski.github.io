@@ -13944,7 +13944,7 @@ function ConnectionsPanel(){
       installable: false,
       comingSoon: 'Included with Meta Ads · organic API coming soon',
     },
-  ];
+  ].filter(src => !(UI_V3 && src.comingSoon));
 
   const sevVar = (n) => n == null ? 'var(--text-muted)' : n <= 1 ? 'var(--good)' : n <= 4 ? 'var(--warn)' : 'var(--bad)';
   const sevLabel = (n) => n == null ? 'No data' : n <= 1 ? 'Fresh' : n <= 4 ? 'Ageing' : 'Stale';
@@ -14258,6 +14258,7 @@ function V3ProductCosts(){
         {cov != null && <>, covering <b>{fmtPctN(cov / 100)}</b> of the last 90 days’ sales</>}.
         {n('missing') > 0 && <> The other {fmtCount(n('missing'))} use your margin{gm != null ? ' of ' + gm + '%' : ''} until they have one.</>}</p>
       <p className="v3-note v3-measure">Costs come from “Cost per item” in Shopify and refresh every half hour. Change one here if Shopify’s is wrong, or add freight and duty on top — your figure stays until you hand it back.</p>
+      <V3FreightRate/>
       <div className="v3-chips v3-chips-plain" role="tablist" aria-label="Show products">
         {[['all', 'All', rows.length], ['missing', 'No cost yet', n('missing')], ['yours', 'Your costs', n('yours')]].map(f => (
           <button key={f[0]} type="button" role="tab" aria-selected={filter === f[0]} className={'v3-chip' + (filter === f[0] ? ' on' : '')}
@@ -15992,6 +15993,7 @@ function DataHealth(){
   const [rows, setRows] = React.useState(null);
   const [agree, setAgree] = React.useState(null);
   const [cover, setCover] = React.useState(null);
+  const [extra, setExtra] = React.useState({ clarity: null, track: [] });
   const [err, setErr] = React.useState('');
 
   React.useEffect(() => {
@@ -16004,8 +16006,13 @@ function DataHealth(){
       sb.from('vw_brand_source_freshness').select('source, feeds, last_date, stale_days, status, likely_systemic').eq('brand_id', brand),
       sb.from('vw_source_agreement_alert').select('broken_pairs, drifting_pairs, pairs_checked, broken_detail, as_of').eq('brand_id', brand).limit(1),
       sb.from('vw_measurement_integrity_daily').select('day, shopify_orders, ga4_purchases, order_coverage').eq('brand_id', brand).gte('day', since).order('day', { ascending: false }),
-    ]).then(([f, a, c]) => {
+      // Clarity is read by Website but has no row in the freshness view; the tracking state says when
+      // a feed that is current is still not fit to compare (GA4 after its July–September break).
+      sb.from('tenant_clarity_daily').select('date').eq('brand_id', brand).order('date', { ascending: false }).limit(1),
+      sb.from('vw_brand_tracking_state').select('source,state,comparisons_clean_from').eq('brand_id', brand),
+    ]).then(([f, a, c, cl, tr]) => {
       if (!alive) return;
+      setExtra({ clarity: cl && cl.data && cl.data[0] ? cl.data[0].date : null, track: (tr && tr.data) || [] });
       setRows((f && f.data) || []);
       setAgree((a && a.data && a.data[0]) || null);
       setCover((c && c.data) || []);
@@ -16024,7 +16031,10 @@ function DataHealth(){
   const covered = (cover || []).filter(c => c.order_coverage != null && String(c.day).slice(0, 10) < todayIso);
   const latest = covered[0];
   const SRC = { shopify_orders: 'Shopify orders', meta_ads: 'Meta ads', meta_ads_ad_level: 'Meta ads, by ad', google_ads: 'Google ads',
-    ga4_daily: 'Site analytics', ga4_items: 'Site analytics, by product', klaviyo: 'Klaviyo email', gsc: 'Google search', tiktok_ads: 'TikTok ads' };
+    ga4_daily: 'Site analytics', ga4_items: 'Site analytics, by product', klaviyo: 'Klaviyo email', gsc: 'Google search', tiktok_ads: 'TikTok ads', clarity: 'Site behaviour (Clarity)' };
+  const tdy = new Date().toISOString().slice(0, 10);
+  const g4hold = (extra.track || []).find(t => t.source === 'ga4' && t.state && t.state !== 'ok' && t.comparisons_clean_from && String(t.comparisons_clean_from).slice(0, 10) > tdy);
+  const feedRows = extra.clarity ? rows.concat([{ source: 'clarity', last_date: extra.clarity, status: 'current' }]) : rows;
   const srcName = k => SRC[k] || v3Sentence(String(k || '').replace(/_/g, ' '));
   const avg = covered.length ? covered.reduce((a, c) => a + Number(c.order_coverage), 0) / covered.length : null;
   const pct = v => v == null ? '—' : Math.round(Number(v) * 100) + '%';
@@ -16035,7 +16045,7 @@ function DataHealth(){
 
     <table className="v3-rw v3-feeds">
       <thead><tr><th className="t-text">Feed</th><th className="t-text">Status</th><th>Latest data</th></tr></thead>
-      <tbody>{rows.map(r => {
+      <tbody>{feedRows.map(r => {
         // Never say "Up to date" beside a date that says otherwise: trust the date as well as the label.
         const lag = r.last_date ? Math.floor((Date.now() - Date.parse(String(r.last_date).slice(0, 10) + 'T00:00:00Z')) / 864e5) : null;
         const ok = r.status === 'current' && !(lag > 3);
@@ -16043,7 +16053,7 @@ function DataHealth(){
         const tone = ok ? 'var(--color-success)' : (behind > 4 ? 'var(--color-danger)' : 'var(--color-warning)');
         return (<tr key={r.source}>
           <td className="t-text v3-rw-name">{srcName(r.source)}</td>
-          <td className="t-text"><span className="v3-conn-state" style={{color: tone}}><i style={{background: tone}}/>{ok ? 'Up to date' : (behind === 1 ? 'A day behind' : Math.round(behind) + ' days behind')}</span></td>
+          <td className="t-text"><span className="v3-conn-state" style={{color: ok && g4hold && /^ga4/.test(r.source) ? 'var(--color-warning)' : tone}}><i style={{background: ok && g4hold && /^ga4/.test(r.source) ? 'var(--color-warning)' : tone}}/>{ok ? (g4hold && /^ga4/.test(r.source) ? 'Current · held for comparisons until ' + v3Day(String(g4hold.comparisons_clean_from).slice(0, 10)) : 'Up to date') : (behind === 1 ? 'A day behind' : Math.round(behind) + ' days behind')}</span></td>
           <td className="v3-muted">{r.last_date ? v3Day(String(r.last_date).slice(0, 10), true) : FMT_NONE}</td>
         </tr>);
       })}</tbody>
@@ -19646,6 +19656,117 @@ function V3CompetitorList({ q, loading }) {
   </section>);
 }
 
+// ── Connections & data: can you trust your numbers? (V3, rebuilt 2026-10-05) ─────────────────────
+// The page answered "is it connected?" (every tile Fresh, every feed Up to date) and left out what
+// makes the numbers read wrong while every feed is current: Google Analytics recovering from a
+// ten-week break, product costs with no freight or duty, a cash balance five weeks old, ad platforms
+// claiming most of the brand's orders, products with no SKU. Each is now a line with what it distorts
+// and the fix, the freight-and-duty rate (0267) set in place.
+const V3_FDR_Q = (sb, b) => sb.from('brand_config').select('freight_duty_rate').eq('brand_id', b).limit(1);
+
+// What freight and duty add to product cost, as one rate for the brand (0267). Used here and on the
+// product cost editor in Goal & costs.
+function V3FreightRate({ compact }) {
+  const q = useV3Rows('fd-rate', V3_FDR_Q);
+  const [val, setVal] = React.useState(null), [busy, setBusy] = React.useState(false), [msg, setMsg] = React.useState(null);
+  const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
+  if (q.err || !q.rows) return null;            // before 0267, or not readable: say nothing
+  const cur = q.rows[0] && q.rows[0].freight_duty_rate != null ? Number(q.rows[0].freight_duty_rate) : null;
+  const shown = val != null ? val : cur != null ? String(Math.round(cur * 1000) / 10) : '';
+  const save = async () => {
+    const p = shown.trim() === '' ? 0 : parseFloat(shown);
+    if (!isFinite(p) || p < 0 || p > 100) { setMsg('Enter a percentage between 0 and 100.'); return; }
+    if (!sb || !b) return;
+    setBusy(true); setMsg(null);
+    const r = await sb.rpc('fn_set_freight_duty_rate', { p_brand: b, p_rate: p / 100 });
+    setBusy(false);
+    if (r.error) { setMsg(/not_authorized/.test(r.error.message || '') ? 'Only an owner or admin can change this.' : 'Could not save that just now.'); return; }
+    const d = r.data || {};
+    setVal(null); q.retry();
+    setMsg(p > 0 ? 'Saved. ' + fmtCount((d.sku_rows || 0) + (d.variant_rows || 0)) + ' cost records now carry ' + p + '% for freight and duty; products where you entered your own keep theirs. Profit figures across Greta pick it up overnight.'
+      : 'Cleared. Product costs no longer include freight and duty, except where you entered your own.');
+  };
+  return (<div className={compact ? '' : 'v3-gap-top'}>
+    <div className="v3-comp-add">
+      <label className="v3-field"><span>Freight and duty add</span>
+        <span className="v3-affix" data-post="%"><input className="oi-num" inputMode="decimal" value={shown} aria-label="Freight and duty, as a percentage of product cost"
+          onChange={e => setVal(e.target.value.replace(/[^0-9.]/g, ''))}/></span></label>
+      <span className="v3-muted">to what my products cost</span>
+      <button type="button" className="v3-btn v3-btn-p v3-btn-sm" disabled={busy || val == null} onClick={save}>{busy ? 'Saving…' : 'Save'}</button>
+    </div>
+    {msg && <p className="v3-note">{msg}</p>}
+    {!msg && <p className="micro muted v3-measure">One rate for every product: shipping it to you, import duty, anything you pay before it is on your shelf, as a share of what the product itself costs. A product where you entered its own freight or duty keeps that.</p>}
+  </div>);
+}
+
+function V3DataTrust() {
+  const today = new Date().toISOString().slice(0, 10);
+  const trk = useV3Rows('trust-tracking', (sb, b) => sb.from('vw_brand_tracking_state').select('source,state,broke_on,fixed_on,comparisons_clean_from,severity').eq('brand_id', b));
+  const cq = useV3Rows('trust-cogs', (sb, b) => sb.from('vw_brand_cogs_quality').select('cogs_coverage_90d,realized_cogs_pct,cogs_landed_complete,lines_total,lines_costed').eq('brand_id', b).limit(1));
+  const cfg = useV3Rows('brand-cfg', V3_BCFG_Q);
+  const fdr = useV3Rows('fd-rate', V3_FDR_Q);
+  const cov = useV3Rows('trust-cover', (sb, b) => sb.from('vw_measurement_integrity_daily').select('day,order_coverage').eq('brand_id', b).gte('day', v3IsoAdd(today, -15)).lt('day', today));
+  const stock = useV3Rows('stock-plan', V3_STOCK_Q);
+  // the same 30 days, ending yesterday, for the platforms' claims and the web orders Shopify took
+  const meta = useV3Rows('trust-meta', (sb, b) => sb.from('tenant_meta_insights_daily').select('purchases,purchase_value').eq('brand_id', b).eq('level', 'account').gte('date', v3IsoAdd(today, -30)).lt('date', today).limit(100));
+  const gads = useV3Rows('trust-gads', (sb, b) => sb.from('tenant_google_ads_daily').select('conversions,conversion_value').eq('brand_id', b).eq('level', 'campaign').gte('date', v3IsoAdd(today, -30)).lt('date', today).limit(1000));
+  // online-store orders only: draft orders and marketplace sales (frkl: John Lewis) never see an ad
+  const web = useV3Rows('trust-web', (sb, b) => sb.from('v_shopify_orders_ex_vat').select('id', { count: 'exact', head: true }).eq('brand_id', b).eq('channel', 'online_store')
+    .gte('processed_at', v3IsoAdd(today, -30)).lt('processed_at', today).then(r => ({ data: r.error ? null : [{ n: r.count }], error: r.error })));
+  const num = v => Number(v) || 0;
+  const H = window.GRETA_HEADLINE || {};
+  if (!cq.rows || !cfg.rows || !trk.rows) return <V3SkeletonRows n={4}/>;
+  const items = [];
+  const go = (dest, sub) => () => window.__oiGo && window.__oiGo(dest, sub);
+
+  // 1. freight and duty
+  const Q = cq.rows[0] || null, rate = fdr.rows && fdr.rows[0] && fdr.rows[0].freight_duty_rate != null ? Number(fdr.rows[0].freight_duty_rate) : null;
+  if (Q && !Q.cogs_landed_complete && !(rate > 0)) {
+    const cost30 = num(H.net_revenue_30d) * num(Q.cogs_coverage_90d) * num(Q.realized_cogs_pct);
+    items.push({ k: 'fd', short: 'product costs leave out freight and duty', head: 'None of your product costs include freight or duty, so every margin and profit figure reads high.',
+      body: <>Your product costs come to about {fmtMoney(cost30)} a month; every 10% that freight and duty add is about {fmtMoney(cost30 * 0.1)} a month of profit Greta is showing you that you don’t have. Set one rate for every product:</>,
+      extra: <V3FreightRate compact/> });
+  }
+  // 2. products with no cost
+  if (Q && num(Q.lines_total) > 0 && num(Q.lines_costed) < num(Q.lines_total) * 0.97) {
+    const miss = num(Q.lines_total) - num(Q.lines_costed);
+    items.push({ k: 'nocost', short: fmtPctN(miss / num(Q.lines_total)) + ' of order lines have no product cost', head: fmtCount(miss) + ' of your last 90 days’ ' + fmtCount(Q.lines_total) + ' order lines have no product cost.',
+      body: <>Greta fills them in from your average margin, so profit on those products is a guess. Add their costs in Shopify (“Cost per item”) or here. <button type="button" className="v3-xref" onClick={go('goal', 'costs')}>Products with no cost yet <span className="v3-xref-go">on Goal &amp; costs →</span></button></> });
+  }
+  // 3. cash
+  const C = cfg.rows[0] || {}, asOf = C.opening_cash_as_of ? v3Iso10(C.opening_cash_as_of) : null;
+  const cashAge = asOf ? Math.round((new Date(today) - new Date(asOf)) / 864e5) : null;
+  if (C.opening_cash != null && cashAge != null && cashAge > 21) items.push({ k: 'cash', short: 'your cash figure is ' + (cashAge >= 35 ? Math.round(cashAge / 7) + ' weeks' : cashAge + ' days') + ' old',
+    head: 'Your cash balance is from ' + v3Day(asOf, true) + '.', body: <>{fmtMoney(num(C.opening_cash))} as at then is what the runway on Review and the cash plan on Stock &amp; orders start from. Update it with today’s bank balance. <button type="button" className="v3-xref" onClick={go('goal')}>Update your cash <span className="v3-xref-go">on Goal &amp; costs →</span></button></> });
+  // 4. Google Analytics recovering
+  const g4 = (trk.rows || []).find(r => r.source === 'ga4' && r.state && r.state !== 'ok' && r.comparisons_clean_from && v3Iso10(r.comparisons_clean_from) > today);
+  const cv = (cov.rows || []).filter(r => r.order_coverage != null), cavg = cv.length ? cv.reduce((a, r) => a + num(r.order_coverage), 0) / cv.length : null;
+  if (g4) items.push({ k: 'ga4', short: 'Google Analytics is still recovering', head: 'Google Analytics is recovering, so visits and conversion are held until ' + v3Day(g4.comparisons_clean_from, true) + '.',
+    body: <>It wasn’t recording properly from {v3Day(g4.broke_on)} to {v3Day(g4.fixed_on, true)}; any comparison that reaches back into those weeks would read the repair as growth. Greta uses your Shopify orders meanwhile.{cavg != null && cavg < 0.9 ? <> It also sees only {fmtPctN(cavg)} of your orders now — check that the purchase event fires on every order, including express checkouts.</> : null}</> });
+  else if (cavg != null && cavg < 0.9) items.push({ k: 'ga4cov', short: 'Google Analytics misses orders', head: 'Google Analytics sees ' + fmtPctN(cavg) + ' of your orders.',
+    body: <>Every conversion rate on Website reads lower than it is. Check that the purchase event fires on every order, including express checkouts.</> });
+  // 5. what the ad platforms claim
+  const mP = (meta.rows || []).reduce((a, r) => a + num(r.purchases), 0), mV = (meta.rows || []).reduce((a, r) => a + num(r.purchase_value), 0);
+  const gP = (gads.rows || []).reduce((a, r) => a + num(r.conversions), 0), gV = (gads.rows || []).reduce((a, r) => a + num(r.conversion_value), 0);
+  const orders30 = web.rows && web.rows[0] ? num(web.rows[0].n) : 0;
+  if (orders30 > 0 && mP + gP >= orders30 * 0.3) items.push({ k: 'claims', short: 'the ad platforms claim ' + fmtPctN((mP + gP) / orders30) + ' of your orders',
+    head: 'Meta and Google claim ' + fmtCount(mP + gP) + ' of the ' + fmtCount(orders30) + ' orders your website took in the last 30 days.',
+    body: <>Meta counts {fmtCount(mP)} purchases worth {fmtMoney(mV)} and Google {fmtCount(gP)} conversions worth {fmtMoney(gV)}, by their own measures — each counts any order that saw or clicked an ad, and both can count the same one. That is why Greta judges ads on your Shopify orders, not on the return their dashboards show. <button type="button" className="v3-xref" onClick={go('marketing')}>What each channel really returns <span className="v3-xref-go">on Marketing →</span></button></> });
+  // 6. products without a SKU
+  const noSku = new Set((stock.rows || []).filter(r => String(r.sku || '').startsWith('v:') && num(r.weekly_velocity) > 0).map(r => String(r.product_title || '').toLowerCase())).size;
+  if (noSku > 0) items.push({ k: 'sku', short: fmtCount(noSku) + ' selling products have no SKU', head: fmtCount(noSku) + ' products that sell have no SKU in Shopify.',
+    body: <>Greta tracks them by Shopify’s own id, so stock and profit include them, but a supplier order can’t carry a product code for them. Add one to each in Shopify. <button type="button" className="v3-xref" onClick={go('stock')}>Which products <span className="v3-xref-go">on Stock &amp; orders →</span></button></> });
+
+  const shortList = items.slice(0, 3).map(i => i.short);
+  const verdict = !items.length ? 'Your feeds are current and nothing Greta checks is reading wrong.'
+    : 'Your feeds are current. ' + (items.length === 1 ? 'One thing makes' : v3Sentence(['', 'one', 'two', 'three', 'four', 'five', 'six'][items.length] || String(items.length)) + ' things make') + ' numbers read wrong: ' + shortList.join('; ') + (items.length > 3 ? '; and ' + (items.length - 3) + ' more below' : '') + '.';
+  return (<div className="v3-page-stack"><section>
+    <div className="v3-kick">Can you trust your numbers?</div>
+    <p className="v3-verdict">{verdict}</p>
+    {items.length > 0 && <ol className="v3-moves">{items.map(i => (<li key={i.k}><b>{i.head}</b> {i.body}{i.extra || null}</li>))}</ol>}
+  </section></div>);
+}
+
 const V3_PAGES = {
   today: (p) => <V3Today {...p}/>,
   review: (p) => (<>
@@ -19765,6 +19886,9 @@ const V3_PAGES = {
         and the live researched list above replaces it for every brand. */}
   </>),
   settings: (p) => (<>
+    {/* Rebuilt 2026-10-05: what makes the numbers read wrong leads (V3DataTrust); the connections and
+        the feed table follow. Duplicate and dead connections for frkl were removed by hand the same day. */}
+    {UI_V3 && <V3DataTrust/>}
     <ConnectionsPanel/>
     <DataHealth/>
   </>),
