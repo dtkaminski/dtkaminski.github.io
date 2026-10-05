@@ -3565,13 +3565,21 @@ function WhatChangedStrip(){
 // The change against a typical month splits exactly: margin × (sales − typical sales) is what sales
 // did, (typical spend − spend) is what ad spend did. The larger one is the headline.
 const V3_DAYS_IN_MONTH = 365 / 12;
+// New and returning customers, last 30 days: one read for the lead and the detail's cost to win one.
+const V3_TIER_Q = (sb, b) => sb.from('vw_customer_tier_periods')
+  .select('window_label,new_customers,returning_customers,new_net,returning_net,net_sales,ncac,returning_rev_share')
+  .eq('brand_id', b).eq('window_label', 'current_30d').limit(1);
 function V3ProfitLead() {
   const H = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || null;
   const lad = useV3Rows('profit-ladder', V3_LADDER_Q);
   const cfg = useV3Rows('profit-overheads', (sb, b) => sb.from('brand_config').select('fixed_costs_monthly').eq('brand_id', b).limit(1));
-  const mix = useV3Rows('cust-tier', (sb, b) => sb.from('vw_customer_tier_periods')
-    .select('window_label,new_customers,returning_customers,new_net,returning_net,net_sales,ncac,returning_rev_share')
-    .eq('brand_id', b).eq('window_label', 'current_30d').limit(1));
+  // The quarter plan at today's ad budget (shared with Goal & costs and Growth plan), last year's
+  // months and the cost checks: the lead's first move and the caveat under the figure.
+  const { pace } = useV3Goal();
+  const mo = useV3Rows('mk-months', V3_MONTHS_Q);
+  const drift = useV3Rows('goal-drift', V3_DRIFT_Q);
+  const cogsq = useV3Rows('goal-cogs', V3_COGSQ_Q);
+  const mix = useV3Rows('cust-tier', V3_TIER_Q);
   const sales = H && H.net_revenue_30d != null ? Number(H.net_revenue_30d) : null;
   const spend = H && H.paid_spend_30d != null ? Number(H.paid_spend_30d) : null;
   const before = H && H.product_contribution_30d != null ? Number(H.product_contribution_30d) : null;
@@ -3644,6 +3652,34 @@ function V3ProfitLead() {
   if (oh30 != null) { chain.push({ k: 'Overheads — rent, wages, software', v: -oh30, kind: 'out' }); chain.push({ k: 'Operating profit', v: op, kind: 'total' }); }
   const per = v => sales > 0 ? Math.round(Math.abs(v) / sales * 100) + 'p in every £1' : '';
 
+  // Move this month's budget into the peak: the plan spreads the quarter's ad budget by season (it
+  // equalises what the next pound buys across months); if this month is on course to spend far more
+  // than the plan puts here, say so, and what the same budget makes spread the plan's way.
+  let shift = null;
+  const PL = (pace.rows || [])[0] || null;
+  if (PL && Array.isArray(PL.months) && PL.inputs && lad.rows) {
+    const today = new Date().toISOString().slice(0, 10), mKey = today.slice(0, 7), mStart = mKey + '-01';
+    const dim = new Date(Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)), 0)).getUTCDate(), done = Number(today.slice(8, 10)) - 1;
+    const curM = PL.months.find(m => String(m.month).slice(0, 7) === mKey);
+    const peak = PL.months.filter(m => String(m.month).slice(0, 7) > mKey).sort((a, b) => Number(b.season_new) - Number(a.season_new))[0];
+    const spentMo = lad.rows.filter(r => { const x = String(r.day).slice(0, 10); return x >= mStart && x < today; }).reduce((a, r) => a + (Number(r.paid_spend) || 0), 0);
+    const proj = done >= 3 ? spentMo / done * dim : null;
+    if (curM && peak && Number(peak.season_new) >= 1.3 && proj && Number(curM.spend) < proj * 0.8) {
+      const beta = Number(PL.inputs.beta), cmU = Number(PL.cm_ratio_used), tot = Number(PL.spend_cap);
+      const days = PL.months.reduce((a, m) => a + Number(m.days), 0);
+      let flat = 0, seas = 0;
+      PL.months.forEach(m => { const sp = Number(m.spend), nw = Number(m.new); if (sp > 0 && nw > 0) { seas += nw; flat += nw * Math.pow(tot * Number(m.days) / days / sp, beta); } });
+      const lyKey = v3MonthAdd(String(peak.month), -12).slice(0, 7);
+      const ly = (mo.rows || []).find(r => String(r.month).slice(0, 7) === lyKey);
+      shift = { cur: curM, peak, proj, gain: (seas - flat) * cmU, lyCost: ly && Number(ly.new_customers) > 0 && Number(ly.spend) > 0 ? Number(ly.spend) / Number(ly.new_customers) : null };
+    }
+  }
+  // How far the figure reads high: refunds as entered against refunds as measured (0260), and product
+  // costs without freight or duty (not sizeable until entered).
+  const rfRow = (drift.rows || []).find(r => r.input_key === 'refundPct' && r.verifiable && r.status === 'drift');
+  const rfGap = rfRow ? (Number(rfRow.realised_value) - Number(rfRow.config_value)) / 100 * sales : null;
+  const noFreight = ((cogsq.rows || [])[0] || {}).cogs_landed_complete === false;
+
   const t30 = (mix.rows || [])[0] || null;
   const newNet = t30 ? Number(t30.new_net) || 0 : 0, retNet = t30 ? Number(t30.returning_net) || 0 : 0, mixTot = newNet + retNet;
 
@@ -3672,6 +3708,9 @@ function V3ProfitLead() {
           <span className="v3-chain-p">{r.kind === 'in' ? '' : (r.v < 0 && r.kind !== 'out' ? '−' : '') + per(r.v)}</span>
         </li>))}
       </ul>
+      {((rfGap != null && rfGap > 0) || noFreight) && <p className="micro muted v3-measure">These figures read {rfGap > 0 ? 'about ' + fmtMoney(rfGap) + ' high' : 'high'}:
+        {' '}{rfGap > 0 ? 'refunds are ' + fmtPctN(Number(rfRow.realised_value) / 100) + ' of sales against the ' + fmtPctN(Number(rfRow.config_value) / 100) + ' entered' : ''}{rfGap > 0 && noFreight ? ', and ' : ''}{noFreight ? 'your product costs carry no freight or duty' : ''}.
+        {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs-off')}>Fix them <span className="v3-xref-go">on Goal &amp; costs →</span></button></p>}
       {oh30 == null && <p className="v3-note v3-measure">Add your monthly overheads — rent, wages, software — and Greta will show whether what you keep covers them, and the ad spend you can afford.{' '}
         <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('goal', 'economics')}>Add overheads</button></p>}
     </section>
@@ -3695,10 +3734,18 @@ function V3ProfitLead() {
       <p className="micro muted v3-measure">Each point is 30 days ending on the date shown. Kept after ads = sales × {fmtPctN(cmr)} (what is left after product and order costs) − ad spend.{oh30 != null ? ' When the line sits under the dashed overheads line, the business made a loss those 30 days.' : ''}</p>
     </figure>)}
 
-    {(extra > Math.max(250, (T ? T.spend : 0) * 0.2) || (op != null && op < 0)) && (<section className="v3-sec">
+    {(shift || extra > Math.max(250, (T ? T.spend : 0) * 0.2) || (op != null && op < 0)) && (<section className="v3-sec">
       <h2 className="v3-sec-title">What to do about it</h2>
       <ol className="v3-moves">
-        {T && extra > Math.max(250, T.spend * 0.2) && (<li>
+        {shift && (<li>
+          <b>Move this month’s ad budget into {gpMonthName(shift.peak.month)}.</b>
+          {' '}At this month’s pace you will spend about {fmtMoney(shift.proj)} on ads in {gpMonthName(shift.cur.month)}. Greta’s quarter plan, for the same budget across the quarter, puts {fmtMoney(shift.cur.spend)} here and {fmtMoney(shift.peak.spend)} into {gpMonthName(shift.peak.month)}
+          {shift.lyCost != null ? <>, when new customers come far cheaper — last {gpMonthName(shift.peak.month)} one cost {fmtMoney(shift.lyCost, 2)}</> : null}.
+          {shift.gain >= 200 ? <> Spread that way, the same spend makes about {fmtMoney(shift.gain)} more profit after ads.</> : null}
+          {' '}<button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('growth')}>Why on Growth plan</button>
+          {' '}<V3Conf state="probably" detail="This month’s spend so far is measured. The split by month is Greta’s quarter plan: your own seasonality and your measured spend curve, so each extra pound buys a little less than the one before."/>
+        </li>)}
+        {!shift && T && extra > Math.max(250, T.spend * 0.2) && (<li>
           <b>Bring ad spend back toward {fmtMoney(T.spend)} a month.</b>
           {' '}You are spending {fmtMoney(extra)} more than in a typical month, and sales are {salesWord}{sChg != null && sChg <= 0.1 ? ', so the extra spend has not bought extra sales' : ''}.
           {' '}If sales hold, that is up to {fmtMoney(extra)} a month back. Marketing shows which channels lose money on any reading — cut those first.
@@ -3737,6 +3784,10 @@ function Overview({start, period, customActive}){
   const [evTick, setEvTick] = useState(0);   // bump to re-read the operator event log
   const [costsOpen, setCostsOpen] = useState(false);
   const [showPlanning, setShowPlanning] = useState(false);  // collapse forecast/LTV deep-dive
+  // New customers in the picked period (daily first orders), so the cost to win one is this period's,
+  // as the lead's is. The tile read the 90-day figure and called a 30-day £53 customer "Healthy".
+  const newDayQ = useV3Rows('new-mo', V3_NEWMO_Q);
+  const tierQ = useV3Rows('cust-tier', V3_TIER_Q);   // the default 30 days uses the lead's own figure
   const costsVerified = useCostTick();       // re-renders margin figures/badges on save
   const daily = useMemo(()=>buildDaily(start),[start]);
   const end = dataEndOf();
@@ -3906,6 +3957,21 @@ function Overview({start, period, customActive}){
   const firstOrderContrib = UE && UE.first_order_contribution != null ? Number(UE.first_order_contribution)
                           : ((aov!=null && cmRateBeforeMkt!=null) ? aov*cmRateBeforeMkt : null);
   const paybackOrders = (cac!=null && firstOrderContrib>0) ? cac/firstOrderContrib : null;  // orders to recover CAC
+  const newInPeriod = newDayQ.rows ? newDayQ.rows.filter(r => { const x = String(r.order_date); return x >= start && x <= end; }).reduce((a, r) => a + (Number(r.orders) || 0), 0) : null;
+  const tier30 = H0 && tierQ.rows && tierQ.rows[0] && Number(tierQ.rows[0].ncac) > 0 ? Number(tierQ.rows[0].ncac) : null;
+  const cacPeriod = tier30 != null ? tier30 : (newInPeriod > 0 && paid > 0 ? paid / newInPeriod : null);
+  const yearValue = UE && Number(UE.ltv_contribution) > 0 ? Number(UE.ltv_contribution) : null;
+  const payWhen = cacPeriod == null || !(firstOrderContrib > 0) ? null : cacPeriod <= firstOrderContrib ? 'first' : (yearValue != null && cacPeriod <= yearValue) ? 'year' : 'not';
+  // The period before, against what a period that long normally sells: a sale in it makes every change
+  // below read worse than an ordinary month.
+  const priorSpike = (() => {
+    if (!UI_V3 || !(pRev > 0)) return null;
+    const len = Math.round((new Date(end) - new Date(start)) / 864e5) + 1, past = [];
+    for (let k = 1; k <= 6; k++) { const e = v3IsoAdd(prior.start, -1 - (k - 1) * len), b = v3IsoAdd(e, -(len - 1)); const rows = inRangeBounded(D.shopify, b, e); if (rows.length >= len * 0.8) past.push(sum(rows, 'netSales')); }
+    if (past.length < 3) return null;
+    const sorted = past.slice().sort((x, y) => x - y), typ = sorted[Math.floor(sorted.length / 2)];
+    return typ > 0 && pRev > typ * 1.35 ? { typ } : null;
+  })();
   const dxMetrics = {rev, orders, sessions, cvr, pCvr, paid, mer, pMer, poas, cac, pCac, ltv, ltvCac, ltvBasis, ltvTopdown, ltvGap, gm:gmGross, cmRatio:cmr, contrib, pContrib, cmPct, returnRate, discLoad, pDiscLoad, returningPct, pRev,
                      aov, breakEvenRoas, allowableCac, paybackOrders, cmRateBeforeMkt,
                      pSessions, pOrders, pPaid, havePrior};
@@ -4021,6 +4087,7 @@ function Overview({start, period, customActive}){
       </button>
       {/* Everything driven by the period picker sits behind one disclosure: the lead above is the answer. */}
       <V3More id="profit-detail" label="The detail for the period you pick — every figure, what moved, day by day">
+      {priorSpike && <p className="v3-note v3-measure">The period before this one sold {fmtMoney(pRev)}, against about {fmtMoney(priorSpike.typ)} for a period this long — it held a sale. Changes below read worse than an ordinary month would; the lead above compares with a typical month instead.</p>}
       {/* COMMERCIAL HEALTH */}
       <div className="section-eyebrow" style={{display:'flex',alignItems:'center',gap:8,margin:'8px 0 -4px',fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-muted)'}}>
         <span style={{width:3,height:14,background:'var(--text-faint)',borderRadius:'var(--radius-sm)'}}/>Commercial health
@@ -4066,10 +4133,14 @@ function Overview({start, period, customActive}){
             agent="Atlas" observation="Whether the growth is actually profitable — net revenue × product margin minus paid media, as a share of revenue. Returns are already netted out of revenue. The single best read on profitable vs vanity growth."
             implication="Below 10% means scaling just amplifies a thin engine — fix discount load, returns and cost per new customer before adding spend."
             benchmark="contribution_margin" bmValue={cmPct} />
-          <KPI label="Time to earn a customer back" val={paybackOrders!=null?(paybackOrders<=1?'1st order':paybackOrders.toFixed(1)+' orders'):'—'} sub={cac!=null?`paid cost per new customer ${curSym()}${Math.round(cac)} ÷ first-order contribution · target ≤2`:'needs paid CAC'} goodDirection="down"
+          {UI_V3 ? <KPI label="When a new customer pays back" val={payWhen === 'first' ? 'First order' : payWhen === 'year' ? 'Within a year' : payWhen === 'not' ? 'Not in a year' : '—'}
+            sub={cacPeriod != null ? `${fmtMoney(cacPeriod)} to win one this period · ${fmtMoney(firstOrderContrib)} on a first order${yearValue != null ? ' · ' + fmtMoney(yearValue) + ' over a year' : ''}` : 'needs ad spend and new customers in the period'}
+            status={payWhen == null ? undefined : payWhen === 'first' ? 'healthy' : payWhen === 'year' ? 'watch' : 'action'} statusLabel={payWhen === 'first' ? 'Pays back' : payWhen === 'year' ? 'Needs a repeat' : payWhen === 'not' ? 'Loses money' : undefined}
+            agent="Atlas" observation="Ad spend in the period divided by the new customers it won, against what a first order earns and what a customer earns over a year." />
+          : <KPI label="Time to earn a customer back" val={paybackOrders!=null?(paybackOrders<=1?'1st order':paybackOrders.toFixed(1)+' orders'):'—'} sub={cac!=null?`paid cost per new customer ${curSym()}${Math.round(cac)} ÷ first-order contribution · target ≤2`:'needs paid CAC'} goodDirection="down"
             status={paybackOrders==null?undefined:paybackOrders<=2?'healthy':paybackOrders<=3?'watch':'action'} statusLabel={paybackOrders==null?undefined:paybackOrders<=2?'Healthy':paybackOrders<=3?'Watch':'Slow payback'}
             agent="Atlas" observation="How many orders it takes to recover the paid cost of acquiring a customer, at your margin. Under ~2 orders = a healthy cash cycle that funds reinvestment."
-            implication="This is the lever on cash flow — faster payback frees working capital. Watch it as you scale spend; if it stretches past 2, growth starts eating cash." />
+            implication="This is the lever on cash flow — faster payback frees working capital. Watch it as you scale spend; if it stretches past 2, growth starts eating cash." />}
           <MoreKpis count={8}>
           <KPI label="Gross margin" val={PCT(gmGross)} sub="after product cost, before order costs and ads" badge={<MarginBadge onSetup={()=>{ window.__oiGo && window.__oiGo('goal', 'margin'); }}/>} series={seriesGM} seriesLabel="Catalogue margin · structurally stable"
             agent="Atlas" observation="Blended product margin across the live catalogue, after cost of goods."
@@ -4177,13 +4248,17 @@ function Overview({start, period, customActive}){
       </V3More>
       {/* PLANNING & DEEP-DIVE — forecast + unit-economics-over-time are board/planning
           artifacts, not "what's happening this week", so they live behind a toggle. */}
-      <div className="section-eyebrow" style={{display:'flex',alignItems:'center',gap:8,margin:'8px 0 -4px',fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-muted)'}}>
+      {/* V3: no Year 1 forecast here. It was a fourth forecast beside the quarter plan, the short-term
+          forecast and Growth plan — its own customer cost, a default seasonal curve for every brand,
+          saved in one browser. The quarter plan, month by month, is on Goal & costs. */}
+      {UI_V3 && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal')}>The quarter plan, month by month <span className="v3-xref-go">on Goal &amp; costs →</span></button>}
+      {!UI_V3 && <div className="section-eyebrow" style={{display:'flex',alignItems:'center',gap:8,margin:'8px 0 -4px',fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-muted)'}}>
         <span style={{width:3,height:14,background:'var(--text-faint)',borderRadius:'var(--radius-sm)'}}/>Planning &amp; deep-dive
-      </div>
-      <button onClick={()=>setShowPlanning(s=>!s)} className="show-more">
+      </div>}
+      {!UI_V3 && <button onClick={()=>setShowPlanning(s=>!s)} className="show-more">
         {showPlanning ? '↑ Hide the forecast' : '↓ A year-one forecast you can adjust'}
-      </button>
-      {showPlanning && (<div style={{display:'flex', flexDirection:'column', gap:'var(--s-5)', marginTop:'var(--s-4)'}}>
+      </button>}
+      {!UI_V3 && showPlanning && (<div style={{display:'flex', flexDirection:'column', gap:'var(--s-5)', marginTop:'var(--s-4)'}}>
         {/* LtvCacCard sat here: customer value ÷ new-customer cost by a method 0206 retired as a double
             count. The page's own "Customer value" figure is the measured one. The forecast now gets
             true gross margin — it subtracts order costs itself, so the after-costs ratio counted them twice. */}
@@ -16539,6 +16614,7 @@ function V3Today(p) {
     return () => { window.removeEventListener('greta-headline-updated', on); window.removeEventListener('frkl-live-status', on); clearTimeout(t); };
   }, []);
   const board = useV3Board();   // above every early return — see the hooks note in measuring-the-ui
+  const gc = useV3GoalCheck();  // pace is withheld while the goal needs re-planning or has just begun
   const D0 = (typeof window !== 'undefined' && window.FRKL_OVERVIEW) || null;
   // Session-stable: the headline and top action are fixed at first render and
   // only change when the reader asks, so numbers never swap under them.
@@ -16672,7 +16748,14 @@ function V3Today(p) {
           </V3Figure>
         </div>
         <V3HeroDelta cam={cam} sales={sales} prod={prod}/>
-        {camTarget != null ? (<>
+        {camTarget != null && (gc.stale || gc.early) ? (
+          <div className="v3-pace">
+            <span className="v3-muted">{gc.stale
+              ? 'Your goal needs re-planning: Greta’s plan changed after you confirmed it, so pace against it would mislead.'
+              : 'Pace against your goal starts on ' + v3Day(gc.paceFrom) + ' — until then the last 30 days are mostly before the goal began.'}</span>
+            {gc.stale && <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('goal')}>Re-plan the quarter</button>}
+          </div>
+        ) : camTarget != null ? (<>
           <div className="v3-bar" aria-hidden="true"><i style={{ width: Math.max(2, Math.min(100, (pacePos || 0) * 66)) + '%' }}/><b style={{ left: '66%' }}/></div>
           {/* The pace sentence is the one the operator acts on, so it must not claim a cushion the
               data cannot support. frkl read "£3,150 ahead" while Meta had not reported for ten
@@ -18546,9 +18629,33 @@ function v3Quarter(iso) {
 const V3_GOAL_Q = (sb, b) => {
   const t = new Date().toISOString().slice(0, 10);
   return sb.from('mos_business_goal')
-    .select('period_start,period_end,revenue_target,contribution_margin_target,cam_target,spend_cap,new_customer_target,confirmed,phasing')
+    .select('period_start,period_end,revenue_target,contribution_margin_target,cam_target,spend_cap,new_customer_target,confirmed,phasing,goal_beta:seasonality->beta')
     .eq('brand_id', b).eq('status', 'active').lte('period_start', t).gte('period_end', t).order('created_at', { ascending: false }).limit(1);
 };
+// The cost checks Goal & costs lists, read once and shared with Profit & sales.
+const V3_DRIFT_Q = (sb, b) => sb.from('vw_brand_config_drift')
+  .select('input_key,unit,config_value,realised_value,verifiable,status').eq('brand_id', b);
+const V3_COGSQ_Q = (sb, b) => sb.from('vw_brand_cogs_quality')
+  .select('cogs_coverage_90d,cogs_landed_complete,realized_cogs_pct').eq('brand_id', b).limit(1);
+// Whether a 30-day pace against the goal means anything right now. Today's hero and the page thread
+// both ask, so they say the same thing. Not while the confirmed goal was planned on a different spend
+// curve (0261 corrected it; the goal stores the exponent it used) — the owner is asked to re-plan —
+// and not in a goal's first 14 days, when the last 30 days are mostly the previous quarter's trading.
+const V3_CURVE_Q = (sb, b) => sb.from('vw_brand_spend_curve').select('beta,identifiable,n_months').eq('brand_id', b).limit(1);
+function useV3GoalCheck() {
+  const goal = useV3Rows('goal-active', V3_GOAL_Q);
+  const cur = useV3Rows('curve-beta', V3_CURVE_Q);
+  const g = (goal.rows || [])[0] || null, c = (cur.rows || [])[0] || null;
+  const today = new Date().toISOString().slice(0, 10);
+  const gb = g && g.goal_beta != null ? Number(g.goal_beta) : null;
+  // the same rule fn_brand_seasonality applies: 1 - CAC elasticity when measured, else 0.6
+  const ce = c ? Number(c.beta) : null;
+  const cb = c ? (c.identifiable && Number(c.n_months) >= 12 && 1 - ce >= 0.2 && 1 - ce <= 0.95 ? 1 - ce : 0.6) : null;
+  const stale = gb != null && cb != null && Math.abs(gb - cb) > 0.03;
+  const start = g ? v3Iso10(g.period_start) : null;
+  const paceFrom = start ? v3IsoAdd(start, 15) : null;
+  return { g, stale, early: !!paceFrom && today < paceFrom, paceFrom, pending: gb != null && !cur.rows && !cur.err };
+}
 // fn_plan_quarter returns one JSON object; useV3Rows wants rows. ok:false (under a month of trading)
 // comes back as no row.
 const v3PlanQ = (start, end, goal) => (sb, b) => sb.rpc('fn_plan_quarter', { p_brand: b, p_start: start, p_end: end, p_goal: goal, p_basis: goal == null ? 'auto' : 'revenue' })
@@ -18712,10 +18819,8 @@ function V3GoalLead() {
 // it does to profit and how to fix it. Replaces CostDrift on this page (V3), which listed "you entered /
 // your data shows" with no £ and no button.
 function V3CostsOff() {
-  const drift = useV3Rows('goal-drift', (sb, b) => sb.from('vw_brand_config_drift')
-    .select('input_key,unit,config_value,realised_value,verifiable,status').eq('brand_id', b));
-  const cq = useV3Rows('goal-cogs', (sb, b) => sb.from('vw_brand_cogs_quality')
-    .select('cogs_coverage_90d,cogs_landed_complete,realized_cogs_pct').eq('brand_id', b).limit(1));
+  const drift = useV3Rows('goal-drift', V3_DRIFT_Q);
+  const cq = useV3Rows('goal-cogs', V3_COGSQ_Q);
   const cfg = useV3Rows('brand-cfg', V3_BCFG_Q);
   const [busy, setBusy] = React.useState(false), [msg, setMsg] = React.useState(null);
   if (drift.err || cfg.err) return <V3LoadFailed what="your cost checks" onRetry={() => { if (drift.err) drift.retry(); if (cfg.err) cfg.retry(); }}/>;
@@ -18750,7 +18855,7 @@ function V3CostsOff() {
   else if (Q && Q.cogs_landed_complete === false) {
     const per10 = mo && Number(Q.realized_cogs_pct) > 0 ? 0.1 * Number(Q.realized_cogs_pct) * mo : null;
     items.push(<li key="fr"><b>None of your product costs include freight or duty.</b> Margins read high until they do
-      {per10 ? <> — every 10% that freight and duty add to what your products cost is about {fmtMoney(per10)} a month of profit you aren’t seeing</> : null}, and profit stays “Estimated”.
+      {per10 ? <> — every 10% that freight and duty add to what your products cost is about {fmtMoney(per10)} a month of profit you aren’t seeing</> : null}, and Greta can’t call your profit measured until they do.
       {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs')}>Add freight and duty <span className="v3-xref-go">under Product costs →</span></button></li>);
   }
   if (!L.entered) items.push(<li key="lt"><b>No supplier lead time.</b> Stock & orders assumes {L.days} days from order to arrival for every product, so its order-by dates may be late.
@@ -18956,6 +19061,7 @@ function useV3NavSignals() {
 // something the hero does not. Click it to go back to the top of the story.
 function V3Thread({ dest, go }) {
   const h = useV3Headline();
+  const gc = useV3GoalCheck();
   if (!h || dest === 'today') return null;
   if (h.can_show_cm === false) return null;
   const cam = h.cm_after_marketing_30d;
@@ -18969,7 +19075,10 @@ function V3Thread({ dest, go }) {
       <span className="v3-thread-lab">Profit after ads</span>
       <span className="v3-thread-val">{v3Gbp(cam)}</span>
       <span className="v3-muted">last 30 days</span>
-      {diff != null && (
+      {diff != null && (gc.stale || gc.early) && !gc.pending && (
+        <span className="v3-thread-pace">{gc.stale ? 'goal needs re-planning' : 'goal pace from ' + v3Day(gc.paceFrom)}</span>
+      )}
+      {diff != null && !(gc.stale || gc.early || gc.pending) && (
         <span className={'v3-thread-pace' + (unreliable ? '' : diff >= 0 ? ' good' : ' bad')}>
           {unreliable
             ? 'pace too close to call'
