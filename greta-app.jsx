@@ -3565,6 +3565,32 @@ function WhatChangedStrip(){
 // The change against a typical month splits exactly: margin × (sales − typical sales) is what sales
 // did, (typical spend − spend) is what ad spend did. The larger one is the headline.
 const V3_DAYS_IN_MONTH = 365 / 12;
+// 30-day windows ending yesterday from cache_daily_cm_ladder, and the typical month: the MEDIAN of the
+// six windows before the latest, so one sale window cannot move it. Profit & sales and Today both
+// compare against this, so they tell the same story about the same month.
+function v3TypicalMonth(ladRows, cmr) {
+  if (!ladRows || cmr == null) return null;
+  const today = new Date().toISOString().slice(0, 10);
+  const rows = ladRows.filter(r => String(r.day).slice(0, 10) < today);
+  if (rows.length < 60) return null;
+  const end = String(rows[rows.length - 1].day).slice(0, 10);
+  const byDay = {}; rows.forEach(r => { byDay[String(r.day).slice(0, 10)] = r; });
+  const wins = [];
+  for (let i = 0; i < 13; i++) {
+    const e = v3IsoAdd(end, -30 * i), s = v3IsoAdd(e, -29);
+    let sl = 0, sp = 0, n = 0;
+    for (let k = 0; k < 30; k++) { const r = byDay[v3IsoAdd(s, k)]; if (r) { sl += Number(r.net_sales) || 0; sp += Number(r.paid_spend) || 0; n++; } }
+    if (n < 25) break;
+    wins.unshift({ s, e, sales: sl, spend: sp, kept: sl * cmr - sp, label: v3Day(e) });
+  }
+  if (wins.length < 4) return null;
+  const prev = wins.slice(Math.max(0, wins.length - 7), wins.length - 1);
+  const typ = { sales: v3Med(prev.map(w => w.sales)), spend: v3Med(prev.map(w => w.spend)) };
+  typ.kept = typ.sales * cmr - typ.spend;
+  const lyEnd = v3IsoAdd(end, -364);
+  let ly = null; { let sl = 0, sp = 0, n = 0; for (let k = 0; k < 30; k++) { const r = byDay[v3IsoAdd(lyEnd, -29 + k)]; if (r) { sl += Number(r.net_sales) || 0; sp += Number(r.paid_spend) || 0; n++; } } if (n >= 25) ly = { sales: sl, spend: sp, kept: sl * cmr - sp }; }
+  return { wins, typ, ly, n: prev.length };
+}
 // New and returning customers, last 30 days: one read for the lead and the detail's cost to win one.
 const V3_TIER_Q = (sb, b) => sb.from('vw_customer_tier_periods')
   .select('window_label,new_customers,returning_customers,new_net,returning_net,net_sales,ncac,returning_rev_share')
@@ -3575,7 +3601,7 @@ function V3ProfitLead() {
   const cfg = useV3Rows('profit-overheads', (sb, b) => sb.from('brand_config').select('fixed_costs_monthly').eq('brand_id', b).limit(1));
   // The quarter plan at today's ad budget (shared with Goal & costs and Growth plan), last year's
   // months and the cost checks: the lead's first move and the caveat under the figure.
-  const { pace } = useV3Goal();
+  const { pace } = useV3Goal({ goalPlan: false });
   const mo = useV3Rows('mk-months', V3_MONTHS_Q);
   const drift = useV3Rows('goal-drift', V3_DRIFT_Q);
   const cogsq = useV3Rows('goal-cogs', V3_COGSQ_Q);
@@ -3588,30 +3614,7 @@ function V3ProfitLead() {
   const ohMonth = ohRow && ohRow.fixed_costs_monthly != null && Number(ohRow.fixed_costs_monthly) > 0 ? Number(ohRow.fixed_costs_monthly) : null;
   const oh30 = ohMonth != null ? ohMonth * 30 / V3_DAYS_IN_MONTH : null;
 
-  const d = React.useMemo(() => {
-    if (!lad.rows || cmr == null) return null;
-    const today = new Date().toISOString().slice(0, 10);
-    const rows = lad.rows.filter(r => String(r.day).slice(0, 10) < today);
-    if (rows.length < 60) return null;
-    const end = String(rows[rows.length - 1].day).slice(0, 10);
-    const byDay = {}; rows.forEach(r => { byDay[String(r.day).slice(0, 10)] = r; });
-    const wins = [];
-    for (let i = 0; i < 13; i++) {
-      const e = v3IsoAdd(end, -30 * i), s = v3IsoAdd(e, -29);
-      let sl = 0, sp = 0, n = 0;
-      for (let k = 0; k < 30; k++) { const r = byDay[v3IsoAdd(s, k)]; if (r) { sl += Number(r.net_sales) || 0; sp += Number(r.paid_spend) || 0; n++; } }
-      if (n < 25) break;                       // a window with missing days is not a month
-      wins.unshift({ s, e, sales: sl, spend: sp, kept: sl * cmr - sp, label: v3Day(e) });
-    }
-    if (wins.length < 4) return null;
-    const med = a => { const x = a.slice().sort((p, q) => p - q), m = Math.floor(x.length / 2); return x.length % 2 ? x[m] : (x[m - 1] + x[m]) / 2; };
-    const prev = wins.slice(Math.max(0, wins.length - 7), wins.length - 1);
-    const typ = { sales: med(prev.map(w => w.sales)), spend: med(prev.map(w => w.spend)) };
-    typ.kept = typ.sales * cmr - typ.spend;
-    const lyEnd = v3IsoAdd(end, -364);
-    let ly = null; { let sl = 0, sp = 0, n = 0; for (let k = 0; k < 30; k++) { const r = byDay[v3IsoAdd(lyEnd, -29 + k)]; if (r) { sl += Number(r.net_sales) || 0; sp += Number(r.paid_spend) || 0; n++; } } if (n >= 25) ly = { sales: sl, spend: sp, kept: sl * cmr - sp }; }
-    return { wins, typ, ly, n: prev.length };
-  }, [lad.rows, cmr]);
+  const d = React.useMemo(() => v3TypicalMonth(lad.rows, cmr), [lad.rows, cmr]);
 
   if (!H) return <V3SkeletonRows n={4}/>;
   if (cmr == null) return (<section className="v3-sec">
@@ -15641,6 +15644,11 @@ function v3PlainAction(row){
     return P('Move £' + x[1] + ' a month from ' + x[2] + ' to ' + x[3],
       'The next pound on ' + x[3] + ' earns more than the last pound on ' + x[2] + '. Re-check after two weeks and repeat until they even out.');
   }
+  // 0262: the stock action leads with what to do; the rest is the why.
+  if (id === 'stock-reorder' && (x = m(/^(.+?\.)\s+([\s\S]+)$/))) return P(x[1].replace(/\.$/, ''), x[2]);
+  // A title that runs into its evidence ("Win back lapsing customers: 732 of your 1137 …"): the words
+  // before the colon are the action, the rest is why.
+  if ((x = m(/^([^:.]{8,70}):\s+([\s\S]{40,})$/))) return P(x[1], v3Sentence(x[2]));
   return { title: fallback.main, why: fallback.detail, raw };
 }
 
@@ -16444,8 +16452,44 @@ function V3TrackingNote() {
   </p>);
 }
 
-function V3Why({ why, period }){
+function V3Why({ why, period, typical, now }){
   if (!why) return null;
+  // Against a typical month: the same split as Profit & sales' lead (sales effect = margin x the
+  // change in sales; ad spend effect = the change in spend), in profit pounds, totalling to the hero.
+  if (typical && typical.typ && now && now.sales != null && now.spend != null && now.kept != null) {
+    const T = typical.typ, cmr = Number(now.sales) > 0 ? (Number(now.kept) + Number(now.spend)) / Number(now.sales) : null;
+    if (cmr != null) {
+      const tot = Number(now.kept) - T.kept, sEff = cmr * (Number(now.sales) - T.sales), pEff = tot - sEff;   // totals exactly to the hero
+      const moves = [{ lab: sEff < 0 ? 'Lower sales' : 'Higher sales', v: sEff }, { lab: pEff < 0 ? 'More ad spend' : 'Less ad spend', v: pEff }].filter(m => Math.round(m.v));
+      const mx = Math.max(1, ...moves.map(m => Math.abs(m.v)), Math.abs(tot));
+      const sChg = T.sales > 0 ? Number(now.sales) / T.sales - 1 : null, pX = T.spend > 0 ? Number(now.spend) / T.spend : null;
+      const bigger = Math.abs(pEff) >= Math.abs(sEff) ? 'spend' : 'sales';
+      return (<div className="v3-why">
+        <div className="v3-kick">What moved your profit · last 30 days against a typical month</div>
+        <div className="v3-moves" role="img" aria-label={'Profit after ads is ' + fmtMoney(tot) + ' against a typical month: ' + moves.map(m => m.lab + ' ' + fmtMoney(m.v)).join(', ')}>
+          {moves.map((m, i) => (<div key={i} className="v3-move">
+            <span className="v3-move-lab">{m.lab}</span>
+            <span className="v3-move-track"><i className={m.v < 0 ? 'neg' : 'pos'} style={{ width: (Math.abs(m.v) / mx * 50) + '%' }}/></span>
+            <span className={'v3-move-v ' + (m.v < 0 ? 'neg' : 'pos')}>{m.v > 0 ? '+' : ''}{fmtMoney(m.v)}</span>
+          </div>))}
+          <div className="v3-move v3-move-total">
+            <span className="v3-move-lab">Against a typical month</span>
+            <span className="v3-move-track"><i className={tot < 0 ? 'neg' : 'pos'} style={{ width: (Math.abs(tot) / mx * 50) + '%' }}/></span>
+            <span className={'v3-move-v ' + (tot < 0 ? 'neg' : 'pos')}>{tot > 0 ? '+' : ''}{fmtMoney(tot)}</span>
+          </div>
+        </div>
+        <p className="v3-why-p">A typical month — the middle of your last {fmtCount(typical.n)} — is {fmtMoney(T.sales)} of sales on {fmtMoney(T.spend)} of ads.
+          {' '}{bigger === 'spend'
+            ? <>Ad spend {pX != null && pX >= 1.15 ? 'at ' + fmtTimes(pX, 1) + ' typical' : 'changing'} is what moved your profit most{sChg != null ? <>; sales are {Math.abs(sChg) < 0.05 ? 'about normal' : (sChg > 0 ? 'up ' : 'down ') + fmtPctN(Math.abs(sChg))}</> : null}.</>
+            : <>Sales {sChg != null ? (sChg > 0 ? 'up ' : 'down ') + fmtPctN(Math.abs(sChg)) + ' on typical' : 'changing'} is what moved your profit most.</>}
+          {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('profit')}>The detail <span className="v3-xref-go">on Profit &amp; sales →</span></button></p>
+        {why.data_integrity_flag && <V3TrackingNote/>}
+        {(why.change_events || []).length > 0 && (<ul className="v3-why-list">
+          {(why.change_events || []).slice(0, 3).map((e, i) => (<li key={i}><span className="v3-num">{v3Day(e.date)}</span> {e.label}</li>))}
+        </ul>)}
+      </div>);
+    }
+  }
   const rev = Number(why.effect_revenue_gbp), spend = Number(why.effect_spend_gbp);
   const b = why.breakdown || {};
   const money = (v) => fmtMoney(Math.abs(Number(v)));
@@ -16488,8 +16532,7 @@ function V3Why({ why, period }){
     <p className="v3-why-p">
       {bits.length ? bits.join(', and ') : 'Profit held broadly steady'}
       {what ? <>. The driver was <b>{what}</b>{who ? <> — mostly <b>{who}</b> customers</> : null}</> : null}.
-      {isFinite(Number(b.aov_gbp)) && Number(b.aov_gbp) !== 0
-        ? <> Order value {Number(b.aov_gbp) > 0 ? 'helped' : 'hurt'} by {money(b.aov_gbp)}.</> : null}
+      {(() => { const mv = moves.find(m => /baskets/.test(m.lab)); return mv ? <> Order value {mv.v > 0 ? 'helped' : 'hurt'} by {money(mv.v)} of profit.</> : null; })()}
     </p>
     {why.data_integrity_flag && <V3TrackingNote/>}
     {(why.change_events || []).length > 0 && (<ul className="v3-why-list">
@@ -16533,8 +16576,18 @@ function v3WindowProfit(byDay, from, to, cmr) {
   return { sales: s, spend: a, profit: s * cmr - a, days };
 }
 
-function V3HeroDelta({ cam, sales, prod }) {
+// Against a typical month (v3TypicalMonth), as Profit & sales: the 30 days before were frkl's August
+// sale, so "−£9,920 · 83%" blamed the month for the sale ending. Falls back to the 30 days before only
+// when there is not enough history for a typical month.
+function V3HeroDelta({ cam, sales, prod, typical }) {
   const cmr = (Number(sales) > 0 && prod != null) ? Number(prod) / Number(sales) : null;
+  if (cam != null && typical && typical.typ) {
+    const diff = Number(cam) - typical.typ.kept, pct = Math.abs(typical.typ.kept) > 1 ? diff / Math.abs(typical.typ.kept) : null, up = diff >= 0;
+    return (<div className={'v3-delta-line ' + (up ? 'good' : 'bad')}>
+      <span className="v3-delta-chip"><Icon name={up ? 'arrowUp' : 'arrowDown'} size={12} stroke={2.2}/>{fmtMoney(Math.abs(diff))}{pct != null ? ' · ' + fmtPctN(Math.abs(pct)) : ''}</span>
+      <span className="v3-muted">vs a typical month for you ({fmtMoney(typical.typ.kept)})</span>
+    </div>);
+  }
   if (cam == null || cmr == null || !REAL_END || v3DailyCurrent() !== 'ready') return null;
   const prior = v3WindowProfit(v3DailyMoney(), v3IsoAdd(REAL_END, -59), v3IsoAdd(REAL_END, -30), cmr);
   if (prior.days < 25) return null;
@@ -16615,6 +16668,12 @@ function V3Today(p) {
   }, []);
   const board = useV3Board();   // above every early return — see the hooks note in measuring-the-ui
   const gc = useV3GoalCheck();  // pace is withheld while the goal needs re-planning or has just begun
+  // A typical month (shared with Profit & sales), and the quarter plan's pace for the seasonal note.
+  const ladT = useV3Rows('profit-ladder', V3_LADDER_Q);
+  const hT = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || null;
+  const cmrT = hT && Number(hT.net_revenue_30d) > 0 && hT.product_contribution_30d != null ? Number(hT.product_contribution_30d) / Number(hT.net_revenue_30d) : null;
+  const typical = React.useMemo(() => v3TypicalMonth(ladT.rows, cmrT), [ladT.rows, cmrT]);
+  const { pace: paceT } = useV3Goal({ goalPlan: false });
   const D0 = (typeof window !== 'undefined' && window.FRKL_OVERVIEW) || null;
   // Session-stable: the headline and top action are fixed at first render and
   // only change when the reader asks, so numbers never swap under them.
@@ -16669,7 +16728,22 @@ function V3Today(p) {
   // The cache paints first; the live board, once it has landed, is what every list reads.
   const liveRows = board.rows ? v3LiveRows(board.rows) : null;
   const top = (topDone && closedTop.current) ? closedTop.current : (liveRows ? (liveRows[0] || null) : d.top_action);
-  const next = liveRows ? liveRows.slice(1, 4) : (d.next_actions || []);
+  // Same fold as the Actions board: under half a percent of a month's sales hides while bigger work remains.
+  const floorT = Math.max(50, Math.round((Number(d.net_revenue_30d) || 0) * 0.005));
+  const bigT = liveRows ? liveRows.filter(r => (Number(r.cm_gbp) || 0) >= floorT) : null;
+  const next = liveRows ? (bigT.length ? liveRows.filter(r => r === liveRows[0] || (Number(r.cm_gbp) || 0) >= floorT) : liveRows).slice(1, 4) : (d.next_actions || []);
+  // A cut in ad spend is for now, not for the peak: say so when the quarter plan puts more into a
+  // later month than this one (order-cost actions are the "bring X back toward £Y a week" ones).
+  const PLT = (paceT && paceT.rows && paceT.rows[0]) || null;
+  const seasonNote = (() => {
+    if (!PLT || !Array.isArray(PLT.months)) return null;
+    const mKey = new Date().toISOString().slice(0, 7);
+    const cur = PLT.months.find(m => String(m.month).slice(0, 7) === mKey);
+    const peak = PLT.months.filter(m => String(m.month).slice(0, 7) > mKey).sort((a, b) => Number(b.season_new) - Number(a.season_new))[0];
+    if (!cur || !peak || Number(peak.season_new) < 1.3 || !(Number(peak.spend) > Number(cur.spend) * 1.5)) return null;
+    return { cur: gpMonthName(cur.month), peak: gpMonthName(peak.month), spend: Number(peak.spend) };
+  })();
+  const isCut = (r) => !!r && /^order-cost-/.test(String(r.external_id || ''));
   const boardCount = board.rows ? board.rows.length : (d.board_actions != null ? d.board_actions : d.open_actions);
   // The profit figure and its confidence badge describe the same broken state and used to
   // offer two different sentences for it — "Reconnect Meta" on one, "Reconnect your ads" on
@@ -16747,7 +16821,7 @@ function V3Today(p) {
             {v3Gbp(cam)}
           </V3Figure>
         </div>
-        <V3HeroDelta cam={cam} sales={sales} prod={prod}/>
+        <V3HeroDelta cam={cam} sales={sales} prod={prod} typical={typical}/>
         {camTarget != null && (gc.stale || gc.early) ? (
           <div className="v3-pace">
             <span className="v3-muted">{gc.stale
@@ -16804,6 +16878,9 @@ function V3Today(p) {
         <div className="v3-kick">Do this first{top.cm_gbp ? ' · worth about ' + v3Gbp(top.cm_gbp) + ' a month' : ''}</div>
         <div className="v3-dofirst-t">{v3PlainAction(top).title}</div>
         {v3PlainAction(top).why && <div className="v3-sub">{v3PlainAction(top).why}</div>}
+        {seasonNote && isCut(top) && <div className="v3-sub">This is for {seasonNote.cur}. Greta’s quarter plan puts {v3Gbp(seasonNote.spend)} of ads into {seasonNote.peak}, when new customers come far cheaper — don’t carry the cut into it.{' '}
+          <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('growth')}>Why <span className="v3-xref-go">on Growth plan →</span></button></div>}
+        {top.external_id === 'stock-reorder' && <div className="v3-sub"><button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('stock')}>The order list <span className="v3-xref-go">on Stock &amp; orders →</span></button></div>}
         {top.step1
           ? <div className="v3-sub">First step: {v3Money(scrubTag(top.step1))}</div>
           : <div className="v3-sub">No first step recorded for this one.{' '}
@@ -16867,11 +16944,12 @@ function V3Today(p) {
         <span>{v3PlainAction(a).title}</span>
         <span className="v3-num">{a.cm_gbp ? v3Gbp(a.cm_gbp) + '/mo' : ''}</span>
       </div>))}
+      {seasonNote && !isCut(top) && next.some(isCut) && <p className="micro muted">The ad-spend cuts are for {seasonNote.cur}; the quarter plan puts {v3Gbp(seasonNote.spend)} into {seasonNote.peak}.</p>}
       <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>See all {boardCount || ''} actions <Icon name="arrowRight" size={13}/></button>
     </div>)}
     </div>
 
-    <V3Why why={d.why} period={d.why_period}/>
+    <V3Why why={d.why} period={d.why_period} typical={typical} now={{ sales, spend, kept: cam }}/>
     {/* Two drawers used to follow. "What changed this week" repeated Review's lead. "Business,
         customer and channel numbers" (GretaOverviewTiers) recomputed everything in the browser on
         its own window: profit after ads £3,124 under a hero saying £3,350, ad spend £10,249 vs
@@ -18660,14 +18738,15 @@ function useV3GoalCheck() {
 // comes back as no row.
 const v3PlanQ = (start, end, goal) => (sb, b) => sb.rpc('fn_plan_quarter', { p_brand: b, p_start: start, p_end: end, p_goal: goal, p_basis: goal == null ? 'auto' : 'revenue' })
   .then(r => ({ data: r.data && r.data.ok !== false ? [r.data] : [], error: r.error }));
-function useV3Goal() {
+function useV3Goal(opts) {
+  const wantGoal = !opts || opts.goalPlan !== false;   // Today and Profit & sales need only the pace
   const today = new Date().toISOString().slice(0, 10);
   const goal = useV3Rows('goal-active', V3_GOAL_Q);
   const g = goal.rows ? (goal.rows[0] || null) : undefined;
   const per = g ? { start: v3Iso10(g.period_start), end: v3Iso10(g.period_end) } : v3Quarter(today);
   const tgt = g && Number(g.revenue_target) > 0 ? Number(g.revenue_target) : null;
   const pace = useV3Rows(g === undefined ? 'goal-pace-wait' : 'goal-pace-' + per.start, g === undefined ? () => Promise.resolve({ data: [] }) : v3PlanQ(per.start, per.end, null));
-  const atGoal = useV3Rows(tgt ? 'goal-plan-' + per.start + '-' + tgt : 'goal-plan-none', tgt ? v3PlanQ(per.start, per.end, tgt) : () => Promise.resolve({ data: [] }));
+  const atGoal = useV3Rows(tgt && wantGoal ? 'goal-plan-' + per.start + '-' + tgt : 'goal-plan-none', tgt && wantGoal ? v3PlanQ(per.start, per.end, tgt) : () => Promise.resolve({ data: [] }));
   return { goal, g, per, tgt, pace, atGoal, today };
 }
 // Sales from the period start to the end of yesterday (the plan's basis), one key per period.
