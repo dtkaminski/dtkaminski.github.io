@@ -8451,96 +8451,135 @@ function SynergyMatrix(){
   </div>);
 }
 
-// ===== Ask: dataset Q&A via Claude API (browser-side) =====
-function buildAskContext(){
-  // Compact, structured summary of all data the model is allowed to reason over.
-  // Aims to stay well under 100k tokens so prompt caching covers most of the cost.
+// ===== Ask: what Greta answers from (rebuilt 2026-10-05) =====
+// It sent every daily row since June 2024 for five channels -- 690k characters, roughly 200k tokens,
+// past the 131k the answering model accepts -- under a prompt that called it "the last ~90 days", plus
+// ten arrays described in the data dictionary and sent empty (creatives, demographics, Instagram...),
+// and none of the figures the pages agree on. Now: the server readout (fn_brand_readout: headline
+// figures, the ranked board, what is held back, coverage, cost trees), one block of the app's own
+// figures (v3AskFacts), 26 weeks of weekly totals, the last 28 days daily, and only sections that
+// have something in them. About a tenth of the size.
+function v3AskWeekly(rows, fields, weeks) {
+  const out = {}; const mon = d => v3Monday(String(d).slice(0, 10));
+  (rows || []).forEach(r => { if (!r || !r.date) return; const k = mon(r.date); const o = out[k] || (out[k] = { week: k });
+    fields.forEach(f => { const v = Number(r[f]); if (isFinite(v)) o[f] = (o[f] || 0) + v; }); });
+  return Object.values(out).sort((a, b) => (a.week < b.week ? -1 : 1)).slice(-(weeks || 26))
+    .map(o => { const x = { week: o.week }; fields.forEach(f => { if (o[f] != null) x[f] = Math.round(o[f] * 100) / 100; }); return x; });
+}
+function v3AskDaily(rows, fields, days) {
+  return (rows || []).filter(r => r && r.date).slice(-(days || 28))
+    .map(r => { const x = { date: v3Iso10(r.date) }; fields.forEach(f => { const v = Number(r[f]); if (isFinite(v)) x[f] = Math.round(v * 100) / 100; }); return x; });
+}
+// The figures every page of the app agrees on, read fresh for each question. Each read is time-boxed;
+// a failed one is left out rather than guessed.
+async function v3AskFacts() {
+  const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
+  if (!sb || !b) return null;
+  const T = (p, ms) => Promise.race([Promise.resolve(p).then(r => (r && !r.error ? r.data : null), () => null), new Promise(res => setTimeout(() => res(null), ms || 9000))]);
+  const today = new Date().toISOString().slice(0, 10), Q = v3Quarter(today);
+  const [lad, goalR, paceR, ueR, drift, cogsR, cfgR, cal, found, curveR] = await Promise.all([
+    T(V3_LADDER_Q(sb, b)), T(V3_GOAL_Q(sb, b)), T(v3PlanQ(Q.start, Q.end, null)(sb, b), 15000), T(V3_UE_Q(sb, b)),
+    T(V3_DRIFT_Q(sb, b)), T(V3_COGSQ_Q(sb, b)),
+    T(sb.from('brand_config').select('supplier_lead_time_weeks,fixed_costs_monthly,cash_floor,opening_cash,opening_cash_as_of').eq('brand_id', b).limit(1)),
+    T(sb.from('mos_calendar_event').select('row_group,title,start_date,end_date,status,channel').eq('brand_id', b)
+      .gte('start_date', v3IsoAdd(today, -180)).lte('start_date', v3IsoAdd(today, 120)).limit(300)),
+    T(sb.from('external_events').select('ts').eq('brand_id', b).eq('kind', 'promo').gte('ts', v3IsoAdd(today, -180)).limit(60)),
+    T(V3_CURVE_Q(sb, b)),
+  ]);
+  const H = window.GRETA_HEADLINE || {};
+  const cmr = Number(H.net_revenue_30d) > 0 && H.product_contribution_30d != null ? Number(H.product_contribution_30d) / Number(H.net_revenue_30d) : null;
+  const r0 = x => (Array.isArray(x) ? x[0] : x) || null, R = v => (v == null || !isFinite(Number(v)) ? null : Math.round(Number(v)));
+  const f = { as_of: today, note: 'These are the figures the app’s pages show. Prefer them to anything worked out from the weekly or daily rows.' };
+  if (H.net_revenue_30d != null) f.last_30_days = { sales: R(H.net_revenue_30d), ad_spend: R(H.paid_spend_30d), profit_after_ads: R(H.cm_after_marketing_30d),
+    margin_after_product_and_order_costs: cmr != null ? Math.round(cmr * 1000) / 1000 : null };
+  const tm = lad && cmr != null ? v3TypicalMonth(lad, cmr) : null;
+  if (tm && tm.typ) f.typical_month = { basis: 'median of the ' + tm.n + ' 30-day windows before the latest; one sale window cannot move it. Compare with this, not with the 30 days before, which can hold a sale.',
+    sales: R(tm.typ.sales), ad_spend: R(tm.typ.spend), profit_after_ads: R(tm.typ.kept), same_30_days_last_year_sales: tm.ly ? R(tm.ly.sales) : null };
+  const g = r0(goalR), c = r0(curveR), P = r0(paceR);
+  if (g) {
+    const gb = g.goal_beta != null ? Number(g.goal_beta) : null;
+    const cb = c ? (c.identifiable && Number(c.n_months) >= 12 && 1 - Number(c.beta) >= 0.2 && 1 - Number(c.beta) <= 0.95 ? 1 - Number(c.beta) : 0.6) : null;
+    f.goal = { period: g.period_start + ' to ' + g.period_end, sales_target: R(g.revenue_target), ad_budget: R(g.spend_cap), profit_after_ads_target: R(g.cam_target),
+      confirmed: !!g.confirmed, needs_replanning: gb != null && cb != null && Math.abs(gb - cb) > 0.03,
+      replanning_note: 'When needs_replanning is true the goal was worked out on a spend curve Greta has since corrected; say so before quoting it, and point to Goal & costs to re-plan.' };
+  }
+  if (P) f.quarter_plan_at_todays_ad_spend = { period: P.period_start + ' to ' + P.period_end, sales: R(P.revenue_target), ad_spend: R(P.spend_cap), profit_after_ads: R(P.cam_target),
+    average_cost_per_new_customer: P.breakdown ? P.breakdown.cost_per_new_customer : null,
+    months: (P.months || []).map(m => ({ month: String(m.month).slice(0, 7), sales: R(m.sales), ad_spend: R(m.spend), new_customers: R(m.new_customers) })),
+    note: 'Greta’s quarter plan: own seasonality, returning customers at their recent rate, new-customer sales rising with ad spend along the measured curve (each extra pound buys less). It spreads the budget by season, so a peak month gets more and an ordinary month less.' };
+  const U = r0(ueR);
+  if (U) f.customers = { cost_to_win_a_new_customer_90d: U.cac, profit_on_a_first_order: U.first_order_contribution, profit_from_a_customer_over_a_year: U.ltv_contribution };
+  const C = r0(cfgR) || {};
+  const lead = Number(C.supplier_lead_time_weeks) > 0 ? Number(C.supplier_lead_time_weeks) : null;
+  f.costs_and_settings = { supplier_lead_time_weeks: lead, overheads_per_month: R(C.fixed_costs_monthly), minimum_cash_balance_set: C.cash_floor != null,
+    cash_balance: R(C.opening_cash), cash_balance_as_of: C.opening_cash_as_of || null };
+  const rf = (drift || []).find(x => x.input_key === 'refundPct' && x.verifiable);
+  if (rf) f.costs_and_settings.refunds = { entered_pct: Number(rf.config_value), measured_pct: Math.round(Number(rf.realised_value) * 10) / 10, off: rf.status === 'drift' };
+  const Qc = r0(cogsR);
+  if (Qc) f.costs_and_settings.product_costs = { share_of_sales_with_a_cost: Qc.cogs_coverage_90d, include_freight_or_duty: Qc.cogs_landed_complete !== false };
+  const evs = cal || [];
+  const peak = evs.filter(e => e.row_group === 'seasonality' && e.status !== 'skipped' && String(e.start_date) >= v3IsoAdd(today, 7)).sort((x, y) => (x.start_date < y.start_date ? -1 : 1))[0];
+  if (peak) {
+    const s = String(peak.start_date).slice(0, 10), e = String(peak.end_date || peak.start_date).slice(0, 10);
+    const ov = x => String(x.start_date).slice(0, 10) <= e && String(x.end_date || x.start_date).slice(0, 10) >= s;
+    let ly = null; if (lad) { const lyS = v3IsoAdd(s, -364), lyE = v3IsoAdd(e, -364); ly = R(lad.filter(r => { const k = String(r.day).slice(0, 10); return k >= lyS && k <= lyE; }).reduce((a, r) => a + (Number(r.net_sales) || 0), 0)); }
+    f.next_peak = { name: peak.title, from: s, to: e, same_days_last_year_sales: ly,
+      promotions_planned: evs.filter(x => x.row_group === 'promo' && x.status !== 'skipped' && ov(x)).map(x => x.title),
+      emails_planned: evs.filter(x => x.channel === 'email' && x.status !== 'skipped' && ov(x)).length,
+      stock_order_by: lead ? v3IsoAdd(s, -Math.round(lead * 7)) : null };
+  }
+  const promos = evs.filter(x => x.row_group === 'promo' && x.status !== 'skipped');
+  const missing = (found || []).filter(r => { const k = String(r.ts).slice(0, 10); return !promos.some(x => String(x.start_date).slice(0, 10) <= v3IsoAdd(k, 1) && String(x.end_date || x.start_date).slice(0, 10) >= v3IsoAdd(k, -1)); });
+  f.calendar = { past_sales_not_on_the_calendar: missing.length,
+    note: missing.length ? 'Greta found sales that are not on the calendar, so what she has learned about promotions rests on too few events. They can be added from the Calendar.' : null };
+  return f;
+}
+function buildAskContext(facts){
   const D = window.FRKL_DATA || {}, B = window.FRKL_BUSINESS || {};
-  const tail = (a, n=14) => Array.isArray(a) ? a.slice(-n) : a;
-  // Data-quality guardrail — the same partial-window / small-sample protection the
-  // automated reads get, computed client-side so the interactive analyst can't
-  // diagnose off a half-finished day or a thin order base for any window the user asks about.
   const _shp = D.shopify || [];
   let _today = ''; try { _today = new Date().toISOString().slice(0,10); } catch(e) {}
   const _dates = _shp.map(r=>r && r.date).filter(Boolean).sort();
   const _latestDate = _dates.length ? _dates[_dates.length-1] : null;
   const _partialLatestDay = !!(_latestDate && _today && _latestDate >= _today);
-  let _lastCompleteDate = _latestDate;
-  if (_partialLatestDay && _latestDate) { try { const d=new Date(_latestDate+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()-1); _lastCompleteDate=d.toISOString().slice(0,10); } catch(e) {} }
-  const _recentDailyOrders = _shp.slice(-10).map(r=>({date:r&&r.date, orders: Math.round(Number(r&&r.orders)||0)}));
-  const dataQuality = {
-    latestDate: _latestDate, today: _today, partialLatestDay: _partialLatestDay,
-    lastCompleteDate: _lastCompleteDate, recentDailyOrders: _recentDailyOrders, smallSampleOrders: 60,
-    note: 'GUARDRAIL (must reflect in confidence + caveats): when answering about a recent window, treat the latest date as a PARTIAL/incomplete day if partialLatestDay is true — never read a partial-window dip as a real decline; compare complete days only (≤ lastCompleteDate) or say the period is still in progress. If the window in question has under ~60 orders (see recentDailyOrders), treat CVR/AOV swings as possible sampling noise and lower confidence accordingly.',
-  };
-  const ctx = {
-    _meta: { brand: OI_BRAND.slug, currency:'GBP', captured:D.meta?.captured, range:D.meta?.range,
-      data_dictionary: {
-        metaDaily: 'Meta paid daily: {date,cost,impressions,linkCtr,purchases,purchaseValue}',
-        googleAds: 'Google paid daily: {date,cost,clicks,impressions,conversions,convValue}',
-        ga4: 'GA4 daily: {date,sessions,engagedSessions,engagementRate,addToCarts,checkouts,purchases,revenue,bounceRate}',
-        klaviyo: 'Klaviyo daily: {date,recipients,opens,clicks,openRate,clickRate,orders,orderValue} — orders/value are GROSS Shopify orders Klaviyo tracks, NOT email-attributed',
-        shopify: 'Shopify daily: {date,totalSales,netSales,orders,aov,discounts,returns}',
-        creatives: 'Meta ad-level last 30d: {name,format,market,concept,cost,impressions,frequency,videoCurve,qualConv,linkCtr,atc,purchases,purchaseValue,thumbnail}',
-        demoAgeGender: 'Meta ad x age x gender last 30d: {name,age,gender,cost,impressions,linkCtr,atc,purchases,purchaseValue}',
-        demoPlacement: 'Meta ad x placement last 30d: {name,platform,position,device,cost,impressions,linkCtr,atc,purchases,purchaseValue}',
-        channelMix: 'GA4 channel grouping 90d: {channel,sessions,engaged,purchases,revenue}',
-        retentionByMonth: 'Monthly returning customer split: {month,new,ret,newRev,retRev,total,returningShare}',
-        products: 'Top 40 items 90d: {title,sku,units,returns,netSales,grossProfit,marginPct,returnRate}',
-        geo: 'Shopify orders by country 90d',
-        igPosts60d: 'Top IG posts 60d: {date,type,product,caption,permalink,likes,comments,views,reach,saves,shares,engagement,engRate}',
-        // 2026-07-13 fix: this schema-description string carried a frkl-specific narrative claim
-        // ("frkl barely posts any") unconditionally into every tenant's AI Analyst prompt context —
-        // unlike the neighboring important_notes array, it wasn't gated behind DEMO. Made brand-neutral;
-        // if posting volume is genuinely thin for a given brand, that's something the live igPosts60d/
-        // contentCadence data itself should show, not a hardcoded claim baked into the schema.
-        igStories: 'IG Stories 60d: {date,type,product,caption,permalink,likes,comments,views,reach,saves,shares,engagement,engRate}',
-        emailCampaigns: 'Klaviyo broadcasts 90d: {name,sendDate,subject,recipients,openRate,clickRate,orders,orderValue,revPerRecip}',
-        emailFlows: 'Klaviyo flow messages 90d (automated triggers): same shape minus sendDate',
-        emailSummary: 'Pre-aggregated flows-vs-campaigns totals (GROSS Klaviyo-tracked — see emailAttribution for TRUE attributed values)',
-        emailAttribution: 'TRUE email-attributed orders/revenue using Klaviyo Attributed report types. attributedFlowRevenue_90d + attributedCampaignRevenue_30d are the correct figures for "email channel revenue contribution". Gross values overstate by including non-attributable overlap with other channels.',
-        attributedFlows: `Per-flow attributed performance (90d): flow, orders, orderValue, days active, ${curSym()}/active day`,
-        igSnapshot: 'IG profile: {followers, mediaCount}',
-        igAudience: 'IG follower demographics: {age,gender,followers}',
-        contentCadence: 'Per-week posting counts: {week,reels,feed,stories,totalReach,total}',
-      },
-      important_notes: [
-        ...(DEMO ? [
-          'Meta claims ~10x more revenue than GA4 attributes; both are real, neither is the whole truth.',
-          'Frkl is an Irish/UK demi-fine jewellery brand; 97% of paid spend reaches female users.',
-          'Email flows generate 19x more revenue per recipient than campaigns.',
-        ] : []),
-        'Today (latest date) may be a partial day — caveat any "today" answers (see dataQuality).',
-      ],
-      dataQuality,
-      // The render contract (0240, fn_brand_readout): canonical figures with window, population and
-      // confidence rung; source coverage and tracking breaks; the ranked board and what is held back;
-      // the exact cost-tree splits; and the rules a narrator follows. Null until it loads or before
-      // 0240 is applied, in which case the model works from the arrays as before.
-      readout: (typeof window !== 'undefined' && window.GRETA_READOUT) || null,
+  const nonEmpty = v => Array.isArray(v) ? v.length > 0 : (v && typeof v === 'object' ? Object.keys(v).length > 0 : v != null);
+  const data = {
+    weekly: {
+      shopify: v3AskWeekly(_shp, ['netSales', 'orders', 'discounts', 'returns']),
+      meta: v3AskWeekly(D.metaDaily, ['cost', 'purchases', 'purchaseValue', 'impressions']),
+      google: v3AskWeekly(D.googleAds, ['cost', 'conversions', 'convValue', 'clicks']),
+      ga4: v3AskWeekly(D.ga4, ['sessions', 'addToCarts', 'checkouts', 'purchases']),
+      email: v3AskWeekly(D.klaviyo, ['recipients', 'opens', 'clicks']),
     },
-    metaDaily: D.metaDaily || [],
-    googleAds: D.googleAds || [],
-    ga4: D.ga4 || [],
-    klaviyo: D.klaviyo || [],
-    shopify: D.shopify || [],
-    creatives: D.creatives || [],
-    demoAgeGender: D.demoAgeGender || [],
-    demoPlacement: D.demoPlacement || [],
-    channelMix: B.channelMix || [],
+    daily_last_28_days: {
+      shopify: v3AskDaily(_shp, ['netSales', 'orders', 'discounts']),
+      meta: v3AskDaily(D.metaDaily, ['cost', 'purchases', 'purchaseValue']),
+      google: v3AskDaily(D.googleAds, ['cost', 'conversions', 'convValue']),
+    },
     retentionByMonth: B.retentionByMonth || [],
-    products: (B.products||[]).slice(0,40),
-    geo: B.geo || [],
-    igPosts60d: B.igPosts60d || [],
-    igStories: B.igStories || [],
-    emailCampaigns: B.emailCampaigns || [],
+    products: (B.products || []).slice(0, 25).map(p => ({ title: p.title, units: p.units, netSales: p.netSales, marginPct: p.marginPct != null ? Math.round(p.marginPct * 1000) / 1000 : null, window: p.window || null })),
     emailFlows: B.emailFlows || [],
+    emailCampaigns: (B.emailCampaigns || []).slice(-15),
     emailSummary: B.emailSummary || {},
-    igSnapshot: B.igSnapshot || {},
-    igAudience: B.igAudience || [],
-    contentCadence: B.contentCadence || [],
   };
-  return ctx;
+  Object.keys(data).forEach(k => { if (!nonEmpty(data[k])) delete data[k]; });
+  const dictionary = {
+    weekly: 'Totals per Monday-start week, last 26 weeks: shopify {netSales (ex VAT, after discounts), orders, discounts, returns}; meta and google {cost, platform-counted purchases/conversions and value}; ga4 {sessions, addToCarts, checkouts, purchases}; email {recipients, opens, clicks}. Platform counts are the platforms’ own claims.',
+    daily_last_28_days: 'Day by day for the last 28 days, same fields.',
+    retentionByMonth: 'Monthly new vs returning customers and their sales.',
+    products: 'Top 25 products by sales; the window is on each row.',
+    emailFlows: 'Klaviyo automated flows.', emailCampaigns: 'The last 15 Klaviyo broadcasts.', emailSummary: 'Flows against campaigns, gross Klaviyo-tracked.',
+  };
+  Object.keys(dictionary).forEach(k => { if (!(k in data)) delete dictionary[k]; });
+  return {
+    _meta: { brand: OI_BRAND.slug, currency: 'GBP', captured: D.meta && D.meta.captured,
+      dataQuality: { latestDate: _latestDate, today: _today, partialLatestDay: _partialLatestDay,
+        note: 'If partialLatestDay is true the latest date is an incomplete day: never read its dip as a decline. Under ~60 orders in a window, treat conversion and order-value swings as possible noise.' },
+      facts: facts || null,
+      readout: (typeof window !== 'undefined' && window.GRETA_READOUT) || null,
+      data_dictionary: dictionary,
+      important_notes: [...(DEMO ? ['Frkl is an Irish/UK demi-fine jewellery brand.'] : []), 'Today may be a partial day — caveat any "today" answers.'] },
+    data,
+  };
 }
 
 // Answer depth -> the model that serves it. The only place a model id appears on the
@@ -8571,6 +8610,24 @@ function AskPanel(){
   const clearHistory = () => { localStorage.removeItem('frkl_ask_history'); setHistory([]); };
   React.useEffect(()=>{ localStorage.setItem('frkl_ask_history', JSON.stringify(history.slice(-30))); }, [history]);
   React.useEffect(()=>{ localStorage.setItem('frkl_ask_depth', depth); }, [depth]);
+  // 0264: questions and answers are kept in the workspace (ask_log). A browser with no history of
+  // its own -- another device, cleared storage -- picks up this person's last ten.
+  React.useEffect(() => {
+    if (history.length) return;
+    const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = (window.FRKL_LIVE && window.FRKL_LIVE.brandId) || (ASK && ASK.brand_id);
+    if (!sb || !b) return;
+    let alive = true;
+    const uid = window.FRKL_LIVE && window.FRKL_LIVE.session && window.FRKL_LIVE.session.user && window.FRKL_LIVE.session.user.id;
+    let q = sb.from('ask_log').select('question,answer,asked_at,ok').eq('brand_id', b).eq('ok', true).order('asked_at', { ascending: false }).limit(10);
+    if (uid) q = q.eq('user_id', uid);
+    q.then(r => {
+      if (!alive || !r || r.error || !r.data || !r.data.length) return;
+      const h = []; r.data.slice().reverse().forEach(x => { const t = new Date(x.asked_at).getTime();
+        h.push({ role: 'user', content: x.question, time: t }); h.push({ role: 'assistant', content: x.answer || '', time: t + 1 }); });
+      setHistory(cur => (cur.length ? cur : h));
+    }, () => {});
+    return () => { alive = false; };
+  }, []);
   // "Ask about this" — a card stashed a question via window.__oiAsk; prefill it here.
   React.useEffect(()=>{
     const consume = () => { try { const q = window.__oiAskPending; if(q){ window.__oiAskPending = null; setQuestion(q); } } catch(e){} };
@@ -8594,9 +8651,12 @@ function AskPanel(){
         }
       } catch (e) {}
     }
-    const ctx = buildAskContext();
-    const ctxJson = JSON.stringify(ctx);
-    const systemPrompt = `You are a senior D2C commercial analyst, growth strategist and operator for ${OI_BRAND.name}, a ${OI_BRAND.markets} DTC ${OI_BRAND.vertical} brand. Seasonality to keep in mind: ${OI_BRAND.seasonality}. You are given the brand's live marketing dataset (last ~90 days, captured ${ctx._meta.captured}). Answer using ONLY the data provided. When _meta.readout is present it is the canonical source and you follow _meta.readout.rules: quote its headline figures exactly as given, with their window and population, and never recompute them from the daily arrays; say how hard the owner can lean on a figure using its rung (direct, likely, probably, possible, outside chance); never compare or total across days that readout.coverage or readout.tracking marks missing or unusable; never recommend an action listed in readout.held; when a cost per result moved, name the stage readout.cost_trees says moved and the stages it rules out; where readout.conflicts lists a disagreement, use the canonical figure and say so. Show the calculation when possible (e.g. "${curSym()}X / ${curSym()}Y = Z%"). Quote specific numbers and dates. If the question cannot be answered from the data, say so clearly and state what data would be needed.
+    const facts = await v3AskFacts().catch(() => null);
+    const ctx = buildAskContext(facts);
+    const ctxJson = JSON.stringify(ctx.data);
+    const systemPrompt = `You are a senior D2C commercial analyst, growth strategist and operator for ${OI_BRAND.name}, a ${OI_BRAND.markets} DTC ${OI_BRAND.vertical} brand. Seasonality to keep in mind: ${OI_BRAND.seasonality}. You are given the brand's figures as of ${ctx._meta.captured}: _meta.facts (the figures every page of the app shows: last 30 days, a typical month, the goal and whether it needs re-planning, the quarter plan by month, the next seasonal peak, customer value, costs and settings), _meta.readout (the server's canonical summary and ranked board), weekly totals for the last 26 weeks and daily rows for the last 28 days. Answer using ONLY the data provided. Prefer _meta.facts and _meta.readout to anything you work out from the weekly or daily rows, and say which you used.
+
+WHAT TO DO: when asked what to do, what matters most or what to change, answer from _meta.readout.board in its order (rank 1 first), with each item's pounds a month and how sure Greta is of it (its rung). Do not invent a different ranking. You may add one idea of your own only if you label it "my suggestion, not on your board". For any question about spending more, check _meta.facts.quarter_plan_at_todays_ad_spend (it spreads the budget by season) and _meta.facts.next_peak first. If _meta.facts.goal.needs_replanning is true, say the goal needs re-planning before quoting it. When _meta.readout is present it is the canonical source and you follow _meta.readout.rules: quote its headline figures exactly as given, with their window and population, and never recompute them from the daily arrays; say how hard the owner can lean on a figure using its rung (direct, likely, probably, possible, outside chance); never compare or total across days that readout.coverage or readout.tracking marks missing or unusable; never recommend an action listed in readout.held; when a cost per result moved, name the stage readout.cost_trees says moved and the stages it rules out; where readout.conflicts lists a disagreement, use the canonical figure and say so. Show the calculation when possible (e.g. "${curSym()}X / ${curSym()}Y = Z%"). Quote specific numbers and dates. If the question cannot be answered from the data, say so clearly and state what data would be needed.
 
 CORE RULE: never diagnose a performance movement until you have checked for confounding factors. Do not just describe what changed — explain what most likely CAUSED it, the evidence, the caveats, and the next action. A naive read ("revenue up = healthy", "return on ad spend down = pause ads", "email up = send more", "average order value up = better") is a failure. Your job is to stop the founder making the wrong call because a metric moved without context.
 
@@ -8613,7 +8673,7 @@ OUTPUT: for a simple factual lookup, answer concisely (under ~150 words) with th
 
 ADDITIONAL OPERATING RULES:
 1. NEVER agree with a stated cause without checking the data. If the user says "X happened because of Y", look for evidence of Y BEFORE accepting it; if absent, push back: "I don't see [Y] in the data. Given the timing, [actual correlated factor] is a more likely explanation. Did you also do Y?"
-2. NEVER fabricate forecasts. Without spend plans, seasonality assumptions or a launch calendar, refuse and offer only a clearly-labelled trend extrapolation.
+2. NEVER fabricate forecasts. For the quarter, use _meta.facts.quarter_plan_at_todays_ad_spend and say it is Greta's plan; beyond it, offer only a clearly-labelled trend extrapolation.
 3. NEVER reconcile conflicting goals silently (e.g. "maximise return on ad spend AND grow new customers aggressively") — call out the tension and ask to prioritise.
 4. NEVER report metrics from a seasonal-event window (BFCM, Christmas, Mother's/Valentine's Day, brand sales) as baseline — flag it as anomalous.
 5. NEVER quote a precise number when you only have a range — use ranges with stated assumptions.
@@ -8621,10 +8681,10 @@ ADDITIONAL OPERATING RULES:
 
 Your value to the operator is being intellectually honest, not being helpful at any cost.
 
-Data dictionary and notes:
-${JSON.stringify(ctx._meta, null, 1)}
+Facts, readout, data dictionary and notes:
+${JSON.stringify(ctx._meta)}
 
-Full dataset (JSON):
+Weekly and daily data (JSON):
 ${ctxJson}`;
     const newHistory = [...history, {role:'user', content:q, time:Date.now()}];
     setHistory(newHistory);
@@ -8677,7 +8737,7 @@ ${ctxJson}`;
   return (<div>
     <div className="card" style={{marginBottom:14}}>
       {!UI_V3 && <h2>Ask Greta</h2>}
-      <p className="v3-note v3-measure" style={{marginTop:0}}>Greta answers from a summary of your live data, which is sent to her AI model to write the reply. Private to your workspace.</p>
+      <p className="v3-note v3-measure" style={{marginTop:0}}>Greta answers from the same figures your pages show, which are sent to her AI model to write the reply. Your questions and her answers are kept in your workspace, private to your team, so you can come back to them on any device.</p>
       {!ASK && (<div style={{padding:12, background:'var(--bg-app)', borderRadius:'var(--radius-none)', marginBottom:10, border:'1px solid var(--border-default)'}}>
         <div style={{fontSize:'var(--text-sm)', color:'var(--text-primary)', lineHeight:1.5}}>Ask runs inside your authenticated workspace, where the model key is held server-side (never in the browser). It isn't enabled in this public demo. The examples below show the questions it answers from your live data.</div>
       </div>)}
@@ -15166,13 +15226,13 @@ const V3_GLOSSARY = {
 // both places. Written the way an owner would ask them — no MER, no CM, no iROAS.
 const V3_ASK_PROMPTS = [
   'What should I do today? Give me the top three, biggest £ first.',
+  'Why is my profit down on a typical month?',
+  'Should I cut ad spend now, or keep it for my next peak?',
+  'What do I need in place for my next peak, and what is already late?',
+  'What does a new customer really cost me, and do they pay it back?',
+  'Which of my costs are wrong, and what is that doing to my profit?',
   'What should I NOT do this week, and why?',
-  'What changed since last week, and does it actually matter?',
-  'Which one thing would most improve my profit after ads?',
-  'Is it safe to spend more on Meta this week? Check stock cover first.',
-  'Which products are about to run out, and what should I reorder?',
   'Which email is earning the most per person it reaches?',
-  'Which channels are growing, and which are slipping?',
 ];
 // The pages that read a window get a control to set it. Before this the app held
 // period state that nothing could change, so every one of them was stuck on 30 days.
