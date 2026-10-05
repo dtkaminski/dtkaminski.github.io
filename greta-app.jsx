@@ -10211,7 +10211,7 @@ function V3BoardDigest({ n = 5 }){
     {live.slice(0, n).map((a, i) => (<div key={a.external_id || i} className="v3-next-row">
       <span className="v3-num">{i + 1}</span>
       <span>{v3PlainAction(a).title}</span>
-      <span className="v3-num">{a.cm_gbp ? v3Gbp(a.cm_gbp) + '/mo' : ''}</span>
+      <span className="v3-num">{a.cm_gbp ? v3Gbp(a.cm_gbp) + v3Per(a, true) : ''}</span>
     </div>))}
     <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>Open the action board <Icon name="arrowRight" size={13}/></button>
   </div>);
@@ -16980,7 +16980,7 @@ function V3Today(p) {
     <div className="v3-act-grid">
     {top ? (
       <div className="v3-dofirst v3-raised">
-        <div className="v3-kick">Do this first{top.cm_gbp ? ' · worth about ' + v3Gbp(top.cm_gbp) + ' a month' : ''}</div>
+        <div className="v3-kick">Do this first{top.cm_gbp ? ' · worth about ' + v3Gbp(top.cm_gbp) + v3Per(top) : ''}</div>
         <div className="v3-dofirst-t">{v3PlainAction(top).title}</div>
         {v3PlainAction(top).why && <div className="v3-sub">{v3PlainAction(top).why}</div>}
         {seasonNote && isCut(top) && <div className="v3-sub">This is for {seasonNote.cur}. Greta’s quarter plan puts {v3Gbp(seasonNote.spend)} of ads into {seasonNote.peak}, when new customers come far cheaper — don’t carry the cut into it.{' '}
@@ -17025,7 +17025,7 @@ function V3Today(p) {
             <p className="v3-note">{v3PlainAction(top).raw}</p>
             {top.cm_gbp ? <p className="v3-note">{V3_BOARD.ranked
               ? <>Ranked first on how sure Greta is and what it is worth together: {top.rung ? <>{String((V3_CONF[v3MoneyConf(top)] || {}).label || top.rung).toLowerCase()} it holds, </> : null}worth about {v3Gbp(top.cm_gbp)} a month{top.money_is_sales ? ' in sales' : ''}. A bigger figure Greta is less sure of sits lower.</>
-              : <>Ranked first because it is worth the most of anything Greta has checked recently: about {v3Gbp(top.cm_gbp)} a month.</>}</p> : null}
+              : <>Ranked first because it is worth the most of anything Greta has checked recently: about {v3Gbp(top.cm_gbp)}{v3Per(top)}.</>}</p> : null}
             {Array.isArray(top.evidence_reasons) && top.evidence_reasons.length > 0 && (
               <ul className="v3-note">{top.evidence_reasons.map((x, i) => <li key={i}>{(x && x.text) || String(x)}</li>)}</ul>)}
             <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiAsk && window.__oiAsk('Explain this action and how I should go about it: ' + scrubTag(top.description))}>Ask a follow-up</button>
@@ -17047,7 +17047,7 @@ function V3Today(p) {
       {next.map((a, i) => (<div key={a.external_id || i} className="v3-next-row">
         <span className="v3-num">{i + 2}</span>
         <span>{v3PlainAction(a).title}</span>
-        <span className="v3-num">{a.cm_gbp ? v3Gbp(a.cm_gbp) + '/mo' : ''}</span>
+        <span className="v3-num">{a.cm_gbp ? v3Gbp(a.cm_gbp) + v3Per(a, true) : ''}</span>
       </div>))}
       {seasonNote && !isCut(top) && next.some(isCut) && <p className="micro muted">The ad-spend cuts are for {seasonNote.cur}; the quarter plan puts {v3Gbp(seasonNote.spend)} into {seasonNote.peak}.</p>}
       <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>See all {boardCount || ''} actions <Icon name="arrowRight" size={13}/></button>
@@ -19237,11 +19237,13 @@ function v3BoardSplitText(rows) {
   const live = v3LiveRows(rows || []), sum = a => a.reduce((t, r) => t + (Number(r.cm_gbp) || 0), 0);
   const act = live.filter(r => r.lane !== 'test'), tests = live.filter(r => r.lane === 'test');
   const stock = act.filter(r => r.category === 'stock'), save = act.filter(r => r.origin === 'order_cost');
-  const rest = act.filter(r => r.category !== 'stock' && r.origin !== 'order_cost');
+  const once = act.filter(r => v3Once(r));
+  const rest = act.filter(r => r.category !== 'stock' && r.origin !== 'order_cost' && !v3Once(r));
   const bits = [];
   if (stock.length) bits.push(v3Gbp(sum(stock)) + ' a month of profit at stake in stock');
   if (save.length) bits.push(v3Gbp(sum(save)) + ' a month of ad spend you can save');
   if (rest.length) bits.push(v3Gbp(sum(rest)) + ' a month from ' + (rest.length === 1 ? 'one more change' : rest.length + ' more changes') + ' Greta is fairly sure of');
+  if (once.length) bits.push(v3Gbp(sum(once)) + ' once from ' + (once.length === 1 ? 'one move before the peak' : once.length + ' moves before the peak'));
   if (tests.length) bits.push((tests.length === 1 ? 'one test' : tests.length + ' tests') + ' worth running');
   return bits.length ? bits.slice(0, -1).join(', ') + (bits.length > 1 ? ', and ' : '') + bits[bits.length - 1] : null;
 }
@@ -19361,7 +19363,7 @@ function V3Review() {
       <h2 className="v3-sec-title">For this week’s meeting</h2>
       <div className="v3-kick">The board{split ? ' · ' + split : ''}</div>
       {board.err ? <div className="v3-empty">Greta could not load your actions just now.</div> : !board.rows ? <V3SkeletonRows n={3}/> : (<ol className="v3-moves">
-        {top.map(r => (<li key={r.external_id}><b>{v3PlainAction(r).title}</b>{r.cm_gbp ? ' — ' + v3Gbp(r.cm_gbp) + ' a month' : ''}.
+        {top.map(r => (<li key={r.external_id}><b>{v3PlainAction(r).title}</b>{r.cm_gbp ? ' — ' + v3Gbp(r.cm_gbp) + v3Per(r) : ''}.
           <div className="v3-btn-row"><V3Done ext={r.external_id} small onDone={() => v3BoardDrop(r.external_id)}/><V3Skip ext={r.external_id} small tone="quiet" onDone={() => v3BoardDrop(r.external_id)}/></div></li>))}
       </ol>)}
       <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>Every action, and why <span className="v3-xref-go">on Actions →</span></button>
@@ -19899,8 +19901,151 @@ function V3Team() {
   </div>);
 }
 
+// ── Where the business stands (V3, 2026-10-05) ──────────────────────────────────────────────────────
+// The whole-product review against a seasoned DTC agency found sixteen accurate pages and no answer to
+// the first thing an agency writes: where the business stands and what the next ninety days are for.
+// fn_brand_state (0269) gathers the figures -- the last 30 days after ads and overheads, ad spend now
+// against the start of the year and a year ago, customer economics, repeat rate, basket, other sales
+// channels, the next peak and the code that drove it -- with a rule-of-thumb range for each. This
+// writes the paragraph and the plan from them and from the board, and shows how the brand compares.
+// One-off money (a peak's worth of profit) reads "once", never "a month".
+const v3Once = r => /\(once\b/.test(String((r && r.money_basis) || ''));
+const v3Per = (r, short) => (v3Once(r) ? (short ? ' once' : ' once, over the peak') : (short ? '/mo' : ' a month'));
+const V3_STATE_Q = (sb, b) => sb.rpc('fn_brand_state', { p_brand: b }).then(r => ({ data: r.data ? [r.data] : [], error: r.error }));
+const V3_CODES_Q = (sb, b) => sb.from('vw_brand_code_performance').select('code,orders_365d,net_sales_365d,avg_depth,first_order_share,last_used,orders_90d')
+  .eq('brand_id', b).order('orders_365d', { ascending: false }).limit(12);
+// where a figure sits against its rule-of-thumb range: 'good', 'ok' or 'weak'
+function v3Bench(v, bm) {
+  if (v == null || !bm) return null;
+  const hi = bm.better === 'higher';
+  if (hi ? v >= bm.typical : v <= bm.typical) return 'good';
+  if (hi ? v >= bm.low : v <= bm.high) return 'ok';
+  return 'weak';
+}
+function V3BusinessState() {
+  const q = useV3Rows('brand-state', V3_STATE_Q);
+  const codes = useV3Rows('brand-codes', V3_CODES_Q);
+  const board = useV3Board();
+  if (q.err) return null;                                   // before 0269, or unreadable: Today carries on without it
+  if (!q.rows) return <V3SkeletonRows n={3}/>;
+  const S = q.rows[0]; if (!S || !S.last_30) return null;
+  const L = S.last_30, A = S.ads || {}, U = S.unit || {}, R = S.retention || {}, K = S.basket || {}, P = S.peak, BM = S.benchmarks || {};
+  const num = v => (v == null ? null : Number(v));
+  const share = num(L.ads_share), early = num(A.early_year_share);
+  const yoySales = num(A.last_year_same_30_sales) > 0 ? num(L.sales) / num(A.last_year_same_30_sales) - 1 : null;
+  const yoyAds = num(A.last_year_same_30_ads) > 0 ? num(L.ads) / num(A.last_year_same_30_ads) : null;
+  const ret = num(L.ads) > 0 ? num(L.sales) / num(L.ads) : null;
+  const topCode = (codes.rows || []).find(c => num(c.orders_365d) >= 50 && num(c.first_order_share) >= 0.6) || null;
+  const other = ((S.channels && S.channels.other) || []).filter(c => num(c.orders) >= 10);
+
+  // the verdict: after overheads when they are known, else after ads
+  const ao = num(L.after_overheads);
+  const verdict = ao != null
+    ? (ao < 0 ? 'You are losing about ' + fmtMoney(-ao) + ' a month after overheads' : 'You are making about ' + fmtMoney(ao) + ' a month after overheads')
+      + (share != null ? ', with ads taking ' + fmtPctN(share) + ' of sales' + (early != null && Math.abs(share - early) >= 0.08 ? ' against ' + fmtPctN(early) + ' at the start of the year' : '') : '') + '.'
+    : 'You kept ' + fmtMoney(num(L.profit_after_ads)) + ' after ads in the last 30 days.';
+  const sents = [];
+  if (yoySales != null && yoyAds != null)
+    sents.push(<>Sales are {yoySales >= 0 ? fmtPctN(yoySales) + ' up' : fmtPctN(-yoySales) + ' down'} on the same 30 days last year, on {fmtTimes(yoyAds, 1)} the ad spend{ret != null && A.break_even_return ? <>: each £1 of ads now brings {fmtMoney(ret, 2)} of sales against the {fmtMoney(num(A.break_even_return), 2)} you need to break even on the ads alone, which leaves little to pay the overheads</> : null}.</>);
+  if (U.cac != null && U.first_order_contribution != null)
+    sents.push(<>A new customer costs {fmtMoney(num(U.cac))} and their first order earns {fmtMoney(num(U.first_order_contribution))}{U.ltv_cac != null ? <>; over their life they are worth {fmtTimes(num(U.ltv_cac), 1)} what they cost, where brands aim for 3×</> : null}. {R.repeat_90d != null ? <>{fmtPctN(num(R.repeat_90d))} order again within 90 days{BM.repeat_90d ? <> (around {fmtPctN(BM.repeat_90d.typical)} is typical)</> : null}, and returning customers bring {fmtPctN(num(R.returning_rev_share))} of sales.</> : null}</>);
+  if (topCode)
+    sents.push(<>Your biggest source of new customers is not an ad platform: the code <b>{topCode.code}</b> brought {fmtCount(topCode.orders_365d)} orders in the last year, {fmtPctN(num(topCode.first_order_share))} of them first orders, at {fmtPctN(num(topCode.avg_depth))} off.</>);
+  if (P && P.title)
+    sents.push(<>{P.title} starts in {fmtCount(P.days_away)} days; the same days last year sold {fmtMoney(num(P.ly_sales))}{P.top_codes && P.top_codes[0] && num(P.ly_orders) > 0 ? <>, and {P.top_codes[0].code} brought {fmtPctN(num(P.top_codes[0].orders) / num(P.ly_orders))} of its orders</> : null}.</>);
+  if (other.length)
+    sents.push(<>{(() => { const named = other.filter(c => !/^\d+$/.test(c.channel)).map(c => c.channel), unnamed = other.length - named.length;
+      return named.concat(unnamed ? [unnamed === 1 ? 'one other sales channel' : unnamed + ' other sales channels'] : []).join(' and '); })()} took {fmtCount(other.reduce((a, c) => a + num(c.orders), 0))} orders in 90 days; they are counted in your sales at the price Shopify records, so if a stockist pays you less, sales and margin read high by the difference.</>);
+
+  // the plan, from the board and the peak
+  const live = board.rows ? v3LiveRows(board.rows) : [];
+  const pick = f => live.filter(f);
+  const now = pick(r => r.lane !== 'test' && !/^promo-peak/.test(r.external_id)).slice(0, 3);
+  const before = pick(r => /^(promo-peak|crm-flows)/.test(r.external_id));
+  const after = pick(r => /^(cust-winback|basket-pair)/.test(r.external_id) || (r.lane === 'test' && !/^(promo-peak|crm-flows)/.test(r.external_id))).slice(0, 3);
+  const item = r => (<li key={r.external_id}><span className="v3-rank-desc">{v3PlainAction(r).title}</span>{r.cm_gbp ? <span className="v3-sub"> · {v3Gbp(r.cm_gbp)}{v3Per(r)}</span> : null}</li>);
+  const phases = [
+    ['This week', now, 'Nothing urgent on the board.'],
+    [P && P.title ? 'Before ' + P.title : 'This month', before, null],
+    [P && P.title ? 'After ' + P.title : 'Next', after, null],
+  ].filter(p => p[1].length || p[2]);
+
+  const rows = [
+    ['Ads as a share of sales', share, BM.ads_share_of_sales, fmtPctN],
+    ['Order again within 90 days', num(R.repeat_90d), BM.repeat_90d, fmtPctN],
+    ['Sales from returning customers', num(R.returning_rev_share), BM.returning_rev_share, fmtPctN],
+    ['Customer value against cost', num(U.ltv_cac), BM.ltv_cac, v => fmtTimes(v, 1)],
+    ['Orders with one item', num(K.single_line_share), BM.single_line_share, fmtPctN],
+  ].filter(r => r[1] != null && r[2]);
+  const TONE = { good: 'v3-up', ok: 'v3-muted', weak: 'v3-down' }, WORD = { good: 'better than typical', ok: 'within the usual range', weak: 'outside the usual range' };
+
+  return (<div className="v3-page-stack"><section>
+    <div className="v3-kick">Where the business stands · last 30 days</div>
+    <p className="v3-verdict">{verdict}</p>
+    {sents.length > 0 && <p className="v3-note v3-measure">{sents.map((s, i) => <React.Fragment key={i}>{i ? ' ' : ''}{s}</React.Fragment>)}</p>}
+    {phases.length > 0 && (<div className="v3-gap-top">
+      <h2 className="v3-sec-title">The next 90 days</h2>
+      {phases.map(([title, list, empty]) => (<div key={title}>
+        <div className="v3-kick v3-gap-top">{title}</div>
+        {list.length ? <ul className="v3-rank-steps">{list.map(item)}</ul> : <p className="micro muted">{empty}</p>}
+      </div>))}
+    </div>)}
+    {rows.length > 0 && (<V3More id="state-bench" label="How you compare with similar brands">
+      <table className="v3-rw">
+        <thead><tr><th className="t-text">Measure</th><th>You</th><th>Typical range</th><th className="t-text"/></tr></thead>
+        <tbody>{rows.map(([lab, v, bm, f]) => { const t = v3Bench(v, bm); return (<tr key={lab}>
+          <td className="t-text">{lab}</td><td>{f(v)}</td><td className="v3-muted">{f(bm.low)} – {f(bm.high)}</td>
+          <td className={'t-text ' + (TONE[t] || '')}>{WORD[t] || ''}</td></tr>); })}</tbody>
+      </table>
+      <p className="micro muted v3-measure">Typical ranges are rules of thumb for {S.vertical === 'default' ? 'UK DTC brands' : 'UK ' + S.vertical + ' brands'}, not measured from other brands’ data; read them as context, not targets.</p>
+    </V3More>)}
+  </section></div>);
+}
+
+// Promotion and creator attribution: what each discount code brought over the last year.
+function V3CodePerformance() {
+  const q = useV3Rows('brand-codes', V3_CODES_Q);
+  if (q.err || !q.rows) return null;
+  const rows = q.rows.filter(r => Number(r.orders_365d) >= 10);
+  if (!rows.length) return null;
+  const top = rows[0];
+  return (<section className="v3-sec">
+    <h2 className="v3-sec-title">Promotions and creators</h2>
+    <p className="v3-note v3-measure">Discount codes are the one attribution Shopify records for certain: an order that used a code came through whoever holds it. <b>{top.code}</b> brought {fmtCount(top.orders_365d)} orders in the last year, {fmtPctN(Number(top.first_order_share))} of them from new customers{Number(top.first_order_share) >= 0.6 ? ' — a source of new customers in its own right, to be planned and paid like a channel' : ''}.</p>
+    <table className="v3-rw">
+      <thead><tr><th className="t-text">Code</th><th>Orders, last year</th><th>Last 90 days</th><th>New customers</th><th>Average discount</th><th>Sales</th><th className="t-text">Last used</th></tr></thead>
+      <tbody>{rows.map(r => (<tr key={r.code}>
+        <td className="t-text v3-rw-name">{r.code}</td><td>{fmtCount(r.orders_365d)}</td><td>{fmtCount(r.orders_90d)}</td>
+        <td>{fmtPctN(Number(r.first_order_share))}</td><td>{fmtPctN(Number(r.avg_depth))}</td><td>{fmtMoney(Number(r.net_sales_365d))}</td>
+        <td className="t-text v3-muted">{v3Day(String(r.last_used).slice(0, 10), true)}</td></tr>))}</tbody>
+    </table>
+    <p className="micro muted v3-measure">Web orders only, sales after discounts and before VAT. A customer who used a code would not all have come without it, so read this as who brought them, not what the code alone earned.</p>
+  </section>);
+}
+
+// Suggested tasks the agents raised long ago that nothing has re-checked. The board does not rank them
+// (it cannot say they are still true); they are listed here so the owner can mark each done or skip it,
+// rather than have them sit open for ever.
+const V3_STALE_Q = (sb, b) => sb.from('actions').select('external_id,description,raised_at,category')
+  .eq('brand_id', b).eq('status', 'open').lt('raised_at', v3IsoAdd(new Date().toISOString().slice(0, 10), -60))
+  .order('raised_at', { ascending: true }).limit(40);
+function V3StaleSuggestions() {
+  const q = useV3Rows('stale-suggestions', V3_STALE_Q);
+  if (q.err || !q.rows) return null;
+  const rows = q.rows.filter(r => /^(pulse|lux|frame|sage|scout|atlas)-/.test(r.external_id));
+  if (!rows.length) return null;
+  return (<V3More id="act-stale" label={'Older suggestions Greta can’t vouch for (' + rows.length + ')'}>
+    <p className="v3-note v3-measure">These were suggested as tasks months ago and nothing has re-checked them since, so Greta doesn’t rank them on the board. Mark each done if it happened, or skip it if it no longer applies.</p>
+    <ul className="v3-rank-steps">{rows.map(r => (<li key={r.external_id}>
+      <span className="v3-rank-desc">{v3Sentence(String(r.description || r.external_id))}</span>
+      <span className="v3-sub"> · suggested {v3Day(String(r.raised_at).slice(0, 10), true)}</span>
+      <div className="v3-btn-row"><V3Done ext={r.external_id} small onDone={q.retry}/><V3Skip ext={r.external_id} small onDone={q.retry}/></div>
+    </li>))}</ul>
+  </V3More>);
+}
+
 const V3_PAGES = {
-  today: (p) => <V3Today {...p}/>,
+  today: (p) => (<><V3BusinessState/><V3Today {...p}/></>),
   review: (p) => (<>
     {/* Rebuilt 2026-10-05: the week against a typical week, the meeting agenda off the board, notes in
         the workspace. The old weekly board (week-on-week only, GA4 repair read as growth, notes in one
@@ -19915,6 +20060,7 @@ const V3_PAGES = {
   actions: (p) => (<>
     <ActionsView/>
     <V3More id="act-decisions" label="What you did, and whether it worked" defaultOpen><V3Anchor id="decisions"/><V3TrackRecord/></V3More>
+    <V3StaleSuggestions/>
   </>),
   calendar: (p) => mosView('Calendar'),
   ask: (p) => <AskPanel/>,
@@ -19967,6 +20113,7 @@ const V3_PAGES = {
         spend-tier "diminishing returns" read (its own numbers did not fall) and the GA4 funnel (Website's,
         on 11 of 30 tracked days) are gone. Platform claims and per-channel evidence sit behind the detail. */}
     <V3MarketingLead/>
+    <V3CodePerformance/>
     <V3Incrementality/>
     <CreativeReallocation/>
     <V3EmailRead/>
@@ -20626,7 +20773,7 @@ function V3WalkActs({ rows, head }) {
     {rows.map((a, i) => (<div key={a.external_id || i} className="v3-walk-act">
       <span className="v3-num">{i + 1}</span>
       <span>{v3PlainAction(a).title}</span>
-      <span className="v3-num">{a.cm_gbp ? v3Gbp(a.cm_gbp) + '/mo' : ''}</span>
+      <span className="v3-num">{a.cm_gbp ? v3Gbp(a.cm_gbp) + v3Per(a, true) : ''}</span>
     </div>))}
   </div>);
 }
