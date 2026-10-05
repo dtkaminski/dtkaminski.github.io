@@ -10134,11 +10134,11 @@ function v3BoardLoad(){
   // server's one-ladder verdict, evidence_reasons says what moved it. PostgREST replaces the
   // view's ORDER BY with .order(), so order by board_rank here. Before 0237 is applied the
   // columns do not exist and PostgREST rejects the select: fall back a step at a time.
-  const EVIDENCE = ',rung,lane,board_rank,evidence_reasons,money_is_sales';
+  const EVIDENCE = ',rung,lane,board_rank,evidence_reasons,money_is_sales,days_since_refresh,evidence_checked_at';
   const ask = (cols, byRank) => sb.from('vw_brand_action_board').select(cols)
     .eq('brand_id', b).order(byRank ? 'board_rank' : 'cm_gbp', byRank ? { ascending: true } : { ascending: false, nullsFirst: false });
   ask(COLS + MONEY + EVIDENCE, true)
-    .then(r => (r && r.error && /rung|lane|board_rank|evidence_reasons|money_is_sales/.test(r.error.message || '')) ? ask(COLS + MONEY, false) : r)
+    .then(r => (r && r.error && /rung|lane|board_rank|evidence_reasons|money_is_sales|days_since_refresh|evidence_checked_at/.test(r.error.message || '')) ? ask(COLS + MONEY, false) : r)
     .then(r => (r && r.error && /money_/.test(r.error.message || '')) ? ask(COLS, false) : r)
     .then(r => {
       V3_BOARD.loading = false;
@@ -10335,10 +10335,10 @@ function V3ActionBoard(){
                   <span className="v3-rank-meta">
                     {r.category || 'general'}{r.days_open > 0 ? ' · open ' + r.days_open + 'd' : ''}
                     {conf ? ' · ' + V3_CONF[conf].label.toLowerCase() : ''}
-                    {unver ? ' · unchecked' : ''}
+                    {unver ? ' · unchecked' : r.days_since_refresh != null ? (Number(r.days_since_refresh) <= 0 ? ' · checked today' : ' · checked ' + r.days_since_refresh + 'd ago') : ''}
                   </span>
                 </span>
-                <span className="v3-rank-gbp">{v3Gbp(gbp)}<span className="v3-rank-per">/mo</span></span>
+                <span className="v3-rank-gbp">{v3Gbp(gbp)}<span className="v3-rank-per">{v3Per(r, true)}</span></span>
               </button>
               {/* Every row's controls. They sit OUTSIDE the expander button — a button
                   inside a button is invalid — and outside the open/closed state, because
@@ -10393,6 +10393,7 @@ function V3ActionBoard(){
           );
         })}
       </ol>
+      {V3_BOARD.ranked && <p className="micro muted v3-measure">Each row says when Greta last checked the evidence behind it. A row nothing has re-checked for three weeks leaves the ranked list, so what is ranked here is what is still true.</p>}
       <V3HeldActions/>
       <V3Findings/>
     </div>
