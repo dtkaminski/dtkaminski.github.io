@@ -10207,7 +10207,7 @@ function V3BoardDigest({ n = 5 }){
   if (!live.length) return <div className="v3-empty">Nothing needs doing right now. Greta raises something here as soon as it is worth your time.</div>;
   const total = live.reduce((a, r) => a + (Number(r.cm_gbp) || 0), 0);
   return (<div className="v3-next">
-    <div className="v3-kick">{v3Gbp(total)} a month across {live.length} action{live.length === 1 ? '' : 's'} Greta has checked</div>
+    <div className="v3-kick">{v3BoardSplitText(rows) || (v3Gbp(total) + ' a month across ' + live.length + ' actions Greta has checked')}</div>
     {live.slice(0, n).map((a, i) => (<div key={a.external_id || i} className="v3-next-row">
       <span className="v3-num">{i + 1}</span>
       <span>{v3PlainAction(a).title}</span>
@@ -10742,6 +10742,11 @@ function BusinessReview(){
   const overUnvalued = overRows.length - overValued.length;
   const slowCapital = !sp ? null : (overRows.length && !overValued.length) ? null : overValued.reduce((a, r) => a + Number(r.trapped_cash), 0);
   const lowCover = sk('critical') + sk('low');
+  // 0262: the stock action counts against the brand's lead time and leaves bundles out (frkl: 21
+  // products, 7 out); 'low_cover' is a fixed four weeks. The card reads the action when it is open.
+  const stockAct = UI_V3 && board && board.rows ? board.rows.find(r => r.external_id === 'stock-reorder') : null;
+  const stockN = stockAct ? (String(stockAct.description || '').match(/Order the (\d+) products/) || [])[1] : null;
+  const stockOut = stockAct ? (String(stockAct.description || '').match(/(\d+) (?:are|is) already out|One is already out/) || []) : [];
   const custBase = retQ.rows && retQ.rows[0] && retQ.rows[0].customers != null ? Number(retQ.rows[0].customers) : null;
 
   // ── HORIZON 1 — Now (trading, this week vs last) ──
@@ -10778,6 +10783,10 @@ function BusinessReview(){
       status:'info', statusLabel:'Monetization',
       series: trail('aov'), color:'var(--accent)', fmt:v=>GBP(v), axisFmt:fmtMoneyK,
       read:`average order value ${W&&W.m.aov!=null?GBP(W.m.aov):'—'} (8-week trend)` },
+    stockN ? { label:'Stock to reorder', value: stockN + ' products',
+      status:'action', statusLabel:'Order now',
+      sub: (stockOut[1] ? stockOut[1] + ' already out · ' : stockOut[0] ? '1 already out · ' : '') + 'run out before a restock can land, at your lead time',
+      read:`${stockN} products run out before a restock can land` } :
     { label:'Stock cover risk', value: sp ? lowCover+(lowCover===1?' item':' items') : '—',
       status: !sp ? 'missing' : lowCover>0?'watch':'healthy', statusLabel: !sp ? '—' : lowCover>0?'Restock needed':'Covered',
       sub: sp ? `${sk('critical')} out of stock · ${sk('low')} run out before a restock` : spWait,
@@ -10796,8 +10805,10 @@ function BusinessReview(){
       sub:'Everyone who has ordered from you',
       read:`Customer base ${custBase!=null ? NUM(custBase) : '—'} customers` },
     { label:'Revenue concentration', value: topShare!=null?pct0(topShare):'—',
-      status: topShare==null?'missing':(topShare>0.45?'watch':'healthy'),
-      statusLabel: topShare==null?'—':(topShare>0.45?'Concentrated':'Diversified'),
+      // Direct is orders with no tracked source (typed-in visits, codes, links Shopify cannot see), not
+      // a channel that could be switched off; a big Direct share is not a concentration risk.
+      status: topShare==null?'missing':(topChan && /direct/i.test(topChan.channel) ? 'info' : topShare>0.45?'watch':'healthy'),
+      statusLabel: topShare==null?'—':(topChan && /direct/i.test(topChan.channel) ? 'Mostly untracked' : topShare>0.45?'Concentrated':'Diversified'),
       sub: topChan?`${topChan.channel} is the largest revenue channel${paidShare!=null?` · paid = ${pct0(paidShare)} of revenue`:''}`:'—',
       read:`Revenue concentration: ${topChan?topChan.channel:'—'} ${topShare!=null?pct0(topShare):''}${paidShare!=null?`, paid ${pct0(paidShare)} of revenue`:''}` },
     { label:'Capital in slow stock', value: slowCapital!=null ? GBP(Math.round(slowCapital)) : '—',
@@ -10835,9 +10846,9 @@ function BusinessReview(){
       read:`Cash runway: cash-flow positive (net +${curSym()}${k(moNet)}/mo, ${curSym()}${k(cashBal)} on hand)` };
   } else {
     const months = cashBal/(-moNet);
-    runwayCard = { label:'Cash runway', value: months>=24?'24+ mo':months.toFixed(1)+' mo',
-      status: months<6?'action':months<12?'watch':'healthy', statusLabel: months<6?'Under 6 months':months<12?'Under 12 months':'12+ months',
-      sub:`${curSym()}${k(cashBal)} ÷ ${curSym()}${k(-moNet)}/mo burn (profit before ads − ad spend − overheads)`, onClick:editCash,
+    runwayCard = { label:'Cash runway', value: months>=24?'Over 2 years':(Math.round(months*10)/10)+' months',
+      status: months<6?'action':months<12?'watch':'healthy', statusLabel: months<6?'Under 6 months':months<12?'Under a year':'Healthy',
+      sub:`${curSym()}${k(cashBal)}${cashCfg.asOf ? ' as at ' + v3Day(cashCfg.asOf, true) : ''} ÷ ${curSym()}${k(-moNet)}/mo burn (profit before ads − ad spend − overheads)`, onClick:editCash,
       read:`Cash runway ${months.toFixed(1)} months (${curSym()}${k(cashBal)} ÷ ${curSym()}${k(-moNet)}/mo net burn)` };
   }
   durD.push(runwayCard);
@@ -10852,7 +10863,8 @@ function BusinessReview(){
                 : (breaches===1 || atRisk>2000) ? {kind:'watch',label:'Watch'}
                 : !moneyKnown ? {kind:'info',label:'Still loading'}
                 : {kind:'healthy',label:'On track'};
-  const verdictSentence = (moneyKnown ? '' : 'Greta’s £ findings are still loading. ') + (!moneyKnown ? '' : `${risks.length} action${risks.length===1?'':'s'} to act on now, worth about ${curSym()}${k(atRisk)}/mo, and ${opps.length} worth testing (${curSym()}${k(upside)}/mo). ${openActions} actions are open in the queue. `)
+  const splitTxt = UI_V3 && moneyKnown ? v3BoardSplitText(board.rows) : null;
+  const verdictSentence = (moneyKnown ? '' : 'Greta’s £ findings are still loading. ') + (!moneyKnown ? '' : splitTxt ? v3Sentence(splitTxt) + '. ' : `${risks.length} action${risks.length===1?'':'s'} to act on now, worth about ${curSym()}${k(atRisk)}/mo, and ${opps.length} worth testing (${curSym()}${k(upside)}/mo). ${openActions} actions are open in the queue. `)
     + `Unit economics: ${ltvCac!=null?ltvCac.toFixed(1)+'× contribution customer lifetime value:cost per new customer':'customer lifetime value:cost per new customer pending cost data'}, repeat rate ${repeat!=null?pct1(repeat):'—'}. `
     + `${topChan&&topShare!=null?`${topChan.channel} drives ${pct0(topShare)} of revenue`:''}${slowCapital>50000?`, with ${curSym()}${k(slowCapital)} of capital tied in slow-moving stock`:''}.`;
 
@@ -10908,7 +10920,7 @@ function BusinessReview(){
       </div>
       {/* TL;DR — the main points across the business, in five lines */}
       {(()=>{ const tl=[];
-        tl.push({t:`${overall.label}: ${curSym()}${k(atRisk)}/mo to act on now, ${curSym()}${k(upside)}/mo worth testing · ${openActions} actions open.`, c: overall.kind==='action'?'var(--bad)':overall.kind==='watch'?'var(--warn)':'var(--good)'});
+        tl.push({t: UI_V3 && board && board.rows && v3BoardSplitText(board.rows) ? `${overall.label}: ${v3BoardSplitText(board.rows)}.` : `${overall.label}: ${curSym()}${k(atRisk)}/mo to act on now, ${curSym()}${k(upside)}/mo worth testing · ${openActions} actions open.`, c: overall.kind==='action'?'var(--bad)':overall.kind==='watch'?'var(--warn)':'var(--good)'});
         if(risks[0]) tl.push({t:`First on the board — ${risks[0].description} (${curSym()}${k(Math.abs(risks[0].monthly_impact_gbp))}/mo).`, c:'var(--bad)'});
         if(opps[0]) tl.push({t:`First to test — ${opps[0].description} (${curSym()}${k(Math.abs(opps[0].monthly_impact_gbp))}/mo).`, c:'var(--good)'});
         tl.push({t:`Unit economics: ${ltvCac!=null?ltvCac.toFixed(1)+'× contribution customer lifetime value:cost per new customer':'customer lifetime value:cost per new customer pending cost data'}, repeat rate ${repeat!=null?pct1(repeat):'—'}${ltvCac!=null?` — ${ltvCac>=3?'healthy':'below the 3× target'}`:''}.`, c: (ltvCac!=null&&ltvCac>=3)?'var(--good)':'var(--warn)'});
@@ -10932,8 +10944,8 @@ function BusinessReview(){
         <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:9,lineHeight:1.4}}>Built from live Shopify, GA4, Meta, Google Ads, Klaviyo and cohort data. Every figure is a factual read of synced data — not a projection.</div>
       </div>
       {/* Three-horizon scorecard */}
-      <Eyebrow>Now · trading — this week vs last</Eyebrow>
-      <div className="card"><div className="wc-grid">{nowD.map((d,idx)=>RvCard({label:d.sp.label, value:d.sp.fmt(d.val), change:`${d.up?'↑':'↓'}${Math.abs(d.ch*100).toFixed(0)}%`, changeColor:d.good==null?'var(--text-muted)':(d.good?'var(--good)':'var(--bad)'), status:d.badge.kind, statusLabel:d.badge.label, series:trail(d.sp.key), color:RAG_COL[d.rag]||'var(--text-faint)', fmt:d.sp.fmt, axisFmt:d.sp.axisFmt}, idx))}</div></div>
+      {!UI_V3 && <Eyebrow>Now · trading — this week vs last</Eyebrow>}
+      {!UI_V3 && <div className="card"><div className="wc-grid">{nowD.map((d,idx)=>RvCard({label:d.sp.label, value:d.sp.fmt(d.val), change:`${d.up?'↑':'↓'}${Math.abs(d.ch*100).toFixed(0)}%`, changeColor:d.good==null?'var(--text-muted)':(d.good?'var(--good)':'var(--bad)'), status:d.badge.kind, statusLabel:d.badge.label, series:trail(d.sp.key), color:RAG_COL[d.rag]||'var(--text-faint)', fmt:d.sp.fmt, axisFmt:d.sp.axisFmt}, idx))}</div></div>}
       <Eyebrow>The engine · is the machine strengthening (trailing)</Eyebrow>
       <div className="card"><div className="wc-grid">{engineD.map(RvCard)}</div></div>
       <Eyebrow>Durability · will it compound — and what could break it</Eyebrow>
@@ -10954,7 +10966,7 @@ function BusinessReview(){
         <div className="card" style={{flex:'1 1 340px', minWidth:0, borderTop:'3px solid var(--bad)'}}>
           <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:8,marginBottom:4}}>
             <span style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>Act on now</span>
-            <span style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',color:'var(--bad)',whiteSpace:'nowrap'}}>{`${curSym()}`}{k(atRisk)}/mo</span>
+            {!UI_V3 && <span style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',color:'var(--bad)',whiteSpace:'nowrap'}}>{`${curSym()}`}{k(atRisk)}/mo</span>}
           </div>
           {risks.length ? risks.slice(0,6).map(regRow('var(--bad)')) : <div className="muted" style={{fontSize:'var(--text-sm)',padding:'8px 0'}}>{moneyKnown ? 'Nothing Greta has checked needs acting on right now.' : 'Loading the action board…'}</div>}
         </div>
@@ -19107,12 +19119,232 @@ function v3FindingTitle(f) {
   return first.replace(/\s*\((derived|measured[^)]*|platform count)\)/g, '').replace(/\s+—\s+mostly[\s\S]*$/, '').replace(/\.$/, '');
 }
 
+// ── Review (V3, rebuilt 2026-10-05) ─────────────────────────────────────────────────────────────────
+// The weekly board compared each week only with the week before (frkl's prior week held a sale), read
+// the GA4 repair as "Traffic grew 186%" under "What worked", judged ads against "2× — where most brands
+// break even", and kept its notes and a second action list in one browser ("0 open" beside a board of
+// six). Now: the week against a typical week (median of the eight before, sale-sized weeks left out), what moved it, sessions and
+// conversion held while tracking is recovering, the brand's own break-even; then the meeting agenda --
+// the board's top items with done / skip, what is coming, what was decided since -- and notes saved to
+// the workspace (review_note, 0265).
+// The board's money in its kinds: profit at stake in stock, ad spend that can be saved, other changes
+// Greta is fairly sure of, and tests. One total of unlike things is a number nobody can bank.
+function v3BoardSplitText(rows) {
+  const live = v3LiveRows(rows || []), sum = a => a.reduce((t, r) => t + (Number(r.cm_gbp) || 0), 0);
+  const act = live.filter(r => r.lane !== 'test'), tests = live.filter(r => r.lane === 'test');
+  const stock = act.filter(r => r.category === 'stock'), save = act.filter(r => r.origin === 'order_cost');
+  const rest = act.filter(r => r.category !== 'stock' && r.origin !== 'order_cost');
+  const bits = [];
+  if (stock.length) bits.push(v3Gbp(sum(stock)) + ' a month of profit at stake in stock');
+  if (save.length) bits.push(v3Gbp(sum(save)) + ' a month of ad spend you can save');
+  if (rest.length) bits.push(v3Gbp(sum(rest)) + ' a month from ' + (rest.length === 1 ? 'one more change' : rest.length + ' more changes') + ' Greta is fairly sure of');
+  if (tests.length) bits.push((tests.length === 1 ? 'one test' : tests.length + ' tests') + ' worth running');
+  return bits.length ? bits.slice(0, -1).join(', ') + (bits.length > 1 ? ', and ' : '') + bits[bits.length - 1] : null;
+}
+const V3_TRACK_Q = (sb, b) => sb.from('vw_brand_tracking_state').select('source,state,broke_on,fixed_on,comparisons_clean_from').eq('brand_id', b).eq('source', 'ga4').limit(1);
+function V3Review() {
+  const today = new Date().toISOString().slice(0, 10);
+  const lad = useV3Rows('profit-ladder', V3_LADDER_Q);
+  const trk = useV3Rows('rev-ga4-state', V3_TRACK_Q);
+  const ext = useV3Rows('rev-promos', (sb, b) => sb.from('external_events').select('ts').eq('brand_id', b).eq('kind', 'promo').gte('ts', v3IsoAdd(today, -400)).limit(200));
+  const done = useV3Rows('rev-done', (sb, b) => sb.from('actions').select('external_id,description,status,disposition_at,verdict,grade:metadata->grade')
+    .eq('brand_id', b).in('status', ['done', 'skipped']).gte('disposition_at', v3IsoAdd(today, -21)).order('disposition_at', { ascending: false }).limit(30));
+  const board = useV3Board();
+  const [back, setBack] = React.useState(0);          // weeks back from the last complete one
+  const [facts, setFacts] = React.useState(null);
+  React.useEffect(() => { let alive = true; v3AskFacts().then(f => { if (alive) setFacts(f); }, () => {}); return () => { alive = false; }; }, []);
+  const H = window.GRETA_HEADLINE || {};
+  const cmr = Number(H.net_revenue_30d) > 0 && H.product_contribution_30d != null ? Number(H.product_contribution_30d) / Number(H.net_revenue_30d) : null;
+  const be = cmr ? 1 / cmr : null;
+  const wk = React.useMemo(() => {
+    if (!lad.rows || cmr == null) return null;
+    const by = {}; lad.rows.forEach(r => { const d = String(r.day).slice(0, 10); if (d >= today) return; const k = v3Monday(d), o = by[k] || (by[k] = { start: k, sales: 0, spend: 0, days: 0 });
+      o.sales += Number(r.net_sales) || 0; o.spend += Number(r.paid_spend) || 0; o.days++; });
+    const list = Object.values(by).filter(w => w.days === 7).sort((a, b) => (a.start < b.start ? -1 : 1));
+    list.forEach(w => { w.kept = w.sales * cmr - w.spend; w.end = v3IsoAdd(w.start, 6); });
+    return list;
+  }, [lad.rows, cmr, today]);
+  const shop = (window.FRKL_DATA && window.FRKL_DATA.shopify) || [];
+  if (lad.err) return <V3LoadFailed what="your weeks" onRetry={lad.retry}/>;
+  if (!wk) return <V3SkeletonRows n={4}/>;
+  if (wk.length < 10) return <div className="v3-empty">The weekly review starts once there are ten full weeks of sales to compare with.</div>;
+  const i = Math.max(9, wk.length - 1 - back), W = wk[i], P = wk[i - 1];
+  // A typical week: the middle of the eight most recent weeks before this one, leaving out sale-sized
+  // weeks (over 1.4x the middle of the sixteen before). frkl's August sale ran three weeks near double;
+  // counted in, they made a normal October week read as half a typical one. Promos are not the test:
+  // the brand runs a small one most weeks.
+  const prev16 = wk.slice(Math.max(0, i - 16), i), m16 = v3Med(prev16.map(w => w.sales));
+  const clean = prev16.filter(w => !(m16 > 0 && w.sales > m16 * 1.4));
+  const prev8 = (clean.length >= 6 ? clean : prev16).slice(-8);
+  const leftOut = clean.length >= 6 ? prev16.filter(w => w.start >= prev8[0].start && !clean.includes(w)).length : 0;
+  const T = { sales: v3Med(prev8.map(w => w.sales)), spend: v3Med(prev8.map(w => w.spend)) }; T.kept = T.sales * cmr - T.spend;
+  const sum = (from, to, f) => shop.filter(r => r && r.date >= from && r.date <= to).reduce((a, r) => a + (Number(r[f]) || 0), 0);
+  const orders = sum(W.start, W.end, 'orders'), aov = orders > 0 ? W.sales / orders : null;
+  const chg = (a, b) => (b > 0 ? a / b - 1 : null);
+  const sChg = chg(W.sales, T.sales), pX = T.spend > 0 ? W.spend / T.spend : null;
+  const sEff = cmr * (W.sales - T.sales), pEff = -(W.spend - T.spend), dKept = W.kept - T.kept;
+  const word = c => (c == null ? '' : Math.abs(c) < 0.05 ? 'about a typical week' : fmtPctN(Math.abs(c)) + (c > 0 ? ' above' : ' below') + ' a typical week');
+  const lead = Math.abs(dKept) < Math.max(150, Math.abs(T.kept) * 0.1) ? 'An ordinary week: you kept ' + fmtMoney(W.kept) + ' after ads, about what a typical week keeps.'
+    : Math.abs(pEff) >= Math.abs(sEff)
+      ? (pEff < 0 ? 'Sales were ' + word(sChg) + ', but ad spend ran at ' + fmtTimes(pX, 1) + ' a typical week — that is what moved your profit.' : 'Ad spend was below a typical week and sales were ' + word(sChg) + ' — the lower spend lifted your profit.')
+      : 'Sales were ' + word(sChg) + ' — that is what moved your profit.';
+  const promoIn = (from, to) => (ext.rows || []).some(r => { const k = String(r.ts).slice(0, 10); return k >= from && k <= to; });
+  // only when the week before was big enough to mislead: a small promo in an ordinary week is not one
+  const priorSale = P && P.sales > T.sales * 1.25 && (promoIn(P.start, P.end) || P.sales > T.sales * 1.4);
+  const g4 = (trk.rows || [])[0] || null, held = g4 && g4.comparisons_clean_from && String(g4.comparisons_clean_from) > today;
+  const mer = W.spend > 0 ? W.sales / W.spend : null;
+  const range = v3Day(W.start) + ' – ' + v3Day(W.end, true);
+  const t12 = wk.slice(Math.max(0, i - 11), i + 1).map(w => ({ ...w, label: v3Day(w.start), mer: w.spend > 0 ? Math.round(w.sales / w.spend * 100) / 100 : null }));
+  const tip = ({ active, payload }) => { if (!active || !payload || !payload.length) return null; const p = payload[0].payload;
+    return (<div className="v3-tip"><b>Week of {v3Day(p.start, true)}</b><span>Sales <em>{fmtMoney(p.sales)}</em></span><span>Ad spend <em>{fmtMoney(p.spend)}</em></span><span>Kept after ads <em>{fmtMoney(p.kept)}</em></span></div>); };
+  const stat = (lab, val, foot, cls) => (<div className="v3-stat" key={lab}><div className="v3-stat-lab"><span>{lab}</span></div><div className="v3-stat-val">{val}</div>
+    <div className="v3-stat-foot"><span className={cls || 'v3-muted'}>{foot}</span></div></div>);
+  const liveRows = board.rows ? v3LiveRows(board.rows) : [];
+  const floor = Math.max(50, Math.round((Number(H.net_revenue_30d) || 0) * 0.005));
+  const top = liveRows.filter(r => (Number(r.cm_gbp) || 0) >= floor).slice(0, 3);
+  const split = board.rows ? v3BoardSplitText(board.rows) : null;
+  const F = facts || {}, pk = F.next_peak, goal = F.goal;
+  const peakDays = pk ? Math.round((new Date(pk.from) - new Date(today)) / 864e5) : null;
+  return (<div className="v3-page-stack">
+    <section>
+      <div className="v3-kick">The week · {range}{back === 0 ? ' · the last full week' : ''}</div>
+      <div className="v3-btn-row">
+        <button type="button" className="v3-btn v3-btn-q v3-btn-sm" disabled={i <= 9} onClick={() => setBack(b => b + 1)}>← Week before</button>
+        <button type="button" className="v3-btn v3-btn-q v3-btn-sm" disabled={back === 0} onClick={() => setBack(b => Math.max(0, b - 1))}>Week after →</button>
+      </div>
+      <p className="v3-verdict">{lead}</p>
+      <p className="v3-note v3-measure">{fmtMoney(W.sales)} of sales on {fmtMoney(W.spend)} of ads, keeping {fmtMoney(W.kept)} after ads. A typical week — the middle of the {prev8.length === 8 ? 'eight' : prev8.length} weeks before{leftOut ? ', leaving out ' + (leftOut === 1 ? 'one sale-sized week' : leftOut + ' sale-sized weeks') : ''} — is {fmtMoney(T.sales)} on {fmtMoney(T.spend)}, keeping {fmtMoney(T.kept)}.
+        {priorSale ? <> The week before held a sale, so against it this week looks worse than it was; Greta compares with a typical week instead.</> : null}
+        {held ? <> Sessions, conversion and the checkout funnel are held until {v3Day(g4.comparisons_clean_from, true)}: Google Analytics was not recording properly{g4.broke_on ? ' from ' + v3Day(g4.broke_on) : ''}{g4.fixed_on ? ' to ' + v3Day(g4.fixed_on) : ''}, so a jump in visits now is the repair, not more traffic.</> : null}</p>
+      <div className="v3-stat-grid v3-gap-top">
+        {stat('Sales', fmtMoney(W.sales), sChg == null ? '' : (sChg >= 0 ? '+' : '−') + fmtPctN(Math.abs(sChg)) + ' on a typical week', sChg != null && sChg < -0.1 ? 'v3-down' : 'v3-muted')}
+        {stat('Ad spend', fmtMoney(W.spend), pX == null ? '' : fmtTimes(pX, 1) + ' a typical week', pX != null && pX > 1.25 ? 'v3-down' : 'v3-muted')}
+        {stat('Kept after ads', fmtMoney(W.kept), fmtMoney(T.kept) + ' in a typical week', W.kept < T.kept * 0.8 ? 'v3-down' : 'v3-muted')}
+        {stat('Sales per £ of ads', mer != null ? fmtTimes(mer, 2) : FMT_NONE, be ? 'you break even at ' + fmtTimes(be, 2) : '', mer != null && be && mer < be ? 'v3-down' : 'v3-muted')}
+        {orders > 0 && stat('Orders', fmtCount(orders), aov ? 'average order ' + fmtMoney(aov) : '')}
+      </div>
+    </section>
+    <div className="v3-chart-pair">
+      <figure className="v3-chart">
+        <figcaption><span className="v3-chart-title">Sales, ad spend and what you kept, by week</span>
+          <span className="v3-legend"><i style={{ background: PAL.quiet }}/>Sales <i style={{ background: PAL.accent }}/>Ad spend <i style={{ background: PAL.ink }}/>Kept after ads</span></figcaption>
+        <R.ResponsiveContainer width="100%" height={240}>
+          <R.ComposedChart data={t12} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+            <R.CartesianGrid/><R.XAxis dataKey="label" interval="preserveStartEnd"/><R.YAxis tickFormatter={fmtMoneyK}/>
+            <R.Tooltip content={tip} cursor={false}/>
+            <R.Bar dataKey="sales" fill={PAL.quiet} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
+            <R.Bar dataKey="spend" fill={PAL.accent} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
+            <R.Line dataKey="kept" type="monotone" stroke={PAL.ink} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
+            <R.ReferenceLine y={0} stroke={PAL.line}/>
+          </R.ComposedChart>
+        </R.ResponsiveContainer>
+      </figure>
+      <figure className="v3-chart">
+        <figcaption><span className="v3-chart-title">Sales per £ of ads, by week</span>
+          {be && <span className="v3-legend"><i className="dash"/>{fmtTimes(be, 2)} — where you break even</span>}</figcaption>
+        <R.ResponsiveContainer width="100%" height={240}>
+          <R.ComposedChart data={t12} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+            <R.CartesianGrid/><R.XAxis dataKey="label" interval="preserveStartEnd"/><R.YAxis tickFormatter={v => v + '×'} domain={[0, 'auto']}/>
+            <R.Tooltip content={tip} cursor={false}/>
+            {be && <R.ReferenceLine y={be} stroke={PAL.muted} strokeDasharray="4 4"/>}
+            <R.Line type="monotone" dataKey="mer" stroke={PAL.accent} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
+          </R.ComposedChart>
+        </R.ResponsiveContainer>
+      </figure>
+    </div>
+
+    <section className="v3-sec">
+      <h2 className="v3-sec-title">For this week’s meeting</h2>
+      <div className="v3-kick">The board{split ? ' · ' + split : ''}</div>
+      {board.err ? <div className="v3-empty">Greta could not load your actions just now.</div> : !board.rows ? <V3SkeletonRows n={3}/> : (<ol className="v3-moves">
+        {top.map(r => (<li key={r.external_id}><b>{v3PlainAction(r).title}</b>{r.cm_gbp ? ' — ' + v3Gbp(r.cm_gbp) + ' a month' : ''}.
+          <div className="v3-btn-row"><V3Done ext={r.external_id} small onDone={() => v3BoardDrop(r.external_id)}/><V3Skip ext={r.external_id} small tone="quiet" onDone={() => v3BoardDrop(r.external_id)}/></div></li>))}
+      </ol>)}
+      <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>Every action, and why <span className="v3-xref-go">on Actions →</span></button>
+      {(pk || (goal && goal.needs_replanning)) && (<>
+        <div className="v3-kick v3-gap-top">Coming up</div>
+        <ul className="v3-moves">
+          {pk && <li><b>{pk.name} starts in {peakDays} days.</b> {pk.same_days_last_year_sales ? 'The same days last year sold ' + fmtMoney(pk.same_days_last_year_sales) + '. ' : ''}{pk.promotions_planned && pk.promotions_planned.length ? pk.promotions_planned.length + ' promotion' + (pk.promotions_planned.length === 1 ? '' : 's') + ' planned.' : 'Nothing is planned in it yet.'}{pk.stock_order_by && pk.stock_order_by < today ? ' Stock for it had to be ordered by ' + v3Day(pk.stock_order_by) + '.' : ''}
+            {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('calendar')}>Plan it <span className="v3-xref-go">on Calendar →</span></button></li>}
+          {goal && goal.needs_replanning && <li><b>Your quarter goal needs re-planning.</b> Greta’s plan changed after it was confirmed.{' '}
+            <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal')}>Re-plan <span className="v3-xref-go">on Goal &amp; costs →</span></button></li>}
+          {F.calendar && F.calendar.past_sales_not_on_the_calendar > 0 && <li><b>{F.calendar.past_sales_not_on_the_calendar} past sales are not on the calendar.</b> Adding them lets Greta learn what your promotions really do.</li>}
+        </ul>
+      </>)}
+      {done.rows && done.rows.length > 0 && (<>
+        <div className="v3-kick v3-gap-top">Decided in the last three weeks</div>
+        <ul className="v3-rank-steps">{done.rows.slice(0, 6).map((r, k) => (<li key={r.external_id + k}><span className="v3-rank-desc">{v3PlainAction(r).title}</span>
+          <span className="v3-sub"> {r.status === 'skipped' ? 'Skipped' : 'Done'} {v3Day(r.disposition_at)}{r.verdict ? ' · ' + ((V3_VERDICT[r.verdict] || {}).label || r.verdict) : ' · not judged yet'}</span></li>))}</ul>
+        {done.rows.length > 6 && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>{done.rows.length - 6} more decided <span className="v3-xref-go">on Actions →</span></button>}
+      </>)}
+    </section>
+    <V3ReviewNotes weekStart={W.start} range={range}/>
+  </div>);
+}
+// Notes and decisions for the week under review, kept in the workspace (review_note, 0265) so the team
+// sees the same page. Notes this browser kept under the old board can be brought over once.
+function V3ReviewNotes({ weekStart, range }) {
+  const key = 'rev-notes-' + weekStart;
+  const q = useV3Rows(key, (sb, b) => sb.from('review_note').select('id,kind,body,author_id,created_at').eq('brand_id', b).eq('week_start', weekStart).order('created_at', { ascending: true }));
+  const [text, setText] = React.useState(''), [kind, setKind] = React.useState('note'), [busy, setBusy] = React.useState(false), [msg, setMsg] = React.useState(null);
+  const uid = window.FRKL_LIVE && window.FRKL_LIVE.session && window.FRKL_LIVE.session.user && window.FRKL_LIVE.session.user.id;
+  const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
+  const oldNotes = (() => { try { const n = boardLoadNotes(), a = boardLoadActions(); return { n: Object.keys(n).filter(k => String(n[k] || '').trim()), a: (a || []).filter(x => x && x.text) }; } catch (e) { return { n: [], a: [] }; } })();
+  const oldCount = oldNotes.n.length + oldNotes.a.length;
+  const save = async () => {
+    const t = text.trim(); if (!t || !sb || !b) return;
+    setBusy(true); setMsg(null);
+    const r = await sb.from('review_note').insert({ brand_id: b, week_start: weekStart, kind, body: t.slice(0, 4000) });
+    setBusy(false);
+    if (r.error) { setMsg('Could not save that just now — try again.'); return; }
+    setText(''); q.retry();
+  };
+  const remove = async (id) => { if (!sb) return; const r = await sb.from('review_note').delete().eq('id', id); if (!r.error) q.retry(); };
+  const bringOver = async () => {
+    if (!sb || !b) return; setBusy(true);
+    const n = boardLoadNotes();
+    const rows = oldNotes.n.map(we => ({ brand_id: b, week_start: v3Monday(String(we).slice(0, 10)), kind: 'note', body: String(n[we]).slice(0, 4000) }))
+      .concat(oldNotes.a.map(x => ({ brand_id: b, week_start: v3Monday(String(x.raised || weekStart).slice(0, 10)), kind: 'decision', body: (x.status === 'done' ? '[done] ' : '') + String(x.text).slice(0, 3990) })));
+    const r = rows.length ? await sb.from('review_note').insert(rows) : { error: null };
+    setBusy(false);
+    if (!r.error) { try { localStorage.removeItem('frkl-board-notes'); localStorage.removeItem('frkl-board-actions'); } catch (e) {} setMsg('Brought over ' + rows.length + ' note' + (rows.length === 1 ? '' : 's') + ' from this browser.'); q.retry(); }
+    else setMsg('Could not bring them over just now.');
+  };
+  return (<section className="v3-sec">
+    <h2 className="v3-sec-title">Notes and decisions <span className="v3-muted">{range}</span></h2>
+    <p className="v3-note v3-measure">Saved to your workspace, so everyone on your team sees the same notes. To act on something on the board, mark it done or skip it above — that is what Greta checks later.</p>
+    {q.err ? <div className="v3-empty">Notes could not load just now.</div> : !q.rows ? <V3SkeletonRows n={2}/> : q.rows.length === 0 ? <div className="v3-empty">Nothing written for this week yet.</div> : (
+      <ul className="v3-rank-steps">{q.rows.map(r => (<li key={r.id}><span className="v3-rank-desc">{r.kind === 'decision' ? 'Decision: ' : ''}{r.body}</span>
+        <span className="v3-sub"> {v3Day(r.created_at)}{r.author_id === uid ? ' · you' : ''}</span>
+        {r.author_id === uid && <> <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => remove(r.id)}>Remove</button></>}</li>))}</ul>)}
+    <div className="v3-ask-box v3-gap-top">
+      <textarea value={text} onChange={e => setText(e.target.value)} rows={3} placeholder="What did you decide, and what should everyone remember about this week?"/>
+      <div className="v3-ask-bar">
+        <div className="v3-seg" role="group" aria-label="Kind of note">
+          <button type="button" aria-pressed={kind === 'note'} onClick={() => setKind('note')}>Note</button>
+          <button type="button" aria-pressed={kind === 'decision'} onClick={() => setKind('decision')}>Decision</button>
+        </div>
+        <button type="button" className="v3-btn v3-btn-p" disabled={busy || !text.trim()} onClick={save}>{busy ? 'Saving…' : 'Save'}</button>
+      </div>
+    </div>
+    {msg && <p className="v3-note">{msg}</p>}
+    {oldCount > 0 && <p className="micro muted v3-measure">This browser still holds {oldCount} note{oldCount === 1 ? '' : 's'} and action{oldCount === 1 ? '' : 's'} from the old board, which only you could see.{' '}
+      <button type="button" className="v3-btn v3-btn-q v3-btn-sm" disabled={busy} onClick={bringOver}>Bring them into the workspace</button></p>}
+  </section>);
+}
+
 const V3_PAGES = {
   today: (p) => <V3Today {...p}/>,
   review: (p) => (<>
-    <V3Anchor id="week"/><WeeklyBoard/>
+    {/* Rebuilt 2026-10-05: the week against a typical week, the meeting agenda off the board, notes in
+        the workspace. The old weekly board (week-on-week only, GA4 repair read as growth, notes in one
+        browser) and the alerts panel (forecast patterns the board holds back, a track record that said
+        nothing was done) are gone; findings that pass the evidence check are below. */}
+    <V3Anchor id="week"/><V3Review/>
     <V3More id="rev-quarter" label="This quarter — the board pack"><V3Anchor id="quarter"/><BusinessReview/></V3More>
-    <V3More id="rev-alerts" label="Alerts — what changed and why"><V3Anchor id="alerts"/><IntelligencePanel/></V3More>
+    <V3More id="rev-alerts" label="What Greta found — the findings behind the board"><V3Anchor id="alerts"/><V3Findings/>
+      <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>What was done, and whether it worked <span className="v3-xref-go">on Actions →</span></button>
+    </V3More>
   </>),
   actions: (p) => (<>
     <ActionsView/>
