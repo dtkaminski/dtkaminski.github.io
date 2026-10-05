@@ -10199,7 +10199,20 @@ function V3ActionBoard(){
   return (
     <div className="v3-board v3-enter">
       <div className="v3-board-head">
-        <span className="v3-board-total">{v3Gbp(total)}<span className="v3-board-total-lab"> a month across {liveRows.length} live action{liveRows.length === 1 ? '' : 's'}</span></span>
+        {/* One total added profit kept by restocking, ad spend saved, an assumed win-back and a price
+            test (frkl: "£9,627 a month") -- a number nobody can bank. Say what each kind is worth. */}
+        {(() => {
+          const sum = a => a.reduce((t, r) => t + (Number(r.cm_gbp) || 0), 0);
+          const act = liveRows.filter(r => r.lane !== 'test'), tests = liveRows.filter(r => r.lane === 'test');
+          const stock = act.filter(r => r.category === 'stock'), save = act.filter(r => r.origin === 'order_cost');
+          const rest = act.filter(r => r.category !== 'stock' && r.origin !== 'order_cost');
+          const bits = [];
+          if (stock.length) bits.push(<span key="s"><b className="v3-num">{v3Gbp(sum(stock))}</b> a month of profit at stake in stock</span>);
+          if (save.length) bits.push(<span key="v"><b className="v3-num">{v3Gbp(sum(save))}</b> a month of ad spend you can save</span>);
+          if (rest.length) bits.push(<span key="r"><b className="v3-num">{v3Gbp(sum(rest))}</b> a month from {rest.length === 1 ? 'one more change' : rest.length + ' more changes'} Greta is fairly sure of</span>);
+          if (tests.length) bits.push(<span key="t">{tests.length === 1 ? 'one test' : tests.length + ' tests'} worth running</span>);
+          return <span className="v3-board-total-lab">{bits.length ? bits.reduce((a, b, i) => a.concat(i === 0 ? [b] : [i === bits.length - 1 ? ', and ' : ', ', b]), []) : <>{v3Gbp(total)} a month across {liveRows.length} live actions</>}.</span>;
+        })()}
         {unverRows.length > 0 && (
           <span className="v3-board-unver">{v3Gbp(unverTotal)} more sits in {unverRows.length} action{unverRows.length === 1 ? '' : 's'} nothing has re-checked</span>
         )}
@@ -10335,6 +10348,7 @@ const V3_RUNG_ORDER = { direct: 0, likely: 1, probably: 2, possible: 3, outside_
 function V3Findings(){
   const [rows, setRows] = React.useState(null);
   const [open, setOpen] = React.useState(null);
+  const board = useV3Board();
   React.useEffect(() => {
     let alive = true;
     const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
@@ -10351,7 +10365,12 @@ function V3Findings(){
       <span className="v3-sub"> What moved and why, where there is no pound figure to rank it by. Strongest evidence first.</span>
       <ul className="v3-rank-steps">
         {sorted.map(f => {
-          const pa = v3PlainAction(f);
+          const pa = { title: v3FindingTitle(f), why: v3Tidy(scrubTag(String(f.description || ''))) };
+          // A diagnosis of a channel the board is already acting on is the why behind that action.
+          const diag = /^(diagnosis|metric-tree)-/.test(String(f.external_id));
+          const ch = !diag ? null : /meta/i.test(f.external_id) ? 'meta' : /google/i.test(f.external_id) ? 'google' : null;
+          const live = board.rows ? v3LiveRows(board.rows) : [];
+          const behind = ch ? live.findIndex(r => r.external_id === 'order-cost-' + ch) : -1;
           const conf = v3MoneyConf(f);
           const isOpen = open === f.external_id;
           const reasons = Array.isArray(f.evidence_reasons) ? f.evidence_reasons.filter(x => x && x.text) : [];
@@ -10359,7 +10378,7 @@ function V3Findings(){
             <button type="button" className="v3-rank-hit" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : f.external_id)}>
               <span className="v3-rank-body">
                 <span className="v3-rank-desc">{pa.title}</span>
-                <span className="v3-rank-meta">{f.category || 'general'}{conf ? ' · ' + V3_CONF[conf].label.toLowerCase() : ''}</span>
+                <span className="v3-rank-meta">{f.category || 'general'}{conf ? ' · ' + V3_CONF[conf].label.toLowerCase() : ''}{behind >= 0 ? ' · explains #' + (behind + 1) : ''}</span>
               </span>
             </button>
             {isOpen && (<div className="v3-rank-why">
@@ -10516,8 +10535,12 @@ function ActionsView(){
       <V3ActionBoard/>
       {/* Restock keeps its own queue, but BELOW the ranked list and collapsed: it is a different
           job (what to order, by date) and it was drowning the money ranking when it led. */}
-      <V3More id="act-restock" label="Stock and purchasing — what to order, by date"><RestockActionQueue/></V3More>
-      <V3More id="act-legacy" label="Earlier specialist review"><ActionBoard/><AdviceLedgerPanel/></V3More>
+      {/* V3: the browser planner's stock list (28 to order, sized to its own demand plan, against the
+          board's 21) and the 137-day-old specialist review (a £4.8k "act now" from a browser rule that
+          the board never raised) are gone. Stock & orders is the one order list. */}
+      {UI_V3 && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('stock')}>What to order, product by product <span className="v3-xref-go">on Stock &amp; orders →</span></button>}
+      {!UI_V3 && <V3More id="act-restock" label="Stock and purchasing — what to order, by date"><RestockActionQueue/></V3More>}
+      {!UI_V3 && <V3More id="act-legacy" label="Earlier specialist review"><ActionBoard/><AdviceLedgerPanel/></V3More>}
     </div>
   );
 }
@@ -18959,6 +18982,71 @@ function V3CostsOff() {
   </section>);
 }
 
+// ── What you did, and whether it worked (Actions) ──────────────────────────────────────────────────
+// The track record read the agents' advice ledger and the decision log, which said "No
+// recommendations marked done yet" and "0 decisions" beside 17 actions marked done in the actions
+// table. This reads the table: every action marked done or skipped, newest first, with the grade
+// fn_grade_one_action gave it (0263 judges each on its own promise) and the reason in its words. Most
+// older ones are "can't be judged": they made no measurable promise, and the page says so rather than
+// counting them as wins.
+const V3_VERDICT = {
+  hit: { label: 'Worked', cls: 'v3-up' }, miss: { label: 'Didn’t work', cls: 'v3-down' }, partial: { label: 'Partly', cls: '' },
+  flat: { label: 'No change', cls: 'v3-muted' }, inconclusive: { label: 'Not judged yet', cls: 'v3-muted' },
+  ungradeable: { label: 'Can’t be judged', cls: 'v3-muted' }, no_data: { label: 'No data', cls: 'v3-muted' }
+};
+function V3TrackRecord() {
+  const q = useV3Rows('act-track', (sb, b) => sb.from('actions')
+    .select('external_id,description,category,status,disposition_at,raised_at,verdict,predicted_window_days,predicted_metric_id,predicted_direction,grade:metadata->grade')
+    .eq('brand_id', b).in('status', ['done', 'skipped', 'partial']).order('disposition_at', { ascending: false, nullsFirst: false }).limit(200));
+  const [showAll, setShowAll] = React.useState(false), [showSkipped, setShowSkipped] = React.useState(false);
+  if (q.err) return <V3LoadFailed what="what you have done" onRetry={q.retry}/>;
+  if (!q.rows) return <V3SkeletonRows n={3}/>;
+  const done = q.rows.filter(r => r.status === 'done' || r.status === 'partial'), skipped = q.rows.filter(r => r.status === 'skipped');
+  if (!done.length && !skipped.length) return <div className="v3-empty">Nothing marked done or skipped yet. Mark an action done and Greta checks whether it worked once its window has passed.</div>;
+  const judged = done.filter(r => ['hit', 'miss', 'partial', 'flat'].includes(r.verdict));
+  const worked = judged.filter(r => r.verdict === 'hit').length, failed = judged.filter(r => r.verdict === 'miss').length;
+  const cant = done.filter(r => r.verdict === 'ungradeable' || r.verdict === 'no_data').length;
+  const waiting = done.filter(r => !r.verdict || r.verdict === 'inconclusive').length;
+  const when = r => r.disposition_at ? v3Day(r.disposition_at, true) : '';
+  const due = r => r.disposition_at && r.predicted_window_days ? v3IsoAdd(v3Iso10(r.disposition_at), Number(r.predicted_window_days) + 1) : null;
+  const row = (r, i) => {
+    const v = V3_VERDICT[r.verdict] || null, g = r.grade || {}, d = due(r);
+    return (<li key={r.external_id + i}>
+      <span className="v3-rank-desc">{v3PlainAction(r).title}</span>
+      <span className="v3-sub"> {r.status === 'skipped' ? 'Skipped' : 'Done'} {when(r)} · <span className={v ? v.cls : 'v3-muted'}>{v ? v.label : (d ? 'Judged after ' + v3Day(d, true) : 'Not judged yet')}</span>
+        {g.reason ? <> — {v3Tidy(g.reason)}</> : (v && r.predicted_metric_id ? <> — {String(r.predicted_metric_id).replace(/_30d$/, '').replace(/_/g, ' ')} {r.verdict === 'miss' ? 'did not move ' : 'moved '}{r.predicted_direction === 'down' ? 'down' : 'up'} as promised, before against after (graded by an earlier method)</> : null)}</span>
+    </li>);
+  };
+  const shown = showAll ? done : done.slice(0, 8);
+  return (<section className="v3-sec">
+    <p className="v3-verdict">{judged.length
+      ? <>Of {fmtCount(done.length)} actions you marked done, Greta could judge {fmtCount(judged.length)}: {fmtCount(worked)} worked{failed ? ', ' + fmtCount(failed) + ' didn’t' : ''}.</>
+      : <>You have marked {fmtCount(done.length)} action{done.length === 1 ? '' : 's'} done, and Greta has not yet been able to say whether any of them worked.</>}</p>
+    <p className="v3-note v3-measure">
+      {cant > 0 && <>{fmtCount(cant)} can’t be judged: most were raised before actions carried a promise Greta could check (a spend that should fall, products back in stock, a price that should hold its sales). </>}
+      {waiting > 0 && <>{fmtCount(waiting)} {waiting === 1 ? 'is' : 'are'} still inside the window Greta waits before judging. </>}
+      Every action raised now says what it should change, and Greta checks that once its window has passed. A grade compares before with after: it says the promise held, not that the action alone made it happen.</p>
+    <ul className="v3-rank-steps">{shown.map(row)}</ul>
+    {done.length > 8 && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => setShowAll(s => !s)}>{showAll ? 'Show the latest 8' : 'Show all ' + done.length}</button>}
+    {skipped.length > 0 && (<>
+      {' '}<button type="button" className="v3-btn v3-btn-q v3-btn-sm" aria-expanded={showSkipped} onClick={() => setShowSkipped(s => !s)}>{showSkipped ? 'Hide' : 'Show'} {skipped.length} skipped</button>
+      {showSkipped && <ul className="v3-rank-steps">{skipped.map(row)}</ul>}
+    </>)}
+  </section>);
+}
+// A finding's title is its own first line, not "Why X changed": the finding is in the text.
+function v3FindingTitle(f) {
+  const raw = v3Tidy(scrubTag(String((f && f.description) || ''))).trim();
+  let x;
+  if ((x = raw.match(/^Why (.+?) moved, ranked by evidence:\s*1\.\s*([^(;]+?)\s*\(/i))) return v3Sentence(x[1]) + ' moved — most likely: ' + x[2].charAt(0).toLowerCase() + x[2].slice(1);
+  if (f.external_id === 'discount-depth-inversion' && (x = raw.match(/they are (\d+)% of the last 90 days/i))) {
+    const y = raw.match(/from £([\d,.]+) to £([\d,.]+)/);
+    return x[1] + '% of orders sell at 45% or more off and don’t pay for a new customer' + (y ? '; capping discounts at 30% would take profit per order from £' + Math.round(Number(y[1].replace(/,/g, ''))) + ' to £' + Math.round(Number(y[2].replace(/,/g, ''))) : '');
+  }
+  const first = (raw.match(/^(.+?[.!?])(\s|$)/) || [null, raw])[1];
+  return first.replace(/\s*\((derived|measured[^)]*|platform count)\)/g, '').replace(/\s+—\s+mostly[\s\S]*$/, '').replace(/\.$/, '');
+}
+
 const V3_PAGES = {
   today: (p) => <V3Today {...p}/>,
   review: (p) => (<>
@@ -18968,7 +19056,7 @@ const V3_PAGES = {
   </>),
   actions: (p) => (<>
     <ActionsView/>
-    <V3More id="act-decisions" label="Decisions and results"><V3Anchor id="decisions"/>{mosView('DecisionLog')}</V3More>
+    <V3More id="act-decisions" label="What you did, and whether it worked" defaultOpen><V3Anchor id="decisions"/><V3TrackRecord/></V3More>
   </>),
   calendar: (p) => mosView('Calendar'),
   ask: (p) => <AskPanel/>,
