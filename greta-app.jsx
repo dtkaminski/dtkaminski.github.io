@@ -19975,6 +19975,11 @@ function V3BusinessState() {
       <span>After product, order and ad costs <em>{fmtMoney(d.v)}</em></span><span>Below usual prices <em>{fmtPctN(d.off)}</em></span></div>); };
   if (U.cac != null && U.first_order_contribution != null)
     sents.push(<>A new customer costs {fmtMoney(num(U.cac))} and their first order earns {fmtMoney(num(U.first_order_contribution))}{U.ltv_cac != null ? <>; over their life they are worth {fmtTimes(num(U.ltv_cac), 1)} what they cost, where brands aim for 3×</> : null}. {R.repeat_90d != null ? <>{fmtPctN(num(R.repeat_90d))} order again within 90 days{BM.repeat_90d ? <> (around {fmtPctN(BM.repeat_90d.typical)} is typical)</> : null}, and returning customers bring {fmtPctN(num(R.returning_rev_share))} of sales.</> : null}</>);
+  // 0271: Klaviyo counts any order after an email was opened; the shop counts only orders that came
+  // through an email link. Say both, and that neither is the answer.
+  const E = S.email || {};
+  if (E.shop_share != null && num(E.share) - num(E.shop_share) >= 0.2)
+    sents.push(<>Klaviyo credits email with {fmtPctN(num(E.share))} of your sales; your shop traces {fmtPctN(num(E.shop_share))} to an email click{num(E.direct_share_30d) >= 0.4 ? <> and records {fmtPctN(num(E.direct_share_30d))} of orders with no source at all</> : null}. The truth sits between, so judge email by holding a slice of customers back, not by either figure.{num(E.campaigns_90d) >= 10 ? <> {fmtCount(E.sale_campaigns_90d)} of your last {fmtCount(E.campaigns_90d)} campaigns were sale emails.</> : null}</>);
   if (topCode)
     sents.push(<>Your biggest source of new customers is not an ad platform: the code <b>{topCode.code}</b> brought {fmtCount(topCode.orders_365d)} orders in the last year, {fmtPctN(num(topCode.first_order_share))} of them first orders, at {fmtPctN(num(topCode.avg_depth))} off.</>);
   if (P && P.title)
@@ -20071,23 +20076,78 @@ function V3CodePerformance() {
 const V3_STALE_Q = (sb, b) => sb.from('actions').select('external_id,description,raised_at,category')
   .eq('brand_id', b).eq('status', 'open').lt('raised_at', v3IsoAdd(new Date().toISOString().slice(0, 10), -60))
   .order('raised_at', { ascending: true }).limit(40);
+// Older suggestions overlap one another (two Judge.me fixes, three checkout tweaks) and some are now
+// covered by a row Greta re-checks. Group them by topic and say where the board already has it, so the
+// owner can clear a group at a glance. The owner still decides each one; nothing closes on its own.
+const V3_STALE_TOPICS = [
+  { k: 'abandon', re: /abandon/i, label: 'Abandoned cart and checkout emails' },
+  { k: 'reviews', re: /judge\.?me|\breviews?\b/i, label: 'Product reviews' },
+  { k: 'post', re: /post.?purchase/i, label: 'Post-purchase email', board: /^crm-flows/ },
+  { k: 'credit', re: /attributed revenue|true flow|reporting gross/i, label: 'How much email really earns',
+    note: 'Today’s summary now sets Klaviyo’s credit against what your shop traces to an email click.' },
+  { k: 'welcome', re: /welcome/i, label: 'Welcome email' },
+  { k: 'checkout', re: /checkout|discount_value|\bcart\b|apple pay/i, label: 'Cart and checkout' },
+  { k: 'creators', re: /influencer|creator|\bugc\b/i, label: 'Creators', board: /^promo-peak/ },
+];
 function V3StaleSuggestions() {
   const q = useV3Rows('stale-suggestions', V3_STALE_Q);
+  const board = useV3Board();
   if (q.err || !q.rows) return null;
   const rows = q.rows.filter(r => /^(pulse|lux|frame|sage|scout|atlas)-/.test(r.external_id));
   if (!rows.length) return null;
+  const live = board.rows ? v3LiveRows(board.rows) : [];
+  const groups = [], byKey = {};
+  rows.forEach(r => {
+    const t = V3_STALE_TOPICS.find(x => x.re.test(String(r.description || '') + ' ' + r.external_id));
+    const k = t ? t.k : r.external_id;
+    if (!byKey[k]) { byKey[k] = { topic: t || null, rows: [] }; groups.push(byKey[k]); }
+    byKey[k].rows.push(r);
+  });
+  const item = r => (<li key={r.external_id}>
+    <span className="v3-rank-desc">{v3Sentence(String(r.description || r.external_id))}</span>
+    <span className="v3-sub"> · suggested {v3Day(String(r.raised_at).slice(0, 10), true)}</span>
+    <div className="v3-btn-row"><V3Done ext={r.external_id} small onDone={q.retry}/><V3Skip ext={r.external_id} small onDone={q.retry}/></div>
+  </li>);
   return (<V3More id="act-stale" label={'Older suggestions Greta can’t vouch for (' + rows.length + ')'}>
-    <p className="v3-note v3-measure">These were suggested as tasks months ago and nothing has re-checked them since, so Greta doesn’t rank them on the board. Mark each done if it happened, or skip it if it no longer applies.</p>
-    <ul className="v3-rank-steps">{rows.map(r => (<li key={r.external_id}>
-      <span className="v3-rank-desc">{v3Sentence(String(r.description || r.external_id))}</span>
-      <span className="v3-sub"> · suggested {v3Day(String(r.raised_at).slice(0, 10), true)}</span>
-      <div className="v3-btn-row"><V3Done ext={r.external_id} small onDone={q.retry}/><V3Skip ext={r.external_id} small onDone={q.retry}/></div>
-    </li>))}</ul>
+    <p className="v3-note v3-measure">These were suggested as tasks months ago and nothing has re-checked them since, so Greta doesn’t rank them on the board. Mark each done if it happened, or skip it if it no longer applies. Where the board already covers one, it says so.</p>
+    <ul className="v3-rank-steps">{groups.map(g => {
+      const t = g.topic;
+      const i = t && t.board ? live.findIndex(r => t.board.test(r.external_id)) : -1;
+      const head = s => { s = String(s || ''); const j = s.search(/[.:;](\s|$)/); s = j > 0 ? s.slice(0, j) : s; return s.length > 90 ? s.slice(0, 87) + '…' : s; };
+      const covered = i >= 0 ? <>Greta’s board covers this now: “{head(v3PlainAction(live[i]).title)}” (#{i + 1}). These can be skipped.</> : (t && t.note) || null;
+      if (!t || (g.rows.length === 1 && !covered)) return g.rows.map(item);
+      return (<li key={'g-' + t.k}>
+        <span className="v3-rank-desc"><b>{t.label}</b>{g.rows.length > 1 ? ' · ' + g.rows.length + ' overlapping suggestions' : ''}</span>
+        {covered && <p className="micro muted v3-measure">{covered}</p>}
+        <ul className="v3-rank-steps">{g.rows.map(item)}</ul>
+      </li>);
+    })}</ul>
   </V3More>);
 }
 
+// Tracking first. When Greta has found that site tracking broke, every figure that rests on the shop's
+// record of where an order came from (cost per order by platform, where ads send people) reads low for
+// each channel and high for "direct". That is the one thing to fix before acting on those rows, so it
+// sits above the board rather than unranked below it.
+const V3_FIXFIRST_Q = (sb, b) => sb.from('actions').select('external_id,description,raised_at')
+  .eq('brand_id', b).eq('status', 'open').eq('external_id', 'tracking-coverage').limit(1);
+function V3FixFirst() {
+  const q = useV3Rows('fix-first', V3_FIXFIRST_Q);
+  const board = useV3Board();
+  if (q.err || !q.rows || !q.rows.length) return null;
+  const r = q.rows[0];
+  const live = board.rows ? v3LiveRows(board.rows) : [];
+  const hit = live.map((x, i) => ({ x, i })).filter(o => /^(order-cost|paid-landing)-/.test(o.x.external_id));
+  return (<section className="v3-sec">
+    <div className="v3-kick">Fix first</div>
+    <p className="v3-note v3-measure"><b>{v3PlainAction(r).title}.</b> {v3Tidy(scrubTag(String(r.description || '')))}</p>
+    {hit.length > 0 && <p className="micro muted v3-measure">Until it is fixed, {hit.map(o => '#' + (o.i + 1)).join(', ').replace(/, ([^,]*)$/, ' and $1')} on the board {hit.length === 1 ? 'counts' : 'count'} the orders your shop credits to each channel, which read low while tracking is broken. Act on {hit.length === 1 ? 'it' : 'them'}, but expect part of the change to be tracking.</p>}
+    <div className="v3-btn-row"><V3Done ext={r.external_id} small onDone={q.retry}/></div>
+  </section>);
+}
+
 const V3_PAGES = {
-  today: (p) => (<><V3BusinessState/><V3Today {...p}/></>),
+  today: (p) => (<><V3BusinessState/><V3FixFirst/><V3Today {...p}/></>),
   review: (p) => (<>
     {/* Rebuilt 2026-10-05: the week against a typical week, the meeting agenda off the board, notes in
         the workspace. The old weekly board (week-on-week only, GA4 repair read as growth, notes in one
@@ -20100,6 +20160,7 @@ const V3_PAGES = {
     </V3More>
   </>),
   actions: (p) => (<>
+    <V3FixFirst/>
     <ActionsView/>
     <V3More id="act-decisions" label="What you did, and whether it worked" defaultOpen><V3Anchor id="decisions"/><V3TrackRecord/></V3More>
     <V3StaleSuggestions/>
