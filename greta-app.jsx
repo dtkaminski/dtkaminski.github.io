@@ -8486,7 +8486,7 @@ async function v3AskFacts() {
   if (!sb || !b) return null;
   const T = (p, ms) => Promise.race([Promise.resolve(p).then(r => (r && !r.error ? r.data : null), () => null), new Promise(res => setTimeout(() => res(null), ms || 9000))]);
   const today = new Date().toISOString().slice(0, 10), Q = v3Quarter(today);
-  const [lad, goalR, paceR, ueR, drift, cogsR, cfgR, cal, found, curveR, boardR, stockR] = await Promise.all([
+  const [lad, goalR, paceR, ueR, drift, cogsR, cfgR, cal, found, curveR, boardR, stockR, stateR] = await Promise.all([
     T(V3_LADDER_Q(sb, b)), T(V3_GOAL_Q(sb, b)), T(v3PlanQ(Q.start, Q.end, null)(sb, b), 15000), T(V3_UE_Q(sb, b)),
     T(V3_DRIFT_Q(sb, b)), T(V3_COGSQ_Q(sb, b)),
     T(sb.from('brand_config').select('supplier_lead_time_weeks,fixed_costs_monthly,cash_floor,opening_cash,opening_cash_as_of').eq('brand_id', b).limit(1)),
@@ -8497,6 +8497,7 @@ async function v3AskFacts() {
     // what each board row's pounds are (the readout gives the number only), and the stock plan's rows
     T(sb.from('vw_brand_action_board').select('board_rank,money_basis').eq('brand_id', b).limit(30)),
     T(V3_STOCK_Q(sb, b), 12000),
+    T(sb.from('cache_brand_state').select('state').eq('brand_id', b).limit(1)),
   ]);
   const H = window.GRETA_HEADLINE || {};
   const cmr = Number(H.net_revenue_30d) > 0 && H.product_contribution_30d != null ? Number(H.product_contribution_30d) / Number(H.net_revenue_30d) : null;
@@ -8547,6 +8548,17 @@ async function v3AskFacts() {
   }
   const promos = evs.filter(x => x.row_group === 'promo' && x.status !== 'skipped');
   const missing = (found || []).filter(r => { const k = String(r.ts).slice(0, 10); return !promos.some(x => String(x.start_date).slice(0, 10) <= v3IsoAdd(k, 1) && String(x.end_date || x.start_date).slice(0, 10) >= v3IsoAdd(k, -1)); });
+  // What was going on in the recent weeks, stated outright: the profit answer (6 Oct) "ruled out"
+  // promotions and stock-outs with sales in 7 of the last 13 weeks and 25 products out of stock.
+  const RH = (r0(stateR) && r0(stateR).state && r0(stateR).state.rhythm) || null;
+  const SP = Array.isArray(stockR) ? stockR : [];
+  f.recent_context = {
+    sale_weeks_in_last_13: RH && RH.sale_weeks_13 != null ? Number(RH.sale_weeks_13) : null,
+    deepest_sale_in_last_13_pct: RH && RH.deepest_13 != null ? Math.round(Number(RH.deepest_13) * 100) : null,
+    products_out_of_stock_now: SP.filter(r => r.stock_status === 'stockout').length,
+    products_running_out_before_a_restock_lands: SP.filter(r => r.runs_out_before_restock).length,
+    past_sales_not_on_the_calendar: missing.length,
+  };
   f._board_basis = Object.fromEntries((boardR || []).map(r => [r.board_rank, r.money_basis || '']));
   f._stock = Array.isArray(stockR) ? stockR : null;
   f.calendar = { past_sales_not_on_the_calendar: missing.length,
@@ -8740,7 +8752,7 @@ Follow _meta.readout.rules. Quote headline figures exactly, with their window. S
 
 WHAT TO DO questions: answer from readout.board in its order, with each item's pounds (a month, or once when the action says so) and its rung. Do not re-rank. One idea of your own is allowed only if labelled "my suggestion, not on your board". For spending more, check facts.quarter_plan_at_todays_ad_spend and facts.next_peak first. If facts.goal.needs_replanning is true, say so before quoting the goal.
 
-WHY questions: before naming a cause, rule out the confounders: a promotion or code, a spend change, a stockout, an email send, a tracking change, seasonality, or a partial latest day (_meta.dataQuality). Locate the move: demand (spend, visits) → conversion → order value and discounts → new vs returning → product and stock. Separate what the data shows from what you infer, and give your confidence.
+WHY questions: before naming a cause, check the confounders: a promotion or code, a spend change, a stockout, an email send, a tracking change, seasonality, or a partial latest day (_meta.dataQuality). Check each against facts.recent_context first: if sale_weeks_in_last_13 is above 0, promotions are part of the story, not ruled out; if products_out_of_stock_now is above 0, stock-outs are too. A planned-events list being empty does not rule out what already happened. Locate the move: demand (spend, visits) → conversion → order value and discounts → new vs returning → product and stock. Separate what the data shows from what you infer, and give your confidence.
 
 STOCK questions: use data.stock_named and data.stock_at_risk (Greta's stock plan) for how many to order (order_units), what being out costs (lost_before_lands, profit) and what an order costs (order_units × unit_cost). An order placed today lands on facts.next_peak.order_placed_today_lands. If facts.next_peak.lands_before_peak_starts is false, never say ordering now gets stock in for the peak: say when it lands, that only what suppliers can send sooner reaches the peak, and to ask for that first. Board pounds are what pounds_are says, a month or once (per); never call them a cost unless pounds_are says so.
 
@@ -8748,7 +8760,7 @@ WHAT NOT TO DO questions: answer from readout.held (what Greta is holding back, 
 
 A difference in cost is not a loss: an ad overspend is spend above what the earlier cost per order needed, not money lost. When a board figure is "probably" or lower, give its why_this_rung in plain words. The weekly tables hold complete weeks only.
 
-Write for the owner: never show field or table names (readout, facts, pounds_are, rung, stock_named, order_units); say what they mean. Use a short table only when it helps.
+Write for the owner: never show field or table names, and never a dotted name such as next_peak.promotions_planned (readout, facts, pounds_are, rung, stock_named, order_units, recent_context); say what they mean. Use a short table only when it helps.
 
 Never invent a forecast beyond facts.quarter_plan_at_todays_ad_spend. If the question cannot be answered from what was sent, say what is missing. Plain British English, no jargon, £ for money. Short questions get a short answer with the number and its calculation; diagnosis questions get: the corrected read, the numbers, what was ruled out, what to do in order, and what would change your mind.
 
