@@ -17712,7 +17712,7 @@ function V3Stock() {
   const shown = allRisk ? order : order.slice(0, 10);
   // one listing with many variants (frkl's initial charms: a letter each) shows as one title per row
   const dupT = {}; order.forEach(r => { const t = String(r.product_title || '').trim().toLowerCase(); dupT[t] = (dupT[t] || 0) + 1; });
-  const nameOf = r => v3Sentence(r.product_title || r.sku) + (dupT[String(r.product_title || '').trim().toLowerCase()] > 1 ? ' · ' + (r.noSku ? 'no SKU' : r.sku) : '');
+  const nameOf = r => v3Sentence(r.product_title || r.sku) + (dupT[String(r.product_title || '').trim().toLowerCase()] > 1 ? ' · ' + (r.noSku ? 'no product code' : r.sku) : '');
   const span = Math.max(14, ...order.map(r => (r.days || 0) + r.gap)) || 14;
   const stat = (lab, val, foot) => (<div className="v3-stat" key={lab}>
     <div className="v3-stat-lab"><span>{lab}</span></div>
@@ -17765,7 +17765,7 @@ function V3Stock() {
       <table className="v3-rw">
         <thead><tr><th className="t-text">Product</th><th className="t-text v3-rw-trackh">Stock left</th><th>Order</th>{anyPeak && <th>For the peak</th>}<th>Cost</th><th>Lost before it lands</th></tr></thead>
         <tbody>{shown.map(r => (<tr key={r.sku}>
-          <td className="t-text v3-rw-name" title={r.noSku ? 'No SKU in Shopify' : r.sku}>{nameOf(r)}</td>
+          <td className="t-text v3-rw-name" title={r.noSku ? 'No product code (SKU) in Shopify' : r.sku}>{nameOf(r)}</td>
           <td className="t-text v3-rw-trackc"><div className="v3-rw-cell">
             <span className="v3-rw-track" role="img" aria-label={(r.days ? r.days + ' days of stock left' : 'Out of stock') + (r.gap ? ', ' + r.gap + ' days with nothing to sell' : '')}>
               {r.days > 0 && <i className="v3-rw-bar" style={{ width: (Math.min(r.days, span) / span * 100) + '%' }}/>}
@@ -17799,8 +17799,8 @@ function V3Stock() {
     </section>)}
 
     {noSku.length > 0 && (<section className="v3-sec">
-      <h2 className="v3-sec-title">Products without a SKU</h2>
-      <p className="v3-note v3-measure">{fmtCount(noSkuTitles)} products that sell have no SKU in Shopify — {fmtPctN(noSkuShare)} of the last four weeks’ sales. Greta tracks them by Shopify’s own variant id, so they are in the order above; add a SKU to each in Shopify so a supplier order can carry a product code. When you do, that product’s selling rate reads low for four weeks while its sales history moves across.</p>
+      <h2 className="v3-sec-title">Products without a product code</h2>
+      <p className="v3-note v3-measure">{fmtCount(noSkuTitles)} products that sell have no product code (SKU) in Shopify — {fmtPctN(noSkuShare)} of the last four weeks’ sales. Greta tracks them by Shopify’s own variant id, so they are in the order above; add a SKU to each in Shopify so a supplier order can carry a product code. When you do, that product’s selling rate reads low for four weeks while its sales history moves across.</p>
     </section>)}
 
     {slow.length > 0 && (<section className="v3-sec">
@@ -19457,13 +19457,23 @@ const V3_VERDICT = {
 };
 function V3TrackRecord() {
   const q = useV3Rows('act-track', (sb, b) => sb.from('actions')
-    .select('external_id,description,category,status,disposition_at,raised_at,verdict,predicted_window_days,predicted_metric_id,predicted_direction,grade:metadata->grade')
+    .select('external_id,description,category,status,disposition_at,raised_at,verdict,predicted_window_days,predicted_metric_id,predicted_direction,grade:metadata->grade,auto:metadata->auto_closed_at')
     .eq('brand_id', b).in('status', ['done', 'skipped', 'partial']).order('disposition_at', { ascending: false, nullsFirst: false }).limit(200));
-  const [showAll, setShowAll] = React.useState(false), [showSkipped, setShowSkipped] = React.useState(false);
+  const [showAll, setShowAll] = React.useState(false), [showSkipped, setShowSkipped] = React.useState(false), [showAuto, setShowAuto] = React.useState(false);
   if (q.err) return <V3LoadFailed what="what you have done" onRetry={q.retry}/>;
   if (!q.rows) return <V3SkeletonRows n={3}/>;
-  const done = q.rows.filter(r => r.status === 'done' || r.status === 'partial'), skipped = q.rows.filter(r => r.status === 'skipped');
-  if (!done.length && !skipped.length) return <div className="v3-empty">Nothing marked done or skipped yet. Mark an action done and Greta checks whether it worked once its window has passed.</div>;
+  // Greta closes an action itself when the condition behind it goes away. Those are not things the owner
+  // did: on 6 Oct, 17 of the 19 rows "decided" in three weeks were Greta's own closures, one shown as
+  // "Worked", and "Of N actions you marked done" counted them.
+  const auto = q.rows.filter(r => r.auto && r.status === 'done');
+  const done = q.rows.filter(r => !r.auto && (r.status === 'done' || r.status === 'partial')), skipped = q.rows.filter(r => r.status === 'skipped');
+  const autoList = auto.length > 0 && (<>
+      {' '}<button type="button" className="v3-btn v3-btn-q v3-btn-sm" aria-expanded={showAuto} onClick={() => setShowAuto(s => !s)}>{showAuto ? 'Hide' : 'Show'} {auto.length} Greta closed</button>
+      {showAuto && (<><p className="micro muted v3-measure">Greta closes an action itself when what raised it is no longer there. These are not graded as things you did.</p>
+        <ul className="v3-rank-steps">{auto.slice(0, 30).map((r, i) => (<li key={r.external_id + i}><span className="v3-rank-desc">{v3PlainAction(r).title}</span>
+          <span className="v3-sub"> Closed by Greta {r.disposition_at ? v3Day(r.disposition_at, true) : ''}</span></li>))}</ul></>)}
+    </>);
+  if (!done.length && !skipped.length) return (<div className="v3-empty">Nothing marked done or skipped yet. Mark an action done and Greta checks whether it worked once its window has passed.{autoList}</div>);
   const judged = done.filter(r => ['hit', 'miss', 'partial', 'flat'].includes(r.verdict));
   const worked = judged.filter(r => r.verdict === 'hit').length, failed = judged.filter(r => r.verdict === 'miss').length;
   const cant = done.filter(r => r.verdict === 'ungradeable' || r.verdict === 'no_data').length;
@@ -19493,6 +19503,7 @@ function V3TrackRecord() {
       {' '}<button type="button" className="v3-btn v3-btn-q v3-btn-sm" aria-expanded={showSkipped} onClick={() => setShowSkipped(s => !s)}>{showSkipped ? 'Hide' : 'Show'} {skipped.length} skipped</button>
       {showSkipped && <ul className="v3-rank-steps">{skipped.map(row)}</ul>}
     </>)}
+    {autoList}
   </section>);
 }
 // A finding's title is its own first line, not "Why X changed": the finding is in the text.
@@ -19538,7 +19549,7 @@ function V3Review() {
   const lad = useV3Rows('profit-ladder', V3_LADDER_Q);
   const trk = useV3Rows('rev-ga4-state', V3_TRACK_Q);
   const ext = useV3Rows('rev-promos', (sb, b) => sb.from('external_events').select('ts').eq('brand_id', b).eq('kind', 'promo').gte('ts', v3IsoAdd(today, -400)).limit(200));
-  const done = useV3Rows('rev-done', (sb, b) => sb.from('actions').select('external_id,description,status,disposition_at,verdict,grade:metadata->grade')
+  const done = useV3Rows('rev-done', (sb, b) => sb.from('actions').select('external_id,description,status,disposition_at,verdict,grade:metadata->grade,auto:metadata->auto_closed_at')
     .eq('brand_id', b).in('status', ['done', 'skipped']).gte('disposition_at', v3IsoAdd(today, -21)).order('disposition_at', { ascending: false }).limit(30));
   const board = useV3Board();
   const [back, setBack] = React.useState(0);          // weeks back from the last complete one
@@ -19662,11 +19673,11 @@ function V3Review() {
           {F.calendar && F.calendar.past_sales_not_on_the_calendar > 0 && <li><b>{F.calendar.past_sales_not_on_the_calendar} past sales are not on the calendar.</b> Adding them lets Greta learn what your promotions really do.</li>}
         </ul>
       </>)}
-      {done.rows && done.rows.length > 0 && (<>
+      {done.rows && done.rows.some(r => !r.auto) && (<>
         <div className="v3-kick v3-gap-top">Decided in the last three weeks</div>
-        <ul className="v3-rank-steps">{done.rows.slice(0, 6).map((r, k) => (<li key={r.external_id + k}><span className="v3-rank-desc">{v3PlainAction(r).title}</span>
+        <ul className="v3-rank-steps">{done.rows.filter(r => !r.auto).slice(0, 6).map((r, k) => (<li key={r.external_id + k}><span className="v3-rank-desc">{v3PlainAction(r).title}</span>
           <span className="v3-sub"> {r.status === 'skipped' ? 'Skipped' : 'Done'} {v3Day(r.disposition_at)}{r.verdict ? ' · ' + ((V3_VERDICT[r.verdict] || {}).label || r.verdict) : ' · Not judged yet'}</span></li>))}</ul>
-        {done.rows.length > 6 && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>{done.rows.length - 6} more decided <span className="v3-xref-go">on Actions →</span></button>}
+        {done.rows.filter(r => !r.auto).length > 6 && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>{done.rows.filter(r => !r.auto).length - 6} more decided <span className="v3-xref-go">on Actions →</span></button>}
       </>)}
     </section>
     <V3ReviewNotes weekStart={W.start} range={range}/>
@@ -20050,7 +20061,7 @@ function V3DataTrust() {
     body: <>Meta counts {fmtCount(mP)} purchases worth {fmtMoney(mV)} and Google {fmtCount(gP)} conversions worth {fmtMoney(gV)}, by their own measures — each counts any order that saw or clicked an ad, and both can count the same one. That is why Greta judges ads on your Shopify orders, not on the return their dashboards show. <button type="button" className="v3-xref" onClick={go('marketing')}>What each channel really returns <span className="v3-xref-go">on Marketing →</span></button></> });
   // 6. products without a SKU
   const noSku = new Set((stock.rows || []).filter(r => String(r.sku || '').startsWith('v:') && num(r.weekly_velocity) > 0).map(r => String(r.product_title || '').toLowerCase())).size;
-  if (noSku > 0) items.push({ k: 'sku', short: fmtCount(noSku) + ' selling products have no SKU', head: fmtCount(noSku) + ' products that sell have no SKU in Shopify.',
+  if (noSku > 0) items.push({ k: 'sku', short: fmtCount(noSku) + ' selling products have no product code', head: fmtCount(noSku) + ' products that sell have no product code (SKU) in Shopify.',
     body: <>Greta tracks them by Shopify’s own id, so stock and profit include them, but a supplier order can’t carry a product code for them. Add one to each in Shopify. <button type="button" className="v3-xref" onClick={go('stock')}>Which products <span className="v3-xref-go">on Stock &amp; orders →</span></button></> });
 
   const shortList = items.slice(0, 3).map(i => i.short);
