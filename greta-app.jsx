@@ -8488,7 +8488,7 @@ async function v3AskFacts(question) {
   const today = new Date().toISOString().slice(0, 10), Q = v3Quarter(today);
   const tq = {}; try { Object.keys(V3_ASK_TOPICS).forEach(k => { tq[k] = V3_ASK_TOPICS[k].test(question || ''); }); } catch (e) {}
   const none = Promise.resolve(null);
-  const [lad, goalR, paceR, ueR, drift, cogsR, cfgR, cal, found, curveR, boardR, stockR, stateR, flowsR, campsR, clR, devR] = await Promise.all([
+  const [lad, goalR, paceR, ueR, drift, cogsR, cfgR, cal, found, curveR, boardR, stockR, stateR, flowsR, campsR, clR, devR, perfR, contribR, factsR] = await Promise.all([
     T(V3_LADDER_Q(sb, b)), T(V3_GOAL_Q(sb, b)), T(v3PlanQ(Q.start, Q.end, null)(sb, b), 15000), T(V3_UE_Q(sb, b)),
     T(V3_DRIFT_Q(sb, b)), T(V3_COGSQ_Q(sb, b)),
     T(sb.from('brand_config').select('supplier_lead_time_weeks,fixed_costs_monthly,cash_floor,opening_cash,opening_cash_as_of').eq('brand_id', b).limit(1)),
@@ -8509,6 +8509,13 @@ async function v3AskFacts(question) {
       .eq('dim_value', 'all').in('metric_name', ['Traffic'].concat(V3_FRICTION.map(x => x[0]))).gte('date', v3IsoAdd(today, -31)).limit(400)) : none,
     tq.site ? T(sb.from('tenant_clarity_daily').select('dim_value,sessions_count').eq('brand_id', b).eq('num_days', 1).eq('metric_name', 'Device')
       .gte('date', v3IsoAdd(today, -31)).limit(400)) : none,
+    // Products, for product questions (6 Oct: "which products should I push for BFCM" got HEYGIRL as
+    // "a product" and the mega necklace gold as selling at £15.90 -- there was no product data at all).
+    T(sb.from('vw_product_performance').select('shopify_product_id,product_title,rev_28d,rev_prior_28d,units_now,share_now,stock_constrained')
+      .eq('brand_id', b).order('rev_28d', { ascending: false, nullsFirst: false }).limit(60)),
+    tq.products ? T(sb.from('vw_product_contribution').select('shopify_product_id,units,contribution_gbp').eq('brand_id', b).limit(1000)) : none,
+    tq.products ? T(sb.from('vw_product_npd_facts').select('shopify_product_id,title,units,revenue,led_first_orders').eq('brand_id', b).eq('status', 'active')
+      .order('revenue', { ascending: false, nullsFirst: false }).limit(15)) : none,
   ]);
   const H = window.GRETA_HEADLINE || {};
   const cmr = Number(H.net_revenue_30d) > 0 && H.product_contribution_30d != null ? Number(H.product_contribution_30d) / Number(H.net_revenue_30d) : null;
@@ -8571,6 +8578,22 @@ async function v3AskFacts(question) {
     past_sales_not_on_the_calendar: missing.length,
   };
   f._board_basis = Object.fromEntries((boardR || []).map(r => [r.board_rank, r.money_basis || '']));
+  f._titles = (perfR || []).map(r => String(r.product_title || '')).concat(SP.map(r => String(r.product_title || '')));
+  if (Array.isArray(factsR) && factsR.length) {
+    const perfBy = Object.fromEntries((perfR || []).map(r => [String(r.shopify_product_id), r]));
+    const cBy = Object.fromEntries((contribR || []).map(r => [String(r.shopify_product_id), r]));
+    const tot12 = factsR.reduce((a, r) => a + (Number(r.revenue) || 0), 0);
+    f._products = factsR.filter(r => Number(r.revenue) > 0).map(r => { const pf = perfBy[String(r.shopify_product_id)] || {}, c = cBy[String(r.shopify_product_id)] || {};
+      return { product: r.title, sales_12m: Math.round(Number(r.revenue)), units_12m: Number(r.units) || null, first_orders_it_led_12m: r.led_first_orders == null ? null : Number(r.led_first_orders),
+        sales_28d: pf.rev_28d == null ? null : Math.round(Number(pf.rev_28d)), sales_28d_before: pf.rev_prior_28d == null ? null : Math.round(Number(pf.rev_prior_28d)),
+        share_of_sales_28d_pct: pf.share_now == null ? null : Math.round(Number(pf.share_now) * 1000) / 10,
+        profit_per_unit: Number(c.units) > 0 && c.contribution_gbp != null ? Math.round(Number(c.contribution_gbp) / Number(c.units) * 100) / 100 : null,
+        short_of_stock: !!pf.stock_constrained }; });
+    f._products_note = 'The ' + f._products.length + ' products that sold most in the last 12 months (the list holds ' + Math.round(tot12) + ' of sales between them).';
+  }
+  if (f.next_peak && r0(stateR) && r0(stateR).state && r0(stateR).state.peak && Array.isArray(r0(stateR).state.peak.top_codes))
+    f.next_peak.discount_codes_used_at_last_peak = { note: 'Discount codes (a creator or a promotion), not products.',
+      codes: r0(stateR).state.peak.top_codes.map(c => ({ code: c.code, orders: c.orders })) };
   if (Array.isArray(flowsR)) f._flows = flowsR.filter(x => Number(x.recipients_30d) > 0 || String(x.status).toLowerCase() !== 'live')
     .map(x => ({ flow: x.name, live: String(x.status).toLowerCase() === 'live', people_30d: Number(x.recipients_30d) || 0,
       sales_30d: Math.round(Number(x.attributed_revenue_30d) || 0),
@@ -8614,6 +8637,7 @@ const V3_ASK_TOPICS = {
   email: /\b(email\w*|klaviyo|flows?|newsletter|list|sms|send\w*|subscriber\w*)\b/i,
   recent: /\b(today|yesterday|this week|last week|days?|daily|recent\w*|weekend|monday|tuesday|wednesday|thursday|friday|saturday|sunday|so far)\b/i,
   stock: /\b(stock\w*|reorder\w*|restock\w*|re-?order|out of|runs? out|running out|sold out|inventory|units?|supplier\w*|lead time|purchase order|how many)\b/i,
+  products: /\b(products?|best[- ]?sellers?|heroe?s?|range|catalogue|collections?|items?|push|promote|feature|bundles?|sku\w*|margin\w*|discount\w*)\b/i,
 };
 // Rows as a header and arrays: about half the characters of one object per row.
 // Weeks that have all seven days in the data: a week still in progress read as a collapse.
@@ -8676,6 +8700,8 @@ function buildAskContext(facts, question){
   const plan = (facts && facts._stock) || [];
   const ql = String(question || '').toLowerCase();
   const named = plan.filter(r => { const t = String(r.product_title || '').toLowerCase().trim(); return t.length >= 6 && ql.includes(t); });
+  const prods = (facts && facts._products) || null, prodsNote = (facts && facts._products_note) || '';
+  if (((facts && facts._titles) || []).some(t => { t = String(t).toLowerCase().trim(); return t.length >= 6 && ql.includes(t); })) topics.products = true;
   const atRisk = plan.filter(r => r.runs_out_before_restock && !named.includes(r))
     .sort((a, b) => (Number(b.cm_at_risk_before_resupply) || 0) - (Number(a.cm_at_risk_before_resupply) || 0)).slice(0, 15);
   const num = v => (v == null || !isFinite(Number(v)) ? null : Number(v));
@@ -8687,7 +8713,7 @@ function buildAskContext(facts, question){
   const basisFor = (facts && facts._board_basis) || {};
   const flows = (facts && facts._flows) || null, camps = (facts && facts._campaigns) || null, site = (facts && facts._site) || null;
   facts = facts ? Object.assign({}, facts) : facts;
-  if (facts) { ['_stock', '_board_basis', '_flows', '_campaigns', '_site'].forEach(k => { delete facts[k]; }); }
+  if (facts) { ['_stock', '_board_basis', '_flows', '_campaigns', '_site', '_products', '_products_note', '_titles'].forEach(k => { delete facts[k]; }); }
   let _today = ''; try { _today = new Date().toISOString().slice(0,10); } catch(e) {}
   const _dates = _shp.map(r=>r && r.date).filter(Boolean).sort();
   const _latestDate = _dates.length ? _dates[_dates.length-1] : null;
@@ -8697,6 +8723,8 @@ function buildAskContext(facts, question){
   const parts = [
     topics.email && flows && flows.length && ['email_flows', () => v3AskTable(flows, 'flow'), 'Klaviyo automated flows, last 30 days: live or switched off, people reached, sales Klaviyo credits to the flow (anyone who opened before buying, so read it as a ranking, not what the email caused), and sales per person reached.'],
     topics.email && camps && camps.length && ['email_campaigns', () => v3AskTable(camps, 'campaign'), 'Klaviyo campaigns (one-off sends), last 90 days, newest first: people sent to, credited sales, sales per person.'],
+    topics.products && prods && prods.length && ['products', () => v3AskTable(prods, 'product'),
+      prodsNote + ' sales are after discounts, before VAT; first_orders_it_led_12m is how many new customers started with it; profit_per_unit is after product and order costs; short_of_stock means a variant is out or low.'],
     named.length && ['stock_named', () => v3AskTable(named.map(stockRow), 'product'), 'The stock plan for the products named in the question.'],
     topics.stock && atRisk.length && ['stock_at_risk', () => v3AskTable(atRisk.map(stockRow), 'product'),
       'Greta’s stock plan, the 15 products that run out before a restock can land, most profit at risk first: weekly_pace (an out-of-stock product at what it sold while in stock), order_units (what to order now: eight weeks of stock after it lands), order_by, lost_before_lands (profit lost before an order placed today arrives), unit_cost (landed).'],
@@ -8812,6 +8840,8 @@ WHY questions: before naming a cause, check the confounders: a promotion or code
 STOCK questions: use data.stock_named and data.stock_at_risk (Greta's stock plan) for how many to order (order_units), what being out costs (lost_before_lands, profit) and what an order costs (order_units × unit_cost). An order placed today lands on facts.next_peak.order_placed_today_lands. If facts.next_peak.lands_before_peak_starts is false, never say ordering now gets stock in for the peak: say when it lands, that only what suppliers can send sooner reaches the peak, and to ask for that first. Board pounds are what pounds_are says, a month or once (per); never call them a cost unless pounds_are says so.
 
 SITE questions: lead with site_last_30_days (Microsoft Clarity counts every visit; Google Analytics was not recording properly for part of the summer): orders per 100 visits, the share on a phone, and the share of visits hitting a JavaScript error or broken clicks. Use the Google Analytics funnel only as a second view of the steps. An item in readout.held is not established: if you mention one, say it was flagged and not re-checked, and never call it the cause.
+
+PRODUCT questions: use data.products (sales, share, the new customers each product brings in, profit per unit, stock) and the stock plan; name products. Discount codes (facts.next_peak.discount_codes_used_at_last_peak) are codes, not products. Never infer a product's selling price from a cost.
 
 EMAIL questions: sales per person are the sales Klaviyo credits to the email (anyone who opened before buying), not profit and not what the email caused; say so, and rank flows and campaigns on them.
 
@@ -15842,6 +15872,18 @@ function v3PlainAction(row){
   const n = V3_WRITER_ACTIONS && V3_NARR.data && V3_NARR.data.actions && V3_NARR.data.actions[id];
   if (n && n.title) return { title: n.title, why: n.why || '', raw, written: true };
   let x;
+  // Forecast checks carry raw channel keys ("google_all", "[acquisition] google_nonbrand: iROAS …"),
+  // which Review's "Decided in the last three weeks" showed as they were (6 Oct).
+  if (/^greta_forecast:/.test(id)) {
+    const CH = { facebook_retargeting: 'Meta retargeting', facebook_acquisition: 'Meta prospecting', facebook_prospecting: 'Meta prospecting',
+      facebook_all: 'Meta overall', google_all: 'Google Ads overall', google_nonbrand: 'Google non-brand search', google_brand: 'Google brand search',
+      google_pmax: 'Google Performance Max', total: 'Your paid channels overall' };
+    const parts = id.split(':'), key = parts[1] === 'proposed' ? parts[3] : parts[1], kind = parts[1] === 'proposed' ? 'proposed' : parts[2];
+    const ch = CH[key] || String(key || 'A channel').replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
+    if (kind === 'proposed') return P(/open bids|raise|increase|scale/i.test(raw) ? 'Raise bids on ' + ch : /cut|reduce|lower|pause|tighten/i.test(raw) ? 'Pull back ' + ch : 'Adjust ' + ch, raw);
+    const ahead = /ahead of|beating/i.test(raw);
+    return P(ch + ' is ' + (ahead ? 'ahead of' : 'behind') + ' forecast on ' + (kind === 'efficiency' ? 'sales per £ of ads' : 'sales'), raw);
+  }
   if (/^measure-saturation-/.test(id) && (x = m(/£\s*([\d,.]+)\s*vs\s*£?\s*([\d,.]+)/))) {
     const ch = v3Ch(id.split('-').pop());
     return P('Test spending less on ' + ch + ' for two weeks',
@@ -19623,7 +19665,7 @@ function V3Review() {
       {done.rows && done.rows.length > 0 && (<>
         <div className="v3-kick v3-gap-top">Decided in the last three weeks</div>
         <ul className="v3-rank-steps">{done.rows.slice(0, 6).map((r, k) => (<li key={r.external_id + k}><span className="v3-rank-desc">{v3PlainAction(r).title}</span>
-          <span className="v3-sub"> {r.status === 'skipped' ? 'Skipped' : 'Done'} {v3Day(r.disposition_at)}{r.verdict ? ' · ' + ((V3_VERDICT[r.verdict] || {}).label || r.verdict) : ' · not judged yet'}</span></li>))}</ul>
+          <span className="v3-sub"> {r.status === 'skipped' ? 'Skipped' : 'Done'} {v3Day(r.disposition_at)}{r.verdict ? ' · ' + ((V3_VERDICT[r.verdict] || {}).label || r.verdict) : ' · Not judged yet'}</span></li>))}</ul>
         {done.rows.length > 6 && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>{done.rows.length - 6} more decided <span className="v3-xref-go">on Actions →</span></button>}
       </>)}
     </section>
@@ -19947,6 +19989,7 @@ function V3FreightRate({ compact }) {
 function V3DataTrust() {
   const today = new Date().toISOString().slice(0, 10);
   const trk = useV3Rows('trust-tracking', (sb, b) => sb.from('vw_brand_tracking_state').select('source,state,broke_on,fixed_on,comparisons_clean_from,severity').eq('brand_id', b));
+  const att = useV3Rows('trust-attrib', (sb, b) => sb.from('actions').select('description').eq('brand_id', b).eq('external_id', 'tracking-coverage').eq('status', 'open').limit(1));
   const cq = useV3Rows('trust-cogs', (sb, b) => sb.from('vw_brand_cogs_quality').select('cogs_coverage_90d,realized_cogs_pct,cogs_landed_complete,lines_total,lines_costed').eq('brand_id', b).limit(1));
   const cfg = useV3Rows('brand-cfg', V3_BCFG_Q);
   const fdr = useV3Rows('fd-rate', V3_FDR_Q);
@@ -19990,6 +20033,14 @@ function V3DataTrust() {
     body: <>It wasn’t recording properly from {v3Day(g4.broke_on)} to {v3Day(g4.fixed_on, true)}; any comparison that reaches back into those weeks would read the repair as growth. Greta uses your Shopify orders meanwhile.{cavg != null && cavg < 0.9 ? <> It also sees only {fmtPctN(cavg)} of your orders now — check that the purchase event fires on every order, including express checkouts.</> : null}</> });
   else if (cavg != null && cavg < 0.9) items.push({ k: 'ga4cov', short: 'Google Analytics misses orders', head: 'Google Analytics sees ' + fmtPctN(cavg) + ' of your orders.',
     body: <>Every conversion rate on Website reads lower than it is. Check that the purchase event fires on every order, including express checkouts.</> });
+  // 4b. the shop no longer recording where orders came from (the tracking check Today leads with under
+  // Fix first). This list named Google Analytics recovering and missed it (6 Oct).
+  const A0 = (att.rows || [])[0];
+  if (A0 && A0.description) {
+    const d = String(A0.description), cut = d.indexOf('. ');
+    items.push({ k: 'attrib', short: 'your shop no longer records where many orders came from',
+      head: cut > 0 ? d.slice(0, cut + 1) : d, body: <>{cut > 0 ? d.slice(cut + 2) : null}</> });
+  }
   // 5. what the ad platforms claim
   const mP = (meta.rows || []).reduce((a, r) => a + num(r.purchases), 0), mV = (meta.rows || []).reduce((a, r) => a + num(r.purchase_value), 0);
   const gP = (gads.rows || []).reduce((a, r) => a + num(r.conversions), 0), gV = (gads.rows || []).reduce((a, r) => a + num(r.conversion_value), 0);
