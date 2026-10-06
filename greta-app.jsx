@@ -16543,14 +16543,22 @@ function CashCeiling(){
 // So read the state and say the true thing for it. Recovered gets the dates and no button,
 // because there is nothing to press. Broken says plainly that the fix is on their own site,
 // and offers the coverage figures as evidence rather than dressing them up as a cure.
+//
+// GA4 recording again is not the whole of tracking (2026-10-06). frkl's GA4 recovered on 24 Sep while
+// the shop still recorded a visit on 48% of orders against 83% before, and called 64% direct against
+// 38%: the open tracking-coverage action, shown as Fix first on the same page. This note said "there
+// is nothing to fix" right under it. It now asks whether that action is open first.
 function V3TrackingNote() {
   const [st, setSt] = React.useState(undefined);   // undefined = loading, null = unknown
+  const [covOpen, setCovOpen] = React.useState(false);
   React.useEffect(() => {
     let alive = true;
     const sb = (typeof window !== 'undefined' && window.FRKL_LIVE && window.FRKL_LIVE.sb) || null;
     const brand = (typeof window !== 'undefined' && ((window.FRKL_LIVE && window.FRKL_LIVE.brandId)
       || (window.OI_ASK && window.OI_ASK.brand_id))) || null;
     if (!sb || !brand) { setSt(null); return; }
+    sb.from('actions').select('external_id').eq('brand_id', brand).eq('external_id', 'tracking-coverage').eq('status', 'open').limit(1)
+      .then(r => { if (alive) setCovOpen(!!(r && r.data && r.data.length)); }, () => {});
     sb.from('vw_brand_tracking_state')
       .select('source, state, broke_on, fixed_on, comparisons_clean_from')
       .eq('brand_id', brand).eq('source', 'ga4').limit(1)
@@ -16579,6 +16587,11 @@ function V3TrackingNote() {
   if (st && st.fixed_on && st.state !== 'broken') {
     const clean = st.comparisons_clean_from;
     const stillDirty = clean && new Date(String(clean).slice(0, 10) + 'T00:00:00Z') > new Date();
+    if (covOpen) return (<p className="v3-why-p v3-muted">
+      Google Analytics has been recording visits again since {dm(st.fixed_on)}, but your shop still does not
+      record where many orders came from — that is the tracking check under Fix first.
+      {stillDirty ? ' Comparisons that reach back into the gap stay unreliable until ' + dm(clean) + '.' : ''}
+    </p>);
     return (<p className="v3-why-p v3-muted">
       Your site tracking was broken until {dm(st.fixed_on)} and has been recording since — there is
       nothing to fix.{stillDirty ? ' Comparisons that still reach back into those days stay unreliable until ' + dm(clean) + '.' : ''}
