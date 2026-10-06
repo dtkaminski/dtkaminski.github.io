@@ -3792,6 +3792,15 @@ function Overview({start, period, customActive}){
   const newDayQ = useV3Rows('new-mo', V3_NEWMO_Q);
   const tierQ = useV3Rows('cust-tier', V3_TIER_Q);   // the default 30 days uses the lead's own figure
   const costsVerified = useCostTick();       // re-renders margin figures/badges on save
+  // The overview loader's reads (measured unit economics among them) now run only when this page
+  // asks, not on every page load; re-render when they land.
+  const [, setOvTick] = useState(0);
+  React.useEffect(() => {
+    const h = () => setOvTick(t => t + 1);
+    window.addEventListener('frkl-overview-updated', h);
+    try { window.GRETA_OVERVIEW_WANT && window.GRETA_OVERVIEW_WANT(); } catch (e) {}
+    return () => window.removeEventListener('frkl-overview-updated', h);
+  }, []);
   const daily = useMemo(()=>buildDaily(start),[start]);
   const end = dataEndOf();
   const prior = priorPeriod(start, end);
@@ -10761,7 +10770,7 @@ function BusinessReview(){
   // A stale feed makes every row 'unknown', which would count as nothing at risk; show it as unknown.
   const spStale = !!(stockQ.rows && stockQ.rows.some(r => r.inventory_stale));
   const sp = spStale ? null : stockQ.rows;   // null while loading or when the counts are out of date
-  const spWait = spStale ? 'Stock counts are out of date' : 'Loading the stock plan…';
+  const spWait = spStale ? 'Stock counts are out of date' : stockQ.err ? 'Greta couldn’t load the stock plan just now' : 'Loading the stock plan…';
   const spCount = st => sp ? sp.filter(r => r.stock_status === st).length : 0;
   const sk = t => t === 'critical' ? spCount('stockout') : t === 'low' ? spCount('low_cover')
     : t === 'overstock' ? (sp ? sp.filter(r => r.stock_status === 'overstock' && Number(r.trapped_cash) > 0).length : 0) : 0;
@@ -17110,18 +17119,37 @@ function V3Today(p) {
 // the page load, and hand back {rows, err}. Pages built on it render from live views only —
 // never from the static snapshots, which are weeks old for frkl and empty for everyone else.
 const V3_Q = {};
+// A read that fails because the database was busy (a statement timeout, a 500/504 from the gateway,
+// a dropped connection) is tried twice more before the page says so. One that fails because the
+// query itself is wrong (a missing column, no permission) fails at once. Measured 2026-10-06: Stock,
+// Goal & costs and Products said "couldn't load" for a whole visit after one busy moment at
+// start-up, while "Try again" loaded Products in 4.9s.
+const V3_HARD_ERR = /column|does not exist|permission denied|violates|invalid input|PGRST1|PGRST2/i;
+function v3Attempt(build, sb, b) {
+  const once = n => Promise.resolve().then(() => build(sb, b)).then(r => {
+    const msg = r && r.error ? String(r.error.message || r.error.code || 'could not load') : null;
+    if (msg == null || n >= 2 || V3_HARD_ERR.test(msg)) return r;
+    return new Promise(res => setTimeout(res, n ? 5000 : 1500)).then(() => once(n + 1));
+  }, e => {
+    if (n >= 2) throw e;
+    return new Promise(res => setTimeout(res, n ? 5000 : 1500)).then(() => once(n + 1));
+  });
+  return once(0);
+}
 function useV3Rows(key, build) {
   const [, bump] = React.useState(0);
   const [tries, setTries] = React.useState(0);
   React.useEffect(() => {
+    // A failure is not remembered for the visit: opening the page again asks again.
+    if (V3_Q[key] && V3_Q[key].err && !V3_Q[key].p) delete V3_Q[key];
     if (V3_Q[key] && (V3_Q[key].rows || V3_Q[key].err || V3_Q[key].p)) { if (V3_Q[key].p) V3_Q[key].p.then(() => bump(n => n + 1)); return; }
     let iv = null, dead = false;
     const go = () => {
       const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
       if (!sb || !b) return false;
       const q = V3_Q[key] = { rows: null, err: null };
-      q.p = Promise.resolve(build(sb, b)).then(r => { q.p = null; if (r && r.error) q.err = r.error.message || 'could not load'; else q.rows = (r && r.data) || []; },
-                                                 e => { q.p = null; q.err = String(e); })
+      q.p = v3Attempt(build, sb, b).then(r => { q.p = null; if (r && r.error) q.err = r.error.message || 'could not load'; else q.rows = (r && r.data) || []; },
+                                         e => { q.p = null; q.err = String(e); })
         .then(() => { if (!dead) bump(n => n + 1); });
       return true;
     };

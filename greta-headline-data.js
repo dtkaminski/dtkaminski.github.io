@@ -262,6 +262,17 @@
       sb.from('cache_brand_today').select('payload,refreshed_at').eq('brand_id', b).limit(1),
       8000, null, 'cache_brand_today');
     try { releaseInflight && releaseInflight(); } catch (e) {}
+    // null is "no answer" (busy or timed out), [] is "no row". A busy database used to send this
+    // straight to the live view below — 17s+ of the heaviest query in the app, on a database that
+    // was already too busy to return one cached row. Ask for the cached row again instead; only a
+    // brand that really has no fresh row goes live.
+    for (var again = 1; again <= 2 && cached === null; again++) {
+      await new Promise(function (r) { setTimeout(r, again * 2000); });
+      cached = await safeQ(
+        sb.from('cache_brand_today').select('payload,refreshed_at').eq('brand_id', b).limit(1),
+        8000, null, 'cache_brand_today');
+    }
+    var cacheAnswered = cached !== null;
     var c0 = cached && cached[0];
     if (c0 && c0.payload) {
       var age = Date.now() - new Date(c0.refreshed_at).getTime();
@@ -273,7 +284,7 @@
     // either way the screen must be correct, just slower. First attempt is generous on purpose —
     // a 12s cap was measured timing out and the retry pushed first paint to ~50s, so giving up
     // early cost far more than waiting.
-    for (var attempt = 0; attempt < 3 && !rows; attempt++) {
+    for (var attempt = 0; attempt < 3 && !rows && cacheAnswered; attempt++) {
       if (attempt) await new Promise(function (r) { setTimeout(r, 1500 * attempt); });
       rows = await safeQ(sb.from('vw_brand_today').select('*').eq('brand_id', b).limit(1), 22000 + attempt * 9000, null, 'vw_brand_today');
     }

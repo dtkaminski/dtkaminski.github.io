@@ -23,7 +23,9 @@
   var built = {};          // brand id -> { key: object }
   var state = { brand: null, busy: false };
 
-  function sb() { return window.FRKL_LIVE && window.FRKL_LIVE.sb; }
+  // Background lane (greta-data-loader.js): these rebuild the older screens' snapshot globals, so a
+  // read the page on show asked for goes first.
+  function sb() { return window.FRKL_LIVE && (window.FRKL_LIVE.sbBg || window.FRKL_LIVE.sb); }
   function bid() { return window.FRKL_LIVE && window.FRKL_LIVE.brandId; }
   // One retry: a first read that fails (a cold pool, a dropped connection) should not leave a
   // screen on its empty state for the whole visit.

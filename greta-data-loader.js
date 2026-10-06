@@ -256,8 +256,46 @@
   // in the URL — keying on the URL alone would serve page 1 to a request asking for page 2. Any
   // non-GET drops everything, so a write is never followed by a cached pre-write read. Responses
   // are cloned on the way in and out: a body can only be consumed once.
+  //
+  // Two lanes (2026-10-06). Landing on Today sent 77 reads to the database at once; small ones
+  // (brand_config, the goal) took 23-34s queued behind heavy views nobody had asked for, timed out,
+  // and the page on screen said "couldn't load". Every read now takes a slot: at most six at a time,
+  // and background prefetch (the client FRKL_LIVE.sbBg, used by the start-up loaders) at most two of
+  // them, only while nothing the page asked for is waiting. A page read that matches a background
+  // read still queued moves it to the front instead of sending it twice.
+  function makeLanes() {
+    const MAX = 6, BG_MAX = 2, wait = { fg: [], bg: [] };
+    let fg = 0, bg = 0;
+    function pump() {
+      while (wait.fg.length && fg + bg < MAX) start(wait.fg.shift());
+      while (!wait.fg.length && wait.bg.length && bg < BG_MAX && fg + bg < MAX) start(wait.bg.shift());
+    }
+    function start(job) {
+      job.started = true;
+      const lane = job.lane;
+      if (lane === 'fg') fg++; else bg++;
+      Promise.resolve().then(job.go).then(job.resolve, job.reject)
+        .then(function () { if (lane === 'fg') fg--; else bg--; pump(); });
+    }
+    function run(lane, go) {
+      const job = { lane: lane === 'bg' ? 'bg' : 'fg', go: go, started: false };
+      const p = new Promise(function (res, rej) { job.resolve = res; job.reject = rej; });
+      wait[job.lane].push(job);
+      pump();
+      p.job = job;
+      return p;
+    }
+    function promote(job) {
+      if (!job || job.started || job.lane !== 'bg') return;
+      const i = wait.bg.indexOf(job); if (i < 0) return;
+      wait.bg.splice(i, 1); job.lane = 'fg'; wait.fg.push(job); pump();
+    }
+    return { run: run, promote: promote };
+  }
+
   function makeDedupeFetch() {
     const inflight = new Map(), done = new Map(), TTL = 15000;
+    const lanes = makeLanes();
     const hdr = (init, input, name) => {
       let h = (init && init.headers) || (input && input.headers) || null;
       if (!h) return '';
@@ -267,7 +305,7 @@
         return k ? String(h[k]) : '';
       } catch (e) { return ''; }
     };
-    return function dedupeFetch(input, init) {
+    return function dedupeFetch(input, init, lane) {
       const url = typeof input === 'string' ? input : ((input && input.url) || String(input));
       const method = String((init && init.method) || (input && input.method) || 'GET').toUpperCase();
 
@@ -277,7 +315,10 @@
         // the user_brand_ids lookup (an RPC, so a POST). Those fire a dozen times during start-up
         // and each one used to wipe the cache, so the same heavy views went out twice per load.
         if (method !== 'GET' && !/\/rest\/v1\/(product_events|client_error_log|rpc\/user_brand_ids)(\?|$)/.test(url)) { inflight.clear(); done.clear(); }
-        return fetch(input, init);
+        // RPCs (fn_plan_quarter is one of the heaviest reads) and writes take a slot too; auth and
+        // edge functions do not touch PostgREST's pool and go straight out.
+        if (url.indexOf('/rest/v1/') === -1) return fetch(input, init);
+        return lanes.run(lane, function () { return fetch(input, init); });
       }
 
       const key = url + '\n' + hdr(init, input, 'range') + '\n' + hdr(init, input, 'prefer');
@@ -285,16 +326,18 @@
       if (hit && (Date.now() - hit.at) < TTL) return Promise.resolve(hit.res.clone());
 
       let p = inflight.get(key);
-      if (p) return p.then(r => r.clone());
+      if (p) { if (lane !== 'bg') lanes.promote(p.job); return p.then(r => r.clone()); }
 
       const _t0 = Date.now();
-      p = fetch(input, init).then(r => {
+      const queued = lanes.run(lane, function () { return fetch(input, init); });
+      p = queued.then(r => {
         const T = window.FRKL_LIVE && window.FRKL_LIVE.timings, d = Date.now() - _t0;
         if (T && d > T.fetchMax) { T.fetchMax = d; T.fetchSlowest = (url.split('/rest/v1/')[1] || '').split('?')[0]; }
         inflight.delete(key);
         if (r && r.ok) { try { done.set(key, { at: Date.now(), res: r.clone() }); } catch (e) {} }
         return r;
       }).catch(e => { inflight.delete(key); throw e; });
+      p.job = queued.job;
 
       inflight.set(key, p);
       return p.then(r => r.clone());
@@ -312,9 +355,21 @@
       return;
     }
 
+    const net = makeDedupeFetch();
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY,
-      { global: { fetch: makeDedupeFetch() } });
+      { global: { fetch: function (i, n) { return net(i, n, 'fg'); } } });
     window.FRKL_LIVE.sb = sb;
+    // The background client: same cache and slots, the back of the queue. It borrows this client's
+    // session token rather than running a second auth client (two would race to refresh the token).
+    try {
+      window.FRKL_LIVE.sbBg = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+        global: { fetch: function (i, n) { return net(i, n, 'bg'); } },
+        accessToken: async function () {
+          try { const s = await sb.auth.getSession(); return (s && s.data && s.data.session && s.data.session.access_token) || null; }
+          catch (e) { return null; }
+        }
+      });
+    } catch (e) { window.FRKL_LIVE.sbBg = null; }   // an older supabase-js: everything stays in one lane
 
     // Where a slow load spends its time. Every query first asks the auth client for the token
     // (getSession), which waits on a lock shared by every tab and frame on this origin; the fetch
@@ -445,7 +500,9 @@
   // ── Main refresh — runs at boot then every 15 min while visible ───────────────────────────
 
   async function refresh() {
-    const sb = window.FRKL_LIVE.sb;
+    // Background lane: this is a prefetch of everything the older screens read, not what the page
+    // on show asked for. A screen that needs one of these reads now moves it to the front.
+    const sb = window.FRKL_LIVE.sbBg || window.FRKL_LIVE.sb;
     const brandId = window.FRKL_LIVE.brandId;
     if (!sb || !brandId) return;
 

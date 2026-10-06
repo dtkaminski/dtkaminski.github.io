@@ -325,12 +325,20 @@
   // heaviest views on the page -- again. They do not depend on the event, so they go out at most
   // once per 5 minutes per brand (a 15-minute poll still refreshes them); a rebuild from the
   // loader's data still happens on every event.
+  //
+  // Only on request (2026-10-06). These eighteen reads include the heaviest views in the app
+  // (vw_brand_cm, vw_channel_optimum, vw_brand_efficiency_targets ran 30s+ at start-up) and fed only
+  // Profit & sales, yet ran on every page load and crowded out the page on show. Profit & sales
+  // calls GRETA_OVERVIEW_WANT() when it opens; until then the cheap rebuild from the loader's data
+  // still runs on every event.
+  var _wanted = false;
+  window.GRETA_OVERVIEW_WANT = function () { if (!_wanted) { _wanted = true; refreshSupp(); } };
   var SUPP_FRESH_MS = 5 * 60 * 1000, _suppAt = 0, _suppBrand = null, _suppP = null;
   async function refreshSupp() {
     var L = window.FRKL_LIVE;
     if (!L || !L.brandId || !window.FRKL_DATA || !window.FRKL_DATA.shopify || !window.FRKL_DATA.shopify.length) return;
     rebuild(); // build business tier immediately from loader data
-    if (!L.sb) return;
+    if (!L.sb || !_wanted) return;
     if (_suppP && _suppBrand === L.brandId) { await _suppP; return; }
     if (_supp && _suppBrand === L.brandId && Date.now() - _suppAt < SUPP_FRESH_MS) return;
     _suppBrand = L.brandId;

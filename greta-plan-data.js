@@ -32,20 +32,32 @@
       new Promise(function (res) { setTimeout(function () { res({ data: null, error: { message: 'timeout' } }); }, ms); })
     ]);
   }
+  // The goal, costs and readiness reads are small; when one fails it is because the database was
+  // busy, and the costs form used to say "couldn't load your costs" for the rest of the visit.
+  // Try twice more before saying so. The builder is rebuilt each time (a query runs once).
+  async function withRetry(mk, ms) {
+    var r = null;
+    for (var i = 0; i < 3; i++) {
+      if (i) await new Promise(function (res) { setTimeout(res, i === 1 ? 1500 : 5000); });
+      r = await withTimeout(mk(), ms);
+      if (r && !r.error) return r;
+    }
+    return r;
+  }
   async function refresh() {
     var s = sb(), b = bid(); if (!s || !b) return;
     // Resilient: each query is independent + time-boxed, so one slow/failing view can't
     // stall or wipe the whole plan feed. Core (goal + config + readiness) flips `ready` so the
     // rail and Plan tab render; the heavy scoreboard/forecast views fill in afterwards.
-    var g = await withTimeout(s.from('mos_business_goal').select('*').eq('brand_id', b).lte('period_start', PERIOD.end).gte('period_end', PERIOD.start).order('created_at', { ascending: false }).limit(1), 8000);
+    var g = await withRetry(function () { return s.from('mos_business_goal').select('*').eq('brand_id', b).lte('period_start', PERIOD.end).gte('period_end', PERIOD.start).order('created_at', { ascending: false }).limit(1); }, 8000);
     if (g && g.data) window.FRKL_PLAN.goal = g.data[0] || null;
-    var cfg = await withTimeout(s.from('brand_config').select('gross_margin, variable_costs, fixed_costs_monthly, inventory_days, discount_rate_annual, seasonality, opening_cash, opening_cash_as_of, benchmarks, supplier_lead_time_weeks, cash_floor').eq('brand_id', b).limit(1), 8000);
+    var cfg = await withRetry(function () { return s.from('brand_config').select('gross_margin, variable_costs, fixed_costs_monthly, inventory_days, discount_rate_annual, seasonality, opening_cash, opening_cash_as_of, benchmarks, supplier_lead_time_weeks, cash_floor').eq('brand_id', b).limit(1); }, 8000);
     if (cfg && cfg.data) window.FRKL_PLAN.config = cfg.data[0] || null;
     // Say which reads failed, so a screen can tell "you have not set this" from "we could not load
     // it" — both used to leave null behind, and the costs form waited on it for ever.
     window.FRKL_PLAN.configErr = (cfg && cfg.error) ? (cfg.error.message || 'failed') : null;
     window.FRKL_PLAN.configLoaded = !!(cfg && cfg.data);
-    var rd = await withTimeout(s.from('vw_brand_plan_readiness').select('section,item,status,detail,blocks_targets,ord').eq('brand_id', b).order('ord', { ascending: true }), 8000);
+    var rd = await withRetry(function () { return s.from('vw_brand_plan_readiness').select('section,item,status,detail,blocks_targets,ord').eq('brand_id', b).order('ord', { ascending: true }); }, 8000);
     if (rd && rd.data) window.FRKL_PLAN.readiness = rd.data || [];
     window.FRKL_PLAN.readinessErr = (rd && rd.error) ? (rd.error.message || 'failed') : null;
     window.FRKL_PLAN.ready = true;
