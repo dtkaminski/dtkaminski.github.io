@@ -10444,6 +10444,10 @@ function V3Findings(){
             </button>
             {isOpen && (<div className="v3-rank-why">
               {pa.why && <p className="v3-rank-plain">{pa.why}</p>}
+              {/* One verdict per platform: this cost is on the platform's own purchase count, the board's
+                  is on the shop's orders, and the two read differently. Say which to judge it on. */}
+              {behind >= 0 && /^metric-tree-/.test(String(f.external_id)) && (<p className="v3-note v3-measure">
+                This cost uses {ch === 'meta' ? 'Meta' : 'Google'}’s own count of purchases, not your shop’s orders, so it reads differently from the cost per order on the board (#{behind + 1}). Judge {ch === 'meta' ? 'Meta' : 'Google'} on the board’s figure; read this for which stage moved.</p>)}
               {reasons.length > 0 && (<div className="v3-rank-raw"><span className="v3-kick">Why {conf ? V3_CONF[conf].label.toLowerCase() : 'this steer'}</span>
                 <ul className="v3-rank-steps">{reasons.map((x, j) => <li key={j}>{v3Tidy(x.text)}</li>)}</ul></div>)}
             </div>)}
@@ -18919,7 +18923,15 @@ const V3_COGSQ_Q = (sb, b) => sb.from('vw_brand_cogs_quality')
 // both ask, so they say the same thing. Not while the confirmed goal was planned on a different spend
 // curve (0261 corrected it; the goal stores the exponent it used) — the owner is asked to re-plan —
 // and not in a goal's first 14 days, when the last 30 days are mostly the previous quarter's trading.
-const V3_CURVE_Q = (sb, b) => sb.from('vw_brand_spend_curve').select('beta,identifiable,n_months').eq('brand_id', b).limit(1);
+// 0270: the spend curve (about 3s live) and the business summary are built once a night into
+// cache_brand_state. A row is a few ms; the live read is the fallback for a brand with no row yet, a row
+// over 26 hours old, or before 0270 is applied (the table is missing, so the cache read errors).
+const V3_FRESH_MS = 26 * 3600 * 1000;
+const v3StateRow = (sb, b, col) => sb.from('cache_brand_state').select(col + ',refreshed_at').eq('brand_id', b).limit(1)
+  .then(c => { const row = c && !c.error && c.data && c.data[0];
+    return row && row[col] && Date.now() - new Date(row.refreshed_at).getTime() < V3_FRESH_MS ? row[col] : null; }, () => null);
+const V3_CURVE_Q = (sb, b) => v3StateRow(sb, b, 'spend_curve').then(c => c ? { data: [c], error: null }
+  : sb.from('vw_brand_spend_curve').select('beta,identifiable,n_months').eq('brand_id', b).limit(1));
 function useV3GoalCheck() {
   const goal = useV3Rows('goal-active', V3_GOAL_Q);
   const cur = useV3Rows('curve-beta', V3_CURVE_Q);
@@ -19912,7 +19924,8 @@ function V3Team() {
 // One-off money (a peak's worth of profit) reads "once", never "a month".
 const v3Once = r => /\(once\b/.test(String((r && r.money_basis) || ''));
 const v3Per = (r, short) => (v3Once(r) ? (short ? ' once' : ' once, over the peak') : (short ? '/mo' : ' a month'));
-const V3_STATE_Q = (sb, b) => sb.rpc('fn_brand_state', { p_brand: b }).then(r => ({ data: r.data ? [r.data] : [], error: r.error }));
+const V3_STATE_Q = (sb, b) => v3StateRow(sb, b, 'state').then(s => s ? { data: [s], error: null }
+  : sb.rpc('fn_brand_state', { p_brand: b }).then(r => ({ data: r.data ? [r.data] : [], error: r.error })));
 const V3_CODES_Q = (sb, b) => sb.from('vw_brand_code_performance').select('code,orders_365d,net_sales_365d,avg_depth,first_order_share,last_used,orders_90d')
   .eq('brand_id', b).order('orders_365d', { ascending: false }).limit(12);
 // where a figure sits against its rule-of-thumb range: 'good', 'ok' or 'weak'
@@ -19948,6 +19961,18 @@ function V3BusinessState() {
   const sents = [];
   if (yoySales != null && yoyAds != null)
     sents.push(<>Sales are {yoySales >= 0 ? fmtPctN(yoySales) + ' up' : fmtPctN(-yoySales) + ' down'} on the same 30 days last year, on {fmtTimes(yoyAds, 1)} the ad spend{ret != null && A.break_even_return ? <>: each £1 of ads now brings {fmtMoney(ret, 2)} of sales against the {fmtMoney(num(A.break_even_return), 2)} you need to break even on the ads alone, which leaves little to pay the overheads</> : null}.</>);
+  // 0270: the sales rhythm. Whether the weeks between sales pay for their ads is the question an agency
+  // asks first of a brand that is on sale most weeks.
+  const H = S.rhythm, rc = H && H.recent, bf = H && H.before;
+  if (H && rc && num(rc.n) >= 2 && num(H.sale_weeks_13) >= 4)
+    sents.push(<>You ran a sale in {fmtCount(H.sale_weeks_13)} of the last {fmtCount(H.weeks_13)} weeks{H.deepest_before != null && num(H.deepest_13) >= num(H.deepest_before) + 0.05 ? <>, and the deepest went from {fmtPctN(num(H.deepest_before))} to {fmtPctN(num(H.deepest_13))} below usual prices</> : null}. In the weeks without one you now {num(rc.after_ads) < 0 ? 'lose about ' + fmtMoney(-num(rc.after_ads)) : 'make about ' + fmtMoney(num(rc.after_ads))} a week after ads{bf && num(bf.n) >= 2 && num(bf.after_ads) !== num(rc.after_ads) ? <>; before that they {num(bf.after_ads) < 0 ? 'lost ' + fmtMoney(-num(bf.after_ads)) : 'made ' + fmtMoney(num(bf.after_ads))}, on {fmtMoney(num(bf.ads))} of ads a week against {fmtMoney(num(rc.ads))} now</> : null}.</>);
+  const wk = (H && Array.isArray(H.weeks) ? H.weeks : []).filter(w => w.after_ads != null)
+    .map(w => ({ label: v3Day(String(w.wk)), sale: !!w.sale, v: num(w.after_ads), sales: num(w.sales), ads: num(w.ads),
+      off: Math.max(num(w.markdown) || 0, num(w.code_depth) || 0) }));
+  const rhTip = ({ active, payload }) => { if (!active || !payload || !payload.length) return null; const d = payload[0].payload;
+    return (<div className="v3-tip"><b>Week of {d.label}{d.sale ? ' · a sale' : ''}</b>
+      <span>Sales <em>{fmtMoney(d.sales)}</em></span><span>Ads <em>{fmtMoney(d.ads)}</em></span>
+      <span>After product, order and ad costs <em>{fmtMoney(d.v)}</em></span><span>Below usual prices <em>{fmtPctN(d.off)}</em></span></div>); };
   if (U.cac != null && U.first_order_contribution != null)
     sents.push(<>A new customer costs {fmtMoney(num(U.cac))} and their first order earns {fmtMoney(num(U.first_order_contribution))}{U.ltv_cac != null ? <>; over their life they are worth {fmtTimes(num(U.ltv_cac), 1)} what they cost, where brands aim for 3×</> : null}. {R.repeat_90d != null ? <>{fmtPctN(num(R.repeat_90d))} order again within 90 days{BM.repeat_90d ? <> (around {fmtPctN(BM.repeat_90d.typical)} is typical)</> : null}, and returning customers bring {fmtPctN(num(R.returning_rev_share))} of sales.</> : null}</>);
   if (topCode)
@@ -19962,8 +19987,9 @@ function V3BusinessState() {
   const live = board.rows ? v3LiveRows(board.rows) : [];
   const pick = f => live.filter(f);
   const now = pick(r => r.lane !== 'test' && !/^promo-peak/.test(r.external_id)).slice(0, 3);
-  const before = pick(r => /^(promo-peak|crm-flows)/.test(r.external_id));
-  const after = pick(r => /^(cust-winback|basket-pair)/.test(r.external_id) || (r.lane === 'test' && !/^(promo-peak|crm-flows)/.test(r.external_id))).slice(0, 3);
+  // the weeks before a peak are the weeks without a sale, so the two-budget test belongs there
+  const before = pick(r => /^(promo-peak|crm-flows|sales-rhythm)/.test(r.external_id));
+  const after = pick(r => /^(cust-winback|basket-pair)/.test(r.external_id) || (r.lane === 'test' && !/^(promo-peak|crm-flows|sales-rhythm)/.test(r.external_id))).slice(0, 3);
   const item = r => (<li key={r.external_id}><span className="v3-rank-desc">{v3PlainAction(r).title}</span>{r.cm_gbp ? <span className="v3-sub"> · {v3Gbp(r.cm_gbp)}{v3Per(r)}</span> : null}</li>);
   const phases = [
     ['This week', now, 'Nothing urgent on the board.'],
@@ -19984,6 +20010,21 @@ function V3BusinessState() {
     <div className="v3-kick">Where the business stands · last 30 days</div>
     <p className="v3-verdict">{verdict}</p>
     {sents.length > 0 && <p className="v3-note v3-measure">{sents.map((s, i) => <React.Fragment key={i}>{i ? ' ' : ''}{s}</React.Fragment>)}</p>}
+    {wk.length >= 8 && num(H.sale_weeks_13) >= 4 && (<figure className="v3-chart v3-chart-solo">
+      <figcaption><span className="v3-chart-title">Profit after ads, by week</span>
+        <span className="v3-legend"><i style={{ background: PAL.accent }}/>A sale <i style={{ background: PAL.data3 }}/>No sale</span></figcaption>
+      <Recharts.ResponsiveContainer width="100%" height={240}>
+        <Recharts.BarChart data={wk} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+          <Recharts.CartesianGrid/>
+          <Recharts.XAxis dataKey="label" interval="preserveStartEnd"/>
+          <Recharts.YAxis tickFormatter={fmtMoneyK}/>
+          <Recharts.Tooltip content={rhTip}/>
+          <Recharts.ReferenceLine y={0} stroke={PAL.muted}/>
+          <Recharts.Bar dataKey="v">{wk.map((d, i) => <Recharts.Cell key={i} fill={d.sale ? PAL.accent : PAL.data3}/>)}</Recharts.Bar>
+        </Recharts.BarChart>
+      </Recharts.ResponsiveContainer>
+      <p className="micro muted v3-measure">{v3Sentence(H.basis)}</p>
+    </figure>)}
     {phases.length > 0 && (<div className="v3-gap-top">
       <h2 className="v3-sec-title">The next 90 days</h2>
       {phases.map(([title, list, empty]) => (<div key={title}>

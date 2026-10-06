@@ -58,19 +58,43 @@
   }
   if (typeof window !== 'undefined') window.FRKL_REPORT_FAILURE = reportFailure;
 
+  // The timer used to run on after the read had answered, so every page left open past `ms` logged
+  // "no response in 8000ms" for a read that came back in 9ms: 84 false timeouts in a week, which then
+  // raised "a screen failed to load" on the board. It now stops when the read settles. And a hidden
+  // tab's timers and network are throttled, so a read there has not failed when its timer fires: it
+  // waits for the tab to be seen again and then gets its full time, rather than falling back to the
+  // slow live view from a tab nobody is looking at.
   async function safeQ(q, ms, def, source) {
-    var label = source || 'unknown';
+    var label = source || 'unknown', timer = null, settled = false;
+    function done() { settled = true; if (timer) { clearTimeout(timer); timer = null; } }
     try {
       return await Promise.race([
         Promise.resolve(q).then(function (r) {
+          done();
           if (r && r.error) { reportFailure(label, 'read_failed', r.error.message || r.error.code); return def; }
           return (r && r.data != null) ? r.data : def;
-        }).catch(function (e) { reportFailure(label, 'read_failed', e && e.message); return def; }),
+        }).catch(function (e) { done(); reportFailure(label, 'read_failed', e && e.message); return def; }),
         new Promise(function (res) {
-          setTimeout(function () { reportFailure(label, 'read_timeout', 'no response in ' + ms + 'ms'); res(def); }, ms);
+          function arm() {
+            timer = setTimeout(function () {
+              timer = null;
+              if (settled) return;
+              if (typeof document !== 'undefined' && document.hidden) {
+                document.addEventListener('visibilitychange', function seen() {
+                  if (document.hidden) return;
+                  document.removeEventListener('visibilitychange', seen);
+                  if (!settled) arm();
+                });
+                return;
+              }
+              reportFailure(label, 'read_timeout', 'no response in ' + ms + 'ms');
+              res(def);
+            }, ms);
+          }
+          arm();
         })
       ]);
-    } catch (e) { reportFailure(label, 'read_failed', e && e.message); return def; }
+    } catch (e) { done(); reportFailure(label, 'read_failed', e && e.message); return def; }
   }
 
   // ── Instant paint ──────────────────────────────────────────────────────────────────────────
@@ -303,7 +327,14 @@
     if (window.console) console.info('[headline-data] GRETA_HEADLINE built · after-ads £' + out.cm_after_marketing_30d + (out.target_is_derived ? ' · target derived' : ''));
   }
 
-  function boot() { build().catch(function () {}); }
+  // One build at a time. 'frkl-brand-ready', the brand poll and the first 'frkl-data-updated' all land
+  // within the first second or two of a load, and each used to start its own read of the same cached
+  // row (three to five reads a load, at the moment the request queue is fullest).
+  var building = null;
+  function boot() {
+    if (building) return;
+    building = build().catch(function () {}).then(function () { building = null; });
+  }
   // The session and brand id arrive asynchronously (greta-data-loader resolves the
   // membership after auth), so a fixed delay races it and exits silently — which is
   // exactly what happened live on 2026-09-25. Poll for the brand id like the overview
