@@ -18981,7 +18981,11 @@ function useV3GoalCheck() {
 }
 // fn_plan_quarter returns one JSON object; useV3Rows wants rows. ok:false (under a month of trading)
 // comes back as no row.
-const v3PlanQ = (start, end, goal) => (sb, b) => sb.rpc('fn_plan_quarter', { p_brand: b, p_start: start, p_end: end, p_goal: goal, p_basis: goal == null ? 'auto' : 'revenue' })
+// The plan is seconds of work. On Today it fed only the season note under "Do this first", and fired at
+// boot it held Today's story up for 14s (2026-10-06), so it waits for the Today-first gate (the page
+// head's GRETA_TODAY_READY: open at once on any other page, never later than 7s).
+const v3PlanQ = (start, end, goal) => (sb, b) => (window.GRETA_TODAY_READY || Promise.resolve())
+  .then(() => sb.rpc('fn_plan_quarter', { p_brand: b, p_start: start, p_end: end, p_goal: goal, p_basis: goal == null ? 'auto' : 'revenue' }))
   .then(r => ({ data: r.data && r.data.ok !== false ? [r.data] : [], error: r.error }));
 function useV3Goal(opts) {
   const wantGoal = !opts || opts.goalPlan !== false;   // Today and Profit & sales need only the pace
