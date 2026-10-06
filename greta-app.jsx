@@ -10122,6 +10122,19 @@ function V3SkeletonRows({ n }) {
 // the live board replaces it the moment it lands.
 const V3_BOARD = { rows: null, err: null, loading: false, subs: new Set() };
 function v3BoardNotify(){ V3_BOARD.subs.forEach(f => { try { f(); } catch(e){} }); }
+// 0272: Greta's words for the board and the summary, written by the LLM from the same figures (the
+// greta-writer edge function) and checked number by number against them. Fetched once a page load,
+// after the board; the first load of a day waits on the model for a few seconds, every later one is
+// the stored text. Until it arrives, or if it fails or a number did not check, every screen keeps
+// the rules' own wording, so nothing waits on it and nothing breaks without it.
+const V3_NARR = { data: null, asked: false };
+function v3NarrLoad(b){
+  if (V3_NARR.asked || !b) return;
+  V3_NARR.asked = true;
+  ciFetch('greta-writer', { brand_id: b }).then(d => {
+    if (d && (d.summary || (d.actions && Object.keys(d.actions).length))) { V3_NARR.data = d; v3BoardNotify(); }
+  }, () => { /* the rules' wording stands */ });
+}
 function v3BoardLoad(){
   if (V3_BOARD.loading || V3_BOARD.rows) return true;
   const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
@@ -10151,6 +10164,7 @@ function v3BoardLoad(){
         : rows.sort((x, y) => (x.verification === 'unverified' ? 1 : 0) - (y.verification === 'unverified' ? 1 : 0));
       V3_BOARD.err = null;
       v3BoardNotify();
+      v3NarrLoad(b);
     }, () => { V3_BOARD.loading = false; V3_BOARD.err = 'could not load'; v3BoardNotify(); });
   return true;
 }
@@ -15667,6 +15681,10 @@ function v3PlainAction(row){
   const fallback = v3ActionText(row && row.description);
   const m = (re) => raw.match(re);
   const P = (t, why) => ({ title: t, why: why || '', raw });
+  // Greta's written version when there is one that passed the number check (0272); the rules'
+  // sentence stays in raw, and the board shows it under "Greta's working".
+  const n = V3_NARR.data && V3_NARR.data.actions && V3_NARR.data.actions[id];
+  if (n && n.title) return { title: n.title, why: n.why || '', raw, written: true };
   let x;
   if (/^measure-saturation-/.test(id) && (x = m(/£\s*([\d,.]+)\s*vs\s*£?\s*([\d,.]+)/))) {
     const ch = v3Ch(id.split('-').pop());
@@ -20011,10 +20029,19 @@ function V3BusinessState() {
   ].filter(r => r[1] != null && r[2]);
   const TONE = { good: 'v3-up', ok: 'v3-muted', weak: 'v3-down' }, WORD = { good: 'better than typical', ok: 'within the usual range', weak: 'outside the usual range' };
 
+  // 0272: Greta's read, written by the LLM from these figures and checked number by number. When it
+  // is there it leads and the rules' sentences sit under it; when it is not, they lead as before.
+  const NS = V3_NARR.data && V3_NARR.data.summary;
+  const facts = sents.length > 0 && <p className="v3-note v3-measure">{sents.map((s, i) => <React.Fragment key={i}>{i ? ' ' : ''}{s}</React.Fragment>)}</p>;
   return (<div className="v3-page-stack"><section>
     <div className="v3-kick">Where the business stands · last 30 days</div>
     <p className="v3-verdict">{verdict}</p>
-    {sents.length > 0 && <p className="v3-note v3-measure">{sents.map((s, i) => <React.Fragment key={i}>{i ? ' ' : ''}{s}</React.Fragment>)}</p>}
+    {NS && NS.story ? (<>
+      <p className="v3-note v3-measure">{NS.story}</p>
+      {NS.first_move && <p className="v3-note v3-measure"><b>This week:</b> {NS.first_move}</p>}
+      <p className="micro muted v3-measure">Written by Greta from the figures on this page; every number in it is checked against them before it is shown.</p>
+      {facts && <V3More id="state-facts" label="The figures behind this">{facts}</V3More>}
+    </>) : facts}
     {wk.length >= 8 && num(H.sale_weeks_13) >= 4 && (<figure className="v3-chart v3-chart-solo">
       <figcaption><span className="v3-chart-title">Profit after ads, by week</span>
         <span className="v3-legend"><i style={{ background: PAL.accent }}/>A sale <i style={{ background: PAL.data3 }}/>No sale</span></figcaption>
