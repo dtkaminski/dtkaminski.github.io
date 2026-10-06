@@ -8486,7 +8486,7 @@ async function v3AskFacts() {
   if (!sb || !b) return null;
   const T = (p, ms) => Promise.race([Promise.resolve(p).then(r => (r && !r.error ? r.data : null), () => null), new Promise(res => setTimeout(() => res(null), ms || 9000))]);
   const today = new Date().toISOString().slice(0, 10), Q = v3Quarter(today);
-  const [lad, goalR, paceR, ueR, drift, cogsR, cfgR, cal, found, curveR] = await Promise.all([
+  const [lad, goalR, paceR, ueR, drift, cogsR, cfgR, cal, found, curveR, boardR, stockR] = await Promise.all([
     T(V3_LADDER_Q(sb, b)), T(V3_GOAL_Q(sb, b)), T(v3PlanQ(Q.start, Q.end, null)(sb, b), 15000), T(V3_UE_Q(sb, b)),
     T(V3_DRIFT_Q(sb, b)), T(V3_COGSQ_Q(sb, b)),
     T(sb.from('brand_config').select('supplier_lead_time_weeks,fixed_costs_monthly,cash_floor,opening_cash,opening_cash_as_of').eq('brand_id', b).limit(1)),
@@ -8494,6 +8494,9 @@ async function v3AskFacts() {
       .gte('start_date', v3IsoAdd(today, -180)).lte('start_date', v3IsoAdd(today, 120)).limit(300)),
     T(sb.from('external_events').select('ts').eq('brand_id', b).eq('kind', 'promo').gte('ts', v3IsoAdd(today, -180)).limit(60)),
     T(V3_CURVE_Q(sb, b)),
+    // what each board row's pounds are (the readout gives the number only), and the stock plan's rows
+    T(sb.from('vw_brand_action_board').select('board_rank,money_basis').eq('brand_id', b).limit(30)),
+    T(V3_STOCK_Q(sb, b), 12000),
   ]);
   const H = window.GRETA_HEADLINE || {};
   const cmr = Number(H.net_revenue_30d) > 0 && H.product_contribution_30d != null ? Number(H.product_contribution_30d) / Number(H.net_revenue_30d) : null;
@@ -8536,9 +8539,16 @@ async function v3AskFacts() {
       promotions_planned: evs.filter(x => x.row_group === 'promo' && x.status !== 'skipped' && ov(x)).map(x => x.title),
       emails_planned: evs.filter(x => x.channel === 'email' && x.status !== 'skipped' && ov(x)).length,
       stock_order_by: lead ? v3IsoAdd(s, -Math.round(lead * 7) - 1) : null };   // lands the day before it starts, as the board says
+    // When an order placed today lands against the peak: the first live answer (6 Oct) said "order now to
+    // have it for BFCM" when today's order lands 28 Nov, eight days into a peak that opens 20 Nov.
+    const leadDays = lead ? Math.round(lead * 7) : 28, lands = v3IsoAdd(today, leadDays);
+    Object.assign(f.next_peak, { order_placed_today_lands: lands, lands_before_peak_starts: lands < s, lands_after_peak_ends: lands > e,
+      lead_days: leadDays, lead_time_entered: !!lead });
   }
   const promos = evs.filter(x => x.row_group === 'promo' && x.status !== 'skipped');
   const missing = (found || []).filter(r => { const k = String(r.ts).slice(0, 10); return !promos.some(x => String(x.start_date).slice(0, 10) <= v3IsoAdd(k, 1) && String(x.end_date || x.start_date).slice(0, 10) >= v3IsoAdd(k, -1)); });
+  f._board_basis = Object.fromEntries((boardR || []).map(r => [r.board_rank, r.money_basis || '']));
+  f._stock = Array.isArray(stockR) ? stockR : null;
   f.calendar = { past_sales_not_on_the_calendar: missing.length,
     note: missing.length ? 'Greta found sales that are not on the calendar, so what she has learned about promotions rests on too few events. They can be added from the Calendar.' : null };
   return f;
@@ -8550,12 +8560,13 @@ async function v3AskFacts() {
 // context is built for the question: the app's own figures and a shortened readout always, the
 // series the question is about as compact tables, and a hard ceiling that drops the least useful
 // parts first. The ceiling is in characters; JSON like this runs about three characters a token.
-const V3_ASK_BUDGET = 14000;
+const V3_ASK_BUDGET = 18000;   // measured 6 Oct: 13,354 characters = 3,926 tokens
 const V3_ASK_TOPICS = {
   ads: /\b(ad|ads|advert\w*|meta|facebook|instagram|google|spend\w*|roas|campaign\w*|creative\w*|channel\w*|acquisition|new customers?|cac|budget|cost per|cpc|cpm|click\w*)\b/i,
   site: /\b(site|website|conversion|convert\w*|traffic|session\w*|checkout|basket|cart|visit\w*|page\w*|mobile|bounce)\b/i,
   email: /\b(email\w*|klaviyo|flows?|newsletter|list|sms|send\w*|subscriber\w*)\b/i,
   recent: /\b(today|yesterday|this week|last week|days?|daily|recent\w*|weekend|monday|tuesday|wednesday|thursday|friday|saturday|sunday|so far)\b/i,
+  stock: /\b(stock\w*|reorder\w*|restock\w*|re-?order|out of|runs? out|running out|sold out|inventory|units?|supplier\w*|lead time|purchase order|how many)\b/i,
 };
 // Rows as a header and arrays: about half the characters of one object per row.
 function v3AskTable(rows, keyField) {
@@ -8563,15 +8574,21 @@ function v3AskTable(rows, keyField) {
   const cols = [keyField].concat(Object.keys(rows[0]).filter(k => k !== keyField));
   return { cols, rows: rows.map(r => cols.map(c => (r[c] == null ? null : r[c]))) };
 }
-function v3AskReadout(R, topics) {
+function v3AskReadout(R, topics, basis) {
   if (!R) return null;
+  basis = basis || {};
   const cut = (s, n) => { s = String(s == null ? '' : s); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
   const out = {
     rules: R.rules || [],
     window: R.window || null,
     headline: (Array.isArray(R.headline) ? R.headline : []).map(h => ({ label: h.label, value: h.value == null ? null : Math.round(Number(h.value) * 100) / 100,
       rung: h.rung, window: h.window_label, population: cut(h.population, 90) })),
-    board: (R.board || []).map(x => ({ rank: x.rank, action: cut(x.action, 180), gbp: x.gbp_per_month, gbp_is_sales: !!x.gbp_is_sales, rung: x.rung, lane: x.lane })),
+    // What the pounds are, with them: the first live answer read "£12,237" (the profit those products
+    // make a month) as the cost of ordering them.
+    board: (R.board || []).map(x => { const bs = String(basis[x.rank] || '');
+      return { rank: x.rank, action: cut(x.action, 180), pounds: x.gbp_per_month,
+        per: /\(once|once,? over/i.test(bs) ? 'once' : 'a month', pounds_are: x.gbp_is_sales ? 'sales' : (cut(bs, 110) || 'profit after product and order costs'),
+        rung: x.rung, lane: x.lane }; }),
     held: (R.held || []).map(x => ({ action: cut(x.action, 90), because: cut((x.held_because || [])[0], 80) })),
     tracking: R.tracking || [],
     coverage: (R.coverage || []).map(c => ({ source: c.source, state: c.state, complete_through: c.complete_through, unusable_days_90d: c.unusable_days_90d })),
@@ -8587,12 +8604,31 @@ function buildAskContext(facts, question){
   const topics = {}; Object.keys(V3_ASK_TOPICS).forEach(k => { topics[k] = V3_ASK_TOPICS[k].test(question || ''); });
   const D = window.FRKL_DATA || {};
   const _shp = D.shopify || [];
+  // The stock plan, for stock questions and for any product the question names: the rows a buyer would
+  // look at. Named products go first and are never dropped by the ceiling.
+  const plan = (facts && facts._stock) || [];
+  const ql = String(question || '').toLowerCase();
+  const named = plan.filter(r => { const t = String(r.product_title || '').toLowerCase().trim(); return t.length >= 6 && ql.includes(t); });
+  const atRisk = plan.filter(r => r.runs_out_before_restock && !named.includes(r))
+    .sort((a, b) => (Number(b.cm_at_risk_before_resupply) || 0) - (Number(a.cm_at_risk_before_resupply) || 0)).slice(0, 15);
+  const num = v => (v == null || !isFinite(Number(v)) ? null : Number(v));
+  const stockRow = r => ({ product: r.product_title, status: r.stock_status, on_hand: num(r.on_hand), weekly_pace: num(r.weekly_velocity),
+    days_left: num(r.projected_days_to_stockout), order_units: num(r.suggested_order_units), order_by: r.reorder_by_date || null,
+    lost_before_lands: r.cm_at_risk_before_resupply == null ? null : Math.round(Number(r.cm_at_risk_before_resupply)),
+    unit_cost: r.unit_cost == null ? null : Math.round(Number(r.unit_cost) * 100) / 100 });
+  if (named.length) topics.stock = true;
+  const basisFor = (facts && facts._board_basis) || {};
+  facts = facts ? Object.assign({}, facts) : facts;
+  if (facts) { delete facts._stock; delete facts._board_basis; }
   let _today = ''; try { _today = new Date().toISOString().slice(0,10); } catch(e) {}
   const _dates = _shp.map(r=>r && r.date).filter(Boolean).sort();
   const _latestDate = _dates.length ? _dates[_dates.length-1] : null;
   const _partialLatestDay = !!(_latestDate && _today && _latestDate >= _today);
   // The series the question is about first, then the shop's own weeks; the ceiling drops from the end.
   const parts = [
+    named.length && ['stock_named', () => v3AskTable(named.map(stockRow), 'product'), 'The stock plan for the products named in the question.'],
+    topics.stock && atRisk.length && ['stock_at_risk', () => v3AskTable(atRisk.map(stockRow), 'product'),
+      'Greta’s stock plan, the 15 products that run out before a restock can land, most profit at risk first: weekly_pace (an out-of-stock product at what it sold while in stock), order_units (what to order now: eight weeks of stock after it lands), order_by, lost_before_lands (profit lost before an order placed today arrives), unit_cost (landed).'],
     topics.ads && ['weekly_meta', () => v3AskTable(v3AskWeekly(D.metaDaily, ['cost', 'purchases', 'purchaseValue'], 26), 'week'), 'Meta per week: spend, Meta-counted purchases and their value (Meta’s own claim).'],
     topics.ads && ['weekly_google', () => v3AskTable(v3AskWeekly(D.googleAds, ['cost', 'conversions', 'convValue'], 26), 'week'), 'Google Ads per week: spend, Google-counted conversions and value (Google’s own claim).'],
     topics.recent && ['daily_shop_28', () => v3AskTable(v3AskDaily(_shp, ['netSales', 'orders', 'discounts'], 28), 'date'), 'Shop day by day, last 28 days.'],
@@ -8607,12 +8643,12 @@ function buildAskContext(facts, question){
     dataQuality: { latestDate: _latestDate, today: _today, partialLatestDay: _partialLatestDay,
       note: 'If partialLatestDay is true the latest date is an incomplete day: never read its dip as a decline. Under ~60 orders in a window, treat conversion and order-value swings as possible noise.' },
     facts: facts || null,
-    readout: v3AskReadout((typeof window !== 'undefined' && window.GRETA_READOUT) || null, topics),
+    readout: v3AskReadout((typeof window !== 'undefined' && window.GRETA_READOUT) || null, topics, basisFor),
     data_dictionary: dictionary,
     sent: 'Only the series this question needs were sent. If the answer needs a series that is not here, say which one and suggest asking about it directly.' };
   // The ceiling: drop data series from the least needed, then shorten the readout.
   const size = () => JSON.stringify(meta).length + JSON.stringify(data).length;
-  const order = Object.keys(data).reverse();
+  const order = Object.keys(data).reverse().filter(k => k !== 'stock_named');
   while (size() > V3_ASK_BUDGET && order.length) { const k = order.shift(); delete data[k]; delete dictionary[k]; }
   if (size() > V3_ASK_BUDGET && meta.readout) delete meta.readout.cost_trees;
   if (size() > V3_ASK_BUDGET && meta.readout) meta.readout.held = meta.readout.held.map(h => ({ action: h.action }));
@@ -8700,6 +8736,8 @@ Follow _meta.readout.rules. Quote headline figures exactly, with their window. S
 WHAT TO DO questions: answer from readout.board in its order, with each item's pounds (a month, or once when the action says so) and its rung. Do not re-rank. One idea of your own is allowed only if labelled "my suggestion, not on your board". For spending more, check facts.quarter_plan_at_todays_ad_spend and facts.next_peak first. If facts.goal.needs_replanning is true, say so before quoting the goal.
 
 WHY questions: before naming a cause, rule out the confounders: a promotion or code, a spend change, a stockout, an email send, a tracking change, seasonality, or a partial latest day (_meta.dataQuality). Locate the move: demand (spend, visits) → conversion → order value and discounts → new vs returning → product and stock. Separate what the data shows from what you infer, and give your confidence.
+
+STOCK questions: use data.stock_named and data.stock_at_risk (Greta's stock plan) for how many to order (order_units), what being out costs (lost_before_lands, profit) and what an order costs (order_units × unit_cost). An order placed today lands on facts.next_peak.order_placed_today_lands. If facts.next_peak.lands_before_peak_starts is false, never say ordering now gets stock in for the peak: say when it lands, that only what suppliers can send sooner reaches the peak, and to ask for that first. Board pounds are what pounds_are says, a month or once (per); never call them a cost unless pounds_are says so.
 
 Never invent a forecast beyond facts.quarter_plan_at_todays_ad_spend. If the question cannot be answered from what was sent, say what is missing. Plain British English, no jargon, £ for money. Short questions get a short answer with the number and its calculation; diagnosis questions get: the corrected read, the numbers, what was ruled out, what to do in order, and what would change your mind.
 
