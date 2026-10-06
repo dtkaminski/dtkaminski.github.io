@@ -8526,7 +8526,7 @@ async function v3AskFacts() {
   f.costs_and_settings = { supplier_lead_time_weeks: lead, overheads_per_month: R(C.fixed_costs_monthly), minimum_cash_balance_set: C.cash_floor != null,
     cash_balance: R(C.opening_cash), cash_balance_as_of: C.opening_cash_as_of || null };
   const rf = (drift || []).find(x => x.input_key === 'refundPct' && x.verifiable);
-  if (rf) f.costs_and_settings.refunds = { entered_pct: Number(rf.config_value), measured_pct: Math.round(Number(rf.realised_value) * 10) / 10, off: rf.status === 'drift' };
+  if (rf) f.costs_and_settings.refunds = { entered_pct: Number(rf.config_value), measured_pct: Math.round(Number(rf.realised_value) * 10) / 10, measured_differs_from_entered: rf.status === 'drift' };
   const Qc = r0(cogsR);
   if (Qc) f.costs_and_settings.product_costs = { share_of_sales_with_a_cost: Qc.cogs_coverage_90d, include_freight_or_duty: Qc.cogs_landed_complete !== false };
   const evs = cal || [];
@@ -8569,6 +8569,10 @@ const V3_ASK_TOPICS = {
   stock: /\b(stock\w*|reorder\w*|restock\w*|re-?order|out of|runs? out|running out|sold out|inventory|units?|supplier\w*|lead time|purchase order|how many)\b/i,
 };
 // Rows as a header and arrays: about half the characters of one object per row.
+// Weeks that have all seven days in the data: a week still in progress read as a collapse.
+function v3AskFullWeeks(rows, latest) {
+  return latest ? (rows || []).filter(r => v3IsoAdd(r.week, 6) <= latest) : (rows || []);
+}
 function v3AskTable(rows, keyField) {
   if (!rows || !rows.length) return null;
   const cols = [keyField].concat(Object.keys(rows[0]).filter(k => k !== keyField));
@@ -8588,7 +8592,7 @@ function v3AskReadout(R, topics, basis) {
     board: (R.board || []).map(x => { const bs = String(basis[x.rank] || '');
       return { rank: x.rank, action: cut(x.action, 180), pounds: x.gbp_per_month,
         per: /\(once|once,? over/i.test(bs) ? 'once' : 'a month', pounds_are: x.gbp_is_sales ? 'sales' : (cut(bs, 110) || 'profit after product and order costs'),
-        rung: x.rung, lane: x.lane }; }),
+        rung: x.rung, why_this_rung: cut((x.why_this_rung || [])[0], 120), lane: x.lane }; }),
     held: (R.held || []).map(x => ({ action: cut(x.action, 90), because: cut((x.held_because || [])[0], 80) })),
     tracking: R.tracking || [],
     coverage: (R.coverage || []).map(c => ({ source: c.source, state: c.state, complete_through: c.complete_through, unusable_days_90d: c.unusable_days_90d })),
@@ -8624,18 +8628,19 @@ function buildAskContext(facts, question){
   const _dates = _shp.map(r=>r && r.date).filter(Boolean).sort();
   const _latestDate = _dates.length ? _dates[_dates.length-1] : null;
   const _partialLatestDay = !!(_latestDate && _today && _latestDate >= _today);
+  const _lastFull = _latestDate ? (_partialLatestDay ? v3IsoAdd(_latestDate, -1) : _latestDate) : null;
   // The series the question is about first, then the shop's own weeks; the ceiling drops from the end.
   const parts = [
     named.length && ['stock_named', () => v3AskTable(named.map(stockRow), 'product'), 'The stock plan for the products named in the question.'],
     topics.stock && atRisk.length && ['stock_at_risk', () => v3AskTable(atRisk.map(stockRow), 'product'),
       'Greta’s stock plan, the 15 products that run out before a restock can land, most profit at risk first: weekly_pace (an out-of-stock product at what it sold while in stock), order_units (what to order now: eight weeks of stock after it lands), order_by, lost_before_lands (profit lost before an order placed today arrives), unit_cost (landed).'],
-    topics.ads && ['weekly_meta', () => v3AskTable(v3AskWeekly(D.metaDaily, ['cost', 'purchases', 'purchaseValue'], 26), 'week'), 'Meta per week: spend, Meta-counted purchases and their value (Meta’s own claim).'],
-    topics.ads && ['weekly_google', () => v3AskTable(v3AskWeekly(D.googleAds, ['cost', 'conversions', 'convValue'], 26), 'week'), 'Google Ads per week: spend, Google-counted conversions and value (Google’s own claim).'],
+    topics.ads && ['weekly_meta', () => v3AskTable(v3AskFullWeeks(v3AskWeekly(D.metaDaily, ['cost', 'purchases', 'purchaseValue'], 26), _lastFull), 'week'), 'Meta per week: spend, Meta-counted purchases and their value (Meta’s own claim).'],
+    topics.ads && ['weekly_google', () => v3AskTable(v3AskFullWeeks(v3AskWeekly(D.googleAds, ['cost', 'conversions', 'convValue'], 26), _lastFull), 'week'), 'Google Ads per week: spend, Google-counted conversions and value (Google’s own claim).'],
     topics.recent && ['daily_shop_28', () => v3AskTable(v3AskDaily(_shp, ['netSales', 'orders', 'discounts'], 28), 'date'), 'Shop day by day, last 28 days.'],
     topics.recent && topics.ads && ['daily_ads_28', () => v3AskTable(v3AskDaily(D.metaDaily, ['cost', 'purchases'], 28), 'date'), 'Meta day by day, last 28 days.'],
-    topics.site && ['weekly_ga4', () => v3AskTable(v3AskWeekly(D.ga4, ['sessions', 'addToCarts', 'checkouts', 'purchases'], 13), 'week'), 'Google Analytics per week, last 13 weeks. Read readout.tracking first: it was not recording properly for part of this.'],
-    topics.email && ['weekly_email', () => v3AskTable(v3AskWeekly(D.klaviyo, ['recipients', 'opens', 'clicks'], 13), 'week'), 'Klaviyo per week, last 13 weeks.'],
-    ['weekly_shop', () => v3AskTable(v3AskWeekly(_shp, ['netSales', 'orders', 'discounts', 'returns'], 26), 'week'), 'Shop totals per Monday-start week, last 26 weeks: net sales ex VAT after discounts, orders, discounts, returns.'],
+    topics.site && ['weekly_ga4', () => v3AskTable(v3AskFullWeeks(v3AskWeekly(D.ga4, ['sessions', 'addToCarts', 'checkouts', 'purchases'], 13), _lastFull), 'week'), 'Google Analytics per week, last 13 weeks. Read readout.tracking first: it was not recording properly for part of this.'],
+    topics.email && ['weekly_email', () => v3AskTable(v3AskFullWeeks(v3AskWeekly(D.klaviyo, ['recipients', 'opens', 'clicks'], 13), _lastFull), 'week'), 'Klaviyo per week, last 13 weeks.'],
+    ['weekly_shop', () => v3AskTable(v3AskFullWeeks(v3AskWeekly(_shp, ['netSales', 'orders', 'discounts', 'returns'], 26), _lastFull), 'week'), 'Shop totals per Monday-start week, last 26 weeks: net sales ex VAT after discounts, orders, discounts, returns.'],
   ].filter(Boolean);
   const data = {}, dictionary = {};
   parts.forEach(([k, make, what]) => { const t = make(); if (t && t.rows.length) { data[k] = t; dictionary[k] = what; } });
@@ -8729,7 +8734,7 @@ function AskPanel(){
     const ctx = buildAskContext(facts, q);
     const ctxJson = JSON.stringify(ctx.data);
     // Kept short on purpose: every character here is sent with every question (see V3_ASK_BUDGET).
-    const systemPrompt = `You are a senior D2C commercial analyst and operator for ${OI_BRAND.name}, a ${OI_BRAND.markets} DTC ${OI_BRAND.vertical} brand (seasonality: ${OI_BRAND.seasonality}). Answer using ONLY the figures below. They are: _meta.facts (what every page of the app shows), _meta.readout (the server's canonical figures, ranked board and rules) and, in data, the series this question needs as tables (cols + rows). Prefer facts and readout to anything you work out from the rows, and say which you used.
+    const systemPrompt = `You are a senior D2C commercial analyst and operator for ${OI_BRAND.name}, a ${OI_BRAND.markets} DTC ${OI_BRAND.vertical} brand. Answer using ONLY the figures below. For where the year stands, use facts.next_peak, facts.typical_month and the weekly rows; never assume a season, a lull or a peak they do not show. They are: _meta.facts (what every page of the app shows), _meta.readout (the server's canonical figures, ranked board and rules) and, in data, the series this question needs as tables (cols + rows). Prefer facts and readout to anything you work out from the rows, and say which you used.
 
 Follow _meta.readout.rules. Quote headline figures exactly, with their window. Say how far the owner can lean on a figure using its rung (direct, likely, probably, possible, outside chance). Never recommend an action in readout.held. Never compare or total across days readout.coverage or readout.tracking marks unusable; missing days are not zero.
 
@@ -8738,6 +8743,12 @@ WHAT TO DO questions: answer from readout.board in its order, with each item's p
 WHY questions: before naming a cause, rule out the confounders: a promotion or code, a spend change, a stockout, an email send, a tracking change, seasonality, or a partial latest day (_meta.dataQuality). Locate the move: demand (spend, visits) → conversion → order value and discounts → new vs returning → product and stock. Separate what the data shows from what you infer, and give your confidence.
 
 STOCK questions: use data.stock_named and data.stock_at_risk (Greta's stock plan) for how many to order (order_units), what being out costs (lost_before_lands, profit) and what an order costs (order_units × unit_cost). An order placed today lands on facts.next_peak.order_placed_today_lands. If facts.next_peak.lands_before_peak_starts is false, never say ordering now gets stock in for the peak: say when it lands, that only what suppliers can send sooner reaches the peak, and to ask for that first. Board pounds are what pounds_are says, a month or once (per); never call them a cost unless pounds_are says so.
+
+WHAT NOT TO DO questions: answer from readout.held (what Greta is holding back, and why) and from cautions the board itself states (a price test held until after the peak, no added ad spend while cost per order is above its earlier level, a sale that would deepen discounting). Never turn a board action into something not to do.
+
+A difference in cost is not a loss: an ad overspend is spend above what the earlier cost per order needed, not money lost. When a board figure is "probably" or lower, give its why_this_rung in plain words. The weekly tables hold complete weeks only.
+
+Write for the owner: never show field or table names (readout, facts, pounds_are, rung, stock_named, order_units); say what they mean. Use a short table only when it helps.
 
 Never invent a forecast beyond facts.quarter_plan_at_todays_ad_spend. If the question cannot be answered from what was sent, say what is missing. Plain British English, no jargon, £ for money. Short questions get a short answer with the number and its calculation; diagnosis questions get: the corrected read, the numbers, what was ruled out, what to do in order, and what would change your mind.
 
