@@ -17007,6 +17007,9 @@ function V3Today(p) {
       </div>
     )}
 
+    {/* The tracking problem sits with the actions it affects, after the profit figure (2026-10-06):
+        above it, it pushed the figure a screen down on a phone. */}
+    <V3FixFirst/>
     <div className="v3-act-grid">
     {top ? (
       <div className="v3-dofirst v3-raised">
@@ -20013,19 +20016,6 @@ function V3BusinessState() {
     sents.push(<>{(() => { const named = other.filter(c => !/^\d+$/.test(c.channel)).map(c => c.channel), unnamed = other.length - named.length;
       return named.concat(unnamed ? [unnamed === 1 ? 'one other sales channel' : unnamed + ' other sales channels'] : []).join(' and '); })()} took {fmtCount(other.reduce((a, c) => a + num(c.orders), 0))} orders in 90 days; they are counted in your sales at the price Shopify records, so if a stockist pays you less, sales and margin read high by the difference.</>);
 
-  // the plan, from the board and the peak
-  const live = board.rows ? v3LiveRows(board.rows) : [];
-  const pick = f => live.filter(f);
-  const now = pick(r => r.lane !== 'test' && !/^promo-peak/.test(r.external_id)).slice(0, 3);
-  // the weeks before a peak are the weeks without a sale, so the two-budget test belongs there
-  const before = pick(r => /^(promo-peak|crm-flows|sales-rhythm)/.test(r.external_id));
-  const after = pick(r => /^(cust-winback|basket-pair)/.test(r.external_id) || (r.lane === 'test' && !/^(promo-peak|crm-flows|sales-rhythm)/.test(r.external_id))).slice(0, 3);
-  const item = r => (<li key={r.external_id}><span className="v3-rank-desc">{v3PlainAction(r).title}</span>{r.cm_gbp ? <span className="v3-sub"> · {v3Gbp(r.cm_gbp)}{v3Per(r)}</span> : null}</li>);
-  const phases = [
-    ['This week', now, 'Nothing urgent on the board.'],
-    [P && P.title ? 'Before ' + P.title : 'This month', before, null],
-    [P && P.title ? 'After ' + P.title : 'Next', after, null],
-  ].filter(p => p[1].length || p[2]);
 
   const rows = [
     ['Ads as a share of sales', share, BM.ads_share_of_sales, fmtPctN],
@@ -20038,18 +20028,13 @@ function V3BusinessState() {
 
   // 0272: Greta's read, written by the LLM from these figures and checked number by number. When it
   // is there it leads and the rules' sentences sit under it; when it is not, they lead as before.
+  // 2026-10-06: on a phone this block ran three and a half screens (story, the rhythm chart, a "next
+  // 90 days" list and its own "This week") before Today's profit figure, and the 90-day list and
+  // "This week" repeated the "Do this first" list straight below it. Now it is the verdict and the
+  // story; the sentences, the chart and the benchmarks sit in one fold; the plan is Today's list.
   const NS = V3_NARR.data && V3_NARR.data.summary;
   const facts = sents.length > 0 && <p className="v3-note v3-measure">{sents.map((s, i) => <React.Fragment key={i}>{i ? ' ' : ''}{s}</React.Fragment>)}</p>;
-  return (<div className="v3-page-stack"><section>
-    <div className="v3-kick">Where the business stands · last 30 days</div>
-    <p className="v3-verdict">{verdict}</p>
-    {NS && NS.story ? (<>
-      <p className="v3-note v3-measure">{NS.story}</p>
-      {NS.first_move && <p className="v3-note v3-measure"><b>This week:</b> {NS.first_move}</p>}
-      <p className="micro muted v3-measure">Written by Greta from the figures on this page; every number in it is checked against them before it is shown.</p>
-      {facts && <V3More id="state-facts" label="The figures behind this">{facts}</V3More>}
-    </>) : facts}
-    {wk.length >= 8 && num(H.sale_weeks_13) >= 4 && (<figure className="v3-chart v3-chart-solo">
+  const chart = wk.length >= 8 && num(H.sale_weeks_13) >= 4 && (<figure className="v3-chart v3-chart-solo">
       <figcaption><span className="v3-chart-title">Profit after ads, by week</span>
         <span className="v3-legend"><i style={{ background: PAL.accent }}/>A sale <i style={{ background: PAL.data3 }}/>No sale</span></figcaption>
       <Recharts.ResponsiveContainer width="100%" height={240}>
@@ -20063,15 +20048,9 @@ function V3BusinessState() {
         </Recharts.BarChart>
       </Recharts.ResponsiveContainer>
       <p className="micro muted v3-measure">{v3Sentence(H.basis)}</p>
-    </figure>)}
-    {phases.length > 0 && (<div className="v3-gap-top">
-      <h2 className="v3-sec-title">The next 90 days</h2>
-      {phases.map(([title, list, empty]) => (<div key={title}>
-        <div className="v3-kick v3-gap-top">{title}</div>
-        {list.length ? <ul className="v3-rank-steps">{list.map(item)}</ul> : <p className="micro muted">{empty}</p>}
-      </div>))}
-    </div>)}
-    {rows.length > 0 && (<V3More id="state-bench" label="How you compare with similar brands">
+    </figure>);
+  const bench = rows.length > 0 && (<>
+      <h3 className="v3-sec-title v3-gap-top">How you compare with similar brands</h3>
       <table className="v3-rw">
         <thead><tr><th className="t-text">Measure</th><th>You</th><th>Typical range</th><th className="t-text"/></tr></thead>
         <tbody>{rows.map(([lab, v, bm, f]) => { const t = v3Bench(v, bm); return (<tr key={lab}>
@@ -20079,7 +20058,19 @@ function V3BusinessState() {
           <td className={'t-text ' + (TONE[t] || '')}>{WORD[t] || ''}</td></tr>); })}</tbody>
       </table>
       <p className="micro muted v3-measure">Typical ranges are rules of thumb for {S.vertical === 'default' ? 'UK DTC brands' : 'UK ' + S.vertical + ' brands'}, not measured from other brands’ data; read them as context, not targets.</p>
-    </V3More>)}
+    </>);
+  const story = NS && NS.story;
+  return (<div className="v3-page-stack"><section>
+    <div className="v3-kick">Where the business stands · last 30 days</div>
+    <p className="v3-verdict">{verdict}</p>
+    {story
+      ? (<><p className="v3-note v3-measure">{NS.story}</p>
+          <p className="micro muted v3-measure">Written by Greta from these figures; every number in it is checked against them before it is shown.</p></>)
+      : facts}
+    {(story ? (facts || chart || bench) : (chart || bench)) && (
+      <V3More id="state-facts" label={story ? 'The figures behind this' : 'The weeks and the benchmarks behind this'}>
+        {story ? facts : null}{chart}{bench}
+      </V3More>)}
   </section></div>);
 }
 
@@ -20172,16 +20163,22 @@ function V3FixFirst() {
   const r = q.rows[0];
   const live = board.rows ? v3LiveRows(board.rows) : [];
   const hit = live.map((x, i) => ({ x, i })).filter(o => /^(order-cost|paid-landing)-/.test(o.x.external_id));
+  // One line and a fold: the full finding ran to a screen and a half on a phone (2026-10-06).
+  const desc = v3Tidy(scrubTag(String(r.description || '')));
+  const first = (desc.match(/^[^.:;]+[.:;]/) || [desc])[0].replace(/[:;]$/, '.');
   return (<section className="v3-sec">
     <div className="v3-kick">Fix first</div>
-    <p className="v3-note v3-measure"><b>{v3PlainAction(r).title}.</b> {v3Tidy(scrubTag(String(r.description || '')))}</p>
-    {hit.length > 0 && <p className="micro muted v3-measure">Until it is fixed, {hit.map(o => '#' + (o.i + 1)).join(', ').replace(/, ([^,]*)$/, ' and $1')} on the board {hit.length === 1 ? 'counts' : 'count'} the orders your shop credits to each channel, which read low while tracking is broken. Act on {hit.length === 1 ? 'it' : 'them'}, but expect part of the change to be tracking.</p>}
+    <p className="v3-note v3-measure"><b>{v3PlainAction(r).title}.</b> {first}{hit.length > 0 && <> Until it is fixed, {hit.map(o => '#' + (o.i + 1)).join(', ').replace(/, ([^,]*)$/, ' and $1')} on the board {hit.length === 1 ? 'reads' : 'read'} low.</>}</p>
+    <V3More id="fixfirst-why" label="What Greta found">
+      <p className="v3-note v3-measure">{desc}</p>
+      {hit.length > 0 && <p className="micro muted v3-measure">Those rows count the orders your shop credits to each channel, which read low while tracking is broken. Act on {hit.length === 1 ? 'it' : 'them'}, but expect part of the change to be tracking.</p>}
+    </V3More>
     <div className="v3-btn-row"><V3Done ext={r.external_id} small onDone={q.retry}/></div>
   </section>);
 }
 
 const V3_PAGES = {
-  today: (p) => (<><V3BusinessState/><V3FixFirst/><V3Today {...p}/></>),
+  today: (p) => (<><V3BusinessState/><V3Today {...p}/></>),
   review: (p) => (<>
     {/* Rebuilt 2026-10-05: the week against a typical week, the meeting agenda off the board, notes in
         the workspace. The old weekly board (week-on-week only, GA4 repair read as growth, notes in one
