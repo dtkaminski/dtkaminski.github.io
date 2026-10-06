@@ -10128,6 +10128,13 @@ function v3BoardNotify(){ V3_BOARD.subs.forEach(f => { try { f(); } catch(e){} }
 // the stored text. Until it arrives, or if it fails or a number did not check, every screen keeps
 // the rules' own wording, so nothing waits on it and nothing breaks without it.
 const V3_NARR = { data: null, asked: false };
+// Action wording stays the rules' for now. On the first live runs (2026-10-06, Groq gpt-oss-120b with a
+// second model reviewing) every number checked, but the written actions reversed or contradicted their
+// rows: "test a lower price" for a £154 price test, "ordering today ensures stock arrives by BFCM" for
+// an order that lands after it starts, and the BFCM plan narrowed to its first part. The summary held.
+// The writer still drafts and checks every action server-side (greta_narrative); turn this on when a
+// stronger model writes them and a week of drafts reads true.
+const V3_WRITER_ACTIONS = false;
 function v3NarrLoad(b){
   if (V3_NARR.asked || !b) return;
   V3_NARR.asked = true;
@@ -15683,7 +15690,7 @@ function v3PlainAction(row){
   const P = (t, why) => ({ title: t, why: why || '', raw });
   // Greta's written version when there is one that passed the number check (0272); the rules'
   // sentence stays in raw, and the board shows it under "Greta's working".
-  const n = V3_NARR.data && V3_NARR.data.actions && V3_NARR.data.actions[id];
+  const n = V3_WRITER_ACTIONS && V3_NARR.data && V3_NARR.data.actions && V3_NARR.data.actions[id];
   if (n && n.title) return { title: n.title, why: n.why || '', raw, written: true };
   let x;
   if (/^measure-saturation-/.test(id) && (x = m(/£\s*([\d,.]+)\s*vs\s*£?\s*([\d,.]+)/))) {
