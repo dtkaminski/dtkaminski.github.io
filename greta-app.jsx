@@ -8535,7 +8535,7 @@ async function v3AskFacts() {
     f.next_peak = { name: peak.title, from: s, to: e, same_days_last_year_sales: ly,
       promotions_planned: evs.filter(x => x.row_group === 'promo' && x.status !== 'skipped' && ov(x)).map(x => x.title),
       emails_planned: evs.filter(x => x.channel === 'email' && x.status !== 'skipped' && ov(x)).length,
-      stock_order_by: lead ? v3IsoAdd(s, -Math.round(lead * 7)) : null };
+      stock_order_by: lead ? v3IsoAdd(s, -Math.round(lead * 7) - 1) : null };   // lands the day before it starts, as the board says
   }
   const promos = evs.filter(x => x.row_group === 'promo' && x.status !== 'skipped');
   const missing = (found || []).filter(r => { const k = String(r.ts).slice(0, 10); return !promos.some(x => String(x.start_date).slice(0, 10) <= v3IsoAdd(k, 1) && String(x.end_date || x.start_date).slice(0, 10) >= v3IsoAdd(k, -1)); });
@@ -8543,54 +8543,83 @@ async function v3AskFacts() {
     note: missing.length ? 'Greta found sales that are not on the calendar, so what she has learned about promotions rests on too few events. They can be added from the Calendar.' : null };
   return f;
 }
-function buildAskContext(facts){
-  const D = window.FRKL_DATA || {}, B = window.FRKL_BUSINESS || {};
+// ── Ask Greta within the model's allowance (2026-10-06) ─────────────────────────────────────────
+// Every question sent ~55,000 characters (~17,600 tokens). Groq's free tier allows 8,000 tokens a
+// minute per model, counting the room left for the reply, so every question since Ask moved to Groq
+// was refused ("Request too large", 413) and the owner was told to try again in a minute. Now the
+// context is built for the question: the app's own figures and a shortened readout always, the
+// series the question is about as compact tables, and a hard ceiling that drops the least useful
+// parts first. The ceiling is in characters; JSON like this runs about three characters a token.
+const V3_ASK_BUDGET = 14000;
+const V3_ASK_TOPICS = {
+  ads: /\b(ad|ads|advert\w*|meta|facebook|instagram|google|spend\w*|roas|campaign\w*|creative\w*|channel\w*|acquisition|new customers?|cac|budget|cost per|cpc|cpm|click\w*)\b/i,
+  site: /\b(site|website|conversion|convert\w*|traffic|session\w*|checkout|basket|cart|visit\w*|page\w*|mobile|bounce)\b/i,
+  email: /\b(email\w*|klaviyo|flows?|newsletter|list|sms|send\w*|subscriber\w*)\b/i,
+  recent: /\b(today|yesterday|this week|last week|days?|daily|recent\w*|weekend|monday|tuesday|wednesday|thursday|friday|saturday|sunday|so far)\b/i,
+};
+// Rows as a header and arrays: about half the characters of one object per row.
+function v3AskTable(rows, keyField) {
+  if (!rows || !rows.length) return null;
+  const cols = [keyField].concat(Object.keys(rows[0]).filter(k => k !== keyField));
+  return { cols, rows: rows.map(r => cols.map(c => (r[c] == null ? null : r[c]))) };
+}
+function v3AskReadout(R, topics) {
+  if (!R) return null;
+  const cut = (s, n) => { s = String(s == null ? '' : s); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
+  const out = {
+    rules: R.rules || [],
+    window: R.window || null,
+    headline: (Array.isArray(R.headline) ? R.headline : []).map(h => ({ label: h.label, value: h.value == null ? null : Math.round(Number(h.value) * 100) / 100,
+      rung: h.rung, window: h.window_label, population: cut(h.population, 90) })),
+    board: (R.board || []).map(x => ({ rank: x.rank, action: cut(x.action, 180), gbp: x.gbp_per_month, gbp_is_sales: !!x.gbp_is_sales, rung: x.rung, lane: x.lane })),
+    held: (R.held || []).map(x => ({ action: cut(x.action, 90), because: cut((x.held_because || [])[0], 80) })),
+    tracking: R.tracking || [],
+    coverage: (R.coverage || []).map(c => ({ source: c.source, state: c.state, complete_through: c.complete_through, unusable_days_90d: c.unusable_days_90d })),
+    conflicts: R.conflicts || [],
+  };
+  if (topics.ads) out.cost_trees = (R.cost_trees || []).map(t => ({ tree: t.tree, weeks: t.weeks, from: t.from == null ? null : Math.round(t.from * 100) / 100,
+    to: t.to == null ? null : Math.round(t.to * 100) / 100,
+    moved: (t.stages || []).filter(s => s.verdict === 'contributed').map(s => s.label + ' ' + (s.change_pct > 0 ? '+' : '') + s.change_pct + '%'),
+    ruled_out: (t.stages || []).filter(s => s.verdict && s.verdict !== 'contributed').map(s => s.label) }));
+  return out;
+}
+function buildAskContext(facts, question){
+  const topics = {}; Object.keys(V3_ASK_TOPICS).forEach(k => { topics[k] = V3_ASK_TOPICS[k].test(question || ''); });
+  const D = window.FRKL_DATA || {};
   const _shp = D.shopify || [];
   let _today = ''; try { _today = new Date().toISOString().slice(0,10); } catch(e) {}
   const _dates = _shp.map(r=>r && r.date).filter(Boolean).sort();
   const _latestDate = _dates.length ? _dates[_dates.length-1] : null;
   const _partialLatestDay = !!(_latestDate && _today && _latestDate >= _today);
-  const nonEmpty = v => Array.isArray(v) ? v.length > 0 : (v && typeof v === 'object' ? Object.keys(v).length > 0 : v != null);
-  const data = {
-    weekly: {
-      shopify: v3AskWeekly(_shp, ['netSales', 'orders', 'discounts', 'returns']),
-      meta: v3AskWeekly(D.metaDaily, ['cost', 'purchases', 'purchaseValue', 'impressions']),
-      google: v3AskWeekly(D.googleAds, ['cost', 'conversions', 'convValue', 'clicks']),
-      ga4: v3AskWeekly(D.ga4, ['sessions', 'addToCarts', 'checkouts', 'purchases']),
-      email: v3AskWeekly(D.klaviyo, ['recipients', 'opens', 'clicks']),
-    },
-    daily_last_28_days: {
-      shopify: v3AskDaily(_shp, ['netSales', 'orders', 'discounts']),
-      meta: v3AskDaily(D.metaDaily, ['cost', 'purchases', 'purchaseValue']),
-      google: v3AskDaily(D.googleAds, ['cost', 'conversions', 'convValue']),
-    },
-    retentionByMonth: B.retentionByMonth || [],
-    products: (B.products || []).slice(0, 25).map(p => ({ title: p.title, units: p.units, netSales: p.netSales, marginPct: p.marginPct != null ? Math.round(p.marginPct * 1000) / 1000 : null, window: p.window || null })),
-    emailFlows: B.emailFlows || [],
-    emailCampaigns: (B.emailCampaigns || []).slice(-15),
-    emailSummary: B.emailSummary || {},
-  };
-  Object.keys(data).forEach(k => { if (!nonEmpty(data[k])) delete data[k]; });
-  const dictionary = {
-    weekly: 'Totals per Monday-start week, last 26 weeks: shopify {netSales (ex VAT, after discounts), orders, discounts, returns}; meta and google {cost, platform-counted purchases/conversions and value}; ga4 {sessions, addToCarts, checkouts, purchases}; email {recipients, opens, clicks}. Platform counts are the platforms’ own claims.',
-    daily_last_28_days: 'Day by day for the last 28 days, same fields.',
-    retentionByMonth: 'Monthly new vs returning customers and their sales.',
-    products: 'Top 25 products by sales; the window is on each row.',
-    emailFlows: 'Klaviyo automated flows.', emailCampaigns: 'The last 15 Klaviyo broadcasts.', emailSummary: 'Flows against campaigns, gross Klaviyo-tracked.',
-  };
-  Object.keys(dictionary).forEach(k => { if (!(k in data)) delete dictionary[k]; });
-  return {
-    _meta: { brand: OI_BRAND.slug, currency: 'GBP', captured: D.meta && D.meta.captured,
-      dataQuality: { latestDate: _latestDate, today: _today, partialLatestDay: _partialLatestDay,
-        note: 'If partialLatestDay is true the latest date is an incomplete day: never read its dip as a decline. Under ~60 orders in a window, treat conversion and order-value swings as possible noise.' },
-      facts: facts || null,
-      readout: (typeof window !== 'undefined' && window.GRETA_READOUT) || null,
-      data_dictionary: dictionary,
-      important_notes: [...(DEMO ? ['Frkl is an Irish/UK demi-fine jewellery brand.'] : []), 'Today may be a partial day — caveat any "today" answers.'] },
-    data,
-  };
+  // The series the question is about first, then the shop's own weeks; the ceiling drops from the end.
+  const parts = [
+    topics.ads && ['weekly_meta', () => v3AskTable(v3AskWeekly(D.metaDaily, ['cost', 'purchases', 'purchaseValue'], 26), 'week'), 'Meta per week: spend, Meta-counted purchases and their value (Meta’s own claim).'],
+    topics.ads && ['weekly_google', () => v3AskTable(v3AskWeekly(D.googleAds, ['cost', 'conversions', 'convValue'], 26), 'week'), 'Google Ads per week: spend, Google-counted conversions and value (Google’s own claim).'],
+    topics.recent && ['daily_shop_28', () => v3AskTable(v3AskDaily(_shp, ['netSales', 'orders', 'discounts'], 28), 'date'), 'Shop day by day, last 28 days.'],
+    topics.recent && topics.ads && ['daily_ads_28', () => v3AskTable(v3AskDaily(D.metaDaily, ['cost', 'purchases'], 28), 'date'), 'Meta day by day, last 28 days.'],
+    topics.site && ['weekly_ga4', () => v3AskTable(v3AskWeekly(D.ga4, ['sessions', 'addToCarts', 'checkouts', 'purchases'], 13), 'week'), 'Google Analytics per week, last 13 weeks. Read readout.tracking first: it was not recording properly for part of this.'],
+    topics.email && ['weekly_email', () => v3AskTable(v3AskWeekly(D.klaviyo, ['recipients', 'opens', 'clicks'], 13), 'week'), 'Klaviyo per week, last 13 weeks.'],
+    ['weekly_shop', () => v3AskTable(v3AskWeekly(_shp, ['netSales', 'orders', 'discounts', 'returns'], 26), 'week'), 'Shop totals per Monday-start week, last 26 weeks: net sales ex VAT after discounts, orders, discounts, returns.'],
+  ].filter(Boolean);
+  const data = {}, dictionary = {};
+  parts.forEach(([k, make, what]) => { const t = make(); if (t && t.rows.length) { data[k] = t; dictionary[k] = what; } });
+  const meta = { brand: OI_BRAND.slug, currency: 'GBP',
+    dataQuality: { latestDate: _latestDate, today: _today, partialLatestDay: _partialLatestDay,
+      note: 'If partialLatestDay is true the latest date is an incomplete day: never read its dip as a decline. Under ~60 orders in a window, treat conversion and order-value swings as possible noise.' },
+    facts: facts || null,
+    readout: v3AskReadout((typeof window !== 'undefined' && window.GRETA_READOUT) || null, topics),
+    data_dictionary: dictionary,
+    sent: 'Only the series this question needs were sent. If the answer needs a series that is not here, say which one and suggest asking about it directly.' };
+  // The ceiling: drop data series from the least needed, then shorten the readout.
+  const size = () => JSON.stringify(meta).length + JSON.stringify(data).length;
+  const order = Object.keys(data).reverse();
+  while (size() > V3_ASK_BUDGET && order.length) { const k = order.shift(); delete data[k]; delete dictionary[k]; }
+  if (size() > V3_ASK_BUDGET && meta.readout) delete meta.readout.cost_trees;
+  if (size() > V3_ASK_BUDGET && meta.readout) meta.readout.held = meta.readout.held.map(h => ({ action: h.action }));
+  if (size() > V3_ASK_BUDGET && meta.readout) meta.readout.coverage = [];
+  while (size() > V3_ASK_BUDGET && meta.readout && meta.readout.board.length > 5) meta.readout.board.pop();
+  return { _meta: meta, data, topics, chars: size() };
 }
-
 // Answer depth -> the model that serves it. The only place a model id appears on the
 // client, and it never reaches the markup.
 const ASK_MODEL = { thorough: 'claude-sonnet-4-5', quick: 'claude-haiku-4-5' };
@@ -8661,45 +8690,31 @@ function AskPanel(){
       } catch (e) {}
     }
     const facts = await v3AskFacts().catch(() => null);
-    const ctx = buildAskContext(facts);
+    const ctx = buildAskContext(facts, q);
     const ctxJson = JSON.stringify(ctx.data);
-    const systemPrompt = `You are a senior D2C commercial analyst, growth strategist and operator for ${OI_BRAND.name}, a ${OI_BRAND.markets} DTC ${OI_BRAND.vertical} brand. Seasonality to keep in mind: ${OI_BRAND.seasonality}. You are given the brand's figures as of ${ctx._meta.captured}: _meta.facts (the figures every page of the app shows: last 30 days, a typical month, the goal and whether it needs re-planning, the quarter plan by month, the next seasonal peak, customer value, costs and settings), _meta.readout (the server's canonical summary and ranked board), weekly totals for the last 26 weeks and daily rows for the last 28 days. Answer using ONLY the data provided. Prefer _meta.facts and _meta.readout to anything you work out from the weekly or daily rows, and say which you used.
+    // Kept short on purpose: every character here is sent with every question (see V3_ASK_BUDGET).
+    const systemPrompt = `You are a senior D2C commercial analyst and operator for ${OI_BRAND.name}, a ${OI_BRAND.markets} DTC ${OI_BRAND.vertical} brand (seasonality: ${OI_BRAND.seasonality}). Answer using ONLY the figures below. They are: _meta.facts (what every page of the app shows), _meta.readout (the server's canonical figures, ranked board and rules) and, in data, the series this question needs as tables (cols + rows). Prefer facts and readout to anything you work out from the rows, and say which you used.
 
-WHAT TO DO: when asked what to do, what matters most or what to change, answer from _meta.readout.board in its order (rank 1 first), with each item's pounds a month and how sure Greta is of it (its rung). Do not invent a different ranking. You may add one idea of your own only if you label it "my suggestion, not on your board". For any question about spending more, check _meta.facts.quarter_plan_at_todays_ad_spend (it spreads the budget by season) and _meta.facts.next_peak first. If _meta.facts.goal.needs_replanning is true, say the goal needs re-planning before quoting it. When _meta.readout is present it is the canonical source and you follow _meta.readout.rules: quote its headline figures exactly as given, with their window and population, and never recompute them from the daily arrays; say how hard the owner can lean on a figure using its rung (direct, likely, probably, possible, outside chance); never compare or total across days that readout.coverage or readout.tracking marks missing or unusable; never recommend an action listed in readout.held; when a cost per result moved, name the stage readout.cost_trees says moved and the stages it rules out; where readout.conflicts lists a disagreement, use the canonical figure and say so. Show the calculation when possible (e.g. "${curSym()}X / ${curSym()}Y = Z%"). Quote specific numbers and dates. If the question cannot be answered from the data, say so clearly and state what data would be needed.
+Follow _meta.readout.rules. Quote headline figures exactly, with their window. Say how far the owner can lean on a figure using its rung (direct, likely, probably, possible, outside chance). Never recommend an action in readout.held. Never compare or total across days readout.coverage or readout.tracking marks unusable; missing days are not zero.
 
-CORE RULE: never diagnose a performance movement until you have checked for confounding factors. Do not just describe what changed — explain what most likely CAUSED it, the evidence, the caveats, and the next action. A naive read ("revenue up = healthy", "return on ad spend down = pause ads", "email up = send more", "average order value up = better") is a failure. Your job is to stop the founder making the wrong call because a metric moved without context.
+WHAT TO DO questions: answer from readout.board in its order, with each item's pounds (a month, or once when the action says so) and its rung. Do not re-rank. One idea of your own is allowed only if labelled "my suggestion, not on your board". For spending more, check facts.quarter_plan_at_todays_ad_spend and facts.next_peak first. If facts.goal.needs_replanning is true, say so before quoting the goal.
 
-For any "why did X change / what happened / analyse performance" question, work through this before concluding:
-1. DECOMPOSE the move and locate the layer — demand generation (spend/sessions/impressions/CTR) → conversion (CVR/ATC/checkout/device) → order economics (AOV/discount/margin/returns) → customer mix (new vs returning/email share) → product mix (hero SKU/stock) → context. Diagnose in that order; don't blame conversion if demand fell, or demand if a bestseller was out of stock.
-2. BASELINE — was the comparison period normal, or inflated/depressed by a promo, launch, stockout or quiet week? If the prior period was abnormal, say so and compare to the multi-week / seasonal baseline. A drop after a promo is usually reversion, not weakening demand. Honour _meta.dataQuality: if partialLatestDay is true the latest date is an incomplete day (a partial-window dip is NOT a real decline — compare complete days ≤ lastCompleteDate, or say the period is still in progress); if the window in question has under ~60 orders, treat CVR/AOV swings as possible sampling noise and lower confidence.
-3. CONFOUNDER CHECK — could a known event explain it? Promotions/discount codes/free-ship changes, paid-spend changes, creative refresh/fatigue, email sends/flow changes, launches/stockouts/returns spikes, site/checkout/tracking changes, margin/AOV shifts, seasonality/paydays/holidays/competitor promos.
-4. LAG — demand pull-forward from last week's promo, 24-72h email spikes that normalise, paid scaling worsening cost per new customer after a lag, stockout disrupting ad-algo learning, a launch spike that shouldn't become the baseline.
-5. CAUSE + CONFIDENCE — most likely cause in one line, labelled strongly-supported / likely / possible / weak / unknown. Separate correlation from causation; never assert a cause without evidence.
+WHY questions: before naming a cause, rule out the confounders: a promotion or code, a spend change, a stockout, an email send, a tracking change, seasonality, or a partial latest day (_meta.dataQuality). Locate the move: demand (spend, visits) → conversion → order value and discounts → new vs returning → product and stock. Separate what the data shows from what you infer, and give your confidence.
 
-Edge cases to catch: post-promo drop → check pull-forward; revenue up → check contribution margin + AOV + discount load + new-customer quality; strong email revenue → check discount dependency / over-harvesting; sales down → rule out stockout + spend cut before blaming conversion; sessions stable but sales down → conversion/offer/availability/checkout/device; revenue flat + orders down → AOV masking a demand drop; sudden channel shift → suspect tracking/attribution change; low CAC on a promo → check if those customers repeat or only buy on discount.
+Never invent a forecast beyond facts.quarter_plan_at_todays_ad_spend. If the question cannot be answered from what was sent, say what is missing. Plain British English, no jargon, £ for money. Short questions get a short answer with the number and its calculation; diagnosis questions get: the corrected read, the numbers, what was ruled out, what to do in order, and what would change your mind.
 
-OUTPUT: for a simple factual lookup, answer concisely (under ~150 words) with the number + calculation. For a performance-diagnosis question, structure as — A) Executive diagnosis (plain English, the corrected read); B) Metric movement (key numbers + timeframe + WoW/MoM/baseline); C) Confounding factors checked; D) Corrected interpretation (what it means after promos/baseline/stock/seasonality/lag/mix/attribution); E) Recommended actions, ordered by priority; F) Watchouts & data limits; G) Confidence 1-10 + what would raise it.
-
-ADDITIONAL OPERATING RULES:
-1. NEVER agree with a stated cause without checking the data. If the user says "X happened because of Y", look for evidence of Y BEFORE accepting it; if absent, push back: "I don't see [Y] in the data. Given the timing, [actual correlated factor] is a more likely explanation. Did you also do Y?"
-2. NEVER fabricate forecasts. For the quarter, use _meta.facts.quarter_plan_at_todays_ad_spend and say it is Greta's plan; beyond it, offer only a clearly-labelled trend extrapolation.
-3. NEVER reconcile conflicting goals silently (e.g. "maximise return on ad spend AND grow new customers aggressively") — call out the tension and ask to prioritise.
-4. NEVER report metrics from a seasonal-event window (BFCM, Christmas, Mother's/Valentine's Day, brand sales) as baseline — flag it as anomalous.
-5. NEVER quote a precise number when you only have a range — use ranges with stated assumptions.
-6. NEVER ignore connection-health context — if a source is stale or missing, caveat any cross-channel answer.
-
-Your value to the operator is being intellectually honest, not being helpful at any cost.
-
-Facts, readout, data dictionary and notes:
+Facts and readout:
 ${JSON.stringify(ctx._meta)}
 
-Weekly and daily data (JSON):
+Data (JSON tables):
 ${ctxJson}`;
     const newHistory = [...history, {role:'user', content:q, time:Date.now()}];
     setHistory(newHistory);
     setQuestion('');
     try {
-      const apiMessages = newHistory.filter(m=>m.role==='user'||m.role==='assistant').slice(-10).map(m=>({role:m.role, content:m.content}));
+      // The last two exchanges, earlier answers shortened: the conversation counts against the same allowance.
+      const apiMessages = newHistory.filter(m=>m.role==='user'||m.role==='assistant').slice(-5)
+        .map((m, i, all) => ({role:m.role, content: (m.role === 'assistant' && i < all.length - 1 && String(m.content).length > 900) ? String(m.content).slice(0, 900) + '…' : m.content}));
       // Resolve a FRESH session token each send (supabase auto-refreshes it), so the
       // per-tenant JWT path never goes stale mid-session. Fall back to a static jwt/token.
       let jwt = '';
@@ -8710,7 +8725,7 @@ ${ctxJson}`;
         : { 'content-type': 'application/json', 'x-internal-secret': ASK.token || '' };   // server/cron
       const resp = await fetch(ASK.endpoint, {
         method: 'POST', headers,
-        body: JSON.stringify({ system: systemPrompt, messages: apiMessages, model, depth, brand_id: ASK.brand_id }),
+        body: JSON.stringify({ system: systemPrompt, messages: apiMessages, model, depth, brand_id: ASK.brand_id, max_tokens: 1500 }),
       });
       // The relay returns an owner-readable `message` on failure; a raw status/JSON blob is
       // never shown (it used to print the provider's 404 straight onto the page).
@@ -17316,7 +17331,12 @@ function V3Growth() {
     const n = Math.round((new Date(hi) - new Date(lo)) / 864e5) + 1, all = Math.round((new Date(me) - new Date(ms)) / 864e5) + 1;
     return a + (n > 0 ? Number(m.sales) * n / all : 0);
   }, 0) : null;
-  const fcOk = fc && Number(fc.forecast_revenue_period) > 0 && planWin > 0 && Math.abs(Number(fc.forecast_revenue_period) / planWin - 1) <= 0.3;
+  // ...and with how the month is actually running (6 Oct: £27,736 for 1 Oct-3 Nov beside "on course for
+  // £14,967" for October, within 30% of the plan but 69% above the pace). Needs a week of the month.
+  const paceWin = (fc && fc.forecast_covers_from && fc.forecast_covers_to && mtd != null && daysDone >= 7)
+    ? mtd / daysDone * (Math.round((new Date(fc.forecast_covers_to) - new Date(fc.forecast_covers_from)) / 864e5) + 1) : null;
+  const fcOk = fc && Number(fc.forecast_revenue_period) > 0 && planWin > 0 && Math.abs(Number(fc.forecast_revenue_period) / planWin - 1) <= 0.3
+    && (paceWin == null ? daysDone >= 7 : Math.abs(Number(fc.forecast_revenue_period) / paceWin - 1) <= 0.3);
 
   const stat = (lab, val, foot, cls) => (<div className="v3-stat" key={lab}>
     <div className="v3-stat-lab"><span>{lab}</span></div>
@@ -17413,7 +17433,7 @@ function V3Growth() {
         {stat('The plan for ' + gpMonthName(mStart), fmtMoney(planMo.sales), 'at today’s ad spend')}
         {fcOk && stat('Forecast, ' + v3Day(fc.forecast_covers_from) + ' – ' + v3Day(fc.forecast_covers_to), fmtMoney(fc.forecast_revenue_period), 'the plan says ' + fmtMoney(planWin))}
       </div>
-      {fc && !fcOk && Number(fc.forecast_revenue_period) > 0 && planWin > 0 && <p className="micro muted v3-measure">Greta’s short-term forecast ({fmtMoney(fc.forecast_revenue_period)} for {v3Day(fc.forecast_covers_from)} – {v3Day(fc.forecast_covers_to)}) is far from the plan for the same days ({fmtMoney(planWin)}) and from how the month is running, so it isn’t shown as a forecast here.</p>}
+      {fc && !fcOk && Number(fc.forecast_revenue_period) > 0 && planWin > 0 && paceWin != null && <p className="micro muted v3-measure">Greta’s short-term forecast ({fmtMoney(fc.forecast_revenue_period)} for {v3Day(fc.forecast_covers_from)} – {v3Day(fc.forecast_covers_to)}) is far from {Math.abs(Number(fc.forecast_revenue_period) / planWin - 1) > 0.3 ? 'the plan for the same days (' + fmtMoney(planWin) + ')' : 'how the month is running (' + fmtMoney(paceWin) + ' at this pace)'}, so it isn’t shown as a forecast here.</p>}
     </section>)}
   </div>);
 }
@@ -17986,7 +18006,10 @@ function V3Customers() {
           'ad spend ÷ new customers, these 30 days' + (u && u.cac != null ? ' (over 90 days: ' + fmtMoney(u.cac) + ')' : ''))}
         {u && u.ltv_contribution != null && stat('What a customer is worth', fmtMoney(u.ltv_contribution),
           'profit over ' + (u.ltv_horizon_months || 12) + ' months', 'Profit after product and order costs that a typical new customer brings in over their first ' + (u.ltv_horizon_months || 12) + ' months, from your own cohorts.')}
-        {u && u.payback_orders != null && stat('Orders to pay back', Number(u.payback_orders).toFixed(1), 'before a new customer is profitable')}
+        {/* On the 30 days' cost beside it, not the 90-day one (0.9 orders sat next to a £53 tile it did not use). */}
+        {t && t.ncac != null && u && Number(u.first_order_contribution) > 0
+          ? stat('Orders to pay back', (Number(t.ncac) / Number(u.first_order_contribution)).toFixed(1), 'at these 30 days’ cost, before a new customer is profitable')
+          : (u && u.payback_orders != null && stat('Orders to pay back', Number(u.payback_orders).toFixed(1), 'at the 90-day cost, before a new customer is profitable'))}
       </div>
     </section>
     {weeks.length >= 4 && (<figure className="v3-chart v3-chart-solo">
@@ -18698,6 +18721,15 @@ function V3MarketingLead() {
 // stated, not used. What email does control is lifecycle coverage — which flows are live, which are
 // built but switched off — and how hard each live flow works per person it reaches. Flow types are
 // read from the flow's name and trigger, so this works for any brand's naming.
+// "Your typical flow" (2026-10-06): the board said £0.44 a person and Marketing and Customers £1.09
+// for the same thing. One rule now, the board's (fn_emit_growth_actions): the median of live flows
+// reaching at least 50 people a month, leaving out welcome flows, which do a different job and earn
+// several times more. Leaving out the flows that earn nothing as well was tried: it lifted "typical"
+// to £1.86 and flagged a browse-abandonment flow at £0.43, normal for that kind of flow.
+// Each row needs t, per and reach.
+function v3TypicalFlowPer(live) {
+  return v3Med((live || []).filter(f => f.reach >= 50 && f.t !== 'welcome').map(f => f.per));
+}
 const V3_FLOW_TYPES = [
   ['welcome', /welcome/i, 'Welcome'], ['cart', /abandon(ed)?\s*cart|cart\s*reminder/i, 'Abandoned cart'],
   ['checkout', /checkout/i, 'Abandoned checkout'], ['browse', /browse/i, 'Browse abandonment'],
@@ -18729,7 +18761,7 @@ function V3EmailRead() {
   const campRev = camps.reduce((a, c) => a + (Number(c.attributed_revenue) || 0), 0), flowRev = live.reduce((a, f) => a + f.rev, 0);
   const claimed = campRev + flowRev, claimShare = shop > 0 ? claimed / shop : null;
   const ppl = live.filter(f => f.reach >= 50).map(f => ({ ...f, per: f.rev / f.reach }));
-  const medPer = v3Med(ppl.map(f => f.per));   // the same median Customers uses
+  const medPer = v3TypicalFlowPer(ppl);   // the same median Customers and the board use
   const post = ppl.find(f => f.t === 'post');
   const weakPost = post && medPer != null && post.per < medPer * 0.2;
   // The segment comes back split by loyalty type: add the parts.
@@ -18856,7 +18888,7 @@ function V3Retention() {
   const winLive = flows.some(f => isLive(f) && v3FlowType(f.name, f.trigger_type) === 'winback');
   const winBuilt = !winLive && flows.some(f => v3FlowType(f.name, f.trigger_type) === 'winback');
   const live = flows.filter(f => isLive(f) && Number(f.recipients_30d) >= 50).map(f => ({ t: v3FlowType(f.name, f.trigger_type), per: (Number(f.attributed_revenue_30d) || 0) / Number(f.recipients_30d), reach: Number(f.recipients_30d) }));
-  const medPer = v3Med(live.map(f => f.per)), post = live.find(f => f.t === 'post');
+  const medPer = v3TypicalFlowPer(live), post = live.find(f => f.t === 'post');
   const d = (dep.rows || []).find(r => r.first_on_markdown === true), f0 = (dep.rows || []).find(r => r.first_on_markdown === false);
   const habit = d && f0 && Number(d.next_order_on_markdown_share) - Number(f0.next_order_on_markdown_share) >= 0.1;
   const moves = [];
