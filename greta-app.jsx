@@ -8481,12 +8481,14 @@ function v3AskDaily(rows, fields, days) {
 }
 // The figures every page of the app agrees on, read fresh for each question. Each read is time-boxed;
 // a failed one is left out rather than guessed.
-async function v3AskFacts() {
+async function v3AskFacts(question) {
   const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
   if (!sb || !b) return null;
   const T = (p, ms) => Promise.race([Promise.resolve(p).then(r => (r && !r.error ? r.data : null), () => null), new Promise(res => setTimeout(() => res(null), ms || 9000))]);
   const today = new Date().toISOString().slice(0, 10), Q = v3Quarter(today);
-  const [lad, goalR, paceR, ueR, drift, cogsR, cfgR, cal, found, curveR, boardR, stockR, stateR] = await Promise.all([
+  const tq = {}; try { Object.keys(V3_ASK_TOPICS).forEach(k => { tq[k] = V3_ASK_TOPICS[k].test(question || ''); }); } catch (e) {}
+  const none = Promise.resolve(null);
+  const [lad, goalR, paceR, ueR, drift, cogsR, cfgR, cal, found, curveR, boardR, stockR, stateR, flowsR, campsR, clR, devR] = await Promise.all([
     T(V3_LADDER_Q(sb, b)), T(V3_GOAL_Q(sb, b)), T(v3PlanQ(Q.start, Q.end, null)(sb, b), 15000), T(V3_UE_Q(sb, b)),
     T(V3_DRIFT_Q(sb, b)), T(V3_COGSQ_Q(sb, b)),
     T(sb.from('brand_config').select('supplier_lead_time_weeks,fixed_costs_monthly,cash_floor,opening_cash,opening_cash_as_of').eq('brand_id', b).limit(1)),
@@ -8498,6 +8500,15 @@ async function v3AskFacts() {
     T(sb.from('vw_brand_action_board').select('board_rank,money_basis').eq('brand_id', b).limit(30)),
     T(V3_STOCK_Q(sb, b), 12000),
     T(sb.from('cache_brand_state').select('state').eq('brand_id', b).limit(1)),
+    // Email and the site, only when the question is about them. "Which email is earning the most per
+    // person it reaches?" -- one of Ask's own suggested questions -- could not be answered (6 Oct).
+    tq.email ? T(V3_FLOWS_Q(sb, b)) : none,
+    tq.email ? T(sb.from('tenant_klaviyo_campaigns').select('name,send_time,recipients,attributed_revenue,attributed_orders').eq('brand_id', b)
+      .gte('send_time', v3IsoAdd(today, -90)).order('send_time', { ascending: false }).limit(60)) : none,
+    tq.site ? T(sb.from('tenant_clarity_daily').select('date,metric_name,sessions_count,with_metric_pct,raw').eq('brand_id', b).eq('num_days', 1)
+      .eq('dim_value', 'all').in('metric_name', ['Traffic'].concat(V3_FRICTION.map(x => x[0]))).gte('date', v3IsoAdd(today, -31)).limit(400)) : none,
+    tq.site ? T(sb.from('tenant_clarity_daily').select('dim_value,sessions_count').eq('brand_id', b).eq('num_days', 1).eq('metric_name', 'Device')
+      .gte('date', v3IsoAdd(today, -31)).limit(400)) : none,
   ]);
   const H = window.GRETA_HEADLINE || {};
   const cmr = Number(H.net_revenue_30d) > 0 && H.product_contribution_30d != null ? Number(H.product_contribution_30d) / Number(H.net_revenue_30d) : null;
@@ -8560,6 +8571,30 @@ async function v3AskFacts() {
     past_sales_not_on_the_calendar: missing.length,
   };
   f._board_basis = Object.fromEntries((boardR || []).map(r => [r.board_rank, r.money_basis || '']));
+  if (Array.isArray(flowsR)) f._flows = flowsR.filter(x => Number(x.recipients_30d) > 0 || String(x.status).toLowerCase() !== 'live')
+    .map(x => ({ flow: x.name, live: String(x.status).toLowerCase() === 'live', people_30d: Number(x.recipients_30d) || 0,
+      sales_30d: Math.round(Number(x.attributed_revenue_30d) || 0),
+      per_person: Number(x.recipients_30d) > 0 ? Math.round((Number(x.attributed_revenue_30d) || 0) / Number(x.recipients_30d) * 100) / 100 : null }))
+    .sort((a, b2) => (b2.people_30d - a.people_30d)).slice(0, 25);
+  if (Array.isArray(campsR)) f._campaigns = campsR.filter(x => Number(x.recipients) > 0).map(x => ({ campaign: x.name, sent: String(x.send_time).slice(0, 10),
+      people: Number(x.recipients), sales: Math.round(Number(x.attributed_revenue) || 0),
+      per_person: Math.round((Number(x.attributed_revenue) || 0) / Number(x.recipients) * 100) / 100 })).slice(0, 20);
+  if (Array.isArray(clR) && clR.length) {
+    const tr = clR.filter(r => r.metric_name === 'Traffic');
+    const visits = tr.reduce((a, r) => { const x = r.raw || {}; return a + Math.max(0, (Number(x.totalSessionCount) || 0) - (Number(x.totalBotSessionCount) || 0)); }, 0);
+    const days = new Set(tr.map(r => String(r.date).slice(0, 10)));
+    const shop = ((window.FRKL_DATA || {}).shopify || []).filter(r => days.has(String(r.date).slice(0, 10)));
+    const orders = shop.reduce((a, r) => a + (Number(r.orders) || 0), 0);
+    const fr = {}; V3_FRICTION.forEach(([m, label]) => { let n = 0, s2 = 0; clR.filter(r => r.metric_name === m).forEach(r => {
+      const sc = Number(r.sessions_count), pc = Number(r.with_metric_pct); if (sc > 0 && isFinite(pc)) { n += sc; s2 += sc * pc; } });
+      if (n) fr[label] = Math.round(s2 / n * 10) / 10; });
+    const dv = {}; (devR || []).forEach(r => { const k = String(r.dim_value || '').toLowerCase(); dv[k] = (dv[k] || 0) + (Number(r.sessions_count) || 0); });
+    const dvT = Object.values(dv).reduce((a, v) => a + v, 0);
+    f._site = { source: 'Microsoft Clarity (counts every visit, unlike Google Analytics) and your Shopify orders, last 30 days',
+      days: days.size, visits, orders, orders_per_100_visits: visits > 0 ? Math.round(orders / visits * 10000) / 100 : null,
+      share_of_visits_on_a_phone_pct: dvT > 0 ? Math.round((dv.mobile || dv.phone || 0) / dvT * 100) : null,
+      share_of_visits_that_pct: fr };
+  }
   f._stock = Array.isArray(stockR) ? stockR : null;
   f.calendar = { past_sales_not_on_the_calendar: missing.length,
     note: missing.length ? 'Greta found sales that are not on the calendar, so what she has learned about promotions rests on too few events. They can be added from the Calendar.' : null };
@@ -8616,6 +8651,22 @@ function v3AskReadout(R, topics, basis) {
     ruled_out: (t.stages || []).filter(s => s.verdict && s.verdict !== 'contributed').map(s => s.label) }));
   return out;
 }
+// The model is told not to show field names and still does ("facts.recent_context", 6 Oct). Plain words
+// for the names it is sent; any other dotted path is dropped.
+const V3_ASK_WORDS = { recent_context: 'the recent weeks', pounds_are: 'what the pounds are', why_this_rung: 'why Greta is that sure',
+  stock_named: 'the stock plan', stock_at_risk: 'the stock plan', order_units: 'units to order', lost_before_lands: 'profit lost before it lands',
+  order_placed_today_lands: 'when an order placed today lands', lands_before_peak_starts: 'whether it lands before the peak',
+  promotions_planned: 'planned promotions', emails_planned: 'planned emails', next_peak: 'the next peak', typical_month: 'a typical month',
+  quarter_plan_at_todays_ad_spend: 'the quarter plan', site_last_30_days: 'the site figures', email_flows: 'your email flows',
+  email_campaigns: 'your email campaigns', weekly_shop: 'the weekly sales', board: 'the board', held: 'what Greta is holding back' };
+function v3AskScrub(text) {
+  let t = String(text || '');
+  t = t.replace(/`?\b(?:_meta\.)?(?:facts|readout|data)\.([a-z_]+)(?:\.([a-z_]+))?`?/g, (m, a, b) => V3_ASK_WORDS[b] || V3_ASK_WORDS[a] || 'the figures');
+  t = t.replace(/`?\b([a-z]+(?:_[a-z]+)*)\.([a-z]+(?:_[a-z]+)+)`?/g, (m, a, b) => V3_ASK_WORDS[b] || V3_ASK_WORDS[a] || b.replace(/_/g, ' '));
+  t = t.replace(/`([a-z]+(?:_[a-z]+)+)`/g, (m, k) => V3_ASK_WORDS[k] || k.replace(/_/g, ' '));
+  t = t.replace(/\b([a-z]+(?:_[a-z]+){1,4})\b/g, (m, k) => V3_ASK_WORDS[k] || m);
+  return t.replace(/\(\s*the figures\s*\)/g, '').replace(/[ \t]{2,}/g, ' ');
+}
 function buildAskContext(facts, question){
   const topics = {}; Object.keys(V3_ASK_TOPICS).forEach(k => { topics[k] = V3_ASK_TOPICS[k].test(question || ''); });
   const D = window.FRKL_DATA || {};
@@ -8634,8 +8685,9 @@ function buildAskContext(facts, question){
     unit_cost: r.unit_cost == null ? null : Math.round(Number(r.unit_cost) * 100) / 100 });
   if (named.length) topics.stock = true;
   const basisFor = (facts && facts._board_basis) || {};
+  const flows = (facts && facts._flows) || null, camps = (facts && facts._campaigns) || null, site = (facts && facts._site) || null;
   facts = facts ? Object.assign({}, facts) : facts;
-  if (facts) { delete facts._stock; delete facts._board_basis; }
+  if (facts) { ['_stock', '_board_basis', '_flows', '_campaigns', '_site'].forEach(k => { delete facts[k]; }); }
   let _today = ''; try { _today = new Date().toISOString().slice(0,10); } catch(e) {}
   const _dates = _shp.map(r=>r && r.date).filter(Boolean).sort();
   const _latestDate = _dates.length ? _dates[_dates.length-1] : null;
@@ -8643,6 +8695,8 @@ function buildAskContext(facts, question){
   const _lastFull = _latestDate ? (_partialLatestDay ? v3IsoAdd(_latestDate, -1) : _latestDate) : null;
   // The series the question is about first, then the shop's own weeks; the ceiling drops from the end.
   const parts = [
+    topics.email && flows && flows.length && ['email_flows', () => v3AskTable(flows, 'flow'), 'Klaviyo automated flows, last 30 days: live or switched off, people reached, sales Klaviyo credits to the flow (anyone who opened before buying, so read it as a ranking, not what the email caused), and sales per person reached.'],
+    topics.email && camps && camps.length && ['email_campaigns', () => v3AskTable(camps, 'campaign'), 'Klaviyo campaigns (one-off sends), last 90 days, newest first: people sent to, credited sales, sales per person.'],
     named.length && ['stock_named', () => v3AskTable(named.map(stockRow), 'product'), 'The stock plan for the products named in the question.'],
     topics.stock && atRisk.length && ['stock_at_risk', () => v3AskTable(atRisk.map(stockRow), 'product'),
       'Greta’s stock plan, the 15 products that run out before a restock can land, most profit at risk first: weekly_pace (an out-of-stock product at what it sold while in stock), order_units (what to order now: eight weeks of stock after it lands), order_by, lost_before_lands (profit lost before an order placed today arrives), unit_cost (landed).'],
@@ -8661,6 +8715,7 @@ function buildAskContext(facts, question){
       note: 'If partialLatestDay is true the latest date is an incomplete day: never read its dip as a decline. Under ~60 orders in a window, treat conversion and order-value swings as possible noise.' },
     facts: facts || null,
     readout: v3AskReadout((typeof window !== 'undefined' && window.GRETA_READOUT) || null, topics, basisFor),
+    site_last_30_days: topics.site ? site : null,
     data_dictionary: dictionary,
     sent: 'Only the series this question needs were sent. If the answer needs a series that is not here, say which one and suggest asking about it directly.' };
   // The ceiling: drop data series from the least needed, then shorten the readout.
@@ -8742,7 +8797,7 @@ function AskPanel(){
         }
       } catch (e) {}
     }
-    const facts = await v3AskFacts().catch(() => null);
+    const facts = await v3AskFacts(q).catch(() => null);
     const ctx = buildAskContext(facts, q);
     const ctxJson = JSON.stringify(ctx.data);
     // Kept short on purpose: every character here is sent with every question (see V3_ASK_BUDGET).
@@ -8794,7 +8849,7 @@ ${ctxJson}`;
       if (!resp.ok) { let m = ''; try { m = (await resp.json()).message || ''; } catch(_){} throw new Error(m || ASK_FAIL); }
       const data = await resp.json();
       if (data.error) throw new Error(data.message || ASK_FAIL);
-      setHistory(h=>[...h, {role:'assistant', content:data.text || '(no response)', time:Date.now(), usage:data.usage||{}}]);
+      setHistory(h=>[...h, {role:'assistant', content:v3AskScrub(data.text || '(no response)'), time:Date.now(), usage:data.usage||{}}]);
     } catch (e) {
       setError(e.message || String(e));
       setHistory(h=>h.slice(0,-1)); // drop the user message on failure
@@ -20107,6 +20162,18 @@ function v3Bench(v, bm) {
   if (hi ? v >= bm.low : v <= bm.high) return 'ok';
   return 'weak';
 }
+// On a phone the story ran Today to 5.1 screens and put the profit figure two screens down (6 Oct).
+// There it opens on its first two sentences; the rest is one tap away.
+function V3StoryText({ text }) {
+  const isMobile = useIsMobile();
+  const [open, setOpen] = React.useState(false);
+  // The end of the second sentence: a stop followed by a space and a capital ("7.6 times" is not one).
+  const t = String(text || ''), re = /[.!?]\s+(?=[A-Z£])/g; let m, n = 0, cut = -1;
+  while ((m = re.exec(t))) { if (++n === 2) { cut = m.index + 1; break; } }
+  const short = isMobile && !open && cut > 0 && cut < t.length - 20;
+  return (<p className="v3-note v3-measure">{short ? t.slice(0, cut) : t}
+    {short && <>{' '}<button type="button" className="v3-xref" onClick={() => setOpen(true)}>Read the rest</button></>}</p>);
+}
 function V3BusinessState() {
   const q = useV3Rows('brand-state', V3_STATE_Q);
   const codes = useV3Rows('brand-codes', V3_CODES_Q);
@@ -20207,7 +20274,7 @@ function V3BusinessState() {
     <div className="v3-kick">Where the business stands · last 30 days</div>
     <p className="v3-verdict">{verdict}</p>
     {story
-      ? (<><p className="v3-note v3-measure">{NS.story}</p>
+      ? (<><V3StoryText text={NS.story}/>
           <p className="micro muted v3-measure">{V3_NARR.data.summary_stale && V3_NARR.data.written_at
             ? <>Written by Greta on {v3Day(String(V3_NARR.data.written_at).slice(0, 10), true)} from the figures then, every number checked; today’s figures are under “The figures behind this”.</>
             : <>Written by Greta from these figures; every number in it is checked against them before it is shown.</>}</p></>)
