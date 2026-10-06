@@ -232,5 +232,8 @@
     refresh();
     if (detailState === 'done') { detailState = 'idle'; loadDetail(); }
   });
-  var t = 0, iv = setInterval(function () { t++; if ((sb() && bid()) || t > 60) { clearInterval(iv); refresh(); } }, 500);
+  // The quarter plan (fn_plan_quarter, seconds of work) waits for Today's own reads: fired at boot it
+  // queued Today's board and story behind it (2026-10-06). GRETA_TODAY_READY resolves within 7s.
+  var afterToday = function () { return Promise.race([window.GRETA_TODAY_READY || Promise.resolve(), new Promise(function (r) { setTimeout(r, 7000); })]); };
+  var t = 0, iv = setInterval(function () { t++; if ((sb() && bid()) || t > 60) { clearInterval(iv); afterToday().then(refresh, refresh); } }, 500);
 })();

@@ -405,6 +405,14 @@
         new Promise(function (r) { setTimeout(r, 1500); })
       ]);
     } catch (e) { /* the bulk read proceeds regardless */ }
+    // ...and then for the rest of what Today shows first (its board and Greta's story): the page
+    // head's GRETA_TODAY_READY, which resolves at once on any other page and never later than 7s.
+    try {
+      await Promise.race([
+        window.GRETA_TODAY_READY || Promise.resolve(),
+        new Promise(function (r) { setTimeout(r, 7000); })
+      ]);
+    } catch (e) { /* the bulk read proceeds regardless */ }
 
     // 4. First fetch immediately, then poll
     await refresh();

@@ -35,9 +35,17 @@
      DOMContentLoaded, which is when greta-data-loader's bootstrap/neutralise runs and well
      before greta-app.js needs the globals) while taking them off the critical path.
      greta-defrkl-gate.js MUST stay last in this list and before greta-app.js: see its header. -->
-<script defer src="./greta-data-loader.js?v=20261005s"></script>
+<script>/* Today first (2026-10-06). A cold load fired two dozen reads at once and the ones Today needs
+   (its summary, the board, Greta's story) queued behind the others for 15-25s: a 9ms cached row took
+   15.6s, the stored story 24s. GRETA_TODAY_READY resolves when Today has its board and story (or
+   2.5s after the board, or straight away on any other page; never later than 7s), and the bulk
+   loader, the quarter plan and the margin check wait for it. */
+(function () { var done; window.GRETA_TODAY_READY = new Promise(function (r) { done = r; });
+  window.GRETA_TODAY_DONE = function () { try { done(); } catch (e) {} };
+  setTimeout(window.GRETA_TODAY_DONE, 7000); })();</script>
+<script defer src="./greta-data-loader.js?v=20261006a"></script>
 <script defer src="./greta-overview-data.js?v=20261004a"></script>
-<script defer src="./greta-plan-data.js?v=20261005g"></script>
+<script defer src="./greta-plan-data.js?v=20261006a"></script>
 <script defer src="./greta-settings.js?v=20261002a"></script>
 <script defer src="./greta-live-snapshots.js?v=20261005x"></script>
 <script defer src="./greta-headline-data.js?v=20261006b"></script>
@@ -1866,7 +1874,7 @@
   .v3-why-list { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 3px; font-size: var(--text-sm); color: var(--text-secondary); }
   .v3-why-list li { display: grid; grid-template-columns: 3rem 1fr; gap: 8px; }
 </style>
-<link rel="stylesheet" href="./greta-kit.css?v=1791280244203">
+<link rel="stylesheet" href="./greta-kit.css?v=1791282349414">
 <link rel="stylesheet" href="./marketing-os-tokens.css?v=20260924a">
 <link rel="stylesheet" href="./marketing-os.css?v=1790774159">
 <link rel="stylesheet" href="./loop-panel.css?v=1790774159">
@@ -1886,6 +1894,6 @@ window.MOS_EMBEDDED = true;</script>
 <script defer src="./today-calendar.build.js?v=20261005e"></script>
 <!-- cost-entry.build.js retired (0221): Product costs is V3ProductCosts in greta-app, reading Shopify costs for every variant. -->
 <script defer src="./loop-panel.js?v=20261002a"></script>
-<script defer src="./greta-app.js?v=1791280244203"></script>
+<script defer src="./greta-app.js?v=1791282349414"></script>
 <script>/* perf: defer frkl static deep-tab data (CVR ~1.7MB, cohorts, promos, products) — not used by the Overview/landing. Background-load after paint; skip for non-frkl (de-frkl). */
 (function(){try{var slug=window.OI_BRAND_SLUG||(window.parent&&window.parent!==window?window.parent.OI_BRAND_SLUG:null)||"frkl";if(slug!=="frkl")return;var files=["greta-cvr.js","greta-cohorts.js","greta-discount-codes.js","greta-products.js","greta-patterns.js"],i=0;function next(){if(i>=files.length){window.FRKL_SNAPSHOTS_LOADED=true;try{window.dispatchEvent(new Event("frkl-snapshots-loaded"))}catch(e){}return;}var s=document.createElement("script");s.src="./"+files[i++]+"?v=20260925f";s.async=true;s.onload=next;s.onerror=next;document.head.appendChild(s);}var kick=function(){next();};if(window.requestIdleCallback){window.requestIdleCallback(kick,{timeout:1500});}else{setTimeout(kick,300);}}catch(e){}})();</script>

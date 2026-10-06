@@ -10138,9 +10138,13 @@ const V3_WRITER_ACTIONS = false;
 function v3NarrLoad(b){
   if (V3_NARR.asked || !b) return;
   V3_NARR.asked = true;
+  // Today is ready once its board is in and the story has come back, or 2.5s after the board:
+  // the story must not hold the rest of the dashboard if the model is writing a fresh one.
+  const done = () => { try { window.GRETA_TODAY_DONE && window.GRETA_TODAY_DONE(); } catch (e) {} };
+  const grace = setTimeout(done, 2500);
   ciFetch('greta-writer', { brand_id: b }).then(d => {
     if (d && (d.summary || (d.actions && Object.keys(d.actions).length))) { V3_NARR.data = d; v3BoardNotify(); }
-  }, () => { /* the rules' wording stands */ });
+  }, () => { /* the rules' wording stands */ }).then(() => { clearTimeout(grace); done(); });
 }
 function v3BoardLoad(){
   if (V3_BOARD.loading || V3_BOARD.rows) return true;
@@ -10162,7 +10166,7 @@ function v3BoardLoad(){
     .then(r => (r && r.error && /money_/.test(r.error.message || '')) ? ask(COLS, false) : r)
     .then(r => {
       V3_BOARD.loading = false;
-      if (r && r.error) { V3_BOARD.err = r.error.message || 'could not load'; v3BoardNotify(); return; }
+      if (r && r.error) { V3_BOARD.err = r.error.message || 'could not load'; v3BoardNotify(); try { window.GRETA_TODAY_DONE && window.GRETA_TODAY_DONE(); } catch (e) {} return; }
       const rows = ((r && r.data) || []).slice();
       // With board_rank the server order is final. Without it, reapply "unverified last"
       // (PostgREST dropped the view's ORDER BY); the sort is stable, so money order holds.
@@ -10172,7 +10176,7 @@ function v3BoardLoad(){
       V3_BOARD.err = null;
       v3BoardNotify();
       v3NarrLoad(b);
-    }, () => { V3_BOARD.loading = false; V3_BOARD.err = 'could not load'; v3BoardNotify(); });
+    }, () => { V3_BOARD.loading = false; V3_BOARD.err = 'could not load'; v3BoardNotify(); try { window.GRETA_TODAY_DONE && window.GRETA_TODAY_DONE(); } catch (e) {} });
   return true;
 }
 // Closing a row anywhere closes it everywhere: the badge, Today's list and the board agree.
@@ -14821,7 +14825,8 @@ function MarginNudge(){
     }catch(e){}
   }, [authed]); // eslint-disable-line
 
-  React.useEffect(()=>{ check(); }, [check]);
+  // after Today's own reads (GRETA_TODAY_READY, at most 7s): a banner can wait, the summary cannot
+  React.useEffect(()=>{ let alive = true; (window.GRETA_TODAY_READY || Promise.resolve()).then(()=>{ if (alive) check(); }); return ()=>{ alive = false; }; }, [check]);
   React.useEffect(()=>{
     const h = ()=>check();
     window.addEventListener('oi-config-updated', h);
@@ -20065,7 +20070,9 @@ function V3BusinessState() {
     <p className="v3-verdict">{verdict}</p>
     {story
       ? (<><p className="v3-note v3-measure">{NS.story}</p>
-          <p className="micro muted v3-measure">Written by Greta from these figures; every number in it is checked against them before it is shown.</p></>)
+          <p className="micro muted v3-measure">{V3_NARR.data.summary_stale && V3_NARR.data.written_at
+            ? <>Written by Greta on {v3Day(String(V3_NARR.data.written_at).slice(0, 10), true)} from the figures then, every number checked; today’s figures are under “The figures behind this”.</>
+            : <>Written by Greta from these figures; every number in it is checked against them before it is shown.</>}</p></>)
       : facts}
     {(story ? (facts || chart || bench) : (chart || bench)) && (
       <V3More id="state-facts" label={story ? 'The figures behind this' : 'The weeks and the benchmarks behind this'}>
@@ -21630,6 +21637,8 @@ function App(){
   // V3: one destination at a time, no sub-tab state. Old (section, sub) deep links
   // are translated by v3Route, so every existing call site still lands somewhere real.
   const [v3dest, setV3dest] = useState('today');
+  // Today-first gate (page head): any other page releases the start-up reads straight away
+  React.useEffect(() => { if (v3dest !== 'today') { try { window.GRETA_TODAY_DONE && window.GRETA_TODAY_DONE(); } catch (e) {} } }, [v3dest]);
   const [subTabBySection, setSubTabBySection] = useState(
     Object.fromEntries(NAV.map(s => [s.id, s.subtabs[0].id]))
   );
