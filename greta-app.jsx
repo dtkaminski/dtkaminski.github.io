@@ -8554,7 +8554,11 @@ async function v3AskFacts(question) {
     months: (P.months || []).map(m => ({ month: String(m.month).slice(0, 7), sales: R(m.sales), ad_spend: R(m.spend), new_customers: R(m.new_customers) })),
     note: 'Greta’s quarter plan: own seasonality, returning customers at their recent rate, new-customer sales rising with ad spend along the measured curve (each extra pound buys less). It spreads the budget by season, so a peak month gets more and an ordinary month less.' };
   const U = r0(ueR);
-  if (U) f.customers = { cost_to_win_a_new_customer_90d: U.cac, profit_on_a_first_order: U.first_order_contribution, profit_from_a_customer_over_a_year: U.ltv_contribution };
+  // the last 30 days decide whether a new customer pays back (as Today, Customers and Growth say it)
+  const SU = (r0(stateR) && r0(stateR).state && r0(stateR).state.unit) || {};
+  if (U) f.customers = { cost_to_win_a_new_customer_last_30_days: SU.cac_30d != null ? Number(SU.cac_30d) : null, cost_to_win_a_new_customer_90d: U.cac,
+    profit_on_a_first_order: U.first_order_contribution, profit_from_a_customer_over_a_year: U.ltv_contribution,
+    which_decides: 'the last 30 days: compare it with the profit on a first order; the 90-day figure is context' };
   const C = r0(cfgR) || {};
   const lead = Number(C.supplier_lead_time_weeks) > 0 ? Number(C.supplier_lead_time_weeks) : null;
   f.costs_and_settings = { supplier_lead_time_weeks: lead, overheads_per_month: R(C.fixed_costs_monthly), minimum_cash_balance_set: C.cash_floor != null,
@@ -10419,6 +10423,22 @@ function v3MoneyConf(row){
 // Rows Greta has checked recently, in money order. The unchecked ones keep their place on the
 // board but never lead Today.
 function v3LiveRows(rows){ return (rows || []).filter(r => r.verification !== 'unverified'); }
+// The board's "bring Meta back toward £1,444 a week" targets, added up as a month. The quarter plan puts
+// its own figure into this month (frkl, 7 Oct: £3,508 for October against about £8,180 for the board's
+// Meta and Google targets), so every page says which one is the month's number: the plan's, with the
+// board's channel targets as ceilings while spend comes down to it.
+function v3BoardSpendTargets(rows) {
+  const per = (rows || []).filter(r => /^order-cost-/.test(String(r.external_id || ''))).map(r => {
+    const m = String(r.description || '').match(/toward £([\d,]+) a week/i);
+    return m ? { ch: String(r.external_id).replace(/^order-cost-/, ''), wk: Number(m[1].replace(/,/g, '')) } : null;
+  }).filter(Boolean);
+  if (!per.length) return null;
+  const wk = per.reduce((t, x) => t + x.wk, 0), now = new Date();
+  const days = new Date(now.getUTCFullYear(), now.getUTCMonth() + 1, 0).getDate();
+  const label = { meta: 'Meta', google: 'Google', tiktok: 'TikTok' };
+  return { weekly: wk, monthly: Math.round(wk * days / 7), names: per.map(x => label[x.ch] || x.ch) };
+}
+function v3AndList(xs) { return xs.length <= 1 ? (xs[0] || '') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1]; }
 
 // The board, in its own order, for drawers that summarise "what to do" (Review's Alerts). Those
 // drawers each kept a copy of every action ever raised, ranked their own way and totalled with
@@ -10489,11 +10509,15 @@ function V3ActionBoard(){
           const sum = a => a.reduce((t, r) => t + (Number(r.cm_gbp) || 0), 0);
           const act = liveRows.filter(r => r.lane !== 'test'), tests = liveRows.filter(r => r.lane === 'test');
           const stock = act.filter(r => r.category === 'stock'), save = act.filter(r => r.origin === 'order_cost');
-          const rest = act.filter(r => r.category !== 'stock' && r.origin !== 'order_cost');
+          // a one-off over the peak is not "a month": "£6,653 a month from 2 more changes" (7 Oct) was the
+          // BFCM plan's £6,249 once plus £404 a month
+          const once = act.filter(r => v3Once(r));
+          const rest = act.filter(r => r.category !== 'stock' && r.origin !== 'order_cost' && !v3Once(r));
           const bits = [];
           if (stock.length) bits.push(<span key="s"><b className="v3-num">{v3Gbp(sum(stock))}</b> a month of profit at stake in stock</span>);
           if (save.length) bits.push(<span key="v"><b className="v3-num">{v3Gbp(sum(save))}</b> a month of ad spend you can save</span>);
           if (rest.length) bits.push(<span key="r"><b className="v3-num">{v3Gbp(sum(rest))}</b> a month from {rest.length === 1 ? 'one more change' : rest.length + ' more changes'} Greta is fairly sure of</span>);
+          if (once.length) bits.push(<span key="o"><b className="v3-num">{v3Gbp(sum(once))}</b> once from {once.length === 1 ? 'one move before the peak' : once.length + ' moves before the peak'}</span>);
           if (tests.length) bits.push(<span key="t">{tests.length === 1 ? 'one test' : tests.length + ' tests'} worth running</span>);
           return <span className="v3-board-total-lab">{bits.length ? bits.reduce((a, b, i) => a.concat(i === 0 ? [b] : [i === bits.length - 1 ? ', and ' : ', ', b]), []) : <>{v3Gbp(total)} a month across {liveRows.length} live actions</>}.</span>;
         })()}
@@ -17105,8 +17129,12 @@ function V3Today(p) {
     const cur = PLT.months.find(m => String(m.month).slice(0, 7) === mKey);
     const peak = PLT.months.filter(m => String(m.month).slice(0, 7) > mKey).sort((a, b) => Number(b.season_new) - Number(a.season_new))[0];
     if (!cur || !peak || Number(peak.season_new) < 1.3 || !(Number(peak.spend) > Number(cur.spend) * 1.5)) return null;
-    return { cur: gpMonthName(cur.month), peak: gpMonthName(peak.month), spend: Number(peak.spend) };
+    return { cur: gpMonthName(cur.month), peak: gpMonthName(peak.month), spend: Number(peak.spend), curSpend: Number(cur.spend) };
   })();
+  const boardSpend = v3BoardSpendTargets(liveRows || []);
+  // the month's ad figure is the plan's; the channel targets above it are ceilings on the way down
+  const monthLine = seasonNote && boardSpend && seasonNote.curSpend > 0 && seasonNote.curSpend < boardSpend.monthly * 0.9
+    ? <> The quarter plan puts {v3Gbp(seasonNote.curSpend)} of ads in all into {seasonNote.cur}, below the {v3AndList(boardSpend.names)} targets (about {v3Gbp(boardSpend.monthly)} a month together): treat those as ceilings on the way down, not the month’s budget.</> : null;
   const isCut = (r) => !!r && /^order-cost-/.test(String(r.external_id || ''));
   const boardCount = board.rows ? board.rows.length : (d.board_actions != null ? d.board_actions : d.open_actions);
   // The profit figure and its confidence badge describe the same broken state and used to
@@ -17245,9 +17273,9 @@ function V3Today(p) {
         <div className="v3-kick">Do this first{top.cm_gbp ? ' · worth about ' + v3Gbp(top.cm_gbp) + v3Per(top) : ''}</div>
         <div className="v3-dofirst-t">{v3PlainAction(top).title}</div>
         {v3PlainAction(top).why && <div className="v3-sub">{v3PlainAction(top).why}</div>}
-        {seasonNote && isCut(top) && <div className="v3-sub">This is for {seasonNote.cur}. Greta’s quarter plan puts {v3Gbp(seasonNote.spend)} of ads into {seasonNote.peak}, when new customers come far cheaper — don’t carry the cut into it.{' '}
+        {seasonNote && isCut(top) && <div className="v3-sub">This is for {seasonNote.cur}. Greta’s quarter plan puts {v3Gbp(seasonNote.spend)} of ads into {seasonNote.peak}, when new customers come far cheaper — don’t carry the cut into it.{monthLine}{' '}
           <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('growth')}>Why <span className="v3-xref-go">on Growth plan →</span></button></div>}
-        {top.external_id === 'stock-reorder' && <div className="v3-sub"><button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('stock')}>The order list <span className="v3-xref-go">on Stock &amp; orders →</span></button></div>}
+        {top.external_id === 'stock-reorder' && <div className="v3-sub"><button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('stock')}>The full order list, with what the peak adds <span className="v3-xref-go">on Stock &amp; orders →</span></button></div>}
         {top.step1
           ? <div className="v3-sub">First step: {v3Money(scrubTag(top.step1))}</div>
           : <div className="v3-sub">No first step recorded for this one.{' '}
@@ -17311,7 +17339,7 @@ function V3Today(p) {
         <span>{v3PlainAction(a).title}</span>
         <span className="v3-num">{a.cm_gbp ? v3Gbp(a.cm_gbp) + v3Per(a, true) : ''}</span>
       </div>))}
-      {seasonNote && !isCut(top) && next.some(isCut) && <p className="micro muted">The ad-spend cuts are for {seasonNote.cur}; the quarter plan puts {v3Gbp(seasonNote.spend)} into {seasonNote.peak}.</p>}
+      {seasonNote && !isCut(top) && next.some(isCut) && <p className="micro muted">The ad-spend cuts are for {seasonNote.cur}; the quarter plan puts {v3Gbp(seasonNote.spend)} into {seasonNote.peak}.{monthLine}</p>}
       <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>See all {boardCount || ''} actions <Icon name="arrowRight" size={13}/></button>
     </div>)}
     </div>
@@ -17447,6 +17475,7 @@ function V3Growth() {
   const P = useV3Plan();
   const ue = useV3Rows('cust-ue', V3_UE_Q);
   const mo = useV3Rows('mk-months', V3_MONTHS_Q);
+  const tierG = useV3Rows('tier-30', V3_TIER_Q);
   const { g, per, pace, atGoal, today } = useV3Goal();
   const sofar = useV3Rows('goal-sofar-' + per.start, V3_SOFAR_Q(per.start, today));
   const sc = P.spendCurve || null;
@@ -17462,14 +17491,16 @@ function V3Growth() {
 
   let head = null, sub = null;
   if (last && fop) {
-    const cac = Number(last.cac), edge = cac < fop && fop - cac < fop * 0.15;
-    const inMonth = 'In ' + v3Month(last.month, 'long') + ', ';
+    // the verdict on the last 30 days, as Today and Customers say it; the months below are the trend
+    const t30 = (tierG.rows || [])[0] || null, c30 = t30 && Number(t30.ncac) > 0 ? Number(t30.ncac) : null;
+    const cac = c30 != null ? c30 : Number(last.cac), edge = cac < fop && fop - cac < fop * 0.15;
+    const inMonth = c30 != null ? 'In the last 30 days ' : 'In ' + v3Month(last.month, 'long') + ', ';
     head = cac >= fop ? 'Not now. ' + inMonth + 'a new customer cost ' + fmtMoney(cac, 2) + ' — more than the ' + fmtMoney(fop, 2) + ' a first order earns.'
       : edge ? inMonth + 'you were at the edge: a new customer cost about what a first order earns.'
       : inMonth + 'there was room to grow: a new customer cost well under what a first order earns.';
-    const rose = back && Number(last.spend) > Number(back.spend) * 1.3 && cac > Number(back.cac) * 1.2;
+    const rose = back && Number(last.spend) > Number(back.spend) * 1.3 && Number(last.cac) > Number(back.cac) * 1.2;
     sub = (rose ? 'Since ' + v3Month(back.month, 'long') + ' your monthly ad spend went from ' + fmtMoney(back.spend) + ' to ' + fmtMoney(last.spend)
-          + ', and the cost of each new customer from ' + fmtMoney(back.cac, 2) + ' to ' + fmtMoney(cac, 2) + '. ' : '')
+          + ', and the cost of each new customer from ' + fmtMoney(back.cac, 2) + ' to ' + fmtMoney(Number(last.cac), 2) + '. ' : '')
       + (marg ? 'At today’s spend the next customer costs about ' + fmtMoney(marg) + (ltv ? ', against ' + fmtMoney(fop) + ' on their first order and ' + fmtMoney(ltv) + ' over a year' : '') + '. ' : '')
       + (cac >= fop ? (ltv && marg && marg > ltv ? 'Extra spend in an ordinary month loses money even counting their repeat orders. Fix what converts before adding budget.'
           : 'Extra spend in an ordinary month only pays back if those customers order again. Fix what converts before adding budget.')
@@ -18326,7 +18357,9 @@ function V3Products() {
   const up = movers.filter(x => x.d > 0).sort((a, b) => b.d - a.d).slice(0, 4);
   const down = movers.filter(x => x.d < 0).sort((a, b) => a.d - b.d).slice(0, 4);
   const leaks = [];
-  if (d.outSold.length) leaks.push(<li key="out"><b>Out of stock: {d.outSold.slice(0, 3).map(x => x.title).join(', ')}{d.outSold.length > 3 ? ' and ' + fmtCount(d.outSold.length - 3) + ' more' : ''}.</b>{' '}
+  // "Out of stock: … and 9 more" read as the whole count (12) beside the board's 25 already out (7 Oct):
+  // say it is the ones that sold in the 28 days before
+  if (d.outSold.length) leaks.push(<li key="out"><b>{d.outSold.length === 1 ? 'One product that sold in the 28 days before is' : fmtCount(d.outSold.length) + ' products that sold in the 28 days before are'} out of stock now: {d.outSold.slice(0, 3).map(x => x.title).join(', ')}{d.outSold.length > 3 ? ' and ' + fmtCount(d.outSold.length - 3) + ' more' : ''}.</b>{' '}
     {d.outSold.length === 1 ? 'It' : 'They'} sold {fmtMoney(d.outSold.reduce((a, x) => a + x.was, 0))} in the 28 days before{d.sale != null ? ' (a sale period)' : ''} and {d.outSold.length === 1 ? 'has' : 'have'} nothing to sell now.{' '}
     <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('stock')}>Open Stock &amp; orders</button></li>);
   if (d.losers.length) leaks.push(<li key="loss"><b>Sold at a loss: {v3Names(d.losers.slice(0, 3).map(x => x.title))}.</b> After what {d.losers.length === 1 ? 'it costs' : 'they cost'}, {d.losers.length === 1 ? 'it' : 'they'} lost {fmtMoney(Math.abs(d.losers.reduce((a, x) => a + x.kept, 0)))} in 28 days — check the price and the cost entered.</li>);
@@ -19025,22 +19058,24 @@ function V3CustomerValue() {
   if (!ue.rows) return <V3SkeletonRows n={2}/>;
   const u = ue.rows[0] || null;
   if (!u || u.ltv_contribution == null || !(Number(u.cac) > 0)) return null;
-  const ltv = Number(u.ltv_contribution), cac = Number(u.cac), ratio = ltv / cac;
+  const ltv = Number(u.ltv_contribution); let cac = Number(u.cac), ratio = ltv / cac;
   const t = (tier.rows || [])[0] || null, cac30 = t && Number(t.ncac) > 0 ? Number(t.ncac) : null;
+  // the last 30 days decide (as on Today and Growth); the 90-day cost follows as context
+  const cac90 = cac; if (cac30 != null) { cac = cac30; ratio = ltv / cac; }
   const day0 = (() => { const r = (front.rows || []).find(x => x.in_standard_basis && /day 0/.test(String(x.bucket))); return r ? Number(r.pct_of_12m_value) / 100 : null; })();
   const X = v3ExtraCustomers(mo.rows);
   const head = ratio >= 3 ? 'Each new customer earns back ' + fmtTimes(ratio, 1) + ' what they cost to win — there is room to spend more.'
-    : ratio >= 1 ? 'A new customer is worth ' + fmtMoney(ltv) + ' in profit over a year and costs ' + fmtMoney(cac) + ' to win — ' + fmtTimes(ratio, 1) + ', where 3× leaves room to grow.'
+    : ratio >= 1 ? 'A new customer is worth ' + fmtMoney(ltv) + ' in profit over a year and ' + (cac30 != null ? 'cost ' + fmtMoney(cac) + ' to win in the last 30 days' : 'costs ' + fmtMoney(cac) + ' to win') + ' — ' + fmtTimes(ratio, 1) + ', where 3× leaves room to grow.'
     : 'A new customer costs more to win (' + fmtMoney(cac) + ') than they are worth over a year (' + fmtMoney(ltv) + ').';
   return (<div className="v3-page-stack"><section className="v3-sec">
     <div className="v3-kick">What a customer is worth against what one costs</div>
     <p className="v3-verdict">{head}</p>
     <p className="v3-note v3-measure">
       {day0 != null && <>{fmtPctN(day0)} of that value comes with the first order, so the first order has to pay for winning the customer; repeat buying adds the other {fmtPctN(1 - day0)} at most. </>}
-      {cac30 != null && Math.abs(cac30 / cac - 1) > 0.2 && <>In the last 30 days a new customer cost {fmtMoney(cac30)}. </>}
+      {cac30 != null && Math.abs(cac30 / cac90 - 1) > 0.1 && <>Over 90 days a new customer cost {fmtMoney(cac90)}. </>}
       {X && X.per != null && <>The extra customers bought since {X.prevLab} cost {fmtMoney(X.per)} each{X.per > ltv ? ' — more than a customer is worth.' : ', still under what a customer is worth.'} </>}
       {X && X.moved && X.dSpend > 0 && X.dNc <= 0 && <>The extra ad spend since {X.prevLab} has bought no extra customers. </>}
-      <V3Conf state="likely" detail="Customer value is a year of profit after product and order costs from your own customers; the cost is ad spend divided by new customers over 90 days. Both are counted, not modelled."/></p>
+      <V3Conf state="likely" detail="Customer value is a year of profit after product and order costs from your own customers; the cost is ad spend divided by new customers over the last 30 days (90 days where 30 are not available). Both are counted, not modelled."/></p>
     {X && (X.per != null || (X.moved && X.dSpend > 0)) && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('marketing')}>
       Where the extra spend went <span className="v3-xref-go">on Marketing →</span></button>}
   </section></div>);
@@ -19275,6 +19310,7 @@ function v3PlanToDate(months, key, today) {
 
 function V3GoalLead() {
   const { goal, g, per, tgt, pace, atGoal, today } = useV3Goal();
+  const boardG = useV3Board();
   const cfg = useV3Rows('brand-cfg', V3_BCFG_Q);
   const ue = useV3Rows('cust-ue', V3_UE_Q);
   const sofar = useV3Rows('goal-sofar-' + per.start, V3_SOFAR_Q(per.start, today));
@@ -19381,6 +19417,12 @@ function V3GoalLead() {
       </tr>))}</tbody>
     </table>
     {ph && maxSeen && <p className="micro muted v3-measure">Your biggest month of ads so far was {fmtMoney(maxSeen)}. Past 1.5× that, Greta is extending your spend curve beyond anything it has seen.</p>}
+    {(() => {
+      const bs = v3BoardSpendTargets(v3LiveRows(boardG.rows || [])), k = new Date().toISOString().slice(0, 7);
+      const cur = rows.find(r => r.iso.slice(0, 7) === k);
+      return bs && cur && cur.pSpend > 0 && cur.pSpend < bs.monthly * 0.9
+        ? <p className="micro muted v3-measure">For {gpMonthName(cur.iso)} the plan’s figure is {fmtMoney(cur.pSpend)} of ads in all. The board’s {v3AndList(bs.names)} targets (about {fmtMoney(bs.monthly)} a month together) are ceilings on the way down to it, not the month’s budget.</p> : null;
+    })()}
   </section>
 
   {g && (<section className="v3-sec">
@@ -20306,7 +20348,15 @@ function V3BusinessState() {
       <span>Sales <em>{fmtMoney(d.sales)}</em></span><span>Ads <em>{fmtMoney(d.ads)}</em></span>
       <span>After product, order and ad costs <em>{fmtMoney(d.v)}</em></span><span>Below usual prices <em>{fmtPctN(d.off)}</em></span></div>); };
   if (U.cac != null && U.first_order_contribution != null)
-    sents.push(<>A new customer costs {fmtMoney(num(U.cac))} and their first order earns {fmtMoney(num(U.first_order_contribution))}{U.ltv_cac != null ? <>; over their life they are worth {fmtTimes(num(U.ltv_cac), 1)} what they cost, where brands aim for 3×</> : null}. {R.repeat_90d != null ? <>{fmtPctN(num(R.repeat_90d))} order again within 90 days{BM.repeat_90d ? <> (around {fmtPctN(BM.repeat_90d.typical)} is typical)</> : null}, and returning customers bring {fmtPctN(num(R.returning_rev_share))} of sales.</> : null}</>);
+    sents.push(<>{(() => {
+      // The last 30 days decide whether a new customer pays back; 90 days is context. Today said "costs £40,
+      // first order earns £43" (90 days) while Growth said "Not now: £49.13" and Customers "£53 in the last
+      // 30 days" (7 Oct) -- the same question answered both ways.
+      const c30 = num(U.cac_30d), c90 = num(U.cac), use = c30 > 0 ? c30 : c90, lc = num(U.ltv_contribution);
+      const ratio = lc > 0 && use > 0 ? lc / use : (U.ltv_cac != null ? num(U.ltv_cac) : null);
+      return <>{c30 > 0 ? <>In the last 30 days a new customer cost {fmtMoney(c30)}{c90 > 0 && Math.abs(c30 / c90 - 1) > 0.1 ? <> ({fmtMoney(c90)} over 90 days)</> : null}</> : <>A new customer costs {fmtMoney(c90)}</>}{' '}
+        against {fmtMoney(num(U.first_order_contribution))} their first order earns{use > num(U.first_order_contribution) ? ', so the first order no longer pays for them' : ''}{ratio != null ? <>; over a year they are worth {fmtTimes(ratio, 1)} what they cost, where brands aim for 3×</> : null}.</>;
+    })()} {R.repeat_90d != null ? <>{fmtPctN(num(R.repeat_90d))} order again within 90 days{BM.repeat_90d ? <> (around {fmtPctN(BM.repeat_90d.typical)} is typical)</> : null}, and returning customers bring {fmtPctN(num(R.returning_rev_share))} of sales.</> : null}</>);
   // 0271: Klaviyo counts any order after an email was opened; the shop counts only orders that came
   // through an email link. Say both, and that neither is the answer.
   const E = S.email || {};
