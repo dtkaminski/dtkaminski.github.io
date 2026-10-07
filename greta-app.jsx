@@ -10705,7 +10705,12 @@ function V3ActionBoard(){
                       <ul className="v3-rank-steps">{r.evidence_reasons.filter(x => x && x.text).map((x, j) => <li key={j}>{v3Tidy(x.text)}</li>)}</ul>
                     </div>
                   )}
-                  <p className="v3-rank-raw"><span className="v3-kick">Greta's working</span>{v3Tidy(r.description)}</p>
+                  {/* Only when it adds something: for most rows the title and text above are this sentence, and
+                      it repeated word for word under them (7 Oct). */}
+                  {(() => { const pa = v3PlainAction(r), raw = v3Tidy(r.description), seen = (pa.title + ' ' + pa.why).replace(/\s+/g, ' ');
+                    const sents = raw.split(/(?<=[.!?])\s+/).map(x => x.replace(/[.!?]$/, '').trim()).filter(x => x.length > 12);
+                    const repeats = !pa.written && sents.every(x => seen.includes(x.slice(0, 50)));
+                    return repeats ? null : <p className="v3-rank-raw"><span className="v3-kick">Greta's working</span>{raw}</p>; })()}
                 </div>
               )}
             </li>
