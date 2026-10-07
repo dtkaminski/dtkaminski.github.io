@@ -8572,6 +8572,21 @@ async function v3AskFacts(question) {
   if (rf) f.costs_and_settings.refunds = { entered_pct: Number(rf.config_value), measured_pct: Math.round(Number(rf.realised_value) * 10) / 10, measured_differs_from_entered: rf.status === 'drift' };
   const Qc = r0(cogsR);
   if (Qc) f.costs_and_settings.product_costs = { share_of_sales_with_a_cost: Qc.cogs_coverage_90d, include_freight_or_duty: Qc.cogs_landed_complete !== false };
+  // What reads wrong in the costs Greta works from, and by how much a month -- the list Goal & costs and
+  // Connections give. "Which of my costs are wrong?" was answered about ad spend (7 Oct): the answer had the
+  // refund rate and the freight flag but not what either does to profit.
+  {
+    const sales30 = Number(H.net_revenue_30d) || 0, wrong = [];
+    if (rf && rf.status === 'drift') { const gap = (Math.round(Number(rf.realised_value) * 10) / 10 - Number(rf.config_value)) / 100 * sales30;
+      wrong.push({ what: 'refunds: you entered ' + rf.config_value + '%, your orders show ' + (Math.round(Number(rf.realised_value) * 10) / 10) + '%', profit_reads_high_by_a_month: Math.round(gap) }); }
+    if (Qc && Qc.cogs_landed_complete === false && Number(Qc.realized_cogs_pct) > 0)
+      wrong.push({ what: 'no product cost includes freight or duty', profit_reads_high_by_a_month_per_10pct_freight: Math.round(0.1 * Number(Qc.realized_cogs_pct) * sales30) });
+    if (Qc && Number(Qc.lines_total) > 0 && Number(Qc.lines_costed) < Number(Qc.lines_total) * 0.97)
+      wrong.push({ what: (Number(Qc.lines_total) - Number(Qc.lines_costed)) + ' of the last 90 days\u2019 ' + Qc.lines_total + ' order lines have no product cost, so Greta fills them in from your average margin' });
+    if (C.opening_cash_as_of && v3IsoAdd(String(C.opening_cash_as_of).slice(0, 10), 21) < today) wrong.push({ what: 'the cash balance is from ' + String(C.opening_cash_as_of).slice(0, 10) });
+    if (C.cash_floor == null) wrong.push({ what: 'no minimum cash balance is set, so Greta cannot check you can afford the plan' });
+    f.costs_and_settings.what_reads_wrong = wrong;
+  }
   const evs = cal || [];
   const peak = evs.filter(e => e.row_group === 'seasonality' && e.status !== 'skipped' && String(e.start_date) >= v3IsoAdd(today, 7)).sort((x, y) => (x.start_date < y.start_date ? -1 : 1))[0];
   if (peak) {
@@ -8776,6 +8791,10 @@ function v3AskScrub(text, facts) {
   t = t.replace(/`?\b([a-z]+(?:_[a-z]+)*)\.([a-z]+(?:_[a-z]+)+)`?/g, (m, a, b) => V3_ASK_WORDS[b] || V3_ASK_WORDS[a] || b.replace(/_/g, ' '));
   t = t.replace(/`([a-z]+(?:_[a-z]+)+)`/g, (m, k) => V3_ASK_WORDS[k] || k.replace(/_/g, ' '));
   t = t.replace(/\b([a-z]+(?:_[a-z]+){1,4})\b/g, (m, k) => V3_ASK_WORDS[k] || m);
+  t = t.replace(/\s*[–—-]\s*rung\s+(direct|likely|probably|possible|outside chance)\b/gi, ' ($1)')
+       .replace(/\brung\s+(direct|likely|probably|possible)\b/gi, '$1')
+       .replace(/\((?:direct|likely|probably|possible)\s*,\s*[^)]*\)/gi, '')
+       .replace(/£([\d,]{4,})\.\d\d\b/g, '£$1');
   return t.replace(/\(\s*the figures\s*\)/g, '').replace(/[ \t]{2,}/g, ' ');
 }
 function buildAskContext(facts, question){
@@ -8946,7 +8965,8 @@ WHAT NOT TO DO questions: answer from readout.held (what Greta is holding back, 
 
 A difference in cost is not a loss: an ad overspend is spend above what the earlier cost per order needed, not money lost. When a board figure is "probably" or lower, give its why_this_rung in plain words. The weekly tables hold complete weeks only.
 
-SHAPE: start with the answer itself in one or two plain sentences, with the figure that decides it. Then at most three short points, or one small table when comparing several things. Keep it under about 180 words unless the question asks for a list. No headings unless there are more than three parts. End with the one thing to do next.
+COST questions ("which of my costs are wrong", "what do things cost me"): answer from facts.costs_and_settings.what_reads_wrong, the cost figures Greta works from that are off and how far each moves profit a month. Ad spend being high is not a cost figure being wrong.
+SHAPE: start with the answer itself in one or two plain sentences, with the figure that decides it. Then at most three short points, or one small table when comparing several things. Keep it under about 180 words unless the question asks for a list. No headings unless there are more than three parts. End with the one thing to do next, worded as the board words it when the board has it.
 Write for the owner: never show field or table names, and never a dotted name such as next_peak.promotions_planned (readout, facts, pounds_are, rung, stock_named, order_units, recent_context); say what they mean. Use a short table only when it helps.
 
 Never invent a forecast beyond facts.quarter_plan_at_todays_ad_spend. If the question cannot be answered from what was sent, say what is missing. Plain British English, no jargon, £ for money. Short questions get a short answer with the number and its calculation; diagnosis questions get: the corrected read, the numbers, what was ruled out, what to do in order, and what would change your mind.
@@ -19369,7 +19389,7 @@ const V3_GOAL_Q = (sb, b) => {
 const V3_DRIFT_Q = (sb, b) => sb.from('vw_brand_config_drift')
   .select('input_key,unit,config_value,realised_value,verifiable,status').eq('brand_id', b);
 const V3_COGSQ_Q = (sb, b) => sb.from('vw_brand_cogs_quality')
-  .select('cogs_coverage_90d,cogs_landed_complete,realized_cogs_pct').eq('brand_id', b).limit(1);
+  .select('cogs_coverage_90d,cogs_landed_complete,realized_cogs_pct,lines_total,lines_costed').eq('brand_id', b).limit(1);
 // Whether a 30-day pace against the goal means anything right now. Today's hero and the page thread
 // both ask, so they say the same thing. Not while the confirmed goal was planned on a different spend
 // curve (0261 corrected it; the goal stores the exponent it used) — the owner is asked to re-plan —
