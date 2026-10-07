@@ -8857,6 +8857,14 @@ function AskPanel(){
   const [question, setQuestion] = useState('');
   const [history, setHistory] = useState(()=>{ try { return JSON.parse(localStorage.getItem('frkl_ask_history')||'[]'); } catch { return []; } });
   const [loading, setLoading] = useState(false);
+  // An answer takes up to a minute; the button saying "Thinking…" was all an owner saw (7 Oct). Say
+  // what Greta is doing and for how long.
+  const [askStage, setAskStage] = useState(''), [askSecs, setAskSecs] = useState(0);
+  React.useEffect(() => {
+    if (!loading) { setAskSecs(0); return; }
+    const t0 = Date.now(), iv = setInterval(() => setAskSecs(Math.round((Date.now() - t0) / 1000)), 1000);
+    return () => clearInterval(iv);
+  }, [loading]);
   const [error, setError] = useState('');
   // The owner picks how much thinking they want, not which model does it. Kept as
   // 'thorough' | 'quick' in state and storage so no model id reaches the DOM; ASK_MODEL
@@ -8898,7 +8906,7 @@ function AskPanel(){
 
   const send = async () => {
     if (!ASK || !question.trim() || loading) return;
-    setLoading(true); setError('');
+    setLoading(true); setError(''); setAskStage('Reading your figures');
     const q = question.trim();
     // Load the server readout once per page before the first question; a failure leaves it null.
     if (!window.GRETA_READOUT) {
@@ -8912,6 +8920,7 @@ function AskPanel(){
       } catch (e) {}
     }
     const facts = await v3AskFacts(q).catch(() => null);
+    setAskStage('Writing the answer');
     const ctx = buildAskContext(facts, q);
     const ctxJson = JSON.stringify(ctx.data);
     // Kept short on purpose: every character here is sent with every question (see V3_ASK_BUDGET).
@@ -8977,7 +8986,7 @@ ${ctxJson}`;
       setHistory(h=>h.slice(0,-1)); // drop the user message on failure
       setQuestion(q);               // ...but keep their words in the box so a retry is one click
     } finally {
-      setLoading(false);
+      setLoading(false); setAskStage('');
     }
   };
 
@@ -9014,6 +9023,7 @@ ${ctxJson}`;
           {ASK && history.length>0 && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={clearHistory}>Clear the conversation</button>}
           <button type="button" className="v3-btn v3-btn-p" onClick={send} disabled={!ASK||loading||!question.trim()}>{loading?'Thinking…':'Ask Greta'}</button>
         </div>
+        {loading && <p className="micro muted v3-measure" role="status" aria-live="polite">{askStage || 'Working'}… {askSecs > 0 ? askSecs + 's' : ''}{askSecs >= 20 ? ' — answers usually take under a minute' : ''}</p>}
       </div>
       <div className="v3-prompts" aria-label="Questions to start with">
         {quickPrompts.map((q,i)=>(<button type="button" key={i} className="v3-prompt" onClick={()=>ASK&&setQuestion(q)} disabled={!ASK} title={ASK?'':'Available in your workspace'}>{q}</button>))}
