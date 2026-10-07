@@ -1090,3 +1090,13 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 @media (max-width: 40rem) { .v3-defs { grid-template-columns: 1fr; gap: var(--space-1) 0; } .v3-defs dd { margin-bottom: var(--space-2); } }
 .v3-comp-add { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
 .v3-main .v3-comp-add .v3-search { margin-bottom: 0; max-width: 18rem; }
+
+/* Ask Greta's answers, rendered (7 Oct): they were plain text with the model's asterisks and table
+   pipes showing. Short paragraphs, lists and a table that scrolls on a phone. */
+.v3-ask-answer { font-size: var(--text-sm); line-height: var(--leading-body); color: var(--text-primary); }
+.v3-ask-p { margin: 0 0 var(--space-3); }
+.v3-ask-h { font-size: var(--text-sm); font-weight: var(--weight-semi); margin: var(--space-4) 0 var(--space-2); }
+.v3-ask-list { margin: 0 0 var(--space-3); padding-left: var(--space-5); }
+.v3-ask-list li { margin-bottom: var(--space-1); }
+.v3-ask-table { overflow-x: auto; margin: 0 0 var(--space-3); }
+.v3-ask-answer > :last-child { margin-bottom: 0; }

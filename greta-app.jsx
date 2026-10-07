@@ -8715,6 +8715,52 @@ const V3_ASK_WORDS = { recent_context: 'the recent weeks', pounds_are: 'what the
   email_campaigns: 'your email campaigns', weekly_shop: 'the weekly sales', board: 'the board', held: 'what Greta is holding back',
   what_moved_profit_after_ads: 'what moved your profit', main_cause: 'the main cause', products_to_reorder_now_board_1: 'products to reorder now',
   of_them_out_of_stock_now: 'already out of stock', out_of_stock_now_examples: 'products out of stock' };
+// Ask's answers are markdown from the model; they were shown as plain text, asterisks, hashes and table
+// pipes included (7 Oct). This turns the few shapes the answers use into elements -- headings, bold,
+// lists, tables, paragraphs -- and never renders HTML from the model.
+function v3MdInline(t, key) {
+  const out = []; const re = /\*\*([^*]+)\*\*|\*([^*\s][^*]*)\*/g; let last = 0, m, i = 0;
+  const s = String(t || '');
+  while ((m = re.exec(s))) {
+    if (m.index > last) out.push(s.slice(last, m.index));
+    out.push(m[1] != null ? <b key={key + '-b' + (i++)}>{m[1]}</b> : <em key={key + '-i' + (i++)}>{m[2]}</em>);
+    last = m.index + m[0].length;
+  }
+  if (last < s.length) out.push(s.slice(last));
+  return out;
+}
+function V3AskMd({ text }) {
+  const lines = String(text || '').replace(/\r/g, '').split('\n');
+  const blocks = []; let para = [], list = null, k = 0;
+  const flushPara = () => { if (para.length) { blocks.push(<p key={'p' + (k++)} className="v3-ask-p">{v3MdInline(para.join(' '), 'p' + k)}</p>); para = []; } };
+  const flushList = () => { if (list) { const L = list; blocks.push(L.ordered
+      ? <ol key={'l' + (k++)} className="v3-ask-list">{L.items.map((x, j) => <li key={j}>{v3MdInline(x, 'li' + k + j)}</li>)}</ol>
+      : <ul key={'l' + (k++)} className="v3-ask-list">{L.items.map((x, j) => <li key={j}>{v3MdInline(x, 'li' + k + j)}</li>)}</ul>); list = null; } };
+  for (let i = 0; i < lines.length; i++) {
+    const ln = lines[i], tr = ln.trim();
+    if (/^\|.*\|$/.test(tr)) {                                     // a table: consecutive pipe lines
+      flushPara(); flushList();
+      const rows = [];
+      while (i < lines.length && /^\|.*\|$/.test(lines[i].trim())) { rows.push(lines[i].trim()); i++; }
+      i--;
+      const cells = rows.filter(r => !/^\|[\s:|-]+\|$/.test(r)).map(r => r.slice(1, -1).split('|').map(c => c.trim()));
+      if (cells.length) blocks.push(<div key={'t' + (k++)} className="v3-ask-table"><table className="v3-rw">
+        <thead><tr>{cells[0].map((c, j) => <th key={j} className={j === 0 ? 't-text' : ''}>{v3MdInline(c, 'h' + j)}</th>)}</tr></thead>
+        <tbody>{cells.slice(1).map((r, a) => <tr key={a}>{r.map((c, j) => <td key={j} className={j === 0 ? 't-text' : ''}>{v3MdInline(c, 'c' + a + j)}</td>)}</tr>)}</tbody>
+      </table></div>);
+      continue;
+    }
+    let m;
+    if ((m = tr.match(/^#{1,4}\s+(.+)$/)) || (m = tr.match(/^\*\*([^*]+)\*\*:?$/))) { flushPara(); flushList(); blocks.push(<h3 key={'h' + (k++)} className="v3-ask-h">{m[1].replace(/\*\*/g, '')}</h3>); continue; }
+    if ((m = tr.match(/^[-*•]\s+(.+)$/))) { flushPara(); if (!list || list.ordered) { flushList(); list = { ordered: false, items: [] }; } list.items.push(m[1]); continue; }
+    if ((m = tr.match(/^\d+[.)]\s+(.+)$/))) { flushPara(); if (!list || !list.ordered) { flushList(); list = { ordered: true, items: [] }; } list.items.push(m[1]); continue; }
+    if (!tr) { flushPara(); flushList(); continue; }
+    if (/^-{3,}$/.test(tr)) { flushPara(); flushList(); continue; }
+    flushList(); para.push(tr);
+  }
+  flushPara(); flushList();
+  return <div className="v3-ask-answer">{blocks}</div>;
+}
 function v3AskScrub(text, facts) {
   let t = String(text || '');
   // "(Figure comes straight from the “facts” page …)" (7 Oct): the context's own name is not a page
@@ -8890,6 +8936,7 @@ WHAT NOT TO DO questions: answer from readout.held (what Greta is holding back, 
 
 A difference in cost is not a loss: an ad overspend is spend above what the earlier cost per order needed, not money lost. When a board figure is "probably" or lower, give its why_this_rung in plain words. The weekly tables hold complete weeks only.
 
+SHAPE: start with the answer itself in one or two plain sentences, with the figure that decides it. Then at most three short points, or one small table when comparing several things. Keep it under about 180 words unless the question asks for a list. No headings unless there are more than three parts. End with the one thing to do next.
 Write for the owner: never show field or table names, and never a dotted name such as next_peak.promotions_planned (readout, facts, pounds_are, rung, stock_named, order_units, recent_context); say what they mean. Use a short table only when it helps.
 
 Never invent a forecast beyond facts.quarter_plan_at_todays_ad_spend. If the question cannot be answered from what was sent, say what is missing. Plain British English, no jargon, £ for money. Short questions get a short answer with the number and its calculation; diagnosis questions get: the corrected read, the numbers, what was ruled out, what to do in order, and what would change your mind.
@@ -8979,12 +9026,15 @@ ${ctxJson}`;
     {history.length > 0 && (<div className="card">
       <h2>Conversation</h2>
       <div style={{display:'flex',flexDirection:'column',gap:12,maxHeight:600,overflowY:'auto'}}>
-        {history.slice().reverse().map((m,i)=>(<div key={i} style={{padding:12, background: m.role==='user'?PAL.panel:PAL.panel, borderRadius:'var(--radius-none)'}}>
+        {/* Question, then its answer, newest pair first: reversing the messages put each answer above
+            the question it answered (7 Oct). */}
+        {(() => { const pairs = []; history.forEach(m => { if (m.role === 'user' || !pairs.length) pairs.push([m]); else pairs[pairs.length - 1].push(m); });
+          return pairs.reverse().flat(); })().map((m,i)=>(<div key={i} style={{padding:12, background: m.role==='user'?PAL.panel:PAL.panel, borderRadius:'var(--radius-none)'}}>
           <div style={{fontSize:'var(--text-xs)',color:PAL.muted,marginBottom:6,textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',fontWeight:'var(--weight-semi)',display:'flex',justifyContent:'space-between'}}>
             <span>{m.role==='user'?'You':'Greta'}</span>
             <span>{new Date(m.time).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}{!UI_V3 && m.usage?` · ${m.usage.input_tokens||0} in / ${m.usage.output_tokens||0} out${m.usage.cache_read_input_tokens?` · cached ${m.usage.cache_read_input_tokens}`:''}`:''}</span>
           </div>
-          <div style={{fontSize:'var(--text-sm)', whiteSpace:'pre-wrap', lineHeight:1.5, color:'var(--text-primary)'}}>{m.content}</div>
+          {m.role === 'assistant' ? <V3AskMd text={m.content}/> : <div style={{fontSize:'var(--text-sm)', whiteSpace:'pre-wrap', lineHeight:1.5, color:'var(--text-primary)'}}>{m.content}</div>}
           {m.role==='assistant' && (<div style={{marginTop:8, display:'flex', gap:8, alignItems:'center'}}>
             <button onClick={()=>{ if(aiSaveTask(m.content)) setSavedTasks(s=>({...s,[m.time]:true})); }} disabled={!!savedTasks[m.time]}
               style={{padding:'4px 10px', background:savedTasks[m.time]?'transparent':PAL.panel, border:'1px solid '+(savedTasks[m.time]?'var(--good)':'#30303a'), borderRadius:'var(--radius-md)', color:savedTasks[m.time]?'var(--good)':PAL.faint, fontSize:'var(--text-xs)', cursor:savedTasks[m.time]?'default':'pointer'}}>
