@@ -2057,9 +2057,9 @@ function runDiagnostic(m, ctx){
   }
   // 4. Return rate vs 10% — pure margin leak.
   if (m.returnRate!=null && m.returnRate > 0.10){
-    f.push({sev:'amber', area:'Margin', metric:`Return rate ${(m.returnRate*100).toFixed(1)}% vs ≤10%`,
+    f.push({sev:'amber', area:'Margin', metric:`Orders refunded ${(m.returnRate*100).toFixed(1)}% vs ≤10%`,
       title:'Returns are leaking contribution', gbp:m.rev*(m.returnRate-0.10)*gm,
-      evidence:`${(m.returnRate*100).toFixed(1)}% of units returned — each point is pure margin lost.`,
+      evidence:`${(m.returnRate*100).toFixed(1)}% of orders were refunded in the last 30 days — each point is margin lost.`,
       action:'Isolate the items/sizes driving returns; fix sizing guidance + product page imagery.'});
   }
   // 5. MER falling — but decompose and confounder-check before calling it decay.
@@ -4037,10 +4037,12 @@ function Overview({start, period, customActive}){
   const dxContext = buildEvidence({mer, pMer, paid, pPaid, rev, pRev, orders, pOrders, discLoad, pDiscLoad, histDaily,
                                    events:{current:curEvents, prior:priEvents, all:brandEvents}});
   // Conversion is judged only when analytics recorded most of the period; overheads are the brand's
-  // own saved figure, prorated to the period.
+  // own saved figure, prorated to the period. Per 30 days, not per 365/12: the default 30 days then
+  // carries the month as entered (£10,000), as Today and Greta's state do — /(365/12) made it £9,863
+  // and the "Covers overheads" badge could disagree with the lead's figure (7 Oct).
   const cvrReliable = (() => { const gd = ga.filter(g => Number(g.sessions) > 0).length; return daily.length > 0 && gd >= daily.length * 0.8; })();
   const ohWin = (() => { try { const c = window.FRKL_PLAN && window.FRKL_PLAN.config; const m = c && c.fixed_costs_monthly != null ? Number(c.fixed_costs_monthly) : null;
-    return m > 0 ? m * Math.max(1, Math.round((Date.parse(end) - Date.parse(start)) / 86400000) + 1) / (365 / 12) : null; } catch (e) { return null; } })();
+    return m > 0 ? m * Math.max(1, Math.round((Date.parse(end) - Date.parse(start)) / 86400000) + 1) / 30 : null; } catch (e) { return null; } })();
   return (
     <div style={{display:'flex', flexDirection:'column', gap:'var(--s-5)'}}>
       {costsOpen && <CostSetupModal catalogueGm={grossMargin} onClose={()=>setCostsOpen(false)}/>}
@@ -4163,7 +4165,7 @@ function Overview({start, period, customActive}){
             agent="Atlas" observation="Blended product margin across the live catalogue, after cost of goods."
             implication="Every profit figure builds on this — discounts eat straight into it."
             benchmark="gross_margin" bmValue={gm} />
-          <KPI label="Return rate" val={PCT(returnRate)} sub={_rcur ? `${NUM(_rcur.refunded_orders)} of ${NUM(_rcur.orders)} orders refunded · last 30 days` : 'refunded orders · last 30 days'} series={seriesReturn} seriesLabel="Refunds ÷ sales · by day" current={returnRate} prior={pReturnRate} goodDirection="down"
+          <KPI label="Orders refunded" val={PCT(returnRate)} sub={_rcur ? `${NUM(_rcur.refunded_orders)} of ${NUM(_rcur.orders)} orders refunded · last 30 days` : 'refunded orders · last 30 days'} series={seriesReturn} seriesLabel="Refunded £ as a share of sales · by day" current={returnRate} prior={pReturnRate} goodDirection="down"
             agent="Lux" observation={`Share of orders refunded in full or in part. The trend is refunds as a share of sales, by day.`}
             implication="A point of return rate is pure margin; flag any item materially above this blended rate."
             benchmark="return_rate" bmValue={returnRate} />
@@ -8504,7 +8506,8 @@ async function v3AskFacts(question) {
     // what each board row's pounds are (the readout gives the number only), and the stock plan's rows
     T(sb.from('vw_brand_action_board').select('board_rank,money_basis').eq('brand_id', b).limit(30)),
     T(V3_STOCK_Q(sb, b), 12000),
-    T(sb.from('cache_brand_state').select('state').eq('brand_id', b).limit(1)),
+    // the hourly snapshot when fresh, else the live function (a stale or missing row gave Ask no CAC)
+    T(V3_STATE_Q(sb, b).then(r => ({ data: r && r.data ? r.data.map(st => ({ state: st })) : [], error: r ? r.error : null }))),
     // Email and the site, only when the question is about them. "Which email is earning the most per
     // person it reaches?" -- one of Ask's own suggested questions -- could not be answered (6 Oct).
     tq.email ? T(V3_FLOWS_Q(sb, b)) : none,
@@ -8531,6 +8534,15 @@ async function v3AskFacts(question) {
   const f = { as_of: today, note: 'These are the figures the app’s pages show. Prefer them to anything worked out from the weekly or daily rows.' };
   if (H.net_revenue_30d != null) f.last_30_days = { sales: R(H.net_revenue_30d), ad_spend: R(H.paid_spend_30d), profit_after_ads: R(H.cm_after_marketing_30d),
     margin_after_product_and_order_costs: cmr != null ? Math.round(cmr * 1000) / 1000 : null };
+  // Profit after overheads, the ads' share of sales and new customers as Today states them, so an answer
+  // quotes them rather than doing its own sums (Ask had only overheads_per_month, 7 Oct).
+  {
+    const S0 = r0(stateR) && r0(stateR).state, L30 = S0 && S0.last_30, U30 = S0 && S0.unit;
+    if (f.last_30_days && L30) Object.assign(f.last_30_days, {
+      overheads: R(L30.overheads), profit_after_overheads: R(L30.after_overheads),
+      ads_share_of_sales_pct: L30.ads_share != null ? Math.round(Number(L30.ads_share) * 100) : null,
+      new_customers: U30 && U30.new_customers_30d != null ? Number(U30.new_customers_30d) : null });
+  }
   const tm = lad && cmr != null ? v3TypicalMonth(lad, cmr) : null;
   if (tm && tm.typ) f.typical_month = { basis: 'median of the ' + tm.n + ' 30-day windows before the latest; one sale window cannot move it. Compare with this, not with the 30 days before, which can hold a sale.',
     sales: R(tm.typ.sales), ad_spend: R(tm.typ.spend), profit_after_ads: R(tm.typ.kept), same_30_days_last_year_sales: tm.ly ? R(tm.ly.sales) : null };
@@ -8618,8 +8630,9 @@ async function v3AskFacts(question) {
       const RN = RA && String(RA.description || '').match(/order the (\d+) products?/i);
       return RP ? { products_to_reorder_now_board_1: RN ? Number(RN[1]) : RP.length, of_them_out_of_stock_now: RM.out_now != null ? Number(RM.out_now) : RP.filter(p => p.out_now).length,
                     out_of_stock_now_examples: RP.filter(p => p.out_now).map(p => p.title).slice(0, 12) }
-        : { products_out_of_stock_now: SP.filter(r => r.stock_status === 'stockout').length,
-            products_running_out_before_a_restock_lands: SP.filter(r => r.runs_out_before_restock).length };
+        : { products_out_of_stock_now: SP.filter(r => r.stock_status === 'stockout' && Number(r.weekly_velocity) > 0 && !v3IsBundle(r.product_title)).length,
+            products_running_out_before_a_restock_lands: SP.filter(r => r.runs_out_before_restock && Number(r.weekly_velocity) > 0 && !v3IsBundle(r.product_title)).length,
+            products_out_for_over_four_weeks: SP.filter(r => r.stock_status === 'stockout' && !(Number(r.weekly_velocity) > 0) && !v3IsBundle(r.product_title)).length };
     })(),
     past_sales_not_on_the_calendar: missing.length,
   };
