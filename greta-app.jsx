@@ -11019,6 +11019,7 @@ function BusinessReview(){
   // and Growth plan use. They came from FRKL_COHORTS / FRKL_BUSINESS — frkl's July snapshot, empty for
   // every other brand — so this board said "Needs cost + cohort data" next to a measured figure.
   const ueQ = useV3Rows('cust-ue', V3_UE_Q), mixQ = useV3Rows('rev-mix', V3_MIX_Q), newMoQ = useV3Rows('new-mo', V3_NEWMO_Q);
+  const tierQ = useV3Rows('tier-30', V3_TIER_Q);
   const board = useV3Board();
   const gm = oiCmRatio();          // contribution ratio: every figure below it is a profit figure
   const cc0 = cashConfig();
@@ -11056,9 +11057,12 @@ function BusinessReview(){
   const _ret = retQ.rows && retQ.rows[0], _ue = ueQ.rows && ueQ.rows[0];
   const repeat = _ret && _ret.repeat_rate != null ? Number(_ret.repeat_rate) : null;
   const opc = _ret && _ret.orders_per_customer != null ? Number(_ret.orders_per_customer) : null;
-  const paidCac = _ue && _ue.cac != null ? Number(_ue.cac) : null;
+  // the last 30 days decide, as on Today, Customers and Growth: this pack said "£59 ÷ £40 = 1.5×" (90 days)
+  // beside pages that say £53 and 1.1× (7 Oct)
+  const _t30 = tierQ.rows && tierQ.rows[0], _c30 = _t30 && Number(_t30.ncac) > 0 ? Number(_t30.ncac) : null;
+  const paidCac = _c30 != null ? _c30 : (_ue && _ue.cac != null ? Number(_ue.cac) : null);
   const contribLTV = _ue && _ue.ltv_contribution != null ? Number(_ue.ltv_contribution) : null;
-  const ltvCac = _ue && _ue.ltv_cac != null ? Number(_ue.ltv_cac) : ((contribLTV!=null && paidCac) ? contribLTV/paidCac : null);
+  const ltvCac = (contribLTV!=null && paidCac) ? contribLTV/paidCac : (_ue && _ue.ltv_cac != null ? Number(_ue.ltv_cac) : null);
   const newCustSeries = (() => { const by = {}; (newMoQ.rows || []).forEach(r => { const m = String(r.order_date).slice(0, 7); by[m] = (by[m] || 0) + (Number(r.orders) || 0); });
     return Object.keys(by).sort().slice(0, -1).map(m => ({ x: m.slice(5), v: by[m] })); })();   // last month is partial
 
@@ -11122,7 +11126,7 @@ function BusinessReview(){
       sub:`${opc?opc.toFixed(2):'—'} orders per customer · ${custBase!=null?NUM(custBase):'—'} customers to date`,
       read:`Repeat rate ${repeat!=null?pct1(repeat):'—'}, ${opc?opc.toFixed(2):'—'} orders/customer` },
     { label:'Average order value', value: W&&W.m.aov!=null?GBP(W.m.aov):'—',
-      status:'info', statusLabel:'Monetization',
+      status:'info', statusLabel:'Order value',
       series: trail('aov'), color:'var(--accent)', fmt:v=>GBP(v), axisFmt:fmtMoneyK,
       read:`average order value ${W&&W.m.aov!=null?GBP(W.m.aov):'—'} (8-week trend)` },
     stockN ? { label:'Stock to reorder', value: stockN + ' products',
@@ -11244,7 +11248,7 @@ function BusinessReview(){
       {x.basis && <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:2,lineHeight:1.4}}>{x.basis}</div>}
     </div>
     <div style={{textAlign:'right',flexShrink:0}}>
-      <div style={{fontWeight:'var(--weight-bold)',fontSize:'var(--text-sm)',color:accent,whiteSpace:'nowrap'}}>{`${curSym()}`}{k(Math.abs(x.monthly_impact_gbp))}/mo</div>
+      <div style={{fontWeight:'var(--weight-bold)',fontSize:'var(--text-sm)',color:accent,whiteSpace:'nowrap'}}>{`${curSym()}`}{k(Math.abs(x.monthly_impact_gbp))}{/\(once/i.test(String(x.basis || '')) ? ' once' : '/mo'}</div>
       {x.rung && <div style={{marginTop:4}}><V3Conf state={x.rung}/></div>}
     </div>
   </div>);
@@ -11265,11 +11269,11 @@ function BusinessReview(){
         tl.push({t: UI_V3 && board && board.rows && v3BoardSplitText(board.rows) ? `${overall.label}: ${v3BoardSplitText(board.rows)}.` : `${overall.label}: ${curSym()}${k(atRisk)}/mo to act on now, ${curSym()}${k(upside)}/mo worth testing · ${openActions} actions open.`, c: overall.kind==='action'?'var(--bad)':overall.kind==='watch'?'var(--warn)':'var(--good)'});
         if(risks[0]) tl.push({t:`First on the board — ${risks[0].description} (${curSym()}${k(Math.abs(risks[0].monthly_impact_gbp))}/mo).`, c:'var(--bad)'});
         if(opps[0]) tl.push({t:`First to test — ${opps[0].description} (${curSym()}${k(Math.abs(opps[0].monthly_impact_gbp))}/mo).`, c:'var(--good)'});
-        tl.push({t:`Unit economics: ${ltvCac!=null?ltvCac.toFixed(1)+'× contribution customer lifetime value:cost per new customer':'customer lifetime value:cost per new customer pending cost data'}, repeat rate ${repeat!=null?pct1(repeat):'—'}${ltvCac!=null?` — ${ltvCac>=3?'healthy':'below the 3× target'}`:''}.`, c: (ltvCac!=null&&ltvCac>=3)?'var(--good)':'var(--warn)'});
+        tl.push({t:`${ltvCac!=null?'A new customer is worth '+ltvCac.toFixed(1)+'× what they cost to win':'What a customer is worth against their cost needs cost data'}, repeat rate ${repeat!=null?pct1(repeat):'—'}${ltvCac!=null?` — ${ltvCac>=3?'healthy':'below the 3× target'}`:''}.`, c: (ltvCac!=null&&ltvCac>=3)?'var(--good)':'var(--warn)'});
         if(slowCapital>50000) tl.push({t:`${curSym()}${k(slowCapital)} of capital tied up in slow-moving stock${topChan&&topShare!=null?`; ${topChan.channel} drives ${pct0(topShare)} of revenue`:''}.`, c:'var(--warn)'});
         return (<div className="card" style={{}}>
           <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:8}}>
-            <span style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',color:'var(--text-primary)'}}>TL;DR</span>
+            <span style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',color:'var(--text-primary)'}}>In short</span>
             <span className="muted" style={{fontSize:'var(--text-xs)'}}>the main points across the business right now</span>
             <button style={{...btn,marginLeft:'auto',fontSize:'var(--text-xs)',padding:'5px 11px'}} onClick={copyBriefing}><Icon name="clipboard" size={12}/> Copy briefing</button>
           </div>
@@ -11279,7 +11283,7 @@ function BusinessReview(){
       <div className="card" style={{}}>
         <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
           <StatusBadge kind={overall.kind} label={overall.label}/>
-          <span className="muted" style={{fontSize:'var(--text-sm)'}}>Overall posture</span>
+          <span className="muted" style={{fontSize:'var(--text-sm)'}}>Overall</span>
           <button style={{...btn,marginLeft:'auto'}} onClick={copyBriefing}><Icon name="clipboard" size={13}/> Copy as briefing</button>
         </div>
         <div style={{fontSize:'var(--text-base)',marginTop:11,lineHeight:1.55,color:'var(--text-primary)'}}>{verdictSentence}</div>
