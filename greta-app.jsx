@@ -17164,7 +17164,7 @@ function V3Today(p) {
   const boardSpend = v3BoardSpendTargets(liveRows || []);
   // the month's ad figure is the plan's; the channel targets above it are ceilings on the way down
   const monthLine = seasonNote && boardSpend && seasonNote.curSpend > 0 && seasonNote.curSpend < boardSpend.monthly * 0.9
-    ? <> The quarter plan puts {v3Gbp(seasonNote.curSpend)} of ads in all into {seasonNote.cur}, below the {v3AndList(boardSpend.names)} targets (about {v3Gbp(boardSpend.monthly)} a month together): treat those as ceilings on the way down, not the month’s budget.</> : null;
+    ? <> For {seasonNote.cur} itself the plan puts {v3Gbp(seasonNote.curSpend)} into ads in all, so the {v3AndList(boardSpend.names)} targets (about {v3Gbp(boardSpend.monthly)} a month together) are ceilings, not the month’s budget.</> : null;
   const isCut = (r) => !!r && /^order-cost-/.test(String(r.external_id || ''));
   const boardCount = board.rows ? board.rows.length : (d.board_actions != null ? d.board_actions : d.open_actions);
   // The profit figure and its confidence badge describe the same broken state and used to
@@ -20592,13 +20592,15 @@ function V3FixFirst() {
   const hit = live.map((x, i) => ({ x, i })).filter(o => /^(order-cost|paid-landing)-/.test(o.x.external_id));
   // One line and a fold: the full finding ran to a screen and a half on a phone (2026-10-06).
   const desc = v3Tidy(scrubTag(String(r.description || '')));
-  const first = (desc.match(/^[^.:;]+[.:;]/) || [desc])[0].replace(/[:;]$/, '.');
+  let first = (desc.match(/^[^.:;]+[.:;]/) || [desc])[0].replace(/[:;]$/, '.');
+  // "still off in September" read as old news in October: the check now says where this month stands (0286)
+  if (/So far in \w+ \([\d,]+ orders\) it is still off/.test(desc)) first = first.replace(/ and is still off in \w+\.$/, ' and is still off this month.');
   return (<section className="v3-sec">
     <div className="v3-kick">Fix first</div>
-    <p className="v3-note v3-measure"><b>{v3PlainAction(r).title}.</b> {first}{hit.length > 0 && <> Until it is fixed, {hit.map(o => '#' + (o.i + 1)).join(', ').replace(/, ([^,]*)$/, ' and $1')} on the board {hit.length === 1 ? 'reads' : 'read'} low.</>}</p>
-    <V3More id="fixfirst-why" label="What Greta found">
+    <p className="v3-note v3-measure"><b>{v3PlainAction(r).title}.</b> {first}{hit.length > 0 && <> Until it is fixed, the orders your shop credits to each channel read low, so {hit.map(o => '#' + (o.i + 1)).join(', ').replace(/, ([^,]*)$/, ' and $1')} on the board {hit.length === 1 ? 'is' : 'are'} less certain.</>}</p>
+    <V3More id="fixfirst-why" label="The detail">
       <p className="v3-note v3-measure">{desc}</p>
-      {hit.length > 0 && <p className="micro muted v3-measure">Those rows count the orders your shop credits to each channel, which read low while tracking is broken. Act on {hit.length === 1 ? 'it' : 'them'}, but expect part of the change to be tracking.</p>}
+      {hit.length > 0 && <p className="micro muted v3-measure">Those rows lean on the orders your shop credits to each channel, which read low while tracking is broken. Where the platform’s own count and the weeks without a sale point the same way, the direction holds: act on {hit.length === 1 ? 'it' : 'them'}, and expect the exact figures to move once tracking is fixed.</p>}
     </V3More>
     <div className="v3-btn-row"><V3Done ext={r.external_id} small onDone={q.retry}/></div>
   </section>);
