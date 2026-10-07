@@ -257,6 +257,13 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 /* Do this first + then, in order. */
 .v3-act-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--space-8); align-items: start; }
 @media (max-width: 900px) { .v3-act-grid { grid-template-columns: 1fr; } }
+/* On a phone the first action sat 2.3 screens down, under the profit figure, the weekly chart and the
+   money flow (7 Oct). The verdict above already says where profit stands, so on a phone Fix first and
+   Do this first come next and the profit block follows them. */
+@media (max-width: 760px) {
+  .v3-today > .v3-hero { order: 1; }
+  .v3-today > .v3-act-grid ~ * { order: 2; }
+}
 .v3-dofirst.v3-raised { border-top: 1px solid var(--color-line); padding: var(--space-6); }
 .v3-dofirst .v3-kick { color: var(--color-accent); }
 .v3-dofirst-t { font-size: var(--text-lg); line-height: var(--leading-snug); letter-spacing: var(--tracking-snug); margin: var(--space-1) 0 var(--space-2); }

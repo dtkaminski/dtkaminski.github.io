@@ -3612,7 +3612,10 @@ function V3ProfitLead() {
   const cmr = sales > 0 && before != null ? before / sales : null;
   const ohRow = (cfg.rows || [])[0] || null;
   const ohMonth = ohRow && ohRow.fixed_costs_monthly != null && Number(ohRow.fixed_costs_monthly) > 0 ? Number(ohRow.fixed_costs_monthly) : null;
-  const oh30 = ohMonth != null ? ohMonth * 30 / V3_DAYS_IN_MONTH : null;
+  // The overheads as entered, against the last 30 days, the way Today and the brand state take them: this
+  // page pro-rated them to 30 days (£9,863, a loss of £8,042) while Today said £8,179 on £10,000, and its
+  // own lever text said "after £10,000 a month of overheads … a loss of £8,042" (7 Oct).
+  const oh30 = ohMonth;
 
   const d = React.useMemo(() => v3TypicalMonth(lad.rows, cmr), [lad.rows, cmr]);
 
@@ -3680,7 +3683,8 @@ function V3ProfitLead() {
   // How far the figure reads high: refunds as entered against refunds as measured (0260), and product
   // costs without freight or duty (not sizeable until entered).
   const rfRow = (drift.rows || []).find(r => r.input_key === 'refundPct' && r.verifiable && r.status === 'drift');
-  const rfGap = rfRow ? (Number(rfRow.realised_value) - Number(rfRow.config_value)) / 100 * sales : null;
+  // the measured rate rounded as it is shown (8.7%), as Goal & costs works it: £254 here, £252 there (7 Oct)
+  const rfGap = rfRow ? (Math.round(Number(rfRow.realised_value) * 10) / 10 - Number(rfRow.config_value)) / 100 * sales : null;
   const noFreight = ((cogsq.rows || [])[0] || {}).cogs_landed_complete === false;
 
   const t30 = (mix.rows || [])[0] || null;
