@@ -15830,7 +15830,7 @@ function V3MoneyFlow({ d, note }) {
   const go   = (sec, sub) => () => window.__oiNav && window.__oiNav(sec, sub);
 
   const steps = [
-    { key: 'cogs',  label: 'What the products cost', value: cogs,  tone: 'cogs',  onGo: go('settings', 'costs') },
+    { key: 'cogs',  label: 'Products and order costs', value: cogs,  tone: 'cogs',  onGo: go('settings', 'costs') },   // sales less product contribution: product cost plus shipping, packing, fees and refunds (it said 'What the products cost')
     { key: 'ads',   label: 'What you spent on ads',  value: spend, tone: 'spend', onGo: go('channels', 'cross'), soft: d.spend_is_stale },
     { key: 'kept',  label: 'What you keep',          value: kept,  tone: 'keep',  onGo: go('home', 'overview') },   // the profit breakdown, not goal setup
   ];
@@ -17312,7 +17312,7 @@ function V3Today(p) {
                     note={v3TrustWhy(d)}
                     inputs={[
                       ['Sales', v3Gbp(sales)],
-                      ['What the products cost', '−' + v3Gbp(Math.max((Number(sales)||0) - (Number(prod)||0), 0))],
+                      ['Products and order costs', '−' + v3Gbp(Math.max((Number(sales)||0) - (Number(prod)||0), 0))],
                       ['Profit before ads', v3Gbp(prod)],
                       ['What you spent on ads', '−' + v3Gbp(spend)],
                       ['Profit after ads', v3Gbp(cam)]
