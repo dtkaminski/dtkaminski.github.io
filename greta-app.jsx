@@ -8518,7 +8518,7 @@ async function v3AskFacts(question) {
       .order('revenue', { ascending: false, nullsFirst: false }).limit(15)) : none,
     // the board's own reorder list: Ask said "31 products out of stock and 50 running out" (7 Oct) from
     // every option in the stock plan, where the board's #1 said 44 run out and 25 are already out
-    T(sb.from('actions').select('metadata').eq('brand_id', b).eq('external_id', 'stock-reorder').eq('status', 'open').limit(1)),
+    T(sb.from('actions').select('description,metadata').eq('brand_id', b).eq('external_id', 'stock-reorder').eq('status', 'open').limit(1)),
   ]);
   const H = window.GRETA_HEADLINE || {};
   const cmr = Number(H.net_revenue_30d) > 0 && H.product_contribution_30d != null ? Number(H.product_contribution_30d) / Number(H.net_revenue_30d) : null;
@@ -8589,9 +8589,11 @@ async function v3AskFacts(question) {
     sale_weeks_in_last_13: RH && RH.sale_weeks_13 != null ? Number(RH.sale_weeks_13) : null,
     deepest_sale_in_last_13_pct: RH && RH.deepest_13 != null ? Math.round(Number(RH.deepest_13) * 100) : null,
     ...(() => {
-      const RM = r0(reorderR) && r0(reorderR).metadata, RP = RM && Array.isArray(RM.products) ? RM.products : null;
-      return RP ? { products_to_reorder_now_board_1: RP.length, of_them_out_of_stock_now: RM.out_now != null ? Number(RM.out_now) : RP.filter(p => p.out_now).length,
-                    out_of_stock_now_names: RP.filter(p => p.out_now).map(p => p.title).slice(0, 12) }
+      // the row keeps its top 10 products only; the count is the one its text gives ("Order the 44 products")
+      const RA = r0(reorderR), RM = RA && RA.metadata, RP = RM && Array.isArray(RM.products) ? RM.products : null;
+      const RN = RA && String(RA.description || '').match(/order the (\d+) products?/i);
+      return RP ? { products_to_reorder_now_board_1: RN ? Number(RN[1]) : RP.length, of_them_out_of_stock_now: RM.out_now != null ? Number(RM.out_now) : RP.filter(p => p.out_now).length,
+                    out_of_stock_now_examples: RP.filter(p => p.out_now).map(p => p.title).slice(0, 12) }
         : { products_out_of_stock_now: SP.filter(r => r.stock_status === 'stockout').length,
             products_running_out_before_a_restock_lands: SP.filter(r => r.runs_out_before_restock).length };
     })(),
@@ -8704,7 +8706,7 @@ const V3_ASK_WORDS = { recent_context: 'the recent weeks', pounds_are: 'what the
   quarter_plan_at_todays_ad_spend: 'the quarter plan', site_last_30_days: 'the site figures', email_flows: 'your email flows',
   email_campaigns: 'your email campaigns', weekly_shop: 'the weekly sales', board: 'the board', held: 'what Greta is holding back',
   what_moved_profit_after_ads: 'what moved your profit', main_cause: 'the main cause', products_to_reorder_now_board_1: 'products to reorder now',
-  of_them_out_of_stock_now: 'already out of stock', out_of_stock_now_names: 'the products out of stock' };
+  of_them_out_of_stock_now: 'already out of stock', out_of_stock_now_examples: 'products out of stock' };
 function v3AskScrub(text) {
   let t = String(text || '');
   t = t.replace(/`?\b(?:_meta\.)?(?:facts|readout|data)\.([a-z_]+)(?:\.([a-z_]+))?`?/g, (m, a, b) => V3_ASK_WORDS[b] || V3_ASK_WORDS[a] || 'the figures');
@@ -8858,7 +8860,7 @@ Follow _meta.readout.rules. Quote headline figures exactly, with their window. S
 WHAT TO DO questions: answer from readout.board in its order, with each item's pounds (a month, or once when the action says so) and its rung. Do not re-rank. One idea of your own is allowed only if labelled "my suggestion, not on your board". For spending more, check facts.quarter_plan_at_todays_ad_spend and facts.next_peak first. If facts.goal.needs_replanning is true, say so before quoting the goal.
 
 WHY questions: before naming a cause, check the confounders: a promotion or code, a spend change, a stockout, an email send, a tracking change, seasonality, or a partial latest day (_meta.dataQuality). Check each against facts.recent_context first: if sale_weeks_in_last_13 is above 0, promotions are part of the story, not ruled out; if of_them_out_of_stock_now or products_out_of_stock_now is above 0, stock-outs are too. A planned-events list being empty does not rule out what already happened. Locate the move: demand (spend, visits) → conversion → order value and discounts → new vs returning → product and stock. Separate what the data shows from what you infer, and give your confidence. For why profit after ads moved against a typical month, lead with facts.typical_month.what_moved_profit_after_ads: its main_cause, its pounds from sales and from ad spend, and its sales and ad spend comparisons exactly as written; do not work out percentages of your own.
-COUNTS AND NAMES: how many products are out of stock or need ordering comes from facts.recent_context (the board's #1 order list), never from counting table rows. Call a product out of stock only if out_of_stock_now_names or a stock table marks it so; never give an example the data does not name. A board action is what its text says: do not attach creatives, audiences or campaigns to it unless its text names them.
+COUNTS AND NAMES: how many products are out of stock or need ordering comes from facts.recent_context (the board's #1 order list), never from counting table rows. Call a product out of stock only if out_of_stock_now_examples or a stock table marks it so; never give an example the data does not name. A board action is what its text says: do not attach creatives, audiences or campaigns to it unless its text names them.
 
 STOCK questions: use data.stock_named and data.stock_at_risk (Greta's stock plan) for how many to order (order_units), what being out costs (lost_before_lands, profit) and what an order costs (order_units × unit_cost). An order placed today lands on facts.next_peak.order_placed_today_lands. If facts.next_peak.lands_before_peak_starts is false, never say ordering now gets stock in for the peak: say when it lands, that only what suppliers can send sooner reaches the peak, and to ask for that first. Board pounds are what pounds_are says, a month or once (per); never call them a cost unless pounds_are says so.
 
