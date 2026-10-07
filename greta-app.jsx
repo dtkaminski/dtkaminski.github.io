@@ -15956,9 +15956,23 @@ function v3PlainAction(row){
   }
   // 0251 (like-for-like margin) writes the action first and the evidence after it; 0250 (cost per
   // real order) writes the evidence first and ends on the action. Title = the action, why = the rest.
+  if (/^product-margin_drain-/.test(id) && (x = m(/^(Check what .+? costs you):\s*([\s\S]+)$/))) {
+    return P(x[1], x[2].charAt(0).toUpperCase() + x[2].slice(1));
+  }
   if (/^product-margin_drain-/.test(id) && (x = m(/^(.+?\.)\s+([\s\S]+)$/))) {
     return P(x[1].replace(/\.$/, ''), x[2]);
   }
+  // A short instruction for every row the board ranks, the detail under it. Five of the thirteen rows
+  // showed their whole paragraph as the title (7 Oct): the BFCM plan, the sales rhythm, the add-on, the
+  // email flows and the free-shipping nudge read as walls of figures with nothing to scan.
+  if (id === 'promo-peak-plan') return P('Plan ' + ((raw.match(/^(.+?) (?:peak window )?starts in/) || [])[1] || 'the peak').replace(/ peak window$/i, '') + ' as one event: the code, the stock and the offer', raw);
+  if (id === 'sales-rhythm') return P('Spend less on ads in the weeks between sales', raw);
+  if (/^basket-pair/.test(id)) { const add = (raw.match(/Offer "([^"]+)" as the add-on/) || [])[1];
+    return P(add ? 'Offer the ' + add + ' as an add-on' : 'Offer an add-on to single-item orders', raw); }
+  if (id === 'crm-flows') return P(/switched off/i.test(raw) ? 'Fix the post-purchase email and switch on the cross-sell flows' : 'Fix the email flows that earn least', raw);
+  if (id === 'basket-free-shipping') return P('Show shoppers how close they are to free shipping', raw);
+  if (/^paid-brand-share/.test(id)) return P('Raise the bid on searches for your name', raw);
+  if ((x = id.match(/^paid-landing-(\w+)/))) return P('Send ' + v3Ch(x[1]) + ' ads to products that pay back a new customer', raw);
   if (/^order-cost-/.test(id) && (x = m(/^([\s\S]+\.)\s+([^.]+(?:\.\d[^.]*)*)\.?$/))) {
     return P(x[2].replace(/\.$/, ''), x[1]);
   }
