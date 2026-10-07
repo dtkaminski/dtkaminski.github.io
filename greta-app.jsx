@@ -8583,7 +8583,7 @@ async function v3AskFacts(question) {
       wrong.push({ what: 'no product cost includes freight or duty', profit_reads_high_by_a_month_per_10pct_freight: Math.round(0.1 * Number(Qc.realized_cogs_pct) * sales30) });
     if (Qc && Number(Qc.lines_total) > 0 && Number(Qc.lines_costed) < Number(Qc.lines_total) * 0.97)
       wrong.push({ what: (Number(Qc.lines_total) - Number(Qc.lines_costed)) + ' of the last 90 days\u2019 ' + Qc.lines_total + ' order lines have no product cost, so Greta fills them in from your average margin' });
-    if (C.opening_cash_as_of && v3IsoAdd(String(C.opening_cash_as_of).slice(0, 10), 21) < today) wrong.push({ what: 'the cash balance is from ' + String(C.opening_cash_as_of).slice(0, 10) });
+    if (C.opening_cash_as_of && v3IsoAdd(v3Iso10(C.opening_cash_as_of), 21) < today) wrong.push({ what: 'the cash balance is from ' + v3Day(v3Iso10(C.opening_cash_as_of), true) });
     if (C.cash_floor == null) wrong.push({ what: 'no minimum cash balance is set, so Greta cannot check you can afford the plan' });
     f.costs_and_settings.what_reads_wrong = wrong;
   }
