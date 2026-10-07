@@ -15972,6 +15972,7 @@ function v3PlainAction(row){
   if (id === 'crm-flows') return P(/switched off/i.test(raw) ? 'Fix the post-purchase email and switch on the cross-sell flows' : 'Fix the email flows that earn least', raw);
   if (id === 'basket-free-shipping') return P('Show shoppers how close they are to free shipping', raw);
   if (/^paid-brand-share/.test(id)) return P('Raise the bid on searches for your name', raw);
+  if (/^test-holdout-/.test(id) && (x = m(/^(Test whether .+?)\.\s+([\s\S]+)$/))) return P(x[1], x[2]);
   if ((x = id.match(/^paid-landing-(\w+)/))) return P('Send ' + v3Ch(x[1]) + ' ads to products that pay back a new customer', raw);
   if (/^order-cost-/.test(id) && (x = m(/^([\s\S]+\.)\s+([^.]+(?:\.\d[^.]*)*)\.?$/))) {
     return P(x[2].replace(/\.$/, ''), x[1]);
@@ -17603,7 +17604,11 @@ function V3Growth() {
       <p className="v3-verdict">{head}</p>
       {sub && <p className="v3-note v3-measure">{sub}</p>}
       <div className="v3-stat-grid v3-gap-top">
-        {stat('New-customer cost', fmtMoney(last.cac, 2), 'in ' + v3Month(last.month, 'long') + (back ? ', from ' + fmtMoney(back.cac, 2) + ' in ' + v3Month(back.month) : ''))}
+        {(() => { const t30 = (tierG.rows || [])[0] || null, c30 = t30 && Number(t30.ncac) > 0 ? Number(t30.ncac) : null;
+          // the headline judges on the last 30 days (£53.42) and this tile said "£49.13 in Sep" under it (7 Oct)
+          return c30 != null
+            ? stat('New-customer cost', fmtMoney(c30, 2), 'last 30 days; ' + fmtMoney(last.cac, 2) + ' in ' + v3Month(last.month, 'long') + (back ? ', ' + fmtMoney(back.cac, 2) + ' in ' + v3Month(back.month) : ''))
+            : stat('New-customer cost', fmtMoney(last.cac, 2), 'in ' + v3Month(last.month, 'long') + (back ? ', from ' + fmtMoney(back.cac, 2) + ' in ' + v3Month(back.month) : '')); })()}
         {stat('A first order earns you', fmtMoney(fop, 2), 'after product and order costs')}
         {ltv != null && stat('A customer earns over a year', fmtMoney(ltv), 'first order and repeats')}
         {marg != null && stat('The next customer costs', fmtMoney(marg), 'at ' + fmtMoney(sc.current_spend) + ' a month of ads', marg > fop ? 'v3-down' : 'v3-muted')}
@@ -17612,12 +17617,13 @@ function V3Growth() {
 
     {peakOn && (<section className="v3-sec">
       <h2 className="v3-sec-title">{gpMonthName(pk.month)} is different</h2>
+      {/* Two short paragraphs, not one of 104 words: last year's month, then the plan (7 Oct). */}
+      {lyCost != null && <p className="v3-note v3-measure">Last {gpMonthName(pk.month)} a new customer cost {fmtMoney(lyCost, 2)} — {fmtCount(ly.new_customers)} of them on {fmtMoney(ly.spend)} of ads — against {(() => { const t30 = (tierG.rows || [])[0] || null; return t30 && Number(t30.ncac) > 0 ? fmtMoney(Number(t30.ncac), 2) + ' in the last 30 days' : fmtMoney(last ? last.cac : null, 2) + ' last month'; })()}. The sale brings them in.</p>}
       <p className="v3-note v3-measure">
-        {lyCost != null ? <>Last {gpMonthName(pk.month)} a new customer cost {fmtMoney(lyCost, 2)} — {fmtCount(ly.new_customers)} of them on {fmtMoney(ly.spend)} of ads — against {fmtMoney(last ? last.cac : null, 2)} last month. The sale brings them in. </> : null}
         At today’s pace Greta’s plan puts {fmtMoney(pk.spend)} of ads into {gpMonthName(pk.month)} for about {fmtCount(pk.new_customers)} new customers, {fmtMoney(per1(pk), 2)} each
         {gk ? <>; your goal puts in {fmtMoney(gk.spend)} for about {fmtCount(gk.new_customers)}, {fmtMoney(per1(gk), 2)} each</> : null}.
         {' '}If you add budget this quarter, it belongs here rather than in an ordinary month — but each extra pound still buys less than the one before.
-        {beyond && ' The bigger figures are beyond any month of ads you have run, so Greta is extending your curve past what it has seen.'}
+        {beyond && ' Those figures are beyond any month of ads you have run, so they are Greta’s projection, not something you have seen work.'}
         {' '}<V3Conf state="probably" detail="Greta’s quarter plan: your own seasonality, returning customers at their recent rate, and new-customer sales that rise with spend along your measured curve. Last year’s month is your actual spend and new customers."/></p>
       <div className="v3-btn-row">
         <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('goal')}>{g ? 'See what the goal takes' : 'Set a goal'} <span className="v3-xref-go">on Goal &amp; costs →</span></button>
@@ -20377,7 +20383,7 @@ function V3StoryText({ text }) {
   // The end of the second sentence: a stop followed by a space and a capital ("7.6 times" is not one).
   const t = String(text || ''), re = /[.!?]\s+(?=[A-Z£])/g; let m, n = 0, cut = -1;
   while ((m = re.exec(t))) { if (++n === 2) { cut = m.index + 1; break; } }
-  const short = isMobile && !open && cut > 0 && cut < t.length - 20;
+  const short = !open && cut > 0 && cut < t.length - 20;
   return (<p className="v3-note v3-measure">{short ? t.slice(0, cut) : t}
     {short && <>{' '}<button type="button" className="v3-xref" onClick={() => setOpen(true)}>Read the rest</button></>}</p>);
 }
