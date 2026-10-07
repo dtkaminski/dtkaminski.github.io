@@ -3630,7 +3630,8 @@ function V3ProfitLead() {
   if (!lad.rows || !cfg.rows) return <V3SkeletonRows n={4}/>;
 
   const kept = before - spend;
-  const op = oh30 != null ? kept - oh30 : null;
+  // whole pounds before taking the overheads off, as Today does: £8,180 here against £8,179 there (7 Oct)
+  const op = oh30 != null ? Math.round(kept) - oh30 : null;
   const T = d && d.typ;
   const salesEff = T ? cmr * (sales - T.sales) : null, spendEff = T ? -(spend - T.spend) : null;
   const dKept = T ? kept - T.kept : null;
