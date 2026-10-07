@@ -19852,7 +19852,7 @@ function V3Competitors() {
   const comps = useV3Rows('comp-list', V3_COMP_Q);
   // the board's brand-search action, when it is open: one set of figures for one item (7 Oct this page
   // said 242 clicks for £62, Direct, and the board 245 for £63, Probably)
-  const bsAct = useV3Rows('comp-brand-act', (sb, b) => sb.from('actions').select('metadata').eq('brand_id', b)
+  const bsAct = useV3Rows('comp-brand-act', (sb, b) => sb.from('actions').select('description,metadata').eq('brand_id', b)
     .eq('external_id', 'paid-brand-share-google').eq('status', 'open').limit(1));
   const gads = useV3Rows('comp-gads', (sb, b) => sb.from('tenant_google_ads_daily')
     .select('entity_name,advertising_channel_type,date,spend,clicks,conversion_value,search_impression_share,search_rank_lost_is,search_budget_lost_is')
@@ -19909,12 +19909,14 @@ function V3Competitors() {
   const loading = !comps.rows && !comps.err;
   const reads = [];
   if (brandC) {
-    const BV = (((bsAct.rows || [])[0] || {}).metadata || {}).values || null;
+    const BA = (bsAct.rows || [])[0] || null, BV = ((BA || {}).metadata || {}).values || null;
+    // the cost as the board states it (its cost per click is kept rounded: 245 x £0.26 read £64 here, £63 there)
+    const BC = BA && String(BA.description || '').match(/more clicks a month for about £([\d,]+)/);
     const lost = Math.max(0, 1 - brandC.is);
     const extra = BV && BV.extra_clicks_month != null ? Number(BV.extra_clicks_month) : brandC.is > 0 ? (brandC.clicks / brandC.is - brandC.clicks) / 3 : 0;
     const cpc = BV && BV.cpc != null ? Number(BV.cpc) : brandC.clicks > 0 ? brandC.spend / brandC.clicks : null;
     reads.push({ k: 'name', lead: lost >= 0.05, head: fmtPctN(lost) + ' of the searches for your name show someone else’s ad instead of yours.',
-      body: <>Your “{brandC.name}” campaign shows on {fmtPctN(brandC.is)} of the searches it could enter{brandC.rank != null ? <>; the rest is lost {brandC.budget != null && brandC.budget < 0.02 ? 'on bid rank, not budget' : <>{fmtPctN(brandC.rank)} on bid rank and {fmtPctN(brandC.budget || 0)} on budget</>}</> : null}. These are people looking for you by name. Winning the rest is about {fmtCount(Math.round(extra))} more clicks a month for about {fmtMoney(extra * (cpc || 0))}, at today’s {fmtMoney(cpc, 2)} a click — raise that campaign’s bid or target impression share.{BV ? <> It is on the action board, rated Probably there: the share of searches is Google’s own measure, but what the clicks earn rests on Google’s count of orders.</> : null}</>,
+      body: <>Your “{brandC.name}” campaign shows on {fmtPctN(brandC.is)} of the searches it could enter{brandC.rank != null ? <>; the rest is lost {brandC.budget != null && brandC.budget < 0.02 ? 'on bid rank, not budget' : <>{fmtPctN(brandC.rank)} on bid rank and {fmtPctN(brandC.budget || 0)} on budget</>}</> : null}. These are people looking for you by name. Winning the rest is about {fmtCount(Math.round(extra))} more clicks a month for about {fmtMoney(BC ? Number(BC[1].replace(/,/g, '')) : extra * (cpc || 0))}, at today’s {fmtMoney(cpc, 2)} a click — raise that campaign’s bid or target impression share.{BV ? <> It is on the action board, rated Probably there: the share of searches is Google’s own measure, but what the clicks earn rests on Google’s count of orders.</> : null}</>,
       conf: 'direct' });
   }
   if (S && S.share != null) {
