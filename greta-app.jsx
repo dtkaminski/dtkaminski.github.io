@@ -19479,7 +19479,7 @@ function V3GoalLead() {
     {stale && (<div className="v3-alert">
       <p className="v3-measure"><b>Greta’s plan has changed since you confirmed this goal.</b> {fmtMoney(tgt)} of sales now takes about {fmtMoney(G.spend_cap)} of ads, not {fmtMoney(g.spend_cap)}
         {dCam != null ? <>, and leaves {fmtMoney(gCam)} after ads — {dCam < 0 ? fmtMoney(-dCam) + ' less than' : fmtMoney(dCam) + ' more than'} staying at today’s pace</> : null}.
-        {' '}The model had read your spend curve the wrong way round, so it thought extra ads bought more than they do. Re-plan the quarter with the corrected figures.</p>
+        {' '}The plan you confirmed expected more from extra ads than your own months show they bring. Re-plan the quarter to see the figures it should have shown.</p>
       <div className="v3-btn-row"><button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={replan}>Re-plan the quarter</button></div>
     </div>)}
     <p className="v3-verdict">{g
