@@ -19333,7 +19333,8 @@ function V3GoalLead() {
       <div className="v3-stat"><div className="v3-stat-lab"><span>Sales so far</span></div><div className="v3-stat-val">{fmtMoney(done)}</div>
         <div className="v3-stat-foot"><span className={onTrack ? 'v3-muted' : 'v3-down'}>{fmtMoney(exp)} expected by now</span></div></div>
       <div className="v3-stat"><div className="v3-stat-lab"><span>Where today’s pace lands</span></div><div className="v3-stat-val">{fmtMoney(P.revenue_target)}</div>
-        <div className="v3-stat-foot"><span className="v3-muted">ads held at {fmtMoney(P.inputs && P.inputs.base_monthly_spend)} a month</span></div></div>
+        <div className="v3-stat-foot"><span className="v3-muted">ads held at {fmtMoney(P.inputs && P.inputs.base_monthly_spend)} a month{P.inputs && P.inputs.base_from && P.inputs.base_to
+          ? <>, your average {gpMonthName(String(P.inputs.base_from).slice(0, 7) + '-01').slice(0, 3)}–{gpMonthName(String(P.inputs.base_to).slice(0, 7) + '-01').slice(0, 3)}</> : null}</span></div></div>
       {g && <div className="v3-stat"><div className="v3-stat-lab"><span>Ads the goal takes</span></div><div className="v3-stat-val">{fmtMoney(gSpend)}</div>
         <div className="v3-stat-foot"><span className="v3-muted">{fmtMoney(peak.gSpend)} of it in {gpMonthName(peak.iso)}</span></div></div>}
       {g && <div className="v3-stat"><div className="v3-stat-lab"><span>Profit after ads, the goal</span></div><div className="v3-stat-val">{fmtMoney(gCam)}</div>
@@ -20021,7 +20022,9 @@ function V3DataTrust() {
   // 1. freight and duty
   const Q = cq.rows[0] || null, rate = fdr.rows && fdr.rows[0] && fdr.rows[0].freight_duty_rate != null ? Number(fdr.rows[0].freight_duty_rate) : null;
   if (Q && !Q.cogs_landed_complete && !(rate > 0)) {
-    const cost30 = num(H.net_revenue_30d) * num(Q.cogs_coverage_90d) * num(Q.realized_cogs_pct);
+    // Freight and duty add to every product's cost, the ones Greta fills in from the average margin too, so
+    // no coverage factor: the same figure Goal & costs gives (this said £343 there £372, 6 Oct).
+    const cost30 = num(H.net_revenue_30d) * num(Q.realized_cogs_pct);
     items.push({ k: 'fd', short: 'product costs leave out freight and duty', head: 'None of your product costs include freight or duty, so every margin and profit figure reads high.',
       body: <>Your product costs come to about {fmtMoney(cost30)} a month; every 10% that freight and duty add is about {fmtMoney(cost30 * 0.1)} a month of profit Greta is showing you that you don’t have. Set one rate for every product:</>,
       extra: <V3FreightRate compact/> });
