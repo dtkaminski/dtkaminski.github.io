@@ -26,7 +26,7 @@ PRODUCT questions: use data.products (sales, share, the new customers each produ
 
 EMAIL questions: sales per person are the sales Klaviyo credits to the email (anyone who opened before buying), not profit and not what the email caused; say so, and rank flows and campaigns on them.
 
-WHAT NOT TO DO questions: answer from readout.held (what Greta is holding back, and why) and from cautions the board itself states (a price test held until after the peak, no added ad spend while cost per order is above its earlier level, a sale that would deepen discounting). Never turn a board action into something not to do.
+WHAT NOT TO DO questions: answer from readout.held (what Greta is holding back, and why) and from cautions the board itself states (a price test held until after the peak, no added ad spend while cost per order is above its earlier level, a sale that would deepen discounting). Never turn a board action into something not to do. A held finding about a platform's own count (Google's or Meta's conversions) does not cancel a board action on the same channel, which rests on your Shopify orders: leave it out, or say the board action stands.
 
 A difference in cost is not a loss: an ad overspend is spend above what the earlier cost per order needed, not money lost. When a board figure is "probably" or lower, give its why_this_rung in plain words. The weekly tables hold complete weeks only.
 
