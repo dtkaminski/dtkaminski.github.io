@@ -10484,6 +10484,14 @@ function v3MoneyConf(row){
 }
 // Rows Greta has checked recently, in money order. The unchecked ones keep their place on the
 // board but never lead Today.
+// What happened, in words: "Discount rate spike to 18% (baseline 9%) — likely promo/sale" and "Meta spend up
+// 60% (£259→£415/day)" were detector shorthand on Today (7 Oct).
+function v3EventWords(label) {
+  const t = String(label || ''); let m;
+  if ((m = t.match(/^Discount rate spike to (\d+)% \(baseline (\d+)%\)/i))) return 'Discounts jumped to ' + m[1] + '% of sales (usually ' + m[2] + '%) — probably a sale';
+  if ((m = t.match(/^(\w+) spend (up|down) (\d+)% \(£([\d,.]+)\s*→\s*£([\d,.]+)\/day\)/i))) return m[1] + ' spend ' + (m[2].toLowerCase() === 'up' ? 'rose' : 'fell') + ' ' + m[3] + '%, from £' + m[4] + ' to £' + m[5] + ' a day';
+  return t.replace(/\bpromo\b/gi, 'sale').replace(/\bbaseline\b/gi, 'usual');
+}
 function v3LiveRows(rows){ return (rows || []).filter(r => r.verification !== 'unverified'); }
 // The board's "bring Meta back toward £1,444 a week" targets, added up as a month. The quarter plan puts
 // its own figure into this month (frkl, 7 Oct: £3,508 for October against about £8,180 for the board's
@@ -16954,7 +16962,7 @@ function V3Why({ why, period, typical, now }){
           {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('profit')}>The detail <span className="v3-xref-go">on Profit &amp; sales →</span></button></p>
         {why.data_integrity_flag && <V3TrackingNote/>}
         {(why.change_events || []).length > 0 && (<ul className="v3-why-list">
-          {(why.change_events || []).slice(0, 3).map((e, i) => (<li key={i}><span className="v3-num">{v3Day(e.date)}</span> {e.label}</li>))}
+          {(why.change_events || []).slice(0, 3).map((e, i) => (<li key={i}><span className="v3-num">{v3Day(e.date)}</span> {v3EventWords(e.label)}</li>))}
         </ul>)}
       </div>);
     }
@@ -17006,7 +17014,7 @@ function V3Why({ why, period, typical, now }){
     {why.data_integrity_flag && <V3TrackingNote/>}
     {(why.change_events || []).length > 0 && (<ul className="v3-why-list">
       {(why.change_events || []).slice(0, 3).map((e, i) => (
-        <li key={i}><span className="v3-num">{v3Day(e.date)}</span> {e.label}</li>
+        <li key={i}><span className="v3-num">{v3Day(e.date)}</span> {v3EventWords(e.label)}</li>
       ))}
     </ul>)}
   </div>);
