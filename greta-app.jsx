@@ -19622,8 +19622,23 @@ function v3FindingTitle(f) {
     const y = raw.match(/from £([\d,.]+) to £([\d,.]+)/);
     return x[1] + '% of orders sell at 45% or more off and don’t pay for a new customer' + (y ? '; capping discounts at 30% would take profit per order from £' + Math.round(Number(y[1].replace(/,/g, ''))) + ' to £' + Math.round(Number(y[2].replace(/,/g, ''))) : '');
   }
+  // Headlines, not first sentences: "19% of the last 90 days' web orders sold at 45% or more below the full
+  // price each product has regularly sold at this year, and each keeps £15.33 … against £53.42 …" was a
+  // title (7 Oct). The whole finding is still there when the row is opened.
+  const id = String((f && f.external_id) || '');
+  if (id === 'discount-depth-inversion' && (x = raw.match(/^(\d+)% of the last 90 days' web orders sold at (\d+)% or more/i)))
+    return 'Deep discounts don’t pay: ' + x[1] + '% of orders sell at ' + x[2] + '% or more off and earn less than a new customer costs';
+  if (id === 'discount-dependency') return 'Customers who join on a discount keep buying on discount';
+  if (id === 'discount-reference-price' && (x = raw.match(/^(\d+) of your marked-down products/i)))
+    return x[1] + ' marked-down products show a “was” price you have not charged in a year';
+  if (/^metric-tree-/.test(id) && (x = raw.match(/^(\w+)'s cost per (purchase|conversion) rose from £([\d,.]+) to £([\d,.]+)/i)))
+    return x[1] + '’s cost per ' + x[2] + ' rose from £' + Math.round(Number(x[3].replace(/,/g, ''))) + ' to £' + Math.round(Number(x[4].replace(/,/g, ''))) + ' this year';
+  if ((x = id.match(/^paid-landing-(\w+)/))) return v3Ch(x[1]) + ' ads land on products that can’t pay back a new customer';
   const first = (raw.match(/^(.+?[.!?])(\s|$)/) || [null, raw])[1];
-  return first.replace(/\s*\((derived|measured[^)]*|platform count)\)/g, '').replace(/\s+—\s+mostly[\s\S]*$/, '').replace(/\.$/, '');
+  let t = first.replace(/\s*\((derived|measured[^)]*|platform count)\)/g, '').replace(/\s+—\s+mostly[\s\S]*$/, '').replace(/\.$/, '');
+  // any other long one stops at its first clause
+  if (t.length > 110) { const cut = t.slice(0, 110).search(/,\s(?:and|but)\s|;\s|\s—\s/); if (cut > 40) t = t.slice(0, cut); }
+  return t;
 }
 
 // ── Review (V3, rebuilt 2026-10-05) ─────────────────────────────────────────────────────────────────
