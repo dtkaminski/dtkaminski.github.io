@@ -8711,8 +8711,16 @@ const V3_ASK_WORDS = { recent_context: 'the recent weeks', pounds_are: 'what the
   email_campaigns: 'your email campaigns', weekly_shop: 'the weekly sales', board: 'the board', held: 'what Greta is holding back',
   what_moved_profit_after_ads: 'what moved your profit', main_cause: 'the main cause', products_to_reorder_now_board_1: 'products to reorder now',
   of_them_out_of_stock_now: 'already out of stock', out_of_stock_now_examples: 'products out of stock' };
-function v3AskScrub(text) {
+function v3AskScrub(text, facts) {
   let t = String(text || '');
+  // "(Figure comes straight from the “facts” page …)" (7 Oct): the context's own name is not a page
+  t = t.replace(/\s*\((?:[^()]*?)\b(?:the\s+)?[“"'‘]?facts[”"'’]?\s+(?:page|section|block)\b[^()]*\)/gi, '')
+       .replace(/\bthe\s+[“"'‘]?facts[”"'’]?\s+(?:page|section|block)\b/gi, 'Greta’s figures');
+  // an order that lands inside the peak window lands after it starts: "29 Nov, which is after the BFCM
+  // peak window" (7 Oct; the window runs 20-30 Nov)
+  const np = facts && facts.next_peak;
+  if (np && np.lands_before_peak_starts === false && np.lands_after_peak_ends === false)
+    t = t.replace(/\b(after the (?:[\w-]+ ){0,2}peak(?: window)?)(?!\s+(?:window\s+)?(?:starts|begins|opens|has started|is over|ends|has ended))/gi, '$1 starts');
   t = t.replace(/`?\b(?:_meta\.)?(?:facts|readout|data)\.([a-z_]+)(?:\.([a-z_]+))?`?/g, (m, a, b) => V3_ASK_WORDS[b] || V3_ASK_WORDS[a] || 'the figures');
   t = t.replace(/`?\b([a-z]+(?:_[a-z]+)*)\.([a-z]+(?:_[a-z]+)+)`?/g, (m, a, b) => V3_ASK_WORDS[b] || V3_ASK_WORDS[a] || b.replace(/_/g, ' '));
   t = t.replace(/`([a-z]+(?:_[a-z]+)+)`/g, (m, k) => V3_ASK_WORDS[k] || k.replace(/_/g, ' '));
@@ -8912,7 +8920,7 @@ ${ctxJson}`;
       if (!resp.ok) { let m = ''; try { m = (await resp.json()).message || ''; } catch(_){} throw new Error(m || ASK_FAIL); }
       const data = await resp.json();
       if (data.error) throw new Error(data.message || ASK_FAIL);
-      setHistory(h=>[...h, {role:'assistant', content:v3AskScrub(data.text || '(no response)'), time:Date.now(), usage:data.usage||{}}]);
+      setHistory(h=>[...h, {role:'assistant', content:v3AskScrub(data.text || '(no response)', facts), time:Date.now(), usage:data.usage||{}}]);
     } catch (e) {
       setError(e.message || String(e));
       setHistory(h=>h.slice(0,-1)); // drop the user message on failure
@@ -17983,6 +17991,10 @@ function V3Website() {
     .eq('brand_id', b).order('mo', { ascending: false }).order('stage_no', { ascending: true }).limit(80));
   const trk = useV3Rows('web-tracking', (sb, b) => sb.from('vw_brand_tracking_state')
     .select('source,state,broke_on,fixed_on,comparisons_clean_from,severity').eq('brand_id', b));
+  // the shop's record of where orders came from: a separate break from Google Analytics' (7 Oct this page
+  // said tracking "was fixed on 24 Sep" while Today's Fix first still said check it)
+  const shopTrk = useV3Rows('web-attrib', (sb, b) => sb.from('actions').select('description,metadata').eq('brand_id', b)
+    .eq('external_id', 'tracking-coverage').eq('status', 'open').limit(1));
   const cl = useV3Rows('web-clarity', (sb, b) => sb.from('tenant_clarity_daily')
     .select('date,metric_name,sessions_count,with_metric_pct,raw').eq('brand_id', b).eq('num_days', 1).eq('dim_value', 'all')
     .in('metric_name', ['Traffic'].concat(V3_FRICTION.map(x => x[0]))).gte('date', v3IsoAdd(today, -125)).order('date', { ascending: false }).limit(1000));
@@ -18081,14 +18093,19 @@ function V3Website() {
       : 'Visits are turning into orders at about the usual rate: ' + v3Per100(C.conv) + ' per 100, against a typical ' + v3Per100(Pv.conv) + '.')
     : null;
 
+  const ST = (shopTrk.rows || [])[0] || null, STm = (ST && ST.metadata) || {}, STd = STm.month_to_date || null;
+  const shopLine = ST ? <>{ga4Bad ? 'That was Google Analytics. A second break is still open: your' : 'Your'} shop has not recorded where many orders came from since {STm.broke_month ? gpMonthName(String(STm.broke_month).slice(0, 10)) : 'the summer'}{STd && STd.visit_recorded != null ? <> — a visit on {fmtPctN(Number(STd.visit_recorded))} of {gpMonthName(String(STd.month).slice(0, 10))}’s orders so far{STm.visit_before != null ? <>, against {fmtPctN(Number(STm.visit_before))} before</> : null}</> : null}. That one is not fixed: it is the tracking check under Fix first on Today, and it makes the orders your shop credits to each channel read low.{' '}
+    <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('today')}>Fix first <span className="v3-xref-go">on Today →</span></button></> : null;
   return (<div className="v3-page-stack">
-    {ga4Bad && (<section className="v3-sec">
+    {(ga4Bad || ST) && (<section className="v3-sec">
       <div className="v3-kick">Can Greta read your site right now?</div>
-      <p className="v3-verdict">Your site analytics stopped recording properly{T.broke_on ? ' on ' + v3Day(T.broke_on, true) : ''}{T.fixed_on ? ' and were fixed on ' + v3Day(T.fixed_on, true) : ', and are not fixed yet'}.</p>
-      <p className="v3-note v3-measure">{T.fixed_on
+      {ga4Bad ? <p className="v3-verdict">Your site analytics stopped recording properly{T.broke_on ? ' on ' + v3Day(T.broke_on, true) : ''}{T.fixed_on ? ' and were fixed on ' + v3Day(T.fixed_on, true) : ', and are not fixed yet'}{ST ? ' — and a second break is still open' : ''}.</p>
+        : <p className="v3-verdict">Your shop is not recording where many orders came from.</p>}
+      {shopLine && <p className="v3-note v3-measure">{shopLine}</p>}
+      {ga4Bad && <p className="v3-note v3-measure">{T.fixed_on
         ? <>Step-by-step comparisons come back {T.comparisons_clean_from ? 'from ' + v3Day(T.comparisons_clean_from, true) : 'once there is enough clean data'}, when there is enough clean data to set against a normal month. </>
         : <>Until the tag on your site records again, no screen can say which step loses shoppers. </>}
-        {now ? 'Until then this page reads your site from Microsoft Clarity, which tracks visits separately, and your Shopify orders.' : 'Until then this page has only your Shopify orders to go on.'}</p>
+        {now ? 'Until then this page reads your site from Microsoft Clarity, which tracks visits separately, and your Shopify orders.' : 'Until then this page has only your Shopify orders to go on.'}</p>}
     </section>)}
 
     {C && (<section className="v3-sec">
@@ -19833,6 +19850,10 @@ const v3Host = u => { try { return new URL(/^https?:/i.test(u) ? u : 'https://' 
 function V3Competitors() {
   const today = new Date().toISOString().slice(0, 10);
   const comps = useV3Rows('comp-list', V3_COMP_Q);
+  // the board's brand-search action, when it is open: one set of figures for one item (7 Oct this page
+  // said 242 clicks for £62, Direct, and the board 245 for £63, Probably)
+  const bsAct = useV3Rows('comp-brand-act', (sb, b) => sb.from('actions').select('metadata').eq('brand_id', b)
+    .eq('external_id', 'paid-brand-share-google').eq('status', 'open').limit(1));
   const gads = useV3Rows('comp-gads', (sb, b) => sb.from('tenant_google_ads_daily')
     .select('entity_name,advertising_channel_type,date,spend,clicks,conversion_value,search_impression_share,search_rank_lost_is,search_budget_lost_is')
     .eq('brand_id', b).eq('level', 'campaign').gte('date', v3IsoAdd(today, -90)).limit(3000));
@@ -19888,9 +19909,12 @@ function V3Competitors() {
   const loading = !comps.rows && !comps.err;
   const reads = [];
   if (brandC) {
-    const lost = Math.max(0, 1 - brandC.is), extra = brandC.is > 0 ? (brandC.clicks / brandC.is - brandC.clicks) / 3 : 0, cpc = brandC.clicks > 0 ? brandC.spend / brandC.clicks : null;
+    const BV = (((bsAct.rows || [])[0] || {}).metadata || {}).values || null;
+    const lost = Math.max(0, 1 - brandC.is);
+    const extra = BV && BV.extra_clicks_month != null ? Number(BV.extra_clicks_month) : brandC.is > 0 ? (brandC.clicks / brandC.is - brandC.clicks) / 3 : 0;
+    const cpc = BV && BV.cpc != null ? Number(BV.cpc) : brandC.clicks > 0 ? brandC.spend / brandC.clicks : null;
     reads.push({ k: 'name', lead: lost >= 0.05, head: fmtPctN(lost) + ' of the searches for your name show someone else’s ad instead of yours.',
-      body: <>Your “{brandC.name}” campaign shows on {fmtPctN(brandC.is)} of the searches it could enter{brandC.rank != null ? <>; the rest is lost {brandC.budget != null && brandC.budget < 0.02 ? 'on bid rank, not budget' : <>{fmtPctN(brandC.rank)} on bid rank and {fmtPctN(brandC.budget || 0)} on budget</>}</> : null}. These are people looking for you by name. Winning the rest is about {fmtCount(Math.round(extra))} more clicks a month for about {fmtMoney(extra * (cpc || 0))}, at today’s {fmtMoney(cpc, 2)} a click — raise that campaign’s bid or target impression share.</>,
+      body: <>Your “{brandC.name}” campaign shows on {fmtPctN(brandC.is)} of the searches it could enter{brandC.rank != null ? <>; the rest is lost {brandC.budget != null && brandC.budget < 0.02 ? 'on bid rank, not budget' : <>{fmtPctN(brandC.rank)} on bid rank and {fmtPctN(brandC.budget || 0)} on budget</>}</> : null}. These are people looking for you by name. Winning the rest is about {fmtCount(Math.round(extra))} more clicks a month for about {fmtMoney(extra * (cpc || 0))}, at today’s {fmtMoney(cpc, 2)} a click — raise that campaign’s bid or target impression share.{BV ? <> It is on the action board, rated Probably there: the share of searches is Google’s own measure, but what the clicks earn rests on Google’s count of orders.</> : null}</>,
       conf: 'direct' });
   }
   if (S && S.share != null) {
@@ -20073,6 +20097,10 @@ function V3DataTrust() {
   const cfg = useV3Rows('brand-cfg', V3_BCFG_Q);
   const fdr = useV3Rows('fd-rate', V3_FDR_Q);
   const cov = useV3Rows('trust-cover', (sb, b) => sb.from('vw_measurement_integrity_daily').select('day,order_coverage').eq('brand_id', b).gte('day', v3IsoAdd(today, -15)).lt('day', today));
+  // the brand's own usual share: GA4 never records every order (frkl 73-78% in a normal month), so "only
+  // 81%, check the purchase event" (7 Oct) sent the owner to fix what was better than usual
+  const covM = useV3Rows('trust-cover-monthly', (sb, b) => sb.from('vw_tracking_coverage_monthly').select('month,orders,ga4_share').eq('brand_id', b)
+    .gte('month', v3IsoAdd(today, -400)).limit(20));
   const stock = useV3Rows('stock-plan', V3_STOCK_Q);
   // the same 30 days, ending yesterday, for the platforms' claims and the web orders Shopify took
   const meta = useV3Rows('trust-meta', (sb, b) => sb.from('tenant_meta_insights_daily').select('purchases,purchase_value').eq('brand_id', b).eq('level', 'account').gte('date', v3IsoAdd(today, -30)).lt('date', today).limit(100));
@@ -20110,9 +20138,13 @@ function V3DataTrust() {
   // 4. Google Analytics recovering
   const g4 = (trk.rows || []).find(r => r.source === 'ga4' && r.state && r.state !== 'ok' && r.comparisons_clean_from && v3Iso10(r.comparisons_clean_from) > today);
   const cv = (cov.rows || []).filter(r => r.order_coverage != null), cavg = cv.length ? cv.reduce((a, r) => a + num(r.order_coverage), 0) / cv.length : null;
+  const usualG = (() => { const xs = (covM.rows || []).filter(r => num(r.orders) >= 30 && r.ga4_share != null && String(r.month).slice(0, 7) < today.slice(0, 7))
+    .map(r => num(r.ga4_share)).sort((a, b) => a - b); return xs.length >= 4 ? xs[Math.floor(xs.length / 2)] : null; })();
+  const ga4Low = cavg != null && (usualG != null ? cavg < usualG - 0.10 : cavg < 0.9);
+  const ga4Usual = usualG != null ? <>, against your usual {fmtPctN(usualG)}</> : null;
   if (g4) items.push({ k: 'ga4', short: 'Google Analytics is still recovering', head: 'Google Analytics is recovering, so visits and conversion are held until ' + v3Day(g4.comparisons_clean_from, true) + '.',
-    body: <>It wasn’t recording properly from {v3Day(g4.broke_on)} to {v3Day(g4.fixed_on, true)}; any comparison that reaches back into those weeks would read the repair as growth. Greta uses your Shopify orders meanwhile.{cavg != null && cavg < 0.9 ? <> It also sees only {fmtPctN(cavg)} of your orders now — check that the purchase event fires on every order, including express checkouts.</> : null}</> });
-  else if (cavg != null && cavg < 0.9) items.push({ k: 'ga4cov', short: 'Google Analytics misses orders', head: 'Google Analytics sees ' + fmtPctN(cavg) + ' of your orders.',
+    body: <>It wasn’t recording properly from {v3Day(g4.broke_on)} to {v3Day(g4.fixed_on, true)}; any comparison that reaches back into those weeks would read the repair as growth. Greta uses your Shopify orders meanwhile.{ga4Low ? <> It also sees only {fmtPctN(cavg)} of your orders now{ga4Usual} — check that the purchase event fires on every order, including express checkouts.</> : null}</> });
+  else if (ga4Low) items.push({ k: 'ga4cov', short: 'Google Analytics misses orders', head: 'Google Analytics sees ' + fmtPctN(cavg) + ' of your orders' + (usualG != null ? ', against your usual ' + fmtPctN(usualG) : '') + '.',
     body: <>Every conversion rate on Website reads lower than it is. Check that the purchase event fires on every order, including express checkouts.</> });
   // 4b. the shop no longer recording where orders came from (the tracking check Today leads with under
   // Fix first). This list named Google Analytics recovering and missed it (6 Oct).
