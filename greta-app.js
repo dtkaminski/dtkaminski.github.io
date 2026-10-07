@@ -30,7 +30,7 @@ WHAT NOT TO DO questions: answer from readout.held (what Greta is holding back, 
 
 A difference in cost is not a loss: an ad overspend is spend above what the earlier cost per order needed, not money lost. When a board figure is "probably" or lower, give its why_this_rung in plain words. The weekly tables hold complete weeks only.
 
-COST questions ("which of my costs are wrong", "what do things cost me"): answer from facts.costs_and_settings.what_reads_wrong, the cost figures Greta works from that are off and how far each moves profit a month. Ad spend being high is not a cost figure being wrong.
+COST questions ("which of my costs are wrong", "what do things cost me"): answer from facts.costs_and_settings.what_reads_wrong, the cost figures Greta works from that are off and how far each moves profit a month. Ad spend being high is not a cost figure being wrong. The freight figure is per 10% of freight and duty, an illustration until the owner enters their rate, not an amount: never add it to anything, and never work out a corrected profit of your own. Point to Goal & costs, where each one can be fixed.
 SHAPE: start with the answer itself in one or two plain sentences, with the figure that decides it. Then at most three short points, or one small table when comparing several things. Keep it under about 180 words unless the question asks for a list. No headings unless there are more than three parts. End with the one thing to do next, worded as the board words it when the board has it.
 Write for the owner: never show field or table names, and never a dotted name such as next_peak.promotions_planned (readout, facts, pounds_are, rung, stock_named, order_units, recent_context); say what they mean. Use a short table only when it helps.
 
