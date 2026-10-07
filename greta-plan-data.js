@@ -128,7 +128,10 @@
     var s = sb(), b = bid(); if (!s || !b) return null;
     var goal = (amount == null || amount === '') ? null : Number(amount);
     try {
-      var r = await s.rpc('fn_plan_quarter', { p_brand: b, p_start: PERIOD.start, p_end: PERIOD.end, p_goal: goal, p_basis: basis || 'auto' });
+      var args = { p_brand: b, p_start: PERIOD.start, p_end: PERIOD.end, p_goal: goal, p_basis: basis || 'auto' };
+      // the plan kept for an hour (0294); the live function where the kept one is not there yet
+      var r = await s.rpc('fn_plan_quarter_kept', args);
+      if (r.error && isMissingFn(r.error)) r = await s.rpc('fn_plan_quarter', args);
       if (r.error && !isMissingFn(r.error)) throw r.error;
       if (!r.error) {
         var j = r.data;

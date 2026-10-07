@@ -19383,7 +19383,9 @@ function useV3GoalCheck() {
 // boot it held Today's story up for 14s (2026-10-06), so it waits for the Today-first gate (the page
 // head's GRETA_TODAY_READY: open at once on any other page, never later than 7s).
 const v3PlanQ = (start, end, goal) => (sb, b) => (window.GRETA_TODAY_READY || Promise.resolve())
-  .then(() => sb.rpc('fn_plan_quarter', { p_brand: b, p_start: start, p_end: end, p_goal: goal, p_basis: goal == null ? 'auto' : 'revenue' }))
+  // the plan kept for an hour (0294); the live function where the kept one is not there yet
+  .then(() => { const a = { p_brand: b, p_start: start, p_end: end, p_goal: goal, p_basis: goal == null ? 'auto' : 'revenue' };
+    return sb.rpc('fn_plan_quarter_kept', a).then(r => (r && r.error && /fn_plan_quarter_kept|PGRST202|Could not find/i.test(String(r.error.message || r.error.code || ''))) ? sb.rpc('fn_plan_quarter', a) : r); })
   .then(r => ({ data: r.data && r.data.ok !== false ? [r.data] : [], error: r.error }));
 function useV3Goal(opts) {
   const wantGoal = !opts || opts.goalPlan !== false;   // Today and Profit & sales need only the pace
