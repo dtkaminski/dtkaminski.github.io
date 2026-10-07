@@ -10692,6 +10692,10 @@ function V3Findings(){
           const ch = !diag ? null : /meta/i.test(f.external_id) ? 'meta' : /google/i.test(f.external_id) ? 'google' : null;
           const live = board.rows ? v3LiveRows(board.rows) : [];
           const behind = ch ? live.findIndex(r => r.external_id === 'order-cost-' + ch) : -1;
+          // A diagnosis whose leading cause is a counting or tracking change does not explain a cost rise
+          // that holds on the platform's own count and on weeks without a sale: "a tracking change hides
+          // visits from every tool · explains #3" (7 Oct) read as if the Meta cut were a measuring error.
+          const counting = /^diagnosis-/.test(String(f.external_id)) && /\b1\.\s*(?:[^.;]{0,40}\b(?:tracking change|own count|counts? (?:fell|changed|rose))\b)/i.test(String(f.description || ''));
           const conf = v3MoneyConf(f);
           const isOpen = open === f.external_id;
           const reasons = Array.isArray(f.evidence_reasons) ? f.evidence_reasons.filter(x => x && x.text) : [];
@@ -10699,7 +10703,7 @@ function V3Findings(){
             <button type="button" className="v3-rank-hit" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : f.external_id)}>
               <span className="v3-rank-body">
                 <span className="v3-rank-desc">{pa.title}</span>
-                <span className="v3-rank-meta">{f.category || 'general'}{conf ? ' · ' + V3_CONF[conf].label.toLowerCase() : ''}{behind >= 0 ? ' · explains #' + (behind + 1) : ''}</span>
+                <span className="v3-rank-meta">{f.category || 'general'}{conf ? ' · ' + V3_CONF[conf].label.toLowerCase() : ''}{behind >= 0 ? (counting ? ' · a counting change, not what is behind #' + (behind + 1) : ' · explains #' + (behind + 1)) : ''}</span>
               </span>
             </button>
             {isOpen && (<div className="v3-rank-why">
@@ -20282,7 +20286,7 @@ function V3Team() {
       <p className="v3-verdict">{verdict}</p>
       {err && <p className="v3-note v3-bad">{err}</p>}
       <table className="v3-rw">
-        <thead><tr><th className="t-text">Person</th><th className="t-text">Role</th><th className="t-text">Last signed in</th><th className="t-text">In Greta, last 30 days</th><th/></tr></thead>
+        <thead><tr><th className="t-text">Person</th><th className="t-text">Role</th><th className="t-text">Last active</th><th className="t-text">In Greta, last 30 days</th><th/></tr></thead>
         <tbody>{rows.map(m => (<tr key={m.user_id}>
           <td className="t-text v3-rw-name">{m.email}{m.is_self ? <span className="v3-muted"> (you)</span> : null}</td>
           <td className="t-text">{canTarget(m)
@@ -20290,12 +20294,12 @@ function V3Team() {
                 {V3_ROLE_HELP.filter(r => r[0] !== 'admin' || me.role === 'owner').map(r => <option key={r[0]} value={r[0]}>{r[1]}</option>)}
               </select>
             : v3Sentence(m.role)}</td>
-          <td className="t-text">{m.activity ? (m.last_sign_in_at ? v3Ago(m.last_sign_in_at) : <span className="v3-down">never — invite not accepted</span>) : FMT_NONE}</td>
+          <td className="t-text">{m.activity ? ((m.last_active_at || m.last_sign_in_at) ? v3Ago(m.last_active_at || m.last_sign_in_at) : <span className="v3-down">never — invite not accepted</span>) : FMT_NONE}</td>
           <td className="t-text v3-muted">{did(m)}</td>
           <td>{(canTarget(m) || (m.is_self && m.role !== 'owner')) && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => remove(m)}>{m.is_self ? 'Leave' : 'Remove'}</button>}</td>
         </tr>))}</tbody>
       </table>
-      <p className="micro muted v3-measure">Decisions are actions marked done or skipped on the board (recorded from 5 Oct 2026); notes are the weekly review’s; questions are asked of Greta.</p>
+      <p className="micro muted v3-measure">Last active is the latest sign-in, session, question, decision or note. Decisions are actions marked done or skipped on the board (recorded from 5 Oct 2026); notes are the weekly review’s; questions are asked of Greta.</p>
     </section>
 
     {canManage && (<section className="v3-sec">
