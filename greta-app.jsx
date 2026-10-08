@@ -16838,6 +16838,11 @@ function ChannelDetailList({ channels }){
 // panel does: the plan may be profitable and still not survivable, because stock is
 // paid for before the sales arrive. It abstains when the cash inputs are missing —
 // and abstention is the point, so this renders the ask rather than a guess.
+// vw_brand_cash_gate names what is missing by column ("opening_cash,cash_floor"); the form's own labels instead
+const V3_CASH_FIELD = { opening_cash: 'cash in bank', opening_cash_as_of: 'the date of that balance', cash_floor: 'minimum balance',
+  supplier_payment_terms_days: 'supplier balance terms', inventory_days: 'days stock is held', supplier_lead_time_weeks: 'supplier lead time' };
+const v3CashInputs = m => String(m || '').replace(/[{}"]/g, '').split(',').map(s => s.trim()).filter(Boolean)
+  .map(s => V3_CASH_FIELD[s] || s.replace(/_/g, ' ')).join(', ');
 function CashCeiling(){
   const [gate, setGate] = React.useState(undefined);
   const [weeks, setWeeks] = React.useState([]);
@@ -16866,7 +16871,7 @@ function CashCeiling(){
         Greta won’t guess this one. Add the cash you have now, the lowest balance you are willing to reach,
         and your supplier’s payment terms. Greta then works out the most you can spend a week without running
         out of cash. That is often less than the most you could spend at a profit.
-        {gate && gate.missing_inputs ? <><br/><span className="muted">Still needed: {String(gate.missing_inputs).replace(/[{}"]/g,'').replace(/,/g, ', ')}</span></> : null}
+        {gate && gate.missing_inputs ? <><br/><span className="muted">Still needed: {v3CashInputs(gate.missing_inputs)}</span></> : null}
       </div>
       <div style={{marginTop:8}}>
         <button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={()=>window.__oiGo && window.__oiGo('goal','economics')}>Add your cash figures</button>
@@ -18121,7 +18126,7 @@ function v3MergeShifts(stages) {
   return out;
 }
 const V3_STEP_WORDS = { 'sessions': 'getting visitors', 'add to cart rate': 'adding to the basket', 'cart to checkout': 'starting checkout',
-  'checkout to purchase': 'finishing checkout', 'cart to purchase': 'checking out', 'average order value': 'order value' };
+  'checkout to purchase': 'finishing checkout', 'cart to purchase': 'checking out', 'average order value': 'the average order' };
 const v3Step = m => V3_STEP_WORDS[String(m || '').toLowerCase()] || String(m || '');
 const v3Per100 = v => fmtOk(v) ? (Number(v) * 100).toFixed(2) : FMT_NONE;   // orders per 100 visits
 const v3CountK = v => !fmtOk(v) ? FMT_NONE : Math.abs(Number(v)) >= 1000 ? fmtCount(Number(v) / 1000) + 'k' : fmtCount(v);
@@ -18221,7 +18226,7 @@ function V3Website() {
   const tip = ({ active, payload }) => {
     if (!active || !payload || !payload.length) return null;
     const p = payload[0].payload;
-    return (<div className="v3-tip"><b>{p.name}{p.metric ? ' · ' + p.metric : ''}</b>
+    return (<div className="v3-tip"><b>{p.name}{p.metric ? ' · ' + v3Step(p.metric) : ''}</b>
       <span>{p.kind === 'total' ? 'Profit before ads' : 'Effect on profit'} <em>{p.kind === 'total' ? fmtMoney(p.val) : (p.delta >= 0 ? '+' : '−') + fmtMoney(Math.abs(p.delta))}</em></span></div>);
   };
   const ctip = ({ active, payload }) => {
@@ -18288,9 +18293,9 @@ function V3Website() {
       <p className="v3-verdict">{worst
         ? (odd ? 'In ' + monthName + ', fewer shoppers than usual got past ' + v3Step(worst.metric) + '.' : 'In ' + monthName + ', the step that lost most was ' + v3Step(worst.metric) + '.')
         : 'Every step of the site ran at or above its normal in ' + monthName + '.'}</p>
-      {worst && <p className="v3-note v3-measure">{v3Sentence(worst.metric)} was {v3StageVal(worst.fmt, worst.v)} against a normal {v3StageVal(worst.fmt, worst.mu)}{lowest ? ', the lowest in the year on file' : ''}. That cost about {fmtMoney(worst.leak)} of profit before ads.
+      {worst && <p className="v3-note v3-measure">{v3Sentence(v3Step(worst.metric))} was {v3StageVal(worst.fmt, worst.v)} against a normal {v3StageVal(worst.fmt, worst.mu)}{lowest ? ', the lowest in the year on file' : ''}. That cost about {fmtMoney(worst.leak)} of profit before ads.
         {top ? ' Most of it happened on ' + (top.value === '/' ? 'the home page' : top.value) + ', where it fell ' + fmtPctN(Math.abs(Number(top.ctc_chg))) + '.' : ''}
-        {shift && <> {v3Sentence(shift.merged[0].metric)} and {shift.merged[1].metric} moved in opposite directions by matching amounts, while {shift.metric} stayed normal. That is a change in what was recorded, not in shoppers, so the two are read together as checkout.</>}
+        {shift && <> {v3Sentence(v3Step(shift.merged[0].metric))} and {v3Step(shift.merged[1].metric)} moved in opposite directions by matching amounts, while {v3Step(shift.metric)} stayed normal. That is a change in what was recorded, not in shoppers, so the two are read together as checkout.</>}
         {potential != null && actual != null && <> Altogether the month made {fmtMoney(Math.abs(potential - actual))} {actual < potential ? 'less' : 'more'} profit before ads than it would have with every step at its normal.</>}</p>}
       {bars.length > 2 && (<figure className="v3-chart">
         <figcaption><span className="v3-chart-title">From a normal month to {monthName}</span>
@@ -19685,6 +19690,14 @@ const V3_VERDICT = {
   flat: { label: 'No change', cls: 'v3-muted' }, inconclusive: { label: 'Not judged yet', cls: 'v3-muted' },
   ungradeable: { label: 'Can’t be judged', cls: 'v3-muted' }, no_data: { label: 'No data', cls: 'v3-muted' }
 };
+// what an action promised to move, by the metric code it was graded on (actions.predicted_metric_id)
+const V3_METRIC_WORDS = { net_revenue: 'sales', orders: 'orders', site_cvr: 'the share of visitors who buy', discount_rate: 'the discount rate',
+  google_spend: 'Google ad spend', meta_spend: 'Meta ad spend', meta_roas: 'Meta’s sales per £1 of ads', google_roas: 'Google’s sales per £1 of ads',
+  contribution: 'profit after product and order costs', product_revenue: 'product sales', sku_cm_pct: 'the product’s margin',
+  returning_customer_share: 'sales from returning customers', aov: 'the average order', return_rate: 'refunds',
+  google_spend_growth: 'Google ad spend', seasonal_creative_spend: 'spend on seasonal ads', ireland_creative_max_freq: 'how often one person in Ireland sees the same ad',
+  uk_creative_max_freq: 'how often one person in the UK sees the same ad', ncac: 'what a new customer costs' };
+const v3MetricWords = id => { const k = String(id || '').replace(/_30d$/, ''); return V3_METRIC_WORDS[k] || k.replace(/_/g, ' '); };
 function V3TrackRecord() {
   const q = useV3Rows('act-track', (sb, b) => sb.from('actions')
     .select('external_id,description,category,status,disposition_at,raised_at,verdict,predicted_window_days,predicted_metric_id,predicted_direction,grade:metadata->grade,auto:metadata->auto_closed_at')
@@ -19715,7 +19728,7 @@ function V3TrackRecord() {
     return (<li key={r.external_id + i}>
       <span className="v3-rank-desc">{v3PlainAction(r).title}</span>
       <span className="v3-sub"> {r.status === 'skipped' ? 'Skipped' : 'Done'} {when(r)} · <span className={v ? v.cls : 'v3-muted'}>{v ? v.label : (d ? 'Judged after ' + v3Day(d, true) : 'Not judged yet')}</span>
-        {g.reason ? <> — {v3Tidy(g.reason)}</> : (v && r.predicted_metric_id ? <> — {String(r.predicted_metric_id).replace(/_30d$/, '').replace(/_/g, ' ')} {r.verdict === 'miss' ? 'did not move ' : 'moved '}{r.predicted_direction === 'down' ? 'down' : 'up'} as promised, comparing before with after (an older check)</> : null)}</span>
+        {g.reason ? <> — {v3Tidy(g.reason)}</> : (v && r.predicted_metric_id ? <> — {v3MetricWords(r.predicted_metric_id)} {r.verdict === 'miss' ? 'did not move ' : 'moved '}{r.predicted_direction === 'down' ? 'down' : 'up'} as promised, comparing before with after (an older check)</> : null)}</span>
     </li>);
   };
   const shown = showAll ? done : done.slice(0, 8);
@@ -19740,7 +19753,7 @@ function V3TrackRecord() {
 function v3FindingTitle(f) {
   const raw = v3Tidy(scrubTag(String((f && f.description) || ''))).trim();
   let x;
-  if ((x = raw.match(/^Why (.+?) moved, ranked by evidence:\s*1\.\s*([^(;]+?)\s*\(/i))) return v3Sentence(x[1]) + ' moved — most likely: ' + x[2].charAt(0).toLowerCase() + x[2].slice(1);
+  if ((x = raw.match(/^Why (.+?) moved(?:, ranked by evidence:|\. Likeliest causes first:)\s*1\.\s*([^(;]+?)\s*\(/i))) return v3Sentence(x[1]) + ' moved — most likely: ' + x[2].charAt(0).toLowerCase() + x[2].slice(1);
   if (f.external_id === 'discount-depth-inversion' && (x = raw.match(/they are (\d+)% of the last 90 days/i))) {
     const y = raw.match(/from £([\d,.]+) to £([\d,.]+)/);
     return x[1] + '% of orders sell at 45% or more off and don’t pay for a new customer' + (y ? '; capping discounts at 30% would take profit per order from £' + Math.round(Number(y[1].replace(/,/g, ''))) + ' to £' + Math.round(Number(y[2].replace(/,/g, ''))) : '');
@@ -19754,7 +19767,7 @@ function v3FindingTitle(f) {
   if (id === 'discount-dependency') return 'Customers who join on a discount keep buying on discount';
   if (id === 'discount-reference-price' && (x = raw.match(/^(\d+) of your marked-down products/i)))
     return x[1] + ' marked-down products show a “was” price you have not charged in a year';
-  if (/^metric-tree-/.test(id) && (x = raw.match(/^(\w+)'s cost per (purchase|conversion) rose from £([\d,.]+) to £([\d,.]+)/i)))
+  if (/^metric-tree-/.test(id) && (x = raw.match(/^(\w+)'s cost per (purchase|conversion|sale) rose from £([\d,.]+) to £([\d,.]+)/i)))
     return x[1] + '’s cost per ' + x[2] + ' rose from £' + Math.round(Number(x[3].replace(/,/g, ''))) + ' to £' + Math.round(Number(x[4].replace(/,/g, ''))) + ' this year';
   if ((x = id.match(/^paid-landing-(\w+)/))) return v3Ch(x[1]) + ' ads land on products that can’t pay back a new customer';
   const first = (raw.match(/^(.+?[.!?])(\s|$)/) || [null, raw])[1];
