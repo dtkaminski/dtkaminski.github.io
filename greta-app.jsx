@@ -3622,8 +3622,8 @@ function V3ProfitLead() {
   if (!H) return <V3SkeletonRows n={4}/>;
   if (cmr == null) return (<section className="v3-sec">
     <div className="v3-kick">Last 30 days</div>
-    <p className="v3-verdict">Greta needs your costs before she can say what you keep.</p>
-    <p className="v3-note v3-measure">Enter what your products and orders cost, and this page shows where each pound of sales goes, what a typical month looks like, and what has changed.</p>
+    <p className="v3-verdict">Greta needs your costs before she can work out your profit.</p>
+    <p className="v3-note v3-measure">Enter what your products cost, and what each order costs to pack, send and take payment for. This page then shows where each £1 of sales goes and how this month compares with a typical one.</p>
     <button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs')}>Enter your costs</button>
   </section>);
   if (lad.err || cfg.err) return null;
@@ -3640,11 +3640,11 @@ function V3ProfitLead() {
   const salesWord = sChg == null ? '' : Math.abs(sChg) < 0.1 ? 'normal for you' : (sChg > 0 ? 'up ' : 'down ') + fmtPctN(Math.abs(sChg)) + ' on a typical month';
   const spendWord = pChg == null ? '' : pChg >= 0.5 ? fmtTimes(spend / T.spend, 1) + ' a typical month' : (pChg >= 0 ? 'up ' : 'down ') + fmtPctN(Math.abs(pChg));
   const moved = T && Math.abs(dKept) >= Math.max(500, Math.abs(T.kept) * 0.1);
-  const lead = !T ? null : !moved ? 'A typical month: sales were ' + salesWord + ' and you kept ' + fmtMoney(kept) + ' after ads.'
+  const lead = !T ? null : !moved ? 'You kept ' + fmtMoney(kept) + ' after ads, close to a typical month for you. Sales were ' + salesWord + '.'
     : Math.abs(spendEff) >= Math.abs(salesEff)
-      ? (spendEff < 0 ? 'Sales are ' + salesWord + ', but ad spend is ' + spendWord + ' — that is what took your profit.'
-                      : 'Ad spend is ' + spendWord + ' and sales are ' + salesWord + ' — the lower spend is what lifted your profit.')
-      : (salesEff < 0 ? 'Sales are ' + salesWord + ' — that is what took your profit.' : 'Sales are ' + salesWord + ' — that is what lifted your profit.');
+      ? (spendEff < 0 ? 'Ad spend is ' + spendWord + ', and that is what cut your profit. Sales are ' + salesWord + '.'
+                      : 'Lower ad spend lifted your profit: spend is ' + spendWord + ', and sales are ' + salesWord + '.')
+      : (salesEff < 0 ? 'Sales are ' + salesWord + ', and that is what cut your profit.' : 'Sales are ' + salesWord + ', and that is what lifted your profit.');
   // Break-even on overheads, both ways round.
   const maxSpend = oh30 != null ? before - oh30 : null;
   const needSales = oh30 != null ? (oh30 + spend) / cmr : null;
@@ -3652,11 +3652,11 @@ function V3ProfitLead() {
 
   const chain = [
     { k: 'Sales', v: sales, kind: 'in' },
-    { k: 'Product and order costs', v: -(sales - before), kind: 'out' },
+    { k: 'Products, delivery and payment fees', v: -(sales - before), kind: 'out' },
     { k: 'Ad spend', v: -spend, kind: 'out' },
     { k: 'Kept after ads', v: kept, kind: 'sub' },
   ];
-  if (oh30 != null) { chain.push({ k: 'Overheads — rent, wages, software', v: -oh30, kind: 'out' }); chain.push({ k: 'Operating profit', v: op, kind: 'total' }); }
+  if (oh30 != null) { chain.push({ k: 'Overheads — rent, wages, software', v: -oh30, kind: 'out' }); chain.push({ k: 'Profit after all costs', v: op, kind: 'total' }); }
   const per = v => sales > 0 ? Math.round(Math.abs(v) / sales * 100) + 'p in every £1' : '';
 
   // Move this month's budget into the peak: the plan spreads the quarter's ad budget by season (it
@@ -3701,12 +3701,13 @@ function V3ProfitLead() {
   return (<div className="v3-page-stack">
     <section className="v3-sec v3-profit-head">
       <div className="v3-kick">Last 30 days · against a typical month for you</div>
-      <p className="v3-verdict">{lead || 'You kept ' + fmtMoney(kept) + ' after ads on ' + fmtMoney(sales) + ' of sales.'}</p>
+      <p className="v3-verdict">{lead || 'You kept ' + fmtMoney(kept) + ' after ads in the last 30 days.'}</p>
       {T && <p className="v3-note v3-measure">
-        A typical month — the middle of your last {fmtCount(d.n)} — is {fmtMoney(T.sales)} of sales on {fmtMoney(T.spend)} of ads, keeping {fmtMoney(T.kept)}.
-        {' '}This month: {fmtMoney(sales)} on {fmtMoney(spend)}, keeping {fmtMoney(kept)}.
-        {moved && <> Against typical, sales {salesEff >= 0 ? 'added' : 'cost you'} {fmtMoney(Math.abs(salesEff))} and ad spend {spendEff >= 0 ? 'added' : 'cost you'} {fmtMoney(Math.abs(spendEff))}.</>}
-        {d.ly && <> The same 30 days last year: {fmtMoney(d.ly.sales)} of sales{d.ly.sales > 0 ? ' (' + (sales >= d.ly.sales ? '+' : '−') + fmtPctN(Math.abs(sales / d.ly.sales - 1)) + ' now)' : ''}.</>}
+        In a typical month you sell {fmtMoney(T.sales)} and spend {fmtMoney(T.spend)} on ads, keeping {fmtMoney(T.kept)}.
+        {' '}In the last 30 days you sold {fmtMoney(sales)} and spent {fmtMoney(spend)}, keeping {fmtMoney(kept)}.
+        {moved && <> Compared with a typical month, the change in sales {salesEff >= 0 ? 'added' : 'cost you'} {fmtMoney(Math.abs(salesEff))}. The change in ad spend {spendEff >= 0 ? 'added' : 'cost you'} {fmtMoney(Math.abs(spendEff))}.</>}
+        {d.ly && <> The same 30 days last year sold {fmtMoney(d.ly.sales)}{d.ly.sales > 0 ? ', so you are ' + fmtPctN(Math.abs(sales / d.ly.sales - 1)) + (sales >= d.ly.sales ? ' up' : ' down') + ' on last year' : ''}.</>}
+        {' '}A typical month is the middle one of your last {fmtCount(d.n)} months.
       </p>}
       <ul className="v3-chain" aria-label="Where each pound of sales went">
         {chain.map(r => (<li key={r.k} className={'v3-chain-' + r.kind + (r.v < 0 && r.kind !== 'out' ? ' neg' : '')}>
@@ -3716,10 +3717,10 @@ function V3ProfitLead() {
           <span className="v3-chain-p">{r.kind === 'in' ? '' : (r.v < 0 && r.kind !== 'out' ? '−' : '') + per(r.v)}</span>
         </li>))}
       </ul>
-      {((rfGap != null && rfGap > 0) || noFreight) && <p className="micro muted v3-measure">These figures read {rfGap > 0 ? 'about ' + fmtMoney(rfGap) + ' high' : 'high'}:
-        {' '}{rfGap > 0 ? 'refunds are ' + fmtPctN(Number(rfRow.realised_value) / 100) + ' of sales against the ' + fmtPctN(Number(rfRow.config_value) / 100) + ' entered' : ''}{rfGap > 0 && noFreight ? ', and ' : ''}{noFreight ? 'your product costs carry no freight or duty' : ''}.
+      {((rfGap != null && rfGap > 0) || noFreight) && <p className="micro muted v3-measure">Your profit here reads {rfGap > 0 ? 'about ' + fmtMoney(rfGap) + ' too high' : 'too high'}:
+        {' '}{rfGap > 0 ? 'refunds are ' + fmtPctN(Number(rfRow.realised_value) / 100) + ' of sales, not the ' + fmtPctN(Number(rfRow.config_value) / 100) + ' you entered' : ''}{rfGap > 0 && noFreight ? ', and ' : ''}{noFreight ? 'your product costs leave out shipping them to you and import duty' : ''}.
         {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs-off')}>Fix them <span className="v3-xref-go">on Goal &amp; costs →</span></button></p>}
-      {oh30 == null && <p className="v3-note v3-measure">Add your monthly overheads — rent, wages, software — and Greta will show whether what you keep covers them, and the ad spend you can afford.{' '}
+      {oh30 == null && <p className="v3-note v3-measure">Add your monthly overheads: what you pay whatever you sell, such as rent, wages and software. Greta will then show whether what you keep covers them, and how much you can afford to spend on ads.{' '}
         <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('goal', 'economics')}>Add overheads</button></p>}
     </section>
 
@@ -3739,7 +3740,7 @@ function V3ProfitLead() {
           <R.ReferenceLine y={0} stroke={PAL.line}/>
         </R.ComposedChart>
       </R.ResponsiveContainer>
-      <p className="micro muted v3-measure">Each point is 30 days ending on the date shown. Kept after ads = sales × {fmtPctN(cmr)} (what is left after product and order costs) − ad spend.{oh30 != null ? ' When the line sits under the dashed overheads line, the business made a loss those 30 days.' : ''}</p>
+      <p className="micro muted v3-measure">Each point covers the 30 days up to the date shown. Kept after ads is the {fmtPctN(cmr)} of sales left after products, delivery and payment fees, minus ad spend.{oh30 != null ? ' When the line is below the dashed overheads line, the business lost money those 30 days.' : ''}</p>
     </figure>)}
 
     {(shift || extra > Math.max(250, (T ? T.spend : 0) * 0.2) || (op != null && op < 0)) && (<section className="v3-sec">
@@ -3747,26 +3748,26 @@ function V3ProfitLead() {
       <ol className="v3-moves">
         {shift && (<li>
           <b>Move this month’s ad budget into {gpMonthName(shift.peak.month)}.</b>
-          {' '}At this month’s pace you will spend about {fmtMoney(shift.proj)} on ads in {gpMonthName(shift.cur.month)}. Greta’s quarter plan, for the same budget across the quarter, puts {fmtMoney(shift.cur.spend)} here and {fmtMoney(shift.peak.spend)} into {gpMonthName(shift.peak.month)}
-          {shift.lyCost != null ? <>, when new customers come far cheaper — last {gpMonthName(shift.peak.month)} one cost {fmtMoney(shift.lyCost, 2)}</> : null}.
-          {shift.gain >= 200 ? <> Spread that way, the same spend makes about {fmtMoney(shift.gain)} more profit after ads.</> : null}
-          {' '}<button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('growth')}>Why on Growth plan</button>
-          {' '}<V3Conf state="probably" detail="This month’s spend so far is measured. The split by month is Greta’s quarter plan: your own seasonality and your measured spend curve, so each extra pound buys a little less than the one before."/>
+          {' '}At this pace you will spend about {fmtMoney(shift.proj)} on ads in {gpMonthName(shift.cur.month)}. Greta’s quarter plan spends the same total but puts {fmtMoney(shift.cur.spend)} in {gpMonthName(shift.cur.month)} and {fmtMoney(shift.peak.spend)} in {gpMonthName(shift.peak.month)}
+          {shift.lyCost != null ? <>, when new customers cost far less to win. Last {gpMonthName(shift.peak.month)}, each one cost {fmtMoney(shift.lyCost, 2)}</> : null}.
+          {shift.gain >= 200 ? <> Spread that way, the same total makes about {fmtMoney(shift.gain)} more profit after ads.</> : null}
+          {' '}<button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('growth')}>See why on Growth plan</button>
+          {' '}<V3Conf state="probably" detail="This month’s spend so far is measured. The monthly split is Greta’s plan, built from your own busy and quiet months. It assumes each extra £1 of ads wins a little less than the one before."/>
         </li>)}
         {!shift && T && extra > Math.max(250, T.spend * 0.2) && (<li>
           <b>Bring ad spend back toward {fmtMoney(T.spend)} a month.</b>
-          {' '}You are spending {fmtMoney(extra)} more than in a typical month, and sales are {salesWord}{sChg != null && sChg <= 0.1 ? ', so the extra spend has not bought extra sales' : ''}.
-          {' '}If sales hold, that is up to {fmtMoney(extra)} a month back. Marketing shows which channels lose money on any reading — cut those first.
+          {' '}You are spending {fmtMoney(extra)} more than in a typical month, and sales are {salesWord}{sChg != null && sChg <= 0.1 ? ', so the extra ads have not brought extra sales' : ''}.
+          {' '}If sales hold, cutting back saves up to {fmtMoney(extra)} a month. Marketing shows which channels lose money however you count it: cut those first.
           {' '}<button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('marketing')}>See which channels</button>
-          {' '}<V3Conf state="probably" detail="The spend and sales are measured. That cutting the extra spend would not cost sales is the assumption — it held over the months shown, where spend rose and sales did not."/>
+          {' '}<V3Conf state="probably" detail="Spend and sales are measured. The guess is that cutting the extra spend will not cost sales. That held in the months shown, when spend rose and sales did not."/>
         </li>)}
         {op != null && op < 0 && (<li>
           <b>Cover your overheads.</b>
-          {' '}After {fmtMoney(ohMonth)} a month of overheads, these 30 days made a loss of {fmtMoney(Math.abs(op))}.
+          {' '}After {fmtMoney(ohMonth)} a month of overheads, the last 30 days made a loss of {fmtMoney(Math.abs(op))}.
           {maxSpend > 0
-            ? <> At today’s sales, ads can cost at most {fmtMoney(maxSpend)} a month for the business to break even; at today’s ad spend it needs {fmtMoney(needSales)} of sales.</>
-            : <> Even with no ads, today’s sales leave {fmtMoney(Math.abs(maxSpend))} of overheads uncovered; at today’s ad spend it needs {fmtMoney(needSales)} of sales.</>}
-          {' '}The other levers are a bigger order and more customers coming back.
+            ? <> To break even at today’s sales, ads can cost at most {fmtMoney(maxSpend)} a month. Or, at today’s ad spend, you need {fmtMoney(needSales)} of sales a month.</>
+            : <> Even with no ads, today’s sales leave {fmtMoney(Math.abs(maxSpend))} of overheads unpaid. At today’s ad spend, you need {fmtMoney(needSales)} of sales a month to break even.</>}
+          {' '}Bigger orders and more customers coming back also help.
           {' '}<button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('products')}>Raise order value</button>
           {' '}<button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('customers')}>Bring customers back</button>
         </li>)}
@@ -3782,7 +3783,7 @@ function V3ProfitLead() {
         <tr><td className="t-text"><i className="v3-dot" style={{ background: PAL.data3 }}/>New customers · {fmtCount(t30.new_customers)}</td><td>{fmtMoney(newNet)}</td><td className="v3-muted">{fmtPctN(newNet / mixTot)}</td></tr>
         <tr><td className="t-text"><i className="v3-dot" style={{ background: PAL.accent }}/>Returning customers · {fmtCount(t30.returning_customers)}</td><td>{fmtMoney(retNet)}</td><td className="v3-muted">{fmtPctN(retNet / mixTot)}</td></tr>
       </tbody></table>
-      <p className="v3-note v3-measure">{t30.ncac != null ? 'Each new customer cost ' + fmtMoney(t30.ncac) + ' in ads to win. ' : ''}What each ad channel actually caused is on Marketing; what customers are worth over time is on Customers.</p>
+      <p className="v3-note v3-measure">{t30.ncac != null ? 'Each new customer cost ' + fmtMoney(t30.ncac) + ' in ads to win. ' : ''}Marketing shows which ad channels really bring in sales. Customers shows what a customer is worth over time.</p>
     </section>)}
   </div>);
 }
@@ -4094,7 +4095,7 @@ function Overview({start, period, customActive}){
       )}
       {costsVerified && (
         <div className="micro" style={{color:'var(--text-faint)', display:'flex', alignItems:'center', gap:8}}>
-          <MarginBadge/> margin figures are based on your entered costs · <span onClick={()=>{ if (UI_V3) { window.__oiGo && window.__oiGo('goal', 'margin'); return; } window.__oiGo && window.__oiGo('goal', 'margin'); }} style={{color:'var(--accent)', cursor:'pointer'}}>edit costs</span>
+          <MarginBadge/> profit figures use the costs you entered · <span onClick={()=>{ if (UI_V3) { window.__oiGo && window.__oiGo('goal', 'margin'); return; } window.__oiGo && window.__oiGo('goal', 'margin'); }} style={{color:'var(--accent)', cursor:'pointer'}}>edit costs</span>
         </div>
       )}
       {/* The ranked queue used to render here in full, above the money read. It is the Actions
@@ -4105,8 +4106,8 @@ function Overview({start, period, customActive}){
         Everything worth doing, in order <span className="v3-xref-go">on Actions →</span>
       </button>
       {/* Everything driven by the period picker sits behind one disclosure: the lead above is the answer. */}
-      <V3More id="profit-detail" label="The detail for the period you pick — every figure, what moved, day by day">
-      {priorSpike && <p className="v3-note v3-measure">The period before this one sold {fmtMoney(pRev)}, against about {fmtMoney(priorSpike.typ)} for a period this long — it held a sale. Changes below read worse than an ordinary month would; the lead above compares with a typical month instead.</p>}
+      <V3More id="profit-detail" label="Every figure for the dates you pick, and what changed day by day">
+      {priorSpike && <p className="v3-note v3-measure">The period before this one sold {fmtMoney(pRev)}, against about {fmtMoney(priorSpike.typ)} usually for that many days: it had a sale. So the changes below look worse than they are. The top of the page compares with a typical month instead.</p>}
       {/* COMMERCIAL HEALTH */}
       <div className="section-eyebrow" style={{display:'flex',alignItems:'center',gap:8,margin:'8px 0 -4px',fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-muted)'}}>
         <span style={{width:3,height:14,background:'var(--text-faint)',borderRadius:'var(--radius-sm)'}}/>Commercial health
@@ -10679,9 +10680,9 @@ function V3ActionBoard(){
             {startsUnver && (
               <li className="v3-rank-break">
                 <span className="v3-kick">Not re-checked</span>
-                <span className="v3-sub">Greta raised these more than 30 days ago and nothing since has
-                  confirmed they are still true. They keep their value and stay on the list, but they sit
-                  outside the ranked work until something verifies them.</span>
+                <span className="v3-sub">Greta raised these more than 30 days ago, and nothing since has
+                  confirmed they still hold. They stay on the list with their £ figure, but outside the
+                  ranking until Greta can check them again.</span>
               </li>
             )}
             <li className={'v3-rank-row' + (isOpen ? ' open' : '') + (unver ? ' unver' : '')}>
@@ -10695,9 +10696,9 @@ function V3ActionBoard(){
                     <i style={{ width: Math.max(1.5, (gbp / max) * 100) + '%' }}/>
                   </span>
                   <span className="v3-rank-meta">
-                    {r.category || 'general'}{r.days_open > 0 ? ' · open ' + r.days_open + 'd' : ''}
+                    {r.category || 'general'}{r.days_open > 0 ? ' · open ' + r.days_open + (Number(r.days_open) === 1 ? ' day' : ' days') : ''}
                     {conf ? ' · ' + V3_CONF[conf].label.toLowerCase() : ''}
-                    {unver ? ' · unchecked' : r.days_since_refresh != null ? (Number(r.days_since_refresh) <= 0 ? ' · checked today' : ' · checked ' + r.days_since_refresh + 'd ago') : ''}
+                    {unver ? ' · not re-checked' : r.days_since_refresh != null ? (Number(r.days_since_refresh) <= 0 ? ' · checked today' : ' · checked ' + r.days_since_refresh + (Number(r.days_since_refresh) === 1 ? ' day ago' : ' days ago')) : ''}
                   </span>
                 </span>
                 <span className="v3-rank-gbp">{v3Gbp(gbp)}<span className="v3-rank-per">{v3Per(r, true)}</span></span>
@@ -10760,7 +10761,7 @@ function V3ActionBoard(){
           );
         })}
       </ol>
-      {V3_BOARD.ranked && <p className="micro muted v3-measure">Each row says when Greta last checked the evidence behind it. A row nothing has re-checked for three weeks leaves the ranked list, so what is ranked here is what is still true.</p>}
+      {V3_BOARD.ranked && <p className="micro muted v3-measure">Each row says when Greta last checked the evidence behind it. A row that goes three weeks without a check leaves the ranking, so what is ranked here still holds.</p>}
       <V3HeldActions/>
       <V3Findings/>
     </div>
@@ -10790,7 +10791,7 @@ function V3Findings(){
   return (
     <div className="v3-rank-why">
       <span className="v3-kick">What Greta found</span>
-      <span className="v3-sub"> What moved and why, where there is no pound figure to rank it by. Strongest evidence first.</span>
+      <span className="v3-sub"> Changes Greta spotted that have no £ figure to rank them by. The best-supported come first.</span>
       <ul className="v3-rank-steps">
         {sorted.map(f => {
           const pa = { title: v3FindingTitle(f), why: v3Tidy(scrubTag(String(f.description || ''))) };
@@ -10810,7 +10811,7 @@ function V3Findings(){
             <button type="button" className="v3-rank-hit" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : f.external_id)}>
               <span className="v3-rank-body">
                 <span className="v3-rank-desc">{pa.title}</span>
-                <span className="v3-rank-meta">{f.category || 'general'}{conf ? ' · ' + V3_CONF[conf].label.toLowerCase() : ''}{behind >= 0 ? (counting ? ' · a counting change, not what is behind #' + (behind + 1) : ' · explains #' + (behind + 1)) : ''}</span>
+                <span className="v3-rank-meta">{({ total: 'Whole business', site: 'Website', finance: 'Money', ops: 'Running the business', product: 'Products', paid: 'Ads', creative: 'Ad content', retention: 'Repeat customers', cx: 'Customer service', stock: 'Stock', email: 'Email', organic: 'Unpaid visits' })[f.category] || f.category || 'general'}{conf ? ' · ' + V3_CONF[conf].label.toLowerCase() : ''}{behind >= 0 ? (counting ? ' · a change in how sales are counted, not the cause of action #' + (behind + 1) : ' · explains action #' + (behind + 1)) : ''}</span>
               </span>
             </button>
             {isOpen && (<div className="v3-rank-why">
@@ -10818,7 +10819,7 @@ function V3Findings(){
               {/* One verdict per platform: this cost is on the platform's own purchase count, the board's
                   is on the shop's orders, and the two read differently. Say which to judge it on. */}
               {behind >= 0 && /^metric-tree-/.test(String(f.external_id)) && (<p className="v3-note v3-measure">
-                This cost uses {ch === 'meta' ? 'Meta' : 'Google'}’s own count of purchases, not your shop’s orders, so it reads differently from the cost per order on the board (#{behind + 1}). Judge {ch === 'meta' ? 'Meta' : 'Google'} on the board’s figure; read this for which stage moved.</p>)}
+                This cost uses {ch === 'meta' ? 'Meta' : 'Google'}’s own count of purchases, not your shop’s orders, so it differs from the cost per order in action #{behind + 1}. Judge {ch === 'meta' ? 'Meta' : 'Google'} on the figure in #{behind + 1}. Use this to see which step changed.</p>)}
               {reasons.length > 0 && (<div className="v3-rank-raw"><span className="v3-kick">Why {conf ? V3_CONF[conf].label.toLowerCase() : 'this steer'}</span>
                 <ul className="v3-rank-steps">{reasons.map((x, j) => <li key={j}>{v3Tidy(x.text)}</li>)}</ul></div>)}
             </div>)}
@@ -10850,7 +10851,7 @@ function V3HeldActions(){
   return (
     <div className="v3-rank-why">
       <button type="button" className="v3-btn v3-btn-sm" aria-expanded={openList} onClick={() => setOpenList(o => !o)}>
-        {openList ? 'Hide' : 'Show'} {rows.length} held back
+        {openList ? 'Hide' : 'Show'} {rows.length} {rows.length === 1 ? 'action' : 'actions'} Greta held back
       </button>
       {openList && (
         <ul className="v3-rank-steps">
@@ -10967,7 +10968,7 @@ function ActionsView(){
     <div>
       {/* No heading here: the page head one line above already reads "Actions / What should I do
           first?". Saying it twice is the kind of thing that makes a product feel unedited. */}
-      <p className="v3-note" style={{margin:'0 0 12px'}}>Everything worth doing, ranked by how sure Greta is and what it is worth — open any row to see why.</p>
+      <p className="v3-note" style={{margin:'0 0 12px'}}>Everything worth doing, ranked by how sure Greta is and what it is worth. Open any row to see why.</p>
       <V3ActionBoard/>
       {/* Restock keeps its own queue, but BELOW the ranked list and collapsed: it is a different
           job (what to order, by date) and it was drowning the money ranking when it led. */}
@@ -13660,7 +13661,7 @@ function GretaPlanPanel({ show } = {}) {
       {/* readiness gate */}
       {isReady && (<div style={{ borderTop: '1px solid ' + GP_T.line, padding: 'var(--space-6) 0', marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <h2 className="v3-sec-title gp-h">Data readiness</h2>
+          <h2 className="v3-sec-title gp-h">Is there enough data to plan?</h2>
           {/* "0 of 0 ready · ready to plan" was what a failed read looked like. */}
           {readiness.length
             ? <div style={{ fontSize: 'var(--text-sm)', color: blocking.length ? GP_T.amber : GP_T.green }}>{readyCount} of {readiness.length} ready{blocking.length ? ' · ' + blocking.length + ' still needed before Greta can set targets' : ' · ready to plan'}</div>
@@ -14131,8 +14132,8 @@ function V3Reconnected() {
   const prov = (typeof window !== 'undefined' && window.GRETA_JUST_CONNECTED) || null;
   if (!prov || !CONN_LABEL[prov]) return null;
   return (<div className="v3-note" role="status">
-    {CONN_LABEL[prov]} is reconnected. The missing days come in with the next sync, within two hours —
-    this action clears itself once they land.
+    {CONN_LABEL[prov]} is reconnected. The missing days arrive within two hours, and this action
+    clears itself once they do.
   </div>);
 }
 
@@ -14637,7 +14638,7 @@ function V3ProductCosts(){
       <p className="v3-lede">Shopify gives a cost for <b>{fmtCount(n('shopify') + n('yours'))}</b> of your {fmtCount(rows.length)} products
         {cov != null && <>, covering <b>{fmtPctN(cov / 100)}</b> of the last 90 days’ sales</>}.
         {n('missing') > 0 && <> The other {fmtCount(n('missing'))} use your margin{gm != null ? ' of ' + gm + '%' : ''} until they have one.</>}</p>
-      <p className="v3-note v3-measure">Costs come from “Cost per item” in Shopify and refresh every half hour. Change one here if Shopify’s is wrong, or add freight and duty on top — your figure stays until you hand it back.</p>
+      <p className="v3-note v3-measure">Costs come from “Cost per item” in Shopify and refresh every half hour. Change one here if Shopify’s is wrong, or add freight and duty on top. Your figure stays until you switch back to Shopify’s.</p>
       <V3FreightRate/>
       <div className="v3-chips v3-chips-plain" role="tablist" aria-label="Show products">
         {[['all', 'All', rows.length], ['missing', 'No cost yet', n('missing')], ['yours', 'Your costs', n('yours')]].map(f => (
@@ -14648,7 +14649,7 @@ function V3ProductCosts(){
       {msg && <p className={msg.kind === 'ok' ? 'v3-note v3-ok' : 'v3-note v3-bad'} role="status">{msg.text}</p>}
       {!shown.length ? <div className="v3-empty">{needle ? 'No products match “' + q.trim() + '”.' : filter === 'yours' ? 'You haven’t changed any of Shopify’s costs.' : 'Every product has a cost.'}</div> : (
       <table className="v3-ptable v3-costs">
-        <thead><tr><th className="t-text">Product</th><th>Price</th><th>Cost</th><th>Freight + duty</th><th>Landed</th><th/></tr></thead>
+        <thead><tr><th className="t-text">Product</th><th>Price</th><th>Cost</th><th>Freight + duty</th><th>Total cost</th><th/></tr></thead>
         <tbody>{shown.slice(0, limit).map(r => {
           const c = r.cur, open = edit && edit.variant_id === r.variant_id;
           return (<React.Fragment key={r.variant_id}>
@@ -14842,7 +14843,7 @@ function BusinessEconomicsPanel(){
     if(!ok){ setCsMsg({ text:data.message||data.detail||data.error||'Save failed.', kind:'err' }); return; }
     setConfig(data.config); seed(data.config);
     try { window.dispatchEvent(new Event('oi-config-updated')); } catch(e){}
-    setCsMsg({ text:'Saved. Your own figures now drive the cash cycle instead of category estimates.', kind:'ok' });
+    setCsMsg({ text:'Saved. Greta now uses your own figures instead of estimates.', kind:'ok' });
   };
 
   // Answering "how is the business funded" stores the answer and the rate it implies, server side.
@@ -14864,7 +14865,7 @@ function BusinessEconomicsPanel(){
     setGenome(g => ({ ...g, discount_rate_annual: String(round2(res.rate * 100)) }));
     await loadGen();
     try { window.dispatchEvent(new Event('oi-config-updated')); } catch (e) {}
-    setFundMsg({ text: 'Saved. Greta uses it from the next engine run.', kind: 'ok' });
+    setFundMsg({ text: 'Saved. Greta uses it from its next update.', kind: 'ok' });
   };
   // Back to the measured stock days (it then follows the stock nightly).
   const useMeasuredDays = async () => {
@@ -14914,8 +14915,8 @@ function BusinessEconomicsPanel(){
       && data.config.cash_floor != null && data.config.supplier_payment_terms_days != null
       && data.config.inventory_days != null && data.config.supplier_lead_time_weeks != null;
     setCashMsg({ text: nowReady
-      ? 'Cash settings saved — the fundable spend ceiling switches on at the next engine run.'
-      : 'Saved. Still missing a core field, so spend is not capped on cash yet.', kind:'ok' });
+      ? 'Cash settings saved. From Greta’s next update, spend is capped at what your cash allows.'
+      : 'Saved. A required field is still missing, so spend is not limited by cash yet.', kind:'ok' });
   };
 
   if(!authed){
@@ -14955,8 +14956,8 @@ function BusinessEconomicsPanel(){
     savings: ((ref.savings && ref.savings.label) || 'the Bank of England rate') + ', what your cash would earn instead',
     investors: ((ref.investors && ref.investors.label) || 'a typical return investors expect') + '. Use a different rate if yours expect more or less' }[dSrc];
   const dSay = dSrc && dRate != null
-    ? <>Repeat orders that arrive later are valued at <span className="v3-econ-fig">{econRatePct(dRate)}</span> a year: {dWhy}.</>
-    : <>Greta uses <span className="v3-econ-fig">{priors.discountRatePct}%</span> for now, an estimate for {priors.label} brands. Pick how you are funded and it uses your real cost of money. It only discounts repeat orders that arrive later, so it moves profit per customer a little.</>;
+    ? <>Repeat orders that come later count as worth <span className="v3-econ-fig">{econRatePct(dRate)}</span> a year less: {dWhy}.</>
+    : <>Greta uses <span className="v3-econ-fig">{priors.discountRatePct}%</span> for now, an estimate for {priors.label} brands. Pick how you are funded and it uses what money really costs you. It only lowers the value of repeat orders that come later, so it moves profit per customer a little.</>;
 
   // Provenance chip: 'your number' when the config has a stored value, else the fallback the engine uses.
   const Tag = ({ saved, fallback }) => (
@@ -14992,9 +14993,9 @@ function BusinessEconomicsPanel(){
             Goal & costs — the one place for them (0221). This panel keeps cash, stock and terms. */}
         {/* ── Step 2 — Cost stack + cash cycle (optional, sharpens the model) ── */}
         <div className="v3-econ-step">
-          <h3 className="v3-econ-title" style={{marginBottom:'var(--s-1)'}}>Cash cycle</h3>
+          <h3 className="v3-econ-title" style={{marginBottom:'var(--s-1)'}}>Stock and funding</h3>
           <div className="meta" style={{fontSize:'var(--text-sm)', marginBottom:'var(--s-5)', lineHeight:1.6, maxWidth:640}}>
-            Optional, but each number you confirm replaces a {priors.label} category estimate with your own — sharpening the cash cycle and customer lifetime value. Leave a field blank and the estimate stands.
+            Optional. Each number you enter replaces Greta’s {priors.label} estimate with your own, which sharpens your cash figures and what a customer is worth. Leave a field blank and the estimate stands.
           </div>
 
           <form onSubmit={saveCostStack} style={{display:'flex', flexDirection:'column', gap:'var(--s-6)'}}>
@@ -15053,15 +15054,15 @@ function BusinessEconomicsPanel(){
             cash number on screen that rests on a guess. */}
         <div className="v3-econ-step">
           <div style={{display:'flex', alignItems:'baseline', gap:'var(--s-2)', flexWrap:'wrap', marginBottom:4}}>
-            <h3 className="v3-econ-title">Cash &amp; working capital</h3>
+            <h3 className="v3-econ-title">Cash: what you can afford</h3>
             <span className="v3-econ-tag" data-tone={cashReady ? 'good' : undefined}>
-              {cashReady ? 'Cash ceiling is on' : 'Not set — spend is not capped on cash'}
+              {cashReady ? 'Spend is capped at what your cash allows' : 'Not set — spend is not limited by cash'}
             </span>
           </div>
           <div className="meta" style={{fontSize:'var(--text-sm)', marginBottom:'var(--s-5)', lineHeight:1.6, maxWidth:660}}>
             Your forecast says what spend is <em>profitable</em>. These say what is <em>affordable</em>.
-            The recommendation becomes the lower of the two. Until the first four are set, nothing is
-            capped and no cash figure appears anywhere — a cash model on guesses is worse than none.
+            Greta recommends the lower of the two. Until the fields marked required and days stock is held
+            are set, nothing is capped and no cash figure appears anywhere. A cash figure built on guesses is worse than none.
           </div>
 
           <form onSubmit={saveCash} style={{display:'flex', flexDirection:'column', gap:'var(--s-6)'}}>
@@ -15076,14 +15077,14 @@ function BusinessEconomicsPanel(){
                   <div className="v3-econ-head"><span>Balance as at</span><Tag saved={config?.opening_cash_as_of != null} fallback={{ label:'required', warn:true }}/></div>
                   <input type="date" value={cash.opening_cash_as_of||''} max={todayISO()}
                     onChange={e=>setCash(s=>({...s, opening_cash_as_of:e.target.value}))} style={inputStyle}/>
-                  <div className="v3-econ-hint">Goes stale after 45 days — after that the model stops showing cash rather than trust it.</div>
+                  <div className="v3-econ-hint">After 45 days, Greta stops showing cash rather than trust an old balance.</div>
                 </div>
                 <Field label="Minimum balance" unit={curSym()} value={cash.cash_floor||''} onChange={v=>setCash(s=>({...s, cash_floor:v}))}
                   saved={config?.cash_floor != null} fallback={{ label:'required', warn:true }}
-                  hint="The floor you will not go below. Spend is capped to keep 13 weeks above it."/>
+                  hint="The lowest you will let cash fall to. Greta caps spend so cash stays above it for the next 13 weeks."/>
                 <Field label="Facility available" unit={curSym()} value={cash.facility_available||''} onChange={v=>setCash(s=>({...s, facility_available:v}))}
                   saved={config?.facility_available != null} fallback={{ label:'assumes none' }}
-                  hint="Undrawn overdraft or line. Shown as headroom — never drawn automatically."/>
+                  hint="An overdraft or loan you could use but haven’t. Shown as spare room, never used automatically."/>
               </div>
             </div>
 
@@ -15093,12 +15094,12 @@ function BusinessEconomicsPanel(){
                 <Field label="Cover you reorder to" unit="days" int value={cash.inventory_cover_days_active||''}
                   onChange={v=>setCash(s=>({...s, inventory_cover_days_active:v}))}
                   saved={config?.inventory_cover_days_active != null}
-                  fallback={{ label:'uses inventory days' }}
-                  hint="The range you actually reorder — not total stock. Slow movers are already bought, so counting them here would overstate future purchases."/>
+                  fallback={{ label:'uses days stock is held' }}
+                  hint="Days of sales you restock to, for the products you keep reordering. Leave out slow sellers: they are already bought, so counting them would overstate what you buy next."/>
                 <Field label="Supplier lead time" unit="wks" value={cash.supplier_lead_time_weeks||''}
                   onChange={v=>setCash(s=>({...s, supplier_lead_time_weeks:v}))}
                   saved={config?.supplier_lead_time_weeks != null} fallback={{ label:'required', warn:true }}
-                  hint="Order to goods landing. 45–60 days is roughly 6.5–8.5 weeks."/>
+                  hint="From placing an order to the goods arriving. 45–60 days is roughly 6.5–8.5 weeks."/>
                 <Field label="Deposit" unit="%" value={cash.supplier_deposit_pct||''}
                   onChange={v=>setCash(s=>({...s, supplier_deposit_pct:v}))}
                   saved={config?.supplier_deposit_pct != null} fallback={{ label:'assumes 0%' }}
@@ -15106,11 +15107,11 @@ function BusinessEconomicsPanel(){
                 <Field label="Deposit paid before landing" unit="days" int value={cash.supplier_deposit_lead_days||''}
                   onChange={v=>setCash(s=>({...s, supplier_deposit_lead_days:v}))}
                   saved={config?.supplier_deposit_lead_days != null} fallback={{ label:'uses lead time' }}
-                  hint="How far ahead of the goods arriving the deposit leaves. This is where growth eats cash."/>
+                  hint="How many days before the goods arrive you pay the deposit. This is where growth eats cash."/>
                 <Field label="Balance terms" unit="days" int value={cash.supplier_payment_terms_days_cash||''}
                   onChange={v=>setCash(s=>({...s, supplier_payment_terms_days_cash:v}))}
                   saved={config?.supplier_payment_terms_days != null} fallback={{ label:'required', warn:true }}
-                  hint="Days after landing you pay the balance. 0 = on shipment."/>
+                  hint="Days after the goods arrive that you pay the rest. 0 means you pay on shipment."/>
               </div>
             </div>
 
@@ -15124,11 +15125,11 @@ function BusinessEconomicsPanel(){
                 <Field label="Fulfilment terms" unit="days" int value={cash.fulfilment_terms_days||''}
                   onChange={v=>setCash(s=>({...s, fulfilment_terms_days:v}))}
                   saved={config?.fulfilment_terms_days != null} fallback={{ label:'assumes same week' }}
-                  hint="Days you have to pay your 3PL and carriers."/>
+                  hint="Days you have to pay your warehouse and couriers."/>
                 <Field label="Fixed-cost terms" unit="days" int value={cash.opex_terms_days||''}
                   onChange={v=>setCash(s=>({...s, opex_terms_days:v}))}
                   saved={config?.opex_terms_days != null} fallback={{ label:'assumes same week' }}
-                  hint="Blended terms on fixed costs — agencies on 30 days, subscriptions immediate."/>
+                  hint="On average, how many days you have to pay your running costs. An agency might give 30; subscriptions are paid straight away."/>
               </div>
             </div>
 
@@ -15137,7 +15138,7 @@ function BusinessEconomicsPanel(){
                 style={{padding:'9px 16px', fontSize:'var(--text-sm)', border:0, borderRadius:'var(--r-md)', cursor:cashBusy?'default':'pointer', fontFamily:'inherit', fontWeight:'var(--weight-semi)', opacity:cashBusy?0.6:1}}>
                 {cashBusy ? 'Saving…' : 'Save cash settings'}
               </button>
-              <span className="meta" style={{fontSize:'var(--text-xs)'}}>Blank fields stay unset — the model abstains rather than guessing.</span>
+              <span className="meta" style={{fontSize:'var(--text-xs)'}}>Blank fields stay empty. Greta shows no cash figure rather than guess.</span>
             </div>
           </form>
           {msgBox(cashMsg)}
@@ -15850,8 +15851,7 @@ function V3MoneyFlow({ d, note }) {
           <span className="v3-flow-top-val">{v3Gbp(sales)} of sales</span>
         </div>
         <p className="v3-note">{v3Gbp(spend)} of that went on ads. Greta cannot yet show what you keep,
-          because it does not know what your products and orders cost you — and a guess here would be
-          wrong by whatever your real margin is.</p>
+          because it does not know what your products and orders cost you. A guess here could be far off.</p>
         <div className="v3-btns">
           <button type="button" className="v3-btn v3-btn-p v3-btn-sm"
                   onClick={() => window.__oiNav && window.__oiNav('settings', 'costs')}>Enter your costs</button>
@@ -16080,17 +16080,17 @@ function v3PlainAction(row){
   if (id === 'sales-rhythm') return P('Spend less on ads in the weeks between sales', raw);
   if (/^basket-pair/.test(id)) { const add = (raw.match(/Offer "([^"]+)" as the add-on/) || [])[1];
     return P(add ? 'Offer the ' + add + ' as an add-on' : 'Offer an add-on to single-item orders', raw); }
-  if (id === 'crm-flows') return P(/switched off/i.test(raw) ? 'Fix the post-purchase email and switch on the cross-sell flows' : 'Fix the email flows that earn least', raw);
+  if (id === 'crm-flows') return P(/switched off/i.test(raw) ? 'Fix the email sent after an order, and switch on the emails that suggest more products' : 'Fix the automatic emails that earn least', raw);
   if (id === 'basket-free-shipping') return P('Show shoppers how close they are to free shipping', raw);
   if (/^paid-brand-share/.test(id)) return P('Raise the bid on searches for your name', raw);
   if (/^test-holdout-/.test(id) && (x = m(/^(Test whether .+?)\.\s+([\s\S]+)$/))) return P(x[1], x[2]);
-  if ((x = id.match(/^paid-landing-(\w+)/))) return P('Send ' + v3Ch(x[1]) + ' ads to products that pay back a new customer', raw);
+  if ((x = id.match(/^paid-landing-(\w+)/))) return P('Send ' + v3Ch(x[1]) + ' ads to products that earn back what a new customer costs', raw);
   if (/^order-cost-/.test(id) && (x = m(/^([\s\S]+\.)\s+([^.]+(?:\.\d[^.]*)*)\.?$/))) {
     return P(x[2].replace(/\.$/, ''), x[1]);
   }
   if (/^product-hero_underexposed/.test(id) && (x = m(/Hidden hero: (.+?) earns ([\d.]+)% gross margin/i))) {
     return P('Show ' + x[1] + ' to more shoppers',
-      'It keeps ' + x[2] + 'p of every £1 after product cost and its sales are growing, but few people see it. More space on the site and in bundles turns that margin into profit.');
+      'It keeps ' + x[2] + 'p of every £1 after product cost, and its sales are growing, but few people see it. More space on the site and in bundles turns that into profit.');
   }
   if (/^pulse-cro-fix-/.test(id)) {
     // "Fix the discount_value JS error on the cart Checkout button — it blocks cart→checkout."
@@ -16104,9 +16104,9 @@ function v3PlainAction(row){
       'A broken script on the ' + plainWhere + ' ' + blocks + '. Every shopper who hits it is a sale lost after you have already paid to bring them in.');
   }
   if (id === 'synth-creative-waste') return P('Stop spending on ads that have never made a sale',
-    'Some ads are taking budget without a single purchase. Check their tracking first — a broken pixel looks the same as a bad ad — then switch off the ones that are genuinely not selling.');
+    'Some ads are taking budget without a single purchase. Check their tracking first, because broken tracking looks the same as a bad ad. Then switch off the ones that really are not selling.');
   if (/^synth-weak-conv-rank-(\w+)-spend/.test(id)) { const ch = v3Ch(id.match(/^synth-weak-conv-rank-(\w+)-spend/)[1]);
-    return P('Move ' + ch + ' budget away from ads that rarely sell', 'Part of your ' + ch + ' spend sits on ads that convert worst. Shifting it to the ads that sell gets more orders from the same budget.'); }
+    return P('Move ' + ch + ' budget away from ads that rarely sell', 'Part of your ' + ch + ' spend sits on the ads that least often lead to a sale. Shifting it to the ads that sell gets more orders from the same budget.'); }
   // What this emitter measures is share of revenue, not demand — so the why says that and
   // tells the owner to check for demand before investing, which is the playbook's own first step.
   if ((x = id.match(/^synth-(.+)-collection-gap$/))) return P('See whether a bigger ' + x[1].replace(/-/g, ' ') + ' range would sell',
@@ -16117,8 +16117,8 @@ function v3PlainAction(row){
     return P('Cut back on discounts of ' + x[1] + '% or more',
       'An order sold that cheaply leaves about £' + x[2] + ' once the product and order costs are paid, but winning a new customer costs you about £' + x[3] + ' — and ' + x[4] + '% of your orders are sold that way.');
   }
-  if (id === 'discount-dependency') return P('Bring markdown customers back at full price',
-    'Customers who first bought on markdown mostly buy on markdown again. Their next offer should be something other than a deeper discount.');
+  if (id === 'discount-dependency') return P('Get customers who first bought in a sale to buy at full price',
+    'Customers whose first order was marked down mostly buy marked-down items again. Offer them something other than a deeper discount next time.');
   if ((x = id.match(/^paid-landing-(\w+)/)) && (x = [x[1], ...(raw.match(/(\d+) new customers/) || [])])) {
     const ch = v3Ch(x[0]);
     return P('Point ' + ch + ' ads at products that can pay for a new customer',
@@ -16190,7 +16190,7 @@ function V3Setup({ s }) {
       hint: 'Product cost, shipping, packaging and fees — this turns sales into profit',
       go: ['goal'], cta: 'Enter costs' },
     { done: s.goal_confirmed, label: 'Confirm your goal',
-      hint: 'Greta estimates one from your trading; you adjust it rather than invent it',
+      hint: 'Greta suggests one from your sales so far. You adjust it rather than start from nothing',
       go: ['goal'], cta: 'Confirm goal' },
     { done: s.has_action, label: 'See your first action',
       hint: 'The one thing worth doing, priced in pounds', go: ['today'], cta: 'Show me' },
@@ -16234,16 +16234,16 @@ function V3Setup({ s }) {
 // navigation. Same edge function, same actions, same capabilities: segment cards, the
 // people table, the loyalty filter, the consent toggle, the reward preview and staging.
 const CSEG = {
-  'Champion':           { tone: 'good',   blurb: 'High value, frequent, recent — reward and protect' },
-  'Loyal':              { tone: 'accent', blurb: 'Repeat and recent — nurture toward Champion' },
-  'At risk':            { tone: 'warn',   blurb: 'Were valuable, gone quiet — win them back' },
-  'Promising (new)':    { tone: 'accent', blurb: 'One order, recent — drive the second purchase' },
-  'Dormant (one-time)': { tone: 'muted',  blurb: 'One order, lapsed — reactivation pool' },
+  'Champion':           { tone: 'good',   blurb: 'Spend the most, buy often and bought recently. Reward them and keep them.' },
+  'Loyal':              { tone: 'accent', blurb: 'Buy again and bought recently. Help them become Champions.' },
+  'At risk':            { tone: 'warn',   blurb: 'Used to spend well, now gone quiet. Win them back.' },
+  'Promising (new)':    { tone: 'accent', blurb: 'One recent order. Ask for the second.' },
+  'Dormant (one-time)': { tone: 'muted',  blurb: 'One order, a while ago. Worth one try to bring back.' },
 };
 const CLOY = {
-  full_price:      { label: 'Full-price loyal', tone: 'good', play: 'The real VIPs — reward with perks, not discounts' },
-  mixed:           { label: 'Mixed',            tone: 'warn', play: 'Nurture toward full price' },
-  discount_driven: { label: 'Discount-driven',  tone: 'bad',  play: 'Loyal to the deal — wean them off, do not send more codes' },
+  full_price:      { label: 'Full-price loyal', tone: 'good', play: 'Your best customers. Reward them with perks, not discounts.' },
+  mixed:           { label: 'Mixed',            tone: 'warn', play: 'Move them towards paying full price.' },
+  discount_driven: { label: 'Discount-driven',  tone: 'bad',  play: 'Loyal to the deal. Send them fewer codes, not more.' },
 };
 const CTONE = { good: 'var(--good)', warn: 'var(--warn)', bad: 'var(--bad)', accent: 'var(--accent)', muted: 'var(--text-muted)' };
 
@@ -16294,8 +16294,8 @@ function CustomerSegments(){
     if (!window.confirm('Create a Klaviyo list of these ' + seg + ' customers?\n\nNothing is sent — you build and send the campaign in Klaviyo.')) return;
     setBusy('stage');
     ciFetch('stage-reward', Object.assign({ segment: seg, requireConsent: consent, confirm: true }, loyalty ? { loyalty } : {}))
-      .then(r => setStaged({ ok: true, t: 'Staged “' + r.listName + '” — ' + r.profilesSubmitted + ' people imported. Build the campaign in Klaviyo.' }))
-      .catch(e => setStaged({ ok: false, t: 'Could not stage it — ' + String(e.message || e) }))
+      .then(r => setStaged({ ok: true, t: 'Created “' + r.listName + '” in Klaviyo with ' + r.profilesSubmitted + ' people. Build the campaign there.' }))
+      .catch(e => setStaged({ ok: false, t: 'Could not create the list: ' + String(e.message || e) }))
       .finally(() => setBusy(''));
   };
 
@@ -16312,7 +16312,7 @@ function CustomerSegments(){
   const t = ov.totals || {};
   return (<div className="card">
     <div className="card-section-title"><h2 style={{margin:0}}>Your customers</h2>
-      <span className="meta">{(t.customers||0).toLocaleString('en-GB')} customers · {GBP(t.netRevenue)} lifetime · grouped by how recently and how often they buy</span></div>
+      <span className="meta">{(t.customers||0).toLocaleString('en-GB')} customers · {GBP(t.netRevenue)} spent in total · grouped by how recently and how often they buy</span></div>
 
     <div style={{display:'flex', gap:8, flexWrap:'wrap', marginTop:10}}>
       {segs.map(s => {
@@ -16354,7 +16354,7 @@ function CustomerSegments(){
             <option value="discount_driven">Discount-driven</option>
           </select>
           <label className="micro" style={{display:'flex', gap:5, alignItems:'center', cursor:'pointer'}}>
-            <input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/> only people who agreed to email
+            <input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/> only people who agreed to get emails
           </label>
           <button type="button" className="v3-btn v3-btn-sm" onClick={previewReward} disabled={busy==='preview'}>
             {busy==='preview' ? 'Checking…' : 'Who would this reach?'}
@@ -16369,7 +16369,7 @@ function CustomerSegments(){
             {preview.excludedNoConsent ? <span className="muted"> · {preview.excludedNoConsent} excluded for not agreeing to email</span> : null}
             <div style={{display:'flex', gap:10, alignItems:'center', flexWrap:'wrap', marginTop:8}}>
               <button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={stage} disabled={busy==='stage'}>
-                {busy==='stage' ? 'Staging…' : 'Create the list in Klaviyo'}
+                {busy==='stage' ? 'Creating…' : 'Create the list in Klaviyo'}
               </button>
               <span className="micro muted">This only creates the list. Nothing is sent — you write and send the campaign in Klaviyo.</span>
             </div>
@@ -16378,7 +16378,7 @@ function CustomerSegments(){
 
       {busy === 'rows' ? <div className="muted" style={{fontSize:'var(--text-sm)'}}>Loading…</div> : (rows && (<>
         <div style={{overflowX:'auto'}}>
-          <table><thead><tr><th>Customer</th><th>Orders</th><th>Spent</th><th>Last order</th><th>Came from</th><th>Average discount</th><th>Emailable</th></tr></thead>
+          <table><thead><tr><th>Customer</th><th>Orders</th><th>Spent</th><th>Last order</th><th>Came from</th><th>Average discount</th><th>Can email</th></tr></thead>
             <tbody>{(rows.people||[]).slice(0,25).map((p,i)=>(<tr key={i}>
               <td>{p.name}</td><td>{p.orders}</td><td>{GBP(p.netRevenue)}</td><td>{p.recencyDays}d ago</td>
               <td>{p.acquisitionChannel}</td>
@@ -16504,8 +16504,8 @@ function DataHealth(){
         {avg != null && <> Over the last fortnight it averaged {pct(avg)}.</>}
       </div>
       {avg != null && avg < 0.9 && (<div className="fine" style={{color:'var(--text-secondary)', marginTop:6}}>
-        Conversion rates are calculated from this, so while coverage is below 100% every conversion
-        rate on the Website page reads lower than reality. The gap is tracking, not shoppers.
+        The share of visitors who buy is worked out from this. While it is below 100%, that share
+        on the Website page reads lower than it really is. The gap is tracking, not shoppers.
       </div>)}
     </div>)}
   </div>);
@@ -16552,11 +16552,11 @@ function CreativeReallocation(){
   const healthy = live.filter(r => r.state === 'holding' || r.state === 'improving' || r.state === 'ahead');
   const total = live.reduce((t, r) => t + n(r.spend_28d), 0);
   const go = () => { try { window.__oiGo && window.__oiGo('marketing', 'creative'); } catch (e) {} };
-  const head = (<div className="card-section-title"><h2 style={{margin:0}}>Spend sitting on the weaker ads</h2>
-    <span className="meta">Last 28 days, on Meta’s count of purchases, after product costs</span></div>);
+  const head = (<div className="card-section-title"><h2 style={{margin:0}}>Which ads should I switch off?</h2>
+    <span className="meta">Last 28 days · purchases as Meta counts them · profit after product costs</span></div>);
   if (!weak.length) return (<div className="card">{head}
     <div style={{fontSize:'var(--text-sm)', lineHeight:1.6, marginTop:8}}>
-      None of your spending ads has broken down in the last 28 days{tiring.length ? '; ' + NUM(tiring.length) + (tiring.length === 1 ? ' is' : ' are') + ' tiring — fewer people click, though purchases have held so far' : ''}.
+      None of the ads you are paying for has broken down in the last 28 days.{tiring.length ? ' ' + NUM(tiring.length) + (tiring.length === 1 ? ' is' : ' are') + ' tiring: fewer people click, though purchases have held so far.' : ''}
     </div></div>);
   const wSpend = weak.reduce((t, r) => t + n(r.spend_28d), 0);
   const wPurch = weak.reduce((t, r) => t + n(r.purchases_28d), 0);
@@ -16576,23 +16576,23 @@ function CreativeReallocation(){
       <b className="oi-num">{v3AdGbp(wSpend)}</b> of your ad spend{total > 0 ? ' (' + fmtPctN(wSpend / total) + ' of it)' : ''} went on
       {' '}<b>{NUM(weak.length)}</b> {weak.length === 1 ? 'ad that has' : 'ads that have'} broken down: {nameList}{weak.length > 3 ? ' and ' + NUM(weak.length - 3) + ' more' : ''}.
       {' '}{wProfit < 0 ? <>Together they lost <b className="oi-num">{curSym() + v3Amount(wProfit)}</b></> : <>Together they made <b className="oi-num">{curSym() + v3Amount(wProfit)}</b></>}
-      {wShort > 0 ? <> — <span className="oi-num">{curSym() + v3Amount(wShort)}</span> less than their own earlier rates would have made</> : null}.
+      {wShort > 0 ? <>. At their own earlier rates they would have made <span className="oi-num">{curSym() + v3Amount(wShort)}</span> more</> : null}.
       {tiring.length > 0 && <> {NUM(tiring.length)} more {tiring.length === 1 ? 'is' : 'are'} tiring: fewer people click, though purchases have held so far.</>}
     </div>
     {/* When the ads holding up also pay more for a purchase than a purchase earns, moving money
         between ads cannot fix it, and a ceiling would point the operator at the wrong lever. */}
     {hCpp && cm > 0 && hCpp > cm && (<div className="note" style={{marginTop:10}}>
-      Moving it to your other ads would not fix this: the ones holding up pay <span className="oi-num">{v3AdGbp2(hCpp)}</span> for a
-      {' '}purchase too, and a purchase earns <span className="oi-num">{v3AdGbp2(cm)}</span> after product costs. The lever is new
-      creative or less spend, not a different split.
+      Moving the money to your other ads would not fix this. They also pay <span className="oi-num">{v3AdGbp2(hCpp)}</span> to win a
+      {' '}purchase, more than the <span className="oi-num">{v3AdGbp2(cm)}</span> a purchase earns after product costs. Make new
+      ads or spend less instead.
     </div>)}
     {hCpp && extra >= 1 && cm > 0 && hCpp <= cm && (<div className="note" style={{marginTop:10}}>
-      Your ads that are holding up bought a purchase for every <span className="oi-num">{v3AdGbp2(hCpp)}</span>. At that rate the same
-      {' '}<span className="oi-num">{v3AdGbp(wSpend)}</span> would have bought about <b className="oi-num">{NUM(extra)}</b> more purchases,
+      Your ads that are holding up won a purchase for every <span className="oi-num">{v3AdGbp2(hCpp)}</span>. At that rate the same
+      {' '}<span className="oi-num">{v3AdGbp(wSpend)}</span> would have won about <b className="oi-num">{NUM(extra)}</b> more purchases,
       worth up to <b className="oi-num">{curSym() + v3Amount(extra * cm)}</b> after product costs.
       <div className="micro muted" style={{marginTop:4}}>
-        A ceiling, not a promise: more budget changes who the stronger ads are shown to, so expect a
-        share of it. Cut the weakest first and watch the cost per purchase before moving the rest.
+        That is the most it could be, not a promise. More budget shows the stronger ads to new people,
+        so expect part of it. Switch off the weakest first, and watch what each purchase costs before moving the rest.
       </div>
     </div>)}
     <div style={{marginTop:10}}><button type="button" className="v3-btn v3-btn-sm" onClick={go}>See each ad</button></div>
@@ -16860,12 +16860,12 @@ function CashCeiling(){
   const missing = gate && gate.readiness !== 'ready';
   return (<div className="card" style={{marginTop:14}}>
     <div className="card-section-title"><h2 style={{margin:0}}>Can you afford the plan?</h2>
-      <span className="meta">Profit and cash are different questions — stock is paid for before the sales arrive</span></div>
+      <span className="meta">You pay for stock before the sales come in, so a profitable plan can still run out of cash</span></div>
     {(!gate || missing) ? (<div style={{marginTop:8}}>
       <div className="fine" style={{color:'var(--text-secondary)', lineHeight:1.55}}>
-        Greta will not guess at this one. Add your cash on hand, the balance you never want to go below,
-        and your supplier terms, and it will work out the most you can spend a week without running out
-        — which is often lower than the most you can spend profitably.
+        Greta won’t guess this one. Add the cash you have now, the lowest balance you are willing to reach,
+        and your supplier’s payment terms. Greta then works out the most you can spend a week without running
+        out of cash. That is often less than the most you could spend at a profit.
         {gate && gate.missing_inputs ? <><br/><span className="muted">Still needed: {String(gate.missing_inputs).replace(/[{}"]/g,'').replace(/,/g, ', ')}</span></> : null}
       </div>
       <div style={{marginTop:8}}>
@@ -16875,19 +16875,19 @@ function CashCeiling(){
       <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:10}}>
         <GP_Metric k="Most you can spend a week" v={GP_gbp(gate.s_recommended)} hi={true}
           sub={gate.binding === 'cash' ? 'limited by cash, not profit' : 'limited by profit'} />
-        <GP_Metric k="Profit alone would allow" v={GP_gbp(gate.s_profit_weekly)} />
-        <GP_Metric k="Cash alone would allow" v={GP_gbp(gate.s_cash_weekly)} />
-        <GP_Metric k="Lowest cash you reach" v={GP_gbp(gate.min_cash)}
-          sub={gate.min_cash_week ? 'week of ' + String(gate.min_cash_week).slice(0,10) : null} />
+        <GP_Metric k="If only profit mattered" v={GP_gbp(gate.s_profit_weekly)} />
+        <GP_Metric k="If only cash mattered" v={GP_gbp(gate.s_cash_weekly)} />
+        <GP_Metric k="Your lowest cash balance" v={GP_gbp(gate.min_cash)}
+          sub={gate.min_cash_week ? 'week of ' + v3Day(String(gate.min_cash_week).slice(0,10), true) : null} />
       </div>
       {Number(gate.funding_gap) > 0 && (<div className="note" style={{marginTop:10}}>
-        <b>You would need {GP_gbp(gate.funding_gap)} more cash</b> to run this plan through the stock
-        purchases it implies{gate.first_breach_week_start ? ', first falling short in the week of ' + String(gate.first_breach_week_start).slice(0,10) : ''}.
-        Either raise it, slow the spend, or move the stock order later.
+        <b>You would need {GP_gbp(gate.funding_gap)} more cash</b> to pay for the stock this plan needs.
+        {gate.first_breach_week_start ? ' You would first run short in the week of ' + v3Day(String(gate.first_breach_week_start).slice(0,10), true) + '.' : ''}
+        {' '}Raise the cash, spend more slowly, or place the stock order later.
       </div>)}
       {weeks.length > 0 && (<div className="micro muted" style={{marginTop:8}}>
-        Based on the next {weeks.length} weeks of expected receipts and payments.
-        {weeks.some(w => w.breach) ? ' Weeks below your floor are counted in the gap above.' : ' No week falls below your floor.'}
+        Based on the money expected in and out over the next {weeks.length} weeks.
+        {weeks.some(w => w.breach) ? ' Weeks below your lowest balance are counted in the gap above.' : ' No week falls below your lowest balance.'}
       </div>)}
     </div>)}
   </div>);
@@ -16968,17 +16968,17 @@ function V3TrackingNote() {
 
   if (st && st.state === 'broken') {
     return (<p className="v3-why-p v3-muted">
-      Your site tracking is not recording every visit{st.broke_on ? ', and has not since ' + dm(st.broke_on) : ''}, so traffic
-      and conversion are withheld rather than guessed. The tag sits on your own site, so this is one
-      Greta cannot fix from here. {coverage}
+      Your site tracking is not recording every visit{st.broke_on ? ', and has not since ' + dm(st.broke_on) : ''}. Until it does,
+      visits and the share of visitors who buy are left out rather than guessed. The tracking code sits on your
+      own site, so Greta cannot fix this from here. {coverage}
     </p>);
   }
 
   // Loading, or no window on record while the cached read still flags one. Claim neither
   // state; the sentence is true either way and the evidence is still worth offering.
   return (<p className="v3-why-p v3-muted">
-    Some of this is uncertain: your site tracking is incomplete, so traffic and conversion are
-    withheld rather than guessed. {st === undefined ? null : coverage}
+    Some of this is uncertain. Your site tracking is incomplete, so visits and the share of visitors
+    who buy are left out rather than guessed. {st === undefined ? null : coverage}
   </p>);
 }
 
@@ -17008,10 +17008,10 @@ function V3Why({ why, period, typical, now }){
             <span className={'v3-move-v ' + (tot < 0 ? 'neg' : 'pos')}>{tot > 0 ? '+' : ''}{fmtMoney(tot)}</span>
           </div>
         </div>
-        <p className="v3-why-p">A typical month — the middle of your last {fmtCount(typical.n)} — is {fmtMoney(T.sales)} of sales on {fmtMoney(T.spend)} of ads.
+        <p className="v3-why-p">A typical month for you is {fmtMoney(T.sales)} of sales on {fmtMoney(T.spend)} of ads (the middle of your last {fmtCount(typical.n)} months).
           {' '}{bigger === 'spend'
-            ? <>Ad spend {pX != null && pX >= 1.15 ? 'at ' + fmtTimes(pX, 1) + ' typical' : 'changing'} is what moved your profit most{sChg != null ? <>; sales are {Math.abs(sChg) < 0.05 ? 'about normal' : (sChg > 0 ? 'up ' : 'down ') + fmtPctN(Math.abs(sChg))}</> : null}.</>
-            : <>Sales {sChg != null ? (sChg > 0 ? 'up ' : 'down ') + fmtPctN(Math.abs(sChg)) + ' on typical' : 'changing'} is what moved your profit most.</>}
+            ? <>{pX != null && pX >= 1.15 ? 'Ad spend at ' + fmtTimes(pX, 1) + ' a typical month' : 'The change in ad spend'} moved your profit most.{sChg != null ? <> Sales are {Math.abs(sChg) < 0.05 ? 'about normal' : (sChg > 0 ? 'up ' : 'down ') + fmtPctN(Math.abs(sChg))}.</> : null}</>
+            : <>{sChg != null ? 'Sales ' + (sChg > 0 ? 'up ' : 'down ') + fmtPctN(Math.abs(sChg)) + ' on a typical month' : 'The change in sales'} moved your profit most.</>}
           {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('profit')}>The detail <span className="v3-xref-go">on Profit &amp; sales →</span></button></p>
         {why.data_integrity_flag && <V3TrackingNote/>}
         {(why.change_events || []).length > 0 && (<ul className="v3-why-list">
@@ -17062,7 +17062,7 @@ function V3Why({ why, period, typical, now }){
     <p className="v3-why-p">
       {bits.length ? bits.join(', and ') : 'Profit held broadly steady'}
       {what ? <>. The driver was <b>{what}</b>{who ? <> — mostly <b>{who}</b> customers</> : null}</> : null}.
-      {(() => { const mv = moves.find(m => /baskets/.test(m.lab)); return mv ? <> Order value {mv.v > 0 ? 'helped' : 'hurt'} by {money(mv.v)} of profit.</> : null; })()}
+      {(() => { const mv = moves.find(m => /baskets/.test(m.lab)); return mv ? <> The size of the average order {mv.v > 0 ? 'added' : 'took off'} {money(mv.v)} of profit.</> : null; })()}
     </p>
     {why.data_integrity_flag && <V3TrackingNote/>}
     {(why.change_events || []).length > 0 && (<ul className="v3-why-list">
@@ -17276,7 +17276,7 @@ function V3Today(p) {
   const boardSpend = v3BoardSpendTargets(liveRows || []);
   // the month's ad figure is the plan's; the channel targets above it are ceilings on the way down
   const monthLine = seasonNote && boardSpend && seasonNote.curSpend > 0 && seasonNote.curSpend < boardSpend.monthly * 0.9
-    ? <> For {seasonNote.cur} itself the plan puts {v3Gbp(seasonNote.curSpend)} into ads in all, so the {v3AndList(boardSpend.names)} targets (about {v3Gbp(boardSpend.monthly)} a month together) are ceilings, not the month’s budget.</> : null;
+    ? <> For {seasonNote.cur} as a whole, the plan puts {v3Gbp(seasonNote.curSpend)} into ads. The {v3AndList(boardSpend.names)} targets (about {v3Gbp(boardSpend.monthly)} a month together) are upper limits, not the month’s budget.</> : null;
   const isCut = (r) => !!r && /^order-cost-/.test(String(r.external_id || ''));
   const boardCount = board.rows ? board.rows.length : (d.board_actions != null ? d.board_actions : d.open_actions);
   // The profit figure and its confidence badge describe the same broken state and used to
@@ -17308,8 +17308,8 @@ function V3Today(p) {
         <div className="v3-hero-lab">Profit after ads · last 30 days <V3Info k="profit_after_ads"/></div>
         <div className="v3-big v3-big-muted">—</div>
         <div className="v3-sub">{noSales
-          ? 'Greta cannot see any sales in the last 30 days. If you have been trading, the shop connection has probably dropped — reconnecting takes about a minute and your history comes back with it.'
-          : 'Enter what your products and orders cost you, and Greta can show profit and rank your actions by pounds.'}</div>
+          ? 'Greta cannot see any sales in the last 30 days. If you have been trading, the link to your shop has probably dropped. Reconnecting takes about a minute, and your history comes back with it.'
+          : 'Enter what your products and orders cost you. Greta can then show your profit and rank your actions by what each is worth.'}</div>
         {/* The sentence above says reconnecting takes about a minute, and then the button
             used to offer a screen. It is the shop that is missing, so it is the shop the
             button connects — worded for whether there has ever been one. V3Fix falls back
@@ -17359,8 +17359,8 @@ function V3Today(p) {
         {camTarget != null && (gc.stale || gc.early) ? (
           <div className="v3-pace">
             <span className="v3-muted">{gc.stale
-              ? 'Your goal needs re-planning: Greta’s plan changed after you confirmed it, so pace against it would mislead.'
-              : 'Pace against your goal starts on ' + v3Day(gc.paceFrom) + ' — until then the last 30 days are mostly before the goal began.'}</span>
+              ? 'Your goal needs re-planning. Greta’s plan changed after you confirmed it, so progress against it would mislead.'
+              : 'Progress against your goal shows from ' + v3Day(gc.paceFrom) + '. Until then, most of the last 30 days fall before the goal began.'}</span>
             {gc.stale && <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('goal')}>Re-plan the quarter</button>}
           </div>
         ) : camTarget != null ? (<>
@@ -17381,7 +17381,7 @@ function V3Today(p) {
           </div>
         </>) : (
           <div className="v3-pace">
-            <span className="v3-muted">{confirmed ? 'Your goal has no profit-after-ads figure and no ad budget to work one out from, so Greta will not guess at your pace.' : 'Your goal is still an estimate, so pace is hidden.'}</span>
+            <span className="v3-muted">{confirmed ? 'Your goal has no profit-after-ads figure, and no ad budget to work one out from. Greta won’t guess how you are doing against it.' : 'Your goal is still an estimate, so Greta doesn’t show progress against it yet.'}</span>
             <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav('home', 'plansetup')}>Set your goal</button>
           </div>
         )}
@@ -17415,7 +17415,7 @@ function V3Today(p) {
         <div className="v3-kick">Do this first{top.cm_gbp ? ' · worth about ' + v3Gbp(top.cm_gbp) + v3Per(top) : ''}</div>
         <div className="v3-dofirst-t">{v3PlainAction(top).title}</div>
         {v3PlainAction(top).why && <div className="v3-sub">{v3PlainAction(top).why}</div>}
-        {seasonNote && isCut(top) && <div className="v3-sub">This is for {seasonNote.cur}. Greta’s quarter plan puts {v3Gbp(seasonNote.spend)} of ads into {seasonNote.peak}, when new customers come far cheaper — don’t carry the cut into it.{monthLine}{' '}
+        {seasonNote && isCut(top) && <div className="v3-sub">This cut is for {seasonNote.cur} only. Greta’s quarter plan puts {v3Gbp(seasonNote.spend)} of ads into {seasonNote.peak}, when new customers cost far less to win, so don’t carry the cut into it.{monthLine}{' '}
           <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('growth')}>Why <span className="v3-xref-go">on Growth plan →</span></button></div>}
         {top.external_id === 'stock-reorder' && <div className="v3-sub"><button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('stock')}>The full order list, with what the peak adds <span className="v3-xref-go">on Stock &amp; orders →</span></button></div>}
         {top.step1
@@ -17426,10 +17426,10 @@ function V3Today(p) {
         {topDone ? (
           <div className="v3-sub v3-resolved" role="status">
             {topDone === 'skipped'
-              ? <>Skipped. Greta will not raise it again for 30 days unless it gets materially worse,
-                  and will not grade it — you did not say it was done, so there is no outcome to check.</>
-              : <>Marked done. Greta checks whether it worked and adds the result to your track record —
-                  and will not raise it again for 30 days unless it gets materially worse.</>}
+              ? <>Skipped. Greta won’t raise it again for 30 days unless it gets much worse.
+                  It won’t be graded, because you didn’t say it was done.</>
+              : <>Marked done. Greta will check whether it worked and add the result to your track record.
+                  It won’t come back for 30 days unless it gets much worse.</>}
           </div>
         ) : (<div className="v3-btns">
           {/* Every button here now does what it says. Two of the three used to navigate to
@@ -17456,7 +17456,7 @@ function V3Today(p) {
             <div className="v3-kick">Greta's working</div>
             <p className="v3-note">{v3PlainAction(top).raw}</p>
             {top.cm_gbp ? <p className="v3-note">{V3_BOARD.ranked
-              ? <>Ranked first on how sure Greta is and what it is worth together: {top.rung ? <>{String((V3_CONF[v3MoneyConf(top)] || {}).label || top.rung).toLowerCase()} it holds, </> : null}worth about {v3Gbp(top.cm_gbp)} a month{top.money_is_sales ? ' in sales' : ''}. A bigger figure Greta is less sure of sits lower.</>
+              ? <>Ranked first on how sure Greta is and what it is worth, taken together.{top.rung ? <> How sure: {String((V3_CONF[v3MoneyConf(top)] || {}).label || top.rung).toLowerCase()}.</> : null} Worth about {v3Gbp(top.cm_gbp)} a month{top.money_is_sales ? ' in sales' : ''}. A bigger figure Greta is less sure of sits lower.</>
               : <>Ranked first because it is worth the most of anything Greta has checked recently: about {v3Gbp(top.cm_gbp)}{v3Per(top)}.</>}</p> : null}
             {Array.isArray(top.evidence_reasons) && top.evidence_reasons.length > 0 && (
               <ul className="v3-note">{top.evidence_reasons.map((x, i) => <li key={i}>{(x && x.text) || String(x)}</li>)}</ul>)}
@@ -17465,7 +17465,7 @@ function V3Today(p) {
         )}
         {/* Say why there is nothing to press here, or the gap reads as an oversight. */}
         {!topDone && connProvider(top.external_id) && (
-          <div className="v3-sub">Greta clears this one herself as soon as the feed reports again — there is nothing to mark off.</div>
+          <div className="v3-sub">Greta clears this herself as soon as the data starts arriving again, so there is nothing to mark off.</div>
         )}
       </div>
     ) : (
@@ -17481,7 +17481,7 @@ function V3Today(p) {
         <span>{v3PlainAction(a).title}</span>
         <span className="v3-num">{a.cm_gbp ? v3Gbp(a.cm_gbp) + v3Per(a, true) : ''}</span>
       </div>))}
-      {seasonNote && !isCut(top) && next.some(isCut) && <p className="micro muted">The ad-spend cuts are for {seasonNote.cur}; the quarter plan puts {v3Gbp(seasonNote.spend)} into {seasonNote.peak}.{monthLine}</p>}
+      {seasonNote && !isCut(top) && next.some(isCut) && <p className="micro muted">The ad-spend cuts are for {seasonNote.cur} only. The quarter plan puts {v3Gbp(seasonNote.spend)} of ads into {seasonNote.peak}.{monthLine}</p>}
       <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>See all {boardCount || ''} actions <Icon name="arrowRight" size={13}/></button>
     </div>)}
     </div>
@@ -17637,17 +17637,17 @@ function V3Growth() {
     const t30 = (tierG.rows || [])[0] || null, c30 = t30 && Number(t30.ncac) > 0 ? Number(t30.ncac) : null;
     const cac = c30 != null ? c30 : Number(last.cac), edge = cac < fop && fop - cac < fop * 0.15;
     const inMonth = c30 != null ? 'In the last 30 days ' : 'In ' + v3Month(last.month, 'long') + ', ';
-    head = cac >= fop ? 'Not now. ' + inMonth + 'a new customer cost ' + fmtMoney(cac, 2) + ' — more than the ' + fmtMoney(fop, 2) + ' a first order earns.'
-      : edge ? inMonth + 'you were at the edge: a new customer cost about what a first order earns.'
-      : inMonth + 'there was room to grow: a new customer cost well under what a first order earns.';
+    head = cac >= fop ? 'Not now. ' + inMonth + 'a new customer cost ' + fmtMoney(cac, 2) + ' to win, more than the ' + fmtMoney(fop, 2) + ' their first order earns.'
+      : edge ? 'Carefully. ' + inMonth + 'a new customer cost about what their first order earns.'
+      : 'Yes, in steps. ' + inMonth + 'a new customer cost well under what their first order earns.';
     const rose = back && Number(last.spend) > Number(back.spend) * 1.3 && Number(last.cac) > Number(back.cac) * 1.2;
     sub = (rose ? 'Since ' + v3Month(back.month, 'long') + ' your monthly ad spend went from ' + fmtMoney(back.spend) + ' to ' + fmtMoney(last.spend)
-          + ', and the cost of each new customer from ' + fmtMoney(back.cac, 2) + ' to ' + fmtMoney(Number(last.cac), 2) + '. ' : '')
-      + (marg ? 'At today’s spend the next customer costs about ' + fmtMoney(marg) + (ltv ? ', against ' + fmtMoney(fop) + ' on their first order and ' + fmtMoney(ltv) + ' over a year' : '') + '. ' : '')
-      + (cac >= fop ? (ltv && marg && marg > ltv ? 'Extra spend in an ordinary month loses money even counting their repeat orders. Fix what converts before adding budget.'
-          : 'Extra spend in an ordinary month only pays back if those customers order again. Fix what converts before adding budget.')
-        : edge ? 'More budget now buys customers who only pay back if they order again. Step up slowly and watch this number.'
-        : 'Each extra customer still pays back on their first order. Raise spend in steps and watch the cost per customer.');
+          + '. Over the same months, the cost of each new customer went from ' + fmtMoney(back.cac, 2) + ' to ' + fmtMoney(Number(last.cac), 2) + '. ' : '')
+      + (marg ? 'At today’s spend, one more customer would cost about ' + fmtMoney(marg) + '. ' + (ltv ? 'Their first order earns ' + fmtMoney(fop) + ', and a year of their orders ' + fmtMoney(ltv) + '. ' : '') : '')
+      + (cac >= fop ? (ltv && marg && marg > ltv ? 'In an ordinary month, extra spend loses money even after their repeat orders. Get more of your visitors buying before you add budget.'
+          : 'In an ordinary month, extra spend only pays for itself if those customers order again. Get more of your visitors buying before you add budget.')
+        : edge ? 'More budget now buys customers who only pay for themselves if they order again. Raise it slowly and watch what each new customer costs.'
+        : 'Each extra customer still pays for themselves on their first order. Raise spend in steps and watch what each new customer costs.');
   }
 
   // Why it bends, in one sentence, only when the split is actually identified.
@@ -17656,11 +17656,11 @@ function V3Growth() {
   if (dec && dec.dominant_constraint && dec.dominant_constraint !== 'indeterminate' && dec.dominant_constraint !== 'no_saturation') {
     const auction = Number(dec.beta_cpc), conversion = -Number(dec.beta_cvr);
     why = conversion > auction
-      ? 'The cost is rising because the extra visitors you buy convert worse' + (auction <= 0 ? ' — your ad prices have not gone up at all' : '') + '. Better product pages and offers will do more than cheaper ads.'
-      : 'The cost is rising because ads get dearer as you buy more of them. New audiences and fresh creative will do more than site changes.';
+      ? 'The cost is rising because fewer of the extra visitors you pay for go on to buy' + (auction <= 0 ? '. Your ad prices have not gone up at all' : '') + '. Better product pages and offers will do more than cheaper ads.'
+      : 'The cost is rising because ads get dearer the more of them you buy. New audiences and new ads will do more than changes to your site.';
   }
-  const LEV = { aov: 'Raise the average order', gross_margin: 'Improve product margin', refund_rate: 'Cut refunds',
-    per_order_costs: 'Cut per-order costs', cvr: 'Convert more visitors', cpc: 'Pay less per click' };
+  const LEV = { aov: 'Raise the average order', gross_margin: 'Make more on each product', refund_rate: 'Cut refunds',
+    per_order_costs: 'Cut the cost of each order', cvr: 'Get more visitors to buy', cpc: 'Pay less per click' };
   const levers = (P.curveLevers || []).filter(l => l.ceiling_multiplier_mid != null)
     .sort((a, b) => Number(b.ceiling_multiplier_mid) - Number(a.ceiling_multiplier_mid)).slice(0, 4);
   const levMax = levers.length ? Number(levers[0].ceiling_multiplier_mid) - 1 : 0;
@@ -17718,24 +17718,24 @@ function V3Growth() {
         {(() => { const t30 = (tierG.rows || [])[0] || null, c30 = t30 && Number(t30.ncac) > 0 ? Number(t30.ncac) : null;
           // the headline judges on the last 30 days (£53.42) and this tile said "£49.13 in Sep" under it (7 Oct)
           return c30 != null
-            ? stat('New-customer cost', fmtMoney(c30, 2), 'last 30 days; ' + fmtMoney(last.cac, 2) + ' in ' + v3Month(last.month, 'long') + (back ? ', ' + fmtMoney(back.cac, 2) + ' in ' + v3Month(back.month) : ''))
-            : stat('New-customer cost', fmtMoney(last.cac, 2), 'in ' + v3Month(last.month, 'long') + (back ? ', from ' + fmtMoney(back.cac, 2) + ' in ' + v3Month(back.month) : '')); })()}
-        {stat('A first order earns you', fmtMoney(fop, 2), 'after product and order costs')}
-        {ltv != null && stat('A customer earns over a year', fmtMoney(ltv), 'first order and repeats')}
-        {marg != null && stat('The next customer costs', fmtMoney(marg), 'at ' + fmtMoney(sc.current_spend) + ' a month of ads', marg > fop ? 'v3-down' : 'v3-muted')}
+            ? stat('Cost to win a new customer', fmtMoney(c30, 2), 'last 30 days; ' + fmtMoney(last.cac, 2) + ' in ' + v3Month(last.month, 'long') + (back ? ', ' + fmtMoney(back.cac, 2) + ' in ' + v3Month(back.month) : ''))
+            : stat('Cost to win a new customer', fmtMoney(last.cac, 2), 'in ' + v3Month(last.month, 'long') + (back ? ', from ' + fmtMoney(back.cac, 2) + ' in ' + v3Month(back.month) : '')); })()}
+        {stat('A first order earns you', fmtMoney(fop, 2), 'after product and delivery costs')}
+        {ltv != null && stat('A customer earns you over a year', fmtMoney(ltv), 'first order and repeats')}
+        {marg != null && stat('One more customer would cost', fmtMoney(marg), 'at ' + fmtMoney(sc.current_spend) + ' a month of ads', marg > fop ? 'v3-down' : 'v3-muted')}
       </div>
     </section>)}
 
     {peakOn && (<section className="v3-sec">
-      <h2 className="v3-sec-title">{gpMonthName(pk.month)} is different</h2>
+      <h2 className="v3-sec-title">Where extra budget belongs: {gpMonthName(pk.month)}</h2>
       {/* Two short paragraphs, not one of 104 words: last year's month, then the plan (7 Oct). */}
-      {lyCost != null && <p className="v3-note v3-measure">Last {gpMonthName(pk.month)} a new customer cost {fmtMoney(lyCost, 2)} — {fmtCount(ly.new_customers)} of them on {fmtMoney(ly.spend)} of ads — against {(() => { const t30 = (tierG.rows || [])[0] || null; return t30 && Number(t30.ncac) > 0 ? fmtMoney(Number(t30.ncac), 2) + ' in the last 30 days' : fmtMoney(last ? last.cac : null, 2) + ' last month'; })()}. The sale brings them in.</p>}
+      {lyCost != null && <p className="v3-note v3-measure">Last {gpMonthName(pk.month)} a new customer cost {fmtMoney(lyCost, 2)} to win: {fmtCount(ly.new_customers)} of them, on {fmtMoney(ly.spend)} of ads. That compares with {(() => { const t30 = (tierG.rows || [])[0] || null; return t30 && Number(t30.ncac) > 0 ? fmtMoney(Number(t30.ncac), 2) + ' in the last 30 days' : fmtMoney(last ? last.cac : null, 2) + ' last month'; })()}. The sale brings them in.</p>}
       <p className="v3-note v3-measure">
-        At today’s pace Greta’s plan puts {fmtMoney(pk.spend)} of ads into {gpMonthName(pk.month)} for about {fmtCount(pk.new_customers)} new customers, {fmtMoney(per1(pk), 2)} each
-        {gk ? <>; your goal puts in {fmtMoney(gk.spend)} for about {fmtCount(gk.new_customers)}, {fmtMoney(per1(gk), 2)} each</> : null}.
-        {' '}If you add budget this quarter, it belongs here rather than in an ordinary month — but each extra pound still buys less than the one before.
-        {beyond && ' Those figures are beyond any month of ads you have run, so they are Greta’s projection, not something you have seen work.'}
-        {' '}<V3Conf state="probably" detail="Greta’s quarter plan: your own seasonality, returning customers at their recent rate, and new-customer sales that rise with spend along your measured curve. Last year’s month is your actual spend and new customers."/></p>
+        At today’s pace, Greta’s plan spends {fmtMoney(pk.spend)} on ads in {gpMonthName(pk.month)} for about {fmtCount(pk.new_customers)} new customers, {fmtMoney(per1(pk), 2)} each.
+        {gk ? <> Your goal would spend {fmtMoney(gk.spend)} for about {fmtCount(gk.new_customers)}, {fmtMoney(per1(gk), 2)} each.</> : null}
+        {' '}If you add budget this quarter, put it here rather than in an ordinary month. Each extra pound still buys less than the one before.
+        {beyond && ' You have never spent this much on ads in a month, so these figures are Greta’s estimate, not results you have seen.'}
+        {' '}<V3Conf state="probably" detail="From Greta’s plan for the quarter: your own busy and quiet months, returning customers at their recent rate, and new-customer sales that rise with spend as your own months show. Last year’s figures are what you actually spent and the new customers you won."/></p>
       <div className="v3-btn-row">
         <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('goal')}>{g ? 'See what the goal takes' : 'Set a goal'} <span className="v3-xref-go">on Goal &amp; costs →</span></button>
       </div>
@@ -17773,7 +17773,7 @@ function V3Growth() {
     </div>)}
 
     {(why || levers.length >= 2) && (<section className="v3-sec">
-      <h2 className="v3-sec-title">What would let you spend more</h2>
+      <h2 className="v3-sec-title">What would let you spend more on ads?</h2>
       {why && <p className="v3-note v3-measure">{why}</p>}
       {levers.length >= 2 && <p className="v3-levers-head"><span>Improve one thing by 10%</span><span>and you could spend</span></p>}
       {levers.length >= 2 && (<ul className="v3-levers">
@@ -17786,7 +17786,7 @@ function V3Growth() {
           </li>);
         })}
       </ul>)}
-      {levers.length >= 2 && <p className="micro muted v3-measure">More, that is, before a new customer costs more than an order earns — holding everything else as it is. Modelled from your own months, so read it as a ranking rather than a promise.</p>}
+      {levers.length >= 2 && <p className="micro muted v3-measure">That is, spend more before a new customer costs more than an order earns, with everything else unchanged. It is worked out from your own months, so treat it as a ranking, not a promise.</p>}
       <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('marketing')}>Which channels earn their money <span className="v3-xref-go">on Marketing →</span></button>
     </section>)}
 
@@ -17835,7 +17835,7 @@ function V3Stock() {
   if (q.err) return <div className="v3-empty">Greta could not load your stock plan just now — refreshing usually sorts it.</div>;
   if (!q.rows) return <V3SkeletonRows n={5}/>;
   const rows = q.rows;
-  if (!rows.length) return (<div className="v3-empty">No products with stock levels yet. Once Shopify inventory syncs, this shows what runs out first and where cash is tied up.</div>);
+  if (!rows.length) return (<div className="v3-empty">No products with stock counts yet. Once your Shopify stock counts come in, this shows what runs out first and where cash is tied up.</div>);
   // The view marks the whole brand stale after 48h without a products sync, and every row then
   // reads 'unknown' — which, counted, says "nothing runs out". Say what is actually known.
   if (rows.some(r => r.inventory_stale)) return (<div className="v3-page-stack">
@@ -17866,6 +17866,8 @@ function V3Stock() {
   // Demand per product per day: today's pace, or last year's peak day when that sold more. The order
   // covers eight weeks after it lands, less what is left by then; the peak's share is what it adds.
   const pk = P.peak, g = grow && pk && pk.growth != null ? pk.growth : 0;
+  // the peak's name as Today says it ("BFCM peak window" reads "Black Friday and Cyber Monday")
+  const pkName = pk ? v3PlainWords(pk.title).replace(/\s*(?:peak\s*)?window$|\s*peak$/i, '') : '';
   const titles = [...new Set(rows.map(r => String(r.product_title || '').trim().toLowerCase()))];
   const PU = pk ? v3PeakUnits(P.ly, titles, P.prods) : {};
   const vByTitle = {}; rows.forEach(r => { const t = String(r.product_title || '').trim().toLowerCase(); vByTitle[t] = (vByTitle[t] || 0) + num(r.weekly_velocity); });
@@ -17941,20 +17943,20 @@ function V3Stock() {
       <div className="v3-kick">What to order</div>
       <p className="v3-verdict">{verdict}</p>
       {order.length > 0 ? (<>
-        <p className="v3-note v3-measure">{nRun > 0 ? <>{fmtCount(nRun)} run out before a restock can land{outNow > 0 ? <> ({fmtCount(outNow)} already out)</> : null}{nPeak > 0 ? <>, and {fmtCount(nPeak)} more won’t last through {pk.title}</> : null}. </> : <>{fmtCount(nPeak)} won’t last through {pk.title}. </>}
-          With your {L.entered ? L.weeks + '-week lead time' : lead + '-day lead time'}, an order placed today lands around <b>{v3Day(land)}</b>{protect ? <> and protects about <b>{fmtMoney(protect)} a month</b> of profit from then</> : null}.
-          {' '}Ordering all of them costs {fmtMoney(cost)} at landed cost{unpriced > 0 ? <> ({fmtCount(unpriced)} without a cost yet)</> : null}.</p>
-        {lost > 0 && <p className="v3-note v3-measure">Until it lands, the ones that run out sell nothing: about {fmtMoney(lost)} of profit at today’s pace, whatever you order now. Only sooner stock saves it — <b>each week your supplier can cut is worth about {fmtMoney(sooner)}</b>{pkLate ? ', more in the peak' : ''}.</p>}
-        {pkLate && <p className="v3-note v3-measure">{pk.title} runs {v3Day(pk.start)} – {v3Day(pk.end, true)}. An order that lands on {v3Day(land)} still catches its last {fmtCount(daysCaught)} {daysCaught === 1 ? 'day' : 'days'}, which sold {fmtMoney(catchNow)} last year — {fmtPctN(catchNow / pk.lySales)} of the peak. {v3IsoAdd(land, -7) <= pk.start ? 'A week sooner catches all of it (' + fmtMoney(pk.lySales) + ').' : 'A week sooner catches ' + fmtMoney(catchWeek) + ' (' + fmtPctN(catchWeek / pk.lySales) + ').'} So ask for the peak’s products first.</p>}
-        {pkAfter && anyPeak && <p className="v3-note v3-measure">{pk.title} starts on {v3Day(pk.start)}, after the order lands, so the quantities include what last year’s peak sold. To land in time, the order goes in by {v3Day(pk.orderBy)}.</p>}
-        {pk && land > pk.end && <p className="v3-note v3-measure">An order placed today lands after {pk.title} ends, so what is in stock is what you can sell in it — what to lead the offer with is below.</p>}
-      </>) : <p className="v3-note v3-measure">Every product that sells has enough stock to cover your supplier’s lead time{pk ? ' and last year’s ' + pk.title : ''}.</p>}
+        <p className="v3-note v3-measure">{nRun > 0 ? <>{fmtCount(nRun)} will run out before new stock could arrive{outNow > 0 ? <> ({fmtCount(outNow)} already out)</> : null}{nPeak > 0 ? <>, and {fmtCount(nPeak)} more won’t last through {pkName}</> : null}. </> : <>{fmtCount(nPeak)} won’t last through {pkName}. </>}
+          Stock takes {L.entered ? L.weeks + ' weeks' : lead + ' days'} to arrive after you order, so an order placed today arrives around <b>{v3Day(land)}</b>.{protect ? <> From then it protects about <b>{fmtMoney(protect)} a month</b> of profit.</> : null}
+          {' '}Ordering all of them costs {fmtMoney(cost)} at landed cost, meaning what each unit costs once it reaches you{unpriced > 0 ? <> ({fmtCount(unpriced)} without a cost yet)</> : null}.</p>
+        {lost > 0 && <p className="v3-note v3-measure">Until the order arrives, the products that run out sell nothing. At today’s pace that loses about {fmtMoney(lost)} of profit, whatever you order now. Only faster delivery saves it: <b>each week your supplier can cut is worth about {fmtMoney(sooner)}</b>{pkLate ? ', more in the peak' : ''}.</p>}
+        {pkLate && <p className="v3-note v3-measure">{pkName} runs {v3Day(pk.start)} – {v3Day(pk.end, true)}. An order arriving on {v3Day(land)} is in time for its last {fmtCount(daysCaught)} {daysCaught === 1 ? 'day' : 'days'}. Those days sold {fmtMoney(catchNow)} last year, {fmtPctN(catchNow / pk.lySales)} of the peak’s sales. {v3IsoAdd(land, -7) <= pk.start ? 'A week sooner would catch all of it (' + fmtMoney(pk.lySales) + ').' : 'A week sooner would catch ' + fmtMoney(catchWeek) + ' (' + fmtPctN(catchWeek / pk.lySales) + ').'} So ask your supplier to send the peak’s products first.</p>}
+        {pkAfter && anyPeak && <p className="v3-note v3-measure">{pkName} starts on {v3Day(pk.start)}, after the order arrives, so the quantities include what last year’s peak sold. To arrive in time, the order needs to go in by {v3Day(pk.orderBy)}.</p>}
+        {pk && land > pk.end && <p className="v3-note v3-measure">An order placed today arrives after {pkName} ends. What you have in stock now is all you can sell in it; what to feature is below.</p>}
+      </>) : <p className="v3-note v3-measure">Every product that sells has enough stock to last until a new order could arrive{pk ? ', and through ' + pkName + ' at last year’s sales' : ''}.</p>}
       {order.length > 0 && <div className="v3-stat-grid v3-gap-top">
         {stat('To order', fmtCount(order.length) + ' products', outNow > 0 ? fmtCount(outNow) + ' already out' : 'none out yet')}
         {stat('Order cost', fmtMoney(cost), 'at landed cost')}
-        {protect != null && stat('Protects', fmtMoney(protect) + '/mo', 'of profit, from ' + v3Day(land))}
-        {lost > 0 && stat('Lost before it lands', fmtMoney(lost), 'at today’s pace')}
-        {sooner > 0 && stat('Each week sooner', fmtMoney(sooner), 'if your supplier can cut it')}
+        {protect != null && stat('Profit it protects', fmtMoney(protect) + ' a month', 'from ' + v3Day(land))}
+        {lost > 0 && stat('Profit lost before it arrives', fmtMoney(lost), 'at today’s pace')}
+        {sooner > 0 && stat('Each week sooner is worth', fmtMoney(sooner), 'if your supplier can cut it')}
       </div>}
     </section>
 
@@ -17964,9 +17966,9 @@ function V3Stock() {
         <button type="button" className={'v3-btn v3-btn-sm' + (grow ? ' v3-btn-q' : '')} onClick={() => setGrow(false)} aria-pressed={!grow}>Peak as last year</button>
         <button type="button" className={'v3-btn v3-btn-sm' + (grow ? '' : ' v3-btn-q')} onClick={() => setGrow(true)} aria-pressed={grow}>With this year’s growth ({(pk.growth >= 0 ? '+' : '−') + fmtPctN(Math.abs(pk.growth))})</button>
       </div>}
-      <p className="v3-legend v3-rw-key"><i className="v3-rw-key-bar"/>Days of stock left <i className="v3-rw-key-gap"/>Days with nothing to sell before the order lands</p>
+      <p className="v3-legend v3-rw-key"><i className="v3-rw-key-bar"/>Days of stock left <i className="v3-rw-key-gap"/>Days with nothing to sell before the order arrives</p>
       <table className="v3-rw">
-        <thead><tr><th className="t-text">Product</th><th className="t-text v3-rw-trackh">Stock left</th><th>Order</th>{anyPeak && <th>For the peak</th>}<th>Cost</th><th>Lost before it lands</th></tr></thead>
+        <thead><tr><th className="t-text">Product</th><th className="t-text v3-rw-trackh">Stock left</th><th>Order</th>{anyPeak && <th>For the peak</th>}<th>Cost</th><th>Profit lost before it arrives</th></tr></thead>
         <tbody>{shown.map(r => (<tr key={r.sku}>
           <td className="t-text v3-rw-name" title={r.noSku ? 'No product code (SKU) in Shopify' : r.sku}>{nameOf(r)}</td>
           <td className="t-text v3-rw-trackc"><div className="v3-rw-cell">
@@ -17988,14 +17990,14 @@ function V3Stock() {
         <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={csvPo}>Download as CSV</button>
       </div>
       <p className="micro muted v3-measure">{L.entered
-        ? <>Uses your supplier lead time: {L.weeks} weeks ({lead} days) from order to stock arriving, from Goal &amp; costs.</>
-        : <>Greta assumes {lead} days from order to stock arriving, for every product — add your supplier lead time under Goal &amp; costs so the dates are yours.</>}
-        {' '}Each order covers eight weeks after it lands, at today’s pace{pk ? <>, with {pk.title} at what each product sold on the same days last year{grow && pk.growth != null ? ' plus this year’s growth' : ''}</> : null}, less what is left when it lands. {anyPeak ? '“For the peak” is how much of the order the peak adds. ' : ''}Costs are your landed cost per unit. Lost before it lands is what these products would have earned between running out and the order arriving.</p>
+        ? <>Uses your supplier lead time, the time from order to stock arriving: {L.weeks} weeks ({lead} days), as set under Goal &amp; costs.</>
+        : <>Greta assumes {lead} days from order to stock arriving, for every product. Add your supplier lead time under Goal &amp; costs to make the dates yours.</>}
+        {' '}Each order covers eight weeks of sales after it arrives, at today’s pace, less what is left by then.{pk ? <> For {pkName}, it uses what each product sold on the same days last year{grow && pk.growth != null ? ', plus this year’s growth' : ''}.</> : null} {anyPeak ? '“For the peak” is the part of the order the peak adds. ' : ''}Cost is your landed cost per unit. “Profit lost before it arrives” is what these products would have earned between running out and the order arriving.</p>
     </section>)}
 
     {longOut.length > 0 && (<section className="v3-sec">
-      <h2 className="v3-sec-title">Out for over four weeks — keep or drop</h2>
-      <p className="v3-note v3-measure">{longOut.length === 1 ? 'One product has' : fmtCount(longOut.length) + ' products have'} been out of stock for over four weeks. None sold in that time, so Greta can’t size an order. Decide each one: restock a small batch if it still belongs in the range, or archive it in Shopify so it stops counting as out of stock.</p>
+      <h2 className="v3-sec-title">Out of stock for over four weeks: keep or drop?</h2>
+      <p className="v3-note v3-measure">{longOut.length === 1 ? 'One product has' : fmtCount(longOut.length) + ' products have'} been out of stock for over four weeks. None sold in that time, so Greta can’t work out how many to order. Decide each one: restock a small batch if you still want to sell it, or archive it in Shopify so it stops counting as out of stock.</p>
       <ul className="v3-rank-steps">{longOut.slice(0, 8).map(r => (<li key={r.sku}><span className="v3-rank-desc">{v3Sentence(r.product_title || r.sku)}</span>
         <span className="v3-sub"> {r.last_sold_on ? 'last sold ' + v3Day(r.last_sold_on, true) : 'no sale in six months'}</span></li>))}</ul>
       {longOut.length > 8 && <p className="micro muted">And {fmtCount(longOut.length - 8)} more.</p>}
@@ -18003,12 +18005,12 @@ function V3Stock() {
 
     {noSku.length > 0 && (<section className="v3-sec">
       <h2 className="v3-sec-title">Products without a product code</h2>
-      <p className="v3-note v3-measure">{fmtCount(noSkuTitles)} products that sell have no product code (SKU) in Shopify — {fmtPctN(noSkuShare)} of the last four weeks’ sales. Greta tracks them by Shopify’s own variant id, so they are in the order above; add a SKU to each in Shopify so a supplier order can carry a product code. When you do, that product’s selling rate reads low for four weeks while its sales history moves across.</p>
+      <p className="v3-note v3-measure">{fmtCount(noSkuTitles)} products that sell have no product code (SKU) in Shopify. They made {fmtPctN(noSkuShare)} of the last four weeks’ sales. Greta tracks them by Shopify’s own reference number, so they are still in the order above. Add a product code to each in Shopify so your supplier order can show it. After you do, that product’s sales rate reads low for four weeks while its history catches up.</p>
     </section>)}
 
     {slow.length > 0 && (<section className="v3-sec">
-      <h2 className="v3-sec-title">Where cash is sitting</h2>
-      <p className="v3-note v3-measure">{fmtMoney(trapped)} is tied up in stock beyond what you will sell in the next few months. A bundle, a gift-with-purchase or a quiet price test frees it without a sitewide discount{pk && pk.start > todayIso ? ' — or lead ' + pk.title + ' with it (below)' : ''}.</p>
+      <h2 className="v3-sec-title">Where is cash tied up in stock?</h2>
+      <p className="v3-note v3-measure">{fmtMoney(trapped)} is tied up in more stock than you will sell in the next few months. A bundle, a free gift with orders or a small price test can free it without a discount across the whole shop{pk && pk.start > todayIso ? '. Or feature it in ' + pkName + ' (see below)' : ''}.</p>
       <table className="v3-rw v3-slow">
         <thead><tr><th className="t-text">Product</th><th>In stock</th><th>Sells a week</th><th>Lasts</th><th>Cash tied up</th></tr></thead>
         <tbody>{slow.slice(0, 8).map(r => (<tr key={r.sku}>
@@ -18019,7 +18021,7 @@ function V3Stock() {
           <td>{fmtMoney(r.trapped_cash)}</td>
         </tr>))}</tbody>
       </table>
-      {dead.length > 0 && <p className="micro muted v3-measure">{fmtCount(dead.length)} more products have {fmtCount(dead.reduce((a, r) => a + num(r.on_hand), 0))} units in stock and no recent sales — worth a look before the next order goes in.{deadBundles > 0 ? ' ' + fmtCount(deadBundles) + ' bundle listings are left out: they sell as their parts.' : ''}</p>}
+      {dead.length > 0 && <p className="micro muted v3-measure">{fmtCount(dead.length)} more products have {fmtCount(dead.reduce((a, r) => a + num(r.on_hand), 0))} units in stock and no recent sales. Check them before the next order goes in.{deadBundles > 0 ? ' ' + fmtCount(deadBundles) + ' bundle listings are left out because they sell as their parts.' : ''}</p>}
     </section>)}
   </div>);
 }
@@ -18034,6 +18036,7 @@ function V3StockOffer() {
   const P = useV3Peak(L.days);
   const pk = P.peak;
   if (!pk || !q.rows || !q.rows.length || !P.ready) return null;
+  const pkName = v3PlainWords(pk.title).replace(/\s*(?:peak\s*)?window$|\s*peak$/i, '');
   const todayIso = new Date().toISOString().slice(0, 10);
   const rows = q.rows, num = v => Number(v) || 0;
   const lead = rows.find(r => r.lead_days != null) ? num(rows.find(r => r.lead_days != null).lead_days) : L.days;
@@ -18051,7 +18054,7 @@ function V3StockOffer() {
   const gone = Object.values(PU).filter(p => p.title.startsWith('#archived:') && p.total >= 5).sort((a, b) => b.total - a.total);
   if (!plenty.length && !short.length) return null;
   const tbl = (list, last) => (<table className="v3-rw">
-    <thead><tr><th className="t-text">Product</th><th>Sold in last year’s peak</th><th>Left when it starts</th>{last && <th className="t-text">Restock lands</th>}</tr></thead>
+    <thead><tr><th className="t-text">Product</th><th>Sold in last year’s peak</th><th>Left when it starts</th>{last && <th className="t-text">Restock arrives</th>}</tr></thead>
     <tbody>{list.map(x => (<tr key={x.title}>
       <td className="t-text v3-rw-name">{x.title}{x.renamed ? <span className="v3-sub"> · was “{x.renamed}”</span> : null}</td>
       <td>{fmtCount(x.ly)}</td>
@@ -18060,12 +18063,12 @@ function V3StockOffer() {
     </tr>))}</tbody>
   </table>);
   return (<div className="v3-page-stack"><section className="v3-sec">
-    <div className="v3-kick">The next peak · {pk.title} · {v3Day(pk.start)} – {v3Day(pk.end, true)}</div>
-    <p className="v3-verdict">Lead {pk.title} with what you have plenty of, and keep the short ones out of the ads.</p>
-    <p className="v3-note v3-measure">The same {fmtCount(pk.days)} days last year sold {fmtMoney(pk.lySales)} — {fmtTimes(pk.ratio, 0)} a normal pace. The order above lands on {v3Day(land)}, after it starts, so until then what is in stock is what you can sell. Featuring what you have plenty of sells stock you have already paid for; pushing what will run short sells it out early and then pays for clicks on a sold-out page.
-      {' '}<V3Conf state="probably" detail="Last year’s units in the same days, at last year’s prices and offers. If this year’s offer is bigger or smaller, so is demand. Stock left assumes today’s pace until the peak starts."/></p>
-    {plenty.length > 0 && <><h2 className="v3-sec-title">Lead the offer with these</h2>{tbl(plenty, false)}</>}
-    {short.length > 0 && <><h2 className="v3-sec-title">Keep these out of the ads until the order lands</h2>{tbl(short, true)}</>}
+    <div className="v3-kick">Your next busy period · {pkName} · {v3Day(pk.start)} – {v3Day(pk.end, true)}</div>
+    <p className="v3-verdict">For {pkName}, feature what you have plenty of. Keep products that will run short out of your ads.</p>
+    <p className="v3-note v3-measure">The same {fmtCount(pk.days)} days last year sold {fmtMoney(pk.lySales)}, {fmtTimes(pk.ratio, 0)} your normal pace. The order above arrives on {v3Day(land)}, after it starts, so until then you can only sell what is in stock. Featuring what you have plenty of sells stock you have already paid for. Advertising what will run short sells it out early, and then you pay for clicks on a sold-out page.
+      {' '}<V3Conf state="probably" detail="Based on units sold on the same days last year, at last year’s prices and offers. A bigger or smaller offer this year changes demand to match. Stock left assumes today’s pace until the peak starts."/></p>
+    {plenty.length > 0 && <><h2 className="v3-sec-title">Feature these in the offer</h2>{tbl(plenty, false)}</>}
+    {short.length > 0 && <><h2 className="v3-sec-title">Keep these out of your ads until the order arrives</h2>{tbl(short, true)}</>}
     {gone.length > 0 && <p className="micro muted v3-measure">{gone.length === 1 ? 'One of last year’s peak sellers is' : fmtCount(gone.length) + ' of last year’s peak sellers are'} no longer sold: {gone.slice(0, 4).map(p => v3Sentence(p.from)).join(', ')}{gone.length > 4 ? ' and others' : ''}.</p>}
     <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('calendar')}>Plan the offer <span className="v3-xref-go">on Calendar →</span></button>
   </section></div>);
@@ -18198,12 +18201,12 @@ function V3Website() {
   const se = C ? C.fr.ScriptErrorCount : null;
   const rising = C && Pv ? V3_FRICTION.filter(([m]) => C.fr[m] != null && Pv.fr[m] != null && C.fr[m] >= Pv.fr[m] * 1.25 && C.fr[m] - Pv.fr[m] >= 0.005) : [];
   const moves = [];
-  if (rising.length) moves.push(<li key="rise"><b>Find what changed on the site:</b> {v3Names(rising.map(([m, l]) => l.toLowerCase() + ' (' + fmtPctN(Pv.fr[m]) + ' → ' + fmtPctN(C.fr[m]) + ' of visits)'))}. A theme, app or tag change in the last month is the usual cause — Clarity’s recordings show where it happens.</li>);
-  if (se != null && se >= 0.1) moves.push(<li key="se"><b>Find the JavaScript error {fmtPctN(se)} of visits hit.</b> Clarity’s error view names it and the pages it happens on. Many come from third-party tags and do no harm; one on a product, basket or checkout page costs sales, so check those pages first.</li>);
+  if (rising.length) moves.push(<li key="rise"><b>Find what changed on your site.</b> More visitors {v3Names(rising.map(([m, l]) => l.toLowerCase() + ' (' + fmtPctN(Pv.fr[m]) + ' → ' + fmtPctN(C.fr[m]) + ' of visits)'))}. The usual cause is a new theme, app or tracking code added in the last month. Clarity’s recordings of visits show where it happens.</li>);
+  if (se != null && se >= 0.1) moves.push(<li key="se"><b>Find the site error that {fmtPctN(se)} of visits hit.</b> Clarity’s error view names it (a “JavaScript error”) and the pages it happens on. Many come from add-ons and tracking code and do no harm. One on a product, basket or checkout page costs sales, so check those pages first.</li>);
   if (now && now.mobile != null && now.mobile >= 0.7) moves.push(<li key="mob"><b>Buy something on your own shop on a phone, start to finish.</b> {fmtPctN(now.mobile)} of visits are on mobile, so that is the shop most customers see.</li>);
   if (ga4Bad) moves.push(<li key="ga4"><b>Check your site analytics are recording add-to-basket and checkout steps.</b> Until they are, no screen can say which step of the site loses shoppers.{' '}
     <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('settings')}>Open Connections &amp; data</button></li>);
-  if (worst && /add to cart/.test(String(worst.metric))) moves.push(<li key="atc"><b>Look at the product pages that get the most visits.</b> In the last clean month the step that lost most was adding to the basket; Products shows which products hold views without selling.{' '}
+  if (worst && /add to cart/.test(String(worst.metric))) moves.push(<li key="atc"><b>Look at the product pages that get the most visits.</b> In the last month with reliable tracking, the step that lost most was adding to the basket. Products shows which products get views without selling.{' '}
     <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('products')}>Open Products</button></li>);
 
   // Bridge: normal → each (merged) stage's effect → what the month made.
@@ -18233,7 +18236,7 @@ function V3Website() {
     : null;
 
   const ST = (shopTrk.rows || [])[0] || null, STm = (ST && ST.metadata) || {}, STd = STm.month_to_date || null;
-  const shopLine = ST ? <>{ga4Bad ? 'That was Google Analytics. A second break is still open: your' : 'Your'} shop has not recorded where many orders came from since {STm.broke_month ? gpMonthName(String(STm.broke_month).slice(0, 10)) : 'the summer'}{STd && STd.visit_recorded != null ? <> — a visit on {fmtPctN(Number(STd.visit_recorded))} of {gpMonthName(String(STd.month).slice(0, 10))}’s orders so far{STm.visit_before != null ? <>, against {fmtPctN(Number(STm.visit_before))} before</> : null}</> : null}. That one is not fixed: it is the tracking check under Fix first on Today, and it makes the orders your shop credits to each channel read low.{' '}
+  const shopLine = ST ? <>{ga4Bad ? 'That was Google Analytics. A second break is still open: your' : 'Your'} shop has not recorded where many orders came from since {STm.broke_month ? gpMonthName(String(STm.broke_month).slice(0, 10)) : 'the summer'}.{STd && STd.visit_recorded != null ? <> It recorded the visit behind only {fmtPctN(Number(STd.visit_recorded))} of {gpMonthName(String(STd.month).slice(0, 10))}’s orders so far{STm.visit_before != null ? <>, against {fmtPctN(Number(STm.visit_before))} before</> : null}.</> : null} This one is not fixed yet. It is the tracking check under Fix first on Today. Until it is fixed, the orders your shop credits to each channel, such as ads or email, read low.{' '}
     <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('today')}>Fix first <span className="v3-xref-go">on Today →</span></button></> : null;
   return (<div className="v3-page-stack">
     {(ga4Bad || ST) && (<section className="v3-sec">
@@ -18242,15 +18245,15 @@ function V3Website() {
         : <p className="v3-verdict">Your shop is not recording where many orders came from.</p>}
       {shopLine && <p className="v3-note v3-measure">{shopLine}</p>}
       {ga4Bad && <p className="v3-note v3-measure">{T.fixed_on
-        ? <>Step-by-step comparisons come back {T.comparisons_clean_from ? 'from ' + v3Day(T.comparisons_clean_from, true) : 'once there is enough clean data'}, when there is enough clean data to set against a normal month. </>
-        : <>Until the tag on your site records again, no screen can say which step loses shoppers. </>}
+        ? <>Comparisons of each step of the site come back {T.comparisons_clean_from ? 'from ' + v3Day(T.comparisons_clean_from, true) + ', when there is a full normal month of clean data to compare with' : 'once there is a full normal month of clean data to compare with'}. </>
+        : <>Until your site analytics record again, no screen can say which step loses shoppers. </>}
         {now ? 'Until then this page reads your site from Microsoft Clarity, which tracks visits separately, and your Shopify orders.' : 'Until then this page has only your Shopify orders to go on.'}</p>}
     </section>)}
 
     {C && (<section className="v3-sec">
       <div className="v3-kick">Your site now · last 30 days · Clarity visits and Shopify orders</div>
       <p className="v3-verdict">{head}</p>
-      <p className="v3-note v3-measure">{fmtCount(C.visits)} visits and {fmtCount(C.orders)} orders{now.mobile != null ? '; ' + fmtPctN(now.mobile) + ' of visits on a phone' : ''}. Clarity counts visits your analytics tag misses, so this rate is lower than a GA4 conversion rate and is only ever compared with itself.</p>
+      <p className="v3-note v3-measure">{fmtCount(C.visits)} visits and {fmtCount(C.orders)} orders{now.mobile != null ? '; ' + fmtPctN(now.mobile) + ' of visits on a phone' : ''}. Clarity counts visits that Google Analytics misses, so this rate is lower than the one Google Analytics gives. It is only ever compared with itself.</p>
       {now.ws.length >= 2 && (<figure className="v3-chart">
         <figcaption><span className="v3-chart-title">Visits and orders per 100 visits, 30 days at a time</span>
           <span className="v3-legend"><i style={{ background: PAL.quiet }}/>Visits <i style={{ background: PAL.ink }}/>Orders per 100 visits</span></figcaption>
@@ -18281,13 +18284,13 @@ function V3Website() {
     </section>)}
 
     {stages.length >= 3 && (<section className="v3-sec">
-      <div className="v3-kick">Last month with clean site tracking · {monthName}{ageM != null && ageM >= 2 ? ' · ' + ageM + ' months ago' : ''}</div>
+      <div className="v3-kick">Last month with reliable site tracking · {monthName}{ageM != null && ageM >= 2 ? ' · ' + ageM + ' months ago' : ''}</div>
       <p className="v3-verdict">{worst
         ? (odd ? 'In ' + monthName + ', fewer shoppers than usual got past ' + v3Step(worst.metric) + '.' : 'In ' + monthName + ', the step that lost most was ' + v3Step(worst.metric) + '.')
         : 'Every step of the site ran at or above its normal in ' + monthName + '.'}</p>
-      {worst && <p className="v3-note v3-measure">{v3Sentence(worst.metric)} was {v3StageVal(worst.fmt, worst.v)} against a normal {v3StageVal(worst.fmt, worst.mu)}{lowest ? ' — the lowest in the year on file' : ''}, about {fmtMoney(worst.leak)} of profit before ads.
+      {worst && <p className="v3-note v3-measure">{v3Sentence(worst.metric)} was {v3StageVal(worst.fmt, worst.v)} against a normal {v3StageVal(worst.fmt, worst.mu)}{lowest ? ', the lowest in the year on file' : ''}. That cost about {fmtMoney(worst.leak)} of profit before ads.
         {top ? ' Most of it happened on ' + (top.value === '/' ? 'the home page' : top.value) + ', where it fell ' + fmtPctN(Math.abs(Number(top.ctc_chg))) + '.' : ''}
-        {shift && <> {v3Sentence(shift.merged[0].metric)} and {shift.merged[1].metric} moved in opposite directions by matching amounts while {shift.metric} stayed normal — a change in what was recorded between them, not in shoppers — so they are read together as checkout.</>}
+        {shift && <> {v3Sentence(shift.merged[0].metric)} and {shift.merged[1].metric} moved in opposite directions by matching amounts, while {shift.metric} stayed normal. That is a change in what was recorded, not in shoppers, so the two are read together as checkout.</>}
         {potential != null && actual != null && <> Altogether the month made {fmtMoney(Math.abs(potential - actual))} {actual < potential ? 'less' : 'more'} profit before ads than it would have with every step at its normal.</>}</p>}
       {bars.length > 2 && (<figure className="v3-chart">
         <figcaption><span className="v3-chart-title">From a normal month to {monthName}</span>
@@ -18379,11 +18382,11 @@ function V3Customers() {
         {t && t.ncac != null && stat('New-customer cost', fmtMoney(t.ncac),
           'ad spend ÷ new customers, these 30 days' + (u && u.cac != null ? ' (over 90 days: ' + fmtMoney(u.cac) + ')' : ''))}
         {u && u.ltv_contribution != null && stat('What a customer is worth', fmtMoney(u.ltv_contribution),
-          'profit over ' + (u.ltv_horizon_months || 12) + ' months', 'Profit after product and order costs that a typical new customer brings in over their first ' + (u.ltv_horizon_months || 12) + ' months, from your own cohorts.')}
+          'profit over ' + (u.ltv_horizon_months || 12) + ' months', 'Profit after product and order costs that a typical new customer brings in over their first ' + (u.ltv_horizon_months || 12) + ' months, from your own customers.')}
         {/* On the 30 days' cost beside it, not the 90-day one (0.9 orders sat next to a £53 tile it did not use). */}
         {t && t.ncac != null && u && Number(u.first_order_contribution) > 0
-          ? stat('Orders to pay back', (Number(t.ncac) / Number(u.first_order_contribution)).toFixed(1), 'at these 30 days’ cost, before a new customer is profitable')
-          : (u && u.payback_orders != null && stat('Orders to pay back', Number(u.payback_orders).toFixed(1), 'at the 90-day cost, before a new customer is profitable'))}
+          ? stat('Orders to earn back their cost', (Number(t.ncac) / Number(u.first_order_contribution)).toFixed(1), 'before a new customer makes you money, at what one cost to win in the last 30 days')
+          : (u && u.payback_orders != null && stat('Orders to earn back their cost', Number(u.payback_orders).toFixed(1), 'before a new customer makes you money, at what one cost to win over 90 days'))}
       </div>
     </section>
     {weeks.length >= 4 && (<figure className="v3-chart v3-chart-solo">
@@ -18518,21 +18521,21 @@ function V3Products() {
   if (d.outSold.length) leaks.push(<li key="out"><b>{d.outSold.length === 1 ? 'One product that sold in the 28 days before is' : fmtCount(d.outSold.length) + ' products that sold in the 28 days before are'} out of stock now: {d.outSold.slice(0, 3).map(x => x.title).join(', ')}{d.outSold.length > 3 ? ' and ' + fmtCount(d.outSold.length - 3) + ' more' : ''}.</b>{' '}
     {d.outSold.length === 1 ? 'It' : 'They'} sold {fmtMoney(d.outSold.reduce((a, x) => a + x.was, 0))} in the 28 days before{d.sale != null ? ' (a sale period)' : ''} and {d.outSold.length === 1 ? 'has' : 'have'} nothing to sell now.{' '}
     <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('stock')}>Open Stock &amp; orders</button></li>);
-  if (d.losers.length) leaks.push(<li key="loss"><b>Sold at a loss: {v3Names(d.losers.slice(0, 3).map(x => x.title))}.</b> After what {d.losers.length === 1 ? 'it costs' : 'they cost'}, {d.losers.length === 1 ? 'it' : 'they'} lost {fmtMoney(Math.abs(d.losers.reduce((a, x) => a + x.kept, 0)))} in 28 days — check the price and the cost entered.</li>);
-  if (d.disc && d.restMed != null && d.disc.margin < d.restMed) leaks.push(<li key="disc"><b>Discounting lands on {d.disc.title}.</b> It sells at {fmtPctN(d.disc.off)} under its list price on average and keeps {fmtPctN(d.disc.margin)} of its sales, against {fmtPctN(d.restMed)} for the rest of your top five. Codes go where demand already is — Promotions below shows which ones.</li>);
-  leaks.push(<li key="aov"><b>Heroes that leave alone.</b> Every order that adds a second product makes more — the hero section below names which products and sizes it.</li>);
+  if (d.losers.length) leaks.push(<li key="loss"><b>Sold at a loss: {v3Names(d.losers.slice(0, 3).map(x => x.title))}.</b> After what {d.losers.length === 1 ? 'it costs' : 'they cost'}, {d.losers.length === 1 ? 'it' : 'they'} lost {fmtMoney(Math.abs(d.losers.reduce((a, x) => a + x.kept, 0)))} in 28 days. Check the price, and the cost you entered.</li>);
+  if (d.disc && d.restMed != null && d.disc.margin < d.restMed) leaks.push(<li key="disc"><b>Discounts eat into {d.disc.title}.</b> On average it sells {fmtPctN(d.disc.off)} below its full price and keeps {fmtPctN(d.disc.margin)} of its sales, against {fmtPctN(d.restMed)} for the rest of your top five. Discount codes tend to land on what people would buy anyway. “Promotions and discount codes” below shows which codes.</li>);
+  leaks.push(<li key="aov"><b>Best sellers often leave in an order on their own.</b> An order that adds a second product makes more profit. “Your hero products” below names which products, and what it is worth.</li>);
   return (<div className="v3-page-stack">
     <section className="v3-sec">
-      <div className="v3-kick">Last 28 days · which products earn, and which leak</div>
+      <div className="v3-kick">Last 28 days · which products make money, and where money is lost</div>
       <p className="v3-verdict">{margin != null
-        ? (d.losers.length ? fmtCount(d.losers.length) + (d.losers.length === 1 ? ' product sold at a loss; ' : ' products sold at a loss; ') + 'the rest kept ' + fmtPctN(margin) + ' of their sales after what they cost.'
-          : 'No product sells at a loss: your products kept ' + fmtPctN(margin) + ' of their sales after what they cost. The leaks are around them.')
+        ? (d.losers.length ? fmtCount(d.losers.length) + (d.losers.length === 1 ? ' product sold at a loss. ' : ' products sold at a loss. ') + 'Overall, your products kept ' + fmtPctN(margin) + ' of their sales after what they cost.'
+          : 'No product sells at a loss. Your products kept ' + fmtPctN(margin) + ' of their sales after what they cost.')
         : fmtMoney(d.total) + ' of product sales across ' + fmtCount(top.length) + ' products.'}</p>
-      <p className="v3-note v3-measure">{fmtMoney(d.total)} of product sales across {fmtCount(top.length)} products{d.top5share != null ? '; your top five bring in ' + fmtPctN(d.top5share) + ' of it' : ''}. “Kept” is after the product’s own cost and payment fees; shipping and packing are per order, so the profit on Profit &amp; sales is lower.</p>
+      <p className="v3-note v3-measure">{fmtMoney(d.total)} of product sales across {fmtCount(top.length)} products{d.top5share != null ? '. Your top five bring in ' + fmtPctN(d.top5share) + ' of it' : ''}. “Kept” is what is left after the product’s own cost and payment fees. Shipping and packing are paid per order, not per product, so profit on Profit &amp; sales is lower.</p>
       <ol className="v3-moves">{leaks}</ol>
     </section>
     <section className="v3-sec">
-      {d.sale != null && <p className="v3-note v3-measure">The 28 days before ran {fmtPctN(d.sale)} above a typical 28 days — a sale — so most products fall against them. Changes marked “against a sale” are that, not the product.</p>}
+      {d.sale != null && <p className="v3-note v3-measure">The 28 days before included a sale: sales ran {fmtPctN(d.sale)} above a typical 28 days. So most products are down against them. A change marked “against a sale” is the sale ending, not the product.</p>}
       <table className="v3-ptable">
         <thead><tr><th>Product</th><th className="t-text">Sales</th><th>Kept</th><th>Change</th><th>Units</th></tr></thead>
         <tbody>{shown.map((x, i) => (<tr key={i}>
@@ -18645,15 +18648,15 @@ function V3Heroes() {
   const moveText = x => {
     if (x.moves[0] === 'stock') return x.weeks < 0.5 ? 'Out of stock: reorder' : 'Reorder: ' + fmtCount(x.weeks) + (Math.round(x.weeks) === 1 ? ' week' : ' weeks') + ' of stock left';
     if (x.moves[0] === 'aov') return x.aov.addon ? 'Offer ' + x.aov.addon + ' with it' : 'Offer an add-on with it';
-    if (x.moves[0] === 'ltv-up') return 'Lead new-customer ads with it';
-    if (x.moves[0] === 'ltv-down') return 'Keep it out of new-customer ads';
+    if (x.moves[0] === 'ltv-up') return 'Feature it in ads for new customers';
+    if (x.moves[0] === 'ltv-down') return 'Leave it out of ads for new customers';
     return FMT_NONE;
   };
   return (<div className="v3-page-stack"><section className="v3-sec">
     <div className="v3-kick">Your hero products · last 12 months</div>
     <p className="v3-verdict">{fmtCount(d.n50)} of your {fmtCount(d.sell.length)} selling products make half your sales. {top.title} alone makes {fmtPctN(top.share)}.</p>
-    <p className="v3-note v3-measure">{fmtCount(d.n80)} make 80%. {d.allFirsts > 0 && top.firsts > 0 && top.firsts >= Math.max(...d.sell.map(x => x.firsts)) ? top.title + ' also leads more first orders than any other product (' + fmtPctN(top.firsts / d.allFirsts) + ' of them): more new customers start there than anywhere else. ' : ''}
-      The levers a hero has are what rides along with it and whether its buyers come back.</p>
+    <p className="v3-note v3-measure">{fmtCount(d.n80)} make 80%. {d.allFirsts > 0 && top.firsts > 0 && top.firsts >= Math.max(...d.sell.map(x => x.firsts)) ? 'More new customers start with ' + top.title + ' than with any other product (' + fmtPctN(top.firsts / d.allFirsts) + ' of first orders). ' : ''}
+      These few best sellers are your heroes. Each can earn more in two ways: what else goes in the basket with it, and whether its buyers come back.</p>
     <div className="v3-share" role="img" aria-label="Share of sales by product group">
       {d.strip.map(b => <i key={b.k} style={{ width: (b.s * 100) + '%', background: stripCol[b.k] }}/>)}
     </div>
@@ -18662,7 +18665,7 @@ function V3Heroes() {
     </tbody></table>
 
     <div className="v3-hero-wrap"><table className="v3-hero-table">
-      <thead><tr><th className="t-text">Product</th><th>Share of sales</th>{d.hasHero && <th>Sold alone</th>}{d.hasHero && <th>Profit per order, alone → with more</th>}{d.hasHero && <th>Buyers back in 6 months</th>}{showMove && <th className="t-text">Move</th>}</tr></thead>
+      <thead><tr><th className="t-text">Product</th><th>Share of sales</th>{d.hasHero && <th>Sold alone</th>}{d.hasHero && <th>Profit per order, alone → with more</th>}{d.hasHero && <th>Buyers back in 6 months</th>}{showMove && <th className="t-text">What to do</th>}</tr></thead>
       <tbody>{d.heroes.map(x => { const h = x.h; return (<tr key={x.id}>
         <td className="t-text">{x.title}</td>
         <td>{fmtPctN(x.share)}</td>
@@ -18672,7 +18675,7 @@ function V3Heroes() {
         {showMove && <td className={'t-text v3-hero-move' + (x.moves[0] === 'stock' ? ' urgent' : '')}>{moveText(x)}</td>}
       </tr>); })}</tbody>
     </table></div>
-    {d.hasHero && d.brandBack != null && <p className="micro muted v3-measure">Profit per order is after product and order costs, before ads, for orders this product led. Buyers back in 6 months: customers whose first order it led, against {fmtPctN(d.brandBack)} for all your new customers; a dash means too few to say.</p>}
+    {d.hasHero && d.brandBack != null && <p className="micro muted v3-measure">Profit per order is after product and order costs, before ads, for orders this product led. Buyers back in 6 months counts customers whose first order it led, against {fmtPctN(d.brandBack)} for all your new customers. A dash means too few to say.</p>}
   </section>
 
   {(d.short.length > 0 || (d.hasHero && (d.aovHeroes.length > 0 || d.ltvUp.length > 0))) && (<section className="v3-sec">
@@ -18680,26 +18683,26 @@ function V3Heroes() {
     <ol className="v3-moves">
       {d.short.length > 0 && (<li>
         <b>Protect the sales you have: reorder {v3Names(d.short.map(x => x.title))}.</b>
-        {' '}{v3Names(d.short.map(x => x.title + (x.weeks < 0.5 ? ' is out of stock' : ' has ' + fmtCount(x.weeks) + (Math.round(x.weeks) === 1 ? ' week' : ' weeks') + ' left at the rate it sells')))}, and {d.short.length === 1 ? 'it makes' : 'together they make'} {fmtPctN(d.short.reduce((a, x) => a + x.share, 0))} of your sales. A hero that runs out takes its add-ons and its first orders with it.
+        {' '}{v3Names(d.short.map(x => x.title + (x.weeks < 0.5 ? ' is out of stock' : ' has ' + fmtCount(x.weeks) + (Math.round(x.weeks) === 1 ? ' week' : ' weeks') + ' left at the rate it sells')))}, and {d.short.length === 1 ? 'it makes' : 'together they make'} {fmtPctN(d.short.reduce((a, x) => a + x.share, 0))} of your sales. A hero that runs out also loses the add-ons and first orders that come with it.
         {' '}<button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('stock')}>Open Stock &amp; orders</button>
       </li>)}
       {d.hasHero && d.aovHeroes.length > 0 && (<li>
-        <b>Raise the order value: sell something with {v3Names(d.aovHeroes.slice(0, 3).map(x => x.title))}.</b>
-        {' '}{d.aovHeroes.length === 1 ? 'It leaves' : 'They leave'} on {d.aovHeroes.length === 1 ? 'its' : 'their'} own {v3Names(d.aovHeroes.slice(0, 3).map(x => fmtPctN(x.aov.solo)))} of the time
-        {d.best ? ', against ' + fmtPctN(Number(d.best.solo_share)) + ' for ' + v3Title(d.best.title) : ''}. An order of {d.aovHeroes[0].title} that takes one more product has made
-        {' '}{fmtMoney(d.aovHeroes[0].aov.dcm)} more profit{d.aovHeroes[0].aov.addon ? ' — ' + d.aovHeroes[0].aov.addon + ' is what shoppers pick most' : ''}.
-        {' '}Bringing {d.aovHeroes.length === 1 ? 'it' : 'them'} down to {fmtPctN(d.target)} — what a quarter of your heroes already manage — would be worth up to <b>{fmtMoney(aovSum)} a month</b>. Put it on the product page and in the basket; if you bundle it, keep the discount below the extra profit.
-        {' '}<V3Conf state="probably" detail="Counted from your orders over the last year. The extra profit is what orders with an add-on made against orders without one; some of that gap is a different kind of shopper, so read it as the size of the prize, not a promise."/>
+        <b>Make orders bigger: sell something with {v3Names(d.aovHeroes.slice(0, 3).map(x => x.title))}.</b>
+        {' '}{d.aovHeroes.length === 1 ? 'It is' : 'They are'} bought on {d.aovHeroes.length === 1 ? 'its' : 'their'} own {v3Names(d.aovHeroes.slice(0, 3).map(x => fmtPctN(x.aov.solo)))} of the time
+        {d.best ? ', against ' + fmtPctN(Number(d.best.solo_share)) + ' for ' + v3Title(d.best.title) : ''}. An order of {d.aovHeroes[0].title} with one more product in it has made
+        {' '}{fmtMoney(d.aovHeroes[0].aov.dcm)} more profit{d.aovHeroes[0].aov.addon ? '. Shoppers add ' + d.aovHeroes[0].aov.addon + ' most often' : ''}.
+        {' '}Getting {d.aovHeroes.length === 1 ? 'it' : 'them'} down to {fmtPctN(d.target)}, which a quarter of your heroes already manage, would be worth up to <b>{fmtMoney(aovSum)} a month</b>. Suggest the add-on on the product page and in the basket. If you bundle it, keep the discount below the extra profit.
+        {' '}<V3Conf state="probably" detail="Counted from your orders over the last year. The extra profit is what orders with an add-on made against orders without one. Part of that gap is a different kind of shopper, so read it as the most you could gain, not a promise."/>
       </li>)}
       {d.hasHero && d.ltvUp.length > 0 && (<li>
-        <b>Raise customer value: lead new-customer ads with {v3Names(d.ltvUp.slice(0, 2).map(x => x.title))}.</b>
+        <b>Win customers who come back: feature {v3Names(d.ltvUp.slice(0, 2).map(x => x.title))} in ads for new customers.</b>
         {' '}{fmtPctN(Number(d.ltvUp[0].h.back_180d))} of the people whose first order it led ordered again within six months, against {fmtPctN(d.brandBack)} across your new customers
-        {d.ltvUp[0].h.median_days_to_second != null ? ', usually ' + fmtCount(d.ltvUp[0].h.median_days_to_second) + ' days after the first — time the follow-up email for then' : ''}.
-        {L && d.ltvUp[0].firstCm2 != null && L.cac != null ? <> A first order it leads makes {fmtMoney(d.ltvUp[0].firstCm2)} before ads; a new customer costs you {fmtMoney(L.cac)} today.</> : null}
-        {' '}<V3Conf state="likely" detail="Counted from your own customers: first orders at least six months old, and whether that customer ordered again within six months. Only differences more than two standard errors from your average are named."/>
+        {d.ltvUp[0].h.median_days_to_second != null ? '. They usually ordered again ' + fmtCount(d.ltvUp[0].h.median_days_to_second) + ' days after the first, so time the follow-up email for then' : ''}.
+        {L && d.ltvUp[0].firstCm2 != null && L.cac != null ? <> A first order it leads makes {fmtMoney(d.ltvUp[0].firstCm2)} before ads. A new customer costs you {fmtMoney(L.cac)} to win today.</> : null}
+        {' '}<V3Conf state="likely" detail="Counted from your own customers: first orders at least six months old, and whether that customer ordered again within six months. Only differences too big to be chance are named."/>
       </li>)}
       {d.hasHero && d.ltvDown.length > 0 && (<li>
-        <b>Do not build acquisition around {v3Names(d.ltvDown.slice(0, 2).map(x => x.title))}.</b>
+        <b>Don’t build your ads for new customers around {v3Names(d.ltvDown.slice(0, 2).map(x => x.title))}.</b>
         {' '}Fewer of {d.ltvDown.length === 1 ? 'its' : 'their'} first-time buyers come back ({v3Names(d.ltvDown.slice(0, 2).map(x => fmtPctN(Number(x.h.back_180d))))} against {fmtPctN(d.brandBack)}), so each new customer {d.ltvDown.length === 1 ? 'it brings' : 'they bring'} is worth less over the year.
       </li>)}
     </ol>
@@ -18754,8 +18757,8 @@ function V3ProductAttention() {
   if (!d) return null;
   const small = d.monthRev > 0 && d.prize < d.monthRev * 0.03;
   const head = !d.drags.length ? 'Your product views go where your sales are.'
-    : d.drags.length === 1 ? 'One product holds views it turns into far fewer sales than others of its type.'
-    : fmtCount(d.drags.length) + ' products hold views they turn into far fewer sales than others of their type.';
+    : d.drags.length === 1 ? 'One product gets many views but turns far fewer of them into sales than others of its type.'
+    : fmtCount(d.drags.length) + ' products get many views but turn far fewer of them into sales than others of their type.';
   const tip = ({ active, payload }) => {
     if (!active || !payload || !payload.length) return null;
     const p = payload[0].payload;
@@ -18767,11 +18770,11 @@ function V3ProductAttention() {
   };
   const kinds = Object.keys(V3_ATTN_KIND);
   return (<div className="v3-page-stack"><section className="v3-sec">
-    <div className="v3-kick">Attention against sales · {v3Day(d.from)} to {v3Day(d.to)}</div>
+    <div className="v3-kick">Which products get seen, and whether they sell · {v3Day(d.from)} to {v3Day(d.to)}</div>
     <p className="v3-verdict">{head}</p>
     <p className="v3-note v3-measure">
       {d.drags.length > 0 && <>If those views had earned their type’s usual sales per view they would have made up to <b>{fmtMoney(d.prize)} a month</b> more. </>}
-      {small ? 'That is small next to your product sales, so most of your attention is already in the right place — treat this as a tidy-up, and look at what rides along with your heroes for the bigger lever.' : d.drags.length ? 'Move the home page slots, collection positions and ad spend they hold to the stronger products of the same type.' : 'No product is clearly over- or under-shown for what it earns against others of its type.'}
+      {small ? 'That is small next to your product sales, so your shop already shows the right products. Treat this as a tidy-up. Selling more alongside your hero products is the bigger win.' : d.drags.length ? 'Move the home page slots, collection positions and ad spend they hold to the stronger products of the same type.' : 'No product is clearly over- or under-shown for what it earns against others of its type.'}
     </p>
     <figure className="v3-chart">
       <figcaption><span className="v3-chart-title">How much each product is shown, against what a view of it earns next to its type</span>
@@ -18787,14 +18790,14 @@ function V3ProductAttention() {
           {kinds.map(k => <R.Scatter key={k} data={d.pts.filter(p => p.kind === k)} fill={V3_ATTN_KIND[k].col()} isAnimationActive={false}/>)}
         </R.ScatterChart>
       </R.ResponsiveContainer>
-      <p className="micro muted v3-measure">Across: share of all product views (log scale). Up: sales per view against the average for products of the same type — the dashed line is that average. A dot is coloured only when its buy rate is clearly apart from its type’s. Products with fewer than 150 views are left out.</p>
+      <p className="micro muted v3-measure">Across: share of all product views, spaced so small shares can be read. Up: sales per view against the average for products of the same type; the dashed line is that average. A dot is coloured only when the share of its viewers who buy is clearly different from its type’s. Products with fewer than 150 views are left out.</p>
     </figure>
   </section>
   {(d.gems.length > 0 || d.drags.length > 0) && (<div className="v3-movers">
     <section><div className="v3-kick">Give more room to · sales per view against type</div>
       {d.gems.length ? d.gems.slice(0, 5).map((p, i) => <div key={i} className="v3-mover"><span>{p.name}</span><b className="v3-up">{fmtTimes(p.y, 1)}</b></div>)
         : <div className="v3-mover"><span className="v3-muted">None clearly</span></div>}</section>
-    <section><div className="v3-kick">Give less room to, or fix the page · views it holds</div>
+    <section><div className="v3-kick">Give less room to, or fix the page · share of views it gets</div>
       {d.drags.length ? d.drags.slice(0, 5).map((p, i) => <div key={i} className="v3-mover"><span>{p.name}</span><b className="v3-down">{fmtPctN(p.x)}</b></div>)
         : <div className="v3-mover"><span className="v3-muted">None clearly</span></div>}</section>
   </div>)}
@@ -18894,8 +18897,8 @@ function V3ReturningBaseline() {
     <p className="v3-verdict">Customers you have already won are expected to spend {fmtMoney(d.next6)} over the next six months.</p>
     <p className="v3-note v3-measure">That is what each month starts with before anyone new buys: {fmtMoney(Math.min(first, last))} to {fmtMoney(Math.max(first, last))} a month,
       {last < first ? ' easing as older customers buy less often.' : ' rising as recent customers come back.'}
-      {' '}Checked against the last twelve months, the same arithmetic expected {fmtMoney(d.e12)} and they spent {fmtMoney(d.a12)}.
-      {d.peaks.length > 0 && <> The difference came in {v3Names(d.peaks.map(m => v3Month(m.iso, 'long')))}, when sales lifted existing customers {fmtMoney(d.peakLift)} above the line.</>}
+      {' '}Run over the last twelve months, the same sum expected {fmtMoney(d.e12)}. They actually spent {fmtMoney(d.a12)}.
+      {d.peaks.length > 0 && <> The gap came in {v3Names(d.peaks.map(m => v3Month(m.iso, 'long')))}, when sale events lifted their spending {fmtMoney(d.peakLift)} above what was expected.</>}
       {' '}<V3Conf state="likely" detail="Built from your own customers: how many you won each month, and what customers like them spent in each month after their first order. Beyond a customer’s first year it assumes they keep spending at their month 10 to 12 rate."/></p>
     <figure className="v3-chart">
       <figcaption><span className="v3-chart-title">Returning customers’ sales by month</span>
@@ -18921,18 +18924,18 @@ function V3ReturningBaseline() {
       <div className="v3-stat"><div className="v3-stat-lab"><span>Sales goal still to make</span></div><div className="v3-stat-val">{fmtMoney(P.remaining)}</div>
         <div className="v3-stat-foot"><span className="v3-muted">of {fmtMoney(P.target)}; {fmtMoney(P.done)} made so far</span></div></div>
       <div className="v3-stat"><div className="v3-stat-lab"><span>From customers you already have</span></div><div className="v3-stat-val">{fmtMoney(P.existing)}</div>
-        <div className="v3-stat-foot"><span className="v3-muted">{fmtPctN(P.existing / P.remaining)} of it, on an ordinary month</span></div></div>
+        <div className="v3-stat-foot"><span className="v3-muted">{fmtPctN(P.existing / P.remaining)} of it, in an ordinary month</span></div></div>
       <div className="v3-stat"><div className="v3-stat-lab"><span>Has to come from new customers</span></div><div className="v3-stat-val">{fmtMoney(P.fromNew)}</div>
         <div className="v3-stat-foot"><span className="v3-muted">{P.customers ? 'about ' + fmtCount(P.customers) + ' first orders at ' + fmtMoney(P.firstValue) : 'first orders and their early repeats'}</span></div></div>
-      {P.spendMonth != null && <div className="v3-stat"><div className="v3-stat-lab"><span>Ad spend that takes, a month</span></div><div className="v3-stat-val">{fmtMoney(P.spendMonth)}</div>
-        <div className="v3-stat-foot"><span className="v3-muted">{P.seasonal ? 'the quarter plan, ' + fmtMoney(P.ncac) + ' a new customer on average with Black Friday' : 'at ' + fmtMoney(P.ncac) + ' a new customer'}{P.spendNow ? '; you spend ' + fmtMoney(P.spendNow) + ' now' : ''}</span></div></div>}
+      {P.spendMonth != null && <div className="v3-stat"><div className="v3-stat-lab"><span>Ad spend needed a month</span></div><div className="v3-stat-val">{fmtMoney(P.spendMonth)}</div>
+        <div className="v3-stat-foot"><span className="v3-muted">{P.seasonal ? 'from the quarter plan, at ' + fmtMoney(P.ncac) + ' per new customer on average, Black Friday included' : 'at ' + fmtMoney(P.ncac) + ' to win each new customer'}{P.spendNow ? '; you spend ' + fmtMoney(P.spendNow) + ' now' : ''}</span></div></div>}
     </div>
     <p className="v3-note v3-measure">
       {P.spendNow && P.spendMonth > P.spendNow * 1.2
-        ? <>{P.seasonal ? 'The quarter plan puts ' : 'At today’s order value and cost of a new customer, the goal needs '}{fmtTimes(P.spendMonth / P.spendNow, 1)} your current ad spend{P.seasonal ? ' into the rest of the goal' : ''}. Three things shrink that gap before spend does: </>
+        ? <>{P.seasonal ? 'The quarter plan puts ' : 'At today’s order value and cost of a new customer, the goal needs '}{fmtTimes(P.spendMonth / P.spendNow, 1)} your current ad spend{P.seasonal ? ' into the rest of the goal' : ''}. Three things close that gap more cheaply than ad spend: </>
         : <>Three things make the goal cheaper to reach: </>}
-      a bigger first order (every pound added to it cuts the new customers you need), a reason for existing customers to come back
-      {d.peakLift > 0 ? ' — your sale months added ' + fmtMoney(d.peakLift) + ' from them alone' : ''}, and a second order sooner.
+      a bigger first order, so you need fewer new customers; a reason for existing customers to come back
+      {d.peakLift > 0 ? ' (your sale months brought ' + fmtMoney(d.peakLift) + ' extra from them alone)' : ''}; and a second order sooner.
     </p>
     <div className="v3-btn-row">
       <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('products')}>Raise order value on Products</button>
@@ -18979,15 +18982,15 @@ function V3Incrementality() {
   const pos = v => Math.min(99, Math.max(1, v / scale * 100));
   return (<div className="v3-score v3-enter">
     <div className="v3-score-head">
-      <h2 className="v3-score-title">Which channels earn their money</h2>
-      <span className="v3-score-key">ring is what the platform reports · dot is what it likely caused · tick is break-even</span>
+      <h2 className="v3-score-title">Which ad channels pay for themselves?</h2>
+      <span className="v3-score-key">ring: sales the platform claims per £1 · dot: sales the ads likely caused · tick: what it needs to break even</span>
     </div>
     <p className="v3-score-verdict">
-      {cut.length > 0 && <>Cut back {v3Names(cut.map(r => r.name))}: {cut.length === 1 ? 'it loses' : 'they lose'} money on the platform’s figures and on what {cut.length === 1 ? 'it' : 'they'} likely caused — {fmtMoney(cutSpend)} of the last 30 days. </>}
-      {test.length > 0 && <>Test {test[0].name} before you scale it: {fmtMoney(test[0].spend)} a month rides on {fmtTimes(test[0].rep)} against a {fmtTimes(test[0].be)} break-even, and the answer turns on how much of it the ads really cause. </>}
-      {pays.length > 0 && <>{v3Names(pays.map(r => r.name))} {pays.length === 1 ? 'pays' : 'pay'} on either reading. </>}
+      {cut.length > 0 && <>Cut back {v3Names(cut.map(r => r.name))}: {cut.length === 1 ? 'it loses' : 'they lose'} money however you count the sales. That is {fmtMoney(cutSpend)} of spend in the last 30 days. </>}
+      {test.length > 0 && <>Test {test[0].name} before you spend more on it. It costs {fmtMoney(test[0].spend)} a month. The platform credits it with {fmtTimes(test[0].rep)} its cost in sales, and it needs {fmtTimes(test[0].be)} to break even. Whether it pays depends on how many of those sales the ads really cause. </>}
+      {pays.length > 0 && <>{v3Names(pays.map(r => r.name))} {pays.length === 1 ? 'pays for itself' : 'pay for themselves'} however you count the sales. </>}
       {!cut.length && !test.length && !pays.length && <>No channel spends enough to be worth a test yet. </>}
-      <V3Conf state={allTested ? 'likely' : 'probably'} detail={allTested ? 'Every channel here has a holdout result of your own.' : 'Where no holdout has run, the share each channel really causes is borrowed from published studies of similar channels — which is exactly why a verdict that only holds on one reading is sent to a test rather than acted on.'}/></p>
+      <V3Conf state={allTested ? 'likely' : 'probably'} detail={allTested ? 'Every channel here has been tested on your own customers.' : 'Where you have not run a test, the share of sales each channel really causes comes from published studies of similar channels. That is why a verdict that holds on only one count goes to a test first.'}/></p>
     <ul className="v3-score-list">
       {rows.map(r => {
         const a = pos(Math.min(r.rep, r.tru)), b = pos(Math.max(r.rep, r.tru));
@@ -19005,7 +19008,7 @@ function V3Incrementality() {
         </li>);
       })}
     </ul>
-    {test.length > 0 && <p className="v3-note">A two-week holdout on {test[0].name} — pausing it in one region while another carries on — replaces the borrowed figure with your own and settles the {fmtMoney(test[0].spend)} a month.{' '}
+    {test.length > 0 && <p className="v3-note">To settle it, pause {test[0].name} in one region for two weeks while another carries on, then compare sales. That swaps the borrowed figure for your own and settles the {fmtMoney(test[0].spend)} a month.{' '}
       <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('calendar')}>Plan the {test[0].name} test</button></p>}
   </div>);
 }
@@ -19054,7 +19057,7 @@ function V3MarketingLead() {
   const nice = p => v3ChanName(p, p);
   const head = !moved ? 'Ad spend has held steady: ' + fmtMoney(d.L.spend) + ' a month for ' + fmtCount(d.L.nc) + ' new customers.'
     : d.dSpend > 0 && d.dNc <= 0 ? 'You are spending ' + fmtMoney(d.dSpend) + ' a month more than in ' + d.prevLab + ', and winning no more new customers.'
-    : d.dSpend > 0 ? 'The extra ' + fmtMoney(d.dSpend) + ' a month of ads has bought about ' + fmtCount(d.dNc) + ' more new customers a month — ' + fmtMoney(per) + ' each.'
+    : d.dSpend > 0 ? 'The extra ' + fmtMoney(d.dSpend) + ' a month on ads won about ' + fmtCount(d.dNc) + ' more new customers a month, at ' + fmtMoney(per) + ' each.'
     : 'You are spending ' + fmtMoney(Math.abs(d.dSpend)) + ' a month less than in ' + d.prevLab + (d.dNc >= 0 ? ', and new customers have held up.' : ', and winning ' + fmtCount(Math.abs(d.dNc)) + ' fewer new customers a month.');
   const cols = [PAL.data1, PAL.data2, PAL.data4, PAL.data5, PAL.data3];
   const tip = ({ active, payload }) => {
@@ -19065,13 +19068,13 @@ function V3MarketingLead() {
       <span>New customers <em>{fmtCount(p.nc)}</em></span><span>Cost each <em>{p.nc > 0 ? fmtMoney(p.spend / p.nc) : FMT_NONE}</em></span></div>);
   };
   return (<div className="v3-page-stack"><section className="v3-sec">
-    <div className="v3-kick">What the ad spend is buying · {d.lastLab} against {d.prevLab}</div>
+    <div className="v3-kick">What your ads are buying · {d.lastLab} against {d.prevLab}</div>
     <p className="v3-verdict">{head}</p>
     <p className="v3-note v3-measure">
-      {moved ? <>A typical month in {d.lastLab}: {fmtMoney(d.L.spend)} of ads for {fmtCount(d.L.nc)} new customers. In {d.prevLab}: {fmtMoney(d.P.spend)} for {fmtCount(d.P.nc)}. </> : null}
+      {moved ? <>In {d.lastLab}, a typical month was {fmtMoney(d.L.spend)} of ads for {fmtCount(d.L.nc)} new customers. In {d.prevLab}, it was {fmtMoney(d.P.spend)} for {fmtCount(d.P.nc)}. </> : null}
       {moved && up.length > 0 && <>Most of the increase went to {up.slice(0, 2).map(x => nice(x.p) + ' (' + fmtMoney(x.was) + ' → ' + fmtMoney(x.now) + ' a month)').join(' and ')}. </>}
-      {ceil != null && <>A new customer is worth at most {fmtMoney(ceil)} to you — their first order plus a year of repeat profit{per != null ? (per > ceil ? ', so the extra customers cost more than they are worth.' : ', so the extra customers still pay their way.') : (moved && d.dSpend > 0 && d.dNc <= 0 ? ', and the extra spend bought none.' : '.')}</>}
-      {' '}<V3Conf state="likely" detail="Spend and new customers are counted from your own ad accounts and Shopify orders, by calendar month. Comparing medians of three months keeps one sale month from deciding it; other things changed too (season, offers), so read it as what the spend bought alongside them."/></p>
+      {ceil != null && <>A new customer is worth at most {fmtMoney(ceil)} to you: the profit on their first order plus a year of repeat orders{per != null ? (per > ceil ? '. So the extra customers cost more than they are worth.' : '. So the extra customers still pay their way.') : (moved && d.dSpend > 0 && d.dNc <= 0 ? '. The extra spend won none.' : '.')}</>}
+      {' '}<V3Conf state="likely" detail="Spend comes from your ad accounts and new customers from your Shopify orders, by calendar month. Each figure is the middle of three months, so one sale month cannot decide it. Season and offers changed too, so the ads did not do this alone."/></p>
     <figure className="v3-chart">
       <figcaption><span className="v3-chart-title">Ad spend by channel, and new customers, by month</span>
         <span className="v3-legend">{d.ps.map((k, i) => <React.Fragment key={k}><i style={{ background: cols[i % cols.length] }}/>{nice(k)} </React.Fragment>)}<i style={{ background: PAL.ink }}/>New customers</span></figcaption>
@@ -19146,31 +19149,31 @@ function V3EmailRead() {
   const priority = ['winback', 'upsell', 'post', 'replenish', 'cart', 'checkout', 'browse', 'welcome'];
   const missing = draftOnly.filter(t => priority.includes(t)).sort((a, b) => priority.indexOf(a) - priority.indexOf(b));
   const head = missing.length
-    ? 'Email has flows built for ' + v3Names(missing.slice(0, 3).map(t => label(t).toLowerCase())) + ', and none of them is switched on.'
-    : weakPost ? 'Your post-purchase email reaches people at the moment a second order is won, and earns almost nothing.'
-    : 'Your email flows cover the main moments; the gains are in how hard each one works.';
+    ? 'You have automatic emails built for ' + v3Names(missing.slice(0, 3).map(t => label(t).toLowerCase())) + ', but none of them is switched on.'
+    : weakPost ? 'Your post-purchase email reaches people just when a second order is won, yet it earns almost nothing.'
+    : 'Your automatic emails cover the main moments. The gains now are in making each one earn more.';
   return (<div className="v3-page-stack"><section className="v3-sec">
     <div className="v3-kick">Email, the channel you own · last 30 days</div>
     <p className="v3-verdict">{head}</p>
-    {claimShare != null && claimShare > 0.5 && <p className="v3-note v3-measure">Klaviyo credits email with {fmtMoney(claimed)} of sales — {fmtPctN(claimShare)} of everything you sold. It counts anyone who opened an email before buying, so that is not what email caused, and Greta does not add it to anything. The useful read is below: what is switched on, and what each flow earns per person it reaches.</p>}
+    {claimShare != null && claimShare > 0.5 && <p className="v3-note v3-measure">Klaviyo credits email with {fmtMoney(claimed)} of sales, {fmtPctN(claimShare)} of everything you sold. But it counts anyone who opened an email before buying, so this is not what email caused. Greta leaves it out of every total. Below is what is switched on, and what each automatic email earns per person it reaches.</p>}
     <ol className="v3-moves">
-      {missing.includes('winback') && (<li><b>Switch on the winback flow.</b>{' '}
-        {atRisk ? <>{fmtCount(atRisk.customers)} customers have gone quiet after buying well — {fmtCount(atRisk.emailable)} of them can be emailed — and nothing writes to them automatically.</> : 'Customers who have gone quiet get nothing automatically.'}
+      {missing.includes('winback') && (<li><b>Switch on the email that wins back quiet customers.</b>{' '}
+        {atRisk ? <>{fmtCount(atRisk.customers)} good customers have stopped buying, and {fmtCount(atRisk.emailable)} of them can be emailed. Nothing writes to them automatically.</> : 'Customers who stop buying get nothing automatically.'}
         {' '}<button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('customers')}>See them on Customers</button></li>)}
-      {missing.includes('upsell') && (<li><b>Switch on the upsell flows.</b>{' '}They follow an order with the product that usually goes with it — the same add-on move Products sizes for your hero products, sent after the order instead of before it.
+      {missing.includes('upsell') && (<li><b>Switch on the emails that suggest an add-on.</b>{' '}They follow an order with the product people usually buy with it. Products shows the same add-ons for your best sellers; these emails offer them after the order instead of before.
         {' '}<button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('products')}>See the add-ons on Products</button></li>)}
-      {weakPost && (<li><b>Rework the post-purchase flow.</b>{' '}It reached {fmtCount(post.reach)} people and earned {fmtMoney(post.rev)} — {fmtMoney(post.per, 2)} a person, against {fmtMoney(medPer, 2)} for your typical live flow.
+      {weakPost && (<li><b>Rework the post-purchase email.</b>{' '}It reached {fmtCount(post.reach)} people and earned {fmtMoney(post.rev)}. That is {fmtMoney(post.per, 2)} a person, against {fmtMoney(medPer, 2)} for your typical automatic email.
         {gap != null ? <> Second orders usually come {fmtCount(gap)} days after the first, so that is when it should give a reason to buy again.</> : null}</li>)}
-      {missing.filter(t => !['winback', 'upsell'].includes(t)).length > 0 && (<li><b>Also built and switched off:</b> {v3Names(missing.filter(t => !['winback', 'upsell'].includes(t)).map(t => label(t).toLowerCase()))}.</li>)}
+      {missing.filter(t => !['winback', 'upsell'].includes(t)).length > 0 && (<li><b>Also built but switched off:</b> {v3Names(missing.filter(t => !['winback', 'upsell'].includes(t)).map(t => label(t).toLowerCase()))}.</li>)}
     </ol>
     <table className="v3-rw v3-email-table">
-      <thead><tr><th className="t-text">Live flow</th><th>People reached</th><th>Sales Klaviyo credits</th><th>Per person</th></tr></thead>
+      <thead><tr><th className="t-text">Automatic email, switched on</th><th>People reached</th><th>Sales Klaviyo credits</th><th>Per person</th></tr></thead>
       <tbody>{ppl.sort((a, b) => b.rev - a.rev).slice(0, 8).map((f, i) => (<tr key={i}>
         <td className="t-text">{label(f.t) === 'other' ? f.name : label(f.t)}<span className="v3-muted"> · {String(f.name).replace(/^[A-Z]{1,3}\s*\|\s*/, '')}</span></td>
         <td>{fmtCount(f.reach)}</td><td>{fmtMoney(f.rev)}</td><td className={f === post && weakPost ? 'v3-down' : ''}>{fmtMoney(f.per, 2)}</td>
       </tr>))}</tbody>
     </table>
-    {camps.length > 0 && <p className="micro muted v3-measure">{fmtCount(camps.length)} campaigns went out in the last 30 days to {fmtCount(camps.reduce((a, c) => a + Number(c.recipients), 0))} inboxes in total; Klaviyo credits them with {fmtMoney(campRev)}. Per-campaign detail is in the Email section below.</p>}
+    {camps.length > 0 && <p className="micro muted v3-measure">You sent {fmtCount(camps.length)} one-off emails (campaigns) in the last 30 days, to {fmtCount(camps.reduce((a, c) => a + Number(c.recipients), 0))} inboxes in total. Klaviyo credits them with {fmtMoney(campRev)}. Each one is in the Email section below.</p>}
   </section></div>);
 }
 
@@ -19220,18 +19223,19 @@ function V3CustomerValue() {
   const cac90 = cac; if (cac30 != null) { cac = cac30; ratio = ltv / cac; }
   const day0 = (() => { const r = (front.rows || []).find(x => x.in_standard_basis && /day 0/.test(String(x.bucket))); return r ? Number(r.pct_of_12m_value) / 100 : null; })();
   const X = v3ExtraCustomers(mo.rows);
-  const head = ratio >= 3 ? 'Each new customer earns back ' + fmtTimes(ratio, 1) + ' what they cost to win — there is room to spend more.'
-    : ratio >= 1 ? 'A new customer is worth ' + fmtMoney(ltv) + ' in profit over a year and ' + (cac30 != null ? 'cost ' + fmtMoney(cac) + ' to win in the last 30 days' : 'costs ' + fmtMoney(cac) + ' to win') + ' — ' + fmtTimes(ratio, 1) + ', where 3× leaves room to grow.'
-    : 'A new customer costs more to win (' + fmtMoney(cac) + ') than they are worth over a year (' + fmtMoney(ltv) + ').';
+  const head = ratio >= 3 ? 'Over a year, a new customer earns you ' + fmtTimes(ratio, 1) + ' what they cost to win. There is room to spend more.'
+    : ratio >= 1 ? 'Over a year, a new customer earns you ' + fmtTimes(ratio, 1) + ' what they cost to win. Brands aim for about 3×, which leaves room to grow.'
+    : 'A new customer costs more to win than they earn you in a year.';
   return (<div className="v3-page-stack"><section className="v3-sec">
     <div className="v3-kick">What a customer is worth against what one costs</div>
     <p className="v3-verdict">{head}</p>
     <p className="v3-note v3-measure">
-      {day0 != null && <>{fmtPctN(day0)} of that value comes with the first order, so the first order has to pay for winning the customer; repeat buying adds the other {fmtPctN(1 - day0)} at most. </>}
+      A new customer is worth {fmtMoney(ltv)} in profit over a year. {cac30 != null ? <>One cost {fmtMoney(cac)} to win in the last 30 days. </> : <>One costs {fmtMoney(cac)} to win. </>}
+      {day0 != null && <>{fmtPctN(day0)} of that profit comes with the first order, so the first order has to pay for winning the customer. Repeat orders add the other {fmtPctN(1 - day0)} at most. </>}
       {cac30 != null && Math.abs(cac30 / cac90 - 1) > 0.1 && <>Over 90 days a new customer cost {fmtMoney(cac90)}. </>}
-      {X && X.per != null && <>The extra customers bought since {X.prevLab} cost {fmtMoney(X.per)} each{X.per > ltv ? ' — more than a customer is worth.' : ', still under what a customer is worth.'} </>}
-      {X && X.moved && X.dSpend > 0 && X.dNc <= 0 && <>The extra ad spend since {X.prevLab} has bought no extra customers. </>}
-      <V3Conf state="likely" detail="Customer value is a year of profit after product and order costs from your own customers; the cost is ad spend divided by new customers over the last 30 days (90 days where 30 are not available). Both are counted, not modelled."/></p>
+      {X && X.per != null && <>The extra ad spend since {X.prevLab} won extra customers at {fmtMoney(X.per)} each{X.per > ltv ? ', more than a customer is worth.' : ', still less than a customer is worth.'} </>}
+      {X && X.moved && X.dSpend > 0 && X.dNc <= 0 && <>The extra ad spend since {X.prevLab} has won no extra customers. </>}
+      <V3Conf state="likely" detail="Customer value is a year of profit after product and order costs, from your own customers. The cost is ad spend divided by new customers over the last 30 days (90 days where 30 are not available). Both are counted from your records, not predicted."/></p>
     {X && (X.per != null || (X.moved && X.dSpend > 0)) && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('marketing')}>
       Where the extra spend went <span className="v3-xref-go">on Marketing →</span></button>}
   </section></div>);
@@ -19271,19 +19275,19 @@ function V3Retention() {
   const habit = d && f0 && Number(d.next_order_on_markdown_share) - Number(f0.next_order_on_markdown_share) >= 0.1;
   const moves = [];
   if (at && at.n > 0) moves.push(<li key="win"><b>Win back {fmtCount(at.n)} customers who bought well and have gone quiet.</b>{' '}
-    {fmtCount(at.mail)} of them can be emailed{winBuilt ? ', and the winback email is built in Klaviyo but switched off' : !winLive && flows.length ? ', and no winback email is set up' : ''}.
-    {retAov ? ' Each one who orders again is worth about ' + fmtMoney(retAov) + ' of sales — your typical returning order.' : ''}{' '}
-    <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('customers', 'segments')}>Stage the list below</button></li>);
+    {fmtCount(at.mail)} of them can be emailed{winBuilt ? '. A win-back email is built in Klaviyo but switched off' : !winLive && flows.length ? '. No win-back email is set up' : ''}.
+    {retAov ? ' Each one who orders again is worth about ' + fmtMoney(retAov) + ' in sales, your typical repeat order.' : ''}{' '}
+    <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('customers', 'segments')}>Build the list below</button></li>);
   if (gap != null) moves.push(<li key="second"><b>Ask for the second order before day {fmtCount(gap)}.</b>{' '}
     That is the usual gap between a customer’s orders{R0 && R0.repeat_rate != null ? ', and ' + fmtPctN(Number(R0.repeat_rate)) + ' of customers have ordered more than once' : ''}.
-    {post && medPer != null && post.per < medPer * 0.2 ? <> Your post-purchase email reaches {fmtCount(post.reach)} people a month and earns {fmtMoney(post.per, 2)} a person, against {fmtMoney(medPer, 2)} for your typical flow — give it a reason to come back, such as the add-on that goes with what they bought.</> : ' Time the follow-up email to land before then, with the add-on that goes with what they bought.'}{' '}
+    {post && medPer != null && post.per < medPer * 0.2 ? <> Your after-purchase email reaches {fmtCount(post.reach)} people a month and earns {fmtMoney(post.per, 2)} a person. Your typical automated email earns {fmtMoney(medPer, 2)}. Give buyers a reason to come back, such as the add-on that goes with what they bought.</> : ' Time the follow-up email to land before then, with the add-on that goes with what they bought.'}{' '}
     <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('products')}>See the add-ons on Products</button></li>);
   if (habit) moves.push(<li key="disc"><b>Reward full-price customers with perks, not codes.</b>{' '}
-    Customers who joined on a discount come back about as often ({fmtPctN(Number(d.repeat_rate_180d))} within six months, against {fmtPctN(Number(f0.repeat_rate_180d))}), but {fmtPctN(Number(d.next_order_on_markdown_share))} of their next orders are discounted too, against {fmtPctN(Number(f0.next_order_on_markdown_share))} for those who paid full price — the code they joined on sets the price they come back at.
-    {champFull.length && champ.length ? ' ' + fmtCount(sum(champFull, 'customers')) + ' of your ' + fmtCount(sum(champ, 'customers')) + ' best customers buy at full price; a code is margin they did not need.' : ''}</li>);
+    Customers whose first order was discounted come back about as often ({fmtPctN(Number(d.repeat_rate_180d))} within six months, against {fmtPctN(Number(f0.repeat_rate_180d))}). But {fmtPctN(Number(d.next_order_on_markdown_share))} of their next orders are discounted too, against {fmtPctN(Number(f0.next_order_on_markdown_share))} for those who paid full price. The discount they joined on sets the price they come back at.
+    {champFull.length && champ.length ? ' ' + fmtCount(sum(champFull, 'customers')) + ' of your ' + fmtCount(sum(champ, 'customers')) + ' best customers buy at full price. A code gives them money off they did not need.' : ''}</li>);
   if (!moves.length) return null;
   return (<div className="v3-page-stack"><section className="v3-sec">
-    <h2 className="v3-sec-title">Keep them coming back</h2>
+    <h2 className="v3-sec-title">How do I bring customers back?</h2>
     <ol className="v3-moves">{moves}</ol>
   </section></div>);
 }
@@ -19488,7 +19492,7 @@ function V3GoalLead() {
   if (!P) return (<section>
     <div className="v3-kick">This quarter · {range}</div>
     <p className="v3-verdict">{g ? 'Your goal is ' + fmtMoney(tgt) + ' of sales this quarter.' : 'There is no goal for this quarter yet.'}</p>
-    <p className="v3-note v3-measure">Greta needs a full month of sales before it can say where your pace lands. {fmtMoney(done)} so far this quarter.</p>
+    <p className="v3-note v3-measure">Greta needs a full month of sales before it can say where the quarter will end up. You have sold {fmtMoney(done)} so far this quarter.</p>
     <div className="v3-btn-row">{setGoal}</div>
   </section>);
 
@@ -19532,9 +19536,9 @@ function V3GoalLead() {
   return (<div className="v3-page-stack"><section>
     <div className="v3-kick">This quarter · {range}</div>
     {stale && (<div className="v3-alert">
-      <p className="v3-measure"><b>Greta’s plan has changed since you confirmed this goal.</b> {fmtMoney(tgt)} of sales now takes about {fmtMoney(G.spend_cap)} of ads, not {fmtMoney(g.spend_cap)}
-        {dCam != null ? <>, and leaves {fmtMoney(gCam)} after ads — {dCam < 0 ? fmtMoney(-dCam) + ' less than' : fmtMoney(dCam) + ' more than'} staying at today’s pace</> : null}.
-        {' '}The plan you confirmed expected more from extra ads than your own months show they bring. Re-plan the quarter to see the figures it should have shown.</p>
+      <p className="v3-measure"><b>Greta’s plan has changed since you confirmed this goal.</b> {fmtMoney(tgt)} of sales now takes about {fmtMoney(G.spend_cap)} of ads, not {fmtMoney(g.spend_cap)}.
+        {dCam != null ? <> That leaves {fmtMoney(gCam)} of profit after ads, {dCam < 0 ? fmtMoney(-dCam) + ' less than' : fmtMoney(dCam) + ' more than'} staying at today’s pace.</> : null}
+        {' '}The plan you confirmed expected more from extra ads than your own sales history shows. Re-plan the quarter to see the corrected figures.</p>
       <div className="v3-btn-row"><button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={replan}>Re-plan the quarter</button></div>
     </div>)}
     <p className="v3-verdict">{g
@@ -19543,11 +19547,11 @@ function V3GoalLead() {
           : <>At today’s ad spend you reach it: about {fmtMoney(P.revenue_target)}.</>}</>
       : <>There is no goal for this quarter yet. At today’s ad spend you land at about {fmtMoney(P.revenue_target)} of sales.</>}</p>
     <p className="v3-note v3-measure">
-      {fmtMoney(done)} so far, against {fmtMoney(exp)} the {g ? 'goal' : 'plan'} expects by now{onTrack ? ' — on track.' : ' — ' + fmtMoney(exp - done) + ' behind.'}
-      {g && short > 0 && <> The gap is ad spend in the peak: the goal takes {fmtMoney(gSpend)} of ads, {fmtMoney(gSpend - Number(P.spend_cap))} more than today’s pace{peakShare != null ? <>, {fmtPctN(peakShare)} of it in {gpMonthName(peak.iso)}</> : null}.</>}
-      {g && short > 0 && dCam != null && <> Those extra ads buy about {fmtMoney(short)} more sales but {dCam > 0 ? 'only ' + fmtMoney(dCam) + ' more' : fmtMoney(-dCam) + ' less'} profit after ads{dCam < 0 ? ' — past a point, extra ads cost more profit than they bring in.' : atBest === 'at' ? ' — the goal sits at the most profitable spend Greta can see.' : atBest === 'past' ? ' — the goal is past the most profitable spend Greta can see (' + fmtMoney(best) + ').' : '.'}</>}
-      {!(g && short > 0) && best && <> The most profitable spend Greta can see is {fmtMoney(best)} of ads for about {fmtMoney(P.ceiling.best_sales)} of sales.</>}
-      {' '}<V3Conf state="probably" detail={'Greta’s quarter plan: your own seasonality from your sales history, returning customers at their last three months’ rate, and new-customer sales that rise with ad spend along your measured curve — each extra pound buys a little less. Its average new customer costs ' + (B.cost_per_new_customer ? fmtMoney(B.cost_per_new_customer, 2) : 'less') + ' because the quarter includes Black Friday, when new customers come cheaper; Customers shows the last 90 days.'}/></p>
+      You have sold {fmtMoney(done)} so far. The {g ? 'goal' : 'plan'} expects {fmtMoney(exp)} by now{onTrack ? ', so you are on track.' : ', so you are ' + fmtMoney(exp - done) + ' behind.'}
+      {g && short > 0 && <> The gap is ad spend. The goal takes {fmtMoney(gSpend)} of ads, {fmtMoney(gSpend - Number(P.spend_cap))} more than today’s pace.{peakShare != null ? <> {fmtPctN(peakShare)} of the goal’s ads go in {gpMonthName(peak.iso)}.</> : null}</>}
+      {g && short > 0 && dCam != null && <> Those extra ads bring about {fmtMoney(short)} more sales but {dCam > 0 ? 'only ' + fmtMoney(dCam) + ' more' : fmtMoney(-dCam) + ' less'} profit after ads.{dCam < 0 ? ' Past a point, extra ads cost more profit than they bring in.' : atBest === 'at' ? ' The goal sits at the most profitable ad spend Greta can see.' : atBest === 'past' ? ' The goal is past the most profitable ad spend Greta can see (' + fmtMoney(best) + ').' : ''}</>}
+      {!(g && short > 0) && best && <> The most profitable ad spend Greta can see is {fmtMoney(best)}, for about {fmtMoney(P.ceiling.best_sales)} of sales.</>}
+      {' '}<V3Conf state="probably" detail={'How Greta plans the quarter: your own busy and quiet months from your sales history, returning customers at their last three months’ rate, and new-customer sales that rise with ad spend, each extra £1 buying a little less. Its average new customer costs ' + (B.cost_per_new_customer ? fmtMoney(B.cost_per_new_customer, 2) : 'less') + ' because the quarter includes Black Friday, when new customers come cheaper. The Customers page shows the last 90 days.'}/></p>
     <div className="v3-stat-grid v3-gap-top">
       <div className="v3-stat"><div className="v3-stat-lab"><span>Sales so far</span></div><div className="v3-stat-val">{fmtMoney(done)}</div>
         <div className="v3-stat-foot"><span className={onTrack ? 'v3-muted' : 'v3-down'}>{fmtMoney(exp)} expected by now</span></div></div>
@@ -19556,7 +19560,7 @@ function V3GoalLead() {
           ? <>, your average {gpMonthName(String(P.inputs.base_from).slice(0, 7) + '-01').slice(0, 3)}–{gpMonthName(String(P.inputs.base_to).slice(0, 7) + '-01').slice(0, 3)}</> : null}</span></div></div>
       {g && <div className="v3-stat"><div className="v3-stat-lab"><span>Ads the goal takes</span></div><div className="v3-stat-val">{fmtMoney(gSpend)}</div>
         <div className="v3-stat-foot"><span className="v3-muted">{fmtMoney(peak.gSpend)} of it in {gpMonthName(peak.iso)}</span></div></div>}
-      {g && <div className="v3-stat"><div className="v3-stat-lab"><span>Profit after ads, the goal</span></div><div className="v3-stat-val">{fmtMoney(gCam)}</div>
+      {g && <div className="v3-stat"><div className="v3-stat-lab"><span>Profit after ads, at the goal</span></div><div className="v3-stat-val">{fmtMoney(gCam)}</div>
         <div className="v3-stat-foot"><span className="v3-muted">{fmtMoney(P.cam_target)} at today’s pace</span></div></div>}
     </div>
   </section>
@@ -19574,23 +19578,23 @@ function V3GoalLead() {
         {ph && maxSeen && <td className={r.x > 1.5 ? 'v3-down' : 'v3-muted'}>{fmtTimes(r.x, 1)}</td>}
       </tr>))}</tbody>
     </table>
-    {ph && maxSeen && <p className="micro muted v3-measure">Your biggest month of ads so far was {fmtMoney(maxSeen)}. Past 1.5× that, Greta is extending your spend curve beyond anything it has seen.</p>}
+    {ph && maxSeen && <p className="micro muted v3-measure">Your biggest month of ads so far was {fmtMoney(maxSeen)}. Past 1.5× that, Greta is estimating beyond any level of spend it has seen from you.</p>}
     {(() => {
       const bs = v3BoardSpendTargets(v3LiveRows(boardG.rows || [])), k = new Date().toISOString().slice(0, 7);
       const cur = rows.find(r => r.iso.slice(0, 7) === k);
       return bs && cur && cur.pSpend > 0 && cur.pSpend < bs.monthly * 0.9
-        ? <p className="micro muted v3-measure">For {gpMonthName(cur.iso)} the plan’s figure is {fmtMoney(cur.pSpend)} of ads in all. The board’s {v3AndList(bs.names)} targets (about {fmtMoney(bs.monthly)} a month together) are ceilings on the way down to it, not the month’s budget.</p> : null;
+        ? <p className="micro muted v3-measure">The plan has {fmtMoney(cur.pSpend)} of ads in all for {gpMonthName(cur.iso)}. The board’s {v3AndList(bs.names)} targets (about {fmtMoney(bs.monthly)} a month together) are upper limits while spend comes down to that, not the month’s budget.</p> : null;
     })()}
   </section>
 
   {g && (<section className="v3-sec">
     <h2 className="v3-sec-title">What reaching it takes</h2>
     <ol className="v3-moves">
-      <li><b>Plan {gpMonthName(peak.iso)}’s ads now.</b> The goal puts {fmtMoney(peak.gSpend)} into {gpMonthName(peak.iso)}
-        {peak.x != null ? <> — {fmtTimes(peak.x, 1)} the most you have spent in a month</> : null}.
-        {mc > 0 && fop > 0 && <> At that spend the last new customers cost about {fmtMoney(mc)} each, against {fmtMoney(fop)} profit on their first order{ltv ? <> and {fmtMoney(ltv)} over a year</> : null}
-          {mc > fop ? ' — past the point where the first order pays for them, so watch cost per new customer weekly as spend climbs.' : mc >= fop * 0.9 ? ' — the first order only just pays for them; the profit is in their next orders.' : ' — still paid for by the first order.'}</>}</li>
-      <li><b>Stock for it.</b> {L.entered ? <>With your {L.weeks}-week lead time</> : <>At Greta’s assumed {L.days} days from order to arrival (add your lead time below)</>}, an order placed today lands around {v3Day(arrive)}
+      <li><b>Plan {gpMonthName(peak.iso)}’s ads now.</b> The goal puts {fmtMoney(peak.gSpend)} of ads into {gpMonthName(peak.iso)}
+        {peak.x != null ? <>, {fmtTimes(peak.x, 1)} the most you have spent in a month</> : null}.
+        {mc > 0 && fop > 0 && <> At that spend, the last new customers cost about {fmtMoney(mc)} each. Their first order makes {fmtMoney(fop)} profit{ltv ? <>, and {fmtMoney(ltv)} over a year</> : null}.
+          {mc > fop ? ' That is past the point where the first order pays for them, so check what a new customer costs each week as spend climbs.' : mc >= fop * 0.9 ? ' The first order only just pays for them; the profit is in their next orders.' : ' The first order still pays for them.'}</>}</li>
+      <li><b>Stock for it.</b> {L.entered ? <>With your {L.weeks}-week wait from order to arrival</> : <>At Greta’s guess of {L.days} days from order to arrival (add yours below)</>}, an order placed today arrives around {v3Day(arrive)}
           {arrive > peakEnd ? <> — after {gpMonthName(peak.iso)} ends, so all of it sells from the stock you hold now.</>
             : arrive > peak.iso ? <> — most of {gpMonthName(peak.iso)} sells from the stock you hold now.</>
             : <> — in time, if it goes in by {v3Day(v3IsoAdd(peak.iso, -L.days))}.</>}
@@ -19632,24 +19636,24 @@ function V3CostsOff() {
       if (r.ok) { drift.retry(); cfg.retry(); setMsg({ ok: true, text: 'Saved — every profit figure now uses ' + fmtPctN(is / 100) + ' refunds.' }); }
       else setMsg({ ok: false, text: r.error || 'Could not save.' });
     };
-    items.push(<li key="rf"><b>Refunds are {fmtPctN(is / 100)} of sales; you entered {fmtPctN(was / 100)}.</b>
+    items.push(<li key="rf"><b>Refunds are {fmtPctN(is / 100)} of sales, but you entered {fmtPctN(was / 100)}.</b>
       {' '}{gbp != null ? <>So every profit figure reads {fmtMoney(Math.abs(gbp))} a month too {gbp > 0 ? 'high' : 'low'}, at your last 30 days’ sales.</> : null}
       {' '}Measured over the last 12 months of orders.
       <div className="v3-btn-row"><button type="button" className="v3-btn v3-btn-p v3-btn-sm" disabled={busy} onClick={use}>{busy ? 'Saving…' : 'Use ' + fmtPctN(is / 100)}</button></div></li>);
   }
   const gm = drift.rows.find(r => r.input_key === 'gross_margin' && r.verifiable && r.status === 'drift');
-  if (gm) items.push(<li key="gm"><b>Products without a cost use a {fmtPctN(Number(gm.config_value))} margin; the ones with a cost make {fmtPctN(Number(gm.realised_value))}.</b> Update it under “What things cost you” below, or add the missing costs.</li>);
+  if (gm) items.push(<li key="gm"><b>Products without a cost are counted at a {fmtPctN(Number(gm.config_value))} margin, but products with a cost make {fmtPctN(Number(gm.realised_value))}.</b> Update it under “What things cost you” below, or add the missing costs.</li>);
   if (Q && Number(Q.cogs_coverage_90d) < 0.8) items.push(<li key="cov"><b>Only {fmtPctN(Number(Q.cogs_coverage_90d))} of your sales have a product cost.</b> The rest use your margin, so profit is an estimate until more products have one.
     {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs')}>Add costs <span className="v3-xref-go">under Product costs →</span></button></li>);
   else if (Q && Q.cogs_landed_complete === false) {
     const per10 = mo && Number(Q.realized_cogs_pct) > 0 ? 0.1 * Number(Q.realized_cogs_pct) * mo : null;
-    items.push(<li key="fr"><b>None of your product costs include freight or duty.</b> Margins read high until they do
-      {per10 ? <> — every 10% that freight and duty add to what your products cost is about {fmtMoney(per10)} a month of profit you aren’t seeing</> : null}, and Greta can’t call your profit measured until they do.
+    items.push(<li key="fr"><b>None of your product costs include freight or duty.</b> Until they do, your margins read too high.
+      {per10 ? <> Every 10% that freight and duty add to your product costs means about {fmtMoney(per10)} a month less profit than Greta shows.</> : null} Greta can’t call your profit measured until they are added.
       {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs')}>Add freight and duty <span className="v3-xref-go">under Product costs →</span></button></li>);
   }
-  if (!L.entered) items.push(<li key="lt"><b>No supplier lead time.</b> Stock & orders assumes {L.days} days from order to arrival for every product, so its order-by dates may be late.
+  if (!L.entered) items.push(<li key="lt"><b>No supplier lead time.</b> That is how long stock takes to arrive after you order it. Stock & orders assumes {L.days} days for every product, so its order-by dates may be late.
     {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'economics')}>Add it <span className="v3-xref-go">under Cash, stock and supplier terms →</span></button></li>);
-  if (C.cash_floor == null) items.push(<li key="cf"><b>No minimum cash balance.</b> Without it Greta can’t check whether you can afford the plan — the ads and stock are paid for before the sales arrive.
+  if (C.cash_floor == null) items.push(<li key="cf"><b>No minimum cash balance.</b> Without it, Greta can’t check whether you can afford the plan. The ads and stock are paid for before the sales arrive.
     {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'economics')}>Add it <span className="v3-xref-go">under Cash, stock and supplier terms →</span></button></li>);
   if (C.opening_cash != null && C.opening_cash_as_of) {
     const as = String(C.opening_cash_as_of).slice(0, 10), stale = v3IsoAdd(as, 45);
@@ -19659,13 +19663,13 @@ function V3CostsOff() {
   const unchecked = drift.rows.filter(r => !r.verifiable).map(r => ({ fixed_costs_monthly: 'overheads', payPct: 'payment fees', payFixed: null, shipping: 'shipping', packaging: 'packaging', fulfilment: 'pick and pack' })[r.input_key]).filter(Boolean);
   return (<section className="v3-sec">
     <V3Anchor id="costs-off"/>
-    <h2 className="v3-sec-title">Costs to check</h2>
+    <h2 className="v3-sec-title">Are the costs behind your profit right?</h2>
     <p className="v3-verdict">{items.length
       ? (items.length === 1 ? 'One thing' : fmtCount(items.length) + ' things') + ' in your costs need a look' + (total > 0 ? ' — profit reads about ' + fmtMoney(total) + ' a month too high.' : '.')
       : 'Every cost Greta can check matches your trading.'}</p>
     {items.length > 0 && <ol className="v3-moves">{items}</ol>}
     {msg && <p className={'v3-note ' + (msg.ok ? 'v3-up' : 'v3-down')}>{msg.text}</p>}
-    {unchecked.length > 0 && <p className="micro muted v3-measure">Greta can’t check your {v3Names(unchecked)} against anything yet — nothing connected records what you pay for them — so they are used as you entered them.</p>}
+    {unchecked.length > 0 && <p className="micro muted v3-measure">Greta can’t check your {v3Names(unchecked)} yet, because nothing connected records what you pay for them. It uses them as you entered them.</p>}
   </section>);
 }
 
@@ -19694,12 +19698,12 @@ function V3TrackRecord() {
   const auto = q.rows.filter(r => r.auto && r.status === 'done');
   const done = q.rows.filter(r => !r.auto && (r.status === 'done' || r.status === 'partial')), skipped = q.rows.filter(r => r.status === 'skipped');
   const autoList = auto.length > 0 && (<>
-      {' '}<button type="button" className="v3-btn v3-btn-q v3-btn-sm" aria-expanded={showAuto} onClick={() => setShowAuto(s => !s)}>{showAuto ? 'Hide' : 'Show'} {auto.length} Greta closed</button>
+      {' '}<button type="button" className="v3-btn v3-btn-q v3-btn-sm" aria-expanded={showAuto} onClick={() => setShowAuto(s => !s)}>{showAuto ? 'Hide' : 'Show'} {auto.length} Greta closed itself</button>
       {showAuto && (<><p className="micro muted v3-measure">Greta closes an action itself when what raised it is no longer there. These are not graded as things you did.</p>
         <ul className="v3-rank-steps">{auto.slice(0, 30).map((r, i) => (<li key={r.external_id + i}><span className="v3-rank-desc">{v3PlainAction(r).title}</span>
           <span className="v3-sub"> Closed by Greta {r.disposition_at ? v3Day(r.disposition_at, true) : ''}</span></li>))}</ul></>)}
     </>);
-  if (!done.length && !skipped.length) return (<div className="v3-empty">Nothing marked done or skipped yet. Mark an action done and Greta checks whether it worked once its window has passed.{autoList}</div>);
+  if (!done.length && !skipped.length) return (<div className="v3-empty">Nothing marked done or skipped yet. Mark an action done, and once enough time has passed Greta checks whether it worked.{autoList}</div>);
   const judged = done.filter(r => ['hit', 'miss', 'partial', 'flat'].includes(r.verdict));
   const worked = judged.filter(r => r.verdict === 'hit').length, failed = judged.filter(r => r.verdict === 'miss').length;
   const cant = done.filter(r => r.verdict === 'ungradeable' || r.verdict === 'no_data').length;
@@ -19711,7 +19715,7 @@ function V3TrackRecord() {
     return (<li key={r.external_id + i}>
       <span className="v3-rank-desc">{v3PlainAction(r).title}</span>
       <span className="v3-sub"> {r.status === 'skipped' ? 'Skipped' : 'Done'} {when(r)} · <span className={v ? v.cls : 'v3-muted'}>{v ? v.label : (d ? 'Judged after ' + v3Day(d, true) : 'Not judged yet')}</span>
-        {g.reason ? <> — {v3Tidy(g.reason)}</> : (v && r.predicted_metric_id ? <> — {String(r.predicted_metric_id).replace(/_30d$/, '').replace(/_/g, ' ')} {r.verdict === 'miss' ? 'did not move ' : 'moved '}{r.predicted_direction === 'down' ? 'down' : 'up'} as promised, before against after (graded by an earlier method)</> : null)}</span>
+        {g.reason ? <> — {v3Tidy(g.reason)}</> : (v && r.predicted_metric_id ? <> — {String(r.predicted_metric_id).replace(/_30d$/, '').replace(/_/g, ' ')} {r.verdict === 'miss' ? 'did not move ' : 'moved '}{r.predicted_direction === 'down' ? 'down' : 'up'} as promised, comparing before with after (an older check)</> : null)}</span>
     </li>);
   };
   const shown = showAll ? done : done.slice(0, 8);
@@ -19720,9 +19724,9 @@ function V3TrackRecord() {
       ? <>Of {fmtCount(done.length)} actions you marked done, Greta could judge {fmtCount(judged.length)}: {fmtCount(worked)} worked{failed ? ', ' + fmtCount(failed) + ' didn’t' : ''}.</>
       : <>You have marked {fmtCount(done.length)} action{done.length === 1 ? '' : 's'} done, and Greta has not yet been able to say whether any of them worked.</>}</p>
     <p className="v3-note v3-measure">
-      {cant > 0 && <>{fmtCount(cant)} can’t be judged: most were raised before actions carried a promise Greta could check (a spend that should fall, products back in stock, a price that should hold its sales). </>}
-      {waiting > 0 && <>{fmtCount(waiting)} {waiting === 1 ? 'is' : 'are'} still inside the window Greta waits before judging. </>}
-      Every action raised now says what it should change, and Greta checks that once its window has passed. A grade compares before with after: it says the promise held, not that the action alone made it happen.</p>
+      {cant > 0 && <>{fmtCount(cant)} can’t be judged. Most were raised before each action said what it should change, such as spend that should fall, products back in stock, or a price that should keep its sales. </>}
+      {waiting > 0 && <>{fmtCount(waiting)} {waiting === 1 ? 'is' : 'are'} too recent to judge yet. </>}
+      Every new action says what it should change, and Greta checks once enough time has passed. A grade compares before with after. It shows the promise held, not that the action alone caused it.</p>
     <ul className="v3-rank-steps">{shown.map(row)}</ul>
     {done.length > 8 && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => setShowAll(s => !s)}>{showAll ? 'Show the latest 8' : 'Show all ' + done.length}</button>}
     {skipped.length > 0 && (<>
@@ -19829,8 +19833,8 @@ function V3Review() {
   const word = c => (c == null ? '' : Math.abs(c) < 0.05 ? 'about a typical week' : fmtPctN(Math.abs(c)) + (c > 0 ? ' above' : ' below') + ' a typical week');
   const lead = Math.abs(dKept) < Math.max(150, Math.abs(T.kept) * 0.1) ? 'An ordinary week: you kept ' + fmtMoney(W.kept) + ' after ads, about what a typical week keeps.'
     : Math.abs(pEff) >= Math.abs(sEff)
-      ? (pEff < 0 ? 'Sales were ' + word(sChg) + ', but ad spend ran at ' + fmtTimes(pX, 1) + ' a typical week — that is what moved your profit.' : 'Ad spend was below a typical week and sales were ' + word(sChg) + ' — the lower spend lifted your profit.')
-      : 'Sales were ' + word(sChg) + ' — that is what moved your profit.';
+      ? (pEff < 0 ? 'Sales were ' + word(sChg) + '. Ad spend ran at ' + fmtTimes(pX, 1) + ' a typical week, and that is what moved your profit.' : 'Ad spend was below a typical week, and that lifted your profit. Sales were ' + word(sChg) + '.')
+      : 'Sales were ' + word(sChg) + ', and that is what moved your profit.';
   const promoIn = (from, to) => (ext.rows || []).some(r => { const k = String(r.ts).slice(0, 10); return k >= from && k <= to; });
   // only when the week before was big enough to mislead: a small promo in an ordinary week is not one
   const priorSale = P && P.sales > T.sales * 1.25 && (promoIn(P.start, P.end) || P.sales > T.sales * 1.4);
@@ -19856,9 +19860,9 @@ function V3Review() {
         <button type="button" className="v3-btn v3-btn-q v3-btn-sm" disabled={back === 0} onClick={() => setBack(b => Math.max(0, b - 1))}>Week after →</button>
       </div>
       <p className="v3-verdict">{lead}</p>
-      <p className="v3-note v3-measure">{fmtMoney(W.sales)} of sales on {fmtMoney(W.spend)} of ads, keeping {fmtMoney(W.kept)} after ads. A typical week — the middle of the {prev8.length === 8 ? 'eight' : prev8.length} weeks before{leftOut ? ', leaving out ' + (leftOut === 1 ? 'one sale-sized week' : leftOut + ' sale-sized weeks') : ''} — is {fmtMoney(T.sales)} on {fmtMoney(T.spend)}, keeping {fmtMoney(T.kept)}.
-        {priorSale ? <> The week before held a sale, so against it this week looks worse than it was; Greta compares with a typical week instead.</> : null}
-        {held ? <> Sessions, conversion and the checkout funnel are held until {v3Day(g4.comparisons_clean_from, true)}: Google Analytics was not recording properly{g4.broke_on ? ' from ' + v3Day(g4.broke_on) : ''}{g4.fixed_on ? ' to ' + v3Day(g4.fixed_on) : ''}, so a jump in visits now is the repair, not more traffic.</> : null}</p>
+      <p className="v3-note v3-measure">{fmtMoney(W.sales)} of sales on {fmtMoney(W.spend)} of ads, keeping {fmtMoney(W.kept)} after ads. A typical week is {fmtMoney(T.sales)} of sales on {fmtMoney(T.spend)} of ads, keeping {fmtMoney(T.kept)}. That is the middle of the {prev8.length === 8 ? 'eight' : prev8.length} weeks before{leftOut ? ', leaving out ' + (leftOut === 1 ? 'one week with a big sale' : leftOut + ' weeks with a big sale') : ''}.
+        {priorSale ? <> The week before held a sale, which would make this week look worse than it was. So Greta compares it with a typical week instead.</> : null}
+        {held ? <> Visits, the share of visitors who buy and the checkout steps are left out until {v3Day(g4.comparisons_clean_from, true)}. Google Analytics was not recording properly{g4.broke_on ? ' from ' + v3Day(g4.broke_on) : ''}{g4.fixed_on ? ' to ' + v3Day(g4.fixed_on) : ''}, so a jump in visits now is the repair, not more visitors.</> : null}</p>
       <div className="v3-stat-grid v3-gap-top">
         {stat('Sales', fmtMoney(W.sales), sChg == null ? '' : (sChg >= 0 ? '+' : '−') + fmtPctN(Math.abs(sChg)) + ' on a typical week', sChg != null && sChg < -0.1 ? 'v3-down' : 'v3-muted')}
         {stat('Ad spend', fmtMoney(W.spend), pX == null ? '' : fmtTimes(pX, 1) + ' a typical week', pX != null && pX > 1.25 ? 'v3-down' : 'v3-muted')}
@@ -19898,7 +19902,7 @@ function V3Review() {
 
     <section className="v3-sec">
       <h2 className="v3-sec-title">For this week’s meeting</h2>
-      <div className="v3-kick">The board{split ? ' · ' + split : ''}</div>
+      <div className="v3-kick">Your actions{split ? ' · ' + split : ''}</div>
       {board.err ? <div className="v3-empty">Greta could not load your actions just now.</div> : !board.rows ? <V3SkeletonRows n={3}/> : (<ol className="v3-moves">
         {top.map(r => (<li key={r.external_id}><b>{v3PlainAction(r).title}</b>{r.cm_gbp ? ' — ' + v3Gbp(r.cm_gbp) + v3Per(r) : ''}.
           <div className="v3-btn-row"><V3Done ext={r.external_id} small onDone={() => v3BoardDrop(r.external_id)}/><V3Skip ext={r.external_id} small tone="quiet" onDone={() => v3BoardDrop(r.external_id)}/></div></li>))}
@@ -19907,7 +19911,7 @@ function V3Review() {
       {(pk || (goal && goal.needs_replanning)) && (<>
         <div className="v3-kick v3-gap-top">Coming up</div>
         <ul className="v3-moves">
-          {pk && <li><b>{pk.name} starts in {peakDays} days.</b> {pk.same_days_last_year_sales ? 'The same days last year sold ' + fmtMoney(pk.same_days_last_year_sales) + '. ' : ''}{pk.promotions_planned && pk.promotions_planned.length ? pk.promotions_planned.length + ' promotion' + (pk.promotions_planned.length === 1 ? '' : 's') + ' planned.' : 'Nothing is planned in it yet.'}{pk.stock_order_by && pk.stock_order_by < today ? ' Stock for it had to be ordered by ' + v3Day(pk.stock_order_by) + '.' : ''}
+          {pk && <li><b>{v3PlainWords(pk.name)} starts in {peakDays} days.</b> {pk.same_days_last_year_sales ? 'The same days last year sold ' + fmtMoney(pk.same_days_last_year_sales) + '. ' : ''}{pk.promotions_planned && pk.promotions_planned.length ? pk.promotions_planned.length + ' promotion' + (pk.promotions_planned.length === 1 ? '' : 's') + ' planned.' : 'Nothing is planned in it yet.'}{pk.stock_order_by && pk.stock_order_by < today ? ' Stock for it had to be ordered by ' + v3Day(pk.stock_order_by) + '.' : ''}
             {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('calendar')}>Plan it <span className="v3-xref-go">on Calendar →</span></button></li>}
           {goal && goal.needs_replanning && <li><b>Your quarter goal needs re-planning.</b> Greta’s plan changed after it was confirmed.{' '}
             <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal')}>Re-plan <span className="v3-xref-go">on Goal &amp; costs →</span></button></li>}
@@ -19955,7 +19959,7 @@ function V3ReviewNotes({ weekStart, range }) {
   };
   return (<section className="v3-sec">
     <h2 className="v3-sec-title">Notes and decisions <span className="v3-muted">{range}</span></h2>
-    <p className="v3-note v3-measure">Saved to your workspace, so everyone on your team sees the same notes. To act on something on the board, mark it done or skip it above — that is what Greta checks later.</p>
+    <p className="v3-note v3-measure">Saved to your workspace, so everyone on your team sees the same notes. To act on an item in the list above, mark it done or skip it there. That is what Greta checks later.</p>
     {q.err ? <div className="v3-empty">Notes could not load just now.</div> : !q.rows ? <V3SkeletonRows n={2}/> : q.rows.length === 0 ? <div className="v3-empty">Nothing written for this week yet.</div> : (
       <ul className="v3-rank-steps">{q.rows.map(r => (<li key={r.id}><span className="v3-rank-desc">{r.kind === 'decision' ? 'Decision: ' : ''}{r.body}</span>
         <span className="v3-sub"> {v3Day(r.created_at)}{r.author_id === uid ? ' · you' : ''}</span>
@@ -20072,31 +20076,31 @@ function V3Competitors() {
     const extra = BV && BV.extra_clicks_month != null ? Number(BV.extra_clicks_month) : brandC.is > 0 ? (brandC.clicks / brandC.is - brandC.clicks) / 3 : 0;
     const cpc = BV && BV.cpc != null ? Number(BV.cpc) : brandC.clicks > 0 ? brandC.spend / brandC.clicks : null;
     reads.push({ k: 'name', lead: lost >= 0.05, head: fmtPctN(lost) + ' of the searches for your name show someone else’s ad instead of yours.',
-      body: <>Your “{brandC.name}” campaign shows on {fmtPctN(brandC.is)} of the searches it could enter{brandC.rank != null ? <>; the rest is lost {brandC.budget != null && brandC.budget < 0.02 ? 'on bid rank, not budget' : <>{fmtPctN(brandC.rank)} on bid rank and {fmtPctN(brandC.budget || 0)} on budget</>}</> : null}. These are people looking for you by name. Winning the rest is about {fmtCount(Math.round(extra))} more clicks a month for about {fmtMoney(BC ? Number(BC[1].replace(/,/g, '')) : extra * (cpc || 0))}, at today’s {fmtMoney(cpc, 2)} a click — raise that campaign’s bid or target impression share.{BV ? <> It is on the action board, rated Probably there: the share of searches is Google’s own measure, but what the clicks earn rests on Google’s count of orders.</> : null}</>,
+      body: <>Your “{brandC.name}” campaign shows on {fmtPctN(brandC.is)} of the searches it could appear on{brandC.rank != null ? <>. {brandC.budget != null && brandC.budget < 0.02 ? 'It loses the rest on ad rank (your bid and ad quality), not budget' : <>It loses {fmtPctN(brandC.rank)} on ad rank (your bid and ad quality) and {fmtPctN(brandC.budget || 0)} on budget</>}</> : null}. These are people looking for you by name. Winning the rest is about {fmtCount(Math.round(extra))} more clicks a month for about {fmtMoney(BC ? Number(BC[1].replace(/,/g, '')) : extra * (cpc || 0))}, at today’s {fmtMoney(cpc, 2)} a click. Raise that campaign’s bid, or switch it to Google’s “Target impression share” bidding.{BV ? <> It is also on the action board, rated Probably: Google measures the share of searches directly, but what the clicks earn rests on Google’s own count of orders.</> : null}</>,
       conf: 'direct' });
   }
   if (S && S.share != null) {
     reads.push({ k: 'search', head: fmtPctN(S.share) + ' of the people who reach you from Google search already knew your name.',
-      body: <>Since {v3Day(S.since)}, {fmtCount(S.br)} search clicks came from searches for your name and {fmtCount(S.nb)} from searches for what you sell. On those, you sit at position {S.pos != null ? S.pos.toFixed(1) : FMT_NONE} on average and get {S.ctr != null ? fmtPctN(S.ctr, 1) : FMT_NONE} of the clicks: the brands above you are where a new customer lands. The way in is pages that answer those searches — collections and guides — rather than paying for them.</>,
+      body: <>Since {v3Day(S.since)}, {fmtCount(S.br)} search clicks came from searches for your name and {fmtCount(S.nb)} from searches for what you sell. On searches for what you sell, you appear at position {S.pos != null ? S.pos.toFixed(1) : FMT_NONE} on average, and {S.ctr != null ? fmtPctN(S.ctr, 1) : FMT_NONE} of the people who see you there click. The brands above you are where a new customer lands. The way in is pages that answer those searches, such as collections and guides, rather than paying for ads.</>,
       conf: 'direct' });
   }
   if (shop) {
     const ret = shop.spend > 0 ? shop.value / shop.spend : null, under = be && ret != null && ret < be;
-    reads.push({ k: 'shop', head: under ? 'In Shopping you lose most auctions on bid, and outbidding would not pay.' : 'In Shopping you lose most auctions on bid.',
-      body: <>“{shop.name}” shows in {fmtPctN(shop.is)} of the auctions it could enter and loses {fmtPctN(shop.rank || 0)} on rank{shop.budget > 0.05 ? <> and {fmtPctN(shop.budget)} on budget</> : null}. It returns {fmtTimes(ret, 2)} by Google’s own count{be ? <> against your {fmtTimes(be, 2)} break-even</> : null}{under ? ' — bidding up to beat competitors there would cost more than it earns. Fix what it sells first (Products) before chasing rank.' : ' — there is room to bid for more of them.'}</>,
+    reads.push({ k: 'shop', head: under ? 'Your Google Shopping ads lose most auctions on bid, and bidding more would not pay.' : 'Your Google Shopping ads lose most auctions on bid.',
+      body: <>“{shop.name}” shows in {fmtPctN(shop.is)} of the auctions it could enter. It loses {fmtPctN(shop.rank || 0)} on ad rank{shop.budget > 0.05 ? <> and {fmtPctN(shop.budget)} on budget</> : null}. By Google’s own count it brings in {fmtTimes(ret, 2)} its cost in sales{be ? <>, and you need {fmtTimes(be, 2)} to break even</> : null}{under ? '. Bidding more to beat competitors there would cost more than it earns. Fix what it sells first (Products) before chasing a higher place.' : '. There is room to bid for more of them.'}</>,
       conf: 'likely' });
   }
   if (M && M.last && M.ly) {
     const ch = M.last.cpm / M.ly.cpm - 1, spike = M.nov && M.oct ? M.nov.cpm / M.oct.cpm - 1 : null;
     reads.push({ k: 'meta', head: 'Meta charged ' + fmtMoney(M.last.cpm, 2) + ' per 1,000 views in ' + gpMonthName(M.last.m + '-01') + (Math.abs(ch) < 0.05 ? ', about what it did a year ago.' : ', ' + fmtPctN(Math.abs(ch)) + (ch > 0 ? ' more' : ' less') + ' than a year ago.'),
-      body: <>The Meta auction is where you bid against every brand chasing the same people; its price is the competition you can measure. {M.nov ? <>Last November it was {fmtMoney(M.nov.cpm, 2)}{spike != null ? <> — {Math.abs(spike) < 0.1 ? 'barely above' : fmtPctN(Math.abs(spike)) + (spike > 0 ? ' above' : ' below')} October</> : null} — so plan Black Friday’s ads at about that, not double.</> : null}</>,
+      body: <>On Meta you bid against every brand chasing the same people, so its price is the competition you can measure. {M.nov ? <>Last November it was {fmtMoney(M.nov.cpm, 2)}{spike != null ? <>, {Math.abs(spike) < 0.1 ? 'barely above' : fmtPctN(Math.abs(spike)) + (spike > 0 ? ' above' : ' below')} October</> : null}. Plan Black Friday’s ads at about that price, not double.</> : null}</>,
       conf: 'direct' });
   }
   // the verdict says where the ground is, across the reads; each read then says it in full
   const vb = [];
   if (brandC && 1 - brandC.is >= 0.05) vb.push(fmtPctN(1 - brandC.is) + ' of the searches for your name');
   if (S && S.share != null && S.share >= 0.75) vb.push('almost all of the searches for what you sell');
-  const verdict = vb.length ? 'Competitors take ' + vb.join(', and ') + '.' + (vb.length === 2 ? ' Your name is the cheaper ground to win back.' : '') : reads.length ? reads[0].head : null;
+  const verdict = vb.length ? 'Competitors take ' + vb.join(', and ') + '.' + (vb.length === 2 ? ' Searches for your name are the cheaper ones to win back.' : '') : reads.length ? reads[0].head : null;
   const tipW = ({ active, payload }) => { if (!active || !payload || !payload.length) return null; const p = payload[0].payload;
     return (<div className="v3-tip"><b>Week of {v3Day(p.start, true)}</b><span>Searches for your name <em>{fmtCount(p.clicks)} clicks</em></span></div>); };
   const tipM = ({ active, payload }) => { if (!active || !payload || !payload.length) return null; const p = payload[0].payload;
@@ -20110,7 +20114,7 @@ function V3Competitors() {
         : !reads.length ? <div className="v3-empty">Greta reads where you meet competitors from your Google Ads, Search Console and Meta accounts. Connect them on Connections &amp; data and this fills in.</div>
         : (<>
           <p className="v3-verdict">{verdict}</p>
-          <ol className="v3-moves">{reads.map(r => (<li key={r.k}><b>{r.head}</b> {r.body} <V3Conf state={r.conf} detail={r.k === 'shop' ? 'Your own account’s auction data; the return is as Google counts it, which usually runs above your real orders.' : 'Counted straight from your own account.'}/></li>))}</ol>
+          <ol className="v3-moves">{reads.map(r => (<li key={r.k}><b>{r.head}</b> {r.body} <V3Conf state={r.conf} detail={r.k === 'shop' ? 'From your own account’s auction data. The return is Google’s own count, which usually runs above your real orders.' : 'Counted straight from your own account.'}/></li>))}</ol>
           {!S && <p className="micro muted v3-measure">Connect Search Console on Connections &amp; data to see how much of your search traffic already knew you, and where you sit on searches for what you sell.</p>}
         </>)}
     </section>
@@ -20126,7 +20130,7 @@ function V3Competitors() {
             <R.Bar dataKey="clicks" fill={PAL.accent} isAnimationActive={false}/>
           </R.ComposedChart>
         </R.ResponsiveContainer>
-        <p className="micro muted">The one direct measure of how many people go looking for you by name. Search Console, clicks from searches containing your brand.</p>
+        <p className="micro muted">The one direct measure of how many people look for you by name: clicks from Google searches that contain your brand name (from Search Console).</p>
       </figure>)}
       {M && (<figure className="v3-chart">
         <figcaption><span className="v3-chart-title">What Meta charges per 1,000 views, by month</span></figcaption>
@@ -20137,7 +20141,7 @@ function V3Competitors() {
             <R.Line type="monotone" dataKey="cpm" stroke={PAL.accent} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
           </R.ComposedChart>
         </R.ResponsiveContainer>
-        <p className="micro muted">Your Meta account’s cost per 1,000 impressions. It rises when more brands bid for the same people.</p>
+        <p className="micro muted">What your Meta account paid for every 1,000 times an ad was shown. It rises when more brands bid for the same people.</p>
       </figure>)}
     </div>) : null}
 
@@ -20175,7 +20179,7 @@ function V3CompetitorList({ q, loading }) {
   const confState = c => (c === 'high' ? 'likely' : c === 'medium' ? 'probably' : 'possible');
   return (<section className="v3-sec">
     <h2 className="v3-sec-title">Who you’re up against</h2>
-    <p className="v3-note v3-measure">Your list, kept in the workspace. Greta researches each one from the open web on request — what they sell and charge, their ads, what customers say — and keeps only sources her search actually opened. Treat it as a briefing to check, not a fact sheet.</p>
+    <p className="v3-note v3-measure">Your own list of competitors. Ask Greta to research one and she reads the open web: what they sell and charge, their ads, and what customers say. She keeps only sources she actually opened. Treat it as a briefing to check, not a fact sheet.</p>
     {q.err ? <div className="v3-empty">Your competitor list could not load just now.</div> : loading ? <V3SkeletonRows n={3}/> : rows.length === 0
       ? <div className="v3-empty">No competitors listed yet. Add the brands your customers compare you with — Greta researches each one.</div>
       : (<ul className="v3-rank-steps">{rows.map(r => { const p = r.profile || {}, done = researched(r), m = p._meta || {};
@@ -20300,10 +20304,10 @@ function V3DataTrust() {
     .map(r => num(r.ga4_share)).sort((a, b) => a - b); return xs.length >= 4 ? xs[Math.floor(xs.length / 2)] : null; })();
   const ga4Low = cavg != null && (usualG != null ? cavg < usualG - 0.10 : cavg < 0.9);
   const ga4Usual = usualG != null ? <>, against your usual {fmtPctN(usualG)}</> : null;
-  if (g4) items.push({ k: 'ga4', short: 'Google Analytics is still recovering', head: 'Google Analytics is recovering, so visits and conversion are held until ' + v3Day(g4.comparisons_clean_from, true) + '.',
-    body: <>It wasn’t recording properly from {v3Day(g4.broke_on)} to {v3Day(g4.fixed_on, true)}; any comparison that reaches back into those weeks would read the repair as growth. Greta uses your Shopify orders meanwhile.{ga4Low ? <> It also sees only {fmtPctN(cavg)} of your orders now{ga4Usual} — check that the purchase event fires on every order, including express checkouts.</> : null}</> });
+  if (g4) items.push({ k: 'ga4', short: 'Google Analytics is still recovering', head: 'Google Analytics is recovering, so comparisons of visits and of the share of visitors who buy are paused until ' + v3Day(g4.comparisons_clean_from, true) + '.',
+    body: <>It wasn’t recording properly from {v3Day(g4.broke_on)} to {v3Day(g4.fixed_on, true)}. Any comparison that reaches back into those weeks would read the repair as growth. Greta uses your Shopify orders meanwhile.{ga4Low ? <> It also sees only {fmtPctN(cavg)} of your orders now{ga4Usual}. Check that it records a purchase on every order, including express checkouts.</> : null}</> });
   else if (ga4Low) items.push({ k: 'ga4cov', short: 'Google Analytics misses orders', head: 'Google Analytics sees ' + fmtPctN(cavg) + ' of your orders' + (usualG != null ? ', against your usual ' + fmtPctN(usualG) : '') + '.',
-    body: <>Every conversion rate on Website reads lower than it is. Check that the purchase event fires on every order, including express checkouts.</> });
+    body: <>So on Website, the share of visitors who buy reads lower than it is. Check that Google Analytics records a purchase on every order, including express checkouts.</> });
   // 4b. the shop no longer recording where orders came from (the tracking check Today leads with under
   // Fix first). This list named Google Analytics recovering and missed it (6 Oct).
   const A0 = (att.rows || [])[0];
@@ -20447,7 +20451,7 @@ function V3Team() {
           <td>{(canTarget(m) || (m.is_self && m.role !== 'owner')) && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => remove(m)}>{m.is_self ? 'Leave' : 'Remove'}</button>}</td>
         </tr>))}</tbody>
       </table>
-      <p className="micro muted v3-measure">Last active is the latest sign-in, session, question, decision or note. Decisions are actions marked done or skipped on the board (recorded from 5 Oct 2026); notes are the weekly review’s; questions are asked of Greta.</p>
+      <p className="micro muted v3-measure">Last active is the latest sign-in, session, question, decision or note. Decisions are actions marked done or skipped on the board (recorded from 5 Oct 2026). Notes are from the weekly review. Questions are the ones asked of Greta.</p>
     </section>
 
     {canManage && (<section className="v3-sec">
@@ -20674,8 +20678,8 @@ function V3CodePerformance() {
   if (!rows.length) return null;
   const top = rows[0];
   return (<section className="v3-sec">
-    <h2 className="v3-sec-title">Promotions and creators</h2>
-    <p className="v3-note v3-measure">Discount codes are the one attribution Shopify records for certain: an order that used a code came through whoever holds it. <b>{top.code}</b> brought {fmtCount(top.orders_365d)} orders in the last year, {fmtPctN(Number(top.first_order_share))} of them from new customers{Number(top.first_order_share) >= 0.6 ? ' — a source of new customers in its own right, to be planned and paid like a channel' : ''}.</p>
+    <h2 className="v3-sec-title">Which discount codes bring you customers?</h2>
+    <p className="v3-note v3-measure">A discount code is the one sure record of who brought an order: whoever holds the code. <b>{top.code}</b> brought {fmtCount(top.orders_365d)} orders in the last year, {fmtPctN(Number(top.first_order_share))} of them from new customers.{Number(top.first_order_share) >= 0.6 ? ' That makes it a source of new customers in its own right: plan and budget for it like an ad channel.' : ''}</p>
     <table className="v3-rw">
       <thead><tr><th className="t-text">Code</th><th>Orders, last year</th><th>Last 90 days</th><th>New customers</th><th>Average discount</th><th>Sales</th><th className="t-text">Last used</th></tr></thead>
       <tbody>{rows.map(r => (<tr key={r.code}>
@@ -20683,7 +20687,7 @@ function V3CodePerformance() {
         <td>{fmtPctN(Number(r.first_order_share))}</td><td>{fmtPctN(Number(r.avg_depth))}</td><td>{fmtMoney(Number(r.net_sales_365d))}</td>
         <td className="t-text v3-muted">{v3Day(String(r.last_used).slice(0, 10), true)}</td></tr>))}</tbody>
     </table>
-    <p className="micro muted v3-measure">Web orders only, sales after discounts and before VAT. A customer who used a code would not all have come without it, so read this as who brought them, not what the code alone earned.</p>
+    <p className="micro muted v3-measure">Website orders only. Sales are after discounts and before VAT. Some of these customers would have bought without the code, so read this as who brought them, not what the code alone earned.</p>
   </section>);
 }
 
@@ -20701,7 +20705,7 @@ const V3_STALE_TOPICS = [
   { k: 'reviews', re: /judge\.?me|\breviews?\b/i, label: 'Product reviews' },
   { k: 'post', re: /post.?purchase/i, label: 'Post-purchase email', board: /^crm-flows/ },
   { k: 'credit', re: /attributed revenue|true flow|reporting gross/i, label: 'How much email really earns',
-    note: 'Today’s summary now sets Klaviyo’s credit against what your shop traces to an email click.' },
+    note: 'Today’s summary now compares what Klaviyo claims with the orders your shop traces to an email click.' },
   { k: 'welcome', re: /welcome/i, label: 'Welcome email' },
   { k: 'checkout', re: /checkout|discount_value|\bcart\b|apple pay/i, label: 'Cart and checkout' },
   { k: 'creators', re: /influencer|creator|\bugc\b/i, label: 'Creators', board: /^promo-peak/ },
@@ -20725,8 +20729,8 @@ function V3StaleSuggestions() {
     <span className="v3-sub"> · suggested {v3Day(String(r.raised_at).slice(0, 10), true)}</span>
     <div className="v3-btn-row"><V3Done ext={r.external_id} small onDone={q.retry}/><V3Skip ext={r.external_id} small onDone={q.retry}/></div>
   </li>);
-  return (<V3More id="act-stale" label={'Older suggestions Greta can’t vouch for (' + rows.length + ')'}>
-    <p className="v3-note v3-measure">These were suggested as tasks months ago and nothing has re-checked them since, so Greta doesn’t rank them on the board. Mark each done if it happened, or skip it if it no longer applies. Where the board already covers one, it says so.</p>
+  return (<V3More id="act-stale" label={'Older suggestions Greta hasn’t re-checked (' + rows.length + ')'}>
+    <p className="v3-note v3-measure">These were suggested months ago and nothing has checked them since, so they are not ranked on the board. Mark each one done if it happened, or skip it if it no longer applies. Where the board already covers one, it says so.</p>
     <ul className="v3-rank-steps">{groups.map(g => {
       const t = g.topic;
       const i = t && t.board ? live.findIndex(r => t.board.test(r.external_id)) : -1;
@@ -20734,7 +20738,7 @@ function V3StaleSuggestions() {
       const covered = i >= 0 ? <>Greta’s board covers this now: “{head(v3PlainAction(live[i]).title)}” (#{i + 1}). These can be skipped.</> : (t && t.note) || null;
       if (!t || (g.rows.length === 1 && !covered)) return g.rows.map(item);
       return (<li key={'g-' + t.k}>
-        <span className="v3-rank-desc"><b>{t.label}</b>{g.rows.length > 1 ? ' · ' + g.rows.length + ' overlapping suggestions' : ''}</span>
+        <span className="v3-rank-desc"><b>{t.label}</b>{g.rows.length > 1 ? ' · ' + g.rows.length + ' similar suggestions' : ''}</span>
         {covered && <p className="micro muted v3-measure">{covered}</p>}
         <ul className="v3-rank-steps">{g.rows.map(item)}</ul>
       </li>);
@@ -20762,10 +20766,10 @@ function V3FixFirst() {
   if (/So far in \w+ \([\d,]+ orders\) it is still off/.test(desc)) first = first.replace(/ and is still off in \w+\.$/, ' and is still off this month.');
   return (<section className="v3-sec">
     <div className="v3-kick">Fix first</div>
-    <p className="v3-note v3-measure"><b>{v3PlainAction(r).title}.</b> {first}{hit.length > 0 && <> Until it is fixed, the orders your shop credits to each channel read low, so {hit.map(o => '#' + (o.i + 1)).join(', ').replace(/, ([^,]*)$/, ' and $1')} on the board {hit.length === 1 ? 'is' : 'are'} less certain.</>}</p>
+    <p className="v3-note v3-measure"><b>{v3PlainAction(r).title}.</b> {first}{hit.length > 0 && <> Until it is fixed, your shop undercounts the orders each ad channel brings. So {hit.map(o => '#' + (o.i + 1)).join(', ').replace(/, ([^,]*)$/, ' and $1')} on the board {hit.length === 1 ? 'is' : 'are'} less certain.</>}</p>
     <V3More id="fixfirst-why" label="The detail">
       <p className="v3-note v3-measure">{desc}</p>
-      {hit.length > 0 && <p className="micro muted v3-measure">Those rows lean on the orders your shop credits to each channel, which read low while tracking is broken. Where the platform’s own count and the weeks without a sale point the same way, the direction holds: act on {hit.length === 1 ? 'it' : 'them'}, and expect the exact figures to move once tracking is fixed.</p>}
+      {hit.length > 0 && <p className="micro muted v3-measure">Those rows rely on the orders your shop credits to each channel, and that count reads low while tracking is broken. Where the ad platform’s own count and the weeks without a sale agree, the direction still holds. Act on {hit.length === 1 ? 'it' : 'them'}, and expect the exact figures to move once tracking is fixed.</p>}
     </V3More>
     <div className="v3-btn-row"><V3Done ext={r.external_id} small onDone={q.retry}/></div>
   </section>);
@@ -20779,8 +20783,8 @@ const V3_PAGES = {
         browser) and the alerts panel (forecast patterns the board holds back, a track record that said
         nothing was done) are gone; findings that pass the evidence check are below. */}
     <V3Anchor id="week"/><V3Review/>
-    <V3More id="rev-quarter" label="This quarter — the board pack"><V3Anchor id="quarter"/><BusinessReview/></V3More>
-    <V3More id="rev-alerts" label="What Greta found — the findings behind the board"><V3Anchor id="alerts"/><V3Findings/>
+    <V3More id="rev-quarter" label="This quarter — a summary to share with your board or investors"><V3Anchor id="quarter"/><BusinessReview/></V3More>
+    <V3More id="rev-alerts" label="What Greta found — what changed, and why"><V3Anchor id="alerts"/><V3Findings/>
       <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>What was done, and whether it worked <span className="v3-xref-go">on Actions →</span></button>
     </V3More>
   </>),
@@ -20811,10 +20815,10 @@ const V3_PAGES = {
   growth: (p) => (<>
     <V3Growth/>
     <CashCeiling/>
-    <V3More id="growth-detail" label="The detail — the spend curve and what moves it">
+    <V3More id="growth-detail" label="The detail: how a new customer’s cost rises with spend, and what changes it">
       <V3Anchor id="forecast"/><GretaPlanPanel show="growth"/>
     </V3More>
-    <V3More id="growth-fit" label="Offer and product fit, cash and forward signal"><FitCard start={p.start} end={ACTIVE_END}/><GenomePanel/></V3More>
+    <V3More id="growth-fit" label="More checks: how well your offer and products sell, cash, and early signs"><FitCard start={p.start} end={ACTIVE_END}/><GenomePanel/></V3More>
   </>),
   stock: (p) => (<>
     {/* The server-side stock plan (vw_stock_demand_plan / fn_stock_gate): what runs out,
@@ -20827,8 +20831,8 @@ const V3_PAGES = {
     {/* The planner reads live stock (vw_sku_stock_cover) for every brand since 2026-10-02. A third
         per-product list — the marketing-os "Every product" table, with its own status bands — sat
         here too and could disagree with both; removed. */}
-    <V3More id="stock-plan" label="Advanced: plan to a forecast">
-      <p className="v3-note v3-measure">The order list above is the one Greta prices and checks, and the one on the action board. This planner sizes orders to a demand plan you set inside it instead, so its quantities differ; purchase orders you mark as raised here are saved in this browser only — other people and devices won’t see them. To send the list above, use “Copy as a purchase order”.</p>
+    <V3More id="stock-plan" label="Advanced: plan orders to your own sales forecast">
+      <p className="v3-note v3-measure">The order list above is the one Greta prices and checks, and the one on your action board. This planner sizes orders to a sales forecast you set inside it, so its quantities differ. Purchase orders you mark as raised here are saved in this browser only, so other people and devices won’t see them. To send the list above to your supplier, use “Copy as a purchase order”.</p>
       <PlanningView/>
     </V3More>
     <V3More id="stock-suppliers" label="Suppliers"><V3Anchor id="suppliers"/><SuppliersDirectory/></V3More>
@@ -20845,20 +20849,20 @@ const V3_PAGES = {
     <V3Incrementality/>
     <CreativeReallocation/>
     <V3EmailRead/>
-    <V3More id="mk-why" label="The detail — what each platform claims, and why each channel behaves as it does">
+    <V3More id="mk-why" label="What each ad platform claims, and why each channel behaves as it does">
       <CrossChannel start={p.start}/>
       <ChannelDetailList channels={(typeof window!=='undefined' && window.FRKL_PLAN && window.FRKL_PLAN.channels) || []}/>
     </V3More>
-    <V3More id="mk-detail" label="Channel detail and platform totals"><V3Anchor id="detail"/><Channels start={p.start}/></V3More>
-    <V3More id="mk-creative" label="Creative"><V3Anchor id="creative"/><Creatives/></V3More>
-    <V3More id="mk-email" label="Email"><V3Anchor id="email"/><EmailHub/></V3More>
-    <V3More id="mk-organic" label="Organic and social"><V3Anchor id="organic"/><Organic/></V3More>
+    <V3More id="mk-detail" label="Each channel’s figures, and the platform totals"><V3Anchor id="detail"/><Channels start={p.start}/></V3More>
+    <V3More id="mk-creative" label="Your ads, one by one"><V3Anchor id="creative"/><Creatives/></V3More>
+    <V3More id="mk-email" label="Email, every send and what it earned"><V3Anchor id="email"/><EmailHub/></V3More>
+    <V3More id="mk-organic" label="Unpaid visits and social media"><V3Anchor id="organic"/><Organic/></V3More>
   </>),
   website: (p) => (<>
     <V3Website/>
-    <V3More id="web-loop" label="The detail — the loop, and which slice of traffic it happened in">{mosView('LoopView')}</V3More>
-    <V3More id="web-cvr" label="What moves conversion"><V3Anchor id="cvr"/><CvrDrivers/></V3More>
-    <V3More id="web-friction" label="Site structure and friction"><V3Anchor id="friction"/><SiteStructure start={p.start}/></V3More>
+    <V3More id="web-loop" label="More detail: each step of the site, and which visitors it happened with">{mosView('LoopView')}</V3More>
+    <V3More id="web-cvr" label="What makes visitors buy"><V3Anchor id="cvr"/><CvrDrivers/></V3More>
+    <V3More id="web-friction" label="How the site is laid out, and where shoppers get stuck"><V3Anchor id="friction"/><SiteStructure start={p.start}/></V3More>
   </>),
   // Customers and Products lead with live views (V3Customers / V3Products). The panels below
   // them were built on static snapshots — weeks old for frkl, empty for every other brand —
