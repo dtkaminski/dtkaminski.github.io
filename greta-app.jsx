@@ -20494,12 +20494,31 @@ function V3StoryText({ text }) {
   const isMobile = useIsMobile();
   const [open, setOpen] = React.useState(false);
   // The end of the second sentence: a stop followed by a space and a capital ("7.6 times" is not one).
-  const t = String(text || ''), re = /[.!?]\s+(?=[A-Z£])/g; let m, n = 0, cut = -1;
+  const t = v3PlainWords(text), re = /[.!?]\s+(?=[A-Z£])/g; let m, n = 0, cut = -1;
   while ((m = re.exec(t))) { if (++n === 2) { cut = m.index + 1; break; } }
   const short = !open && cut > 0 && cut < t.length - 20;
   return (<p className="v3-note v3-measure">{short ? t.slice(0, cut) : t}
     {short && <>{' '}<button type="button" className="v3-xref" onClick={() => setOpen(true)}>Read the rest</button></>}</p>);
 }
+// 8 Oct: written for an owner who may be new to running an online shop. The figures behind the story
+// were one 250-word paragraph ("the £1.63 you need to break even on the ads alone", "worth 1.1× what they
+// cost"). Each is now a point: a plain question, one word for how it stands, and one or two short
+// sentences that say what the figure means.
+const v3PlainWords = s => String(s || '').replace(/\bBFCM\b/g, 'Black Friday and Cyber Monday');
+const V3_SIG_WORD = { good: 'Healthy', ok: 'Watch', weak: 'Problem', typical: 'Typical' };
+const V3_SIG_TONE = { good: 'v3-up', ok: 'v3-warn', weak: 'v3-down', typical: 'v3-muted', unclear: 'v3-muted' };
+// against a rule-of-thumb range, inside the range is typical, not a warning: 17% beside a typical 18%
+// is no cause to act
+const v3SigBench = (v, bm) => { const t = v3Bench(v, bm); return t === 'ok' ? 'typical' : t; };
+function V3Signals({ items }) {
+  return (<ul className="v3-signals">{items.map(it => (<li key={it.k}>
+    <span className="v3-signals-k">{it.k}</span>
+    <span className={'v3-signals-s ' + (V3_SIG_TONE[it.tone] || '')}>{it.word || V3_SIG_WORD[it.tone] || ''}</span>
+    <p className="v3-signals-t">{it.t}</p>
+  </li>))}</ul>);
+}
+// what ads cost out of each £1 of sales, in pence: "53p of every £1" reads faster than "53% of sales"
+const v3Pence = v => (v >= 1 ? fmtMoney(v, 2) : Math.round(v * 100) + 'p');
 function V3BusinessState() {
   const q = useV3Rows('brand-state', V3_STATE_Q);
   const codes = useV3Rows('brand-codes', V3_CODES_Q);
@@ -20516,20 +20535,35 @@ function V3BusinessState() {
   const topCode = (codes.rows || []).find(c => num(c.orders_365d) >= 50 && num(c.first_order_share) >= 0.6) || null;
   const other = ((S.channels && S.channels.other) || []).filter(c => num(c.orders) >= 10);
 
-  // the verdict: after overheads when they are known, else after ads
+  // the verdict: after overheads when they are known, else after ads. The headline carries the one
+  // figure; the line under it says what "after all costs" counts and what ads take of each £1.
   const ao = num(L.after_overheads);
   const verdict = ao != null
-    ? (ao < 0 ? 'You are losing about ' + fmtMoney(-ao) + ' a month after overheads' : 'You are making about ' + fmtMoney(ao) + ' a month after overheads')
-      + (share != null ? ', with ads taking ' + fmtPctN(share) + ' of sales' + (early != null && Math.abs(share - early) >= 0.08 ? ' against ' + fmtPctN(early) + ' at the start of the year' : '') : '') + '.'
+    ? (ao < 0 ? 'You are losing about ' + fmtMoney(-ao) + ' a month after all costs.' : 'You are making about ' + fmtMoney(ao) + ' a month after all costs.')
     : 'You kept ' + fmtMoney(num(L.profit_after_ads)) + ' after ads in the last 30 days.';
-  const sents = [];
+  const sub = ao != null && (<p className="v3-lede v3-measure">That is what is left from sales once products, delivery, ads and your monthly running costs are paid.
+    {share != null ? <> Ads now cost {v3Pence(share)} of every £1 you sell{early != null && Math.abs(share - early) >= 0.08 ? <>, {share > early ? 'up' : 'down'} from {v3Pence(early)} at the start of the year</> : null}.</> : null}</p>);
+
+  const items = [];
+  if (ret != null && A.break_even_return) {
+    const be = num(A.break_even_return);
+    items.push({ k: 'Are the ads paying for themselves?', tone: ret < be ? 'weak' : ret < be * 1.3 ? 'ok' : 'good',
+      t: <>Each £1 spent on ads brings back {fmtMoney(ret, 2)} in sales. You need {fmtMoney(be, 2)} back just to cover the ads, the products and delivery{ret < be ? ', so the ads cost more than they earn.' : ret < be * 1.3 ? ', so little is left to pay your running costs.' : ', so there is money left for your running costs.'}</> });
+  }
   if (yoySales != null && yoyAds != null)
-    sents.push(<>Sales are {yoySales >= 0 ? fmtPctN(yoySales) + ' up' : fmtPctN(-yoySales) + ' down'} on the same 30 days last year, on {fmtTimes(yoyAds, 1)} the ad spend{ret != null && A.break_even_return ? <>: each £1 of ads now brings {fmtMoney(ret, 2)} of sales against the {fmtMoney(num(A.break_even_return), 2)} you need to break even on the ads alone, which leaves little to pay the overheads</> : null}.</>);
+    items.push({ k: 'Sales against last year', tone: yoySales < 0 ? 'weak' : yoyAds - 1 > 2 * yoySales && yoyAds > 1.2 ? 'ok' : 'good',
+      t: <>Sales are {yoySales >= 0 ? fmtPctN(yoySales) + ' up' : fmtPctN(-yoySales) + ' down'} on the same 30 days last year. Ad spend is {fmtTimes(yoyAds, 1)} what it was{yoyAds > 1 + Math.max(yoySales, 0) ? ', so it grew faster than sales' : ''}.</> });
   // 0270: the sales rhythm. Whether the weeks between sales pay for their ads is the question an agency
   // asks first of a brand that is on sale most weeks.
   const H = S.rhythm, rc = H && H.recent, bf = H && H.before;
-  if (H && rc && num(rc.n) >= 2 && num(H.sale_weeks_13) >= 4)
-    sents.push(<>You ran a sale in {fmtCount(H.sale_weeks_13)} of the last {fmtCount(H.weeks_13)} weeks{H.deepest_before != null && num(H.deepest_13) >= num(H.deepest_before) + 0.05 ? <>, and the deepest went from {fmtPctN(num(H.deepest_before))} to {fmtPctN(num(H.deepest_13))} below usual prices</> : null}. In the weeks without one you now {num(rc.after_ads) < 0 ? 'lose about ' + fmtMoney(-num(rc.after_ads)) : 'make about ' + fmtMoney(num(rc.after_ads))} a week after ads{bf && num(bf.n) >= 2 && num(bf.after_ads) !== num(rc.after_ads) ? <>; before that they {num(bf.after_ads) < 0 ? 'lost ' + fmtMoney(-num(bf.after_ads)) : 'made ' + fmtMoney(num(bf.after_ads))}, on {fmtMoney(num(bf.ads))} of ads a week against {fmtMoney(num(rc.ads))} now</> : null}.</>);
+  if (H && rc && num(rc.n) >= 2 && num(H.sale_weeks_13) >= 4) {
+    const deeper = H.deepest_before != null && num(H.deepest_13) >= num(H.deepest_before) + 0.05;
+    items.push({ k: 'How often you run a sale', tone: num(H.sale_weeks_13) / num(H.weeks_13) >= 0.4 ? 'ok' : null,
+      t: <>You ran a sale in {fmtCount(H.sale_weeks_13)} of the last {fmtCount(H.weeks_13)} weeks.{deeper ? <> Your deepest discount grew from {fmtPctN(num(H.deepest_before))} to {fmtPctN(num(H.deepest_13))} off.</> : null}</> });
+    const ra = num(rc.after_ads), ba = bf && num(bf.n) >= 2 ? num(bf.after_ads) : null;
+    items.push({ k: 'Weeks without a sale', tone: ra < 0 ? 'weak' : ba != null && ra < ba ? 'ok' : 'good',
+      t: <>These show what the business earns at full price. After product, delivery and ad costs they now {ra < 0 ? 'lose about ' + fmtMoney(-ra) : 'make about ' + fmtMoney(ra)} a week.{ba != null && ba !== ra ? <> Before, they {ba < 0 ? 'lost ' + fmtMoney(-ba) : 'made ' + fmtMoney(ba)} a week, on {fmtMoney(num(bf.ads))} of ads a week against {fmtMoney(num(rc.ads))} now.</> : null}</> });
+  }
   const wk = (H && Array.isArray(H.weeks) ? H.weeks : []).filter(w => w.after_ads != null)
     .map(w => ({ label: v3Day(String(w.wk)), sale: !!w.sale, v: num(w.after_ads), sales: num(w.sales), ads: num(w.ads),
       off: Math.max(num(w.markdown) || 0, num(w.code_depth) || 0) }));
@@ -20537,28 +20571,38 @@ function V3BusinessState() {
     return (<div className="v3-tip"><b>Week of {d.label}{d.sale ? ' · a sale' : ''}</b>
       <span>Sales <em>{fmtMoney(d.sales)}</em></span><span>Ads <em>{fmtMoney(d.ads)}</em></span>
       <span>After product, order and ad costs <em>{fmtMoney(d.v)}</em></span><span>Below usual prices <em>{fmtPctN(d.off)}</em></span></div>); };
-  if (U.cac != null && U.first_order_contribution != null)
-    sents.push(<>{(() => {
-      // The last 30 days decide whether a new customer pays back; 90 days is context. Today said "costs £40,
-      // first order earns £43" (90 days) while Growth said "Not now: £49.13" and Customers "£53 in the last
-      // 30 days" (7 Oct) -- the same question answered both ways.
-      const c30 = num(U.cac_30d), c90 = num(U.cac), use = c30 > 0 ? c30 : c90, lc = num(U.ltv_contribution);
-      const ratio = lc > 0 && use > 0 ? lc / use : (U.ltv_cac != null ? num(U.ltv_cac) : null);
-      return <>{c30 > 0 ? <>In the last 30 days a new customer cost {fmtMoney(c30)}{c90 > 0 && Math.abs(c30 / c90 - 1) > 0.1 ? <> ({fmtMoney(c90)} over 90 days)</> : null}</> : <>A new customer costs {fmtMoney(c90)}</>}{' '}
-        against {fmtMoney(num(U.first_order_contribution))} their first order earns{use > num(U.first_order_contribution) ? ', so the first order no longer pays for them' : ''}{ratio != null ? <>; over a year they are worth {fmtTimes(ratio, 1)} what they cost, where brands aim for 3×</> : null}.</>;
-    })()} {R.repeat_90d != null ? <>{fmtPctN(num(R.repeat_90d))} order again within 90 days{BM.repeat_90d ? <> (around {fmtPctN(BM.repeat_90d.typical)} is typical)</> : null}, and returning customers bring {fmtPctN(num(R.returning_rev_share))} of sales.</> : null}</>);
+  if (U.cac != null && U.first_order_contribution != null) {
+    // The last 30 days decide whether a new customer pays back; 90 days is context. Today said "costs £40,
+    // first order earns £43" (90 days) while Growth said "Not now: £49.13" and Customers "£53 in the last
+    // 30 days" (7 Oct) -- the same question answered both ways.
+    const c30 = num(U.cac_30d), c90 = num(U.cac), use = c30 > 0 ? c30 : c90, lc = num(U.ltv_contribution), fo = num(U.first_order_contribution);
+    const ratio = lc > 0 && use > 0 ? lc / use : (U.ltv_cac != null ? num(U.ltv_cac) : null);
+    items.push({ k: 'Winning new customers', tone: use > fo ? 'weak' : 'good',
+      t: <>{c30 > 0 ? <>A new customer cost {fmtMoney(c30)} to win in the last 30 days.</> : <>A new customer costs {fmtMoney(c90)} to win.</>}{' '}
+        Their first order earns you {fmtMoney(fo)} after product and delivery costs{use > fo ? ', so you lose money on them until they buy again.' : ', so the first order pays for them.'}</> });
+    if (ratio != null)
+      items.push({ k: 'What a customer is worth', tone: v3SigBench(ratio, BM.ltv_cac) || (ratio >= 3 ? 'good' : ratio >= 2 ? 'ok' : 'weak'),
+        t: <>Over a year, a customer brings in {fmtTimes(ratio, 1)} what they cost to win. Brands aim for about 3×.</> });
+  }
+  if (R.repeat_90d != null)
+    items.push({ k: 'Customers coming back', tone: v3SigBench(num(R.repeat_90d), BM.repeat_90d),
+      t: <>{fmtPctN(num(R.repeat_90d))} of customers order again within 90 days{BM.repeat_90d ? <> (about {fmtPctN(BM.repeat_90d.typical)} is typical)</> : null}.{R.returning_rev_share != null ? <> Returning customers bring {fmtPctN(num(R.returning_rev_share))} of your sales.</> : null}</> });
   // 0271: Klaviyo counts any order after an email was opened; the shop counts only orders that came
   // through an email link. Say both, and that neither is the answer.
   const E = S.email || {};
   if (E.shop_share != null && num(E.share) - num(E.shop_share) >= 0.2)
-    sents.push(<>Klaviyo credits email with {fmtPctN(num(E.share))} of your sales; your shop traces {fmtPctN(num(E.shop_share))} to an email click{num(E.direct_share_30d) >= 0.4 ? <> and records {fmtPctN(num(E.direct_share_30d))} of orders with no source at all</> : null}. The truth sits between, so judge email by holding a slice of customers back, not by either figure.{num(E.campaigns_90d) >= 10 ? <> {fmtCount(E.sale_campaigns_90d)} of your last {fmtCount(E.campaigns_90d)} campaigns were sale emails.</> : null}</>);
+    items.push({ k: 'What email really brings', tone: 'unclear', word: 'Unclear',
+      t: <>Klaviyo says email brought {fmtPctN(num(E.share))} of your sales. Your shop can link only {fmtPctN(num(E.shop_share))} to someone clicking an email{num(E.direct_share_30d) >= 0.4 ? <>, and {fmtPctN(num(E.direct_share_30d))} of orders have no recorded source</> : null}. The truth is in between: to find it, stop emailing a small group of customers for a few weeks and compare what they buy.{num(E.campaigns_90d) >= 10 ? <> {fmtCount(E.sale_campaigns_90d)} of your last {fmtCount(E.campaigns_90d)} emails were sale emails.</> : null}</> });
   if (topCode)
-    sents.push(<>Your biggest source of new customers is not an ad platform: the code <b>{topCode.code}</b> brought {fmtCount(topCode.orders_365d)} orders in the last year, {fmtPctN(num(topCode.first_order_share))} of them first orders, at {fmtPctN(num(topCode.avg_depth))} off.</>);
+    items.push({ k: 'Your best source of new customers',
+      t: <>The discount code <b>{topCode.code}</b>, not an ad platform. It brought {fmtCount(topCode.orders_365d)} orders in the last year, {fmtPctN(num(topCode.first_order_share))} of them from first-time buyers, at {fmtPctN(num(topCode.avg_depth))} off on average.</> });
   if (P && P.title)
-    sents.push(<>{P.title} starts in {fmtCount(P.days_away)} days; the same days last year sold {fmtMoney(num(P.ly_sales))}{P.top_codes && P.top_codes[0] && num(P.ly_orders) > 0 ? <>, and {P.top_codes[0].code} brought {fmtPctN(num(P.top_codes[0].orders) / num(P.ly_orders))} of its orders</> : null}.</>);
+    items.push({ k: 'Your next busy period',
+      t: <>It is {fmtCount(P.days_away)} days until {v3PlainWords(P.title).replace(/\s*(?:peak\s*)?window$|\s*peak$/i, '')}. The same days last year sold {fmtMoney(num(P.ly_sales))}{P.top_codes && P.top_codes[0] && num(P.ly_orders) > 0 ? <>, and {P.top_codes[0].code} brought {fmtPctN(num(P.top_codes[0].orders) / num(P.ly_orders))} of those orders</> : null}.</> });
   if (other.length)
-    sents.push(<>{(() => { const named = other.filter(c => !/^\d+$/.test(c.channel)).map(c => c.channel), unnamed = other.length - named.length;
-      return named.concat(unnamed ? [unnamed === 1 ? 'one other sales channel' : unnamed + ' other sales channels'] : []).join(' and '); })()} took {fmtCount(other.reduce((a, c) => a + num(c.orders), 0))} orders in 90 days; they are counted in your sales at the price Shopify records, so if a stockist pays you less, sales and margin read high by the difference.</>);
+    items.push({ k: 'Other places you sell',
+      t: <>{(() => { const named = other.filter(c => !/^\d+$/.test(c.channel)).map(c => c.channel), unnamed = other.length - named.length;
+        return named.concat(unnamed ? [unnamed === 1 ? 'One other sales channel' : unnamed + ' other sales channels'] : []).join(' and '); })()} took {fmtCount(other.reduce((a, c) => a + num(c.orders), 0))} orders in 90 days. They count in your sales at the shop price, so if a stockist pays you less, sales and profit read higher than they are.</> });
 
 
   const rows = [
@@ -20571,13 +20615,14 @@ function V3BusinessState() {
   const TONE = { good: 'v3-up', ok: 'v3-muted', weak: 'v3-down' }, WORD = { good: 'better than typical', ok: 'within the usual range', weak: 'outside the usual range' };
 
   // 0272: Greta's read, written by the LLM from these figures and checked number by number. When it
-  // is there it leads and the rules' sentences sit under it; when it is not, they lead as before.
+  // is there it leads and the rules' points sit under it; when it is not, they lead as before.
   // 2026-10-06: on a phone this block ran three and a half screens (story, the rhythm chart, a "next
   // 90 days" list and its own "This week") before Today's profit figure, and the 90-day list and
   // "This week" repeated the "Do this first" list straight below it. Now it is the verdict and the
-  // story; the sentences, the chart and the benchmarks sit in one fold; the plan is Today's list.
+  // story; the points, the chart and the benchmarks sit in one fold; the plan is Today's list.
   const NS = V3_NARR.data && V3_NARR.data.summary;
-  const facts = sents.length > 0 && <p className="v3-note v3-measure">{sents.map((s, i) => <React.Fragment key={i}>{i ? ' ' : ''}{s}</React.Fragment>)}</p>;
+  const facts = items.length > 0 && <V3Signals items={items}/>;
+  const terms = ao != null && (<p className="micro muted v3-measure"><b>Running costs</b> (overheads) are what you pay each month whatever you sell, such as rent, wages and software. <b>Profit after ads</b> is what is left from sales once products, delivery, payment fees and ads are paid, before running costs.</p>);
   const chart = wk.length >= 8 && num(H.sale_weeks_13) >= 4 && (<figure className="v3-chart v3-chart-solo">
       <figcaption><span className="v3-chart-title">Profit after ads, by week</span>
         <span className="v3-legend"><i style={{ background: PAL.accent }}/>A sale <i style={{ background: PAL.data3 }}/>No sale</span></figcaption>
@@ -20607,15 +20652,16 @@ function V3BusinessState() {
   return (<div className="v3-page-stack"><section>
     <div className="v3-kick">Where the business stands · last 30 days</div>
     <p className="v3-verdict">{verdict}</p>
+    {sub}
     {story
       ? (<><V3StoryText text={NS.story}/>
           <p className="micro muted v3-measure">{V3_NARR.data.summary_stale && V3_NARR.data.written_at
-            ? <>Written by Greta on {v3Day(String(V3_NARR.data.written_at).slice(0, 10), true)} from the figures then, every number checked; today’s figures are under “The figures behind this”.</>
-            : <>Written by Greta from these figures; every number in it is checked against them before it is shown.</>}</p></>)
-      : facts}
+            ? <>Written by Greta on {v3Day(String(V3_NARR.data.written_at).slice(0, 10), true)}. Today’s figures are in “The figures behind this”.</>
+            : <>Written by Greta. Every figure in it is checked against your data.</>}</p></>)
+      : <>{facts}{terms}</>}
     {(story ? (facts || chart || bench) : (chart || bench)) && (
       <V3More id="state-facts" label={story ? 'The figures behind this' : 'The weeks and the benchmarks behind this'}>
-        {story ? facts : null}{chart}{bench}
+        {story ? <>{facts}{terms}</> : null}{chart}{bench}
       </V3More>)}
   </section></div>);
 }
