@@ -8713,7 +8713,7 @@ const V3_ASK_BUDGET = 18000;   // measured 6 Oct: 13,354 characters = 3,926 toke
 // on top, so by 8 Oct a question sent 24,852 characters, and Groq's 8,000 tokens a request (counting the
 // 1,500 kept for the answer) refused 3 of 4 questions on both models. This is the whole request: rules,
 // figures and conversation together, about 5,700 tokens.
-const V3_ASK_TOTAL = 19500;
+const V3_ASK_TOTAL = 21000;   // 19,500 measured 4,871 prompt tokens (8 Oct): room for ~1,500 more characters
 const V3_ASK_TOPICS = {
   ads: /\b(ad|ads|advert\w*|meta|facebook|instagram|google|spend\w*|roas|campaign\w*|creative\w*|channel\w*|acquisition|new customers?|cac|budget|cost per|cpc|cpm|click\w*)\b/i,
   site: /\b(site|website|conversion|convert\w*|traffic|session\w*|checkout|basket|cart|visit\w*|page\w*|mobile|bounce)\b/i,
@@ -8736,6 +8736,20 @@ function v3AskReadout(R, topics, basis) {
   if (!R) return null;
   basis = basis || {};
   const cut = (s, n) => { s = String(s == null ? '' : s); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
+  // A board action ends with what to do ("... Bring Meta back toward £1,444 a week and judge it on your
+  // Shopify orders."). Cut at 180 characters, that sentence was lost, and on 8 Oct the model quoted the
+  // only target it could see, Google's £445, as Meta's. Keep the opening and the closing sentence.
+  const cutAction = s => {
+    s = String(s == null ? '' : s);
+    if (s.length <= 200) return s;
+    const sents = s.match(/[^.!?]+(?:[.!?](?=\s|$)|$)/g) || [s];
+    if (sents.length < 2) return cut(s, 200);
+    // A long closing sentence keeps its first and last clause: the peak plan ends "...; build the offer
+    // around the £19,691 of slow stock (at cost) rather than money off everything."
+    let last = sents[sents.length - 1].trim();
+    if (last.length > 220) { const parts = last.split(/;\s*/); last = parts.length > 1 ? cut(parts[0], 110) + ' … ' + cut(parts[parts.length - 1], 160) : cut(last, 220); }
+    return cut(sents[0].trim(), 150) + ' … ' + last;
+  };
   const out = {
     rules: R.rules || [],
     window: R.window || null,
@@ -8744,7 +8758,7 @@ function v3AskReadout(R, topics, basis) {
     // What the pounds are, with them: the first live answer read "£12,237" (the profit those products
     // make a month) as the cost of ordering them.
     board: (R.board || []).map(x => { const bs = String(basis[x.rank] || '');
-      return { rank: x.rank, action: cut(x.action, 180), pounds: x.gbp_per_month,
+      return { rank: x.rank, action: cutAction(x.action), pounds: x.gbp_per_month,
         per: /\(once|once,? over/i.test(bs) ? 'once' : 'a month', pounds_are: x.gbp_is_sales ? 'sales' : (cut(bs, 110) || 'profit after product and order costs'),
         rung: x.rung, why_this_rung: cut((x.why_this_rung || [])[0], 120), lane: x.lane }; }),
     held: (R.held || []).map(x => ({ action: cut(x.action, 90), because: cut((x.held_because || [])[0], 80) })),
@@ -8872,14 +8886,19 @@ function v3AskCheck(text, sent) {
     const lp = v3AskPounds(lines[li]);
     if (best && bestScore >= 2 && lp.length) {
       const bp = v3AskPounds(best.action).concat(best.gbp_per_month != null ? [Number(best.gbp_per_month)] : []);
-      if (!lp.every(x => bp.some(y => near(x, y)))) {
-        // The board sentence the line was quoting, not the whole paragraph.
+      const bad = x => !bp.some(y => near(x, y));
+      if (lp.some(bad)) {
+        // Replace only the sentence holding the wrong figure, with the board sentence it was quoting:
+        // "Meta now costs £197 ... Bring Meta back toward £445 a week." keeps its first sentence.
+        const lsents = lines[li].match(/[^.!?]+(?:[.!?]+[”"’*_)]*(?=\s|$)|$)/g) || [lines[li]];
+        const target = lsents.find(s => v3AskPounds(s).some(bad)) || lines[li];
+        const tw = words(target);
         const sents = String(best.action || '').match(/[^.!?]+(?:[.!?](?=\s|$)|$)/g) || [String(best.action || '')];
         let said = sents[sents.length - 1], top = -1;
-        sents.forEach(s => { const sw = words(s); let sc = 0; lw.forEach(w => { if (sw.has(w)) sc++; }); if (sc > top) { top = sc; said = s; } });
+        sents.forEach(s => { const sw = words(s); let sc = 0; tw.forEach(w => { if (sw.has(w)) sc++; }); if (sc >= top) { top = sc; said = s; } });
         said = said.trim().replace(/\s*\.$/, '') + '.';
-        const m = lines[li].match(/^(\W*[^:]{0,40}:[*_]*\s*)/);
-        lines[li] = (m ? m[1] : 'Next step: ') + said;
+        const m = target.match(/^(\s*(?:[*_]*[A-Za-z ]{3,30}:[*_]*\s*)?[“"‘*_]*)([\s\S]*?)([.!?]*[”"’*_)]*\s*)$/);
+        lines[li] = lines[li].replace(target, () => (m ? m[1] + said + m[3].replace(/[.!?]/g, '') : said));
         t = lines.join('\n');
       }
     }
@@ -8964,7 +8983,13 @@ function buildAskContext(facts, question, budget){
   if (size() > BUDGET && meta.readout) delete meta.readout.cost_trees;
   if (size() > BUDGET && meta.readout) meta.readout.held = meta.readout.held.map(h => ({ action: h.action }));
   if (size() > BUDGET && meta.readout) meta.readout.coverage = [];
-  while (size() > BUDGET && meta.readout && meta.readout.board.length > 5) meta.readout.board.pop();
+  // Board rows about what was asked stay: "Meta or email?" lost both email actions to this trim (8 Oct).
+  const onTopic = x => Object.keys(topics).some(k => topics[k] && V3_ASK_TOPICS[k].test(String(x.action || '')));
+  while (size() > BUDGET && meta.readout && meta.readout.board.length > 5) {
+    const B = meta.readout.board; let i = B.length - 1;
+    while (i >= 5 && onTopic(B[i])) i--;
+    B.splice(i >= 5 ? i : B.length - 1, 1);
+  }
   // Still over (the figures every page shows run large on a busy brand): the named stock rows go last.
   if (size() > BUDGET && meta.readout) meta.readout.headline = meta.readout.headline.map(h => ({ label: h.label, value: h.value, window: h.window }));
   if (size() > BUDGET && data.stock_named) { delete data.stock_named; delete dictionary.stock_named; }
