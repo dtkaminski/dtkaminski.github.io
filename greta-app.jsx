@@ -8546,8 +8546,13 @@ async function v3AskFacts(question) {
   const cmr = Number(H.net_revenue_30d) > 0 && H.product_contribution_30d != null ? Number(H.product_contribution_30d) / Number(H.net_revenue_30d) : null;
   const r0 = x => (Array.isArray(x) ? x[0] : x) || null, R = v => (v == null || !isFinite(Number(v)) ? null : Math.round(Number(v)));
   const f = { as_of: today, note: 'These are the figures the app’s pages show. Prefer them to anything worked out from the weekly or daily rows.' };
+  // The return on ads and the line it must clear, stated: given only the margin, "my ROAS looks great"
+  // got "your ROAS (1.9x) is solid" against a break-even of 1.63x (8 Oct).
   if (H.net_revenue_30d != null) f.last_30_days = { sales: R(H.net_revenue_30d), ad_spend: R(H.paid_spend_30d), profit_after_ads: R(H.cm_after_marketing_30d),
-    margin_after_product_and_order_costs: cmr != null ? Math.round(cmr * 1000) / 1000 : null };
+    margin_after_product_and_order_costs: cmr != null ? Math.round(cmr * 1000) / 1000 : null,
+    sales_per_pound_of_ads: Number(H.paid_spend_30d) > 0 ? Math.round(Number(H.net_revenue_30d) / Number(H.paid_spend_30d) * 100) / 100 : null,
+    sales_per_pound_of_ads_to_break_even: cmr > 0 ? Math.round(100 / cmr) / 100 : null,
+    note_on_return: 'Ads pay only above the break-even figure. Within 30% above it, little is left for overheads: call that thin, not good.' };
   // Profit after overheads, the ads' share of sales and new customers as Today states them, so an answer
   // quotes them rather than doing its own sums (Ask had only overheads_per_month, 7 Oct).
   {
@@ -8762,7 +8767,8 @@ const V3_ASK_WORDS = { recent_context: 'the recent weeks', pounds_are: 'what the
   quarter_plan_at_todays_ad_spend: 'the quarter plan', site_last_30_days: 'the site figures', email_flows: 'your email flows',
   email_campaigns: 'your email campaigns', weekly_shop: 'the weekly sales', board: 'the board', held: 'what Greta is holding back',
   what_moved_profit_after_ads: 'what moved your profit', main_cause: 'the main cause', products_to_reorder_now_board_1: 'products to reorder now',
-  of_them_out_of_stock_now: 'already out of stock', out_of_stock_now_examples: 'products out of stock' };
+  of_them_out_of_stock_now: 'already out of stock', out_of_stock_now_examples: 'products out of stock',
+  sales_per_pound_of_ads: 'sales per £1 of ads', sales_per_pound_of_ads_to_break_even: 'the break-even return on ads' };
 // Ask's answers are markdown from the model; they were shown as plain text, asterisks, hashes and table
 // pipes included (7 Oct). This turns the few shapes the answers use into elements -- headings, bold,
 // lists, tables, paragraphs -- and never renders HTML from the model.
@@ -8822,7 +8828,7 @@ function v3AskScrub(text, facts) {
   t = t.replace(/`?\b(?:_meta\.)?(?:facts|readout|data)\.([a-z_]+)(?:\.([a-z_]+))?`?/g, (m, a, b) => V3_ASK_WORDS[b] || V3_ASK_WORDS[a] || 'the figures');
   t = t.replace(/`?\b([a-z]+(?:_[a-z]+)*)\.([a-z]+(?:_[a-z]+)+)`?/g, (m, a, b) => V3_ASK_WORDS[b] || V3_ASK_WORDS[a] || b.replace(/_/g, ' '));
   t = t.replace(/`([a-z]+(?:_[a-z]+)+)`/g, (m, k) => V3_ASK_WORDS[k] || k.replace(/_/g, ' '));
-  t = t.replace(/\b([a-z]+(?:_[a-z]+){1,4})\b/g, (m, k) => V3_ASK_WORDS[k] || m);
+  t = t.replace(/\b([a-z]+(?:_[a-z]+){1,8})\b/g, (m, k) => V3_ASK_WORDS[k] || m);
   t = t.replace(/\s*[–—-]\s*rung\s+(direct|likely|probably|possible|outside chance)\b/gi, ' ($1)')
        .replace(/\brung\s+(direct|likely|probably|possible)\b/gi, '$1')
        .replace(/\((?:direct|likely|probably|possible)\s*,\s*[^)]*\)/gi, '')
@@ -9055,7 +9061,7 @@ COUNTS AND NAMES: how many products are out of stock or need ordering comes from
 
 STOCK questions: use data.stock_named and data.stock_at_risk (Greta's stock plan) for how many to order (order_units), what being out costs (lost_before_lands, profit) and what an order costs (order_units × unit_cost). An order placed today lands on facts.next_peak.order_placed_today_lands. If facts.next_peak.lands_before_peak_starts is false, never say ordering now gets stock in for the peak: say when it lands, that only what suppliers can send sooner reaches the peak, and to ask for that first. Board pounds are what pounds_are says, a month or once (per); never call them a cost or spend unless pounds_are says so. When the board already has an action for what is asked, give its instruction as the board words it ("bring Meta back toward £X a week"), not a stronger one of your own such as pausing a channel.
 
-CHECK THE PREMISE FIRST: when the question states something about the business ("ROAS looks great", "conversion dropped 30%", "about to stock out"), check it against the figures before anything else. If they do not show it, say so in the first sentence with the figure (each £1 of ads brings back £X against £Y needed to break even; visits turn into orders at the usual rate), then say what the owner is most likely seeing instead, such as a tracking break in readout.tracking or a platform's own count.
+CHECK THE PREMISE FIRST: when the question states something about the business ("ROAS looks great", "conversion dropped 30%", "about to stock out"), check it against the figures before anything else. If they do not show it, say so in the first sentence with the figure (each £1 of ads brings back facts.last_30_days.sales_per_pound_of_ads against sales_per_pound_of_ads_to_break_even; visits turn into orders at the usual rate), then say what the owner is most likely seeing instead, such as a tracking break in readout.tracking or a platform's own count.
 
 SITE questions: first say whether the rate really moved, from site_last_30_days against its typical figure; if Google Analytics or the shop's order sources are in readout.tracking, a drop in their figures is most likely the tracking, not shoppers. Never explain a change in how visits turn into orders by ad costs. Lead with site_last_30_days (Microsoft Clarity counts every visit; Google Analytics was not recording properly for part of the summer): orders per 100 visits, the share on a phone, and the share of visits hitting a JavaScript error or broken clicks. Use the Google Analytics funnel only as a second view of the steps. An item in readout.held is not established: if you mention one, say it was flagged and not re-checked, and never call it the cause.
 
@@ -9068,7 +9074,7 @@ WHAT NOT TO DO questions: answer from readout.held (what Greta is holding back, 
 A difference in cost is not a loss: an ad overspend is spend above what the earlier cost per order needed, not money lost. When a board figure is "probably" or lower, give its why_this_rung in plain words. The weekly tables hold complete weeks only.
 
 COST questions ("which of my costs are wrong", "what do things cost me"): answer from facts.costs_and_settings.what_reads_wrong, the cost figures Greta works from that are off and how far each moves profit a month. Ad spend being high is not a cost figure being wrong. The freight figure is per 10% of freight and duty, an illustration until the owner enters their rate, not an amount: never add it to anything, and never work out a corrected profit of your own. Point to Goal & costs, where each one can be fixed.
-SHAPE: start with the answer itself in one or two plain sentences, with the figure that decides it. Then at most three short points, or one small table when comparing several things. Keep it under about 180 words unless the question asks for a list. No headings unless there are more than three parts. End with the one thing to do next, worded as the board words it when the board has it.
+SHAPE: start with the answer itself in one or two plain sentences, with the figure that decides it. Then at most three short points, or one small table when comparing several things. Keep it under about 180 words unless the question asks for a list. No headings unless there are more than three parts. End with the one thing to do next: the board action that answers this question (for an ads question, the ads action, not the top of the board), worded as the board words it.
 Write for the owner: never show field or table names, and never a dotted name such as next_peak.promotions_planned (readout, facts, pounds_are, rung, stock_named, order_units, recent_context); say what they mean. Use a short table only when it helps.
 
 Never invent a forecast beyond facts.quarter_plan_at_todays_ad_spend. If the question cannot be answered from what was sent, say what is missing. Plain British English, no jargon, £ for money. Short questions get a short answer with the number and its calculation; diagnosis questions get: the corrected read, the numbers, what was ruled out, what to do in order, and what would change your mind.
