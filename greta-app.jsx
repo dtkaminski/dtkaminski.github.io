@@ -8691,6 +8691,11 @@ async function v3AskFacts(question) {
 // series the question is about as compact tables, and a hard ceiling that drops the least useful
 // parts first. The ceiling is in characters; JSON like this runs about three characters a token.
 const V3_ASK_BUDGET = 18000;   // measured 6 Oct: 13,354 characters = 3,926 tokens
+// The ceiling above covered the figures only. The rules (~6,600 characters) and the last exchanges rode
+// on top, so by 8 Oct a question sent 24,852 characters, and Groq's 8,000 tokens a request (counting the
+// 1,500 kept for the answer) refused 3 of 4 questions on both models. This is the whole request: rules,
+// figures and conversation together, about 5,700 tokens.
+const V3_ASK_TOTAL = 19500;
 const V3_ASK_TOPICS = {
   ads: /\b(ad|ads|advert\w*|meta|facebook|instagram|google|spend\w*|roas|campaign\w*|creative\w*|channel\w*|acquisition|new customers?|cac|budget|cost per|cpc|cpm|click\w*)\b/i,
   site: /\b(site|website|conversion|convert\w*|traffic|session\w*|checkout|basket|cart|visit\w*|page\w*|mobile|bounce)\b/i,
@@ -8809,9 +8814,76 @@ function v3AskScrub(text, facts) {
        .replace(/\brung\s+(direct|likely|probably|possible)\b/gi, '$1')
        .replace(/\((?:direct|likely|probably|possible)\s*,\s*[^)]*\)/gi, '')
        .replace(/£([\d,]{4,})\.\d\d\b/g, '£$1');
-  return t.replace(/\(\s*the figures\s*\)/g, '').replace(/[ \t]{2,}/g, ' ');
+  // What still leaked on 8 Oct: "(whether it lands before the peak = false)", "(when an order placed today
+  // lands)" -- a field name in brackets, translated -- "(direct)" after a figure, and "board rank 1".
+  const glosses = new Set(Object.keys(V3_ASK_WORDS).map(k => V3_ASK_WORDS[k].toLowerCase()));
+  t = t.replace(/\brung\s+([*_]*)(direct|likely|probably|possible|outside chance)\b/gi, '$1$2')
+       .replace(/\s*\([^()]*=\s*(?:true|false|null)\s*\)/gi, '')
+       .replace(/\s*\(([^()]{3,60})\)/g, (m, inner) => (glosses.has(inner.trim().toLowerCase()) ? '' : m))
+       .replace(/\s*\(\s*direct\s*\)/gi, '')
+       .replace(/\(\s*board rank (\d+)\s*,\s*/gi, '(#$1 on your board, ')
+       .replace(/\bboard rank (\d+)\b/gi, '#$1 on your board');
+  return t.replace(/\(\s*the figures\s*\)/g, '').replace(/[ \t]{2,}/g, ' ').replace(/ ([,.;:])/g, '$1');
 }
-function buildAskContext(facts, question){
+// Two checks on a new answer, against the request that produced it.
+// 1. The closing step. On 8 Oct the ROAS answer ended "Bring Meta back toward £445 a week": the board's
+//    words, with Google's target in them (Meta's is £1,444). When the last "next step" line quotes a board
+//    action but not its pounds, the board's own wording replaces it.
+// 2. Any £ figure that appears nowhere in what Greta was sent is one the model worked out itself (a sum,
+//    a "corrected" profit). It is not removed -- it may be right -- but the owner is told which ones.
+const V3_ASK_STOP = new Set(['your', 'with', 'that', 'this', 'from', 'back', 'toward', 'towards', 'week', 'month', 'each', 'them',
+  'they', 'have', 'about', 'what', 'when', 'then', 'into', 'more', 'less', 'than', 'next', 'step', 'judge', 'shopify', 'there', 'their']);
+function v3AskPounds(s) {
+  return (String(s || '').match(/£\s?\d[\d,]*(?:\.\d+)?k?/gi) || []).map(p => {
+    const n = Number(p.replace(/[£,\sk]/gi, '')); return /k$/i.test(p) ? n * 1000 : n; }).filter(n => isFinite(n));
+}
+function v3AskCheck(text, sent) {
+  let t = String(text || '');
+  const R = (typeof window !== 'undefined' && window.GRETA_READOUT) || null;
+  const board = (R && Array.isArray(R.board)) ? R.board : [];
+  const near = (x, y) => Math.abs(x - y) <= Math.max(1, Math.abs(y) * 0.005);
+  const lines = t.split('\n');
+  const STEP = /^\W*(?:next step|what to do next|do this next|the one thing to do)/i;
+  let li = -1; for (let i = lines.length - 1; i >= 0; i--) { if (STEP.test(lines[i])) { li = i; break; } }
+  if (li >= 0 && board.length) {
+    const words = s => new Set((String(s || '').toLowerCase().match(/[a-z]{4,}/g) || []).filter(w => !V3_ASK_STOP.has(w)));
+    const lw = words(lines[li]);
+    let best = null, bestScore = 0;
+    board.forEach(b => { const bw = words(b.action); let sc = 0; lw.forEach(w => { if (bw.has(w)) sc++; }); if (sc > bestScore) { bestScore = sc; best = b; } });
+    const lp = v3AskPounds(lines[li]);
+    if (best && bestScore >= 2 && lp.length) {
+      const bp = v3AskPounds(best.action).concat(best.gbp_per_month != null ? [Number(best.gbp_per_month)] : []);
+      if (!lp.every(x => bp.some(y => near(x, y)))) {
+        // The board sentence the line was quoting, not the whole paragraph.
+        const sents = String(best.action || '').match(/[^.!?]+(?:[.!?](?=\s|$)|$)/g) || [String(best.action || '')];
+        let said = sents[sents.length - 1], top = -1;
+        sents.forEach(s => { const sw = words(s); let sc = 0; lw.forEach(w => { if (sw.has(w)) sc++; }); if (sc > top) { top = sc; said = s; } });
+        said = said.trim().replace(/\s*\.$/, '') + '.';
+        const m = lines[li].match(/^(\W*[^:]{0,40}:[*_]*\s*)/);
+        lines[li] = (m ? m[1] : 'Next step: ') + said;
+        t = lines.join('\n');
+      }
+    }
+  }
+  const nums = (String(sent || '').match(/\d[\d,]*(?:\.\d+)?/g) || []).map(s => Number(s.replace(/,/g, ''))).filter(n => isFinite(n));
+  const whole = new Set(nums.map(n => Math.round(n)));
+  const untraced = [];
+  v3AskPounds(t).forEach(x => {
+    if (x < 10) return;
+    const r = Math.round(x);
+    if (whole.has(r) || whole.has(r - 1) || whole.has(r + 1) || nums.some(n => near(x, n))) return;
+    const lbl = '£' + r.toLocaleString('en-GB');
+    if (!untraced.includes(lbl)) untraced.push(lbl);
+  });
+  if (untraced.length) {
+    const one = untraced.length === 1;
+    t += '\n\n*Greta worked ' + (one ? 'this figure' : 'these figures') + ' out herself rather than reading ' + (one ? 'it' : 'them')
+      + ' from your pages: ' + untraced.join(', ') + '. Check ' + (one ? 'it' : 'them') + ' before acting.*';
+  }
+  return t;
+}
+function buildAskContext(facts, question, budget){
+  const BUDGET = budget > 0 ? Math.min(budget, V3_ASK_BUDGET) : V3_ASK_BUDGET;
   const topics = {}; Object.keys(V3_ASK_TOPICS).forEach(k => { topics[k] = V3_ASK_TOPICS[k].test(question || ''); });
   const D = window.FRKL_DATA || {};
   const _shp = D.shopify || [];
@@ -8869,11 +8941,14 @@ function buildAskContext(facts, question){
   // The ceiling: drop data series from the least needed, then shorten the readout.
   const size = () => JSON.stringify(meta).length + JSON.stringify(data).length;
   const order = Object.keys(data).reverse().filter(k => k !== 'stock_named');
-  while (size() > V3_ASK_BUDGET && order.length) { const k = order.shift(); delete data[k]; delete dictionary[k]; }
-  if (size() > V3_ASK_BUDGET && meta.readout) delete meta.readout.cost_trees;
-  if (size() > V3_ASK_BUDGET && meta.readout) meta.readout.held = meta.readout.held.map(h => ({ action: h.action }));
-  if (size() > V3_ASK_BUDGET && meta.readout) meta.readout.coverage = [];
-  while (size() > V3_ASK_BUDGET && meta.readout && meta.readout.board.length > 5) meta.readout.board.pop();
+  while (size() > BUDGET && order.length) { const k = order.shift(); delete data[k]; delete dictionary[k]; }
+  if (size() > BUDGET && meta.readout) delete meta.readout.cost_trees;
+  if (size() > BUDGET && meta.readout) meta.readout.held = meta.readout.held.map(h => ({ action: h.action }));
+  if (size() > BUDGET && meta.readout) meta.readout.coverage = [];
+  while (size() > BUDGET && meta.readout && meta.readout.board.length > 5) meta.readout.board.pop();
+  // Still over (the figures every page shows run large on a busy brand): the named stock rows go last.
+  if (size() > BUDGET && meta.readout) meta.readout.headline = meta.readout.headline.map(h => ({ label: h.label, value: h.value, window: h.window }));
+  if (size() > BUDGET && data.stock_named) { delete data.stock_named; delete dictionary.stock_named; }
   return { _meta: meta, data, topics, chars: size() };
 }
 // Answer depth -> the model that serves it. The only place a model id appears on the
@@ -8955,12 +9030,10 @@ function AskPanel(){
     }
     const facts = await v3AskFacts(q).catch(() => null);
     setAskStage('Writing the answer');
-    const ctx = buildAskContext(facts, q);
-    const ctxJson = JSON.stringify(ctx.data);
-    // Kept short on purpose: every character here is sent with every question (see V3_ASK_BUDGET).
-    const systemPrompt = `You are a senior D2C commercial analyst and operator for ${OI_BRAND.name}, a ${OI_BRAND.markets} DTC ${OI_BRAND.vertical} brand. Answer using ONLY the figures below. For where the year stands, use facts.next_peak, facts.typical_month and the weekly rows; never assume a season, a lull or a peak they do not show. They are: _meta.facts (what every page of the app shows), _meta.readout (the server's canonical figures, ranked board and rules) and, in data, the series this question needs as tables (cols + rows). Prefer facts and readout to anything you work out from the rows, and say which you used.
+    // Kept short on purpose: every character here is sent with every question (see V3_ASK_TOTAL).
+    const askSystem = (metaStr, dataStr) => `You are a senior D2C commercial analyst and operator for ${OI_BRAND.name}, a ${OI_BRAND.markets} DTC ${OI_BRAND.vertical} brand. Answer using ONLY the figures below. For where the year stands, use facts.next_peak, facts.typical_month and the weekly rows; never assume a season, a lull or a peak they do not show. They are: _meta.facts (what every page of the app shows), _meta.readout (the server's canonical figures, ranked board and rules) and, in data, the series this question needs as tables (cols + rows). Prefer facts and readout to anything you work out from the rows, and say which you used.
 
-Follow _meta.readout.rules. Quote headline figures exactly, with their window. Say how far the owner can lean on a figure using its rung (direct, likely, probably, possible, outside chance). Never recommend an action in readout.held. Never compare or total across days readout.coverage or readout.tracking marks unusable; missing days are not zero.
+Follow _meta.readout.rules. Quote headline figures exactly, with their window. Say how far the owner can lean on a figure in plain words (measured, likely, probably, possibly, an outside chance), as part of the sentence: never the word rung, never in brackets after a figure. Never recommend an action in readout.held. Never compare or total across days readout.coverage or readout.tracking marks unusable; missing days are not zero.
 
 WHAT TO DO questions: answer from readout.board in its order, with each item's pounds (a month, or once when the action says so) and its rung. Do not re-rank. One idea of your own is allowed only if labelled "my suggestion, not on your board". For spending more, check facts.quarter_plan_at_todays_ad_spend and facts.next_peak first. If facts.goal.needs_replanning is true, say so before quoting the goal.
 
@@ -8986,17 +9059,27 @@ Write for the owner: never show field or table names, and never a dotted name su
 Never invent a forecast beyond facts.quarter_plan_at_todays_ad_spend. If the question cannot be answered from what was sent, say what is missing. Plain British English, no jargon, £ for money. Short questions get a short answer with the number and its calculation; diagnosis questions get: the corrected read, the numbers, what was ruled out, what to do in order, and what would change your mind.
 
 Facts and readout:
-${JSON.stringify(ctx._meta)}
+${metaStr}
 
 Data (JSON tables):
-${ctxJson}`;
+${dataStr}`;
     const newHistory = [...history, {role:'user', content:q, time:Date.now()}];
+    // The last two exchanges, earlier answers shortened: the conversation counts against the same allowance.
+    let apiMessages = newHistory.filter(m=>m.role==='user'||m.role==='assistant').slice(-5)
+      .map((m, i, all) => ({role:m.role, content: (m.role === 'assistant' && i < all.length - 1 && String(m.content).length > 900) ? String(m.content).slice(0, 900) + '…' : m.content}));
+    const fixedChars = askSystem('', '').length;
+    const msgChars = () => apiMessages.reduce((n, m) => n + String(m.content || '').length, 0);
+    // A long conversation leaves less room for the figures: keep at least 9,000 characters of them by
+    // dropping the earliest exchanges first. The conversation always starts with the owner's words.
+    while (apiMessages.length > 1 && V3_ASK_TOTAL - fixedChars - msgChars() < 9000) {
+      apiMessages = apiMessages.slice(1);
+      while (apiMessages.length > 1 && apiMessages[0].role !== 'user') apiMessages = apiMessages.slice(1);
+    }
+    const ctx = buildAskContext(facts, q, V3_ASK_TOTAL - fixedChars - msgChars());
+    const systemPrompt = askSystem(JSON.stringify(ctx._meta), JSON.stringify(ctx.data));
     setHistory(newHistory);
     setQuestion('');
     try {
-      // The last two exchanges, earlier answers shortened: the conversation counts against the same allowance.
-      const apiMessages = newHistory.filter(m=>m.role==='user'||m.role==='assistant').slice(-5)
-        .map((m, i, all) => ({role:m.role, content: (m.role === 'assistant' && i < all.length - 1 && String(m.content).length > 900) ? String(m.content).slice(0, 900) + '…' : m.content}));
       // Resolve a FRESH session token each send (supabase auto-refreshes it), so the
       // per-tenant JWT path never goes stale mid-session. Fall back to a static jwt/token.
       let jwt = '';
@@ -9015,7 +9098,7 @@ ${ctxJson}`;
       if (!resp.ok) { let m = ''; try { m = (await resp.json()).message || ''; } catch(_){} throw new Error(m || ASK_FAIL); }
       const data = await resp.json();
       if (data.error) throw new Error(data.message || ASK_FAIL);
-      setHistory(h=>[...h, {role:'assistant', content:v3AskScrub(data.text || '(no response)', facts), time:Date.now(), usage:data.usage||{}}]);
+      setHistory(h=>[...h, {role:'assistant', content:v3AskCheck(v3AskScrub(data.text || '(no response)', facts), systemPrompt + JSON.stringify(apiMessages)), time:Date.now(), usage:data.usage||{}}]);
     } catch (e) {
       setError(e.message || String(e));
       setHistory(h=>h.slice(0,-1)); // drop the user message on failure
