@@ -512,12 +512,12 @@ function findingScore(f){
 // Map a finding to the tab that holds its evidence, so cross-refs become clickable.
 function findingNav(f){
   if(!f) return null;
-  if(f._cvr) return {section:'conversion', sub:'cvr', label:'What moves conversion'};
-  if(f._markdown || f._discount) return {section:'commerce', sub:'promos', label:'Promotions'};
+  if(f._cvr) return {section:'conversion', sub:'cvr', label:'What makes visitors buy'};
+  if(f._markdown || f._discount) return {section:'commerce', sub:'promos', label:'Promotions and discount codes'};
   if(f._product) return {section:'commerce', sub:'products', label:'Products'};
   const a = (f.area||'').toLowerCase();
-  if(/conversion|checkout|cvr/.test(a)) return {section:'conversion', sub:'cvr', label:'What moves conversion'};
-  if(/margin|promotion|discount/.test(a)) return {section:'commerce', sub:'promos', label:'Promotions'};
+  if(/conversion|checkout|cvr/.test(a)) return {section:'conversion', sub:'cvr', label:'What makes visitors buy'};
+  if(/margin|promotion|discount/.test(a)) return {section:'commerce', sub:'promos', label:'Promotions and discount codes'};
   if(/merchandis|product|availability/.test(a)) return {section:'commerce', sub:'products', label:'Products'};
   return null;
 }
@@ -10911,7 +10911,7 @@ function V3ChannelScoreboard(){
   if (rows === null) return <V3SkeletonRows n={4}/>;
   if (!rows.length) return (
     <div className="v3-score v3-enter">
-      <div className="v3-score-head"><h2 className="v3-score-title">Which channels earn their money</h2></div>
+      <div className="v3-score-head"><h2 className="v3-score-title">Which ad channels pay for themselves?</h2></div>
       <p className="v3-note">No channel has spent anything in the last 30 days, so there is nothing to rank yet.
         Once a channel is running, this compares what each one returns against what it needs to return to
         break even on your margin — and that comparison is the fastest read on this page.</p>
@@ -10934,7 +10934,7 @@ function V3ChannelScoreboard(){
   return (
     <div className="v3-score v3-enter">
       <div className="v3-score-head">
-        <h2 className="v3-score-title">Which channels earn their money</h2>
+        <h2 className="v3-score-title">Which ad channels pay for themselves?</h2>
         <span className="v3-score-key">bar is what it returns · tick is what it needs</span>
       </div>
       {verdict && <p className="v3-score-verdict">{verdict}</p>}
@@ -13907,7 +13907,7 @@ const NAV = [
     { id:'organic',   label:'Organic',       component: () => <Organic/> },
   ]},
   { id:'conversion', label:'Conversion', icon:'pulse', subtabs:[
-    { id:'cvr',  label:'What moves conversion',    component: () => <CvrDrivers/> },
+    { id:'cvr',  label:'What makes visitors buy',    component: () => <CvrDrivers/> },
     { id:'site', label:'Site & friction', component: (p) => <SiteStructure start={p.start}/> },
     // 2026-09-15: the operating loop. Every funnel stage against its OWN trailing twelve-month
     // normal (the first standard deviation anywhere in the model), the month's shortfall split
@@ -17792,7 +17792,7 @@ function V3Growth() {
         })}
       </ul>)}
       {levers.length >= 2 && <p className="micro muted v3-measure">That is, spend more before a new customer costs more than an order earns, with everything else unchanged. It is worked out from your own months, so treat it as a ranking, not a promise.</p>}
-      <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('marketing')}>Which channels earn their money <span className="v3-xref-go">on Marketing →</span></button>
+      <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('marketing')}>Which ad channels pay for themselves <span className="v3-xref-go">on Marketing →</span></button>
     </section>)}
 
     {planMo && mtd != null && daysDone >= 3 && (<section className="v3-sec">
@@ -21826,13 +21826,13 @@ const V3_WALK_TOUR = {
     what: 'The ads segment of this bar is how many pence of every £1 of sales went on ads over the last 30 days. Tap it to open Marketing, where the spend is split by channel.' },
   channels: { dest: 'marketing', target: { sel: '.v3-score' },
     what: 'Read the tick before the bar: it is the return each channel needs to break even. Rows are ordered by spend, because falling short at £300 is not the same as at £6,000.' },
-  creative: { dest: 'marketing', target: { sel: '.card', has: 'Spend sitting on the weaker ads' }, fallback: { sel: '.v3-score' },
+  creative: { dest: 'marketing', target: { sel: '.card', has: 'Which ads should I switch off?' }, fallback: { sel: '.v3-score' },
     what: 'Ads whose last 28 days have broken down, against their own past or against your other ads, and what that money cost you — and whether moving it to the ads that are holding up would actually help.' },
   stock: { dest: 'stock', target: { sel: '.v3-sec', has: 'What to order, product by product' }, fallback: { sel: '.v3-verdict' },
     what: 'Each row is a product: the solid bar is the days of stock left, the hatched part is days you would have nothing to sell before a new order could land. The longer the hatching, the more it costs you.' },
   reorder: { dest: 'stock', target: { sel: '.v3-sec', has: 'What to order, product by product' }, fallback: { sel: '.v3-verdict' },
     what: 'The same table, read for ordering: the tick on each row is when an order placed today would arrive. Anything whose bar ends before its tick needs ordering now.' },
-  cash: { dest: 'stock', target: { sel: '.v3-sec', has: 'Where cash is sitting' }, fallback: { sel: '.v3-stat-grid' },
+  cash: { dest: 'stock', target: { sel: '.v3-sec', has: 'Where is cash tied up in stock?' }, fallback: { sel: '.v3-stat-grid' },
     what: 'Money tied up in stock that will not sell through soon. It is cash you have already spent and cannot use for ads or new lines until it sells.' },
   leaks: { dest: 'products', target: { sel: '.v3-more', has: 'Promotions and discount codes' },
     what: 'Every discount code, what it was used for and what it cost you, sits behind this heading. Open it to see which codes earn their keep.' },
@@ -21840,7 +21840,7 @@ const V3_WALK_TOUR = {
     what: 'Your products ranked by sales over the last 28 days. The bar is size, the change column is against the 28 days before, and a "Low stock" tag means sales may be held back by stock rather than demand.' },
   movers: { dest: 'products', target: { sel: '.v3-movers' }, fallback: { sel: '.v3-ptable' },
     what: 'What gained and lost the most in pounds. Before acting on a faller, check it against stock — a product that ran out looks exactly like one that stopped selling.' },
-  traffic: { dest: 'website', target: { sel: 'figure.v3-chart' }, fallback: { sel: '.v3-sec', has: 'Each stage against its normal' },
+  traffic: { dest: 'website', target: { sel: 'figure.v3-chart' }, fallback: { sel: '.v3-verdict' },
     what: 'Your shop as a funnel — visits, product views, baskets, checkouts, orders — against a normal month. The stage that has slipped furthest is where buyers are being lost.' },
   retention: { dest: 'customers', target: { sel: 'figure.v3-chart', has: 'What a customer spends over time' }, fallback: { sel: '.v3-stat-grid' },
     what: 'How much the average customer has spent with you as the months go by after their first order. The steeper the early climb, the more a new customer is really worth.' },
