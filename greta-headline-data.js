@@ -223,6 +223,9 @@
         },
         top_action: acts[0] || null,
         next_actions: acts.slice(1, 4),
+        // The days the 30-day figures cover (8 Oct: Profit & sales counted orders over different days).
+        window_from: h.window_from || null,
+        window_to: h.window_to || null,
         // when the cached row was built, so the screen can say how fresh it is rather than imply now
         data_as_of: asOfArg,
         fetched_at: new Date().toISOString()

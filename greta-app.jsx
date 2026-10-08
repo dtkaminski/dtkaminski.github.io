@@ -3717,6 +3717,9 @@ function V3ProfitLead() {
           <span className="v3-chain-p">{r.kind === 'in' ? '' : (r.v < 0 && r.kind !== 'out' ? '−' : '') + per(r.v)}</span>
         </li>))}
       </ul>
+      {/* An owner who opens Shopify sees a bigger number for the same days (frkl, 8 Sep to 7 Oct: £26,761
+          against £18,989) and nothing said why (review, 8 Oct). */}
+      <p className="micro muted v3-measure">Shopify’s home screen shows a bigger sales figure for the same days. It adds VAT, the delivery you charge, orders later refunded, and other places you sell such as stockists. Sales here are your own shop’s sales after refunds and before VAT: the money the business has to work with.</p>
       {((rfGap != null && rfGap > 0) || noFreight) && <p className="micro muted v3-measure">Your profit here reads {rfGap > 0 ? 'about ' + fmtMoney(rfGap) + ' too high' : 'too high'}:
         {' '}{rfGap > 0 ? 'refunds are ' + fmtPctN(Number(rfRow.realised_value) / 100) + ' of sales, not the ' + fmtPctN(Number(rfRow.config_value) / 100) + ' you entered' : ''}{rfGap > 0 && noFreight ? ', and ' : ''}{noFreight ? 'your product costs leave out shipping them to you and import duty' : ''}.
         {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs-off')}>Fix them <span className="v3-xref-go">on Goal &amp; costs →</span></button></p>}
@@ -3819,7 +3822,12 @@ function Overview({start, period, customActive}){
   const H0 = (!customActive && period === '30d' && typeof window !== 'undefined' && window.GRETA_HEADLINE) || null;
   const paid = (H0 && H0.paid_spend_30d != null) ? Number(H0.paid_spend_30d) : sum(meta,'cost')+sum(gads,'cost');
   const rev = (H0 && H0.net_revenue_30d != null) ? Number(H0.net_revenue_30d) : sum(shop,'netSales');
-  const orders = sum(shop,'orders');
+  // Orders over the same days as those sales. Counted over the page's own 30 days (which reach today)
+  // against the headline's 8 Sep-7 Oct sales, this tile read 282 orders and £67 an order while the
+  // server said 279 and £68 (review, 8 Oct).
+  const orders = (H0 && H0.window_from && H0.window_to)
+    ? (D.shopify || []).filter(r => r.date >= H0.window_from && r.date <= H0.window_to).reduce((a, r) => a + (Number(r.orders) || 0), 0)
+    : sum(shop,'orders');
   const sessions = sum(ga,'sessions');
   const purch = sum(ga,'purchases');
   const emailRev = sum(kl,'orderValue');
@@ -4140,11 +4148,16 @@ function Overview({start, period, customActive}){
             agent="Pulse" observation={_vs('Visits', sessions, pSessions, 'ad spend', paid, pPaid)} />
           {!UI_V3 && <KPI label="Orders Klaviyo saw" val={GBP(emailRev)} sub="every order Klaviyo recorded, including VAT and shipping — not sales from email" series={seriesEmail} current={emailRev} prior={(pKl.length >= Math.max(3, Math.floor(kl.length * 0.8))) ? pEmailRev : null} goodDirection="up"
             agent="Lux" observation={_vs('Orders Klaviyo saw', emailRev, pEmailRev, 'sales', rev, pRev)} />}
-          <KPI label="Visitors who buy" val={PCT(cvr)} sub="orders ÷ sessions, on the days analytics recorded" series={seriesCVR} current={cvr} prior={pCvr} goodDirection="up"
+          {/* With analytics recording under 80% of the days, a benchmark beside this tile ("0.8% vs 1.5%")
+              read as a conversion problem while Website, which counts every visit with Clarity, showed
+              the usual rate (review, 8 Oct). Website is the one to read then. */}
+          <KPI label="Visitors who buy" val={PCT(cvr)} sub={cvrReliable ? 'orders ÷ visits, on the days analytics recorded' : 'Google Analytics missed too many days to judge this. Website counts every visit another way: read it there.'} series={seriesCVR} current={cvr} prior={pCvr} goodDirection="up"
             status={(cvr==null||!cvrReliable)?undefined:cvr>=CVR_BENCH?'healthy':cvr>=CVR_BENCH*0.8?'watch':'action'} statusLabel={cvr==null?undefined:!cvrReliable?'Too few tracked days':cvr>=CVR_BENCH?'Healthy':cvr>=CVR_BENCH*0.8?'Watch':'Below target'}
             agent="Pulse" observation={`Site conversion rate (Shopify orders ÷ GA4 sessions) is the single biggest revenue lever — against the ${CVR_BENCH_LABEL} target, more spend just buys more bounces.`}
-            benchmark="site_cvr" bmValue={cvr} />
-          <KPI label="Discount depth" val={PCT(discLoad)} sub={`${curSym()} off ÷ ${curSym()} of sales — how deep, not how many orders · drafts excluded`} series={seriesDisc} current={discLoad} prior={pDiscLoad} goodDirection="down"
+            benchmark={cvrReliable ? 'site_cvr' : undefined} bmValue={cvrReliable ? cvr : null} />
+          {/* "Discount depth 6%" here and "up to 36% off" on Today were both true and read as a contradiction:
+              this tile counts codes only, Today's figure is sale prices (review, 8 Oct). */}
+          <KPI label="Money off from codes" val={PCT(discLoad)} sub={`${curSym()} off from discount codes ÷ ${curSym()} of sales. Sale prices come on top: Today shows how deep your sales went.`} series={seriesDisc} current={discLoad} prior={pDiscLoad} goodDirection="down"
             agent="Atlas" observation={`Code + automatic discount as a share of DTC gross sales (draft/exchange orders excluded). This excludes sale-price markdowns${_mdPct?`, which add ~${_mdPct}% of value on top`:''} — the full load is on the Promotions tab.`}
             implication="Audit always-on codes + affiliate rates; protect full-price demand. The true load incl. markdowns is materially higher — see Promotions."
             benchmark="discount_load" bmValue={discLoad} />
@@ -8821,8 +8834,8 @@ function v3AskScrub(text, facts) {
        .replace(/\s*\([^()]*=\s*(?:true|false|null)\s*\)/gi, '')
        .replace(/\s*\(([^()]{3,60})\)/g, (m, inner) => (glosses.has(inner.trim().toLowerCase()) ? '' : m))
        .replace(/\s*\(\s*direct\s*\)/gi, '')
-       .replace(/\(\s*board rank (\d+)\s*,\s*/gi, '(#$1 on your board, ')
-       .replace(/\bboard rank (\d+)\b/gi, '#$1 on your board');
+       .replace(/\(\s*board (?:action )?rank (\d+)\s*,\s*/gi, '(#$1 on your board, ')
+       .replace(/\bboard (?:action )?rank (\d+)\b/gi, '#$1 on your board');
   return t.replace(/\(\s*the figures\s*\)/g, '').replace(/[ \t]{2,}/g, ' ').replace(/ ([,.;:])/g, '$1');
 }
 // Two checks on a new answer, against the request that produced it.
@@ -9042,7 +9055,9 @@ COUNTS AND NAMES: how many products are out of stock or need ordering comes from
 
 STOCK questions: use data.stock_named and data.stock_at_risk (Greta's stock plan) for how many to order (order_units), what being out costs (lost_before_lands, profit) and what an order costs (order_units × unit_cost). An order placed today lands on facts.next_peak.order_placed_today_lands. If facts.next_peak.lands_before_peak_starts is false, never say ordering now gets stock in for the peak: say when it lands, that only what suppliers can send sooner reaches the peak, and to ask for that first. Board pounds are what pounds_are says, a month or once (per); never call them a cost or spend unless pounds_are says so. When the board already has an action for what is asked, give its instruction as the board words it ("bring Meta back toward £X a week"), not a stronger one of your own such as pausing a channel.
 
-SITE questions: lead with site_last_30_days (Microsoft Clarity counts every visit; Google Analytics was not recording properly for part of the summer): orders per 100 visits, the share on a phone, and the share of visits hitting a JavaScript error or broken clicks. Use the Google Analytics funnel only as a second view of the steps. An item in readout.held is not established: if you mention one, say it was flagged and not re-checked, and never call it the cause.
+CHECK THE PREMISE FIRST: when the question states something about the business ("ROAS looks great", "conversion dropped 30%", "about to stock out"), check it against the figures before anything else. If they do not show it, say so in the first sentence with the figure (each £1 of ads brings back £X against £Y needed to break even; visits turn into orders at the usual rate), then say what the owner is most likely seeing instead, such as a tracking break in readout.tracking or a platform's own count.
+
+SITE questions: first say whether the rate really moved, from site_last_30_days against its typical figure; if Google Analytics or the shop's order sources are in readout.tracking, a drop in their figures is most likely the tracking, not shoppers. Never explain a change in how visits turn into orders by ad costs. Lead with site_last_30_days (Microsoft Clarity counts every visit; Google Analytics was not recording properly for part of the summer): orders per 100 visits, the share on a phone, and the share of visits hitting a JavaScript error or broken clicks. Use the Google Analytics funnel only as a second view of the steps. An item in readout.held is not established: if you mention one, say it was flagged and not re-checked, and never call it the cause.
 
 PRODUCT questions: use data.products (sales, share, the new customers each product brings in, profit per unit, stock) and the stock plan; name products. Discount codes (facts.next_peak.discount_codes_used_at_last_peak) are codes, not products. Never infer a product's selling price from a cost.
 
@@ -17204,8 +17219,9 @@ function V3HeroDelta({ cam, sales, prod, typical }) {
   if (cam != null && typical && typical.typ) {
     const diff = Number(cam) - typical.typ.kept, pct = Math.abs(typical.typ.kept) > 1 ? diff / Math.abs(typical.typ.kept) : null, up = diff >= 0;
     return (<div className={'v3-delta-line ' + (up ? 'good' : 'bad')}>
-      <span className="v3-delta-chip"><Icon name={up ? 'arrowUp' : 'arrowDown'} size={12} stroke={2.2}/>{fmtMoney(Math.abs(diff))}{pct != null ? ' · ' + fmtPctN(Math.abs(pct)) : ''}</span>
-      <span className="v3-muted">vs a typical month for you ({fmtMoney(typical.typ.kept)})</span>
+      {/* "£6,139 · 80%" alone did not say more or less, or than what (review, 8 Oct). */}
+      <span className="v3-delta-chip"><Icon name={up ? 'arrowUp' : 'arrowDown'} size={12} stroke={2.2}/>{fmtMoney(Math.abs(diff))} {up ? 'more' : 'less'}{pct != null ? ' (' + fmtPctN(Math.abs(pct)) + ')' : ''}</span>
+      <span className="v3-muted">than a typical month for you ({fmtMoney(typical.typ.kept)})</span>
     </div>);
   }
   if (cam == null || cmr == null || !REAL_END || v3DailyCurrent() !== 'ready') return null;
@@ -17215,8 +17231,8 @@ function V3HeroDelta({ cam, sales, prod, typical }) {
   const pct = Math.abs(prior.profit) > 1 ? diff / Math.abs(prior.profit) : null;
   const up = diff >= 0;
   return (<div className={'v3-delta-line ' + (up ? 'good' : 'bad')}>
-    <span className="v3-delta-chip"><Icon name={up ? 'arrowUp' : 'arrowDown'} size={12} stroke={2.2}/>{fmtMoney(Math.abs(diff))}{pct != null ? ' · ' + fmtPctN(Math.abs(pct)) : ''}</span>
-    <span className="v3-muted">vs the 30 days before ({fmtMoney(prior.profit)})</span>
+    <span className="v3-delta-chip"><Icon name={up ? 'arrowUp' : 'arrowDown'} size={12} stroke={2.2}/>{fmtMoney(Math.abs(diff))} {up ? 'more' : 'less'}{pct != null ? ' (' + fmtPctN(Math.abs(pct)) + ')' : ''}</span>
+    <span className="v3-muted">than the 30 days before ({fmtMoney(prior.profit)})</span>
   </div>);
 }
 
@@ -17502,7 +17518,9 @@ function V3Today(p) {
     <div className="v3-act-grid">
     {top ? (
       <div className="v3-dofirst v3-raised">
-        <div className="v3-kick">Do this first{top.cm_gbp ? ' · worth about ' + v3Gbp(top.cm_gbp) + v3Per(top) : ''}</div>
+        {/* A stock order's figure is the profit those products make while in stock, not what ordering
+            adds: "worth about £8,604 a month" read as a gain (review, 8 Oct). Stock & orders says "protects". */}
+        <div className="v3-kick">Do this first{top.cm_gbp ? (top.category === 'stock' || top.external_id === 'stock-reorder' ? ' · protects about ' : ' · worth about ') + v3Gbp(top.cm_gbp) + v3Per(top) : ''}</div>
         <div className="v3-dofirst-t">{v3PlainAction(top).title}</div>
         {v3PlainAction(top).why && <div className="v3-sub">{v3PlainAction(top).why}</div>}
         {seasonNote && isCut(top) && <div className="v3-sub">This cut is for {seasonNote.cur} only. Greta’s quarter plan puts {v3Gbp(seasonNote.spend)} of ads into {seasonNote.peak}, when new customers cost far less to win, so don’t carry the cut into it.{monthLine}{' '}
@@ -18027,7 +18045,12 @@ function V3Stock() {
     a.download = 'order-' + todayIso + '.csv'; document.body.appendChild(a); a.click(); a.remove();
   };
 
-  const verdict = order.length ? 'Order ' + (order.length === 1 ? 'one product' : fmtCount(order.length) + ' products') + ' today.' : 'Nothing needs ordering today.';
+  // Today's first action counts the products that run out (45); this page counted those plus the peak's
+  // top-ups (62) and read as a different order (review, 8 Oct). Same split, said in the same order.
+  const pc = n => (n === 1 ? 'one product' : fmtCount(n) + ' products');
+  const verdict = !order.length ? 'Nothing needs ordering today.'
+    : nRun > 0 && nPeak > 0 ? 'Order ' + pc(nRun) + ' today, and ' + fmtCount(nPeak) + ' more for ' + pkName + '.'
+    : 'Order ' + pc(order.length) + ' today.';
   return (<div className="v3-page-stack">
     <section>
       <div className="v3-kick">What to order</div>
@@ -18035,7 +18058,7 @@ function V3Stock() {
       {order.length > 0 ? (<>
         <p className="v3-note v3-measure">{nRun > 0 ? <>{fmtCount(nRun)} will run out before new stock could arrive{outNow > 0 ? <> ({fmtCount(outNow)} already out)</> : null}{nPeak > 0 ? <>, and {fmtCount(nPeak)} more won’t last through {pkName}</> : null}. </> : <>{fmtCount(nPeak)} won’t last through {pkName}. </>}
           Stock takes {L.entered ? L.weeks + ' weeks' : lead + ' days'} to arrive after you order, so an order placed today arrives around <b>{v3Day(land)}</b>.{protect ? <> From then it protects about <b>{fmtMoney(protect)} a month</b> of profit.</> : null}
-          {' '}Ordering all of them costs {fmtMoney(cost)} at landed cost, meaning what each unit costs once it reaches you{unpriced > 0 ? <> ({fmtCount(unpriced)} without a cost yet)</> : null}.</p>
+          {' '}{nRun > 0 && nPeak > 0 ? <>With the peak’s extra units, ordering all {fmtCount(order.length)} costs </> : <>Ordering all of them costs </>}{fmtMoney(cost)} at landed cost, meaning what each unit costs once it reaches you{unpriced > 0 ? <> ({fmtCount(unpriced)} without a cost yet)</> : null}.</p>
         {lost > 0 && <p className="v3-note v3-measure">Until the order arrives, the products that run out sell nothing. At today’s pace that loses about {fmtMoney(lost)} of profit, whatever you order now. Only faster delivery saves it: <b>each week your supplier can cut is worth about {fmtMoney(sooner)}</b>{pkLate ? ', more in the peak' : ''}.</p>}
         {pkLate && <p className="v3-note v3-measure">{pkName} runs {v3Day(pk.start)} – {v3Day(pk.end, true)}. An order arriving on {v3Day(land)} is in time for its last {fmtCount(daysCaught)} {daysCaught === 1 ? 'day' : 'days'}. Those days sold {fmtMoney(catchNow)} last year, {fmtPctN(catchNow / pk.lySales)} of the peak’s sales. {v3IsoAdd(land, -7) <= pk.start ? 'A week sooner would catch all of it (' + fmtMoney(pk.lySales) + ').' : 'A week sooner would catch ' + fmtMoney(catchWeek) + ' (' + fmtPctN(catchWeek / pk.lySales) + ').'} So ask your supplier to send the peak’s products first.</p>}
         {pkAfter && anyPeak && <p className="v3-note v3-measure">{pkName} starts on {v3Day(pk.start)}, after the order arrives, so the quantities include what last year’s peak sold. To arrive in time, the order needs to go in by {v3Day(pk.orderBy)}.</p>}
