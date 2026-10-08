@@ -261,12 +261,12 @@
       <div class="progress-card-inner">
         <div class="progress-eyebrow">Welcome to Greta</div>
         <h1 class="progress-headline" id="welcome-headline">Let's get <span id="welcome-brand">your workspace</span> producing findings.</h1>
-        <p class="progress-sub" id="welcome-sub">Connect Shopify and your sales history starts loading straight away. Greta works through it overnight, so your first ranked actions are waiting the next morning — and a written brief follows every Monday.</p>
+        <p class="progress-sub" id="welcome-sub">Connect Shopify and your sales history starts loading straight away. Greta works through it overnight, so your first ranked actions are waiting the next morning.</p>
 
         <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width: 0%;"></div></div>
         <div class="progress-row">
           <span><b id="progress-count">0 of 1</b> required source connected</span>
-          <span id="progress-eta">First brief: <b>next Monday</b></span>
+          <span id="progress-eta">First ranked actions: <b>tomorrow morning</b></span>
         </div>
 
         <div class="next-step-cta" id="next-step-cta" hidden>
@@ -704,12 +704,10 @@
 
       // Update headline + sub
       document.getElementById('welcome-headline').innerHTML = `${currentBrand.name} is connected.`;
-      document.getElementById('welcome-sub').textContent = 'Greta reads your sales every night and ranks what is worth doing, in pounds. A written brief lands every Monday. Adding Meta and Google shows what your ads really earn; Klaviyo shows what email brings back.';
+      document.getElementById('welcome-sub').textContent = 'Greta reads your sales every night and ranks what is worth doing, in pounds. Adding Meta and Google shows what your ads really earn; Klaviyo shows what email brings back.';
     }
 
-    // Compute next brief day
-    const nextBrief = nextMonday();
-    document.getElementById('progress-eta').innerHTML = `First brief: <b>${nextBrief}</b>`;
+    // The first ranked actions follow the night's run; the Monday email is not promised until it can send.
   }
 
   function nextMonday() {
