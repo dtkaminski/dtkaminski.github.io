@@ -10637,7 +10637,7 @@ function V3ActionBoard(){
           return <span className="v3-board-total-lab">{bits.length ? bits.reduce((a, b, i) => a.concat(i === 0 ? [b] : [i === bits.length - 1 ? ', and ' : ', ', b]), []) : <>{v3Gbp(total)} a month across {liveRows.length} live actions</>}.</span>;
         })()}
         {unverRows.length > 0 && (
-          <span className="v3-board-unver">{v3Gbp(unverTotal)} more sits in {unverRows.length} action{unverRows.length === 1 ? '' : 's'} nothing has re-checked</span>
+          <span className="v3-board-unver">{v3Gbp(unverTotal)} more sits in {unverRows.length} action{unverRows.length === 1 ? '' : 's'} open over a month, listed below the rest</span>
         )}
       </div>
       <div className="v3-chips" role="tablist" aria-label="Filter actions by area">
@@ -10679,10 +10679,10 @@ function V3ActionBoard(){
             )}
             {startsUnver && (
               <li className="v3-rank-break">
-                <span className="v3-kick">Not re-checked</span>
-                <span className="v3-sub">Greta raised these more than 30 days ago, and nothing since has
-                  confirmed they still hold. They stay on the list with their £ figure, but outside the
-                  ranking until Greta can check them again.</span>
+                <span className="v3-kick">Open over a month</span>
+                <span className="v3-sub">Greta raised these more than 30 days ago. Their figures are still
+                  up to date, but Greta has no nightly test to tell when one is fixed, so they sit below the
+                  ranked list. Mark each one done, or skip it, once you have decided.</span>
               </li>
             )}
             <li className={'v3-rank-row' + (isOpen ? ' open' : '') + (unver ? ' unver' : '')}>
@@ -10698,7 +10698,7 @@ function V3ActionBoard(){
                   <span className="v3-rank-meta">
                     {r.category || 'general'}{r.days_open > 0 ? ' · open ' + r.days_open + (Number(r.days_open) === 1 ? ' day' : ' days') : ''}
                     {conf ? ' · ' + V3_CONF[conf].label.toLowerCase() : ''}
-                    {unver ? ' · not re-checked' : r.days_since_refresh != null ? (Number(r.days_since_refresh) <= 0 ? ' · checked today' : ' · checked ' + r.days_since_refresh + (Number(r.days_since_refresh) === 1 ? ' day ago' : ' days ago')) : ''}
+                    {unver ? ' · open over a month' : r.days_since_refresh != null ? (Number(r.days_since_refresh) <= 0 ? ' · checked today' : ' · checked ' + r.days_since_refresh + (Number(r.days_since_refresh) === 1 ? ' day ago' : ' days ago')) : ''}
                   </span>
                 </span>
                 <span className="v3-rank-gbp">{v3Gbp(gbp)}<span className="v3-rank-per">{v3Per(r, true)}</span></span>
@@ -10716,9 +10716,11 @@ function V3ActionBoard(){
               </div>
               {isOpen && (
                 <div className="v3-rank-why">
-                  {/* Server-written, so the age in this sentence cannot drift from the age in
-                      the row. vw_brand_action_board.unverified_reason. */}
-                  {r.unverified_reason && <p className="v3-rank-unver">{r.unverified_reason}</p>}
+                  {/* The server marks the row (vw_brand_action_board.unverified_reason is set exactly when it is
+                      open over 30 days with no nightly test); the words are said here, from the same
+                      days_open, because the server's said "nothing has re-checked it" of a row whose
+                      figures are re-measured every night. */}
+                  {r.unverified_reason && <p className="v3-rank-unver">Open {fmtCount(r.days_open)} days. Its figures are still up to date, but Greta has no nightly test to tell when it is fixed, so it sits below the ranked list.</p>}
                   {play.length
                     ? <ol className="v3-rank-steps">{play.map((s, j) => <li key={j}>{v3Tidy(s)}</li>)}</ol>
                     : <p className="v3-rank-nosteps">{v3Tidy(r.step1) || 'Greta has no further detail on this one yet.'}</p>}
@@ -10761,7 +10763,7 @@ function V3ActionBoard(){
           );
         })}
       </ol>
-      {V3_BOARD.ranked && <p className="micro muted v3-measure">Each row says when Greta last checked the evidence behind it. A row that goes three weeks without a check leaves the ranking, so what is ranked here still holds.</p>}
+      {V3_BOARD.ranked && <p className="micro muted v3-measure">Each row says when Greta last checked its figures. An action whose figures go three weeks without a check drops off this list, so every figure here is current. Actions open over a month that Greta has no nightly test for sit below the ranked list.</p>}
       <V3HeldActions/>
       <V3Findings/>
     </div>
