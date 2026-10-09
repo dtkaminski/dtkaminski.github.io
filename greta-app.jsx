@@ -21226,7 +21226,7 @@ function v3ModelStock(order, lead, land, sooner) {
       ['Profit lost a day, once out', perDayA, perDayB, v => fmtMoney(v), null],
       ['Profit lost before the order lands', A, B, v => fmtMoney(v), null],
     ],
-    note: 'From the order list on this page: each product’s profit a day at today’s pace, times the days it has nothing to sell before an order placed today could arrive. Greta keeps stock as it is today; from 10 October it also keeps a copy each night, so in a few weeks this can say which products ran out, which were restocked and which are still out.',
+    note: 'From the order list on this page: each product’s profit a day at today’s pace, times the days it has nothing to sell before an order placed today could arrive. Shopify keeps only today’s stock; since 9 October Greta also keeps a copy each night (0315), so in a few weeks this can say which products ran out, which were restocked and which are still out.',
   };
 }
 function V3StockDrivers({ order, lead, land, sooner }) {
