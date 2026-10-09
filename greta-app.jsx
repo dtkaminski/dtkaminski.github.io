@@ -9124,6 +9124,17 @@ function v3WhyPrompt(d) {
     metacpa: 'Why does a sale on Meta cost ' + v + '?', googcpa: 'Why does a sale on Google cost ' + v + '?', ly: 'What is driving sales against last year?' };
   return T[d.key] || 'What is driving ' + String(d.figure).toLowerCase() + '?';
 }
+const V3_WHY_MATCH = [
+  ['metacpa', /\b(meta|facebook|instagram)\b.{0,40}\b(cost|sale|cpa)/i], ['googcpa', /\bgoogle\b.{0,40}\b(cost|sale|cpa)/i],
+  ['cac', /cost (to win|of|per) (a |each )?new customer|new customers? (cost|costs)|\bcac\b/i],
+  ['newsales', /new customers?.{0,15}\b(sales|spend|spent|buy|bought)\b/i], ['retsales', /returning customers?/i],
+  ['newc', /\bnew customers?\b/i], ['ret', /£1 of ads|per £ of ads|\broas\b|return on (ad|ads)/i],
+  ['spend', /\bad spend\b|\bspend\b.{0,10}\b(go|went)\b/i], ['repeat', /order again|repeat|come back/i],
+  ['conv', /\bvisits?\b|conversion|convert/i], ['ly', /last year/i], ['profit', /losing|after all costs|\bprofit\b|making money/i],
+];
+const v3WhyFor = (question, drivers) => { const q = String(question || '');
+  for (const [k, re] of V3_WHY_MATCH) { if (re.test(q)) { const d = (drivers || []).find(x => x.key === k); if (d) return d; } }
+  return null; };
 const V3_ASK_WHY = /\b(why|reason\w*|caus\w*|driv\w*|what (has )?changed|what happened|fell|fallen|drop\w*|rose|risen|worse|better|so (high|low)|go(ne)? (up|down))\b/i;
 function buildAskContext(facts, question, budget){
   const BUDGET = budget > 0 ? Math.min(budget, V3_ASK_BUDGET) : V3_ASK_BUDGET;
@@ -9181,6 +9192,8 @@ function buildAskContext(facts, question, budget){
     dataQuality: { latestDate: _latestDate, today: _today, partialLatestDay: _partialLatestDay,
       note: 'If partialLatestDay is true the latest date is an incomplete day: never read its dip as a decline. Under ~60 orders in a window, treat conversion and order-value swings as possible noise.' },
     facts: facts || null,
+    why_this_question: (() => { const d = askWhy ? v3WhyFor(question, drivers) : null; return d ? { figure: d.figure, now: d.now, then: d.then, against: d.against,
+      parts_biggest_first: String(d.parts || '').split('; ').filter(Boolean), what_to_do_from_the_board: String(d.board || '').split('; ').filter(Boolean) } : null; })(),
     readout: v3AskReadout((typeof window !== 'undefined' && window.GRETA_READOUT) || null, topics, basisFor),
     site_last_30_days: topics.site ? site : null,
     data_dictionary: dictionary,
@@ -9313,7 +9326,7 @@ function AskPanel(){
 
 Follow _meta.readout.rules. Quote headline figures exactly, with their window. Say how far the owner can lean on a figure in plain words (measured, likely, probably, possibly, an outside chance), as part of the sentence: never the word rung, never in brackets after a figure. Never recommend an action in readout.held. Never compare or total across days readout.coverage or readout.tracking marks unusable; missing days are not zero.
 
-WHY questions (why did a figure move, what is driving it): if data.drivers has the figure, answer from it. Say now against then and since when, then each part in the order given with its amount exactly as written, then the board rows it lists as what to do. Do not add causes that are not in it. If the figure is not in data.drivers, say it is not one that is going the wrong way, and answer from the other figures.
+WHY questions (why did a figure move, what is driving it): when _meta.why_this_question is present, it IS the answer and comes before facts and readout. Open with the figure now against then and since when (one sentence). Then each item of parts_biggest_first, in that order, one line each, with its amount exactly as written (these are the parts the change splits into and they add up to it). Then "What to do:" and the items of what_to_do_from_the_board, as written. Do not explain the figure as a division, and do not add causes that are not in it. Otherwise, if data.drivers has the figure, answer from its row the same way. If neither has it, say it is not a figure that is going the wrong way, and answer from the other figures.
 WHAT TO DO questions: answer from readout.board in its order, with each item's pounds (a month, or once when the action says so) and its rung. Do not re-rank. One idea of your own is allowed only if labelled "my suggestion, not on your board", and never one from readout.held (9 Oct: a held Judge.me fix came back as "my suggestion"). For spending more, check facts.quarter_plan_at_todays_ad_spend and facts.next_peak first. If facts.goal.needs_replanning is true, say so before quoting the goal.
 
 WHY questions: before naming a cause, check the confounders: a promotion or code, a spend change, a stockout, an email send, a tracking change, seasonality, or a partial latest day (_meta.dataQuality). Check each against facts.recent_context first: if sale_weeks_in_last_13 is above 0, promotions are part of the story, not ruled out; if of_them_out_of_stock_now or products_out_of_stock_now is above 0, stock-outs are too. A planned-events list being empty does not rule out what already happened. Locate the move: demand (spend, visits) → conversion → order value and discounts → new vs returning → product and stock. Separate what the data shows from what you infer, and give your confidence. For why profit after ads moved against a typical month, lead with facts.typical_month.what_moved_profit_after_ads: its main_cause, its pounds from sales and from ad spend, and its sales and ad spend comparisons exactly as written; do not work out percentages of your own.
