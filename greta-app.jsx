@@ -10911,6 +10911,22 @@ function V3BoardDigest({ n = 5 }){
   </div>);
 }
 
+// Actions (9 Oct): which figure each board row moves, the drivers panels' "What to do" read backwards.
+// An id ending in "-" matches every row that starts with it. The first figure is the one the row is for.
+const V3_MOVES = [
+  ['driver-meta-ads', ['metacpa', 'cac', 'newc']], ['driver-retargeting', ['cac', 'spend']],
+  ['order-cost-meta', ['ret', 'cac', 'spend']], ['order-cost-google', ['googcpa', 'ret', 'spend']],
+  ['sales-rhythm', ['profit', 'ret', 'conv']], ['promo-peak-plan', ['profit', 'ly']], ['stock-reorder', ['prodsales', 'profit']],
+  ['cust-winback-atrisk', ['retsales', 'repeat']], ['crm-flows', ['repeat', 'retsales']], ['discount-dependency', ['repeat']],
+  ['basket-pair', ['aov']], ['basket-free-shipping', ['aov']], ['paid-landing-meta', ['metacpa', 'conv']], ['paid-landing-google', ['googcpa', 'conv']],
+  ['paid-brand-share-google', ['brandshare']], ['test-holdout-', ['cac']], ['product-hero_underexposed-', ['prodsales']],
+  ['product-margin_drain-', ['profit']], ['discount-', ['profit']], ['tracking-coverage', ['conv']],
+];
+const V3_MOVE_LABEL = { cac: 'cost to win a new customer', ret: 'sales from each £1 of ads', profit: 'profit after all costs', ly: 'sales against last year',
+  repeat: 'customers who order again', conv: 'orders per 100 visits', newc: 'new customers', retsales: 'returning customers’ sales', spend: 'ad spend',
+  metacpa: 'Meta’s cost per sale', googcpa: 'Google’s cost per sale', newsales: 'new customers’ sales', prodsales: 'product sales', aov: 'the average order',
+  brandshare: 'searches for your name' };
+const v3Moves = id => { const k = String(id || ''); const m = V3_MOVES.find(([p]) => (p.endsWith('-') ? k.startsWith(p) : k === p)); return m ? m[1] : []; };
 function V3ActionBoard(){
   const { rows, err } = useV3Board();
   const [cat, setCat] = React.useState('all');
@@ -11034,6 +11050,7 @@ function V3ActionBoard(){
                     {r.category || 'general'}{r.days_open > 0 ? ' · open ' + r.days_open + (Number(r.days_open) === 1 ? ' day' : ' days') : ''}
                     {conf ? ' · ' + V3_CONF[conf].label.toLowerCase() : ''}
                     {unver ? ' · open over a month' : r.days_since_refresh != null ? (Number(r.days_since_refresh) <= 0 ? ' · checked today' : ' · checked ' + r.days_since_refresh + (Number(r.days_since_refresh) === 1 ? ' day ago' : ' days ago')) : ''}
+                    {v3Moves(r.external_id).length ? <span className="v3-rank-moves"> · moves {V3_MOVE_LABEL[v3Moves(r.external_id)[0]]}</span> : null}
                   </span>
                 </span>
                 <span className="v3-rank-gbp">{v3Gbp(gbp)}<span className="v3-rank-per">{v3Per(r, true)}</span></span>
@@ -21636,6 +21653,36 @@ function V3ProductStrip({ d }) {
     {open && <V3DriverPanel fixed={M}/>}
   </section>);
 }
+// What the board is working on (Actions, 9 Oct): every sign going the wrong way that a board row moves,
+// with those rows by rank; the sign opens its drivers panel. Signs going the right way, or that no row
+// moves, are left out, so the list stays short.
+function V3BoardDrivers() {
+  const q = useV3Rows('brand-state', V3_STATE_Q);
+  const hq = useV3Rows('sign-history', V3_SIGN_HIST_Q);
+  const board = useV3Board();
+  const [drv, setDrv] = React.useState(null);
+  if (q.err || hq.err || !q.rows || !hq.rows || !board.rows) return null;
+  const S = q.rows[0]; if (!S || !S.last_30) return null;
+  const SG = v3BuildSigns(S, hq.rows[0] && hq.rows[0].history);
+  const live = v3LiveRows(board.rows);
+  const all = SG.signs.concat(SG.profitSign ? [SG.profitSign] : []);
+  const items = all.filter(sg => sg.which && (sg.tone === 'weak' || sg.tone === 'ok')).map(sg => ({ sg,
+    rows: live.map((r, i) => ({ r, n: i + 1 })).filter(x => v3Moves(x.r.external_id).indexOf(sg.which) >= 0).slice(0, 3) }))
+    .filter(x => x.rows.length).sort((a, b) => a.rows[0].n - b.rows[0].n).slice(0, 5);
+  if (!items.length) return null;
+  const open = drv ? items.find(x => x.sg.which === drv) : null;
+  return (<section className="v3-sec v3-strip">
+    <h2 className="v3-sec-title">What the board is working on <span className="v3-muted">last 30 days</span></h2>
+    <ul className="v3-bdrv">{items.map(({ sg, rows }) => (<li key={sg.which}>
+      <button type="button" className="v3-bdrv-sign" aria-expanded={drv === sg.which} onClick={() => setDrv(o => (o === sg.which ? null : sg.which))}>
+        <span className="v3-bdrv-k">{sg.k}</span><span className="v3-bdrv-v">{sg.v}</span>
+        <span className={'v3-sign-s v3-sign-' + sg.tone}>{V3_SIG_WORD[sg.tone]}</span>
+        <span className="v3-xref-go">{drv === sg.which ? 'Hide why ↑' : 'Why ↓'}</span></button>
+      <span className="v3-bdrv-acts">{rows.map(({ r, n }) => <span key={r.external_id}><b className="oi-num">#{n}</b> {v3PlainAction(r).title}</span>)}</span>
+    </li>))}</ul>
+    {open && <V3DriverPanel key={drv} which={drv} points={SG.HP} ctx={open.sg.ctx} line={open.sg.dline}/>}
+  </section>);
+}
 // The same signs and drivers on the page where each figure is the subject (9 Oct): one row of signs,
 // each with its arrow, its 13 weeks on hover and "What is driving this?", and the panel under them.
 function V3DriverStrip({ keys, title, opts }) {
@@ -22485,6 +22532,7 @@ const V3_PAGES = {
   actions: (p) => (<>
     <V3FixFirst/>
     <ActionsView/>
+    <V3BoardDrivers/>
     <V3More id="act-decisions" label="What you did, and whether it worked"><V3Anchor id="decisions"/><V3TrackRecord/></V3More>
     <V3StaleSuggestions/>
   </>),
