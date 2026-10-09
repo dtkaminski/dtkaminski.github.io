@@ -8806,6 +8806,17 @@ async function v3AskFacts(question) {
         in_stock: Number(r.on_hand) || 0,
         weeks_left: r.projected_days_to_stockout != null ? Math.round(Number(r.projected_days_to_stockout) / 7 * 10) / 10 : null,
         runs_out_before_a_restock_lands: !!r.runs_out_before_restock }));
+    // ...and whether it runs short in the coming peak: "lasts 10 weeks, no action" missed that the mega
+    // necklace gold sold 137 in last year's peak against 75 in stock (9 Oct). The board's peak plan
+    // states it as "<product>: N in stock, M sold last year".
+    const RD = (typeof window !== 'undefined' && window.GRETA_READOUT) || null;
+    const peakRow = RD && Array.isArray(RD.board) ? RD.board.find(x => /sold last year/i.test(String(x.action || ''))) : null;
+    if (peakRow) {
+      const PK = {}; const re = /([^;(),]+?):\s*([\d,]+) in stock,\s*([\d,]+) sold last year/gi; let m;
+      while ((m = re.exec(String(peakRow.action)))) PK[m[1].trim().replace(/^the\s+/i, '').toLowerCase()] = { stock: Number(m[2].replace(/,/g, '')), sold: Number(m[3].replace(/,/g, '')) };
+      f.best_sellers_stock.forEach(x => { const k = String(x.product).replace(/^the\s+/i, '').toLowerCase(); const p = PK[k];
+        if (p) Object.assign(x, { sold_in_last_years_peak: p.sold, runs_short_in_the_peak: p.sold > x.in_stock }); });
+    }
   }
   f.calendar = { past_sales_not_on_the_calendar: missing.length,
     note: missing.length ? 'Greta found sales that are not on the calendar, so what she has learned about promotions rests on too few events. They can be added from the Calendar.' : null };
@@ -9266,7 +9277,7 @@ WHAT TO DO questions: answer from readout.board in its order, with each item's p
 WHY questions: before naming a cause, check the confounders: a promotion or code, a spend change, a stockout, an email send, a tracking change, seasonality, or a partial latest day (_meta.dataQuality). Check each against facts.recent_context first: if sale_weeks_in_last_13 is above 0, promotions are part of the story, not ruled out; if of_them_out_of_stock_now or products_out_of_stock_now is above 0, stock-outs are too. A planned-events list being empty does not rule out what already happened. Locate the move: demand (spend, visits) → conversion → order value and discounts → new vs returning → product and stock. Separate what the data shows from what you infer, and give your confidence. For why profit after ads moved against a typical month, lead with facts.typical_month.what_moved_profit_after_ads: its main_cause, its pounds from sales and from ad spend, and its sales and ad spend comparisons exactly as written; do not work out percentages of your own.
 COUNTS AND NAMES: how many products are out of stock or need ordering comes from facts.recent_context (the board's #1 order list), never from counting table rows. Call a product out of stock only if out_of_stock_now_examples or a stock table marks it so; never give an example the data does not name. A board action is what its text says: do not attach creatives, audiences or campaigns to it unless its text names them.
 
-STOCK questions: when the owner says "our best seller", first name it from facts.best_sellers_stock (the fastest seller) and say how many weeks it lasts and whether it runs out before a restock lands; if it does not, say that first, then which products do. Use data.stock_named and data.stock_at_risk (Greta's stock plan) for how many to order (order_units), what being out costs (lost_before_lands, profit) and what an order costs (order_units × unit_cost). An order placed today lands on facts.next_peak.order_placed_today_lands. If facts.next_peak.lands_before_peak_starts is false, never say ordering now gets stock in for the peak: say when it lands, that only what suppliers can send sooner reaches the peak, and to ask for that first. Board pounds are what pounds_are says, a month or once (per); never call them a cost or spend unless pounds_are says so. When the board already has an action for what is asked, give its instruction as the board words it ("bring Meta back toward £X a week"), not a stronger one of your own such as pausing a channel.
+STOCK questions: when the owner says "our best seller", first name it from facts.best_sellers_stock (the fastest seller) and say how many weeks it lasts and whether it runs out before a restock lands; if it does not, say that first, then which products do. If it lasts at today's pace but runs_short_in_the_peak, say so plainly: it sold more in last year's peak than you hold, an order placed today lands after the peak starts, so ask the supplier to send it first and keep it out of ads once it runs low. Use data.stock_named and data.stock_at_risk (Greta's stock plan) for how many to order (order_units), what being out costs (lost_before_lands, profit) and what an order costs (order_units × unit_cost). An order placed today lands on facts.next_peak.order_placed_today_lands. If facts.next_peak.lands_before_peak_starts is false, never say ordering now gets stock in for the peak: say when it lands, that only what suppliers can send sooner reaches the peak, and to ask for that first. Board pounds are what pounds_are says, a month or once (per); never call them a cost or spend unless pounds_are says so. When the board already has an action for what is asked, give its instruction as the board words it ("bring Meta back toward £X a week"), not a stronger one of your own such as pausing a channel.
 
 CHECK THE PREMISE FIRST: when the question states something about the business ("ROAS looks great", "conversion dropped 30%", "about to stock out"), check it against the figures before anything else. For ads, the first sentence is facts.last_30_days.return_verdict as written; for the site, site_last_30_days.verdict as written. Never call a return good, solid, healthy or decent when return_verdict says thin. If the figures do not show what the owner said, say so in the first sentence, then say what the owner is most likely seeing instead, such as a tracking break in readout.tracking or a platform's own count.
 
@@ -9330,7 +9341,11 @@ ${dataStr}`;
       if (!resp.ok) { let m = ''; try { m = (await resp.json()).message || ''; } catch(_){} throw new Error(m || ASK_FAIL); }
       const data = await resp.json();
       if (data.error) throw new Error(data.message || ASK_FAIL);
-      setHistory(h=>[...h, {role:'assistant', content:v3AskCheck(v3AskScrub(data.text || '(no response)', facts), systemPrompt + JSON.stringify(apiMessages)), checked:true, time:Date.now(), usage:data.usage||{}}]);
+      // Thorough falls back to the quicker model when the main one is busy (9 Oct, after a day of tests):
+      // the owner is told, so a thinner answer is not mistaken for Greta's best.
+      const quickNote = depth === 'thorough' && /20b|mini|8b|scout|haiku/i.test(String(data.model || ''))
+        ? '\n\n*Answered by Greta’s quicker model because the main one was busy. Ask again in a few minutes for a fuller answer.*' : '';
+      setHistory(h=>[...h, {role:'assistant', content:v3AskCheck(v3AskScrub(data.text || '(no response)', facts), systemPrompt + JSON.stringify(apiMessages)) + quickNote, checked:true, time:Date.now(), usage:data.usage||{}}]);
     } catch (e) {
       setError(e.message || String(e));
       setHistory(h=>h.slice(0,-1)); // drop the user message on failure
