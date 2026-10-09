@@ -21357,14 +21357,15 @@ function v3ModelShare(name, kind, A, B, info) {
       cause: <>the campaign’s budget ran out in {v3UpDown(A.budget, B.budget, 'more', 'fewer')} auctions ({fmtPctN(A.budget)} to {fmtPctN(B.budget)})</>,
       against: <>{v3UpDown(A.budget, B.budget, 'More', 'Less')} lost to budget ({fmtPctN(A.budget)} to {fmtPctN(B.budget)})</> },
   ];
-  if (Math.abs(other) >= 0.002) parts.push({ amt: other, k: 'Not split by Google', sub: 'days Google reports only in part', cause: <>Google does not split the rest</>, against: <>What Google does not split</> });
+  if (Math.abs(other) >= 0.002) parts.push({ amt: other, k: 'Not split by Google', sub: 'days Google reports only in part', cause: <>Google does not split the rest</>, against: <>Days Google reports only in part</> });
+  const shown = parts.filter(p => Math.abs(p.amt) >= 0.0005);
   return {
     title: brand ? 'Why you show on ' + fmtPctN(B.is) + ' of the searches for your name' : 'Why “' + name + '” shows in ' + fmtPctN(B.is) + ' of its auctions',
     from: A.is, to: B.is, better: 'higher', fmtV: v => fmtPctN(v), fmtAmt: v3PtsAmt,
     startK: 'Shown in, 30 days before', endK: 'Shown in, last 30 days', subA: v3Day(info.a0) + ' – ' + v3Day(info.a1, true), subB: v3Day(info.b0) + ' – ' + v3Day(info.b1, true),
     colA: 'The 30 days before', colB: 'The last 30 days', bridgeCap: brand ? 'Searches for your name your ad showed on' : 'Auctions the campaign showed in',
-    todo: brand ? [{ amt: pR, ids: ['paid-brand-share-google'] }, { amt: pB, ids: ['paid-brand-share-google'] }] : [{ amt: pR, ids: ['order-cost-google'] }, { amt: pB, ids: ['order-cost-google'] }],
-    parts,
+    todo: brand ? (B.is < 0.95 ? [{ amt: -1, force: true, always: true, ids: ['paid-brand-share-google'] }] : []) : [{ amt: pR, ids: ['order-cost-google'] }, { amt: pB, ids: ['order-cost-google'] }],
+    parts: shown,
     opening: brand
       ? <>Your “{name}” campaign showed on {fmtPctN(B.is)} of the searches for your name in the last 30 days, against {fmtPctN(A.is)} in the 30 before. The rest went to someone else’s ad, or to none. The figures below are points of those searches.</>
       : <>“{name}” showed in {fmtPctN(B.is)} of the auctions it could enter in the last 30 days, against {fmtPctN(A.is)} in the 30 before. The figures below are points of those auctions.</>,
@@ -22215,7 +22216,7 @@ function V3DriverPanel({ which, points, ctx, line, fixed }) {
   const todo = [];
   // a figure that barely moved and sits on the right side of its line needs nothing doing
   const fine = flat && (line == null || (M.better === 'higher' ? M.to >= line : M.to <= line));
-  (fine ? [] : (M.todo || [])).filter(t => t.force || bad(t)).sort((x, y) => Math.abs(y.amt) - Math.abs(x.amt)).forEach(t => {
+  (fine ? (M.todo || []).filter(t => t.always) : (M.todo || [])).filter(t => t.force || bad(t)).sort((x, y) => Math.abs(y.amt) - Math.abs(x.amt)).forEach(t => {
     if (todo.length >= 2) return;
     for (const id of t.ids) { const i = live.findIndex(r => (id.endsWith('-') ? String(r.external_id).startsWith(id) : r.external_id === id));
       if (i >= 0) { if (!todo.some(x => x.row === live[i])) todo.push({ row: live[i], rank: i + 1 }); break; } }
