@@ -21123,7 +21123,9 @@ function V3BusinessState({ part }) {
     ? { label: drv === sg.which ? 'Hide what is driving it' : 'What is driving this?', open: drv === sg.which, on: () => setDrv(o => (o === sg.which ? null : sg.which)) } : null; });
   // the headline loss: the same panel, with the margin and running costs the headline uses
   const mKept = num(L.sales) > 0 && L.profit_after_ads != null && L.ads != null ? (num(L.profit_after_ads) + num(L.ads)) / num(L.sales) : null;
-  const profitCfg = mKept != null ? { which: 'profit', ctx: { m: mKept, o: ao != null ? num(L.overheads) : 0, weeks: H && Array.isArray(H.weeks) ? H.weeks : [] }, dline: 0 } : null;
+  const lastP = HP && HP.length ? HP[HP.length - 1] : null;
+  const anchor = lastP && Number(lastP.sales) === num(L.sales) ? { d: String(lastP.d), v: ao != null ? ao : num(L.profit_after_ads) } : null;
+  const profitCfg = mKept != null ? { which: 'profit', ctx: { m: mKept, o: ao != null ? num(L.overheads) : 0, anchor, weeks: H && Array.isArray(H.weeks) ? H.weeks : [] }, dline: 0 } : null;
   const profitAct = profitCfg && v3HasDrivers('profit', HP)
     ? { label: drv === 'profit' ? 'Hide what is driving it' : 'What is driving this?', open: drv === 'profit', on: () => setDrv(o => (o === 'profit' ? null : 'profit')) } : null;
   const openSign = drv === 'profit' ? profitCfg : drv ? signs.find(sg => sg.which === drv) : null;
@@ -21399,7 +21401,9 @@ const v3SignedGbp = v => (v < 0 ? '−' : '') + fmtMoney(Math.abs(v));
 function v3ModelProfit(a, b, ctx) {
   const m = ctx.m, O = ctx.o || 0;
   const f = p => { const s = Number(p.sales), o = Number(p.orders), ad = Number(p.ads);
-    return { s, o, ad, aov: s / o, kept: s * m, ms: Number(p.meta_spend), gs: Number(p.google_spend), n: Number(p.new_customers), v: s * m - ad - O }; };
+    // the latest week is the headline's own figure, so the panel and the verdict above it agree to the pound
+    const v = ctx.anchor && String(p.d) === ctx.anchor.d ? ctx.anchor.v : s * m - ad - O;
+    return { s, o, ad, aov: s / o, kept: s * m, ms: Number(p.meta_spend), gs: Number(p.google_spend), n: Number(p.new_customers), v }; };
   const A = f(a), B = f(b);
   const [sO, sA] = v3LogParts(A.s, B.s, [{ a: A.o, b: B.o, sign: 1 }, { a: A.aov, b: B.aov, sign: 1 }]);
   const dMeta = B.ms - A.ms, dAds = B.ad - A.ad;
@@ -21443,7 +21447,7 @@ function v3ModelProfit(a, b, ctx) {
 }
 const V3_DRIVER_MODELS = {
   profit: { model: v3ModelProfit,   mode: 'pair',   key: 'profit',     fmt: v3SignedGbp,
-            prep: (P, ctx) => P.map(p => Object.assign({}, p, { profit: Number(p.sales) * ctx.m - Number(p.ads) - (ctx.o || 0) })),
+            prep: (P, ctx) => P.map(p => Object.assign({}, p, { profit: ctx.anchor && String(p.d) === ctx.anchor.d ? ctx.anchor.v : Number(p.sales) * ctx.m - Number(p.ads) - (ctx.o || 0) })),
             ok: p => Number(p.sales) > 0 && Number(p.orders) > 0 && p.ads != null && p.meta_spend != null },
   cac:    { model: v3ModelCac,      mode: 'pair',   key: 'cac',        fmt: v => fmtMoney(v),
             ok: p => p.cac != null && p.new_customers > 0 && (Number(p.meta_clicks) + Number(p.google_clicks)) > 0 && p.cac_spend != null },
@@ -21477,7 +21481,10 @@ function V3DriverPanel({ which, points, ctx, line }) {
                tone: endGood == null ? 'keep' : endGood ? 'keep' : 'loss', v: M.fmtV(M.to), total: true });
   const all = steps.flatMap(s => [s.lo, s.hi]).concat(line != null ? [line] : []);
   const lo = Math.min(0, ...all), hi = Math.max(...all) * 1.04, span = (hi - lo) || 1, x = v => ((v - lo) / span) * 100;
-  const ch = (p, q, better) => { if (p == null || q == null || !isFinite(p) || !isFinite(q) || p === 0) return null;
+  const ch = (p, q, better, fm) => { if (p == null || q == null || !isFinite(p) || !isFinite(q)) return null;
+    if (q === p) return { t: 'Same', cls: 'v3-muted' };
+    // a figure that is or turns negative (a loss) changes in its own units: a deeper loss is not +72%
+    if (p <= 0 || q < 0) { const dd = q - p; return { t: (dd >= 0 ? '+' : '−') + String(fm(Math.abs(dd))).replace(/^[−-]/, ''), cls: !better ? 'v3-muted' : (dd > 0) === (better === 'higher') ? 'v3-up' : 'v3-down' }; }
     const r = q / p - 1; return { t: (r >= 0 ? '+' : '−') + fmtPctN(Math.abs(r)), cls: Math.abs(r) < 0.03 || !better ? 'v3-muted' : (r > 0) === (better === 'higher') ? 'v3-up' : 'v3-down' }; };
   const rows = M.rows.filter(r => r[1] != null && r[2] != null && isFinite(r[1]) && isFinite(r[2]));
   const flat = Math.abs(d) <= Math.abs(M.from) * 0.01;
@@ -21520,7 +21527,7 @@ function V3DriverPanel({ which, points, ctx, line }) {
     <h4 className="v3-drivers-h">What changed underneath</h4>
     <table className="v3-rw">
       <thead><tr><th className="t-text">Measure</th><th>{M.colA || '30 days to ' + v3Day(String(a.d), true)}</th><th>{M.colB || '30 days to ' + v3Day(String(b.d), true)}</th><th>Change</th></tr></thead>
-      <tbody>{rows.map(([lab, p, q, fm, better]) => { const c = ch(p, q, better); return (<tr key={lab}>
+      <tbody>{rows.map(([lab, p, q, fm, better]) => { const c = ch(p, q, better, fm); return (<tr key={lab}>
         <td className="t-text">{lab}</td><td>{fm(p)}</td><td>{fm(q)}</td><td className={c ? c.cls : ''}>{c ? c.t : ''}</td></tr>); })}</tbody>
     </table>
     {M.extra || null}
