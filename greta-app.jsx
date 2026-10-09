@@ -22038,7 +22038,8 @@ function V3DriverPanel({ which, points, ctx, line, fixed }) {
                  v: (p.amt >= 0 ? '+' : '−') + M.fmtAmt(p.amt), cls: M.neutral ? '' : good ? 'v3-up' : 'v3-down' }); run = nx; });
   const endGood = line == null ? null : (M.better === 'higher' ? M.to >= line : M.to <= line);
   steps.push({ k: M.endK, sub: M.subB || (single ? M.colB : '30 days to ' + v3Day(String(b.d), true)), lo: Math.min(0, M.to), hi: Math.max(0, M.to),
-               tone: M.endTone || (endGood == null ? 'keep' : endGood ? 'keep' : 'loss'), v: M.fmtV(M.to), total: true });
+               // a figure below zero that should be above it is a loss, line or no line
+               tone: M.endTone || (endGood == null ? (M.to < 0 && M.better === 'higher' ? 'loss' : 'keep') : endGood ? 'keep' : 'loss'), v: M.fmtV(M.to), total: true });
   const all = steps.flatMap(s => [s.lo, s.hi]).concat(line != null ? [line] : []);
   const lo = Math.min(0, ...all), hi = Math.max(...all) * 1.04, span = (hi - lo) || 1, x = v => ((v - lo) / span) * 100;
   const ch = (p, q, better, fm) => { if (p == null || q == null || !isFinite(p) || !isFinite(q)) return null;
@@ -22075,7 +22076,7 @@ function V3DriverPanel({ which, points, ctx, line, fixed }) {
         <figcaption className="v3-bridge-cap">{M.bridgeCap || (single ? 'From last year to this' : 'From then to now')}</figcaption>
         {steps.map((r, i) => (<div key={i} className={'v3-bridge-row' + (r.total ? ' v3-bridge-total' : '')}>
           <span className="v3-bridge-k">{r.k}{r.sub ? <small>{r.sub}</small> : null}</span>
-          <span className="v3-bridge-track"><i className={'v3-bridge-' + r.tone} style={{ left: x(r.lo) + '%', width: Math.max(0.6, x(r.hi) - x(r.lo)) + '%' }}/>
+          <span className="v3-bridge-track">{lo < 0 && line !== 0 ? <b style={{ left: x(0) + '%' }}/> : null}<i className={'v3-bridge-' + r.tone} style={{ left: x(r.lo) + '%', width: Math.max(0.6, x(r.hi) - x(r.lo)) + '%' }}/>
             {line != null ? <b className="v3-bridge-mark" style={{ left: x(line) + '%' }}/> : null}</span>
           <span className={'v3-bridge-v' + (r.cls && !r.total ? ' ' + r.cls : '')}>{r.v}</span>
         </div>))}
