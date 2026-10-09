@@ -296,6 +296,7 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-stand-why b { color: var(--color-ink); font-weight: var(--weight-semi); }
 .v3-stand-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-10); align-items: start; }
 @media (max-width: 900px) { .v3-stand-grid { grid-template-columns: minmax(0, 1fr); gap: var(--space-6); } }
+@media (max-width: 640px) { .v3-stand .v3-verdict { font-size: var(--text-xl); } .v3-stand-why { margin-bottom: var(--space-4); } }
 .v3-bridge { margin: 0; border-top: 1px solid var(--color-line); padding-top: var(--space-4); }
 .v3-bridge-cap { font-size: var(--text-xs); font-weight: var(--weight-semi); color: var(--color-muted); margin-bottom: var(--space-3); }
 .v3-bridge-row { display: grid; grid-template-columns: 10.5rem minmax(0, 1fr) 5.5rem; gap: var(--space-3); align-items: center;
