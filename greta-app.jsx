@@ -20936,9 +20936,13 @@ function V3Signals({ items }) {
 }
 // what ads cost out of each £1 of sales, in pence: "53p of every £1" reads faster than "53% of sales"
 const v3Pence = v => (v >= 1 ? fmtMoney(v, 2) : Math.round(v * 100) + 'p');
+// 0310: each sign's 30-day figure at 13 weekly points (cache_brand_sign_history, hourly). Before 0310
+// the read fails at once and the signs show as a snapshot, as they did.
+const V3_SIGN_HIST_Q = (sb, b) => sb.from('cache_brand_sign_history').select('history,refreshed_at').eq('brand_id', b).limit(1);
 function V3BusinessState({ part }) {
   const q = useV3Rows('brand-state', V3_STATE_Q);
   const codes = useV3Rows('brand-codes', V3_CODES_Q);
+  const hq = useV3Rows('sign-history', V3_SIGN_HIST_Q);
   if (q.err) return null;                                   // before 0269, or unreadable: Today carries on without it
   if (!q.rows) return part === 'detail' ? null : <V3SkeletonRows n={3}/>;
   const S = q.rows[0]; if (!S || !S.last_30) return null;
@@ -21083,25 +21087,31 @@ function V3BusinessState({ part }) {
       {facts}{terms}{chart}{bench}
     </V3More>);
   }
+  const HP = (hq.rows && hq.rows[0] && hq.rows[0].history && Array.isArray(hq.rows[0].history.points)) ? hq.rows[0].history.points : null;
+  const ser = k => HP ? HP.map(p => ({ d: String(p.d), v: p[k] == null ? null : Number(p[k]) })) : null;
   const signs = [];
   if (ret != null && A.break_even_return) {
     const be = num(A.break_even_return), top = Math.max(ret, be) * 1.25;
     signs.push({ k: 'Sales from each £1 of ads', v: fmtMoney(ret, 2), tone: ret < be ? 'weak' : ret < be * 1.3 ? 'ok' : 'good',
-      bar: { fill: ret / top, mark: be / top }, n: <>{fmtMoney(be, 2)} only covers the ads, products and delivery</> });
+      bar: { fill: ret / top, mark: be / top }, n: <>{fmtMoney(be, 2)} only covers the ads, products and delivery</>,
+      series: ser('return'), fmt: v => fmtMoney(v, 2), better: 'higher', ref: { v: be, label: 'Break-even ' + fmtMoney(be, 2) } });
   }
   if (U.cac != null && U.first_order_contribution != null) {
     const c30 = num(U.cac_30d), use = c30 > 0 ? c30 : num(U.cac), fo = num(U.first_order_contribution), top = Math.max(use, fo) * 1.25;
     signs.push({ k: 'Cost to win a new customer', v: fmtMoney(use), tone: use > fo ? 'weak' : 'good',
-      bar: { fill: use / top, mark: fo / top }, n: <>Their first order earns {fmtMoney(fo)}{use > fo ? ', so each one starts at a loss' : ''}</> });
+      bar: { fill: use / top, mark: fo / top }, n: <>Their first order earns {fmtMoney(fo)}{use > fo ? ', so each one starts at a loss' : ''}</>,
+      series: c30 > 0 ? ser('cac') : null, fmt: v => fmtMoney(v), better: 'lower', ref: { v: fo, label: 'First order earns ' + fmtMoney(fo) } });
   }
   if (yoySales != null && yoyAds != null)
     signs.push({ k: 'Sales against last year', v: (yoySales >= 0 ? '+' : '−') + fmtPctN(Math.abs(yoySales)),
       tone: yoySales < 0 ? 'weak' : yoyAds - 1 > 2 * yoySales && yoyAds > 1.2 ? 'ok' : 'good',
-      n: <>On {fmtTimes(yoyAds, 1)} last year’s ad spend</> });
+      n: <>On {fmtTimes(yoyAds, 1)} last year’s ad spend</>,
+      series: ser('vs_ly'), fmt: v => (v >= 0 ? '+' : '−') + fmtPctN(Math.abs(v)), better: 'higher', ref: { v: 0, label: 'Same as last year' } });
   if (R.repeat_90d != null)
     signs.push({ k: 'Customers who order again', v: fmtPctN(num(R.repeat_90d)), tone: v3SigBench(num(R.repeat_90d), BM.repeat_90d) || 'typical',
       bar: BM.repeat_90d ? { fill: Math.min(1, num(R.repeat_90d) / (num(BM.repeat_90d.high) * 1.25)), mark: num(BM.repeat_90d.typical) / (num(BM.repeat_90d.high) * 1.25) } : null,
-      n: <>Within 90 days{BM.repeat_90d ? <>; about {fmtPctN(BM.repeat_90d.typical)} is typical</> : null}</> });
+      n: <>Within 90 days{BM.repeat_90d ? <>; about {fmtPctN(BM.repeat_90d.typical)} is typical</> : null}</>,
+      series: ser('repeat_90d'), fmt: v => fmtPctN(v), better: 'higher', ref: BM.repeat_90d ? { v: num(BM.repeat_90d.typical), label: 'Typical ' + fmtPctN(BM.repeat_90d.typical) } : null });
   return (<section className="v3-stand">
     <div className="v3-kick">Where you stand · last 30 days</div>
     <p className="v3-verdict">{verdict}</p>
@@ -21110,16 +21120,52 @@ function V3BusinessState({ part }) {
       <V3MoneyBridge L={L} share={share}/>
       {signs.length > 0 && <div className="v3-signs">{signs.slice(0, 4).map(s => <V3Sign key={s.k} {...s}/>)}</div>}
     </div>
+    {/* How fresh these are, asked on 9 Oct: the figures are worked out again every hour from feeds that
+        arrive every 30 minutes (Shopify) and every 2 hours (ad accounts). */}
+    <p className="micro muted v3-stand-fresh">Each figure covers the 30 days to {HP ? v3Day(String(hq.rows[0].history.as_of), true) : 'yesterday'}, the last full day. Greta works them out again every hour; Shopify orders arrive every 30 minutes and ad spend every 2 hours.{HP ? ' Point at a sign to see its last 13 weeks.' : ''}</p>
   </section>);
 }
 // One sign: what it is, the figure, one word for how it stands, and where relevant a bar with a mark
 // for the line that matters (break-even, what a first order earns, a typical rate).
-function V3Sign({ k, v, tone, bar, n }) {
+// 9 Oct: each sign also says which way it is heading (against four weeks ago, on the same 30-day basis)
+// and, on hover, focus or tap, draws its last 13 weeks with the line that matters.
+function V3Sign({ k, v, tone, bar, n, series, fmt, better, ref }) {
   const pc = x => Math.max(0, Math.min(100, x * 100)) + '%';
-  return (<div className="v3-sign">
+  const [open, setOpen] = React.useState(false);
+  const pts = (series || []).filter(p => p.v != null);
+  const last = pts.length ? pts[pts.length - 1] : null, then = pts.length >= 5 ? pts[pts.length - 5] : null;
+  let trend = null;
+  if (last && then && fmt) {
+    const ch = last.v - then.v, rel = Math.abs(then.v) > 0.0001 ? Math.abs(ch) / Math.abs(then.v) : Math.abs(ch);
+    const dir = rel < 0.03 ? 'flat' : ch > 0 ? 'up' : 'down';
+    const good = dir === 'flat' ? null : (dir === 'up') === (better === 'higher');
+    trend = { dir, cls: dir === 'flat' ? 'flat' : good ? 'good' : 'bad', from: fmt(then.v) };
+  }
+  const chart = open && pts.length >= 4 && (<span className="v3-sign-pop" role="dialog" aria-label={k + ', last ' + pts.length + ' weeks'}>
+    <span className="v3-sign-pop-h"><b>{k}</b><span>Last {pts.length} weeks · each point is the 30 days to that date</span></span>
+    <R.ResponsiveContainer width="100%" height={160}>
+      <R.LineChart data={pts} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
+        <R.XAxis dataKey="d" tickFormatter={d => v3Day(d)} interval="preserveStartEnd" minTickGap={40}/>
+        <R.YAxis hide domain={['auto', 'auto']}/>
+        {ref && ref.v != null && <R.ReferenceLine y={ref.v} stroke={PAL.muted} strokeDasharray="3 3"/>}
+        <R.Tooltip content={({ active, payload }) => (active && payload && payload.length)
+          ? <div className="v3-tip"><b>30 days to {v3Day(payload[0].payload.d, true)}</b><span>{k} <em>{fmt(payload[0].payload.v)}</em></span></div> : null}/>
+        <R.Line type="monotone" dataKey="v" stroke={PAL.accent} strokeWidth={2} isAnimationActive={false}
+                dot={pr => pr.index === pts.length - 1 ? <circle key="last" cx={pr.cx} cy={pr.cy} r={3.5} fill={PAL.accent}/> : null}/>
+      </R.LineChart>
+    </R.ResponsiveContainer>
+    {ref && ref.v != null && <span className="v3-sign-pop-f"><i aria-hidden="true"/>{ref.label}</span>}
+  </span>);
+  return (<div className={'v3-sign' + (pts.length >= 4 ? ' v3-sign-has' : '')} tabIndex={pts.length >= 4 ? 0 : undefined}
+              onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}
+              onFocus={() => setOpen(true)} onBlur={() => setOpen(false)} onClick={() => setOpen(o => !o)}>
     <div className="v3-sign-k">{k}</div>
     <div className="v3-sign-row"><span className="v3-sign-v">{v}</span>
       <span className={'v3-sign-s v3-sign-' + (tone || 'typical')}>{V3_SIG_WORD[tone] || V3_SIG_WORD.typical}</span></div>
+    {trend && <div className={'v3-sign-trend ' + trend.cls}>
+      {trend.dir === 'flat' ? <span aria-hidden="true">→</span> : <Icon name={trend.dir === 'up' ? 'arrowUp' : 'arrowDown'} size={12} stroke={2.2}/>}
+      <span>{trend.dir === 'flat' ? 'About the same as' : trend.dir === 'up' ? 'Up from' : 'Down from'} {trend.from} four weeks ago</span></div>}
+    {chart}
     {bar && <span className="v3-sign-bar" aria-hidden="true"><i className={'v3-sign-fill-' + (tone || 'typical')} style={{ width: pc(bar.fill) }}/>
       {bar.mark != null && <b style={{ left: pc(bar.mark) }}/>}</span>}
     <div className="v3-sign-n">{n}</div>
