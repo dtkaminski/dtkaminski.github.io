@@ -20943,6 +20943,7 @@ function V3BusinessState({ part }) {
   const q = useV3Rows('brand-state', V3_STATE_Q);
   const codes = useV3Rows('brand-codes', V3_CODES_Q);
   const hq = useV3Rows('sign-history', V3_SIGN_HIST_Q);
+  const [drv, setDrv] = React.useState(false);   // the cost-of-a-new-customer drivers, opened from its sign
   if (q.err) return null;                                   // before 0269, or unreadable: Today carries on without it
   if (!q.rows) return part === 'detail' ? null : <V3SkeletonRows n={3}/>;
   const S = q.rows[0]; if (!S || !S.last_30) return null;
@@ -21100,7 +21101,8 @@ function V3BusinessState({ part }) {
     const c30 = num(U.cac_30d), use = c30 > 0 ? c30 : num(U.cac), fo = num(U.first_order_contribution), top = Math.max(use, fo) * 1.25;
     signs.push({ k: 'Cost to win a new customer', v: fmtMoney(use), tone: use > fo ? 'weak' : 'good',
       bar: { fill: use / top, mark: fo / top }, n: <>Their first order earns {fmtMoney(fo)}{use > fo ? ', so each one starts at a loss' : ''}</>,
-      series: c30 > 0 ? ser('cac') : null, fmt: v => fmtMoney(v), better: 'lower', line: { v: fo, label: 'First order earns ' + fmtMoney(fo) } });
+      series: c30 > 0 ? ser('cac') : null, fmt: v => fmtMoney(v), better: 'lower', line: { v: fo, label: 'First order earns ' + fmtMoney(fo) },
+      act: c30 > 0 && HP && HP.length >= 2 && HP[HP.length - 1].meta_clicks != null ? { label: drv ? 'Hide what is driving it' : 'What is driving this?', open: drv, on: () => setDrv(o => !o) } : null });
   }
   if (yoySales != null && yoyAds != null)
     signs.push({ k: 'Sales against last year', v: (yoySales >= 0 ? '+' : '−') + fmtPctN(Math.abs(yoySales)),
@@ -21120,6 +21122,7 @@ function V3BusinessState({ part }) {
       <V3MoneyBridge L={L} share={share}/>
       {signs.length > 0 && <div className="v3-signs">{signs.slice(0, 4).map(s => <V3Sign key={s.k} {...s}/>)}</div>}
     </div>
+    {drv && HP && <V3CacDrivers points={HP} fo={num(U.first_order_contribution)} weeks={H && Array.isArray(H.weeks) ? H.weeks : []}/>}
     {/* How fresh these are, asked on 9 Oct: the figures are worked out again every hour from feeds that
         arrive every 30 minutes (Shopify) and every 2 hours (ad accounts). */}
     <p className="micro muted v3-stand-fresh">Each figure covers the 30 days to {HP ? v3Day(String(hq.rows[0].history.as_of), true) : 'yesterday'}, the last full day. Greta works them out again every hour; Shopify orders arrive every 30 minutes and ad spend every 2 hours.{HP ? ' Point at a sign to see its last 13 weeks.' : ''}</p>
@@ -21130,7 +21133,7 @@ function V3BusinessState({ part }) {
 // 9 Oct: each sign also says which way it is heading (against four weeks ago, on the same 30-day basis)
 // and, on hover, focus or tap, draws its last 13 weeks with the line that matters. (`line`, not `ref`:
 // React keeps a prop called ref for itself, so the break-even line never arrived.)
-function V3Sign({ k, v, tone, bar, n, series, fmt, better, line }) {
+function V3Sign({ k, v, tone, bar, n, series, fmt, better, line, act }) {
   const pc = x => Math.max(0, Math.min(100, x * 100)) + '%';
   const [open, setOpen] = React.useState(false);
   const pts = (series || []).filter(p => p.v != null);
@@ -21170,8 +21173,134 @@ function V3Sign({ k, v, tone, bar, n, series, fmt, better, line }) {
     {bar && <span className="v3-sign-bar" aria-hidden="true"><i className={'v3-sign-fill-' + (tone || 'typical')} style={{ width: pc(bar.fill) }}/>
       {bar.mark != null && <b style={{ left: pc(bar.mark) }}/>}</span>}
     <div className="v3-sign-n">{n}</div>
+    {act && <button type="button" className="v3-xref v3-sign-act" aria-expanded={act.open}
+      onClick={e => { e.stopPropagation(); act.on(); }}>{act.label} <span className="v3-xref-go">{act.open ? '↑' : '↓'}</span></button>}
   </div>);
 }
+// 0311: what drives the cost of a new customer (Dan, 9 Oct: "£55 is expensive for frkl; show quickly
+// what is driving it"). The cost is ad spend over first-time buyers, which is (spend per paid click) x
+// (paid clicks per new customer). The change between two weeks splits into those two parts, and the
+// price of a click into what Meta charges to show an ad, how often people click it, and what Google
+// charges a click. Click a week on the chart to compare against it; four weeks ago, as the arrow, to start.
+function V3CacDrivers({ points, fo, weeks }) {
+  const P = (points || []).filter(p => p.cac != null && p.new_customers > 0 && (Number(p.meta_clicks) + Number(p.google_clicks)) > 0);
+  const [ci, setCi] = React.useState(() => Math.max(0, P.length - 5));
+  if (P.length < 2) return null;
+  const i0 = Math.min(ci, P.length - 2), a = P[i0], b = P[P.length - 1];
+  const f = p => {
+    const sp = Number(p.cac_spend), mc = Number(p.meta_clicks), gc = Number(p.google_clicks), cl = mc + gc, n = Number(p.new_customers);
+    const mi = Number(p.meta_impressions), ms = Number(p.meta_spend), gs = Number(p.google_spend);
+    return { sp, cl, n, mc, gc, ms, gs, cac: sp / n, cpc: sp / cl, cpn: cl / n,
+             cpm: mi > 0 ? 1000 * ms / mi : null, ctr: mi > 0 ? mc / mi : null, mcpc: mc > 0 ? ms / mc : null, gcpc: gc > 0 ? gs / gc : null };
+  };
+  const A = f(a), B = f(b), d = B.cac - A.cac, Lg = Math.log(B.cac / A.cac);
+  // the two parts in pounds: shares of the log change, so they add up to the whole and neither depends on order
+  const pClick = Math.abs(Lg) > 0.005 ? d * Math.log(B.cpc / A.cpc) / Lg : (B.cpc - A.cpc) * A.cpn;
+  const pConv = d - pClick;
+  const pence = v => (v >= 1 ? fmtMoney(v, 2) : Math.round(v * 100) + 'p');
+  const sgn = v => (v >= 0 ? '+' : '−') + fmtMoney(Math.abs(v), 2);
+  const day = p => v3Day(String(p.d), true);
+  // what made the click price move, largest first: each candidate weighted by its platform's share of spend
+  const subs = [];
+  if (A.ctr && B.ctr) subs.push({ up: B.ctr < A.ctr, w: Math.abs(Math.log(A.ctr / B.ctr)) * B.ms / B.sp,
+    t: B.ctr < A.ctr ? <>fewer people clicked the Meta ads ({fmtPctN(A.ctr)} to {fmtPctN(B.ctr)} of views)</> : <>more people clicked the Meta ads ({fmtPctN(A.ctr)} to {fmtPctN(B.ctr)} of views)</> });
+  if (A.cpm && B.cpm) subs.push({ up: B.cpm > A.cpm, w: Math.abs(Math.log(B.cpm / A.cpm)) * B.ms / B.sp,
+    t: <>Meta charged {B.cpm > A.cpm ? 'more' : 'less'} to show the ads ({fmtMoney(A.cpm, 2)} to {fmtMoney(B.cpm, 2)} per 1,000 views)</> });
+  if (A.gcpc && B.gcpc) subs.push({ up: B.gcpc > A.gcpc, w: Math.abs(Math.log(B.gcpc / A.gcpc)) * B.gs / B.sp,
+    t: <>Google clicks cost {B.gcpc > A.gcpc ? 'more' : 'less'} ({pence(A.gcpc)} to {pence(B.gcpc)})</> });
+  const top = subs.filter(s => s.up === (pClick > 0) && s.w > 0.02).sort((x, y) => y.w - x.w).slice(0, 2);
+  // sale weeks inside each 30 days: a sale turns more clicks into first orders
+  const saleIn = p => (weeks || []).filter(w => w.sale && String(w.wk) >= v3IsoAdd(String(p.d), -29) && String(w.wk) <= String(p.d)).length;
+  const sA = saleIn(a), sB = saleIn(b);
+  const partClickT = <><b className="oi-num">{fmtMoney(Math.abs(pClick))}</b> because each paid click cost {pClick >= 0 ? 'more' : 'less'} ({pence(A.cpc)} to {pence(B.cpc)}){top.length ? <>, mainly because {top.map((s, i) => <React.Fragment key={i}>{i ? ' and ' : ''}{s.t}</React.Fragment>)}</> : null}</>;
+  const partConvT = <><b className="oi-num">{fmtMoney(Math.abs(pConv))}</b> because it took {pConv >= 0 ? 'more' : 'fewer'} clicks to win each customer ({Math.round(A.cpn)} to {Math.round(B.cpn)}){sA > sB && pConv > 0 ? <>, as the earlier 30 days had {sA === 1 ? 'a sale week' : sA + ' sale weeks'} and a sale turns more clicks into first orders</> : null}</>;
+  const parts = Math.abs(pClick) >= Math.abs(pConv) ? [partClickT, partConvT] : [partConvT, partClickT];
+
+  // the walk from then to now, drawn as the money waterfall is
+  const steps = [
+    { k: <>A new customer<small>30 days to {day(a)}</small></>, a: 0, b: A.cac, tone: 'sales', v: fmtMoney(A.cac, 2) },
+    { k: <>{pClick >= 0 ? 'Each click cost more' : 'Each click cost less'}<small>{pence(A.cpc)} to {pence(B.cpc)} a paid click</small></>,
+      a: Math.min(A.cac, A.cac + pClick), b: Math.max(A.cac, A.cac + pClick), tone: pClick >= 0 ? 'loss' : 'gain', v: sgn(pClick) },
+    { k: <>{pConv >= 0 ? 'More clicks per customer' : 'Fewer clicks per customer'}<small>{Math.round(A.cpn)} to {Math.round(B.cpn)} paid clicks</small></>,
+      a: Math.min(A.cac + pClick, B.cac), b: Math.max(A.cac + pClick, B.cac), tone: pConv >= 0 ? 'loss' : 'gain', v: sgn(pConv) },
+    { k: <>A new customer now<small>30 days to {day(b)}</small></>, a: 0, b: B.cac, tone: B.cac > fo ? 'loss' : 'keep', v: fmtMoney(B.cac, 2), total: true },
+  ];
+  const hi = Math.max(A.cac, B.cac, A.cac + pClick, fo || 0) * 1.05, x = v => (v / hi) * 100;
+
+  const ch = (p, q, better) => { if (p == null || q == null || p === 0) return null;
+    const r = q / p - 1; return { t: (r >= 0 ? '+' : '−') + fmtPctN(Math.abs(r)), cls: Math.abs(r) < 0.03 ? 'v3-muted' : (r > 0) === (better === 'higher') ? 'v3-up' : 'v3-down' }; };
+  const rows = [
+    ['Meta: cost to show your ads 1,000 times', A.cpm, B.cpm, v => fmtMoney(v, 2), 'lower'],
+    ['Meta: people who click, out of every view', A.ctr, B.ctr, v => fmtPctN(v), 'higher'],
+    ['Meta: cost per click', A.mcpc, B.mcpc, pence, 'lower'],
+    ['Google: cost per click', A.gcpc, B.gcpc, pence, 'lower'],
+    ['All ads: spend', A.sp, B.sp, v => fmtMoney(v), null],
+    ['All ads: paid clicks', A.cl, B.cl, v => fmtCount(v), 'higher'],
+    ['New customers', A.n, B.n, v => fmtCount(v), 'higher'],
+  ].filter(r => r[1] != null && r[2] != null);
+
+  // where the spend moved, by campaign: then and now, biggest change first
+  const key = c => c.platform + '|' + c.name, cm = {};
+  (a.campaigns || []).forEach(c => { cm[key(c)] = { platform: c.platform, name: c.name, then: Number(c.spend), now: 0 }; });
+  (b.campaigns || []).forEach(c => { const r = cm[key(c)] || (cm[key(c)] = { platform: c.platform, name: c.name, then: 0 });
+    r.now = Number(c.spend); r.cpc = Number(c.clicks) > 0 ? Number(c.spend) / Number(c.clicks) : null; r.buys = Number(c.platform_buys); });
+  const camps = Object.values(cm).sort((p, q) => Math.abs(q.now - q.then) - Math.abs(p.now - p.then)).slice(0, 6);
+  const retarget = camps.find(c => /retarget|remarket/i.test(c.name) && c.now - c.then >= 200);
+
+  const cTip = ({ active, payload }) => (active && payload && payload.length)
+    ? <div className="v3-tip"><b>30 days to {v3Day(payload[0].payload.d, true)}</b><span>A new customer <em>{fmtMoney(payload[0].payload.cac, 2)}</em></span><span>Click to compare with now</span></div> : null;
+  return (<div className="v3-drivers" id="cac-drivers">
+    <h3 className="v3-sec-title">Why a new customer costs {fmtMoney(B.cac)}</h3>
+    <p className="v3-note v3-measure">Since the 30 days to {day(a)}, a new customer went from {fmtMoney(A.cac)} to {fmtMoney(B.cac)}{fo ? <>, against the {fmtMoney(fo)} a first order earns</> : null}. {parts[0]}. The other {parts[1]}.</p>
+    <div className="v3-drivers-grid">
+      <figure className="v3-bridge v3-bridge-wide" role="img" aria-label={'From ' + fmtMoney(A.cac, 2) + ' to ' + fmtMoney(B.cac, 2)}>
+        <figcaption className="v3-bridge-cap">From then to now</figcaption>
+        {steps.map((r, i) => (<div key={i} className={'v3-bridge-row' + (r.total ? ' v3-bridge-total' : '')}>
+          <span className="v3-bridge-k">{r.k}</span>
+          <span className="v3-bridge-track"><i className={'v3-bridge-' + r.tone} style={{ left: x(r.a) + '%', width: Math.max(0.6, x(r.b) - x(r.a)) + '%' }}/>
+            {fo ? <b className="v3-bridge-mark" style={{ left: x(fo) + '%' }}/> : null}</span>
+          <span className={'v3-bridge-v' + (r.tone === 'loss' && !r.total ? ' v3-down' : r.tone === 'gain' ? ' v3-up' : '')}>{r.v}</span>
+        </div>))}
+        {fo ? <p className="micro muted">The upright line is the {fmtMoney(fo)} a first order earns after product and delivery costs.</p> : null}
+      </figure>
+      <figure className="v3-chart">
+        <figcaption><span className="v3-chart-title">A new customer, week by week</span><span className="v3-muted">click a week to compare with it</span></figcaption>
+        <R.ResponsiveContainer width="100%" height={160}>
+          <R.BarChart data={P} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+            <R.XAxis dataKey="d" tickFormatter={dd => v3Day(dd)} interval="preserveStartEnd" minTickGap={30}/>
+            <R.YAxis hide/>
+            {fo ? <R.ReferenceLine y={fo} stroke={PAL.muted} strokeDasharray="3 3" ifOverflow="extendDomain"/> : null}
+            <R.Tooltip content={cTip} cursor={{ fill: PAL.surface }}/>
+            <R.Bar dataKey="cac" isAnimationActive={false} onClick={(_, i) => { if (i < P.length - 1) setCi(i); }} style={{ cursor: 'pointer' }}>
+              {P.map((p, i) => <R.Cell key={i} fill={i === P.length - 1 ? PAL.accent : i === i0 ? PAL.ink : PAL.quiet}/>)}
+            </R.Bar>
+          </R.BarChart>
+        </R.ResponsiveContainer>
+        <span className="v3-legend"><i style={{ background: PAL.ink }}/>Compared with <i style={{ background: PAL.accent }}/>Now</span>
+      </figure>
+    </div>
+    <h4 className="v3-drivers-h">What changed underneath</h4>
+    <table className="v3-rw">
+      <thead><tr><th className="t-text">Measure</th><th>30 days to {day(a)}</th><th>30 days to {day(b)}</th><th>Change</th></tr></thead>
+      <tbody>{rows.map(([lab, p, q, fm, better]) => { const c = ch(p, q, better); return (<tr key={lab}>
+        <td className="t-text">{lab}</td><td>{fm(p)}</td><td>{fm(q)}</td><td className={c ? c.cls : ''}>{c ? c.t : ''}</td></tr>); })}</tbody>
+    </table>
+    {camps.length > 0 && <>
+      <h4 className="v3-drivers-h">Where the ad money went</h4>
+      <table className="v3-rw">
+        <thead><tr><th className="t-text">Campaign</th><th>Spend then</th><th>Spend now</th><th>Change</th><th>Cost per click now</th><th>Sales the platform claims, now</th></tr></thead>
+        <tbody>{camps.map(c => (<tr key={c.platform + c.name}>
+          <td className="t-text v3-rw-name">{c.name} <span className="v3-muted">· {c.platform}</span></td>
+          <td>{fmtMoney(c.then)}</td><td>{fmtMoney(c.now)}</td>
+          <td className={c.now - c.then > 0 ? 'v3-down' : c.now - c.then < 0 ? 'v3-up' : ''}>{(c.now - c.then >= 0 ? '+' : '−') + fmtMoney(Math.abs(c.now - c.then))}</td>
+          <td>{c.cpc != null ? pence(c.cpc) : '—'}</td><td>{c.buys != null && !isNaN(c.buys) ? fmtCount(c.buys) : '—'}</td></tr>))}</tbody>
+      </table>
+      {retarget && <p className="v3-note v3-measure"><b>{retarget.name}</b> went from {fmtMoney(retarget.then)} to {fmtMoney(retarget.now)}. Retargeting shows ads to people who have already visited, so most of the sales it claims come from people who already know you. It wins few new customers, and its spend still counts in this cost.</p>}
+    </>}
+    <p className="micro muted v3-measure">The cost of a new customer is all Meta and Google spend divided by first-time buyers from any source, as on the sign above. Paid clicks are Meta link clicks plus Google clicks. Sales the platform claims are each platform’s own count; they overlap and run high, so read them as a guide.</p>
+  </div>);
+}
+
 // Where the month's sales went, as a waterfall: sales, less products and delivery, less ads, less
 // running costs, and what is left. The verdict's figure is the last bar, so the two cannot disagree.
 function V3MoneyBridge({ L, share }) {
