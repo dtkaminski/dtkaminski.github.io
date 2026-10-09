@@ -3,3 +3,5 @@
 Thumbs.db
 greta-app.jsx.bak-econ
 greta-dashboard.html.bak-econ
+# local backups made while editing (kept on disk, never published)
+*.bak-*
