@@ -21217,6 +21217,7 @@ function v3DriverSentence(parts, d, fmtAmt) {
     return <React.Fragment key={i}> {cap(p.against)} {d >= 0 ? 'took' : 'added'} <b className="oi-num">{fmtAmt(p.amt)}</b> {d >= 0 ? 'off' : 'back'}.</React.Fragment>;
   });
 }
+const v3Pct1 = v => (Math.round(v * 1000) / 10) + '%';   // one decimal, for rates that move by tenths
 const v3PtsAmt = v => (Math.round(Math.abs(v) * 1000) / 10) + (Math.round(Math.abs(v) * 1000) === 10 ? ' point' : ' points');
 const v3Pence2 = v => (v >= 1 ? fmtMoney(v, 2) : Math.round(v * 100) + 'p');
 const v3SaleWeeksIn = (weeks, p) => (weeks || []).filter(w => w.sale && String(w.wk) >= v3IsoAdd(String(p.d), -29) && String(w.wk) <= String(p.d)).length;
@@ -21258,7 +21259,7 @@ function v3ModelCac(a, b, ctx) {
   const retarget = camps.find(c => /retarget|remarket/i.test(c.name) && c.now - c.then >= 200);
   return {
     title: 'Why a new customer costs ' + fmtMoney(B.v), from: A.v, to: B.v, better: 'lower', fmtV: v => fmtMoney(v, 2), fmtAmt: v => fmtMoney(Math.abs(v)),
-    startK: 'A new customer', endK: 'A new customer now', parts,
+    startK: 'A new customer', endK: 'A new customer now', chartK: 'A new customer', parts,
     opening: <>Since the 30 days to {v3Day(String(a.d), true)}, a new customer went from {fmtMoney(A.v)} to {fmtMoney(B.v)}{ctx.fo ? <>, against the {fmtMoney(ctx.fo)} a first order earns</> : null}.</>,
     rows: [
       ['Meta: cost to show your ads 1,000 times', A.cpm, B.cpm, v => fmtMoney(v, 2), 'lower'],
@@ -21290,10 +21291,10 @@ function v3ModelReturn(a, b, ctx) {
   const A = f(a), B = f(b);
   const [pO, pA, pS] = v3LogParts(A.v, B.v, [{ a: A.o, b: B.o, sign: 1 }, { a: A.aov, b: B.aov, sign: 1 }, { a: A.ad, b: B.ad, sign: -1 }]);
   const sA = v3SaleWeeksIn(ctx.weeks, a), sB = v3SaleWeeksIn(ctx.weeks, b);
-  const saleNote = sA !== sB ? <>, as the earlier 30 days had {sA === 0 ? 'no sale weeks' : sA === 1 ? 'a sale week' : sA + ' sale weeks'} and these have {sB === 0 ? 'none' : sB}</> : null;
+  const saleNote = sA !== sB ? <>, as the earlier 30 days had {sA === 0 ? 'no sale weeks' : sA === 1 ? 'a sale week' : sA + ' sale weeks'} and these have {sB === 0 ? 'none' : sB === 1 ? 'one' : sB}</> : null;
   return {
     title: 'Why each £1 of ads now brings ' + fmtMoney(B.v, 2), from: A.v, to: B.v, better: 'higher', fmtV: v => fmtMoney(v, 2), fmtAmt: v => fmtMoney(Math.abs(v), 2),
-    startK: 'Sales from each £1 of ads', endK: 'Sales from each £1 of ads now',
+    startK: 'Sales from each £1 of ads', endK: 'Sales from each £1 of ads now', chartK: 'Sales from each £1 of ads',
     parts: [
       { amt: pO, k: v3UpDown(A.o, B.o, 'More orders', 'Fewer orders'), sub: fmtCount(A.o) + ' to ' + fmtCount(B.o),
         cause: <>there were {v3UpDown(A.o, B.o, 'more', 'fewer')} orders ({fmtCount(A.o)} to {fmtCount(B.o)}){saleNote}</>,
@@ -21328,7 +21329,7 @@ function v3ModelLastYear(a, _b, ctx) {
   const ad = Number(a.ads), adl = Number(a.ads_ly);
   return {
     title: 'Sales against last year, 30 days to ' + v3Day(String(a.d), true), from: sl, to: s, better: 'higher', fmtV: v => fmtMoney(v), fmtAmt: v => fmtMoney(Math.abs(v)),
-    startK: 'Same 30 days last year', endK: 'This year', colA: 'Same 30 days last year', colB: '30 days to ' + v3Day(String(a.d), true),
+    startK: 'Last year', endK: 'This year', chartK: 'Sales against last year', colA: 'Same 30 days last year', colB: '30 days to ' + v3Day(String(a.d), true),
     parts: ok ? [
       { amt: pNew, k: 'New customers', sub: fmtMoney(nwl) + ' to ' + fmtMoney(nw) + ' · ' + fmtCount(nl) + ' to ' + fmtCount(n) + ' people',
         cause: <>new customers spent {v3UpDown(nwl, nw, 'more', 'less')} ({fmtMoney(nwl)} to {fmtMoney(nw)}; {fmtCount(nl)} to {fmtCount(n)} first-time buyers)</>,
@@ -21359,8 +21360,8 @@ function v3ModelRepeat(a, b, ctx) {
   const pMix = (B.s - A.s) * (rcm - rfm), pCode = sm * (B.rc - A.rc), pFull = (1 - sm) * (B.rf - A.rf);
   const codeMore = rcm >= rfm;
   return {
-    title: 'Why ' + fmtPctN(B.v) + ' of customers order again', from: A.v, to: B.v, better: 'higher', fmtV: v => fmtPctN(v), fmtAmt: v3PtsAmt,
-    startK: 'Ordered again', endK: 'Ordered again now',
+    title: 'Why ' + fmtPctN(B.v) + ' of customers order again', from: A.v, to: B.v, better: 'higher', fmtV: v3Pct1, fmtAmt: v3PtsAmt,
+    startK: 'Ordered again', endK: 'Ordered again now', chartK: 'Ordered again within 90 days',
     parts: [
       { amt: pMix, k: v3UpDown(A.s, B.s, 'More first orders with a code', 'Fewer first orders with a code'), sub: fmtPctN(A.s) + ' to ' + fmtPctN(B.s) + ' used a code',
         cause: <>{v3UpDown(A.s, B.s, 'more', 'fewer')} first-time buyers used a discount code ({fmtPctN(A.s)} to {fmtPctN(B.s)}), and code buyers come back {codeMore ? 'more' : 'less'} often</>,
@@ -21372,7 +21373,7 @@ function v3ModelRepeat(a, b, ctx) {
         cause: <>customers whose first order was at full price came back {v3UpDown(A.rf, B.rf, 'more', 'less')} often ({fmtPctN(A.rf)} to {fmtPctN(B.rf)})</>,
         against: <>Full-price buyers coming back {v3UpDown(A.rf, B.rf, 'more', 'less')} often ({fmtPctN(A.rf)} to {fmtPctN(B.rf)})</> },
     ],
-    opening: <>Since the 30 days to {v3Day(String(a.d), true)}, the share of customers who order again within 90 days went from {fmtPctN(A.v)} to {fmtPctN(B.v)}{ctx.typical ? <>; about {fmtPctN(ctx.typical)} is typical</> : null}.</>,
+    opening: <>Since the 30 days to {v3Day(String(a.d), true)}, the share of customers who order again within 90 days went from {v3Pct1(A.v)} to {v3Pct1(B.v)}{ctx.typical ? <>; about {fmtPctN(ctx.typical)} is typical</> : null}.</>,
     closing: <> Customers whose first order used a discount code come back {codeMore ? 'more' : 'less'} often than full-price ones: {fmtPctN(B.rc)} against {fmtPctN(B.rf)}.</>,
     rows: [
       ['First-time buyers in the group', A.n, B.n, v => fmtCount(v), null],
@@ -21422,7 +21423,7 @@ function V3DriverPanel({ which, points, ctx, line }) {
   const rows = M.rows.filter(r => r[1] != null && r[2] != null && isFinite(r[1]) && isFinite(r[2]));
   const flat = Math.abs(d) <= Math.abs(M.from) * 0.01;
   const tip = ({ active, payload }) => (active && payload && payload.length)
-    ? <div className="v3-tip"><b>30 days to {v3Day(payload[0].payload.d, true)}</b><span>{M.startK} <em>{M0.fmt(payload[0].payload[M0.key])}</em></span>
+    ? <div className="v3-tip"><b>30 days to {v3Day(payload[0].payload.d, true)}</b><span>{M.chartK} <em>{M0.fmt(payload[0].payload[M0.key])}</em></span>
         <span>{single ? 'Click to explain this week' : 'Click to compare with now'}</span></div> : null;
   return (<div className="v3-drivers" id={'drivers-' + which}>
     <h3 className="v3-sec-title">{M.title}</h3>
@@ -21439,7 +21440,7 @@ function V3DriverPanel({ which, points, ctx, line }) {
         {line != null && ctx && ctx.lineLabel ? <p className="micro muted">The upright line is {ctx.lineLabel}.</p> : null}
       </figure>
       <figure className="v3-chart">
-        <figcaption><span className="v3-chart-title">{M.startK}, week by week</span><span className="v3-muted">{single ? 'click a week to explain it' : 'click a week to compare with it'}</span></figcaption>
+        <figcaption><span className="v3-chart-title">{M.chartK}, week by week</span><span className="v3-muted">{single ? 'click a week to explain it' : 'click a week to compare with it'}</span></figcaption>
         <R.ResponsiveContainer width="100%" height={160}>
           <R.BarChart data={P} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
             <R.XAxis dataKey="d" tickFormatter={dd => v3Day(dd)} interval="preserveStartEnd" minTickGap={30}/>
