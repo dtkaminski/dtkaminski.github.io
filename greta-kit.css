@@ -257,13 +257,8 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 /* Do this first + then, in order. */
 .v3-act-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--space-8); align-items: start; }
 @media (max-width: 900px) { .v3-act-grid { grid-template-columns: 1fr; } }
-/* On a phone the first action sat 2.3 screens down, under the profit figure, the weekly chart and the
-   money flow (7 Oct). The verdict above already says where profit stands, so on a phone Fix first and
-   Do this first come next and the profit block follows them. */
-@media (max-width: 760px) {
-  .v3-today > .v3-hero { order: 1; }
-  .v3-today > .v3-act-grid ~ * { order: 2; }
-}
+/* The profit block now follows the actions in the page itself (9 Oct), on every screen size, so the
+   phone-only reordering that put it there is gone. */
 .v3-dofirst.v3-raised { border-top: 1px solid var(--color-line); padding: var(--space-6); }
 .v3-dofirst .v3-kick { color: var(--color-accent); }
 .v3-dofirst-t { font-size: var(--text-lg); line-height: var(--leading-snug); letter-spacing: var(--tracking-snug); margin: var(--space-1) 0 var(--space-2); }
@@ -274,6 +269,67 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-next-row .v3-num:last-child { color: var(--color-ink); font-weight: var(--weight-semi); }
 .v3-next .v3-btn-q { margin-top: var(--space-2); padding-left: 0; }
 .v3-why-open { border-top: 1px solid var(--color-line); }
+/* The card: what to do on the left, what it is worth on the right; why and first step as labelled lines. */
+.v3-dofirst-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-6); }
+.v3-dofirst-worth { display: flex; flex-direction: column; align-items: flex-end; text-align: right; flex: none; }
+.v3-dofirst-worth-v { font-family: var(--font-figure); font-size: var(--text-2xl); font-weight: var(--weight-semi);
+  line-height: var(--leading-tight); color: var(--color-accent); }
+.v3-dofirst-worth-k { font-size: var(--text-xs); color: var(--color-muted); }
+.v3-dofirst-line { display: grid; grid-template-columns: 6rem minmax(0, 1fr); gap: var(--space-3); margin: var(--space-3) 0 0;
+  font-size: var(--text-sm); line-height: var(--leading-body); color: var(--color-secondary); }
+.v3-dofirst-line b { font-weight: var(--weight-semi); color: var(--color-ink); }
+.v3-main .v3-dofirst .v3-sub { font-size: var(--text-sm); font-weight: var(--weight-normal); color: var(--color-secondary); margin: var(--space-3) 0 0; }
+@media (max-width: 640px) {
+  .v3-dofirst-head { flex-direction: column; gap: var(--space-2); }
+  .v3-dofirst-worth { align-items: flex-start; text-align: left; }
+  .v3-dofirst-line { grid-template-columns: minmax(0, 1fr); gap: 0; }
+}
+.v3-next-bar { display: block; height: var(--space-1); margin-top: var(--space-2); background: var(--color-sunken); }
+.v3-next-bar i { display: block; height: 100%; background: var(--color-accent-line); }
+
+/* Where you stand (Today's lead, 9 Oct): verdict, one line of why, then the picture and the signs. */
+.v3-stand { margin-bottom: var(--space-2); }
+.v3-stand .v3-verdict { font-size: var(--text-2xl); max-width: 30ch; margin-bottom: var(--space-2); }
+.v3-stand-why { font-size: var(--text-base); color: var(--color-secondary); margin: 0 0 var(--space-6); max-width: 68ch; }
+.v3-stand-why b { color: var(--color-ink); font-weight: var(--weight-semi); }
+.v3-stand-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-10); align-items: start; }
+@media (max-width: 900px) { .v3-stand-grid { grid-template-columns: minmax(0, 1fr); gap: var(--space-6); } }
+.v3-bridge { margin: 0; border-top: 1px solid var(--color-line); padding-top: var(--space-4); }
+.v3-bridge-cap { font-size: var(--text-xs); font-weight: var(--weight-semi); color: var(--color-muted); margin-bottom: var(--space-3); }
+.v3-bridge-row { display: grid; grid-template-columns: 10.5rem minmax(0, 1fr) 5.5rem; gap: var(--space-3); align-items: center;
+  padding: var(--space-1) 0; font-size: var(--text-sm); }
+.v3-bridge-k { color: var(--color-secondary); }
+.v3-bridge-track { position: relative; height: var(--space-4); }
+.v3-bridge-track i { position: absolute; top: 0; bottom: 0; border-radius: var(--radius-sm); }
+.v3-bridge-track b { position: absolute; top: calc(-1 * var(--space-1)); bottom: calc(-1 * var(--space-1)); border-left: 1px solid var(--color-ink); }
+.v3-bridge-sales { background: var(--color-data-quiet); }
+.v3-bridge-cost  { background: var(--color-line-strong); }
+.v3-bridge-ads   { background: var(--color-muted); }
+.v3-bridge-loss  { background: var(--color-danger); }
+.v3-bridge-keep  { background: var(--color-accent); }
+.v3-bridge-v { font-family: var(--font-figure); text-align: right; color: var(--color-ink); }
+.v3-bridge-total { border-top: 1px solid var(--color-line); margin-top: var(--space-1); padding-top: var(--space-2); }
+.v3-bridge-total .v3-bridge-k, .v3-bridge-total .v3-bridge-v { font-weight: var(--weight-semi); color: var(--color-ink); }
+.v3-main .v3-bridge-total .v3-bridge-v.v3-down { color: var(--color-danger); }
+@media (max-width: 640px) { .v3-bridge-row { grid-template-columns: 7.5rem minmax(0, 1fr) 4.75rem; gap: var(--space-2); font-size: var(--text-xs); } }
+.v3-signs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--space-6); }
+.v3-sign { border-top: 1px solid var(--color-line); padding: var(--space-4) 0 var(--space-5); min-width: 0; }
+.v3-sign-k { font-size: var(--text-xs); font-weight: var(--weight-semi); color: var(--color-muted); }
+.v3-sign-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); margin: var(--space-1) 0 var(--space-2); }
+.v3-sign-v { font-family: var(--font-figure); font-size: var(--text-2xl); font-weight: var(--weight-semi); line-height: var(--leading-tight); color: var(--color-ink); }
+.v3-sign-s { font-size: var(--text-xs); font-weight: var(--weight-semi); padding: 0 var(--space-2); border-radius: var(--radius-sm); white-space: nowrap; }
+.v3-sign-good    { color: var(--color-success); background: var(--color-success-wash); }
+.v3-sign-ok      { color: var(--color-warning); background: var(--color-warning-wash); }
+.v3-sign-weak    { color: var(--color-danger);  background: var(--color-danger-wash); }
+.v3-sign-typical, .v3-sign-unclear { color: var(--color-muted); background: var(--color-sunken); }
+.v3-sign-bar { position: relative; display: block; height: var(--space-2); background: var(--color-sunken); border-radius: var(--radius-sm); margin-bottom: var(--space-2); }
+.v3-sign-bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: var(--radius-sm); }
+.v3-sign-bar i.v3-sign-fill-good { background: var(--color-success); }
+.v3-sign-bar i.v3-sign-fill-ok { background: var(--color-warning); }
+.v3-sign-bar i.v3-sign-fill-weak { background: var(--color-danger); }
+.v3-sign-bar i.v3-sign-fill-typical, .v3-sign-bar i.v3-sign-fill-unclear { background: var(--color-muted); }
+.v3-sign-bar b { position: absolute; top: calc(-1 * var(--space-1)); bottom: calc(-1 * var(--space-1)); border-left: 2px solid var(--color-ink); }
+.v3-sign-n { font-size: var(--text-xs); color: var(--color-secondary); line-height: var(--leading-snug); }
 
 /* What moved your profit: diverging bars from a centre line. */
 .v3-why { border-top: 1px solid var(--color-line); padding-top: var(--space-6); }

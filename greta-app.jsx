@@ -17541,6 +17541,8 @@ function V3Today(p) {
     return () => { window.removeEventListener('greta-headline-updated', on); window.removeEventListener('frkl-live-status', on); clearTimeout(t); };
   }, []);
   const board = useV3Board();   // above every early return — see the hooks note in measuring-the-ui
+  const stateQ = useV3Rows('brand-state', V3_STATE_Q);
+  const stateLead = !!(stateQ.rows && stateQ.rows[0] && stateQ.rows[0].last_30);
   const gc = useV3GoalCheck();  // pace is withheld while the goal needs re-planning or has just begun
   // A typical month (shared with Profit & sales), and the quarter plan's pace for the seasonal note.
   const ladT = useV3Rows('profit-ladder', V3_LADDER_Q);
@@ -17639,7 +17641,7 @@ function V3Today(p) {
   return (<div className="v3-today">
     <V3Reconnected/>
     <V3Setup s={d.setup}/>
-    {gate ? (() => {
+    {gate && (() => {
       // The gate has TWO reasons and used to give one answer. 0202 made can_show_cm
       // require revenue as well as a margin source, which is right -- but this branch
       // still said "enter what your products cost you" to a brand whose shop Greta
@@ -17662,7 +17664,104 @@ function V3Today(p) {
           ? <V3Fix provider="shopify" label={connExists('shopify') ? 'Reconnect Shopify' : 'Connect Shopify'}/>
           : <button type="button" className="v3-btn v3-btn-p" onClick={() => window.__oiNav && window.__oiNav('settings', 'economics')}>Enter your costs</button>}</div>
       </div>);
-    })() : (
+    })()}
+
+    {/* The tracking problem sits with the actions it affects, after the profit figure (2026-10-06):
+        above it, it pushed the figure a screen down on a phone. */}
+    <V3FixFirst/>
+    <div className="v3-act-grid">
+    {top ? (
+      <div className="v3-dofirst v3-raised">
+        {/* A stock order's figure is the profit those products make while in stock, not what ordering
+            adds: "worth about £8,604 a month" read as a gain (review, 8 Oct). Stock & orders says "protects". */}
+        {/* 9 Oct: what to do and what it is worth side by side, and the why and the first step each
+            under a label, so the card reads at a glance rather than as three paragraphs. */}
+        <div className="v3-dofirst-head">
+          <div><div className="v3-kick">Do this first</div>
+            <div className="v3-dofirst-t">{v3PlainAction(top).title}</div></div>
+          {top.cm_gbp ? <div className="v3-dofirst-worth">
+            <span className="v3-dofirst-worth-k">{top.category === 'stock' || top.external_id === 'stock-reorder' ? 'Protects about' : 'Worth about'}</span>
+            <span className="v3-dofirst-worth-v">{v3Gbp(top.cm_gbp)}</span>
+            <span className="v3-dofirst-worth-k">{v3Once(top) ? 'once, over the peak' : 'a month'}</span></div> : null}
+        </div>
+        {v3PlainAction(top).why && <p className="v3-dofirst-line"><b>Why</b><span>{v3PlainAction(top).why}</span></p>}
+        {seasonNote && isCut(top) && <div className="v3-sub">This cut is for {seasonNote.cur} only. Greta’s quarter plan puts {v3Gbp(seasonNote.spend)} of ads into {seasonNote.peak}, when new customers cost far less to win, so don’t carry the cut into it.{monthLine}{' '}
+          <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('growth')}>Why <span className="v3-xref-go">on Growth plan →</span></button></div>}
+        {top.external_id === 'stock-reorder' && <div className="v3-sub"><button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('stock')}>The full order list, with what the peak adds <span className="v3-xref-go">on Stock &amp; orders →</span></button></div>}
+        {top.step1
+          ? <p className="v3-dofirst-line"><b>First step</b><span>{v3Money(scrubTag(top.step1))}</span></p>
+          : <div className="v3-sub">No first step recorded for this one.{' '}
+              <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiAsk && window.__oiAsk('What is the first thing I should do about this, in concrete steps: ' + v3ActionText(top.description).main)}>Ask Greta where to start</button>
+            </div>}
+        {topDone ? (
+          <div className="v3-sub v3-resolved" role="status">
+            {topDone === 'skipped'
+              ? <>Skipped. Greta won’t raise it again for 30 days unless it gets much worse.
+                  It won’t be graded, because you didn’t say it was done.</>
+              : <>Marked done. Greta will check whether it worked and add the result to your track record.
+                  It won’t come back for 30 days unless it gets much worse.</>}
+          </div>
+        ) : (<div className="v3-btns">
+          {/* Every button here now does what it says. Two of the three used to navigate to
+              the action queue: one to read the sentence already on screen, the other to a
+              board with no way to close anything. */}
+          {connProvider(top.external_id)
+            ? <V3Fix provider={connProvider(top.external_id)}/>
+            : <V3Steps ext={top.external_id} step1={top.step1}/>}
+          {/* No Mark done on a connection action. Whether a feed is reporting is a fact
+              Greta checks every fifteen minutes, so taking the operator's word for it is
+              the one case where the button is worse than useless: a manual 'done' is held
+              against the emitter for 30 days, which would mean pressing it on a dead feed
+              goes blind on that spend for a month. fn_emit_connection_actions withdraws
+              this action itself the moment the connection is healthy again. */}
+          {/* Skip is offered on the same terms as done, and withheld on the same ones. A
+              dead feed is not a matter of opinion, so declining it would suppress a
+              measured fact for 30 days exactly as marking it done would. */}
+          {!connProvider(top.external_id) && <V3Done ext={top.external_id} onDone={() => closeTop(top, 'done')}/>}
+          {!connProvider(top.external_id) && <V3Skip ext={top.external_id} tone="quiet" onDone={() => closeTop(top, 'skipped')}/>}
+          <button type="button" className="v3-btn v3-btn-q" aria-expanded={whyOpen} onClick={() => setWhyOpen(o => !o)}>{whyOpen ? 'Hide why' : 'Why this first?'}</button>
+        </div>)}
+        {whyOpen && !topDone && (
+          <div className="v3-why-open">
+            <div className="v3-kick">Greta's working</div>
+            <p className="v3-note">{v3PlainAction(top).raw}</p>
+            {top.cm_gbp ? <p className="v3-note">{V3_BOARD.ranked
+              ? <>Ranked first on how sure Greta is and what it is worth, taken together.{top.rung ? <> How sure: {String((V3_CONF[v3MoneyConf(top)] || {}).label || top.rung).toLowerCase()}.</> : null} Worth about {v3Gbp(top.cm_gbp)} a month{top.money_is_sales ? ' in sales' : ''}. A bigger figure Greta is less sure of sits lower.</>
+              : <>Ranked first because it is worth the most of anything Greta has checked recently: about {v3Gbp(top.cm_gbp)}{v3Per(top)}.</>}</p> : null}
+            {Array.isArray(top.evidence_reasons) && top.evidence_reasons.length > 0 && (
+              <ul className="v3-note">{top.evidence_reasons.map((x, i) => <li key={i}>{(x && x.text) || String(x)}</li>)}</ul>)}
+            <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiAsk && window.__oiAsk('Explain this action and how I should go about it: ' + scrubTag(top.description))}>Ask a follow-up</button>
+          </div>
+        )}
+        {/* Say why there is nothing to press here, or the gap reads as an oversight. */}
+        {!topDone && connProvider(top.external_id) && (
+          <div className="v3-sub">Greta clears this herself as soon as the data starts arriving again, so there is nothing to mark off.</div>
+        )}
+      </div>
+    ) : (
+      <div className="v3-dofirst v3-raised"><div className="v3-kick">Do this first</div>
+        <div className="v3-dofirst-t">Nothing needs you today.</div>
+        <div className="v3-sub">Greta checks again with tomorrow's data.</div></div>
+    )}
+
+    {next.length > 0 && (<div className="v3-next">
+      <div className="v3-kick">Then, in order</div>
+      {next.map((a, i) => (<div key={a.external_id || i} className="v3-next-row">
+        <span className="v3-num">{i + 2}</span>
+        <span>{v3PlainAction(a).title}
+          {/* how big each one is next to the first, drawn */}
+          {a.cm_gbp && top && top.cm_gbp ? <span className="v3-next-bar" aria-hidden="true"><i style={{ width: Math.max(2, Math.min(100, Number(a.cm_gbp) / Math.max(Number(top.cm_gbp), ...next.map(x => Number(x.cm_gbp) || 0)) * 100)) + '%' }}/></span> : null}</span>
+        <span className="v3-num">{a.cm_gbp ? v3Gbp(a.cm_gbp) + v3Per(a, true) : ''}</span>
+      </div>))}
+      {seasonNote && !isCut(top) && next.some(isCut) && <p className="micro muted">The ad-spend cuts are for {seasonNote.cur} only. The quarter plan puts {v3Gbp(seasonNote.spend)} of ads into {seasonNote.peak}.{monthLine}</p>}
+      <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>See all {boardCount || ''} actions <Icon name="arrowRight" size={13}/></button>
+    </div>)}
+    </div>
+
+    {/* 9 Oct: the profit figure, the goal and the weeks follow the actions. The lead above already
+        says where profit stands and draws where the sales went, so the first screen is the answer and
+        what to do; this is the evidence. */}
+    {!gate && (
       <div className="v3-hero">
        <div className="v3-hero-grid">
         <div className="v3-hero-main">
@@ -17732,7 +17831,8 @@ function V3Today(p) {
         </div>
         <V3HeroTrend sales={sales} prod={prod}/>
        </div>
-        <V3MoneyFlow d={d}/>
+        {/* the lead draws where the sales went; the flow stays only when the lead could not load */}
+        {!stateLead && <V3MoneyFlow d={d}/>}
         {stale && <button type="button" className="v3-refresh" onClick={refresh}>New numbers are available — show them</button>}
         {/* The live read failed and the figures above are the last ones this browser saw. Say
             when they are from, rather than let a day-old number read as this morning's. */}
@@ -17750,88 +17850,7 @@ function V3Today(p) {
       </div>
     )}
 
-    {/* The tracking problem sits with the actions it affects, after the profit figure (2026-10-06):
-        above it, it pushed the figure a screen down on a phone. */}
-    <V3FixFirst/>
-    <div className="v3-act-grid">
-    {top ? (
-      <div className="v3-dofirst v3-raised">
-        {/* A stock order's figure is the profit those products make while in stock, not what ordering
-            adds: "worth about £8,604 a month" read as a gain (review, 8 Oct). Stock & orders says "protects". */}
-        <div className="v3-kick">Do this first{top.cm_gbp ? (top.category === 'stock' || top.external_id === 'stock-reorder' ? ' · protects about ' : ' · worth about ') + v3Gbp(top.cm_gbp) + v3Per(top) : ''}</div>
-        <div className="v3-dofirst-t">{v3PlainAction(top).title}</div>
-        {v3PlainAction(top).why && <div className="v3-sub">{v3PlainAction(top).why}</div>}
-        {seasonNote && isCut(top) && <div className="v3-sub">This cut is for {seasonNote.cur} only. Greta’s quarter plan puts {v3Gbp(seasonNote.spend)} of ads into {seasonNote.peak}, when new customers cost far less to win, so don’t carry the cut into it.{monthLine}{' '}
-          <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('growth')}>Why <span className="v3-xref-go">on Growth plan →</span></button></div>}
-        {top.external_id === 'stock-reorder' && <div className="v3-sub"><button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('stock')}>The full order list, with what the peak adds <span className="v3-xref-go">on Stock &amp; orders →</span></button></div>}
-        {top.step1
-          ? <div className="v3-sub">First step: {v3Money(scrubTag(top.step1))}</div>
-          : <div className="v3-sub">No first step recorded for this one.{' '}
-              <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiAsk && window.__oiAsk('What is the first thing I should do about this, in concrete steps: ' + v3ActionText(top.description).main)}>Ask Greta where to start</button>
-            </div>}
-        {topDone ? (
-          <div className="v3-sub v3-resolved" role="status">
-            {topDone === 'skipped'
-              ? <>Skipped. Greta won’t raise it again for 30 days unless it gets much worse.
-                  It won’t be graded, because you didn’t say it was done.</>
-              : <>Marked done. Greta will check whether it worked and add the result to your track record.
-                  It won’t come back for 30 days unless it gets much worse.</>}
-          </div>
-        ) : (<div className="v3-btns">
-          {/* Every button here now does what it says. Two of the three used to navigate to
-              the action queue: one to read the sentence already on screen, the other to a
-              board with no way to close anything. */}
-          {connProvider(top.external_id)
-            ? <V3Fix provider={connProvider(top.external_id)}/>
-            : <V3Steps ext={top.external_id} step1={top.step1}/>}
-          {/* No Mark done on a connection action. Whether a feed is reporting is a fact
-              Greta checks every fifteen minutes, so taking the operator's word for it is
-              the one case where the button is worse than useless: a manual 'done' is held
-              against the emitter for 30 days, which would mean pressing it on a dead feed
-              goes blind on that spend for a month. fn_emit_connection_actions withdraws
-              this action itself the moment the connection is healthy again. */}
-          {/* Skip is offered on the same terms as done, and withheld on the same ones. A
-              dead feed is not a matter of opinion, so declining it would suppress a
-              measured fact for 30 days exactly as marking it done would. */}
-          {!connProvider(top.external_id) && <V3Done ext={top.external_id} onDone={() => closeTop(top, 'done')}/>}
-          {!connProvider(top.external_id) && <V3Skip ext={top.external_id} tone="quiet" onDone={() => closeTop(top, 'skipped')}/>}
-          <button type="button" className="v3-btn v3-btn-q" aria-expanded={whyOpen} onClick={() => setWhyOpen(o => !o)}>{whyOpen ? 'Hide why' : 'Why this first?'}</button>
-        </div>)}
-        {whyOpen && !topDone && (
-          <div className="v3-why-open">
-            <div className="v3-kick">Greta's working</div>
-            <p className="v3-note">{v3PlainAction(top).raw}</p>
-            {top.cm_gbp ? <p className="v3-note">{V3_BOARD.ranked
-              ? <>Ranked first on how sure Greta is and what it is worth, taken together.{top.rung ? <> How sure: {String((V3_CONF[v3MoneyConf(top)] || {}).label || top.rung).toLowerCase()}.</> : null} Worth about {v3Gbp(top.cm_gbp)} a month{top.money_is_sales ? ' in sales' : ''}. A bigger figure Greta is less sure of sits lower.</>
-              : <>Ranked first because it is worth the most of anything Greta has checked recently: about {v3Gbp(top.cm_gbp)}{v3Per(top)}.</>}</p> : null}
-            {Array.isArray(top.evidence_reasons) && top.evidence_reasons.length > 0 && (
-              <ul className="v3-note">{top.evidence_reasons.map((x, i) => <li key={i}>{(x && x.text) || String(x)}</li>)}</ul>)}
-            <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiAsk && window.__oiAsk('Explain this action and how I should go about it: ' + scrubTag(top.description))}>Ask a follow-up</button>
-          </div>
-        )}
-        {/* Say why there is nothing to press here, or the gap reads as an oversight. */}
-        {!topDone && connProvider(top.external_id) && (
-          <div className="v3-sub">Greta clears this herself as soon as the data starts arriving again, so there is nothing to mark off.</div>
-        )}
-      </div>
-    ) : (
-      <div className="v3-dofirst v3-raised"><div className="v3-kick">Do this first</div>
-        <div className="v3-dofirst-t">Nothing needs you today.</div>
-        <div className="v3-sub">Greta checks again with tomorrow's data.</div></div>
-    )}
-
-    {next.length > 0 && (<div className="v3-next">
-      <div className="v3-kick">Then, in order</div>
-      {next.map((a, i) => (<div key={a.external_id || i} className="v3-next-row">
-        <span className="v3-num">{i + 2}</span>
-        <span>{v3PlainAction(a).title}</span>
-        <span className="v3-num">{a.cm_gbp ? v3Gbp(a.cm_gbp) + v3Per(a, true) : ''}</span>
-      </div>))}
-      {seasonNote && !isCut(top) && next.some(isCut) && <p className="micro muted">The ad-spend cuts are for {seasonNote.cur} only. The quarter plan puts {v3Gbp(seasonNote.spend)} of ads into {seasonNote.peak}.{monthLine}</p>}
-      <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>See all {boardCount || ''} actions <Icon name="arrowRight" size={13}/></button>
-    </div>)}
-    </div>
-
+    <V3BusinessState part="detail"/>
     {/* Today read 5.3 screens (review, 8 Oct). The summary at the top already names what moved profit and
         Profit & sales has it in full, so the breakdown folds away here. */}
     <V3More id="today-why" label="What moved your profit, in pounds"><V3Why why={d.why} period={d.why_period} typical={typical} now={{ sales, spend, kept: cam }}/></V3More>
@@ -20903,12 +20922,11 @@ function V3Signals({ items }) {
 }
 // what ads cost out of each £1 of sales, in pence: "53p of every £1" reads faster than "53% of sales"
 const v3Pence = v => (v >= 1 ? fmtMoney(v, 2) : Math.round(v * 100) + 'p');
-function V3BusinessState() {
+function V3BusinessState({ part }) {
   const q = useV3Rows('brand-state', V3_STATE_Q);
   const codes = useV3Rows('brand-codes', V3_CODES_Q);
-  const board = useV3Board();
   if (q.err) return null;                                   // before 0269, or unreadable: Today carries on without it
-  if (!q.rows) return <V3SkeletonRows n={3}/>;
+  if (!q.rows) return part === 'detail' ? null : <V3SkeletonRows n={3}/>;
   const S = q.rows[0]; if (!S || !S.last_30) return null;
   const L = S.last_30, A = S.ads || {}, U = S.unit || {}, R = S.retention || {}, K = S.basket || {}, P = S.peak, BM = S.benchmarks || {};
   const num = v => (v == null ? null : Number(v));
@@ -20925,8 +20943,13 @@ function V3BusinessState() {
   const verdict = ao != null
     ? (ao < 0 ? 'You are losing about ' + fmtMoney(-ao) + ' a month after all costs.' : 'You are making about ' + fmtMoney(ao) + ' a month after all costs.')
     : 'You kept ' + fmtMoney(num(L.profit_after_ads)) + ' after ads in the last 30 days.';
-  const sub = ao != null && (<p className="v3-lede v3-measure">That is what is left from sales once products, delivery, ads and your monthly running costs are paid.
-    {share != null ? <> Ads now cost {v3Pence(share)} of every £1 you sell{early != null && Math.abs(share - early) >= 0.08 ? <>, {share > early ? 'up' : 'down'} from {v3Pence(early)} at the start of the year</> : null}.</> : null}</p>);
+  // 9 Oct: one line under the verdict, the biggest reason in the owner's words. What "after all costs"
+  // counts is drawn in the picture beside it, so it no longer needs a sentence.
+  const sub = share != null && (<p className="v3-stand-why">{early != null && share - early >= 0.08
+    ? <>The main reason: ads now take <b className="oi-num">{v3Pence(share)}</b> of every £1 you sell, up from <b className="oi-num">{v3Pence(early)}</b> at the start of the year.</>
+    : early != null && early - share >= 0.08
+      ? <>Ads now take <b className="oi-num">{v3Pence(share)}</b> of every £1 you sell, down from <b className="oi-num">{v3Pence(early)}</b> at the start of the year.</>
+      : <>Ads take <b className="oi-num">{v3Pence(share)}</b> of every £1 you sell.</>}</p>);
 
   const items = [];
   if (ret != null && A.break_even_return) {
@@ -21033,21 +21056,86 @@ function V3BusinessState() {
       <p className="micro muted v3-measure">Typical ranges are rules of thumb for {S.vertical === 'default' ? 'UK DTC brands' : 'UK ' + S.vertical + ' brands'}, not measured from other brands’ data; read them as context, not targets.</p>
     </>);
   const story = NS && NS.story;
-  return (<div className="v3-page-stack"><section>
-    <div className="v3-kick">Where the business stands · last 30 days</div>
+  // 9 Oct: Today opened on about 150 words before any picture or action. The top is now the verdict,
+  // one line of why, where the month's sales went (drawn), and four signs with one word each. Greta's
+  // written read, the points, the weekly chart and the benchmarks follow the actions, in one fold.
+  if (part === 'detail') {
+    if (!(story || facts || chart || bench)) return null;
+    return (<V3More id="today-read" label="Greta’s read of the month, and the figures behind it">
+      {story && <><p className="v3-note v3-measure">{v3PlainWords(NS.story)}</p>
+        <p className="micro muted v3-measure">{V3_NARR.data.summary_stale && V3_NARR.data.written_at
+          ? <>Written by Greta on {v3Day(String(V3_NARR.data.written_at).slice(0, 10), true)}. Today’s figures are in the points below.</>
+          : <>Written by Greta. Every figure in it is checked against your data.</>}</p></>}
+      {facts}{terms}{chart}{bench}
+    </V3More>);
+  }
+  const signs = [];
+  if (ret != null && A.break_even_return) {
+    const be = num(A.break_even_return), top = Math.max(ret, be) * 1.25;
+    signs.push({ k: 'Sales from each £1 of ads', v: fmtMoney(ret, 2), tone: ret < be ? 'weak' : ret < be * 1.3 ? 'ok' : 'good',
+      bar: { fill: ret / top, mark: be / top }, n: <>{fmtMoney(be, 2)} only covers the ads, products and delivery</> });
+  }
+  if (U.cac != null && U.first_order_contribution != null) {
+    const c30 = num(U.cac_30d), use = c30 > 0 ? c30 : num(U.cac), fo = num(U.first_order_contribution), top = Math.max(use, fo) * 1.25;
+    signs.push({ k: 'Cost to win a new customer', v: fmtMoney(use), tone: use > fo ? 'weak' : 'good',
+      bar: { fill: use / top, mark: fo / top }, n: <>Their first order earns {fmtMoney(fo)}{use > fo ? ', so each one starts at a loss' : ''}</> });
+  }
+  if (yoySales != null && yoyAds != null)
+    signs.push({ k: 'Sales against last year', v: (yoySales >= 0 ? '+' : '−') + fmtPctN(Math.abs(yoySales)),
+      tone: yoySales < 0 ? 'weak' : yoyAds - 1 > 2 * yoySales && yoyAds > 1.2 ? 'ok' : 'good',
+      n: <>On {fmtTimes(yoyAds, 1)} last year’s ad spend</> });
+  if (R.repeat_90d != null)
+    signs.push({ k: 'Customers who order again', v: fmtPctN(num(R.repeat_90d)), tone: v3SigBench(num(R.repeat_90d), BM.repeat_90d) || 'typical',
+      bar: BM.repeat_90d ? { fill: Math.min(1, num(R.repeat_90d) / (num(BM.repeat_90d.high) * 1.25)), mark: num(BM.repeat_90d.typical) / (num(BM.repeat_90d.high) * 1.25) } : null,
+      n: <>Within 90 days{BM.repeat_90d ? <>; about {fmtPctN(BM.repeat_90d.typical)} is typical</> : null}</> });
+  return (<section className="v3-stand">
+    <div className="v3-kick">Where you stand · last 30 days</div>
     <p className="v3-verdict">{verdict}</p>
     {sub}
-    {story
-      ? (<><V3StoryText text={NS.story}/>
-          <p className="micro muted v3-measure">{V3_NARR.data.summary_stale && V3_NARR.data.written_at
-            ? <>Written by Greta on {v3Day(String(V3_NARR.data.written_at).slice(0, 10), true)}. Today’s figures are in “The figures behind this”.</>
-            : <>Written by Greta. Every figure in it is checked against your data.</>}</p></>)
-      : <>{facts}{terms}</>}
-    {(story ? (facts || chart || bench) : (chart || bench)) && (
-      <V3More id="state-facts" label={story ? 'The figures behind this' : 'The weeks and the benchmarks behind this'}>
-        {story ? <>{facts}{terms}</> : null}{chart}{bench}
-      </V3More>)}
-  </section></div>);
+    <div className="v3-stand-grid">
+      <V3MoneyBridge L={L} share={share}/>
+      {signs.length > 0 && <div className="v3-signs">{signs.slice(0, 4).map(s => <V3Sign key={s.k} {...s}/>)}</div>}
+    </div>
+  </section>);
+}
+// One sign: what it is, the figure, one word for how it stands, and where relevant a bar with a mark
+// for the line that matters (break-even, what a first order earns, a typical rate).
+function V3Sign({ k, v, tone, bar, n }) {
+  const pc = x => Math.max(0, Math.min(100, x * 100)) + '%';
+  return (<div className="v3-sign">
+    <div className="v3-sign-k">{k}</div>
+    <div className="v3-sign-row"><span className="v3-sign-v">{v}</span>
+      <span className={'v3-sign-s v3-sign-' + (tone || 'typical')}>{V3_SIG_WORD[tone] || V3_SIG_WORD.typical}</span></div>
+    {bar && <span className="v3-sign-bar" aria-hidden="true"><i className={'v3-sign-fill-' + (tone || 'typical')} style={{ width: pc(bar.fill) }}/>
+      {bar.mark != null && <b style={{ left: pc(bar.mark) }}/>}</span>}
+    <div className="v3-sign-n">{n}</div>
+  </div>);
+}
+// Where the month's sales went, as a waterfall: sales, less products and delivery, less ads, less
+// running costs, and what is left. The verdict's figure is the last bar, so the two cannot disagree.
+function V3MoneyBridge({ L, share }) {
+  const num = v => (v == null ? null : Number(v));
+  const sales = num(L.sales), ads = num(L.ads), pa = num(L.profit_after_ads), ao = num(L.after_overheads);
+  if (!(sales > 0) || pa == null || ads == null) return null;
+  const goods = Math.max(sales - ads - pa, 0), end = ao != null ? ao : pa;
+  const lo = Math.min(0, end, pa), span = (sales - lo) || 1;
+  const x = v => ((v - lo) / span) * 100;
+  const rows = [
+    { k: 'Sales', a: 0, b: sales, tone: 'sales', v: sales },
+    { k: 'Products and delivery', a: sales - goods, b: sales, tone: 'cost', v: -goods },
+    { k: share != null ? 'Ads · ' + v3Pence(share) + ' of each £1' : 'Ads', a: pa, b: sales - goods, tone: 'ads', v: -ads },
+  ];
+  if (ao != null) rows.push({ k: 'Running costs', a: Math.min(ao, pa), b: Math.max(ao, pa), tone: 'cost', v: -(pa - ao) });
+  rows.push({ k: end < 0 ? 'You lose' : 'You keep', a: Math.min(0, end), b: Math.max(0, end), tone: end < 0 ? 'loss' : 'keep', v: end, total: true });
+  return (<figure className="v3-bridge" role="img" aria-label={rows.map(r => r.k + ' ' + fmtMoney(r.v)).join(', ')}>
+    <figcaption className="v3-bridge-cap">Where the last 30 days’ sales went</figcaption>
+    {rows.map(r => (<div key={r.k} className={'v3-bridge-row' + (r.total ? ' v3-bridge-total' : '')}>
+      <span className="v3-bridge-k">{r.k}</span>
+      <span className="v3-bridge-track">{lo < 0 && <b style={{ left: x(0) + '%' }}/>}
+        <i className={'v3-bridge-' + r.tone} style={{ left: x(r.a) + '%', width: Math.max(0.6, x(r.b) - x(r.a)) + '%' }}/></span>
+      <span className={'v3-bridge-v' + (r.total ? (r.v < 0 ? ' v3-down' : ' v3-up') : '')}>{r.v < 0 ? '−' : ''}{fmtMoney(Math.abs(r.v))}</span>
+    </div>))}
+  </figure>);
 }
 
 // Promotion and creator attribution: what each discount code brought over the last year.
@@ -21156,7 +21244,7 @@ function V3FixFirst() {
 }
 
 const V3_PAGES = {
-  today: (p) => (<><V3BusinessState/><V3Today {...p}/></>),
+  today: (p) => (<><V3BusinessState part="lead"/><V3Today {...p}/></>),
   review: (p) => (<>
     {/* Rebuilt 2026-10-05: the week against a typical week, the meeting agenda off the board, notes in
         the workspace. The old weekly board (week-on-week only, GA4 repair read as growth, notes in one
