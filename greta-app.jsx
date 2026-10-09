@@ -18348,6 +18348,7 @@ function V3Stock() {
         {lost > 0 && stat('Profit lost before it arrives', fmtMoney(lost), 'at today’s pace')}
         {sooner > 0 && stat('Each week sooner is worth', fmtMoney(sooner), 'if your supplier can cut it')}
       </div>}
+      {order.length > 0 && <V3StockDrivers order={order} lead={lead} land={land} sooner={sooner}/>}
     </section>
 
     {order.length > 0 && (<section className="v3-sec">
@@ -21192,6 +21193,52 @@ function V3BusinessState({ part }) {
     <p className="micro muted v3-stand-fresh">Each figure covers the 30 days to {HP ? v3Day(String(hq.rows[0].history.as_of), true) : 'yesterday'}, the last full day. Greta works them out again every hour; Shopify orders arrive every 30 minutes and ad spend every 2 hours.{HP ? ' Point at a sign to see its last 13 weeks.' : ''}</p>
   </section>);
 }
+// Stock (9 Oct): what drives the profit lost before an order placed today can land. Greta keeps stock
+// as it is now (Shopify's counts are overwritten on every sync), so there is no "then" yet: this splits
+// today's figure, from the Stock page's own order list, into products already out and products that run
+// out before the order lands, names the products behind each, and the lever (the supplier's lead time).
+function v3ModelStock(order, lead, land, sooner) {
+  const out = order.filter(r => r.stock_status === 'stockout' && r.risk > 0), soon = order.filter(r => r.stock_status !== 'stockout' && r.risk > 0);
+  const sum = a => a.reduce((t, r) => t + r.risk, 0), A = sum(out), B = sum(soon), tot = A + B;
+  const name = r => v3Sentence(r.product_title || r.sku);
+  const top = a => a.slice().sort((p, q) => q.risk - p.risk).slice(0, 3);
+  const perDayA = out.reduce((t, r) => t + r.perDay, 0), perDayB = soon.reduce((t, r) => t + r.perDay, 0);
+  const avgDays = soon.length ? Math.round(soon.reduce((t, r) => t + (r.days || 0), 0) / soon.length) : null;
+  return {
+    title: 'Why ' + fmtMoney(tot) + ' of profit is lost before the order lands',
+    from: 0, to: tot, better: 'lower', fmtV: v => fmtMoney(v), fmtAmt: v => fmtMoney(Math.abs(v)),
+    startK: 'If the order were here today', endK: 'Lost before it lands', subA: ' ', subB: 'arrives ' + v3Day(land, true),
+    bridgeCap: 'What runs short, and how much it costs', noChange: true, tableTitle: 'The two groups',
+    colA: 'Already out', colB: 'Run out before it lands',
+    todo: [{ amt: A, ids: ['stock-reorder'] }, { amt: B, ids: ['stock-reorder', 'promo-peak-plan'] }],
+    parts: [
+      ...(out.length ? [{ amt: A, k: 'Already out of stock', sub: fmtCount(out.length) + ' products, ' + fmtCount(lead) + ' days with nothing to sell',
+        cause: <>{fmtCount(out.length)} products are already out and sell nothing for the {fmtCount(lead)} days until an order placed today lands ({v3Names(top(out).map(name))} lose most)</>,
+        against: <>Products already out</> }] : []),
+      ...(soon.length ? [{ amt: B, k: 'Run out before it lands', sub: fmtCount(soon.length) + ' products, out in about ' + fmtCount(avgDays) + ' days',
+        cause: <>{fmtCount(soon.length)} more run out before then, in about {fmtCount(avgDays)} days on average ({v3Names(top(soon).map(name))} lose most)</>,
+        against: <>Products that run out before it lands</> }] : []),
+    ],
+    opening: <>At today’s pace, the products on the order list lose about {fmtMoney(tot)} of profit before an order placed today can land on {v3Day(land, true)}, {fmtCount(lead)} days away.</>,
+    closing: sooner > 0 ? <> The lever is the lead time: each week your supplier can cut is worth about {fmtMoney(sooner)}. Ordering the rest before they run out stops the second group growing.</> : null,
+    rows: [
+      ['Products', out.length, soon.length, v => fmtCount(v), null],
+      ['Profit lost a day, once out', perDayA, perDayB, v => fmtMoney(v), null],
+      ['Profit lost before the order lands', A, B, v => fmtMoney(v), null],
+    ],
+    note: 'From the order list on this page: each product’s profit a day at today’s pace, times the days it has nothing to sell before an order placed today could arrive. Greta keeps stock as it is today; from 10 October it also keeps a copy each night, so in a few weeks this can say which products ran out, which were restocked and which are still out.',
+  };
+}
+function V3StockDrivers({ order, lead, land, sooner }) {
+  const [open, setOpen] = React.useState(false);
+  const tot = (order || []).reduce((t, r) => t + (r.risk || 0), 0);
+  if (!(tot > 0)) return null;
+  return (<div className="v3-strip-act">
+    <button type="button" className="v3-xref v3-sign-act" aria-expanded={open} onClick={() => setOpen(o => !o)}>
+      {open ? 'Hide what is driving it' : 'What is driving the ' + fmtMoney(tot) + ' lost?'} <span className="v3-xref-go">{open ? '↑' : '↓'}</span></button>
+    {open && <V3DriverPanel fixed={v3ModelStock(order, lead, land, sooner)}/>}
+  </div>);
+}
 // Products (9 Oct): product sales over the last 28 days against the 28 before, on the Products page's
 // own figures (vw_product_performance), split into products that ran out, fewer or more units on the
 // products still selling, the price each unit sold at (a sale ending shows here), new products, and
@@ -21742,11 +21789,11 @@ function V3DriverPanel({ which, points, ctx, line, fixed }) {
                 : <span className="v3-legend"><i style={{ background: PAL.ink }}/>Compared with <i style={{ background: PAL.accent }}/>Now</span>}
       </figure>}
     </div>
-    <h4 className="v3-drivers-h">What changed underneath</h4>
+    <h4 className="v3-drivers-h">{M.tableTitle || 'What changed underneath'}</h4>
     <table className="v3-rw">
-      <thead><tr><th className="t-text">Measure</th><th>{M.colA || '30 days to ' + v3Day(String(a.d), true)}</th><th>{M.colB || '30 days to ' + v3Day(String(b.d), true)}</th><th>Change</th></tr></thead>
-      <tbody>{rows.map(([lab, p, q, fm, better]) => { const c = ch(p, q, better, fm); return (<tr key={lab}>
-        <td className="t-text">{lab}</td><td>{fm(p)}</td><td>{fm(q)}</td><td className={c ? c.cls : ''}>{c ? c.t : ''}</td></tr>); })}</tbody>
+      <thead><tr><th className="t-text">Measure</th><th>{M.colA || '30 days to ' + v3Day(String(a.d), true)}</th><th>{M.colB || '30 days to ' + v3Day(String(b.d), true)}</th>{M.noChange ? null : <th>Change</th>}</tr></thead>
+      <tbody>{rows.map(([lab, p, q, fm, better]) => { const c = M.noChange ? null : ch(p, q, better, fm); return (<tr key={lab}>
+        <td className="t-text">{lab}</td><td>{fm(p)}</td><td>{fm(q)}</td>{M.noChange ? null : <td className={c ? c.cls : ''}>{c ? c.t : ''}</td>}</tr>); })}</tbody>
     </table>
     {M.extra || null}
     <p className="micro muted v3-measure">{M.note}</p>
