@@ -20838,7 +20838,8 @@ function V3DataTrust() {
     <div className="v3-kick">Can you trust your numbers?</div>
     <p className="v3-verdict">{verdict}</p>
     {items.length > 0 && <ol className="v3-moves">{items.map(i => (<li key={i.k}><b>{i.head}</b> {i.body}{i.extra || null}</li>))}</ol>}
-  </section></div>);
+  </section>
+  <V3DriverStrip keys={['claims']} opts={orders30 > 0 && meta.rows && gads.rows ? { claims: { m: mP, g: gP, o: orders30 } } : null}/></div>);
 }
 
 // ── Team (V3, rebuilt 2026-10-05) ────────────────────────────────────────────────────────────────
@@ -21144,6 +21145,18 @@ function v3BuildSigns(S, hist, opts) {
   };
   cpaSign('metacpa', 'Meta: cost per sale', 'meta_spend', 'meta_purchases', 'Meta');
   cpaSign('googcpa', 'Google: cost per sale', 'google_spend', 'google_conversions', 'Google');
+  // settings: the share of web orders the ad platforms claim (neutral: more is not better or worse)
+  const CLP = HP ? HP.filter(p => Number(p.web_orders) > 0 && p.meta_purchases != null).map(p => Object.assign({}, p)) : [];
+  if (CLP.length >= 4) {
+    const own = opts && opts.claims;
+    if (own && own.o > 0) Object.assign(CLP[CLP.length - 1], { meta_purchases: own.m, google_conversions: own.g, web_orders: own.o });
+    const l = CLP[CLP.length - 1], v = ((Number(l.meta_purchases) || 0) + (Number(l.google_conversions) || 0)) / Number(l.web_orders);
+    signs.push({ k: 'Orders the ad platforms claim', v: fmtPctN(v), tone: v > 1 ? 'weak' : 'typical',
+      n: <>Meta {fmtCount(Math.round(Number(l.meta_purchases)))}, Google {fmtCount(Math.round(Number(l.google_conversions)))}, of {fmtCount(Number(l.web_orders))} website orders</>,
+      series: CLP.map(p => ({ d: String(p.d), v: ((Number(p.meta_purchases) || 0) + (Number(p.google_conversions) || 0)) / Number(p.web_orders) })),
+      fmt: x => fmtPctN(x), better: null, line: { v: 1, label: 'Every order claimed' },
+      which: 'claims', ctx: { lineLabel: 'every order claimed once' }, dline: 1, points: CLP });
+  }
   // the headline as a sign of its own, for the pages that show it beside the others
   const profitSign = profitCfg && (ao != null || L.profit_after_ads != null) ? Object.assign({
     k: ao != null ? 'After all costs, a month' : 'Profit after ads', v: v3SignedGbp(ao != null ? ao : num(L.profit_after_ads)),
@@ -21760,7 +21773,7 @@ function V3DriverStrip({ keys, title, opts }) {
   return (<section className="v3-sec v3-strip">
     <h2 className="v3-sec-title">{title || 'What is moving it'} <span className="v3-muted">last 30 days</span></h2>
     <div className="v3-signs">{picked.map(sg => <V3Sign key={sg.k} {...sg}/>)}</div>
-    {open && <V3DriverPanel key={drv} which={drv} points={SG.HP} ctx={open.ctx} line={open.dline}/>}
+    {open && <V3DriverPanel key={drv} which={drv} points={open.points || SG.HP} ctx={open.ctx} line={open.dline}/>}
   </section>);
 }
 // One sign: what it is, the figure, one word for how it stands, and where relevant a bar with a mark
@@ -22316,7 +22329,47 @@ function v3ModelNewSales(a, b, ctx) {
     note: 'New customers’ sales are first orders from your own shop, after discounts and before VAT, as on Customers. New customers are first-time buyers from any source; the cost of each is all Meta and Google spend divided by them. The three parts multiply to the sales, so they add up to the change exactly.',
   };
 }
+// Settings (9 Oct): the share of your website's orders that Meta and Google claim, each on its own count,
+// is Meta's claims / orders + Google's claims / orders, so a change splits exactly into the two. One
+// count falling much faster than real orders is the sign its tracking broke, which is what Settings is for.
+function v3ModelClaims(a, b, ctx) {
+  const f = p => { const o = Number(p.web_orders), m = Number(p.meta_purchases) || 0, g = Number(p.google_conversions) || 0;
+    return { o, m, g, ms: m / o, gs: g / o, v: (m + g) / o }; };
+  const A = f(a), B = f(b), pM = B.ms - A.ms, pG = B.gs - A.gs;
+  const fast = (x0, x1) => A.o > 0 && x0 > 0 && (x1 / x0) < (B.o / A.o) * 0.7;   // fell 30% more than orders did
+  const gFast = fast(A.g, B.g), mFast = fast(A.m, B.m);
+  const r = v => Math.round(v);
+  return {
+    neutral: true,
+    todo: [...(gFast ? [{ amt: pG, force: true, ids: ['diagnosis-google_cost_per_conversion', 'tracking-coverage', 'order-cost-google'] }] : []),
+           ...(mFast ? [{ amt: pM, force: true, ids: ['tracking-coverage', 'order-cost-meta'] }] : [])],
+    title: 'Why Meta and Google claim ' + fmtPctN(B.v) + ' of your orders', from: A.v, to: B.v, better: 'higher', fmtV: v => fmtPctN(v), fmtAmt: v3PtsAmt,
+    startK: 'Claimed, 30 days before', endK: 'Claimed, last 30 days', chartK: 'Orders the ad platforms claim',
+    parts: [
+      { amt: pM, k: 'Meta’s claims', sub: fmtCount(r(A.m)) + ' to ' + fmtCount(r(B.m)) + ' purchases, ' + fmtPctN(A.ms) + ' to ' + fmtPctN(B.ms) + ' of orders',
+        cause: <>Meta claimed {v3UpDown(A.ms, B.ms, 'more', 'fewer')} of your orders ({fmtCount(r(A.m))} to {fmtCount(r(B.m))} purchases, {fmtPctN(A.ms)} to {fmtPctN(B.ms)})</>,
+        against: <>Meta claiming {v3UpDown(A.ms, B.ms, 'more', 'fewer')} ({fmtPctN(A.ms)} to {fmtPctN(B.ms)} of orders)</> },
+      { amt: pG, k: 'Google’s claims', sub: fmtCount(r(A.g)) + ' to ' + fmtCount(r(B.g)) + ' conversions, ' + fmtPctN(A.gs) + ' to ' + fmtPctN(B.gs) + ' of orders',
+        cause: <>Google claimed {v3UpDown(A.gs, B.gs, 'more', 'fewer')} of your orders ({fmtCount(r(A.g))} to {fmtCount(r(B.g))} conversions, {fmtPctN(A.gs)} to {fmtPctN(B.gs)})</>,
+        against: <>Google claiming {v3UpDown(A.gs, B.gs, 'more', 'fewer')} ({fmtPctN(A.gs)} to {fmtPctN(B.gs)} of orders)</> },
+    ],
+    opening: <>In the last 30 days Meta and Google together claimed {fmtCount(r(B.m + B.g))} of the {fmtCount(B.o)} orders your website took ({fmtPctN(B.v)}), against {fmtPctN(A.v)} in the 30 days to {v3Day(String(a.d), true)}. The figures below are points of your orders.</>,
+    closing: gFast || mFast
+      ? <> {gFast ? 'Google’s' : 'Meta’s'} count fell much faster than your orders did ({fmtCount(B.o)} against {fmtCount(A.o)}): that usually means its conversion tracking changed, not that the ads stopped working. Check it before judging that platform on its own figures.</>
+      : B.v > 1 ? <> Together they claim more orders than you took: each counts any order that saw or clicked one of its ads, so both can count the same order.</> : null,
+    rows: [
+      ['Website orders', A.o, B.o, v => fmtCount(v), null],
+      ['Meta purchases, Meta’s count', A.m, B.m, v => fmtCount(Math.round(v)), null],
+      ['Google conversions, Google’s count', A.g, B.g, v => fmtCount(Math.round(v)), null],
+      ['Share the platforms claim', A.v, B.v, v => fmtPctN(v), null],
+    ],
+    note: 'Website orders are your shop’s web orders; each platform’s figure is its own count of sales it says its ads brought. Each counts any order that saw or clicked one of its ads, so they overlap and can add up to more than your orders.',
+  };
+}
 const V3_DRIVER_MODELS = {
+  claims: { model: v3ModelClaims, mode: 'pair', key: 'claims_share', fmt: v => fmtPctN(v),
+            prep: P => P.map(p => Object.assign({}, p, { claims_share: Number(p.web_orders) > 0 ? ((Number(p.meta_purchases) || 0) + (Number(p.google_conversions) || 0)) / Number(p.web_orders) : null })),
+            ok: p => p.claims_share != null && p.meta_purchases != null },
   newsales: { model: v3ModelNewSales, mode: 'pair', key: 'new_net', fmt: v => fmtMoney(v),
               ok: p => Number(p.new_customers) > 0 && Number(p.cac_spend) > 0 && Number(p.new_net) > 0 },
   spend:   { model: v3ModelSpend,     mode: 'pair', key: 'cac_spend',  fmt: v => fmtMoney(v),
