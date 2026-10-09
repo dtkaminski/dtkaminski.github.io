@@ -553,6 +553,8 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-plan-step .v3-rank-desc { font-size: var(--text-sm); }
 .v3-plan-step .v3-rank-gbp { font-size: var(--text-sm); }
 .v3-plan-step .v3-rank-n { color: var(--color-faint); }
+.v3-plan-step .v3-rank-meta { text-transform: none; }
+.v3-plan-step .v3-rank-why { padding-bottom: 0; }
 
 /* ── Sections, verdicts, share bar, levers (Growth plan and later pages) ─── */
 .v3-sec { border-top: 1px solid var(--color-line); padding-top: var(--space-6); }

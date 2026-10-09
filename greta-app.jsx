@@ -9107,7 +9107,7 @@ function v3DriverSummaries(S, hist, liveRows) {
     let M; try { M = M0.model(a, b, sg.ctx || {}); } catch (e) { return null; }
     const parts = M.parts.slice().sort((x, y) => Math.abs(y.amt) - Math.abs(x.amt)).filter(p => Math.abs(p.amt) > Math.abs(M.to - M.from) * 0.03)
       .map(p => p.k + (p.sub ? ' (' + p.sub + ')' : '') + ' ' + (p.amt >= 0 ? '+' : '−') + M.fmtAmt(p.amt)).join('; ');
-    const board = live.map(r => ({ r, n: v3BoardRank(live, r.external_id) })).filter(x => v3Moves(x.r.external_id).indexOf(sg.which) >= 0).slice(0, 3)
+    const board = live.map(r => ({ r, n: v3BoardRank(live, r.external_id) })).filter(x => x.n && v3Moves(x.r.external_id).indexOf(sg.which) >= 0).slice(0, 3)
       .map(x => '#' + x.n + ' ' + v3PlainAction(x.r).title).join('; ');
     return { figure: sg.k, key: sg.which, now: M.fmtV(M.to), then: M.fmtV(M.from), tone: sg.tone, v: sg.v,
       against: single ? 'the same 30 days last year' : 'the 30 days to ' + v3Day(String(a.d), true), parts, board: board || 'nothing on the board yet' };
@@ -10949,10 +10949,14 @@ function v3LiveRows(rows){ return (rows || []).filter(r => r.verification !== 'u
 // Skip. The figures overlap (spend saved and profit from the same ads), so the plan shows the lead's, never a sum.
 const V3_PLANS = [{ key: 'meta', title: 'One plan for your Meta ads',
   ids: ['order-cost-meta', 'driver-retargeting', 'driver-meta-ads', 'paid-landing-meta', 'test-holdout-facebook_acquisition'] }];
-// The number a row carries on the board with plans folded: every step of a plan carries the plan's number,
-// so "#3" on a drivers panel is the row the reader finds at 3 on the Actions page.
+// The number a row carries on the board as it first opens: plans folded (every step carries the plan's
+// number) and the rows under the small-item floor left out, as the board hides them. So "#5" on a drivers
+// panel is the row the reader finds at 5 on the Actions page; a hidden small row has no number (null).
 function v3BoardRank(live, id) {
-  const F = v3FoldPlans(live), i = F.findIndex(r => r.external_id === id || (r.plan && r.plan.steps.some(st => st.external_id === id)));
+  const sales30 = Number(((typeof window !== 'undefined' && window.GRETA_HEADLINE) || {}).net_revenue_30d) || 0;
+  const floor = Math.max(50, Math.round(sales30 * 0.005)), F = v3FoldPlans(live);
+  const big = F.some(r => (Number(r.cm_gbp) || 0) >= floor) ? F.filter(r => (Number(r.cm_gbp) || 0) >= floor) : F;
+  const i = big.findIndex(r => r.external_id === id || (r.plan && r.plan.steps.some(st => st.external_id === id)));
   return i >= 0 ? i + 1 : null;
 }
 function v3FoldPlans(rows) {
@@ -11239,11 +11243,11 @@ function V3PlanSteps({ plan }) {
         </span>
         <span className="v3-rank-gbp">{v3Gbp(gbp)}<span className="v3-rank-per">{v3Per(st, true)}</span></span>
       </button>
-      <div className="v3-rank-fix">
-        <V3Done ext={st.external_id} small tone="quiet" onDone={() => v3BoardDrop(st.external_id)}/>
-        <V3Skip ext={st.external_id} small tone="quiet" onDone={() => v3BoardDrop(st.external_id)}/>
-      </div>
       {isOpen && (<div className="v3-rank-why">
+        <div className="v3-rank-fix">
+          <V3Done ext={st.external_id} small tone="quiet" onDone={() => v3BoardDrop(st.external_id)}/>
+          <V3Skip ext={st.external_id} small tone="quiet" onDone={() => v3BoardDrop(st.external_id)}/>
+        </div>
         {pa.why && <p className="v3-rank-plain">{pa.why}</p>}
         {play.length ? <ol className="v3-rank-steps">{play.map((x, k) => <li key={k}>{v3Tidy(x)}</li>)}</ol> : null}
         {st.money_basis && <p className="v3-rank-raw"><span className="v3-kick">How Greta got to {v3Gbp(gbp)}</span>{v3Tidy(scrubTag(st.money_basis))}.</p>}
@@ -11296,14 +11300,14 @@ function V3Findings(){
             <button type="button" className="v3-rank-hit" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : f.external_id)}>
               <span className="v3-rank-body">
                 <span className="v3-rank-desc">{pa.title}</span>
-                <span className="v3-rank-meta">{({ total: 'Whole business', site: 'Website', finance: 'Money', ops: 'Running the business', product: 'Products', paid: 'Ads', creative: 'Ad content', retention: 'Repeat customers', cx: 'Customer service', stock: 'Stock', email: 'Email', organic: 'Unpaid visits' })[f.category] || f.category || 'general'}{conf ? ' · ' + V3_CONF[conf].label.toLowerCase() : ''}{behind >= 0 ? (counting ? ' · a change in how sales are counted, not the cause of action #' + bN : ' · explains action #' + bN) : ''}</span>
+                <span className="v3-rank-meta">{({ total: 'Whole business', site: 'Website', finance: 'Money', ops: 'Running the business', product: 'Products', paid: 'Ads', creative: 'Ad content', retention: 'Repeat customers', cx: 'Customer service', stock: 'Stock', email: 'Email', organic: 'Unpaid visits' })[f.category] || f.category || 'general'}{conf ? ' · ' + V3_CONF[conf].label.toLowerCase() : ''}{bN ? (counting ? ' · a change in how sales are counted, not the cause of action #' + bN : ' · explains action #' + bN) : ''}</span>
               </span>
             </button>
             {isOpen && (<div className="v3-rank-why">
               {pa.why && <p className="v3-rank-plain">{pa.why}</p>}
               {/* One verdict per platform: this cost is on the platform's own purchase count, the board's
                   is on the shop's orders, and the two read differently. Say which to judge it on. */}
-              {behind >= 0 && /^metric-tree-/.test(String(f.external_id)) && (<p className="v3-note v3-measure">
+              {bN && /^metric-tree-/.test(String(f.external_id)) && (<p className="v3-note v3-measure">
                 This cost uses {ch === 'meta' ? 'Meta' : 'Google'}’s own count of purchases, not your shop’s orders, so it differs from the cost per order in action #{bN}. Judge {ch === 'meta' ? 'Meta' : 'Google'} on the figure in #{bN}. Use this to see which step changed.</p>)}
               {reasons.length > 0 && (<div className="v3-rank-raw"><span className="v3-kick">Why {conf ? V3_CONF[conf].label.toLowerCase() : 'this steer'}</span>
                 <ul className="v3-rank-steps">{reasons.map((x, j) => <li key={j}>{v3Tidy(x.text)}</li>)}</ul></div>)}
@@ -16533,7 +16537,7 @@ function v3PlainAction(row){
   const n = V3_WRITER_ACTIONS && V3_NARR.data && V3_NARR.data.actions && V3_NARR.data.actions[id];
   if (n && n.title) return { title: n.title, why: n.why || '', raw, written: true };
   if (row && row.plan) return { title: row.plan.title, raw,
-    why: row.plan.steps.length + ' changes on the same budget, in the order to make them: ' + row.plan.steps.map(st => v3PlainAction(Object.assign({}, st, { plan: null })).title.replace(/^./, c => c.toLowerCase())).join('; ') + '.' };
+    why: v3Sentence(['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven'][row.plan.steps.length] || String(row.plan.steps.length)) + ' changes on the same budget, in the order to make them: ' + row.plan.steps.map(st => v3PlainAction(Object.assign({}, st, { plan: null })).title.replace(/^./, c => c.toLowerCase())).join('; ') + '.' };
   let x;
   // Forecast checks carry raw channel keys ("google_all", "[acquisition] google_nonbrand: iROAS …"),
   // which Review's "Decided in the last three weeks" showed as they were (6 Oct).
@@ -21804,7 +21808,11 @@ function v3ModelProducts(list, sale) {
 // refunded orders over orders across products, the basis the board's returns rows quote (frkl: 11%).
 // Settings (9 Oct): every part of a D2C business (the anatomy, 184 measures in 18 parts), and for each what
 // Greta measures, whether a drivers panel explains it and how many actions act on it, so a gap reads as a gap.
-const V3_COVERAGE_Q = (sb, b) => sb.rpc('fn_anatomy_coverage', { p_brand: b });
+// The map's drivers are the sign panels; these parts are explained by a page's own panel instead (Products'
+// sales and refunds, Stock's order timing, Goal's so-far and gap), so they are not "Not yet".
+const V3_PAGE_PANELS = { 'Range and price': ['products', 'refunds'], 'Stock and supply': ['stock'], 'Plan and forecast': ['goal'] };
+const V3_COVERAGE_Q = (sb, b) => sb.rpc('fn_anatomy_coverage', { p_brand: b }).then(r => (r && Array.isArray(r.data))
+  ? Object.assign({}, r, { data: r.data.map(x => V3_PAGE_PANELS[x.category] ? Object.assign({}, x, { drivers: (x.drivers || []).concat(V3_PAGE_PANELS[x.category]) }) : x) }) : r);
 function V3AnatomyCoverage() {
   const q = useV3Rows('anatomy-coverage', V3_COVERAGE_Q);
   const R = Array.isArray(q.rows) ? q.rows : [];
@@ -21841,17 +21849,17 @@ function V3RefundSign({ part, open, setOpen }) {
   const live = board.rows ? v3LiveRows(board.rows) : [];
   const acts = live.filter(r => /^returns-product-/.test(r.external_id));
   if (part === 'sign') return (
-    <V3Sign k="Orders refunded" v={fmtPctN(rate)} tone={high.length ? 'weak' : 'typical'}
-      n={<>{fmtMoney(G)} of {fmtMoney(S)} given back over three months{high.length ? <>; {high.length === 1 ? 'one product comes' : fmtCount(high.length) + ' products come'} back at half as often again or more</> : null}</>}
+    <V3Sign k="Orders refunded" v={fmtPctN(rate)} tone={high.length ? 'ok' : 'typical'}
+      n={<>{fmtMoney(G)} of {fmtMoney(S)} given back over three months{high.length ? <>; {high.length === 1 ? 'one product is' : fmtCount(high.length) + ' products are'} refunded at 1.5 times that or more</> : null}</>}
       act={high.length ? { label: open ? 'Hide which products' : 'Which products?', open, on: () => setOpen(o => !o) } : null}/>);
   if (!open || !high.length) return null;
   return (<div className="v3-drivers">
       <h3 className="v3-sec-title">Products refunded more than your shop’s {fmtPctN(rate)}</h3>
-      <p className="v3-note v3-measure">{high.length === 1 ? 'This product is' : 'These products are'} refunded at least half as often again as your shop as a whole. A product that keeps coming back usually has one reason: the size, the photos, the quality, or the description. Find it before you spend more selling it.</p>
+      <p className="v3-note v3-measure">{high.length === 1 ? 'This product is' : 'These products are'} refunded at 1.5 times your shop’s rate or more. A product that keeps coming back usually has one reason: the size, the photos, the quality, or the description. Find it before you spend more selling it.</p>
       {acts.length > 0 && <div className="v3-drivers-todo">
         <div className="v3-kick">What to do</div>
         {acts.slice(0, 3).map(r => (<button key={r.external_id} type="button" className="v3-drivers-todo-row" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>
-          <span className="v3-num">#{v3BoardRank(live, r.external_id)}</span><span>{v3PlainAction(r).title}</span>
+          <span className="v3-num">{v3BoardRank(live, r.external_id) ? '#' + v3BoardRank(live, r.external_id) : ''}</span><span>{v3PlainAction(r).title}</span>
           <span className="v3-num">{r.cm_gbp ? v3Gbp(r.cm_gbp) + v3Per(r, true) : ''}</span><Icon name="arrowRight" size={13}/></button>))}
       </div>}
       <table className="v3-rw">
@@ -21897,7 +21905,8 @@ function V3BoardDrivers() {
   const live = v3LiveRows(board.rows);
   const all = SG.signs.concat(SG.profitSign ? [SG.profitSign] : []);
   const items = all.filter(sg => sg.which && (sg.tone === 'weak' || sg.tone === 'ok')).map(sg => ({ sg,
-    rows: live.map(r => ({ r, n: v3BoardRank(live, r.external_id) })).filter(x => v3Moves(x.r.external_id).indexOf(sg.which) >= 0).slice(0, 3) }))
+    rows: live.map(r => ({ r, n: v3BoardRank(live, r.external_id) })).filter(x => x.n && v3Moves(x.r.external_id).indexOf(sg.which) >= 0)
+      .filter((x, k, A) => A.findIndex(y => y.n === x.n) === k).slice(0, 3) }))
     .filter(x => x.rows.length).sort((a, b) => a.rows[0].n - b.rows[0].n).slice(0, 5);
   if (!items.length) return null;
   const open = drv ? items.find(x => x.sg.which === drv) : null;
@@ -22678,7 +22687,7 @@ function V3DriverPanel({ which, points, ctx, line, fixed }) {
     {todo.length > 0 && <div className="v3-drivers-todo">
       <div className="v3-kick">What to do</div>
       {todo.map(t => (<button key={t.row.external_id} type="button" className="v3-drivers-todo-row" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>
-        <span className="v3-num">#{t.rank}</span><span>{v3PlainAction(t.row).title}</span>
+        <span className="v3-num">{t.rank ? '#' + t.rank : ''}</span><span>{v3PlainAction(t.row).title}</span>
         <span className="v3-num">{t.row.cm_gbp ? v3Gbp(t.row.cm_gbp) + v3Per(t.row, true) : ''}</span><Icon name="arrowRight" size={13}/></button>))}
     </div>}
     <div className={'v3-drivers-grid' + (fixed ? ' v3-drivers-grid-one' : '')}>
@@ -22837,7 +22846,7 @@ function V3FixFirst({ kick }) {
   if (q.err || !q.rows || !q.rows.length) return null;
   const r = q.rows[0];
   const live = board.rows ? v3LiveRows(board.rows) : [];
-  const hit = live.map(x => ({ x, i: v3BoardRank(live, x.external_id) - 1 })).filter(o => /^(order-cost|paid-landing)-/.test(o.x.external_id))
+  const hit = live.map(x => ({ x, i: (v3BoardRank(live, x.external_id) || 0) - 1 })).filter(o => o.i >= 0 && /^(order-cost|paid-landing)-/.test(o.x.external_id))
     .filter((o, k, A) => A.findIndex(p => p.i === o.i) === k);
   // One line and a fold: the full finding ran to a screen and a half on a phone (2026-10-06).
   const desc = v3Tidy(scrubTag(String(r.description || '')));
