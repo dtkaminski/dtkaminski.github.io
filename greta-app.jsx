@@ -17528,6 +17528,18 @@ function V3HeroTrend({ sales, prod }) {
   </figure>);
 }
 
+// The first n sentences: a stop followed by a space and a capital or £ ("7.5 weeks" is not one).
+function v3FirstSentences(text, n) {
+  const t = String(text || ''), re = /[.!?]\s+(?=[A-Z£])/g; let m, k = 0;
+  while ((m = re.exec(t))) { if (++k === n) return t.slice(0, m.index + 1); }
+  return t;
+}
+// A first step that lists products ("Link up necklace (36 units, £388); The OG ...; ...") keeps its
+// first two and points to the rest, so the card stays a glance.
+function v3ShortStep(t) {
+  const parts = String(t || '').split(/;\s+/);
+  return parts.length > 2 && /\(\d[\d,]* units/.test(parts[1]) ? parts.slice(0, 2).join('; ') + ', and the rest on the list.' : String(t || '');
+}
 function V3Today(p) {
   const h = useV3Headline();
   // The loader flags a headline that never arrived (GRETA_HEADLINE_ERROR); nothing listened, so
@@ -17666,9 +17678,6 @@ function V3Today(p) {
       </div>);
     })()}
 
-    {/* The tracking problem sits with the actions it affects, after the profit figure (2026-10-06):
-        above it, it pushed the figure a screen down on a phone. */}
-    <V3FixFirst/>
     <div className="v3-act-grid">
     {top ? (
       <div className="v3-dofirst v3-raised">
@@ -17684,12 +17693,13 @@ function V3Today(p) {
             <span className="v3-dofirst-worth-v">{v3Gbp(top.cm_gbp)}</span>
             <span className="v3-dofirst-worth-k">{v3Once(top) ? 'once, over the peak' : 'a month'}</span></div> : null}
         </div>
-        {v3PlainAction(top).why && <p className="v3-dofirst-line"><b>Why</b><span>{v3PlainAction(top).why}</span></p>}
+        {/* two sentences of why on the card; the rest is under "Why this first?" */}
+        {v3PlainAction(top).why && <p className="v3-dofirst-line"><b>Why</b><span>{v3FirstSentences(v3PlainAction(top).why, 2)}</span></p>}
         {seasonNote && isCut(top) && <div className="v3-sub">This cut is for {seasonNote.cur} only. Greta’s quarter plan puts {v3Gbp(seasonNote.spend)} of ads into {seasonNote.peak}, when new customers cost far less to win, so don’t carry the cut into it.{monthLine}{' '}
           <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('growth')}>Why <span className="v3-xref-go">on Growth plan →</span></button></div>}
         {top.external_id === 'stock-reorder' && <div className="v3-sub"><button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('stock')}>The full order list, with what the peak adds <span className="v3-xref-go">on Stock &amp; orders →</span></button></div>}
         {top.step1
-          ? <p className="v3-dofirst-line"><b>First step</b><span>{v3Money(scrubTag(top.step1))}</span></p>
+          ? <p className="v3-dofirst-line"><b>First step</b><span>{v3Money(v3ShortStep(scrubTag(top.step1)))}</span></p>
           : <div className="v3-sub">No first step recorded for this one.{' '}
               <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiAsk && window.__oiAsk('What is the first thing I should do about this, in concrete steps: ' + v3ActionText(top.description).main)}>Ask Greta where to start</button>
             </div>}
@@ -17758,6 +17768,10 @@ function V3Today(p) {
     </div>)}
     </div>
 
+    {/* The tracking problem sits straight after the actions it affects (9 Oct): above them it pushed
+        "Do this first" off the first screen. */}
+    <V3FixFirst kick="Fix this as well"/>
+
     {/* 9 Oct: the profit figure, the goal and the weeks follow the actions. The lead above already
         says where profit stands and draws where the sales went, so the first screen is the answer and
         what to do; this is the evidence. */}
@@ -17765,7 +17779,7 @@ function V3Today(p) {
       <div className="v3-hero">
        <div className="v3-hero-grid">
         <div className="v3-hero-main">
-        <div className="v3-hero-lab">Profit after ads · last 30 days <V3Info k="profit_after_ads"/>
+        <div className="v3-hero-lab">Profit after ads, before running costs · last 30 days <V3Info k="profit_after_ads"/>
           {/* The basis comes from the server (0192), not from cm_source. This chip used to read
               cm_source === 'fit_engine' as "Measured — calculated from your own product and order
               costs", which was exactly backwards: fit_engine means the engine derived margin from
@@ -21220,7 +21234,7 @@ function V3StaleSuggestions() {
 // sits above the board rather than unranked below it.
 const V3_FIXFIRST_Q = (sb, b) => sb.from('actions').select('external_id,description,raised_at')
   .eq('brand_id', b).eq('status', 'open').eq('external_id', 'tracking-coverage').limit(1);
-function V3FixFirst() {
+function V3FixFirst({ kick }) {
   const q = useV3Rows('fix-first', V3_FIXFIRST_Q);
   const board = useV3Board();
   if (q.err || !q.rows || !q.rows.length) return null;
@@ -21233,7 +21247,7 @@ function V3FixFirst() {
   // "still off in September" read as old news in October: the check now says where this month stands (0286)
   if (/So far in \w+ \([\d,]+ orders\) it is still off/.test(desc)) first = first.replace(/ and is still off in \w+\.$/, ' and is still off this month.');
   return (<section className="v3-sec">
-    <div className="v3-kick">Fix first</div>
+    <div className="v3-kick">{kick || 'Fix first'}</div>
     <p className="v3-note v3-measure"><b>{v3PlainAction(r).title}.</b> {first}{hit.length > 0 && <> Until it is fixed, your shop undercounts the orders each ad channel brings. So {hit.map(o => '#' + (o.i + 1)).join(', ').replace(/, ([^,]*)$/, ' and $1')} on the board {hit.length === 1 ? 'is' : 'are'} less certain.</>}</p>
     <V3More id="fixfirst-why" label="The detail">
       <p className="v3-note v3-measure">{desc}</p>
