@@ -3595,6 +3595,46 @@ function v3TypicalMonth(ladRows, cmr) {
 const V3_TIER_Q = (sb, b) => sb.from('vw_customer_tier_periods')
   .select('window_label,new_customers,returning_customers,new_net,returning_net,net_sales,ncac,returning_rev_share')
   .eq('brand_id', b).eq('window_label', 'current_30d').limit(1);
+// One conversion figure for the owner (review, 8 Oct): Website said 0.45 orders per 100 visits (Clarity,
+// every visit) while this page said 0.8% (Google Analytics sessions, on the 14 days it recorded). When the
+// brand has Clarity, Profit & sales shows Website's figure, from the same cached query; otherwise the
+// Google Analytics tile it is given.
+function V3VisitsKPI({ fallback }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const cl = useV3Rows('web-clarity', (sb, b) => sb.from('tenant_clarity_daily')
+    .select('date,metric_name,sessions_count,with_metric_pct,raw').eq('brand_id', b).eq('num_days', 1).eq('dim_value', 'all')
+    .in('metric_name', ['Traffic'].concat(V3_FRICTION.map(x => x[0]))).gte('date', v3IsoAdd(today, -125)).order('date', { ascending: false }).limit(1000));
+  const ord = useV3Rows('web-orders', (sb, b) => sb.from('v_tenant_shopify_daily_agg')
+    .select('day,order_count').eq('brand_id', b).gte('day', v3IsoAdd(today, -125)).limit(1000));
+  const r = React.useMemo(() => {
+    if (!cl.rows || !ord.rows) return null;
+    const tr = cl.rows.filter(x => x.metric_name === 'Traffic');
+    const days = [...new Set(tr.map(x => String(x.date).slice(0, 10)))].sort();
+    if (days.length < 20) return null;
+    const end = days[days.length - 1];
+    const ordBy = {}; ord.rows.forEach(x => { const d = String(x.day).slice(0, 10); ordBy[d] = (ordBy[d] || 0) + (Number(x.order_count) || 0); });
+    const read = k => {
+      const e = v3IsoAdd(end, -30 * k), s = v3IsoAdd(e, -29);
+      const t = tr.filter(x => { const d = String(x.date).slice(0, 10); return d >= s && d <= e; });
+      if (t.length < 25) return null;
+      const v = t.reduce((a, x) => { const w = x.raw || {}; return a + Math.max(0, (Number(w.totalSessionCount) || 0) - (Number(w.totalBotSessionCount) || 0)); }, 0);
+      let o = 0; for (let i = 0; i < 30; i++) o += ordBy[v3IsoAdd(s, i)] || 0;
+      return v > 0 ? o / v : null;
+    };
+    const cur = read(0); if (cur == null) return null;
+    const before = [1, 2, 3].map(read).filter(x => x != null).sort((a, b) => a - b);
+    const typ = before.length ? before[Math.floor(before.length / 2)] : null;   // the window before can hold a sale
+    return { cur, typ };
+  }, [cl.rows, ord.rows]);
+  if (!r) return fallback;
+  const per = v => (v * 100).toFixed(2);
+  const chg = r.typ ? r.cur / r.typ - 1 : null;
+  return (<KPI label="Orders per 100 visits" val={per(r.cur)}
+    status={chg == null ? undefined : chg <= -0.2 ? 'action' : chg < -0.1 ? 'watch' : 'healthy'}
+    statusLabel={chg == null ? undefined : chg <= -0.2 ? 'Below your usual' : chg < -0.1 ? 'A little below usual' : 'Your usual rate'}
+    sub={(r.typ ? 'against a typical ' + per(r.typ) + ' for you. ' : '') + 'Every visit, counted by Microsoft Clarity: the same figure as Website.'}/>);
+}
+
 function V3ProfitLead() {
   const H = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || null;
   const lad = useV3Rows('profit-ladder', V3_LADDER_Q);
@@ -4144,17 +4184,17 @@ function Overview({start, period, customActive}){
               status={st || undefined} statusLabel={st === 'healthy' ? 'Above break-even' : st === 'watch' ? 'Just above break-even' : st === 'action' ? 'Below break-even' : undefined}
               agent="Atlas" observation={_vs('Sales', rev, pRev, 'ad spend', paid, pPaid)} />; })()}
           <KPI label="Sessions (GA4)" val={NUM(sessions)} sub={(() => { const gd = ga.filter(g => Number(g.sessions) > 0).length, nd = daily.length;
-              return (gd < nd ? `${gd} of ${nd} days have reliable analytics · ` : '') + `site conversion rate ${PCT(cvr)} on those days`; })()} series={seriesSessions} current={sessions} prior={pSessions} goodDirection="up"
+              return gd < nd ? `${gd} of ${nd} days have reliable analytics` : `every day of the period recorded`; })()} series={seriesSessions} current={sessions} prior={pSessions} goodDirection="up"
             agent="Pulse" observation={_vs('Visits', sessions, pSessions, 'ad spend', paid, pPaid)} />
           {!UI_V3 && <KPI label="Orders Klaviyo saw" val={GBP(emailRev)} sub="every order Klaviyo recorded, including VAT and shipping — not sales from email" series={seriesEmail} current={emailRev} prior={(pKl.length >= Math.max(3, Math.floor(kl.length * 0.8))) ? pEmailRev : null} goodDirection="up"
             agent="Lux" observation={_vs('Orders Klaviyo saw', emailRev, pEmailRev, 'sales', rev, pRev)} />}
           {/* With analytics recording under 80% of the days, a benchmark beside this tile ("0.8% vs 1.5%")
               read as a conversion problem while Website, which counts every visit with Clarity, showed
               the usual rate (review, 8 Oct). Website is the one to read then. */}
-          <KPI label="Visitors who buy" val={PCT(cvr)} sub={cvrReliable ? 'orders ÷ visits, on the days analytics recorded' : 'Google Analytics missed too many days to judge this. Website counts every visit another way: read it there.'} series={seriesCVR} current={cvr} prior={pCvr} goodDirection="up"
+          <V3VisitsKPI fallback={<KPI label="Visitors who buy" val={PCT(cvr)} sub={cvrReliable ? 'orders ÷ visits, on the days analytics recorded' : 'Google Analytics missed too many days to judge this. Website counts every visit another way: read it there.'} series={seriesCVR} current={cvr} prior={pCvr} goodDirection="up"
             status={(cvr==null||!cvrReliable)?undefined:cvr>=CVR_BENCH?'healthy':cvr>=CVR_BENCH*0.8?'watch':'action'} statusLabel={cvr==null?undefined:!cvrReliable?'Too few tracked days':cvr>=CVR_BENCH?'Healthy':cvr>=CVR_BENCH*0.8?'Watch':'Below target'}
             agent="Pulse" observation={`Site conversion rate (Shopify orders ÷ GA4 sessions) is the single biggest revenue lever — against the ${CVR_BENCH_LABEL} target, more spend just buys more bounces.`}
-            benchmark={cvrReliable ? 'site_cvr' : undefined} bmValue={cvrReliable ? cvr : null} />
+            benchmark={cvrReliable ? 'site_cvr' : undefined} bmValue={cvrReliable ? cvr : null} />}/>
           {/* "Discount depth 6%" here and "up to 36% off" on Today were both true and read as a contradiction:
               this tile counts codes only, Today's figure is sale prices (review, 8 Oct). */}
           <KPI label="Money off from codes" val={PCT(discLoad)} sub={`${curSym()} off from discount codes ÷ ${curSym()} of sales. Sale prices come on top: Today shows how deep your sales went.`} series={seriesDisc} current={discLoad} prior={pDiscLoad} goodDirection="down"
@@ -10950,7 +10990,9 @@ function V3ActionBoard(){
       </ol>
       {V3_BOARD.ranked && <p className="micro muted v3-measure">Each row says when Greta last checked its figures. An action whose figures go three weeks without a check drops off this list, so every figure here is current. Actions open over a month that Greta has no nightly test for sit below the ranked list.</p>}
       <V3HeldActions/>
-      <V3Findings/>
+      {/* Actions read 7.1 screens (review, 8 Oct); the ranked list is the page's answer, so the changes
+          with no £ figure fold away below it. */}
+      <V3More id="act-findings" label="Changes Greta spotted that have no £ figure yet"><V3Findings/></V3More>
     </div>
   );
 }
@@ -17681,7 +17723,9 @@ function V3Today(p) {
     </div>)}
     </div>
 
-    <V3Why why={d.why} period={d.why_period} typical={typical} now={{ sales, spend, kept: cam }}/>
+    {/* Today read 5.3 screens (review, 8 Oct). The summary at the top already names what moved profit and
+        Profit & sales has it in full, so the breakdown folds away here. */}
+    <V3More id="today-why" label="What moved your profit, in pounds"><V3Why why={d.why} period={d.why_period} typical={typical} now={{ sales, spend, kept: cam }}/></V3More>
     {/* Two drawers used to follow. "What changed this week" repeated Review's lead. "Business,
         customer and channel numbers" (GretaOverviewTiers) recomputed everything in the browser on
         its own window: profit after ads £3,124 under a hero saying £3,350, ad spend £10,249 vs
@@ -18195,6 +18239,9 @@ function V3Stock() {
         {' '}Each order covers eight weeks of sales after it arrives, at today’s pace, less what is left by then.{pk ? <> For {pkName}, it uses what each product sold on the same days last year{grow && pk.growth != null ? ', plus this year’s growth' : ''}.</> : null} {anyPeak ? '“For the peak” is the part of the order the peak adds. ' : ''}Cost is your landed cost per unit. “Profit lost before it arrives” is what these products would have earned between running out and the order arriving.</p>
     </section>)}
 
+    {/* Housekeeping folds away: the page read 6.1 screens, and an owner deciding what to order today does
+        not need these first (review, 8 Oct). The label says what is inside. */}
+    {(longOut.length > 0 || noSku.length > 0) && <V3More id="stock-tidy" label={'Tidy-up in Shopify: ' + [longOut.length > 0 ? fmtCount(longOut.length) + ' out of stock for over four weeks' : null, noSku.length > 0 ? fmtCount(noSkuTitles) + ' without a product code' : null].filter(Boolean).join(', ')}>
     {longOut.length > 0 && (<section className="v3-sec">
       <h2 className="v3-sec-title">Out of stock for over four weeks: keep or drop?</h2>
       <p className="v3-note v3-measure">{longOut.length === 1 ? 'One product has' : fmtCount(longOut.length) + ' products have'} been out of stock for over four weeks. None sold in that time, so Greta can’t work out how many to order. Decide each one: restock a small batch if you still want to sell it, or archive it in Shopify so it stops counting as out of stock.</p>
@@ -18207,6 +18254,7 @@ function V3Stock() {
       <h2 className="v3-sec-title">Products without a product code</h2>
       <p className="v3-note v3-measure">{fmtCount(noSkuTitles)} products that sell have no product code (SKU) in Shopify. They made {fmtPctN(noSkuShare)} of the last four weeks’ sales. Greta tracks them by Shopify’s own reference number, so they are still in the order above. Add a product code to each in Shopify so your supplier order can show it. After you do, that product’s sales rate reads low for four weeks while its history catches up.</p>
     </section>)}
+    </V3More>}
 
     {slow.length > 0 && (<section className="v3-sec">
       <h2 className="v3-sec-title">Where is cash tied up in stock?</h2>
@@ -20999,7 +21047,7 @@ const V3_PAGES = {
   actions: (p) => (<>
     <V3FixFirst/>
     <ActionsView/>
-    <V3More id="act-decisions" label="What you did, and whether it worked" defaultOpen><V3Anchor id="decisions"/><V3TrackRecord/></V3More>
+    <V3More id="act-decisions" label="What you did, and whether it worked"><V3Anchor id="decisions"/><V3TrackRecord/></V3More>
     <V3StaleSuggestions/>
   </>),
   calendar: (p) => mosView('Calendar'),
