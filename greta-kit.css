@@ -555,6 +555,16 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-plan-step .v3-rank-n { color: var(--color-faint); }
 .v3-plan-step .v3-rank-meta { text-transform: none; }
 .v3-plan-step .v3-rank-why { padding-bottom: 0; }
+/* What Greta can see (Settings, 0319): a part opens onto each measure's figure, hairlines, no card. */
+.v3-cov .v3-cov-open > td { white-space: normal; padding-top: 0; }
+.v3-cov-list { list-style: none; margin: 0 0 var(--space-3); padding: 0; }
+.v3-cov-list > li { display: grid; grid-template-columns: minmax(0, 14rem) minmax(0, 1fr); gap: var(--space-1) var(--space-4);
+  border-top: 1px solid var(--color-line); padding: var(--space-2) 0; font-size: var(--text-sm); }
+.v3-cov-name { color: var(--color-ink); font-family: var(--font-sans); }
+.v3-cov-fig { font-family: var(--font-sans); color: var(--color-ink); }
+.v3-cov-why { grid-column: 2; font-size: var(--text-xs); color: var(--color-muted); }
+@media (max-width: 640px) { .v3-cov-list > li { grid-template-columns: minmax(0, 1fr); } .v3-cov-why { grid-column: 1; } }
+.v3-field-check { flex-direction: row; align-items: center; gap: var(--space-2); }
 
 /* ── Sections, verdicts, share bar, levers (Growth plan and later pages) ─── */
 .v3-sec { border-top: 1px solid var(--color-line); padding-top: var(--space-6); }
@@ -1234,3 +1244,5 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-ask-list li { margin-bottom: var(--space-1); }
 .v3-ask-table { overflow-x: auto; margin: 0 0 var(--space-3); }
 .v3-ask-answer > :last-child { margin-bottom: 0; }
+.v3-cov-chev { display: inline-flex; color: var(--color-faint); transition: transform 120ms; }
+.v3-cov-chev.open { transform: rotate(90deg); }

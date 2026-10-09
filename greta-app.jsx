@@ -9201,7 +9201,8 @@ function buildAskContext(facts, question, budget){
     // the parts of the business with something missing (0318): what is not measured, and whether anything explains or acts on it
     anatomy_gaps: (() => { const C = (typeof window !== 'undefined' && Array.isArray(window.GRETA_COVERAGE)) ? window.GRETA_COVERAGE : [];
       const g = C.filter(r => (r.missing_core && r.missing_core.length) || !(r.drivers && r.drivers.length) || !r.open_actions)
-        .map(r => ({ part: r.arm, measured: r.measured + ' of ' + r.metrics, explained: !!(r.drivers && r.drivers.length), open_actions: Number(r.open_actions) || 0, not_measured: r.missing_core || [] }));
+        .map(r => ({ part: r.arm, measured: r.measured + ' of ' + (Number(r.metrics) - Number(r.not_applicable || 0)), explained: !!(r.drivers && r.drivers.length), open_actions: Number(r.open_actions) || 0,
+          not_measured: r.missing_core || [], waiting_on: (r.waiting_on || []).map(w => w.name + ': ' + (w.needs || w.health)) }));
       return g.length ? g : null; })(),
     data_dictionary: dictionary,
     sent: 'Only the series this question needs were sent. If the answer needs a series that is not here, say which one and suggest asking about it directly.' };
@@ -9216,6 +9217,7 @@ function buildAskContext(facts, question, budget){
   if (topics.products) keepSeries.add('products');
   const order = Object.keys(data).reverse().filter(k => !keepSeries.has(k));
   while (size() > BUDGET && order.length) { const k = order.shift(); delete data[k]; delete dictionary[k]; }
+  if (size() > BUDGET && meta.anatomy_gaps) meta.anatomy_gaps = meta.anatomy_gaps.map(g => ({ part: g.part, not_measured: g.not_measured, waiting_on: g.waiting_on }));
   if (size() > BUDGET && meta.anatomy_gaps) meta.anatomy_gaps = meta.anatomy_gaps.map(g => ({ part: g.part, not_measured: g.not_measured }));
   if (size() > BUDGET && meta.readout) delete meta.readout.cost_trees;
   if (size() > BUDGET && meta.readout) meta.readout.held = meta.readout.held.map(h => ({ action: h.action }));
@@ -11021,6 +11023,7 @@ const V3_MOVES = [
   ['product-margin_drain-', ['profit']], ['discount-', ['profit']], ['tracking-coverage', ['conv']],
   ['email-campaign-drop', ['email', 'retsales']], ['email-cart-reach', ['email', 'conv']], ['site-errors', ['conv']],
   ['returns-product-', ['profit', 'prodsales']], ['seo-nonbrand', ['organic']],
+  ['email-list-health', ['email']], ['email-list-growth', ['email']], ['email-holdout', ['email']], ['site-speed', ['conv']], ['returns-faults', ['profit']],
 ];
 const V3_MOVE_LABEL = { cac: 'cost to win a new customer', ret: 'sales from each £1 of ads', profit: 'profit after all costs', ly: 'sales against last year',
   repeat: 'customers who order again', conv: 'orders per 100 visits', newc: 'new customers', retsales: 'returning customers’ sales', spend: 'ad spend',
@@ -16606,6 +16609,13 @@ function v3PlainAction(row){
     return P(nm ? 'Find out why ' + nm + ' comes back so often' : 'Find out why one product comes back so often', raw); }
   if (id === 'seo-nonbrand') { const t = (raw.match(/"([^"]+)"/) || [])[1];
     return P(t ? 'Move up Google for "' + t + '" and the other searches you nearly win' : 'Move up Google for the searches you nearly win', raw); }
+  // 0319: the measures that were missing
+  if (id === 'email-list-health') return P('Stop emailing people who never open: your list is wearing out', raw);
+  if (id === 'email-list-growth') return P('Grow your email list again: it shrank this month', raw);
+  if (id === 'email-holdout') return P('Test what email really adds: hold back a tenth of your list', raw);
+  if (id === 'site-speed') return P('Make your site load faster on phones', raw);
+  if (id === 'returns-faults') { const k = (raw.match(/You sent (\d+) free replacement orders/) || [])[1];
+    return P(k ? 'Cut the ' + k + ' free replacement orders you sent in three months' : 'Cut the free replacement orders you send', raw); }
   if (id === 'synth-creative-waste') return P('Stop spending on ads that have never made a sale',
     'Some ads are taking budget without a single purchase. Check their tracking first, because broken tracking looks the same as a bad ad. Then switch off the ones that really are not selling.');
   if (/^synth-weak-conv-rank-(\w+)-spend/.test(id)) { const ch = v3Ch(id.match(/^synth-weak-conv-rank-(\w+)-spend/)[1]);
@@ -20925,7 +20935,8 @@ function V3DataTrust() {
     {items.length > 0 && <ol className="v3-moves">{items.map(i => (<li key={i.k}><b>{i.head}</b> {i.body}{i.extra || null}</li>))}</ol>}
   </section>
   <V3DriverStrip keys={['claims']} opts={orders30 > 0 && meta.rows && gads.rows ? { claims: { m: mP, g: gP, o: orders30 } } : null}/>
-  <V3AnatomyCoverage/></div>);
+  <V3AnatomyCoverage/>
+  <V3AnatomyInputs/></div>);
 }
 
 // ── Team (V3, rebuilt 2026-10-05) ────────────────────────────────────────────────────────────────
@@ -21808,32 +21819,148 @@ function v3ModelProducts(list, sale) {
 // refunded orders over orders across products, the basis the board's returns rows quote (frkl: 11%).
 // Settings (9 Oct): every part of a D2C business (the anatomy, 184 measures in 18 parts), and for each what
 // Greta measures, whether a drivers panel explains it and how many actions act on it, so a gap reads as a gap.
-// The map's drivers are the sign panels; these parts are explained by a page's own panel instead (Products'
-// sales and refunds, Stock's order timing, Goal's so-far and gap), so they are not "Not yet".
-const V3_PAGE_PANELS = { 'Range and price': ['products', 'refunds'], 'Stock and supply': ['stock'], 'Plan and forecast': ['goal'] };
-const V3_COVERAGE_Q = (sb, b) => sb.rpc('fn_anatomy_coverage', { p_brand: b }).then(r => (r && Array.isArray(r.data))
-  ? Object.assign({}, r, { data: r.data.map(x => V3_PAGE_PANELS[x.category] ? Object.assign({}, x, { drivers: (x.drivers || []).concat(V3_PAGE_PANELS[x.category]) }) : x) }) : r);
+// 0319: read from each measure's health, not from whether something exists to produce it; every measure has
+// its figure, or the plain reason it has none (it does not apply, it needs you, a test, or tonight's sync).
+const V3_COVERAGE_Q = (sb, b) => sb.rpc('fn_anatomy_coverage', { p_brand: b });
+const V3_HEALTH_WORD = { 'live': null, 'computed on demand': null, 'not applicable': 'Does not apply', 'needs your input': 'Needs a figure from you',
+  'needs a test': 'Needs a test', 'waiting for its first sync': 'Fills after tonight’s sync', 'stale': 'Out of date', 'no data for this brand': 'No data yet',
+  'missing': 'Not measured', 'declared, object missing': 'Not measured', 'error': 'Could not be worked out' };
 function V3AnatomyCoverage() {
   const q = useV3Rows('anatomy-coverage', V3_COVERAGE_Q);
+  const [open, setOpen] = React.useState(null);
   const R = Array.isArray(q.rows) ? q.rows : [];
   if (!R.length) return null;
-  const gaps = R.filter(r => (r.missing_core && r.missing_core.length) || !(r.drivers && r.drivers.length) || !r.open_actions);
-  const pages = { profit: 'profit', marketing: 'marketing', website: 'website', customers: 'customers', products: 'products', stock: 'stock', competitors: 'competitors', goal: 'goal', settings: 'settings', review: 'review' };
+  const all = R.flatMap(r => r.measures || []);
+  const cnt = h => all.filter(m => (Array.isArray(h) ? h.includes(m.health) : m.health === h)).length;
+  const covered = cnt(['live', 'computed on demand']), na = cnt('not applicable'), you = cnt('needs your input'), test = cnt('needs a test'), sync = cnt('waiting for its first sync');
+  const rest = all.length - covered - na - you - test - sync;
+  const pages = { profit: 'profit', marketing: 'marketing', website: 'website', customers: 'customers', products: 'products', stock: 'stock', competitors: 'competitors', goal: 'goal', settings: 'settings', review: 'review', actions: 'actions' };
   return (<section className="v3-sec">
     <h2 className="v3-sec-title">What Greta can see <span className="v3-muted">every part of the business</span></h2>
-    <p className="v3-note v3-measure">{gaps.length
-      ? <>Greta measures, explains and acts on {fmtCount(R.length - gaps.length)} of the {fmtCount(R.length)} parts of your business fully. In the other {fmtCount(gaps.length)}, something is not measured yet, nothing explains a change, or nothing on the board acts on it; those are listed with what is missing.</>
-      : <>Greta measures, explains and acts on every part of your business.</>}</p>
-    <table className="v3-rw">
-      <thead><tr><th className="t-text">Part of the business</th><th>Measured</th><th className="t-text">Why it moves</th><th>Actions</th><th className="t-text">Not measured yet</th></tr></thead>
-      <tbody>{R.map(r => (<tr key={r.category}>
-        <td className="t-text">{pages[r.page] ? <button type="button" className="v3-xref" onClick={() => window.__oiNav && window.__oiNav(pages[r.page])}>{r.arm}</button> : r.arm}</td>
-        <td>{fmtCount(Number(r.measured))} of {fmtCount(Number(r.metrics))}</td>
-        <td className="t-text">{r.drivers && r.drivers.length ? 'Explained' : <span className="v3-muted">Not yet</span>}</td>
-        <td className={Number(r.open_actions) ? '' : 'v3-muted'}>{fmtCount(Number(r.open_actions))}</td>
-        <td className="t-text v3-muted">{r.missing_core && r.missing_core.length ? r.missing_core.join(', ') : ''}</td></tr>))}</tbody>
+    <p className="v3-note v3-measure">Greta measures {fmtCount(covered)} of the {fmtCount(all.length)} things worth knowing about a business like yours{na ? <>, and {fmtCount(na)} do not apply to you</> : null}.
+      {you + test + sync + rest > 0 ? <> Of the rest, {[sync ? fmtCount(sync) + ' fill after tonight’s syncs' : null, you ? fmtCount(you) + ' need a figure from you (below)' : null,
+        test ? fmtCount(test) + ' need a test to measure' : null, rest ? fmtCount(rest) + ' cannot be measured yet' : null].filter(Boolean).join(', ')}.</> : null} Open a part to see each figure.</p>
+    <table className="v3-rw v3-cov">
+      <thead><tr><th className="t-text">Part of the business</th><th>Measured</th><th className="t-text">Why it moves</th><th>Actions</th><th className="t-text">Still missing</th></tr></thead>
+      <tbody>{R.map(r => { const isOpen = open === r.category, miss = (r.measures || []).filter(m => !['live', 'computed on demand', 'not applicable'].includes(m.health));
+        return (<React.Fragment key={r.category}>
+          <tr>
+            <td className="t-text"><button type="button" className="v3-xref" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : r.category)}><span className={'v3-cov-chev' + (isOpen ? ' open' : '')}><Icon name="chevron" size={12}/></span> {r.arm}</button></td>
+            <td>{fmtCount(Number(r.measured))} of {fmtCount(Number(r.metrics) - Number(r.not_applicable || 0))}</td>
+            <td className="t-text">{r.drivers && r.drivers.length ? 'Explained' : <span className="v3-muted">Not yet</span>}</td>
+            <td className={Number(r.open_actions) ? '' : 'v3-muted'}>{fmtCount(Number(r.open_actions))}</td>
+            <td className="t-text v3-muted">{miss.length ? miss.slice(0, 3).map(m => m.name).join(', ') + (miss.length > 3 ? ' and ' + (miss.length - 3) + ' more' : '') : ''}</td>
+          </tr>
+          {isOpen && <tr className="v3-cov-open"><td colSpan={5}>
+            <ul className="v3-cov-list">{(r.measures || []).map(m => (<li key={m.key}>
+              <span className="v3-cov-name">{m.name}</span>
+              <span className={'v3-cov-fig' + (V3_HEALTH_WORD[m.health] ? ' v3-muted' : '')}>{m.display || V3_HEALTH_WORD[m.health] || 'Measured'}</span>
+              {(m.basis || m.needs) && <span className="v3-cov-why">{[m.basis ? v3Sentence(m.basis) + '.' : null, m.needs ? v3Sentence(m.needs) + '.' : null].filter(Boolean).join(' ')}</span>}
+            </li>))}</ul>
+            {pages[r.page] && <button type="button" className="v3-xref" onClick={() => window.__oiNav && window.__oiNav(pages[r.page])}>Open {r.arm.toLowerCase()} <span className="v3-xref-go">→</span></button>}
+          </td></tr>}
+        </React.Fragment>); })}</tbody>
     </table>
-    <p className="micro muted v3-measure">Measured counts the measures Greta works out or tracks from your connected accounts. Why it moves is a drivers panel that splits a change into its parts. Actions are the open ones on your board for that part. The ones listed as not measured are the important ones still missing.</p>
+    <p className="micro muted v3-measure">Measured counts the measures Greta works out from your connected accounts, or from figures you entered. Why it moves is a panel that splits a change into its parts. Actions are the open ones on your board for that part.</p>
+  </section>);
+}
+
+// What only the owner knows (0319): suppliers, what other routes take and when they pay, and whose codes are
+// whose. Editors write; Greta reads them each morning.
+const V3_INPUTS_Q = (sb, b) => Promise.all([
+  sb.from('brand_supplier').select('id,name,lead_time_days,moq_units,has_alternative,product_match').eq('brand_id', b).order('name'),
+  sb.from('brand_route_terms').select('route,commission_pct,other_costs_pct,payment_days').eq('brand_id', b),
+  sb.from('brand_code_kind').select('code,kind,commission_pct').eq('brand_id', b),
+  sb.from('anatomy_metric_value').select('metric_key,detail').eq('brand_id', b).in('metric_key', ['revenue_by_route', 'creator_cost']),
+  sb.from('vw_brand_code_performance').select('code,orders_90d').eq('brand_id', b).gt('orders_90d', 0).order('orders_90d', { ascending: false }).limit(15),
+]).then(rs => { const e = rs.find(r => r && r.error); return e ? { error: e.error } : { data: [{ sup: rs[0].data || [], terms: rs[1].data || [], codes: rs[2].data || [], vals: rs[3].data || [], perf: rs[4].data || [] }] }; });
+function V3AnatomyInputs() {
+  const q = useV3Rows('anatomy-inputs', V3_INPUTS_Q);
+  const cov = useV3Rows('anatomy-coverage', V3_COVERAGE_Q);
+  const D = q.rows && q.rows[0];
+  const [sup, setSup] = React.useState(null), [terms, setTerms] = React.useState(null), [codes, setCodes] = React.useState(null);
+  const [draft, setDraft] = React.useState({ name: '', lead: '', moq: '', alt: false, match: '' });
+  const [msg, setMsg] = React.useState(null);
+  React.useEffect(() => { if (D && sup === null) {
+    setSup(D.sup);
+    const rv = (D.vals.find(v => v.metric_key === 'revenue_by_route') || {}).detail || [];
+    const routes = (Array.isArray(rv) ? rv : []).map(x => x.route).filter(x => x && x !== 'Own website' && x !== 'Draft orders');
+    setTerms(routes.map(route => Object.assign({ route, commission_pct: '', other_costs_pct: '', payment_days: '' },
+      Object.fromEntries(Object.entries(D.terms.find(t => t.route === route) || {}).map(([k, v]) => [k, v == null ? '' : String(v)])))));
+    const inferred = (((D.vals.find(v => v.metric_key === 'creator_cost') || {}).detail || {}).codes) || [];
+    const names = [...new Set([...D.codes.map(c => c.code), ...inferred.map(c => String(c).toUpperCase()), ...D.perf.map(p => String(p.code).toUpperCase())])];
+    setCodes(names.map(code => { const k = D.codes.find(c => c.code === code), p = D.perf.find(x => String(x.code).toUpperCase() === code);
+      return { code, orders: p ? Number(p.orders_90d) : null, kind: k ? k.kind : '', commission_pct: k && k.commission_pct != null ? String(k.commission_pct) : '', guess: !k && inferred.map(c => String(c).toUpperCase()).includes(code) }; }));
+  } }, [D]);
+  if (!D || sup === null) return null;
+  const C = Array.isArray(cov.rows) ? cov.rows : [];
+  const needs = C.flatMap(r => (r.measures || []).filter(m => m.health === 'needs your input'));
+  const cashNeeds = needs.filter(m => /Goal & costs/.test(m.needs || ''));
+  const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
+  const num = v => (v === '' || v == null ? null : Number(v));
+  const done = (r, ok) => { if (r && r.error) setMsg(/row-level|permission/i.test(r.error.message || '') ? 'Only owners and editors can change these.' : 'That did not save: ' + r.error.message); else setMsg(ok); };
+  const addSupplier = async () => {
+    if (!draft.name.trim()) return;
+    const row = { brand_id: b, name: draft.name.trim(), lead_time_days: num(draft.lead), moq_units: num(draft.moq), has_alternative: !!draft.alt, product_match: draft.match.trim() || null };
+    const r = await sb.from('brand_supplier').insert(row).select('id,name,lead_time_days,moq_units,has_alternative,product_match');
+    done(r, 'Saved. Greta uses it from tomorrow morning.');
+    if (!r.error) { setSup(s => s.concat(r.data || [])); setDraft({ name: '', lead: '', moq: '', alt: false, match: '' }); }
+  };
+  const dropSupplier = async id => { const r = await sb.from('brand_supplier').delete().eq('id', id); done(r, 'Removed.'); if (!r.error) setSup(s => s.filter(x => x.id !== id)); };
+  const saveTerms = async () => {
+    const rows = terms.map(t => ({ brand_id: b, route: t.route, commission_pct: num(t.commission_pct), other_costs_pct: num(t.other_costs_pct), payment_days: num(t.payment_days), updated_at: new Date().toISOString() }));
+    done(await sb.from('brand_route_terms').upsert(rows, { onConflict: 'brand_id,route' }), 'Saved. Greta uses them from tomorrow morning.');
+  };
+  const saveCodes = async () => {
+    const keep = codes.filter(c => c.kind), drop = codes.filter(c => !c.kind).map(c => c.code);
+    let r = keep.length ? await sb.from('brand_code_kind').upsert(keep.map(c => ({ brand_id: b, code: c.code, kind: c.kind, commission_pct: num(c.commission_pct), updated_at: new Date().toISOString() })), { onConflict: 'brand_id,code' }) : null;
+    if (!(r && r.error) && drop.length) r = await sb.from('brand_code_kind').delete().eq('brand_id', b).in('code', drop);
+    done(r, 'Saved. Greta uses them from tomorrow morning.');
+  };
+  return (<section className="v3-sec">
+    <h2 className="v3-sec-title">What Greta needs from you <span className="v3-muted">{needs.length ? fmtCount(needs.length) + (needs.length === 1 ? ' figure' : ' figures') : 'all filled in'}</span></h2>
+    <p className="v3-note v3-measure">Some things only you know. Each one below closes a gap above; Greta reads them each morning.</p>
+    {msg && <p className="micro v3-measure">{msg}</p>}
+
+    <h3 className="v3-drivers-h">Your suppliers</h3>
+    <p className="micro muted v3-measure">Lead time and minimum order for each, and whether anyone else could make the same things. Greta uses one lead time for everything until you add them.</p>
+    {sup.length > 0 && <table className="v3-rw"><thead><tr><th className="t-text">Supplier</th><th>Lead time</th><th>Minimum order</th><th className="t-text">Another could make it</th><th className="t-text">Makes</th><th></th></tr></thead>
+      <tbody>{sup.map(s => (<tr key={s.id}><td className="t-text">{s.name}</td><td>{s.lead_time_days != null ? fmtCount(s.lead_time_days) + ' days' : ''}</td><td>{s.moq_units != null ? fmtCount(s.moq_units) + ' units' : ''}</td>
+        <td className="t-text">{s.has_alternative ? 'Yes' : 'No'}</td><td className="t-text">{s.product_match || ''}</td>
+        <td><button type="button" className="v3-btn v3-btn-sm" onClick={() => dropSupplier(s.id)}>Remove</button></td></tr>))}</tbody></table>}
+    <div className="v3-form-grid v3-gap-top">
+      <label className="v3-field"><span>Supplier</span><input value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))}/></label>
+      <label className="v3-field"><span>Lead time, days</span><input type="number" min="0" value={draft.lead} onChange={e => setDraft(d => ({ ...d, lead: e.target.value }))}/></label>
+      <label className="v3-field"><span>Minimum order, units</span><input type="number" min="0" value={draft.moq} onChange={e => setDraft(d => ({ ...d, moq: e.target.value }))}/></label>
+      <label className="v3-field"><span>Products it makes (words, commas)</span><input value={draft.match} placeholder="necklace, charm" onChange={e => setDraft(d => ({ ...d, match: e.target.value }))}/></label>
+      <label className="v3-field v3-field-check"><span>Another supplier could make these</span><input type="checkbox" checked={draft.alt} onChange={e => setDraft(d => ({ ...d, alt: e.target.checked }))}/></label>
+    </div>
+    <button type="button" className="v3-btn v3-btn-sm v3-gap-top" onClick={addSupplier} disabled={!draft.name.trim()}>Add supplier</button>
+
+    {terms.length > 0 && <>
+      <h3 className="v3-drivers-h">Where else you sell</h3>
+      <p className="micro muted v3-measure">What each takes from a sale, what you fund on top (promotions, levies, listing fees), and how long it takes to pay you. Without these Greta counts {terms.map(t => t.route).join(' and ')} before its commission.</p>
+      <table className="v3-rw"><thead><tr><th className="t-text">Route</th><th>Commission, % of sales</th><th>Other costs, % of sales</th><th>Pays you after, days</th></tr></thead>
+        <tbody>{terms.map((t, i) => (<tr key={t.route}><td className="t-text">{t.route}</td>
+          {['commission_pct', 'other_costs_pct', 'payment_days'].map(k => (<td key={k}><input type="number" min="0" aria-label={t.route + ' ' + k.replace(/_/g, ' ')} value={t[k]}
+            onChange={e => { const v = e.target.value; setTerms(ts => ts.map((x, j) => j === i ? { ...x, [k]: v } : x)); }}/></td>))}</tr>))}</tbody></table>
+      <button type="button" className="v3-btn v3-btn-sm v3-gap-top" onClick={saveTerms}>Save</button>
+    </>}
+
+    {codes.length > 0 && <>
+      <h3 className="v3-drivers-h">Whose discount codes are whose</h3>
+      <p className="micro muted v3-measure">Mark the codes that belong to creators or affiliates, and what commission they earn, so their cost counts as marketing. Greta has guessed the ones marked “looks like a creator’s” from their shape.</p>
+      <table className="v3-rw"><thead><tr><th className="t-text">Code</th><th>Orders, 90 days</th><th className="t-text">Whose</th><th>Commission, %</th></tr></thead>
+        <tbody>{codes.map((c, i) => (<tr key={c.code}><td className="t-text">{c.code}{c.guess ? <span className="v3-muted"> · looks like a creator’s</span> : null}</td><td>{c.orders != null ? fmtCount(c.orders) : ''}</td>
+          <td className="t-text"><select aria-label={c.code + ' kind'} value={c.kind} onChange={e => { const v = e.target.value; setCodes(cs => cs.map((x, j) => j === i ? { ...x, kind: v } : x)); }}>
+            <option value="">Not set</option><option value="creator">A creator’s</option><option value="affiliate">An affiliate’s</option><option value="promotion">A promotion</option>
+            <option value="staff">Staff or friends</option><option value="service">Customer service</option><option value="gifting">Gifting</option></select></td>
+          <td><input type="number" min="0" aria-label={c.code + ' commission'} value={c.commission_pct} disabled={!['creator', 'affiliate'].includes(c.kind)}
+            onChange={e => { const v = e.target.value; setCodes(cs => cs.map((x, j) => j === i ? { ...x, commission_pct: v } : x)); }}/></td></tr>))}</tbody></table>
+      <button type="button" className="v3-btn v3-btn-sm v3-gap-top" onClick={saveCodes}>Save</button>
+    </>}
+
+    {cashNeeds.length > 0 && <p className="v3-note v3-measure v3-gap-top">{cashNeeds.map(m => m.name).join(', ')}: {v3Sentence(cashNeeds[0].needs)}. <button type="button" className="v3-xref" onClick={() => window.__oiNav && window.__oiNav('goal')}>Open Goal &amp; costs <span className="v3-xref-go">→</span></button></p>}
   </section>);
 }
 const V3_REFUNDS_Q = (sb, b) => sb.from('vw_product_refunds_90d').select('title,orders,refunded_orders,refunded_gbp,sales_gbp').eq('brand_id', b).order('refunded_gbp', { ascending: false }).limit(200);
