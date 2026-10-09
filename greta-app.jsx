@@ -21031,6 +21031,27 @@ function v3BuildSigns(S, hist, opts) {
       series: ser('ret_net'), fmt: v => fmtMoney(v), better: 'higher', line: { v: typ, label: 'Usual ' + fmtMoney(typ) },
       which: 'retsales', ctx: { weeks: H && Array.isArray(H.weeks) ? H.weeks : [], lineLabel: 'about ' + fmtMoney(typ) + ', your usual month' }, dline: typ });
   }
+  // marketing (0317): ad spend, and each platform's cost per sale on its own count
+  const SPP = HP ? HP.filter(p => Number(p.cac_spend) > 0) : [];
+  if (SPP.length >= 4) {
+    const l = SPP[SPP.length - 1], f4 = SPP.length >= 5 ? SPP[SPP.length - 5] : SPP[0];
+    const worse = Number(l.cac_spend) > Number(f4.cac_spend) * 1.05 && Number(l.new_customers) < Number(f4.new_customers);
+    signs.push({ k: 'Ad spend', v: fmtMoney(Number(l.cac_spend)), tone: worse ? 'weak' : 'typical',
+      n: <>Meta {fmtMoney(Number(l.meta_spend))}, Google {fmtMoney(Number(l.google_spend))}{worse ? '; up while new customers fell' : ''}</>,
+      series: ser('cac_spend'), fmt: v => fmtMoney(v), better: worse ? 'lower' : null, line: null,
+      which: 'spend', ctx: {}, dline: null });
+  }
+  const cpaSign = (key, k, spendK, salesK, who) => {
+    const PP = HP ? HP.filter(p => Number(p[salesK]) > 0 && Number(p[spendK]) > 0).map(p => ({ d: String(p.d), v: Number(p[spendK]) / Number(p[salesK]) })) : [];
+    if (PP.length < 4) return;
+    const v = PP[PP.length - 1].v, typ = med(PP.slice(0, -1).map(p => p.v)), top = Math.max(v, typ) * 1.25;
+    signs.push({ k, v: fmtMoney(v, 2), tone: v > typ * 1.1 ? 'weak' : v < typ * 0.9 ? 'good' : 'typical',
+      bar: { fill: v / top, mark: typ / top }, n: <>On {who}’s own count, which runs high; about {fmtMoney(typ, 2)} is usual for you</>,
+      series: PP, fmt: x => fmtMoney(x, 2), better: 'lower', line: { v: typ, label: 'Usual ' + fmtMoney(typ, 2) },
+      which: key, ctx: { lineLabel: 'about ' + fmtMoney(typ, 2) + ', your usual cost' }, dline: typ });
+  };
+  cpaSign('metacpa', 'Meta: cost per sale', 'meta_spend', 'meta_purchases', 'Meta');
+  cpaSign('googcpa', 'Google: cost per sale', 'google_spend', 'google_conversions', 'Google');
   // the headline as a sign of its own, for the pages that show it beside the others
   const profitSign = profitCfg && (ao != null || L.profit_after_ads != null) ? Object.assign({
     k: ao != null ? 'After all costs, a month' : 'Profit after ads', v: v3SignedGbp(ao != null ? ao : num(L.profit_after_ads)),
@@ -21365,7 +21386,7 @@ function V3Sign({ k, v, tone, bar, n, series, fmt, better, line, act, trendAs })
     const ch = last.v - then.v, rel = Math.abs(then.v) > 0.0001 ? Math.abs(ch) / Math.abs(then.v) : Math.abs(ch);
     const dir = rel < 0.03 ? 'flat' : ch > 0 ? 'up' : 'down';
     const good = dir === 'flat' ? null : (dir === 'up') === (better === 'higher');
-    trend = { dir, cls: dir === 'flat' ? 'flat' : good ? 'good' : 'bad', from: fmt(then.v) };
+    trend = { dir, cls: dir === 'flat' || !better ? 'flat' : good ? 'good' : 'bad', from: fmt(then.v) };
   }
   if (!trend && trendAs) trend = trendAs;
   const chart = open && pts.length >= 4 && (<span className="v3-sign-pop" role="dialog" aria-label={k + ', last ' + pts.length + ' weeks'}>
@@ -21772,7 +21793,111 @@ function v3ModelReturning(a, b, ctx) {
     note: 'Returning buyers are customers whose order in the 30 days was not their first, as on the rest of this page: orders from your own shop, with marketplace orders counted apart.',
   };
 }
+// Marketing (0317): ad spend by campaign (0311's campaign lists; the rest is campaigns under £50 and
+// rounding, so the parts add up to the spend), and each platform's cost per sale on its own count:
+//   Meta   spend / purchases = (spend / views) x (views / clicks) x (clicks / purchases)
+//   Google spend / conversions = (spend / clicks) x (clicks / conversions)
+// Platform counts overlap and run high; the panels say so and point to the real-order figures.
+function v3ModelSpend(a, b, ctx) {
+  const A = Number(a.cac_spend), B = Number(b.cac_spend), key = c => c.platform + '|' + c.name, cm = {};
+  (a.campaigns || []).forEach(c => { cm[key(c)] = { platform: c.platform, name: c.name, then: Number(c.spend), now: 0 }; });
+  (b.campaigns || []).forEach(c => { const r = cm[key(c)] || (cm[key(c)] = { platform: c.platform, name: c.name, then: 0 }); r.now = Number(c.spend); });
+  const camps = Object.values(cm).map(c => ({ ...c, d: c.now - c.then })).sort((p, q) => Math.abs(q.d) - Math.abs(p.d));
+  const shown = camps.slice(0, 4), rest = (B - A) - shown.reduce((t, c) => t + c.d, 0);
+  const ids = c => /retarget|remarket/i.test(c.name) ? ['driver-retargeting', 'order-cost-meta'] : c.platform === 'Meta' ? ['driver-meta-ads', 'order-cost-meta'] : ['order-cost-google'];
+  const na = Number(a.new_customers), nb = Number(b.new_customers);
+  return {
+    neutral: true,
+    todo: shown.filter(c => c.d >= 200).map(c => ({ amt: c.d, force: true, ids: ids(c) })),
+    title: 'Where the ' + fmtMoney(B) + ' of ad spend went', from: A, to: B, better: 'lower', fmtV: v => fmtMoney(v), fmtAmt: v => fmtMoney(Math.abs(v)),
+    startK: 'Ad spend', endK: 'Ad spend now', chartK: 'Ad spend', of: B >= A ? 'the rise' : 'the fall',
+    parts: shown.map(c => ({ amt: c.d, k: c.name, sub: c.platform + ' · ' + fmtMoney(c.then) + ' to ' + fmtMoney(c.now),
+      cause: <>“{c.name}” on {c.platform} went from {fmtMoney(c.then)} to {fmtMoney(c.now)}</>,
+      against: <>{c.d < 0 ? 'Less' : 'More'} on “{c.name}” ({fmtMoney(c.then)} to {fmtMoney(c.now)})</> }))
+      .concat(Math.abs(rest) >= 1 ? [{ amt: rest, k: 'Other campaigns', sub: 'under £50 each, and rounding', cause: <>smaller campaigns moved</>, against: <>Smaller campaigns</> }] : []),
+    opening: <>Since the 30 days to {v3Day(String(a.d), true)}, ad spend went from {fmtMoney(A)} to {fmtMoney(B)}{na > 0 && nb > 0 ? <>, while new customers went from {fmtCount(na)} to {fmtCount(nb)}</> : null}.</>,
+    rows: [
+      ['Meta', Number(a.meta_spend), Number(b.meta_spend), v => fmtMoney(v), null],
+      ['Google', Number(a.google_spend), Number(b.google_spend), v => fmtMoney(v), null],
+      ['New customers', na, nb, v => fmtCount(v), 'higher'],
+      ['Cost to win each', na > 0 ? A / na : null, nb > 0 ? B / nb : null, v => fmtMoney(v), 'lower'],
+    ],
+    note: 'Meta and Google spend from your ad accounts, by campaign; campaigns under £50 in either 30 days are counted together. New customers are first-time buyers from any source.',
+  };
+}
+function v3ModelMetaCpa(a, b, ctx) {
+  const f = p => { const sp = Number(p.meta_spend), im = Number(p.meta_impressions), cl = Number(p.meta_clicks), pu = Number(p.meta_purchases);
+    return { sp, im, cl, pu, v: sp / pu, cpm: 1000 * sp / im, ctr: cl / im, cvr: pu / cl }; };
+  const A = f(a), B = f(b);
+  const [pM, pT, pV] = v3LogParts(A.v, B.v, [{ a: A.cpm, b: B.cpm, sign: 1 }, { a: A.ctr, b: B.ctr, sign: -1 }, { a: A.cvr, b: B.cvr, sign: -1 }]);
+  return {
+    todo: [{ amt: pT, ids: ['driver-meta-ads'] }, { amt: pV, ids: ['paid-landing-meta', 'driver-meta-ads'] }, { amt: pM, ids: ['order-cost-meta'] }],
+    title: 'Why a sale on Meta’s count costs ' + fmtMoney(B.v, 2), from: A.v, to: B.v, better: 'lower', fmtV: v => fmtMoney(v, 2), fmtAmt: v => fmtMoney(Math.abs(v), 2),
+    startK: 'Meta: cost per sale', endK: 'Meta: cost per sale now', chartK: 'Meta: cost per sale, Meta’s count',
+    parts: [
+      { amt: pM, k: v3UpDown(A.cpm, B.cpm, 'Dearer to show the ads', 'Cheaper to show the ads'), sub: fmtMoney(A.cpm, 2) + ' to ' + fmtMoney(B.cpm, 2) + ' per 1,000 views',
+        cause: <>Meta charged {v3UpDown(A.cpm, B.cpm, 'more', 'less')} to show the ads ({fmtMoney(A.cpm, 2)} to {fmtMoney(B.cpm, 2)} per 1,000 views)</>,
+        against: <>{v3UpDown(A.cpm, B.cpm, 'Dearer', 'Cheaper')} views ({fmtMoney(A.cpm, 2)} to {fmtMoney(B.cpm, 2)} per 1,000)</> },
+      { amt: pT, k: v3UpDown(A.ctr, B.ctr, 'More people clicked', 'Fewer people clicked'), sub: fmtPctN(A.ctr) + ' to ' + fmtPctN(B.ctr) + ' of views',
+        cause: <>{v3UpDown(A.ctr, B.ctr, 'more', 'fewer')} people clicked the ads ({fmtPctN(A.ctr)} to {fmtPctN(B.ctr)} of views)</>,
+        against: <>{v3UpDown(A.ctr, B.ctr, 'More', 'Fewer')} people clicking ({fmtPctN(A.ctr)} to {fmtPctN(B.ctr)} of views)</> },
+      { amt: pV, k: v3UpDown(A.cvr, B.cvr, 'More clicks became sales', 'Fewer clicks became sales'), sub: fmtPctN(A.cvr) + ' to ' + fmtPctN(B.cvr) + ' of clicks',
+        cause: <>{v3UpDown(A.cvr, B.cvr, 'more', 'fewer')} clicks became a sale on Meta’s count ({fmtPctN(A.cvr)} to {fmtPctN(B.cvr)})</>,
+        against: <>{v3UpDown(A.cvr, B.cvr, 'More', 'Fewer')} clicks becoming sales ({fmtPctN(A.cvr)} to {fmtPctN(B.cvr)})</> },
+    ],
+    opening: <>Since the 30 days to {v3Day(String(a.d), true)}, a sale on Meta’s own count went from costing {fmtMoney(A.v, 2)} to {fmtMoney(B.v, 2)} ({fmtCount(A.pu)} to {fmtCount(B.pu)} sales).</>,
+    closing: <> Meta counts sales it touched, which overlap with other channels and run high; the cost of a new customer counts real first orders.</>,
+    rows: [
+      ['Spend', A.sp, B.sp, v => fmtMoney(v), null],
+      ['Views', A.im, B.im, v => fmtCount(v), null],
+      ['Link clicks', A.cl, B.cl, v => fmtCount(v), 'higher'],
+      ['Sales, Meta’s count', A.pu, B.pu, v => fmtCount(v), 'higher'],
+      ['Cost per 1,000 views', A.cpm, B.cpm, v => fmtMoney(v, 2), 'lower'],
+      ['Click rate', A.ctr, B.ctr, v => fmtPctN(v), 'higher'],
+      ['Sales per click', A.cvr, B.cvr, v => fmtPctN(v), 'higher'],
+    ],
+    note: 'From your Meta ad account, every campaign together. The three parts multiply to the cost per sale, so they add up to its change exactly.',
+  };
+}
+function v3ModelGoogleCpa(a, b, ctx) {
+  const f = p => { const sp = Number(p.google_spend), cl = Number(p.google_clicks), cv = Number(p.google_conversions);
+    return { sp, cl, cv, v: sp / cv, cpc: sp / cl, cvr: cv / cl }; };
+  const A = f(a), B = f(b);
+  const [pC, pV] = v3LogParts(A.v, B.v, [{ a: A.cpc, b: B.cpc, sign: 1 }, { a: A.cvr, b: B.cvr, sign: -1 }]);
+  return {
+    todo: [{ amt: pC, ids: ['order-cost-google'] }, { amt: pV, ids: ['paid-landing-google', 'tracking-coverage'] }],
+    title: 'Why a sale on Google’s count costs ' + fmtMoney(B.v, 2), from: A.v, to: B.v, better: 'lower', fmtV: v => fmtMoney(v, 2), fmtAmt: v => fmtMoney(Math.abs(v), 2),
+    startK: 'Google: cost per sale', endK: 'Google: cost per sale now', chartK: 'Google: cost per sale, Google’s count',
+    parts: [
+      { amt: pC, k: v3UpDown(A.cpc, B.cpc, 'Dearer clicks', 'Cheaper clicks'), sub: v3Pence2(A.cpc) + ' to ' + v3Pence2(B.cpc) + ' a click',
+        cause: <>each click cost {v3UpDown(A.cpc, B.cpc, 'more', 'less')} ({v3Pence2(A.cpc)} to {v3Pence2(B.cpc)})</>,
+        against: <>{v3UpDown(A.cpc, B.cpc, 'Dearer', 'Cheaper')} clicks ({v3Pence2(A.cpc)} to {v3Pence2(B.cpc)})</> },
+      { amt: pV, k: v3UpDown(A.cvr, B.cvr, 'More clicks became sales', 'Fewer clicks became sales'), sub: fmtPctN(A.cvr) + ' to ' + fmtPctN(B.cvr) + ' of clicks',
+        cause: <>{v3UpDown(A.cvr, B.cvr, 'more', 'fewer')} clicks became a sale on Google’s count ({fmtPctN(A.cvr)} to {fmtPctN(B.cvr)})</>,
+        against: <>{v3UpDown(A.cvr, B.cvr, 'More', 'Fewer')} clicks becoming sales ({fmtPctN(A.cvr)} to {fmtPctN(B.cvr)})</> },
+    ],
+    opening: <>Since the 30 days to {v3Day(String(a.d), true)}, a sale on Google’s own count went from costing {fmtMoney(A.v, 2)} to {fmtMoney(B.v, 2)} ({fmtCount(Math.round(A.cv))} to {fmtCount(Math.round(B.cv))} sales).</>,
+    closing: B.cvr < A.cvr * 0.7 ? <> Google’s own count can fall when its tracking changes rather than when sales do: check it against real orders, the cost of a new customer and the Website page, before cutting what works.</>
+      : <> Google counts the sales it touched, which overlap with other channels.</>,
+    rows: [
+      ['Spend', A.sp, B.sp, v => fmtMoney(v), null],
+      ['Clicks', A.cl, B.cl, v => fmtCount(v), 'higher'],
+      ['Sales, Google’s count', A.cv, B.cv, v => fmtCount(Math.round(v)), 'higher'],
+      ['Cost per click', A.cpc, B.cpc, v3Pence2, 'lower'],
+      ['Sales per click', A.cvr, B.cvr, v => fmtPctN(v), 'higher'],
+    ],
+    note: 'From your Google Ads account, every campaign together. The two parts multiply to the cost per sale, so they add up to its change exactly.',
+  };
+}
 const V3_DRIVER_MODELS = {
+  spend:   { model: v3ModelSpend,     mode: 'pair', key: 'cac_spend',  fmt: v => fmtMoney(v),
+             ok: p => Number(p.cac_spend) > 0 && Array.isArray(p.campaigns) },
+  metacpa: { model: v3ModelMetaCpa,   mode: 'pair', key: 'meta_cpa',   fmt: v => fmtMoney(v, 2),
+             prep: P => P.map(p => Object.assign({}, p, { meta_cpa: Number(p.meta_purchases) > 0 ? Number(p.meta_spend) / Number(p.meta_purchases) : null })),
+             ok: p => p.meta_cpa != null && Number(p.meta_impressions) > 0 && Number(p.meta_clicks) > 0 },
+  googcpa: { model: v3ModelGoogleCpa, mode: 'pair', key: 'google_cpa', fmt: v => fmtMoney(v, 2),
+             prep: P => P.map(p => Object.assign({}, p, { google_cpa: Number(p.google_conversions) > 0 ? Number(p.google_spend) / Number(p.google_conversions) : null })),
+             ok: p => p.google_cpa != null && Number(p.google_clicks) > 0 },
   newc:     { model: v3ModelNewCustomers, mode: 'pair', key: 'new_customers', fmt: v => fmtCount(v),
               ok: p => Number(p.new_customers) > 0 && Number(p.cac_spend) > 0 },
   retsales: { model: v3ModelReturning,    mode: 'pair', key: 'ret_net',       fmt: v => fmtMoney(v),
@@ -21792,7 +21917,7 @@ const V3_DRIVER_MODELS = {
             ok: p => p.repeat_90d != null && Number(p.rep_code_n) + Number(p.rep_full_n) >= 30 && p.rep_code != null && p.rep_full != null },
 };
 const v3HasDrivers = (which, points) => { const m = V3_DRIVER_MODELS[which]; if (!m || !Array.isArray(points)) return false;
-  const P = points.filter(m.ok); return m.mode === 'single' ? P.length >= 1 : P.length >= 2; };
+  const P = (m.prep ? m.prep(points, {}) : points).filter(m.ok); return m.mode === 'single' ? P.length >= 1 : P.length >= 2; };
 
 function V3DriverPanel({ which, points, ctx, line, fixed }) {
   const board = useV3Board();   // above the early return: what to do points at rows already on the board
@@ -21810,8 +21935,8 @@ function V3DriverPanel({ which, points, ctx, line, fixed }) {
   const steps = [{ k: M.startK, sub: M.subA || (single ? M.colA : '30 days to ' + v3Day(String(a.d), true)), lo: Math.min(0, M.from), hi: Math.max(0, M.from), tone: 'sales', v: M.fmtV(M.from) }];
   let run = M.from;
   M.parts.forEach(p => { const nx = run + p.amt; const good = (p.amt >= 0) === (M.better === 'higher');
-    steps.push({ k: p.k, sub: p.sub, lo: Math.min(run, nx), hi: Math.max(run, nx), tone: Math.abs(p.amt) < 1e-9 ? 'cost' : good ? 'gain' : 'loss',
-                 v: (p.amt >= 0 ? '+' : '−') + M.fmtAmt(p.amt), cls: good ? 'v3-up' : 'v3-down' }); run = nx; });
+    steps.push({ k: p.k, sub: p.sub, lo: Math.min(run, nx), hi: Math.max(run, nx), tone: Math.abs(p.amt) < 1e-9 ? 'cost' : M.neutral ? 'ads' : good ? 'gain' : 'loss',
+                 v: (p.amt >= 0 ? '+' : '−') + M.fmtAmt(p.amt), cls: M.neutral ? '' : good ? 'v3-up' : 'v3-down' }); run = nx; });
   const endGood = line == null ? null : (M.better === 'higher' ? M.to >= line : M.to <= line);
   steps.push({ k: M.endK, sub: M.subB || (single ? M.colB : '30 days to ' + v3Day(String(b.d), true)), lo: Math.min(0, M.to), hi: Math.max(0, M.to),
                tone: M.endTone || (endGood == null ? 'keep' : endGood ? 'keep' : 'loss'), v: M.fmtV(M.to), total: true });
@@ -22092,7 +22217,7 @@ const V3_PAGES = {
         spend-tier "diminishing returns" read (its own numbers did not fall) and the GA4 funnel (Website's,
         on 11 of 30 tracked days) are gone. Platform claims and per-channel evidence sit behind the detail. */}
     <V3MarketingLead/>
-    <V3DriverStrip keys={['cac', 'ret']}/>
+    <V3DriverStrip keys={['spend', 'cac', 'ret', 'metacpa', 'googcpa']}/>
     <V3CodePerformance/>
     <V3Incrementality/>
     <CreativeReallocation/>
