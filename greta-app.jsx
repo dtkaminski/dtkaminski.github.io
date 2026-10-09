@@ -16416,6 +16416,9 @@ function v3PlainAction(row){
   // email flows and the free-shipping nudge read as walls of figures with nothing to scan.
   if (id === 'promo-peak-plan') return P('Plan ' + ((raw.match(/^(.+?) (?:peak window )?starts in/) || [])[1] || 'the peak').replace(/ peak window$/i, '') + ' as one event: the code, the stock and the offer', raw);
   if (id === 'sales-rhythm') return P('Spend less on ads in the weeks between sales', raw);
+  if (id === 'driver-meta-ads') return P(/^People click/.test(raw) ? 'Make new Meta ads: people click the current ones less' : 'Move Meta budget from older ads to the newer ones that sell for less', raw);
+  if (id === 'driver-retargeting') { const t = (raw.match(/Bring it back to about (£[\d,]+) a month/) || [])[1];
+    return P(t ? 'Bring retargeting back to about ' + t + ' a month' : 'Bring retargeting spend back down', raw); }
   if (/^basket-pair/.test(id)) { const add = (raw.match(/Offer "([^"]+)" as the add-on/) || [])[1];
     return P(add ? 'Offer the ' + add + ' as an add-on' : 'Offer an add-on to single-item orders', raw); }
   if (id === 'crm-flows') return P(/switched off/i.test(raw) ? 'Fix the email sent after an order, and switch on the emails that suggest more products' : 'Fix the automatic emails that earn least', raw);
@@ -21274,6 +21277,8 @@ function v3ModelCac(a, b, ctx) {
   const camps = Object.values(cm).sort((p, q) => Math.abs(q.now - q.then) - Math.abs(p.now - p.then)).slice(0, 6);
   const retarget = camps.find(c => /retarget|remarket/i.test(c.name) && c.now - c.then >= 200);
   return {
+    todo: [{ amt: pClick, ids: ['driver-meta-ads', 'driver-retargeting', 'order-cost-meta', 'order-cost-google'] },
+           { amt: pConv, ids: ['sales-rhythm', 'promo-peak-plan'] }],
     title: 'Why a new customer costs ' + fmtMoney(B.v), from: A.v, to: B.v, better: 'lower', fmtV: v => fmtMoney(v, 2), fmtAmt: v => fmtMoney(Math.abs(v)),
     startK: 'A new customer', endK: 'A new customer now', chartK: 'A new customer', parts,
     opening: <>Since the 30 days to {v3Day(String(a.d), true)}, a new customer went from {fmtMoney(A.v)} to {fmtMoney(B.v)}{ctx.fo ? <>, against the {fmtMoney(ctx.fo)} a first order earns</> : null}.</>,
@@ -21309,6 +21314,7 @@ function v3ModelReturn(a, b, ctx) {
   const sA = v3SaleWeeksIn(ctx.weeks, a), sB = v3SaleWeeksIn(ctx.weeks, b);
   const saleNote = sA !== sB ? <>, as the earlier 30 days had {sA === 0 ? 'no sale weeks' : sA === 1 ? 'a sale week' : sA + ' sale weeks'} and these have {sB === 0 ? 'none' : sB === 1 ? 'one' : sB}</> : null;
   return {
+    todo: [{ amt: pO, ids: ['sales-rhythm', 'promo-peak-plan'] }, { amt: pS, ids: ['order-cost-meta', 'order-cost-google', 'driver-meta-ads'] }],
     title: 'Why each £1 of ads now brings ' + fmtMoney(B.v, 2), from: A.v, to: B.v, better: 'higher', fmtV: v => fmtMoney(v, 2), fmtAmt: v => fmtMoney(Math.abs(v), 2),
     startK: 'Sales from each £1 of ads', endK: 'Sales from each £1 of ads now', chartK: 'Sales from each £1 of ads',
     parts: [
@@ -21344,6 +21350,7 @@ function v3ModelLastYear(a, _b, ctx) {
   const o = Number(a.orders), ol = Number(a.orders_ly), n = Number(a.new_customers), nl = Number(a.new_customers_ly);
   const ad = Number(a.ads), adl = Number(a.ads_ly);
   return {
+    todo: [{ amt: pNew, ids: ['driver-meta-ads', 'test-holdout-', 'promo-peak-plan'] }, { amt: pRet, ids: ['crm-flows', 'cust-winback-atrisk'] }],
     title: 'Sales against last year, 30 days to ' + v3Day(String(a.d), true), from: sl, to: s, better: 'higher', fmtV: v => fmtMoney(v), fmtAmt: v => fmtMoney(Math.abs(v)),
     startK: 'Last year', endK: 'This year', chartK: 'Sales against last year', colA: 'Same 30 days last year', colB: '30 days to ' + v3Day(String(a.d), true),
     parts: ok ? [
@@ -21376,6 +21383,7 @@ function v3ModelRepeat(a, b, ctx) {
   const pMix = (B.s - A.s) * (rcm - rfm), pCode = sm * (B.rc - A.rc), pFull = (1 - sm) * (B.rf - A.rf);
   const codeMore = rcm >= rfm;
   return {
+    todo: [{ amt: pFull, ids: ['crm-flows', 'cust-winback-atrisk'] }, { amt: pCode, ids: ['crm-flows', 'cust-winback-atrisk'] }, { amt: pMix, ids: ['discount-dependency', 'crm-flows'] }],
     title: 'Why ' + fmtPctN(B.v) + ' of customers order again', from: A.v, to: B.v, better: 'higher', fmtV: v3Pct1, fmtAmt: v3PtsAmt,
     startK: 'Ordered again', endK: 'Ordered again now', chartK: 'Ordered again within 90 days',
     parts: [
@@ -21420,6 +21428,7 @@ function v3ModelProfit(a, b, ctx) {
   const label = O ? 'after all costs' : 'after ads';
   const state = v => (v < 0 ? 'losing ' + fmtMoney(-v) : 'making ' + fmtMoney(v));
   return {
+    todo: [{ amt: m * sO, ids: ['sales-rhythm', 'promo-peak-plan'] }, { amt: -dMeta, ids: ['order-cost-meta', 'driver-meta-ads', 'driver-retargeting'] }, { amt: -(dAds - dMeta), ids: ['order-cost-google'] }],
     title: (B.v < 0 ? 'Why you are losing ' + fmtMoney(-B.v) : 'Why you are making ' + fmtMoney(B.v)) + ' a month ' + label,
     from: A.v, to: B.v, better: 'higher', fmtV: v3SignedGbp, fmtAmt: v => fmtMoney(Math.abs(v)),
     startK: O ? 'After all costs' : 'After ads', endK: O ? 'After all costs now' : 'After ads now', chartK: O ? 'After all costs' : 'Profit after ads',
@@ -21470,6 +21479,7 @@ const v3HasDrivers = (which, points) => { const m = V3_DRIVER_MODELS[which]; if 
   const P = points.filter(m.ok); return m.mode === 'single' ? P.length >= 1 : P.length >= 2; };
 
 function V3DriverPanel({ which, points, ctx, line }) {
+  const board = useV3Board();   // above the early return: what to do points at rows already on the board
   const M0 = V3_DRIVER_MODELS[which];
   const P = (M0 && M0.prep ? M0.prep(points || [], ctx || {}) : (points || [])).filter(M0 ? M0.ok : () => false);
   const single = M0 && M0.mode === 'single';
@@ -21496,12 +21506,26 @@ function V3DriverPanel({ which, points, ctx, line }) {
     const r = q / p - 1; return { t: (r >= 0 ? '+' : '−') + fmtPctN(Math.abs(r)), cls: Math.abs(r) < 0.03 || !better ? 'v3-muted' : (r > 0) === (better === 'higher') ? 'v3-up' : 'v3-down' }; };
   const rows = M.rows.filter(r => r[1] != null && r[2] != null && isFinite(r[1]) && isFinite(r[2]));
   const flat = Math.abs(d) <= Math.abs(M.from) * 0.01;
+  const live = board.rows ? v3LiveRows(board.rows) : [];
+  const bad = t => (t.amt > 0) !== (M.better === 'higher') && Math.abs(t.amt) > Math.abs(d) * 0.1;
+  const todo = [];
+  (M.todo || []).filter(bad).sort((x, y) => Math.abs(y.amt) - Math.abs(x.amt)).forEach(t => {
+    if (todo.length >= 2) return;
+    for (const id of t.ids) { const i = live.findIndex(r => (id.endsWith('-') ? String(r.external_id).startsWith(id) : r.external_id === id));
+      if (i >= 0) { if (!todo.some(x => x.row === live[i])) todo.push({ row: live[i], rank: i + 1 }); break; } }
+  });
   const tip = ({ active, payload }) => (active && payload && payload.length)
     ? <div className="v3-tip"><b>30 days to {v3Day(payload[0].payload.d, true)}</b><span>{M.chartK} <em>{M0.fmt(payload[0].payload[M0.key])}</em></span>
         <span>{single ? 'Click to explain this week' : 'Click to compare with now'}</span></div> : null;
   return (<div className="v3-drivers" id={'drivers-' + which}>
     <h3 className="v3-sec-title">{M.title}</h3>
     <p className="v3-note v3-measure">{M.opening}{flat ? ' It barely moved.' : v3DriverSentence(M.parts, d, M.fmtAmt)}{M.closing}</p>
+    {todo.length > 0 && <div className="v3-drivers-todo">
+      <div className="v3-kick">What to do</div>
+      {todo.map(t => (<button key={t.row.external_id} type="button" className="v3-drivers-todo-row" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>
+        <span className="v3-num">#{t.rank}</span><span>{v3PlainAction(t.row).title}</span>
+        <span className="v3-num">{t.row.cm_gbp ? v3Gbp(t.row.cm_gbp) + v3Per(t.row, true) : ''}</span><Icon name="arrowRight" size={13}/></button>))}
+    </div>}
     <div className="v3-drivers-grid">
       <figure className="v3-bridge v3-bridge-wide" role="img" aria-label={M.startK + ' ' + M.fmtV(M.from) + ' to ' + M.fmtV(M.to)}>
         <figcaption className="v3-bridge-cap">{single ? 'From last year to this' : 'From then to now'}</figcaption>
