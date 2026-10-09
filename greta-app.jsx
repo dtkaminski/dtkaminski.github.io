@@ -21276,11 +21276,11 @@ function v3ModelGoalSoFar(act, plan, info) {
   return {
     title: act.done >= info.exp ? 'Why sales are ahead of the plan so far' : 'Why sales are behind the plan so far',
     from: info.exp, to: act.done, better: 'higher', fmtV: v => fmtMoney(v), fmtAmt: v => fmtMoney(Math.abs(v)),
-    startK: 'The plan by now', endK: 'Sold so far', subA: info.basis, subB: info.range, colA: 'The plan by now', colB: 'So far',
+    startK: 'The plan by now', endK: 'Sold so far', subA: 'what the ' + info.basis + ' expects by now', subB: info.range, colA: 'The plan by now', colB: 'So far',
     bridgeCap: 'From the plan to what you have sold', of: act.done >= info.exp ? 'the lead' : 'the gap',
     todo: [{ amt: cP, ids: ['driver-meta-ads', 'order-cost-meta', 'promo-peak-plan'] }, { amt: aP, ids: ['basket-pair', 'basket-free-shipping'] }, { amt: aR - pR, ids: ['cust-winback-atrisk', 'crm-flows'] }],
     parts,
-    opening: <>You have sold {fmtMoney(act.done)} this quarter so far, against the {fmtMoney(info.exp)} {info.basis} expected by now.</>,
+    opening: <>You have sold {fmtMoney(act.done)} this quarter so far, against the {fmtMoney(info.exp)} the {info.basis} expected by now.</>,
     rows: [
       ['New customers', pC, aC, v => fmtCount(Math.round(v)), 'higher'],
       ['New customers’ sales', pN, aN, v => fmtMoney(v), 'higher'],
@@ -21303,7 +21303,7 @@ function v3ModelGoalGap(goalMonths, paceMonths, goal, pace, info) {
     bridgeCap: 'From today’s pace to the goal, by month', of: 'the gap', noChange: true, tableTitle: 'Month by month: ads',
     todo: peak && peak.d > 0 ? [{ amt: peak.d, force: true, ids: ['promo-peak-plan'] }] : [],
     parts: rows.map(r => ({ amt: r.d, k: gpMonthName(r.iso), sub: (r.ads >= 0 ? fmtMoney(r.ads) + ' more ads' : fmtMoney(-r.ads) + ' less on ads') + ' (' + fmtMoney(r.ps) + ' to ' + fmtMoney(r.gs) + ')',
-      cause: <>the goal sells {fmtMoney(r.d)} more in {gpMonthName(r.iso)}, on {fmtMoney(r.ads)} more ads ({fmtMoney(r.ps)} to {fmtMoney(r.gs)})</>,
+      cause: <>the goal puts {fmtMoney(r.ads)} more ads into {gpMonthName(r.iso)} ({fmtMoney(r.ps)} to {fmtMoney(r.gs)})</>,
       against: <>{gpMonthName(r.iso)}, where the goal sells {fmtMoney(Math.abs(r.d))} less</> }))
       .concat(Math.abs(rest) >= 1 ? [{ amt: rest, k: 'Rounding', sub: 'the goal’s months against its total', cause: <>rounding</>, against: <>Rounding</> }] : []),
     opening: <>At today’s ad spend the quarter lands at about {fmtMoney(pace)}; your goal is {fmtMoney(goal)}, {fmtMoney(goal - pace)} more.</>,
