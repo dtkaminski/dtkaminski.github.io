@@ -20246,6 +20246,7 @@ function V3Review() {
   const leftOut = clean.length >= 6 ? prev16.filter(w => w.start >= prev8[0].start && !clean.includes(w)).length : 0;
   const T = { sales: v3Med(prev8.map(w => w.sales)), spend: v3Med(prev8.map(w => w.spend)) }; T.kept = T.sales * cmr - T.spend;
   const sum = (from, to, f) => shop.filter(r => r && r.date >= from && r.date <= to).reduce((a, r) => a + (Number(r[f]) || 0), 0);
+  T.orders = v3Med(prev8.map(w => sum(w.start, w.end, 'orders')).filter(n => n > 0));
   const orders = sum(W.start, W.end, 'orders'), aov = orders > 0 ? W.sales / orders : null;
   const chg = (a, b) => (b > 0 ? a / b - 1 : null);
   const sChg = chg(W.sales, T.sales), pX = T.spend > 0 ? W.spend / T.spend : null;
@@ -20290,6 +20291,7 @@ function V3Review() {
         {stat('Sales per £ of ads', mer != null ? fmtTimes(mer, 2) : FMT_NONE, be ? 'you break even at ' + fmtTimes(be, 2) : '', mer != null && be && mer < be ? 'v3-down' : 'v3-muted')}
         {orders > 0 && stat('Orders', fmtCount(orders), aov ? 'average order ' + fmtMoney(aov) : '')}
       </div>
+      <V3WeekDrivers W={{ ...W, orders }} T={T} cmr={cmr} info={{ range, n: prev8.length, leftOut, sale: promoIn(W.start, W.end) && W.sales > T.sales * 1.25 }}/>
     </section>
     <div className="v3-chart-pair">
       <figure className="v3-chart">
@@ -21241,6 +21243,57 @@ function V3BusinessState({ part }) {
         arrive every 30 minutes (Shopify) and every 2 hours (ad accounts). */}
     <p className="micro muted v3-stand-fresh">Each figure covers the 30 days to {HP ? v3Day(String(hq.rows[0].history.as_of), true) : 'yesterday'}, the last full day. Greta works them out again every hour; Shopify orders arrive every 30 minutes and ad spend every 2 hours.{HP ? ' Point at a sign to see its last 13 weeks.' : ''}</p>
   </section>);
+}
+// Review (9 Oct): the week against a typical week, on the Review page's own figures. Kept after ads is
+// sales x what each £1 keeps less ad spend, so the gap splits exactly into orders and the average order
+// (the sales change, at what each £1 keeps) and ad spend. A typical week is the middle of the eight
+// weeks before, sale weeks left out, as the page says; its orders are the middle of theirs.
+function v3ModelWeek(W, T, cmr, info) {
+  const okO = W.orders > 0 && T.orders > 0;
+  const [sO, sA] = okO ? v3LogParts(T.sales, W.sales, [{ a: T.orders, b: W.orders, sign: 1 }, { a: T.sales / T.orders, b: W.sales / W.orders, sign: 1 }]) : [W.sales - T.sales, 0];
+  const aT = okO ? T.sales / T.orders : null, aW = okO ? W.sales / W.orders : null;
+  const parts = okO ? [
+    { amt: cmr * sO, k: v3UpDown(T.orders, W.orders, 'More orders', 'Fewer orders'), sub: fmtCount(Math.round(T.orders)) + ' to ' + fmtCount(W.orders),
+      cause: <>there were {v3UpDown(T.orders, W.orders, 'more', 'fewer')} orders than in a typical week ({fmtCount(Math.round(T.orders))} to {fmtCount(W.orders)}){info.sale ? ', with a sale on' : ''}</>,
+      against: <>{v3UpDown(T.orders, W.orders, 'More', 'Fewer')} orders ({fmtCount(Math.round(T.orders))} to {fmtCount(W.orders)})</> },
+    { amt: cmr * sA, k: v3UpDown(aT, aW, 'Bigger orders', 'Smaller orders'), sub: fmtMoney(aT, 2) + ' to ' + fmtMoney(aW, 2) + ' an order',
+      cause: <>orders were {v3UpDown(aT, aW, 'bigger', 'smaller')} ({fmtMoney(aT, 2)} to {fmtMoney(aW, 2)})</>,
+      against: <>{v3UpDown(aT, aW, 'Bigger', 'Smaller')} orders ({fmtMoney(aT, 2)} to {fmtMoney(aW, 2)})</> },
+  ] : [
+    { amt: cmr * sO, k: v3UpDown(T.sales, W.sales, 'More sales', 'Fewer sales'), sub: fmtMoney(T.sales) + ' to ' + fmtMoney(W.sales),
+      cause: <>sales were {v3UpDown(T.sales, W.sales, 'higher', 'lower')} ({fmtMoney(T.sales)} to {fmtMoney(W.sales)})</>,
+      against: <>{v3UpDown(T.sales, W.sales, 'Higher', 'Lower')} sales ({fmtMoney(T.sales)} to {fmtMoney(W.sales)})</> },
+  ];
+  parts.push({ amt: -(W.spend - T.spend), k: v3UpDown(T.spend, W.spend, 'More ad spend', 'Less ad spend'), sub: fmtMoney(T.spend) + ' to ' + fmtMoney(W.spend),
+    cause: <>ad spend was {v3UpDown(T.spend, W.spend, 'higher', 'lower')} ({fmtMoney(T.spend)} to {fmtMoney(W.spend)})</>,
+    against: <>{v3UpDown(T.spend, W.spend, 'More', 'Less')} ad spend ({fmtMoney(T.spend)} to {fmtMoney(W.spend)})</> });
+  const sgn = v => (v < 0 ? '−' : '') + fmtMoney(Math.abs(v));
+  return {
+    title: 'Why the week kept ' + sgn(W.kept) + ' after ads', from: T.kept, to: W.kept, better: 'higher', fmtV: sgn, fmtAmt: v => fmtMoney(Math.abs(v)),
+    startK: 'A typical week', endK: 'This week', subA: 'the middle of ' + fmtCount(info.n) + ' weeks' + (info.leftOut ? ', sale weeks left out' : ''), subB: info.range,
+    colA: 'A typical week', colB: 'This week', bridgeCap: 'From a typical week to this one', of: W.kept >= T.kept ? 'the gain' : 'the gap',
+    todo: okO ? [{ amt: cmr * sO, ids: ['sales-rhythm', 'promo-peak-plan'] }, { amt: cmr * sA, ids: ['basket-pair', 'basket-free-shipping'] }, { amt: -(W.spend - T.spend), ids: ['order-cost-meta', 'order-cost-google', 'driver-retargeting'] }]
+              : [{ amt: cmr * sO, ids: ['sales-rhythm', 'promo-peak-plan'] }, { amt: -(W.spend - T.spend), ids: ['order-cost-meta', 'order-cost-google'] }],
+    parts,
+    opening: <>In the week of {info.range}, you kept {sgn(W.kept)} after ads, against {sgn(T.kept)} in a typical week.</>,
+    closing: <> Each £1 of sales keeps about {Math.round(cmr * 100)}p after products and delivery, so each £100 of sales is worth about {fmtMoney(cmr * 100)} here.</>,
+    rows: [
+      ['Sales', T.sales, W.sales, v => fmtMoney(v), 'higher'],
+      ...(okO ? [['Orders', T.orders, W.orders, v => fmtCount(Math.round(v)), 'higher'], ['Average order', aT, aW, v => fmtMoney(v, 2), 'higher']] : []),
+      ['Ad spend', T.spend, W.spend, v => fmtMoney(v), 'lower'],
+      ['Kept after ads', T.kept, W.kept, sgn, 'higher'],
+    ],
+    note: 'The figures above on this page: Monday to Sunday, sales after discounts and before VAT, Meta and Google spend. A typical week is the middle of the eight before, leaving out weeks over 1.4 times the usual, so a sale does not set the bar.',
+  };
+}
+function V3WeekDrivers({ W, T, cmr, info }) {
+  const [open, setOpen] = React.useState(false);
+  if (!W || !T || cmr == null || !(T.sales > 0)) return null;
+  return (<div className="v3-strip-act">
+    <button type="button" className="v3-xref v3-sign-act" aria-expanded={open} onClick={() => setOpen(o => !o)}>
+      {open ? 'Hide what is driving it' : 'What is driving this week?'} <span className="v3-xref-go">{open ? '↑' : '↓'}</span></button>
+    {open && <V3DriverPanel fixed={v3ModelWeek(W, T, cmr, info)}/>}
+  </div>);
 }
 // Stock (9 Oct): what drives the profit lost before an order placed today can land. Greta keeps stock
 // as it is now (Shopify's counts are overwritten on every sync), so there is no "then" yet: this splits
