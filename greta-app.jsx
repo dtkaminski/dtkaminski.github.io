@@ -21221,7 +21221,7 @@ function v3ModelProducts(list, sale) {
     cause: <>the products still in stock sold {v3UpDown(U0, U1, 'more', 'fewer')} units ({fmtCount(U0)} to {fmtCount(U1)}){sale != null && U1 < U0 ? <>, as the 28 days before included a sale</> : null}</>,
     against: <>Selling {v3UpDown(U0, U1, 'more', 'fewer')} units of the products still in stock ({fmtCount(U0)} to {fmtCount(U1)})</> });
   if (idx != null) parts.push({ amt: price, k: idx >= 0 ? 'Higher prices' : 'Lower prices', sub: fmtPctN(Math.abs(idx)) + (idx >= 0 ? ' more' : ' less') + ' for the same product',
-    cause: <>the same products sold for {idx >= 0 ? 'more' : 'less'} each ({fmtPctN(Math.abs(idx))} {idx >= 0 ? 'more' : 'less'} on average){idx < 0 ? ', from discounts or codes' : ''}</>,
+    cause: <>the same products sold for {idx >= 0 ? 'more' : 'less'} each ({fmtPctN(Math.abs(idx))} {idx >= 0 ? 'more' : 'less'} on average)</>,
     against: sale != null && idx > 0 ? <>Higher prices once the sale ended ({fmtPctN(idx)} more for the same product)</> : <>{idx >= 0 ? 'Higher' : 'Lower'} prices for the same products ({fmtPctN(Math.abs(idx))})</> });
   if (nw.length) parts.push({ amt: newD, k: 'New products', sub: fmtCount(nw.length) + ' new in the last eight weeks',
     cause: <>new products sold {fmtMoney(sum(nw, 'now'))}</>, against: <>New products ({fmtCount(nw.length)})</> });
