@@ -21121,13 +21121,19 @@ function V3BusinessState({ part }) {
   // one "What is driving this?" per sign whose history can explain it; one panel open at a time
   signs.forEach(sg => { sg.act = sg.which && v3HasDrivers(sg.which, HP)
     ? { label: drv === sg.which ? 'Hide what is driving it' : 'What is driving this?', open: drv === sg.which, on: () => setDrv(o => (o === sg.which ? null : sg.which)) } : null; });
-  const openSign = drv ? signs.find(sg => sg.which === drv) : null;
+  // the headline loss: the same panel, with the margin and running costs the headline uses
+  const mKept = num(L.sales) > 0 && L.profit_after_ads != null && L.ads != null ? (num(L.profit_after_ads) + num(L.ads)) / num(L.sales) : null;
+  const profitCfg = mKept != null ? { which: 'profit', ctx: { m: mKept, o: ao != null ? num(L.overheads) : 0, weeks: H && Array.isArray(H.weeks) ? H.weeks : [] }, dline: 0 } : null;
+  const profitAct = profitCfg && v3HasDrivers('profit', HP)
+    ? { label: drv === 'profit' ? 'Hide what is driving it' : 'What is driving this?', open: drv === 'profit', on: () => setDrv(o => (o === 'profit' ? null : 'profit')) } : null;
+  const openSign = drv === 'profit' ? profitCfg : drv ? signs.find(sg => sg.which === drv) : null;
   return (<section className="v3-stand">
     <div className="v3-kick">Where you stand · last 30 days</div>
     <p className="v3-verdict">{verdict}</p>
     {sub}
     <div className="v3-stand-grid">
-      <V3MoneyBridge L={L} share={share}/>
+      <div><V3MoneyBridge L={L} share={share}/>
+        {profitAct && <button type="button" className="v3-xref v3-sign-act" aria-expanded={profitAct.open} onClick={profitAct.on}>{profitAct.label} <span className="v3-xref-go">{profitAct.open ? '↑' : '↓'}</span></button>}</div>
       {signs.length > 0 && <div className="v3-signs">{signs.slice(0, 4).map(s => <V3Sign key={s.k} {...s}/>)}</div>}
     </div>
     {openSign && HP && <V3DriverPanel key={drv} which={drv} points={HP} ctx={openSign.ctx} line={openSign.dline}/>}
@@ -21385,7 +21391,60 @@ function v3ModelRepeat(a, b, ctx) {
     note: 'Each point looks at web customers whose first order was 91 to 180 days before it, because it takes 90 days to know whether someone came back. A code is any discount code on that first order.',
   };
 }
+// The headline, after all costs: sales x what each £1 keeps after products and delivery (the brand's
+// measured margin, one figure for every week, as the headline uses), less ad spend and running costs.
+// So between two weeks it moves with sales (split into orders and average order) and with ad spend
+// (Meta and Google); running costs only when they were changed.
+const v3SignedGbp = v => (v < 0 ? '−' : '') + fmtMoney(Math.abs(v));
+function v3ModelProfit(a, b, ctx) {
+  const m = ctx.m, O = ctx.o || 0;
+  const f = p => { const s = Number(p.sales), o = Number(p.orders), ad = Number(p.ads);
+    return { s, o, ad, aov: s / o, kept: s * m, ms: Number(p.meta_spend), gs: Number(p.google_spend), n: Number(p.new_customers), v: s * m - ad - O }; };
+  const A = f(a), B = f(b);
+  const [sO, sA] = v3LogParts(A.s, B.s, [{ a: A.o, b: B.o, sign: 1 }, { a: A.aov, b: B.aov, sign: 1 }]);
+  const dMeta = B.ms - A.ms, dAds = B.ad - A.ad;
+  const sAw = v3SaleWeeksIn(ctx.weeks, a), sBw = v3SaleWeeksIn(ctx.weeks, b);
+  const saleNote = sAw !== sBw ? <>, as the earlier 30 days had {sAw === 0 ? 'no sale weeks' : sAw === 1 ? 'a sale week' : sAw + ' sale weeks'} and these have {sBw === 0 ? 'none' : sBw === 1 ? 'one' : sBw}</> : null;
+  const label = O ? 'after all costs' : 'after ads';
+  const state = v => (v < 0 ? 'losing ' + fmtMoney(-v) : 'making ' + fmtMoney(v));
+  return {
+    title: (B.v < 0 ? 'Why you are losing ' + fmtMoney(-B.v) : 'Why you are making ' + fmtMoney(B.v)) + ' a month ' + label,
+    from: A.v, to: B.v, better: 'higher', fmtV: v3SignedGbp, fmtAmt: v => fmtMoney(Math.abs(v)),
+    startK: O ? 'After all costs' : 'After ads', endK: O ? 'After all costs now' : 'After ads now', chartK: O ? 'After all costs' : 'Profit after ads',
+    parts: [
+      { amt: m * sO, k: v3UpDown(A.o, B.o, 'More orders', 'Fewer orders'), sub: fmtCount(A.o) + ' to ' + fmtCount(B.o),
+        cause: <>there were {v3UpDown(A.o, B.o, 'more', 'fewer')} orders ({fmtCount(A.o)} to {fmtCount(B.o)}){saleNote}</>,
+        against: <>{v3UpDown(A.o, B.o, 'More', 'Fewer')} orders ({fmtCount(A.o)} to {fmtCount(B.o)})</> },
+      { amt: m * sA, k: v3UpDown(A.aov, B.aov, 'Bigger orders', 'Smaller orders'), sub: fmtMoney(A.aov, 2) + ' to ' + fmtMoney(B.aov, 2) + ' an order',
+        cause: <>orders were {v3UpDown(A.aov, B.aov, 'bigger', 'smaller')} on average ({fmtMoney(A.aov, 2)} to {fmtMoney(B.aov, 2)})</>,
+        against: <>{v3UpDown(A.aov, B.aov, 'Bigger', 'Smaller')} orders ({fmtMoney(A.aov, 2)} to {fmtMoney(B.aov, 2)} on average)</> },
+      { amt: -dMeta, k: v3UpDown(A.ms, B.ms, 'More Meta spend', 'Less Meta spend'), sub: fmtMoney(A.ms) + ' to ' + fmtMoney(B.ms),
+        cause: <>Meta ad spend went {v3UpDown(A.ms, B.ms, 'up', 'down')} ({fmtMoney(A.ms)} to {fmtMoney(B.ms)})</>,
+        against: <>{v3UpDown(A.ms, B.ms, 'More', 'Less')} Meta ad spend ({fmtMoney(A.ms)} to {fmtMoney(B.ms)})</> },
+      // the rest of the ad spend change, so the parts add up to the figure (Google, and any other platform)
+      { amt: -(dAds - dMeta), k: v3UpDown(A.ad - A.ms, B.ad - B.ms, 'More Google spend', 'Less Google spend'), sub: fmtMoney(A.ad - A.ms) + ' to ' + fmtMoney(B.ad - B.ms),
+        cause: <>Google ad spend went {v3UpDown(A.ad - A.ms, B.ad - B.ms, 'up', 'down')} ({fmtMoney(A.ad - A.ms)} to {fmtMoney(B.ad - B.ms)})</>,
+        against: <>{v3UpDown(A.ad - A.ms, B.ad - B.ms, 'More', 'Less')} Google ad spend ({fmtMoney(A.ad - A.ms)} to {fmtMoney(B.ad - B.ms)})</> },
+    ],
+    opening: <>Since the 30 days to {v3Day(String(a.d), true)}, the business went from {state(A.v)} a month {label} to {state(B.v)}.</>,
+    closing: <> Each £1 of sales keeps about {Math.round(m * 100)}p after products and delivery, so every £1,000 of sales lost costs about {fmtMoney(m * 1000)} of profit{O ? <>, while running costs stay at {fmtMoney(O)} a month</> : null}.</>,
+    rows: [
+      ['Sales', A.s, B.s, v => fmtMoney(v), 'higher'],
+      ['Orders', A.o, B.o, v => fmtCount(v), 'higher'],
+      ['Average order', A.aov, B.aov, v => fmtMoney(v, 2), 'higher'],
+      ['Kept after products and delivery', A.kept, B.kept, v => fmtMoney(v), 'higher'],
+      ['Ad spend: Meta', A.ms, B.ms, v => fmtMoney(v), 'lower'],
+      ['Ad spend: Google and other', A.ad - A.ms, B.ad - B.ms, v => fmtMoney(v), 'lower'],
+      ...(O ? [['Running costs', O, O, v => fmtMoney(v), null]] : []),
+      [O ? 'After all costs' : 'After ads', A.v, B.v, v3SignedGbp, 'higher'],
+    ],
+    note: 'This is the headline figure worked out for each 30 days: sales times the ' + Math.round(m * 100) + 'p each £1 keeps after products and delivery (your measured margin, used for every week, as the headline does), less ad spend' + (O ? ' and ' + fmtMoney(O) + ' of running costs a month' : '') + '. So it moves with sales and ad spend. When Greta measures your margin again, every week moves with it.',
+  };
+}
 const V3_DRIVER_MODELS = {
+  profit: { model: v3ModelProfit,   mode: 'pair',   key: 'profit',     fmt: v3SignedGbp,
+            prep: (P, ctx) => P.map(p => Object.assign({}, p, { profit: Number(p.sales) * ctx.m - Number(p.ads) - (ctx.o || 0) })),
+            ok: p => Number(p.sales) > 0 && Number(p.orders) > 0 && p.ads != null && p.meta_spend != null },
   cac:    { model: v3ModelCac,      mode: 'pair',   key: 'cac',        fmt: v => fmtMoney(v),
             ok: p => p.cac != null && p.new_customers > 0 && (Number(p.meta_clicks) + Number(p.google_clicks)) > 0 && p.cac_spend != null },
   ret:    { model: v3ModelReturn,   mode: 'pair',   key: 'return',     fmt: v => fmtMoney(v, 2),
@@ -21400,7 +21459,7 @@ const v3HasDrivers = (which, points) => { const m = V3_DRIVER_MODELS[which]; if 
 
 function V3DriverPanel({ which, points, ctx, line }) {
   const M0 = V3_DRIVER_MODELS[which];
-  const P = (points || []).filter(M0 ? M0.ok : () => false);
+  const P = (M0 && M0.prep ? M0.prep(points || [], ctx || {}) : (points || [])).filter(M0 ? M0.ok : () => false);
   const single = M0 && M0.mode === 'single';
   const [ci, setCi] = React.useState(() => single ? P.length - 1 : Math.max(0, P.length - 5));
   if (!M0 || P.length < (single ? 1 : 2)) return null;
@@ -21445,7 +21504,7 @@ function V3DriverPanel({ which, points, ctx, line }) {
           <R.BarChart data={P} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
             <R.XAxis dataKey="d" tickFormatter={dd => v3Day(dd)} interval="preserveStartEnd" minTickGap={30}/>
             <R.YAxis hide/>
-            {M0.key === 'vs_ly' ? <R.ReferenceLine y={0} stroke={PAL.muted}/> : null}
+            {M0.key === 'vs_ly' || M0.key === 'profit' ? <R.ReferenceLine y={0} stroke={PAL.muted}/> : null}
             {line != null && M0.key !== 'vs_ly' ? <R.ReferenceLine y={line} stroke={PAL.muted} strokeDasharray="3 3" ifOverflow="extendDomain"/> : null}
             <R.Tooltip content={tip} cursor={{ fill: PAL.surface }}/>
             <R.Bar dataKey={M0.key} isAnimationActive={false} style={{ cursor: 'pointer' }}
