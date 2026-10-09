@@ -21212,9 +21212,11 @@ function V3CacDrivers({ points, fo, weeks }) {
   // sale weeks inside each 30 days: a sale turns more clicks into first orders
   const saleIn = p => (weeks || []).filter(w => w.sale && String(w.wk) >= v3IsoAdd(String(p.d), -29) && String(w.wk) <= String(p.d)).length;
   const sA = saleIn(a), sB = saleIn(b);
-  const partClickT = <><b className="oi-num">{fmtMoney(Math.abs(pClick))}</b> because each paid click cost {pClick >= 0 ? 'more' : 'less'} ({pence(A.cpc)} to {pence(B.cpc)}){top.length ? <>, mainly because {top.map((s, i) => <React.Fragment key={i}>{i ? ' and ' : ''}{s.t}</React.Fragment>)}</> : null}</>;
-  const partConvT = <><b className="oi-num">{fmtMoney(Math.abs(pConv))}</b> because it took {pConv >= 0 ? 'more' : 'fewer'} clicks to win each customer ({Math.round(A.cpn)} to {Math.round(B.cpn)}){sA > sB && pConv > 0 ? <>, as the earlier 30 days had {sA === 1 ? 'a sale week' : sA + ' sale weeks'} and a sale turns more clicks into first orders</> : null}</>;
-  const parts = Math.abs(pClick) >= Math.abs(pConv) ? [partClickT, partConvT] : [partConvT, partClickT];
+  // "£13 of the rise is because ..." first, "The other £12 is because ..." second, biggest part first
+  const move = d >= 0 ? 'rise' : 'fall';
+  const partClickT = lead => <>{lead ? null : 'The other '}<b className="oi-num">{fmtMoney(Math.abs(pClick))}</b>{lead ? ' of the ' + move : ''} is because each paid click cost {pClick >= 0 ? 'more' : 'less'} ({pence(A.cpc)} to {pence(B.cpc)}){top.length ? <>, mainly because {top.map((s, i) => <React.Fragment key={i}>{i ? ' and ' : ''}{s.t}</React.Fragment>)}</> : null}</>;
+  const partConvT = lead => <>{lead ? null : 'The other '}<b className="oi-num">{fmtMoney(Math.abs(pConv))}</b>{lead ? ' of the ' + move : ''} is because it took {pConv >= 0 ? 'more' : 'fewer'} clicks to win each customer ({Math.round(A.cpn)} to {Math.round(B.cpn)}){sA > sB && pConv > 0 ? <>, as the earlier 30 days had {sA === 1 ? 'a sale week' : sA + ' sale weeks'} and a sale turns more clicks into first orders</> : null}</>;
+  const parts = Math.abs(pClick) >= Math.abs(pConv) ? [partClickT(true), partConvT(false)] : [partConvT(true), partClickT(false)];
 
   // the walk from then to now, drawn as the money waterfall is
   const steps = [
@@ -21251,7 +21253,7 @@ function V3CacDrivers({ points, fo, weeks }) {
     ? <div className="v3-tip"><b>30 days to {v3Day(payload[0].payload.d, true)}</b><span>A new customer <em>{fmtMoney(payload[0].payload.cac, 2)}</em></span><span>Click to compare with now</span></div> : null;
   return (<div className="v3-drivers" id="cac-drivers">
     <h3 className="v3-sec-title">Why a new customer costs {fmtMoney(B.cac)}</h3>
-    <p className="v3-note v3-measure">Since the 30 days to {day(a)}, a new customer went from {fmtMoney(A.cac)} to {fmtMoney(B.cac)}{fo ? <>, against the {fmtMoney(fo)} a first order earns</> : null}. {parts[0]}. The other {parts[1]}.</p>
+    <p className="v3-note v3-measure">Since the 30 days to {day(a)}, a new customer went from {fmtMoney(A.cac)} to {fmtMoney(B.cac)}{fo ? <>, against the {fmtMoney(fo)} a first order earns</> : null}. {parts[0]}. {parts[1]}.</p>
     <div className="v3-drivers-grid">
       <figure className="v3-bridge v3-bridge-wide" role="img" aria-label={'From ' + fmtMoney(A.cac, 2) + ' to ' + fmtMoney(B.cac, 2)}>
         <figcaption className="v3-bridge-cap">From then to now</figcaption>
