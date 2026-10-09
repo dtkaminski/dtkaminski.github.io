@@ -8743,7 +8743,11 @@ async function v3AskFacts(question) {
       const o = shopAll.filter(r => ds.has(String(r.date).slice(0, 10))).reduce((a, r) => a + (Number(r.orders) || 0), 0);
       return { days: ds.size, visits: v, orders: o, per100: v > 0 && ds.size >= 0.6 * (fromBack - toBack) ? Math.round(o / v * 10000) / 100 : null };
     };
-    const wk = span(8, 1), wk4 = span(36, 8), typ = span(121, 31);
+    // Weekly rates swing (frkl, Aug-Oct: 0.28 to 0.72 per 100 visits, the highs in sale weeks), so last
+    // week is read against the range of the 8 weeks before, not one average a sale can lift.
+    const weeks = [0, 1, 2, 3, 4, 5, 6, 7, 8].map(k => span(8 + 7 * k, 1 + 7 * k));
+    const wk = weeks[0], prior = weeks.slice(1).filter(w => w.per100 != null), typ = span(121, 31);
+    const wk4 = span(36, 8);
     const tr = clR.filter(r => r.metric_name === 'Traffic' && String(r.date).slice(0, 10) >= v3IsoAdd(today, -31));
     const visits = tr.reduce((a, r) => a + vis(r), 0);
     const days = new Set(tr.map(r => String(r.date).slice(0, 10)));
@@ -8751,13 +8755,17 @@ async function v3AskFacts(question) {
     const orders = shop.reduce((a, r) => a + (Number(r.orders) || 0), 0);
     const p30 = visits > 0 ? Math.round(orders / visits * 10000) / 100 : null;
     let verdict = null;
-    if (wk.per100 != null && wk4.per100 != null && wk4.per100 > 0) {
-      const chg = wk.per100 / wk4.per100 - 1;
-      verdict = (chg <= -0.2 ? 'Fewer visits turned into orders last week than in the 4 weeks before'
-        : chg >= 0.2 ? 'More visits turned into orders last week than in the 4 weeks before'
-        : 'Visits turned into orders at about the usual rate last week')
-        + ': ' + wk.per100 + ' orders per 100 visits, against ' + wk4.per100 + ' (Microsoft Clarity, which counts every visit).'
-        + (Math.abs(chg) < 0.2 ? ' So a drop in Google Analytics or in the orders the shop links to a source is most likely tracking, not shoppers.' : '');
+    if (wk.per100 != null && prior.length >= 4) {
+      const lo = Math.min(...prior.map(w => w.per100)), hi = Math.max(...prior.map(w => w.per100));
+      const range = lo.toFixed(2) + ' to ' + hi.toFixed(2) + ' in the ' + prior.length + ' weeks before';
+      verdict = (wk.per100 < lo ? 'Fewer visits turned into orders last week than in any of the ' + prior.length + ' weeks before: '
+          : wk.per100 > hi ? 'More visits turned into orders last week than in any of the ' + prior.length + ' weeks before: '
+          : 'Visits turned into orders within their usual range last week: ')
+        + wk.per100.toFixed(2) + ' orders per 100 visits (' + wk.orders + ' orders), against ' + range
+        + ' (Microsoft Clarity, which counts every visit; the highest weeks are usually sales).'
+        + (wk.per100 >= lo && wk.per100 <= hi ? ' So a drop in Google Analytics or in the orders the shop links to a source is most likely tracking, not shoppers.'
+          : ' Check the site before blaming ads: buy something on a phone, and look at the site errors below.')
+        + (wk.orders < 60 ? ' With ' + wk.orders + ' orders in the week, part of a swing this size can be chance.' : '');
     }
     const cl30 = clR.filter(r => String(r.date).slice(0, 10) >= v3IsoAdd(today, -31));
     const fr = {}; V3_FRICTION.forEach(([m, label]) => { let n = 0, s2 = 0; cl30.filter(r => r.metric_name === m).forEach(r => {
@@ -8928,7 +8936,8 @@ function v3AskScrub(text, facts) {
   // What still leaked on 8 Oct: "(whether it lands before the peak = false)", "(when an order placed today
   // lands)" -- a field name in brackets, translated -- "(direct)" after a figure, and "board rank 1".
   const glosses = new Set(Object.keys(V3_ASK_WORDS).map(k => V3_ASK_WORDS[k].toLowerCase()));
-  t = t.replace(/\brung\s+([*_]*)(direct|likely|probably|possible|outside chance)\b/gi, '$1$2')
+  t = t.replace(/\b(the|its|this) rung (is|was) ([*_]*)(direct|likely|probably|possible|outside chance)\b/gi, (m, a, b, s, w) => 'Greta rates it ' + s + w)
+       .replace(/\brung\s+([*_]*)(direct|likely|probably|possible|outside chance)\b/gi, '$1$2')
        .replace(/\s*\([^()]*=\s*(?:true|false|null)\s*\)/gi, '')
        .replace(/\s*\(([^()]{3,60})\)/g, (m, inner) => (glosses.has(inner.trim().toLowerCase()) ? '' : m))
        .replace(/\s*\(\s*direct\s*\)/gi, '')
@@ -9173,7 +9182,7 @@ function AskPanel(){
 
 Follow _meta.readout.rules. Quote headline figures exactly, with their window. Say how far the owner can lean on a figure in plain words (measured, likely, probably, possibly, an outside chance), as part of the sentence: never the word rung, never in brackets after a figure. Never recommend an action in readout.held. Never compare or total across days readout.coverage or readout.tracking marks unusable; missing days are not zero.
 
-WHAT TO DO questions: answer from readout.board in its order, with each item's pounds (a month, or once when the action says so) and its rung. Do not re-rank. One idea of your own is allowed only if labelled "my suggestion, not on your board". For spending more, check facts.quarter_plan_at_todays_ad_spend and facts.next_peak first. If facts.goal.needs_replanning is true, say so before quoting the goal.
+WHAT TO DO questions: answer from readout.board in its order, with each item's pounds (a month, or once when the action says so) and its rung. Do not re-rank. One idea of your own is allowed only if labelled "my suggestion, not on your board", and never one from readout.held (9 Oct: a held Judge.me fix came back as "my suggestion"). For spending more, check facts.quarter_plan_at_todays_ad_spend and facts.next_peak first. If facts.goal.needs_replanning is true, say so before quoting the goal.
 
 WHY questions: before naming a cause, check the confounders: a promotion or code, a spend change, a stockout, an email send, a tracking change, seasonality, or a partial latest day (_meta.dataQuality). Check each against facts.recent_context first: if sale_weeks_in_last_13 is above 0, promotions are part of the story, not ruled out; if of_them_out_of_stock_now or products_out_of_stock_now is above 0, stock-outs are too. A planned-events list being empty does not rule out what already happened. Locate the move: demand (spend, visits) → conversion → order value and discounts → new vs returning → product and stock. Separate what the data shows from what you infer, and give your confidence. For why profit after ads moved against a typical month, lead with facts.typical_month.what_moved_profit_after_ads: its main_cause, its pounds from sales and from ad spend, and its sales and ad spend comparisons exactly as written; do not work out percentages of your own.
 COUNTS AND NAMES: how many products are out of stock or need ordering comes from facts.recent_context (the board's #1 order list), never from counting table rows. Call a product out of stock only if out_of_stock_now_examples or a stock table marks it so; never give an example the data does not name. A board action is what its text says: do not attach creatives, audiences or campaigns to it unless its text names them.
