@@ -18683,7 +18683,7 @@ function V3Website() {
           <td className="v3-muted">{Pv && Pv.fr[m] != null ? fmtPctN(Pv.fr[m]) : FMT_NONE}</td></tr>); })}</tbody>
       </table>
     </section>)}
-    <V3DriverStrip keys={['conv']}/>
+    <V3DriverStrip keys={['conv']} opts={{ convTypical: Pv && Pv.conv }}/>
 
     {moves.length > 0 && (<section className="v3-sec">
       <h2 className="v3-sec-title">What to do</h2>
@@ -20947,7 +20947,7 @@ const V3_SIGN_HIST_Q = (sb, b) => sb.from('cache_brand_sign_history').select('hi
 // The signs and the headline, built once for every page that shows them (Today, and since 9 Oct Profit &
 // sales, Marketing, Customers, Growth plan, Review and Goal & costs), so a figure, its arrow and its
 // drivers read the same wherever it appears. S is fn_brand_state; hist is cache_brand_sign_history.
-function v3BuildSigns(S, hist) {
+function v3BuildSigns(S, hist, opts) {
   const L = S.last_30 || {}, A = S.ads || {}, U = S.unit || {}, R = S.retention || {}, BM = S.benchmarks || {}, H = S.rhythm;
   const num = v => (v == null ? null : Number(v));
   const yoySales = num(A.last_year_same_30_sales) > 0 ? num(L.sales) / num(A.last_year_same_30_sales) - 1 : null;
@@ -21001,9 +21001,12 @@ function v3BuildSigns(S, hist) {
   const CP = HP ? HP.filter(p => p.conv != null) : [];
   if (CP.length >= 4) {
     const cv = Number(CP[CP.length - 1].conv), bs = CP.slice(0, -1).map(p => Number(p.conv)).sort((x, y) => x - y);
-    const typ = bs.length % 2 ? bs[(bs.length - 1) / 2] : (bs[bs.length / 2 - 1] + bs[bs.length / 2]) / 2, top = Math.max(cv, typ) * 1.25;
+    // the Website page's own "typical" (the middle of the three 30-day blocks before) when it is given, so the
+    // page says one usual rate: the middle of 12 overlapping weeks counted frkl's August sale several times
+    const own = opts && opts.convTypical > 0 ? Number(opts.convTypical) : null;
+    const typ = own != null ? own : (bs.length % 2 ? bs[(bs.length - 1) / 2] : (bs[bs.length / 2 - 1] + bs[bs.length / 2]) / 2), top = Math.max(cv, typ) * 1.25;
     signs.push({ k: 'Orders per 100 visits', v: v3Per100(cv), tone: cv < typ * 0.9 ? 'weak' : cv > typ * 1.1 ? 'good' : 'typical',
-      bar: { fill: cv / top, mark: typ / top }, n: <>About {v3Per100(typ)} is usual for you, the middle of the last {fmtCount(CP.length)} weeks</>,
+      bar: { fill: cv / top, mark: typ / top }, n: own != null ? <>About {v3Per100(typ)} is usual for you, the middle of the three 30 days before</> : <>About {v3Per100(typ)} is usual for you, the middle of the last {fmtCount(CP.length)} weeks</>,
       series: ser('conv'), fmt: v => v3Per100(v), better: 'higher', line: { v: typ, label: 'Usual ' + v3Per100(typ) },
       which: 'conv', ctx: { weeks: H && Array.isArray(H.weeks) ? H.weeks : [], typical: typ, lineLabel: 'about ' + v3Per100(typ) + ', your usual rate' }, dline: typ });
   }
@@ -21190,13 +21193,13 @@ function V3BusinessState({ part }) {
 }
 // The same signs and drivers on the page where each figure is the subject (9 Oct): one row of signs,
 // each with its arrow, its 13 weeks on hover and "What is driving this?", and the panel under them.
-function V3DriverStrip({ keys, title }) {
+function V3DriverStrip({ keys, title, opts }) {
   const q = useV3Rows('brand-state', V3_STATE_Q);
   const hq = useV3Rows('sign-history', V3_SIGN_HIST_Q);
   const [drv, setDrv] = React.useState(null);
   if (q.err || hq.err || !q.rows || !hq.rows) return null;
   const S = q.rows[0]; if (!S || !S.last_30) return null;
-  const SG = v3BuildSigns(S, hq.rows[0] && hq.rows[0].history);
+  const SG = v3BuildSigns(S, hq.rows[0] && hq.rows[0].history, opts);
   const all = SG.signs.concat(SG.profitSign ? [SG.profitSign] : []);
   const picked = keys.map(k => all.find(sg => sg.which === k)).filter(Boolean).map(sg => Object.assign({}, sg, {
     act: v3HasDrivers(sg.which, SG.HP) ? { label: drv === sg.which ? 'Hide what is driving it' : 'What is driving this?', open: drv === sg.which,
