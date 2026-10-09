@@ -21406,6 +21406,68 @@ function V3CompetitorDrivers({ rows, brandName, shopName, under, today }) {
     {open === 'shop' && mS && <V3DriverPanel fixed={mS}/>}
   </div>);
 }
+// Calendar (9 Oct): this month against the calendar's own day-by-day projection (cache_calendar_payload
+// .projection, what the embed below draws as "Live actuals"). Sales = ad spend x sales per £1 of ads,
+// so the gap splits exactly into spending more or less than planned and each £1 bringing more or less.
+// Complete days only; before a week of the month has passed, the last 30 complete days instead.
+function v3ModelCalendar(A, P, info) {
+  const mA = A.spend > 0 ? A.rev / A.spend : null, mP = P.spend > 0 ? P.rev / P.spend : null;
+  const ok = mA && mP;
+  const [pS, pM] = ok ? v3LogParts(P.rev, A.rev, [{ a: P.spend, b: A.spend, sign: 1 }, { a: mP, b: mA, sign: 1 }]) : [A.rev - P.rev, 0];
+  return {
+    title: A.rev >= P.rev ? 'Why sales are ahead of the calendar' : 'Why sales are behind the calendar',
+    from: P.rev, to: A.rev, better: 'higher', fmtV: v => fmtMoney(v), fmtAmt: v => fmtMoney(Math.abs(v)),
+    startK: 'The calendar’s plan', endK: 'What came in', subA: info.range, subB: info.range, colA: 'Planned', colB: 'Actual',
+    bridgeCap: 'From the plan to what came in', of: A.rev >= P.rev ? 'the lead' : 'the gap',
+    todo: [{ amt: pM, ids: ['driver-meta-ads', 'order-cost-meta', 'sales-rhythm'] }],
+    parts: ok ? [
+      { amt: pS, k: v3UpDown(P.spend, A.spend, 'More on ads than planned', 'Less on ads than planned'), sub: fmtMoney(P.spend) + ' planned, ' + fmtMoney(A.spend) + ' spent',
+        cause: <>ads spent {v3UpDown(P.spend, A.spend, 'more', 'less')} than planned ({fmtMoney(P.spend)} planned, {fmtMoney(A.spend)} spent)</>,
+        against: <>Spending {v3UpDown(P.spend, A.spend, 'more', 'less')} on ads than planned ({fmtMoney(P.spend)} to {fmtMoney(A.spend)})</> },
+      { amt: pM, k: v3UpDown(mP, mA, 'Each £1 of ads brought more', 'Each £1 of ads brought less'), sub: fmtMoney(mP, 2) + ' planned, ' + fmtMoney(mA, 2) + ' actual',
+        cause: <>each £1 of ads brought {v3UpDown(mP, mA, 'more', 'less')} in sales than planned ({fmtMoney(mP, 2)} planned, {fmtMoney(mA, 2)} actual)</>,
+        against: <>Each £1 of ads bringing {v3UpDown(mP, mA, 'more', 'less')} than planned ({fmtMoney(mP, 2)} to {fmtMoney(mA, 2)})</> },
+    ] : [{ amt: A.rev - P.rev, k: 'Sales against plan', sub: '', cause: <>sales came in {v3UpDown(P.rev, A.rev, 'above', 'below')} plan</>, against: <>Sales against plan</> }],
+    opening: <>For {info.range}, the calendar planned {fmtMoney(P.rev)} of sales and {fmtMoney(A.rev)} came in.</>,
+    closing: <> Profit after ads was {(A.cm < 0 ? '−' : '') + fmtMoney(Math.abs(A.cm))} against {(P.cm < 0 ? '−' : '') + fmtMoney(Math.abs(P.cm))} planned.</>,
+    rows: [
+      ['Sales', P.rev, A.rev, v => fmtMoney(v), 'higher'],
+      ['Ad spend', P.spend, A.spend, v => fmtMoney(v), null],
+      ['Sales from each £1 of ads', mP, mA, v => fmtMoney(v, 2), 'higher'],
+      ['Profit after ads', P.cm, A.cm, v => (v < 0 ? '−' : '') + fmtMoney(Math.abs(v)), 'higher'],
+    ],
+    note: 'The calendar’s own projection, day by day, from your plan and the events on it, against what came in (the “Live actuals” rows below). It is the calendar’s plan, not the quarter goal on Goal & costs, and the two can differ.',
+  };
+}
+const V3_CAL_PROJ_Q = (sb, b) => sb.from('cache_calendar_payload').select('proj:payload->projection,generated_at').eq('brand_id', b).limit(1);
+function V3CalendarDrivers() {
+  const q = useV3Rows('cal-proj', V3_CAL_PROJ_Q);
+  const [open, setOpen] = React.useState(false);
+  const rows = q.rows && q.rows[0] && Array.isArray(q.rows[0].proj) ? q.rows[0].proj : null;
+  if (!rows) return null;
+  const today = new Date().toISOString().slice(0, 10), mStart = today.slice(0, 8) + '01';
+  const done = rows.filter(r => r.elapsed && String(r.day) < today && r.act_revenue != null && r.proj_revenue != null);
+  let win = done.filter(r => String(r.day) >= mStart);
+  if (win.length < 7) win = done.slice(-30);
+  if (win.length < 3) return null;
+  const sum = k => win.reduce((t, r) => t + (Number(r[k]) || 0), 0);
+  const A = { rev: sum('act_revenue'), spend: sum('act_spend'), cm: sum('act_cm') }, P = { rev: sum('proj_revenue'), spend: sum('proj_spend'), cm: sum('proj_cm') };
+  if (!(P.rev > 0)) return null;
+  const d0 = String(win[0].day).slice(0, 10), d1 = String(win[win.length - 1].day).slice(0, 10);
+  const range = v3Day(d0) + ' – ' + v3Day(d1, true);
+  const ch = A.rev / P.rev - 1;
+  return (<section className="v3-sec v3-strip">
+    <h2 className="v3-sec-title">What is moving it <span className="v3-muted">{range}</span></h2>
+    <div className="v3-signs">
+      <V3Sign k="Sales against the calendar’s plan" v={fmtMoney(A.rev)} tone={ch < -0.1 ? 'weak' : ch > 0.1 ? 'good' : 'typical'}
+        bar={{ fill: Math.min(1, A.rev / (Math.max(A.rev, P.rev) * 1.25)), mark: P.rev / (Math.max(A.rev, P.rev) * 1.25) }}
+        n={<>{fmtMoney(P.rev)} planned; the mark is the plan</>}
+        trendAs={{ dir: Math.abs(ch) < 0.03 ? 'flat' : ch > 0 ? 'up' : 'down', cls: Math.abs(ch) < 0.03 ? 'flat' : ch > 0 ? 'good' : 'bad', text: Math.abs(ch) < 0.03 ? 'About what was planned' : fmtPctN(Math.abs(ch)) + (ch > 0 ? ' above' : ' below') + ' the plan' }}
+        act={{ label: open ? 'Hide what is driving it' : 'What is driving this?', open, on: () => setOpen(o => !o) }}/>
+    </div>
+    {open && <V3DriverPanel fixed={v3ModelCalendar(A, P, { range })}/>}
+  </section>);
+}
 // Review (9 Oct): the week against a typical week, on the Review page's own figures. Kept after ads is
 // sales x what each £1 keeps less ad spend, so the gap splits exactly into orders and the average order
 // (the sales change, at what each £1 keeps) and ad spend. A typical week is the middle of the eight
@@ -21636,7 +21698,7 @@ function V3Sign({ k, v, tone, bar, n, series, fmt, better, line, act, trendAs })
       <span className={'v3-sign-s v3-sign-' + (tone || 'typical')}>{V3_SIG_WORD[tone] || V3_SIG_WORD.typical}</span></div>
     {trend && <div className={'v3-sign-trend ' + trend.cls}>
       {trend.dir === 'flat' ? <span aria-hidden="true">→</span> : <Icon name={trend.dir === 'up' ? 'arrowUp' : 'arrowDown'} size={12} stroke={2.2}/>}
-      <span>{trend.dir === 'flat' ? 'About the same as' : trend.dir === 'up' ? 'Up from' : 'Down from'} {trend.from} {trend.when || 'four weeks ago'}</span></div>}
+      <span>{trend.text || <>{trend.dir === 'flat' ? 'About the same as' : trend.dir === 'up' ? 'Up from' : 'Down from'} {trend.from} {trend.when || 'four weeks ago'}</>}</span></div>}
     {chart}
     {bar && <span className="v3-sign-bar" aria-hidden="true"><i className={'v3-sign-fill-' + (tone || 'typical')} style={{ width: pc(bar.fill) }}/>
       {bar.mark != null && <b style={{ left: pc(bar.mark) }}/>}</span>}
@@ -22426,7 +22488,7 @@ const V3_PAGES = {
     <V3More id="act-decisions" label="What you did, and whether it worked"><V3Anchor id="decisions"/><V3TrackRecord/></V3More>
     <V3StaleSuggestions/>
   </>),
-  calendar: (p) => mosView('Calendar'),
+  calendar: (p) => (<><V3CalendarDrivers/>{mosView('Calendar')}</>),
   ask: (p) => <AskPanel/>,
   goal: (p) => (<>
     {/* Rebuilt 2026-10-05: the goal and where today's pace lands, the costs that are off with their £
