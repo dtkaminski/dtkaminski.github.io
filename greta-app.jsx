@@ -21216,7 +21216,13 @@ function V3CacDrivers({ points, fo, weeks }) {
   const move = d >= 0 ? 'rise' : 'fall';
   const partClickT = lead => <>{lead ? null : 'The other '}<b className="oi-num">{fmtMoney(Math.abs(pClick))}</b>{lead ? ' of the ' + move : ''} is because each paid click cost {pClick >= 0 ? 'more' : 'less'} ({pence(A.cpc)} to {pence(B.cpc)}){top.length ? <>, mainly because {top.map((s, i) => <React.Fragment key={i}>{i ? ' and ' : ''}{s.t}</React.Fragment>)}</> : null}</>;
   const partConvT = lead => <>{lead ? null : 'The other '}<b className="oi-num">{fmtMoney(Math.abs(pConv))}</b>{lead ? ' of the ' + move : ''} is because it took {pConv >= 0 ? 'more' : 'fewer'} clicks to win each customer ({Math.round(A.cpn)} to {Math.round(B.cpn)}){sA > sB && pConv > 0 ? <>, as the earlier 30 days had {sA === 1 ? 'a sale week' : sA + ' sale weeks'} and a sale turns more clicks into first orders</> : null}</>;
-  const parts = Math.abs(pClick) >= Math.abs(pConv) ? [partClickT(true), partConvT(false)] : [partConvT(true), partClickT(false)];
+  // a part that pulled the other way is said as what it took off (or added back), never as a cause of the move
+  const against = p => (p >= 0) !== (d >= 0) && Math.abs(p) >= 0.5;
+  const clickAgainst = <>{pClick < 0 ? 'Cheaper' : 'Dearer'} clicks ({pence(A.cpc)} to {pence(B.cpc)}) {pClick < 0 ? 'took' : 'added'} <b className="oi-num">{fmtMoney(Math.abs(pClick))}</b> {pClick < 0 ? 'off' : 'back'}</>;
+  const convAgainst = <>Taking {pConv < 0 ? 'fewer' : 'more'} clicks to win each customer ({Math.round(A.cpn)} to {Math.round(B.cpn)}) {pConv < 0 ? 'took' : 'added'} <b className="oi-num">{fmtMoney(Math.abs(pConv))}</b> {pConv < 0 ? 'off' : 'back'}</>;
+  const parts = Math.abs(pClick) >= Math.abs(pConv)
+    ? [partClickT(true), against(pConv) ? convAgainst : partConvT(false)]
+    : [partConvT(true), against(pClick) ? clickAgainst : partClickT(false)];
 
   // the walk from then to now, drawn as the money waterfall is
   const steps = [
