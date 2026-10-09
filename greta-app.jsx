@@ -21854,10 +21854,10 @@ function V3AnatomyCoverage() {
           {isOpen && <tr className="v3-cov-open"><td colSpan={5}>
             <ul className="v3-cov-list">{(r.measures || []).map(m => (<li key={m.key}>
               <span className="v3-cov-name">{m.name}</span>
-              <span className={'v3-cov-fig' + (V3_HEALTH_WORD[m.health] ? ' v3-muted' : '')}>{m.display || V3_HEALTH_WORD[m.health] || 'Measured'}</span>
+              <span className={'v3-cov-fig' + (V3_HEALTH_WORD[m.health] ? ' v3-muted' : '')}>{m.display || V3_HEALTH_WORD[m.health] || ('Measured' + (pages[r.page] ? ', shown on ' + ((V3_BY_ID[pages[r.page]] || {}).label || r.arm) : ''))}</span>
               {(m.basis || m.needs) && <span className="v3-cov-why">{[m.basis ? v3Sentence(m.basis) + '.' : null, m.needs ? v3Sentence(m.needs) + '.' : null].filter(Boolean).join(' ')}</span>}
             </li>))}</ul>
-            {pages[r.page] && <button type="button" className="v3-xref" onClick={() => window.__oiNav && window.__oiNav(pages[r.page])}>Open {r.arm.toLowerCase()} <span className="v3-xref-go">→</span></button>}
+            {pages[r.page] && <button type="button" className="v3-xref" onClick={() => window.__oiNav && window.__oiNav(pages[r.page])}>Go to {(V3_BY_ID[pages[r.page]] || {}).label || r.arm} <span className="v3-xref-go">→</span></button>}
           </td></tr>}
         </React.Fragment>); })}</tbody>
     </table>
