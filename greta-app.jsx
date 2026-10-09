@@ -8916,7 +8916,9 @@ function V3AskMd({ text }) {
   return <div className="v3-ask-answer">{blocks}</div>;
 }
 function v3AskScrub(text, facts) {
-  let t = String(text || '');
+  // The model writes non-breaking and narrow spaces ("board rank 1", "That rung"), which the patterns
+  // below did not see (9 Oct). Plain spaces first.
+  let t = String(text || '').replace(/[   ]/g, ' ');
   // "(Figure comes straight from the “facts” page …)" (7 Oct): the context's own name is not a page
   t = t.replace(/\s*\((?:[^()]*?)\b(?:the\s+)?[“"'‘]?facts[”"'’]?\s+(?:page|section|block)\b[^()]*\)/gi, '')
        .replace(/\bthe\s+[“"'‘]?facts[”"'’]?\s+(?:page|section|block)\b/gi, 'Greta’s figures');
@@ -8947,7 +8949,7 @@ function v3AskScrub(text, facts) {
   });
   t = t.replace(/\b(20\d\d)[-‐‑–](\d\d)[-‐‑–](\d\d)\b/g, (m, y, mo, d) => {
     const iso = y + '-' + mo + '-' + d; try { return v3Day(iso, true); } catch (e) { return m; } });
-  t = t.replace(/\b(the|its|this) rung (is|was) ([*_]*)(direct|likely|probably|possible|outside chance)\b/gi, (m, a, b, s, w) => 'Greta rates it ' + s + w)
+  t = t.replace(/\b(the|its|this|that) rung (is|was) ([*_]*)(direct|likely|probably|possible|outside chance)\b/gi, (m, a, b, s, w) => 'Greta rates it ' + s + w)
        .replace(/\brung\s+([*_]*)(direct|likely|probably|possible|outside chance)\b/gi, '$1$2')
        .replace(/\s*\([^()]*=\s*(?:true|false|null)\s*\)/gi, '')
        .replace(/\s*\(([^()]{3,60})\)/g, (m, inner) => (glosses.has(inner.trim().toLowerCase()) ? '' : m))
