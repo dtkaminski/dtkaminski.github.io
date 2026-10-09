@@ -19975,6 +19975,9 @@ function V3GoalLead() {
       {g && <div className="v3-stat"><div className="v3-stat-lab"><span>Profit after ads, at the goal</span></div><div className="v3-stat-val">{fmtMoney(gCam)}</div>
         <div className="v3-stat-foot"><span className="v3-muted">{fmtMoney(P.cam_target)} at today’s pace</span></div></div>}
     </div>
+    <V3GoalDrivers per={per} today={today} exp={exp} done={done} months={ph || P.months} paceMonths={P.months}
+      goal={g && ph ? tgt : null} pace={Number(P.revenue_target)} dCam={dCam} basis={g ? 'goal' : 'plan'}
+      range={v3Day(per.start) + ' – ' + v3Day(v3IsoAdd(today, -1), true)}/>
   </section>
 
   <section className="v3-sec">
@@ -21243,6 +21246,99 @@ function V3BusinessState({ part }) {
         arrive every 30 minutes (Shopify) and every 2 hours (ad accounts). */}
     <p className="micro muted v3-stand-fresh">Each figure covers the 30 days to {HP ? v3Day(String(hq.rows[0].history.as_of), true) : 'yesterday'}, the last full day. Greta works them out again every hour; Shopify orders arrive every 30 minutes and ad spend every 2 hours.{HP ? ' Point at a sign to see its last 13 weeks.' : ''}</p>
   </section>);
+}
+// Goal & costs (9 Oct), on the page's own figures:
+//  1. sales so far against what the plan expected by now, split into new customers (how many, and the
+//     size of their first order) and returning customers, each against the plan's own figure to date
+//  2. where today's pace lands against the goal, month by month: what the goal sells in each month
+//     beyond today's pace, and the extra ads it takes there
+function v3ModelGoalSoFar(act, plan, info) {
+  const pN = plan.new, pR = plan.ret, pC = plan.newCust, aN = act.new, aR = act.ret, aC = act.newCust;
+  const okC = pC > 0 && aC > 0 && pN > 0 && aN > 0;
+  const [cP, aP] = okC ? v3LogParts(pN, aN, [{ a: pC, b: aC, sign: 1 }, { a: pN / pC, b: aN / aC, sign: 1 }]) : [aN - pN, 0];
+  const other = (act.done - info.exp) - (aN - pN) - (aR - pR);
+  const parts = okC ? [
+    { amt: cP, k: v3UpDown(pC, aC, 'More new customers than planned', 'Fewer new customers than planned'), sub: fmtCount(Math.round(pC)) + ' planned, ' + fmtCount(aC) + ' so far',
+      cause: <>there were {v3UpDown(pC, aC, 'more', 'fewer')} new customers than the plan expected by now ({fmtCount(Math.round(pC))} planned, {fmtCount(aC)} so far)</>,
+      against: <>{v3UpDown(pC, aC, 'More', 'Fewer')} new customers than planned ({fmtCount(Math.round(pC))} planned, {fmtCount(aC)} so far)</> },
+    { amt: aP, k: v3UpDown(pN / pC, aN / aC, 'Bigger first orders', 'Smaller first orders'), sub: fmtMoney(pN / pC, 2) + ' planned, ' + fmtMoney(aN / aC, 2) + ' so far',
+      cause: <>first orders were {v3UpDown(pN / pC, aN / aC, 'bigger', 'smaller')} than planned ({fmtMoney(pN / pC, 2)} to {fmtMoney(aN / aC, 2)})</>,
+      against: <>{v3UpDown(pN / pC, aN / aC, 'Bigger', 'Smaller')} first orders than planned ({fmtMoney(pN / pC, 2)} to {fmtMoney(aN / aC, 2)})</> },
+  ] : [
+    { amt: aN - pN, k: v3UpDown(pN, aN, 'New customers bought more', 'New customers bought less'), sub: fmtMoney(pN) + ' planned, ' + fmtMoney(aN) + ' so far',
+      cause: <>new customers bought {v3UpDown(pN, aN, 'more', 'less')} than planned ({fmtMoney(pN)} planned, {fmtMoney(aN)} so far)</>,
+      against: <>New customers buying {v3UpDown(pN, aN, 'more', 'less')} than planned</> },
+  ];
+  parts.push({ amt: aR - pR, k: v3UpDown(pR, aR, 'Returning customers bought more', 'Returning customers bought less'), sub: fmtMoney(pR) + ' planned, ' + fmtMoney(aR) + ' so far',
+    cause: <>returning customers bought {v3UpDown(pR, aR, 'more', 'less')} than planned ({fmtMoney(pR)} planned, {fmtMoney(aR)} so far)</>,
+    against: <>Returning customers buying {v3UpDown(pR, aR, 'more', 'less')} than planned ({fmtMoney(pR)} to {fmtMoney(aR)})</> });
+  if (Math.abs(other) >= 1) parts.push({ amt: other, k: 'Buyers Greta cannot match', sub: 'orders without a customer record', cause: <>orders without a customer record came in {v3UpDown(0, other, 'above', 'below')} plan</>, against: <>Orders without a customer record</> });
+  return {
+    title: act.done >= info.exp ? 'Why sales are ahead of the plan so far' : 'Why sales are behind the plan so far',
+    from: info.exp, to: act.done, better: 'higher', fmtV: v => fmtMoney(v), fmtAmt: v => fmtMoney(Math.abs(v)),
+    startK: 'The plan by now', endK: 'Sold so far', subA: info.basis, subB: info.range, colA: 'The plan by now', colB: 'So far',
+    bridgeCap: 'From the plan to what you have sold', of: act.done >= info.exp ? 'the lead' : 'the gap',
+    todo: [{ amt: cP, ids: ['driver-meta-ads', 'order-cost-meta', 'promo-peak-plan'] }, { amt: aP, ids: ['basket-pair', 'basket-free-shipping'] }, { amt: aR - pR, ids: ['cust-winback-atrisk', 'crm-flows'] }],
+    parts,
+    opening: <>You have sold {fmtMoney(act.done)} this quarter so far, against the {fmtMoney(info.exp)} {info.basis} expected by now.</>,
+    rows: [
+      ['New customers', pC, aC, v => fmtCount(Math.round(v)), 'higher'],
+      ['New customers’ sales', pN, aN, v => fmtMoney(v), 'higher'],
+      ['Returning customers’ sales', pR, aR, v => fmtMoney(v), 'higher'],
+      ['All sales', info.exp, act.done, v => fmtMoney(v), 'higher'],
+    ],
+    note: 'Sales so far are your own shop’s orders since the quarter began, up to yesterday, after discounts and before VAT, as on this page. The plan’s figures by now are its months to date, with the current month taken pro rata; where the goal’s months do not split new and returning customers, they are split as the quarter’s plan does.',
+  };
+}
+function v3ModelGoalGap(goalMonths, paceMonths, goal, pace, info) {
+  const pm = {}; (paceMonths || []).forEach(m => { pm[String(m.month).slice(0, 7)] = m; });
+  const rows = (goalMonths || []).map(m => { const k = String(m.month).slice(0, 7), p = pm[k] || {};
+    return { iso: String(m.month).slice(0, 10), d: Number(m.sales) - (Number(p.sales) || 0), ads: Number(m.spend) - (Number(p.spend) || 0), gs: Number(m.spend), ps: Number(p.spend) || 0 }; });
+  const rest = (goal - pace) - rows.reduce((t, r) => t + r.d, 0);
+  const peak = rows.slice().sort((a, b) => b.d - a.d)[0];
+  return {
+    neutral: true,
+    title: 'What the goal adds to today’s pace', from: pace, to: goal, better: 'higher', fmtV: v => fmtMoney(v), fmtAmt: v => fmtMoney(Math.abs(v)),
+    startK: 'Where today’s pace lands', endK: 'Your goal', subA: 'ads held at today’s level', subB: ' ', colA: 'Today’s pace', colB: 'The goal',
+    bridgeCap: 'From today’s pace to the goal, by month', of: 'the gap', noChange: true, tableTitle: 'Month by month: ads',
+    todo: peak && peak.d > 0 ? [{ amt: peak.d, force: true, ids: ['promo-peak-plan'] }] : [],
+    parts: rows.map(r => ({ amt: r.d, k: gpMonthName(r.iso), sub: (r.ads >= 0 ? fmtMoney(r.ads) + ' more ads' : fmtMoney(-r.ads) + ' less on ads') + ' (' + fmtMoney(r.ps) + ' to ' + fmtMoney(r.gs) + ')',
+      cause: <>the goal sells {fmtMoney(r.d)} more in {gpMonthName(r.iso)}, on {fmtMoney(r.ads)} more ads ({fmtMoney(r.ps)} to {fmtMoney(r.gs)})</>,
+      against: <>{gpMonthName(r.iso)}, where the goal sells {fmtMoney(Math.abs(r.d))} less</> }))
+      .concat(Math.abs(rest) >= 1 ? [{ amt: rest, k: 'Rounding', sub: 'the goal’s months against its total', cause: <>rounding</>, against: <>Rounding</> }] : []),
+    opening: <>At today’s ad spend the quarter lands at about {fmtMoney(pace)}; your goal is {fmtMoney(goal)}, {fmtMoney(goal - pace)} more.</>,
+    closing: info.dCam != null ? <> The extra ads bring that much more in sales but {info.dCam >= 0 ? fmtMoney(info.dCam) + ' more' : fmtMoney(-info.dCam) + ' less'} profit after ads{info.dCam < 0 ? ': past a point, each extra £1 of ads costs more than the sales it brings keep' : ''}.</> : null,
+    rows: rows.map(r => [gpMonthName(r.iso), r.ps, r.gs, v => fmtMoney(v), null]),
+    note: 'Both are Greta’s plan for the quarter: your own busy and quiet months, returning customers at their recent rate, and new-customer sales that rise with ad spend. Today’s pace holds ads at your recent level; the goal spends what it takes to reach the target.',
+  };
+}
+const V3_GOAL_NR_Q = (start, today) => (sb, b) => sb.from('vw_daily_new_vs_returning').select('order_date,customer_type,orders,net_revenue')
+  .eq('brand_id', b).eq('ledger', 'dtc').gte('order_date', start).lt('order_date', today).limit(3000);
+function V3GoalDrivers({ per, today, exp, done, months, paceMonths, goal, pace, dCam, basis, range }) {
+  const nr = useV3Rows('goal-nr-' + per.start, V3_GOAL_NR_Q(per.start, today));
+  const [open, setOpen] = React.useState(null);
+  const rows = nr.rows || [];
+  const act = { done, new: 0, ret: 0, newCust: 0 };
+  rows.forEach(r => { const v = Number(r.net_revenue) || 0; if (r.customer_type === 'new') { act.new += v; act.newCust += Number(r.orders) || 0; } else if (r.customer_type === 'returning') act.ret += v; });
+  const has = k => (months || []).some(m => m[k] != null);
+  const pTo = (ms, k) => v3PlanToDate(ms, k, today);
+  const shareN = pTo(paceMonths, 'sales') > 0 ? pTo(paceMonths, 'new') / pTo(paceMonths, 'sales') : null;
+  const plan = has('new') && has('returning')
+    ? { new: pTo(months, 'new'), ret: pTo(months, 'returning'), newCust: has('new_customers') ? pTo(months, 'new_customers') : 0 }
+    : shareN != null ? { new: exp * shareN, ret: exp * (1 - shareN), newCust: pTo(paceMonths, 'new_customers') * (exp / Math.max(1, pTo(paceMonths, 'sales'))) } : null;
+  const canSoFar = nr.rows && plan && exp > 0;
+  const canGap = goal != null && pace != null && goal > pace && Array.isArray(months) && months.some(m => m.spend != null);
+  if (!canSoFar && !canGap) return null;
+  const btn = (id, label) => (<button type="button" className="v3-xref v3-sign-act" aria-expanded={open === id} onClick={() => setOpen(o => (o === id ? null : id))}>
+    {open === id ? 'Hide what is driving it' : label} <span className="v3-xref-go">{open === id ? '↑' : '↓'}</span></button>);
+  return (<div className="v3-strip-act">
+    <div className="v3-btn-row">
+      {canSoFar && btn('sofar', done >= exp ? 'Why sales are ahead so far?' : 'Why sales are behind so far?')}
+      {canGap && btn('gap', 'What would the goal take?')}
+    </div>
+    {open === 'sofar' && canSoFar && <V3DriverPanel fixed={v3ModelGoalSoFar(act, plan, { exp, basis, range })}/>}
+    {open === 'gap' && canGap && <V3DriverPanel fixed={v3ModelGoalGap(months, paceMonths, goal, pace, { dCam })}/>}
+  </div>);
 }
 // Review (9 Oct): the week against a typical week, on the Review page's own figures. Kept after ads is
 // sales x what each £1 keeps less ad spend, so the gap splits exactly into orders and the average order
