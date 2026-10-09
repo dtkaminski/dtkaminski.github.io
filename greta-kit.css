@@ -366,7 +366,7 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-drivers-grid.v3-drivers-grid-one { grid-template-columns: minmax(0, 1fr); max-width: 48rem; }
 .v3-strip-act { margin-top: var(--space-2); }
 /* Actions: what each row moves, and the figures the board is working on. */
-.v3-rank-moves { color: var(--color-accent); }
+.v3-rank-moves { color: var(--color-accent); text-transform: none; }
 .v3-bdrv { list-style: none; margin: var(--space-2) 0 0; padding: 0; max-width: 60rem; }
 .v3-bdrv li { display: grid; grid-template-columns: minmax(0, 22rem) minmax(0, 1fr); gap: var(--space-4); align-items: baseline;
   padding: var(--space-3) 0; border-top: 1px solid var(--color-line); }

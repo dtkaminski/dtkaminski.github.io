@@ -10916,7 +10916,7 @@ function V3BoardDigest({ n = 5 }){
 const V3_MOVES = [
   ['driver-meta-ads', ['metacpa', 'cac', 'newc']], ['driver-retargeting', ['cac', 'spend']],
   ['order-cost-meta', ['ret', 'cac', 'spend']], ['order-cost-google', ['googcpa', 'ret', 'spend']],
-  ['sales-rhythm', ['profit', 'ret', 'conv']], ['promo-peak-plan', ['profit', 'ly']], ['stock-reorder', ['prodsales', 'profit']],
+  ['sales-rhythm', ['profit', 'ret', 'conv']], ['promo-peak-plan', ['profit']], ['stock-reorder', ['prodsales', 'profit']],
   ['cust-winback-atrisk', ['retsales', 'repeat']], ['crm-flows', ['repeat', 'retsales']], ['discount-dependency', ['repeat']],
   ['basket-pair', ['aov']], ['basket-free-shipping', ['aov']], ['paid-landing-meta', ['metacpa', 'conv']], ['paid-landing-google', ['googcpa', 'conv']],
   ['paid-brand-share-google', ['brandshare']], ['test-holdout-', ['cac']], ['product-hero_underexposed-', ['prodsales']],
