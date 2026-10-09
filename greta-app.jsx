@@ -21509,7 +21509,9 @@ function V3DriverPanel({ which, points, ctx, line }) {
   const live = board.rows ? v3LiveRows(board.rows) : [];
   const bad = t => (t.amt > 0) !== (M.better === 'higher') && Math.abs(t.amt) > Math.abs(d) * 0.1;
   const todo = [];
-  (M.todo || []).filter(bad).sort((x, y) => Math.abs(y.amt) - Math.abs(x.amt)).forEach(t => {
+  // a figure that barely moved and sits on the right side of its line needs nothing doing
+  const fine = flat && (line == null || (M.better === 'higher' ? M.to >= line : M.to <= line));
+  (fine ? [] : (M.todo || [])).filter(bad).sort((x, y) => Math.abs(y.amt) - Math.abs(x.amt)).forEach(t => {
     if (todo.length >= 2) return;
     for (const id of t.ids) { const i = live.findIndex(r => (id.endsWith('-') ? String(r.external_id).startsWith(id) : r.external_id === id));
       if (i >= 0) { if (!todo.some(x => x.row === live[i])) todo.push({ row: live[i], rank: i + 1 }); break; } }
