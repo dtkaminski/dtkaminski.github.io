@@ -21012,6 +21012,25 @@ function v3BuildSigns(S, hist, opts) {
       series: ser('conv'), fmt: v => v3Per100(v), better: 'higher', line: { v: typ, label: 'Usual ' + v3Per100(typ) },
       which: 'conv', ctx: { weeks: H && Array.isArray(H.weeks) ? H.weeks : [], typical: typ, lineLabel: 'about ' + v3Per100(typ) + ', your usual rate' }, dline: typ });
   }
+  // customers (0316): new customers and returning customers' sales, against the middle of the earlier weeks
+  const med = a => { const x = a.filter(v => v != null && isFinite(v)).sort((p, q) => p - q); if (!x.length) return null; const m = Math.floor(x.length / 2); return x.length % 2 ? x[m] : (x[m - 1] + x[m]) / 2; };
+  const NP = HP ? HP.filter(p => Number(p.new_customers) > 0) : [];
+  if (NP.length >= 4) {
+    const nv = Number(NP[NP.length - 1].new_customers), typ = med(NP.slice(0, -1).map(p => Number(p.new_customers))), top = Math.max(nv, typ) * 1.25;
+    const c = Number(NP[NP.length - 1].cac_spend) / nv;
+    signs.push({ k: 'New customers', v: fmtCount(nv), tone: nv < typ * 0.9 ? 'weak' : nv > typ * 1.1 ? 'good' : 'typical',
+      bar: { fill: nv / top, mark: typ / top }, n: <>Each cost {fmtMoney(c)} to win; about {fmtCount(Math.round(typ))} is usual for you</>,
+      series: ser('new_customers'), fmt: v => fmtCount(v), better: 'higher', line: { v: typ, label: 'Usual ' + fmtCount(Math.round(typ)) },
+      which: 'newc', ctx: { weeks: H && Array.isArray(H.weeks) ? H.weeks : [], lineLabel: 'about ' + fmtCount(Math.round(typ)) + ', your usual number' }, dline: typ });
+  }
+  const RP = HP ? HP.filter(p => p.ret_net != null && Number(p.ret_customers) > 0) : [];
+  if (RP.length >= 4) {
+    const rv = Number(RP[RP.length - 1].ret_net), typ = med(RP.slice(0, -1).map(p => Number(p.ret_net))), top = Math.max(rv, typ) * 1.25;
+    signs.push({ k: 'Returning customers’ sales', v: fmtMoney(rv), tone: rv < typ * 0.9 ? 'weak' : rv > typ * 1.1 ? 'good' : 'typical',
+      bar: { fill: rv / top, mark: typ / top }, n: <>From {fmtCount(Number(RP[RP.length - 1].ret_customers))} returning buyers; about {fmtMoney(typ)} is usual for you</>,
+      series: ser('ret_net'), fmt: v => fmtMoney(v), better: 'higher', line: { v: typ, label: 'Usual ' + fmtMoney(typ) },
+      which: 'retsales', ctx: { weeks: H && Array.isArray(H.weeks) ? H.weeks : [], lineLabel: 'about ' + fmtMoney(typ) + ', your usual month' }, dline: typ });
+  }
   // the headline as a sign of its own, for the pages that show it beside the others
   const profitSign = profitCfg && (ao != null || L.profit_after_ads != null) ? Object.assign({
     k: ao != null ? 'After all costs, a month' : 'Profit after ads', v: v3SignedGbp(ao != null ? ao : num(L.profit_after_ads)),
@@ -21689,7 +21708,75 @@ function v3ModelConv(a, b, ctx) {
     note: 'Visits are Microsoft Clarity’s, less bots, as on the rest of this page; orders are web orders. Visits from ads are Meta link clicks plus Google clicks, and other visits are everything else: email, search, social and people typing your address. Your shop cannot say which visitors bought while its tracking is broken, so this splits the rate into orders and visits rather than by where buyers came from.',
   };
 }
+// Customers (0316): new customers = ad spend / what each cost to win, so a change splits exactly into the
+// spend and the cost of each; returning customers' sales = returning buyers x orders each x average order,
+// on vw_customer_orders as the Customers page's own figures.
+function v3ModelNewCustomers(a, b, ctx) {
+  const f = p => { const n = Number(p.new_customers), sp = Number(p.cac_spend); return { n, sp, c: sp / n, v: n }; };
+  const A = f(a), B = f(b);
+  const [pS, pC] = v3LogParts(A.v, B.v, [{ a: A.sp, b: B.sp, sign: 1 }, { a: A.c, b: B.c, sign: -1 }]);
+  const sA = v3SaleWeeksIn(ctx.weeks, a), sB = v3SaleWeeksIn(ctx.weeks, b);
+  const cnt = v => fmtCount(Math.round(Math.abs(v)));
+  return {
+    todo: [{ amt: pC, ids: ['driver-meta-ads', 'driver-retargeting', 'order-cost-meta', 'order-cost-google'] }],
+    title: 'Why you won ' + fmtCount(B.n) + ' new customers', from: A.v, to: B.v, better: 'higher', fmtV: v => fmtCount(Math.round(v)), fmtAmt: cnt,
+    startK: 'New customers', endK: 'New customers now', chartK: 'New customers',
+    parts: [
+      { amt: pC, k: v3UpDown(A.c, B.c, 'Each cost more', 'Each cost less'), sub: fmtMoney(A.c) + ' to ' + fmtMoney(B.c) + ' each',
+        cause: <>each one cost {v3UpDown(A.c, B.c, 'more', 'less')} to win ({fmtMoney(A.c)} to {fmtMoney(B.c)}){sA > sB && B.c > A.c ? <>, as the earlier 30 days had {sA === 1 ? 'a sale week' : sA + ' sale weeks'}</> : null}</>,
+        against: <>Each costing {v3UpDown(A.c, B.c, 'more', 'less')} to win ({fmtMoney(A.c)} to {fmtMoney(B.c)})</> },
+      { amt: pS, k: v3UpDown(A.sp, B.sp, 'More ad spend', 'Less ad spend'), sub: fmtMoney(A.sp) + ' to ' + fmtMoney(B.sp),
+        cause: <>ad spend went {v3UpDown(A.sp, B.sp, 'up', 'down')} ({fmtMoney(A.sp)} to {fmtMoney(B.sp)})</>,
+        against: <>{v3UpDown(A.sp, B.sp, 'More', 'Less')} ad spend ({fmtMoney(A.sp)} to {fmtMoney(B.sp)})</> },
+    ],
+    opening: <>Since the 30 days to {v3Day(String(a.d), true)}, first-time buyers went from {fmtCount(A.n)} to {fmtCount(B.n)}. The figures below are customers.</>,
+    closing: <> The cost of each is split further on “Cost to win a new customer”.</>,
+    rows: [
+      ['New customers', A.n, B.n, v => fmtCount(v), 'higher'],
+      ['Ad spend (Meta and Google)', A.sp, B.sp, v => fmtMoney(v), null],
+      ['Cost to win each', A.c, B.c, v => fmtMoney(v), 'lower'],
+      ['Sale weeks in the 30 days', sA, sB, v => fmtCount(v), null],
+    ],
+    note: 'New customers are first-time buyers from any source, as on the rest of this page. Each one’s cost is all Meta and Google spend divided by them, so the two parts add up to the change exactly.',
+  };
+}
+function v3ModelReturning(a, b, ctx) {
+  const f = p => { const n = Number(p.ret_customers), o = Number(p.ret_orders), v = Number(p.ret_net); return { n, o, v, per: o / n, aov: v / o }; };
+  const A = f(a), B = f(b);
+  const [pN, pP, pA] = v3LogParts(A.v, B.v, [{ a: A.n, b: B.n, sign: 1 }, { a: A.per, b: B.per, sign: 1 }, { a: A.aov, b: B.aov, sign: 1 }]);
+  const sA = v3SaleWeeksIn(ctx.weeks, a), sB = v3SaleWeeksIn(ctx.weeks, b);
+  const saleNote = sA !== sB ? <>, as the earlier 30 days had {sA === 0 ? 'no sale weeks' : sA === 1 ? 'a sale week' : sA + ' sale weeks'} and these have {sB === 0 ? 'none' : sB === 1 ? 'one' : sB}</> : null;
+  return {
+    todo: [{ amt: pN, ids: ['cust-winback-atrisk', 'crm-flows'] }, { amt: pP, ids: ['crm-flows', 'cust-winback-atrisk'] }, { amt: pA, ids: ['basket-pair', 'basket-free-shipping'] }],
+    title: 'Why returning customers spent ' + fmtMoney(B.v), from: A.v, to: B.v, better: 'higher', fmtV: v => fmtMoney(v), fmtAmt: v => fmtMoney(Math.abs(v)),
+    startK: 'Returning customers’ sales', endK: 'Returning customers’ sales now', chartK: 'Returning customers’ sales',
+    parts: [
+      { amt: pN, k: v3UpDown(A.n, B.n, 'More came back', 'Fewer came back'), sub: fmtCount(A.n) + ' to ' + fmtCount(B.n) + ' returning buyers',
+        cause: <>{v3UpDown(A.n, B.n, 'more', 'fewer')} customers came back to buy ({fmtCount(A.n)} to {fmtCount(B.n)}){saleNote}</>,
+        against: <>{v3UpDown(A.n, B.n, 'More', 'Fewer')} customers coming back ({fmtCount(A.n)} to {fmtCount(B.n)})</> },
+      { amt: pP, k: v3UpDown(A.per, B.per, 'More orders each', 'Fewer orders each'), sub: (Math.round(A.per * 100) / 100) + ' to ' + (Math.round(B.per * 100) / 100) + ' orders each',
+        cause: <>each returning buyer ordered {v3UpDown(A.per, B.per, 'more', 'less')} often</>,
+        against: <>{v3UpDown(A.per, B.per, 'More', 'Fewer')} orders from each returning buyer</> },
+      { amt: pA, k: v3UpDown(A.aov, B.aov, 'Bigger orders', 'Smaller orders'), sub: fmtMoney(A.aov, 2) + ' to ' + fmtMoney(B.aov, 2) + ' an order',
+        cause: <>their orders were {v3UpDown(A.aov, B.aov, 'bigger', 'smaller')} ({fmtMoney(A.aov, 2)} to {fmtMoney(B.aov, 2)})</>,
+        against: <>{v3UpDown(A.aov, B.aov, 'Bigger', 'Smaller')} orders ({fmtMoney(A.aov, 2)} to {fmtMoney(B.aov, 2)})</> },
+    ],
+    opening: <>Since the 30 days to {v3Day(String(a.d), true)}, customers who had bought before spent {fmtMoney(B.v)}, against {fmtMoney(A.v)}.</>,
+    rows: [
+      ['Returning buyers', A.n, B.n, v => fmtCount(v), 'higher'],
+      ['Their orders', A.o, B.o, v => fmtCount(v), 'higher'],
+      ['Orders each', A.per, B.per, v => String(Math.round(v * 100) / 100), 'higher'],
+      ['Average order', A.aov, B.aov, v => fmtMoney(v, 2), 'higher'],
+      ['Their sales', A.v, B.v, v => fmtMoney(v), 'higher'],
+    ],
+    note: 'Returning buyers are customers whose order in the 30 days was not their first, as on the rest of this page: orders from your own shop, with marketplace orders counted apart.',
+  };
+}
 const V3_DRIVER_MODELS = {
+  newc:     { model: v3ModelNewCustomers, mode: 'pair', key: 'new_customers', fmt: v => fmtCount(v),
+              ok: p => Number(p.new_customers) > 0 && Number(p.cac_spend) > 0 },
+  retsales: { model: v3ModelReturning,    mode: 'pair', key: 'ret_net',       fmt: v => fmtMoney(v),
+              ok: p => Number(p.ret_customers) > 0 && Number(p.ret_orders) > 0 && p.ret_net != null },
   conv:   { model: v3ModelConv,     mode: 'pair',   key: 'conv',       fmt: v => v3Per100(v),
             ok: p => p.conv != null && Number(p.visits) > 0 && Number(p.web_orders) > 0 },
   profit: { model: v3ModelProfit,   mode: 'pair',   key: 'profit',     fmt: v3SignedGbp,
@@ -22032,7 +22119,7 @@ const V3_PAGES = {
     {/* Rebuilt 2026-10-05: a verdict on what a customer is worth against what one costs, then the
         numbers, then the retention moves, then the segments panel that stages them, then the plan. */}
     <V3CustomerValue/>
-    <V3DriverStrip keys={['cac', 'repeat']}/>
+    <V3DriverStrip keys={['newc', 'cac', 'retsales', 'repeat']}/>
     <V3Customers/>
     <V3Retention/>
     <V3Anchor id="segments"/>
