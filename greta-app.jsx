@@ -3609,7 +3609,7 @@ function V3VisitsKPI({ fallback }) {
   const r = React.useMemo(() => {
     if (!cl.rows || !ord.rows) return null;
     const tr = cl.rows.filter(x => x.metric_name === 'Traffic');
-    const days = [...new Set(tr.map(x => String(x.date).slice(0, 10)))].sort();
+    const days = [...new Set(tr.map(x => String(x.date).slice(0, 10)))].filter(d => d < today).sort();   // complete days only
     if (days.length < 20) return null;
     const end = days[days.length - 1];
     const ordBy = {}; ord.rows.forEach(x => { const d = String(x.day).slice(0, 10); ordBy[d] = (ordBy[d] || 0) + (Number(x.order_count) || 0); });
@@ -8936,6 +8936,17 @@ function v3AskScrub(text, facts) {
   // What still leaked on 8 Oct: "(whether it lands before the peak = false)", "(when an order placed today
   // lands)" -- a field name in brackets, translated -- "(direct)" after a figure, and "board rank 1".
   const glosses = new Set(Object.keys(V3_ASK_WORDS).map(k => V3_ASK_WORDS[k].toLowerCase()));
+  // A translated field name stated as true or false (9 Oct: "Because whether it lands before the peak is
+  // false, an order ... would arrive on 2026-12-01"): the lands-before-peak one becomes its meaning, any
+  // other is dropped. Dates written as 2026-12-01 (often with non-breaking hyphens) read as days.
+  t = t.replace(/\b(because\s+)?whether it lands before the peak\s+(?:is|=)\s+(true|false)\b,?\s*/gi,
+        (m, because, v) => (v.toLowerCase() === 'false' ? (because ? 'Because it lands after the peak starts, ' : 'It lands after the peak starts. ') : (because ? 'Because it lands before the peak, ' : 'It lands before the peak. ')));
+  Array.from(glosses).forEach(g => {
+    const esc = g.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    t = t.replace(new RegExp('\\b(?:because\\s+)?(?:the\\s+)?' + esc + '\\s+(?:is|=)\\s+(?:true|false)\\b,?\\s*', 'gi'), '');
+  });
+  t = t.replace(/\b(20\d\d)[-‐‑–](\d\d)[-‐‑–](\d\d)\b/g, (m, y, mo, d) => {
+    const iso = y + '-' + mo + '-' + d; try { return v3Day(iso, true); } catch (e) { return m; } });
   t = t.replace(/\b(the|its|this) rung (is|was) ([*_]*)(direct|likely|probably|possible|outside chance)\b/gi, (m, a, b, s, w) => 'Greta rates it ' + s + w)
        .replace(/\brung\s+([*_]*)(direct|likely|probably|possible|outside chance)\b/gi, '$1$2')
        .replace(/\s*\([^()]*=\s*(?:true|false|null)\s*\)/gi, '')
@@ -9068,7 +9079,13 @@ function buildAskContext(facts, question, budget){
     sent: 'Only the series this question needs were sent. If the answer needs a series that is not here, say which one and suggest asking about it directly.' };
   // The ceiling: drop data series from the least needed, then shorten the readout.
   const size = () => JSON.stringify(meta).length + JSON.stringify(data).length;
-  const order = Object.keys(data).reverse().filter(k => k !== 'stock_named');
+  // The series a question is about are never dropped for room: "Meta or email?" lost the email flows and
+  // answered "no email figures" (9 Oct). The stock list stays for stock questions, products for product ones.
+  const keepSeries = new Set(['stock_named']);
+  if (topics.email) keepSeries.add('email_flows');
+  if (topics.stock) keepSeries.add('stock_at_risk');
+  if (topics.products) keepSeries.add('products');
+  const order = Object.keys(data).reverse().filter(k => !keepSeries.has(k));
   while (size() > BUDGET && order.length) { const k = order.shift(); delete data[k]; delete dictionary[k]; }
   if (size() > BUDGET && meta.readout) delete meta.readout.cost_trees;
   if (size() > BUDGET && meta.readout) meta.readout.held = meta.readout.held.map(h => ({ action: h.action }));
@@ -9195,7 +9212,7 @@ SITE questions: first say whether the rate really moved, from site_last_30_days 
 
 PRODUCT questions: use data.products (sales, share, the new customers each product brings in, profit per unit, stock) and the stock plan; name products. Discount codes (facts.next_peak.discount_codes_used_at_last_peak) are codes, not products. Never infer a product's selling price from a cost.
 
-EMAIL questions: sales per person are the sales Klaviyo credits to the email (anyone who opened before buying), not profit and not what the email caused; say so, and rank flows and campaigns on them.
+EMAIL questions: sales per person are the sales Klaviyo credits to the email (anyone who opened before buying), not profit and not what the email caused; say so, and rank flows and campaigns on them. Board actions to win back lapsing customers or to switch on or fix automatic emails are email actions: for "ads or email?", set them against the ads actions, pound for pound.
 
 WHAT NOT TO DO questions: answer from readout.held (what Greta is holding back, and why) and from cautions the board itself states (a price test held until after the peak, no added ad spend while cost per order is above its earlier level, a sale that would deepen discounting). Never turn a board action into something not to do. A held finding about a platform's own count (Google's or Meta's conversions) does not cancel a board action on the same channel, which rests on your Shopify orders: leave it out, or say the board action stands.
 
@@ -9213,14 +9230,15 @@ ${metaStr}
 Data (JSON tables):
 ${dataStr}`;
     const newHistory = [...history, {role:'user', content:q, time:Date.now()}];
-    // The last two exchanges, earlier answers shortened: the conversation counts against the same allowance.
-    let apiMessages = newHistory.filter(m=>m.role==='user'||m.role==='assistant').slice(-5)
-      .map((m, i, all) => ({role:m.role, content: (m.role === 'assistant' && i < all.length - 1 && String(m.content).length > 900) ? String(m.content).slice(0, 900) + '…' : m.content}));
+    // The last exchange only, its answer shortened: the conversation counts against the same allowance,
+    // and two earlier exchanges (about 4,000 characters) pushed the figures for the new question out (9 Oct).
+    let apiMessages = newHistory.filter(m=>m.role==='user'||m.role==='assistant').slice(-3)
+      .map((m, i, all) => ({role:m.role, content: (m.role === 'assistant' && i < all.length - 1 && String(m.content).length > 600) ? String(m.content).slice(0, 600) + '…' : m.content}));
     const fixedChars = askSystem('', '').length;
     const msgChars = () => apiMessages.reduce((n, m) => n + String(m.content || '').length, 0);
-    // A long conversation leaves less room for the figures: keep at least 9,000 characters of them by
+    // A long conversation leaves less room for the figures: keep at least 11,000 characters of them by
     // dropping the earliest exchanges first. The conversation always starts with the owner's words.
-    while (apiMessages.length > 1 && V3_ASK_TOTAL - fixedChars - msgChars() < 9000) {
+    while (apiMessages.length > 1 && V3_ASK_TOTAL - fixedChars - msgChars() < 11000) {
       apiMessages = apiMessages.slice(1);
       while (apiMessages.length > 1 && apiMessages[0].role !== 'user') apiMessages = apiMessages.slice(1);
     }
@@ -18410,7 +18428,8 @@ function V3Website() {
 
   const now = React.useMemo(() => {
     if (!cl.rows || !ord.rows) return null;
-    const days = [...new Set(cl.rows.filter(r => r.metric_name === 'Traffic').map(r => String(r.date).slice(0, 10)))].sort();
+    // Complete days only: today's half-day of visits counted against today's half-day of orders (9 Oct).
+    const days = [...new Set(cl.rows.filter(r => r.metric_name === 'Traffic').map(r => String(r.date).slice(0, 10)))].filter(d => d < today).sort();
     if (days.length < 20) return null;
     const end = days[days.length - 1];
     const ordBy = {}; ord.rows.forEach(r => { const d = String(r.day).slice(0, 10); ordBy[d] = (ordBy[d] || 0) + (Number(r.order_count) || 0); });
@@ -18788,7 +18807,10 @@ function V3Products() {
         ? (d.losers.length ? fmtCount(d.losers.length) + (d.losers.length === 1 ? ' product sold at a loss. ' : ' products sold at a loss. ') + 'Overall, your products kept ' + fmtPctN(margin) + ' of their sales after what they cost.'
           : 'No product sells at a loss. Your products kept ' + fmtPctN(margin) + ' of their sales after what they cost.')
         : fmtMoney(d.total) + ' of product sales across ' + fmtCount(top.length) + ' products.'}</p>
-      <p className="v3-note v3-measure">{fmtMoney(d.total)} of product sales across {fmtCount(top.length)} products{d.top5share != null ? '. Your top five bring in ' + fmtPctN(d.top5share) + ' of it' : ''}. “Kept” is what is left after the product’s own cost and payment fees. Shipping and packing are paid per order, not per product, so profit on Profit &amp; sales is lower.</p>
+      {/* With no margin the headline above is already this sentence: it read twice (9 Oct). */}
+      <p className="v3-note v3-measure">{margin != null
+        ? <>{fmtMoney(d.total)} of product sales across {fmtCount(top.length)} products{d.top5share != null ? '. Your top five bring in ' + fmtPctN(d.top5share) + ' of it' : ''}. </>
+        : (d.top5share != null ? 'Your top five bring in ' + fmtPctN(d.top5share) + ' of it. ' : '')}“Kept” is what is left after the product’s own cost and payment fees. Shipping and packing are paid per order, not per product, so profit on Profit &amp; sales is lower.</p>
       <ol className="v3-moves">{leaks}</ol>
     </section>
     <section className="v3-sec">
