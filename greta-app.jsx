@@ -20540,6 +20540,8 @@ function V3Competitors() {
         : (<>
           <p className="v3-verdict">{verdict}</p>
           <ol className="v3-moves">{reads.map(r => (<li key={r.k}><b>{r.head}</b> {r.body} <V3Conf state={r.conf} detail={r.k === 'shop' ? 'From your own account’s auction data. The return is Google’s own count, which usually runs above your real orders.' : 'Counted straight from your own account.'}/></li>))}</ol>
+          <V3CompetitorDrivers rows={gads.rows} brandName={brandC && brandC.name} shopName={shop && shop.name}
+            under={!!(shop && be && shop.spend > 0 && shop.value / shop.spend < be)} today={today}/>
           {!S && <p className="micro muted v3-measure">Connect Search Console on Connections &amp; data to see how much of your search traffic already knew you, and where you sit on searches for what you sell.</p>}
         </>)}
     </section>
@@ -21338,6 +21340,69 @@ function V3GoalDrivers({ per, today, exp, done, months, paceMonths, goal, pace, 
     </div>
     {open === 'sofar' && canSoFar && <V3DriverPanel fixed={v3ModelGoalSoFar(act, plan, { exp, basis, range })}/>}
     {open === 'gap' && canGap && <V3DriverPanel fixed={v3ModelGoalGap(months, paceMonths, goal, pace, { dCam })}/>}
+  </div>);
+}
+// Competitors (9 Oct): how often a Google campaign shows in the auctions it could enter, the last 30
+// days against the 30 before, from the rows the page already reads. Google splits what it misses into
+// auctions lost on ad rank (other advertisers' bids and ads beat yours) and on budget, so a change in the
+// share splits into those two; anything Google leaves unexplained is shown as such.
+function v3ModelShare(name, kind, A, B, info) {
+  const pR = -(B.rank - A.rank), pB = -(B.budget - A.budget), other = (B.is - A.is) - pR - pB;
+  const brand = kind === 'brand';
+  const parts = [
+    { amt: pR, k: v3UpDown(A.rank, B.rank, 'More lost to other bidders', 'Less lost to other bidders'), sub: fmtPctN(A.rank) + ' to ' + fmtPctN(B.rank) + ' of auctions, on ad rank',
+      cause: <>{v3UpDown(A.rank, B.rank, 'more', 'fewer')} auctions went to other advertisers on ad rank, their bid and ad against yours ({fmtPctN(A.rank)} to {fmtPctN(B.rank)})</>,
+      against: <>{v3UpDown(A.rank, B.rank, 'Losing more', 'Losing fewer')} auctions to other bidders ({fmtPctN(A.rank)} to {fmtPctN(B.rank)})</> },
+    { amt: pB, k: v3UpDown(A.budget, B.budget, 'More lost to budget', 'Less lost to budget'), sub: fmtPctN(A.budget) + ' to ' + fmtPctN(B.budget) + ' of auctions',
+      cause: <>the campaign’s budget ran out in {v3UpDown(A.budget, B.budget, 'more', 'fewer')} auctions ({fmtPctN(A.budget)} to {fmtPctN(B.budget)})</>,
+      against: <>{v3UpDown(A.budget, B.budget, 'More', 'Less')} lost to budget ({fmtPctN(A.budget)} to {fmtPctN(B.budget)})</> },
+  ];
+  if (Math.abs(other) >= 0.002) parts.push({ amt: other, k: 'Not split by Google', sub: 'days Google reports only in part', cause: <>Google does not split the rest</>, against: <>What Google does not split</> });
+  return {
+    title: brand ? 'Why you show on ' + fmtPctN(B.is) + ' of the searches for your name' : 'Why “' + name + '” shows in ' + fmtPctN(B.is) + ' of its auctions',
+    from: A.is, to: B.is, better: 'higher', fmtV: v => fmtPctN(v), fmtAmt: v3PtsAmt,
+    startK: 'Shown in, 30 days before', endK: 'Shown in, last 30 days', subA: v3Day(info.a0) + ' – ' + v3Day(info.a1, true), subB: v3Day(info.b0) + ' – ' + v3Day(info.b1, true),
+    colA: 'The 30 days before', colB: 'The last 30 days', bridgeCap: brand ? 'Searches for your name your ad showed on' : 'Auctions the campaign showed in',
+    todo: brand ? [{ amt: pR, ids: ['paid-brand-share-google'] }, { amt: pB, ids: ['paid-brand-share-google'] }] : [{ amt: pR, ids: ['order-cost-google'] }, { amt: pB, ids: ['order-cost-google'] }],
+    parts,
+    opening: brand
+      ? <>Your “{name}” campaign showed on {fmtPctN(B.is)} of the searches for your name in the last 30 days, against {fmtPctN(A.is)} in the 30 before. The rest went to someone else’s ad, or to none. The figures below are points of those searches.</>
+      : <>“{name}” showed in {fmtPctN(B.is)} of the auctions it could enter in the last 30 days, against {fmtPctN(A.is)} in the 30 before. The figures below are points of those auctions.</>,
+    closing: brand ? <> Searches for your name are the cheapest to win back: a higher bid on that campaign, or Google’s “Target impression share” bidding, closes most of the gap.</>
+      : info.under ? <> By Google’s own count this campaign brings in less than it needs to break even, so bidding more to beat other advertisers would cost more than it earns.</> : null,
+    rows: [
+      ['Shown in', A.is, B.is, v => fmtPctN(v), 'higher'],
+      ['Lost on ad rank', A.rank, B.rank, v => fmtPctN(v), 'lower'],
+      ['Lost on budget', A.budget, B.budget, v => fmtPctN(v), 'lower'],
+      ['Clicks', A.clicks, B.clicks, v => fmtCount(v), 'higher'],
+      ['Spend', A.spend, B.spend, v => fmtMoney(v), null],
+    ],
+    note: 'Google’s own auction figures for this campaign, each day’s share averaged over the 30 days, as on the rest of this page.',
+  };
+}
+function V3CompetitorDrivers({ rows, brandName, shopName, under, today }) {
+  const [open, setOpen] = React.useState(null);
+  const b1 = v3IsoAdd(today, -1), b0 = v3IsoAdd(b1, -29), a1 = v3IsoAdd(b0, -1), a0 = v3IsoAdd(a1, -29);
+  const win = (name, lo, hi) => {
+    const rs = (rows || []).filter(r => r.entity_name === name && String(r.date) >= lo && String(r.date) <= hi);
+    const av = k => { const v = rs.filter(r => r[k] != null).map(r => Number(r[k])); return v.length ? v.reduce((t, x) => t + x, 0) / v.length : null; };
+    const n = rs.filter(r => r.search_impression_share != null).length;
+    return n >= 20 ? { is: av('search_impression_share'), rank: av('search_rank_lost_is') || 0, budget: av('search_budget_lost_is') || 0,
+      clicks: rs.reduce((t, r) => t + (Number(r.clicks) || 0), 0), spend: rs.reduce((t, r) => t + (Number(r.spend) || 0), 0) } : null;
+  };
+  const mk = (name, kind) => { if (!name) return null; const A = win(name, a0, a1), B = win(name, b0, b1);
+    return A && B ? v3ModelShare(name, kind, A, B, { a0, a1, b0, b1, under }) : null; };
+  const mB = mk(brandName, 'brand'), mS = mk(shopName, 'shop');
+  if (!mB && !mS) return null;
+  const btn = (id, label) => (<button type="button" className="v3-xref v3-sign-act" aria-expanded={open === id} onClick={() => setOpen(o => (o === id ? null : id))}>
+    {open === id ? 'Hide what is driving it' : label} <span className="v3-xref-go">{open === id ? '↑' : '↓'}</span></button>);
+  return (<div className="v3-strip-act">
+    <div className="v3-btn-row">
+      {mB && btn('brand', 'What changed on searches for your name?')}
+      {mS && btn('shop', 'What changed in Shopping auctions?')}
+    </div>
+    {open === 'brand' && mB && <V3DriverPanel fixed={mB}/>}
+    {open === 'shop' && mS && <V3DriverPanel fixed={mS}/>}
   </div>);
 }
 // Review (9 Oct): the week against a typical week, on the Review page's own figures. Kept after ads is
