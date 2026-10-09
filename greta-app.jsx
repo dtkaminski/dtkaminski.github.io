@@ -8682,6 +8682,14 @@ async function v3AskFacts(question) {
     const leadDays = lead ? Math.round(lead * 7) : 28, lands = v3IsoAdd(today, leadDays);
     Object.assign(f.next_peak, { order_placed_today_lands: lands, lands_before_peak_starts: lands < s, lands_after_peak_ends: lands > e,
       lead_days: leadDays, lead_time_entered: !!lead });
+    // How deep an offer can go, from the brand's own margin (the same sums as Stock & orders).
+    if (cmr > 0.1 && cmr < 0.95) {
+      const half = Math.floor(cmr * 50 / 5) * 5;
+      f.next_peak.discount_depth = { kept_per_100_full_price: Math.round(100 * cmr), kept_at_20_off: Math.round(100 * (cmr - 0.2)),
+        ['kept_at_' + half + '_off']: Math.round(100 * (cmr - half / 100)), kept_at_45_off: Math.max(0, Math.round(100 * (cmr - 0.45))),
+        keep_the_offer_at_or_under_pct: half,
+        note: 'pounds kept from each 100 pounds of full-price sales after product and order costs; deeper offers need that many more orders to make the same profit' };
+    }
   }
   const promos = evs.filter(x => x.row_group === 'promo' && x.status !== 'skipped');
   const missing = (found || []).filter(r => { const k = String(r.ts).slice(0, 10); return !promos.some(x => String(x.start_date).slice(0, 10) <= v3IsoAdd(k, 1) && String(x.end_date || x.start_date).slice(0, 10) >= v3IsoAdd(k, -1)); });
@@ -8766,6 +8774,13 @@ async function v3AskFacts(question) {
         + (wk.per100 >= lo && wk.per100 <= hi ? ' So a drop in Google Analytics or in the orders the shop links to a source is most likely tracking, not shoppers.'
           : ' Check the site before blaming ads: buy something on a phone, and look at the site errors below.')
         + (wk.orders < 60 ? ' With ' + wk.orders + ' orders in the week, part of a swing this size can be chance.' : '');
+      // Sale weeks among those 8: the answer said "promotions are not listed" while 7 of the last 13 weeks
+      // were sales (9 Oct). Weekly rhythm from the state (Monday weeks), counted over the same 9 weeks.
+      const st0 = r0(stateR) && r0(stateR).state, rw = (st0 && st0.rhythm && st0.rhythm.weeks) || [];
+      const nSale = rw.filter(w => w.sale && w.wk >= v3IsoAdd(today, -63)).length, lastSale = rw.filter(w => w.sale).map(w => w.wk).sort().pop();
+      if (rw.length) verdict += nSale > 0
+        ? ' ' + nSale + ' of those weeks had a sale, and sale weeks turn more visits into orders, so the range is lifted by them' + (lastSale ? ' (the last sale week began ' + v3Day(lastSale) + ')' : '') + '.'
+        : ' None of those weeks had a sale.';
     }
     const cl30 = clR.filter(r => String(r.date).slice(0, 10) >= v3IsoAdd(today, -31));
     const fr = {}; V3_FRICTION.forEach(([m, label]) => { let n = 0, s2 = 0; cl30.filter(r => r.metric_name === m).forEach(r => {
@@ -8781,6 +8796,17 @@ async function v3AskFacts(question) {
       share_of_visits_that_pct: fr };
   }
   f._stock = Array.isArray(stockR) ? stockR : null;
+  // "We're about to stock out of our best seller" got "it's in the list of 45 if it's there" (9 Oct): the
+  // mega necklace gold, the best seller, had 9.7 weeks of stock. The five fastest sellers and how long
+  // each lasts, so the answer can say whether the best seller really runs out.
+  if (Array.isArray(stockR) && stockR.length) {
+    f.best_sellers_stock = stockR.filter(r => Number(r.weekly_velocity) > 0)
+      .sort((a, b) => Number(b.weekly_velocity) - Number(a.weekly_velocity)).slice(0, 5)
+      .map(r => ({ product: v3Title(r.product_title || r.sku), sells_a_week: Math.round(Number(r.weekly_velocity) * 10) / 10,
+        in_stock: Number(r.on_hand) || 0,
+        weeks_left: r.projected_days_to_stockout != null ? Math.round(Number(r.projected_days_to_stockout) / 7 * 10) / 10 : null,
+        runs_out_before_a_restock_lands: !!r.runs_out_before_restock }));
+  }
   f.calendar = { past_sales_not_on_the_calendar: missing.length,
     note: missing.length ? 'Greta found sales that are not on the calendar, so what she has learned about promotions rests on too few events. They can be added from the Calendar.' : null };
   return f;
@@ -8927,10 +8953,19 @@ function v3AskScrub(text, facts) {
   const np = facts && facts.next_peak;
   if (np && np.lands_before_peak_starts === false && np.lands_after_peak_ends === false)
     t = t.replace(/\b(after the (?:[\w-]+ ){0,2}peak(?: window)?)(?!\s+(?:window\s+)?(?:starts|begins|opens|has started|is over|ends|has ended))/gi, '$1 starts');
-  t = t.replace(/`?\b(?:_meta\.)?(?:facts|readout|data)\.([a-z_]+)(?:\.([a-z_]+))?`?/g, (m, a, b) => V3_ASK_WORDS[b] || V3_ASK_WORDS[a] || 'the figures');
-  t = t.replace(/`?\b([a-z]+(?:_[a-z]+)*)\.([a-z]+(?:_[a-z]+)+)`?/g, (m, a, b) => V3_ASK_WORDS[b] || V3_ASK_WORDS[a] || b.replace(/_/g, ' '));
-  t = t.replace(/`([a-z]+(?:_[a-z]+)+)`/g, (m, k) => V3_ASK_WORDS[k] || k.replace(/_/g, ' '));
-  t = t.replace(/\b([a-z]+(?:_[a-z]+){1,8})\b/g, (m, k) => V3_ASK_WORDS[k] || m);
+  // Field names, with digits and at any depth (9 Oct: "facts.last_30_days.return_verdict" came out as
+  // "the figures30_days.the return on ads", and "from_ad_spend" was left as it was).
+  const fw = k => V3_ASK_WORDS[k] || k.replace(/_/g, ' ');
+  const pathWords = p => { const seg = p.replace(/`/g, '').split('.').filter(Boolean); const known = seg.slice().reverse().find(s => V3_ASK_WORDS[s]);
+    const last = seg[seg.length - 1]; return known ? V3_ASK_WORDS[known] : (/^(facts|readout|data|_meta)$/.test(last) ? 'the figures' : fw(last)); };
+  // a bracket that holds nothing but a path is a citation: dropped
+  t = t.replace(/\s*\(\s*`?(?:_meta\.)?(?:facts|readout|data)(?:\.[a-z0-9_]+)+`?\s*\)/gi, '');
+  t = t.replace(/`?\b(?:_meta\.)?(?:facts|readout|data)(?:\.[a-z0-9_]+)+`?/g, m => pathWords(m));
+  t = t.replace(/`?\b[a-z][a-z0-9]*(?:_[a-z0-9]+)*(?:\.[a-z][a-z0-9]*(?:_[a-z0-9]+)*)*\.[a-z][a-z0-9]*(?:_[a-z0-9]+)+`?/g, m => pathWords(m));
+  t = t.replace(/`([a-z][a-z0-9]*(?:_[a-z0-9]+)+)`/g, (m, k) => fw(k));
+  t = t.replace(/\b([a-z][a-z0-9]*(?:_[a-z0-9]+){1,8})\b/g, (m, k) => fw(k));
+  // "(your email flows table)": the context's tables are not something the owner can see
+  t = t.replace(/\s*\((?:the |your )?[a-z ]{3,40} table\)/gi, '');
   t = t.replace(/\s*[–—-]\s*rung\s+(direct|likely|probably|possible|outside chance)\b/gi, ' ($1)')
        .replace(/\brung\s+(direct|likely|probably|possible)\b/gi, '$1')
        .replace(/\((?:direct|likely|probably|possible)\s*,\s*[^)]*\)/gi, '')
@@ -9002,6 +9037,26 @@ function v3AskCheck(text, sent) {
         t = lines.join('\n');
       }
     }
+  }
+  // Held items never come back as "my suggestion" (9 Oct, twice: "Fix the site-wide JavaScript errors (e.g.,
+  // the Judge.me PDP issue)", where the Judge.me fix is held, not re-checked since April). The held part
+  // goes; a suggestion that is mostly a held item goes whole.
+  const held = (R && Array.isArray(R.held)) ? R.held : [];
+  if (held.length) {
+    const names = new Set(), heldWords = [];
+    held.forEach(h => { const s = String(h.action || '');
+      (s.match(/\b[\w-]+\.[a-z]{2,}\b|“[^”]+”|"[^"]+"/g) || []).forEach(x => names.add(x.replace(/[“”"]/g, '').toLowerCase()));
+      heldWords.push(new Set((s.toLowerCase().match(/[a-z][a-z.]{4,}/g) || []).filter(w => !V3_ASK_STOP.has(w)))); });
+    let dropped = false;
+    t = t.split('\n').map(ln => {
+      if (!/suggestion|not on your board/i.test(ln)) return ln;
+      let out = ln.replace(/\s*\([^()]*\)/g, p => (Array.from(names).some(n => n && p.toLowerCase().includes(n)) ? (dropped = true, '') : p));
+      const w = new Set((out.toLowerCase().match(/[a-z][a-z.]{4,}/g) || []));
+      if (heldWords.some(s => { let n = 0; s.forEach(x => { if (w.has(x)) n++; }); return n >= 3; })) { dropped = true; return ''; }
+      if (Array.from(names).some(n => n && out.toLowerCase().includes(n))) { dropped = true; return ''; }
+      return out;
+    }).join('\n').replace(/\n{3,}/g, '\n\n');
+    if (dropped) t += '\n\n*Greta left out something she is holding back: it was flagged once and has not been re-checked.*';
   }
   // A stored answer (history from another device) has no request to trace its figures against: the
   // next-step repair above still runs, the figure note does not.
@@ -9206,11 +9261,13 @@ WHAT TO DO questions: answer from readout.board in its order, with each item's p
 WHY questions: before naming a cause, check the confounders: a promotion or code, a spend change, a stockout, an email send, a tracking change, seasonality, or a partial latest day (_meta.dataQuality). Check each against facts.recent_context first: if sale_weeks_in_last_13 is above 0, promotions are part of the story, not ruled out; if of_them_out_of_stock_now or products_out_of_stock_now is above 0, stock-outs are too. A planned-events list being empty does not rule out what already happened. Locate the move: demand (spend, visits) → conversion → order value and discounts → new vs returning → product and stock. Separate what the data shows from what you infer, and give your confidence. For why profit after ads moved against a typical month, lead with facts.typical_month.what_moved_profit_after_ads: its main_cause, its pounds from sales and from ad spend, and its sales and ad spend comparisons exactly as written; do not work out percentages of your own.
 COUNTS AND NAMES: how many products are out of stock or need ordering comes from facts.recent_context (the board's #1 order list), never from counting table rows. Call a product out of stock only if out_of_stock_now_examples or a stock table marks it so; never give an example the data does not name. A board action is what its text says: do not attach creatives, audiences or campaigns to it unless its text names them.
 
-STOCK questions: use data.stock_named and data.stock_at_risk (Greta's stock plan) for how many to order (order_units), what being out costs (lost_before_lands, profit) and what an order costs (order_units × unit_cost). An order placed today lands on facts.next_peak.order_placed_today_lands. If facts.next_peak.lands_before_peak_starts is false, never say ordering now gets stock in for the peak: say when it lands, that only what suppliers can send sooner reaches the peak, and to ask for that first. Board pounds are what pounds_are says, a month or once (per); never call them a cost or spend unless pounds_are says so. When the board already has an action for what is asked, give its instruction as the board words it ("bring Meta back toward £X a week"), not a stronger one of your own such as pausing a channel.
+STOCK questions: when the owner says "our best seller", first name it from facts.best_sellers_stock (the fastest seller) and say how many weeks it lasts and whether it runs out before a restock lands; if it does not, say that first, then which products do. Use data.stock_named and data.stock_at_risk (Greta's stock plan) for how many to order (order_units), what being out costs (lost_before_lands, profit) and what an order costs (order_units × unit_cost). An order placed today lands on facts.next_peak.order_placed_today_lands. If facts.next_peak.lands_before_peak_starts is false, never say ordering now gets stock in for the peak: say when it lands, that only what suppliers can send sooner reaches the peak, and to ask for that first. Board pounds are what pounds_are says, a month or once (per); never call them a cost or spend unless pounds_are says so. When the board already has an action for what is asked, give its instruction as the board words it ("bring Meta back toward £X a week"), not a stronger one of your own such as pausing a channel.
 
 CHECK THE PREMISE FIRST: when the question states something about the business ("ROAS looks great", "conversion dropped 30%", "about to stock out"), check it against the figures before anything else. For ads, the first sentence is facts.last_30_days.return_verdict as written; for the site, site_last_30_days.verdict as written. Never call a return good, solid, healthy or decent when return_verdict says thin. If the figures do not show what the owner said, say so in the first sentence, then say what the owner is most likely seeing instead, such as a tracking break in readout.tracking or a platform's own count.
 
 SITE questions: first say whether the rate really moved, from site_last_30_days against its typical figure; if Google Analytics or the shop's order sources are in readout.tracking, a drop in their figures is most likely the tracking, not shoppers. Never explain a change in how visits turn into orders by ad costs. Lead with site_last_30_days (Microsoft Clarity counts every visit; Google Analytics was not recording properly for part of the summer): orders per 100 visits, the share on a phone, and the share of visits hitting a JavaScript error or broken clicks. Use the Google Analytics funnel only as a second view of the steps. An item in readout.held is not established: if you mention one, say it was flagged and not re-checked, and never call it the cause.
+
+DISCOUNT and peak-offer questions: give the depth from facts.next_peak.discount_depth (keep the offer at or under that % off, and what 45% off keeps of every 100 pounds), then the board's peak plan: what to put the offer on and which products to keep out of ads.
 
 PRODUCT questions: use data.products (sales, share, the new customers each product brings in, profit per unit, stock) and the stock plan; name products. Discount codes (facts.next_peak.discount_codes_used_at_last_peak) are codes, not products. Never infer a product's selling price from a cost.
 
@@ -9221,6 +9278,7 @@ WHAT NOT TO DO questions: answer from readout.held (what Greta is holding back, 
 A difference in cost is not a loss: an ad overspend is spend above what the earlier cost per order needed, not money lost. When a board figure is "probably" or lower, give its why_this_rung in plain words. The weekly tables hold complete weeks only.
 
 COST questions ("which of my costs are wrong", "what do things cost me"): answer from facts.costs_and_settings.what_reads_wrong, the cost figures Greta works from that are off and how far each moves profit a month. Ad spend being high is not a cost figure being wrong. The freight figure is per 10% of freight and duty, an illustration until the owner enters their rate, not an amount: never add it to anything, and never work out a corrected profit of your own. Point to Goal & costs, where each one can be fixed.
+Answer only the newest question. Earlier exchanges are background: never repeat or continue an earlier answer.
 SHAPE: start with the answer itself in one or two plain sentences, with the figure that decides it. Then at most three short points, or one small table when comparing several things. Keep it under about 180 words unless the question asks for a list. No headings unless there are more than three parts. End with the one thing to do next: the board action that answers this question (for an ads question, the ads action, not the top of the board), worded as the board words it.
 Write for the owner: never show field or table names, and never a dotted name such as next_peak.promotions_planned (readout, facts, pounds_are, rung, stock_named, order_units, recent_context); say what they mean. Use a short table only when it helps.
 
@@ -18342,6 +18400,17 @@ function V3StockOffer() {
   return (<div className="v3-page-stack"><section className="v3-sec">
     <div className="v3-kick">Your next busy period · {pkName} · {v3Day(pk.start)} – {v3Day(pk.end, true)}</div>
     <p className="v3-verdict">For {pkName}, feature what you have plenty of. Keep products that will run short out of your ads.</p>
+    {/* How deep to go (review, 9 Oct: Greta said run a peak offer but never how much off). From the brand's
+        own margin after product and order costs: at d off full price, £100 of full-price sales keeps
+        100 x (margin - d). */}
+    {(() => { const H = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || {};
+      const cm = Number(H.net_revenue_30d) > 0 && H.product_contribution_30d != null ? Number(H.product_contribution_30d) / Number(H.net_revenue_30d) : null;
+      if (cm == null || cm <= 0.1 || cm >= 0.95) return null;
+      const keep = d => fmtMoney(Math.max(0, Math.round(100 * (cm - d))));
+      const half = Math.floor(cm * 50 / 5) * 5;
+      return <p className="v3-note v3-measure"><b>How deep to go.</b> After product and order costs you keep about {keep(0)} of every £100 you sell at full price.
+        {' '}At 20% off you keep {keep(0.2)}; at {half}% off, {keep(half / 100)}, about half; at 45% off, {keep(0.45)}. Codes also go to people who would have bought anyway, so keep the offer at or under {half}% off and put it on what you have plenty of, below.
+        {' '}<V3Conf state="likely" detail="Your margin after product and order costs over the last 30 days, applied to full-price sales. It leaves out the extra orders a deeper offer brings, which have to make up the difference."/></p>; })()}
     <p className="v3-note v3-measure">The same {fmtCount(pk.days)} days last year sold {fmtMoney(pk.lySales)}, {fmtTimes(pk.ratio, 0)} your normal pace. The order above arrives on {v3Day(land)}, after it starts, so until then you can only sell what is in stock. Featuring what you have plenty of sells stock you have already paid for. Advertising what will run short sells it out early, and then you pay for clicks on a sold-out page.
       {' '}<V3Conf state="probably" detail="Based on units sold on the same days last year, at last year’s prices and offers. A bigger or smaller offer this year changes demand to match. Stock left assumes today’s pace until the peak starts."/></p>
     {plenty.length > 0 && <><h2 className="v3-sec-title">Feature these in the offer</h2>{tbl(plenty, false)}</>}
