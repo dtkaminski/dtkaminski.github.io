@@ -21201,7 +21201,12 @@ function v3ModelProducts(list, sale) {
   const sum = (a, k) => a.reduce((t, x) => t + (x[k] || 0), 0);
   const out = list.filter(x => x.out), nw = list.filter(x => !x.out && x.isNew), back = list.filter(x => !x.out && !x.isNew && x.back);
   const cont = list.filter(x => !x.out && !x.isNew && !x.back);
-  let price = 0; cont.forEach(x => { if (x.unitsWas > 0 && x.units > 0) price += x.units * (x.now / x.units - x.was / x.unitsWas); });
+  // like for like: what this period's units would have sold for at the earlier prices. The average price a
+  // unit moves with which products sell too (frkl: £28 to £39 a unit while each product sold for a little
+  // less), so the label follows the same-product change, not the average.
+  let price = 0, atOld = 0, atNew = 0;
+  cont.forEach(x => { if (x.unitsWas > 0 && x.units > 0) { const p0 = x.was / x.unitsWas, p1 = x.now / x.units; price += x.units * (p1 - p0); atOld += x.units * p0; atNew += x.units * p1; } });
+  const idx = atOld > 0 ? atNew / atOld - 1 : null;
   const contD = cont.reduce((t, x) => t + x.now - x.was, 0), units = contD - price;
   const was = sum(list, 'was'), now = sum(list, 'now');
   const U0 = cont.reduce((t, x) => t + (x.unitsWas || 0), 0), U1 = cont.reduce((t, x) => t + (x.units || 0), 0);
@@ -21215,9 +21220,9 @@ function v3ModelProducts(list, sale) {
   if (cont.length) parts.push({ amt: units, k: v3UpDown(U0, U1, 'Sold more units', 'Sold fewer units'), sub: fmtCount(U0) + ' to ' + fmtCount(U1) + ' units, products still selling',
     cause: <>the products still in stock sold {v3UpDown(U0, U1, 'more', 'fewer')} units ({fmtCount(U0)} to {fmtCount(U1)}){sale != null && U1 < U0 ? <>, as the 28 days before included a sale</> : null}</>,
     against: <>Selling {v3UpDown(U0, U1, 'more', 'fewer')} units of the products still in stock ({fmtCount(U0)} to {fmtCount(U1)})</> });
-  if (pA != null && pB != null) parts.push({ amt: price, k: v3UpDown(pA, pB, 'Higher price a unit', 'Lower price a unit'), sub: fmtMoney(pA, 2) + ' to ' + fmtMoney(pB, 2) + ' a unit',
-    cause: <>each unit sold for {v3UpDown(pA, pB, 'more', 'less')} on average ({fmtMoney(pA, 2)} to {fmtMoney(pB, 2)})</>,
-    against: sale != null && pB > pA ? <>Higher prices once the sale ended ({fmtMoney(pA, 2)} to {fmtMoney(pB, 2)} a unit)</> : <>{v3UpDown(pA, pB, 'Higher', 'Lower')} prices a unit ({fmtMoney(pA, 2)} to {fmtMoney(pB, 2)})</> });
+  if (idx != null) parts.push({ amt: price, k: idx >= 0 ? 'Higher prices' : 'Lower prices', sub: fmtPctN(Math.abs(idx)) + (idx >= 0 ? ' more' : ' less') + ' for the same product',
+    cause: <>the same products sold for {idx >= 0 ? 'more' : 'less'} each ({fmtPctN(Math.abs(idx))} {idx >= 0 ? 'more' : 'less'} on average){idx < 0 ? ', from discounts or codes' : ''}</>,
+    against: sale != null && idx > 0 ? <>Higher prices once the sale ended ({fmtPctN(idx)} more for the same product)</> : <>{idx >= 0 ? 'Higher' : 'Lower'} prices for the same products ({fmtPctN(Math.abs(idx))})</> });
   if (nw.length) parts.push({ amt: newD, k: 'New products', sub: fmtCount(nw.length) + ' new in the last eight weeks',
     cause: <>new products sold {fmtMoney(sum(nw, 'now'))}</>, against: <>New products ({fmtCount(nw.length)})</> });
   if (back.length) parts.push({ amt: backD, k: 'Selling again', sub: fmtCount(back.length) + ' with no sales the 28 days before',
@@ -21234,10 +21239,10 @@ function v3ModelProducts(list, sale) {
     rows: [
       ['Products that sold', list.filter(x => x.was > 0).length, list.filter(x => x.now > 0).length, v => fmtCount(v), 'higher'],
       ['Units, products still selling', U0, U1, v => fmtCount(v), 'higher'],
-      ['Price a unit, products still selling', pA, pB, v => fmtMoney(v, 2), null],
+      ['Average price a unit, products still selling', pA, pB, v => fmtMoney(v, 2), null],
       ['Out of stock now, sold before', 0, out.length, v => fmtCount(v), 'lower'],
     ],
-    note: 'These are the figures in the table on this page: Shopify order lines, after discounts and before VAT, for the last 28 days and the 28 before. Each product still selling splits its change into units and the price each unit sold at; products that ran out, are new, or sold again after none are counted on their own.',
+    note: 'These are the figures in the table on this page: Shopify order lines, after discounts and before VAT, for the last 28 days and the 28 before. Each product still selling splits its change into units and the price each unit sold at, product for product; the average price a unit also moves with which products sell, so it can rise while each product sells for less. Products that ran out, are new, or sold again after none are counted on their own.',
   };
 }
 function V3ProductStrip({ d }) {
