@@ -21031,6 +21031,15 @@ function v3BuildSigns(S, hist, opts) {
       series: ser('ret_net'), fmt: v => fmtMoney(v), better: 'higher', line: { v: typ, label: 'Usual ' + fmtMoney(typ) },
       which: 'retsales', ctx: { weeks: H && Array.isArray(H.weeks) ? H.weeks : [], lineLabel: 'about ' + fmtMoney(typ) + ', your usual month' }, dline: typ });
   }
+  // growth plan: new customers' sales, against the middle of the earlier weeks
+  const NSP = HP ? HP.filter(p => Number(p.new_net) > 0 && Number(p.new_customers) > 0) : [];
+  if (NSP.length >= 4) {
+    const l = NSP[NSP.length - 1], nv = Number(l.new_net), typ = med(NSP.slice(0, -1).map(p => Number(p.new_net))), top = Math.max(nv, typ) * 1.25;
+    signs.push({ k: 'New customers’ sales', v: fmtMoney(nv), tone: nv < typ * 0.9 ? 'weak' : nv > typ * 1.1 ? 'good' : 'typical',
+      bar: { fill: nv / top, mark: typ / top }, n: <>{fmtCount(Number(l.new_customers))} first orders at {fmtMoney(nv / Number(l.new_customers), 2)}; about {fmtMoney(typ)} is usual for you</>,
+      series: ser('new_net'), fmt: v => fmtMoney(v), better: 'higher', line: { v: typ, label: 'Usual ' + fmtMoney(typ) },
+      which: 'newsales', ctx: { weeks: H && Array.isArray(H.weeks) ? H.weeks : [], lineLabel: 'about ' + fmtMoney(typ) + ', your usual month' }, dline: typ });
+  }
   // marketing (0317): ad spend, and each platform's cost per sale on its own count
   const SPP = HP ? HP.filter(p => Number(p.cac_spend) > 0) : [];
   if (SPP.length >= 4) {
@@ -21889,7 +21898,44 @@ function v3ModelGoogleCpa(a, b, ctx) {
     note: 'From your Google Ads account, every campaign together. The two parts multiply to the cost per sale, so they add up to its change exactly.',
   };
 }
+// Growth plan (9 Oct): sales from new customers = ad spend / cost of each new customer x their average
+// first order, so a change splits exactly into the spend, what each customer cost and how big their
+// first order was: did more spend buy more new-customer sales, and if not, why not.
+function v3ModelNewSales(a, b, ctx) {
+  const f = p => { const sp = Number(p.cac_spend), n = Number(p.new_customers), v = Number(p.new_net); return { sp, n, v, c: sp / n, aov: v / n }; };
+  const A = f(a), B = f(b);
+  const [pS, pC, pA] = v3LogParts(A.v, B.v, [{ a: A.sp, b: B.sp, sign: 1 }, { a: A.c, b: B.c, sign: -1 }, { a: A.aov, b: B.aov, sign: 1 }]);
+  const sA = v3SaleWeeksIn(ctx.weeks, a), sB = v3SaleWeeksIn(ctx.weeks, b);
+  return {
+    todo: [{ amt: pC, ids: ['driver-meta-ads', 'driver-retargeting', 'order-cost-meta', 'order-cost-google'] }, { amt: pA, ids: ['basket-pair', 'basket-free-shipping'] }],
+    title: 'Why new customers bought ' + fmtMoney(B.v), from: A.v, to: B.v, better: 'higher', fmtV: v => fmtMoney(v), fmtAmt: v => fmtMoney(Math.abs(v)),
+    startK: 'New customers’ sales', endK: 'New customers’ sales now', chartK: 'New customers’ sales',
+    parts: [
+      { amt: pS, k: v3UpDown(A.sp, B.sp, 'More ad spend', 'Less ad spend'), sub: fmtMoney(A.sp) + ' to ' + fmtMoney(B.sp),
+        cause: <>ad spend went {v3UpDown(A.sp, B.sp, 'up', 'down')} ({fmtMoney(A.sp)} to {fmtMoney(B.sp)})</>,
+        against: <>{v3UpDown(A.sp, B.sp, 'More', 'Less')} ad spend ({fmtMoney(A.sp)} to {fmtMoney(B.sp)})</> },
+      { amt: pC, k: v3UpDown(A.c, B.c, 'Each cost more to win', 'Each cost less to win'), sub: fmtMoney(A.c) + ' to ' + fmtMoney(B.c) + ' each',
+        cause: <>each new customer cost {v3UpDown(A.c, B.c, 'more', 'less')} to win ({fmtMoney(A.c)} to {fmtMoney(B.c)}), so the spend bought {v3UpDown(A.n, B.n, 'more', 'fewer')} of them ({fmtCount(A.n)} to {fmtCount(B.n)}){sA > sB && B.c > A.c ? <>, as the earlier 30 days had {sA === 1 ? 'a sale week' : sA + ' sale weeks'}</> : null}</>,
+        against: <>Each new customer costing {v3UpDown(A.c, B.c, 'more', 'less')} to win ({fmtMoney(A.c)} to {fmtMoney(B.c)})</> },
+      { amt: pA, k: v3UpDown(A.aov, B.aov, 'Bigger first orders', 'Smaller first orders'), sub: fmtMoney(A.aov, 2) + ' to ' + fmtMoney(B.aov, 2),
+        cause: <>first orders were {v3UpDown(A.aov, B.aov, 'bigger', 'smaller')} ({fmtMoney(A.aov, 2)} to {fmtMoney(B.aov, 2)})</>,
+        against: <>{v3UpDown(A.aov, B.aov, 'Bigger', 'Smaller')} first orders ({fmtMoney(A.aov, 2)} to {fmtMoney(B.aov, 2)} on average)</> },
+    ],
+    opening: <>Since the 30 days to {v3Day(String(a.d), true)}, first orders brought in {fmtMoney(B.v)}, against {fmtMoney(A.v)}.</>,
+    closing: B.sp > A.sp && B.v < A.v ? <> More spend bought less: until each new customer costs less to win, extra budget in an ordinary month does not grow sales.</> : null,
+    rows: [
+      ['Ad spend (Meta and Google)', A.sp, B.sp, v => fmtMoney(v), null],
+      ['New customers', A.n, B.n, v => fmtCount(v), 'higher'],
+      ['Cost to win each', A.c, B.c, v => fmtMoney(v), 'lower'],
+      ['Average first order', A.aov, B.aov, v => fmtMoney(v, 2), 'higher'],
+      ['New customers’ sales', A.v, B.v, v => fmtMoney(v), 'higher'],
+    ],
+    note: 'New customers’ sales are first orders from your own shop, after discounts and before VAT, as on Customers. New customers are first-time buyers from any source; the cost of each is all Meta and Google spend divided by them. The three parts multiply to the sales, so they add up to the change exactly.',
+  };
+}
 const V3_DRIVER_MODELS = {
+  newsales: { model: v3ModelNewSales, mode: 'pair', key: 'new_net', fmt: v => fmtMoney(v),
+              ok: p => Number(p.new_customers) > 0 && Number(p.cac_spend) > 0 && Number(p.new_net) > 0 },
   spend:   { model: v3ModelSpend,     mode: 'pair', key: 'cac_spend',  fmt: v => fmtMoney(v),
              ok: p => Number(p.cac_spend) > 0 && Array.isArray(p.campaigns) },
   metacpa: { model: v3ModelMetaCpa,   mode: 'pair', key: 'meta_cpa',   fmt: v => fmtMoney(v, 2),
@@ -22185,7 +22231,7 @@ const V3_PAGES = {
   </>),
   growth: (p) => (<>
     <V3Growth/>
-    <V3DriverStrip keys={['cac']}/>
+    <V3DriverStrip keys={['newsales', 'cac', 'spend']}/>
     <CashCeiling/>
     <V3More id="growth-detail" label="The detail: how a new customer’s cost rises with spend, and what changes it">
       <V3Anchor id="forecast"/><GretaPlanPanel show="growth"/>
