@@ -8527,8 +8527,9 @@ async function v3AskFacts(question) {
     tq.email ? T(V3_FLOWS_Q(sb, b)) : none,
     tq.email ? T(sb.from('tenant_klaviyo_campaigns').select('name,send_time,recipients,attributed_revenue,attributed_orders').eq('brand_id', b)
       .gte('send_time', v3IsoAdd(today, -90)).order('send_time', { ascending: false }).limit(60)) : none,
+    // 120 days, so "conversion dropped last week" can be checked against the weeks before and a typical month.
     tq.site ? T(sb.from('tenant_clarity_daily').select('date,metric_name,sessions_count,with_metric_pct,raw').eq('brand_id', b).eq('num_days', 1)
-      .eq('dim_value', 'all').in('metric_name', ['Traffic'].concat(V3_FRICTION.map(x => x[0]))).gte('date', v3IsoAdd(today, -31)).limit(400)) : none,
+      .eq('dim_value', 'all').in('metric_name', ['Traffic'].concat(V3_FRICTION.map(x => x[0]))).gte('date', v3IsoAdd(today, -121)).limit(1500)) : none,
     tq.site ? T(sb.from('tenant_clarity_daily').select('dim_value,sessions_count').eq('brand_id', b).eq('num_days', 1).eq('metric_name', 'Device')
       .gte('date', v3IsoAdd(today, -31)).limit(400)) : none,
     // Products, for product questions (6 Oct: "which products should I push for BFCM" got HEYGIRL as
@@ -8553,6 +8554,14 @@ async function v3AskFacts(question) {
     sales_per_pound_of_ads: Number(H.paid_spend_30d) > 0 ? Math.round(Number(H.net_revenue_30d) / Number(H.paid_spend_30d) * 100) / 100 : null,
     sales_per_pound_of_ads_to_break_even: cmr > 0 ? Math.round(100 / cmr) / 100 : null,
     note_on_return: 'Ads pay only above the break-even figure. Within 30% above it, little is left for overheads: call that thin, not good.' };
+  // The verdict as a sentence: told to call 1.88x against 1.63x "thin", the model still said "decent" (8 Oct).
+  if (f.last_30_days && f.last_30_days.sales_per_pound_of_ads != null && f.last_30_days.sales_per_pound_of_ads_to_break_even != null) {
+    const sp = f.last_30_days.sales_per_pound_of_ads, be = f.last_30_days.sales_per_pound_of_ads_to_break_even;
+    f.last_30_days.return_verdict = 'Each £1 of ads brings back £' + sp.toFixed(2) + ' against £' + be.toFixed(2) + ' needed to break even: '
+      + (sp < be ? 'below break-even, so the ads lose money before overheads.'
+        : sp < be * 1.3 ? 'thin. Little is left to pay overheads, so this is not a good return.'
+        : 'comfortably above break-even.');
+  }
   // Profit after overheads, the ads' share of sales and new customers as Today states them, so an answer
   // quotes them rather than doing its own sums (Ask had only overheads_per_month, 7 Oct).
   {
@@ -8681,18 +8690,45 @@ async function v3AskFacts(question) {
       people: Number(x.recipients), sales: Math.round(Number(x.attributed_revenue) || 0),
       per_person: Math.round((Number(x.attributed_revenue) || 0) / Number(x.recipients) * 100) / 100 })).slice(0, 20);
   if (Array.isArray(clR) && clR.length) {
-    const tr = clR.filter(r => r.metric_name === 'Traffic');
-    const visits = tr.reduce((a, r) => { const x = r.raw || {}; return a + Math.max(0, (Number(x.totalSessionCount) || 0) - (Number(x.totalBotSessionCount) || 0)); }, 0);
+    // Orders per 100 Clarity visits over a span of days (only days Clarity recorded). The model was told to
+    // check "conversion dropped 30% last week" against these and still blamed ad costs (8 Oct), so the
+    // comparison is worked out here and handed over as a sentence.
+    const shopAll = (window.FRKL_DATA || {}).shopify || [];
+    const vis = r => { const x = r.raw || {}; return Math.max(0, (Number(x.totalSessionCount) || 0) - (Number(x.totalBotSessionCount) || 0)); };
+    const span = (fromBack, toBack) => {
+      const lo = v3IsoAdd(today, -fromBack), hi = v3IsoAdd(today, -toBack);
+      const rows = clR.filter(r => r.metric_name === 'Traffic' && String(r.date).slice(0, 10) >= lo && String(r.date).slice(0, 10) < hi);
+      const ds = new Set(rows.map(r => String(r.date).slice(0, 10)));
+      const v = rows.reduce((a, r) => a + vis(r), 0);
+      const o = shopAll.filter(r => ds.has(String(r.date).slice(0, 10))).reduce((a, r) => a + (Number(r.orders) || 0), 0);
+      return { days: ds.size, visits: v, orders: o, per100: v > 0 && ds.size >= 0.6 * (fromBack - toBack) ? Math.round(o / v * 10000) / 100 : null };
+    };
+    const wk = span(8, 1), wk4 = span(36, 8), typ = span(121, 31);
+    const tr = clR.filter(r => r.metric_name === 'Traffic' && String(r.date).slice(0, 10) >= v3IsoAdd(today, -31));
+    const visits = tr.reduce((a, r) => a + vis(r), 0);
     const days = new Set(tr.map(r => String(r.date).slice(0, 10)));
-    const shop = ((window.FRKL_DATA || {}).shopify || []).filter(r => days.has(String(r.date).slice(0, 10)));
+    const shop = shopAll.filter(r => days.has(String(r.date).slice(0, 10)));
     const orders = shop.reduce((a, r) => a + (Number(r.orders) || 0), 0);
-    const fr = {}; V3_FRICTION.forEach(([m, label]) => { let n = 0, s2 = 0; clR.filter(r => r.metric_name === m).forEach(r => {
+    const p30 = visits > 0 ? Math.round(orders / visits * 10000) / 100 : null;
+    let verdict = null;
+    if (wk.per100 != null && wk4.per100 != null && wk4.per100 > 0) {
+      const chg = wk.per100 / wk4.per100 - 1;
+      verdict = (chg <= -0.2 ? 'Fewer visits turned into orders last week than in the 4 weeks before'
+        : chg >= 0.2 ? 'More visits turned into orders last week than in the 4 weeks before'
+        : 'Visits turned into orders at about the usual rate last week')
+        + ': ' + wk.per100 + ' orders per 100 visits, against ' + wk4.per100 + ' (Microsoft Clarity, which counts every visit).'
+        + (Math.abs(chg) < 0.2 ? ' So a drop in Google Analytics or in the orders the shop links to a source is most likely tracking, not shoppers.' : '');
+    }
+    const cl30 = clR.filter(r => String(r.date).slice(0, 10) >= v3IsoAdd(today, -31));
+    const fr = {}; V3_FRICTION.forEach(([m, label]) => { let n = 0, s2 = 0; cl30.filter(r => r.metric_name === m).forEach(r => {
       const sc = Number(r.sessions_count), pc = Number(r.with_metric_pct); if (sc > 0 && isFinite(pc)) { n += sc; s2 += sc * pc; } });
       if (n) fr[label] = Math.round(s2 / n * 10) / 10; });
     const dv = {}; (devR || []).forEach(r => { const k = String(r.dim_value || '').toLowerCase(); dv[k] = (dv[k] || 0) + (Number(r.sessions_count) || 0); });
     const dvT = Object.values(dv).reduce((a, v) => a + v, 0);
     f._site = { source: 'Microsoft Clarity (counts every visit, unlike Google Analytics) and your Shopify orders, last 30 days',
-      days: days.size, visits, orders, orders_per_100_visits: visits > 0 ? Math.round(orders / visits * 10000) / 100 : null,
+      verdict, days: days.size, visits, orders, orders_per_100_visits: p30,
+      orders_per_100_visits_last_7_days: wk.per100, orders_per_100_visits_4_weeks_before: wk4.per100,
+      orders_per_100_visits_typical_before: typ.per100,
       share_of_visits_on_a_phone_pct: dvT > 0 ? Math.round((dv.mobile || dv.phone || 0) / dvT * 100) : null,
       share_of_visits_that_pct: fr };
   }
@@ -8782,7 +8818,9 @@ const V3_ASK_WORDS = { recent_context: 'the recent weeks', pounds_are: 'what the
   email_campaigns: 'your email campaigns', weekly_shop: 'the weekly sales', board: 'the board', held: 'what Greta is holding back',
   what_moved_profit_after_ads: 'what moved your profit', main_cause: 'the main cause', products_to_reorder_now_board_1: 'products to reorder now',
   of_them_out_of_stock_now: 'already out of stock', out_of_stock_now_examples: 'products out of stock',
-  sales_per_pound_of_ads: 'sales per £1 of ads', sales_per_pound_of_ads_to_break_even: 'the break-even return on ads' };
+  sales_per_pound_of_ads: 'sales per £1 of ads', sales_per_pound_of_ads_to_break_even: 'the break-even return on ads',
+  return_verdict: 'the return on ads', orders_per_100_visits_last_7_days: 'last week’s orders per 100 visits',
+  orders_per_100_visits_4_weeks_before: 'the 4 weeks before', orders_per_100_visits_typical_before: 'a typical month' };
 // Ask's answers are markdown from the model; they were shown as plain text, asterisks, hashes and table
 // pipes included (7 Oct). This turns the few shapes the answers use into elements -- headings, bold,
 // lists, tables, paragraphs -- and never renders HTML from the model.
@@ -8903,6 +8941,9 @@ function v3AskCheck(text, sent) {
       }
     }
   }
+  // A stored answer (history from another device) has no request to trace its figures against: the
+  // next-step repair above still runs, the figure note does not.
+  if (sent == null) return t;
   const nums = (String(sent || '').match(/\d[\d,]*(?:\.\d+)?/g) || []).map(s => Number(s.replace(/,/g, ''))).filter(n => isFinite(n));
   const whole = new Set(nums.map(n => Math.round(n)));
   const untraced = [];
@@ -9049,6 +9090,19 @@ function AskPanel(){
     }, () => {});
     return () => { alive = false; };
   }, []);
+  // The board the next-step check reads (v3AskCheck): loaded on opening, not only on the first question,
+  // so stored answers are checked against it too. Re-renders once it lands.
+  const [, setReadoutTick] = useState(0);
+  React.useEffect(() => {
+    if (window.GRETA_READOUT) return;
+    const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = (window.FRKL_LIVE && window.FRKL_LIVE.brandId) || (ASK && ASK.brand_id);
+    if (!sb || !b) return;
+    let alive = true;
+    sb.rpc('fn_brand_readout', { p_brand_id: b }).then(rr => {
+      if (alive && rr && !rr.error && rr.data && rr.data.state === 'ok') { window.GRETA_READOUT = rr.data; setReadoutTick(t => t + 1); }
+    }, () => {});
+    return () => { alive = false; };
+  }, []);
   // "Ask about this" — a card stashed a question via window.__oiAsk; prefill it here.
   React.useEffect(()=>{
     const consume = () => { try { const q = window.__oiAskPending; if(q){ window.__oiAskPending = null; setQuestion(q); } } catch(e){} };
@@ -9086,7 +9140,7 @@ COUNTS AND NAMES: how many products are out of stock or need ordering comes from
 
 STOCK questions: use data.stock_named and data.stock_at_risk (Greta's stock plan) for how many to order (order_units), what being out costs (lost_before_lands, profit) and what an order costs (order_units × unit_cost). An order placed today lands on facts.next_peak.order_placed_today_lands. If facts.next_peak.lands_before_peak_starts is false, never say ordering now gets stock in for the peak: say when it lands, that only what suppliers can send sooner reaches the peak, and to ask for that first. Board pounds are what pounds_are says, a month or once (per); never call them a cost or spend unless pounds_are says so. When the board already has an action for what is asked, give its instruction as the board words it ("bring Meta back toward £X a week"), not a stronger one of your own such as pausing a channel.
 
-CHECK THE PREMISE FIRST: when the question states something about the business ("ROAS looks great", "conversion dropped 30%", "about to stock out"), check it against the figures before anything else. If they do not show it, say so in the first sentence with the figure (each £1 of ads brings back facts.last_30_days.sales_per_pound_of_ads against sales_per_pound_of_ads_to_break_even; visits turn into orders at the usual rate), then say what the owner is most likely seeing instead, such as a tracking break in readout.tracking or a platform's own count.
+CHECK THE PREMISE FIRST: when the question states something about the business ("ROAS looks great", "conversion dropped 30%", "about to stock out"), check it against the figures before anything else. For ads, the first sentence is facts.last_30_days.return_verdict as written; for the site, site_last_30_days.verdict as written. Never call a return good, solid, healthy or decent when return_verdict says thin. If the figures do not show what the owner said, say so in the first sentence, then say what the owner is most likely seeing instead, such as a tracking break in readout.tracking or a platform's own count.
 
 SITE questions: first say whether the rate really moved, from site_last_30_days against its typical figure; if Google Analytics or the shop's order sources are in readout.tracking, a drop in their figures is most likely the tracking, not shoppers. Never explain a change in how visits turn into orders by ad costs. Lead with site_last_30_days (Microsoft Clarity counts every visit; Google Analytics was not recording properly for part of the summer): orders per 100 visits, the share on a phone, and the share of visits hitting a JavaScript error or broken clicks. Use the Google Analytics funnel only as a second view of the steps. An item in readout.held is not established: if you mention one, say it was flagged and not re-checked, and never call it the cause.
 
@@ -9144,7 +9198,7 @@ ${dataStr}`;
       if (!resp.ok) { let m = ''; try { m = (await resp.json()).message || ''; } catch(_){} throw new Error(m || ASK_FAIL); }
       const data = await resp.json();
       if (data.error) throw new Error(data.message || ASK_FAIL);
-      setHistory(h=>[...h, {role:'assistant', content:v3AskCheck(v3AskScrub(data.text || '(no response)', facts), systemPrompt + JSON.stringify(apiMessages)), time:Date.now(), usage:data.usage||{}}]);
+      setHistory(h=>[...h, {role:'assistant', content:v3AskCheck(v3AskScrub(data.text || '(no response)', facts), systemPrompt + JSON.stringify(apiMessages)), checked:true, time:Date.now(), usage:data.usage||{}}]);
     } catch (e) {
       setError(e.message || String(e));
       setHistory(h=>h.slice(0,-1)); // drop the user message on failure
@@ -9208,7 +9262,9 @@ ${dataStr}`;
             <span>{m.role==='user'?'You':'Greta'}</span>
             <span>{new Date(m.time).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}{!UI_V3 && m.usage?` · ${m.usage.input_tokens||0} in / ${m.usage.output_tokens||0} out${m.usage.cache_read_input_tokens?` · cached ${m.usage.cache_read_input_tokens}`:''}`:''}</span>
           </div>
-          {m.role === 'assistant' ? <V3AskMd text={m.content}/> : <div style={{fontSize:'var(--text-sm)', whiteSpace:'pre-wrap', lineHeight:1.5, color:'var(--text-primary)'}}>{m.content}</div>}
+          {/* Answers from ask_log or an older browser history were never checked (8 Oct: the stored "£445 a
+              week" for Meta came back on another device). Checked once on arrival, or here on show. */}
+          {m.role === 'assistant' ? <V3AskMd text={m.checked ? m.content : v3AskCheck(v3AskScrub(m.content, null), null)}/> : <div style={{fontSize:'var(--text-sm)', whiteSpace:'pre-wrap', lineHeight:1.5, color:'var(--text-primary)'}}>{m.content}</div>}
           {m.role==='assistant' && (<div style={{marginTop:8, display:'flex', gap:8, alignItems:'center'}}>
             <button onClick={()=>{ if(aiSaveTask(m.content)) setSavedTasks(s=>({...s,[m.time]:true})); }} disabled={!!savedTasks[m.time]}
               style={{padding:'4px 10px', background:savedTasks[m.time]?'transparent':PAL.panel, border:'1px solid '+(savedTasks[m.time]?'var(--good)':'#30303a'), borderRadius:'var(--radius-md)', color:savedTasks[m.time]?'var(--good)':PAL.faint, fontSize:'var(--text-xs)', cursor:savedTasks[m.time]?'default':'pointer'}}>
