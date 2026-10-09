@@ -20943,7 +20943,7 @@ function V3BusinessState({ part }) {
   const q = useV3Rows('brand-state', V3_STATE_Q);
   const codes = useV3Rows('brand-codes', V3_CODES_Q);
   const hq = useV3Rows('sign-history', V3_SIGN_HIST_Q);
-  const [drv, setDrv] = React.useState(false);   // the cost-of-a-new-customer drivers, opened from its sign
+  const [drv, setDrv] = React.useState(null);   // which sign's drivers are open: 'cac', 'ret', 'ly', 'repeat'
   if (q.err) return null;                                   // before 0269, or unreadable: Today carries on without it
   if (!q.rows) return part === 'detail' ? null : <V3SkeletonRows n={3}/>;
   const S = q.rows[0]; if (!S || !S.last_30) return null;
@@ -21095,25 +21095,33 @@ function V3BusinessState({ part }) {
     const be = num(A.break_even_return), top = Math.max(ret, be) * 1.25;
     signs.push({ k: 'Sales from each £1 of ads', v: fmtMoney(ret, 2), tone: ret < be ? 'weak' : ret < be * 1.3 ? 'ok' : 'good',
       bar: { fill: ret / top, mark: be / top }, n: <>{fmtMoney(be, 2)} only covers the ads, products and delivery</>,
-      series: ser('return'), fmt: v => fmtMoney(v, 2), better: 'higher', line: { v: be, label: 'Break-even ' + fmtMoney(be, 2) } });
+      series: ser('return'), fmt: v => fmtMoney(v, 2), better: 'higher', line: { v: be, label: 'Break-even ' + fmtMoney(be, 2) },
+      which: 'ret', ctx: { weeks: H && Array.isArray(H.weeks) ? H.weeks : [], be, lineLabel: 'the ' + fmtMoney(be, 2) + ' that only covers the ads, products and delivery' }, dline: be });
   }
   if (U.cac != null && U.first_order_contribution != null) {
     const c30 = num(U.cac_30d), use = c30 > 0 ? c30 : num(U.cac), fo = num(U.first_order_contribution), top = Math.max(use, fo) * 1.25;
     signs.push({ k: 'Cost to win a new customer', v: fmtMoney(use), tone: use > fo ? 'weak' : 'good',
       bar: { fill: use / top, mark: fo / top }, n: <>Their first order earns {fmtMoney(fo)}{use > fo ? ', so each one starts at a loss' : ''}</>,
       series: c30 > 0 ? ser('cac') : null, fmt: v => fmtMoney(v), better: 'lower', line: { v: fo, label: 'First order earns ' + fmtMoney(fo) },
-      act: c30 > 0 && HP && HP.length >= 2 && HP[HP.length - 1].meta_clicks != null ? { label: drv ? 'Hide what is driving it' : 'What is driving this?', open: drv, on: () => setDrv(o => !o) } : null });
+      which: c30 > 0 ? 'cac' : null, ctx: { weeks: H && Array.isArray(H.weeks) ? H.weeks : [], fo, lineLabel: 'the ' + fmtMoney(fo) + ' a first order earns after product and delivery costs' }, dline: fo });
   }
   if (yoySales != null && yoyAds != null)
     signs.push({ k: 'Sales against last year', v: (yoySales >= 0 ? '+' : '−') + fmtPctN(Math.abs(yoySales)),
       tone: yoySales < 0 ? 'weak' : yoyAds - 1 > 2 * yoySales && yoyAds > 1.2 ? 'ok' : 'good',
       n: <>On {fmtTimes(yoyAds, 1)} last year’s ad spend</>,
-      series: ser('vs_ly'), fmt: v => (v >= 0 ? '+' : '−') + fmtPctN(Math.abs(v)), better: 'higher', line: { v: 0, label: 'Same as last year' } });
+      series: ser('vs_ly'), fmt: v => (v >= 0 ? '+' : '−') + fmtPctN(Math.abs(v)), better: 'higher', line: { v: 0, label: 'Same as last year' },
+      which: 'ly', ctx: {}, dline: null });
   if (R.repeat_90d != null)
     signs.push({ k: 'Customers who order again', v: fmtPctN(num(R.repeat_90d)), tone: v3SigBench(num(R.repeat_90d), BM.repeat_90d) || 'typical',
       bar: BM.repeat_90d ? { fill: Math.min(1, num(R.repeat_90d) / (num(BM.repeat_90d.high) * 1.25)), mark: num(BM.repeat_90d.typical) / (num(BM.repeat_90d.high) * 1.25) } : null,
       n: <>Within 90 days{BM.repeat_90d ? <>; about {fmtPctN(BM.repeat_90d.typical)} is typical</> : null}</>,
-      series: ser('repeat_90d'), fmt: v => fmtPctN(v), better: 'higher', line: BM.repeat_90d ? { v: num(BM.repeat_90d.typical), label: 'Typical ' + fmtPctN(BM.repeat_90d.typical) } : null });
+      series: ser('repeat_90d'), fmt: v => fmtPctN(v), better: 'higher', line: BM.repeat_90d ? { v: num(BM.repeat_90d.typical), label: 'Typical ' + fmtPctN(BM.repeat_90d.typical) } : null,
+      which: 'repeat', ctx: { typical: BM.repeat_90d ? num(BM.repeat_90d.typical) : null, lineLabel: BM.repeat_90d ? 'about ' + fmtPctN(BM.repeat_90d.typical) + ', typical for similar brands' : null },
+      dline: BM.repeat_90d ? num(BM.repeat_90d.typical) : null });
+  // one "What is driving this?" per sign whose history can explain it; one panel open at a time
+  signs.forEach(sg => { sg.act = sg.which && v3HasDrivers(sg.which, HP)
+    ? { label: drv === sg.which ? 'Hide what is driving it' : 'What is driving this?', open: drv === sg.which, on: () => setDrv(o => (o === sg.which ? null : sg.which)) } : null; });
+  const openSign = drv ? signs.find(sg => sg.which === drv) : null;
   return (<section className="v3-stand">
     <div className="v3-kick">Where you stand · last 30 days</div>
     <p className="v3-verdict">{verdict}</p>
@@ -21122,7 +21130,7 @@ function V3BusinessState({ part }) {
       <V3MoneyBridge L={L} share={share}/>
       {signs.length > 0 && <div className="v3-signs">{signs.slice(0, 4).map(s => <V3Sign key={s.k} {...s}/>)}</div>}
     </div>
-    {drv && HP && <V3CacDrivers points={HP} fo={num(U.first_order_contribution)} weeks={H && Array.isArray(H.weeks) ? H.weeks : []}/>}
+    {openSign && HP && <V3DriverPanel key={drv} which={drv} points={HP} ctx={openSign.ctx} line={openSign.dline}/>}
     {/* How fresh these are, asked on 9 Oct: the figures are worked out again every hour from feeds that
         arrive every 30 minutes (Shopify) and every 2 hours (ad accounts). */}
     <p className="micro muted v3-stand-fresh">Each figure covers the 30 days to {HP ? v3Day(String(hq.rows[0].history.as_of), true) : 'yesterday'}, the last full day. Greta works them out again every hour; Shopify orders arrive every 30 minutes and ad spend every 2 hours.{HP ? ' Point at a sign to see its last 13 weeks.' : ''}</p>
@@ -21177,123 +21185,91 @@ function V3Sign({ k, v, tone, bar, n, series, fmt, better, line, act }) {
       onClick={e => { e.stopPropagation(); act.on(); }}>{act.label} <span className="v3-xref-go">{act.open ? '↑' : '↓'}</span></button>}
   </div>);
 }
-// 0311: what drives the cost of a new customer (Dan, 9 Oct: "£55 is expensive for frkl; show quickly
-// what is driving it"). The cost is ad spend over first-time buyers, which is (spend per paid click) x
-// (paid clicks per new customer). The change between two weeks splits into those two parts, and the
-// price of a click into what Meta charges to show an ad, how often people click it, and what Google
-// charges a click. Click a week on the chart to compare against it; four weeks ago, as the arrow, to start.
-function V3CacDrivers({ points, fo, weeks }) {
-  const P = (points || []).filter(p => p.cac != null && p.new_customers > 0 && (Number(p.meta_clicks) + Number(p.google_clicks)) > 0);
-  const [ci, setCi] = React.useState(() => Math.max(0, P.length - 5));
-  if (P.length < 2) return null;
-  const i0 = Math.min(ci, P.length - 2), a = P[i0], b = P[P.length - 1];
+// ── Drivers: why a sign moved (0311, 0312) ─────────────────────────────────────────────────────────
+// Dan, 9 Oct: "£55 is expensive for frkl; show quickly what is driving it", then "apply the same logic
+// to other metrics". Each sign's figure is a product or a sum of parts:
+//   cost of a new customer   = (spend per paid click) x (paid clicks per new customer)
+//   sales from each £1 of ads = orders x average order / ad spend
+//   sales against last year   = what new customers spent + what everyone else spent, against last year
+//   customers who order again = code buyers' rate and full-price buyers' rate, weighted by how many of each
+// A model takes two weekly points and returns the figure at each and what each part moved it by. The
+// panel draws the walk from one to the other, names the biggest part first, and shows what changed
+// underneath. Pair models compare two weeks (four weeks ago, as the arrow, to start; click a bar to pick
+// another). The last-year model explains one week against the same 30 days a year before.
+// For a product, the parts split the log change, so they add up to the whole and do not depend on order.
+function v3LogParts(from, to, factors) {
+  const d = to - from, L = Math.log(to / from);
+  return factors.map(f => (f.a > 0 && f.b > 0)
+    ? (Math.abs(L) > 1e-6 ? d * f.sign * Math.log(f.b / f.a) / L : from * f.sign * Math.log(f.b / f.a)) : 0);
+}
+// "£13 of the rise is because ...", "Another £2 is because ...", and a part that pulled the other way
+// as what it took off or added back, never as a cause of the move.
+function v3DriverSentence(parts, d, fmtAmt) {
+  const move = d >= 0 ? 'rise' : 'fall', tiny = Math.max(Math.abs(d) * 0.04, 1e-9);
+  const ps = parts.filter(p => Math.abs(p.amt) > tiny).sort((x, y) => Math.abs(y.amt) - Math.abs(x.amt));
+  const cap = s => (typeof s === 'string' ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+  let leadDone = false;
+  return ps.map((p, i) => {
+    const same = (p.amt >= 0) === (d >= 0);
+    if (same && !leadDone) { leadDone = true;
+      return <React.Fragment key={i}> <b className="oi-num">{fmtAmt(p.amt)}</b> of the {move} is because {p.cause}.</React.Fragment>; }
+    if (same) return <React.Fragment key={i}> Another <b className="oi-num">{fmtAmt(p.amt)}</b> is because {p.cause}.</React.Fragment>;
+    return <React.Fragment key={i}> {cap(p.against)} {d >= 0 ? 'took' : 'added'} <b className="oi-num">{fmtAmt(p.amt)}</b> {d >= 0 ? 'off' : 'back'}.</React.Fragment>;
+  });
+}
+const v3PtsAmt = v => (Math.round(Math.abs(v) * 1000) / 10) + (Math.round(Math.abs(v) * 1000) === 10 ? ' point' : ' points');
+const v3Pence2 = v => (v >= 1 ? fmtMoney(v, 2) : Math.round(v * 100) + 'p');
+const v3SaleWeeksIn = (weeks, p) => (weeks || []).filter(w => w.sale && String(w.wk) >= v3IsoAdd(String(p.d), -29) && String(w.wk) <= String(p.d)).length;
+const v3UpDown = (a, b, up, down) => (b >= a ? up : down);
+
+// ── the four models ──
+function v3ModelCac(a, b, ctx) {
   const f = p => {
     const sp = Number(p.cac_spend), mc = Number(p.meta_clicks), gc = Number(p.google_clicks), cl = mc + gc, n = Number(p.new_customers);
     const mi = Number(p.meta_impressions), ms = Number(p.meta_spend), gs = Number(p.google_spend);
-    return { sp, cl, n, mc, gc, ms, gs, cac: sp / n, cpc: sp / cl, cpn: cl / n,
+    return { sp, cl, n, ms, gs, v: sp / n, cpc: sp / cl, cpn: cl / n,
              cpm: mi > 0 ? 1000 * ms / mi : null, ctr: mi > 0 ? mc / mi : null, mcpc: mc > 0 ? ms / mc : null, gcpc: gc > 0 ? gs / gc : null };
   };
-  const A = f(a), B = f(b), d = B.cac - A.cac, Lg = Math.log(B.cac / A.cac);
-  // the two parts in pounds: shares of the log change, so they add up to the whole and neither depends on order
-  const pClick = Math.abs(Lg) > 0.005 ? d * Math.log(B.cpc / A.cpc) / Lg : (B.cpc - A.cpc) * A.cpn;
-  const pConv = d - pClick;
-  const pence = v => (v >= 1 ? fmtMoney(v, 2) : Math.round(v * 100) + 'p');
-  const sgn = v => (v >= 0 ? '+' : '−') + fmtMoney(Math.abs(v), 2);
-  const day = p => v3Day(String(p.d), true);
-  // what made the click price move, largest first: each candidate weighted by its platform's share of spend
+  const A = f(a), B = f(b), d = B.v - A.v;
+  const [pClick, pConv] = v3LogParts(A.v, B.v, [{ a: A.cpc, b: B.cpc, sign: 1 }, { a: A.cpn, b: B.cpn, sign: 1 }]);
   const subs = [];
   if (A.ctr && B.ctr) subs.push({ up: B.ctr < A.ctr, w: Math.abs(Math.log(A.ctr / B.ctr)) * B.ms / B.sp,
-    t: B.ctr < A.ctr ? <>fewer people clicked the Meta ads ({fmtPctN(A.ctr)} to {fmtPctN(B.ctr)} of views)</> : <>more people clicked the Meta ads ({fmtPctN(A.ctr)} to {fmtPctN(B.ctr)} of views)</> });
+    t: <>{B.ctr < A.ctr ? 'fewer' : 'more'} people clicked the Meta ads ({fmtPctN(A.ctr)} to {fmtPctN(B.ctr)} of views)</> });
   if (A.cpm && B.cpm) subs.push({ up: B.cpm > A.cpm, w: Math.abs(Math.log(B.cpm / A.cpm)) * B.ms / B.sp,
     t: <>Meta charged {B.cpm > A.cpm ? 'more' : 'less'} to show the ads ({fmtMoney(A.cpm, 2)} to {fmtMoney(B.cpm, 2)} per 1,000 views)</> });
   if (A.gcpc && B.gcpc) subs.push({ up: B.gcpc > A.gcpc, w: Math.abs(Math.log(B.gcpc / A.gcpc)) * B.gs / B.sp,
-    t: <>Google clicks cost {B.gcpc > A.gcpc ? 'more' : 'less'} ({pence(A.gcpc)} to {pence(B.gcpc)})</> });
+    t: <>Google clicks cost {B.gcpc > A.gcpc ? 'more' : 'less'} ({v3Pence2(A.gcpc)} to {v3Pence2(B.gcpc)})</> });
   const top = subs.filter(s => s.up === (pClick > 0) && s.w > 0.02).sort((x, y) => y.w - x.w).slice(0, 2);
-  // sale weeks inside each 30 days: a sale turns more clicks into first orders
-  const saleIn = p => (weeks || []).filter(w => w.sale && String(w.wk) >= v3IsoAdd(String(p.d), -29) && String(w.wk) <= String(p.d)).length;
-  const sA = saleIn(a), sB = saleIn(b);
-  // "£13 of the rise is because ..." first, "The other £12 is because ..." second, biggest part first
-  const move = d >= 0 ? 'rise' : 'fall';
-  const partClickT = lead => <>{lead ? null : 'The other '}<b className="oi-num">{fmtMoney(Math.abs(pClick))}</b>{lead ? ' of the ' + move : ''} is because each paid click cost {pClick >= 0 ? 'more' : 'less'} ({pence(A.cpc)} to {pence(B.cpc)}){top.length ? <>, mainly because {top.map((s, i) => <React.Fragment key={i}>{i ? ' and ' : ''}{s.t}</React.Fragment>)}</> : null}</>;
-  const partConvT = lead => <>{lead ? null : 'The other '}<b className="oi-num">{fmtMoney(Math.abs(pConv))}</b>{lead ? ' of the ' + move : ''} is because it took {pConv >= 0 ? 'more' : 'fewer'} clicks to win each customer ({Math.round(A.cpn)} to {Math.round(B.cpn)}){sA > sB && pConv > 0 ? <>, as the earlier 30 days had {sA === 1 ? 'a sale week' : sA + ' sale weeks'} and a sale turns more clicks into first orders</> : null}</>;
-  // a part that pulled the other way is said as what it took off (or added back), never as a cause of the move
-  const against = p => (p >= 0) !== (d >= 0) && Math.abs(p) >= 0.5;
-  const clickAgainst = <>{pClick < 0 ? 'Cheaper' : 'Dearer'} clicks ({pence(A.cpc)} to {pence(B.cpc)}) {pClick < 0 ? 'took' : 'added'} <b className="oi-num">{fmtMoney(Math.abs(pClick))}</b> {pClick < 0 ? 'off' : 'back'}</>;
-  const convAgainst = <>Taking {pConv < 0 ? 'fewer' : 'more'} clicks to win each customer ({Math.round(A.cpn)} to {Math.round(B.cpn)}) {pConv < 0 ? 'took' : 'added'} <b className="oi-num">{fmtMoney(Math.abs(pConv))}</b> {pConv < 0 ? 'off' : 'back'}</>;
-  const parts = Math.abs(pClick) >= Math.abs(pConv)
-    ? [partClickT(true), against(pConv) ? convAgainst : partConvT(false)]
-    : [partConvT(true), against(pClick) ? clickAgainst : partClickT(false)];
-
-  // the walk from then to now, drawn as the money waterfall is
-  const steps = [
-    { k: <>A new customer<small>30 days to {day(a)}</small></>, a: 0, b: A.cac, tone: 'sales', v: fmtMoney(A.cac, 2) },
-    { k: <>{pClick >= 0 ? 'Each click cost more' : 'Each click cost less'}<small>{pence(A.cpc)} to {pence(B.cpc)} a paid click</small></>,
-      a: Math.min(A.cac, A.cac + pClick), b: Math.max(A.cac, A.cac + pClick), tone: pClick >= 0 ? 'loss' : 'gain', v: sgn(pClick) },
-    { k: <>{pConv >= 0 ? 'More clicks per customer' : 'Fewer clicks per customer'}<small>{Math.round(A.cpn)} to {Math.round(B.cpn)} paid clicks</small></>,
-      a: Math.min(A.cac + pClick, B.cac), b: Math.max(A.cac + pClick, B.cac), tone: pConv >= 0 ? 'loss' : 'gain', v: sgn(pConv) },
-    { k: <>A new customer now<small>30 days to {day(b)}</small></>, a: 0, b: B.cac, tone: B.cac > fo ? 'loss' : 'keep', v: fmtMoney(B.cac, 2), total: true },
+  const sA = v3SaleWeeksIn(ctx.weeks, a), sB = v3SaleWeeksIn(ctx.weeks, b);
+  const parts = [
+    { amt: pClick, k: pClick >= 0 ? 'Each click cost more' : 'Each click cost less', sub: v3Pence2(A.cpc) + ' to ' + v3Pence2(B.cpc) + ' a paid click',
+      cause: <>each paid click cost {B.cpc >= A.cpc ? 'more' : 'less'} ({v3Pence2(A.cpc)} to {v3Pence2(B.cpc)}){top.length ? <>, mainly because {top.map((s, i) => <React.Fragment key={i}>{i ? ' and ' : ''}{s.t}</React.Fragment>)}</> : null}</>,
+      against: <>{B.cpc < A.cpc ? 'Cheaper' : 'Dearer'} clicks ({v3Pence2(A.cpc)} to {v3Pence2(B.cpc)})</> },
+    { amt: pConv, k: pConv >= 0 ? 'More clicks per customer' : 'Fewer clicks per customer', sub: Math.round(A.cpn) + ' to ' + Math.round(B.cpn) + ' paid clicks',
+      cause: <>it took {B.cpn >= A.cpn ? 'more' : 'fewer'} clicks to win each customer ({Math.round(A.cpn)} to {Math.round(B.cpn)}){sA > sB && B.cpn > A.cpn ? <>, as the earlier 30 days had {sA === 1 ? 'a sale week' : sA + ' sale weeks'} and a sale turns more clicks into first orders</> : null}</>,
+      against: <>Taking {B.cpn < A.cpn ? 'fewer' : 'more'} clicks to win each customer ({Math.round(A.cpn)} to {Math.round(B.cpn)})</> },
   ];
-  const hi = Math.max(A.cac, B.cac, A.cac + pClick, fo || 0) * 1.05, x = v => (v / hi) * 100;
-
-  const ch = (p, q, better) => { if (p == null || q == null || p === 0) return null;
-    const r = q / p - 1; return { t: (r >= 0 ? '+' : '−') + fmtPctN(Math.abs(r)), cls: Math.abs(r) < 0.03 ? 'v3-muted' : (r > 0) === (better === 'higher') ? 'v3-up' : 'v3-down' }; };
-  const rows = [
-    ['Meta: cost to show your ads 1,000 times', A.cpm, B.cpm, v => fmtMoney(v, 2), 'lower'],
-    ['Meta: people who click, out of every view', A.ctr, B.ctr, v => fmtPctN(v), 'higher'],
-    ['Meta: cost per click', A.mcpc, B.mcpc, pence, 'lower'],
-    ['Google: cost per click', A.gcpc, B.gcpc, pence, 'lower'],
-    ['All ads: spend', A.sp, B.sp, v => fmtMoney(v), null],
-    ['All ads: paid clicks', A.cl, B.cl, v => fmtCount(v), 'higher'],
-    ['New customers', A.n, B.n, v => fmtCount(v), 'higher'],
-  ].filter(r => r[1] != null && r[2] != null);
-
-  // where the spend moved, by campaign: then and now, biggest change first
+  // where the spend moved, by campaign
   const key = c => c.platform + '|' + c.name, cm = {};
   (a.campaigns || []).forEach(c => { cm[key(c)] = { platform: c.platform, name: c.name, then: Number(c.spend), now: 0 }; });
   (b.campaigns || []).forEach(c => { const r = cm[key(c)] || (cm[key(c)] = { platform: c.platform, name: c.name, then: 0 });
     r.now = Number(c.spend); r.cpc = Number(c.clicks) > 0 ? Number(c.spend) / Number(c.clicks) : null; r.buys = Number(c.platform_buys); });
   const camps = Object.values(cm).sort((p, q) => Math.abs(q.now - q.then) - Math.abs(p.now - p.then)).slice(0, 6);
   const retarget = camps.find(c => /retarget|remarket/i.test(c.name) && c.now - c.then >= 200);
-
-  const cTip = ({ active, payload }) => (active && payload && payload.length)
-    ? <div className="v3-tip"><b>30 days to {v3Day(payload[0].payload.d, true)}</b><span>A new customer <em>{fmtMoney(payload[0].payload.cac, 2)}</em></span><span>Click to compare with now</span></div> : null;
-  return (<div className="v3-drivers" id="cac-drivers">
-    <h3 className="v3-sec-title">Why a new customer costs {fmtMoney(B.cac)}</h3>
-    <p className="v3-note v3-measure">Since the 30 days to {day(a)}, a new customer went from {fmtMoney(A.cac)} to {fmtMoney(B.cac)}{fo ? <>, against the {fmtMoney(fo)} a first order earns</> : null}. {parts[0]}. {parts[1]}.</p>
-    <div className="v3-drivers-grid">
-      <figure className="v3-bridge v3-bridge-wide" role="img" aria-label={'From ' + fmtMoney(A.cac, 2) + ' to ' + fmtMoney(B.cac, 2)}>
-        <figcaption className="v3-bridge-cap">From then to now</figcaption>
-        {steps.map((r, i) => (<div key={i} className={'v3-bridge-row' + (r.total ? ' v3-bridge-total' : '')}>
-          <span className="v3-bridge-k">{r.k}</span>
-          <span className="v3-bridge-track"><i className={'v3-bridge-' + r.tone} style={{ left: x(r.a) + '%', width: Math.max(0.6, x(r.b) - x(r.a)) + '%' }}/>
-            {fo ? <b className="v3-bridge-mark" style={{ left: x(fo) + '%' }}/> : null}</span>
-          <span className={'v3-bridge-v' + (r.tone === 'loss' && !r.total ? ' v3-down' : r.tone === 'gain' ? ' v3-up' : '')}>{r.v}</span>
-        </div>))}
-        {fo ? <p className="micro muted">The upright line is the {fmtMoney(fo)} a first order earns after product and delivery costs.</p> : null}
-      </figure>
-      <figure className="v3-chart">
-        <figcaption><span className="v3-chart-title">A new customer, week by week</span><span className="v3-muted">click a week to compare with it</span></figcaption>
-        <R.ResponsiveContainer width="100%" height={160}>
-          <R.BarChart data={P} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
-            <R.XAxis dataKey="d" tickFormatter={dd => v3Day(dd)} interval="preserveStartEnd" minTickGap={30}/>
-            <R.YAxis hide/>
-            {fo ? <R.ReferenceLine y={fo} stroke={PAL.muted} strokeDasharray="3 3" ifOverflow="extendDomain"/> : null}
-            <R.Tooltip content={cTip} cursor={{ fill: PAL.surface }}/>
-            <R.Bar dataKey="cac" isAnimationActive={false} onClick={(_, i) => { if (i < P.length - 1) setCi(i); }} style={{ cursor: 'pointer' }}>
-              {P.map((p, i) => <R.Cell key={i} fill={i === P.length - 1 ? PAL.accent : i === i0 ? PAL.ink : PAL.quiet}/>)}
-            </R.Bar>
-          </R.BarChart>
-        </R.ResponsiveContainer>
-        <span className="v3-legend"><i style={{ background: PAL.ink }}/>Compared with <i style={{ background: PAL.accent }}/>Now</span>
-      </figure>
-    </div>
-    <h4 className="v3-drivers-h">What changed underneath</h4>
-    <table className="v3-rw">
-      <thead><tr><th className="t-text">Measure</th><th>30 days to {day(a)}</th><th>30 days to {day(b)}</th><th>Change</th></tr></thead>
-      <tbody>{rows.map(([lab, p, q, fm, better]) => { const c = ch(p, q, better); return (<tr key={lab}>
-        <td className="t-text">{lab}</td><td>{fm(p)}</td><td>{fm(q)}</td><td className={c ? c.cls : ''}>{c ? c.t : ''}</td></tr>); })}</tbody>
-    </table>
-    {camps.length > 0 && <>
+  return {
+    title: 'Why a new customer costs ' + fmtMoney(B.v), from: A.v, to: B.v, better: 'lower', fmtV: v => fmtMoney(v, 2), fmtAmt: v => fmtMoney(Math.abs(v)),
+    startK: 'A new customer', endK: 'A new customer now', parts,
+    opening: <>Since the 30 days to {v3Day(String(a.d), true)}, a new customer went from {fmtMoney(A.v)} to {fmtMoney(B.v)}{ctx.fo ? <>, against the {fmtMoney(ctx.fo)} a first order earns</> : null}.</>,
+    rows: [
+      ['Meta: cost to show your ads 1,000 times', A.cpm, B.cpm, v => fmtMoney(v, 2), 'lower'],
+      ['Meta: people who click, out of every view', A.ctr, B.ctr, v => fmtPctN(v), 'higher'],
+      ['Meta: cost per click', A.mcpc, B.mcpc, v3Pence2, 'lower'],
+      ['Google: cost per click', A.gcpc, B.gcpc, v3Pence2, 'lower'],
+      ['All ads: spend', A.sp, B.sp, v => fmtMoney(v), null],
+      ['All ads: paid clicks', A.cl, B.cl, v => fmtCount(v), 'higher'],
+      ['New customers', A.n, B.n, v => fmtCount(v), 'higher'],
+    ],
+    extra: camps.length > 0 && <>
       <h4 className="v3-drivers-h">Where the ad money went</h4>
       <table className="v3-rw">
         <thead><tr><th className="t-text">Campaign</th><th>Spend then</th><th>Spend now</th><th>Change</th><th>Cost per click now</th><th>Sales the platform claims, now</th></tr></thead>
@@ -21301,11 +21277,194 @@ function V3CacDrivers({ points, fo, weeks }) {
           <td className="t-text v3-rw-name">{c.name} <span className="v3-muted">· {c.platform}</span></td>
           <td>{fmtMoney(c.then)}</td><td>{fmtMoney(c.now)}</td>
           <td className={c.now - c.then > 0 ? 'v3-down' : c.now - c.then < 0 ? 'v3-up' : ''}>{(c.now - c.then >= 0 ? '+' : '−') + fmtMoney(Math.abs(c.now - c.then))}</td>
-          <td>{c.cpc != null ? pence(c.cpc) : '—'}</td><td>{c.buys != null && !isNaN(c.buys) ? fmtCount(c.buys) : '—'}</td></tr>))}</tbody>
+          <td>{c.cpc != null ? v3Pence2(c.cpc) : '—'}</td><td>{c.buys != null && !isNaN(c.buys) ? fmtCount(c.buys) : '—'}</td></tr>))}</tbody>
       </table>
       {retarget && <p className="v3-note v3-measure"><b>{retarget.name}</b> went from {fmtMoney(retarget.then)} to {fmtMoney(retarget.now)}. Retargeting shows ads to people who have already visited, so most of the sales it claims come from people who already know you. It wins few new customers, and its spend still counts in this cost.</p>}
-    </>}
-    <p className="micro muted v3-measure">The cost of a new customer is all Meta and Google spend divided by first-time buyers from any source, as on the sign above. Paid clicks are Meta link clicks plus Google clicks. Sales the platform claims are each platform’s own count; they overlap and run high, so read them as a guide.</p>
+    </>,
+    note: 'The cost of a new customer is all Meta and Google spend divided by first-time buyers from any source, as on the sign above. Paid clicks are Meta link clicks plus Google clicks. Sales the platform claims are each platform’s own count; they overlap and run high, so read them as a guide.',
+  };
+}
+function v3ModelReturn(a, b, ctx) {
+  const f = p => { const s = Number(p.sales), o = Number(p.orders), ad = Number(p.ads);
+    return { s, o, ad, v: s / ad, aov: s / o, n: Number(p.new_customers), ms: Number(p.meta_spend), gs: Number(p.google_spend) }; };
+  const A = f(a), B = f(b);
+  const [pO, pA, pS] = v3LogParts(A.v, B.v, [{ a: A.o, b: B.o, sign: 1 }, { a: A.aov, b: B.aov, sign: 1 }, { a: A.ad, b: B.ad, sign: -1 }]);
+  const sA = v3SaleWeeksIn(ctx.weeks, a), sB = v3SaleWeeksIn(ctx.weeks, b);
+  const saleNote = sA !== sB ? <>, as the earlier 30 days had {sA === 0 ? 'no sale weeks' : sA === 1 ? 'a sale week' : sA + ' sale weeks'} and these have {sB === 0 ? 'none' : sB}</> : null;
+  return {
+    title: 'Why each £1 of ads now brings ' + fmtMoney(B.v, 2), from: A.v, to: B.v, better: 'higher', fmtV: v => fmtMoney(v, 2), fmtAmt: v => fmtMoney(Math.abs(v), 2),
+    startK: 'Sales from each £1 of ads', endK: 'Sales from each £1 of ads now',
+    parts: [
+      { amt: pO, k: v3UpDown(A.o, B.o, 'More orders', 'Fewer orders'), sub: fmtCount(A.o) + ' to ' + fmtCount(B.o),
+        cause: <>there were {v3UpDown(A.o, B.o, 'more', 'fewer')} orders ({fmtCount(A.o)} to {fmtCount(B.o)}){saleNote}</>,
+        against: <>{v3UpDown(A.o, B.o, 'More', 'Fewer')} orders ({fmtCount(A.o)} to {fmtCount(B.o)})</> },
+      { amt: pA, k: v3UpDown(A.aov, B.aov, 'Bigger orders', 'Smaller orders'), sub: fmtMoney(A.aov, 2) + ' to ' + fmtMoney(B.aov, 2) + ' an order',
+        cause: <>orders were {v3UpDown(A.aov, B.aov, 'bigger', 'smaller')} on average ({fmtMoney(A.aov, 2)} to {fmtMoney(B.aov, 2)})</>,
+        against: <>{v3UpDown(A.aov, B.aov, 'Bigger', 'Smaller')} orders ({fmtMoney(A.aov, 2)} to {fmtMoney(B.aov, 2)} on average)</> },
+      { amt: pS, k: v3UpDown(A.ad, B.ad, 'More ad spend', 'Less ad spend'), sub: fmtMoney(A.ad) + ' to ' + fmtMoney(B.ad),
+        cause: <>ad spend went {v3UpDown(A.ad, B.ad, 'up', 'down')} ({fmtMoney(A.ad)} to {fmtMoney(B.ad)}) without the sales to match</>,
+        against: <>{v3UpDown(A.ad, B.ad, 'More', 'Less')} ad spend ({fmtMoney(A.ad)} to {fmtMoney(B.ad)})</> },
+    ],
+    opening: <>Since the 30 days to {v3Day(String(a.d), true)}, each £1 of ads went from bringing {fmtMoney(A.v, 2)} in sales to {fmtMoney(B.v, 2)}{ctx.be ? <>, against the {fmtMoney(ctx.be, 2)} that only covers the ads, products and delivery</> : null}.</>,
+    rows: [
+      ['Sales', A.s, B.s, v => fmtMoney(v), 'higher'],
+      ['Orders', A.o, B.o, v => fmtCount(v), 'higher'],
+      ['Average order', A.aov, B.aov, v => fmtMoney(v, 2), 'higher'],
+      ['New customers', A.n, B.n, v => fmtCount(v), 'higher'],
+      ['Ad spend: Meta', A.ms, B.ms, v => fmtMoney(v), null],
+      ['Ad spend: Google', A.gs, B.gs, v => fmtMoney(v), null],
+    ],
+    note: 'Sales are after discounts and before VAT, from every channel the shop records; ad spend is Meta and Google. Sales from each £1 of ads is sales divided by ad spend, so it moves with orders, the size of each order and what you spend on ads.',
+  };
+}
+function v3ModelLastYear(a, _b, ctx) {
+  const s = Number(a.sales), sl = Number(a.sales_ly);
+  // who bought: the shop's own split of net sales, laid onto the sales figure so the parts add up to it
+  const nw = Number(a.dtc_net) > 0 ? s * Number(a.new_net) / Number(a.dtc_net) : null;
+  const nwl = Number(a.dtc_net_ly) > 0 ? sl * Number(a.new_net_ly) / Number(a.dtc_net_ly) : null;
+  const ok = nw != null && nwl != null;
+  const pNew = ok ? nw - nwl : 0, pRet = ok ? (s - nw) - (sl - nwl) : s - sl;
+  const o = Number(a.orders), ol = Number(a.orders_ly), n = Number(a.new_customers), nl = Number(a.new_customers_ly);
+  const ad = Number(a.ads), adl = Number(a.ads_ly);
+  return {
+    title: 'Sales against last year, 30 days to ' + v3Day(String(a.d), true), from: sl, to: s, better: 'higher', fmtV: v => fmtMoney(v), fmtAmt: v => fmtMoney(Math.abs(v)),
+    startK: 'Same 30 days last year', endK: 'This year', colA: 'Same 30 days last year', colB: '30 days to ' + v3Day(String(a.d), true),
+    parts: ok ? [
+      { amt: pNew, k: 'New customers', sub: fmtMoney(nwl) + ' to ' + fmtMoney(nw) + ' · ' + fmtCount(nl) + ' to ' + fmtCount(n) + ' people',
+        cause: <>new customers spent {v3UpDown(nwl, nw, 'more', 'less')} ({fmtMoney(nwl)} to {fmtMoney(nw)}; {fmtCount(nl)} to {fmtCount(n)} first-time buyers)</>,
+        against: <>{v3UpDown(nwl, nw, 'More', 'Less')} spent by new customers ({fmtMoney(nwl)} to {fmtMoney(nw)})</> },
+      { amt: pRet, k: 'Returning customers', sub: fmtMoney(sl - nwl) + ' to ' + fmtMoney(s - nw),
+        cause: <>returning customers spent {v3UpDown(sl - nwl, s - nw, 'more', 'less')} ({fmtMoney(sl - nwl)} to {fmtMoney(s - nw)})</>,
+        against: <>{v3UpDown(sl - nwl, s - nw, 'More', 'Less')} spent by returning customers ({fmtMoney(sl - nwl)} to {fmtMoney(s - nw)})</> },
+    ] : [{ amt: s - sl, k: 'Change', sub: '', cause: 'sales changed', against: 'The change' }],
+    opening: <>In the 30 days to {v3Day(String(a.d), true)}, sales were {fmtMoney(s)}, against {fmtMoney(sl)} in the same days last year ({(s >= sl ? '+' : '−') + fmtPctN(Math.abs(s / sl - 1))}).</>,
+    closing: adl > 0 ? <> Ads cost {fmtTimes(ad / adl, 1)} what they did ({fmtMoney(adl)} to {fmtMoney(ad)}), so each £1 of ads brought {fmtMoney(s / ad, 2)} against {fmtMoney(sl / adl, 2)} a year ago.</> : null,
+    rows: [
+      ['Sales', sl, s, v => fmtMoney(v), 'higher'],
+      ['Orders', ol, o, v => fmtCount(v), 'higher'],
+      ['Average order', ol > 0 ? sl / ol : null, o > 0 ? s / o : null, v => fmtMoney(v, 2), 'higher'],
+      ['New customers', nl, n, v => fmtCount(v), 'higher'],
+      ['Ad spend', adl, ad, v => fmtMoney(v), null],
+      ['Sales from each £1 of ads', adl > 0 ? sl / adl : null, ad > 0 ? s / ad : null, v => fmtMoney(v, 2), 'higher'],
+    ],
+    note: 'Last year is the same 30 days 364 days earlier, so the weekdays line up. New customers’ sales are first orders; the rest is returning and unidentified buyers, split as the shop records them.',
+  };
+}
+function v3ModelRepeat(a, b, ctx) {
+  const f = p => { const nc = Number(p.rep_code_n), nf = Number(p.rep_full_n), n = nc + nf, rc = Number(p.rep_code), rf = Number(p.rep_full);
+    return { n, nc, nf, s: n > 0 ? nc / n : 0, rc, rf, v: n > 0 ? (nc * rc + nf * rf) / n : null }; };
+  const A = f(a), B = f(b);
+  // R = s x code rate + (1 - s) x full-price rate; the midpoint split adds up exactly
+  const sm = (A.s + B.s) / 2, rcm = (A.rc + B.rc) / 2, rfm = (A.rf + B.rf) / 2;
+  const pMix = (B.s - A.s) * (rcm - rfm), pCode = sm * (B.rc - A.rc), pFull = (1 - sm) * (B.rf - A.rf);
+  const codeMore = rcm >= rfm;
+  return {
+    title: 'Why ' + fmtPctN(B.v) + ' of customers order again', from: A.v, to: B.v, better: 'higher', fmtV: v => fmtPctN(v), fmtAmt: v3PtsAmt,
+    startK: 'Ordered again', endK: 'Ordered again now',
+    parts: [
+      { amt: pMix, k: v3UpDown(A.s, B.s, 'More first orders with a code', 'Fewer first orders with a code'), sub: fmtPctN(A.s) + ' to ' + fmtPctN(B.s) + ' used a code',
+        cause: <>{v3UpDown(A.s, B.s, 'more', 'fewer')} first-time buyers used a discount code ({fmtPctN(A.s)} to {fmtPctN(B.s)}), and code buyers come back {codeMore ? 'more' : 'less'} often</>,
+        against: <>{v3UpDown(A.s, B.s, 'More', 'Fewer')} first-time buyers using a code ({fmtPctN(A.s)} to {fmtPctN(B.s)})</> },
+      { amt: pCode, k: v3UpDown(A.rc, B.rc, 'Code buyers came back more', 'Code buyers came back less'), sub: fmtPctN(A.rc) + ' to ' + fmtPctN(B.rc),
+        cause: <>customers whose first order used a code came back {v3UpDown(A.rc, B.rc, 'more', 'less')} often ({fmtPctN(A.rc)} to {fmtPctN(B.rc)})</>,
+        against: <>Code buyers coming back {v3UpDown(A.rc, B.rc, 'more', 'less')} often ({fmtPctN(A.rc)} to {fmtPctN(B.rc)})</> },
+      { amt: pFull, k: v3UpDown(A.rf, B.rf, 'Full-price buyers came back more', 'Full-price buyers came back less'), sub: fmtPctN(A.rf) + ' to ' + fmtPctN(B.rf),
+        cause: <>customers whose first order was at full price came back {v3UpDown(A.rf, B.rf, 'more', 'less')} often ({fmtPctN(A.rf)} to {fmtPctN(B.rf)})</>,
+        against: <>Full-price buyers coming back {v3UpDown(A.rf, B.rf, 'more', 'less')} often ({fmtPctN(A.rf)} to {fmtPctN(B.rf)})</> },
+    ],
+    opening: <>Since the 30 days to {v3Day(String(a.d), true)}, the share of customers who order again within 90 days went from {fmtPctN(A.v)} to {fmtPctN(B.v)}{ctx.typical ? <>; about {fmtPctN(ctx.typical)} is typical</> : null}.</>,
+    closing: <> Customers whose first order used a discount code come back {codeMore ? 'more' : 'less'} often than full-price ones: {fmtPctN(B.rc)} against {fmtPctN(B.rf)}.</>,
+    rows: [
+      ['First-time buyers in the group', A.n, B.n, v => fmtCount(v), null],
+      ['Used a discount code on their first order', A.s, B.s, v => fmtPctN(v), null],
+      ['Code buyers who ordered again', A.rc, B.rc, v => fmtPctN(v), 'higher'],
+      ['Full-price buyers who ordered again', A.rf, B.rf, v => fmtPctN(v), 'higher'],
+      ['All who ordered again', A.v, B.v, v => fmtPctN(v), 'higher'],
+    ],
+    note: 'Each point looks at web customers whose first order was 91 to 180 days before it, because it takes 90 days to know whether someone came back. A code is any discount code on that first order.',
+  };
+}
+const V3_DRIVER_MODELS = {
+  cac:    { model: v3ModelCac,      mode: 'pair',   key: 'cac',        fmt: v => fmtMoney(v),
+            ok: p => p.cac != null && p.new_customers > 0 && (Number(p.meta_clicks) + Number(p.google_clicks)) > 0 && p.cac_spend != null },
+  ret:    { model: v3ModelReturn,   mode: 'pair',   key: 'return',     fmt: v => fmtMoney(v, 2),
+            ok: p => p.return != null && Number(p.orders) > 0 && Number(p.ads) > 0 },
+  ly:     { model: v3ModelLastYear, mode: 'single', key: 'vs_ly',      fmt: v => (v >= 0 ? '+' : '−') + fmtPctN(Math.abs(v)),
+            ok: p => p.vs_ly != null && Number(p.sales_ly) > 0 && p.dtc_net != null },
+  repeat: { model: v3ModelRepeat,   mode: 'pair',   key: 'repeat_90d', fmt: v => fmtPctN(v),
+            ok: p => p.repeat_90d != null && Number(p.rep_code_n) + Number(p.rep_full_n) >= 30 && p.rep_code != null && p.rep_full != null },
+};
+const v3HasDrivers = (which, points) => { const m = V3_DRIVER_MODELS[which]; if (!m || !Array.isArray(points)) return false;
+  const P = points.filter(m.ok); return m.mode === 'single' ? P.length >= 1 : P.length >= 2; };
+
+function V3DriverPanel({ which, points, ctx, line }) {
+  const M0 = V3_DRIVER_MODELS[which];
+  const P = (points || []).filter(M0 ? M0.ok : () => false);
+  const single = M0 && M0.mode === 'single';
+  const [ci, setCi] = React.useState(() => single ? P.length - 1 : Math.max(0, P.length - 5));
+  if (!M0 || P.length < (single ? 1 : 2)) return null;
+  const i0 = single ? Math.min(ci, P.length - 1) : Math.min(ci, P.length - 2);
+  const a = P[i0], b = single ? P[i0] : P[P.length - 1];
+  const M = M0.model(a, b, ctx || {});
+  const d = M.to - M.from;
+  const steps = [{ k: M.startK, sub: single ? M.colA : '30 days to ' + v3Day(String(a.d), true), lo: Math.min(0, M.from), hi: Math.max(0, M.from), tone: 'sales', v: M.fmtV(M.from) }];
+  let run = M.from;
+  M.parts.forEach(p => { const nx = run + p.amt; const good = (p.amt >= 0) === (M.better === 'higher');
+    steps.push({ k: p.k, sub: p.sub, lo: Math.min(run, nx), hi: Math.max(run, nx), tone: Math.abs(p.amt) < 1e-9 ? 'cost' : good ? 'gain' : 'loss',
+                 v: (p.amt >= 0 ? '+' : '−') + M.fmtAmt(p.amt), cls: good ? 'v3-up' : 'v3-down' }); run = nx; });
+  const endGood = line == null ? null : (M.better === 'higher' ? M.to >= line : M.to <= line);
+  steps.push({ k: M.endK, sub: single ? M.colB : '30 days to ' + v3Day(String(b.d), true), lo: Math.min(0, M.to), hi: Math.max(0, M.to),
+               tone: endGood == null ? 'keep' : endGood ? 'keep' : 'loss', v: M.fmtV(M.to), total: true });
+  const all = steps.flatMap(s => [s.lo, s.hi]).concat(line != null ? [line] : []);
+  const lo = Math.min(0, ...all), hi = Math.max(...all) * 1.04, span = (hi - lo) || 1, x = v => ((v - lo) / span) * 100;
+  const ch = (p, q, better) => { if (p == null || q == null || !isFinite(p) || !isFinite(q) || p === 0) return null;
+    const r = q / p - 1; return { t: (r >= 0 ? '+' : '−') + fmtPctN(Math.abs(r)), cls: Math.abs(r) < 0.03 || !better ? 'v3-muted' : (r > 0) === (better === 'higher') ? 'v3-up' : 'v3-down' }; };
+  const rows = M.rows.filter(r => r[1] != null && r[2] != null && isFinite(r[1]) && isFinite(r[2]));
+  const flat = Math.abs(d) <= Math.abs(M.from) * 0.01;
+  const tip = ({ active, payload }) => (active && payload && payload.length)
+    ? <div className="v3-tip"><b>30 days to {v3Day(payload[0].payload.d, true)}</b><span>{M.startK} <em>{M0.fmt(payload[0].payload[M0.key])}</em></span>
+        <span>{single ? 'Click to explain this week' : 'Click to compare with now'}</span></div> : null;
+  return (<div className="v3-drivers" id={'drivers-' + which}>
+    <h3 className="v3-sec-title">{M.title}</h3>
+    <p className="v3-note v3-measure">{M.opening}{flat ? ' It barely moved.' : v3DriverSentence(M.parts, d, M.fmtAmt)}{M.closing}</p>
+    <div className="v3-drivers-grid">
+      <figure className="v3-bridge v3-bridge-wide" role="img" aria-label={M.startK + ' ' + M.fmtV(M.from) + ' to ' + M.fmtV(M.to)}>
+        <figcaption className="v3-bridge-cap">{single ? 'From last year to this' : 'From then to now'}</figcaption>
+        {steps.map((r, i) => (<div key={i} className={'v3-bridge-row' + (r.total ? ' v3-bridge-total' : '')}>
+          <span className="v3-bridge-k">{r.k}{r.sub ? <small>{r.sub}</small> : null}</span>
+          <span className="v3-bridge-track"><i className={'v3-bridge-' + r.tone} style={{ left: x(r.lo) + '%', width: Math.max(0.6, x(r.hi) - x(r.lo)) + '%' }}/>
+            {line != null ? <b className="v3-bridge-mark" style={{ left: x(line) + '%' }}/> : null}</span>
+          <span className={'v3-bridge-v' + (r.cls && !r.total ? ' ' + r.cls : '')}>{r.v}</span>
+        </div>))}
+        {line != null && ctx && ctx.lineLabel ? <p className="micro muted">The upright line is {ctx.lineLabel}.</p> : null}
+      </figure>
+      <figure className="v3-chart">
+        <figcaption><span className="v3-chart-title">{M.startK}, week by week</span><span className="v3-muted">{single ? 'click a week to explain it' : 'click a week to compare with it'}</span></figcaption>
+        <R.ResponsiveContainer width="100%" height={160}>
+          <R.BarChart data={P} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+            <R.XAxis dataKey="d" tickFormatter={dd => v3Day(dd)} interval="preserveStartEnd" minTickGap={30}/>
+            <R.YAxis hide/>
+            {M0.key === 'vs_ly' ? <R.ReferenceLine y={0} stroke={PAL.muted}/> : null}
+            {line != null && M0.key !== 'vs_ly' ? <R.ReferenceLine y={line} stroke={PAL.muted} strokeDasharray="3 3" ifOverflow="extendDomain"/> : null}
+            <R.Tooltip content={tip} cursor={{ fill: PAL.surface }}/>
+            <R.Bar dataKey={M0.key} isAnimationActive={false} style={{ cursor: 'pointer' }}
+                   onClick={(_, i) => { if (single || i < P.length - 1) setCi(i); }}>
+              {P.map((p, i) => <R.Cell key={i} fill={single ? (i === i0 ? PAL.accent : PAL.quiet) : (i === P.length - 1 ? PAL.accent : i === i0 ? PAL.ink : PAL.quiet)}/>)}
+            </R.Bar>
+          </R.BarChart>
+        </R.ResponsiveContainer>
+        {single ? <span className="v3-legend"><i style={{ background: PAL.accent }}/>The week explained</span>
+                : <span className="v3-legend"><i style={{ background: PAL.ink }}/>Compared with <i style={{ background: PAL.accent }}/>Now</span>}
+      </figure>
+    </div>
+    <h4 className="v3-drivers-h">What changed underneath</h4>
+    <table className="v3-rw">
+      <thead><tr><th className="t-text">Measure</th><th>{M.colA || '30 days to ' + v3Day(String(a.d), true)}</th><th>{M.colB || '30 days to ' + v3Day(String(b.d), true)}</th><th>Change</th></tr></thead>
+      <tbody>{rows.map(([lab, p, q, fm, better]) => { const c = ch(p, q, better); return (<tr key={lab}>
+        <td className="t-text">{lab}</td><td>{fm(p)}</td><td>{fm(q)}</td><td className={c ? c.cls : ''}>{c ? c.t : ''}</td></tr>); })}</tbody>
+    </table>
+    {M.extra || null}
+    <p className="micro muted v3-measure">{M.note}</p>
   </div>);
 }
 
