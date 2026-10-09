@@ -21094,24 +21094,24 @@ function V3BusinessState({ part }) {
     const be = num(A.break_even_return), top = Math.max(ret, be) * 1.25;
     signs.push({ k: 'Sales from each £1 of ads', v: fmtMoney(ret, 2), tone: ret < be ? 'weak' : ret < be * 1.3 ? 'ok' : 'good',
       bar: { fill: ret / top, mark: be / top }, n: <>{fmtMoney(be, 2)} only covers the ads, products and delivery</>,
-      series: ser('return'), fmt: v => fmtMoney(v, 2), better: 'higher', ref: { v: be, label: 'Break-even ' + fmtMoney(be, 2) } });
+      series: ser('return'), fmt: v => fmtMoney(v, 2), better: 'higher', line: { v: be, label: 'Break-even ' + fmtMoney(be, 2) } });
   }
   if (U.cac != null && U.first_order_contribution != null) {
     const c30 = num(U.cac_30d), use = c30 > 0 ? c30 : num(U.cac), fo = num(U.first_order_contribution), top = Math.max(use, fo) * 1.25;
     signs.push({ k: 'Cost to win a new customer', v: fmtMoney(use), tone: use > fo ? 'weak' : 'good',
       bar: { fill: use / top, mark: fo / top }, n: <>Their first order earns {fmtMoney(fo)}{use > fo ? ', so each one starts at a loss' : ''}</>,
-      series: c30 > 0 ? ser('cac') : null, fmt: v => fmtMoney(v), better: 'lower', ref: { v: fo, label: 'First order earns ' + fmtMoney(fo) } });
+      series: c30 > 0 ? ser('cac') : null, fmt: v => fmtMoney(v), better: 'lower', line: { v: fo, label: 'First order earns ' + fmtMoney(fo) } });
   }
   if (yoySales != null && yoyAds != null)
     signs.push({ k: 'Sales against last year', v: (yoySales >= 0 ? '+' : '−') + fmtPctN(Math.abs(yoySales)),
       tone: yoySales < 0 ? 'weak' : yoyAds - 1 > 2 * yoySales && yoyAds > 1.2 ? 'ok' : 'good',
       n: <>On {fmtTimes(yoyAds, 1)} last year’s ad spend</>,
-      series: ser('vs_ly'), fmt: v => (v >= 0 ? '+' : '−') + fmtPctN(Math.abs(v)), better: 'higher', ref: { v: 0, label: 'Same as last year' } });
+      series: ser('vs_ly'), fmt: v => (v >= 0 ? '+' : '−') + fmtPctN(Math.abs(v)), better: 'higher', line: { v: 0, label: 'Same as last year' } });
   if (R.repeat_90d != null)
     signs.push({ k: 'Customers who order again', v: fmtPctN(num(R.repeat_90d)), tone: v3SigBench(num(R.repeat_90d), BM.repeat_90d) || 'typical',
       bar: BM.repeat_90d ? { fill: Math.min(1, num(R.repeat_90d) / (num(BM.repeat_90d.high) * 1.25)), mark: num(BM.repeat_90d.typical) / (num(BM.repeat_90d.high) * 1.25) } : null,
       n: <>Within 90 days{BM.repeat_90d ? <>; about {fmtPctN(BM.repeat_90d.typical)} is typical</> : null}</>,
-      series: ser('repeat_90d'), fmt: v => fmtPctN(v), better: 'higher', ref: BM.repeat_90d ? { v: num(BM.repeat_90d.typical), label: 'Typical ' + fmtPctN(BM.repeat_90d.typical) } : null });
+      series: ser('repeat_90d'), fmt: v => fmtPctN(v), better: 'higher', line: BM.repeat_90d ? { v: num(BM.repeat_90d.typical), label: 'Typical ' + fmtPctN(BM.repeat_90d.typical) } : null });
   return (<section className="v3-stand">
     <div className="v3-kick">Where you stand · last 30 days</div>
     <p className="v3-verdict">{verdict}</p>
@@ -21128,8 +21128,9 @@ function V3BusinessState({ part }) {
 // One sign: what it is, the figure, one word for how it stands, and where relevant a bar with a mark
 // for the line that matters (break-even, what a first order earns, a typical rate).
 // 9 Oct: each sign also says which way it is heading (against four weeks ago, on the same 30-day basis)
-// and, on hover, focus or tap, draws its last 13 weeks with the line that matters.
-function V3Sign({ k, v, tone, bar, n, series, fmt, better, ref }) {
+// and, on hover, focus or tap, draws its last 13 weeks with the line that matters. (`line`, not `ref`:
+// React keeps a prop called ref for itself, so the break-even line never arrived.)
+function V3Sign({ k, v, tone, bar, n, series, fmt, better, line }) {
   const pc = x => Math.max(0, Math.min(100, x * 100)) + '%';
   const [open, setOpen] = React.useState(false);
   const pts = (series || []).filter(p => p.v != null);
@@ -21147,14 +21148,14 @@ function V3Sign({ k, v, tone, bar, n, series, fmt, better, ref }) {
       <R.LineChart data={pts} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
         <R.XAxis dataKey="d" tickFormatter={d => v3Day(d)} interval="preserveStartEnd" minTickGap={40}/>
         <R.YAxis hide domain={['auto', 'auto']}/>
-        {ref && ref.v != null && <R.ReferenceLine y={ref.v} stroke={PAL.muted} strokeDasharray="3 3"/>}
+        {line && line.v != null && <R.ReferenceLine y={line.v} stroke={PAL.muted} strokeDasharray="3 3" ifOverflow="extendDomain"/>}
         <R.Tooltip content={({ active, payload }) => (active && payload && payload.length)
           ? <div className="v3-tip"><b>30 days to {v3Day(payload[0].payload.d, true)}</b><span>{k} <em>{fmt(payload[0].payload.v)}</em></span></div> : null}/>
         <R.Line type="monotone" dataKey="v" stroke={PAL.accent} strokeWidth={2} isAnimationActive={false}
                 dot={pr => pr.index === pts.length - 1 ? <circle key="last" cx={pr.cx} cy={pr.cy} r={3.5} fill={PAL.accent}/> : null}/>
       </R.LineChart>
     </R.ResponsiveContainer>
-    {ref && ref.v != null && <span className="v3-sign-pop-f"><i aria-hidden="true"/>{ref.label}</span>}
+    {line && line.v != null && <span className="v3-sign-pop-f"><i aria-hidden="true"/>{line.label}</span>}
   </span>);
   return (<div className={'v3-sign' + (pts.length >= 4 ? ' v3-sign-has' : '')} tabIndex={pts.length >= 4 ? 0 : undefined}
               onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}
