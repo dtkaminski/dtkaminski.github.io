@@ -547,6 +547,12 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-rank-gbp { font-family: var(--font-figure); font-size: var(--text-base); font-weight: var(--weight-semi); color: var(--color-ink); }
 .v3-rank-per { color: var(--color-faint); font-weight: var(--weight-normal); font-size: var(--text-xs); }
 .v3-rank-fix { gap: var(--space-1); }
+/* One plan's steps under its row (the Meta plan, 9 Oct): indented, hairline between steps, no card. */
+.v3-plan-steps { list-style: none; margin: var(--space-3) 0 0; padding: 0 0 0 calc(1.4em + var(--space-3)); }
+.v3-plan-step { border-top: 1px solid var(--color-line); padding: var(--space-3) 0; }
+.v3-plan-step .v3-rank-desc { font-size: var(--text-sm); }
+.v3-plan-step .v3-rank-gbp { font-size: var(--text-sm); }
+.v3-plan-step .v3-rank-n { color: var(--color-faint); }
 
 /* ── Sections, verdicts, share bar, levers (Growth plan and later pages) ─── */
 .v3-sec { border-top: 1px solid var(--color-line); padding-top: var(--space-6); }

@@ -9107,7 +9107,7 @@ function v3DriverSummaries(S, hist, liveRows) {
     let M; try { M = M0.model(a, b, sg.ctx || {}); } catch (e) { return null; }
     const parts = M.parts.slice().sort((x, y) => Math.abs(y.amt) - Math.abs(x.amt)).filter(p => Math.abs(p.amt) > Math.abs(M.to - M.from) * 0.03)
       .map(p => p.k + (p.sub ? ' (' + p.sub + ')' : '') + ' ' + (p.amt >= 0 ? '+' : '−') + M.fmtAmt(p.amt)).join('; ');
-    const board = live.map((r, i) => ({ r, n: i + 1 })).filter(x => v3Moves(x.r.external_id).indexOf(sg.which) >= 0).slice(0, 3)
+    const board = live.map(r => ({ r, n: v3BoardRank(live, r.external_id) })).filter(x => v3Moves(x.r.external_id).indexOf(sg.which) >= 0).slice(0, 3)
       .map(x => '#' + x.n + ' ' + v3PlainAction(x.r).title).join('; ');
     return { figure: sg.k, key: sg.which, now: M.fmtV(M.to), then: M.fmtV(M.from), tone: sg.tone, v: sg.v,
       against: single ? 'the same 30 days last year' : 'the 30 days to ' + v3Day(String(a.d), true), parts, board: board || 'nothing on the board yet' };
@@ -9121,10 +9121,12 @@ function v3WhyPrompt(d) {
     repeat: 'Why do only ' + v + ' of customers order again?', conv: 'Why do only ' + v + ' of every 100 visits turn into an order?',
     newc: 'Why did I win only ' + v + ' new customers?', retsales: 'Why did returning customers spend only ' + v + '?',
     newsales: 'Why did new customers buy only ' + v + '?', spend: 'Where did the ' + v + ' of ad spend go?',
-    metacpa: 'Why does a sale on Meta cost ' + v + '?', googcpa: 'Why does a sale on Google cost ' + v + '?', ly: 'What is driving sales against last year?' };
+    metacpa: 'Why does a sale on Meta cost ' + v + '?', googcpa: 'Why does a sale on Google cost ' + v + '?', ly: 'What is driving sales against last year?',
+    email: 'Why did my email campaigns bring in only ' + v + '?' };
   return T[d.key] || 'What is driving ' + String(d.figure).toLowerCase() + '?';
 }
 const V3_WHY_MATCH = [
+  ['email', /\b(e-?mails?|klaviyo|newsletters?)\b/i],
   ['metacpa', /\b(meta|facebook|instagram)\b.{0,40}\b(cost|sale|cpa)/i], ['googcpa', /\bgoogle\b.{0,40}\b(cost|sale|cpa)/i],
   ['cac', /cost (to win|of|per) (a |each )?new customer|new customers? (cost|costs)|\bcac\b/i],
   ['newsales', /new customers?.{0,15}\b(sales|spend|spent|buy|bought)\b/i], ['retsales', /returning customers?/i],
@@ -9196,6 +9198,11 @@ function buildAskContext(facts, question, budget){
       parts_biggest_first: String(d.parts || '').split('; ').filter(Boolean), what_to_do_from_the_board: String(d.board || '').split('; ').filter(Boolean) } : null; })(),
     readout: v3AskReadout((typeof window !== 'undefined' && window.GRETA_READOUT) || null, topics, basisFor),
     site_last_30_days: topics.site ? site : null,
+    // the parts of the business with something missing (0318): what is not measured, and whether anything explains or acts on it
+    anatomy_gaps: (() => { const C = (typeof window !== 'undefined' && Array.isArray(window.GRETA_COVERAGE)) ? window.GRETA_COVERAGE : [];
+      const g = C.filter(r => (r.missing_core && r.missing_core.length) || !(r.drivers && r.drivers.length) || !r.open_actions)
+        .map(r => ({ part: r.arm, measured: r.measured + ' of ' + r.metrics, explained: !!(r.drivers && r.drivers.length), open_actions: Number(r.open_actions) || 0, not_measured: r.missing_core || [] }));
+      return g.length ? g : null; })(),
     data_dictionary: dictionary,
     sent: 'Only the series this question needs were sent. If the answer needs a series that is not here, say which one and suggest asking about it directly.' };
   // The ceiling: drop data series from the least needed, then shorten the readout.
@@ -9209,6 +9216,7 @@ function buildAskContext(facts, question, budget){
   if (topics.products) keepSeries.add('products');
   const order = Object.keys(data).reverse().filter(k => !keepSeries.has(k));
   while (size() > BUDGET && order.length) { const k = order.shift(); delete data[k]; delete dictionary[k]; }
+  if (size() > BUDGET && meta.anatomy_gaps) meta.anatomy_gaps = meta.anatomy_gaps.map(g => ({ part: g.part, not_measured: g.not_measured }));
   if (size() > BUDGET && meta.readout) delete meta.readout.cost_trees;
   if (size() > BUDGET && meta.readout) meta.readout.held = meta.readout.held.map(h => ({ action: h.action }));
   if (size() > BUDGET && meta.readout) meta.readout.coverage = [];
@@ -9327,6 +9335,7 @@ function AskPanel(){
 Follow _meta.readout.rules. Quote headline figures exactly, with their window. Say how far the owner can lean on a figure in plain words (measured, likely, probably, possibly, an outside chance), as part of the sentence: never the word rung, never in brackets after a figure. Never recommend an action in readout.held. Never compare or total across days readout.coverage or readout.tracking marks unusable; missing days are not zero.
 
 WHY questions (why did a figure move, what is driving it): when _meta.why_this_question is present, it IS the answer and comes before facts and readout. Open with one sentence: the figure is now <now>, against <then> in <against> (use the words of against as written: "the 30 days to 10 Sep" is not "the period before 10 Sep"). Then each item of parts_biggest_first, in that order, one line each, with its amount exactly as written (these are the parts the change splits into and they add up to it). Then "What to do:" and the items of what_to_do_from_the_board, as written. Do not explain the figure as a division, and do not add causes that are not in it. Otherwise, if data.drivers has the figure, answer from its row the same way. If neither has it, say it is not a figure that is going the wrong way, and answer from the other figures.
+GAPS: _meta.anatomy_gaps lists the parts of the business with a measure missing, nothing explaining a change, or no action. When a question touches one, say plainly what Greta cannot see yet; never call that part covered.
 WHAT TO DO questions: answer from readout.board in its order, with each item's pounds (a month, or once when the action says so) and its rung. Do not re-rank. One idea of your own is allowed only if labelled "my suggestion, not on your board", and never one from readout.held (9 Oct: a held Judge.me fix came back as "my suggestion"). For spending more, check facts.quarter_plan_at_todays_ad_spend and facts.next_peak first. If facts.goal.needs_replanning is true, say so before quoting the goal.
 
 WHY questions: before naming a cause, check the confounders: a promotion or code, a spend change, a stockout, an email send, a tracking change, seasonality, or a partial latest day (_meta.dataQuality). Check each against facts.recent_context first: if sale_weeks_in_last_13 is above 0, promotions are part of the story, not ruled out; if of_them_out_of_stock_now or products_out_of_stock_now is above 0, stock-outs are too. A planned-events list being empty does not rule out what already happened. Locate the move: demand (spend, visits) → conversion → order value and discounts → new vs returning → product and stock. Separate what the data shows from what you infer, and give your confidence. For why profit after ads moved against a typical month, lead with facts.typical_month.what_moved_profit_after_ads: its main_cause, its pounds from sales and from ad spend, and its sales and ad spend comparisons exactly as written; do not work out percentages of your own.
@@ -9417,6 +9426,8 @@ ${dataStr}`;
   const drivers = React.useMemo(() => { try { return v3DriverSummaries(askSt.rows && askSt.rows[0], askHist.rows && askHist.rows[0] && askHist.rows[0].history, askBoard.rows ? v3LiveRows(askBoard.rows) : []); } catch (e) { return []; } },
     [askSt.rows, askHist.rows, askBoard.rows]);
   if (typeof window !== 'undefined') window.GRETA_DRIVERS = drivers;
+  const askCov = useV3Rows('anatomy-coverage', V3_COVERAGE_Q);
+  if (typeof window !== 'undefined' && Array.isArray(askCov.rows)) window.GRETA_COVERAGE = askCov.rows;
   const whyPrompts = drivers.slice().sort((a, b) => (a.tone === 'weak' ? 0 : 1) - (b.tone === 'weak' ? 0 : 1)).slice(0, 3).map(v3WhyPrompt);
   const quickPrompts = UI_V3 ? V3_ASK_PROMPTS : [
     `What should I do today? Give me the top 3 actions, ranked by ${curSym()} impact.`,
@@ -10932,6 +10943,30 @@ function v3EventWords(label) {
   return t.replace(/\bpromo\b/gi, 'sale').replace(/\bbaseline\b/gi, 'usual');
 }
 function v3LiveRows(rows){ return (rows || []).filter(r => r.verification !== 'unverified'); }
+// Actions (9 Oct review): five Meta rows (bring spend back, trim retargeting, new ads, where the ads land, a
+// holdout) read as five jobs on one budget, at #3, #6, #7, #11 and #19. They fold into one plan at the place
+// of the highest-ranked, its steps in the order to do them, each keeping its own figure and its own Done and
+// Skip. The figures overlap (spend saved and profit from the same ads), so the plan shows the lead's, never a sum.
+const V3_PLANS = [{ key: 'meta', title: 'One plan for your Meta ads',
+  ids: ['order-cost-meta', 'driver-retargeting', 'driver-meta-ads', 'paid-landing-meta', 'test-holdout-facebook_acquisition'] }];
+// The number a row carries on the board with plans folded: every step of a plan carries the plan's number,
+// so "#3" on a drivers panel is the row the reader finds at 3 on the Actions page.
+function v3BoardRank(live, id) {
+  const F = v3FoldPlans(live), i = F.findIndex(r => r.external_id === id || (r.plan && r.plan.steps.some(st => st.external_id === id)));
+  return i >= 0 ? i + 1 : null;
+}
+function v3FoldPlans(rows) {
+  let out = rows || [];
+  for (const P of V3_PLANS) {
+    const steps = out.filter(r => P.ids.includes(r.external_id));
+    if (steps.length < 2) continue;
+    steps.sort((x, y) => P.ids.indexOf(x.external_id) - P.ids.indexOf(y.external_id));
+    const lead = out.find(r => P.ids.includes(r.external_id));
+    out = out.filter(r => r === lead || !P.ids.includes(r.external_id))
+      .map(r => r === lead ? Object.assign({}, lead, { plan: { key: P.key, title: P.title, steps } }) : r);
+  }
+  return out;
+}
 // The board's "bring Meta back toward £1,444 a week" targets, added up as a month. The quarter plan puts
 // its own figure into this month (frkl, 7 Oct: £3,508 for October against about £8,180 for the board's
 // Meta and Google targets), so every page says which one is the month's number: the plan's, with the
@@ -10956,9 +10991,9 @@ function V3BoardDigest({ n = 5 }){
   const { rows, err } = useV3Board();
   if (err) return <div className="v3-empty">Greta could not load your actions just now — refreshing usually sorts it.</div>;
   if (rows === null) return <V3SkeletonRows n={3}/>;
-  const live = v3LiveRows(rows);
+  const live = v3FoldPlans(v3LiveRows(rows));
   if (!live.length) return <div className="v3-empty">Nothing needs doing right now. Greta raises something here as soon as it is worth your time.</div>;
-  const total = live.reduce((a, r) => a + (Number(r.cm_gbp) || 0), 0);
+  const total = v3LiveRows(rows).reduce((a, r) => a + (Number(r.cm_gbp) || 0), 0);
   return (<div className="v3-next">
     <div className="v3-kick">{v3BoardSplitText(rows) || (v3Gbp(total) + ' a month across ' + live.length + ' actions Greta has checked')}</div>
     {live.slice(0, n).map((a, i) => (<div key={a.external_id || i} className="v3-next-row">
@@ -10980,11 +11015,13 @@ const V3_MOVES = [
   ['basket-pair', ['aov']], ['basket-free-shipping', ['aov']], ['paid-landing-meta', ['metacpa', 'conv']], ['paid-landing-google', ['googcpa', 'conv']],
   ['paid-brand-share-google', ['brandshare']], ['test-holdout-', ['cac']], ['product-hero_underexposed-', ['prodsales']],
   ['product-margin_drain-', ['profit']], ['discount-', ['profit']], ['tracking-coverage', ['conv']],
+  ['email-campaign-drop', ['email', 'retsales']], ['email-cart-reach', ['email', 'conv']], ['site-errors', ['conv']],
+  ['returns-product-', ['profit', 'prodsales']], ['seo-nonbrand', ['organic']],
 ];
 const V3_MOVE_LABEL = { cac: 'cost to win a new customer', ret: 'sales from each £1 of ads', profit: 'profit after all costs', ly: 'sales against last year',
   repeat: 'customers who order again', conv: 'orders per 100 visits', newc: 'new customers', retsales: 'returning customers’ sales', spend: 'ad spend',
   metacpa: 'Meta’s cost per sale', googcpa: 'Google’s cost per sale', newsales: 'new customers’ sales', prodsales: 'product sales', aov: 'the average order',
-  brandshare: 'searches for your name' };
+  brandshare: 'searches for your name', email: 'sales from email campaigns', organic: 'visits from unpaid search' };
 const v3Moves = id => { const k = String(id || ''); const m = V3_MOVES.find(([p]) => (p.endsWith('-') ? k.startsWith(p) : k === p)); return m ? m[1] : []; };
 function V3ActionBoard(){
   const { rows, err } = useV3Board();
@@ -11013,15 +11050,16 @@ function V3ActionBoard(){
   const sales30 = Number(((typeof window !== 'undefined' && window.GRETA_HEADLINE) || {}).net_revenue_30d) || 0;
   const floor = Math.max(50, Math.round(sales30 * 0.005));
   // When everything is small, nothing is: the floor only folds rows when bigger work remains above it.
-  const aboveFloor = liveRows.filter(r => (Number(r.cm_gbp) || 0) >= floor);
+  const liveF = v3FoldPlans(liveRows);
+  const aboveFloor = liveF.filter(r => (Number(r.cm_gbp) || 0) >= floor);
   const isSmall = (r) => aboveFloor.length > 0 && (Number(r.cm_gbp) || 0) < floor;
-  const bigRows = liveRows.filter(r => !isSmall(r));
-  const smallRows = liveRows.filter(isSmall);
+  const bigRows = liveF.filter(r => !isSmall(r));
+  const smallRows = liveF.filter(isSmall);
   // On the evidence-ranked board (0237) a small item keeps its place in its lane: folding it to the
   // end put £93 and £75 actions Greta is fairly sure of below the "worth testing" ones. So small rows
   // hide in place and, shown, come back where the server ranked them. Unranked, as before.
   const liveShown = V3_BOARD.ranked
-    ? liveRows.filter(r => showSmall || !isSmall(r))
+    ? liveF.filter(r => showSmall || !isSmall(r))
     : [...bigRows, ...(showSmall ? smallRows : [])];
   const ordered = [...liveShown, ...unverRows];
 
@@ -11109,6 +11147,7 @@ function V3ActionBoard(){
                     {r.category || 'general'}{r.days_open > 0 ? ' · open ' + r.days_open + (Number(r.days_open) === 1 ? ' day' : ' days') : ''}
                     {conf ? ' · ' + V3_CONF[conf].label.toLowerCase() : ''}
                     {unver ? ' · open over a month' : r.days_since_refresh != null ? (Number(r.days_since_refresh) <= 0 ? ' · checked today' : ' · checked ' + r.days_since_refresh + (Number(r.days_since_refresh) === 1 ? ' day ago' : ' days ago')) : ''}
+                    {r.plan ? ' · ' + r.plan.steps.length + ' steps' : ''}
                     {v3Moves(r.external_id).length ? <span className="v3-rank-moves"> · moves {V3_MOVE_LABEL[v3Moves(r.external_id)[0]]}</span> : null}
                   </span>
                 </span>
@@ -11119,13 +11158,14 @@ function V3ActionBoard(){
                   making someone open a row to find the one-click fix is the friction this
                   was built to remove. Before this the board was read-only: a ranked list
                   of things you could look at and not one you could act on or close. */}
-              <div className="v3-rank-fix">
+              {!r.plan && <div className="v3-rank-fix">
                 {connProvider(r.external_id) ? <V3Fix provider={connProvider(r.external_id)} small/> : (<>
                   <V3Done ext={r.external_id} small tone="quiet" onDone={() => v3BoardDrop(r.external_id)}/>
                   <V3Skip ext={r.external_id} small tone="quiet" onDone={() => v3BoardDrop(r.external_id)}/>
                 </>)}
-              </div>
-              {isOpen && (
+              </div>}
+              {r.plan && <V3PlanSteps plan={r.plan}/>}
+              {isOpen && !r.plan && (
                 <div className="v3-rank-why">
                   {/* The server marks the row (vw_brand_action_board.unverified_reason is set exactly when it is
                       open over 30 days with no nightly test); the words are said here, from the same
@@ -11183,6 +11223,35 @@ function V3ActionBoard(){
   );
 }
 
+// One plan's steps (see V3_PLANS): always shown, since the steps are the plan. Each opens onto its own
+// how-to, and is marked done or skipped on its own, so a decision on one never closes the others.
+function V3PlanSteps({ plan }) {
+  const [open, setOpen] = React.useState(null);
+  return (<ol className="v3-plan-steps">{plan.steps.map((st, j) => {
+    const pa = v3PlainAction(st), gbp = Number(st.cm_gbp) || 0, isOpen = open === st.external_id;
+    const play = Array.isArray(st.playbook) ? st.playbook : [];
+    return (<li key={st.external_id} className="v3-plan-step">
+      <button type="button" className="v3-rank-hit" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : st.external_id)}>
+        <span className="v3-rank-n">{j + 1}</span>
+        <span className="v3-rank-body">
+          <span className="v3-rank-desc">{pa.title}</span>
+          <span className="v3-rank-meta">{st.lane === 'test' ? 'worth testing' : 'do this'}{st.origin === 'order_cost' ? ' · ad spend saved' : ''}</span>
+        </span>
+        <span className="v3-rank-gbp">{v3Gbp(gbp)}<span className="v3-rank-per">{v3Per(st, true)}</span></span>
+      </button>
+      <div className="v3-rank-fix">
+        <V3Done ext={st.external_id} small tone="quiet" onDone={() => v3BoardDrop(st.external_id)}/>
+        <V3Skip ext={st.external_id} small tone="quiet" onDone={() => v3BoardDrop(st.external_id)}/>
+      </div>
+      {isOpen && (<div className="v3-rank-why">
+        {pa.why && <p className="v3-rank-plain">{pa.why}</p>}
+        {play.length ? <ol className="v3-rank-steps">{play.map((x, k) => <li key={k}>{v3Tidy(x)}</li>)}</ol> : null}
+        {st.money_basis && <p className="v3-rank-raw"><span className="v3-kick">How Greta got to {v3Gbp(gbp)}</span>{v3Tidy(scrubTag(st.money_basis))}.</p>}
+      </div>)}
+    </li>);
+  })}</ol>);
+}
+
 // ── What Greta found ─────────────────────────────────────────────────────
 // The board lists what is worth doing in pounds. Channel diagnoses and cost-tree splits carry no
 // pound figure, so until 0245 they reached no screen at all -- the corrected Google finding ("the
@@ -11215,6 +11284,7 @@ function V3Findings(){
           const ch = !diag ? null : /meta/i.test(f.external_id) ? 'meta' : /google/i.test(f.external_id) ? 'google' : null;
           const live = board.rows ? v3LiveRows(board.rows) : [];
           const behind = ch ? live.findIndex(r => r.external_id === 'order-cost-' + ch) : -1;
+          const bN = behind >= 0 ? v3BoardRank(live, live[behind].external_id) : null;
           // A diagnosis whose leading cause is a counting or tracking change does not explain a cost rise
           // that holds on the platform's own count and on weeks without a sale: "a tracking change hides
           // visits from every tool · explains #3" (7 Oct) read as if the Meta cut were a measuring error.
@@ -11226,7 +11296,7 @@ function V3Findings(){
             <button type="button" className="v3-rank-hit" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : f.external_id)}>
               <span className="v3-rank-body">
                 <span className="v3-rank-desc">{pa.title}</span>
-                <span className="v3-rank-meta">{({ total: 'Whole business', site: 'Website', finance: 'Money', ops: 'Running the business', product: 'Products', paid: 'Ads', creative: 'Ad content', retention: 'Repeat customers', cx: 'Customer service', stock: 'Stock', email: 'Email', organic: 'Unpaid visits' })[f.category] || f.category || 'general'}{conf ? ' · ' + V3_CONF[conf].label.toLowerCase() : ''}{behind >= 0 ? (counting ? ' · a change in how sales are counted, not the cause of action #' + (behind + 1) : ' · explains action #' + (behind + 1)) : ''}</span>
+                <span className="v3-rank-meta">{({ total: 'Whole business', site: 'Website', finance: 'Money', ops: 'Running the business', product: 'Products', paid: 'Ads', creative: 'Ad content', retention: 'Repeat customers', cx: 'Customer service', stock: 'Stock', email: 'Email', organic: 'Unpaid visits' })[f.category] || f.category || 'general'}{conf ? ' · ' + V3_CONF[conf].label.toLowerCase() : ''}{behind >= 0 ? (counting ? ' · a change in how sales are counted, not the cause of action #' + bN : ' · explains action #' + bN) : ''}</span>
               </span>
             </button>
             {isOpen && (<div className="v3-rank-why">
@@ -11234,7 +11304,7 @@ function V3Findings(){
               {/* One verdict per platform: this cost is on the platform's own purchase count, the board's
                   is on the shop's orders, and the two read differently. Say which to judge it on. */}
               {behind >= 0 && /^metric-tree-/.test(String(f.external_id)) && (<p className="v3-note v3-measure">
-                This cost uses {ch === 'meta' ? 'Meta' : 'Google'}’s own count of purchases, not your shop’s orders, so it differs from the cost per order in action #{behind + 1}. Judge {ch === 'meta' ? 'Meta' : 'Google'} on the figure in #{behind + 1}. Use this to see which step changed.</p>)}
+                This cost uses {ch === 'meta' ? 'Meta' : 'Google'}’s own count of purchases, not your shop’s orders, so it differs from the cost per order in action #{bN}. Judge {ch === 'meta' ? 'Meta' : 'Google'} on the figure in #{bN}. Use this to see which step changed.</p>)}
               {reasons.length > 0 && (<div className="v3-rank-raw"><span className="v3-kick">Why {conf ? V3_CONF[conf].label.toLowerCase() : 'this steer'}</span>
                 <ul className="v3-rank-steps">{reasons.map((x, j) => <li key={j}>{v3Tidy(x.text)}</li>)}</ul></div>)}
             </div>)}
@@ -16462,6 +16532,8 @@ function v3PlainAction(row){
   // sentence stays in raw, and the board shows it under "Greta's working".
   const n = V3_WRITER_ACTIONS && V3_NARR.data && V3_NARR.data.actions && V3_NARR.data.actions[id];
   if (n && n.title) return { title: n.title, why: n.why || '', raw, written: true };
+  if (row && row.plan) return { title: row.plan.title, raw,
+    why: row.plan.steps.length + ' changes on the same budget, in the order to make them: ' + row.plan.steps.map(st => v3PlainAction(Object.assign({}, st, { plan: null })).title.replace(/^./, c => c.toLowerCase())).join('; ') + '.' };
   let x;
   // Forecast checks carry raw channel keys ("google_all", "[acquisition] google_nonbrand: iROAS …"),
   // which Review's "Decided in the last three weeks" showed as they were (6 Oct).
@@ -16521,6 +16593,15 @@ function v3PlainAction(row){
     return P('Fix a site error on the ' + plainWhere,
       'A broken script on the ' + plainWhere + ' ' + blocks + '. Every shopper who hits it is a sale lost after you have already paid to bring them in.');
   }
+  // 0318: the arms of the business the board had no action for (email, the site, returns, unpaid search)
+  if (id === 'email-campaign-drop') return P(/Opens held up/i.test(raw) ? 'Change what your email campaigns offer: they sell less for each email sent'
+    : /fewer people open|opens fell/i.test(raw) ? 'Check your email campaigns reach inboxes: fewer people open them' : 'Find out why your email campaigns sell less', raw);
+  if (id === 'email-cart-reach') return P('Widen your abandoned basket email so it reaches more shoppers', raw);
+  if (id === 'site-errors') return P('Find and fix the errors on your site', raw);
+  if (/^returns-product-/.test(id)) { const nm = (raw.match(/with "([^"]+)" in them/) || [])[1];
+    return P(nm ? 'Find out why ' + nm + ' comes back so often' : 'Find out why one product comes back so often', raw); }
+  if (id === 'seo-nonbrand') { const t = (raw.match(/"([^"]+)"/) || [])[1];
+    return P(t ? 'Move up Google for "' + t + '" and the other searches you nearly win' : 'Move up Google for the searches you nearly win', raw); }
   if (id === 'synth-creative-waste') return P('Stop spending on ads that have never made a sale',
     'Some ads are taking budget without a single purchase. Check their tracking first, because broken tracking looks the same as a bad ad. Then switch off the ones that really are not selling.');
   if (/^synth-weak-conv-rank-(\w+)-spend/.test(id)) { const ch = v3Ch(id.match(/^synth-weak-conv-rank-(\w+)-spend/)[1]);
@@ -17694,7 +17775,7 @@ function V3Today(p) {
   const pacePos = (camTarget != null && camTarget > 0) ? (cam / camTarget) : null;
   const diff = camTarget != null ? cam - camTarget : null;
   // The cache paints first; the live board, once it has landed, is what every list reads.
-  const liveRows = board.rows ? v3LiveRows(board.rows) : null;
+  const liveRows = board.rows ? v3FoldPlans(v3LiveRows(board.rows)) : null;
   const top = (topDone && closedTop.current) ? closedTop.current : (liveRows ? (liveRows[0] || null) : d.top_action);
   // Same fold as the Actions board: under half a percent of a month's sales hides while bigger work remains.
   const floorT = Math.max(50, Math.round((Number(d.net_revenue_30d) || 0) * 0.005));
@@ -20839,7 +20920,8 @@ function V3DataTrust() {
     <p className="v3-verdict">{verdict}</p>
     {items.length > 0 && <ol className="v3-moves">{items.map(i => (<li key={i.k}><b>{i.head}</b> {i.body}{i.extra || null}</li>))}</ol>}
   </section>
-  <V3DriverStrip keys={['claims']} opts={orders30 > 0 && meta.rows && gads.rows ? { claims: { m: mP, g: gP, o: orders30 } } : null}/></div>);
+  <V3DriverStrip keys={['claims']} opts={orders30 > 0 && meta.rows && gads.rows ? { claims: { m: mP, g: gP, o: orders30 } } : null}/>
+  <V3AnatomyCoverage/></div>);
 }
 
 // ── Team (V3, rebuilt 2026-10-05) ────────────────────────────────────────────────────────────────
@@ -21082,7 +21164,8 @@ function v3BuildSigns(S, hist, opts) {
   const mKept = num(L.sales) > 0 && L.profit_after_ads != null && L.ads != null ? (num(L.profit_after_ads) + num(L.ads)) / num(L.sales) : null;
   const lastP = HP && HP.length ? HP[HP.length - 1] : null;
   const anchor = lastP ? { d: String(lastP.d), v: ao != null ? ao : num(L.profit_after_ads) } : null;
-  const profitCfg = mKept != null ? { which: 'profit', ctx: { m: mKept, o: ao != null ? num(L.overheads) : 0, anchor, weeks: H && Array.isArray(H.weeks) ? H.weeks : [] }, dline: 0 } : null;
+  const mAt = mKept != null && lastP ? v3MarginAt(H && H.weeks, mKept, String(lastP.d)) : null;
+  const profitCfg = mKept != null ? { which: 'profit', ctx: { m: mKept, mAt, o: ao != null ? num(L.overheads) : 0, anchor, weeks: H && Array.isArray(H.weeks) ? H.weeks : [] }, dline: 0 } : null;
   // website conversion (0314): the latest 30 days against the middle of the earlier weeks
   const CP = HP ? HP.filter(p => p.conv != null) : [];
   if (CP.length >= 4) {
@@ -21145,6 +21228,15 @@ function v3BuildSigns(S, hist, opts) {
   };
   cpaSign('metacpa', 'Meta: cost per sale', 'meta_spend', 'meta_purchases', 'Meta');
   cpaSign('googcpa', 'Google: cost per sale', 'google_spend', 'google_conversions', 'Google');
+  // marketing (0318): email campaign sales on Klaviyo's count, against the middle of the earlier weeks
+  const EP = HP ? HP.filter(p => Number(p.em_sends) > 0 && Number(p.em_opens) > 0 && Number(p.em_clicks) > 0 && Number(p.em_rev) > 0) : [];
+  if (EP.length >= 4) {
+    const l = EP[EP.length - 1], ev = Number(l.em_rev), typ = med(EP.slice(0, -1).map(p => Number(p.em_rev))), top = Math.max(ev, typ) * 1.25;
+    signs.push({ k: 'Email campaign sales', v: fmtMoney(ev), tone: ev < typ * 0.9 ? 'weak' : ev > typ * 1.1 ? 'good' : 'typical',
+      bar: { fill: ev / top, mark: typ / top }, n: <>{fmtMoney(1000 * ev / Number(l.em_sends), 2)} per 1,000 emails, on Klaviyo’s count; about {fmtMoney(typ)} is usual for you</>,
+      series: ser('em_rev'), fmt: v => fmtMoney(v), better: 'higher', line: { v: typ, label: 'Usual ' + fmtMoney(typ) },
+      which: 'email', ctx: { lineLabel: 'about ' + fmtMoney(typ) + ', your usual month' }, dline: typ });
+  }
   // settings: the share of web orders the ad platforms claim (neutral: more is not better or worse)
   const CLP = HP ? HP.filter(p => Number(p.web_orders) > 0 && p.meta_purchases != null).map(p => Object.assign({}, p)) : [];
   if (CLP.length >= 4) {
@@ -21707,8 +21799,72 @@ function v3ModelProducts(list, sale) {
     note: 'These are the figures in the table on this page: Shopify order lines, after discounts and before VAT, for the last 28 days and the 28 before. Each product still selling splits its change into units and the price each unit sold at, product for product; the average price a unit also moves with which products sell, so it can rise while each product sells for less. Products that ran out, are new, or sold again after none are counted on their own.',
   };
 }
+// Returns (9 Oct review: refunds had no driver or action). Web orders from 104 to 14 days ago, so each has had
+// two weeks to come back; a refund is shared across an order's products by line value. The shop's rate is
+// refunded orders over orders across products, the basis the board's returns rows quote (frkl: 11%).
+// Settings (9 Oct): every part of a D2C business (the anatomy, 184 measures in 18 parts), and for each what
+// Greta measures, whether a drivers panel explains it and how many actions act on it, so a gap reads as a gap.
+const V3_COVERAGE_Q = (sb, b) => sb.rpc('fn_anatomy_coverage', { p_brand: b });
+function V3AnatomyCoverage() {
+  const q = useV3Rows('anatomy-coverage', V3_COVERAGE_Q);
+  const R = Array.isArray(q.rows) ? q.rows : [];
+  if (!R.length) return null;
+  const gaps = R.filter(r => (r.missing_core && r.missing_core.length) || !(r.drivers && r.drivers.length) || !r.open_actions);
+  const pages = { profit: 'profit', marketing: 'marketing', website: 'website', customers: 'customers', products: 'products', stock: 'stock', competitors: 'competitors', goal: 'goal', settings: 'settings', review: 'review' };
+  return (<section className="v3-sec">
+    <h2 className="v3-sec-title">What Greta can see <span className="v3-muted">every part of the business</span></h2>
+    <p className="v3-note v3-measure">{gaps.length
+      ? <>Greta measures, explains and acts on {fmtCount(R.length - gaps.length)} of the {fmtCount(R.length)} parts of your business fully. In the other {fmtCount(gaps.length)}, something is not measured yet, nothing explains a change, or nothing on the board acts on it; those are listed with what is missing.</>
+      : <>Greta measures, explains and acts on every part of your business.</>}</p>
+    <table className="v3-rw">
+      <thead><tr><th className="t-text">Part of the business</th><th>Measured</th><th className="t-text">Why it moves</th><th>Actions</th><th className="t-text">Not measured yet</th></tr></thead>
+      <tbody>{R.map(r => (<tr key={r.category}>
+        <td className="t-text">{pages[r.page] ? <button type="button" className="v3-xref" onClick={() => window.__oiNav && window.__oiNav(pages[r.page])}>{r.arm}</button> : r.arm}</td>
+        <td>{fmtCount(Number(r.measured))} of {fmtCount(Number(r.metrics))}</td>
+        <td className="t-text">{r.drivers && r.drivers.length ? 'Explained' : <span className="v3-muted">Not yet</span>}</td>
+        <td className={Number(r.open_actions) ? '' : 'v3-muted'}>{fmtCount(Number(r.open_actions))}</td>
+        <td className="t-text v3-muted">{r.missing_core && r.missing_core.length ? r.missing_core.join(', ') : ''}</td></tr>))}</tbody>
+    </table>
+    <p className="micro muted v3-measure">Measured counts the measures Greta works out or tracks from your connected accounts. Why it moves is a drivers panel that splits a change into its parts. Actions are the open ones on your board for that part. The ones listed as not measured are the important ones still missing.</p>
+  </section>);
+}
+const V3_REFUNDS_Q = (sb, b) => sb.from('vw_product_refunds_90d').select('title,orders,refunded_orders,refunded_gbp,sales_gbp').eq('brand_id', b).order('refunded_gbp', { ascending: false }).limit(200);
+function V3RefundSign({ part, open, setOpen }) {
+  const q = useV3Rows('product-refunds', V3_REFUNDS_Q), board = useV3Board();
+  const R = q.rows || [];
+  if (!R.length) return null;
+  const O = R.reduce((t, r) => t + Number(r.orders), 0), RO = R.reduce((t, r) => t + Number(r.refunded_orders), 0);
+  const G = R.reduce((t, r) => t + Number(r.refunded_gbp), 0), S = R.reduce((t, r) => t + Number(r.sales_gbp), 0);
+  if (!(O > 0)) return null;
+  const rate = RO / O;
+  const high = R.filter(r => Number(r.orders) >= 10 && Number(r.refunded_orders) / Number(r.orders) >= rate * 1.5).slice(0, 6);
+  const live = board.rows ? v3LiveRows(board.rows) : [];
+  const acts = live.filter(r => /^returns-product-/.test(r.external_id));
+  if (part === 'sign') return (
+    <V3Sign k="Orders refunded" v={fmtPctN(rate)} tone={high.length ? 'weak' : 'typical'}
+      n={<>{fmtMoney(G)} of {fmtMoney(S)} given back over three months{high.length ? <>; {high.length === 1 ? 'one product comes' : fmtCount(high.length) + ' products come'} back at half as often again or more</> : null}</>}
+      act={high.length ? { label: open ? 'Hide which products' : 'Which products?', open, on: () => setOpen(o => !o) } : null}/>);
+  if (!open || !high.length) return null;
+  return (<div className="v3-drivers">
+      <h3 className="v3-sec-title">Products refunded more than your shop’s {fmtPctN(rate)}</h3>
+      <p className="v3-note v3-measure">{high.length === 1 ? 'This product is' : 'These products are'} refunded at least half as often again as your shop as a whole. A product that keeps coming back usually has one reason: the size, the photos, the quality, or the description. Find it before you spend more selling it.</p>
+      {acts.length > 0 && <div className="v3-drivers-todo">
+        <div className="v3-kick">What to do</div>
+        {acts.slice(0, 3).map(r => (<button key={r.external_id} type="button" className="v3-drivers-todo-row" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>
+          <span className="v3-num">#{v3BoardRank(live, r.external_id)}</span><span>{v3PlainAction(r).title}</span>
+          <span className="v3-num">{r.cm_gbp ? v3Gbp(r.cm_gbp) + v3Per(r, true) : ''}</span><Icon name="arrowRight" size={13}/></button>))}
+      </div>}
+      <table className="v3-rw">
+        <thead><tr><th className="t-text">Product</th><th>Orders</th><th>Refunded</th><th>Share</th><th>Given back</th></tr></thead>
+        <tbody>{high.map(r => (<tr key={r.title}><td className="t-text">{r.title}</td><td>{fmtCount(Number(r.orders))}</td><td>{fmtCount(Number(r.refunded_orders))}</td>
+          <td className="v3-down">{fmtPctN(Number(r.refunded_orders) / Number(r.orders))}</td><td>{fmtMoney(Number(r.refunded_gbp))}</td></tr>))}</tbody>
+      </table>
+      <p className="micro muted v3-measure">Website orders placed between 104 and 14 days ago, so each has had two weeks to come back. A refund on an order with several products is shared between them by price. Products with fewer than ten orders are left out.</p>
+    </div>);
+}
 function V3ProductStrip({ d }) {
   const [open, setOpen] = React.useState(false);
+  const [rOpen, setROpen] = React.useState(false);
   if (!d || !d.list || !d.list.length) return null;
   const now = d.list.reduce((t, x) => t + x.now, 0), was = d.list.reduce((t, x) => t + x.was, 0);
   if (!(was > 0)) return null;
@@ -21721,8 +21877,10 @@ function V3ProductStrip({ d }) {
         n={<>{fmtCount(d.list.filter(x => x.now > 0).length)} products sold{d.top5share != null ? <>; your top five bring {fmtPctN(d.top5share)}</> : null}</>}
         trendAs={{ dir: Math.abs(ch) < 0.03 ? 'flat' : ch > 0 ? 'up' : 'down', cls: Math.abs(ch) < 0.03 ? 'flat' : ch > 0 ? 'good' : 'bad', from: fmtMoney(was), when: 'the 28 days before' }}
         act={{ label: open ? 'Hide what is driving it' : 'What is driving this?', open, on: () => setOpen(o => !o) }}/>
+      <V3RefundSign part="sign" open={rOpen} setOpen={setROpen}/>
     </div>
     {open && <V3DriverPanel fixed={M}/>}
+    <V3RefundSign part="panel" open={rOpen}/>
   </section>);
 }
 // What the board is working on (Actions, 9 Oct): every sign going the wrong way that a board row moves,
@@ -21739,7 +21897,7 @@ function V3BoardDrivers() {
   const live = v3LiveRows(board.rows);
   const all = SG.signs.concat(SG.profitSign ? [SG.profitSign] : []);
   const items = all.filter(sg => sg.which && (sg.tone === 'weak' || sg.tone === 'ok')).map(sg => ({ sg,
-    rows: live.map((r, i) => ({ r, n: i + 1 })).filter(x => v3Moves(x.r.external_id).indexOf(sg.which) >= 0).slice(0, 3) }))
+    rows: live.map(r => ({ r, n: v3BoardRank(live, r.external_id) })).filter(x => v3Moves(x.r.external_id).indexOf(sg.which) >= 0).slice(0, 3) }))
     .filter(x => x.rows.length).sort((a, b) => a.rows[0].n - b.rows[0].n).slice(0, 5);
   if (!items.length) return null;
   const open = drv ? items.find(x => x.sg.which === drv) : null;
@@ -22036,31 +22194,52 @@ function v3ModelRepeat(a, b, ctx) {
 // So between two weeks it moves with sales (split into orders and average order) and with ad spend
 // (Meta and Google); running costs only when they were changed.
 const v3SignedGbp = v => (v < 0 ? '−' : '') + fmtMoney(Math.abs(v));
+// Margin by week (9 Oct review: one margin for every week hid a sale month keeping less of each £1). Each
+// 30 days keeps what its own weeks kept after products and delivery (the rhythm weeks, from real orders),
+// scaled so the latest 30 days is the headline's measured margin, which the verdict above uses.
+function v3MarginAt(weeks, m, lastD) {
+  const W = (weeks || []).filter(w => Number(w.sales) > 0 && w.before_ads != null && w.wk);
+  if (W.length < 4 || !(m > 0) || !lastD) return null;
+  const day = x => Math.floor(Date.parse(String(x).slice(0, 10) + 'T00:00:00Z') / 86400000);
+  const raw = d => { const e = day(d), s0 = e - 29; let k = 0, sv = 0;
+    for (const w of W) { const a = day(w.wk), ov = Math.min(a + 6, e) - Math.max(a, s0) + 1;
+      if (ov > 0) { k += ov / 7 * Number(w.before_ads); sv += ov / 7 * Number(w.sales); } }
+    return sv > 0 ? k / sv : null; };
+  const base = raw(lastD);
+  if (!(base > 0)) return null;
+  return d => { if (String(d) === String(lastD)) return m; const r = raw(d); return r > 0 ? m * r / base : m; };
+}
 function v3ModelProfit(a, b, ctx) {
-  const m = ctx.m, O = ctx.o || 0;
-  const f = p => { const s = Number(p.sales), o = Number(p.orders), ad = Number(p.ads);
+  const m = ctx.m, O = ctx.o || 0, mOf = p => (ctx.mAt ? ctx.mAt(p.d) : m);
+  const f = p => { const s = Number(p.sales), o = Number(p.orders), ad = Number(p.ads), mp = mOf(p);
     // the latest week is the headline's own figure, so the panel and the verdict above it agree to the pound
-    const v = ctx.anchor && String(p.d) === ctx.anchor.d ? ctx.anchor.v : s * m - ad - O;
-    return { s, o, ad, aov: s / o, kept: s * m, ms: Number(p.meta_spend), gs: Number(p.google_spend), n: Number(p.new_customers), v }; };
+    const v = ctx.anchor && String(p.d) === ctx.anchor.d ? ctx.anchor.v : s * mp - ad - O;
+    return { s, o, ad, mp, aov: s / o, kept: s * mp, ms: Number(p.meta_spend), gs: Number(p.google_spend), n: Number(p.new_customers), v }; };
   const A = f(a), B = f(b);
-  const [sO, sA] = v3LogParts(A.s, B.s, [{ a: A.o, b: B.o, sign: 1 }, { a: A.aov, b: B.aov, sign: 1 }]);
+  // what was kept = orders x average order x margin, so the sales parts and the margin part add up to it
+  const [kO, kA, kM] = v3LogParts(A.kept, B.kept, [{ a: A.o, b: B.o, sign: 1 }, { a: A.aov, b: B.aov, sign: 1 }, { a: A.mp, b: B.mp, sign: 1 }]);
+  const sO = kO / m, sA = kA / m;
+  const pence = x => Math.round(x * 100) + 'p';
   const dMeta = B.ms - A.ms, dAds = B.ad - A.ad;
   const sAw = v3SaleWeeksIn(ctx.weeks, a), sBw = v3SaleWeeksIn(ctx.weeks, b);
   const saleNote = sAw !== sBw ? <>, as the earlier 30 days had {sAw === 0 ? 'no sale weeks' : sAw === 1 ? 'a sale week' : sAw + ' sale weeks'} and these have {sBw === 0 ? 'none' : sBw === 1 ? 'one' : sBw}</> : null;
   const label = O ? 'after all costs' : 'after ads';
   const state = v => (v < 0 ? 'losing ' + fmtMoney(-v) : 'making ' + fmtMoney(v));
   return {
-    todo: [{ amt: m * sO, ids: ['sales-rhythm', 'promo-peak-plan'] }, { amt: -dMeta, ids: ['order-cost-meta', 'driver-meta-ads', 'driver-retargeting'] }, { amt: -(dAds - dMeta), ids: ['order-cost-google'] }],
+    todo: [{ amt: kO, ids: ['sales-rhythm', 'promo-peak-plan'] }, { amt: kM, ids: ['discount-depth-inversion', 'product-margin_drain-', 'returns-product-'] }, { amt: -dMeta, ids: ['order-cost-meta', 'driver-meta-ads', 'driver-retargeting'] }, { amt: -(dAds - dMeta), ids: ['order-cost-google'] }],
     title: (B.v < 0 ? 'Why you are losing ' + fmtMoney(-B.v) : 'Why you are making ' + fmtMoney(B.v)) + ' a month ' + label,
     from: A.v, to: B.v, better: 'higher', fmtV: v3SignedGbp, fmtAmt: v => fmtMoney(Math.abs(v)),
     startK: O ? 'After all costs' : 'After ads', endK: O ? 'After all costs now' : 'After ads now', chartK: O ? 'After all costs' : 'Profit after ads',
     parts: [
-      { amt: m * sO, k: v3UpDown(A.o, B.o, 'More orders', 'Fewer orders'), sub: fmtCount(A.o) + ' to ' + fmtCount(B.o),
+      { amt: kO, k: v3UpDown(A.o, B.o, 'More orders', 'Fewer orders'), sub: fmtCount(A.o) + ' to ' + fmtCount(B.o),
         cause: <>there were {v3UpDown(A.o, B.o, 'more', 'fewer')} orders ({fmtCount(A.o)} to {fmtCount(B.o)}){saleNote}</>,
         against: <>{v3UpDown(A.o, B.o, 'More', 'Fewer')} orders ({fmtCount(A.o)} to {fmtCount(B.o)})</> },
-      { amt: m * sA, k: v3UpDown(A.aov, B.aov, 'Bigger orders', 'Smaller orders'), sub: fmtMoney(A.aov, 2) + ' to ' + fmtMoney(B.aov, 2) + ' an order',
+      { amt: kA, k: v3UpDown(A.aov, B.aov, 'Bigger orders', 'Smaller orders'), sub: fmtMoney(A.aov, 2) + ' to ' + fmtMoney(B.aov, 2) + ' an order',
         cause: <>orders were {v3UpDown(A.aov, B.aov, 'bigger', 'smaller')} on average ({fmtMoney(A.aov, 2)} to {fmtMoney(B.aov, 2)})</>,
         against: <>{v3UpDown(A.aov, B.aov, 'Bigger', 'Smaller')} orders ({fmtMoney(A.aov, 2)} to {fmtMoney(B.aov, 2)} on average)</> },
+      ...(ctx.mAt ? [{ amt: kM, k: v3UpDown(A.mp, B.mp, 'More kept from each £1', 'Less kept from each £1'), sub: pence(A.mp) + ' to ' + pence(B.mp) + ' of each £1',
+        cause: <>each £1 of sales kept {v3UpDown(A.mp, B.mp, 'more', 'less')} after products and delivery ({pence(A.mp)} to {pence(B.mp)}){sAw > sBw && B.mp > A.mp ? <>, as fewer orders were marked down</> : sBw > sAw && B.mp < A.mp ? <>, as more orders were marked down</> : null}</>,
+        against: <>{v3UpDown(A.mp, B.mp, 'More', 'Less')} kept from each £1 ({pence(A.mp)} to {pence(B.mp)})</> }] : []),
       { amt: -dMeta, k: v3UpDown(A.ms, B.ms, 'More Meta spend', 'Less Meta spend'), sub: fmtMoney(A.ms) + ' to ' + fmtMoney(B.ms),
         cause: <>Meta ad spend went {v3UpDown(A.ms, B.ms, 'up', 'down')} ({fmtMoney(A.ms)} to {fmtMoney(B.ms)})</>,
         against: <>{v3UpDown(A.ms, B.ms, 'More', 'Less')} Meta ad spend ({fmtMoney(A.ms)} to {fmtMoney(B.ms)})</> },
@@ -22070,18 +22249,21 @@ function v3ModelProfit(a, b, ctx) {
         against: <>{v3UpDown(A.ad - A.ms, B.ad - B.ms, 'More', 'Less')} Google ad spend ({fmtMoney(A.ad - A.ms)} to {fmtMoney(B.ad - B.ms)})</> },
     ],
     opening: <>Since the 30 days to {v3Day(String(a.d), true)}, the business went from {state(A.v)} a month {label} to {state(B.v)}.</>,
-    closing: <> Each £1 of sales keeps about {Math.round(m * 100)}p after products and delivery, so every £1,000 of sales lost costs about {fmtMoney(m * 1000)} of profit{O ? <>, while running costs stay at {fmtMoney(O)} a month</> : null}.</>,
+    closing: <> Each £1 of sales keeps about {Math.round(m * 100)}p after products and delivery now, so every £1,000 of sales lost costs about {fmtMoney(m * 1000)} of profit{O ? <>, while running costs stay at {fmtMoney(O)} a month</> : null}.</>,
     rows: [
       ['Sales', A.s, B.s, v => fmtMoney(v), 'higher'],
       ['Orders', A.o, B.o, v => fmtCount(v), 'higher'],
       ['Average order', A.aov, B.aov, v => fmtMoney(v, 2), 'higher'],
+      ...(ctx.mAt ? [['Kept from each £1', A.mp, B.mp, pence, 'higher']] : []),
       ['Kept after products and delivery', A.kept, B.kept, v => fmtMoney(v), 'higher'],
       ['Ad spend: Meta', A.ms, B.ms, v => fmtMoney(v), 'lower'],
       ['Ad spend: Google and other', A.ad - A.ms, B.ad - B.ms, v => fmtMoney(v), 'lower'],
       ...(O ? [['Running costs', O, O, v => fmtMoney(v), null]] : []),
       [O ? 'After all costs' : 'After ads', A.v, B.v, v3SignedGbp, 'higher'],
     ],
-    note: 'This is the headline figure worked out for each 30 days: sales times the ' + Math.round(m * 100) + 'p each £1 keeps after products and delivery (your measured margin, used for every week, as the headline does), less ad spend' + (O ? ' and ' + fmtMoney(O) + ' of running costs a month' : '') + '. So it moves with sales and ad spend. When Greta measures your margin again, every week moves with it.',
+    note: ctx.mAt
+      ? 'This is the headline figure worked out for each 30 days: sales times what each £1 kept after products and delivery in those weeks (from your orders, so a sale month keeps less), scaled so the latest 30 days uses your measured ' + Math.round(m * 100) + 'p, less ad spend' + (O ? ' and ' + fmtMoney(O) + ' of running costs a month' : '') + '. Orders, order size and what each £1 kept multiply to what was kept, so the parts add up to the change exactly.'
+      : 'This is the headline figure worked out for each 30 days: sales times the ' + Math.round(m * 100) + 'p each £1 keeps after products and delivery (your measured margin, used for every week, as the headline does), less ad spend' + (O ? ' and ' + fmtMoney(O) + ' of running costs a month' : '') + '. So it moves with sales and ad spend. When Greta measures your margin again, every week moves with it.',
   };
 }
 // Website conversion (0314): orders per 100 visits = web orders / visits, with visits from Clarity less
@@ -22329,6 +22511,49 @@ function v3ModelNewSales(a, b, ctx) {
     note: 'New customers’ sales are first orders from your own shop, after discounts and before VAT, as on Customers. New customers are first-time buyers from any source; the cost of each is all Meta and Google spend divided by them. The three parts multiply to the sales, so they add up to the change exactly.',
   };
 }
+// Marketing (9 Oct review: email had no drivers): sales from email campaigns = emails sent x the share opened
+// x clicks per open x sales per click, so a change splits exactly into sending, opening, clicking and buying.
+// Sales are Klaviyo's own credit (any order within days of an open or click), which runs high; the parts
+// still say which step moved, and that is what decides the fix (inbox, subject, or offer).
+function v3ModelEmail(a, b, ctx) {
+  const f = p => { const n = Number(p.em_sends), o = Number(p.em_opens), c = Number(p.em_clicks), v = Number(p.em_rev), k = Number(p.em_campaigns) || 0;
+    return { n, o, c, v, k, or: o / n, cto: c / o, rpc: v / c, rpk: 1000 * v / n }; };
+  const A = f(a), B = f(b);
+  const [pN, pO, pC, pR] = v3LogParts(A.v, B.v, [{ a: A.n, b: B.n, sign: 1 }, { a: A.or, b: B.or, sign: 1 }, { a: A.cto, b: B.cto, sign: 1 }, { a: A.rpc, b: B.rpc, sign: 1 }]);
+  const inbox = B.or < A.or - 0.05, offer = !inbox && B.rpc < A.rpc * 0.7;
+  return {
+    todo: [{ amt: pO, ids: ['email-campaign-drop'] }, { amt: pC, ids: ['email-campaign-drop'] }, { amt: pR, ids: ['email-campaign-drop', 'site-errors'] }, { amt: pN, ids: ['email-campaign-drop', 'crm-flows'] }],
+    title: 'Why your email campaigns brought in ' + fmtMoney(B.v), from: A.v, to: B.v, better: 'higher', fmtV: v => fmtMoney(v), fmtAmt: v => fmtMoney(Math.abs(v)),
+    startK: 'Email campaign sales', endK: 'Email campaign sales now', chartK: 'Email campaign sales, Klaviyo’s count',
+    parts: [
+      { amt: pN, k: v3UpDown(A.n, B.n, 'More emails sent', 'Fewer emails sent'), sub: fmtCount(A.n) + ' to ' + fmtCount(B.n) + ' emails',
+        cause: <>you sent {v3UpDown(A.n, B.n, 'more', 'fewer')} campaign emails ({fmtCount(A.n)} to {fmtCount(B.n)}, in {fmtCount(A.k)} and {fmtCount(B.k)} campaigns)</>,
+        against: <>{v3UpDown(A.n, B.n, 'More', 'Fewer')} emails sent ({fmtCount(A.n)} to {fmtCount(B.n)})</> },
+      { amt: pO, k: v3UpDown(A.or, B.or, 'More people opened them', 'Fewer people opened them'), sub: fmtPctN(A.or) + ' to ' + fmtPctN(B.or) + ' opened',
+        cause: <>{v3UpDown(A.or, B.or, 'more', 'fewer')} people opened them ({fmtPctN(A.or)} to {fmtPctN(B.or)})</>,
+        against: <>{v3UpDown(A.or, B.or, 'More', 'Fewer')} people opening them ({fmtPctN(A.or)} to {fmtPctN(B.or)})</> },
+      { amt: pC, k: v3UpDown(A.cto, B.cto, 'More who opened clicked', 'Fewer who opened clicked'), sub: fmtPctN(A.cto) + ' to ' + fmtPctN(B.cto) + ' of opens',
+        cause: <>{v3UpDown(A.cto, B.cto, 'more', 'fewer')} of the people who opened one clicked through ({fmtPctN(A.cto)} to {fmtPctN(B.cto)})</>,
+        against: <>{v3UpDown(A.cto, B.cto, 'More', 'Fewer')} clicking through ({fmtPctN(A.cto)} to {fmtPctN(B.cto)} of opens)</> },
+      { amt: pR, k: v3UpDown(A.rpc, B.rpc, 'Each click sold more', 'Each click sold less'), sub: fmtMoney(A.rpc, 2) + ' to ' + fmtMoney(B.rpc, 2) + ' a click',
+        cause: <>each click led to {v3UpDown(A.rpc, B.rpc, 'more', 'less')} in sales ({fmtMoney(A.rpc, 2)} to {fmtMoney(B.rpc, 2)})</>,
+        against: <>Each click selling {v3UpDown(A.rpc, B.rpc, 'more', 'less')} ({fmtMoney(A.rpc, 2)} to {fmtMoney(B.rpc, 2)})</> },
+    ],
+    opening: <>Since the 30 days to {v3Day(String(a.d), true)}, your email campaigns went from {fmtMoney(A.v)} to {fmtMoney(B.v)} of sales on Klaviyo’s count, or {fmtMoney(A.rpk, 2)} to {fmtMoney(B.rpk, 2)} for every 1,000 emails sent.</>,
+    closing: inbox ? <> Opens fell by more than five points: check the emails are reaching inboxes (your sending domain, and people who have not opened in months still on the list) before changing what is in them.</>
+      : offer ? <> People still open and click, but each click sells much less: the offer or the products in the emails are the place to look.</> : null,
+    rows: [
+      ['Campaigns sent', A.k, B.k, v => fmtCount(v), null],
+      ['Emails sent', A.n, B.n, v => fmtCount(v), null],
+      ['Opened', A.or, B.or, v => fmtPctN(v), 'higher'],
+      ['Clicked, of those who opened', A.cto, B.cto, v => fmtPctN(v), 'higher'],
+      ['Sales per click', A.rpc, B.rpc, v => fmtMoney(v, 2), 'higher'],
+      ['Sales per 1,000 emails', A.rpk, B.rpk, v => fmtMoney(v, 2), 'higher'],
+      ['Sales, Klaviyo’s count', A.v, B.v, v => fmtMoney(v), 'higher'],
+    ],
+    note: 'From your Klaviyo campaigns; automatic emails (flows) are not in it. Sales are Klaviyo’s own credit, any order within a few days of an open or click, so they run high and overlap with ads. Opens include the ones Apple Mail records on its own. The four parts multiply to the sales, so they add up to the change exactly.',
+  };
+}
 // Settings (9 Oct): the share of your website's orders that Meta and Google claim, each on its own count,
 // is Meta's claims / orders + Google's claims / orders, so a change splits exactly into the two. One
 // count falling much faster than real orders is the sign its tracking broke, which is what Settings is for.
@@ -22367,6 +22592,8 @@ function v3ModelClaims(a, b, ctx) {
   };
 }
 const V3_DRIVER_MODELS = {
+  email: { model: v3ModelEmail, mode: 'pair', key: 'em_rev', fmt: v => fmtMoney(v),
+           ok: p => Number(p.em_sends) > 0 && Number(p.em_opens) > 0 && Number(p.em_clicks) > 0 && Number(p.em_rev) > 0 },
   claims: { model: v3ModelClaims, mode: 'pair', key: 'claims_share', fmt: v => fmtPctN(v),
             prep: P => P.map(p => Object.assign({}, p, { claims_share: Number(p.web_orders) > 0 ? ((Number(p.meta_purchases) || 0) + (Number(p.google_conversions) || 0)) / Number(p.web_orders) : null })),
             ok: p => p.claims_share != null && p.meta_purchases != null },
@@ -22387,7 +22614,7 @@ const V3_DRIVER_MODELS = {
   conv:   { model: v3ModelConv,     mode: 'pair',   key: 'conv',       fmt: v => v3Per100(v),
             ok: p => p.conv != null && Number(p.visits) > 0 && Number(p.web_orders) > 0 },
   profit: { model: v3ModelProfit,   mode: 'pair',   key: 'profit',     fmt: v3SignedGbp,
-            prep: (P, ctx) => P.map(p => Object.assign({}, p, { profit: ctx.anchor && String(p.d) === ctx.anchor.d ? ctx.anchor.v : Number(p.sales) * ctx.m - Number(p.ads) - (ctx.o || 0) })),
+            prep: (P, ctx) => P.map(p => Object.assign({}, p, { profit: ctx.anchor && String(p.d) === ctx.anchor.d ? ctx.anchor.v : Number(p.sales) * (ctx.mAt ? ctx.mAt(p.d) : ctx.m) - Number(p.ads) - (ctx.o || 0) })),
             ok: p => Number(p.sales) > 0 && Number(p.orders) > 0 && p.ads != null && p.meta_spend != null },
   cac:    { model: v3ModelCac,      mode: 'pair',   key: 'cac',        fmt: v => fmtMoney(v),
             ok: p => p.cac != null && p.new_customers > 0 && (Number(p.meta_clicks) + Number(p.google_clicks)) > 0 && p.cac_spend != null },
@@ -22440,7 +22667,7 @@ function V3DriverPanel({ which, points, ctx, line, fixed }) {
   (fine ? (M.todo || []).filter(t => t.always) : (M.todo || [])).filter(t => t.force || bad(t)).sort((x, y) => Math.abs(y.amt) - Math.abs(x.amt)).forEach(t => {
     if (todo.length >= 2) return;
     for (const id of t.ids) { const i = live.findIndex(r => (id.endsWith('-') ? String(r.external_id).startsWith(id) : r.external_id === id));
-      if (i >= 0) { if (!todo.some(x => x.row === live[i])) todo.push({ row: live[i], rank: i + 1 }); break; } }
+      if (i >= 0) { if (!todo.some(x => x.row === live[i])) todo.push({ row: live[i], rank: v3BoardRank(live, live[i].external_id) }); break; } }
   });
   const tip = ({ active, payload }) => (active && payload && payload.length)
     ? <div className="v3-tip"><b>30 days to {v3Day(payload[0].payload.d, true)}</b><span>{M.chartK} <em>{M0.fmt(payload[0].payload[M0.key])}</em></span>
@@ -22610,7 +22837,8 @@ function V3FixFirst({ kick }) {
   if (q.err || !q.rows || !q.rows.length) return null;
   const r = q.rows[0];
   const live = board.rows ? v3LiveRows(board.rows) : [];
-  const hit = live.map((x, i) => ({ x, i })).filter(o => /^(order-cost|paid-landing)-/.test(o.x.external_id));
+  const hit = live.map(x => ({ x, i: v3BoardRank(live, x.external_id) - 1 })).filter(o => /^(order-cost|paid-landing)-/.test(o.x.external_id))
+    .filter((o, k, A) => A.findIndex(p => p.i === o.i) === k);
   // One line and a fold: the full finding ran to a screen and a half on a phone (2026-10-06).
   const desc = v3Tidy(scrubTag(String(r.description || '')));
   let first = (desc.match(/^[^.:;]+[.:;]/) || [desc])[0].replace(/[:;]$/, '.');
@@ -22701,7 +22929,7 @@ const V3_PAGES = {
         spend-tier "diminishing returns" read (its own numbers did not fall) and the GA4 funnel (Website's,
         on 11 of 30 tracked days) are gone. Platform claims and per-channel evidence sit behind the detail. */}
     <V3MarketingLead/>
-    <V3DriverStrip keys={['spend', 'cac', 'ret', 'metacpa', 'googcpa']}/>
+    <V3DriverStrip keys={['spend', 'cac', 'ret', 'metacpa', 'googcpa', 'email']}/>
     <V3CodePerformance/>
     <V3Incrementality/>
     <CreativeReallocation/>
