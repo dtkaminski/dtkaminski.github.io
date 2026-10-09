@@ -21088,7 +21088,15 @@ function V3BusinessState({ part }) {
       {facts}{terms}{chart}{bench}
     </V3More>);
   }
-  const HP = (hq.rows && hq.rows[0] && hq.rows[0].history && Array.isArray(hq.rows[0].history.points)) ? hq.rows[0].history.points : null;
+  const HP0 = (hq.rows && hq.rows[0] && hq.rows[0].history && Array.isArray(hq.rows[0].history.points)) ? hq.rows[0].history.points : null;
+  // The latest week takes the headline's own sales and ad spend. The history reads the daily table, which
+  // catches an order edited or refunded today only overnight (9 Oct: £19,155 there, £19,093 live), so
+  // without this the panels and the verdict above them disagreed by a few pounds for the rest of the day.
+  const HP = HP0 && HP0.length && num(L.sales) > 0 && L.ads != null ? HP0.slice(0, -1).concat([(() => {
+    const p = HP0[HP0.length - 1], sl = num(p.sales_ly), al = num(p.ads_ly), sv = num(L.sales), av = num(L.ads);
+    return Object.assign({}, p, { sales: sv, ads: av, return: av > 0 ? Math.round(sv / av * 100) / 100 : p.return,
+      vs_ly: sl > 0 ? Math.round((sv / sl - 1) * 1000) / 1000 : p.vs_ly, ads_vs_ly: al > 0 ? Math.round(av / al * 100) / 100 : p.ads_vs_ly });
+  })()]) : HP0;
   const ser = k => HP ? HP.map(p => ({ d: String(p.d), v: p[k] == null ? null : Number(p[k]) })) : null;
   const signs = [];
   if (ret != null && A.break_even_return) {
@@ -21124,7 +21132,7 @@ function V3BusinessState({ part }) {
   // the headline loss: the same panel, with the margin and running costs the headline uses
   const mKept = num(L.sales) > 0 && L.profit_after_ads != null && L.ads != null ? (num(L.profit_after_ads) + num(L.ads)) / num(L.sales) : null;
   const lastP = HP && HP.length ? HP[HP.length - 1] : null;
-  const anchor = lastP && Number(lastP.sales) === num(L.sales) ? { d: String(lastP.d), v: ao != null ? ao : num(L.profit_after_ads) } : null;
+  const anchor = lastP ? { d: String(lastP.d), v: ao != null ? ao : num(L.profit_after_ads) } : null;
   const profitCfg = mKept != null ? { which: 'profit', ctx: { m: mKept, o: ao != null ? num(L.overheads) : 0, anchor, weeks: H && Array.isArray(H.weeks) ? H.weeks : [] }, dline: 0 } : null;
   const profitAct = profitCfg && v3HasDrivers('profit', HP)
     ? { label: drv === 'profit' ? 'Hide what is driving it' : 'What is driving this?', open: drv === 'profit', on: () => setDrv(o => (o === 'profit' ? null : 'profit')) } : null;
