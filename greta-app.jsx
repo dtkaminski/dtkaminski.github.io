@@ -21208,7 +21208,7 @@ function v3ModelStock(order, lead, land, sooner) {
     title: 'Why ' + fmtMoney(tot) + ' of profit is lost before the order lands',
     from: 0, to: tot, better: 'lower', fmtV: v => fmtMoney(v), fmtAmt: v => fmtMoney(Math.abs(v)),
     startK: 'If the order were here today', endK: 'Lost before it lands', subA: ' ', subB: 'arrives ' + v3Day(land, true),
-    bridgeCap: 'What runs short, and how much it costs', noChange: true, tableTitle: 'The two groups',
+    bridgeCap: 'What runs short, and how much it costs', noChange: true, tableTitle: 'The two groups', of: 'that', endTone: 'loss',
     colA: 'Already out', colB: 'Run out before it lands',
     todo: [{ amt: A, ids: ['stock-reorder'] }, { amt: B, ids: ['stock-reorder', 'promo-peak-plan'] }],
     parts: [
@@ -21400,15 +21400,15 @@ function v3LogParts(from, to, factors) {
 }
 // "£13 of the rise is because ...", "Another £2 is because ...", and a part that pulled the other way
 // as what it took off or added back, never as a cause of the move.
-function v3DriverSentence(parts, d, fmtAmt) {
-  const move = d >= 0 ? 'rise' : 'fall', tiny = Math.max(Math.abs(d) * 0.04, 1e-9);
+function v3DriverSentence(parts, d, fmtAmt, of) {
+  const move = of || ('the ' + (d >= 0 ? 'rise' : 'fall')), tiny = Math.max(Math.abs(d) * 0.04, 1e-9);
   const ps = parts.filter(p => Math.abs(p.amt) > tiny).sort((x, y) => Math.abs(y.amt) - Math.abs(x.amt));
   const cap = s => (typeof s === 'string' ? s.charAt(0).toUpperCase() + s.slice(1) : s);
   let leadDone = false;
   return ps.map((p, i) => {
     const same = (p.amt >= 0) === (d >= 0);
     if (same && !leadDone) { leadDone = true;
-      return <React.Fragment key={i}> <b className="oi-num">{fmtAmt(p.amt)}</b> of the {move} is because {p.cause}.</React.Fragment>; }
+      return <React.Fragment key={i}> <b className="oi-num">{fmtAmt(p.amt)}</b> of {move} is because {p.cause}.</React.Fragment>; }
     if (same) return <React.Fragment key={i}> Another <b className="oi-num">{fmtAmt(p.amt)}</b> is because {p.cause}.</React.Fragment>;
     return <React.Fragment key={i}> {cap(p.against)} {d >= 0 ? 'took' : 'added'} <b className="oi-num">{fmtAmt(p.amt)}</b> {d >= 0 ? 'off' : 'back'}.</React.Fragment>;
   });
@@ -21727,7 +21727,7 @@ function V3DriverPanel({ which, points, ctx, line, fixed }) {
                  v: (p.amt >= 0 ? '+' : '−') + M.fmtAmt(p.amt), cls: good ? 'v3-up' : 'v3-down' }); run = nx; });
   const endGood = line == null ? null : (M.better === 'higher' ? M.to >= line : M.to <= line);
   steps.push({ k: M.endK, sub: M.subB || (single ? M.colB : '30 days to ' + v3Day(String(b.d), true)), lo: Math.min(0, M.to), hi: Math.max(0, M.to),
-               tone: endGood == null ? 'keep' : endGood ? 'keep' : 'loss', v: M.fmtV(M.to), total: true });
+               tone: M.endTone || (endGood == null ? 'keep' : endGood ? 'keep' : 'loss'), v: M.fmtV(M.to), total: true });
   const all = steps.flatMap(s => [s.lo, s.hi]).concat(line != null ? [line] : []);
   const lo = Math.min(0, ...all), hi = Math.max(...all) * 1.04, span = (hi - lo) || 1, x = v => ((v - lo) / span) * 100;
   const ch = (p, q, better, fm) => { if (p == null || q == null || !isFinite(p) || !isFinite(q)) return null;
@@ -21752,7 +21752,7 @@ function V3DriverPanel({ which, points, ctx, line, fixed }) {
         <span>{single ? 'Click to explain this week' : 'Click to compare with now'}</span></div> : null;
   return (<div className="v3-drivers" id={'drivers-' + (which || 'fixed')}>
     <h3 className="v3-sec-title">{M.title}</h3>
-    <p className="v3-note v3-measure">{M.opening}{flat ? ' It barely moved.' : v3DriverSentence(M.parts, d, M.fmtAmt)}{M.closing}</p>
+    <p className="v3-note v3-measure">{M.opening}{flat ? ' It barely moved.' : v3DriverSentence(M.parts, d, M.fmtAmt, M.of)}{M.closing}</p>
     {todo.length > 0 && <div className="v3-drivers-todo">
       <div className="v3-kick">What to do</div>
       {todo.map(t => (<button key={t.row.external_id} type="button" className="v3-drivers-todo-row" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>
