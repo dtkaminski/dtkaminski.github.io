@@ -8969,6 +8969,8 @@ function v3AskScrub(text, facts) {
   const fw = k => V3_ASK_WORDS[k] || k.replace(/_/g, ' ');
   const pathWords = p => { const seg = p.replace(/`/g, '').split('.').filter(Boolean); const known = seg.slice().reverse().find(s => V3_ASK_WORDS[s]);
     const last = seg[seg.length - 1]; return known ? V3_ASK_WORDS[known] : (/^(facts|readout|data|_meta)$/.test(last) ? 'the figures' : fw(last)); };
+  // the discount-depth fields read as what they mean ("kept_at_30_off 31" -> "what 30% off keeps: 31")
+  t = t.replace(/\bkept_at_(\d+)_off\b\s*:?\s*/g, (m, d) => 'what ' + d + '% off keeps: ').replace(/\bkept_per_100_full_price\b\s*:?\s*/g, 'kept from each £100 at full price: ');
   // a bracket that holds nothing but a path is a citation: dropped
   t = t.replace(/\s*\(\s*`?(?:_meta\.)?(?:facts|readout|data)(?:\.[a-z0-9_]+)+`?\s*\)/gi, '');
   t = t.replace(/`?\b(?:_meta\.)?(?:facts|readout|data)(?:\.[a-z0-9_]+)+`?/g, m => pathWords(m));
