@@ -9157,6 +9157,11 @@ function buildAskContext(facts, question, budget){
   // Still over (the figures every page shows run large on a busy brand): the named stock rows go last.
   if (size() > BUDGET && meta.readout) meta.readout.headline = meta.readout.headline.map(h => ({ label: h.label, value: h.value, window: h.window }));
   if (size() > BUDGET && data.stock_named) { delete data.stock_named; delete dictionary.stock_named; }
+  // The protected series still have to fit: "our best seller" matched stock and products, both kept,
+  // and the request ran 1,800 characters over, so the reply allowance was cut to a one-line answer
+  // (9 Oct). Shorter first (8 rows, then 5), dropped last.
+  [8, 5].forEach(n => { Array.from(keepSeries).forEach(k => { if (size() > BUDGET && data[k] && data[k].rows.length > n) data[k] = { cols: data[k].cols, rows: data[k].rows.slice(0, n) }; }); });
+  Array.from(keepSeries).forEach(k => { if (size() > BUDGET && data[k]) { delete data[k]; delete dictionary[k]; } });
   return { _meta: meta, data, topics, chars: size() };
 }
 // Answer depth -> the model that serves it. The only place a model id appears on the
