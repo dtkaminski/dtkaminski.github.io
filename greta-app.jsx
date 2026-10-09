@@ -18887,7 +18887,7 @@ function V3Products() {
       const now = Number(x.rev_28d) || 0, was = Number(x.rev_prior_28d) || 0;
       const isNew = !!(born[String(x.shopify_product_id)] && born[String(x.shopify_product_id)] >= recent);
       const out = !!(st && st.oh === 0 && (st.v > 0 || was > 0));
-      return { title: v3Title(x.product_title), now, was, units: Number(x.units_now) || 0, d: now - was, ch: was > 0 ? now / was - 1 : null,
+      return { title: v3Title(x.product_title), now, was, units: Number(x.units_now) || 0, unitsWas: Number(x.units_prior) || 0, d: now - was, ch: was > 0 ? now / was - 1 : null,
         kept: c ? c.kept : null, margin: c && c.rev > 0 ? c.kept / c.rev : null, off: c && c.list > 0 ? 1 - c.listed / c.list : null,
         out, low: !out && !!x.stock_constrained, isNew, back: !isNew && was <= 0 && now > 0 };
     });
@@ -18944,6 +18944,7 @@ function V3Products() {
         : (d.top5share != null ? 'Your top five bring in ' + fmtPctN(d.top5share) + ' of it. ' : '')}“Kept” is what is left after the product’s own cost and payment fees. Shipping and packing are paid per order, not per product, so profit on Profit &amp; sales is lower.</p>
       <ol className="v3-moves">{leaks}</ol>
     </section>
+    <V3ProductStrip d={d}/>
     <section className="v3-sec">
       {d.sale != null && <p className="v3-note v3-measure">The 28 days before included a sale: sales ran {fmtPctN(d.sale)} above a typical 28 days. So most products are down against them. A change marked “against a sale” is the sale ending, not the product.</p>}
       <table className="v3-ptable">
@@ -21191,6 +21192,72 @@ function V3BusinessState({ part }) {
     <p className="micro muted v3-stand-fresh">Each figure covers the 30 days to {HP ? v3Day(String(hq.rows[0].history.as_of), true) : 'yesterday'}, the last full day. Greta works them out again every hour; Shopify orders arrive every 30 minutes and ad spend every 2 hours.{HP ? ' Point at a sign to see its last 13 weeks.' : ''}</p>
   </section>);
 }
+// Products (9 Oct): product sales over the last 28 days against the 28 before, on the Products page's
+// own figures (vw_product_performance), split into products that ran out, fewer or more units on the
+// products still selling, the price each unit sold at (a sale ending shows here), new products, and
+// products that sold again after none. Units and price split each product's change exactly:
+// now - was = was price x unit change + units now x price change.
+function v3ModelProducts(list, sale) {
+  const sum = (a, k) => a.reduce((t, x) => t + (x[k] || 0), 0);
+  const out = list.filter(x => x.out), nw = list.filter(x => !x.out && x.isNew), back = list.filter(x => !x.out && !x.isNew && x.back);
+  const cont = list.filter(x => !x.out && !x.isNew && !x.back);
+  let price = 0; cont.forEach(x => { if (x.unitsWas > 0 && x.units > 0) price += x.units * (x.now / x.units - x.was / x.unitsWas); });
+  const contD = cont.reduce((t, x) => t + x.now - x.was, 0), units = contD - price;
+  const was = sum(list, 'was'), now = sum(list, 'now');
+  const U0 = cont.reduce((t, x) => t + (x.unitsWas || 0), 0), U1 = cont.reduce((t, x) => t + (x.units || 0), 0);
+  const pA = U0 > 0 ? cont.reduce((t, x) => t + x.was, 0) / U0 : null, pB = U1 > 0 ? cont.reduce((t, x) => t + x.now, 0) / U1 : null;
+  const big = a => a.slice().sort((p, q) => Math.abs(q.now - q.was) - Math.abs(p.now - p.was))[0];
+  const outD = out.reduce((t, x) => t + x.now - x.was, 0), newD = sum(nw, 'now') - sum(nw, 'was'), backD = back.reduce((t, x) => t + x.now - x.was, 0);
+  const parts = [];
+  if (out.length) parts.push({ amt: outD, k: 'Ran out of stock', sub: fmtCount(out.length) + ' products, ' + big(out).title + ' the biggest',
+    cause: <>{out.length === 1 ? 'a product' : fmtCount(out.length) + ' products'} that sold before ran out of stock ({big(out).title} the biggest, {fmtMoney(big(out).was)} in the 28 days before)</>,
+    against: <>Products that ran out of stock</> });
+  if (cont.length) parts.push({ amt: units, k: v3UpDown(U0, U1, 'Sold more units', 'Sold fewer units'), sub: fmtCount(U0) + ' to ' + fmtCount(U1) + ' units, products still selling',
+    cause: <>the products still in stock sold {v3UpDown(U0, U1, 'more', 'fewer')} units ({fmtCount(U0)} to {fmtCount(U1)}){sale != null && U1 < U0 ? <>, as the 28 days before included a sale</> : null}</>,
+    against: <>Selling {v3UpDown(U0, U1, 'more', 'fewer')} units of the products still in stock ({fmtCount(U0)} to {fmtCount(U1)})</> });
+  if (pA != null && pB != null) parts.push({ amt: price, k: v3UpDown(pA, pB, 'Higher price a unit', 'Lower price a unit'), sub: fmtMoney(pA, 2) + ' to ' + fmtMoney(pB, 2) + ' a unit',
+    cause: <>each unit sold for {v3UpDown(pA, pB, 'more', 'less')} on average ({fmtMoney(pA, 2)} to {fmtMoney(pB, 2)})</>,
+    against: sale != null && pB > pA ? <>Higher prices once the sale ended ({fmtMoney(pA, 2)} to {fmtMoney(pB, 2)} a unit)</> : <>{v3UpDown(pA, pB, 'Higher', 'Lower')} prices a unit ({fmtMoney(pA, 2)} to {fmtMoney(pB, 2)})</> });
+  if (nw.length) parts.push({ amt: newD, k: 'New products', sub: fmtCount(nw.length) + ' new in the last eight weeks',
+    cause: <>new products sold {fmtMoney(sum(nw, 'now'))}</>, against: <>New products ({fmtCount(nw.length)})</> });
+  if (back.length) parts.push({ amt: backD, k: 'Selling again', sub: fmtCount(back.length) + ' with no sales the 28 days before',
+    cause: <>products with no sales before sold again</>, against: <>Products selling again ({fmtCount(back.length)})</> });
+  return {
+    title: 'Why product sales ' + (now >= was ? 'rose' : 'fell') + ' to ' + fmtMoney(now),
+    from: was, to: now, better: 'higher', fmtV: v => fmtMoney(v), fmtAmt: v => fmtMoney(Math.abs(v)),
+    startK: 'The 28 days before', endK: 'The last 28 days', subA: sale != null ? 'included a sale' : ' ', subB: ' ', colA: 'The 28 days before', colB: 'The last 28 days',
+    bridgeCap: 'From the 28 days before to the last 28',
+    todo: [{ amt: outD, ids: ['stock-reorder'] }, { amt: units, ids: ['promo-peak-plan', 'product-hero_underexposed-', 'basket-pair'] },
+           { amt: price, ids: ['discount-depth-inversion', 'discount-reference-price', 'sales-rhythm'] }],
+    parts,
+    opening: <>Product sales were {fmtMoney(now)} in the last 28 days, against {fmtMoney(was)} in the 28 days before{sale != null ? ', which included a sale' : ''}.</>,
+    rows: [
+      ['Products that sold', list.filter(x => x.was > 0).length, list.filter(x => x.now > 0).length, v => fmtCount(v), 'higher'],
+      ['Units, products still selling', U0, U1, v => fmtCount(v), 'higher'],
+      ['Price a unit, products still selling', pA, pB, v => fmtMoney(v, 2), null],
+      ['Out of stock now, sold before', 0, out.length, v => fmtCount(v), 'lower'],
+    ],
+    note: 'These are the figures in the table on this page: Shopify order lines, after discounts and before VAT, for the last 28 days and the 28 before. Each product still selling splits its change into units and the price each unit sold at; products that ran out, are new, or sold again after none are counted on their own.',
+  };
+}
+function V3ProductStrip({ d }) {
+  const [open, setOpen] = React.useState(false);
+  if (!d || !d.list || !d.list.length) return null;
+  const now = d.list.reduce((t, x) => t + x.now, 0), was = d.list.reduce((t, x) => t + x.was, 0);
+  if (!(was > 0)) return null;
+  const ch = now / was - 1;
+  const M = v3ModelProducts(d.list, d.sale);
+  return (<section className="v3-sec v3-strip">
+    <h2 className="v3-sec-title">What is moving it <span className="v3-muted">last 28 days</span></h2>
+    <div className="v3-signs">
+      <V3Sign k="Product sales" v={fmtMoney(now)} tone={ch >= 0 ? 'good' : d.sale != null ? 'ok' : ch < -0.15 ? 'weak' : 'ok'}
+        n={<>{fmtCount(d.list.filter(x => x.now > 0).length)} products sold{d.top5share != null ? <>; your top five bring {fmtPctN(d.top5share)}</> : null}</>}
+        trendAs={{ dir: Math.abs(ch) < 0.03 ? 'flat' : ch > 0 ? 'up' : 'down', cls: Math.abs(ch) < 0.03 ? 'flat' : ch > 0 ? 'good' : 'bad', from: fmtMoney(was), when: 'the 28 days before' }}
+        act={{ label: open ? 'Hide what is driving it' : 'What is driving this?', open, on: () => setOpen(o => !o) }}/>
+    </div>
+    {open && <V3DriverPanel fixed={M}/>}
+  </section>);
+}
 // The same signs and drivers on the page where each figure is the subject (9 Oct): one row of signs,
 // each with its arrow, its 13 weeks on hover and "What is driving this?", and the panel under them.
 function V3DriverStrip({ keys, title, opts }) {
@@ -21217,7 +21284,7 @@ function V3DriverStrip({ keys, title, opts }) {
 // 9 Oct: each sign also says which way it is heading (against four weeks ago, on the same 30-day basis)
 // and, on hover, focus or tap, draws its last 13 weeks with the line that matters. (`line`, not `ref`:
 // React keeps a prop called ref for itself, so the break-even line never arrived.)
-function V3Sign({ k, v, tone, bar, n, series, fmt, better, line, act }) {
+function V3Sign({ k, v, tone, bar, n, series, fmt, better, line, act, trendAs }) {
   const pc = x => Math.max(0, Math.min(100, x * 100)) + '%';
   const [open, setOpen] = React.useState(false);
   const pts = (series || []).filter(p => p.v != null);
@@ -21229,6 +21296,7 @@ function V3Sign({ k, v, tone, bar, n, series, fmt, better, line, act }) {
     const good = dir === 'flat' ? null : (dir === 'up') === (better === 'higher');
     trend = { dir, cls: dir === 'flat' ? 'flat' : good ? 'good' : 'bad', from: fmt(then.v) };
   }
+  if (!trend && trendAs) trend = trendAs;
   const chart = open && pts.length >= 4 && (<span className="v3-sign-pop" role="dialog" aria-label={k + ', last ' + pts.length + ' weeks'}>
     <span className="v3-sign-pop-h"><b>{k}</b><span>Last {pts.length} weeks · each point is the 30 days to that date</span></span>
     <R.ResponsiveContainer width="100%" height={160}>
@@ -21252,7 +21320,7 @@ function V3Sign({ k, v, tone, bar, n, series, fmt, better, line, act }) {
       <span className={'v3-sign-s v3-sign-' + (tone || 'typical')}>{V3_SIG_WORD[tone] || V3_SIG_WORD.typical}</span></div>
     {trend && <div className={'v3-sign-trend ' + trend.cls}>
       {trend.dir === 'flat' ? <span aria-hidden="true">→</span> : <Icon name={trend.dir === 'up' ? 'arrowUp' : 'arrowDown'} size={12} stroke={2.2}/>}
-      <span>{trend.dir === 'flat' ? 'About the same as' : trend.dir === 'up' ? 'Up from' : 'Down from'} {trend.from} four weeks ago</span></div>}
+      <span>{trend.dir === 'flat' ? 'About the same as' : trend.dir === 'up' ? 'Up from' : 'Down from'} {trend.from} {trend.when || 'four weeks ago'}</span></div>}
     {chart}
     {bar && <span className="v3-sign-bar" aria-hidden="true"><i className={'v3-sign-fill-' + (tone || 'typical')} style={{ width: pc(bar.fill) }}/>
       {bar.mark != null && <b style={{ left: pc(bar.mark) }}/>}</span>}
@@ -21587,24 +21655,26 @@ const V3_DRIVER_MODELS = {
 const v3HasDrivers = (which, points) => { const m = V3_DRIVER_MODELS[which]; if (!m || !Array.isArray(points)) return false;
   const P = points.filter(m.ok); return m.mode === 'single' ? P.length >= 1 : P.length >= 2; };
 
-function V3DriverPanel({ which, points, ctx, line }) {
+function V3DriverPanel({ which, points, ctx, line, fixed }) {
   const board = useV3Board();   // above the early return: what to do points at rows already on the board
-  const M0 = V3_DRIVER_MODELS[which];
-  const P = (M0 && M0.prep ? M0.prep(points || [], ctx || {}) : (points || [])).filter(M0 ? M0.ok : () => false);
-  const single = M0 && M0.mode === 'single';
+  // fixed: a model already worked out on a page's own window (Products: the last 28 days against the 28
+  // before), drawn without the weekly chart
+  const M0 = fixed ? null : V3_DRIVER_MODELS[which];
+  const P = fixed ? [] : (M0 && M0.prep ? M0.prep(points || [], ctx || {}) : (points || [])).filter(M0 ? M0.ok : () => false);
+  const single = !fixed && M0 && M0.mode === 'single';
   const [ci, setCi] = React.useState(() => single ? P.length - 1 : Math.max(0, P.length - 5));
-  if (!M0 || P.length < (single ? 1 : 2)) return null;
+  if (!fixed && (!M0 || P.length < (single ? 1 : 2))) return null;
   const i0 = single ? Math.min(ci, P.length - 1) : Math.min(ci, P.length - 2);
-  const a = P[i0], b = single ? P[i0] : P[P.length - 1];
-  const M = M0.model(a, b, ctx || {});
+  const a = fixed ? null : P[i0], b = fixed ? null : single ? P[i0] : P[P.length - 1];
+  const M = fixed || M0.model(a, b, ctx || {});
   const d = M.to - M.from;
-  const steps = [{ k: M.startK, sub: single ? M.colA : '30 days to ' + v3Day(String(a.d), true), lo: Math.min(0, M.from), hi: Math.max(0, M.from), tone: 'sales', v: M.fmtV(M.from) }];
+  const steps = [{ k: M.startK, sub: M.subA || (single ? M.colA : '30 days to ' + v3Day(String(a.d), true)), lo: Math.min(0, M.from), hi: Math.max(0, M.from), tone: 'sales', v: M.fmtV(M.from) }];
   let run = M.from;
   M.parts.forEach(p => { const nx = run + p.amt; const good = (p.amt >= 0) === (M.better === 'higher');
     steps.push({ k: p.k, sub: p.sub, lo: Math.min(run, nx), hi: Math.max(run, nx), tone: Math.abs(p.amt) < 1e-9 ? 'cost' : good ? 'gain' : 'loss',
                  v: (p.amt >= 0 ? '+' : '−') + M.fmtAmt(p.amt), cls: good ? 'v3-up' : 'v3-down' }); run = nx; });
   const endGood = line == null ? null : (M.better === 'higher' ? M.to >= line : M.to <= line);
-  steps.push({ k: M.endK, sub: single ? M.colB : '30 days to ' + v3Day(String(b.d), true), lo: Math.min(0, M.to), hi: Math.max(0, M.to),
+  steps.push({ k: M.endK, sub: M.subB || (single ? M.colB : '30 days to ' + v3Day(String(b.d), true)), lo: Math.min(0, M.to), hi: Math.max(0, M.to),
                tone: endGood == null ? 'keep' : endGood ? 'keep' : 'loss', v: M.fmtV(M.to), total: true });
   const all = steps.flatMap(s => [s.lo, s.hi]).concat(line != null ? [line] : []);
   const lo = Math.min(0, ...all), hi = Math.max(...all) * 1.04, span = (hi - lo) || 1, x = v => ((v - lo) / span) * 100;
@@ -21628,7 +21698,7 @@ function V3DriverPanel({ which, points, ctx, line }) {
   const tip = ({ active, payload }) => (active && payload && payload.length)
     ? <div className="v3-tip"><b>30 days to {v3Day(payload[0].payload.d, true)}</b><span>{M.chartK} <em>{M0.fmt(payload[0].payload[M0.key])}</em></span>
         <span>{single ? 'Click to explain this week' : 'Click to compare with now'}</span></div> : null;
-  return (<div className="v3-drivers" id={'drivers-' + which}>
+  return (<div className="v3-drivers" id={'drivers-' + (which || 'fixed')}>
     <h3 className="v3-sec-title">{M.title}</h3>
     <p className="v3-note v3-measure">{M.opening}{flat ? ' It barely moved.' : v3DriverSentence(M.parts, d, M.fmtAmt)}{M.closing}</p>
     {todo.length > 0 && <div className="v3-drivers-todo">
@@ -21637,9 +21707,9 @@ function V3DriverPanel({ which, points, ctx, line }) {
         <span className="v3-num">#{t.rank}</span><span>{v3PlainAction(t.row).title}</span>
         <span className="v3-num">{t.row.cm_gbp ? v3Gbp(t.row.cm_gbp) + v3Per(t.row, true) : ''}</span><Icon name="arrowRight" size={13}/></button>))}
     </div>}
-    <div className="v3-drivers-grid">
+    <div className={'v3-drivers-grid' + (fixed ? ' v3-drivers-grid-one' : '')}>
       <figure className="v3-bridge v3-bridge-wide" role="img" aria-label={M.startK + ' ' + M.fmtV(M.from) + ' to ' + M.fmtV(M.to)}>
-        <figcaption className="v3-bridge-cap">{single ? 'From last year to this' : 'From then to now'}</figcaption>
+        <figcaption className="v3-bridge-cap">{M.bridgeCap || (single ? 'From last year to this' : 'From then to now')}</figcaption>
         {steps.map((r, i) => (<div key={i} className={'v3-bridge-row' + (r.total ? ' v3-bridge-total' : '')}>
           <span className="v3-bridge-k">{r.k}{r.sub ? <small>{r.sub}</small> : null}</span>
           <span className="v3-bridge-track"><i className={'v3-bridge-' + r.tone} style={{ left: x(r.lo) + '%', width: Math.max(0.6, x(r.hi) - x(r.lo)) + '%' }}/>
@@ -21648,7 +21718,7 @@ function V3DriverPanel({ which, points, ctx, line }) {
         </div>))}
         {line != null && ctx && ctx.lineLabel ? <p className="micro muted">The upright line is {ctx.lineLabel}.</p> : null}
       </figure>
-      <figure className="v3-chart">
+      {!fixed && <figure className="v3-chart">
         <figcaption><span className="v3-chart-title">{M.chartK}, week by week</span><span className="v3-muted">{single ? 'click a week to explain it' : 'click a week to compare with it'}</span></figcaption>
         <R.ResponsiveContainer width="100%" height={160}>
           <R.BarChart data={P} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
@@ -21665,7 +21735,7 @@ function V3DriverPanel({ which, points, ctx, line }) {
         </R.ResponsiveContainer>
         {single ? <span className="v3-legend"><i style={{ background: PAL.accent }}/>The week explained</span>
                 : <span className="v3-legend"><i style={{ background: PAL.ink }}/>Compared with <i style={{ background: PAL.accent }}/>Now</span>}
-      </figure>
+      </figure>}
     </div>
     <h4 className="v3-drivers-h">What changed underneath</h4>
     <table className="v3-rw">
