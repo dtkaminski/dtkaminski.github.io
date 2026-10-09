@@ -360,6 +360,9 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-bridge-gain { background: var(--color-success); }
 /* What to do, under a driver panel's sentence: at most two rows already on the board, one line each. */
 .v3-drivers-todo { margin: var(--space-4) 0 0; max-width: 68ch; }
+/* The signs on the other pages: one row, as many columns as signs, up to three. */
+.v3-strip .v3-signs { grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); max-width: 60rem; }
+.v3-strip .v3-drivers { margin-top: var(--space-4); }
 .v3-drivers-todo .v3-kick { color: var(--color-accent); margin-bottom: var(--space-1); }
 .v3-drivers-todo-row { display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto auto; gap: var(--space-3); align-items: baseline; width: 100%;
   padding: var(--space-2) 0; border: 0; border-top: 1px solid var(--color-line); background: none; text-align: left; cursor: pointer;

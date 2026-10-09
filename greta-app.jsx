@@ -3766,6 +3766,7 @@ function V3ProfitLead() {
       {oh30 == null && <p className="v3-note v3-measure">Add your monthly overheads: what you pay whatever you sell, such as rent, wages and software. Greta will then show whether what you keep covers them, and how much you can afford to spend on ads.{' '}
         <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('goal', 'economics')}>Add overheads</button></p>}
     </section>
+    <V3DriverStrip keys={['profit', 'ly', 'ret']}/>
 
     {d && (<figure className="v3-chart v3-chart-solo">
       <figcaption><span className="v3-chart-title">Sales, ad spend and what you kept, 30 days at a time</span>
@@ -20942,6 +20943,68 @@ const v3Pence = v => (v >= 1 ? fmtMoney(v, 2) : Math.round(v * 100) + 'p');
 // 0310: each sign's 30-day figure at 13 weekly points (cache_brand_sign_history, hourly). Before 0310
 // the read fails at once and the signs show as a snapshot, as they did.
 const V3_SIGN_HIST_Q = (sb, b) => sb.from('cache_brand_sign_history').select('history,refreshed_at').eq('brand_id', b).limit(1);
+// The signs and the headline, built once for every page that shows them (Today, and since 9 Oct Profit &
+// sales, Marketing, Customers, Growth plan, Review and Goal & costs), so a figure, its arrow and its
+// drivers read the same wherever it appears. S is fn_brand_state; hist is cache_brand_sign_history.
+function v3BuildSigns(S, hist) {
+  const L = S.last_30 || {}, A = S.ads || {}, U = S.unit || {}, R = S.retention || {}, BM = S.benchmarks || {}, H = S.rhythm;
+  const num = v => (v == null ? null : Number(v));
+  const yoySales = num(A.last_year_same_30_sales) > 0 ? num(L.sales) / num(A.last_year_same_30_sales) - 1 : null;
+  const yoyAds = num(A.last_year_same_30_ads) > 0 ? num(L.ads) / num(A.last_year_same_30_ads) : null;
+  const ret = num(L.ads) > 0 ? num(L.sales) / num(L.ads) : null;
+  const ao = num(L.after_overheads);
+  const HP0 = hist && Array.isArray(hist.points) ? hist.points : null;
+  // The latest week takes the headline's own sales and ad spend. The history reads the daily table, which
+  // catches an order edited or refunded today only overnight (9 Oct: £19,155 there, £19,093 live), so
+  // without this the panels and the verdict above them disagreed by a few pounds for the rest of the day.
+  const HP = HP0 && HP0.length && num(L.sales) > 0 && L.ads != null ? HP0.slice(0, -1).concat([(() => {
+    const p = HP0[HP0.length - 1], sl = num(p.sales_ly), al = num(p.ads_ly), sv = num(L.sales), av = num(L.ads);
+    return Object.assign({}, p, { sales: sv, ads: av, return: av > 0 ? Math.round(sv / av * 100) / 100 : p.return,
+      vs_ly: sl > 0 ? Math.round((sv / sl - 1) * 1000) / 1000 : p.vs_ly, ads_vs_ly: al > 0 ? Math.round(av / al * 100) / 100 : p.ads_vs_ly });
+  })()]) : HP0;
+  const ser = k => HP ? HP.map(p => ({ d: String(p.d), v: p[k] == null ? null : Number(p[k]) })) : null;
+  const signs = [];
+  if (ret != null && A.break_even_return) {
+    const be = num(A.break_even_return), top = Math.max(ret, be) * 1.25;
+    signs.push({ k: 'Sales from each £1 of ads', v: fmtMoney(ret, 2), tone: ret < be ? 'weak' : ret < be * 1.3 ? 'ok' : 'good',
+      bar: { fill: ret / top, mark: be / top }, n: <>{fmtMoney(be, 2)} only covers the ads, products and delivery</>,
+      series: ser('return'), fmt: v => fmtMoney(v, 2), better: 'higher', line: { v: be, label: 'Break-even ' + fmtMoney(be, 2) },
+      which: 'ret', ctx: { weeks: H && Array.isArray(H.weeks) ? H.weeks : [], be, lineLabel: 'the ' + fmtMoney(be, 2) + ' that only covers the ads, products and delivery' }, dline: be });
+  }
+  if (U.cac != null && U.first_order_contribution != null) {
+    const c30 = num(U.cac_30d), use = c30 > 0 ? c30 : num(U.cac), fo = num(U.first_order_contribution), top = Math.max(use, fo) * 1.25;
+    signs.push({ k: 'Cost to win a new customer', v: fmtMoney(use), tone: use > fo ? 'weak' : 'good',
+      bar: { fill: use / top, mark: fo / top }, n: <>Their first order earns {fmtMoney(fo)}{use > fo ? ', so each one starts at a loss' : ''}</>,
+      series: c30 > 0 ? ser('cac') : null, fmt: v => fmtMoney(v), better: 'lower', line: { v: fo, label: 'First order earns ' + fmtMoney(fo) },
+      which: c30 > 0 ? 'cac' : null, ctx: { weeks: H && Array.isArray(H.weeks) ? H.weeks : [], fo, lineLabel: 'the ' + fmtMoney(fo) + ' a first order earns after product and delivery costs' }, dline: fo });
+  }
+  if (yoySales != null && yoyAds != null)
+    signs.push({ k: 'Sales against last year', v: (yoySales >= 0 ? '+' : '−') + fmtPctN(Math.abs(yoySales)),
+      tone: yoySales < 0 ? 'weak' : yoyAds - 1 > 2 * yoySales && yoyAds > 1.2 ? 'ok' : 'good',
+      n: <>On {fmtTimes(yoyAds, 1)} last year’s ad spend</>,
+      series: ser('vs_ly'), fmt: v => (v >= 0 ? '+' : '−') + fmtPctN(Math.abs(v)), better: 'higher', line: { v: 0, label: 'Same as last year' },
+      which: 'ly', ctx: {}, dline: null });
+  if (R.repeat_90d != null)
+    signs.push({ k: 'Customers who order again', v: fmtPctN(num(R.repeat_90d)), tone: v3SigBench(num(R.repeat_90d), BM.repeat_90d) || 'typical',
+      bar: BM.repeat_90d ? { fill: Math.min(1, num(R.repeat_90d) / (num(BM.repeat_90d.high) * 1.25)), mark: num(BM.repeat_90d.typical) / (num(BM.repeat_90d.high) * 1.25) } : null,
+      n: <>Within 90 days{BM.repeat_90d ? <>; about {fmtPctN(BM.repeat_90d.typical)} is typical</> : null}</>,
+      series: ser('repeat_90d'), fmt: v => fmtPctN(v), better: 'higher', line: BM.repeat_90d ? { v: num(BM.repeat_90d.typical), label: 'Typical ' + fmtPctN(BM.repeat_90d.typical) } : null,
+      which: 'repeat', ctx: { typical: BM.repeat_90d ? num(BM.repeat_90d.typical) : null, lineLabel: BM.repeat_90d ? 'about ' + fmtPctN(BM.repeat_90d.typical) + ', typical for similar brands' : null },
+      dline: BM.repeat_90d ? num(BM.repeat_90d.typical) : null });
+  // the headline loss: the same panel, with the margin and running costs the headline uses
+  const mKept = num(L.sales) > 0 && L.profit_after_ads != null && L.ads != null ? (num(L.profit_after_ads) + num(L.ads)) / num(L.sales) : null;
+  const lastP = HP && HP.length ? HP[HP.length - 1] : null;
+  const anchor = lastP ? { d: String(lastP.d), v: ao != null ? ao : num(L.profit_after_ads) } : null;
+  const profitCfg = mKept != null ? { which: 'profit', ctx: { m: mKept, o: ao != null ? num(L.overheads) : 0, anchor, weeks: H && Array.isArray(H.weeks) ? H.weeks : [] }, dline: 0 } : null;
+  // the headline as a sign of its own, for the pages that show it beside the others
+  const profitSign = profitCfg && (ao != null || L.profit_after_ads != null) ? Object.assign({
+    k: ao != null ? 'After all costs, a month' : 'Profit after ads', v: v3SignedGbp(ao != null ? ao : num(L.profit_after_ads)),
+    tone: (ao != null ? ao : num(L.profit_after_ads)) < 0 ? 'weak' : 'good',
+    n: ao != null ? <>Sales less products, delivery, ads and {fmtMoney(num(L.overheads))} of running costs</> : <>Sales less products, delivery and ads</>,
+    series: HP ? V3_DRIVER_MODELS.profit.prep(HP, profitCfg.ctx).map(p => ({ d: String(p.d), v: p.profit })) : null,
+    fmt: v3SignedGbp, better: 'higher', line: { v: 0, label: 'Break-even' } }, profitCfg) : null;
+  return { signs, profitCfg, profitSign, HP };
+}
 function V3BusinessState({ part }) {
   const q = useV3Rows('brand-state', V3_STATE_Q);
   const codes = useV3Rows('brand-codes', V3_CODES_Q);
@@ -21091,52 +21154,11 @@ function V3BusinessState({ part }) {
       {facts}{terms}{chart}{bench}
     </V3More>);
   }
-  const HP0 = (hq.rows && hq.rows[0] && hq.rows[0].history && Array.isArray(hq.rows[0].history.points)) ? hq.rows[0].history.points : null;
-  // The latest week takes the headline's own sales and ad spend. The history reads the daily table, which
-  // catches an order edited or refunded today only overnight (9 Oct: £19,155 there, £19,093 live), so
-  // without this the panels and the verdict above them disagreed by a few pounds for the rest of the day.
-  const HP = HP0 && HP0.length && num(L.sales) > 0 && L.ads != null ? HP0.slice(0, -1).concat([(() => {
-    const p = HP0[HP0.length - 1], sl = num(p.sales_ly), al = num(p.ads_ly), sv = num(L.sales), av = num(L.ads);
-    return Object.assign({}, p, { sales: sv, ads: av, return: av > 0 ? Math.round(sv / av * 100) / 100 : p.return,
-      vs_ly: sl > 0 ? Math.round((sv / sl - 1) * 1000) / 1000 : p.vs_ly, ads_vs_ly: al > 0 ? Math.round(av / al * 100) / 100 : p.ads_vs_ly });
-  })()]) : HP0;
-  const ser = k => HP ? HP.map(p => ({ d: String(p.d), v: p[k] == null ? null : Number(p[k]) })) : null;
-  const signs = [];
-  if (ret != null && A.break_even_return) {
-    const be = num(A.break_even_return), top = Math.max(ret, be) * 1.25;
-    signs.push({ k: 'Sales from each £1 of ads', v: fmtMoney(ret, 2), tone: ret < be ? 'weak' : ret < be * 1.3 ? 'ok' : 'good',
-      bar: { fill: ret / top, mark: be / top }, n: <>{fmtMoney(be, 2)} only covers the ads, products and delivery</>,
-      series: ser('return'), fmt: v => fmtMoney(v, 2), better: 'higher', line: { v: be, label: 'Break-even ' + fmtMoney(be, 2) },
-      which: 'ret', ctx: { weeks: H && Array.isArray(H.weeks) ? H.weeks : [], be, lineLabel: 'the ' + fmtMoney(be, 2) + ' that only covers the ads, products and delivery' }, dline: be });
-  }
-  if (U.cac != null && U.first_order_contribution != null) {
-    const c30 = num(U.cac_30d), use = c30 > 0 ? c30 : num(U.cac), fo = num(U.first_order_contribution), top = Math.max(use, fo) * 1.25;
-    signs.push({ k: 'Cost to win a new customer', v: fmtMoney(use), tone: use > fo ? 'weak' : 'good',
-      bar: { fill: use / top, mark: fo / top }, n: <>Their first order earns {fmtMoney(fo)}{use > fo ? ', so each one starts at a loss' : ''}</>,
-      series: c30 > 0 ? ser('cac') : null, fmt: v => fmtMoney(v), better: 'lower', line: { v: fo, label: 'First order earns ' + fmtMoney(fo) },
-      which: c30 > 0 ? 'cac' : null, ctx: { weeks: H && Array.isArray(H.weeks) ? H.weeks : [], fo, lineLabel: 'the ' + fmtMoney(fo) + ' a first order earns after product and delivery costs' }, dline: fo });
-  }
-  if (yoySales != null && yoyAds != null)
-    signs.push({ k: 'Sales against last year', v: (yoySales >= 0 ? '+' : '−') + fmtPctN(Math.abs(yoySales)),
-      tone: yoySales < 0 ? 'weak' : yoyAds - 1 > 2 * yoySales && yoyAds > 1.2 ? 'ok' : 'good',
-      n: <>On {fmtTimes(yoyAds, 1)} last year’s ad spend</>,
-      series: ser('vs_ly'), fmt: v => (v >= 0 ? '+' : '−') + fmtPctN(Math.abs(v)), better: 'higher', line: { v: 0, label: 'Same as last year' },
-      which: 'ly', ctx: {}, dline: null });
-  if (R.repeat_90d != null)
-    signs.push({ k: 'Customers who order again', v: fmtPctN(num(R.repeat_90d)), tone: v3SigBench(num(R.repeat_90d), BM.repeat_90d) || 'typical',
-      bar: BM.repeat_90d ? { fill: Math.min(1, num(R.repeat_90d) / (num(BM.repeat_90d.high) * 1.25)), mark: num(BM.repeat_90d.typical) / (num(BM.repeat_90d.high) * 1.25) } : null,
-      n: <>Within 90 days{BM.repeat_90d ? <>; about {fmtPctN(BM.repeat_90d.typical)} is typical</> : null}</>,
-      series: ser('repeat_90d'), fmt: v => fmtPctN(v), better: 'higher', line: BM.repeat_90d ? { v: num(BM.repeat_90d.typical), label: 'Typical ' + fmtPctN(BM.repeat_90d.typical) } : null,
-      which: 'repeat', ctx: { typical: BM.repeat_90d ? num(BM.repeat_90d.typical) : null, lineLabel: BM.repeat_90d ? 'about ' + fmtPctN(BM.repeat_90d.typical) + ', typical for similar brands' : null },
-      dline: BM.repeat_90d ? num(BM.repeat_90d.typical) : null });
+  const SG = v3BuildSigns(S, hq.rows && hq.rows[0] && hq.rows[0].history);
+  const HP = SG.HP, signs = SG.signs, profitCfg = SG.profitCfg;
   // one "What is driving this?" per sign whose history can explain it; one panel open at a time
   signs.forEach(sg => { sg.act = sg.which && v3HasDrivers(sg.which, HP)
     ? { label: drv === sg.which ? 'Hide what is driving it' : 'What is driving this?', open: drv === sg.which, on: () => setDrv(o => (o === sg.which ? null : sg.which)) } : null; });
-  // the headline loss: the same panel, with the margin and running costs the headline uses
-  const mKept = num(L.sales) > 0 && L.profit_after_ads != null && L.ads != null ? (num(L.profit_after_ads) + num(L.ads)) / num(L.sales) : null;
-  const lastP = HP && HP.length ? HP[HP.length - 1] : null;
-  const anchor = lastP ? { d: String(lastP.d), v: ao != null ? ao : num(L.profit_after_ads) } : null;
-  const profitCfg = mKept != null ? { which: 'profit', ctx: { m: mKept, o: ao != null ? num(L.overheads) : 0, anchor, weeks: H && Array.isArray(H.weeks) ? H.weeks : [] }, dline: 0 } : null;
   const profitAct = profitCfg && v3HasDrivers('profit', HP)
     ? { label: drv === 'profit' ? 'Hide what is driving it' : 'What is driving this?', open: drv === 'profit', on: () => setDrv(o => (o === 'profit' ? null : 'profit')) } : null;
   const openSign = drv === 'profit' ? profitCfg : drv ? signs.find(sg => sg.which === drv) : null;
@@ -21153,6 +21175,27 @@ function V3BusinessState({ part }) {
     {/* How fresh these are, asked on 9 Oct: the figures are worked out again every hour from feeds that
         arrive every 30 minutes (Shopify) and every 2 hours (ad accounts). */}
     <p className="micro muted v3-stand-fresh">Each figure covers the 30 days to {HP ? v3Day(String(hq.rows[0].history.as_of), true) : 'yesterday'}, the last full day. Greta works them out again every hour; Shopify orders arrive every 30 minutes and ad spend every 2 hours.{HP ? ' Point at a sign to see its last 13 weeks.' : ''}</p>
+  </section>);
+}
+// The same signs and drivers on the page where each figure is the subject (9 Oct): one row of signs,
+// each with its arrow, its 13 weeks on hover and "What is driving this?", and the panel under them.
+function V3DriverStrip({ keys, title }) {
+  const q = useV3Rows('brand-state', V3_STATE_Q);
+  const hq = useV3Rows('sign-history', V3_SIGN_HIST_Q);
+  const [drv, setDrv] = React.useState(null);
+  if (q.err || hq.err || !q.rows || !hq.rows) return null;
+  const S = q.rows[0]; if (!S || !S.last_30) return null;
+  const SG = v3BuildSigns(S, hq.rows[0] && hq.rows[0].history);
+  const all = SG.signs.concat(SG.profitSign ? [SG.profitSign] : []);
+  const picked = keys.map(k => all.find(sg => sg.which === k)).filter(Boolean).map(sg => Object.assign({}, sg, {
+    act: v3HasDrivers(sg.which, SG.HP) ? { label: drv === sg.which ? 'Hide what is driving it' : 'What is driving this?', open: drv === sg.which,
+      on: () => setDrv(o => (o === sg.which ? null : sg.which)) } : null }));
+  if (!picked.length) return null;
+  const open = drv ? picked.find(sg => sg.which === drv) : null;
+  return (<section className="v3-sec v3-strip">
+    <h2 className="v3-sec-title">{title || 'What is moving it'} <span className="v3-muted">last 30 days</span></h2>
+    <div className="v3-signs">{picked.map(sg => <V3Sign key={sg.k} {...sg}/>)}</div>
+    {open && <V3DriverPanel key={drv} which={drv} points={SG.HP} ctx={open.ctx} line={open.dline}/>}
   </section>);
 }
 // One sign: what it is, the figure, one word for how it stands, and where relevant a bar with a mark
@@ -21709,6 +21752,7 @@ const V3_PAGES = {
         browser) and the alerts panel (forecast patterns the board holds back, a track record that said
         nothing was done) are gone; findings that pass the evidence check are below. */}
     <V3Anchor id="week"/><V3Review/>
+    <V3DriverStrip keys={['profit', 'ly']}/>
     <V3More id="rev-quarter" label="This quarter — a summary to share with your board or investors"><V3Anchor id="quarter"/><BusinessReview/></V3More>
     <V3More id="rev-alerts" label="What Greta found — what changed, and why"><V3Anchor id="alerts"/><V3Findings/>
       <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>What was done, and whether it worked <span className="v3-xref-go">on Actions →</span></button>
@@ -21726,6 +21770,7 @@ const V3_PAGES = {
     {/* Rebuilt 2026-10-05: the goal and where today's pace lands, the costs that are off with their £
         and a fix, then the forms. Readiness moved to the foot and reads the app's own figures. */}
     <V3GoalLead/>
+    <V3DriverStrip keys={['profit']}/>
     <V3CostsOff/>
     <GretaPlanPanel show="goal"/>
     {/* The only place a brand can enter per-variant landed cost. Business economics below sets the
@@ -21740,6 +21785,7 @@ const V3_PAGES = {
   </>),
   growth: (p) => (<>
     <V3Growth/>
+    <V3DriverStrip keys={['cac']}/>
     <CashCeiling/>
     <V3More id="growth-detail" label="The detail: how a new customer’s cost rises with spend, and what changes it">
       <V3Anchor id="forecast"/><GretaPlanPanel show="growth"/>
@@ -21771,6 +21817,7 @@ const V3_PAGES = {
         spend-tier "diminishing returns" read (its own numbers did not fall) and the GA4 funnel (Website's,
         on 11 of 30 tracked days) are gone. Platform claims and per-channel evidence sit behind the detail. */}
     <V3MarketingLead/>
+    <V3DriverStrip keys={['cac', 'ret']}/>
     <V3CodePerformance/>
     <V3Incrementality/>
     <CreativeReallocation/>
@@ -21797,6 +21844,7 @@ const V3_PAGES = {
     {/* Rebuilt 2026-10-05: a verdict on what a customer is worth against what one costs, then the
         numbers, then the retention moves, then the segments panel that stages them, then the plan. */}
     <V3CustomerValue/>
+    <V3DriverStrip keys={['cac', 'repeat']}/>
     <V3Customers/>
     <V3Retention/>
     <V3Anchor id="segments"/>
