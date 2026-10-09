@@ -18683,6 +18683,7 @@ function V3Website() {
           <td className="v3-muted">{Pv && Pv.fr[m] != null ? fmtPctN(Pv.fr[m]) : FMT_NONE}</td></tr>); })}</tbody>
       </table>
     </section>)}
+    <V3DriverStrip keys={['conv']}/>
 
     {moves.length > 0 && (<section className="v3-sec">
       <h2 className="v3-sec-title">What to do</h2>
@@ -20996,6 +20997,16 @@ function v3BuildSigns(S, hist) {
   const lastP = HP && HP.length ? HP[HP.length - 1] : null;
   const anchor = lastP ? { d: String(lastP.d), v: ao != null ? ao : num(L.profit_after_ads) } : null;
   const profitCfg = mKept != null ? { which: 'profit', ctx: { m: mKept, o: ao != null ? num(L.overheads) : 0, anchor, weeks: H && Array.isArray(H.weeks) ? H.weeks : [] }, dline: 0 } : null;
+  // website conversion (0314): the latest 30 days against the middle of the earlier weeks
+  const CP = HP ? HP.filter(p => p.conv != null) : [];
+  if (CP.length >= 4) {
+    const cv = Number(CP[CP.length - 1].conv), bs = CP.slice(0, -1).map(p => Number(p.conv)).sort((x, y) => x - y);
+    const typ = bs.length % 2 ? bs[(bs.length - 1) / 2] : (bs[bs.length / 2 - 1] + bs[bs.length / 2]) / 2, top = Math.max(cv, typ) * 1.25;
+    signs.push({ k: 'Orders per 100 visits', v: v3Per100(cv), tone: cv < typ * 0.9 ? 'weak' : cv > typ * 1.1 ? 'good' : 'typical',
+      bar: { fill: cv / top, mark: typ / top }, n: <>About {v3Per100(typ)} is usual for you, the middle of the last {fmtCount(CP.length)} weeks</>,
+      series: ser('conv'), fmt: v => v3Per100(v), better: 'higher', line: { v: typ, label: 'Usual ' + v3Per100(typ) },
+      which: 'conv', ctx: { weeks: H && Array.isArray(H.weeks) ? H.weeks : [], typical: typ, lineLabel: 'about ' + v3Per100(typ) + ', your usual rate' }, dline: typ });
+  }
   // the headline as a sign of its own, for the pages that show it beside the others
   const profitSign = profitCfg && (ao != null || L.profit_after_ads != null) ? Object.assign({
     k: ao != null ? 'After all costs, a month' : 'Profit after ads', v: v3SignedGbp(ao != null ? ao : num(L.profit_after_ads)),
@@ -21505,7 +21516,59 @@ function v3ModelProfit(a, b, ctx) {
     note: 'This is the headline figure worked out for each 30 days: sales times the ' + Math.round(m * 100) + 'p each £1 keeps after products and delivery (your measured margin, used for every week, as the headline does), less ad spend' + (O ? ' and ' + fmtMoney(O) + ' of running costs a month' : '') + '. So it moves with sales and ad spend. When Greta measures your margin again, every week moves with it.',
   };
 }
+// Website conversion (0314): orders per 100 visits = web orders / visits, with visits from Clarity less
+// bots as the Website page reads them. Visits split into ad clicks (Meta link clicks plus Google clicks)
+// and everything else. The shop cannot say which visitors bought while its tracking is broken, so the
+// rate splits into orders and visits, not by source; what Clarity sees on the site sits underneath.
+const V3_CONV_FRICTION = [['fr_script', 'Hit a JavaScript error'], ['fr_errclick', 'Clicked something broken'],
+  ['fr_dead', 'Clicked something that did nothing'], ['fr_quick', 'Went back within seconds'], ['fr_rage', 'Clicked repeatedly in frustration']];
+function v3ModelConv(a, b, ctx) {
+  const f = p => { const O = Number(p.web_orders), V = Number(p.visits), paid = Math.min(V, (Number(p.meta_clicks) || 0) + (Number(p.google_clicks) || 0));
+    return { O, V, paid, other: V - paid, v: O / V, mob: p.mobile != null ? Number(p.mobile) : null,
+             fr: Object.fromEntries(V3_CONV_FRICTION.map(([k]) => [k, p[k] != null ? Number(p[k]) : null])) }; };
+  const A = f(a), B = f(b);
+  const [pO, pV] = v3LogParts(A.v, B.v, [{ a: A.O, b: B.O, sign: 1 }, { a: A.V, b: B.V, sign: -1 }]);
+  const dV = B.V - A.V, pPaid = Math.abs(dV) > 0 ? pV * (B.paid - A.paid) / dV : 0, pOther = pV - pPaid;
+  const sA = v3SaleWeeksIn(ctx.weeks, a), sB = v3SaleWeeksIn(ctx.weeks, b);
+  const saleNote = sA !== sB ? <>, as the earlier 30 days had {sA === 0 ? 'no sale weeks' : sA === 1 ? 'a sale week' : sA + ' sale weeks'} and these have {sB === 0 ? 'none' : sB === 1 ? 'one' : sB}</> : null;
+  const risen = V3_CONV_FRICTION.filter(([k]) => A.fr[k] != null && B.fr[k] != null && B.fr[k] >= A.fr[k] * 1.25 && B.fr[k] - A.fr[k] >= 0.005);
+  const per = v => v3Per100(v);
+  return {
+    todo: [{ amt: pO, ids: ['sales-rhythm', 'promo-peak-plan'] }, { amt: pPaid, ids: ['paid-landing-meta', 'paid-landing-google', 'driver-meta-ads'] },
+           { amt: pOther, ids: ['crm-flows', 'promo-peak-plan'] },
+           ...(risen.length ? [{ amt: -1, force: true, ids: ['site-', 'pulse-cro-fix-'] }] : [])],
+    title: 'Why ' + per(B.v) + ' of every 100 visits turn into an order', from: A.v, to: B.v, better: 'higher', fmtV: per, fmtAmt: v => per(Math.abs(v)),
+    startK: 'Orders per 100 visits', endK: 'Orders per 100 visits now', chartK: 'Orders per 100 visits',
+    parts: [
+      { amt: pO, k: v3UpDown(A.O, B.O, 'More orders', 'Fewer orders'), sub: fmtCount(A.O) + ' to ' + fmtCount(B.O) + ' web orders',
+        cause: <>there were {v3UpDown(A.O, B.O, 'more', 'fewer')} orders ({fmtCount(A.O)} to {fmtCount(B.O)}){saleNote}</>,
+        against: <>{v3UpDown(A.O, B.O, 'More', 'Fewer')} orders ({fmtCount(A.O)} to {fmtCount(B.O)})</> },
+      { amt: pPaid, k: v3UpDown(A.paid, B.paid, 'More visits from ads', 'Fewer visits from ads'), sub: fmtCount(A.paid) + ' to ' + fmtCount(B.paid) + ' ad clicks',
+        cause: <>visits from ads went {v3UpDown(A.paid, B.paid, 'up', 'down')} ({fmtCount(A.paid)} to {fmtCount(B.paid)} clicks) without the orders to match</>,
+        against: <>{v3UpDown(A.paid, B.paid, 'More', 'Fewer')} visits from ads ({fmtCount(A.paid)} to {fmtCount(B.paid)} clicks)</> },
+      { amt: pOther, k: v3UpDown(A.other, B.other, 'More other visits', 'Fewer other visits'), sub: fmtCount(A.other) + ' to ' + fmtCount(B.other),
+        cause: <>other visits went {v3UpDown(A.other, B.other, 'up', 'down')} ({fmtCount(A.other)} to {fmtCount(B.other)}) without the orders to match</>,
+        against: <>{v3UpDown(A.other, B.other, 'More', 'Fewer')} other visits ({fmtCount(A.other)} to {fmtCount(B.other)})</> },
+    ],
+    opening: <>Since the 30 days to {v3Day(String(a.d), true)}, visits turning into orders went from {per(A.v)} to {per(B.v)} in every 100{ctx.typical ? <>; about {per(ctx.typical)} is usual for you</> : null}. The figures below are orders per 100 visits.</>,
+    closing: risen.length
+      ? <> On the site, more visits {v3Names(risen.map(([k, l]) => l.toLowerCase() + ' (' + fmtPctN(A.fr[k]) + ' to ' + fmtPctN(B.fr[k]) + ')'))}: check what changed there, starting with the list further down this page.</>
+      : <> What Clarity sees on the site barely moved{B.fr.fr_script != null ? <> ({fmtPctN(B.fr.fr_script)} of visits hit a JavaScript error, against {fmtPctN(A.fr.fr_script)})</> : null}, so the change is not in the site itself.</>,
+    rows: [
+      ['Visits', A.V, B.V, v => fmtCount(v), null],
+      ['Visits from ads (clicks)', A.paid, B.paid, v => fmtCount(v), null],
+      ['Other visits', A.other, B.other, v => fmtCount(v), null],
+      ['Web orders', A.O, B.O, v => fmtCount(v), 'higher'],
+      ['Orders per 100 visits', A.v, B.v, per, 'higher'],
+      ['Visits on a phone', A.mob, B.mob, v => fmtPctN(v), null],
+      ...V3_CONV_FRICTION.map(([k, l]) => [l, A.fr[k], B.fr[k], v => fmtPctN(v), 'lower']),
+    ],
+    note: 'Visits are Microsoft Clarity’s, less bots, as on the rest of this page; orders are web orders. Visits from ads are Meta link clicks plus Google clicks, and other visits are everything else: email, search, social and people typing your address. Your shop cannot say which visitors bought while its tracking is broken, so this splits the rate into orders and visits rather than by where buyers came from.',
+  };
+}
 const V3_DRIVER_MODELS = {
+  conv:   { model: v3ModelConv,     mode: 'pair',   key: 'conv',       fmt: v => v3Per100(v),
+            ok: p => p.conv != null && Number(p.visits) > 0 && Number(p.web_orders) > 0 },
   profit: { model: v3ModelProfit,   mode: 'pair',   key: 'profit',     fmt: v3SignedGbp,
             prep: (P, ctx) => P.map(p => Object.assign({}, p, { profit: ctx.anchor && String(p.d) === ctx.anchor.d ? ctx.anchor.v : Number(p.sales) * ctx.m - Number(p.ads) - (ctx.o || 0) })),
             ok: p => Number(p.sales) > 0 && Number(p.orders) > 0 && p.ads != null && p.meta_spend != null },
@@ -21554,7 +21617,7 @@ function V3DriverPanel({ which, points, ctx, line }) {
   const todo = [];
   // a figure that barely moved and sits on the right side of its line needs nothing doing
   const fine = flat && (line == null || (M.better === 'higher' ? M.to >= line : M.to <= line));
-  (fine ? [] : (M.todo || [])).filter(bad).sort((x, y) => Math.abs(y.amt) - Math.abs(x.amt)).forEach(t => {
+  (fine ? [] : (M.todo || [])).filter(t => t.force || bad(t)).sort((x, y) => Math.abs(y.amt) - Math.abs(x.amt)).forEach(t => {
     if (todo.length >= 2) return;
     for (const id of t.ids) { const i = live.findIndex(r => (id.endsWith('-') ? String(r.external_id).startsWith(id) : r.external_id === id));
       if (i >= 0) { if (!todo.some(x => x.row === live[i])) todo.push({ row: live[i], rank: i + 1 }); break; } }
