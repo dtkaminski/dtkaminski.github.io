@@ -21269,13 +21269,13 @@ function v3ModelWeek(W, T, cmr, info) {
     against: <>{v3UpDown(T.spend, W.spend, 'More', 'Less')} ad spend ({fmtMoney(T.spend)} to {fmtMoney(W.spend)})</> });
   const sgn = v => (v < 0 ? '−' : '') + fmtMoney(Math.abs(v));
   return {
-    title: 'Why the week kept ' + sgn(W.kept) + ' after ads', from: T.kept, to: W.kept, better: 'higher', fmtV: sgn, fmtAmt: v => fmtMoney(Math.abs(v)),
+    title: 'Why the week ' + (W.kept < 0 ? 'lost ' + fmtMoney(-W.kept) : 'kept ' + fmtMoney(W.kept)) + ' after ads', from: T.kept, to: W.kept, better: 'higher', fmtV: sgn, fmtAmt: v => fmtMoney(Math.abs(v)),
     startK: 'A typical week', endK: 'This week', subA: 'the middle of ' + fmtCount(info.n) + ' weeks' + (info.leftOut ? ', sale weeks left out' : ''), subB: info.range,
     colA: 'A typical week', colB: 'This week', bridgeCap: 'From a typical week to this one', of: W.kept >= T.kept ? 'the gain' : 'the gap',
     todo: okO ? [{ amt: cmr * sO, ids: ['sales-rhythm', 'promo-peak-plan'] }, { amt: cmr * sA, ids: ['basket-pair', 'basket-free-shipping'] }, { amt: -(W.spend - T.spend), ids: ['order-cost-meta', 'order-cost-google', 'driver-retargeting'] }]
               : [{ amt: cmr * sO, ids: ['sales-rhythm', 'promo-peak-plan'] }, { amt: -(W.spend - T.spend), ids: ['order-cost-meta', 'order-cost-google'] }],
     parts,
-    opening: <>In the week of {info.range}, you kept {sgn(W.kept)} after ads, against {sgn(T.kept)} in a typical week.</>,
+    opening: <>In the week of {info.range}, you {W.kept < 0 ? 'lost ' + fmtMoney(-W.kept) : 'kept ' + fmtMoney(W.kept)} after ads, against {T.kept < 0 ? 'a loss of ' + fmtMoney(-T.kept) : fmtMoney(T.kept) + ' kept'} in a typical week.</>,
     closing: <> Each £1 of sales keeps about {Math.round(cmr * 100)}p after products and delivery, so each £100 of sales is worth about {fmtMoney(cmr * 100)} here.</>,
     rows: [
       ['Sales', T.sales, W.sales, v => fmtMoney(v), 'higher'],
