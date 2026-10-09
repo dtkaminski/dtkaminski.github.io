@@ -9092,11 +9092,46 @@ function v3AskCheck(text, sent) {
   }
   return t;
 }
+// Ask Greta (9 Oct): the drivers of every figure going the wrong way, worked out by the same models as
+// the panels, as one line each: then and now, the parts biggest first with what each moved it by, and the
+// board rows that move it. Ask answers a "why" question from these, so its figures are the panels' figures.
+function v3DriverSummaries(S, hist, liveRows) {
+  if (!S || !S.last_30 || !hist) return [];
+  const SG = v3BuildSigns(S, hist);
+  const all = SG.signs.concat(SG.profitSign ? [SG.profitSign] : []);
+  const live = liveRows || [];
+  return all.filter(sg => sg.which && (sg.tone === 'weak' || sg.tone === 'ok') && v3HasDrivers(sg.which, SG.HP)).map(sg => {
+    const M0 = V3_DRIVER_MODELS[sg.which], single = M0.mode === 'single';
+    const P = (M0.prep ? M0.prep(SG.HP, sg.ctx || {}) : SG.HP).filter(M0.ok);
+    const a = single ? P[P.length - 1] : P[Math.max(0, P.length - 5)], b = P[P.length - 1];
+    let M; try { M = M0.model(a, b, sg.ctx || {}); } catch (e) { return null; }
+    const parts = M.parts.slice().sort((x, y) => Math.abs(y.amt) - Math.abs(x.amt)).filter(p => Math.abs(p.amt) > Math.abs(M.to - M.from) * 0.03)
+      .map(p => p.k + (p.sub ? ' (' + p.sub + ')' : '') + ' ' + (p.amt >= 0 ? '+' : '−') + M.fmtAmt(p.amt)).join('; ');
+    const board = live.map((r, i) => ({ r, n: i + 1 })).filter(x => v3Moves(x.r.external_id).indexOf(sg.which) >= 0).slice(0, 3)
+      .map(x => '#' + x.n + ' ' + v3PlainAction(x.r).title).join('; ');
+    return { figure: sg.k, key: sg.which, now: M.fmtV(M.to), then: M.fmtV(M.from), tone: sg.tone, v: sg.v,
+      against: single ? 'the same 30 days last year' : 'the 30 days to ' + v3Day(String(a.d), true), parts, board: board || 'nothing on the board yet' };
+  }).filter(Boolean);
+}
+// The "why" questions Ask offers, one per figure going the wrong way, in the owner's words.
+function v3WhyPrompt(d) {
+  const v = d.v, pos = String(v).replace(/^[−-]/, '');
+  const T = { cac: 'Why does a new customer cost ' + v + ' to win?', ret: 'Why does each £1 of ads bring only ' + v + '?',
+    profit: /^[−-]/.test(String(v)) ? 'Why am I losing ' + pos + ' a month?' : 'What is driving my ' + v + ' a month after all costs?',
+    repeat: 'Why do only ' + v + ' of customers order again?', conv: 'Why do only ' + v + ' of every 100 visits turn into an order?',
+    newc: 'Why did I win only ' + v + ' new customers?', retsales: 'Why did returning customers spend only ' + v + '?',
+    newsales: 'Why did new customers buy only ' + v + '?', spend: 'Where did the ' + v + ' of ad spend go?',
+    metacpa: 'Why does a sale on Meta cost ' + v + '?', googcpa: 'Why does a sale on Google cost ' + v + '?', ly: 'What is driving sales against last year?' };
+  return T[d.key] || 'What is driving ' + String(d.figure).toLowerCase() + '?';
+}
+const V3_ASK_WHY = /\b(why|reason\w*|caus\w*|driv\w*|what (has )?changed|what happened|fell|fallen|drop\w*|rose|risen|worse|better|so (high|low)|go(ne)? (up|down))\b/i;
 function buildAskContext(facts, question, budget){
   const BUDGET = budget > 0 ? Math.min(budget, V3_ASK_BUDGET) : V3_ASK_BUDGET;
   const topics = {}; Object.keys(V3_ASK_TOPICS).forEach(k => { topics[k] = V3_ASK_TOPICS[k].test(question || ''); });
   const D = window.FRKL_DATA || {};
   const _shp = D.shopify || [];
+  const drivers = (typeof window !== 'undefined' && Array.isArray(window.GRETA_DRIVERS)) ? window.GRETA_DRIVERS : [];
+  const askWhy = V3_ASK_WHY.test(question || '') || drivers.some(d => String(question || '').toLowerCase().includes(String(d.figure).toLowerCase()));
   // The stock plan, for stock questions and for any product the question names: the rows a buyer would
   // look at. Named products go first and are never dropped by the ceiling.
   const plan = (facts && facts._stock) || [];
@@ -9137,6 +9172,8 @@ function buildAskContext(facts, question, budget){
     topics.site && ['weekly_ga4', () => v3AskTable(v3AskFullWeeks(v3AskWeekly(D.ga4, ['sessions', 'addToCarts', 'checkouts', 'purchases'], 13), _lastFull), 'week'), 'Google Analytics per week, last 13 weeks. Read readout.tracking first: it was not recording properly for part of this.'],
     topics.email && ['weekly_email', () => v3AskTable(v3AskFullWeeks(v3AskWeekly(D.klaviyo, ['recipients', 'opens', 'clicks'], 13), _lastFull), 'week'), 'Klaviyo per week, last 13 weeks.'],
     ['weekly_shop', () => v3AskTable(v3AskFullWeeks(v3AskWeekly(_shp, ['netSales', 'orders', 'discounts', 'returns'], 26), _lastFull), 'week'), 'Shop totals per Monday-start week, last 26 weeks: net sales ex VAT after discounts, orders, discounts, returns.'],
+    drivers.length && ['drivers', () => v3AskTable(drivers.map(d => ({ figure: d.figure, now: d.now, then: d.then, against: d.against, parts: d.parts, board: d.board })), 'figure'),
+      'Why each figure that is going the wrong way moved: now against then (the 30 days to the date given, or the same 30 days last year), the parts biggest first with what each moved it by (they add up to the change, worked out exactly as on the pages), and the board rows that move it back, by rank.'],
   ].filter(Boolean);
   const data = {}, dictionary = {};
   parts.forEach(([k, make, what]) => { const t = make(); if (t && t.rows.length) { data[k] = t; dictionary[k] = what; } });
@@ -9153,6 +9190,7 @@ function buildAskContext(facts, question, budget){
   // The series a question is about are never dropped for room: "Meta or email?" lost the email flows and
   // answered "no email figures" (9 Oct). The stock list stays for stock questions, products for product ones.
   const keepSeries = new Set(['stock_named']);
+  if (askWhy) keepSeries.add('drivers');
   if (topics.email) keepSeries.add('email_flows');
   if (topics.stock) keepSeries.add('stock_at_risk');
   if (topics.products) keepSeries.add('products');
@@ -9275,6 +9313,7 @@ function AskPanel(){
 
 Follow _meta.readout.rules. Quote headline figures exactly, with their window. Say how far the owner can lean on a figure in plain words (measured, likely, probably, possibly, an outside chance), as part of the sentence: never the word rung, never in brackets after a figure. Never recommend an action in readout.held. Never compare or total across days readout.coverage or readout.tracking marks unusable; missing days are not zero.
 
+WHY questions (why did a figure move, what is driving it): if data.drivers has the figure, answer from it. Say now against then and since when, then each part in the order given with its amount exactly as written, then the board rows it lists as what to do. Do not add causes that are not in it. If the figure is not in data.drivers, say it is not one that is going the wrong way, and answer from the other figures.
 WHAT TO DO questions: answer from readout.board in its order, with each item's pounds (a month, or once when the action says so) and its rung. Do not re-rank. One idea of your own is allowed only if labelled "my suggestion, not on your board", and never one from readout.held (9 Oct: a held Judge.me fix came back as "my suggestion"). For spending more, check facts.quarter_plan_at_todays_ad_spend and facts.next_peak first. If facts.goal.needs_replanning is true, say so before quoting the goal.
 
 WHY questions: before naming a cause, check the confounders: a promotion or code, a spend change, a stockout, an email send, a tracking change, seasonality, or a partial latest day (_meta.dataQuality). Check each against facts.recent_context first: if sale_weeks_in_last_13 is above 0, promotions are part of the story, not ruled out; if of_them_out_of_stock_now or products_out_of_stock_now is above 0, stock-outs are too. A planned-events list being empty does not rule out what already happened. Locate the move: demand (spend, visits) → conversion → order value and discounts → new vs returning → product and stock. Separate what the data shows from what you infer, and give your confidence. For why profit after ads moved against a typical month, lead with facts.typical_month.what_moved_profit_after_ads: its main_cause, its pounds from sales and from ad spend, and its sales and ad spend comparisons exactly as written; do not work out percentages of your own.
@@ -9360,6 +9399,12 @@ ${dataStr}`;
 
   // Action-oriented prompts first (what to do / not do / what changed), then the
   // analytical deep-dives. These are what a busy operator actually opens with.
+  // the figures going the wrong way, their drivers for the context, and a "why" question for each
+  const askSt = useV3Rows('brand-state', V3_STATE_Q), askHist = useV3Rows('sign-history', V3_SIGN_HIST_Q), askBoard = useV3Board();
+  const drivers = React.useMemo(() => { try { return v3DriverSummaries(askSt.rows && askSt.rows[0], askHist.rows && askHist.rows[0] && askHist.rows[0].history, askBoard.rows ? v3LiveRows(askBoard.rows) : []); } catch (e) { return []; } },
+    [askSt.rows, askHist.rows, askBoard.rows]);
+  if (typeof window !== 'undefined') window.GRETA_DRIVERS = drivers;
+  const whyPrompts = drivers.slice().sort((a, b) => (a.tone === 'weak' ? 0 : 1) - (b.tone === 'weak' ? 0 : 1)).slice(0, 3).map(v3WhyPrompt);
   const quickPrompts = UI_V3 ? V3_ASK_PROMPTS : [
     `What should I do today? Give me the top 3 actions, ranked by ${curSym()} impact.`,
     'What should I NOT do this week, and why?',
@@ -9394,6 +9439,7 @@ ${dataStr}`;
         {loading && <p className="micro muted v3-measure" role="status" aria-live="polite">{askStage || 'Working'}… {askSecs > 0 ? askSecs + 's' : ''}{askSecs >= 20 ? ' — answers usually take under a minute' : ''}</p>}
       </div>
       <div className="v3-prompts" aria-label="Questions to start with">
+        {whyPrompts.map((q,i)=>(<button type="button" key={'why'+i} className="v3-prompt v3-prompt-why" onClick={()=>ASK&&setQuestion(q)} disabled={!ASK} title={ASK?'':'Available in your workspace'}>{q}</button>))}
         {quickPrompts.map((q,i)=>(<button type="button" key={i} className="v3-prompt" onClick={()=>ASK&&setQuestion(q)} disabled={!ASK} title={ASK?'':'Available in your workspace'}>{q}</button>))}
       </div>
       {error && (<div role="alert" style={{padding:'var(--space-3)',background:'var(--color-danger-wash)',borderTop:'1px solid var(--color-danger-line)',marginTop:'var(--space-3)',color:'var(--text-primary)',fontSize:'var(--text-sm)',display:'flex',alignItems:'center',gap:'var(--space-3)',flexWrap:'wrap'}}>
