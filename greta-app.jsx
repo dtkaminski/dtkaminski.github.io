@@ -23119,7 +23119,7 @@ function V3FixFirst({ kick }) {
 const V3_CFILE_Q = (sb, b) => sb.from('cache_customer_file').select('month_start,active_end,new_customers,reactivated,lapsed,net_change,complete')
   .eq('brand_id', b).order('month_start', { ascending: false }).limit(13);
 const V3_AM_CUST_Q = (sb, b) => sb.from('anatomy_metric_value').select('metric_key,value,display,detail')
-  .eq('brand_id', b).in('metric_key', ['active_file', 'net_active_change', 'lapse_window']).limit(3);
+  .eq('brand_id', b).in('metric_key', ['active_file', 'net_active_change', 'lapse_window', 'heavy_buyer_share', 'ltv_60d']).limit(5);
 function V3CustomerFile() {
   const f = useV3Rows('cust-file', V3_CFILE_Q);
   const a = useV3Rows('cust-file-am', V3_AM_CUST_Q);
@@ -23145,6 +23145,12 @@ function V3CustomerFile() {
       {lapse != null && <div className="v3-stat"><div className="v3-stat-lab"><span>When customers stop coming back</span></div>
         <div className="v3-stat-val">{fmtCount(lapse)} days</div>
         <div className="v3-stat-foot"><span className="v3-muted">80% of second orders arrive by then{p50 != null ? '; half within ' + fmtCount(p50) + ' days' : ''}</span></div></div>}
+      {am.heavy_buyer_share && am.heavy_buyer_share.value != null && (() => { const hv = Number(am.heavy_buyer_share.value); return (<div className="v3-stat"><div className="v3-stat-lab"><span>Customers with three or more orders</span></div>
+        <div className="v3-stat-val">{fmtPctN(hv)}</div>
+        <div className="v3-stat-foot"><span className={hv < 0.2 ? 'v3-down' : 'v3-muted'}>healthy brands hold 20–30%</span></div></div>); })()}
+      {am.ltv_60d && am.ltv_60d.value != null && (<div className="v3-stat"><div className="v3-stat-lab"><span>Repeat sales in a customer’s first 60 days</span></div>
+        <div className="v3-stat-val">+{fmtPctN(Number(am.ltv_60d.value))}</div>
+        <div className="v3-stat-foot"><span className="v3-muted">on top of the first order</span></div></div>)}
     </div>
     {months.length >= 4 && <figure className="v3-chart">
       <figcaption><span className="v3-chart-title">Customers gained and lapsed, by month</span>
@@ -23160,6 +23166,30 @@ function V3CustomerFile() {
     </figure>}
     <p className="v3-note v3-measure">{yoy != null && odds ? <>A file that grows 10% or more in a year beat the previous Black Friday {odds} across other brands; yours is {yoy >= 0 ? 'up' : 'down'} {Math.abs(Math.round(yoy))}%. That is a pattern, not a forecast. </> : null}
       {lapse != null ? <>A customer who has not bought again within {fmtCount(lapse)} days is unlikely to come back unprompted, so that is when win-back should start, not later.</> : null}</p>
+  </section>);
+}
+// Growth plan: CTC's acquisition checks (0350), one figure each from anatomy_metric_value, worded on the
+// server. The CAC-curve figures are estimates while the curve's range is wide; the tile says so.
+const V3_AM_ACQ_Q = (sb, b) => sb.from('anatomy_metric_value').select('metric_key,value,display,state,detail')
+  .eq('brand_id', b).in('metric_key', ['weighted_ncac', 'spending_power', 'pct_over_model', 'new_customer_layers']).limit(4);
+function V3AcquisitionChecks() {
+  const q = useV3Rows('acq-checks', V3_AM_ACQ_Q);
+  if (q.err || !q.rows || !q.rows.length) return null;
+  const am = {}; q.rows.forEach(r => { if (r.value != null && r.display) am[r.metric_key] = r; });
+  const rows = [
+    am.weighted_ncac && ['Cost of a new customer, gifts and creator codes included', fmtMoney(Number(am.weighted_ncac.value), 2), am.weighted_ncac],
+    am.spending_power && ['Ad spend that adds £1 to that cost', fmtMoney(Math.round(Number(am.spending_power.value) / 10) * 10) + ' a month', am.spending_power],
+    am.pct_over_model && ['Last month against your cost curve', (Number(am.pct_over_model.value) >= 0 ? '+' : '−') + fmtPctN(Math.abs(Number(am.pct_over_model.value))), am.pct_over_model],
+    am.new_customer_layers && ['Sales from returning customers, last 90 days', fmtPctN(Number(am.new_customer_layers.value)), am.new_customer_layers],
+  ].filter(Boolean);
+  if (!rows.length) return null;
+  return (<section className="v3-sec">
+    <h2 className="v3-sec-title">How growth is costing you</h2>
+    <table className="v3-rw">
+      <thead><tr><th className="t-text">Measure</th><th>You</th><th className="t-text">What it means</th></tr></thead>
+      <tbody>{rows.map(([k, v, r]) => <tr key={k}><td className="t-text">{k}</td><td>{v}</td>
+        <td className="t-text v3-muted">{v3FigSpans(r.display)}{r.state === 'estimated' ? ' (an estimate)' : ''}</td></tr>)}</tbody>
+    </table>
   </section>);
 }
 // Goal & costs: the golden rule (0335, 0341). While returning customers' profit does not cover running costs,
@@ -23270,6 +23300,7 @@ const V3_PAGES = {
   growth: (p) => (<>
     <V3Growth/>
     <V3DriverStrip keys={['newsales', 'cac', 'spend']}/>
+    <V3AcquisitionChecks/>
     <CashCeiling/>
     <V3More id="growth-detail" label="The detail: how a new customer’s cost rises with spend, and what changes it">
       <V3Anchor id="forecast"/><GretaPlanPanel show="growth"/>
