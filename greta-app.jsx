@@ -3593,7 +3593,7 @@ function v3TypicalMonth(ladRows, cmr) {
 }
 // New and returning customers, last 30 days: one read for the lead and the detail's cost to win one.
 const V3_TIER_Q = (sb, b) => sb.from('vw_customer_tier_periods')
-  .select('window_label,new_customers,returning_customers,new_net,returning_net,net_sales,ncac,returning_rev_share')
+  .select('window_label,new_customers,returning_customers,new_net,returning_net,net_sales,ncac,returning_rev_share,amer')
   .eq('brand_id', b).eq('window_label', 'current_30d').limit(1);
 // One conversion figure for the owner (review, 8 Oct): Website said 0.45 orders per 100 visits (Clarity,
 // every visit) while this page said 0.8% (Google Analytics sessions, on the 14 days it recorded). When the
@@ -4220,7 +4220,7 @@ function Overview({start, period, customActive}){
             agent="Atlas" observation="Blended product margin across the live catalogue, after cost of goods."
             implication="Every profit figure builds on this — discounts eat straight into it."
             benchmark="gross_margin" bmValue={gm} />
-          <KPI label="Orders refunded" val={PCT(returnRate)} sub={_rcur ? `${NUM(_rcur.refunded_orders)} of ${NUM(_rcur.orders)} orders refunded · last 30 days` : 'refunded orders · last 30 days'} series={seriesReturn} seriesLabel="Refunded £ as a share of sales · by day" current={returnRate} prior={pReturnRate} goodDirection="down"
+          <KPI label="Refunded so far" val={PCT(returnRate)} sub={_rcur ? `${NUM(_rcur.refunded_orders)} of ${NUM(_rcur.orders)} orders from the last 30 days · many are too new to have come back; Products shows the settled rate` : 'orders from the last 30 days refunded so far'} series={seriesReturn} seriesLabel="Refunded £ as a share of sales · by day" current={returnRate} prior={pReturnRate} goodDirection="down"
             agent="Lux" observation={`Share of orders refunded in full or in part. The trend is refunds as a share of sales, by day.`}
             implication="A point of return rate is pure margin; flag any item materially above this blended rate."
             benchmark="return_rate" bmValue={returnRate} />
@@ -19543,9 +19543,19 @@ function V3Incrementality() {
     .eq('brand_id', b).order('spend_30d', { ascending: false, nullsFirst: false }).limit(8));
   const sc = useV3Rows('mk-incr-be', (sb, b) => sb.from('vw_channel_scoreboard')
     .select('channel_type,break_even_iroas').eq('brand_id', b).limit(20));
+  // 10 Oct eval: the average return said Meta prospecting was "too close to call" (£1.71 against £1.65)
+  // while the brand's own Shopify curve says the next £1 brings back £0.39 (vw_channel_optimum 'ease').
+  // The verdict now reads the margin first. The Ads Manager target is the platform ROAS that equals
+  // break-even after the share of sales the channel really causes (vw_channel_iroas_targets, 0335).
+  const opt = useV3Rows('mk-incr-opt', (sb, b) => sb.from('vw_channel_optimum')
+    .select('channel_type,status,marginal_iroas').eq('brand_id', b).limit(20));
+  const tg = useV3Rows('mk-incr-tgt', (sb, b) => sb.from('vw_channel_iroas_targets')
+    .select('channel_type,reported_target_roas').eq('brand_id', b).limit(20));
   if (inc.err) return null;
   if (!inc.rows || (!sc.rows && !sc.err)) return <V3SkeletonRows n={3}/>;
   const beOf = {}; (sc.rows || []).forEach(x => { if (x.break_even_iroas != null) beOf[x.channel_type] = Number(x.break_even_iroas); });
+  const optOf = {}; (opt.rows || []).forEach(x => { optOf[x.channel_type] = x; });
+  const tgtOf = {}; (tg.rows || []).forEach(x => { if (x.reported_target_roas != null) tgtOf[x.channel_type] = Number(x.reported_target_roas); });
   const nice = v3ChanName;
   const rows = inc.rows.filter(x => Number(x.spend_30d) > 0 && x.reported_iroas != null && x.true_iroas != null)
     .map(x => ({ ...x, name: nice(x.platform, x.channel_type), rep: Number(x.reported_iroas), tru: Number(x.true_iroas), spend: Number(x.spend_30d),
@@ -19555,10 +19565,17 @@ function V3Incrementality() {
   const total = rows.reduce((a, r) => a + r.spend, 0), floor = Math.max(500, total * 0.1);
   rows.forEach(r => {
     const lo = Math.min(r.rep, r.tru), hi = Math.max(r.rep, r.tru), room = Math.min(Math.abs(r.rep - r.be), Math.abs(r.tru - r.be)) / r.be;
-    r.call = hi < r.be && room >= 0.1 ? 'cut' : lo >= r.be && room >= 0.1 ? 'pays' : r.spend >= floor ? 'test' : 'small';
+    const o = optOf[r.channel_type];
+    r.mg = o && o.marginal_iroas != null ? Number(o.marginal_iroas) : null;
+    r.tgt = tgtOf[r.channel_type] != null ? tgtOf[r.channel_type] : null;
+    r.call = hi < r.be && room >= 0.1 ? 'cut'
+      : o && o.status === 'ease' && r.mg != null && r.mg < r.be ? 'ease'
+      : lo >= r.be && room >= 0.1 ? 'pays' : r.spend >= floor ? 'test' : 'small';
   });
-  const CALL = { cut: 'Loses money either way', pays: 'Pays either way', test: 'Too close to call — test it', small: 'Too small to test' };
+  const CALL = { cut: 'Loses money either way', ease: 'Pays on average, not at the margin — spend less', pays: 'Pays either way', test: 'Too close to call — test it', small: 'Too small to test' };
   const cut = rows.filter(r => r.call === 'cut'), pays = rows.filter(r => r.call === 'pays'), test = rows.filter(r => r.call === 'test').sort((a, b) => b.spend - a.spend);
+  const ease = rows.filter(r => r.call === 'ease').sort((a, b) => b.spend - a.spend);
+  const tgts = rows.filter(r => r.tgt != null && r.call !== 'small');
   const cutSpend = cut.reduce((a, r) => a + r.spend, 0);
   const allTested = rows.every(r => r.tested);
   const scale = Math.max(...rows.map(r => Math.max(r.rep, r.tru, r.be)), 1) * 1.15;
@@ -19570,9 +19587,10 @@ function V3Incrementality() {
     </div>
     <p className="v3-score-verdict">
       {cut.length > 0 && <>Cut back {v3Names(cut.map(r => r.name))}: {cut.length === 1 ? 'it loses' : 'they lose'} money however you count the sales. That is {fmtMoney(cutSpend)} of spend in the last 30 days. </>}
+      {ease.length > 0 && <>Spend less on {ease[0].name}. On average it pays ({fmtTimes(ease[0].tru)} against the {fmtTimes(ease[0].be)} it needs), but on your own Shopify orders the next £1 brings back about {fmtMoney(ease[0].mg, 2)} of first-order sales, so the last pounds you add cost more than they make. The ad actions on the board size the cut. </>}
       {test.length > 0 && <>Test {test[0].name} before you spend more on it. It costs {fmtMoney(test[0].spend)} a month. The platform credits it with {fmtTimes(test[0].rep)} its cost in sales, and it needs {fmtTimes(test[0].be)} to break even. Whether it pays depends on how many of those sales the ads really cause. </>}
       {pays.length > 0 && <>{v3Names(pays.map(r => r.name))} {pays.length === 1 ? 'pays for itself' : 'pay for themselves'} however you count the sales. </>}
-      {!cut.length && !test.length && !pays.length && <>No channel spends enough to be worth a test yet. </>}
+      {!cut.length && !test.length && !pays.length && !ease.length && <>No channel spends enough to be worth a test yet. </>}
       <V3Conf state={allTested ? 'likely' : 'probably'} detail={allTested ? 'Every channel here has been tested on your own customers.' : 'Where you have not run a test, the share of sales each channel really causes comes from published studies of similar channels. That is why a verdict that holds on only one count goes to a test first.'}/></p>
     <ul className="v3-score-list">
       {rows.map(r => {
@@ -19591,6 +19609,7 @@ function V3Incrementality() {
         </li>);
       })}
     </ul>
+    {tgts.length > 0 && <p className="v3-note v3-measure"><b>What to aim for in the ad platforms.</b> The return each platform must report for the channel to break even, after the share of its sales it really causes: {tgts.map((r, i) => <React.Fragment key={r.channel_type}>{i ? (i === tgts.length - 1 ? ' and ' : ', ') : ''}{r.name} <b className="oi-num">{fmtTimes(r.tgt, 2)}</b></React.Fragment>)}. Set these as the target return in Ads Manager and Google Ads, not the platform’s default.</p>}
     {test.length > 0 && <p className="v3-note">To settle it, pause {test[0].name} in one region for two weeks while another carries on, then compare sales. That swaps the borrowed figure for your own and settles the {fmtMoney(test[0].spend)} a month.{' '}
       <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('calendar')}>Plan the {test[0].name} test</button></p>}
   </div>);
@@ -21155,6 +21174,21 @@ function v3BuildSigns(S, hist, opts) {
       series: ser('return'), fmt: v => fmtMoney(v, 2), better: 'higher', line: { v: be, label: 'Break-even ' + fmtMoney(be, 2) },
       which: 'ret', ctx: { weeks: H && Array.isArray(H.weeks) ? H.weeks : [], be, lineLabel: 'the ' + fmtMoney(be, 2) + ' that only covers the ads, products and delivery' }, dline: be });
   }
+  // 10 Oct eval: the governor is new-customer sales from each £1 of ads (aMER), not all sales per £1. The
+  // blended figure counts returning customers the ads did not win, so it read "ok" (£1.94) while the ads
+  // lost money on every first order (£1.40 against £1.65). opts.amer is the hourly snapshot's figure
+  // (cache_customer_tier_periods, the same as Customers); the history uses each point's new-customer
+  // sales over its ad spend, so the last point lands on the tile.
+  const am = opts && opts.amer != null ? Number(opts.amer) : null;
+  if (am != null && am > 0 && A.break_even_return) {
+    const be = num(A.break_even_return), top = Math.max(am, be) * 1.25;
+    const AP = HP ? HP.filter(p => Number(p.cac_spend) > 0 && p.new_net != null).map(p => ({ d: String(p.d), v: Number(p.new_net) / Number(p.cac_spend) })) : [];
+    signs.push({ k: 'New-customer sales from each £1 of ads', v: fmtMoney(am, 2), tone: am < be ? 'weak' : am < be * 1.15 ? 'ok' : 'good',
+      bar: { fill: am / top, mark: be / top },
+      n: <>{fmtMoney(be, 2)} pays for the ads and a first order’s products and delivery{ret != null ? <>; all sales per £1, returning customers included: {fmtMoney(ret, 2)}</> : null}</>,
+      series: AP.length >= 4 ? AP : null, fmt: v => fmtMoney(v, 2), better: 'higher', line: { v: be, label: 'First-order break-even ' + fmtMoney(be, 2) },
+      which: null, amer: true, ctx: {}, dline: be });
+  }
   if (U.cac != null && U.first_order_contribution != null) {
     const c30 = num(U.cac_30d), use = c30 > 0 ? c30 : num(U.cac), fo = num(U.first_order_contribution), top = Math.max(use, fo) * 1.25;
     signs.push({ k: 'Cost to win a new customer', v: fmtMoney(use), tone: use > fo ? 'weak' : 'good',
@@ -21273,10 +21307,39 @@ function v3BuildSigns(S, hist, opts) {
     fmt: v3SignedGbp, better: 'higher', line: { v: 0, label: 'Break-even' } }, profitCfg) : null;
   return { signs, profitCfg, profitSign, HP };
 }
+// 10 Oct eval, fix 6: the morning-after read. fn_sales_move (0340, cache_sales_move, 07:45 daily) splits a
+// change in sales into what sold (marked down, full price to new and to returning customers, which add up
+// to the change) and how it sold (visits, orders per visit, order size), plus products now out of stock.
+// The week leads when it moved; otherwise the month. Figures in the server's sentences are split into
+// their own spans so tagFigures sets them in the figures face.
+const V3_MOVE_Q = (sb, b) => sb.from('cache_sales_move').select('win,payload,computed_at').eq('brand_id', b).limit(2);
+const v3FigSpans = s => String(s || '').split(/([−-]?[+]?£[\d,]+(?:\.\d+)?|[\d.]+%)/).map((t, i) => (i % 2 ? <span key={i}>{t}</span> : t));
+function V3SalesMove() {
+  const q = useV3Rows('sales-move', V3_MOVE_Q);
+  const [open, setOpen] = React.useState(false);
+  if (q.err || !q.rows) return null;
+  const by = {}; q.rows.forEach(r => { by[r.win] = r.payload || {}; });
+  const w = by['7d'], m = by['28d'];
+  const lead = w && w.state === 'moved' ? w : m && m.state === 'moved' ? m : null;
+  if (!lead) return null;
+  const other = lead === w ? m : null;
+  return (<div className="v3-move">
+    <div className="v3-kick">What moved {lead === w ? 'this week' : 'this month'}</div>
+    <p className="v3-move-lead v3-measure"><b>{v3FigSpans(lead.headline)}</b> {v3FigSpans(lead.why)}</p>
+    <button type="button" className="v3-xref" aria-expanded={open} onClick={() => setOpen(o => !o)}>
+      {open ? 'Hide how Greta split it' : 'How Greta split it'} <span className="v3-xref-go">{open ? '↑' : '↓'}</span></button>
+    {open && <ul className="v3-move-lines v3-measure">
+      {(lead.lines || []).map((t, i) => <li key={i}>{v3FigSpans(t)}</li>)}
+      {other && other.state === 'moved' && <li>{v3FigSpans(other.headline)} {v3FigSpans(other.why)}</li>}
+      {lead.basis && <li className="micro muted">{lead.basis} Worked out each morning.</li>}
+    </ul>}
+  </div>);
+}
 function V3BusinessState({ part }) {
   const q = useV3Rows('brand-state', V3_STATE_Q);
   const codes = useV3Rows('brand-codes', V3_CODES_Q);
   const hq = useV3Rows('sign-history', V3_SIGN_HIST_Q);
+  const tq = useV3Rows('tier-30', V3_TIER_Q);   // aMER, from the same hourly snapshot as Customers
   const [drv, setDrv] = React.useState(null);   // which sign's drivers are open: 'cac', 'ret', 'ly', 'repeat'
   if (q.err) return null;                                   // before 0269, or unreadable: Today carries on without it
   if (!q.rows) return part === 'detail' ? null : <V3SkeletonRows n={3}/>;
@@ -21422,8 +21485,12 @@ function V3BusinessState({ part }) {
       {facts}{terms}{chart}{bench}
     </V3More>);
   }
-  const SG = v3BuildSigns(S, hq.rows && hq.rows[0] && hq.rows[0].history);
-  const HP = SG.HP, signs = SG.signs, profitCfg = SG.profitCfg;
+  const tRow = tq.rows && tq.rows[0];
+  const SG = v3BuildSigns(S, hq.rows && hq.rows[0] && hq.rows[0].history, { amer: tRow && tRow.amer != null ? tRow.amer : null });
+  const HP = SG.HP, profitCfg = SG.profitCfg;
+  // Today's four: aMER takes the blended return's place when it is known (the blended sign stays for the
+  // pages whose driver strips use it)
+  const signs = SG.signs.some(s => s.amer) ? SG.signs.filter(s => s.which !== 'ret') : SG.signs;
   // one "What is driving this?" per sign whose history can explain it; one panel open at a time
   signs.forEach(sg => { sg.act = sg.which && v3HasDrivers(sg.which, HP)
     ? { label: drv === sg.which ? 'Hide what is driving it' : 'What is driving this?', open: drv === sg.which, on: () => setDrv(o => (o === sg.which ? null : sg.which)) } : null; });
@@ -21440,6 +21507,7 @@ function V3BusinessState({ part }) {
       {signs.length > 0 && <div className="v3-signs">{signs.slice(0, 4).map(s => <V3Sign key={s.k} {...s}/>)}</div>}
     </div>
     {openSign && HP && <V3DriverPanel key={drv} which={drv} points={HP} ctx={openSign.ctx} line={openSign.dline}/>}
+    <V3SalesMove/>
     {/* How fresh these are, asked on 9 Oct: the figures are worked out again every hour from feeds that
         arrive every 30 minutes (Shopify) and every 2 hours (ad accounts). */}
     <p className="micro muted v3-stand-fresh">Each figure covers the 30 days to {HP ? v3Day(String(hq.rows[0].history.as_of), true) : 'yesterday'}, the last full day. Greta works them out again every hour; Shopify orders arrive every 30 minutes and ad spend every 2 hours.{HP ? ' Point at a sign to see its last 13 weeks.' : ''}</p>
@@ -22991,6 +23059,119 @@ function V3FixFirst({ kick }) {
   </section>);
 }
 
+// ── 10 Oct eval, fixes 5, 7, 8, 9: figures Greta computed but showed only in Settings, or nowhere ──────
+// Customers: the active file (an order in the last 12 months), its change each month and the lapse window
+// (0336 cache_customer_file + anatomy_metric_value). The year-on-year change is CTC's leading indicator for
+// the peak; it is a pattern from other brands, so it is said as one and carries no pounds.
+const V3_CFILE_Q = (sb, b) => sb.from('cache_customer_file').select('month_start,active_end,new_customers,reactivated,lapsed,net_change,complete')
+  .eq('brand_id', b).order('month_start', { ascending: false }).limit(13);
+const V3_AM_CUST_Q = (sb, b) => sb.from('anatomy_metric_value').select('metric_key,value,display,detail')
+  .eq('brand_id', b).in('metric_key', ['active_file', 'net_active_change', 'lapse_window']).limit(3);
+function V3CustomerFile() {
+  const f = useV3Rows('cust-file', V3_CFILE_Q);
+  const a = useV3Rows('cust-file-am', V3_AM_CUST_Q);
+  if (f.err) return <V3LoadFailed what="your customer file" onRetry={f.retry}/>;
+  if (!f.rows) return <V3SkeletonRows n={2}/>;
+  if (!f.rows.length) return null;
+  const am = {}; (a.rows || []).forEach(r => { am[r.metric_key] = r; });
+  const now = f.rows[0], yoy = am.active_file && am.active_file.detail ? Number(am.active_file.detail.yoy_pct) : null;
+  const lapse = am.lapse_window ? Number(am.lapse_window.value) : null, p50 = am.lapse_window && am.lapse_window.detail ? Number(am.lapse_window.detail.p50_days) : null;
+  const odds = am.active_file && am.active_file.detail ? am.active_file.detail.peak_odds : null;
+  const months = f.rows.filter(r => r.complete).slice(0, 12).reverse()
+    .map(r => ({ label: gpMonthName(String(r.month_start).slice(0, 10)).slice(0, 3), gained: Number(r.new_customers) + Number(r.reactivated), lapsed: -Number(r.lapsed), net: Number(r.net_change) }));
+  const last = months.length ? months[months.length - 1] : null;
+  return (<section className="v3-sec">
+    <h2 className="v3-sec-title">Your customer file</h2>
+    <div className="v3-stat-grid">
+      <div className="v3-stat"><div className="v3-stat-lab"><span>Customers who bought in the last 12 months</span></div>
+        <div className="v3-stat-val">{fmtCount(Number(now.active_end))}</div>
+        <div className="v3-stat-foot">{yoy != null ? <span className={yoy >= 0 ? 'v3-up' : 'v3-down'}>{(yoy >= 0 ? '+' : '−') + Math.abs(Math.round(yoy)) + '%'} on a year ago</span> : <span className="v3-muted">an order in the last 12 months</span>}</div></div>
+      {last && <div className="v3-stat"><div className="v3-stat-lab"><span>Change last month</span></div>
+        <div className="v3-stat-val">{(last.net >= 0 ? '+' : '−') + fmtCount(Math.abs(last.net))}</div>
+        <div className="v3-stat-foot"><span className="v3-muted">{fmtCount(last.gained)} new or back, {fmtCount(-last.lapsed)} lapsed</span></div></div>}
+      {lapse != null && <div className="v3-stat"><div className="v3-stat-lab"><span>When customers stop coming back</span></div>
+        <div className="v3-stat-val">{fmtCount(lapse)} days</div>
+        <div className="v3-stat-foot"><span className="v3-muted">80% of second orders arrive by then{p50 != null ? '; half within ' + fmtCount(p50) + ' days' : ''}</span></div></div>}
+    </div>
+    {months.length >= 4 && <figure className="v3-chart">
+      <figcaption><span className="v3-chart-title">Customers gained and lapsed, by month</span>
+        <span className="v3-legend"><i style={{ background: PAL.good }}/>New or back <i style={{ background: PAL.bad }}/>Lapsed</span></figcaption>
+      <Recharts.ResponsiveContainer width="100%" height={160}>
+        <Recharts.BarChart data={months} stackOffset="sign" margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+          <Recharts.CartesianGrid/><Recharts.XAxis dataKey="label"/><Recharts.YAxis/>
+          <Recharts.ReferenceLine y={0} stroke={PAL.muted}/>
+          <Recharts.Tooltip formatter={(v, k) => [fmtCount(Math.abs(v)), k === 'gained' ? 'New or back' : 'Lapsed']}/>
+          <Recharts.Bar dataKey="gained" stackId="a" fill={PAL.good}/><Recharts.Bar dataKey="lapsed" stackId="a" fill={PAL.bad}/>
+        </Recharts.BarChart>
+      </Recharts.ResponsiveContainer>
+    </figure>}
+    <p className="v3-note v3-measure">{yoy != null && odds ? <>A file that grows 10% or more in a year beat the previous Black Friday about {odds} across other brands; yours is {yoy >= 0 ? 'up' : 'down'} {Math.abs(Math.round(yoy))}%. That is a pattern, not a forecast. </> : null}
+      {lapse != null ? <>A customer who has not bought again within {fmtCount(lapse)} days is unlikely to come back unprompted, so that is when win-back should start, not later.</> : null}</p>
+  </section>);
+}
+// Goal & costs: the golden rule (0335, 0341). While returning customers' profit does not cover running costs,
+// every new customer has to pay back on the first order, so the ad target is first-order payback.
+const V3_GR_Q = (sb, b) => sb.from('vw_channel_iroas_targets').select('returning_cm_month,opex_month,golden_rule_met').eq('brand_id', b).limit(1);
+function V3GoldenRule() {
+  const g = useV3Rows('golden-rule', V3_GR_Q);
+  const t = useV3Rows('tier-30', V3_TIER_Q);
+  const s = useV3Rows('brand-state', V3_STATE_Q);
+  if (g.err || !g.rows || !g.rows.length) return null;
+  const r = g.rows[0], ret = Number(r.returning_cm_month), opex = Number(r.opex_month);
+  if (!(opex > 0) || r.returning_cm_month == null) return null;
+  const met = !!r.golden_rule_met, tr = t.rows && t.rows[0], amer = tr && tr.amer != null ? Number(tr.amer) : null;
+  const st = s.rows && s.rows[0], be = st && st.ads && st.ads.break_even_return != null ? Number(st.ads.break_even_return) : null;
+  const top = Math.max(ret, opex) * 1.1;
+  return (<section className="v3-sec">
+    <h2 className="v3-sec-title">The golden rule: do returning customers pay the running costs?</h2>
+    <p className="v3-note v3-measure"><b className={met ? 'v3-up' : 'v3-down'}>{met ? 'Yes.' : 'Not yet.'}</b> Returning customers bring <span>{fmtMoney(ret)}</span> a month of profit after product and delivery costs, against <span>{fmtMoney(opex)}</span> of running costs.{' '}
+      {met ? <>So a new customer can be bought for more than their first order earns: what they buy later pays it back.</>
+        : <>So every new customer has to pay for themselves on the first order{be != null ? <>: each £1 of ads needs to bring <span>{fmtMoney(be, 2)}</span> of new-customer sales</> : null}{amer != null && be != null ? <>, and it brought <span>{fmtMoney(amer, 2)}</span> in the last 30 days{amer < be ? ', so new customers cost more than their first order makes' : ''}</> : null}. The rule holds once returning customers bring <span>{fmtMoney(opex - ret)}</span> a month more, or running costs fall by that much.</>}</p>
+    <div className="v3-gr" role="img" aria-label={'Returning profit ' + fmtMoney(ret) + ' a month against running costs ' + fmtMoney(opex)}>
+      <div className="v3-gr-row"><span>Returning customers’ profit</span><i className={'v3-gr-bar' + (met ? '' : ' short')} style={{ width: (ret / top * 100) + '%' }}/><b>{fmtMoney(ret)}</b></div>
+      <div className="v3-gr-row"><span>Running costs</span><i className="v3-gr-bar cost" style={{ width: (opex / top * 100) + '%' }}/><b>{fmtMoney(opex)}</b></div>
+    </div>
+  </section>);
+}
+// Marketing: creative demand (vw_creative_demand, 0330), on CTC's measures with CTC's bands. Before this
+// the front end read none of it.
+const V3_CDEM_Q = (sb, b) => sb.from('vw_creative_demand').select('*').eq('brand_id', b).limit(1);
+function V3CreativeDemand() {
+  const q = useV3Rows('creative-demand', V3_CDEM_Q);
+  if (q.err || !q.rows || !q.rows.length) return null;
+  const c = q.rows[0], n = v => (v == null ? null : Number(v));
+  if (!(n(c.active_ads) > 0)) return null;
+  const rows = [
+    ['Spend in your top 5 ads', n(c.ad_concentration), 'CTC worries above 33–50%', v => v > 0.5 ? 'weak' : v > 0.33 ? 'ok' : 'good'],
+    ['Ads that earned nothing', n(c.zero_rev_rate), 'some is normal while testing', v => v > 0.5 ? 'weak' : 'ok'],
+    ['Spend on ads still running after a month', n(c.evergreen_share), 'the best brands hold about 61%', v => v >= 0.5 ? 'good' : v >= 0.3 ? 'ok' : 'weak'],
+    ['New ads that became winners', n(c.win_rate != null ? c.win_rate : c.activation_rate), 'about 21% is typical', v => v >= 0.18 ? 'good' : v >= 0.1 ? 'ok' : 'weak'],
+  ].filter(r => r[1] != null);
+  const TONE = { good: 'v3-up', ok: 'v3-warn', weak: 'v3-down' };
+  return (<section className="v3-sec">
+    <h2 className="v3-sec-title">Are you making enough new ads?</h2>
+    <p className="v3-note v3-measure">At your Meta spend (<span>{fmtMoney(n(c.meta_spend_30d))}</span> a month) and win rate, you need about <b className="oi-num">{fmtCount(n(c.ads_needed_month))}</b> new ads a month to keep <span>{fmtCount(n(c.winners_needed))}</span> winners running{n(c.net_winner_gap) > 0.5 ? <>; you are short by about <span>{Math.round(n(c.net_winner_gap) * 10) / 10}</span> winners</> : null}. Each winner carries about <span>{fmtMoney(n(c.spend_per_winner))}</span> of spend.</p>
+    <table className="v3-rw">
+      <thead><tr><th className="t-text">Measure, last 30 days</th><th>You</th><th className="t-text">Rule of thumb</th></tr></thead>
+      <tbody>{rows.map(([k, v, band, tone]) => <tr key={k}><td className="t-text">{k}</td><td className={TONE[tone(v)] || ''}>{fmtPctN(v)}</td><td className="t-text v3-muted">{band}</td></tr>)}</tbody>
+    </table>
+    <p className="micro muted v3-measure">From {fmtCount(n(c.active_ads))} Meta ads, on Meta’s own sales count. A high share of spend on ads that keep running is good: it means winners last.</p>
+  </section>);
+}
+// Review: congruency (vw_brand_congruency). When the ad platforms' return and the shop's profit move apart,
+// one of them is wrong; when they move together, the reading can be trusted.
+const V3_CONG_Q = (sb, b) => sb.from('vw_brand_congruency').select('*').eq('brand_id', b).limit(1);
+function V3Congruency() {
+  const q = useV3Rows('congruency', V3_CONG_Q);
+  if (q.err || !q.rows || !q.rows.length) return null;
+  const c = q.rows[0], n = v => (v == null ? null : Number(v));
+  if (n(c.iroas_now) == null || n(c.cm_now) == null) return null;
+  const ok = c.congruency === 'congruent';
+  return (<p className="v3-note v3-measure v3-cong"><b>Do the ad figures and your profit agree?</b>{' '}
+    {ok ? 'Yes: they moved the same way.' : 'No: they moved apart, so one of them is misreading.'}{' '}
+    Return on ads after the share they really cause went from <span>{fmtTimes(n(c.iroas_prior), 2)}</span> to <span>{fmtTimes(n(c.iroas_now), 2)}</span>; profit after products and delivery went from <span>{fmtMoney(n(c.cm_prior))}</span> to <span>{fmtMoney(n(c.cm_now))}</span>{c.prior_date ? <> ({v3Day(String(c.prior_date))} to {v3Day(String(c.latest_date))})</> : null}.
+    {ok ? '' : ' Check the tracking on Settings before acting on the ad figures.'}</p>);
+}
 const V3_PAGES = {
   today: (p) => (<><V3BusinessState part="lead"/><V3Today {...p}/></>),
   review: (p) => (<>
@@ -23000,6 +23181,7 @@ const V3_PAGES = {
         nothing was done) are gone; findings that pass the evidence check are below. */}
     <V3Anchor id="week"/><V3Review/>
     <V3DriverStrip keys={['profit', 'ly']}/>
+    <V3Congruency/>
     <V3More id="rev-quarter" label="This quarter — a summary to share with your board or investors"><V3Anchor id="quarter"/><BusinessReview/></V3More>
     <V3More id="rev-alerts" label="What Greta found — what changed, and why"><V3Anchor id="alerts"/><V3Findings/>
       <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>What was done, and whether it worked <span className="v3-xref-go">on Actions →</span></button>
@@ -23019,6 +23201,7 @@ const V3_PAGES = {
         and a fix, then the forms. Readiness moved to the foot and reads the app's own figures. */}
     <V3GoalLead/>
     <V3DriverStrip keys={['profit']}/>
+    <V3GoldenRule/>
     <V3CostsOff/>
     <GretaPlanPanel show="goal"/>
     {/* The only place a brand can enter per-variant landed cost. Business economics below sets the
@@ -23068,6 +23251,7 @@ const V3_PAGES = {
     <V3DriverStrip keys={['spend', 'cac', 'ret', 'metacpa', 'googcpa', 'email']}/>
     <V3CodePerformance/>
     <V3Incrementality/>
+    <V3CreativeDemand/>
     <CreativeReallocation/>
     <V3EmailRead/>
     <V3More id="mk-why" label="What each ad platform claims, and why each channel behaves as it does">
@@ -23093,6 +23277,7 @@ const V3_PAGES = {
         numbers, then the retention moves, then the segments panel that stages them, then the plan. */}
     <V3CustomerValue/>
     <V3DriverStrip keys={['newc', 'cac', 'retsales', 'repeat']}/>
+    <V3CustomerFile/>
     <V3Customers/>
     <V3Retention/>
     <V3Anchor id="segments"/>
