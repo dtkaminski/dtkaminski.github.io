@@ -9198,6 +9198,10 @@ function buildAskContext(facts, question, budget){
       parts_biggest_first: String(d.parts || '').split('; ').filter(Boolean), what_to_do_from_the_board: String(d.board || '').split('; ').filter(Boolean) } : null; })(),
     readout: v3AskReadout((typeof window !== 'undefined' && window.GRETA_READOUT) || null, topics, basisFor),
     site_last_30_days: topics.site ? site : null,
+    // what moved sales and why (0340, worked out each morning): the cause on Today's strip, with the split
+    sales_move: (() => { const M = (typeof window !== 'undefined' && Array.isArray(window.GRETA_SALES_MOVE)) ? window.GRETA_SALES_MOVE : [];
+      const o = {}; M.forEach(r => { const p = r.payload || {}; if (p.headline) o[r.win === '7d' ? 'last_7_days' : 'last_28_days'] = { said: p.headline + ' ' + (p.why || ''), split: p.lines || [] }; });
+      return Object.keys(o).length ? o : null; })(),
     // the parts of the business with something missing (0318): what is not measured, and whether anything explains or acts on it
     anatomy_gaps: (() => { const C = (typeof window !== 'undefined' && Array.isArray(window.GRETA_COVERAGE)) ? window.GRETA_COVERAGE : [];
       const g = C.filter(r => (r.missing_core && r.missing_core.length) || !(r.drivers && r.drivers.length) || !r.open_actions)
@@ -9337,6 +9341,7 @@ function AskPanel(){
 Follow _meta.readout.rules. Quote headline figures exactly, with their window. Say how far the owner can lean on a figure in plain words (measured, likely, probably, possibly, an outside chance), as part of the sentence: never the word rung, never in brackets after a figure. Never recommend an action in readout.held. Never compare or total across days readout.coverage or readout.tracking marks unusable; missing days are not zero.
 
 WHY questions (why did a figure move, what is driving it): when _meta.why_this_question is present, it IS the answer and comes before facts and readout. Open with one sentence: the figure is now <now>, against <then> in <against> (use the words of against as written: "the 30 days to 10 Sep" is not "the period before 10 Sep"). Then each item of parts_biggest_first, in that order, one line each, with its amount exactly as written (these are the parts the change splits into and they add up to it). Then "What to do:" and the items of what_to_do_from_the_board, as written. Do not explain the figure as a division, and do not add causes that are not in it. Otherwise, if data.drivers has the figure, answer from its row the same way. If neither has it, say it is not a figure that is going the wrong way, and answer from the other figures.
+SALES MOVES: when the question is why sales or profit went up or down, start from _meta.sales_move: give its cause as written (it splits the change into marked-down sales, full-price sales to new and to returning customers, and visits, orders per visit and order size), then the one or two biggest parts from split. Do not name a different cause.
 GAPS: _meta.anatomy_gaps lists the parts of the business with a measure missing, nothing explaining a change, or no action. When a question touches one, say plainly what Greta cannot see yet; never call that part covered.
 WHAT TO DO questions: answer from readout.board in its order, with each item's pounds (a month, or once when the action says so) and its rung. Do not re-rank. One idea of your own is allowed only if labelled "my suggestion, not on your board", and never one from readout.held (9 Oct: a held Judge.me fix came back as "my suggestion"). For spending more, check facts.quarter_plan_at_todays_ad_spend and facts.next_peak first. If facts.goal.needs_replanning is true, say so before quoting the goal.
 
@@ -9430,6 +9435,9 @@ ${dataStr}`;
   if (typeof window !== 'undefined') window.GRETA_DRIVERS = drivers;
   const askCov = useV3Rows('anatomy-coverage', V3_COVERAGE_Q);
   if (typeof window !== 'undefined' && Array.isArray(askCov.rows)) window.GRETA_COVERAGE = askCov.rows;
+  // 0340: the morning's read of what moved sales (the same rows as Today's strip)
+  const askMove = useV3Rows('sales-move', V3_MOVE_Q);
+  if (typeof window !== 'undefined' && Array.isArray(askMove.rows)) window.GRETA_SALES_MOVE = askMove.rows;
   const whyPrompts = drivers.slice().sort((a, b) => (a.tone === 'weak' ? 0 : 1) - (b.tone === 'weak' ? 0 : 1)).slice(0, 3).map(v3WhyPrompt);
   const quickPrompts = UI_V3 ? V3_ASK_PROMPTS : [
     `What should I do today? Give me the top 3 actions, ranked by ${curSym()} impact.`,
