@@ -20731,7 +20731,7 @@ function V3Competitors() {
           <p className="v3-verdict">{verdict}</p>
           <ol className="v3-moves">{reads.map(r => (<li key={r.k}><b>{r.head}</b> {r.body} <V3Conf state={r.conf} detail={r.k === 'shop' ? 'From your own account’s auction data. The return is Google’s own count, which usually runs above your real orders.' : 'Counted straight from your own account.'}/></li>))}</ol>
           <V3CompetitorDrivers rows={gads.rows} brandName={brandC && brandC.name} shopName={shop && shop.name}
-            under={!!(shop && be && shop.spend > 0 && shop.value / shop.spend < be)} today={today}/>
+            under={!!(shop && be && shop.spend > 0 && shop.value / shop.spend < be)} today={today} gsc={gsc.rows}/>
           {!S && <p className="micro muted v3-measure">Connect Search Console on Connections &amp; data to see how much of your search traffic already knew you, and where you sit on searches for what you sell.</p>}
         </>)}
     </section>
@@ -21645,8 +21645,51 @@ function v3ModelShare(name, kind, A, B, info) {
     note: 'Google’s own auction figures for this campaign, each day’s share averaged over the 30 days, as on the rest of this page.',
   };
 }
-function V3CompetitorDrivers({ rows, brandName, shopName, under, today }) {
+// Organic search (10 Oct eval, fix 12: the anatomy's organic part had no driver). Clicks from searches for
+// what you sell (Search Console, non-branded), the last 30 reported days against the 30 before, split
+// exactly in logs into how often you were seen (impressions) and how often a viewer clicked; position is
+// shown beside it because it drives the click rate.
+function v3ModelOrganic(A, B, info) {
+  const ok = A.imp > 0 && B.imp > 0 && A.clicks > 0 && B.clicks > 0;
+  const [pI, pC] = ok ? v3LogParts(A.clicks, B.clicks, [{ a: A.imp, b: B.imp, sign: 1 }, { a: A.clicks / A.imp, b: B.clicks / B.imp, sign: 1 }]) : [B.clicks - A.clicks, 0];
+  return {
+    title: B.clicks >= A.clicks ? 'Why more people found you on searches for what you sell' : 'Why fewer people found you on searches for what you sell',
+    from: A.clicks, to: B.clicks, better: 'higher', fmtV: v => fmtCount(Math.round(v)) + ' clicks', fmtAmt: v => fmtCount(Math.round(Math.abs(v))) + ' clicks',
+    startK: 'Clicks, 30 days before', endK: 'Clicks, last 30 days', subA: v3Day(info.a0) + ' – ' + v3Day(info.a1, true), subB: v3Day(info.b0) + ' – ' + v3Day(info.b1, true),
+    colA: 'The 30 days before', colB: 'The last 30 days', bridgeCap: 'Clicks from searches for what you sell', of: B.clicks >= A.clicks ? 'the rise' : 'the fall',
+    todo: [{ amt: pI, ids: ['seo-nonbrand'] }, { amt: pC, ids: ['seo-nonbrand'] }],
+    parts: ok ? [
+      { amt: pI, k: v3UpDown(A.imp, B.imp, 'Seen in more searches', 'Seen in fewer searches'), sub: fmtCount(A.imp) + ' to ' + fmtCount(B.imp) + ' times shown',
+        cause: <>Google showed you {v3UpDown(A.imp, B.imp, 'more', 'less')} often ({fmtCount(A.imp)} to {fmtCount(B.imp)} times)</>,
+        against: <>Shown {v3UpDown(A.imp, B.imp, 'more', 'less')} often in searches ({fmtCount(A.imp)} to {fmtCount(B.imp)})</> },
+      { amt: pC, k: v3UpDown(A.clicks / A.imp, B.clicks / B.imp, 'More viewers clicked', 'Fewer viewers clicked'), sub: fmtPctN(A.clicks / A.imp, 1) + ' to ' + fmtPctN(B.clicks / B.imp, 1) + ', at position ' + A.pos.toFixed(1) + ' to ' + B.pos.toFixed(1),
+        cause: <>{v3UpDown(A.clicks / A.imp, B.clicks / B.imp, 'more', 'fewer')} of the people who saw you clicked ({fmtPctN(A.clicks / A.imp, 1)} to {fmtPctN(B.clicks / B.imp, 1)}; average position {A.pos.toFixed(1)} to {B.pos.toFixed(1)})</>,
+        against: <>{v3UpDown(A.clicks / A.imp, B.clicks / B.imp, 'More', 'Fewer')} viewers clicking ({fmtPctN(A.clicks / A.imp, 1)} to {fmtPctN(B.clicks / B.imp, 1)})</> },
+    ] : [{ amt: B.clicks - A.clicks, k: 'Clicks', sub: '', cause: <>clicks moved</>, against: <>Clicks</> }],
+    opening: <>Searches for what you sell, not your name, brought {fmtCount(B.clicks)} clicks in the last 30 days Google has reported, against {fmtCount(A.clicks)} in the 30 before.</>,
+    closing: <> Below position 3, most clicks go to the results above you: pages that answer these searches (collections, guides) move both parts.</>,
+    rows: [
+      ['Clicks', A.clicks, B.clicks, v => fmtCount(v), 'higher'],
+      ['Times shown', A.imp, B.imp, v => fmtCount(v), 'higher'],
+      ['Share who clicked', A.clicks / A.imp, B.clicks / B.imp, v => fmtPctN(v, 1), 'higher'],
+      ['Average position', A.pos, B.pos, v => v.toFixed(1), 'lower'],
+    ],
+    note: 'Search Console’s own figures for searches that do not include your brand name, summed by day; Google reports them two to three days late, so the windows end on its latest day.',
+  };
+}
+function V3CompetitorDrivers({ rows, brandName, shopName, under, today, gsc }) {
   const [open, setOpen] = React.useState(null);
+  const mO = (() => {
+    const nb = (gsc || []).filter(r => r.segment !== 'branded'); if (!nb.length) return null;
+    const last = nb.reduce((m, r) => (String(r.date) > m ? String(r.date).slice(0, 10) : m), '0000');
+    const q1 = last, q0 = v3IsoAdd(q1, -29), p1 = v3IsoAdd(q0, -1), p0 = v3IsoAdd(p1, -29);
+    const agg = (lo, hi) => { const rs = nb.filter(r => String(r.date) >= lo && String(r.date).slice(0, 10) <= hi);
+      const imp = rs.reduce((t, r) => t + (Number(r.impressions) || 0), 0), clicks = rs.reduce((t, r) => t + (Number(r.clicks) || 0), 0);
+      const pos = imp > 0 ? rs.reduce((t, r) => t + (Number(r.position) || 0) * (Number(r.impressions) || 0), 0) / imp : 0;
+      return rs.length >= 20 ? { imp, clicks, pos } : null; };
+    const A = agg(p0, p1), B = agg(q0, q1);
+    return A && B ? v3ModelOrganic(A, B, { a0: p0, a1: p1, b0: q0, b1: q1 }) : null;
+  })();
   const b1 = v3IsoAdd(today, -1), b0 = v3IsoAdd(b1, -29), a1 = v3IsoAdd(b0, -1), a0 = v3IsoAdd(a1, -29);
   const win = (name, lo, hi) => {
     const rs = (rows || []).filter(r => r.entity_name === name && String(r.date) >= lo && String(r.date) <= hi);
@@ -21658,16 +21701,18 @@ function V3CompetitorDrivers({ rows, brandName, shopName, under, today }) {
   const mk = (name, kind) => { if (!name) return null; const A = win(name, a0, a1), B = win(name, b0, b1);
     return A && B ? v3ModelShare(name, kind, A, B, { a0, a1, b0, b1, under }) : null; };
   const mB = mk(brandName, 'brand'), mS = mk(shopName, 'shop');
-  if (!mB && !mS) return null;
+  if (!mB && !mS && !mO) return null;
   const btn = (id, label) => (<button type="button" className="v3-xref v3-sign-act" aria-expanded={open === id} onClick={() => setOpen(o => (o === id ? null : id))}>
     {open === id ? 'Hide what is driving it' : label} <span className="v3-xref-go">{open === id ? '↑' : '↓'}</span></button>);
   return (<div className="v3-strip-act">
     <div className="v3-btn-row">
       {mB && btn('brand', 'What changed on searches for your name?')}
       {mS && btn('shop', 'What changed in Shopping auctions?')}
+      {mO && btn('organic', 'What changed on searches for what you sell?')}
     </div>
     {open === 'brand' && mB && <V3DriverPanel fixed={mB}/>}
     {open === 'shop' && mS && <V3DriverPanel fixed={mS}/>}
+    {open === 'organic' && mO && <V3DriverPanel fixed={mO}/>}
   </div>);
 }
 // Calendar (9 Oct): this month against the calendar's own day-by-day projection (cache_calendar_payload
@@ -23105,7 +23150,7 @@ function V3CustomerFile() {
         </Recharts.BarChart>
       </Recharts.ResponsiveContainer>
     </figure>}
-    <p className="v3-note v3-measure">{yoy != null && odds ? <>A file that grows 10% or more in a year beat the previous Black Friday about {odds} across other brands; yours is {yoy >= 0 ? 'up' : 'down'} {Math.abs(Math.round(yoy))}%. That is a pattern, not a forecast. </> : null}
+    <p className="v3-note v3-measure">{yoy != null && odds ? <>A file that grows 10% or more in a year beat the previous Black Friday {odds} across other brands; yours is {yoy >= 0 ? 'up' : 'down'} {Math.abs(Math.round(yoy))}%. That is a pattern, not a forecast. </> : null}
       {lapse != null ? <>A customer who has not bought again within {fmtCount(lapse)} days is unlikely to come back unprompted, so that is when win-back should start, not later.</> : null}</p>
   </section>);
 }
