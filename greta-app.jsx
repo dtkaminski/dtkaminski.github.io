@@ -19766,6 +19766,10 @@ function V3ChannelMap() {
     .sort((a, b) => Number(b.est_share) - Number(a.est_share)).slice(0, 3);
   const cover = (String(M.est_basis || '').match(/\((\d+)% of orders/) || [])[1];
   const codes = (M.codes || []).filter(c => c.kind === 'unconfirmed' && Number(c.sales) >= 0.1 * Number(M.web_sales));
+  // the codes on the untraced orders: harder evidence of where they came from than Google Analytics' split
+  const ux = ((M.channels.find(c => c.key === 'not_recorded') || {}).extra) || {};
+  const uCodes = (ux.top_codes || []).filter(c => Number(c.sales) >= 100).slice(0, 4);
+  const kindSay = { welcome: 'your sign-up offer', creator: 'a creator’s code', affiliate: 'an affiliate’s code', promotion: 'a promotion', gifting: 'gifting', staff: 'staff', service: 'customer service' };
   const pct = v => (v == null ? FMT_NONE : Number(v).toFixed(1) + '%');
   const head = unt >= 40
     ? fmtPctN(unt / 100) + ' of web sales carry no record of where the customer came from.'
@@ -19784,6 +19788,8 @@ function V3ChannelMap() {
     <p className="micro muted v3-measure">Web sales as on Today ({fmtMoney(M.web_sales)}): after discounts and refunds, before VAT, each order placed by the shop’s own record of its last click. Compare shares rather than sales when the 30 days before held a sale.
       {estTop.length ? <> Google Analytics’ split is how it shares out all the sales it saw, by its own rules{cover ? <> ({cover}% of orders, the visitors who accept cookies)</> : null}: a second opinion on the mix, not where the untraced sales came from.</> : null}
       {Number(M.other_stores_sales) > 0 ? <> Other stores sold {fmtMoney(M.other_stores_sales)} on top.</> : null}</p>
+    {unt >= 40 && Number(ux.with_a_code) > 0 && uCodes.length > 0 && (<p className="micro muted v3-measure">Of the {fmtCount(ux.untraced_orders)} orders with no source, {fmtCount(ux.with_a_code)} used a discount code, which says more about where they came from than Google Analytics can:{' '}
+      {uCodes.map((c, i) => <React.Fragment key={c.code}>{i ? ', ' : ''}{c.code} {fmtMoney(c.sales)}{kindSay[c.kind] ? ' (' + kindSay[c.kind] + ')' : ''}</React.Fragment>)}.</p>)}
     {codes.length > 0 && (<p className="v3-note v3-measure">{v3Names(codes.map(c => c.code))} brought {fmtMoney(codes.reduce((s, c) => s + Number(c.sales), 0))} of these sales, and Greta cannot tell whether {codes.length > 1 ? 'they are' : 'it is'} a creator’s code, your sign-up offer or a promotion.{' '}
       <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('settings')}>Say which in Settings</button></p>)}
   </section></div>);
