@@ -19840,6 +19840,8 @@ function V3EmailRead() {
   const seg = useV3Rows('mk-atrisk', (sb, b) => sb.from('v_tenant_customer_segment_stats')
     .select('segment,customers,emailable').eq('brand_id', b).eq('segment', 'At risk'));
   const ret = useV3Rows('cust-ret', V3_RET_Q);
+  // phones: the flow table folds (Marketing ran to 9 screens); wider screens show it open
+  const fst = React.useState(() => typeof window === 'undefined' || window.innerWidth > 640), showFlows = fst[0], setShowFlows = fst[1];
   if (fl.err) return null;
   if (!fl.rows || !ca.rows) return <V3SkeletonRows n={3}/>;
   if (!fl.rows.length) return null;    // no Klaviyo connected: the Email section below says so
@@ -19880,13 +19882,14 @@ function V3EmailRead() {
         {gap != null ? <> Second orders usually come {fmtCount(gap)} days after the first, so that is when it should give a reason to buy again.</> : null}</li>)}
       {missing.filter(t => !['winback', 'upsell'].includes(t)).length > 0 && (<li><b>Also built but switched off:</b> {v3Names(missing.filter(t => !['winback', 'upsell'].includes(t)).map(t => label(t).toLowerCase()))}.</li>)}
     </ol>
-    <table className="v3-rw v3-email-table">
+    {!showFlows && ppl.length > 0 && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => setShowFlows(true)}>Show the {fmtCount(Math.min(ppl.length, 8))} automatic emails switched on</button>}
+    {showFlows && <table className="v3-rw v3-email-table">
       <thead><tr><th className="t-text">Automatic email, switched on</th><th>People reached</th><th>Sales Klaviyo credits</th><th>Per person</th></tr></thead>
       <tbody>{ppl.sort((a, b) => b.rev - a.rev).slice(0, 8).map((f, i) => (<tr key={i}>
         <td className="t-text">{label(f.t) === 'other' ? f.name : label(f.t)}<span className="v3-muted"> · {String(f.name).replace(/^[A-Z]{1,3}\s*\|\s*/, '')}</span></td>
         <td>{fmtCount(f.reach)}</td><td>{fmtMoney(f.rev)}</td><td className={f === post && weakPost ? 'v3-down' : ''}>{fmtMoney(f.per, 2)}</td>
       </tr>))}</tbody>
-    </table>
+    </table>}
     {camps.length > 0 && <p className="micro muted v3-measure">You sent {fmtCount(camps.length)} one-off emails (campaigns) in the last 30 days, to {fmtCount(camps.reduce((a, c) => a + Number(c.recipients), 0))} inboxes in total. Klaviyo credits them with {fmtMoney(campRev)}. Each one is in the Email section below.</p>}
   </section></div>);
 }
@@ -23120,6 +23123,8 @@ function V3MoneyBridge({ L, share }) {
 // Promotion and creator attribution: what each discount code brought over the last year.
 function V3CodePerformance() {
   const q = useV3Rows('brand-codes', V3_CODES_Q);
+  // the six biggest codes show, the rest fold (Marketing ran to 9 phone screens)
+  const ast = React.useState(false), allCodes = ast[0], setAllCodes = ast[1];
   if (q.err || !q.rows) return null;
   const rows = q.rows.filter(r => Number(r.orders_365d) >= 10);
   if (!rows.length) return null;
@@ -23128,12 +23133,13 @@ function V3CodePerformance() {
     <h2 className="v3-sec-title">Which discount codes bring you customers?</h2>
     <p className="v3-note v3-measure">A discount code is the one sure record of who brought an order: whoever holds the code. <b>{top.code}</b> brought {fmtCount(top.orders_365d)} orders in the last year, {fmtPctN(Number(top.first_order_share))} of them from new customers.{Number(top.first_order_share) >= 0.6 ? ' That makes it a source of new customers in its own right: plan and budget for it like an ad channel.' : ''}</p>
     <table className="v3-rw">
-      <thead><tr><th className="t-text">Code</th><th>Orders, last year</th><th>Last 90 days</th><th>New customers</th><th>Average discount</th><th>Sales</th><th className="t-text">Last used</th></tr></thead>
-      <tbody>{rows.map(r => (<tr key={r.code}>
-        <td className="t-text v3-rw-name">{r.code}</td><td>{fmtCount(r.orders_365d)}</td><td>{fmtCount(r.orders_90d)}</td>
-        <td>{fmtPctN(Number(r.first_order_share))}</td><td>{fmtPctN(Number(r.avg_depth))}</td><td>{fmtMoney(Number(r.net_sales_365d))}</td>
-        <td className="t-text v3-muted">{v3Day(String(r.last_used).slice(0, 10), true)}</td></tr>))}</tbody>
+      <thead><tr><th className="t-text">Code</th><th>Orders, last year</th><th className="v3-rw-opt">Last 90 days</th><th>New customers</th><th className="v3-rw-opt">Average discount</th><th>Sales</th><th className="t-text v3-rw-opt">Last used</th></tr></thead>
+      <tbody>{(allCodes ? rows : rows.slice(0, 6)).map(r => (<tr key={r.code}>
+        <td className="t-text v3-rw-name">{r.code}</td><td>{fmtCount(r.orders_365d)}</td><td className="v3-rw-opt">{fmtCount(r.orders_90d)}</td>
+        <td>{fmtPctN(Number(r.first_order_share))}</td><td className="v3-rw-opt">{fmtPctN(Number(r.avg_depth))}</td><td>{fmtMoney(Number(r.net_sales_365d))}</td>
+        <td className="t-text v3-muted v3-rw-opt">{v3Day(String(r.last_used).slice(0, 10), true)}</td></tr>))}</tbody>
     </table>
+    {rows.length > 6 && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => setAllCodes(v => !v)}>{allCodes ? 'Show the biggest 6' : 'Show all ' + rows.length + ' codes'}</button>}
     <p className="micro muted v3-measure">Website orders only. Sales are after discounts and before VAT. Some of these customers would have bought without the code, so read this as who brought them, not what the code alone earned.</p>
   </section>);
 }
@@ -23347,7 +23353,7 @@ function V3CreativeDemand() {
     <p className="v3-note v3-measure">At your Meta spend (<span>{fmtMoney(n(c.meta_spend_30d))}</span> a month) and win rate, you need about <b className="oi-num">{fmtCount(n(c.ads_needed_month))}</b> new ads a month to keep <span>{fmtCount(n(c.winners_needed))}</span> winners running{n(c.net_winner_gap) > 0.5 ? <>; you are short by about <span>{Math.round(n(c.net_winner_gap) * 10) / 10}</span> winners</> : null}. Each winner carries about <span>{fmtMoney(n(c.spend_per_winner))}</span> of spend.</p>
     <table className="v3-rw">
       <thead><tr><th className="t-text">Measure, last 30 days</th><th>You</th><th className="t-text">Rule of thumb</th></tr></thead>
-      <tbody>{rows.map(([k, v, band, tone]) => <tr key={k}><td className="t-text">{k}</td><td className={TONE[tone(v)] || ''}>{fmtPctN(v)}</td><td className="t-text v3-muted">{band}</td></tr>)}</tbody>
+      <tbody>{rows.map(([k, v, band, tone]) => <tr key={k}><td className="t-text v3-rw-wrap">{k}</td><td className={TONE[tone(v)] || ''}>{fmtPctN(v)}</td><td className="t-text v3-muted v3-rw-wrap">{band}</td></tr>)}</tbody>
     </table>
     <p className="micro muted v3-measure">From {fmtCount(n(c.active_ads))} Meta ads, on Meta’s own sales count. A high share of spend on ads that keep running is good: it means winners last.</p>
   </section>);

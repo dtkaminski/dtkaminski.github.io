@@ -368,6 +368,12 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-drivers-todo { margin: var(--space-4) 0 0; max-width: 68ch; }
 /* The signs on the other pages: one row, as many columns as signs, up to three. */
 .v3-strip .v3-signs { grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); max-width: 60rem; }   /* fill, not fit: one sign keeps a tile's width */
+/* phones: two signs a row, a smaller figure (Marketing's six signs ran to 1,330px in one column) */
+@media (max-width: 640px) {
+  .v3-strip .v3-signs { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--space-4); }
+  .v3-strip .v3-sign { padding: var(--space-3) 0 var(--space-4); }
+  .v3-strip .v3-sign-v { font-size: var(--text-xl); }
+}
 .v3-strip .v3-drivers { margin-top: var(--space-4); }
 .v3-drivers-grid.v3-drivers-grid-one { grid-template-columns: minmax(0, 1fr); max-width: 48rem; }
 .v3-strip-act { margin-top: var(--space-2); }
@@ -614,12 +620,14 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-rw-key-gap { width: var(--space-4) !important; height: var(--space-1) !important; border-radius: 0 !important;
   background: repeating-linear-gradient(135deg, var(--color-danger) 0 2px, transparent 2px 4px); }
 .v3-main table.v3-rw { width: 100%; }
-@media (max-width: 640px) {
-  .v3-main table.v3-rw .v3-rw-opt { display: none; }
-  .v3-main table.v3-rw td.v3-rw-wrap, .v3-main table.v3-rw th.v3-rw-wrap { white-space: normal; }
-}
 .v3-main table.v3-rw td, .v3-main table.v3-rw th { padding-top: var(--space-3); padding-bottom: var(--space-3); white-space: nowrap; }
 .v3-main table.v3-rw td.v3-rw-name { white-space: normal; min-width: 12rem; max-width: 20rem; color: var(--color-ink); }
+/* phones: secondary columns hidden, headers and names wrap (after the base rules, same specificity) */
+@media (max-width: 640px) {
+  .v3-main table.v3-rw .v3-rw-opt { display: none; }
+  .v3-main table.v3-rw td.v3-rw-wrap, .v3-main table.v3-rw th { white-space: normal; }
+  .v3-main table.v3-rw td.v3-rw-name { min-width: 0; overflow-wrap: anywhere; }
+}
 .v3-rw-trackh, .v3-rw-trackc { width: 34%; }
 .v3-rw-cell { display: flex; align-items: center; gap: var(--space-3); min-width: 10rem; }
 .v3-rw-track { position: relative; flex: 1; height: var(--space-2); background: var(--color-sunken); border-radius: var(--radius-sm); overflow: hidden; }
