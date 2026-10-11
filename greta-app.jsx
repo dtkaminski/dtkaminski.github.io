@@ -23344,7 +23344,7 @@ function V3Congruency() {
   const ok = c.congruency === 'congruent';
   return (<p className="v3-note v3-measure v3-cong"><b>Do the ad figures and your profit agree?</b>{' '}
     {ok ? 'Yes: they moved the same way.' : 'No: they moved apart, so one of them is misreading.'}{' '}
-    Return on ads after the share they really cause went from <span>{fmtTimes(n(c.iroas_prior), 2)}</span> to <span>{fmtTimes(n(c.iroas_now), 2)}</span>; profit after products and delivery went from <span>{fmtMoney(n(c.cm_prior))}</span> to <span>{fmtMoney(n(c.cm_now))}</span>{c.prior_date ? <> ({v3Day(String(c.prior_date))} to {v3Day(String(c.latest_date))})</> : null}.
+    Return on ads after the share they really cause went from <span>{fmtTimes(n(c.iroas_prior), 2)}</span> to <span>{fmtTimes(n(c.iroas_now), 2)}</span>; profit after ads went from <span>{fmtMoney(n(c.cm_prior))}</span> to <span>{fmtMoney(n(c.cm_now))}</span>{c.prior_date ? <> ({v3Day(String(c.prior_date))} to {v3Day(String(c.latest_date))})</> : null}.
     {ok ? '' : ' Check the tracking on Settings before acting on the ad figures.'}</p>);
 }
 const V3_PAGES = {
