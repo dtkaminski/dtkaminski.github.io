@@ -8840,6 +8840,7 @@ const V3_ASK_TOPICS = {
   ads: /\b(ad|ads|advert\w*|meta|facebook|instagram|google|spend\w*|roas|campaign\w*|creative\w*|channel\w*|acquisition|new customers?|cac|budget|cost per|cpc|cpm|click\w*)\b/i,
   site: /\b(site|website|conversion|convert\w*|traffic|session\w*|checkout|basket|cart|visit\w*|page\w*|mobile|bounce)\b/i,
   email: /\b(email\w*|klaviyo|flows?|newsletter|list|sms|send\w*|subscriber\w*)\b/i,
+  search: /\b(search\w*|seo|keywords?|organic|rank\w*|google|brand(ed)? (search|terms?))\b/i,
   recent: /\b(today|yesterday|this week|last week|days?|daily|recent\w*|weekend|monday|tuesday|wednesday|thursday|friday|saturday|sunday|so far)\b/i,
   stock: /\b(stock\w*|reorder\w*|restock\w*|re-?order|out of|runs? out|running out|sold out|inventory|units?|supplier\w*|lead time|purchase order|how many)\b/i,
   products: /\b(products?|best[- ]?sellers?|heroe?s?|range|catalogue|collections?|items?|push|promote|feature|bundles?|sku\w*|margin\w*|discount\w*)\b/i,
@@ -9210,7 +9211,13 @@ function buildAskContext(facts, question, budget){
         rows: M.channels.map(c => ({ channel: c.label, sales: c.sales, share_pct: c.share, share_before_pct: c.share_prior, orders: c.orders,
           new_customers: c.new_customers, ad_spend: c.ad_spend, estimated_share_pct: c.est_share })),
         codes: (M.codes || []).slice(0, 6).map(c => ({ code: c.code, kind: c.kind + (c.kind_source === 'inferred' ? ' (inferred, unconfirmed by the owner)' : ''), sales: c.sales, new_customers: c.new_customers })),
+        // 0391: the codes the untraced orders used, harder evidence of where they came from than the estimate
+        untraced_orders_by_code: (() => { const x = ((M.channels.find(c => c.key === 'not_recorded') || {}).extra) || {};
+          return x.untraced_orders ? { untraced_orders: x.untraced_orders, with_a_code: x.with_a_code,
+            codes: (x.top_codes || []).slice(0, 5).map(c => ({ code: c.code, sales: c.sales, orders: c.orders, kind: c.kind })) } : null; })(),
         note: 'Shares are the shop’s own last-click record. estimated_share_pct is Google Analytics’ split of the sales it saw, a second reading of the untraced share, never a measurement. Compare shares, not sales, when the earlier 30 days held a sale. A code’s kind marked inferred is Greta’s guess from its name: never call it a creator’s code or a partnership unless the owner said so.' }; })(),
+    // search, unpaid and paid (0392): the top searches from Search Console by day, Google keywords by spend
+    search: (topics.search || topics.ads) && typeof window !== 'undefined' && window.GRETA_SEARCH ? window.GRETA_SEARCH : null,
     // the parts of the business with something missing (0318): what is not measured, and whether anything explains or acts on it
     anatomy_gaps: (() => { const C = (typeof window !== 'undefined' && Array.isArray(window.GRETA_COVERAGE)) ? window.GRETA_COVERAGE : [];
       const g = C.filter(r => (r.missing_core && r.missing_core.length) || !(r.drivers && r.drivers.length) || !r.open_actions)
@@ -9451,6 +9458,9 @@ ${dataStr}`;
   // 0362: where sales came from, the same rows as Marketing's channel map
   const askChan = useV3Rows('channel-map', V3_CHANNEL_MAP_Q);
   if (typeof window !== 'undefined' && Array.isArray(askChan.rows)) window.GRETA_CHANNELS = (askChan.rows[0] || {}).map || null;
+  // 0392: search history for search and ad questions, one compact read
+  const askSearch = useV3Rows('search-read', (sb, b) => sb.rpc('fn_brand_search_read', { p_brand: b }).then(r => ({ data: r && r.data ? [r.data] : [], error: r && r.error })));
+  if (typeof window !== 'undefined' && Array.isArray(askSearch.rows)) window.GRETA_SEARCH = (askSearch.rows[0] && (askSearch.rows[0].unpaid_search || askSearch.rows[0].google_keywords)) ? askSearch.rows[0] : null;
   const whyPrompts = drivers.slice().sort((a, b) => (a.tone === 'weak' ? 0 : 1) - (b.tone === 'weak' ? 0 : 1)).slice(0, 3).map(v3WhyPrompt);
   const quickPrompts = UI_V3 ? V3_ASK_PROMPTS : [
     `What should I do today? Give me the top 3 actions, ranked by ${curSym()} impact.`,
