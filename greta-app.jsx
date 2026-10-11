@@ -24144,8 +24144,12 @@ function v3WalkMeansProfit(X) {
       ? ' — covered, but that includes repeat and organic sales, so it does not show that every channel earns its spend.'
       : ' — not covered: ad spend is costing more than all the sales it sits against.'));
   if (p.has_history && p.cm_after_marketing != null) {
-    const vol = X.cm * (c.net_revenue - p.net_revenue), sp = -(c.paid_spend - p.paid_spend), tot = c.cm_after_marketing - p.cm_after_marketing;
-    out.push('Against ' + X.N.prev + ', profit after ads moved ' + v3WalkSigned(tot) + ': ' + v3WalkSigned(vol) + ' from sales and ' + v3WalkSigned(sp) + ' from ad spend.');
+    // sales priced at the earlier period's margin; what is left over is the change in what each sale kept
+    const rp = p.cm_ratio_window != null ? Number(p.cm_ratio_window) : X.cm;
+    const vol = rp * (c.net_revenue - p.net_revenue), sp = -(c.paid_spend - p.paid_spend), tot = c.cm_after_marketing - p.cm_after_marketing;
+    const mg = tot - vol - sp;
+    out.push('Against ' + X.N.prev + ', profit after ads moved ' + v3WalkSigned(tot) + ': ' + v3WalkSigned(vol) + ' from sales'
+      + (Math.abs(mg) >= 50 ? ', ' + v3WalkSigned(mg) + ' from what each sale kept' : '') + ' and ' + v3WalkSigned(sp) + ' from ad spend.');
   }
   return out;
 }
@@ -24593,7 +24597,8 @@ function V3WalkRun({ w }) {
   const P = data && data.periods;
   const X = P && P.cur ? { P, N: v3WalkNames(h, P), h, prods: data.products || [], stock: stock.rows,
     score: score.rows, ret: ret.rows ? (ret.rows[0] || {}) : null, npd: npd.rows, board: board.rows,
-    series: data.series || [], cm: data.cm_ratio != null ? Number(data.cm_ratio) : null,
+    // 0384: each period carries its own margin (cm_ratio_window); "what products kept" is the period's
+    series: data.series || [], cm: P.cur.cm_ratio_window != null ? Number(P.cur.cm_ratio_window) : data.cm_ratio != null ? Number(data.cm_ratio) : null,
     ue: ue.rows ? (ue.rows[0] || null) : null } : null;
   const view = V3_WALK_VIEW[sid] || {};
   let means = [];
