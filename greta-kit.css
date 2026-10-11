@@ -614,6 +614,10 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-rw-key-gap { width: var(--space-4) !important; height: var(--space-1) !important; border-radius: 0 !important;
   background: repeating-linear-gradient(135deg, var(--color-danger) 0 2px, transparent 2px 4px); }
 .v3-main table.v3-rw { width: 100%; }
+@media (max-width: 640px) {
+  .v3-main table.v3-rw .v3-rw-opt { display: none; }
+  .v3-main table.v3-rw td.v3-rw-wrap, .v3-main table.v3-rw th.v3-rw-wrap { white-space: normal; }
+}
 .v3-main table.v3-rw td, .v3-main table.v3-rw th { padding-top: var(--space-3); padding-bottom: var(--space-3); white-space: nowrap; }
 .v3-main table.v3-rw td.v3-rw-name { white-space: normal; min-width: 12rem; max-width: 20rem; color: var(--color-ink); }
 .v3-rw-trackh, .v3-rw-trackc { width: 34%; }

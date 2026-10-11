@@ -13381,6 +13381,17 @@ const GP_FLAG_TEXT = {
       + ' each, against ' + (b.first_order_profit ? GP_gbp(b.first_order_profit) : 'what')
       + ' their first order keeps. Greta will not suggest spending past it, so reaching this goal needs more from returning customers, or a lower goal.';
   },
+  // 0378: the plan now stops at the best spend while the rule fails, and says what it held back
+  held_at_first_order_profit: d => {
+    const c = d.ceiling || {}, want = Number(d.spend_wanted), cap = Number(c.best_spend || d.spend_cap);
+    const goal = Number(d.goal), rev = Number(d.revenue_target);
+    return 'Your returning customers do not yet cover your running costs, so a new customer has to pay for themselves on their first order. '
+      + (cap > 0 ? 'That holds up to about ' + GP_gbp(cap) + ' of ads this quarter, so the plan stops there' : 'The plan stops where that stops holding')
+      + (want > cap * 1.02 ? ', not the ' + GP_gbp(want) + (goal > 0 ? ' the goal alone would ask for' : ' it would otherwise spend') : '')
+      + (goal > 0 && rev > 0 && rev < goal * 0.98
+          ? '. At that budget sales reach about ' + GP_gbp(rev) + ' against your goal of ' + GP_gbp(goal) + ': closing the gap needs more from returning customers, or a lower goal.'
+          : '.');
+  },
   no_ad_history: 'There is no ad-spend history yet, so new-customer sales are carried at their current rate and no budget is planned.',
   short_base: 'There are fewer than three full months of trading behind this, so the starting point is thin.'
 };
@@ -13399,7 +13410,10 @@ function GP_PlanBreakdown({ d }) {
   const planMonths = months.map(m => Number(String(m.month).slice(5, 7)));
   const idx = (s.months || []).map(m => Number(m.sales_idx));
   const hi = Math.max(1, ...idx);
-  const basisLine = d.basis === 'revenue'
+  const held = (d.flags || []).indexOf('held_at_first_order_profit') >= 0;
+  const basisLine = d.basis === 'revenue' && held
+    ? <>You asked for <b>{GP_gbp(d.goal)}</b> of sales. Returning customers bring <b>{GP_gbp(b.returning_sales)}</b> on their own — their recent rate, adjusted for the season. New customers bought with a budget that still pays for itself on their first order bring <b>{GP_gbp(b.new_sales)}</b> more, so this plan reaches about <b>{GP_gbp(d.revenue_target)}</b>.</>
+    : d.basis === 'revenue'
     ? <>You asked for <b>{GP_gbp(d.goal)}</b> of sales. Returning customers bring <b>{GP_gbp(b.returning_sales)}</b> on their own — their recent rate, adjusted for the season. The other <b>{GP_gbp(b.new_sales)}</b> has to come from new customers, and Greta found the ad budget that buys it, given how your new-customer sales respond to spend and when demand peaks.</>
     : d.basis === 'cam' && (d.flags || []).indexOf('goal_above_max') >= 0
     ? <>You asked for <b>{GP_gbp(d.goal)}</b> of profit after ads. That is more than any budget reaches this quarter, so Greta planned the budget that makes the most: past it, each extra pound of ads brings back less than a pound of profit.</>
@@ -19736,12 +19750,16 @@ function V3MarketingLead() {
 const V3_CHANNEL_MAP_Q = (sb, b) => sb.from('cache_brand_channel_map').select('map,refreshed_at').eq('brand_id', b).limit(1);
 function V3ChannelMap() {
   const q = useV3Rows('channel-map', V3_CHANNEL_MAP_Q);
+  // 0383: Marketing ran to 8-10 screens on a phone; the biggest six channels show, the rest fold
+  const st = React.useState(false), all = st[0], setAll = st[1];
   if (q.err) return null;
   if (!q.rows) return <V3SkeletonRows n={4}/>;
   const M = (q.rows[0] || {}).map;
   if (!M || !Array.isArray(M.channels) || !(Number(M.web_sales) > 0)) return null;
   const untracedKeys = ['no_referrer', 'not_recorded'];
-  const rows = M.channels.filter(c => Number(c.sales) > 0 || Number(c.sales_prior) > 0 || Number(c.est_share) > 0);
+  const rows = M.channels.filter(c => Number(c.sales) > 0 || Number(c.sales_prior) > 0 || Number(c.est_share) > 0)
+    .sort((a, b) => (Number(b.sales) || 0) - (Number(a.sales) || 0));
+  const shown = all ? rows : rows.slice(0, 6);
   const traced = rows.filter(c => !untracedKeys.includes(c.key)).sort((a, b) => Number(b.sales) - Number(a.sales));
   const unt = Number(M.untraced_share) || 0;
   const estTop = rows.filter(c => c.est_share != null && !untracedKeys.includes(c.key))
@@ -19751,19 +19769,20 @@ function V3ChannelMap() {
   const pct = v => (v == null ? FMT_NONE : Number(v).toFixed(1) + '%');
   const head = unt >= 40
     ? fmtPctN(unt / 100) + ' of web sales carry no record of where the customer came from.'
-      + (estTop.length ? ' Google Analytics’ own reading puts most sales with ' + v3Names(estTop.map(c => c.label)) + '.' : '')
+      + (estTop.length ? ' Google Analytics’ own split of the sales it saw puts most with ' + v3Names(estTop.map(c => c.label)) + '.' : '')
     : 'Most web sales came through ' + (traced[0] ? traced[0].label : 'your own channels') + '.';
   return (<div className="v3-page-stack"><section className="v3-sec">
     <div className="v3-kick">Where sales came from · the 30 days to {v3Day(M.window && M.window.to, true)}</div>
     <p className="v3-verdict">{head}</p>
     <table className="v3-rw">
-      <thead><tr><th className="t-text">Channel</th><th>Sales</th><th>Share</th><th>The 30 days before</th><th>New customers</th><th>Estimated share</th></tr></thead>
-      <tbody>{rows.map(c => (<tr key={c.key}>
-        <td className="t-text">{c.label}</td><td>{fmtMoney(c.sales)}</td><td>{pct(c.share)}</td><td>{pct(c.share_prior)}</td>
-        <td>{fmtCount(c.new_customers)}</td><td>{c.est_share == null || c.key === 'not_recorded' ? FMT_NONE : pct(c.est_share)}</td></tr>))}
+      <thead><tr><th className="t-text">Channel</th><th>Sales</th><th>Share</th><th className="v3-rw-opt">The 30 days before</th><th className="v3-rw-opt">New customers</th><th className="v3-rw-wrap">Google Analytics’ split</th></tr></thead>
+      <tbody>{shown.map(c => (<tr key={c.key}>
+        <td className="t-text v3-rw-wrap">{c.label}</td><td>{fmtMoney(c.sales)}</td><td>{pct(c.share)}</td><td className="v3-rw-opt">{pct(c.share_prior)}</td>
+        <td className="v3-rw-opt">{fmtCount(c.new_customers)}</td><td>{c.est_share == null || c.key === 'not_recorded' ? FMT_NONE : pct(c.est_share)}</td></tr>))}
       </tbody></table>
+    {rows.length > 6 && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => setAll(v => !v)}>{all ? 'Show the biggest 6' : 'Show all ' + rows.length + ' channels'}</button>}
     <p className="micro muted v3-measure">Web sales as on Today ({fmtMoney(M.web_sales)}): after discounts and refunds, before VAT, each order placed by the shop’s own record of its last click. Compare shares rather than sales when the 30 days before held a sale.
-      {estTop.length ? <> Estimated share is Google Analytics’ split of the sales it saw{cover ? <> ({cover}% of orders, the visitors who accept cookies)</> : null}: a second reading of where untraced sales came from, not a measurement.</> : null}
+      {estTop.length ? <> Google Analytics’ split is how it shares out all the sales it saw, by its own rules{cover ? <> ({cover}% of orders, the visitors who accept cookies)</> : null}: a second opinion on the mix, not where the untraced sales came from.</> : null}
       {Number(M.other_stores_sales) > 0 ? <> Other stores sold {fmtMoney(M.other_stores_sales)} on top.</> : null}</p>
     {codes.length > 0 && (<p className="v3-note v3-measure">{v3Names(codes.map(c => c.code))} brought {fmtMoney(codes.reduce((s, c) => s + Number(c.sales), 0))} of these sales, and Greta cannot tell whether {codes.length > 1 ? 'they are' : 'it is'} a creator’s code, your sign-up offer or a promotion.{' '}
       <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('settings')}>Say which in Settings</button></p>)}
@@ -20952,8 +20971,11 @@ function V3DataTrust() {
   const cov = useV3Rows('trust-cover', (sb, b) => sb.from('vw_measurement_integrity_daily').select('day,order_coverage').eq('brand_id', b).gte('day', v3IsoAdd(today, -15)).lt('day', today));
   // the brand's own usual share: GA4 never records every order (frkl 73-78% in a normal month), so "only
   // 81%, check the purchase event" (7 Oct) sent the owner to fix what was better than usual
-  const covM = useV3Rows('trust-cover-monthly', (sb, b) => sb.from('vw_tracking_coverage_monthly').select('month,orders,ga4_share').eq('brand_id', b)
-    .gte('month', v3IsoAdd(today, -400)).limit(20));
+  // kept hourly in cache_tracking_coverage_monthly (0383: the view took 5s signed in); the view if the cache is missing
+  const covM = useV3Rows('trust-cover-monthly', (sb, b) => {
+    const q = t => sb.from(t).select('month,orders,ga4_share').eq('brand_id', b).gte('month', v3IsoAdd(today, -400)).limit(20);
+    return q('cache_tracking_coverage_monthly').then(r => r && r.error ? q('vw_tracking_coverage_monthly') : r);
+  });
   const stock = useV3Rows('stock-plan', V3_STOCK_Q);
   // the same 30 days, ending yesterday, for the platforms' claims and the web orders Shopify took
   const meta = useV3Rows('trust-meta', (sb, b) => sb.from('tenant_meta_insights_daily').select('purchases,purchase_value').eq('brand_id', b).eq('level', 'account').gte('date', v3IsoAdd(today, -30)).lt('date', today).limit(100));
@@ -22150,7 +22172,11 @@ function V3AnatomyInputs() {
     {cashNeeds.length > 0 && <p className="v3-note v3-measure v3-gap-top">{cashNeeds.map(m => m.name).join(', ')}: {v3Sentence(cashNeeds[0].needs)}. <button type="button" className="v3-xref" onClick={() => window.__oiNav && window.__oiNav('goal')}>Open Goal &amp; costs <span className="v3-xref-go">→</span></button></p>}
   </section>);
 }
-const V3_REFUNDS_Q = (sb, b) => sb.from('vw_product_refunds_90d').select('title,orders,refunded_orders,refunded_gbp,sales_gbp').eq('brand_id', b).order('refunded_gbp', { ascending: false }).limit(200);
+// kept hourly in cache_product_refunds_90d (0383: the view took 5s signed in); the view if the cache is missing
+const V3_REFUNDS_Q = (sb, b) => {
+  const q = t => sb.from(t).select('title,orders,refunded_orders,refunded_gbp,sales_gbp').eq('brand_id', b).order('refunded_gbp', { ascending: false }).limit(200);
+  return q('cache_product_refunds_90d').then(r => r && r.error ? q('vw_product_refunds_90d') : r);
+};
 function V3RefundSign({ part, open, setOpen }) {
   const q = useV3Rows('product-refunds', V3_REFUNDS_Q), board = useV3Board();
   const R = q.rows || [];
