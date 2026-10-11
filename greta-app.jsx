@@ -13357,6 +13357,17 @@ const GP_FLAG_TEXT = {
   capped_at_spend_seen: 'Greta stopped the growth at three times your biggest month of ad spend: beyond that the curve is guesswork, not evidence.',
   goal_above_max: 'That profit is beyond what Greta can see a way to this quarter, so the plan below is the most profitable one instead.',
   met_by_returning: 'Returning customers alone are on course to reach this, so no ad budget is needed for it.',
+  // 0353: the golden rule. While returning customers do not cover the running costs, each new customer
+  // has to pay for themselves on the first order; past the best spend the last ones this budget buys do not.
+  past_first_order_profit: d => {
+    const b = d.breakdown || {}, c = d.ceiling || {};
+    return 'Your returning customers do not yet cover your running costs, so a new customer has to pay for themselves on their first order. '
+      + (c.best_spend ? 'That holds up to about ' + GP_gbp(c.best_spend) + ' of ads this quarter. ' : '')
+      + 'Past it, the last customers this budget buys cost '
+      + (b.marginal_cost_per_new_customer ? 'about ' + GP_gbp(b.marginal_cost_per_new_customer) : 'more')
+      + ' each, against ' + (b.first_order_profit ? GP_gbp(b.first_order_profit) : 'what')
+      + ' their first order keeps. Greta will not suggest spending past it, so reaching this goal needs more from returning customers, or a lower goal.';
+  },
   no_ad_history: 'There is no ad-spend history yet, so new-customer sales are carried at their current rate and no budget is planned.',
   short_base: 'There are fewer than three full months of trading behind this, so the starting point is thin.'
 };
@@ -13385,7 +13396,7 @@ function GP_PlanBreakdown({ d }) {
 
   return (<div className="gp-plan">
     {flags.length > 0 && (<ul className="gp-plan-flags" aria-label="What to bear in mind">
-      {flags.map(f => <li key={f}>{GP_FLAG_TEXT[f]}</li>)}
+      {flags.map(f => <li key={f}>{typeof GP_FLAG_TEXT[f] === 'function' ? GP_FLAG_TEXT[f](d) : GP_FLAG_TEXT[f]}</li>)}
     </ul>)}
 
     <section className="gp-plan-sec">
