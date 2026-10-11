@@ -9217,7 +9217,7 @@ function buildAskContext(facts, question, budget){
             codes: (x.top_codes || []).slice(0, 5).map(c => ({ code: c.code, sales: c.sales, orders: c.orders, kind: c.kind })) } : null; })(),
         note: 'Shares are the shop’s own last-click record. estimated_share_pct is Google Analytics’ split of the sales it saw, a second reading of the untraced share, never a measurement. Compare shares, not sales, when the earlier 30 days held a sale. A code’s kind marked inferred is Greta’s guess from its name: never call it a creator’s code or a partnership unless the owner said so.' }; })(),
     // search, unpaid and paid (0392): the top searches from Search Console by day, Google keywords by spend
-    search: (topics.search || topics.ads) && typeof window !== 'undefined' && window.GRETA_SEARCH ? window.GRETA_SEARCH : null,
+    search: (topics.search || topics.ads) && typeof window !== 'undefined' && window.GRETA_SEARCH ? JSON.parse(JSON.stringify(window.GRETA_SEARCH)) : null,
     // the parts of the business with something missing (0318): what is not measured, and whether anything explains or acts on it
     anatomy_gaps: (() => { const C = (typeof window !== 'undefined' && Array.isArray(window.GRETA_COVERAGE)) ? window.GRETA_COVERAGE : [];
       const g = C.filter(r => (r.missing_core && r.missing_core.length) || !(r.drivers && r.drivers.length) || !r.open_actions)
@@ -9239,6 +9239,9 @@ function buildAskContext(facts, question, budget){
   while (size() > BUDGET && order.length) { const k = order.shift(); delete data[k]; delete dictionary[k]; }
   if (size() > BUDGET && meta.anatomy_gaps) meta.anatomy_gaps = meta.anatomy_gaps.map(g => ({ part: g.part, not_measured: g.not_measured, waiting_on: g.waiting_on }));
   if (size() > BUDGET && meta.anatomy_gaps) meta.anatomy_gaps = meta.anatomy_gaps.map(g => ({ part: g.part, not_measured: g.not_measured }));
+  // 0392: the search read goes first when the question is not about search, and is shortened when it is
+  if (size() > BUDGET && meta.search && !topics.search) meta.search = null;
+  if (size() > BUDGET && meta.search) ['unpaid_search', 'google_keywords'].forEach(k => { const o = meta.search[k]; if (o) ['top_searches', 'top_by_spend'].forEach(t => { if (Array.isArray(o[t])) o[t] = o[t].slice(0, 4); }); });
   if (size() > BUDGET && meta.channels) delete meta.channels.codes;
   if (size() > BUDGET && meta.readout) delete meta.readout.cost_trees;
   if (size() > BUDGET && meta.readout) meta.readout.held = meta.readout.held.map(h => ({ action: h.action }));
