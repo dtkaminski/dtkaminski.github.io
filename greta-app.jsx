@@ -9202,6 +9202,15 @@ function buildAskContext(facts, question, budget){
     sales_move: (() => { const M = (typeof window !== 'undefined' && Array.isArray(window.GRETA_SALES_MOVE)) ? window.GRETA_SALES_MOVE : [];
       const o = {}; M.forEach(r => { const p = r.payload || {}; if (p.headline) o[r.win === '7d' ? 'last_7_days' : 'last_28_days'] = { said: p.headline + ' ' + (p.why || ''), split: p.lines || [] }; });
       return Object.keys(o).length ? o : null; })(),
+    // where web sales came from (0362): every channel, not only the ad platforms, with the untraced share and
+    // Google Analytics' estimate kept apart from what the shop traced
+    channels: (() => { const M = (typeof window !== 'undefined' && window.GRETA_CHANNELS) || null;
+      if (!M || !Array.isArray(M.channels)) return null;
+      return { window: M.window, web_sales: M.web_sales, untraced_share_pct: M.untraced_share, other_stores_sales: M.other_stores_sales,
+        rows: M.channels.map(c => ({ channel: c.label, sales: c.sales, share_pct: c.share, share_before_pct: c.share_prior, orders: c.orders,
+          new_customers: c.new_customers, ad_spend: c.ad_spend, estimated_share_pct: c.est_share })),
+        codes: (M.codes || []).slice(0, 6).map(c => ({ code: c.code, kind: c.kind + (c.kind_source === 'inferred' ? ' (inferred, unconfirmed by the owner)' : ''), sales: c.sales, new_customers: c.new_customers })),
+        note: 'Shares are the shop’s own last-click record. estimated_share_pct is Google Analytics’ split of the sales it saw, a second reading of the untraced share, never a measurement. Compare shares, not sales, when the earlier 30 days held a sale. A code’s kind marked inferred is Greta’s guess from its name: never call it a creator’s code or a partnership unless the owner said so.' }; })(),
     // the parts of the business with something missing (0318): what is not measured, and whether anything explains or acts on it
     anatomy_gaps: (() => { const C = (typeof window !== 'undefined' && Array.isArray(window.GRETA_COVERAGE)) ? window.GRETA_COVERAGE : [];
       const g = C.filter(r => (r.missing_core && r.missing_core.length) || !(r.drivers && r.drivers.length) || !r.open_actions)
@@ -9223,6 +9232,7 @@ function buildAskContext(facts, question, budget){
   while (size() > BUDGET && order.length) { const k = order.shift(); delete data[k]; delete dictionary[k]; }
   if (size() > BUDGET && meta.anatomy_gaps) meta.anatomy_gaps = meta.anatomy_gaps.map(g => ({ part: g.part, not_measured: g.not_measured, waiting_on: g.waiting_on }));
   if (size() > BUDGET && meta.anatomy_gaps) meta.anatomy_gaps = meta.anatomy_gaps.map(g => ({ part: g.part, not_measured: g.not_measured }));
+  if (size() > BUDGET && meta.channels) delete meta.channels.codes;
   if (size() > BUDGET && meta.readout) delete meta.readout.cost_trees;
   if (size() > BUDGET && meta.readout) meta.readout.held = meta.readout.held.map(h => ({ action: h.action }));
   if (size() > BUDGET && meta.readout) meta.readout.coverage = [];
@@ -9438,6 +9448,9 @@ ${dataStr}`;
   // 0340: the morning's read of what moved sales (the same rows as Today's strip)
   const askMove = useV3Rows('sales-move', V3_MOVE_Q);
   if (typeof window !== 'undefined' && Array.isArray(askMove.rows)) window.GRETA_SALES_MOVE = askMove.rows;
+  // 0362: where sales came from, the same rows as Marketing's channel map
+  const askChan = useV3Rows('channel-map', V3_CHANNEL_MAP_Q);
+  if (typeof window !== 'undefined' && Array.isArray(askChan.rows)) window.GRETA_CHANNELS = (askChan.rows[0] || {}).map || null;
   const whyPrompts = drivers.slice().sort((a, b) => (a.tone === 'weak' ? 0 : 1) - (b.tone === 'weak' ? 0 : 1)).slice(0, 3).map(v3WhyPrompt);
   const quickPrompts = UI_V3 ? V3_ASK_PROMPTS : [
     `What should I do today? Give me the top 3 actions, ranked by ${curSym()} impact.`,
@@ -17201,7 +17214,7 @@ function CostDrift(){
     gross_margin: 'Margin on products without a cost', refundPct: 'Refund rate', refund_rate: 'Refund rate',
     shipping: 'Shipping', packaging: 'Packaging', fulfilment: 'Fulfilment', payPct: 'Payment fee',
     payment_pct: 'Payment fee', payFixed: 'Payment fee per order', payment_fixed: 'Payment fee per order',
-    fixed_costs_monthly: 'Monthly overheads', discount_rate: 'Discount rate', aov: 'Average order value',
+    fixed_costs_monthly: 'Monthly overheads', discount_rate: 'Discount codes', aov: 'Average order value',
   };
   const name = k => LABEL[k] || String(k).replace(/_/g,' ');
   const fmt = (v, unit) => {
@@ -19715,6 +19728,48 @@ function V3MarketingLead() {
   </section></div>);
 }
 
+// ── Where sales came from (Marketing, 0362) ────────────────────────────────────────────────────
+// Every place web sales come from, on Today's sales basis, from cache_brand_channel_map (hourly). Shares
+// are the shop's own last-click record; a creator's code places an order when no ad click did. Most of
+// frkl's sales carry no source at all, so Google Analytics' own split of the sales it saw sits beside the
+// traced shares as an estimate, never mixed into them.
+const V3_CHANNEL_MAP_Q = (sb, b) => sb.from('cache_brand_channel_map').select('map,refreshed_at').eq('brand_id', b).limit(1);
+function V3ChannelMap() {
+  const q = useV3Rows('channel-map', V3_CHANNEL_MAP_Q);
+  if (q.err) return null;
+  if (!q.rows) return <V3SkeletonRows n={4}/>;
+  const M = (q.rows[0] || {}).map;
+  if (!M || !Array.isArray(M.channels) || !(Number(M.web_sales) > 0)) return null;
+  const untracedKeys = ['no_referrer', 'not_recorded'];
+  const rows = M.channels.filter(c => Number(c.sales) > 0 || Number(c.sales_prior) > 0 || Number(c.est_share) > 0);
+  const traced = rows.filter(c => !untracedKeys.includes(c.key)).sort((a, b) => Number(b.sales) - Number(a.sales));
+  const unt = Number(M.untraced_share) || 0;
+  const estTop = rows.filter(c => c.est_share != null && !untracedKeys.includes(c.key))
+    .sort((a, b) => Number(b.est_share) - Number(a.est_share)).slice(0, 3);
+  const cover = (String(M.est_basis || '').match(/\((\d+)% of orders/) || [])[1];
+  const codes = (M.codes || []).filter(c => c.kind === 'unconfirmed' && Number(c.sales) >= 0.1 * Number(M.web_sales));
+  const pct = v => (v == null ? FMT_NONE : Number(v).toFixed(1) + '%');
+  const head = unt >= 40
+    ? fmtPctN(unt / 100) + ' of web sales carry no record of where the customer came from.'
+      + (estTop.length ? ' Google Analytics’ own reading puts most sales with ' + v3Names(estTop.map(c => c.label)) + '.' : '')
+    : 'Most web sales came through ' + (traced[0] ? traced[0].label : 'your own channels') + '.';
+  return (<div className="v3-page-stack"><section className="v3-sec">
+    <div className="v3-kick">Where sales came from · the 30 days to {v3Day(M.window && M.window.to, true)}</div>
+    <p className="v3-verdict">{head}</p>
+    <table className="v3-rw">
+      <thead><tr><th className="t-text">Channel</th><th>Sales</th><th>Share</th><th>The 30 days before</th><th>New customers</th><th>Estimated share</th></tr></thead>
+      <tbody>{rows.map(c => (<tr key={c.key}>
+        <td className="t-text">{c.label}</td><td>{fmtMoney(c.sales)}</td><td>{pct(c.share)}</td><td>{pct(c.share_prior)}</td>
+        <td>{fmtCount(c.new_customers)}</td><td>{c.est_share == null || c.key === 'not_recorded' ? FMT_NONE : pct(c.est_share)}</td></tr>))}
+      </tbody></table>
+    <p className="micro muted v3-measure">Web sales as on Today ({fmtMoney(M.web_sales)}): after discounts and refunds, before VAT, each order placed by the shop’s own record of its last click. Compare shares rather than sales when the 30 days before held a sale.
+      {estTop.length ? <> Estimated share is Google Analytics’ split of the sales it saw{cover ? <> ({cover}% of orders, the visitors who accept cookies)</> : null}: a second reading of where untraced sales came from, not a measurement.</> : null}
+      {Number(M.other_stores_sales) > 0 ? <> Other stores sold {fmtMoney(M.other_stores_sales)} on top.</> : null}</p>
+    {codes.length > 0 && (<p className="v3-note v3-measure">{v3Names(codes.map(c => c.code))} brought {fmtMoney(codes.reduce((s, c) => s + Number(c.sales), 0))} of these sales, and Greta cannot tell whether {codes.length > 1 ? 'they are' : 'it is'} a creator’s code, your sign-up offer or a promotion.{' '}
+      <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('settings')}>Say which in Settings</button></p>)}
+  </section></div>);
+}
+
 // ── Email, the channel you own (Marketing) ─────────────────────────────────────────────────
 // Klaviyo's own figures, read for what they can honestly say. Its attributed sales count anyone who
 // opened or clicked an email before buying, so set against Shopify sales they over-claim; that is
@@ -20310,7 +20365,7 @@ const V3_VERDICT = {
   ungradeable: { label: 'Can’t be judged', cls: 'v3-muted' }, no_data: { label: 'No data', cls: 'v3-muted' }
 };
 // what an action promised to move, by the metric code it was graded on (actions.predicted_metric_id)
-const V3_METRIC_WORDS = { net_revenue: 'sales', orders: 'orders', site_cvr: 'the share of visitors who buy', discount_rate: 'the discount rate',
+const V3_METRIC_WORDS = { net_revenue: 'sales', orders: 'orders', site_cvr: 'the share of visitors who buy', discount_rate: 'the share taken by discount codes',
   google_spend: 'Google ad spend', meta_spend: 'Meta ad spend', meta_roas: 'Meta’s sales per £1 of ads', google_roas: 'Google’s sales per £1 of ads',
   contribution: 'profit after product and order costs', product_revenue: 'product sales', sku_cm_pct: 'the product’s margin',
   returning_customer_share: 'sales from returning customers', aov: 'the average order', return_rate: 'refunds',
@@ -23343,6 +23398,7 @@ const V3_PAGES = {
         spend-tier "diminishing returns" read (its own numbers did not fall) and the GA4 funnel (Website's,
         on 11 of 30 tracked days) are gone. Platform claims and per-channel evidence sit behind the detail. */}
     <V3MarketingLead/>
+    <V3ChannelMap/>
     <V3DriverStrip keys={['spend', 'cac', 'ret', 'metacpa', 'googcpa', 'email']}/>
     <V3CodePerformance/>
     <V3Incrementality/>
@@ -23876,12 +23932,14 @@ const V3_WALK_STEP = {
   leaks: { q: 'Are discounts and refunds eating sales?', dest: 'products', anchor: 'promos', build: X => {
     const { P } = X, c = P.cur;
     const say = [];
-    if (c.discount_rate != null) say.push('Discounts took ' + fmtPctN(c.discount_rate) + ' off full-price sales in ' + X.N.cur
+    // 11 Oct: this is codes and automatic discounts against sales before them, not markdowns from full price
+    // (the anatomy's "off list price" figure counts those too), so it is named for what it is.
+    if (c.discount_rate != null) say.push('Discount codes took ' + fmtPctN(c.discount_rate) + ' of what customers would have paid before them in ' + X.N.cur
       + ', against ' + fmtPctN(P.prev.discount_rate) + ' in ' + X.N.prev + (P.ly.has_history ? ' and ' + fmtPctN(P.ly.discount_rate) + ' in ' + X.N.ly : '') + '.');
     if (c.return_rate != null) say.push('Refunds came to ' + fmtPctN(c.return_rate) + ' of sales, against ' + fmtPctN(P.prev.return_rate) + ' in ' + X.N.prev + '.');
     if (!say.length) say.push('There were no sales in ' + X.N.cur + ' to measure discounts or refunds against.');
-    return { say, tbl: [['Discounts', 'discount_rate', fmtPctN, 'down', true], ['Refunds', 'return_rate', fmtPctN, 'down', true]],
-      note: 'Discounts are as Shopify records them, so customer-service adjustments count too.' };
+    return { say, tbl: [['Discount codes', 'discount_rate', fmtPctN, 'down', true], ['Refunds', 'return_rate', fmtPctN, 'down', true]],
+      note: 'Discount codes and automatic discounts as Shopify records them, so customer-service adjustments count too. Markdowns from full price are not in this figure.' };
   } },
   topProducts: { q: 'Which products carry the business?', dest: 'products', cat: 'product', build: X => {
     const pr = (X.prods || []).filter(p => Number(p.cur_rev) > 0).sort((a, b) => Number(b.cur_rev) - Number(a.cur_rev)).slice(0, 5);
@@ -24106,10 +24164,10 @@ function v3WalkMeansLeaks(X) {
   const c = X.P.cur, p = X.P.prev, out = [];
   if (c.discount_rate == null) return out;
   const gross = c.net_revenue / (1 - c.discount_rate);
-  out.push('A discount comes straight off profit. On ' + v3Gbp(gross) + ' of full-price sales in ' + X.N.cur + ', each point of discount is about ' + v3Gbp(gross * 0.01) + '.');
+  out.push('A discount comes straight off profit. On ' + v3Gbp(gross) + ' of sales before codes in ' + X.N.cur + ', each point of discount is about ' + v3Gbp(gross * 0.01) + '.');
   if (p.has_history && p.discount_rate != null) {
     const d = c.discount_rate - p.discount_rate;
-    if (Math.abs(d) >= 0.005) out.push('Against ' + X.N.prev + ' the discount rate moved ' + (d > 0 ? 'up' : 'down') + ' ' + v3WalkDp(Math.abs(d) * 100, 1) + ' points — about ' + v3Gbp(Math.abs(d) * gross)
+    if (Math.abs(d) >= 0.005) out.push('Against ' + X.N.prev + ' the share taken by discount codes moved ' + (d > 0 ? 'up' : 'down') + ' ' + v3WalkDp(Math.abs(d) * 100, 1) + ' points — about ' + v3Gbp(Math.abs(d) * gross)
       + (d > 0 ? ' of profit given away.' : ' of profit kept.'));
   }
   if (c.return_rate != null && c.return_rate > 0) out.push('Refunds took ' + v3Gbp(c.return_rate * c.net_revenue) + ' back out of sales in ' + X.N.cur + '.');
@@ -24147,7 +24205,7 @@ const V3_WALK_VIEW = {
   stock:       { chart: null, means: v3WalkMeansStock },
   reorder:     { chart: null, means: v3WalkMeansStock },
   cash:        { chart: null, means: v3WalkMeansCash },
-  leaks:       { chart: ['discount_rate', v3WalkPct, 'Discount rate'], means: v3WalkMeansLeaks },
+  leaks:       { chart: ['discount_rate', v3WalkPct, 'Discount codes'], means: v3WalkMeansLeaks },
   topProducts: { chart: ['net_revenue', v3Gbp, 'Sales'], means: v3WalkMeansProducts },
   movers:      { chart: ['net_revenue', v3Gbp, 'Sales'], means: v3WalkMeansProducts },
   traffic:     { chart: ['sessions', fmtCount, 'Visits'], means: v3WalkMeansSales },
