@@ -21103,6 +21103,7 @@ function V3DataTrust() {
   </section>
   <V3DriverStrip keys={['claims']} opts={orders30 > 0 && meta.rows && gads.rows ? { claims: { m: mP, g: gP, o: orders30 } } : null}/>
   <V3AnatomyCoverage/>
+  <V3LearningStatus/>
   <V3AnatomyInputs/></div>);
 }
 
@@ -22086,7 +22087,7 @@ function v3ModelProducts(list, sale) {
 const V3_COVERAGE_Q = (sb, b) => sb.rpc('fn_anatomy_coverage', { p_brand: b });
 const V3_HEALTH_WORD = { 'live': null, 'computed on demand': null, 'not applicable': 'Does not apply', 'needs your input': 'Needs a figure from you',
   'needs a test': 'Needs a test', 'waiting for its first sync': 'Fills after tonight’s sync', 'stale': 'Out of date', 'no data for this brand': 'No data yet',
-  'missing': 'Not measured', 'declared, object missing': 'Not measured', 'error': 'Could not be worked out' };
+  'missing': 'Not measured', 'declared, object missing': 'Not measured', 'error': 'Could not be worked out', 'no source reporting': 'No source is reporting' };
 function V3AnatomyCoverage() {
   const q = useV3Rows('anatomy-coverage', V3_COVERAGE_Q);
   const [open, setOpen] = React.useState(null);
@@ -22094,12 +22095,15 @@ function V3AnatomyCoverage() {
   if (!R.length) return null;
   const all = R.flatMap(r => r.measures || []);
   const cnt = h => all.filter(m => (Array.isArray(h) ? h.includes(m.health) : m.health === h)).length;
-  const covered = cnt(['live', 'computed on demand']), na = cnt('not applicable'), you = cnt('needs your input'), test = cnt('needs a test'), sync = cnt('waiting for its first sync');
-  const rest = all.length - covered - na - you - test - sync;
+  // 0438: an estimate is not a measurement (frkl read "measures 183" above a table that said 157 + 26 estimated)
+  const isLive = m => m.health === 'live' || m.health === 'computed on demand';
+  const covered = all.filter(m => isLive(m) && m.state !== 'estimated').length, est = all.filter(m => isLive(m) && m.state === 'estimated').length;
+  const na = cnt('not applicable'), you = cnt('needs your input'), test = cnt('needs a test'), sync = cnt('waiting for its first sync');
+  const rest = all.length - covered - est - na - you - test - sync;
   const pages = { profit: 'profit', marketing: 'marketing', website: 'website', customers: 'customers', products: 'products', stock: 'stock', competitors: 'competitors', goal: 'goal', settings: 'settings', review: 'review', actions: 'actions' };
   return (<section className="v3-sec">
     <h2 className="v3-sec-title">What Greta can see <span className="v3-muted">every part of the business</span></h2>
-    <p className="v3-note v3-measure">Greta measures {fmtCount(covered)} of the {fmtCount(all.length)} things worth knowing about a business like yours{na ? <>, and {fmtCount(na)} do not apply to you</> : null}.
+    <p className="v3-note v3-measure">Greta measures {fmtCount(covered)} of the {fmtCount(all.length)} things worth knowing about a business like yours{est ? <> and estimates {fmtCount(est)} more</> : null}{na ? <>, and {fmtCount(na)} do not apply to you</> : null}.
       {you + test + sync + rest > 0 ? <> Of the rest, {[sync ? fmtCount(sync) + ' fill after tonight’s syncs' : null, you ? fmtCount(you) + ' need a figure from you (below)' : null,
         test ? fmtCount(test) + ' need a test to measure' : null, rest ? fmtCount(rest) + ' cannot be measured yet' : null].filter(Boolean).join(', ')}.</> : null} Open a part to see each figure.</p>
     <table className="v3-rw v3-cov">
@@ -22124,6 +22128,44 @@ function V3AnatomyCoverage() {
         </React.Fragment>); })}</tbody>
     </table>
     <p className="micro muted v3-measure">Measured counts the measures Greta works out from your connected accounts, or from figures you entered. Why it moves is a panel that splits a change into its parts. Actions are the open ones on your board for that part.</p>
+  </section>);
+}
+
+// What Greta has learned about this brand (12 Oct re-eval): Greta starts every brand on a typical brand and
+// replaces each piece with the brand's own data as it builds up. vw_brand_learning_status says where each
+// piece stands; vw_action_track_record how often checked actions moved the number they promised (0449).
+const V3_LEARN_Q = (sb, b) => Promise.all([
+  sb.from('vw_brand_learning_status').select('profile_as_of,last_fit_problem,spend_curves,spend_curve_detail,spend_curve_own_share,cost_curve_months,cost_curve_ok,event_types_own,event_types,ltv_status,channel_tests').eq('brand_id', b).limit(1),
+  sb.from('vw_action_track_record').select('profile,graded,hits').eq('brand_id', b),
+]).then(rs => { const e = rs.find(r => r && r.error); return e ? { error: e.error } : { data: [{ s: (rs[0].data || [])[0] || null, tr: rs[1].data || [] }] }; });
+function V3LearningStatus() {
+  const q = useV3Rows('learning-status', V3_LEARN_Q);
+  const d = Array.isArray(q.rows) ? q.rows[0] : null;
+  if (!d || !d.s) return null;
+  const s = d.s;
+  const graded = d.tr.reduce((a, r) => a + (Number(r.graded) || 0), 0), hits = d.tr.reduce((a, r) => a + (Number(r.hits) || 0), 0);
+  const own = Number(s.spend_curve_own_share);
+  const rows = [
+    ['What each £1 of ads brings in new customers',
+      Number(s.spend_curves) ? 'Your own spend curve (' + s.spend_curve_detail + '); the rest is a typical brand’s' : 'A typical brand’s curve, until about 26 weeks of your ad spend', own >= 0.8],
+    ['What a new customer costs as spend rises',
+      s.cost_curve_ok ? 'Your own, from ' + fmtCount(Number(s.cost_curve_months)) + ' months of your ad spend' : 'A typical brand’s, until there are more months of your ad spend', !!s.cost_curve_ok],
+    ['How a sale or launch lifts sales',
+      fmtCount(Number(s.event_types_own) || 0) + ' of ' + fmtCount(Number(s.event_types) || 0) + ' kinds of event learned from your own events', Number(s.event_types) > 0 && Number(s.event_types_own) === Number(s.event_types)],
+    ['What a customer is worth over time',
+      s.ltv_status === 'measured' ? 'Your own customers' : 'A typical brand’s, until your customers have a year behind them', s.ltv_status === 'measured'],
+    ['How much each ad channel really causes',
+      Number(s.channel_tests) ? 'Your own holdout tests' : 'A published estimate, until you run a holdout test (on the board)', Number(s.channel_tests) > 0],
+    ['How often Greta’s actions worked',
+      graded ? fmtCount(hits) + ' of ' + fmtCount(graded) + ' checked actions moved the number they promised' : 'Nothing checked yet: mark actions done on the board and Greta checks each one when its window ends', graded >= 5],
+  ];
+  return (<section className="v3-sec">
+    <h2 className="v3-sec-title">What Greta has learned about you <span className="v3-muted">your own data, or a typical brand’s</span></h2>
+    <p className="v3-note v3-measure">Greta starts every brand on what is typical for a business like yours, then replaces each piece with your own data as it builds up. {s.last_fit_problem ? 'The last weekly refit did not finish: ' + s.last_fit_problem + '.' : s.profile_as_of ? 'Last refitted on ' + v3Day(s.profile_as_of) + '.' : ''}</p>
+    <table className="v3-rw">
+      <thead><tr><th className="t-text">What Greta needs to know</th><th className="t-text">Where it comes from now</th><th className="t-text">Yours yet?</th></tr></thead>
+      <tbody>{rows.map(([k, v, mine]) => (<tr key={k}><td className="t-text">{k}</td><td className="t-text">{v}</td><td className={'t-text' + (mine ? '' : ' v3-muted')}>{mine ? 'Yours' : 'Partly typical'}</td></tr>))}</tbody>
+    </table>
   </section>);
 }
 
