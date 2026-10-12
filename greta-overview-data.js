@@ -67,7 +67,7 @@
       safeQ(sb.from('vw_channel_effect').select('channel_type, family, spend_30d, attributed_rev_30d, phi, incremental_rev_30d, cost_30d, contribution_30d, drives, rev_per_send').eq('brand_id', brandId), Q, []),
       safeQ(sb.from('vw_channel_optimum').select('channel_type, avg_iroas, marginal_iroas, target_marginal_iroas, break_even_iroas, marginal_cm_per_pound, status, marginal_reason').eq('brand_id', brandId), Q, []),
       safeQ(sb.from('vw_email_breakdown').select('total_rev, total_orders, total_sends, campaign_rev, campaign_orders, flow_rev, flow_orders, rev_per_1k_sent').eq('brand_id', brandId).limit(1), Q, null),
-      safeQ(sb.from('mos_business_goal').select('revenue_target, contribution_margin_target, spend_cap, period_start, period_end, confirmed').eq('brand_id', brandId).lte('period_start', new Date().toISOString().slice(0,10)).gte('period_end', new Date().toISOString().slice(0,10)).order('created_at', { ascending: false }).limit(1), Q, null),
+      safeQ(sb.from('mos_business_goal').select('revenue_target, contribution_margin_target, spend_cap, period_start, period_end, confirmed, phasing').eq('brand_id', brandId).lte('period_start', new Date().toISOString().slice(0,10)).gte('period_end', new Date().toISOString().slice(0,10)).order('created_at', { ascending: false }).limit(1), Q, null),
       safeQ(sb.from('daily_forecast').select('day, revenue, spend, cm').eq('brand_id', brandId).order('day', { ascending: true }), Q, []),
       safeQ(sb.from('brand_config').select('fixed_costs_monthly, gross_margin').eq('brand_id', brandId).limit(1), Q, null),
       safeQ(sb.from('vw_brand_efficiency_targets').select('actual_cac, breakeven_cac_first_order, breakeven_cac_ltv, target_cac, actual_roas, breakeven_roas_first_order, breakeven_roas_ltv, target_roas, goal_confirmed, cac_ltv_headroom, roas_ltv_headroom, orders_per_customer, repeat_ltv_share, status').eq('brand_id', brandId).limit(1), Q, null),
@@ -215,16 +215,23 @@
     var pacing = (function () {
       var g = S.goal; if (!g || !g.period_start) return null;
       var gDays = Math.max(1, Math.round((new Date(g.period_end) - new Date(g.period_start)) / 864e5) + 1);
-      var tSalesPD = n(g.revenue_target) / gDays, tSpendPD = n(g.spend_cap) / gDays;
+      // 0397: each day's target is its month's planned sales and spend over that month's days in the period
+      var ph = Array.isArray(g.phasing) ? g.phasing : [];
+      var perDay = function (iso, key) {
+        var m = ph.find(function (x) { return String(x.month).slice(0, 7) === String(iso).slice(0, 7); });
+        if (m && n(m.days) > 0) return n(m[key]) / n(m.days);
+        return (key === 'sales' ? n(g.revenue_target) : n(g.spend_cap)) / gDays;
+      };
       var byDay = {};
       (D.shopify || []).forEach(function (r) { if (r.date >= w.cs && r.date <= w.ce) { (byDay[r.date] = byDay[r.date] || { d: r.date, sales: 0, spend: 0 }).sales += n(r.netSales); } });
       (D.metaDaily || []).forEach(function (r) { if (r.date >= w.cs && r.date <= w.ce) { (byDay[r.date] = byDay[r.date] || { d: r.date, sales: 0, spend: 0 }).spend += n(r.cost); } });
       (D.googleAds || []).forEach(function (r) { if (r.date >= w.cs && r.date <= w.ce) { (byDay[r.date] = byDay[r.date] || { d: r.date, sales: 0, spend: 0 }).spend += n(r.cost); } });
-      var days = Object.keys(byDay).sort().map(function (k) { var x = byDay[k]; return { date: k.slice(5), sales: f0(x.sales), spend: f0(x.spend), tSales: f0(tSalesPD), tSpend: f0(tSpendPD) }; });
+      var days = Object.keys(byDay).sort().map(function (k) { var x = byDay[k]; return { date: k.slice(5), sales: f0(x.sales), spend: f0(x.spend), tSales: f0(perDay(k, 'sales')), tSpend: f0(perDay(k, 'spend')) }; });
       var today = new Date().toISOString().slice(0, 10);
       var elapsed = Math.max(1, Math.round((new Date(today) - new Date(g.period_start)) / 864e5) + 1);
       var actTD = sumR(D.shopify, "date", g.period_start, today, function (r) { return n(r.netSales); });
-      var tgtTD = tSalesPD * elapsed;
+      var tgtTD = 0;
+      for (var i = 0; i < elapsed; i++) { var dd = new Date(new Date(g.period_start).getTime() + i * 864e5).toISOString().slice(0, 10); tgtTD += perDay(dd, 'sales'); }
       return { days: days, goalConfirmed: g.confirmed === true, revActual: f0(actTD), revTarget: f0(tgtTD), pacePct: tgtTD > 0 ? +((actTD / tgtTD - 1) * 100).toFixed(1) : null };
     })();
     var cacBlock = (function () {

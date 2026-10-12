@@ -9214,7 +9214,8 @@ function buildAskContext(facts, question, budget){
         // 0391: the codes the untraced orders used, harder evidence of where they came from than the estimate
         untraced_orders_by_code: (() => { const x = ((M.channels.find(c => c.key === 'not_recorded') || {}).extra) || {};
           return x.untraced_orders ? { untraced_orders: x.untraced_orders, with_a_code: x.with_a_code,
-            codes: (x.top_codes || []).slice(0, 5).map(c => ({ code: c.code, sales: c.sales, orders: c.orders, kind: c.kind })) } : null; })(),
+            codes: (x.top_codes || []).slice(0, 5).map(c => ({ code: c.code, sales_incl_vat: c.sales, orders: c.orders,
+              kind: c.kind + (c.kind_source === 'inferred' || !c.kind_source ? ' (inferred, unconfirmed by the owner)' : '') })) } : null; })(),
         note: 'Shares are the shop’s own last-click record. estimated_share_pct is Google Analytics’ split of the sales it saw, a second reading of the untraced share, never a measurement. Compare shares, not sales, when the earlier 30 days held a sale. A code’s kind marked inferred is Greta’s guess from its name: never call it a creator’s code or a partnership unless the owner said so.' }; })(),
     // search, unpaid and paid (0392): the top searches from Search Console by day, Google keywords by spend
     search: (topics.search || topics.ads) && typeof window !== 'undefined' && window.GRETA_SEARCH ? JSON.parse(JSON.stringify(window.GRETA_SEARCH)) : null,
@@ -9233,6 +9234,7 @@ function buildAskContext(facts, question, budget){
   const keepSeries = new Set(['stock_named']);
   if (askWhy) keepSeries.add('drivers');
   if (topics.email) keepSeries.add('email_flows');
+  if (topics.search) keepSeries.add('weekly_google');
   if (topics.stock) keepSeries.add('stock_at_risk');
   if (topics.products) keepSeries.add('products');
   const order = Object.keys(data).reverse().filter(k => !keepSeries.has(k));
@@ -12865,11 +12867,11 @@ const GO_EXPLAIN = {
   'cost per new customer:Actual cost per new customer (paid)':'What you actually pay per new customer right now (spend ÷ new customers).',
   'cost per new customer:Break-even · 1st order':'The most you can pay per customer and still be CM-positive on their first order.',
   'cost per new customer:Break-even · lifetime':'The most you can pay and still break even over the customer’s whole lifetime (customer lifetime value-adjusted).',
-  'cost per new customer:Target / optimal cost per new customer':'Your target acquisition cost — taken from your goal, or a profit-safe default.',
+  'cost per new customer:Most the next new customer should cost':'What the next new customer can cost at your plan\u2019s budget. While returning customers do not cover your running costs, that is what their first order keeps.',
   'return on ad spend:Actual return on ad spend (sales per £ of ads for new customers)':'Your actual acquisition return on ad spend — new-customer revenue ÷ spend.',
   'return on ad spend:Break-even · 1st order':'Minimum return on ad spend to be CM-positive on order one (= 1 ÷ contribution margin).',
   'return on ad spend:Break-even · lifetime':'Minimum return on ad spend once repeat purchases are counted — the customer lifetime value-adjusted floor.',
-  'return on ad spend:Target / optimal return on ad spend':'Your target return on ad spend — taken from your goal, or a profit-safe default.'
+  'return on ad spend:What the next £ of ads should bring':'The sales the next \u00a31 of ads should bring a new customer\u2019s first order, at that cost.'
 };
 
 const GO_FALLBACK = { monthly: {
@@ -13262,7 +13264,9 @@ function GretaOverviewTiers(){
           var col=C.rag==="g"?GO_T.green:C.rag==="a"?GO_T.amber:C.rag==="r"?GO_T.red:GO_T.dim;
           var cell=function(k,v,sub,hi){var ex=GO_EXPLAIN[(String(v).indexOf("×")>=0?"return on ad spend:":"cost per new customer:")+k]||GO_EXPLAIN[k]||"";return <div className="go-tile" style={{background:GO_T.panel,border:"1px solid "+(hi||GO_T.line),borderRadius:'var(--radius-none)',padding:"14px 15px",boxShadow:"var(--shadow-panel)"}}><div style={{fontSize:'var(--text-xs)',color:GO_T.mut}}>{k}</div><div style={{fontFamily:GO_T.mono,fontSize:'var(--text-xl)',fontWeight:'var(--weight-semi)',margin:"8px 0 4px"}}>{v}</div><div style={{fontSize:'var(--text-xs)',color:GO_T.dim}}>{sub}</div>{ex&&<div className="go-pop"><div className="go-head">{k}</div><div style={{fontSize:'var(--text-xs)',color:GO_T.mut,lineHeight:1.5}}>{ex}</div></div>}</div>;};
           var ltvSub=C.opc.toFixed(2)+" orders/cust"+(C.repeatPct!=null?" · "+C.repeatPct+"% repeat":"");
-          var tgtSub=C.goalConfirmed?"from your goal":"profit-safe default";
+          var tgtSub=C.goalConfirmed?"at your plan\u2019s budget":"what a first order keeps";
+          // 0397: while repeat profit does not cover running costs the lifetime ceiling is the first order's
+          if (C.cac.ltv!=null && C.cac.first!=null && Math.abs(C.cac.ltv-C.cac.first)<0.01) ltvSub="first order only, until repeat profit covers your running costs";
           return <div style={{marginTop:2,marginBottom:6}}>
             <div style={{fontSize:'var(--text-xs)',color:GO_T.dim,textTransform:"uppercase",letterSpacing:'var(--tracking-wide)',margin:"0 2px 6px"}}>Acquisition efficiency · break-even &amp; optimal</div>
             <div style={{fontSize:'var(--text-xs)',color:GO_T.mut,margin:"0 2px 4px"}}>cost per new customer — most you can pay per new customer</div>
@@ -13270,14 +13274,14 @@ function GretaOverviewTiers(){
               {cell("New-customer cost (paid)",g2(C.cac.actual),"spend ÷ new custs",col)}
               {cell("Break-even · 1st order",g2(C.cac.first),"CM-positive on order 1")}
               {cell("Break-even · lifetime",g2(C.cac.ltv),ltvSub)}
-              {cell("Target / optimal cost per new customer",g2(C.cac.target),tgtSub)}
+              {cell("Most the next new customer should cost",g2(C.cac.target),tgtSub)}
             </div>
             <div style={{fontSize:'var(--text-xs)',color:GO_T.mut,margin:"0 2px 4px"}}>return on ad spend — least you can accept (sales per £ of ads for new customers)</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:12}}>
               {cell("Actual return on ad spend (sales per £ of ads for new customers)",rx(C.roas.actual),"new rev ÷ spend",col)}
               {cell("Break-even · 1st order",rx(C.roas.first),"= 1 ÷ contribution")}
               {cell("Break-even · lifetime",rx(C.roas.ltv),"customer lifetime value-adjusted floor")}
-              {cell("Target / optimal return on ad spend",rx(C.roas.target),tgtSub)}
+              {cell("What the next £ of ads should bring",rx(C.roas.target),tgtSub)}
             </div>
             <div style={{fontSize:'var(--text-xs)',color:col,marginTop:7,display:"flex",gap:6,alignItems:"baseline"}}><GO_Dot r={C.rag} style={{marginTop:4}}/> <span>{C.verdict}</span></div>
           </div>; })()}
@@ -13434,7 +13438,9 @@ function GP_PlanBreakdown({ d }) {
     ? <>You asked for <b>{GP_gbp(d.goal)}</b> of profit after ads, and Greta treats it as a floor: this is the most growth that still clears it — the biggest budget at which profit after ads stays at your goal{(d.flags || []).indexOf('capped_at_spend_seen') >= 0 ? ', stopped at three times your biggest month of spend' : ''}.</>
     : <>No goal set, so this carries your recent ad spend — about <b>{GP_gbp(inp.base_monthly_spend)}</b> a month — through the quarter, spread toward the months where it buys most.</>;
 
+  const td = d.to_date;
   return (<div className="gp-plan">
+    {td && Number(td.spend) + Number(td.sales) > 0 && (<p className="gp-plan-say">So far this quarter, to {v3Day(String(td.to))}: <b>{GP_gbp(td.sales)}</b> of sales and <b>{GP_gbp(td.spend)}</b> of ads, keeping {GP_gbp(td.cam)} after ads. The plan below adds the days left to that.</p>)}
     {flags.length > 0 && (<ul className="gp-plan-flags" aria-label="What to bear in mind">
       {flags.map(f => <li key={f}>{typeof GP_FLAG_TEXT[f] === 'function' ? GP_FLAG_TEXT[f](d) : GP_FLAG_TEXT[f]}</li>)}
     </ul>)}
@@ -16711,6 +16717,7 @@ function v3PlainAction(row){
     return P('Why ' + named(x[1]) + ' changed', named(raw.replace(/^Why .+? moved, ranked by evidence:\s*/i, 'Most likely first: ')));
   }
   if (/^connection-/.test(id)) { const p = id.replace(/^connection-/, ''); return P('Reconnect ' + (CONN_LABEL[p] || v3Ch(p)), raw); }
+  if (id === 'data-health-jobs') return P('Some figures may be out of date', raw);
   if (/^data-health-/.test(id)) return P('Some numbers did not load', 'Part of a screen could not load its data, so a figure there may be missing rather than zero. Refreshing usually fixes it.');
   if (id === 'tracking-coverage') return P('Check your site tracking', raw);
   if ((x = id.match(/^greta_forecast:([^:]+):(efficiency|volume)$/))) {
@@ -23372,8 +23379,16 @@ function V3Congruency() {
     Return on ads after the share they really cause went from <span>{fmtTimes(n(c.iroas_prior), 2)}</span> to <span>{fmtTimes(n(c.iroas_now), 2)}</span>; profit after ads went from <span>{fmtMoney(n(c.cm_prior))}</span> to <span>{fmtMoney(n(c.cm_now))}</span>{c.prior_date ? <> ({v3Day(String(c.prior_date))} to {v3Day(String(c.latest_date))})</> : null}.
     {ok ? '' : ' Check the tracking on Settings before acting on the ad figures.'}</p>);
 }
+// A scheduled refresh that failed twice or stopped (0383, 0398): one line, in the notice's own words.
+const V3_JOBHEALTH_Q = (sb, b) => sb.from('actions').select('description,updated_at').eq('brand_id', b)
+  .eq('external_id', 'data-health-jobs').eq('status', 'open').limit(1);
+function V3JobHealth() {
+  const q = useV3Rows('job-health', V3_JOBHEALTH_Q);
+  if (q.err || !q.rows || !q.rows.length) return null;
+  return (<p className="v3-note v3-measure v3-jobhealth"><b>Some figures may be out of date.</b> {String(q.rows[0].description || '')}</p>);
+}
 const V3_PAGES = {
-  today: (p) => (<><V3BusinessState part="lead"/><V3Today {...p}/></>),
+  today: (p) => (<><V3JobHealth/><V3BusinessState part="lead"/><V3Today {...p}/></>),
   review: (p) => (<>
     {/* Rebuilt 2026-10-05: the week against a typical week, the meeting agenda off the board, notes in
         the workspace. The old weekly board (week-on-week only, GA4 repair read as growth, notes in one
@@ -23506,6 +23521,7 @@ const V3_PAGES = {
         and the live researched list above replaces it for every brand. */}
   </>),
   settings: (p) => (<>
+    <V3JobHealth/>
     {/* Rebuilt 2026-10-05: what makes the numbers read wrong leads (V3DataTrust); the connections and
         the feed table follow. Duplicate and dead connections for frkl were removed by hand the same day. */}
     {UI_V3 && <V3DataTrust/>}
