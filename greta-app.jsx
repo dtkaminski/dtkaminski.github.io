@@ -8615,6 +8615,8 @@ async function v3AskFacts(question) {
   // 0453: the owner's week, the plan's one budget for all ads, and cash to the plan's end, as Today and Goal say them
   {
     const S1 = r0(stateR) && r0(stateR).state;
+    // 0456: a source that has stopped sending: said first, and its figures run only to data_through
+    if (S1 && S1.freshness && S1.freshness.stale && S1.freshness.said) f.data_freshness = { said: S1.freshness.said, data_through: S1.freshness.data_through || null };
     if (S1 && S1.this_week && S1.this_week.said) f.this_week = { said: S1.this_week.said, sales: S1.this_week.sales, ad_spend: S1.this_week.ads, profit_after_ads: S1.this_week.profit_after_ads, month_so_far: S1.this_week.month };
     if (S1 && S1.ad_budget && S1.ad_budget.said) f.ad_budget_for_all_ads = { said: S1.ad_budget.said, per_week: S1.ad_budget.per_week, month: S1.ad_budget.month,
       next_month_per_week: S1.ad_budget.next_per_week, last_7_days: S1.ad_budget.last_7_days,
@@ -9384,6 +9386,8 @@ function AskPanel(){
     const askSystem = (metaStr, dataStr) => `You are a senior D2C commercial analyst and operator for ${OI_BRAND.name}, a ${OI_BRAND.markets} DTC ${OI_BRAND.vertical} brand. Answer using ONLY the figures below. For where the year stands, use facts.next_peak, facts.typical_month and the weekly rows; never assume a season, a lull or a peak they do not show. They are: _meta.facts (what every page of the app shows), _meta.readout (the server's canonical figures, ranked board and rules) and, in data, the series this question needs as tables (cols + rows). Prefer facts and readout to anything you work out from the rows, and say which you used.
 
 Follow _meta.readout.rules. Quote headline figures exactly, with their window. Say how far the owner can lean on a figure in plain words (measured, likely, probably, possibly, an outside chance), as part of the sentence: never the word rung, never in brackets after a figure. Never recommend an action in readout.held. Never compare or total across days readout.coverage or readout.tracking marks unusable; missing days are not zero.
+
+STALE DATA: when facts.data_freshness is there, the first sentence of every answer says it in its words: which data has stopped, and since when. Figures from that data run only to that day; never call them current.
 
 WHY questions (why did a figure move, what is driving it): when _meta.why_this_question is present, it IS the answer and comes before facts and readout. Open with one sentence: the figure is now <now>, against <then> in <against> (use the words of against as written: "the 30 days to 10 Sep" is not "the period before 10 Sep"). Then each item of parts_biggest_first, in that order, one line each, with its amount exactly as written (these are the parts the change splits into and they add up to it). Then "What to do:" and the items of what_to_do_from_the_board, as written. Do not explain the figure as a division, and do not add causes that are not in it. Otherwise, if data.drivers has the figure, answer from its row the same way. If neither has it, say it is not a figure that is going the wrong way, and answer from the other figures.
 SALES MOVES: when the question is why sales or profit went up or down, start from _meta.sales_move: give its cause as written (it splits the change into marked-down sales, full-price sales to new and to returning customers, and visits, orders per visit and order size), then the one or two biggest parts from split. Do not name a different cause.
@@ -19859,7 +19863,7 @@ function V3ChannelMap() {
     {rows.length > 6 && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => setAll(v => !v)}>{all ? 'Show the biggest 6' : 'Show all ' + rows.length + ' channels'}</button>}
     <p className="micro muted v3-measure">Web sales as on Today ({fmtMoney(M.web_sales)}): after discounts and refunds, before VAT, each order placed by the shop’s own record of its last click. Compare shares rather than sales when the 30 days before held a sale.
       {estTop.length ? <> Google Analytics’ split is how it shares out all the sales it saw, by its own rules{cover ? <> ({cover}% of orders, the visitors who accept cookies)</> : null}: a second opinion on the mix, not where the untraced sales came from.</> : null}
-      {Number(M.other_stores_sales) > 0 ? <> Other stores sold {fmtMoney(M.other_stores_sales)} on top.</> : null}</p>
+      {Number(M.other_stores_sales) > 0 ? <> {fmtMoney(M.other_stores_sales)} sold through other stores is left out: Greta reads your own shop only.</> : null}</p>
     {unt >= 40 && Number(ux.with_a_code) > 0 && uCodes.length > 0 && (<p className="micro muted v3-measure">Of the {fmtCount(ux.untraced_orders)} orders with no source, {fmtCount(ux.with_a_code)} used a discount code, which says more about where they came from than Google Analytics can:{' '}
       {uCodes.map((c, i) => <React.Fragment key={c.code}>{i ? ', ' : ''}{c.code} {fmtMoney(c.sales)}{kindSay[c.kind] ? ' (' + kindSay[c.kind] + ')' : ''}</React.Fragment>)}.</p>)}
     {codes.length > 0 && (<p className="v3-note v3-measure">{v3Names(codes.map(c => c.code))} brought {fmtMoney(codes.reduce((s, c) => s + Number(c.sales), 0))} of these sales, and Greta cannot tell whether {codes.length > 1 ? 'they are' : 'it is'} a creator’s code, your sign-up offer or a promotion.{' '}
@@ -21534,7 +21538,6 @@ function V3BusinessState({ part }) {
   const yoyAds = num(A.last_year_same_30_ads) > 0 ? num(L.ads) / num(A.last_year_same_30_ads) : null;
   const ret = num(L.ads) > 0 ? num(L.sales) / num(L.ads) : null;
   const topCode = (codes.rows || []).find(c => num(c.orders_365d) >= 50 && num(c.first_order_share) >= 0.6) || null;
-  const other = ((S.channels && S.channels.other) || []).filter(c => num(c.orders) >= 10);
 
   // the verdict: after overheads when they are known, else after ads. The headline carries the one
   // figure; the line under it says what "after all costs" counts and what ads take of each £1.
@@ -21605,12 +21608,6 @@ function V3BusinessState({ part }) {
   if (P && P.title)
     items.push({ k: 'Your next busy period',
       t: <>It is {fmtCount(P.days_away)} days until {v3PlainWords(P.title).replace(/\s*(?:peak\s*)?window$|\s*peak$/i, '')}. The same days last year sold {fmtMoney(num(P.ly_sales))}{P.top_codes && P.top_codes[0] && num(P.ly_orders) > 0 ? <>, and {P.top_codes[0].code} brought {fmtPctN(num(P.top_codes[0].orders) / num(P.ly_orders))} of those orders</> : null}.</> });
-  if (other.length)
-    items.push({ k: 'Other places you sell',
-      t: <>{(() => { const named = other.filter(c => !/^\d+$/.test(c.channel)).map(c => c.channel), unnamed = other.length - named.length;
-        return named.concat(unnamed ? [unnamed === 1 ? 'One other sales channel' : unnamed + ' other sales channels'] : []).join(' and '); })()} took {fmtCount(other.reduce((a, c) => a + num(c.orders), 0))} orders in 90 days. They count in your sales at the shop price, so if a stockist pays you less, sales and profit read higher than they are.</> });
-
-
   const rows = [
     ['Ads as a share of sales', share, BM.ads_share_of_sales, fmtPctN],
     ['Order again within 90 days', num(R.repeat_90d), BM.repeat_90d, fmtPctN],
@@ -22249,28 +22246,23 @@ function V3LearningStatus() {
   </section>);
 }
 
-// What only the owner knows (0319): suppliers, what other routes take and when they pay, and whose codes are
-// whose. Editors write; Greta reads them each morning.
+// What only the owner knows (0319): suppliers, and whose codes are whose. 0457: Greta reads the D2C business
+// only, so the route terms (commission, fees, payment days for other stores) are gone. Editors write; Greta reads them each morning.
 const V3_INPUTS_Q = (sb, b) => Promise.all([
   sb.from('brand_supplier').select('id,name,lead_time_days,moq_units,has_alternative,product_match').eq('brand_id', b).order('name'),
-  sb.from('brand_route_terms').select('route,commission_pct,other_costs_pct,payment_days').eq('brand_id', b),
   sb.from('brand_code_kind').select('code,kind,commission_pct').eq('brand_id', b),
-  sb.from('anatomy_metric_value').select('metric_key,detail').eq('brand_id', b).in('metric_key', ['revenue_by_route', 'creator_cost']),
+  sb.from('anatomy_metric_value').select('metric_key,detail').eq('brand_id', b).in('metric_key', ['creator_cost']),
   sb.from('vw_brand_code_performance').select('code,orders_90d').eq('brand_id', b).gt('orders_90d', 0).order('orders_90d', { ascending: false }).limit(15),
-]).then(rs => { const e = rs.find(r => r && r.error); return e ? { error: e.error } : { data: [{ sup: rs[0].data || [], terms: rs[1].data || [], codes: rs[2].data || [], vals: rs[3].data || [], perf: rs[4].data || [] }] }; });
+]).then(rs => { const e = rs.find(r => r && r.error); return e ? { error: e.error } : { data: [{ sup: rs[0].data || [], codes: rs[1].data || [], vals: rs[2].data || [], perf: rs[3].data || [] }] }; });
 function V3AnatomyInputs() {
   const q = useV3Rows('anatomy-inputs', V3_INPUTS_Q);
   const cov = useV3Rows('anatomy-coverage', V3_COVERAGE_Q);
   const D = q.rows && q.rows[0];
-  const [sup, setSup] = React.useState(null), [terms, setTerms] = React.useState(null), [codes, setCodes] = React.useState(null);
+  const [sup, setSup] = React.useState(null), [codes, setCodes] = React.useState(null);
   const [draft, setDraft] = React.useState({ name: '', lead: '', moq: '', alt: false, match: '' });
   const [msg, setMsg] = React.useState(null);
   React.useEffect(() => { if (D && sup === null) {
     setSup(D.sup);
-    const rv = (D.vals.find(v => v.metric_key === 'revenue_by_route') || {}).detail || [];
-    const routes = (Array.isArray(rv) ? rv : []).map(x => x.route).filter(x => x && x !== 'Own website' && x !== 'Draft orders');
-    setTerms(routes.map(route => Object.assign({ route, commission_pct: '', other_costs_pct: '', payment_days: '' },
-      Object.fromEntries(Object.entries(D.terms.find(t => t.route === route) || {}).map(([k, v]) => [k, v == null ? '' : String(v)])))));
     const inferred = (((D.vals.find(v => v.metric_key === 'creator_cost') || {}).detail || {}).codes) || [];
     const names = [...new Set([...D.codes.map(c => c.code), ...inferred.map(c => String(c).toUpperCase()), ...D.perf.map(p => String(p.code).toUpperCase())])];
     setCodes(names.map(code => { const k = D.codes.find(c => c.code === code), p = D.perf.find(x => String(x.code).toUpperCase() === code);
@@ -22291,10 +22283,6 @@ function V3AnatomyInputs() {
     if (!r.error) { setSup(s => s.concat(r.data || [])); setDraft({ name: '', lead: '', moq: '', alt: false, match: '' }); }
   };
   const dropSupplier = async id => { const r = await sb.from('brand_supplier').delete().eq('id', id); done(r, 'Removed.'); if (!r.error) setSup(s => s.filter(x => x.id !== id)); };
-  const saveTerms = async () => {
-    const rows = terms.map(t => ({ brand_id: b, route: t.route, commission_pct: num(t.commission_pct), other_costs_pct: num(t.other_costs_pct), payment_days: num(t.payment_days), updated_at: new Date().toISOString() }));
-    done(await sb.from('brand_route_terms').upsert(rows, { onConflict: 'brand_id,route' }), 'Saved. Greta uses them from tomorrow morning.');
-  };
   const saveCodes = async () => {
     const keep = codes.filter(c => c.kind), drop = codes.filter(c => !c.kind).map(c => c.code);
     let r = keep.length ? await sb.from('brand_code_kind').upsert(keep.map(c => ({ brand_id: b, code: c.code, kind: c.kind, commission_pct: num(c.commission_pct), updated_at: new Date().toISOString() })), { onConflict: 'brand_id,code' }) : null;
@@ -22320,16 +22308,6 @@ function V3AnatomyInputs() {
       <label className="v3-field v3-field-check"><span>Another supplier could make these</span><input type="checkbox" checked={draft.alt} onChange={e => setDraft(d => ({ ...d, alt: e.target.checked }))}/></label>
     </div>
     <button type="button" className="v3-btn v3-btn-sm v3-gap-top" onClick={addSupplier} disabled={!draft.name.trim()}>Add supplier</button>
-
-    {terms.length > 0 && <>
-      <h3 className="v3-drivers-h">Where else you sell</h3>
-      <p className="micro muted v3-measure">What each takes from a sale, what you fund on top (promotions, levies, listing fees), and how long it takes to pay you. Without these Greta counts {terms.map(t => t.route).join(' and ')} before its commission.</p>
-      <table className="v3-rw"><thead><tr><th className="t-text">Route</th><th>Commission, % of sales</th><th>Other costs, % of sales</th><th>Pays you after, days</th></tr></thead>
-        <tbody>{terms.map((t, i) => (<tr key={t.route}><td className="t-text">{t.route}</td>
-          {['commission_pct', 'other_costs_pct', 'payment_days'].map(k => (<td key={k}><input type="number" min="0" aria-label={t.route + ' ' + k.replace(/_/g, ' ')} value={t[k]}
-            onChange={e => { const v = e.target.value; setTerms(ts => ts.map((x, j) => j === i ? { ...x, [k]: v } : x)); }}/></td>))}</tr>))}</tbody></table>
-      <button type="button" className="v3-btn v3-btn-sm v3-gap-top" onClick={saveTerms}>Save</button>
-    </>}
 
     {codes.length > 0 && <>
       <h3 className="v3-drivers-h">Whose discount codes are whose</h3>
@@ -24940,6 +24918,18 @@ function V3WalkFab({ dest }) {
   </div>);
 }
 
+// 0456: when a source stops sending data, every page says so first, in Greta's words (state.freshness).
+// Each source is judged against its own last eight weeks, so a quiet day at a small shop does not trip it.
+function V3FreshnessBanner() {
+  const q = useV3Rows('brand-state', V3_STATE_Q);
+  const F = q.rows && q.rows[0] && q.rows[0].freshness;
+  if (!F || !F.stale || !F.said) return null;
+  return (<div className={'v3-alert v3-measure' + (F.level === 'problem' ? ' problem' : '')} role="status">
+    <p><b>{F.core_stale ? 'Your data is out of date.' : 'Some of your data is out of date.'}</b> {F.said}</p>
+    <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('settings')}>Open connections in Settings</button>
+  </div>);
+}
+
 function V3App({ dest, go, children, start, periodCtl }) {
   const d = V3_BY_ID[dest] || V3_NAV[0];
   const sig = useV3NavSignals();
@@ -24971,6 +24961,7 @@ function V3App({ dest, go, children, start, periodCtl }) {
         {/* Ask sits on Today; everywhere else it is one keystroke away (nav item, ⌘K). On every
             page it was a sticky bar above the title, so the first thing on each screen was an
             input rather than the page's own question. */}
+        <V3FreshnessBanner/>
         {dest === 'today' && <V3AskBar dest={dest}/>}
         <header className="v3-page-head">
           <div className="v3-page-head-row">
