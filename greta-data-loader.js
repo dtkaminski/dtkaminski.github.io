@@ -757,9 +757,12 @@
   // healthy, ≤180d high, beyond that (or stock with no sales) overstock.
   async function fetchInventory(sb, brandId) {
     try {
-      const { data, error } = await sb.from('vw_sku_stock_cover')
-        .select('sku, product_title, on_hand, weekly_velocity, weeks_of_cover, stock_status, unit_price, landed_cost, rev_28d')
-        .eq('brand_id', brandId).limit(5000);
+      // 0421: the hourly kept copy (5 ms against 2.7 s live); the live view only when the copy is empty or
+      // more than three hours old
+      const COLS = 'sku, product_title, on_hand, weekly_velocity, weeks_of_cover, stock_status, unit_price, landed_cost, rev_28d';
+      let { data, error } = await sb.from('cache_sku_stock_cover').select(COLS + ', refreshed_at').eq('brand_id', brandId).limit(5000);
+      const fresh = !error && data && data.length && (Date.now() - new Date(data[0].refreshed_at).getTime()) < 3 * 3600 * 1000;
+      if (!fresh) ({ data, error } = await sb.from('vw_sku_stock_cover').select(COLS).eq('brand_id', brandId).limit(5000));
       if (error) return { items: [], summary: {} };
       const items = (data || []).map(r => {
         const qty = Number(r.on_hand || 0), wk = Number(r.weekly_velocity || 0), daily = wk / 7;

@@ -17656,7 +17656,7 @@ function V3Why({ why, period, typical, now }){
     </div>)}
     <p className="v3-why-p">
       {bits.length ? bits.join(', and ') : 'Profit held broadly steady'}
-      {what ? <>. The driver was <b>{what}</b>{who ? <> — mostly <b>{who}</b> customers</> : null}</> : null}.
+      {what ? <>. The driver was <b>{what}</b>{who ? (who === 'new and returning' ? <> — <b>new and returning</b> customers alike</> : <> — mostly <b>{who}</b> customers</>) : null}</> : null}.
       {(() => { const mv = moves.find(m => /baskets/.test(m.lab)); return mv ? <> The size of the average order {mv.v > 0 ? 'added' : 'took off'} {money(mv.v)} of profit.</> : null; })()}
     </p>
     {why.data_integrity_flag && <V3TrackingNote/>}
