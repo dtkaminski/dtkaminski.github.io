@@ -174,6 +174,9 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
   min-height: 36px; padding: 0 var(--space-3);
 }
 .v3-main textarea { padding: var(--space-2) var(--space-3); font-family: var(--font-sans); }
+/* A number in a table cell is a figure, not a sentence: without this each one took ~217 px and the
+   Settings route and code tables scrolled sideways at 1024. */
+.v3-main td input[type="number"] { width: var(--size-field-figure); max-width: 100%; }
 .v3-main select { font-family: var(--font-sans); padding-right: var(--space-8); }
 .v3-main input:focus, .v3-main select:focus, .v3-main textarea:focus {
   outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 3px var(--color-accent-wash-2);
@@ -622,6 +625,13 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-main table.v3-rw { width: 100%; }
 .v3-main table.v3-rw td, .v3-main table.v3-rw th { padding-top: var(--space-3); padding-bottom: var(--space-3); white-space: nowrap; }
 .v3-main table.v3-rw td.v3-rw-name { white-space: normal; min-width: 12rem; max-width: 20rem; color: var(--color-ink); }
+/* narrow desktops and tablets (content column ~690 px at 1024): every table's headers wrap and the
+   secondary columns go, so tables fit instead of scrolling sideways. Names keep their width. */
+@media (max-width: 1100px) {
+  .v3-main th { white-space: normal; }
+  .v3-main table.v3-rw .v3-rw-opt { display: none; }
+  .v3-main table.v3-rw th { white-space: normal; }
+}
 /* phones: secondary columns hidden, headers and names wrap (after the base rules, same specificity) */
 @media (max-width: 640px) {
   .v3-main table.v3-rw .v3-rw-opt { display: none; }

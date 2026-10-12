@@ -206,6 +206,9 @@
      evidence above stays visible; on a phone it clears the tab bar. */
   --size-dock:       46vh;
   --size-mobile-nav: 56px;
+  /* A number typed into a table cell (a rate, a percent, a day count): wide enough for
+     the figure, not the browser's twenty-character default. */
+  --size-field-figure: 7rem;
 
   --transition-fast: 120ms cubic-bezier(.2,0,.2,1);
   --transition-base: 200ms cubic-bezier(.2,0,.2,1);
