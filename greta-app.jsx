@@ -8616,6 +8616,10 @@ async function v3AskFacts(question) {
   {
     const S1 = r0(stateR) && r0(stateR).state;
     // 0456: a source that has stopped sending: said first, and its figures run only to data_through
+    // 0458: what moved profit after ads, ranked; several causes, each with how sure Greta is
+    if (S1 && S1.drivers && S1.drivers.state === 'ok') f.what_moved_profit = { said: S1.drivers.said, from: S1.drivers.from, to: S1.drivers.to,
+      drivers: (S1.drivers.drivers || []).slice(0, 6).map(d => ({ rank: d.rank, part: d.label, change: d.gbp, how_sure: d.evidence, expected: d.expected || null, said: d.said, action: d.action ? d.action.id : null })),
+      context: (S1.drivers.context || []).map(c => c.said).filter(Boolean) };
     if (S1 && S1.freshness && S1.freshness.stale && S1.freshness.said) f.data_freshness = { said: S1.freshness.said, data_through: S1.freshness.data_through || null };
     if (S1 && S1.this_week && S1.this_week.said) f.this_week = { said: S1.this_week.said, sales: S1.this_week.sales, ad_spend: S1.this_week.ads, profit_after_ads: S1.this_week.profit_after_ads, month_so_far: S1.this_week.month };
     if (S1 && S1.ad_budget && S1.ad_budget.said) f.ad_budget_for_all_ads = { said: S1.ad_budget.said, per_week: S1.ad_budget.per_week, month: S1.ad_budget.month,
@@ -9386,6 +9390,8 @@ function AskPanel(){
     const askSystem = (metaStr, dataStr) => `You are a senior D2C commercial analyst and operator for ${OI_BRAND.name}, a ${OI_BRAND.markets} DTC ${OI_BRAND.vertical} brand. Answer using ONLY the figures below. For where the year stands, use facts.next_peak, facts.typical_month and the weekly rows; never assume a season, a lull or a peak they do not show. They are: _meta.facts (what every page of the app shows), _meta.readout (the server's canonical figures, ranked board and rules) and, in data, the series this question needs as tables (cols + rows). Prefer facts and readout to anything you work out from the rows, and say which you used.
 
 Follow _meta.readout.rules. Quote headline figures exactly, with their window. Say how far the owner can lean on a figure in plain words (measured, likely, probably, possibly, an outside chance), as part of the sentence: never the word rung, never in brackets after a figure. Never recommend an action in readout.held. Never compare or total across days readout.coverage or readout.tracking marks unusable; missing days are not zero.
+
+WHAT MOVED PROFIT: for "how is the business doing" and "why is profit up or down" overall, answer from facts.what_moved_profit: its said, then its drivers in rank order, one line each with its change and how sure (how_sure "usual" means within its usual range: leave those out unless asked). There can be several causes: never name one as the only cause. End with the action of the first driver that has one, worded as the board words it.
 
 STALE DATA: when facts.data_freshness is there, the first sentence of every answer says it in its words: which data has stopped, and since when. Figures from that data run only to that day; never call them current.
 
@@ -21522,6 +21528,61 @@ function V3SalesMove() {
     </ul>}
   </div>);
 }
+// 0458: what moved profit after ads, as parts that add up, ranked by size and how sure Greta is
+// (state.drivers). There can be several causes: the list shows the ones that moved, each with how sure, and
+// "What to do" carries the board action for each part that pulls profit down. Replaces the one-reason line.
+const V3_DRIVER_SURE = { likely: 'Likely', probably: 'Probably', possible: 'Possibly', usual: 'Within its usual range' };
+const V3_DRIVER_ALSO = { 'the 28 days before': 'the 28 days before', 'the same days last year': 'last year' };
+function V3RankedDrivers({ D }) {
+  const board = useV3Board();
+  const [all, setAll] = React.useState(false), [why, setWhy] = React.useState(false);
+  const R = (D.drivers || []).filter(r => Number(r.gbp));
+  const moved = R.filter(r => r.evidence !== 'usual');
+  const shown = all ? R : (moved.length ? moved : R).slice(0, 3);
+  if (!shown.length) return null;
+  const vals = shown.map(r => Number(r.gbp));
+  const lo = Math.min(0, ...vals), hi = Math.max(0, ...vals), span = (hi - lo) || 1;
+  const x = v => (v - lo) / span * 100;
+  const signed = v => (v > 0 ? '+' : '') + fmtMoney(v);
+  const rows = board.rows || [], seen = new Set(), todo = [];
+  for (const r of R) {
+    if (r.direction !== 'down' || r.evidence === 'usual' || !r.action || seen.has(r.action.id)) continue;
+    const row = rows.find(b => b.external_id === r.action.id);
+    if (!row) continue;
+    seen.add(r.action.id); todo.push({ r, row });
+  }
+  const sub = r => [V3_DRIVER_SURE[r.evidence] || '',
+    (r.holds || []).filter(h => V3_DRIVER_ALSO[h]).length && r.evidence !== 'usual' ? 'also against ' + (r.holds || []).filter(h => V3_DRIVER_ALSO[h]).map(h => V3_DRIVER_ALSO[h]).join(' and ') : '',
+    r.evidence !== 'usual' && r.expected === 'season' ? 'partly the season' : r.evidence !== 'usual' && r.expected === 'sale_ended' ? 'a sale ended' : ''].filter(Boolean).join(' · ');
+  return (<div className="v3-ranked">
+    <p className="v3-stand-why">{D.said}</p>
+    <figure className="v3-bridge v3-bridge-wide" role="img" aria-label="What moved profit after ads, biggest and surest first">
+      <figcaption className="v3-bridge-cap">What is driving it, against a typical 28 days</figcaption>
+      {shown.map(r => (<div key={r.key} className="v3-bridge-row">
+        <span className="v3-bridge-k">{r.label}<small>{sub(r)}</small></span>
+        <span className="v3-bridge-track">{lo < 0 && hi > 0 ? <b style={{ left: x(0) + '%' }}/> : null}
+          <i className={'v3-bridge-' + (Number(r.gbp) < 0 ? 'loss' : 'gain')} style={{ left: x(Math.min(0, Number(r.gbp))) + '%', width: Math.max(0.6, x(Math.max(0, Number(r.gbp))) - x(Math.min(0, Number(r.gbp)))) + '%' }}/></span>
+        <span className="v3-bridge-v">{signed(Number(r.gbp))}</span>
+      </div>))}
+    </figure>
+    {todo.length > 0 && <div className="v3-drivers-todo">
+      <div className="v3-kick">What to do</div>
+      {todo.slice(0, 3).map(t => (<button key={t.row.external_id} type="button" className="v3-drivers-todo-row" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>
+        <span className="v3-num">{t.row.board_rank ? '#' + t.row.board_rank : ''}</span><span>{v3PlainAction(t.row).title}</span>
+        <span className="v3-num">{t.row.cm_gbp ? v3Gbp(t.row.cm_gbp) + v3Per(t.row, true) : ''}</span><Icon name="arrowRight" size={13}/></button>))}
+    </div>}
+    <p className="micro v3-measure">
+      {R.length > shown.length || all ? <button type="button" className="v3-xref" onClick={() => setAll(v => !v)}>{all ? 'Show only what moved' : 'Show all ' + R.length + ' parts'}</button> : null}
+      {' '}<button type="button" className="v3-xref" aria-expanded={why} onClick={() => setWhy(v => !v)}>Why Greta ranks it this way <span className="v3-xref-go">{why ? '↑' : '↓'}</span></button>
+    </p>
+    {why && <div className="v3-measure">
+      {R.map(r => <p key={r.key} className="v3-note">{r.said}</p>)}
+      {(D.context || []).filter(c => c.said).map(c => <p key={c.key} className="micro muted">{c.said}</p>)}
+      <p className="micro muted">{v3Sentence(D.basis)}</p>
+    </div>}
+  </div>);
+}
+
 function V3BusinessState({ part }) {
   const q = useV3Rows('brand-state', V3_STATE_Q);
   const codes = useV3Rows('brand-codes', V3_CODES_Q);
@@ -21688,7 +21749,7 @@ function V3BusinessState({ part }) {
     </div>)}
     <div className="v3-kick">Where you stand · last 30 days</div>
     <p className="v3-verdict">{verdict}</p>
-    {sub}
+    {S.drivers && S.drivers.state === 'ok' && (S.drivers.drivers || []).length ? <V3RankedDrivers D={S.drivers}/> : sub}
     <div className="v3-stand-grid">
       <div><V3MoneyBridge L={L} share={share}/>
         {profitAct && <button type="button" className="v3-xref v3-sign-act" aria-expanded={profitAct.open} onClick={profitAct.on}>{profitAct.label} <span className="v3-xref-go">{profitAct.open ? '↑' : '↓'}</span></button>}</div>
