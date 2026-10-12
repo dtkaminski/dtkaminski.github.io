@@ -9233,7 +9233,7 @@ function buildAskContext(facts, question, budget){
     // the parts of the business with something missing (0318): what is not measured, and whether anything explains or acts on it
     anatomy_gaps: (() => { const C = (typeof window !== 'undefined' && Array.isArray(window.GRETA_COVERAGE)) ? window.GRETA_COVERAGE : [];
       const g = C.filter(r => (r.missing_core && r.missing_core.length) || !(r.drivers && r.drivers.length) || !r.open_actions)
-        .map(r => ({ part: r.arm, measured: r.measured + ' of ' + (Number(r.metrics) - Number(r.not_applicable || 0)), explained: !!(r.drivers && r.drivers.length), open_actions: Number(r.open_actions) || 0,
+        .map(r => ({ part: r.arm, measured: r.measured + ' of ' + (Number(r.metrics) - Number(r.not_applicable || 0)) + (Number(r.estimated) ? ' (+' + r.estimated + ' estimated)' : ''), explained: !!(r.drivers && r.drivers.length), open_actions: Number(r.open_actions) || 0,
           not_measured: r.missing_core || [], waiting_on: (r.waiting_on || []).map(w => w.name + ': ' + (w.needs || w.health)) }));
       return g.length ? g : null; })(),
     data_dictionary: dictionary,
@@ -22108,7 +22108,7 @@ function V3AnatomyCoverage() {
         return (<React.Fragment key={r.category}>
           <tr>
             <td className="t-text"><button type="button" className="v3-xref" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : r.category)}><span className={'v3-cov-chev' + (isOpen ? ' open' : '')}><Icon name="chevron" size={12}/></span> {r.arm}</button></td>
-            <td>{fmtCount(Number(r.measured))} of {fmtCount(Number(r.metrics) - Number(r.not_applicable || 0))}</td>
+            <td>{fmtCount(Number(r.measured))} of {fmtCount(Number(r.metrics) - Number(r.not_applicable || 0))}{Number(r.estimated) ? <span className="v3-muted"> (+{fmtCount(Number(r.estimated))} estimated)</span> : null}</td>
             <td className="t-text">{r.drivers && r.drivers.length ? 'Explained' : <span className="v3-muted">Not yet</span>}</td>
             <td className={Number(r.open_actions) ? '' : 'v3-muted'}>{fmtCount(Number(r.open_actions))}</td>
             <td className="t-text v3-muted">{miss.length ? miss.slice(0, 3).map(m => m.name).join(', ') + (miss.length > 3 ? ' and ' + (miss.length - 3) + ' more' : '') : ''}</td>
