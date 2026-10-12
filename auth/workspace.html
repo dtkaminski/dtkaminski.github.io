@@ -397,6 +397,32 @@
   </div>
 </div>
 
+<!-- Clarity Data Export token modal (0445) -->
+<div id="clarity-modal" class="modal-bg" hidden>
+  <div class="modal">
+    <h3>Connect Microsoft Clarity</h3>
+    <p class="lead" style="font-size:13px; margin:8px 0 14px;">
+      Paste a <b style="color:var(--text-primary);">Data Export API token</b>. It takes about a minute:
+    </p>
+    <ol style="font-size:12.5px; color:var(--text-secondary); margin:0 0 14px; padding-left:18px; line-height:1.7;">
+      <li><a href="https://clarity.microsoft.com/" target="_blank" rel="noopener" style="color:var(--color-accent);">Open Clarity ↗</a> and choose your shop's project</li>
+      <li>Go to <b style="color:var(--text-primary);">Settings → Data Export</b> and click <b style="color:var(--text-primary);">Generate new API token</b>, name it “Greta”</li>
+      <li>Copy the whole token and paste it below</li>
+    </ol>
+    <label>API token
+      <input type="text" id="clarity-key-input" placeholder="eyJ..." style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12.5px;"/>
+    </label>
+    <p class="meta" style="margin-top:var(--s-2); font-size:11px;">
+      Greta reads Clarity's daily totals only, never recordings, and changes nothing in Clarity. Checking the token uses one of Clarity's ten daily reads.
+    </p>
+    <div id="clarity-error" class="error-box" hidden style="margin-top: 12px;"></div>
+    <div class="row" style="margin-top: 16px;">
+      <button id="clarity-submit" class="btn-primary">Connect →</button>
+      <button id="clarity-cancel" class="btn-ghost" style="margin-left:auto;">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <script>
   const SUPABASE_URL = 'https://awcncqvsnuhqyihpdgcx.supabase.co';
   const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_6NLIq1JL_LZIMjez3FmnVQ_JIVw3-A2';
@@ -427,7 +453,13 @@
       unlocks:'Sessions, funnel drop-off, channel mix, on-site conversions',
       buildInstallUrl: (b) => `${SUPABASE_FNS}/oauth-ga4-install?brand=${encodeURIComponent(b)}`,
       promptType:'direct' },
-    { id:'tiktok_ads', name:'TikTok Ads', icon:'T', required:false, authType:'oauth',
+    // Clarity (0445, 12 Oct 2026): a Data Export token the owner pastes; read-only aggregates.
+    { id:'clarity', name:'Microsoft Clarity', icon:'C', required:false, authType:'api_key',
+      unlocks:'Where shoppers get stuck on your site: rage and dead clicks, script errors, scroll depth, devices',
+      promptType:'clarity_key' },
+    // TikTok: there is no route to connect it yet (connect-start has no TikTok branch), so the card says so
+    // rather than offering a button that fails.
+    { id:'tiktok_ads', name:'TikTok Ads', icon:'T', required:false, authType:'oauth', unavailable:true,
       unlocks:'TikTok spend, video views, completion rates, conversions',
       buildInstallUrl: (b) => `${SUPABASE_FNS}/oauth-tiktok-ads-install?brand=${encodeURIComponent(b)}`,
       promptType:'direct' },
@@ -649,6 +681,8 @@
           ${isActive ? `
             <span class="meta">Last sync: ${conn.last_sync_at ? new Date(conn.last_sync_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'pending first sync'}</span>
             <button class="btn-ghost reconnect-btn" data-provider="${spec.id}">Reconnect</button>
+          ` : spec.unavailable ? `
+            <span class="meta">Not available yet</span>
           ` : `
             <span class="meta">${spec.required ? 'Start here →' : 'Add when ready'}</span>
             <button class="btn-primary connect-btn" data-provider="${spec.id}">${connectLabel}</button>
@@ -665,6 +699,7 @@
         if (!spec) return;
         if (spec.promptType === 'shopify_domain') openShopifyModal();
         else if (spec.promptType === 'api_key') openKlaviyoModal();
+        else if (spec.promptType === 'clarity_key') openClarityModal();
         else if (spec.promptType === 'direct') {
           // Direct OAuth — go through the authenticated connect-start endpoint
           // (validates brand ownership + stamps the initiator) then redirect.
@@ -816,6 +851,53 @@
       klaviyoError.hidden = false;
       klaviyoSubmit.disabled = false;
       klaviyoSubmit.textContent = 'Connect →';
+    }
+  });
+
+  // ── Clarity modal (0445) ───────────────────────────────────────────────
+  const clarityModal = document.getElementById('clarity-modal');
+  const clarityKeyInput = document.getElementById('clarity-key-input');
+  const clarityError = document.getElementById('clarity-error');
+  const claritySubmit = document.getElementById('clarity-submit');
+  function openClarityModal() {
+    clarityModal.hidden = false;
+    clarityKeyInput.value = '';
+    clarityError.hidden = true;
+    setTimeout(() => clarityKeyInput.focus(), 50);
+  }
+  document.getElementById('clarity-cancel').addEventListener('click', () => { clarityModal.hidden = true; });
+  clarityModal.addEventListener('click', (e) => { if (e.target === clarityModal) clarityModal.hidden = true; });
+  claritySubmit.addEventListener('click', async () => {
+    const key = clarityKeyInput.value.trim();
+    if (!key || key.split('.').length !== 3) {
+      clarityError.textContent = 'That does not look like a Clarity API token. Copy the whole token from Settings → Data Export.';
+      clarityError.hidden = false;
+      return;
+    }
+    claritySubmit.disabled = true;
+    claritySubmit.textContent = 'Checking with Clarity…';
+    clarityError.hidden = true;
+    try {
+      const resp = await fetch(`${SUPABASE_FNS}/clarity-connect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
+        body: JSON.stringify({ brand: currentBrand.slug, api_key: key }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        clarityError.textContent = data.message || data.error || 'Failed to connect.';
+        clarityError.hidden = false;
+        claritySubmit.disabled = false;
+        claritySubmit.textContent = 'Connect →';
+        return;
+      }
+      clarityModal.hidden = true;
+      window.location.reload();
+    } catch (e) {
+      clarityError.textContent = `Network error: ${e.message || e}`;
+      clarityError.hidden = false;
+      claritySubmit.disabled = false;
+      claritySubmit.textContent = 'Connect →';
     }
   });
 
