@@ -8612,6 +8612,18 @@ async function v3AskFacts(question) {
       ads_share_of_sales_pct: L30.ads_share != null ? Math.round(Number(L30.ads_share) * 100) : null,
       new_customers: U30 && U30.new_customers_30d != null ? Number(U30.new_customers_30d) : null });
   }
+  // 0453: the owner's week, the plan's one budget for all ads, and cash to the plan's end, as Today and Goal say them
+  {
+    const S1 = r0(stateR) && r0(stateR).state;
+    if (S1 && S1.this_week && S1.this_week.said) f.this_week = { said: S1.this_week.said, sales: S1.this_week.sales, ad_spend: S1.this_week.ads, profit_after_ads: S1.this_week.profit_after_ads, month_so_far: S1.this_week.month };
+    if (S1 && S1.ad_budget && S1.ad_budget.said) f.ad_budget_for_all_ads = { said: S1.ad_budget.said, per_week: S1.ad_budget.per_week, month: S1.ad_budget.month,
+      next_month_per_week: S1.ad_budget.next_per_week, last_7_days: S1.ad_budget.last_7_days,
+      note: 'The plan’s budget for ALL ads together. A channel’s own weekly figure on an action is a most, above this budget: never give it as a level to spend or cut to.' };
+    if (S1 && S1.cash_to_peak && S1.cash_to_peak.said) { const Cp = S1.cash_to_peak;
+      f.cash_to_the_plan_end = { said: Cp.said, to: Cp.to, ads: Cp.ads_left, sales_expected: Cp.sales_expected, profit_after_ads_expected: Cp.profit_after_ads_expected,
+        overheads: Cp.overheads, trading_result: Cp.after_overheads, stock_to_order: Cp.stock_to_order, after_overheads_and_stock: Cp.after_overheads_and_stock,
+        lowest_cash_need: Cp.peak_cash_need, slow_stock_at_cost: Cp.slow_stock, cash_cycle_days: Cp.cash_cycle_days, basis: Cp.basis }; }
+  }
   const tm = lad && cmr != null ? v3TypicalMonth(lad, cmr) : null;
   if (tm && tm.typ) f.typical_month = { basis: 'median of the ' + tm.n + ' 30-day windows before the latest; one sale window cannot move it. Compare with this, not with the 30 days before, which can hold a sale.',
     sales: R(tm.typ.sales), ad_spend: R(tm.typ.spend), profit_after_ads: R(tm.typ.kept), same_30_days_last_year_sales: tm.ly ? R(tm.ly.sales) : null };
@@ -10997,7 +11009,7 @@ function v3LiveRows(rows){ return (rows || []).filter(r => r.verification !== 'u
 // of the highest-ranked, its steps in the order to do them, each keeping its own figure and its own Done and
 // Skip. The figures overlap (spend saved and profit from the same ads), so the plan shows the lead's, never a sum.
 const V3_PLANS = [{ key: 'meta', title: 'One plan for your Meta ads',
-  ids: ['order-cost-meta', 'driver-retargeting', 'driver-meta-ads', 'paid-landing-meta', 'test-holdout-facebook_acquisition'] }];
+  ids: ['order-cost-meta', 'driver-retargeting', 'driver-meta-ads', 'metric-tree-meta', 'diagnosis-meta_click_to_cart', 'paid-landing-meta', 'test-holdout-facebook_acquisition'] }];
 // The number a row carries on the board as it first opens: plans folded (every step carries the plan's
 // number) and the rows under the small-item floor left out, as the board hides them. So "#5" on a drivers
 // panel is the row the reader finds at 5 on the Actions page; a hidden small row has no number (null).
@@ -11026,7 +11038,7 @@ function v3FoldPlans(rows) {
 // board's channel targets as ceilings while spend comes down to it.
 function v3BoardSpendTargets(rows) {
   const per = (rows || []).filter(r => /^order-cost-/.test(String(r.external_id || ''))).map(r => {
-    const m = String(r.description || '').match(/toward £([\d,]+) a week/i);
+    const m = String(r.description || '').match(/(?:toward|own ceiling of) £([\d,]+) a week/i);
     return m ? { ch: String(r.external_id).replace(/^order-cost-/, ''), wk: Number(m[1].replace(/,/g, '')) } : null;
   }).filter(Boolean);
   if (!per.length) return null;
@@ -11082,6 +11094,7 @@ function V3ActionBoard(){
   const [cat, setCat] = React.useState('all');
   const [open, setOpen] = React.useState(null);
   const [showSmall, setShowSmall] = React.useState(false);
+  const [showAll, setShowAll] = React.useState(false);
 
   if (err) return <div className="v3-empty">Greta could not load your actions just now — refreshing usually sorts it. If it keeps happening, Greta has logged the reason and will raise it here.</div>;
   if (rows === null) return <V3SkeletonRows n={5}/>;
@@ -11116,6 +11129,11 @@ function V3ActionBoard(){
     ? liveF.filter(r => showSmall || !isSmall(r))
     : [...bigRows, ...(showSmall ? smallRows : [])];
   const ordered = [...liveShown, ...unverRows];
+  // 12 Oct (owner-seat eval): 20 rows, 27 new this week, was too much to read. The board opens on its first
+  // three, in the server's order; the rest, the small items and the old ones sit behind one fold.
+  const TOP = 3;
+  const limited = cat === 'all' && !showAll && ordered.length > TOP + 1;
+  const list = limited ? ordered.slice(0, TOP) : ordered;
 
   return (
     <div className="v3-board v3-enter">
@@ -11155,7 +11173,7 @@ function V3ActionBoard(){
         ))}
       </div>
       <ol className="v3-rank">
-        {ordered.map((r, i) => {
+        {list.map((r, i) => {
           const gbp = Number(r.cm_gbp) || 0;
           const isOpen = open === r.external_id;
           const play = Array.isArray(r.playbook) ? r.playbook : [];
@@ -11169,7 +11187,7 @@ function V3ActionBoard(){
           const startsTest = V3_BOARD.ranked && !unver && r.lane === 'test'
             && (i === 0 || ordered[i - 1].lane !== 'test' || ordered[i - 1].verification === 'unverified');
           // The fold sits after the last live row shown.
-          const foldHere = smallRows.length > 0 && i === liveShown.length - 1;
+          const foldHere = !limited && smallRows.length > 0 && i === liveShown.length - 1;
           return (
             <React.Fragment key={r.external_id}>
             {startsTest && (
@@ -11267,6 +11285,14 @@ function V3ActionBoard(){
             </React.Fragment>
           );
         })}
+        {(limited || (showAll && cat === 'all' && ordered.length > TOP + 1)) && (
+          <li className="v3-rank-break">
+            <button type="button" className="v3-btn v3-btn-sm" onClick={() => setShowAll(v => !v)} aria-expanded={!limited}>
+              {limited ? 'Show ' + (ordered.length - TOP) + ' more action' + (ordered.length - TOP === 1 ? '' : 's') : 'Show only the first ' + TOP}
+            </button>
+            {limited && <span className="v3-sub">Ranked below these three. Most are tests worth running when the first three are in hand.</span>}
+          </li>
+        )}
       </ol>
       {V3_BOARD.ranked && <p className="micro muted v3-measure">Each row says when Greta last checked its figures. An action whose figures go three weeks without a check drops off this list, so every figure here is current. Actions open over a month that Greta has no nightly test for sit below the ranked list.</p>}
       <V3HeldActions/>
@@ -16662,9 +16688,17 @@ function v3PlainAction(row){
     return P(add ? 'Offer the ' + add + ' as an add-on' : 'Offer an add-on to single-item orders', raw); }
   if (id === 'crm-flows') return P(/switched off/i.test(raw) ? 'Fix the email sent after an order, and switch on the emails that suggest more products' : 'Fix the automatic emails that earn least', raw);
   if (id === 'basket-free-shipping') return P('Show shoppers how close they are to free shipping', raw);
+  // 0453: the cap now carries its £ for the next sale; the paragraph is the why, not the title
+  if (id === 'discount-depth-inversion') return P(/were in sale weeks/.test(raw)
+    ? 'Cap your next sale at 30% off, markdown and code together' : 'Cap markdown and code together at 30% off', raw);
   if (/^paid-brand-share/.test(id)) return P('Raise the bid on searches for your name', raw);
   if (/^test-holdout-/.test(id) && (x = m(/^(Test whether .+?)\.\s+([\s\S]+)$/))) return P(x[1], x[2]);
   if ((x = id.match(/^paid-landing-(\w+)/))) return P('Send ' + v3Ch(x[1]) + ' ads to products that earn back what a new customer costs', raw);
+  // 0453: when the plan's budget for all ads is below the channel's own figure the row leads with it, and so
+  // does the title ("Coming back to £1,506 a week keeps about £456 a month" read as the instruction, 12 Oct)
+  if (/^order-cost-/.test(id) && (x = m(/(Keep all your ads[^:]*?) for the rest of (\w+):/))) {
+    return P(x[1] + ' for the rest of ' + x[2], raw.slice(0, raw.indexOf(x[1])).trim());
+  }
   if (/^order-cost-/.test(id) && (x = m(/^([\s\S]+\.)\s+([^.]+(?:\.\d[^.]*)*)\.?$/))) {
     return P(x[2].replace(/\.$/, ''), x[1]);
   }
@@ -21646,7 +21680,15 @@ function V3BusinessState({ part }) {
   const profitAct = profitCfg && v3HasDrivers('profit', HP)
     ? { label: drv === 'profit' ? 'Hide what is driving it' : 'What is driving this?', open: drv === 'profit', on: () => setDrv(o => (o === 'profit' ? null : 'profit')) } : null;
   const openSign = drv === 'profit' ? profitCfg : drv ? signs.find(sg => sg.which === drv) : null;
+  // 0453 (owner-seat eval, 12 Oct): the 30 days were still carried by September's clearance while last week
+  // lost money after ads. The week and the plan's one budget for all ads come first, as the server says them.
+  const TW = S.this_week && S.this_week.said ? S.this_week : null, AB = S.ad_budget && S.ad_budget.said ? S.ad_budget : null;
   return (<section className="v3-stand">
+    {(TW || AB) && (<div className="v3-week">
+      <div className="v3-kick">This week</div>
+      {TW && <p className="v3-week-line">{TW.said}</p>}
+      {AB && <p className="v3-week-line"><b>Your ad budget:</b> {AB.said}</p>}
+    </div>)}
     <div className="v3-kick">Where you stand · last 30 days</div>
     <p className="v3-verdict">{verdict}</p>
     {sub}
@@ -21660,6 +21702,33 @@ function V3BusinessState({ part }) {
     {/* How fresh these are, asked on 9 Oct: the figures are worked out again every hour from feeds that
         arrive every 30 minutes (Shopify) and every 2 hours (ad accounts). */}
     <p className="micro muted v3-stand-fresh">Each figure covers the 30 days to {HP ? v3Day(String(hq.rows[0].history.as_of), true) : 'yesterday'}, the last full day. Greta works them out again every hour; Shopify orders arrive every 30 minutes and ad spend every 2 hours.{HP ? ' Point at a sign to see its last 13 weeks.' : ''}</p>
+  </section>);
+}
+// Cash to the plan's end (0453, owner-seat eval 12 Oct): "can I afford the peak?" had every piece on some
+// page and no answer. fn_brand_cash_to_peak adds them up; one slow-stock figure, the anatomy's one cash cycle.
+function V3CashToPeak() {
+  const q = useV3Rows('brand-state', V3_STATE_Q);
+  const C = q.rows && q.rows[0] && q.rows[0].cash_to_peak;
+  if (!C || !C.said) return null;
+  const n = v => (v == null || !isFinite(Number(v)) ? null : Number(v));
+  const rows = [
+    ['Sales the plan expects', n(C.sales_expected)],
+    ['Ads in the plan', n(C.ads_left)],
+    ['Kept after product, order and ad costs', n(C.profit_after_ads_expected)],
+    ['Your overheads', n(C.overheads) ? -n(C.overheads) : null],
+    ['Trading result', n(C.after_overheads)],
+    ['Stock to order now, paid before it sells', n(C.stock_to_order) > 0 ? -n(C.stock_to_order) : null],
+    ['After overheads and the stock orders', n(C.stock_to_order) > 0 ? n(C.after_overheads_and_stock) : null],
+    ['Most cash the plan needs at once', n(C.peak_cash_need) > 0 ? n(C.peak_cash_need) : null],
+    ['Slow stock you hold, at cost', n(C.slow_stock)],
+  ].filter(r => r[1] != null);
+  return (<section className="v3-sec v3-cash">
+    <h2 className="v3-sec-title">Cash to {v3Day(String(C.to))} <span className="v3-muted">what ads, stock and overheads need, against what the plan brings back</span></h2>
+    <p className="v3-note v3-measure">{C.said}</p>
+    <table className="v3-rw">
+      <tbody>{rows.map(([k, v]) => (<tr key={k}><td className="t-text">{k}</td><td>{fmtMoney(v)}</td></tr>))}</tbody>
+    </table>
+    <p className="micro muted v3-measure">{v3Sentence(C.basis)}</p>
   </section>);
 }
 // Goal & costs (9 Oct), on the page's own figures:
@@ -22137,7 +22206,8 @@ function V3AnatomyCoverage() {
 const V3_LEARN_Q = (sb, b) => Promise.all([
   sb.from('vw_brand_learning_status').select('profile_as_of,last_fit_problem,spend_curves,spend_curve_detail,spend_curve_own_share,cost_curve_months,cost_curve_ok,event_types_own,event_types,ltv_status,channel_tests').eq('brand_id', b).limit(1),
   sb.from('vw_action_track_record').select('profile,graded,hits').eq('brand_id', b),
-]).then(rs => { const e = rs.find(r => r && r.error); return e ? { error: e.error } : { data: [{ s: (rs[0].data || [])[0] || null, tr: rs[1].data || [] }] }; });
+  sb.from('vw_event_lift_learned').select('row_group,measured_weight').eq('brand_id', b),
+]).then(rs => { const e = rs.find(r => r && r.error); return e ? { error: e.error } : { data: [{ s: (rs[0].data || [])[0] || null, tr: rs[1].data || [], ev: rs[2].data || [] }] }; });
 function V3LearningStatus() {
   const q = useV3Rows('learning-status', V3_LEARN_Q);
   const d = Array.isArray(q.rows) ? q.rows[0] : null;
@@ -22145,13 +22215,23 @@ function V3LearningStatus() {
   const s = d.s;
   const graded = d.tr.reduce((a, r) => a + (Number(r.graded) || 0), 0), hits = d.tr.reduce((a, r) => a + (Number(r.hits) || 0), 0);
   const own = Number(s.spend_curve_own_share);
+  // 12 Oct eval #3: event lift read "Yours" at 0.63 own weight, under the 0.8 the other rows use. A kind of
+  // event is the brand's own only when its own events carry at least 80% of the estimate.
+  const evN = d.ev.length, ev80 = d.ev.filter(x => Number(x.measured_weight) >= 0.8).length;
+  // An empty brand saw "0 of 0" and a refit date from July: say once what is true instead.
+  const sales30 = Number(((typeof window !== 'undefined' && window.GRETA_HEADLINE) || {}).net_revenue_30d) || 0;
+  if (!(sales30 > 0)) return (<section className="v3-sec">
+    <h2 className="v3-sec-title">What Greta has learned about you</h2>
+    <p className="v3-note v3-measure">Nothing yet: Greta has no orders from your shop in the last 30 days, so every estimate it makes is a typical brand’s. Each piece becomes yours as your orders and ad spend build up.</p>
+  </section>);
   const rows = [
-    ['What each £1 of ads brings in new customers',
+    ['What each ' + curSym() + '1 of ads brings in new customers',
       Number(s.spend_curves) ? 'Your own spend curve (' + s.spend_curve_detail + '); the rest is a typical brand’s' : 'A typical brand’s curve, until about 26 weeks of your ad spend', own >= 0.8],
     ['What a new customer costs as spend rises',
       s.cost_curve_ok ? 'Your own, from ' + fmtCount(Number(s.cost_curve_months)) + ' months of your ad spend' : 'A typical brand’s, until there are more months of your ad spend', !!s.cost_curve_ok],
     ['How a sale or launch lifts sales',
-      fmtCount(Number(s.event_types_own) || 0) + ' of ' + fmtCount(Number(s.event_types) || 0) + ' kinds of event learned from your own events', Number(s.event_types) > 0 && Number(s.event_types_own) === Number(s.event_types)],
+      evN ? fmtCount(ev80) + ' of ' + fmtCount(evN) + ' kinds of event learned mostly from your own events' + (ev80 < evN ? '; the rest blend yours with a typical brand’s' : '')
+          : 'A typical brand’s, until you have run a few sales or launches', evN > 0 && ev80 === evN],
     ['What a customer is worth over time',
       s.ltv_status === 'measured' ? 'Your own customers' : 'A typical brand’s, until your customers have a year behind them', s.ltv_status === 'measured'],
     ['How much each ad channel really causes',
@@ -23481,6 +23561,7 @@ const V3_PAGES = {
     {/* Rebuilt 2026-10-05: the goal and where today's pace lands, the costs that are off with their £
         and a fix, then the forms. Readiness moved to the foot and reads the app's own figures. */}
     <V3GoalLead/>
+    <V3CashToPeak/>
     <V3DriverStrip keys={['profit']}/>
     <V3GoldenRule/>
     <V3CostsOff/>

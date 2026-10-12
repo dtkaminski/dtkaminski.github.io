@@ -299,6 +299,11 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-stand .v3-verdict { font-size: var(--text-2xl); max-width: 40ch; margin-bottom: var(--space-2); }
 .v3-stand-why { font-size: var(--text-base); color: var(--color-secondary); margin: 0 0 var(--space-6); max-width: 68ch; }
 .v3-stand-why b { color: var(--color-ink); font-weight: var(--weight-semi); }
+/* This week (0453): the last full week and the plan's one ad budget, above the 30-day read. A rule, not a card. */
+.v3-week { border-bottom: 1px solid var(--color-line); padding-bottom: var(--space-4); margin-bottom: var(--space-6); }
+.v3-week-line { font-size: var(--text-base); color: var(--color-ink); margin: 0 0 var(--space-2); max-width: 72ch; }
+.v3-week-line:last-child { margin-bottom: 0; }
+.v3-week-line b { font-weight: var(--weight-semi); }
 .v3-stand-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-10); align-items: start; }
 @media (max-width: 900px) { .v3-stand-grid { grid-template-columns: minmax(0, 1fr); gap: var(--space-6); } }
 @media (max-width: 640px) { .v3-stand .v3-verdict { font-size: var(--text-xl); } .v3-stand-why { margin-bottom: var(--space-4); } }
