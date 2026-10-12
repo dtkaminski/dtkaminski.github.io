@@ -13420,6 +13420,13 @@ const GP_FLAG_TEXT = {
           ? '. At that budget sales reach about ' + GP_gbp(rev) + ' against your goal of ' + GP_gbp(goal) + ': closing the gap needs more from returning customers, or a lower goal.'
           : '.');
   },
+  // 0423: the days already gone shade the days left, part of the way
+  demand_calibrated_to_date: d => {
+    const t = (d.inputs || {}).demand_to_date || {}, r = Number(t.ratio), c = Number(t.calibration);
+    if (!(r > 0) || !(c > 0)) return null;
+    return 'So far this quarter new customers bought ' + Math.round(r * 100) + '% of what Greta\u2019s model expected at the ads you ran (' + GP_gbp(t.new_sales) + ' against ' + GP_gbp(t.model_expected) + ' in ' + t.days + ' days). '
+      + 'The days left are planned ' + Math.round(Math.abs(1 - c) * 100) + '% ' + (c < 1 ? 'lower' : 'higher') + ' for it: part of the way, because a few weeks can be noise.';
+  },
   no_ad_history: 'There is no ad-spend history yet, so new-customer sales are carried at their current rate and no budget is planned.',
   short_base: 'There are fewer than three full months of trading behind this, so the starting point is thin.'
 };

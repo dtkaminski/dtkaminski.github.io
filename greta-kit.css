@@ -177,6 +177,8 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 /* A number in a table cell is a figure, not a sentence: without this each one took ~217 px and the
    Settings route and code tables scrolled sideways at 1024. */
 .v3-main td input[type="number"] { width: var(--size-field-figure); max-width: 100%; }
+/* The job-health line is a warning, not a footnote: a bar in the warning colour and ink text. */
+.v3-main .v3-jobhealth { border-left: var(--space-1) solid var(--color-warning); padding-left: var(--space-3); color: var(--color-ink); }
 .v3-main select { font-family: var(--font-sans); padding-right: var(--space-8); }
 .v3-main input:focus, .v3-main select:focus, .v3-main textarea:focus {
   outline: none; border-color: var(--color-accent); box-shadow: 0 0 0 3px var(--color-accent-wash-2);
