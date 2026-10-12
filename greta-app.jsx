@@ -8797,6 +8797,9 @@ async function v3AskFacts(question) {
       share_of_visits_that_pct: fr };
   }
   f._stock = Array.isArray(stockR) ? stockR : null;
+  // 0415: the board's stock order (units, pace and pounds at the full-price pace) for the products on it,
+  // so Ask does not size them on the marked-down pace the board has left behind ("order 36" against 15)
+  f._stock_order = (() => { const RA = r0(reorderR), RM = RA && RA.metadata; return RM && Array.isArray(RM.products) ? RM.products : null; })();
   // "We're about to stock out of our best seller" got "it's in the list of 45 if it's there" (9 Oct): the
   // mega necklace gold, the best seller, had 9.7 weeks of stock. The five fastest sellers and how long
   // each lasts, so the answer can say whether the best seller really runs out.
@@ -9149,22 +9152,30 @@ function buildAskContext(facts, question, budget){
   // The stock plan, for stock questions and for any product the question names: the rows a buyer would
   // look at. Named products go first and are never dropped by the ceiling.
   const plan = (facts && facts._stock) || [];
+  const SO = (facts && facts._stock_order) || null;
+  const soKey = t => String(t || '').toLowerCase().trim();
+  const soBy = {}; (SO || []).forEach(p => { soBy[soKey(p.title)] = p; });
   const ql = String(question || '').toLowerCase();
   const named = plan.filter(r => { const t = String(r.product_title || '').toLowerCase().trim(); return t.length >= 6 && ql.includes(t); });
   const prods = (facts && facts._products) || null, prodsNote = (facts && facts._products_note) || '';
   if (((facts && facts._titles) || []).some(t => { t = String(t).toLowerCase().trim(); return t.length >= 6 && ql.includes(t); })) topics.products = true;
-  const atRisk = plan.filter(r => r.runs_out_before_restock && !named.includes(r))
-    .sort((a, b) => (Number(b.cm_at_risk_before_resupply) || 0) - (Number(a.cm_at_risk_before_resupply) || 0)).slice(0, 15);
+  const atRisk = (SO
+    ? SO.map(p => plan.find(r => soKey(r.product_title) === soKey(p.title))).filter(r => r && !named.includes(r))
+    : plan.filter(r => r.runs_out_before_restock && !named.includes(r))
+        .sort((a, b) => (Number(b.cm_at_risk_before_resupply) || 0) - (Number(a.cm_at_risk_before_resupply) || 0))).slice(0, 15);
   const num = v => (v == null || !isFinite(Number(v)) ? null : Number(v));
-  const stockRow = r => ({ product: r.product_title, status: r.stock_status, on_hand: num(r.on_hand), weekly_pace: num(r.weekly_velocity),
-    days_left: num(r.projected_days_to_stockout), order_units: num(r.suggested_order_units), order_by: r.reorder_by_date || null,
-    lost_before_lands: r.cm_at_risk_before_resupply == null ? null : Math.round(Number(r.cm_at_risk_before_resupply)),
-    unit_cost: r.unit_cost == null ? null : Math.round(Number(r.unit_cost) * 100) / 100 });
+  const stockRow = r => { const o = soBy[soKey(r.product_title)], fp = o ? num(o.weekly_pace_full_price) : null;
+    return { product: r.product_title, status: r.stock_status, on_hand: num(r.on_hand),
+      weekly_pace: fp != null ? fp : num(r.weekly_velocity), weekly_pace_incl_sale_weeks: o ? num(r.weekly_velocity) : null,
+      days_left: fp > 0 ? Math.round(Math.max(0, num(r.on_hand) || 0) / fp * 7) : num(r.projected_days_to_stockout),
+      order_units: o ? num(o.units) : num(r.suggested_order_units), on_the_boards_order: o ? true : null, order_by: r.reorder_by_date || null,
+      lost_before_lands: o ? num(o.cm_at_risk) : (r.cm_at_risk_before_resupply == null ? null : Math.round(Number(r.cm_at_risk_before_resupply))),
+      unit_cost: r.unit_cost == null ? null : Math.round(Number(r.unit_cost) * 100) / 100 }; };
   if (named.length) topics.stock = true;
   const basisFor = (facts && facts._board_basis) || {};
   const flows = (facts && facts._flows) || null, camps = (facts && facts._campaigns) || null, site = (facts && facts._site) || null;
   facts = facts ? Object.assign({}, facts) : facts;
-  if (facts) { ['_stock', '_board_basis', '_flows', '_campaigns', '_site', '_products', '_products_note', '_titles'].forEach(k => { delete facts[k]; }); }
+  if (facts) { ['_stock', '_stock_order', '_board_basis', '_flows', '_campaigns', '_site', '_products', '_products_note', '_titles'].forEach(k => { delete facts[k]; }); }
   let _today = ''; try { _today = new Date().toISOString().slice(0,10); } catch(e) {}
   const _dates = _shp.map(r=>r && r.date).filter(Boolean).sort();
   const _latestDate = _dates.length ? _dates[_dates.length-1] : null;
@@ -9178,7 +9189,7 @@ function buildAskContext(facts, question, budget){
       prodsNote + ' sales are after discounts, before VAT; first_orders_it_led_12m is how many new customers started with it; profit_per_unit is after product and order costs; short_of_stock means a variant is out or low.'],
     named.length && ['stock_named', () => v3AskTable(named.map(stockRow), 'product'), 'The stock plan for the products named in the question.'],
     topics.stock && atRisk.length && ['stock_at_risk', () => v3AskTable(atRisk.map(stockRow), 'product'),
-      'Greta’s stock plan, the 15 products that run out before a restock can land, most profit at risk first: weekly_pace (an out-of-stock product at what it sold while in stock), order_units (what to order now: eight weeks of stock after it lands), order_by, lost_before_lands (profit lost before an order placed today arrives), unit_cost (landed).'],
+      'Greta’s stock order (the board’s stock action), the products that run out before a restock can land, most profit at risk first. For the products on the board’s order (on_the_boards_order), everything is at the pace they sell at full price, as the board sizes them: weekly_pace (orders with no marked-down line; weekly_pace_incl_sale_weeks is the pace with marked-down weeks in, do not size an order on it), days_left at that pace, order_units (the board’s order: eight weeks of stock after it lands), order_by, lost_before_lands (profit lost before an order placed today arrives), unit_cost (landed).'],
     topics.ads && ['weekly_meta', () => v3AskTable(v3AskFullWeeks(v3AskWeekly(D.metaDaily, ['cost', 'purchases', 'purchaseValue'], 26), _lastFull), 'week'), 'Meta per week: spend, Meta-counted purchases and their value (Meta’s own claim).'],
     topics.ads && ['weekly_google', () => v3AskTable(v3AskFullWeeks(v3AskWeekly(D.googleAds, ['cost', 'conversions', 'convValue'], 26), _lastFull), 'week'), 'Google Ads per week: spend, Google-counted conversions and value (Google’s own claim).'],
     topics.recent && ['daily_shop_28', () => v3AskTable(v3AskDaily(_shp, ['netSales', 'orders', 'discounts'], 28), 'date'), 'Shop day by day, last 28 days.'],
@@ -18417,7 +18428,7 @@ function V3Growth() {
       <div className="v3-stat-grid">
         {stat('Sales so far', fmtMoney(mtd), fmtCount(daysDone) + ' of ' + fmtCount(dim) + ' days')}
         {stat('On course for', fmtMoney(mtd / daysDone * dim), 'at this pace for the month')}
-        {stat('The plan for ' + gpMonthName(mStart), fmtMoney(planMo.sales), 'at today’s ad spend')}
+        {stat('The plan for ' + gpMonthName(mStart), fmtMoney(planMo.sales), ((PL && PL.flags) || []).indexOf('held_at_first_order_profit') >= 0 ? 'at the plan’s budget' : 'at today’s ad spend')}
         {fcOk && stat('Forecast, ' + v3Day(fc.forecast_covers_from) + ' – ' + v3Day(fc.forecast_covers_to), fmtMoney(fc.forecast_revenue_period), 'the plan says ' + fmtMoney(planWin))}
       </div>
       {fc && !fcOk && Number(fc.forecast_revenue_period) > 0 && planWin > 0 && paceWin != null && <p className="micro muted v3-measure">Greta’s short-term forecast ({fmtMoney(fc.forecast_revenue_period)} for {v3Day(fc.forecast_covers_from)} – {v3Day(fc.forecast_covers_to)}) is far from {Math.abs(Number(fc.forecast_revenue_period) / planWin - 1) > 0.3 ? 'the plan for the same days (' + fmtMoney(planWin) + ')' : 'how the month is running (' + fmtMoney(paceWin) + ' at this pace)'}, so it isn’t shown as a forecast here.</p>}
@@ -20224,6 +20235,9 @@ function V3GoalLead() {
     ? G.months : (g && Array.isArray(g.phasing) && g.phasing.length ? g.phasing : null);
   const exp = ph ? v3PlanToDate(ph, 'sales', today) : v3PlanToDate(P.months, 'sales', today);
   const short = tgt ? tgt - Number(P.revenue_target) : null;
+  // 0396: when the plan holds ads where a first order still pays for itself, it is not "today's ad spend"
+  const held = (P.flags || []).indexOf('held_at_first_order_profit') >= 0;
+  const atWords = held ? 'At the ad budget that still pays on a first order' : 'At today’s ad spend';
   const maxSeen = P.inputs && Number(P.inputs.max_monthly_spend_seen) > 0 ? Number(P.inputs.max_monthly_spend_seen) : null;
   const paceMo = {}; (P.months || []).forEach(m => { paceMo[String(m.month).slice(0, 7)] = m; });
   const rows = (ph || P.months || []).map(m => { const k = String(m.month).slice(0, 7), p = paceMo[k] || {};
@@ -20267,28 +20281,30 @@ function V3GoalLead() {
     </div>)}
     <p className="v3-verdict">{g
       ? <>Your goal is {fmtMoney(tgt)} of sales this quarter. {short > 0
-          ? <>At today’s ad spend you land at about {fmtMoney(P.revenue_target)} — {fmtMoney(short)} short.</>
-          : <>At today’s ad spend you reach it: about {fmtMoney(P.revenue_target)}.</>}</>
-      : <>There is no goal for this quarter yet. At today’s ad spend you land at about {fmtMoney(P.revenue_target)} of sales.</>}</p>
+          ? <>{atWords} you land at about {fmtMoney(P.revenue_target)} — {fmtMoney(short)} short.</>
+          : <>{atWords} you reach it: about {fmtMoney(P.revenue_target)}.</>}</>
+      : <>There is no goal for this quarter yet. {atWords} you land at about {fmtMoney(P.revenue_target)} of sales.</>}</p>
     <p className="v3-note v3-measure">
       You have sold {fmtMoney(done)} so far. The {g ? 'goal' : 'plan'} expects {fmtMoney(exp)} by now{onTrack ? ', so you are on track.' : ', so you are ' + fmtMoney(exp - done) + ' behind.'}
-      {g && short > 0 && <> The gap is ad spend. The goal takes {fmtMoney(gSpend)} of ads, {fmtMoney(gSpend - Number(P.spend_cap))} more than today’s pace.{peakShare != null ? <> {fmtPctN(peakShare)} of the goal’s ads go in {gpMonthName(peak.iso)}.</> : null}</>}
+      {g && short > 0 && <> The gap is ad spend. The goal takes {fmtMoney(gSpend)} of ads, {fmtMoney(gSpend - Number(P.spend_cap))} more than {held ? 'the plan' : 'today’s pace'}.{peakShare != null ? <> {fmtPctN(peakShare)} of the goal’s ads go in {gpMonthName(peak.iso)}.</> : null}</>}
       {g && short > 0 && dCam != null && <> Those extra ads bring about {fmtMoney(short)} more sales but {dCam > 0 ? 'only ' + fmtMoney(dCam) + ' more' : fmtMoney(-dCam) + ' less'} profit after ads.{dCam < 0 ? ' Past a point, extra ads cost more profit than they bring in.' : atBest === 'at' ? ' The goal sits at the most profitable ad spend Greta can see.' : atBest === 'past' ? ' The goal is past the most profitable ad spend Greta can see (' + fmtMoney(best) + ').' : ''}</>}
       {!(g && short > 0) && best && <> The most profitable ad spend Greta can see is {fmtMoney(best)}, for about {fmtMoney(P.ceiling.best_sales)} of sales.</>}
       {' '}<V3Conf state="probably" detail={'How Greta plans the quarter: your own busy and quiet months from your sales history, returning customers at their last three months’ rate, and new-customer sales that rise with ad spend, each extra £1 buying a little less. Its average new customer costs ' + (B.cost_per_new_customer ? fmtMoney(B.cost_per_new_customer, 2) : 'less') + ' because the quarter includes Black Friday, when new customers come cheaper. The Customers page shows the last 90 days.'}/></p>
     <div className="v3-stat-grid v3-gap-top">
       <div className="v3-stat"><div className="v3-stat-lab"><span>Sales so far</span></div><div className="v3-stat-val">{fmtMoney(done)}</div>
         <div className="v3-stat-foot"><span className={onTrack ? 'v3-muted' : 'v3-down'}>{fmtMoney(exp)} expected by now</span></div></div>
-      <div className="v3-stat"><div className="v3-stat-lab"><span>Where today’s pace lands</span></div><div className="v3-stat-val">{fmtMoney(P.revenue_target)}</div>
-        <div className="v3-stat-foot"><span className="v3-muted">ads held at {fmtMoney(P.inputs && P.inputs.base_monthly_spend)} a month{P.inputs && P.inputs.base_from && P.inputs.base_to
-          ? <>, your average {gpMonthName(String(P.inputs.base_from).slice(0, 7) + '-01').slice(0, 3)}–{gpMonthName(String(P.inputs.base_to).slice(0, 7) + '-01').slice(0, 3)}</> : null}</span></div></div>
+      <div className="v3-stat"><div className="v3-stat-lab"><span>{held ? 'Where the plan lands' : 'Where today’s pace lands'}</span></div><div className="v3-stat-val">{fmtMoney(P.revenue_target)}</div>
+        <div className="v3-stat-foot"><span className="v3-muted">{held
+          ? <>{fmtMoney(P.spend_cap)} of ads, the most a first order pays for{Number(P.spend_wanted) > 0 ? <> (today’s pace would spend {fmtMoney(P.spend_wanted)})</> : null}</>
+          : <>ads held at {fmtMoney(P.inputs && P.inputs.base_monthly_spend)} a month{P.inputs && P.inputs.base_from && P.inputs.base_to
+          ? <>, your average {gpMonthName(String(P.inputs.base_from).slice(0, 7) + '-01').slice(0, 3)}–{gpMonthName(String(P.inputs.base_to).slice(0, 7) + '-01').slice(0, 3)}</> : null}</>}</span></div></div>
       {g && <div className="v3-stat"><div className="v3-stat-lab"><span>Ads the goal takes</span></div><div className="v3-stat-val">{fmtMoney(gSpend)}</div>
         <div className="v3-stat-foot"><span className="v3-muted">{fmtMoney(peak.gSpend)} of it in {gpMonthName(peak.iso)}</span></div></div>}
       {g && <div className="v3-stat"><div className="v3-stat-lab"><span>Profit after ads, at the goal</span></div><div className="v3-stat-val">{fmtMoney(gCam)}</div>
-        <div className="v3-stat-foot"><span className="v3-muted">{fmtMoney(P.cam_target)} at today’s pace</span></div></div>}
+        <div className="v3-stat-foot"><span className="v3-muted">{fmtMoney(P.cam_target)} {held ? 'on the plan' : 'at today’s pace'}</span></div></div>}
     </div>
     <V3GoalDrivers per={per} today={today} exp={exp} done={done} months={ph || P.months} paceMonths={P.months}
-      goal={g && ph ? tgt : null} pace={Number(P.revenue_target)} dCam={dCam} basis={g ? 'goal' : 'plan'}
+      goal={g && ph ? tgt : null} pace={Number(P.revenue_target)} dCam={dCam} held={held} basis={g ? 'goal' : 'plan'}
       range={v3Day(per.start) + ' – ' + v3Day(v3IsoAdd(today, -1), true)}/>
   </section>
 
@@ -21689,23 +21705,24 @@ function v3ModelGoalGap(goalMonths, paceMonths, goal, pace, info) {
   const peak = rows.slice().sort((a, b) => b.d - a.d)[0];
   return {
     neutral: true,
-    title: 'What the goal adds to today’s pace', from: pace, to: goal, better: 'higher', fmtV: v => fmtMoney(v), fmtAmt: v => fmtMoney(Math.abs(v)),
-    startK: 'Where today’s pace lands', endK: 'Your goal', subA: 'ads held at today’s level', subB: ' ', colA: 'Today’s pace', colB: 'The goal',
+    title: info.held ? 'What the goal adds to the plan' : 'What the goal adds to today’s pace', from: pace, to: goal, better: 'higher', fmtV: v => fmtMoney(v), fmtAmt: v => fmtMoney(Math.abs(v)),
+    startK: info.held ? 'Where the plan lands' : 'Where today’s pace lands', endK: 'Your goal',
+    subA: info.held ? 'ads held where a first order still pays' : 'ads held at today’s level', subB: ' ', colA: info.held ? 'The plan' : 'Today’s pace', colB: 'The goal',
     bridgeCap: 'From today’s pace to the goal, by month', of: 'the gap', noChange: true, tableTitle: 'Month by month: ads',
     todo: peak && peak.d > 0 ? [{ amt: peak.d, force: true, ids: ['promo-peak-plan'] }] : [],
     parts: rows.map(r => ({ amt: r.d, k: gpMonthName(r.iso), sub: (r.ads >= 0 ? fmtMoney(r.ads) + ' more ads' : fmtMoney(-r.ads) + ' less on ads') + ' (' + fmtMoney(r.ps) + ' to ' + fmtMoney(r.gs) + ')',
       cause: <>the goal puts {fmtMoney(r.ads)} more ads into {gpMonthName(r.iso)} ({fmtMoney(r.ps)} to {fmtMoney(r.gs)})</>,
       against: <>{gpMonthName(r.iso)}, where the goal sells {fmtMoney(Math.abs(r.d))} less</> }))
       .concat(Math.abs(rest) >= 1 ? [{ amt: rest, k: 'Rounding', sub: 'the goal’s months against its total', cause: <>rounding</>, against: <>Rounding</> }] : []),
-    opening: <>At today’s ad spend the quarter lands at about {fmtMoney(pace)}; your goal is {fmtMoney(goal)}, {fmtMoney(goal - pace)} more.</>,
+    opening: <>{info.held ? 'At the ad budget that still pays on a first order' : 'At today’s ad spend'} the quarter lands at about {fmtMoney(pace)}; your goal is {fmtMoney(goal)}, {fmtMoney(goal - pace)} more.</>,
     closing: info.dCam != null ? <> The extra ads bring that much more in sales but {info.dCam >= 0 ? fmtMoney(info.dCam) + ' more' : fmtMoney(-info.dCam) + ' less'} profit after ads{info.dCam < 0 ? ': past a point, each extra £1 of ads costs more than the sales it brings keep' : ''}.</> : null,
     rows: rows.map(r => [gpMonthName(r.iso), r.ps, r.gs, v => fmtMoney(v), null]),
-    note: 'Both are Greta’s plan for the quarter: your own busy and quiet months, returning customers at their recent rate, and new-customer sales that rise with ad spend. Today’s pace holds ads at your recent level; the goal spends what it takes to reach the target.',
+    note: 'Both are Greta’s plan for the quarter: your own busy and quiet months, returning customers at their recent rate, and new-customer sales that rise with ad spend. ' + (info.held ? 'The plan holds ads where a first order still pays for the new customer it buys' : 'Today’s pace holds ads at your recent level') + '; the goal spends what it takes to reach the target.',
   };
 }
 const V3_GOAL_NR_Q = (start, today) => (sb, b) => sb.from('vw_daily_new_vs_returning').select('order_date,customer_type,orders,net_revenue')
   .eq('brand_id', b).eq('ledger', 'dtc').gte('order_date', start).lt('order_date', today).limit(3000);
-function V3GoalDrivers({ per, today, exp, done, months, paceMonths, goal, pace, dCam, basis, range }) {
+function V3GoalDrivers({ per, today, exp, done, months, paceMonths, goal, pace, dCam, held, basis, range }) {
   const nr = useV3Rows('goal-nr-' + per.start, V3_GOAL_NR_Q(per.start, today));
   const [open, setOpen] = React.useState(null);
   const rows = nr.rows || [];
@@ -21728,7 +21745,7 @@ function V3GoalDrivers({ per, today, exp, done, months, paceMonths, goal, pace, 
       {canGap && btn('gap', 'What would the goal take?')}
     </div>
     {open === 'sofar' && canSoFar && <V3DriverPanel fixed={v3ModelGoalSoFar(act, plan, { exp, basis, range })}/>}
-    {open === 'gap' && canGap && <V3DriverPanel fixed={v3ModelGoalGap(months, paceMonths, goal, pace, { dCam })}/>}
+    {open === 'gap' && canGap && <V3DriverPanel fixed={v3ModelGoalGap(months, paceMonths, goal, pace, { dCam, held })}/>}
   </div>);
 }
 // Competitors (9 Oct): how often a Google campaign shows in the auctions it could enter, the last 30
