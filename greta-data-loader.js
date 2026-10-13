@@ -620,7 +620,9 @@
       const [pRes, mRes, sRes, aRes] = await Promise.all([
         sb.from('patterns_brand').select('kind, metric_id, related_metric_id, description, detected_at, window_start, window_end, confidence, significance, effect_size, metadata').eq('brand_id', brandId).eq('active', true).order('detected_at', { ascending: false }),
         sb.from('metrics').select('id, name, unit, direction, category'),
-        sb.from('agent_scorecard').select('agent, category, window_days, hits, misses, inconclusive, total_closed, hit_rate, avg_attributed_lift, last_updated').eq('brand_id', brandId).order('agent').order('category'),
+        // Eval 13 Oct (gap 17): agent_scorecard (last written 8 Jun) is retired; the track record is
+        // vw_action_track_record_summary, read where it is shown. Same shape, no request.
+        Promise.resolve({ data: [] }),
         sb.from('actions').select('external_id, agent, category, priority, description, status, verdict, predicted_metric_id, predicted_direction, predicted_magnitude_abs, baseline_value, observed_value, observed_delta, counterfactual_delta, attributed_lift, significance_z, observed_at, metadata').eq('brand_id', brandId),
       ]);
       const active = pRes.data || [];

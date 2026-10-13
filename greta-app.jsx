@@ -8151,7 +8151,7 @@ function IntelligencePanel(){
       {/* Advanced detail — collapsible by default, for reference */}
       <section>
         <button className="show-more" onClick={()=>setShowAdvanced(!showAdvanced)}>
-          {showAdvanced ? '↑ Hide advanced' : '↓ Advanced: synergy matrix · agent scorecard · attribution ledger'}
+          {showAdvanced ? '↑ Hide advanced' : '↓ Advanced: synergy matrix · attribution ledger'}
         </button>
         {showAdvanced && (<div style={{display:'flex', flexDirection:'column', gap:'var(--s-4)', marginTop:'var(--s-4)'}}>
           <SynergyMatrix/>
@@ -20601,6 +20601,10 @@ function V3TrackRecord() {
   const q = useV3Rows('act-track', (sb, b) => sb.from('actions')
     .select('external_id,description,category,status,disposition_at,raised_at,verdict,predicted_window_days,predicted_metric_id,predicted_direction,grade:metadata->grade,auto:metadata->auto_closed_at')
     .eq('brand_id', b).in('status', ['done', 'skipped', 'partial']).order('disposition_at', { ascending: false, nullsFirst: false }).limit(200));
+  // 0938 (eval 13 Oct, gap 17): one track record. The sums come from vw_action_track_record_summary, the same
+  // scorer every other surface reads: marked done = judged + cannot judge yet, judged = worked + did not + unclear.
+  const ts = useV3Rows('act-track-sum', (sb, b) => sb.from('vw_action_track_record_summary')
+    .select('marked_done,judged,worked,did_not_work,inconclusive,cannot_judge_yet,closed_by_greta,reasons').eq('brand_id', b).limit(1));
   const [showAll, setShowAll] = React.useState(false), [showSkipped, setShowSkipped] = React.useState(false), [showAuto, setShowAuto] = React.useState(false);
   if (q.err) return <V3LoadFailed what="what you have done" onRetry={q.retry}/>;
   if (!q.rows) return <V3SkeletonRows n={3}/>;
@@ -20631,14 +20635,22 @@ function V3TrackRecord() {
     </li>);
   };
   const shown = showAll ? done : done.slice(0, 8);
+  const S = (ts.rows || [])[0] || null;
+  const sumLine = S && Number(S.marked_done) > 0 ? (<>
+    <p className="v3-verdict">Of {fmtCount(S.marked_done)} actions you marked done, Greta has judged {fmtCount(S.judged)}: {fmtCount(S.worked)} worked
+      {Number(S.did_not_work) ? ', ' + fmtCount(S.did_not_work) + ' didn’t' : ''}{Number(S.inconclusive) ? ', ' + fmtCount(S.inconclusive) + ' showed no clear change' : ''}.
+      {Number(S.cannot_judge_yet) ? ' ' + fmtCount(S.cannot_judge_yet) + ' can’t be judged yet.' : ''}</p>
+    {Array.isArray(S.reasons) && S.reasons.length > 0 && <ul className="v3-rank-steps">{S.reasons.map((x, i) => (<li key={'why' + i}><span className="v3-rank-desc">{x.reason}</span><span className="v3-sub"> {fmtCount(x.actions)}</span></li>))}</ul>}
+    <p className="v3-note v3-measure">Every new action says what it should change and by how much, and Greta checks once enough time has passed. A grade compares what happened with what was expected without the action. It shows the promise held, not that the action alone caused it.</p>
+  </>) : null;
   return (<section className="v3-sec">
-    <p className="v3-verdict">{judged.length
+    {sumLine || <><p className="v3-verdict">{judged.length
       ? <>Of {fmtCount(done.length)} actions you marked done, Greta could judge {fmtCount(judged.length)}: {fmtCount(worked)} worked{failed ? ', ' + fmtCount(failed) + ' didn’t' : ''}.</>
       : <>You have marked {fmtCount(done.length)} action{done.length === 1 ? '' : 's'} done, and Greta has not yet been able to say whether any of them worked.</>}</p>
     <p className="v3-note v3-measure">
       {cant > 0 && <>{fmtCount(cant)} can’t be judged. Most were raised before each action said what it should change, such as spend that should fall, products back in stock, or a price that should keep its sales. </>}
       {waiting > 0 && <>{fmtCount(waiting)} {waiting === 1 ? 'is' : 'are'} too recent to judge yet. </>}
-      Every new action says what it should change, and Greta checks once enough time has passed. A grade compares before with after. It shows the promise held, not that the action alone caused it.</p>
+      Every new action says what it should change, and Greta checks once enough time has passed. A grade compares before with after. It shows the promise held, not that the action alone caused it.</p></>}
     <ul className="v3-rank-steps">{shown.map(row)}</ul>
     {done.length > 8 && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => setShowAll(s => !s)}>{showAll ? 'Show the latest 8' : 'Show all ' + done.length}</button>}
     {skipped.length > 0 && (<>
