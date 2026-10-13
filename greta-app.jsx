@@ -17097,7 +17097,11 @@ function DataHealth(){
     if (!sb || !brand) { setErr(v3NoBrand('where your data comes from')); return; }
     const since = new Date(Date.now() - 14 * 864e5).toISOString().slice(0, 10);
     Promise.all([
-      sb.from('vw_brand_source_freshness').select('source, feeds, last_date, stale_days, status, likely_systemic').eq('brand_id', brand),
+      // 0951 (eval 13 Oct, gap 20): the kept copy (refreshed every 15 minutes) answers in milliseconds; the view
+      // took 2.7 s and held "Checking your sources" for 8 s. The view stays the fallback for a brand with no row yet.
+      sb.from('cache_brand_source_freshness').select('source, feeds, last_date, stale_days, status, likely_systemic').eq('brand_id', brand)
+        .then(r => (r && !r.error && r.data && r.data.length) ? r
+          : sb.from('vw_brand_source_freshness').select('source, feeds, last_date, stale_days, status, likely_systemic').eq('brand_id', brand)),
       sb.from('vw_source_agreement_alert').select('broken_pairs, drifting_pairs, pairs_checked, broken_detail, as_of').eq('brand_id', brand).limit(1),
       sb.from('vw_measurement_integrity_daily').select('day, shopify_orders, ga4_purchases, order_coverage').eq('brand_id', brand).gte('day', since).order('day', { ascending: false }),
       // Clarity is read by Website but has no row in the freshness view; the tracking state says when
