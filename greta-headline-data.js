@@ -275,6 +275,12 @@
         sb.from('cache_brand_today').select('payload,refreshed_at').eq('brand_id', b).limit(1),
         8000, null, 'cache_brand_today');
     }
+    // Eval 13 Oct (gap 10): one break-even return on every page, the state's (1 / the brand's CM rate,
+    // the same tick the scoreboard and the board use). Not awaited: charts redraw when it lands.
+    sb.from('cache_brand_state').select('be:state->ads->break_even_return').eq('brand_id', b).limit(1).then(function (r) {
+      var be = r && !r.error && r.data && r.data[0] ? Number(r.data[0].be) : NaN;
+      if (isFinite(be) && be > 0) { window.GRETA_BREAK_EVEN = be; try { window.dispatchEvent(new CustomEvent('greta-headline-updated')); } catch (e) {} }
+    }, function () {});
     var cacheAnswered = cached !== null;
     var c0 = cached && cached[0];
     if (c0 && c0.payload) {

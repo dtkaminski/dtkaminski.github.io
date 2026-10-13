@@ -18254,7 +18254,9 @@ const V3_NEWMO_Q = (sb, b) => sb.from('vw_daily_new_vs_returning').select('order
     .eq('customer_type', 'new').gte('order_date', v3IsoAdd(new Date().toISOString().slice(0, 10), -400)).order('order_date', { ascending: true }).limit(2000);
 // Break-even sales per £ of ads: the point where profit before ads pays for the ads (1 ÷ margin after
 // costs). Review and the weekly board measured against 2× and 3× — two made-up lines for one metric.
-function v3MerBreakEven(){ const c = oiCmRatio(); return (c != null && c > 0) ? 1 / c : null; }
+// Eval 13 Oct (gap 10): the state's break-even (cache_brand_state.ads.break_even_return, loaded with the headline)
+// is the one every page draws; 1 / the headline CM rate is only the fallback before it lands.
+function v3MerBreakEven(){ const s = typeof window !== 'undefined' ? Number(window.GRETA_BREAK_EVEN) : NaN; if (isFinite(s) && s > 0) return s; const c = oiCmRatio(); return (c != null && c > 0) ? 1 / c : null; }
 const V3_RETURNS_Q = (sb, b) => sb.from('vw_brand_returns').select('window_label,orders,refunded_orders,return_rate_pct').eq('brand_id', b);
 const V3_RET_Q = (sb, b) => sb.from('v_tenant_retention_summary')
   .select('customers,orders_per_customer,repeat_rate,repeat_rate_90d,median_days_between_orders').eq('brand_id', b).limit(1);
@@ -20605,6 +20607,7 @@ function V3Review() {
   const today = new Date().toISOString().slice(0, 10);
   const lad = useV3Rows('profit-ladder', V3_LADDER_Q);
   const trk = useV3Rows('rev-ga4-state', V3_TRACK_Q);
+  const stq = useV3Rows('brand-state', V3_STATE_Q);   // eval 13 Oct (gap 10): last week as Today says it
   const ext = useV3Rows('rev-promos', (sb, b) => sb.from('external_events').select('ts').eq('brand_id', b).eq('kind', 'promo').gte('ts', v3IsoAdd(today, -400)).limit(200));
   const done = useV3Rows('rev-done', (sb, b) => sb.from('actions').select('external_id,description,status,disposition_at,verdict,grade:metadata->grade,auto:metadata->auto_closed_at')
     .eq('brand_id', b).in('status', ['done', 'skipped']).gte('disposition_at', v3IsoAdd(today, -21)).order('disposition_at', { ascending: false }).limit(30));
@@ -20614,7 +20617,7 @@ function V3Review() {
   React.useEffect(() => { let alive = true; v3AskFacts().then(f => { if (alive) setFacts(f); }, () => {}); return () => { alive = false; }; }, []);
   const H = window.GRETA_HEADLINE || {};
   const cmr = Number(H.net_revenue_30d) > 0 && H.product_contribution_30d != null ? Number(H.product_contribution_30d) / Number(H.net_revenue_30d) : null;
-  const be = cmr ? 1 / cmr : null;
+  const be = v3MerBreakEven();   // one break-even on every page (eval 13 Oct, gap 10)
   const wk = React.useMemo(() => {
     if (!lad.rows || cmr == null) return null;
     const by = {}; lad.rows.forEach(r => { const d = String(r.day).slice(0, 10); if (d >= today) return; const k = v3Monday(d), o = by[k] || (by[k] = { start: k, sales: 0, spend: 0, days: 0 });
@@ -20628,6 +20631,10 @@ function V3Review() {
   if (!wk) return <V3SkeletonRows n={4}/>;
   if (wk.length < 10) return <div className="v3-empty">The weekly review starts once there are ten full weeks of sales to compare with.</div>;
   const i = Math.max(9, wk.length - 1 - back), W = wk[i], P = wk[i - 1];
+  // The last full week reads the figure Today shows (state.this_week: product, order and ad costs), so the
+  // two pages give one result for the same week. Earlier weeks keep the 30-day rate.
+  { const TW = ((stq.rows || [])[0] || {}).this_week;
+    if (TW && TW.week_from === W.start && TW.profit_after_ads != null) Object.assign(W, { sales: Number(TW.sales), spend: Number(TW.ads), kept: Number(TW.profit_after_ads) }); }
   // A typical week: the middle of the eight most recent weeks before this one, leaving out sale-sized
   // weeks (over 1.4x the middle of the sixteen before). frkl's August sale ran three weeks near double;
   // counted in, they made a normal October week read as half a typical one. Promos are not the test:
@@ -20838,7 +20845,7 @@ function V3Competitors() {
   const num = v => Number(v) || 0;
   const H = window.GRETA_HEADLINE || {};
   const cmr = num(H.net_revenue_30d) > 0 && H.product_contribution_30d != null ? num(H.product_contribution_30d) / num(H.net_revenue_30d) : null;
-  const be = cmr ? 1 / cmr : null;
+  const be = v3MerBreakEven();   // one break-even on every page (eval 13 Oct, gap 10)
 
   // Google: campaigns over 90 days
   const camp = React.useMemo(() => {
