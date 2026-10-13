@@ -18153,6 +18153,7 @@ function V3Today(p) {
               fix={['home', 'plansetup', 'Open Goal & costs']}/>
           </div>
           {ppP.pace_finish != null && <p className="micro muted v3-measure">At today’s pace {ppMonth} ends at {v3Gbp(ppP.pace_finish)} after ads, against {v3Gbp(ppP.plan_total)} planned.</p>}
+          <V3FcErr/>
         </>) : (camTarget != null && !ppT.rows && !ppT.err) ? null : (camTarget != null && ppT.err) ? (
           <div className="v3-pace"><span className="v3-muted">Greta couldn’t load this month’s plan just now.</span>
             <button type="button" className="v3-btn v3-btn-sm" onClick={ppT.retry}>Try again</button></div>
@@ -18268,6 +18269,21 @@ const V3_PLAN_PROGRESS_Q = period => (sb, b) => sb.rpc('fn_plan_progress', { p_b
 const V3_PP_MONTH_Q = V3_PLAN_PROGRESS_Q('month'), V3_PP_QUARTER_Q = V3_PLAN_PROGRESS_Q('quarter');
 const V3_PLAN_WORD = { ahead: 'Ahead of plan', on_plan: 'On plan', just_behind: 'Just behind plan', behind: 'Behind plan' };
 const v3PlanTone = st => (st === 'ahead' || st === 'on_plan') ? 'good' : st === 'behind' ? 'bad' : '';
+// How far off Greta's daily sales forecast has been (vw_forecast_error_30d): one muted line beside every
+// forward sales figure, so a projection never reads as surer than the record behind it.
+const V3_FC_ERR_Q = (sb, b) => sb.from('vw_forecast_error_30d').select('metric,model,days,wape,bias,source,label')
+  .eq('brand_id', b).eq('metric', 'revenue').order('days', { ascending: false }).limit(1);
+function V3FcErr() {
+  const q = useV3Rows('fc-err', V3_FC_ERR_Q);
+  const r = q.rows && q.rows[0];
+  if (!r) return null;
+  const w = r.wape != null && isFinite(Number(r.wape)) ? Number(r.wape) : null;
+  // too few days to judge on: the view's own sentence says so
+  const text = w != null && Number(r.days) >= 14
+    ? 'Greta’s daily sales forecast was off by about ' + fmtPctN(w) + ' over the last ' + fmtCount(Number(r.days)) + ' days' + (Number(r.bias) > 0 ? ' (low on average).' : Number(r.bias) < 0 ? ' (high on average).' : '.')
+    : (r.label || null);
+  return text ? <p className="micro muted v3-measure">{text}</p> : null;
+}
 // One stock list (fn_stock_reorder + fn_stock_reorder_summary, 0924): the order lines and their totals,
 // the same rows the board's stock action, cash to peak and the snapshot read.
 const V3_STOCK_LIST_Q = (sb, b) => sb.rpc('fn_stock_reorder', { p_brand: b }).then(r => ({ data: Array.isArray(r.data) ? r.data : [], error: r.error }));
@@ -20382,6 +20398,7 @@ function V3GoalLead() {
       {g && short > 0 && dCam != null && <> Those extra ads bring about {fmtMoney(short)} more sales but {dCam > 0 ? 'only ' + fmtMoney(dCam) + ' more' : fmtMoney(-dCam) + ' less'} profit after ads.{dCam < 0 ? ' Past a point, extra ads cost more profit than they bring in.' : atBest === 'at' ? ' The goal sits at the most profitable ad spend Greta can see.' : atBest === 'past' ? ' The goal is past the most profitable ad spend Greta can see (' + fmtMoney(best) + ').' : ''}</>}
       {!(g && short > 0) && best && <> The most profitable ad spend Greta can see is {fmtMoney(best)}, for about {fmtMoney(P.ceiling.best_sales)} of sales.</>}
       {' '}<V3Conf state="probably" detail={'How Greta plans the quarter: your own busy and quiet months from your sales history, returning customers at their last three months’ rate, and new-customer sales that rise with ad spend, each extra £1 buying a little less. Its average new customer costs ' + (B.cost_per_new_customer ? fmtMoney(B.cost_per_new_customer, 2) : 'less') + ' because the quarter includes Black Friday, when new customers come cheaper. The Customers page shows the last 90 days.' + (PQ && PQ.basis_note ? ' ' + PQ.basis_note : '')}/></p>
+    {exp != null && <V3FcErr/>}
     <div className="v3-stat-grid v3-gap-top">
       {done != null && <div className="v3-stat"><div className="v3-stat-lab"><span>Sales so far</span></div><div className="v3-stat-val">{fmtMoney(done)}</div>
         <div className="v3-stat-foot"><span className={!st || onTrack ? 'v3-muted' : 'v3-down'}>{exp != null ? fmtMoney(exp) + ' expected by now' : 'no plan to compare with yet'}</span></div></div>}
@@ -22096,6 +22113,7 @@ function V3CalendarDrivers() {
         act={{ label: open ? 'Hide what is driving it' : 'What is driving this?', open, on: () => setOpen(o => !o) }}/>
     </div>
     <p className="micro muted v3-measure">{S.plan_total != null ? <>The plan for {gpMonthName(M.start)} is {fmtMoney(S.plan_total)}. </> : null}{S.pace_finish != null ? <>At today’s pace the month ends at about {fmtMoney(S.pace_finish)}. </> : null}<V3Conf state="probably" detail={[M.basis_note, S.pace_basis ? 'At today’s pace: ' + S.pace_basis + '.' : null].filter(Boolean).join(' ')}/></p>
+    <V3FcErr/>
     {open && <V3DriverPanel fixed={v3ModelCalendar(A, P, { range, month: gpMonthName(M.start) })}/>}
   </section>);
 }
