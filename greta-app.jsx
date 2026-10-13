@@ -11739,7 +11739,7 @@ function BusinessReview(){
     { label:'Repeat purchase rate', value: repeat!=null?pct1(repeat):'—',
       status: repeat==null?'missing':(repeat>=0.25?'healthy':repeat>=0.12?'watch':'action'),
       statusLabel: repeat==null?'—':(repeat>=0.25?'Healthy':repeat>=0.12?'Building':'Low'),
-      sub:`${opc?opc.toFixed(2):'—'} orders per customer · ${custBase!=null?NUM(custBase):'—'} customers to date`,
+      sub:`${opc?opc.toFixed(2):'—'} orders per customer · ${custBase!=null?NUM(custBase):'—'} customers ever`,
       read:`Repeat rate ${repeat!=null?pct1(repeat):'—'}, ${opc?opc.toFixed(2):'—'} orders/customer` },
     { label:'Average order value', value: W&&W.m.aov!=null?GBP(W.m.aov):'—',
       status:'info', statusLabel:'Order value',
@@ -17150,7 +17150,7 @@ function DataHealth(){
       <div className="micro" style={{color:'var(--text-secondary)'}}>
         On {v3Day(String(latest.day).slice(0, 10))} your site analytics recorded <b>{fmtCount(latest.ga4_purchases)}</b> of the <b>{fmtCount(latest.shopify_orders)}</b> orders Shopify took
         {' '}(<b className={Number(latest.order_coverage) < 0.9 ? 'v3-down' : 'v3-up'}>{pct(latest.order_coverage)}</b>).
-        {avg != null && <> Over the last fortnight it averaged {pct(avg)}.</>}
+        {avg != null && <> Over the last 14 days ({fmtCount(covered.length)} complete {covered.length === 1 ? 'day' : 'days'} to {v3Day(String(latest.day).slice(0, 10))}) it averaged {pct(avg)}.</>}
       </div>
       {avg != null && avg < 0.9 && (<div className="fine" style={{color:'var(--text-secondary)', marginTop:6}}>
         The share of visitors who buy is worked out from this. While it is below 100%, that share
@@ -19274,8 +19274,8 @@ function V3Products() {
     <section className="v3-sec">
       <div className="v3-kick">Last 28 days · which products make money, and where money is lost</div>
       <p className="v3-verdict">{margin != null
-        ? (d.losers.length ? fmtCount(d.losers.length) + (d.losers.length === 1 ? ' product sold at a loss. ' : ' products sold at a loss. ') + 'Overall, your products kept ' + fmtPctN(margin) + ' of their sales after what they cost.'
-          : 'No product sells at a loss. Your products kept ' + fmtPctN(margin) + ' of their sales after what they cost.')
+        ? (d.losers.length ? fmtCount(d.losers.length) + (d.losers.length === 1 ? ' product sold at a loss. ' : ' products sold at a loss. ') + 'Overall, your products kept ' + fmtPctN(margin) + ' of their sales after their own cost only, before delivery, packing and card fees.'
+          : 'No product sells at a loss. Your products kept ' + fmtPctN(margin) + ' of their sales after their own cost only, before delivery, packing and card fees.')
         : fmtMoney(d.total) + ' of product sales across ' + fmtCount(top.length) + ' products.'}</p>
       {/* With no margin the headline above is already this sentence: it read twice (9 Oct). */}
       <p className="v3-note v3-measure">{margin != null
@@ -21844,7 +21844,9 @@ function V3CashToPeak() {
     ['Stock to order now, paid before it sells', n(C.stock_to_order) > 0 ? -n(C.stock_to_order) : null],
     ['After overheads and the stock orders', n(C.stock_to_order) > 0 ? n(C.after_overheads_and_stock) : null],
     ['Most cash the plan needs at once', n(C.peak_cash_need) > 0 ? n(C.peak_cash_need) : null],
-    ['Slow stock you hold, at cost', n(C.slow_stock)],
+    // slow_stock is the open cash-trapped-stock action: more than eight weeks' worth at the pace it sells,
+    // plus products unsold for 60 days. It is not measured against the peak, so the label does not say so.
+    ['Stock that won’t sell soon, at cost (over eight weeks’ worth, or unsold for 60 days)', n(C.slow_stock)],
   ].filter(r => r[1] != null);
   return (<section className="v3-sec v3-cash">
     <h2 className="v3-sec-title">Cash to {v3Day(String(C.to))} <span className="v3-muted">what ads, stock and overheads need, against what the plan brings back</span></h2>
