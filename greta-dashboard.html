@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Geist:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./design-tokens.css?v=20261012a">
+<link rel="stylesheet" href="./design-tokens.css?v=20261013a">
 <!-- perf: warm up the CDN + Supabase origins so the deferred libs and the first data
      fetch don't each pay a fresh DNS+TLS round-trip on cold load. -->
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
@@ -1229,7 +1229,7 @@
     display: flex; flex-direction: column; gap: 1px;
   }
   .v3-nav-search {
-    display: flex; align-items: center; gap: 9px; margin: 0 2px 14px; padding: 10px 11px; min-height: 44px;
+    display: flex; align-items: center; gap: 9px; margin: 0 2px 14px; padding: 10px 11px; min-height: var(--tap-min);
     border: 1px solid var(--border-default); border-radius: var(--r-md); background: var(--bg-card);
     color: var(--text-muted); font-size: var(--text-sm); cursor: pointer; font-family: inherit; width: calc(100% - 4px);
   }
@@ -1244,7 +1244,7 @@
      to read than the rest of the list. */
   .v3-nav-item {
     position: relative; display: flex; align-items: center; gap: 10px; width: 100%;
-    min-height: 38px; padding: 7px 11px 7px 12px;
+    min-height: var(--tap-min); padding: 7px 11px 7px 12px;
     border: 0; border-radius: var(--radius-md); background: none; color: var(--color-muted);
     font-family: inherit; font-size: var(--text-sm); font-weight: var(--weight-medium);
     letter-spacing: var(--tracking-snug); text-align: left; cursor: pointer;
@@ -1312,20 +1312,20 @@
   .v3-sub { font-size: var(--text-sm); color: var(--text-secondary); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
   .v3-muted { color: var(--text-muted); }
   .v3-dot { width: 3px; height: 3px; border-radius: 50%; background: var(--text-faint); display: inline-block; }
-  .v3-refresh { margin-top: 10px; background: var(--accent-bg); border: 1px solid var(--accent); color: var(--accent); border-radius: var(--r-md); min-height: 44px; padding: 0 14px; font-family: inherit; font-size: var(--text-sm); font-weight: var(--weight-semi); cursor: pointer; }
+  .v3-refresh { margin-top: 10px; background: var(--accent-bg); border: 1px solid var(--accent); color: var(--accent); border-radius: var(--r-md); min-height: var(--tap-min); padding: 0 14px; font-family: inherit; font-size: var(--text-sm); font-weight: var(--weight-semi); cursor: pointer; }
   .v3-kick { font-size: var(--text-xs); letter-spacing: var(--tracking-wide); text-transform: uppercase; color: var(--text-muted); font-weight: var(--weight-semi); margin-bottom: 6px; }
   .v3-dofirst { border-top: 1px solid var(--border-subtle); padding-top: 14px; }
   .v3-dofirst-t { font-size: var(--text-lg); font-weight: var(--weight-semi); line-height: 1.35; margin-bottom: 4px; }
   .v3-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
   .v3-btn {
-    min-height: 44px; padding: 0 16px; border-radius: var(--r-md); border: 1px solid var(--border-default);
+    min-height: var(--tap-min); padding: 0 16px; border-radius: var(--r-md); border: 1px solid var(--border-default);
     background: var(--bg-card); color: var(--text-primary); font-family: inherit; font-size: var(--text-sm); font-weight: var(--weight-semi); cursor: pointer;
     display: inline-flex; align-items: center; gap: 6px;
   }
   .v3-btn:hover { border-color: var(--accent); color: var(--accent); }
   .v3-btn-p { background: var(--accent); border-color: var(--accent); color: #fff; }
   .v3-btn-p:hover { color: #fff; opacity: .92; }
-  .v3-btn-sm { min-height: 36px; padding: 0 11px; font-size: var(--text-sm); font-weight: var(--weight-medium); }
+  .v3-btn-sm { min-height: var(--tap-min); padding: 0 11px; font-size: var(--text-sm); font-weight: var(--weight-medium); }
   .v3-next { border-top: 1px solid var(--border-subtle); padding-top: 14px; }
   .v3-next-row { display: grid; grid-template-columns: 1.6rem 1fr auto; gap: 12px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--border-subtle); font-size: var(--text-sm); }
   .v3-num { font-family: var(--font-mono, ui-monospace), monospace; color: var(--text-muted); font-size: var(--text-sm); }
@@ -1346,7 +1346,7 @@
      keeps a 22px dot visually quiet while giving a finger the full 44px to aim at. */
   .v3-tap {
     display: inline-flex; align-items: center; justify-content: center;
-    min-height: 44px; min-width: 44px; padding: 11px; margin: -11px;
+    min-height: var(--tap-min); min-width: var(--tap-min); padding: 11px; margin: -11px;
     background: none; border: 0; cursor: pointer; font: inherit; color: inherit;
   }
   .v3-tap + .v3-tap { margin-left: -4px; }
@@ -1495,14 +1495,7 @@
                    border-left: 2px solid var(--color-line-strong);
                    padding-left: var(--space-3, 12px); }
 
-  .v3-chips { display: flex; flex-wrap: wrap; gap: var(--space-2, 8px); padding-bottom: var(--space-3, 12px); }
-  .v3-chip { font-family: var(--font-sans); font-size: var(--text-xs, 11px); color: var(--color-muted);
-             background: none; border: 1px solid var(--color-line); border-radius: var(--radius-md, 4px);
-             padding: 3px 9px; cursor: pointer;
-             transition: color var(--transition-fast, .15s) ease, border-color var(--transition-fast, .15s) ease; }
-  .v3-chip:hover { color: var(--color-ink); border-color: var(--color-line-strong, var(--color-line)); }
-  .v3-chip.on { color: var(--color-panel); background: var(--color-ink); border-color: var(--color-ink); }
-  .v3-chip-n { font-family: var(--font-mono); opacity: .7; margin-left: 3px; }
+  /* .v3-chips / .v3-chip: one rule, in greta-kit.css. */
 
   .v3-rank { list-style: none; margin: 0; padding: 0; }
   .v3-rank-row { border-top: 1px solid var(--color-line); }
@@ -1653,7 +1646,7 @@
   /* Progressive disclosure */
   .v3-more { border-top: 1px solid var(--border-subtle); }
   .v3-more-head {
-    display: flex; align-items: center; gap: 9px; width: 100%; min-height: 44px; padding: 10px 0;
+    display: flex; align-items: center; gap: 9px; width: 100%; min-height: var(--tap-min); padding: 10px 0;
     background: none; border: 0; color: var(--text-secondary); font-family: inherit;
     font-size: var(--text-sm); font-weight: var(--weight-semi); text-align: left; cursor: pointer;
   }
@@ -1723,7 +1716,7 @@
   .v3-askbar-sug { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; padding: 8px 2px 0; font-size: var(--text-sm); }
   .v3-sug {
     border: 1px solid var(--border-default); background: var(--bg-card); color: var(--text-secondary);
-    border-radius: var(--radius-md); min-height: 44px; padding: 0 12px; font-family: var(--font-sans); font-size: var(--text-sm); cursor: pointer;
+    border-radius: var(--radius-md); min-height: var(--tap-min); padding: 0 12px; font-family: var(--font-sans); font-size: var(--text-sm); cursor: pointer;
   }
   .v3-sug:hover { border-color: var(--accent); color: var(--accent); }
   @media (max-width: 760px) {
@@ -1861,7 +1854,7 @@
   .v3-page-head-row > div:first-child { flex: 1 1 260px; min-width: 0; }
   .v3-period { display: flex; align-items: center; gap: 8px; font-size: var(--text-sm); flex-wrap: wrap; }
   .v3-period select, .v3-period input {
-    font-family: var(--font-sans); font-size: var(--text-sm); min-height: 44px; padding: 0 10px;
+    font-family: var(--font-sans); font-size: var(--text-sm); min-height: var(--tap-min); padding: 0 10px;
     border: 1px solid var(--border-default); color: var(--text-primary);
     background-color: var(--bg-card);   /* see .toolbar select — the shorthand kills the caret */
   }

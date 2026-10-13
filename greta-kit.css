@@ -38,7 +38,7 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-nav { scrollbar-width: none; }
 .v3-nav::-webkit-scrollbar { display: none; }
 .v3-nav-group { font-weight: var(--weight-semi); padding-top: var(--space-6); }
-.v3-nav-item { min-height: 36px; }
+.v3-nav-item { min-height: var(--tap-min); }
 .v3-nav-n { font-family: var(--font-figure); background: var(--color-sunken); color: var(--color-muted);
             padding: 1px 7px; border-radius: var(--radius-full); font-size: var(--text-xs); }
 @media (max-width: 760px) {
@@ -146,23 +146,23 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 /* ── Buttons: primary, secondary, quiet ──────────────────────────────────── */
 .v3-btn, .btn, .btn-ghost, .board-nav-btn, .btn-secondary {
   display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
-  min-height: 36px; padding: 0 var(--space-4); border-radius: var(--radius-md);
+  min-height: var(--tap-min); padding: 0 var(--space-4); border-radius: var(--radius-md);
   border: 1px solid var(--color-line-strong); background: var(--color-panel); color: var(--color-ink);
   font-family: var(--font-sans); font-size: var(--text-sm); font-weight: var(--weight-medium);
   cursor: pointer; transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 }
 .v3-btn:hover, .btn-ghost:hover, .board-nav-btn:hover:not(:disabled) { border-color: var(--color-ink); background: var(--color-panel); color: var(--color-ink); }
 .v3-btn-p, .btn-primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-panel);
-  border-radius: var(--radius-md); font-weight: var(--weight-semi); min-height: 36px; padding: 0 var(--space-4); }
+  border-radius: var(--radius-md); font-weight: var(--weight-semi); min-height: var(--tap-min); padding: 0 var(--space-4); }
 .v3-btn-p:hover, .btn-primary:hover { background: var(--color-accent-hover); border-color: var(--color-accent-hover); color: var(--color-panel); }
 .v3-btn-q { border-color: transparent; background: none; color: var(--color-muted); padding: 0 var(--space-2); }
 .v3-btn-q:hover { color: var(--color-ink); background: var(--color-sunken); border-color: transparent; }
-.v3-btn-sm { min-height: 30px; padding: 0 var(--space-3); font-size: var(--text-xs); }
+.v3-btn-sm { min-height: var(--tap-min); padding: 0 var(--space-3); font-size: var(--text-xs); }
 /* Segmented choice (two or three options that switch a view or a basis). */
 .v3-seg { display: inline-flex; padding: var(--space-1); gap: var(--space-1); background: var(--color-sunken);
   border-radius: var(--radius-md); }
 .v3-seg button { border: 0; background: none; color: var(--color-muted); font: inherit; font-size: var(--text-sm);
-  padding: var(--space-1) var(--space-3); border-radius: var(--radius-sm); cursor: pointer; }
+  min-height: var(--tap-min); padding: var(--space-1) var(--space-3); border-radius: var(--radius-sm); cursor: pointer; }
 .v3-seg button[aria-pressed="true"] { background: var(--color-panel); color: var(--color-ink); font-weight: var(--weight-semi);
   box-shadow: 0 0 0 1px var(--color-line); }
 
@@ -219,7 +219,7 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 
 /* ── Disclosure ──────────────────────────────────────────────────────────── */
 .v3-more { border-top: 1px solid var(--color-line); }
-.v3-more-head { font-size: var(--text-sm); font-weight: var(--weight-semi); color: var(--color-ink); padding: var(--space-4) 0; }
+.v3-more-head { min-height: var(--tap-min); font-size: var(--text-sm); font-weight: var(--weight-semi); color: var(--color-ink); padding: var(--space-4) 0; }
 .v3-more-body { padding-bottom: var(--space-6); }
 
 /* ── Today ───────────────────────────────────────────────────────────────── */
@@ -479,7 +479,7 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 
 /* Weekly board header */
 .board .card:first-child { border-top: 0; padding-top: 0; }
-.board-nav-btn { min-height: 34px; padding: 0 var(--space-3); }
+.board-nav-btn { min-height: var(--tap-min); padding: 0 var(--space-3); }
 .board select { min-height: 34px; }
 .board-commentary-cols { gap: var(--space-8); }
 .board-comm-head { font-size: var(--text-xs); letter-spacing: var(--tracking-wide); text-transform: uppercase; }
@@ -560,8 +560,27 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-board-total { font-family: var(--font-figure); font-size: var(--text-2xl); font-weight: var(--weight-semi); letter-spacing: -0.02em; color: var(--color-ink); }
 .v3-board-total-lab { font-family: var(--font-sans); font-size: var(--text-base); font-weight: var(--weight-normal); color: var(--color-muted); letter-spacing: 0; }
 .v3-board-unver { font-size: var(--text-sm); color: var(--color-faint); }
-.v3-chips { gap: var(--space-1); margin-bottom: var(--space-4); }
-.v3-chip { border-radius: var(--radius-full); height: 28px; padding: 0 var(--space-3); font-size: var(--text-xs); }
+/* One chip rule (was two: here at 28 tall and a 3px 9px one in the dashboard <style>). Chips are
+   buttons, so they take the button radius and the tap height. */
+.v3-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-4); }
+.v3-chip { display: inline-flex; align-items: center; gap: var(--space-1); min-height: var(--tap-min); padding: 0 var(--space-3);
+  font-family: var(--font-sans); font-size: var(--text-xs); color: var(--color-muted); background: none;
+  border: 1px solid var(--color-line); border-radius: var(--radius-md); cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast); }
+.v3-chip:hover { color: var(--color-ink); border-color: var(--color-line-strong); }
+.v3-chip.on { color: var(--color-panel); background: var(--color-ink); border-color: var(--color-ink); }
+.v3-chip-n { font-family: var(--font-mono); opacity: .7; }
+/* Text-styled links that are really buttons ("What is driving this?", "Why", "Go to"): the line
+   stays quiet, the tap area is full height. */
+.v3-xref { min-height: var(--tap-min); align-items: center; }
+/* The rest of the small controls: older action buttons, the board's to-do rows, the walkthrough's
+   links. Each keeps its look; the box grows to the tap height. */
+.ia-btn, .cf-btn, .markbtn, .v3-drivers-todo-row { min-height: var(--tap-min); }
+/* Links inside a sentence keep the line height; an invisible box gives the finger the full height. */
+.v3-walk-link, .v3-linkbtn { position: relative; }
+.v3-walk-link::after, .v3-linkbtn::after { content: ''; position: absolute; left: 0; right: 0; top: 50%;
+  height: var(--tap-min); transform: translateY(-50%); }
+.ia-btn, .cf-btn, .markbtn { display: inline-flex; align-items: center; border-radius: var(--radius-md); }
 .v3-rank-row { padding: var(--space-4) 0; }
 .v3-rank-bar { height: 3px; background: var(--color-sunken); max-width: 420px; margin: var(--space-2) 0; }
 .v3-rank-bar i { background: var(--color-accent); opacity: .85; }
@@ -732,7 +751,7 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
    styles. Most of it is inline style in legacy panels, which only !important can reach, so these
    rules are deliberately few and scoped to .v3-main. The target system:
      page title 26 · section title 18 · sub-title 15 · ONE small-caps label · ONE table header ·
-     buttons 36 (primary / secondary) or 30 (small), radius-md · pills for filters. */
+     buttons at least --tap-min (44) tall, small ones by type size only, radius-md. */
 
 /* Headings */
 .v3-main h2, .v3-main .card h2, .v3-main h2.section, .v3-main .card-section-title h2, .v3-main .v3-sec-title,
@@ -756,11 +775,11 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-main [style*="text-transform: uppercase"][style*="var(--text-muted)"] { color: var(--color-muted) !important; }
 .v3-main th { text-transform: uppercase; }
 
-/* Buttons: two heights, one radius. Pills (radius-full) and tile-buttons keep their shape. */
+/* Buttons: one tap height (--tap-min), one radius. Tile-buttons keep their shape. */
 .v3-main .btn, .v3-main .btn-primary, .v3-main .btn-secondary, .v3-main .btn-ghost, .v3-main .board-nav-btn,
 .v3-main .v3-btn, .v3-main .mc-today-btn, .v3-main .cg-add {
-  min-height: 36px; border-radius: var(--radius-md) !important; font-size: var(--text-sm) !important; }
-.v3-main .v3-btn-sm, .v3-main .btn-sm { min-height: 30px; font-size: var(--text-xs) !important; }
+  min-height: var(--tap-min); border-radius: var(--radius-md) !important; font-size: var(--text-sm) !important; }
+.v3-main .v3-btn-sm, .v3-main .btn-sm { min-height: var(--tap-min); font-size: var(--text-xs) !important; }
 .v3-main button[style*="border-radius: 0"], .v3-main button[style*="border-radius: var(--radius-none)"],
 .v3-main button[style*="border-radius: var(--r-md)"], .v3-main button[style*="border-radius: var(--r-sm)"] { border-radius: var(--radius-md) !important; }
 
@@ -855,14 +874,14 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
   border-radius: var(--radius-md) !important; background-color: var(--color-panel) !important; }
 .v3-main input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), .v3-main select { min-height: 36px; }
 
-/* Buttons styled inline: small type → 30 tall, regular type → 36 tall. Tabs inside embeds round. */
-.v3-main button[style*="px solid"][style*="font-size: var(--text-xs)"] { min-height: 30px !important; }
-.v3-main button[style*="px solid"]:not([style*="font-size: var(--text-xs)"]) { min-height: 36px !important; }
-.v3-main .show-more, .v3-main .tdy-btn, .v3-main .btn-primary { min-height: 36px !important; padding-top: 0 !important; padding-bottom: 0 !important;
+/* Buttons styled inline: every size gets the tap height. Tabs inside embeds round. */
+.v3-main button[style*="px solid"][style*="font-size: var(--text-xs)"] { min-height: var(--tap-min) !important; }
+.v3-main button[style*="px solid"]:not([style*="font-size: var(--text-xs)"]) { min-height: var(--tap-min) !important; }
+.v3-main .show-more, .v3-main .tdy-btn, .v3-main .btn-primary { min-height: var(--tap-min) !important; padding-top: 0 !important; padding-bottom: 0 !important;
   display: inline-flex; align-items: center; justify-content: center; }
 .v3-main .nav-item { border-radius: var(--radius-md) !important; }
-.v3-main .seg button, .v3-main .mc-arrow { min-height: 30px; }
-.v3-main .mc-arrow, .v3-main .mc-today-btn, .v3-main .cg-add { min-height: 36px !important; }
+.v3-main .seg button, .v3-main .mc-arrow { min-height: var(--tap-min); }
+.v3-main .mc-arrow, .v3-main .mc-today-btn, .v3-main .cg-add { min-height: var(--tap-min) !important; }
 
 /* Form groups whose size varies: columns follow the field count, so no field sits alone. */
 .v3-form-grid--n { max-width: none; }
@@ -884,13 +903,13 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-main [style*="font-weight: var(--weight-bold)"][style*="font-size: var(--text-lg)"],
 .v3-main [style*="font-weight: var(--weight-bold)"][style*="font-size: var(--text-xl)"],
 .v3-main [style*="font-weight: var(--weight-bold)"][style*="font-size: var(--text-2xl)"] { font-weight: var(--weight-semi) !important; }
-.v3-main .v3-prompt { min-height: 36px; display: inline-flex; align-items: center; padding-top: var(--space-1); padding-bottom: var(--space-1); }
+.v3-main .v3-prompt { min-height: var(--tap-min); display: inline-flex; align-items: center; padding-top: var(--space-1); padding-bottom: var(--space-1); }
 /* Inline-styled buttons serialise their border several ways, so match on padding + type size:
-   small type → 30, regular → 36. Link-style buttons (padding 0) are left alone. */
-.v3-main button[style*="padding"]:not([style*="padding: 0"]):not([style*="padding:0"])[style*="font-size: var(--text-xs)"] { min-height: 30px !important; }
+   every size gets the tap height. Link-style buttons (padding 0) are left alone. */
+.v3-main button[style*="padding"]:not([style*="padding: 0"]):not([style*="padding:0"])[style*="font-size: var(--text-xs)"] { min-height: var(--tap-min) !important; }
 .v3-main button[style*="padding"]:not([style*="padding: 0"]):not([style*="padding:0"])[style*="font-size: var(--text-sm)"],
-.v3-main button[style*="padding"]:not([style*="padding: 0"]):not([style*="padding:0"])[style*="font-size: var(--text-base)"] { min-height: 36px !important; }
-.v3-main .show-more { height: 36px; }
+.v3-main button[style*="padding"]:not([style*="padding: 0"]):not([style*="padding:0"])[style*="font-size: var(--text-base)"] { min-height: var(--tap-min) !important; }
+.v3-main .show-more { height: var(--tap-min); }
 .v3-main .lr-pill { font-weight: var(--weight-semi) !important; }
 
 /* ══ Vertical rhythm ═══════════════════════════════════════════════════════
@@ -979,7 +998,7 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
    minimum touch size. */
 .v3-main :not(.v3-main):not(td):not(th):has(> table) { overflow-x: auto; }
 .v3-main .go-tf { flex-wrap: wrap; max-width: 100%; }
-.v3-main .v3-unit button { min-height: 24px !important; }
+.v3-main .v3-unit button { min-height: var(--tap-min) !important; }
 .v3-main .sbadge { white-space: normal; max-width: 100%; }
 /* Last line of defence: nothing in the page column can make the page scroll sideways. clip (not
    hidden) creates no scroll container, so sticky headers keep working. */
