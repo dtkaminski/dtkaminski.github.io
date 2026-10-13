@@ -11242,7 +11242,7 @@ function V3ActionBoard(){
               <li className="v3-rank-break">
                 <span className="v3-kick">Open over a month</span>
                 <span className="v3-sub">Greta raised these more than 30 days ago. Their figures are still
-                  up to date, but Greta has no nightly test to tell when one is fixed, so they sit below the
+                  up to date, but Greta has no test that tells when one is fixed, so they sit below the
                   ranked list. Mark each one done, or skip it, once you have decided.</span>
               </li>
             )}
@@ -11284,7 +11284,7 @@ function V3ActionBoard(){
                       open over 30 days with no nightly test); the words are said here, from the same
                       days_open, because the server's said "nothing has re-checked it" of a row whose
                       figures are re-measured every night. */}
-                  {r.unverified_reason && <p className="v3-rank-unver">Open {fmtCount(r.days_open)} days. Its figures are still up to date, but Greta has no nightly test to tell when it is fixed, so it sits below the ranked list.</p>}
+                  {r.unverified_reason && <p className="v3-rank-unver">Open {fmtCount(r.days_open)} days. Its figures are still up to date, but Greta has no test that tells when it is fixed, so it sits below the ranked list.</p>}
                   {play.length
                     ? <ol className="v3-rank-steps">{play.map((s, j) => <li key={j}>{v3Tidy(s)}</li>)}</ol>
                     : <p className="v3-rank-nosteps">{v3Tidy(r.step1) || 'Greta has no further detail on this one yet.'}</p>}
@@ -11335,7 +11335,7 @@ function V3ActionBoard(){
           </li>
         )}
       </ol>
-      {V3_BOARD.ranked && <p className="micro muted v3-measure">Each row says when Greta last checked its figures. An action whose figures go three weeks without a check drops off this list, so every figure here is current. Actions open over a month that Greta has no nightly test for sit below the ranked list.</p>}
+      {V3_BOARD.ranked && <p className="micro muted v3-measure">Each row says when Greta last checked its figures. An action whose figures go three weeks without a check drops off this list, so every figure here is current. Actions open over a month that Greta has no test for sit below the ranked list.</p>}
       <V3HeldActions/>
       {/* Actions read 7.1 screens (review, 8 Oct); the ranked list is the page's answer, so the changes
           with no £ figure fold away below it. */}
@@ -18085,7 +18085,7 @@ function V3Today(p) {
     ) : (
       <div className="v3-dofirst v3-raised"><div className="v3-kick">Do this first</div>
         <div className="v3-dofirst-t">Nothing needs you today.</div>
-        <div className="v3-sub">Greta checks again with tomorrow's data.</div></div>
+        <div className="v3-sub">Greta checks again as new data arrives.</div></div>
     )}
 
     {next.length > 0 && (<div className="v3-next">
@@ -21555,7 +21555,7 @@ function V3SalesMove() {
     {open && <ul className="v3-move-lines v3-measure">
       {(lead.lines || []).map((t, i) => <li key={i}>{v3FigSpans(t)}</li>)}
       {other && other.state === 'moved' && <li>{v3FigSpans(other.headline)} {v3FigSpans(other.why)}</li>}
-      {lead.basis && <li className="micro muted">{lead.basis} Worked out each morning.</li>}
+      {lead.basis && <li className="micro muted">{lead.basis} Worked out again every hour.</li>}
     </ul>}
   </div>);
 }
@@ -22244,7 +22244,7 @@ function v3ModelProducts(list, sale) {
 // its figure, or the plain reason it has none (it does not apply, it needs you, a test, or tonight's sync).
 const V3_COVERAGE_Q = (sb, b) => sb.rpc('fn_anatomy_coverage', { p_brand: b });
 const V3_HEALTH_WORD = { 'live': null, 'computed on demand': null, 'not applicable': 'Does not apply', 'needs your input': 'Needs a figure from you',
-  'needs a test': 'Needs a test', 'waiting for its first sync': 'Fills after tonight’s sync', 'stale': 'Out of date', 'no data for this brand': 'No data yet',
+  'needs a test': 'Needs a test', 'waiting for its first sync': 'Fills after its first sync', 'stale': 'Out of date', 'no data for this brand': 'No data yet',
   'missing': 'Not measured', 'declared, object missing': 'Not measured', 'error': 'Could not be worked out', 'no source reporting': 'No source is reporting' };
 function V3AnatomyCoverage() {
   const q = useV3Rows('anatomy-coverage', V3_COVERAGE_Q);
@@ -22262,7 +22262,7 @@ function V3AnatomyCoverage() {
   return (<section className="v3-sec">
     <h2 className="v3-sec-title">What Greta can see <span className="v3-muted">every part of the business</span></h2>
     <p className="v3-note v3-measure">Greta measures {fmtCount(covered)} of the {fmtCount(all.length)} things worth knowing about a business like yours{est ? <> and estimates {fmtCount(est)} more</> : null}{na ? <>, and {fmtCount(na)} do not apply to you</> : null}.
-      {you + test + sync + rest > 0 ? <> Of the rest, {[sync ? fmtCount(sync) + ' fill after tonight’s syncs' : null, you ? fmtCount(you) + ' need a figure from you (below)' : null,
+      {you + test + sync + rest > 0 ? <> Of the rest, {[sync ? fmtCount(sync) + ' fill after their first sync' : null, you ? fmtCount(you) + ' need a figure from you (below)' : null,
         test ? fmtCount(test) + ' need a test to measure' : null, rest ? fmtCount(rest) + ' cannot be measured yet' : null].filter(Boolean).join(', ')}.</> : null} Open a part to see each figure.</p>
     <table className="v3-rw v3-cov">
       <thead><tr><th className="t-text">Part of the business</th><th>Measured</th><th className="t-text">Why it moves</th><th>Actions</th><th className="t-text">Still missing</th></tr></thead>
@@ -22371,7 +22371,7 @@ function V3AnatomyInputs() {
     if (!draft.name.trim()) return;
     const row = { brand_id: b, name: draft.name.trim(), lead_time_days: num(draft.lead), moq_units: num(draft.moq), has_alternative: !!draft.alt, product_match: draft.match.trim() || null };
     const r = await sb.from('brand_supplier').insert(row).select('id,name,lead_time_days,moq_units,has_alternative,product_match');
-    done(r, 'Saved. Greta uses it from tomorrow morning.');
+    done(r, 'Saved. Greta uses it the next time she works out your figures.');
     if (!r.error) { setSup(s => s.concat(r.data || [])); setDraft({ name: '', lead: '', moq: '', alt: false, match: '' }); }
   };
   const dropSupplier = async id => { const r = await sb.from('brand_supplier').delete().eq('id', id); done(r, 'Removed.'); if (!r.error) setSup(s => s.filter(x => x.id !== id)); };
@@ -22379,11 +22379,11 @@ function V3AnatomyInputs() {
     const keep = codes.filter(c => c.kind), drop = codes.filter(c => !c.kind).map(c => c.code);
     let r = keep.length ? await sb.from('brand_code_kind').upsert(keep.map(c => ({ brand_id: b, code: c.code, kind: c.kind, commission_pct: num(c.commission_pct), updated_at: new Date().toISOString() })), { onConflict: 'brand_id,code' }) : null;
     if (!(r && r.error) && drop.length) r = await sb.from('brand_code_kind').delete().eq('brand_id', b).in('code', drop);
-    done(r, 'Saved. Greta uses them from tomorrow morning.');
+    done(r, 'Saved. Greta uses them the next time she works out your figures.');
   };
   return (<section className="v3-sec">
     <h2 className="v3-sec-title">What Greta needs from you <span className="v3-muted">{needs.length ? fmtCount(needs.length) + (needs.length === 1 ? ' figure' : ' figures') : 'all filled in'}</span></h2>
-    <p className="v3-note v3-measure">Some things only you know. Each one below closes a gap above; Greta reads them each morning.</p>
+    <p className="v3-note v3-measure">Some things only you know. Each one below closes a gap above; Greta reads them every time she works out your figures.</p>
     {msg && <p className="micro v3-measure">{msg}</p>}
 
     <h3 className="v3-drivers-h">Your suppliers</h3>

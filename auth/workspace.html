@@ -261,12 +261,12 @@
       <div class="progress-card-inner">
         <div class="progress-eyebrow">Welcome to Greta</div>
         <h1 class="progress-headline" id="welcome-headline">Let's get <span id="welcome-brand">your workspace</span> producing findings.</h1>
-        <p class="progress-sub" id="welcome-sub">Connect Shopify and your sales history starts loading straight away. Greta works through it overnight, so your first ranked actions are waiting the next morning.</p>
+        <p class="progress-sub" id="welcome-sub">Connect Shopify and your sales history starts loading straight away. Greta works through it as it arrives, so your first ranked actions arrive within the hour.</p>
 
         <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width: 0%;"></div></div>
         <div class="progress-row">
           <span><b id="progress-count">0 of 1</b> required source connected</span>
-          <span id="progress-eta">First ranked actions: <b>tomorrow morning</b></span>
+          <span id="progress-eta">First ranked actions: <b>within the hour</b></span>
         </div>
 
         <div class="next-step-cta" id="next-step-cta" hidden>
@@ -645,7 +645,7 @@
     const banner = document.createElement('div');
     banner.setAttribute('role', 'status');
     banner.style.cssText = 'display:flex;align-items:center;gap:10px;background:var(--color-success-wash);border:1px solid var(--color-success-line);color:var(--color-success);border-radius:var(--radius-none);padding:12px 16px;margin-bottom:16px;font-size:14px;';
-    banner.innerHTML = `<span style="font-size:16px;">✓</span><span style="color:var(--text-primary,#fff);"><b>${name} connected.</b> Your sales history is loading now. Greta works through it overnight — your first ranked actions are ready tomorrow morning.</span>`;
+    banner.innerHTML = `<span style="font-size:16px;">✓</span><span style="color:var(--text-primary,#fff);"><b>${name} connected.</b> Your sales history is loading now. Greta works through it as it arrives: your first ranked actions arrive within the hour.</span>`;
     view.insertBefore(banner, view.firstChild);
     // Clean the URL so a refresh doesn't re-flash the banner.
     try { window.history.replaceState({}, '', window.location.pathname); } catch (_) {}
@@ -758,7 +758,7 @@
 
       // Update headline + sub
       document.getElementById('welcome-headline').innerHTML = `${currentBrand.name} is connected.`;
-      document.getElementById('welcome-sub').textContent = 'Greta reads your sales every night and ranks what is worth doing, in pounds. Adding Meta and Google shows what your ads really earn; Klaviyo shows what email brings back.';
+      document.getElementById('welcome-sub').textContent = 'Shopify orders arrive every 30 minutes and Greta works out again every hour what is worth doing, ranked in pounds. Adding Meta and Google shows what your ads really earn; Klaviyo shows what email brings back.';
     }
 
     // The first ranked actions follow the night's run; the Monday email is not promised until it can send.
