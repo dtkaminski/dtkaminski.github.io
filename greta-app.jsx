@@ -23632,10 +23632,11 @@ const V3_PAGES = {
         and a fix, then the forms. Readiness moved to the foot and reads the app's own figures. */}
     <V3GoalLead/>
     <V3CashToPeak/>
-    <V3DriverStrip keys={['profit']}/>
-    <V3GoldenRule/>
     <V3CostsOff/>
     <GretaPlanPanel show="goal"/>
+    {/* 13 Oct (gap 22): the "why" panels fold under the goal, the cash and the costs that are off. */}
+    <V3More id="goal-moving" label="What is moving profit"><V3DriverStrip keys={['profit']}/></V3More>
+    <V3More id="goal-golden" label="Do returning customers pay the running costs?"><V3GoldenRule/></V3More>
     {/* The only place a brand can enter per-variant landed cost. Business economics below sets the
         BLENDED margin; this sets what things actually cost, which is what moves the profit number
         from Estimated to Measured (0192). Open by default, because the confidence chip on Today
@@ -23680,14 +23681,16 @@ const V3_PAGES = {
         switch off, then email. The scoreboard merged into the channel table; the lag correlation, the
         spend-tier "diminishing returns" read (its own numbers did not fall) and the GA4 funnel (Website's,
         on 11 of 30 tracked days) are gone. Platform claims and per-channel evidence sit behind the detail. */}
+    {/* 13 Oct (gap 22): nine sections stood open. The lead and the channel verdict stay open; the
+        rest fold, each under the question it answers. */}
     <V3MarketingLead/>
-    <V3ChannelMap/>
-    <V3DriverStrip keys={['spend', 'cac', 'ret', 'metacpa', 'googcpa', 'email']}/>
-    <V3CodePerformance/>
     <V3Incrementality/>
-    <V3CreativeDemand/>
-    <CreativeReallocation/>
-    <V3EmailRead/>
+    <V3More id="mk-map" label="Where your sales came from, channel by channel"><V3ChannelMap/></V3More>
+    <V3More id="mk-moving" label="What is moving ad spend and the cost of a new customer"><V3DriverStrip keys={['spend', 'cac', 'ret', 'metacpa', 'googcpa', 'email']}/></V3More>
+    <V3More id="mk-codes" label="Which discount codes bring you customers"><V3CodePerformance/></V3More>
+    <V3More id="mk-ads-needed" label="Are you making enough new ads?"><V3CreativeDemand/></V3More>
+    <V3More id="mk-switch-off" label="Which ads to switch off"><CreativeReallocation/></V3More>
+    <V3More id="mk-email-read" label="Email, the channel you own"><V3EmailRead/></V3More>
     <V3More id="mk-why" label="What each ad platform claims, and why each channel behaves as it does">
       <CrossChannel start={p.start}/>
       <ChannelDetailList channels={(typeof window!=='undefined' && window.FRKL_PLAN && window.FRKL_PLAN.channels) || []}/>
@@ -23709,14 +23712,15 @@ const V3_PAGES = {
   customers: (p) => (<>
     {/* Rebuilt 2026-10-05: a verdict on what a customer is worth against what one costs, then the
         numbers, then the retention moves, then the segments panel that stages them, then the plan. */}
+    {/* 13 Oct (gap 22): seven sections stood open. The verdict, the last 30 days and the retention
+        moves stay open; the rest fold. */}
     <V3CustomerValue/>
-    <V3DriverStrip keys={['newc', 'cac', 'retsales', 'repeat']}/>
-    <V3CustomerFile/>
     <V3Customers/>
     <V3Retention/>
-    <V3Anchor id="segments"/>
-    <CustomerSegments/>
-    <V3ReturningBaseline/>
+    <V3More id="cust-moving" label="What is moving new customers and repeat sales"><V3DriverStrip keys={['newc', 'cac', 'retsales', 'repeat']}/></V3More>
+    <V3More id="cust-file" label="Your customer file: how many buy, and when they stop"><V3CustomerFile/></V3More>
+    <V3More id="cust-segments" label="Your customers, group by group"><V3Anchor id="segments"/><CustomerSegments/></V3More>
+    <V3More id="cust-baseline" label="The customers you already have: the next six months"><V3ReturningBaseline/></V3More>
     <V3More id="cust-more" label="More customer detail"><Customers/><V3Anchor id="cohorts"/><CohortsPanel/></V3More>
   </>),
   products: (p) => (<>
