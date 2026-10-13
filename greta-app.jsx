@@ -15,6 +15,36 @@ function v3NoBrand(what) {
   if (L.session) return 'Your workspace is still loading.';
   return 'Sign in to see ' + what + '.';
 }
+// Owner words, not ours. A key, slug or id that reaches the screen reads as plain words.
+// "unit_economics" -> "Unit economics"; "payPct" -> "Pay pct". Known keys get a proper label first.
+function v3KeyWords(k) {
+  const s = String(k == null ? '' : k).replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+}
+const V3_CATEGORY_WORDS = {
+  unit_economics: 'Costs per order', paid: 'Ads', creative: 'Ad content', retention: 'Repeat customers',
+  stock: 'Stock', site: 'Website', email: 'Email', measurement: 'Measurement', data: 'Data',
+  product: 'Products', finance: 'Money', ops: 'Running the business', cx: 'Customer service', organic: 'Unpaid visits',
+  total: 'Whole business', general: 'General', pricing: 'Prices', discount: 'Discounts', returns: 'Returns',
+  acquisition: 'New customers', growth: 'Growth', tracking: 'Tracking',
+};
+// The stored vertical is a key ("dtc_jewellery"); in a sentence it reads "jewellery".
+function v3VerticalWords(v) { return String(v || '').toLowerCase().replace(/[_-]+/g, ' ').replace(/^dtc\s+/, '').replace(/\s+/g, ' ').trim(); }
+function v3CategoryWords(c) { return V3_CATEGORY_WORDS[c] || v3KeyWords(c || 'general'); }
+// A connection's stored label can carry how it connects ("FRKL Klaviyo (API key)"). Show the name only.
+function v3AccountWords(s) { return String(s || '').replace(/\s*\([^()]*\)\s*$/, '').trim(); }
+// Engine-written basis text can name the view, cache or function it came from. Drop those names
+// (and any bracket that only held them) so the owner reads the sentence, not our plumbing.
+const V3_INTERNAL_ID = /\b(?:vw|v|fn|cache|tenant|mos)_[a-z0-9_]+\b/.source;
+const V3_INTERNAL_LIST = V3_INTERNAL_ID + '(?:' + /\s*(?:,|\/|\+|&|\band\b|\bor\b)\s*/.source + V3_INTERNAL_ID + ')*';
+const V3_INTERNAL_BRACKET = new RegExp(/\(\s*/.source + V3_INTERNAL_LIST + /\s*\)/.source, 'g');
+const V3_INTERNAL_RUN = new RegExp(/(?:\b(?:from|in|via|see|using|by|on)\s+(?:the\s+)?)?/.source + V3_INTERNAL_LIST + /(?:\s+(?:view|cache|table|function))?/.source, 'g');
+function v3NoInternal(s) {
+  if (s == null) return s;
+  return String(s).replace(V3_INTERNAL_BRACKET, '').replace(V3_INTERNAL_RUN, '')
+    .replace(/\(\s*[,;]?\s*\)/g, '').replace(/[ \t]+([,.;:)])/g, '$1').replace(/([,;:])\s*([,;:.])/g, '$2')
+    .replace(/[ \t]{2,}/g, ' ').trim();
+}
 const D = window.FRKL_DATA;
 const _CUR_SYM = { GBP:'£', USD:'$', EUR:'€', AUD:'A$', CAD:'C$', NZD:'NZ$', JPY:'¥' };
 const curSym = () => _CUR_SYM[(typeof window!=='undefined' && window.OI_CURRENCY)] || '£';
@@ -674,6 +704,7 @@ const PLAIN_WORDS = [
   // Engine sentences carry their own enum values and shorthand; say them in words.
   [/\bat_risk\b/g, 'at risk'],
   [/\s*\((?:low|medium|high) conf\.\)/g, ''],
+  [/\s*\(CTC\)/g, ''],
   [/\bthe discount_value JS error\b/g, 'the discount-code script error'],
   [/\bdiscount_value JS error\b/g, 'discount-code script error'],
   [/\biROAS\b/g, 'real return on ad spend'],
@@ -7843,7 +7874,7 @@ function Competitors(){
   return (<div>
     <div className="card" style={{marginBottom:14}}>
       <h2>Competitor matrix</h2>
-      <div className="muted" style={{marginBottom:10}}>Category positioning for the {DEMO ? 'demi-fine / customisable jewellery' : (OI_BRAND.vertical || 'category')} space. Refresh via Chrome (Meta Ads Library + competitor stores) when warranted — the dashboard's a flag-board, not a live scraper.</div>
+      <div className="muted" style={{marginBottom:10}}>Category positioning for the {DEMO ? 'demi-fine / customisable jewellery' : (v3VerticalWords(OI_BRAND.vertical) || 'category')} space. Greta flags changes here; it does not watch competitors’ shops live.</div>
       <table><thead><tr><th>Brand</th><th className="tl">Position</th><th>Average order</th><th>Meta intensity</th><th>Threat</th><th className="tl">vs {OI_BRAND.name}</th></tr></thead><tbody>
       {comps.map((c,i)=>(<tr key={i}>
         <td><b>{c.name}</b><br/><span className="muted" style={{fontSize:'var(--text-xs)'}}>{c.url}</span></td>
@@ -7865,7 +7896,7 @@ function SiteStructure({start}){
   const fmax=f[0].v||1;
   return (<div>
     <ClarityFrictionPanel/>
-    {DEMO && <div className="note" style={{marginBottom:14}}>Funnel mapped live from myfrkl.com. The problem is <b>engagement and a broken cart→checkout step</b> — see the live Clarity friction signals above. Paid spend (Overview tab) lands on a homepage where most visitors drop before 15% scroll.</div>}
+    {DEMO && <div className="note" style={{marginBottom:14}}>Funnel mapped live from myfrkl.com. The problem is <b>engagement and a broken step from cart to checkout</b>: see the live Clarity friction signals above. Paid visits land on a homepage where most visitors leave before scrolling 15% of the page.</div>}
     {/* SITE_STEPS, CLARITY and FIXES are a hand-made audit of frkl's own site (July 2026):
         necklaces, Judge.me, "106 products". Every other brand was shown it as if it were theirs.
         It renders for frkl only, labelled with its date; other brands get the live funnel. */}
@@ -11178,7 +11209,7 @@ function V3ActionBoard(){
         {cats.map(c => (
           <button key={c} type="button" role="tab" aria-selected={cat === c}
                   className={'v3-chip' + (cat === c ? ' on' : '')} onClick={() => setCat(c)}>
-            {c} <span className="v3-chip-n">{rows.filter(r => r.category === c).length}</span>
+            {v3CategoryWords(c)} <span className="v3-chip-n">{rows.filter(r => r.category === c).length}</span>
           </button>
         ))}
       </div>
@@ -11226,7 +11257,7 @@ function V3ActionBoard(){
                     <i style={{ width: Math.max(1.5, (gbp / max) * 100) + '%' }}/>
                   </span>
                   <span className="v3-rank-meta">
-                    {r.category || 'general'}{r.days_open > 0 ? ' · open ' + r.days_open + (Number(r.days_open) === 1 ? ' day' : ' days') : ''}
+                    {v3CategoryWords(r.category)}{r.days_open > 0 ? ' · raised ' + r.days_open + (Number(r.days_open) === 1 ? ' day ago' : ' days ago') : ''}
                     {conf ? ' · ' + V3_CONF[conf].label.toLowerCase() : ''}
                     {unver ? ' · open over a month' : r.days_since_refresh != null ? (Number(r.days_since_refresh) <= 0 ? ' · checked today' : ' · checked ' + r.days_since_refresh + (Number(r.days_since_refresh) === 1 ? ' day ago' : ' days ago')) : ''}
                     {r.plan ? ' · ' + r.plan.steps.length + ' steps' : ''}
@@ -11325,7 +11356,7 @@ function V3PlanSteps({ plan }) {
         <span className="v3-rank-n">{j + 1}</span>
         <span className="v3-rank-body">
           <span className="v3-rank-desc">{pa.title}</span>
-          <span className="v3-rank-meta">{st.lane === 'test' ? 'worth testing' : 'do this'}{st.origin === 'order_cost' ? ' · ad spend saved' : ''}</span>
+          <span className="v3-rank-meta">{st.lane === 'test' ? 'Worth testing' : 'Do this'}{st.origin === 'order_cost' ? ' · ad spend saved' : ''}</span>
         </span>
         <span className="v3-rank-gbp">{v3Gbp(gbp)}<span className="v3-rank-per">{v3Per(st, true)}</span></span>
       </button>
@@ -11386,7 +11417,7 @@ function V3Findings(){
             <button type="button" className="v3-rank-hit" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : f.external_id)}>
               <span className="v3-rank-body">
                 <span className="v3-rank-desc">{pa.title}</span>
-                <span className="v3-rank-meta">{({ total: 'Whole business', site: 'Website', finance: 'Money', ops: 'Running the business', product: 'Products', paid: 'Ads', creative: 'Ad content', retention: 'Repeat customers', cx: 'Customer service', stock: 'Stock', email: 'Email', organic: 'Unpaid visits' })[f.category] || f.category || 'general'}{conf ? ' · ' + V3_CONF[conf].label.toLowerCase() : ''}{bN ? (counting ? ' · a change in how sales are counted, not the cause of action #' + bN : ' · explains action #' + bN) : ''}</span>
+                <span className="v3-rank-meta">{v3CategoryWords(f.category)}{conf ? ' · ' + V3_CONF[conf].label.toLowerCase() : ''}{bN ? (counting ? ' · a change in how sales are counted, not the cause of action #' + bN : ' · explains action #' + bN) : ''}</span>
               </span>
             </button>
             {isOpen && (<div className="v3-rank-why">
@@ -12899,7 +12930,7 @@ const GO_EXPLAIN = {
   'Repeat rate':'Share of orders from returning customers — your core retention signal.',
   'Weighted cost per new customer':'Blended cost to acquire one new customer (ad spend ÷ new customers).',
   'aMER':'Acquisition sales per £ of ads — new-customer revenue ÷ ad spend. The efficiency of acquisition on its own.',
-  'iRevenue':'Incremental revenue — the extra revenue paid actually caused (φ-adjusted), not last-click attributed.',
+  'iRevenue':'Sales the ads really added: the extra sales paid ads caused, not the sales the ad platforms claim.',
   'iOrders':'Incremental orders paid actually caused, after removing the organic baseline.',
   'iAOV':'Average value of one incremental (paid-caused) order.',
   'iCAC':'Incremental cost per new customer — spend ÷ incremental orders. The true cost of a paid-caused customer.',
@@ -12907,7 +12938,7 @@ const GO_EXPLAIN = {
   'Average order':'Average order value — revenue ÷ orders for this segment.',
   'New-customer cost (weighted)':'Blended cost to acquire one new customer (ad spend ÷ new customers).',
   'Sales per £ of ads (new)':'Acquisition sales per £ of ads — new-customer revenue ÷ ad spend. The efficiency of acquisition on its own.',
-  'Revenue caused by ads':'The extra revenue paid advertising actually caused (φ-adjusted), not last-click attributed.',
+  'Revenue caused by ads':'The extra sales paid ads really caused, not the sales the ad platforms claim.',
   'Orders caused by ads':'The orders paid advertising actually caused, after removing the organic baseline.',
   'Cost per new customer':'Spend ÷ the orders ads actually caused. The true cost of a paid-caused customer.',
   'Sales per £ of ads':'Revenue ads actually caused ÷ spend. Paid efficiency on a causal basis.',
@@ -13292,7 +13323,7 @@ function GretaOverviewTiers(){
       </div>
 
       <div style={{margin:'28px 0 10px'}}>
-        <GO_TierHead n="02" title="Customer" sub="returning · new · paid-incremental (CTC)"/>
+        <GO_TierHead n="02" title="Customer" sub="returning · new · new customers the ads really added"/>
         <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:'var(--radius-none)',padding:'13px 15px',boxShadow:'var(--shadow-panel)',marginBottom:10}}>
           <div style={{fontSize:'var(--text-xs)',color:GO_T.mut,marginBottom:6}}>New vs returning revenue</div>
           <div style={{display:'flex',height:9,borderRadius:'var(--radius-md)',overflow:'hidden',marginBottom:6}}><div style={{width:d.customer.splitNew+'%',background:GO_T.accent}}/><div style={{width:d.customer.splitRet+'%',background:PAL.data3}}/></div>
@@ -13336,13 +13367,13 @@ function GretaOverviewTiers(){
       </div>
 
       <div style={{margin:'28px 0 10px'}}>
-        <GO_TierHead n="03" title="Channel" sub="avg vs marginal real return on ad spend — where the next £ goes (CTC)"/>
+        <GO_TierHead n="03" title="Channel" sub="average vs next-pound return on ad spend: where the next £ goes"/>
         <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:'var(--radius-none)',padding:'2px 4px',overflowX:'auto'}}>
           <table style={{width:'100%',borderCollapse:'collapse',fontSize:'var(--text-sm)'}}>
-            <thead><tr>{['Channel','Spend','Incr rev','CM','iROAS','Marginal','Verdict'].map((h,i)=><th key={i} style={{textAlign:i===0?'left':'right',color:GO_T.dim,fontWeight:'var(--weight-medium)',fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{h}</th>)}</tr></thead>
+            <thead><tr>{['Channel','Spend','Added sales','Profit','Real return','Next £','Verdict'].map((h,i)=><th key={i} style={{textAlign:i===0?'left':'right',color:GO_T.dim,fontWeight:'var(--weight-medium)',fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{h}</th>)}</tr></thead>
             <tbody>{d.channel.map((c,i)=>(
               <tr key={i} style={{background:c.family==='email'?'var(--color-surface)':'none'}}>
-                <td style={{textAlign:'left',padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{c.name} <span style={{fontSize:'var(--text-xs)',color:c.family==='email'?GO_T.accent2:GO_T.mut}}>{c.family==='email'?'email':(c.acquisition?'acq':'retn')}{c.phi!=null?' · φ'+c.phi:''}</span></td>
+                <td style={{textAlign:'left',padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{c.name} <span style={{fontSize:'var(--text-xs)',color:c.family==='email'?GO_T.accent2:GO_T.mut}}>{c.family==='email'?'email':(c.acquisition?'new customers':'repeat customers')}</span></td>
                 <td style={{textAlign:'right',fontFamily:GO_T.mono,padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{GO_gbp(c.spend)}</td>
                 <td style={{textAlign:'right',fontFamily:GO_T.mono,padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{GO_gbp(c.incRev)}</td>
                 <td style={{textAlign:'right',fontFamily:GO_T.mono,color:(c.contribution!=null&&c.contribution<0)?GO_T.red:GO_T.ink,padding:'8px 9px',borderBottom:'1px solid '+GO_T.line}}>{c.contribution!=null?GO_gbp(c.contribution):'—'}</td>
@@ -14417,7 +14448,7 @@ function GretaPlanPanel({ show } = {}) {
           </table>
           <div style={{ fontSize: 'var(--text-xs)', color: GP_T.dim, marginTop: 8 }}>
             Focus: <b style={{ color: GP_T.ink }}>{String(P.channels[0].channel_type).replace(/_/g, ' ')}</b> — {P.channels[0].action}
-            {P.channels[0].phi_is_assumed ? <span> · real return on ad spend uses <b>benchmark</b> incrementality (φ), not yet measured — run a holdout to confirm.</span> : null}
+            {P.channels[0].phi_is_assumed ? <span> · real return on ad spend uses a <b>typical brand’s</b> share of sales the ads really cause, not yet measured: pause ads in one area for a few weeks to confirm.</span> : null}
           </div>
         </div>
       ) : null}
@@ -15007,7 +15038,7 @@ function ConnectionsPanel(){
                 <span className="v3-conn-state" style={{color:c}}><i style={{background:c}}/>{lbl}</span>
               </div>
               {(conn || s.last != null) && <div className="v3-conn-meta">
-                {conn ? 'Connected' + (conn.account_label ? ' · ' + conn.account_label : '') + (syncStr ? ' · synced ' + syncStr : '') + ' · ' : ''}
+                {conn ? 'Connected' + (conn.account_label ? ' · ' + v3AccountWords(conn.account_label) : '') + (syncStr ? ' · synced ' + syncStr : '') + ' · ' : ''}
                 {s.id === 'shopify' ? 'last order' : 'last data'} {ageStr}
               </div>}
               <div className="v3-conn-desc">{s.description}</div>
@@ -17307,12 +17338,12 @@ function CostDrift(){
   // vw_brand_config_drift keys mix snake and camel case (they are brand_config keys) and
   // its units are fraction / percent / money_order / money_month.
   const LABEL = {
-    gross_margin: 'Margin on products without a cost', refundPct: 'Refund rate', refund_rate: 'Refund rate',
-    shipping: 'Shipping', packaging: 'Packaging', fulfilment: 'Fulfilment', payPct: 'Payment fee',
-    payment_pct: 'Payment fee', payFixed: 'Payment fee per order', payment_fixed: 'Payment fee per order',
+    gross_margin: 'Margin on products without a cost', refundPct: 'Refunds, % of sales', refund_rate: 'Refunds, % of sales',
+    shipping: 'Shipping', packaging: 'Packaging', fulfilment: 'Fulfilment', payPct: 'Card fee, % of each order',
+    payment_pct: 'Card fee, % of each order', payFixed: 'Card fee per order', payment_fixed: 'Card fee per order',
     fixed_costs_monthly: 'Monthly overheads', discount_rate: 'Discount codes', aov: 'Average order value',
   };
-  const name = k => LABEL[k] || String(k).replace(/_/g,' ');
+  const name = k => LABEL[k] || v3KeyWords(k);
   const fmt = (v, unit) => {
     if (v == null) return FMT_NONE;
     const n = Number(v);
@@ -17346,7 +17377,7 @@ function CostDrift(){
           </div>
         </div>)}
     {rows.some(r => !r.verifiable) && (<div className="micro muted" style={{marginTop:'var(--space-2)'}}>
-      Greta can’t check {rows.filter(r=>!r.verifiable).map(r => name(r.input_key).toLowerCase()).join(', ')} yet —
+      Greta can’t check {rows.filter(r=>!r.verifiable).map(r => name(r.input_key).toLowerCase()).join(', ')} yet:
       nothing connected records what you actually pay for these, so your figures are used as entered.
     </div>)}
   </div>);
@@ -21710,7 +21741,7 @@ function V3BusinessState({ part }) {
           <td className="t-text">{lab}</td><td>{f(v)}</td><td className="v3-muted">{f(bm.low)} – {f(bm.high)}</td>
           <td className={'t-text ' + (TONE[t] || '')}>{WORD[t] || ''}</td></tr>); })}</tbody>
       </table>
-      <p className="micro muted v3-measure">Typical ranges are rules of thumb for {S.vertical === 'default' ? 'UK DTC brands' : 'UK ' + S.vertical + ' brands'}, not measured from other brands’ data; read them as context, not targets.</p>
+      <p className="micro muted v3-measure">Typical ranges are rules of thumb for {S.vertical === 'default' || !v3VerticalWords(S.vertical) ? 'UK online brands' : 'UK ' + v3VerticalWords(S.vertical) + ' brands'}, not measured from other brands’ data; read them as context, not targets.</p>
     </>);
   const story = NS && NS.story;
   // 9 Oct: Today opened on about 150 words before any picture or action. The top is now the verdict,
@@ -22248,7 +22279,7 @@ function V3AnatomyCoverage() {
             <ul className="v3-cov-list">{(r.measures || []).map(m => (<li key={m.key}>
               <span className="v3-cov-name">{m.name}</span>
               <span className={'v3-cov-fig' + (V3_HEALTH_WORD[m.health] ? ' v3-muted' : '')}>{m.display || V3_HEALTH_WORD[m.health] || ('Measured' + (pages[r.page] ? ', shown on ' + ((V3_BY_ID[pages[r.page]] || {}).label || r.arm) : ''))}</span>
-              {(m.basis || m.needs) && <span className="v3-cov-why">{[m.basis ? v3Sentence(m.basis) + '.' : null, m.needs ? v3Sentence(m.needs) + '.' : null].filter(Boolean).join(' ')}</span>}
+              {(m.basis || m.needs) && <span className="v3-cov-why">{[m.basis ? v3Sentence(v3NoInternal(m.basis)) + '.' : null, m.needs ? v3Sentence(v3NoInternal(m.needs)) + '.' : null].filter(Boolean).join(' ')}</span>}
             </li>))}</ul>
             {pages[r.page] && <button type="button" className="v3-xref" onClick={() => window.__oiNav && window.__oiNav(pages[r.page])}>Go to {(V3_BY_ID[pages[r.page]] || {}).label || r.arm} <span className="v3-xref-go">→</span></button>}
           </td></tr>}
@@ -23534,7 +23565,7 @@ function V3CreativeDemand() {
   const c = q.rows[0], n = v => (v == null ? null : Number(v));
   if (!(n(c.active_ads) > 0)) return null;
   const rows = [
-    ['Spend in your top 5 ads', n(c.ad_concentration), 'CTC worries above 33–50%', v => v > 0.5 ? 'weak' : v > 0.33 ? 'ok' : 'good'],
+    ['Spend in your top 5 ads', n(c.ad_concentration), 'most brands see ads tire once the top 5 take more than a third to a half of spend', v => v > 0.5 ? 'weak' : v > 0.33 ? 'ok' : 'good'],
     ['Ads that earned nothing', n(c.zero_rev_rate), 'some is normal while testing', v => v > 0.5 ? 'weak' : 'ok'],
     ['Spend on ads still running after a month', n(c.evergreen_share), 'the best brands hold about 61%', v => v >= 0.5 ? 'good' : v >= 0.3 ? 'ok' : 'weak'],
     ['New ads that became winners', n(c.win_rate != null ? c.win_rate : c.activation_rate), 'about 21% is typical', v => v >= 0.18 ? 'good' : v >= 0.1 ? 'ok' : 'weak'],

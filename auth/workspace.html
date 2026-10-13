@@ -316,12 +316,17 @@
       <h2 style="font-size:14px; margin:0 0 var(--s-2); font-weight:650; color:var(--text-secondary);">Workspace details</h2>
       <table class="kv-table">
         <tr><td>Brand</td><td id="kv-brand">—</td></tr>
-        <tr><td>Workspace handle</td><td><code id="kv-slug">—</code></td></tr>
-        <tr><td>Vertical</td><td id="kv-vertical">—</td></tr>
+        <tr><td>What you sell</td><td id="kv-vertical">—</td></tr>
         <tr><td>Currency</td><td id="kv-currency">—</td></tr>
         <tr><td>Your role</td><td id="kv-role">—</td></tr>
-        <tr><td>Workspace ID</td><td><code id="kv-id" style="font-size:10.5px;">—</code></td></tr>
       </table>
+      <details class="advanced-details">
+        <summary>Details for support</summary>
+        <table class="kv-table">
+          <tr><td>Workspace handle</td><td><code id="kv-slug">—</code></td></tr>
+          <tr><td>Workspace ID</td><td><code id="kv-id" style="font-size:10.5px;">—</code></td></tr>
+        </table>
+      </details>
     </div>
 
     <!-- ── TEAM ───────────────────────────────────────────────────────── -->
@@ -601,7 +606,7 @@
     document.getElementById('welcome-brand').textContent = currentBrand.name;
     document.getElementById('kv-brand').textContent = currentBrand.name;
     document.getElementById('kv-slug').textContent = currentBrand.slug;
-    document.getElementById('kv-vertical').textContent = currentBrand.vertical || '—';
+    document.getElementById('kv-vertical').textContent = verticalWords(currentBrand.vertical);
     document.getElementById('kv-currency').textContent = currentBrand.currency || 'GBP';
     document.getElementById('kv-role').textContent = m.role;
     document.getElementById('kv-id').textContent = currentBrand.id;
@@ -647,6 +652,20 @@
     setTimeout(() => { banner.style.transition = 'opacity .6s'; banner.style.opacity = '0'; setTimeout(() => banner.remove(), 700); }, 8000);
   }
 
+  // A stored label can carry how it connects ("FRKL Klaviyo (API key)"): show the name only.
+  function accountWords(s) { return String(s || '').replace(/\s*\([^()]*\)\s*$/, '').trim(); }
+  // The stored vertical is a key ("dtc_jewellery"): say it in words.
+  function verticalWords(v) {
+    if (!v) return '—';
+    const KNOWN = { dtc_jewellery: 'Jewellery', jewellery: 'Jewellery', dtc_apparel: 'Clothing', apparel: 'Clothing',
+      dtc_beauty: 'Beauty', beauty: 'Beauty', dtc_coffee: 'Coffee', coffee: 'Coffee', dtc_food: 'Food and drink',
+      dtc_wellness: 'Health and wellness', wellness: 'Health and wellness', dtc_home: 'Home', home: 'Home' };
+    const k = String(v).trim().toLowerCase();
+    if (KNOWN[k]) return KNOWN[k];
+    const s = k.replace(/[_-]+/g, ' ').replace(/^dtc\s+/, '').replace(/\s+/g, ' ').trim();
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) : '—';
+  }
+
   function renderConnections(connByProvider) {
     const grid = document.getElementById('conn-grid');
     grid.innerHTML = '';
@@ -658,7 +677,7 @@
 
       const card = document.createElement('div');
       card.className = 'conn-card' + (isActive ? ' active' : isPending ? ' pending' : '');
-      const connectLabel = spec.authType === 'api_key' ? 'Add API key' : 'Connect';
+      const connectLabel = 'Connect';
       card.innerHTML = `
         <div class="conn-card-head">
           <div class="conn-icon">${spec.icon}</div>
@@ -666,7 +685,7 @@
             <div class="conn-name">${spec.name}</div>
             <span class="conn-status ${isActive ? 'active' : isPending ? 'pending' : isError ? 'pending' : 'disconnected'}">
               <span class="dot"></span>
-              ${isActive ? `Connected${conn.account_label ? ` · ${conn.account_label}` : ''}` :
+              ${isActive ? `Connected${conn.account_label ? ` · ${accountWords(conn.account_label)}` : ''}` :
                 isPending ? 'Install in progress' :
                 isError ? 'Error · reconnect needed' :
                 spec.required ? 'Required · not connected' : 'Optional · not connected'}

@@ -1498,7 +1498,7 @@
   .v3-chips { display: flex; flex-wrap: wrap; gap: var(--space-2, 8px); padding-bottom: var(--space-3, 12px); }
   .v3-chip { font-family: var(--font-sans); font-size: var(--text-xs, 11px); color: var(--color-muted);
              background: none; border: 1px solid var(--color-line); border-radius: var(--radius-md, 4px);
-             padding: 3px 9px; cursor: pointer; text-transform: capitalize;
+             padding: 3px 9px; cursor: pointer;
              transition: color var(--transition-fast, .15s) ease, border-color var(--transition-fast, .15s) ease; }
   .v3-chip:hover { color: var(--color-ink); border-color: var(--color-line-strong, var(--color-line)); }
   .v3-chip.on { color: var(--color-panel); background: var(--color-ink); border-color: var(--color-ink); }
@@ -1538,8 +1538,7 @@
   .v3-rank-bar { display: block; height: 3px; background: var(--color-sunken, #EFEAE3); margin: 6px 0 4px; }
   .v3-rank-bar i { display: block; height: 100%; background: var(--color-accent);
                    transition: width var(--transition-base, .25s) ease; }
-  .v3-rank-meta { font-family: var(--font-sans); font-size: var(--text-xs, 11px); color: var(--color-muted);
-                  text-transform: capitalize; }
+  .v3-rank-meta { font-family: var(--font-sans); font-size: var(--text-xs, 11px); color: var(--color-muted); }
   .v3-rank-gbp { font-family: var(--font-mono); font-size: var(--text-base, 15px); color: var(--color-ink); white-space: nowrap; }
   .v3-rank-per { font-size: var(--text-xs, 11px); color: var(--text-faint, var(--color-muted)); }
   /* A row's controls: the remedy where there is one, and always Mark done. Indented to

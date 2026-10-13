@@ -561,11 +561,11 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-board-total-lab { font-family: var(--font-sans); font-size: var(--text-base); font-weight: var(--weight-normal); color: var(--color-muted); letter-spacing: 0; }
 .v3-board-unver { font-size: var(--text-sm); color: var(--color-faint); }
 .v3-chips { gap: var(--space-1); margin-bottom: var(--space-4); }
-.v3-chip { border-radius: var(--radius-full); height: 28px; padding: 0 var(--space-3); font-size: var(--text-xs); text-transform: capitalize; }
+.v3-chip { border-radius: var(--radius-full); height: 28px; padding: 0 var(--space-3); font-size: var(--text-xs); }
 .v3-rank-row { padding: var(--space-4) 0; }
 .v3-rank-bar { height: 3px; background: var(--color-sunken); max-width: 420px; margin: var(--space-2) 0; }
 .v3-rank-bar i { background: var(--color-accent); opacity: .85; }
-.v3-rank-meta { font-size: var(--text-xs); color: var(--color-faint); text-transform: capitalize; }
+.v3-rank-meta { font-size: var(--text-xs); color: var(--color-faint); }
 .v3-rank-gbp { font-family: var(--font-figure); font-size: var(--text-base); font-weight: var(--weight-semi); color: var(--color-ink); }
 .v3-rank-per { color: var(--color-faint); font-weight: var(--weight-normal); font-size: var(--text-xs); }
 .v3-rank-fix { gap: var(--space-1); }
