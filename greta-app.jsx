@@ -17863,6 +17863,8 @@ function V3Today(p) {
   const stateQ = useV3Rows('brand-state', V3_STATE_Q);
   const stateLead = !!(stateQ.rows && stateQ.rows[0] && stateQ.rows[0].last_30);
   const gc = useV3GoalCheck();  // pace is withheld while the goal needs re-planning or has just begun
+  // The month so far against the plan (fn_plan_progress): the same answer Goal, Growth and Calendar give.
+  const ppT = useV3Rows('plan-progress-month', V3_PP_MONTH_Q);
   // A typical month (shared with Profit & sales), and the quarter plan's pace for the seasonal note.
   const ladT = useV3Rows('profit-ladder', V3_LADDER_Q);
   const hT = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || null;
@@ -17918,8 +17920,12 @@ function V3Today(p) {
   const confirmed = d.plan_status === 'confirmed';
   // Guard the divisor, not the truthiness: a zero target used to hide the bar while the
   // pounds-ahead line underneath kept rendering off the same number.
-  const pacePos = (camTarget != null && camTarget > 0) ? (cam / camTarget) : null;
-  const diff = camTarget != null ? cam - camTarget : null;
+  // Progress is the month so far against what the month's plan expects by now (fn_plan_progress),
+  // not the last 30 days against a whole month's target: those two windows never lined up.
+  const PPT = ppT.rows && ppT.rows[0] ? ppT.rows[0] : null;
+  const ppP = PPT && PPT.profit_after_ads && Number(PPT.profit_after_ads.plan_total) > 0 && PPT.profit_after_ads.status ? PPT.profit_after_ads : null;
+  const ppMonth = PPT ? gpMonthName(PPT.start) : '';
+  const ppPct = (v, of) => Math.max(0, Math.min(100, (Number(v) || 0) / of * 100));
   // The cache paints first; the live board, once it has landed, is what every list reads.
   const liveRows = board.rows ? v3FoldPlans(v3LiveRows(board.rows)) : null;
   const top = (topDone && closedTop.current) ? closedTop.current : (liveRows ? (liveRows[0] || null) : d.top_action);
@@ -18120,30 +18126,33 @@ function V3Today(p) {
           </V3Figure>
         </div>
         <V3HeroDelta cam={cam} sales={sales} prod={prod} typical={typical}/>
-        {camTarget != null && (gc.stale || gc.early) ? (
+        {(camTarget != null || ppP) && gc.stale ? (
           <div className="v3-pace">
-            <span className="v3-muted">{gc.stale
-              ? 'Your goal needs re-planning. Greta’s plan changed after you confirmed it, so progress against it would mislead.'
-              : 'Progress against your goal shows from ' + v3Day(gc.paceFrom) + '. Until then, most of the last 30 days fall before the goal began.'}</span>
-            {gc.stale && <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('goal')}>Re-plan the quarter</button>}
+            <span className="v3-muted">Your goal needs re-planning. Greta’s plan changed after you confirmed it, so progress against it would mislead.</span>
+            <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('goal')}>Re-plan the quarter</button>
           </div>
-        ) : camTarget != null ? (<>
-          <div className="v3-bar" aria-hidden="true"><i style={{ width: Math.max(2, Math.min(100, (pacePos || 0) * 66)) + '%' }}/><b style={{ left: '66%' }}/></div>
+        ) : ppP ? (<>
+          {/* The bar is the month's planned profit after ads; the fill is what is kept so far and the
+              mark is what the plan expects by now. */}
+          <div className="v3-bar" aria-hidden="true"><i style={{ width: Math.max(2, ppPct(ppP.actual_so_far, Number(ppP.plan_total))) + '%' }}/><b style={{ left: ppPct(ppP.expected_by_now, Number(ppP.plan_total)) + '%' }}/></div>
           {/* The pace sentence is the one the operator acts on, so it must not claim a cushion the
               data cannot support. frkl read "£3,150 ahead" while Meta had not reported for ten
               days; the missing spend was about £2,238, so the real cushion was closer to £900 and
               the claim was out by roughly five times. When unreported spend could swallow half the
               gap, Greta says it is too close to call rather than picking a side. */}
-          <div className={'v3-pace ' + (d.pace_is_reliable === false ? '' : (diff >= 0 ? 'good' : 'bad'))}>
+          <div className={'v3-pace ' + (d.pace_is_reliable === false ? '' : v3PlanTone(ppP.status))}>
             {d.pace_is_reliable === false
-              ? <>Too close to call — {v3Gbp(d.unreported_spend)} of ad spend has not come through yet</>
-              : <>{diff >= 0 ? v3Gbp(Math.abs(diff)) + ' ahead of' : v3Gbp(Math.abs(diff)) + ' behind'} your monthly goal</>}
-            <span className="v3-muted v3-pace-goal"><span className="v3-sep" aria-hidden="true"> · </span>goal {v3Gbp(camTarget)} a month</span>
-            {d.target_is_derived && <V3Conf state="probably"
-              detail={'Nobody has confirmed a profit-after-ads goal, so Greta worked this one out by taking your ad budget off your profit target. That assumes you spend the budget in full. Confirm a goal and this becomes your own figure.'}
-              fix={['home', 'plansetup', 'Open Goal & costs']}/>}
+              ? <>Too close to call: {v3Gbp(d.unreported_spend)} of ad spend has not come through yet</>
+              : <>{V3_PLAN_WORD[ppP.status]}: {v3Gbp(Math.abs(Number(ppP.gap)))} {Number(ppP.gap) >= 0 ? 'more' : 'less'} after ads than {ppMonth}’s plan expects by now</>}
+            <span className="v3-muted v3-pace-goal"><span className="v3-sep" aria-hidden="true"> · </span>{v3Gbp(ppP.actual_so_far)} kept so far of {v3Gbp(ppP.plan_total)} planned for {ppMonth}</span>
+            <V3Conf state="probably" detail={[PPT.basis_note, ppP.pace_basis ? 'At today’s pace: ' + ppP.pace_basis + '.' : null].filter(Boolean).join(' ')}
+              fix={['home', 'plansetup', 'Open Goal & costs']}/>
           </div>
-        </>) : (
+          {ppP.pace_finish != null && <p className="micro muted v3-measure">At today’s pace {ppMonth} ends at {v3Gbp(ppP.pace_finish)} after ads, against {v3Gbp(ppP.plan_total)} planned.</p>}
+        </>) : (camTarget != null && !ppT.rows && !ppT.err) ? null : (camTarget != null && ppT.err) ? (
+          <div className="v3-pace"><span className="v3-muted">Greta couldn’t load this month’s plan just now.</span>
+            <button type="button" className="v3-btn v3-btn-sm" onClick={ppT.retry}>Try again</button></div>
+        ) : (
           <div className="v3-pace">
             <span className="v3-muted">{confirmed ? 'Your goal has no profit-after-ads figure, and no ad budget to work one out from. Greta won’t guess how you are doing against it.' : 'Your goal is still an estimate, so Greta doesn’t show progress against it yet.'}</span>
             <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav('home', 'plansetup')}>Set your goal</button>
@@ -18247,6 +18256,14 @@ const V3_STOCK_Q = (sb, b) => {
     .then(r => (r && r.error && /lead_days|runs_out/.test(r.error.message || '')) ? ask(V3_STOCK_COLS + ',last_sold_on') : r)
     .then(r => (r && r.error && /last_sold_on/.test(r.error.message || '')) ? ask(V3_STOCK_COLS) : r);
 };
+// One answer to "is the month on plan?" (fn_plan_progress, 0923): Goal, Growth, Calendar and Today
+// all read it, so they cannot disagree. Sales and profit after ads so far, what the plan expects by
+// now, a status, and "at today's pace" from the last 30 days. One cached read per period.
+const V3_PLAN_PROGRESS_Q = period => (sb, b) => sb.rpc('fn_plan_progress', { p_brand: b, p_period: period })
+  .then(r => ({ data: r.data ? [r.data] : [], error: r.error }));
+const V3_PP_MONTH_Q = V3_PLAN_PROGRESS_Q('month'), V3_PP_QUARTER_Q = V3_PLAN_PROGRESS_Q('quarter');
+const V3_PLAN_WORD = { ahead: 'Ahead of plan', on_plan: 'On plan', just_behind: 'Just behind plan', behind: 'Behind plan' };
+const v3PlanTone = st => (st === 'ahead' || st === 'on_plan') ? 'good' : st === 'behind' ? 'bad' : '';
 const V3_UE_Q = (sb, b) => sb.from('vw_brand_unit_economics')
     .select('cac,ltv_contribution,ltv_rev,ltv_horizon_months,ltv_cac,payback_orders,first_order_contribution').eq('brand_id', b).limit(1);
 const V3_MIX_Q = (sb, b) => sb.from('vw_channel_revenue_mix').select('window_label,channel,net_revenue').eq('brand_id', b).eq('window_label', 'current_30d');
@@ -18309,7 +18326,7 @@ function V3Growth() {
   const mo = useV3Rows('mk-months', V3_MONTHS_Q);
   const tierG = useV3Rows('tier-30', V3_TIER_Q);
   const { g, per, pace, atGoal, today } = useV3Goal();
-  const sofar = useV3Rows('goal-sofar-' + per.start, V3_SOFAR_Q(per.start, today));
+  const ppG = useV3Rows('plan-progress-month', V3_PP_MONTH_Q);   // the month so far, as Today and Goal say it
   const sc = P.spendCurve || null;
   const pts = (P.spendCurvePoints || []).filter(p => Number(p.spend) > 0 && p.cac != null);
   const U = (ue.rows || [])[0] || null;
@@ -18371,10 +18388,13 @@ function V3Growth() {
   // the plan over the same days (frkl, 5 Oct: forecast GBP 28.5k for 1 Oct-2 Nov, plan about 16k,
   // October running at about 16k).
   const fc = P.forecast || null;
-  const mStart = today.slice(0, 8) + '01', dim = new Date(Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)), 0)).getUTCDate();
-  const daysDone = Number(today.slice(8, 10)) - 1;
-  const mtd = sofar.rows ? sofar.rows.filter(r => String(r.order_date) >= mStart).reduce((a, r) => a + (Number(r.net_revenue) || 0), 0) : null;
-  const planMo = PL ? (PL.months || []).find(m => String(m.month).slice(0, 7) === today.slice(0, 7)) : null;
+  // The month so far, its plan and "at today's pace" all come from fn_plan_progress.
+  const MP = ppG.rows && ppG.rows[0] ? ppG.rows[0] : null, MS = MP && MP.sales ? MP.sales : null;
+  const mStart = MP ? String(MP.start).slice(0, 10) : today.slice(0, 8) + '01';
+  const dim = MP ? Number(MP.days_total) : 0, daysDone = MP ? Number(MP.days_done) : 0;
+  const mtd = MS && MS.actual_so_far != null ? Number(MS.actual_so_far) : null;
+  const planMo = MS && Number(MS.plan_total) > 0 && MS.status ? MS : null;
+  const ppdG = MS && MS.pace_per_day != null ? Number(MS.pace_per_day) : null;
   const planWin = (PL && fc && fc.forecast_covers_from && fc.forecast_covers_to) ? (PL.months || []).reduce((a, m) => {
     const ms = String(m.month).slice(0, 10), me = v3IsoAdd(v3MonthAdd(ms, 1), -1);
     const lo = fc.forecast_covers_from > ms ? fc.forecast_covers_from : ms, hi = fc.forecast_covers_to < me ? fc.forecast_covers_to : me;
@@ -18383,8 +18403,8 @@ function V3Growth() {
   }, 0) : null;
   // ...and with how the month is actually running (6 Oct: £27,736 for 1 Oct-3 Nov beside "on course for
   // £14,967" for October, within 30% of the plan but 69% above the pace). Needs a week of the month.
-  const paceWin = (fc && fc.forecast_covers_from && fc.forecast_covers_to && mtd != null && daysDone >= 7)
-    ? mtd / daysDone * (Math.round((new Date(fc.forecast_covers_to) - new Date(fc.forecast_covers_from)) / 864e5) + 1) : null;
+  const paceWin = (fc && fc.forecast_covers_from && fc.forecast_covers_to && ppdG != null && daysDone >= 7)
+    ? ppdG * (Math.round((new Date(fc.forecast_covers_to) - new Date(fc.forecast_covers_from)) / 864e5) + 1) : null;
   const fcOk = fc && Number(fc.forecast_revenue_period) > 0 && planWin > 0 && Math.abs(Number(fc.forecast_revenue_period) / planWin - 1) <= 0.3
     && (paceWin == null ? daysDone >= 7 : Math.abs(Number(fc.forecast_revenue_period) / paceWin - 1) <= 0.3);
 
@@ -18483,9 +18503,9 @@ function V3Growth() {
     {planMo && mtd != null && daysDone >= 3 && (<section className="v3-sec">
       <h2 className="v3-sec-title">{gpMonthName(mStart)} so far</h2>
       <div className="v3-stat-grid">
-        {stat('Sales so far', fmtMoney(mtd), fmtCount(daysDone) + ' of ' + fmtCount(dim) + ' days')}
-        {stat('On course for', fmtMoney(mtd / daysDone * dim), 'at this pace for the month')}
-        {stat('The plan for ' + gpMonthName(mStart), fmtMoney(planMo.sales), ((PL && PL.flags) || []).indexOf('held_at_first_order_profit') >= 0 ? 'at the plan’s budget' : 'at today’s ad spend')}
+        {stat('Sales so far', fmtMoney(mtd), V3_PLAN_WORD[planMo.status] + ': ' + fmtMoney(planMo.expected_by_now) + ' expected by now', 'v3-' + (v3PlanTone(planMo.status) === 'bad' ? 'down' : 'muted'))}
+        {planMo.pace_finish != null && stat('At today’s pace', fmtMoney(planMo.pace_finish), 'your last 30 days’ average day (' + fmtMoney(planMo.pace_per_day) + ') for each of the ' + fmtCount(MP.days_left) + ' days left')}
+        {stat('The plan for ' + gpMonthName(mStart), fmtMoney(planMo.plan_total), ((PL && PL.flags) || []).indexOf('held_at_first_order_profit') >= 0 ? 'at the plan’s budget' : 'at today’s ad spend')}
         {fcOk && stat('Forecast, ' + v3Day(fc.forecast_covers_from) + ' – ' + v3Day(fc.forecast_covers_to), fmtMoney(fc.forecast_revenue_period), 'the plan says ' + fmtMoney(planWin))}
       </div>
       {fc && !fcOk && Number(fc.forecast_revenue_period) > 0 && planWin > 0 && paceWin != null && <p className="micro muted v3-measure">Greta’s short-term forecast ({fmtMoney(fc.forecast_revenue_period)} for {v3Day(fc.forecast_covers_from)} – {v3Day(fc.forecast_covers_to)}) is far from {Math.abs(Number(fc.forecast_revenue_period) / planWin - 1) > 0.3 ? 'the plan for the same days (' + fmtMoney(planWin) + ')' : 'how the month is running (' + fmtMoney(paceWin) + ' at this pace)'}, so it isn’t shown as a forecast here.</p>}
@@ -20253,9 +20273,6 @@ function useV3Goal(opts) {
   const atGoal = useV3Rows(tgt && wantGoal ? 'goal-plan-' + per.start + '-' + tgt : 'goal-plan-none', tgt && wantGoal ? v3PlanQ(per.start, per.end, tgt) : () => Promise.resolve({ data: [] }));
   return { goal, g, per, tgt, pace, atGoal, today };
 }
-// Sales from the period start to the end of yesterday (the plan's basis), one key per period.
-const V3_SOFAR_Q = (start, today) => (sb, b) => sb.from('vw_daily_new_vs_returning').select('order_date,net_revenue')
-  .eq('brand_id', b).eq('ledger', 'dtc').gte('order_date', start).lt('order_date', today).limit(2000);
 // What the plan expected by the end of yesterday: whole months, and the current month pro rata.
 function v3PlanToDate(months, key, today) {
   let s = 0;
@@ -20273,30 +20290,39 @@ function V3GoalLead() {
   const boardG = useV3Board();
   const cfg = useV3Rows('brand-cfg', V3_BCFG_Q);
   const ue = useV3Rows('cust-ue', V3_UE_Q);
-  const sofar = useV3Rows('goal-sofar-' + per.start, V3_SOFAR_Q(per.start, today));
+  // The quarter so far against the plan: the same answer (fn_plan_progress) Today, Growth and Calendar give.
+  const ppq = useV3Rows('plan-progress-quarter', V3_PP_QUARTER_Q);
   // A confirmed plan re-reads everything that depends on the goal.
   React.useEffect(() => {
-    const on = () => { goal.retry(); pace.retry(); atGoal.retry(); };
+    const on = () => { goal.retry(); pace.retry(); atGoal.retry(); ppq.retry(); };
     window.addEventListener('greta-goal-updated', on);
     return () => window.removeEventListener('greta-goal-updated', on);
   });
   if (goal.err || pace.err) return <V3LoadFailed what="your goal and plan" onRetry={() => { if (goal.err) goal.retry(); if (pace.err) pace.retry(); }}/>;
-  if (!goal.rows || !pace.rows || !sofar.rows) return <V3SkeletonRows n={4}/>;
+  if (!goal.rows || !pace.rows || (!ppq.rows && !ppq.err)) return <V3SkeletonRows n={4}/>;
   const P = pace.rows[0] || null, G = (atGoal.rows || [])[0] || null;
   const L = v3Lead(cfg.rows), C = (cfg.rows || [])[0] || {}, U = (ue.rows || [])[0] || null;
-  const done = sofar.rows.reduce((a, r) => a + (Number(r.net_revenue) || 0), 0);
+  const PQ = ppq.rows && ppq.rows[0] ? ppq.rows[0] : null, QS = PQ && PQ.sales ? PQ.sales : null;
+  const done = QS && QS.actual_so_far != null ? Number(QS.actual_so_far) : null;
   const range = v3Day(per.start) + ' – ' + v3Day(per.end, true);
   const setGoal = <button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={() => { const el = document.getElementById('v3a-goal-set'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>{g ? 'Change the goal' : 'Set a goal'}</button>;
   if (!P) return (<section>
     <div className="v3-kick">This quarter · {range}</div>
     <p className="v3-verdict">{g ? 'Your goal is ' + fmtMoney(tgt) + ' of sales this quarter.' : 'There is no goal for this quarter yet.'}</p>
-    <p className="v3-note v3-measure">Greta needs a full month of sales before it can say where the quarter will end up. You have sold {fmtMoney(done)} so far this quarter.</p>
+    <p className="v3-note v3-measure">Greta needs a full month of sales before it can say where the quarter will end up.{done != null ? <> You have sold {fmtMoney(done)} so far this quarter.</> : null}</p>
     <div className="v3-btn-row">{setGoal}</div>
   </section>);
 
   const ph = G && Array.isArray(G.months) && G.months.length && g && Array.isArray(g.phasing) && g.phasing.length && Math.abs(Number(G.spend_cap) / Number(g.spend_cap) - 1) > 0.05
     ? G.months : (g && Array.isArray(g.phasing) && g.phasing.length ? g.phasing : null);
-  const exp = ph ? v3PlanToDate(ph, 'sales', today) : v3PlanToDate(P.months, 'sales', today);
+  // What the plan expects by now and whether the quarter is on it come from fn_plan_progress, not a
+  // second spread of the months here.
+  const exp = QS && QS.expected_by_now != null ? Number(QS.expected_by_now) : null;
+  const st = QS && QS.status ? QS.status : null;
+  // "At today's pace" is the last 30 days' average day for each day left (fn_plan_progress), per month.
+  const ppd = QS && QS.pace_per_day != null ? Number(QS.pace_per_day) : null;
+  const ppMo = {}; ((PQ && PQ.series) || []).forEach(s => { ppMo[String(s.month).slice(0, 7)] = s; });
+  const paceAt = k => { const s = ppMo[k]; return s && ppd != null ? (Number(s.actual) || 0) + ppd * Math.max(0, Number(s.days) - Number(s.days_done)) : null; };
   const short = tgt ? tgt - Number(P.revenue_target) : null;
   // 0396: when the plan holds ads where a first order still pays for itself, it is not "today's ad spend"
   const held = (P.flags || []).indexOf('held_at_first_order_profit') >= 0;
@@ -20304,15 +20330,14 @@ function V3GoalLead() {
   const maxSeen = P.inputs && Number(P.inputs.max_monthly_spend_seen) > 0 ? Number(P.inputs.max_monthly_spend_seen) : null;
   const paceMo = {}; (P.months || []).forEach(m => { paceMo[String(m.month).slice(0, 7)] = m; });
   const rows = (ph || P.months || []).map(m => { const k = String(m.month).slice(0, 7), p = paceMo[k] || {};
-    return { iso: String(m.month).slice(0, 10), goal: ph ? Number(m.sales) : null, gSpend: ph ? Number(m.spend) : null, pace: Number(p.sales), pSpend: Number(p.spend), x: ph && maxSeen ? Number(m.spend) / maxSeen : null }; });
+    return { iso: String(m.month).slice(0, 10), goal: ph ? Number(m.sales) : null, gSpend: ph ? Number(m.spend) : null, pace: Number(p.sales), atPace: paceAt(k), pSpend: Number(p.spend), x: ph && maxSeen ? Number(m.spend) / maxSeen : null }; });
   const peak = ph ? rows.slice().sort((a, b) => b.gSpend - a.gSpend)[0] : rows.slice().sort((a, b) => b.pace - a.pace)[0];
   const gSpendNow = G ? Number(G.spend_cap) : (g ? Number(g.spend_cap) : null);
   const peakShare = ph && gSpendNow > 0 ? peak.gSpend / gSpendNow : null;
   const B = (G || P).breakdown || {};
   const mc = Number(B.marginal_cost_per_new_customer), fop = Number(B.first_order_profit);
   const ltv = U && Number(U.ltv_contribution) > 0 ? Number(U.ltv_contribution) : null;
-  // Stock for the peak month has to land before it starts.
-  const onTrack = done >= exp * 0.95;
+  const onTrack = st === 'ahead' || st === 'on_plan';
   // The goal's profit on today's figures (the stored one used the margin of the day it was confirmed),
   // against today's pace: what the extra ads buy in profit, not just in sales.
   const gCam = G ? Number(G.cam_target) : (g ? Number(g.cam_target) : null);
@@ -20338,7 +20363,7 @@ function V3GoalLead() {
     <div className="v3-kick">This quarter · {range}</div>
     {stale && (<div className="v3-alert">
       <p className="v3-measure"><b>Greta’s plan has changed since you confirmed this goal.</b> {fmtMoney(tgt)} of sales now takes about {fmtMoney(G.spend_cap)} of ads, not {fmtMoney(g.spend_cap)}.
-        {dCam != null ? <> That leaves {fmtMoney(gCam)} of profit after ads, {dCam < 0 ? fmtMoney(-dCam) + ' less than' : fmtMoney(dCam) + ' more than'} staying at today’s pace.</> : null}
+        {dCam != null ? <> That leaves {fmtMoney(gCam)} of profit after ads, {dCam < 0 ? fmtMoney(-dCam) + ' less than' : fmtMoney(dCam) + ' more than'} staying at today’s ad spend.</> : null}
         {' '}The plan you confirmed expected more from extra ads than your own sales history shows. Re-plan the quarter to see the corrected figures.</p>
       <div className="v3-btn-row"><button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={replan}>Re-plan the quarter</button></div>
     </div>)}
@@ -20348,25 +20373,29 @@ function V3GoalLead() {
           : <>{atWords} you reach it: about {fmtMoney(P.revenue_target)}.</>}</>
       : <>There is no goal for this quarter yet. {atWords} you land at about {fmtMoney(P.revenue_target)} of sales.</>}</p>
     <p className="v3-note v3-measure">
-      You have sold {fmtMoney(done)} so far. The {g ? 'goal' : 'plan'} expects {fmtMoney(exp)} by now{onTrack ? ', so you are on track.' : ', so you are ' + fmtMoney(exp - done) + ' behind.'}
-      {g && short > 0 && <> The gap is ad spend. The goal takes {fmtMoney(gSpend)} of ads, {fmtMoney(gSpend - Number(P.spend_cap))} more than {held ? 'the plan' : 'today’s pace'}.{peakShare != null ? <> {fmtPctN(peakShare)} of the goal’s ads go in {gpMonthName(peak.iso)}.</> : null}</>}
+      {done != null && exp != null && st
+        ? <>You have sold {fmtMoney(done)} so far. Greta’s plan expects {fmtMoney(exp)} by now, so you are {onTrack ? V3_PLAN_WORD[st].toLowerCase() : V3_PLAN_WORD[st].toLowerCase() + ', ' + fmtMoney(Math.abs(Number(QS.gap))) + ' short'}.{QS.pace_finish != null ? <> At today’s pace the quarter ends at about {fmtMoney(QS.pace_finish)}.</> : null}</>
+        : done != null ? <>You have sold {fmtMoney(done)} so far.</> : null}
+      {g && short > 0 && <> The gap is ad spend. The goal takes {fmtMoney(gSpend)} of ads, {fmtMoney(gSpend - Number(P.spend_cap))} more than {held ? 'the plan' : 'today’s ad spend'}.{peakShare != null ? <> {fmtPctN(peakShare)} of the goal’s ads go in {gpMonthName(peak.iso)}.</> : null}</>}
       {g && short > 0 && dCam != null && <> Those extra ads bring about {fmtMoney(short)} more sales but {dCam > 0 ? 'only ' + fmtMoney(dCam) + ' more' : fmtMoney(-dCam) + ' less'} profit after ads.{dCam < 0 ? ' Past a point, extra ads cost more profit than they bring in.' : atBest === 'at' ? ' The goal sits at the most profitable ad spend Greta can see.' : atBest === 'past' ? ' The goal is past the most profitable ad spend Greta can see (' + fmtMoney(best) + ').' : ''}</>}
       {!(g && short > 0) && best && <> The most profitable ad spend Greta can see is {fmtMoney(best)}, for about {fmtMoney(P.ceiling.best_sales)} of sales.</>}
-      {' '}<V3Conf state="probably" detail={'How Greta plans the quarter: your own busy and quiet months from your sales history, returning customers at their last three months’ rate, and new-customer sales that rise with ad spend, each extra £1 buying a little less. Its average new customer costs ' + (B.cost_per_new_customer ? fmtMoney(B.cost_per_new_customer, 2) : 'less') + ' because the quarter includes Black Friday, when new customers come cheaper. The Customers page shows the last 90 days.'}/></p>
+      {' '}<V3Conf state="probably" detail={'How Greta plans the quarter: your own busy and quiet months from your sales history, returning customers at their last three months’ rate, and new-customer sales that rise with ad spend, each extra £1 buying a little less. Its average new customer costs ' + (B.cost_per_new_customer ? fmtMoney(B.cost_per_new_customer, 2) : 'less') + ' because the quarter includes Black Friday, when new customers come cheaper. The Customers page shows the last 90 days.' + (PQ && PQ.basis_note ? ' ' + PQ.basis_note : '')}/></p>
     <div className="v3-stat-grid v3-gap-top">
-      <div className="v3-stat"><div className="v3-stat-lab"><span>Sales so far</span></div><div className="v3-stat-val">{fmtMoney(done)}</div>
-        <div className="v3-stat-foot"><span className={onTrack ? 'v3-muted' : 'v3-down'}>{fmtMoney(exp)} expected by now</span></div></div>
-      <div className="v3-stat"><div className="v3-stat-lab"><span>{held ? 'Where the plan lands' : 'Where today’s pace lands'}</span></div><div className="v3-stat-val">{fmtMoney(P.revenue_target)}</div>
+      {done != null && <div className="v3-stat"><div className="v3-stat-lab"><span>Sales so far</span></div><div className="v3-stat-val">{fmtMoney(done)}</div>
+        <div className="v3-stat-foot"><span className={!st || onTrack ? 'v3-muted' : 'v3-down'}>{exp != null ? fmtMoney(exp) + ' expected by now' : 'no plan to compare with yet'}</span></div></div>}
+      {QS && QS.pace_finish != null && <div className="v3-stat"><div className="v3-stat-lab"><span>At today’s pace</span></div><div className="v3-stat-val">{fmtMoney(QS.pace_finish)}</div>
+        <div className="v3-stat-foot"><span className="v3-muted">sales so far, then your last 30 days’ average day ({fmtMoney(QS.pace_per_day)}) for each day left</span></div></div>}
+      <div className="v3-stat"><div className="v3-stat-lab"><span>{held ? 'Where the plan lands' : 'Where the plan lands at today’s ad spend'}</span></div><div className="v3-stat-val">{fmtMoney(P.revenue_target)}</div>
         <div className="v3-stat-foot"><span className="v3-muted">{held
-          ? <>{fmtMoney(P.spend_cap)} of ads, the most a first order pays for{Number(P.spend_wanted) > 0 ? <> (today’s pace would spend {fmtMoney(P.spend_wanted)})</> : null}</>
+          ? <>{fmtMoney(P.spend_cap)} of ads, the most a first order pays for{Number(P.spend_wanted) > 0 ? <> (today’s ad spend would come to {fmtMoney(P.spend_wanted)})</> : null}</>
           : <>ads held at {fmtMoney(P.inputs && P.inputs.base_monthly_spend)} a month{P.inputs && P.inputs.base_from && P.inputs.base_to
           ? <>, your average {gpMonthName(String(P.inputs.base_from).slice(0, 7) + '-01').slice(0, 3)}–{gpMonthName(String(P.inputs.base_to).slice(0, 7) + '-01').slice(0, 3)}</> : null}</>}</span></div></div>
       {g && <div className="v3-stat"><div className="v3-stat-lab"><span>Ads the goal takes</span></div><div className="v3-stat-val">{fmtMoney(gSpend)}</div>
         <div className="v3-stat-foot"><span className="v3-muted">{fmtMoney(peak.gSpend)} of it in {gpMonthName(peak.iso)}</span></div></div>}
       {g && <div className="v3-stat"><div className="v3-stat-lab"><span>Profit after ads, at the goal</span></div><div className="v3-stat-val">{fmtMoney(gCam)}</div>
-        <div className="v3-stat-foot"><span className="v3-muted">{fmtMoney(P.cam_target)} {held ? 'on the plan' : 'at today’s pace'}</span></div></div>}
+        <div className="v3-stat-foot"><span className="v3-muted">{fmtMoney(P.cam_target)} {held ? 'on the plan' : 'at today’s ad spend'}</span></div></div>}
     </div>
-    <V3GoalDrivers per={per} today={today} exp={exp} done={done} months={ph || P.months} paceMonths={P.months}
+    <V3GoalDrivers per={per} today={today} exp={exp || 0} done={done || 0} months={ph || P.months} paceMonths={P.months}
       goal={g && ph ? tgt : null} pace={Number(P.revenue_target)} dCam={dCam} held={held} basis={g ? 'goal' : 'plan'}
       range={v3Day(per.start) + ' – ' + v3Day(v3IsoAdd(today, -1), true)}/>
   </section>
@@ -20374,16 +20403,17 @@ function V3GoalLead() {
   <section className="v3-sec">
     <h2 className="v3-sec-title">Month by month</h2>
     <table className="v3-rw">
-      <thead><tr><th className="t-text">Month</th>{ph && <th>Goal</th>}<th>At today’s pace</th>{ph && <th>Ads in the goal</th>}<th>Ads at today’s pace</th>{ph && maxSeen && <th>Against your biggest month</th>}</tr></thead>
+      <thead><tr><th className="t-text">Month</th>{ph && <th>Goal</th>}<th>At today’s pace</th>{ph && <th>Ads in the goal</th>}<th>{held ? 'Ads in Greta’s plan' : 'Ads at today’s spend'}</th>{ph && maxSeen && <th>Against your biggest month</th>}</tr></thead>
       <tbody>{rows.map(r => (<tr key={r.iso}>
         <td className="t-text">{gpMonthName(r.iso)}</td>
         {ph && <td>{fmtMoney(r.goal)}</td>}
-        <td className={ph && r.pace < r.goal ? 'v3-down' : ''}>{fmtMoney(r.pace)}</td>
+        <td className={ph && r.atPace != null && r.atPace < r.goal ? 'v3-down' : ''}>{fmtMoney(r.atPace)}</td>
         {ph && <td>{fmtMoney(r.gSpend)}</td>}
         <td className="v3-muted">{fmtMoney(r.pSpend)}</td>
         {ph && maxSeen && <td className={r.x > 1.5 ? 'v3-down' : 'v3-muted'}>{fmtTimes(r.x, 1)}</td>}
       </tr>))}</tbody>
     </table>
+    {ppd != null && <p className="micro muted v3-measure">At today’s pace is what each month has sold so far plus your average day over the last 30 days ({fmtMoney(ppd)}) for each day left in it.</p>}
     {ph && maxSeen && <p className="micro muted v3-measure">Your biggest month of ads so far was {fmtMoney(maxSeen)}. Past 1.5× that, Greta is estimating beyond any level of spend it has seen from you.</p>}
     {(() => {
       const bs = v3BoardSpendTargets(v3LiveRows(boardG.rows || [])), k = new Date().toISOString().slice(0, 7);
@@ -22009,18 +22039,17 @@ function V3CompetitorDrivers({ rows, brandName, shopName, under, today, gsc }) {
     {open === 'organic' && mO && <V3DriverPanel fixed={mO}/>}
   </div>);
 }
-// Calendar (9 Oct): this month against the calendar's own day-by-day projection (cache_calendar_payload
-// .projection, what the embed below draws as "Live actuals"). Sales = ad spend x sales per £1 of ads,
-// so the gap splits exactly into spending more or less than planned and each £1 bringing more or less.
-// Complete days only; before a week of the month has passed, the last 30 complete days instead.
+// Calendar (9 Oct; 13 Oct reads fn_plan_progress): the month so far against what the month's plan expects
+// by now. Sales = ad spend x sales per £1 of ads, so the gap splits exactly into spending more or less than
+// planned and each £1 bringing more or less. Complete days only.
 function v3ModelCalendar(A, P, info) {
   const mA = A.spend > 0 ? A.rev / A.spend : null, mP = P.spend > 0 ? P.rev / P.spend : null;
   const ok = mA && mP;
   const [pS, pM] = ok ? v3LogParts(P.rev, A.rev, [{ a: P.spend, b: A.spend, sign: 1 }, { a: mP, b: mA, sign: 1 }]) : [A.rev - P.rev, 0];
   return {
-    title: A.rev >= P.rev ? 'Why sales are ahead of the calendar' : 'Why sales are behind the calendar',
+    title: A.rev >= P.rev ? 'Why sales are ahead of the plan' : 'Why sales are behind the plan',
     from: P.rev, to: A.rev, better: 'higher', fmtV: v => fmtMoney(v), fmtAmt: v => fmtMoney(Math.abs(v)),
-    startK: 'The calendar’s plan', endK: 'What came in', subA: info.range, subB: info.range, colA: 'Planned', colB: 'Actual',
+    startK: 'The plan by now', endK: 'What came in', subA: info.range, subB: info.range, colA: 'Planned', colB: 'Actual',
     bridgeCap: 'From the plan to what came in', of: A.rev >= P.rev ? 'the lead' : 'the gap',
     todo: [{ amt: pM, ids: ['driver-meta-ads', 'order-cost-meta', 'sales-rhythm'] }],
     parts: ok ? [
@@ -22031,7 +22060,7 @@ function v3ModelCalendar(A, P, info) {
         cause: <>each £1 of ads brought {v3UpDown(mP, mA, 'more', 'less')} in sales than planned ({fmtMoney(mP, 2)} planned, {fmtMoney(mA, 2)} actual)</>,
         against: <>Each £1 of ads bringing {v3UpDown(mP, mA, 'more', 'less')} than planned ({fmtMoney(mP, 2)} to {fmtMoney(mA, 2)})</> },
     ] : [{ amt: A.rev - P.rev, k: 'Sales against plan', sub: '', cause: <>sales came in {v3UpDown(P.rev, A.rev, 'above', 'below')} plan</>, against: <>Sales against plan</> }],
-    opening: <>For {info.range}, the calendar planned {fmtMoney(P.rev)} of sales and {fmtMoney(A.rev)} came in.</>,
+    opening: <>For {info.range}, {info.month ? info.month + '’s' : 'the month’s'} plan expected {fmtMoney(P.rev)} of sales by now and {fmtMoney(A.rev)} came in.</>,
     closing: <> Profit after ads was {(A.cm < 0 ? '−' : '') + fmtMoney(Math.abs(A.cm))} against {(P.cm < 0 ? '−' : '') + fmtMoney(Math.abs(P.cm))} planned.</>,
     rows: [
       ['Sales', P.rev, A.rev, v => fmtMoney(v), 'higher'],
@@ -22039,36 +22068,33 @@ function v3ModelCalendar(A, P, info) {
       ['Sales from each £1 of ads', mP, mA, v => fmtMoney(v, 2), 'higher'],
       ['Profit after ads', P.cm, A.cm, v => (v < 0 ? '−' : '') + fmtMoney(Math.abs(v)), 'higher'],
     ],
-    note: 'The calendar’s own projection, day by day, from your plan and the events on it, against what came in (the “Live actuals” rows below). It is the calendar’s plan, not the quarter goal on Goal & costs, and the two can differ.',
+    note: 'The month’s plan, the same one Today, Goal & costs and Growth compare with, spread evenly over the month’s days, against what came in. The calendar below draws its own day-by-day projection, which can differ.',
   };
 }
-const V3_CAL_PROJ_Q = (sb, b) => sb.from('cache_calendar_payload').select('proj:payload->projection,generated_at').eq('brand_id', b).limit(1);
+// The month so far against the month's plan (fn_plan_progress, the same answer Today, Goal and Growth
+// give): A is what came in, P is what the plan expects by now. No 30-day fallback: before the month has
+// a complete day there is nothing to compare.
 function V3CalendarDrivers() {
-  const q = useV3Rows('cal-proj', V3_CAL_PROJ_Q);
+  const q = useV3Rows('plan-progress-month', V3_PP_MONTH_Q);
   const [open, setOpen] = React.useState(false);
-  const rows = q.rows && q.rows[0] && Array.isArray(q.rows[0].proj) ? q.rows[0].proj : null;
-  if (!rows) return null;
-  const today = new Date().toISOString().slice(0, 10), mStart = today.slice(0, 8) + '01';
-  const done = rows.filter(r => r.elapsed && String(r.day) < today && r.act_revenue != null && r.proj_revenue != null);
-  let win = done.filter(r => String(r.day) >= mStart);
-  if (win.length < 7) win = done.slice(-30);
-  if (win.length < 3) return null;
-  const sum = k => win.reduce((t, r) => t + (Number(r[k]) || 0), 0);
-  const A = { rev: sum('act_revenue'), spend: sum('act_spend'), cm: sum('act_cm') }, P = { rev: sum('proj_revenue'), spend: sum('proj_spend'), cm: sum('proj_cm') };
-  if (!(P.rev > 0)) return null;
-  const d0 = String(win[0].day).slice(0, 10), d1 = String(win[win.length - 1].day).slice(0, 10);
-  const range = v3Day(d0) + ' – ' + v3Day(d1, true);
-  const ch = A.rev / P.rev - 1;
+  const M = q.rows && q.rows[0] ? q.rows[0] : null;
+  const S = M && M.sales, Pa = M && M.profit_after_ads, Ad = M && M.ad_spend;
+  if (!S || !S.status || !(Number(S.expected_by_now) > 0) || !(Number(M.days_done) > 0)) return null;
+  const A = { rev: Number(S.actual_so_far) || 0, spend: Number(Ad && Ad.actual_so_far) || 0, cm: Number(Pa && Pa.actual_so_far) || 0 };
+  const P = { rev: Number(S.expected_by_now), spend: Number(Ad && Ad.expected_by_now) || 0, cm: Number(Pa && Pa.expected_by_now) || 0 };
+  const range = v3Day(String(M.start).slice(0, 10)) + ' – ' + v3Day(String(M.counted_through).slice(0, 10), true);
+  const tone = v3PlanTone(S.status);
   return (<section className="v3-sec v3-strip">
     <h2 className="v3-sec-title">What is moving it <span className="v3-muted">{range}</span></h2>
     <div className="v3-signs">
-      <V3Sign k="Sales against the calendar’s plan" v={fmtMoney(A.rev)} tone={ch < -0.1 ? 'weak' : ch > 0.1 ? 'good' : 'typical'}
+      <V3Sign k={'Sales against ' + gpMonthName(M.start) + '’s plan'} v={fmtMoney(A.rev)} tone={tone === 'bad' ? 'weak' : S.status === 'ahead' ? 'good' : 'typical'}
         bar={{ fill: Math.min(1, A.rev / (Math.max(A.rev, P.rev) * 1.25)), mark: P.rev / (Math.max(A.rev, P.rev) * 1.25) }}
-        n={<>{fmtMoney(P.rev)} planned; the mark is the plan</>}
-        trendAs={{ dir: Math.abs(ch) < 0.03 ? 'flat' : ch > 0 ? 'up' : 'down', cls: Math.abs(ch) < 0.03 ? 'flat' : ch > 0 ? 'good' : 'bad', text: Math.abs(ch) < 0.03 ? 'About what was planned' : fmtPctN(Math.abs(ch)) + (ch > 0 ? ' above' : ' below') + ' the plan' }}
+        n={<>{fmtMoney(P.rev)} expected by now; the mark is the plan</>}
+        trendAs={{ dir: S.status === 'on_plan' ? 'flat' : S.status === 'ahead' ? 'up' : 'down', cls: S.status === 'on_plan' ? 'flat' : tone === 'good' ? 'good' : 'bad', text: V3_PLAN_WORD[S.status] }}
         act={{ label: open ? 'Hide what is driving it' : 'What is driving this?', open, on: () => setOpen(o => !o) }}/>
     </div>
-    {open && <V3DriverPanel fixed={v3ModelCalendar(A, P, { range })}/>}
+    <p className="micro muted v3-measure">{S.plan_total != null ? <>The plan for {gpMonthName(M.start)} is {fmtMoney(S.plan_total)}. </> : null}{S.pace_finish != null ? <>At today’s pace the month ends at about {fmtMoney(S.pace_finish)}. </> : null}<V3Conf state="probably" detail={[M.basis_note, S.pace_basis ? 'At today’s pace: ' + S.pace_basis + '.' : null].filter(Boolean).join(' ')}/></p>
+    {open && <V3DriverPanel fixed={v3ModelCalendar(A, P, { range, month: gpMonthName(M.start) })}/>}
   </section>);
 }
 // Review (9 Oct): the week against a typical week, on the Review page's own figures. Kept after ads is
@@ -23799,12 +23825,14 @@ function useV3NavSignals() {
 function V3Thread({ dest, go }) {
   const h = useV3Headline();
   const gc = useV3GoalCheck();
+  const pp = useV3Rows('plan-progress-month', V3_PP_MONTH_Q);   // the month so far, as Today says it
   if (!h || dest === 'today') return null;
   if (h.can_show_cm === false) return null;
   const cam = h.cm_after_marketing_30d;
   if (cam == null) return null;
-  const target = h.cam_target_monthly;
-  const diff = target != null ? cam - target : null;
+  const PP = pp.rows && pp.rows[0] && pp.rows[0].profit_after_ads;
+  const ppOk = !!(PP && Number(PP.plan_total) > 0 && PP.status);
+  const diff = ppOk ? Number(PP.gap) : null;
   const unreliable = h.pace_is_reliable === false;
   return (
     <button type="button" className="v3-thread" onClick={() => go('today')}
@@ -23812,14 +23840,14 @@ function V3Thread({ dest, go }) {
       <span className="v3-thread-lab">Profit after ads</span>
       <span className="v3-thread-val">{v3Gbp(cam)}</span>
       <span className="v3-muted">last 30 days</span>
-      {diff != null && (gc.stale || gc.early) && !gc.pending && (
-        <span className="v3-thread-pace">{gc.stale ? 'goal needs re-planning' : 'goal pace from ' + v3Day(gc.paceFrom)}</span>
+      {diff != null && gc.stale && !gc.pending && (
+        <span className="v3-thread-pace">goal needs re-planning</span>
       )}
-      {diff != null && !(gc.stale || gc.early || gc.pending) && (
-        <span className={'v3-thread-pace' + (unreliable ? '' : diff >= 0 ? ' good' : ' bad')}>
+      {diff != null && !(gc.stale || gc.pending) && (
+        <span className={'v3-thread-pace' + (unreliable ? '' : ' ' + v3PlanTone(PP.status))}>
           {unreliable
             ? 'pace too close to call'
-            : (diff >= 0 ? v3Gbp(Math.abs(diff)) + ' ahead' : v3Gbp(Math.abs(diff)) + ' behind')}
+            : V3_PLAN_WORD[PP.status].toLowerCase() + ' this month'}
         </span>
       )}
     </button>
