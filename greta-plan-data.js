@@ -51,7 +51,7 @@
     // rail and Plan tab render; the heavy scoreboard/forecast views fill in afterwards.
     var g = await withRetry(function () { return s.from('mos_business_goal').select('*').eq('brand_id', b).lte('period_start', PERIOD.end).gte('period_end', PERIOD.start).order('created_at', { ascending: false }).limit(1); }, 8000);
     if (g && g.data) window.FRKL_PLAN.goal = g.data[0] || null;
-    var cfg = await withRetry(function () { return s.from('brand_config').select('gross_margin, variable_costs, fixed_costs_monthly, inventory_days, discount_rate_annual, seasonality, opening_cash, opening_cash_as_of, benchmarks, supplier_lead_time_weeks, cash_floor').eq('brand_id', b).limit(1); }, 8000);
+    var cfg = await withRetry(function () { return s.from('brand_config').select('updated_at, gross_margin, variable_costs, fixed_costs_monthly, inventory_days, discount_rate_annual, seasonality, opening_cash, opening_cash_as_of, benchmarks, supplier_lead_time_weeks, cash_floor').eq('brand_id', b).limit(1); }, 8000);
     if (cfg && cfg.data) window.FRKL_PLAN.config = cfg.data[0] || null;
     // Say which reads failed, so a screen can tell "you have not set this" from "we could not load
     // it" — both used to leave null behind, and the costs form waited on it for ever.
@@ -199,6 +199,8 @@
     if (fields.opening_cash != null && fields.opening_cash !== '') body.opening_cash = Number(fields.opening_cash);
     if (fields.opening_cash_as_of) body.opening_cash_as_of = String(fields.opening_cash_as_of);
     if (Object.keys(body).length < 2) return { ok: false, error: 'nothing to save' };
+    // Eval 13 Oct (gap 11): the server saves only against the copy this page loaded; a newer row wins.
+    body.if_updated_at = (window.FRKL_PLAN && window.FRKL_PLAN.config && window.FRKL_PLAN.config.updated_at) || null;
     try {
       var jwt = await ASK.getJwt();
       var base = String(ASK.endpoint).replace(/\/functions\/v1\/[^/]*$/, '/functions/v1');
@@ -208,6 +210,7 @@
         body: JSON.stringify(body)
       });
       var out = await r.json().catch(function () { return {}; });
+      if (r.status === 409) { await refresh(); throw new Error(out.message || 'These settings changed since this page loaded them. Reload and save again.'); }
       if (!r.ok) throw new Error(out.error || ('save failed (' + r.status + ')'));
       await refresh();
       // The "numbers are switched off" banner and anything else keyed to brand_config re-check on

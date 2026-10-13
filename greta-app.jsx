@@ -10928,7 +10928,9 @@ function v3NarrLoad(b){
   // the story must not hold the rest of the dashboard if the model is writing a fresh one.
   const done = () => { try { window.GRETA_TODAY_DONE && window.GRETA_TODAY_DONE(); } catch (e) {} };
   const grace = setTimeout(done, 2500);
-  ciFetch('greta-writer', { brand_id: b }).then(d => {
+  // Eval 13 Oct (gap 11): a page view only reads the stored story (read_only: no model call, no write).
+  // The scheduled writer writes it.
+  ciFetch('greta-writer', { brand_id: b, read_only: true }).then(d => {
     if (d && (d.summary || (d.actions && Object.keys(d.actions).length))) { V3_NARR.data = d; v3BoardNotify(); }
   }, () => { /* the rules' wording stands */ }).then(() => { clearTimeout(grace); done(); });
 }
@@ -15413,7 +15415,8 @@ function BusinessEconomicsPanel(){
     const r = await fetch(cfgUrl, {
       method:'POST',
       headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+jwt },
-      body: JSON.stringify({ brand_id: ASK.brand_id, ...patch }),
+      // Eval 13 Oct (gap 11): saved only against the copy this page loaded; a newer stored row wins (409).
+      body: JSON.stringify({ brand_id: ASK.brand_id, if_updated_at: (config && config.updated_at) || null, ...patch }),
     });
     const data = await r.json().catch(()=>({}));
     return { ok:r.ok, data };
@@ -15781,7 +15784,8 @@ function MarginNudge(){
       const jwt = await ASK.getJwt();
       if(!jwt) return;
       const base = ASK.endpoint.replace(/\/[^/]*$/, '');
-      const r = await fetch(base + '/save-brand-config?brand_id=' + encodeURIComponent(ASK.brand_id), { headers:{ 'Authorization':'Bearer '+jwt } });
+      // lite: the config row only, not the cost tables and the catalogue (eval 13 Oct, gap 20)
+      const r = await fetch(base + '/save-brand-config?lite=1&brand_id=' + encodeURIComponent(ASK.brand_id), { headers:{ 'Authorization':'Bearer '+jwt } });
       const data = await r.json().catch(()=>({}));
       if(r.ok) setStatus(data.gross_margin_set ? 'set' : 'unset');
     }catch(e){}
@@ -19679,11 +19683,16 @@ function V3Incrementality() {
     .select('channel_type,status,marginal_iroas').eq('brand_id', b).limit(20));
   const tg = useV3Rows('mk-incr-tgt', (sb, b) => sb.from('vw_channel_iroas_targets')
     .select('channel_type,reported_target_roas').eq('brand_id', b).limit(20));
+  // 0922: the verdict is the server's (vw_channel_verdict), the one the channel actions close against, so
+  // this page and the board cannot disagree. The rule below stays only as the fallback before 0922.
+  const vd = useV3Rows('mk-incr-verdict', (sb, b) => sb.from('vw_channel_verdict')
+    .select('channel_type,verdict').eq('brand_id', b).limit(20));
   if (inc.err) return null;
   if (!inc.rows || (!sc.rows && !sc.err)) return <V3SkeletonRows n={3}/>;
   const beOf = {}; (sc.rows || []).forEach(x => { if (x.break_even_iroas != null) beOf[x.channel_type] = Number(x.break_even_iroas); });
   const optOf = {}; (opt.rows || []).forEach(x => { optOf[x.channel_type] = x; });
   const tgtOf = {}; (tg.rows || []).forEach(x => { if (x.reported_target_roas != null) tgtOf[x.channel_type] = Number(x.reported_target_roas); });
+  const vdOf = {}; (vd.rows || []).forEach(x => { if (x.verdict) vdOf[x.channel_type] = x.verdict; });
   const nice = v3ChanName;
   const rows = inc.rows.filter(x => Number(x.spend_30d) > 0 && x.reported_iroas != null && x.true_iroas != null)
     .map(x => ({ ...x, name: nice(x.platform, x.channel_type), rep: Number(x.reported_iroas), tru: Number(x.true_iroas), spend: Number(x.spend_30d),
@@ -19696,7 +19705,8 @@ function V3Incrementality() {
     const o = optOf[r.channel_type];
     r.mg = o && o.marginal_iroas != null ? Number(o.marginal_iroas) : null;
     r.tgt = tgtOf[r.channel_type] != null ? tgtOf[r.channel_type] : null;
-    r.call = hi < r.be && room >= 0.1 ? 'cut'
+    r.call = vdOf[r.channel_type] ? vdOf[r.channel_type]
+      : hi < r.be && room >= 0.1 ? 'cut'
       : o && o.status === 'ease' && r.mg != null && r.mg < r.be ? 'ease'
       : lo >= r.be && room >= 0.1 ? 'pays' : r.spend >= floor ? 'test' : 'small';
   });
