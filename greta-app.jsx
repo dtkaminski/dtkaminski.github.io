@@ -10953,7 +10953,9 @@ function v3BoardLoad(){
   const EVIDENCE = ',rung,lane,board_rank,evidence_reasons,money_is_sales,days_since_refresh,evidence_checked_at';
   const ask = (cols, byRank) => sb.from('vw_brand_action_board').select(cols)
     .eq('brand_id', b).order(byRank ? 'board_rank' : 'cm_gbp', byRank ? { ascending: true } : { ascending: false, nullsFirst: false });
-  ask(COLS + MONEY + EVIDENCE, true)
+  // 0926: the board from Today's one call when it has rows, else the live read
+  Promise.resolve(window.GRETA_TODAY_BUNDLE_P || null)
+    .then(j => (j && Array.isArray(j.board) && j.board.length) ? { data: j.board, error: null } : ask(COLS + MONEY + EVIDENCE, true), () => ask(COLS + MONEY + EVIDENCE, true))
     .then(r => (r && r.error && /rung|lane|board_rank|evidence_reasons|money_is_sales|days_since_refresh|evidence_checked_at/.test(r.error.message || '')) ? ask(COLS + MONEY, false) : r)
     .then(r => (r && r.error && /money_/.test(r.error.message || '')) ? ask(COLS, false) : r)
     .then(r => {
@@ -18206,6 +18208,22 @@ function V3Today(p) {
 // the page load, and hand back {rows, err}. Pages built on it render from live views only —
 // never from the static snapshots, which are weeks old for frkl and empty for everyone else.
 const V3_Q = {};
+// 0926 (eval 13 Oct, gap 20): Today's first reads come from one call (fn_today_bundle, started by the headline
+// loader). A key listed here takes its rows from that call when it has them, else runs its own query.
+const V3_SEED = {
+  'brand-state': j => (j.state && j.state.state && Date.now() - new Date(j.state.refreshed_at).getTime() < 26 * 3600 * 1000) ? [j.state.state] : null,
+  'profit-ladder': j => Array.isArray(j.ladder) && j.ladder.length ? j.ladder : null,
+  'brand-codes': j => Array.isArray(j.codes) ? j.codes : null,
+  'sign-history': j => j.sign_history ? [j.sign_history] : null,
+  'tier-30': j => Array.isArray(j.tiers) && j.tiers.length ? j.tiers : null,
+  'job-health': j => Array.isArray(j.job_health) ? j.job_health : null,
+};
+function v3Seeded(key, build) {
+  const f = V3_SEED[key];
+  if (!f) return build;
+  return (sb, b) => Promise.resolve((typeof window !== 'undefined' && window.GRETA_TODAY_BUNDLE_P) || null)
+    .then(j => { const rows = j ? f(j) : null; return rows ? { data: rows, error: null } : build(sb, b); }, () => build(sb, b));
+}
 // A read that fails because the database was busy (a statement timeout, a 500/504 from the gateway,
 // a dropped connection) is tried twice more before the page says so. One that fails because the
 // query itself is wrong (a missing column, no permission) fails at once. Measured 2026-10-06: Stock,
@@ -18235,7 +18253,7 @@ function useV3Rows(key, build) {
       const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
       if (!sb || !b) return false;
       const q = V3_Q[key] = { rows: null, err: null };
-      q.p = v3Attempt(build, sb, b).then(r => { q.p = null; if (r && r.error) q.err = r.error.message || 'could not load'; else q.rows = (r && r.data) || []; },
+      q.p = v3Attempt(v3Seeded(key, build), sb, b).then(r => { q.p = null; if (r && r.error) q.err = r.error.message || 'could not load'; else q.rows = (r && r.data) || []; },
                                          e => { q.p = null; q.err = String(e); })
         .then(() => { if (!dead) bump(n => n + 1); });
       return true;

@@ -253,6 +253,20 @@
     // it has been seen at 9.8s and once 35.9s. Cached, the same row is a single-key lookup at 9ms.
     // An 18-second first paint disqualifies the product however it looks, so Today reads the cache.
     // Paint from the last known payload first — synchronous, no request, no await.
+    // 0926 (eval 13 Oct, gap 20): Today's first screen in one call. The headline, the state, the board
+    // and the rest of Today's first reads come back together; each read falls back to its own query when
+    // the call fails or takes over 6s. Started first, before anything else is on the wire.
+    if (!window.GRETA_TODAY_BUNDLE_P) {
+      window.GRETA_TODAY_BUNDLE_P = Promise.race([
+        sb.rpc('fn_today_bundle', { p_brand: b }).then(function (r) { return r && !r.error ? r.data : null; }, function () { return null; }),
+        new Promise(function (res) { setTimeout(function () { res(null); }, 6000); })
+      ]).then(function (j) {
+        window.GRETA_TODAY_BUNDLE = j || null;
+        var be = j && j.state && j.state.state && j.state.state.ads ? Number(j.state.state.ads.break_even_return) : NaN;
+        if (isFinite(be) && be > 0) window.GRETA_BREAK_EVEN = be;
+        return j || null;
+      });
+    }
     var seeded = lsRead(b);
     if (seeded && !window.GRETA_HEADLINE) { publish(seeded.payload, seeded.as_of, true); }
 
@@ -261,7 +275,8 @@
     // until this one request is away rather than flooding the pool alongside it.
     var releaseInflight;
     window.GRETA_TODAY_INFLIGHT = new Promise(function (r) { releaseInflight = r; });
-    var cached = await safeQ(
+    var bundle = await window.GRETA_TODAY_BUNDLE_P;
+    var cached = (bundle && bundle.headline && bundle.headline.payload) ? [bundle.headline] : await safeQ(
       sb.from('cache_brand_today').select('payload,refreshed_at').eq('brand_id', b).limit(1),
       8000, null, 'cache_brand_today');
     try { releaseInflight && releaseInflight(); } catch (e) {}
@@ -277,7 +292,7 @@
     }
     // Eval 13 Oct (gap 10): one break-even return on every page, the state's (1 / the brand's CM rate,
     // the same tick the scoreboard and the board use). Not awaited: charts redraw when it lands.
-    sb.from('cache_brand_state').select('be:state->ads->break_even_return').eq('brand_id', b).limit(1).then(function (r) {
+    if (!window.GRETA_BREAK_EVEN) sb.from('cache_brand_state').select('be:state->ads->break_even_return').eq('brand_id', b).limit(1).then(function (r) {
       var be = r && !r.error && r.data && r.data[0] ? Number(r.data[0].be) : NaN;
       if (isFinite(be) && be > 0) { window.GRETA_BREAK_EVEN = be; try { window.dispatchEvent(new CustomEvent('greta-headline-updated')); } catch (e) {} }
     }, function () {});
