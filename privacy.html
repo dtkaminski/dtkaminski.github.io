@@ -18,7 +18,7 @@
 <div class="wrap">
   <div class="eyebrow">Greta</div>
   <h1>Privacy Policy</h1>
-  <div class="updated">Last updated: 12 June 2026</div>
+  <div class="updated">Last updated: 14 October 2026</div>
   <div class="note">
     This is the privacy policy for the Greta beta. It describes our practices accurately as the
     product stands today. It is written to be honest rather than exhaustive and should be reviewed by a solicitor
@@ -39,7 +39,7 @@
     <tr><td>Account data</td><td>Your email address, workspace name, role</td><td>You, at signup</td></tr>
     <tr><td>Commercial data</td><td>Orders, revenue, AOV, discounts, inventory, product mix</td><td>Your Shopify store (read-only)</td></tr>
     <tr><td>Customer data</td><td>Order-level records that may include a customer identifier and order details contained in the Shopify order payload</td><td>Your Shopify store (read-only)</td></tr>
-    <tr><td>Marketing data</td><td>Ad spend, impressions, clicks, ROAS, email/flow metrics</td><td>Meta, Google Ads, GA4, Klaviyo, TikTok (read-only)</td></tr>
+    <tr><td>Marketing data</td><td>Ad spend, impressions, clicks, ROAS, email/flow metrics</td><td>Meta, Google Ads, Google Analytics, Google Search Console, Klaviyo, Microsoft Clarity (read-only)</td></tr>
   </table>
   <p>
     All third-party connections request <strong>read-only</strong> scopes. We never write to, change, or send anything
@@ -58,9 +58,10 @@
     We use the following sub-processors:
   </p>
   <ul>
-    <li><strong>Supabase</strong> — database, authentication, and hosting (UK/EU).</li>
-    <li><strong>Netlify</strong> — static site delivery for the marketing site and app shell.</li>
-    <li><strong>Anthropic and/or OpenAI</strong> — to generate the natural-language analysis in the "Ask the data" feature and written findings. Only the aggregated figures needed to answer a question are sent; we do not send raw customer records for model training.</li>
+    <li><strong>Supabase</strong> — database, authentication, and back-end functions (London, eu-west-2).</li>
+    <li><strong>GitHub Pages</strong> — static delivery of the website and the app's pages. It serves files only; your business data is not stored there.</li>
+    <li><strong>Groq</strong> — the language model that writes the plain-English summaries and answers questions in Ask Greta. Only the aggregated figures needed for the answer are sent, never raw customer records, and they are not used to train models.</li>
+    <li><strong>Resend</strong> — delivery of the weekly email. It receives your email address and the content of the brief.</li>
   </ul>
   <p>
     Tenant data is isolated per workspace using database row-level security, so one brand cannot access another
@@ -84,7 +85,7 @@
   <h2>7. Disconnecting a source</h2>
   <p>
     You can revoke any connection at any time from your workspace, or directly in Shopify, Meta, Google, Klaviyo, or
-    TikTok. Revoking stops further syncs; to also delete already-synced data, contact us.
+    Microsoft Clarity. Revoking stops further syncs; to also delete already-synced data, contact us.
   </p>
 
   <h2>8. Changes</h2>

@@ -20373,7 +20373,9 @@ function V3GoalLead() {
   });
   if (goal.err || pace.err) return <V3LoadFailed what="your goal and plan" onRetry={() => { if (goal.err) goal.retry(); if (pace.err) pace.retry(); }}/>;
   if (!goal.rows || !pace.rows || (!ppq.rows && !ppq.err)) return <V3SkeletonRows n={4}/>;
-  const P = pace.rows[0] || null, G = (atGoal.rows || [])[0] || null;
+  // A plan read that comes back without its figures is no plan: "you reach it: about —" otherwise (eval 14 Oct)
+  const P0 = pace.rows[0] || null, P = P0 && Number.isFinite(Number(P0.revenue_target)) && P0.revenue_target != null ? P0 : null;
+  const G = (atGoal.rows || [])[0] || null;
   const L = v3Lead(cfg.rows), C = (cfg.rows || [])[0] || {}, U = (ue.rows || [])[0] || null;
   const PQ = ppq.rows && ppq.rows[0] ? ppq.rows[0] : null, QS = PQ && PQ.sales ? PQ.sales : null;
   const done = QS && QS.actual_so_far != null ? Number(QS.actual_so_far) : null;
@@ -21212,6 +21214,8 @@ function V3DataTrust() {
   // online-store orders only: draft orders and marketplace sales (frkl: John Lewis) never see an ad
   const web = useV3Rows('trust-web', (sb, b) => sb.from('v_shopify_orders_ex_vat').select('id', { count: 'exact', head: true }).eq('brand_id', b).eq('channel', 'online_store')
     .gte('processed_at', v3IsoAdd(today, -30)).lt('processed_at', today).then(r => ({ data: r.error ? null : [{ n: r.count }], error: r.error })));
+  // The job-health notice (V3JobHealth) above this verdict: "feeds are current" under "a refresh has failed" (eval 14 Oct)
+  const jh = useV3Rows('job-health', V3_JOBHEALTH_Q);
   const num = v => Number(v) || 0;
   const H = window.GRETA_HEADLINE || {};
   if (!cq.rows || !cfg.rows || !trk.rows) return <V3SkeletonRows n={4}/>;
@@ -21271,8 +21275,11 @@ function V3DataTrust() {
     body: <>Greta tracks them by Shopify’s own id, so stock and profit include them, but a supplier order can’t carry a product code for them. Add one to each in Shopify. <button type="button" className="v3-xref" onClick={go('stock')}>Which products <span className="v3-xref-go">on Stock &amp; orders →</span></button></> });
 
   const shortList = items.slice(0, 3).map(i => i.short);
-  const verdict = !items.length ? 'Your feeds are current and nothing Greta checks is reading wrong.'
-    : 'Your feeds are current. ' + (items.length === 1 ? 'One thing makes' : v3Sentence(['', 'one', 'two', 'three', 'four', 'five', 'six'][items.length] || String(items.length)) + ' things make') + ' numbers read wrong: ' + shortList.join('; ') + (items.length > 3 ? '; and ' + (items.length - 3) + ' more below' : '') + '.';
+  const jobLate = !!(jh.rows && jh.rows.length);
+  const feeds = jobLate ? 'Your data is arriving, but a refresh that works it out has failed (see the note above), so some figures may lag.'
+    : 'Your feeds are current.';
+  const verdict = !items.length ? (jobLate ? feeds + ' Nothing else Greta checks is reading wrong.' : 'Your feeds are current and nothing Greta checks is reading wrong.')
+    : feeds + ' ' + (items.length === 1 ? 'One thing makes' : v3Sentence(['', 'one', 'two', 'three', 'four', 'five', 'six'][items.length] || String(items.length)) + ' things make') + ' numbers read wrong: ' + shortList.join('; ') + (items.length > 3 ? '; and ' + (items.length - 3) + ' more below' : '') + '.';
   return (<div className="v3-page-stack"><section>
     <div className="v3-kick">Can you trust your numbers?</div>
     <p className="v3-verdict">{verdict}</p>
