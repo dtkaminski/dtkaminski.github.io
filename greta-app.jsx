@@ -503,6 +503,8 @@ function oiCmRatio(){
   if(typeof window==='undefined') return null;
   const h = window.GRETA_HEADLINE;
   if(h){
+    // 0953: the anatomy's CM2 % (over order value), the one CM rate, when Today carries it
+    const c2 = Number(h.cm2_pct_30d); if (isFinite(c2) && c2 > 0) return c2;
     const rev = Number(h.net_revenue_30d), prod = Number(h.product_contribution_30d);
     if(isFinite(rev) && rev > 0 && isFinite(prod) && prod !== 0) return prod / rev;
   }
@@ -21478,7 +21480,7 @@ function v3BuildSigns(S, hist, opts) {
   const num = v => (v == null ? null : Number(v));
   const yoySales = num(A.last_year_same_30_sales) > 0 ? num(L.sales) / num(A.last_year_same_30_sales) - 1 : null;
   const yoyAds = num(A.last_year_same_30_ads) > 0 ? num(L.ads) / num(A.last_year_same_30_ads) : null;
-  const ret = num(L.ads) > 0 ? num(L.sales) / num(L.ads) : null;
+  const ret = num(L.mer) > 0 ? num(L.mer) : num(L.ads) > 0 ? num(L.sales) / num(L.ads) : null;   // 0952: the anatomy's MER when the state carries it
   const ao = num(L.after_overheads);
   const HP0 = hist && Array.isArray(hist.points) ? hist.points : null;
   // The latest week takes the headline's own sales and ad spend. The history reads the daily table, which
@@ -21486,7 +21488,7 @@ function v3BuildSigns(S, hist, opts) {
   // without this the panels and the verdict above them disagreed by a few pounds for the rest of the day.
   const HP = HP0 && HP0.length && num(L.sales) > 0 && L.ads != null ? HP0.slice(0, -1).concat([(() => {
     const p = HP0[HP0.length - 1], sl = num(p.sales_ly), al = num(p.ads_ly), sv = num(L.sales), av = num(L.ads);
-    return Object.assign({}, p, { sales: sv, ads: av, return: av > 0 ? Math.round(sv / av * 100) / 100 : p.return,
+    return Object.assign({}, p, { sales: sv, ads: av, return: num(L.mer) > 0 ? num(L.mer) : av > 0 ? Math.round(sv / av * 100) / 100 : p.return,
       vs_ly: sl > 0 ? Math.round((sv / sl - 1) * 1000) / 1000 : p.vs_ly, ads_vs_ly: al > 0 ? Math.round(av / al * 100) / 100 : p.ads_vs_ly });
   })()]) : HP0;
   const ser = k => HP ? HP.map(p => ({ d: String(p.d), v: p[k] == null ? null : Number(p[k]) })) : null;
@@ -21503,7 +21505,7 @@ function v3BuildSigns(S, hist, opts) {
   // lost money on every first order (£1.40 against £1.65). opts.amer is the hourly snapshot's figure
   // (cache_customer_tier_periods, the same as Customers); the history uses each point's new-customer
   // sales over its ad spend, so the last point lands on the tile.
-  const am = opts && opts.amer != null ? Number(opts.amer) : null;
+  const am = num(L.amer) > 0 ? num(L.amer) : opts && opts.amer != null ? Number(opts.amer) : null;   // 0952: the anatomy's aMER first
   if (am != null && am > 0 && A.break_even_return) {
     const be = num(A.break_even_return), top = Math.max(am, be) * 1.25;
     const AP = HP ? HP.filter(p => Number(p.cac_spend) > 0 && p.new_net != null).map(p => ({ d: String(p.d), v: Number(p.new_net) / Number(p.cac_spend) })) : [];
@@ -21728,7 +21730,7 @@ function V3BusinessState({ part }) {
   const share = num(L.ads_share), early = num(A.early_year_share);
   const yoySales = num(A.last_year_same_30_sales) > 0 ? num(L.sales) / num(A.last_year_same_30_sales) - 1 : null;
   const yoyAds = num(A.last_year_same_30_ads) > 0 ? num(L.ads) / num(A.last_year_same_30_ads) : null;
-  const ret = num(L.ads) > 0 ? num(L.sales) / num(L.ads) : null;
+  const ret = num(L.mer) > 0 ? num(L.mer) : num(L.ads) > 0 ? num(L.sales) / num(L.ads) : null;   // 0952: the anatomy's MER when the state carries it
   const topCode = (codes.rows || []).find(c => num(c.orders_365d) >= 50 && num(c.first_order_share) >= 0.6) || null;
 
   // the verdict: after overheads when they are known, else after ads. The headline carries the one
