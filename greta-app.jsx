@@ -20612,15 +20612,19 @@ function V3TrackRecord() {
   // 0938 (eval 13 Oct, gap 17): one track record. The sums come from vw_action_track_record_summary, the same
   // scorer every other surface reads: marked done = judged + cannot judge yet, judged = worked + did not + unclear.
   const ts = useV3Rows('act-track-sum', (sb, b) => sb.from('vw_action_track_record_summary')
-    .select('marked_done,judged,worked,did_not_work,inconclusive,cannot_judge_yet,closed_by_greta,reasons').eq('brand_id', b).limit(1));
+    .select('marked_done,judged,worked,did_not_work,inconclusive,cannot_judge_yet,closed_by_greta,reasons,imported_before_greta').eq('brand_id', b).limit(1));
+  // 0958 (eval 14 Oct): tasks imported from before the brand joined Greta are not Greta's track record
+  const bj = useV3Rows('brand-joined', (sb, b) => sb.from('brands').select('created_at').eq('id', b).limit(1));
   const [showAll, setShowAll] = React.useState(false), [showSkipped, setShowSkipped] = React.useState(false), [showAuto, setShowAuto] = React.useState(false);
   if (q.err) return <V3LoadFailed what="what you have done" onRetry={q.retry}/>;
   if (!q.rows) return <V3SkeletonRows n={3}/>;
+  const joined = bj.rows && bj.rows[0] && bj.rows[0].created_at ? String(bj.rows[0].created_at) : null;
+  const own = joined ? q.rows.filter(r => !r.raised_at || String(r.raised_at) >= joined) : q.rows;
   // Greta closes an action itself when the condition behind it goes away. Those are not things the owner
   // did: on 6 Oct, 17 of the 19 rows "decided" in three weeks were Greta's own closures, one shown as
   // "Worked", and "Of N actions you marked done" counted them.
-  const auto = q.rows.filter(r => r.auto && r.status === 'done');
-  const done = q.rows.filter(r => !r.auto && (r.status === 'done' || r.status === 'partial')), skipped = q.rows.filter(r => r.status === 'skipped');
+  const auto = own.filter(r => r.auto && r.status === 'done');
+  const done = own.filter(r => !r.auto && (r.status === 'done' || r.status === 'partial')), skipped = own.filter(r => r.status === 'skipped');
   const autoList = auto.length > 0 && (<>
       {' '}<button type="button" className="v3-btn v3-btn-q v3-btn-sm" aria-expanded={showAuto} onClick={() => setShowAuto(s => !s)}>{showAuto ? 'Hide' : 'Show'} {auto.length} Greta closed itself</button>
       {showAuto && (<><p className="micro muted v3-measure">Greta closes an action itself when what raised it is no longer there. These are not graded as things you did.</p>
@@ -20649,7 +20653,7 @@ function V3TrackRecord() {
       {Number(S.did_not_work) ? ', ' + fmtCount(S.did_not_work) + ' didn’t' : ''}{Number(S.inconclusive) ? ', ' + fmtCount(S.inconclusive) + ' showed no clear change' : ''}.
       {Number(S.cannot_judge_yet) ? ' ' + fmtCount(S.cannot_judge_yet) + ' can’t be judged yet.' : ''}</p>
     {Array.isArray(S.reasons) && S.reasons.length > 0 && <ul className="v3-rank-steps">{S.reasons.map((x, i) => (<li key={'why' + i}><span className="v3-rank-desc">{x.reason}</span><span className="v3-sub"> {fmtCount(x.actions)}</span></li>))}</ul>}
-    <p className="v3-note v3-measure">Every new action says what it should change and by how much, and Greta checks once enough time has passed. A grade compares what happened with what was expected without the action. It shows the promise held, not that the action alone caused it.</p>
+    <p className="v3-note v3-measure">Every new action says what it should change and by how much, and Greta checks once enough time has passed. A grade compares what happened with what was expected without the action. It shows the promise held, not that the action alone caused it.{Number(S.imported_before_greta) > 0 ? ' ' + fmtCount(S.imported_before_greta) + ' task' + (Number(S.imported_before_greta) === 1 ? '' : 's') + ' from before you joined Greta are left out: Greta did not raise them.' : ''}</p>
   </>) : null;
   return (<section className="v3-sec">
     {sumLine || <><p className="v3-verdict">{judged.length
