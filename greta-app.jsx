@@ -20563,6 +20563,14 @@ function V3GoalLead() {
   // against today's pace: what the extra ads buy in profit, not just in sales.
   const gCam = G ? Number(G.cam_target) : (g ? Number(g.cam_target) : null);
   const dCam = gCam != null ? gCam - Number(P.cam_target) : null;
+  // 16 Oct (eval F8): when even the plan at the goal lands well short of it, no ad spend gets there. The page
+  // said "The gap is ad spend. The goal takes £14,460 of ads, £0 more than the plan ... £78,696 more sales but
+  // £0 less profit" for a £150,000 goal the plan tops out at about £70,000 (last year's quarter: £91,235).
+  const gLand = G && Number.isFinite(Number(G.revenue_target)) ? Number(G.revenue_target) : null;
+  const unreach = !!(tgt && short > 0 && gLand != null && gLand < tgt * 0.95);
+  const reachBest = Math.max(Number(P.revenue_target) || 0, Number(P.ceiling && P.ceiling.best_sales) || 0, gLand || 0);
+  const reachGoal = reachBest > 0 ? Math.floor(reachBest / 1000) * 1000 : null;
+  const lySales = P.last_year && Number(P.last_year.sales) > 0 ? Number(P.last_year.sales) : null;
   // The best-spend point comes from the same curve; vw_marginal_econ_gate suppresses it when the curve
   // is too weak to place a ceiling (0261 passes the gate through as seasonality.ceiling_status).
   const ceil = P.seasonality && P.seasonality.ceiling_status;
@@ -20597,8 +20605,9 @@ function V3GoalLead() {
       {done != null && exp != null && st
         ? <>You have sold {fmtMoney(done)} so far. Greta’s plan expects {fmtMoney(exp)} by now, so you are {onTrack ? V3_PLAN_WORD[st].toLowerCase() : V3_PLAN_WORD[st].toLowerCase() + ', ' + fmtMoney(Math.abs(Number(QS.gap))) + ' short'}.{QS.pace_finish != null ? <> At today’s pace the quarter ends at about {fmtMoney(QS.pace_finish)}.</> : null}</>
         : done != null ? <>You have sold {fmtMoney(done)} so far.</> : null}
-      {g && short > 0 && <> The gap is ad spend. The goal takes {fmtMoney(gSpend)} of ads, {fmtMoney(gSpend - Number(P.spend_cap))} more than {held ? 'the plan' : 'today’s ad spend'}.{peakShare != null ? <> {fmtPctN(peakShare)} of the goal’s ads go in {gpMonthName(peak.iso)}.</> : null}</>}
-      {g && short > 0 && dCam != null && <> Those extra ads bring about {fmtMoney(short)} more sales but {dCam > 0 ? 'only ' + fmtMoney(dCam) + ' more' : fmtMoney(-dCam) + ' less'} profit after ads.{dCam < 0 ? ' Past a point, extra ads cost more profit than they bring in.' : atBest === 'at' ? ' The goal sits at the most profitable ad spend Greta can see.' : atBest === 'past' ? ' The goal is past the most profitable ad spend Greta can see (' + fmtMoney(best) + ').' : ''}</>}
+      {g && unreach && <> No ad spend Greta can see gets there: the most the plan lands is about {fmtMoney(reachBest)}{best ? <>, at about {fmtMoney(best)} of ads; past that, extra ads cost more profit than they bring</> : null}.{lySales ? <> Last year this quarter sold {fmtMoney(lySales)}.</> : null}{reachGoal ? <> A goal near {fmtMoney(reachGoal)} is one the plan can reach.</> : null}</>}
+      {g && short > 0 && !unreach && <> The gap is ad spend. The goal takes {fmtMoney(gSpend)} of ads, {fmtMoney(gSpend - Number(P.spend_cap))} more than {held ? 'the plan' : 'today’s ad spend'}.{peakShare != null ? <> {fmtPctN(peakShare)} of the goal’s ads go in {gpMonthName(peak.iso)}.</> : null}</>}
+      {g && short > 0 && !unreach && dCam != null && <> Those extra ads bring about {fmtMoney(short)} more sales but {dCam > 0 ? 'only ' + fmtMoney(dCam) + ' more' : fmtMoney(-dCam) + ' less'} profit after ads.{dCam < 0 ? ' Past a point, extra ads cost more profit than they bring in.' : atBest === 'at' ? ' The goal sits at the most profitable ad spend Greta can see.' : atBest === 'past' ? ' The goal is past the most profitable ad spend Greta can see (' + fmtMoney(best) + ').' : ''}</>}
       {!(g && short > 0) && best && <> The most profitable ad spend Greta can see is {fmtMoney(best)}, for about {fmtMoney(P.ceiling.best_sales)} of sales.</>}
       {' '}<V3Conf state="probably" detail={'How Greta plans the quarter: your own busy and quiet months from your sales history, returning customers at their last three months’ rate, and new-customer sales that rise with ad spend, each extra £1 buying a little less. Its average new customer costs ' + (B.cost_per_new_customer ? fmtMoney(B.cost_per_new_customer, 2) : 'less') + ' because the quarter includes Black Friday, when new customers come cheaper. The Customers page shows the last 90 days.' + (PQ && PQ.basis_note ? ' ' + PQ.basis_note : '')}/></p>
     {exp != null && <V3FcErr/>}
@@ -20612,9 +20621,11 @@ function V3GoalLead() {
           ? <>{fmtMoney(P.spend_cap)} of ads, the most a first order pays for{Number(P.spend_wanted) > 0 ? <> (today’s ad spend would come to {fmtMoney(P.spend_wanted)})</> : null}</>
           : <>ads held at {fmtMoney(P.inputs && P.inputs.base_monthly_spend)} a month{P.inputs && P.inputs.base_from && P.inputs.base_to
           ? <>, your average {gpMonthName(String(P.inputs.base_from).slice(0, 7) + '-01').slice(0, 3)}–{gpMonthName(String(P.inputs.base_to).slice(0, 7) + '-01').slice(0, 3)}</> : null}</>}</span></div></div>
-      {g && <div className="v3-stat"><div className="v3-stat-lab"><span>Ads the goal takes</span></div><div className="v3-stat-val">{fmtMoney(gSpend)}</div>
+      {g && unreach && <div className="v3-stat"><div className="v3-stat-lab"><span>The most the plan reaches</span></div><div className="v3-stat-val">{fmtMoney(reachBest)}</div>
+        <div className="v3-stat-foot"><span className="v3-muted">{fmtMoney(tgt - reachBest)} short of the goal{lySales ? <>; last year {fmtMoney(lySales)}</> : null}</span></div></div>}
+      {g && !unreach && <div className="v3-stat"><div className="v3-stat-lab"><span>Ads the goal takes</span></div><div className="v3-stat-val">{fmtMoney(gSpend)}</div>
         <div className="v3-stat-foot"><span className="v3-muted">{fmtMoney(peak.gSpend)} of it in {gpMonthName(peak.iso)}</span></div></div>}
-      {g && <div className="v3-stat"><div className="v3-stat-lab"><span>Profit after ads, at the goal</span></div><div className="v3-stat-val">{fmtMoney(gCam)}</div>
+      {g && !unreach && <div className="v3-stat"><div className="v3-stat-lab"><span>Profit after ads, at the goal</span></div><div className="v3-stat-val">{fmtMoney(gCam)}</div>
         <div className="v3-stat-foot"><span className="v3-muted">{fmtMoney(P.cam_target)} {held ? 'on the plan' : 'at today’s ad spend'}</span></div></div>}
     </div>
     <V3GoalDrivers per={per} today={today} exp={exp || 0} done={done || 0} months={ph || P.months} paceMonths={P.months}
