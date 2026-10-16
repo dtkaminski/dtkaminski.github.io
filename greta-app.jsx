@@ -8759,6 +8759,9 @@ async function v3AskFacts(question) {
         ['kept_at_' + half + '_off']: Math.round(100 * (cmr - half / 100)), kept_at_45_off: Math.max(0, Math.round(100 * (cmr - 0.45))),
         keep_the_offer_at_or_under_pct: half,
         note: 'pounds kept from each 100 pounds of full-price sales after product and order costs; deeper offers need that many more orders to make the same profit' };
+      // 16 Oct: "at 30% you still keep £67 of every £100" was the full-price figure (30% off keeps £37): said once, as the cash verdict is
+      f.next_peak.discount_depth.said = 'Keep the offer at or under ' + half + '% off. Of every £100 of sales at full price you keep £' + Math.round(100 * cmr)
+        + ' after product and order costs; at ' + half + '% off you keep £' + Math.round(100 * (cmr - half / 100)) + ', and at 45% off £' + Math.max(0, Math.round(100 * (cmr - 0.45))) + '.';
     }
   }
   const promos = evs.filter(x => x.row_group === 'promo' && x.status !== 'skipped');
@@ -9572,7 +9575,7 @@ CHECK THE PREMISE FIRST: when the question states something about the business (
 
 SITE questions: first say whether the rate really moved, from site_last_30_days against its typical figure; if Google Analytics or the shop's order sources are in readout.tracking, a drop in their figures is most likely the tracking, not shoppers. Never explain a change in how visits turn into orders by ad costs. Lead with site_last_30_days (Microsoft Clarity counts every visit; Google Analytics was not recording properly for part of the summer): orders per 100 visits, the share on a phone, and the share of visits hitting a JavaScript error or broken clicks. Use the Google Analytics funnel only as a second view of the steps. An item in readout.held is not established: if you mention one, say it was flagged and not re-checked, and never call it the cause.
 
-DISCOUNT and peak-offer questions: give the depth from facts.next_peak.discount_depth (keep the offer at or under that % off, and what 45% off keeps of every 100 pounds), then the board's peak plan: what to put the offer on and which products to keep out of ads.
+DISCOUNT and peak-offer questions: give the depth as facts.next_peak.discount_depth.said, as written, then the board's peak plan: what to put the offer on and which products to keep out of ads.
 
 PRODUCT questions: use data.products (sales, share, the new customers each product brings in, profit per unit, stock) and the stock plan; name products. Discount codes (facts.next_peak.discount_codes_used_at_last_peak) are codes, not products. Never infer a product's selling price from a cost.
 
