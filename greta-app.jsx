@@ -9301,9 +9301,9 @@ function buildAskContext(facts, question, budget){
   // 16 Oct: the trims below cut the series and the readout, never facts, channels or the sales move.
   // By 16 Oct those ran to ~18,000 characters on their own for frkl, so every question, even "how much did
   // I sell last week?", was refused as too large on both models (413) and the owner was told to ask about
-  // one area at a time. So the figures the question is not about go first, least needed first, before any
-  // series it needs; at the end the long ones are shortened, then, only if it still does not fit, the rest
-  // goes in the same order.
+  // one area at a time. So after the general series, the figures the question is not about go, least needed
+  // first; then the long ones are shortened, then the series it asked about; only then the rest, in the same
+  // order.
   // What was left out is named, so the answer can say so instead of guessing.
   const qs = String(question || '');
   const needs = [
@@ -9316,25 +9316,40 @@ function buildAskContext(facts, question, budget){
     ['facts.goal', () => /\b(goal|target|on track|quarter)\b/i.test(qs)],
     ['facts.quarter_plan_at_todays_ad_spend', () => topics.ads || /\b(goal|plan|quarter|forecast|target|budget|on track|afford|peak)\b/i.test(qs)],
     ['facts.customers', () => /\b(customers?|repeat|returning|retention|ltv|cac|win|loyal\w*)\b/i.test(qs)],
+    ['board', () => false],   // the biggest part: shortened (5 rows, then 3) before the facts below, never dropped
     ['readout.held', () => /\b(not do|avoid|hold\w*|shouldn'?t|don'?t)\b/i.test(qs)],
     ['facts.next_peak', () => topics.stock || /\b(peak|black friday|cyber|christmas|bfcm|discount\w*|offer|promo\w*|sale)\b/i.test(qs)],
     ['facts.typical_month', () => /\b(typical|profit|why|doing|going)\b/i.test(qs)],
     ['facts.what_moved_profit', () => /\b(profit|doing|going|why|moved?|typical|loss|losing)\b/i.test(qs)],
   ];
   const leftOut = [];
-  const dropPart = key => { const [a, b] = key.split('.'); const o = b ? meta[a] : meta; const k = b || a;
-    if (o && o[k] != null) { delete o[k]; leftOut.push(key); } };
-  needs.forEach(([key, needed]) => { if (size() > BUDGET && !needed()) dropPart(key); });
+  // Named as it goes, so the size checks count the note itself.
+  const noteLeftOut = () => { meta.left_out_for_room = leftOut.map(k => k.replace(/^facts\./, '').replace(/_/g, ' ')); };
+  const dropPart = key => {
+    if (key === 'board') {
+      const B = meta.readout && meta.readout.board, n = B && B.length > 5 ? 5 : 3;
+      if (Array.isArray(B) && B.length > n) {
+        meta.readout.board = B.slice(0, n).map(r => Object.assign({}, r, { action: String(r.action || '').length > 400 ? String(r.action).slice(0, 400) + '…' : r.action }));
+        leftOut.push('board rows after ' + n); noteLeftOut();
+      }
+      return;
+    }
+    const [a, b] = key.split('.'); const o = b ? meta[a] : meta; const k = b || a;
+    if (o && o[k] != null) { delete o[k]; leftOut.push(key); noteLeftOut(); } };
   // The series a question is about are never dropped for room: "Meta or email?" lost the email flows and
   // answered "no email figures" (9 Oct). The stock list stays for stock questions, products for product ones.
   const keepSeries = new Set(['stock_named']);
   if (askWhy) keepSeries.add('drivers');
-  if (topics.email) keepSeries.add('email_flows');
+  if (topics.email) { keepSeries.add('email_flows'); keepSeries.add('weekly_email'); }   // 16 Oct: the weekly series too
+  if (topics.ads) keepSeries.add('weekly_meta');
+  if (topics.site) keepSeries.add('weekly_ga4');
   if (topics.search) keepSeries.add('weekly_google');
   if (topics.stock) keepSeries.add('stock_at_risk');
   if (topics.products) keepSeries.add('products');
   const order = Object.keys(data).reverse().filter(k => !keepSeries.has(k));
   while (size() > BUDGET && order.length) { const k = order.shift(); delete data[k]; delete dictionary[k]; }
+  // Then the figures the question is not about, before anything it asked about is shortened.
+  needs.forEach(([key, needed]) => { if (size() > BUDGET && !needed()) dropPart(key); });
   if (size() > BUDGET && meta.anatomy_gaps) meta.anatomy_gaps = meta.anatomy_gaps.map(g => ({ part: g.part, not_measured: g.not_measured, waiting_on: g.waiting_on }));
   if (size() > BUDGET && meta.anatomy_gaps) meta.anatomy_gaps = meta.anatomy_gaps.map(g => ({ part: g.part, not_measured: g.not_measured }));
   // 0392: the search read goes first when the question is not about search, and is shortened when it is
@@ -9342,7 +9357,7 @@ function buildAskContext(facts, question, budget){
   if (size() > BUDGET && meta.search) ['unpaid_search', 'google_keywords'].forEach(k => { const o = meta.search[k]; if (o) ['top_searches', 'top_by_spend'].forEach(t => { if (Array.isArray(o[t])) o[t] = o[t].slice(0, 4); }); });
   if (size() > BUDGET && meta.channels) delete meta.channels.codes;
   if (size() > BUDGET && meta.readout) delete meta.readout.cost_trees;
-  if (size() > BUDGET && meta.readout) meta.readout.held = meta.readout.held.map(h => ({ action: h.action }));
+  if (size() > BUDGET && meta.readout && Array.isArray(meta.readout.held)) meta.readout.held = meta.readout.held.map(h => ({ action: h.action }));
   if (size() > BUDGET && meta.readout) meta.readout.coverage = [];
   // Board rows about what was asked stay: "Meta or email?" lost both email actions to this trim (8 Oct).
   const onTopic = x => Object.keys(topics).some(k => topics[k] && V3_ASK_TOPICS[k].test(String(x.action || '')));
@@ -9366,7 +9381,6 @@ function buildAskContext(facts, question, budget){
   [8, 5].forEach(n => { Array.from(keepSeries).forEach(k => { if (size() > BUDGET && data[k] && data[k].rows.length > n) data[k] = { cols: data[k].cols, rows: data[k].rows.slice(0, n) }; }); });
   Array.from(keepSeries).forEach(k => { if (size() > BUDGET && data[k]) { delete data[k]; delete dictionary[k]; } });
   needs.forEach(([key]) => { if (size() > BUDGET) dropPart(key); });
-  if (leftOut.length) meta.left_out_for_room = leftOut.map(k => k.replace(/^facts\./, '').replace(/_/g, ' '));
   return { _meta: meta, data, topics, chars: size() };
 }
 // Answer depth -> the model that serves it. The only place a model id appears on the
@@ -9447,6 +9461,16 @@ function AskPanel(){
   // A suggested question sends on click (16 Oct: the chips only filled the box, so a click looked like nothing
   // happened); onClick={send} passes an event, so only a string counts as the question.
   const send = async (asked) => {
+    try { await sendAsked(asked); }
+    catch (e) {
+      // Anything that fails before the request goes out (building the figures) lands here, so the button
+      // never stays on "Thinking…" (16 Oct: a dropped part was read later and Ask hung with no message).
+      console.warn('ask: could not build the question', e);
+      setError("Greta couldn't put your figures together for that question. Try again, or ask it another way.");
+      setLoading(false); setAskStage('');
+    }
+  };
+  const sendAsked = async (asked) => {
     const q = String(typeof asked === 'string' ? asked : question).trim();
     if (!ASK || !q || loading) return;
     setLoading(true); setError(''); setAskStage('Reading your figures');
