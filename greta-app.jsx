@@ -8592,10 +8592,13 @@ async function v3AskFacts(question) {
     T(sb.from('external_events').select('ts').eq('brand_id', b).eq('kind', 'promo').gte('ts', v3IsoAdd(today, -180)).limit(60)),
     T(V3_CURVE_Q(sb, b)),
     // what each board row's pounds are (the readout gives the number only), and the stock plan's rows
-    T(sb.from('vw_brand_action_board').select('board_rank,money_basis').eq('brand_id', b).limit(30)),
+    // ...and each row's id and words, for its title (16 Oct: the readout's action is the row's description, so
+    // the discount cap, which opens "... £52.92 to win a new customer ...", was named "Win a new customer" 3/3)
+    // 16 Oct: 15 s, as the plan: under a busy morning the 9 s box dropped it, and with it every title and basis
+    T(sb.from('vw_brand_action_board').select('board_rank,money_basis,external_id,description').eq('brand_id', b).limit(30), 15000),
     T(V3_STOCK_Q(sb, b), 12000),
     // the hourly snapshot when fresh, else the live function (a stale or missing row gave Ask no CAC)
-    T(V3_STATE_Q(sb, b).then(r => ({ data: r && r.data ? r.data.map(st => ({ state: st })) : [], error: r ? r.error : null }))),
+    T(V3_STATE_Q(sb, b).then(r => ({ data: r && r.data ? r.data.map(st => ({ state: st })) : [], error: r ? r.error : null })), 15000),
     // Email and the site, only when the question is about them. "Which email is earning the most per
     // person it reaches?" -- one of Ask's own suggested questions -- could not be answered (6 Oct).
     tq.email ? T(V3_FLOWS_Q(sb, b)) : none,
@@ -8651,20 +8654,34 @@ async function v3AskFacts(question) {
     const S1 = r0(stateR) && r0(stateR).state;
     // 0456: a source that has stopped sending: said first, and its figures run only to data_through
     // 0458: what moved profit after ads, ranked; several causes, each with how sure Greta is
+    // 16 Oct: the one typical period Ask is sent. typical_month (30-day median, -£5,073) and this (28 days,
+    // -£2,700) both went, and the answers mixed them; this is Today's, so typical_month is left out when it is here.
     if (S1 && S1.drivers && S1.drivers.state === 'ok') f.what_moved_profit = { said: S1.drivers.said, from: S1.drivers.from, to: S1.drivers.to,
+      profit_after_ads: S1.drivers.profit_after_ads, typical_28_days_profit_after_ads: S1.drivers.typical, change_against_typical: S1.drivers.change,
+      typical_is: 'the average of the six 28-day spells before (the one comparison Greta uses for a typical month)',
       drivers: (S1.drivers.drivers || []).slice(0, 6).map(d => ({ rank: d.rank, part: d.label, change: d.gbp, how_sure: d.evidence, expected: d.expected || null, said: d.said, action: d.action ? d.action.id : null })),
       context: (S1.drivers.context || []).map(c => c.said).filter(Boolean) };
     if (S1 && S1.freshness && S1.freshness.stale && S1.freshness.said) f.data_freshness = { said: S1.freshness.said, data_through: S1.freshness.data_through || null };
     if (S1 && S1.this_week && S1.this_week.said) f.this_week = { said: S1.this_week.said, sales: S1.this_week.sales, ad_spend: S1.this_week.ads, profit_after_ads: S1.this_week.profit_after_ads, month_so_far: S1.this_week.month };
     if (S1 && S1.ad_budget && S1.ad_budget.said) f.ad_budget_for_all_ads = { said: S1.ad_budget.said, per_week: S1.ad_budget.per_week, month: S1.ad_budget.month,
       next_month_per_week: S1.ad_budget.next_per_week, last_7_days: S1.ad_budget.last_7_days,
-      note: 'The plan’s budget for ALL ads together. A channel’s own weekly figure on an action is a most, above this budget: never give it as a level to spend or cut to.' };
-    if (S1 && S1.cash_to_peak && S1.cash_to_peak.said) { const Cp = S1.cash_to_peak;
+      note: 'The plan’s budget for ALL ads together. A board action that says "Cut <channel> from £A to about £B a week" is that channel’s cut: give it as written. A channel’s "own ceiling" is a most, never a level to spend or cut to.' };
+    // 16 Oct: "Can I afford the peak?" flipped between "you don't have enough cash" and "you can afford it",
+    // and once counted slow stock as cash: the entered balance never reached Ask. It is sent here, said to be
+    // entered and not measured, with the verdict worked out once.
+    if (S1 && S1.cash_to_peak && S1.cash_to_peak.said) { const Cp = S1.cash_to_peak, ce = Cp.cash_entered != null ? Number(Cp.cash_entered) : null, need = Number(Cp.peak_cash_need);
+      const on = Cp.cash_entered_on ? v3Day(v3Iso10(Cp.cash_entered_on), true) : null;
       f.cash_to_the_plan_end = { said: Cp.said, to: Cp.to, ads: Cp.ads_left, sales_expected: Cp.sales_expected, profit_after_ads_expected: Cp.profit_after_ads_expected,
         overheads: Cp.overheads, trading_result: Cp.after_overheads, stock_to_order: Cp.stock_to_order, after_overheads_and_stock: Cp.after_overheads_and_stock,
-        lowest_cash_need: Cp.peak_cash_need, slow_stock_at_cost: Cp.slow_stock, cash_cycle_days: Cp.cash_cycle_days, basis: Cp.basis }; }
+        lowest_cash_need: Cp.peak_cash_need, slow_stock_at_cost: Cp.slow_stock, cash_cycle_days: Cp.cash_cycle_days, basis: Cp.basis,
+        cash_balance: ce != null ? { amount: Math.round(ce), as_of: on, source: 'entered by you, not measured: Greta cannot see your bank' } : null,
+        verdict: ce == null ? 'Greta has no cash balance for you, so she cannot say whether you can afford the plan: enter it on Goal & costs.'
+          : !(need > 0) ? 'On the cash balance you entered (£' + Math.round(ce).toLocaleString('en-GB') + (on ? ' on ' + on : '') + ', not measured), the plan never needs more cash than it makes.'
+          : ce >= need ? 'Yes, on the cash balance you entered: £' + Math.round(ce).toLocaleString('en-GB') + (on ? ' on ' + on : '') + ' (entered, not measured) covers the £' + Math.round(need).toLocaleString('en-GB') + ' the plan needs at its lowest point. Check your bank balance today before relying on it.'
+          : 'Not on the cash balance you entered: £' + Math.round(ce).toLocaleString('en-GB') + (on ? ' on ' + on : '') + ' (entered, not measured) is short of the £' + Math.round(need).toLocaleString('en-GB') + ' the plan needs at its lowest point.',
+        note: 'Slow stock is stock, not cash: it turns into cash only if it sells. Never add it to the cash balance.' }; }
   }
-  const tm = lad && cmr != null ? v3TypicalMonth(lad, cmr) : null;
+  const tm = lad && cmr != null && !f.what_moved_profit ? v3TypicalMonth(lad, cmr) : null;
   if (tm && tm.typ) f.typical_month = { basis: 'median of the ' + tm.n + ' 30-day windows before the latest; one sale window cannot move it. Compare with this, not with the 30 days before, which can hold a sale.',
     sales: R(tm.typ.sales), ad_spend: R(tm.typ.spend), profit_after_ads: R(tm.typ.kept), same_30_days_last_year_sales: tm.ly ? R(tm.ly.sales) : null };
   // What moved profit after ads against it: Today's split (V3Why), stated in words so the answer does not
@@ -8769,6 +8786,14 @@ async function v3AskFacts(question) {
     past_sales_not_on_the_calendar: missing.length,
   };
   f._board_basis = Object.fromEntries((boardR || []).map(r => [r.board_rank, r.money_basis || '']));
+  const boardRows = Array.isArray(boardR) && boardR.length ? boardR : ((typeof V3_BOARD !== 'undefined' && Array.isArray(V3_BOARD.rows)) ? V3_BOARD.rows.filter(r => r.board_rank != null) : []);
+  f._board_title = Object.fromEntries(boardRows.map(r => { let t = ''; try { t = String(v3PlainAction(r).title || ''); } catch (e) {}
+    return [r.board_rank, t.length > 170 ? t.slice(0, 169) + '…' : t]; }));
+  // the drivers name their action by id ("order-cost-meta" reached two answers, 16 Oct): the board's title instead
+  if (f.what_moved_profit && Array.isArray(f.what_moved_profit.drivers)) {
+    const tById = {}; boardRows.forEach(r => { if (r.external_id && f._board_title[r.board_rank]) tById[r.external_id] = '#' + r.board_rank + ' ' + f._board_title[r.board_rank]; });
+    f.what_moved_profit.drivers.forEach(d => { d.action = d.action ? (tById[d.action] || null) : null; });
+  }
   f._titles = (perfR || []).map(r => String(r.product_title || '')).concat(SP.map(r => String(r.product_title || '')));
   if (Array.isArray(factsR) && factsR.length) {
     const perfBy = Object.fromEntries((perfR || []).map(r => [String(r.shopify_product_id), r]));
@@ -8877,6 +8902,17 @@ async function v3AskFacts(question) {
         if (p) Object.assign(x, { sold_in_last_years_peak: p.sold, runs_short_in_the_peak: p.sold > x.in_stock }); });
     }
   }
+  // 16 Oct: "our best seller" got "order the 23 products" with the facts in hand; the verdict is worked out here, as
+  // the cash one is, so the answer can say it as written
+  if (Array.isArray(f.best_sellers_stock) && f.best_sellers_stock.length) {
+    const B0 = f.best_sellers_stock[0], np = f.next_peak || null, lands = np && np.order_placed_today_lands ? v3Day(np.order_placed_today_lands, true) : null;
+    f.best_seller_verdict = 'Your best seller is ' + B0.product + ': it sells ' + B0.sells_a_week + ' a week and you hold ' + B0.in_stock
+      + (B0.weeks_left != null ? ', about ' + B0.weeks_left + ' weeks' : '') + '. '
+      + (B0.runs_out_before_a_restock_lands ? 'At that pace it runs out before a restock can land, so order it now.' : 'At that pace it does not run out before a restock can land.')
+      + (B0.runs_short_in_the_peak ? ' But it sold ' + B0.sold_in_last_years_peak + ' in last year\u2019s ' + (np && np.name ? np.name : 'peak') + ' against the ' + B0.in_stock + ' you hold, so it runs short at the peak'
+        + (np && np.lands_before_peak_starts === false && lands ? ': an order placed today lands ' + lands + ', after the peak starts, so ask the supplier what can be sent sooner and keep it out of ads once it runs low.' : '.') : '')
+      + (f.best_sellers_stock.slice(1).some(x => x.runs_out_before_a_restock_lands) ? ' Of your other fast sellers, ' + f.best_sellers_stock.slice(1).filter(x => x.runs_out_before_a_restock_lands).map(x => x.product).join(', ') + ' run out before a restock can land.' : '');
+  }
   f.calendar = { past_sales_not_on_the_calendar: missing.length,
     note: missing.length ? 'Greta found sales that are not on the calendar, so what she has learned about promotions rests on too few events. They can be added from the Calendar.' : null };
   return f;
@@ -8916,9 +8952,9 @@ function v3AskTable(rows, keyField) {
   const cols = [keyField].concat(Object.keys(rows[0]).filter(k => k !== keyField));
   return { cols, rows: rows.map(r => cols.map(c => (r[c] == null ? null : r[c]))) };
 }
-function v3AskReadout(R, topics, basis) {
+function v3AskReadout(R, topics, basis, titles, withHeld) {
   if (!R) return null;
-  basis = basis || {};
+  basis = basis || {}; titles = titles || {};
   const cut = (s, n) => { s = String(s == null ? '' : s); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
   // A board action ends with what to do ("... Bring Meta back toward £1,444 a week and judge it on your
   // Shopify orders."). Cut at 180 characters, that sentence was lost, and on 8 Oct the model quoted the
@@ -8941,15 +8977,32 @@ function v3AskReadout(R, topics, basis) {
       rung: h.rung, window: h.window_label, population: cut(h.population, 90) })),
     // What the pounds are, with them: the first live answer read "£12,237" (the profit those products
     // make a month) as the cost of ordering them.
-    board: (R.board || []).map(x => { const bs = String(basis[x.rank] || '');
-      return { rank: x.rank, action: cutAction(x.action), pounds: x.gbp_per_month,
+    // 16 Oct: action is the row's title, the instruction as the board shows it; detail is the row's own text.
+    // The description alone opened the discount cap with "... £52.92 to win a new customer ...", so the
+    // model named it "Win a new customer" every time.
+    board: (R.board || []).map(x => { const bs = String(basis[x.rank] || ''), ti = String(titles[x.rank] || '');
+      return { rank: x.rank, action: ti || cutAction(x.action), detail: ti ? cutAction(x.action) : undefined, pounds: x.gbp_per_month,
         per: /\(once|once,? over/i.test(bs) ? 'once' : 'a month', pounds_are: x.gbp_is_sales ? 'sales' : (cut(bs, 110) || 'profit after product and order costs'),
         rung: x.rung, why_this_rung: cut((x.why_this_rung || [])[0], 120), lane: x.lane }; }),
-    held: (R.held || []).map(x => ({ action: cut(x.action, 90), because: cut((x.held_because || [])[0], 80) })),
+    // 16 Oct: the held list was read as things not to do, once inverted ("retain too little margin" of products
+    // keeping 87-91%). Sent only for "what not to do / what is held" questions, and labelled for what it is.
+    held: withHeld && (R.held || []).length ? { what_these_are: 'Flagged, not checked: never advise on these, and never list them as things to do or not to do. At most say Greta is holding them back until she can check them, with the reason.',
+      items: R.held.map(x => ({ flag: cut(x.action, 90), held_because: cut((x.held_because || [])[0], 80) })) } : undefined,
     tracking: R.tracking || [],
     coverage: (R.coverage || []).map(c => ({ source: c.source, state: c.state, complete_through: c.complete_through, unusable_days_90d: c.unusable_days_90d })),
     conflicts: R.conflicts || [],
   };
+  // 16 Oct round 1: "What should I NOT do" got "there are no cautions recorded": they sit inside the rows' text.
+  // For that question, each row's cautions are handed over as sentences, with the row they come from.
+  if (withHeld) {
+    const cau = [];
+    (R.board || []).slice(0, 10).forEach(x => { const ti = String(titles[x.rank] || '');
+      if (/^Cut /.test(ti)) cau.push({ rank: x.rank, caution: 'Do not keep spending at today\u2019s level or add ad spend: ' + ti + '.' });
+      if (/^Cap /.test(ti)) cau.push({ rank: x.rank, caution: 'Do not run an offer deeper than the cap: ' + ti + '.' });
+      (String(x.action || '').match(/[^.!?]+[.!?]/g) || []).forEach(sn => { sn = sn.trim();
+        if (/\b(hold any|do not|don\u2019t|don't|never|only if|rather than)\b/i.test(sn) && sn.length < 260) cau.push({ rank: x.rank, caution: sn }); }); });
+    if (cau.length) out.cautions = cau.slice(0, 8);
+  }
   if (topics.ads) out.cost_trees = (R.cost_trees || []).map(t => ({ tree: t.tree, weeks: t.weeks, from: t.from == null ? null : Math.round(t.from * 100) / 100,
     to: t.to == null ? null : Math.round(t.to * 100) / 100,
     moved: (t.stages || []).filter(s => s.verdict === 'contributed').map(s => s.label + ' ' + (s.change_pct > 0 ? '+' : '') + s.change_pct + '%'),
@@ -9230,10 +9283,11 @@ function buildAskContext(facts, question, budget){
       lost_before_lands: o ? num(o.cm_at_risk) : (r.cm_at_risk_before_resupply == null ? null : Math.round(Number(r.cm_at_risk_before_resupply))),
       unit_cost: r.unit_cost == null ? null : Math.round(Number(r.unit_cost) * 100) / 100 }; };
   if (named.length) topics.stock = true;
-  const basisFor = (facts && facts._board_basis) || {};
+  const basisFor = (facts && facts._board_basis) || {}, titlesFor = (facts && facts._board_title) || {};
+  const withHeld = /\b(not do|avoid|hold\w*|held|flag\w*|shouldn'?t|don'?t|stop)\b/i.test(question || '');
   const flows = (facts && facts._flows) || null, camps = (facts && facts._campaigns) || null, site = (facts && facts._site) || null;
   facts = facts ? Object.assign({}, facts) : facts;
-  if (facts) { ['_stock', '_stock_order', '_board_basis', '_flows', '_campaigns', '_site', '_products', '_products_note', '_titles'].forEach(k => { delete facts[k]; }); }
+  if (facts) { ['_stock', '_stock_order', '_board_basis', '_board_title', '_flows', '_campaigns', '_site', '_products', '_products_note', '_titles'].forEach(k => { delete facts[k]; }); }
   let _today = ''; try { _today = new Date().toISOString().slice(0,10); } catch(e) {}
   const _dates = _shp.map(r=>r && r.date).filter(Boolean).sort();
   const _latestDate = _dates.length ? _dates[_dates.length-1] : null;
@@ -9266,7 +9320,7 @@ function buildAskContext(facts, question, budget){
     facts: facts || null,
     why_this_question: (() => { const d = askWhy ? v3WhyFor(question, drivers) : null; return d ? { figure: d.figure, now: d.now, then: d.then, against: d.against,
       parts_biggest_first: String(d.parts || '').split('; ').filter(Boolean), what_to_do_from_the_board: String(d.board || '').split('; ').filter(Boolean) } : null; })(),
-    readout: v3AskReadout((typeof window !== 'undefined' && window.GRETA_READOUT) || null, topics, basisFor),
+    readout: v3AskReadout((typeof window !== 'undefined' && window.GRETA_READOUT) || null, topics, basisFor, titlesFor, withHeld),
     site_last_30_days: topics.site ? site : null,
     // what moved sales and why (0340, worked out each morning): the cause on Today's strip, with the split
     sales_move: (() => { const M = (typeof window !== 'undefined' && Array.isArray(window.GRETA_SALES_MOVE)) ? window.GRETA_SALES_MOVE : [];
@@ -9329,7 +9383,7 @@ function buildAskContext(facts, question, budget){
     if (key === 'board') {
       const B = meta.readout && meta.readout.board, n = B && B.length > 5 ? 5 : 3;
       if (Array.isArray(B) && B.length > n) {
-        meta.readout.board = B.slice(0, n).map(r => Object.assign({}, r, { action: String(r.action || '').length > 400 ? String(r.action).slice(0, 400) + '…' : r.action }));
+        meta.readout.board = B.slice(0, n).map(r => Object.assign({}, r, { action: String(r.action || '').length > 400 ? String(r.action).slice(0, 400) + '…' : r.action, detail: r.detail && String(r.detail).length > 300 ? String(r.detail).slice(0, 300) + '…' : r.detail }));
         leftOut.push('board rows after ' + n); noteLeftOut();
       }
       return;
@@ -9357,10 +9411,10 @@ function buildAskContext(facts, question, budget){
   if (size() > BUDGET && meta.search) ['unpaid_search', 'google_keywords'].forEach(k => { const o = meta.search[k]; if (o) ['top_searches', 'top_by_spend'].forEach(t => { if (Array.isArray(o[t])) o[t] = o[t].slice(0, 4); }); });
   if (size() > BUDGET && meta.channels) delete meta.channels.codes;
   if (size() > BUDGET && meta.readout) delete meta.readout.cost_trees;
-  if (size() > BUDGET && meta.readout && Array.isArray(meta.readout.held)) meta.readout.held = meta.readout.held.map(h => ({ action: h.action }));
+  if (size() > BUDGET && meta.readout && meta.readout.held && Array.isArray(meta.readout.held.items)) meta.readout.held.items = meta.readout.held.items.map(h => ({ flag: h.flag }));
   if (size() > BUDGET && meta.readout) meta.readout.coverage = [];
   // Board rows about what was asked stay: "Meta or email?" lost both email actions to this trim (8 Oct).
-  const onTopic = x => Object.keys(topics).some(k => topics[k] && V3_ASK_TOPICS[k].test(String(x.action || '')));
+  const onTopic = x => Object.keys(topics).some(k => topics[k] && V3_ASK_TOPICS[k].test(String(x.action || '') + ' ' + String(x.detail || '')));
   while (size() > BUDGET && meta.readout && meta.readout.board.length > 5) {
     const B = meta.readout.board; let i = B.length - 1;
     while (i >= 5 && onTopic(B[i])) i--;
@@ -9377,7 +9431,7 @@ function buildAskContext(facts, question, budget){
   if (size() > BUDGET && meta.facts && meta.facts.what_moved_profit && Array.isArray(meta.facts.what_moved_profit.drivers))
     meta.facts.what_moved_profit.drivers = meta.facts.what_moved_profit.drivers.slice(0, 3);
   if (size() > BUDGET && meta.readout && meta.readout.board) meta.readout.board = meta.readout.board.slice(0, 3)
-    .map(r => Object.assign({}, r, { action: String(r.action || '').length > 400 ? String(r.action).slice(0, 400) + '…' : r.action }));
+    .map(r => Object.assign({}, r, { action: String(r.action || '').length > 400 ? String(r.action).slice(0, 400) + '…' : r.action, detail: r.detail && String(r.detail).length > 300 ? String(r.detail).slice(0, 300) + '…' : r.detail }));
   [8, 5].forEach(n => { Array.from(keepSeries).forEach(k => { if (size() > BUDGET && data[k] && data[k].rows.length > n) data[k] = { cols: data[k].cols, rows: data[k].rows.slice(0, n) }; }); });
   Array.from(keepSeries).forEach(k => { if (size() > BUDGET && data[k]) { delete data[k]; delete dictionary[k]; } });
   needs.forEach(([key]) => { if (size() > BUDGET) dropPart(key); });
@@ -9386,6 +9440,10 @@ function buildAskContext(facts, question, budget){
 // Answer depth -> the model that serves it. The only place a model id appears on the
 // client, and it never reaches the markup.
 const ASK_MODEL = { thorough: 'claude-sonnet-4-5', quick: 'claude-haiku-4-5' };
+// 16 Oct: on the same 10 questions the quick model (gpt-oss-20b) got the judgement calls wrong or unstable (cut ads
+// now?, can I afford the peak?, what not to do) while gpt-oss-120b got them right; fact look-ups were right on both.
+// So a question that asks for a decision goes to the thorough model whatever the owner picked.
+const V3_ASK_JUDGE = /\b(should|shall)\s+(i|we)\b|^\s*(can|could|do|would)\s+(i|we)\b|\b(can|could)\s+(i|we)\s+afford\b/i;
 function AskPanel(){
   // Server-side relay (ask-data edge fn). The authenticated workspace injects
   // window.OI_ASK = {endpoint, brand_id, getJwt}. When this dashboard runs inside
@@ -9488,11 +9546,11 @@ function AskPanel(){
     const facts = await v3AskFacts(q).catch(() => null);
     setAskStage('Writing the answer');
     // Kept short on purpose: every character here is sent with every question (see V3_ASK_TOTAL).
-    const askSystem = (metaStr, dataStr) => `You are a senior D2C commercial analyst and operator for ${OI_BRAND.name}, a ${OI_BRAND.markets} DTC ${OI_BRAND.vertical} brand. Answer using ONLY the figures below. For where the year stands, use facts.next_peak, facts.typical_month and the weekly rows; never assume a season, a lull or a peak they do not show. They are: _meta.facts (what every page of the app shows), _meta.readout (the server's canonical figures, ranked board and rules) and, in data, the series this question needs as tables (cols + rows). Prefer facts and readout to anything you work out from the rows, and say which you used.
+    const askSystem = (metaStr, dataStr) => `You are a senior D2C commercial analyst and operator for ${OI_BRAND.name}, a ${OI_BRAND.markets} DTC ${OI_BRAND.vertical} brand. Answer using ONLY the figures below. For where the year stands, use facts.next_peak, facts.what_moved_profit (facts.typical_month only when it is absent) and the weekly rows; never assume a season, a lull or a peak they do not show. They are: _meta.facts (what every page of the app shows), _meta.readout (the server's canonical figures, ranked board and rules) and, in data, the series this question needs as tables (cols + rows). Prefer facts and readout to anything you work out from the rows, and say which you used.
 
 Follow _meta.readout.rules. Quote headline figures exactly, with their window. Say how far the owner can lean on a figure in plain words (measured, likely, probably, possibly, an outside chance), as part of the sentence: never the word rung, never in brackets after a figure. Never recommend an action in readout.held. Never compare or total across days readout.coverage or readout.tracking marks unusable; missing days are not zero.
 
-WHAT MOVED PROFIT: for "how is the business doing" and "why is profit up or down" overall, answer from facts.what_moved_profit: its said, then its drivers in rank order, one line each with its change and how sure (how_sure "usual" means within its usual range: leave those out unless asked). There can be several causes: never name one as the only cause. End with the action of the first driver that has one, worded as the board words it.
+WHAT MOVED PROFIT: for "how is the business doing" and "why is profit up or down" overall, answer from facts.what_moved_profit: for "how is the business doing", open with profit after overheads in the last 30 days (facts.last_30_days.profit_after_overheads; a loss when negative). Then its said (profit after ads in the 28 days, the typical 28 days and the gap between them, exactly as written; that gap is the one against typical), then its drivers in rank order, one line each with its change and how sure (how_sure "usual" means within its usual range: leave those out unless asked). There can be several causes: never name one as the only cause. End with the action of the first driver that has one, worded as the board words it.
 
 STALE DATA: when facts.data_freshness is there, the first sentence of every answer says it in its words: which data has stopped, and since when. Figures from that data run only to that day; never call them current.
 
@@ -9501,10 +9559,14 @@ SALES MOVES: when the question is why sales or profit went up or down, start fro
 GAPS: _meta.anatomy_gaps lists the parts of the business with a measure missing, nothing explaining a change, or no action. When a question touches one, say plainly what Greta cannot see yet; never call that part covered.
 WHAT TO DO questions: answer from readout.board in its order, with each item's pounds (a month, or once when the action says so) and its rung. Do not re-rank. One idea of your own is allowed only if labelled "my suggestion, not on your board", and never one from readout.held (9 Oct: a held Judge.me fix came back as "my suggestion"). For spending more, check facts.quarter_plan_at_todays_ad_spend and facts.next_peak first. If facts.goal.needs_replanning is true, say so before quoting the goal.
 
-WHY questions: before naming a cause, check the confounders: a promotion or code, a spend change, a stockout, an email send, a tracking change, seasonality, or a partial latest day (_meta.dataQuality). Check each against facts.recent_context first: if sale_weeks_in_last_13 is above 0, promotions are part of the story, not ruled out; if of_them_out_of_stock_now or products_out_of_stock_now is above 0, stock-outs are too. A planned-events list being empty does not rule out what already happened. Locate the move: demand (spend, visits) → conversion → order value and discounts → new vs returning → product and stock. Separate what the data shows from what you infer, and give your confidence. For why profit after ads moved against a typical month, lead with facts.typical_month.what_moved_profit_after_ads: its main_cause, its pounds from sales and from ad spend, and its sales and ad spend comparisons exactly as written; do not work out percentages of your own.
+WHY questions: before naming a cause, check the confounders: a promotion or code, a spend change, a stockout, an email send, a tracking change, seasonality, or a partial latest day (_meta.dataQuality). Check each against facts.recent_context first: if sale_weeks_in_last_13 is above 0, promotions are part of the story, not ruled out; if of_them_out_of_stock_now or products_out_of_stock_now is above 0, stock-outs are too. A planned-events list being empty does not rule out what already happened. Locate the move: demand (spend, visits) → conversion → order value and discounts → new vs returning → product and stock. Separate what the data shows from what you infer, and give your confidence. For why profit after ads moved against a typical month, lead with facts.what_moved_profit; only when it is absent, with facts.typical_month.what_moved_profit_after_ads: its main_cause, its pounds from sales and from ad spend, and its sales and ad spend comparisons exactly as written; do not work out percentages of your own.
 COUNTS AND NAMES: how many products are out of stock or need ordering comes from facts.recent_context (the board's #1 order list), never from counting table rows. Call a product out of stock only if out_of_stock_now_examples or a stock table marks it so; never give an example the data does not name. A board action is what its text says: do not attach creatives, audiences or campaigns to it unless its text names them.
 
-STOCK questions: when the owner says "our best seller", first name it from facts.best_sellers_stock (the fastest seller) and say how many weeks it lasts and whether it runs out before a restock lands; if it does not, say that first, then which products do. If it lasts at today's pace but runs_short_in_the_peak, say so plainly: it sold more in last year's peak than you hold, an order placed today lands after the peak starts, so ask the supplier to send it first and keep it out of ads once it runs low. Use data.stock_named and data.stock_at_risk (Greta's stock plan) for how many to order (order_units), what being out costs (lost_before_lands, profit) and what an order costs (order_units × unit_cost). An order placed today lands on facts.next_peak.order_placed_today_lands. If facts.next_peak.lands_before_peak_starts is false, never say ordering now gets stock in for the peak: say when it lands, that only what suppliers can send sooner reaches the peak, and to ask for that first. Board pounds are what pounds_are says, a month or once (per); never call them a cost or spend unless pounds_are says so. When the board already has an action for what is asked, give its instruction as the board words it ("bring Meta back toward £X a week"), not a stronger one of your own such as pausing a channel.
+STOCK questions: when the owner says "our best seller", the first sentences are facts.best_seller_verdict as written. Otherwise first name it from facts.best_sellers_stock (the fastest seller) and say how many weeks it lasts and whether it runs out before a restock lands; if it does not, say that first, then which products do. If it lasts at today's pace but runs_short_in_the_peak, say so plainly: it sold more in last year's peak than you hold, an order placed today lands after the peak starts, so ask the supplier to send it first and keep it out of ads once it runs low. Use data.stock_named and data.stock_at_risk (Greta's stock plan) for how many to order (order_units), what being out costs (lost_before_lands, profit) and what an order costs (order_units × unit_cost). An order placed today lands on facts.next_peak.order_placed_today_lands. If facts.next_peak.lands_before_peak_starts is false, never say ordering now gets stock in for the peak: say when it lands, that only what suppliers can send sooner reaches the peak, and to ask for that first. Board pounds are what pounds_are says, a month or once (per); never call them a cost or spend unless pounds_are says so. When the board already has an action for what is asked, give its instruction as the board words it ("cut Meta from £A to about £B a week"), not a stronger one of your own such as pausing a channel.
+
+SHOULD I CUT OR SPEND ON ADS: answer from the board ads action. When it says Cut, the answer is cut now, from and to the figures it gives, with its pounds a month; facts.ad_budget_for_all_ads says how the plan keeps budget for the peak (next_month_per_week), so cutting now is how the peak gets its money. Never advise keeping today’s spend when an action says cut.
+
+CASH and AFFORD questions: the first sentence is facts.cash_to_the_plan_end.verdict as written. Then the lowest_cash_need and when, from its said. The cash balance is one the owner entered, not measured: say so once. Slow stock is not cash.
 
 CHECK THE PREMISE FIRST: when the question states something about the business ("ROAS looks great", "conversion dropped 30%", "about to stock out"), check it against the figures before anything else. For ads, the first sentence is facts.last_30_days.return_verdict as written; for the site, site_last_30_days.verdict as written. Never call a return good, solid, healthy or decent when return_verdict says thin. If the figures do not show what the owner said, say so in the first sentence, then say what the owner is most likely seeing instead, such as a tracking break in readout.tracking or a platform's own count.
 
@@ -9516,7 +9578,7 @@ PRODUCT questions: use data.products (sales, share, the new customers each produ
 
 EMAIL questions: sales per person are the sales Klaviyo credits to the email (anyone who opened before buying), not profit and not what the email caused; say so, and rank flows and campaigns on them. Board actions to win back lapsing customers or to switch on or fix automatic emails are email actions: for "ads or email?", set them against the ads actions, pound for pound.
 
-WHAT NOT TO DO questions: answer from readout.held (what Greta is holding back, and why) and from cautions the board itself states (a price test held until after the peak, no added ad spend while cost per order is above its earlier level, a sale that would deepen discounting). Never turn a board action into something not to do. A held finding about a platform's own count (Google's or Meta's conversions) does not cancel a board action on the same channel, which rests on your Shopify orders: leave it out, or say the board action stands.
+WHAT NOT TO DO questions: answer from readout.cautions, each with the board row (#rank) it comes from, top rows first; they are the board's own cautions: an ads cut means do not keep spending at today's level or add spend; a discount cap means no offer deeper than it; a price test held until after the peak; stock that lands after the peak is not stock for the peak. Each with the board row it comes from. Never turn a board action into something not to do. readout.held, when sent, holds flags Greta has not checked: never list them as don'ts or as advice; at most say she is holding them back and why. A held finding about a platform's own count never cancels a board action on the same channel.
 
 A difference in cost is not a loss: an ad overspend is spend above what the earlier cost per order needed, not money lost. When a board figure is "probably" or lower, give its why_this_rung in plain words. The weekly tables hold complete weeks only.
 
@@ -9547,6 +9609,7 @@ ${dataStr}`;
     }
     const ctx = buildAskContext(facts, q, V3_ASK_TOTAL - fixedChars - msgChars());
     const systemPrompt = askSystem(JSON.stringify(ctx._meta), JSON.stringify(ctx.data));
+    const askDepth = depth === 'quick' && V3_ASK_JUDGE.test(q) ? 'thorough' : depth;
     setHistory(newHistory);
     setQuestion('');
     try {
@@ -9560,7 +9623,7 @@ ${dataStr}`;
         : { 'content-type': 'application/json', 'x-internal-secret': ASK.token || '' };   // server/cron
       const resp = await fetch(ASK.endpoint, {
         method: 'POST', headers,
-        body: JSON.stringify({ system: systemPrompt, messages: apiMessages, model, depth, brand_id: ASK.brand_id, max_tokens: 1500 }),
+        body: JSON.stringify({ system: systemPrompt, messages: apiMessages, model: ASK_MODEL[askDepth] || model, depth: askDepth, brand_id: ASK.brand_id, max_tokens: 1500 }),
       });
       // The relay returns an owner-readable `message` on failure; a raw status/JSON blob is
       // never shown (it used to print the provider's 404 straight onto the page).
@@ -9570,7 +9633,7 @@ ${dataStr}`;
       if (data.error) throw new Error(data.message || ASK_FAIL);
       // Thorough falls back to the quicker model when the main one is busy (9 Oct, after a day of tests):
       // the owner is told, so a thinner answer is not mistaken for Greta's best.
-      const quickNote = depth === 'thorough' && /20b|mini|8b|scout|haiku/i.test(String(data.model || ''))
+      const quickNote = askDepth === 'thorough' && /20b|mini|8b|scout|haiku/i.test(String(data.model || ''))
         ? '\n\n*Answered by Greta’s quicker model because the main one was busy. Ask again in a few minutes for a fuller answer.*' : '';
       setHistory(h=>[...h, {role:'assistant', content:v3AskCheck(v3AskScrub(data.text || '(no response)', facts), systemPrompt + JSON.stringify(apiMessages)) + quickNote, checked:true, time:Date.now(), usage:data.usage||{}}]);
     } catch (e) {
@@ -11151,6 +11214,8 @@ function v3FoldPlans(rows) {
 // its own figure into this month (frkl, 7 Oct: £3,508 for October against about £8,180 for the board's
 // Meta and Google targets), so every page says which one is the month's number: the plan's, with the
 // board's channel targets as ceilings while spend comes down to it.
+// 0972 (16 Oct): the rows now lead with "Cut Meta from £1,410 to about £274 a week"; they still name the
+// channel's "own ceiling of £X a week", which is what this reads, so the ceilings are unchanged.
 function v3BoardSpendTargets(rows) {
   const per = (rows || []).filter(r => /^order-cost-/.test(String(r.external_id || ''))).map(r => {
     const m = String(r.description || '').match(/(?:toward|own ceiling of) £([\d,]+) a week/i);
@@ -16813,6 +16878,20 @@ function v3PlainAction(row){
   if ((x = id.match(/^paid-landing-(\w+)/))) return P('Send ' + v3Ch(x[1]) + ' ads to products that earn back what a new customer costs', raw);
   // 0453: when the plan's budget for all ads is below the channel's own figure the row leads with it, and so
   // does the title ("Coming back to £1,506 a week keeps about £456 a month" read as the instruction, 12 Oct)
+  // 0972: the rows say the cut as a cut ("Cut Meta from £1,410 to about £274 a week for the rest of October"):
+  // "keep all your ads to £273" and "holding Meta to £274" read as "carry on" to Ask, 3 times out of 3 (16 Oct)
+  if (/^order-cost-/.test(id) && (x = m(/\b(Cut [A-Z]\w* from £[\d,]+ to about £[\d,]+ a week(?: for the rest of \w+)?)/))) {
+    return P(x[1], raw.slice(0, raw.indexOf(x[1])).trim() || raw);
+  }
+  if (/^order-cost-/.test(id) && (x = m(/\bCut ([A-Z]\w*) from the £([\d,]+) it spent in the last 7 days: your plan's budget for all your ads together is about £([\d,]+) a week for the rest of (\w+)/))) {
+    return P('Cut ' + x[1] + ' from £' + x[2] + ' a week, toward the plan’s £' + x[3] + ' a week for all your ads, for the rest of ' + x[4], raw.slice(0, raw.indexOf(x[0])).trim() || raw);
+  }
+  if (/^order-cost-/.test(id) && (x = m(/\b(Cut [A-Z]\w* from about £[\d,]+ a week back toward £[\d,]+ a week)/))) {
+    return P(x[1], raw.slice(0, raw.indexOf(x[1])).trim() || raw);
+  }
+  if (/^order-cost-/.test(id) && (x = m(/\bKeep ([A-Z]\w*) within your plan's budget for all your ads together, about £([\d,]+) a week for the rest of (\w+)/))) {
+    return P('Keep ' + x[1] + ' within the plan’s £' + x[2] + ' a week for all your ads, for the rest of ' + x[3], raw.slice(0, raw.indexOf(x[0])).trim() || raw);
+  }
   if (/^order-cost-/.test(id) && (x = m(/(Keep all your ads[^:]*?) for the rest of (\w+):/))) {
     return P(x[1] + ' for the rest of ' + x[2], raw.slice(0, raw.indexOf(x[1])).trim());
   }
