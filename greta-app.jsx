@@ -8893,7 +8893,10 @@ const V3_ASK_BUDGET = 18000;   // measured 6 Oct: 13,354 characters = 3,926 toke
 // on top, so by 8 Oct a question sent 24,852 characters, and Groq's 8,000 tokens a request (counting the
 // 1,500 kept for the answer) refused 3 of 4 questions on both models. This is the whole request: rules,
 // figures and conversation together, about 5,700 tokens.
-const V3_ASK_TOTAL = 21000;   // 19,500 measured 4,871 prompt tokens (8 Oct): room for ~1,500 more characters
+// 16 Oct: the rules alone are now ~11,300 characters, so 21,000 left the figures ~9,000, which the figures
+// never kept to (see the end of buildAskContext). A refused request measured 30,100 characters = 6,647
+// prompt tokens (4.5 a token); 24,000 is about 6,000 tokens at a cautious 4 a token, leaving 1,500 for the answer.
+const V3_ASK_TOTAL = 24000;
 const V3_ASK_TOPICS = {
   ads: /\b(ad|ads|advert\w*|meta|facebook|instagram|google|spend\w*|roas|campaign\w*|creative\w*|channel\w*|acquisition|new customers?|cac|budget|cost per|cpc|cpm|click\w*)\b/i,
   site: /\b(site|website|conversion|convert\w*|traffic|session\w*|checkout|basket|cart|visit\w*|page\w*|mobile|bounce)\b/i,
@@ -9295,6 +9298,33 @@ function buildAskContext(facts, question, budget){
     sent: 'Only the series this question needs were sent. If the answer needs a series that is not here, say which one and suggest asking about it directly.' };
   // The ceiling: drop data series from the least needed, then shorten the readout.
   const size = () => JSON.stringify(meta).length + JSON.stringify(data).length;
+  // 16 Oct: the trims below cut the series and the readout, never facts, channels or the sales move.
+  // By 16 Oct those ran to ~18,000 characters on their own for frkl, so every question, even "how much did
+  // I sell last week?", was refused as too large on both models (413) and the owner was told to ask about
+  // one area at a time. So the figures the question is not about go first, least needed first, before any
+  // series it needs; at the end the long ones are shortened, then, only if it still does not fit, the rest
+  // goes in the same order.
+  // What was left out is named, so the answer can say so instead of guessing.
+  const qs = String(question || '');
+  const needs = [
+    ['channels', () => topics.ads || /\b(channels?|where .* come|traced|untraced|codes?|creators?|affiliates?)\b/i.test(qs)],
+    ['anatomy_gaps', () => /\b(see|missing|blind|gaps?|know|measure\w*|track\w*)\b/i.test(qs)],
+    ['facts.calendar', () => /\b(calendar|events?|launch\w*|dates?)\b/i.test(qs)],
+    ['facts.costs_and_settings', () => /\b(costs?|wrong|settings?|cogs|freight|duty|margins?)\b/i.test(qs)],
+    ['sales_move', () => /\b(sales|sell|sold|revenue|down|up|fell|fall\w*|drop\w*|rose|why)\b/i.test(qs)],
+    ['facts.cash_to_the_plan_end', () => /\b(cash|afford|runway|money|bank|peak)\b/i.test(qs)],
+    ['facts.goal', () => /\b(goal|target|on track|quarter)\b/i.test(qs)],
+    ['facts.quarter_plan_at_todays_ad_spend', () => topics.ads || /\b(goal|plan|quarter|forecast|target|budget|on track|afford|peak)\b/i.test(qs)],
+    ['facts.customers', () => /\b(customers?|repeat|returning|retention|ltv|cac|win|loyal\w*)\b/i.test(qs)],
+    ['readout.held', () => /\b(not do|avoid|hold\w*|shouldn'?t|don'?t)\b/i.test(qs)],
+    ['facts.next_peak', () => topics.stock || /\b(peak|black friday|cyber|christmas|bfcm|discount\w*|offer|promo\w*|sale)\b/i.test(qs)],
+    ['facts.typical_month', () => /\b(typical|profit|why|doing|going)\b/i.test(qs)],
+    ['facts.what_moved_profit', () => /\b(profit|doing|going|why|moved?|typical|loss|losing)\b/i.test(qs)],
+  ];
+  const leftOut = [];
+  const dropPart = key => { const [a, b] = key.split('.'); const o = b ? meta[a] : meta; const k = b || a;
+    if (o && o[k] != null) { delete o[k]; leftOut.push(key); } };
+  needs.forEach(([key, needed]) => { if (size() > BUDGET && !needed()) dropPart(key); });
   // The series a question is about are never dropped for room: "Meta or email?" lost the email flows and
   // answered "no email figures" (9 Oct). The stock list stays for stock questions, products for product ones.
   const keepSeries = new Set(['stock_named']);
@@ -9327,8 +9357,16 @@ function buildAskContext(facts, question, budget){
   // The protected series still have to fit: "our best seller" matched stock and products, both kept,
   // and the request ran 1,800 characters over, so the reply allowance was cut to a one-line answer
   // (9 Oct). Shorter first (8 rows, then 5), dropped last.
+  // 16 Oct: the long figures are shortened before the series the question is about give way.
+  if (size() > BUDGET && meta.channels) { delete meta.channels.untraced_orders_by_code; if (Array.isArray(meta.channels.rows)) meta.channels.rows = meta.channels.rows.slice(0, 5); }
+  if (size() > BUDGET && meta.facts && meta.facts.what_moved_profit && Array.isArray(meta.facts.what_moved_profit.drivers))
+    meta.facts.what_moved_profit.drivers = meta.facts.what_moved_profit.drivers.slice(0, 3);
+  if (size() > BUDGET && meta.readout && meta.readout.board) meta.readout.board = meta.readout.board.slice(0, 3)
+    .map(r => Object.assign({}, r, { action: String(r.action || '').length > 400 ? String(r.action).slice(0, 400) + '…' : r.action }));
   [8, 5].forEach(n => { Array.from(keepSeries).forEach(k => { if (size() > BUDGET && data[k] && data[k].rows.length > n) data[k] = { cols: data[k].cols, rows: data[k].rows.slice(0, n) }; }); });
   Array.from(keepSeries).forEach(k => { if (size() > BUDGET && data[k]) { delete data[k]; delete dictionary[k]; } });
+  needs.forEach(([key]) => { if (size() > BUDGET) dropPart(key); });
+  if (leftOut.length) meta.left_out_for_room = leftOut.map(k => k.replace(/^facts\./, '').replace(/_/g, ' '));
   return { _meta: meta, data, topics, chars: size() };
 }
 // Answer depth -> the model that serves it. The only place a model id appears on the
@@ -9406,10 +9444,12 @@ function AskPanel(){
     return () => window.removeEventListener('oi-ask-prefill', consume);
   }, []);
 
-  const send = async () => {
-    if (!ASK || !question.trim() || loading) return;
+  // A suggested question sends on click (16 Oct: the chips only filled the box, so a click looked like nothing
+  // happened); onClick={send} passes an event, so only a string counts as the question.
+  const send = async (asked) => {
+    const q = String(typeof asked === 'string' ? asked : question).trim();
+    if (!ASK || !q || loading) return;
     setLoading(true); setError(''); setAskStage('Reading your figures');
-    const q = question.trim();
     // Load the server readout once per page before the first question; a failure leaves it null.
     if (!window.GRETA_READOUT) {
       try {
@@ -9461,7 +9501,7 @@ Answer only the newest question. Earlier exchanges are background: never repeat 
 SHAPE: start with the answer itself in one or two plain sentences, with the figure that decides it. Then at most three short points, or one small table when comparing several things. Keep it under about 180 words unless the question asks for a list. No headings unless there are more than three parts. End with the one thing to do next: the board action that answers this question (for an ads question, the ads action, not the top of the board), worded as the board words it.
 Write for the owner: never show field or table names, and never a dotted name such as next_peak.promotions_planned (readout, facts, pounds_are, rung, stock_named, order_units, recent_context); say what they mean. Use a short table only when it helps.
 
-Never invent a forecast beyond facts.quarter_plan_at_todays_ad_spend. If the question cannot be answered from what was sent, say what is missing. Plain British English, no jargon, £ for money. Short questions get a short answer with the number and its calculation; diagnosis questions get: the corrected read, the numbers, what was ruled out, what to do in order, and what would change your mind.
+Never invent a forecast beyond facts.quarter_plan_at_todays_ad_spend. If the question cannot be answered from what was sent, say what is missing (_meta.left_out_for_room names figures left out for room: suggest asking about them directly). Plain British English, no jargon, £ for money. Short questions get a short answer with the number and its calculation; diagnosis questions get: the corrected read, the numbers, what was ruled out, what to do in order, and what would change your mind.
 
 Facts and readout:
 ${metaStr}
@@ -9571,8 +9611,8 @@ ${dataStr}`;
         {loading && <p className="micro muted v3-measure" role="status" aria-live="polite">{askStage || 'Working'}… {askSecs > 0 ? askSecs + 's' : ''}{askSecs >= 20 ? ' — answers usually take under a minute' : ''}</p>}
       </div>
       <div className="v3-prompts" aria-label="Questions to start with">
-        {whyPrompts.map((q,i)=>(<button type="button" key={'why'+i} className="v3-prompt v3-prompt-why" onClick={()=>ASK&&setQuestion(q)} disabled={!ASK} title={ASK?'':'Available in your workspace'}>{q}</button>))}
-        {quickPrompts.map((q,i)=>(<button type="button" key={i} className="v3-prompt" onClick={()=>ASK&&setQuestion(q)} disabled={!ASK} title={ASK?'':'Available in your workspace'}>{q}</button>))}
+        {whyPrompts.map((q,i)=>(<button type="button" key={'why'+i} className="v3-prompt v3-prompt-why" onClick={()=>{ if (ASK) { setQuestion(q); send(q); } }} disabled={!ASK||loading} title={ASK?'':'Available in your workspace'}>{q}</button>))}
+        {quickPrompts.map((q,i)=>(<button type="button" key={i} className="v3-prompt" onClick={()=>{ if (ASK) { setQuestion(q); send(q); } }} disabled={!ASK||loading} title={ASK?'':'Available in your workspace'}>{q}</button>))}
       </div>
       {error && (<div role="alert" style={{padding:'var(--space-3)',background:'var(--color-danger-wash)',borderTop:'1px solid var(--color-danger-line)',marginTop:'var(--space-3)',color:'var(--text-primary)',fontSize:'var(--text-sm)',display:'flex',alignItems:'center',gap:'var(--space-3)',flexWrap:'wrap'}}>
         <span style={{flex:1,minWidth:200}}>{error}</span>
