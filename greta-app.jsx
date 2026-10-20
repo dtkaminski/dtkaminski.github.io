@@ -8656,7 +8656,7 @@ async function v3AskFacts(question) {
     // 0458: what moved profit after ads, ranked; several causes, each with how sure Greta is
     // 16 Oct: the one typical period Ask is sent. typical_month (30-day median, -£5,073) and this (28 days,
     // -£2,700) both went, and the answers mixed them; this is Today's, so typical_month is left out when it is here.
-    if (S1 && S1.drivers && S1.drivers.state === 'ok') f.what_moved_profit = { said: S1.drivers.said, from: S1.drivers.from, to: S1.drivers.to,
+    if (S1 && S1.drivers && S1.drivers.state === 'ok') f.what_moved_profit = { said: v3DriversSaid(S1.drivers), from: S1.drivers.from, to: S1.drivers.to,
       profit_after_ads: S1.drivers.profit_after_ads, typical_28_days_profit_after_ads: S1.drivers.typical, change_against_typical: S1.drivers.change,
       typical_is: 'the average of the six 28-day spells before (the one comparison Greta uses for a typical month)',
       drivers: (S1.drivers.drivers || []).slice(0, 6).map(d => ({ rank: d.rank, part: d.label, change: d.gbp, how_sure: d.evidence, expected: d.expected || null, said: d.said, action: d.action ? d.action.id : null })),
@@ -8985,7 +8985,7 @@ function v3AskReadout(R, topics, basis, titles, withHeld) {
     // model named it "Win a new customer" every time.
     board: (R.board || []).map(x => { const bs = String(basis[x.rank] || ''), ti = String(titles[x.rank] || '');
       return { rank: x.rank, action: ti || cutAction(x.action), detail: ti ? cutAction(x.action) : undefined, pounds: x.gbp_per_month,
-        per: /\(once|once,? over/i.test(bs) ? 'once' : 'a month', pounds_are: x.gbp_is_sales ? 'sales' : (cut(bs, 110) || 'profit after product and order costs'),
+        per: v3OnceBasis(bs) ? v3OnceOver(bs) : 'a month', pounds_are: x.gbp_is_sales ? 'sales' : (cut(bs, 110) || 'profit after product and order costs'),
         rung: x.rung, why_this_rung: cut((x.why_this_rung || [])[0], 120), lane: x.lane }; }),
     // 16 Oct: the held list was read as things not to do, once inverted ("retain too little margin" of products
     // keeping 87-91%). Sent only for "what not to do / what is held" questions, and labelled for what it is.
@@ -9512,12 +9512,17 @@ function AskPanel(){
     return () => { alive = false; };
   }, []);
   // "Ask about this" — a card stashed a question via window.__oiAsk; prefill it here.
+  // The Today Ask bar sets __oiAskSendNow: the question is sent, not only prefilled. It goes through
+  // autoAsk so send() runs from a render that has the current history and depth.
+  const [autoAsk, setAutoAsk] = useState(null);
   React.useEffect(()=>{
-    const consume = () => { try { const q = window.__oiAskPending; if(q){ window.__oiAskPending = null; setQuestion(q); } } catch(e){} };
+    const consume = () => { try { const q = window.__oiAskPending; const go = window.__oiAskSendNow; window.__oiAskSendNow = false;
+      if(q){ window.__oiAskPending = null; setQuestion(q); if (go) setAutoAsk(q); } } catch(e){} };
     consume();
     window.addEventListener('oi-ask-prefill', consume);
     return () => window.removeEventListener('oi-ask-prefill', consume);
   }, []);
+  React.useEffect(()=>{ if (autoAsk) { setAutoAsk(null); send(autoAsk); } }, [autoAsk]);
 
   // A suggested question sends on click (16 Oct: the chips only filled the box, so a click looked like nothing
   // happened); onClick={send} passes an event, so only a string counts as the question.
@@ -12031,7 +12036,7 @@ function BusinessReview(){
       {x.basis && <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:2,lineHeight:1.4}}>{x.basis}</div>}
     </div>
     <div style={{textAlign:'right',flexShrink:0}}>
-      <div style={{fontWeight:'var(--weight-bold)',fontSize:'var(--text-sm)',color:accent,whiteSpace:'nowrap'}}>{`${curSym()}`}{k(Math.abs(x.monthly_impact_gbp))}{/\(once/i.test(String(x.basis || '')) ? ' once' : '/mo'}</div>
+      <div style={{fontWeight:'var(--weight-bold)',fontSize:'var(--text-sm)',color:accent,whiteSpace:'nowrap'}}>{`${curSym()}`}{k(Math.abs(x.monthly_impact_gbp))}{v3OnceBasis(x.basis) ? ' once' : '/mo'}</div>
       {x.rung && <div style={{marginTop:4}}><V3Conf state={x.rung}/></div>}
     </div>
   </div>);
@@ -16469,7 +16474,9 @@ function V3AskBar({ dest }) {
     if (!t) { window.__oiGo && window.__oiGo('ask'); return; }
     track('ask_used', { from: 'askbar', chars: t.length });
     setQ(''); setOpen(false);
-    if (window.__oiAsk) window.__oiAsk(t); else window.__oiGo && window.__oiGo('ask');
+    // The bar sends: the question opens on Ask already asked (20 Oct: it only moved there, and the
+    // owner pressed Ask a second time). Cards elsewhere still only prefill.
+    if (window.__oiAsk) window.__oiAsk(t, { send: true }); else window.__oiGo && window.__oiGo('ask');
   };
   if (dest === 'ask') return null;          // never ask twice on the Ask screen itself
   return (<div className="v3-askbar" ref={barRef}>
@@ -18193,7 +18200,7 @@ function V3Today(p) {
           {top.cm_gbp ? <div className="v3-dofirst-worth">
             <span className="v3-dofirst-worth-k">{top.category === 'stock' || top.external_id === 'stock-reorder' ? 'Protects about' : 'Worth about'}</span>
             <span className="v3-dofirst-worth-v">{v3Gbp(top.cm_gbp)}</span>
-            <span className="v3-dofirst-worth-k">{v3Once(top) ? 'once, over the peak' : 'a month'}</span></div> : null}
+            <span className="v3-dofirst-worth-k">{v3Once(top) ? v3OnceOver(top.money_basis) : 'a month'}</span></div> : null}
         </div>
         {/* two sentences of why on the card; the rest is under "Why this first?" */}
         {v3PlainAction(top).why && <p className="v3-dofirst-line"><b>Why</b><span>{v3FirstSentences(v3PlainAction(top).why, 2)}</span></p>}
@@ -18238,7 +18245,7 @@ function V3Today(p) {
             <div className="v3-kick">Greta's working</div>
             <p className="v3-note">{v3PlainAction(top).raw}</p>
             {top.cm_gbp ? <p className="v3-note">{V3_BOARD.ranked
-              ? <>Ranked first on how sure Greta is and what it is worth, taken together.{top.rung ? <> How sure: {String((V3_CONF[v3MoneyConf(top)] || {}).label || top.rung).toLowerCase()}.</> : null} Worth about {v3Gbp(top.cm_gbp)} a month{top.money_is_sales ? ' in sales' : ''}. A bigger figure Greta is less sure of sits lower.</>
+              ? <>Ranked first on how sure Greta is and what it is worth, taken together.{top.rung ? <> How sure: {String((V3_CONF[v3MoneyConf(top)] || {}).label || top.rung).toLowerCase()}.</> : null} Worth about {v3Gbp(top.cm_gbp)}{v3Per(top)}{top.money_is_sales ? ' in sales' : ''}. A bigger figure Greta is less sure of sits lower.</>
               : <>Ranked first because it is worth the most of anything Greta has checked recently: about {v3Gbp(top.cm_gbp)}{v3Per(top)}.</>}</p> : null}
             {Array.isArray(top.evidence_reasons) && top.evidence_reasons.length > 0 && (
               <ul className="v3-note">{top.evidence_reasons.map((x, i) => <li key={i}>{(x && x.text) || String(x)}</li>)}</ul>)}
@@ -18333,7 +18340,7 @@ function V3Today(p) {
             {d.pace_is_reliable === false
               ? <>Too close to call: {v3Gbp(d.unreported_spend)} of ad spend has not come through yet</>
               : <>{V3_PLAN_WORD[ppP.status]}: {v3Gbp(Math.abs(Number(ppP.gap)))} {Number(ppP.gap) >= 0 ? 'more' : 'less'} after ads than {ppMonth}’s plan expects by now</>}
-            <span className="v3-muted v3-pace-goal"><span className="v3-sep" aria-hidden="true"> · </span>{v3Gbp(ppP.actual_so_far)} kept so far of {v3Gbp(ppP.plan_total)} planned for {ppMonth}</span>
+            <span className="v3-muted v3-pace-goal"><span className="v3-sep" aria-hidden="true"> · </span>{Number(ppP.actual_so_far) < 0 ? v3Gbp(Math.abs(Number(ppP.actual_so_far))) + ' lost so far' : v3Gbp(ppP.actual_so_far) + ' kept so far'}, against {v3Gbp(ppP.plan_total)} planned for {ppMonth}</span>
             <V3Conf state="probably" detail={[PPT.basis_note, ppP.pace_basis ? 'At today’s pace: ' + ppP.pace_basis + '.' : null].filter(Boolean).join(' ')}
               fix={['home', 'plansetup', 'Open Goal & costs']}/>
           </div>
@@ -21592,8 +21599,14 @@ function V3Team() {
 // channels, the next peak and the code that drove it -- with a rule-of-thumb range for each. This
 // writes the paragraph and the plan from them and from the board, and shows how the brand compares.
 // One-off money (a peak's worth of profit) reads "once", never "a month".
-const v3Once = r => /\(once\b/.test(String((r && r.money_basis) || ''));
-const v3Per = (r, short) => (v3Once(r) ? (short ? ' once' : ' once, over the peak') : (short ? '/mo' : ' a month'));
+// A one-off is said two ways in money_basis: "... (once, over the peak)" and, on the discount cap, a basis
+// that opens "once, over a sale like the last one". Only the first was caught, so the cap showed "£4,645/mo"
+// against its own basis (20 Oct, O2). One test for both; the long label says the basis's own "over ...".
+const V3_ONCE_RX = /\(once\b|^\s*once\b|\bonce,? over\b/i;
+const v3OnceBasis = b => V3_ONCE_RX.test(String(b || ''));
+const v3OnceOver = b => { const m = String(b || '').match(/\bonce,? (over [^:;)]+)/i); return 'once, ' + (m ? m[1].trim() : 'over the peak'); };
+const v3Once = r => v3OnceBasis(r && r.money_basis);
+const v3Per = (r, short) => (v3Once(r) ? (short ? ' once' : ' ' + v3OnceOver(r.money_basis)) : (short ? '/mo' : ' a month'));
 const V3_STATE_Q = (sb, b) => v3StateRow(sb, b, 'state').then(s => s ? { data: [s], error: null }
   : sb.rpc('fn_brand_state', { p_brand: b }).then(r => ({ data: r.data ? [r.data] : [], error: r.error })));
 const V3_CODES_Q = (sb, b) => sb.from('vw_brand_code_performance').select('code,orders_365d,net_sales_365d,avg_depth,first_order_share,last_used,orders_90d')
@@ -21834,6 +21847,15 @@ function V3SalesMove() {
 // "What to do" carries the board action for each part that pulls profit down. Replaces the one-reason line.
 const V3_DRIVER_SURE = { likely: 'Likely', probably: 'Probably', possible: 'Possibly', usual: 'Within its usual range' };
 const V3_DRIVER_ALSO = { 'the 28 days before': 'the 28 days before', 'the same days last year': 'last year' };
+// The drivers' total in words. The server's said read "you kept -£1,336 ... (£6,592)" (20 Oct, O4); 0988 fixes it at
+// source, and until then (and after) the sentence is built here from the figures it carries.
+function v3DriversSaid(D) {
+  if (!D || D.profit_after_ads == null || D.typical == null) return (D && D.said) || '';
+  const k = Number(D.profit_after_ads), t = Number(D.typical), gap = k - t;
+  return 'In the 28 days to ' + v3Day(String(D.to).slice(0, 10)) + ' you ' + (Math.round(k) < 0 ? 'lost ' : 'kept ') + fmtMoney(Math.abs(k))
+    + ' after product, order and ad costs, ' + fmtMoney(Math.abs(gap)) + (gap < 0 ? ' below' : ' above') + ' a typical 28 days, which '
+    + (Math.round(t) < 0 ? 'loses ' : 'keeps ') + fmtMoney(Math.abs(t)) + '.';
+}
 function V3RankedDrivers({ D }) {
   const board = useV3Board();
   const [all, setAll] = React.useState(false), [why, setWhy] = React.useState(false);
@@ -21855,10 +21877,13 @@ function V3RankedDrivers({ D }) {
   const sub = r => [V3_DRIVER_SURE[r.evidence] || '',
     (r.holds || []).filter(h => V3_DRIVER_ALSO[h]).length && r.evidence !== 'usual' ? 'also against ' + (r.holds || []).filter(h => V3_DRIVER_ALSO[h]).map(h => V3_DRIVER_ALSO[h]).join(' and ') : '',
     r.evidence !== 'usual' && r.expected === 'season' ? 'partly the season' : r.evidence !== 'usual' && r.expected === 'sale_ended' ? 'a sale ended' : ''].filter(Boolean).join(' · ');
+  // One total and one "typical" on Today (20 Oct, O4): the hero's 30 days against a typical month. The drivers' own
+  // 28-day total read as a second answer beside it ("-£1,336 ... a typical 28 days (£6,592)" against "-£436 ... a
+  // typical month (£8,773)"), so here they are the breakdown, named by their weeks, and the total sits in the fold.
+  const wk = D.to ? v3Day(String(D.to).slice(0, 10)) : null;
   return (<div className="v3-ranked">
-    <p className="v3-stand-why">{D.said}</p>
     <figure className="v3-bridge v3-bridge-wide" role="img" aria-label="What moved profit after ads, biggest and surest first">
-      <figcaption className="v3-bridge-cap">What is driving it, against a typical 28 days</figcaption>
+      <figcaption className="v3-bridge-cap">What moved it{wk ? ' in the four full weeks to ' + wk : ''}, against a typical four weeks</figcaption>
       {shown.map(r => (<div key={r.key} className="v3-bridge-row">
         <span className="v3-bridge-k">{r.label}<small>{sub(r)}</small></span>
         <span className="v3-bridge-track">{lo < 0 && hi > 0 ? <b style={{ left: x(0) + '%' }}/> : null}
@@ -21877,6 +21902,7 @@ function V3RankedDrivers({ D }) {
       {' '}<button type="button" className="v3-xref" aria-expanded={why} onClick={() => setWhy(v => !v)}>Why Greta ranks it this way <span className="v3-xref-go">{why ? '↑' : '↓'}</span></button>
     </p>
     {why && <div className="v3-measure">
+      <p className="v3-note">{v3DriversSaid(D)}</p>
       {R.map(r => <p key={r.key} className="v3-note">{r.said}</p>)}
       {(D.context || []).filter(c => c.said).map(c => <p key={c.key} className="micro muted">{c.said}</p>)}
       <p className="micro muted">{v3Sentence(D.basis)}</p>
@@ -22340,15 +22366,28 @@ function V3CalendarDrivers() {
   const P = { rev: Number(S.expected_by_now), spend: Number(Ad && Ad.expected_by_now) || 0, cm: Number(Pa && Pa.expected_by_now) || 0 };
   const range = v3Day(String(M.start).slice(0, 10)) + ' – ' + v3Day(String(M.counted_through).slice(0, 10), true);
   const tone = v3PlanTone(S.status);
+  // Sales on plan with profit off it (20 Oct, O5): "Healthy, ahead of plan" on £7,138 of sales while Today said the
+  // month was £509 down after ads against £1,270 planned. One line says both, and the sign drops to Watch.
+  const salesOk = S.status === 'ahead' || S.status === 'on_plan';
+  const profOff = Pa && Pa.status && Pa.status !== S.status && (salesOk ? !(Pa.status === 'ahead' || Pa.status === 'on_plan') : (Pa.status === 'ahead' || Pa.status === 'on_plan'));
+  const overAds = P.spend > 0 && A.spend > P.spend * 1.1;
+  const both = Pa && Pa.status ? (<p className="v3-stand-why v3-plan-both">
+    {salesOk ? 'Sales are ' + (S.status === 'ahead' ? fmtMoney(A.rev - P.rev) + ' ahead of' : 'on') + ' plan'
+             : 'Sales are ' + fmtMoney(P.rev - A.rev) + ' behind plan'}
+    {profOff ? (salesOk ? ', but profit after ads is behind it: ' : ', but profit after ads is on plan: ') : ', and so is profit after ads: '}
+    {A.cm < 0 ? 'you have lost ' : 'you have kept '}<b className="v3-num">{fmtMoney(Math.abs(A.cm))}</b> so far, against{P.cm < 0 ? ' a planned loss of ' : ' '}<b className="v3-num">{fmtMoney(Math.abs(P.cm))}</b>{P.cm < 0 ? ' by now' : ' planned by now'}
+    {profOff && salesOk && overAds ? <>, because ads ran over plan (<b className="v3-num">{fmtMoney(A.spend)}</b> spent against <b className="v3-num">{fmtMoney(P.spend)}</b>)</> : null}.
+  </p>) : null;
   return (<section className="v3-sec v3-strip">
     <h2 className="v3-sec-title">What is moving it <span className="v3-muted">{range}</span></h2>
     <div className="v3-signs">
-      <V3Sign k={'Sales against ' + gpMonthName(M.start) + '’s plan'} v={fmtMoney(A.rev)} tone={tone === 'bad' ? 'weak' : S.status === 'ahead' ? 'good' : 'typical'}
+      <V3Sign k={'Sales against ' + gpMonthName(M.start) + '’s plan'} v={fmtMoney(A.rev)} tone={tone === 'bad' ? 'weak' : profOff && salesOk ? 'ok' : S.status === 'ahead' ? 'good' : 'typical'}
         bar={{ fill: Math.min(1, A.rev / (Math.max(A.rev, P.rev) * 1.25)), mark: P.rev / (Math.max(A.rev, P.rev) * 1.25) }}
         n={<>{fmtMoney(P.rev)} expected by now; the mark is the plan</>}
         trendAs={{ dir: S.status === 'on_plan' ? 'flat' : S.status === 'ahead' ? 'up' : 'down', cls: S.status === 'on_plan' ? 'flat' : tone === 'good' ? 'good' : 'bad', text: V3_PLAN_WORD[S.status] }}
         act={{ label: open ? 'Hide what is driving it' : 'What is driving this?', open, on: () => setOpen(o => !o) }}/>
     </div>
+    {both}
     <p className="micro muted v3-measure">{S.plan_total != null ? <>The plan for {gpMonthName(M.start)} is {fmtMoney(S.plan_total)}. </> : null}{S.pace_finish != null ? <>At today’s pace the month ends at about {fmtMoney(S.pace_finish)}. </> : null}<V3Conf state="probably" detail={[M.basis_note, S.pace_basis ? 'At today’s pace: ' + S.pace_basis + '.' : null].filter(Boolean).join(' ')}/></p>
     <V3FcErr/>
     {open && <V3DriverPanel fixed={v3ModelCalendar(A, P, { range, month: gpMonthName(M.start) })}/>}
@@ -25470,8 +25509,8 @@ function App(){
     };
     // "Ask about this" — any card can hand a question to the AI panel: stash it,
     // jump to Home › Ask, and let AskPanel pick it up (prefilled, ready to send).
-    window.__oiAsk = (q) => {
-      try { window.__oiAskPending = q || ''; } catch(e){}
+    window.__oiAsk = (q, opts) => {
+      try { window.__oiAskPending = q || ''; window.__oiAskSendNow = !!(q && opts && opts.send); } catch(e){}
       window.__oiNav('home', 'ask');
       try { window.dispatchEvent(new Event('oi-ask-prefill')); } catch(e){}
     };
