@@ -11078,7 +11078,10 @@ function V3SkeletonRows({ n }) {
 // 13 actions where Actions listed 12. Now there is one fetch of vw_brand_action_board per page
 // load, and every one of those surfaces renders from it. The cache still paints Today instantly;
 // the live board replaces it the moment it lands.
-const V3_BOARD = { rows: null, err: null, loading: false, subs: new Set() };
+// 0991: open actions with no figure that still belong on the board (the peak plan when its stock cannot
+// arrive, a question about a code) come as their own lane, after the priced rows. Before 0991 is applied the
+// view is missing, and the lane stays empty.
+const V3_BOARD = { rows: null, unpriced: null, err: null, loading: false, subs: new Set() };
 function v3BoardNotify(){ V3_BOARD.subs.forEach(f => { try { f(); } catch(e){} }); }
 // 0272: Greta's words for the board and the summary, written by the LLM from the same figures (the
 // greta-writer edge function) and checked number by number against them. Fetched once a page load,
@@ -11121,8 +11124,18 @@ function v3BoardLoad(){
   const EVIDENCE = ',rung,lane,board_rank,evidence_reasons,money_is_sales,days_since_refresh,evidence_checked_at';
   const ask = (cols, byRank) => sb.from('vw_brand_action_board').select(cols)
     .eq('brand_id', b).order(byRank ? 'board_rank' : 'cm_gbp', byRank ? { ascending: true } : { ascending: false, nullsFirst: false });
+  // 0991: the unpriced lane rides on Today's call; without it, one read of the view
+  const askLane = () => sb.from('vw_brand_action_unpriced')
+    .select('external_id,description,priority,category,origin,step1,playbook,days_open,rung,lane,lane_kind,lane_said,due_on,days_to_due,lane_rank,anatomy_category,evidence_reasons')
+    .eq('brand_id', b).order('lane_rank', { ascending: true })
+    .then(r => (r && !r.error && Array.isArray(r.data)) ? r.data : [], () => []);
   // 0926: the board from Today's one call when it has rows, else the live read
   Promise.resolve(window.GRETA_TODAY_BUNDLE_P || null)
+    .then(j => {
+      const lane = j && Array.isArray(j.unpriced) ? Promise.resolve(j.unpriced) : askLane();
+      lane.then(u => { V3_BOARD.unpriced = u || []; if (V3_BOARD.rows) v3BoardNotify(); });
+      return j;
+    }, () => { askLane().then(u => { V3_BOARD.unpriced = u || []; if (V3_BOARD.rows) v3BoardNotify(); }); return null; })
     .then(j => (j && Array.isArray(j.board) && j.board.length) ? { data: j.board, error: null } : ask(COLS + MONEY + EVIDENCE, true), () => ask(COLS + MONEY + EVIDENCE, true))
     .then(r => (r && r.error && /rung|lane|board_rank|evidence_reasons|money_is_sales|days_since_refresh|evidence_checked_at/.test(r.error.message || '')) ? ask(COLS + MONEY, false) : r)
     .then(r => (r && r.error && /money_/.test(r.error.message || '')) ? ask(COLS, false) : r)
@@ -11145,6 +11158,7 @@ function v3BoardLoad(){
 function v3BoardDrop(ext){
   if (!V3_BOARD.rows) return;
   V3_BOARD.rows = V3_BOARD.rows.filter(x => x.external_id !== ext);
+  if (V3_BOARD.unpriced) V3_BOARD.unpriced = V3_BOARD.unpriced.filter(x => x.external_id !== ext);
   v3BoardNotify();
 }
 function useV3Board(){
@@ -11159,7 +11173,7 @@ function useV3Board(){
     }
     return () => { V3_BOARD.subs.delete(f); if (iv) clearInterval(iv); };
   }, []);
-  return { rows: V3_BOARD.rows, err: V3_BOARD.err };
+  return { rows: V3_BOARD.rows, err: V3_BOARD.err, unpriced: V3_BOARD.unpriced };
 }
 // Emitters grade their own figures in their own words ("high", "medium", "directional",
 // "Probably"). One ladder on screen (confidence-ladder): anything resting on a stated
@@ -11277,8 +11291,91 @@ const V3_MOVE_LABEL = { cac: 'cost to win a new customer', ret: 'sales from each
   metacpa: 'Meta’s cost per sale', googcpa: 'Google’s cost per sale', newsales: 'new customers’ sales', prodsales: 'product sales', aov: 'the average order',
   brandshare: 'searches for your name', email: 'sales from email campaigns', organic: 'visits from unpaid search' };
 const v3Moves = id => { const k = String(id || ''); const m = V3_MOVES.find(([p]) => (p.endsWith('-') ? k.startsWith(p) : k === p)); return m ? m[1] : []; };
+// ── The unpriced lane (0991) ─────────────────────────────────────────────
+// The board ranks by pounds, so an open action with no figure never reached it: on 20 Oct the Black Friday plan
+// lost its figure (the stock it needed lands after the peak) and the owner's biggest week had no row anywhere.
+// These come after the ranked list, each saying why it has no figure; one with a deadline says the date. The
+// server ranks them (how sure, then the soonest date). Today shows only the dated ones, under its list.
+function v3DueWords(r, short) {
+  if (!r || !r.due_on) return '';
+  const d = new Date(String(r.due_on).slice(0, 10) + 'T00:00:00Z');
+  if (isNaN(d)) return '';
+  const day = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  const n = Number(r.days_to_due);
+  const left = r.days_to_due == null || !isFinite(n) ? '' : n <= 0 ? 'today' : n === 1 ? '1 day' : n + ' days';
+  return short ? (left ? day + ' · ' + left : day) : 'due by ' + day + (left ? ' (' + left + ')' : '');
+}
+function V3UnpricedLane({ compact }) {
+  const { unpriced } = useV3Board();
+  const [open, setOpen] = React.useState(null);
+  const lane = Array.isArray(unpriced) ? unpriced : [];
+  const rows = compact ? lane.filter(r => r.due_on) : lane;
+  if (!rows.length) return null;
+  if (compact) return (
+    <div className="v3-next">
+      <div className="v3-kick">With a deadline, no figure yet</div>
+      {rows.map(a => (<div key={a.external_id} className="v3-next-row">
+        <span className="v3-num"/>
+        <span>{v3PlainAction(a).title}</span>
+        <span className="v3-num">{v3DueWords(a, true)}</span>
+      </div>))}
+      <p className="micro muted">{v3Tidy(rows[0].lane_said)}</p>
+    </div>
+  );
+  return (
+    <ol className="v3-rank v3-rank-lane" aria-label="Actions with no figure yet">
+      <li className="v3-rank-break">
+        <span className="v3-kick">Still to do, no figure yet</span>
+        <span className="v3-sub">These have no £ figure to rank them by, so they sit after the ranked list. Each one says
+          why; one with a deadline says the date.</span>
+      </li>
+      {rows.map(r => {
+        const isOpen = open === r.external_id;
+        const play = Array.isArray(r.playbook) ? r.playbook : [];
+        const conf = v3MoneyConf(r);
+        const pa = v3PlainAction(r);
+        return (
+          <li key={r.external_id} className={'v3-rank-row' + (isOpen ? ' open' : '')}>
+            <button type="button" className="v3-rank-hit" aria-expanded={isOpen}
+                    onClick={() => setOpen(isOpen ? null : r.external_id)}>
+              <span className="v3-rank-n"/>
+              <span className="v3-rank-body">
+                <span className="v3-rank-desc">{pa.title}</span>
+                {pa.why && <span className={'v3-rank-plain' + (isOpen ? '' : ' clamp')}>{pa.why}</span>}
+                <span className="v3-rank-meta">
+                  {v3Tidy(r.lane_said)}
+                  {r.due_on ? ' · ' + v3DueWords(r) : ''}
+                  {r.category ? ' · ' + v3CategoryWords(r.category) : ''}
+                  {conf ? ' · ' + V3_CONF[conf].label.toLowerCase() : ''}
+                </span>
+              </span>
+              <span className="v3-rank-gbp"><span className="v3-rank-per">{r.due_on ? v3DueWords(r, true) : 'no figure'}</span></span>
+            </button>
+            <div className="v3-rank-fix">
+              <V3Done ext={r.external_id} small tone="quiet" onDone={() => v3BoardDrop(r.external_id)}/>
+              <V3Skip ext={r.external_id} small tone="quiet" onDone={() => v3BoardDrop(r.external_id)}/>
+            </div>
+            {isOpen && (
+              <div className="v3-rank-why">
+                {play.length
+                  ? <ol className="v3-rank-steps">{play.map((s, j) => <li key={j}>{v3Tidy(s)}</li>)}</ol>
+                  : <p className="v3-rank-nosteps">{v3Tidy(r.step1) || 'Greta has no further detail on this one yet.'}</p>}
+                {Array.isArray(r.evidence_reasons) && r.evidence_reasons.some(x => x && x.text) && (
+                  <div className="v3-rank-raw"><span className="v3-kick">Why {conf ? V3_CONF[conf].label.toLowerCase() : 'this steer'}</span>
+                    <ul className="v3-rank-steps">{r.evidence_reasons.filter(x => x && x.text).map((x, j) => <li key={j}>{v3Tidy(x.text)}</li>)}</ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 function V3ActionBoard(){
-  const { rows, err } = useV3Board();
+  const { rows, err, unpriced } = useV3Board();
   const [cat, setCat] = React.useState('all');
   const [open, setOpen] = React.useState(null);
   const [showSmall, setShowSmall] = React.useState(false);
@@ -11286,7 +11383,14 @@ function V3ActionBoard(){
 
   if (err) return <div className="v3-empty">Greta could not load your actions just now — refreshing usually sorts it. If it keeps happening, Greta has logged the reason and will raise it here.</div>;
   if (rows === null) return <V3SkeletonRows n={5}/>;
-  if (!rows.length) return <div className="v3-empty">Nothing needs doing right now. Greta raises something here as soon as it is worth your time.</div>;
+  if (!rows.length) return (
+    <div className="v3-board v3-enter">
+      <div className="v3-empty">{Array.isArray(unpriced) && unpriced.length
+        ? 'Nothing with a £ figure needs doing right now.'
+        : 'Nothing needs doing right now. Greta raises something here as soon as it is worth your time.'}</div>
+      <V3UnpricedLane/>
+    </div>
+  );
 
   const cats = [...new Set(rows.map(r => r.category).filter(Boolean))].sort();
   const shown = cat === 'all' ? rows : rows.filter(r => r.category === cat);
@@ -11483,6 +11587,7 @@ function V3ActionBoard(){
         )}
       </ol>
       {V3_BOARD.ranked && <p className="micro muted v3-measure">Each row says when Greta last checked its figures. An action whose figures go three weeks without a check drops off this list, so every figure here is current. Actions open over a month that Greta has no test for sit below the ranked list.</p>}
+      <V3UnpricedLane/>
       <V3HeldActions/>
       {/* Actions read 7.1 screens (review, 8 Oct); the ranked list is the page's answer, so the changes
           with no £ figure fold away below it. */}
@@ -18259,10 +18364,12 @@ function V3Today(p) {
       </div>
     ) : (
       <div className="v3-dofirst v3-raised"><div className="v3-kick">Do this first</div>
-        <div className="v3-dofirst-t">Nothing needs you today.</div>
+        <div className="v3-dofirst-t">{Array.isArray(board.unpriced) && board.unpriced.some(r => r.due_on) ? 'Nothing with a £ figure needs you today.' : 'Nothing needs you today.'}</div>
         <div className="v3-sub">Greta checks again as new data arrives.</div></div>
     )}
 
+    {/* 0991: one column for the ranked list and, under it, a dated action with no figure */}
+    <div>
     {next.length > 0 && (<div className="v3-next">
       <div className="v3-kick">Then, in order</div>
       {next.map((a, i) => (<div key={a.external_id || i} className="v3-next-row">
@@ -18275,6 +18382,9 @@ function V3Today(p) {
       {seasonNote && !isCut(top) && next.some(isCut) && <p className="micro muted">The ad-spend cuts are for {seasonNote.cur} only. The quarter plan puts {v3Gbp(seasonNote.spend)} of ads into {seasonNote.peak}.{monthLine}</p>}
       <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>See all {boardCount || ''} actions <Icon name="arrowRight" size={13}/></button>
     </div>)}
+    {/* 0991: a dated action with no figure (the peak plan when its stock cannot arrive) under the list */}
+    <V3UnpricedLane compact/>
+    </div>
     </div>
 
     {/* The tracking problem sits straight after the actions it affects (9 Oct): above them it pushed
