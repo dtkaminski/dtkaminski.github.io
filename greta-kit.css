@@ -1313,3 +1313,13 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-ask-answer > :last-child { margin-bottom: 0; }
 .v3-cov-chev { display: inline-flex; color: var(--color-faint); transition: transform 120ms; }
 .v3-cov-chev.open { transform: rotate(90deg); }
+
+/* ── What the ads and email really cause (Actions, 1021) ─────────────────── */
+/* the last column is a short sentence: it wraps at every width instead of running off the edge */
+.v3-main .v3-incr table.v3-rw td.v3-rw-wrap { white-space: normal; min-width: 0; }
+.v3-incr-reads { margin: var(--space-4) 0 0; max-width: 68ch; }
+.v3-incr-reads > div { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: var(--space-3);
+  padding: var(--space-2) 0; border-top: 1px solid var(--color-line); }
+.v3-incr-reads dt { font-size: var(--text-sm); color: var(--color-muted); }
+.v3-incr-reads dd { margin: 0; font-size: var(--text-sm); color: var(--color-ink); line-height: var(--leading-body); }
+@media (max-width: 640px) { .v3-incr-reads > div { grid-template-columns: 1fr; gap: var(--space-1); } }

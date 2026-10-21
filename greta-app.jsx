@@ -23804,6 +23804,73 @@ const V3_STALE_TOPICS = [
   { k: 'checkout', re: /checkout|discount_value|\bcart\b|apple pay/i, label: 'Cart and checkout' },
   { k: 'creators', re: /influencer|creator|\bugc\b/i, label: 'Creators', board: /^promo-peak/ },
 ];
+// What the ads and email really cause (1021, eval 21 Oct): the anatomy part "Tests and true lift" had no
+// driver panel, so it could never read as explained. fn_brand_incrementality_read says, for each paid channel
+// and for email, what Greta has measured (a finished holdout) against what it assumes (a published share),
+// and which test settles the biggest figure on the board that rests on one of those guesses. Before 1021 is
+// applied the call fails and the panel stays away.
+const V3_INCR_Q = (sb, b) => sb.rpc('fn_brand_incrementality_read', { p_brand: b })
+  .then(r => ({ data: r && r.data ? [r.data] : [], error: r && r.error }));
+const V3_INCR_CALL = { pays_across_range: 'pays anywhere in the published range', short_across_range: 'falls short anywhere in the published range',
+                       turns_on_it: 'whether it pays turns on the share' };
+const V3_INCR_READS = [
+  ['marginal_cac', 'Cost of the next new customer'],
+  ['marginal_cac_phi', 'The same, counting only the sales the ads cause'],
+  ['discount_breakeven', 'How deep a discount can go and still pay'],
+  ['promo_net_of_dip', 'The last promotion, net of the dip after it'],
+];
+function V3Incremental() {
+  const q = useV3Rows('incremental-read', V3_INCR_Q);
+  const board = useV3Board();
+  const D = q.rows && q.rows[0];
+  if (!D || D.state !== 'ok') return null;
+  const num = v => (v == null || v === '' || !isFinite(Number(v)) ? null : Number(v));
+  const ret = v => (num(v) == null ? FMT_NONE : fmtMoney(num(v), 2));
+  const chans = D.channels || [], silent = D.silent || [], E = D.email || {}, T = D.tests || {}, S = D.settle;
+  const live = board.rows ? v3LiveRows(board.rows) : [];
+  const sRow = S ? live.find(r => r.external_id === S.external_id) : null;
+  const sRank = S ? (v3BoardRank(live, S.external_id) || S.board_rank) : null;
+  // a figure worked out more than two days ago says when
+  const old = iso => iso && (Date.now() - new Date(iso).getTime()) > 2 * 864e5;
+  const reads = V3_INCR_READS.map(([k, l]) => [k, l, D.reads && D.reads[k]]).filter(x => x[2] && x[2].display);
+  return (<section className="v3-sec v3-incr" id="drivers-incremental">
+    <h2 className="v3-sec-title">What your ads and email really cause <span className="v3-muted">measured, or assumed until a test</span></h2>
+    <p className="v3-note v3-measure">{D.said}</p>
+    {chans.length > 0 && <table className="v3-rw">
+      <thead><tr><th className="t-text">Channel</th><th className="v3-rw-opt">Spend, 30 days</th><th>Share of its sales it really causes</th>
+        <th>Each {curSym()}1 brings back</th><th className="v3-rw-opt">Needs</th><th className="t-text">How Greta knows</th></tr></thead>
+      <tbody>{chans.map(c => { const tr = num(c.true_return), be = num(c.break_even);
+        return (<tr key={c.channel_type}>
+          <td className="t-text v3-rw-name">{c.label}</td>
+          <td className="v3-rw-opt">{fmtMoney(c.spend_30d)}</td>
+          <td>{fmtPctN(c.share_caused)}{c.basis === 'assumed' && num(c.share_lo) != null && num(c.share_hi) != null
+            ? <span className="v3-muted v3-rw-opt"> ({fmtPctN(c.share_lo)} to {fmtPctN(c.share_hi)})</span> : null}</td>
+          <td className={tr != null && be != null ? (tr >= be ? 'v3-up' : 'v3-down') : ''}>{ret(c.true_return)}</td>
+          <td className="v3-rw-opt">{ret(c.break_even)}</td>
+          <td className="t-text v3-rw-wrap">{c.basis === 'known'
+            ? <span className="v3-flag good">Measured{num(c.n_tests) ? ', ' + c.n_tests + (num(c.n_tests) === 1 ? ' test' : ' tests') : ''}</span>
+            : <span className="v3-muted">Assumed{V3_INCR_CALL[c.call] ? ': ' + V3_INCR_CALL[c.call] : ''}</span>}</td>
+        </tr>); })}</tbody>
+    </table>}
+    <dl className="v3-incr-reads">
+      {silent.map(s => (<div key={'s-' + s.platform}><dt>{s.label}</dt><dd>{s.said}</dd></div>))}
+      {E.said ? <div key="email"><dt>Email</dt><dd>{E.said}</dd></div> : null}
+    </dl>
+    {S && <div className="v3-drivers-todo">
+      <div className="v3-kick">The test that settles the most</div>
+      <button type="button" className="v3-drivers-todo-row" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>
+        <span className="v3-num">{sRank ? '#' + sRank : ''}</span><span>{sRow ? v3PlainAction(sRow).title : v3Sentence(S.test)}</span>
+        <span className="v3-num">{fmtMoney(S.gbp)}{sRow ? v3Per(sRow, true) : '/mo'}</span><Icon name="arrowRight" size={13}/></button>
+      <p className="micro muted v3-measure">{v3Sentence(S.test)}: {String(S.how || '').charAt(0).toLowerCase() + String(S.how || '').slice(1)}</p>
+    </div>}
+    <p className="micro muted v3-measure">Tests: <span className="v3-num">{num(T.finished) || 0}</span> finished, <span className="v3-num">{num(T.running) || 0}</span> running.
+      {' '}{num(T.queued) ? <><span className="v3-num">{T.queued}</span> of the <span className="v3-num">{num(T.worth_testing) || 0}</span> rows under “Worth testing” rest on one of these guesses.</> : 'No row on the board rests on one of these guesses.'}</p>
+    {reads.length > 0 && <dl className="v3-incr-reads">{reads.map(([k, l, r]) => (<div key={k}><dt>{l}</dt>
+      <dd>{v3Sentence(r.display)}{r.state === 'estimated' ? <span className="v3-muted"> · estimated</span> : null}
+        {old(r.as_of) ? <span className="v3-muted"> · worked out {v3Day(String(r.as_of))}</span> : null}</dd></div>))}</dl>}
+    <p className="micro muted v3-measure">{D.basis}</p>
+  </section>);
+}
 function V3StaleSuggestions() {
   const q = useV3Rows('stale-suggestions', V3_STALE_Q);
   const board = useV3Board();
@@ -24040,6 +24107,7 @@ const V3_PAGES = {
     <V3FixFirst/>
     <ActionsView/>
     <V3BoardDrivers/>
+    <V3Incremental/>
     <V3More id="act-decisions" label="What you did, and whether it worked"><V3Anchor id="decisions"/><V3TrackRecord/></V3More>
     <V3StaleSuggestions/>
   </>),
