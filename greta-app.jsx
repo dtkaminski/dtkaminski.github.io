@@ -5357,9 +5357,9 @@ function Channels({start}){
 
 function CreatorCandidatesPanel(){
   const C = window.FRKL_CREATORS;
-  if (!C || !Array.isArray(C.candidates)) return null;
   const [tierFilter, setTierFilter] = useState('actionable');
   const [statusFilter, setStatusFilter] = useState('all');
+  if (!C || !Array.isArray(C.candidates)) return null;
   const TIER_COLOR = {hero:PAL.good, core:PAL.data3, longtail:PAL.warn, pass:PAL.bad};
 
   const candidates = C.candidates.filter(c => {
@@ -5715,8 +5715,8 @@ function BundlesPanel(){
 function InventoryPanel(){
   const inv = B.inventory || [];
   const summary = B.inventorySummary || {};
-  if (!inv.length) return null;
   const [tierFilter, setTierFilter] = useState('actionable');
+  if (!inv.length) return null;
   const TIER_COLOR = {critical:PAL.bad, low:PAL.warn, healthy:PAL.good, high:PAL.muted, overstock:PAL.accent, archived_stock:PAL.muted, no_stock_no_sales:PAL.line};
   const TIER_LABEL = {critical:'CRITICAL <14d',low:'LOW <30d',healthy:'HEALTHY 30-90d',high:'HIGH 90-180d',overstock:'OVERSTOCK >180d',archived_stock:'ARCHIVED (dead)',no_stock_no_sales:'NO STOCK / NO SALES'};
   const filtered = tierFilter === 'all' ? inv :
@@ -6060,12 +6060,86 @@ function partialCorr(x,y,z){ const _r=(a,b)=>{ const v=pearson(a,b); return v==n
 function CvrDrivers(){
   const [showStats,setShowStats]=useState(false);
   const D = (typeof window!=='undefined' && window.FRKL_CVR) || null;
-  if(!D || !D.meta || D.meta.insufficient) return (
+  // 21 Oct: every hook sits above the early return (the chart controls, the period pair and STAT were below it,
+  // so the hook count changed when the analytics landed). With no data they run on empty series.
+  const _cvrOk = !!(D && D.meta && !D.meta.insufficient);
+  const series = (_cvrOk && D.series) || [], seriesDaily = (_cvrOk && D.seriesDaily) || [];
+  const [chartGran,setChartGran] = useState('week');   // weekly ↔ daily
+  const [chartDays,setChartDays] = useState(0);        // 0 = all; else last N days
+  const [showDisc,setShowDisc] = useState(true);       // overlay total discount depth on the trend
+  const defaultPair = (p)=>{ let best=null;
+    for(let i=0;i<p.length;i++) for(let j=i+1;j<p.length;j++){
+      const A=p[i],B=p[j], lo=Math.min(A.sessions,B.sessions), hi=Math.max(A.sessions,B.sessions);
+      if(hi<=0 || lo/hi<0.75) continue;
+      const gap=Math.abs(A.cvr-B.cvr); if(!best||gap>best.gap) best={a:A.w,b:B.w,gap};
+    }
+    if(!best && p.length>=2) best={a:p[p.length-2].w,b:p[p.length-1].w};
+    return best?{a:best.a,b:best.b}:{a:p[0]&&p[0].w,b:p[0]&&p[0].w};
+  };
+  // null until a pair is picked; mounted before the data, the default pair is the one a fresh mount would choose
+  const [cmpSel,setCmp] = useState(()=>(_cvrOk ? defaultPair(series) : null));
+  const cmp = cmpSel || defaultPair(series);
+  const relDiff=(a,b)=>{ if(a==null||b==null) return 0; const m=(Math.abs(a)+Math.abs(b))/2||1; return Math.abs(b-a)/m; };
+  // ── Deeper signal: confound-controlled drivers + expected-CVR residuals + the
+  // cleanest "natural experiment" pairs. Computed from the daily/weekly series. ──
+  const STAT = useMemo(()=>{
+    const dd = seriesDaily.length>=12 ? seriesDaily : series; const nD=dd.length;
+    const col = k => dd.map(d=> d[k]);
+    const ctrlKey='newShare';   // dominant traffic-mix confound (closed-form partial)
+    const LEVERS=[
+      {k:'trueDiscountIntensity',label:'Discount depth (incl. sale)'},
+      {k:'discountIntensity',label:'Code/auto discount'},
+      {k:'bounce',label:'Bounce rate'},
+      {k:'engagement',label:'Engagement rate'},
+      {k:'emailSends',label:'Email sends'},
+      {k:'adSpend',label:'Ad spend'},
+      {k:'aov',label:'Average order'},
+      {k:'freeShipShare',label:'Free-shipping rate'},
+      {k:'altPayShare',label:'Alt-payment share'},
+      {k:'emailShare',label:'Email-traffic share'},
+    ];
+    const zc=col(ctrlKey); const y=col('cvr');
+    const drivers=LEVERS.filter(L=>L.k!==ctrlKey).map(L=>{ const x=col(L.k);
+      const X=[],Y=[],Zv=[];
+      for(let i=0;i<nD;i++){ const xv=x[i],yv=y[i],zv=zc[i];
+        if(xv==null||yv==null||zv==null) continue; X.push(xv); Y.push(yv); Zv.push(zv); }
+      if(X.length<8) return null;
+      const raw=(()=>{ const r=pearson(X,Y); return r==null?0:r; })();
+      const adj=partialCorr(X,Y,Zv);
+      return {k:L.k,label:L.label,n:X.length,raw,adj,sig:corrSig(adj,X.length)};
+    }).filter(Boolean).sort((a,b)=>Math.abs(b.adj)-Math.abs(a.adj));
+    // expected-CVR residuals, weekly: simple closed-form regression on new-visitor
+    // share (traffic warmth). Residual = CVR the traffic mix alone does NOT explain
+    // — the genuine "something off-model happened" signal. Closed form = bulletproof.
+    const wk=series; const XX=[],yy=[],idx=[];
+    wk.forEach((sx,i)=>{ if(sx.newShare==null||sx.cvr==null) return; XX.push(sx.newShare); yy.push(sx.cvr); idx.push(i); });
+    let resid=null;
+    if(XX.length>=8){ const mx=_mean(XX), my=_mean(yy); let sxy=0,sxx=0;
+      for(let i=0;i<XX.length;i++){ sxy+=(XX[i]-mx)*(yy[i]-my); sxx+=(XX[i]-mx)*(XX[i]-mx); }
+      const slope=sxx>0? sxy/sxx : 0, b0=my-slope*mx;
+      const res=yy.map((v,i)=> v-(b0+slope*XX[i])); const sd=Math.sqrt(_mean(res.map(r=>r*r)));
+      const byW={}; idx.forEach((wi,i)=>{ const w=wk[wi].w; const e=res[i]; byW[w]={exp:b0+slope*XX[i],act:yy[i],e,z:sd?e/sd:0}; });
+      resid={sd,byW,list:Object.keys(byW).map(w=>({w,...byW[w]})).filter(r=>Math.abs(r.z)>=1.3).sort((a,b)=>Math.abs(b.e)-Math.abs(a.e)).slice(0,5)};
+    }
+    // clean "natural experiment" pairs: matched traffic, one lever differs
+    const mixKeys=['newShare','paidShare','mobileShare'];
+    const levers=[['trueDiscountIntensity','discount depth','pct'],['emailSends','email volume','num'],['freeShipShare','free-ship rate','pct'],['aov','AOV','gbp']];
+    const pairs=[];
+    for(let i=0;i<wk.length;i++) for(let j=i+1;j<wk.length;j++){ const A=wk[i],B=wk[j]; if(A.cvr==null||B.cvr==null) continue;
+      const lo=Math.min(A.sessions,B.sessions),hi=Math.max(A.sessions,B.sessions); if(hi<=0||lo/hi<0.7) continue;
+      if(!mixKeys.every(k=> A[k]!=null&&B[k]!=null&&Math.abs(A[k]-B[k])<=6)) continue;
+      let best=null; levers.forEach(([k,lab,t])=>{ if(A[k]==null||B[k]==null) return; const rel=relDiff(A[k],B[k]); if(!best||rel>best.rel) best={k,lab,t,rel,a:A[k],b:B[k]}; });
+      if(!best||best.rel<0.2) continue;
+      pairs.push({a:A.w,b:B.w,lever:best,cvrGap:Math.abs(A.cvr-B.cvr),score:best.rel*Math.abs(A.cvr-B.cvr)});
+    }
+    return {drivers, resid, cleanPairs:pairs.sort((x,y)=>y.score-x.score).slice(0,3)};
+  }, [seriesDaily, series]);
+  if(!_cvrOk) return (
     <div className="card"><div className="card-section-title"><h2 style={{margin:0}}>Conversion rate — drivers</h2></div>
     <div className="note">{D&&D.meta
       ? `Needs 21 days of reliable analytics to split conversion into traffic mix and site performance. Greta has ${D.meta.days||0}${D.meta.lo?` (since ${D.meta.lo})`:''} — days when GA4 tracking was broken are left out. This fills in by itself.`
       : 'Loading your analytics…'}</div></div>);
-  const M=D.meta, series=D.series||[], channels=D.channels||[], drivers=D.drivers||[];
+  const M=D.meta, channels=D.channels||[], drivers=D.drivers||[];
   const STAGES=['session→cart','cart→checkout','checkout→purchase'];
   const up = M.deltaCVR>=0, mixDom=M.mixDominant;
   const verdict = mixDom
@@ -6075,13 +6149,9 @@ function CvrDrivers(){
 
   // ── Two-week comparator: default to the pair with the biggest CVR gap among
   // similar-session weeks (sessions within 75%) — i.e. "same traffic, different CVR". ──
-  const seriesDaily = D.seriesDaily || [];
   // ── Granularity + range. chartGran is the SINGLE source for both the trend
   // chart and the period comparison, so clicking a point on the chart selects a
   // directly-comparable period. ──
-  const [chartGran,setChartGran] = useState('week');   // weekly ↔ daily
-  const [chartDays,setChartDays] = useState(0);        // 0 = all; else last N days
-  const [showDisc,setShowDisc] = useState(true);       // overlay total discount depth on the trend
   const gran = chartGran;                              // comparator follows the chart
   const panel = (chartGran==='day' ? seriesDaily : series);
   const segBtn = (active)=>({fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',padding:'4px 10px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1px solid '+(active?PAL.accent:'var(--border-subtle)'),background:active?'var(--color-accent-wash-2)':'transparent',color:active?PAL.accent:'var(--text-muted)'});
@@ -6116,16 +6186,6 @@ function CvrDrivers(){
     deepDisc:_avg(_deep,'trueDiscountIntensity'), restDisc:_avg(_rest,'trueDiscountIntensity'),
   } : null;
   if(discLift){ discLift.pp = discLift.deepCvr - discLift.restCvr; discLift.pct = discLift.restCvr ? discLift.pp/discLift.restCvr : null; }
-  const defaultPair = (p)=>{ let best=null;
-    for(let i=0;i<p.length;i++) for(let j=i+1;j<p.length;j++){
-      const A=p[i],B=p[j], lo=Math.min(A.sessions,B.sessions), hi=Math.max(A.sessions,B.sessions);
-      if(hi<=0 || lo/hi<0.75) continue;
-      const gap=Math.abs(A.cvr-B.cvr); if(!best||gap>best.gap) best={a:A.w,b:B.w,gap};
-    }
-    if(!best && p.length>=2) best={a:p[p.length-2].w,b:p[p.length-1].w};
-    return best?{a:best.a,b:best.b}:{a:p[0]&&p[0].w,b:p[0]&&p[0].w};
-  };
-  const [cmp,setCmp] = useState(()=>defaultPair(series));
   // ── Click a point on the trend chart to select it ──
   // First click → A, second → B, and the comparison rebuilds the moment both
   // are set. Clicking a selected period clears it; a third click starts a fresh
@@ -6169,7 +6229,6 @@ function CvrDrivers(){
   const byW = Object.fromEntries(panel.map(s=>[s.w,s]));
   const cA=byW[cmp.a], cB=byW[cmp.b];
   const fmtVal=(t,v)=> v==null?'—': t==='pct'?(v+'%'): t==='gbp'?GBP(v): NUM(v);
-  const relDiff=(a,b)=>{ if(a==null||b==null) return 0; const m=(Math.abs(a)+Math.abs(b))/2||1; return Math.abs(b-a)/m; };
   const cmpRows = CMP_METRICS.map(m=>({...m, a:cA?cA[m.k]:null, b:cB?cB[m.k]:null, rel:relDiff(cA&&cA[m.k], cB&&cB[m.k])}));
   const movers = cmpRows.filter(r=>r.a!=null&&r.b!=null&&r.rel>=0.12).sort((x,y)=>y.rel-x.rel).slice(0,4);
   const moverKeys = new Set(movers.map(m=>m.k));
@@ -6242,60 +6301,6 @@ function CvrDrivers(){
   const gapSig = (cA&&cB)? twoPropZ(cA.orders,cA.sessions,cB.orders,cB.sessions):null;
   const pTxt = (p)=> p<0.001?'p<0.001': p<0.01?'p<0.01': p<0.05?('p='+p.toFixed(3)): ('p='+p.toFixed(2));
 
-  // ── Deeper signal: confound-controlled drivers + expected-CVR residuals + the
-  // cleanest "natural experiment" pairs. Computed from the daily/weekly series. ──
-  const STAT = useMemo(()=>{
-    const dd = seriesDaily.length>=12 ? seriesDaily : series; const nD=dd.length;
-    const col = k => dd.map(d=> d[k]);
-    const ctrlKey='newShare';   // dominant traffic-mix confound (closed-form partial)
-    const LEVERS=[
-      {k:'trueDiscountIntensity',label:'Discount depth (incl. sale)'},
-      {k:'discountIntensity',label:'Code/auto discount'},
-      {k:'bounce',label:'Bounce rate'},
-      {k:'engagement',label:'Engagement rate'},
-      {k:'emailSends',label:'Email sends'},
-      {k:'adSpend',label:'Ad spend'},
-      {k:'aov',label:'Average order'},
-      {k:'freeShipShare',label:'Free-shipping rate'},
-      {k:'altPayShare',label:'Alt-payment share'},
-      {k:'emailShare',label:'Email-traffic share'},
-    ];
-    const zc=col(ctrlKey); const y=col('cvr');
-    const drivers=LEVERS.filter(L=>L.k!==ctrlKey).map(L=>{ const x=col(L.k);
-      const X=[],Y=[],Zv=[];
-      for(let i=0;i<nD;i++){ const xv=x[i],yv=y[i],zv=zc[i];
-        if(xv==null||yv==null||zv==null) continue; X.push(xv); Y.push(yv); Zv.push(zv); }
-      if(X.length<8) return null;
-      const raw=(()=>{ const r=pearson(X,Y); return r==null?0:r; })();
-      const adj=partialCorr(X,Y,Zv);
-      return {k:L.k,label:L.label,n:X.length,raw,adj,sig:corrSig(adj,X.length)};
-    }).filter(Boolean).sort((a,b)=>Math.abs(b.adj)-Math.abs(a.adj));
-    // expected-CVR residuals, weekly: simple closed-form regression on new-visitor
-    // share (traffic warmth). Residual = CVR the traffic mix alone does NOT explain
-    // — the genuine "something off-model happened" signal. Closed form = bulletproof.
-    const wk=series; const XX=[],yy=[],idx=[];
-    wk.forEach((sx,i)=>{ if(sx.newShare==null||sx.cvr==null) return; XX.push(sx.newShare); yy.push(sx.cvr); idx.push(i); });
-    let resid=null;
-    if(XX.length>=8){ const mx=_mean(XX), my=_mean(yy); let sxy=0,sxx=0;
-      for(let i=0;i<XX.length;i++){ sxy+=(XX[i]-mx)*(yy[i]-my); sxx+=(XX[i]-mx)*(XX[i]-mx); }
-      const slope=sxx>0? sxy/sxx : 0, b0=my-slope*mx;
-      const res=yy.map((v,i)=> v-(b0+slope*XX[i])); const sd=Math.sqrt(_mean(res.map(r=>r*r)));
-      const byW={}; idx.forEach((wi,i)=>{ const w=wk[wi].w; const e=res[i]; byW[w]={exp:b0+slope*XX[i],act:yy[i],e,z:sd?e/sd:0}; });
-      resid={sd,byW,list:Object.keys(byW).map(w=>({w,...byW[w]})).filter(r=>Math.abs(r.z)>=1.3).sort((a,b)=>Math.abs(b.e)-Math.abs(a.e)).slice(0,5)};
-    }
-    // clean "natural experiment" pairs: matched traffic, one lever differs
-    const mixKeys=['newShare','paidShare','mobileShare'];
-    const levers=[['trueDiscountIntensity','discount depth','pct'],['emailSends','email volume','num'],['freeShipShare','free-ship rate','pct'],['aov','AOV','gbp']];
-    const pairs=[];
-    for(let i=0;i<wk.length;i++) for(let j=i+1;j<wk.length;j++){ const A=wk[i],B=wk[j]; if(A.cvr==null||B.cvr==null) continue;
-      const lo=Math.min(A.sessions,B.sessions),hi=Math.max(A.sessions,B.sessions); if(hi<=0||lo/hi<0.7) continue;
-      if(!mixKeys.every(k=> A[k]!=null&&B[k]!=null&&Math.abs(A[k]-B[k])<=6)) continue;
-      let best=null; levers.forEach(([k,lab,t])=>{ if(A[k]==null||B[k]==null) return; const rel=relDiff(A[k],B[k]); if(!best||rel>best.rel) best={k,lab,t,rel,a:A[k],b:B[k]}; });
-      if(!best||best.rel<0.2) continue;
-      pairs.push({a:A.w,b:B.w,lever:best,cvrGap:Math.abs(A.cvr-B.cvr),score:best.rel*Math.abs(A.cvr-B.cvr)});
-    }
-    return {drivers, resid, cleanPairs:pairs.sort((x,y)=>y.score-x.score).slice(0,3)};
-  }, [seriesDaily, series]);
 
   const fmtMetric=(k,v)=> fmtVal(cmType[k]||'pct', v);
   const cmpAskAI = ()=>{ if(!window.__oiAsk||!cA||!cB||!cmpStory) return; const S=cmpStory; const u=gran==='day'?'day':'week';
@@ -6705,10 +6710,11 @@ function brushProps(key, fmt){
 
 function ProductSignal(){
   const S = computeProductSignals();
-  if(!S) return null;
-  const { gm, siteV2A, atc2pur, medPct, enriched, gems, pdpFix, checkoutFix, fixes, restock, META, PR } = S;
+  // 21 Oct: the hooks (lens, list length, chart zoom) come before the early return; with no signals the
+  // chart sizes itself on no points
   const [lens,setLens] = useState('desire');   // Y-axis lens: desirability ↔ completion
   const [showAll,setShowAll] = useState(false); // ranked lists: top 3 ↔ up to 10
+  const { gm, siteV2A, atc2pur, medPct, enriched = [], gems, pdpFix, checkoutFix, fixes, restock, META, PR } = S || {};
 
   const COL={star:PAL.good,gem:PAL.accent,dud:PAL.bad,dead:PAL.muted,oos:PAL.warn};
   const LBL={star:'Star',gem:'Hidden gem',dud:'Dud',dead:'Dead weight',oos:'Out of stock'};
@@ -6724,6 +6730,7 @@ function ProductSignal(){
   const xMax = allPts.length ? Math.max(...allPts.map(p=>p.x)) : 100;
   const yMax = allPts.length ? Math.max(...allPts.map(p=>p.y)) : 100;
   const z = useChartZoom(0, +((xMax*1.08)||1).toFixed(2), 0, +((yMax*1.12)||1).toFixed(2));
+  if(!S) return null;
   const lensBtn=(id)=>(<button key={id} onClick={()=>setLens(id)} style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',padding:'3px 11px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1px solid '+(lens===id?PAL.accent:'var(--border-subtle)'),background:lens===id?'var(--color-accent-wash-2)':'transparent',color:lens===id?PAL.accent:'var(--text-muted)'}}>{LENS[id].short}</button>);
 
   const oppRow = (p,accent) => (<div key={p.name} style={{display:'flex',gap:10,alignItems:'baseline',padding:'7px 0',borderTop:'1px solid var(--border-subtle)'}}>
@@ -8583,7 +8590,7 @@ async function v3AskFacts(question) {
   const today = new Date().toISOString().slice(0, 10), Q = v3Quarter(today);
   const tq = {}; try { Object.keys(V3_ASK_TOPICS).forEach(k => { tq[k] = V3_ASK_TOPICS[k].test(question || ''); }); } catch (e) {}
   const none = Promise.resolve(null);
-  const [lad, goalR, paceR, ueR, drift, cogsR, cfgR, cal, found, curveR, boardR, stockR, stateR, flowsR, campsR, clR, devR, perfR, contribR, factsR, reorderR] = await Promise.all([
+  const [lad, goalR, paceR, ueR, drift, cogsR, cfgR, cal, found, curveR, boardR, stockR, stateR, flowsR, campsR, clR, devR, perfR, contribR, factsR, reorderR, laneR] = await Promise.all([
     T(V3_LADDER_Q(sb, b)), T(V3_GOAL_Q(sb, b)), T(v3PlanQ(Q.start, Q.end, null)(sb, b), 15000), T(V3_UE_Q(sb, b)),
     T(V3_DRIFT_Q(sb, b)), T(V3_COGSQ_Q(sb, b)),
     T(sb.from('brand_config').select('supplier_lead_time_weeks,fixed_costs_monthly,cash_floor,opening_cash,opening_cash_as_of').eq('brand_id', b).limit(1)),
@@ -8620,6 +8627,11 @@ async function v3AskFacts(question) {
     // running out" (7 Oct) from every option in the stock plan; the board, Stock & orders and Review
     // all count from this summary now
     T(sb.rpc('fn_stock_reorder_summary', { p_brand: b })),
+    // 21 Oct: the unpriced lane (0991), open actions with no £ figure: "what should I do for Black Friday?" could not
+    // find the peak plan, which sits there once its stock lands after the peak. The board's copy when loaded, else one read.
+    (typeof V3_BOARD !== 'undefined' && Array.isArray(V3_BOARD.unpriced)) ? Promise.resolve(V3_BOARD.unpriced)
+      : T(sb.from('vw_brand_action_unpriced').select('external_id,description,category,origin,step1,lane_kind,lane_said,due_on,days_to_due,lane_rank')
+        .eq('brand_id', b).order('lane_rank', { ascending: true }).limit(8)),
   ]);
   const H = window.GRETA_HEADLINE || {};
   const cmr = Number(H.net_revenue_30d) > 0 && H.product_contribution_30d != null ? Number(H.product_contribution_30d) / Number(H.net_revenue_30d) : null;
@@ -8918,6 +8930,12 @@ async function v3AskFacts(question) {
   }
   f.calendar = { past_sales_not_on_the_calendar: missing.length,
     note: missing.length ? 'Greta found sales that are not on the calendar, so what she has learned about promotions rests on too few events. They can be added from the Calendar.' : null };
+  // the lane's rows, short: title, why, the due date in words and why there is no figure (sent as _meta.board_no_figure)
+  const clip = (x, n) => { x = String(x == null ? '' : x).trim(); return x.length > n ? x.slice(0, n - 1) + '…' : x; };
+  f._no_figure = (Array.isArray(laneR) ? laneR : []).slice(0, 5).map(r => { let pa = {}; try { pa = v3PlainAction(r) || {}; } catch (e) {}
+    const why = clip(v3Tidy(String(pa.why || '')), 160), because = clip(v3Tidy(String(r.lane_said || '')), 120);
+    return { action: clip(pa.title || v3Tidy(String(r.description || '')), 150), why: why || undefined,
+      due: r.due_on ? v3DueWords(r) : undefined, no_figure_because: because || undefined }; }).filter(x => x.action);
   return f;
 }
 // ── Ask Greta within the model's allowance (2026-10-06) ─────────────────────────────────────────
@@ -9289,8 +9307,9 @@ function buildAskContext(facts, question, budget){
   const basisFor = (facts && facts._board_basis) || {}, titlesFor = (facts && facts._board_title) || {};
   const withHeld = /\b(not do|avoid|hold\w*|held|flag\w*|shouldn'?t|don'?t|stop)\b/i.test(question || '');
   const flows = (facts && facts._flows) || null, camps = (facts && facts._campaigns) || null, site = (facts && facts._site) || null;
+  const noFigure = (facts && Array.isArray(facts._no_figure) && facts._no_figure.length) ? facts._no_figure : null;
   facts = facts ? Object.assign({}, facts) : facts;
-  if (facts) { ['_stock', '_stock_order', '_board_basis', '_board_title', '_flows', '_campaigns', '_site', '_products', '_products_note', '_titles'].forEach(k => { delete facts[k]; }); }
+  if (facts) { ['_stock', '_stock_order', '_board_basis', '_board_title', '_flows', '_campaigns', '_site', '_products', '_products_note', '_titles', '_no_figure'].forEach(k => { delete facts[k]; }); }
   let _today = ''; try { _today = new Date().toISOString().slice(0,10); } catch(e) {}
   const _dates = _shp.map(r=>r && r.date).filter(Boolean).sort();
   const _latestDate = _dates.length ? _dates[_dates.length-1] : null;
@@ -9324,6 +9343,9 @@ function buildAskContext(facts, question, budget){
     why_this_question: (() => { const d = askWhy ? v3WhyFor(question, drivers) : null; return d ? { figure: d.figure, now: d.now, then: d.then, against: d.against,
       parts_biggest_first: String(d.parts || '').split('; ').filter(Boolean), what_to_do_from_the_board: String(d.board || '').split('; ').filter(Boolean) } : null; })(),
     readout: v3AskReadout((typeof window !== 'undefined' && window.GRETA_READOUT) || null, topics, basisFor, titlesFor, withHeld),
+    // 21 Oct: the board's rows with no £ figure (0991's lane), after the ranked ones
+    board_no_figure: noFigure ? { what_these_are: 'Open actions with no £ figure, so they sit after the ranked board. Name the ones the question is about, with their date; never give them pounds.',
+      rows: noFigure } : null,
     site_last_30_days: topics.site ? site : null,
     // what moved sales and why (0340, worked out each morning): the cause on Today's strip, with the split
     sales_move: (() => { const M = (typeof window !== 'undefined' && Array.isArray(window.GRETA_SALES_MOVE)) ? window.GRETA_SALES_MOVE : [];
@@ -9373,6 +9395,7 @@ function buildAskContext(facts, question, budget){
     ['facts.goal', () => /\b(goal|target|on track|quarter)\b/i.test(qs)],
     ['facts.quarter_plan_at_todays_ad_spend', () => topics.ads || /\b(goal|plan|quarter|forecast|target|budget|on track|afford|peak)\b/i.test(qs)],
     ['facts.customers', () => /\b(customers?|repeat|returning|retention|ltv|cac|win|loyal\w*)\b/i.test(qs)],
+    ['board_no_figure', () => topics.stock || /\b(do|should|next|plan\w*|peak|black friday|cyber|christmas|bfcm|deadlines?|due|overdue|dates?|when|priorit\w*|first|focus|board|actions?)\b/i.test(qs)],
     ['board', () => false],   // the biggest part: shortened (5 rows, then 3) before the facts below, never dropped
     ['readout.held', () => /\b(not do|avoid|hold\w*|shouldn'?t|don'?t)\b/i.test(qs)],
     ['facts.next_peak', () => topics.stock || /\b(peak|black friday|cyber|christmas|bfcm|discount\w*|offer|promo\w*|sale)\b/i.test(qs)],
@@ -9382,8 +9405,12 @@ function buildAskContext(facts, question, budget){
   const leftOut = [];
   // Named as it goes, so the size checks count the note itself.
   const noteLeftOut = () => { meta.left_out_for_room = leftOut.map(k => k.replace(/^facts\./, '').replace(/_/g, ' ')); };
+  // the no-figure rows shorten with the board: three, without their why
+  const shortLane = () => { const L = meta.board_no_figure; if (L && Array.isArray(L.rows))
+    L.rows = L.rows.slice(0, 3).map(r => ({ action: r.action, due: r.due, no_figure_because: r.no_figure_because })); };
   const dropPart = key => {
     if (key === 'board') {
+      shortLane();
       const B = meta.readout && meta.readout.board, n = B && B.length > 5 ? 5 : 3;
       if (Array.isArray(B) && B.length > n) {
         meta.readout.board = B.slice(0, n).map(r => Object.assign({}, r, { action: String(r.action || '').length > 400 ? String(r.action).slice(0, 400) + '…' : r.action, detail: r.detail && String(r.detail).length > 300 ? String(r.detail).slice(0, 300) + '…' : r.detail }));
@@ -9433,11 +9460,13 @@ function buildAskContext(facts, question, budget){
   if (size() > BUDGET && meta.channels) { delete meta.channels.untraced_orders_by_code; if (Array.isArray(meta.channels.rows)) meta.channels.rows = meta.channels.rows.slice(0, 5); }
   if (size() > BUDGET && meta.facts && meta.facts.what_moved_profit && Array.isArray(meta.facts.what_moved_profit.drivers))
     meta.facts.what_moved_profit.drivers = meta.facts.what_moved_profit.drivers.slice(0, 3);
+  if (size() > BUDGET) shortLane();
   if (size() > BUDGET && meta.readout && meta.readout.board) meta.readout.board = meta.readout.board.slice(0, 3)
     .map(r => Object.assign({}, r, { action: String(r.action || '').length > 400 ? String(r.action).slice(0, 400) + '…' : r.action, detail: r.detail && String(r.detail).length > 300 ? String(r.detail).slice(0, 300) + '…' : r.detail }));
   [8, 5].forEach(n => { Array.from(keepSeries).forEach(k => { if (size() > BUDGET && data[k] && data[k].rows.length > n) data[k] = { cols: data[k].cols, rows: data[k].rows.slice(0, n) }; }); });
   Array.from(keepSeries).forEach(k => { if (size() > BUDGET && data[k]) { delete data[k]; delete dictionary[k]; } });
-  needs.forEach(([key]) => { if (size() > BUDGET) dropPart(key); });
+  // the no-figure rows a question is about stay, as the board does (three, already short)
+  needs.forEach(([key, needed]) => { if (size() > BUDGET && !(key === 'board_no_figure' && needed())) dropPart(key); });
   return { _meta: meta, data, topics, chars: size() };
 }
 // Answer depth -> the model that serves it. The only place a model id appears on the
@@ -9565,7 +9594,7 @@ STALE DATA: when facts.data_freshness is there, the first sentence of every answ
 WHY questions (why did a figure move, what is driving it): when _meta.why_this_question is present, it IS the answer and comes before facts and readout. Open with one sentence: the figure is now <now>, against <then> in <against> (use the words of against as written: "the 30 days to 10 Sep" is not "the period before 10 Sep"). Then each item of parts_biggest_first, in that order, one line each, with its amount exactly as written (these are the parts the change splits into and they add up to it). Then "What to do:" and the items of what_to_do_from_the_board, as written. Do not explain the figure as a division, and do not add causes that are not in it. Otherwise, if data.drivers has the figure, answer from its row the same way. If neither has it, say it is not a figure that is going the wrong way, and answer from the other figures.
 SALES MOVES: when the question is why sales or profit went up or down, start from _meta.sales_move: give its cause as written (it splits the change into marked-down sales, full-price sales to new and to returning customers, and visits, orders per visit and order size), then the one or two biggest parts from split. Do not name a different cause.
 GAPS: _meta.anatomy_gaps lists the parts of the business with a measure missing, nothing explaining a change, or no action. When a question touches one, say plainly what Greta cannot see yet; never call that part covered.
-WHAT TO DO questions: answer from readout.board in its order, with each item's pounds (a month, or once when the action says so) and its rung. Do not re-rank. One idea of your own is allowed only if labelled "my suggestion, not on your board", and never one from readout.held (9 Oct: a held Judge.me fix came back as "my suggestion"). For spending more, check facts.quarter_plan_at_todays_ad_spend and facts.next_peak first. If facts.goal.needs_replanning is true, say so before quoting the goal.
+WHAT TO DO questions: answer from readout.board in its order, with each item's pounds (a month, or once when the action says so) and its rung. Do not re-rank. _meta.board_no_figure rows have no £ figure: name the ones the question is about (a peak, a date) with their due date, never with pounds. One idea of your own is allowed only if labelled "my suggestion, not on your board", and never one from readout.held (9 Oct: a held Judge.me fix came back as "my suggestion"). For spending more, check facts.quarter_plan_at_todays_ad_spend and facts.next_peak first. If facts.goal.needs_replanning is true, say so before quoting the goal.
 
 WHY questions: before naming a cause, check the confounders: a promotion or code, a spend change, a stockout, an email send, a tracking change, seasonality, or a partial latest day (_meta.dataQuality). Check each against facts.recent_context first: if sale_weeks_in_last_13 is above 0, promotions are part of the story, not ruled out; if of_them_out_of_stock_now or products_out_of_stock_now is above 0, stock-outs are too. A planned-events list being empty does not rule out what already happened. Locate the move: demand (spend, visits) → conversion → order value and discounts → new vs returning → product and stock. Separate what the data shows from what you infer, and give your confidence. For why profit after ads moved against a typical month, lead with facts.what_moved_profit; only when it is absent, with facts.typical_month.what_moved_profit_after_ads: its main_cause, its pounds from sales and from ad spend, and its sales and ad spend comparisons exactly as written; do not work out percentages of your own.
 COUNTS AND NAMES: how many products are out of stock or need ordering comes from facts.recent_context (the board's #1 order list), never from counting table rows. Call a product out of stock only if out_of_stock_now_examples or a stock table marks it so; never give an example the data does not name. A board action is what its text says: do not attach creatives, audiences or campaigns to it unless its text names them.
@@ -10926,6 +10955,11 @@ function ProductRetentionMatrix(){
   const verified = useCostTick();
   const C = (typeof window!=='undefined' && window.FRKL_COHORTS) || null;
   const M = (C && C.productMatrix) || [];
+  // 21 Oct: the chart zoom is a hook, so it comes before the early returns; its range is the points' own
+  // (x = repeat rate %, y = customers acquired), worked out from the rows
+  const rxMax = M.length ? Math.max(...M.map(p=>+(p.retentionRate*100).toFixed(1))) : 100;
+  const ryMax = M.length ? Math.max(...M.map(p=>p.acquired)) : 100;
+  const z = useChartZoom(0, +((rxMax*1.08)||1).toFixed(2), 0, Math.ceil((ryMax*1.12)||1));
   if(!M.length) return null;
   const gm = oiCmRatio();
   if(gm == null) return null;
@@ -10942,9 +10976,6 @@ function ProductRetentionMatrix(){
   };
   const groups = {hero:[], gem:[], leaky:[], tail:[]};
   pts.forEach(p=>{ const hiR=p.x>=brandRep, hiV=p.y>=medAcq; groups[hiR&&hiV?'hero':hiR&&!hiV?'gem':!hiR&&hiV?'leaky':'tail'].push(p); });
-  const rxMax = pts.length ? Math.max(...pts.map(p=>p.x)) : 100;
-  const ryMax = pts.length ? Math.max(...pts.map(p=>p.y)) : 100;
-  const z = useChartZoom(0, +((rxMax*1.08)||1).toFixed(2), 0, Math.ceil((ryMax*1.12)||1));
   return (<div className="card" style={{marginBottom:14}}>
     <div className="card-section-title">
       <h2 style={{margin:0}}>Which products acquire vs retain</h2>
@@ -11302,7 +11333,11 @@ function v3DueWords(r, short) {
   if (isNaN(d)) return '';
   const day = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
   const n = Number(r.days_to_due);
-  const left = r.days_to_due == null || !isFinite(n) ? '' : n <= 0 ? 'today' : n === 1 ? '1 day' : n + ' days';
+  // 21 Oct: days_to_due (0991: due_on - current_date) goes below zero once the date passes, and every
+  // overdue row read "(today)". A past date says when it was due; only the day itself is today.
+  if (r.days_to_due != null && isFinite(n) && n < 0)
+    return short ? 'was due ' + day : 'was due ' + day + ' (' + (n === -1 ? '1 day ago' : (-n) + ' days ago') + ')';
+  const left = r.days_to_due == null || !isFinite(n) ? '' : n === 0 ? 'today' : n === 1 ? '1 day' : n + ' days';
   return short ? (left ? day + ' · ' + left : day) : 'due by ' + day + (left ? ' (' + left + ')' : '');
 }
 function V3UnpricedLane({ compact }) {
@@ -16603,8 +16638,9 @@ function V3AskBar({ dest }) {
   </div>);
 }
 function V3Info({ k }) {
-  const g = V3_GLOSSARY[k]; if (!g) return null;
+  const g = V3_GLOSSARY[k];
   const [open, setOpen] = React.useState(false);
+  if (!g) return null;
   return (<span className="v3-info-wrap">
     <button type="button" className="v3-tap" aria-label={'What is ' + g.label + '?'} aria-expanded={open}
             onClick={(ev) => { ev.stopPropagation(); setOpen(o => !o); }}><span className="v3-info">i</span></button>
