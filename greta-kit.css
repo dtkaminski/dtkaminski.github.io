@@ -1190,7 +1190,7 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .gp-pos { color: var(--color-success) !important; }
 .gp-neg { color: var(--color-danger) !important; }
 .gp-plan-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); }
-.gp-plan-stats > div { display: grid; gap: var(--space-1); }
+.gp-plan-stats > div { display: grid; gap: var(--space-1); align-content: start; }
 .gp-plan-k { font-size: var(--text-xs); color: var(--color-muted); }
 .gp-plan-v { font-family: var(--font-mono); font-size: var(--text-lg); font-weight: var(--weight-semi); color: var(--color-ink); }
 .gp-plan-sub { font-size: var(--text-xs); color: var(--color-faint); }

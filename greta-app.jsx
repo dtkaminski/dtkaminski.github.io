@@ -14781,7 +14781,7 @@ function GretaPlanPanel({ show } = {}) {
               <GP_Metric k="Ad budget" v={GP_gbp(derived.spend_cap)} sub={derived.mer_target != null ? Number(derived.mer_target).toFixed(1) + '× sales per £ of ads' : ''} />
               <GP_Metric k="New customers" v={fmtCount(derived.new_customer_target)} sub={derived.amer_used != null ? Number(derived.amer_used).toFixed(1) + '× new-customer sales per £ of ads' : ''} />
               <GP_Metric k="Sales from returning customers" v={GP_gbp(derived.returning_revenue_target)} sub="at your current rate" />
-              <GP_Metric k="Average cost per new customer" v={fmtMoney(targetCac, 2)} hi={true} sub="ad budget ÷ new customers" />
+              <GP_Metric k="Average cost per new customer" v={fmtMoney(targetCac, 2)} hi={true} sub="the whole quarter’s ad budget ÷ its new customers, days already gone included; not what a new customer costs now" />
               <GP_Metric k="Operating profit" v={opTarget == null ? '—' : GP_gbp(opTarget)} sub={fixedForPeriod > 0 ? 'after ' + GP_gbp(fixedForPeriod) + ' of overheads' : 'add your overheads above'} />
             </div>
             <GP_PlanBreakdown d={derived}/>
