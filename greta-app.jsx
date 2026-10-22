@@ -8718,6 +8718,8 @@ async function v3AskFacts(question) {
   }
   if (P) f.quarter_plan_at_todays_ad_spend = { period: P.period_start + ' to ' + P.period_end, sales: R(P.revenue_target), ad_spend: R(P.spend_cap), profit_after_ads: R(P.cam_target),
     average_cost_per_new_customer: P.breakdown ? P.breakdown.cost_per_new_customer : null,
+    average_cost_per_new_customer_basis: (P.breakdown && P.breakdown.cost_per_new_customer_basis)
+      || 'the plan’s ad budget over the new customers it expects across its whole period; not what a new customer costs now, which is customers.cost_to_win_a_new_customer_last_30_days',
     months: (P.months || []).map(m => ({ month: String(m.month).slice(0, 7), sales: R(m.sales), ad_spend: R(m.spend), new_customers: R(m.new_customers) })),
     note: 'Greta’s quarter plan: own seasonality, returning customers at their recent rate, new-customer sales rising with ad spend along the measured curve (each extra pound buys less). It spreads the budget by season, so a peak month gets more and an ordinary month less.' };
   const U = r0(ueR);
@@ -13838,8 +13840,8 @@ function GP_PlanBreakdown({ d }) {
       <h3 className="gp-plan-h">Each new customer</h3>
       <div className="gp-plan-stats">
         <div><span className="gp-plan-k">First order</span><span className="gp-plan-v">{fmtMoney(b.new_aov, 2)}</span><span className="gp-plan-sub">{fmtMoney(b.first_order_profit, 2)} profit before ads</span></div>
-        <div><span className="gp-plan-k">Average cost to win one</span><span className="gp-plan-v">{fmtMoney(b.cost_per_new_customer, 2)}</span><span className="gp-plan-sub">ad budget ÷ new customers</span></div>
-        <div><span className="gp-plan-k">Cost of the last ones bought</span><span className="gp-plan-v">{fmtMoney(b.marginal_cost_per_new_customer, 2)}</span><span className="gp-plan-sub">each extra £ of ads buys fewer</span></div>
+        <div><span className="gp-plan-k">Average cost to win one</span><span className="gp-plan-v">{fmtMoney(b.cost_per_new_customer, 2)}</span><span className="gp-plan-sub">{b.cost_per_new_customer_basis || 'ad budget ÷ new customers'}</span></div>
+        <div><span className="gp-plan-k">Cost of the last ones bought</span><span className="gp-plan-v">{fmtMoney(b.marginal_cost_per_new_customer, 2)}</span><span className="gp-plan-sub">{b.marginal_cost_per_new_customer_basis || 'each extra £ of ads buys fewer'}</span></div>
       </div>
       <p className="gp-plan-say">{b.first_order_profit >= b.cost_per_new_customer
         ? 'On average a new customer pays for themselves on the first order. '
@@ -20762,7 +20764,7 @@ function V3GoalLead() {
       {g && short > 0 && !unreach && <> The gap is ad spend. The goal takes {fmtMoney(gSpend)} of ads, {fmtMoney(gSpend - Number(P.spend_cap))} more than {held ? 'the plan' : 'today’s ad spend'}.{peakShare != null ? <> {fmtPctN(peakShare)} of the goal’s ads go in {gpMonthName(peak.iso)}.</> : null}</>}
       {g && short > 0 && !unreach && dCam != null && <> Those extra ads bring about {fmtMoney(short)} more sales but {dCam > 0 ? 'only ' + fmtMoney(dCam) + ' more' : fmtMoney(-dCam) + ' less'} profit after ads.{dCam < 0 ? ' Past a point, extra ads cost more profit than they bring in.' : atBest === 'at' ? ' The goal sits at the most profitable ad spend Greta can see.' : atBest === 'past' ? ' The goal is past the most profitable ad spend Greta can see (' + fmtMoney(best) + ').' : ''}</>}
       {!(g && short > 0) && best && <> The most profitable ad spend Greta can see is {fmtMoney(best)}, for about {fmtMoney(P.ceiling.best_sales)} of sales.</>}
-      {' '}<V3Conf state="probably" detail={'How Greta plans the quarter: your own busy and quiet months from your sales history, returning customers at their last three months’ rate, and new-customer sales that rise with ad spend, each extra £1 buying a little less. Its average new customer costs ' + (B.cost_per_new_customer ? fmtMoney(B.cost_per_new_customer, 2) : 'less') + ' because the quarter includes Black Friday, when new customers come cheaper. The Customers page shows the last 90 days.' + (PQ && PQ.basis_note ? ' ' + PQ.basis_note : '')}/></p>
+      {' '}<V3Conf state="probably" detail={'How Greta plans the quarter: your own busy and quiet months from your sales history, returning customers at their last three months’ rate, and new-customer sales that rise with ad spend, each extra £1 buying a little less. Its average new customer costs ' + (B.cost_per_new_customer ? fmtMoney(B.cost_per_new_customer, 2) : 'less') + (B.cost_per_new_customer_basis ? ': ' + B.cost_per_new_customer_basis + '.' : ' because the quarter includes Black Friday, when new customers come cheaper.') + ' The Customers page shows the last 90 days.' + (PQ && PQ.basis_note ? ' ' + PQ.basis_note : '')}/></p>
     {exp != null && <V3FcErr/>}
     <div className="v3-stat-grid v3-gap-top">
       {done != null && <div className="v3-stat"><div className="v3-stat-lab"><span>Sales so far</span></div><div className="v3-stat-val">{fmtMoney(done)}</div>
@@ -24666,7 +24668,7 @@ const V3_WALK_STEP = {
     const say = ['Each £1 of ads came back as ' + v3WalkG2(c.sales_per_ad_pound) + ' of sales in ' + X.N.cur
       + ', against ' + v3WalkG2(P.prev.sales_per_ad_pound) + ' in ' + X.N.prev
       + (P.ly.has_history && P.ly.sales_per_ad_pound != null ? ' and ' + v3WalkG2(P.ly.sales_per_ad_pound) + ' in ' + X.N.ly : '') + '.'];
-    if (c.cost_per_new_customer != null) say.push('Spread over new customers, ads cost about ' + v3Gbp(c.cost_per_new_customer) + ' for each one' + v3WalkVs(X, 'cost_per_new_customer') + '.');
+    if (c.cost_per_new_customer != null) say.push('Spread over the new customers who ordered in ' + X.N.cur + ', ads cost about ' + v3Gbp(c.cost_per_new_customer) + ' for each one' + v3WalkVs(X, 'cost_per_new_customer') + '.');
     const sc = X.score;
     if (sc && sc.length) {
       const under = sc.filter(r => r.avg_iroas != null && r.break_even_iroas != null && Number(r.avg_iroas) < Number(r.break_even_iroas));
@@ -24674,7 +24676,7 @@ const V3_WALK_STEP = {
         ? 'Over the last 30 days, ' + under.length + ' of ' + sc.length + ' ad channels returned less than they need to break even: ' + under.map(r => v3ChanName(r.platform, r.channel_type)).join(', ') + '.'
         : 'Over the last 30 days, every ad channel returned at least what it needs to break even.');
     }
-    return { say, tbl: [['Sales per £1 of ads', 'sales_per_ad_pound', v3WalkG2, 'up'], ['Cost per new customer', 'cost_per_new_customer', v3Gbp, 'down'],
+    return { say, tbl: [['Sales per £1 of ads', 'sales_per_ad_pound', v3WalkG2, 'up'], ['Ad spend per new customer that period', 'cost_per_new_customer', v3Gbp, 'down'],
                         ['Ad spend', 'paid_spend', v3Gbp, null]], note: v3WalkGaps(X) };
   } },
   spend: { q: 'What did the ad spend buy?', dest: 'marketing', cat: 'paid', build: X => {
@@ -24686,7 +24688,7 @@ const V3_WALK_STEP = {
     say.push('It came back as ' + v3WalkG2(c.sales_per_ad_pound) + ' of sales per £1' + v3WalkVs(X, 'sales_per_ad_pound')
       + (c.cost_per_new_customer != null ? ', at about ' + v3Gbp(c.cost_per_new_customer) + ' per new customer.' : '.'));
     return { say, tbl: [['Ad spend', 'paid_spend', v3Gbp, null], ['Meta', 'meta_spend', v3Gbp, null], ['Google', 'google_spend', v3Gbp, null],
-                        ['Sales per £1 of ads', 'sales_per_ad_pound', v3WalkG2, 'up'], ['Cost per new customer', 'cost_per_new_customer', v3Gbp, 'down']],
+                        ['Sales per £1 of ads', 'sales_per_ad_pound', v3WalkG2, 'up'], ['Ad spend per new customer that period', 'cost_per_new_customer', v3Gbp, 'down']],
       note: v3WalkGaps(X) };
   } },
   channels: { q: 'Which channels pay their way?', dest: 'marketing', cat: 'paid', build: X => {
