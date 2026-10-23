@@ -20262,7 +20262,7 @@ function V3Incrementality() {
       : o && o.status === 'ease' && r.mg != null && r.mg < r.be ? 'ease'
       : lo >= r.be && room >= 0.1 ? 'pays' : r.spend >= floor ? 'test' : 'small';
   });
-  const CALL = { cut: 'Loses money either way', ease: 'Pays on average, not at the margin — spend less', pays: 'Pays either way', test: 'Too close to call — test it', small: 'Too small to test' };
+  const CALL = { cut: 'Loses money either way', ease: 'Pays on average, not at the margin — spend less', pays: 'Pays either way', test: 'Too close to call — test it', small: 'Too small to test', unclear: 'The test’s range is too wide to call — test it again' };  // 1097: a tested channel judged on its range
   const cut = rows.filter(r => r.call === 'cut'), pays = rows.filter(r => r.call === 'pays'), test = rows.filter(r => r.call === 'test').sort((a, b) => b.spend - a.spend);
   const ease = rows.filter(r => r.call === 'ease').sort((a, b) => b.spend - a.spend);
   const tgts = rows.filter(r => r.tgt != null && r.call !== 'small');
@@ -20286,7 +20286,7 @@ function V3Incrementality() {
       {rows.map(r => {
         const a = pos(Math.min(r.rep, r.tru)), b = pos(Math.max(r.rep, r.tru));
         return (<li key={r.platform + r.channel_type} className={'v3-score-row v3-incr-row' + (r.call === 'cut' ? ' under' : '')}>
-          <span className="v3-score-name">{r.name}<span className={'v3-incr-call v3-incr-' + r.call}>{CALL[r.call]}</span></span>
+          <span className="v3-score-name">{r.name}<span className={'v3-incr-call v3-incr-' + (r.call === 'unclear' ? 'test' : r.call)}>{CALL[r.call]}</span></span>
           <span className="v3-score-track" role="img"
                 aria-label={r.name + ': reported ' + fmtTimes(r.rep) + ', likely caused ' + fmtTimes(r.tru) + ', break-even ' + fmtTimes(r.be) + '. ' + CALL[r.call]}>
             <i className="v3-incr-seg" style={{ left: a + '%', width: (b - a) + '%' }}/>
