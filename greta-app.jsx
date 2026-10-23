@@ -3880,6 +3880,11 @@ function V3ProfitLead() {
   </div>);
 }
 
+// TikTok's daily spend. The loader's bundle has no TikTok feed, and the headline's spend counts TikTok, so the
+// prior period read Meta and Google only and the change in sales per £ of ads was skewed (23 Oct).
+const V3_TT_DAILY_Q = (sb, b) => sb.from('v_tenant_tiktok_ads_daily').select('date,spend').eq('brand_id', b)
+  .gte('date', v3IsoAdd(new Date().toISOString().slice(0, 10), -800)).order('date', { ascending: false }).limit(1000)
+  .then(r => (r && r.error ? { data: [], error: null } : r));
 function Overview({start, period, customActive}){
   const isMobile = useIsMobile();
   const [evTick, setEvTick] = useState(0);   // bump to re-read the operator event log
@@ -3889,6 +3894,7 @@ function Overview({start, period, customActive}){
   // as the lead's is. The tile read the 90-day figure and called a 30-day £53 customer "Healthy".
   const newDayQ = useV3Rows('new-mo', V3_NEWMO_Q);
   const tierQ = useV3Rows('cust-tier', V3_TIER_Q);   // the default 30 days uses the lead's own figure
+  const ttQ = useV3Rows('ov-tiktok-daily', V3_TT_DAILY_Q);
   const costsVerified = useCostTick();       // re-renders margin figures/badges on save
   // The overview loader's reads (measured unit economics among them) now run only when this page
   // asks, not on every page load; re-render when they land.
@@ -3909,7 +3915,11 @@ function Overview({start, period, customActive}){
   // landing after the 08:55 cache made the two pages disagree by tens of pounds ("what you keep"
   // £2,563 here, £2,632 on Today). Any other period is computed from the feeds.
   const H0 = (!customActive && period === '30d' && typeof window !== 'undefined' && window.GRETA_HEADLINE) || null;
-  const paid = (H0 && H0.paid_spend_30d != null) ? Number(H0.paid_spend_30d) : sum(meta,'cost')+sum(gads,'cost');
+  // Every ad platform in both periods: the headline's spend counts TikTok, so the feeds' periods add it too.
+  // Until the TikTok read lands there is no prior, rather than a Meta-and-Google-only one.
+  const ttReady = !!(ttQ.rows || ttQ.err || !(typeof window !== 'undefined' && window.FRKL_LIVE && window.FRKL_LIVE.sb));
+  const ttSum = v3SumBetween(ttQ.rows, 'date', 'spend'), ttCur = ttSum(start, end);
+  const paid = (H0 && H0.paid_spend_30d != null) ? Number(H0.paid_spend_30d) : sum(meta,'cost')+sum(gads,'cost')+ttCur;
   const rev = (H0 && H0.net_revenue_30d != null) ? Number(H0.net_revenue_30d) : sum(shop,'netSales');
   // Orders over the same days as those sales. Counted over the page's own 30 days (which reach today)
   // against the headline's 8 Sep-7 Oct sales, this tile read 282 orders and £67 an order while the
@@ -3922,7 +3932,7 @@ function Overview({start, period, customActive}){
   const emailRev = sum(kl,'orderValue');
   const mer = paid>0 ? rev/paid : null;
   const havePrior = pShop.length >= Math.max(3, Math.floor((shop.length||1)*0.5));
-  const pPaid = havePrior ? (sum(pMeta,'cost')+sum(pGads,'cost')) : null;
+  const pPaid = havePrior && ttReady ? (sum(pMeta,'cost')+sum(pGads,'cost')+ttSum(prior.start, prior.end)) : null;
   // The headline's sales count the delivery customers pay; the daily feed holds goods only. The prior
   // period and the daily line take the same basis (v3DeliveryK), so the change and the line match the figure.
   const dk = (H0 && v3DeliveryK(v3SumBetween(D.shopify, 'date', 'netSales'))) || 1;
@@ -4224,7 +4234,7 @@ function Overview({start, period, customActive}){
         {(() => { const L = window.FRKL_LIVE; return !!(L && L.session && !L.lastFetchAt && /^(error|static-only)$/.test(L.status || '')); })() &&
           <p className="v3-empty">Your daily detail didn’t load, so only the headline figures are filled in below. Refreshing the page usually sorts it.</p>}
         <div className="row">
-          <KPI label="Paid ad spend" val={GBP(paid)} sub={(() => { const m = sum(meta,'cost'), g = sum(gads,'cost'), t = m + g; return t > 0 ? `Meta ${fmtPctN(m / t)} · Google ${fmtPctN(g / t)}` : ''; })()} series={seriesPaid} current={paid} prior={pPaid}
+          <KPI label="Paid ad spend" val={GBP(paid)} sub={(() => { const m = sum(meta,'cost'), g = sum(gads,'cost'), k = ttCur, t = m + g + k; return t > 0 ? `Meta ${fmtPctN(m / t)} · Google ${fmtPctN(g / t)}` + (k >= 1 ? ` · TikTok ${fmtPctN(k / t)}` : '') : ''; })()} series={seriesPaid} current={paid} prior={pPaid}
             agent="Pulse" observation={_vs('Ad spend', paid, pPaid, 'sales', rev, pRev)} />
           <KPI label="Shopify net revenue" val={GBP(rev)} sub={`${NUM(orders)} orders · average order value ${GBP(orders?rev/orders:null)}`} series={seriesRev} current={rev} prior={pRev} goodDirection="up"
             agent="Atlas" observation={discLoad != null ? `${fmtPctN(discLoad)} of sales went out as code or automatic discounts; sale-price markdowns come on top — see Promotions for the full picture.` : undefined} />
@@ -9251,9 +9261,9 @@ function v3AskCheck(text, sent) {
 // Ask Greta (9 Oct): the drivers of every figure going the wrong way, worked out by the same models as
 // the panels, as one line each: then and now, the parts biggest first with what each moved it by, and the
 // board rows that move it. Ask answers a "why" question from these, so its figures are the panels' figures.
-function v3DriverSummaries(S, hist, liveRows) {
+function v3DriverSummaries(S, hist, liveRows, ladQ) {
   if (!S || !S.last_30 || !hist) return [];
-  const SG = v3BuildSigns(S, hist);
+  const SG = v3BuildSigns(S, hist, { lad: ladQ });
   const all = SG.signs.concat(SG.profitSign ? [SG.profitSign] : []);
   const live = liveRows || [];
   return all.filter(sg => sg.which && !sg.noDrivers && (sg.tone === 'weak' || sg.tone === 'ok') && v3HasDrivers(sg.which, SG.HP)).map(sg => {
@@ -9706,8 +9716,9 @@ ${dataStr}`;
   // analytical deep-dives. These are what a busy operator actually opens with.
   // the figures going the wrong way, their drivers for the context, and a "why" question for each
   const askSt = useV3Rows('brand-state', V3_STATE_Q), askHist = useV3Rows('sign-history', V3_SIGN_HIST_Q), askBoard = useV3Board();
-  const drivers = React.useMemo(() => { try { return v3DriverSummaries(askSt.rows && askSt.rows[0], askHist.rows && askHist.rows[0] && askHist.rows[0].history, askBoard.rows ? v3LiveRows(askBoard.rows) : []); } catch (e) { return []; } },
-    [askSt.rows, askHist.rows, askBoard.rows]);
+  const askLad = useV3Rows('profit-ladder', V3_LADDER_Q);   // the sales-per-£ basis for the drivers' history
+  const drivers = React.useMemo(() => { try { return v3DriverSummaries(askSt.rows && askSt.rows[0], askHist.rows && askHist.rows[0] && askHist.rows[0].history, askBoard.rows ? v3LiveRows(askBoard.rows) : [], askLad); } catch (e) { return []; } },
+    [askSt.rows, askHist.rows, askBoard.rows, askLad.rows, askLad.err]);
   if (typeof window !== 'undefined') window.GRETA_DRIVERS = drivers;
   const askCov = useV3Rows('anatomy-coverage', V3_COVERAGE_Q);
   if (typeof window !== 'undefined' && Array.isArray(askCov.rows)) window.GRETA_COVERAGE = askCov.rows;
@@ -21152,6 +21163,10 @@ function V3Review() {
   if (lad.err) return <V3LoadFailed what="your weeks" onRetry={lad.retry}/>;
   if (!wk) return <V3SkeletonRows n={4}/>;
   if (wk.length < 10) return <div className="v3-empty">The weekly review starts once there are ten full weeks of sales to compare with.</div>;
+  // One basis for the sales shown and the sales per £ of ads (23 Oct). The daily table holds goods only; the
+  // 30-day figure counts the delivery customers pay too (v3DeliveryK). Shown sales take the same k, so the
+  // shown sales over the shown ad spend is the shown sales per £. Kept after ads keeps its own working.
+  const dk = v3LadderK(lad.rows) || 1, sD = w => w.sales * dk;
   const i = Math.max(9, wk.length - 1 - back), W = wk[i], P = wk[i - 1];
   // The last full week reads the figure Today shows (state.this_week: product, order and ad costs), so the
   // two pages give one result for the same week. Earlier weeks keep the 30-day rate.
@@ -21168,7 +21183,7 @@ function V3Review() {
   const T = { sales: v3Med(prev8.map(w => w.sales)), spend: v3Med(prev8.map(w => w.spend)) }; T.kept = T.sales * cmr - T.spend;
   const sum = (from, to, f) => shop.filter(r => r && r.date >= from && r.date <= to).reduce((a, r) => a + (Number(r[f]) || 0), 0);
   T.orders = v3Med(prev8.map(w => sum(w.start, w.end, 'orders')).filter(n => n > 0));
-  const orders = sum(W.start, W.end, 'orders'), aov = orders > 0 ? W.sales / orders : null;
+  const orders = sum(W.start, W.end, 'orders'), aov = orders > 0 ? sD(W) / orders : null;
   const chg = (a, b) => (b > 0 ? a / b - 1 : null);
   const sChg = chg(W.sales, T.sales), pX = T.spend > 0 ? W.spend / T.spend : null;
   const sEff = cmr * (W.sales - T.sales), pEff = -(W.spend - T.spend), dKept = W.kept - T.kept;
@@ -21181,11 +21196,9 @@ function V3Review() {
   // only when the week before was big enough to mislead: a small promo in an ordinary week is not one
   const priorSale = P && P.sales > T.sales * 1.25 && (promoIn(P.start, P.end) || P.sales > T.sales * 1.4);
   const g4 = (trk.rows || [])[0] || null, held = g4 && g4.comparisons_clean_from && String(g4.comparisons_clean_from) > today;
-  // sales per £ of ads with the delivery customers pay, as the 30-day figure counts it (v3DeliveryK)
-  const dk = v3LadderK(lad.rows) || 1;
-  const mer = W.spend > 0 ? W.sales * dk / W.spend : null;
+  const mer = W.spend > 0 ? sD(W) / W.spend : null;
   const range = v3Day(W.start) + ' – ' + v3Day(W.end, true);
-  const t12 = wk.slice(Math.max(0, i - 11), i + 1).map(w => ({ ...w, label: v3Day(w.start), mer: w.spend > 0 ? Math.round(w.sales * dk / w.spend * 100) / 100 : null }));
+  const t12 = wk.slice(Math.max(0, i - 11), i + 1).map(w => ({ ...w, sales: sD(w), label: v3Day(w.start), mer: w.spend > 0 ? Math.round(sD(w) / w.spend * 100) / 100 : null }));
   const tip = ({ active, payload }) => { if (!active || !payload || !payload.length) return null; const p = payload[0].payload;
     return (<div className="v3-tip"><b>Week of {v3Day(p.start, true)}</b><span>Sales <em>{fmtMoney(p.sales)}</em></span><span>Ad spend <em>{fmtMoney(p.spend)}</em></span><span>Kept after ads <em>{fmtMoney(p.kept)}</em></span></div>); };
   const stat = (lab, val, foot, cls) => (<div className="v3-stat" key={lab}><div className="v3-stat-lab"><span>{lab}</span></div><div className="v3-stat-val">{val}</div>
@@ -21204,17 +21217,17 @@ function V3Review() {
         <button type="button" className="v3-btn v3-btn-q v3-btn-sm" disabled={back === 0} onClick={() => setBack(b => Math.max(0, b - 1))}>Week after →</button>
       </div>
       <p className="v3-verdict">{lead}</p>
-      <p className="v3-note v3-measure">{fmtMoney(W.sales)} of sales on {fmtMoney(W.spend)} of ads, keeping {fmtMoney(W.kept)} after ads. A typical week is {fmtMoney(T.sales)} of sales on {fmtMoney(T.spend)} of ads, keeping {fmtMoney(T.kept)}. That is the middle of the {prev8.length === 8 ? 'eight' : prev8.length} weeks before{leftOut ? ', leaving out ' + (leftOut === 1 ? 'one week with a big sale' : leftOut + ' weeks with a big sale') : ''}.
+      <p className="v3-note v3-measure">{fmtMoney(sD(W))} of sales on {fmtMoney(W.spend)} of ads, keeping {fmtMoney(W.kept)} after ads. A typical week is {fmtMoney(sD(T))} of sales on {fmtMoney(T.spend)} of ads, keeping {fmtMoney(T.kept)}. That is the middle of the {prev8.length === 8 ? 'eight' : prev8.length} weeks before{leftOut ? ', leaving out ' + (leftOut === 1 ? 'one week with a big sale' : leftOut + ' weeks with a big sale') : ''}.
         {priorSale ? <> The week before held a sale, which would make this week look worse than it was. So Greta compares it with a typical week instead.</> : null}
         {held ? <> Visits, the share of visitors who buy and the checkout steps are left out until {v3Day(g4.comparisons_clean_from, true)}. Google Analytics was not recording properly{g4.broke_on ? ' from ' + v3Day(g4.broke_on) : ''}{g4.fixed_on ? ' to ' + v3Day(g4.fixed_on) : ''}, so a jump in visits now is the repair, not more visitors.</> : null}</p>
       <div className="v3-stat-grid v3-gap-top">
-        {stat('Sales', fmtMoney(W.sales), sChg == null ? '' : (sChg >= 0 ? '+' : '−') + fmtPctN(Math.abs(sChg)) + ' on a typical week', sChg != null && sChg < -0.1 ? 'v3-down' : 'v3-muted')}
+        {stat(dk > 1.001 ? 'Sales, with delivery' : 'Sales', fmtMoney(sD(W)), sChg == null ? '' : (sChg >= 0 ? '+' : '−') + fmtPctN(Math.abs(sChg)) + ' on a typical week', sChg != null && sChg < -0.1 ? 'v3-down' : 'v3-muted')}
         {stat('Ad spend', fmtMoney(W.spend), pX == null ? '' : fmtTimes(pX, 1) + ' a typical week', pX != null && pX > 1.25 ? 'v3-down' : 'v3-muted')}
         {stat('Kept after ads', fmtMoney(W.kept), fmtMoney(T.kept) + ' in a typical week', W.kept < T.kept * 0.8 ? 'v3-down' : 'v3-muted')}
-        {stat('Sales per £ of ads', mer != null ? fmtTimes(mer, 2) : FMT_NONE, (dk > 1.001 ? 'with the delivery you charge' + (be ? '; ' : '') : '') + (be ? 'you break even at ' + fmtTimes(be, 2) : ''), mer != null && be && mer < be ? 'v3-down' : 'v3-muted')}
+        {stat('Sales per £ of ads', mer != null ? fmtTimes(mer, 2) : FMT_NONE, (be ? 'you break even at ' + fmtTimes(be, 2) : ''), mer != null && be && mer < be ? 'v3-down' : 'v3-muted')}
         {orders > 0 && stat('Orders', fmtCount(orders), aov ? 'average order ' + fmtMoney(aov) : '')}
       </div>
-      <V3WeekDrivers W={{ ...W, orders }} T={T} cmr={cmr} info={{ range, n: prev8.length, leftOut, sale: promoIn(W.start, W.end) && W.sales > T.sales * 1.25 }}/>
+      <V3WeekDrivers W={{ ...W, sales: sD(W), orders }} T={{ ...T, sales: sD(T) }} cmr={cmr / dk} info={{ range, n: prev8.length, leftOut, sale: promoIn(W.start, W.end) && W.sales > T.sales * 1.25 }}/>
     </section>
     <div className="v3-chart-pair">
       <figure className="v3-chart">
@@ -21912,8 +21925,12 @@ function v3BuildSigns(S, hist, opts) {
   // Sales from each £1 of ads: the sales and ad spend the page shows, divided (see v3DeliveryK). L.mer is
   // the anatomy's order-value MER, before refunds: £1.29 on frkl beside £1.25 everywhere else (23 Oct).
   const ret = num(L.ads) > 0 && num(L.sales) > 0 ? num(L.sales) / num(L.ads) : null;
-  const lad = V3_Q['profit-ladder'] && V3_Q['profit-ladder'].rows;
-  const dk = (opts && opts.k) || v3LadderK(lad) || 1;
+  // The ladder (cache_daily_cm_ladder) arrives as opts.lad, the caller's useV3Rows('profit-ladder'), so the
+  // page re-renders when it lands. Read from V3_Q here, the first paint took k = 1 and the history jumped
+  // once it came. Until it has loaded dk is null: the earlier points carry no sales-per-£ and that sign shows
+  // no history or drivers, rather than a goods-only figure.
+  const LQ = opts && opts.lad, ladReady = !!(opts && opts.k) || !!(LQ && (LQ.rows || LQ.err));
+  const dk = (opts && opts.k) || (ladReady ? v3LadderK(LQ && LQ.rows) || 1 : null);
   const ao = num(L.after_overheads);
   // earlier points on the same basis as the latest: sales_net is what the return model divides
   const HP00 = hist && Array.isArray(hist.points) ? hist.points : null;
@@ -21928,8 +21945,8 @@ function v3BuildSigns(S, hist, opts) {
     const sp = Number(p.cac_spend) + t, n = Number(p.new_customers);
     return { tiktok_spend: t, cac_spend: sp, cac: n > 0 ? Math.round(sp / n * 100) / 100 : p.cac };
   };
-  const HP0 = HP00 ? HP00.map(p => Object.assign({}, p, allAds(p), { sales_net: p.sales == null ? null : Number(p.sales) * dk,
-    return: p.return == null ? p.return : Math.round(Number(p.return) * dk * 100) / 100 })) : null;
+  const HP0 = HP00 ? HP00.map(p => Object.assign({}, p, allAds(p), { sales_net: p.sales == null || dk == null ? null : Number(p.sales) * dk,
+    return: p.return == null || dk == null ? null : Math.round(Number(p.return) * dk * 100) / 100 })) : null;
   // The latest week takes the headline's own sales and ad spend. The history reads the daily table, which
   // catches an order edited or refunded today only overnight (9 Oct: £19,155 there, £19,093 live), so
   // without this the panels and the verdict above them disagreed by a few pounds for the rest of the day.
@@ -21944,8 +21961,8 @@ function v3BuildSigns(S, hist, opts) {
     const be = num(A.break_even_return), top = Math.max(ret, be) * 1.25;
     signs.push({ k: 'Sales from each £1 of ads', v: fmtMoney(ret, 2), tone: ret < be ? 'weak' : ret < be * 1.3 ? 'ok' : 'good',
       bar: { fill: ret / top, mark: be / top }, n: <>{fmtMoney(be, 2)} only covers the ads, products and delivery</>,
-      series: ser('return'), fmt: v => fmtMoney(v, 2), better: 'higher', line: { v: be, label: 'Break-even ' + fmtMoney(be, 2) },
-      which: 'ret', ctx: { weeks: H && Array.isArray(H.weeks) ? H.weeks : [], be, lineLabel: 'the ' + fmtMoney(be, 2) + ' that only covers the ads, products and delivery' }, dline: be });
+      series: dk != null ? ser('return') : null, fmt: v => fmtMoney(v, 2), better: 'higher', line: { v: be, label: 'Break-even ' + fmtMoney(be, 2) },
+      which: 'ret', noDrivers: dk == null, ctx: { weeks: H && Array.isArray(H.weeks) ? H.weeks : [], be, lineLabel: 'the ' + fmtMoney(be, 2) + ' that only covers the ads, products and delivery' }, dline: be });
   }
   // 10 Oct eval: the governor is new-customer sales from each £1 of ads (aMER), not all sales per £1. The
   // blended figure counts returning customers the ads did not win, so it read "ok" (£1.94) while the ads
@@ -22184,7 +22201,7 @@ function V3BusinessState({ part }) {
   const q = useV3Rows('brand-state', V3_STATE_Q);
   const codes = useV3Rows('brand-codes', V3_CODES_Q);
   const hq = useV3Rows('sign-history', V3_SIGN_HIST_Q);
-  useV3Rows('profit-ladder', V3_LADDER_Q);   // the sales-per-£ basis (v3DeliveryK) for the signs' history
+  const ladQ = useV3Rows('profit-ladder', V3_LADDER_Q);   // the sales-per-£ basis (v3DeliveryK) for the signs' history
   const tq = useV3Rows('tier-30', V3_TIER_Q);   // aMER, from the same hourly snapshot as Customers
   const [drv, setDrv] = React.useState(null);   // which sign's drivers are open: 'cac', 'ret', 'ly', 'repeat'
   if (q.err) return null;                                   // before 0269, or unreadable: Today carries on without it
@@ -22325,7 +22342,7 @@ function V3BusinessState({ part }) {
     </V3More>);
   }
   const tRow = tq.rows && tq.rows[0];
-  const SG = v3BuildSigns(S, hq.rows && hq.rows[0] && hq.rows[0].history, { amer: tRow && tRow.amer != null ? tRow.amer : null });
+  const SG = v3BuildSigns(S, hq.rows && hq.rows[0] && hq.rows[0].history, { amer: tRow && tRow.amer != null ? tRow.amer : null, lad: ladQ });
   const HP = SG.HP, profitCfg = SG.profitCfg;
   // Today's four: aMER takes the blended return's place when it is known (the blended sign stays for the
   // pages whose driver strips use it)
@@ -23068,12 +23085,12 @@ function V3ProductStrip({ d }) {
 function V3BoardDrivers() {
   const q = useV3Rows('brand-state', V3_STATE_Q);
   const hq = useV3Rows('sign-history', V3_SIGN_HIST_Q);
-  useV3Rows('profit-ladder', V3_LADDER_Q);   // the sales-per-£ basis (v3DeliveryK) for the signs' history
+  const ladQ = useV3Rows('profit-ladder', V3_LADDER_Q);   // the sales-per-£ basis (v3DeliveryK) for the signs' history
   const board = useV3Board();
   const [drv, setDrv] = React.useState(null);
-  if (q.err || hq.err || !q.rows || !hq.rows || !board.rows) return null;
+  if (q.err || hq.err || !q.rows || !hq.rows || !board.rows || !(ladQ.rows || ladQ.err)) return null;
   const S = q.rows[0]; if (!S || !S.last_30) return null;
-  const SG = v3BuildSigns(S, hq.rows[0] && hq.rows[0].history);
+  const SG = v3BuildSigns(S, hq.rows[0] && hq.rows[0].history, { lad: ladQ });
   const live = v3LiveRows(board.rows);
   const all = SG.signs.concat(SG.profitSign ? [SG.profitSign] : []);
   const items = all.filter(sg => sg.which && (sg.tone === 'weak' || sg.tone === 'ok')).map(sg => ({ sg,
@@ -23099,11 +23116,11 @@ function V3BoardDrivers() {
 function V3DriverStrip({ keys, title, opts }) {
   const q = useV3Rows('brand-state', V3_STATE_Q);
   const hq = useV3Rows('sign-history', V3_SIGN_HIST_Q);
-  useV3Rows('profit-ladder', V3_LADDER_Q);   // the sales-per-£ basis (v3DeliveryK) for the signs' history
+  const ladQ = useV3Rows('profit-ladder', V3_LADDER_Q);   // the sales-per-£ basis (v3DeliveryK) for the signs' history
   const [drv, setDrv] = React.useState(null);
   if (q.err || hq.err || !q.rows || !hq.rows) return null;
   const S = q.rows[0]; if (!S || !S.last_30) return null;
-  const SG = v3BuildSigns(S, hq.rows[0] && hq.rows[0].history, opts);
+  const SG = v3BuildSigns(S, hq.rows[0] && hq.rows[0].history, Object.assign({}, opts, { lad: ladQ }));
   const all = SG.signs.concat(SG.profitSign ? [SG.profitSign] : []);
   const picked = keys.map(k => all.find(sg => sg.which === k)).filter(Boolean).map(sg => Object.assign({}, sg, {
     act: !sg.noDrivers && v3HasDrivers(sg.which, SG.HP) ? { label: drv === sg.which ? 'Hide what is driving it' : 'What is driving this?', open: drv === sg.which,
@@ -24251,6 +24268,10 @@ function V3CreativeDemand() {
 // Review: congruency (vw_brand_congruency). When the ad platforms' return and the shop's profit move apart,
 // one of them is wrong; when they move together, the reading can be trusted.
 const V3_CONG_Q = (sb, b) => sb.from('vw_brand_congruency').select('*').eq('brand_id', b).limit(1);
+// The days a congruency reading covers. A missing date leaves its clause out: String(null) printed
+// "from null" (23 Oct).
+const v3CongDays = (prior, latest) => (prior && latest ? ' (' + v3Day(String(prior)) + ' to ' + v3Day(String(latest)) + ')'
+  : latest ? ', up to ' + v3Day(String(latest)) : '');
 function V3Congruency() {
   const q = useV3Rows('congruency', V3_CONG_Q);
   if (q.err || !q.rows || !q.rows.length) return null;
@@ -24260,7 +24281,7 @@ function V3Congruency() {
   // "No: they moved apart … went from — to 2.73×" (Halden, 23 Oct): a verdict with nothing to compare.
   if (c.congruency === 'insufficient_history' || n(c.iroas_prior) == null || n(c.cm_prior) == null) {
     return (<p className="v3-note v3-measure v3-cong"><b>Do the ad figures and your profit agree?</b>{' '}
-      Not known yet. Greta compares them against a reading from at least 10 days earlier, and the first one is from {v3Day(String(c.latest_date))}.</p>);
+      Not known yet. Greta compares them against a reading from at least 10 days earlier{c.latest_date ? ', and the first one is from ' + v3Day(String(c.latest_date)) : ''}.</p>);
   }
   const ok = c.congruency === 'congruent';
   // The change, not the two levels: the snapshot's profit is worked on its own day and basis, and printed
@@ -24268,7 +24289,7 @@ function V3Congruency() {
   const dCm = n(c.cm_now) - n(c.cm_prior);
   return (<p className="v3-note v3-measure v3-cong"><b>Do the ad figures and your profit agree?</b>{' '}
     {ok ? 'Yes: they moved the same way.' : 'No: they moved apart, so one of them is misreading.'}{' '}
-    Return on ads after the share they really cause went from <span>{fmtTimes(n(c.iroas_prior), 2)}</span> to <span>{fmtTimes(n(c.iroas_now), 2)}</span>; profit after ads {dCm >= 0 ? 'rose' : 'fell'} by <span>{fmtMoney(Math.abs(dCm))}</span> over the same days ({v3Day(String(c.prior_date))} to {v3Day(String(c.latest_date))}).
+    Return on ads after the share they really cause went from <span>{fmtTimes(n(c.iroas_prior), 2)}</span> to <span>{fmtTimes(n(c.iroas_now), 2)}</span>; profit after ads {dCm >= 0 ? 'rose' : 'fell'} by <span>{fmtMoney(Math.abs(dCm))}</span> over the same days{v3CongDays(c.prior_date, c.latest_date)}.
     {ok ? '' : ' Check the tracking on Settings before acting on the ad figures.'}</p>);
 }
 // A scheduled refresh that failed twice or stopped (0383, 0398): one line, in the notice's own words.
