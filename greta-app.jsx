@@ -3683,14 +3683,28 @@ function V3ProfitLead() {
   const spend = H && H.paid_spend_30d != null ? Number(H.paid_spend_30d) : null;
   const before = H && H.product_contribution_30d != null ? Number(H.product_contribution_30d) : null;
   const cmr = sales > 0 && before != null ? before / sales : null;
+  // Profit after ads is the header's figure (anatomy CM3): it also takes off the other marketing cost
+  // (creator commission, creator and agency fees, seeding, a media agency fee). This page worked out
+  // product contribution less ad spend and called it "Kept after ads", £57,654 against the header's
+  // £43,623 on Halden (23 Oct). The other marketing cost now has its own line, and the figure is one.
+  const cam = H && H.cm_after_marketing_30d != null ? Number(H.cm_after_marketing_30d) : null;
+  const other = cam != null && before != null && spend != null ? Math.max(0, Math.round(before - spend - cam)) : 0;
   const ohRow = (cfg.rows || [])[0] || null;
   const ohMonth = ohRow && ohRow.fixed_costs_monthly != null && Number(ohRow.fixed_costs_monthly) > 0 ? Number(ohRow.fixed_costs_monthly) : null;
-  // The overheads as entered, against the last 30 days, the way Today and the brand state take them: this
-  // page pro-rated them to 30 days (£9,863, a loss of £8,042) while Today said £8,179 on £10,000, and its
-  // own lever text said "after £10,000 a month of overheads … a loss of £8,042" (7 Oct).
-  const oh30 = ohMonth;
+  // The overheads as entered, over the last 30 days, the way the brand state takes them
+  // (fn_brand_state last_30.after_overheads: a month is 365/12 days). Today's "Where the last 30 days'
+  // sales went" and Review read that figure; this page took the whole month against 30 days and showed
+  // £15,654 after all costs where they said £2,198 (Halden, 23 Oct).
+  const oh30 = ohMonth != null ? Math.round(ohMonth * 12 / 365 * 30) : null;
 
-  const d = React.useMemo(() => v3TypicalMonth(lad.rows, cmr), [lad.rows, cmr]);
+  // The other marketing cost is known for the last 30 days only, so every window takes it at that amount:
+  // a change against a typical month is then the change in sales and ad spend, as the lead says.
+  const d = React.useMemo(() => {
+    const t = v3TypicalMonth(lad.rows, cmr);
+    if (!t || !other) return t;
+    const less = w => w && Object.assign({}, w, { kept: w.kept - other });
+    return Object.assign({}, t, { wins: t.wins.map(less), typ: less(t.typ), ly: less(t.ly) });
+  }, [lad.rows, cmr, other]);
 
   if (!H) return <V3SkeletonRows n={4}/>;
   if (cmr == null) return (<section className="v3-sec">
@@ -3702,7 +3716,7 @@ function V3ProfitLead() {
   if (lad.err || cfg.err) return null;
   if (!lad.rows || !cfg.rows) return <V3SkeletonRows n={4}/>;
 
-  const kept = before - spend;
+  const kept = cam != null ? cam : before - spend;
   // whole pounds before taking the overheads off, as Today does: £8,180 here against £8,179 there (7 Oct)
   const op = oh30 != null ? Math.round(kept) - oh30 : null;
   const T = d && d.typ;
@@ -3719,17 +3733,18 @@ function V3ProfitLead() {
                       : 'Lower ad spend lifted your profit: spend is ' + spendWord + ', and sales are ' + salesWord + '.')
       : (salesEff < 0 ? 'Sales are ' + salesWord + ', and that is what cut your profit.' : 'Sales are ' + salesWord + ', and that is what lifted your profit.');
   // Break-even on overheads, both ways round.
-  const maxSpend = oh30 != null ? before - oh30 : null;
-  const needSales = oh30 != null ? (oh30 + spend) / cmr : null;
+  const maxSpend = oh30 != null ? before - other - oh30 : null;
+  const needSales = oh30 != null ? (oh30 + spend + other) / cmr : null;
   const extra = T ? spend - T.spend : 0;
 
   const chain = [
     { k: 'Sales', v: sales, kind: 'in' },
     { k: 'Products, delivery and payment fees', v: -(sales - before), kind: 'out' },
     { k: 'Ad spend', v: -spend, kind: 'out' },
-    { k: 'Kept after ads', v: kept, kind: 'sub' },
   ];
-  if (oh30 != null) { chain.push({ k: 'Overheads — rent, wages, software', v: -oh30, kind: 'out' }); chain.push({ k: 'Profit after all costs', v: op, kind: 'total' }); }
+  if (other >= 1) chain.push({ k: 'Other marketing — creators, agencies, seeding', v: -other, kind: 'out' });
+  chain.push({ k: 'Kept after ads', v: kept, kind: 'sub' });
+  if (oh30 != null) { chain.push({ k: 'Overheads — rent, wages, software, for 30 days', v: -oh30, kind: 'out' }); chain.push({ k: 'Profit after all costs', v: op, kind: 'total' }); }
   const per = v => sales > 0 ? Math.round(Math.abs(v) / sales * 100) + 'p in every £1' : '';
 
   // Move this month's budget into the peak: the plan spreads the quarter's ad budget by season (it
@@ -3817,7 +3832,7 @@ function V3ProfitLead() {
           <R.ReferenceLine y={0} stroke={PAL.line}/>
         </R.ComposedChart>
       </R.ResponsiveContainer>
-      <p className="micro muted v3-measure">Each point covers the 30 days up to the date shown. Kept after ads is the {fmtPctN(cmr)} of sales left after products, delivery and payment fees, minus ad spend.{oh30 != null ? ' When the line is below the dashed overheads line, the business lost money those 30 days.' : ''}</p>
+      <p className="micro muted v3-measure">Each point covers the 30 days up to the date shown. Kept after ads is the {fmtPctN(cmr)} of sales left after products, delivery and payment fees, minus ad spend{other >= 1 ? <> and the other marketing cost. Greta has that cost for the last 30 days only ({fmtMoney(other)}), so every point takes it at that amount</> : null}.{oh30 != null ? ' When the line is below the dashed overheads line, the business lost money those 30 days.' : ''}</p>
     </figure>)}
 
     {(shift || extra > Math.max(250, (T ? T.spend : 0) * 0.2) || (op != null && op < 0)) && (<section className="v3-sec">
@@ -3908,13 +3923,16 @@ function Overview({start, period, customActive}){
   const mer = paid>0 ? rev/paid : null;
   const havePrior = pShop.length >= Math.max(3, Math.floor((shop.length||1)*0.5));
   const pPaid = havePrior ? (sum(pMeta,'cost')+sum(pGads,'cost')) : null;
-  const pRev = havePrior ? sum(pShop,'netSales') : null;
+  // The headline's sales count the delivery customers pay; the daily feed holds goods only. The prior
+  // period and the daily line take the same basis (v3DeliveryK), so the change and the line match the figure.
+  const dk = (H0 && v3DeliveryK(v3SumBetween(D.shopify, 'date', 'netSales'))) || 1;
+  const pRev = havePrior ? sum(pShop,'netSales') * dk : null;
   const pSessions = havePrior ? sum(pGa,'sessions') : null;
   const pEmailRev = havePrior ? sum(pKl,'orderValue') : null;
   const pMer = (havePrior && pPaid>0) ? pRev/pPaid : null;
   const seriesPaid    = daily.map(d=>({d:d.dlabel, v:d.paid}));
   const seriesRev     = daily.map(d=>({d:d.dlabel, v:d.revenue}));
-  const seriesMER     = daily.map(d=>({d:d.dlabel, v: d.paid>0 ? +(d.revenue/d.paid).toFixed(2) : 0}));
+  const seriesMER     = daily.map(d=>({d:d.dlabel, v: d.paid>0 ? +(d.revenue*dk/d.paid).toFixed(2) : 0}));
   const seriesSessions= daily.map(d=>({d:d.dlabel, v:d.sessions}));
   const seriesEmail   = daily.map(d=>({d:d.dlabel, v:d.emailRev}));
   // ── Additional headline KPIs ──
@@ -8760,7 +8778,7 @@ async function v3AskFacts(question) {
     f.next_peak = { name: peak.title, from: s, to: e, same_days_last_year_sales: ly,
       promotions_planned: evs.filter(x => x.row_group === 'promo' && x.status !== 'skipped' && ov(x)).map(x => x.title),
       emails_planned: evs.filter(x => x.channel === 'email' && x.status !== 'skipped' && ov(x)).length,
-      stock_order_by: lead ? v3IsoAdd(s, -Math.round(lead * 7) - 1) : null };   // lands the day before it starts, as the board says
+      stock_order_by: lead ? v3IsoAdd(s, -7 - Math.round(lead * 7)) : null };   // lands a week before it starts (1065, fn_peak_stock_deadline)
     // When an order placed today lands against the peak: the first live answer (6 Oct) said "order now to
     // have it for BFCM" when today's order lands 28 Nov, eight days into a peak that opens 20 Nov.
     const leadDays = lead ? Math.round(lead * 7) : 28, lands = v3IsoAdd(today, leadDays);
@@ -9238,7 +9256,7 @@ function v3DriverSummaries(S, hist, liveRows) {
   const SG = v3BuildSigns(S, hist);
   const all = SG.signs.concat(SG.profitSign ? [SG.profitSign] : []);
   const live = liveRows || [];
-  return all.filter(sg => sg.which && (sg.tone === 'weak' || sg.tone === 'ok') && v3HasDrivers(sg.which, SG.HP)).map(sg => {
+  return all.filter(sg => sg.which && !sg.noDrivers && (sg.tone === 'weak' || sg.tone === 'ok') && v3HasDrivers(sg.which, SG.HP)).map(sg => {
     const M0 = V3_DRIVER_MODELS[sg.which], single = M0.mode === 'single';
     const P = (M0.prep ? M0.prep(SG.HP, sg.ctx || {}) : SG.HP).filter(M0.ok);
     const a = single ? P[P.length - 1] : P[Math.max(0, P.length - 5)], b = P[P.length - 1];
@@ -15218,6 +15236,9 @@ function ConnectionsPanel(){
   // Live connection rows (provider, status, account_label, last_sync_at) — populated by
   // the data loader from the tenant's `connections` table. Empty on the static demo.
   const LIVE_CONNS = (typeof window!=='undefined' && window.FRKL_LIVE && window.FRKL_LIVE.connections) || [];
+  // TikTok's last day of spend: the loader's bundle has no TikTok feed to read it from
+  const ttLast = useV3Rows('conn-tiktok-last', (sb, b) => sb.from('v_tenant_tiktok_ads_daily').select('date').eq('brand_id', b)
+    .order('date', { ascending: false }).limit(1).then(r => (r && r.error ? { data: [], error: null } : r)));
   const sources = [
     {
       id: 'shopify', name: 'Shopify', icon: 'S', provider: 'shopify',
@@ -15249,6 +15270,13 @@ function ConnectionsPanel(){
       last: lastDate(D.klaviyo),
       installable: false,
     },
+    // listed when connected: Greta reads its spend into every ad figure (1048), and this list left it out (23 Oct)
+    ...(LIVE_CONNS.some(x => x.provider === 'tiktok_ads') ? [{
+      id: 'tiktok_ads', name: 'TikTok Ads', icon: 'T', provider: 'tiktok_ads',
+      description: 'Spend, clicks and the conversions TikTok claims',
+      last: ttLast.rows && ttLast.rows[0] ? String(ttLast.rows[0].date).slice(0, 10) : null,
+      installable: false,
+    }] : []),
     {
       id: 'instagram', name: 'Instagram', icon: 'I',
       description: 'Organic posts, reels, stories, follower growth',
@@ -17406,9 +17434,11 @@ function DataHealth(){
       // a feed that is current is still not fit to compare (GA4 after its July–September break).
       sb.from('tenant_clarity_daily').select('date').eq('brand_id', brand).order('date', { ascending: false }).limit(1),
       sb.from('vw_brand_tracking_state').select('source,state,comparisons_clean_from').eq('brand_id', brand),
-    ]).then(([f, a, c, cl, tr]) => {
+      // TikTok has no row in the freshness view either (23 Oct); its last day of spend, when there is one
+      sb.from('v_tenant_tiktok_ads_daily').select('date').eq('brand_id', brand).order('date', { ascending: false }).limit(1).then(r => r, () => null),
+    ]).then(([f, a, c, cl, tr, tt]) => {
       if (!alive) return;
-      setExtra({ clarity: cl && cl.data && cl.data[0] ? cl.data[0].date : null, track: (tr && tr.data) || [] });
+      setExtra({ clarity: cl && cl.data && cl.data[0] ? cl.data[0].date : null, tiktok: tt && !tt.error && tt.data && tt.data[0] ? tt.data[0].date : null, track: (tr && tr.data) || [] });
       setRows((f && f.data) || []);
       setAgree((a && a.data && a.data[0]) || null);
       setCover((c && c.data) || []);
@@ -17430,7 +17460,9 @@ function DataHealth(){
     ga4_daily: 'Site analytics', ga4_items: 'Site analytics, by product', klaviyo: 'Klaviyo email', gsc: 'Google search', tiktok_ads: 'TikTok ads', clarity: 'Site behaviour (Clarity)' };
   const tdy = new Date().toISOString().slice(0, 10);
   const g4hold = (extra.track || []).find(t => t.source === 'ga4' && t.state && t.state !== 'ok' && t.comparisons_clean_from && String(t.comparisons_clean_from).slice(0, 10) > tdy);
-  const feedRows = extra.clarity ? rows.concat([{ source: 'clarity', last_date: extra.clarity, status: 'current' }]) : rows;
+  const lastAll = rows.reduce((m, r) => (r.last_date && String(r.last_date) > m ? String(r.last_date) : m), '');
+  const feedRows = rows.concat(extra.clarity ? [{ source: 'clarity', last_date: extra.clarity, status: 'current' }] : [])
+    .concat(extra.tiktok ? [{ source: 'tiktok_ads', last_date: extra.tiktok, status: !lastAll || String(extra.tiktok).slice(0, 10) >= v3IsoAdd(lastAll.slice(0, 10), -2) ? 'current' : 'stale' }] : []);
   const srcName = k => SRC[k] || v3Sentence(String(k || '').replace(/_/g, ' '));
   const avg = covered.length ? covered.reduce((a, c) => a + Number(c.order_coverage), 0) / covered.length : null;
   const pct = v => v == null ? '—' : Math.round(Number(v) * 100) + '%';
@@ -17830,6 +17862,11 @@ const v3CashInputs = m => String(m || '').replace(/[{}"]/g, '').split(',').map(s
 function CashCeiling(){
   const [gate, setGate] = React.useState(undefined);
   const [weeks, setWeeks] = React.useState([]);
+  // The cash the brand entered, as Goal & costs reads it (cache_brand_state.state.cash_to_peak). The
+  // week-by-week gate has no rows for any brand (23 Oct: brand_cash_ceiling and brand_cash_week are empty),
+  // so this card asked Halden to "add the cash you have now" under the £640,000 it entered on 15 Oct.
+  const stc = useV3Rows('brand-state', V3_STATE_Q);
+  const CP = stc.rows && stc.rows[0] && stc.rows[0].cash_to_peak;
   React.useEffect(() => {
     let alive = true;
     const sb = (typeof window !== 'undefined' && window.FRKL_LIVE && window.FRKL_LIVE.sb) || window.sb;
@@ -17847,6 +17884,7 @@ function CashCeiling(){
 
   if (gate === undefined) return <V3SkeletonRows n={3}/>;   // pending, not empty
   const missing = gate && gate.readiness !== 'ready';
+  if ((!gate || missing) && CP && CP.said && CP.cash_entered != null) return <V3CashToPeak/>;
   return (<div className="card" style={{marginTop:14}}>
     <div className="card-section-title"><h2 style={{margin:0}}>Can you afford the plan?</h2>
       <span className="meta">You pay for stock before the sales come in, so a profitable plan can still run out of cash</span></div>
@@ -18919,6 +18957,9 @@ function V3Stock() {
   const lq = useV3Rows('brand-cfg', V3_BCFG_Q);    // the brand's supplier lead time
   const L = v3Lead(lq.rows);
   const P = useV3Peak(L.days);
+  // the stock list's own peak and lead time (fn_stock_reorder_summary), as the board reads them
+  const SQ0 = (sq.rows && sq.rows[0]) || {};
+  const PD = useV3PeakDeadline((SQ0.peak && SQ0.peak.start) || (P.peak && P.peak.start) || null, SQ0.lead_days != null ? Number(SQ0.lead_days) : L.days);
   const [allRisk, setAllRisk] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
   if (q.err || lq2.err || sq.err) return <div className="v3-empty">Greta could not load your stock plan just now. Refreshing usually sorts it.</div>;
@@ -19034,7 +19075,7 @@ function V3Stock() {
           {' '}{SM.at_stake_basis && <V3Conf state="probably" detail={SM.at_stake_basis + (SM.rule ? ' ' + SM.rule : '')}/>}</p>
         {lost > 0 && <p className="v3-note v3-measure">Until the order arrives, the products that run out sell nothing. At today’s pace that loses about {fmtMoney(lost)} of profit, whatever you order now. Only faster delivery saves it: <b>each week your supplier can cut is worth about {fmtMoney(sooner)}</b>{pkLate ? ', more in the peak' : ''}.</p>}
         {pkLate && <p className="v3-note v3-measure">{pkName} runs {v3Day(pk.start)} – {v3Day(pk.end, true)}. An order arriving on {v3Day(land)} is in time for its last {fmtCount(daysCaught)} {daysCaught === 1 ? 'day' : 'days'}. Those days sold {fmtMoney(catchNow)} last year, {fmtPctN(catchNow / pk.lySales)} of the peak’s sales. {v3IsoAdd(land, -7) <= pk.start ? 'A week sooner would catch all of it (' + fmtMoney(pk.lySales) + ').' : 'A week sooner would catch ' + fmtMoney(catchWeek) + ' (' + fmtPctN(catchWeek / pk.lySales) + ').'} So ask your supplier to send the peak’s products first.</p>}
-        {pkAfter && anyPeak && <p className="v3-note v3-measure">{pkName} starts on {v3Day(pk.start)}, after the order arrives, so the quantities include what last year’s peak sold. To arrive in time, the order needs to go in by {v3Day(pk.orderBy)}.</p>}
+        {pkAfter && anyPeak && <p className="v3-note v3-measure">{pkName} starts on {v3Day(pk.start)}, after the order arrives, so the quantities include what last year’s peak sold. {PD ? <> Peak stock needs to be in by {v3Day(PD.deadline)}, a week before it starts, so the order needs to go in by {v3Day(PD.orderBy)}.</> : <> To arrive in time, the order needs to go in by {v3Day(pk.orderBy)}.</>}</p>}
         {pk && land > pk.end && <p className="v3-note v3-measure">An order placed today arrives after {pkName} ends. What you have in stock now is all you can sell in it; what to feature is below.</p>}
       </>) : <p className="v3-note v3-measure">Every product that sells has enough stock to last until a new order could arrive{pk ? ', and through ' + pkName + ' at last year’s sales' : ''}.</p>}
       {order.length > 0 && <div className="v3-stat-grid v3-gap-top">
@@ -19542,6 +19583,22 @@ function V3LoadFailed({ what, onRetry }) {
 const V3_LADDER_Q = (sb, b) => sb.from('cache_daily_cm_ladder')
   .select('day,net_sales,paid_spend').eq('brand_id', b)
   .gte('day', v3IsoAdd(new Date().toISOString().slice(0, 10), -400)).order('day', { ascending: true }).limit(1000);
+// Sales per £ of ads on one basis (23 Oct). The 30-day figure is sales as Today counts them (net revenue:
+// goods and the delivery customers pay, after discounts and refunds, before VAT) over all ad spend, the
+// anatomy's blended MER: frkl £1.25. The daily tables the charts read (cache_daily_cm_ladder,
+// v_tenant_shopify_daily_agg, cache_brand_sign_history) hold goods only, so the charts said £1.20 and the
+// sign took the anatomy's order-value MER (£1.29). Until the daily table carries delivery, a chart's sales
+// are scaled by the last 30 days' ratio of the two (k), so its latest point is the figure above it.
+function v3DeliveryK(goods) {
+  const H = typeof window !== 'undefined' && window.GRETA_HEADLINE;
+  if (!H || !(Number(H.net_revenue_30d) > 0) || !H.window_from || !H.window_to) return null;
+  const g = goods(String(H.window_from).slice(0, 10), String(H.window_to).slice(0, 10));
+  const k = g > 0 ? Number(H.net_revenue_30d) / g : null;
+  return k != null && k >= 0.95 && k <= 1.3 ? k : null;
+}
+const v3SumBetween = (rows, dayKey, valKey) => (a, b) => (rows || []).reduce((t, r) => {
+  const d = String(r[dayKey]).slice(0, 10); return d >= a && d <= b ? t + (Number(r[valKey]) || 0) : t; }, 0);
+const v3LadderK = rows => (rows && rows.length ? v3DeliveryK(v3SumBetween(rows, 'day', 'net_sales')) : null);
 
 // ── Products (V3, live) — which products earn, and which leak (anatomy Stage 3) ─────────────────
 // Per brand, last 28 days against the 28 before:
@@ -20495,6 +20552,23 @@ function V3Retention() {
 // window and a year of history gets it; anything missing and it says nothing.
 const V3_LEAD_DAYS = 28;   // the stock plan's assumption when a brand has entered no lead time (v3Lead)
 const v3IsBundle = t => /\b(stack|bundle|gift ?set|set of|kit)\b/i.test(String(t || ''));
+// The one date peak stock must be in by (1065: public.fn_peak_stock_deadline, a week before the peak starts),
+// and the order-by date that lands by it. On 23 Oct Halden's peak stock had four order-by dates: the board's
+// 29 Oct (start less lead less a day), Stock & orders' 30 Oct (start less lead), the Calendar's 22 Oct (from
+// another peak row) and Goal & costs' 3 Nov (December less lead). Every page reads this one; the server's
+// function when it is there, the same rule until 1065 is applied.
+const v3PeakDeadlineQ = start => sb => sb.rpc('fn_peak_stock_deadline', { p_peak_start: start })
+  .then(r => { const d = r && !r.error && typeof r.data === 'string' ? r.data.slice(0, 10) : '';
+    return { data: [{ d: /^\d{4}-\d\d-\d\d$/.test(d) ? d : v3IsoAdd(start, -7) }], error: null }; },
+        () => ({ data: [{ d: v3IsoAdd(start, -7) }], error: null }));
+function useV3PeakDeadline(start, leadDays) {
+  const s = start && /^\d{4}-\d\d-\d\d$/.test(String(start).slice(0, 10)) ? String(start).slice(0, 10) : null;
+  const q = useV3Rows('peak-deadline-' + (s || 'none'), s ? v3PeakDeadlineQ(s) : () => Promise.resolve({ data: [] }));
+  if (!s) return null;
+  const d = ((q.rows || [])[0] || {}).d || v3IsoAdd(s, -7);
+  const ld = Number(leadDays);   // the lead time can still be loading
+  return { start: s, deadline: d, orderBy: leadDays != null && Number.isFinite(ld) ? v3IsoAdd(d, -Math.round(ld)) : null };
+}
 function useV3Peak(leadDays) {
   const today = new Date().toISOString().slice(0, 10);
   const cal = useV3Rows('stock-cal', (sb, b) => sb.from('vw_calendar_grid').select('title,start_date,end_date,row_group')
@@ -20521,7 +20595,7 @@ function useV3Peak(leadDays) {
         const growth = n1 >= 25 && n2 >= 25 && ly > 0 ? Math.max(-0.5, Math.min(1, now / ly - 1)) : null;
         // last year's sales on and after a given (this year's) date inside the window
         const from = iso => daily.filter(x => x.d >= iso).reduce((a, x) => a + x.s, 0);
-        return { ...e, days, lyS, lyE, lySales: ws, daily, from, normal, ratio, growth, orderBy: v3IsoAdd(e.start, -leadDays),
+        return { ...e, days, lyS, lyE, lySales: ws, daily, from, normal, ratio, growth, orderBy: v3IsoAdd(e.start, -7 - leadDays),   // see useV3PeakDeadline
           until: Math.max(0, Math.round((new Date(e.start) - new Date(today)) / 864e5)) };
       }
     }
@@ -20666,6 +20740,12 @@ function V3GoalLead() {
   const ue = useV3Rows('cust-ue', V3_UE_Q);
   // The quarter so far against the plan: the same answer (fn_plan_progress) Today, Growth and Calendar give.
   const ppq = useV3Rows('plan-progress-quarter', V3_PP_QUARTER_Q);
+  // The peak the stock list plans for and the one date its stock must be in by, as Stock & orders and the
+  // board say them. This line used the plan's biggest month (1 Dec) less the lead time: "if it goes in by
+  // 3 Nov" against 29 Oct on the board (Halden, 23 Oct).
+  const sqG = useV3Rows('stock-sum', V3_STOCK_SUM_Q);
+  const SQG = (sqG.rows && sqG.rows[0]) || {};
+  const PDG = useV3PeakDeadline(SQG.peak && SQG.peak.start, SQG.lead_days != null ? Number(SQG.lead_days) : v3Lead(cfg.rows).days);
   // A confirmed plan re-reads everything that depends on the goal.
   React.useEffect(() => {
     const on = () => { goal.retry(); pace.retry(); atGoal.retry(); ppq.retry(); };
@@ -20818,12 +20898,20 @@ function V3GoalLead() {
         {peak.x != null ? <>, {fmtTimes(peak.x, 1)} the most you have spent in a month</> : null}.
         {mc > 0 && fop > 0 && <> At that spend, the last new customers cost about {fmtMoney(mc)} each. Their first order makes {fmtMoney(fop)} profit{ltv ? <>, and {fmtMoney(ltv)} over a year</> : null}.
           {mc > fop ? ' That is past the point where the first order pays for them, so check what a new customer costs each week as spend climbs.' : mc >= fop * 0.9 ? ' The first order only just pays for them; the profit is in their next orders.' : ' The first order still pays for them.'}</>}</li>
-      <li><b>Stock for it.</b> {L.entered ? <>With your {L.weeks}-week wait from order to arrival</> : <>At Greta’s guess of {L.days} days from order to arrival (add yours below)</>}, an order placed today arrives around {v3Day(arrive)}
+      {PDG && SQG.peak ? (() => { const pn = v3PlainWords(SQG.peak.title || 'the peak'), pEnd = String(SQG.peak.end || PDG.start).slice(0, 10);
+        const lands = SQG.lands_on ? String(SQG.lands_on).slice(0, 10) : arrive;
+        return (<li><b>Stock for {pn}.</b> {L.entered ? <>With your {L.weeks}-week wait from order to arrival</> : <>At Greta’s guess of {L.days} days from order to arrival (add yours below)</>}, an order placed today arrives around {v3Day(lands)}.
+          {' '}{pn} starts on {v3Day(PDG.start)}, so its stock needs to be in by {v3Day(PDG.deadline)}, a week before.
+          {lands > pEnd ? <> The order arrives after it ends, so all of it sells from the stock you hold now.</>
+            : lands > PDG.deadline ? <> The order arrives after that: most of it sells from the stock you hold now. Check that stock covers last year’s peak, and ask suppliers what can arrive sooner.</>
+            : <> That is in time if the order goes in by {v3Day(PDG.orderBy)}.</>}
+        {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('stock')}>What to order <span className="v3-xref-go">on Stock &amp; orders →</span></button></li>); })()
+      : (<li><b>Stock for it.</b> {L.entered ? <>With your {L.weeks}-week wait from order to arrival</> : <>At Greta’s guess of {L.days} days from order to arrival (add yours below)</>}, an order placed today arrives around {v3Day(arrive)}
           {arrive > peakEnd ? <> — after {gpMonthName(peak.iso)} ends, so all of it sells from the stock you hold now.</>
             : arrive > peak.iso ? <> — most of {gpMonthName(peak.iso)} sells from the stock you hold now.</>
             : <> — in time, if it goes in by {v3Day(v3IsoAdd(peak.iso, -L.days))}.</>}
           {arrive > peak.iso && ' Check it covers last year’s peak, and ask suppliers what can arrive sooner.'}
-        {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('stock')}>What to order <span className="v3-xref-go">on Stock &amp; orders →</span></button></li>
+        {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('stock')}>What to order <span className="v3-xref-go">on Stock &amp; orders →</span></button></li>)}
       {cashOff && <li><b>Check you can fund it.</b> The ads and the stock are paid for before the sales arrive. Greta can’t check that until you add the lowest balance you’ll let cash fall to.
         {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'economics')}>Add it <span className="v3-xref-go">under Cash, stock and supplier terms →</span></button></li>}
     </ol>
@@ -21093,9 +21181,11 @@ function V3Review() {
   // only when the week before was big enough to mislead: a small promo in an ordinary week is not one
   const priorSale = P && P.sales > T.sales * 1.25 && (promoIn(P.start, P.end) || P.sales > T.sales * 1.4);
   const g4 = (trk.rows || [])[0] || null, held = g4 && g4.comparisons_clean_from && String(g4.comparisons_clean_from) > today;
-  const mer = W.spend > 0 ? W.sales / W.spend : null;
+  // sales per £ of ads with the delivery customers pay, as the 30-day figure counts it (v3DeliveryK)
+  const dk = v3LadderK(lad.rows) || 1;
+  const mer = W.spend > 0 ? W.sales * dk / W.spend : null;
   const range = v3Day(W.start) + ' – ' + v3Day(W.end, true);
-  const t12 = wk.slice(Math.max(0, i - 11), i + 1).map(w => ({ ...w, label: v3Day(w.start), mer: w.spend > 0 ? Math.round(w.sales / w.spend * 100) / 100 : null }));
+  const t12 = wk.slice(Math.max(0, i - 11), i + 1).map(w => ({ ...w, label: v3Day(w.start), mer: w.spend > 0 ? Math.round(w.sales * dk / w.spend * 100) / 100 : null }));
   const tip = ({ active, payload }) => { if (!active || !payload || !payload.length) return null; const p = payload[0].payload;
     return (<div className="v3-tip"><b>Week of {v3Day(p.start, true)}</b><span>Sales <em>{fmtMoney(p.sales)}</em></span><span>Ad spend <em>{fmtMoney(p.spend)}</em></span><span>Kept after ads <em>{fmtMoney(p.kept)}</em></span></div>); };
   const stat = (lab, val, foot, cls) => (<div className="v3-stat" key={lab}><div className="v3-stat-lab"><span>{lab}</span></div><div className="v3-stat-val">{val}</div>
@@ -21121,7 +21211,7 @@ function V3Review() {
         {stat('Sales', fmtMoney(W.sales), sChg == null ? '' : (sChg >= 0 ? '+' : '−') + fmtPctN(Math.abs(sChg)) + ' on a typical week', sChg != null && sChg < -0.1 ? 'v3-down' : 'v3-muted')}
         {stat('Ad spend', fmtMoney(W.spend), pX == null ? '' : fmtTimes(pX, 1) + ' a typical week', pX != null && pX > 1.25 ? 'v3-down' : 'v3-muted')}
         {stat('Kept after ads', fmtMoney(W.kept), fmtMoney(T.kept) + ' in a typical week', W.kept < T.kept * 0.8 ? 'v3-down' : 'v3-muted')}
-        {stat('Sales per £ of ads', mer != null ? fmtTimes(mer, 2) : FMT_NONE, be ? 'you break even at ' + fmtTimes(be, 2) : '', mer != null && be && mer < be ? 'v3-down' : 'v3-muted')}
+        {stat('Sales per £ of ads', mer != null ? fmtTimes(mer, 2) : FMT_NONE, (dk > 1.001 ? 'with the delivery you charge' + (be ? '; ' : '') : '') + (be ? 'you break even at ' + fmtTimes(be, 2) : ''), mer != null && be && mer < be ? 'v3-down' : 'v3-muted')}
         {orders > 0 && stat('Orders', fmtCount(orders), aov ? 'average order ' + fmtMoney(aov) : '')}
       </div>
       <V3WeekDrivers W={{ ...W, orders }} T={T} cmr={cmr} info={{ range, n: prev8.length, leftOut, sale: promoIn(W.start, W.end) && W.sales > T.sales * 1.25 }}/>
@@ -21527,6 +21617,10 @@ function V3DataTrust() {
   // the same 30 days, ending yesterday, for the platforms' claims and the web orders Shopify took
   const meta = useV3Rows('trust-meta', (sb, b) => sb.from('tenant_meta_insights_daily').select('purchases,purchase_value').eq('brand_id', b).eq('level', 'account').gte('date', v3IsoAdd(today, -30)).lt('date', today).limit(100));
   const gads = useV3Rows('trust-gads', (sb, b) => sb.from('tenant_google_ads_daily').select('conversions,conversion_value').eq('brand_id', b).eq('level', 'campaign').gte('date', v3IsoAdd(today, -30)).lt('date', today).limit(1000));
+  // TikTok claims orders too (Halden: 1,497 in 30 days); "Meta and Google claim 129%" left them out (23 Oct)
+  const ttk = useV3Rows('trust-tiktok', (sb, b) => sb.from('v_tenant_tiktok_ads_daily').select('conversions,conversion_value').eq('brand_id', b).gte('date', v3IsoAdd(today, -30)).lt('date', today).limit(1000)
+    .then(r => (r && r.error ? { data: [], error: null } : r)));
+  const stq = useV3Rows('brand-state', V3_STATE_Q);   // the freshness the banner at the top reads
   // online-store orders only: draft orders and marketplace sales (frkl: John Lewis) never see an ad
   const web = useV3Rows('trust-web', (sb, b) => sb.from('v_shopify_orders_ex_vat').select('id', { count: 'exact', head: true }).eq('brand_id', b).eq('channel', 'online_store')
     .gte('processed_at', v3IsoAdd(today, -30)).lt('processed_at', today).then(r => ({ data: r.error ? null : [{ n: r.count }], error: r.error })));
@@ -21581,10 +21675,12 @@ function V3DataTrust() {
   // 5. what the ad platforms claim
   const mP = (meta.rows || []).reduce((a, r) => a + num(r.purchases), 0), mV = (meta.rows || []).reduce((a, r) => a + num(r.purchase_value), 0);
   const gP = (gads.rows || []).reduce((a, r) => a + num(r.conversions), 0), gV = (gads.rows || []).reduce((a, r) => a + num(r.conversion_value), 0);
+  const tP = (ttk.rows || []).reduce((a, r) => a + num(r.conversions), 0), tV = (ttk.rows || []).reduce((a, r) => a + num(r.conversion_value), 0);
+  const plats = tP > 0 ? 'Meta, Google and TikTok' : 'Meta and Google';
   const orders30 = web.rows && web.rows[0] ? num(web.rows[0].n) : 0;
-  if (orders30 > 0 && mP + gP >= orders30 * 0.3) items.push({ k: 'claims', short: 'the ad platforms claim ' + fmtPctN((mP + gP) / orders30) + ' of your orders',
-    head: 'Meta and Google claim ' + fmtCount(mP + gP) + ' of the ' + fmtCount(orders30) + ' orders your website took in the last 30 days.',
-    body: <>Meta counts {fmtCount(mP)} purchases worth {fmtMoney(mV)} and Google {fmtCount(gP)} conversions worth {fmtMoney(gV)}, by their own measures — each counts any order that saw or clicked an ad, and both can count the same one. That is why Greta judges ads on your Shopify orders, not on the return their dashboards show. <button type="button" className="v3-xref" onClick={go('marketing')}>What each channel really returns <span className="v3-xref-go">on Marketing →</span></button></> });
+  if (orders30 > 0 && mP + gP + tP >= orders30 * 0.3) items.push({ k: 'claims', short: 'the ad platforms claim ' + fmtPctN((mP + gP + tP) / orders30) + ' of your orders',
+    head: plats + ' claim ' + fmtCount(Math.round(mP + gP + tP)) + ' of the ' + fmtCount(orders30) + ' orders your website took in the last 30 days.',
+    body: <>Meta counts {fmtCount(mP)} purchases worth {fmtMoney(mV)}{tP > 0 ? ',' : ' and'} Google {fmtCount(gP)} conversions worth {fmtMoney(gV)}{tP > 0 ? <> and TikTok {fmtCount(tP)} conversions worth {fmtMoney(tV)}</> : null}, by their own measures — each counts any order that saw or clicked an ad, and {tP > 0 ? 'they' : 'both'} can count the same one. That is why Greta judges ads on your Shopify orders, not on the return their dashboards show. <button type="button" className="v3-xref" onClick={go('marketing')}>What each channel really returns <span className="v3-xref-go">on Marketing →</span></button></> });
   // 6. products without a SKU
   const noSku = new Set((stock.rows || []).filter(r => String(r.sku || '').startsWith('v:') && num(r.weekly_velocity) > 0).map(r => String(r.product_title || '').toLowerCase())).size;
   if (noSku > 0) items.push({ k: 'sku', short: fmtCount(noSku) + ' selling products have no product code', head: fmtCount(noSku) + ' products that sell have no product code (SKU) in Shopify.',
@@ -21592,7 +21688,11 @@ function V3DataTrust() {
 
   const shortList = items.slice(0, 3).map(i => i.short);
   const jobLate = !!(jh.rows && jh.rows.length);
-  const feeds = jobLate ? 'Your data is arriving, but a refresh that works it out has failed (see the note above), so some figures may lag.'
+  // the banner at the top of every page (state.freshness) and this verdict say the same thing: "Your feeds are
+  // current" sat under "Your data is out of date. Shopify has sent nothing since 21 Oct" (Halden, 23 Oct)
+  const FR = ((stq.rows || [])[0] || {}).freshness;
+  const feeds = FR && FR.stale && FR.said ? (FR.core_stale ? 'Your data is out of date (see the note at the top).' : 'Some of your data is out of date (see the note at the top).')
+    : jobLate ? 'Your data is arriving, but a refresh that works it out has failed (see the note above), so some figures may lag.'
     : 'Your feeds are current.';
   const verdict = !items.length ? (jobLate ? feeds + ' Nothing else Greta checks is reading wrong.' : 'Your feeds are current and nothing Greta checks is reading wrong.')
     : feeds + ' ' + (items.length === 1 ? 'One thing makes' : v3Sentence(['', 'one', 'two', 'three', 'four', 'five', 'six'][items.length] || String(items.length)) + ' things make') + ' numbers read wrong: ' + shortList.join('; ') + (items.length > 3 ? '; and ' + (items.length - 3) + ' more below' : '') + '.';
@@ -21601,7 +21701,7 @@ function V3DataTrust() {
     <p className="v3-verdict">{verdict}</p>
     {items.length > 0 && <ol className="v3-moves">{items.map(i => (<li key={i.k}><b>{i.head}</b> {i.body}{i.extra || null}</li>))}</ol>}
   </section>
-  <V3DriverStrip keys={['claims']} opts={orders30 > 0 && meta.rows && gads.rows ? { claims: { m: mP, g: gP, o: orders30 } } : null}/>
+  <V3DriverStrip keys={['claims']} opts={orders30 > 0 && meta.rows && gads.rows && ttk.rows ? { claims: { m: mP, g: gP, t: tP, o: orders30 } } : null}/>
   <V3AnatomyCoverage/>
   <V3LearningStatus/>
   <V3AnatomyInputs/></div>);
@@ -21809,15 +21909,33 @@ function v3BuildSigns(S, hist, opts) {
   const num = v => (v == null ? null : Number(v));
   const yoySales = num(A.last_year_same_30_sales) > 0 ? num(L.sales) / num(A.last_year_same_30_sales) - 1 : null;
   const yoyAds = num(A.last_year_same_30_ads) > 0 ? num(L.ads) / num(A.last_year_same_30_ads) : null;
-  const ret = num(L.mer) > 0 ? num(L.mer) : num(L.ads) > 0 ? num(L.sales) / num(L.ads) : null;   // 0952: the anatomy's MER when the state carries it
+  // Sales from each £1 of ads: the sales and ad spend the page shows, divided (see v3DeliveryK). L.mer is
+  // the anatomy's order-value MER, before refunds: £1.29 on frkl beside £1.25 everywhere else (23 Oct).
+  const ret = num(L.ads) > 0 && num(L.sales) > 0 ? num(L.sales) / num(L.ads) : null;
+  const lad = V3_Q['profit-ladder'] && V3_Q['profit-ladder'].rows;
+  const dk = (opts && opts.k) || v3LadderK(lad) || 1;
   const ao = num(L.after_overheads);
-  const HP0 = hist && Array.isArray(hist.points) ? hist.points : null;
+  // earlier points on the same basis as the latest: sales_net is what the return model divides
+  const HP00 = hist && Array.isArray(hist.points) ? hist.points : null;
+  // All ad spend in every point (1068): cac_spend was Meta and Google only, so the Growth plan's "Ad spend"
+  // said £83,678 where the same point's ads and Customers said £99,812 with TikTok (Halden, 23 Oct). After
+  // 1068 each point carries tiktok_spend and a cac_spend with it in; before, the gap to the point's own
+  // ads total is TikTok's (the only other platform Greta reads), and it is added here the same way.
+  const allAds = p => {
+    if (p.tiktok_spend != null || p.ads == null || p.cac_spend == null) return {};
+    const t = Math.round((Number(p.ads) - (Number(p.meta_spend) || 0) - (Number(p.google_spend) || 0)) * 100) / 100;
+    if (!(t >= 1)) return {};
+    const sp = Number(p.cac_spend) + t, n = Number(p.new_customers);
+    return { tiktok_spend: t, cac_spend: sp, cac: n > 0 ? Math.round(sp / n * 100) / 100 : p.cac };
+  };
+  const HP0 = HP00 ? HP00.map(p => Object.assign({}, p, allAds(p), { sales_net: p.sales == null ? null : Number(p.sales) * dk,
+    return: p.return == null ? p.return : Math.round(Number(p.return) * dk * 100) / 100 })) : null;
   // The latest week takes the headline's own sales and ad spend. The history reads the daily table, which
   // catches an order edited or refunded today only overnight (9 Oct: £19,155 there, £19,093 live), so
   // without this the panels and the verdict above them disagreed by a few pounds for the rest of the day.
   const HP = HP0 && HP0.length && num(L.sales) > 0 && L.ads != null ? HP0.slice(0, -1).concat([(() => {
     const p = HP0[HP0.length - 1], sl = num(p.sales_ly), al = num(p.ads_ly), sv = num(L.sales), av = num(L.ads);
-    return Object.assign({}, p, { sales: sv, ads: av, return: num(L.mer) > 0 ? num(L.mer) : av > 0 ? Math.round(sv / av * 100) / 100 : p.return,
+    return Object.assign({}, p, { sales: sv, sales_net: sv, ads: av, return: av > 0 ? Math.round(sv / av * 100) / 100 : p.return,
       vs_ly: sl > 0 ? Math.round((sv / sl - 1) * 1000) / 1000 : p.vs_ly, ads_vs_ly: al > 0 ? Math.round(av / al * 100) / 100 : p.ads_vs_ly });
   })()]) : HP0;
   const ser = k => HP ? HP.map(p => ({ d: String(p.d), v: p[k] == null ? null : Number(p[k]) })) : null;
@@ -21917,7 +22035,7 @@ function v3BuildSigns(S, hist, opts) {
     const l = SPP[SPP.length - 1], f4 = SPP.length >= 5 ? SPP[SPP.length - 5] : SPP[0];
     const worse = Number(l.cac_spend) > Number(f4.cac_spend) * 1.05 && Number(l.new_customers) < Number(f4.new_customers);
     signs.push({ k: 'Ad spend', v: fmtMoney(Number(l.cac_spend)), tone: worse ? 'weak' : 'typical',
-      n: <>Meta {fmtMoney(Number(l.meta_spend))}, Google {fmtMoney(Number(l.google_spend))}{worse ? '; up while new customers fell' : ''}</>,
+      n: <>Meta {fmtMoney(Number(l.meta_spend))}, Google {fmtMoney(Number(l.google_spend))}{Number(l.tiktok_spend) >= 1 ? <>, TikTok {fmtMoney(Number(l.tiktok_spend))}</> : null}{worse ? '; up while new customers fell' : ''}</>,
       series: ser('cac_spend'), fmt: v => fmtMoney(v), better: worse ? 'lower' : null, line: null,
       which: 'spend', ctx: {}, dline: null });
   }
@@ -21945,13 +22063,17 @@ function v3BuildSigns(S, hist, opts) {
   const CLP = HP ? HP.filter(p => Number(p.web_orders) > 0 && p.meta_purchases != null).map(p => Object.assign({}, p)) : [];
   if (CLP.length >= 4) {
     const own = opts && opts.claims;
-    if (own && own.o > 0) Object.assign(CLP[CLP.length - 1], { meta_purchases: own.m, google_conversions: own.g, web_orders: own.o });
-    const l = CLP[CLP.length - 1], v = ((Number(l.meta_purchases) || 0) + (Number(l.google_conversions) || 0)) / Number(l.web_orders);
+    if (own && own.o > 0) Object.assign(CLP[CLP.length - 1], { meta_purchases: own.m, google_conversions: own.g, tiktok_conversions: own.t || 0, web_orders: own.o });
+    const cl = p => (Number(p.meta_purchases) || 0) + (Number(p.google_conversions) || 0) + (Number(p.tiktok_conversions) || 0);
+    const l = CLP[CLP.length - 1], v = cl(l) / Number(l.web_orders);
+    // the history has no TikTok claims: with TikTok in the latest figure, its 13 weeks and drivers would read
+    // TikTok as a jump, so they show only where every point counts it
+    const tk = Number(l.tiktok_conversions) > 0, histOk = !tk || CLP.every(p => p.tiktok_conversions != null);
     signs.push({ k: 'Orders the ad platforms claim', v: fmtPctN(v), tone: v > 1 ? 'weak' : 'typical',
-      n: <>Meta {fmtCount(Math.round(Number(l.meta_purchases)))}, Google {fmtCount(Math.round(Number(l.google_conversions)))}, of {fmtCount(Number(l.web_orders))} website orders</>,
-      series: CLP.map(p => ({ d: String(p.d), v: ((Number(p.meta_purchases) || 0) + (Number(p.google_conversions) || 0)) / Number(p.web_orders) })),
+      n: <>Meta {fmtCount(Math.round(Number(l.meta_purchases)))}, Google {fmtCount(Math.round(Number(l.google_conversions)))}{tk ? <>, TikTok {fmtCount(Math.round(Number(l.tiktok_conversions)))}</> : null}, of {fmtCount(Number(l.web_orders))} website orders</>,
+      series: histOk ? CLP.map(p => ({ d: String(p.d), v: cl(p) / Number(p.web_orders) })) : null,
       fmt: x => fmtPctN(x), better: null, line: { v: 1, label: 'Every order claimed' },
-      which: 'claims', ctx: { lineLabel: 'every order claimed once' }, dline: 1, points: CLP });
+      which: 'claims', noDrivers: !histOk, ctx: { lineLabel: 'every order claimed once' }, dline: 1, points: CLP });
   }
   // the headline as a sign of its own, for the pages that show it beside the others
   const profitSign = profitCfg && (ao != null || L.profit_after_ads != null) ? Object.assign({
@@ -22062,6 +22184,7 @@ function V3BusinessState({ part }) {
   const q = useV3Rows('brand-state', V3_STATE_Q);
   const codes = useV3Rows('brand-codes', V3_CODES_Q);
   const hq = useV3Rows('sign-history', V3_SIGN_HIST_Q);
+  useV3Rows('profit-ladder', V3_LADDER_Q);   // the sales-per-£ basis (v3DeliveryK) for the signs' history
   const tq = useV3Rows('tier-30', V3_TIER_Q);   // aMER, from the same hourly snapshot as Customers
   const [drv, setDrv] = React.useState(null);   // which sign's drivers are open: 'cac', 'ret', 'ly', 'repeat'
   if (q.err) return null;                                   // before 0269, or unreadable: Today carries on without it
@@ -22072,7 +22195,7 @@ function V3BusinessState({ part }) {
   const share = num(L.ads_share), early = num(A.early_year_share);
   const yoySales = num(A.last_year_same_30_sales) > 0 ? num(L.sales) / num(A.last_year_same_30_sales) - 1 : null;
   const yoyAds = num(A.last_year_same_30_ads) > 0 ? num(L.ads) / num(A.last_year_same_30_ads) : null;
-  const ret = num(L.mer) > 0 ? num(L.mer) : num(L.ads) > 0 ? num(L.sales) / num(L.ads) : null;   // 0952: the anatomy's MER when the state carries it
+  const ret = num(L.ads) > 0 && num(L.sales) > 0 ? num(L.sales) / num(L.ads) : null;   // one basis: see v3DeliveryK
   const topCode = (codes.rows || []).find(c => num(c.orders_365d) >= 50 && num(c.first_order_share) >= 0.6) || null;
 
   // the verdict: after overheads when they are known, else after ads. The headline carries the one
@@ -22208,7 +22331,7 @@ function V3BusinessState({ part }) {
   // pages whose driver strips use it)
   const signs = SG.signs.some(s => s.amer) ? SG.signs.filter(s => s.which !== 'ret') : SG.signs;
   // one "What is driving this?" per sign whose history can explain it; one panel open at a time
-  signs.forEach(sg => { sg.act = sg.which && v3HasDrivers(sg.which, HP)
+  signs.forEach(sg => { sg.act = sg.which && !sg.noDrivers && v3HasDrivers(sg.which, HP)
     ? { label: drv === sg.which ? 'Hide what is driving it' : 'What is driving this?', open: drv === sg.which, on: () => setDrv(o => (o === sg.which ? null : sg.which)) } : null; });
   const profitAct = profitCfg && v3HasDrivers('profit', HP)
     ? { label: drv === 'profit' ? 'Hide what is driving it' : 'What is driving this?', open: drv === 'profit', on: () => setDrv(o => (o === 'profit' ? null : 'profit')) } : null;
@@ -22880,23 +23003,30 @@ const V3_REFUNDS_Q = (sb, b) => {
 };
 function V3RefundSign({ part, open, setOpen }) {
   const q = useV3Rows('product-refunds', V3_REFUNDS_Q), board = useV3Board();
+  const drift = useV3Rows('goal-drift', V3_DRIFT_Q);
   const R = q.rows || [];
   if (!R.length) return null;
-  const O = R.reduce((t, r) => t + Number(r.orders), 0), RO = R.reduce((t, r) => t + Number(r.refunded_orders), 0);
   const G = R.reduce((t, r) => t + Number(r.refunded_gbp), 0), S = R.reduce((t, r) => t + Number(r.sales_gbp), 0);
-  if (!(O > 0)) return null;
-  const rate = RO / O;
-  const high = R.filter(r => Number(r.orders) >= 10 && Number(r.refunded_orders) / Number(r.orders) >= rate * 1.5).slice(0, 6);
+  if (!(S > 0)) return null;
+  // One refund rate (23 Oct): this sign said "Orders refunded 4.4%" (refunded orders over orders, summed
+  // over product rows, so an order with three products counted three times) beside "£41,734 of £1,133,818"
+  // (3.7%), while Goal & costs and Profit & sales said refunds are 4.0% of sales. The sign now shows that
+  // 4.0% (vw_brand_config_drift: money refunded over web sales, last 12 months). Products are compared
+  // with the shop on the same money basis and the same orders: refunded £ over sales £.
+  const rf = (drift.rows || []).find(r => r.input_key === 'refundPct' && r.verifiable && r.realised_value != null);
+  const share = G / S, rateY = rf ? Number(rf.realised_value) / 100 : null;
+  const pShare = r => Number(r.sales_gbp) > 0 ? Number(r.refunded_gbp) / Number(r.sales_gbp) : 0;
+  const high = R.filter(r => Number(r.orders) >= 10 && pShare(r) >= share * 1.5).sort((a, b) => pShare(b) - pShare(a)).slice(0, 6);
   const live = board.rows ? v3LiveRows(board.rows) : [];
   const acts = live.filter(r => /^returns-product-/.test(r.external_id));
   if (part === 'sign') return (
-    <V3Sign k="Orders refunded" v={fmtPctN(rate)} tone={high.length ? 'ok' : 'typical'}
-      n={<>{fmtMoney(G)} of {fmtMoney(S)} given back over three months{high.length ? <>; {high.length === 1 ? 'one product is' : fmtCount(high.length) + ' products are'} refunded at 1.5 times that or more</> : null}</>}
+    <V3Sign k="Sales refunded" v={fmtPctN(rateY != null ? rateY : share)} tone={high.length ? 'ok' : 'typical'}
+      n={<>{rateY != null ? 'of sales over the last 12 months, as Goal & costs reads it' : <>{fmtMoney(G)} of {fmtMoney(S)} given back over three months</>}{high.length ? <>; {high.length === 1 ? 'one product has' : fmtCount(high.length) + ' products have'} 1.5 times the shop’s share of sales refunded or more</> : null}</>}
       act={high.length ? { label: open ? 'Hide which products' : 'Which products?', open, on: () => setOpen(o => !o) } : null}/>);
   if (!open || !high.length) return null;
   return (<div className="v3-drivers">
-      <h3 className="v3-sec-title">Products refunded more than your shop’s {fmtPctN(rate)}</h3>
-      <p className="v3-note v3-measure">{high.length === 1 ? 'This product is' : 'These products are'} refunded at 1.5 times your shop’s rate or more. A product that keeps coming back usually has one reason: the size, the photos, the quality, or the description. Find it before you spend more selling it.</p>
+      <h3 className="v3-sec-title">Products refunded more than the rest of your shop</h3>
+      <p className="v3-note v3-measure">On orders placed between 104 and 14 days ago, the shop gave back {fmtMoney(G)} of {fmtMoney(S)}. {high.length === 1 ? 'This product had' : 'These products had'} 1.5 times that share of sales refunded or more. A product that keeps coming back usually has one reason: the size, the photos, the quality, or the description. Find it before you spend more selling it.</p>
       {acts.length > 0 && <div className="v3-drivers-todo">
         <div className="v3-kick">What to do</div>
         {acts.slice(0, 3).map(r => (<button key={r.external_id} type="button" className="v3-drivers-todo-row" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>
@@ -22904,9 +23034,9 @@ function V3RefundSign({ part, open, setOpen }) {
           <span className="v3-num">{r.cm_gbp ? v3Gbp(r.cm_gbp) + v3Per(r, true) : ''}</span><Icon name="arrowRight" size={13}/></button>))}
       </div>}
       <table className="v3-rw">
-        <thead><tr><th className="t-text">Product</th><th>Orders</th><th>Refunded</th><th>Share</th><th>Given back</th></tr></thead>
+        <thead><tr><th className="t-text">Product</th><th>Orders</th><th>Orders refunded</th><th>Sales</th><th>Given back</th><th>Share of sales</th></tr></thead>
         <tbody>{high.map(r => (<tr key={r.title}><td className="t-text">{r.title}</td><td>{fmtCount(Number(r.orders))}</td><td>{fmtCount(Number(r.refunded_orders))}</td>
-          <td className="v3-down">{fmtPctN(Number(r.refunded_orders) / Number(r.orders))}</td><td>{fmtMoney(Number(r.refunded_gbp))}</td></tr>))}</tbody>
+          <td>{fmtMoney(Number(r.sales_gbp))}</td><td>{fmtMoney(Number(r.refunded_gbp))}</td><td className="v3-down">{fmtPctN(pShare(r))}</td></tr>))}</tbody>
       </table>
       <p className="micro muted v3-measure">Website orders placed between 104 and 14 days ago, so each has had two weeks to come back. A refund on an order with several products is shared between them by price. Products with fewer than ten orders are left out.</p>
     </div>);
@@ -22938,6 +23068,7 @@ function V3ProductStrip({ d }) {
 function V3BoardDrivers() {
   const q = useV3Rows('brand-state', V3_STATE_Q);
   const hq = useV3Rows('sign-history', V3_SIGN_HIST_Q);
+  useV3Rows('profit-ladder', V3_LADDER_Q);   // the sales-per-£ basis (v3DeliveryK) for the signs' history
   const board = useV3Board();
   const [drv, setDrv] = React.useState(null);
   if (q.err || hq.err || !q.rows || !hq.rows || !board.rows) return null;
@@ -22968,13 +23099,14 @@ function V3BoardDrivers() {
 function V3DriverStrip({ keys, title, opts }) {
   const q = useV3Rows('brand-state', V3_STATE_Q);
   const hq = useV3Rows('sign-history', V3_SIGN_HIST_Q);
+  useV3Rows('profit-ladder', V3_LADDER_Q);   // the sales-per-£ basis (v3DeliveryK) for the signs' history
   const [drv, setDrv] = React.useState(null);
   if (q.err || hq.err || !q.rows || !hq.rows) return null;
   const S = q.rows[0]; if (!S || !S.last_30) return null;
   const SG = v3BuildSigns(S, hq.rows[0] && hq.rows[0].history, opts);
   const all = SG.signs.concat(SG.profitSign ? [SG.profitSign] : []);
   const picked = keys.map(k => all.find(sg => sg.which === k)).filter(Boolean).map(sg => Object.assign({}, sg, {
-    act: v3HasDrivers(sg.which, SG.HP) ? { label: drv === sg.which ? 'Hide what is driving it' : 'What is driving this?', open: drv === sg.which,
+    act: !sg.noDrivers && v3HasDrivers(sg.which, SG.HP) ? { label: drv === sg.which ? 'Hide what is driving it' : 'What is driving this?', open: drv === sg.which,
       on: () => setDrv(o => (o === sg.which ? null : sg.which)) } : null }));
   if (!picked.length) return null;
   const open = drv ? picked.find(sg => sg.which === drv) : null;
@@ -23137,7 +23269,7 @@ function v3ModelCac(a, b, ctx) {
   };
 }
 function v3ModelReturn(a, b, ctx) {
-  const f = p => { const s = Number(p.sales), o = Number(p.orders), ad = Number(p.ads);
+  const f = p => { const s = Number(p.sales_net != null ? p.sales_net : p.sales), o = Number(p.orders), ad = Number(p.ads);
     return { s, o, ad, v: s / ad, aov: s / o, n: Number(p.new_customers), ms: Number(p.meta_spend), gs: Number(p.google_spend) }; };
   const A = f(a), B = f(b);
   const [pO, pA, pS] = v3LogParts(A.v, B.v, [{ a: A.o, b: B.o, sign: 1 }, { a: A.aov, b: B.aov, sign: 1 }, { a: A.ad, b: B.ad, sign: -1 }]);
@@ -23440,7 +23572,9 @@ function v3ModelSpend(a, b, ctx) {
   (a.campaigns || []).forEach(c => { cm[key(c)] = { platform: c.platform, name: c.name, then: Number(c.spend), now: 0 }; });
   (b.campaigns || []).forEach(c => { const r = cm[key(c)] || (cm[key(c)] = { platform: c.platform, name: c.name, then: 0 }); r.now = Number(c.spend); });
   const camps = Object.values(cm).map(c => ({ ...c, d: c.now - c.then })).sort((p, q) => Math.abs(q.d) - Math.abs(p.d));
-  const shown = camps.slice(0, 4), rest = (B - A) - shown.reduce((t, c) => t + c.d, 0);
+  // TikTok has no campaign list in the history: its change is one part of its own
+  const tA = Number(a.tiktok_spend) || 0, tB = Number(b.tiktok_spend) || 0;
+  const shown = camps.slice(0, 4), rest = (B - A) - (tB - tA) - shown.reduce((t, c) => t + c.d, 0);
   const ids = c => /retarget|remarket/i.test(c.name) ? ['driver-retargeting', 'order-cost-meta'] : c.platform === 'Meta' ? ['driver-meta-ads', 'order-cost-meta'] : ['order-cost-google'];
   const na = Number(a.new_customers), nb = Number(b.new_customers);
   return {
@@ -23451,15 +23585,18 @@ function v3ModelSpend(a, b, ctx) {
     parts: shown.map(c => ({ amt: c.d, k: c.name, sub: c.platform + ' · ' + fmtMoney(c.then) + ' to ' + fmtMoney(c.now),
       cause: <>“{c.name}” on {c.platform} went from {fmtMoney(c.then)} to {fmtMoney(c.now)}</>,
       against: <>{c.d < 0 ? 'Less' : 'More'} on “{c.name}” ({fmtMoney(c.then)} to {fmtMoney(c.now)})</> }))
+      .concat(Math.abs(tB - tA) >= 1 ? [{ amt: tB - tA, k: 'TikTok', sub: 'TikTok · ' + fmtMoney(tA) + ' to ' + fmtMoney(tB),
+        cause: <>TikTok went from {fmtMoney(tA)} to {fmtMoney(tB)}</>, against: <>{tB < tA ? 'Less' : 'More'} on TikTok ({fmtMoney(tA)} to {fmtMoney(tB)})</> }] : [])
       .concat(Math.abs(rest) >= 1 ? [{ amt: rest, k: 'Other campaigns', sub: 'under £50 each, and rounding', cause: <>smaller campaigns moved</>, against: <>Smaller campaigns</> }] : []),
     opening: <>Since the 30 days to {v3Day(String(a.d), true)}, ad spend went from {fmtMoney(A)} to {fmtMoney(B)}{na > 0 && nb > 0 ? <>, while new customers went from {fmtCount(na)} to {fmtCount(nb)}</> : null}.</>,
     rows: [
       ['Meta', Number(a.meta_spend), Number(b.meta_spend), v => fmtMoney(v), null],
       ['Google', Number(a.google_spend), Number(b.google_spend), v => fmtMoney(v), null],
+      ...(tA >= 1 || tB >= 1 ? [['TikTok', tA, tB, v => fmtMoney(v), null]] : []),
       ['New customers', na, nb, v => fmtCount(v), 'higher'],
       ['Cost to win each', na > 0 ? A / na : null, nb > 0 ? B / nb : null, v => fmtMoney(v), 'lower'],
     ],
-    note: 'Meta and Google spend from your ad accounts, by campaign; campaigns under £50 in either 30 days are counted together. New customers are first-time buyers from any source.',
+    note: 'Spend from your ad accounts: Meta and Google by campaign' + (tA >= 1 || tB >= 1 ? ', TikTok as one figure' : '') + '; campaigns under £50 in either 30 days are counted together. New customers are first-time buyers from any source.',
   };
 }
 function v3ModelMetaCpa(a, b, ctx) {
@@ -23778,14 +23915,21 @@ function V3MoneyBridge({ L, share }) {
   const num = v => (v == null ? null : Number(v));
   const sales = num(L.sales), ads = num(L.ads), pa = num(L.profit_after_ads), ao = num(L.after_overheads);
   if (!(sales > 0) || pa == null || ads == null) return null;
-  const goods = Math.max(sales - ads - pa, 0), end = ao != null ? ao : pa;
+  // Profit after ads also takes off the other marketing cost (creators, agencies, seeding). It was folded
+  // into "Products and delivery" here (£169,433 on Halden, 23 Oct, against £155,402 on Profit & sales).
+  // The headline holds product contribution for the same 30 days; when it agrees on sales, the cost has its own bar.
+  const H = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || null;
+  const pc = H && H.product_contribution_30d != null && Math.abs(Number(H.net_revenue_30d) - sales) < 1 ? Number(H.product_contribution_30d) : null;
+  const other = pc != null ? Math.max(0, Math.round(pc - ads - pa)) : 0;
+  const goods = Math.max(sales - ads - other - pa, 0), end = ao != null ? ao : pa;
   const lo = Math.min(0, end, pa), span = (sales - lo) || 1;
   const x = v => ((v - lo) / span) * 100;
   const rows = [
     { k: 'Sales', a: 0, b: sales, tone: 'sales', v: sales },
     { k: 'Products and delivery', a: sales - goods, b: sales, tone: 'cost', v: -goods },
-    { k: share != null ? 'Ads · ' + v3Pence(share) + ' of each £1' : 'Ads', a: pa, b: sales - goods, tone: 'ads', v: -ads },
+    { k: share != null ? 'Ads · ' + v3Pence(share) + ' of each £1' : 'Ads', a: pa + other, b: sales - goods, tone: 'ads', v: -ads },
   ];
+  if (other >= 1) rows.push({ k: 'Other marketing', a: pa, b: pa + other, tone: 'cost', v: -other });
   if (ao != null) rows.push({ k: 'Running costs', a: Math.min(ao, pa), b: Math.max(ao, pa), tone: 'cost', v: -(pa - ao) });
   rows.push({ k: end < 0 ? 'You lose' : 'You keep', a: Math.min(0, end), b: Math.max(0, end), tone: end < 0 ? 'loss' : 'keep', v: end, total: true });
   return (<figure className="v3-bridge" role="img" aria-label={rows.map(r => r.k + ' ' + fmtMoney(r.v)).join(', ')}>
@@ -24112,10 +24256,19 @@ function V3Congruency() {
   if (q.err || !q.rows || !q.rows.length) return null;
   const c = q.rows[0], n = v => (v == null ? null : Number(v));
   if (n(c.iroas_now) == null || n(c.cm_now) == null) return null;
+  // The view says 'insufficient_history' until there is a reading 10 or more days old. That was printed as
+  // "No: they moved apart … went from — to 2.73×" (Halden, 23 Oct): a verdict with nothing to compare.
+  if (c.congruency === 'insufficient_history' || n(c.iroas_prior) == null || n(c.cm_prior) == null) {
+    return (<p className="v3-note v3-measure v3-cong"><b>Do the ad figures and your profit agree?</b>{' '}
+      Not known yet. Greta compares them against a reading from at least 10 days earlier, and the first one is from {v3Day(String(c.latest_date))}.</p>);
+  }
   const ok = c.congruency === 'congruent';
+  // The change, not the two levels: the snapshot's profit is worked on its own day and basis, and printed
+  // as a level it sat beside the header's profit after ads as a second figure for the same thing.
+  const dCm = n(c.cm_now) - n(c.cm_prior);
   return (<p className="v3-note v3-measure v3-cong"><b>Do the ad figures and your profit agree?</b>{' '}
     {ok ? 'Yes: they moved the same way.' : 'No: they moved apart, so one of them is misreading.'}{' '}
-    Return on ads after the share they really cause went from <span>{fmtTimes(n(c.iroas_prior), 2)}</span> to <span>{fmtTimes(n(c.iroas_now), 2)}</span>; profit after ads went from <span>{fmtMoney(n(c.cm_prior))}</span> to <span>{fmtMoney(n(c.cm_now))}</span>{c.prior_date ? <> ({v3Day(String(c.prior_date))} to {v3Day(String(c.latest_date))})</> : null}.
+    Return on ads after the share they really cause went from <span>{fmtTimes(n(c.iroas_prior), 2)}</span> to <span>{fmtTimes(n(c.iroas_now), 2)}</span>; profit after ads {dCm >= 0 ? 'rose' : 'fell'} by <span>{fmtMoney(Math.abs(dCm))}</span> over the same days ({v3Day(String(c.prior_date))} to {v3Day(String(c.latest_date))}).
     {ok ? '' : ' Check the tracking on Settings before acting on the ad figures.'}</p>);
 }
 // A scheduled refresh that failed twice or stopped (0383, 0398): one line, in the notice's own words.
