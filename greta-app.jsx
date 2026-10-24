@@ -3917,7 +3917,9 @@ function Overview({start, period, customActive}){
     try { window.GRETA_OVERVIEW_WANT && window.GRETA_OVERVIEW_WANT(); } catch (e) {}
     return () => window.removeEventListener('frkl-overview-updated', h);
   }, []);
-  const daily = useMemo(()=>buildDaily(start),[start]);
+  // TikTok is in every ad total (1048); the bundle has no TikTok feed, so its daily spend (ttQ) is added here
+  const daily = useMemo(()=>{ const tt = {}; (ttQ.rows || []).forEach(r => { const k = String(r.date).slice(0, 10); tt[k] = (tt[k] || 0) + (Number(r.spend) || 0); });
+    return buildDaily(start).map(x => tt[x.date] ? { ...x, tiktokSpend: tt[x.date], paid: x.paid + tt[x.date] } : x); },[start, ttQ.rows]);
   const end = dataEndOf();
   const prior = priorPeriod(start, end);
   const meta = inRangeBounded(D.metaDaily,start,end), gads = inRangeBounded(D.googleAds,start,end), shop = inRangeBounded(D.shopify,start,end), ga = inRangeBounded(D.ga4,start,end), kl = inRangeBounded(D.klaviyo,start,end);
@@ -4134,8 +4136,8 @@ function Overview({start, period, customActive}){
     const cp = priorPeriod(cruxStart, end);
     const cM=inRangeBounded(D.metaDaily,cruxStart,end), cG=inRangeBounded(D.googleAds,cruxStart,end), cS=inRangeBounded(D.shopify,cruxStart,end), cA=inRangeBounded(D.ga4,cruxStart,end);
     const pM=inRangeBounded(D.metaDaily,cp.start,cp.end), pG=inRangeBounded(D.googleAds,cp.start,cp.end), pS=inRangeBounded(D.shopify,cp.start,cp.end), pA=inRangeBounded(D.ga4,cp.start,cp.end);
-    const r=sum(cS,'netSales'), o=sum(cS,'orders'), ses=sum(cA,'sessions'), pd=sum(cM,'cost')+sum(cG,'cost'), gs=sum(cS,'totalSales'), da=sum(cS,'discounts');
-    const pr=sum(pS,'netSales'), po=sum(pS,'orders'), pses=sum(pA,'sessions'), ppd=sum(pM,'cost')+sum(pG,'cost'), pgs=sum(pS,'totalSales'), pda=sum(pS,'discounts');
+    const r=sum(cS,'netSales'), o=sum(cS,'orders'), ses=sum(cA,'sessions'), pd=sum(cM,'cost')+sum(cG,'cost')+ttSum(cruxStart, end), gs=sum(cS,'totalSales'), da=sum(cS,'discounts');
+    const pr=sum(pS,'netSales'), po=sum(pS,'orders'), pses=sum(pA,'sessions'), ppd=sum(pM,'cost')+sum(pG,'cost')+ttSum(cp.start, cp.end), pgs=sum(pS,'totalSales'), pda=sum(pS,'discounts');
     // The fixed last 30 days are the registered figures' (1080); the period before is not a registered figure.
     const F = id => v3Fig(id, figQ.rows).value;
     const _aov=F('aov_30d');
@@ -21258,8 +21260,12 @@ function V3Review() {
     const list = Object.values(by).filter(w => w.days === 7).sort((a, b) => (a.start < b.start ? -1 : 1));
     // not a registered figure: past weeks, valued at today's margin (the last full week is replaced below)
     list.forEach(w => { w.kept = w.sales * cmr - w.spend; w.end = v3IsoAdd(w.start, 6); });
+    // the server's weeks (state.rhythm.weeks, Monday weeks at each week's own costs) replace that, so a week reads
+    // the same here as in Today's sales rhythm; only weeks older than the state's 26 keep today's margin
+    const RW = {}; ((((stq.rows || [])[0] || {}).rhythm || {}).weeks || []).forEach(x => { if (x && x.wk != null && x.after_ads != null) RW[String(x.wk).slice(0, 10)] = Number(x.after_ads); });
+    list.forEach(w => { if (RW[w.start] != null) { w.kept = RW[w.start]; w.keptFrom = 'state'; } });
     return list;
-  }, [lad.rows, cmr, today]);
+  }, [lad.rows, cmr, today, stq.rows]);
   const shop = (window.FRKL_DATA && window.FRKL_DATA.shopify) || [];
   if (lad.err) return <V3LoadFailed what="your weeks" onRetry={lad.retry}/>;
   if (!wk) return <V3SkeletonRows n={4}/>;
@@ -21283,7 +21289,9 @@ function V3Review() {
   const prev8 = (clean.length >= 6 ? clean : prev16).slice(-8);
   const leftOut = clean.length >= 6 ? prev16.filter(w => w.start >= prev8[0].start && !clean.includes(w)).length : 0;
   // not a registered figure: a typical week (median of past weeks), valued at today's margin
-  const T = { sales: v3Med(prev8.map(w => w.sales)), spend: v3Med(prev8.map(w => w.spend)) }; T.kept = T.sales * cmr - T.spend;
+  const T = { sales: v3Med(prev8.map(w => w.sales)), spend: v3Med(prev8.map(w => w.spend)) };
+  // the typical week keeps what its weeks kept (the server's), when every one of them has the server's figure
+  T.kept = prev8.length && prev8.every(w => w.keptFrom === 'state') ? v3Med(prev8.map(w => w.kept)) : T.sales * cmr - T.spend;
   const sum = (from, to, f) => shop.filter(r => r && r.date >= from && r.date <= to).reduce((a, r) => a + (Number(r[f]) || 0), 0);
   T.orders = v3Med(prev8.map(w => sum(w.start, w.end, 'orders')).filter(n => n > 0));
   const orders = sum(W.start, W.end, 'orders'), aov = orders > 0 ? sD(W) / orders : null;
@@ -22505,6 +22513,9 @@ function V3CashToPeak() {
     ['Kept after product, order and ad costs', n(C.profit_after_ads_expected)],
     ['Your overheads', n(C.overheads) ? -n(C.overheads) : null],
     ['Trading result', n(C.after_overheads)],
+    // 1092: the plan's profit has had the product cost of its sales taken off; stock is paid for when it is ordered,
+    // so that cost is added back once. Without this row the table did not add up (frkl: 3,713 - 6,721 shown as 10,302).
+    ['Product cost of those sales, paid when the stock is ordered', n(C.stock_to_order) > 0 && n(C.product_cost_added_back) > 0 ? n(C.product_cost_added_back) : null],
     ['Stock to order now, paid before it sells', n(C.stock_to_order) > 0 ? -n(C.stock_to_order) : null],
     ['After overheads and the stock orders', n(C.stock_to_order) > 0 ? n(C.after_overheads_and_stock) : null],
     ['Most cash the plan needs at once', (() => { const v = v3Fig('peak_cash_need', figQ.rows).value; const x = v != null ? v : n(C.peak_cash_need); return x > 0 ? x : null; })()],
