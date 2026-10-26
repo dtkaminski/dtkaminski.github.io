@@ -1409,6 +1409,23 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-mv-due.late, .v3-mv-late { color: var(--color-danger); }
 .v3-mv-late { margin: 0; font-size: var(--text-sm); }
 .v3-mv-decide .v3-mv-said { margin-left: 0; }   /* the decide block is already indented */
+/* 1113: Results, one ruled row per move, the label as the goal strip's chip */
+.v3-res-fig { font-family: var(--font-mono); font-weight: var(--weight-semi); }
+.v3-res-counts { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-5); margin: var(--space-2) 0 var(--space-3);
+                 font-size: var(--text-sm); color: var(--color-secondary); }
+.v3-res-list { list-style: none; margin: var(--space-4) 0 0; padding: 0; }
+.v3-res-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2) var(--space-5); align-items: start;
+              padding: var(--space-4) 0; border-top: 1px solid var(--color-line); }
+.v3-res-main { display: grid; gap: var(--space-1); min-width: 0; }
+.v3-res-t { margin: 0; font-size: var(--text-base); font-weight: var(--weight-semi); line-height: var(--leading-snug); color: var(--color-ink); }
+.v3-res-sub { margin: 0; font-size: var(--text-xs); color: var(--color-muted); }
+.v3-res-line { margin: 0; font-size: var(--text-sm); line-height: var(--leading-body); color: var(--color-secondary); }
+.v3-res-k { margin-right: var(--space-2); font-size: var(--text-xs); color: var(--color-muted); }
+.v3-res-chip { white-space: nowrap; }
+@media (max-width: 760px) {
+  .v3-res-row { grid-template-columns: minmax(0, 1fr); }
+  .v3-res-chip { justify-self: start; white-space: normal; }
+}
 .v3-rank-row.v3-rank-card { display: block; padding: 0; border-top: 0; }
 @media (max-width: 760px) {
   .v3-goal-figs dd { font-size: var(--text-lg); }

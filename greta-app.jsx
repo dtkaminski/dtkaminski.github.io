@@ -16520,7 +16520,8 @@ const V3_NAV = [
   { group: 'Home',     id: 'today',       label: 'Today',              icon: 'home',      q: 'Am I on track, and what do I do now?' },
   { group: 'Home',     id: 'review',      label: 'Review',             icon: 'report',    q: 'What changed, and why?' },
   { group: 'Act',      id: 'actions',     label: 'Actions',            icon: 'clipboard', q: 'What should I do first?' },
-  { group: 'Act',      id: 'calendar',    label: 'Calendar',           icon: 'calendar',  q: 'What is planned, and what did past events do?' },
+  { group: 'Act',      id: 'results',     label: 'Results',            icon: 'check',     q: 'Did the moves I made work?' },
+  { group: 'Act',      id: 'calendar',    label: 'Calendar',          icon: 'calendar',  q: 'What is planned, and what did past events do?' },
   { group: 'Act',      id: 'ask',         label: 'Ask Greta',          icon: 'spark',     q: 'Ask anything about your business, in plain English.' },
   { group: 'Plan',     id: 'goal',        label: 'Goal & costs',       icon: 'sliders',   q: 'What am I aiming for, and what do things cost me?' },
   { group: 'Plan',     id: 'growth',      label: 'Growth plan',        icon: 'trendUp',   q: 'How much more should I spend, and what would change that?' },
@@ -16557,7 +16558,7 @@ const V3_ROUTE = {
   'market/competitors': ['competitors'],
   'commerce/products': ['products'], 'commerce/promos': ['products', 'promos'],
   'planning/plan': ['stock'], 'planning/suppliers': ['stock', 'suppliers'],
-  'operate/calendar': ['calendar'], 'operate/command': ['actions'], 'operate/decisions': ['actions', 'decisions'],
+  'operate/calendar': ['calendar'], 'operate/command': ['actions'], 'operate/decisions': ['results', 'decisions'],
   'settings/connections': ['settings'], 'settings/economics': ['goal'], 'settings/team': ['team'],
   // V3 has no Settings group with subtabs, so an unmapped key silently falls through to the first
   // 'settings/*' match — which is why the cost chip's fix button landed on Connections & data.
@@ -21451,7 +21452,13 @@ const V3_METRIC_WORDS = { net_revenue: 'sales', orders: 'orders', site_cvr: 'the
   contribution: 'profit after product and order costs', product_revenue: 'product sales', sku_cm_pct: 'the product’s margin',
   returning_customer_share: 'sales from returning customers', aov: 'the average order', return_rate: 'refunds',
   google_spend_growth: 'Google ad spend', seasonal_creative_spend: 'spend on seasonal ads', ireland_creative_max_freq: 'how often one person in Ireland sees the same ad',
-  uk_creative_max_freq: 'how often one person in the UK sees the same ad', ncac: 'what a new customer costs' };
+  uk_creative_max_freq: 'how often one person in the UK sees the same ad', ncac: 'what a new customer costs',
+  // 1113: the numbers the newer predictions (edge_prediction) are checked on
+  cm2: 'profit before ads', cm3: 'profit after ads', net_sales: 'sales', flow_revenue: 'sales from email flows',
+  refund_value: 'money refunded', gsc_clicks: 'clicks from Google search', blended_mer: 'sales for each £1 of ads',
+  paid_spend: 'ad spend', sku_revenue: 'the product’s sales', sku_units: 'units sold', units_per_order: 'items per order',
+  returning_orders: 'repeat orders', replacement_orders: 'replacement orders', campaign_rpr: 'sales for each email sent',
+  site_cvr: 'the share of visitors who buy', contribution_after_ads: 'profit after ads' };
 const v3MetricWords = id => { const k = String(id || '').replace(/_30d$/, ''); return V3_METRIC_WORDS[k] || k.replace(/_/g, ' '); };
 function V3TrackRecord() {
   const q = useV3Rows('act-track', (sb, b) => sb.from('actions')
@@ -21520,6 +21527,79 @@ function V3TrackRecord() {
       {showSkipped && <ul className="v3-rank-steps">{skipped.map(row)}</ul>}
     </>)}
     {autoList}
+  </section>);
+}
+// ── Results (UX brief Phase 4, 1113) ─────────────────────────────────────────────────────────────────────────
+// Every move the owner marked done, through the one scorer (vw_action_outcome) via fn_brand_results: what Greta
+// expected when it was taken, what happened, and a label. The labels and every £ are the server's; the page only
+// words them. Measured £ exists only where the check reads profit in pounds.
+const V3_RESULTS_Q = (sb, b) => sb.rpc('fn_brand_results', { p_brand: b })
+  .then(r => ({ data: r && r.data ? [r.data] : [], error: r ? r.error : null }));
+const V3_RESULT = {
+  worked: { label: 'Worked', cls: 'good' }, pointing: { label: 'Pointing the right way', cls: 'good' },
+  did_not_work: { label: 'Didn’t work', cls: 'bad' }, too_early: { label: 'Too early to tell', cls: '' },
+  checking: { label: 'Being checked', cls: '' }, cant_tell: { label: 'Can’t tell', cls: '' },
+};
+// a change in the checked number, in its own unit
+function v3ResultAmt(v, unit) {
+  const n = Math.abs(Number(v));
+  if (!isFinite(n)) return '';
+  if (unit === 'gbp' || unit === 'gbp_profit') return v3Gbp(n);
+  if (unit === 'share') return (n * 100).toFixed(n * 100 < 1 ? 2 : 1).replace(/\.0+$/, '') + ' points';
+  if (unit === 'ratio') return n.toFixed(2);
+  return fmtCount(Math.round(n));
+}
+function V3ResultRow({ r }) {
+  const L = V3_RESULT[r.label] || V3_RESULT.cant_tell;
+  const what = v3MetricWords(r.metric);
+  const way = r.direction === 'down' ? 'down' : 'up';
+  const hasExp = r.expect_p50 != null && Number(r.expect_p50) !== 0;
+  const range = r.expect_p10 != null && r.expect_p90 != null && Number(r.expect_p10) !== Number(r.expect_p90);
+  const seen = r.seen != null ? Number(r.seen) : null;
+  const a = r.assignee;
+  return (<li className="v3-res-row">
+    <div className="v3-res-main">
+      <p className="v3-res-t">{v3PlainAction({ external_id: r.external_id, description: r.description }).title}</p>
+      <p className="v3-res-sub">Done {v3Day(r.done_on, true)}{a && a.kind === 'agency' && a.name ? ' by ' + a.name : ''}</p>
+      <p className="v3-res-line">
+        <span className="v3-res-k">Greta expected</span>
+        {Number(r.gbp) > 0
+          ? <>about <b className="v3-res-fig">{v3Gbp(r.gbp)}</b> {r.per === 'once' ? 'once' : 'a month'}{r.low_gbp != null && r.high_gbp != null && Number(r.high_gbp) > Number(r.low_gbp) ? <> (between {v3Gbp(r.low_gbp)} and {v3Gbp(r.high_gbp)})</> : null}{r.metric ? ', checked on ' : ''}</>
+          : null}
+        {r.metric ? <>{what} {Number(r.gbp) > 0 ? 'going' : 'to go'} {way}{hasExp ? <> by about <b className="v3-res-fig">{v3ResultAmt(r.expect_p50, r.unit)}</b>{range ? <> ({v3ResultAmt(r.expect_p10, r.unit)} to {v3ResultAmt(r.expect_p90, r.unit)})</> : null}</> : null}</> : (Number(r.gbp) > 0 ? null : 'no figure it could be checked on')}.
+      </p>
+      <p className="v3-res-line">
+        <span className="v3-res-k">What happened</span>
+        {seen != null
+          ? <>{what} went {seen < 0 ? 'down' : 'up'} by <b className="v3-res-fig">{v3ResultAmt(seen, r.unit)}</b> against what would have happened anyway{r.measured_gbp != null ? <>: <b className="v3-res-fig">{v3Gbp(r.measured_gbp)}</b> measured</> : null}.</>
+          : <>{r.reason ? v3Tidy(r.reason) : 'Not checked yet'}.</>}
+      </p>
+    </div>
+    <span className={'v3-goal-chip v3-res-chip ' + L.cls}>{L.label}{r.label === 'too_early' && r.days_left != null ? ': about ' + r.days_left + (r.days_left === 1 ? ' more day' : ' more days') : ''}</span>
+  </li>);
+}
+function V3Results() {
+  const q = useV3Rows('brand-results', V3_RESULTS_Q);
+  if (q.err) return <V3LoadFailed what="your results" onRetry={q.retry}/>;
+  if (!q.rows) return <V3SkeletonRows n={3}/>;
+  const R = q.rows[0] || { rows: [], totals: {} };
+  const T = R.totals || {};
+  const rows = Array.isArray(R.rows) ? R.rows : [];
+  if (!rows.length) return (<section className="v3-sec v3-res">
+    <p className="v3-verdict">No results yet</p>
+    <p className="v3-note v3-measure">Take a move on Today and mark it done once it is. Greta checks each one when its window has passed, against what would have happened anyway, and shows here whether it worked.</p>
+    <button type="button" className="v3-btn v3-btn-sm v3-btn-p" onClick={() => window.__oiGo && window.__oiGo('today')}>Go to Today’s moves</button>
+  </section>);
+  const counts = ['worked', 'pointing', 'did_not_work', 'checking', 'too_early', 'cant_tell'].filter(k => Number(T[k]) > 0);
+  return (<section className="v3-sec v3-res">
+    <p className="v3-verdict">Moves you took: <span className="v3-res-fig">{v3Gbp(T.predicted_month)}</span> a month predicted{Number(T.predicted_once) > 0 ? <>, and <span className="v3-res-fig">{v3Gbp(T.predicted_once)}</span> once</> : null}, <span className="v3-res-fig">{v3Gbp(T.measured_gbp)}</span> measured so far.</p>
+    <p className="v3-res-counts">{counts.map(k => <span key={k}><b className="v3-res-fig">{fmtCount(T[k])}</b> {V3_RESULT[k].label.toLowerCase()}</span>)}</p>
+    <p className="v3-note v3-measure">
+      {Number(T.measured_moves) > 0 ? 'Measured counts the ' + fmtCount(T.measured_moves) + (Number(T.measured_moves) === 1 ? ' move' : ' moves') + ' whose check reads profit in pounds. ' : 'Nothing is measured in pounds yet: a £ figure counts only once a check reads profit itself. '}
+      {T.next_check ? 'The next check is due ' + v3Day(T.next_check, true) + '. ' : ''}
+      Each check compares what happened with what would have happened anyway. It shows the promise held, not that the move alone caused it.
+    </p>
+    <ul className="v3-res-list">{rows.map(r => <V3ResultRow key={r.external_id} r={r}/>)}</ul>
   </section>);
 }
 // A finding's title is its own first line, not "Why X changed": the finding is in the text.
@@ -24774,7 +24854,7 @@ const V3_PAGES = {
     <V3Congruency/>
     <V3More id="rev-quarter" label="This quarter — a summary to share with your board or investors"><V3Anchor id="quarter"/><BusinessReview/></V3More>
     <V3More id="rev-alerts" label="What Greta found — what changed, and why"><V3Anchor id="alerts"/><V3Findings/>
-      <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>What was done, and whether it worked <span className="v3-xref-go">on Actions →</span></button>
+      <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('results')}>What was done, and whether it worked <span className="v3-xref-go">on Results →</span></button>
     </V3More>
   </>),
   actions: (p) => (<>
@@ -24782,8 +24862,14 @@ const V3_PAGES = {
     <ActionsView/>
     <V3BoardDrivers/>
     <V3Incremental/>
-    <V3More id="act-decisions" label="What you did, and whether it worked"><V3Anchor id="decisions"/><V3TrackRecord/></V3More>
+    {/* 1113: what you did and whether it worked has its own page, Results */}
+    <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('results')}>What you did, and whether it worked <span className="v3-xref-go">on Results →</span></button>
     <V3StaleSuggestions/>
+  </>),
+  // 1113: the moves you took, what Greta expected and what happened; the older list folds underneath
+  results: (p) => (<>
+    <V3Results/>
+    <V3More id="res-all" label="Everything closed, with Greta’s older checks"><V3Anchor id="decisions"/><V3TrackRecord/></V3More>
   </>),
   calendar: (p) => (<><V3CalendarDrivers/>{mosView('Calendar')}</>),
   ask: (p) => <AskPanel/>,
