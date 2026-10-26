@@ -3747,14 +3747,15 @@ function V3ProfitLead() {
   const needSales = oh30 != null ? (oh30 + spend + other) / cmr : null;
   const extra = T ? spend - T.spend : 0;
 
+  // 1111: each line carries the registered figure it shows, so it can say where it comes from (V3SourceTag)
   const chain = [
-    { k: 'Sales', v: sales, kind: 'in' },
-    ...(costsF != null ? [{ k: 'Products, delivery and payment fees', v: -costsF, kind: 'out' }] : []),
-    { k: 'Ad spend', v: -spend, kind: 'out' },
+    { k: 'Sales', v: sales, kind: 'in', fig: 'sales_30d' },
+    ...(costsF != null ? [{ k: 'Products, delivery and payment fees', v: -costsF, kind: 'out', fig: 'costs_before_ads_30d' }] : []),
+    { k: 'Ad spend', v: -spend, kind: 'out', fig: 'ads_30d' },
   ];
-  if (other >= 1) chain.push({ k: 'Other marketing: creators, agencies, seeding', v: -other, kind: 'out' });
-  chain.push({ k: 'Kept after ads', v: kept, kind: 'sub' });
-  if (oh30 != null) { chain.push({ k: 'Overheads: rent, wages, software, for 30 days', v: -oh30, kind: 'out' }); if (op != null) chain.push({ k: 'Profit after running costs', v: op, kind: 'total' }); }
+  if (other >= 1) chain.push({ k: 'Other marketing: creators, agencies, seeding', v: -other, kind: 'out', fig: 'other_marketing_30d' });
+  chain.push({ k: 'Kept after ads', v: kept, kind: 'sub', fig: 'profit_after_ads_30d' });
+  if (oh30 != null) { chain.push({ k: 'Overheads: rent, wages, software, for 30 days', v: -oh30, kind: 'out', fig: 'overheads_30d' }); if (op != null) chain.push({ k: 'Profit after running costs', v: op, kind: 'total', fig: 'after_overheads_30d' }); }
   const per = v => sales > 0 ? Math.round(Math.abs(v) / sales * 100) + 'p in every £1' : '';
 
   // Move this month's budget into the peak: the plan spreads the quarter's ad budget by season (it
@@ -3810,14 +3811,15 @@ function V3ProfitLead() {
       </p>}
       <ul className="v3-chain" aria-label="Where each pound of sales went">
         {chain.map(r => (<li key={r.k} className={'v3-chain-' + r.kind + (r.v < 0 && r.kind !== 'out' ? ' neg' : '')}>
-          <span className="v3-chain-k">{r.kind === 'out' ? '− ' : r.kind === 'sub' || r.kind === 'total' ? '= ' : ''}{r.k}</span>
+          <span className="v3-chain-k">{r.kind === 'out' ? '− ' : r.kind === 'sub' || r.kind === 'total' ? '= ' : ''}{r.k} <V3SourceTag id={r.fig}/></span>
           <span className="v3-chain-track"><i style={{ width: Math.min(100, sales > 0 ? Math.abs(r.v) / sales * 100 : 0) + '%' }}/></span>
-          <span className="v3-chain-v">{fmtMoney(r.v)}</span>
+          <span className="v3-chain-v">{v3Waiting(r.fig) ? <span className="v3-src-wait">Waiting for data</span> : fmtMoney(r.v)}</span>
           <span className="v3-chain-p">{r.kind === 'in' ? '' : (r.v < 0 && r.kind !== 'out' ? '−' : '') + per(r.v)}</span>
         </li>))}
       </ul>
       {/* An owner who opens Shopify sees a bigger number for the same days (frkl, 8 Sep to 7 Oct: £26,761
           against £18,989) and nothing said why (review, 8 Oct). */}
+      <V3CostGapLine/>
       <p className="micro muted v3-measure">Shopify’s home screen shows a bigger sales figure for the same days. It adds VAT, the delivery you charge, orders later refunded, and other places you sell such as stockists. Sales here are your own shop’s sales after refunds and before VAT: the money the business has to work with.</p>
       {((rfGap != null && rfGap > 0) || noFreight) && <p className="micro muted v3-measure">Your profit here reads {rfGap > 0 ? 'about ' + fmtMoney(rfGap) + ' too high' : 'too high'}:
         {' '}{rfGap > 0 ? 'refunds are ' + fmtPctN(Number(rfRow.realised_value) / 100) + ' of sales, not the ' + fmtPctN(Number(rfRow.config_value) / 100) + ' you entered' : ''}{rfGap > 0 && noFreight ? ', and ' : ''}{noFreight ? 'your product costs leave out shipping them to you and import duty' : ''}.
@@ -3866,7 +3868,7 @@ function V3ProfitLead() {
         </li>)}
         {op != null && op < 0 && (<li>
           <b>Cover your overheads.</b>
-          {' '}After {fmtMoney(ohMonth)} a month of overheads, the last 30 days made a loss of {fmtMoney(Math.abs(op))}.
+          {' '}After {fmtMoney(v3Fig('overheads_month', figQ.rows).value)} a month of overheads, the last 30 days made a loss of {fmtMoney(Math.abs(op))}.
           {maxSpend > 0
             ? <> To break even at today’s sales, ads can cost at most {fmtMoney(maxSpend)} a month. Or, at today’s ad spend, you need {fmtMoney(needSales)} of sales a month.</>
             : <> Even with no ads, today’s sales leave {fmtMoney(Math.abs(maxSpend))} of overheads unpaid. At today’s ad spend, you need {fmtMoney(needSales)} of sales a month to break even.</>}
@@ -18564,8 +18566,74 @@ function V3TodayLead() {
   const d = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || {};
   return (<div className="v3-today-lead">
     <V3GoalStrip q={q} gc={gc} unreliable={d.pace_is_reliable === false}/>
+    <V3SetupChecklist/>
     <V3TodayMoves q={q} board={board}/>
   </div>);
+}
+// ── Where every number comes from (UX brief Phase 2, 1111) ──────────────────────────────────────────────────
+// fn_brand_setup: each money figure's source from the anatomy's own state (Shopify, Ad accounts, You entered,
+// Estimated, Waiting for data), the order lines sold with no product cost, and the five setup steps. One read a
+// page load, shared by every tag.
+const V3_SETUP_Q = (sb, b) => sb.rpc('fn_brand_setup', { p_brand: b })
+  .then(r => ({ data: r && r.data ? [r.data] : [], error: r ? r.error : null }));
+function useV3Setup() { const q = useV3Rows('brand-setup', V3_SETUP_Q); return (q.rows && q.rows[0]) || null; }
+function v3Source(id) {
+  const q = V3_Q['brand-setup'], s = q && q.rows && q.rows[0];
+  return (s && s.sources && s.sources[id]) || null;
+}
+// A figure whose source has not sent anything yet shows these words instead of a number.
+const v3Waiting = id => { const s = v3Source(id); return !!(s && s.state === 'pending_sync'); };
+// The small tag beside a figure. Estimated and not-entered ones say, on hover or tap, what would make them measured.
+function V3SourceTag({ id }) {
+  useV3Setup();
+  const s = v3Source(id);
+  if (!s || !s.tag || s.state === 'pending_sync') return null;
+  const tone = s.state === 'estimated' ? 'est' : s.state === 'needs_input' ? 'missing' : s.state === 'entered' ? 'entered' : 'measured';
+  return <span className={'v3-src v3-src-' + tone} title={s.needs || undefined}>{s.tag}</span>;
+}
+// "Cost missing on 6% of what you sold", with the way to fix it. Counted on order lines, the costing the profit
+// figures use (v_tenant_realized_cogs_daily), over the last 90 days.
+function V3CostGapLine({ compact }) {
+  const S = useV3Setup();
+  const g = S && S.cost_gap;
+  if (!g || !(Number(g.uncosted_share) > 0)) return null;
+  const pct = Number(g.uncosted_share);
+  return (<p className={(compact ? 'v3-src-gap' : 'micro muted v3-measure') + ''}>
+    Cost missing on <b>{fmtPctN(pct)}</b> of what you sold in the last 90 days ({fmtCount(g.uncosted_lines_90d)} of {fmtCount(g.lines_90d)} order lines).
+    {' '}Those take your average margin, so profit is an estimate there.
+    {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs')}>Add the missing costs <span className="v3-xref-go">on Goal &amp; costs →</span></button>
+  </p>);
+}
+// The five setup steps on Today until they are all done; "3 of 5 done", each with the place to do it. Dismissed,
+// it stays hidden in this browser until another step is done.
+const V3_SETUP_GO = { shop: ['settings', 'connections', 'Connect'], ads: ['settings', 'connections', 'Connect'],
+  costs: ['goal', 'costs', 'Add costs'], overheads: ['goal', 'costs', 'Enter them'], goal: ['home', 'plansetup', 'Confirm goal'] };
+function V3SetupChecklist() {
+  const S = useV3Setup();
+  const b = (typeof window !== 'undefined' && window.FRKL_LIVE && window.FRKL_LIVE.brandId) || '';
+  const key = 'greta-setup-dismissed:' + b;
+  const [hid, setHid] = React.useState(() => { try { return localStorage.getItem(key); } catch (e) { return null; } });
+  const C = S && S.checklist;
+  if (!C || !Array.isArray(C.steps) || Number(C.done) >= Number(C.total)) return null;
+  if (hid != null && String(hid) === String(C.done)) return null;
+  const next = C.steps.findIndex(x => !x.done);
+  const go = st => { const g = V3_SETUP_GO[st.key] || ['settings']; if (g[0] === 'home') { window.__oiNav && window.__oiNav(g[0], g[1]); } else { window.__oiGo && window.__oiGo(g[0], g[1]); } };
+  const dismiss = () => { try { localStorage.setItem(key, String(C.done)); } catch (e) {} setHid(String(C.done)); };
+  return (<section className="v3-setup v3-setup-list">
+    <div className="v3-setup-top">
+      <p className="v3-goal-lab">Getting set up · {C.done} of {C.total} done</p>
+      <button type="button" className="v3-mv-toggle" onClick={dismiss}>Hide for now</button>
+    </div>
+    <ol className="v3-steps">
+      {C.steps.map((x, i) => (
+        <li key={x.key} className={'v3-step' + (x.done ? ' done' : '') + (i === next ? ' next' : '')}>
+          <span className="v3-step-mark" aria-hidden="true">{x.done ? <Icon name="check" size={13} stroke={2.4}/> : i + 1}</span>
+          <span className="v3-step-body"><b>{x.done ? x.done_label : x.label}</b>
+            {x.key === 'costs' && <V3CostGapLine compact/>}</span>
+          {!x.done && <button type="button" className={'v3-btn v3-btn-sm' + (i === next ? ' v3-btn-p' : '')} onClick={() => go(x)}>{(V3_SETUP_GO[x.key] || [])[2] || 'Open'}</button>}
+        </li>))}
+    </ol>
+  </section>);
 }
 function V3Today(p) {
   const h = useV3Headline();
@@ -18694,7 +18762,7 @@ function V3Today(p) {
 
   return (<div className="v3-today">
     <V3Reconnected/>
-    <V3Setup s={d.setup}/>
+    {/* 1111: the setup steps are V3SetupChecklist, under the goal strip */}
     {gate && (() => {
       // The gate has TWO reasons and used to give one answer. 0202 made can_show_cm
       // require revenue as well as a margin source, which is right -- but this branch
@@ -24225,30 +24293,33 @@ function V3DriverPanel({ which, points, ctx, line, fixed }) {
 // Where the month's sales went, as a waterfall: sales, less products and delivery, less ads, less
 // running costs, and what is left. The verdict's figure is the last bar, so the two cannot disagree.
 function V3MoneyBridge({ L, share }) {
+  const figQ = useV3Figures();   // 1109: products and order costs, other marketing and running costs are registered
+  useV3Setup();                  // 1111: where each line comes from
   const num = v => (v == null ? null : Number(v));
+  const F = id => v3Fig(id, figQ.rows).value;
   const sales = num(L.sales), ads = num(L.ads), pa = num(L.profit_after_ads), ao = num(L.after_overheads);
   if (!(sales > 0) || pa == null || ads == null) return null;
-  // Profit after ads also takes off the other marketing cost (creators, agencies, seeding). It was folded
-  // into "Products and delivery" here (£169,433 on Halden, 23 Oct, against £155,402 on Profit & sales).
-  // The headline holds product contribution for the same 30 days; when it agrees on sales, the cost has its own bar.
-  const H = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || null;
-  const pc = H && H.product_contribution_30d != null && Math.abs(Number(H.net_revenue_30d) - sales) < 1 ? Number(H.product_contribution_30d) : null;
-  const other = pc != null ? Math.max(0, Math.round(pc - ads - pa)) : 0;
-  const goods = Math.max(sales - ads - other - pa, 0), end = ao != null ? ao : pa;
+  // Profit after ads also takes off the other marketing cost (creators, agencies, seeding), with its own bar. The
+  // lines are the registry's (1109), not what this panel worked out from the headline's product contribution.
+  const goodsF = F('costs_before_ads_30d'), otherF = F('other_marketing_30d'), ohF = F('overheads_30d');
+  if (goodsF == null) return null;   // the registry has not landed: no bridge rather than a sum worked here
+  const other = otherF != null && otherF >= 1 ? Math.round(otherF) : 0;
+  const goods = Math.max(goodsF, 0), end = ao != null ? ao : pa;
   const lo = Math.min(0, end, pa), span = (sales - lo) || 1;
   const x = v => ((v - lo) / span) * 100;
   const rows = [
-    { k: 'Sales', a: 0, b: sales, tone: 'sales', v: sales },
-    { k: 'Products and delivery', a: sales - goods, b: sales, tone: 'cost', v: -goods },
-    { k: share != null ? 'Ads · ' + v3Pence(share) + ' of each £1' : 'Ads', a: pa + other, b: sales - goods, tone: 'ads', v: -ads },
+    { k: 'Sales', a: 0, b: sales, tone: 'sales', v: sales, fig: 'sales_30d' },
+    { k: 'Products and delivery', a: sales - goods, b: sales, tone: 'cost', v: -goods, fig: 'costs_before_ads_30d' },
+    { k: share != null ? 'Ads · ' + v3Pence(share) + ' of each £1' : 'Ads', a: pa + other, b: sales - goods, tone: 'ads', v: -ads, fig: 'ads_30d' },
   ];
-  if (other >= 1) rows.push({ k: 'Other marketing', a: pa, b: pa + other, tone: 'cost', v: -other });
-  if (ao != null) rows.push({ k: 'Running costs', a: Math.min(ao, pa), b: Math.max(ao, pa), tone: 'cost', v: -(pa - ao) });
-  rows.push({ k: end < 0 ? 'You lose' : 'You keep', a: Math.min(0, end), b: Math.max(0, end), tone: end < 0 ? 'loss' : 'keep', v: end, total: true });
+  if (other >= 1) rows.push({ k: 'Other marketing', a: pa, b: pa + other, tone: 'cost', v: -other, fig: 'other_marketing_30d' });
+  if (ao != null && ohF != null) rows.push({ k: 'Running costs', a: Math.min(ao, pa), b: Math.max(ao, pa), tone: 'cost', v: -ohF, fig: 'overheads_30d' });
+  rows.push({ k: end < 0 ? 'You lose' : 'You keep', a: Math.min(0, end), b: Math.max(0, end), tone: end < 0 ? 'loss' : 'keep', v: end, total: true,
+              fig: ao != null ? 'after_overheads_30d' : 'profit_after_ads_30d' });
   return (<figure className="v3-bridge" role="img" aria-label={rows.map(r => r.k + ' ' + fmtMoney(r.v)).join(', ')}>
     <figcaption className="v3-bridge-cap">Where the last 30 days’ sales went</figcaption>
     {rows.map(r => (<div key={r.k} className={'v3-bridge-row' + (r.total ? ' v3-bridge-total' : '')}>
-      <span className="v3-bridge-k">{r.k}</span>
+      <span className="v3-bridge-k">{r.k} <V3SourceTag id={r.fig}/></span>
       <span className="v3-bridge-track">{lo < 0 && <b style={{ left: x(0) + '%' }}/>}
         <i className={'v3-bridge-' + r.tone} style={{ left: x(r.a) + '%', width: Math.max(0.6, x(r.b) - x(r.a)) + '%' }}/></span>
       <span className={'v3-bridge-v' + (r.total ? (r.v < 0 ? ' v3-down' : ' v3-up') : '')}>{r.v < 0 ? '−' : ''}{fmtMoney(Math.abs(r.v))}</span>

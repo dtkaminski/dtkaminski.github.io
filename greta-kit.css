@@ -1407,3 +1407,16 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
   .v3-mv-range, .v3-mv-closes, .v3-mv-said, .v3-mv-more, .v3-mv-open, .v3-mv-decide { margin-left: 0; }
   .v3-mv-form { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ── Where every number comes from (UX brief Phase 2, 1111) ───────────────────────────────────────────── */
+.v3-src { display: inline-block; margin-left: var(--space-1); padding: 0 var(--space-2); border-radius: var(--radius-full);
+          font-family: var(--font-sans); font-size: var(--text-xs); font-weight: var(--weight-medium); line-height: var(--leading-snug);
+          letter-spacing: 0; text-transform: none; vertical-align: middle; background: var(--color-sunken); color: var(--color-muted); }
+.v3-src-est { background: var(--color-warning-wash); color: var(--color-warning); cursor: help; }
+.v3-src-missing { background: var(--color-danger-wash); color: var(--color-danger); cursor: help; }
+.v3-src-wait { font-family: var(--font-sans); font-size: var(--text-sm); font-weight: var(--weight-normal); color: var(--color-muted); }
+.v3-src-gap { margin: var(--space-1) 0 0; font-size: var(--text-sm); font-weight: var(--weight-normal); color: var(--color-secondary); }
+.v3-src-gap b { font-family: var(--font-mono); font-weight: var(--weight-semi); color: var(--color-ink); }
+.v3-setup.v3-setup-list { display: grid; gap: var(--space-3); margin: 0; padding: 0 0 var(--space-6); background: none; box-shadow: none;
+                          border: 0; border-bottom: 1px solid var(--color-line); border-radius: var(--radius-none); }
+.v3-setup-top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
