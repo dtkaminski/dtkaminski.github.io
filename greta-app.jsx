@@ -3669,7 +3669,6 @@ function V3VisitsKPI({ fallback }) {
 function V3ProfitLead() {
   const H = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || null;
   const lad = useV3Rows('profit-ladder', V3_LADDER_Q);
-  const cfg = useV3Rows('profit-overheads', (sb, b) => sb.from('brand_config').select('fixed_costs_monthly').eq('brand_id', b).limit(1));
   // The quarter plan at today's ad budget (shared with Goal & costs and Growth plan), last year's
   // months and the cost checks: the lead's first move and the caveat under the figure.
   const { pace } = useV3Goal({ goalPlan: false });
@@ -3680,7 +3679,9 @@ function V3ProfitLead() {
   const figQ = useV3Figures();
   const sales = H && H.net_revenue_30d != null ? Number(H.net_revenue_30d) : null;
   const spend = H && H.paid_spend_30d != null ? Number(H.paid_spend_30d) : null;
-  const before = H && H.product_contribution_30d != null ? Number(H.product_contribution_30d) : null;
+  // 1109: profit before ads is registered (anatomy cm2); the headline holds a copy of it until the registry loads
+  const beforeF = v3Fig('profit_before_ads_30d', figQ.rows).value;
+  const before = beforeF != null ? beforeF : H && H.product_contribution_30d != null ? Number(H.product_contribution_30d) : null;
   const cmr = sales > 0 && before != null ? before / sales : null;
   // Profit after ads is the header's figure (anatomy CM3): it also takes off the other marketing cost
   // (creator commission, creator and agency fees, seeding, a media agency fee). This page worked out
@@ -3689,18 +3690,16 @@ function V3ProfitLead() {
   // 1080: the registered figure (profit_after_ads_30d); the headline's copy of the same anatomy cm3 until it loads.
   const camF = v3Fig('profit_after_ads_30d', figQ.rows);
   const cam = camF.value != null ? camF.value : H && H.cm_after_marketing_30d != null ? Number(H.cm_after_marketing_30d) : null;
-  // not a registered figure: the other marketing cost has no registry line, so it is what profit before ads,
-  // less ads, leaves above the registered profit after ads
-  const other = cam != null && before != null && spend != null ? Math.max(0, Math.round(before - spend - cam)) : 0;
-  const ohRow = (cfg.rows || [])[0] || null;
-  const ohMonth = ohRow && ohRow.fixed_costs_monthly != null && Number(ohRow.fixed_costs_monthly) > 0 ? Number(ohRow.fixed_costs_monthly) : null;
-  // The overheads as entered, over the last 30 days, the way the brand state takes them
-  // (fn_brand_state last_30.after_overheads: a month is 365/12 days). Today's "Where the last 30 days'
-  // sales went" and Review read that figure; this page took the whole month against 30 days and showed
-  // £15,654 after all costs where they said £2,198 (Halden, 23 Oct).
-  // not a registered figure: the registry holds the month's overheads and after_overheads_30d, not the 30 days'
-  // share, which the chain below needs as a line
-  const oh30 = ohMonth != null ? Math.round(ohMonth * 12 / 365 * 30) : null;
+  // 1109: the other marketing cost is the anatomy's own line (other_marketing_30d), no longer what profit before
+  // ads, less ads, left above profit after ads. Absent means none entered, so the chain shows no line.
+  const otherF = v3Fig('other_marketing_30d', figQ.rows).value;
+  const other = otherF != null && otherF >= 0 ? Math.round(otherF) : 0;
+  // The overheads as entered, over the last 30 days, the way the brand state takes them (a month is 365/12
+  // days). Today's "Where the last 30 days' sales went" and Review read the same; this page took the whole
+  // month against 30 days and showed £15,654 after all costs where they said £2,198 (Halden, 23 Oct).
+  // 1109: the registered share (overheads_30d), the amount after_overheads_30d takes off.
+  const oh30F = v3Fig('overheads_30d', figQ.rows).value;
+  const oh30 = oh30F != null && oh30F > 0 ? oh30F : null;
 
   // The other marketing cost is known for the last 30 days only, so every window takes it at that amount:
   // a change against a typical month is then the change in sales and ad spend, as the lead says.
@@ -3718,13 +3717,14 @@ function V3ProfitLead() {
     <p className="v3-note v3-measure">Enter what your products cost, and what each order costs to pack, send and take payment for. This page then shows where each £1 of sales goes and how this month compares with a typical one.</p>
     <button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs')}>Enter your costs</button>
   </section>);
-  if (lad.err || cfg.err) return null;
-  if (!lad.rows || !cfg.rows) return <V3SkeletonRows n={4}/>;
+  if (lad.err) return null;
+  if (!lad.rows) return <V3SkeletonRows n={4}/>;
 
   // Profit after ads is the registered figure; product contribution less ads is not it (it leaves out the other
   // marketing cost), so there is no fallback to it.
   if (cam == null) return (figQ.rows || figQ.err) ? <div className="v3-empty">Greta could not load your profit after ads just now. Refreshing usually sorts it.</div> : <V3SkeletonRows n={4}/>;
   const kept = cam;
+  const costsF = v3Fig('costs_before_ads_30d', figQ.rows).value;   // 1109: sales less profit before ads, registered
   // after_overheads_30d, as Today and Review read it
   const opF = v3Fig('after_overheads_30d', figQ.rows).value;
   const op = oh30 != null && opF != null ? Math.round(opF) : null;
@@ -3749,12 +3749,12 @@ function V3ProfitLead() {
 
   const chain = [
     { k: 'Sales', v: sales, kind: 'in' },
-    { k: 'Products, delivery and payment fees', v: -(sales - before), kind: 'out' },
+    ...(costsF != null ? [{ k: 'Products, delivery and payment fees', v: -costsF, kind: 'out' }] : []),
     { k: 'Ad spend', v: -spend, kind: 'out' },
   ];
-  if (other >= 1) chain.push({ k: 'Other marketing — creators, agencies, seeding', v: -other, kind: 'out' });
+  if (other >= 1) chain.push({ k: 'Other marketing: creators, agencies, seeding', v: -other, kind: 'out' });
   chain.push({ k: 'Kept after ads', v: kept, kind: 'sub' });
-  if (oh30 != null) { chain.push({ k: 'Overheads — rent, wages, software, for 30 days', v: -oh30, kind: 'out' }); if (op != null) chain.push({ k: 'Profit after running costs', v: op, kind: 'total' }); }
+  if (oh30 != null) { chain.push({ k: 'Overheads: rent, wages, software, for 30 days', v: -oh30, kind: 'out' }); if (op != null) chain.push({ k: 'Profit after running costs', v: op, kind: 'total' }); }
   const per = v => sales > 0 ? Math.round(Math.abs(v) / sales * 100) + 'p in every £1' : '';
 
   // Move this month's budget into the peak: the plan spreads the quarter's ad budget by season (it
@@ -3783,8 +3783,8 @@ function V3ProfitLead() {
   // How far the figure reads high: refunds as entered against refunds as measured (0260), and product
   // costs without freight or duty (not sizeable until entered).
   const rfRow = (drift.rows || []).find(r => r.input_key === 'refundPct' && r.verifiable && r.status === 'drift');
-  // the measured rate rounded as it is shown (8.7%), as Goal & costs works it: £254 here, £252 there (7 Oct)
-  const rfGap = rfRow ? (Math.round(Number(rfRow.realised_value) * 10) / 10 - Number(rfRow.config_value)) / 100 * sales : null;
+  // 1109: the check's own pounds a month (gbp_month), the figure Goal & costs and Ask show (they differed by £2, 7 Oct)
+  const rfGap = rfRow && rfRow.gbp_month != null ? Number(rfRow.gbp_month) : null;
   const noFreight = ((cogsq.rows || [])[0] || {}).cogs_landed_complete === false;
 
   const t30 = (mix.rows || [])[0] || null;
@@ -8811,11 +8811,11 @@ async function v3AskFacts(question) {
   // Connections give. "Which of my costs are wrong?" was answered about ad spend (7 Oct): the answer had the
   // refund rate and the freight flag but not what either does to profit.
   {
-    const sales30 = Number(H.net_revenue_30d) || 0, wrong = [];
-    if (rf && rf.status === 'drift') { const gap = (Math.round(Number(rf.realised_value) * 10) / 10 - Number(rf.config_value)) / 100 * sales30;
-      wrong.push({ what: 'refunds: you entered ' + rf.config_value + '%, your orders show ' + (Math.round(Number(rf.realised_value) * 10) / 10) + '%', profit_reads_high_by_a_month: Math.round(gap) }); }
+    const wrong = [];   // 1109: the pounds a month are the views' own (gbp_month, freight_per_10pct_month)
+    if (rf && rf.status === 'drift')
+      wrong.push({ what: 'refunds: you entered ' + rf.config_value + '%, your orders show ' + (Math.round(Number(rf.realised_value) * 10) / 10) + '%', profit_reads_high_by_a_month: rf.gbp_month != null ? Number(rf.gbp_month) : null });
     if (Qc && Qc.cogs_landed_complete === false && Number(Qc.realized_cogs_pct) > 0)
-      wrong.push({ what: 'no product cost includes freight or duty', profit_reads_high_by_a_month_per_10pct_freight: Math.round(0.1 * Number(Qc.realized_cogs_pct) * sales30) });
+      wrong.push({ what: 'no product cost includes freight or duty', profit_reads_high_by_a_month_per_10pct_freight: Qc.freight_per_10pct_month != null ? Number(Qc.freight_per_10pct_month) : null });
     if (Qc && Number(Qc.lines_total) > 0 && Number(Qc.lines_costed) < Number(Qc.lines_total) * 0.97)
       wrong.push({ what: (Number(Qc.lines_total) - Number(Qc.lines_costed)) + ' of the last 90 days\u2019 ' + Qc.lines_total + ' order lines have no product cost, so Greta fills them in from your average margin' });
     if (C.opening_cash_as_of && v3IsoAdd(v3Iso10(C.opening_cash_as_of), 21) < today) wrong.push({ what: 'the cash balance is from ' + v3Day(v3Iso10(C.opening_cash_as_of), true) });
@@ -8841,17 +8841,19 @@ async function v3AskFacts(question) {
     const leadDays = lead ? Math.round(lead * 7) : 28, lands = v3IsoAdd(today, leadDays);
     Object.assign(f.next_peak, { order_placed_today_lands: lands, lands_before_peak_starts: lands < s, lands_after_peak_ends: lands > e,
       lead_days: leadDays, lead_time_entered: !!lead });
-    // How deep an offer can go, from the brand's own margin (the same sums as Stock & orders). Not a registered
-    // figure: the discount cap has no registry line yet (lineage F10).
-    if (cmr > 0.1 && cmr < 0.95) {
-      const half = Math.floor(cmr * 50 / 5) * 5;
-      f.next_peak.discount_depth = { kept_per_100_full_price: Math.round(100 * cmr), kept_at_20_off: Math.round(100 * (cmr - 0.2)),
-        ['kept_at_' + half + '_off']: Math.round(100 * (cmr - half / 100)), kept_at_45_off: Math.max(0, Math.round(100 * (cmr - 0.45))),
+    // How deep an offer can go, from the brand's own margin (1109: registered, so Ask and the peak panel say the
+    // same figures). Pounds kept from each 100 pounds of full-price sales after product and order costs.
+    const cap = fg('discount_cap'), k0 = fg('kept_per_100_full_price'), k20 = fg('kept_per_100_at_20_off'),
+          kCap = fg('kept_per_100_at_cap'), k45 = fg('kept_per_100_at_45_off');
+    if (cap != null && k0 != null && kCap != null) {
+      const half = Math.round(cap * 100);   // the registered share, as whole points
+      f.next_peak.discount_depth = { kept_per_100_full_price: k0, kept_at_20_off: k20,
+        ['kept_at_' + half + '_off']: kCap, kept_at_45_off: k45,
         keep_the_offer_at_or_under_pct: half,
         note: 'pounds kept from each 100 pounds of full-price sales after product and order costs; deeper offers need that many more orders to make the same profit' };
       // 16 Oct: "at 30% you still keep £67 of every £100" was the full-price figure (30% off keeps £37): said once, as the cash verdict is
-      f.next_peak.discount_depth.said = 'Keep the offer at or under ' + half + '% off. Of every £100 of sales at full price you keep £' + Math.round(100 * cmr)
-        + ' after product and order costs; at ' + half + '% off you keep £' + Math.round(100 * (cmr - half / 100)) + ', and at 45% off £' + Math.max(0, Math.round(100 * (cmr - 0.45))) + '.';
+      f.next_peak.discount_depth.said = 'Keep the offer at or under ' + half + '% off. Of every £100 of sales at full price you keep £' + k0
+        + ' after product and order costs; at ' + half + '% off you keep £' + kCap + (k45 != null ? ', and at 45% off £' + k45 : '') + '.';
     }
   }
   const promos = evs.filter(x => x.row_group === 'promo' && x.status !== 'skipped');
@@ -16863,14 +16865,19 @@ function V3Figure({ children, label, window: win, inputs, note, basis, fix }) {
 // confidence flag from 0196 — when a feed has gone quiet the segment is drawn hatched rather than
 // solid, so "this bar is smaller than the truth" is visible rather than only readable.
 function V3MoneyFlow({ d, note }) {
-  const sales = Number(d.net_revenue_30d) || 0;
-  const spend = Number(d.paid_spend_30d) || 0;
+  // 1109: every segment is a registered figure, so the strip shows the server's sums and its parts add up to
+  // sales (the other marketing cost had no segment, so frkl's parts came to £1,420 short of its sales).
+  const figQ = useV3Figures();
+  const F = id => v3Fig(id, figQ.rows).value;
+  const sales = F('sales_30d') != null ? F('sales_30d') : Number(d.net_revenue_30d) || 0;
+  const spend = F('ads_30d') != null ? F('ads_30d') : Number(d.paid_spend_30d) || 0;
   if (sales <= 0) return null;
   // `|| 0` on the two profit figures turned "we do not know" into "you keep nothing".
   // A brand that has not entered costs was shown a flow reading "£0 · What you keep",
   // which is a false statement about their business rather than a missing input. Unknown
   // gets said, and gets the one button that resolves it.
-  const prodRaw = d.product_contribution_30d, keptRaw = d.cm_after_marketing_30d;
+  const prodRaw = F('profit_before_ads_30d') != null ? F('profit_before_ads_30d') : d.product_contribution_30d;
+  const keptRaw = F('profit_after_ads_30d') != null ? F('profit_after_ads_30d') : d.cm_after_marketing_30d;
   if (prodRaw == null || keptRaw == null) {
     return (
       <div className="v3-flow">
@@ -16886,14 +16893,17 @@ function V3MoneyFlow({ d, note }) {
         </div>
       </div>);
   }
-  const prod = Number(prodRaw), kept = Number(keptRaw);
-  const cogs = Math.max(sales - prod, 0);
+  const kept = Number(keptRaw);
+  const cogsF = F('costs_before_ads_30d'), other = Math.max(0, F('other_marketing_30d') || 0);
+  if (cogsF == null) return null;   // the registry has not landed: no strip rather than a sum worked here
+  const cogs = Math.max(cogsF, 0);
   const pct  = (v) => Math.max(0, Math.min(100, (v / sales) * 100));
   const go   = (sec, sub) => () => window.__oiNav && window.__oiNav(sec, sub);
 
   const steps = [
     { key: 'cogs',  label: 'Products and order costs', value: cogs,  tone: 'cogs',  onGo: go('settings', 'costs') },   // sales less product contribution: product cost plus shipping, packing, fees and refunds (it said 'What the products cost')
     { key: 'ads',   label: 'What you spent on ads',  value: spend, tone: 'spend', onGo: go('channels', 'cross'), soft: d.spend_is_stale },
+    ...(other >= 1 ? [{ key: 'other', label: 'Other marketing', value: other, tone: 'spend', onGo: go('settings', 'costs') }] : []),
     { key: 'kept',  label: 'What you keep',          value: kept,  tone: 'keep',  onGo: go('home', 'overview') },   // the profit breakdown, not goal setup
   ];
 
@@ -18364,10 +18374,11 @@ function V3Today(p) {
   // first from this browser's store and stayed until "show them" was pressed: Halden's Today read £73,309 under a
   // header of £55,880 on every other page (26 Oct walk, item 1).
   const camF = v3Fig('profit_after_ads_30d', todayFig.rows);
-  const cam = camF.value != null ? camF.value : d.cm_after_marketing_30d, prod = d.product_contribution_30d, spend = d.paid_spend_30d, sales = d.net_revenue_30d;
-  // not a registered figure: the other marketing cost (creators, agencies, seeding) is what profit before ads, less
-  // ads, leaves above the registered profit after ads; the tile's working lists it so its lines add up
-  const otherMk = cam != null && prod != null && spend != null ? Math.max(0, Math.round(Number(prod) - Number(spend) - Number(cam))) : 0;
+  // 1109: profit before ads (anatomy cm2) and the other marketing cost (creators, agencies, seeding) are registered,
+  // so the tile's working lists them as they are and its lines add up; the headline's copy of cm2 until it loads
+  const prodF = v3Fig('profit_before_ads_30d', todayFig.rows).value, otherF = v3Fig('other_marketing_30d', todayFig.rows).value;
+  const cam = camF.value != null ? camF.value : d.cm_after_marketing_30d, prod = prodF != null ? prodF : d.product_contribution_30d, spend = d.paid_spend_30d, sales = d.net_revenue_30d;
+  const otherMk = otherF != null && otherF >= 0 ? Math.round(otherF) : 0;
   const gate = d.can_show_cm === false;
   const camTarget = d.cam_target_monthly;               // stored since 0169; null when there is no after-ads target
   const confirmed = d.plan_status === 'confirmed';
@@ -19267,6 +19278,7 @@ function V3StockOffer() {
   const lq = useV3Rows('brand-cfg', V3_BCFG_Q);
   const L = v3Lead(lq.rows);
   const P = useV3Peak(L.days);
+  const figQ = useV3Figures();   // the offer depth (1109)
   const pk = P.peak;
   if (!pk || !q.rows || !q.rows.length || !P.ready) return null;
   const pkName = v3PlainWords(pk.title).replace(/\s*(?:peak\s*)?window$|\s*peak$/i, '');
@@ -19301,13 +19313,12 @@ function V3StockOffer() {
     {/* How deep to go (review, 9 Oct: Greta said run a peak offer but never how much off). From the brand's
         own margin after product and order costs: at d off full price, £100 of full-price sales keeps
         100 x (margin - d). */}
-    {(() => { const H = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || {};
-      const cm = Number(H.net_revenue_30d) > 0 && H.product_contribution_30d != null ? Number(H.product_contribution_30d) / Number(H.net_revenue_30d) : null;
-      if (cm == null || cm <= 0.1 || cm >= 0.95) return null;
-      const keep = d => fmtMoney(Math.max(0, Math.round(100 * (cm - d))));
-      const half = Math.floor(cm * 50 / 5) * 5;
-      return <p className="v3-note v3-measure"><b>How deep to go.</b> After product and order costs you keep about {keep(0)} of every £100 you sell at full price.
-        {' '}At 20% off you keep {keep(0.2)}; at {half}% off, {keep(half / 100)}, about half; at 45% off, {keep(0.45)}. Codes also go to people who would have bought anyway, so keep the offer at or under {half}% off and put it on what you have plenty of, below.
+    {(() => { const F = id => v3Fig(id, figQ.rows).value;   // 1109: the registered offer figures, as Ask says them
+      const cap = F('discount_cap'), k0 = F('kept_per_100_full_price'), k20 = F('kept_per_100_at_20_off'), kCap = F('kept_per_100_at_cap'), k45 = F('kept_per_100_at_45_off');
+      if (cap == null || k0 == null || k20 == null || kCap == null || k45 == null) return null;
+      const half = Math.round(cap * 100);
+      return <p className="v3-note v3-measure"><b>How deep to go.</b> After product and order costs you keep about {fmtMoney(k0)} of every £100 you sell at full price.
+        {' '}At 20% off you keep {fmtMoney(k20)}{half !== 20 ? <>; at {half}% off, {fmtMoney(kCap)}, about half</> : <>, about half</>}; at 45% off, {fmtMoney(k45)}. Codes also go to people who would have bought anyway, so keep the offer at or under {half}% off and put it on what you have plenty of, below.
         {' '}<V3Conf state="likely" detail="Your margin after product and order costs over the last 30 days, applied to full-price sales. It leaves out the extra orders a deeper offer brings, which have to make up the difference."/></p>; })()}
     <p className="v3-note v3-measure">The same {fmtCount(pk.days)} days last year sold {fmtMoney(pk.lySales)}, {fmtTimes(pk.ratio, 0)} your normal pace. The order above arrives on {v3Day(land)}, after it starts, so until then you can only sell what is in stock. Featuring what you have plenty of sells stock you have already paid for. Advertising what will run short sells it out early, and then you pay for clicks on a sold-out page.
       {' '}<V3Conf state="probably" detail="Based on units sold on the same days last year, at last year’s prices and offers. A bigger or smaller offer this year changes demand to match. Stock left assumes today’s pace until the peak starts."/></p>
@@ -20801,9 +20812,9 @@ const V3_GOAL_Q = (sb, b) => {
 };
 // The cost checks Goal & costs lists, read once and shared with Profit & sales.
 const V3_DRIFT_Q = (sb, b) => sb.from('vw_brand_config_drift')
-  .select('input_key,unit,config_value,realised_value,verifiable,status').eq('brand_id', b);
+  .select('input_key,unit,config_value,realised_value,verifiable,status,gbp_month').eq('brand_id', b);   // gbp_month: 1109
 const V3_COGSQ_Q = (sb, b) => sb.from('vw_brand_cogs_quality')
-  .select('cogs_coverage_90d,cogs_landed_complete,realized_cogs_pct,lines_total,lines_costed').eq('brand_id', b).limit(1);
+  .select('cogs_coverage_90d,cogs_landed_complete,realized_cogs_pct,lines_total,lines_costed,freight_per_10pct_month').eq('brand_id', b).limit(1);   // freight_per_10pct_month: 1109
 // Whether a 30-day pace against the goal means anything right now. Today's hero and the page thread
 // both ask, so they say the same thing. Not while the confirmed goal was planned on a different spend
 // curve (0261 corrected it; the goal stores the exponent it used) — the owner is asked to re-plan —
@@ -21067,14 +21078,13 @@ function V3CostsOff() {
   if (drift.err || cfg.err) return <V3LoadFailed what="your cost checks" onRetry={() => { if (drift.err) drift.retry(); if (cfg.err) cfg.retry(); }}/>;
   if (!drift.rows || !cq.rows || !cfg.rows) return <V3SkeletonRows n={3}/>;
   const C = cfg.rows[0] || {}, Q = cq.rows[0] || null, L = v3Lead(cfg.rows);
-  const H = window.GRETA_HEADLINE || {};
-  const mo = Number(H.net_revenue_30d) > 0 ? Number(H.net_revenue_30d) : null;   // last 30 days' sales
   const today = new Date().toISOString().slice(0, 10);
   const items = [];
   let total = 0;
   const rf = drift.rows.find(r => r.input_key === 'refundPct' && r.verifiable && r.status === 'drift');
   if (rf) {
-    const was = Number(rf.config_value), is = Math.round(Number(rf.realised_value) * 10) / 10, gbp = mo ? (is - was) / 100 * mo : null;
+    // 1109: the pounds a month are the check's own (gbp_month, at the last 30 days' sales), not worked out here
+    const was = Number(rf.config_value), is = Math.round(Number(rf.realised_value) * 10) / 10, gbp = rf.gbp_month != null ? Number(rf.gbp_month) : null;
     if (gbp > 0) total += gbp;
     const use = async () => {
       setBusy(true); setMsg(null);
@@ -21094,7 +21104,7 @@ function V3CostsOff() {
   if (Q && Number(Q.cogs_coverage_90d) < 0.8) items.push(<li key="cov"><b>Only {fmtPctN(Number(Q.cogs_coverage_90d))} of your sales have a product cost.</b> The rest use your margin, so profit is an estimate until more products have one.
     {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs')}>Add costs <span className="v3-xref-go">under Product costs →</span></button></li>);
   else if (Q && Q.cogs_landed_complete === false) {
-    const per10 = mo && Number(Q.realized_cogs_pct) > 0 ? 0.1 * Number(Q.realized_cogs_pct) * mo : null;
+    const per10 = Q.freight_per_10pct_month != null ? Number(Q.freight_per_10pct_month) : null;   // 1109: the view's own figure
     items.push(<li key="fr"><b>None of your product costs include freight or duty.</b> Until they do, your margins read too high.
       {per10 ? <> Every 10% that freight and duty add to your product costs means about {fmtMoney(per10)} a month less profit than Greta shows.</> : null} Greta can’t call your profit measured until they are added.
       {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs')}>Add freight and duty <span className="v3-xref-go">under Product costs →</span></button></li>);
@@ -21113,7 +21123,7 @@ function V3CostsOff() {
     <V3Anchor id="costs-off"/>
     <h2 className="v3-sec-title">Are the costs behind your profit right?</h2>
     <p className="v3-verdict">{items.length
-      ? (items.length === 1 ? 'One thing' : fmtCount(items.length) + ' things') + ' in your costs need a look' + (total > 0 ? ' — profit reads about ' + fmtMoney(total) + ' a month too high.' : '.')
+      ? (items.length === 1 ? 'One thing in your costs needs a look' : fmtCount(items.length) + ' things in your costs need a look') + (total > 0 ? ': profit reads about ' + fmtMoney(total) + ' a month too high.' : '.')
       : 'Every cost Greta can check matches your trading.'}</p>
     {items.length > 0 && <ol className="v3-moves">{items}</ol>}
     {msg && <p className={'v3-note ' + (msg.ok ? 'v3-up' : 'v3-down')}>{msg.text}</p>}
@@ -22074,19 +22084,9 @@ function v3BuildSigns(S, hist, opts) {
   const ao = num(L.after_overheads);
   // earlier points on the same basis as the latest: sales_net is what the return model divides
   const HP00 = hist && Array.isArray(hist.points) ? hist.points : null;
-  // All ad spend in every point (1068): cac_spend was Meta and Google only, so the Growth plan's "Ad spend"
-  // said £83,678 where the same point's ads and Customers said £99,812 with TikTok (Halden, 23 Oct). After
-  // 1068 each point carries tiktok_spend and a cac_spend with it in; before, the gap to the point's own
-  // ads total is TikTok's (the only other platform Greta reads), and it is added here the same way.
-  // not a registered figure: history points before 1068, where TikTok is the gap to the point's ads total
-  const allAds = p => {
-    if (p.tiktok_spend != null || p.ads == null || p.cac_spend == null) return {};
-    const t = Math.round((Number(p.ads) - (Number(p.meta_spend) || 0) - (Number(p.google_spend) || 0)) * 100) / 100;
-    if (!(t >= 1)) return {};
-    const sp = Number(p.cac_spend) + t, n = Number(p.new_customers);
-    return { tiktok_spend: t, cac_spend: sp, cac: n > 0 ? Math.round(sp / n * 100) / 100 : p.cac };
-  };
-  const HP0 = HP00 ? HP00.map(p => Object.assign({}, p, allAds(p), { sales_net: p.sales == null || dk == null ? null : Number(p.sales) * dk,
+  // All ad spend in every point: since 1068 each point carries tiktok_spend and a cac_spend with it in (every
+  // brand's 13 points did on 26 Oct), so the browser no longer infers TikTok as the gap to the ads total.
+  const HP0 = HP00 ? HP00.map(p => Object.assign({}, p, { sales_net: p.sales == null || dk == null ? null : Number(p.sales) * dk,
     return: p.return == null || dk == null ? null : Math.round(Number(p.return) * dk * 100) / 100 })) : null;
   // The latest week takes the headline's own sales and ad spend. The history reads the daily table, which
   // catches an order edited or refunded today only overnight (9 Oct: £19,155 there, £19,093 live), so
@@ -24445,10 +24445,10 @@ function V3Congruency() {
   const ok = c.congruency === 'congruent';
   // The change, not the two levels: the snapshot's profit is worked on its own day and basis, and printed
   // as a level it sat beside the header's profit after ads as a second figure for the same thing.
-  const dCm = n(c.cm_now) - n(c.cm_prior);
+  const dCm = n(c.cm_change);   // 1109: the view's own change, not worked out here
   return (<p className="v3-note v3-measure v3-cong"><b>Do the ad figures and your profit agree?</b>{' '}
     {ok ? 'Yes: they moved the same way.' : 'No: they moved apart, so one of them is misreading.'}{' '}
-    Return on ads after the share they really cause went from <span>{fmtTimes(n(c.iroas_prior), 2)}</span> to <span>{fmtTimes(n(c.iroas_now), 2)}</span>; profit after ads {dCm >= 0 ? 'rose' : 'fell'} by <span>{fmtMoney(Math.abs(dCm))}</span> over the same days{v3CongDays(c.prior_date, c.latest_date)}.
+    Return on ads after the share they really cause went from <span>{fmtTimes(n(c.iroas_prior), 2)}</span> to <span>{fmtTimes(n(c.iroas_now), 2)}</span>{dCm != null ? <>; profit after ads {dCm >= 0 ? 'rose' : 'fell'} by <span>{fmtMoney(Math.abs(dCm))}</span> over the same days</> : null}{v3CongDays(c.prior_date, c.latest_date)}.
     {ok ? '' : ' Check the tracking on Settings before acting on the ad figures.'}</p>);
 }
 // A scheduled refresh that failed twice or stopped (0383, 0398): one line, in the notice's own words.
