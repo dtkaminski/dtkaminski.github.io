@@ -38,6 +38,7 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-nav { scrollbar-width: none; }
 .v3-nav::-webkit-scrollbar { display: none; }
 .v3-nav-group { font-weight: var(--weight-semi); padding-top: var(--space-6); }
+.v3-nav-gap { height: var(--space-4); }   /* 1114: between groups that need no heading (Today, Moves, Results) */
 .v3-nav-item { min-height: var(--tap-min); }
 .v3-nav-n { font-family: var(--font-figure); background: var(--color-sunken); color: var(--color-muted);
             padding: 1px 7px; border-radius: var(--radius-full); font-size: var(--text-xs); }
@@ -1409,6 +1410,16 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-mv-due.late, .v3-mv-late { color: var(--color-danger); }
 .v3-mv-late { margin: 0; font-size: var(--text-sm); }
 .v3-mv-decide .v3-mv-said { margin-left: 0; }   /* the decide block is already indented */
+/* 1114: where a move is done, and the quiet morning alert */
+.v3-mv-where { display: grid; gap: var(--space-1); }
+.v3-mv-place { color: var(--color-accent); font-weight: var(--weight-semi); text-decoration: underline; text-underline-offset: var(--space-1); }
+.v3-mv-place:hover { color: var(--color-accent-hover); }
+.v3-mv-note { margin: 0; font-size: var(--text-xs); color: var(--color-muted); }
+.v3-ma { margin: 0 0 var(--space-5); padding: var(--space-3) 0 var(--space-3) var(--space-4); border-left: 2px solid var(--color-danger); }
+.v3-ma ul { list-style: none; margin: var(--space-1) 0 0; padding: 0; display: grid; gap: var(--space-2); }
+.v3-ma-line { font-size: var(--text-sm); line-height: var(--leading-body); color: var(--color-secondary); }
+.v3-ma-line b { font-weight: var(--weight-semi); color: var(--color-ink); }
+.v3-ma-goal_off b, .v3-ma-late b { color: var(--color-danger); }
 /* 1113: Results, one ruled row per move, the label as the goal strip's chip */
 .v3-res-fig { font-family: var(--font-mono); font-weight: var(--weight-semi); }
 .v3-res-counts { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-5); margin: var(--space-2) 0 var(--space-3);

@@ -4239,7 +4239,7 @@ function Overview({start, period, customActive}){
           this page's own answer into third place. A one-line pointer instead: it teaches where
           things live rather than duplicating them. */}
       <button type="button" className="v3-xref" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>
-        Everything worth doing, in order <span className="v3-xref-go">on Actions →</span>
+        Everything worth doing, in order <span className="v3-xref-go">on Moves →</span>
       </button>
       {/* Everything driven by the period picker sits behind one disclosure: the lead above is the answer. */}
       <V3More id="profit-detail" label="Every figure for the dates you pick, and what changed day by day">
@@ -8206,7 +8206,7 @@ function IntelligencePanel(){
         <ZoneHeader
           number="03"
           title="What to do"
-          meta="The same actions as Today and the Actions page, in the same order"
+          meta="The same moves as Today and the Moves page, in the same order"
         />
         {/* This zone used to total every action ever raised ("£Xk/mo at stake", skipped and done
             included) and rank its own copy by a P(hit) score. One board everywhere: removed 2026-10-05. */}
@@ -16517,31 +16517,33 @@ if (typeof window!=='undefined') window.GretaPlanRail = GretaPlanRail;
 const UI_V3 = (typeof window === 'undefined') || window.GRETA_UI_V3 !== false;
 
 const V3_NAV = [
-  { group: 'Home',     id: 'today',       label: 'Today',              icon: 'home',      q: 'Am I on track, and what do I do now?' },
-  { group: 'Home',     id: 'review',      label: 'Review',             icon: 'report',    q: 'What changed, and why?' },
-  { group: 'Act',      id: 'actions',     label: 'Actions',            icon: 'clipboard', q: 'What should I do first?' },
-  { group: 'Act',      id: 'results',     label: 'Results',            icon: 'check',     q: 'Did the moves I made work?' },
-  { group: 'Act',      id: 'calendar',    label: 'Calendar',          icon: 'calendar',  q: 'What is planned, and what did past events do?' },
-  { group: 'Act',      id: 'ask',         label: 'Ask Greta',          icon: 'spark',     q: 'Ask anything about your business, in plain English.' },
-  { group: 'Plan',     id: 'goal',        label: 'Goal & costs',       icon: 'sliders',   q: 'What am I aiming for, and what do things cost me?' },
-  { group: 'Plan',     id: 'growth',      label: 'Growth plan',        icon: 'trendUp',   q: 'How much more should I spend, and what would change that?' },
-  { group: 'Plan',     id: 'stock',       label: 'Stock & orders',     icon: 'truck',     q: 'What runs out, what do I reorder, and what is on order?' },
-  { group: 'Numbers',  id: 'profit',      label: 'Profit & sales',     icon: 'report',    q: 'Where does my money come from, and where does it go?' },
-  { group: 'Numbers',  id: 'marketing',   label: 'Marketing',          icon: 'trendUp',   q: 'Which channels and ads earn their money?' },
-  { group: 'Numbers',  id: 'website',     label: 'Website',            icon: 'pulse',     q: 'Where do shoppers drop off, and why?' },
-  { group: 'Numbers',  id: 'customers',   label: 'Customers',          icon: 'users',     q: 'Who buys, who comes back, and what are they worth?' },
-  { group: 'Numbers',  id: 'products',    label: 'Products',           icon: 'box',       q: 'Which products earn, and which leak?' },
-  { group: 'Numbers',  id: 'competitors', label: 'Competitors',        icon: 'search',    q: 'Who am I up against?' },
-  { group: 'Settings', id: 'settings',    label: 'Connections & data', icon: 'sliders',   q: 'Is my data connected, and can I trust it?' },
-  { group: 'Settings', id: 'team',        label: 'Team',               icon: 'users',     q: 'Who else can see this workspace?' },
+  // 1114 (UX brief Phase 5): six groups, Today, Moves, Results, Business, Plan, Settings. A group whose first item
+  // has its own name shows the item, not a heading over it.
+  { group: 'Today',       id: 'today',       label: 'Today',              icon: 'home',      q: 'Am I on track, and what do I do now?' },
+  { group: 'Today',       id: 'review',      label: 'Review',             icon: 'report',    q: 'What changed, and why?' },
+  { group: 'Today',       id: 'ask',         label: 'Ask Greta',          icon: 'spark',     q: 'Ask anything about your business, in plain English.' },
+  { group: 'Moves',       id: 'actions',     label: 'Moves',              icon: 'clipboard', q: 'What should I do first?' },
+  { group: 'Results',     id: 'results',     label: 'Results',            icon: 'check',     q: 'Did the moves I made work?' },
+  { group: 'Business',    id: 'profit',      label: 'Profit & sales',     icon: 'report',    q: 'Where does my money come from, and where does it go?' },
+  { group: 'Business',    id: 'marketing',   label: 'Marketing',          icon: 'trendUp',   q: 'Which channels and ads earn their money?' },
+  { group: 'Business',    id: 'website',     label: 'Website',            icon: 'pulse',     q: 'Where do shoppers drop off, and why?' },
+  { group: 'Business',    id: 'customers',   label: 'Customers',          icon: 'users',     q: 'Who buys, who comes back, and what are they worth?' },
+  { group: 'Business',    id: 'products',    label: 'Products',           icon: 'box',       q: 'Which products earn, and which leak?' },
+  { group: 'Business',    id: 'competitors', label: 'Competitors',        icon: 'search',    q: 'Who am I up against?' },
+  { group: 'Plan',        id: 'goal',        label: 'Goal & costs',       icon: 'sliders',   q: 'What am I aiming for, and what do things cost me?' },
+  { group: 'Plan',        id: 'growth',      label: 'Growth plan',        icon: 'trendUp',   q: 'How much more should I spend, and what would change that?' },
+  { group: 'Plan',        id: 'stock',       label: 'Stock & orders',     icon: 'truck',     q: 'What runs out, what do I reorder, and what is on order?' },
+  { group: 'Plan',        id: 'calendar',    label: 'Calendar',          icon: 'calendar',  q: 'What is planned, and what did past events do?' },
+  { group: 'Settings',    id: 'settings',    label: 'Connections & data', icon: 'sliders',   q: 'Is my data connected, and can I trust it?' },
+  { group: 'Settings',    id: 'team',        label: 'Team',               icon: 'users',     q: 'Who else can see this workspace?' },
 ];
 const V3_BY_ID = Object.fromEntries(V3_NAV.map(d => [d.id, d]));
 // Mobile: five places. Ask sits in the middle; "More" opens the palette.
 const V3_MOBILE = [
   { id: 'today', label: 'Today', icon: 'home' },
-  { id: 'actions', label: 'Actions', icon: 'clipboard' },
-  { id: 'ask', label: 'Ask', icon: 'spark' },
-  { id: 'profit', label: 'Numbers', icon: 'report' },
+  { id: 'actions', label: 'Moves', icon: 'clipboard' },
+  { id: 'results', label: 'Results', icon: 'check' },
+  { id: 'profit', label: 'Business', icon: 'report' },
 ];
 // Old (section, sub) → new destination [, section anchor]. Keeps 16 deep-link
 // call sites, the ⌘K palette and every "open X" button working unchanged.
@@ -18367,7 +18369,11 @@ function V3MoveDecide({ row, small, onDecided }) {
   if (!ext) return null;
   // A dead feed is a fact Greta checks, not a choice: the only move is to reconnect it.
   if (connProvider(ext)) return <div className="v3-mv-btns"><V3Fix provider={connProvider(ext)} small={small}/></div>;
+  // 1114: "Do it" opens the exact place, in a new tab, before anything is saved (a browser lets a click open a
+  // tab, not a reply that comes back later)
+  const place = v3MovePlaces(ext).find(p => !p.demo && p.url) || null;
   const go = async (decision) => {
+    if (decision === 'do' && place) { try { window.open(place.url, '_blank', 'noopener'); } catch (e) {} }
     setBusy(true); setErr('');
     try {
       await v3Decide(ext, decision, decision === 'not_now' ? until : null, reason.trim() || null);
@@ -18398,6 +18404,8 @@ function V3MoveDecide({ row, small, onDecided }) {
       <button type="button" className={cls} disabled={busy} onClick={() => { setMode('later'); setErr(''); }}>Not now</button>
       <button type="button" className={cls + ' v3-btn-q'} disabled={busy} onClick={() => { setMode('dismiss'); setErr(''); }}>Dismiss</button>
     </div>}
+    {!accepted && !mode && place && <p className="v3-mv-note">Do it opens {place.label} in a new tab, with the steps here.</p>}
+    {accepted && !mode && <V3MovePlaces ext={ext}/>}
     {mode && <div className="v3-mv-form">
       {mode === 'later' && <label className="v3-mv-field"><span>Bring it back on</span>
         <input type="date" value={until} min={v3IsoAdd(today, 1)} max={v3IsoAdd(today, 183)} onChange={e => setUntil(e.target.value)}/></label>}
@@ -18501,6 +18509,48 @@ function V3MoveWho({ ext, stamp }) {
     </div>}
     {err && <span className="v3-fix-err" role="alert">{err}</span>}
   </div>);
+}
+// Where a move is done (1114): fn_board_moves rows carry places, each a link into the brand's own account (Meta Ads
+// Manager, Google Ads, Shopify admin, Klaviyo...). Greta writes nothing there; the owner makes the change and marks
+// it done. A demo brand's accounts are made up, so its places have no link.
+function v3MovePlaces(ext) {
+  const B = v3BoardMoves();
+  const r = B && Array.isArray(B.rows) ? B.rows.find(x => x.external_id === ext) : null;
+  return (r && Array.isArray(r.places)) ? r.places : [];
+}
+function V3MovePlaces({ ext }) {
+  useV3Rows('board-moves', V3_BOARD_MOVES_Q);
+  const pl = v3MovePlaces(ext);
+  if (!pl.length) return null;
+  return (<div className="v3-mv-where">
+    <p className="v3-mv-who"><span className="v3-mv-who-k">Where</span>
+      {pl.map((p, i) => <span key={p.provider + i}>{p.demo
+        ? <>{p.label} <span className="v3-muted">(a demo account, so no link)</span></>
+        : <a className="v3-mv-place" href={p.url} target="_blank" rel="noopener noreferrer">{p.label} ↗</a>}</span>)}
+    </p>
+    <p className="v3-mv-note">Greta changes nothing in your accounts. Make the change there, then mark it done here.</p>
+  </div>);
+}
+// The quiet morning alert on Today (1114): only what needs the owner this morning (fn_morning_alerts), nothing
+// at all when nothing does. A stopped feed is left to the freshness banner above the page, which already says it.
+const V3_ALERTS_Q = (sb, b) => sb.rpc('fn_morning_alerts', { p_brand: b })
+  .then(r => ({ data: r && r.data ? [r.data] : [], error: r ? r.error : null }));
+function V3MorningAlerts() {
+  const q = useV3Rows('morning-alerts', V3_ALERTS_Q);
+  const board = useV3Board();
+  if (q.err || !q.rows || !q.rows[0]) return null;
+  const all = (Array.isArray(q.rows[0].alerts) ? q.rows[0].alerts : []).filter(a => a.kind !== 'feed');
+  if (!all.length) return null;
+  const title = ext => { const r = (board.rows || []).find(x => x.external_id === ext); return r ? v3PlainAction(r).title : ext; };
+  const when = (n, iso) => n <= 0 ? 'today' : n === 1 ? 'tomorrow' : 'in ' + n + ' days, on ' + v3Day(iso);
+  return (<section className="v3-ma" role="status">
+    <p className="v3-goal-lab">This morning</p>
+    <ul>{all.map(a => <li key={a.key} className={'v3-ma-line v3-ma-' + a.kind}>
+      {a.kind === 'goal_off' && <><b>Your goal slipped off track overnight.</b> You are now on course {Number(a.forecast) < 0 ? 'to lose ' + v3Gbp(Math.abs(Number(a.forecast))) : 'for ' + v3Gbp(a.forecast)} after ads by {v3Day(a.period_end)}, <span className="v3-res-fig">{v3Gbp(a.gap)}</span> short of your goal.</>}
+      {a.kind === 'late' && <><b>{title(a.external_id)}</b> is {a.days === 1 ? 'a day' : a.days + ' days'} late: it was due {v3Day(a.due_on)}{a.assignee && a.assignee.label ? ', with ' + a.assignee.label : ''}.</>}
+      {a.kind === 'deadline' && <><b>{title(a.external_id)}</b>: its order-by date is {when(a.days, a.deadline)}.{a.taken_on ? '' : ' Nobody has taken it on yet.'}</>}
+    </li>)}</ul>
+  </section>);
 }
 // The £ between its low and high figures, where the row carries them; the mark is the figure the card shows.
 function V3MoveRange({ lo, hi, at }) {
@@ -18651,7 +18701,7 @@ function V3TodayMoves({ q, board }) {
     </div>}
     <V3UnpricedLane compact/>
     <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>
-      See all {total} moves on Actions <Icon name="arrowRight" size={13}/></button>
+      See all {total} moves <Icon name="arrowRight" size={13}/></button>
   </section>);
 }
 function V3TodayLead() {
@@ -18660,6 +18710,7 @@ function V3TodayLead() {
   const gc = useV3GoalCheck();
   const d = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || {};
   return (<div className="v3-today-lead">
+    <V3MorningAlerts/>
     <V3GoalStrip q={q} gc={gc} unreliable={d.pace_is_reliable === false}/>
     <V3SetupChecklist/>
     <V3TodayMoves q={q} board={board}/>
@@ -21794,7 +21845,7 @@ function V3Review() {
         {top.map(r => (<li key={r.external_id}><b>{v3PlainAction(r).title}</b>{r.cm_gbp ? ' — ' + v3Gbp(r.cm_gbp) + v3Per(r) : ''}.
           <V3MoveDecide row={r} small/></li>))}
       </ol>)}
-      <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>Every action, and why <span className="v3-xref-go">on Actions →</span></button>
+      <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>Every action, and why <span className="v3-xref-go">on Moves →</span></button>
       {(pk || (goal && goal.needs_replanning)) && (<>
         <div className="v3-kick v3-gap-top">Coming up</div>
         <ul className="v3-moves">
@@ -21810,7 +21861,7 @@ function V3Review() {
         <div className="v3-kick v3-gap-top">Decided in the last three weeks</div>
         <ul className="v3-rank-steps">{done.rows.filter(r => !r.auto && !r.sup).slice(0, 6).map((r, k) => (<li key={r.external_id + k}><span className="v3-rank-desc">{v3PlainAction(r).title}</span>
           <span className="v3-sub"> {r.status === 'skipped' ? 'Skipped' : 'Done'} {v3Day(r.disposition_at)}{r.verdict ? ' · ' + ((V3_VERDICT[r.verdict] || {}).label || r.verdict) : ' · Not judged yet'}</span></li>))}</ul>
-        {done.rows.filter(r => !r.auto && !r.sup).length > 6 && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>{done.rows.filter(r => !r.auto && !r.sup).length - 6} more decided <span className="v3-xref-go">on Actions →</span></button>}
+        {done.rows.filter(r => !r.auto && !r.sup).length > 6 && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>{done.rows.filter(r => !r.auto && !r.sup).length - 6} more decided <span className="v3-xref-go">on Moves →</span></button>}
       </>)}
     </section>
     <V3ReviewNotes weekStart={W.start} range={range}/>
@@ -26293,14 +26344,17 @@ function V3App({ dest, go, children, start, periodCtl }) {
           <Icon name="search" size={14}/> Search… <kbd>{V3_KBD}</kbd>
         </button>
         {(() => { let prev = null; return V3_NAV.map(e => {
-          const head = e.group !== prev ? <div key={'h' + e.group} className="v3-nav-group">{e.group}</div> : null;
+          // a group led by an item of its own name (Today, Moves, Results) takes a gap, not a heading
+          const head = e.group === prev ? null : e.group === e.label
+            ? (prev ? <div key={'h' + e.group} className="v3-nav-gap" aria-hidden="true"/> : null)
+            : <div key={'h' + e.group} className="v3-nav-group">{e.group}</div>;
           prev = e.group;
           const n = e.id === 'actions' ? sig.actions : 0;
           const alert = e.id === 'settings' && sig.feedAlert;
           return (<React.Fragment key={e.id}>{head}
             <button type="button" className={'v3-nav-item' + (e.id === dest ? ' active' : '')} onClick={() => go(e.id)} aria-current={e.id === dest ? 'page' : undefined}>
               <Icon name={e.icon} size={17}/>{e.label}
-              {n > 0 && <span className="v3-nav-n" aria-label={n + ' actions worth doing'}>{n}</span>}
+              {n > 0 && <span className="v3-nav-n" aria-label={n + ' moves worth doing'}>{n}</span>}
               {alert && <span className="v3-nav-alert" aria-label="A data source has stopped reporting"/>}
             </button>
           </React.Fragment>);
