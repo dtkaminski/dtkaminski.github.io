@@ -18638,7 +18638,8 @@ function V3GoalStrip({ q, gc, unreliable }) {
   </section>);
   const short = Number(g.gap) > 0;
   const chip = unreliable ? { cls: '', word: 'Too close to call' } : g.status === 'on_track' ? { cls: 'good', word: 'On track' } : { cls: 'bad', word: 'Off track' };
-  const ahead = Number(g.so_far) - Number(g.expected_by_now);
+  // 1116: the server says how far ahead of the plan the quarter is to date; the browser does not work it out
+  const ahead = g.ahead_gbp != null ? Number(g.ahead_gbp) : null;
   return (<section className="v3-goal-strip">
     <div className="v3-goal-top">
       <p className="v3-goal-lab">Goal for {v3Day(g.period_start)} to {v3Day(g.period_end)} · profit after ads · day {g.day} of {g.days}</p>
@@ -18651,7 +18652,7 @@ function V3GoalStrip({ q, gc, unreliable }) {
     </dl>
     <p className="v3-goal-note">
       So far {Number(g.so_far) < 0 ? v3Gbp(Math.abs(Number(g.so_far))) + ' lost' : v3Gbp(g.so_far) + ' kept'} after ads,
-      {' '}{v3Gbp(Math.abs(ahead))} {ahead >= 0 ? 'ahead of' : 'behind'} what the plan expected by {v3Day(g.counted_through)}.
+      {ahead != null ? <>{' '}{v3Gbp(Math.abs(ahead))} {ahead >= 0 ? 'ahead of' : 'behind'} what the plan expected by {v3Day(g.counted_through)}.</> : '.'}
       {' '}<button type="button" className="v3-mv-toggle" aria-expanded={how} onClick={() => setHow(h => !h)}>How is the forecast worked out?</button>
     </p>
     {how && <p className="v3-goal-note v3-muted">The forecast is {g.forecast_basis || 'what you have kept so far plus your recent pace for each day left'}. It does not count the moves below yet, so each one you make moves it up.</p>}
