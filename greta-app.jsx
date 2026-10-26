@@ -18362,6 +18362,7 @@ function V3MoveDecide({ row, small, onDecided }) {
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState('');
   const [said, setSaid] = React.useState(null);
+  const [stamp, setStamp] = React.useState(0);   // 1112: re-read who and when after taking it on
   if (!ext) return null;
   // A dead feed is a fact Greta checks, not a choice: the only move is to reconnect it.
   if (connProvider(ext)) return <div className="v3-mv-btns"><V3Fix provider={connProvider(ext)} small={small}/></div>;
@@ -18369,7 +18370,12 @@ function V3MoveDecide({ row, small, onDecided }) {
     setBusy(true); setErr('');
     try {
       await v3Decide(ext, decision, decision === 'not_now' ? until : null, reason.trim() || null);
-      if (decision === 'do') { setAccepted(true); setMode(null); setReason(''); }
+      if (decision === 'do') {
+        // whoever takes a move on has it until they give it to someone else (1112)
+        const uid = v3Uid();
+        if (uid) { try { await v3Assign(ext, 'user:' + uid, null); } catch (e) {} }
+        setAccepted(true); setMode(null); setReason(''); setStamp(s => s + 1);
+      }
       else {
         setSaid(decision === 'done' ? 'Marked done. Greta will check whether it worked and add it to Results.'
           : decision === 'not_now' ? 'Put off until ' + v3Day(until, true) + '. It comes back then, sooner only if it gets much bigger.'
@@ -18382,7 +18388,8 @@ function V3MoveDecide({ row, small, onDecided }) {
   const cls = 'v3-btn' + (small ? ' v3-btn-sm' : '');
   if (said) return <p className="v3-mv-said" role="status">{said}</p>;
   return (<div className="v3-mv-decide">
-    {accepted && !mode && <p className="v3-mv-said">You’re on it. Mark it done once it is done, so Greta can check what it did.</p>}
+    {accepted && !mode && <p className="v3-mv-said">Taken on. Mark it done once it is done, so Greta can check what it did.</p>}
+    {!mode && <V3MoveWho ext={ext} stamp={stamp}/>}
     {!mode && <div className="v3-mv-btns">
       {accepted
         ? <button type="button" className={cls + ' v3-btn-p'} disabled={busy} onClick={() => go('done')}>{busy ? 'Saving…' : 'Mark done'}</button>
@@ -18404,6 +18411,93 @@ function V3MoveDecide({ row, small, onDecided }) {
     </div>}
     {accepted && !mode && Array.isArray(row.playbook) && row.playbook.length > 0 && (
       <ol className="v3-mv-steps">{row.playbook.map((s, i) => <li key={i}>{v3Tidy(s)}</li>)}</ol>)}
+    {err && <span className="v3-fix-err" role="alert">{err}</span>}
+  </div>);
+}
+// Who has a move and by when (1112). fn_board_moves carries both, with Greta's default due date (the move's own
+// deadline, else a week from taking it on) and how many days late it is; the card only shows them. Giving it to
+// someone is fn_action_assign; the team is fn_team_activity.
+const V3_TEAM_Q = (sb, b) => sb.rpc('fn_team_activity', { p_brand: b })
+  .then(r => ({ data: r && Array.isArray(r.data) ? r.data : [], error: r ? r.error : null }));
+async function v3Assign(ext, who, due) {
+  const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
+  if (!sb || !b) throw new Error('Your session expired. Refresh the page and sign in again.');
+  const r = await sb.rpc('fn_action_assign', { p_brand: b, p_external_id: ext, p_who: who, p_due: due || null });
+  if (r && r.error) throw new Error(/42501|not allowed/i.test(String(r.error.code || r.error.message)) ? 'Only the owner or an editor can change this.' : (r.error.message || 'Could not save. Try again.'));
+  try { track('move_assigned', { external_id: ext, kind: String(who).split(':')[0] }, 'moves'); } catch (e) {}
+  return r.data;
+}
+function v3Uid() { const L = window.FRKL_LIVE; return (L && L.session && L.session.user && L.session.user.id) || null; }
+function v3PersonName(p) {
+  const e = String((p && p.email) || '');
+  return e ? e.split('@')[0].replace(/\./g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'A team member';
+}
+function V3MoveWho({ ext, stamp }) {
+  const bm = useV3Rows('board-moves', V3_BOARD_MOVES_Q);
+  const team = useV3Rows('team-who', V3_TEAM_Q);
+  const last = React.useRef(null);
+  const [edit, setEdit] = React.useState(false);
+  const [pick, setPick] = React.useState('');
+  const [agency, setAgency] = React.useState('');
+  const [due, setDue] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState('');
+  React.useEffect(() => { if (stamp) bm.retry(); }, [stamp]);
+  const B = bm.rows && bm.rows[0];
+  const found = B && Array.isArray(B.rows) ? B.rows.find(r => r.external_id === ext) : null;
+  if (found) last.current = found;
+  const m = found || last.current;
+  if (!m) return null;
+  const today = new Date().toISOString().slice(0, 10);
+  if (!m.taken_on) {
+    // a move nobody took on is never late; only its own deadline can pass
+    return m.deadline && m.deadline < today ? <p className="v3-mv-late">Its order-by date, {v3Day(m.deadline)}, has passed.</p> : null;
+  }
+  const uid = v3Uid(), a = m.assignee;
+  const who = !a ? 'Nobody yet' : a.kind === 'agency' ? a.label + ' (agency)' : a.user_id && a.user_id === uid ? 'You' : a.label;
+  const late = Number(m.overdue_days) > 0;
+  const why = m.due_from === 'deadline' ? ', the order-by date' : m.due_from === 'week' ? ', a week from taking it on' : '';
+  const people = (team.rows || []).filter(p => p && p.user_id);
+  const open = () => {
+    setPick(a && a.kind === 'agency' ? 'agency' : a && a.user_id ? 'user:' + a.user_id : uid ? 'user:' + uid : 'owner');
+    setAgency(a && a.kind === 'agency' ? a.label : ''); setDue(m.due_on || v3IsoAdd(today, 7)); setErr(''); setEdit(true);
+  };
+  const save = async () => {
+    setBusy(true); setErr('');
+    try {
+      // an unchanged date stays the owner's own if they set one, else Greta's default
+      await v3Assign(ext, pick === 'agency' ? 'agency:' + agency.trim() : pick,
+        due !== m.due_on ? due : (m.due_from === 'you' && m.due_on >= today ? m.due_on : null));
+      setEdit(false); bm.retry();
+    } catch (e) { setErr(String((e && e.message) || e)); }
+    setBusy(false);
+  };
+  return (<div className="v3-mv-who-wrap">
+    <p className="v3-mv-who">
+      <span><span className="v3-mv-who-k">Who</span><b>{who}</b></span>
+      {m.due_on && <span><span className="v3-mv-who-k">Due</span><span className={'v3-mv-due' + (late ? ' late' : '')}>{v3Day(m.due_on)}</span>{!late && why}</span>}
+      {!edit && <button type="button" className="v3-mv-toggle" onClick={open}>Change</button>}
+    </p>
+    {late && !edit && <p className="v3-mv-late">{m.overdue_days === 1 ? 'A day' : m.overdue_days + ' days'} late. Mark it done if it is, or give it a new date.</p>}
+    {edit && <div className="v3-mv-form">
+      <label className="v3-mv-field"><span>Who does it</span>
+        <select value={pick} onChange={e => setPick(e.target.value)}>
+          {people.map(p => <option key={p.user_id} value={'user:' + p.user_id}>{p.user_id === uid ? 'You' : v3PersonName(p)}{p.role === 'owner' && p.user_id !== uid ? ' (owner)' : ''}</option>)}
+          {!people.length && <option value="owner">The owner</option>}
+          <option value="agency">An agency</option>
+        </select></label>
+      {pick === 'agency'
+        ? <label className="v3-mv-field v3-mv-field-wide"><span>Agency name</span>
+            <input type="text" maxLength={80} value={agency} placeholder="For example: the paid social agency" onChange={e => setAgency(e.target.value)}/></label>
+        : <span/>}
+      <label className="v3-mv-field"><span>Due</span>
+        <input type="date" value={due} min={today} max={v3IsoAdd(today, 366)} onChange={e => setDue(e.target.value)}/></label>
+      <span/>
+      <div className="v3-mv-btns">
+        <button type="button" className="v3-btn v3-btn-sm v3-btn-p" disabled={busy || (pick === 'agency' && !agency.trim()) || !(due >= today || (due === m.due_on && m.due_from !== 'you'))} onClick={save}>{busy ? 'Saving…' : 'Save'}</button>
+        <button type="button" className="v3-btn v3-btn-sm v3-btn-q" disabled={busy} onClick={() => { setEdit(false); setErr(''); }}>Cancel</button>
+      </div>
+    </div>}
     {err && <span className="v3-fix-err" role="alert">{err}</span>}
   </div>);
 }
