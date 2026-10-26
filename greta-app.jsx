@@ -18356,8 +18356,14 @@ async function v3Decide(ext, decision, until, reason) {
 // offers Mark done; the other three close it everywhere at once.
 function V3MoveDecide({ row, small, onDecided }) {
   const ext = row && row.external_id;
+  // 26 Oct eval: whether the move is taken on is read on every render from the server's moves (and the open
+  // actions), not once when the card mounts; the card drew "Do it" again for a move taken on, after a page change.
+  const bmQ = useV3Rows('board-moves', V3_BOARD_MOVES_Q);
+  useV3Rows('move-extras', V3_MOVE_EXTRAS_Q);
   const ex = v3MoveExtra(ext);
-  const [accepted, setAccepted] = React.useState(!!(ex && ex.accepted_at));
+  const bmRow = bmQ.rows && bmQ.rows[0] && Array.isArray(bmQ.rows[0].rows) ? bmQ.rows[0].rows.find(x => x.external_id === ext) : null;
+  const [mine, setMine] = React.useState(null);   // what this card just did, until the server's rows catch up
+  const accepted = mine != null ? mine : !!((bmRow && bmRow.taken_on) || (ex && ex.accepted_at));
   const [mode, setMode] = React.useState(null);   // null | 'later' | 'dismiss'
   const today = new Date().toISOString().slice(0, 10);
   const [until, setUntil] = React.useState(v3IsoAdd(today, 7));
@@ -18365,7 +18371,6 @@ function V3MoveDecide({ row, small, onDecided }) {
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState('');
   const [said, setSaid] = React.useState(null);
-  const [stamp, setStamp] = React.useState(0);   // 1112: re-read who and when after taking it on
   if (!ext) return null;
   // A dead feed is a fact Greta checks, not a choice: the only move is to reconnect it.
   if (connProvider(ext)) return <div className="v3-mv-btns"><V3Fix provider={connProvider(ext)} small={small}/></div>;
@@ -18378,16 +18383,18 @@ function V3MoveDecide({ row, small, onDecided }) {
     try {
       await v3Decide(ext, decision, decision === 'not_now' ? until : null, reason.trim() || null);
       if (decision === 'do') {
-        // whoever takes a move on has it until they give it to someone else (1112)
+        // whoever takes a move on has it until they give it to someone else (1112); one already given keeps its owner
         const uid = v3Uid();
-        if (uid) { try { await v3Assign(ext, 'user:' + uid, null); } catch (e) {} }
-        setAccepted(true); setMode(null); setReason(''); setStamp(s => s + 1);
+        if (uid && !(bmRow && bmRow.assignee)) { try { await v3Assign(ext, 'user:' + uid, null); } catch (e) {} }
+        setMine(true); setMode(null); setReason('');
+        v3QRefresh(V3_MOVE_KEYS);
       }
       else {
         setSaid(decision === 'done' ? 'Marked done. Greta will check whether it worked and add it to Results.'
           : decision === 'not_now' ? 'Put off until ' + v3Day(until, true) + '. It comes back then, sooner only if it gets much bigger.'
           : 'Dismissed. Greta won’t raise it again for 30 days unless it gets much bigger.');
-        setTimeout(() => { v3BoardDrop(ext); if (onDecided) onDecided(decision); }, 1600);
+        // every page that shows this move follows: the goal's shares, the totals, the alerts, Results
+        setTimeout(() => { v3BoardDrop(ext); v3QRefresh(V3_MOVE_KEYS); if (onDecided) onDecided(decision); }, 1600);
       }
     } catch (e) { setErr(String((e && e.message) || e)); }
     setBusy(false);
@@ -18396,7 +18403,7 @@ function V3MoveDecide({ row, small, onDecided }) {
   if (said) return <p className="v3-mv-said" role="status">{said}</p>;
   return (<div className="v3-mv-decide">
     {accepted && !mode && <p className="v3-mv-said">Taken on. Mark it done once it is done, so Greta can check what it did.</p>}
-    {!mode && <V3MoveWho ext={ext} stamp={stamp}/>}
+    {!mode && <V3MoveWho ext={ext}/>}
     {!mode && <div className="v3-mv-btns">
       {accepted
         ? <button type="button" className={cls + ' v3-btn-p'} disabled={busy} onClick={() => go('done')}>{busy ? 'Saving…' : 'Mark done'}</button>
@@ -18441,7 +18448,7 @@ function v3PersonName(p) {
   const e = String((p && p.email) || '');
   return e ? e.split('@')[0].replace(/\./g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'A team member';
 }
-function V3MoveWho({ ext, stamp }) {
+function V3MoveWho({ ext }) {
   const bm = useV3Rows('board-moves', V3_BOARD_MOVES_Q);
   const team = useV3Rows('team-who', V3_TEAM_Q);
   const last = React.useRef(null);
@@ -18451,7 +18458,6 @@ function V3MoveWho({ ext, stamp }) {
   const [due, setDue] = React.useState('');
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState('');
-  React.useEffect(() => { if (stamp) bm.retry(); }, [stamp]);
   const B = bm.rows && bm.rows[0];
   const found = B && Array.isArray(B.rows) ? B.rows.find(r => r.external_id === ext) : null;
   if (found) last.current = found;
@@ -18477,7 +18483,7 @@ function V3MoveWho({ ext, stamp }) {
       // an unchanged date stays the owner's own if they set one, else Greta's default
       await v3Assign(ext, pick === 'agency' ? 'agency:' + agency.trim() : pick,
         due !== m.due_on ? due : (m.due_from === 'you' && m.due_on >= today ? m.due_on : null));
-      setEdit(false); bm.retry();
+      setEdit(false); v3QRefresh(V3_MOVE_KEYS);   // the card, the alerts and Today follow, without a skeleton
     } catch (e) { setErr(String((e && e.message) || e)); }
     setBusy(false);
   };
@@ -18662,7 +18668,7 @@ function V3GoalStrip({ q, gc, unreliable }) {
 // Today's moves: the top three as cards, then at most two more as short rows, with how much of the gap each
 // closes and what the three close together. The order and the shares are the server's (fn_today_goal); before
 // the goal loads, or without one, the folded board's own order.
-function V3TodayMoves({ q, board }) {
+function V3TodayMoves({ q, board, gc }) {
   const g = q.rows && q.rows[0];
   const bm = useV3Rows('board-moves', V3_BOARD_MOVES_Q);
   useV3Rows('move-extras', V3_MOVE_EXTRAS_Q);
@@ -18680,16 +18686,17 @@ function V3TodayMoves({ q, board }) {
     <p className="v3-muted">{Array.isArray(board.unpriced) && board.unpriced.some(r => r.due_on) ? 'Nothing with a £ figure needs you today.' : 'Nothing needs you today. Greta checks again as new data arrives.'}</p>
     <V3UnpricedLane compact/>
   </section>);
-  const shared = g && g.confirmed && g.forecast != null;
+  // 26 Oct eval: the moves share the gap only when the strip shows one; a goal that needs re-planning shows none
+  const shared = g && g.confirmed && g.forecast != null && !(gc && gc.stale);
   const to = shared ? 'by ' + v3Day(g.period_end) : '';
   const gap = shared ? Number(g.gap) : null;
   const together = shared ? Number(g.together_gbp) : null;
   const total = B && B.totals ? Number(B.totals.moves) || live.length : live.length;
-  const retry = () => { if (q.retry) q.retry(); };
+  // a decision refreshes the goal and the moves itself (v3QRefresh), keeping these rows on screen meanwhile
   return (<section className="v3-mvlist">
     <p className="v3-goal-lab">{shared ? 'The moves that close it, in order' : 'Your moves, in order'}</p>
     {moves.slice(0, 3).map((m, i) => <V3MoveCard key={m.row.external_id} row={m.row} rank={i + 1}
-      closes={shared && gap > 0 ? m.closes : null} closesTo={to} onDecided={retry}/>)}
+      closes={shared && gap > 0 ? m.closes : null} closesTo={to}/>)}
     {shared && together > 0 && (gap > 0
       ? <p className="v3-mvlist-total">{together >= gap
           ? <>Together these more than close your <b>{v3Gbp(gap)}</b> gap {to}, if each starts this week.</>
@@ -18698,7 +18705,7 @@ function V3TodayMoves({ q, board }) {
     {moves.length > 3 && <div className="v3-mvlist-more">
       <p className="v3-kick">Then</p>
       {moves.slice(3).map((m, i) => <V3MoveCard key={m.row.external_id} row={m.row} rank={i + 4} dense
-        closes={shared && gap > 0 ? m.closes : null} closesTo={to} onDecided={retry}/>)}
+        closes={shared && gap > 0 ? m.closes : null} closesTo={to}/>)}
     </div>}
     <V3UnpricedLane compact/>
     <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>
@@ -18714,7 +18721,7 @@ function V3TodayLead() {
     <V3MorningAlerts/>
     <V3GoalStrip q={q} gc={gc} unreliable={d.pace_is_reliable === false}/>
     <V3SetupChecklist/>
-    <V3TodayMoves q={q} board={board}/>
+    <V3TodayMoves q={q} board={board} gc={gc}/>
   </div>);
 }
 // ── Where every number comes from (UX brief Phase 2, 1111) ──────────────────────────────────────────────────
@@ -19065,9 +19072,32 @@ function v3Attempt(build, sb, b) {
   });
   return once(0);
 }
+// 26 Oct eval: one change, every page that shows it follows. A write calls v3QRefresh with the keys it touches. Each
+// key already read on this visit is read again while its old rows stay on screen (no skeleton, no reshuffle), and
+// every component that reads it redraws when the new rows land. A key not read yet is left for the next page to read.
+const V3_SUBS = {};
+function v3QRefresh(keys) {
+  const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
+  if (!sb || !b) return;
+  keys.forEach(key => {
+    const q = V3_Q[key];
+    if (!q || !q.build || (q.p && !q.rows)) return;
+    const ping = () => (V3_SUBS[key] || new Set()).forEach(f => f());
+    const p = q.p = v3Attempt(q.build, sb, b).then(r => { if (q.p === p) q.p = null; if (r && !r.error) { q.rows = (r && r.data) || []; q.err = null; } },
+                                                  () => { if (q.p === p) q.p = null; }).then(ping);
+  });
+}
+// What a decision on a move can change: the goal's shares, the folded moves, who and when, this morning's alerts,
+// Results and the older track record.
+const V3_MOVE_KEYS = ['today-goal', 'board-moves', 'move-extras', 'morning-alerts', 'brand-results', 'act-track', 'act-track-sum', 'fix-first'];
 function useV3Rows(key, build) {
   const [, bump] = React.useState(0);
   const [tries, setTries] = React.useState(0);
+  React.useEffect(() => {
+    const f = () => bump(n => n + 1);
+    (V3_SUBS[key] = V3_SUBS[key] || new Set()).add(f);
+    return () => { V3_SUBS[key].delete(f); };
+  }, [key]);
   React.useEffect(() => {
     // A failure is not remembered for the visit: opening the page again asks again.
     if (V3_Q[key] && V3_Q[key].err && !V3_Q[key].p) delete V3_Q[key];
@@ -19076,7 +19106,7 @@ function useV3Rows(key, build) {
     const go = () => {
       const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
       if (!sb || !b) return false;
-      const q = V3_Q[key] = { rows: null, err: null };
+      const q = V3_Q[key] = { rows: null, err: null, build };   // build: what v3QRefresh reads again
       q.p = v3Attempt(v3Seeded(key, build), sb, b).then(r => { q.p = null; if (r && r.error) q.err = r.error.message || 'could not load'; else q.rows = (r && r.data) || []; },
                                          e => { q.p = null; q.err = String(e); })
         .then(() => { if (!dead) bump(n => n + 1); });
@@ -21246,7 +21276,8 @@ function V3GoalLead() {
   const PDG = useV3PeakDeadline(SQG.peak && SQG.peak.start, SQG.lead_days != null ? Number(SQG.lead_days) : v3Lead(cfg.rows).days);
   // A confirmed plan re-reads everything that depends on the goal.
   React.useEffect(() => {
-    const on = () => { goal.retry(); pace.retry(); atGoal.retry(); ppq.retry(); };
+    // 26 Oct eval: Today's goal strip, the setup checklist and the registered figures follow too
+    const on = () => { goal.retry(); pace.retry(); atGoal.retry(); ppq.retry(); v3QRefresh(['today-goal', 'brand-setup', 'figures', 'morning-alerts']); };
     window.addEventListener('greta-goal-updated', on);
     return () => window.removeEventListener('greta-goal-updated', on);
   });
