@@ -18360,7 +18360,14 @@ function V3Today(p) {
           {!(window.FRKL_LIVE && window.FRKL_LIVE.lastError === 'no membership') && <button type="button" className="v3-btn v3-btn-sm v3-gap-top" onClick={() => location.reload()}>Try again</button>}</>
       : <div className="v3-sub">Loading your live numbers…</div>}</div>);
 
-  const cam = d.cm_after_marketing_30d, prod = d.product_contribution_30d, spend = d.paid_spend_30d, sales = d.net_revenue_30d;
+  // The registered figure (profit_after_ads_30d), the one every page header shows. The headline's copy painted
+  // first from this browser's store and stayed until "show them" was pressed: Halden's Today read £73,309 under a
+  // header of £55,880 on every other page (26 Oct walk, item 1).
+  const camF = v3Fig('profit_after_ads_30d', todayFig.rows);
+  const cam = camF.value != null ? camF.value : d.cm_after_marketing_30d, prod = d.product_contribution_30d, spend = d.paid_spend_30d, sales = d.net_revenue_30d;
+  // not a registered figure: the other marketing cost (creators, agencies, seeding) is what profit before ads, less
+  // ads, leaves above the registered profit after ads; the tile's working lists it so its lines add up
+  const otherMk = cam != null && prod != null && spend != null ? Math.max(0, Math.round(Number(prod) - Number(spend) - Number(cam))) : 0;
   const gate = d.can_show_cm === false;
   const camTarget = d.cam_target_monthly;               // stored since 0169; null when there is no after-ads target
   const confirmed = d.plan_status === 'confirmed';
@@ -18570,13 +18577,17 @@ function V3Today(p) {
                       ['Products and order costs', '−' + v3Gbp(Math.max((Number(sales)||0) - (Number(prod)||0), 0))],
                       ['Profit before ads', v3Gbp(prod)],
                       ['What you spent on ads', '−' + v3Gbp(spend)],
+                      ...(otherMk > 0 ? [['Other marketing: creators, agencies, seeding', '−' + v3Gbp(otherMk)]] : []),
                       ['Profit after ads', v3Gbp(cam)]
                     ]}
                     fix={trustFix}>
             {v3Gbp(cam)}
           </V3Figure>
         </div>
-        <V3HeroDelta cam={cam} sales={sales} prod={prod} typical={typical}/>
+        {/* the typical month on the registered figure's basis, other marketing taken off as Profit & sales does,
+            or the gap reads 29% where it is 13% */}
+        <V3HeroDelta cam={cam} sales={sales} prod={prod}
+          typical={typical && typical.typ && otherMk ? Object.assign({}, typical, { typ: Object.assign({}, typical.typ, { kept: typical.typ.kept - otherMk }) }) : typical}/>
         {(camTarget != null || ppP) && gc.stale ? (
           <div className="v3-pace">
             <span className="v3-muted">Your goal needs re-planning. Greta’s plan changed after you confirmed it, so progress against it would mislead.</span>
@@ -19863,8 +19874,10 @@ function V3Heroes() {
     const cover = {}; Object.keys(inv).forEach(k => { if (inv[k].v > 0) cover[k] = inv[k].oh / inv[k].v; });
     // On the stock list (fn_stock_reorder), by title: why it is there and whether any of it is out now.
     const onList = {}; (slist.rows || []).forEach(r => { const k = String(r.product_title || '').trim().toLowerCase(); if (!k) return;
-      const o = onList[k] || (onList[k] = { out: false, run: false, peak: false });
-      if (r.out_of_stock) o.out = true; if (r.reason !== 'peak_top_up') o.run = true; if (r.reason !== 'runs_out') o.peak = true; });
+      const o = onList[k] || (onList[k] = { out: false, run: false, peak: false, days: null });
+      if (r.out_of_stock) o.out = true; if (r.reason !== 'peak_top_up') o.run = true; if (r.reason !== 'runs_out') o.peak = true;
+      // the list's own days left (full-price pace), the figure Stock & orders shows, soonest variant first
+      if (r.days_left != null && isFinite(Number(r.days_left))) o.days = o.days == null ? Number(r.days_left) : Math.min(o.days, Number(r.days_left)); });
     const big = (hero.rows || []).filter(h => Number(h.led_orders) >= 50).map(h => Number(h.solo_share)).filter(isFinite).sort((a, b) => a - b);
     const target = big.length >= 4 ? big[Math.floor(big.length / 4)] : null;
     const best = target != null ? (hero.rows || []).filter(h => Number(h.led_orders) >= 50).sort((a, b) => Number(a.solo_share) - Number(b.solo_share))[0] : null;
@@ -19889,7 +19902,9 @@ function V3Heroes() {
         }
       }
       const w = cover[x.title.toLowerCase()], ol = onList[x.title.toLowerCase()];
-      if (ol) { o.stock = ol; o.weeks = ol.out ? 0 : w; o.moves.unshift('stock'); }
+      // 26 Oct walk, item 7: this used all-weeks cover (on hand / weekly velocity, sale weeks in), "5 weeks left"
+      // beside Stock & orders' 26 days. A product on the list takes the list's days left.
+      if (ol) { o.stock = ol; o.weeks = ol.out ? 0 : ol.days != null ? ol.days / 7 : w; o.days = ol.out ? 0 : ol.days; o.moves.unshift('stock'); }
       return o;
     });
     const short = heroes.filter(x => x.stock && x.weeks != null);
@@ -19910,7 +19925,8 @@ function V3Heroes() {
   const showMove = d.hasHero || d.heroes.some(x => x.moves.length);
   const moveText = x => {
     if (x.moves[0] === 'stock') return x.stock.out ? 'Out of stock: reorder' : !x.stock.run ? 'Reorder: short for the peak'
-      : 'Reorder: runs out before a restock lands' + (x.weeks != null ? ' (' + fmtCount(x.weeks) + (Math.round(x.weeks) === 1 ? ' week' : ' weeks') + ' left)' : '');
+      : 'Reorder: runs out before a restock lands' + (x.days != null ? ' (' + fmtCount(x.days) + (Math.round(x.days) === 1 ? ' day' : ' days') + ' left)'
+        : x.weeks != null ? ' (' + fmtCount(x.weeks) + (Math.round(x.weeks) === 1 ? ' week' : ' weeks') + ' left)' : '');
     if (x.moves[0] === 'aov') return x.aov.addon ? 'Offer ' + x.aov.addon + ' with it' : 'Offer an add-on with it';
     if (x.moves[0] === 'ltv-up') return 'Feature it in ads for new customers';
     if (x.moves[0] === 'ltv-down') return 'Leave it out of ads for new customers';
@@ -19947,7 +19963,9 @@ function V3Heroes() {
     <ol className="v3-moves">
       {d.short.length > 0 && (<li>
         <b>Protect the sales you have: reorder {v3Names(d.short.map(x => x.title))}.</b>
-        {' '}{v3Names(d.short.map(x => x.title + (x.weeks < 0.5 ? ' is out of stock' : ' has ' + fmtCount(x.weeks) + (Math.round(x.weeks) === 1 ? ' week' : ' weeks') + ' left at the rate it sells')))}, and {d.short.length === 1 ? 'it makes' : 'together they make'} {fmtPctN(d.short.reduce((a, x) => a + x.share, 0))} of your sales. A hero that runs out also loses the add-ons and first orders that come with it.
+        {' '}{v3Names(d.short.map(x => x.title + (x.weeks < 0.5 && !(x.days > 0) ? ' is out of stock'
+          : x.days != null ? ' has ' + fmtCount(x.days) + (Math.round(x.days) === 1 ? ' day' : ' days') + ' left at the rate it sells at full price'
+          : ' has ' + fmtCount(x.weeks) + (Math.round(x.weeks) === 1 ? ' week' : ' weeks') + ' left at the rate it sells')))}, and {d.short.length === 1 ? 'it makes' : 'together they make'} {fmtPctN(d.short.reduce((a, x) => a + x.share, 0))} of your sales. A hero that runs out also loses the add-ons and first orders that come with it.
         {' '}<button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('stock')}>Open Stock &amp; orders</button>
       </li>)}
       {d.hasHero && d.aovHeroes.length > 0 && (<li>
@@ -20235,8 +20253,11 @@ function V3Incrementality() {
   // break-even after the share of sales the channel really causes (vw_channel_iroas_targets, 0335).
   const opt = useV3Rows('mk-incr-opt', (sb, b) => sb.from('vw_channel_optimum')
     .select('channel_type,status,marginal_iroas').eq('brand_id', b).limit(20));
-  const tg = useV3Rows('mk-incr-tgt', (sb, b) => sb.from('vw_channel_iroas_targets')
-    .select('channel_type,reported_target_roas').eq('brand_id', b).limit(20));
+  // 1108: the break-even platform return (break_even_reported_roas), at the share of sales the brand's own test
+  // measured. The sentence below says "to break even" and the tick is break-even; reported_target_roas is the
+  // lifetime target, which counts a year of repeat orders and read as roughly half of it (26 Oct walk, item 3).
+  const tg = useV3Rows('mk-incr-tgt-be', (sb, b) => sb.from('vw_channel_iroas_targets')
+    .select('channel_type,break_even_reported_roas').eq('brand_id', b).limit(20));
   // 0922: the verdict is the server's (vw_channel_verdict), the one the channel actions close against, so
   // this page and the board cannot disagree. The rule below stays only as the fallback before 0922.
   const vd = useV3Rows('mk-incr-verdict', (sb, b) => sb.from('vw_channel_verdict')
@@ -20245,7 +20266,7 @@ function V3Incrementality() {
   if (!inc.rows || (!sc.rows && !sc.err)) return <V3SkeletonRows n={3}/>;
   const beOf = {}; (sc.rows || []).forEach(x => { if (x.break_even_iroas != null) beOf[x.channel_type] = Number(x.break_even_iroas); });
   const optOf = {}; (opt.rows || []).forEach(x => { optOf[x.channel_type] = x; });
-  const tgtOf = {}; (tg.rows || []).forEach(x => { if (x.reported_target_roas != null) tgtOf[x.channel_type] = Number(x.reported_target_roas); });
+  const tgtOf = {}; (tg.rows || []).forEach(x => { if (x.break_even_reported_roas != null) tgtOf[x.channel_type] = Number(x.break_even_reported_roas); });
   const vdOf = {}; (vd.rows || []).forEach(x => { if (x.verdict) vdOf[x.channel_type] = x.verdict; });
   const nice = v3ChanName;
   const rows = inc.rows.filter(x => Number(x.spend_30d) > 0 && x.reported_iroas != null && x.true_iroas != null)
@@ -20347,7 +20368,7 @@ function V3MarketingLead() {
   const U = (ue.rows || [])[0] || null, ceil = U && Number(U.allowable_cac) > 0 ? Number(U.allowable_cac) : null;
   const moved = d.P.spend > 0 && Math.abs(d.dSpend) > d.P.spend * 0.15;
   const per = moved && d.dSpend > 0 && d.dNc > 0 ? d.dSpend / d.dNc : null;
-  const up = d.moves.filter(x => x.d > 0);
+  const up = d.moves.filter(x => x.d > 0), down = d.moves.filter(x => x.d < 0).sort((a, b) => a.d - b.d);
   const nice = p => v3ChanName(p, p);
   const head = !moved ? 'Ad spend has held steady: ' + fmtMoney(d.L.spend) + ' a month for ' + fmtCount(d.L.nc) + ' new customers.'
     : d.dSpend > 0 && d.dNc <= 0 ? 'You are spending ' + fmtMoney(d.dSpend) + ' a month more than in ' + d.prevLab + ', and winning no more new customers.'
@@ -20366,7 +20387,10 @@ function V3MarketingLead() {
     <p className="v3-verdict">{head}</p>
     <p className="v3-note v3-measure">
       {moved ? <>In {d.lastLab}, a typical month was {fmtMoney(d.L.spend)} of ads for {fmtCount(d.L.nc)} new customers. In {d.prevLab}, it was {fmtMoney(d.P.spend)} for {fmtCount(d.P.nc)}. </> : null}
-      {moved && up.length > 0 && <>Most of the increase went to {up.slice(0, 2).map(x => nice(x.p) + ' (' + fmtMoney(x.was) + ' → ' + fmtMoney(x.now) + ' a month)').join(' and ')}. </>}
+      {/* 26 Oct walk, item 4: with spend down the line said "Most of the increase went to TikTok". A rise names
+          where the extra went; a fall names where it came from, and any channel that rose against it. */}
+      {moved && d.dSpend > 0 && up.length > 0 && <>Most of the increase went to {up.slice(0, 2).map(x => nice(x.p) + ' (' + fmtMoney(x.was) + ' → ' + fmtMoney(x.now) + ' a month)').join(' and ')}. </>}
+      {moved && d.dSpend < 0 && down.length > 0 && <>Most of the cut came from {down.slice(0, 2).map(x => nice(x.p) + ' (' + fmtMoney(x.was) + ' → ' + fmtMoney(x.now) + ' a month)').join(' and ')}{up.length > 0 ? <>, while {up.slice(0, 2).map(x => nice(x.p) + ' rose (' + fmtMoney(x.was) + ' → ' + fmtMoney(x.now) + ')').join(' and ')}</> : null}. </>}
       {ceil != null && <>A new customer is worth at most {fmtMoney(ceil)} to you: the profit on their first order plus a year of repeat orders{per != null ? (per > ceil ? '. So the extra customers cost more than they are worth.' : '. So the extra customers still pay their way.') : (moved && d.dSpend > 0 && d.dNc <= 0 ? '. The extra spend won none.' : '.')}</>}
       {' '}<V3Conf state="likely" detail="Spend comes from your ad accounts and new customers from your Shopify orders, by calendar month. Each figure is the middle of three months, so one sale month cannot decide it. Season and offers changed too, so the ads did not do this alone."/></p>
     <figure className="v3-chart">
@@ -21119,7 +21143,7 @@ const V3_METRIC_WORDS = { net_revenue: 'sales', orders: 'orders', site_cvr: 'the
 const v3MetricWords = id => { const k = String(id || '').replace(/_30d$/, ''); return V3_METRIC_WORDS[k] || k.replace(/_/g, ' '); };
 function V3TrackRecord() {
   const q = useV3Rows('act-track', (sb, b) => sb.from('actions')
-    .select('external_id,description,category,status,disposition_at,raised_at,verdict,predicted_window_days,predicted_metric_id,predicted_direction,grade:metadata->grade,auto:metadata->auto_closed_at')
+    .select('external_id,description,category,status,disposition_at,raised_at,verdict,predicted_window_days,predicted_metric_id,predicted_direction,grade:metadata->grade,auto:metadata->auto_closed_at,sup:metadata->suppressed_at')
     .eq('brand_id', b).in('status', ['done', 'skipped', 'partial']).order('disposition_at', { ascending: false, nullsFirst: false }).limit(200));
   // 0938 (eval 13 Oct, gap 17): one track record. The sums come from vw_action_track_record_summary, the same
   // scorer every other surface reads: marked done = judged + cannot judge yet, judged = worked + did not + unclear.
@@ -21135,8 +21159,10 @@ function V3TrackRecord() {
   // Greta closes an action itself when the condition behind it goes away. Those are not things the owner
   // did: on 6 Oct, 17 of the 19 rows "decided" in three weeks were Greta's own closures, one shown as
   // "Worked", and "Of N actions you marked done" counted them.
-  const auto = own.filter(r => r.auto && r.status === 'done');
-  const done = own.filter(r => !r.auto && (r.status === 'done' || r.status === 'partial')), skipped = own.filter(r => r.status === 'skipped');
+  // 1064 closes the second row on one lever itself (status skipped, metadata.suppressed_by, actor
+  // greta:one-row-per-lever): Greta's close too, not the owner's skip (26 Oct walk, item 8).
+  const auto = own.filter(r => (r.auto && r.status === 'done') || (r.sup && r.status === 'skipped'));
+  const done = own.filter(r => !r.auto && (r.status === 'done' || r.status === 'partial')), skipped = own.filter(r => r.status === 'skipped' && !r.sup);
   const autoList = auto.length > 0 && (<>
       {' '}<button type="button" className="v3-btn v3-btn-q v3-btn-sm" aria-expanded={showAuto} onClick={() => setShowAuto(s => !s)}>{showAuto ? 'Hide' : 'Show'} {auto.length} Greta closed itself</button>
       {showAuto && (<><p className="micro muted v3-measure">Greta closes an action itself when what raised it is no longer there. These are not graded as things you did.</p>
@@ -21244,7 +21270,7 @@ function V3Review() {
   const stq = useV3Rows('brand-state', V3_STATE_Q);   // eval 13 Oct (gap 10): last week as Today says it
   const figR = useV3Figures();   // week_sales and week_profit_after_ads (1080)
   const ext = useV3Rows('rev-promos', (sb, b) => sb.from('external_events').select('ts').eq('brand_id', b).eq('kind', 'promo').gte('ts', v3IsoAdd(today, -400)).limit(200));
-  const done = useV3Rows('rev-done', (sb, b) => sb.from('actions').select('external_id,description,status,disposition_at,verdict,grade:metadata->grade,auto:metadata->auto_closed_at')
+  const done = useV3Rows('rev-done', (sb, b) => sb.from('actions').select('external_id,description,status,disposition_at,verdict,grade:metadata->grade,auto:metadata->auto_closed_at,sup:metadata->suppressed_at')
     .eq('brand_id', b).in('status', ['done', 'skipped']).gte('disposition_at', v3IsoAdd(today, -21)).order('disposition_at', { ascending: false }).limit(30));
   const board = useV3Board();
   const [back, setBack] = React.useState(0);          // weeks back from the last complete one
@@ -21387,11 +21413,12 @@ function V3Review() {
           {F.calendar && F.calendar.past_sales_not_on_the_calendar > 0 && <li><b>{F.calendar.past_sales_not_on_the_calendar} past sales are not on the calendar.</b> Adding them lets Greta learn what your promotions really do.</li>}
         </ul>
       </>)}
-      {done.rows && done.rows.some(r => !r.auto) && (<>
+      {/* Greta's own closes (auto-closed, or the second row on one lever, 1064) are not the owner's decisions */}
+      {done.rows && done.rows.some(r => !r.auto && !r.sup) && (<>
         <div className="v3-kick v3-gap-top">Decided in the last three weeks</div>
-        <ul className="v3-rank-steps">{done.rows.filter(r => !r.auto).slice(0, 6).map((r, k) => (<li key={r.external_id + k}><span className="v3-rank-desc">{v3PlainAction(r).title}</span>
+        <ul className="v3-rank-steps">{done.rows.filter(r => !r.auto && !r.sup).slice(0, 6).map((r, k) => (<li key={r.external_id + k}><span className="v3-rank-desc">{v3PlainAction(r).title}</span>
           <span className="v3-sub"> {r.status === 'skipped' ? 'Skipped' : 'Done'} {v3Day(r.disposition_at)}{r.verdict ? ' · ' + ((V3_VERDICT[r.verdict] || {}).label || r.verdict) : ' · Not judged yet'}</span></li>))}</ul>
-        {done.rows.filter(r => !r.auto).length > 6 && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>{done.rows.filter(r => !r.auto).length - 6} more decided <span className="v3-xref-go">on Actions →</span></button>}
+        {done.rows.filter(r => !r.auto && !r.sup).length > 6 && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>{done.rows.filter(r => !r.auto && !r.sup).length - 6} more decided <span className="v3-xref-go">on Actions →</span></button>}
       </>)}
     </section>
     <V3ReviewNotes weekStart={W.start} range={range}/>
@@ -22278,6 +22305,8 @@ function V3RankedDrivers({ D }) {
     if (!row) continue;
     seen.add(r.action.id); todo.push({ r, row });
   }
+  // the board's order, so the numbers read #1, #3, #7 rather than #1, #7, #3 (26 Oct walk, item 9)
+  todo.sort((a, b) => (Number(a.row.board_rank) || 999) - (Number(b.row.board_rank) || 999));
   const sub = r => [V3_DRIVER_SURE[r.evidence] || '',
     (r.holds || []).filter(h => V3_DRIVER_ALSO[h]).length && r.evidence !== 'usual' ? 'also against ' + (r.holds || []).filter(h => V3_DRIVER_ALSO[h]).map(h => V3_DRIVER_ALSO[h]).join(' and ') : '',
     r.evidence !== 'usual' && r.expected === 'season' ? 'partly the season' : r.evidence !== 'usual' && r.expected === 'sale_ended' ? 'a sale ended' : ''].filter(Boolean).join(' · ');
