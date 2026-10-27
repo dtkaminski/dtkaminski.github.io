@@ -1410,6 +1410,8 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-mv-due.late, .v3-mv-late { color: var(--color-danger); }
 .v3-mv-late { margin: 0; font-size: var(--text-sm); }
 .v3-mv-decide .v3-mv-said { margin-left: 0; }   /* the decide block is already indented */
+/* 1120: the sample-brand note above the page head */
+.v3-sample { margin: 0 0 var(--space-4); font-size: var(--text-sm); }
 /* 1114: where a move is done, and the quiet morning alert */
 .v3-mv-where { display: grid; gap: var(--space-1); }
 .v3-mv-place { color: var(--color-accent); font-weight: var(--weight-semi); text-decoration: underline; text-underline-offset: var(--space-1); }

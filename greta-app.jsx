@@ -26354,6 +26354,11 @@ function V3WalkFab({ dest }) {
 function V3FreshnessBanner() {
   const q = useV3Rows('brand-state', V3_STATE_Q);
   const F = q.rows && q.rows[0] && q.rows[0].freshness;
+  // 1120: a sample brand's figures end on its seed date; say so plainly instead of warning about a stopped feed
+  if (F && F.demo && !F.stale) {
+    return (<p className="v3-note v3-measure v3-sample" role="note">This is a sample brand, made up to show Greta at work.
+      {F.demo_through ? ' Its figures run to ' + v3Day(F.demo_through, true) + '.' : ''}</p>);
+  }
   if (!F || !F.stale || !F.said) return null;
   return (<div className={'v3-alert v3-measure' + (F.level === 'problem' ? ' problem' : '')} role="status">
     <p><b>{F.core_stale ? 'Your data is out of date.' : 'Some of your data is out of date.'}</b> {F.said}</p>
