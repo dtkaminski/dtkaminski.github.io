@@ -18633,11 +18633,6 @@ function V3GoalStrip({ q, gc, unreliable }) {
     <p className="v3-muted">Your goal is still an estimate, so Greta doesn’t show progress against it yet.</p>
     <button type="button" className="v3-btn v3-btn-sm v3-btn-p" onClick={() => window.__oiNav && window.__oiNav('home', 'plansetup')}>Set your goal</button>
   </section>);
-  if (gc && gc.stale) return (<section className="v3-goal-strip">
-    <p className="v3-goal-lab">Your goal</p>
-    <p className="v3-muted">Your goal needs re-planning. Greta’s plan changed after you confirmed it, so progress against it would mislead.</p>
-    <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('goal')}>Re-plan the quarter</button>
-  </section>);
   if (g.forecast == null) return (<section className="v3-goal-strip">
     <p className="v3-goal-lab">Your goal{g.target != null ? ': ' + v3Gbp(g.target) + ' after ads' : ''}</p>
     <p className="v3-muted">Greta can’t work out a pace for it yet, so she won’t guess whether you are on track.</p>
@@ -18648,21 +18643,24 @@ function V3GoalStrip({ q, gc, unreliable }) {
   const ahead = g.ahead_gbp != null ? Number(g.ahead_gbp) : null;
   return (<section className="v3-goal-strip">
     <div className="v3-goal-top">
-      <p className="v3-goal-lab">Goal for {v3Day(g.period_start)} to {v3Day(g.period_end)} · profit after ads · day {g.day} of {g.days}</p>
+      <p className="v3-goal-lab">{g.confirmed_on ? 'The goal you confirmed on ' + v3Day(g.confirmed_on) : 'Goal'} for {v3Day(g.period_start)} to {v3Day(g.period_end)} · profit after ads · day {g.day} of {g.days}</p>
       <span className={'v3-goal-chip ' + chip.cls}>{chip.word}</span>
     </div>
     <dl className="v3-goal-figs">
-      <div><dt>Target</dt><dd>{v3Gbp(g.target)}</dd></div>
+      <div><dt>Goal</dt><dd>{v3Gbp(g.target)}</dd></div>
       <div><dt>Forecast</dt><dd>{v3Gbp(g.forecast)}</dd></div>
       <div className={short ? 'bad' : 'good'}><dt>{short ? 'Gap' : 'Ahead'}</dt><dd>{v3Gbp(Math.abs(Number(g.gap)))}</dd></div>
     </dl>
     <p className="v3-goal-note">
       So far {Number(g.so_far) < 0 ? v3Gbp(Math.abs(Number(g.so_far))) + ' lost' : v3Gbp(g.so_far) + ' kept'} after ads,
-      {ahead != null ? <>{' '}{v3Gbp(Math.abs(ahead))} {ahead >= 0 ? 'ahead of' : 'behind'} what the plan expected by {v3Day(g.counted_through)}.</> : '.'}
+      {ahead != null ? <>{' '}{v3Gbp(Math.abs(ahead))} {ahead >= 0 ? 'ahead of' : 'behind'} what {g.confirmed_on ? 'your goal' : 'the plan'} expected by {v3Day(g.counted_through)}.</> : '.'}
       {' '}<button type="button" className="v3-mv-toggle" aria-expanded={how} onClick={() => setHow(h => !h)}>How is the forecast worked out?</button>
     </p>
     {how && <p className="v3-goal-note v3-muted">The forecast is {g.forecast_basis || 'what you have kept so far plus your recent pace for each day left'}. It does not count the moves below yet, so each one you make moves it up.</p>}
     {unreliable && <p className="v3-muted">Some ad spend has not come through yet, so the forecast could move either way.</p>}
+    {/* 1123: the strip reads against the goal as confirmed, so a changed plan no longer hides it; it asks for a re-plan */}
+    {gc && gc.stale && <p className="v3-goal-note v3-muted">Greta’s plan has changed since you confirmed this goal.{' '}
+      <button type="button" className="v3-mv-toggle" onClick={() => window.__oiGo && window.__oiGo('goal')}>Re-plan the quarter</button></p>}
   </section>);
 }
 // Today's moves: the top three as cards, then at most two more as short rows, with how much of the gap each
@@ -18686,8 +18684,8 @@ function V3TodayMoves({ q, board, gc }) {
     <p className="v3-muted">{Array.isArray(board.unpriced) && board.unpriced.some(r => r.due_on) ? 'Nothing with a £ figure needs you today.' : 'Nothing needs you today. Greta checks again as new data arrives.'}</p>
     <V3UnpricedLane compact/>
   </section>);
-  // 26 Oct eval: the moves share the gap only when the strip shows one; a goal that needs re-planning shows none
-  const shared = g && g.confirmed && g.forecast != null && !(gc && gc.stale);
+  // the moves share the gap whenever the strip shows one (1123: it reads against the goal as confirmed)
+  const shared = g && g.confirmed && g.forecast != null;
   const to = shared ? 'by ' + v3Day(g.period_end) : '';
   const gap = shared ? Number(g.gap) : null;
   const together = shared ? Number(g.together_gbp) : null;
@@ -21192,7 +21190,7 @@ function v3Quarter(iso) {
 const V3_GOAL_Q = (sb, b) => {
   const t = new Date().toISOString().slice(0, 10);
   return sb.from('mos_business_goal')
-    .select('period_start,period_end,revenue_target,contribution_margin_target,cam_target,spend_cap,new_customer_target,confirmed,phasing,goal_beta:seasonality->beta')
+    .select('period_start,period_end,revenue_target,contribution_margin_target,cam_target,spend_cap,new_customer_target,confirmed,phasing,confirmed_cam_target,confirmed_at,goal_beta:seasonality->beta')
     .eq('brand_id', b).eq('status', 'active').lte('period_start', t).gte('period_end', t).order('created_at', { ascending: false }).limit(1);
 };
 // The cost checks Goal & costs lists, read once and shared with Profit & sales.
@@ -21367,7 +21365,7 @@ function V3GoalLead() {
     </div>)}
     <p className="v3-verdict">{g
       ? <>Your goal is {fmtMoney(tgt)} of sales this quarter. {short > 0
-          ? <>{atWords} you land at about {fmtMoney(P.revenue_target)} — {fmtMoney(short)} short.</>
+          ? <>{atWords} you land at about {fmtMoney(P.revenue_target)}, {fmtMoney(short)} short.</>
           : <>{atWords} you reach it: about {fmtMoney(P.revenue_target)}.</>}</>
       : <>There is no goal for this quarter yet. {atWords} you land at about {fmtMoney(P.revenue_target)} of sales.</>}</p>
     <p className="v3-note v3-measure">
@@ -21394,8 +21392,8 @@ function V3GoalLead() {
         <div className="v3-stat-foot"><span className="v3-muted">{fmtMoney(tgt - reachBest)} short of the goal{lySales ? <>; last year {fmtMoney(lySales)}</> : null}</span></div></div>}
       {g && !unreach && <div className="v3-stat"><div className="v3-stat-lab"><span>Ads the goal takes</span></div><div className="v3-stat-val">{fmtMoney(gSpend)}</div>
         <div className="v3-stat-foot"><span className="v3-muted">{fmtMoney(peak.gSpend)} of it in {gpMonthName(peak.iso)}</span></div></div>}
-      {g && !unreach && <div className="v3-stat"><div className="v3-stat-lab"><span>Profit after ads, at the goal</span></div><div className="v3-stat-val">{fmtMoney(gCam)}</div>
-        <div className="v3-stat-foot"><span className="v3-muted">{fmtMoney(P.cam_target)} {held ? 'on the plan' : 'at today’s ad spend'}</span></div></div>}
+      {g && !unreach && <div className="v3-stat"><div className="v3-stat-lab"><span>Profit after ads, on today’s plan for the goal</span></div><div className="v3-stat-val">{fmtMoney(gCam)}</div>
+        <div className="v3-stat-foot"><span className="v3-muted">{fmtMoney(P.cam_target)} {held ? 'on the plan' : 'at today’s ad spend'}{g.confirmed_cam_target != null && g.confirmed_at ? <>; you confirmed {fmtMoney(g.confirmed_cam_target)} on {v3Day(g.confirmed_at)}</> : null}</span></div></div>}
     </div>
     <V3GoalDrivers per={per} today={today} exp={exp || 0} done={done || 0} months={ph || P.months} paceMonths={P.months}
       goal={g && ph ? tgt : null} pace={Number(P.revenue_target)} dCam={dCam} held={held} basis={g ? 'goal' : 'plan'}
