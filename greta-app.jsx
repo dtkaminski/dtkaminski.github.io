@@ -19205,7 +19205,9 @@ const V3_STOCK_COLS = 'sku,product_title,on_hand,weekly_velocity,weeks_of_cover,
 // select falls back and the page works from brand_config's lead time itself.
 const V3_STOCK_Q = (sb, b) => {
   const ask = cols => sb.from('vw_stock_demand_plan').select(cols).eq('brand_id', b).limit(3000);
-  return ask(V3_STOCK_COLS + ',last_sold_on,lead_days,runs_out_before_restock,revenue_per_unit,unit_cost')
+  // 1149: owed_units, what a product sits below zero (sold, not held); asked first, dropped if the view predates it
+  return ask(V3_STOCK_COLS + ',last_sold_on,lead_days,runs_out_before_restock,revenue_per_unit,unit_cost,owed_units')
+    .then(r => (r && r.error && /owed_units/.test(r.error.message || '')) ? ask(V3_STOCK_COLS + ',last_sold_on,lead_days,runs_out_before_restock,revenue_per_unit,unit_cost') : r)
     .then(r => (r && r.error && /unit_cost|revenue_per_unit/.test(r.error.message || '')) ? ask(V3_STOCK_COLS + ',last_sold_on,lead_days,runs_out_before_restock') : r)
     .then(r => (r && r.error && /lead_days|runs_out/.test(r.error.message || '')) ? ask(V3_STOCK_COLS + ',last_sold_on') : r)
     .then(r => (r && r.error && /last_sold_on/.test(r.error.message || '')) ? ask(V3_STOCK_COLS) : r);
@@ -19560,16 +19562,20 @@ function V3Stock() {
   // the peak's name as the list names it; the calendar's when the list has none
   const pkName = SM.peak && SM.peak.title ? v3PlainWords(SM.peak.title) : pk ? v3PlainWords(pk.title).replace(/\s*(?:peak\s*)?window$|\s*peak$/i, '') : 'the peak';
   const REASON = { runs_out: 'Runs out before a restock lands', peak_top_up: 'Short for the peak', both: 'Both: runs out first, and short for the peak' };
+  // 1149: a product Shopify keeps selling when out is on pre-order: it loses no sales, and what sits below zero is owed
+  const plan = {}; (rows || []).forEach(x => { if (x && x.sku) plan[x.sku] = x; });
   const order = (lq2.rows || []).slice().sort((a, b) => num(a.rank) - num(b.rank)).map(r => {
+    const pre = !!(plan[r.sku] && plan[r.sku].stock_status === 'preorder'), owed = plan[r.sku] ? num(plan[r.sku].owed_units) : 0;
     const dl = r.days_left != null ? Math.max(0, Math.round(num(r.days_left))) : null;
-    const gap = r.reason !== 'peak_top_up' && dl != null ? Math.max(0, num(r.lead_days || lead) - dl) : 0;
+    const gap = !pre && r.reason !== 'peak_top_up' && dl != null ? Math.max(0, num(r.lead_days || lead) - dl) : 0;
     const risk = num(r.lost_before_landing_gbp);
     return { ...r, units: num(r.order_units), forPeak: num(r.peak_units), run: r.reason !== 'peak_top_up', days: dl, gap, risk,
       perDay: gap > 0 ? risk / gap : 0, cost: r.order_cost_gbp != null ? num(r.order_cost_gbp) : null, unit: r.unit_cost != null ? num(r.unit_cost) : null,
-      stock_status: r.out_of_stock ? 'stockout' : 'ok', noSku: String(r.sku || '').startsWith('v:') };
+      stock_status: pre ? 'preorder' : r.out_of_stock ? 'stockout' : 'ok', pre, owed, noSku: String(r.sku || '').startsWith('v:') };
   });
   const nRun = num(SM.products_runs_out), nPeak = num(SM.products_peak_only);
   const outNow = num(SM.out_of_stock), outRun = num(SM.out_of_stock_runs_out);
+  const preN = num(SM.products_preorder), owedN = num(SM.units_owed);   // 1149
   const cost = num(SM.order_cost_gbp), unpriced = num(SM.unpriced);
   const lost = num(SM.lost_before_landing_gbp);
   // each week sooner: the lost-before-landing figure per day out, for up to seven of those days
@@ -19627,9 +19633,11 @@ function V3Stock() {
       <div className="v3-kick">What to order</div>
       <p className="v3-verdict">{verdict}</p>
       {order.length > 0 ? (<>
-        <p className="v3-note v3-measure">{nRun > 0 ? <>{fmtCount(nRun)} will run out before new stock could arrive{outRun > 0 ? <> ({fmtCount(outRun)} already out)</> : null}{nPeak > 0 ? <>, and {fmtCount(nPeak)} more won’t last through {pkName}</> : null}. </> : <>{fmtCount(nPeak)} won’t last through {pkName}. </>}
+        {/* 1149: products on pre-order are already below zero and still selling: they are not "run out", the sentence after the cost says what they are */}
+        <p className="v3-note v3-measure">{nRun - preN > 0 ? <>{fmtCount(nRun - preN)} will run out before new stock could arrive{outRun > 0 ? <> ({fmtCount(outRun)} already out)</> : null}{nPeak > 0 ? <>, and {fmtCount(nPeak)} more won’t last through {pkName}</> : null}. </> : nPeak > 0 ? <>{fmtCount(nPeak)} won’t last through {pkName}. </> : null}
           Stock takes {L.entered ? L.weeks + ' weeks' : lead + ' days'} to arrive after you order, so an order placed today arrives around <b>{v3Day(land)}</b>.{protect ? <> From then it protects about <b>{fmtMoney(protect)} a month</b> of profit</> : null}{protect && peakAt ? <>, and the peak’s extra units about <b>{fmtMoney(peakAt)}</b> once, over {pkName}.</> : protect ? '.' : null}
           {' '}{nRun > 0 && nPeak > 0 ? <>With the peak’s extra units, ordering all {fmtCount(order.length)} ({fmtCount(SM.units)} units) costs </> : <>Ordering all of them ({fmtCount(SM.units)} units) costs </>}{fmtMoney(cost)} at landed cost, meaning what each unit costs once it reaches you{unpriced > 0 ? <> ({fmtCount(unpriced)} without a cost yet)</> : null}.
+          {preN > 0 && owedN > 0 ? <>{' '}{preN === order.length ? 'All of them sell' : fmtCount(preN) + ' of them sell'} on pre-order: Shopify keeps selling them when out, so they lose no sales, and customers have already bought <b>{fmtCount(owedN)} units</b> you do not hold yet. The order includes them.</> : null}
           {' '}{SM.at_stake_basis && <V3Conf state="probably" detail={SM.at_stake_basis + (SM.rule ? ' ' + SM.rule : '')}/>}</p>
         {lost > 0 && <p className="v3-note v3-measure">Until the order arrives, the products that run out sell nothing. At today’s pace that loses about {fmtMoney(lost)} of profit, whatever you order now. Only faster delivery saves it: <b>each week your supplier can cut is worth about {fmtMoney(sooner)}</b>{pkLate ? ', more in the peak' : ''}.</p>}
         {pkLate && <p className="v3-note v3-measure">{pkName} runs {v3Day(pk.start)} – {v3Day(pk.end, true)}. An order arriving on {v3Day(land)} is in time for its last {fmtCount(daysCaught)} {daysCaught === 1 ? 'day' : 'days'}. Those days sold {fmtMoney(catchNow)} last year, {fmtPctN(catchNow / pk.lySales)} of the peak’s sales. {v3IsoAdd(land, -7) <= pk.start ? 'A week sooner would catch all of it (' + fmtMoney(pk.lySales) + ').' : 'A week sooner would catch ' + fmtMoney(catchWeek) + ' (' + fmtPctN(catchWeek / pk.lySales) + ').'} So ask your supplier to send the peak’s products first.</p>}
@@ -19637,7 +19645,7 @@ function V3Stock() {
         {pk && land > pk.end && <p className="v3-note v3-measure">An order placed today arrives after {pkName} ends. What you have in stock now is all you can sell in it; what to feature is below.</p>}
       </>) : <p className="v3-note v3-measure">Every product that sells has enough stock to last until a new order could arrive{pk ? ', and through ' + pkName + ' at last year’s sales' : ''}.</p>}
       {order.length > 0 && <div className="v3-stat-grid v3-gap-top">
-        {stat('To order', fmtCount(order.length) + ' products', outNow > 0 ? fmtCount(outNow) + ' already out' : 'none out yet')}
+        {stat('To order', fmtCount(order.length) + ' products', [outNow > 0 ? fmtCount(outNow) + ' already out' : preN > 0 ? '' : 'none out yet', preN > 0 ? fmtCount(preN) + ' on pre-order' : ''].filter(Boolean).join(', '))}
         {stat('Order cost', fmtMoney(cost), fmtCount(SM.units) + ' units at landed cost')}
         {protect != null && stat('Profit it protects', fmtMoney(protect) + ' a month', 'from ' + v3Day(land))}
         {peakAt != null && stat('Peak sales it protects', fmtMoney(peakAt), 'once, over ' + pkName)}
@@ -19654,13 +19662,13 @@ function V3Stock() {
         <thead><tr><th className="t-text">Product</th><th className="t-text">Why</th><th className="t-text v3-rw-trackh">Stock left</th><th>Order</th>{anyPeak && <th>For the peak</th>}<th>Cost</th><th>Profit lost before it arrives</th></tr></thead>
         <tbody>{shown.map(r => (<tr key={r.sku}>
           <td className="t-text v3-rw-name" title={r.noSku ? 'No product code (SKU) in Shopify' : r.sku}>{nameOf(r)}</td>
-          <td className="t-text v3-muted">{REASON[r.reason] || ''}</td>
+          <td className="t-text v3-muted">{r.pre ? 'On pre-order' + (r.owed > 0 ? ': ' + fmtCount(r.owed) + ' already bought' : '') : REASON[r.reason] || ''}</td>
           <td className="t-text v3-rw-trackc"><div className="v3-rw-cell">
-            <span className="v3-rw-track" role="img" aria-label={(r.days ? r.days + ' days of stock left' : 'Out of stock') + (r.gap ? ', ' + r.gap + ' days with nothing to sell' : '')}>
+            <span className="v3-rw-track" role="img" aria-label={(r.pre ? 'On pre-order, still selling' : r.days ? r.days + ' days of stock left' : 'Out of stock') + (r.gap ? ', ' + r.gap + ' days with nothing to sell' : '')}>
               {r.days > 0 && <i className="v3-rw-bar" style={{ width: (Math.min(r.days, span) / span * 100) + '%' }}/>}
               {r.gap > 0 && <i className="v3-rw-gap" style={{ left: (r.days / span * 100) + '%', width: (r.gap / span * 100) + '%' }}/>}
             </span>
-            <span className="v3-rw-days">{r.days ? fmtCount(r.days) + (r.days === 1 ? ' day' : ' days') : 'Out now'}</span>
+            <span className="v3-rw-days">{r.pre ? 'Pre-order' : r.days ? fmtCount(r.days) + (r.days === 1 ? ' day' : ' days') : 'Out now'}</span>
           </div></td>
           <td>{fmtCount(r.units)} units</td>
           {anyPeak && <td className="v3-muted">{r.forPeak > 0 ? fmtCount(r.forPeak) : FMT_NONE}</td>}
