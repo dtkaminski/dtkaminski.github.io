@@ -17237,7 +17237,7 @@ function V3Setup({ s }) {
   const brokenSrc = Object.keys(best).filter(p => best[p] === 'error' || best[p] === 'expired');
   const nConn = conns ? liveSrc.length : s.connected;
   const steps = [
-    { done: nConn > 0 && s.has_revenue && !brokenSrc.length, label: 'Connect your data',
+    { done: nConn > 0 && (s.has_revenue || s.young) && !brokenSrc.length, label: 'Connect your data',
       // Until the live connection list arrives, say "connected" without a count: the
       // server's figure counts rows, and painting it first made the number jump 6 → 5.
       hint: !conns && s.connected > 0 ? 'Your sources are connected'
@@ -18766,7 +18766,7 @@ function V3TodayMoves({ q, board, gc }) {
     </div>}
     <V3UnpricedLane compact/>
     <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>
-      See all {total} moves <Icon name="arrowRight" size={13}/></button>
+      {total === 1 ? 'See it on Moves' : 'See all ' + total + ' moves'} <Icon name="arrowRight" size={13}/></button>
   </section>);
 }
 function V3TodayLead() {
@@ -18982,6 +18982,8 @@ function V3Today(p) {
       // that is actually missing, and ask for sales first: costs on top of no sales
       // still gets you no profit figure.
       const noSales = d.setup && d.setup.has_revenue === false;
+      // 1144: a brand that has traded for less than the month the full read needs is not a dropped shop
+      if (d.setup && d.setup.young) return <V3YoungHero setup={d.setup}/>;
       return (
       <div className="v3-hero">
         <div className="v3-hero-lab">Profit after ads · last 30 days <V3Info k="profit_after_ads"/></div>
@@ -19076,7 +19078,7 @@ function V3Today(p) {
     <V3BusinessState part="detail"/>
     {/* Today read 5.3 screens (review, 8 Oct). The summary at the top already names what moved profit and
         Profit & sales has it in full, so the breakdown folds away here. */}
-    <V3More id="today-why" label="What moved your profit, in pounds"><V3Why why={d.why} period={d.why_period} typical={typical} now={{ sales, spend, kept: cam }}/></V3More>
+    {!(d.setup && d.setup.young) && <V3More id="today-why" label="What moved your profit, in pounds"><V3Why why={d.why} period={d.why_period} typical={typical} now={{ sales, spend, kept: cam }}/></V3More>}
     {/* Two drawers used to follow. "What changed this week" repeated Review's lead. "Business,
         customer and channel numbers" (GretaOverviewTiers) recomputed everything in the browser on
         its own window: profit after ads £3,124 under a hero saying £3,350, ad spend £10,249 vs
@@ -22869,6 +22871,10 @@ function V3BusinessState({ part }) {
   const figQ = useV3Figures();   // the registered figures the signals and signs show (1080)
   const [drv, setDrv] = React.useState(null);   // which sign's drivers are open: 'cac', 'ret', 'ly', 'repeat'
   if (q.err) return null;                                   // before 0269, or unreadable: Today carries on without it
+  // 1144: a brand with less than the month the read needs gets V3YoungHero instead; "a month after all costs" would set
+  // a month's overheads against its first fortnight of sales
+  const youngH = typeof window !== 'undefined' && window.GRETA_HEADLINE && window.GRETA_HEADLINE.setup;
+  if (youngH && youngH.young) return null;
   if (!q.rows) return part === 'detail' ? null : <V3SkeletonRows n={3}/>;
   const S = q.rows[0]; if (!S || !S.last_30) return null;
   const L = S.last_30, A = S.ads || {}, U = S.unit || {}, R = S.retention || {}, K = S.basket || {}, P = S.peak, BM = S.benchmarks || {};
@@ -26467,6 +26473,36 @@ function V3TellUs({ dest, label }) {
       {err && <span className="v3-fix-err" role="alert">{err}</span>}
     </div>}
   </section>);
+}
+
+// 1144: Today for a brand that has traded for less than the month the full read needs (Tranquillity, 29 Oct: 14 days
+// since its first order). It says how many days Greta has and when the full read starts, then what those days say,
+// from the same state every page reads. No overheads line: a month's overheads against a fortnight's sales would read
+// as a loss the business has not made. Moves that are already sure enough sit below, as on any Today.
+function V3YoungHero({ setup }) {
+  const q = useV3Rows('brand-state', V3_STATE_Q);
+  const S = q.rows && q.rows[0];
+  const L = (S && S.last_30) || {};
+  const U = (S && S.unit) || {};
+  const days = Number(setup.sales_days) || null;
+  const noAds = !(Number(L.ads) > 0);
+  return (<div className="v3-hero">
+    <div className="v3-hero-lab">Your first {days ? days + ' days' : 'days'} of sales{setup.sales_since ? ' · since ' + v3Day(setup.sales_since) : ''}</div>
+    {L.profit_after_ads != null
+      ? <div className="v3-big">{v3Gbp(L.profit_after_ads)}</div>
+      : <div className="v3-big v3-big-muted">—</div>}
+    <div className="v3-sub"><span>{/* one item: .v3-sub is a flex row */}
+      {L.profit_after_ads != null
+        ? <>kept after {noAds ? 'product and order' : 'product, order and ad'} costs, from {v3Gbp(L.sales)} of sales{U.new_customers_30d != null ? <> and {U.new_customers_30d} new customers</> : ''}. </>
+        : 'Greta is reading your first orders. '}
+      Greta has {days ? days + ' days' : 'a few days'} of your sales; her full read of a month starts about {setup.full_read_from ? v3Day(setup.full_read_from) : 'four weeks after your first order'}.
+      Until then these are your first days, not a month, so she does not compare them with a typical month.
+    </span></div>
+    {noAds && <div className="v3-btns">
+      <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('settings')}>Connect your ad accounts</button>
+      <span className="v3-muted">No ad account is connected yet, so ad spend counts as nothing.</span>
+    </div>}
+  </div>);
 }
 
 function V3App({ dest, go, children, start, periodCtl }) {

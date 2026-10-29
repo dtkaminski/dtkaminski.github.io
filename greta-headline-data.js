@@ -217,6 +217,11 @@
           connected: Number(h.active_connections) || 0,
           connected_total: 5,
           has_revenue: rd ? rd.has_revenue !== false : false,
+          // 1144: a brand trading for less than the month the full read needs (vw_brand_readiness)
+          young: rd ? rd.young === true : false,
+          sales_since: rd ? rd.sales_since || null : null,
+          sales_days: rd ? num(rd.sales_days) : null,
+          full_read_from: rd ? rd.full_read_from || null : null,
           has_economics: rd ? rd.has_economics === true : false,
           goal_confirmed: h.plan_status === 'confirmed',
           has_action: !!acts[0]
