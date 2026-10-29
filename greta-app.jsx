@@ -18435,7 +18435,7 @@ function V3MoveDecide({ row, small, onDecided }) {
     try {
       const gbp = Number(row.cm_gbp) || 0;
       await v3Feedback('wrong', { surface: v3CurDest, key: ext, title: v3PlainAction(Object.assign({}, row, { plan: null })).title,
-        reason: pick || null, body: reason.trim() || null, context: gbp > 0 ? { figure: v3Gbp(gbp) + ' ' + v3Per(row) } : {} });
+        reason: pick || null, body: reason.trim() || null, context: gbp > 0 ? { figure: (v3Gbp(gbp) + ' ' + v3Per(row)).replace(/s+/g, ' ').trim() } : {} });
       setSent(true); setMode(null); setReason(''); setPick('');
     } catch (e) { setErr(String((e && e.message) || e)); }
     setBusy(false);
