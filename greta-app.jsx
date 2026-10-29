@@ -18668,9 +18668,18 @@ function V3MoveCard({ row, rank, closes, closesTo, meta, dense, onDecided }) {
     {others.length > 0 && <V3PlanSteps plan={Object.assign({}, row.plan, { steps: others })}/>}
   </article>);
 }
+// 29 Oct (MVP eval P6): whether the ad spend that has not come through yet could turn a verdict round. It is the
+// test vw_brand_headline_trust uses (missing spend above half the gap), but taken against the gap the verdict is
+// about. pace_is_reliable is not used: it compares a 30-day figure (vw_brand_headline.cm_after_marketing_30d) that
+// is null whenever a brand's costs are measured, so it read false for every brand and Today said "Too close to
+// call" and blamed missing ad spend with £0 missing, even for a brand £24,765 short of its goal.
+function v3SpendCouldSwing(unreported, gap) {
+  const u = Number(unreported) || 0;
+  return u > 0 && u > Math.abs(Number(gap) || 0) * 0.5;
+}
 // The goal strip: the quarter's target, Greta's forecast and the gap, in profit after ads, on track or not, and
 // which day of the period it is. Before the goal is confirmed it asks for one and shows no pace at all.
-function V3GoalStrip({ q, gc, unreliable }) {
+function V3GoalStrip({ q, gc, unreported }) {
   const [how, setHow] = React.useState(false);
   const g = q.rows && q.rows[0];
   if (q.err) return (<section className="v3-goal-strip"><p className="v3-muted">Greta couldn’t load your goal just now.</p>
@@ -18686,6 +18695,7 @@ function V3GoalStrip({ q, gc, unreliable }) {
     <p className="v3-muted">Greta can’t work out a pace for it yet, so she won’t guess whether you are on track.</p>
   </section>);
   const short = Number(g.gap) > 0;
+  const unreliable = v3SpendCouldSwing(unreported, g.gap);
   const chip = unreliable ? { cls: '', word: 'Too close to call' } : g.status === 'on_track' ? { cls: 'good', word: 'On track' } : { cls: 'bad', word: 'Off track' };
   // 1116: the server says how far ahead of the plan the quarter is to date; the browser does not work it out
   const ahead = g.ahead_gbp != null ? Number(g.ahead_gbp) : null;
@@ -18705,7 +18715,7 @@ function V3GoalStrip({ q, gc, unreliable }) {
       {' '}<button type="button" className="v3-mv-toggle" aria-expanded={how} onClick={() => setHow(h => !h)}>How is the forecast worked out?</button>
     </p>
     {how && <p className="v3-goal-note v3-muted">The forecast is {g.forecast_basis || 'what you have kept so far plus your recent pace for each day left'}. It does not count the moves below yet, so each one you make moves it up.</p>}
-    {unreliable && <p className="v3-muted">Some ad spend has not come through yet, so the forecast could move either way.</p>}
+    {unreliable && <p className="v3-muted">About {v3Gbp(unreported)} of ad spend has not come through yet, enough to move the forecast either way.</p>}
     {/* 1123: the strip reads against the goal as confirmed, so a changed plan no longer hides it; it asks for a re-plan */}
     {gc && gc.stale && <p className="v3-goal-note v3-muted">Greta’s plan has changed since you confirmed this goal.{' '}
       <button type="button" className="v3-mv-toggle" onClick={() => window.__oiGo && window.__oiGo('goal')}>Re-plan the quarter</button></p>}
@@ -18716,6 +18726,7 @@ function V3GoalStrip({ q, gc, unreliable }) {
 // the goal loads, or without one, the folded board's own order.
 function V3TodayMoves({ q, board, gc }) {
   const g = q.rows && q.rows[0];
+  const hd = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || {};
   const bm = useV3Rows('board-moves', V3_BOARD_MOVES_Q);
   useV3Rows('move-extras', V3_MOVE_EXTRAS_Q);
   if (board.err) return <div className="v3-empty">Greta could not load your moves just now. Refreshing usually sorts it.</div>;
@@ -18747,7 +18758,7 @@ function V3TodayMoves({ q, board, gc }) {
       ? <p className="v3-mvlist-total">{together >= gap
           ? <>Together these more than close your <b>{v3Gbp(gap)}</b> gap {to}, if each starts this week.</>
           : <>Together these close <b>{v3Gbp(together)}</b> of your <b>{v3Gbp(gap)}</b> gap {to}, if each starts this week.</>}</p>
-      : <p className="v3-mvlist-total">You are on track. Together these add about <b>{v3Gbp(together)}</b> {to}, if each starts this week.</p>)}
+      : <p className="v3-mvlist-total">{g.status === 'on_track' && !v3SpendCouldSwing(hd.unreported_spend, gap) ? 'You are on track. ' : ''}Together these add about <b>{v3Gbp(together)}</b> {to}, if each starts this week.</p>)}
     {moves.length > 3 && <div className="v3-mvlist-more">
       <p className="v3-kick">Then</p>
       {moves.slice(3).map((m, i) => <V3MoveCard key={m.row.external_id} row={m.row} rank={i + 4} dense
@@ -18765,7 +18776,7 @@ function V3TodayLead() {
   const d = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || {};
   return (<div className="v3-today-lead">
     <V3MorningAlerts/>
-    <V3GoalStrip q={q} gc={gc} unreliable={d.pace_is_reliable === false}/>
+    <V3GoalStrip q={q} gc={gc} unreported={d.unreported_spend}/>
     <V3SetupChecklist/>
     <V3TodayMoves q={q} board={board} gc={gc}/>
   </div>);
@@ -25200,7 +25211,7 @@ function V3Thread({ dest, go }) {
   const PP = pp.rows && pp.rows[0] && pp.rows[0].profit_after_ads;
   const ppOk = !!(PP && Number(PP.plan_total) > 0 && PP.status);
   const diff = ppOk ? Number(PP.gap) : null;
-  const unreliable = h.pace_is_reliable === false;
+  const unreliable = diff != null && v3SpendCouldSwing(h.unreported_spend, diff);   // the month's own gap (P6)
   return (
     <button type="button" className="v3-thread" onClick={() => go('today')}
             title="Back to Today">
