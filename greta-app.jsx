@@ -2283,6 +2283,7 @@ const OI_ICONS = {
   report:'<rect x="5" y="3.2" width="14" height="17.6" rx="2"/><path d="M8.4 8h7.2M8.4 12h7.2M8.4 16h4.2"/>',
   truck:'<rect x="1.5" y="6.5" width="11.5" height="8.5" rx="1"/><path d="M13 9.5h3.6l3.4 3.2V15H13z"/><circle cx="6" cy="17.4" r="1.7"/><circle cx="16.6" cy="17.4" r="1.7"/>',
   factory:'<path d="M3 21V10.5l5.2 3.2V10.5l5.2 3.2V6.5H21V21z"/><path d="M2.2 21h19.6M11 21v-3.2M16 21v-3.2"/>',
+  message:'<path d="M20 4.5H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3v3.8l4.6-3.8H20a1 1 0 0 0 1-1v-10a1 1 0 0 0-1-1z"/>',
 };
 function Icon({name, size=16, stroke=1.7, style, className, title}){
   const p = OI_ICONS[name]; if(!p) return null;
@@ -2366,7 +2367,9 @@ function toast(msg, opts){ try{ window.__oiToast && window.__oiToast(msg, opts);
 function oiSnoozeAdd(t){ try{ const s=JSON.parse(localStorage.getItem('oi_snoozed')||'[]'); if(!s.some(x=>x.t===t)){ s.push({t}); localStorage.setItem('oi_snoozed', JSON.stringify(s.slice(-200))); } }catch(e){} }
 function oiSnoozeRemove(t){ try{ let s=JSON.parse(localStorage.getItem('oi_snoozed')||'[]'); s=s.filter(x=>x.t!==t); localStorage.setItem('oi_snoozed', JSON.stringify(s)); }catch(e){} }
 function oiSnoozed(t){ try{ return JSON.parse(localStorage.getItem('oi_snoozed')||'[]').some(x=>x.t===t); }catch(e){ return false; } }
-function oiFeedbackAdd(t){ try{ const s=JSON.parse(localStorage.getItem('oi_insight_feedback')||'[]'); s.push({t, at:new Date().toISOString()}); localStorage.setItem('oi_insight_feedback', JSON.stringify(s.slice(-200))); }catch(e){} }
+function oiFeedbackAdd(t){ try{ const s=JSON.parse(localStorage.getItem('oi_insight_feedback')||'[]'); s.push({t, at:new Date().toISOString()}); localStorage.setItem('oi_insight_feedback', JSON.stringify(s.slice(-200))); }catch(e){}
+  // 1141: it used to stop here, in this browser only, while the toast said it "tunes future insights"
+  return v3Feedback('wrong', { surface: v3CurDest, key: String(t || '').slice(0, 200), title: t, reason: 'Marked wrong' }); }
 
 // ── Evidence drawer — global slide-in trust panel; window.__oiEvidence(payload) ──
 function EvidenceDrawer(){
@@ -2415,7 +2418,7 @@ function InsightActions({title, why, recommendation, agent, askQ, caveat, confid
     <button className="ia-btn" onClick={()=>aiSaveTask(recommendation||title)}><Icon name="clipboard" size={13}/>Create task</button>
     <button className="ia-btn" onClick={()=>window.__oiAsk && window.__oiAsk(askQ||('Explain this finding: '+title))}><Icon name="spark" size={13}/>Ask Greta</button>
     <button className="ia-btn" onClick={()=>{ oiSnoozeAdd(title); toast('Snoozed', {body:'Hidden from your view.'}); onSnooze && onSnooze(); }}><Icon name="bell" size={13}/>Snooze</button>
-    <button className="ia-btn" onClick={()=>{ oiFeedbackAdd(title); toast('Flagged as not useful', {kind:'warn', body:'Thanks — this tunes future insights.'}); onWrong && onWrong(); }}><Icon name="alert" size={13}/>Mark wrong</button>
+    <button className="ia-btn" onClick={()=>{ oiFeedbackAdd(title).then(()=>toast('Flagged as wrong', {kind:'warn', body:'Sent to the Greta team. Thank you.'}), e=>toast('Could not send', {kind:'warn', body:String((e && e.message) || e)})); onWrong && onWrong(); }}><Icon name="alert" size={13}/>Mark wrong</button>
   </div>);
 }
 
@@ -18352,6 +18355,32 @@ async function v3Decide(ext, decision, until, reason) {
   try { track('move_decided', { external_id: ext, decision }, 'moves'); } catch (e) {}
   return r.data;
 }
+// 1141: what an owner tells Greta goes to the server (fn_feedback_add) and from there into Dan's morning email
+// (send-feedback-digest). Not now and Dismiss reasons already travel with the decision (fn_action_decide) and the
+// same email reads them; the chips only make a reason one click. Viewers can send feedback too: it is not an edit.
+let v3CurDest = 'today';
+const V3_WHY = {
+  later: ['After the peak', 'No budget for it now', 'No time this week', 'Need to check with the team'],
+  dismiss: ['The figure looks wrong', 'We already do this', 'Not right for our brand', 'We tried it before'],
+  wrong: ['The £ figure', 'The reason it gives', 'The data behind it', 'It does not apply to us'],
+  page: ['Something is wrong', 'Something is missing', 'Something is confusing', 'An idea'],
+};
+async function v3Feedback(kind, f) {
+  const L = window.FRKL_LIVE, sb = L && L.sb, b = L && L.brandId;
+  if (!sb || !b) throw new Error('Your session expired. Refresh the page and sign in again.');
+  const context = Object.assign({ width: window.innerWidth || null }, f.context || {});
+  const r = await sb.rpc('fn_feedback_add', { p_brand: b, p_kind: kind, p_surface: f.surface || null, p_item_key: f.key || null,
+    p_item_title: f.title || null, p_reason: f.reason || null, p_body: f.body || null, p_context: context });
+  if (r && r.error) throw new Error(String(r.error.code) === '54000' ? 'That is a lot in one hour. Try again later.' : 'Could not send. Try again.');
+  try { track('feedback_sent', { kind, surface: f.surface || null }, f.surface || null); } catch (e) {}
+  return r.data;
+}
+function V3WhyChips({ list, pick, setPick, label }) {
+  return (<div className="v3-chips v3-chips-plain v3-why" role="group" aria-label={label || 'Pick a reason'}>
+    {list.map(c => <button key={c} type="button" className={'v3-chip' + (pick === c ? ' on' : '')} aria-pressed={pick === c}
+      onClick={() => setPick(pick === c ? '' : c)}>{c}</button>)}
+  </div>);
+}
 // Do it, Not now (to a date) and Dismiss, each with an optional reason. Taking a move on keeps it on the list and
 // offers Mark done; the other three close it everywhere at once.
 function V3MoveDecide({ row, small, onDecided }) {
@@ -18371,6 +18400,8 @@ function V3MoveDecide({ row, small, onDecided }) {
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState('');
   const [said, setSaid] = React.useState(null);
+  const [pick, setPick] = React.useState('');      // a reason chip (1141)
+  const [sent, setSent] = React.useState(false);   // "something looks wrong" went to the server
   if (!ext) return null;
   // A dead feed is a fact Greta checks, not a choice: the only move is to reconnect it.
   if (connProvider(ext)) return <div className="v3-mv-btns"><V3Fix provider={connProvider(ext)} small={small}/></div>;
@@ -18381,12 +18412,12 @@ function V3MoveDecide({ row, small, onDecided }) {
     if (decision === 'do' && place) { try { window.open(place.url, '_blank', 'noopener'); } catch (e) {} }
     setBusy(true); setErr('');
     try {
-      await v3Decide(ext, decision, decision === 'not_now' ? until : null, reason.trim() || null);
+      await v3Decide(ext, decision, decision === 'not_now' ? until : null, [pick, reason.trim()].filter(Boolean).join('. ') || null);
       if (decision === 'do') {
         // whoever takes a move on has it until they give it to someone else (1112); one already given keeps its owner
         const uid = v3Uid();
         if (uid && !(bmRow && bmRow.assignee)) { try { await v3Assign(ext, 'user:' + uid, null); } catch (e) {} }
-        setMine(true); setMode(null); setReason('');
+        setMine(true); setMode(null); setReason(''); setPick('');
         v3QRefresh(V3_MOVE_KEYS);
       }
       else {
@@ -18399,6 +18430,17 @@ function V3MoveDecide({ row, small, onDecided }) {
     } catch (e) { setErr(String((e && e.message) || e)); }
     setBusy(false);
   };
+  const sendWrong = async () => {
+    setBusy(true); setErr('');
+    try {
+      const gbp = Number(row.cm_gbp) || 0;
+      await v3Feedback('wrong', { surface: v3CurDest, key: ext, title: v3PlainAction(Object.assign({}, row, { plan: null })).title,
+        reason: pick || null, body: reason.trim() || null, context: gbp > 0 ? { figure: v3Gbp(gbp) + ' ' + v3Per(row) } : {} });
+      setSent(true); setMode(null); setReason(''); setPick('');
+    } catch (e) { setErr(String((e && e.message) || e)); }
+    setBusy(false);
+  };
+  const close = () => { setMode(null); setErr(''); setPick(''); };
   const cls = 'v3-btn' + (small ? ' v3-btn-sm' : '');
   if (said) return <p className="v3-mv-said" role="status">{said}</p>;
   return (<div className="v3-mv-decide">
@@ -18410,19 +18452,25 @@ function V3MoveDecide({ row, small, onDecided }) {
         : <button type="button" className={cls + ' v3-btn-p'} disabled={busy} onClick={() => go('do')}>{busy ? 'Saving…' : 'Do it'}</button>}
       <button type="button" className={cls} disabled={busy} onClick={() => { setMode('later'); setErr(''); }}>Not now</button>
       <button type="button" className={cls + ' v3-btn-q'} disabled={busy} onClick={() => { setMode('dismiss'); setErr(''); }}>Dismiss</button>
+      <button type="button" className={cls + ' v3-btn-q'} disabled={busy} onClick={() => { setMode('wrong'); setErr(''); setSent(false); }}>Something looks wrong?</button>
     </div>}
+    {sent && !mode && <p className="v3-mv-said" role="status">Sent to the Greta team. Thank you.</p>}
     {!accepted && !mode && place && <p className="v3-mv-note">Do it opens {place.label} in a new tab, with the steps here.</p>}
     {accepted && !mode && <V3MovePlaces ext={ext}/>}
     {mode && <div className="v3-mv-form">
+      <V3WhyChips list={V3_WHY[mode]} pick={pick} setPick={setPick} label={mode === 'wrong' ? 'What looks wrong?' : 'Why?'}/>
       {mode === 'later' && <label className="v3-mv-field"><span>Bring it back on</span>
         <input type="date" value={until} min={v3IsoAdd(today, 1)} max={v3IsoAdd(today, 183)} onChange={e => setUntil(e.target.value)}/></label>}
-      <label className="v3-mv-field v3-mv-field-wide"><span>Why? (optional)</span>
-        <input type="text" maxLength={500} value={reason} placeholder={mode === 'later' ? 'For example: after the peak' : 'For example: we tried this in the spring'}
+      <label className="v3-mv-field v3-mv-field-wide"><span>{mode === 'wrong' ? 'What looks wrong? (optional)' : 'Why? (optional)'}</span>
+        <input type="text" maxLength={500} value={reason}
+               placeholder={mode === 'wrong' ? 'For example: we spent less than that on Meta' : mode === 'later' ? 'For example: after the peak' : 'For example: we tried this in the spring'}
                onChange={e => setReason(e.target.value)}/></label>
       <div className="v3-mv-btns">
-        <button type="button" className={cls + ' v3-btn-p'} disabled={busy || (mode === 'later' && !(until > today))}
-                onClick={() => go(mode === 'later' ? 'not_now' : 'dismiss')}>{busy ? 'Saving…' : mode === 'later' ? 'Put it off' : 'Dismiss it'}</button>
-        <button type="button" className={cls + ' v3-btn-q'} disabled={busy} onClick={() => { setMode(null); setErr(''); }}>Cancel</button>
+        {mode === 'wrong'
+          ? <button type="button" className={cls + ' v3-btn-p'} disabled={busy || !(pick || reason.trim())} onClick={sendWrong}>{busy ? 'Sending…' : 'Send'}</button>
+          : <button type="button" className={cls + ' v3-btn-p'} disabled={busy || (mode === 'later' && !(until > today))}
+                onClick={() => go(mode === 'later' ? 'not_now' : 'dismiss')}>{busy ? 'Saving…' : mode === 'later' ? 'Put it off' : 'Dismiss it'}</button>}
+        <button type="button" className={cls + ' v3-btn-q'} disabled={busy} onClick={close}>Cancel</button>
       </div>
     </div>}
     {accepted && !mode && Array.isArray(row.playbook) && row.playbook.length > 0 && (
@@ -26364,8 +26412,55 @@ function V3FreshnessBanner() {
   </div>);
 }
 
+// 1141: at the foot of every page, one line that opens a box. What is sent goes to Dan's morning email with the
+// page it came from. The nav's "Tell us" opens the same box.
+function V3TellUs({ dest, label }) {
+  const [open, setOpen] = React.useState(false);
+  const [pick, setPick] = React.useState('');
+  const [text, setText] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState('');
+  const [sent, setSent] = React.useState(false);
+  const ref = React.useRef(null);
+  const area = React.useRef(null);
+  React.useEffect(() => { setOpen(false); setSent(false); setErr(''); }, [dest]);
+  React.useEffect(() => {
+    const on = () => { setOpen(true); setSent(false);
+      setTimeout(() => { try { ref.current && ref.current.scrollIntoView({ block: 'center' }); area.current && area.current.focus(); } catch (e) {} }, 0); };
+    window.addEventListener('v3-tell-open', on);
+    return () => window.removeEventListener('v3-tell-open', on);
+  }, []);
+  const send = async () => {
+    setBusy(true); setErr('');
+    try {
+      await v3Feedback('tell_us', { surface: dest, title: label, reason: pick || null, body: text.trim() || null });
+      setSent(true); setOpen(false); setPick(''); setText('');
+    } catch (e) { setErr(String((e && e.message) || e)); }
+    setBusy(false);
+  };
+  return (<section className="v3-tell" ref={ref} aria-label="Tell us">
+    {!open && <p className="v3-tell-q">
+      {sent ? 'Sent to the Greta team. Thank you.' : 'Something wrong, missing or confusing on this page?'}
+      <button type="button" className="v3-btn v3-btn-sm" onClick={() => { setOpen(true); setSent(false); }}>{sent ? 'Tell us more' : 'Tell us'}</button>
+    </p>}
+    {open && <div className="v3-tell-form">
+      <V3WhyChips list={V3_WHY.page} pick={pick} setPick={setPick} label="What is it?"/>
+      <label className="v3-mv-field"><span>What should we know about {label}?</span>
+        <textarea ref={area} rows={3} maxLength={2000} value={text} onChange={e => setText(e.target.value)}
+                  placeholder="For example: the ad spend here does not match what Meta shows me"/></label>
+      <div className="v3-mv-btns">
+        <button type="button" className="v3-btn v3-btn-sm v3-btn-p" disabled={busy || !(pick || text.trim())} onClick={send}>{busy ? 'Sending…' : 'Send'}</button>
+        <button type="button" className="v3-btn v3-btn-sm v3-btn-q" disabled={busy} onClick={() => { setOpen(false); setErr(''); }}>Cancel</button>
+      </div>
+      <p className="v3-tell-note">It goes to a person at Greta, with the page you are on.</p>
+      {err && <span className="v3-fix-err" role="alert">{err}</span>}
+    </div>}
+  </section>);
+}
+
 function V3App({ dest, go, children, start, periodCtl }) {
   const d = V3_BY_ID[dest] || V3_NAV[0];
+  v3CurDest = dest;
   const sig = useV3NavSignals();
   useFigureTypography(dest);
   useV3Figures();   // the figure registry (1080), read once per page load; every page shares the cached rows
@@ -26394,6 +26489,10 @@ function V3App({ dest, go, children, start, periodCtl }) {
             </button>
           </React.Fragment>);
         }); })()}
+        <div className="v3-nav-gap" aria-hidden="true"/>
+        <button type="button" className="v3-nav-item" onClick={() => window.dispatchEvent(new Event('v3-tell-open'))}>
+          <Icon name="message" size={17}/>Tell us
+        </button>
       </nav>
       <main className="v3-main" id="v3-content" tabIndex={-1}>
         {/* Ask sits on Today; everywhere else it is one keystroke away (nav item, ⌘K). On every
@@ -26414,6 +26513,7 @@ function V3App({ dest, go, children, start, periodCtl }) {
         <BrandAgeBanner/>
         <MarginNudge/>
         {children}
+        <V3TellUs dest={dest} label={d.label}/>
       </main>
     </div>
     <nav className="v3-mobile" aria-label="Main (mobile)">
