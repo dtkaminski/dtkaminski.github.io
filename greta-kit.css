@@ -1472,3 +1472,27 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-setup.v3-setup-list { display: grid; gap: var(--space-3); margin: 0; padding: 0 0 var(--space-6); background: none; box-shadow: none;
                           border: 0; border-bottom: 1px solid var(--color-line); border-radius: var(--radius-none); }
 .v3-setup-top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+
+/* ── 30 Oct aesthetics and flow pass ─────────────────────────────────────────────────────────────── */
+/* The page's verdict. 34ch was being overridden by the sheet's `.v3-main p` measure, so 26px leads ran
+   944px wide in two slabs. A headline measure, with lines balanced. */
+.v3-main p.v3-verdict { max-width: 24em; text-wrap: balance; }
+/* The sample-brand note: a small chip above the head, not a paragraph that reads as page copy. */
+.v3-main > .v3-sample { display: inline-flex; align-items: center; max-width: none; width: fit-content; justify-self: start; align-self: flex-start; margin-bottom: var(--space-5) !important;
+  padding: var(--space-1) var(--space-3); font-size: var(--text-xs); color: var(--color-secondary);
+  background: var(--color-sunken); border-radius: var(--radius-full); }
+/* Today's Ask sits in the head row beside the question; its suggestions drop over the page. */
+.v3-page-head-row > .v3-askbar { flex: 0 1 calc(var(--space-16) * 7); margin: 0; position: relative; }
+.v3-page-head-row > .v3-askbar .v3-askbar-sug { position: absolute; top: calc(100% + var(--space-1)); left: 0; right: 0; z-index: 30;
+  padding: var(--space-3); background: var(--color-panel); border: 1px solid var(--color-line-strong); box-shadow: var(--shadow-raised); }
+/* A move's controls on one row: the decision, then "How sure?" and "What it does elsewhere". */
+.v3-mv-acts { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-2) var(--space-4);
+  margin-left: calc(var(--space-6) + var(--space-4)); }
+.v3-mv-acts > .v3-mv-decide, .v3-mv-acts > .v3-mv-more { margin-left: 0; }
+.v3-mv-btns .v3-mv-quiet { font-size: var(--text-xs); }
+@media (max-width: 760px) {
+  .v3-mv-acts { margin-left: 0; }
+  /* the tour button: an icon above the bottom nav, so it no longer sits on a move's buttons */
+  .v3-walk-fab-btn { width: var(--space-10); padding: 0; justify-content: center; border-radius: var(--radius-full); }
+  .v3-walk-fab-lab { display: none; }
+}

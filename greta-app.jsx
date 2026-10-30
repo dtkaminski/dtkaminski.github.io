@@ -11678,14 +11678,16 @@ function V3ActionBoard(){
 
 // One plan's steps (see V3_PLANS): always shown, since the steps are the plan. Each opens onto its own
 // how-to, and is marked done or skipped on its own, so a decision on one never closes the others.
-function V3PlanSteps({ plan }) {
+// rank: the lead move's place on the list. The steps under it read 2b, 2c: a second "1" under move 2 read as a
+// new list (30 Oct eval).
+function V3PlanSteps({ plan, rank }) {
   const [open, setOpen] = React.useState(null);
   return (<ol className="v3-plan-steps">{plan.steps.map((st, j) => {
     const pa = v3PlainAction(st), gbp = Number(st.cm_gbp) || 0, isOpen = open === st.external_id;
     const play = Array.isArray(st.playbook) ? st.playbook : [];
     return (<li key={st.external_id} className="v3-plan-step">
       <button type="button" className="v3-rank-hit" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : st.external_id)}>
-        <span className="v3-rank-n">{j + 1}</span>
+        <span className="v3-rank-n">{rank != null ? rank + String.fromCharCode(98 + j) : j + 1}</span>
         <span className="v3-rank-body">
           <span className="v3-rank-desc">{pa.title}</span>
           <span className="v3-rank-meta">{st.lane === 'test' ? 'Worth testing' : 'Do this'}{st.origin === 'order_cost' ? ' · ad spend saved' : ''}</span>
@@ -17011,7 +17013,10 @@ function v3Tidy(s) {
 function v3Money(s) {
   // The engine writes amounts unformatted inside its own sentences; group them so a
   // reader can take in £247,261 at a glance instead of counting digits.
-  return String(s).replace(/£(\d{4,})(?![\d,])/g, (m, n) => '£' + Number(n).toLocaleString('en-GB'));
+  // 30 Oct: counts too ("about 3032 a month" on Today's add-on move), only where a unit follows, so years stay
+  return String(s).replace(/£(\d{4,})(?![\d,])/g, (m, n) => '£' + Number(n).toLocaleString('en-GB'))
+    .replace(/(^|[^\d.,£$€])(\d{4,})(?=\s+(?:a (?:month|week|day)|orders?|units?|customers?|visits?|sessions?|people|products?|sends|searches|clicks)\b)/g,
+      (m, pre, n) => pre + Number(n).toLocaleString('en-GB'));
 }
 function v3ActionText(raw) {
   let s = v3Money(scrubTag(String(raw || '')).trim());
@@ -18349,7 +18354,7 @@ function v3CauseLine(why, title) {
     if (last && ((last.match(/"/g) || []).length % 2 === 1)) sents[sents.length - 1] = last + ' ' + p; else sents.push(p);
   }
   const tt = String(title || '').toLowerCase().replace(/[.:]$/, '');
-  return sents.find(s => s.length > 12 && !tt.includes(s.toLowerCase().replace(/[.:]$/, ''))) || '';
+  return v3Money(sents.find(s => s.length > 12 && !tt.includes(s.toLowerCase().replace(/[.:]$/, ''))) || '');
 }
 // The time a decision call can take before the button says so.
 async function v3Decide(ext, decision, until, reason) {
@@ -18456,8 +18461,8 @@ function V3MoveDecide({ row, small, onDecided }) {
         ? <button type="button" className={cls + ' v3-btn-p'} disabled={busy} onClick={() => go('done')}>{busy ? 'Saving…' : 'Mark done'}</button>
         : <button type="button" className={cls + ' v3-btn-p'} disabled={busy} onClick={() => go('do')}>{busy ? 'Saving…' : 'Do it'}</button>}
       <button type="button" className={cls} disabled={busy} onClick={() => { setMode('later'); setErr(''); }}>Not now</button>
-      <button type="button" className={cls + ' v3-btn-q'} disabled={busy} onClick={() => { setMode('dismiss'); setErr(''); }}>Dismiss</button>
-      <button type="button" className={cls + ' v3-btn-q'} disabled={busy} onClick={() => { setMode('wrong'); setErr(''); setSent(false); }}>Something looks wrong?</button>
+      <button type="button" className={cls + ' v3-btn-q v3-mv-quiet'} disabled={busy} onClick={() => { setMode('dismiss'); setErr(''); }}>Dismiss</button>
+      <button type="button" className={cls + ' v3-btn-q v3-mv-quiet'} disabled={busy} onClick={() => { setMode('wrong'); setErr(''); setSent(false); }}>Something looks wrong?</button>
     </div>}
     {sent && !mode && <p className="v3-mv-said" role="status">Sent to the Greta team. Thank you.</p>}
     {!accepted && !mode && place && <p className="v3-mv-note">Do it opens {place.label} in a new tab, with the steps here.</p>}
@@ -18654,9 +18659,13 @@ function V3MoveCard({ row, rank, closes, closesTo, meta, dense, onDecided }) {
     </div>
     {gbp > 0 && <V3MoveRange lo={ex && ex.lo} hi={ex && ex.hi} at={gbp}/>}
     {closes != null && <p className="v3-mv-closes">Closes about <b>{v3Gbp(closes)}</b> of the gap {closesTo}.</p>}
-    <div className="v3-mv-more">
-      {knock.length > 0 && <button type="button" className="v3-mv-toggle" aria-expanded={show === 'else'} onClick={() => setShow(s => s === 'else' ? null : 'else')}>What it does elsewhere</button>}
-      <button type="button" className="v3-mv-toggle" aria-expanded={show === 'sure'} onClick={() => setShow(s => s === 'sure' ? null : 'sure')}>How sure?</button>
+    {/* 30 Oct: one row of controls, not two -- the decision first, then the two questions about it */}
+    <div className="v3-mv-acts">
+      <V3MoveDecide row={row} small={dense} onDecided={onDecided}/>
+      <div className="v3-mv-more">
+        <button type="button" className="v3-mv-toggle" aria-expanded={show === 'sure'} onClick={() => setShow(s => s === 'sure' ? null : 'sure')}>How sure?</button>
+        {knock.length > 0 && <button type="button" className="v3-mv-toggle" aria-expanded={show === 'else'} onClick={() => setShow(s => s === 'else' ? null : 'else')}>What it does elsewhere</button>}
+      </div>
     </div>
     {show === 'else' && <p className="v3-mv-open">On its way to your profit it also moves {v3AndList(knock)}.</p>}
     {show === 'sure' && <div className="v3-mv-open">
@@ -18669,8 +18678,7 @@ function V3MoveCard({ row, rank, closes, closesTo, meta, dense, onDecided }) {
       {play.length > 0 && <><p><b>The steps</b></p><ol className="v3-mv-steps">{play.map((s, j) => <li key={j}>{v3Tidy(s)}</li>)}</ol></>}
       <p className="v3-mv-raw"><b>Greta’s working:</b> {pa.raw}</p>
     </div>}
-    <V3MoveDecide row={row} small={dense} onDecided={onDecided}/>
-    {others.length > 0 && <V3PlanSteps plan={Object.assign({}, row.plan, { steps: others })}/>}
+    {others.length > 0 && <V3PlanSteps plan={Object.assign({}, row.plan, { steps: others })} rank={rank}/>}
   </article>);
 }
 // 29 Oct (MVP eval P6): whether the ad spend that has not come through yet could turn a verdict round. It is the
@@ -18799,8 +18807,21 @@ function V3TodayMoves({ q, board, gc }) {
       {total === 1 ? 'See it on Moves' : 'See all ' + total + ' moves'} <Icon name="arrowRight" size={13}/></button>
   </section>);
 }
+// 30 Oct eval: fn_today_goal takes 2-4 s and queues behind the page's other reads, so "Am I on track?" was the last
+// thing on Today to fill (about 12 s of grey bar under moves already showing). The last answer this browser saw for
+// the brand paints at once, the way Today's figures do, and the live one replaces it when it lands.
+const v3GoalSeedKey = () => { const b = window.FRKL_LIVE && window.FRKL_LIVE.brandId; return b ? 'greta_goal_' + b : null; };
+function v3GoalSeed(q) {
+  const k = v3GoalSeedKey();
+  if (!k) return q;
+  try {
+    if (q.rows && q.rows[0] && q.rows[0].confirmed != null) { localStorage.setItem(k, JSON.stringify(q.rows[0])); return q; }
+    if (!q.rows && !q.err) { const s = JSON.parse(localStorage.getItem(k) || 'null'); if (s) return Object.assign({}, q, { rows: [s], seeded: true }); }
+  } catch (e) {}
+  return q;
+}
 function V3TodayLead() {
-  const q = useV3Rows('today-goal', V3_TODAY_GOAL_Q);
+  const q = v3GoalSeed(useV3Rows('today-goal', V3_TODAY_GOAL_Q));
   const board = useV3Board();
   const gc = useV3GoalCheck();
   const d = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || {};
@@ -23420,7 +23441,9 @@ function V3CalendarDrivers() {
       <V3Sign k={'Sales against ' + gpMonthName(M.start) + '’s plan'} v={fmtMoney(A.rev)} tone={tone === 'bad' ? 'weak' : profOff && salesOk ? 'ok' : S.status === 'ahead' ? 'good' : 'typical'}
         bar={{ fill: Math.min(1, A.rev / (Math.max(A.rev, P.rev) * 1.25)), mark: P.rev / (Math.max(A.rev, P.rev) * 1.25) }}
         n={<>{fmtMoney(P.rev)} expected by now; the mark is the plan</>}
-        trendAs={{ dir: S.status === 'on_plan' ? 'flat' : S.status === 'ahead' ? 'up' : 'down', cls: S.status === 'on_plan' ? 'flat' : tone === 'good' ? 'good' : 'bad', text: V3_PLAN_WORD[S.status] }}
+        trendAs={{ dir: S.status === 'on_plan' ? 'flat' : S.status === 'ahead' ? 'up' : 'down', cls: S.status === 'on_plan' ? 'flat' : tone === 'good' ? 'good' : 'bad',
+          // the Watch chip is for profit (the line below); say so beside it, not a bare "On plan" (30 Oct eval)
+          text: profOff && salesOk ? V3_PLAN_WORD[S.status] + ' for sales; profit behind' : V3_PLAN_WORD[S.status] }}
         act={{ label: open ? 'Hide what is driving it' : 'What is driving this?', open, on: () => setOpen(o => !o) }}/>
     </div>
     {both}
@@ -23902,6 +23925,9 @@ function V3Sign({ k, v, tone, bar, n, series, fmt, better, line, act, trendAs })
     trend = { dir, cls: dir === 'flat' || !better ? 'flat' : good ? 'good' : 'bad', from: fmt(then.v) };
   }
   if (!trend && trendAs) trend = trendAs;
+  // 30 Oct eval: a green "Healthy" chip beside a red arrow read as two verdicts. The chip judges the figure; the arrow
+  // only says which way it moved, so under Healthy a worsening arrow is neutral.
+  if (trend && tone === 'good' && trend.cls === 'bad') trend = Object.assign({}, trend, { cls: 'flat' });
   const chart = open && pts.length >= 4 && (<span className="v3-sign-pop" role="dialog" aria-label={k + ', last ' + pts.length + ' weeks'}>
     <span className="v3-sign-pop-h"><b>{k}</b><span>Last {pts.length} weeks · each point is the 30 days to that date</span></span>
     <R.ResponsiveContainer width="100%" height={160}>
@@ -26480,8 +26506,8 @@ function V3WalkFab({ dest }) {
         </button>))}
       </div>
     </div>)}
-    <button type="button" className="v3-walk-fab-btn" aria-expanded={open} onClick={() => setOpen(o => !o)}>
-      <Icon name="spark" size={15}/> Walk me through</button>
+    <button type="button" className="v3-walk-fab-btn" aria-expanded={open} aria-label="Walk me through" onClick={() => setOpen(o => !o)}>
+      <Icon name="spark" size={15}/> <span className="v3-walk-fab-lab">Walk me through</span></button>
   </div>);
 }
 
@@ -26619,14 +26645,15 @@ function V3App({ dest, go, children, start, periodCtl }) {
             page it was a sticky bar above the title, so the first thing on each screen was an
             input rather than the page's own question. */}
         <V3FreshnessBanner/>
-        {dest === 'today' && <V3AskBar dest={dest}/>}
         <header className="v3-page-head">
           <div className="v3-page-head-row">
             <div>
               <h1 className="v3-page-title">{d.label}</h1>
               <p className="v3-page-q">{d.q}</p>
             </div>
-            {V3_PERIOD_PAGES.indexOf(dest) >= 0 ? periodCtl : null}
+            {/* 30 Oct: Ask sits in Today's head row, beside the page's question, so the first thing on the screen is
+                the question and the answer under it, not an input above the title */}
+            {dest === 'today' ? <V3AskBar dest={dest}/> : V3_PERIOD_PAGES.indexOf(dest) >= 0 ? periodCtl : null}
           </div>
           <V3Thread dest={dest} go={go}/>
         </header>
