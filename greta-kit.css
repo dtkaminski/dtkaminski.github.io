@@ -1564,7 +1564,7 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-al-dots i.off { background: var(--color-hero-bad); }
 /* Ask, as the way to talk to her */
 .v3-al-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3) var(--space-6); }
-.v3-al .v3-askbar { flex: 0 1 calc(var(--space-16) * 7); margin: 0; background: none; border: 0; padding: 0; position: relative; }
+.v3-al .v3-askbar { flex: 0 1 calc(var(--space-16) * 7); min-width: 0; margin: 0; background: none; border: 0; padding: 0; position: relative; }
 .v3-al .v3-askbar-in { background: var(--color-hero-raised); border-color: var(--color-hero-line); }
 .v3-al .v3-askbar-in:focus-within { background: var(--color-hero-raised); border-color: var(--color-hero-accent); }
 .v3-al .v3-askbar-in svg { color: var(--color-hero-muted); }

@@ -16687,7 +16687,7 @@ function V3AskBar({ dest }) {
         value={q} onChange={e=>setQ(e.target.value)} onFocus={()=>setOpen(true)}
         onBlur={()=>setTimeout(()=>setOpen(false), 180)}
         onKeyDown={e=>{ if (e.key === 'Enter') send(); }}
-        placeholder="Ask Greta anything about your business…" aria-label="Ask Greta a question"/>
+        placeholder="Ask about your business…" aria-label="Ask Greta a question"/>
       <button type="button" className="v3-btn v3-btn-p" onClick={()=>send()}>Ask</button>
     </div>
     {open && (<div className="v3-askbar-sug">
@@ -25712,7 +25712,7 @@ function V3Thread({ dest, go }) {
       <span className="v3-thread-lab">Profit after ads</span>
       <span className="v3-thread-val">{v3Gbp(cam)}</span>
       <span className="v3-muted">last 30 days</span>
-      {V && <span className={'v3-thread-pace ' + V.tone}>{V.close ? 'goal too close to call' : V.soft ? 'on track, on a thin margin' : V.on ? 'on track for your goal' : 'off track for your goal'}</span>}
+      {V && <span className={'v3-thread-pace ' + V.tone}>Goal: {V.word.toLowerCase()}</span>}
       {diff != null && gc.stale && !gc.pending && (
         <span className="v3-thread-pace">goal needs re-planning</span>
       )}
