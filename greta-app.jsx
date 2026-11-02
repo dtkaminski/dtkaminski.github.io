@@ -19562,10 +19562,15 @@ function useV3Rows(key, build) {
     const go = () => {
       const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
       if (!sb || !b) return false;
+      // 2 Nov: parts of a page that mount before the client is ready each poll here. Each sent its own read and replaced
+      // the other's entry (fn_today_goal twice at every load), and only the part that sent the last read heard when it
+      // landed: the strip sat on its fallback for the whole visit once Today had gone. One read, and everyone hears.
+      const cur = V3_Q[key];
+      if (cur && (cur.rows || cur.err || cur.p)) { if (!cur.p) bump(n => n + 1); return true; }
       const q = V3_Q[key] = { rows: null, err: null, build };   // build: what v3QRefresh reads again
       q.p = v3Attempt(v3Seeded(key, build), sb, b).then(r => { q.p = null; if (r && r.error) q.err = r.error.message || 'could not load'; else q.rows = (r && r.data) || []; },
                                          e => { q.p = null; q.err = String(e); })
-        .then(() => { if (!dead) bump(n => n + 1); });
+        .then(() => (V3_SUBS[key] || new Set()).forEach(f => f()));
       return true;
     };
     if (!go()) { iv = setInterval(() => { if (go()) { clearInterval(iv); iv = null; } }, 500); setTimeout(() => iv && clearInterval(iv), 30000); }
@@ -25692,7 +25697,7 @@ function V3Thread({ dest, go }) {
   const h = useV3Headline();
   const gc = useV3GoalCheck();
   const pp = useV3Rows('plan-progress-month', V3_PP_MONTH_Q);   // the month so far, before a goal is confirmed
-  const tg = useV3Rows('today-goal', V3_TODAY_GOAL_Q);          // the goal verdict, as Today's strip says it
+  const tg = v3GoalSeed(useV3Rows('today-goal', V3_TODAY_GOAL_Q));   // the goal verdict, as Today's strip says it
   const threadBoard = useV3Board();
   if (!h || dest === 'today') return null;
   if (h.can_show_cm === false) return null;
@@ -25702,7 +25707,9 @@ function V3Thread({ dest, go }) {
   // (Greta's re-worked month plan) under a Today that said "On track".
   const V = v3GoalVerdict(tg.rows && tg.rows[0], h.unreported_spend);
   const PP = pp.rows && pp.rows[0] && pp.rows[0].profit_after_ads;
-  const ppOk = !V && !!(PP && Number(PP.plan_total) > 0 && PP.status);
+  // 2 Nov: the month's word is for a brand with no confirmed goal. While the goal is still loading, or if the read failed,
+  // it said "ahead of plan" in green under a Today that said "On track, narrowly", so then the strip says neither.
+  const ppOk = !V && !!tg.rows && !!(PP && Number(PP.plan_total) > 0 && PP.status);
   const diff = ppOk ? Number(PP.gap) : null;
   const unreliable = diff != null && v3SpendCouldSwing(h.unreported_spend, diff);   // the month's own gap (P6)
   return (
