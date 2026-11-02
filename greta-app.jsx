@@ -20057,7 +20057,7 @@ function V3Website() {
         if (i < 0) return null;
         const g = String(live[i].description || '').match(/(\d+)% fewer of your visits end in an order than on your full-price weeks \(([\d.]+%) against ([\d.]+%)/);
         if (!g) return null;
-        return (<p className="v3-note v3-measure">The checkout move on Today measures something else: on Google Analytics’ count, {g[1]}% fewer visits end in an order than on your full-price weeks ({g[2]} against {g[3]}). This page compares Clarity’s count with a typical month, sale weeks included, so the two can differ.{' '}
+        return (<p className="v3-note v3-measure">The checkout move on Today measures something else: counting visits with Google Analytics, {g[1]}% fewer visits end in an order than on your full-price weeks ({g[2]} against {g[3]}). This page compares Clarity’s count with a typical month, sale weeks included, so the two can differ.{' '}
           <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('today')}>The move <span className="v3-xref-go">on Today →</span></button></p>);
       })()}
       {now.ws.length >= 2 && (<figure className="v3-chart">
