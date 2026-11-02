@@ -11214,12 +11214,23 @@ const V3_NARR = { data: null, asked: false };
 // The writer still drafts and checks every action server-side (greta_narrative); turn this on when a
 // stronger model writes them and a week of drafts reads true.
 const V3_WRITER_ACTIONS = false;
+// 3 Nov: the verdict is the first thing an owner reads and it came about 7 s in: the goal read takes about 2.7 s alone and
+// 5.6 s beside the page's other heavy reads, on a small database. So the start-up reads now wait for it as well as for the
+// story (the page head's GRETA_TODAY_READY, never later than 7 s, at once on any other page).
+const V3_TODAY_PARTS = { story: false, goal: false };
+function v3TodayPart(part) {
+  V3_TODAY_PARTS[part] = true;
+  if (V3_TODAY_PARTS.story && V3_TODAY_PARTS.goal) { try { window.GRETA_TODAY_DONE && window.GRETA_TODAY_DONE(); } catch (e) {} }
+}
+// A read Today can show a moment later: it waits at that same gate.
+const v3AfterToday = build => (sb, b) => (window.GRETA_TODAY_READY || Promise.resolve()).then(() => build(sb, b));
+const V3_NO_READ = () => Promise.resolve({ data: [] });
 function v3NarrLoad(b){
   if (V3_NARR.asked || !b) return;
   V3_NARR.asked = true;
   // Today is ready once its board is in and the story has come back, or 2.5s after the board:
   // the story must not hold the rest of the dashboard if the model is writing a fresh one.
-  const done = () => { try { window.GRETA_TODAY_DONE && window.GRETA_TODAY_DONE(); } catch (e) {} };
+  const done = () => v3TodayPart('story');
   const grace = setTimeout(done, 2500);
   // Eval 13 Oct (gap 11): a page view only reads the stored story (read_only: no model call, no write).
   // The scheduled writer writes it.
@@ -11259,7 +11270,7 @@ function v3BoardLoad(){
     .then(r => (r && r.error && /money_/.test(r.error.message || '')) ? ask(COLS, false) : r)
     .then(r => {
       V3_BOARD.loading = false;
-      if (r && r.error) { V3_BOARD.err = r.error.message || 'could not load'; v3BoardNotify(); try { window.GRETA_TODAY_DONE && window.GRETA_TODAY_DONE(); } catch (e) {} return; }
+      if (r && r.error) { V3_BOARD.err = r.error.message || 'could not load'; v3BoardNotify(); v3TodayPart('story'); return; }
       // 30 Oct eval: forecast status rows are not moves (v3IsStatusRow); dropped here so every list and count agrees
       const rows = ((r && r.data) || []).filter(x => !v3IsStatusRow(x));
       // With board_rank the server order is final. Without it, reapply "unverified last"
@@ -11270,7 +11281,7 @@ function v3BoardLoad(){
       V3_BOARD.err = null;
       v3BoardNotify();
       v3NarrLoad(b);
-    }, () => { V3_BOARD.loading = false; V3_BOARD.err = 'could not load'; v3BoardNotify(); try { window.GRETA_TODAY_DONE && window.GRETA_TODAY_DONE(); } catch (e) {} });
+    }, () => { V3_BOARD.loading = false; V3_BOARD.err = 'could not load'; v3BoardNotify(); v3TodayPart('story'); });
   return true;
 }
 // Closing a row anywhere closes it everywhere: the badge, Today's list and the board agree.
@@ -18321,7 +18332,7 @@ function v3ShortStep(t) {
 // what it does elsewhere, the assumption behind "How sure?", and Do it / Not now / Dismiss.
 // fn_today_goal is 2-4 s (it works the quarter's pace), so it is its own read and a skeleton holds its place.
 const V3_TODAY_GOAL_Q = (sb, b) => sb.rpc('fn_today_goal', { p_brand: b })
-  .then(r => ({ data: r && r.data ? [r.data] : [], error: r ? r.error : null }));
+  .then(r => { v3TodayPart('goal'); return { data: r && r.data ? [r.data] : [], error: r ? r.error : null }; }, e => { v3TodayPart('goal'); throw e; });
 // The board folded by lever (action_lever), each row's period and the small-item floor, from the server.
 const V3_BOARD_MOVES_Q = (sb, b) => sb.rpc('fn_board_moves', { p_brand: b })
   .then(r => ({ data: r && r.data ? [r.data] : [], error: r ? r.error : null }));
@@ -19063,7 +19074,6 @@ function V3AgentLead({ q, gc, board, unreported }) {
   const [sinceOpen, setSinceOpen] = React.useState(false);
   const st = useV3Rows('brand-state', V3_STATE_Q);
   const sh = useV3Rows('sign-history', V3_SIGN_HIST_Q);
-  const pp = useV3Rows('plan-progress-quarter', V3_PP_QUARTER_Q);
   const ph = useV3Rows('goal-phasing', V3_GOAL_PHASING_Q);
   const lad = useV3Rows('profit-ladder', V3_LADDER_Q);
   const fr = useV3Rows('source-freshness', V3_FRESH_Q);
@@ -19071,6 +19081,11 @@ function V3AgentLead({ q, gc, board, unreported }) {
   const bm = useV3Rows('board-moves', V3_BOARD_MOVES_Q);
   const g = q.rows && q.rows[0];
   const V = v3GoalVerdict(g, unreported);
+  // 3 Nov: the goal read has already worked out the quarter's progress, and since 1154 returns its months. Asking for them
+  // again cost 2 s of database at the worst moment, for one bend in the chart's forecast line. A goal read from before 1154
+  // still asks, once it has landed. A remembered goal never does: the live one is on its way.
+  const askMonths = !!V && !q.seeded && !Array.isArray(g.series);
+  const pp = useV3Rows(askMonths ? 'plan-progress-quarter' : 'plan-progress-none', askMonths ? V3_PP_QUARTER_Q : V3_NO_READ);
   const since = useV3SinceLook(g, board.rows ? v3LiveRows(board.rows) : null);
   // no confirmed goal, no forecast, or a failed read: the plain strip says what is missing and asks for it
   if (!g || !V) {
@@ -19079,7 +19094,7 @@ function V3AgentLead({ q, gc, board, unreported }) {
       <V3AskBar dest="today"/></>);
   }
   const PP = pp.rows && pp.rows[0], phasing = ph.rows && ph.rows[0] && ph.rows[0].confirmed_phasing;
-  const P = v3GoalPaths(g, PP && PP.series, phasing, lad.rows);
+  const P = v3GoalPaths(g, Array.isArray(g.series) ? g.series : PP && PP.series, phasing, lad.rows);
   const src = v3Sources(fr.rows), live = board.rows ? v3LiveRows(board.rows) : [];
   const checked = live.filter(r => r.days_since_refresh != null && Number(r.days_since_refresh) <= 0).length;
   const R = bm.rows && bm.rows[0], takenOn = R && Array.isArray(R.rows) ? R.rows.filter(r => r.taken_on).length : 0;
@@ -19180,8 +19195,8 @@ function V3TodayLead() {
 // fn_brand_setup: each money figure's source from the anatomy's own state (Shopify, Ad accounts, You entered,
 // Estimated, Waiting for data), the order lines sold with no product cost, and the five setup steps. One read a
 // page load, shared by every tag.
-const V3_SETUP_Q = (sb, b) => sb.rpc('fn_brand_setup', { p_brand: b })
-  .then(r => ({ data: r && r.data ? [r.data] : [], error: r ? r.error : null }));
+const V3_SETUP_Q = v3AfterToday((sb, b) => sb.rpc('fn_brand_setup', { p_brand: b })
+  .then(r => ({ data: r && r.data ? [r.data] : [], error: r ? r.error : null })));
 function useV3Setup() { const q = useV3Rows('brand-setup', V3_SETUP_Q); return (q.rows && q.rows[0]) || null; }
 function v3Source(id) {
   const q = V3_Q['brand-setup'], s = q && q.rows && q.rows[0];
@@ -19258,8 +19273,6 @@ function V3Today(p) {
   const stateQ = useV3Rows('brand-state', V3_STATE_Q);
   const stateLead = !!(stateQ.rows && stateQ.rows[0] && stateQ.rows[0].last_30);
   const gc = useV3GoalCheck();  // pace is withheld while the goal needs re-planning or has just begun
-  // The month so far against the plan (fn_plan_progress): the same answer Goal, Growth and Calendar give.
-  const ppT = useV3Rows('plan-progress-month', V3_PP_MONTH_Q);
   // A typical month (shared with Profit & sales), and the quarter plan's pace for the seasonal note.
   const ladT = useV3Rows('profit-ladder', V3_LADDER_Q);
   const hT = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || null;
@@ -19323,12 +19336,6 @@ function V3Today(p) {
   const confirmed = d.plan_status === 'confirmed';
   // Guard the divisor, not the truthiness: a zero target used to hide the bar while the
   // pounds-ahead line underneath kept rendering off the same number.
-  // Progress is the month so far against what the month's plan expects by now (fn_plan_progress),
-  // not the last 30 days against a whole month's target: those two windows never lined up.
-  const PPT = ppT.rows && ppT.rows[0] ? ppT.rows[0] : null;
-  const ppP = PPT && PPT.profit_after_ads && Number(PPT.profit_after_ads.plan_total) > 0 && PPT.profit_after_ads.status ? PPT.profit_after_ads : null;
-  const ppMonth = PPT ? gpMonthName(PPT.start) : '';
-  const ppPct = (v, of) => Math.max(0, Math.min(100, (Number(v) || 0) / of * 100));
   // The cache paints first; the live board, once it has landed, is what every list reads.
   const liveRows = board.rows ? v3FoldPlans(v3LiveRows(board.rows)) : null;
   const top = (topDone && closedTop.current) ? closedTop.current : (liveRows ? (liveRows[0] || null) : d.top_action);
@@ -19639,7 +19646,7 @@ function V3FcErr() {
 }
 // One stock list (fn_stock_reorder + fn_stock_reorder_summary, 0924): the order lines and their totals,
 // the same rows the board's stock action, cash to peak and the snapshot read.
-const V3_STOCK_LIST_Q = (sb, b) => sb.rpc('fn_stock_reorder', { p_brand: b }).then(r => ({ data: Array.isArray(r.data) ? r.data : [], error: r.error }));
+const V3_STOCK_LIST_Q = v3AfterToday((sb, b) => sb.rpc('fn_stock_reorder', { p_brand: b }).then(r => ({ data: Array.isArray(r.data) ? r.data : [], error: r.error })));
 const V3_STOCK_SUM_Q = (sb, b) => sb.rpc('fn_stock_reorder_summary', { p_brand: b }).then(r => ({ data: r.data ? [r.data] : [], error: r.error }));
 const V3_UE_Q = (sb, b) => sb.from('vw_brand_unit_economics')
     .select('cac,ltv_contribution,ltv_rev,ltv_horizon_months,ltv_cac,payback_orders,first_order_contribution').eq('brand_id', b).limit(1);
@@ -25696,8 +25703,10 @@ function useV3NavSignals() {
 function V3Thread({ dest, go }) {
   const h = useV3Headline();
   const gc = useV3GoalCheck();
-  const pp = useV3Rows('plan-progress-month', V3_PP_MONTH_Q);   // the month so far, before a goal is confirmed
   const tg = v3GoalSeed(useV3Rows('today-goal', V3_TODAY_GOAL_Q));   // the goal verdict, as Today's strip says it
+  // the month so far, before a goal is confirmed: Today has no band, and a brand with a verdict never says the month's word
+  const wantMonth = dest !== 'today' && !!tg.rows && !v3GoalVerdict(tg.rows[0], h && h.unreported_spend);
+  const pp = useV3Rows(wantMonth ? 'plan-progress-month' : 'plan-progress-none', wantMonth ? V3_PP_MONTH_Q : V3_NO_READ);
   const threadBoard = useV3Board();
   if (!h || dest === 'today') return null;
   if (h.can_show_cm === false) return null;
