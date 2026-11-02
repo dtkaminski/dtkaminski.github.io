@@ -18328,17 +18328,18 @@ const V3_BOARD_MOVES_Q = (sb, b) => sb.rpc('fn_board_moves', { p_brand: b })
 // The parts of a move the board view does not carry: its range, its route through the business, and whether the
 // owner has taken it on.
 const V3_MOVE_EXTRAS_Q = (sb, b) => sb.from('actions')
-  .select('external_id,lo:metadata->money->low_gbp,hi:metadata->money->high_gbp,routes:metadata->graph_path->routes,accepted_at:metadata->>accepted_at')
+  .select('external_id,win:predicted_window_days,lo:metadata->money->low_gbp,hi:metadata->money->high_gbp,routes:metadata->graph_path->routes,accepted_at:metadata->>accepted_at')
   .eq('brand_id', b).eq('status', 'open');
 function v3BoardMoves() { const q = V3_Q['board-moves']; return (q && q.rows && q.rows[0]) || null; }
 function v3MoveExtra(ext) {
   const q = V3_Q['move-extras'];
   return (q && Array.isArray(q.rows) && q.rows.find(r => r.external_id === ext)) || null;
 }
-// The card's confidence word (UX brief, 26 Oct): Measured, Estimated or Assumed, from the one ladder. A figure that
-// rests on a stated assumption is Assumed; the ladder's top two rungs are Measured; the rest are Estimated.
+// The card's confidence word (UX brief, 26 Oct): from the one ladder. A figure that rests on a stated assumption is Assumed;
+// the ladder's top two rungs are From your data; the rest are Estimated. 2 Nov eval: this word was "Measured", beside what a
+// move is expected to bring. The inputs are measured; the GBP is a forecast until Results checks it.
 const V3_MOVE_SURE = {
-  measured: { label: 'Measured', why: 'Worked from your own orders and spend.' },
+  measured: { label: 'From your data', why: 'Worked from your own orders and spend. The figure is what Greta expects it to bring; Results checks it once you have done it.' },
   estimated: { label: 'Estimated', why: 'Partly your own figures and partly a rule of thumb. Right in direction; check before a big bet.' },
   assumed: { label: 'Assumed', why: 'It rests on an assumption, set out below. Worth knowing; try it where it is cheap to undo.' },
 };
@@ -18347,6 +18348,45 @@ function v3MoveSure(row) {
   if (row.money_assumption) return 'assumed';
   const r = v3MoneyConf(row);
   return r === 'direct' || r === 'likely' ? 'measured' : r ? 'estimated' : null;
+}
+// 2 Nov eval: "the queue is still a text report". A move's evidence as a picture: the products it orders against the
+// day an order would land, or the rate or cost it wants back, then and now. Figures are the move's own (its text, or the
+// same list the stock move reads); nothing is worked out here. A move with neither shows no picture.
+function V3MoveRunway() {
+  const q = useV3Rows('stock-list', V3_STOCK_LIST_Q);
+  const rows = (q.rows || []).filter(r => Number(r.order_units) > 0).slice(0, 4);
+  if (!rows.length) return null;
+  const lead = Number(rows[0].lead_days) || 0;
+  const span = Math.max(lead * 1.5, ...rows.map(r => Math.min(Number(r.days_left) || 0, lead * 2)), 1);
+  return (<figure className="v3-mvviz v3-mvrun" aria-label="Days of stock left against when an order would land">
+    <figcaption>Days of stock left <span>· the line is {v3Day(String(rows[0].lands_on).slice(0, 10))}, when an order placed today lands</span></figcaption>
+    {rows.map(r => { const d = Number(r.days_left) || 0;
+      return (<div className="v3-mvrun-row" key={r.sku || r.product_title}>
+        <span className="v3-mvrun-k">{r.product_title}</span>
+        <span className="v3-mvrun-track"><i className={d < lead ? 'short' : ''} style={{ width: Math.max(1, Math.min(100, d / span * 100)) + '%' }}/><b style={{ left: (lead / span * 100) + '%' }}/></span>
+        <span className="v3-mvrun-v">{Number(r.out_of_stock) || r.out_of_stock === true ? 'Out' : fmtCount(d) + ' days'}</span>
+      </div>); })}
+  </figure>);
+}
+function V3MoveViz({ row }) {
+  const id = String(row.external_id || ''), d = String(row.description || '');
+  if (id === 'stock-reorder') return <V3MoveRunway/>;
+  let was = null, now = null, labWas = '', labNow = 'Now', suf = '', pre = '';
+  if (id === 'site-funnel-weakstep') {
+    const m = d.match(/\(([\d.]+)% against ([\d.]+)%/);
+    if (m) { now = Number(m[1]); was = Number(m[2]); labWas = 'Your full-price weeks'; suf = '%'; }
+  } else if (/^order-cost-/.test(id)) {
+    const m = d.match(/costs? £([\d,.]+) for each order[^.]*?up from £([\d,.]+)/);
+    if (m) { now = Number(m[1].replace(/,/g, '')); was = Number(m[2].replace(/,/g, '')); labWas = 'The 12 weeks before'; pre = '£'; }
+  }
+  if (was == null || now == null || !(Math.max(was, now) > 0)) return null;
+  const top = Math.max(was, now);
+  return (<figure className="v3-mvviz v3-mvcmp" aria-label={labWas + ' ' + pre + was + suf + ', now ' + pre + now + suf}>
+    {[[labWas, was, ''], [labNow, now, 'now']].map(([k, v, c]) => (<div className="v3-mvrun-row" key={k}>
+      <span className="v3-mvrun-k">{k}</span>
+      <span className="v3-mvrun-track"><i className={c} style={{ width: (v / top * 100) + '%' }}/></span>
+      <span className="v3-mvrun-v">{pre}{v}{suf}</span></div>))}
+  </figure>);
 }
 // What a move does on its way to profit, in owner words: the steps of its route through the business
 // (graph_path.routes, the anatomy's own links). Profit itself and the lever are left out; at most three.
@@ -18436,6 +18476,7 @@ function V3MoveDecide({ row, small, onDecided }) {
   const [said, setSaid] = React.useState(null);
   const [pick, setPick] = React.useState('');      // a reason chip (1141)
   const [sent, setSent] = React.useState(false);   // "something looks wrong" went to the server
+  const [moreOpen, setMoreOpen] = React.useState(false);   // Dismiss and "something looks wrong", one press away
   if (!ext) return null;
   // A dead feed is a fact Greta checks, not a choice: the only move is to reconnect it.
   if (connProvider(ext)) return <div className="v3-mv-btns"><V3Fix provider={connProvider(ext)} small={small}/></div>;
@@ -18483,13 +18524,14 @@ function V3MoveDecide({ row, small, onDecided }) {
     {!mode && <div className="v3-mv-btns">
       {accepted
         ? <button type="button" className={cls + ' v3-btn-p'} disabled={busy} onClick={() => go('done')}>{busy ? 'Saving…' : 'Mark done'}</button>
-        : <button type="button" className={cls + ' v3-btn-p'} disabled={busy} onClick={() => go('do')}>{busy ? 'Saving…' : 'Do it'}</button>}
+        : <button type="button" className={cls + ' v3-btn-p'} disabled={busy} onClick={() => go('do')}>{busy ? 'Saving…' : 'I’ll do this'}</button>}
       <button type="button" className={cls} disabled={busy} onClick={() => { setMode('later'); setErr(''); }}>Not now</button>
-      <button type="button" className={cls + ' v3-btn-q v3-mv-quiet'} disabled={busy} onClick={() => { setMode('dismiss'); setErr(''); }}>Dismiss</button>
-      <button type="button" className={cls + ' v3-btn-q v3-mv-quiet'} disabled={busy} onClick={() => { setMode('wrong'); setErr(''); setSent(false); }}>Something looks wrong?</button>
+      {!moreOpen && <button type="button" className={cls + ' v3-btn-q v3-mv-quiet'} aria-label="More choices" onClick={() => setMoreOpen(true)}>More</button>}
+      {moreOpen && <button type="button" className={cls + ' v3-btn-q v3-mv-quiet'} disabled={busy} onClick={() => { setMode('dismiss'); setErr(''); }}>Dismiss</button>}
+      {moreOpen && <button type="button" className={cls + ' v3-btn-q v3-mv-quiet'} disabled={busy} onClick={() => { setMode('wrong'); setErr(''); setSent(false); }}>Something looks wrong?</button>}
     </div>}
     {sent && !mode && <p className="v3-mv-said" role="status">Sent to the Greta team. Thank you.</p>}
-    {!accepted && !mode && place && <p className="v3-mv-note">Do it opens {place.label} in a new tab, with the steps here.</p>}
+    {!accepted && !mode && place && <p className="v3-mv-note">This opens {place.label} in a new tab, with the steps here.</p>}
     {accepted && !mode && <V3MovePlaces ext={ext}/>}
     {mode && <div className="v3-mv-form">
       <V3WhyChips list={V3_WHY[mode]} pick={pick} setPick={setPick} label={mode === 'wrong' ? 'What looks wrong?' : 'Why?'}/>
@@ -18652,7 +18694,7 @@ function V3MoveRange({ lo, hi, at }) {
 }
 // One card for every move. `rank` numbers it; `closes` is its share of the goal gap (Today only); `meta` is the
 // Actions page's line (area, when raised, when checked); `dense` tightens it for a list.
-function V3MoveCard({ row, rank, closes, closesTo, meta, dense, onDecided }) {
+function V3MoveCard({ row, rank, closes, closesTo, meta, dense, onDecided, maxGbp }) {
   const [show, setShow] = React.useState(null);   // null | 'else' | 'sure'
   if (!row) return null;
   const pa = v3PlainAction(Object.assign({}, row, { plan: null }));
@@ -18679,8 +18721,11 @@ function V3MoveCard({ row, rank, closes, closesTo, meta, dense, onDecided }) {
         <span className="v3-mv-gbp">{v3Gbp(gbp)}</span>
         <span className="v3-mv-per">{isStock ? 'protected ' : ''}{v3Per(row)}{row.money_is_sales ? ', in sales' : ''}</span>
         {sure && <span className={'v3-mv-sure v3-mv-sure-' + sure}>{V3_MOVE_SURE[sure].label}</span>}
+        {/* size is seen, not read: this move against the biggest on the list */}
+        {maxGbp > 0 && <span className="v3-mv-size" aria-hidden="true"><i style={{ width: Math.max(3, gbp / maxGbp * 100) + '%' }}/></span>}
       </div>}
     </div>
+    {!dense && <V3MoveViz row={row}/>}
     {gbp > 0 && <V3MoveRange lo={ex && ex.lo} hi={ex && ex.hi} at={gbp}/>}
     {closes != null && <p className="v3-mv-closes">Closes about <b>{v3Gbp(closes)}</b> of the gap {closesTo}.</p>}
     {/* 30 Oct: one row of controls, not two -- the decision first, then the two questions about it */}
@@ -18689,6 +18734,8 @@ function V3MoveCard({ row, rank, closes, closesTo, meta, dense, onDecided }) {
       <div className="v3-mv-more">
         <button type="button" className="v3-mv-toggle" aria-expanded={show === 'sure'} onClick={() => setShow(s => s === 'sure' ? null : 'sure')}>How sure?</button>
         {knock.length > 0 && <button type="button" className="v3-mv-toggle" aria-expanded={show === 'else'} onClick={() => setShow(s => s === 'else' ? null : 'else')}>What it does elsewhere</button>}
+        {/* the agent's promise, on the move it is about */}
+        {ex && Number(ex.win) > 0 && <span className="v3-mv-check">Greta checks it {fmtCount(Number(ex.win))} days after you mark it done</span>}
       </div>
     </div>
     {show === 'else' && <p className="v3-mv-open">On its way to your profit it also moves {v3AndList(knock)}.</p>}
@@ -18724,8 +18771,13 @@ function v3GoalVerdict(g, unreported) {
   const close = v3SpendCouldSwing(unreported, gap);
   const on = g.status === 'on_track';
   const ahead = g.ahead_gbp != null ? Number(g.ahead_gbp) : null;
-  return { on, close, gap, ahead, word: close ? 'Too close to call' : on ? 'On track' : 'Off track',
-    cls: close ? '' : on ? 'good' : 'bad', tone: close ? '' : on ? 'good' : 'bad',
+  // 2 Nov eval: "On track" read the same at GBP 47,670 ahead as it did with today's pace only GBP 785 over the goal. The status
+  // is the server's; the word says how much it rests on: the plan alone, or a pace within 2% of the goal.
+  const pace = g.pace_finish != null ? Number(g.pace_finish) : null, tgt = Number(g.target) || 0;
+  const planOnly = on && pace != null && pace < tgt, narrow = on && pace != null && pace >= tgt && pace - tgt < Math.abs(tgt) * 0.02;
+  const soft = planOnly || narrow;
+  return { on, close, gap, ahead, soft, word: close ? 'Too close to call' : planOnly ? 'On track if the plan holds' : narrow ? 'On track, narrowly' : on ? 'On track' : 'Off track',
+    cls: close ? '' : soft ? 'warn' : on ? 'good' : 'bad', tone: close ? '' : soft ? 'warn' : on ? 'good' : 'bad',
     // "£959 behind what your goal expected by 29 Oct", the figure Today and Calendar both print
     toDate: ahead == null ? null : v3Gbp(Math.abs(ahead)) + (ahead >= 0 ? ' ahead of' : ' behind') + ' what your goal expected by ' + v3Day(g.counted_through) };
 }
@@ -18806,6 +18858,7 @@ function V3TodayMoves({ q, board, gc }) {
   // The server sums its own top three (together_gbp); a status row left off the list would still be in that sum,
   // so add up the three cards shown. With nothing left off the two agree.
   const top3 = moves.slice(0, 3);
+  const maxGbp = Math.max(0, ...moves.map(m => Number(m.row.cm_gbp) || 0));
   const sm = Array.isArray(g && g.moves) ? g.moves.slice(0, 3) : [];
   const together = !shared ? null : top3.length === sm.length && top3.every((m, i) => m.row.external_id === sm[i].external_id)
     ? Number(g.together_gbp) : top3.reduce((t, m) => t + (Number(m.closes) || 0), 0);
@@ -18813,17 +18866,20 @@ function V3TodayMoves({ q, board, gc }) {
   const total = v3LiveRows(board.rows).length;
   // a decision refreshes the goal and the moves itself (v3QRefresh), keeping these rows on screen meanwhile
   return (<section className="v3-mvlist">
-    <p className="v3-goal-lab">{shared ? 'The moves that close it, in order' : 'Your moves, in order'}</p>
-    {moves.slice(0, 3).map((m, i) => <V3MoveCard key={m.row.external_id} row={m.row} rank={i + 1}
+    <p className="v3-goal-lab" id="v3-queue">{shared && gap > 0 ? 'Waiting on you · the moves that close it' : 'Waiting on you · in order'}</p>
+    {moves.slice(0, 3).map((m, i) => <V3MoveCard key={m.row.external_id} row={m.row} rank={i + 1} maxGbp={maxGbp}
       closes={shared && gap > 0 ? m.closes : null} closesTo={to}/>)}
+    {shared && together > 0 && top3.some(m => Number(m.closes) > 0) && <div className="v3-mvstack" aria-hidden="true">
+      {top3.filter(m => Number(m.closes) > 0).map((m, i) => <i key={m.row.external_id} className={'s' + (i + 1)} style={{ flexGrow: Number(m.closes) }}>{i + 1}</i>)}
+    </div>}
     {shared && together > 0 && (gap > 0
       ? <p className="v3-mvlist-total">{together >= gap
           ? <>Together these more than close your <b>{v3Gbp(gap)}</b> gap {to}, if each starts this week.</>
           : <>Together these close <b>{v3Gbp(together)}</b> of your <b>{v3Gbp(gap)}</b> gap {to}, if each starts this week.</>}</p>
-      : <p className="v3-mvlist-total">{g.status === 'on_track' && !v3SpendCouldSwing(hd.unreported_spend, gap) ? 'You are on track. ' : ''}Together these add about <b>{v3Gbp(together)}</b> {to}, if each starts this week.</p>)}
+      : <p className="v3-mvlist-total">{g.status === 'on_track' && !v3SpendCouldSwing(hd.unreported_spend, gap) && !(v3GoalVerdict(g, hd.unreported_spend) || {}).soft ? 'You are on track. ' : ''}Together these add about <b>{v3Gbp(together)}</b> {to}, if each starts this week.</p>)}
     {moves.length > 3 && <div className="v3-mvlist-more">
       <p className="v3-kick">Then</p>
-      {moves.slice(3).map((m, i) => <V3MoveCard key={m.row.external_id} row={m.row} rank={i + 4} dense
+      {moves.slice(3).map((m, i) => <V3MoveCard key={m.row.external_id} row={m.row} rank={i + 4} dense maxGbp={maxGbp}
         closes={shared && gap > 0 ? m.closes : null} closesTo={to}/>)}
     </div>}
     <V3UnpricedLane compact/>
@@ -18844,6 +18900,269 @@ function v3GoalSeed(q) {
   } catch (e) {}
   return q;
 }
+// ── The agent lead (2 Nov) ──────────────────────────────────────────────────────────────────────────────
+// Dan, looking at Today: "lots of words and not many graphs... it needs to feel like an agentic dashboard". The first
+// screen now shows Greta at work: her verdict, the quarter as one picture, and what she is watching, re-checking and
+// waiting on. Only what she really does: she reads, prices, ranks and checks; the owner decides and acts.
+const V3_FRESH_Q = (sb, b) => sb.from('cache_brand_source_freshness').select('source,last_date,stale_days,status').eq('brand_id', b);
+const V3_GOAL_PHASING_Q = (sb, b) => sb.from('mos_business_goal').select('confirmed_phasing')
+  .eq('brand_id', b).eq('status', 'active').eq('confirmed', true).order('updated_at', { ascending: false }).limit(1);
+const V3_SOURCE_NAME = { shopify_orders: 'Shopify', meta_ads: 'Meta', meta_ads_ad_level: 'Meta', google_ads: 'Google Ads', ga4_daily: 'Google Analytics', ga4_items: 'Google Analytics',
+  klaviyo: 'Klaviyo', gsc: 'Search Console', tiktok_ads: 'TikTok', tiktok: 'TikTok', clarity: 'Clarity' };
+function v3Sources(rows) {
+  const by = {};
+  (rows || []).forEach(r => { const n = V3_SOURCE_NAME[r.source] || String(r.source).replace(/_/g, ' ');
+    const ok = !/stale|stopped|missing|late/i.test(String(r.status || ''));
+    by[n] = by[n] === undefined ? ok : (by[n] && ok); });
+  return Object.keys(by).map(n => ({ name: n, ok: by[n] }));
+}
+const v3Ms = d => new Date(String(d).slice(0, 10) + 'T00:00:00Z').getTime();
+function v3MonthEnd(m) { return v3IsoAdd(v3MonthAdd(String(m).slice(0, 10), 1), -1); }
+// The quarter as three lines. Goal: the split the owner confirmed. Actual: each day's sales and ads, at the one kept margin
+// that makes them add up to the server's figure so far, so the line ends exactly on it (the headline's own method). Forecast:
+// from there along what the plan expects for the days left, ending on the server's forecast. Nothing here is a new figure.
+function v3GoalPaths(g, series, phasing, ladder) {
+  const start = String(g.period_start).slice(0, 10), end = String(g.period_end).slice(0, 10);
+  const thru = String(g.counted_through || new Date().toISOString()).slice(0, 10);
+  const soFar = Number(g.so_far) || 0, target = Number(g.target) || 0, fc = Number(g.forecast) || 0;
+  const goal = [{ d: start, v: 0 }];
+  if (Array.isArray(phasing) && phasing.length) {
+    let t = 0; phasing.forEach(m => { t += Number(m.cam) || 0; goal.push({ d: v3MonthEnd(m.month), v: t }); });
+  } else goal.push({ d: end, v: target });
+  const days = (ladder || []).filter(r => String(r.day).slice(0, 10) >= start && String(r.day).slice(0, 10) <= thru);
+  const S = days.reduce((a, r) => a + (Number(r.net_sales) || 0), 0), P = days.reduce((a, r) => a + (Number(r.paid_spend) || 0), 0);
+  let actual = [{ d: start, v: 0 }, { d: thru, v: soFar }];
+  if (days.length >= 3 && S > 0) {
+    const m = (soFar + P) / S; let t = 0;
+    actual = [{ d: start, v: 0 }].concat(days.map(r => { t += (Number(r.net_sales) || 0) * m - (Number(r.paid_spend) || 0); return { d: String(r.day).slice(0, 10), v: t }; }));
+  }
+  const forecast = [{ d: thru, v: soFar }];
+  let run = soFar;
+  (series || []).forEach(m => { const me = v3MonthEnd(m.month); if (me <= thru) return;
+    run += (Number(m.plan_profit_after_ads) || 0) - (Number(m.actual_profit_after_ads) || 0); forecast.push({ d: me, v: run }); });
+  if (forecast.length < 2) forecast.push({ d: end, v: fc }); else forecast[forecast.length - 1].v = fc;
+  return { start, end, thru, goal, actual, forecast };
+}
+function v3Interp(pts, ms) {
+  if (!pts.length) return null;
+  if (ms <= v3Ms(pts[0].d)) return pts[0].v;
+  for (let i = 1; i < pts.length; i++) { const a = v3Ms(pts[i - 1].d), b = v3Ms(pts[i].d);
+    if (ms <= b) return b === a ? pts[i].v : pts[i - 1].v + (pts[i].v - pts[i - 1].v) * (ms - a) / (b - a); }
+  return pts[pts.length - 1].v;
+}
+function V3GoalChart({ P, g }) {
+  const ref = React.useRef(null);
+  const [w, setW] = React.useState(640);
+  const [hover, setHover] = React.useState(null);
+  React.useEffect(() => {
+    const el = ref.current; if (!el) return;
+    const read = () => { const n = el.getBoundingClientRect().width; if (n > 0) setW(Math.round(n)); };
+    read();
+    if (!('ResizeObserver' in window)) { window.addEventListener('resize', read); return () => window.removeEventListener('resize', read); }
+    const ro = new ResizeObserver(read); ro.observe(el); return () => ro.disconnect();
+  }, []);
+  const H = w < 520 ? 160 : 200, top = 12, bottom = 24, right = w < 520 ? 84 : 116;
+  const x0 = v3Ms(P.start), x1 = v3Ms(P.end);
+  const all = P.goal.concat(P.actual, P.forecast).map(p => p.v).concat(g.pace_finish != null ? [Number(g.pace_finish)] : []);
+  const lo = Math.min(0, ...all), hi = Math.max(...all, 1);
+  const X = ms => (ms - x0) / (x1 - x0 || 1) * (w - right);
+  const Y = v => top + (1 - (v - lo) / (hi - lo || 1)) * (H - top - bottom);
+  const path = pts => pts.map((p, i) => (i ? 'L' : 'M') + X(v3Ms(p.d)).toFixed(1) + ' ' + Y(p.v).toFixed(1)).join(' ');
+  const a = P.actual, last = a[a.length - 1];
+  // 2 Nov eval: the forecast follows the plan for the days left. Beside it, where the last 30 days' pace would land
+  // (the server's pace_finish): frkl's plan lands on GBP 27,945 and its pace on GBP 8,474, and one line alone overclaims.
+  const pace = g.pace_finish != null ? Number(g.pace_finish) : null;
+  const showPace = pace != null && Math.abs(pace - Number(g.forecast)) >= Math.max(1, Math.abs(Number(g.forecast)) * 0.05);
+  const area = path(a) + ' L' + X(v3Ms(last.d)).toFixed(1) + ' ' + Y(lo).toFixed(1) + ' L' + X(x0).toFixed(1) + ' ' + Y(lo).toFixed(1) + ' Z';
+  const months = []; let mm = P.start.slice(0, 7) + '-01';
+  while (mm <= P.end) { months.push(mm); mm = v3MonthAdd(mm, 1); }
+  const today = v3Ms(P.thru);
+  const yF = Y(Number(g.forecast)), yG = Y(Number(g.target));
+  // the end labels never sit on each other: 30 apart at least, two lines each, kept inside the chart
+  const lx = w - right + 8;
+  const labs = [{ k: 'Forecast', v: g.forecast, y: yF, c: 'v3-al-lab v3-al-lab-fc' }, { k: 'Goal', v: g.target, y: yG, c: 'v3-al-lab' }]
+    .concat(showPace ? [{ k: w < 520 ? 'At pace' : 'At today’s pace', v: pace, y: Y(pace), c: 'v3-al-lab v3-al-lab-pace' }] : []).sort((p, q) => p.y - q.y);
+  labs.forEach((l, i) => { l.at = Math.max(l.y, i ? labs[i - 1].at + 30 : top); });
+  const over = labs[labs.length - 1].at - (H - bottom - 14);
+  if (over > 0) labs.forEach(l => { l.at -= over; });
+  const move = e => {
+    const r = ref.current.getBoundingClientRect();
+    const ms = x0 + Math.max(0, Math.min(1, (e.clientX - r.left) / (w - right))) * (x1 - x0);
+    setHover({ ms, past: ms <= today });
+  };
+  const hv = hover ? (hover.past ? v3Interp(P.actual, hover.ms) : v3Interp(P.forecast, hover.ms)) : null;
+  const hg = hover ? v3Interp(P.goal, hover.ms) : null;
+  return (<figure className="v3-al-chart" ref={ref} onPointerMove={move} onPointerLeave={() => setHover(null)}
+    aria-label={'Profit after ads this quarter: ' + v3Gbp(g.so_far) + ' so far, forecast ' + v3Gbp(g.forecast) + ', goal ' + v3Gbp(g.target)}>
+    <svg width={w} height={H} viewBox={'0 0 ' + w + ' ' + H} role="img" aria-hidden="true">
+      <defs><linearGradient id="v3AlArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" className="v3-al-stop-a"/><stop offset="100%" className="v3-al-stop-b"/></linearGradient></defs>
+      {months.map(m => <g key={m}><line className="v3-al-grid" x1={X(v3Ms(m))} x2={X(v3Ms(m))} y1={top} y2={H - bottom}/>
+        <text className="v3-al-tick" x={X(v3Ms(m)) + 6} y={H - 6}>{gpMonthName(m).slice(0, 3)}</text></g>)}
+      <line className="v3-al-base" x1="0" x2={w - right} y1={Y(lo)} y2={Y(lo)}/>
+      {months.length > 0 && <line className="v3-al-grid" x1={w - right} x2={w - right} y1={top} y2={H - bottom}/>}
+      <path className="v3-al-goal" d={path(P.goal)}/>
+      <path d={area} fill="url(#v3AlArea)"/>
+      <path className="v3-al-fc" d={path(P.forecast)}/>
+      {showPace && <path className="v3-al-range" d={path(P.forecast) + ' L' + X(x1).toFixed(1) + ' ' + Y(pace).toFixed(1) + ' Z'}/>}
+      {showPace && <path className="v3-al-pace" d={'M' + X(today).toFixed(1) + ' ' + Y(last.v).toFixed(1) + ' L' + X(x1).toFixed(1) + ' ' + Y(pace).toFixed(1)}/>}
+      <path className="v3-al-act" d={path(a)}/>
+      <line className="v3-al-today" x1={X(today)} x2={X(today)} y1={top - 8} y2={H - bottom}/>
+      <circle className="v3-al-dot" cx={X(v3Ms(last.d))} cy={Y(last.v)} r="4"/>
+      {labs.map(l => <text key={l.k} className={l.c} x={lx} y={l.at}><tspan x={lx} className="v3-al-lab-k">{l.k}</tspan><tspan x={lx} dy="14">{v3Gbp(l.v)}</tspan></text>)}
+      {hover && <line className="v3-al-hover" x1={X(hover.ms)} x2={X(hover.ms)} y1={top} y2={H - bottom}/>}
+    </svg>
+    {hover && hv != null && <figcaption className={'v3-al-tip' + (X(hover.ms) > w * 0.6 ? ' left' : '')} style={{ left: (X(hover.ms) / w * 100) + '%' }}>
+      <b>{v3Day(new Date(hover.ms).toISOString().slice(0, 10))}</b>
+      <span>{hover.past ? 'Kept' : 'Forecast'} <em>{v3Gbp(Math.round(hv))}</em></span>
+      <span>Goal by then <em>{v3Gbp(Math.round(hg))}</em></span></figcaption>}
+  </figure>);
+}
+// 2 Nov eval: "an agent has a past and a future; this page only has a present". What changed since this browser last
+// looked: the forecast, new moves, moves that climbed, moves that left. The last two looks are kept per brand; a new look
+// starts after 6 hours, so reloading in one morning keeps the same handover. Before there is a last look, the moves raised
+// today. Facts only: nothing here says why. (A server read of regression_snapshot.board would carry this across devices.)
+const V3_LOOK_GAP = 6 * 3600 * 1000;
+function useV3SinceLook(g, live) {
+  const ready = !!(g && g.confirmed && g.forecast != null && live && live.length);
+  const b = (typeof window !== 'undefined' && window.FRKL_LIVE && window.FRKL_LIVE.brandId) || null;
+  const key = b ? 'greta_seen_' + b : null;
+  const [prev, setPrev] = React.useState(null);
+  React.useEffect(() => {
+    if (!ready || !key) return;
+    try {
+      const st = JSON.parse(localStorage.getItem(key) || 'null') || {};
+      const now = Date.now();
+      const fresh = { at: now, forecast: Number(g.forecast), ranks: {} };
+      live.forEach((r, i) => { fresh.ranks[r.external_id] = i + 1; });
+      const before = st.cur && now - st.cur.at > V3_LOOK_GAP ? st.cur : (st.prev || null);
+      setPrev(before);
+      localStorage.setItem(key, JSON.stringify({ prev: before, cur: st.cur && now - st.cur.at <= V3_LOOK_GAP ? st.cur : fresh }));
+    } catch (e) {}
+  }, [ready, key]);
+  if (!ready) return null;
+  const title = r => v3PlainAction(Object.assign({}, r, { plan: null })).title;
+  const items = [];
+  if (prev && prev.ranks) {
+    const days = (Date.now() - prev.at) / 864e5;
+    const dF = Number(g.forecast) - Number(prev.forecast);
+    if (Math.abs(dF) >= Math.max(1, Math.abs(Number(prev.forecast)) * 0.01)) items.push({ k: 'fc', up: dF > 0, t: 'Forecast ' + (dF > 0 ? 'up ' : 'down ') + v3Gbp(Math.abs(dF)) });
+    const fresh = live.filter(r => prev.ranks[r.external_id] == null);
+    if (fresh.length) items.push({ k: 'new', t: fresh.length === 1 ? '1 new move' : fresh.length + ' new moves', rows: fresh.map(r => 'New: ' + title(r)) });
+    const up = live.map((r, i) => ({ r, was: prev.ranks[r.external_id], now: i + 1 })).filter(x => x.was != null && x.was - x.now >= 2).sort((p, q) => p.now - q.now);
+    if (up.length) items.push({ k: 'up', t: up.length === 1 ? '1 move climbed' : up.length + ' moves climbed', rows: up.map(x => 'Up to #' + x.now + ': ' + title(x.r)) });
+    const gone = Object.keys(prev.ranks).filter(id => !live.some(r => r.external_id === id)).length;
+    if (gone) items.push({ k: 'gone', t: gone + ' left the list' });
+    return { when: days >= 1.5 ? Math.round(days) + ' days ago' : days >= 0.9 ? 'yesterday' : 'earlier today', items, first: false };
+  }
+  const today = live.filter(r => r.days_open != null && Number(r.days_open) <= 0);
+  if (today.length) items.push({ k: 'new', t: today.length === 1 ? '1 new move' : today.length + ' new moves', rows: today.map(r => 'New: ' + title(r)) });
+  return { when: null, items, first: true };
+}
+function V3AgentLead({ q, gc, board, unreported }) {
+  const [how, setHow] = React.useState(false);
+  const [sinceOpen, setSinceOpen] = React.useState(false);
+  const st = useV3Rows('brand-state', V3_STATE_Q);
+  const sh = useV3Rows('sign-history', V3_SIGN_HIST_Q);
+  const pp = useV3Rows('plan-progress-quarter', V3_PP_QUARTER_Q);
+  const ph = useV3Rows('goal-phasing', V3_GOAL_PHASING_Q);
+  const lad = useV3Rows('profit-ladder', V3_LADDER_Q);
+  const fr = useV3Rows('source-freshness', V3_FRESH_Q);
+  const res = useV3Rows('brand-results', V3_RESULTS_Q);
+  const bm = useV3Rows('board-moves', V3_BOARD_MOVES_Q);
+  const g = q.rows && q.rows[0];
+  const V = v3GoalVerdict(g, unreported);
+  const since = useV3SinceLook(g, board.rows ? v3LiveRows(board.rows) : null);
+  // no confirmed goal, no forecast, or a failed read: the plain strip says what is missing and asks for it
+  if (!g || !V) {
+    return (<>{!g && !q.err ? <section className="v3-al" aria-busy="true"><p className="v3-al-live"><i aria-hidden="true"/>Greta is reading your business…</p></section>
+      : <V3GoalStrip q={q} gc={gc} unreported={unreported}/>}
+      <V3AskBar dest="today"/></>);
+  }
+  const PP = pp.rows && pp.rows[0], phasing = ph.rows && ph.rows[0] && ph.rows[0].confirmed_phasing;
+  const P = v3GoalPaths(g, PP && PP.series, phasing, lad.rows);
+  const src = v3Sources(fr.rows), live = board.rows ? v3LiveRows(board.rows) : [];
+  const checked = live.filter(r => r.days_since_refresh != null && Number(r.days_since_refresh) <= 0).length;
+  const R = bm.rows && bm.rows[0], takenOn = R && Array.isArray(R.rows) ? R.rows.filter(r => r.taken_on).length : 0;
+  const waiting = live.length - takenOn;
+  const T = (res.rows && res.rows[0] && res.rows[0].totals) || {};
+  const beingChecked = takenOn + (Number(T.checking) || 0) + (Number(T.too_early) || 0);
+  const goodN = (Number(T.worked) || 0) + (Number(T.pointing) || 0), judged = goodN + (Number(T.did_not_work) || 0);
+  const hdAsOf = (typeof window !== 'undefined' && window.GRETA_HEADLINE && window.GRETA_HEADLINE.data_as_of) || null;
+  const asOf = hdAsOf || g.as_of ? new Date(hdAsOf || g.as_of) : null;
+  const at = asOf && isFinite(asOf.getTime()) ? asOf.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : null;
+  const short = V.gap > 0;
+  const go = (d) => window.__oiGo && window.__oiGo(d);
+  // 2 Nov eval: "ahead" on the plan beside a pace that only just reaches the goal begged the question of which is true
+  const paceGap = g.pace_finish != null ? Number(g.pace_finish) - Number(g.target) : null;
+  // the verdict is about the goal; what is wrong under it is said beside it, not only further down the page
+  let warn = 0;
+  try { const SR = st.rows && st.rows[0]; if (SR) { const SG = v3BuildSigns(SR, sh.rows && sh.rows[0] && sh.rows[0].history, { lad }); warn = (SG.signs || []).slice(0, 4).filter(x => x.tone === 'weak').length; } } catch (e) {}
+  return (<section className="v3-al" aria-label="Greta's read of the quarter">
+    <div className="v3-al-top">
+      <p className="v3-al-live" title="Greta works the figures out again every hour. Shopify orders arrive every 30 minutes and ad spend every 2 hours."><i aria-hidden="true"/>
+        Greta is watching{src.length ? ' ' + src.length + ' sources' : ''}{at ? ' · last read ' + at : ''}</p>
+      <V3AskBar dest="today"/>
+    </div>
+    <div className="v3-al-grid">
+      <div className="v3-al-say">
+        <p className={'v3-al-verdict ' + V.tone}>{V.word}</p>
+        <p className="v3-al-sub">{V.close ? <>About {v3Gbp(unreported)} of ad spend has not come through, enough to move the forecast either way.</>
+          : <>{v3Day(g.period_end)}: <b>{v3Gbp(Math.abs(V.gap))}</b> {short ? 'short' : 'ahead'} if the plan holds{paceGap != null ? <>, <b>{v3Gbp(Math.abs(paceGap))}</b> {paceGap < 0 ? 'short' : 'ahead'} at today’s pace</> : null}.</>}</p>
+        {warn > 0 && <button type="button" className="v3-al-warn" onClick={() => { const el = document.querySelector('.v3-signs'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }}>
+          <i aria-hidden="true"/>{warn === 1 ? '1 sign needs watching' : warn + ' signs need watching'}</button>}
+        <p className="v3-al-sofar"><b>{Number(g.so_far) < 0 ? '−' : ''}{v3Gbp(Math.abs(Number(g.so_far)))}</b> kept so far, day {g.day} of {g.days}.{' '}
+          <button type="button" className="v3-al-link" aria-expanded={how} onClick={() => setHow(h => !h)}>How?</button></p>
+        {how && <p className="v3-al-how">{V.toDate ? 'So far you are ' + V.toDate + '. ' : ''}{g.confirmed_on ? 'The goal is the one you confirmed on ' + v3Day(g.confirmed_on) + '. ' : ''}The forecast is {g.forecast_basis || 'what you have kept so far plus your recent pace for each day left'}. It does not count the moves below yet, so each one you make moves it up.</p>}
+        {gc && gc.stale && <p className="v3-al-how">Greta’s plan has changed since you confirmed this goal.{' '}
+          <button type="button" className="v3-al-link" onClick={() => go('goal')}>Re-plan the quarter</button></p>}
+      </div>
+      <V3GoalChart P={P} g={g}/>
+    </div>
+    {since && (since.items.length > 0 || !since.first) && <div className="v3-al-since"><span>{since.first ? 'Today' : 'Since you last looked, ' + since.when}</span>
+      {since.items.length ? since.items.map(x => <b key={x.k} className={x.k === 'fc' ? (x.up ? 'up' : 'down') : ''}>{x.t}</b>) : <b>Nothing has changed</b>}
+      {since.items.some(x => x.rows) && <button type="button" className="v3-al-link" aria-expanded={sinceOpen} onClick={() => setSinceOpen(o => !o)}>{sinceOpen ? 'Hide' : 'Which?'}</button>}
+      {sinceOpen && <ul>{since.items.flatMap(x => x.rows || []).map((t, i) => <li key={i}>{t}</li>)}</ul>}</div>}
+    <ol className="v3-al-pipe" aria-label="What Greta is doing">
+      <li><button type="button" onClick={() => go('settings')}><span className="v3-al-n">{src.length || '–'}</span><span className="v3-al-k">sources read</span></button></li>
+      <li><button type="button" onClick={() => go('actions')}><span className="v3-al-n">{checked}</span><span className="v3-al-k">moves re-priced today</span></button></li>
+      <li className="now"><button type="button" onClick={() => { const el = document.getElementById('v3-queue'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}><span className="v3-al-n">{waiting}</span><span className="v3-al-k">waiting on you</span></button></li>
+      <li><button type="button" onClick={() => go('results')}>{judged > 0 ? <><span className="v3-al-n">{goodN}/{judged}</span><span className="v3-al-k">checked moves worked</span></>
+        : beingChecked ? <><span className="v3-al-n">{beingChecked}</span><span className="v3-al-k">being checked</span></> : <span className="v3-al-k">Nothing checked yet</span>}</button></li>
+    </ol>
+  </section>);
+}
+// 2 Nov eval: "the core promise, that Greta checks whether a move worked, is never shown". What happened to the moves
+// the owner took, from the one scorer (fn_brand_results), newest first. Before there are any, how the loop runs, in the words
+// Results already uses. Nothing is sampled or filled in.
+function V3LoopStrip() {
+  const q = useV3Rows('brand-results', V3_RESULTS_Q);
+  const R = q.rows && q.rows[0];
+  if (!R) return null;
+  const go = () => window.__oiGo && window.__oiGo('results');
+  const rows = Array.isArray(R.rows) ? R.rows.slice(0, 4) : [];
+  if (!rows.length) return (<section className="v3-loop" aria-label="How Greta checks a move">
+    <p className="v3-goal-lab">Then Greta checks</p>
+    <ol className="v3-loop-steps">
+      <li><b>You take a move</b><span>and mark it done when it is</span></li>
+      <li><b>Its window passes</b><span>each move says how long</span></li>
+      <li><b>Greta checks it</b><span>against what would have happened anyway</span></li>
+      <li className="last"><b>The result lands here</b><span>predicted against what happened</span></li>
+    </ol>
+  </section>);
+  return (<section className="v3-loop" aria-label="What happened to the moves you took">
+    <p className="v3-goal-lab">What happened to the moves you took</p>
+    <ul className="v3-loop-rows">{rows.map(r => { const lab = V3_RESULT[r.label] || V3_RESULT.checking;
+      const due = r.due_on && String(r.due_on).slice(0, 10) >= new Date().toISOString().slice(0, 10);
+      let t = r.description; try { t = v3PlainAction({ external_id: r.external_id, description: r.description }).title; } catch (e) {}
+      return (<li key={r.external_id}>
+        <span className={'v3-loop-pill ' + lab.cls}>{lab.label}</span>
+        <span className="v3-loop-t">{t}</span>
+        <span className="v3-loop-w">{due ? 'Checks ' + v3Day(String(r.due_on).slice(0, 10)) : r.done_on ? 'Done ' + v3Day(String(r.done_on).slice(0, 10)) : ''}</span>
+        <span className="v3-loop-v">{r.measured_gbp != null ? v3Gbp(r.measured_gbp) + ' measured' : r.gbp != null ? v3Gbp(r.gbp) + ' predicted' : ''}</span>
+      </li>); })}</ul>
+    <button type="button" className="v3-xref" onClick={go}>All results <span className="v3-xref-go">on Results →</span></button>
+  </section>);
+}
 function V3TodayLead() {
   const q = v3GoalSeed(useV3Rows('today-goal', V3_TODAY_GOAL_Q));
   const board = useV3Board();
@@ -18851,9 +19170,10 @@ function V3TodayLead() {
   const d = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || {};
   return (<div className="v3-today-lead">
     <V3MorningAlerts/>
-    <V3GoalStrip q={q} gc={gc} unreported={d.unreported_spend}/>
+    <V3AgentLead q={q} gc={gc} board={board} unreported={d.unreported_spend}/>
     <V3SetupChecklist/>
     <V3TodayMoves q={q} board={board} gc={gc}/>
+    <V3LoopStrip/>
   </div>);
 }
 // ── Where every number comes from (UX brief Phase 2, 1111) ──────────────────────────────────────────────────
@@ -23158,8 +23478,14 @@ function V3BusinessState({ part }) {
     && !/^[A-Z][a-z]+ so far:/.test(x)).join(' ') }) : null, AB = null;
   return (<section className="v3-stand">
     {(TW || AB) && (<div className="v3-week">
-      <div className="v3-kick">This week</div>
-      {TW && <p className="v3-week-line">{TW.said}</p>}
+      <div className="v3-kick">Last week{TW && TW.week_from ? ' · ' + v3Day(TW.week_from) + ' to ' + v3Day(TW.week_to) : ''}</div>
+      {TW && TW.sales != null && TW.profit_after_ads != null ? <div className="v3-stat-grid v3-week-stats">
+        {[['Sales', TW.sales, TW.prev_sales, true], ['Ad spend', TW.ads, TW.prev_ads, null], ['Kept after ads', TW.profit_after_ads, TW.prev_profit_after_ads, true]].map(([k, v, was, up]) => {
+          const ch = was != null ? Number(v) - Number(was) : null;
+          return (<div className="v3-stat" key={k}><div className="v3-stat-lab"><span>{k}</span></div><div className="v3-stat-val">{fmtMoney(v)}</div>
+            <div className="v3-stat-foot"><span className={ch == null || up == null ? 'v3-muted' : ch >= 0 ? 'v3-up' : 'v3-down'}>{ch == null ? '' : (ch >= 0 ? '+' : '−') + fmtMoney(Math.abs(ch)) + ' on the week before'}</span></div></div>);
+        })}
+      </div> : TW && <p className="v3-week-line">{TW.said}</p>}
       {AB && <p className="v3-week-line"><b>Your ad budget:</b> {AB.said}</p>}
     </div>)}
     <div className="v3-kick">Where you stand · last 30 days</div>
@@ -23171,10 +23497,8 @@ function V3BusinessState({ part }) {
       {signs.length > 0 && <div className="v3-signs">{signs.slice(0, 4).map(s => <V3Sign key={s.k} {...s}/>)}</div>}
     </div>
     {openSign && HP && <V3DriverPanel key={drv} which={drv} points={HP} ctx={openSign.ctx} line={openSign.dline}/>}
-    <V3SalesMove/>
-    {/* How fresh these are, asked on 9 Oct: the figures are worked out again every hour from feeds that
-        arrive every 30 minutes (Shopify) and every 2 hours (ad accounts). */}
-    <p className="micro muted v3-stand-fresh">Each figure covers the 30 days to {HP ? v3Day(String(hq.rows[0].history.as_of), true) : 'yesterday'}, the last full day. Greta works them out again every hour; Shopify orders arrive every 30 minutes and ad spend every 2 hours.{HP ? ' Point at a sign to see its last 13 weeks.' : ''}</p>
+    <V3More id="today-sales-move" label="What moved sales this month"><V3SalesMove/></V3More>
+    {/* 2 Nov: how fresh the figures are is on the agent lead's status line (its tooltip), not a paragraph here */}
   </section>);
 }
 // Cash to the plan's end (0453, owner-seat eval 12 Oct): "can I afford the peak?" had every piece on some
@@ -23978,6 +24302,8 @@ function V3Sign({ k, v, tone, bar, n, series, fmt, better, line, act, trendAs })
   // 30 Oct eval: a green "Healthy" chip beside a red arrow read as two verdicts. The chip judges the figure; the arrow
   // only says which way it moved, so under Healthy a worsening arrow is neutral.
   if (trend && tone === 'good' && trend.cls === 'bad') trend = Object.assign({}, trend, { cls: 'flat' });
+  const refV = line && line.v != null && isFinite(Number(line.v)) ? Number(line.v) : null;
+  const yOf = (v, lo, r) => 22 - (v - lo) / r * 20;
   const chart = open && pts.length >= 4 && (<span className="v3-sign-pop" role="dialog" aria-label={k + ', last ' + pts.length + ' weeks'}>
     <span className="v3-sign-pop-h"><b>{k}</b><span>Last {pts.length} weeks · each point is the 30 days to that date</span></span>
     <R.ResponsiveContainer width="100%" height={160}>
@@ -24003,7 +24329,16 @@ function V3Sign({ k, v, tone, bar, n, series, fmt, better, line, act, trendAs })
       {trend.dir === 'flat' ? <span aria-hidden="true">→</span> : <Icon name={trend.dir === 'up' ? 'arrowUp' : 'arrowDown'} size={12} stroke={2.2}/>}
       <span>{trend.text || <>{trend.dir === 'flat' ? 'About the same as' : trend.dir === 'up' ? 'Up from' : 'Down from'} {trend.from} {trend.when || 'four weeks ago'}</>}</span></div>}
     {chart}
-    {bar && <span className="v3-sign-bar" aria-hidden="true"><i className={'v3-sign-fill-' + (tone || 'typical')} style={{ width: pc(bar.fill) }}/>
+    {pts.length >= 4 && (() => { const vs = pts.map(p => Number(p.v)).concat(refV != null ? [refV] : []), lo = Math.min(...vs), hi = Math.max(...vs), r = hi - lo || 1;
+      if (refV != null) vs.pop();
+      const line2 = vs.map((v, i) => (i / (vs.length - 1) * 100).toFixed(1) + ',' + yOf(v, lo, r).toFixed(1)).join(' ');
+      return <span className={'v3-sign-sparkw v3-sign-spark-' + (tone || 'typical')} aria-hidden="true">
+        <svg className="v3-sign-spark" viewBox="0 0 100 24" preserveAspectRatio="none">
+          <polygon points={'0,24 ' + line2 + ' 100,24'}/>
+          {refV != null && <line className="v3-sign-spark-ref" x1="0" x2="100" y1={yOf(refV, lo, r)} y2={yOf(refV, lo, r)}/>}
+          <polyline points={line2}/></svg>
+        <i style={{ top: (yOf(vs[vs.length - 1], lo, r) / 24 * 100) + '%' }}/></span>; })()}
+    {bar && !(pts.length >= 4 && refV != null) && <span className="v3-sign-bar" aria-hidden="true"><i className={'v3-sign-fill-' + (tone || 'typical')} style={{ width: pc(bar.fill) }}/>
       {bar.mark != null && <b style={{ left: pc(bar.mark) }}/>}</span>}
     <div className="v3-sign-n">{n}</div>
     {act && <button type="button" className="v3-xref v3-sign-act" aria-expanded={act.open}
@@ -25358,6 +25693,7 @@ function V3Thread({ dest, go }) {
   const gc = useV3GoalCheck();
   const pp = useV3Rows('plan-progress-month', V3_PP_MONTH_Q);   // the month so far, before a goal is confirmed
   const tg = useV3Rows('today-goal', V3_TODAY_GOAL_Q);          // the goal verdict, as Today's strip says it
+  const threadBoard = useV3Board();
   if (!h || dest === 'today') return null;
   if (h.can_show_cm === false) return null;
   const cam = h.cm_after_marketing_30d;
@@ -25372,10 +25708,11 @@ function V3Thread({ dest, go }) {
   return (
     <button type="button" className="v3-thread" onClick={() => go('today')}
             title="Back to Today">
+      <i className="v3-thread-live" aria-hidden="true"/>
       <span className="v3-thread-lab">Profit after ads</span>
       <span className="v3-thread-val">{v3Gbp(cam)}</span>
       <span className="v3-muted">last 30 days</span>
-      {V && <span className={'v3-thread-pace ' + V.tone}>{V.close ? 'goal too close to call' : V.on ? 'on track for your goal' : 'off track for your goal'}</span>}
+      {V && <span className={'v3-thread-pace ' + V.tone}>{V.close ? 'goal too close to call' : V.soft ? 'on track, on a thin margin' : V.on ? 'on track for your goal' : 'off track for your goal'}</span>}
       {diff != null && gc.stale && !gc.pending && (
         <span className="v3-thread-pace">goal needs re-planning</span>
       )}
@@ -25386,6 +25723,7 @@ function V3Thread({ dest, go }) {
             : V3_PLAN_WORD[PP.status].toLowerCase() + ' this month'}
         </span>
       )}
+      {threadBoard.rows && v3LiveRows(threadBoard.rows).length > 0 && <span className="v3-thread-wait">{v3LiveRows(threadBoard.rows).length} waiting on you</span>}
     </button>
   );
 }
@@ -26201,8 +26539,8 @@ function V3WalkWhy({ X, diag, focus }) {
 // so no page had to change to be toured; if a panel is not on screen for this brand (no data yet),
 // the caption says so and the stop still reads.
 const V3_WALK_TOUR = {
-  profit: { dest: 'today', target: { sel: '.v3-hero' },
-    what: 'The big number is your profit after ads over the last 30 days — what the business kept after product costs and ad spend. Tap it to see exactly what went into it; the bar underneath is your pace against your goal.' },
+  profit: { dest: 'today', target: { sel: '.v3-bridge' }, fallback: { sel: '.v3-al' },
+    what: 'Where the last 30 days’ sales went: products and delivery, ads and running costs come out, and what is left is what you keep. Profit after ads is the line before running costs.' },
   sales: { dest: 'profit', target: { sel: '.v3-flow' },
     what: 'This bar is every £1 of sales and where it went: product costs, order costs and ads come out, and the last segment is what you keep. Tap any segment to open the page behind it.' },
   customers: { dest: 'customers', target: { sel: 'figure.v3-chart', has: 'New and returning' }, fallback: { sel: '.v3-stat-grid' },
@@ -26698,15 +27036,14 @@ function V3App({ dest, go, children, start, periodCtl }) {
             page it was a sticky bar above the title, so the first thing on each screen was an
             input rather than the page's own question. */}
         <V3FreshnessBanner/>
-        <header className="v3-page-head">
+        <header className={'v3-page-head' + (dest === 'today' ? ' v3-sr-only' : '')}>
           <div className="v3-page-head-row">
             <div>
               <h1 className="v3-page-title">{d.label}</h1>
               <p className="v3-page-q">{d.q}</p>
             </div>
-            {/* 30 Oct: Ask sits in Today's head row, beside the page's question, so the first thing on the screen is
-                the question and the answer under it, not an input above the title */}
-            {dest === 'today' ? <V3AskBar dest={dest}/> : V3_PERIOD_PAGES.indexOf(dest) >= 0 ? periodCtl : null}
+            {/* 2 Nov: Ask lives in Today's agent lead (V3AgentLead) */}
+            {V3_PERIOD_PAGES.indexOf(dest) >= 0 ? periodCtl : null}
           </div>
           <V3Thread dest={dest} go={go}/>
         </header>

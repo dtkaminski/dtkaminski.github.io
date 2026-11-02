@@ -45,6 +45,19 @@
   /* Chrome behind a backdrop-filter: the nav that sits over scrolling content. Warm,
      because white at 85% over this canvas reads cool and slightly blue. */
   --color-chrome-blur: rgba(248, 247, 244, 0.86);
+  /* One dark surface, the deck's, for Greta speaking: Today's lead and the status band on other pages. Nothing else uses it. */
+  --color-hero:        #0F1614;
+  --color-hero-raised: #19221F;
+  --color-hero-line:   rgba(245, 243, 238, 0.14);
+  --color-hero-ink:    #F5F3EE;
+  --color-hero-muted:  rgba(245, 243, 238, 0.64);
+  --color-hero-faint:  rgba(245, 243, 238, 0.32);
+  --color-hero-accent: #E58A63;
+  --color-hero-accent-wash: rgba(229, 138, 99, 0.28);
+  --color-hero-accent-clear: rgba(229, 138, 99, 0);
+  --color-hero-good:   #86CFA6;
+  --color-hero-bad:    #F09A88;
+  --color-hero-warn:   #E9C46A;
   --color-sunken:   #EAE8E3;   /* track/rail behind a bar                       */
   --color-input:    #FFFFFF;
 
