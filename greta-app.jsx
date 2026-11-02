@@ -17090,7 +17090,7 @@ function v3PlainAction(row){
     const step = (m(/The step losing most is ([^.]+)\./) || [])[1], gap = m(/^(About \d+% fewer of your visits end in an order than on your full-price weeks) \(([\d.]+%) against ([\d.]+%)/);
     // 30 Oct eval: the rewrite dropped the emitter's basis, so this read as contradicting Website's "about the usual
     // rate". Keep it: the move's rates are Google Analytics', on full-price weeks.
-    return P(step ? 'Fix the ' + step + ' step so more visits end in an order' : 'Find the step where visits stop turning into orders',
+    return P(step ? 'Improve ' + v3Step(step) + ' so more visits end in an order' : 'Find the step where visits stop turning into orders',
       gap ? gap[1] + ' (' + gap[2] + ' against ' + gap[3] + ', as Google Analytics counts visits).' : raw);
   }
   // the stock order's first clause is the instruction; what follows the colon is why
@@ -19905,7 +19905,9 @@ function v3MergeShifts(stages) {
   return out;
 }
 const V3_STEP_WORDS = { 'sessions': 'getting visitors', 'add to cart rate': 'adding to the basket', 'cart to checkout': 'starting checkout',
-  'checkout to purchase': 'finishing checkout', 'cart to purchase': 'checking out', 'average order value': 'the average order' };
+  'checkout to purchase': 'finishing checkout', 'cart to purchase': 'checking out', 'average order value': 'the average order',
+  // the site move's names for the same steps (vw_site_funnel_gap.weakest_step), so a step has one name on every page
+  'session to atc': 'adding to the basket', 'atc to checkout': 'starting checkout' };
 const v3Step = m => V3_STEP_WORDS[String(m || '').toLowerCase()] || String(m || '');
 const v3Per100 = v => fmtOk(v) ? (Number(v) * 100).toFixed(2) : FMT_NONE;   // orders per 100 visits
 const v3CountK = v => !fmtOk(v) ? FMT_NONE : Math.abs(Number(v)) >= 1000 ? fmtCount(Number(v) / 1000) + 'k' : fmtCount(v);
@@ -19976,7 +19978,13 @@ function V3Website() {
   const monthName = mo ? v3Month(mo, 'long') : '';
   const ageM = mo ? (Number(today.slice(0, 4)) * 12 + Number(today.slice(5, 7))) - (Number(String(mo).slice(0, 4)) * 12 + Number(String(mo).slice(5, 7))) : null;
   const odd = stages.filter(s => !s.merged && Math.abs(Number(s.sigma)) >= 2 && Number(s.leak) > 0).sort((a, b) => Number(a.sigma) - Number(b.sigma))[0] || null;
-  const worst = odd || stages.filter(s => Number(s.leak) > 0).sort((a, b) => Number(b.leak) - Number(a.leak))[0] || null;
+  // 2 Nov: the headline is the step that cost most. It was the most unusual one, so Halden's October led on adding to
+  // the basket (9.82% against 10.04%, 4 standard deviations, £4,166) with checkout to purchase at £7,748 on the same
+  // chart, and the to-do below called that "the step that lost most". A tight step can be unusual and small; the
+  // unusual one is now said second, and a top step within its normal swing says so.
+  const worst = stages.filter(s => Number(s.leak) > 0).sort((a, b) => Number(b.leak) - Number(a.leak))[0] || null;
+  const alsoOdd = odd && odd !== worst ? odd : null;
+  const inSwing = !!(worst && !worst.merged && worst.fmt === 'rate' && Math.abs(Number(worst.sigma)) < 2);
   // Is the weak stage the lowest it has been in the year of months on file?
   const lowest = worst && !worst.merged ? (() => { const vs = rows.filter(r => r.stage_no === worst.stage_no).map(r => Number(r.v)); return vs.length >= 6 && Number(worst.v) <= Math.min(...vs); })() : false;
   const shift = stages.find(s => s.merged);
@@ -19992,7 +20000,8 @@ function V3Website() {
   if (now && now.mobile != null && now.mobile >= 0.7) moves.push(<li key="mob"><b>Buy something on your own shop on a phone, start to finish.</b> {fmtPctN(now.mobile)} of visits are on mobile, so that is the shop most customers see.</li>);
   if (ga4Bad) moves.push(<li key="ga4"><b>Check your site analytics are recording add-to-basket and checkout steps.</b> Until they are, no screen can say which step of the site loses shoppers.{' '}
     <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('settings')}>Open Connections &amp; data</button></li>);
-  if (worst && /add to cart/.test(String(worst.metric))) moves.push(<li key="atc"><b>Look at the product pages that get the most visits.</b> In the last month with reliable tracking, the step that lost most was adding to the basket. Products shows which products get views without selling.{' '}
+  const atcWorst = !!(worst && /add to cart/.test(String(worst.metric))), atcOdd = !!(alsoOdd && /add to cart/.test(String(alsoOdd.metric)));
+  if (atcWorst || atcOdd) moves.push(<li key="atc"><b>Look at the product pages that get the most visits.</b> In the last month with reliable tracking, {atcWorst ? 'the step that lost most was adding to the basket' : 'adding to the basket fell further below its normal than it usually does'}. Products shows which products get views without selling.{' '}
     <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('products')}>Open Products</button></li>);
 
   // Bridge: normal → each (merged) stage's effect → what the month made.
@@ -20084,9 +20093,10 @@ function V3Website() {
     {stages.length >= 3 && (<section className="v3-sec">
       <div className="v3-kick">Last month with reliable site tracking · {monthName}{ageM != null && ageM >= 2 ? ' · ' + ageM + ' months ago' : ''}</div>
       <p className="v3-verdict">{worst
-        ? (odd ? 'In ' + monthName + ', fewer shoppers than usual got past ' + v3Step(worst.metric) + '.' : 'In ' + monthName + ', the step that lost most was ' + v3Step(worst.metric) + '.')
+        ? (odd && odd === worst && worst.fmt === 'rate' ? 'In ' + monthName + ', fewer shoppers than usual got past ' + v3Step(worst.metric) + '.' : 'In ' + monthName + ', the step that lost most was ' + v3Step(worst.metric) + '.')
         : 'Every step of the site ran at or above its normal in ' + monthName + '.'}</p>
-      {worst && <p className="v3-note v3-measure">{v3Sentence(v3Step(worst.metric))} was {v3StageVal(worst.fmt, worst.v)} against a normal {v3StageVal(worst.fmt, worst.mu)}{lowest ? ', the lowest in the year on file' : ''}. That cost about {fmtMoney(worst.leak)} of profit before ads.
+      {worst && <p className="v3-note v3-measure">{v3Sentence(v3Step(worst.metric))} was {v3StageVal(worst.fmt, worst.v)} against a normal {v3StageVal(worst.fmt, worst.mu)}{lowest ? ', the lowest in the year on file' : ''}. That cost about {fmtMoney(worst.leak)} of profit before ads.{inSwing ? ' That is within its usual swing from month to month.' : ''}
+        {alsoOdd ? <> {v3Sentence(v3Step(alsoOdd.metric))} moved further from its normal than it usually does ({v3StageVal(alsoOdd.fmt, alsoOdd.v)} against {v3StageVal(alsoOdd.fmt, alsoOdd.mu)}), but cost less: about {fmtMoney(alsoOdd.leak)}.</> : null}
         {top ? ' Most of it happened on ' + (top.value === '/' ? 'the home page' : top.value) + ', where it fell ' + fmtPctN(Math.abs(Number(top.ctc_chg))) + '.' : ''}
         {shift && <> {v3Sentence(v3Step(shift.merged[0].metric))} and {v3Step(shift.merged[1].metric)} moved in opposite directions by matching amounts, while {v3Step(shift.metric)} stayed normal. That is a change in what was recorded, not in shoppers, so the two are read together as checkout.</>}
         {potential != null && actual != null && <> Altogether the month made {fmtMoney(Math.abs(potential - actual))} {actual < potential ? 'less' : 'more'} profit before ads than it would have with every step at its normal.</>}</p>}
