@@ -1522,6 +1522,11 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-main .v3-al-verdict.bad { color: var(--color-hero-bad); }
 .v3-main .v3-al-sub { margin: 0; font-size: var(--text-lg); line-height: var(--leading-snug); color: var(--color-hero-ink); }
 .v3-al-sub b { font-family: var(--font-mono); font-weight: var(--weight-semi); }
+.v3-al-call { display: grid; gap: var(--space-1); padding-top: var(--space-3); border-top: 1px solid var(--color-hero-line); }
+.v3-main .v3-al-call-k { margin: 0; font-size: var(--text-xs); font-weight: var(--weight-semi); color: var(--color-hero-accent); }
+.v3-main .v3-al-call-t { margin: 0; font-size: var(--text-base); line-height: var(--leading-snug); color: var(--color-hero-ink); }
+.v3-al-call-t b { font-family: var(--font-mono); font-weight: var(--weight-semi); }
+.v3-al-call .v3-al-link { justify-self: start; font-size: var(--text-sm); }
 .v3-al-figs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); margin: var(--space-2) 0 0; padding-top: var(--space-3); border-top: 1px solid var(--color-hero-line); }
 .v3-al-figs dt { font-size: var(--text-xs); color: var(--color-hero-muted); }
 .v3-al-figs dd { margin: var(--space-1) 0 0; font-family: var(--font-mono); font-size: var(--text-base); font-weight: var(--weight-semi); color: var(--color-hero-ink); }
@@ -1731,7 +1736,7 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-fut-t { fill: var(--color-hero-ink); font-family: var(--font-sans); font-size: var(--text-xs); }
 .v3-fut-s { fill: var(--color-hero-muted); font-family: var(--font-sans); font-size: var(--text-xs); }
 .v3-fut-lab:hover .v3-fut-t, .v3-fut-lab:focus .v3-fut-t { text-decoration: underline; }
-.v3-story { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 5fr) minmax(0, 3fr); margin-bottom: var(--space-6); }
+.v3-story { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 3fr) minmax(0, 3fr); margin-bottom: var(--space-6); }
 .v3-story.no-why { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
 .v3-story-col { display: grid; align-content: start; gap: var(--space-3); min-width: 0; padding: 0 var(--space-6); }
 .v3-story-col:first-child { padding-left: 0; }
