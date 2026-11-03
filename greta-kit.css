@@ -1898,3 +1898,22 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
   .v3-figs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5) var(--space-4); margin-top: var(--space-8); }
   .v3-figs .v3-sign-pop { width: auto; right: auto; }
 }
+
+/* 3 Nov, part 4: one top on every inner page. Kicker, verdict, one line, with the page's picture beside the answer (.v3-lead2). */
+.v3-page-head + .v3-page-stack > section.v3-sec:first-child, .v3-page-head + section.v3-sec { border-top: 0; padding-top: 0; }
+.v3-kick-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); margin-bottom: var(--space-2); }
+.v3-kick-row > .v3-kick { margin: 0; }
+.v3-main .v3-kick-row > .v3-btn-row { margin: calc(var(--space-2) * -1) 0; }
+.v3-sec.v3-profit-head { border-top: 0; padding-top: 0; }
+.v3-lead2 > div > .v3-verdict:first-child, .v3-lead2 > .v3-verdict { margin-top: 0; }
+.v3-lead2 > .v3-chart { margin: 0; }
+.v3-lead2 > .v3-moves, .v3-lead2 .v3-moves { margin: 0; max-width: none; }
+.v3-lead2 > .v3-signs { grid-template-columns: minmax(0, 1fr); max-width: none; }
+.v3-lead2 > .v3-chain { margin: 0; max-width: none; }
+.v3-lead2 > .v3-chain li { grid-template-columns: minmax(0, 1fr) calc(var(--space-16) * 1.25) calc(var(--space-16) * 1.75); grid-template-areas: "k v p" "t t t"; gap: var(--space-1) var(--space-3); }
+.v3-lead2 > .v3-chain .v3-chain-k { grid-area: k; }
+.v3-lead2 > .v3-chain .v3-chain-track { grid-area: t; }
+.v3-lead2 > .v3-chain .v3-chain-v { grid-area: v; }
+.v3-lead2 > .v3-chain .v3-chain-p { grid-area: p; }
+.v3-brief-link { display: grid; justify-items: start; gap: var(--space-1); }
+.v3-board > .v3-verdict { margin-bottom: var(--space-2); }
