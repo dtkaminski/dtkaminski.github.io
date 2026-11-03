@@ -9250,6 +9250,16 @@ function v3AskPounds(s) {
   return (String(s || '').match(/£\s?\d[\d,]*(?:\.\d+)?k?/gi) || []).map(p => {
     const n = Number(p.replace(/[£,\sk]/gi, '')); return /k$/i.test(p) ? n * 1000 : n; }).filter(n => isFinite(n));
 }
+// 3 Nov: told to quote facts.goal_verdict, the model turned it into "the profit goal of £249,005 is already met" with £88,385
+// kept. On a question that asks whether the goal will be hit, the verdict is the first paragraph, as written; the rest stays.
+const V3_ASK_ON_TRACK = /\b(on track|on course|(?:hit|reach|make|meet) (?:my|the|our) (?:\w+ )?(?:goal|target))\b/i;
+function v3AskGoalLead(text, facts, question) {
+  const said = facts && facts.goal_verdict && facts.goal_verdict.said, q = String(question || '');
+  if (!said || !V3_ASK_ON_TRACK.test(q) || /\b(why|cut|spend\w*|ads?|budget)\b/i.test(q)) return text;
+  const parts = String(text || '').split(/\n\s*\n/);
+  parts[0] = said;
+  return parts.join('\n\n');
+}
 function v3AskCheck(text, sent) {
   let t = String(text || '');
   const R = (typeof window !== 'undefined' && window.GRETA_READOUT) || null;
@@ -9788,7 +9798,7 @@ ${dataStr}`;
       // the owner is told, so a thinner answer is not mistaken for Greta's best.
       const quickNote = askDepth === 'thorough' && /(^|[^0-9])(20b|8b)|mini|scout|haiku/i.test(String(data.model || ''))
         ? '\n\n*Answered by Greta’s quicker model because the main one was busy. Ask again in a few minutes for a fuller answer.*' : '';
-      setHistory(h=>[...h, {role:'assistant', content:v3AskCheck(v3AskScrub(data.text || '(no response)', facts), systemPrompt + JSON.stringify(apiMessages)) + quickNote, checked:true, time:Date.now(), usage:data.usage||{}}]);
+      setHistory(h=>[...h, {role:'assistant', content:v3AskCheck(v3AskGoalLead(v3AskScrub(data.text || '(no response)', facts), facts, q), systemPrompt + JSON.stringify(apiMessages)) + quickNote, checked:true, time:Date.now(), usage:data.usage||{}}]);
     } catch (e) {
       setError(e.message || String(e));
       setHistory(h=>h.slice(0,-1)); // drop the user message on failure
