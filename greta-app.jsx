@@ -11725,18 +11725,18 @@ function V3ActionBoard(){
 
 // One plan's steps (see V3_PLANS): always shown, since the steps are the plan. Each opens onto its own
 // how-to, and is marked done or skipped on its own, so a decision on one never closes the others.
-// rank: the lead move's place on the list. The steps under it read 2b, 2c: a second "1" under move 2 read as a
-// new list (30 Oct eval).
+// rank: the lead move's place on the list. Under a numbered move a step reads "Goes with it": a second "1" read as a new
+// list (30 Oct eval), and "1b" read as a code (3 Nov).
 function V3PlanSteps({ plan, rank }) {
   const [open, setOpen] = React.useState(null);
   return (<ol className="v3-plan-steps">{plan.steps.map((st, j) => {
     const pa = v3PlainAction(st), gbp = Number(st.cm_gbp) || 0, isOpen = open === st.external_id;
     const play = Array.isArray(st.playbook) ? st.playbook : [];
     return (<li key={st.external_id} className="v3-plan-step">
-      <button type="button" className="v3-rank-hit" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : st.external_id)}>
-        <span className="v3-rank-n">{rank != null ? rank + String.fromCharCode(98 + j) : j + 1}</span>
+      <button type="button" className={'v3-rank-hit' + (rank != null ? ' v3-rank-hit-with' : '')} aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : st.external_id)}>
+        {rank == null && <span className="v3-rank-n">{j + 1}</span>}
         <span className="v3-rank-body">
-          <span className="v3-rank-desc">{pa.title}</span>
+          <span className="v3-rank-desc">{rank != null ? 'Goes with it: ' : ''}{pa.title}</span>
           <span className="v3-rank-meta">{st.lane === 'test' ? 'Worth testing' : 'Do this'}{st.origin === 'order_cost' ? ' · ad spend saved' : ''}</span>
         </span>
         <span className="v3-rank-gbp">{v3Gbp(gbp)}<span className="v3-rank-per">{v3Per(st, true)}</span></span>
@@ -18757,6 +18757,20 @@ function V3MoveRange({ lo, hi, at }) {
     <span className="v3-mv-range-lab">Between {v3Gbp(l)} and {v3Gbp(h)}</span>
   </div>);
 }
+function V3MoveSureOpen({ row, raw, noSteps }) {
+  const sure = v3MoveSure(row), gbp = Number(row.cm_gbp) || 0, conf = v3MoneyConf(row);
+  const play = Array.isArray(row.playbook) && !noSteps ? row.playbook : [];
+  return (<div className="v3-mv-open">
+    {sure && <p><b>{V3_MOVE_SURE[sure].label}.</b> {V3_MOVE_SURE[sure].why}</p>}
+    {row.money_assumption && <p><b>The assumption:</b> {v3Tidy(scrubTag(row.money_assumption)).replace(/^./, c => c.toUpperCase())}.</p>}
+    {row.money_basis && <p><b>How Greta got to {v3Gbp(gbp)}:</b> {v3Tidy(scrubTag(row.money_basis))}.</p>}
+    {Array.isArray(row.evidence_reasons) && row.evidence_reasons.some(x => x && x.text) && (
+      <ul>{row.evidence_reasons.filter(x => x && x.text).map((x, j) => <li key={j}>{v3Tidy(x.text)}</li>)}</ul>)}
+    {conf && <p className="v3-muted">On Greta’s ladder: {String(V3_CONF[conf].label).toLowerCase()}.</p>}
+    {play.length > 0 && <><p><b>The steps</b></p><ol className="v3-mv-steps">{play.map((s, j) => <li key={j}>{v3Tidy(s)}</li>)}</ol></>}
+    <p className="v3-mv-raw"><b>Greta’s working:</b> {raw}</p>
+  </div>);
+}
 // One card for every move. `rank` numbers it; `closes` is its share of the goal gap (Today only); `meta` is the
 // Actions page's line (area, when raised, when checked); `dense` tightens it for a list.
 function V3MoveCard({ row, rank, closes, closesTo, meta, dense, viz, onDecided, maxGbp }) {
@@ -18769,8 +18783,6 @@ function V3MoveCard({ row, rank, closes, closesTo, meta, dense, viz, onDecided, 
   const knock = v3KnockOns(ex && ex.routes);
   const cause = v3CauseLine(pa.why, pa.title);
   const isStock = row.category === 'stock' || row.external_id === 'stock-reorder';
-  const conf = v3MoneyConf(row);
-  const play = Array.isArray(row.playbook) ? row.playbook : [];
   // a folded plan: this card is its lead step; the others follow it, each decided on its own
   const others = row.plan ? row.plan.steps.filter(st => st.external_id !== row.external_id) : [];
   return (<article className={'v3-mv' + (dense ? ' v3-mv-dense' : '')}>
@@ -18804,16 +18816,7 @@ function V3MoveCard({ row, rank, closes, closesTo, meta, dense, viz, onDecided, 
       </div>
     </div>
     {show === 'else' && <p className="v3-mv-open">On its way to your profit it also moves {v3AndList(knock)}.</p>}
-    {show === 'sure' && <div className="v3-mv-open">
-      {sure && <p><b>{V3_MOVE_SURE[sure].label}.</b> {V3_MOVE_SURE[sure].why}</p>}
-      {row.money_assumption && <p><b>The assumption:</b> {v3Tidy(scrubTag(row.money_assumption)).replace(/^./, c => c.toUpperCase())}.</p>}
-      {row.money_basis && <p><b>How Greta got to {v3Gbp(gbp)}:</b> {v3Tidy(scrubTag(row.money_basis))}.</p>}
-      {Array.isArray(row.evidence_reasons) && row.evidence_reasons.some(x => x && x.text) && (
-        <ul>{row.evidence_reasons.filter(x => x && x.text).map((x, j) => <li key={j}>{v3Tidy(x.text)}</li>)}</ul>)}
-      {conf && <p className="v3-muted">On Greta’s ladder: {String(V3_CONF[conf].label).toLowerCase()}.</p>}
-      {play.length > 0 && <><p><b>The steps</b></p><ol className="v3-mv-steps">{play.map((s, j) => <li key={j}>{v3Tidy(s)}</li>)}</ol></>}
-      <p className="v3-mv-raw"><b>Greta’s working:</b> {pa.raw}</p>
-    </div>}
+    {show === 'sure' && <V3MoveSureOpen row={row} raw={pa.raw}/>}
     {others.length > 0 && <V3PlanSteps plan={Object.assign({}, row.plan, { steps: others })} rank={rank}/>}
   </article>);
 }
@@ -18858,6 +18861,21 @@ function v3GoalVerdict(g, unreported) {
     // "£959 behind what your goal expected by 29 Oct", the figure Today and Calendar both print
     toDate: ahead == null ? null : v3Gbp(Math.abs(ahead)) + (ahead >= 0 ? ' ahead of' : ' behind') + ' what your goal expected by ' + v3Day(g.counted_through) };
 }
+// 1159: what the plan with no sales goal spends a week. "Today's" was a label on that plan, not a measure of today. Until the
+// figure reaches a brand's state, the plain words.
+const v3AdsNear = A => Number(A && A.hold_week) > 0 ? 'ads near ' + v3Gbp(A.hold_week) + ' a week' : 'ads near today’s level';
+// How far the plan already reaches into the ad cut on the board. On Halden it runs £21,381 a week, the last 7 days ran £23,705
+// and the cut takes them to £20,248, so about two thirds of the cut is inside the line. Its worth is not on top of the line.
+function v3AdCutInPlan(A) {
+  const now = Number(A && A.last_7_days), after = Number(A && A.week_after_cuts), hold = Number(A && A.hold_week);
+  const cuts = A && Array.isArray(A.cuts) ? A.cuts : [];
+  if (!(hold > 0) || !(now > 0)) return { share: 0, bridge: null, ids: [] };
+  const cut = cuts.length && after > 0 && after < now ? now - after : 0;
+  const share = cut > 0 ? Math.max(0, Math.min(1, (now - hold) / cut)) : 0;
+  const bridge = cut > 0 ? 'Your last 7 days ran ' + v3Gbp(now) + '. ' + (cuts.length === 1 && cuts[0].channel ? 'The ' + cuts[0].channel + ' cut in your moves takes' : 'The ad cuts in your moves take') + ' that to about ' + v3Gbp(after) + '.'
+    : now > hold * 1.05 ? 'Your last 7 days ran ' + v3Gbp(now) + ', so this means coming down.' : null;
+  return { share, bridge, ids: share > 0 ? cuts.map(c => c.external_id) : [] };
+}
 // 3 Nov: one message on the goal, in the order an owner asks: am I all right, what is mine to decide, what do I do, why believe
 // it. Today, Goal and Ask quote it, so none of them words the verdict alone. "Ahead" was two figures in one paragraph (the
 // quarter's end and so far), so "so far" now lives only in the evidence.
@@ -18868,8 +18886,8 @@ function v3GoalMessage(g, V, move) {
   const salesShort = !!(F && F.ahead >= 0 && Number(A.sales_short) > 0);
   const pace = g.pace_finish != null ? Number(g.pace_finish) - Number(g.target) : null;
   const line = V.close ? 'About ' + v3Gbp(hd.unreported_spend) + ' of ad spend has not come through, enough to move the forecast either way.'
-    : F ? (F.ahead >= 0 ? 'At today’s ad spend you beat your ' + target + ' profit goal by about ' + v3Gbp(F.ahead) + '.'
-                        : 'At today’s ad spend you land about ' + v3Gbp(-F.ahead) + ' short of your ' + target + ' profit goal.')
+    : F ? (F.ahead >= 0 ? 'With ' + v3AdsNear(A) + ' you beat your ' + target + ' profit goal by about ' + v3Gbp(F.ahead) + '.'
+                        : 'With ' + v3AdsNear(A) + ' you land about ' + v3Gbp(-F.ahead) + ' short of your ' + target + ' profit goal.')
     : v3Day(g.period_end) + ': ' + v3Gbp(Math.abs(V.gap)) + (V.gap > 0 ? ' short' : ' ahead') + ' if the plan holds'
       + (pace != null ? ', ' + v3Gbp(Math.abs(pace)) + (pace < 0 ? ' short' : ' ahead') + ' at today’s pace' : '') + '.';
   const call = salesShort ? 'Sales land about ' + v3Gbp(A.sales_short) + ' short.' + (A.owner_question ? ' ' + A.owner_question : '') : null;
@@ -18885,8 +18903,9 @@ function v3GoalMessage(g, V, move) {
       + (sure ? ' (' + String(V3_MOVE_SURE[sure].label).toLowerCase() + ')' : '') + '.' : '');
   }
   const lead = salesShort ? 'On track for profit, not for sales.' : V.word + '.';
-  return { lead, line, call, note, doFirst, evidence, salesShort,
-    words: [lead + ' ' + line, call && '**Your call:** ' + call, note, doFirst && '**Do first:** ' + doFirst, '**How Greta worked this out:** ' + evidence].filter(Boolean).join('\n\n') };
+  const bridge = F && !V.close ? v3AdCutInPlan(A).bridge : null;
+  return { lead, line, bridge, call, note, doFirst, evidence, salesShort,
+    words: [lead + ' ' + line + (bridge ? ' ' + bridge : ''), call && '**Your call:** ' + call, note, doFirst && '**Do first:** ' + doFirst, '**How Greta worked this out:** ' + evidence].filter(Boolean).join('\n\n') };
 }
 function v3BoldMoney(t) {
   return String(t || '').split(/(£\d[\d,]*(?:\.\d+)?[km]?)/).map((p, i) => i % 2 ? <b key={i}>{p}</b> : p);
@@ -18940,9 +18959,8 @@ function V3GoalStrip({ q, gc, unreported }) {
       <button type="button" className="v3-mv-toggle" onClick={() => window.__oiGo && window.__oiGo('goal')}>Re-plan the quarter</button></p>}
   </section>);
 }
-// Today's moves: the top three as cards, then at most two more as short rows, with how much of the gap each
-// closes and what the three close together. The order and the shares are the server's (fn_today_goal); before
-// the goal loads, or without one, the folded board's own order.
+// Today's moves. The order and the shares of the gap are the server's (fn_today_goal); before the goal loads, or
+// without one, the folded board's own order.
 function v3TodayMoveList(g, rows, B) {
   const live = v3FoldPlans(v3LiveRows(rows));
   const byId = {}; live.forEach(r => { byId[r.external_id] = r; });
@@ -18951,55 +18969,131 @@ function v3TodayMoveList(g, rows, B) {
     : (B ? B.rows.filter(r => r.lead && !r.small).map(r => ({ row: byId[r.external_id], closes: null })) : live.map(r => ({ row: r, closes: null })));
   return order.filter(m => m.row).slice(0, 5);
 }
+// 3 Nov, interface review: one list in order. Each move is one row, what it is, what it is worth, what to press; the first is
+// open, the rest open on their title. The strip's three columns set stock beside a cause about new customers; that cause is now
+// inside the ad cut it explains, and "did it work" is one line under the list.
+const v3MoveShort = r => { const id = String(r.external_id || ''), ch = id.match(/^order-cost-(.+)$/);
+  return id === 'stock-reorder' ? 'Stock order' : id === 'site-funnel-weakstep' ? 'Checkout' : ch ? ch[1].replace(/^./, c => c.toUpperCase()) + ' cut'
+    : v3PlainAction(Object.assign({}, r, { plan: null })).title; };
+function V3TodayRow({ row, rank, isOpen, onToggle, closes, closesTo, why }) {
+  const [show, setShow] = React.useState(null);   // null | 'else' | 'sure'
+  const pa = v3PlainAction(Object.assign({}, row, { plan: null }));
+  const ex = v3MoveExtra(row.external_id);
+  const sure = v3MoveSure(row);
+  const gbp = Number(row.cm_gbp) || 0;
+  const knock = v3KnockOns(ex && ex.routes);
+  const cause = v3CauseLine(pa.why, pa.title);
+  const isStock = row.category === 'stock' || row.external_id === 'stock-reorder';
+  const play = Array.isArray(row.playbook) ? row.playbook : [];
+  const others = row.plan ? row.plan.steps.filter(st => st.external_id !== row.external_id) : [];
+  return (<article className={'v3-row' + (isOpen ? ' open' : '') + (rank === 1 ? ' first' : '')}>
+    <span className="v3-row-n">{rank}</span>
+    <div className="v3-row-main">
+      <h3 className="v3-row-t"><button type="button" aria-expanded={isOpen} onClick={onToggle}>{pa.title}</button></h3>
+      {cause && <p className="v3-row-cause">{cause}</p>}
+      {!isOpen && others.length > 0 && <p className="v3-mv-plan">{others.length === 1 ? 'One more step goes with it.' : others.length + ' more steps go with it.'}</p>}
+    </div>
+    {gbp > 0 && <div className="v3-row-worth">
+      <b>{v3Gbp(gbp)}</b>
+      <small>{isStock ? 'protected ' : ''}{v3Per(row)}{row.money_is_sales ? ', in sales' : ''}</small>
+      {sure && <small>{V3_MOVE_SURE[sure].label}</small>}
+    </div>}
+    <V3MoveDecide row={row}/>
+    {isOpen && <div className="v3-row-open">
+      <div className="v3-row-detail">
+        <div className="v3-row-pics"><V3MoveViz row={row}/>{why}</div>
+        {play.length > 0 && <div><p className="v3-row-k">How</p><ol className="v3-mv-steps">{play.map((s, j) => <li key={j}>{v3Tidy(s)}</li>)}</ol></div>}
+      </div>
+      {gbp > 0 && <V3MoveRange lo={ex && ex.lo} hi={ex && ex.hi} at={gbp}/>}
+      {closes != null && <p className="v3-mv-closes">Closes about <b>{v3Gbp(closes)}</b> of the gap {closesTo}.</p>}
+      <div className="v3-mv-more">
+        <button type="button" className="v3-mv-toggle" aria-expanded={show === 'sure'} onClick={() => setShow(s => s === 'sure' ? null : 'sure')}>How sure?</button>
+        {knock.length > 0 && <button type="button" className="v3-mv-toggle" aria-expanded={show === 'else'} onClick={() => setShow(s => s === 'else' ? null : 'else')}>What it does elsewhere</button>}
+        {ex && Number(ex.win) > 0 && <span className="v3-mv-check">Greta checks it {fmtCount(Number(ex.win))} days after you mark it done</span>}
+      </div>
+      {show === 'else' && <p className="v3-mv-open">On its way to your profit it also moves {v3AndList(knock)}.</p>}
+      {show === 'sure' && <V3MoveSureOpen row={row} raw={pa.raw} noSteps/>}
+      {others.length > 0 && <V3PlanSteps plan={Object.assign({}, row.plan, { steps: others })} rank={rank}/>}
+    </div>}
+  </article>);
+}
 function V3TodayMoves({ q, board, gc }) {
   useV3Rows('brand-state', V3_STATE_Q);   // the gap reads the ad answer
   const g = q.rows && q.rows[0];
-  const hd = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || {};
   const bm = useV3Rows('board-moves', V3_BOARD_MOVES_Q);
+  const res = useV3Rows('brand-results', V3_RESULTS_Q);
+  const fig = useV3Figures();
   useV3Rows('move-extras', V3_MOVE_EXTRAS_Q);
+  const [opened, setOpened] = React.useState({});   // the first row is open until it is closed
   if (board.err) return <div className="v3-empty">Greta could not load your moves just now. Refreshing usually sorts it.</div>;
   if (!board.rows) return <V3SkeletonRows n={3}/>;
+  const go = d => window.__oiGo && window.__oiGo(d);
   const moves = v3TodayMoveList(g, board.rows, bm.rows && bm.rows[0]);
+  // "Did it work" is the one scorer (fn_brand_results) or, before there is anything to score, the date each of the top moves
+  // would be read back. 2 Nov eval: "the core promise, that Greta checks whether a move worked, is never shown".
+  const R = res.rows && res.rows[0], done = R && Array.isArray(R.rows) ? R.rows.slice(0, 3) : [];
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const due = moves.slice(0, 3).map(m => { const ex = v3MoveExtra(m.row.external_id); return ex && Number(ex.win) > 0 ? { id: m.row.external_id, k: v3MoveShort(m.row), on: v3IsoAdd(todayIso, Number(ex.win)) } : null; })
+    .filter(Boolean).sort((a, b) => a.on.localeCompare(b.on));
+  const back = (done.length > 0 || due.length > 0) && (<p className="v3-row-back"><span><b>Did it work?</b>{' '}
+    {done.length > 0 ? done.map((r, i) => { const lab = V3_RESULT[r.label] || V3_RESULT.checking, soon = r.due_on && String(r.due_on).slice(0, 10) >= todayIso;
+        return <React.Fragment key={r.external_id}>{i ? ', ' : ''}{v3MoveShort(r)} <span className={'v3-row-fig ' + lab.cls}>{soon ? 'checks ' + v3Day(String(r.due_on).slice(0, 10)) : r.measured_gbp != null ? v3Gbp(r.measured_gbp) : lab.label}</span></React.Fragment>; })
+      : <>Nothing checked yet. Greta reads back:{' '}{due.map((x, i) => <React.Fragment key={x.id}>{i ? ', ' : ''}{x.k} <span className="v3-row-fig">{v3Day(x.on)}</span></React.Fragment>)}.</>}</span>
+    <button type="button" className="v3-xref" onClick={() => go('results')}>Results</button></p>);
   if (!moves.length) return (<section className="v3-mvlist">
     <p className="v3-goal-lab">Your moves</p>
     <p className="v3-muted">{Array.isArray(board.unpriced) && board.unpriced.some(r => r.due_on) ? 'Nothing with a £ figure needs you today.' : 'Nothing needs you today. Greta checks again as new data arrives.'}</p>
     <V3UnpricedLane compact/>
+    {done.length > 0 && back}
   </section>);
-  // the moves share the gap whenever the strip shows one (1123: it reads against the goal as confirmed)
+  // the moves share the gap whenever the goal shows one (1123: it reads against the goal as confirmed)
   const shared = g && g.confirmed && g.forecast != null;
   const to = shared ? 'by ' + v3Day(g.period_end) : '';
   const F = shared ? v3Futures(g) : null;
   const gap = shared ? (F ? -F.ahead : Number(g.gap)) : null;
   // The server sums its own top three (together_gbp); a status row left off the list would still be in that sum,
-  // so add up the three cards shown. With nothing left off the two agree.
+  // so add up the three rows shown. With nothing left off the two agree.
   const top3 = moves.slice(0, 3);
-  const maxGbp = Math.max(0, ...moves.map(m => Number(m.row.cm_gbp) || 0));
   const sm = Array.isArray(g && g.moves) ? g.moves.slice(0, 3) : [];
   const together = !shared ? null : top3.length === sm.length && top3.every((m, i) => m.row.external_id === sm[i].external_id)
     ? Number(g.together_gbp) : top3.reduce((t, m) => t + (Number(m.closes) || 0), 0);
+  // 1159: an ad cut the plan already counts is not added to it again
+  const inPlan = F ? v3AdCutInPlan(F.A) : { ids: [] };
+  const isCut = m => inPlan.ids.includes(m.row.external_id);
+  const rest = top3.filter(m => !isCut(m)), besides = rest.length < top3.length ? rest.reduce((t, m) => t + (Number(m.closes) || 0), 0) : null;
+  const note = !shared || !(together > 0) ? null
+    : gap > 0 ? (together >= gap ? <>Together the top three more than close your <b>{v3Gbp(gap)}</b> gap {to}, if each starts this week.</>
+        : <>The top three close <b>{v3Gbp(together)}</b> of your <b>{v3Gbp(gap)}</b> gap {to}, if each starts this week.</>)
+    : besides > 0 ? <>Besides the ad cut, the other {rest.length === 1 ? 'one adds' : rest.length === 2 ? 'two add' : 'moves add'} about <b>{v3Gbp(besides)}</b> {to}, if each starts this week.</>
+    : <>The top three add about <b>{v3Gbp(together)}</b> {to}, if each starts this week.</>;
+  // the cause behind the ad cut, in the row it explains
+  const cac = v3Fig('cac_30d', fig.rows).value, fo = v3Fig('first_order_profit', fig.rows).value, cv = v3Fig('customer_value', fig.rows).value;
+  let cutWhy = null;
+  if (cac > 0 && fo != null && cac > fo) {
+    const top = Math.max(cac, fo, Number(cv) || 0) * 1.08;
+    const bar = (k, v, c) => (<div className="v3-mvrun-row" key={k}><span className="v3-mvrun-k">{k}</span>
+      <span className="v3-mvrun-track"><i className={c} style={{ width: Math.max(1, Math.max(0, v) / top * 100) + '%' }}/></span>
+      <span className="v3-mvrun-v">{v3Gbp(v)}</span></div>);
+    cutWhy = (<figure className="v3-mvviz"><figcaption>A new customer costs more than a first order earns</figcaption>
+      {bar('Costs to win', cac, 'now')}{bar('First order earns', fo, '')}{cv != null && bar('A year earns', cv, '')}</figure>);
+  }
   // the count the nav badge and the Moves page's "All" show (30 Oct eval: Today said 14 beside their 15)
-  const total = v3LiveRows(board.rows).length;
+  const total = v3LiveRows(board.rows).length, shown = moves.slice(0, 4);
   // a decision refreshes the goal and the moves itself (v3QRefresh), keeping these rows on screen meanwhile
-  return (<section className="v3-mvlist">
-    {moves.length > 1 && <p className="v3-goal-lab" id="v3-queue">{shared && gap > 0 ? 'Then · the moves that close it' : 'Then, in order'}</p>}
-    {moves.slice(1, 3).map((m, i) => <V3MoveCard key={m.row.external_id} row={m.row} rank={i + 2} maxGbp={maxGbp}
-      closes={shared && gap > 0 ? m.closes : null} closesTo={to}/>)}
-    {shared && together > 0 && top3.some(m => Number(m.closes) > 0) && <div className="v3-mvstack" aria-hidden="true">
-      {top3.filter(m => Number(m.closes) > 0).map((m, i) => <i key={m.row.external_id} className={'s' + (i + 1)} style={{ flexGrow: Number(m.closes) }}>{i + 1}</i>)}
-    </div>}
-    {shared && together > 0 && (gap > 0
-      ? <p className="v3-mvlist-total">{together >= gap
-          ? <>Together these more than close your <b>{v3Gbp(gap)}</b> gap {to}, if each starts this week.</>
-          : <>Together these close <b>{v3Gbp(together)}</b> of your <b>{v3Gbp(gap)}</b> gap {to}, if each starts this week.</>}</p>
-      : <p className="v3-mvlist-total">{g.status === 'on_track' && !v3SpendCouldSwing(hd.unreported_spend, gap) && !(v3GoalVerdict(g, hd.unreported_spend) || {}).soft ? 'You are on track. ' : ''}Together these add about <b>{v3Gbp(together)}</b> {to}, if each starts this week.</p>)}
-    {moves.length > 3 && <div className="v3-mvlist-more">
-      <p className="v3-kick">Then</p>
-      {moves.slice(3).map((m, i) => <V3MoveCard key={m.row.external_id} row={m.row} rank={i + 4} dense maxGbp={maxGbp}
-        closes={shared && gap > 0 ? m.closes : null} closesTo={to}/>)}
-    </div>}
+  return (<section className="v3-rows" aria-label="What to do, in order">
+    <div className="v3-row-head" id="v3-queue">
+      <h2 className="v3-row-h">What to do, in order</h2>
+      {note && <p className="v3-row-note">{note}</p>}
+    </div>
+    {shown.map((m, i) => { const id = m.row.external_id, isOpen = id in opened ? opened[id] : i === 0;
+      return <V3TodayRow key={id} row={m.row} rank={i + 1} isOpen={isOpen} onToggle={() => setOpened(o => Object.assign({}, o, { [id]: !isOpen }))}
+        closes={shared && gap > 0 ? m.closes : null} closesTo={to} why={/^order-cost-/.test(String(id)) ? cutWhy : null}/>; })}
     <V3UnpricedLane compact/>
-    <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>
-      {total === 1 ? 'See it on Moves' : 'See all ' + total + ' moves'} <Icon name="arrowRight" size={13}/></button>
+    <div className="v3-row-foot">
+      <span>{total > shown.length ? 'The rest are worth less or are less certain.' : ''}</span>
+      <button type="button" className="v3-xref" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>{total === 1 ? 'See it on Moves' : 'See all ' + total + ' moves'}</button>
+    </div>
+    {back}
   </section>);
 }
 // 30 Oct eval: fn_today_goal takes 2-4 s and queues behind the page's other reads, so "Am I on track?" was the last
@@ -19153,8 +19247,9 @@ function V3FuturesChart({ F, g, P }) {
   const raw = P.actual.map(p => ({ d: p.d, v: p.v - v3Interp(P.goal, v3Ms(p.d)) }));
   const lastRaw = raw[raw.length - 1].v, now = g.ahead_gbp != null ? Number(g.ahead_gbp) : lastRaw;
   const past = raw.map(p => ({ d: p.d, v: p.v + (now - lastRaw) * (v3Ms(p.d) - x0) / ((today - x0) || 1) }));
-  const ends = [{ k: 'keep', v: F.keep - tgt, t: small ? 'Keep ad spend' : 'Keep today’s ad spend', s: 'counts the season ahead' },
-    { k: 'chase', v: F.chase - tgt, t: small ? 'Chase sales goal' : 'Chase the sales goal', s: v3Gbp(Number(F.A.extra_ads)) + ' more ads' }]
+  const holdW = Number(F.A.hold_week), chaseW = Number(F.A.chase_week);
+  const ends = [{ k: 'keep', v: F.keep - tgt, t: holdW > 0 ? (small ? 'Ads ' : 'Ads near ') + v3Gbp(holdW) + ' a week' : small ? 'Ads as now' : 'Ads near today’s level', s: 'counts the season ahead' },
+    { k: 'chase', v: F.chase - tgt, t: small ? 'Chase sales goal' : 'Chase the sales goal', s: chaseW > 0 ? 'ads near ' + v3Gbp(chaseW) + ' a week' : v3Gbp(Number(F.A.extra_ads)) + ' more ads' }]
     .concat(g.pace_finish != null ? [{ k: 'pace', v: Number(g.pace_finish) - tgt, t: small ? 'Last 30 days' : 'Last 30 days carry on', s: 'ignores the season' }] : []);
   const all = past.map(p => p.v).concat(ends.map(e => e.v), [0]);
   const lo = Math.min(...all), hi = Math.max(...all, 1);
@@ -19287,12 +19382,13 @@ function V3AgentLead({ q, gc, board, unreported }) {
       <div className="v3-al-say">
         <p className={'v3-al-verdict ' + (M.salesShort ? 'warn' : V.tone)}>{M.lead}</p>
         <p className="v3-al-sub">{v3BoldMoney(M.line)}</p>
+        {M.bridge && <p className="v3-al-sofar">{M.bridge}</p>}
         {M.call && <div className="v3-al-call"><p className="v3-al-call-k">Your call</p><p className="v3-al-call-t">{v3BoldMoney(M.call)}</p>
           <button type="button" className="v3-al-link" onClick={() => go('goal')}>See both futures</button></div>}
         {M.note && <p className="v3-al-sofar">{M.note}{' '}
           <button type="button" className="v3-al-link" onClick={() => go('goal')}>See the answer on ad spend</button></p>}
         <p className="v3-al-sofar"><button type="button" className="v3-al-link" aria-expanded={how} onClick={() => setHow(h => !h)}>How Greta worked this out</button></p>
-        {how && <p className="v3-al-how">{M.evidence} {g.confirmed_on ? 'The goal is the one you confirmed on ' + v3Day(g.confirmed_on) + '. ' : ''}{V.F ? <>Keeping today’s ad spend is Greta’s plan at the ads you run now, counting the season ahead. Worked from {AD.basis}. </> : <>The forecast is {g.forecast_basis || 'what you have kept so far plus your recent pace for each day left'}. </>}It does not count the moves below yet, so each one you make moves it up.</p>}
+        {how && <p className="v3-al-how">{M.evidence} {g.confirmed_on ? 'The goal is the one you confirmed on ' + v3Day(g.confirmed_on) + '. ' : ''}{V.F ? <>{Number(AD.hold_week) > 0 ? <>This line is Greta’s plan at about {v3Gbp(AD.hold_week)} of ads a week over the days left, more in the busiest weeks, counting the season ahead.</> : <>This line is Greta’s plan at the ads you run now, counting the season ahead.</>} Worked from {AD.basis}. </> : <>The forecast is {g.forecast_basis || 'what you have kept so far plus your recent pace for each day left'}. </>}{V.F && v3AdCutInPlan(AD).share >= 0.5 ? 'It already counts most of the ad cut in your moves, so the other moves are what add to it.' : V.F && v3AdCutInPlan(AD).share > 0 ? 'It counts part of the ad cut in your moves; the other moves add to it.' : 'It does not count the moves below yet, so each one you make moves it up.'}</p>}
         {gc && gc.stale && <p className="v3-al-how">Greta’s plan has changed since you confirmed this goal.{' '}
           <button type="button" className="v3-al-link" onClick={() => go('goal')}>Re-plan the quarter</button></p>}
       </div>
@@ -19304,76 +19400,6 @@ function V3AgentLead({ q, gc, board, unreported }) {
       {sinceOpen && <ul>{since.items.flatMap(x => x.rows || []).map((t, i) => <li key={i}>{t}</li>)}</ul>}</div>}
   </section>);
 }
-// 3 Nov, storytelling review: why, what to do first, and whether it worked, side by side under the verdict, so the cause no
-// longer waits three screens below the actions. The first move is the real card with its buttons; the list below carries on
-// from the second. "Did it work" is the one scorer (fn_brand_results) or, before there is anything to score, the date each of
-// the top moves would be read back. 2 Nov eval: "the core promise, that Greta checks whether a move worked, is never shown".
-const v3MoveShort = r => { const id = String(r.external_id || ''), ch = id.match(/^order-cost-(.+)$/);
-  return id === 'stock-reorder' ? 'Stock order' : id === 'site-funnel-weakstep' ? 'Checkout' : ch ? ch[1].replace(/^./, c => c.toUpperCase()) + ' cut'
-    : v3PlainAction(Object.assign({}, r, { plan: null })).title; };
-function V3StoryStrip({ q, board }) {
-  const st = useV3Rows('brand-state', V3_STATE_Q);
-  const sh = useV3Rows('sign-history', V3_SIGN_HIST_Q);
-  const lad = useV3Rows('profit-ladder', V3_LADDER_Q);
-  const res = useV3Rows('brand-results', V3_RESULTS_Q);
-  const bm = useV3Rows('board-moves', V3_BOARD_MOVES_Q);
-  const fig = useV3Figures();
-  useV3Rows('move-extras', V3_MOVE_EXTRAS_Q);
-  if (!board.rows) return null;
-  const g = q.rows && q.rows[0];
-  const go = d => window.__oiGo && window.__oiGo(d);
-  const moves = v3TodayMoveList(g, board.rows, bm.rows && bm.rows[0]);
-  const first = moves[0] || null;
-  const shared = g && g.confirmed && g.forecast != null, F = shared ? v3Futures(g) : null, gap = shared ? (F ? -F.ahead : Number(g.gap)) : 0;
-
-  const cac = v3Fig('cac_30d', fig.rows).value, fo = v3Fig('first_order_profit', fig.rows).value, cv = v3Fig('customer_value', fig.rows).value;
-  let why = null;
-  if (cac > 0 && fo != null && cac > fo) {
-    const top = Math.max(cac, fo, Number(cv) || 0) * 1.08;
-    const bar = (k, v, c) => (<div className="v3-mvrun-row" key={k}><span className="v3-mvrun-k">{k}</span>
-      <span className="v3-mvrun-track"><i className={c} style={{ width: Math.max(1, Math.max(0, v) / top * 100) + '%' }}/></span>
-      <span className="v3-mvrun-v">{v3Gbp(v)}</span></div>);
-    why = { t: 'A new customer costs more than a first order earns', to: 'marketing', toWord: 'Marketing',
-      pic: <>{bar('Costs to win', cac, 'now')}{bar('First order earns', fo, '')}{cv != null && bar('A year earns', cv, '')}</> };
-  } else {
-    let weak = null;
-    try { const SR = st.rows && st.rows[0]; if (SR) weak = (v3BuildSigns(SR, sh.rows && sh.rows[0] && sh.rows[0].history, { lad }).signs || []).slice(0, 4).find(x => x.tone === 'weak'); } catch (e) {}
-    if (weak) why = { t: weak.k, to: 'profit', toWord: 'Profit & sales',
-      pic: <><p className="v3-story-big">{weak.v}</p>{weak.bar && <div className="v3-mvrun-track"><i className="now" style={{ width: Math.min(100, weak.bar.fill * 100) + '%' }}/>{weak.bar.mark != null && <b style={{ left: Math.min(100, weak.bar.mark * 100) + '%' }}/>}</div>}<p className="v3-story-note">{weak.n}</p></> };
-  }
-
-  const R = res.rows && res.rows[0], done = R && Array.isArray(R.rows) ? R.rows.slice(0, 3) : [];
-  const todayIso = new Date().toISOString().slice(0, 10);
-  const due = moves.slice(0, 3).map(m => { const ex = v3MoveExtra(m.row.external_id); return ex && Number(ex.win) > 0 ? { id: m.row.external_id, k: v3MoveShort(m.row), on: v3IsoAdd(todayIso, Number(ex.win)) } : null; })
-    .filter(Boolean).sort((a, b) => a.on.localeCompare(b.on));
-  if (!first && !why && !done.length) return null;
-  return (<section className={'v3-story' + (why ? '' : ' no-why')} aria-label="What to do first, why, and whether it worked">
-    {first && <div className="v3-story-col v3-story-do">
-      <p className="v3-kick">Do first</p>
-      <V3MoveCard row={first.row} rank={1} closes={shared && gap > 0 ? first.closes : null} closesTo={shared ? 'by ' + v3Day(g.period_end) : ''}/>
-    </div>}
-    {why && <div className="v3-story-col">
-      <p className="v3-kick">Why</p>
-      <h3 className="v3-story-t">{why.t}</h3>
-      <button type="button" className="v3-story-pic" onClick={() => go(why.to)} aria-label={'Open ' + why.toWord}>{why.pic}</button>
-      <button type="button" className="v3-xref" onClick={() => go(why.to)}>What moves it <span className="v3-xref-go">on {why.toWord} →</span></button>
-    </div>}
-    <div className="v3-story-col">
-      <p className="v3-kick">Did it work?</p>
-      {done.length > 0 ? <>
-        <h3 className="v3-story-t">What happened to the moves you took</h3>
-        <ul className="v3-story-list">{done.map(r => { const lab = V3_RESULT[r.label] || V3_RESULT.checking;
-          const soon = r.due_on && String(r.due_on).slice(0, 10) >= todayIso;
-          return (<li key={r.external_id}><span className="v3-story-k">{v3MoveShort(r)}</span>
-            <b className={lab.cls}>{soon ? 'Checks ' + v3Day(String(r.due_on).slice(0, 10)) : r.measured_gbp != null ? v3Gbp(r.measured_gbp) : lab.label}</b></li>); })}</ul>
-      </> : <>
-        <h3 className="v3-story-t">{due.length ? 'Nothing checked yet. Act today and Greta reads back:' : 'Nothing checked yet'}</h3>
-        {due.length > 0 && <ul className="v3-story-list">{due.map(x => <li key={x.id}><span className="v3-story-k">{x.k}</span><b>{v3Day(x.on)}</b></li>)}</ul>}
-      </>}
-      <button type="button" className="v3-xref" onClick={() => go('results')}>How Greta checks <span className="v3-xref-go">on Results →</span></button>
-    </div>
-  </section>);
-}
 function V3TodayLead() {
   const q = v3GoalSeed(useV3Rows('today-goal', V3_TODAY_GOAL_Q));
   const board = useV3Board();
@@ -19383,7 +19409,7 @@ function V3TodayLead() {
     <V3MorningAlerts/>
     <V3AgentLead q={q} gc={gc} board={board} unreported={d.unreported_spend}/>
     <V3SetupChecklist/>
-    <V3StoryStrip q={q} board={board}/>
+    <V3BusinessState part="figs"/>
     <V3TodayMoves q={q} board={board} gc={gc}/>
   </div>);
 }
@@ -20793,11 +20819,12 @@ function V3AdAnswer({ action, g }) {
     const row = (k, a, b, c) => { const top = Math.max(Number(a), Number(b)) || 1;
       const cell = v => <span className="v3-adf-bar"><i className={c} style={{ width: Math.max(0, Number(v)) / top * 100 + '%' }}/><b>{fmtMoney(Number(v))}</b></span>;
       return <React.Fragment key={k}><span className="v3-adf-k">{k}</span>{cell(a)}{cell(b)}</React.Fragment>; };
-    return (<figure className="v3-adf" aria-label={'Two futures for the quarter. Keep today’s ad spend: sales ' + fmtMoney(T.sales) + ', ads ' + fmtMoney(T.ads) + ', profit ' + fmtMoney(T.profit_after_ads) + '. Chase the sales goal: sales ' + fmtMoney(G.sales) + ', ads ' + fmtMoney(G.ads) + ', profit ' + fmtMoney(G.profit_after_ads) + '.'}>
+    const keepWord = Number(A.hold_week) > 0 ? 'Ads near ' + v3Gbp(A.hold_week) + ' a week' : 'Ads near today’s level';
+    return (<figure className="v3-adf" aria-label={'Two futures for the quarter. ' + keepWord + ': sales ' + fmtMoney(T.sales) + ', ads ' + fmtMoney(T.ads) + ', profit ' + fmtMoney(T.profit_after_ads) + '. Chase the sales goal: sales ' + fmtMoney(G.sales) + ', ads ' + fmtMoney(G.ads) + ', profit ' + fmtMoney(G.profit_after_ads) + '.'}>
       {A.owner_question && <p className="v3-kick">Your call</p>}
       <h3 className="v3-adf-t">Chasing the sales goal costs {fmtMoney(Math.abs(Number(A.profit_change)))} of profit.</h3>
       <div className="v3-adf-grid">
-        <span/><span className="v3-adf-h">Keep today’s ad spend</span><span className="v3-adf-h">Chase the sales goal</span>
+        <span/><span className="v3-adf-h">{keepWord}</span><span className="v3-adf-h">Chase the sales goal</span>
         {row('Sales', T.sales, G.sales, 'sales')}{row('Ads', T.ads, G.ads, 'ads')}{row('Profit', T.profit_after_ads, G.profit_after_ads, 'profit')}
       </div>
       {A.owner_question && <div className="v3-adf-q"><b>{A.owner_question}</b>{action}</div>}
@@ -23735,26 +23762,38 @@ function V3BusinessState({ part }) {
   // beside the goal strip's quarter: the week keeps what last week and the month so far did, not what the month needs.
   const TW = S.this_week && S.this_week.said ? Object.assign({}, S.this_week, { said: String(S.this_week.said).split(/(?<=\.)\s+(?=[A-Z])/).filter(x => !/^The plan has/.test(x)
     // 30 Oct eval: "October so far ... made £69,790 after ads" repeats the goal strip's figure two sections up
-    && !/^[A-Z][a-z]+ so far:/.test(x)).join(' ') }) : null, AB = null;
+    && !/^[A-Z][a-z]+ so far:/.test(x)).join(' ') }) : null;
+  // 3 Nov, interface review: Dan, "keep some kind of dashboard element of the key metrics, so the user can quickly see what is
+  // performing and what is not". The week and the four signs sit under the verdict (part="figs"), each with its word; the two
+  // pictures follow the moves (part="lead").
+  const hasStats = TW && TW.sales != null && TW.profit_after_ads != null;
+  if (part === 'figs') return (<section className="v3-stand-figs" aria-label="How the brand is doing">
+    <h2 className="v3-stand-h">How the brand is doing</h2>
+    {TW && !hasStats && <p className="v3-week-line">{TW.said}</p>}
+    {(hasStats || signs.length > 0) && <div className="v3-figs">
+      {hasStats && [['Sales', TW.sales, TW.prev_sales, true], ['Ad spend', TW.ads, TW.prev_ads, null], ['Kept after ads', TW.profit_after_ads, TW.prev_profit_after_ads, true]].map(([k, v, was, up]) => {
+        const ch = was != null ? Number(v) - Number(was) : null;
+        return (<div className="v3-stat" key={k} title={TW.week_from ? v3Day(TW.week_from) + ' to ' + v3Day(TW.week_to) : undefined}><div className="v3-stat-lab"><span>{k}, last week</span></div><div className="v3-stat-val">{fmtMoney(v)}</div>
+          <div className="v3-stat-foot"><span className={ch == null || up == null ? 'v3-muted' : ch >= 0 ? 'v3-up' : 'v3-down'}>{ch == null ? '' : (ch >= 0 ? '+' : '−') + fmtMoney(Math.abs(ch)) + ' on the week before'}</span></div></div>);
+      })}
+      {signs.slice(0, 4).map(s => <V3Sign key={s.k} {...s}/>)}
+    </div>}
+    {openSign && HP && <V3DriverPanel key={drv} which={drv} points={HP} ctx={openSign.ctx} line={openSign.dline}/>}
+  </section>);
+  const hasDrivers = S.drivers && S.drivers.state === 'ok' && (S.drivers.drivers || []).length > 0;
+  const drvTo = hasDrivers && S.drivers.to ? v3Day(String(S.drivers.to).slice(0, 10)) : null;
   return (<section className="v3-stand">
-    {(TW || AB) && (<div className="v3-week">
-      <div className="v3-kick">Last week{TW && TW.week_from ? ' · ' + v3Day(TW.week_from) + ' to ' + v3Day(TW.week_to) : ''}</div>
-      {TW && TW.sales != null && TW.profit_after_ads != null ? <div className="v3-stat-grid v3-week-stats">
-        {[['Sales', TW.sales, TW.prev_sales, true], ['Ad spend', TW.ads, TW.prev_ads, null], ['Kept after ads', TW.profit_after_ads, TW.prev_profit_after_ads, true]].map(([k, v, was, up]) => {
-          const ch = was != null ? Number(v) - Number(was) : null;
-          return (<div className="v3-stat" key={k}><div className="v3-stat-lab"><span>{k}</span></div><div className="v3-stat-val">{fmtMoney(v)}</div>
-            <div className="v3-stat-foot"><span className={ch == null || up == null ? 'v3-muted' : ch >= 0 ? 'v3-up' : 'v3-down'}>{ch == null ? '' : (ch >= 0 ? '+' : '−') + fmtMoney(Math.abs(ch)) + ' on the week before'}</span></div></div>);
-        })}
-      </div> : TW && <p className="v3-week-line">{TW.said}</p>}
-      {AB && <p className="v3-week-line"><b>Your ad budget:</b> {AB.said}</p>}
-    </div>)}
-    <div className="v3-kick">Where you stand · last 30 days</div>
-    <p className="v3-verdict">{verdict}</p>
-    {S.drivers && S.drivers.state === 'ok' && (S.drivers.drivers || []).length ? <V3RankedDrivers D={S.drivers}/> : sub}
-    <div className="v3-stand-grid">
-      <div><V3MoneyBridge L={L} share={share}/>
-        {profitAct && <button type="button" className="v3-xref v3-sign-act" aria-expanded={profitAct.open} onClick={profitAct.on}>{profitAct.label} <span className="v3-xref-go">{profitAct.open ? '↑' : '↓'}</span></button>}</div>
-      {signs.length > 0 && <div className="v3-signs">{signs.slice(0, 4).map(s => <V3Sign key={s.k} {...s}/>)}</div>}
+    <div className="v3-stand-two">
+      <div>
+        <h2 className="v3-stand-h">Where the money went</h2>
+        <p className="v3-stand-lede">{verdict} Last 30 days.</p>
+        <V3MoneyBridge L={L} share={share}/>
+        {profitAct && <button type="button" className="v3-xref v3-sign-act" aria-expanded={profitAct.open} onClick={profitAct.on}>{profitAct.label} <span className="v3-xref-go">{profitAct.open ? '↑' : '↓'}</span></button>}
+      </div>
+      {(hasDrivers || sub) && <div>
+        <h2 className="v3-stand-h">What moved it</h2>
+        {hasDrivers ? <><p className="v3-stand-lede">{drvTo ? 'The four full weeks to ' + drvTo : 'The last four full weeks'}, against a typical four.</p><V3RankedDrivers D={S.drivers}/></> : sub}
+      </div>}
     </div>
     {openSign && HP && <V3DriverPanel key={drv} which={drv} points={HP} ctx={openSign.ctx} line={openSign.dline}/>}
     <V3More id="today-sales-move" label="What moved sales this month"><V3SalesMove/></V3More>

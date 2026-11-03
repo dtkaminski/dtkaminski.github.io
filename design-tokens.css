@@ -201,6 +201,9 @@
   /* ── The product frame ── the nav's width, and the widest the content runs. */
   --size-rail: 200px;
   --size-content: 1144px;
+  --size-col-worth: 112px;
+  --size-col-act: 96px;
+  --measure-row: 72ch;
 
   /* ── Space — 4px rhythm ─────────────────────────────────────────────── */
   --space-1:  4px;
