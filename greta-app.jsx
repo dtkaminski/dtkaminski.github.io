@@ -3382,7 +3382,7 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
             {fld('wholesale','Wholesale /mo',curSym())}
             {fld('wholesaleGrowthPct','Wholesale growth /mo',null,'%')}
           </div>}
-          <div style={{fontSize:'var(--text-xs)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:6}}>Seasonality index <span style={{textTransform:'none',letterSpacing:0,color:'var(--text-muted)'}}>· 1.0 = average month · default = UK jewellery (Nov–Dec, Feb, Mar peaks)</span></div>
+          <div style={{fontSize:'var(--text-xs)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:6}}>Seasonality index <span style={{textTransform:'none',letterSpacing:0,color:'var(--text-muted)'}}>· 1.0 = average month · flat until you set your own</span></div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
             {FC_MONTHS.map((m,j)=>(<label key={j} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:2,fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>
               <span>{m}</span>
@@ -3457,7 +3457,7 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
         {mode==='bottomup'
           ? <>Bottom-up: <b>New</b> = (paid spend ÷ cost per new customer + organic new) × new average order value; <b>Returning</b> = customer base × repeat rate × returning average order value, where the base compounds (each month's new customers join it); <b>+ Wholesale</b>. Every line is seasonalised by calendar month. cost per new customer bundles CPM×CTR×conversion rate — seed it from a defensible blended figure. Base + repeat rate are seeded to reproduce your current returning-order share.</>
           : <>Top-down: revenue compounds at your monthly growth rate (×seasonality); paid marketing is implied at your target sales per £ of ads. Cross-check against bottom-up — if the spend to hit this revenue is unaffordable, it's a wish, not a plan.</>}
-        {' '}Seasonality defaults to a UK-jewellery curve (peaks Nov–Dec, Feb, Mar; troughs Jan + summer) — edit in Advanced. Scenarios flex growth + retention. Not a cash-flow model — working capital (stock + AR/AP days) sits on top.
+        {' '}Seasonality is flat until you set your own months: edit in Advanced. Scenarios flex growth + retention. Not a cash-flow model — working capital (stock + AR/AP days) sits on top.
       </div>
     </div>
   );
@@ -4022,6 +4022,16 @@ function Overview({start, period, customActive}){
   const cmr = oiCmRatio();
   const gmGross = oiGrossMargin();                 // genuinely gross, for the COGS line only
   const gm = cmr;                                  // every "contribution" figure on this page
+  // 2 Nov eval: the period before was valued at today's margin. On a month with a 50% sale in it that read profit
+  // down 28% where the daily ladder shows it up 26%. What each period kept comes from that period's own days.
+  const _ladQ = useV3Rows('profit-kept', V3_KEPT_Q);
+  const keptShare = (a, b) => { let n = 0, c = 0, days = 0;
+    (_ladQ.rows || []).forEach(r => { const d = String(r.day).slice(0, 10); if (d >= a && d <= b && r.cm2 != null) { n += Number(r.net_sales) || 0; c += Number(r.cm2) || 0; days++; } });
+    const want = Math.max(1, Math.round((Date.parse(b) - Date.parse(a)) / 86400000) + 1);
+    return n > 0 && days >= want * 0.5 ? c / n : null; };
+  const keptDay = {}; (_ladQ.rows || []).forEach(r => { if (r.cm2 != null && Number(r.net_sales) > 0) keptDay[String(r.day).slice(0, 10)] = Number(r.cm2) / Number(r.net_sales); });
+  const gmNowK = (H0 && H0.window_from && H0.window_to) ? keptShare(H0.window_from, H0.window_to) : keptShare(start, end);
+  const gmPriK = havePrior ? keptShare(prior.start, prior.end) : null;
   const cogs = (gmGross!=null) ? rev * (1 - gmGross) : null;
   const grossProfit = (gm!=null) ? rev * gm : null;
   // Profit after ads: profit_after_ads_30d (anatomy cm3, other marketing cost included) for the default 30 days.
@@ -4029,9 +4039,9 @@ function Overview({start, period, customActive}){
   const contrib = onFig ? contribF.value : ((gm!=null) ? grossProfit - paid : null);   // other periods: not a registered figure (picked window)
   const cmPct = (contrib!=null && rev>0) ? contrib/rev : null;   // not a registered figure: the share of sales
   const poas = (grossProfit!=null && paid>0) ? grossProfit/paid : null;   // profit on ad spend; break-even 1.0
-  // not a registered figure: the period before and the daily line are history, valued at today's margin
-  const pContrib = (gm!=null && havePrior && pRev!=null && pPaid!=null) ? (pRev*gm - pPaid) : null;
-  const seriesContrib = (gm!=null) ? daily.map(d=>({d:d.dlabel, v: +((d.revenue*gm) - d.paid).toFixed(0)})) : [];
+  // not a registered figure: the period before and the daily line are history, each on its own days' margin
+  const pContrib = (gmPriK!=null && havePrior && pRev!=null && pPaid!=null) ? (pRev*gmPriK - pPaid) : null;
+  const seriesContrib = (gm!=null) ? daily.map(d=>({d:d.dlabel, v: +((d.revenue*(keptDay[d.date] != null ? keptDay[d.date] : gm)) - d.paid).toFixed(0)})) : [];
   // LTV / CAC (estimates): repeat behaviour from retentionByMonth, windowed spend + AOV.
   // ── Unit economics, measured (0206) ─────────────────────────────────────────
   // This block used to derive everything from FRKL_BUSINESS.retentionByMonth: a static
@@ -4159,7 +4169,7 @@ function Overview({start, period, customActive}){
     const _cmr=gm, _beroas=F('break_even_return'), _foc=F('first_order_profit');
     return {rev:r, orders:o, sessions:ses, paid:pd, cvr:ses>0?o/ses:null, pCvr:pses>0?po/pses:null,
             mer:F('mer_30d'), cac:_cac, pCac:_pcac, ltv:_ltv, ltvCac:(_ltv!=null&&_cac)?_ltv/_cac:null,
-            gm:gmGross, cmRatio:gm, contrib:_contrib, pContrib:(gm!=null)?pr*gm-ppd:null,   // pContrib: not a registered figure (the 30 days before)
+            gm:gmGross, cmRatio:gm, contrib:_contrib, pContrib:(keptShare(cp.start, cp.end)!=null)?pr*keptShare(cp.start, cp.end)-ppd:null,   // pContrib: not a registered figure (the 30 days before, on their own margin)
             cmPct:(_contrib!=null&&r>0)?_contrib/r:null, returnRate,
             discLoad:gs>0?da/gs:null, pDiscLoad:pgs>0?pda/pgs:null, pRev:pr,
             aov:_aov, breakEvenRoas:_beroas,
@@ -4351,7 +4361,7 @@ function Overview({start, period, customActive}){
       {/* gm here is the server's contribution ratio — already net of shipping, packaging and fees —
           so no per-order costs are taken off again. With them (and frkl's device-only defaults)
           the bridge ended on "Now £406" beside a £2,632 hero. */}
-      <LazyMount minHeight={360}><MarginBridge cur={bridgeCur} pri={bridgePri} gm={gm} perOrderFixed={0} payPct={0}/></LazyMount>
+      <LazyMount minHeight={360}><MarginBridge cur={bridgeCur} pri={bridgePri} gmNow={gmNowK} gmPri={gmPriK} tile={onFig ? contrib : null} perOrderFixed={0} payPct={0}/></LazyMount>
       {/* Channel stream chart */}
       <LazyMount minHeight={340}><ChannelStreamPanel/></LazyMount>
       {/* Today's view — the pacing + anomaly tile */}
@@ -5889,7 +5899,7 @@ function CollectionsPanel(){
         </tr>);
       })}
       </tbody></table>
-      <div className="note" style={{marginTop:14}}><b>Collection read:</b> {top.collection} drive {PCT(top.revenueShare)} of product revenue ({top.skus}{` items, average order value ${curSym()}`}{Math.round(top.aovPerUnit||0)}). {tinyCollections.length > 0 ? `${tinyCollections.length} collection${tinyCollections.length>1?'s':''} have only 1-2 active items (${tinyCollections.map(c=>c.collection).join(', ')}) — long-tail expansion candidates worth a Frame brief.` : ''} The Necklaces + Charms combination is 85% of revenue — the modular system working as designed.</div>
+      <div className="note" style={{marginTop:14}}><b>Collection read:</b> {top.collection} drive {PCT(top.revenueShare)} of product revenue ({top.skus}{` items, average order value ${curSym()}`}{Math.round(top.aovPerUnit||0)}). {tinyCollections.length > 0 ? `${tinyCollections.length} collection${tinyCollections.length>1?'s':''} have only 1-2 active items (${tinyCollections.map(c=>c.collection).join(', ')}) — long-tail expansion candidates worth a Frame brief.` : ''}{DEMO ? ' The Necklaces + Charms combination is 85% of revenue — the modular system working as designed.' : ''}</div>
     </div>
   );
 }
@@ -7609,7 +7619,7 @@ function EmailHub(){
           the data said, and empty data printed "undefined messages". Shown only with real rows. */}
       {(camps.length > 0 || flows.length > 0) ? (<>
       <div className="card" style={{marginBottom:14}}>
-        <h2>Email is the #1 revenue channel — and flows are doing the heavy lifting</h2>
+        <h2>Email: flows and campaigns</h2>
         <div className="muted" style={{marginBottom:10,fontSize:'var(--text-sm)'}}>Last 90 days · Klaviyo via Supermetrics. Campaigns = broadcasts. Flows = automated triggers (welcome, abandoned cart, browse abandonment, back-in-stock, birthday).</div>
         <div className="row">
           <KPI label="Flow revenue (30d)" val={GBP(summary.flows.orderValue)} sub={summary.flows.messages ? `${summary.flows.messages} live flows · ${NUM(summary.flows.recipients)} recipients` : 'no flow results from Klaviyo yet'}
@@ -7617,13 +7627,13 @@ function EmailHub(){
             implication={DEMO ? "This is the highest-margin marketing activity frkl runs. Investment in flow optimisation = direct revenue." : undefined} />
           <KPI label="Campaign revenue (90d)" val={GBP(summary.campaigns.orderValue)} sub={summary.campaigns.messages ? `${summary.campaigns.messages} sends · ${NUM(summary.campaigns.recipients)} total recipients` : 'no campaigns sent in the last 90 days'} series={sendChart.map(w=>({d:w.date, v:Math.round(w.revenue)}))} seriesLabel="Campaign revenue · by send date"
             agent="Lux" observation={summary.campaigns.messages ? `${summary.campaigns.messages} campaigns brought in ${GBP(summary.campaigns.orderValue)}, against ${GBP(summary.flows.orderValue)} from flows in 30 days.` : undefined}
-            implication="Send cadence is high; revenue per send isn't. Either cut the 50% lowest-performing or differentiate angles." />
+            implication={DEMO ? "Send cadence is high; revenue per send isn't. Either cut the 50% lowest-performing or differentiate angles." : undefined} />
           <KPI label="Flow rev per recipient" val={fmtMoney(summary.flows.revPerRecip||0, 2)} sub={`vs ${curSym()}${(summary.campaigns.revPerRecip||0).toFixed(2)} for campaigns — ${lift}× lift`}
             agent="Atlas" observation={`Each flow recipient is worth ${lift}× more than a campaign recipient.`}
             implication="The action: get more profiles INTO flows (sign-up forms, browse, cart, post-purchase) before sending another broadcast." />
           <KPI label="Avg open rate (camp.)" val={PCT(summary.campaigns.avgOpenRate)} sub={`Click ${PCT(summary.campaigns.avgClickRate)} — flows avg ${PCT(summary.flows.avgOpenRate)} open`}
-            agent="Lux" observation="58% campaign open rate is excellent — list hygiene + brand affinity are strong. Click-through is the weak link."
-            implication="Subject lines work; CTAs and content layout don't. A/B test single-CTA emails next." />
+            agent="Lux" observation={DEMO ? "58% campaign open rate is excellent — list hygiene + brand affinity are strong. Click-through is the weak link." : undefined}
+            implication={DEMO ? "Subject lines work; CTAs and content layout don't. A/B test single-CTA emails next." : undefined} />
         </div>
       </div>
       <div className="row">
@@ -7641,27 +7651,6 @@ function EmailHub(){
             <td><b style={{color:f.revPerRecip>3?PAL.good:f.revPerRecip>1?PAL.warn:PAL.muted}}>{`${curSym()}`}{(f.revPerRecip||0).toFixed(2)}</b></td>
           </tr>))}
           </tbody></table>
-        </div>
-        <div className="card" style={{flex:'1 1 280px'}}>
-          <h2>Quick wins</h2>
-          <div style={{display:'flex',flexDirection:'column',gap:10,fontSize:'var(--text-sm)'}}>
-            <div style={{padding:10,background:'var(--bg-app)',borderRadius:'var(--radius-none) var(--radius-md) var(--radius-md) var(--radius-none)'}}>
-              <div style={{fontWeight:'var(--weight-semi)',marginBottom:3}}>{`Back-in-Stock at ${curSym()}8.16/recipient`}</div>
-              <div className="muted">Best-performing flow. Audit which products trigger it — expand to more items.</div>
-            </div>
-            <div style={{padding:10,background:'var(--bg-app)',borderRadius:'var(--radius-none) var(--radius-md) var(--radius-md) var(--radius-none)'}}>
-              <div style={{fontWeight:'var(--weight-semi)',marginBottom:3}}>{`NECKLACES Welcome at ${curSym()}6.65/recipient`}</div>
-              <div className="muted">Per-category welcome flows crushing — replicate for new categories.</div>
-            </div>
-            <div style={{padding:10,background:'var(--bg-app)',borderRadius:'var(--radius-none) var(--radius-md) var(--radius-md) var(--radius-none)'}}>
-              <div style={{fontWeight:'var(--weight-semi)',marginBottom:3}}>Happy Birthday flow = 0 revenue</div>
-              <div className="muted">Open rate 41% but zero orders. Subject works, CTA doesn't. Test a stronger offer.</div>
-            </div>
-            <div style={{padding:10,background:'var(--bg-app)',borderRadius:'var(--radius-none) var(--radius-md) var(--radius-md) var(--radius-none)'}}>
-              <div style={{fontWeight:'var(--weight-semi)',marginBottom:3}}>43 campaigns in 90d = 1 every 2 days</div>
-              <div className="muted">High frequency. List fatigue likely — consider cutting low performers.</div>
-            </div>
-          </div>
         </div>
       </div>
       <div className="card" style={{marginTop:14}}>
@@ -7866,7 +7855,7 @@ function InstagramPanel(){
             agent="Frame" observation={`~9.5k people reached organically every day — roughly what ${curSym()}100/day of paid would buy you.`}
             implication="Organic IG is paid-equivalent reach for free. Brief 2 content pillars per week, not occasional one-offs." />
           <KPI label="Top post (90d)" val={NUM(topPosts[0]?.views)} sub={`${topPosts[0]?.likes} likes — ${(topPosts[0]?.caption||'').slice(0,32)}…`}
-            agent="Frame" observation="The ADHD reel (79k views) is the breakout outlier — non-jewellery, relatable hook, broad appeal."
+            agent="Frame" observation={DEMO ? "The ADHD reel (79k views) is the breakout outlier — non-jewellery, relatable hook, broad appeal." : "Your most-viewed post in the last 90 days."}
             implication="Test more lifestyle/relatable content alongside product posts. Not every Reel needs to sell directly." />
         </div>
       </div>
@@ -8745,6 +8734,11 @@ async function v3AskFacts(question) {
     if (S1 && S1.ad_budget && S1.ad_budget.said) f.ad_budget_for_all_ads = { said: S1.ad_budget.said, per_week: fgOr('ad_target_week', S1.ad_budget.per_week), month: S1.ad_budget.month,
       next_month_per_week: fgOr('ad_next_week', S1.ad_budget.next_per_week), last_7_days: fgOr('ads_7d', S1.ad_budget.last_7_days),
       note: 'The plan’s budget for ALL ads together. A board action that says "Cut <channel> from £A to about £B a week" is that channel’s cut: give it as written. A channel’s "own ceiling" is a most, never a level to spend or cut to.' };
+    // 1156: the one answer on ad spend, worked out once. Rules in this prompt alone never stopped the flips.
+    if (S1 && S1.ad_decision && S1.ad_decision.said) { const AD = S1.ad_decision;
+      f.ad_spend_answer = { said: AD.said, decision: AD.decision, week_after_cuts: fgOr('ad_week_after_cuts', AD.week_after_cuts), extra_ads_for_sales_goal: fgOr('ad_extra_for_sales_goal', AD.extra_ads),
+        profit_change_from_sales_goal: fgOr('ad_profit_change_for_sales_goal', AD.profit_change), cuts_on_the_board: (AD.cuts || []).map(c => c.channel || 'all ads'), owner_decides: AD.owner_question || null,
+        note: 'The one answer on ad spend. Quote said as written. Whether to keep the sales goal is the owner’s call: ask owner_decides, do not decide it for them.' }; }
     // 16 Oct: "Can I afford the peak?" flipped between "you don't have enough cash" and "you can afford it",
     // and once counted slow stock as cash: the entered balance never reached Ask. It is sent here, said to be
     // entered and not measured, with the verdict worked out once.
@@ -9273,6 +9267,15 @@ function v3AskCheck(text, sent) {
       }
     }
   }
+  // 1156: "the board has no cut action for Meta" beside a board row saying "Cut Meta" (2 Nov). The sentence goes; the
+  // board's own sentence takes its place.
+  ['Meta', 'Google', 'TikTok'].forEach(ch => {
+    const says = new RegExp('\\b(?:cut|spend less on)\\s+' + ch + '\\b', 'i');
+    const row = board.find(b => says.test(String(b.action || ''))); if (!row) return;
+    const said = (String(row.action).match(/[^.!?]+[.!?]+/g) || []).find(x => says.test(x)); if (!said) return;
+    const no = "(?:no|not|isn.t|doesn.t|without|nothing)", move = "(?:cut|reduc\\w*|action|move)";
+    t = t.replace(new RegExp('[^.!?\\n]*\\b' + no + '\\b[^.!?\\n]{0,60}\\b' + move + '\\b[^.!?\\n]{0,40}\\b' + ch + '\\b[^.!?\\n]*[.!?]?|[^.!?\\n]*\\b' + ch + '\\b[^.!?\\n]{0,40}\\b' + no + '\\b[^.!?\\n]{0,30}\\b' + move + '\\b[^.!?\\n]*[.!?]?', 'gi'), () => ' ' + said.trim());
+  });
   // Held items never come back as "my suggestion" (9 Oct, twice: "Fix the site-wide JavaScript errors (e.g.,
   // the Judge.me PDP issue)", where the Judge.me fix is held, not re-checked since April). The held part
   // goes; a suggestion that is mostly a held item goes whole.
@@ -9478,7 +9481,10 @@ function buildAskContext(facts, question, budget){
     ['sales_move', () => /\b(sales|sell|sold|revenue|down|up|fell|fall\w*|drop\w*|rose|why)\b/i.test(qs)],
     ['facts.cash_to_the_plan_end', () => /\b(cash|afford|runway|money|bank|peak)\b/i.test(qs)],
     ['facts.goal', () => /\b(goal|target|on track|quarter)\b/i.test(qs)],
-    ['facts.quarter_plan_at_todays_ad_spend', () => topics.ads || /\b(goal|plan|quarter|forecast|target|budget|on track|afford|peak)\b/i.test(qs)],
+    ['facts.ad_spend_answer', () => topics.ads || /\b(ads?|spend\w*|budget|cut|goal|target|on track|forecast)\b/i.test(qs)],
+    ['facts.quarter_plan_at_todays_ad_spend', () => !(meta.facts && meta.facts.ad_spend_answer) && (topics.ads || /\b(goal|plan|quarter|forecast|target|budget|on track|afford|peak)\b/i.test(qs))],
+    ['facts.best_sellers_stock', () => topics.stock || topics.products || /\b(best.?sell\w*|top sell\w*|products?)\b/i.test(qs)],
+    ['facts.best_seller_verdict', () => topics.stock || topics.products || /\b(best.?sell\w*|top sell\w*|products?)\b/i.test(qs)],
     ['facts.customers', () => /\b(customers?|repeat|returning|retention|ltv|cac|win|loyal\w*)\b/i.test(qs)],
     ['board_no_figure', () => topics.stock || /\b(do|should|next|plan\w*|peak|black friday|cyber|christmas|bfcm|deadlines?|due|overdue|dates?|when|priorit\w*|first|focus|board|actions?)\b/i.test(qs)],
     ['board', () => false],   // the biggest part: shortened (5 rows, then 3) before the facts below, never dropped
@@ -9493,14 +9499,22 @@ function buildAskContext(facts, question, budget){
   // the no-figure rows shorten with the board: three, without their why
   const shortLane = () => { const L = meta.board_no_figure; if (L && Array.isArray(L.rows))
     L.rows = L.rows.slice(0, 3).map(r => ({ action: r.action, due: r.due, no_figure_because: r.no_figure_because })); };
+  // Board rows about what was asked stay: "Meta or email?" lost both email actions to this trim (8 Oct).
+  const onTopic = x => Object.keys(topics).some(k => topics[k] && V3_ASK_TOPICS[k].test(String(x.action || '') + ' ' + String(x.detail || '')));
+  const shortRow = r => Object.assign({}, r, { action: String(r.action || '').length > 400 ? String(r.action).slice(0, 400) + '…' : r.action, detail: r.detail && String(r.detail).length > 300 ? String(r.detail).slice(0, 300) + '…' : r.detail });
+  // 3 Nov: every cut to the board now keeps on-topic rows and names what it took off, so a row that did not fit is not
+  // read as a row that does not exist ("the board has no cut action for Meta", 2 Nov).
+  const keepBoard = n => {
+    const B = meta.readout && meta.readout.board; if (!Array.isArray(B) || B.length <= n) return false;
+    const kept = B.filter((r, i) => i < n || onTopic(r)).slice(0, n + 2), gone = B.filter(r => kept.indexOf(r) < 0);
+    meta.readout.board = kept.map(shortRow);
+    meta.readout.board_left_out_for_room = (meta.readout.board_left_out_for_room || []).concat(gone.map(r => ({ rank: r.rank, action: String(r.action || '').slice(0, 70) }))).slice(0, 8);
+    return true; };
   const dropPart = key => {
     if (key === 'board') {
       shortLane();
       const B = meta.readout && meta.readout.board, n = B && B.length > 5 ? 5 : 3;
-      if (Array.isArray(B) && B.length > n) {
-        meta.readout.board = B.slice(0, n).map(r => Object.assign({}, r, { action: String(r.action || '').length > 400 ? String(r.action).slice(0, 400) + '…' : r.action, detail: r.detail && String(r.detail).length > 300 ? String(r.detail).slice(0, 300) + '…' : r.detail }));
-        leftOut.push('board rows after ' + n); noteLeftOut();
-      }
+      if (keepBoard(n)) { leftOut.push('board rows after ' + n); noteLeftOut(); }
       return;
     }
     const [a, b] = key.split('.'); const o = b ? meta[a] : meta; const k = b || a;
@@ -9528,8 +9542,6 @@ function buildAskContext(facts, question, budget){
   if (size() > BUDGET && meta.readout) delete meta.readout.cost_trees;
   if (size() > BUDGET && meta.readout && meta.readout.held && Array.isArray(meta.readout.held.items)) meta.readout.held.items = meta.readout.held.items.map(h => ({ flag: h.flag }));
   if (size() > BUDGET && meta.readout) meta.readout.coverage = [];
-  // Board rows about what was asked stay: "Meta or email?" lost both email actions to this trim (8 Oct).
-  const onTopic = x => Object.keys(topics).some(k => topics[k] && V3_ASK_TOPICS[k].test(String(x.action || '') + ' ' + String(x.detail || '')));
   while (size() > BUDGET && meta.readout && meta.readout.board.length > 5) {
     const B = meta.readout.board; let i = B.length - 1;
     while (i >= 5 && onTopic(B[i])) i--;
@@ -9546,12 +9558,12 @@ function buildAskContext(facts, question, budget){
   if (size() > BUDGET && meta.facts && meta.facts.what_moved_profit && Array.isArray(meta.facts.what_moved_profit.drivers))
     meta.facts.what_moved_profit.drivers = meta.facts.what_moved_profit.drivers.slice(0, 3);
   if (size() > BUDGET) shortLane();
-  if (size() > BUDGET && meta.readout && meta.readout.board) meta.readout.board = meta.readout.board.slice(0, 3)
-    .map(r => Object.assign({}, r, { action: String(r.action || '').length > 400 ? String(r.action).slice(0, 400) + '…' : r.action, detail: r.detail && String(r.detail).length > 300 ? String(r.detail).slice(0, 300) + '…' : r.detail }));
+  if (size() > BUDGET) keepBoard(3);
   [8, 5].forEach(n => { Array.from(keepSeries).forEach(k => { if (size() > BUDGET && data[k] && data[k].rows.length > n) data[k] = { cols: data[k].cols, rows: data[k].rows.slice(0, n) }; }); });
   Array.from(keepSeries).forEach(k => { if (size() > BUDGET && data[k]) { delete data[k]; delete dictionary[k]; } });
   // the no-figure rows a question is about stay, as the board does (three, already short)
-  needs.forEach(([key, needed]) => { if (size() > BUDGET && !(key === 'board_no_figure' && needed())) dropPart(key); });
+  // and so does the answer to the question asked: "should I cut Meta?" lost the ad spend answer to this line (3 Nov)
+  needs.forEach(([key, needed]) => { if (size() > BUDGET && !((key === 'board_no_figure' || key === 'facts.ad_spend_answer') && needed())) dropPart(key); });
   return { _meta: meta, data, topics, chars: size() };
 }
 // Answer depth -> the model that serves it. The only place a model id appears on the
@@ -9686,7 +9698,7 @@ COUNTS AND NAMES: how many products are out of stock or need ordering comes from
 
 STOCK questions: when the owner says "our best seller", the first sentences are facts.best_seller_verdict as written. Otherwise first name it from facts.best_sellers_stock (the fastest seller) and say how many weeks it lasts and whether it runs out before a restock lands; if it does not, say that first, then which products do. If it lasts at today's pace but runs_short_in_the_peak, say so plainly: it sold more in last year's peak than you hold, an order placed today lands after the peak starts, so ask the supplier to send it first and keep it out of ads once it runs low. Use data.stock_named and data.stock_at_risk (Greta's stock plan) for how many to order (order_units), what being out costs (lost_before_lands, profit) and what an order costs (order_units × unit_cost). An order placed today lands on facts.next_peak.order_placed_today_lands. If facts.next_peak.lands_before_peak_starts is false, never say ordering now gets stock in for the peak: say when it lands, that only what suppliers can send sooner reaches the peak, and to ask for that first. Board pounds are what pounds_are says, a month or once (per); never call them a cost or spend unless pounds_are says so. When the board already has an action for what is asked, give its instruction as the board words it ("cut Meta from £A to about £B a week"), not a stronger one of your own such as pausing a channel.
 
-SHOULD I CUT OR SPEND ON ADS: answer from the board ads action. When it says Cut, the answer is cut now, from and to the figures it gives, with its pounds a month; facts.ad_budget_for_all_ads says how the plan keeps budget for the peak (next_month_per_week), so cutting now is how the peak gets its money. Never advise keeping today’s spend when an action says cut.
+SHOULD I CUT OR SPEND ON ADS, how much to spend, or whether the goal needs more ads: the first sentences are facts.ad_spend_answer.said as written. Then the board ads action: from and to the figures it gives, with its pounds a month; facts.ad_budget_for_all_ads says how the plan keeps budget for the peak (next_month_per_week), so cutting now is how the peak gets its money. Never advise keeping today’s spend when an action says cut. Never say the board has no cut for a channel that facts.ad_spend_answer.cuts_on_the_board or the board names. The return on all ads together is not one channel’s return: never use it to judge a channel.
 
 CASH and AFFORD questions: the first sentence is facts.cash_to_the_plan_end.verdict as written. Then the lowest_cash_need and when, from its said. The cash balance is one the owner entered, not measured: say so once. Slow stock is not cash.
 
@@ -9755,7 +9767,7 @@ ${dataStr}`;
       if (data.error) throw new Error(data.message || ASK_FAIL);
       // Thorough falls back to the quicker model when the main one is busy (9 Oct, after a day of tests):
       // the owner is told, so a thinner answer is not mistaken for Greta's best.
-      const quickNote = askDepth === 'thorough' && /20b|mini|8b|scout|haiku/i.test(String(data.model || ''))
+      const quickNote = askDepth === 'thorough' && /(^|[^0-9])(20b|8b)|mini|scout|haiku/i.test(String(data.model || ''))
         ? '\n\n*Answered by Greta’s quicker model because the main one was busy. Ask again in a few minutes for a fuller answer.*' : '';
       setHistory(h=>[...h, {role:'assistant', content:v3AskCheck(v3AskScrub(data.text || '(no response)', facts), systemPrompt + JSON.stringify(apiMessages)) + quickNote, checked:true, time:Date.now(), usage:data.usage||{}}]);
     } catch (e) {
@@ -10965,19 +10977,22 @@ function RetentionPanel(){
 // returns and paid media. Built as an exactly-reconciling sequential walk (change
 // one driver prior→current at a time, recompute contribution), so the bars ALWAYS
 // sum to the real change. Uses the operator's verified costs (Phase 0.1).
-function MarginBridge({cur, pri, gm, perOrderFixed, payPct}){
+function MarginBridge({cur, pri, gmNow, gmPri, tile, perOrderFixed, payPct}){
   const verified = useCostTick();
-  if(!cur || !pri || !pri.orders || !cur.orders) return null;
+  // 2 Nov eval: each period on what it kept itself. One margin on both months read a sale month as a fall in profit.
+  // Without both, no comparison: a figure from one margin is the fault this replaced.
+  if(!cur || !pri || !pri.orders || !cur.orders || gmNow==null || gmPri==null) return null;
   const netRev = s => s.orders * (s.grossAOV - s.discPO - s.retPO);
   const C = s => netRev(s)*s.gm - (s.orders*perOrderFixed + netRev(s)*payPct) - s.paid;
-  const stOf = o => ({orders:o.orders, grossAOV:o.grossMerch/o.orders, discPO:o.disc/o.orders, retPO:o.returns/o.orders, gm:gm, paid:o.paid});
-  let s = stOf(pri); const C0 = C(s); const target = stOf(cur);
+  const stOf = (o, g) => ({orders:o.orders, grossAOV:o.grossMerch/o.orders, discPO:o.disc/o.orders, retPO:o.returns/o.orders, gm:g, paid:o.paid});
+  let s = stOf(pri, gmPri); const C0 = C(s); const target = stOf(cur, gmNow);
   const steps = [];
   const apply = (label, patch) => { const before=C(s); s={...s, ...patch}; steps.push({label, delta:C(s)-before}); };
   apply('Volume',      {orders:target.orders});
   apply('average order value / price', {grossAOV:target.grossAOV});
   apply('Discounting', {discPO:target.discPO});
   apply('Returns',     {retPO:target.retPO});
+  apply(`Kept per ${curSym()}1`, {gm:target.gm});
   apply('Paid media',  {paid:target.paid});
   const Cc = C(s);
   const shown = steps.filter(x=>Math.abs(x.delta) >= Math.max(1, Math.abs(Cc-C0)*0.01));
@@ -11018,7 +11033,7 @@ function MarginBridge({cur, pri, gm, perOrderFixed, payPct}){
           <R.Bar dataKey="neg" stackId="s" fill={PAL.bad} isAnimationActive={false} radius={[2,2,0,0]}><R.LabelList content={segLabel('neg')}/></R.Bar>
         </R.BarChart>
       </R.ResponsiveContainer>
-      <p className="v3-note" style={{marginTop:'var(--space-2)'}}>Profit after ads is sales × {PCT(gm)} (what is left after product and order costs) minus ad spend. The bars add up exactly to the change: green helped, red hurt.</p>
+      <p className="v3-note" style={{marginTop:'var(--space-2)'}}>Profit after ads is sales × what is left after product and order costs ({PCT(gmPri)} before, {PCT(gmNow)} now) minus ad spend. The bars add up exactly to the change: green helped, red hurt.{tile != null && Cc - tile > Math.max(1, Math.abs(tile) * 0.01) ? <> The {GBP(tile)} on this page also takes off {GBP(Cc - tile)} of other marketing costs, which Greta has no figure for in the period before.</> : null}</p>
       <ChartFooter note="Which lever moved contribution most this period — and was it volume, margin, or spend?"
         ask="From the contribution bridge, what drove the change in contribution most, and is it something I can act on?"
         rows={rows} columns={[{key:'name',label:'Driver'},{key:'delta',label:'Δ contribution',right:true,fmt:(v,r)=>r.total!=null?GBP(r.total):(v>=0?'+':'−')+GBP(Math.abs(v))}]}/>
@@ -12775,7 +12790,7 @@ function DemandPlanner({embedded}={}){
           <button style={{...btn,fontSize:'var(--text-xs)',padding:'5px 11px'}} onClick={addFocus}>+ Add focus</button>
         </div>
         {focus.length===0
-          ? <div className="muted" style={{fontSize:'var(--text-sm)'}}>None — the plan follows historic product mix. Add a focus to push a product or type (e.g. a Q4 promo on charms).</div>
+          ? <div className="muted" style={{fontSize:'var(--text-sm)'}}>None — the plan follows historic product mix. Add a focus to push a product or type (e.g. a Q4 promo on one range).</div>
           : <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {focus.map((e,i)=>{ const matched = sellers.filter(p=>{ const pid='product:'+(p.sku||p.title), tid='type:'+(p.type||''); return e.key===pid||e.key===tid||e.key==='all'; });
                 return (<div key={i} style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
@@ -19107,6 +19122,8 @@ function V3AgentLead({ q, gc, board, unreported }) {
   const at = asOf && isFinite(asOf.getTime()) ? asOf.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : null;
   const short = V.gap > 0;
   const go = (d) => window.__oiGo && window.__oiGo(d);
+  // 1156: the verdict is profit after ads; the sales goal's half is said beside it, not only on Goal & costs
+  const AD = st.rows && st.rows[0] && st.rows[0].ad_decision;
   // 2 Nov eval: "ahead" on the plan beside a pace that only just reaches the goal begged the question of which is true
   const paceGap = g.pace_finish != null ? Number(g.pace_finish) - Number(g.target) : null;
   // the verdict is about the goal; what is wrong under it is said beside it, not only further down the page
@@ -19127,6 +19144,8 @@ function V3AgentLead({ q, gc, board, unreported }) {
           <i aria-hidden="true"/>{warn === 1 ? '1 sign needs watching' : warn + ' signs need watching'}</button>}
         <p className="v3-al-sofar"><b>{Number(g.so_far) < 0 ? '−' : ''}{v3Gbp(Math.abs(Number(g.so_far)))}</b> kept so far, day {g.day} of {g.days}.{' '}
           <button type="button" className="v3-al-link" aria-expanded={how} onClick={() => setHow(h => !h)}>How?</button></p>
+        {AD && AD.sales_line && <p className="v3-al-sofar">{AD.sales_line}{' '}
+          <button type="button" className="v3-al-link" onClick={() => go('goal')}>See the answer on ad spend</button></p>}
         {how && <p className="v3-al-how">{V.toDate ? 'So far you are ' + V.toDate + '. ' : ''}{g.confirmed_on ? 'The goal is the one you confirmed on ' + v3Day(g.confirmed_on) + '. ' : ''}The forecast is {g.forecast_basis || 'what you have kept so far plus your recent pace for each day left'}. It does not count the moves below yet, so each one you make moves it up.</p>}
         {gc && gc.stale && <p className="v3-al-how">Greta’s plan has changed since you confirmed this goal.{' '}
           <button type="button" className="v3-al-link" onClick={() => go('goal')}>Re-plan the quarter</button></p>}
@@ -20580,6 +20599,28 @@ function V3LoadFailed({ what, onRetry }) {
   return (<div className="v3-empty">Greta couldn’t load {what} just now — the database was busy.{' '}
     {onRetry && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={onRetry}>Try again</button>}</div>);
 }
+// 1156: the one answer on ad spend. Worked out once (fn_brand_ad_decision) and quoted; no page makes its own.
+function V3AdAnswer({ action }) {
+  const st = useV3Rows('brand-state', V3_STATE_Q);
+  const A = st.rows && st.rows[0] && st.rows[0].ad_decision;
+  if (!A || !A.said) return null;
+  return (<div className="v3-ad-answer">
+    <h3 className="v3-ad-answer-t">Ad spend: one answer</h3>
+    <p className="v3-measure">{A.said}</p>
+    {A.owner_question && <p className="v3-measure"><b>{A.owner_question}</b> It is your call: a lower sales goal lets Greta plan on what keeps the most profit.{action ? <> {action}</> : null}</p>}
+  </div>);
+}
+// The same answer where a page works out what a goal would take in ads: the sum stays, and it is not read as advice.
+function V3GoalAdsNote({ times, seasonal }) {
+  const st = useV3Rows('brand-state', V3_STATE_Q);
+  const A = st.rows && st.rows[0] && st.rows[0].ad_decision;
+  if (A && A.lead && A.decision !== 'up') return <>Reaching it on ads alone takes {times} your current ad spend, and that is not Greta’s advice: {String(A.lead).replace(/^./, c => c.toLowerCase()).replace(/\.$/, '')} (Goal & costs says why). Three things close that gap more cheaply than ad spend: </>;
+  return <>{seasonal ? 'The quarter plan puts ' : 'At today’s order value and cost of a new customer, the goal needs '}{times} your current ad spend{seasonal ? ' into the rest of the goal' : ''}. Three things close that gap more cheaply than ad spend: </>;
+}
+// 2 Nov eval: what each day kept before ads, for the Profit fold. Its own read: the first-paint bundle answers 'profit-ladder' without it.
+const V3_KEPT_Q = (sb, b) => sb.from('cache_daily_cm_ladder')
+  .select('day,net_sales,cm2').eq('brand_id', b)
+  .gte('day', v3IsoAdd(new Date().toISOString().slice(0, 10), -400)).order('day', { ascending: true }).limit(1000);
 const V3_LADDER_Q = (sb, b) => sb.from('cache_daily_cm_ladder')
   .select('day,net_sales,paid_spend').eq('brand_id', b)
   .gte('day', v3IsoAdd(new Date().toISOString().slice(0, 10), -400)).order('day', { ascending: true }).limit(1000);
@@ -21108,12 +21149,12 @@ function V3ReturningBaseline() {
         <div className="v3-stat-foot"><span className="v3-muted">{fmtPctN(P.existing / P.remaining)} of it, in an ordinary month</span></div></div>
       <div className="v3-stat"><div className="v3-stat-lab"><span>Has to come from new customers</span></div><div className="v3-stat-val">{fmtMoney(P.fromNew)}</div>
         <div className="v3-stat-foot"><span className="v3-muted">{P.customers ? 'about ' + fmtCount(P.customers) + ' first orders at ' + fmtMoney(P.firstValue) : 'first orders and their early repeats'}</span></div></div>
-      {P.spendMonth != null && <div className="v3-stat"><div className="v3-stat-lab"><span>Ad spend needed a month</span></div><div className="v3-stat-val">{fmtMoney(P.spendMonth)}</div>
+      {P.spendMonth != null && <div className="v3-stat"><div className="v3-stat-lab"><span>Ad spend the goal would take a month</span></div><div className="v3-stat-val">{fmtMoney(P.spendMonth)}</div>
         <div className="v3-stat-foot"><span className="v3-muted">{P.seasonal ? 'from the quarter plan, at ' + fmtMoney(P.ncac) + ' per new customer on average, Black Friday included' : 'at ' + fmtMoney(P.ncac) + ' to win each new customer (the cost of a new customer, last 30 days)'}{P.spendNow ? '; you spend ' + fmtMoney(P.spendNow) + ' now' : ''}</span></div></div>}
     </div>
     <p className="v3-note v3-measure">
       {P.spendNow && P.spendMonth > P.spendNow * 1.2
-        ? <>{P.seasonal ? 'The quarter plan puts ' : 'At today’s order value and cost of a new customer, the goal needs '}{fmtTimes(P.spendMonth / P.spendNow, 1)} your current ad spend{P.seasonal ? ' into the rest of the goal' : ''}. Three things close that gap more cheaply than ad spend: </>
+        ? <V3GoalAdsNote times={fmtTimes(P.spendMonth / P.spendNow, 1)} seasonal={P.seasonal}/>
         : <>Three things make the goal cheaper to reach: </>}
       a bigger first order, so you need fewer new customers; a reason for existing customers to come back
       {d.peakLift > 0 ? ' (your sale months brought ' + fmtMoney(d.peakLift) + ' extra from them alone)' : ''}; and a second order sooner.
@@ -21892,6 +21933,7 @@ function V3GoalLead() {
       {g && short > 0 && !unreach && dCam != null && <> Those extra ads bring about {fmtMoney(short)} more sales but {dCam > 0 ? 'only ' + fmtMoney(dCam) + ' more' : fmtMoney(-dCam) + ' less'} profit after ads.{dCam < 0 ? ' Past a point, extra ads cost more profit than they bring in.' : atBest === 'at' ? ' The goal sits at the most profitable ad spend Greta can see.' : atBest === 'past' ? ' The goal is past the most profitable ad spend Greta can see (' + fmtMoney(best) + ').' : ''}</>}
       {!(g && short > 0) && best && <> The most profitable ad spend Greta can see is {fmtMoney(best)}, for about {fmtMoney(P.ceiling.best_sales)} of sales.</>}
       {' '}<V3Conf state="probably" detail={'How Greta plans the quarter: your own busy and quiet months from your sales history, returning customers at their last three months’ rate, and new-customer sales that rise with ad spend, each extra £1 buying a little less. Its average new customer costs ' + (v3Fig('plan_cost_per_new_customer', figG.rows).value != null ? fmtMoney(v3Fig('plan_cost_per_new_customer', figG.rows).value, 2) + ' (' + v3Fig('plan_cost_per_new_customer', figG.rows).label.toLowerCase() + ')' : B.cost_per_new_customer ? fmtMoney(B.cost_per_new_customer, 2) : 'less') + (B.cost_per_new_customer_basis ? ': ' + B.cost_per_new_customer_basis + '.' : ' because the quarter includes Black Friday, when new customers come cheaper.') + ' The Customers page shows the last 90 days.' + (PQ && PQ.basis_note ? ' ' + PQ.basis_note : '')}/></V3Brief>
+    <V3AdAnswer action={setGoal}/>
     {exp != null && <V3FcErr/>}
     <div className="v3-stat-grid v3-gap-top">
       {done != null && <div className="v3-stat"><div className="v3-stat-lab"><span>Sales so far</span></div><div className="v3-stat-val">{fmtMoney(done)}</div>
@@ -24150,7 +24192,7 @@ function V3AnatomyInputs() {
       <label className="v3-field"><span>Supplier</span><input value={draft.name} onChange={e => setDraft(d => ({ ...d, name: e.target.value }))}/></label>
       <label className="v3-field"><span>Lead time, days</span><input type="number" min="0" value={draft.lead} onChange={e => setDraft(d => ({ ...d, lead: e.target.value }))}/></label>
       <label className="v3-field"><span>Minimum order, units</span><input type="number" min="0" value={draft.moq} onChange={e => setDraft(d => ({ ...d, moq: e.target.value }))}/></label>
-      <label className="v3-field"><span>Products it makes (words, commas)</span><input value={draft.match} placeholder="necklace, charm" onChange={e => setDraft(d => ({ ...d, match: e.target.value }))}/></label>
+      <label className="v3-field"><span>Products it makes (words, commas)</span><input value={draft.match} onChange={e => setDraft(d => ({ ...d, match: e.target.value }))}/></label>
       <label className="v3-field v3-field-check"><span>Another supplier could make these</span><input type="checkbox" checked={draft.alt} onChange={e => setDraft(d => ({ ...d, alt: e.target.checked }))}/></label>
     </div>
     <button type="button" className="v3-btn v3-btn-sm v3-gap-top" onClick={addSupplier} disabled={!draft.name.trim()}>Add supplier</button>

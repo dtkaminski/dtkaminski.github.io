@@ -1711,3 +1711,7 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
   .v3-loop-v { grid-row: 3; }
   .v3-main .v3-thread .v3-thread-wait { margin-left: 0; }
 }
+/* 1156: the one answer on ad spend, on Goal & costs */
+.v3-ad-answer { border-top: 1px solid var(--color-line); margin-top: var(--space-4); padding-top: var(--space-3); }
+.v3-ad-answer-t { margin: 0 0 var(--space-1); font-size: var(--text-sm); font-weight: var(--weight-semi); }
+.v3-ad-answer p { margin: 0 0 var(--space-2); }
