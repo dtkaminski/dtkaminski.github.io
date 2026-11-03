@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-frame="product">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Geist:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./design-tokens.css?v=20261102b">
+<link rel="stylesheet" href="./design-tokens.css?v=20261103frame">
 <!-- perf: warm up the CDN + Supabase origins so the deferred libs and the first data
      fetch don't each pay a fresh DNS+TLS round-trip on cold load. -->
 <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
@@ -1216,7 +1216,7 @@
      the sheet it sits beside, ran 57px taller than its own viewport, and the ask bar hung
      mid-page with content scrolling up through the strip above it and shearing off at its
      top edge. A V3-owned offset, so the legacy rails and health bar keep --appbar-h. */
-  .v3-root { --v3-nav-w: 232px; --v3-top: 0px; }
+  .v3-root { --v3-nav-w: var(--size-rail); --v3-top: 0px; }
   .v3-shell { display: flex; align-items: flex-start; max-width: 1800px; margin: 0 auto; }
   /* The nav is CHROME, not content: its own surface, so the working sheet to its right reads as
      the place where the job happens. Previously both sat on the same cream and the product looked
@@ -1732,23 +1732,6 @@
 
   /* Period control (Numbers pages) */
   .v3-page-head-row { display: flex; gap: var(--s-4); align-items: flex-start; flex-wrap: wrap; }
-  /* The thread back to the headline: on every page but Today, the number all of this
-     is meant to move. Quiet by default -- it is context, not a call to action -- and
-     numbers in mono like every other figure in the product. */
-  .v3-thread { font-variant-numeric: tabular-nums; display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap;
-    margin-top: var(--space-3); padding: var(--space-2) var(--space-3);
-    background: var(--color-surface); border: 0; border-left: 2px solid var(--color-line-strong);
-    border-radius: var(--radius-none); cursor: pointer; text-align: left; width: 100%;
-    font-family: var(--font-sans); font-size: var(--text-xs); color: var(--color-muted); }
-  .v3-thread:hover { border-left-color: var(--color-accent); background: var(--color-panel-hover); }
-  .v3-thread-lab { text-transform: uppercase; letter-spacing: var(--tracking-wide); color: var(--color-faint); }
-  .v3-thread-val { font-family: var(--font-mono); font-size: var(--text-sm); font-weight: var(--weight-medium);
-    color: var(--color-ink); }
-  /* Sans: this slot holds a sentence ("pace too close to call") as often as it holds a
-     figure ("£3,150 ahead"), and tabular-nums from .v3-thread already lines the digits up. */
-  .v3-thread-pace { font-variant-numeric: tabular-nums; }
-  .v3-thread-pace.good { color: var(--color-success); }
-  .v3-thread-pace.bad  { color: var(--color-danger); }
 
   /* Business vitals: three stats, not a sentence of debug output. Rules between them
      instead of three boxes, per whitespace-over-cards. */
@@ -1866,7 +1849,7 @@
   .v3-why-list { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 3px; font-size: var(--text-sm); color: var(--text-secondary); }
   .v3-why-list li { display: grid; grid-template-columns: 3rem 1fr; gap: 8px; }
 </style>
-<link rel="stylesheet" href="./greta-kit.css?v=1793711469949">
+<link rel="stylesheet" href="./greta-kit.css?v=1793721405058">
 <link rel="stylesheet" href="./marketing-os-tokens.css?v=20260924a">
 <link rel="stylesheet" href="./marketing-os.css?v=1790774159">
 <link rel="stylesheet" href="./loop-panel.css?v=1790774159">
@@ -1886,6 +1869,6 @@ window.MOS_EMBEDDED = true;</script>
 <script defer src="./today-calendar.build.js?v=20261023a"></script>
 <!-- cost-entry.build.js retired (0221): Product costs is V3ProductCosts in greta-app, reading Shopify costs for every variant. -->
 <script defer src="./loop-panel.js?v=20261002a"></script>
-<script defer src="./greta-app.js?v=1793711469949"></script>
+<script defer src="./greta-app.js?v=1793721405058"></script>
 <script>/* perf: defer frkl static deep-tab data (CVR ~1.7MB, cohorts, promos, products) — not used by the Overview/landing. Background-load after paint; skip for non-frkl (de-frkl). */
 (function(){try{var slug=window.OI_BRAND_SLUG||(window.parent&&window.parent!==window?window.parent.OI_BRAND_SLUG:null)||"frkl";if(slug!=="frkl")return;var files=["greta-cvr.js","greta-cohorts.js","greta-discount-codes.js","greta-products.js","greta-patterns.js"],i=0;function next(){if(i>=files.length){window.FRKL_SNAPSHOTS_LOADED=true;try{window.dispatchEvent(new Event("frkl-snapshots-loaded"))}catch(e){}return;}var s=document.createElement("script");s.src="./"+files[i++]+"?v=20260925f";s.async=true;s.onload=next;s.onerror=next;document.head.appendChild(s);}var kick=function(){next();};if(window.requestIdleCallback){window.requestIdleCallback(kick,{timeout:1500});}else{setTimeout(kick,300);}}catch(e){}})();</script>

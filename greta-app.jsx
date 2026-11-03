@@ -11995,8 +11995,10 @@ function CommandMenu(){
     return () => { window.removeEventListener('keydown', onKey); try{ delete window.__oiCommandOpen; }catch(e){} };
   }, []);
   const filtered = items.filter(it => (it.label+' '+it.sub).toLowerCase().includes(q.trim().toLowerCase()));
+  // 3 Nov: the box takes a question as well as a page; it said "No matches" to anything a page is not called.
+  if (UI_V3 && q.trim()) filtered.push({ label: 'Ask Greta: ' + q.trim(), sub: 'Ask', icon: 'spark', ask: q.trim() });
   if(!open) return null;
-  const go = (it) => { setOpen(false); if (it.v3 && window.__oiGo) window.__oiGo(it.v3); else if(window.__oiNav) window.__oiNav(it.section, it.subId); };
+  const go = (it) => { setOpen(false); if (it.ask && window.__oiAsk) window.__oiAsk(it.ask, { send: true }); else if (it.v3 && window.__oiGo) window.__oiGo(it.v3); else if(window.__oiNav) window.__oiNav(it.section, it.subId); };
   const onKeyDown = (e) => {
     if(e.key==='ArrowDown'){ e.preventDefault(); setSel(s=>Math.min(s+1, filtered.length-1)); }
     else if(e.key==='ArrowUp'){ e.preventDefault(); setSel(s=>Math.max(s-1, 0)); }
@@ -16574,13 +16576,13 @@ if (typeof window!=='undefined') window.GretaPlanRail = GretaPlanRail;
 const UI_V3 = (typeof window === 'undefined') || window.GRETA_UI_V3 !== false;
 
 const V3_NAV = [
-  // 1114 (UX brief Phase 5): six groups, Today, Moves, Results, Business, Plan, Settings. A group whose first item
-  // has its own name shows the item, not a heading over it.
+  // 3 Nov: the loop first (what is true, what to do, did it work), then the record and the question box. A group whose
+  // first item has its own name shows the item, not a heading over it.
   { group: 'Today',       id: 'today',       label: 'Today',              icon: 'home',      q: 'Am I on track, and what do I do now?' },
+  { group: 'Today',       id: 'actions',     label: 'Moves',              icon: 'clipboard', q: 'What should I do first?' },
+  { group: 'Today',       id: 'results',     label: 'Results',            icon: 'check',     q: 'Did the moves I made work?' },
   { group: 'Today',       id: 'review',      label: 'Review',             icon: 'report',    q: 'What changed, and why?' },
   { group: 'Today',       id: 'ask',         label: 'Ask Greta',          icon: 'spark',     q: 'Ask anything about your business, in plain English.' },
-  { group: 'Moves',       id: 'actions',     label: 'Moves',              icon: 'clipboard', q: 'What should I do first?' },
-  { group: 'Results',     id: 'results',     label: 'Results',            icon: 'check',     q: 'Did the moves I made work?' },
   { group: 'Business',    id: 'profit',      label: 'Profit & sales',     icon: 'report',    q: 'Where does my money come from, and where does it go?' },
   { group: 'Business',    id: 'marketing',   label: 'Marketing',          icon: 'trendUp',   q: 'Which channels and ads earn their money?' },
   { group: 'Business',    id: 'website',     label: 'Website',            icon: 'pulse',     q: 'Where do shoppers drop off, and why?' },
@@ -16989,20 +16991,27 @@ class V3Boundary extends React.Component {
 // 30 Oct eval: the paragraph under a page's verdict carried 5-8 figures (Goal & costs about 12), so a page read as a
 // report from its second line. V3Brief shows the first two lines (the reason) and opens onto the rest; the button
 // appears only when there is more. Nothing is removed; the figures are one press away and stay in the DOM.
-function V3Brief({ children }) {
-  const ref = React.useRef(null);
-  const [open, setOpen] = React.useState(false);
-  const [more, setMore] = React.useState(false);
-  React.useLayoutEffect(() => {
-    const el = ref.current; if (!el || open) return;
-    const check = () => setMore(el.scrollHeight > el.clientHeight + 2);
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
+// 3 Nov: it shows the first whole sentence. Two clamped lines cut the reason off mid-sentence ("keeping…"), which read as a fault.
+function v3BriefFlat(children) {
+  return React.Children.toArray(children).reduce((a, c) => a.concat(c && c.type === React.Fragment ? v3BriefFlat(c.props.children) : [c]), []);
+}
+function v3BriefSplit(children) {
+  const first = [], rest = [];
+  let done = false;
+  v3BriefFlat(children).forEach(c => {
+    if (done) { rest.push(c); return; }
+    const m = typeof c === 'string' && c.match(/^[\s\S]*?[.?!](?=\s+[A-Z£"“]|\s+$)/);
+    if (!m) { first.push(c); return; }
+    first.push(m[0]); rest.push(c.slice(m[0].length)); done = true;
   });
-  return (<div className={'v3-brief' + (open ? '' : ' v3-brief-shut')}>
-    <p className="v3-note v3-measure" ref={ref}>{children}</p>
-    {(more || open) && <button type="button" className="v3-xref" aria-expanded={open} onClick={() => setOpen(o => !o)}>
+  return { first, rest, more: rest.some(r => typeof r !== 'string' || r.trim()) };
+}
+function V3Brief({ children }) {
+  const [open, setOpen] = React.useState(false);
+  const { first, rest, more } = v3BriefSplit(children);
+  return (<div className="v3-brief">
+    <p className="v3-note v3-measure">{first}<span hidden={!open}>{rest}</span></p>
+    {more && <button type="button" className="v3-xref" aria-expanded={open} onClick={() => setOpen(o => !o)}>
       {open ? 'Show less' : 'Show the figures'} <span className="v3-xref-go">{open ? '↑' : '↓'}</span></button>}
   </div>);
 }
@@ -25928,63 +25937,6 @@ function useV3NavSignals() {
   return board.rows ? { ...sig, actions: v3LiveRows(board.rows).length } : sig;
 }
 
-// The one number the whole product is about, carried onto every other page.
-//
-// The 16 destinations each answer a good question, but once you leave Today nothing
-// on screen says what you are trying to move. An operator reading channel iROAS or
-// stock cover is three clicks from the profit figure those numbers exist to change,
-// and has to remember it. That is the difference between a tour of dashboards and a
-// journey through one business.
-//
-// So: profit after ads and the pace sentence, in one line, on every page but Today
-// (where the hero already says it) -- same values, same formatter and same wording
-// as V3Today, read from the same GRETA_HEADLINE row, so the thread can never say
-// something the hero does not. Click it to go back to the top of the story.
-function V3Thread({ dest, go }) {
-  const h = useV3Headline();
-  useV3Rows('brand-state', V3_STATE_Q);   // the verdict reads the ad answer
-  const gc = useV3GoalCheck();
-  const tg = v3GoalSeed(useV3Rows('today-goal', V3_TODAY_GOAL_Q));   // the goal verdict, as Today's strip says it
-  // the month so far, before a goal is confirmed: Today has no band, and a brand with a verdict never says the month's word
-  const wantMonth = dest !== 'today' && !!tg.rows && !v3GoalVerdict(tg.rows[0], h && h.unreported_spend);
-  const pp = useV3Rows(wantMonth ? 'plan-progress-month' : 'plan-progress-none', wantMonth ? V3_PP_MONTH_Q : V3_NO_READ);
-  const threadBoard = useV3Board();
-  if (!h || dest === 'today') return null;
-  if (h.can_show_cm === false) return null;
-  const cam = h.cm_after_marketing_30d;
-  if (cam == null) return null;
-  // 30 Oct eval: with a confirmed goal the strip says Today's verdict; it said "just behind plan this month"
-  // (Greta's re-worked month plan) under a Today that said "On track".
-  const V = v3GoalVerdict(tg.rows && tg.rows[0], h.unreported_spend);
-  const PP = pp.rows && pp.rows[0] && pp.rows[0].profit_after_ads;
-  // 2 Nov: the month's word is for a brand with no confirmed goal. While the goal is still loading, or if the read failed,
-  // it said "ahead of plan" in green under a Today that said "On track, narrowly", so then the strip says neither.
-  const ppOk = !V && !!tg.rows && !!(PP && Number(PP.plan_total) > 0 && PP.status);
-  const diff = ppOk ? Number(PP.gap) : null;
-  const unreliable = diff != null && v3SpendCouldSwing(h.unreported_spend, diff);   // the month's own gap (P6)
-  return (
-    <button type="button" className="v3-thread" onClick={() => go('today')}
-            title="Back to Today">
-      <i className="v3-thread-live" aria-hidden="true"/>
-      <span className="v3-thread-lab">Profit after ads</span>
-      <span className="v3-thread-val">{v3Gbp(cam)}</span>
-      <span className="v3-muted">last 30 days</span>
-      {V && <span className={'v3-thread-pace ' + V.tone}>Goal: {V.word.toLowerCase()}</span>}
-      {diff != null && gc.stale && !gc.pending && (
-        <span className="v3-thread-pace">goal needs re-planning</span>
-      )}
-      {diff != null && !(gc.stale || gc.pending) && (
-        <span className={'v3-thread-pace' + (unreliable ? '' : ' ' + v3PlanTone(PP.status))}>
-          {unreliable
-            ? 'pace too close to call'
-            : V3_PLAN_WORD[PP.status].toLowerCase() + ' this month'}
-        </span>
-      )}
-      {threadBoard.rows && v3LiveRows(threadBoard.rows).length > 0 && <span className="v3-thread-wait">{v3LiveRows(threadBoard.rows).length} waiting on you</span>}
-    </button>
-  );
-}
-
 // Mono on the figures the stylesheet cannot reach.
 //
 // The house rule is mono for anything countable and sans for language. In the deep pages
@@ -27159,16 +27111,20 @@ function V3WalkFab({ dest }) {
   </div>);
 }
 
+// An element of the /app shell around this frame (same origin), or null when the dashboard runs on its own.
+function v3ShellEl(id) { try { return window.parent !== window ? window.parent.document.getElementById(id) : null; } catch (e) { return null; } }
+
 // 0456: when a source stops sending data, every page says so first, in Greta's words (state.freshness).
 // Each source is judged against its own last eight weeks, so a quiet day at a small shop does not trip it.
 function V3FreshnessBanner() {
   const q = useV3Rows('brand-state', V3_STATE_Q);
   const F = q.rows && q.rows[0] && q.rows[0].freshness;
-  // 1120: a sample brand's figures end on its seed date; say so plainly instead of warning about a stopped feed
-  if (F && F.demo && !F.stale) {
-    return (<p className="v3-note v3-measure v3-sample" role="note">This is a sample brand, made up to show Greta at work.
-      {F.demo_through ? ' Its figures run to ' + v3Day(F.demo_through, true) + '.' : ''}</p>);
-  }
+  // 1120: a sample brand's figures end on its seed date; say so plainly instead of warning about a stopped feed.
+  // 3 Nov: in the shell's bar, so it is not the first thing on every page.
+  const sample = F && F.demo && !F.stale ? 'Sample brand, made up to show Greta at work.' + (F.demo_through ? ' Figures run to ' + v3Day(F.demo_through, true) + '.' : '') : null;
+  const bar = v3ShellEl('bar-note');
+  React.useEffect(() => { if (bar) bar.textContent = sample || ''; }, [bar, sample]);
+  if (sample) return bar ? null : <p className="v3-note v3-measure v3-sample" role="note">{sample}</p>;
   if (!F || !F.stale || !F.said) return null;
   return (<div className={'v3-alert v3-measure' + (F.level === 'problem' ? ' problem' : '')} role="status">
     <p><b>{F.core_stale ? 'Your data is out of date.' : 'Some of your data is out of date.'}</b> {F.said}</p>
@@ -27258,37 +27214,37 @@ function V3App({ dest, go, children, start, periodCtl }) {
   const sig = useV3NavSignals();
   useFigureTypography(dest);
   useV3Figures();   // the figure registry (1080), read once per page load; every page shares the cached rows
-  return (<div className="v3-root">
+  const inShell = !!v3ShellEl('bar-ask');   // the shell's bar holds the box; on its own the dashboard keeps it in the nav
+  return (<div className={'v3-root' + (inShell ? ' v3-in-shell' : '')}>
     {/* First thing in the tab order on every page: the nav has 16 items and a keyboard
         user had to walk all of them to reach the content. */}
     <a className="v3-skip" href="#v3-content">Skip to content</a>
     <div className="v3-shell">
       <nav className="v3-nav" aria-label="Main">
-        <button type="button" className="v3-nav-search" onClick={() => window.__oiCommandOpen && window.__oiCommandOpen()}>
-          <Icon name="search" size={14}/> Search… <kbd>{V3_KBD}</kbd>
-        </button>
+        {!inShell && <button type="button" className="v3-nav-search" onClick={() => window.__oiCommandOpen && window.__oiCommandOpen()}>
+          Ask or search <kbd>{V3_KBD}</kbd>
+        </button>}
         {(() => { let prev = null; return V3_NAV.map(e => {
           // a group led by an item of its own name (Today, Moves, Results) takes a gap, not a heading
           const head = e.group === prev ? null : e.group === e.label
             ? (prev ? <div key={'h' + e.group} className="v3-nav-gap" aria-hidden="true"/> : null)
-            : <div key={'h' + e.group} className="v3-nav-group">{e.group}</div>;
+            : <div key={'h' + e.group} className={'v3-nav-group' + (e.group === 'Settings' ? ' v3-nav-foot' : '')}>{e.group}</div>;
           prev = e.group;
           const n = e.id === 'actions' ? sig.actions : 0;
           const alert = e.id === 'settings' && sig.feedAlert;
           return (<React.Fragment key={e.id}>{head}
             <button type="button" className={'v3-nav-item' + (e.id === dest ? ' active' : '')} onClick={() => go(e.id)} aria-current={e.id === dest ? 'page' : undefined}>
-              <Icon name={e.icon} size={17}/>{e.label}
+              {e.label}
               {n > 0 && <span className="v3-nav-n" aria-label={n + ' moves worth doing'}>{n}</span>}
               {alert && <span className="v3-nav-alert" aria-label="A data source has stopped reporting"/>}
             </button>
           </React.Fragment>);
         }); })()}
-        <div className="v3-nav-gap" aria-hidden="true"/>
         <button type="button" className="v3-nav-item" onClick={() => window.dispatchEvent(new Event('v3-tell-open'))}>
-          <Icon name="message" size={17}/>Tell us
+          Tell us
         </button>
       </nav>
-      <main className="v3-main" id="v3-content" tabIndex={-1}>
+      <main className={'v3-main' + (dest === 'today' ? ' v3-main-today' : '')} id="v3-content" tabIndex={-1}>
         {/* Ask sits on Today; everywhere else it is one keystroke away (nav item, ⌘K). On every
             page it was a sticky bar above the title, so the first thing on each screen was an
             input rather than the page's own question. */}
@@ -27302,7 +27258,6 @@ function V3App({ dest, go, children, start, periodCtl }) {
             {/* 2 Nov: Ask lives in Today's agent lead (V3AgentLead) */}
             {V3_PERIOD_PAGES.indexOf(dest) >= 0 ? periodCtl : null}
           </div>
-          <V3Thread dest={dest} go={go}/>
         </header>
         <BrandAgeBanner/>
         <MarginNudge/>

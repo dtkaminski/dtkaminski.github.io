@@ -1,6 +1,6 @@
 /* Shared styling for signup/login/workspace pages and the product shell.
    Every value resolves to design-tokens.css (imported below) — Phase 3, 2026-09-24. */
-@import url("../design-tokens.css?v=20261001logo");
+@import url("../design-tokens.css?v=20261103frame");
 @import url("../greta-logo.css?v=20261001a");
 
 :root {

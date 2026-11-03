@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-frame="product">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Geist:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../auth/auth.css?v=20261001logo">
+<link rel="stylesheet" href="../auth/auth.css?v=20261103frame">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
   /* ── App shell ─────────────────────────────────────────────────────── */
@@ -16,20 +16,33 @@
      than one), and your account. No tagline — the product is the dashboard below it. */
   .app-bar {
     position: sticky; top: 0; z-index: 50;
-    background: var(--color-chrome-blur); backdrop-filter: blur(14px);
+    background: var(--color-panel);
     border-bottom: 1px solid var(--color-line);
   }
   .app-bar-inner {
-    padding: var(--space-2) var(--space-6);
+    padding: var(--space-2) var(--space-6) var(--space-2) var(--space-4);
     display: flex; align-items: center; gap: var(--space-4); min-height: var(--space-12);
   }
-  .app-bar .brand { margin-bottom: 0; gap: var(--space-2); --logo-height: var(--space-6); }
-  .app-bar .divider { width: 1px; height: var(--space-5); background: var(--color-line); }
+  /* The workspace lines up with the page, past the nav's edge */
+  .app-bar .brand { margin-bottom: 0; gap: var(--space-2); --logo-height: var(--space-6); width: calc(var(--size-rail) - var(--space-4)); flex-shrink: 0; }
+  .bar-note { font-size: var(--text-xs); color: var(--color-faint); }
+  .bar-ask { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); width: calc(var(--space-16) * 4.5); min-height: var(--space-8);
+    padding: 0 var(--space-3); border: 1px solid var(--color-line); border-radius: var(--radius-md); background: var(--color-panel);
+    font: inherit; font-size: var(--text-sm); color: var(--color-faint); cursor: pointer; }
+  .bar-ask:hover { border-color: var(--color-line-strong); color: var(--color-muted); }
+  .bar-ask kbd { font: inherit; font-size: var(--text-xs); }
+  body:not(.has-dash) .bar-ask { display: none; }
+  @media (max-width: 760px) {
+    .app-bar .brand { width: auto; }
+    .bar-ask { display: none; }
+    .app-bar-inner { flex-wrap: wrap; row-gap: var(--space-1); }
+    .bar-note { order: 9; flex-basis: 100%; }
+    .bar-note:empty { display: none; }
+  }
   .workspace-chip {
     display: inline-flex; align-items: center; gap: var(--space-2);
-    font-size: var(--text-sm); font-weight: var(--weight-semi); color: var(--color-ink);
+    font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--color-ink);
   }
-  .workspace-chip .dot { width: var(--space-2); height: var(--space-2); border-radius: var(--radius-full); background: var(--color-success); }
   .workspace-chip select {
     font: inherit; color: inherit; background: none; border: 1px solid var(--color-line);
     border-radius: var(--radius-md); padding: var(--space-1) var(--space-6) var(--space-1) var(--space-2); cursor: pointer;
@@ -137,12 +150,12 @@
     <a href="/" class="brand" style="margin-bottom:0;">
       <svg class="greta-logo" viewBox="72 70 448 116" role="img" aria-label="Greta" xmlns="http://www.w3.org/2000/svg"><g transform="translate(46 44) scale(1.32)" fill="none" stroke-width="27" stroke-linecap="round"><path class="gl-purple" d="M 43.494 43.494 A 29 29 0 0 1 90.283 51.744"/><path class="gl-forest" d="M 43.494 84.506 A 29 29 0 0 1 51.744 37.717"/><path class="gl-terracotta" d="M 84.506 84.506 A 29 29 0 0 1 37.717 76.256"/><path class="gl-stone" d="M 84.506 43.494 A 29 29 0 0 1 76.256 90.283"/></g><text class="gl-word" x="245" y="154" font-size="112" font-weight="700" letter-spacing="-5">Greta</text></svg>
     </a>
-    <div class="divider"></div>
     <div class="workspace-chip" title="Your workspace">
-      <div class="dot" aria-hidden="true"></div>
       <span id="brand-chip">loading…</span>
     </div>
+    <span class="bar-note" id="bar-note" role="note"></span>
     <div class="app-bar-spacer"></div>
+    <button type="button" class="bar-ask" id="bar-ask"><span>Ask or search</span><kbd id="bar-ask-kbd">Ctrl K</kbd></button>
     <!-- The four top tabs were removed on 2026-09-25 (Phase 2, one navigation).
          Overview is the app; Customers is now Numbers > Customers inside it;
          Connections is Settings > Connections & data; the static Intelligence
@@ -238,6 +251,11 @@
     try { if (fr && fr.contentWindow && fr.contentWindow.__oiGo) { fr.contentWindow.__oiGo(dest); return; } } catch (e) {}
   };
   document.getElementById('acct-settings').addEventListener('click', () => openInApp('settings'));
+  // The one box for a question or a page. The palette lives in the dashboard; the keystroke has to work from the bar too.
+  const openPalette = () => { const fr = document.getElementById('rich-dash'); try { fr && fr.contentWindow && fr.contentWindow.__oiCommandOpen && fr.contentWindow.__oiCommandOpen(); } catch (e) {} };
+  document.getElementById('bar-ask').addEventListener('click', openPalette);
+  if (/Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent || '')) document.getElementById('bar-ask-kbd').textContent = '⌘K';
+  document.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); openPalette(); } });
   document.getElementById('acct-team').addEventListener('click', () => openInApp('team'));
   document.addEventListener('click', (e) => { const a = document.getElementById('acct'); if (a.open && !a.contains(e.target)) a.open = false; });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') document.getElementById('acct').open = false; });
@@ -338,7 +356,7 @@
     // so we pre-satisfy the dashboard's access gate via shared same-origin localStorage
     // (no passcode prompt). The embedded dashboard's loader reads live tenant data using
     // this same session.
-    const richUrl = '/greta-dashboard.html?v=1793711469949';
+    const richUrl = '/greta-dashboard.html?v=1793721405058';
     // The dashboard is the app: every connected brand renders it inline. The old
     // placeholder-panel path below this point was unreachable (the condition above
     // was always true) and was removed on 2026-09-25 with the panels it filled.

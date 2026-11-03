@@ -198,6 +198,10 @@
   /* ── Touch ── the smallest height anything you tap may have (WCAG / Apple HIG 44pt). */
   --tap-min: 44px;
 
+  /* ── The product frame ── the nav's width, and the widest the content runs. */
+  --size-rail: 200px;
+  --size-content: 1144px;
+
   /* ── Space — 4px rhythm ─────────────────────────────────────────────── */
   --space-1:  4px;
   --space-2:  8px;
@@ -228,4 +232,16 @@
 
   --transition-fast: 120ms cubic-bezier(.2,0,.2,1);
   --transition-base: 200ms cubic-bezier(.2,0,.2,1);
+}
+
+/* The product's own voice (3 Nov 2026, Dan: "far too budget"). One face, lighter weights, and on a mouse
+   controls sized to their text: 12px type in a 44px box was the loudest tell in the app. Scoped to the
+   product (html[data-frame]) so the marketing site and legal pages do not move with it. Touch keeps 44. */
+html[data-frame="product"] {
+  --font-sans: 'Geist', 'DM Sans', ui-sans-serif, sans-serif;
+  --weight-semi: 500;
+  --weight-bold: 600;
+}
+@media (hover: hover) and (pointer: fine) {
+  html[data-frame="product"] { --tap-min: 32px; }
 }
