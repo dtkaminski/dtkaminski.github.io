@@ -312,11 +312,11 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-bridge-track { position: relative; height: var(--space-4); }
 .v3-bridge-track i { position: absolute; top: 0; bottom: 0; border-radius: var(--radius-sm); }
 .v3-bridge-track b { position: absolute; top: calc(-1 * var(--space-1)); bottom: calc(-1 * var(--space-1)); border-left: 1px solid var(--color-ink); }
-.v3-bridge-sales { background: var(--color-data-quiet); }
+.v3-bridge-sales { background: var(--color-series-sales); }
 .v3-bridge-cost  { background: var(--color-line-strong); }
-.v3-bridge-ads   { background: var(--color-muted); }
+.v3-bridge-ads   { background: var(--color-series-ads); }
 .v3-bridge-loss  { background: var(--color-danger); }
-.v3-bridge-keep  { background: var(--color-accent); }
+.v3-bridge-keep  { background: var(--color-series-kept); }
 .v3-bridge-v { font-family: var(--font-figure); text-align: right; color: var(--color-ink); }
 .v3-bridge-total { border-top: 1px solid var(--color-line); margin-top: var(--space-1); padding-top: var(--space-2); }
 .v3-bridge-total .v3-bridge-k, .v3-bridge-total .v3-bridge-v { font-weight: var(--weight-semi); color: var(--color-ink); }
@@ -642,7 +642,7 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 
 /* ── Stock: what runs out first, where cash is sitting ───────────────────── */
 .v3-rw-key { margin: 0 0 var(--space-3); }
-.v3-rw-key-bar { width: var(--space-4) !important; height: var(--space-1) !important; border-radius: 0 !important; background: var(--color-data-3); }
+.v3-rw-key-bar { width: var(--space-4) !important; height: var(--space-1) !important; border-radius: 0 !important; background: var(--color-series-neutral); }
 .v3-rw-key-gap { width: var(--space-4) !important; height: var(--space-1) !important; border-radius: 0 !important;
   background: repeating-linear-gradient(135deg, var(--color-danger) 0 2px, transparent 2px 4px); }
 .v3-main table.v3-rw { width: 100%; }
@@ -664,7 +664,7 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-rw-trackh, .v3-rw-trackc { width: 34%; }
 .v3-rw-cell { display: flex; align-items: center; gap: var(--space-3); min-width: 10rem; }
 .v3-rw-track { position: relative; flex: 1; height: var(--space-2); background: var(--color-sunken); border-radius: var(--radius-sm); overflow: hidden; }
-.v3-rw-bar { position: absolute; left: 0; top: 0; bottom: 0; background: var(--color-data-3); }
+.v3-rw-bar { position: absolute; left: 0; top: 0; bottom: 0; background: var(--color-series-neutral); }
 .v3-rw-gap { position: absolute; top: 0; bottom: 0; background: repeating-linear-gradient(135deg, var(--color-danger) 0 2px, transparent 2px 4px); opacity: .7; }
 .v3-rw-days { min-width: 4.5rem; text-align: right; font-family: var(--font-figure); font-size: var(--text-sm); color: var(--color-muted); }
 .v3-main td.v3-rw-now { color: var(--color-ink); font-weight: var(--weight-semi); }
@@ -1133,8 +1133,8 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-walk-chart-key { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-1); font-size: var(--text-xs); color: var(--color-muted); }
 .v3-walk-chart-key span { display: inline-flex; align-items: center; gap: var(--space-1); font-family: var(--font-mono); }
 .v3-walk-chart-key i { display: inline-block; width: var(--space-2); height: var(--space-2); }
-.v3-walk-chart-key .k-cur { background: var(--color-accent); }
-.v3-walk-chart-key .k-ly { background: var(--color-data-3); }
+.v3-walk-chart-key .k-cur { background: var(--color-ink); }
+.v3-walk-chart-key .k-ly { background: var(--color-series-neutral); }
 .v3-why-ch + .v3-why-ch { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--color-line); }
 .v3-why-drivers { list-style: none; margin: var(--space-2) 0; padding: 0; }
 .v3-why-drivers li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-1) var(--space-2); align-items: center;
@@ -1269,8 +1269,9 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
   padding: var(--space-2) 0; border-top: 1px solid var(--color-line); font-size: var(--text-sm); color: var(--color-secondary); }
 .v3-chain-track { height: var(--space-2); background: var(--color-sunken); border-radius: var(--radius-sm); overflow: hidden; }
 .v3-chain-track i { display: block; height: 100%; background: var(--color-data-quiet); }
-.v3-chain-in .v3-chain-track i { background: var(--color-data-3); }
-.v3-chain-sub .v3-chain-track i, .v3-chain-total .v3-chain-track i { background: var(--color-success); }
+.v3-chain-in .v3-chain-track i { background: var(--color-series-sales); }
+.v3-chain-ads .v3-chain-track i { background: var(--color-series-ads); }
+.v3-chain-sub .v3-chain-track i, .v3-chain-total .v3-chain-track i { background: var(--color-series-kept); }
 .v3-chain li.neg .v3-chain-track i { background: var(--color-danger); }
 .v3-chain-v { font-family: var(--font-figure); font-weight: var(--weight-semi); text-align: right; color: var(--color-ink); }
 .v3-chain-p { font-size: var(--text-xs); color: var(--color-muted); text-align: right; }
@@ -1491,7 +1492,7 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
   .v3-walk-fab-lab { display: none; }
 }
 /* Today's money bridge: profit after ads as a subtotal on the way to what the owner keeps */
-.v3-bridge-sub { background: var(--color-ink); }
+.v3-bridge-sub { background: var(--color-series-kept); }
 .v3-bridge-subtotal { border-top: 1px solid var(--color-line); margin-top: var(--space-1); padding-top: var(--space-2); }
 .v3-bridge-subtotal .v3-bridge-k, .v3-bridge-subtotal .v3-bridge-v { font-weight: var(--weight-semi); color: var(--color-ink); }
 /* The sentence under a page's verdict: two lines, then the figures on request (V3Brief) */

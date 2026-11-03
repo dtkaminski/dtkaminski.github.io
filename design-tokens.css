@@ -118,6 +118,21 @@
   --color-data-5: #8B5E83;   /* mauve                                    */
   --color-data-quiet: #CBC6BC;
 
+  /* One colour per meaning (3 Nov 2026). A chart's colour says what the thing is, on every page, so an owner
+     learns it once: Sales is always this blue, ad money always this orange. A measure with no meaning of its
+     own stays neutral and its title names it. --color-data-1..5 remain for lists with no fixed meaning.
+     Pairs that share a chart pass the palette check for colour blindness (sales and ads, new and returning,
+     ads and new). The three ad steps are lightness steps of one hue, so parts of ad spend read as ad spend. */
+  --color-series-sales:     #4F8BBF;   /* sales, whatever the chart                 */
+  --color-series-ads:       #C2410C;   /* ad money: spend, cost per customer, Meta  */
+  --color-series-ads-2:     #D96F3A;   /* Google                                    */
+  --color-series-ads-3:     #E8A07A;   /* TikTok                                    */
+  --color-series-kept:      #16150F;   /* profit: what is kept                      */
+  --color-series-new:       #14967F;   /* new customers                             */
+  --color-series-returning: #8A4A86;   /* returning customers                       */
+  --color-series-site:      #B0860F;   /* the site: visits, orders per 100 visits   */
+  --color-series-neutral:   #8A867D;   /* a measure with no colour of its own       */
+
   /* ── Brand (Greta Route 3, approved 2026-10-01) ─────────────────────────
      The logo's own colours. For the logo and nothing else — they are not UI
      colours and not chart series. The wordmark is ink on light surfaces and

@@ -35,7 +35,7 @@
 }
 
 /* ---- the ring ---- */
-.lp-pipe { fill: var(--color-accent); opacity: .26; stroke: var(--color-accent); stroke-width: 1; stroke-opacity: .5; }
+.lp-pipe { fill: var(--color-series-site); opacity: .26; stroke: var(--color-series-site); stroke-width: 1; stroke-opacity: .5; }
 .lp-leak { fill: var(--color-danger);  opacity: .85; }
 .lp-gain { fill: var(--color-success); opacity: .8; }
 .lp-leak:hover, .lp-gain:hover { opacity: 1; }
@@ -56,9 +56,9 @@
 .lp-sev-good  { fill: var(--color-success); }
 .lp-sev-flat  { fill: var(--color-muted); }
 .lp-in { stroke: var(--color-muted); stroke-width: 2; opacity: .7; color: var(--color-muted); }
-.lp-hub    { fill: var(--color-surface); stroke: var(--color-accent); stroke-width: 2; }
-.lp-hub-r  { stroke: var(--color-accent); stroke-width: 1; opacity: .35; }
-.lp-hub-k  { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: var(--tracking-wide); fill: var(--color-accent); }
+.lp-hub    { fill: var(--color-surface); stroke: var(--color-series-site); stroke-width: 2; }
+.lp-hub-r  { stroke: var(--color-series-site); stroke-width: 1; opacity: .35; }
+.lp-hub-k  { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: var(--tracking-wide); fill: var(--color-muted); }
 .lp-hub-n  { font-family: var(--font-mono); font-size: var(--text-2xl); font-weight: var(--weight-semi); fill: var(--color-ink); }
 .lp-hub-s  { font-size: var(--text-sm); fill: var(--color-ink); }
 .lp-hub-s2 { font-size: var(--text-xs); fill: var(--color-muted); }
@@ -66,7 +66,7 @@
 /* ---- cuts ---- */
 .lp-cuts { margin-top: var(--space-4); }
 .lp-cut  { padding: var(--space-3) var(--space-3) var(--space-2); border-radius: var(--radius-sm); }
-.lp-cut-win { background: color-mix(in srgb, var(--color-accent) 6%, transparent); }
+.lp-cut-win { background: color-mix(in srgb, var(--color-series-site) 6%, transparent); }
 .lp-cut-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); }
 .lp-cut-name { font-size: var(--text-sm); font-weight: var(--weight-semi); }
 .lp-cut-disp { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-muted); }
@@ -75,7 +75,7 @@
 .lp-cut-zero { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--color-line); }
 .lp-dot { position: absolute; top: 50%; border-radius: 50%; transform: translate(-50%, -50%);
   background: var(--color-danger); opacity: .72; border: 2px solid var(--color-panel); }
-.lp-dot-up   { background: var(--color-accent); }
+.lp-dot-up   { background: var(--color-success); }
 .lp-dot-thin { opacity: .3; }
 .lp-dot:hover { opacity: 1; }
 .lp-cut-legend { display: flex; gap: var(--space-4); flex-wrap: wrap;
@@ -103,10 +103,10 @@
 .lp-tick    { font-family: var(--font-mono); font-size: var(--text-xs); fill: var(--color-muted); }
 .lp-axlab   { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: var(--tracking-wide);
   text-transform: uppercase; fill: var(--color-muted); }
-.lp-ribbon  { fill: var(--color-accent); opacity: .12; }
-.lp-ribedge { fill: none; stroke: var(--color-accent); stroke-width: 1; stroke-dasharray: 3 4; opacity: .4; }
-.lp-line    { fill: none; stroke: var(--color-accent); stroke-width: 2.2; stroke-linejoin: round; }
-.lp-pt      { fill: var(--color-accent); stroke: var(--color-panel); stroke-width: 1.5; }
+.lp-ribbon  { fill: var(--color-series-site); opacity: .12; }
+.lp-ribedge { fill: none; stroke: var(--color-series-site); stroke-width: 1; stroke-dasharray: 3 4; opacity: .4; }
+.lp-line    { fill: none; stroke: var(--color-series-site); stroke-width: 2.2; stroke-linejoin: round; }
+.lp-pt      { fill: var(--color-series-site); stroke: var(--color-panel); stroke-width: 1.5; }
 
 .lp-abstain { border-left: 3px solid var(--color-warning); padding: var(--space-3) var(--space-4);
   background: color-mix(in srgb, var(--color-warning) 7%, transparent);

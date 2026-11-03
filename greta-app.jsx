@@ -95,12 +95,13 @@ const PAL = (function () {
     ink: '#141414', muted: '#6B6B6B', faint: '#8C857C', line: '#E0DCD6',
     panel: '#FFFFFF', surface: '#F2F1ED', accent: '#C2410C',
     good: '#15803D', warn: '#B45309', bad: '#B42318',
-    data1: '#C2410C', data2: '#0F766E', data3: '#475569', data4: '#A16207', data5: '#8B5E83', quiet: '#CBC6BC'
+    sales: '#4F8BBF', ads: '#C2410C', ads2: '#D96F3A', ads3: '#E8A07A', kept: '#16150F', nw: '#14967F', ret: '#8A4A86', site: '#B0860F', neutral: '#8A867D', data1: '#C2410C', data2: '#0F766E', data3: '#475569', data4: '#A16207', data5: '#8B5E83', quiet: '#CBC6BC'
   };
   const map = {
     ink: '--color-ink', muted: '--color-muted', faint: '--text-faint', line: '--color-line',
     panel: '--color-panel', surface: '--color-surface', accent: '--color-accent',
     good: '--color-success', warn: '--color-warning', bad: '--color-danger',
+    sales: '--color-series-sales', ads: '--color-series-ads', ads2: '--color-series-ads-2', ads3: '--color-series-ads-3', kept: '--color-series-kept', nw: '--color-series-new', ret: '--color-series-returning', site: '--color-series-site', neutral: '--color-series-neutral',
     data1: '--color-data-1', data2: '--color-data-2', data3: '--color-data-3', data4: '--color-data-4',
     data5: '--color-data-5', quiet: '--color-data-quiet'
   };
@@ -552,7 +553,7 @@ const sum = (arr,k) => arr.reduce((a,r)=>a+(r[k]||0),0);
 // Series identity, never meaning: revenue is not "good" and Google is not a warning. Each
 // gets a categorical colour (design-tokens --color-data-*), so green and red stay free to
 // say better and worse.
-const COL = { revenue:PAL.data1, meta:PAL.data3, google:PAL.data4, email:PAL.data2, sessions:PAL.data3, spend:PAL.quiet };
+const COL = { revenue:PAL.sales, meta:PAL.ads, google:PAL.ads2, tiktok:PAL.ads3, email:PAL.neutral, sessions:PAL.site, spend:PAL.quiet };
 const SERIES = [PAL.data1, PAL.data2, PAL.data3, PAL.data4, PAL.data5];
 
 // ── One chart theme ─────────────────────────────────────────────────────────────
@@ -900,8 +901,8 @@ function KPI({label, val, sub, badge, status, statusLabel, conf, series, seriesL
   // Resolve the CSS variable to a real hex for Recharts SVG stroke
   const rechartsStroke = lineColor === 'var(--good)' ? PAL.good
     : lineColor === 'var(--bad)' ? PAL.bad
-    : lineColor === 'var(--accent)' ? PAL.accent
-    : PAL.accent;
+    : lineColor === 'var(--accent)' ? PAL.muted
+    : PAL.muted;
   // Focusable when it has a popout: a tap focuses it on touch screens, where hover never fires.
   return (<div className={'card kpi' + (hasPop ? ' has-pop' : '')} tabIndex={hasPop ? 0 : undefined}>
     {/* The label owns its line. Status and confidence badges used to share it, which wrapped
@@ -2515,6 +2516,7 @@ function ConfigurableChart({dataset, dimensions, metrics, defaultMetric, default
   const [order,  setOrder]  = useState('desc');
   const [topN,   setTopN]   = useState(defaultTopN);
   const M = metrics.find(m=>m.key===metric) || metrics[0];
+  const metricCol = (s => /spend|cost|cac/.test(s) ? PAL.ads : /profit|contribution|margin/.test(s) ? PAL.kept : /sales|revenue|\bnet\b/.test(s) ? PAL.sales : PAL.neutral)((M.key + ' ' + M.label).toLowerCase());
   const D = dimensions.find(d=>d.key===split) || dimensions[0];
   const fmt = M.fmt || (v=>v);
 
@@ -2559,8 +2561,8 @@ function ConfigurableChart({dataset, dimensions, metrics, defaultMetric, default
                <R.YAxis tickFormatter={fmt} tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}}/></>)}
         <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',boxShadow:'var(--shadow-md)'}} formatter={v=>fmt(v)}/>
         {bar
-          ? <R.Bar dataKey="val" name={M.label} fill={svgCol(COL.revenue)} radius={[0,4,4,0]}/>
-          : <R.Line dataKey="val" name={M.label} stroke={svgCol(COL.revenue)} strokeWidth={2.2} dot={false}/>}
+          ? <R.Bar dataKey="val" name={M.label} fill={metricCol} radius={[0,4,4,0]}/>
+          : <R.Line dataKey="val" name={M.label} stroke={metricCol} strokeWidth={2.2} dot={false}/>}
       </R.ComposedChart>
     </R.ResponsiveContainer>
     <ChartFooter
@@ -3398,7 +3400,7 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
         {tile(annLabel+' operating profit', GBP(t.ebitda), PCT(t.ebitdaPct)+' of sales', t.ebitda>=0?'var(--good)':'var(--bad)')}
         {tile('operating profit break-even', beLabel, mode==='bottomup'?('repeat '+n('repeatRate').toFixed(0)+'%/mo'):('growth '+n('growthPct').toFixed(0)+'%/mo'))}
       </div>
-      {mode==='bottomup' && <div style={{fontSize:'var(--text-sm)',color:'var(--text-muted)',marginBottom:10}}>Revenue mix: <b style={{color:PAL.accent}}>New {pctOf(t.newRev)}%</b> · <b style={{color:PAL.good}}>Returning {pctOf(t.retRev)}%</b>{t.whRev>0?<> · <b style={{color:PAL.warn}}>Wholesale {pctOf(t.whRev)}%</b></>:''} — returning revenue compounds as the base grows.</div>}
+      {mode==='bottomup' && <div style={{fontSize:'var(--text-sm)',color:'var(--text-muted)',marginBottom:10}}>Revenue mix: <b style={{color:PAL.nw}}>New {pctOf(t.newRev)}%</b> · <b style={{color:PAL.good}}>Returning {pctOf(t.retRev)}%</b>{t.whRev>0?<> · <b style={{color:PAL.warn}}>Wholesale {pctOf(t.whRev)}%</b></>:''} — returning revenue compounds as the base grows.</div>}
       <R.ResponsiveContainer width="100%" height={240}>
         <R.ComposedChart data={rows} margin={{top:6,right:16,left:14,bottom:20}}>
           <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
@@ -3407,13 +3409,13 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
           <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)'}} formatter={v=>GBP(v)}/>
           <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:'var(--text-sm)', paddingBottom:8}}/>
           {mode==='bottomup' ? [
-            <R.Area key="n" type="monotone" dataKey="newRev" name="New" stackId="rev" stroke={PAL.accent} fill={palAlpha(PAL.accent, 0.50)} strokeWidth={1}/>,
-            <R.Area key="r" type="monotone" dataKey="retRev" name="Returning" stackId="rev" stroke={PAL.good} fill={palAlpha(PAL.good, 0.45)} strokeWidth={1}/>,
+            <R.Area key="n" type="monotone" dataKey="newRev" name="New" stackId="rev" stroke={PAL.nw} fill={palAlpha(PAL.nw, 0.50)} strokeWidth={1}/>,
+            <R.Area key="r" type="monotone" dataKey="retRev" name="Returning" stackId="rev" stroke={PAL.ret} fill={palAlpha(PAL.ret, 0.45)} strokeWidth={1}/>,
             <R.Area key="w" type="monotone" dataKey="whRev" name="Wholesale" stackId="rev" stroke={PAL.warn} fill="var(--color-warning-wash)" strokeWidth={1}/>
           ] : (
-            <R.Area key="rev" type="monotone" dataKey="revenue" name="Revenue" stroke={PAL.accent} fill={palAlpha(PAL.accent, 0.16)} strokeWidth={2}/>
+            <R.Area key="rev" type="monotone" dataKey="revenue" name="Revenue" stroke={PAL.sales} fill={palAlpha(PAL.sales, 0.16)} strokeWidth={2}/>
           )}
-          <R.Line type="monotone" dataKey="ebitda" name="Operating profit" stroke="#f0f0f4" strokeWidth={2} strokeDasharray="4 3" dot={false}/>
+          <R.Line type="monotone" dataKey="ebitda" name="Operating profit" stroke={PAL.kept} strokeWidth={2} strokeDasharray="4 3" dot={false}/>
         </R.ComposedChart>
       </R.ResponsiveContainer>
       {/* Scenario band — investor-grade */}
@@ -3754,7 +3756,7 @@ function V3ProfitLead() {
   const chain = [
     { k: 'Sales', v: sales, kind: 'in', fig: 'sales_30d' },
     ...(costsF != null ? [{ k: 'Products, delivery and payment fees', v: -costsF, kind: 'out', fig: 'costs_before_ads_30d' }] : []),
-    { k: 'Ad spend', v: -spend, kind: 'out', fig: 'ads_30d' },
+    { k: 'Ad spend', v: -spend, kind: 'out', ads: true, fig: 'ads_30d' },
   ];
   if (other >= 1) chain.push({ k: 'Other marketing: creators, agencies, seeding', v: -other, kind: 'out', fig: 'other_marketing_30d' });
   chain.push({ k: 'Kept after ads', v: kept, kind: 'sub', fig: 'profit_after_ads_30d' });
@@ -3813,7 +3815,7 @@ function V3ProfitLead() {
         {' '}A typical month is the middle one of your last {fmtCount(d.n)} months.
       </V3Brief>}
       <ul className="v3-chain" aria-label="Where each pound of sales went">
-        {chain.map(r => (<li key={r.k} className={'v3-chain-' + r.kind + (r.v < 0 && r.kind !== 'out' ? ' neg' : '')}>
+        {chain.map(r => (<li key={r.k} className={'v3-chain-' + r.kind + (r.ads ? ' v3-chain-ads' : '') + (r.v < 0 && r.kind !== 'out' ? ' neg' : '')}>
           <span className="v3-chain-k">{r.kind === 'out' ? '− ' : r.kind === 'sub' || r.kind === 'total' ? '= ' : ''}{r.k} <V3SourceTag id={r.fig}/></span>
           <span className="v3-chain-track"><i style={{ width: Math.min(100, sales > 0 ? Math.abs(r.v) / sales * 100 : 0) + '%' }}/></span>
           <span className="v3-chain-v">{v3Waiting(r.fig) ? <span className="v3-src-wait">Waiting for data</span> : fmtMoney(r.v)}</span>
@@ -3834,16 +3836,16 @@ function V3ProfitLead() {
 
     {d && (<figure className="v3-chart v3-chart-solo">
       <figcaption><span className="v3-chart-title">Sales, ad spend and what you kept, 30 days at a time</span>
-        <span className="v3-legend"><i style={{ background: PAL.quiet }}/>Sales <i style={{ background: PAL.accent }}/>Ad spend <i style={{ background: PAL.ink }}/>Kept after ads{oh30 != null && <> <i className="dash"/>Overheads</>}</span></figcaption>
+        <span className="v3-legend"><i style={{ background: PAL.sales }}/>Sales <i style={{ background: PAL.ads }}/>Ad spend <i style={{ background: PAL.kept }}/>Kept after ads{oh30 != null && <> <i className="dash"/>Overheads</>}</span></figcaption>
       <R.ResponsiveContainer width="100%" height={240}>
         <R.ComposedChart data={d.wins} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <R.CartesianGrid/>
           <R.XAxis dataKey="label" interval="preserveStartEnd"/>
           <R.YAxis tickFormatter={fmtMoneyK}/>
           <R.Tooltip content={tip} cursor={false}/>
-          <R.Bar dataKey="sales" fill={PAL.quiet} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
-          <R.Bar dataKey="spend" fill={PAL.accent} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
-          <R.Line dataKey="kept" type="monotone" stroke={PAL.ink} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
+          <R.Bar dataKey="sales" fill={PAL.sales} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
+          <R.Bar dataKey="spend" fill={PAL.ads} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
+          <R.Line dataKey="kept" type="monotone" stroke={PAL.kept} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
           {oh30 != null && <R.ReferenceLine y={oh30} stroke={PAL.muted} strokeDasharray="4 3"/>}
           <R.ReferenceLine y={0} stroke={PAL.line}/>
         </R.ComposedChart>
@@ -3885,11 +3887,11 @@ function V3ProfitLead() {
     {mixTot > 0 && (<section className="v3-sec">
       <h2 className="v3-sec-title">Where the sales came from <span className="v3-muted">last 30 days</span></h2>
       <div className="v3-share" role="img" aria-label="Sales from new and returning customers">
-        <i style={{ width: (newNet / mixTot * 100) + '%', background: PAL.data3 }}/><i style={{ width: (retNet / mixTot * 100) + '%', background: PAL.accent }}/>
+        <i style={{ width: (newNet / mixTot * 100) + '%', background: PAL.nw }}/><i style={{ width: (retNet / mixTot * 100) + '%', background: PAL.ret }}/>
       </div>
       <table className="v3-share-table"><tbody>
-        <tr><td className="t-text"><i className="v3-dot" style={{ background: PAL.data3 }}/>New customers · {fmtCount(t30.new_customers)}</td><td>{fmtMoney(newNet)}</td><td className="v3-muted">{fmtPctN(newNet / mixTot)}</td></tr>
-        <tr><td className="t-text"><i className="v3-dot" style={{ background: PAL.accent }}/>Returning customers · {fmtCount(t30.returning_customers)}</td><td>{fmtMoney(retNet)}</td><td className="v3-muted">{fmtPctN(retNet / mixTot)}</td></tr>
+        <tr><td className="t-text"><i className="v3-dot" style={{ background: PAL.nw }}/>New customers · {fmtCount(t30.new_customers)}</td><td>{fmtMoney(newNet)}</td><td className="v3-muted">{fmtPctN(newNet / mixTot)}</td></tr>
+        <tr><td className="t-text"><i className="v3-dot" style={{ background: PAL.ret }}/>Returning customers · {fmtCount(t30.returning_customers)}</td><td>{fmtMoney(retNet)}</td><td className="v3-muted">{fmtPctN(retNet / mixTot)}</td></tr>
       </tbody></table>
       <p className="v3-note v3-measure">{(() => { const c = v3Fig('cac_30d', figQ.rows); return c.value != null ? c.label + ': ' + fmtMoney(c.value) + '. ' : ''; })()}Marketing shows which ad channels really bring in sales. Customers shows what a customer is worth over time.</p>
     </section>)}
@@ -5686,8 +5688,8 @@ function Customers(){
             {false && <R.YAxis yAxisId="r" orientation="right" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>v+'%'} domain={[0,80]} label={{value:'% returning', angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:'var(--text-xs)'}} />}
             <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)'}} />
             <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:'var(--text-sm)', paddingBottom:8}} />
-            <R.Bar yAxisId="l" dataKey="new" stackId="o" name="New" fill={svgCol(COL.sessions)} />
-            <R.Bar yAxisId="l" dataKey="ret" stackId="o" name="Returning" fill={svgCol(COL.revenue)} />
+            <R.Bar yAxisId="l" dataKey="new" stackId="o" name="New" fill={PAL.nw} />
+            <R.Bar yAxisId="l" dataKey="ret" stackId="o" name="Returning" fill={PAL.ret} />
             {/* The share is the stack below read as a proportion; a second scale added nothing but a crossing point. */}
             {false && <R.Line yAxisId="r" type="monotone" dataKey="retPct" name="% returning" stroke={svgCol(COL.email)} strokeWidth={2} dot={false} />}
           </R.ComposedChart>
@@ -6455,12 +6457,12 @@ function CvrDrivers(){
           <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:'var(--text-sm)', paddingBottom:8}}/>
           {false && <R.Bar yAxisId="r" dataKey="sessions" name="Sessions" fill={PAL.panel} maxBarSize={30}/>}
           {/* Total discount depth (codes + sale prices) as a soft amber band; amber diamonds flag the deepest periods. */}
-          {showDisc && <R.Area yAxisId="disc" type="monotone" dataKey="trueDiscountIntensity" name="Discount depth" stroke={PAL.warn} strokeWidth={1.4} strokeOpacity={0.6} fill={PAL.warn} fillOpacity={0.10} dot={discDot} activeDot={false} isAnimationActive={false} connectNulls/>}
+          {showDisc && <R.Area yAxisId="disc" type="monotone" dataKey="trueDiscountIntensity" name="Discount depth" stroke={PAL.neutral} strokeWidth={1.4} strokeOpacity={0.6} fill={PAL.neutral} fillOpacity={0.10} dot={discDot} activeDot={false} isAnimationActive={false} connectNulls/>}
           <R.Brush {...brushProps('w', fmtWk)} />
-          <R.Line yAxisId="l" type="monotone" dataKey="cvr" name="Visitors who buy" stroke={PAL.accent} strokeWidth={2.5} dot={false}/>
+          <R.Line yAxisId="l" type="monotone" dataKey="cvr" name="Visitors who buy" stroke={PAL.site} strokeWidth={2.5} dot={false}/>
           {/* Show, don't tell: the single CVR benchmark drawn on the chart so the gap is visible, not described. */}
-          <R.ReferenceLine yAxisId="l" y={CVR_BENCH*100} stroke={PAL.accent} strokeDasharray="5 4" strokeOpacity={0.75}
-            label={{value:`${CVR_BENCH_LABEL} conversion rate target`, position:'insideTopRight', fill:PAL.accent, fontSize:'var(--text-xs)'}}/>
+          <R.ReferenceLine yAxisId="l" y={CVR_BENCH*100} stroke={PAL.site} strokeDasharray="5 4" strokeOpacity={0.75}
+            label={{value:`${CVR_BENCH_LABEL} conversion rate target`, position:'insideTopRight', fill:PAL.muted, fontSize:'var(--text-xs)'}}/>
           {/* The two selected periods, marked where you clicked — A (blue) vs B (green). */}
           {cmp.a && chartData.some(d=>d.w===cmp.a) && <R.ReferenceLine yAxisId="l" x={cmp.a} stroke={PAL.accent} strokeWidth={2} strokeOpacity={0.95}
             label={{value:'A', position:'top', fill:PAL.accent, fontSize:'var(--text-sm)', fontWeight:'var(--weight-bold)'}}/>}
@@ -8480,7 +8482,7 @@ function SynergyMatrix(){
   const synergies = P.patterns.filter(p => p.kind === 'synergy');
   if (!synergies.length) return null;
   // Group by (src, tgt) pair so each cell shows the best correlation across lags
-  const CHANNEL_COLORS = {meta:PAL.data3, google:PAL.data4, site:PAL.data2, email:PAL.data5, shopify:PAL.data1};
+  const CHANNEL_COLORS = {meta:PAL.ads, google:PAL.ads2, site:PAL.site, email:PAL.neutral, shopify:PAL.sales};
   // Build list of all metrics that appear in any synergy
   const metricsSet = new Set();
   synergies.forEach(s => {
@@ -10427,15 +10429,15 @@ function WeeklyBoard(){
         return (<div className="v3-chart-pair">
           <figure className="v3-chart">
             <figcaption><span className="v3-chart-title">Sales and ad spend</span>
-              <span className="v3-legend"><i style={{ background: PAL.accent }}/>Sales <i style={{ background: PAL.data3 }}/>Ad spend</span></figcaption>
+              <span className="v3-legend"><i style={{ background: PAL.sales }}/>Sales <i style={{ background: PAL.ads }}/>Ad spend</span></figcaption>
             <R.ResponsiveContainer width="100%" height={240}>
               <R.ComposedChart data={t13} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
                 <R.CartesianGrid/>
                 <R.XAxis dataKey="x" tickFormatter={v => String(v).split(' – ')[0]} interval="preserveStartEnd"/>
                 <R.YAxis tickFormatter={fmtMoneyK}/>
                 <R.Tooltip content={tip}/>
-                <R.Bar dataKey="revenue" name="Sales" fill={PAL.accent} radius={[2, 2, 0, 0]}/>
-                <R.Line type="monotone" dataKey="paid" name="Ad spend" stroke={PAL.data3}/>
+                <R.Bar dataKey="revenue" name="Sales" fill={PAL.sales} radius={[2, 2, 0, 0]}/>
+                <R.Line type="monotone" dataKey="paid" name="Ad spend" stroke={PAL.ads}/>
               </R.ComposedChart>
             </R.ResponsiveContainer>
           </figure>
@@ -10449,7 +10451,7 @@ function WeeklyBoard(){
                 <R.YAxis tickFormatter={v => v + '×'} domain={[0, 'auto']}/>
                 <R.Tooltip content={tip}/>
                 <R.ReferenceLine y={2} stroke={PAL.muted} strokeDasharray="4 4"/>
-                <R.Line type="monotone" dataKey="mer" name="Sales per £ of ads" stroke={PAL.accent}/>
+                <R.Line type="monotone" dataKey="mer" name="Sales per £ of ads" stroke={PAL.ads}/>
               </R.ComposedChart>
             </R.ResponsiveContainer>
           </figure>
@@ -10556,9 +10558,9 @@ function CohortsPanel(){
               <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',boxShadow:'var(--shadow-md)'}} formatter={(v,n)=>[GBP(v), n==='contrib'?'Contribution':'Revenue']}
                 labelFormatter={(l,p)=> l + (p&&p[0]&&p[0].payload? ' · '+p[0].payload.n+' customers observed':'')}/>
               <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:'var(--text-sm)', paddingBottom:8}}/>
-              {paidCac!=null && <R.ReferenceLine y={paidCac} stroke={PAL.accent} strokeDasharray="5 4" strokeOpacity={0.8} label={{value:'paid New-customer cost', position:'insideTopRight', fill:PAL.accent, fontSize:'var(--text-xs)'}}/>}
+              {paidCac!=null && <R.ReferenceLine y={paidCac} stroke={PAL.ads} strokeDasharray="5 4" strokeOpacity={0.8} label={{value:'paid New-customer cost', position:'insideTopRight', fill:PAL.muted, fontSize:'var(--text-xs)'}}/>}
               <R.Area type="monotone" dataKey="rev" name="Revenue" stroke={svgCol(COL.revenue)} fill={COL.revenue+'22'} strokeWidth={2}/>
-              <R.Line type="monotone" dataKey="contrib" name="Contribution" stroke={PAL.accent} strokeWidth={2.4} dot={false}/>
+              <R.Line type="monotone" dataKey="contrib" name="Contribution" stroke={PAL.kept} strokeWidth={2.4} dot={false}/>
               <R.Brush {...brushProps('m')} />
             </R.ComposedChart>
           </R.ResponsiveContainer>
@@ -10576,7 +10578,7 @@ function CohortsPanel(){
               <R.XAxis tickLine={false} dataKey="month" tick={false}/>
               <R.YAxis yAxisId="l" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}}/>
               <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',boxShadow:'var(--shadow-md)'}} formatter={(v,n)=> n==='cac'?[v!=null?GBP(v):'no paid spend','Paid cost per new customer']:[NUM(v),'New customers']}/>
-              <R.Bar yAxisId="l" dataKey="newCust" name="New customers" fill={svgCol(COL.sessions)} radius={[2,2,0,0]}/>
+              <R.Bar yAxisId="l" dataKey="newCust" name="New customers" fill={PAL.nw} radius={[2,2,0,0]}/>
             </R.ComposedChart>
           </R.ResponsiveContainer>
           <R.ResponsiveContainer width="100%" height={160}>
@@ -10585,7 +10587,7 @@ function CohortsPanel(){
               <R.XAxis dataKey="month" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}}/>
               <R.YAxis yAxisId="l" orientation="left" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>curSym()+v}/>
               <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',boxShadow:'var(--shadow-md)'}} formatter={(v,n)=> n==='cac'?[v!=null?GBP(v):'no paid spend','Paid cost per new customer']:[NUM(v),'New customers']}/>
-              <R.Line yAxisId="l" type="monotone" dataKey="cac" name="cac" stroke={svgCol(COL.google)} strokeWidth={2.2} dot={{r:2.5}} connectNulls/>
+              <R.Line yAxisId="l" type="monotone" dataKey="cac" name="cac" stroke={PAL.ads} strokeWidth={2.2} dot={{r:2.5}} connectNulls/>
               <R.Brush {...brushProps('month')} />
             </R.ComposedChart>
           </R.ResponsiveContainer>          <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{BRUSH_HINT}</div>
@@ -11050,7 +11052,7 @@ function MarginBridge({cur, pri, gmNow, gmPri, tile, perOrderFixed, payPct}){
           <R.YAxis tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={fmtMoneyK}/>
           <R.Tooltip content={<Tip/>}/>
           <R.Bar dataKey="base" stackId="s" fill="transparent" isAnimationActive={false}/>
-          <R.Bar dataKey="pos" stackId="s" isAnimationActive={false} radius={[2,2,0,0]}>{data.map((d,i)=><R.Cell key={i} fill={d.isTotal?PAL.data3:PAL.good}/>)}<R.LabelList content={segLabel('pos')}/></R.Bar>
+          <R.Bar dataKey="pos" stackId="s" isAnimationActive={false} radius={[2,2,0,0]}>{data.map((d,i)=><R.Cell key={i} fill={d.isTotal?PAL.kept:PAL.good}/>)}<R.LabelList content={segLabel('pos')}/></R.Bar>
           <R.Bar dataKey="neg" stackId="s" fill={PAL.bad} isAnimationActive={false} radius={[2,2,0,0]}><R.LabelList content={segLabel('neg')}/></R.Bar>
         </R.BarChart>
       </R.ResponsiveContainer>
@@ -13372,7 +13374,7 @@ const GO_FALLBACK = { monthly: {
 function GO_Dot(p){ return React.createElement('span',{style:Object.assign({width:7,height:7,borderRadius:'50%',display:'inline-block',background:GO_rag(p.r)},p.style||{})}); }
 
 function GO_Tile(p){ const t=p.t; const _sr=(t.series&&t.series.length>1)?t.series:null;
-  const _stroke=t.rag==='r'?PAL.bad:t.rag==='g'?PAL.good:PAL.accent;
+  const _stroke=t.rag==='r'?PAL.bad:t.rag==='g'?PAL.good:PAL.muted;
   const _statusTxt=t.rag==='g'?'On track':t.rag==='a'?'Watch':t.rag==='r'?'Off target':'—';
   return (
   <div className="go-tile" style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:'var(--radius-none)',padding:'14px 15px',position:'relative',boxShadow:'var(--shadow-panel)'}}>
@@ -13974,7 +13976,7 @@ function GP_PlanBreakdown({ d }) {
           <line x1="0" x2="240" y1={64 - 64 / hi} y2={64 - 64 / hi} stroke={PAL.line} strokeWidth="1"/>
           {idx.map((v, i) => {
             const h = Math.max(1, v / hi * 64), on = planMonths.indexOf(i + 1) >= 0;
-            return <rect key={i} x={i * 20 + 2} y={64 - h} width="16" height={h} fill={on ? PAL.accent : PAL.quiet}><title>{GP_MONTH_NAME[i] + ': ' + v3WalkDp(v, 2) + '× an average month'}</title></rect>;
+            return <rect key={i} x={i * 20 + 2} y={64 - h} width="16" height={h} fill={on ? PAL.sales : PAL.quiet}><title>{GP_MONTH_NAME[i] + ': ' + v3WalkDp(v, 2) + '× an average month'}</title></rect>;
           })}
         </svg>
         <figcaption><span>Jan</span><span>Sales against an average month · this quarter highlighted</span><span>Dec</span></figcaption>
@@ -18345,14 +18347,14 @@ function V3HeroTrend({ sales, prod }) {
     <R.ResponsiveContainer width="100%" height={160}>
       <R.AreaChart data={data} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
         <defs><linearGradient id="v3HeroFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={PAL.accent} stopOpacity={0.18}/><stop offset="100%" stopColor={PAL.accent} stopOpacity={0}/>
+          <stop offset="0%" stopColor={PAL.kept} stopOpacity={0.18}/><stop offset="100%" stopColor={PAL.kept} stopOpacity={0}/>
         </linearGradient></defs>
         <R.XAxis dataKey="wk" interval="preserveStartEnd" minTickGap={40}/>
         <R.YAxis hide domain={['auto', 'auto']}/>
         <R.ReferenceLine y={0} stroke={PAL.line}/>
         <R.Tooltip content={tip} cursor={{ stroke: PAL.line }}/>
-        <R.Area type="monotone" dataKey="v" stroke={PAL.accent} fill="url(#v3HeroFill)"
-                dot={(pr) => pr.index === data.length - 1 ? <circle key="last" cx={pr.cx} cy={pr.cy} r={3.5} fill={PAL.accent}/> : null}/>
+        <R.Area type="monotone" dataKey="v" stroke={PAL.kept} fill="url(#v3HeroFill)"
+                dot={(pr) => pr.index === data.length - 1 ? <circle key="last" cx={pr.cx} cy={pr.cy} r={3.5} fill={PAL.kept}/> : null}/>
       </R.AreaChart>
     </R.ResponsiveContainer>
   </figure>);
@@ -20061,17 +20063,17 @@ function V3Growth() {
     {pts.length >= 4 && fop && (<div className="v3-chart-pair">
       <figure className="v3-chart">
         <figcaption><span className="v3-chart-title">What a new customer costs, by month</span>
-          <span className="v3-legend"><i style={{ background: PAL.accent }}/>New-customer cost <i className="dash"/>What a first order earns</span></figcaption>
+          <span className="v3-legend"><i style={{ background: PAL.ads }}/>New-customer cost <i className="dash"/>What a first order earns</span></figcaption>
         <R.ResponsiveContainer width="100%" height={240}>
           <R.ComposedChart data={pts} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <defs><linearGradient id="v3CacFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={PAL.accent} stopOpacity={0.14}/><stop offset="100%" stopColor={PAL.accent} stopOpacity={0}/></linearGradient></defs>
+              <stop offset="0%" stopColor={PAL.ads} stopOpacity={0.14}/><stop offset="100%" stopColor={PAL.ads} stopOpacity={0}/></linearGradient></defs>
             <R.CartesianGrid/>
             <R.XAxis dataKey="month" tickFormatter={m => v3Month(m, true)} interval="preserveStartEnd"/>
             <R.YAxis tickFormatter={v => fmtMoney(v)} domain={[0, dataMax => Math.ceil(Math.max(dataMax, fop) * 1.15 / 10) * 10]}/>
             <R.Tooltip content={cacTip}/>
             <R.ReferenceLine y={fop} stroke={PAL.muted} strokeDasharray="4 4"/>
-            <R.Area type="monotone" dataKey="cac" stroke={PAL.accent} fill="url(#v3CacFill)"/>
+            <R.Area type="monotone" dataKey="cac" stroke={PAL.ads} fill="url(#v3CacFill)"/>
           </R.ComposedChart>
         </R.ResponsiveContainer>
       </figure>
@@ -20083,7 +20085,7 @@ function V3Growth() {
             <R.XAxis dataKey="month" tickFormatter={m => v3Month(m, true)} interval="preserveStartEnd"/>
             <R.YAxis tickFormatter={fmtMoneyK}/>
             <R.Tooltip content={cacTip}/>
-            <R.Bar dataKey="spend" fill={PAL.data3} radius={[2, 2, 0, 0]}/>
+            <R.Bar dataKey="spend" fill={PAL.ads} radius={[2, 2, 0, 0]}/>
           </R.BarChart>
         </R.ResponsiveContainer>
       </figure>
@@ -20569,7 +20571,7 @@ function V3Website() {
       bars.push({ name: s.merged ? 'Checkout' : s.stage, base: lo, val: Math.abs(d), kind: d < 0 ? 'down' : 'up', delta: d, metric: s.metric }); run += d; });
     bars.push({ name: monthName.split(' ')[0], base: 0, val: actual, kind: 'total' });
   }
-  const colour = k => (k === 'total' ? PAL.data3 : k === 'down' ? PAL.bad : PAL.good);
+  const colour = k => (k === 'total' ? PAL.kept : k === 'down' ? PAL.bad : PAL.good);
   const tip = ({ active, payload }) => {
     if (!active || !payload || !payload.length) return null;
     const p = payload[0].payload;
@@ -20619,7 +20621,7 @@ function V3Website() {
       })()}
       {now.ws.length >= 2 && (<figure className="v3-chart">
         <figcaption><span className="v3-chart-title">Visits and orders per 100 visits, 30 days at a time</span>
-          <span className="v3-legend"><i style={{ background: PAL.quiet }}/>Visits <i style={{ background: PAL.ink }}/>Orders per 100 visits</span></figcaption>
+          <span className="v3-legend"><i style={{ background: palAlpha(PAL.site, 0.35) }}/>Visits <i style={{ background: PAL.site }}/>Orders per 100 visits</span></figcaption>
         <R.ResponsiveContainer width="100%" height={160}>
           <R.ComposedChart data={now.ws.map(w => ({ ...w, label: v3Day(w.e), c100: w.conv != null ? Math.round(w.conv * 10000) / 100 : null }))} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <R.CartesianGrid/>
@@ -20627,8 +20629,8 @@ function V3Website() {
             <R.YAxis yAxisId="v" tickFormatter={v3CountK}/>
             <R.YAxis yAxisId="c" orientation="right" allowDecimals domain={[0, Math.ceil(now.cMax * 12) / 10]} ticks={[0, Math.ceil(now.cMax * 12) / 20, Math.ceil(now.cMax * 12) / 10]} tickFormatter={v3Fix2}/>
             <R.Tooltip content={ctip} cursor={false}/>
-            <R.Bar yAxisId="v" dataKey="visits" fill={PAL.quiet} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
-            <R.Line yAxisId="c" dataKey="c100" type="monotone" stroke={PAL.ink} strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false}/>
+            <R.Bar yAxisId="v" dataKey="visits" fill={palAlpha(PAL.site, 0.35)} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
+            <R.Line yAxisId="c" dataKey="c100" type="monotone" stroke={PAL.site} strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false}/>
           </R.ComposedChart>
         </R.ResponsiveContainer>
       </figure>)}
@@ -20759,15 +20761,15 @@ function V3Customers() {
     </section>
     {weeks.length >= 4 && (<figure className="v3-chart v3-chart-solo">
       <figcaption><span className="v3-chart-title">New and returning customers' sales, by week</span>
-        <span className="v3-legend"><i style={{ background: PAL.data3 }}/>New <i style={{ background: PAL.accent }}/>Returning</span></figcaption>
+        <span className="v3-legend"><i style={{ background: PAL.nw }}/>New <i style={{ background: PAL.ret }}/>Returning</span></figcaption>
       <R.ResponsiveContainer width="100%" height={240}>
         <R.BarChart data={weeks} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
           <R.CartesianGrid/>
           <R.XAxis dataKey="label" interval="preserveStartEnd"/>
           <R.YAxis tickFormatter={fmtMoneyK}/>
           <R.Tooltip content={wkTip}/>
-          <R.Bar dataKey="nw" stackId="s" fill={PAL.data3}/>
-          <R.Bar dataKey="rt" stackId="s" fill={PAL.accent} radius={[2, 2, 0, 0]}/>
+          <R.Bar dataKey="nw" stackId="s" fill={PAL.nw}/>
+          <R.Bar dataKey="rt" stackId="s" fill={PAL.ret} radius={[2, 2, 0, 0]}/>
         </R.BarChart>
       </R.ResponsiveContainer>
     </figure>)}
@@ -20778,12 +20780,12 @@ function V3Customers() {
         <R.ResponsiveContainer width="100%" height={240}>
           <R.AreaChart data={cv} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <defs><linearGradient id="v3CvFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={PAL.accent} stopOpacity={0.16}/><stop offset="100%" stopColor={PAL.accent} stopOpacity={0}/></linearGradient></defs>
+              <stop offset="0%" stopColor={PAL.ret} stopOpacity={0.16}/><stop offset="100%" stopColor={PAL.ret} stopOpacity={0}/></linearGradient></defs>
             <R.CartesianGrid/>
             <R.XAxis dataKey="m" tickFormatter={m => m === 0 ? '1st' : 'M' + m} interval="preserveStartEnd"/>
             <R.YAxis tickFormatter={fmtMoneyK}/>
             <R.Tooltip content={cvTip}/>
-            <R.Area type="monotone" dataKey="v" stroke={PAL.accent} fill="url(#v3CvFill)"/>
+            <R.Area type="monotone" dataKey="v" stroke={PAL.ret} fill="url(#v3CvFill)"/>
           </R.AreaChart>
         </R.ResponsiveContainer>
       </figure>
@@ -21083,7 +21085,7 @@ function V3Heroes() {
   if (!facts.rows || (!hero.rows && !hero.err)) return <V3SkeletonRows n={4}/>;
   if (!d) return null;
   const top = d.sell[0], L = (ue.rows || [])[0] || null;
-  const stripCol = { top: PAL.accent, half: palAlpha(PAL.accent, 0.6), eighty: palAlpha(PAL.accent, 0.3), rest: PAL.quiet };
+  const stripCol = { top: PAL.sales, half: palAlpha(PAL.sales, 0.6), eighty: palAlpha(PAL.sales, 0.3), rest: PAL.quiet };
   const stripLab = b => b.k === 'top' ? top.title : b.k === 'half' ? 'Next ' + fmtCount(b.n) : b.k === 'eighty' ? 'Next ' + fmtCount(b.n) : 'Other ' + fmtCount(b.n);
   const aovSum = d.aovHeroes.reduce((a, x) => a + x.aov.gain, 0);
   const showMove = d.hasHero || d.heroes.some(x => x.moves.length);
@@ -21353,16 +21355,16 @@ function V3ReturningBaseline() {
       {' '}<V3Conf state="likely" detail="Built from your own customers: how many you won each month, and what customers like them spent in each month after their first order. Beyond a customer’s first year it assumes they keep spending at their month 10 to 12 rate."/></p>
     <figure className="v3-chart">
       <figcaption><span className="v3-chart-title">Returning customers’ sales by month</span>
-        <span className="v3-legend"><i style={{ background: PAL.accent }}/>What they spent <i style={{ background: palAlpha(PAL.accent, 0.3) }}/>Expected ahead <i className="dash"/>Expected from customers already won</span></figcaption>
+        <span className="v3-legend"><i style={{ background: PAL.ret }}/>What they spent <i style={{ background: palAlpha(PAL.ret, 0.3) }}/>Expected ahead <i className="dash"/>Expected from customers already won</span></figcaption>
       <R.ResponsiveContainer width="100%" height={240}>
         <R.ComposedChart data={d.months} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <R.CartesianGrid/>
           <R.XAxis dataKey="label" interval="preserveStartEnd"/>
           <R.YAxis tickFormatter={fmtMoneyK}/>
           <R.Tooltip content={tip} cursor={false}/>
-          <R.Bar dataKey="act" stackId="m" fill={PAL.accent} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
-          <R.Bar dataKey="fc" stackId="m" fill={palAlpha(PAL.accent, 0.3)} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
-          <R.Line dataKey="exp" type="monotone" stroke={PAL.ink} strokeWidth={1.5} strokeDasharray="4 3" dot={false} isAnimationActive={false}/>
+          <R.Bar dataKey="act" stackId="m" fill={PAL.ret} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
+          <R.Bar dataKey="fc" stackId="m" fill={palAlpha(PAL.ret, 0.3)} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
+          <R.Line dataKey="exp" type="monotone" stroke={PAL.muted} strokeWidth={1.5} strokeDasharray="4 3" dot={false} isAnimationActive={false}/>
         </R.ComposedChart>
       </R.ResponsiveContainer>
       <p className="micro muted v3-measure">Sales from customers on their second order or later, after discounts and refunds. Customers you win from now on come on top of this.</p>
@@ -21538,7 +21540,7 @@ function V3MarketingLead() {
     : d.dSpend > 0 && d.dNc <= 0 ? 'You are spending ' + fmtMoney(d.dSpend) + ' a month more than in ' + d.prevLab + ', and winning no more new customers.'
     : d.dSpend > 0 ? 'The extra ' + fmtMoney(d.dSpend) + ' a month on ads won about ' + fmtCount(d.dNc) + ' more new customers a month, at ' + fmtMoney(per) + ' each.'
     : 'You are spending ' + fmtMoney(Math.abs(d.dSpend)) + ' a month less than in ' + d.prevLab + (d.dNc >= 0 ? ', and new customers have held up.' : ', and winning ' + fmtCount(Math.abs(d.dNc)) + ' fewer new customers a month.');
-  const cols = [PAL.data1, PAL.data2, PAL.data4, PAL.data5, PAL.data3];
+  const adCol = k => { const s = String(k).toLowerCase(); return s.includes('meta') || s.includes('facebook') ? PAL.ads : s.includes('google') ? PAL.ads2 : s.includes('tiktok') ? PAL.ads3 : PAL.neutral; };
   const tip = ({ active, payload }) => {
     if (!active || !payload || !payload.length) return null;
     const p = payload[0].payload;
@@ -21559,7 +21561,7 @@ function V3MarketingLead() {
       {' '}<V3Conf state="likely" detail="Spend comes from your ad accounts and new customers from your Shopify orders, by calendar month. Each figure is the middle of three months, so one sale month cannot decide it. Season and offers changed too, so the ads did not do this alone."/></V3Brief>
     <figure className="v3-chart">
       <figcaption><span className="v3-chart-title">Ad spend by channel, and new customers, by month</span>
-        <span className="v3-legend">{d.ps.map((k, i) => <React.Fragment key={k}><i style={{ background: cols[i % cols.length] }}/>{nice(k)} </React.Fragment>)}<i style={{ background: PAL.ink }}/>New customers</span></figcaption>
+        <span className="v3-legend">{d.ps.map((k, i) => <React.Fragment key={k}><i style={{ background: adCol(k) }}/>{nice(k)} </React.Fragment>)}<i style={{ background: PAL.nw }}/>New customers</span></figcaption>
       <R.ResponsiveContainer width="100%" height={240}>
         <R.ComposedChart data={d.rows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <R.CartesianGrid/>
@@ -21567,8 +21569,8 @@ function V3MarketingLead() {
           <R.YAxis yAxisId="s" tickFormatter={fmtMoneyK}/>
           <R.YAxis yAxisId="c" orientation="right" tickFormatter={v => fmtCount(v)}/>
           <R.Tooltip content={tip} cursor={false}/>
-          {d.ps.map((k, i) => <R.Bar key={k} yAxisId="s" dataKey={'p_' + k} stackId="sp" fill={cols[i % cols.length]} isAnimationActive={false}/>)}
-          <R.Line yAxisId="c" dataKey="nc" type="monotone" stroke={PAL.ink} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
+          {d.ps.map((k, i) => <R.Bar key={k} yAxisId="s" dataKey={'p_' + k} stackId="sp" fill={adCol(k)} isAnimationActive={false}/>)}
+          <R.Line yAxisId="c" dataKey="nc" type="monotone" stroke={PAL.nw} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
         </R.ComposedChart>
       </R.ResponsiveContainer>
       <p className="micro muted v3-measure">Bars are ad spend (left scale), the line is first-time customers (right scale). A new customer is anyone whose first order fell in that month, however they found you.</p>
@@ -22632,14 +22634,14 @@ function V3Review() {
     <div className="v3-chart-pair">
       <figure className="v3-chart">
         <figcaption><span className="v3-chart-title">Sales, ad spend and what you kept, by week</span>
-          <span className="v3-legend"><i style={{ background: PAL.quiet }}/>Sales <i style={{ background: PAL.accent }}/>Ad spend <i style={{ background: PAL.ink }}/>Kept after ads</span></figcaption>
+          <span className="v3-legend"><i style={{ background: PAL.sales }}/>Sales <i style={{ background: PAL.ads }}/>Ad spend <i style={{ background: PAL.kept }}/>Kept after ads</span></figcaption>
         <R.ResponsiveContainer width="100%" height={240}>
           <R.ComposedChart data={t12} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
             <R.CartesianGrid/><R.XAxis dataKey="label" interval="preserveStartEnd"/><R.YAxis tickFormatter={fmtMoneyK}/>
             <R.Tooltip content={tip} cursor={false}/>
-            <R.Bar dataKey="sales" fill={PAL.quiet} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
-            <R.Bar dataKey="spend" fill={PAL.accent} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
-            <R.Line dataKey="kept" type="monotone" stroke={PAL.ink} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
+            <R.Bar dataKey="sales" fill={PAL.sales} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
+            <R.Bar dataKey="spend" fill={PAL.ads} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
+            <R.Line dataKey="kept" type="monotone" stroke={PAL.kept} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
             <R.ReferenceLine y={0} stroke={PAL.line}/>
           </R.ComposedChart>
         </R.ResponsiveContainer>
@@ -22652,7 +22654,7 @@ function V3Review() {
             <R.CartesianGrid/><R.XAxis dataKey="label" interval="preserveStartEnd"/><R.YAxis tickFormatter={v => v + '×'} domain={[0, 'auto']}/>
             <R.Tooltip content={tip} cursor={false}/>
             {be && <R.ReferenceLine y={be} stroke={PAL.muted} strokeDasharray="4 4"/>}
-            <R.Line type="monotone" dataKey="mer" stroke={PAL.accent} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
+            <R.Line type="monotone" dataKey="mer" stroke={PAL.ads} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
           </R.ComposedChart>
         </R.ResponsiveContainer>
       </figure>
@@ -22888,7 +22890,7 @@ function V3Competitors() {
           <R.ComposedChart data={S.weeks} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
             <R.CartesianGrid/><R.XAxis dataKey="label" interval="preserveStartEnd"/><R.YAxis domain={[0, 'auto']}/>
             <R.Tooltip content={tipW} cursor={false}/>
-            <R.Bar dataKey="clicks" fill={PAL.accent} isAnimationActive={false}/>
+            <R.Bar dataKey="clicks" fill={PAL.neutral} isAnimationActive={false}/>
           </R.ComposedChart>
         </R.ResponsiveContainer>
         <p className="micro muted">The one direct measure of how many people look for you by name: clicks from Google searches that contain your brand name (from Search Console).</p>
@@ -22899,7 +22901,7 @@ function V3Competitors() {
           <R.ComposedChart data={M.list} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
             <R.CartesianGrid/><R.XAxis dataKey="label" interval="preserveStartEnd"/><R.YAxis tickFormatter={v => curSym() + v} domain={[0, 'auto']}/>
             <R.Tooltip content={tipM} cursor={false}/>
-            <R.Line type="monotone" dataKey="cpm" stroke={PAL.accent} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
+            <R.Line type="monotone" dataKey="cpm" stroke={PAL.ads} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
           </R.ComposedChart>
         </R.ResponsiveContainer>
         <p className="micro muted">What your Meta account paid for every 1,000 times an ad was shown. It rises when more brands bid for the same people.</p>
@@ -23707,7 +23709,7 @@ function V3BusinessState({ part }) {
   const terms = ao != null && (<p className="micro muted v3-measure"><b>Running costs</b> (overheads) are what you pay each month whatever you sell, such as rent, wages and software. <b>Profit after ads</b> is what is left from sales once products, delivery, payment fees and ads are paid, before running costs.</p>);
   const chart = wk.length >= 8 && num(H.sale_weeks_13) >= 4 && (<figure className="v3-chart v3-chart-solo">
       <figcaption><span className="v3-chart-title">Profit after ads, by week</span>
-        <span className="v3-legend"><i style={{ background: PAL.accent }}/>A sale <i style={{ background: PAL.data3 }}/>No sale</span></figcaption>
+        <span className="v3-legend"><i style={{ background: PAL.kept }}/>A sale <i style={{ background: PAL.neutral }}/>No sale</span></figcaption>
       <Recharts.ResponsiveContainer width="100%" height={240}>
         <Recharts.BarChart data={wk} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
           <Recharts.CartesianGrid/>
@@ -23715,7 +23717,7 @@ function V3BusinessState({ part }) {
           <Recharts.YAxis tickFormatter={fmtMoneyK}/>
           <Recharts.Tooltip content={rhTip}/>
           <Recharts.ReferenceLine y={0} stroke={PAL.muted}/>
-          <Recharts.Bar dataKey="v">{wk.map((d, i) => <Recharts.Cell key={i} fill={d.sale ? PAL.accent : PAL.data3}/>)}</Recharts.Bar>
+          <Recharts.Bar dataKey="v">{wk.map((d, i) => <Recharts.Cell key={i} fill={d.sale ? PAL.kept : PAL.neutral}/>)}</Recharts.Bar>
         </Recharts.BarChart>
       </Recharts.ResponsiveContainer>
       <p className="micro muted v3-measure">{v3Sentence(H.basis)}</p>
@@ -24613,8 +24615,8 @@ function V3Sign({ k, v, tone, bar, n, series, fmt, better, line, act, trendAs })
         {line && line.v != null && <R.ReferenceLine y={line.v} stroke={PAL.muted} strokeDasharray="3 3" ifOverflow="extendDomain"/>}
         <R.Tooltip content={({ active, payload }) => (active && payload && payload.length)
           ? <div className="v3-tip"><b>30 days to {v3Day(payload[0].payload.d, true)}</b><span>{k} <em>{fmt(payload[0].payload.v)}</em></span></div> : null}/>
-        <R.Line type="monotone" dataKey="v" stroke={PAL.accent} strokeWidth={2} isAnimationActive={false}
-                dot={pr => pr.index === pts.length - 1 ? <circle key="last" cx={pr.cx} cy={pr.cy} r={3.5} fill={PAL.accent}/> : null}/>
+        <R.Line type="monotone" dataKey="v" stroke={PAL.muted} strokeWidth={2} isAnimationActive={false}
+                dot={pr => pr.index === pts.length - 1 ? <circle key="last" cx={pr.cx} cy={pr.cy} r={3.5} fill={PAL.muted}/> : null}/>
       </R.LineChart>
     </R.ResponsiveContainer>
     {line && line.v != null && <span className="v3-sign-pop-f"><i aria-hidden="true"/>{line.label}</span>}
@@ -25258,6 +25260,8 @@ function v3ModelClaims(a, b, ctx) {
     note: 'Website orders are your shop’s web orders; each platform’s figure is its own count of sales it says its ads brought. Each counts any order that saw or clicked one of its ads, so they overlap and can add up to more than your orders.',
   };
 }
+// 3 Nov: one colour per meaning. The week a driver panel explains wears the colour of what the panel is about.
+const v3DriverCol = which => ({ claims: PAL.ads, spend: PAL.ads, metacpa: PAL.ads, googcpa: PAL.ads2, cac: PAL.ads, ret: PAL.ads, newsales: PAL.nw, newc: PAL.nw, retsales: PAL.ret, repeat: PAL.ret, conv: PAL.site, ly: PAL.sales, profit: PAL.kept }[which] || PAL.muted);
 const V3_DRIVER_MODELS = {
   email: { model: v3ModelEmail, mode: 'pair', key: 'em_rev', fmt: v => fmtMoney(v),
            ok: p => Number(p.em_sends) > 0 && Number(p.em_opens) > 0 && Number(p.em_clicks) > 0 && Number(p.em_rev) > 0 },
@@ -25370,12 +25374,12 @@ function V3DriverPanel({ which, points, ctx, line, fixed }) {
             <R.Tooltip content={tip} cursor={{ fill: PAL.surface }}/>
             <R.Bar dataKey={M0.key} isAnimationActive={false} style={{ cursor: 'pointer' }}
                    onClick={(_, i) => { if (single || i < P.length - 1) setCi(i); }}>
-              {P.map((p, i) => <R.Cell key={i} fill={single ? (i === i0 ? PAL.accent : PAL.quiet) : (i === P.length - 1 ? PAL.accent : i === i0 ? PAL.ink : PAL.quiet)}/>)}
+              {P.map((p, i) => <R.Cell key={i} fill={single ? (i === i0 ? v3DriverCol(which) : PAL.quiet) : (i === P.length - 1 ? v3DriverCol(which) : i === i0 ? PAL.neutral : PAL.quiet)}/>)}
             </R.Bar>
           </R.BarChart>
         </R.ResponsiveContainer>
-        {single ? <span className="v3-legend"><i style={{ background: PAL.accent }}/>The week explained</span>
-                : <span className="v3-legend"><i style={{ background: PAL.ink }}/>Compared with <i style={{ background: PAL.accent }}/>Now</span>}
+        {single ? <span className="v3-legend"><i style={{ background: v3DriverCol(which) }}/>The week explained</span>
+                : <span className="v3-legend"><i style={{ background: PAL.neutral }}/>Compared with <i style={{ background: v3DriverCol(which) }}/>Now</span>}
       </figure>}
     </div>
     <h4 className="v3-drivers-h">{M.tableTitle || 'What changed underneath'}</h4>
@@ -26679,7 +26683,7 @@ function V3WalkChart({ X, metric }) {
         if (v == null) return <rect key={i} x={x} y={y0 - 2} width={bw} height="2" fill={PAL.line}/>;
         const h = Math.max(1, Math.abs(v) * sc);
         return <rect key={i} x={x} y={v >= 0 ? y0 - h : y0} width={bw} height={h}
-          fill={i === last ? PAL.accent : i === lyIdx ? PAL.data3 : PAL.quiet}><title>{v3WalkBucket(X.h, S[i]) + ': ' + fmt(v)}</title></rect>;
+          fill={i === last ? PAL.ink : i === lyIdx ? PAL.neutral : PAL.quiet}><title>{v3WalkBucket(X.h, S[i]) + ': ' + fmt(v)}</title></rect>;
       })}
     </svg>
     <figcaption>
