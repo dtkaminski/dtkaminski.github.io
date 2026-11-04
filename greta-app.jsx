@@ -26,7 +26,7 @@ const V3_CATEGORY_WORDS = {
   stock: 'Stock', site: 'Website', email: 'Email', measurement: 'Measurement', data: 'Data',
   product: 'Products', finance: 'Money', ops: 'Running the business', cx: 'Customer service', organic: 'Unpaid visits',
   total: 'Whole business', general: 'General', pricing: 'Prices', discount: 'Discounts', returns: 'Returns',
-  acquisition: 'New customers', growth: 'Growth', tracking: 'Tracking',
+  acquisition: 'New customers', growth: 'Growth', tracking: 'Tracking', cash: 'Cash', seo: 'SEO',
 };
 // The stored vertical is a key ("dtc_jewellery"); in a sentence it reads "jewellery".
 function v3VerticalWords(v) { return String(v || '').toLowerCase().replace(/[_-]+/g, ' ').replace(/^dtc\s+/, '').replace(/\s+/g, ' ').trim(); }
@@ -11311,7 +11311,7 @@ function v3BoardLoad(){
     .then(r => (r && r.error && /money_/.test(r.error.message || '')) ? ask(COLS, false) : r)
     .then(r => {
       V3_BOARD.loading = false;
-      if (r && r.error) { V3_BOARD.err = r.error.message || 'could not load'; v3BoardNotify(); v3TodayPart('story'); return; }
+      if (r && (r.error || (r.data && !Array.isArray(r.data)))) { V3_BOARD.err = (r.error && r.error.message) || 'could not load'; v3BoardNotify(); v3TodayPart('story'); return; }
       // 30 Oct eval: forecast status rows are not moves (v3IsStatusRow); dropped here so every list and count agrees
       const rows = ((r && r.data) || []).filter(x => !v3IsStatusRow(x));
       // With board_rank the server order is final. Without it, reapply "unverified last"
@@ -11569,170 +11569,93 @@ function V3UnpricedLane({ compact }) {
 function V3ActionBoard(){
   const { rows, err, unpriced } = useV3Board();
   const bmQ = useV3Rows('board-moves', V3_BOARD_MOVES_Q);   // 1110: the levers, the periods and the totals
-  useV3Rows('move-extras', V3_MOVE_EXTRAS_Q);                // 1110: each card's range, route and whether it is taken on
+  useV3Rows('move-extras', V3_MOVE_EXTRAS_Q);                // 1110: each row's range, route and whether it is taken on
+  const fig = useV3Figures();
   const [cat, setCat] = React.useState('all');
-  const [open, setOpen] = React.useState(null);
   const [showSmall, setShowSmall] = React.useState(false);
-  const [showAll, setShowAll] = React.useState(false);
+  const [drawer, setDrawer] = React.useState(null);   // { id, mode }
 
-  if (err) return <div className="v3-empty">Greta could not load your actions just now — refreshing usually sorts it. If it keeps happening, Greta has logged the reason and will raise it here.</div>;
-  if (rows === null) return <V3SkeletonRows n={5}/>;
-  if (!rows.length) return (
-    <div className="v3-board v3-enter">
-      <div className="v3-empty">{Array.isArray(unpriced) && unpriced.length
-        ? 'Nothing with a £ figure needs doing right now.'
-        : 'Nothing needs doing right now. Greta raises something here as soon as it is worth your time.'}</div>
-      <V3UnpricedLane/>
-    </div>
-  );
+  if (err) return <section className="v3-panel v3-board"><p className="v3-panel-note">Actions could not load. Refresh the page to try again.</p></section>;
+  if (rows === null) return <section className="v3-panel v3-board" aria-busy="true"><div className="v3-panel-pad"><V3SkeletonRows n={5}/></div></section>;
+  const laneAll = Array.isArray(unpriced) ? unpriced : [];
+  if (!rows.length && !laneAll.length) return <section className="v3-panel v3-board"><p className="v3-panel-note">No open actions. The list updates as new data arrives.</p></section>;
 
   const cats = [...new Set(rows.map(r => r.category).filter(Boolean))].sort();
-  const shown = cat === 'all' ? rows : rows.filter(r => r.category === cat);
-  const max = Math.max(...rows.map(r => Number(r.cm_gbp) || 0), 1);
-  // Split the headline: a month's worth of live work is a different claim from money sitting
-  // in something raised in April that nothing has confirmed since. Summing them together is
-  // how a board reads as bigger than the work actually in front of you.
+  const shown = cat === 'all' ? rows : cat === 'none' ? [] : rows.filter(r => r.category === cat);
+  const lane = cat === 'all' || cat === 'none' ? laneAll : [];
   const liveRows = shown.filter(r => r.verification !== 'unverified');
   const unverRows = shown.filter(r => r.verification === 'unverified');
-  const total = liveRows.reduce((a, r) => a + (Number(r.cm_gbp) || 0), 0);
-  const unverTotal = unverRows.reduce((a, r) => a + (Number(r.cm_gbp) || 0), 0);
-  // A £ floor relative to the business: anything worth under half a percent of a month's sales
-  // folds below the ranked work. On frkl a £105/mo "hidden hero" resting on four units sold sat
-  // among the top six; at £22k a month that is noise beside a £1,024 decision. The floor scales,
-  // so a £5k-a-month brand still sees its £40 items.
+  // A £ floor relative to the business: anything worth under half a percent of a month's sales folds below the
+  // ranked work, and comes back in the place the server ranked it. When everything is small, nothing is.
   const sales30 = Number(((typeof window !== 'undefined' && window.GRETA_HEADLINE) || {}).net_revenue_30d) || 0;
   const floor = Math.max(50, Math.round(sales30 * 0.005));
-  // When everything is small, nothing is: the floor only folds rows when bigger work remains above it.
   const liveF = v3FoldPlans(liveRows);
   const aboveFloor = liveF.filter(r => (Number(r.cm_gbp) || 0) >= floor);
   const isSmall = (r) => aboveFloor.length > 0 && (Number(r.cm_gbp) || 0) < floor;
-  const bigRows = liveF.filter(r => !isSmall(r));
   const smallRows = liveF.filter(isSmall);
-  // On the evidence-ranked board (0237) a small item keeps its place in its lane: folding it to the
-  // end put £93 and £75 actions Greta is fairly sure of below the "worth testing" ones. So small rows
-  // hide in place and, shown, come back where the server ranked them. Unranked, as before.
   const liveShown = V3_BOARD.ranked
     ? liveF.filter(r => showSmall || !isSmall(r))
-    : [...bigRows, ...(showSmall ? smallRows : [])];
-  const ordered = [...liveShown, ...unverRows];
-  // 12 Oct (owner-seat eval): 20 rows, 27 new this week, was too much to read. The board opens on its first
-  // three, in the server's order; the rest, the small items and the old ones sit behind one fold.
-  const TOP = 3;
-  const limited = cat === 'all' && !showAll && ordered.length > TOP + 1;
-  const list = limited ? ordered.slice(0, TOP) : ordered;
-  // The page asks "what should I do first?": the areas of the first moves, in the board's order. The moves' own titles
-  // sit just below, so this does not repeat them, and it adds no figure.
-  const firstAreas = [...new Set(v3FoldPlans(rows.filter(r => r.verification !== 'unverified')).map(r => r.category).filter(c => c && c !== 'general' && c !== 'total'))].slice(0, 3)
-    .map(c => c === 'site' ? 'the website' : v3CategoryWords(c).toLowerCase());
-  const firstDo = !firstAreas.length ? null : 'Start with ' + firstAreas[0] + (firstAreas[1] ? ', then ' + firstAreas[1] : '') + (firstAreas[2] ? ', then ' + firstAreas[2] : '') + '.';
+    : [...liveF.filter(r => !isSmall(r)), ...(showSmall ? smallRows : [])];
+  const act = V3_BOARD.ranked ? liveShown.filter(r => r.lane !== 'test') : liveShown;
+  const test = V3_BOARD.ranked ? liveShown.filter(r => r.lane === 'test') : [];
 
-  return (
-    <div className="v3-board v3-enter">
-      <div className="v3-kick">{fmtCount(rows.length)} {rows.length === 1 ? 'action' : 'actions'} · ranked by how sure the figure is and what each is worth</div>
-      {firstDo && <p className="v3-verdict">{firstDo}</p>}
-      <div className="v3-board-head">
-        {/* One total added profit kept by restocking, ad spend saved, an assumed win-back and a price
-            test (frkl: "£9,627 a month") -- a number nobody can bank. Say what each kind is worth. */}
-        {/* 1110: the totals are the server's (fn_board_moves), one figure per lever, so rows that act on one budget are
-            not added together; a one-off before the peak is not "a month". By area, the count only. */}
-        {(() => {
-          const T = cat === 'all' && bmQ.rows && bmQ.rows[0] && bmQ.rows[0].totals;
-          if (cat !== 'all') return <span className="v3-board-total-lab">{fmtCount(liveRows.length)} {liveRows.length === 1 ? 'move' : 'moves'} in {v3CategoryWords(cat).toLowerCase()}.</span>;
-          if (!T) return <span className="v3-board-total-lab v3-muted">Adding up your moves…</span>;
-          const bits = [];
-          if (Number(T.stock_month) > 0) bits.push(<span key="s"><b className="v3-num">{v3Gbp(T.stock_month)}</b> a month of profit at stake in stock</span>);
-          if (Number(T.save_month) > 0) bits.push(<span key="v"><b className="v3-num">{v3Gbp(T.save_month)}</b> a month of ad spend you can save</span>);
-          if (Number(T.other_month) > 0) bits.push(<span key="r"><b className="v3-num">{v3Gbp(T.other_month)}</b> a month from {Number(T.other_n) === 1 ? 'one more change' : T.other_n + ' more changes'} Greta is fairly sure of</span>);
-          if (Number(T.once_gbp) > 0) bits.push(<span key="o"><b className="v3-num">{v3Gbp(T.once_gbp)}</b> once from {Number(T.once_n) === 1 ? 'one move before the peak' : T.once_n + ' moves before the peak'}</span>);
-          if (Number(T.tests) > 0) bits.push(<span key="t">{Number(T.tests) === 1 ? 'one test' : T.tests + ' tests'} worth running</span>);
-          return <span className="v3-board-total-lab">{bits.length ? bits.reduce((a, b, i) => a.concat(i === 0 ? [b] : [i === bits.length - 1 ? ', and ' : ', ', b]), []) : 'Nothing with a £ figure'}.</span>;
-        })()}
-        {unverRows.length > 0 && (
-          <span className="v3-board-unver">{v3Gbp(unverTotal)} more sits in {unverRows.length} action{unverRows.length === 1 ? '' : 's'} open over a month, listed below the rest</span>
-        )}
+  // The number each row carries is the one every other page quotes (#3), so a filter never renumbers it.
+  const liveAll = v3LiveRows(rows);
+  const bmRows = bmQ.rows && bmQ.rows[0] && Array.isArray(bmQ.rows[0].rows) ? bmQ.rows[0].rows : [];
+  const firstId = (act[0] || test[0] || {}).external_id;
+  const owners = bmRows.some(x => x.taken_on);
+  const line = r => <V3HomeRow key={r.external_id} row={r} wide owners={owners} first={r.external_id === firstId} rank={v3BoardRank(liveAll, r.external_id)}
+    bmRow={bmRows.find(x => x.external_id === r.external_id)} onOpen={mode => setDrawer({ id: r.external_id, mode })}/>;
+  const group = (label, n, note) => (<tr className="v3-acts-group"><td colSpan={7}><b>{label}</b><span className="v3-count">{n}</span>{note && <span className="v3-muted">{note}</span>}</td></tr>);
+  const others = test.length + lane.length + unverRows.length;
+  const open = drawer && [...liveF, ...lane, ...unverRows].find(r => r.external_id === drawer.id);
+
+  // 1110: the totals are the server's (fn_board_moves), one figure per lever, so rows that act on one budget are not added
+  // together and a one-off before the peak is not "a month". They are never summed into one number nobody can bank.
+  const T = bmQ.rows && bmQ.rows[0] && bmQ.rows[0].totals;
+  const tiles = !T ? [] : [
+    Number(T.stock_month) > 0 && { k: 'Profit at stake in stock', v: v3GbpRound(T.stock_month), d: 'a month' },
+    Number(T.save_month) > 0 && { k: 'Ad spend to save', v: v3GbpRound(T.save_month), d: 'a month' },
+    Number(T.other_month) > 0 && { k: 'Other changes', v: v3GbpRound(T.other_month), d: 'a month, ' + (Number(T.other_n) === 1 ? '1 change' : T.other_n + ' changes') },
+    Number(T.once_gbp) > 0 && { k: 'Before the peak', v: v3GbpRound(T.once_gbp), d: 'once, ' + (Number(T.once_n) === 1 ? '1 change' : T.once_n + ' changes') },
+    Number(T.tests) > 0 && { k: 'Tests to run', v: fmtCount(T.tests), d: '' },
+    { k: 'In progress', v: fmtCount(T.taken_on || 0), d: Number(T.overdue) > 0 ? fmtCount(T.overdue) + ' late' : '', cls: Number(T.overdue) > 0 ? 'v3-down' : '' },
+  ].filter(Boolean);
+
+  return (<div className="v3-board v3-acts">
+    {tiles.length > 0 && <section className="v3-panel v3-home-strip" aria-label="Actions in figures">
+      <div className="v3-home-group" style={{ '--n': tiles.length }}><div className="v3-home-tiles">
+        {tiles.map(t => <V3HomeTile key={t.k} k={t.k} v={t.v} delta={t.d} cls={t.cls}/>)}
+      </div></div>
+    </section>}
+    <section className="v3-panel" id="v3-queue" aria-label="Actions">
+      <div className="v3-tabs" role="tablist" aria-label="Filter actions by area">
+        <button type="button" role="tab" aria-selected={cat === 'all'} className={'v3-tab' + (cat === 'all' ? ' on' : '')} onClick={() => setCat('all')}>All</button>
+        {cats.map(c => (<button key={c} type="button" role="tab" aria-selected={cat === c} className={'v3-tab' + (cat === c ? ' on' : '')} onClick={() => setCat(c)}>
+          {v3CategoryWords(c)} <span className="v3-tab-n">{rows.filter(r => r.category === c).length}</span></button>))}
+        {laneAll.length > 0 && <button type="button" role="tab" aria-selected={cat === 'none'} className={'v3-tab' + (cat === 'none' ? ' on' : '')} onClick={() => setCat('none')}>
+          No figure <span className="v3-tab-n">{laneAll.length}</span></button>}
       </div>
-      <div className="v3-chips" role="tablist" aria-label="Filter actions by area">
-        <button type="button" role="tab" aria-selected={cat === 'all'}
-                className={'v3-chip' + (cat === 'all' ? ' on' : '')} onClick={() => setCat('all')}>
-          All <span className="v3-chip-n">{rows.length}</span>
-        </button>
-        {cats.map(c => (
-          <button key={c} type="button" role="tab" aria-selected={cat === c}
-                  className={'v3-chip' + (cat === c ? ' on' : '')} onClick={() => setCat(c)}>
-            {v3CategoryWords(c)} <span className="v3-chip-n">{rows.filter(r => r.category === c).length}</span>
-          </button>
-        ))}
-      </div>
-      <ol className="v3-rank">
-        {list.map((r, i) => {
-          const gbp = Number(r.cm_gbp) || 0;
-          const isOpen = open === r.external_id;
-          const play = Array.isArray(r.playbook) ? r.playbook : [];
-          const unver = r.verification === 'unverified';
-          const conf = v3MoneyConf(r);
-          // One break, above the first demoted row, so the reader knows the list changed
-          // meaning rather than just getting quieter.
-          const startsUnver = unver && (i === 0 || ordered[i - 1].verification !== 'unverified');
-          // 0237: the server ranks the act lane before the test lane. Mark where the list stops
-          // being "do this" and starts being "worth testing", once, like the unverified break.
-          const startsTest = V3_BOARD.ranked && !unver && r.lane === 'test'
-            && (i === 0 || ordered[i - 1].lane !== 'test' || ordered[i - 1].verification === 'unverified');
-          // The fold sits after the last live row shown.
-          const foldHere = !limited && smallRows.length > 0 && i === liveShown.length - 1;
-          return (
-            <React.Fragment key={r.external_id}>
-            {startsTest && (
-              <li className="v3-rank-break">
-                <span className="v3-kick">Worth testing</span>
-                <span className="v3-sub">The evidence behind these is not yet strong enough to act on outright.
-                  Each one says why. Try them where they are cheap to undo.</span>
-              </li>
-            )}
-            {startsUnver && (
-              <li className="v3-rank-break">
-                <span className="v3-kick">Open over a month</span>
-                <span className="v3-sub">Greta raised these more than 30 days ago. Their figures are still
-                  up to date, but Greta has no test that tells when one is fixed, so they sit below the
-                  ranked list. Mark each one done, or skip it, once you have decided.</span>
-              </li>
-            )}
-            {/* 1110: every move is the same card as on Today (V3MoveCard): title, cause, £ and how sure, what it does
-                elsewhere, the assumption, and Do it / Not now / Dismiss */}
-            <li className={'v3-rank-row v3-rank-card' + (unver ? ' unver' : '')}>
-              <V3MoveCard row={r} rank={i + 1} dense viz
-                meta={[v3CategoryWords(r.category), r.days_open > 0 ? 'raised ' + r.days_open + (Number(r.days_open) === 1 ? ' day ago' : ' days ago') : null,
-                       unver ? 'open over a month' : r.days_since_refresh != null ? (Number(r.days_since_refresh) <= 0 ? 'checked today' : 'checked ' + r.days_since_refresh + (Number(r.days_since_refresh) === 1 ? ' day ago' : ' days ago')) : null,
-                       v3Moves(r.external_id).length ? 'moves ' + V3_MOVE_LABEL[v3Moves(r.external_id)[0]] : null].filter(Boolean).join(' · ')}/>
-              {r.unverified_reason && <p className="v3-rank-unver">Open {fmtCount(r.days_open)} days. Its figures are still up to date, but Greta has no test that tells when it is fixed, so it sits below the ranked list.</p>}
-            </li>
-            {foldHere && (
-              <li className="v3-rank-break">
-                <button type="button" className="v3-btn v3-btn-sm" onClick={() => setShowSmall(s => !s)} aria-expanded={showSmall}>
-                  {showSmall ? 'Hide' : 'Show'} {smallRows.length} smaller item{smallRows.length === 1 ? '' : 's'}
-                </button>
-                <span className="v3-sub">Each worth under {v3Gbp(floor)} a month — half a percent of your monthly sales.</span>
-              </li>
-            )}
-            </React.Fragment>
-          );
-        })}
-        {(limited || (showAll && cat === 'all' && ordered.length > TOP + 1)) && (
-          <li className="v3-rank-break">
-            <button type="button" className="v3-btn v3-btn-sm" onClick={() => setShowAll(v => !v)} aria-expanded={!limited}>
-              {limited ? 'Show ' + (ordered.length - TOP) + ' more action' + (ordered.length - TOP === 1 ? '' : 's') : 'Show only the first ' + TOP}
-            </button>
-            {limited && <span className="v3-sub">Ranked below these three. Most are tests worth running when the first three are in hand.</span>}
-          </li>
-        )}
-      </ol>
-      {V3_BOARD.ranked && <p className="micro muted v3-measure">Each row says when Greta last checked its figures. An action whose figures go three weeks without a check drops off this list, so every figure here is current. Actions open over a month that Greta has no test for sit below the ranked list.</p>}
-      <V3UnpricedLane/>
-      <V3HeldActions/>
-      {/* Actions read 7.1 screens (review, 8 Oct); the ranked list is the page's answer, so the changes
-          with no £ figure fold away below it. */}
-      <V3More id="act-findings" label="Changes Greta spotted that have no £ figure yet"><V3Findings/></V3More>
-    </div>
-  );
+      <table className="v3-home-table v3-acts-table">
+        <thead><tr><th>Action</th><th>Area</th><th className="r">Worth</th><th>Basis</th>{owners && <th>Owner</th>}<th>Status</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
+        <tbody>
+          {act.length > 0 && others > 0 && group('Do now', act.length)}
+          {act.map(line)}
+          {test.length > 0 && group('Worth testing', test.length, 'The evidence is not strong enough to act outright. Try these where they are cheap to undo.')}
+          {test.map(line)}
+          {smallRows.length > 0 && <tr className="v3-acts-foot"><td colSpan={7}>
+            <button type="button" className="v3-panel-link" aria-expanded={showSmall} onClick={() => setShowSmall(s => !s)}>{showSmall ? 'Hide' : 'Show'} {smallRows.length} smaller</button>
+            <span className="v3-muted">Each under {v3GbpRound(floor)} a month</span></td></tr>}
+          {unverRows.length > 0 && group('Open over a month', unverRows.length, 'No test tells when these are fixed. Mark each one done, or dismiss it.')}
+          {unverRows.map(line)}
+          {lane.length > 0 && group('No figure yet', lane.length)}
+          {lane.map(line)}
+        </tbody>
+      </table>
+    </section>
+    {open && <V3HomeDrawer key={open.external_id} row={open} startMode={drawer.mode} why={/^order-cost-/.test(String(open.external_id)) ? v3CutWhy(fig.rows) : null}
+      onClose={() => setDrawer(null)}/>}
+  </div>);
 }
 
 // One plan's steps (see V3_PLANS): always shown, since the steps are the plan. Each opens onto its own
@@ -11757,7 +11680,7 @@ function V3PlanSteps({ plan, rank }) {
         <V3MoveDecide row={st} small/>
         {pa.why && <p className="v3-rank-plain">{pa.why}</p>}
         {play.length ? <ol className="v3-rank-steps">{play.map((x, k) => <li key={k}>{v3Tidy(x)}</li>)}</ol> : null}
-        {st.money_basis && <p className="v3-rank-raw"><span className="v3-kick">How Greta got to {v3Gbp(gbp)}</span>{v3Tidy(scrubTag(st.money_basis))}.</p>}
+        {st.money_basis && <p className="v3-rank-raw"><span className="v3-kick">How the figure is worked out</span>{v3Tidy(scrubTag(st.money_basis))}.</p>}
       </div>)}
     </li>);
   })}</ol>);
@@ -11785,8 +11708,6 @@ function V3Findings(){
   const sorted = rows.slice().sort((x, y) => ((V3_RUNG_ORDER[x.rung] ?? 9) - (V3_RUNG_ORDER[y.rung] ?? 9)) || String(x.external_id).localeCompare(String(y.external_id)));
   return (
     <div className="v3-rank-why">
-      <span className="v3-kick">What Greta found</span>
-      <span className="v3-sub"> Changes Greta spotted that have no £ figure to rank them by. The best-supported come first.</span>
       <ul className="v3-rank-steps">
         {sorted.map(f => {
           const pa = { title: v3FindingTitle(f), why: v3Tidy(scrubTag(String(f.description || ''))) };
@@ -11807,7 +11728,7 @@ function V3Findings(){
             <button type="button" className="v3-rank-hit" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : f.external_id)}>
               <span className="v3-rank-body">
                 <span className="v3-rank-desc">{pa.title}</span>
-                <span className="v3-rank-meta">{v3CategoryWords(f.category)}{conf ? ' · ' + V3_CONF[conf].label.toLowerCase() : ''}{bN ? (counting ? ' · a change in how sales are counted, not the cause of action #' + bN : ' · explains action #' + bN) : ''}</span>
+                <span className="v3-rank-meta">{v3CategoryWords(f.category)}{conf ? ', ' + V3_CONF[conf].label.toLowerCase() : ''}{bN ? (counting ? ', a change in how sales are counted, not the cause of action #' + bN : ', explains action #' + bN) : ''}</span>
               </span>
             </button>
             {isOpen && (<div className="v3-rank-why">
@@ -11833,7 +11754,6 @@ function V3Findings(){
 // listed with the reason, closed by default. Renders nothing until 0237 is applied or when none.
 function V3HeldActions(){
   const [rows, setRows] = React.useState(null);
-  const [openList, setOpenList] = React.useState(false);
   React.useEffect(() => {
     let alive = true;
     const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
@@ -11844,23 +11764,10 @@ function V3HeldActions(){
     return () => { alive = false; };
   }, []);
   if (!rows || !rows.length) return null;
-  return (
-    <div className="v3-rank-why">
-      <button type="button" className="v3-btn v3-btn-sm" aria-expanded={openList} onClick={() => setOpenList(o => !o)}>
-        {openList ? 'Hide' : 'Show'} {rows.length} {rows.length === 1 ? 'action' : 'actions'} Greta held back
-      </button>
-      {openList && (
-        <ul className="v3-rank-steps">
-          {rows.map(h => (
-            <li key={h.external_id}>
-              <span className="v3-rank-desc">{v3PlainAction(h).title}</span>
-              <span className="v3-sub"> Held because: {(Array.isArray(h.held_because) ? h.held_because : []).map(v3Tidy).join(' ')}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
+  return (<V3More id="act-held" label={'Held back (' + rows.length + ')'}>
+    <table className="v3-home-pl"><thead><tr><th>Action</th><th>Why it is held</th></tr></thead>
+      <tbody>{rows.map(h => (<tr key={h.external_id}><td>{v3PlainAction(h).title}</td><td>{(Array.isArray(h.held_because) ? h.held_because : []).map(v3Tidy).join(' ')}</td></tr>))}</tbody></table>
+  </V3More>);
 }
 
 // ── Channel scoreboard ───────────────────────────────────────────────────
@@ -11965,12 +11872,9 @@ function ActionsView(){
       {/* No heading here: the page head one line above already reads "Actions / What should I do
           first?". Saying it twice is the kind of thing that makes a product feel unedited. */}
       <V3ActionBoard/>
-      {/* Restock keeps its own queue, but BELOW the ranked list and collapsed: it is a different
-          job (what to order, by date) and it was drowning the money ranking when it led. */}
       {/* V3: the browser planner's stock list (28 to order, sized to its own demand plan, against the
           board's 21) and the 137-day-old specialist review (a £4.8k "act now" from a browser rule that
-          the board never raised) are gone. Stock & orders is the one order list. */}
-      {UI_V3 && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('stock')}>What to order, product by product <span className="v3-xref-go">on Stock &amp; orders →</span></button>}
+          the board never raised) are gone. Stock & orders is the one order list; the stock row opens it. */}
       {!UI_V3 && <V3More id="act-restock" label="Stock and purchasing — what to order, by date"><RestockActionQueue/></V3More>}
       {!UI_V3 && <V3More id="act-legacy" label="Earlier specialist review"><ActionBoard/><AdviceLedgerPanel/></V3More>}
     </div>
@@ -18407,7 +18311,7 @@ function v3MoveExtra(ext) {
 // the ladder's top two rungs are From your data; the rest are Estimated. 2 Nov eval: this word was "Measured", beside what a
 // move is expected to bring. The inputs are measured; the GBP is a forecast until Results checks it.
 const V3_MOVE_SURE = {
-  measured: { label: 'From your data', why: 'Worked from your own orders and spend. The figure is what Greta expects it to bring; Results checks it once you have done it.' },
+  measured: { label: 'From your data', why: 'Worked from your own orders and spend. The figure is what it is expected to bring; Results checks it once you have done it.' },
   estimated: { label: 'Estimated', why: 'Partly your own figures and partly a rule of thumb. Right in direction; check before a big bet.' },
   assumed: { label: 'Assumed', why: 'It rests on an assumption, set out below. Worth knowing; try it where it is cheap to undo.' },
 };
@@ -18775,12 +18679,12 @@ function V3MoveSureOpen({ row, raw, noSteps }) {
   return (<div className="v3-mv-open">
     {sure && <p><b>{V3_MOVE_SURE[sure].label}.</b> {V3_MOVE_SURE[sure].why}</p>}
     {row.money_assumption && <p><b>The assumption:</b> {v3Tidy(scrubTag(row.money_assumption)).replace(/^./, c => c.toUpperCase())}.</p>}
-    {row.money_basis && <p><b>How Greta got to {v3Gbp(gbp)}:</b> {v3Tidy(scrubTag(row.money_basis))}.</p>}
+    {row.money_basis && <p><b>How the figure is worked out:</b> {v3Tidy(scrubTag(row.money_basis))}.</p>}
     {Array.isArray(row.evidence_reasons) && row.evidence_reasons.some(x => x && x.text) && (
       <ul>{row.evidence_reasons.filter(x => x && x.text).map((x, j) => <li key={j}>{v3Tidy(x.text)}</li>)}</ul>)}
-    {conf && <p className="v3-muted">On Greta’s ladder: {String(V3_CONF[conf].label).toLowerCase()}.</p>}
+    {conf && <p className="v3-muted">Confidence: {String(V3_CONF[conf].label).toLowerCase()}.</p>}
     {play.length > 0 && <><p><b>The steps</b></p><ol className="v3-mv-steps">{play.map((s, j) => <li key={j}>{v3Tidy(s)}</li>)}</ol></>}
-    <p className="v3-mv-raw"><b>Greta’s working:</b> {raw}</p>
+    <p className="v3-mv-raw"><b>Working:</b> {raw}</p>
   </div>);
 }
 // One card for every move. `rank` numbers it; `closes` is its share of the goal gap (Today only); `meta` is the
@@ -19460,8 +19364,13 @@ const v3SignShort = s => s.amer ? 'New sales per £1 of ads' : s.which === 'ret'
   : s.which === 'ly' ? 'Sales vs last year' : String(s.k).replace(/,\s*last 30 days$/i, '');
 // The page each kind of action is worked from.
 const V3_HOME_WORK = { stock: ['stock', 'Open order list'], site: ['website', 'Open Website'], paid: ['marketing', 'Open Marketing'], creative: ['marketing', 'Open Marketing'],
-  email: ['marketing', 'Open Marketing'], acquisition: ['marketing', 'Open Marketing'], product: ['products', 'Open Products'], retention: ['customers', 'Open Customers'], finance: ['profit', 'Open Profit & sales'] };
+  email: ['marketing', 'Open Marketing'], acquisition: ['marketing', 'Open Marketing'], product: ['products', 'Open Products'], retention: ['customers', 'Open Customers'], finance: ['profit', 'Open Profit & sales'],
+  cash: ['stock', 'Open Stock & orders'], seo: ['website', 'Open Website'], organic: ['website', 'Open Website'], returns: ['products', 'Open Products'], pricing: ['products', 'Open Products'], discount: ['products', 'Open Products'] };
 const V3_HOME_BASIS = { measured: 'v3-pill-good', estimated: 'v3-pill-none', assumed: 'v3-pill-warn' };
+function v3SplitTitle(t) {
+  const m = String(t || '').match(/^(.{20,}?[.!?])\s+(?=[A-Z0-9£])(.+)$/s);
+  return m && String(t).length > 110 ? [m[1].replace(/\.$/, ''), m[2]] : [t, ''];
+}
 function V3HomeDrawer({ row, why, closes, closesTo, startMode, onClose }) {
   const panel = React.useRef(null);
   React.useEffect(() => {
@@ -19485,16 +19394,24 @@ function V3HomeDrawer({ row, why, closes, closesTo, startMode, onClose }) {
         <span className="v3-muted">{v3CategoryWords(row.category)}</span>
         <button type="button" className="v3-btn v3-btn-sm" onClick={onClose}>Close</button>
       </header>
-      <h2 className="v3-drawer-t">{pa.title}</h2>
+      <h2 className="v3-drawer-t">{v3SplitTitle(pa.title)[0]}</h2>
       <dl className="v3-drawer-facts">
         {gbp > 0 && <div><dt>{isStock ? 'Protects' : row.money_is_sales ? 'Worth, in sales' : 'Worth'}</dt><dd>{v3GbpRound(gbp)}{v3Per(row)}</dd></div>}
         {sure && <div title={V3_MOVE_SURE[sure].why}><dt>Basis</dt><dd><span className={'v3-pill ' + V3_HOME_BASIS[sure]}>{V3_MOVE_SURE[sure].label}</span></dd></div>}
         {ex && Number(ex.win) > 0 && <div><dt>Result checked</dt><dd>{fmtCount(Number(ex.win))} days after done</dd></div>}
+        {row.due_on && <div><dt>Due</dt><dd>{v3Day(String(row.due_on).slice(0, 10))}</dd></div>}
+        {Number(row.days_open) > 0 && <div><dt>Raised</dt><dd>{Number(row.days_open) === 1 ? '1 day ago' : fmtCount(row.days_open) + ' days ago'}</dd></div>}
+        {row.days_since_refresh != null && <div><dt>Figures checked</dt><dd>{Number(row.days_since_refresh) <= 0 ? 'Today' : Number(row.days_since_refresh) === 1 ? '1 day ago' : fmtCount(row.days_since_refresh) + ' days ago'}</dd></div>}
+        {v3Moves(row.external_id).length > 0 && <div><dt>Moves</dt><dd>{V3_MOVE_LABEL[v3Moves(row.external_id)[0]]}</dd></div>}
       </dl>
+      {v3SplitTitle(pa.title)[1] && <p className="v3-drawer-p">{v3SplitTitle(pa.title)[1]}</p>}
+      {row.lane_said && <p className="v3-drawer-p">{v3Tidy(row.lane_said)}</p>}
+      {row.unverified_reason && <p className="v3-drawer-p">Open {fmtCount(row.days_open)} days. No test tells when it is fixed, so it sits below the ranked list.</p>}
       {pa.why && <p className="v3-drawer-p">{v3Money(pa.why)}</p>}
       <V3MoveViz row={row}/>
       {why}
       {play.length > 0 && <section className="v3-drawer-sec"><h3>Steps</h3><ol className="v3-mv-steps">{play.map((s, j) => <li key={j}>{v3Tidy(s)}</li>)}</ol></section>}
+      {!play.length && row.step1 && <section className="v3-drawer-sec"><h3>Steps</h3><p className="v3-drawer-p">{v3Tidy(row.step1)}</p></section>}
       {others.length > 0 && <section className="v3-drawer-sec"><V3PlanSteps plan={Object.assign({}, row.plan, { steps: others })} rank={1}/></section>}
       {gbp > 0 && <section className="v3-drawer-sec"><V3MoveRange lo={ex && ex.lo} hi={ex && ex.hi} at={gbp}/>
         {closes != null && <p className="v3-mv-closes">Closes about <b>{v3GbpRound(closes)}</b> of the gap {closesTo}.</p>}</section>}
@@ -19504,7 +19421,7 @@ function V3HomeDrawer({ row, why, closes, closesTo, startMode, onClose }) {
     </aside>
   </div>);
 }
-function V3HomeRow({ row, first, bmRow, onOpen }) {
+function V3HomeRow({ row, first, bmRow, onOpen, rank, wide, owners }) {
   const ext = row.external_id;
   const ex = v3MoveExtra(ext);
   const taken = !!((bmRow && bmRow.taken_on) || (ex && ex.accepted_at));
@@ -19521,6 +19438,11 @@ function V3HomeRow({ row, first, bmRow, onOpen }) {
   const conn = connProvider(ext);
   const place = v3MovePlaces(ext).find(p => !p.demo && p.url) || null;
   const work = V3_HOME_WORK[row.category] || ['actions', 'Open Actions'];
+  const here = wide && work[0] === 'actions';   // already on Actions: the button opens the detail
+  const a = bmRow && bmRow.assignee, late = bmRow && Number(bmRow.overdue_days) > 0;
+  const who = !wide || status !== 'doing' ? null : !a ? (mine === 'doing' ? 'You' : 'Nobody yet')
+    : a.kind === 'agency' ? a.label : a.user_id && a.user_id === v3Uid() ? 'You' : a.label;
+  const due = row.due_on ? String(row.due_on).slice(0, 10) : null;
   const others = row.plan ? row.plan.steps.filter(st => st.external_id !== ext).length : 0;
   // The status writes through the one decision path (fn_action_decide), so Done still starts the check of whether it worked.
   const change = async e => {
@@ -19546,23 +19468,40 @@ function V3HomeRow({ row, first, bmRow, onOpen }) {
     setBusy(false);
   };
   return (<tr className={status === 'done' ? 'v3-home-done' : ''}>
-    <td className="v3-home-act">
-      <button type="button" className="v3-home-title" onClick={() => onOpen(null)}>{pa.title}</button>
+    <td className="v3-home-act"><div className="v3-home-act-in">
+      {wide && <span className="v3-home-n">{rank != null ? rank : ''}</span>}
+      <div className="v3-home-act-b">
+      <button type="button" className="v3-home-title" title={wide ? pa.title : undefined} onClick={() => onOpen(null)}>{wide ? v3SplitTitle(pa.title)[0] : pa.title}</button>
       {status === 'done' ? <span className="v3-home-sub">Marked done. The result shows on Results once it is checked.</span>
+        : wide && row.lane_said ? <span className="v3-home-sub">{v3Tidy(row.lane_said)}</span>
         : cause ? <span className="v3-home-sub">{cause}</span> : null}
       {others > 0 && <span className="v3-home-sub">{others === 1 ? '1 more step' : others + ' more steps'}</span>}
       {err && <span className="v3-home-sub v3-down" role="alert">{err}</span>}
+      </div></div>
     </td>
     <td className="v3-home-area" data-k="Area">{v3CategoryWords(row.category)}</td>
-    <td className="v3-home-worth" data-k="Worth">{gbp > 0 ? <><b>{v3GbpRound(gbp)}{v3Per(row)}</b>{isStock ? <small>protected</small> : row.money_is_sales ? <small>in sales</small> : null}</> : '–'}</td>
+    <td className="v3-home-worth" data-k="Worth">{gbp > 0 ? <><b>{v3GbpRound(gbp)}{v3Per(row)}</b>{isStock ? <small>protected</small> : row.money_is_sales ? <small>in sales</small> : null}</>
+      : wide && due ? <><b>{v3Day(due)}</b><small>due</small></> : wide ? <small>No figure</small> : '–'}</td>
     <td className="v3-home-basis" data-k="Basis">{sure ? <span className={'v3-pill ' + V3_HOME_BASIS[sure]} title={V3_MOVE_SURE[sure].why}>{V3_MOVE_SURE[sure].label}</span> : '–'}</td>
+    {wide && owners && <td className="v3-home-owner" data-k="Owner">{who && <><b>{who}</b>{bmRow && bmRow.due_on && <small className={late ? 'v3-down' : ''}>{late ? fmtCount(bmRow.overdue_days) + (Number(bmRow.overdue_days) === 1 ? ' day late' : ' days late') : 'Due ' + v3Day(bmRow.due_on)}</small>}</>}</td>}
     <td className="v3-home-status" data-k="Status">{conn ? null : <select className="v3-select" aria-label={'Status of ' + pa.title} value={status} disabled={busy || status === 'done'} onChange={change}>
       <option value="todo">To do</option><option value="doing">Doing</option><option value="done">Done</option><option value="later">Not now…</option><option value="dismiss">Dismiss…</option>
     </select>}</td>
     <td className="v3-home-open">{conn ? <V3Fix provider={conn} small/>
       : place ? <a className={'v3-btn v3-btn-sm' + (first ? ' v3-btn-p' : '')} href={place.url} target="_blank" rel="noopener noreferrer">Open {place.label}</a>
+      : here ? <button type="button" className="v3-btn v3-btn-sm" onClick={() => onOpen(null)}>View</button>
       : <button type="button" className={'v3-btn v3-btn-sm' + (first ? ' v3-btn-p' : '')} onClick={() => window.__oiGo && window.__oiGo(work[0])}>{work[1]}</button>}</td>
   </tr>);
+}
+function v3CutWhy(figRows) {
+  const cac = v3Fig('cac_30d', figRows).value, fo = v3Fig('first_order_profit', figRows).value, cv = v3Fig('customer_value', figRows).value;
+  if (!(cac > 0 && fo != null && cac > fo)) return null;
+  const top = Math.max(cac, fo, Number(cv) || 0) * 1.08;
+  const bar = (k, v, c) => (<div className="v3-mvrun-row" key={k}><span className="v3-mvrun-k">{k}</span>
+    <span className="v3-mvrun-track"><i className={c} style={{ width: Math.max(1, Math.max(0, v) / top * 100) + '%' }}/></span>
+    <span className="v3-mvrun-v">{v3Gbp(v)}</span></div>);
+  return (<figure className="v3-mvviz"><figcaption>Cost of a new customer against what they earn</figcaption>
+    {bar('Costs to win', cac, 'now')}{bar('First order earns', fo, '')}{cv != null && bar('A year earns', cv, '')}</figure>);
 }
 function V3HomeActions({ q, board }) {
   const g = q.rows && q.rows[0];
@@ -19586,16 +19525,7 @@ function V3HomeActions({ q, board }) {
   const shared = g && g.confirmed && g.forecast != null;
   const F = shared ? v3Futures(g) : null;
   const gap = shared ? (F ? -F.ahead : Number(g.gap)) : null;
-  const cac = v3Fig('cac_30d', fig.rows).value, fo = v3Fig('first_order_profit', fig.rows).value, cv = v3Fig('customer_value', fig.rows).value;
-  let cutWhy = null;
-  if (cac > 0 && fo != null && cac > fo) {
-    const top = Math.max(cac, fo, Number(cv) || 0) * 1.08;
-    const bar = (k, v, c) => (<div className="v3-mvrun-row" key={k}><span className="v3-mvrun-k">{k}</span>
-      <span className="v3-mvrun-track"><i className={c} style={{ width: Math.max(1, Math.max(0, v) / top * 100) + '%' }}/></span>
-      <span className="v3-mvrun-v">{v3Gbp(v)}</span></div>);
-    cutWhy = (<figure className="v3-mvviz"><figcaption>Cost of a new customer against what they earn</figcaption>
-      {bar('Costs to win', cac, 'now')}{bar('First order earns', fo, '')}{cv != null && bar('A year earns', cv, '')}</figure>);
-  }
+  const cutWhy = v3CutWhy(fig.rows);
   const open = drawer && moves.find(m => m.row.external_id === drawer.id);
   return (<section className="v3-panel v3-home-actions" id="v3-queue" aria-label="Actions">
     {head(total)}
@@ -24910,16 +24840,19 @@ function V3BoardDrivers() {
     .filter(x => x.rows.length).sort((a, b) => a.rows[0].n - b.rows[0].n).slice(0, 5);
   if (!items.length) return null;
   const open = drv ? items.find(x => x.sg.which === drv) : null;
-  return (<section className="v3-sec v3-strip">
-    <h2 className="v3-sec-title">What the board is working on <span className="v3-muted">last 30 days</span></h2>
-    <ul className="v3-bdrv">{items.map(({ sg, rows }) => (<li key={sg.which}>
-      <button type="button" className="v3-bdrv-sign" aria-expanded={drv === sg.which} onClick={() => setDrv(o => (o === sg.which ? null : sg.which))}>
-        <span className="v3-bdrv-k">{sg.k}</span><span className="v3-bdrv-v">{sg.v}</span>
-        <span className={'v3-sign-s v3-sign-' + sg.tone}>{V3_SIG_WORD[sg.tone]}</span>
-        <span className="v3-xref-go">{drv === sg.which ? 'Hide why ↑' : 'Why ↓'}</span></button>
-      <span className="v3-bdrv-acts">{rows.map(({ r, n }) => <span key={r.external_id}><b className="oi-num">#{n}</b> {v3PlainAction(r).title}</span>)}</span>
-    </li>))}</ul>
-    {open && <V3DriverPanel key={drv} which={drv} points={SG.HP} ctx={open.sg.ctx} line={open.sg.dline}/>}
+  const pill = { weak: 'v3-pill-bad', ok: 'v3-pill-warn' };
+  return (<section className="v3-panel">
+    <div className="v3-panel-head"><h2>Figures these actions move</h2><span className="v3-muted">Last 30 days</span></div>
+    <table className="v3-home-pl v3-acts-figs">
+      <thead><tr><th>Figure</th><th className="r">Value</th><th>Status</th><th>Action</th></tr></thead>
+      <tbody>{items.map(({ sg, rows }) => (<tr key={sg.which}>
+        <td><button type="button" className="v3-home-title" aria-expanded={drv === sg.which} onClick={() => setDrv(o => (o === sg.which ? null : sg.which))}>{sg.k}</button></td>
+        <td className="r">{sg.v}</td>
+        <td><span className={'v3-pill ' + (pill[sg.tone] || 'v3-pill-none')}>{V3_SIG_WORD[sg.tone]}</span></td>
+        <td className="v3-acts-figs-acts">{rows.map(({ r, n }) => <span key={r.external_id}><b>{n}</b>{v3PlainAction(r).title}</span>)}</td>
+      </tr>))}</tbody>
+    </table>
+    {open && <div className="v3-acts-driver"><V3DriverPanel key={drv} which={drv} points={SG.HP} ctx={open.sg.ctx} line={open.sg.dline}/></div>}
   </section>);
 }
 // The same signs and drivers on the page where each figure is the subject (9 Oct): one row of signs,
@@ -25867,12 +25800,11 @@ function V3Incremental() {
   // a figure worked out more than two days ago says when
   const old = iso => iso && (Date.now() - new Date(iso).getTime()) > 2 * 864e5;
   const reads = V3_INCR_READS.map(([k, l]) => [k, l, D.reads && D.reads[k]]).filter(x => x[2] && x[2].display);
-  return (<section className="v3-sec v3-incr" id="drivers-incremental">
-    <h2 className="v3-sec-title">What your ads and email really cause <span className="v3-muted">measured, or assumed until a test</span></h2>
+  return (<section className="v3-incr" id="drivers-incremental">
     <p className="v3-note v3-measure">{D.said}</p>
     {chans.length > 0 && <table className="v3-rw">
       <thead><tr><th className="t-text">Channel</th><th className="v3-rw-opt">Spend, 30 days</th><th>Share of its sales it really causes</th>
-        <th>Each {curSym()}1 brings back</th><th className="v3-rw-opt">Needs</th><th className="t-text">How Greta knows</th></tr></thead>
+        <th>Each {curSym()}1 brings back</th><th className="v3-rw-opt">Needs</th><th className="t-text">Basis</th></tr></thead>
       <tbody>{chans.map(c => { const tr = num(c.true_return), be = num(c.break_even);
         return (<tr key={c.channel_type}>
           <td className="t-text v3-rw-name">{c.label}</td>
@@ -25900,10 +25832,16 @@ function V3Incremental() {
     <p className="micro muted v3-measure">Tests: <span className="v3-num">{num(T.finished) || 0}</span> finished, <span className="v3-num">{num(T.running) || 0}</span> running.
       {' '}{num(T.queued) ? <><span className="v3-num">{T.queued}</span> of the <span className="v3-num">{num(T.worth_testing) || 0}</span> rows under “Worth testing” rest on one of these guesses.</> : 'No row on the board rests on one of these guesses.'}</p>
     {reads.length > 0 && <dl className="v3-incr-reads">{reads.map(([k, l, r]) => (<div key={k}><dt>{l}</dt>
-      <dd>{v3Sentence(r.display)}{r.state === 'estimated' ? <span className="v3-muted"> · estimated</span> : null}
-        {old(r.as_of) ? <span className="v3-muted"> · worked out {v3Day(String(r.as_of))}</span> : null}</dd></div>))}</dl>}
+      <dd>{v3Sentence(r.display)}{r.state === 'estimated' ? <span className="v3-muted">, estimated</span> : null}
+        {old(r.as_of) ? <span className="v3-muted">, worked out {v3Day(String(r.as_of))}</span> : null}</dd></div>))}</dl>}
     <p className="micro muted v3-measure">{D.basis}</p>
   </section>);
+}
+function V3IncrementalFold() {
+  const q = useV3Rows('incremental-read', V3_INCR_Q);
+  const D = q.rows && q.rows[0];
+  if (!D || D.state !== 'ok') return null;
+  return <V3More id="act-true" label="True effect of ads and email"><V3Incremental/></V3More>;
 }
 function V3StaleSuggestions() {
   const q = useV3Rows('stale-suggestions', V3_STALE_Q);
@@ -25924,7 +25862,7 @@ function V3StaleSuggestions() {
     <span className="v3-sub"> · suggested {v3Day(String(r.raised_at).slice(0, 10), true)}</span>
     <V3MoveDecide row={r} small onDecided={q.retry}/>
   </li>);
-  return (<V3More id="act-stale" label={'Older suggestions Greta hasn’t re-checked (' + rows.length + ')'}>
+  return (<V3More id="act-stale" label={'Older suggestions (' + rows.length + ')'}>
     <p className="v3-note v3-measure">These were suggested months ago and nothing has checked them since, so they are not ranked on the board. Mark each one done if it happened, or skip it if it no longer applies. Where the board already covers one, it says so.</p>
     <ul className="v3-rank-steps">{groups.map(g => {
       const t = g.topic;
@@ -26147,7 +26085,7 @@ const V3_PAGES = {
     <V3DriverStrip keys={['profit', 'ly']}/>
     <V3Congruency/>
     <V3More id="rev-quarter" label="This quarter — a summary to share with your board or investors"><V3Anchor id="quarter"/><BusinessReview/></V3More>
-    <V3More id="rev-alerts" label="What Greta found — what changed, and why"><V3Anchor id="alerts"/><V3Findings/>
+    <V3More id="rev-alerts" label="Findings"><V3Anchor id="alerts"/><V3Findings/>
       <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('results')}>What was done, and whether it worked <span className="v3-xref-go">on Results →</span></button>
     </V3More>
   </>),
@@ -26155,9 +26093,9 @@ const V3_PAGES = {
     <V3FixFirst/>
     <ActionsView/>
     <V3BoardDrivers/>
-    <V3Incremental/>
-    {/* 1113: what you did and whether it worked has its own page, Results */}
-    <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('results')}>What you did, and whether it worked <span className="v3-xref-go">on Results →</span></button>
+    <V3HeldActions/>
+    <V3More id="act-findings" label="Findings with no figure"><V3Findings/></V3More>
+    <V3IncrementalFold/>
     <V3StaleSuggestions/>
   </>),
   // 1113: the moves you took, what Greta expected and what happened; the older list folds underneath
@@ -27200,7 +27138,7 @@ V3_WALK_STEP.creative = Object.assign({ q: 'Is money sitting on weak ads?', cat:
   return { say: [rows.length + (rows.length === 1 ? ' fix here is' : ' fixes here are') + ' worth about ' + v3Gbp(t) + ' a month: ' + rows.map(r => v3PlainAction(r).title.replace(/\.$/, '')).join('; ') + '.'] };
 }, now: true }, V3_WALK_TOUR.creative);
 Object.assign(V3_WALK_END, { target: { sel: '.v3-board' }, fallback: { sel: '.v3-main .v3-page-head' },
-  what: 'Every action Greta has, biggest pound value first. The chips at the top filter by area; open a row to see the steps, and press Mark done when it is done — Greta then checks whether it worked.' });
+  what: 'Every open action, in rank order. The tabs filter by area. Open a title for the steps, and set its status to Done when it is done: the result then shows on Results.' });
 V3_WALKS.find(w => w.id === 'business').steps = ['profit', 'sales', 'customers', 'efficiency', 'stock'];
 V3_WALKS.find(w => w.id === 'paid').steps = ['spend', 'channels', 'creative', 'profit'];
 
