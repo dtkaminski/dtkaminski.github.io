@@ -2239,3 +2239,24 @@ div:has(> .v3-profit) ~ .v3-today { gap: 0; }
   .v3-main .v3-profit table.v3-profit-rows th.r { white-space: normal; }
   .v3-main .v3-profit table.v3-profit-rows td:nth-last-child(2), .v3-main .v3-profit table.v3-profit-rows th:nth-last-child(2) { padding-right: var(--space-4); }
 }
+
+/* Marketing on the Home pattern */
+.v3-mk-charts { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5); }
+.v3-mk-charts .v3-chart { min-width: 0; margin: 0; }
+.v3-mk-test { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); border-top: 1px solid var(--color-line); }
+.v3-marketing .v3-panel-note + .v3-panel-note { border-top: 0; padding-top: 0; }
+.v3-mk-channels .v3-panel-head .v3-conf, .v3-mk-channels .v3-panel-head > :last-child { margin-left: auto; }
+@media (max-width: 1099px) { .v3-mk-charts { grid-template-columns: 1fr; } }
+@media (max-width: 767px) {
+  .v3-mk-opt { display: none; }
+  .v3-mk-test { align-items: flex-start; flex-direction: column; }
+  .v3-main .v3-marketing table.v3-profit-rows th:last-child, .v3-main .v3-marketing table.v3-profit-rows td:last-child { display: table-cell; }
+}
+/* seven tiles across: the small text wraps at every width, and keeps the sparklines in line */
+.v3-mk-strip .v3-home-tile-d { white-space: normal; overflow: visible; text-overflow: clip; align-items: flex-start; min-height: 2lh; }
+.v3-mk-strip .v3-home-tile-k { white-space: normal; overflow: visible; text-overflow: clip; }
+/* phone: long channel names wrap so these two tables fit the panel */
+@media (max-width: 767px) {
+  .v3-main .v3-marketing .v3-mk-channels table.v3-profit-rows th:first-child, .v3-main .v3-marketing .v3-mk-channels table.v3-profit-rows td:first-child,
+  .v3-main .v3-marketing .v3-mk-map table.v3-profit-rows th:first-child, .v3-main .v3-marketing .v3-mk-map table.v3-profit-rows td:first-child { white-space: normal; min-width: 0; }
+}
