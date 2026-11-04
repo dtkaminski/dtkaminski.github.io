@@ -208,6 +208,7 @@
   --radius-none: 0px;
   --radius-sm:   2px;
   --radius-md:   5px;
+  --radius-panel: 8px;
   --radius-full: 999px;
 
   /* ── Touch ── the smallest height anything you tap may have (WCAG / Apple HIG 44pt). */
@@ -255,10 +256,88 @@
 /* The product's own voice (3 Nov 2026, Dan: "far too budget"). One face, lighter weights, and on a mouse
    controls sized to their text: 12px type in a 44px box was the loudest tell in the app. Scoped to the
    product (html[data-frame]) so the marketing site and legal pages do not move with it. Touch keeps 44. */
+/* 3 Nov 2026, Dan: "more like a traditional professional saas software". Grey canvas, white bordered panels,
+   cool neutrals, one dark primary, status colours for status only. Rust stays as the ad-money series in charts. */
 html[data-frame="product"] {
-  --font-sans: 'Geist', 'DM Sans', ui-sans-serif, sans-serif;
-  --weight-semi: 500;
+  --font-sans: 'IBM Plex Sans', 'DM Sans', ui-sans-serif, sans-serif;
+  --font-figure: 'IBM Plex Sans', 'DM Sans', ui-sans-serif, sans-serif;
+  --weight-semi: 600;
   --weight-bold: 600;
+
+  --color-ink: #1A1F24;
+  --color-secondary: #343B42;
+  --color-muted: #545D66;
+  --color-faint: #6B747D;
+  --color-surface: #F4F5F6;
+  --color-chrome: #FFFFFF;
+  --color-chrome-blur: rgba(255, 255, 255, 0.92);
+  --color-panel: #FFFFFF;
+  --color-panel-hover: #F7F8F9;
+  --color-sunken: #E9EBEE;
+  --color-line: #E2E5E8;
+  --color-line-strong: #CBD0D5;
+  --color-scrim: rgba(26, 31, 36, 0.45);
+  --color-scroll-cue: rgba(26, 31, 36, 0.13);
+
+  --color-accent: #1A1F24;
+  --color-accent-hover: #343B42;
+  --color-accent-wash: rgba(26, 31, 36, 0.05);
+  --color-accent-wash-2: rgba(26, 31, 36, 0.08);
+  --color-accent-line: rgba(26, 31, 36, 0.2);
+  --color-success: #1B7F4F;
+  --color-success-wash: #E6F4EC;
+  --color-success-wash-2: #D5ECDF;
+  --color-success-line: rgba(27, 127, 79, 0.26);
+  --color-warning: #A65D00;
+  --color-warning-wash: #FBF0DF;
+  --color-danger: #BF2F26;
+  --color-danger-wash: #FBEBE9;
+  --color-danger-line: rgba(191, 47, 38, 0.26);
+
+  --color-series-kept: #1A1F24;
+  --color-series-neutral: #8A9097;
+  --color-data-quiet: #C6CBD0;
+
+  /* The dark surface goes: what still uses it reads as an ordinary panel. */
+  --color-hero: #FFFFFF;
+  --color-hero-raised: #F4F5F6;
+  --color-hero-line: #E2E5E8;
+  --color-hero-ink: #1A1F24;
+  --color-hero-muted: #545D66;
+  --color-hero-faint: #6B747D;
+  --color-hero-accent: #1A1F24;
+  --color-hero-accent-wash: rgba(26, 31, 36, 0.08);
+  --color-hero-accent-clear: rgba(26, 31, 36, 0);
+  --color-hero-good: #1B7F4F;
+  --color-hero-bad: #BF2F26;
+  --color-hero-warn: #A65D00;
+
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-lg: 0.9375rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.375rem;
+  --text-data: 1.75rem;
+  --text-display: 2rem;
+  --tracking-tight: -0.01em;
+  --tracking-snug: -0.005em;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --size-rail: 212px;
+  --size-content: 1280px;
+  --size-home-status: 112px;
+  --size-home-open: 132px;
+  --size-home-area: 112px;
+  --size-home-worth: 112px;
+  --size-home-basis: 104px;
+  --size-spark: 20px;
+  --size-bar: 8px;
+  --size-drawer: 520px;
+
+  --shadow-panel: none;
+  --shadow-raised: 0 8px 24px -6px rgba(26, 31, 36, 0.18), 0 2px 6px rgba(26, 31, 36, 0.06);
+  --caret-down: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%23545D66' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>");
 }
 @media (hover: hover) and (pointer: fine) {
   html[data-frame="product"] { --tap-min: 32px; }

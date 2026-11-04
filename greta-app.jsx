@@ -4257,7 +4257,7 @@ function Overview({start, period, customActive}){
           this page's own answer into third place. A one-line pointer instead: it teaches where
           things live rather than duplicating them. */}
       <button type="button" className="v3-xref" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>
-        Everything worth doing, in order <span className="v3-xref-go">on Moves →</span>
+        Everything worth doing, in order <span className="v3-xref-go">on Actions</span>
       </button>
       {/* Everything driven by the period picker sits behind one disclosure: the lead above is the answer. */}
       <V3More id="profit-detail" label="Every figure for the dates you pick, and what changed day by day">
@@ -8203,7 +8203,7 @@ function IntelligencePanel(){
         <ZoneHeader
           number="03"
           title="What to do"
-          meta="The same moves as Today and the Moves page, in the same order"
+          meta="The same actions as Home and the Actions page, in the same order"
         />
         {/* This zone used to total every action ever raised ("£Xk/mo at stake", skipped and done
             included) and rank its own copy by a P(hit) score. One board everywhere: removed 2026-10-05. */}
@@ -11456,7 +11456,7 @@ function V3BoardDigest({ n = 5 }){
   if (!live.length) return <div className="v3-empty">Nothing needs doing right now. Greta raises something here as soon as it is worth your time.</div>;
   // 1110: the same card as Today and Actions; no browser total (rows on one budget would be added twice)
   return (<div className="v3-mvlist">
-    <p className="v3-goal-lab">The first {Math.min(n, live.length)} of {live.length} moves, in order</p>
+    <p className="v3-goal-lab">The first {Math.min(n, live.length)} of {live.length} actions, in order</p>
     {live.slice(0, n).map((a, i) => <V3MoveCard key={a.external_id || i} row={a} rank={i + 1} dense/>)}
     <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>Open all your moves <Icon name="arrowRight" size={13}/></button>
   </div>);
@@ -11628,7 +11628,7 @@ function V3ActionBoard(){
 
   return (
     <div className="v3-board v3-enter">
-      <div className="v3-kick">{fmtCount(rows.length)} {rows.length === 1 ? 'move' : 'moves'} · ranked by how sure Greta is and what each is worth</div>
+      <div className="v3-kick">{fmtCount(rows.length)} {rows.length === 1 ? 'action' : 'actions'} · ranked by how sure the figure is and what each is worth</div>
       {firstDo && <p className="v3-verdict">{firstDo}</p>}
       <div className="v3-board-head">
         {/* One total added profit kept by restocking, ad spend saved, an assumed win-back and a price
@@ -16589,29 +16589,29 @@ const UI_V3 = (typeof window === 'undefined') || window.GRETA_UI_V3 !== false;
 const V3_NAV = [
   // 3 Nov: the loop first (what is true, what to do, did it work), then the record and the question box. A group whose
   // first item has its own name shows the item, not a heading over it.
-  { group: 'Today',       id: 'today',       label: 'Today',              icon: 'home',      q: 'Am I on track, and what do I do now?' },
-  { group: 'Today',       id: 'actions',     label: 'Moves',              icon: 'clipboard', q: 'What should I do first?' },
-  { group: 'Today',       id: 'results',     label: 'Results',            icon: 'check',     q: 'Did the moves I made work?' },
-  { group: 'Today',       id: 'review',      label: 'Review',             icon: 'report',    q: 'What changed, and why?' },
-  { group: 'Today',       id: 'ask',         label: 'Ask Greta',          icon: 'spark',     q: 'Ask anything about your business, in plain English.' },
-  { group: 'Business',    id: 'profit',      label: 'Profit & sales',     icon: 'report',    q: 'Where does my money come from, and where does it go?' },
-  { group: 'Business',    id: 'marketing',   label: 'Marketing',          icon: 'trendUp',   q: 'Which channels and ads earn their money?' },
-  { group: 'Business',    id: 'website',     label: 'Website',            icon: 'pulse',     q: 'Where do shoppers drop off, and why?' },
-  { group: 'Business',    id: 'customers',   label: 'Customers',          icon: 'users',     q: 'Who buys, who comes back, and what are they worth?' },
-  { group: 'Business',    id: 'products',    label: 'Products',           icon: 'box',       q: 'Which products earn, and which leak?' },
-  { group: 'Business',    id: 'competitors', label: 'Competitors',        icon: 'search',    q: 'Who am I up against?' },
-  { group: 'Plan',        id: 'goal',        label: 'Goal & costs',       icon: 'sliders',   q: 'What am I aiming for, and what do things cost me?' },
-  { group: 'Plan',        id: 'growth',      label: 'Growth plan',        icon: 'trendUp',   q: 'How much more should I spend, and what would change that?' },
-  { group: 'Plan',        id: 'stock',       label: 'Stock & orders',     icon: 'truck',     q: 'What runs out, what do I reorder, and what is on order?' },
-  { group: 'Plan',        id: 'calendar',    label: 'Calendar',          icon: 'calendar',  q: 'What is planned, and what did past events do?' },
+  { group: 'Home',        id: 'today',       label: 'Home',               icon: 'home',      q: 'Am I on track, and what do I do now?' },
+  { group: 'Home',        id: 'actions',     label: 'Actions',            icon: 'clipboard', q: 'What should I do first?' },
+  { group: 'Home',        id: 'results',     label: 'Results',            icon: 'check',     q: 'Did the moves I made work?' },
+  { group: 'Home',        id: 'review',      label: 'Weekly review',      icon: 'report',    q: 'What changed, and why?' },
+  { group: 'Home',        id: 'ask',         label: 'Ask Greta',          icon: 'spark',     q: 'Ask anything about your business, in plain English.' },
+  { group: 'Analytics',   id: 'profit',      label: 'Profit & sales',     icon: 'report',    q: 'Where does my money come from, and where does it go?' },
+  { group: 'Analytics',   id: 'marketing',   label: 'Marketing',          icon: 'trendUp',   q: 'Which channels and ads earn their money?' },
+  { group: 'Analytics',   id: 'website',     label: 'Website',            icon: 'pulse',     q: 'Where do shoppers drop off, and why?' },
+  { group: 'Analytics',   id: 'customers',   label: 'Customers',          icon: 'users',     q: 'Who buys, who comes back, and what are they worth?' },
+  { group: 'Analytics',   id: 'products',    label: 'Products',           icon: 'box',       q: 'Which products earn, and which leak?' },
+  { group: 'Analytics',   id: 'competitors', label: 'Competitors',        icon: 'search',    q: 'Who am I up against?' },
+  { group: 'Planning',    id: 'goal',        label: 'Goal & costs',       icon: 'sliders',   q: 'What am I aiming for, and what do things cost me?' },
+  { group: 'Planning',    id: 'growth',      label: 'Growth plan',        icon: 'trendUp',   q: 'How much more should I spend, and what would change that?' },
+  { group: 'Planning',    id: 'stock',       label: 'Stock & orders',     icon: 'truck',     q: 'What runs out, what do I reorder, and what is on order?' },
+  { group: 'Planning',    id: 'calendar',    label: 'Calendar',          icon: 'calendar',  q: 'What is planned, and what did past events do?' },
   { group: 'Settings',    id: 'settings',    label: 'Connections & data', icon: 'sliders',   q: 'Is my data connected, and can I trust it?' },
   { group: 'Settings',    id: 'team',        label: 'Team',               icon: 'users',     q: 'Who else can see this workspace?' },
 ];
 const V3_BY_ID = Object.fromEntries(V3_NAV.map(d => [d.id, d]));
 // Mobile: five places. Ask sits in the middle; "More" opens the palette.
 const V3_MOBILE = [
-  { id: 'today', label: 'Today', icon: 'home' },
-  { id: 'actions', label: 'Moves', icon: 'clipboard' },
+  { id: 'today', label: 'Home', icon: 'home' },
+  { id: 'actions', label: 'Actions', icon: 'clipboard' },
   { id: 'results', label: 'Results', icon: 'check' },
   { id: 'profit', label: 'Business', icon: 'report' },
 ];
@@ -18534,7 +18534,7 @@ function V3WhyChips({ list, pick, setPick, label }) {
 }
 // Do it, Not now (to a date) and Dismiss, each with an optional reason. Taking a move on keeps it on the list and
 // offers Mark done; the other three close it everywhere at once.
-function V3MoveDecide({ row, small, onDecided }) {
+function V3MoveDecide({ row, small, onDecided, startMode }) {
   const ext = row && row.external_id;
   // 26 Oct eval: whether the move is taken on is read on every render from the server's moves (and the open
   // actions), not once when the card mounts; the card drew "Do it" again for a move taken on, after a page change.
@@ -18544,7 +18544,7 @@ function V3MoveDecide({ row, small, onDecided }) {
   const bmRow = bmQ.rows && bmQ.rows[0] && Array.isArray(bmQ.rows[0].rows) ? bmQ.rows[0].rows.find(x => x.external_id === ext) : null;
   const [mine, setMine] = React.useState(null);   // what this card just did, until the server's rows catch up
   const accepted = mine != null ? mine : !!((bmRow && bmRow.taken_on) || (ex && ex.accepted_at));
-  const [mode, setMode] = React.useState(null);   // null | 'later' | 'dismiss'
+  const [mode, setMode] = React.useState(startMode || null);   // null | 'later' | 'dismiss'
   const today = new Date().toISOString().slice(0, 10);
   const [until, setUntil] = React.useState(v3IsoAdd(today, 7));
   const [reason, setReason] = React.useState('');
@@ -18573,9 +18573,9 @@ function V3MoveDecide({ row, small, onDecided }) {
         v3QRefresh(V3_MOVE_KEYS);
       }
       else {
-        setSaid(decision === 'done' ? 'Marked done. Greta will check whether it worked and add it to Results.'
+        setSaid(decision === 'done' ? 'Marked done. The result shows on Results once it is checked.'
           : decision === 'not_now' ? 'Put off until ' + v3Day(until, true) + '. It comes back then, sooner only if it gets much bigger.'
-          : 'Dismissed. Greta won’t raise it again for 30 days unless it gets much bigger.');
+          : 'Dismissed. It stays off the list for 30 days unless it gets much bigger.');
         // every page that shows this move follows: the goal's shares, the totals, the alerts, Results
         setTimeout(() => { v3BoardDrop(ext); v3QRefresh(V3_MOVE_KEYS); if (onDecided) onDecided(decision); }, 1600);
       }
@@ -18596,12 +18596,12 @@ function V3MoveDecide({ row, small, onDecided }) {
   const cls = 'v3-btn' + (small ? ' v3-btn-sm' : '');
   if (said) return <p className="v3-mv-said" role="status">{said}</p>;
   return (<div className="v3-mv-decide">
-    {accepted && !mode && <p className="v3-mv-said">Taken on. Mark it done once it is done, so Greta can check what it did.</p>}
+    {accepted && !mode && <p className="v3-mv-said">In progress. Mark it done when finished, so the result can be checked.</p>}
     {!mode && <V3MoveWho ext={ext}/>}
     {!mode && <div className="v3-mv-btns">
       {accepted
         ? <button type="button" className={cls + ' v3-btn-p'} disabled={busy} onClick={() => go('done')}>{busy ? 'Saving…' : 'Mark done'}</button>
-        : <button type="button" className={cls + ' v3-btn-p'} disabled={busy} onClick={() => go('do')}>{busy ? 'Saving…' : 'I’ll do this'}</button>}
+        : <button type="button" className={cls + ' v3-btn-p'} disabled={busy} onClick={() => go('do')}>{busy ? 'Saving…' : 'Start'}</button>}
       <button type="button" className={cls} disabled={busy} onClick={() => { setMode('later'); setErr(''); }}>Not now</button>
       {!moreOpen && <button type="button" className={cls + ' v3-btn-q v3-mv-quiet'} aria-label="More choices" onClick={() => setMoreOpen(true)}>More</button>}
       {moreOpen && <button type="button" className={cls + ' v3-btn-q v3-mv-quiet'} disabled={busy} onClick={() => { setMode('dismiss'); setErr(''); }}>Dismiss</button>}
@@ -18978,7 +18978,7 @@ function v3TodayMoveList(g, rows, B) {
   const byId = {}; live.forEach(r => { byId[r.external_id] = r; });
   const order = g && g.confirmed && Array.isArray(g.moves) && g.moves.length
     ? g.moves.map(m => ({ row: byId[m.external_id], closes: m.closes_gbp }))
-    : (B ? B.rows.filter(r => r.lead && !r.small).map(r => ({ row: byId[r.external_id], closes: null })) : live.map(r => ({ row: r, closes: null })));
+    : (B && Array.isArray(B.rows) ? B.rows.filter(r => r.lead && !r.small).map(r => ({ row: byId[r.external_id], closes: null })) : live.map(r => ({ row: r, closes: null })));
   return order.filter(m => m.row).slice(0, 5);
 }
 // 3 Nov, interface review: one list in order. Each move is one row, what it is, what it is worth, what to press; the first is
@@ -19412,17 +19412,341 @@ function V3AgentLead({ q, gc, board, unreported }) {
       {sinceOpen && <ul>{since.items.flatMap(x => x.rows || []).map((t, i) => <li key={i}>{t}</li>)}</ul>}</div>}
   </section>);
 }
+// ── Home (3 Nov, Dan: "simple, clear and easy to understand whilst surfacing the useful actions ... more like a traditional
+// professional saas software") ─ a figure strip, the actions as a table with a status and a button that opens the work, then the
+// goals and profit as panels. Sentences live in Ask and the weekly email. Every figure is one the old Today showed, from the same
+// read; a forecast is shown in round pounds because it is a forecast.
+function v3GbpRound(n) {
+  const v = Number(n);
+  if (!isFinite(v)) return '';
+  const a = Math.abs(v), s = v < 0 ? '−' : '', c = curSym();
+  if (a >= 999500) return s + c + (a / 1e6).toFixed(2).replace(/0$/, '') + 'm';
+  if (a >= 1e4) return s + c + Math.round(a / 1e3) + 'k';
+  if (a >= 1e3) return s + c + (a / 1e3).toFixed(1).replace(/\.0$/, '') + 'k';
+  return s + c + Math.round(a);
+}
+function V3HomeSpark({ pts, weak }) {
+  const vs = (pts || []).filter(v => v != null && isFinite(v));
+  if (vs.length < 4) return null;
+  const lo = Math.min(...vs), hi = Math.max(...vs), r = hi - lo || 1;
+  const line = vs.map((v, i) => (i / (vs.length - 1) * 100).toFixed(1) + ',' + (18 - (v - lo) / r * 16).toFixed(1)).join(' ');
+  return (<svg className={'v3-home-spark' + (weak ? ' weak' : '')} viewBox="0 0 100 20" preserveAspectRatio="none" aria-hidden="true"><polyline points={line}/></svg>);
+}
+function V3HomeTile({ k, v, dir, cls, delta, weak, pts, act, title }) {
+  const body = (<>
+    <span className="v3-home-tile-k">{weak && <i className="v3-home-dot" aria-label="Needs attention"/>}{k}</span>
+    <span className="v3-home-tile-v">{v}</span>
+    <span className="v3-home-tile-d">
+      {dir && dir !== 'flat' && <span className={cls || ''}><Icon name={dir === 'up' ? 'arrowUp' : 'arrowDown'} size={11} stroke={2.4}/></span>}
+      <span className={cls || ''}>{delta}</span></span>
+    <V3HomeSpark pts={pts} weak={weak}/>
+  </>);
+  return act
+    ? <button type="button" className={'v3-home-tile' + (act.open ? ' open' : '')} aria-expanded={act.open} title={title} onClick={act.on}>{body}</button>
+    : <div className="v3-home-tile" title={title}>{body}</div>;
+}
+// The figure a sign moved from four weeks ago, by the same rule the sign has always used.
+function v3SignTrend(s) {
+  const pts = (s.series || []).filter(p => p.v != null);
+  if (pts.length < 5 || !s.fmt) return null;
+  const last = pts[pts.length - 1], then = pts[pts.length - 5];
+  const ch = last.v - then.v, rel = Math.abs(then.v) > 0.0001 ? Math.abs(ch) / Math.abs(then.v) : Math.abs(ch);
+  const dir = rel < 0.03 ? 'flat' : ch > 0 ? 'up' : 'down';
+  const good = dir === 'flat' ? null : (dir === 'up') === (s.better === 'higher');
+  const cls = dir === 'flat' || !s.better || (s.tone === 'good' && !good) ? '' : good ? 'v3-up' : 'v3-down';
+  return { dir, cls, delta: 'from ' + s.fmt(then.v) + ' in 4 weeks' };
+}
+const v3SignShort = s => s.amer ? 'New sales per £1 of ads' : s.which === 'ret' ? 'Sales per £1 of ads' : s.which === 'repeat' ? 'Repeat in 90 days'
+  : s.which === 'ly' ? 'Sales vs last year' : String(s.k).replace(/,\s*last 30 days$/i, '');
+// The page each kind of action is worked from.
+const V3_HOME_WORK = { stock: ['stock', 'Open order list'], site: ['website', 'Open Website'], paid: ['marketing', 'Open Marketing'], creative: ['marketing', 'Open Marketing'],
+  email: ['marketing', 'Open Marketing'], acquisition: ['marketing', 'Open Marketing'], product: ['products', 'Open Products'], retention: ['customers', 'Open Customers'], finance: ['profit', 'Open Profit & sales'] };
+const V3_HOME_BASIS = { measured: 'v3-pill-good', estimated: 'v3-pill-none', assumed: 'v3-pill-warn' };
+function V3HomeDrawer({ row, why, closes, closesTo, startMode, onClose }) {
+  const panel = React.useRef(null);
+  React.useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    if (panel.current) panel.current.focus();
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  const pa = v3PlainAction(Object.assign({}, row, { plan: null }));
+  const ex = v3MoveExtra(row.external_id);
+  const sure = v3MoveSure(row);
+  const gbp = Number(row.cm_gbp) || 0;
+  const knock = v3KnockOns(ex && ex.routes);
+  const play = Array.isArray(row.playbook) ? row.playbook : [];
+  const others = row.plan ? row.plan.steps.filter(st => st.external_id !== row.external_id) : [];
+  const isStock = row.category === 'stock' || row.external_id === 'stock-reorder';
+  return (<div className="v3-drawer-wrap">
+    <div className="v3-drawer-scrim" onClick={onClose}/>
+    <aside className="v3-drawer" role="dialog" aria-modal="true" aria-label={pa.title} tabIndex={-1} ref={panel}>
+      <header className="v3-drawer-head">
+        <span className="v3-muted">{v3CategoryWords(row.category)}</span>
+        <button type="button" className="v3-btn v3-btn-sm" onClick={onClose}>Close</button>
+      </header>
+      <h2 className="v3-drawer-t">{pa.title}</h2>
+      <dl className="v3-drawer-facts">
+        {gbp > 0 && <div><dt>{isStock ? 'Protects' : row.money_is_sales ? 'Worth, in sales' : 'Worth'}</dt><dd>{v3GbpRound(gbp)}{v3Per(row)}</dd></div>}
+        {sure && <div title={V3_MOVE_SURE[sure].why}><dt>Basis</dt><dd><span className={'v3-pill ' + V3_HOME_BASIS[sure]}>{V3_MOVE_SURE[sure].label}</span></dd></div>}
+        {ex && Number(ex.win) > 0 && <div><dt>Result checked</dt><dd>{fmtCount(Number(ex.win))} days after done</dd></div>}
+      </dl>
+      {pa.why && <p className="v3-drawer-p">{v3Money(pa.why)}</p>}
+      <V3MoveViz row={row}/>
+      {why}
+      {play.length > 0 && <section className="v3-drawer-sec"><h3>Steps</h3><ol className="v3-mv-steps">{play.map((s, j) => <li key={j}>{v3Tidy(s)}</li>)}</ol></section>}
+      {others.length > 0 && <section className="v3-drawer-sec"><V3PlanSteps plan={Object.assign({}, row.plan, { steps: others })} rank={1}/></section>}
+      {gbp > 0 && <section className="v3-drawer-sec"><V3MoveRange lo={ex && ex.lo} hi={ex && ex.hi} at={gbp}/>
+        {closes != null && <p className="v3-mv-closes">Closes about <b>{v3GbpRound(closes)}</b> of the gap {closesTo}.</p>}</section>}
+      <section className="v3-drawer-sec"><h3>How sure</h3><V3MoveSureOpen row={row} raw={pa.raw} noSteps/>
+        {knock.length > 0 && <p className="v3-mv-open">Also moves {v3AndList(knock)}.</p>}</section>
+      <section className="v3-drawer-sec v3-drawer-decide"><V3MoveDecide row={row} startMode={startMode} onDecided={onClose}/></section>
+    </aside>
+  </div>);
+}
+function V3HomeRow({ row, first, bmRow, onOpen }) {
+  const ext = row.external_id;
+  const ex = v3MoveExtra(ext);
+  const taken = !!((bmRow && bmRow.taken_on) || (ex && ex.accepted_at));
+  const [mine, setMine] = React.useState(null);   // what this row just did, until the server's rows catch up
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState('');
+  React.useEffect(() => { setMine(null); }, [taken]);
+  const status = mine || (taken ? 'doing' : 'todo');
+  const pa = v3PlainAction(Object.assign({}, row, { plan: null }));
+  const cause = v3CauseLine(pa.why, pa.title);
+  const sure = v3MoveSure(row);
+  const gbp = Number(row.cm_gbp) || 0;
+  const isStock = row.category === 'stock' || ext === 'stock-reorder';
+  const conn = connProvider(ext);
+  const place = v3MovePlaces(ext).find(p => !p.demo && p.url) || null;
+  const work = V3_HOME_WORK[row.category] || ['actions', 'Open Actions'];
+  const others = row.plan ? row.plan.steps.filter(st => st.external_id !== ext).length : 0;
+  // The status writes through the one decision path (fn_action_decide), so Done still starts the check of whether it worked.
+  const change = async e => {
+    const to = e.target.value;
+    if (to === 'later' || to === 'dismiss') { onOpen(to); return; }
+    if (to === status) return;
+    setBusy(true); setErr('');
+    try {
+      if (to === 'doing') {
+        await v3Decide(ext, 'do');
+        const uid = v3Uid();
+        if (uid && !(bmRow && bmRow.assignee)) { try { await v3Assign(ext, 'user:' + uid, null); } catch (x) {} }
+        setMine('doing'); v3QRefresh(V3_MOVE_KEYS);
+      } else if (to === 'todo') {
+        await v3Decide(ext, 'reopen');
+        setMine('todo'); v3QRefresh(V3_MOVE_KEYS);
+      } else if (to === 'done') {
+        await v3Decide(ext, 'done');
+        setMine('done');
+        setTimeout(() => { v3BoardDrop(ext); v3QRefresh(V3_MOVE_KEYS); }, 1600);
+      }
+    } catch (x) { setErr(String((x && x.message) || x)); }
+    setBusy(false);
+  };
+  return (<tr className={status === 'done' ? 'v3-home-done' : ''}>
+    <td className="v3-home-act">
+      <button type="button" className="v3-home-title" onClick={() => onOpen(null)}>{pa.title}</button>
+      {status === 'done' ? <span className="v3-home-sub">Marked done. The result shows on Results once it is checked.</span>
+        : cause ? <span className="v3-home-sub">{cause}</span> : null}
+      {others > 0 && <span className="v3-home-sub">{others === 1 ? '1 more step' : others + ' more steps'}</span>}
+      {err && <span className="v3-home-sub v3-down" role="alert">{err}</span>}
+    </td>
+    <td className="v3-home-area" data-k="Area">{v3CategoryWords(row.category)}</td>
+    <td className="v3-home-worth" data-k="Worth">{gbp > 0 ? <><b>{v3GbpRound(gbp)}{v3Per(row)}</b>{isStock ? <small>protected</small> : row.money_is_sales ? <small>in sales</small> : null}</> : '–'}</td>
+    <td className="v3-home-basis" data-k="Basis">{sure ? <span className={'v3-pill ' + V3_HOME_BASIS[sure]} title={V3_MOVE_SURE[sure].why}>{V3_MOVE_SURE[sure].label}</span> : '–'}</td>
+    <td className="v3-home-status" data-k="Status">{conn ? null : <select className="v3-select" aria-label={'Status of ' + pa.title} value={status} disabled={busy || status === 'done'} onChange={change}>
+      <option value="todo">To do</option><option value="doing">Doing</option><option value="done">Done</option><option value="later">Not now…</option><option value="dismiss">Dismiss…</option>
+    </select>}</td>
+    <td className="v3-home-open">{conn ? <V3Fix provider={conn} small/>
+      : place ? <a className={'v3-btn v3-btn-sm' + (first ? ' v3-btn-p' : '')} href={place.url} target="_blank" rel="noopener noreferrer">Open {place.label}</a>
+      : <button type="button" className={'v3-btn v3-btn-sm' + (first ? ' v3-btn-p' : '')} onClick={() => window.__oiGo && window.__oiGo(work[0])}>{work[1]}</button>}</td>
+  </tr>);
+}
+function V3HomeActions({ q, board }) {
+  const g = q.rows && q.rows[0];
+  const bm = useV3Rows('board-moves', V3_BOARD_MOVES_Q);
+  const fig = useV3Figures();
+  useV3Rows('move-extras', V3_MOVE_EXTRAS_Q);
+  useV3Rows('brand-state', V3_STATE_Q);   // the gap reads the ad answer
+  const [drawer, setDrawer] = React.useState(null);   // { id, mode }
+  const bmRows = bm.rows && bm.rows[0] && Array.isArray(bm.rows[0].rows) ? bm.rows[0].rows : [];
+  const head = (n) => (<div className="v3-panel-head">
+    <h2>Actions</h2>{n > 0 && <span className="v3-count">{n}</span>}
+    {n > 0 && <span className="v3-muted">Ranked by what each is worth and how sure the figure is</span>}
+    <button type="button" className="v3-panel-link" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>View all</button>
+  </div>);
+  if (board.err) return <section className="v3-panel" id="v3-queue">{head(0)}<p className="v3-panel-note">Actions could not load. Refresh the page to try again.</p></section>;
+  if (!board.rows) return <section className="v3-panel" id="v3-queue" aria-busy="true">{head(0)}<div className="v3-panel-pad"><V3SkeletonRows n={3}/></div></section>;
+  const moves = v3TodayMoveList(g, board.rows, bm.rows && bm.rows[0]).slice(0, 4);
+  const lane = (Array.isArray(board.unpriced) ? board.unpriced : []).filter(r => r.due_on);
+  const total = v3LiveRows(board.rows).length;
+  if (!moves.length && !lane.length) return <section className="v3-panel" id="v3-queue">{head(0)}<p className="v3-panel-note">No open actions. The list updates as new data arrives.</p></section>;
+  const shared = g && g.confirmed && g.forecast != null;
+  const F = shared ? v3Futures(g) : null;
+  const gap = shared ? (F ? -F.ahead : Number(g.gap)) : null;
+  const cac = v3Fig('cac_30d', fig.rows).value, fo = v3Fig('first_order_profit', fig.rows).value, cv = v3Fig('customer_value', fig.rows).value;
+  let cutWhy = null;
+  if (cac > 0 && fo != null && cac > fo) {
+    const top = Math.max(cac, fo, Number(cv) || 0) * 1.08;
+    const bar = (k, v, c) => (<div className="v3-mvrun-row" key={k}><span className="v3-mvrun-k">{k}</span>
+      <span className="v3-mvrun-track"><i className={c} style={{ width: Math.max(1, Math.max(0, v) / top * 100) + '%' }}/></span>
+      <span className="v3-mvrun-v">{v3Gbp(v)}</span></div>);
+    cutWhy = (<figure className="v3-mvviz"><figcaption>Cost of a new customer against what they earn</figcaption>
+      {bar('Costs to win', cac, 'now')}{bar('First order earns', fo, '')}{cv != null && bar('A year earns', cv, '')}</figure>);
+  }
+  const open = drawer && moves.find(m => m.row.external_id === drawer.id);
+  return (<section className="v3-panel v3-home-actions" id="v3-queue" aria-label="Actions">
+    {head(total)}
+    <table className="v3-home-table">
+      <thead><tr><th>Action</th><th>Area</th><th className="r">Worth</th><th>Basis</th><th>Status</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
+      <tbody>
+        {moves.map((m, i) => <V3HomeRow key={m.row.external_id} row={m.row} first={i === 0} bmRow={bmRows.find(x => x.external_id === m.row.external_id)}
+          onOpen={mode => setDrawer({ id: m.row.external_id, mode })}/>)}
+        {lane.map(a => (<tr key={a.external_id}>
+          <td className="v3-home-act"><span className="v3-home-title-static">{v3PlainAction(a).title}</span></td>
+          <td className="v3-home-area" data-k="Area">{v3CategoryWords(a.category)}</td>
+          <td className="v3-home-worth" data-k="Due"><b>{v3DueWords(a, true)}</b></td>
+          <td className="v3-home-basis" data-k="Basis"><span className="v3-pill v3-pill-none">No figure yet</span></td>
+          <td className="v3-home-status"/>
+          <td className="v3-home-open"><button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>Open Actions</button></td>
+        </tr>))}
+      </tbody>
+    </table>
+    {open && <V3HomeDrawer key={open.row.external_id} row={open.row} startMode={drawer.mode} why={/^order-cost-/.test(String(open.row.external_id)) ? cutWhy : null}
+      closes={shared && gap > 0 ? open.closes : null} closesTo={shared ? 'by ' + v3Day(g.period_end) : ''} onClose={() => setDrawer(null)}/>}
+  </section>);
+}
+function V3HomeGoalRow({ name, pill, pillCls, line, so, exp, atGoal, soFar, title }) {
+  const w = v => Math.max(0, Math.min(100, v * 100)) + '%';
+  return (<div className="v3-home-goal" title={title}>
+    <div className="v3-home-goal-top"><b>{name}</b>{pill && <span className={'v3-pill ' + pillCls}>{pill}</span>}<span className="v3-home-goal-fc">{line}</span></div>
+    {atGoal > 0 && <div className="v3-home-bar" aria-hidden="true"><i style={{ width: w(Math.max(0, soFar) / atGoal) }}/>{exp != null && <b style={{ left: w(exp / atGoal) }}/>}</div>}
+    <div className="v3-home-goal-sub"><span>{so}</span></div>
+  </div>);
+}
+function V3HomeGoals({ q, gc, unreported }) {
+  useV3Rows('brand-state', V3_STATE_Q);   // the verdict reads the ad answer
+  const g = q.rows && q.rows[0];
+  const go = () => window.__oiGo && window.__oiGo('goal');
+  const head = (<div className="v3-panel-head"><h2>Quarter goals</h2>
+    {g && g.period_start && <span className="v3-muted">{v3Day(g.period_start)} to {v3Day(g.period_end)}</span>}
+    <button type="button" className="v3-panel-link" onClick={go}>Goal &amp; costs</button></div>);
+  if (q.err) return <section className="v3-panel">{head}<p className="v3-panel-note">Goals could not load. <button type="button" className="v3-panel-link" onClick={q.retry}>Try again</button></p></section>;
+  if (!g) return <section className="v3-panel" aria-busy="true">{head}<div className="v3-panel-pad"><V3SkeletonRows n={2}/></div></section>;
+  if (!g.confirmed) return (<section className="v3-panel">{head}<div className="v3-panel-pad"><p className="v3-panel-text">No goal confirmed yet.</p>
+    <button type="button" className="v3-btn v3-btn-sm v3-btn-p" onClick={() => window.__oiNav && window.__oiNav('home', 'plansetup')}>Set your goal</button></div></section>);
+  if (g.forecast == null) return <section className="v3-panel">{head}<p className="v3-panel-note">{g.target != null ? 'Goal ' + v3Gbp(g.target) + ' after ads. ' : ''}No forecast yet.</p></section>;
+  const V = v3GoalVerdict(g, unreported);
+  const F = V.F, A = F && F.A;
+  const pillOf = { good: 'v3-pill-good', warn: 'v3-pill-warn', bad: 'v3-pill-bad', '': 'v3-pill-none' };
+  const fc = F ? F.keep : Number(g.forecast);
+  const soLine = v => (Number(v) < 0 ? v3GbpRound(Math.abs(Number(v))) + ' lost so far' : v3GbpRound(v) + ' so far');
+  // the months the goal read returns, the same figures as Goal & costs
+  const ser = Array.isArray(g.series) ? g.series : [];
+  const salesSoFar = ser.length ? ser.reduce((t, m) => t + (Number(m.actual) || 0), 0) : null;
+  const salesExp = ser.length ? ser.reduce((t, m) => t + (Number(m.plan_to_date) || 0), 0) : null;
+  const goalSales = Number(g.goal_sales) || (A && A.at_goal ? Number(A.at_goal.sales) : 0);
+  const salesFc = A && A.at_today ? Number(A.at_today.sales) : null;
+  const short = A ? Number(A.sales_short) : null;
+  return (<section className="v3-panel v3-home-goals">{head}
+    <V3HomeGoalRow name="Profit after ads" pill={V.word} pillCls={pillOf[V.cls || '']}
+      line={'Forecast ' + v3GbpRound(fc) + ' of ' + v3GbpRound(g.target) + ' goal'}
+      title={F ? 'With ' + v3AdsNear(A) : g.forecast_basis || undefined}
+      atGoal={Number(g.target)} soFar={Number(g.so_far)} exp={g.expected_by_now != null ? Number(g.expected_by_now) : null}
+      so={soLine(g.so_far) + (g.expected_by_now != null ? ', ' + v3GbpRound(g.expected_by_now) + ' expected by now' : '')}/>
+    {goalSales > 0 && salesFc != null && <V3HomeGoalRow name="Sales" pill={short > 0 ? v3GbpRound(short) + ' short' : 'On track'} pillCls={short > 0 ? 'v3-pill-bad' : 'v3-pill-good'}
+      line={'Forecast ' + v3GbpRound(salesFc) + ' of ' + v3GbpRound(goalSales) + ' goal'}
+      title={A.owner_question || undefined} atGoal={goalSales} soFar={salesSoFar || 0} exp={salesExp}
+      so={salesSoFar != null ? soLine(salesSoFar) + ', ' + v3GbpRound(salesExp) + ' expected by now' : ''}/>}
+    {V.close && <p className="v3-panel-note">{v3GbpRound(unreported)} of ad spend has not come through yet, enough to move the forecast either way.</p>}
+    {gc && gc.stale && <p className="v3-panel-note">The plan has changed since this goal was confirmed. <button type="button" className="v3-panel-link" onClick={go}>Re-plan</button></p>}
+  </section>);
+}
+function V3HomeProfit({ L }) {
+  const figQ = useV3Figures();
+  useV3Setup();
+  const num = v => (v == null ? null : Number(v));
+  const F = id => v3Fig(id, figQ.rows).value;
+  const sales = num(L.sales), ads = num(L.ads), pa = num(L.profit_after_ads), ao = num(L.after_overheads);
+  const goodsF = F('costs_before_ads_30d'), otherF = F('other_marketing_30d'), ohF = F('overheads_30d');
+  const head = est => (<div className="v3-panel-head"><h2>Profit</h2><span className="v3-muted">Last 30 days</span>
+    {est && <span className="v3-pill v3-pill-none" title={est}>Estimated</span>}
+    <button type="button" className="v3-panel-link" onClick={() => window.__oiGo && window.__oiGo('profit')}>View report</button></div>);
+  if (!(sales > 0) || pa == null || ads == null || goodsF == null) return <section className="v3-panel v3-home-profit">{head(null)}<p className="v3-panel-note">Profit shows once sales and costs have come through.</p></section>;
+  const other = otherF != null && otherF >= 1 ? Math.round(otherF) : 0;
+  const end = ao != null ? ao : pa, hasOh = ao != null && ohF != null;
+  const rows = [
+    { k: 'Sales', v: sales, c: 'sales', fig: 'sales_30d' },
+    { k: 'Products and delivery', v: -Math.max(goodsF, 0), c: 'cost', fig: 'costs_before_ads_30d' },
+    { k: 'Ads', v: -ads, c: 'ads', fig: 'ads_30d' },
+  ];
+  if (other >= 1) rows.push({ k: 'Other marketing', v: -other, c: 'cost', fig: 'other_marketing_30d' });
+  if (hasOh) rows.push({ k: 'Profit after ads', v: pa, c: 'kept', tot: true, fig: 'profit_after_ads_30d' });
+  if (hasOh) rows.push({ k: 'Running costs', v: -ohF, c: 'cost', fig: 'overheads_30d' });
+  rows.push({ k: hasOh ? 'Net profit' : 'Profit after ads', v: end, c: end < 0 ? 'loss' : 'kept', tot: true, fig: hasOh ? 'after_overheads_30d' : 'profit_after_ads_30d' });
+  // one tag for the panel: what is estimated, in the tag's tooltip, not a tag on every row
+  const est = rows.map(r => ({ r, s: v3Source(r.fig) })).filter(x => x.s && x.s.state === 'estimated');
+  const estWords = est.length ? 'Estimated: ' + v3AndList(est.map(x => x.r.k.toLowerCase())) + (est[0].s.needs ? '. ' + est[0].s.needs : '') : null;
+  return (<section className="v3-panel v3-home-profit">{head(estWords)}
+    <table className="v3-home-pl"><tbody>{rows.map(r => (<tr key={r.k} className={r.tot ? 'tot' : ''}>
+      <td>{r.k}</td>
+      <td className="bar"><i className={'v3-home-pl-' + r.c} style={{ width: Math.max(0.6, Math.min(100, Math.abs(r.v) / sales * 100)) + '%' }}/></td>
+      <td className={'r' + (r.tot && r.v < 0 ? ' v3-down' : '')}>{r.v < 0 ? '−' : ''}{fmtMoney(Math.abs(r.v))}</td>
+    </tr>))}</tbody></table>
+  </section>);
+}
+// "Did it work": the one scorer, or the date each of the top actions would be read back.
+function V3HomeResults({ q, board }) {
+  const res = useV3Rows('brand-results', V3_RESULTS_Q);
+  const bm = useV3Rows('board-moves', V3_BOARD_MOVES_Q);
+  useV3Rows('move-extras', V3_MOVE_EXTRAS_Q);
+  const g = q.rows && q.rows[0];
+  const R = res.rows && res.rows[0], done = R && Array.isArray(R.rows) ? R.rows.slice(0, 4) : [];
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const moves = board.rows ? v3TodayMoveList(g, board.rows, bm.rows && bm.rows[0]).slice(0, 4) : [];
+  const due = moves.map(m => { const ex = v3MoveExtra(m.row.external_id); return ex && Number(ex.win) > 0 ? { id: m.row.external_id, k: v3PlainAction(Object.assign({}, m.row, { plan: null })).title, on: v3IsoAdd(todayIso, Number(ex.win)) } : null; })
+    .filter(Boolean).sort((a, b) => a.on.localeCompare(b.on));
+  const pillOf = { good: 'v3-pill-good', bad: 'v3-pill-bad', '': 'v3-pill-none' };
+  return (<section className="v3-panel v3-home-results">
+    <div className="v3-panel-head"><h2>Results</h2><span className="v3-muted">Did the actions work</span>
+      <button type="button" className="v3-panel-link" onClick={() => window.__oiGo && window.__oiGo('results')}>View all</button></div>
+    {done.length > 0 ? <table className="v3-home-pl v3-home-res"><tbody>{done.map(r => { const lab = V3_RESULT[r.label] || V3_RESULT.checking, soon = r.due_on && String(r.due_on).slice(0, 10) >= todayIso;
+        return (<tr key={r.external_id}><td>{v3MoveShort(r)}</td>
+          <td><span className={'v3-pill ' + (soon ? 'v3-pill-none' : pillOf[lab.cls || ''])}>{soon ? 'Checks ' + v3Day(String(r.due_on).slice(0, 10)) : lab.label}</span></td>
+          <td className="r">{!soon && r.measured_gbp != null ? v3Gbp(r.measured_gbp) : ''}</td></tr>); })}</tbody></table>
+      : due.length > 0 ? <table className="v3-home-pl v3-home-res"><thead><tr><th>If started today</th><th className="r">Checked on</th></tr></thead>
+          <tbody>{due.map(x => <tr key={x.id}><td>{x.k}</td><td className="r">{v3Day(x.on)}</td></tr>)}</tbody></table>
+      : <p className="v3-panel-note">Mark an action done and its result shows here once it is checked.</p>}
+  </section>);
+}
+function V3HomeUpdated() {
+  useV3Headline();
+  const q = V3_Q['today-goal'], g = q && q.rows && q.rows[0];
+  const hd = (typeof window !== 'undefined' && window.GRETA_HEADLINE && window.GRETA_HEADLINE.data_as_of) || null;
+  const t = hd || (g && g.as_of) ? new Date(hd || g.as_of) : null;
+  if (!t || !isFinite(t.getTime())) return null;
+  return <span className="v3-muted v3-home-updated" title="The figures are worked out again every hour. Shopify orders arrive every 30 minutes and ad spend every 2 hours.">Updated {t.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>;
+}
 function V3TodayLead() {
   const q = v3GoalSeed(useV3Rows('today-goal', V3_TODAY_GOAL_Q));
   const board = useV3Board();
   const gc = useV3GoalCheck();
   const d = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || {};
-  return (<div className="v3-today-lead">
+  return (<div className="v3-home">
     <V3MorningAlerts/>
-    <V3AgentLead q={q} gc={gc} board={board} unreported={d.unreported_spend}/>
     <V3SetupChecklist/>
     <V3BusinessState part="figs"/>
-    <V3TodayMoves q={q} board={board} gc={gc}/>
+    <V3HomeActions q={q} board={board}/>
+    <div className="v3-home-two">
+      <V3HomeGoals q={q} gc={gc} unreported={d.unreported_spend}/>
+      <V3BusinessState part="profit"/>
+    </div>
+    <div className="v3-home-two">
+      <V3BusinessState part="moved"/>
+      <V3HomeResults q={q} board={board}/>
+    </div>
   </div>);
 }
 // ── Where every number comes from (UX brief Phase 2, 1111) ──────────────────────────────────────────────────
@@ -19476,7 +19800,7 @@ function V3SetupChecklist() {
   const dismiss = () => { try { localStorage.setItem(key, String(C.done)); } catch (e) {} setHid(String(C.done)); };
   return (<section className="v3-setup v3-setup-list">
     <div className="v3-setup-top">
-      <p className="v3-goal-lab">Getting set up · {C.done} of {C.total} done</p>
+      <p className="v3-goal-lab">Getting set up: {C.done} of {C.total} done</p>
       <button type="button" className="v3-mv-toggle" onClick={dismiss}>Hide for now</button>
     </div>
     <ol className="v3-steps">
@@ -19549,6 +19873,8 @@ function V3Today(p) {
   const refresh = () => { frozen.current = window.GRETA_HEADLINE; setStale(false); };
 
   const liveDown = typeof window !== 'undefined' && window.FRKL_LIVE && /^(error|static-only)$/.test(window.FRKL_LIVE.status || '');
+  const onProfit = p.page === 'profit';
+  if (!d && (onProfit || !(hErr || liveDown))) return null;   // Home's panels show their own loading state
   if (!d) return (<div className="v3-hero"><div className="v3-hero-lab">Profit after ads · last 30 days</div>
     <div className="v3-big">—</div>
     {(hErr || liveDown)
@@ -19608,9 +19934,9 @@ function V3Today(p) {
       : ['settings', 'connections', 'Reconnect your ads'];
 
   return (<div className="v3-today">
-    <V3Reconnected/>
+    {!onProfit && <V3Reconnected/>}
     {/* 1111: the setup steps are V3SetupChecklist, under the goal strip */}
-    {gate && (() => {
+    {!onProfit && gate && (() => {
       // The gate has TWO reasons and used to give one answer. 0202 made can_show_cm
       // require revenue as well as a margin source, which is right -- but this branch
       // still said "enter what your products cost you" to a brand whose shop Greta
@@ -19641,14 +19967,17 @@ function V3Today(p) {
 
     {/* The tracking problem sits straight after the actions it affects (9 Oct): above them it pushed
         "Do this first" off the first screen. */}
-    <V3FixFirst kick="Fix this as well"/>
+    {!onProfit && <V3FixFirst kick="Fix this as well"/>}
+    {!onProfit && !gate && stateLead && stale && <button type="button" className="v3-refresh" onClick={refresh}>New numbers are available. Show them</button>}
+    {!onProfit && !gate && stateLead && d.refresh_failed && <div className="v3-pace"><span className="v3-muted">These are the last figures that loaded.</span>
+      <button type="button" className="v3-btn v3-btn-sm" onClick={() => location.reload()}>Try again</button></div>}
 
     {/* 9 Oct: the profit figure, the goal and the weeks follow the actions. The lead above already
         says where profit stands and draws where the sales went, so the first screen is the answer and
         what to do; this is the evidence. */}
     {/* 30 Oct eval: Today read profit four ways. With the lead's waterfall on screen (it now carries profit after
         ads as a subtotal), this panel folds to its weekly chart and the typical month; without the lead it stays. */}
-    {!gate && v3FoldIf(stateLead, 'today-profit-weeks', 'Profit after ads by week, and against a typical month', (
+    {!gate && (onProfit ? stateLead : !stateLead) && v3FoldIf(stateLead, 'today-profit-weeks', 'Profit after ads by week, and against a typical month', (
       <div className="v3-hero">
        <div className="v3-hero-grid">
         <div className="v3-hero-main">
@@ -19713,10 +20042,10 @@ function V3Today(p) {
       </div>
     ))}
 
-    <V3BusinessState part="detail"/>
+    {onProfit && <V3BusinessState part="detail"/>}
     {/* Today read 5.3 screens (review, 8 Oct). The summary at the top already names what moved profit and
         Profit & sales has it in full, so the breakdown folds away here. */}
-    {!(d.setup && d.setup.young) && <V3More id="today-why" label="What moved your profit, in pounds"><V3Why why={d.why} period={d.why_period} typical={typical} now={{ sales, spend, kept: cam }}/></V3More>}
+    {onProfit && !(d.setup && d.setup.young) && <V3More id="today-why" label="What moved your profit, in pounds"><V3Why why={d.why} period={d.why_period} typical={typical} now={{ sales, spend, kept: cam }}/></V3More>}
     {/* Two drawers used to follow. "What changed this week" repeated Review's lead. "Business,
         customer and channel numbers" (GretaOverviewTiers) recomputed everything in the browser on
         its own window: profit after ads £3,124 under a hero saying £3,350, ad spend £10,249 vs
@@ -20288,7 +20617,7 @@ function V3Stock() {
       </div>{order.length > 0 && <V3MoveRunway lead peakOn={pk ? pk.start : null}/>}</div>
       {order.length > 0 ? (<>
         {lost > 0 && <div className="v3-sowhat"><span>Waiting costs about <b>{fmtMoney(lost)}</b> of profit, whatever you order now. Only faster delivery saves it: each week your supplier can cut is worth <b>{fmtMoney(sooner)}</b>{pkLate ? ', more in the peak' : ''}.</span>
-          {protect != null && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>The order protects {fmtMoney(protect)} a month <span className="v3-xref-go">on Moves →</span></button>}</div>}
+          {protect != null && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>The order protects {fmtMoney(protect)} a month <span className="v3-xref-go">on Actions</span></button>}</div>}
         {pkLate && <p className="v3-note v3-measure">{pkName} runs {v3Day(pk.start)} – {v3Day(pk.end, true)}. An order arriving on {v3Day(land)} is in time for its last {fmtCount(daysCaught)} {daysCaught === 1 ? 'day' : 'days'}. Those days sold {fmtMoney(catchNow)} last year, {fmtPctN(catchNow / pk.lySales)} of the peak’s sales. {v3IsoAdd(land, -7) <= pk.start ? 'A week sooner would catch all of it (' + fmtMoney(pk.lySales) + ').' : 'A week sooner would catch ' + fmtMoney(catchWeek) + ' (' + fmtPctN(catchWeek / pk.lySales) + ').'} So ask your supplier to send the peak’s products first.</p>}
         {pkAfter && anyPeak && <p className="v3-note v3-measure">{pkName} starts on {v3Day(pk.start)}, after the order arrives, so the quantities include what last year’s peak sold. {PD ? <> Peak stock needs to be in by {v3Day(PD.deadline)}, a week before it starts, so the order needs to go in by {v3Day(PD.orderBy)}.</> : null}</p>}
         {pk && land > pk.end && <p className="v3-note v3-measure">An order placed today arrives after {pkName} ends. What you have in stock now is all you can sell in it; what to feature is below.</p>}
@@ -21635,7 +21964,7 @@ function V3ChannelMap() {
         <td className="v3-rw-opt">{fmtCount(c.new_customers)}</td><td>{c.est_share == null || c.key === 'not_recorded' ? FMT_NONE : pct(c.est_share)}</td></tr>))}
       </tbody></table>
     {rows.length > 6 && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => setAll(v => !v)}>{all ? 'Show the biggest 6' : 'Show all ' + rows.length + ' channels'}</button>}
-    <p className="micro muted v3-measure">Web sales as on Today ({fmtMoney(M.web_sales)}): after discounts and refunds, before VAT, each order placed by the shop’s own record of its last click. Compare shares rather than sales when the 30 days before held a sale.
+    <p className="micro muted v3-measure">Web sales as on Home ({fmtMoney(M.web_sales)}): after discounts and refunds, before VAT, each order placed by the shop’s own record of its last click. Compare shares rather than sales when the 30 days before held a sale.
       {estTop.length ? <> Google Analytics’ split is how it shares out all the sales it saw, by its own rules{cover ? <> ({cover}% of orders, the visitors who accept cookies)</> : null}: a second opinion on the mix, not where the untraced sales came from.</> : null}
       {Number(M.other_stores_sales) > 0 ? <> {fmtMoney(M.other_stores_sales)} sold through other stores is left out: Greta reads your own shop only.</> : null}</p>
     {unt >= 40 && Number(ux.with_a_code) > 0 && uCodes.length > 0 && (<p className="micro muted v3-measure">Of the {fmtCount(ux.untraced_orders)} orders with no source, {fmtCount(ux.with_a_code)} used a discount code, which says more about where they came from than Google Analytics can:{' '}
@@ -22476,8 +22805,8 @@ function V3Results() {
   if (!rows.length) return (<section className="v3-sec v3-res">
     <div className="v3-kick">The moves you marked done</div>
     <p className="v3-verdict">No results yet</p>
-    <p className="v3-note v3-measure">Take a move on Today and mark it done once it is. Greta checks each one when its window has passed, against what would have happened anyway, and shows here whether it worked.</p>
-    <button type="button" className="v3-btn v3-btn-sm v3-btn-p" onClick={() => window.__oiGo && window.__oiGo('today')}>Go to Today’s moves</button>
+    <p className="v3-note v3-measure">Take an action on Home and mark it done once it is. Greta checks each one when its window has passed, against what would have happened anyway, and shows here whether it worked.</p>
+    <button type="button" className="v3-btn v3-btn-sm v3-btn-p" onClick={() => window.__oiGo && window.__oiGo('today')}>Go to Home</button>
   </section>);
   const counts = ['worked', 'pointing', 'did_not_work', 'checking', 'too_early', 'cant_tell'].filter(k => Number(T[k]) > 0);
   return (<section className="v3-sec v3-res">
@@ -22699,7 +23028,7 @@ function V3Review() {
         {top.map(r => (<li key={r.external_id}><b>{v3PlainAction(r).title}</b>{r.cm_gbp ? ' — ' + v3Gbp(r.cm_gbp) + v3Per(r) : ''}.
           <V3MoveDecide row={r} small/></li>))}
       </ol>)}
-      <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>Every action, and why <span className="v3-xref-go">on Moves →</span></button>
+      <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>Every action, and why <span className="v3-xref-go">on Actions</span></button>
       {(pk || (goal && goal.needs_replanning)) && (<>
         <div className="v3-kick v3-gap-top">Coming up</div>
         <ul className="v3-moves">
@@ -22715,7 +23044,7 @@ function V3Review() {
         <div className="v3-kick v3-gap-top">Decided in the last three weeks</div>
         <ul className="v3-rank-steps">{done.rows.filter(r => !r.auto && !r.sup).slice(0, 6).map((r, k) => (<li key={r.external_id + k}><span className="v3-rank-desc">{v3PlainAction(r).title}</span>
           <span className="v3-sub"> {r.status === 'skipped' ? 'Skipped' : 'Done'} {v3Day(r.disposition_at)}{r.verdict ? ' · ' + ((V3_VERDICT[r.verdict] || {}).label || r.verdict) : ' · Not judged yet'}</span></li>))}</ul>
-        {done.rows.filter(r => !r.auto && !r.sup).length > 6 && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>{done.rows.filter(r => !r.auto && !r.sup).length - 6} more decided <span className="v3-xref-go">on Moves →</span></button>}
+        {done.rows.filter(r => !r.auto && !r.sup).length > 6 && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>{done.rows.filter(r => !r.auto && !r.sup).length - 6} more decided <span className="v3-xref-go">on Actions</span></button>}
       </>)}
     </section>
     <V3ReviewNotes weekStart={W.start} range={range}/>
@@ -23577,7 +23906,7 @@ function v3DriversSaid(D) {
     + ' after product, order and ad costs, ' + fmtMoney(Math.abs(gap)) + (gap < 0 ? ' below' : ' above') + ' a typical 28 days, which '
     + (Math.round(t) < 0 ? 'loses ' : 'keeps ') + fmtMoney(Math.abs(t)) + '.';
 }
-function V3RankedDrivers({ D }) {
+function V3RankedDrivers({ D, plain }) {
   const board = useV3Board();
   const [all, setAll] = React.useState(false), [why, setWhy] = React.useState(false);
   const R = (D.drivers || []).filter(r => Number(r.gbp));
@@ -23606,9 +23935,9 @@ function V3RankedDrivers({ D }) {
   const wk = D.to ? v3Day(String(D.to).slice(0, 10)) : null;
   return (<div className="v3-ranked">
     <figure className="v3-bridge v3-bridge-wide" role="img" aria-label="What moved profit after ads, biggest and surest first">
-      <figcaption className="v3-bridge-cap">What moved it{wk ? ' in the four full weeks to ' + wk : ''}, against a typical four weeks</figcaption>
+      {!plain && <figcaption className="v3-bridge-cap">What moved it{wk ? ' in the four full weeks to ' + wk : ''}, against a typical four weeks</figcaption>}
       {shown.map(r => (<div key={r.key} className="v3-bridge-row">
-        <span className="v3-bridge-k">{r.label}<small>{sub(r)}</small></span>
+        <span className="v3-bridge-k">{r.label}{plain ? <small>{V3_DRIVER_SURE[r.evidence] || ''}</small> : <small>{sub(r)}</small>}</span>
         <span className="v3-bridge-track">{lo < 0 && hi > 0 ? <b style={{ left: x(0) + '%' }}/> : null}
           <i className={'v3-bridge-' + (Number(r.gbp) < 0 ? 'loss' : 'gain')} style={{ left: x(Math.min(0, Number(r.gbp))) + '%', width: Math.max(0.6, x(Math.max(0, Number(r.gbp))) - x(Math.min(0, Number(r.gbp)))) + '%' }}/></span>
         <span className="v3-bridge-v">{signed(Number(r.gbp))}</span>
@@ -23617,7 +23946,7 @@ function V3RankedDrivers({ D }) {
     {/* 1110: the moves that act on these lead Today, as cards, above this; a second list here gave them twice */}
     <p className="micro v3-measure">
       {R.length > shown.length || all ? <button type="button" className="v3-xref" onClick={() => setAll(v => !v)}>{all ? 'Show only what moved' : 'Show all ' + R.length + ' parts'}</button> : null}
-      {' '}<button type="button" className="v3-xref" aria-expanded={why} onClick={() => setWhy(v => !v)}>Why Greta ranks it this way <span className="v3-xref-go">{why ? '↑' : '↓'}</span></button>
+      {' '}<button type="button" className="v3-xref" aria-expanded={why} onClick={() => setWhy(v => !v)}>{plain ? 'How this is ranked' : <>Why Greta ranks it this way <span className="v3-xref-go">{why ? '↑' : '↓'}</span></>}</button>
     </p>
     {why && <div className="v3-measure">
       <p className="v3-note">{v3DriversSaid(D)}</p>
@@ -23641,7 +23970,7 @@ function V3BusinessState({ part }) {
   // a month's overheads against its first fortnight of sales
   const youngH = typeof window !== 'undefined' && window.GRETA_HEADLINE && window.GRETA_HEADLINE.setup;
   if (youngH && youngH.young) return null;
-  if (!q.rows) return part === 'detail' ? null : <V3SkeletonRows n={3}/>;
+  if (!q.rows) return part === 'detail' || part === 'moved' ? null : <section className="v3-panel" aria-busy="true"><div className="v3-panel-pad"><V3SkeletonRows n={2}/></div></section>;
   const S = q.rows[0]; if (!S || !S.last_30) return null;
   const L = S.last_30, A = S.ads || {}, U = S.unit || {}, R = S.retention || {}, K = S.basket || {}, P = S.peak, BM = S.benchmarks || {};
   const num = v => (v == null ? null : Number(v));
@@ -23804,37 +24133,35 @@ function V3BusinessState({ part }) {
   // performing and what is not". The week and the four signs sit under the verdict (part="figs"), each with its word; the two
   // pictures follow the moves (part="lead").
   const hasStats = TW && TW.sales != null && TW.profit_after_ads != null;
-  if (part === 'figs') return (<section className="v3-stand-figs" aria-label="How the brand is doing">
-    <h2 className="v3-stand-h">How the brand is doing</h2>
-    {TW && !hasStats && <p className="v3-week-line">{TW.said}</p>}
-    {(hasStats || signs.length > 0) && <div className="v3-figs">
-      {hasStats && [['Sales', TW.sales, TW.prev_sales, true], ['Ad spend', TW.ads, TW.prev_ads, null], ['Kept after ads', TW.profit_after_ads, TW.prev_profit_after_ads, true]].map(([k, v, was, up]) => {
-        const ch = was != null ? Number(v) - Number(was) : null;
-        return (<div className="v3-stat" key={k} title={TW.week_from ? v3Day(TW.week_from) + ' to ' + v3Day(TW.week_to) : undefined}><div className="v3-stat-lab"><span>{k}, last week</span></div><div className="v3-stat-val">{fmtMoney(v)}</div>
-          <div className="v3-stat-foot"><span className={ch == null || up == null ? 'v3-muted' : ch >= 0 ? 'v3-up' : 'v3-down'}>{ch == null ? '' : (ch >= 0 ? '+' : '−') + fmtMoney(Math.abs(ch)) + ' on the week before'}</span></div></div>);
-      })}
-      {signs.slice(0, 4).map(s => <V3Sign key={s.k} {...s}/>)}
-    </div>}
-    {openSign && HP && <V3DriverPanel key={drv} which={drv} points={HP} ctx={openSign.ctx} line={openSign.dline}/>}
-  </section>);
+  if (part === 'figs') {
+    const wkSer = k => wk.map(w => w[k]);
+    const weekly = hasStats ? [['Sales', TW.sales, TW.prev_sales, true, 'sales'], ['Ad spend', TW.ads, TW.prev_ads, null, 'ads'], ['Profit after ads', TW.profit_after_ads, TW.prev_profit_after_ads, true, 'v']] : [];
+    return (<section className="v3-panel v3-home-strip" aria-label="Key figures">
+      {weekly.length > 0 && <div className="v3-home-group" style={{ '--n': weekly.length }}>
+        <div className="v3-home-group-h">Last week{TW.week_from ? <span>{v3Day(TW.week_from)} to {v3Day(TW.week_to)}, against the week before</span> : <span>against the week before</span>}</div>
+        <div className="v3-home-tiles">{weekly.map(([k, v, was, up, key]) => {
+          const ch = was != null && Number(was) !== 0 ? (Number(v) - Number(was)) / Math.abs(Number(was)) : null;
+          const dir = ch == null || Math.abs(ch) < 0.0005 ? 'flat' : ch > 0 ? 'up' : 'down';
+          return <V3HomeTile key={k} k={k} v={fmtMoney(v)} dir={dir} cls={up == null || dir === 'flat' ? '' : (dir === 'up') === up ? 'v3-up' : 'v3-down'}
+            delta={ch == null ? '' : (Math.abs(ch) * 100).toFixed(1) + '%'} pts={wkSer(key)}/>;
+        })}</div></div>}
+      {signs.length > 0 && <div className="v3-home-group" style={{ '--n': Math.min(signs.length, 4) }}>
+        <div className="v3-home-group-h">Last 30 days</div>
+        <div className="v3-home-tiles">{signs.slice(0, 4).map(sg => { const t = v3SignTrend(sg);
+          return <V3HomeTile key={sg.k} k={v3SignShort(sg)} v={sg.v} dir={t && t.dir} cls={t && t.cls} delta={t ? t.delta : ''} weak={sg.tone === 'weak'}
+            pts={(sg.series || []).map(p => p.v)} act={sg.act} title={sg.k}/>; })}</div></div>}
+      {TW && !hasStats && <p className="v3-panel-note">{TW.said}</p>}
+      {openSign && HP && <div className="v3-home-drv"><V3DriverPanel key={drv} which={drv} points={HP} ctx={openSign.ctx} line={openSign.dline}/></div>}
+    </section>);
+  }
+  if (part === 'profit') return <V3HomeProfit L={L}/>;
+  // part === 'moved'
   const hasDrivers = S.drivers && S.drivers.state === 'ok' && (S.drivers.drivers || []).length > 0;
-  const drvTo = hasDrivers && S.drivers.to ? v3Day(String(S.drivers.to).slice(0, 10)) : null;
-  return (<section className="v3-stand">
-    <div className="v3-stand-two">
-      <div>
-        <h2 className="v3-stand-h">Where the money went</h2>
-        <p className="v3-stand-lede">{verdict} Last 30 days.</p>
-        <V3MoneyBridge L={L} share={share}/>
-        {profitAct && <button type="button" className="v3-xref v3-sign-act" aria-expanded={profitAct.open} onClick={profitAct.on}>{profitAct.label} <span className="v3-xref-go">{profitAct.open ? '↑' : '↓'}</span></button>}
-      </div>
-      {(hasDrivers || sub) && <div>
-        <h2 className="v3-stand-h">What moved it</h2>
-        {hasDrivers ? <><p className="v3-stand-lede">{drvTo ? 'The four full weeks to ' + drvTo : 'The last four full weeks'}, against a typical four.</p><V3RankedDrivers D={S.drivers}/></> : sub}
-      </div>}
-    </div>
-    {openSign && HP && <V3DriverPanel key={drv} which={drv} points={HP} ctx={openSign.ctx} line={openSign.dline}/>}
-    <V3More id="today-sales-move" label="What moved sales this month"><V3SalesMove/></V3More>
-    {/* 2 Nov: how fresh the figures are is on the agent lead's status line (its tooltip), not a paragraph here */}
+  if (!hasDrivers) return null;
+  const drvTo = S.drivers.to ? v3Day(String(S.drivers.to).slice(0, 10)) : null;
+  return (<section className="v3-panel v3-home-moved">
+    <div className="v3-panel-head"><h2>What moved profit</h2><span className="v3-muted">{drvTo ? '4 weeks to ' + drvTo : 'Last 4 weeks'}, against a typical 4</span></div>
+    <div className="v3-panel-pad"><V3RankedDrivers D={S.drivers} plain/></div>
   </section>);
 }
 // Cash to the plan's end (0453, owner-seat eval 12 Oct): "can I afford the peak?" had every piece on some
@@ -25810,7 +26137,7 @@ function V3JobHealth() {
 }
 const V3_PAGES = {
   // 1110: the goal strip and the moves first, above everything else
-  today: (p) => (<><V3TodayLead/><V3JobHealth/><V3BusinessState part="lead"/><V3Today {...p}/></>),
+  today: (p) => (<><V3TodayLead/><V3JobHealth/><V3Today {...p}/></>),
   review: (p) => (<>
     {/* Rebuilt 2026-10-05: the week against a typical week, the meeting agenda off the board, notes in
         the workspace. The old weekly board (week-on-week only, GA4 repair read as growth, notes in one
@@ -25887,7 +26214,7 @@ const V3_PAGES = {
     </V3More>
     <V3More id="stock-suppliers" label="Suppliers"><V3Anchor id="suppliers"/><SuppliersDirectory/></V3More>
   </>),
-  profit: (p) => <Overview start={p.start} period={p.period} customActive={p.customActive}/>,
+  profit: (p) => <><Overview start={p.start} period={p.period} customActive={p.customActive}/><V3Today page="profit"/></>,
   marketing: (p) => (<>
     {/* Rebuilt 2026-10-05 around what the spend buys: the brand-level read first (spend against new
         customers), then one channel table with a verdict that survives the assumption, then the ads to
@@ -26826,7 +27153,7 @@ function V3WalkWhy({ X, diag, focus }) {
 // so no page had to change to be toured; if a panel is not on screen for this brand (no data yet),
 // the caption says so and the stop still reads.
 const V3_WALK_TOUR = {
-  profit: { dest: 'today', target: { sel: '.v3-bridge' }, fallback: { sel: '.v3-al' },
+  profit: { dest: 'today', target: { sel: '.v3-home-profit' }, fallback: { sel: '.v3-home-strip' },
     what: 'Where the last 30 days’ sales went: products and delivery, ads and running costs come out, and what is left is what you keep. Profit after ads is the line before running costs.' },
   sales: { dest: 'profit', target: { sel: '.v3-flow' },
     what: 'This bar is every £1 of sales and where it went: product costs, order costs and ads come out, and the last segment is what you keep. Tap any segment to open the page behind it.' },
@@ -27166,7 +27493,7 @@ function V3WalkFab({ dest }) {
   return (<div className="v3-walk-fab" ref={ref}>
     {open && (<div className="v3-walk-pop" role="dialog" aria-labelledby="v3-walk-pop-t">
       <div className="v3-walk-pop-head">
-        <h2 className="v3-walk-pop-t" id="v3-walk-pop-t">Walk me through</h2>
+        <h2 className="v3-walk-pop-t" id="v3-walk-pop-t">Guided tour</h2>
         <button type="button" className="v3-btn v3-btn-q v3-btn-sm" aria-label="Close" onClick={() => setOpen(false)}><Icon name="close" size={14}/></button>
       </div>
       <p className="v3-note">Greta takes you round the app panel by panel: what each one shows, what it says against the period before and the same time last year, and what to do about it.</p>
@@ -27184,8 +27511,8 @@ function V3WalkFab({ dest }) {
         </button>))}
       </div>
     </div>)}
-    <button type="button" className="v3-walk-fab-btn" aria-expanded={open} aria-label="Walk me through" onClick={() => setOpen(o => !o)}>
-      <Icon name="spark" size={15}/> <span className="v3-walk-fab-lab">Walk me through</span></button>
+    <button type="button" className="v3-walk-fab-btn" aria-expanded={open} aria-label="Guided tour" onClick={() => setOpen(o => !o)}>
+      <Icon name="info" size={15}/> <span className="v3-walk-fab-lab">Guided tour</span></button>
   </div>);
 }
 
@@ -27199,7 +27526,7 @@ function V3FreshnessBanner() {
   const F = q.rows && q.rows[0] && q.rows[0].freshness;
   // 1120: a sample brand's figures end on its seed date; say so plainly instead of warning about a stopped feed.
   // 3 Nov: in the shell's bar, so it is not the first thing on every page.
-  const sample = F && F.demo && !F.stale ? 'Sample brand, made up to show Greta at work.' + (F.demo_through ? ' Figures run to ' + v3Day(F.demo_through, true) + '.' : '') : null;
+  const sample = F && F.demo && !F.stale ? 'Sample data.' + (F.demo_through ? ' Figures run to ' + v3Day(F.demo_through, true) + '.' : '') : null;
   const bar = v3ShellEl('bar-note');
   React.useEffect(() => { if (bar) bar.textContent = sample || ''; }, [bar, sample]);
   if (sample) return bar ? null : <p className="v3-note v3-measure v3-sample" role="note">{sample}</p>;
@@ -27236,10 +27563,9 @@ function V3TellUs({ dest, label }) {
     } catch (e) { setErr(String((e && e.message) || e)); }
     setBusy(false);
   };
-  return (<section className="v3-tell" ref={ref} aria-label="Tell us">
+  return (<section className={'v3-tell' + (open ? ' open' : '')} ref={ref} aria-label="Feedback">
     {!open && <p className="v3-tell-q">
-      {sent ? 'Sent to the Greta team. Thank you.' : 'Something wrong, missing or confusing on this page?'}
-      <button type="button" className="v3-btn v3-btn-sm" onClick={() => { setOpen(true); setSent(false); }}>{sent ? 'Tell us more' : 'Tell us'}</button>
+      {sent ? 'Sent. Thank you.' : ''}
     </p>}
     {open && <div className="v3-tell-form">
       <V3WhyChips list={V3_WHY.page} pick={pick} setPick={setPick} label="What is it?"/>
@@ -27313,13 +27639,13 @@ function V3App({ dest, go, children, start, periodCtl }) {
           return (<React.Fragment key={e.id}>{head}
             <button type="button" className={'v3-nav-item' + (e.id === dest ? ' active' : '')} onClick={() => go(e.id)} aria-current={e.id === dest ? 'page' : undefined}>
               {e.label}
-              {n > 0 && <span className="v3-nav-n" aria-label={n + ' moves worth doing'}>{n}</span>}
+              {n > 0 && <span className="v3-nav-n" aria-label={n + ' actions open'}>{n}</span>}
               {alert && <span className="v3-nav-alert" aria-label="A data source has stopped reporting"/>}
             </button>
           </React.Fragment>);
         }); })()}
         <button type="button" className="v3-nav-item" onClick={() => window.dispatchEvent(new Event('v3-tell-open'))}>
-          Tell us
+          Feedback
         </button>
       </nav>
       <main className={'v3-main' + (dest === 'today' ? ' v3-main-today' : '')} id="v3-content" tabIndex={-1}>
@@ -27327,12 +27653,10 @@ function V3App({ dest, go, children, start, periodCtl }) {
             page it was a sticky bar above the title, so the first thing on each screen was an
             input rather than the page's own question. */}
         <V3FreshnessBanner/>
-        <header className={'v3-page-head' + (dest === 'today' ? ' v3-sr-only' : '')}>
+        <header className="v3-page-head">
           <div className="v3-page-head-row">
-            <div>
-              <h1 className="v3-page-title">{d.label}</h1>
-              <p className="v3-page-q">{d.q}</p>
-            </div>
+            <h1 className="v3-page-title">{d.label}</h1>
+            {dest === 'today' && <V3HomeUpdated/>}
             {/* 2 Nov: Ask lives in Today's agent lead (V3AgentLead) */}
             {V3_PERIOD_PAGES.indexOf(dest) >= 0 ? periodCtl : null}
           </div>
@@ -27500,15 +27824,6 @@ function App(){
         <V3App dest={v3dest} go={(d)=>{ setV3dest(d); track('page_view', { dest: d }, d); }} start={start}
                periodCtl={<V3Period period={period} setPeriod={setPeriod} rangeStart={rangeStart} rangeEnd={rangeEnd}
                                     setRangeStart={setRangeStart} setRangeEnd={setRangeEnd} customActive={customActive}/>}><V3Boundary where={'page:' + v3dest} resetKey={v3dest} label="This page">{page}</V3Boundary></V3App>
-        <footer className="app-footer">
-          <div className="app-footer-brand"><span>greta</span></div>
-          <span className="app-footer-dot"/>
-          <span title={D.meta.source}>{(OI_BRAND.name||'your')} workspace · {(D.meta.source||'').split('—')[0].trim()||'Live data'}</span>
-          <span className="app-footer-dot"/>
-          {D.meta.captured && <span>Updated {v3Stamp(D.meta.captured)}</span>}
-          <div style={{flex:1}}/>
-          <span>Auto-updates daily</span>
-        </footer>
         <ToastHost/>
         <CommandMenu/>
         <EvidenceDrawer/>
