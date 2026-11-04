@@ -2260,3 +2260,22 @@ div:has(> .v3-profit) ~ .v3-today { gap: 0; }
   .v3-main .v3-marketing .v3-mk-channels table.v3-profit-rows th:first-child, .v3-main .v3-marketing .v3-mk-channels table.v3-profit-rows td:first-child,
   .v3-main .v3-marketing .v3-mk-map table.v3-profit-rows th:first-child, .v3-main .v3-marketing .v3-mk-map table.v3-profit-rows td:first-child { white-space: normal; min-width: 0; }
 }
+/* Weekly review */
+.v3-review-pick .recharts-wrapper { cursor: pointer; }
+.v3-main .v3-review .v3-review-total td { font-weight: var(--weight-semi); }
+.v3-review-this td { background: var(--color-surface); }
+.v3-review-sale { margin-left: var(--space-2); padding: 0 var(--space-1); border: 1px solid var(--color-line); border-radius: var(--radius-sm); color: var(--color-muted); font-size: var(--text-xs); }
+.v3-main .v3-review table.v3-profit-rows td.v3-review-wrap { white-space: normal; }
+.v3-review-old { margin-top: var(--space-3); padding-top: var(--space-3); color: var(--color-muted); font-size: var(--text-sm); }
+#v3-page-control:empty { display: none; }
+/* an anchor is a scroll target: it takes no room between the page head and the first panel */
+.v3-main > .v3-anchor { position: absolute; }
+.v3-mk-charts figcaption { align-items: center; }
+@media (max-width: 767px) {
+  .v3-main .v3-review table.v3-profit-rows th:first-child, .v3-main .v3-review table.v3-profit-rows td:first-child { white-space: normal; min-width: 0; }
+  .v3-review section[aria-label="Coming up"] .v3-btn { white-space: nowrap; }
+}
+@media (max-width: 767px) {
+  .v3-main .v3-review table.v3-profit-rows th.v3-mk-opt, .v3-main .v3-review table.v3-profit-rows td.v3-mk-opt { display: none; }
+  .v3-review-sale { display: inline-block; margin-left: 0; }
+}

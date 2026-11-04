@@ -23006,18 +23006,23 @@ function v3BoardSplitText(rows) {
   if (tests.length) bits.push((tests.length === 1 ? 'one test' : tests.length + ' tests') + ' worth running');
   return bits.length ? bits.slice(0, -1).join(', ') + (bits.length > 1 ? ', and ' : '') + bits[bits.length - 1] : null;
 }
-const V3_TRACK_Q = (sb, b) => sb.from('vw_brand_tracking_state').select('source,state,broke_on,fixed_on,comparisons_clean_from').eq('brand_id', b).eq('source', 'ga4').limit(1);
 function V3Review() {
   const today = new Date().toISOString().slice(0, 10);
   const lad = useV3Rows('profit-ladder', V3_LADDER_Q);
-  const trk = useV3Rows('rev-ga4-state', V3_TRACK_Q);
   const stq = useV3Rows('brand-state', V3_STATE_Q);   // eval 13 Oct (gap 10): last week as Today says it
   const figR = useV3Figures();   // week_sales and week_profit_after_ads (1080)
   const ext = useV3Rows('rev-promos', (sb, b) => sb.from('external_events').select('ts').eq('brand_id', b).eq('kind', 'promo').gte('ts', v3IsoAdd(today, -400)).limit(200));
   const done = useV3Rows('rev-done', (sb, b) => sb.from('actions').select('external_id,description,status,disposition_at,verdict,grade:metadata->grade,auto:metadata->auto_closed_at,sup:metadata->suppressed_at')
     .eq('brand_id', b).in('status', ['done', 'skipped']).gte('disposition_at', v3IsoAdd(today, -21)).order('disposition_at', { ascending: false }).limit(30));
   const board = useV3Board();
+  const bm = useV3Rows('board-moves', V3_BOARD_MOVES_Q);
+  useV3Rows('move-extras', V3_MOVE_EXTRAS_Q);
+  const hq = useV3Rows('sign-history', V3_SIGN_HIST_Q);
   const [back, setBack] = React.useState(0);          // weeks back from the last complete one
+  const [drv, setDrv] = React.useState(null);
+  const [drawer, setDrawer] = React.useState(null);   // { id, mode }
+  const [slot, setSlot] = React.useState(null);       // the header's place for the week control
+  React.useEffect(() => { setSlot(document.getElementById('v3-page-control')); }, []);
   const [facts, setFacts] = React.useState(null);
   React.useEffect(() => { let alive = true; v3AskFacts().then(f => { if (alive) setFacts(f); }, () => {}); return () => { alive = false; }; }, []);
   const H = window.GRETA_HEADLINE || {};
@@ -23037,14 +23042,12 @@ function V3Review() {
     return list;
   }, [lad.rows, cmr, today, stq.rows]);
   const shop = (window.FRKL_DATA && window.FRKL_DATA.shopify) || [];
-  if (lad.err) return <V3LoadFailed what="your weeks" onRetry={lad.retry}/>;
+  if (lad.err) return <V3LoadFailed what="Your weeks" onRetry={lad.retry}/>;
   if (!wk) return <V3SkeletonRows n={4}/>;
   if (wk.length < 10) return <div className="v3-empty">The weekly review starts once there are ten full weeks of sales to compare with.</div>;
-  // One basis for the sales shown and the sales per £ of ads (23 Oct). The daily table holds goods only; the
-  // 30-day figure counts the delivery customers pay too (v3DeliveryK). Shown sales take the same k, so the
-  // shown sales over the shown ad spend is the shown sales per £. Kept after ads keeps its own working.
-  const dk = v3LadderK(lad.rows) || 1, sD = w => w.sales * dk;
-  const i = Math.max(9, wk.length - 1 - back), W = wk[i], P = wk[i - 1];
+  // One basis: the registered week_sales, which Ask and the weekly email say, is sales before delivery, and so is every
+  // week in the ladder. This page alone scaled them up for delivery (£84,693 against £84,168 on Halden, 4 Nov).
+  const i = Math.max(9, wk.length - 1 - back), W = wk[i];
   // The last full week reads the figure Today shows (state.this_week: product, order and ad costs), so the
   // two pages give one result for the same week. Earlier weeks keep the 30-day rate.
   // 1080: week_sales and week_profit_after_ads, when the state's week is this one
@@ -23066,121 +23069,173 @@ function V3Review() {
   T.kept = prev8.length && prev8.every(w => w.keptFrom === 'state') ? v3Med(prev8.map(w => w.kept)) : T.sales * cmr - T.spend;
   const sum = (from, to, f) => shop.filter(r => r && r.date >= from && r.date <= to).reduce((a, r) => a + (Number(r[f]) || 0), 0);
   T.orders = v3Med(prev8.map(w => sum(w.start, w.end, 'orders')).filter(n => n > 0));
-  const orders = sum(W.start, W.end, 'orders'), aov = orders > 0 ? sD(W) / orders : null;
-  const chg = (a, b) => (b > 0 ? a / b - 1 : null);
-  const sChg = chg(W.sales, T.sales), pX = T.spend > 0 ? W.spend / T.spend : null;
-  // What moved the week: only a cause that points the same way as the result and carries a good share of it gets named.
+  const ordOf = w => sum(w.start, w.end, 'orders');
+  const orders = ordOf(W);
   const rateW = W.rate != null ? W.rate : null, rateT = prev8.every(w => w.rate != null) ? v3Med(prev8.map(w => w.rate)) : null;
-  const sEff = (rateT != null ? rateT : cmr) * (W.sales - T.sales), pEff = -(W.spend - T.spend), dKept = W.kept - T.kept;
-  const rEff = rateW != null && rateT != null ? (rateW - rateT) * W.sales : null;
-  const ordinary = Math.abs(dKept) < Math.max(150, Math.abs(T.kept) * 0.1);
-  const causes = [['sales', sChg == null ? null : sEff], ['ads', pX == null ? null : pEff], ['rate', rEff]].filter(c => c[1] != null && c[1] * dKept > 0 && Math.abs(c[1]) >= Math.abs(dKept) * 0.4).sort((p, q) => Math.abs(q[1]) - Math.abs(p[1]));
-  const pence = r => Math.round(r * 100) + 'p';
-  const clause = c => c === 'sales' ? 'Sales were ' + fmtPctN(Math.abs(sChg)) + (sChg > 0 ? ' higher' : ' lower')
-    : c === 'ads' ? (pEff < 0 ? 'Ad spend ran at ' + fmtTimes(pX, 1) + ' a typical week' : 'Ad spend was ' + fmtPctN(1 - pX) + ' lower')
-    : 'Each £1 of sales kept ' + pence(rateW) + ' after products and delivery, against ' + pence(rateT) + ' in a typical week' + (W.sale ? ', with a sale on' : '');
-  const lc = t => t.charAt(0).toLowerCase() + t.slice(1);
-  const why = !causes.length ? 'Sales, ad spend and what each sale kept each moved a little; none of them explains it alone.'
-    : causes.length > 1 ? clause(causes[0][0]) + ' and ' + lc(clause(causes[1][0])) + ', and those two moved it.'
-    : causes[0][0] === 'rate' ? clause('rate') + '.' : clause(causes[0][0]) + ', and that is what moved it.';
-  const lead = ordinary ? 'An ordinary week: you kept ' + fmtMoney(W.kept) + ' after ads, about what a typical week keeps.'
-    : (W.kept < 0 ? 'You lost ' + fmtMoney(-W.kept) : 'You kept ' + fmtMoney(W.kept)) + ' after ads, ' + fmtMoney(Math.abs(Math.round(W.kept) - Math.round(T.kept))) + (dKept > 0 ? ' more' : ' less') + ' than a typical week. ' + why;
   const promoIn = (from, to) => (ext.rows || []).some(r => { const k = String(r.ts).slice(0, 10); return k >= from && k <= to; });
-  // only when the week before was big enough to mislead: a small promo in an ordinary week is not one
-  const priorSale = P && P.sales > T.sales * 1.25 && (promoIn(P.start, P.end) || P.sales > T.sales * 1.4);
-  const g4 = (trk.rows || [])[0] || null, held = g4 && g4.comparisons_clean_from && String(g4.comparisons_clean_from) > today;
-  const mer = W.spend > 0 ? sD(W) / W.spend : null;
+  const mer = W.spend > 0 ? W.sales / W.spend : null, tMer = T.spend > 0 ? T.sales / T.spend : null;
   const range = v3Day(W.start) + ' – ' + v3Day(W.end, true);
-  const t12 = wk.slice(Math.max(0, i - 11), i + 1).map(w => ({ ...w, sales: sD(w), label: v3Day(w.start), mer: w.spend > 0 ? Math.round(sD(w) / w.spend * 100) / 100 : null }));
+  const withMer = w => ({ ...w, label: v3Day(w.start), orders: ordOf(w), mer: w.spend > 0 ? Math.round(w.sales / w.spend * 100) / 100 : null });
+  // The chart stays on the latest weeks while the week picked is among them, so a click does not move what was clicked.
+  const lastI = i >= wk.length - 12 ? wk.length - 1 : i;
+  const t12 = wk.slice(Math.max(0, lastI - 11), lastI + 1).map(withMer);
+  const spark = wk.slice(Math.max(0, i - 11), i + 1).map(withMer);
+  const pickFrom = e => { const p = e && e.activePayload && e.activePayload[0] && e.activePayload[0].payload; if (!p) return; const k = wk.findIndex(w => w.start === p.start); if (k >= 9) { setBack(wk.length - 1 - k); setDrv(null); } };
+  const dim = w => (back > 0 && w.start !== W.start ? 0.4 : 1);
   const tip = ({ active, payload }) => { if (!active || !payload || !payload.length) return null; const p = payload[0].payload;
-    return (<div className="v3-tip"><b>Week of {v3Day(p.start, true)}</b><span>Sales <em>{fmtMoney(p.sales)}</em></span><span>Ad spend <em>{fmtMoney(p.spend)}</em></span><span>Kept after ads <em>{fmtMoney(p.kept)}</em></span></div>); };
-  const stat = (lab, val, foot, cls) => (<div className="v3-stat" key={lab}><div className="v3-stat-lab"><span>{lab}</span></div><div className="v3-stat-val">{val}</div>
-    <div className="v3-stat-foot"><span className={cls || 'v3-muted'}>{foot}</span></div></div>);
-  const liveRows = board.rows ? v3LiveRows(board.rows) : [];
-  const floor = Math.max(50, Math.round((Number(H.net_revenue_30d) || 0) * 0.005));
-  const top = liveRows.filter(r => (Number(r.cm_gbp) || 0) >= floor).slice(0, 3);
-  const split = board.rows ? v3BoardSplitText(board.rows) : null;
-  const F = facts || {}, pk = F.next_peak, goal = F.goal;
-  const peakDays = pk ? Math.round((new Date(pk.from) - new Date(today)) / 864e5) : null;
-  return (<div className="v3-page-stack">
-    <section>
-      <div className="v3-kick-row"><div className="v3-kick">The week, {range}{back === 0 ? ', the last full week' : ''}, against a typical week</div>
-      <div className="v3-btn-row">
-        <button type="button" className="v3-btn v3-btn-q v3-btn-sm" disabled={i <= 9} onClick={() => setBack(b => b + 1)}>Previous week</button>
-        <button type="button" className="v3-btn v3-btn-q v3-btn-sm" disabled={back === 0} onClick={() => setBack(b => Math.max(0, b - 1))}>Next week</button>
-      </div></div>
-      <div className="v3-lead2"><div>
-      <p className="v3-verdict">{lead}</p>
-      <V3Brief>{fmtMoney(sD(W))} of sales on {fmtMoney(W.spend)} of ads, keeping {fmtMoney(W.kept)} after ads. A typical week is {fmtMoney(sD(T))} of sales on {fmtMoney(T.spend)} of ads, keeping {fmtMoney(T.kept)}. That is the middle of the {prev8.length === 8 ? 'eight' : prev8.length} weeks before{leftOut ? ', leaving out ' + (leftOut === 1 ? 'one sale week' : leftOut + ' sale weeks') : ''}.
-        {priorSale ? <> The week before held a sale, which would make this week look worse than it was. So it is compared with a typical week instead.</> : null}
-        {held ? <> Visits, the share of visitors who buy and the checkout steps are left out until {v3Day(g4.comparisons_clean_from, true)}. Google Analytics was not recording properly{g4.broke_on ? ' from ' + v3Day(g4.broke_on) : ''}{g4.fixed_on ? ' to ' + v3Day(g4.fixed_on) : ''}, so a jump in visits now is the repair, not more visitors.</> : null}</V3Brief>
-      </div>
-      <figure className="v3-chart">
-        <figcaption><span className="v3-chart-title">Sales, ad spend and what you kept, by week</span>
-          <span className="v3-legend"><i style={{ background: PAL.sales }}/>Sales <i style={{ background: PAL.ads }}/>Ad spend <i style={{ background: PAL.kept }}/>Kept after ads</span></figcaption>
-        <R.ResponsiveContainer width="100%" height={240}>
-          <R.ComposedChart data={t12} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
-            <R.CartesianGrid/><R.XAxis dataKey="label" interval="preserveStartEnd"/><R.YAxis tickFormatter={fmtMoneyK}/>
-            <R.Tooltip content={tip} cursor={false}/>
-            <R.Bar dataKey="sales" fill={PAL.sales} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
-            <R.Bar dataKey="spend" fill={PAL.ads} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
-            <R.Line dataKey="kept" type="linear" stroke={PAL.kept} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
-            <R.ReferenceLine y={0} stroke={PAL.line}/>
-          </R.ComposedChart>
-        </R.ResponsiveContainer>
-      </figure>
-      </div>
-      <div className="v3-stat-grid v3-gap-top">
-        {stat(dk > 1.001 ? 'Sales, with delivery' : 'Sales', fmtMoney(sD(W)), sChg == null ? '' : (sChg >= 0 ? '+' : '−') + fmtPctN(Math.abs(sChg)) + ' on a typical week', sChg != null && sChg < -0.1 ? 'v3-down' : 'v3-muted')}
-        {stat('Ad spend', fmtMoney(W.spend), pX == null ? '' : fmtTimes(pX, 1) + ' a typical week', pX != null && pX > 1.25 ? 'v3-down' : 'v3-muted')}
-        {stat('Kept after ads', fmtMoney(W.kept), fmtMoney(T.kept) + ' in a typical week', W.kept < T.kept * 0.8 ? 'v3-down' : 'v3-muted')}
-        {stat('Sales per £ of ads', mer != null ? fmtTimes(mer, 2) : FMT_NONE, (be ? 'you break even at ' + fmtTimes(be, 2) : ''), mer != null && be && mer < be ? 'v3-down' : 'v3-muted')}
-        {orders > 0 && stat('Orders', fmtCount(orders), aov ? 'average order ' + fmtMoney(aov) : '')}
-      </div>
-      <V3WeekDrivers W={{ ...W, sales: sD(W), orders }} T={{ ...T, sales: sD(T) }} cmr={cmr / dk} info={{ range, n: prev8.length, leftOut, sale: promoIn(W.start, W.end) && W.sales > T.sales * 1.25 }}/>
-    </section>
-    <div className="v3-chart-pair">
-      <figure className="v3-chart">
-        <figcaption><span className="v3-chart-title">Sales per £ of ads, by week</span>
-          {be && <span className="v3-legend"><i className="dash"/>{fmtTimes(be, 2)}, where you break even</span>}</figcaption>
-        <R.ResponsiveContainer width="100%" height={240}>
-          <R.ComposedChart data={t12} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
-            <R.CartesianGrid/><R.XAxis dataKey="label" interval="preserveStartEnd"/><R.YAxis tickFormatter={v => v + '×'} domain={[0, 'auto']}/>
-            <R.Tooltip content={tip} cursor={false}/>
-            {be && <R.ReferenceLine y={be} stroke={PAL.muted} strokeDasharray="4 4"/>}
-            <R.Line type="linear" dataKey="mer" stroke={PAL.ads} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
-          </R.ComposedChart>
-        </R.ResponsiveContainer>
-      </figure>
-    </div>
+    return (<div className="v3-tip"><b>Week of {v3Day(p.start, true)}</b><span>Sales <em>{fmtMoney(p.sales)}</em></span><span>Ad spend <em>{fmtMoney(p.spend)}</em></span><span>Profit after ads <em>{fmtMoney(p.kept)}</em></span>
+      <span>Sales per £1 of ads <em>{p.mer == null ? FMT_NONE : fmtMoney(p.mer, 2)}</em></span></div>); };
 
-    <section className="v3-sec">
-      <h2 className="v3-sec-title">For this week’s meeting</h2>
-      <div className="v3-kick">Your actions{split ? ', ' + split : ''}</div>
-      {board.err ? <div className="v3-empty">Greta could not load your actions just now.</div> : !board.rows ? <V3SkeletonRows n={3}/> : (<ol className="v3-moves">
-        {top.map(r => (<li key={r.external_id}><b>{v3PlainAction(r).title}</b>{r.cm_gbp ? ', ' + v3Gbp(r.cm_gbp) + v3Per(r) : ''}.
-          <V3MoveDecide row={r} small/></li>))}
-      </ol>)}
-      <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>Every action, and why <span className="v3-xref-go">on Actions</span></button>
-      {(pk || (goal && goal.needs_replanning)) && (<>
-        <div className="v3-kick v3-gap-top">Coming up</div>
-        <ul className="v3-moves">
-          {pk && <li><b>{v3PlainWords(pk.name)} starts in {peakDays} days.</b> {pk.same_days_last_year_sales ? 'The same days last year sold ' + fmtMoney(pk.same_days_last_year_sales) + '. ' : ''}{pk.promotions_planned && pk.promotions_planned.length ? pk.promotions_planned.length + ' promotion' + (pk.promotions_planned.length === 1 ? '' : 's') + ' planned.' : 'Nothing is planned in it yet.'}{pk.stock_order_by && pk.stock_order_by < today ? ' Stock for it had to be ordered by ' + v3Day(pk.stock_order_by) + '.' : ''}
-            {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('calendar')}>Plan it <span className="v3-xref-go">on Calendar</span></button></li>}
-          {goal && goal.needs_replanning && <li><b>Your quarter goal needs re-planning.</b> The plan changed after it was confirmed.{' '}
-            <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal')}>Re-plan <span className="v3-xref-go">on Goal &amp; costs</span></button></li>}
-          {F.calendar && F.calendar.past_sales_not_on_the_calendar > 0 && <li><b>{F.calendar.past_sales_not_on_the_calendar} past sales are not on the calendar.</b> Adding them shows what your promotions really do.</li>}
-        </ul>
-      </>)}
-      {/* Greta's own closes (auto-closed, or the second row on one lever, 1064) are not the owner's decisions */}
-      {done.rows && done.rows.some(r => !r.auto && !r.sup) && (<>
-        <div className="v3-kick v3-gap-top">Decided in the last three weeks</div>
-        <ul className="v3-rank-steps">{done.rows.filter(r => !r.auto && !r.sup).slice(0, 6).map((r, k) => (<li key={r.external_id + k}><span className="v3-rank-desc">{v3PlainAction(r).title}</span>
-          <span className="v3-sub"> {r.status === 'skipped' ? 'Skipped' : 'Done'} {v3Day(r.disposition_at)}{r.verdict ? ', ' + ((V3_VERDICT[r.verdict] || {}).label || r.verdict) : ', Not judged yet'}</span></li>))}</ul>
-        {done.rows.filter(r => !r.auto && !r.sup).length > 6 && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>{done.rows.filter(r => !r.auto && !r.sup).length - 6} more decided <span className="v3-xref-go">on Actions</span></button>}
-      </>)}
+  // The strip: the week against a typical week.
+  const money2 = v => fmtMoney(v, 2), count = v => fmtCount(Math.round(v));
+  const pts = k => spark.map(w => w[k]);
+  const tile = (k, v, typ, up, key, fmt, act) => { const ch = typ ? (v - typ) / Math.abs(typ) : null; const dir = ch == null || Math.abs(ch) < 0.03 ? 'flat' : ch > 0 ? 'up' : 'down';
+    return <V3HomeTile key={k} k={k} v={v == null ? FMT_NONE : fmt(v)} dir={dir} cls={up == null || dir === 'flat' ? '' : (dir === 'up') === up ? 'v3-up' : 'v3-down'} delta={typ == null ? '' : 'typical ' + fmt(typ)} pts={pts(key)} act={act}/>; };
+  const weekM = T.sales > 0 && cmr != null ? v3ModelWeek({ ...W, orders }, T, cmr, { range, n: prev8.length, leftOut, sale: promoIn(W.start, W.end) && W.sales > T.sales * 1.25 }) : null;
+  // The last 30 days beside it, each opening what drives it.
+  const S0 = stq.rows && stq.rows[0];
+  const SG = S0 && S0.last_30 && hq.rows ? v3BuildSigns(S0, hq.rows[0] && hq.rows[0].history, { lad }) : null;
+  const signAll = SG ? SG.signs.concat(SG.profitSign ? [SG.profitSign] : []) : [];
+  const signs = ['profit', 'ly'].map(w => signAll.find(sg => sg.which === w)).filter(Boolean).map(sg => Object.assign({}, sg, { act: !sg.noDrivers && v3HasDrivers(sg.which, SG.HP) ? { open: drv === sg.which, on: () => setDrv(o => (o === sg.which ? null : sg.which)) } : null }));
+  const openSign = drv ? signs.find(sg => sg.which === drv) : null;
+  const signTile = sg => { const t = v3SignTrend(sg);
+    return <V3HomeTile key={sg.which} k={v3SignShort(sg)} v={sg.v} dir={t && t.dir} cls={t && t.cls} delta={t ? t.delta : ''} weak={sg.tone === 'weak'} pts={(sg.series || []).map(p => p.v)} act={sg.act} title={sg.k}/>; };
+
+  // What moved profit: the same parts the driver panel draws, and what they leave.
+  const signed = v => (v < 0 ? '−' : '+') + fmtMoney(Math.abs(v));
+  const dKept = Math.round(W.kept) - Math.round(T.kept);
+  const parts = weekM ? weekM.parts.map(p => ({ k: p.k, sub: p.sub, amt: Math.round(p.amt) })) : [];
+  const rest = dKept - parts.reduce((t, p) => t + p.amt, 0);
+  const pence = r => Math.round(r * 100) + 'p';
+
+  // The meeting: the board's top items, what is coming, what was decided.
+  const liveRows = board.rows ? v3FoldPlans(v3LiveRows(board.rows)) : [];
+  const floor = Math.max(50, Math.round((Number(H.net_revenue_30d) || 0) * 0.005));
+  const top = liveRows.filter(r => (Number(r.cm_gbp) || 0) >= floor).slice(0, 5);
+  const bmRows = bm.rows && bm.rows[0] && Array.isArray(bm.rows[0].rows) ? bm.rows[0].rows : [];
+  const openRow = drawer && top.find(r => r.external_id === drawer.id);
+  const F = facts || {}, pk = F.next_peak, goal = F.goal, notOnCal = F.calendar && F.calendar.past_sales_not_on_the_calendar > 0 ? F.calendar.past_sales_not_on_the_calendar : 0;
+  const peakDays = pk ? Math.round((new Date(pk.from) - new Date(today)) / 864e5) : null;
+  const replan = goal && goal.needs_replanning;
+  // Greta's own closes (auto-closed, or the second row on one lever, 1064) are not the owner's decisions
+  const decided = done.rows ? done.rows.filter(r => !r.auto && !r.sup) : [];
+  const go = (...a) => window.__oiGo && window.__oiGo(...a);
+
+  return (<div className="v3-home v3-profit v3-marketing v3-review">
+    {slot && ReactDOM.createPortal(<div className="v3-period">
+      <label htmlFor="v3-week-sel" className="v3-muted">Showing</label>
+      <select id="v3-week-sel" value={wk.length - 1 - i} onChange={e => { setBack(Number(e.target.value)); setDrv(null); setDrawer(null); }}>
+        {wk.slice(9).reverse().map((w, k) => <option key={w.start} value={k}>{v3Day(w.start) + ' – ' + v3Day(w.end, true)}</option>)}
+      </select></div>, slot)}
+
+    <section className="v3-panel v3-home-strip v3-mk-strip" aria-label="Key figures">
+      <div className="v3-home-group" style={{ '--n': 5 }}>
+        <div className="v3-home-group-h">{back === 0 ? 'Last full week' : 'Week shown'}<span>against a typical week</span></div>
+        <div className="v3-home-tiles">
+          {tile('Sales', W.sales, T.sales, true, 'sales', fmtMoney)}
+          {tile('Ad spend', W.spend, T.spend, T.spend > 0 && W.spend / T.spend > 1.25 ? false : null, 'spend', fmtMoney)}
+          {tile('Profit after ads', W.kept, T.kept, true, 'kept', fmtMoney, weekM ? { open: drv === 'week', on: () => setDrv(o => (o === 'week' ? null : 'week')) } : null)}
+          <V3HomeTile key="mer" k="Sales per £1 of ads" v={mer == null ? FMT_NONE : money2(mer)} weak={mer != null && be && mer < be} delta={be ? 'break-even ' + money2(be) : tMer != null ? 'typical ' + money2(tMer) : ''} pts={pts('mer')}/>
+          {orders > 0 && tile('Orders', orders, T.orders, true, 'orders', count)}
+        </div></div>
+      {signs.length > 0 && <div className="v3-home-group" style={{ '--n': signs.length }}>
+        <div className="v3-home-group-h">Last 30 days<span>against 4 weeks ago</span></div>
+        <div className="v3-home-tiles">{signs.map(signTile)}</div></div>}
+      {drv === 'week' && weekM && <div className="v3-home-drv"><V3DriverPanel key="week" fixed={weekM}/></div>}
+      {openSign && <div className="v3-home-drv"><V3DriverPanel key={drv} which={drv} points={openSign.points || SG.HP} ctx={openSign.ctx} line={openSign.dline}/></div>}
     </section>
+
+    <section className="v3-panel" aria-label="Sales, ad spend and profit by week">
+      <div className="v3-panel-head"><h2>By week</h2><span className="v3-muted">Pick a week on the chart to see it</span></div>
+      <div className="v3-panel-pad v3-mk-charts">
+        <figure className="v3-chart v3-review-pick" aria-label="Sales, ad spend and profit after ads, by week">
+          <figcaption><span className="v3-chart-title">Sales, ad spend and profit after ads</span>
+            <span className="v3-legend"><i style={{ background: PAL.sales }}/>Sales <i style={{ background: PAL.ads }}/>Ad spend <i style={{ background: PAL.kept }}/>Profit after ads</span></figcaption>
+          <R.ResponsiveContainer width="100%" height={240}>
+            <R.ComposedChart data={t12} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} onClick={pickFrom}>
+              <R.CartesianGrid/><R.XAxis dataKey="label" interval="preserveStartEnd"/><R.YAxis tickFormatter={fmtMoneyK}/>
+              <R.Tooltip content={tip} cursor={false}/>
+              <R.Bar dataKey="sales" fill={PAL.sales} isAnimationActive={false}>{t12.map(w => <R.Cell key={w.start} fillOpacity={dim(w)}/>)}</R.Bar>
+              <R.Bar dataKey="spend" fill={PAL.ads} isAnimationActive={false}>{t12.map(w => <R.Cell key={w.start} fillOpacity={dim(w)}/>)}</R.Bar>
+              <R.Line dataKey="kept" type="linear" stroke={PAL.kept} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
+              <R.ReferenceLine y={0} stroke={PAL.line}/>
+            </R.ComposedChart>
+          </R.ResponsiveContainer>
+        </figure>
+        <figure className="v3-chart v3-review-pick" aria-label="Sales per £1 of ads, by week">
+          <figcaption><span className="v3-chart-title">Sales per £1 of ads</span>
+            {be && <span className="v3-legend"><i className="dash"/>Break-even {money2(be)}</span>}</figcaption>
+          <R.ResponsiveContainer width="100%" height={240}>
+            <R.ComposedChart data={t12} margin={{ top: 8, right: 8, left: 0, bottom: 0 }} onClick={pickFrom}>
+              <R.CartesianGrid/><R.XAxis dataKey="label" interval="preserveStartEnd"/><R.YAxis tickFormatter={v => fmtMoney(v)} domain={[0, 'auto']}/>
+              <R.Tooltip content={tip} cursor={false}/>
+              {be && <R.ReferenceLine y={be} stroke={PAL.muted} strokeDasharray="4 4"/>}
+              <R.Line type="linear" dataKey="mer" stroke={PAL.ads} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
+            </R.ComposedChart>
+          </R.ResponsiveContainer>
+        </figure>
+      </div>
+    </section>
+
+    {weekM && <section className="v3-panel" aria-label="What moved profit">
+      <div className="v3-panel-head"><h2>What moved profit</h2><span className="v3-muted">{range}, against a typical week</span></div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+        <thead><tr><th>Cause</th><th className="r">Typical week to this week</th><th className="r">Effect on profit</th></tr></thead>
+        <tbody>
+          {parts.map(p => <tr key={p.k}><td>{p.k}</td><td className="r">{p.sub}</td><td className="r">{signed(p.amt)}</td></tr>)}
+          {rest !== 0 && <tr><td>Margin and other costs</td><td className="r">{rateW != null && rateT != null ? pence(rateT) + ' to ' + pence(rateW) + ' kept per £1' : ''}</td><td className="r">{signed(rest)}</td></tr>}
+          <tr className="v3-review-total"><td>Profit after ads</td><td className="r">{fmtMoney(T.kept)} to {fmtMoney(W.kept)}</td><td className="r">{signed(dKept)}</td></tr>
+        </tbody></table></div>
+      <p className="v3-panel-note">A typical week is the middle of the {prev8.length} weeks before{leftOut ? ', leaving out ' + leftOut + (leftOut === 1 ? ' sale week' : ' sale weeks') : ''}.</p>
+    </section>}
+
+    <section className="v3-panel" aria-label="Actions">
+      <div className="v3-panel-head"><h2>Actions</h2><span className="v3-muted">For the week’s meeting</span>
+        <button type="button" className="v3-panel-link" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>View all</button></div>
+      {board.err ? <p className="v3-panel-note">Actions could not load. Refresh the page to try again.</p>
+        : !board.rows ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={3}/></div>
+        : !top.length ? <p className="v3-panel-note">No open actions.</p>
+        : <table className="v3-home-table">
+          <thead><tr><th>Action</th><th>Area</th><th className="r">Worth</th><th>Basis</th><th>Status</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
+          <tbody>{top.map(r => <V3HomeRow key={r.external_id} row={r} bmRow={bmRows.find(x => x.external_id === r.external_id)} onOpen={mode => setDrawer({ id: r.external_id, mode })}/>)}</tbody>
+        </table>}
+      {openRow && <V3HomeDrawer key={openRow.external_id} row={openRow} startMode={drawer.mode} onClose={() => setDrawer(null)}/>}
+    </section>
+
+    {(pk || replan || notOnCal > 0) && <section className="v3-panel" aria-label="Coming up">
+      <div className="v3-panel-head"><h2>Coming up</h2></div>
+      {pk && <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+        <thead><tr><th>Peak</th><th className="r">Starts in</th><th className="r v3-mk-opt">Same days last year</th><th className="r v3-mk-opt">Promotions planned</th><th className="r">Order stock by</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
+        <tbody><tr><td>{v3PlainWords(pk.name)}</td><td className="r">{peakDays > 0 ? fmtCount(peakDays) + (peakDays === 1 ? ' day' : ' days') : 'Running'}</td>
+          <td className="r v3-mk-opt">{pk.same_days_last_year_sales ? fmtMoney(pk.same_days_last_year_sales) : FMT_NONE}</td>
+          <td className="r v3-mk-opt">{fmtCount(pk.promotions_planned ? pk.promotions_planned.length : 0)}</td>
+          <td className={'r' + (pk.stock_order_by && pk.stock_order_by < today ? ' v3-down' : '')}>{pk.stock_order_by ? v3Day(pk.stock_order_by, true) : FMT_NONE}</td>
+          <td className="r"><button type="button" className="v3-btn v3-btn-sm" onClick={() => go('calendar')}>Open Calendar</button></td></tr></tbody>
+      </table></div>}
+      {replan && <div className="v3-panel-note v3-mk-test"><span>Quarter goal: the plan changed after it was confirmed.</span><button type="button" className="v3-btn v3-btn-sm" onClick={() => go('goal')}>Re-plan</button></div>}
+      {notOnCal > 0 && <div className="v3-panel-note v3-mk-test"><span>Past sales not on the calendar: {fmtCount(notOnCal)}</span><button type="button" className="v3-btn v3-btn-sm" onClick={() => go('calendar')}>Open Calendar</button></div>}
+    </section>}
+
+    {decided.length > 0 && <section className="v3-panel" aria-label="Decided">
+      <div className="v3-panel-head"><h2>Decided</h2><span className="v3-muted">Last 3 weeks</span>
+        {decided.length > 6 && <button type="button" className="v3-panel-link" onClick={() => go('actions')}>View all {fmtCount(decided.length)}</button>}</div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+        <thead><tr><th>Action</th><th>Decision</th><th>Date</th><th>Result</th></tr></thead>
+        <tbody>{decided.slice(0, 6).map((r, k) => <tr key={r.external_id + k}><td className="v3-review-wrap">{v3PlainAction(r).title}</td><td>{r.status === 'skipped' ? 'Skipped' : 'Done'}</td><td>{v3Day(r.disposition_at)}</td><td>{r.verdict ? ((V3_VERDICT[r.verdict] || {}).label || r.verdict) : 'Not judged yet'}</td></tr>)}</tbody>
+      </table></div>
+    </section>}
+
     <V3ReviewNotes weekStart={W.start} range={range}/>
+
+    <section className="v3-panel" aria-label="Weeks">
+      <div className="v3-panel-head"><h2>Weeks</h2><span className="v3-muted">Week starting, newest first</span></div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+        <thead><tr><th>Week</th><th className="r">Sales</th><th className="r">Ad spend</th><th className="r">Profit after ads</th><th className="r">Sales per £1 of ads</th><th className="r v3-mk-opt">Orders</th></tr></thead>
+        <tbody>{t12.slice().reverse().map(w => <tr key={w.start} className={w.start === W.start ? 'v3-review-this' : ''}>
+          <td>{v3Day(w.start)}{w.sale ? <span className="v3-review-sale">Sale</span> : null}</td><td className="r">{fmtMoney(w.sales)}</td><td className="r">{fmtMoney(w.spend)}</td>
+          <td className={'r' + (w.kept < 0 ? ' v3-down' : '')}>{fmtMoney(w.kept)}</td><td className={'r' + (be && w.mer != null && w.mer < be ? ' v3-down' : '')}>{w.mer == null ? FMT_NONE : money2(w.mer)}</td><td className="r v3-mk-opt">{w.orders > 0 ? fmtCount(w.orders) : FMT_NONE}</td></tr>)}</tbody>
+      </table></div>
+    </section>
   </div>);
 }
 // Notes and decisions for the week under review, kept in the workspace (review_note, 0265) so the team
@@ -23212,26 +23267,29 @@ function V3ReviewNotes({ weekStart, range }) {
     if (!r.error) { try { localStorage.removeItem('frkl-board-notes'); localStorage.removeItem('frkl-board-actions'); } catch (e) {} setMsg('Brought over ' + rows.length + ' note' + (rows.length === 1 ? '' : 's') + ' from this browser.'); q.retry(); }
     else setMsg('Could not bring them over just now.');
   };
-  return (<section className="v3-sec">
-    <h2 className="v3-sec-title">Notes and decisions <span className="v3-muted">{range}</span></h2>
-    <p className="v3-note v3-measure">Saved to your workspace, so everyone on your team sees the same notes. To act on an item in the list above, mark it done or skip it there.</p>
-    {q.err ? <div className="v3-empty">Notes could not load just now.</div> : !q.rows ? <V3SkeletonRows n={2}/> : q.rows.length === 0 ? <div className="v3-empty">Nothing written for this week yet.</div> : (
-      <ul className="v3-rank-steps">{q.rows.map(r => (<li key={r.id}><span className="v3-rank-desc">{r.kind === 'decision' ? 'Decision: ' : ''}{r.body}</span>
-        <span className="v3-sub"> {v3Day(r.created_at)}{r.author_id === uid ? ', you' : ''}</span>
-        {r.author_id === uid && <> <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => remove(r.id)}>Remove</button></>}</li>))}</ul>)}
-    <div className="v3-ask-box v3-gap-top">
-      <textarea value={text} onChange={e => setText(e.target.value)} rows={3} placeholder="What did you decide, and what should everyone remember about this week?"/>
-      <div className="v3-ask-bar">
-        <div className="v3-seg" role="group" aria-label="Kind of note">
-          <button type="button" aria-pressed={kind === 'note'} onClick={() => setKind('note')}>Note</button>
-          <button type="button" aria-pressed={kind === 'decision'} onClick={() => setKind('decision')}>Decision</button>
+  return (<section className="v3-panel" aria-label="Notes">
+    <div className="v3-panel-head"><h2>Notes</h2><span className="v3-muted">{range}</span></div>
+    {q.err ? <p className="v3-panel-note">Notes could not load. Refresh the page to try again.</p> : !q.rows ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={2}/></div> : q.rows.length > 0 && (
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+        <thead><tr><th>Date</th><th>Type</th><th>Note</th><th>By</th><th><span className="v3-sr-only">Remove</span></th></tr></thead>
+        <tbody>{q.rows.map(r => <tr key={r.id}><td>{v3Day(r.created_at)}</td><td>{r.kind === 'decision' ? 'Decision' : 'Note'}</td><td className="v3-review-wrap">{r.body}</td><td>{r.author_id === uid ? 'You' : 'Team'}</td>
+          <td className="r">{r.author_id === uid && <button type="button" className="v3-btn v3-btn-sm" onClick={() => remove(r.id)}>Remove</button>}</td></tr>)}</tbody>
+      </table></div>)}
+    <div className="v3-panel-pad">
+      <div className="v3-ask-box">
+        <textarea value={text} onChange={e => setText(e.target.value)} rows={3} aria-label="Note or decision" placeholder="Note or decision for this week, shared with your team"/>
+        <div className="v3-ask-bar">
+          <div className="v3-seg" role="group" aria-label="Kind of note">
+            <button type="button" aria-pressed={kind === 'note'} onClick={() => setKind('note')}>Note</button>
+            <button type="button" aria-pressed={kind === 'decision'} onClick={() => setKind('decision')}>Decision</button>
+          </div>
+          <button type="button" className="v3-btn v3-btn-p" disabled={busy || !text.trim()} onClick={save}>{busy ? 'Saving…' : 'Save'}</button>
         </div>
-        <button type="button" className="v3-btn v3-btn-p" disabled={busy || !text.trim()} onClick={save}>{busy ? 'Saving…' : 'Save'}</button>
       </div>
+      {msg && <p className="v3-note">{msg}</p>}
+      {oldCount > 0 && <div className="v3-mk-test v3-review-old"><span>Notes from the old board, held in this browser only: {fmtCount(oldCount)}</span>
+        <button type="button" className="v3-btn v3-btn-sm" disabled={busy} onClick={bringOver}>Bring into the workspace</button></div>}
     </div>
-    {msg && <p className="v3-note">{msg}</p>}
-    {oldCount > 0 && <p className="micro muted v3-measure">This browser still holds {oldCount} note{oldCount === 1 ? '' : 's'} and action{oldCount === 1 ? '' : 's'} from the old board, which only you could see.{' '}
-      <button type="button" className="v3-btn v3-btn-q v3-btn-sm" disabled={busy} onClick={bringOver}>Bring them into the workspace</button></p>}
   </section>);
 }
 
@@ -24665,15 +24723,6 @@ function v3ModelWeek(W, T, cmr, info) {
     ],
     note: 'The figures above on this page: Monday to Sunday, sales after discounts and before VAT, Meta and Google spend. A typical week is the middle of the eight before, leaving out sale weeks, so a sale does not set the bar.',
   };
-}
-function V3WeekDrivers({ W, T, cmr, info }) {
-  const [open, setOpen] = React.useState(false);
-  if (!W || !T || cmr == null || !(T.sales > 0)) return null;
-  return (<div className="v3-strip-act">
-    <button type="button" className="v3-xref v3-sign-act" aria-expanded={open} onClick={() => setOpen(o => !o)}>
-      {open ? 'Hide what is driving it' : 'What is driving this week?'} <span className="v3-xref-go">{open ? '↑' : '↓'}</span></button>
-    {open && <V3DriverPanel fixed={v3ModelWeek(W, T, cmr, info)}/>}
-  </div>);
 }
 // Stock (9 Oct): what drives the profit lost before an order placed today can land. Greta keeps stock
 // as it is now (Shopify's counts are overwritten on every sync), so there is no "then" yet: this splits
@@ -26256,17 +26305,17 @@ function V3Congruency() {
   // The view says 'insufficient_history' until there is a reading 10 or more days old. That was printed as
   // "No: they moved apart … went from — to 2.73×" (Halden, 23 Oct): a verdict with nothing to compare.
   if (c.congruency === 'insufficient_history' || n(c.iroas_prior) == null || n(c.cm_prior) == null) {
-    return (<p className="v3-note v3-measure v3-cong"><b>Do the ad figures and your profit agree?</b>{' '}
-      Not known yet. They are compared against a reading from at least 10 days earlier{c.latest_date ? ', and the first one is from ' + v3Day(String(c.latest_date)) : ''}.</p>);
+    return (<V3More id="rev-cong" label="Ad figures against profit"><p className="v3-note v3-measure v3-cong">
+      Not known yet. They are compared against a reading from at least 10 days earlier{c.latest_date ? ', and the first one is from ' + v3Day(String(c.latest_date)) : ''}.</p></V3More>);
   }
   const ok = c.congruency === 'congruent';
   // The change, not the two levels: the snapshot's profit is worked on its own day and basis, and printed
   // as a level it sat beside the header's profit after ads as a second figure for the same thing.
   const dCm = n(c.cm_change);   // 1109: the view's own change, not worked out here
-  return (<p className="v3-note v3-measure v3-cong"><b>Do the ad figures and your profit agree?</b>{' '}
-    {ok ? 'Yes: they moved the same way.' : 'No: they moved apart, so one of them is misreading.'}{' '}
+  return (<V3More id="rev-cong" label="Ad figures against profit"><p className="v3-note v3-measure v3-cong">
+    {ok ? 'They moved the same way.' : 'They moved apart, so one of them is misreading.'}{' '}
     Return on ads after the share they really cause went from <span>{fmtTimes(n(c.iroas_prior), 2)}</span> to <span>{fmtTimes(n(c.iroas_now), 2)}</span>{dCm != null ? <>; profit after ads {dCm >= 0 ? 'rose' : 'fell'} by <span>{fmtMoney(Math.abs(dCm))}</span> over the same days</> : null}{v3CongDays(c.prior_date, c.latest_date)}.
-    {ok ? '' : ' Check the tracking on Settings before acting on the ad figures.'}</p>);
+    {ok ? '' : ' Check the tracking on Settings before acting on the ad figures.'}</p></V3More>);
 }
 // A scheduled refresh that failed twice or stopped (0383, 0398): one line, in the notice's own words.
 const V3_JOBHEALTH_Q = (sb, b) => sb.from('actions').select('description,updated_at').eq('brand_id', b)
@@ -26285,11 +26334,10 @@ const V3_PAGES = {
         browser) and the alerts panel (forecast patterns the board holds back, a track record that said
         nothing was done) are gone; findings that pass the evidence check are below. */}
     <V3Anchor id="week"/><V3Review/>
-    <V3DriverStrip keys={['profit', 'ly']}/>
     <V3Congruency/>
-    <V3More id="rev-quarter" label="This quarter, a summary to share with your board or investors"><V3Anchor id="quarter"/><BusinessReview/></V3More>
+    <V3More id="rev-quarter" label="Quarter summary"><V3Anchor id="quarter"/><BusinessReview/></V3More>
     <V3More id="rev-alerts" label="Findings"><V3Anchor id="alerts"/><V3Findings/>
-      <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('results')}>What was done, and whether it worked <span className="v3-xref-go">on Results</span></button>
+      <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('results')}>Open Results</button>
     </V3More>
   </>),
   actions: (p) => (<>
@@ -27791,6 +27839,7 @@ function V3App({ dest, go, children, start, periodCtl }) {
             {dest === 'today' && <V3HomeUpdated/>}
             {/* 2 Nov: Ask lives in Today's agent lead (V3AgentLead) */}
             {V3_PERIOD_PAGES.indexOf(dest) >= 0 ? periodCtl : null}
+            {dest === 'review' && <div id="v3-page-control"/>}
           </div>
         </header>
         <BrandAgeBanner/>
