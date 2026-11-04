@@ -3671,7 +3671,29 @@ function V3VisitsKPI({ fallback }) {
     sub={(r.typ ? 'against a typical ' + per(r.typ) + ' for you. ' : '') + 'Every visit, counted by Microsoft Clarity: the same figure as Website.'}/>);
 }
 
-function V3ProfitLead() {
+// A period's length repeated back from its last day, on the daily ladder. Each window keeps what its own days
+// kept (keptShare, as Overview values the period before): one margin for every window read Halden's September
+// sale as its best month (£103,164) when its own days kept £51,744. A window with too few days stops the run,
+// as v3TypicalMonth's does. k is the delivery basis, other the other marketing taken off. Not registered figures.
+function v3ProfitWindows(rows, keptShare, fallback, len, end, k, other) {
+  if (!rows || !(len > 0)) return null;
+  const today = new Date().toISOString().slice(0, 10), byDay = {};
+  rows.forEach(r => { const d = String(r.day).slice(0, 10); if (d < today) byDay[d] = r; });
+  const days = Object.keys(byDay).sort();
+  if (!days.length) return null;
+  const last = end && end < days[days.length - 1] ? end : days[days.length - 1];
+  const out = [];
+  for (let i = 0; i < 13; i++) {
+    const e = v3IsoAdd(last, -len * i), a = v3IsoAdd(e, -(len - 1));
+    let sl = 0, sp = 0, n = 0;
+    for (let d = 0; d < len; d++) { const r = byDay[v3IsoAdd(a, d)]; if (r) { sl += Number(r.net_sales) || 0; sp += Number(r.paid_spend) || 0; n++; } }
+    if (n < len * 0.8) break;
+    const own = keptShare ? keptShare(a, e) : null, m = own != null ? own : fallback, sales = sl * (k || 1);
+    out.unshift({ s: a, e, sales, spend: sp, kept: m != null ? sales * m - sp - (other || 0) : null, label: v3Day(e) });
+  }
+  return out.length ? out : null;
+}
+function V3ProfitLead({ view, costsVerified }) {
   const H = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || null;
   const lad = useV3Rows('profit-ladder', V3_LADDER_Q);
   // The quarter plan at today's ad budget (shared with Goal & costs and Growth plan), last year's
@@ -3682,6 +3704,11 @@ function V3ProfitLead() {
   const cogsq = useV3Rows('goal-cogs', V3_COGSQ_Q);
   const mix = useV3Rows('cust-tier', V3_TIER_Q);
   const figQ = useV3Figures();
+  const setup = useV3Setup();
+  const stQ = useV3Rows('brand-state', V3_STATE_Q);
+  const hq = useV3Rows('sign-history', V3_SIGN_HIST_Q);
+  const [drv, setDrv] = React.useState(null);
+  const onFig = !view || view.onFig;
   const sales = H && H.net_revenue_30d != null ? Number(H.net_revenue_30d) : null;
   const spend = H && H.paid_spend_30d != null ? Number(H.paid_spend_30d) : null;
   // 1109: profit before ads is registered (anatomy cm2); the headline holds a copy of it until the registry loads
@@ -3722,8 +3749,7 @@ function V3ProfitLead() {
     <p className="v3-note v3-measure">Enter what your products cost, and what each order costs to pack, send and take payment for. This page then shows where each £1 of sales goes and how this month compares with a typical one.</p>
     <button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs')}>Enter your costs</button>
   </section>);
-  if (lad.err) return null;
-  if (!lad.rows) return <V3SkeletonRows n={4}/>;
+  if (!lad.rows && !lad.err) return <V3SkeletonRows n={4}/>;
 
   // Profit after ads is the registered figure; product contribution less ads is not it (it leaves out the other
   // marketing cost), so there is no fallback to it.
@@ -3755,12 +3781,12 @@ function V3ProfitLead() {
   // 1111: each line carries the registered figure it shows, so it can say where it comes from (V3SourceTag)
   const chain = [
     { k: 'Sales', v: sales, kind: 'in', fig: 'sales_30d' },
-    ...(costsF != null ? [{ k: 'Products, delivery and payment fees', v: -costsF, kind: 'out', fig: 'costs_before_ads_30d' }] : []),
+    ...(costsF != null ? [{ k: 'Products and delivery', v: -costsF, kind: 'out', fig: 'costs_before_ads_30d' }] : []),
     { k: 'Ad spend', v: -spend, kind: 'out', ads: true, fig: 'ads_30d' },
   ];
-  if (other >= 1) chain.push({ k: 'Other marketing: creators, agencies, seeding', v: -other, kind: 'out', fig: 'other_marketing_30d' });
-  chain.push({ k: 'Kept after ads', v: kept, kind: 'sub', fig: 'profit_after_ads_30d' });
-  if (oh30 != null) { chain.push({ k: 'Overheads: rent, wages, software, for 30 days', v: -oh30, kind: 'out', fig: 'overheads_30d' }); if (op != null) chain.push({ k: 'Profit after running costs', v: op, kind: 'total', fig: 'after_overheads_30d' }); }
+  if (other >= 1) chain.push({ k: 'Other marketing', v: -other, kind: 'out', fig: 'other_marketing_30d' });
+  chain.push({ k: 'Profit after ads', v: kept, kind: 'sub', fig: 'profit_after_ads_30d' });
+  if (oh30 != null) { chain.push({ k: 'Running costs', v: -oh30, kind: 'out', fig: 'overheads_30d' }); if (op != null) chain.push({ k: 'Net profit', v: op, kind: 'total', fig: 'after_overheads_30d' }); }
   const per = v => sales > 0 ? Math.round(Math.abs(v) / sales * 100) + 'p in every £1' : '';
 
   // Move this month's budget into the peak: the plan spreads the quarter's ad budget by season (it
@@ -3796,108 +3822,197 @@ function V3ProfitLead() {
   const t30 = (mix.rows || [])[0] || null;
   const newNet = t30 ? Number(t30.new_net) || 0 : 0, retNet = t30 ? Number(t30.returning_net) || 0 : 0, mixTot = newNet + retNet;
 
+  // Whole weeks, months and quarters repeat back like for like. Anything else runs on the nearest plain step:
+  // "34 days at a time" says nothing, and nor does one bar a year.
+  const v3Step = n => n < 7 ? 1 : n < 28 ? 7 : n <= 31 ? n : n < 90 ? 30 : n <= 92 ? n : 30;
+  const len = onFig ? 30 : v3Step(view.len);
+  const wholePeriod = onFig || len === view.len;
+  const dk = onFig ? (v3DeliveryK(v3SumBetween(lad.rows, 'day', 'net_sales')) || 1) : 1;
+  const wins = (() => {
+    const w = v3ProfitWindows(lad.rows, view && view.keptShare, onFig ? cmr : view.gm, len, onFig ? null : view.end, dk, onFig ? other : 0);
+    if (!w) return null;
+    const l = w[w.length - 1];
+    if (wholePeriod) { if (onFig) { l.sales = sales; l.spend = spend; if (kept != null) l.kept = kept; } else { l.sales = view.rev; l.spend = view.paid; if (view.contrib != null) l.kept = view.contrib; } }
+    return w;
+  })();
+  const ohRef = onFig ? oh30 : (view.ohWin != null ? view.ohWin * (len / view.len) : null);
   const tip = ({ active, payload }) => {
     if (!active || !payload || !payload.length) return null;
     const p = payload[0].payload;
-    return (<div className="v3-tip"><b>30 days to {v3Day(p.e, true)}</b>
+    return (<div className="v3-tip"><b>{len === 1 ? v3Day(p.e, true) : len + ' days to ' + v3Day(p.e, true)}</b>
       <span>Sales <em>{fmtMoney(p.sales)}</em></span><span>Ad spend <em>{fmtMoney(p.spend)}</em></span>
-      <span>Kept after ads <em>{fmtMoney(p.kept)}</em></span>{oh30 != null && <span>Overheads <em>{fmtMoney(oh30)}</em></span>}</div>);
+      <span>Profit after ads <em>{fmtMoney(p.kept)}</em></span>{ohRef != null && <span>Running costs <em>{fmtMoney(ohRef)}</em></span>}</div>);
   };
-  return (<div className="v3-page-stack">
-    <section className="v3-sec v3-profit-head">
-      <div className="v3-kick">Last 30 days, against a typical month for you</div>
-      <div className="v3-lead2"><div>
-      <p className="v3-verdict">{lead || 'You kept ' + fmtMoney(kept) + ' after ads in the last 30 days.'}</p>
-      {T && <V3Brief>
-        In a typical month you sell {fmtMoney(T.sales)} and spend {fmtMoney(T.spend)} on ads, keeping {fmtMoney(T.kept)}.
-        {' '}In the last 30 days you sold {fmtMoney(sales)} and spent {fmtMoney(spend)}, keeping {fmtMoney(kept)}.
-        {moved && <> Compared with a typical month, the change in sales {salesEff >= 0 ? 'added' : 'cost you'} {fmtMoney(Math.abs(salesEff))}. The change in ad spend {spendEff >= 0 ? 'added' : 'cost you'} {fmtMoney(Math.abs(spendEff))}.</>}
-        {d.ly && <> The same 30 days last year sold {fmtMoney(d.ly.sales)}{d.ly.sales > 0 ? ', so you are ' + fmtPctN(Math.abs(sales / d.ly.sales - 1)) + (sales >= d.ly.sales ? ' up' : ' down') + ' on last year' : ''}.</>}
-        {' '}A typical month is the middle one of your last {fmtCount(d.n)} months.
-      </V3Brief>}
-      {/* An owner who opens Shopify sees a bigger number for the same days (frkl, 8 Sep to 7 Oct: £26,761
-          against £18,989) and nothing said why (review, 8 Oct). */}
-      <V3CostGapLine/>
-      <p className="micro muted v3-measure">Shopify’s home screen shows a bigger sales figure for the same days. It adds VAT, the delivery you charge, orders later refunded, and other places you sell such as stockists. Sales here are your own shop’s sales after refunds and before VAT: the money the business has to work with.</p>
-      {((rfGap != null && rfGap > 0) || noFreight) && <p className="micro muted v3-measure">Your profit here reads {rfGap > 0 ? 'about ' + fmtMoney(rfGap) + ' too high' : 'too high'}:
-        {' '}{rfGap > 0 ? 'refunds are ' + fmtPctN(Number(rfRow.realised_value) / 100) + ' of sales, not the ' + fmtPctN(Number(rfRow.config_value) / 100) + ' you entered' : ''}{rfGap > 0 && noFreight ? ', and ' : ''}{noFreight ? 'your product costs leave out shipping them to you and import duty' : ''}.
-        {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs-off')}>Fix them <span className="v3-xref-go">on Goal &amp; costs</span></button></p>}
-      {oh30 == null && <p className="v3-note v3-measure">Add your monthly overheads: what you pay whatever you sell, such as rent, wages and software. You will then see whether what you keep covers them, and how much you can afford to spend on ads.{' '}
-        <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('goal', 'economics')}>Add overheads</button></p>}
-      </div>
-      <ul className="v3-chain" aria-label="Where each pound of sales went">
-        {chain.map(r => (<li key={r.k} className={'v3-chain-' + r.kind + (r.ads ? ' v3-chain-ads' : '') + (r.v < 0 && r.kind !== 'out' ? ' neg' : '')}>
-          <span className="v3-chain-k">{r.kind === 'out' ? '− ' : r.kind === 'sub' || r.kind === 'total' ? '= ' : ''}{r.k} <V3SourceTag id={r.fig}/></span>
-          <span className="v3-chain-track"><i style={{ width: Math.min(100, sales > 0 ? Math.abs(r.v) / sales * 100 : 0) + '%' }}/></span>
-          <span className="v3-chain-v">{v3Waiting(r.fig) ? <span className="v3-src-wait">Waiting for data</span> : fmtMoney(r.v)}</span>
-          <span className="v3-chain-p">{r.kind === 'in' ? '' : (r.v < 0 && r.kind !== 'out' ? '−' : '') + per(r.v)}</span>
-        </li>))}
-      </ul>
-      </div>
+
+  // The strip: what the date control picked, against a typical month (30 days) or the period before (any other).
+  const pts = k => (wins || []).map(w => w[k]);
+  const tile = (k, v, was, up, ser, fmt) => {
+    const ch = was != null && Number(was) !== 0 && v != null ? (Number(v) - Number(was)) / Math.abs(Number(was)) : null;
+    const dir = ch == null || Math.abs(ch) < 0.0005 ? 'flat' : ch > 0 ? 'up' : 'down';
+    return <V3HomeTile key={k} k={k} v={(fmt || fmtMoney)(v)} dir={dir} cls={up == null || dir === 'flat' ? '' : (dir === 'up') === up ? 'v3-up' : 'v3-down'}
+      delta={ch == null ? '' : (Math.abs(ch) * 100).toFixed(1) + '%'} pts={ser}/>;
+  };
+  const money2 = v => fmtMoney(v, 2);
+  const S0 = stQ.rows && stQ.rows[0];
+  const SG = S0 && S0.last_30 && hq.rows ? v3BuildSigns(S0, hq.rows[0] && hq.rows[0].history, { lad }) : null;
+  const signAll = SG ? SG.signs.concat(SG.profitSign ? [SG.profitSign] : []) : [];
+  const signs = (oh30 != null ? ['profit', 'ly', 'ret'] : ['ly', 'ret']).map(w => signAll.find(sg => sg.which === w)).filter(Boolean).map(sg => Object.assign({}, sg, {
+    act: !sg.noDrivers && v3HasDrivers(sg.which, SG.HP) ? { open: drv === sg.which, on: () => setDrv(o => (o === sg.which ? null : sg.which)) } : null }));
+  const openSign = onFig && drv ? signs.find(sg => sg.which === drv) : null;
+
+  // The profit lines: the registered 30 days, or the picked period worked out from its own sales and spend.
+  const pl = onFig ? chain : (view.contrib == null ? [] : [
+    { k: 'Sales', v: view.rev, kind: 'in' },
+    { k: 'Products and delivery', v: -(view.rev - view.contrib - view.paid), kind: 'out' },
+    { k: 'Ad spend', v: -view.paid, kind: 'out', ads: true },
+    { k: 'Profit after ads', v: view.contrib, kind: 'sub' },
+    ...(view.ohWin != null ? [{ k: 'Running costs', v: -view.ohWin, kind: 'out' }, { k: 'Net profit', v: view.contrib - view.ohWin, kind: 'total' }] : []),
+  ]);
+  const plSales = onFig ? sales : view.rev;
+  const plEst = onFig ? chain.map(r => ({ r, s: v3Source(r.fig) })).filter(x => x.s && x.s.state === 'estimated') : [];
+  const plEstWords = !onFig ? 'Worked out from this period’s sales and spend at your usual margin.' : plEst.length ? 'Estimated: ' + v3AndList(plEst.map(x => x.r.k.toLowerCase())) + (plEst[0].s.needs ? '. ' + plEst[0].s.needs : '') : null;
+  const plClass = r => r.kind === 'in' ? 'sales' : r.ads ? 'ads' : r.kind === 'out' ? 'cost' : r.v < 0 ? 'loss' : 'kept';
+  const cacF = v3Fig('cac_30d', figQ.rows);
+  const periodWords = onFig ? 'Last 30 days' : view.label;
+
+  // What to do, from the last 30 days whatever the date control says: the plan and a typical month are monthly.
+  const goBtn = (dest, label, primary, section) => <button type="button" className={'v3-btn v3-btn-sm' + (primary ? ' v3-btn-p' : '')} onClick={() => window.__oiGo && window.__oiGo(dest, section)}>{label}</button>;
+  const moves = [];
+  if (shift) moves.push({ key: 'shift', t: 'Move this month’s ad budget into ' + gpMonthName(shift.peak.month),
+    sub: 'Plan ' + fmtMoneyK(shift.cur.spend) + ' in ' + gpMonthName(shift.cur.month) + ' and ' + fmtMoneyK(shift.peak.spend) + ' in ' + gpMonthName(shift.peak.month) + ', against ' + fmtMoneyK(shift.proj) + ' this month at this pace.' + (shift.lyCost != null ? ' A new customer cost ' + fmtMoney(shift.lyCost, 2) + ' last ' + gpMonthName(shift.peak.month) + '.' : ''),
+    worth: shift.gain >= 200 ? fmtMoneyK(shift.gain) : null, worthSub: 'more profit, same total',
+    conf: <V3Conf state="probably" detail="This month’s spend so far is measured. The monthly split is the plan, built from your own busy and quiet months. It assumes each extra £1 of ads wins a little less than the one before."/>,
+    btn: goBtn('growth', 'Open Growth plan', true) });
+  if (!shift && T && extra > Math.max(250, T.spend * 0.2)) moves.push({ key: 'extra', t: 'Bring ad spend back toward ' + fmtMoney(T.spend) + ' a month',
+    sub: fmtMoney(extra) + ' above a typical month, with sales ' + salesWord + '.',
+    worth: 'Up to ' + fmtMoney(extra), worthSub: 'a month',
+    conf: <V3Conf state="probably" detail="Spend and sales are measured. The guess is that cutting the extra spend will not cost sales. That held in the months shown, when spend rose and sales did not."/>,
+    btn: goBtn('marketing', 'Open Marketing', !shift) });
+  if (op != null && op < 0) moves.push({ key: 'overheads', t: 'Cover your running costs',
+    sub: 'A loss of ' + fmtMoney(Math.abs(op)) + ' after ' + fmtMoney(v3Fig('overheads_month', figQ.rows).value) + ' of running costs. ' + (maxSpend > 0 ? 'Break-even: ads at ' + fmtMoney(maxSpend) + ' a month, or ' + fmtMoney(needSales) + ' of sales a month.' : 'Break-even: ' + fmtMoney(needSales) + ' of sales a month at this ad spend.'),
+    worth: fmtMoney(Math.abs(op)), worthSub: 'to break even', conf: null,
+    btn: goBtn('products', 'Open Products', !moves.length) });
+
+  // Checks on how far the figures can be trusted: one row each, not a paragraph.
+  const gap = setup && setup.cost_gap && Number(setup.cost_gap.uncosted_share) > 0 ? setup.cost_gap : null;
+  const checks = [];
+  if (gap) checks.push({ k: 'Missing product costs', d: fmtPctN(Number(gap.uncosted_share)) + ' of what you sold in the last 90 days (' + fmtCount(gap.uncosted_lines_90d) + ' of ' + fmtCount(gap.lines_90d) + ' order lines). They take your average margin.',
+    btn: goBtn('goal', 'Add costs', false, 'costs') });
+  if ((rfGap != null && rfGap > 0) || noFreight) checks.push({ k: rfGap > 0 ? 'Refunds' : 'Freight and duty',
+    d: (rfGap > 0 ? 'Profit reads ' + fmtMoney(rfGap) + ' too high: refunds are ' + fmtPctN(Number(rfRow.realised_value) / 100) + ' of sales, not the ' + fmtPctN(Number(rfRow.config_value) / 100) + ' entered.' : 'Profit reads too high.') + (noFreight ? ' Product costs leave out shipping them to you and import duty.' : ''),
+    btn: goBtn('goal', 'Fix costs', false, 'costs-off') });
+  if (oh30 == null) checks.push({ k: 'Running costs', d: 'Not entered, so net profit cannot be worked out.', btn: goBtn('goal', 'Add running costs', false, 'economics') });
+  checks.push({ k: 'Shopify’s sales figure', d: 'Shopify’s home screen shows more for the same days: it adds VAT, the delivery you charge, orders later refunded and other places you sell. Sales here are your own shop’s, after refunds and before VAT.' });
+  if (costsVerified) checks.push({ k: 'Your costs', d: 'Profit uses the costs you entered.', btn: goBtn('goal', 'Edit costs', false, 'costs') });
+
+  return (<div className="v3-home v3-profit">
+    <section className="v3-panel v3-home-strip v3-profit-strip" aria-label="Key figures">
+      {onFig ? <div className="v3-home-group" style={{ '--n': 3 }}>
+        <div className="v3-home-group-h" title={T ? 'A typical month is the middle one of your last ' + fmtCount(d.n) + ' months.' : undefined}>Last 30 days<span>{T ? 'against a typical month' : ''}</span></div>
+        <div className="v3-home-tiles">
+          {tile('Sales', sales, T && T.sales, true, pts('sales'))}
+          {tile('Ad spend', spend, T && T.spend, null, pts('spend'))}
+          {tile('Profit after ads', kept, T && T.kept, true, pts('kept'))}
+        </div></div>
+      : <div className="v3-home-group" style={{ '--n': 4 }}>
+        <div className="v3-home-group-h">{view.label}<span>{view.pRev != null ? 'against the period before' : ''}</span></div>
+        <div className="v3-home-tiles">
+          {tile('Sales', view.rev, view.pRev, true, pts('sales'))}
+          {tile('Ad spend', view.paid, view.pPaid, null, pts('spend'))}
+          {tile('Profit after ads', view.contrib, view.pContrib, true, pts('kept'))}
+          {tile('Sales per £1 of ads', view.mer, view.pMer, true, (wins || []).map(w => w.spend > 0 ? w.sales / w.spend : null), money2)}
+        </div></div>}
+      {onFig && signs.length > 0 && <div className="v3-home-group" style={{ '--n': signs.length }}>
+        <div className="v3-home-group-h">Last 30 days<span>against 4 weeks ago</span></div>
+        <div className="v3-home-tiles">{signs.map(sg => { const t = v3SignTrend(sg);
+          return <V3HomeTile key={sg.k} k={sg.which === 'profit' ? 'Net profit' : v3SignShort(sg)} v={sg.v} dir={t && t.dir} cls={t && t.cls} delta={t ? t.delta : ''} weak={sg.tone === 'weak'}
+            pts={(sg.series || []).map(p => p.v)} act={sg.act} title={sg.k}/>; })}</div></div>}
+      {openSign && <div className="v3-home-drv"><V3DriverPanel key={drv} which={drv} points={openSign.points || SG.HP} ctx={openSign.ctx} line={openSign.dline}/></div>}
+      {!onFig && view.priorSpike && <p className="v3-panel-note v3-profit-spike">The period before had a sale: {fmtMoney(view.pRev)}, against {fmtMoney(view.priorSpike.typ)} usually.</p>}
     </section>
-    <V3DriverStrip keys={['profit', 'ly', 'ret']}/>
 
-    {d && (<figure className="v3-chart v3-chart-solo">
-      <figcaption><span className="v3-chart-title">Sales, ad spend and what you kept, 30 days at a time</span>
-        <span className="v3-legend"><i style={{ background: PAL.sales }}/>Sales <i style={{ background: PAL.ads }}/>Ad spend <i style={{ background: PAL.kept }}/>Kept after ads{oh30 != null && <> <i className="dash"/>Overheads</>}</span></figcaption>
-      <R.ResponsiveContainer width="100%" height={240}>
-        <R.ComposedChart data={d.wins} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-          <R.CartesianGrid/>
-          <R.XAxis dataKey="label" interval="preserveStartEnd"/>
-          <R.YAxis tickFormatter={fmtMoneyK}/>
-          <R.Tooltip content={tip} cursor={false}/>
-          <R.Bar dataKey="sales" fill={PAL.sales} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
-          <R.Bar dataKey="spend" fill={PAL.ads} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
-          <R.Line dataKey="kept" type="linear" stroke={PAL.kept} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
-          {oh30 != null && <R.ReferenceLine y={oh30} stroke={PAL.muted} strokeDasharray="4 3"/>}
-          <R.ReferenceLine y={0} stroke={PAL.line}/>
-        </R.ComposedChart>
-      </R.ResponsiveContainer>
-      <p className="micro muted v3-measure">Each point covers the 30 days up to the date shown. Kept after ads is the {fmtPctN(cmr)} of sales left after products, delivery and payment fees, minus ad spend{other >= 1 ? <> and the other marketing cost. That cost is known for the last 30 days only ({fmtMoney(other)}), so every point takes it at that amount</> : null}.{oh30 != null ? ' When the line is below the dashed overheads line, the business lost money those 30 days.' : ''}</p>
-    </figure>)}
-
-    {(shift || extra > Math.max(250, (T ? T.spend : 0) * 0.2) || (op != null && op < 0)) && (<section className="v3-sec">
-      <h2 className="v3-sec-title">What to do about it</h2>
-      <ol className="v3-moves">
-        {shift && (<li>
-          <b>Move this month’s ad budget into {gpMonthName(shift.peak.month)}.</b>
-          {' '}At this pace you will spend about {fmtMoney(shift.proj)} on ads in {gpMonthName(shift.cur.month)}. The quarter plan spends the same total but puts {fmtMoney(shift.cur.spend)} in {gpMonthName(shift.cur.month)} and {fmtMoney(shift.peak.spend)} in {gpMonthName(shift.peak.month)}
-          {shift.lyCost != null ? <>, when new customers cost far less to win. Last {gpMonthName(shift.peak.month)}, each one cost {fmtMoney(shift.lyCost, 2)}</> : null}.
-          {shift.gain >= 200 ? <> Spread that way, the same total makes about {fmtMoney(shift.gain)} more profit after ads.</> : null}
-          {' '}<button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('growth')}>See why on Growth plan</button>
-          {' '}<V3Conf state="probably" detail="This month’s spend so far is measured. The monthly split is the plan, built from your own busy and quiet months. It assumes each extra £1 of ads wins a little less than the one before."/>
-        </li>)}
-        {!shift && T && extra > Math.max(250, T.spend * 0.2) && (<li>
-          <b>Bring ad spend back toward {fmtMoney(T.spend)} a month.</b>
-          {' '}You are spending {fmtMoney(extra)} more than in a typical month, and sales are {salesWord}{sChg != null && sChg <= 0.1 ? ', so the extra ads have not brought extra sales' : ''}.
-          {' '}If sales hold, cutting back saves up to {fmtMoney(extra)} a month. Marketing shows which channels lose money however you count it: cut those first.
-          {' '}<button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('marketing')}>See which channels</button>
-          {' '}<V3Conf state="probably" detail="Spend and sales are measured. The guess is that cutting the extra spend will not cost sales. That held in the months shown, when spend rose and sales did not."/>
-        </li>)}
-        {op != null && op < 0 && (<li>
-          <b>Cover your overheads.</b>
-          {' '}After {fmtMoney(v3Fig('overheads_month', figQ.rows).value)} a month of overheads, the last 30 days made a loss of {fmtMoney(Math.abs(op))}.
-          {maxSpend > 0
-            ? <> To break even on the last 30 days’ sales, ads can cost at most {fmtMoney(maxSpend)} a month. Or, at the last 30 days’ ad spend, you need {fmtMoney(needSales)} of sales a month.</>
-            : <> Even with no ads, the last 30 days’ sales leave {fmtMoney(Math.abs(maxSpend))} of overheads unpaid. At the last 30 days’ ad spend, you need {fmtMoney(needSales)} of sales a month to break even.</>}
-          {' '}Bigger orders and more customers coming back also help.
-          {' '}<button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('products')}>Raise order value</button>
-          {' '}<button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('customers')}>Bring customers back</button>
-        </li>)}
-      </ol>
+    {wins && wins.length > 0 && (<section className="v3-panel v3-profit-chart">
+      <div className="v3-panel-head"><h2>Sales, ad spend and profit after ads</h2><span className="v3-muted">{len === 1 ? 'By day' : len + ' days at a time'}</span>
+        <span className="v3-legend"><i style={{ background: PAL.sales }}/>Sales <i style={{ background: PAL.ads }}/>Ad spend <i style={{ background: PAL.kept }}/>Profit after ads{ohRef != null && <> <i className="dash"/>Running costs</>}</span></div>
+      <figure className="v3-chart v3-panel-pad" aria-label={'Sales, ad spend and profit after ads, ' + len + ' days at a time'}>
+        <R.ResponsiveContainer width="100%" height={240}>
+          <R.ComposedChart data={wins} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <R.CartesianGrid/>
+            <R.XAxis dataKey="label" interval="preserveStartEnd"/>
+            <R.YAxis tickFormatter={fmtMoneyK}/>
+            <R.Tooltip content={tip} cursor={false}/>
+            <R.Bar dataKey="sales" fill={PAL.sales} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
+            <R.Bar dataKey="spend" fill={PAL.ads} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
+            <R.Line dataKey="kept" type="linear" stroke={PAL.kept} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
+            {ohRef != null && <R.ReferenceLine y={ohRef} stroke={PAL.muted} strokeDasharray="4 3"/>}
+            <R.ReferenceLine y={0} stroke={PAL.line}/>
+          </R.ComposedChart>
+        </R.ResponsiveContainer>
+      </figure>
+      {onFig ? (other >= 1 && <p className="v3-panel-note">Other marketing is known for the last 30 days only, so every point takes off {fmtMoney(other)}.</p>)
+        : <p className="v3-panel-note">Other marketing is known for the last 30 days only, so it is not taken off here.</p>}
     </section>)}
 
-    {mixTot > 0 && (<section className="v3-sec">
-      <h2 className="v3-sec-title">Where the sales came from <span className="v3-muted">last 30 days</span></h2>
-      <div className="v3-share" role="img" aria-label="Sales from new and returning customers">
-        <i style={{ width: (newNet / mixTot * 100) + '%', background: PAL.nw }}/><i style={{ width: (retNet / mixTot * 100) + '%', background: PAL.ret }}/>
-      </div>
-      <table className="v3-share-table"><tbody>
-        <tr><td className="t-text"><i className="v3-dot" style={{ background: PAL.nw }}/>New customers, {fmtCount(t30.new_customers)}</td><td>{fmtMoney(newNet)}</td><td className="v3-muted">{fmtPctN(newNet / mixTot)}</td></tr>
-        <tr><td className="t-text"><i className="v3-dot" style={{ background: PAL.ret }}/>Returning customers, {fmtCount(t30.returning_customers)}</td><td>{fmtMoney(retNet)}</td><td className="v3-muted">{fmtPctN(retNet / mixTot)}</td></tr>
-      </tbody></table>
-      <p className="v3-note v3-measure">{(() => { const c = v3Fig('cac_30d', figQ.rows); return c.value != null ? c.label + ': ' + fmtMoney(c.value) + '. ' : ''; })()}Marketing shows which ad channels really bring in sales. Customers shows what a customer is worth over time.</p>
-    </section>)}
+    <div className="v3-home-two">
+      {pl.length > 0 && <section className="v3-panel v3-profit-pl" aria-label="Where each pound of sales went">
+        <div className="v3-panel-head"><h2>Profit</h2><span className="v3-muted">{periodWords}</span>
+          {plEstWords && <span className="v3-pill v3-pill-none" title={plEstWords}>Estimated</span>}
+          <button type="button" className="v3-panel-link" onClick={() => window.__oiGo && window.__oiGo('goal')}>Quarter plan</button></div>
+        <table className="v3-home-pl"><thead><tr><th>Line</th><th className="bar"><span className="v3-sr-only">Share of sales</span></th><th className="r">Amount</th><th className="r">In every £1</th></tr></thead>
+          <tbody>{pl.map(r => (<tr key={r.k} className={r.kind === 'sub' || r.kind === 'total' ? 'tot' : ''}>
+            <td>{r.k}</td>
+            <td className="bar"><i className={'v3-home-pl-' + plClass(r)} style={{ width: Math.max(0.6, Math.min(100, plSales > 0 ? Math.abs(r.v) / plSales * 100 : 0)) + '%' }}/></td>
+            <td className={'r' + (r.kind !== 'out' && r.v < 0 ? ' v3-down' : '')}>{r.fig && v3Waiting(r.fig) ? 'Waiting for data' : fmtMoney(r.v)}</td>
+            <td className="r v3-muted">{r.kind === 'in' || !(plSales > 0) ? '' : Math.round(Math.abs(r.v) / plSales * 100) + 'p'}</td>
+          </tr>))}</tbody></table>
+      </section>}
+      {mixTot > 0 && <section className="v3-panel v3-profit-mix" aria-label="Sales from new and returning customers">
+        <div className="v3-panel-head"><h2>Customers</h2><span className="v3-muted">Last 30 days</span>
+          <button type="button" className="v3-panel-link" onClick={() => window.__oiGo && window.__oiGo('customers')}>View report</button></div>
+        <div className="v3-panel-pad"><div className="v3-share" role="img" aria-label="Sales from new and returning customers">
+          <i style={{ width: (newNet / mixTot * 100) + '%', background: PAL.nw }}/><i style={{ width: (retNet / mixTot * 100) + '%', background: PAL.ret }}/>
+        </div></div>
+        <table className="v3-home-pl"><thead><tr><th>Type</th><th className="r">Customers</th><th className="r">Sales</th><th className="r">Share</th></tr></thead>
+          <tbody>
+            <tr><td><i className="v3-dot" style={{ background: PAL.nw }}/>New</td><td className="r">{fmtCount(t30.new_customers)}</td><td className="r">{fmtMoney(newNet)}</td><td className="r v3-muted">{fmtPctN(newNet / mixTot)}</td></tr>
+            <tr><td><i className="v3-dot" style={{ background: PAL.ret }}/>Returning</td><td className="r">{fmtCount(t30.returning_customers)}</td><td className="r">{fmtMoney(retNet)}</td><td className="r v3-muted">{fmtPctN(retNet / mixTot)}</td></tr>
+            {cacF.value != null && <tr className="tot"><td colSpan={3}>{cacF.label || 'Cost of a new customer'}</td><td className="r">{fmtMoney(cacF.value)}</td></tr>}
+          </tbody></table>
+      </section>}
+    </div>
+
+    <section className="v3-panel" aria-label="Actions">
+      <div className="v3-panel-head"><h2>Actions</h2>{moves.length > 0 && <span className="v3-count">{moves.length}</span>}<span className="v3-muted">From these figures, last 30 days</span>
+        <button type="button" className="v3-panel-link" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>View all</button></div>
+      {moves.length ? <table className="v3-home-table">
+        <thead><tr><th>Action</th>{moves.some(m => m.worth) && <th className="r">Worth</th>}<th>Basis</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
+        <tbody>{moves.map(m => (<tr key={m.key}>
+          <td className="v3-home-act"><span className="v3-home-title-static">{m.t}</span><span className="v3-home-sub">{m.sub}</span></td>
+          {moves.some(x => x.worth) && <td className="v3-home-worth" data-k="Worth">{m.worth && <><b>{m.worth}</b><small>{m.worthSub}</small></>}</td>}
+          <td className="v3-home-basis" data-k="Basis">{m.conf}</td>
+          <td className="v3-home-open">{m.btn}</td>
+        </tr>))}</tbody></table>
+      : <p className="v3-panel-note">{T ? 'Nothing on this page needs acting on. Everything else is on Actions.' : 'Everything to act on is on Actions.'}</p>}
+    </section>
+
+    {wins && wins.length > 0 && <section className="v3-panel" aria-label={'Sales, ad spend and profit after ads, ' + len + ' days at a time'}>
+      <div className="v3-panel-head"><h2>By period</h2><span className="v3-muted">{len === 1 ? 'Newest first' : len + ' days to each date, newest first'}</span></div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+        <thead><tr><th>Period to</th><th className="r">Sales</th><th className="r">Ad spend</th><th className="r">Profit after ads</th><th className="r">Sales per £1 of ads</th></tr></thead>
+        <tbody>{wins.slice().reverse().map(w => (<tr key={w.e}>
+          <td>{v3Day(w.e, true)}</td><td className="r">{fmtMoney(w.sales)}</td><td className="r">{fmtMoney(w.spend)}</td>
+          <td className={'r' + (w.kept < 0 ? ' v3-down' : '')}>{fmtMoney(w.kept)}</td><td className="r">{w.spend > 0 ? fmtMoney(w.sales / w.spend, 2) : '—'}</td>
+        </tr>))}</tbody></table></div>
+    </section>}
+
+    <section className="v3-panel v3-profit-checks" aria-label="Data checks">
+      <div className="v3-panel-head"><h2>Data checks</h2></div>
+      <table className="v3-home-table">
+        <tbody>{checks.map(c => (<tr key={c.k}>
+          <td className="v3-home-act"><span className="v3-home-title-static">{c.k}</span><span className="v3-home-sub">{c.d}</span></td>
+          <td className="v3-home-open">{c.btn || null}</td>
+        </tr>))}</tbody></table>
+    </section>
   </div>);
 }
 
@@ -4041,7 +4156,7 @@ function Overview({start, period, customActive}){
   const grossProfit = (gm!=null) ? rev * gm : null;
   // Profit after ads: profit_after_ads_30d (anatomy cm3, other marketing cost included) for the default 30 days.
   const contribF = fig30('profit_after_ads_30d');
-  const contrib = onFig ? contribF.value : ((gm!=null) ? grossProfit - paid : null);   // other periods: not a registered figure (picked window)
+  const contrib = onFig ? contribF.value : ((gm!=null) ? rev * (gmNowK != null ? gmNowK : gm) - paid : null);   // other periods: not a registered figure (picked window), on its own days' margin as the period before is
   const cmPct = (contrib!=null && rev>0) ? contrib/rev : null;   // not a registered figure: the share of sales
   const poas = (grossProfit!=null && paid>0) ? grossProfit/paid : null;   // profit on ad spend; break-even 1.0
   // not a registered figure: the period before and the daily line are history, each on its own days' margin
@@ -4216,7 +4331,9 @@ function Overview({start, period, customActive}){
           collapsed section below rather than deleted, because the content is good, just misplaced.
           Figures come from the same row Today reads, so the two screens cannot disagree. */}
       {/* The lead answers the page question against a typical month, not the 30 days before (2026-10-05). */}
-      {UI_V3 ? <V3ProfitLead/> : (<div className="v3-profit-lead">
+      {UI_V3 ? <V3ProfitLead costsVerified={costsVerified} view={{ onFig, start, end, len: Math.max(1, Math.round((Date.parse(end) - Date.parse(start)) / 86400000) + 1),
+        label: customActive ? v3Day(start) + ' to ' + v3Day(end) : ((PERIODS.find(p => p.key === period) || {}).label || 'This period'),
+        rev, paid, contrib, mer, pRev, pPaid, pContrib, pMer, gm, ohWin, priorSpike, keptShare }}/> : (<div className="v3-profit-lead">
         <V3MoneyFlow d={(typeof window !== 'undefined' && window.GRETA_HEADLINE) || {}} note="last 30 days"/>
       </div>)}
       {/* Crux verdict: compact scorecard strip + the diagnostic (with the £-bridge nested in its "thinking") */}
@@ -4247,7 +4364,7 @@ function Overview({start, period, customActive}){
           <button onClick={()=>{ if (UI_V3) { window.__oiGo && window.__oiGo('goal', 'margin'); return; } window.__oiGo && window.__oiGo('goal', 'margin'); }} className="btn-primary" style={{flexShrink:0}}>Set up costs</button>
         </div>
       )}
-      {costsVerified && (
+      {!UI_V3 && costsVerified && (
         <div className="micro" style={{color:'var(--text-faint)', display:'flex', alignItems:'center', gap:8}}>
           <MarginBadge/> profit figures use the costs you entered, <span onClick={()=>{ if (UI_V3) { window.__oiGo && window.__oiGo('goal', 'margin'); return; } window.__oiGo && window.__oiGo('goal', 'margin'); }} style={{color:'var(--accent)', cursor:'pointer'}}>edit costs</span>
         </div>
@@ -4256,12 +4373,9 @@ function Overview({start, period, customActive}){
           destination's whole job, and Today already carries the top four, so a third copy pushed
           this page's own answer into third place. A one-line pointer instead: it teaches where
           things live rather than duplicating them. */}
-      <button type="button" className="v3-xref" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>
-        Everything worth doing, in order <span className="v3-xref-go">on Actions</span>
-      </button>
       {/* Everything driven by the period picker sits behind one disclosure: the lead above is the answer. */}
-      <V3More id="profit-detail" label="Every figure for the dates you pick, and what changed day by day">
-      {priorSpike && <p className="v3-note v3-measure">The period before this one sold {fmtMoney(pRev)}, against about {fmtMoney(priorSpike.typ)} usually for that many days: it had a sale. So the changes below look worse than they are. The top of the page compares with a typical month instead.</p>}
+      <V3More id="profit-detail" label="All figures, day by day">
+      {priorSpike && <p className="v3-note v3-measure">The period before this one sold {fmtMoney(pRev)}, against about {fmtMoney(priorSpike.typ)} usually for that many days: it had a sale. So the changes below look worse than they are.</p>}
       {/* COMMERCIAL HEALTH */}
       <div className="section-eyebrow" style={{display:'flex',alignItems:'center',gap:8,margin:'8px 0 -4px',fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-muted)'}}>
         <span style={{width:3,height:14,background:'var(--text-faint)',borderRadius:'var(--radius-sm)'}}/>Commercial health
@@ -4431,7 +4545,6 @@ function Overview({start, period, customActive}){
       {/* V3: no Year 1 forecast here. It was a fourth forecast beside the quarter plan, the short-term
           forecast and Growth plan, its own customer cost, a default seasonal curve for every brand,
           saved in one browser. The quarter plan, month by month, is on Goal & costs. */}
-      {UI_V3 && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal')}>The quarter plan, month by month <span className="v3-xref-go">on Goal &amp; costs</span></button>}
       {!UI_V3 && <div className="section-eyebrow" style={{display:'flex',alignItems:'center',gap:8,margin:'8px 0 -4px',fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-muted)'}}>
         <span style={{width:3,height:14,background:'var(--text-faint)',borderRadius:'var(--radius-sm)'}}/>Planning &amp; deep-dive
       </div>}
@@ -27102,13 +27215,13 @@ function V3WalkWhy({ X, diag, focus }) {
 const V3_WALK_TOUR = {
   profit: { dest: 'today', target: { sel: '.v3-home-profit' }, fallback: { sel: '.v3-home-strip' },
     what: 'Where the last 30 days’ sales went: products and delivery, ads and running costs come out, and what is left is what you keep. Profit after ads is the line before running costs.' },
-  sales: { dest: 'profit', target: { sel: '.v3-flow' },
+  sales: { dest: 'profit', target: { sel: '.v3-profit-strip' },
     what: 'This bar is every £1 of sales and where it went: product costs, order costs and ads come out, and the last segment is what you keep. Tap any segment to open the page behind it.' },
   customers: { dest: 'customers', target: { sel: 'figure.v3-chart', has: 'New and returning' }, fallback: { sel: '.v3-stat-grid' },
     what: 'Sales split by who placed them, week by week: first-time customers against people who have bought before. A healthy shop grows both; a business living on new customers alone has to keep paying to replace them.' },
   efficiency: { dest: 'marketing', target: { sel: '.v3-score' },
     what: 'Every ad channel on one scale. The bar is what each £1 of spend brings back; the tick is what it needs to bring back to pay for itself at your margins. A bar short of its tick is losing money, whatever the platform reports.' },
-  spend: { dest: 'profit', target: { sel: '.v3-flow' },
+  spend: { dest: 'profit', target: { sel: '.v3-profit-strip' },
     what: 'The ads segment of this bar is how many pence of every £1 of sales went on ads over the last 30 days. Tap it to open Marketing, where the spend is split by channel.' },
   channels: { dest: 'marketing', target: { sel: '.v3-score' },
     what: 'Read the tick before the bar: it is the return each channel needs to break even. Rows are ordered by spend, because falling short at £300 is not the same as at £6,000.' },

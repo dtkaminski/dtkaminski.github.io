@@ -2210,3 +2210,32 @@ html[data-frame="product"] .v3-xref:hover { text-decoration-color: currentColor;
 }
 .v3-home-tile-d svg { flex: none; }
 .v3-home-tile > svg, .v3-home-tile .v3-home-spark { margin-top: auto; }
+
+/* Profit & sales on the Home pattern */
+.v3-panel-head .v3-legend { margin-left: auto; }
+.v3-profit-spike { flex: 1 0 100%; border-top: 1px solid var(--color-line); }
+.v3-profit-mix .v3-share { margin: 0; }
+.v3-profit-mix .v3-panel-pad { padding-bottom: 0; }
+.v3-profit-mix .v3-dot { margin-right: var(--space-2); }
+.v3-home-pl th { padding-top: var(--space-2); }
+.v3-profit-scroll { overflow-x: auto; }
+.v3-profit-rows td { border-top: 1px solid var(--color-line); padding-top: var(--space-2); padding-bottom: var(--space-2); }
+.v3-profit-rows td:first-child { white-space: nowrap; }
+.v3-profit-rows th { white-space: nowrap; }
+.v3-profit-checks .v3-home-sub { display: block; overflow: visible; -webkit-line-clamp: unset; }
+.v3-profit .v3-panel-note { max-width: none; }
+div:has(> .v3-profit) ~ .v3-today { gap: 0; }
+.v3-profit-mix td:first-child { white-space: nowrap; }
+@media (max-width: 767px) {
+  .v3-profit-pl .bar { display: none; }
+  .v3-profit-rows th { white-space: normal; }
+  .v3-profit-rows th:last-child, .v3-profit-rows td:last-child { display: none; }
+}
+.v3-profit-pl td:first-child { white-space: nowrap; }
+@media (max-width: 767px) {
+  .v3-main .v3-profit table.v3-home-pl td, .v3-main .v3-profit table.v3-home-pl th { padding-left: var(--space-1); padding-right: var(--space-1); }
+  .v3-main .v3-profit table.v3-home-pl td:first-child, .v3-main .v3-profit table.v3-home-pl th:first-child { padding-left: var(--space-4); }
+  .v3-main .v3-profit table.v3-home-pl td:last-child, .v3-main .v3-profit table.v3-home-pl th:last-child { padding-right: var(--space-4); }
+  .v3-main .v3-profit table.v3-profit-rows th.r { white-space: normal; }
+  .v3-main .v3-profit table.v3-profit-rows td:nth-last-child(2), .v3-main .v3-profit table.v3-profit-rows th:nth-last-child(2) { padding-right: var(--space-4); }
+}
