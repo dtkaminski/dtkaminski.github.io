@@ -2300,3 +2300,13 @@ div:has(> .v3-profit) ~ .v3-today { gap: 0; }
   .v3-main .v3-competitors .v3-comp-add .v3-search { max-width: none; }
   .v3-comp-acts { flex-wrap: wrap; }
 }
+/* Website */
+.v3-website .v3-flag { white-space: nowrap; }
+.v3-website .v3-home-tile-k { min-height: 2lh; }
+.v3-website .v3-panel-note + .v3-panel-note { border-top: 0; padding-top: 0; }
+.v3-main .v3-website table.v3-profit-rows td.v3-web-wrap { white-space: normal; }
+.v3-main .v3-website table.v3-profit-rows td.v3-web-wrap .v3-home-sub { display: block; overflow: visible; -webkit-line-clamp: unset; }
+@media (max-width: 767px) {
+  .v3-main .v3-website table.v3-profit-rows th:first-child, .v3-main .v3-website table.v3-profit-rows td:first-child { white-space: normal; min-width: 0; }
+  .v3-main .v3-website table.v3-profit-rows th.v3-mk-opt, .v3-main .v3-website table.v3-profit-rows td.v3-mk-opt { display: none; }
+}
