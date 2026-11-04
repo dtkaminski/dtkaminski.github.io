@@ -1,13 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-frame="product">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Log in — greta</title>
+<title>Log in | Greta</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Geist:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./auth.css?v=20261001logo">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./auth.css?v=20261104finish">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="/brand/greta-favicon.svg?v=20261001a" type="image/svg+xml">
@@ -22,7 +23,7 @@
   <div class="auth-card">
     <div id="form-state">
       <h1>Log in</h1>
-      <p class="lead">Enter your email — we'll email you a login code (and a sign-in link). No passwords. Sessions last 7 days.</p>
+      <p class="lead">We'll email you a login code and a sign-in link.</p>
 
       <form id="login-form">
         <label>Email
@@ -36,7 +37,7 @@
         <div id="error-box" class="error-box" hidden></div>
 
         <p class="fine-print">
-          New here? <a href="./signup.html">Create a workspace →</a>
+          New here? <a href="./signup.html">Create a workspace</a>
         </p>
       </form>
     </div>
@@ -44,20 +45,20 @@
     <div id="success-state" hidden>
       <div class="success-icon">✓</div>
       <h1>Check your email</h1>
-      <p class="lead">We emailed a login code to <b id="success-email"></b>. Enter it below — or just click the sign-in link in the same email.</p>
+      <p class="lead">We emailed a login code to <b id="success-email"></b>. Enter it below, or use the sign-in link in the same email.</p>
       <form id="code-form">
-        <label>login code
+        <label>Login code
           <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="10" placeholder="123456" />
         </label>
         <button type="submit" class="btn-primary" id="verify-btn"><span class="btn-label">Verify &amp; sign in</span></button>
         <div id="code-error" class="error-box" hidden></div>
       </form>
-      <p class="fine-print">Didn't arrive in 60 seconds? <a href="#" id="resend-link">Resend</a> · check spam · or <a href="mailto:hello@operatorintelligence.com">contact support</a>.</p>
+      <p class="fine-print">Didn't arrive in 60 seconds? <a href="#" id="resend-link">Resend</a>, check spam, or <a href="mailto:hello@operatorintelligence.com">contact support</a>.</p>
     </div>
   </div>
 
   <p class="auth-footer">
-    <a href="/">← Back to home</a>
+    <a href="/">Back to home</a>
   </p>
 </div>
 
@@ -144,7 +145,7 @@
     verifyBtn.disabled = true; verifyBtn.querySelector('.btn-label').textContent = 'Verifying…';
     const { error } = await sb.auth.verifyOtp({ email, token, type: 'email' });
     if (error) {
-      codeErr.textContent = error.message || 'That code is invalid or expired — request a new one.';
+      codeErr.textContent = error.message || 'That code is invalid or expired. Request a new one.';
       codeErr.hidden = false;
       verifyBtn.disabled = false; verifyBtn.querySelector('.btn-label').textContent = 'Verify & sign in';
       return;

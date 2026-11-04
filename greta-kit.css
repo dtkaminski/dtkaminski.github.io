@@ -2196,3 +2196,17 @@ button.v3-home-tile:hover, button.v3-home-tile.open { background: var(--color-pa
   .v3-main table.v3-acts-figs td { display: block; padding: 0; }
   .v3-main table.v3-acts-figs td.v3-acts-figs-acts { grid-column: 1 / -1; }
 }
+
+/* Finish pass: a link looks like a link; a tile's words wrap instead of clipping */
+html[data-frame="product"] .v3-xref { color: var(--color-ink); text-decoration: underline; text-decoration-color: var(--color-line-strong); text-underline-offset: 2px; }
+html[data-frame="product"] .v3-xref:hover { text-decoration-color: currentColor; }
+.v3-home-tile { display: flex; flex-direction: column; }
+@media (max-width: 1399px) {
+  .v3-home-tile-k, .v3-home-tile-d { white-space: normal; overflow: visible; text-overflow: clip; }
+  .v3-home-tile-d { align-items: flex-start; }
+}
+@media (min-width: 768px) and (max-width: 1399px) {
+  .v3-home-tile-k { min-height: 2lh; }
+}
+.v3-home-tile-d svg { flex: none; }
+.v3-home-tile > svg, .v3-home-tile .v3-home-spark { margin-top: auto; }

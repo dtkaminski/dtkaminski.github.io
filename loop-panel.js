@@ -343,7 +343,7 @@
       className: "lp-cut-name"
     }, d.dim === 'landing' ? 'Landing page' : d.dim === 'device' ? 'Device' : 'Country'), /*#__PURE__*/React.createElement("span", {
       className: "lp-cut-disp"
-    }, i === 0 ? 'separates most · ' : '', (d.disp * 100).toFixed(0), " pts apart")), /*#__PURE__*/React.createElement("div", {
+    }, i === 0 ? 'separates most, ' : '', (d.disp * 100).toFixed(0), " pts apart")), /*#__PURE__*/React.createElement("div", {
       className: "lp-cut-track"
     }, /*#__PURE__*/React.createElement("div", {
       className: "lp-cut-zero",
@@ -497,7 +497,7 @@
       className: "lp-h"
     }, "What the next pound buys"), /*#__PURE__*/React.createElement("span", {
       className: "lp-asof"
-    }, "fitted ", p.as_of, " · ", p.k_n, " months")), /*#__PURE__*/React.createElement("div", {
+    }, "fitted ", p.as_of, ", ", p.k_n, " months")), /*#__PURE__*/React.createElement("div", {
       className: "lp-hero"
     }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
       className: "lp-k"
@@ -630,7 +630,7 @@
       className: "lp-h"
     }, "Where the month went"), /*#__PURE__*/React.createElement("span", {
       className: "lp-asof"
-    }, lpMonth(month), " · each stage against its own twelve-month normal")), monthLags && /*#__PURE__*/React.createElement("p", {
+    }, lpMonth(month), ", each stage against its own twelve-month normal")), monthLags && /*#__PURE__*/React.createElement("p", {
       className: "lp-note"
     }, lpMonth(month), " is the latest month whose site tracking passed Greta's quality checks. Later months are held back because their site analytics data was incomplete (for example, checkout events stopped recording); they appear here automatically once the data is reliable. ", window.__oiNav && /*#__PURE__*/React.createElement("button", {
       type: "button",

@@ -1,13 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-frame="product">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Sign up — greta</title>
+<title>Sign up | Greta</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Geist:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./auth.css?v=20261001logo">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./auth.css?v=20261104finish">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="/brand/greta-favicon.svg?v=20261001a" type="image/svg+xml">
@@ -42,7 +43,7 @@
         <details class="advanced-details">
           <summary>Advanced (optional)</summary>
           <div style="display:flex; flex-direction:column; gap:var(--s-3); margin-top:var(--s-3);">
-            <label>Workspace handle <span class="meta">(used in your URL — or enter the handle of a workspace set up for you, to claim it)</span>
+            <label>Workspace handle <span class="meta">(used in your URL, or enter the handle of a workspace set up for you to claim it)</span>
               <input type="text" id="advanced-slug" placeholder="auto-derived from brand name" pattern="[a-z0-9][a-z0-9\-]{2,49}" minlength="3" maxlength="50"/>
             </label>
             <div class="row">
@@ -63,13 +64,13 @@
         </details>
 
         <button type="submit" class="btn-primary" id="submit-btn">
-          <span class="btn-label">Create workspace → email me a code</span>
+          <span class="btn-label">Create workspace</span>
         </button>
 
         <div id="error-box" class="error-box" hidden></div>
 
         <p class="fine-print">
-          Already have one? <a href="./login.html">Log in →</a>
+          Already have one? <a href="./login.html">Log in</a>
           <br/>By signing up you agree to our <a href="/terms">terms</a> and <a href="/privacy">privacy</a>.
         </p>
       </form>
@@ -78,7 +79,7 @@
     <div id="success-state" hidden>
       <div class="success-icon">✓</div>
       <h1 id="success-title">Enter your code</h1>
-      <p class="lead">Workspace <b><span id="success-brand"></span></b> created. We emailed a login code to <b id="success-email"></b> — enter it to finish and land in your workspace.</p>
+      <p class="lead">Workspace <b><span id="success-brand"></span></b> created. We emailed a login code to <b id="success-email"></b>. Enter it to finish and land in your workspace.</p>
       <form id="code-form">
         <label>login code
           <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="10" placeholder="123456" />
@@ -86,13 +87,13 @@
         <button type="submit" class="btn-primary" id="verify-btn"><span class="btn-label">Verify &amp; enter workspace</span></button>
         <div id="code-error" class="error-box" hidden></div>
       </form>
-      <p class="fine-print">Didn't arrive in 60 seconds? <a href="#" id="resend-link">Resend</a> · check spam · or <a href="mailto:hello@operatorintelligence.com">contact support</a>.</p>
+      <p class="fine-print">Didn't arrive in 60 seconds? <a href="#" id="resend-link">Resend</a>, check spam, or <a href="mailto:hello@operatorintelligence.com">contact support</a>.</p>
     </div>
   </div>
 
   <p class="auth-footer">
     <span>Greta is the accountability layer for DTC brands.</span>
-    <a href="/">← Back to home</a>
+    <a href="/">Back to home</a>
   </p>
 </div>
 
@@ -165,7 +166,7 @@
       errorBox.textContent = 'Brand name must produce a valid handle. Try a longer name or set one manually under Advanced.';
       errorBox.hidden = false;
       submitBtn.disabled = false;
-      submitBtn.querySelector('.btn-label').textContent = 'Create workspace → email me a code';
+      submitBtn.querySelector('.btn-label').textContent = 'Create workspace';
       return;
     }
 
@@ -203,13 +204,13 @@
 
         let msg;
         if (code === 'slug_taken') {
-          msg = "That handle's taken — pick another.";
+          msg = "That handle's taken. Pick another.";
           openAdvancedOnSlug();
         } else if (code === 'invalid_brand_slug') {
-          msg = "That handle isn't valid — use 3–50 lowercase letters, numbers or hyphens.";
+          msg = "That handle isn't valid. Use 3 to 50 lowercase letters, numbers or hyphens.";
           openAdvancedOnSlug();
         } else if (code === 'invalid_email') {
-          msg = "That email doesn't look right — check it and try again.";
+          msg = "That email doesn't look right. Check it and try again.";
           form.email.focus();
         } else if (code === 'invalid_brand_name') {
           msg = 'Enter your brand name (1–100 characters).';
@@ -221,7 +222,7 @@
         errorBox.textContent = msg;
         errorBox.hidden = false;
         submitBtn.disabled = false;
-        submitBtn.querySelector('.btn-label').textContent = 'Create workspace → email me a code';
+        submitBtn.querySelector('.btn-label').textContent = 'Create workspace';
         return;
       }
 
@@ -239,7 +240,7 @@
       errorBox.textContent = `Network error: ${err.message || err}`;
       errorBox.hidden = false;
       submitBtn.disabled = false;
-      submitBtn.querySelector('.btn-label').textContent = 'Create workspace → email me a code';
+      submitBtn.querySelector('.btn-label').textContent = 'Create workspace';
     }
   });
 
@@ -254,7 +255,7 @@
     verifyBtn.disabled = true; verifyBtn.querySelector('.btn-label').textContent = 'Verifying…';
     const { error } = await sb.auth.verifyOtp({ email: signupEmail, token, type: 'email' });
     if (error) {
-      codeErr.textContent = error.message || 'That code is invalid or expired — tap Resend for a new one.';
+      codeErr.textContent = error.message || 'That code is invalid or expired. Tap Resend for a new one.';
       codeErr.hidden = false;
       verifyBtn.disabled = false; verifyBtn.querySelector('.btn-label').textContent = 'Verify & enter workspace';
       return;

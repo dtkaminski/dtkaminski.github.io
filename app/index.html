@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>greta — Dashboard</title>
+<title>Greta</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Geist:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../auth/auth.css?v=20261103frame">
+<link rel="stylesheet" href="../auth/auth.css?v=20261104finish">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
   /* ── App shell ─────────────────────────────────────────────────────── */
@@ -185,7 +185,7 @@
         <div class="state-banner-sub">Log in to see your workspace.</div>
       </div>
       <div class="state-banner-action">
-        <a href="../auth/login.html" class="btn-primary">Log in →</a>
+        <a href="../auth/login.html" class="btn-primary">Log in</a>
       </div>
     </div>
   </div>
@@ -195,13 +195,13 @@
     <!-- Connection state banner (shown when Shopify not connected OR first sync running) -->
     <div id="state-not-connected" hidden>
       <div class="state-banner info">
-        <div class="state-banner-icon">→</div>
+        <div class="state-banner-icon"></div>
         <div class="state-banner-body">
           <div class="state-banner-title">Connect Shopify to populate your dashboard</div>
           <div class="state-banner-sub">~30 seconds via OAuth. Pulls 90 days of orders, products, inventory and discounts. First findings appear within the hour.</div>
         </div>
         <div class="state-banner-action">
-          <a href="../auth/workspace.html" class="btn-primary">Set up Shopify →</a>
+          <a href="../auth/workspace.html" class="btn-primary">Set up Shopify</a>
         </div>
       </div>
     </div>
@@ -356,7 +356,7 @@
     // so we pre-satisfy the dashboard's access gate via shared same-origin localStorage
     // (no passcode prompt). The embedded dashboard's loader reads live tenant data using
     // this same session.
-    const richUrl = '/greta-dashboard.html?v=1793787411397';
+    const richUrl = '/greta-dashboard.html?v=1793790720885';
     // The dashboard is the app: every connected brand renders it inline. The old
     // placeholder-panel path below this point was unreachable (the condition above
     // was always true) and was removed on 2026-09-25 with the panels it filled.

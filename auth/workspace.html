@@ -1,13 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-frame="product">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Your workspace — greta</title>
+<title>Your workspace | Greta</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Geist:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./auth.css?v=20261001logo">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./auth.css?v=20261104finish">
 <script>
   // ── Return the operator to wherever the reconnect started ────────────────
   // FIRST thing on the page, ahead of the Supabase bundle, the stylesheet and the fonts.
@@ -234,7 +235,7 @@
   <div id="no-session" class="auth-card" hidden>
     <h1>You're not logged in</h1>
     <p class="lead">Your session has expired or this link is no longer valid.</p>
-    <a href="./login.html" class="btn-primary" style="display:inline-flex; text-decoration:none;">Log in →</a>
+    <a href="./login.html" class="btn-primary" style="display:inline-flex; text-decoration:none;">Log in</a>
   </div>
 
   <div id="no-brands" class="auth-card" hidden>
@@ -246,12 +247,12 @@
       <div class="micro" style="color:var(--accent); margin-bottom:6px;">An existing workspace matches your email</div>
       <div style="font-size:14px; font-weight:600; margin-bottom:4px;" id="claim-brand-name">—</div>
       <div class="meta" style="font-size:12px; margin-bottom:var(--s-3);">You're on the claim allowlist for this workspace. Click below to link your account as owner.</div>
-      <button id="claim-btn" class="btn-primary" style="padding:8px 14px; font-size:13px;">Claim workspace →</button>
+      <button id="claim-btn" class="btn-primary" style="padding:8px 14px; font-size:13px;">Claim workspace</button>
       <div id="claim-error" class="error-box" hidden style="margin-top: 10px;"></div>
     </div>
 
     <p class="meta" style="font-size:12px; margin: var(--s-4) 0 var(--s-3);">Or start fresh:</p>
-    <a href="./signup.html" class="btn-primary" style="display:inline-flex; text-decoration:none;">Create a new workspace →</a>
+    <a href="./signup.html" class="btn-primary" style="display:inline-flex; text-decoration:none;">Create a new workspace</a>
   </div>
 
   <div id="workspace-view" hidden>
@@ -274,7 +275,7 @@
             <div class="next-step-tag" id="next-step-tag">Next step</div>
             <div class="next-step-title" id="next-step-title">Connect Shopify</div>
           </div>
-          <button class="btn-primary" id="next-step-btn">Connect →</button>
+          <button class="btn-primary" id="next-step-btn">Connect</button>
         </div>
       </div>
     </div>
@@ -282,7 +283,7 @@
     <!-- ── CONNECTION GRID ─────────────────────────────────────────────── -->
     <h2 style="font-size:16px; margin: var(--s-7) 0 var(--s-3); font-weight:650;">Data sources</h2>
     <p class="meta" style="font-size:12.5px; margin-bottom:var(--s-2);">
-      Each source unlocks more of the dashboard. <b>Only Shopify is required</b> — start there, add the rest later.
+      Each source unlocks more of the dashboard. <b>Only Shopify is required.</b> Start there and add the rest later.
     </p>
     <div class="conn-grid" id="conn-grid">
       <!-- Filled by JS -->
@@ -298,7 +299,7 @@
       <div class="preview-grid">
         <div class="preview-tile">
           <div class="preview-tile-eyebrow">What you keep</div>
-          <div class="preview-tile-sub">Of every £1 you sell, how much goes on products, how much on ads, and how much is left — the number everything else is there to move.</div>
+          <div class="preview-tile-sub">Of every £1 you sell, how much goes on products, how much on ads, and how much is left.</div>
         </div>
         <div class="preview-tile">
           <div class="preview-tile-eyebrow">Do this first</div>
@@ -306,7 +307,7 @@
         </div>
         <div class="preview-tile">
           <div class="preview-tile-eyebrow">What your ads earn</div>
-          <div class="preview-tile-sub">Each channel against the return it needs to break even on your margin — so you can see which ones pay for themselves.</div>
+          <div class="preview-tile-sub">Each channel against the return it needs to break even on your margin.</div>
         </div>
       </div>
     </div>
@@ -342,11 +343,11 @@
       <form class="invite-form" id="invite-form" hidden>
         <input type="email" id="invite-email" placeholder="teammate@yourbrand.com" autocomplete="off" required/>
         <select id="invite-role" aria-label="Role">
-          <option value="member">Member — full access</option>
-          <option value="viewer">Viewer — read only</option>
-          <option value="admin">Admin — can manage team</option>
+          <option value="member">Member: full access</option>
+          <option value="viewer">Viewer: read only</option>
+          <option value="admin">Admin: can manage team</option>
         </select>
-        <button type="submit" class="btn-primary" id="invite-submit" style="padding:9px 16px; font-size:13px;">Send invite →</button>
+        <button type="submit" class="btn-primary" id="invite-submit" style="padding:9px 16px; font-size:13px;">Send invite</button>
       </form>
       <div id="invite-msg" class="invite-msg" hidden></div>
 
@@ -369,7 +370,7 @@
       Read-only scopes: orders, products, inventory, customers, analytics, discounts.
     </p>
     <div class="row" style="margin-top: 16px;">
-      <a id="shop-approve-link" class="btn-primary" target="_top">Approve on Shopify →</a>
+      <a id="shop-approve-link" class="btn-primary" target="_top">Approve on Shopify</a>
       <button id="shop-cancel" class="btn-ghost" style="margin-left:auto;">Cancel</button>
     </div>
   </div>
@@ -380,10 +381,10 @@
   <div class="modal">
     <h3>Connect Klaviyo</h3>
     <p class="lead" style="font-size:13px; margin:8px 0 14px;">
-      Paste a <b style="color:var(--text-primary);">read-only Private API Key</b> — takes about 30 seconds:
+      Paste a <b style="color:var(--text-primary);">read-only Private API Key</b>. It takes about 30 seconds:
     </p>
     <ol style="font-size:12.5px; color:var(--text-secondary); margin:0 0 14px; padding-left:18px; line-height:1.7;">
-      <li><a href="https://www.klaviyo.com/settings/account/api-keys" target="_blank" rel="noopener" style="color:var(--color-accent);">Open Klaviyo → Settings → API keys ↗</a></li>
+      <li><a href="https://www.klaviyo.com/settings/account/api-keys" target="_blank" rel="noopener" style="color:var(--color-accent);">Open Klaviyo API keys</a></li>
       <li>Click <b style="color:var(--text-primary);">Create Private API Key</b>, name it “Greta”</li>
       <li>Choose <b style="color:var(--text-primary);">Read-only</b> access (or scopes: accounts, metrics, flows, campaigns, profiles)</li>
       <li>Copy the key (starts with <code>pk_</code>) and paste it below</li>
@@ -396,7 +397,7 @@
     </p>
     <div id="klaviyo-error" class="error-box" hidden style="margin-top: 12px;"></div>
     <div class="row" style="margin-top: 16px;">
-      <button id="klaviyo-submit" class="btn-primary">Connect →</button>
+      <button id="klaviyo-submit" class="btn-primary">Connect</button>
       <button id="klaviyo-cancel" class="btn-ghost" style="margin-left:auto;">Cancel</button>
     </div>
   </div>
@@ -411,7 +412,7 @@
     </p>
     <ol style="font-size:12.5px; color:var(--text-secondary); margin:0 0 14px; padding-left:18px; line-height:1.7;">
       <li><a href="https://clarity.microsoft.com/" target="_blank" rel="noopener" style="color:var(--color-accent);">Open Clarity ↗</a> and choose your shop's project</li>
-      <li>Go to <b style="color:var(--text-primary);">Settings → Data Export</b> and click <b style="color:var(--text-primary);">Generate new API token</b>, name it “Greta”</li>
+      <li>Go to <b style="color:var(--text-primary);">Settings > Data Export</b> and click <b style="color:var(--text-primary);">Generate new API token</b>, name it “Greta”</li>
       <li>Copy the whole token and paste it below</li>
     </ol>
     <label>API token
@@ -422,7 +423,7 @@
     </p>
     <div id="clarity-error" class="error-box" hidden style="margin-top: 12px;"></div>
     <div class="row" style="margin-top: 16px;">
-      <button id="clarity-submit" class="btn-primary">Connect →</button>
+      <button id="clarity-submit" class="btn-primary">Connect</button>
       <button id="clarity-cancel" class="btn-ghost" style="margin-left:auto;">Cancel</button>
     </div>
   </div>
@@ -444,7 +445,7 @@
       buildInstallUrl: (b, opts) => `${SUPABASE_FNS}/oauth-shopify-install?shop=${encodeURIComponent(opts.shop)}&brand=${encodeURIComponent(b)}`,
       promptType:'shopify_domain' },
     { id:'meta', name:'Meta Ads', icon:'M', required:false, authType:'oauth',
-      unlocks:'Paid spend, ROAS, creative-level performance, audience health · includes Instagram',
+      unlocks:'Paid spend, ROAS, creative-level performance, audience health, including Instagram',
       buildInstallUrl: (b) => `${SUPABASE_FNS}/oauth-meta-install?brand=${encodeURIComponent(b)}`,
       promptType:'direct' },
     { id:'klaviyo', name:'Klaviyo', icon:'K', required:false, authType:'api_key',
@@ -503,8 +504,8 @@
         const lead = card.querySelector('.lead');
         const btn = card.querySelector('a.btn-primary');
         if (h1) h1.textContent = 'That sign-in link expired';
-        if (lead) lead.textContent = 'Magic links can only be used once and expire quickly — and requesting a new link cancels older ones. Send yourself a fresh link and open the newest email.';
-        if (btn) btn.textContent = 'Send a new link →';
+        if (lead) lead.textContent = 'Sign-in links work once and expire quickly, and a new link cancels older ones. Send yourself a new link and open the newest email.';
+        if (btn) btn.textContent = 'Send a new link';
         // Strip the error out of the URL so a refresh doesn't re-trigger this state.
         history.replaceState(null, '', window.location.pathname + window.location.search);
       }
@@ -571,7 +572,7 @@
                 if (!resp.ok || data.action !== 'claimed') {
                   errEl.textContent = data.message || 'Claim failed.';
                   errEl.hidden = false;
-                  btn.disabled = false; btn.textContent = 'Claim workspace →';
+                  btn.disabled = false; btn.textContent = 'Claim workspace';
                   return;
                 }
                 window.location.reload();
@@ -685,10 +686,10 @@
             <div class="conn-name">${spec.name}</div>
             <span class="conn-status ${isActive ? 'active' : isPending ? 'pending' : isError ? 'pending' : 'disconnected'}">
               <span class="dot"></span>
-              ${isActive ? `Connected${conn.account_label ? ` · ${accountWords(conn.account_label)}` : ''}` :
+              ${isActive ? `Connected${conn.account_label ? `: ${accountWords(conn.account_label)}` : ''}` :
                 isPending ? 'Install in progress' :
-                isError ? 'Error · reconnect needed' :
-                spec.required ? 'Required · not connected' : 'Optional · not connected'}
+                isError ? 'Error: reconnect needed' :
+                spec.required ? 'Required' : 'Optional'}
             </span>
           </div>
         </div>
@@ -703,7 +704,7 @@
           ` : spec.unavailable ? `
             <span class="meta">Not available yet</span>
           ` : `
-            <span class="meta">${spec.required ? 'Start here →' : 'Add when ready'}</span>
+            <span class="meta">${spec.required ? 'Start here' : 'Add when ready'}</span>
             <button class="btn-primary connect-btn" data-provider="${spec.id}">${connectLabel}</button>
           `}
         </div>
@@ -746,14 +747,14 @@
       cta.hidden = false;
       document.getElementById('next-step-tag').textContent = 'Required next step';
       document.getElementById('next-step-title').textContent = 'Connect Shopify (~30 seconds)';
-      document.getElementById('next-step-btn').textContent = 'Connect Shopify →';
+      document.getElementById('next-step-btn').textContent = 'Connect Shopify';
       document.getElementById('next-step-btn').onclick = openShopifyModal;
     } else {
       // Shopify connected — push to open the dashboard
       cta.hidden = false;
       document.getElementById('next-step-tag').textContent = 'Your dashboard is ready';
       document.getElementById('next-step-title').textContent = `Open the ${currentBrand.name} dashboard`;
-      document.getElementById('next-step-btn').textContent = 'Open dashboard →';
+      document.getElementById('next-step-btn').textContent = 'Open dashboard';
       document.getElementById('next-step-btn').onclick = () => { window.location.href = `/app/?brand=${currentBrand.slug}`; };
 
       // Update headline + sub
@@ -859,7 +860,7 @@
         klaviyoError.textContent = data.message || data.error || 'Failed to connect.';
         klaviyoError.hidden = false;
         klaviyoSubmit.disabled = false;
-        klaviyoSubmit.textContent = 'Connect →';
+        klaviyoSubmit.textContent = 'Connect';
         return;
       }
       // Success — reload to show the new connection
@@ -869,7 +870,7 @@
       klaviyoError.textContent = `Network error: ${e.message || e}`;
       klaviyoError.hidden = false;
       klaviyoSubmit.disabled = false;
-      klaviyoSubmit.textContent = 'Connect →';
+      klaviyoSubmit.textContent = 'Connect';
     }
   });
 
@@ -889,7 +890,7 @@
   claritySubmit.addEventListener('click', async () => {
     const key = clarityKeyInput.value.trim();
     if (!key || key.split('.').length !== 3) {
-      clarityError.textContent = 'That does not look like a Clarity API token. Copy the whole token from Settings → Data Export.';
+      clarityError.textContent = 'That does not look like a Clarity API token. Copy the whole token from Settings > Data Export.';
       clarityError.hidden = false;
       return;
     }
@@ -907,7 +908,7 @@
         clarityError.textContent = data.message || data.error || 'Failed to connect.';
         clarityError.hidden = false;
         claritySubmit.disabled = false;
-        claritySubmit.textContent = 'Connect →';
+        claritySubmit.textContent = 'Connect';
         return;
       }
       clarityModal.hidden = true;
@@ -916,7 +917,7 @@
       clarityError.textContent = `Network error: ${e.message || e}`;
       clarityError.hidden = false;
       claritySubmit.disabled = false;
-      claritySubmit.textContent = 'Connect →';
+      claritySubmit.textContent = 'Connect';
     }
   });
 
@@ -1005,7 +1006,7 @@
       action: 'invite', email, role,
       redirect_to: window.location.origin + '/auth/workspace.html',
     });
-    submit.disabled = false; submit.textContent = 'Send invite →';
+    submit.disabled = false; submit.textContent = 'Send invite';
     if (!ok) { showInviteMsg(data.detail || data.message || data.error || 'Invite failed.', 'err'); return; }
     showInviteMsg(data.message || 'Invite sent.', 'ok');
     document.getElementById('invite-email').value = '';

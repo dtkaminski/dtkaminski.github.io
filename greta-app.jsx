@@ -10,7 +10,7 @@ if (R.Tooltip && R.Tooltip.defaultProps) R.Tooltip.defaultProps.labelFormatter =
 // was told to "sign in", and on Team that this was "the public demo".
 function v3NoBrand(what) {
   const L = (typeof window !== 'undefined' && window.FRKL_LIVE) || {};
-  if (L.session && L.status === 'error') return 'Greta couldn’t load your workspace just now, so ' + what + ' can’t be shown. Refreshing the page usually sorts it.';
+  if (L.session && L.status === 'error') return 'Your workspace could not load just now, so ' + what + ' can’t be shown. Refreshing the page usually sorts it.';
   if (L.session && L.lastError === 'no membership') return 'Your account isn’t linked to this brand yet, so ' + what + ' can’t be shown. Ask the brand’s owner to invite you.';
   if (L.session) return 'Your workspace is still loading.';
   return 'Sign in to see ' + what + '.';
@@ -411,7 +411,7 @@ function planReorder(over){
   const productLines = inv.filter(p=>(p.dailyVelocity||0)>0 && !del[p.sku||p.title]).map(p=>{
     const sup = skuSup[p.sku||p.title] || {};                                   // SKU-level supplier master
     const assigned = !!(sup.supplier && String(sup.supplier).trim());
-    const supplier = assigned ? sup.supplier.trim() : 'Unassigned — set supplier';
+    const supplier = assigned ? sup.supplier.trim() : 'Unassigned, set supplier';
     const contact = assigned ? (dir[supplier]||{}) : {};
     const leadMake = (sup.lead!=null&&sup.lead!=='') ? Number(sup.lead) : leadDaysForType(p.type);  // order → shipment (production)
     const leadShip = (contact.shipDays!=null&&contact.shipDays!=='') ? Number(contact.shipDays) : (Number(rc.shipDays)||0);  // shipment → landing (transit)
@@ -795,7 +795,7 @@ function priorPeriod(start, end){
 }
 function inRangeBounded(rows, start, end){ return (rows||[]).filter(r => r.date >= start && r.date <= end); }
 function dataEndOf(){ return ACTIVE_END || REAL_END; }
-function fmtDelta(d){ if(d==null) return null; const pct = Math.abs(d*100); if (pct < 0.5) return '·0%'; return (d>0?'↑':'↓') + pct.toFixed(0) + '%'; }
+function fmtDelta(d){ if(d==null) return null; const pct = Math.abs(d*100); if (pct < 0.5) return '0%'; return (d>0?'↑':'↓') + pct.toFixed(0) + '%'; }
 
 // Small inline confidence pill for any margin-derived figure. Subscribes to cost
 // updates so it flips the instant the operator verifies their costs.
@@ -813,7 +813,7 @@ function MarginBadge({onSetup}){
   const conf = V3_CONF[rung];
   const good = rung === 'direct' || rung === 'likely', faint = rung === 'outside' || rung === 'held';
   const canFix = !good && onSetup;
-  return (<span title={conf.label + ' — ' + conf.why} onClick={canFix ? (e=>{e.stopPropagation(); onSetup();}) : undefined}
+  return (<span title={conf.label + ', ' + conf.why} onClick={canFix ? (e=>{e.stopPropagation(); onSetup();}) : undefined}
     style={{display:'inline-flex', alignItems:'center', gap:3, fontSize:'var(--text-xs)', fontWeight:'var(--weight-bold)', letterSpacing:'var(--tracking-wide)', textTransform:'uppercase',
             padding:'1px 6px', borderRadius:'var(--r-full)', cursor:canFix?'pointer':'help', whiteSpace:'nowrap',
             background: good?'var(--good-bg)':faint?'transparent':'var(--warn-bg)', color: good?'var(--good)':faint?'var(--text-faint)':'var(--warn)',
@@ -857,7 +857,7 @@ function CostSetupModal({catalogueGm, onClose}){
   return (
     <div className="modal-bg" onClick={onClose}>
       <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:560}}>
-        <h3>Set up your real costs <span style={{fontWeight:'var(--weight-normal)', color:'var(--text-faint)', fontSize:'var(--text-sm)'}}>· ~5 min, makes margin numbers accurate</span></h3>
+        <h3>Set up your real costs <span style={{fontWeight:'var(--weight-normal)', color:'var(--text-faint)', fontSize:'var(--text-sm)'}}>~5 min, makes margin numbers accurate</span></h3>
         <div className="micro" style={{color:'var(--text-muted)', marginBottom:14, lineHeight:1.5}}>
           Contribution, CAC payback and LTV:CAC are only as good as the costs behind them. Until these are confirmed they're shown as <b style={{color:'var(--warn)'}}>estimates</b>. Enter your real numbers once and every margin figure flips to <b style={{color:'var(--good)'}}>verified</b>.
         </div>
@@ -923,7 +923,7 @@ function KPI({label, val, sub, badge, status, statusLabel, conf, series, seriesL
     {hasPop && (
       <div className="kpi-pop">
         {hasSpark && (<div>
-          <div className="head">{seriesLabel || `${series.length}-day trend · vs prior period`}</div>
+          <div className="head">{seriesLabel || `${series.length}-day trend, vs prior period`}</div>
           <R.ResponsiveContainer width="100%" height={160}>
             <R.LineChart data={series} margin={{top:6,right:10,left:2,bottom:4}}>
               <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
@@ -931,7 +931,7 @@ function KPI({label, val, sub, badge, status, statusLabel, conf, series, seriesL
               <R.YAxis tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} width={34} domain={['auto','auto']}
                        tickFormatter={v=> Math.abs(v)>=1000 ? (v/1000).toFixed(1)+'k' : (Math.abs(v)<10 ? v.toFixed(1) : Math.round(v))}/>
               <R.Tooltip contentStyle={{fontSize:'var(--text-xs)',background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',padding:'2px 6px'}} formatter={v=> typeof v==='number' ? (Math.abs(v)>=1000 ? Math.round(v).toLocaleString() : v.toFixed(2)) : v} labelFormatter={l=>l}/>
-              <R.Line type="monotone" dataKey="v" stroke={svgCol(rechartsStroke)} strokeWidth={2} dot={false} isAnimationActive={false}/>
+              <R.Line type="linear" dataKey="v" stroke={svgCol(rechartsStroke)} strokeWidth={2} dot={false} isAnimationActive={false}/>
             </R.LineChart>
           </R.ResponsiveContainer>
         </div>)}
@@ -962,7 +962,7 @@ function statusBadge(s){
 function fmtPct(x){ if (!fmtOk(x)) return FMT_NONE; const v=x*100; return (v>=0?"+":"−")+Math.abs(v).toFixed(0)+"%"; }
 function ImpactLine({impact, resolvedAt}){
   if (!impact || !Object.keys(impact).length) return null;
-  const parts = Object.entries(impact).map(([k,v]) => `${k.replace(/_/g,' ')}: ${fmtPct(v.deltaPct)}`).join(" · ");
+  const parts = Object.entries(impact).map(([k,v]) => `${k.replace(/_/g,' ')}: ${fmtPct(v.deltaPct)}`).join(", ");
   const when = resolvedAt ? new Date(resolvedAt).toISOString().slice(0,10) : "";
   return <div className="impact"><span className="label">Since {when}:</span> {parts}</div>;
 }
@@ -989,7 +989,7 @@ function MarkDoneModal({action, onClose}){
       const out = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(out.error || ('could not save (' + res.status + ')'));
       onClose();
-      toast('Marked done', {kind:'good', body:'Greta will check whether it worked and add the result to your track record.'});
+      toast('Marked done', {kind:'good', body:'It will be checked, and the result added to your track record.'});
       try { window.dispatchEvent(new Event('frkl-data-updated')); } catch(e){}
     } catch (e) {
       setErr(String((e && e.message) || e));
@@ -1000,9 +1000,9 @@ function MarkDoneModal({action, onClose}){
     <div className="modal" onClick={e=>e.stopPropagation()}>
       <h3>Mark this done</h3>
       <div className="actiontxt">{typeof scrubTag === 'function' ? scrubTag(action.text) : action.text}</div>
-      <label>When did it go live? <span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)'}}>— Greta measures the result from this date</span></label>
+      <label>When did it go live? <span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)'}}>(the result is measured from this date)</span></label>
       <input type="date" value={doneDate} max={new Date().toISOString().slice(0,10)} onChange={e=>setDoneDate(e.target.value)}/>
-      <label>What did you do? <span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)'}}>— optional, helps when you look back</span></label>
+      <label>What did you do? <span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)'}}>optional, helps when you look back</span></label>
       <input type="text" value={note} onChange={e=>setNote(e.target.value)} placeholder="e.g. confirmed product cost with the supplier" autoFocus/>
       {err && <div style={{color:'var(--bad)', fontSize:'var(--text-sm)', marginTop:8}}>{err}</div>}
       <div className="row">
@@ -1010,7 +1010,7 @@ function MarkDoneModal({action, onClose}){
         <button onClick={onClose} style={{marginLeft:'auto'}}>Cancel</button>
       </div>
       <div className="hint">
-        Marking it done closes it everywhere and starts the check: Greta compares what happens next
+        Marking it done closes it everywhere and starts the check, which compares what happens next
         against what it predicted, and records whether the call was right on your track record.
         {!ASK && <><br/><b>You are not signed in</b>, so this cannot be saved right now.</>}
       </div>
@@ -1067,9 +1067,9 @@ function ActionContract({vf}){
   if(vf.verdict){
     const V = {hit:['hit','var(--good)'], miss:['miss','var(--bad)'], flat:['– no move','var(--text-muted)']}[vf.verdict] || ['',''];
     rc = V[1];
-    result = oiVfmt(vf.baseline_value, vf.metric_format)+' → '+oiVfmt(vf.current_value, vf.metric_format)+' · '+V[0];
+    result = oiVfmt(vf.baseline_value, vf.metric_format)+' → '+oiVfmt(vf.current_value, vf.metric_format)+', '+V[0];
   } else if(vf.current_value!=null){
-    result = 'now '+oiVfmt(vf.current_value, vf.metric_format) + (vf.is_matured ? ' · grading due' : '');
+    result = 'now '+oiVfmt(vf.current_value, vf.metric_format) + (vf.is_matured ? ', grading due' : '');
   }
   return (<div className="ev" style={{marginTop:3, display:'flex', gap:8, flexWrap:'wrap', alignItems:'baseline'}}>
     <span style={{color:'var(--accent)', fontWeight:'var(--weight-semi)'}}>◎ {predict}</span>
@@ -1082,14 +1082,14 @@ function TrackRecord({compact}){
   if(!s) return null;
   const box = {display:'flex', alignItems:'center', gap:8, fontSize:'var(--text-sm)', padding:compact?'6px 10px':'8px 12px', border:'1px solid var(--color-line, #23252d)', borderRadius:'var(--radius-md)', background:'var(--color-accent-wash)', margin: compact?'0 0 8px':'0 0 12px'};
   if(!s.graded){
-    if(s.predicted_total>0) return (<div style={box}><span style={{color:'var(--accent)',fontWeight:'var(--weight-bold)'}}>◎ Verification loop live</span><span style={{color:'var(--text-muted)'}}>{s.predicted_total} predictions tracked · first grades pending</span></div>);
+    if(s.predicted_total>0) return (<div style={box}><span style={{color:'var(--accent)',fontWeight:'var(--weight-bold)'}}>◎ Verification loop live</span><span style={{color:'var(--text-muted)'}}>{s.predicted_total} predictions tracked, first grades pending</span></div>);
     return null;
   }
   return (<div style={box}>
     <span style={{color:'var(--accent)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',fontSize:'var(--text-xs)'}}>Track record</span>
     <span style={{fontWeight:'var(--weight-semi)'}}>{s.hits}/{s.graded} predicted actions hit</span>
     <span style={{color: s.hit_rate_pct>=60?'var(--good)':s.hit_rate_pct>=40?'var(--warn)':'var(--bad)', fontWeight:'var(--weight-bold)'}}>{s.hit_rate_pct}%</span>
-    {s.awaiting_grade>0 && <span style={{color:'var(--text-muted)'}}>· {s.awaiting_grade} awaiting grade</span>}
+    {s.awaiting_grade>0 && <span style={{color:'var(--text-muted)'}}>{s.awaiting_grade} awaiting grade</span>}
   </div>);
 }
 function ActionRow({a, area, onMark}){
@@ -1099,7 +1099,7 @@ function ActionRow({a, area, onMark}){
   const effectiveStatus = localDone && st.status !== "verified-done" ? "verified-done" : st.status;
   const [statCls, statTxt] = statusBadge(effectiveStatus);
   const isDone = effectiveStatus === "verified-done";
-  const ev = localDone && st.status !== "verified-done" ? "Marked done locally — pending refresh to persist" : st.evidence;
+  const ev = localDone && st.status !== "verified-done" ? "Marked done locally, pending refresh to persist" : st.evidence;
   return (<div className={"actionrow"+(isDone?" done":"")}>
     <span className={'pill '+pClass(a.p)}>{priorityWord(a.p)}</span>
     <div className="t" style={{flex:1}}>
@@ -1120,7 +1120,7 @@ function Insight({k}){
     return (<div className="card insight ia-collapsed" style={{marginTop:14}}>
       <div className="ia-dismissed">
         <Icon name={dismissed==='wrong'?'alert':'bell'} size={14}/>
-        <span><b>{agentLabel(d.agent)}</b> · {dismissed==='wrong'?'flagged as not useful':'snoozed'} — {plainWords(d.headline)}</span>
+        <span><b>{agentLabel(d.agent)}</b>, {dismissed==='wrong'?'flagged as not useful':'snoozed'}, {plainWords(d.headline)}</span>
         <button onClick={()=>{ oiSnoozeRemove(d.headline); setDismissed(null); }}>Undo</button>
       </div>
     </div>);
@@ -1188,7 +1188,7 @@ function PHitBadge({phit}){
   const color = v > 0.6 ? PAL.good : v >= 0.3 ? PAL.warn : PAL.bad;
   const opacity = conf === 'high' ? 1 : conf === 'medium' ? 0.85 : 0.55;
   const tooltip = `P(hit) = ${(v*100).toFixed(0)}% based on ${phit.source} (n=${n}, ${conf} confidence). `
-    + (n === 0 ? 'No history yet — pure prior. Badges become meaningful once 3+ actions of this type have closed.'
+    + (n === 0 ? 'No history yet, pure prior. Badges become meaningful once 3+ actions of this type have closed.'
        : `Closed actions in this bucket: ${(phit.breakdown.agent_category?.hits ?? 0)} hits / ${(phit.breakdown.agent_category?.misses ?? 0)} misses.`);
   return (<span title={tooltip} style={{
     display:'inline-block',
@@ -1221,7 +1221,7 @@ const ACTION_TRADEOFFS = [
     name: "New customer acquisition vs Retention focus",
     keywords_a: ["new customer", "acquisition", "cold audience", "prospecting"],
     keywords_b: ["returning", "loyalty", "win-back", "vip", "retargeting only"],
-    framework: `Both are valid but resource-constrained. Quantify: 1 new customer at ${curSym()}15 cost per new customer vs 1 reactivated returning customer at ${curSym()}4 cost per new customer — the math usually says retention first when cost per new customer is high. State your bet explicitly.`,
+    framework: `Both are valid but resource-constrained. Quantify: 1 new customer at ${curSym()}15 cost per new customer vs 1 reactivated returning customer at ${curSym()}4 cost per new customer, the math usually says retention first when cost per new customer is high. State your bet explicitly.`,
   },
 ];
 
@@ -1247,7 +1247,7 @@ function ActionConflictBanner(){
   if (!conflicts.length) return null;
   return (<div className="card alert-warn" style={{marginBottom:'var(--s-3)'}}>
     <div className="micro" style={{color:'var(--warn)', marginBottom:'var(--s-3)'}}>
-      {conflicts.length} contradictory goal pair{conflicts.length>1?'s':''} open — pick one
+      {conflicts.length} contradictory goal pair{conflicts.length>1?'s':''} open, pick one
     </div>
     {conflicts.map((c,i) => (<div key={i} style={{
       marginTop: i ? 'var(--s-4)' : 0,
@@ -1258,11 +1258,11 @@ function ActionConflictBanner(){
       <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'var(--s-3)', marginBottom:'var(--s-2)'}}>
         <div>
           <div className="micro" style={{marginBottom:'var(--s-1)'}}>Scale / grow ({c.hits_a.length})</div>
-          {c.hits_a.map((a,j)=>(<div key={j} style={{fontSize:'var(--text-xs)', color:'var(--text-secondary)', marginBottom:2, lineHeight:1.5}}>· {a.text.slice(0,80)}{a.text.length>80?'…':''}</div>))}
+          {c.hits_a.map((a,j)=>(<div key={j} style={{fontSize:'var(--text-xs)', color:'var(--text-secondary)', marginBottom:2, lineHeight:1.5}}>{a.text.slice(0,80)}{a.text.length>80?'…':''}</div>))}
         </div>
         <div>
           <div className="micro" style={{marginBottom:'var(--s-1)'}}>Efficiency / tighten ({c.hits_b.length})</div>
-          {c.hits_b.map((a,j)=>(<div key={j} style={{fontSize:'var(--text-xs)', color:'var(--text-secondary)', marginBottom:2, lineHeight:1.5}}>· {a.text.slice(0,80)}{a.text.length>80?'…':''}</div>))}
+          {c.hits_b.map((a,j)=>(<div key={j} style={{fontSize:'var(--text-xs)', color:'var(--text-secondary)', marginBottom:2, lineHeight:1.5}}>{a.text.slice(0,80)}{a.text.length>80?'…':''}</div>))}
         </div>
       </div>
       <div style={{fontSize:'var(--text-sm)', color:'var(--text-secondary)', background:'var(--bg-elevated)', padding:'var(--s-3)', borderRadius:'var(--radius-none)', lineHeight:1.5}}>
@@ -1309,7 +1309,7 @@ function ActionBoard(){
     const isDone = eff === "verified-done";
     const phit = phitMap[a.id];
     const showPhit = !isDone && phit && phit.sample_size >= 3;            // meaningful only with history
-    const rawEv = localDone && st.status !== "verified-done" ? "Marked done locally — pending refresh to persist" : st.evidence;
+    const rawEv = localDone && st.status !== "verified-done" ? "Marked done locally, pending refresh to persist" : st.evidence;
     const why = rawEv && /\(target/i.test(rawEv) ? rawEv : (localDone ? rawEv : '');  // keep metric justification, drop ops noise
     const fs = !isDone ? friendly(eff) : null;
     const pdot = pClass(a.p);
@@ -1322,7 +1322,7 @@ function ActionBoard(){
       </div>
       <div>
         <div className="sp-text" style={{textDecoration:contra?'line-through':'none',textDecorationColor:'var(--bad)'}}>{linkify(a.text)}</div>
-        {contra && <div style={{fontSize:'var(--text-xs)',color:'var(--bad)',marginTop:2}}>Today's live read contradicts this (ad frequency is healthy — fatigue ruled out). Re-validate before acting.</div>}
+        {contra && <div style={{fontSize:'var(--text-xs)',color:'var(--bad)',marginTop:2}}>Today's live read contradicts this (ad frequency is healthy, fatigue ruled out). Re-validate before acting.</div>}
         {why && <div className="sp-ev">{why}</div>}
         {isDone && st.impact && <ImpactLine impact={st.impact} resolvedAt={st.resolvedAt}/>}
         <div className="sp-cta">
@@ -1332,7 +1332,7 @@ function ActionBoard(){
       </div>
       <div className="sp-status">
         {showPhit && <PHitBadge phit={phit} />}
-        {fs ? <span className={'stat '+fs.c} title={fs.c==='chrome'?'Needs a manual check on the live site / Shopify — the data can flag it, but someone has to eyeball it to confirm.':'Waiting on a number or decision from you before it can proceed.'} style={{cursor:'help'}}>{fs.t}</span>
+        {fs ? <span className={'stat '+fs.c} title={fs.c==='chrome'?'Needs a manual check on the live site / Shopify, the data can flag it, but someone has to eyeball it to confirm.':'Waiting on a number or decision from you before it can proceed.'} style={{cursor:'help'}}>{fs.t}</span>
             : isDone ? <span className="stat done">Done</span>
             : <span style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>On track</span>}
       </div>
@@ -1413,14 +1413,14 @@ function ActionBoard(){
     <div className="card">
       <div className="card-section-title">
         <h2 style={{margin:0}}>Action plan <span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)',fontSize:'var(--text-sm)'}}>{`— live read first, ranked by ${curSym()} impact`}</span></h2>
-        <span className="meta">Greta's live read{liveRead&&liveRead.generatedAt?` (${v3Day(liveRead.generatedAt.slice(0,10))})`:''} · {open.length} specialist items{contraCount>0?` · ${contraCount} contradicted by today's read`:''}</span>
+        <span className="meta">Greta's live read{liveRead&&liveRead.generatedAt?` (${v3Day(liveRead.generatedAt.slice(0,10))})`:''}, {open.length} specialist items{contraCount>0?`, ${contraCount} contradicted by today's read`:''}</span>
       </div>
       <ActionConflictBanner/>
       {/* LIVE — from the diagnostic engine, always coherent with the diagnostic card */}
       {liveFindings.length>0 && (<div style={{marginBottom:12}}>
         <div style={{display:'flex',alignItems:'center',gap:9,borderBottom:'1px solid var(--border-subtle)',padding:'9px 0 7px'}}>
           <span style={{width:7,height:7,borderRadius:'50%',background:'var(--accent)'}}/>
-          <span style={{fontWeight:'var(--weight-bold)',color:'var(--text-primary)',fontSize:'var(--text-sm)'}}>Now — live read</span>
+          <span style={{fontWeight:'var(--weight-bold)',color:'var(--text-primary)',fontSize:'var(--text-sm)'}}>Now, live read</span>
           <span style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>From today's diagnostic</span>
         </div>
         {(()=>{
@@ -1440,9 +1440,9 @@ function ActionBoard(){
       {(()=>{ const sm=(typeof window!=='undefined'&&window.FRKL_INSIGHTS_META)||{}; const run=sm.specialistRunAt; const age=run?Math.round((Date.now()-new Date(run))/86400000):null; const stale=age!=null&&age>7; return (
       <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:2,flexWrap:'wrap'}}>
         <span style={{fontSize:'var(--text-xs)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)'}}>Specialist agent review</span>
-        <span style={{fontSize:'var(--text-xs)',color:stale?'var(--warn)':'var(--text-muted)'}}>· {run?`from ${run}${age!=null?` · ${age}d old`:''}`:'static'}{stale?' — needs an agent re-run; re-validate against the live read above':' — re-validate against the live read above'}</span>
+        <span style={{fontSize:'var(--text-xs)',color:stale?'var(--warn)':'var(--text-muted)'}}>{run?`from ${run}${age!=null?`, ${age}d old`:''}`:'static'}{stale?', needs an agent re-run; re-validate against the live read above':', re-validate against the live read above'}</span>
       </div>); })()}
-      <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',lineHeight:1.5,margin:'4px 0 2px'}}>The <b style={{color:PAL.good}}>%</b> next to a status is the <b>hit-rate</b> — how often this <i>type</i> of action has actually moved the metric before (<span style={{color:PAL.good}}>green &gt;60%</span> · <span style={{color:PAL.warn}}>amber 30–60%</span> · <span style={{color:PAL.bad}}>red &lt;30%</span>; a “?” = small sample). Hover it for the track record.</div>
+      <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',lineHeight:1.5,margin:'4px 0 2px'}}>The <b style={{color:PAL.good}}>%</b> next to a status is the <b>hit-rate</b>, how often this <i>type</i> of action has actually moved the metric before (<span style={{color:PAL.good}}>green &gt;60%</span>, <span style={{color:PAL.warn}}>amber 30–60%</span>, <span style={{color:PAL.bad}}>red &lt;30%</span>; a “?” = small sample). Hover it for the track record.</div>
       <div style={{display:'flex', flexDirection:'column', gap:4}}>
         {groupList.map(({g, items, sum})=>(
           <div key={g}>
@@ -1505,14 +1505,14 @@ function ChannelStreamPanel(){
   return (
     <div className="card">
       <div className="card-section-title">
-        <h2 style={{margin:0}}>Revenue by stream — last 30 days</h2>
-        <span className="meta">Headline KPIs use <b>DTC only</b> · wholesale + gifting tracked separately</span>
+        <h2 style={{margin:0}}>Revenue by stream, last 30 days</h2>
+        <span className="meta">Headline KPIs use <b>DTC only</b>, wholesale + gifting tracked separately</span>
       </div>
       <div className="row" style={{marginBottom:'var(--s-3)'}}>
-        <KPI label={<>{_dot('var(--good)')}DTC (Online Store)</>} val={GBP(dtcRev)} sub={`${NUM(dtcOrd)} orders · ${PCT(dtcRev/total)} of revenue · average order value ${GBP(dtcOrd?dtcRev/dtcOrd:null)}`} series={sDtc} seriesLabel="DTC revenue · last 30 days" />
-        <KPI label={<>{_dot('var(--warn)')}Wholesale (JL + Faire)</>} val={GBP(whRev)} sub={`${NUM(whOrd)} orders · ${PCT(whRev/total)} of revenue · average order value ${GBP(whOrd?whRev/whOrd:null)}`} series={sWh} seriesLabel="Wholesale revenue · last 30 days" />
-        <KPI label={<>{_dot('var(--accent)')}Gifting (Draft Orders)</>} val={`${NUM(giOrd)} drops`} sub={`${GBP(giDisc)} retail value gifted · ${curSym()}0 revenue (100% comped)`} series={sGi} seriesLabel="Gifting drops · last 30 days" />
-        <KPI label={<>{_dot('var(--text-muted)')}Other channels</>} val={GBP(otRev)} sub={`${NUM(otOrd)} orders · likely IG/FB Shop / POS`} series={sOt} seriesLabel="Other revenue · last 30 days" />
+        <KPI label={<>{_dot('var(--good)')}DTC (Online Store)</>} val={GBP(dtcRev)} sub={`${NUM(dtcOrd)} orders, ${PCT(dtcRev/total)} of revenue, average order value ${GBP(dtcOrd?dtcRev/dtcOrd:null)}`} series={sDtc} seriesLabel="DTC revenue, last 30 days" />
+        <KPI label={<>{_dot('var(--warn)')}Wholesale (JL + Faire)</>} val={GBP(whRev)} sub={`${NUM(whOrd)} orders, ${PCT(whRev/total)} of revenue, average order value ${GBP(whOrd?whRev/whOrd:null)}`} series={sWh} seriesLabel="Wholesale revenue, last 30 days" />
+        <KPI label={<>{_dot('var(--accent)')}Gifting (Draft Orders)</>} val={`${NUM(giOrd)} drops`} sub={`${GBP(giDisc)} retail value gifted, ${curSym()}0 revenue (100% comped)`} series={sGi} seriesLabel="Gifting drops, last 30 days" />
+        <KPI label={<>{_dot('var(--text-muted)')}Other channels</>} val={GBP(otRev)} sub={`${NUM(otOrd)} orders, likely IG/FB Shop / POS`} series={sOt} seriesLabel="Other revenue, last 30 days" />
       </div>
       <div className="note">
         <b>Important context:</b>{` before this segmentation, headline metrics conflated all 4 streams. Discount rate looked like 36-47% (actually 12% on real DTC); average order value looked like ${curSym()}63 (actually ${curSym()}`}{Math.round(dtcOrd?dtcRev/dtcOrd:0)}). Two headline "crises" were data artefacts.
@@ -1576,7 +1576,7 @@ function DailyPanel(){
   const anomalies = [];
   const merDelta = delta(yMER, pMERavg);
   if (yMER!=null && pMERavg!=null && merDelta!=null && merDelta < -0.25) anomalies.push({sev:'red', text:`sales per £ of ads dropped ${Math.round(Math.abs(merDelta)*100)}% vs 7-day avg (${yMER.toFixed(2)}× vs ${pMERavg.toFixed(2)}×)`});
-  if (yMER!=null && pMERavg!=null && merDelta!=null && merDelta > 0.30) anomalies.push({sev:'green', text:`sales per £ of ads up ${Math.round(merDelta*100)}% vs 7-day avg — what worked?`});
+  if (yMER!=null && pMERavg!=null && merDelta!=null && merDelta > 0.30) anomalies.push({sev:'green', text:`sales per £ of ads up ${Math.round(merDelta*100)}% vs 7-day avg, what worked?`});
   const sDelta = delta(ySpend, pSpendAvg);
   if (sDelta != null && Math.abs(sDelta) > 0.40) anomalies.push({sev:'amber', text:`Spend ${sDelta>0?'jumped':'dropped'} ${Math.round(Math.abs(sDelta)*100)}% vs 7-day avg (${GBP(ySpend)} vs ${GBP(pSpendAvg)})`});
   // Creative frequency
@@ -1593,10 +1593,10 @@ function DailyPanel(){
   // 7-day discount load
   const last7 = shop.slice(-7);
   const discR = sumOf(last7,'netSales') ? sumOf(last7,'discounts')/sumOf(last7,'netSales') : 0;
-  if (discR > 0.35) anomalies.push({sev:'red', text:`Discount load (7d) at ${(discR*100).toFixed(0)}% — sustainability flag`});
+  if (discR > 0.35) anomalies.push({sev:'red', text:`Discount load (7d) at ${(discR*100).toFixed(0)}%, sustainability flag`});
   // Returns
   const retR = sumOf(last7,'totalSales') ? sumOf(last7,'returns')/sumOf(last7,'totalSales') : 0;
-  if (retR > 0.10) anomalies.push({sev:'amber', text:`Return rate (7d) at ${(retR*100).toFixed(0)}% — investigate item hotspots`});
+  if (retR > 0.10) anomalies.push({sev:'amber', text:`Return rate (7d) at ${(retR*100).toFixed(0)}%, investigate item hotspots`});
 
   const projVsBudgetSev = null; // No fixed monthly budget set — placeholder for future config
 
@@ -1616,17 +1616,17 @@ function DailyPanel(){
 
   return (<div className="card">
     <div className="card-section-title">
-      <h2 style={{margin:0}}>Last full day — {v3Day(latest)}</h2>
+      <h2 style={{margin:0}}>Last full day, {v3Day(latest)}</h2>
       <span className="meta">compared with the 7 days before it</span>
     </div>
     <div className="row" style={{marginBottom:'var(--s-4)'}}>
-      <KPI label="Ad spend" val={GBP(ySpend)} sub={`7d avg ${GBP(pSpendAvg)}`} series={sSpend} seriesLabel="Daily spend · last 14 days" current={ySpend} prior={pSpendAvg} />
-      <KPI label="Sales" val={GBP(yRev)} sub={`${NUM(yOrders)} orders · 7d avg ${GBP(pRevAvg)}`} series={sRev} seriesLabel="Daily revenue · last 14 days" current={yRev} prior={pRevAvg} goodDirection="up" />
-      <KPI label="Sales per £ of ads" val={yMER?yMER.toFixed(2)+'×':'—'} sub={`7d avg ${pMERavg?pMERavg.toFixed(2)+'×':'—'}`} series={sMER} seriesLabel="Daily sales per £ of ads · last 14 days" current={yMER} prior={pMERavg} goodDirection="up" />
-      <KPI label="Ad spend this month" val={GBP(mtdSpend)} sub={`Day ${dayOfMonth}/${daysInMonth} · proj. EOM ${GBP(projSpend)} spend · ${GBP(projRev)} rev`} series={sMTD} seriesLabel="Cumulative MTD spend" />
+      <KPI label="Ad spend" val={GBP(ySpend)} sub={`7d avg ${GBP(pSpendAvg)}`} series={sSpend} seriesLabel="Daily spend, last 14 days" current={ySpend} prior={pSpendAvg} />
+      <KPI label="Sales" val={GBP(yRev)} sub={`${NUM(yOrders)} orders, 7d avg ${GBP(pRevAvg)}`} series={sRev} seriesLabel="Daily revenue, last 14 days" current={yRev} prior={pRevAvg} goodDirection="up" />
+      <KPI label="Sales per £ of ads" val={yMER?yMER.toFixed(2)+'×':'—'} sub={`7d avg ${pMERavg?pMERavg.toFixed(2)+'×':'—'}`} series={sMER} seriesLabel="Daily sales per £ of ads, last 14 days" current={yMER} prior={pMERavg} goodDirection="up" />
+      <KPI label="Ad spend this month" val={GBP(mtdSpend)} sub={`Day ${dayOfMonth}/${daysInMonth}, proj. EOM ${GBP(projSpend)} spend, ${GBP(projRev)} rev`} series={sMTD} seriesLabel="Cumulative MTD spend" />
     </div>
     {anomalies.length > 0 && (<div>
-      <div className="micro" style={{color:'var(--warn)', marginBottom:'var(--s-2)'}}>Flags — {anomalies.length}</div>
+      <div className="micro" style={{color:'var(--warn)', marginBottom:'var(--s-2)'}}>Flags, {anomalies.length}</div>
       <div style={{display:'flex', flexDirection:'column', gap:'var(--s-1)'}}>
         {anomalies.map((a,i)=>{
           const c = a.sev==='red' ? 'var(--bad)' : a.sev==='amber' ? 'var(--warn)' : 'var(--good)';
@@ -1796,7 +1796,7 @@ function ThisWeekHero(){
       <div className="hero-bg"/>
       <div className="hero-content">
         <div className="hero-meta">
-          <span className="micro" style={{color:'var(--accent)'}}>{weekday} · {dateStr}</span>
+          <span className="micro" style={{color:'var(--accent)'}}>{weekday}, {dateStr}</span>
           <span style={{margin:'0 var(--s-2)', color:'var(--text-faint)'}}>·</span>
           <span className="micro">Operator weekly</span>
         </div>
@@ -1809,27 +1809,27 @@ function ThisWeekHero(){
 
         <div className="hero-stats">
           <HeroStat valK={(r.leakage/1000).toFixed(1)} color="var(--bad)" label="Leaking now"
-            explain="Revenue going out the door right now — broken checkout/product page steps, JS errors, over-discounting. The most urgent bucket: fixing these recovers money you're already losing."
+            explain="Revenue going out the door right now, broken checkout/product page steps, JS errors, over-discounting. The most urgent bucket: fixing these recovers money you're already losing."
             items={topFor('leakage')}/>
           <div className="hero-stat-divider"/>
           <HeroStat valK={(r.at_risk/1000).toFixed(1)} color="var(--warn)" label="At risk"
-            explain="Revenue exposed but not yet lost — over-reliance on one channel, code or item, or a metric trending down. Worth de-risking before it bites."
+            explain="Revenue exposed but not yet lost, over-reliance on one channel, code or item, or a metric trending down. Worth de-risking before it bites."
             items={topFor('at_risk')}/>
           <div className="hero-stat-divider"/>
           <HeroStat valK={(r.opportunity/1000).toFixed(1)} color="var(--good)" label="Opportunity"
-            explain="Upside you're not yet capturing — average order value, bundle attach, audience or range levers that could add revenue if pursued."
+            explain="Upside you're not yet capturing, average order value, bundle attach, audience or range levers that could add revenue if pursued."
             items={topFor('opportunity')}/>
           <div className="hero-stat-divider"/>
           <HeroStat valK={totalK} color="var(--text-primary)" label="In total" alignRight
-            explain="Everything money-tagged this week — leaking + at-risk + opportunity. These are illustrative estimates that can overlap, so they're not strictly additive. Read it as where to look, not a guaranteed sum."
+            explain="Everything money-tagged this week, leaking + at-risk + opportunity. These are illustrative estimates that can overlap, so they're not strictly additive. Read it as where to look, not a guaranteed sum."
             total={[{c:'var(--bad)',k:'Leaking now',v:r.leakage},{c:'var(--warn)',k:'At risk',v:r.at_risk},{c:'var(--good)',k:'Opportunity',v:r.opportunity}]}/>
         </div>
-        <div className="v3-note" style={{marginTop:'var(--s-2)'}}>Illustrative — each line is a money-tagged <i>estimate</i>, not a guaranteed recovery, and findings can overlap so the total isn't strictly additive. Treat it as where to look, not a forecast.</div>
+        <div className="v3-note" style={{marginTop:'var(--s-2)'}}>Illustrative, each line is a money-tagged <i>estimate</i>, not a guaranteed recovery, and findings can overlap so the total isn't strictly additive. Treat it as where to look, not a forecast.</div>
 
         <div className="hero-grid">
           <div className="hero-col">
             <div className="micro" style={{marginBottom:'var(--s-3)'}}>What changed since last run</div>
-            {!diff.previous_run_at && <div className="meta">First run — comparison will appear next week.</div>}
+            {!diff.previous_run_at && <div className="meta">First run, comparison will appear next week.</div>}
             {diff.previous_run_at && (<div style={{display:'flex',flexDirection:'column',gap:'var(--s-2)'}}>
               <HeroChangeRow color="var(--bad)"  count={diff.new.length}      label="new findings"/>
               <HeroChangeRow color="var(--warn)" count={diff.stronger.length} label="strengthened"/>
@@ -1976,14 +1976,14 @@ function buildChartPins(buckets){
       if(!pk) return; const x = snap(pk.w); if(x==null) return;
       const rate = c.discountRate!=null ? Math.round(c.discountRate*100)+'% off' : 'sale';
       pins.push({x, tone:'accent', title:c.code, date:pk.w, sale:true,
-        detail:`${rate} · ${curSym()}${Math.round(c.discount)} given · ${c.orders} orders`});
+        detail:`${rate}, ${curSym()}${Math.round(c.discount)} given, ${c.orders} orders`});
     });
   // 3) collapse pins landing in the same bucket so markers never crowd; sale leads the badge
   const byX = {};
   pins.forEach(p=>{ (byX[p.x] = byX[p.x] || []).push(p); });
   return Object.keys(byX).map(x=>{
     const g = byX[x], head = g.find(p=>p.sale) || g[0];
-    const tip = g.map(p=> `${p.title}${p.detail? ' — '+p.detail : ''}  (${(p.date||'').slice(5)})`).join('\n');
+    const tip = g.map(p=> `${p.title}${p.detail? ', '+p.detail : ''}  (${(p.date||'').slice(5)})`).join('\n');
     return {x, tone:head.tone, n:g.length, tip};
   });
 }
@@ -2035,14 +2035,14 @@ function buildEvidence(a){
     const why = priorPromoEvent
       ? `the prior period included a logged promo (${eventDateLabel(priEv.find(e=>e.type==='promo'))})`
       : `prior period ran hotter on discounts (${(pDiscLoad*100).toFixed(0)}% load vs ${(discLoad*100).toFixed(0)}% now)`;
-    notes.push(`${why[0].toUpperCase()+why.slice(1)} — a promo inflated the prior sales per £ of ads, so this period's lower sales per £ of ads is largely reversion, not decay.`);
+    notes.push(`${why[0].toUpperCase()+why.slice(1)}, a promo inflated the prior sales per £ of ads, so this period's lower sales per £ of ads is largely reversion, not decay.`);
   }
   if(spendChangeLogged && decomp.spendChg!=null && decomp.spendChg>0.10){
-    notes.push(`You logged a deliberate spend change this period (${spendChangeEvent.title}, ${eventDateLabel(spendChangeEvent)}) — the sales per £ of ads dip is read as the cost of that test, not unplanned fatigue.`);
+    notes.push(`You logged a deliberate spend change this period (${spendChangeEvent.title}, ${eventDateLabel(spendChangeEvent)}), the sales per £ of ads dip is read as the cost of that test, not unplanned fatigue.`);
   }
   if(!priorPromoEvent && detected.length){
     const e = detected[detected.length-1];
-    notes.push(`Detected a promo window in the trailing data (${e.start}–${e.end}, ~${(e.avgLoad*100).toFixed(0)}% avg discount load) — period comparisons spanning it are interpreted with care.`);
+    notes.push(`Detected a promo window in the trailing data (${e.start}–${e.end}, ~${(e.avgLoad*100).toFixed(0)}% avg discount load), period comparisons spanning it are interpreted with care.`);
   }
 
   // Events overlapping either window, for the "Context considered" display.
@@ -2064,8 +2064,8 @@ function runDiagnostic(m, ctx){
     const gbp = m.sessions*(CVR_BENCH - m.cvr)*aov*gm;
     f.push({sev: m.cvr<CVR_BENCH*0.75?'red':'amber', area:'Conversion', metric:`conversion rate ${(m.cvr*100).toFixed(2)}% vs ${CVR_BENCH_LABEL} target`,
       title:'Site conversion is throttling revenue', gbp,
-      evidence:`${NUM(m.sessions)} sessions converting at ${(m.cvr*100).toFixed(2)}% — you're paying for visits that don't convert.`,
-      action:'Fix cart→checkout friction + product page before adding spend; every 0.1pt of conversion rate is more revenue than more traffic.'});
+      evidence:`${NUM(m.sessions)} sessions converting at ${(m.cvr*100).toFixed(2)}%, you're paying for visits that don't convert.`,
+      action:'Fix cart to checkout friction + product page before adding spend; every 0.1pt of conversion rate is more revenue than more traffic.'});
   }
   // 2. LTV:CAC vs 3× scaling threshold.
   if (m.ltvCac!=null && m.ltvCac < 3 && m.cac!=null){
@@ -2078,14 +2078,14 @@ function runDiagnostic(m, ctx){
   if (m.discLoad!=null && m.discLoad > 0.20){
     f.push({sev: m.discLoad>0.30?'red':'amber', area:'Margin', metric:`Discount load ${(m.discLoad*100).toFixed(0)}% vs ≤20%`,
       title:'Discounting is compressing contribution', gbp:m.rev*(m.discLoad-0.20)*gm,
-      evidence:`${(m.discLoad*100).toFixed(0)}% of gross sales given away in discounts — above the 20% healthy ceiling.`,
+      evidence:`${(m.discLoad*100).toFixed(0)}% of gross sales given away in discounts, above the 20% healthy ceiling.`,
       action:'Audit always-on codes + affiliate rates; protect full-price demand.'});
   }
   // 4. Return rate vs 10% — pure margin leak.
   if (m.returnRate!=null && m.returnRate > 0.10){
     f.push({sev:'amber', area:'Margin', metric:`Orders refunded ${(m.returnRate*100).toFixed(1)}% vs ≤10%`,
       title:'Returns are leaking contribution', gbp:m.rev*(m.returnRate-0.10)*gm,
-      evidence:`${(m.returnRate*100).toFixed(1)}% of orders were refunded in the last 30 days — each point is margin lost.`,
+      evidence:`${(m.returnRate*100).toFixed(1)}% of orders were refunded in the last 30 days, each point is margin lost.`,
       action:'Isolate the items/sizes driving returns; fix sizing guidance + product page imagery.'});
   }
   // 5. MER falling — but decompose and confounder-check before calling it decay.
@@ -2098,21 +2098,21 @@ function runDiagnostic(m, ctx){
     const driverTxt = drivers.length?` (${drivers.join(', ')})`:'';
     if(ctx.merConfounded){
       // Expected reversion after a promo ended — surfaced as context, not an action.
-      f.push({sev:'info', area:'Efficiency', metric:`sales per £ of ads ${m.mer.toFixed(2)}× (was ${m.pMer.toFixed(2)}×) — expected`, gbp:0, confidence:'high',
+      f.push({sev:'info', area:'Efficiency', metric:`sales per £ of ads ${m.mer.toFixed(2)}× (was ${m.pMer.toFixed(2)}×), expected`, gbp:0, confidence:'high',
         title:'Sales per £ of ads dip is a post-promo reversion, not efficiency decay',
         evidence:`sales per £ of ads fell on the revenue side${driverTxt}, and the prior period carried a promo (discount load ${(ctx.priorDiscLoad*100).toFixed(0)}% vs ${(ctx.discLoad*100).toFixed(0)}% now). Underlying efficiency looks stable ex-promo.`,
-        action:'No action — expected after the promo ended. Re-check once discounts have been normalised for a full period; only treat as decay if sales per £ of ads keeps falling then.'});
+        action:'No action, expected after the promo ended. Re-check once discounts have been normalised for a full period; only treat as decay if sales per £ of ads keeps falling then.'});
     } else if(ctx.spendChangeLogged && dc.spendChg!=null && dc.spendChg>0.10){
       // Operator logged a deliberate spend increase → it's a test to judge on payback, not fatigue.
-      f.push({sev:'info', area:'Efficiency', metric:`sales per £ of ads ${m.mer.toFixed(2)}× (was ${m.pMer.toFixed(2)}×) — logged spend test`, gbp:0, confidence:'high',
-        title:'Sales per £ of ads dip aligns with your logged spend increase — watch payback, not fatigue',
-        evidence:`sales per £ of ads fell on the spend side${driverTxt}. You logged "${ctx.spendChangeEvent.title}" this period, so the lower sales per £ of ads is the expected cost of a deliberate scale-up — judge it on payback over the test window, not as unplanned fatigue.`,
-        action:'No action yet — track contribution and CAC against the test\'s payback horizon before deciding to hold or pull back.'});
+      f.push({sev:'info', area:'Efficiency', metric:`sales per £ of ads ${m.mer.toFixed(2)}× (was ${m.pMer.toFixed(2)}×), logged spend test`, gbp:0, confidence:'high',
+        title:'Sales per £ of ads dip aligns with your logged spend increase, watch payback, not fatigue',
+        evidence:`sales per £ of ads fell on the spend side${driverTxt}. You logged "${ctx.spendChangeEvent.title}" this period, so the lower sales per £ of ads is the expected cost of a deliberate scale-up, judge it on payback over the test window, not as unplanned fatigue.`,
+        action:'No action yet, track contribution and CAC against the test\'s payback horizon before deciding to hold or pull back.'});
     } else {
       const fatigue = dc.spendChg!=null && dc.spendChg>0.10;
       f.push({sev:'amber', area:'Efficiency', metric:`sales per £ of ads ${m.mer.toFixed(2)}× (was ${m.pMer.toFixed(2)}×)`, confidence:'med',
         title:'Ad efficiency falling as spend scales', gbp:m.paid*(m.pMer-m.mer),
-        evidence:`Each ${curSym()} of spend now returns ${m.mer.toFixed(2)}× vs ${m.pMer.toFixed(2)}× prior${driverTxt} — ${fatigue?'spend is scaling into a fatiguing audience':'demand is softening faster than spend is coming down'}.`,
+        evidence:`Each ${curSym()} of spend now returns ${m.mer.toFixed(2)}× vs ${m.pMer.toFixed(2)}× prior${driverTxt}, ${fatigue?'spend is scaling into a fatiguing audience':'demand is softening faster than spend is coming down'}.`,
         action: fatigue?'Pause scaling; refresh fatigued creative + fix the conversion leak first.':'Hold spend flat and protect efficiency until demand recovers; don\'t cut winning campaigns into the dip.'});
     }
   }
@@ -2121,7 +2121,7 @@ function runDiagnostic(m, ctx){
     f.push({sev: m.cmPct<0?'red':'amber', area:'Profitability', metric:`Contribution margin ${(m.cmPct*100).toFixed(0)}%`, gbp:0,
       title: m.cmPct<0?'Selling below contribution breakeven':'Contribution margin is thin',
       evidence:`After product cost + ad spend, contribution is ${(m.cmPct*100).toFixed(0)}% of revenue.`,
-      action:'The levers above (conversion rate, discount, cost per new customer) feed this — fix the top one and contribution follows.'});
+      action:'The levers above (conversion rate, discount, cost per new customer) feed this, fix the top one and contribution follows.'});
   }
   f.sort((a,b)=>(b.gbp||0)-(a.gbp||0));
   const actions = f.filter(x=>x.sev!=='info');
@@ -2147,7 +2147,7 @@ function ContextConsidered({dx}){
     {dx.context.map((x,i)=>(<div key={'c'+i} style={{display:'flex',gap:8,alignItems:'flex-start',marginTop:6}}>
       <span style={{width:7,height:7,borderRadius:'50%',background:'var(--accent)',marginTop:5,flexShrink:0}}/>
       <div style={{flex:1}}>
-        <div style={{fontWeight:'var(--weight-semi)',color:'var(--text-primary)',fontSize:'var(--text-sm)'}}>{plainWords(x.title)} <span style={{fontWeight:'var(--weight-normal)',color:'var(--text-faint)'}}>· {plainWords(x.metric)}</span></div>
+        <div style={{fontWeight:'var(--weight-semi)',color:'var(--text-primary)',fontSize:'var(--text-sm)'}}>{plainWords(x.title)} <span style={{fontWeight:'var(--weight-normal)',color:'var(--text-faint)'}}>{plainWords(x.metric)}</span></div>
         <div style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)',marginTop:2,lineHeight:1.5}}>{x.evidence}</div>
         <div style={{fontSize:'var(--text-sm)',color:'var(--text-muted)',marginTop:2,lineHeight:1.5}}>→ {x.action}</div>
       </div>
@@ -2184,21 +2184,21 @@ const PLAYBOOKS = [
   {match:/geo-?holdout|holdout|incremental|spend-?down|true paid|in-platform/i,
    title:'How to run a geo-holdout (measure true paid return)',
    steps:[
-     "Pick two regions you advertise to that normally behave alike — e.g. UK (test) and Ireland (control).",
+     "Pick two regions you advertise to that normally behave alike, e.g. UK (test) and Ireland (control).",
      "Keep the control region's budget unchanged. In the test region, cut paid spend by ~half (or pause it) for 2–3 full weeks.",
-     "Track TOTAL revenue in each region (all channels) — not Meta/Google's reported return on ad spend.",
+     "Track TOTAL revenue in each region (all channels), not Meta/Google's reported return on ad spend.",
      "If test-region revenue barely moves, paid was mostly taking credit for sales you'd get anyway. If it drops sharply, paid is genuinely driving demand.",
-     "Incremental sales per £ of ads = revenue you lost ÷ spend you removed. Use that as your scale-up floor — not the blended topline.",
+     "Incremental sales per £ of ads = revenue you lost ÷ spend you removed. Use that as your scale-up floor, not the blended topline.",
    ],
    caution:"Run it long enough to clear the buy-consideration lag, and don't overlap a promo or peak week."},
   {match:/checkout|cart→checkout|cart to checkout|abandoned|payment option/i,
    title:'How to audit the cart → checkout leak',
    steps:[
      "On your phone, add an item and go all the way to the payment screen. Note every tap and every surprise.",
-     "Make sure the shipping cost shows on the cart page — not first revealed at checkout. Late shipping cost is the #1 abandon cause.",
-     "Check Shop Pay / Apple Pay / Google Pay appear at the top of checkout — one-tap pay lifts completion.",
-     "Open the browser console (right-click → Inspect → Console) on the cart and checkout pages; get any red JS errors fixed — a broken coupon field can block the step.",
-     "Re-check the cart→checkout and checkout→purchase rates weekly; aim for each above ~45–55%.",
+     "Make sure the shipping cost shows on the cart page, not first revealed at checkout. Late shipping cost is the #1 abandon cause.",
+     "Check Shop Pay / Apple Pay / Google Pay appear at the top of checkout, one-tap pay lifts completion.",
+     "Open the browser console (right-click → Inspect → Console) on the cart and checkout pages; get any red JS errors fixed, a broken coupon field can block the step.",
+     "Re-check the cart to checkout and checkout to purchase rates weekly; aim for each above ~45–55%.",
    ]},
   {match:/out[-\s]?of[-\s]?stock|stockout|restock|inventory/i,
    title:'How to clear the out-of-stock drag',
@@ -2212,7 +2212,7 @@ const PLAYBOOKS = [
    title:'How to tighten discount leakage',
    steps:[
      "List every live discount: the on-site popup code, any always-on codes, affiliate/influencer codes, and active sales.",
-     "Check whether they stack (popup + code + sale on one order) — that's where margin quietly leaks.",
+     "Check whether they stack (popup + code + sale on one order), that's where margin quietly leaks.",
      "Set one rule: codes don't stack, and cap total discount per order (e.g. 15%).",
      "Switch the first-visit popup to exit-intent / after-30s, so you're not discounting buyers who'd pay full price.",
    ]},
@@ -2566,7 +2566,7 @@ function ConfigurableChart({dataset, dimensions, metrics, defaultMetric, default
       </R.ComposedChart>
     </R.ResponsiveContainer>
     <ChartFooter
-      note={`${M.label} by ${D.label.toLowerCase()} — ${order==='desc'?'highest':'lowest'} ${topN}.`}
+      note={`${M.label} by ${D.label.toLowerCase()}, ${order==='desc'?'highest':'lowest'} ${topN}.`}
       ask={`Looking at ${M.label} by ${D.label}, what's driving the ${order==='desc'?'top':'bottom'} ${topN} and what should I do about it?`}
       rows={rows} columns={[{key:'label',label:D.label},{key:'val',label:M.label,right:true,fmt}]}/>
   </div>);
@@ -2576,7 +2576,7 @@ function DataFreshness(){
   const today = (()=>{ try { return new Date(); } catch(e){ return null; } })();
   const maxDate = rows => (rows && rows.length) ? rows.reduce((m,r)=> (r.date && r.date>m) ? r.date : m, '') : '';
   const SRC_META = (typeof window!=='undefined' && window.FRKL_SOURCES) ||
-    { Google: {live:false, note:'Estimated — live Google Ads sync pending dev-token approval, so these figures are not yet a live read.'} };
+    { Google: {live:false, note:'Estimated, live Google Ads sync pending dev-token approval, so these figures are not yet a live read.'} };
   const src = [['Shopify',D.shopify],['Meta',D.metaDaily],['Google',D.googleAds],['GA4',D.ga4],['Klaviyo',D.klaviyo]];
   const items = src.map(([name,rows])=>{
     const d = maxDate(rows);
@@ -2587,7 +2587,7 @@ function DataFreshness(){
   }).filter(x=>x.d);
   if(!items.length) return null;
   const tone = it => it.estimated ? 'var(--warn)' : (it.stale==null?'var(--text-muted)': it.stale<=3?'var(--good)': it.stale<=10?'var(--warn)':'var(--bad)');
-  const label = it => it.estimated ? 'estimated' : (it.stale!=null && it.stale<=1 ? 'today' : it.stale!=null && it.stale<=10 ? it.d.slice(5) : `${it.d.slice(5)} · ${it.stale}d old`);
+  const label = it => it.estimated ? 'estimated' : (it.stale!=null && it.stale<=1 ? 'today' : it.stale!=null && it.stale<=10 ? it.d.slice(5) : `${it.d.slice(5)}, ${it.stale}d old`);
   const flagged = items.some(x=>x.estimated || (x.stale!=null && x.stale>10));
   return (<div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap',fontSize:'var(--text-xs)',padding:'0 2px'}}>
     <span style={{textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>Data freshness</span>
@@ -2596,7 +2596,7 @@ function DataFreshness(){
       <span style={{color:'var(--text-secondary)'}}>{x.name}</span>
       <span style={{color:tone(x)}}>{label(x)}</span>
     </span>))}
-    {flagged && <span style={{color:'var(--warn)'}}>estimated/stale channels aren't a live read — reconnect to refresh</span>}
+    {flagged && <span style={{color:'var(--warn)'}}>estimated/stale channels aren't a live read, reconnect to refresh</span>}
   </div>);
 }
 // ── Crux — commercial-intelligence synthesis: composite scores across the team ──
@@ -2615,7 +2615,7 @@ function computeScores(m){
   add('Customer value ÷ new-customer cost', m.ltvCac!=null ? m.ltvCac/3 : null, 0.15, m.ltvCac!=null?`${m.ltvCac.toFixed(1)}× (aim for 3×)`:'');
   add('Gross margin', m.gm ? m.gm/0.6 : null, 0.10, m.gm?`${(m.gm*100).toFixed(0)}%`:'');
   add('Visitors who buy', m.cvr!=null ? m.cvr/CVR_BENCH : null, 0.10, m.cvr!=null?`${(m.cvr*100).toFixed(2)}% (${CVR_BENCH_LABEL} target)`:'');
-  add('Discount discipline', m.discLoad!=null ? 1-Math.max(0,m.discLoad-0.10)/0.10 : null, 0.08, m.discLoad!=null?`${(m.discLoad*100).toFixed(0)}% load (≤10% ideal · 20% ceiling)`:'');
+  add('Discount discipline', m.discLoad!=null ? 1-Math.max(0,m.discLoad-0.10)/0.10 : null, 0.08, m.discLoad!=null?`${(m.discLoad*100).toFixed(0)}% load (≤10% ideal, 20% ceiling)`:'');
   add('Returns', m.returnRate!=null ? 1-m.returnRate/0.10 : null, 0.07, m.returnRate!=null?`${(m.returnRate*100).toFixed(1)}%`:'');
   const wsum = f.reduce((a,x)=>a+x.w,0) || 1;
   const health = Math.round(100 * f.reduce((a,x)=>a+x.s*x.w,0)/wsum);
@@ -2721,7 +2721,7 @@ function ScoresStrip({metrics, windowLabel}){
     return (<div style={{padding:'10px 12px',borderRadius:'var(--r-md)',background:'var(--color-sunken)',border:'1px solid var(--border-subtle)',marginBottom:12}}>
       <div style={{display:'flex',alignItems:'center',gap:16,flexWrap:'wrap',fontSize:'var(--text-sm)',color:'var(--text-secondary)'}}>
         <span style={{textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>Business vitals</span>
-        <span>Not scored yet — needs ≥30 days of trading history ({histDays}d so far). Scoring this early would over-claim; check back as data accumulates.</span>
+        <span>Not scored yet, needs ≥30 days of trading history ({histDays}d so far). Scoring this early would over-claim; check back as data accumulates.</span>
       </div>
     </div>);
   }
@@ -2743,8 +2743,8 @@ function ScoresStrip({metrics, windowLabel}){
     'Insufficient history':'not yet showing enough history to judge the trend',
   })[s.growth.band] || String(s.growth.band).toLowerCase();
   const scaleWord = s.scale.score>=80?'the economics support spending more to grow'
-    : s.scale.score>=55?'it’s not safe to scale spend yet — clear the blockers first'
-    : 'it’s not safe to scale — the unit economics need work first';
+    : s.scale.score>=55?'it’s not safe to scale spend yet, clear the blockers first'
+    : 'it’s not safe to scale, the unit economics need work first';
   // Three scores read as a sentence of debug output: "Health 86/100 · Strong · Scale-readiness
   // 50/100 · Not yet · Growth Contracting", all at 12px in a single wrapped flex row. They are
   // the vitals of the business and they were the least legible thing on the page. Laid out as
@@ -2758,8 +2758,8 @@ function ScoresStrip({metrics, windowLabel}){
   );
   return (<div className="v3-vitals">
     <div className="v3-vitals-head">
-      <span className="v3-vitals-eyebrow">Business vitals{windowLabel?<span className="v3-muted"> · {windowLabel} · independent of the date picker</span>:null}</span>
-      {partial && <span className="v3-vitals-partial">Partly scored — missing {s.missing.join(' and ')}</span>}
+      <span className="v3-vitals-eyebrow">Business vitals{windowLabel?<span className="v3-muted"> {windowLabel}</span>:null}</span>
+      {partial && <span className="v3-vitals-partial">Partly scored, missing {s.missing.join(' and ')}</span>}
       <button onClick={()=>setOpen(o=>!o)} className="v3-vitals-detail">{open?'Hide detail':'Detail'}</button>
     </div>
     <div className="v3-vitals-row">
@@ -2767,32 +2767,32 @@ function ScoresStrip({metrics, windowLabel}){
           <div className="v3-vital-val">{s.health.score}<span className="v3-vital-of">/100</span></div>
           <V3Gauge v={s.health.score} marks={[55, 75]} col={tone(s.health.score)}/>
           <div className="v3-vital-band">{s.health.band}</div></>,
-        <ScoreTip title="Health — is the engine sound?" lines={[
+        <ScoreTip title="Health, is the engine sound?" lines={[
           "A 0–100 blend of your profit margins, ad efficiency, conversion rate, returns and discount discipline. Answers: are the fundamentals healthy?",
-          "75+ strong · 55–74 okay · under 55 needs work.",
-          w0?`Weakest right now: ${w0.label} — ${w0.detail}.`:'' ]} valueNode={null}/>)}
+          "75+ strong, 55–74 okay, under 55 needs work.",
+          w0?`Weakest right now: ${w0.label}, ${w0.detail}.`:'' ]} valueNode={null}/>)}
       {stat('Safe to scale', <>
           <div className="v3-vital-val">{s.scale.score}<span className="v3-vital-of">/100</span></div>
           <V3Gauge v={s.scale.score} marks={[55, 80]} col={tone(s.scale.score)}/>
           <div className="v3-vital-band">{s.scale.band}</div></>,
-        <ScoreTip title="Scale-readiness — safe to spend more?" lines={[
-          "The share of 'safe to scale' checks you pass — e.g. cost to win a customer under your limit, profitable per order, fast payback, conversion not slipping.",
-          "80+ ready · 55–79 conditional (fix blockers first) · under 55 not yet.",
+        <ScoreTip title="Scale-readiness, safe to spend more?" lines={[
+          "The share of 'safe to scale' checks you pass, e.g. cost to win a customer under your limit, profitable per order, fast payback, conversion not slipping.",
+          "80+ ready, 55–79 conditional (fix blockers first), under 55 not yet.",
           s.scale.fails.length?`Blocking: ${s.scale.fails.slice(0,3).join('; ')}.`:'All checks pass.' ]} valueNode={null}/>)}
       {stat('Growth quality', <div className="v3-vital-word" style={{color:gTone(s.growth.band)}}>{s.growth.band}</div>,
-        <ScoreTip title="Growth quality — is the growth profitable?" lines={[
+        <ScoreTip title="Growth quality, is the growth profitable?" lines={[
           "Whether recent revenue growth came with profit growth.",
-          "'Low-quality growth' = sales up but profit flat or down — usually rising ad costs or heavier discounting.",
-          s.growth.signals.length?('Latest: '+s.growth.signals.join(' · ')):'' ]} valueNode={null}/>)}
+          "'Low-quality growth' = sales up but profit flat or down, usually rising ad costs or heavier discounting.",
+          s.growth.signals.length?('Latest: '+s.growth.signals.join(', ')):'' ]} valueNode={null}/>)}
     </div>
     <div className="v3-vitals-plain">
       The business is <b style={{color:tone(s.health.score)}}>{healthWord}</b> (Health {s.health.score}/100){s.growth.band!=='Insufficient history'?<> and right now it&rsquo;s <b style={{color:gTone(s.growth.band)}}>{growthPlain}</b></>:''}. On growing, {scaleWord}.
     </div>
     {open && (<div style={{marginTop:7,fontSize:'var(--text-sm)',color:'var(--text-secondary)',lineHeight:1.55}}>
-      <div><b style={{color:'var(--text-primary)'}}>Weakest fundamentals:</b> {s.health.weakest.map(w=>`${w.label} — ${w.detail}`).join('; ')||'—'}.</div>
+      <div><b style={{color:'var(--text-primary)'}}>Weakest fundamentals:</b> {s.health.weakest.map(w=>`${w.label}, ${w.detail}`).join('; ')||'—'}.</div>
       {s.scale.fails.length>0
         ? <div style={{marginTop:3}}><b style={{color:'var(--text-primary)'}}>Scale blockers:</b> {s.scale.fails.join('; ')}.</div>
-        : <div style={{marginTop:3}}>All scale gates pass — economics support gradual scaling.</div>}
+        : <div style={{marginTop:3}}>All scale gates pass, economics support gradual scaling.</div>}
     </div>)}
   </div>);
 }
@@ -2840,7 +2840,7 @@ function MediaSplitBody({metrics:m}){
   const col = v => v >= 0 ? 'var(--color-success)' : 'var(--color-danger)';
   return (<div style={{marginTop:10,paddingTop:10,borderTop:'1px solid var(--border-subtle)'}}>
     <div style={{fontSize:'var(--text-xs)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:7}}>
-      Volume or efficiency · revenue {dRev>=0?'up':'down'} {GBP(Math.abs(dRev))} vs prior period
+      Volume or efficiency, revenue {dRev>=0?'up':'down'} {GBP(Math.abs(dRev))} vs prior period
     </div>
     {rows.map(r=>(
       <div key={r.k} style={{display:'flex',alignItems:'center',gap:10,marginBottom:6}}>
@@ -2859,12 +2859,12 @@ function MediaSplitBody({metrics:m}){
     <div style={{marginTop:8,fontSize:'var(--text-sm)',color:'var(--text-secondary)',lineHeight:1.55}}>
       <b style={{color:'var(--color-ink)'}}>{verdict==='volume'?'A volume move.':'An efficiency move.'}</b>{' '}
       {verdict==='volume'
-        ? 'The rate roughly held — there was simply more or less of it. Levers: spend, audiences, placements, or a tracking or delivery outage.'
+        ? 'The rate roughly held, there was simply more or less of it. Levers: spend, audiences, placements, or a tracking or delivery outage.'
         : 'The rate itself moved. Levers: creative, offer, landing page and product-page conversion, audience quality, bid structure.'}
       {dContrib != null && (
         <> {' '}Profit after ads {dContrib>=0?'rose':'fell'} {GBP(Math.abs(dContrib))} over the same period
         {((dRev>=0) !== (dContrib>=0))
-          ? <> — <b style={{color:'var(--color-warning)'}}>revenue and profit disagree, so profit wins the argument.</b></>
+          ? <>, <b style={{color:'var(--color-warning)'}}>revenue and profit disagree, so profit wins the argument.</b></>
           : '.'}</>
       )}
     </div>
@@ -2890,7 +2890,7 @@ function ChangeBridgeBody({metrics:m}){
   const col=v=> v>=0?'var(--good)':'var(--bad)';
   const top=items[0];
   return (<div style={{marginTop:10,paddingTop:10,borderTop:'1px solid var(--border-subtle)'}}>
-    <div style={{fontSize:'var(--text-xs)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:6}}>What changed · revenue {dRev>=0?'up':'down'} {GBP(Math.abs(dRev))} vs prior period</div>
+    <div style={{fontSize:'var(--text-xs)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:6}}>What changed, revenue {dRev>=0?'up':'down'} {GBP(Math.abs(dRev))} vs prior period</div>
     <div style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)',lineHeight:1.55,marginBottom:10}}>
       Revenue {dRev>=0?'rose':'fell'} <b style={{color:col(dRev)}}>{GBP(Math.abs(dRev))}</b>. Biggest driver: <b>{top.label.toLowerCase()}</b> ({top.v>=0?'+':'−'}{GBP(Math.abs(top.v))}). At {PCT(gm)} margin, net of a {GBP(Math.abs(dSpend))} ad-spend {dSpend>=0?'rise':'cut'}, contribution moved <b style={{color:col(dContrib)}}>{dContrib>=0?'+':'−'}{GBP(Math.abs(dContrib))}</b>.
     </div>
@@ -2903,7 +2903,7 @@ function ChangeBridgeBody({metrics:m}){
       <span style={{width:80,textAlign:'right',fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',color:col(it.v),flexShrink:0}}>{it.v>=0?'+':'−'}{GBP(Math.abs(it.v))}</span>
       <span style={{width:130,fontSize:'var(--text-xs)',color:'var(--text-faint)',flexShrink:0}}>{it.note}</span>
     </div>))}
-    <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:8,lineHeight:1.5}}>Revenue = Sessions × Conversion × average order value — the three effects sum exactly to the revenue change. Contribution applies {PCT(gm)} margin and nets off the {GBP(Math.abs(dSpend))} ad-spend change.</div>
+    <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:8,lineHeight:1.5}}>Revenue = Sessions × Conversion × average order value, the three effects sum exactly to the revenue change. Contribution applies {PCT(gm)} margin and nets off the {GBP(Math.abs(dSpend))} ad-spend change.</div>
   </div>);
 }
 // Concise, decision-first layout: ONE move up top, everything else folded away.
@@ -2941,12 +2941,12 @@ function AnalystRead({read, dx, metrics, onLog, logUI}){
       {move && (
       <div style={{padding:'14px 16px',borderRadius:'var(--r-md)',background:moveLow?'var(--color-sunken)':'var(--color-accent-wash)',border:'1px solid '+(moveLow?'var(--border-default)':'var(--border-subtle)')}}>
         <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-          <span style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:moveLow?'var(--text-muted)':'var(--accent)'}}>{moveLow?'Top hypothesis · validate first':'Do this next'}</span>
+          <span style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:moveLow?'var(--text-muted)':'var(--accent)'}}>{moveLow?'Top hypothesis, validate first':'Do this next'}</span>
           {confChip(conf(move))}
           {move.gbp>0 && <span style={{marginLeft:'auto',fontWeight:'var(--weight-bold)',color:'var(--good)',whiteSpace:'nowrap'}}>{GBP(move.gbp)}{moveLow?' if confirmed':' on the table'}</span>}
         </div>
         <div style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)',marginTop:6,lineHeight:1.45}}>{moveLow?'Test this: ':''}{plainWords(move.recommendation)}</div>
-        <div style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)',marginTop:6,lineHeight:1.5}}><span style={{color:'var(--text-faint)'}}>Why · </span>{move.metric}</div>
+        <div style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)',marginTop:6,lineHeight:1.5}}><span style={{color:'var(--text-faint)'}}>Why, </span>{move.metric}</div>
         <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginTop:2}}><PlaybookHint text={`${plainWords(move.recommendation)} ${move.metric} ${move.area}`}/><NavChip f={move}/></div>
       </div>
       )}
@@ -2972,7 +2972,7 @@ function AnalystRead({read, dx, metrics, onLog, logUI}){
           {metrics && <ChangeBridgeBody metrics={metrics}/>}
           {metrics && <MediaSplitBody metrics={metrics}/>}
           <div style={{marginTop:10}}>
-            {findings.map((x,i)=>(<div key={i} style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)',lineHeight:1.5,marginBottom:5}}><b style={{color:'var(--text-primary)'}}>{x.area}{x.confidence?` · ${x.confidence} confidence`:''}.</b> {x.reasoning}</div>))}
+            {findings.map((x,i)=>(<div key={i} style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)',lineHeight:1.5,marginBottom:5}}><b style={{color:'var(--text-primary)'}}>{x.area}{x.confidence?`, ${x.confidence} confidence`:''}.</b> {x.reasoning}</div>))}
           </div>
           {(read.blindspots||[]).length>0 && (
             <div style={{marginTop:10,padding:'10px 14px',borderRadius:'var(--r-md)',background:'var(--color-sunken)',border:'1px solid var(--border-subtle)'}}>
@@ -3010,7 +3010,7 @@ function LogEventModal({onClose, onSaved}){
   return (<div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:200,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
     <div onClick={e=>e.stopPropagation()} style={{background:'var(--surface-1)',border:'1px solid var(--border-default)',borderRadius:'var(--r-lg,12px)',padding:'20px 22px',width:'min(440px,100%)',boxShadow:'var(--shadow-raised)'}}>
       <div style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',marginBottom:4}}>Log a business event</div>
-      <div style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)',marginBottom:16,lineHeight:1.5}}>Tell the diagnostic what happened — it'll factor this into the read straight away (e.g. a deliberate spend test stops an sales per £ of ads dip reading as fatigue).</div>
+      <div style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)',marginBottom:16,lineHeight:1.5}}>Tell the diagnostic what happened, it'll factor this into the read straight away (e.g. a deliberate spend test stops an sales per £ of ads dip reading as fatigue).</div>
       <label style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)'}}>Type</label>
       <select value={type} onChange={e=>setType(e.target.value)} style={{width:'100%',margin:'4px 0 12px',padding:'8px 10px',backgroundColor: 'transparent',border:'1px solid var(--border-subtle)',borderRadius:'var(--radius-md)',color:'var(--text-primary)',colorScheme:'light dark'}}>
         {Object.keys(EVENT_META).map(k=><option key={k} value={k}>{EVENT_META[k].label}</option>)}
@@ -3052,7 +3052,7 @@ function DiagnosticCard({metrics, context, period, onLogEvent}){
   if (!dx.findings.length) return (<div className="card">
     {logUI}
     <div className="card-section-title"><h2 style={{margin:0}}>What the numbers say right now</h2><div style={{display:'flex',alignItems:'center',gap:10}}><span className="meta">Live cross-metric read</span><LogEventButton onClick={()=>setLogOpen(true)}/></div></div>
-    <div className="note">No binding constraint this period — funnel, margin and unit economics are all within healthy ranges. Keep scaling while customer lifetime value:cost per new customer holds above 3×.</div>
+    <div className="note">No binding constraint this period, funnel, margin and unit economics are all within healthy ranges. Keep scaling while customer lifetime value:cost per new customer holds above 3×.</div>
     <ContextConsidered dx={dx}/>
   </div>);
   const top = dx.findings[0];
@@ -3061,7 +3061,7 @@ function DiagnosticCard({metrics, context, period, onLogEvent}){
       {logUI}
       <div className="card-section-title">
         <h2 style={{margin:0}}>What the numbers say right now</h2>
-        <div style={{display:'flex',alignItems:'center',gap:10}}><span className="meta">Live cross-metric read{dx.inPlay>0?` · ${GBP(dx.inPlay)} contribution in play`:''}</span><LogEventButton onClick={()=>setLogOpen(true)}/></div>
+        <div style={{display:'flex',alignItems:'center',gap:10}}><span className="meta">Live cross-metric read{dx.inPlay>0?`, ${GBP(dx.inPlay)} contribution in play`:''}</span><LogEventButton onClick={()=>setLogOpen(true)}/></div>
       </div>
       <div style={{padding:'12px 16px',borderRadius:'var(--r-md)',background:'var(--color-accent-wash)',border:'1px solid var(--border-subtle)',marginBottom:14}}>
         <div style={{fontSize:'var(--text-xs)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)'}}>Biggest lever</div>
@@ -3083,7 +3083,7 @@ function DiagnosticCard({metrics, context, period, onLogEvent}){
         ))}
       </div>
       <ContextConsidered dx={dx}/>
-      <div className="note" style={{marginTop:10}}>{`Computed live from this period's metrics via the operator model (funnel × unit economics × margin), with decomposition + event detection applied before ranking. ${curSym()} are contribution-impact estimates used to rank leverage — not forecasts.`}</div>
+      <div className="note" style={{marginTop:10}}>{`Computed live from this period's metrics via the operator model (funnel × unit economics × margin), with decomposition + event detection applied before ranking. ${curSym()} are contribution-impact estimates used to rank leverage, not forecasts.`}</div>
     </div>
   );
 }
@@ -3115,8 +3115,8 @@ function LtvCacCard({daily, gm, ordersPerCust}){
   return (
     <div className="card">
       <div className="card-section-title">
-        <h2 style={{margin:0}}>customer lifetime value : cost per new customer over time <span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)',fontSize:'var(--text-sm)'}}>— weekly · est.</span></h2>
-        <span className="meta">This period: cost per new customer {GBP(cacT)} · customer lifetime value {GBP(ltvT)} · ratio <b style={{color:(ratioT||0)>=3?'var(--good)':(ratioT||0)>=1?'var(--warn)':'var(--bad)'}}>{ratioT?ratioT.toFixed(1)+'×':'—'}</b> · target 3×+</span>
+        <h2 style={{margin:0}}>customer lifetime value : cost per new customer over time <span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)',fontSize:'var(--text-sm)'}}>weekly, est.</span></h2>
+        <span className="meta">This period: cost per new customer {GBP(cacT)}, customer lifetime value {GBP(ltvT)}, ratio <b style={{color:(ratioT||0)>=3?'var(--good)':(ratioT||0)>=1?'var(--warn)':'var(--bad)'}}>{ratioT?ratioT.toFixed(1)+'×':'—'}</b>, target 3×+</span>
       </div>
       <R.ResponsiveContainer width="100%" height={240}>
         <R.ComposedChart data={rows} margin={{top:6,right:20,left:14,bottom:22}}>
@@ -3127,10 +3127,10 @@ function LtvCacCard({daily, gm, ordersPerCust}){
           {false && <R.YAxis yAxisId="r" orientation="right" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>v+'×'} label={{value:'Customer value:New-customer cost', angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:'var(--text-xs)'}}/>}
           <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',boxShadow:'var(--shadow-md)'}} formatter={(v,nm)=> nm==='LTV:CAC' ? v+'×' : GBP(v)} labelFormatter={l=>'Week of '+l}/>
           <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:'var(--text-sm)', paddingBottom:8}}/>
-          <R.Line yAxisId="l" type="monotone" dataKey="ltv" name="Customer value" stroke={svgCol(COL.revenue)} strokeWidth={2.2} dot={single?{r:3}:false}/>
-          <R.Line yAxisId="l" type="monotone" dataKey="cac" name="New-customer cost" stroke={svgCol(COL.meta)} strokeWidth={2.2} dot={single?{r:3}:false}/>
+          <R.Line yAxisId="l" type="linear" dataKey="ltv" name="Customer value" stroke={svgCol(COL.revenue)} strokeWidth={2.2} dot={single?{r:3}:false}/>
+          <R.Line yAxisId="l" type="linear" dataKey="cac" name="New-customer cost" stroke={svgCol(COL.meta)} strokeWidth={2.2} dot={single?{r:3}:false}/>
           {/* The LTV:CAC ratio needed a second scale. It is the two lines above divided, and it is printed above the chart and in the table, so the chart keeps one honest scale. */}
-          {false && <R.Line yAxisId="r" type="monotone" dataKey="ratio" name="Customer value vs cost" stroke={svgCol(COL.email)} strokeWidth={2} strokeDasharray="4 3" dot={single?{r:3}:false}/>}
+          {false && <R.Line yAxisId="r" type="linear" dataKey="ratio" name="Customer value vs cost" stroke={svgCol(COL.email)} strokeWidth={2} strokeDasharray="4 3" dot={single?{r:3}:false}/>}
           {false && <R.ReferenceLine yAxisId="r" y={3} stroke={svgCol(COL.email)} strokeDasharray="5 4" strokeOpacity={0.7}
             label={{value:'3× target', position:'insideTopRight', fill:COL.email, fontSize:'var(--text-xs)'}}/>}
           <R.Brush {...brushProps('label')} />
@@ -3160,7 +3160,7 @@ function ContributionCard({rev, orders, paid, cmr, gross, days}){
   // about a brand that simply had not entered its costs. Unknown now says so.
   if (cmr == null || !(rev > 0)) return (<div className="card">
     <div className="card-section-title"><h2 style={{margin:0}}>Where the money goes</h2></div>
-    <p className="v3-note">Greta needs to know what your products and orders cost you before she can show what is left after them — a guess here would be wrong by exactly your real margin.</p>
+    <p className="v3-note">Add what your products and orders cost you to see what is left after them, a guess here would be wrong by exactly your real margin.</p>
     <button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs')}>Enter your costs</button>
   </div>);
   const g = (gross != null && gross >= cmr) ? gross : null;          // gross margin, if known and coherent
@@ -3176,18 +3176,18 @@ function ContributionCard({rev, orders, paid, cmr, gross, days}){
     bold={opts && opts.bold} color={opts && opts.color || 'var(--text-muted)'} top={opts && opts.top}/>;
   return (<div className="card">
     <div className="card-section-title">
-      <h2 style={{margin:0}}>Where the money goes <span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)',fontSize:'var(--text-sm)'}}>— {NUM(orders)} orders in this period</span></h2>
-      <span className="meta">costs from Goal &amp; costs · same margin as Today</span>
+      <h2 style={{margin:0}}>Where the money goes <span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)',fontSize:'var(--text-sm)'}}>{NUM(orders)} orders in this period</span></h2>
+      <span className="meta">costs from Goal &amp; costs, same margin as Today</span>
     </div>
     <div style={{maxWidth:620,fontSize:'var(--text-base)'}}>
       {line('Sales', rev, {bold:true, color:'var(--text-primary)', top:'none'})}
       {g != null ? (<>
-        {line('− What the products cost · ' + pct(productCost), productCost, {neg:true})}
-        {line('− Shipping, packaging and fees · ' + pct(orderCosts), orderCosts, {neg:true})}
-      </>) : line('− Products, shipping, packaging and fees · ' + pct(rev - beforeAds), rev - beforeAds, {neg:true})}
+        {line('− What the products cost, ' + pct(productCost), productCost, {neg:true})}
+        {line('− Shipping, packaging and fees, ' + pct(orderCosts), orderCosts, {neg:true})}
+      </>) : line('− Products, shipping, packaging and fees, ' + pct(rev - beforeAds), rev - beforeAds, {neg:true})}
       {line('= Profit before ads', beforeAds, {bold:true, color:'var(--text-primary)'})}
-      {line('− What you spent on ads · ' + pct(paid || 0), paid || 0, {neg:true})}
-      {line('= What you keep · ' + pct(kept), kept, {bold:true, color: kept >= 0 ? 'var(--good)' : 'var(--bad)', top:'2px solid var(--border-default)'})}
+      {line('− What you spent on ads, ' + pct(paid || 0), paid || 0, {neg:true})}
+      {line('= What you keep, ' + pct(kept), kept, {bold:true, color: kept >= 0 ? 'var(--good)' : 'var(--bad)', top:'2px solid var(--border-default)'})}
       {fixedWin!=null
         ? (<>
             {line('− Overheads (rent, wages, software) for this period', fixedWin, {neg:true})}
@@ -3344,12 +3344,12 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
   return (
     <div className="card">
       <div className="card-section-title">
-        <h2 style={{margin:0}}>P&amp;L &amp; forecast <span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)',fontSize:'var(--text-sm)'}}>— {annLabel}, seasonalised</span></h2>
+        <h2 style={{margin:0}}>P&amp;L &amp; forecast <span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)',fontSize:'var(--text-sm)'}}>{annLabel}, seasonalised</span></h2>
         <div style={{display:'flex',gap:6}}>{modeBtn('topdown','Top-down')}{modeBtn('bottomup','Bottom-up')}</div>
       </div>
       {/* Assumptions — all number inputs at the TOP, before the outputs */}
       <div style={{marginTop:6}}>
-        <div style={{fontSize:'var(--text-xs)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:8}}>Assumptions <span style={{textTransform:'none',letterSpacing:0,color:'var(--text-muted)'}}>· started from your last 30 days · saved on this device only · edit to recompute below</span></div>
+        <div style={{fontSize:'var(--text-xs)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:8}}>Assumptions <span style={{textTransform:'none',letterSpacing:0,color:'var(--text-muted)'}}>started from your last 30 days, saved on this device only, edit to recompute below</span></div>
         <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:8}}>
           {mode==='topdown' ? (<>
             {fld('startRevenue','Start revenue',curSym())}
@@ -3375,7 +3375,7 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
         </div>
       </div>
       {/* Advanced — retention, wholesale, seasonality */}
-      <Disclosure label="Advanced — retention base, wholesale & seasonality" open={showAdv} onToggle={()=>setShowAdv(s=>!s)}/>
+      <Disclosure label="Advanced, retention base, wholesale & seasonality" open={showAdv} onToggle={()=>setShowAdv(s=>!s)}/>
       {showAdv && (
         <div style={{padding:'10px 0 0 4px'}}>
           {mode==='bottomup' && <div style={{display:'flex',gap:14,flexWrap:'wrap',marginBottom:12}}>
@@ -3384,7 +3384,7 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
             {fld('wholesale','Wholesale /mo',curSym())}
             {fld('wholesaleGrowthPct','Wholesale growth /mo',null,'%')}
           </div>}
-          <div style={{fontSize:'var(--text-xs)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:6}}>Seasonality index <span style={{textTransform:'none',letterSpacing:0,color:'var(--text-muted)'}}>· 1.0 = average month · flat until you set your own</span></div>
+          <div style={{fontSize:'var(--text-xs)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:6}}>Seasonality index <span style={{textTransform:'none',letterSpacing:0,color:'var(--text-muted)'}}>· 1.0 = average month, flat until you set your own</span></div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
             {FC_MONTHS.map((m,j)=>(<label key={j} style={{display:'flex',flexDirection:'column',alignItems:'center',gap:2,fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>
               <span>{m}</span>
@@ -3400,7 +3400,7 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
         {tile(annLabel+' operating profit', GBP(t.ebitda), PCT(t.ebitdaPct)+' of sales', t.ebitda>=0?'var(--good)':'var(--bad)')}
         {tile('operating profit break-even', beLabel, mode==='bottomup'?('repeat '+n('repeatRate').toFixed(0)+'%/mo'):('growth '+n('growthPct').toFixed(0)+'%/mo'))}
       </div>
-      {mode==='bottomup' && <div style={{fontSize:'var(--text-sm)',color:'var(--text-muted)',marginBottom:10}}>Revenue mix: <b style={{color:PAL.nw}}>New {pctOf(t.newRev)}%</b> · <b style={{color:PAL.good}}>Returning {pctOf(t.retRev)}%</b>{t.whRev>0?<> · <b style={{color:PAL.warn}}>Wholesale {pctOf(t.whRev)}%</b></>:''} — returning revenue compounds as the base grows.</div>}
+      {mode==='bottomup' && <div style={{fontSize:'var(--text-sm)',color:'var(--text-muted)',marginBottom:10}}>Revenue mix: <b style={{color:PAL.nw}}>New {pctOf(t.newRev)}%</b>, <b style={{color:PAL.good}}>Returning {pctOf(t.retRev)}%</b>{t.whRev>0?<>, <b style={{color:PAL.warn}}>Wholesale {pctOf(t.whRev)}%</b></>:''}, returning revenue compounds as the base grows.</div>}
       <R.ResponsiveContainer width="100%" height={240}>
         <R.ComposedChart data={rows} margin={{top:6,right:16,left:14,bottom:20}}>
           <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
@@ -3409,13 +3409,13 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
           <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)'}} formatter={v=>GBP(v)}/>
           <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:'var(--text-sm)', paddingBottom:8}}/>
           {mode==='bottomup' ? [
-            <R.Area key="n" type="monotone" dataKey="newRev" name="New" stackId="rev" stroke={PAL.nw} fill={palAlpha(PAL.nw, 0.50)} strokeWidth={1}/>,
-            <R.Area key="r" type="monotone" dataKey="retRev" name="Returning" stackId="rev" stroke={PAL.ret} fill={palAlpha(PAL.ret, 0.45)} strokeWidth={1}/>,
-            <R.Area key="w" type="monotone" dataKey="whRev" name="Wholesale" stackId="rev" stroke={PAL.warn} fill="var(--color-warning-wash)" strokeWidth={1}/>
+            <R.Area key="n" type="linear" dataKey="newRev" name="New" stackId="rev" stroke={PAL.nw} fill={palAlpha(PAL.nw, 0.50)} strokeWidth={1}/>,
+            <R.Area key="r" type="linear" dataKey="retRev" name="Returning" stackId="rev" stroke={PAL.ret} fill={palAlpha(PAL.ret, 0.45)} strokeWidth={1}/>,
+            <R.Area key="w" type="linear" dataKey="whRev" name="Wholesale" stackId="rev" stroke={PAL.warn} fill="var(--color-warning-wash)" strokeWidth={1}/>
           ] : (
-            <R.Area key="rev" type="monotone" dataKey="revenue" name="Revenue" stroke={PAL.sales} fill={palAlpha(PAL.sales, 0.16)} strokeWidth={2}/>
+            <R.Area key="rev" type="linear" dataKey="revenue" name="Revenue" stroke={PAL.sales} fill={palAlpha(PAL.sales, 0.16)} strokeWidth={2}/>
           )}
-          <R.Line type="monotone" dataKey="ebitda" name="Operating profit" stroke={PAL.kept} strokeWidth={2} strokeDasharray="4 3" dot={false}/>
+          <R.Line type="linear" dataKey="ebitda" name="Operating profit" stroke={PAL.kept} strokeWidth={2} strokeDasharray="4 3" dot={false}/>
         </R.ComposedChart>
       </R.ResponsiveContainer>
       {/* Scenario band — investor-grade */}
@@ -3443,9 +3443,9 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
       {showWork && (
         <div style={{maxWidth:560,fontSize:'var(--text-sm)',padding:'8px 0 0 4px'}}>
           <CmRow label={`Revenue (${annLabel})`} amount={GBP(t.revenue)} bold color="var(--text-primary)" top="none"/>
-          {mode==='bottomup' && <><CmRow label="  · New customers" amount={GBP(t.newRev)} color="var(--text-muted)"/>
-          <CmRow label="  · Returning customers" amount={GBP(t.retRev)} color="var(--text-muted)"/>
-          {t.whRev>0 && <CmRow label="  · Wholesale" amount={GBP(t.whRev)} color="var(--text-muted)"/>}</>}
+          {mode==='bottomup' && <><CmRow label=" , New customers" amount={GBP(t.newRev)} color="var(--text-muted)"/>
+          <CmRow label=" , Returning customers" amount={GBP(t.retRev)} color="var(--text-muted)"/>
+          {t.whRev>0 && <CmRow label=" , Wholesale" amount={GBP(t.whRev)} color="var(--text-muted)"/>}</>}
           <CmRow label={`− product cost (${PCT(1-n('gmPct')/100)})`} amount={'−'+GBP(t.cogs)} color="var(--text-muted)"/>
           <CmRow label="= Gross profit" amount={GBP(t.grossProfit)} bold color="var(--good)"/>
           <CmRow label="− Variable order costs (pack/fulfil/ship/fees/refunds)" amount={'−'+GBP(t.varCosts)} color="var(--text-muted)"/>
@@ -3457,9 +3457,9 @@ function ForecastCard({rev, orders, paid, gm, aov, cac, returningPct}){
       )}
       <div className="note" style={{marginTop:10}}>
         {mode==='bottomup'
-          ? <>Bottom-up: <b>New</b> = (paid spend ÷ cost per new customer + organic new) × new average order value; <b>Returning</b> = customer base × repeat rate × returning average order value, where the base compounds (each month's new customers join it); <b>+ Wholesale</b>. Every line is seasonalised by calendar month. cost per new customer bundles CPM×CTR×conversion rate — seed it from a defensible blended figure. Base + repeat rate are seeded to reproduce your current returning-order share.</>
-          : <>Top-down: revenue compounds at your monthly growth rate (×seasonality); paid marketing is implied at your target sales per £ of ads. Cross-check against bottom-up — if the spend to hit this revenue is unaffordable, it's a wish, not a plan.</>}
-        {' '}Seasonality is flat until you set your own months: edit in Advanced. Scenarios flex growth + retention. Not a cash-flow model — working capital (stock + AR/AP days) sits on top.
+          ? <>Bottom-up: <b>New</b> = (paid spend ÷ cost per new customer + organic new) × new average order value; <b>Returning</b> = customer base × repeat rate × returning average order value, where the base compounds (each month's new customers join it); <b>+ Wholesale</b>. Every line is seasonalised by calendar month. cost per new customer bundles CPM×CTR×conversion rate, seed it from a defensible blended figure. Base + repeat rate are seeded to reproduce your current returning-order share.</>
+          : <>Top-down: revenue compounds at your monthly growth rate (×seasonality); paid marketing is implied at your target sales per £ of ads. Cross-check against bottom-up, if the spend to hit this revenue is unaffordable, it's a wish, not a plan.</>}
+        {' '}Seasonality is flat until you set your own months: edit in Advanced. Scenarios flex growth + retention. Not a cash-flow model, working capital (stock + AR/AP days) sits on top.
       </div>
     </div>
   );
@@ -3515,7 +3515,7 @@ function WcSpark({data, color, fmt, axisFmt}){
           <div style={{color:'var(--text-faint)', fontSize:'var(--text-xs)', marginBottom:1}}>Week of {label}</div>
           <div style={{fontWeight:'var(--weight-bold)', color:'var(--text-primary)'}}>{fmt?fmt(v):v}</div>
         </div>); }}/>
-      <R.Line type="monotone" dataKey="v" stroke={svgCol(color)} strokeWidth={1.8} dot={false} activeDot={{r:3, strokeWidth:0}} isAnimationActive={false}/>
+      <R.Line type="linear" dataKey="v" stroke={svgCol(color)} strokeWidth={1.8} dot={false} activeDot={{r:3, strokeWidth:0}} isAnimationActive={false}/>
     </R.LineChart>
   </R.ResponsiveContainer>);
 }
@@ -3565,10 +3565,10 @@ function WhatChangedStrip(){
   };
   return (<div>
     <div className="section-eyebrow" style={{display:'flex',alignItems:'center',gap:8,margin:'4px 0 -4px',fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-muted)'}}>
-      <span style={{width:3,height:14,background:'var(--text-faint)',borderRadius:'var(--radius-sm)'}}/>What changed · week of {W.label}
+      <span style={{width:3,height:14,background:'var(--text-faint)',borderRadius:'var(--radius-sm)'}}/>What changed, week of {W.label}
     </div>
     <div className="card">
-      <div className="muted" style={{fontSize:'var(--text-sm)', marginBottom:11}}>Latest complete week vs the one before — the movers worth a look. Independent of the date picker above.</div>
+      <div className="muted" style={{fontSize:'var(--text-sm)', marginBottom:11}}>Latest complete week vs the one before, the movers worth a look. Independent of the date picker above.</div>
       {movers.length ? (<div className="wc-grid">
         {movers.map((r,idx)=>{ const sb=badgeFor(r); const up=r.ch>=0;
           const good = r.better==='flat' ? null : (r.better==='down' ? !up : up);
@@ -3579,7 +3579,7 @@ function WhatChangedStrip(){
             <WcSpark data={trail(r.key)} color={RAG_COL[r.rag]||'var(--text-faint)'} fmt={r.fmt} axisFmt={r.axisFmt}/>
           </div>);
         })}
-      </div>) : (<div className="muted" style={{fontSize:'var(--text-sm)'}}>Quiet week — nothing moved more than 3% vs the prior week.</div>)}
+      </div>) : (<div className="muted" style={{fontSize:'var(--text-sm)'}}>Quiet week, nothing moved more than 3% vs the prior week.</div>)}
     </div>
   </div>);
 }
@@ -3718,7 +3718,7 @@ function V3ProfitLead() {
   if (!H) return <V3SkeletonRows n={4}/>;
   if (cmr == null) return (<section className="v3-sec">
     <div className="v3-kick">Last 30 days</div>
-    <p className="v3-verdict">Greta needs your costs before she can work out your profit.</p>
+    <p className="v3-verdict">Add your costs to see your profit.</p>
     <p className="v3-note v3-measure">Enter what your products cost, and what each order costs to pack, send and take payment for. This page then shows where each £1 of sales goes and how this month compares with a typical one.</p>
     <button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs')}>Enter your costs</button>
   </section>);
@@ -3805,7 +3805,7 @@ function V3ProfitLead() {
   };
   return (<div className="v3-page-stack">
     <section className="v3-sec v3-profit-head">
-      <div className="v3-kick">Last 30 days · against a typical month for you</div>
+      <div className="v3-kick">Last 30 days, against a typical month for you</div>
       <div className="v3-lead2"><div>
       <p className="v3-verdict">{lead || 'You kept ' + fmtMoney(kept) + ' after ads in the last 30 days.'}</p>
       {T && <V3Brief>
@@ -3821,8 +3821,8 @@ function V3ProfitLead() {
       <p className="micro muted v3-measure">Shopify’s home screen shows a bigger sales figure for the same days. It adds VAT, the delivery you charge, orders later refunded, and other places you sell such as stockists. Sales here are your own shop’s sales after refunds and before VAT: the money the business has to work with.</p>
       {((rfGap != null && rfGap > 0) || noFreight) && <p className="micro muted v3-measure">Your profit here reads {rfGap > 0 ? 'about ' + fmtMoney(rfGap) + ' too high' : 'too high'}:
         {' '}{rfGap > 0 ? 'refunds are ' + fmtPctN(Number(rfRow.realised_value) / 100) + ' of sales, not the ' + fmtPctN(Number(rfRow.config_value) / 100) + ' you entered' : ''}{rfGap > 0 && noFreight ? ', and ' : ''}{noFreight ? 'your product costs leave out shipping them to you and import duty' : ''}.
-        {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs-off')}>Fix them <span className="v3-xref-go">on Goal &amp; costs →</span></button></p>}
-      {oh30 == null && <p className="v3-note v3-measure">Add your monthly overheads: what you pay whatever you sell, such as rent, wages and software. Greta will then show whether what you keep covers them, and how much you can afford to spend on ads.{' '}
+        {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs-off')}>Fix them <span className="v3-xref-go">on Goal &amp; costs</span></button></p>}
+      {oh30 == null && <p className="v3-note v3-measure">Add your monthly overheads: what you pay whatever you sell, such as rent, wages and software. You will then see whether what you keep covers them, and how much you can afford to spend on ads.{' '}
         <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('goal', 'economics')}>Add overheads</button></p>}
       </div>
       <ul className="v3-chain" aria-label="Where each pound of sales went">
@@ -3848,12 +3848,12 @@ function V3ProfitLead() {
           <R.Tooltip content={tip} cursor={false}/>
           <R.Bar dataKey="sales" fill={PAL.sales} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
           <R.Bar dataKey="spend" fill={PAL.ads} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
-          <R.Line dataKey="kept" type="monotone" stroke={PAL.kept} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
+          <R.Line dataKey="kept" type="linear" stroke={PAL.kept} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
           {oh30 != null && <R.ReferenceLine y={oh30} stroke={PAL.muted} strokeDasharray="4 3"/>}
           <R.ReferenceLine y={0} stroke={PAL.line}/>
         </R.ComposedChart>
       </R.ResponsiveContainer>
-      <p className="micro muted v3-measure">Each point covers the 30 days up to the date shown. Kept after ads is the {fmtPctN(cmr)} of sales left after products, delivery and payment fees, minus ad spend{other >= 1 ? <> and the other marketing cost. Greta has that cost for the last 30 days only ({fmtMoney(other)}), so every point takes it at that amount</> : null}.{oh30 != null ? ' When the line is below the dashed overheads line, the business lost money those 30 days.' : ''}</p>
+      <p className="micro muted v3-measure">Each point covers the 30 days up to the date shown. Kept after ads is the {fmtPctN(cmr)} of sales left after products, delivery and payment fees, minus ad spend{other >= 1 ? <> and the other marketing cost. That cost is known for the last 30 days only ({fmtMoney(other)}), so every point takes it at that amount</> : null}.{oh30 != null ? ' When the line is below the dashed overheads line, the business lost money those 30 days.' : ''}</p>
     </figure>)}
 
     {(shift || extra > Math.max(250, (T ? T.spend : 0) * 0.2) || (op != null && op < 0)) && (<section className="v3-sec">
@@ -3861,11 +3861,11 @@ function V3ProfitLead() {
       <ol className="v3-moves">
         {shift && (<li>
           <b>Move this month’s ad budget into {gpMonthName(shift.peak.month)}.</b>
-          {' '}At this pace you will spend about {fmtMoney(shift.proj)} on ads in {gpMonthName(shift.cur.month)}. Greta’s quarter plan spends the same total but puts {fmtMoney(shift.cur.spend)} in {gpMonthName(shift.cur.month)} and {fmtMoney(shift.peak.spend)} in {gpMonthName(shift.peak.month)}
+          {' '}At this pace you will spend about {fmtMoney(shift.proj)} on ads in {gpMonthName(shift.cur.month)}. The quarter plan spends the same total but puts {fmtMoney(shift.cur.spend)} in {gpMonthName(shift.cur.month)} and {fmtMoney(shift.peak.spend)} in {gpMonthName(shift.peak.month)}
           {shift.lyCost != null ? <>, when new customers cost far less to win. Last {gpMonthName(shift.peak.month)}, each one cost {fmtMoney(shift.lyCost, 2)}</> : null}.
           {shift.gain >= 200 ? <> Spread that way, the same total makes about {fmtMoney(shift.gain)} more profit after ads.</> : null}
           {' '}<button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('growth')}>See why on Growth plan</button>
-          {' '}<V3Conf state="probably" detail="This month’s spend so far is measured. The monthly split is Greta’s plan, built from your own busy and quiet months. It assumes each extra £1 of ads wins a little less than the one before."/>
+          {' '}<V3Conf state="probably" detail="This month’s spend so far is measured. The monthly split is the plan, built from your own busy and quiet months. It assumes each extra £1 of ads wins a little less than the one before."/>
         </li>)}
         {!shift && T && extra > Math.max(250, T.spend * 0.2) && (<li>
           <b>Bring ad spend back toward {fmtMoney(T.spend)} a month.</b>
@@ -3893,8 +3893,8 @@ function V3ProfitLead() {
         <i style={{ width: (newNet / mixTot * 100) + '%', background: PAL.nw }}/><i style={{ width: (retNet / mixTot * 100) + '%', background: PAL.ret }}/>
       </div>
       <table className="v3-share-table"><tbody>
-        <tr><td className="t-text"><i className="v3-dot" style={{ background: PAL.nw }}/>New customers · {fmtCount(t30.new_customers)}</td><td>{fmtMoney(newNet)}</td><td className="v3-muted">{fmtPctN(newNet / mixTot)}</td></tr>
-        <tr><td className="t-text"><i className="v3-dot" style={{ background: PAL.ret }}/>Returning customers · {fmtCount(t30.returning_customers)}</td><td>{fmtMoney(retNet)}</td><td className="v3-muted">{fmtPctN(retNet / mixTot)}</td></tr>
+        <tr><td className="t-text"><i className="v3-dot" style={{ background: PAL.nw }}/>New customers, {fmtCount(t30.new_customers)}</td><td>{fmtMoney(newNet)}</td><td className="v3-muted">{fmtPctN(newNet / mixTot)}</td></tr>
+        <tr><td className="t-text"><i className="v3-dot" style={{ background: PAL.ret }}/>Returning customers, {fmtCount(t30.returning_customers)}</td><td>{fmtMoney(retNet)}</td><td className="v3-muted">{fmtPctN(retNet / mixTot)}</td></tr>
       </tbody></table>
       <p className="v3-note v3-measure">{(() => { const c = v3Fig('cac_30d', figQ.rows); return c.value != null ? c.label + ': ' + fmtMoney(c.value) + '. ' : ''; })()}Marketing shows which ad channels really bring in sales. Customers shows what a customer is worth over time.</p>
     </section>)}
@@ -4202,7 +4202,7 @@ function Overview({start, period, customActive}){
     <div style={{display:'flex', flexDirection:'column', gap:'var(--s-5)'}}>
       {costsOpen && <CostSetupModal catalogueGm={grossMargin} onClose={()=>setCostsOpen(false)}/>}
       {/* Cost-setup prompt deliberately lives BELOW the hero + diagnosis (prove value
-          first, then ask for the ~5-min margin input) — see after DiagnosticCard. */}
+          first, then ask for the ~5-min margin input), see after DiagnosticCard. */}
       {/* The mobile "Today" card that sat here totalled every action ever raised (skipped, done and
           July seeds: ~£190k/mo "in play") and listed its own top three. Today itself, which mobile
           opens on, shows the one board. Removed 2026-10-05. */}
@@ -4210,7 +4210,7 @@ function Overview({start, period, customActive}){
       {/* Hero — the answer to "what should I look at right now" */}
       {/* SetupProgressCard repeated Today's setup steps and its button left the app; removed. */}
       {/* This page asks "Where does my money come from, and where does it go?" and used to open
-          with a weekly briefing, a track record and an action queue — all three of which have
+          with a weekly briefing, a track record and an action queue, all three of which have
           their own destinations in V3 (Review, Review, Actions). The page never answered its own
           question. The money flow is that answer, so it leads; the briefing is demoted to a
           collapsed section below rather than deleted, because the content is good, just misplaced.
@@ -4234,22 +4234,22 @@ function Overview({start, period, customActive}){
       {/* "This week's briefing" (static insights, the track record and the weekly strip) answered
           Review's question with frkl's July read; Review leads with the live weekly board. Removed. */}
       {/* Prove-value-first onboarding nudge: the read above already works on
-          catalogue-estimate margins — now offer the one ~5-min input that makes the
+          catalogue-estimate margins, now offer the one ~5-min input that makes the
           margin figures exact. Placed AFTER the value, framed as "make it exact". */}
       {/* V3: Getting started on Today owns "enter your costs", from the server's has_economics;
           this nudge read a per-browser flag and showed on brands whose costs were already set. */}
       {!UI_V3 && !costsVerified && (
         <div className="card" style={{display:'flex', alignItems:'center', gap:16, flexWrap:'wrap'}}>
           <div style={{flex:'1 1 420px'}}>
-            <div style={{fontWeight:'var(--weight-bold)', fontSize:'var(--text-base)', marginBottom:3}}>Make the margin numbers exact <span style={{fontWeight:'var(--weight-normal)', color:'var(--text-faint)', fontSize:'var(--text-sm)'}}>· optional, ~5 min</span></div>
-            <div className="fine" style={{color:'var(--text-secondary)', lineHeight:1.5}}>The read above already works on catalogue-estimate margins. Enter your real product cost + fulfilment once and contribution, cost per new customer payback and customer lifetime value:cost per new customer become exact — and carry a <b>verified</b> badge for the raise.</div>
+            <div style={{fontWeight:'var(--weight-bold)', fontSize:'var(--text-base)', marginBottom:3}}>Make the margin numbers exact <span style={{fontWeight:'var(--weight-normal)', color:'var(--text-faint)', fontSize:'var(--text-sm)'}}>optional, ~5 min</span></div>
+            <div className="fine" style={{color:'var(--text-secondary)', lineHeight:1.5}}>The read above already works on catalogue-estimate margins. Enter your real product cost + fulfilment once and contribution, cost per new customer payback and customer lifetime value:cost per new customer become exact, and carry a <b>verified</b> badge for the raise.</div>
           </div>
-          <button onClick={()=>{ if (UI_V3) { window.__oiGo && window.__oiGo('goal', 'margin'); return; } window.__oiGo && window.__oiGo('goal', 'margin'); }} className="btn-primary" style={{flexShrink:0}}>Set up costs →</button>
+          <button onClick={()=>{ if (UI_V3) { window.__oiGo && window.__oiGo('goal', 'margin'); return; } window.__oiGo && window.__oiGo('goal', 'margin'); }} className="btn-primary" style={{flexShrink:0}}>Set up costs</button>
         </div>
       )}
       {costsVerified && (
         <div className="micro" style={{color:'var(--text-faint)', display:'flex', alignItems:'center', gap:8}}>
-          <MarginBadge/> profit figures use the costs you entered · <span onClick={()=>{ if (UI_V3) { window.__oiGo && window.__oiGo('goal', 'margin'); return; } window.__oiGo && window.__oiGo('goal', 'margin'); }} style={{color:'var(--accent)', cursor:'pointer'}}>edit costs</span>
+          <MarginBadge/> profit figures use the costs you entered, <span onClick={()=>{ if (UI_V3) { window.__oiGo && window.__oiGo('goal', 'margin'); return; } window.__oiGo && window.__oiGo('goal', 'margin'); }} style={{color:'var(--accent)', cursor:'pointer'}}>edit costs</span>
         </div>
       )}
       {/* The ranked queue used to render here in full, above the money read. It is the Actions
@@ -4270,7 +4270,7 @@ function Overview({start, period, customActive}){
       <div>
         <div className="card-section-title" style={{marginBottom:'var(--s-3)'}}>
           <h2 style={{margin:0}}>Headline KPIs</h2>
-          <span className="meta">Last {daily.length} days · vs prior period · hover any card for the full read</span>
+          <span className="meta">Last {daily.length} days, against the period before</span>
         </div>
         {/* When the daily detail never arrived, the headline figures still show (they come from the
             morning summary) beside 0 orders and 0 sessions. Say so, rather than let the zeros read as
@@ -4278,82 +4278,82 @@ function Overview({start, period, customActive}){
         {(() => { const L = window.FRKL_LIVE; return !!(L && L.session && !L.lastFetchAt && /^(error|static-only)$/.test(L.status || '')); })() &&
           <p className="v3-empty">Your daily detail didn’t load, so only the headline figures are filled in below. Refreshing the page usually sorts it.</p>}
         <div className="row">
-          <KPI label="Paid ad spend" val={GBP(paid)} sub={(() => { const m = sum(meta,'cost'), g = sum(gads,'cost'), k = ttCur, t = m + g + k; return t > 0 ? `Meta ${fmtPctN(m / t)} · Google ${fmtPctN(g / t)}` + (k >= 1 ? ` · TikTok ${fmtPctN(k / t)}` : '') : ''; })()} series={seriesPaid} current={paid} prior={pPaid}
+          <KPI label="Paid ad spend" val={GBP(paid)} sub={(() => { const m = sum(meta,'cost'), g = sum(gads,'cost'), k = ttCur, t = m + g + k; return t > 0 ? `Meta ${fmtPctN(m / t)}, Google ${fmtPctN(g / t)}` + (k >= 1 ? `, TikTok ${fmtPctN(k / t)}` : '') : ''; })()} series={seriesPaid} current={paid} prior={pPaid}
             agent="Pulse" observation={_vs('Ad spend', paid, pPaid, 'sales', rev, pRev)} />
-          <KPI label="Shopify net revenue" val={GBP(rev)} sub={`${NUM(orders)} orders · average order value ${GBP(orders?rev/orders:null)}`} series={seriesRev} current={rev} prior={pRev} goodDirection="up"
-            agent="Atlas" observation={discLoad != null ? `${fmtPctN(discLoad)} of sales went out as code or automatic discounts; sale-price markdowns come on top — see Promotions for the full picture.` : undefined} />
+          <KPI label="Shopify net revenue" val={GBP(rev)} sub={`${NUM(orders)} orders, average order value ${GBP(orders?rev/orders:null)}`} series={seriesRev} current={rev} prior={pRev} goodDirection="up"
+            agent="Atlas" observation={discLoad != null ? `${fmtPctN(discLoad)} of sales went out as code or automatic discounts; sale-price markdowns come on top, see Promotions for the full picture.` : undefined} />
           {/* Measured against the brand's own break-even (1 ÷ margin after costs), the line Review and
               the weekly board use. It showed an industry "3× jewellery" here, so the same figure was
               "below target" on one page and above break-even on another. */}
           {(() => { const be = v3MerBreakEven(); const st = (mer == null || be == null) ? null : mer >= be * 1.3 ? 'healthy' : mer >= be ? 'watch' : 'action';
             const merF = fig30('mer_30d');
-            return <KPI label={onFig && merF.label ? merF.label + ', ' + V3_FIG_PER[merF.per] : 'Sales per £ of ads'} val={fmtTimes(mer, 2)} sub={be ? `net revenue ÷ all ad spend · break-even ${fmtTimes(be, 2)}` : 'net revenue ÷ all ad spend · break-even needs your costs'} series={seriesMER} current={mer} prior={pMer} goodDirection="up"
+            return <KPI label={onFig && merF.label ? merF.label + ', ' + V3_FIG_PER[merF.per] : 'Sales per £ of ads'} val={fmtTimes(mer, 2)} sub={be ? `net revenue ÷ all ad spend, break-even ${fmtTimes(be, 2)}` : 'net revenue ÷ all ad spend, break-even needs your costs'} series={seriesMER} current={mer} prior={pMer} goodDirection="up"
               status={st || undefined} statusLabel={st === 'healthy' ? 'Above break-even' : st === 'watch' ? 'Just above break-even' : st === 'action' ? 'Below break-even' : undefined}
               agent="Atlas" observation={_vs('Sales', rev, pRev, 'ad spend', paid, pPaid)} />; })()}
           <KPI label="Sessions (GA4)" val={NUM(sessions)} sub={(() => { const gd = ga.filter(g => Number(g.sessions) > 0).length, nd = daily.length;
               return gd < nd ? `${gd} of ${nd} days have reliable analytics` : `every day of the period recorded`; })()} series={seriesSessions} current={sessions} prior={pSessions} goodDirection="up"
             agent="Pulse" observation={_vs('Visits', sessions, pSessions, 'ad spend', paid, pPaid)} />
-          {!UI_V3 && <KPI label="Orders Klaviyo saw" val={GBP(emailRev)} sub="every order Klaviyo recorded, including VAT and shipping — not sales from email" series={seriesEmail} current={emailRev} prior={(pKl.length >= Math.max(3, Math.floor(kl.length * 0.8))) ? pEmailRev : null} goodDirection="up"
+          {!UI_V3 && <KPI label="Orders Klaviyo saw" val={GBP(emailRev)} sub="every order Klaviyo recorded, including VAT and shipping, not sales from email" series={seriesEmail} current={emailRev} prior={(pKl.length >= Math.max(3, Math.floor(kl.length * 0.8))) ? pEmailRev : null} goodDirection="up"
             agent="Lux" observation={_vs('Orders Klaviyo saw', emailRev, pEmailRev, 'sales', rev, pRev)} />}
           {/* With analytics recording under 80% of the days, a benchmark beside this tile ("0.8% vs 1.5%")
               read as a conversion problem while Website, which counts every visit with Clarity, showed
               the usual rate (review, 8 Oct). Website is the one to read then. */}
           <V3VisitsKPI fallback={<KPI label="Visitors who buy" val={PCT(cvr)} sub={cvrReliable ? 'orders ÷ visits, on the days analytics recorded' : 'Google Analytics missed too many days to judge this. Website counts every visit another way: read it there.'} series={seriesCVR} current={cvr} prior={pCvr} goodDirection="up"
             status={(cvr==null||!cvrReliable)?undefined:cvr>=CVR_BENCH?'healthy':cvr>=CVR_BENCH*0.8?'watch':'action'} statusLabel={cvr==null?undefined:!cvrReliable?'Too few tracked days':cvr>=CVR_BENCH?'Healthy':cvr>=CVR_BENCH*0.8?'Watch':'Below target'}
-            agent="Pulse" observation={`Site conversion rate (Shopify orders ÷ GA4 sessions) is the single biggest revenue lever — against the ${CVR_BENCH_LABEL} target, more spend just buys more bounces.`}
+            agent="Pulse" observation={`Site conversion rate (Shopify orders ÷ GA4 sessions) is the single biggest revenue lever, against the ${CVR_BENCH_LABEL} target, more spend just buys more bounces.`}
             benchmark={cvrReliable ? 'site_cvr' : undefined} bmValue={cvrReliable ? cvr : null} />}/>
           {/* "Discount depth 6%" here and "up to 36% off" on Today were both true and read as a contradiction:
               this tile counts codes only, Today's figure is sale prices (review, 8 Oct). */}
           <KPI label="Money off from codes" val={PCT(discLoad)} sub={`${curSym()} off from discount codes ÷ ${curSym()} of sales. Sale prices come on top: Today shows how deep your sales went.`} series={seriesDisc} current={discLoad} prior={pDiscLoad} goodDirection="down"
-            agent="Atlas" observation={`Code + automatic discount as a share of DTC gross sales (draft/exchange orders excluded). This excludes sale-price markdowns${_mdPct?`, which add ~${_mdPct}% of value on top`:''} — the full load is on the Promotions tab.`}
-            implication="Audit always-on codes + affiliate rates; protect full-price demand. The true load incl. markdowns is materially higher — see Promotions."
+            agent="Atlas" observation={`Code + automatic discount as a share of DTC gross sales (draft/exchange orders excluded). This excludes sale-price markdowns${_mdPct?`, which add ~${_mdPct}% of value on top`:''}, the full load is on the Promotions tab.`}
+            implication="Audit always-on codes + affiliate rates; protect full-price demand. The true load incl. markdowns is materially higher, see Promotions."
             benchmark="discount_load" bmValue={discLoad} />
-          <KPI label="Profit after ads (% of sales)" val={cmPct!=null?PCT(cmPct):'—'} sub="what you keep from each £ of sales, after product costs and ads · 10% or more is healthy" badge={<MarginBadge onSetup={()=>{ window.__oiGo && window.__oiGo('goal', 'margin'); }}/>} series={seriesContrib} seriesLabel={`Contribution ${curSym()} · by day`} current={contrib} prior={pContrib} goodDirection="up"
+          <KPI label="Profit after ads (% of sales)" val={cmPct!=null?PCT(cmPct):'—'} sub="what you keep from each £ of sales, after product costs and ads, 10% or more is healthy" badge={<MarginBadge onSetup={()=>{ window.__oiGo && window.__oiGo('goal', 'margin'); }}/>} series={seriesContrib} seriesLabel={`Contribution ${curSym()}, by day`} current={contrib} prior={pContrib} goodDirection="up"
             status={cmPct==null?undefined:ohWin!=null?(contrib>=ohWin?'healthy':contrib>0?'watch':'margin'):cmPct>=0.10?'healthy':cmPct>=0.05?'watch':'margin'} statusLabel={cmPct==null?undefined:ohWin!=null?(contrib>=ohWin?'Covers overheads':contrib>0?'Short of overheads':'Loss after ads'):cmPct>=0.10?'Healthy':cmPct>=0.05?'Watch':'Margin risk'}
-            agent="Atlas" observation="Whether the growth is actually profitable — net revenue × product margin minus paid media, as a share of revenue. Returns are already netted out of revenue. The single best read on profitable vs vanity growth."
-            implication="Below 10% means scaling just amplifies a thin engine — fix discount load, returns and cost per new customer before adding spend."
+            agent="Atlas" observation="Whether the growth is actually profitable, net revenue × product margin minus paid media, as a share of revenue. Returns are already netted out of revenue. The single best read on profitable vs vanity growth."
+            implication="Below 10% means scaling just amplifies a thin engine, fix discount load, returns and cost per new customer before adding spend."
             benchmark="contribution_margin" bmValue={cmPct} />
           {UI_V3 ? <KPI label="When a new customer pays back" val={payWhen === 'first' ? 'First order' : payWhen === 'year' ? 'Within a year' : payWhen === 'not' ? 'Not in a year' : '—'}
-            sub={cacPeriod != null ? `${onFig && cac30F.label ? cac30F.label + ': ' + fmtMoney(cacPeriod) : fmtMoney(cacPeriod) + ' to win one this period'} · ${fmtMoney(firstOrderContrib)} on a first order${yearValue != null ? ' · ' + fmtMoney(yearValue) + ' over a year' : ''}` : 'needs ad spend and new customers in the period'}
+            sub={cacPeriod != null ? `${onFig && cac30F.label ? cac30F.label + ': ' + fmtMoney(cacPeriod) : fmtMoney(cacPeriod) + ' to win one this period'}, ${fmtMoney(firstOrderContrib)} on a first order${yearValue != null ? ', ' + fmtMoney(yearValue) + ' over a year' : ''}` : 'needs ad spend and new customers in the period'}
             status={payWhen == null ? undefined : payWhen === 'first' ? 'healthy' : payWhen === 'year' ? 'watch' : 'action'} statusLabel={payWhen === 'first' ? 'Pays back' : payWhen === 'year' ? 'Needs a repeat' : payWhen === 'not' ? 'Loses money' : undefined}
             agent="Atlas" observation="Ad spend in the period divided by the new customers it won, against what a first order earns and what a customer earns over a year." />
-          : <KPI label="Time to earn a customer back" val={paybackOrders!=null?(paybackOrders<=1?'1st order':paybackOrders.toFixed(1)+' orders'):'—'} sub={cac!=null?`paid cost per new customer ${curSym()}${Math.round(cac)} ÷ first-order contribution · target ≤2`:'needs paid CAC'} goodDirection="down"
+          : <KPI label="Time to earn a customer back" val={paybackOrders!=null?(paybackOrders<=1?'1st order':paybackOrders.toFixed(1)+' orders'):'—'} sub={cac!=null?`paid cost per new customer ${curSym()}${Math.round(cac)} ÷ first-order contribution, target ≤2`:'needs paid CAC'} goodDirection="down"
             status={paybackOrders==null?undefined:paybackOrders<=2?'healthy':paybackOrders<=3?'watch':'action'} statusLabel={paybackOrders==null?undefined:paybackOrders<=2?'Healthy':paybackOrders<=3?'Watch':'Slow payback'}
             agent="Atlas" observation="How many orders it takes to recover the paid cost of acquiring a customer, at your margin. Under ~2 orders = a healthy cash cycle that funds reinvestment."
-            implication="This is the lever on cash flow — faster payback frees working capital. Watch it as you scale spend; if it stretches past 2, growth starts eating cash." />}
+            implication="This is the lever on cash flow, faster payback frees working capital. Watch it as you scale spend; if it stretches past 2, growth starts eating cash." />}
           <MoreKpis count={8}>
-          <KPI label="Gross margin" val={PCT(gmGross)} sub="after product cost, before order costs and ads" badge={<MarginBadge onSetup={()=>{ window.__oiGo && window.__oiGo('goal', 'margin'); }}/>} series={seriesGM} seriesLabel="Catalogue margin · structurally stable"
+          <KPI label="Gross margin" val={PCT(gmGross)} sub="after product cost, before order costs and ads" badge={<MarginBadge onSetup={()=>{ window.__oiGo && window.__oiGo('goal', 'margin'); }}/>} series={seriesGM} seriesLabel="Catalogue margin, structurally stable"
             agent="Atlas" observation="Blended product margin across the live catalogue, after cost of goods."
-            implication="Every profit figure builds on this — discounts eat straight into it."
+            implication="Every profit figure builds on this, discounts eat straight into it."
             benchmark="gross_margin" bmValue={gm} />
-          <KPI label="Refunded so far" val={PCT(returnRate)} sub={_rcur ? `${NUM(_rcur.refunded_orders)} of ${NUM(_rcur.orders)} orders from the last 30 days · many are too new to have come back; Products shows the settled rate` : 'orders from the last 30 days refunded so far'} series={seriesReturn} seriesLabel="Refunded £ as a share of sales · by day" current={returnRate} prior={pReturnRate} goodDirection="down"
+          <KPI label="Refunded so far" val={PCT(returnRate)} sub={_rcur ? `${NUM(_rcur.refunded_orders)} of ${NUM(_rcur.orders)} orders from the last 30 days, many are too new to have come back; Products shows the settled rate` : 'orders from the last 30 days refunded so far'} series={seriesReturn} seriesLabel="Refunded £ as a share of sales, by day" current={returnRate} prior={pReturnRate} goodDirection="down"
             agent="Lux" observation={`Share of orders refunded in full or in part. The trend is refunds as a share of sales, by day.`}
             implication="A point of return rate is pure margin; flag any item materially above this blended rate."
             benchmark="return_rate" bmValue={returnRate} />
-          <KPI label="Orders with a discount" val={_dc.fullPriceShare!=null?PCT(1-_dc.fullPriceShare):'—'} sub="share of orders using a code/auto discount — how often, not how deep · drafts excluded" goodDirection="down"
+          <KPI label="Orders with a discount" val={_dc.fullPriceShare!=null?PCT(1-_dc.fullPriceShare):'—'} sub="share of orders using a code/auto discount, how often, not how deep, drafts excluded" goodDirection="down"
             agent="Atlas" observation={_dc.fullPriceShare!=null?`${Math.round((1-_dc.fullPriceShare)*100)}% of orders carry a discount; ${Math.round(_dc.fullPriceShare*100)}% pay full price. Read it with Discount depth: lots of orders but a shallow ~${discLoad!=null?Math.round(discLoad*100):9}% of revenue = many small codes, not deep cuts.`:'How often a discount is used across orders (draft/exchange orders excluded).'}
-            implication="If penetration and depth climb together you're training customers to wait for a code — tighten the always-on codes first." series={seriesPenetration} seriesLabel="Orders with a code · by week" />
-          <KPI label="Discount value" val={GBP(discAmt)} sub={`total ${curSym()} given as code/auto discount this period — drafts excluded`} series={seriesDiscVal} seriesLabel={`Discount ${curSym()} given · by day`} goodDirection="down"
+            implication="If penetration and depth climb together you're training customers to wait for a code, tighten the always-on codes first." series={seriesPenetration} seriesLabel="Orders with a code, by week" />
+          <KPI label="Discount value" val={GBP(discAmt)} sub={`total ${curSym()} given as code/auto discount this period, drafts excluded`} series={seriesDiscVal} seriesLabel={`Discount ${curSym()} given, by day`} goodDirection="down"
             agent="Atlas" observation="The actual money handed back as discounts this period (code + automatic). Excludes sale-price markdowns, which are shown separately on Promotions."
-            implication="Recoverable margin to the extent any of it went to buyers who'd have paid full price — start with the biggest always-on codes." />
-          <KPI label="Returning customers" val={PCT(returningPct)} sub="share of orders · trailing months" series={seriesReturning} seriesLabel="Repeat-order share · by month" goodDirection="up"
-            agent="Lux" observation="Repeat-purchase share — the cheapest revenue you have and a read on brand love."
+            implication="Recoverable margin to the extent any of it went to buyers who'd have paid full price, start with the biggest always-on codes." />
+          <KPI label="Returning customers" val={PCT(returningPct)} sub="share of orders, trailing months" series={seriesReturning} seriesLabel="Repeat-order share, by month" goodDirection="up"
+            agent="Lux" observation="Repeat-purchase share, the cheapest revenue you have and a read on brand love."
             implication="Lift with post-purchase flows + a reason to come back; it compounds faster than paid." />
-          <KPI label={onFig && contribF.label ? contribF.label : 'Profit after ads'} val={GBP(contrib)} sub={onFig && contribF.basis ? contribF.basis : 'gross profit − paid media · full breakdown below'} badge={<MarginBadge onSetup={()=>{ window.__oiGo && window.__oiGo('goal', 'margin'); }}/>} series={seriesContrib} current={contrib} prior={pContrib} goodDirection="up"
-            agent="Atlas" observation="Sales × what you keep after product and order costs, minus ad spend — the same figure Today leads with." />
-          <KPI label={cacF.label || 'Cost of a new customer, last 90 days'} val={GBP(cac)} sub={`${newCust != null ? NUM(newCust) + ' new customers' : 'all ad spend over new customers'}${allowableCac!=null?` · most one can cost ${GBP(allowableCac)}`:''}`} badge={<MarginBadge onSetup={()=>{ window.__oiGo && window.__oiGo('goal', 'margin'); }}/>} series={seriesCAC} seriesLabel="Spend ÷ new customers · by day" current={cac} prior={pCac} goodDirection="down"
-            agent="Pulse" observation="All ad spend over the last 90 days (including any agency fee) ÷ first-time customers counted from your orders — the same figure Ask Greta quotes and the action board checks spend against."
+          <KPI label={onFig && contribF.label ? contribF.label : 'Profit after ads'} val={GBP(contrib)} sub={onFig && contribF.basis ? contribF.basis : 'gross profit − paid media, full breakdown below'} badge={<MarginBadge onSetup={()=>{ window.__oiGo && window.__oiGo('goal', 'margin'); }}/>} series={seriesContrib} current={contrib} prior={pContrib} goodDirection="up"
+            agent="Atlas" observation="Sales × what you keep after product and order costs, minus ad spend, the same figure Today leads with." />
+          <KPI label={cacF.label || 'Cost of a new customer, last 90 days'} val={GBP(cac)} sub={`${newCust != null ? NUM(newCust) + ' new customers' : 'all ad spend over new customers'}${allowableCac!=null?`, most one can cost ${GBP(allowableCac)}`:''}`} badge={<MarginBadge onSetup={()=>{ window.__oiGo && window.__oiGo('goal', 'margin'); }}/>} series={seriesCAC} seriesLabel="Spend ÷ new customers, by day" current={cac} prior={pCac} goodDirection="down"
+            agent="Pulse" observation="All ad spend over the last 90 days (including any agency fee) ÷ first-time customers counted from your orders, the same figure Ask Greta quotes and the action board checks spend against."
             implication="The most a new customer can cost is what their first order plus a year of repeat orders earns you. Under that, spend pays back within a year; 3× under it is the healthier target." />
           <KPI label="Customer value" val={GBP(ltv)} sub={ltvBasis
-              ? `contribution · ${ltvBasis} · vs cost per new customer ${ltvCac?ltvCac.toFixed(1)+'×':'—'}`
-              : 'not measured yet'} badge={<MarginBadge onSetup={()=>{ window.__oiGo && window.__oiGo('goal', 'margin'); }}/>} series={seriesLTV} seriesLabel="Customer value · by day" goodDirection="up"
+              ? `contribution, ${ltvBasis}, vs cost per new customer ${ltvCac?ltvCac.toFixed(1)+'×':'—'}`
+              : 'not measured yet'} badge={<MarginBadge onSetup={()=>{ window.__oiGo && window.__oiGo('goal', 'margin'); }}/>} series={seriesLTV} seriesLabel="Customer value, by day" goodDirection="up"
             agent="Atlas"
             observation={ltvBasis
               ? `Profit per acquired customer: ${ltvBasis}.`
-              : 'Contribution per acquired customer, integrated from the cohort curve. Not available on this workspace yet — either there is not enough order history, or the measurement has not been switched on for your account.'}
+              : 'Contribution per acquired customer, integrated from the cohort curve. Not available on this workspace yet, either there is not enough order history, or the measurement has not been switched on for your account.'}
             implication={ltvTopdown!=null && ltvGap!=null
-              ? `Cross-checked against MER × cost per new customer — the same quantity derived a completely different way: ${GBP(ltvTopdown)} of revenue per customer, ${Math.abs(ltvGap*100).toFixed(1)}% ${ltvGap>=0?'above':'below'} the cohort read. A small, stable gap is a calibration constant; a widening one means the cohort model has broken. Keep scaling only while this figure stays 3× your cost per new customer.`
-              : 'The customer-value to acquisition-cost ratio is the unit-economics headline — 3×+ is the target to defend.'}
+              ? `Cross-checked against MER × cost per new customer, the same quantity derived a completely different way: ${GBP(ltvTopdown)} of revenue per customer, ${Math.abs(ltvGap*100).toFixed(1)}% ${ltvGap>=0?'above':'below'} the cohort read. A small, stable gap is a calibration constant; a widening one means the cohort model has broken. Keep scaling only while this figure stays 3× your cost per new customer.`
+              : 'The customer-value to acquisition-cost ratio is the unit-economics headline, 3×+ is the target to defend.'}
             benchmark="ltv_cac" bmValue={ltvCac} />
           </MoreKpis>
         </div>
@@ -4374,8 +4374,8 @@ function Overview({start, period, customActive}){
       {/* The big paid-vs-revenue chart */}
       <LazyMount minHeight={360}><div className="card">
         <div className="card-section-title">
-          <h2 style={{margin:0}}>Paid spend vs Shopify revenue — daily</h2>
-          <span className="meta">Spend above, revenue below — same dates, each on its own scale</span>
+          <h2 style={{margin:0}}>Paid spend vs Shopify revenue, daily</h2>
+          <span className="meta">Spend above, revenue below, same dates, each on its own scale</span>
         </div>
         {/* Two scales, two charts (no dual axis): spend above, revenue below, linked by
             syncId so the same day highlights in both. The event pins stay on the spend
@@ -4409,14 +4409,14 @@ function Overview({start, period, customActive}){
             <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',boxShadow:'var(--shadow-md)'}}
                        formatter={(v,n)=>[GBP(v),n]}
                        labelFormatter={(l,p)=> (p&&p[0]&&p[0].payload&&p[0].payload.date) ? p[0].payload.date : l} />
-            <R.Line type="monotone" dataKey="revenue" name="Shopify net rev" stroke={svgCol(COL.revenue)} strokeWidth={2.4} dot={false} />
+            <R.Line type="linear" dataKey="revenue" name="Shopify net rev" stroke={svgCol(COL.revenue)} strokeWidth={2.4} dot={false} />
             <R.Brush {...brushProps('dlabel')} />
           </R.ComposedChart>
         </R.ResponsiveContainer>
         <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{BRUSH_HINT}</div>
         {(function(){ var pins=buildChartPins(daily.map(function(d){return {x:d.dlabel, date:d.date};})); if(!pins.length) return null; return (
-          <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>Dots mark sales and promos, and events you logged — <span style={{color:'var(--text-muted)'}}>hover any marker for what it was</span></div>); })()}
-        <ChartFooter note="Does paid spend track with revenue? Watch for spend rising while revenue flattens — that's efficiency slipping."
+          <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>Dots mark sales and promos, and events you logged, <span style={{color:'var(--text-muted)'}}>hover any marker for what it was</span></div>); })()}
+        <ChartFooter note="Does paid spend track with revenue? Watch for spend rising while revenue flattens, that's efficiency slipping."
           ask="Looking at daily paid spend vs Shopify revenue, is my paid media still efficient, and what changed?"
           rows={daily} columns={[
             {key:'dlabel', label:'Date'},
@@ -4429,9 +4429,9 @@ function Overview({start, period, customActive}){
       {/* PLANNING & DEEP-DIVE — forecast + unit-economics-over-time are board/planning
           artifacts, not "what's happening this week", so they live behind a toggle. */}
       {/* V3: no Year 1 forecast here. It was a fourth forecast beside the quarter plan, the short-term
-          forecast and Growth plan — its own customer cost, a default seasonal curve for every brand,
+          forecast and Growth plan, its own customer cost, a default seasonal curve for every brand,
           saved in one browser. The quarter plan, month by month, is on Goal & costs. */}
-      {UI_V3 && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal')}>The quarter plan, month by month <span className="v3-xref-go">on Goal &amp; costs →</span></button>}
+      {UI_V3 && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal')}>The quarter plan, month by month <span className="v3-xref-go">on Goal &amp; costs</span></button>}
       {!UI_V3 && <div className="section-eyebrow" style={{display:'flex',alignItems:'center',gap:8,margin:'8px 0 -4px',fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-muted)'}}>
         <span style={{width:3,height:14,background:'var(--text-faint)',borderRadius:'var(--radius-sm)'}}/>Planning &amp; deep-dive
       </div>}
@@ -4441,7 +4441,7 @@ function Overview({start, period, customActive}){
       {!UI_V3 && showPlanning && (<div style={{display:'flex', flexDirection:'column', gap:'var(--s-5)', marginTop:'var(--s-4)'}}>
         {/* LtvCacCard sat here: customer value ÷ new-customer cost by a method 0206 retired as a double
             count. The page's own "Customer value" figure is the measured one. The forecast now gets
-            true gross margin — it subtracts order costs itself, so the after-costs ratio counted them twice. */}
+            true gross margin, it subtracts order costs itself, so the after-costs ratio counted them twice. */}
         <ForecastCard rev={rev} orders={orders} paid={paid} gm={gmGross} aov={aov} cac={cac} returningPct={returningPct}/>
       </div>)}
     </div>
@@ -4522,7 +4522,7 @@ function useFitResult(start, end){
 function FitCard({start, end}){
   const { fit:FIT, loading, error, source } = useFitResult(start, end);
   if(loading && (!FIT||!FIT.blended)){ return (<div className="card" style={{marginBottom:14}}><h2>Offer &amp; Product Market Fit</h2><div className="note">Assessing fit for the selected window…</div></div>); }
-  if(!FIT||!FIT.blended){ return (<div className="card" style={{marginBottom:14}}><h2>Offer &amp; Product Market Fit</h2><div className="note">{error ? ('Fit not available — '+error) : 'No fit assessment yet — connect Meta, Shopify and GA4, then the engine reads offer-market fit (the paid funnel) and product-market fit (cohorts) and tells you whether to scale.'}</div></div>); }
+  if(!FIT||!FIT.blended){ return (<div className="card" style={{marginBottom:14}}><h2>Offer &amp; Product Market Fit</h2><div className="note">{error ? ('Fit not available, '+error) : 'No fit assessment yet, connect Meta, Shopify and GA4, then the engine reads offer-market fit (the paid funnel) and product-market fit (cohorts) and tells you whether to scale.'}</div></div>); }
   const b=FIT.blended;
   // Paid-only offer fit (engine: parameters.paidOmf). OMF is a paid-acquisition read, but the blended
   // headline sums in zero-spend organic/direct customers, flattering it. Show the honest paid number as
@@ -4538,16 +4538,16 @@ function FitCard({start, end}){
       <h2 style={{margin:0}}>Offer &amp; Product Market Fit</h2>
       <div style={{display:'flex',gap:6,alignItems:'center'}}>
         {source==='live'
-          ? <span className="pill" style={{background:'var(--color-success-wash-2)',color:PAL.good}} title={'Live engine output'+(FIT.window?` · window ${FIT.window.start} → ${FIT.window.end}`:'')}>live</span>
-          : <span className="pill" style={{background:'var(--color-sunken)',color:'var(--text-faint)'}} title={(error?('Live fetch failed ('+error+') — showing cached snapshot. '):'')+'Log in to load your live engine output'}>cached</span>}
+          ? <span className="pill" style={{background:'var(--color-success-wash-2)',color:PAL.good}} title={'Live engine output'+(FIT.window?`, window ${FIT.window.start} → ${FIT.window.end}`:'')}>live</span>
+          : <span className="pill" style={{background:'var(--color-sunken)',color:'var(--text-faint)'}} title={(error?('Live fetch failed ('+error+'), showing cached snapshot. '):'')+'Log in to load your live engine output'}>cached</span>}
         <span className="pill" style={{background:fitConfColor(FIT.confidence)+'22',color:fitConfColor(FIT.confidence)}}>{FIT.confidence} confidence</span>
       </div>
     </div>
     <div style={{display:'flex',gap:10,margin:'12px 0'}}>
-      <FitScore label="Offer-market fit" value={omfHeadline} sub={diluted?'paid channels only':'CTR · landing conversion rate · cost per new customer coverage'}/>
-      <FitScore label="Product-market fit" value={b.pmfScore} sub="customer lifetime value:cost per new customer · payback · retention"/>
+      <FitScore label="Offer-market fit" value={omfHeadline} sub={diluted?'paid channels only':'CTR, landing conversion rate, cost per new customer coverage'}/>
+      <FitScore label="Product-market fit" value={b.pmfScore} sub="customer lifetime value:cost per new customer, payback, retention"/>
     </div>
-    {diluted&&(<div className="note" style={{marginBottom:12}}><b>Paid-only offer fit.</b> Blended (incl. organic/direct) reads <b>{pomf.blendedOmfScore}</b> at {rx(pomf.blendedCacCoverageRatio)} cost per new customer coverage — flattered by {pomf.excludedChannels.join(', ')} with no ad spend. On the paid channels you control, cost per new customer coverage is {rx(pomf.cacCoverageRatio)}.</div>)}
+    {diluted&&(<div className="note" style={{marginBottom:12}}><b>Paid-only offer fit.</b> Blended (incl. organic/direct) reads <b>{pomf.blendedOmfScore}</b> at {rx(pomf.blendedCacCoverageRatio)} cost per new customer coverage, flattered by {pomf.excludedChannels.join(', ')} with no ad spend. On the paid channels you control, cost per new customer coverage is {rx(pomf.cacCoverageRatio)}.</div>)}
     <div style={{padding:'12px 14px',borderRadius:'var(--radius-none)',background:'var(--accent-bg)',border:'1px solid var(--color-accent-line)',marginBottom:12}}>
       <div style={{fontWeight:'var(--weight-bold)',color:'var(--text-primary)',marginBottom:4}}>{FIT.primaryDiagnosis}</div>
       <div style={{fontSize:'var(--text-sm)',lineHeight:1.5,color:'var(--text-secondary)'}}>{FIT.recommendedAction}</div>
@@ -4596,7 +4596,7 @@ function FitCard({start, end}){
         <td>{rx(c.cacCoverageRatio)}</td><td>{rx(c.ltvCacRatio)}</td>
       </tr>))}</tbody>
     </table>)}
-    {FIT.confidenceReasons&&FIT.confidenceReasons.length>0&&(<div className="note" style={{marginTop:12}}><b>Read with care:</b> {FIT.confidenceReasons.join(' · ')}</div>)}
+    {FIT.confidenceReasons&&FIT.confidenceReasons.length>0&&(<div className="note" style={{marginTop:12}}><b>Read with care:</b> {FIT.confidenceReasons.join(', ')}</div>)}
     <div className="micro" style={{color:'var(--text-faint)',marginTop:8}}>Blended/sales per £ of ads treated as truth; platform return on ad spend is directional. Window {FIT.window.start} → {FIT.window.end}.</div>
   </div>);
 }
@@ -4694,7 +4694,7 @@ function GenomePanel() {
     const extrapolated = Array.isArray(reasons) && reasons.some((r) => /extrapolat/i.test(r));
     if (extrapolated && !quals.includes('extrapolated')) quals.push('extrapolated');
     if (FIT && FIT.confidence) quals.push(FIT.confidence + ' confidence');
-    return quals.length ? quals.join(' · ') : null;
+    return quals.length ? quals.join(', ') : null;
   })();
   const accent = 'var(--accent)';
   const good = PAL.good, warn = PAL.warn, bad = PAL.bad;
@@ -4707,7 +4707,7 @@ function GenomePanel() {
     <div className="card" style={{ marginBottom: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', flexWrap: 'wrap', gap: 8 }}>
         <h2 style={{ margin: 0 }}>Cash, profitability &amp; forward signal</h2>
-        <span className="pill" style={{ background: 'var(--bg-app)', color: 'var(--text-faint)', border: '1px solid var(--border-subtle)' }}>shadow · not scored</span>
+        <span className="pill" style={{ background: 'var(--bg-app)', color: 'var(--text-faint)', border: '1px solid var(--border-subtle)' }}>shadow, not scored</span>
       </div>
       <div className="fine" style={{ color: 'var(--text-faint)', margin: '4px 0 12px' }}>
         Computed from the fitted curves &amp; your economics - what the offer and product fit scores can't see: when cash moves, and whether the business (not the order) makes money.
@@ -4718,7 +4718,7 @@ function GenomePanel() {
         <GpStat label="Cash conversion cycle" value={gpDays(cc.cccDays)} sub="cash gap, order to bank" />
         <GpStat label="Working capital tied" value={gpGBP0(cc.workingCapitalRequired)} sub="locked across the cycle" />
         <GpStat label="Customer value (discounted)" value={gpGBP2(dl.discountedLtv)} sub={'vs ' + gpGBP2(dl.undiscountedLtv) + ' undiscounted'} src={ltvBasisLabel && <GpSrc label={ltvBasisLabel} />} />
-        <GpStat label="Operating profit" value={gpGBP0(pr.operatingProfitWindow)} sub={gpPCT(pr.ebitdaMarginPct) + ' margin · window'} accent={(pr.operatingProfitWindow ?? 0) >= 0 ? good : bad} />
+        <GpStat label="Operating profit" value={gpGBP0(pr.operatingProfitWindow)} sub={gpPCT(pr.ebitdaMarginPct) + ' margin, window'} accent={(pr.operatingProfitWindow ?? 0) >= 0 ? good : bad} />
       </div>
 
       {cashTrap && (
@@ -4750,13 +4750,13 @@ function GenomePanel() {
       </div>
 
       {/* The forward signal: marginal economics + trajectories. */}
-      <div className="micro" style={{ color: 'var(--text-muted)', margin: '16px 0 8px', fontWeight:'var(--weight-semi)' }}>FORWARD SIGNAL <span style={{ color: 'var(--text-faint)', fontWeight:'var(--weight-normal)' }}>· projected from the fitted curves</span></div>
+      <div className="micro" style={{ color: 'var(--text-muted)', margin: '16px 0 8px', fontWeight:'var(--weight-semi)' }}>FORWARD SIGNAL <span style={{ color: 'var(--text-faint)', fontWeight:'var(--weight-normal)' }}>projected from the fitted curves</span></div>
       <div className="row">
         <div style={{ flex: '1 1 240px' }}>
           {me.status === 'ok' ? (
             (gate && gate.s_star_status === 'suppress') ? (
               <div style={{ padding: '12px 13px', borderRadius:'var(--radius-none)', background: 'var(--bg-app)', border: '1px dashed var(--border-subtle)' }}>
-                <div style={{ fontWeight:'var(--weight-semi)', color: 'var(--text-secondary)', marginBottom: 4 }}>Spend ceiling — not yet reliable</div>
+                <div style={{ fontWeight:'var(--weight-semi)', color: 'var(--text-secondary)', marginBottom: 4 }}>Spend ceiling, not yet reliable</div>
                 <div className="micro" style={{ color: 'var(--text-faint)' }}>{gate.reason}</div>
               </div>
             ) : (
@@ -4770,7 +4770,7 @@ function GenomePanel() {
             )
           ) : (
             <div style={{ padding: '12px 13px', borderRadius:'var(--radius-none)', background: 'var(--bg-app)', border: '1px dashed var(--border-subtle)' }}>
-              <div style={{ fontWeight:'var(--weight-semi)', color: 'var(--text-secondary)', marginBottom: 4 }}>Marginal cost per new customer &amp; spend ceiling — not yet available</div>
+              <div style={{ fontWeight:'var(--weight-semi)', color: 'var(--text-secondary)', marginBottom: 4 }}>Marginal cost per new customer &amp; spend ceiling, not yet available</div>
               <div className="micro" style={{ color: 'var(--text-faint)' }}>{me.note || 'Needs a fitted cost per new customer-elasticity curve (≥3 aligned spend/cost per new customer months). No number shown rather than a guessed one.'}</div>
             </div>
           )}
@@ -4784,7 +4784,7 @@ function GenomePanel() {
       </div>
 
       <div className="fine" style={{ color: 'var(--text-faint)', marginTop: 10 }}>
-        Projection assumes spend flat, retention curve holds, costs constant; paid-attributed orders only. Shadow layer — reported, not yet gating any verdict.
+        Projection assumes spend flat, retention curve holds, costs constant; paid-attributed orders only. Shadow layer, reported, not yet gating any verdict.
       </div>
     </div>
   );
@@ -4827,14 +4827,14 @@ function CrossChannel({start}){
     {!UI_V3 && <GenomePanel/>}
     <div className="card" style={{marginBottom:14}}>
       <h2>Channel revenue claims vs spend</h2>
-      {UI_V3 && <p className="v3-note">For the period you pick, from each platform's own daily figures — so spend can differ by a few pounds from the 30-day figures above, which come from the morning summary.</p>}
+      {UI_V3 && <p className="v3-note">For the period you pick, from each platform's own daily figures, so spend can differ by a few pounds from the 30-day figures above, which come from the morning summary.</p>}
       <table>
         <thead><tr><th>Channel</th><th>Spend</th><th>Claimed revenue</th><th>Claimed return</th><th>% of Shopify net</th></tr></thead>
         <tbody>
         {channels.map(c=>(<tr key={c.name}><td><span className="pill" style={{background:c.color+'22',color:c.color}}>{c.name}</span></td><td>{c.spend?GBP(c.spend):'—'}</td><td>{GBP(c.claimed)}</td><td>{c.spend?(c.claimed/c.spend).toFixed(2)+'x':'—'}</td><td>{PCT(rev?c.claimed/rev:null)}</td></tr>))}
         </tbody>
       </table>
-      <div className="note" style={{marginTop:12}}>Platform-claimed revenue is <b>double-counted</b> — Meta + Google each claim conversions the other (and email) also touched, so claims sum to more than Shopify's actual net. That gap is exactly why the next step is incrementality. {UI_V3 ? 'Email is read on its own above: Klaviyo credits any order that followed an opened email, which is not comparable with these.' : 'Email is not in this table yet: Greta does not read Klaviyo\x27s own sales figures, and would rather leave email out than guess at it.'}</div>
+      <div className="note" style={{marginTop:12}}>Platform-claimed revenue is <b>double-counted</b>, Meta + Google each claim conversions the other (and email) also touched, so claims sum to more than Shopify's actual net. That gap is exactly why the next step is incrementality. {UI_V3 ? 'Email is read on its own above: Klaviyo credits any order that followed an opened email, which is not comparable with these.' : 'Email is not in this table yet: Klaviyo\x27s own sales figures are not used, and email is left out rather than guessed.'}</div>
     </div>
     {!UI_V3 && (<div className="row">
       <div className="card" style={{flex:'1 1 380px'}}>
@@ -4843,7 +4843,7 @@ function CrossChannel({start}){
           <div className="mrow"><span className="k">{s.stage}</span><span className="v">{NUM(s.v)} ({PCT(s.v/fmax)})</span></div>
           <div style={{height:9,background:PAL.panel,borderRadius:'var(--radius-none)',marginTop:4}}><div style={{height:9,width:(100*s.v/fmax)+'%',background:COL.sessions,borderRadius:'var(--radius-none)'}}/></div>
         </div>))}
-        <div className="muted" style={{marginTop:8}}>Add-to-cart → checkout is the steepest drop — see where shoppers stall in <GoLink sec="conversion" sub="site">Website, under site structure and friction</GoLink>.</div>
+        <div className="muted" style={{marginTop:8}}>Add-to-cart → checkout is the steepest drop, see where shoppers stall in <GoLink sec="conversion" sub="site">Website, under site structure and friction</GoLink>.</div>
       </div>
       <div className="card" style={{flex:'1 1 380px'}}>
         <h2>Paid effect &amp; incrementality</h2>
@@ -4854,13 +4854,13 @@ function CrossChannel({start}){
             <div className="micro" style={{color:'var(--text-faint)'}}>+{l.lag}d</div>
           </div>))}
         </div>
-        {bestLag && <div className="fine" style={{color:'var(--text-secondary)', marginBottom:10}}>Strongest at a <b>{bestLag.lag}-day lag</b> (r={bestLag.r.toFixed(2)}) — judge paid on a few-day window, not same-day return on ad spend.</div>}
+        {bestLag && <div className="fine" style={{color:'var(--text-secondary)', marginBottom:10}}>Strongest at a <b>{bestLag.lag}-day lag</b> (r={bestLag.r.toFixed(2)}), judge paid on a few-day window, not same-day return on ad spend.</div>}
         {tiers && (<div style={{marginBottom:8}}>
-          <div className="fine" style={{color:'var(--text-muted)', marginBottom:4}}>Meta claimed return on ad spend by daily-spend tier {tierFalling?'— falling at higher spend (diminishing returns)':'— broadly flat across tiers'}:</div>
+          <div className="fine" style={{color:'var(--text-muted)', marginBottom:4}}>Meta claimed return on ad spend by daily-spend tier {tierFalling?', falling at higher spend (diminishing returns)':'— broadly flat across tiers'}:</div>
           <div style={{display:'flex', gap:8}}>
             {tiers.map((t,i)=>(<div key={i} style={{flex:1, textAlign:'center', fontSize:'var(--text-sm)'}}>
               <div style={{fontWeight:'var(--weight-bold)', color: tierFalling&&i===2?PAL.bad:'var(--text-primary)'}}>{t.roas!=null?t.roas.toFixed(1)+'×':'—'}</div>
-              <div className="micro" style={{color:'var(--text-faint)'}}>{t.label} · {GBP(t.avgSpend)}/d</div>
+              <div className="micro" style={{color:'var(--text-faint)'}}>{t.label}, {GBP(t.avgSpend)}/d</div>
             </div>))}
           </div>
         </div>)}
@@ -4929,26 +4929,26 @@ function DemoPanel(){
   const sortedAge=[...byAge].sort((a,b)=>ageOrder.indexOf(a.key)-ageOrder.indexOf(b.key));
   return (
     <div className="card" style={{marginTop:14}}>
-      <h2>Audience — who's actually buying</h2>
+      <h2>Audience, who's actually buying</h2>
       <div className="row" style={{marginBottom:12}}>
         <KPI label="% spend female" val={PCT(totalSpend>0?femaleSpend/totalSpend:0)} sub={`vs ${PCT(totalSpend>0?(1-femaleSpend/totalSpend):0)} male/unknown`}
-          agent="Pulse" observation="95%+ of spend is female — Meta has correctly identified the audience, the IG follower base confirms it."
-          implication="Explicitly exclude male audiences in targeting — the ~5% currently going there is waste." />
-        <KPI label="Top spend age" val={byAge[0]?.key||'—'} sub={byAge[0]?GBP(byAge[0].cost)+' · claimed return '+(byAge[0].roas?byAge[0].roas.toFixed(2)+'x':'—'):''}
-          agent="Pulse" observation="35-44 / 45-54 females absorb most of the spend — Meta's algorithm chose them because they trigger more events."
-          implication={`Check return on ad spend per ${curSym()}, not just spend volume — the algorithm optimises for events, not necessarily for your margin.`} />
-        <KPI label="Best-returning age group" val={[...byAge].filter(a=>a.roas).sort((a,b)=>b.roas-a.roas)[0]?.key||'—'} sub={(()=>{const b=[...byAge].filter(a=>a.roas).sort((a,b)=>b.roas-a.roas)[0]; return b?b.roas.toFixed(2)+'x · '+GBP(b.cost)+' spend':'';})()}
+          agent="Pulse" observation="95%+ of spend is female, Meta has correctly identified the audience, the IG follower base confirms it."
+          implication="Explicitly exclude male audiences in targeting, the ~5% currently going there is waste." />
+        <KPI label="Top spend age" val={byAge[0]?.key||'—'} sub={byAge[0]?GBP(byAge[0].cost)+', claimed return '+(byAge[0].roas?byAge[0].roas.toFixed(2)+'x':'—'):''}
+          agent="Pulse" observation="35-44 / 45-54 females absorb most of the spend, Meta's algorithm chose them because they trigger more events."
+          implication={`Check return on ad spend per ${curSym()}, not just spend volume, the algorithm optimises for events, not necessarily for your margin.`} />
+        <KPI label="Best-returning age group" val={[...byAge].filter(a=>a.roas).sort((a,b)=>b.roas-a.roas)[0]?.key||'—'} sub={(()=>{const b=[...byAge].filter(a=>a.roas).sort((a,b)=>b.roas-a.roas)[0]; return b?b.roas.toFixed(2)+'x, '+GBP(b.cost)+' spend':'';})()}
           agent="Frame" observation={`25-34 females convert at the highest return on ad spend per ${curSym()} but get the lowest spend allocation.`}
-          implication="Run an age-split test campaign aimed at 25-34 to validate scaling — could materially shift the efficiency curve." />
+          implication="Run an age-split test campaign aimed at 25-34 to validate scaling, could materially shift the efficiency curve." />
       </div>
-      <h2 style={{fontSize:'var(--text-base)',marginTop:8}}>By age band (female only — male spend is tiny)</h2>
+      <h2 style={{fontSize:'var(--text-base)',marginTop:8}}>By age band (female only, male spend is tiny)</h2>
       <table><thead><tr><th>Age</th><th>Spend</th><th>% of spend</th><th>CTR</th><th>Purch</th><th>CPA</th><th>Claimed return</th></tr></thead><tbody>
         {sortedAge.map((a,i)=>(<tr key={i}>
           <td>{a.key}</td><td>{GBP(a.cost)}</td><td>{PCT(totalSpend>0?a.cost/totalSpend:0)}</td><td>{PCT(a.ctr)}</td><td>{a.purch}</td><td>{a.cpa?GBP(a.cpa):'—'}</td>
           <td style={{color:a.roas==null?PAL.muted:a.roas>=2.5?PAL.good:a.roas>=1.7?PAL.warn:PAL.bad}}>{a.roas?a.roas.toFixed(2)+'x':'—'}</td>
         </tr>))}
       </tbody></table>
-      <div className="note" style={{marginTop:10}}>The algorithm has settled on <b>35–54 females</b> as the biggest spend bucket — but younger <b>25–34 females</b>{` often convert at higher return on ad spend per ${curSym()} when they do convert. `}<b>18–24 doesn't convert.</b> Almost zero male conversions across the whole library — male spend is wasted.</div>
+      <div className="note" style={{marginTop:10}}>The algorithm has settled on <b>35–54 females</b> as the biggest spend bucket, but younger <b>25–34 females</b>{` often convert at higher return on ad spend per ${curSym()} when they do convert. `}<b>18–24 doesn't convert.</b> Almost zero male conversions across the whole library, male spend is wasted.</div>
     </div>
   );
 }
@@ -4962,15 +4962,15 @@ function PlacementPanel(){
   const igSpend=byPlat.find(p=>p.key==='instagram')?.cost||0;
   return (
     <div className="card" style={{marginTop:14}}>
-      <h2>Where the ads run — placement & device</h2>
+      <h2>Where the ads run, placement & device</h2>
       <div className="row" style={{marginBottom:12}}>
         <KPI label="% Instagram spend" val={PCT(totalSpend>0?igSpend/totalSpend:0)} sub="Facebook delivery: zero"
-          agent="Pulse" observation="100% Instagram, 0% Facebook — an entire ad surface is currently untouched."
-          implication="Test FB placement with the same creative — different audience, often lower CPM, free incremental reach." />
-        <KPI label="Top placement" val={byPos[0]?.key.replace('instagram_','').replace('_',' ')||'—'} sub={byPos[0]?GBP(byPos[0].cost)+' · claimed return '+(byPos[0].roas?byPos[0].roas.toFixed(2)+'x':'—'):''}
+          agent="Pulse" observation="100% Instagram, 0% Facebook, an entire ad surface is currently untouched."
+          implication="Test FB placement with the same creative, different audience, often lower CPM, free incremental reach." />
+        <KPI label="Top placement" val={byPos[0]?.key.replace('instagram_','').replace('_',' ')||'—'} sub={byPos[0]?GBP(byPos[0].cost)+', claimed return '+(byPos[0].roas?byPos[0].roas.toFixed(2)+'x':'—'):''}
           agent="Frame" observation="Feed dominates spend, but Stories has the highest CTR on catalogue ads (3.6% iPhone, 5.3% Android)."
-          implication="Brief Stories-native creative for the Stacks catalogue — match format to the placement that's already winning." />
-        <KPI label="Best-returning placement" val={(()=>{const b=[...byPos].filter(a=>a.roas&&a.cost>50).sort((a,b)=>b.roas-a.roas)[0]; return b?b.key.replace('instagram_','').replace('_',' '):'—';})()} sub={(()=>{const b=[...byPos].filter(a=>a.roas&&a.cost>50).sort((a,b)=>b.roas-a.roas)[0]; return b?b.roas.toFixed(2)+'x · '+GBP(b.cost):'';})()}
+          implication="Brief Stories-native creative for the Stacks catalogue, match format to the placement that's already winning." />
+        <KPI label="Best-returning placement" val={(()=>{const b=[...byPos].filter(a=>a.roas&&a.cost>50).sort((a,b)=>b.roas-a.roas)[0]; return b?b.key.replace('instagram_','').replace('_',' '):'—';})()} sub={(()=>{const b=[...byPos].filter(a=>a.roas&&a.cost>50).sort((a,b)=>b.roas-a.roas)[0]; return b?b.roas.toFixed(2)+'x, '+GBP(b.cost):'';})()}
           agent="Frame" observation={`Reels iPhone on Angela is 4.49× return on ad spend but starved at ${curSym()}192 vs ${curSym()}530 in feed.`}
           implication="Push budget into Reels with Reels-native edits (9:16, hook in 1.5s, captions for sound-off)." />
       </div>
@@ -4988,7 +4988,7 @@ function PlacementPanel(){
           </tbody></table>
         </div>
       </div>
-      {DEMO && <div className="note" style={{marginTop:10}}>frkl is delivering <b>100% on Instagram, 0% on Facebook</b> — an entire ad surface is untouched. <b>iPhone dominates</b> spend (~70%); Android converts at similar quality. <b>Stories</b> on Stacks/Catalogue is the highest-CTR placement; <b>Reels</b> is the best converter on Angela but under-funded.</div>}
+      {DEMO && <div className="note" style={{marginTop:10}}>frkl is delivering <b>100% on Instagram, 0% on Facebook</b>, an entire ad surface is untouched. <b>iPhone dominates</b> spend (~70%); Android converts at similar quality. <b>Stories</b> on Stacks/Catalogue is the highest-CTR placement; <b>Reels</b> is the best converter on Angela but under-funded.</div>}
     </div>
   );
 }
@@ -4997,7 +4997,7 @@ function FatigueBoard({rows}){
   const sorted=[...rows].sort((a,b)=>(b.frequency||0)-(a.frequency||0));
   const totalSpend=rows.reduce((a,r)=>a+(r.cost||0),0);
   return (<div className="card">
-    <h2>Fatigue board — frequency × Meta quality ranking</h2>
+    <h2>Fatigue board, frequency × Meta quality ranking</h2>
     <div className="muted" style={{marginBottom:10}}>Higher frequency = audience saturated. Below-average conversion-rate ranking = Meta thinks post-click is weak.</div>
     <table><thead><tr><th>Ad</th><th>Freq</th><th>Reach</th><th>Engage rank</th><th>Conv rank</th><th>Spend</th><th>% spend</th></tr></thead><tbody>
     {sorted.map((c,i)=>(<tr key={i}>
@@ -5031,7 +5031,7 @@ function HookRetention({rows}){
     data[4][key]=v.vp100?+(100*v.vp100/Math.max(v.v3s,v.vp25,v.vp50,v.vp75,v.vp100)).toFixed(0):null;
   });
   return (<div className="card">
-    <h2>Hook retention — video drop-off after the 3s view</h2>
+    <h2>Hook retention, video drop-off after the 3s view</h2>
     <div className="muted" style={{marginBottom:8}}>Each line normalised to 100 at the highest milestone reached. Steeper drop = weaker hook.</div>
     <R.ResponsiveContainer width="100%" height={240}>
       <R.LineChart data={data} margin={{top:6,right:8,left:10,bottom:20}}>
@@ -5039,7 +5039,7 @@ function HookRetention({rows}){
         <R.XAxis dataKey="stage" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} label={{value:'Video milestone', position:'insideBottom', offset:-8, fill:PAL.muted, fontSize:'var(--text-xs)'}} />
         <R.YAxis tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>v+'%'} label={{value:'Retention (%)', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:'var(--text-xs)'}} />
         <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)'}} formatter={v=>v+'%'} />
-        {names.map(n=>(<R.Line key={n.key} type="monotone" dataKey={n.key} name={n.name} stroke={svgCol(n.color)} strokeWidth={2} dot={{r:3}} />))}
+        {names.map(n=>(<R.Line key={n.key} type="linear" dataKey={n.key} name={n.name} stroke={svgCol(n.color)} strokeWidth={2} dot={{r:3}} />))}
       </R.LineChart>
     </R.ResponsiveContainer>
     <div style={{marginTop:8,display:'flex',flexWrap:'wrap',gap:10}}>{names.map(n=>(<span key={n.key} style={{fontSize:'var(--text-xs)',color:PAL.faint}}><span style={{display:'inline-block',width:10,height:10,background:n.color,borderRadius:'var(--radius-sm)',marginRight:5,verticalAlign:'middle'}}/>{n.name}</span>))}</div>
@@ -5049,9 +5049,9 @@ function HookRetention({rows}){
 function FunnelTable({rows}){
   const sorted=[...rows].filter(r=>r.atc).sort((a,b)=>(b.cost||0)-(a.cost||0));
   return (<div className="card">
-    <h2>Per-creative funnel — where the cart leaks</h2>
+    <h2>Per-creative funnel, where the cart leaks</h2>
     <div className="muted" style={{marginBottom:10}}>Reading across: how many people added to the basket, how many then started checkout, and how many bought. The ratios show the drop at each step.</div>
-    <table><thead><tr><th>Ad</th><th>Added to basket</th><th>Started checkout</th><th>Bought</th><th>Basket→checkout</th><th>Checkout→bought</th><th>Baskets per sale</th></tr></thead><tbody>
+    <table><thead><tr><th>Ad</th><th>Added to basket</th><th>Started checkout</th><th>Bought</th><th>Basket to checkout</th><th>Checkout to bought</th><th>Baskets per sale</th></tr></thead><tbody>
     {sorted.map((c,i)=>{ const atcIc=c.atc>0?c.ic/c.atc:null; const icP=c.ic>0&&c.purchases?c.purchases/c.ic:null; const atcP=c.atc>0&&c.purchases?c.atc/c.purchases:null;
       const leakAtcP = atcP!=null && atcP>=7 ? 'red' : atcP!=null && atcP>=5 ? 'amber' : 'green';
       return (<tr key={i}>
@@ -5063,7 +5063,7 @@ function FunnelTable({rows}){
       </tr>);
     })}
     </tbody></table>
-    <div className="muted" style={{marginTop:8,fontSize:'var(--text-sm)'}}>A high baskets-per-sale figure means lots of baskets but few sales — likely a landing/checkout problem more than a creative one.</div>
+    <div className="muted" style={{marginTop:8,fontSize:'var(--text-sm)'}}>A high baskets-per-sale figure means lots of baskets but few sales, likely a landing/checkout problem more than a creative one.</div>
   </div>);
 }
 
@@ -5077,11 +5077,11 @@ function CreativeVisionPanel(){
   const meta = V.meta || {};
   const refreshedAt = meta.generated_at_last_refresh || meta.generated_at;
   return (<div className="card" style={{marginBottom:14}}>
-    <h2>Creative analysis — what is actually in the frame</h2>
+    <h2>Creative analysis, what is actually in the frame</h2>
     <div className="muted" style={{marginBottom:10, fontSize:'var(--text-sm)'}}>
-      Each creative is scored on hook strength, visual hierarchy, claim quality, audience fit and brand consistency — so you can see why an ad won, not just that it did. Scored at the asset level.
-      {refreshedAt && <span> · Last refresh: {new Date(refreshedAt).toLocaleString()}</span>}
-      · Re-run with <code>python scripts/oi_creative_vision.py --force</code>
+      Each creative is scored on hook strength, visual hierarchy, claim quality, audience fit and brand consistency, so you can see why an ad won, not just that it did. Scored at the asset level.
+      {refreshedAt && <span>, Last refresh: {new Date(refreshedAt).toLocaleString()}</span>}
+     , Re-run with <code>python scripts/oi_creative_vision.py --force</code>
     </div>
     <div className="row" style={{marginBottom:10}}>
       <div className="card kpi" style={{}}>
@@ -5092,17 +5092,17 @@ function CreativeVisionPanel(){
       <div className="card kpi" style={{}}>
         <div className="label">Top scorer</div>
         <div className="val" style={{fontSize:'var(--text-base)',lineHeight:1.2}}>{cre[0]?.name?.slice(0,32) || '—'}</div>
-        <div className="sub">{cre[0]?.composite?.toFixed(2) || '—'} composite · {cre[0]?.verdict || ''}</div>
+        <div className="sub">{cre[0]?.composite?.toFixed(2) || '—'} composite, {cre[0]?.verdict || ''}</div>
       </div>
       <div className="card kpi" style={{}}>
         <div className="label">Pause-or-rework</div>
         <div className="val">{(insights.pause_or_rework || []).length}</div>
-        <div className="sub">composite ≤ 2.0 — wasted impressions</div>
+        <div className="sub">composite ≤ 2.0, wasted impressions</div>
       </div>
       <div className="card kpi" style={{}}>
         <div className="label">Need full asset</div>
         <div className="val">{(insights.need_more_data || []).length}</div>
-        <div className="sub">scoring confidence low — pull video</div>
+        <div className="sub">scoring confidence low, pull video</div>
       </div>
     </div>
     {/* Per-creative cards */}
@@ -5166,18 +5166,18 @@ function Creatives(){
         "Angela video", "10 active ads"). Shown only when there are rows to back it. */}
     {rows.length > 0 ? (<>
     <div className="row" style={{marginBottom:14}}>
-      <KPI label="Active ads (30d)" val={rows.length} sub={`${NUM(total.impr)} impressions · reach ${NUM(total.reach)}`}
-        agent="Pulse" observation="10 active ads is a small library for this spend level — concentration risk on a couple of creatives."
+      <KPI label="Active ads (30d)" val={rows.length} sub={`${NUM(total.impr)} impressions, reach ${NUM(total.reach)}`}
+        agent="Pulse" observation="10 active ads is a small library for this spend level, concentration risk on a couple of creatives."
         implication="Brief 3–5 new creator variants every fortnight to keep the rotation fresh and avoid audience fatigue." />
-      <KPI label="Creative spend" val={GBP(total.spend)} sub={`${NUM(total.purch)} purchases · CPA ${GBP(total.purch>0?total.spend/total.purch:null)}`}
-        agent="Pulse" observation="Top 2 ads carry ~50% of the spend — Angela video + Stacks catalogue."
+      <KPI label="Creative spend" val={GBP(total.spend)} sub={`${NUM(total.purch)} purchases, CPA ${GBP(total.purch>0?total.spend/total.purch:null)}`}
+        agent="Pulse" observation="Top 2 ads carry ~50% of the spend, Angela video + Stacks catalogue."
         implication="Spread budget across more proven winners so a single creative pause doesn't blow up the month." />
       <KPI label="Claimed return on ads" val={total.spend>0?(total.val/total.spend).toFixed(2)+'x':'—'} sub={`Claimed value ${GBP(total.val)}`}
-        agent="Atlas" observation="Platform-claimed — net of code discounts (~10% of direct sales), sale-price markdowns and ~30% product cost it sits close to contribution breakeven."
+        agent="Atlas" observation="Platform-claimed, net of code discounts (~10% of direct sales), sale-price markdowns and ~30% product cost it sits close to contribution breakeven."
         implication="Re-report on a contribution basis before any investor conversation; claimed return on ad spend overstates." />
       <KPI label="% spend on weak conv rank" val={PCT(total.spend>0?total.weakSpend/total.spend:0)} sub="ads flagged Below average by Meta"
-        agent="Frame" observation="Over a third of spend is on ads Meta itself flags Below-average for conversion — Angela + All Videos."
-        implication="It's probably landing / audience mismatch, not creative — fix the cart JS error first, then re-judge." />
+        agent="Frame" observation="Over a third of spend is on ads Meta itself flags Below-average for conversion, Angela + All Videos."
+        implication="It's probably landing / audience mismatch, not creative, fix the cart JS error first, then re-judge." />
     </div>
     <div className="row">
       <AggTable title="By format" rows={agg(rows,'format')} lblCol="Format" />
@@ -5196,7 +5196,7 @@ function Creatives(){
       <HookRetention rows={rows} />
     </div>
     <div className="card" style={{marginTop:14,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}}>
-      <div><h2 style={{marginBottom:4}}>Creative gallery</h2><div className="muted">Live thumbnails from Meta · tags now factor Meta's conv-rate ranking, not just return on ad spend.</div></div>
+      <div><h2 style={{marginBottom:4}}>Creative gallery</h2><div className="muted">Live thumbnails from Meta, tags now factor Meta's conv-rate ranking, not just return on ad spend.</div></div>
       <div className="seg">{['cost','roas','purchases','frequency','linkCtr'].map(s=>(<button key={s} className={sort===s?'on':''} onClick={()=>setSort(s)}>{ {cost:'Spend',roas:'Claimed return',purchases:'Purchases',frequency:'Frequency',linkCtr:'Click rate'}[s] }</button>))}</div>
     </div>
     <div className="grid cg">
@@ -5214,14 +5214,14 @@ function Creatives(){
             <div className="copy">{c.body}</div>
             <div style={{marginTop:'auto',display:'flex',flexDirection:'column',gap:4}}>
               <div className="mrow"><span className="k">Spend</span><span className="v">{GBP(c.cost)}</span></div>
-              <div className="mrow"><span className="k">CTR / CPM</span><span className="v">{PCT(c.linkCtr)} · {GBP2(c.cpm)}</span></div>
+              <div className="mrow"><span className="k">CTR / CPM</span><span className="v">{PCT(c.linkCtr)}, {GBP2(c.cpm)}</span></div>
               <div className="mrow"><span className="k">Basket → checkout → bought</span><span className="v">{NUM(c.atc)} → {NUM(c.ic)} → {c.purchases==null?'—':c.purchases}</span></div>
               <div className="mrow"><span className="k">return on ad spend</span><span className="v" style={{color:cls==='green'?PAL.good:cls==='red'?PAL.bad:PAL.ink}}>{c.roas==null?'—':c.roas.toFixed(2)+'x'}</span></div>
             </div>
           </div>
         </div>); })}
     </div>
-    <div className="note" style={{marginTop:14}}>The two biggest spenders (Angela | Video and All Videos | Flexi) have <b>below-average Meta conversion-rate ranking</b> — they drive purchases but Meta judges the post-click weak (landing/audience mismatch). 'Stacks Catalogue UK' at 7.6× frequency is the most fatigued. Image URLs from Meta CDN expire ~24h after the pull — regenerate the data file for fresh images.</div>
+    <div className="note" style={{marginTop:14}}>The two biggest spenders (Angela | Video and All Videos | Flexi) have <b>below-average Meta conversion-rate ranking</b>, they drive purchases but Meta judges the post-click weak (landing/audience mismatch). 'Stacks Catalogue UK' at 7.6× frequency is the most fatigued. Image URLs from Meta CDN expire ~24h after the pull, regenerate the data file for fresh images.</div>
     <Insight k="creative" />
     </>) : <V3AdRead/>}
   </div>);
@@ -5313,7 +5313,7 @@ function V3AdRead(){
   const [open, setOpen] = React.useState(null);
   // The cache not existing yet (before 0247) falls back to the old table; anything else is said plainly.
   if (q.err && /cache_ad_read|PGRST205|does not exist|Could not find/i.test(q.err)) return <V3AdTable/>;
-  if (q.err) return <V3AdRetry why={/timed out/.test(q.err) ? ' — the data service is slow at the moment' : ''} onRetry={() => setTries(t => t + 1)}/>;
+  if (q.err) return <V3AdRetry why={/timed out/.test(q.err) ? ', the data service is slow at the moment' : ''} onRetry={() => setTries(t => t + 1)}/>;
   if (!q.rows) return <p className="v3-empty">Loading your ads…</p>;
   const all = q.rows;
   if (!all.length) return <p className="v3-empty">No Meta ads have spent in the last 28 days.</p>;
@@ -5336,7 +5336,7 @@ function V3AdRead(){
     {stale && <div className="v3-sub">Read as of {v3Day(String(asOf).slice(0, 10))}; Meta has not synced since.</div>}
     {drift != null && Math.abs(1 - drift) >= 0.1 && <div className="v3-sub">Across the account each pound bought {fmtPctN(Math.abs(1 - drift))} {drift < 1 ? 'fewer' : 'more'} purchases than in the 8 weeks before. Each ad is read with that allowed for.</div>}
     <table>
-      <thead><tr><th className="tl">Ad</th><th className="tl">Read</th><th>Spend, 28 days</th><th>Share</th><th>Purchases</th><th>Return, before → now</th><th className="tl">12 weeks</th></tr></thead>
+      <thead><tr><th className="tl">Ad</th><th className="tl">Read</th><th>Spend, 28 days</th><th>Share</th><th>Purchases</th><th>Return, before and now</th><th className="tl">12 weeks</th></tr></thead>
       <tbody>{sorted.map(r => {
         const st = V3_AD_STATE[r.state] || V3_AD_STATE.holding;
         const col = st.tone ? RAG_COL[st.tone] : 'var(--text-faint)';
@@ -5410,7 +5410,7 @@ function Channels({start}){
   const chMix = (B.channelMix||[]).map(c=>({channel:c.channel, group:/^Paid/.test(c.channel)?'Paid':'Organic & owned', revenue:c.revenue||0, purchases:c.purchases||0, sessions:c.sessions||0}));
   return (<div>
     {chMix.length>0 && <ConfigurableChart
-      title="Explore channels — GA4 attribution"
+      title="Explore channels, GA4 attribution"
       dataset={chMix}
       dimensions={[{key:'channel',label:'Channel'},{key:'group',label:'Paid vs organic'}]}
       metrics={[{key:'revenue',label:'Revenue',fmt:GBP},{key:'purchases',label:'Purchases',fmt:NUM},{key:'sessions',label:'Sessions',fmt:NUM}]}
@@ -5448,9 +5448,9 @@ function CreatorCandidatesPanel(){
   return (
     <div style={{marginTop:14}}>
       <div className="card" style={{marginBottom:14}}>
-        <h2>Creator candidate discovery — Tier B</h2>
+        <h2>Creator candidate discovery, Tier B</h2>
         <div className="muted" style={{marginBottom:10, fontSize:'var(--text-sm)'}}>
-          {summary.totalCandidates || 0} candidates scored against {OI_BRAND.name||'your brand'}'s brand brief and current winning affiliates. Sources searched: Astrid &amp; Miyu ambassador roster · Modash UK micro-influencer listings · SheerLuxe / Marie Claire / Fashion Monitor curated lists · UK lifestyle podcast hosts. <b>Scores are inference, not measurement</b> — verify follower counts, audience demos and engagement via Heepsy / Modash before significant outreach.
+          {summary.totalCandidates || 0} candidates scored against {OI_BRAND.name||'your brand'}'s brand brief and current winning affiliates. Sources searched: Astrid &amp; Miyu ambassador roster, Modash UK micro-influencer listings, SheerLuxe / Marie Claire / Fashion Monitor curated lists, UK lifestyle podcast hosts. <b>Scores are inference, not measurement</b>, verify follower counts, audience demos and engagement via Heepsy / Modash before significant outreach.
         </div>
         <div className="row" style={{marginBottom:8}}>
           <div className="card kpi" style={{}}>
@@ -5502,7 +5502,7 @@ function CreatorCandidatesPanel(){
             <td className="tl" style={{fontSize:'var(--text-xs)'}}><code>{c.handle}</code></td>
             <td className="tl" style={{fontSize:'var(--text-xs)',maxWidth:280}}>
               <b>{c.name}</b>
-              <div className="muted" style={{fontSize:'var(--text-xs)',marginTop:2}}>{(c.themes||[]).join(' · ')}</div>
+              <div className="muted" style={{fontSize:'var(--text-xs)',marginTop:2}}>{(c.themes||[]).join(', ')}</div>
               {(c.brand_partnerships_known||[]).length>0 && <div className="muted" style={{fontSize:'var(--text-xs)',marginTop:2}}>Past: {(c.brand_partnerships_known||[]).join(', ')}</div>}
             </td>
             <td>{c.audience_size_estimated ? (c.audience_size_estimated/1000).toFixed(0)+'k' : '—'}<br/><span className="muted" style={{fontSize:'var(--text-xs)'}}>{c.audience_size_confidence} conf.</span></td>
@@ -5523,16 +5523,16 @@ function CreatorCandidatesPanel(){
           {(C.candidates||[]).filter(c=>c.tier==='hero'||c.tier==='core').slice(0,12).map((c,i)=>(<div key={i} style={{padding:10,background:'var(--bg-app)',borderRadius:'var(--radius-none) var(--radius-md) var(--radius-md) var(--radius-none)',fontSize:'var(--text-xs)'}}>
             <div style={{fontWeight:'var(--weight-semi)',marginBottom:4}}>{c.name} <span className="muted" style={{fontWeight:'var(--weight-normal)'}}>({c.handle})</span></div>
             <div style={{color:PAL.faint,lineHeight:1.45}}>{c.reasoning}</div>
-            {(c.verify_next||[]).length>0 && <div style={{marginTop:6,fontSize:'var(--text-xs)',color:PAL.muted}}><b>Verify next:</b> {c.verify_next.join(' · ')}</div>}
+            {(c.verify_next||[]).length>0 && <div style={{marginTop:6,fontSize:'var(--text-xs)',color:PAL.muted}}><b>Verify next:</b> {c.verify_next.join(', ')}</div>}
           </div>))}
           </div>
         </div>
         <div className="card" style={{flex:'1 1 280px'}}>
           <h2>How to use this</h2>
           <div style={{fontSize:'var(--text-sm)',lineHeight:1.6,color:'var(--text-secondary)'}}>
-            <p><b>Scores are inferred, not measured.</b> They are read from public web signals — past partnerships, audience age cues, content themes and engagement quoted in articles — so treat them as a shortlist to check, not a ranking to act on.</p>
+            <p><b>Scores are inferred, not measured.</b> They are read from public web signals, past partnerships, audience age cues, content themes and engagement quoted in articles, so treat them as a shortlist to check, not a ranking to act on.</p>
             <p><b>Before outreaching at scale</b>{`, verify with a real creator-discovery tool (Heepsy ${curSym()}69/mo or Modash ${curSym()}150+/mo). Look for: actual follower count, UK audience %, age split, engagement rate, brand-overlap with frkl peers.`}</p>
-            {DEMO && <p><b>The highest-EV move</b> isn't in any external creator — it's an internal audit of <code>#myfrkl</code> tagged users. These are existing customers who already buy frkl AND have audiences. Pull that list from Instagram.</p>}
+            {DEMO && <p><b>The highest-EV move</b> isn't in any external creator, it's an internal audit of <code>#myfrkl</code> tagged users. These are existing customers who already buy frkl AND have audiences. Pull that list from Instagram.</p>}
           </div>
         </div>
       </div>
@@ -5557,21 +5557,21 @@ function AffiliatePanel(){
   return (
     <div style={{marginTop:14}}>
       <div className="card" style={{marginBottom:14}}>
-        <h2>Affiliates & creator partnerships — 90d</h2>
+        <h2>Affiliates & creator partnerships, 90d</h2>
         <div className="muted" style={{marginBottom:10,fontSize:'var(--text-sm)'}}>Tracked via Shopify discount-code attribution. Edit the code → creator mapping in <code>scripts/_affiliate_codes.txt</code>.</div>
         <div className="row" style={{marginBottom:8}}>
-          <KPI label="Affiliate revenue (90d)" val={GBP(totalAffRev)} sub={`${PCT(affShareDTC)} of DTC revenue · ${aff.orders||0} orders · average order value ${curSym()}${aff.avgAov||0}`}
-            agent="Scout" observation={`Creator partnerships drive ${PCT(affShareDTC)} of revenue — significantly higher per-order than paid acquisition.`}
+          <KPI label="Affiliate revenue (90d)" val={GBP(totalAffRev)} sub={`${PCT(affShareDTC)} of DTC revenue, ${aff.orders||0} orders, average order value ${curSym()}${aff.avgAov||0}`}
+            agent="Scout" observation={`Creator partnerships drive ${PCT(affShareDTC)} of revenue, significantly higher per-order than paid acquisition.`}
             implication="This is the most efficient acquisition channel in the business. Double down on top performers, replicate format with lookalikes." />
-          <KPI label="Top affiliate" val={topAff.code} sub={`${topAff.orders} orders · ${GBP(topAff.netSales)} · ${PCT(topShare)} of affiliate rev`}
-            agent="Lux" observation={`${topAff.label} is the single biggest revenue driver — ${PCT(topShare)} concentration is a risk if the relationship cools.`}
+          <KPI label="Top affiliate" val={topAff.code} sub={`${topAff.orders} orders, ${GBP(topAff.netSales)}, ${PCT(topShare)} of affiliate rev`}
+            agent="Lux" observation={`${topAff.label} is the single biggest revenue driver, ${PCT(topShare)} concentration is a risk if the relationship cools.`}
             implication="Lock in long-term commercials. Brief a like-for-like discovery search to reduce single-creator dependency." />
           <KPI label="Affiliate avg discount" val={PCT(aff.discountPct)} sub={`vs ${PCT(camp.discountPct)} for promo campaigns`}
             agent="Atlas" observation={`Affiliates cost ~${Math.round((aff.discountPct||0)*100)}% off list vs ${Math.round((camp.discountPct||0)*100)}% for blanket promos. Cheaper acquisition, higher average order value.`}
             implication="Shift incremental budget from promo campaigns toward creator commercials. Better unit economics." />
-          <KPI label="Gifting & CS adjustments" val={cs.orders||0} sub={`${cs.codeCount||0} codes · ${curSym()}${NUM(cs.discounts)} retail value of comped product`}
+          <KPI label="Gifting & CS adjustments" val={cs.orders||0} sub={`${cs.codeCount||0} codes, ${curSym()}${NUM(cs.discounts)} retail value of comped product`}
             agent="Lux" observation={`Operational comps (gifting, replacements, lost-in-transit) total ${curSym()}10k+ in product value over 90d. Tracked but not in DTC revenue.`}
-            implication="Worth quarterly review with ops — is the gifting budget converting to UGC / press / repurchase? Currently no attribution loop." />
+            implication="Worth quarterly review with ops, is the gifting budget converting to UGC / press / repurchase? Currently no attribution loop." />
         </div>
       </div>
       <div className="row">
@@ -5610,17 +5610,17 @@ function AffiliatePanel(){
           </tbody></table>
         </div>
       </div>
-      {DEMO && <div className="note" style={{marginTop:14}}><b>Greta's read:</b> Creator partnerships are doing more work than the data has been crediting them for. HEYGIRL (Angela Scanlon) is genuinely the biggest single attribution lever you have — that's <b>one quarter of revenue from one relationship</b>. Diversification candidates: brief a discovery search for UK creators in the 35-54 lifestyle/jewellery space with engagement rates above 4% (matching Angela's audience profile). The other named affiliates (GMS, Boldly, Davidson, Nora, Charissa) all have signal but tiny volume — worth a deeper conversation per creator about content cadence and commercial terms.</div>}
+      {DEMO && <div className="note" style={{marginTop:14}}><b>Greta's read:</b> Creator partnerships are doing more work than the data has been crediting them for. HEYGIRL (Angela Scanlon) is genuinely the biggest single attribution lever you have, that's <b>one quarter of revenue from one relationship</b>. Diversification candidates: brief a discovery search for UK creators in the 35-54 lifestyle/jewellery space with engagement rates above 4% (matching Angela's audience profile). The other named affiliates (GMS, Boldly, Davidson, Nora, Charissa) all have signal but tiny volume, worth a deeper conversation per creator about content cadence and commercial terms.</div>}
     </div>
   );
 }
 
 const SITE_STEPS = [
-  {step:'Homepage', live:`Promo "10% off" popup interrupts on load; announcement bar (free UK delivery over ${curSym()}75); clear nav (necklaces/charms/bracelets/earrings, gifting).`, issue:'Cookie banner + popup consume the first interaction. 50.8% of visitors drop between 10–15% scroll — most never see past the hero. 1.07 pages/session.', sev:'red'},
+  {step:'Homepage', live:`Promo "10% off" popup interrupts on load; announcement bar (free UK delivery over ${curSym()}75); clear nav (necklaces/charms/bracelets/earrings, gifting).`, issue:'Cookie banner + popup consume the first interaction. 50.8% of visitors drop between 10–15% scroll, most never see past the hero. 1.07 pages/session.', sev:'red'},
   {step:'Collection (PLP)', live:`Filters (type/price/availability), "worth ${curSym()}X" bundle-saving badges, 106 products, build-system style labels.`, issue:'Out-of-stock products sit in prime grid slots → dead-end clicks. 80–85% scroll cliff where the grid ends. Mobile filter/pagination friction.', sev:'amber'},
   {step:'Product (product page)', live:'Gallery + lifestyle shots, Clearpay BNPL, reviews, variant swatches, Shop Pay express, 90-day returns & free-ship badges.', issue:'Judge.me review widget throws JS errors → elements look clickable but do nothing (dead/rage clicks).', sev:'amber'},
-  {step:'Cart drawer', live:`Free-shipping progress bar, cross-sell add-ons (charm ${curSym()}25, notebook ${curSym()}12), qty stepper, coupon field, Checkout CTA.`, issue:'Coupon-code field throws JS errors when codes are applied — a prime suspect for the 67.8% basket→checkout drop (people hunt for a code, it fails, they leave).', sev:'red'},
-  {step:'Checkout', live:'Standard Shopify checkout. Express: Shop Pay + Google Pay. Discount field, taxes shown.', issue:'No Apple Pay express button — a real gap for an iOS-heavy female audience. 90% of checkout-starters still abandon (vs 50–60% benchmark).', sev:'red'},
+  {step:'Cart drawer', live:`Free-shipping progress bar, cross-sell add-ons (charm ${curSym()}25, notebook ${curSym()}12), qty stepper, coupon field, Checkout CTA.`, issue:'Coupon-code field throws JS errors when codes are applied, a prime suspect for the 67.8% basket to checkout drop (people hunt for a code, it fails, they leave).', sev:'red'},
+  {step:'Checkout', live:'Standard Shopify checkout. Express: Shop Pay + Google Pay. Discount field, taxes shown.', issue:'No Apple Pay express button, a real gap for an iOS-heavy female audience. 90% of checkout-starters still abandon (vs 50–60% benchmark).', sev:'red'},
 ];
 const CLARITY = [
   {m:'Begin-checkout rate', v:'1.10%', bench:'4–6%', sev:'red'},
@@ -5632,7 +5632,7 @@ const CLARITY = [
 ];
 const FIXES = [
   {fix:'Suppress the 10% popup on first visit (show on exit-intent / after 30s); fix its dismiss handler', p:'P1'},
-  {fix:'Fix the cart coupon-code error (kills the basket→checkout step)', p:'P1'},
+  {fix:'Fix the cart coupon-code error (kills the basket to checkout step)', p:'P1'},
   {fix:'Remove out-of-stock products from collection grids', p:'P1'},
   {fix:'Fix the Judge.me script errors on product pages', p:'P1'},
   {fix:'Move cookie consent to a non-blocking bottom bar', p:'P1'},
@@ -5667,21 +5667,21 @@ function Customers(){
     <div>
       <RetentionPanel/>
       {(hasRet || hasList || hasGeo) && <div className="row" style={{marginBottom:14}}>
-        {hasRet && <KPI label="% orders from returning" val={PCT((totalRet)/(totalNew+totalRet))} sub={`${NUM(totalRet)} returning / ${NUM(totalNew)} new (90d)`} series={retPctSeries} seriesLabel="Returning order share · by week"
-          agent="Lux" observation="38.7% repeat is healthier than Clarity's 95% new-visitor stat suggested — buyers ARE coming back."
-          implication="The repeat customer is real but undermonetised — post-purchase + restyle flows would lift customer lifetime value materially." />}
-        {hasRet && <KPI label="Returning revenue share" val={PCT((totalRetRev)/(totalNewRev+totalRetRev))} sub={`${curSym()}${NUM(totalRetRev)} of ${curSym()}${NUM(totalNewRev+totalRetRev)}`} series={retRevPctSeries} seriesLabel="Returning revenue share · by week"
-          agent="Atlas" observation="29.6% of revenue from returning customers comes with zero acquisition cost — highest-margin slice."
+        {hasRet && <KPI label="% orders from returning" val={PCT((totalRet)/(totalNew+totalRet))} sub={`${NUM(totalRet)} returning / ${NUM(totalNew)} new (90d)`} series={retPctSeries} seriesLabel="Returning order share, by week"
+          agent="Lux" observation="38.7% repeat is healthier than Clarity's 95% new-visitor stat suggested, buyers ARE coming back."
+          implication="The repeat customer is real but undermonetised, post-purchase + restyle flows would lift customer lifetime value materially." />}
+        {hasRet && <KPI label="Returning revenue share" val={PCT((totalRetRev)/(totalNewRev+totalRetRev))} sub={`${curSym()}${NUM(totalRetRev)} of ${curSym()}${NUM(totalNewRev+totalRetRev)}`} series={retRevPctSeries} seriesLabel="Returning revenue share, by week"
+          agent="Atlas" observation="29.6% of revenue from returning customers comes with zero acquisition cost, highest-margin slice."
           implication={`Every ${curSym()}1 of retention spend likely returns more than every ${curSym()}1 of paid acquisition right now.`} />}
-        {hasList && <KPI label="Net list growth (90d)" val={'+'+NUM(subsTotal-unsubsTotal)} sub={`${NUM(subsTotal)} new − ${NUM(unsubsTotal)} unsub`} series={listNetSeries} seriesLabel="Net list growth · by day"
-          agent="Sage" observation="~26 new subs/day with <5 unsubs — acquisition is filling the funnel cleanly."
-          implication="The list is healthy; the gap is monetisation — abandoned-cart + welcome series are the levers, not more sign-ups." />}
-        {hasGeo && <KPI label="Markets" val={geo.length+'+'} sub={`UK ${PCT(geo[0]?.netSales/geo.reduce((a,b)=>a+b.netSales,0))} · IE ${PCT((geo[1]?.netSales||0)/geo.reduce((a,b)=>a+b.netSales,0))}`}
-          agent="Scout" observation={OI_BRAND.slug==='frkl' ? `UK 66% / Ireland 30% — Ireland is genuinely a second home market, and average order value is ${curSym()}6 higher there.` : undefined}
+        {hasList && <KPI label="Net list growth (90d)" val={'+'+NUM(subsTotal-unsubsTotal)} sub={`${NUM(subsTotal)} new − ${NUM(unsubsTotal)} unsub`} series={listNetSeries} seriesLabel="Net list growth, by day"
+          agent="Sage" observation="~26 new subs/day with <5 unsubs, acquisition is filling the funnel cleanly."
+          implication="The list is healthy; the gap is monetisation, abandoned-cart + welcome series are the levers, not more sign-ups." />}
+        {hasGeo && <KPI label="Markets" val={geo.length+'+'} sub={`UK ${PCT(geo[0]?.netSales/geo.reduce((a,b)=>a+b.netSales,0))}, IE ${PCT((geo[1]?.netSales||0)/geo.reduce((a,b)=>a+b.netSales,0))}`}
+          agent="Scout" observation={OI_BRAND.slug==='frkl' ? `UK 66% / Ireland 30%, Ireland is genuinely a second home market, and average order value is ${curSym()}6 higher there.` : undefined}
           implication={OI_BRAND.slug==='frkl' ? "An IE-specific creative + landing test could capitalise on the higher-average order value behaviour you're already seeing." : undefined} />}
       </div>}
       {hasRet && <div className="card" style={{marginBottom:14}}>
-        <h2>New vs returning orders — weekly</h2>
+        <h2>New vs returning orders, weekly</h2>
         <R.ResponsiveContainer width="100%" height={240}>
           <R.ComposedChart data={weeks} margin={{top:6,right:8,left:14,bottom:20}}>
             <R.CartesianGrid stroke={PAL.panel} vertical={false} />
@@ -5694,25 +5694,25 @@ function Customers(){
             <R.Bar yAxisId="l" dataKey="new" stackId="o" name="New" fill={PAL.nw} />
             <R.Bar yAxisId="l" dataKey="ret" stackId="o" name="Returning" fill={PAL.ret} />
             {/* The share is the stack below read as a proportion; a second scale added nothing but a crossing point. */}
-            {false && <R.Line yAxisId="r" type="monotone" dataKey="retPct" name="% returning" stroke={svgCol(COL.email)} strokeWidth={2} dot={false} />}
+            {false && <R.Line yAxisId="r" type="linear" dataKey="retPct" name="% returning" stroke={svgCol(COL.email)} strokeWidth={2} dot={false} />}
           </R.ComposedChart>
         </R.ResponsiveContainer>
       </div>}
       {hasGeo && <ConfigurableChart
-        title="Explore markets — Shopify settlement"
+        title="Explore markets, Shopify settlement"
         dataset={(geo||[]).map(g=>({country:g.country||'(unknown)', region:/kingdom|^uk$|^gb$/i.test(g.country||'')?'UK':/ireland|^ie$/i.test(g.country||'')?'Ireland':'Rest of world', revenue:g.netSales||0, orders:g.orders||0}))}
         dimensions={[{key:'country',label:'Country'},{key:'region',label:'Region (UK/IE/RoW)'}]}
         metrics={[{key:'revenue',label:'Net revenue',fmt:GBP},{key:'orders',label:'Orders',fmt:NUM}]}
         defaultMetric="revenue" defaultSplit="country" defaultChart="bar" defaultTopN={10}/>}
       {(hasGeo || hasList) && <div className="row">
         {hasGeo && <div className="card" style={{flex:'1 1 360px'}}>
-          <h2>Markets — top 10</h2>
+          <h2>Markets, top 10</h2>
           <table><thead><tr><th>Country</th><th>Orders</th><th>Net rev</th><th>Average order</th></tr></thead><tbody>
           {geo.map((g,i)=>(<tr key={i}><td>{g.country||'(unknown)'}</td><td>{NUM(g.orders)}</td><td>{GBP(g.netSales)}</td><td>{GBP(g.aov)}</td></tr>))}
           </tbody></table>
         </div>}
         {hasList && <div className="card" style={{flex:'1 1 360px'}}>
-          <h2>Klaviyo list — daily net growth</h2>
+          <h2>Klaviyo list, daily net growth</h2>
           <R.ResponsiveContainer width="100%" height={160}>
             <R.BarChart data={listChart} margin={{top:6,right:8,left:14,bottom:18}}>
               <R.CartesianGrid stroke={PAL.panel} vertical={false} />
@@ -5724,7 +5724,7 @@ function Customers(){
           </R.ResponsiveContainer>
         </div>}
       </div>}
-      {OI_BRAND.slug==='frkl' && hasRet && <div className="note" style={{marginTop:14}}>The big spike of returning customers <b>late April</b>{` (Apr 22–28) is the cohort responding to Meta re-scaling on Apr 13 — and the email flow firing on that traffic. Ireland's average order value (${curSym()}71) is meaningfully higher than the UK's (${curSym()}65). The list is net-positive every single day — Klaviyo has product-market fit for acquisition; the gap is monetisation of the list with proper attributed reporting.`}</div>}
+      {OI_BRAND.slug==='frkl' && hasRet && <div className="note" style={{marginTop:14}}>The big spike of returning customers <b>late April</b>{` (Apr 22–28) is the cohort responding to Meta re-scaling on Apr 13, and the email flow firing on that traffic. Ireland's average order value (${curSym()}71) is meaningfully higher than the UK's (${curSym()}65). The list is net-positive every single day, Klaviyo has product-market fit for acquisition; the gap is monetisation of the list with proper attributed reporting.`}</div>}
     </div>
   );
 }
@@ -5741,8 +5741,8 @@ function BundlesPanel(){
     ? ((bundlesAgg.aovPerUnit / singles.aovPerUnit) - 1) : null;
   return (
     <div className="card" style={{marginBottom:14}}>
-      <h2>Bundles & stacks — 90d</h2>
-      {DEMO && <div className="muted" style={{marginBottom:10, fontSize:'var(--text-sm)'}}>frkl's "stack" products are pre-styled bundles (base + style + charm). They unlock higher average order value but currently sell rarely. Two bundle tracking systems exist in Shopify: explicit "stack" items and a hidden "Bundle for reference only" wrapper — both surfaced below.</div>}
+      <h2>Bundles & stacks, 90d</h2>
+      {DEMO && <div className="muted" style={{marginBottom:10, fontSize:'var(--text-sm)'}}>frkl's "stack" products are pre-styled bundles (base + style + charm). They unlock higher average order value but currently sell rarely. Two bundle tracking systems exist in Shopify: explicit "stack" items and a hidden "Bundle for reference only" wrapper, both surfaced below.</div>}
       <div className="row" style={{marginBottom:10}}>
         <KPI label="Bundle revenue share" val={PCT(summary.bundleRevenueShare)} sub={`${curSym()}${NUM(bundlesAgg.netSales)} of ${curSym()}${NUM((singles.netSales||0)+(bundlesAgg.netSales||0)+(summary.giftCards?.netSales||0))} total products`}
           agent="Atlas" observation={`Bundles are only ${PCT(summary.bundleRevenueShare)} of product revenue. This is the single biggest average order value lever sitting unused.`}
@@ -5751,9 +5751,9 @@ function BundlesPanel(){
           agent="Lux" observation="Less than 1% of customers buy a pre-styled stack. Either discovery's broken (no product page cross-sell?) or the price gap to à la carte isn't compelling."
           implication={`Test a 'complete the stack' upsell on every product page. Test a ${curSym()}10 bundle saving banner. Track delta in Site conversion rate.`} />
         <KPI label="Avg bundle price (per unit)" val={GBP(bundlesAgg.aovPerUnit)} sub={aovLift != null ? `${(aovLift*100).toFixed(0)}% vs single average order value ${curSym()}${NUM(singles.aovPerUnit)}` : '—'}
-          agent="Frame" observation={aovLift > 0 ? `Bundle average order value per unit is ${(aovLift*100).toFixed(0)}% higher than singles. Each stack sale = one customer behaving like ${(1+aovLift).toFixed(1)} customers.` : 'Bundle pricing not yet outperforming singles — pricing strategy worth reviewing.'}
+          agent="Frame" observation={aovLift > 0 ? `Bundle average order value per unit is ${(aovLift*100).toFixed(0)}% higher than singles. Each stack sale = one customer behaving like ${(1+aovLift).toFixed(1)} customers.` : 'Bundle pricing not yet outperforming singles, pricing strategy worth reviewing.'}
           implication="Use bundles in investor materials as the average-order-value play. Each percentage point of bundle attach rate moves blended average order value measurably." />
-        <KPI label="Bundle margin %" val={PCT(bundlesAgg.marginPct)} sub={`100% reflects missing bundle product cost in Shopify — true margin is component-weighted`}
+        <KPI label="Bundle margin %" val={PCT(bundlesAgg.marginPct)} sub={`100% reflects missing bundle product cost in Shopify, true margin is component-weighted`}
           agent="Atlas" observation="COGS isn't tracked per bundle SKU in Shopify, so the margin figure here is artificial. Real bundle margin should match (or exceed) the weighted-average margin of its components."
           implication="One-off fix: add product cost to each bundle parent item in Shopify. ~30 min job, makes this number trustworthy." />
       </div>
@@ -5776,11 +5776,11 @@ function BundlesPanel(){
           <h2>Bundle wrappers (Shopify-native)</h2>
           <div className="muted" style={{marginBottom:8, fontSize:'var(--text-sm)'}}>"Bundle for reference only" entries record the purchase event without splitting line items. Revenue is recorded on component items.</div>
           {wrapperRows.length ? (<ul style={{margin:0,padding:'0 0 0 18px',fontSize:'var(--text-sm)',lineHeight:1.7}}>
-            {wrapperRows.map((b,i)=>(<li key={i}>{(b.title||'').replace(' (Bundle for reference only)','')} — <b>{b.units} purchase{b.units===1?'':'s'}</b></li>))}
+            {wrapperRows.map((b,i)=>(<li key={i}>{(b.title||'').replace(' (Bundle for reference only)','')}, <b>{b.units} purchase{b.units===1?'':'s'}</b></li>))}
           </ul>) : (<div className="muted">No Shopify-native bundle wrappers in this window.</div>)}
         </div>
       </div>
-      <div className="note" style={{marginTop:14}}><b>Strategic read:</b> bundles are a tiny share of revenue (1.9%) at a high relative average order value. If you can move bundle attach from ~0.8% to ~5%, blended average order value would lift by roughly 2-4% with no extra ad spend. The Klaviyo data already showed Pre-styled stacks have their own welcome flow — that audience is the natural place to test a stack-builder product page module first.</div>
+      <div className="note" style={{marginTop:14}}><b>Strategic read:</b> bundles are a tiny share of revenue (1.9%) at a high relative average order value. If you can move bundle attach from ~0.8% to ~5%, blended average order value would lift by roughly 2-4% with no extra ad spend. The Klaviyo data already showed Pre-styled stacks have their own welcome flow, that audience is the natural place to test a stack-builder product page module first.</div>
     </div>
   );
 }
@@ -5819,22 +5819,22 @@ function InventoryPanel(){
         <div className="card kpi" style={{}}>
           <div className="label">Critical / out of stock</div>
           <div className="val">{(summary.critical||{}).skus||0}</div>
-          <div className="sub">{(summary.critical||{}).totalQty||0} units left · running out in &lt;14 days</div>
+          <div className="sub">{(summary.critical||{}).totalQty||0} units left, running out in &lt;14 days</div>
         </div>
         <div className="card kpi" style={{}}>
           <div className="label">Healthy cover (30-90d)</div>
           <div className="val">{(summary.healthy||{}).skus||0}</div>
-          <div className="sub">{(summary.healthy||{}).totalQty||0}{` units · ${curSym()}`}{NUM((summary.healthy||{}).totalValue)} on shelf</div>
+          <div className="sub">{(summary.healthy||{}).totalQty||0}{` units, ${curSym()}`}{NUM((summary.healthy||{}).totalValue)} on shelf</div>
         </div>
         <div className="card kpi" style={{}}>
           <div className="label">Overstock (&gt;180d)</div>
           <div className="val">{(summary.overstock||{}).skus||0}</div>
-          <div className="sub">{(summary.overstock||{}).totalQty||0} units · <b>{`${curSym()}`}{NUM(overstockValue)} tied up</b></div>
+          <div className="sub">{(summary.overstock||{}).totalQty||0} units, <b>{`${curSym()}`}{NUM(overstockValue)} tied up</b></div>
         </div>
         <div className="card kpi" style={{}}>
           <div className="label">Archived (dead stock)</div>
           <div className="val">{(summary.archived_stock||{}).skus||0}</div>
-          <div className="sub">{(summary.archived_stock||{}).totalQty||0} units · <b>{`${curSym()}`}{NUM(archivedValue)}</b> at sell-value</div>
+          <div className="sub">{(summary.archived_stock||{}).totalQty||0} units, <b>{`${curSym()}`}{NUM(archivedValue)}</b> at sell-value</div>
         </div>
       </div>
       <div style={{display:'flex',gap:10,alignItems:'center',marginBottom:10,flexWrap:'wrap'}}>
@@ -5873,7 +5873,7 @@ function InventoryPanel(){
         </tbody></table>
       </div>
       {sorted.length > 80 && <div className="muted" style={{fontSize:'var(--text-xs)',marginTop:8}}>Showing 80 of {sorted.length}. Adjust filter to drill in.</div>}
-      {DEMO && <div className="note" style={{marginTop:14}}><b>Greta's read:</b> {critRows.length}{` items are about to stock out — at current velocity that's roughly ${curSym()}`}{NUM(lostSalesEstMonthly)}/mo in lost sales if reorders don't land. Meanwhile <b>{`${curSym()}`}{NUM(overstockValue + archivedValue)} of capital is locked in slow-moving stock + archived items</b>{`. For a brand at ${curSym()}16k/mo DTC revenue, that's ~18 months of working capital tied up. Most of the overstock is in `}<b>pre-styled stack items</b> — connects directly to the Bundle attach finding (Products tab): bundles aren't selling, so the bundle-specific inventory is bloating. Liquidate the dead bundles + redirect capital to charm + necklace replenishment.</div>}
+      {DEMO && <div className="note" style={{marginTop:14}}><b>Greta's read:</b> {critRows.length}{` items are about to stock out, at current velocity that's roughly ${curSym()}`}{NUM(lostSalesEstMonthly)}/mo in lost sales if reorders don't land. Meanwhile <b>{`${curSym()}`}{NUM(overstockValue + archivedValue)} of capital is locked in slow-moving stock + archived items</b>{`. For a brand at ${curSym()}16k/mo DTC revenue, that's ~18 months of working capital tied up. Most of the overstock is in `}<b>pre-styled stack items</b>, connects directly to the Bundle attach finding (Products tab): bundles aren't selling, so the bundle-specific inventory is bloating. Liquidate the dead bundles + redirect capital to charm + necklace replenishment.</div>}
     </div>
   );
 }
@@ -5886,7 +5886,7 @@ function CollectionsPanel(){
   const tinyCollections = cols.filter(c => c.skus <= 2 && c.netSales > 50);
   return (
     <div className="card" style={{marginBottom:14}}>
-      <h2>Collections — revenue by product category (90d)</h2>
+      <h2>Collections, revenue by product category (90d)</h2>
       <div className="muted" style={{marginBottom:10, fontSize:'var(--text-sm)'}}>Buyer-facing category roll-up. Click any collection's top items to find drilldown candidates. Bundles are surfaced separately above.</div>
       <table><thead><tr><th>Collection</th><th>items</th><th>Units</th><th>Net rev</th><th>% rev</th><th>Average per unit</th><th>Margin</th><th>Return</th><th className="tl">Top items</th></tr></thead><tbody>
       {cols.map((c,i)=>{
@@ -5900,11 +5900,11 @@ function CollectionsPanel(){
           <td>{GBP(c.aovPerUnit)}</td>
           <td style={{color:c.marginPct>=0.8?'var(--good)':c.marginPct>=0.6?'var(--warn)':'var(--bad)',fontWeight:'var(--weight-semi)'}}>{PCT(c.marginPct)}</td>
           <td style={{color:c.returnRate>=0.1?'var(--bad)':c.returnRate>=0.06?'var(--warn)':'var(--text-faint)',fontWeight:'var(--weight-semi)'}}>{PCT(c.returnRate)}</td>
-          <td className="muted tl" style={{fontSize:'var(--text-xs)',maxWidth:240}}>{(c.topSkus||[]).map(s=>s.title?.slice(0,28)).join(' · ')}</td>
+          <td className="muted tl" style={{fontSize:'var(--text-xs)',maxWidth:240}}>{(c.topSkus||[]).map(s=>s.title?.slice(0,28)).join(', ')}</td>
         </tr>);
       })}
       </tbody></table>
-      <div className="note" style={{marginTop:14}}><b>Collection read:</b> {top.collection} drive {PCT(top.revenueShare)} of product revenue ({top.skus}{` items, average order value ${curSym()}`}{Math.round(top.aovPerUnit||0)}). {tinyCollections.length > 0 ? `${tinyCollections.length} collection${tinyCollections.length>1?'s':''} have only 1-2 active items (${tinyCollections.map(c=>c.collection).join(', ')}) — long-tail expansion candidates worth a Frame brief.` : ''}{DEMO ? ' The Necklaces + Charms combination is 85% of revenue — the modular system working as designed.' : ''}</div>
+      <div className="note" style={{marginTop:14}}><b>Collection read:</b> {top.collection} drive {PCT(top.revenueShare)} of product revenue ({top.skus}{` items, average order value ${curSym()}`}{Math.round(top.aovPerUnit||0)}). {tinyCollections.length > 0 ? `${tinyCollections.length} collection${tinyCollections.length>1?'s':''} have only 1-2 active items (${tinyCollections.map(c=>c.collection).join(', ')}), long-tail expansion candidates worth a Frame brief.` : ''}{DEMO ? ' The Necklaces + Charms combination is 85% of revenue, the modular system working as designed.' : ''}</div>
     </div>
   );
 }
@@ -5917,8 +5917,8 @@ function ProductTiersPanel(){
   const total = tiers.reduce((a,t)=>a+(t.netSales||0),0);
   return (
     <div className="card" style={{marginBottom:14}}>
-      <h2>Component tiers — base / charm / style</h2>
-      {DEMO && <div className="muted" style={{marginBottom:10, fontSize:'var(--text-sm)'}}>frkl's modular system uses three tiers, encoded in the Shopify vendor field. A customer buys a base, layers a style, attaches charms — every charm raises average order value, every style raises margin.</div>}
+      <h2>Component tiers, base / charm / style</h2>
+      {DEMO && <div className="muted" style={{marginBottom:10, fontSize:'var(--text-sm)'}}>frkl's modular system uses three tiers, encoded in the Shopify vendor field. A customer buys a base, layers a style, attaches charms, every charm raises average order value, every style raises margin.</div>}
       <table><thead><tr><th>Tier</th><th>items</th><th>Units</th><th>Net revenue</th><th>% of rev</th><th>Average per unit</th><th>Margin %</th><th>Return %</th></tr></thead><tbody>
         {tiers.map((t,i)=>(<tr key={i}>
           <td><span className="pill" style={{background:colors[t.tier]+'22',color:colors[t.tier],fontSize:'var(--text-xs)',padding:'2px 8px',borderRadius:'var(--radius-md)',fontWeight:'var(--weight-bold)',textTransform:'uppercase'}}>{labels[t.tier]||t.tier}</span></td>
@@ -5931,7 +5931,7 @@ function ProductTiersPanel(){
           <td style={{color:t.returnRate>=0.1?'var(--bad)':t.returnRate>=0.06?'var(--warn)':'var(--text-faint)',fontWeight:'var(--weight-semi)'}}>{PCT(t.returnRate)}</td>
         </tr>))}
       </tbody></table>
-      {DEMO && <div className="note" style={{marginTop:12}}><b>Tier read:</b>{` bases drive revenue (${curSym()}23k, biggest), styles drive margin (92%, highest), charms drive volume (450 units = lowest unit price but highest engagement). A pre-styled stack is literally one of each — so the bundle thesis is exactly the multiplier this product system was designed to produce.`}</div>}
+      {DEMO && <div className="note" style={{marginTop:12}}><b>Tier read:</b>{` bases drive revenue (${curSym()}23k, biggest), styles drive margin (92%, highest), charms drive volume (450 units = lowest unit price but highest engagement). A pre-styled stack is literally one of each, so the bundle thesis is exactly the multiplier this product system was designed to produce.`}</div>}
     </div>
   );
 }
@@ -5970,19 +5970,19 @@ function computeProductSignals(){
     if(atc2pur>0 && atcToPurch<atc2pur) stages.push(['completion',(atc2pur-atcToPurch)/atc2pur]);
     const leakStage = stages.length ? stages.sort((a,b)=>b[1]-a[1])[0][0] : 'none';
     if(lab==='gem'){ const extraViews=Math.max(0,(p75v-p.pctViews)/100*totV); gbp=extraViews*p.viewToPurch*p.price*gm*monthly;
-      move='Merchandise it — homepage/collection + ad feed. It converts; it just isn\'t seen.'; }
+      move='Merchandise it, homepage/collection + ad feed. It converts; it just isn\'t seen.'; }
     else if(lab==='dud'){ const rec=p.views*siteV2A*atc2pur - p.purchases; gbp=Math.max(0,rec)*p.price*gm*monthly;
-      move='Seen a lot, wanted little — fix the product page (price/imagery/offer) or stop sending traffic.'; }
+      move='Seen a lot, wanted little, fix the product page (price/imagery/offer) or stop sending traffic.'; }
     else if(lab==='oos'){ gbp=p.views*siteV2A*atc2pur*p.price*gm*monthly;
-      move='Out of stock but in demand — restock + switch on a back-in-stock email.'; }
-    else if(lab==='star'){ move='Working — protect it and scale its visibility.'; }
-    else { move='Low visibility + low desire — candidate to delist.'; }
+      move='Out of stock but in demand, restock + switch on a back-in-stock email.'; }
+    else if(lab==='star'){ move='Working, protect it and scale its visibility.'; }
+    else { move='Low visibility + low desire, candidate to delist.'; }
     // Checkout leak overrides the move + £ (it can hit a "star" or a "dud") — the recoverable
     // money is the carts that would convert if this SKU closed at the site rate.
     if(checkoutLeak){ const recPur=Math.max(0, p.atc*(atc2pur-atcToPurch)); gbp=Math.max(gbp, recPur*p.price*gm*monthly);
-      move='Wanted but not bought — carted, then dropped at checkout. Check the price/shipping reveal, trust signals, or a missing/out-of-stock variant on this product page.'; }
+      move='Wanted but not bought, carted, then dropped at checkout. Check the price/shipping reveal, trust signals, or a missing/out-of-stock variant on this product page.'; }
     const redFlag = !p.oos && p.atc>=20 && p.viewToPurch<0.003 && p.viewToAtc>=siteV2A*0.7;
-    if(redFlag){ gbp=Math.max(gbp, p.atc*atc2pur*p.price*gm*monthly); move='Strong intent but ~0 sales — check stock/variant selector/checkout on this product page.'; }
+    if(redFlag){ gbp=Math.max(gbp, p.atc*atc2pur*p.price*gm*monthly); move='Strong intent but ~0 sales, check stock/variant selector/checkout on this product page.'; }
     return {...p, lab, atcToPurch, completionHi, checkoutLeak, leakStage, gbp, move, redFlag};
   });
   // Materiality floor: only list a product where closing the gap is worth ≥ £50/mo (the
@@ -6008,14 +6008,14 @@ function productFindings(){
     const a2p=(p.atcToPurch*100).toFixed(0), site=(S.atc2pur*100).toFixed(0);
     return {
       area: isRestock?'Availability':isGem?'Merchandising':isCheckout?'Checkout':'Product',
-      metric: isRestock ? `${p.name} — ${p.pctViews}% of all views, out of stock`
-            : isGem ? `${p.name} — view→cart ${(p.viewToAtc*100).toFixed(0)}% but only ${p.pctViews}% of views`
-            : isCheckout ? `${p.name} — carted by ${(p.viewToAtc*100).toFixed(0)}% of viewers, but only ${a2p}% of carts buy`
-            : `${p.name} — ${NUM(p.views)} views, view→cart ${(p.viewToAtc*100).toFixed(1)}%`,
+      metric: isRestock ? `${p.name}, ${p.pctViews}% of all views, out of stock`
+            : isGem ? `${p.name}, view to cart ${(p.viewToAtc*100).toFixed(0)}% but only ${p.pctViews}% of views`
+            : isCheckout ? `${p.name}, carted by ${(p.viewToAtc*100).toFixed(0)}% of viewers, but only ${a2p}% of carts buy`
+            : `${p.name}, ${NUM(p.views)} views, view to cart ${(p.viewToAtc*100).toFixed(1)}%`,
       verdict:'act', confidence: isRestock?'high':'med',
       reasoning: isCheckout
-        ? `Product-level GA4: ${NUM(p.views)} views, view→cart ${(p.viewToAtc*100).toFixed(1)}% (healthy desire — people want it), but cart→purchase just ${a2p}% vs the site's ${site}%. They cart it, then drop at checkout — a completion problem, not a product one.`
-        : `Product-level GA4: ${NUM(p.views)} views, view→cart ${(p.viewToAtc*100).toFixed(1)}%, view→buy ${(p.viewToPurch*100).toFixed(1)}%. ${isRestock?'In demand but out of stock.':isGem?'Strong desire, low visibility — a merchandising win.':'High visibility, weak desire — a product page/product problem.'}`,
+        ? `Product-level GA4: ${NUM(p.views)} views, view to cart ${(p.viewToAtc*100).toFixed(1)}% (healthy desire, people want it), but cart to purchase just ${a2p}% vs the site's ${site}%. They cart it, then drop at checkout, a completion problem, not a product one.`
+        : `Product-level GA4: ${NUM(p.views)} views, view to cart ${(p.viewToAtc*100).toFixed(1)}%, view to buy ${(p.viewToPurch*100).toFixed(1)}%. ${isRestock?'In demand but out of stock.':isGem?'Strong desire, low visibility, a merchandising win.':'High visibility, weak desire, a product page/product problem.'}`,
       recommendation: p.move, gbp: Math.round(p.gbp), _product:true,
     };
   });
@@ -6037,9 +6037,9 @@ function discountFindings(){
   const ratePct = Math.round((full.discountRate||0)*100);
   return [{
     area:'Promotions',
-    metric:`${leak.code} — always-on ${ratePct}% code, every week on ${NUM(full.orders)} orders`,
+    metric:`${leak.code}, always-on ${ratePct}% code, every week on ${NUM(full.orders)} orders`,
     verdict:'act', confidence:'med',
-    reasoning:`"${leak.code}" has run continuously since ${fmtWk(full.firstSeen)} (${full.activeDays} active days) — not a campaign, a standing discount. It gives away ${GBP(perMonth)}/mo of margin (${GBP(full.discount)} over the window). Some of those orders would convert at full price; the open question is how many.`,
+    reasoning:`"${leak.code}" has run continuously since ${fmtWk(full.firstSeen)} (${full.activeDays} active days), not a campaign, a standing discount. It gives away ${GBP(perMonth)}/mo of margin (${GBP(full.discount)} over the window). Some of those orders would convert at full price; the open question is how many.`,
     recommendation:`Decide if this is a deliberate evergreen offer or a default capping margin. Test it: gate it behind email signup, or run a 2-week holdout, and watch whether orders hold. If they do, you've recovered the margin; if they drop, it's load-bearing demand.`,
     gbp: perMonth, _discount:true,
   }];
@@ -6058,10 +6058,10 @@ function markdownFindings(){
   const codeAuto = (D.marketingDiscount||0) + (D.automaticDiscount||0);
   return [{
     area:'Margin',
-    metric:`Sale-price markdowns — ${D.catalogOnSale}/${D.catalogActive} of catalogue at ~${D.avgMarkdownPct}% off (~${Math.round((D.markdownShareOfValue||0)*100)}% of sold value)`,
+    metric:`Sale-price markdowns, ${D.catalogOnSale}/${D.catalogActive} of catalogue at ~${D.avgMarkdownPct}% off (~${Math.round((D.markdownShareOfValue||0)*100)}% of sold value)`,
     verdict:'act', confidence:'med',
-    reasoning:`Compare-at markdowns never enter Shopify's discount total, so the headline discount load (codes + automatic ≈ ${GBP(codeAuto)}) understates the real giveaway. Markdowns add ${GBP(md)} over the window — the true discount load is materially higher than the code figure. A margin lever hiding from the discount reports.`,
-    recommendation:`Review the markdown/clearance strategy — it's a bigger margin lever than your codes. Tighten deep markdowns on full-demand items; reserve them for genuine clearance. Full breakdown on Promotions.`,
+    reasoning:`Compare-at markdowns never enter Shopify's discount total, so the headline discount load (codes + automatic ≈ ${GBP(codeAuto)}) understates the real giveaway. Markdowns add ${GBP(md)} over the window, the true discount load is materially higher than the code figure. A margin lever hiding from the discount reports.`,
+    recommendation:`Review the markdown/clearance strategy, it's a bigger margin lever than your codes. Tighten deep markdowns on full-demand items; reserve them for genuine clearance. Full breakdown on Promotions.`,
     gbp: perMonth, _markdown:true,
   }];
 }
@@ -6075,9 +6075,9 @@ function cvrFindings(){
   const td = M.topDriver;
   return [{
     area:'Conversion',
-    metric:`conversion rate ${M.cvrPrev}% → ${M.cvrNow}% (${M.deltaCVR>=0?'+':''}${M.deltaCVR}pp) · ${M.mixDominant?'traffic-mix':'site / within-channel'}`,
+    metric:`conversion rate ${M.cvrPrev}% → ${M.cvrNow}% (${M.deltaCVR>=0?'+':''}${M.deltaCVR}pp), ${M.mixDominant?'traffic-mix':'site / within-channel'}`,
     verdict: up?'monitor':'act', confidence:'med',
-    reasoning:`${M.mixDominant?'Largely a traffic-mix shift (who you sent, not how the site converts)':'A real within-channel move — the site converts differently, not just a mix artefact'}; ${contrib}% of the change sits at ${mover}.${td?` Strongest daily correlate: ${td.label} (r=${td.r>0?'+':''}${td.r}${td.confound?', traffic-mix confounded':''}).`:''}`,
+    reasoning:`${M.mixDominant?'Largely a traffic-mix shift (who you sent, not how the site converts)':'A real within-channel move, the site converts differently, not just a mix artefact'}; ${contrib}% of the change sits at ${mover}.${td?` Strongest daily correlate: ${td.label} (r=${td.r>0?'+':''}${td.r}${td.confound?', traffic-mix confounded':''}).`:''}`,
     recommendation: up
       ? `Protect what changed at ${mover}. See conversion rate drivers for the funnel decomposition, mix-vs-site split and the week-vs-week comparator.`
       : `Investigate ${mover} first. See conversion rate drivers for the funnel decomposition, mix-vs-site split and correlations.`,
@@ -6208,16 +6208,16 @@ function CvrDrivers(){
     return {drivers, resid, cleanPairs:pairs.sort((x,y)=>y.score-x.score).slice(0,3)};
   }, [seriesDaily, series]);
   if(!_cvrOk) return (
-    <div className="card"><div className="card-section-title"><h2 style={{margin:0}}>Conversion rate — drivers</h2></div>
+    <div className="card"><div className="card-section-title"><h2 style={{margin:0}}>Conversion rate, drivers</h2></div>
     <div className="note">{D&&D.meta
-      ? `Needs 21 days of reliable analytics to split conversion into traffic mix and site performance. Greta has ${D.meta.days||0}${D.meta.lo?` (since ${D.meta.lo})`:''} — days when GA4 tracking was broken are left out. This fills in by itself.`
+      ? `Needs 21 days of reliable analytics to split conversion into traffic mix and site performance. There are ${D.meta.days||0} so far${D.meta.lo?` (since ${D.meta.lo})`:''}, days when GA4 tracking was broken are left out. This fills in by itself.`
       : 'Loading your analytics…'}</div></div>);
   const M=D.meta, channels=D.channels||[], drivers=D.drivers||[];
-  const STAGES=['session→cart','cart→checkout','checkout→purchase'];
+  const STAGES=['session to cart','cart to checkout','checkout to purchase'];
   const up = M.deltaCVR>=0, mixDom=M.mixDominant;
   const verdict = mixDom
     ? {txt:'Traffic-mix shift', color:PAL.warn, sub:'mostly who you’re sending, not how the site converts'}
-    : {txt:(up?'Real site improvement':'Real site slowdown'), color:(up?PAL.good:PAL.bad), sub:'channels are converting differently — not just a mix artefact'};
+    : {txt:(up?'Real site improvement':'Real site slowdown'), color:(up?PAL.good:PAL.bad), sub:'channels are converting differently, not just a mix artefact'};
   const maxAbs = Math.max(...drivers.map(d=>d.abs), 0.01);
 
   // ── Two-week comparator: default to the pair with the biggest CVR gap among
@@ -6275,9 +6275,9 @@ function CvrDrivers(){
   const setGranReset = (g)=>{ setChartGran(g); setCmp(defaultPair(g==='day'?seriesDaily:series)); };
   const lbl = (s)=> (gran==='day'?'':'wc ')+fmtWk(s.w);
   const CMP_METRICS=[
-    {g:'Funnel stage', k:'s2c', l:'Session→cart', t:'pct'},
-    {g:'Funnel stage', k:'c2co', l:'Cart→checkout', t:'pct'},
-    {g:'Funnel stage', k:'co2p', l:'Checkout→purchase', t:'pct'},
+    {g:'Funnel stage', k:'s2c', l:'Session to cart', t:'pct'},
+    {g:'Funnel stage', k:'c2co', l:'Cart to checkout', t:'pct'},
+    {g:'Funnel stage', k:'co2p', l:'Checkout to purchase', t:'pct'},
     {g:'Traffic & behaviour', k:'paidShare', l:'Paid-traffic share', t:'pct'},
     {g:'Traffic & behaviour', k:'emailShare', l:'Email-traffic share', t:'pct'},
     {g:'Traffic & behaviour', k:'organicShare', l:'Organic share', t:'pct'},
@@ -6292,9 +6292,9 @@ function CvrDrivers(){
     {g:'Checkout & payment', k:'freeShipShare', l:'Free-shipping rate (web)', t:'pct'},
     {g:'Checkout & payment', k:'altPayShare', l:'Alt-payment share (PayPal/other)', t:'pct'},
     {g:'Commercial', k:'aov', l:'Average order', t:'gbp'},
-    {g:'Commercial', k:'trueDiscountIntensity', l:'Discount intensity — incl. sale prices (web)', t:'pct'},
-    {g:'Commercial', k:'markdownIntensity', l:'— of which sale-price markdowns', t:'pct'},
-    {g:'Commercial', k:'discountIntensity', l:'Discount intensity — codes/auto only (all orders)', t:'pct'},
+    {g:'Commercial', k:'trueDiscountIntensity', l:'Discount intensity, incl. sale prices (web)', t:'pct'},
+    {g:'Commercial', k:'markdownIntensity', l:'of which sale-price markdowns', t:'pct'},
+    {g:'Commercial', k:'discountIntensity', l:'Discount intensity, codes/auto only (all orders)', t:'pct'},
     {g:'Commercial', k:'emailSends', l:'Email sends', t:'num'},
     {g:'Commercial', k:'adSpend', l:'Ad spend', t:'gbp'},
     {g:'Commercial', k:'revenue', l:'Revenue', t:'gbp'},
@@ -6336,16 +6336,16 @@ function CvrDrivers(){
     adSpend:              {dir:-1, kind:'mix',      noun:'ad spend', rate:true, note:'usually buys colder reach'},
   };
   const KIND_VERDICT = {
-    mix:`mostly a traffic-mix effect — the gap is about WHO visited, not how the site converted. Treat it as a composition artefact unless within-channel conversion rate also moved.`,
-    site:`a site / behaviour change (relevance, speed, engagement) — a genuine, ownable lever.`,
-    offer:`offer-led — discounting moved with conversion rate. Watch margin: a conversion rate win bought with depth can still lose money.`,
-    checkout:`checkout mechanics (shipping or payment friction) — usually a fixable, durable lever.`,
-    device:`a device-mix shift (mobile vs desktop) — check mobile conversion rate specifically before acting.`,
+    mix:`mostly a traffic-mix effect, the gap is about WHO visited, not how the site converted. Treat it as a composition artefact unless within-channel conversion rate also moved.`,
+    site:`a site / behaviour change (relevance, speed, engagement), a genuine, ownable lever.`,
+    offer:`offer-led, discounting moved with conversion rate. Watch margin: a conversion rate win bought with depth can still lose money.`,
+    checkout:`checkout mechanics (shipping or payment friction), usually a fixable, durable lever.`,
+    device:`a device-mix shift (mobile vs desktop), check mobile conversion rate specifically before acting.`,
   };
   const buildCmpStory = ()=>{ if(!cA||!cB||cA.cvr==null||cB.cvr==null) return null;
     const pp=+(cB.cvr-cA.cvr).toFixed(2), up=pp>=0;
     const ln=(a,b)=> (a>0&&b>0)?Math.log(b/a):0;
-    const stages=[['session→cart','s2c'],['cart→checkout','c2co'],['checkout→purchase','co2p']]
+    const stages=[['session to cart','s2c'],['cart to checkout','c2co'],['checkout to purchase','co2p']]
       .map(([label,k])=>({label,k,a:cA[k],b:cB[k],ln:ln(cA[k],cB[k])}));
     const sumLn=stages.reduce((s,x)=>s+x.ln,0);
     const tiny = Math.abs(pp)<0.03 || Math.abs(sumLn)<1e-4;
@@ -6358,7 +6358,7 @@ function CvrDrivers(){
       if(k!=='adSpend' && Math.abs(d)<1) return null;     // <1pp pct move = noise
       if(mag<0.08) return null;                            // <8% relative = noise
       const word = d>0 ? (m.rate?'higher':'more') : (m.rate?'lower':'fewer');
-      const phrase = `${word} ${m.noun}${m.note?` — ${m.note}`:''}`;
+      const phrase = `${word} ${m.noun}${m.note?`, ${m.note}`:''}`;
       const push=Math.sign(d)*m.dir, consistent= up? push>0 : push<0;
       return {k,a,b,d,mag,kind:m.kind,phrase,consistent}; }).filter(Boolean).sort((x,y)=>y.mag-x.mag);
     const consistent=drivers.filter(d=>d.consistent).slice(0,4);
@@ -6377,8 +6377,8 @@ function CvrDrivers(){
 
   const fmtMetric=(k,v)=> fmtVal(cmType[k]||'pct', v);
   const cmpAskAI = ()=>{ if(!window.__oiAsk||!cA||!cB||!cmpStory) return; const S=cmpStory; const u=gran==='day'?'day':'week';
-    const fld=(c)=>`conversion rate ${c.cvr}%, sessions ${NUM(c.sessions)} | funnel: session→cart ${c.s2c}%, cart→checkout ${c.c2co}%, checkout→purchase ${c.co2p}% | new-visitor ${c.newShare}%, paid ${c.paidShare}%, email ${c.emailShare}%, mobile ${c.mobileShare}%, bounce ${c.bounce}%, engagement ${c.engagement}% | discount(incl. sale) ${c.trueDiscountIntensity}%, free-ship ${c.freeShipShare}%, average order value ${GBP(c.aov)}`;
-    const prompt=`Act as my analyst. Compare these two ${u}s for ${OI_BRAND.name||'my brand'} and explain what most likely drove the CVR difference. Use the identity CVR = session→cart × cart→checkout × checkout→purchase, and separate genuine site/offer/checkout levers from traffic-mix confounds (paid/new-visitor/device share).\n\nA · ${lbl(cA)} — ${fld(cA)}\nB · ${lbl(cB)} — ${fld(cB)}\n\nMy structural read: CVR moved ${S.up?'+':''}${S.pp}pp, mostly at ${S.lead?S.lead.label:'—'}${S.offset?` (partly offset by ${S.offset.label})`:''}. Moving with it: ${S.consistent.map(d=>cmLabel[d.k]).join(', ')||'little else'}. Against the grain: ${S.against.map(d=>cmLabel[d.k]).join(', ')||'none'}. Looks ${S.topKind||'unclear'}.\n\nDo you agree? Give the single most likely cause, the strongest confound to rule out, and one controlled test (holdout/A-B) that would confirm it.`;
+    const fld=(c)=>`conversion rate ${c.cvr}%, sessions ${NUM(c.sessions)} | funnel: session to cart ${c.s2c}%, cart to checkout ${c.c2co}%, checkout to purchase ${c.co2p}% | new-visitor ${c.newShare}%, paid ${c.paidShare}%, email ${c.emailShare}%, mobile ${c.mobileShare}%, bounce ${c.bounce}%, engagement ${c.engagement}% | discount(incl. sale) ${c.trueDiscountIntensity}%, free-ship ${c.freeShipShare}%, average order value ${GBP(c.aov)}`;
+    const prompt=`Act as my analyst. Compare these two ${u}s for ${OI_BRAND.name||'my brand'} and explain what most likely drove the CVR difference. Use the identity CVR = session to cart × cart to checkout × checkout to purchase, and separate genuine site/offer/checkout levers from traffic-mix confounds (paid/new-visitor/device share).\n\nA, ${lbl(cA)}, ${fld(cA)}\nB, ${lbl(cB)}, ${fld(cB)}\n\nMy structural read: CVR moved ${S.up?'+':''}${S.pp}pp, mostly at ${S.lead?S.lead.label:'—'}${S.offset?` (partly offset by ${S.offset.label})`:''}. Moving with it: ${S.consistent.map(d=>cmLabel[d.k]).join(', ')||'little else'}. Against the grain: ${S.against.map(d=>cmLabel[d.k]).join(', ')||'none'}. Looks ${S.topKind||'unclear'}.\n\nDo you agree? Give the single most likely cause, the strongest confound to rule out, and one controlled test (holdout/A-B) that would confirm it.`;
     window.__oiAsk(prompt);
   };
 
@@ -6405,25 +6405,25 @@ function CvrDrivers(){
 
   // recommended test — derived, honest
   const topReal = drivers.find(d=>d.significant && !d.confound);
-  const test = M.moverStage==='checkout→purchase'
-    ? `Most of the move is at checkout→purchase — audit what changed there (payment/shipping reveal, trust, the discount→full-price mix) and protect it. ${topReal?`Bounce/engagement tracks CVR most tightly (${topReal.label}, r=${topReal.r}); improve landing relevance on your top pages and watch CVR.`:''}`
-    : `${topReal?`${topReal.label} tracks CVR most tightly (r=${topReal.r}). It's a hypothesis, not proof — run a controlled change (e.g. a holdout or A/B) and watch conversion rate before committing.`:'Confirm the top correlate with a controlled test before acting.'}`;
+  const test = M.moverStage==='checkout to purchase'
+    ? `Most of the move is at checkout to purchase, audit what changed there (payment/shipping reveal, trust, the discount to full-price mix) and protect it. ${topReal?`Bounce/engagement tracks CVR most tightly (${topReal.label}, r=${topReal.r}); improve landing relevance on your top pages and watch CVR.`:''}`
+    : `${topReal?`${topReal.label} tracks CVR most tightly (r=${topReal.r}). It's a hypothesis, not proof, run a controlled change (e.g. a holdout or A/B) and watch conversion rate before committing.`:'Confirm the top correlate with a controlled test before acting.'}`;
 
   return (<div>
     <ClarityFrictionPanel/>
     <div className="card" style={{marginBottom:14}}>
       <div className="card-section-title">
-        <h2 style={{margin:0}}>Conversion rate — what's moving it <span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)',fontSize:'var(--text-sm)'}}>(sessions → order)</span></h2>
-        <span className="meta">Greta · {M.lo} → {M.hi} · {M.days} days · GA4 × Shopify × Klaviyo × Meta</span>
+        <h2 style={{margin:0}}>Conversion rate, what's moving it <span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)',fontSize:'var(--text-sm)'}}>(sessions to orders)</span></h2>
+        <span className="meta">{M.lo} to {M.hi}, {M.days} days, GA4, Shopify, Klaviyo and Meta</span>
       </div>
       <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:8}}>
-        {tile('GA4 funnel conversion rate (recent)', M.cvrNow+'%', `was ${M.cvrPrev}% · ${M.deltaCVR>=0?'+':''}${M.deltaCVR}pp`, up?PAL.good:PAL.bad)}
+        {tile('GA4 funnel conversion rate (recent)', M.cvrNow+'%', `was ${M.cvrPrev}%, ${M.deltaCVR>=0?'+':''}${M.deltaCVR}pp`, up?PAL.good:PAL.bad)}
         {tile('What kind of move', verdict.txt, verdict.sub, verdict.color)}
         {tile('Biggest funnel mover', M.moverStage, `${Math.round((M.stageContribution[M.moverStage]||0)*100)}% of the change`, PAL.accent)}
       </div>
       {M.siteCvrNow!=null && (
         <div className="note" style={{marginBottom:14}}>
-          <b>Headline site conversion rate: {M.siteCvrNow}%</b> (Shopify orders ÷ GA4 sessions) vs the {M.benchmarkLabel||CVR_BENCH_LABEL} target — this is the figure shown on the Overview and board. The funnel percentages here are GA4-tracked (GA4 undercounts purchases vs Shopify), used to pinpoint <i>where</i> in the journey conversion moves, not as the headline number.
+          <b>Headline site conversion rate: {M.siteCvrNow}%</b> (Shopify orders ÷ GA4 sessions) vs the {M.benchmarkLabel||CVR_BENCH_LABEL} target, this is the figure shown on the Overview and board. The funnel percentages here are GA4-tracked (GA4 undercounts purchases vs Shopify), used to pinpoint <i>where</i> in the journey conversion moves, not as the headline number.
         </div>
       )}
       <div style={{display:'flex',gap:6,flexWrap:'wrap',alignItems:'center',marginBottom:8}}>
@@ -6435,13 +6435,13 @@ function CvrDrivers(){
         <span style={{width:1,height:18,background:'var(--border-subtle)',margin:'0 6px'}}/>
         <span style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',marginRight:2}}>Overlay</span>
         <button onClick={()=>setShowDisc(v=>!v)} title="Shade total discount depth (codes + sale prices) and flag the deepest-discount periods" style={{...segBtn(showDisc), border:'1px solid '+(showDisc?PAL.warn:'var(--border-subtle)'), background:showDisc?'var(--color-warning-wash)':'transparent', color:showDisc?PAL.warn:'var(--text-muted)'}}>🏷️ Discounts</button>
-        <span style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginLeft:4}}>{chartData.length} {chartGran==='day'?'days':'weeks'}{chartGran==='day'?' · daily conversion rate is noisier — read the trend, not single days':''}</span>
+        <span style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginLeft:4}}>{chartData.length} {chartGran==='day'?'days':'weeks'}{chartGran==='day'?', daily conversion rate is noisier, read the trend, not single days':''}</span>
       </div>
       <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',margin:'2px 0 8px',padding:'7px 11px',borderRadius:'var(--radius-none)',background:'var(--color-accent-wash)',border:'1px solid var(--color-accent-line)'}}>
         <span style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)',color:PAL.accent}}>Click two points on the chart to compare them</span>
         <span style={{fontSize:'var(--text-sm)',color:'var(--text-muted)'}}>{cA&&cB
-          ? <>Comparing <b style={{color:PAL.accent}}>A · {lbl(cA)}</b> <span style={{color:'var(--text-faint)'}}>vs</span> <b style={{color:PAL.good}}>B · {lbl(cB)}</b> — see table below.</>
-          : cA ? <>Picked <b style={{color:PAL.accent}}>A · {lbl(cA)}</b> — now click another point for <b style={{color:PAL.good}}>B</b>.</>
+          ? <>Comparing <b style={{color:PAL.accent}}>A: {lbl(cA)}</b> <span style={{color:'var(--text-faint)'}}>vs</span> <b style={{color:PAL.good}}>B: {lbl(cB)}</b>, see table below.</>
+          : cA ? <>Picked <b style={{color:PAL.accent}}>A: {lbl(cA)}</b>, now click another point for <b style={{color:PAL.good}}>B</b>.</>
           : <>Click the first {chartGran==='day'?'day':'week'} to set <b style={{color:PAL.accent}}>A</b>.</>}</span>
         {(cmp.a||cmp.b) && <button onClick={()=>setCmp({a:null,b:null})} style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',padding:'4px 10px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-muted)'}}>✕ Clear</button>}
         <button onClick={()=>setCmp(defaultPair(panel))} title="Auto-pick the clearest pair: similar traffic, biggest conversion rate gap" style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',padding:'4px 10px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-muted)'}}>↻ Best pair</button>
@@ -6451,7 +6451,7 @@ function CvrDrivers(){
         <R.ComposedChart data={chartData} syncId="cvr-traffic" margin={{top:6,right:14,left:8,bottom:20}} onClick={(st)=>{ if(st && st.activeLabel!=null) pickPeriod(st.activeLabel); }}>
           <R.CartesianGrid stroke={PAL.panel} vertical={false}/>
           <R.XAxis dataKey="w" tickFormatter={fmtWk} tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} interval={Math.ceil(chartData.length/9)} tickMargin={8} label={{value:chartGran==='day'?'Day':'Week', position:'insideBottom', offset:-10, fill:PAL.muted, fontSize:'var(--text-xs)'}}/>
-          <R.YAxis yAxisId="l" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>v+'%'} label={{value:'Visitors who buy (sessions→order)', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:'var(--text-xs)'}}/>
+          <R.YAxis yAxisId="l" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>v+'%'} label={{value:'Visitors who buy (sessions to order)', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:'var(--text-xs)'}}/>
           {/* Sessions moved to their own chart below: a count and a rate share no scale. */}
           {false && <R.YAxis yAxisId="r" orientation="right" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>(v/1000).toFixed(0)+'k'} label={{value:'Sessions', angle:90, position:'insideRight', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:'var(--text-xs)'}}/>}
           {/* Hidden axis for the discount-depth overlay, scaled so the amber band sits in the lower ~45% — readable but never fighting the CVR line. */}
@@ -6460,9 +6460,9 @@ function CvrDrivers(){
           <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:'var(--text-sm)', paddingBottom:8}}/>
           {false && <R.Bar yAxisId="r" dataKey="sessions" name="Sessions" fill={PAL.panel} maxBarSize={30}/>}
           {/* Total discount depth (codes + sale prices) as a soft amber band; amber diamonds flag the deepest periods. */}
-          {showDisc && <R.Area yAxisId="disc" type="monotone" dataKey="trueDiscountIntensity" name="Discount depth" stroke={PAL.neutral} strokeWidth={1.4} strokeOpacity={0.6} fill={PAL.neutral} fillOpacity={0.10} dot={discDot} activeDot={false} isAnimationActive={false} connectNulls/>}
+          {showDisc && <R.Area yAxisId="disc" type="linear" dataKey="trueDiscountIntensity" name="Discount depth" stroke={PAL.neutral} strokeWidth={1.4} strokeOpacity={0.6} fill={PAL.neutral} fillOpacity={0.10} dot={discDot} activeDot={false} isAnimationActive={false} connectNulls/>}
           <R.Brush {...brushProps('w', fmtWk)} />
-          <R.Line yAxisId="l" type="monotone" dataKey="cvr" name="Visitors who buy" stroke={PAL.site} strokeWidth={2.5} dot={false}/>
+          <R.Line yAxisId="l" type="linear" dataKey="cvr" name="Visitors who buy" stroke={PAL.site} strokeWidth={2.5} dot={false}/>
           {/* Show, don't tell: the single CVR benchmark drawn on the chart so the gap is visible, not described. */}
           <R.ReferenceLine yAxisId="l" y={CVR_BENCH*100} stroke={PAL.site} strokeDasharray="5 4" strokeOpacity={0.75}
             label={{value:`${CVR_BENCH_LABEL} conversion rate target`, position:'insideTopRight', fill:PAL.muted, fontSize:'var(--text-xs)'}}/>
@@ -6496,29 +6496,29 @@ function CvrDrivers(){
       </div>
       <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{BRUSH_HINT}</div>
       {(function(){ var pins=buildChartPins(chartData.map(function(d){return d.w;})); if(!pins.length) return null; return (
-        <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>Dots mark sales and promos, and events you logged — <span style={{color:'var(--text-muted)'}}>hover any marker for what it was</span></div>); })()}
+        <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>Dots mark sales and promos, and events you logged, <span style={{color:'var(--text-muted)'}}>hover any marker for what it was</span></div>); })()}
       {showDisc && _dv.length>0 && <div className="micro" style={{color:'var(--text-faint)',marginTop:4}}>
-        <span style={{color:PAL.warn,fontWeight:'var(--weight-semi)'}}>Amber band = total discount depth</span> (codes + automatic + sale prices, % of sales) · <span style={{color:PAL.warn}}>◆ diamonds</span> = the deepest {chartGran==='day'?'days':'weeks'} (≥{Math.round(discThr)}%, top quartile). Line up the amber peaks against conversion rate to see whether a deep promo actually moved conversion{chartGran==='day'?'':' — heavy always-on discounting can flatten the link, so look for the spikes'}.</div>}
+        <span style={{color:PAL.warn,fontWeight:'var(--weight-semi)'}}>Amber band = total discount depth</span> (codes + automatic + sale prices, % of sales), <span style={{color:PAL.warn}}>◆ diamonds</span> = the deepest {chartGran==='day'?'days':'weeks'} (≥{Math.round(discThr)}%, top quartile). Line up the amber peaks against conversion rate to see whether a deep promo actually moved conversion{chartGran==='day'?'':', heavy always-on discounting can flatten the link, so look for the spikes'}.</div>}
       {showDisc && discLift && (()=>{ const L=discLift; const big=Math.abs(L.pct||0)>=0.05; const pos=L.pp>=0; const col=!big?'var(--text-muted)':(pos?PAL.good:PAL.bad);
         const unit=chartGran==='day'?'days':'weeks';
         const verdict = !big
-          ? `Deep-discount ${unit} convert about the same as the rest — discounting isn't buying conversion here.`
+          ? `Deep-discount ${unit} convert about the same as the rest, discounting isn't buying conversion here.`
           : pos
-            ? `Deep-discount ${unit} convert ${Math.abs(L.pct*100).toFixed(0)}% higher — worth a look, but check it isn't just traffic mix or seasonality.`
-            : `Deep-discount ${unit} convert ${Math.abs(L.pct*100).toFixed(0)}% lower — promos aren't lifting conversion.`;
+            ? `Deep-discount ${unit} convert ${Math.abs(L.pct*100).toFixed(0)}% higher, worth a look, but check it isn't just traffic mix or seasonality.`
+            : `Deep-discount ${unit} convert ${Math.abs(L.pct*100).toFixed(0)}% lower, promos aren't lifting conversion.`;
         return (<div style={{marginTop:10,padding:'11px 13px',borderRadius:'var(--radius-none)',background:'var(--color-warning-wash)',border:'1px solid var(--color-warning-wash)'}}>
           <div style={{display:'flex',alignItems:'baseline',gap:8,flexWrap:'wrap',marginBottom:7}}>
             <span style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',color:PAL.warn,fontWeight:'var(--weight-bold)'}}>Discount lift</span>
-            <span style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>mean conversion rate on the deepest-discount {unit} vs the rest · this range</span>
+            <span style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>mean conversion rate on the deepest-discount {unit} vs the rest, this range</span>
           </div>
           <div style={{display:'flex',gap:16,flexWrap:'wrap',alignItems:'center'}}>
-            <div><div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)'}}>Deepest {L.deepN} · avg {Math.round(L.deepDisc)}% off</div><div style={{fontSize:'var(--text-lg)',fontWeight:'var(--weight-bold)',color:PAL.warn}}>{L.deepCvr.toFixed(2)}%</div></div>
+            <div><div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)'}}>Deepest {L.deepN}, avg {Math.round(L.deepDisc)}% off</div><div style={{fontSize:'var(--text-lg)',fontWeight:'var(--weight-bold)',color:PAL.warn}}>{L.deepCvr.toFixed(2)}%</div></div>
             <div style={{fontSize:'var(--text-base)',color:'var(--text-faint)'}}>vs</div>
-            <div><div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)'}}>Other {L.restN} · avg {Math.round(L.restDisc)}% off</div><div style={{fontSize:'var(--text-lg)',fontWeight:'var(--weight-bold)'}}>{L.restCvr.toFixed(2)}%</div></div>
+            <div><div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)'}}>Other {L.restN}, avg {Math.round(L.restDisc)}% off</div><div style={{fontSize:'var(--text-lg)',fontWeight:'var(--weight-bold)'}}>{L.restCvr.toFixed(2)}%</div></div>
             <div style={{fontSize:'var(--text-base)',color:'var(--text-faint)'}}>→</div>
             <div><div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)'}}>Lift</div><div style={{fontSize:'var(--text-lg)',fontWeight:'var(--weight-bold)',color:col}}>{L.pp>=0?'+':''}{L.pp.toFixed(2)}pp{L.pct!=null?` (${L.pp>=0?'+':''}${Math.round(L.pct*100)}%)`:''}</div></div>
           </div>
-          <div style={{fontSize:'var(--text-xs)',color:'var(--text-muted)',marginTop:8}}>{verdict} <span style={{color:'var(--text-faint)'}}>Observational, not causal — deep-discount {unit} can also differ in traffic mix, season and email volume. Click a deep-discount point vs a normal one below to inspect a specific pair.</span></div>
+          <div style={{fontSize:'var(--text-xs)',color:'var(--text-muted)',marginTop:8}}>{verdict} <span style={{color:'var(--text-faint)'}}>Observational, not causal, deep-discount {unit} can also differ in traffic mix, season and email volume. Click a deep-discount point vs a normal one below to inspect a specific pair.</span></div>
         </div>); })()}
       <ChartFooter note={`Is conversion holding above the ${CVR_BENCH_LABEL} target? A falling line on rising sessions usually means traffic-mix, not the site.`}
         ask="Looking at the weekly conversion-rate trend vs sessions, what's driving conversion rate and is it a site problem or a traffic-mix one?"
@@ -6531,7 +6531,7 @@ function CvrDrivers(){
 
     <div className="card" style={{marginBottom:14}}>
       <div className="card-section-title"><h2 style={{margin:0}}>Compare two {gran==='day'?'days':'weeks'}</h2>
-        <span className="meta">click two points on the trend chart above — biggest differences flagged automatically</span></div>
+        <span className="meta">click two points on the trend chart above, biggest differences flagged automatically</span></div>
       <div style={{display:'flex',gap:10,flexWrap:'wrap',alignItems:'center',marginBottom:10}}>
         {cA && cB
           ? <div style={{fontSize:'var(--text-sm)',color:'var(--text-muted)'}}>Comparing <b style={{color:PAL.accent}}>{lbl(cA)}</b> <span style={{color:'var(--text-faint)'}}>vs</span> <b style={{color:PAL.good}}>{lbl(cB)}</b></div>
@@ -6540,17 +6540,17 @@ function CvrDrivers(){
         {(cmp.a||cmp.b) && <button onClick={()=>setCmp({a:null,b:null})} style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)',padding:'6px 12px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:'var(--text-muted)'}}>✕ Clear</button>}
       </div>
       {gran==='week' && STAT.cleanPairs && STAT.cleanPairs.length>0 && <div style={{marginBottom:12}}>
-        <div style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',color:'var(--text-faint)',marginBottom:5}}>Cleanest tests — matched traffic, one lever differs <span title="Week pairs where traffic mix (new/paid/mobile share) and volume are near-identical, so the CVR gap is mostly attributable to the single lever shown. The lowest-confound comparisons in your data — the closest thing to a natural experiment." style={{cursor:'help',color:'var(--text-muted)'}}>ⓘ</span></div>
+        <div style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',color:'var(--text-faint)',marginBottom:5}}>Cleanest tests, matched traffic, one lever differs <span title="Week pairs where traffic mix (new/paid/mobile share) and volume are near-identical, so the CVR gap is mostly attributable to the single lever shown. The lowest-confound comparisons in your data, the closest thing to a natural experiment." style={{cursor:'help',color:'var(--text-muted)'}}>ⓘ</span></div>
         <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{STAT.cleanPairs.map((p,i)=>{ const A=byW[p.a],B=byW[p.b]; if(!A||!B) return null; const f=(t,v)=> t==='pct'?Math.round(v)+'%': t==='gbp'?GBP(v): NUM(v);
           return (<button key={i} onClick={()=>setCmp({a:p.a,b:p.b})} title="Load this low-confound pair" style={{fontSize:'var(--text-xs)',padding:'5px 10px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1px solid var(--color-success-line)',background:'var(--color-success-wash)',color:'var(--text-secondary)',textAlign:'left'}}>
-            <b style={{color:PAL.good}}>{p.lever.lab}</b> {f(p.lever.t,p.lever.a)}→{f(p.lever.t,p.lever.b)} <span style={{color:'var(--text-faint)'}}>· {fmtWk(p.a)} vs {fmtWk(p.b)} · conversion rate gap {p.cvrGap.toFixed(2)}pp</span>
+            <b style={{color:PAL.good}}>{p.lever.lab}</b> {f(p.lever.t,p.lever.a)}→{f(p.lever.t,p.lever.b)} <span style={{color:'var(--text-faint)'}}>{fmtWk(p.a)} vs {fmtWk(p.b)}, conversion rate gap {p.cvrGap.toFixed(2)}pp</span>
           </button>); })}</div>
       </div>}
       {cA&&cB&&<>
         <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:12}}>
-          {tile(lbl(cA), cA.cvr+'%', `${NUM(cA.orders)}/${NUM(cA.sessions)} · 95% CI ${ciA?(ciA.lo*100).toFixed(2)+'–'+(ciA.hi*100).toFixed(2)+'%':'—'}`, cA.cvr>=cB.cvr?PAL.good:'var(--text-primary)')}
-          {tile(lbl(cB), cB.cvr+'%', `${NUM(cB.orders)}/${NUM(cB.sessions)} · 95% CI ${ciB?(ciB.lo*100).toFixed(2)+'–'+(ciB.hi*100).toFixed(2)+'%':'—'}`, cB.cvr>=cA.cvr?PAL.good:'var(--text-primary)')}
-          {tile('conversion rate gap', `${(Math.abs(cA.cvr-cB.cvr)).toFixed(2)}pp`, gapSig?(gapSig.p<0.05?`${pTxt(gapSig.p)} — a real difference`:`${pTxt(gapSig.p)} — within sampling noise`):'', gapSig?(gapSig.p<0.05?PAL.good:PAL.warn):PAL.accent)}
+          {tile(lbl(cA), cA.cvr+'%', `${NUM(cA.orders)}/${NUM(cA.sessions)}, 95% CI ${ciA?(ciA.lo*100).toFixed(2)+'–'+(ciA.hi*100).toFixed(2)+'%':'—'}`, cA.cvr>=cB.cvr?PAL.good:'var(--text-primary)')}
+          {tile(lbl(cB), cB.cvr+'%', `${NUM(cB.orders)}/${NUM(cB.sessions)}, 95% CI ${ciB?(ciB.lo*100).toFixed(2)+'–'+(ciB.hi*100).toFixed(2)+'%':'—'}`, cB.cvr>=cA.cvr?PAL.good:'var(--text-primary)')}
+          {tile('conversion rate gap', `${(Math.abs(cA.cvr-cB.cvr)).toFixed(2)}pp`, gapSig?(gapSig.p<0.05?`${pTxt(gapSig.p)}, a real difference`:`${pTxt(gapSig.p)}, within sampling noise`):'', gapSig?(gapSig.p<0.05?PAL.good:PAL.warn):PAL.accent)}
         </div>
         {movers.length>0 && <div style={{marginBottom:10}}>
           <div style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',color:'var(--text-faint)',marginBottom:5}}>Biggest differences</div>
@@ -6561,23 +6561,23 @@ function CvrDrivers(){
           const u=gran==='day'?'day':'week';
           return (<div style={{marginBottom:12,padding:'13px 15px',borderRadius:'var(--radius-none)',background:'var(--color-accent-wash)',border:'1px solid var(--color-accent-line)'}}>
             <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:8}}>
-              <span style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',color:PAL.accent,fontWeight:'var(--weight-bold)'}}>Why the difference — likely drivers</span>
+              <span style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',color:PAL.accent,fontWeight:'var(--weight-bold)'}}>Why the difference, likely drivers</span>
               <span style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}} >Derived from the metric model</span>
             </div>
             {gapSig && (gapSig.p<0.05
-              ? <div style={{fontSize:'var(--text-xs)',color:PAL.good,marginBottom:8,fontWeight:'var(--weight-semi)'}}>The conversion rate gap is statistically real ({pTxt(gapSig.p)}, two-proportion test) — worth explaining.</div>
-              : <div style={{fontSize:'var(--text-sm)',color:PAL.warn,marginBottom:8,padding:'7px 10px',borderRadius:'var(--radius-none)',background:'var(--color-warning-wash)',border:'1px solid var(--color-warning-wash)'}}>This conversion rate gap is within sampling noise ({pTxt(gapSig.p)}) — only {NUM(cA.orders)} vs {NUM(cB.orders)} orders on these {gran==='day'?'days':'weeks'}. Treat the read below as a weak hypothesis, not a finding; a wider-apart or higher-volume pair gives a cleaner signal.</div>)}
+              ? <div style={{fontSize:'var(--text-xs)',color:PAL.good,marginBottom:8,fontWeight:'var(--weight-semi)'}}>The conversion rate gap is statistically real ({pTxt(gapSig.p)}, two-proportion test), worth explaining.</div>
+              : <div style={{fontSize:'var(--text-sm)',color:PAL.warn,marginBottom:8,padding:'7px 10px',borderRadius:'var(--radius-none)',background:'var(--color-warning-wash)',border:'1px solid var(--color-warning-wash)'}}>This conversion rate gap is within sampling noise ({pTxt(gapSig.p)}), only {NUM(cA.orders)} vs {NUM(cB.orders)} orders on these {gran==='day'?'days':'weeks'}. Treat the read below as a weak hypothesis, not a finding; a wider-apart or higher-volume pair gives a cleaner signal.</div>)}
             {S.tiny
-              ? <div style={{fontSize:'var(--text-sm)',color:'var(--text-muted)'}}>CVR is essentially flat between these two ({S.pp>=0?'+':''}{S.pp}pp). The inputs below shifted but netted out — there's no real conversion difference to explain. Pick a wider-apart pair to see a driver story.</div>
+              ? <div style={{fontSize:'var(--text-sm)',color:'var(--text-muted)'}}>CVR is essentially flat between these two ({S.pp>=0?'+':''}{S.pp}pp). The inputs below shifted but netted out, there's no real conversion difference to explain. Pick a wider-apart pair to see a driver story.</div>
               : <div style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)',lineHeight:1.55}}>
-                  <div style={{marginBottom:6}}><b style={{color:PAL.accent}}>1 · Where in the funnel.</b> The <b style={{color:S.up?PAL.good:PAL.bad}}>{S.up?'+':''}{S.pp}pp</b> move is mostly at <b>{S.lead.label}</b> ({Math.round(Math.min(Math.abs(S.lead.share),1)*100)}% of it{S.offset?<>, partly offset by <b>{S.offset.label}</b></>:''}) — {(+S.lead.a).toFixed(1)}% → {(+S.lead.b).toFixed(1)}%.</div>
-                  <div style={{marginBottom:6}}><b style={{color:PAL.accent}}>2 · What moved with it.</b> {S.consistent.length
+                  <div style={{marginBottom:6}}><b style={{color:PAL.accent}}>1. Where in the funnel.</b> The <b style={{color:S.up?PAL.good:PAL.bad}}>{S.up?'+':''}{S.pp}pp</b> move is mostly at <b>{S.lead.label}</b> ({Math.round(Math.min(Math.abs(S.lead.share),1)*100)}% of it{S.offset?<>, partly offset by <b>{S.offset.label}</b></>:''}), {(+S.lead.a).toFixed(1)}% → {(+S.lead.b).toFixed(1)}%.</div>
+                  <div style={{marginBottom:6}}><b style={{color:PAL.accent}}>2. What moved with it.</b> {S.consistent.length
                     ? <>{S.consistent.map((d,i)=><span key={d.k}>{i>0?'; ':''}<b>{cmLabel[d.k]}</b> {fmtMetric(d.k,d.a)}→{fmtMetric(d.k,d.b)} <span style={{color:'var(--text-faint)'}}>({d.phrase})</span></span>)}.</>
-                    : <span style={{color:'var(--text-muted)'}}>nothing else moved much — the tracked inputs don't explain this gap, so suspect data noise or an untracked factor.</span>}</div>
-                  {S.against.length>0 && <div style={{marginBottom:6}}><b style={{color:PAL.accent}}>3 · Against the grain.</b> {S.against.map((d,i)=><span key={d.k}>{i>0?'; ':''}<b>{cmLabel[d.k]}</b> {fmtMetric(d.k,d.a)}→{fmtMetric(d.k,d.b)}</span>)} usually push{S.against.length>1?'':'es'} conversion rate the other way — so the {S.up?'gain':'drop'} happened <i>despite</i> {S.against.length>1?'them':'it'}, which sharpens the diagnosis.</div>}
-                  {S.verdict && <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--border-subtle)'}}><b style={{color:vcol}}>Likely driver:</b> <span style={{color:'var(--text-secondary)'}}>{S.verdict}</span> <span style={{color:'var(--text-faint)'}}>{sessClose?'Sessions are near-identical, so this is a relatively clean read.':'Sessions differ a lot here — volume itself shifts the mix, so read with care.'} Two periods is correlation, not proof.</span></div>}
+                    : <span style={{color:'var(--text-muted)'}}>nothing else moved much, the tracked inputs don't explain this gap, so suspect data noise or an untracked factor.</span>}</div>
+                  {S.against.length>0 && <div style={{marginBottom:6}}><b style={{color:PAL.accent}}>3. Against the grain.</b> {S.against.map((d,i)=><span key={d.k}>{i>0?'; ':''}<b>{cmLabel[d.k]}</b> {fmtMetric(d.k,d.a)}→{fmtMetric(d.k,d.b)}</span>)} usually push{S.against.length>1?'':'es'} conversion rate the other way, so the {S.up?'gain':'drop'} happened <i>despite</i> {S.against.length>1?'them':'it'}, which sharpens the diagnosis.</div>}
+                  {S.verdict && <div style={{marginTop:8,paddingTop:8,borderTop:'1px solid var(--border-subtle)'}}><b style={{color:vcol}}>Likely driver:</b> <span style={{color:'var(--text-secondary)'}}>{S.verdict}</span> <span style={{color:'var(--text-faint)'}}>{sessClose?'Sessions are near-identical, so this is a relatively clean read.':'Sessions differ a lot here, volume itself shifts the mix, so read with care.'} Two periods is correlation, not proof.</span></div>}
                   {STAT.resid && STAT.resid.byW[cmp.b] && (()=>{ const rB=STAT.resid.byW[cmp.b]; const unexp=Math.abs(rB.z)>=1.3;
-                    return (<div style={{marginTop:6,fontSize:'var(--text-xs)',color:'var(--text-faint)'}}><b style={{color:unexp?PAL.accent:'var(--text-muted)'}}>Mix-adjusted:</b> after modelling conversion rate from traffic warmth (new-visitor share), {lbl(cB)} lands <b style={{color:rB.e>=0?PAL.good:PAL.bad}}>{rB.e>=0?'+':''}{rB.e.toFixed(2)}pp</b> vs expected ({(rB.exp).toFixed(2)}%) — {unexp?'a genuinely un-modelled move, the kind worth a controlled test':'about what the model predicts, so most of the gap is explained by the inputs'}.</div>); })()}
+                    return (<div style={{marginTop:6,fontSize:'var(--text-xs)',color:'var(--text-faint)'}}><b style={{color:unexp?PAL.accent:'var(--text-muted)'}}>Mix-adjusted:</b> after modelling conversion rate from traffic warmth (new-visitor share), {lbl(cB)} lands <b style={{color:rB.e>=0?PAL.good:PAL.bad}}>{rB.e>=0?'+':''}{rB.e.toFixed(2)}pp</b> vs expected ({(rB.exp).toFixed(2)}%), {unexp?'a genuinely un-modelled move, the kind worth a controlled test':'about what the model predicts, so most of the gap is explained by the inputs'}.</div>); })()}
                 </div>}
             <div onClick={cmpAskAI} style={{marginTop:9,fontSize:'var(--text-sm)',color:PAL.accent,cursor:'pointer',fontWeight:'var(--weight-semi)'}}>Ask Greta about this pair</div>
           </div>); })()}
@@ -6597,7 +6597,7 @@ function CvrDrivers(){
 
         {Object.keys(cA.landing||{}).length>0 && (()=>{ const types=[...new Set([...Object.keys(cA.landing||{}),...Object.keys(cB.landing||{})])].sort((x,y)=>((cB.landing[y]||{}).share||0)-((cB.landing[x]||{}).share||0));
           return (<div style={{marginTop:14}}>
-            <div style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',color:PAL.accent,marginBottom:4}}>Landing pages — where they entered (share · conversion rate within type)</div>
+            <div style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',color:PAL.accent,marginBottom:4}}>Landing pages, where they entered (share, conversion rate within type)</div>
             <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:'var(--text-sm)'}}>
               <thead><tr style={{textAlign:'left',color:'var(--text-faint)',fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)'}}><th style={{padding:'4px 8px 4px 0'}}>Type</th><th style={{padding:'4px 8px',textAlign:'right'}}>{lbl(cA)} share</th><th style={{padding:'4px 8px',textAlign:'right'}}>{lbl(cB)} share</th><th style={{padding:'4px 8px',textAlign:'right'}}>{lbl(cA)} conversion rate</th><th style={{padding:'4px 8px',textAlign:'right'}}>{lbl(cB)} conversion rate</th></tr></thead>
               <tbody>{types.map(t=>{ const A=cA.landing[t]||{}, B=cB.landing[t]||{}; const cg=(B.cvr||0)-(A.cvr||0); return (<tr key={t} style={{borderTop:'1px solid var(--border-subtle)'}}>
@@ -6611,47 +6611,47 @@ function CvrDrivers(){
           </div>); })()}
 
         {((cA.landTop||[]).length>0 || (cB.landTop||[]).length>0) && <div style={{marginTop:14}}>
-          <div style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',color:PAL.accent,marginBottom:4}}>Top landing pages — specific URLs (sessions · conversion rate)</div>
+          <div style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',color:PAL.accent,marginBottom:4}}>Top landing pages, specific URLs (sessions, conversion rate)</div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))',gap:16}}>
             {[[lbl(cA),cA.landTop||[]],[lbl(cB),cB.landTop||[]]].map((pair,i)=>(<div key={i}>
               <div style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',color:'var(--text-secondary)',marginBottom:2}}>{pair[0]}</div>
               {pair[1].length?pair[1].map(p=>(<div key={p.url} style={{display:'flex',justifyContent:'space-between',gap:8,padding:'4px 0',borderTop:'1px solid var(--border-subtle)',fontSize:'var(--text-sm)'}}>
                 <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}} title={p.url}><span style={{color:'var(--text-primary)'}}>{p.url}</span>{p.oos&&<span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',color:PAL.bad,background:'var(--color-danger-wash)',border:'1px solid var(--color-danger-wash)',borderRadius:'var(--radius-md)',padding:'0 4px'}}>OOS</span>}</span>
-                <span style={{whiteSpace:'nowrap',color:'var(--text-muted)'}}>{NUM(p.sessions)} · <b style={{color:p.cvr>=1.5?PAL.good:(p.cvr<0.4?PAL.bad:'var(--text-secondary)')}}>{p.cvr}%</b></span>
+                <span style={{whiteSpace:'nowrap',color:'var(--text-muted)'}}>{NUM(p.sessions)}, <b style={{color:p.cvr>=1.5?PAL.good:(p.cvr<0.4?PAL.bad:'var(--text-secondary)')}}>{p.cvr}%</b></span>
               </div>)):<div style={{fontSize:'var(--text-sm)',color:'var(--text-muted)',padding:'4px 0'}}>—</div>}
             </div>))}
           </div>
-          <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:3}}>Watch for pages pulling big traffic at <b style={{color:PAL.bad}}>near-zero conversion rate</b> — cold campaigns or <b style={{color:PAL.bad}}>out-of-stock</b> product pages leaking spend (e.g. an ad sending traffic to an OOS product). OOS = the product is currently out of stock.</div>
+          <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:3}}>Watch for pages pulling big traffic at <b style={{color:PAL.bad}}>near-zero conversion rate</b>, cold campaigns or <b style={{color:PAL.bad}}>out-of-stock</b> product pages leaking spend (e.g. an ad sending traffic to an OOS product). OOS = the product is currently out of stock.</div>
         </div>}
 
         {((cA.topProducts||[]).length>0 || (cB.topProducts||[]).length>0) && <div style={{marginTop:14}}>
-          <div style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',color:PAL.accent,marginBottom:4}}>Top products purchased (web · units · % of units)</div>
+          <div style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',color:PAL.accent,marginBottom:4}}>Top products purchased (web, units, % of units)</div>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))',gap:16}}>
             {[[lbl(cA),cA.topProducts||[]],[lbl(cB),cB.topProducts||[]]].map((pair,i)=>(<div key={i}>
               <div style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',color:'var(--text-secondary)',marginBottom:2}}>{pair[0]}</div>
-              {pair[1].length?pair[1].map(p=>(<div key={p.name} style={{display:'flex',justifyContent:'space-between',gap:8,padding:'4px 0',borderTop:'1px solid var(--border-subtle)',fontSize:'var(--text-sm)'}}><span style={{color:'var(--text-primary)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</span><span style={{color:'var(--text-muted)',whiteSpace:'nowrap'}}>{NUM(p.units)} · {p.share}%</span></div>)):<div style={{fontSize:'var(--text-sm)',color:'var(--text-muted)',padding:'4px 0'}}>—</div>}
+              {pair[1].length?pair[1].map(p=>(<div key={p.name} style={{display:'flex',justifyContent:'space-between',gap:8,padding:'4px 0',borderTop:'1px solid var(--border-subtle)',fontSize:'var(--text-sm)'}}><span style={{color:'var(--text-primary)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.name}</span><span style={{color:'var(--text-muted)',whiteSpace:'nowrap'}}>{NUM(p.units)}, {p.share}%</span></div>)):<div style={{fontSize:'var(--text-sm)',color:'var(--text-muted)',padding:'4px 0'}}>—</div>}
             </div>))}
           </div></div>}
 
-        <div className="note" style={{marginTop:14}}>{hiW&&loW&&<>The <b>{lbl(hiW)}</b> {gran==='day'?'day':'week'} converted <b>{hiW.cvr}%</b> vs <b>{loW.cvr}%</b>{sessClose?' on near-identical traffic':''}. Clearest differences: {movers.length?movers.map((m,i)=>`${m.l.toLowerCase()} ${fmtVal(m.t,m.a)}→${fmtVal(m.t,m.b)}`).join(', '):'none stand out'}. Funnel-stage gaps are mechanical; landing/traffic gaps suggest <i>why</i>. {gran==='day'?<b>Daily samples are small — read day-vs-day as a hint, not proof.</b>:'Still correlation within two periods — the lead, not proof.'}</>}</div>
+        <div className="note" style={{marginTop:14}}>{hiW&&loW&&<>The <b>{lbl(hiW)}</b> {gran==='day'?'day':'week'} converted <b>{hiW.cvr}%</b> vs <b>{loW.cvr}%</b>{sessClose?' on near-identical traffic':''}. Clearest differences: {movers.length?movers.map((m,i)=>`${m.l.toLowerCase()} ${fmtVal(m.t,m.a)}→${fmtVal(m.t,m.b)}`).join(', '):'none stand out'}. Funnel-stage gaps are mechanical; landing/traffic gaps suggest <i>why</i>. {gran==='day'?<b>Daily samples are small, read day-vs-day as a hint, not proof.</b>:'Still correlation within two periods, the lead, not proof.'}</>}</div>
       </>}
     </div>
 
     <div className="card" style={{marginBottom:14}}>
-      <div className="card-section-title"><h2 style={{margin:0}}>1 · Where in the funnel it moved</h2>
-        <span className="meta">conversion rate = session→cart × cart→checkout × checkout→purchase — strongest evidence (structural)</span></div>
+      <div className="card-section-title"><h2 style={{margin:0}}>1. Where in the funnel it moved</h2>
+        <span className="meta">conversion rate = session to cart × cart to checkout × checkout to purchase, strongest evidence (structural)</span></div>
       <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>{STAGES.map(stageCard)}</div>
-      <div className="note" style={{marginTop:12}}>This splits the conversion rate into its three multiplicative stages and shows which one actually moved — the most causal view available, because it's arithmetic, not correlation. {M.stageContribution[M.moverStage]>=0.5?<>Here <b>{Math.round(M.stageContribution[M.moverStage]*100)}%</b> of the change sits at <b>{M.moverStage}</b> — start the investigation there.</>:null}</div>
+      <div className="note" style={{marginTop:12}}>This splits the conversion rate into its three multiplicative stages and shows which one actually moved, the most causal view available, because it's arithmetic, not correlation. {M.stageContribution[M.moverStage]>=0.5?<>Here <b>{Math.round(M.stageContribution[M.moverStage]*100)}%</b> of the change sits at <b>{M.moverStage}</b>, start the investigation there.</>:null}</div>
     </div>
 
     <div className="card" style={{marginBottom:14}}>
-      <div className="card-section-title"><h2 style={{margin:0}}>2 · Traffic mix, or the site itself?</h2>
-        <span className="meta">controls the #1 confounder — a conversion rate move that's really just colder/warmer traffic</span></div>
-      <div className="note" style={{marginBottom:10}}>Of the <b>{M.deltaCVR>=0?'+':''}{M.deltaCVR}pp</b> change, <b style={{color:PAL.warn}}>{M.mixEffect>=0?'+':''}{M.mixEffect}pp</b> is <b>traffic mix</b> (sending more/less of higher-converting channels) and <b style={{color:up?PAL.good:PAL.bad}}>{M.rateEffect>=0?'+':''}{M.rateEffect}pp</b> is <b>within-channel</b> (each channel converting differently). {mixDom?'So this is largely a mix shift — be careful calling it a site win.':<>So this is <b>real</b> — channels are genuinely converting {up?'better':'worse'}{channels.length&&Math.max(...channels.map(c=>c.shareNow-c.sharePrev))>3?', even against a rising paid-traffic share':''}.</>}</div>
+      <div className="card-section-title"><h2 style={{margin:0}}>2. Traffic mix, or the site itself?</h2>
+        <span className="meta">controls the #1 confounder, a conversion rate move that's really just colder/warmer traffic</span></div>
+      <div className="note" style={{marginBottom:10}}>Of the <b>{M.deltaCVR>=0?'+':''}{M.deltaCVR}pp</b> change, <b style={{color:PAL.warn}}>{M.mixEffect>=0?'+':''}{M.mixEffect}pp</b> is <b>traffic mix</b> (sending more/less of higher-converting channels) and <b style={{color:up?PAL.good:PAL.bad}}>{M.rateEffect>=0?'+':''}{M.rateEffect}pp</b> is <b>within-channel</b> (each channel converting differently). {mixDom?'So this is largely a mix shift, be careful calling it a site win.':<>So this is <b>real</b>, channels are genuinely converting {up?'better':'worse'}{channels.length&&Math.max(...channels.map(c=>c.shareNow-c.sharePrev))>3?', even against a rising paid-traffic share':''}.</>}</div>
       <div style={{overflowX:'auto'}}>
       <table style={{width:'100%',borderCollapse:'collapse',fontSize:'var(--text-sm)'}}>
         <thead><tr style={{textAlign:'left',color:'var(--text-faint)',fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)'}}>
-          <th style={{padding:'5px 8px 5px 0'}}>Channel</th><th style={{padding:'5px 8px',textAlign:'right'}}>Share (prev→now)</th><th style={{padding:'5px 8px',textAlign:'right'}}>Visitors who buy (before → now)</th></tr></thead>
+          <th style={{padding:'5px 8px 5px 0'}}>Channel</th><th style={{padding:'5px 8px',textAlign:'right'}}>Share (prev to now)</th><th style={{padding:'5px 8px',textAlign:'right'}}>Visitors who buy, before and now</th></tr></thead>
         <tbody>{channels.map(c=>{ const cg=c.cvrNow-c.cvrPrev; return (<tr key={c.name} style={{borderTop:'1px solid var(--border-subtle)'}}>
           <td style={{padding:'6px 8px 6px 0',fontWeight:'var(--weight-semi)'}}>{c.name}</td>
           <td style={{padding:'6px 8px',textAlign:'right',color:'var(--text-muted)'}}>{c.sharePrev}% → {c.shareNow}%</td>
@@ -6662,18 +6662,18 @@ function CvrDrivers(){
     <button onClick={()=>setShowStats(s=>!s)} style={{display:'flex',alignItems:'center',gap:8,width:'100%',background:'transparent',border:'1px solid var(--border-subtle)',borderRadius:'var(--radius-md)',padding:'11px 14px',cursor:'pointer',textAlign:'left',marginBottom:showStats?0:14}}>
       <span style={{color:'var(--text-faint)',display:'inline-flex',transform:showStats?'rotate(90deg)':'none',transition:'transform 120ms'}}><Icon name="chevron" size={13}/></span>
       <span style={{fontWeight:'var(--weight-bold)',color:'var(--text-primary)',fontSize:'var(--text-sm)'}}>Show the statistics</span>
-      <span className="muted" style={{fontSize:'var(--text-xs)'}}>correlation scan + mix-adjusted partial correlations — methodology, on demand</span>
+      <span className="muted" style={{fontSize:'var(--text-xs)'}}>correlation scan + mix-adjusted partial correlations, methodology, on demand</span>
       <span style={{marginLeft:'auto',fontSize:'var(--text-xs)',color:'var(--accent)',fontWeight:'var(--weight-semi)'}}>{showStats?'Hide':'Show'}</span>
     </button>
     {showStats && (<div>
     <div className="card">
-      <div className="card-section-title"><h2 style={{margin:0}}>3 · What moves the share of visitors who buy</h2>
-        <span className="meta">ranked by strength · green = moves with conversion rate, red = against · flagged = likely confounded by traffic mix</span></div>
+      <div className="card-section-title"><h2 style={{margin:0}}>3. What moves the share of visitors who buy</h2>
+        <span className="meta">ranked by strength, green = moves with conversion rate, red = against, flagged = likely confounded by traffic mix</span></div>
       <div style={{marginTop:4}}>{drivers.map(d=>(<div key={d.key} style={{padding:'6px 0',borderTop:'1px solid var(--border-subtle)'}}>
         <div style={{display:'grid',gridTemplateColumns:'180px 1fr 118px',gap:10,alignItems:'center'}}>
-          <div style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)'}}>{d.label}{d.confound&&<span title="moves with traffic mix — likely confounded" style={{marginLeft:5,fontSize:'var(--text-xs)',color:PAL.warn}}>⚑</span>}</div>
+          <div style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)'}}>{d.label}{d.confound&&<span title="moves with traffic mix, likely confounded" style={{marginLeft:5,fontSize:'var(--text-xs)',color:PAL.warn}}>⚑</span>}</div>
           {barCell(d)}
-          <div style={{fontSize:'var(--text-xs)',textAlign:'right'}}><b style={{color:d.dir==='up'?PAL.good:PAL.bad}}>{d.r>0?'+':''}{d.r.toFixed(2)}</b> <span style={{color:'var(--text-faint)'}}>n={d.n}{d.significant?'':' · ns'}</span></div>
+          <div style={{fontSize:'var(--text-xs)',textAlign:'right'}}><b style={{color:d.dir==='up'?PAL.good:PAL.bad}}>{d.r>0?'+':''}{d.r.toFixed(2)}</b> <span style={{color:'var(--text-faint)'}}>n={d.n}{d.significant?'':', ns'}</span></div>
         </div>
         <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:2}}>{d.note}</div>
       </div>))}</div>
@@ -6681,35 +6681,35 @@ function CvrDrivers(){
     </div>
 
     <div className="card" style={{marginTop:14}}>
-      <div className="card-section-title"><h2 style={{margin:0}}>4 · Deeper signal <span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)',fontSize:'var(--text-sm)'}}>— what survives the confounds</span></h2>
-        <span className="meta">partial correlations + an expected-CVR model{STAT.drivers[0]?` · n=${STAT.drivers[0].n} ${seriesDaily.length>=12?'days':'weeks'}`:''}</span></div>
+      <div className="card-section-title"><h2 style={{margin:0}}>4. Deeper signal <span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)',fontSize:'var(--text-sm)'}}>what survives the confounds</span></h2>
+        <span className="meta">partial correlations + an expected-CVR model{STAT.drivers[0]?`, n=${STAT.drivers[0].n} ${seriesDaily.length>=12?'days':'weeks'}`:''}</span></div>
       {STAT.drivers.length>0 ? <>
-      <div style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',color:PAL.accent,marginBottom:6}}>Levers, mix-adjusted — independent link to conversion rate after holding new-visitor share constant</div>
+      <div style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',color:PAL.accent,marginBottom:6}}>Levers, mix-adjusted, independent link to conversion rate after holding new-visitor share constant</div>
       <div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:'var(--text-sm)'}}>
         <thead><tr style={{textAlign:'left',color:'var(--text-faint)',fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)'}}>
           <th style={{padding:'4px 8px 4px 0'}}>Lever</th><th style={{padding:'4px 8px',textAlign:'right'}}>Raw r</th><th style={{padding:'4px 8px',width:120}}>Mix-adjusted</th><th style={{padding:'4px 8px',textAlign:'right'}}>Adj r</th><th style={{padding:'4px 8px'}}></th></tr></thead>
         <tbody>{STAT.drivers.map(d=>{ const w=Math.round(Math.min(Math.abs(d.adj),1)*46); const pos=d.adj>=0; const col=d.sig?(pos?PAL.good:PAL.bad):'var(--text-faint)';
           const collapsed=Math.abs(d.raw)>=0.12 && Math.abs(d.adj)<Math.abs(d.raw)*0.5;
           return (<tr key={d.k} style={{borderTop:'1px solid var(--border-subtle)'}}>
-            <td style={{padding:'6px 8px 6px 0',fontWeight:'var(--weight-semi)'}}>{d.label}{!d.sig&&<span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)',fontSize:'var(--text-xs)'}}> · ns</span>}</td>
+            <td style={{padding:'6px 8px 6px 0',fontWeight:'var(--weight-semi)'}}>{d.label}{!d.sig&&<span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)',fontSize:'var(--text-xs)'}}>, ns</span>}</td>
             <td style={{padding:'6px 8px',textAlign:'right',color:'var(--text-faint)'}}>{d.raw>=0?'+':''}{d.raw.toFixed(2)}</td>
             <td style={{padding:'6px 8px'}}><div style={{position:'relative',height:12,background:`var(--surface-2,${PAL.panel})`,borderRadius:'var(--radius-sm)'}}><div style={{position:'absolute',left:'50%',top:0,bottom:0,width:1,background:PAL.line}}/><div style={{position:'absolute',top:2,bottom:2,borderRadius:'var(--radius-sm)',background:col,left:(pos?50:(50-w))+'%',width:w+'%'}}/></div></td>
             <td style={{padding:'6px 8px',textAlign:'right',fontWeight:'var(--weight-bold)',color:col}}>{d.adj>=0?'+':''}{d.adj.toFixed(2)}</td>
             <td style={{padding:'6px 8px',fontSize:'var(--text-xs)',color:collapsed?PAL.warn:'var(--text-faint)'}}>{collapsed?'mostly mix':(d.sig?'holds':'')}</td>
           </tr>); })}</tbody>
       </table></div>
-      <div className="note" style={{marginTop:8}}>Each lever's correlation with daily conversion rate <b>after partialling out new-visitor share</b> — the dominant traffic-mix confound (it alone correlates r≈−0.46 with conversion rate). Where the adjusted figure holds near the raw one, the signal is genuinely that lever; where it collapses toward 0 (<span style={{color:'var(--color-warning)'}}>“mostly mix”</span>), the raw correlation was really just <i>who</i> visited. This is the honest read on what's actually moveable. “ns” = not significant at n shown.</div>
+      <div className="note" style={{marginTop:8}}>Each lever's correlation with daily conversion rate <b>after partialling out new-visitor share</b>, the dominant traffic-mix confound (it alone correlates r≈−0.46 with conversion rate). Where the adjusted figure holds near the raw one, the signal is genuinely that lever; where it collapses toward 0 (<span style={{color:'var(--color-warning)'}}>“mostly mix”</span>), the raw correlation was really just <i>who</i> visited. This is the honest read on what's actually moveable. “ns” = not significant at n shown.</div>
       </> : <div className="note">Not enough clean daily history yet to separate levers from traffic mix.</div>}
 
       {STAT.resid && <div style={{marginTop:16}}>
-        <div style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',color:PAL.accent,marginBottom:6}}>Unexplained conversion rate weeks — actual vs an expected-conversion rate model</div>
+        <div style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',color:PAL.accent,marginBottom:6}}>Unexplained conversion rate weeks, actual vs an expected-conversion rate model</div>
         {STAT.resid.list.length? <div style={{display:'flex',flexDirection:'column',gap:6}}>{STAT.resid.list.map(r=>{ const pos=r.e>=0;
           return (<div key={r.w} style={{display:'flex',justifyContent:'space-between',gap:10,padding:'6px 10px',borderRadius:'var(--radius-none)',background:`var(--surface-1,${PAL.panel})`,border:'1px solid var(--border-subtle)'}}>
             <span><b>{fmtWk(r.w)}</b> <span style={{color:'var(--text-faint)'}}>actual {r.act.toFixed(2)}% vs expected {r.exp.toFixed(2)}%</span></span>
             <span style={{fontWeight:'var(--weight-bold)',color:pos?PAL.good:PAL.bad}}>{pos?'+':''}{r.e.toFixed(2)}pp unexplained</span>
           </div>); })}</div>
-          : <div className="note">No week deviates much from the model — over this window conversion rate is well-explained by traffic mix + discount, so there's no off-model anomaly to chase.</div>}
-        <div className="note" style={{marginTop:8}}>Expected conversion rate is modelled from new-visitor share (how cold the week's traffic was); big residuals are weeks where <b>something other than traffic warmth</b> moved conversion rate — a site change, a tracking break, a one-off promo — i.e. the genuine “investigate this” list, already stripped of the mix confound. Click a flagged week on the chart above to compare it.</div>
+          : <div className="note">No week deviates much from the model, over this window conversion rate is well-explained by traffic mix + discount, so there's no off-model anomaly to chase.</div>}
+        <div className="note" style={{marginTop:8}}>Expected conversion rate is modelled from new-visitor share (how cold the week's traffic was); big residuals are weeks where <b>something other than traffic warmth</b> moved conversion rate, a site change, a tracking break, a one-off promo, i.e. the genuine “investigate this” list, already stripped of the mix confound. Click a flagged week on the chart above to compare it.</div>
       </div>}
     </div>
     </div>)}
@@ -6772,8 +6772,8 @@ function ZoomControls({z}){
       style={{...b, width:'auto', padding:'0 9px', fontSize:'var(--text-xs)', fontWeight:'var(--weight-semi)', opacity:z.zoomed?1:0.4, cursor:z.zoomed?'pointer':'default'}}>Reset</button>
   </div>);
 }
-const ZOOM_HINT = 'Drag to pan · pinch or ⌘/Ctrl-scroll to zoom · double-click to reset';
-const BRUSH_HINT = 'Drag the slider below to scroll · drag its handles to zoom the date range';
+const ZOOM_HINT = 'Drag to pan, pinch or ⌘/Ctrl-scroll to zoom, double-click to reset';
+const BRUSH_HINT = 'Drag the slider to scroll, or its handles to zoom';
 // Themed Recharts <Brush> for time-series charts — drag the window to scroll,
 // drag a handle to zoom the date range. Must be a direct child of the chart.
 function brushProps(key, fmt){
@@ -6794,8 +6794,8 @@ function ProductSignal(){
   // Two lenses, same quadrant: Y = desire (view→cart) or completion (cart→purchase).
   // Plotting completion while keeping the desire-based colours makes the leak visible —
   // a green "star" sitting BELOW the completion line = wanted, but not bought.
-  const LENS={ desire:{key:'viewToAtc', ref:siteV2A, label:'Desirability — view→cart %', short:'Desire (view→cart)'},
-               completion:{key:'atcToPurch', ref:atc2pur, label:'Completion — cart→purchase %', short:'Completion (cart→buy)'} };
+  const LENS={ desire:{key:'viewToAtc', ref:siteV2A, label:'Desirability, view to cart %', short:'Desire (view to cart)'},
+               completion:{key:'atcToPurch', ref:atc2pur, label:'Completion, cart to purchase %', short:'Completion (cart to buy)'} };
   const L=LENS[lens];
   const scatter = enriched.filter(p=>p.views>=30);
   const series = ['gem','star','dud','oos','dead'].map(k=>({k, data: scatter.filter(p=>p.lab===k).map(p=>({x:p.pctViews, y:+(p[L.key]*100).toFixed(1), z:p.views, name:p.name, d:+(p.viewToAtc*100).toFixed(1), c:+(p.atcToPurch*100).toFixed(1)}))}));
@@ -6814,7 +6814,7 @@ function ProductSignal(){
           exists in this bundle yet, so gate to the one brand we know the domain for (matches the
           OI_BRAND.slug==='frkl' convention used elsewhere in this file) and fall back to plain text. */}
       <div style={{fontSize:'var(--text-sm)',color:'var(--text-primary)',fontWeight:'var(--weight-semi)'}}>{(p.handle && typeof OI_BRAND!=='undefined' && OI_BRAND && OI_BRAND.slug==='frkl')?<a className="txt-link" href={`https://myfrkl.com/products/${p.handle}`} target="_blank">{p.name}</a>:p.name}</div>
-      <div style={{fontSize:'var(--text-xs)',color:'var(--text-muted)',marginTop:1}}>{NUM(p.views)} views · {p.pctViews}% of views · view→cart {(p.viewToAtc*100).toFixed(1)}% · cart→buy {(p.atcToPurch*100).toFixed(0)}%{p.price?` · ${curSym()}${p.price}`:''}</div>
+      <div style={{fontSize:'var(--text-xs)',color:'var(--text-muted)',marginTop:1}}>{NUM(p.views)} views, {p.pctViews}% of views, view to cart {(p.viewToAtc*100).toFixed(1)}%, cart to buy {(p.atcToPurch*100).toFixed(0)}%{p.price?`, ${curSym()}${p.price}`:''}</div>
       <div style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)',marginTop:2}}>→ {p.move}</div>
     </div>
     {p.gbp>=50 && <span style={{fontWeight:'var(--weight-bold)',color:'var(--good)',whiteSpace:'nowrap'}}>{GBP(p.gbp)}/mo</span>}
@@ -6837,25 +6837,25 @@ function ProductSignal(){
   return (
     <div className="card" style={{marginBottom:14}}>
       <div className="card-section-title">
-        <h2 style={{margin:0}}>Product signals <span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)',fontSize:'var(--text-sm)'}}>— where each product leaks in the funnel</span></h2>
-        <span className="meta">{gems.length} unseen gems · {pdpFix.length} product-page problems · {checkoutFix.length} checkout leaks · {restock.length} OOS in demand · view→cart = desire, cart→buy = completion</span>
+        <h2 style={{margin:0}}>Product signals <span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)',fontSize:'var(--text-sm)'}}>where each product leaks in the funnel</span></h2>
+        <span className="meta">{gems.length} unseen gems, {pdpFix.length} product-page problems, {checkoutFix.length} checkout leaks, {restock.length} OOS in demand, view to cart = desire, cart to buy = completion</span>
       </div>
       <div style={{display:'flex',alignItems:'center',gap:8,margin:'2px 0 6px'}}>
         <span style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)'}}>Y axis</span>
         {['desire','completion'].map(lensBtn)}
-        <span style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{lens==='completion'?'— a high-desire dot sitting low here = wanted, but not bought':'— how badly people want it once they see it'}</span>
+        <span style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{lens==='completion'?'a high-desire dot sitting low here = wanted, but not bought':'how badly people want it once they see it'}</span>
       </div>
       <div {...z.bind}>
       <ZoomControls z={z}/>
       <R.ResponsiveContainer width="100%" height={240}>
         <R.ScatterChart margin={{top:10,right:20,left:10,bottom:24}}>
           <R.CartesianGrid stroke={PAL.panel}/>
-          <R.XAxis type="number" dataKey="x" name="Visibility" unit="%" domain={[z.view[0],z.view[1]]} allowDataOverflow tickFormatter={niceTick} tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} label={{value:'Visibility — % of all product views', position:'insideBottom', offset:-12, fill:PAL.muted, fontSize:'var(--text-xs)'}}/>
+          <R.XAxis type="number" dataKey="x" name="Visibility" unit="%" domain={[z.view[0],z.view[1]]} allowDataOverflow tickFormatter={niceTick} tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} label={{value:'Visibility, % of all product views', position:'insideBottom', offset:-12, fill:PAL.muted, fontSize:'var(--text-xs)'}}/>
           <R.YAxis type="number" dataKey="y" name={L.short} unit="%" domain={[z.view[2],z.view[3]]} allowDataOverflow tickFormatter={niceTick} tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} label={{value:L.label, angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:'var(--text-xs)'}}/>
           <R.ZAxis type="number" dataKey="z" range={[25,320]} name="views"/>
           <R.ReferenceLine x={medPct} stroke={PAL.line} strokeDasharray="4 3"/>
           <R.ReferenceLine y={+(L.ref*100).toFixed(1)} stroke={PAL.line} strokeDasharray="4 3"/>
-          <R.Tooltip cursor={{strokeDasharray:'3 3'}} content={({payload})=>{ const p=payload&&payload[0]&&payload[0].payload; return p?(<div style={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-none)',padding:'7px 10px',fontSize:'var(--text-sm)',boxShadow:'var(--shadow-md)'}}><b>{p.name}</b><br/>{NUM(p.z)} views · {p.x}% of views<br/>view→cart {p.d}% · cart→buy {p.c}%</div>):null; }}/>
+          <R.Tooltip cursor={{strokeDasharray:'3 3'}} content={({payload})=>{ const p=payload&&payload[0]&&payload[0].payload; return p?(<div style={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-none)',padding:'7px 10px',fontSize:'var(--text-sm)',boxShadow:'var(--shadow-md)'}}><b>{p.name}</b><br/>{NUM(p.z)} views, {p.x}% of views<br/>view to cart {p.d}%, cart to buy {p.c}%</div>):null; }}/>
           <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:'var(--text-sm)', paddingBottom:8}}/>
           {series.map(s=> s.data.length>0 && <R.Scatter key={s.k} name={LBL[s.k]} data={s.data} fill={COL[s.k]} fillOpacity={0.75}/>)}
         </R.ScatterChart>
@@ -6863,19 +6863,19 @@ function ProductSignal(){
       <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{ZOOM_HINT}</div>
       </div>
       <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',margin:'2px 0 12px'}}>{lens==='completion'
-        ? <>Y = cart→purchase. Dots <b>below the dashed line buy worse than the site average once carted</b> — a checkout/commitment problem, not a desire one. X = visibility. Bubble = views.</>
-        : <>Top-left = wanted but unseen (merchandise) · top-right = stars · bottom-right = seen but unwanted (fix/stop). Dashed lines = site median visibility &amp; average view→cart.</>}</div>
-      <div style={{fontSize:'var(--text-xs)',color:'var(--text-muted)',margin:'2px 0 10px',lineHeight:1.5}}>The <b style={{color:'var(--good)'}}>{`${curSym()}/mo in green`}</b> is the <b>opportunity size</b> — estimated extra <b>gross profit per month</b> if this product closed the gap to the site's average funnel (for out-of-stock, the demand missed while it's unavailable). Margin-weighted at {PCT(gm)}{` and scaled to a month — a ceiling worth chasing, not a guaranteed gain. Only products worth ≥ ${curSym()}50/mo are listed.`}</div>
+        ? <>Y = cart to purchase. Dots <b>below the dashed line buy worse than the site average once carted</b>, a checkout/commitment problem, not a desire one. X = visibility. Bubble = views.</>
+        : <>Top-left = wanted but unseen (merchandise), top-right = stars, bottom-right = seen but unwanted (fix/stop). Dashed lines = site median visibility &amp; average view to cart.</>}</div>
+      <div style={{fontSize:'var(--text-xs)',color:'var(--text-muted)',margin:'2px 0 10px',lineHeight:1.5}}>The <b style={{color:'var(--good)'}}>{`${curSym()}/mo in green`}</b> is the <b>opportunity size</b>, estimated extra <b>gross profit per month</b> if this product closed the gap to the site's average funnel (for out-of-stock, the demand missed while it's unavailable). Margin-weighted at {PCT(gm)}{` and scaled to a month, a ceiling worth chasing, not a guaranteed gain. Only products worth ≥ ${curSym()}50/mo are listed.`}</div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(250px,1fr))',gap:16}}>
-        {oppCol('Unseen — visibility problem',PAL.accent,gems,'None — visibility matches desire.')}
-        {oppCol('Browsed, not wanted — product page problem',PAL.bad,pdpFix,'None flagged.')}
-        {oppCol('Wanted, not bought — checkout leak',PAL.warn,checkoutFix,'None — carts close at the site rate.')}
-        {oppCol('Restock — in demand, out of stock',PAL.warn,restock,'None.')}
+        {oppCol('Unseen, visibility problem',PAL.accent,gems,'None, visibility matches desire.')}
+        {oppCol('Browsed, not wanted, product page problem',PAL.bad,pdpFix,'None flagged.')}
+        {oppCol('Wanted, not bought, checkout leak',PAL.warn,checkoutFix,'None, carts close at the site rate.')}
+        {oppCol('Restock, in demand, out of stock',PAL.warn,restock,'None.')}
       </div>
       {moreAvail && <div style={{marginTop:12,textAlign:'center'}}>
-        <button onClick={()=>setShowAll(!showAll)} style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)',padding:'6px 16px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:PAL.accent}}>{showAll?'Show fewer':`Show more — ${totalOpps} opportunities ≥ ${curSym()}50/mo`}</button>
+        <button onClick={()=>setShowAll(!showAll)} style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)',padding:'6px 16px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1px solid var(--border-subtle)',background:'transparent',color:PAL.accent}}>{showAll?'Show fewer':`Show more, ${totalOpps} opportunities ≥ ${curSym()}50/mo`}</button>
       </div>}
-      <div className="note" style={{marginTop:12}}>The full funnel, per product: <b>% of views = visibility</b>, <b>view→cart = desire</b> (do they want it once seen), <b>cart→purchase = completion</b> (do they close once they want it). Splitting the last two is the depth — a low-converting item is now diagnosed as either <b style={{color:PAL.bad}}>browsed-not-wanted</b> (fix the product page/product) or <b style={{color:PAL.warn}}>wanted-not-bought</b>{` (fix price/shipping/trust/variant at checkout) — opposite fixes. Out-of-stock items are separated (they can't convert); ${curSym()} is margin-weighted at `}{PCT(gm)}, scaled to /month. GA4 item-scoped ({META.products||PR.length} products) × Shopify price/stock.</div>
+      <div className="note" style={{marginTop:12}}>The full funnel, per product: <b>% of views = visibility</b>, <b>view to cart = desire</b> (do they want it once seen), <b>cart to purchase = completion</b> (do they close once they want it). Splitting the last two is the depth, a low-converting item is now diagnosed as either <b style={{color:PAL.bad}}>browsed-not-wanted</b> (fix the product page/product) or <b style={{color:PAL.warn}}>wanted-not-bought</b>{` (fix price/shipping/trust/variant at checkout), opposite fixes. Out-of-stock items are separated (they can't convert); ${curSym()} is margin-weighted at `}{PCT(gm)}, scaled to /month. GA4 item-scoped ({META.products||PR.length} products) × Shopify price/stock.</div>
     </div>
   );
 }
@@ -6886,7 +6886,7 @@ function ProductSignal(){
 // MARKETING codes from SERVICE/goodwill codes (replacements, resends) that are £0-
 // revenue cost, not promotion. From Shopify order-level discount_codes over time.
 const DC_PATTERN = {
-  'always-on': {label:'Always-on', color:PAL.warn, note:'runs constantly — structural margin'},
+  'always-on': {label:'Always-on', color:PAL.warn, note:'runs constantly, structural margin'},
   'recurring': {label:'Recurring', color:PAL.accent, note:'on & off over time'},
   'spike':     {label:'Spike',     color:PAL.good, note:'short campaign burst'},
   'one-off':   {label:'One-off',   color:PAL.muted, note:'single day'},
@@ -6948,8 +6948,8 @@ function DiscountCodeTracker(){
   const verdict = UI_V3 && allOrders > 0 && always.length > 0 ? (<section className="v3-sec" style={{marginBottom:14}}>
     <p className="v3-verdict">{fmtPctN(alwaysOrders / allOrders)} of your orders use a code that never stops.</p>
     <ol className="v3-moves">
-      <li><b>Check where {always[0].code} is being used.</b> It is on {fmtCount(always[0].orders)} orders — {fmtPctN(always[0].orders / allOrders)} of every order in {M.weeks || 26} weeks — and has given away {fmtMoney(always[0].discount)}. A code that common has usually spread past the people it was made for, to coupon sites and browser extensions. If those orders are not its audience, retire it or replace it with one that expires.</li>
-      {deep && <li><b>Size {deep.code} against what a first order makes.</b> It takes {fmtPctN(deep.discountRate)} off, {fmtMoney(deep.discount / Math.max(1, deep.orders))} an order on average{firstProfit ? <> — against the {fmtMoney(firstProfit)} a first order makes after costs</> : null}. Keep it only where it wins customers who would not have bought without it.</li>}
+      <li><b>Check where {always[0].code} is being used.</b> It is on {fmtCount(always[0].orders)} orders, {fmtPctN(always[0].orders / allOrders)} of every order in {M.weeks || 26} weeks, and has given away {fmtMoney(always[0].discount)}. A code that common has usually spread past the people it was made for, to coupon sites and browser extensions. If those orders are not its audience, retire it or replace it with one that expires.</li>
+      {deep && <li><b>Size {deep.code} against what a first order makes.</b> It takes {fmtPctN(deep.discountRate)} off, {fmtMoney(deep.discount / Math.max(1, deep.orders))} an order on average{firstProfit ? <>, against the {fmtMoney(firstProfit)} a first order makes after costs</> : null}. Keep it only where it wins customers who would not have bought without it.</li>}
     </ol>
   </section>) : null;
   return (
@@ -6957,15 +6957,15 @@ function DiscountCodeTracker(){
       {verdict}
       <div className="card" style={{marginBottom:14}}>
         <div className="card-section-title">
-          <h2 style={{margin:0}}>Affiliate & discount codes <span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)',fontSize:'var(--text-sm)'}}>— over time</span></h2>
-          <span className="meta">{Math.round((M.codedShare||0)*100)}% of orders use a code · spike vs constant · codes + automatic + markdowns · last {M.weeks||26}w · draft/exchange orders excluded</span>
+          <h2 style={{margin:0}}>Affiliate & discount codes <span style={{color:'var(--text-faint)',fontWeight:'var(--weight-normal)',fontSize:'var(--text-sm)'}}>over time</span></h2>
+          <span className="meta">{Math.round((M.codedShare||0)*100)}% of orders use a code, spike vs constant, codes + automatic + markdowns, last {M.weeks||26}w, draft/exchange orders excluded</span>
         </div>
 
         <div style={{display:'flex',gap:10,flexWrap:'wrap',marginBottom:14}}>
-          {tile('Full-price orders', Math.round((M.fullPriceShare||0)*100)+'%', `${NUM(M.fullPriceOrders)} orders · ${GBP(M.fullPriceRevenue)} (${Math.round((M.fullPriceRevenueShare||0)*100)}% of revenue)`, 'var(--good)')}
-          {tile('Orders with a discount', Math.round((1-(M.fullPriceShare||0))*100)+'%', `${NUM(M.discountedOrders)} orders · ${GBP(M.discountedRevenue)} revenue`)}
+          {tile('Full-price orders', Math.round((M.fullPriceShare||0)*100)+'%', `${NUM(M.fullPriceOrders)} orders, ${GBP(M.fullPriceRevenue)} (${Math.round((M.fullPriceRevenueShare||0)*100)}% of revenue)`, 'var(--good)')}
+          {tile('Orders with a discount', Math.round((1-(M.fullPriceShare||0))*100)+'%', `${NUM(M.discountedOrders)} orders, ${GBP(M.discountedRevenue)} revenue`)}
           {tile('Marketing discount', GBP(M.marketingDiscount), `${mkt.length} promo / affiliate codes`, PAL.accent)}
-          {tile('Draft orders excluded', String(M.draftOrdersExcluded||0), `exchanges/replacements · ${GBP(M.draftDiscountExcluded)} internal credits not counted as discount`, 'var(--text-muted)')}
+          {tile('Draft orders excluded', String(M.draftOrdersExcluded||0), `exchanges/replacements, ${GBP(M.draftDiscountExcluded)} internal credits not counted as discount`, 'var(--text-muted)')}
           {tile('Always-on codes', String(M.alwaysOnCount||0), leak?`${leak.code} = ${GBP(leak.discount)} given away`:'—', PAL.warn)}
         </div>
 
@@ -6974,17 +6974,17 @@ function DiscountCodeTracker(){
           const inten=gr?Math.round(td/gr*100):0, pen=Math.round((1-(M.fullPriceShare||0))*100), avg=(M.discountedOrders)?td/M.discountedOrders:0;
           return (
             <div style={{background:'var(--accent-bg)',border:'1px solid var(--color-accent-line)',borderRadius:'var(--radius-none)',padding:'11px 14px',marginBottom:14,fontSize:'var(--text-sm)',color:'var(--text-secondary)',lineHeight:1.55}}>
-              <b style={{color:'var(--text-primary)'}}>How often vs how deep —</b>these two figures look like they disagree but they measure different things:
-                        <span style={{display:'inline'}}> <b style={{color:'var(--text-primary)'}}>{pen}%</b> of orders carry a discount (how <i>often</i>), but the average is only <b style={{color:'var(--text-primary)'}}>{GBP(avg)}</b> off — so across all sales discounts come to only <b style={{color:'var(--text-primary)'}}>~{inten}%</b> of revenue (how <i>deep</i>). Frequent but shallow: lots of small codes, not deep cuts.</span>
-              <span style={{color:'var(--text-faint)',display:'block',marginTop:4}}>The <i>“Discount depth”</i> figure on Profit &amp; sales (~{inten}{`%) is the ${curSym()}-weighted view; the `}<i>“Orders with a discount”</i> tile above ({pen}%) is the order-count view. Same data, different denominators — not a discrepancy.</span>
+              <b style={{color:'var(--text-primary)'}}>How often vs how deep:</b> these two figures look like they disagree but they measure different things:
+                        <span style={{display:'inline'}}> <b style={{color:'var(--text-primary)'}}>{pen}%</b> of orders carry a discount (how <i>often</i>), but the average is only <b style={{color:'var(--text-primary)'}}>{GBP(avg)}</b> off, so across all sales discounts come to only <b style={{color:'var(--text-primary)'}}>~{inten}%</b> of revenue (how <i>deep</i>). Frequent but shallow: lots of small codes, not deep cuts.</span>
+              <span style={{color:'var(--text-faint)',display:'block',marginTop:4}}>The <i>“Discount depth”</i> figure on Profit &amp; sales (~{inten}{`%) is the ${curSym()}-weighted view; the `}<i>“Orders with a discount”</i> tile above ({pen}%) is the order-count view. Same data, different denominators, not a discrepancy.</span>
             </div>
           ); })()}
 
         {(M.markdownEstimate>0 || M.automaticDiscount>0) && <div style={{background:'var(--color-warning-wash)',border:'1px solid var(--color-warning-wash)',borderRadius:'var(--radius-none)',padding:'11px 14px',marginBottom:14}}>
-          <div style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',color:PAL.warn,fontWeight:'var(--weight-bold)',marginBottom:5}}>{`Discounts beyond codes — not in the ${curSym()} above`}</div>
+          <div style={{fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',color:PAL.warn,fontWeight:'var(--weight-bold)',marginBottom:5}}>{`Discounts beyond codes, not in the ${curSym()} above`}</div>
           <div style={{display:'flex',gap:20,flexWrap:'wrap',fontSize:'var(--text-sm)',color:'var(--text-secondary)'}}>
-            <div style={{flex:'1 1 240px'}}><b>Automatic (no code):</b> {GBP(M.automaticDiscount)} on {NUM(M.automaticOrders)} orders <span style={{color:'var(--text-faint)'}}>— in Shopify's discount totals, just not tied to a code.</span></div>
-            <div style={{flex:'1 1 320px'}}><b style={{color:PAL.bad}}>Sale-price markdowns:</b> ~{GBP(M.markdownEstimate)} est. ({Math.round((M.markdownShareOfValue||0)*100)}% of sold value) · {M.catalogActive > 0 && M.avgMarkdownPct != null ? <><b>{M.catalogOnSale}/{M.catalogActive}</b> of catalog on sale at ~{M.avgMarkdownPct}% off.</> : null} <span style={{color:'var(--text-faint)'}}>Compare-at markdowns never enter Shopify's <code>total_discounts</code>{`, so they're invisible to the code/automatic figures — this is the true site-wide discount the ${curSym()} above misses. Estimated from web line-items × current compare-at price.`}</span></div>
+            <div style={{flex:'1 1 240px'}}><b>Automatic (no code):</b> {GBP(M.automaticDiscount)} on {NUM(M.automaticOrders)} orders <span style={{color:'var(--text-faint)'}}>in Shopify's discount totals, just not tied to a code.</span></div>
+            <div style={{flex:'1 1 320px'}}><b style={{color:PAL.bad}}>Sale-price markdowns:</b> ~{GBP(M.markdownEstimate)} est. ({Math.round((M.markdownShareOfValue||0)*100)}% of sold value), {M.catalogActive > 0 && M.avgMarkdownPct != null ? <><b>{M.catalogOnSale}/{M.catalogActive}</b> of catalog on sale at ~{M.avgMarkdownPct}% off.</> : null} <span style={{color:'var(--text-faint)'}}>Compare-at markdowns never enter Shopify's <code>total_discounts</code>{`, so they're invisible to the code/automatic figures, this is the true site-wide discount the ${curSym()} above misses. Estimated from web line-items × current compare-at price.`}</span></div>
           </div>
         </div>}
 
@@ -7000,18 +7000,18 @@ function DiscountCodeTracker(){
             {stackKeys.map(k=> <R.Bar key={k.code} dataKey={k.code} stackId="a" fill={svgCol(k.color)} maxBarSize={26}/>) }
           </R.BarChart>
         </R.ResponsiveContainer>
-        <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',margin:'2px 0 4px'}}>A steady band every week = an <b style={{color:PAL.warn}}>always-on</b> code (structural discount). A tall single-week bar = a <b style={{color:PAL.good}}>spike</b> (sale/launch). <span style={{color:PAL.bad}}>Service</span> = goodwill codes (replacement/resend), shown for context — not promotion.</div>
+        <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',margin:'2px 0 4px'}}>A steady band every week = an <b style={{color:PAL.warn}}>always-on</b> code (structural discount). A tall single-week bar = a <b style={{color:PAL.good}}>spike</b> (sale/launch). <span style={{color:PAL.bad}}>Service</span> = goodwill codes (replacement/resend), shown for context, not promotion.</div>
         <ChartFooter ask="From discount-code usage over time, which codes are always-on structural margin give-away vs one-off campaign spikes, and where should I tighten?"/>
       </div>
       <ConfigurableChart
-        title="Explore codes — marketing discounts"
+        title="Explore codes, marketing discounts"
         dataset={mkt.map(c=>({code:c.code, pattern:(DC_PATTERN[c.pattern]||DC_PATTERN.recurring).label, discount:c.discount||0, revenue:c.revenue||0, orders:c.orders||0}))}
         dimensions={[{key:'code',label:'Code'},{key:'pattern',label:'Pattern'}]}
         metrics={[{key:'discount',label:`Discount ${curSym()}`,fmt:GBP},{key:'revenue',label:'Revenue',fmt:GBP},{key:'orders',label:'Orders',fmt:NUM}]}
         defaultMetric="discount" defaultSplit="code" defaultChart="bar" defaultTopN={10}/>
       <div className="card">
         <div className="card-section-title"><h2 style={{margin:0}}>By code</h2>
-          <span className="meta">marketing codes · sorted by orders · sparkline = weekly usage across the window</span></div>
+          <span className="meta">marketing codes, sorted by orders, sparkline = weekly usage across the window</span></div>
         <div style={{overflowX:'auto'}}>
         <table style={{width:'100%',borderCollapse:'collapse',fontSize:'var(--text-sm)'}}>
           <thead><tr style={{textAlign:'left',color:'var(--text-faint)',fontSize:'var(--text-xs)',textTransform:'uppercase',letterSpacing:'var(--tracking-wide)'}}>
@@ -7031,15 +7031,15 @@ function DiscountCodeTracker(){
               <td style={{padding:'8px',textAlign:'right'}}>{GBP(c.revenue)}</td>
               <td style={{padding:'8px',textAlign:'right',color:PAL.bad}}>{GBP(c.discount)}</td>
               <td style={{padding:'8px',textAlign:'right'}}>{Math.round(c.discountRate*100)}%</td>
-              <td style={{padding:'8px',whiteSpace:'nowrap',color:'var(--text-muted)',fontSize:'var(--text-xs)'}}>{fmtWk(c.firstSeen)} → {fmtWk(c.lastSeen)}{c.recent?'':' · ended'}</td>
+              <td style={{padding:'8px',whiteSpace:'nowrap',color:'var(--text-muted)',fontSize:'var(--text-xs)'}}>{fmtWk(c.firstSeen)} to {fmtWk(c.lastSeen)}{c.recent?'':', ended'}</td>
             </tr>); })}
             {oneOffN>0 && <tr style={{borderTop:'1px solid var(--border-subtle)'}}><td colSpan={8} style={{padding:'8px 0',color:'var(--text-faint)',fontSize:'var(--text-xs)'}}>+ {oneOffN} one-off / single-order codes (creator trials, edge cases)</td></tr>}
           </tbody>
         </table>
         </div>
         <div className="note" style={{marginTop:12}}>
-          <b>Read it:</b> <b>{Math.round((M.fullPriceShare||0)*100)}% of orders ({NUM(M.fullPriceOrders)}) were placed at full price</b> — {GBP(M.fullPriceRevenue)}, {Math.round((M.fullPriceRevenueShare||0)*100)}% of revenue, at ~{GBP(M.fullPriceOrders?M.fullPriceRevenue/M.fullPriceOrders:0)} average order value. The other {NUM(M.discountedOrders)} orders carried a discount. {leak ? <>Your biggest always-on code <b>{leak.code}</b> has run every week since launch on {NUM(leak.orders)} orders — {GBP(leak.discount)} of margin given away with no campaign trigger. Worth asking whether it's a deliberate evergreen offer or a default that quietly caps margin. </> : null}
-          {(M.draftOrdersExcluded>0) && <> <b>{NUM(M.draftOrdersExcluded)} draft orders</b> (exchanges/replacements, ~{GBP(M.draftDiscountExcluded)} of internal credits) are <b>excluded</b> — they're not real sales and were inflating the discount totals.</>} The figures above are codes + automatic discounts; sale-price markdowns are shown separately as they never enter Shopify's discount totals.
+          <b>Read it:</b> <b>{Math.round((M.fullPriceShare||0)*100)}% of orders ({NUM(M.fullPriceOrders)}) were placed at full price</b>, {GBP(M.fullPriceRevenue)}, {Math.round((M.fullPriceRevenueShare||0)*100)}% of revenue, at ~{GBP(M.fullPriceOrders?M.fullPriceRevenue/M.fullPriceOrders:0)} average order value. The other {NUM(M.discountedOrders)} orders carried a discount. {leak ? <>Your biggest always-on code <b>{leak.code}</b> has run every week since launch on {NUM(leak.orders)} orders, {GBP(leak.discount)} of margin given away with no campaign trigger. Worth asking whether it's a deliberate evergreen offer or a default that quietly caps margin. </> : null}
+          {(M.draftOrdersExcluded>0) && <> <b>{NUM(M.draftOrdersExcluded)} draft orders</b> (exchanges/replacements, ~{GBP(M.draftDiscountExcluded)} of internal credits) are <b>excluded</b>, they're not real sales and were inflating the discount totals.</>} The figures above are codes + automatic discounts; sale-price markdowns are shown separately as they never enter Shopify's discount totals.
         </div>
       </div>
     </div>
@@ -7156,7 +7156,7 @@ function RestockAlertsPanel(){
     <div className="card" style={{marginBottom:14}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:8}}>
         <div style={{display:'inline-flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-          <h2 style={{margin:0}}>Restock alerts — good sellers running low</h2>
+          <h2 style={{margin:0}}>Restock alerts, good sellers running low</h2>
           <StatusBadge kind={data.nowCount>0 ? 'action' : 'watch'} label={data.nowCount>0 ? 'Action required' : 'Watch'}/>
         </div>
         <button className="btn-ghost" style={{padding:'4px 10px',fontSize:'var(--text-xs)'}} onClick={()=>setEditLead(v=>!v)}>
@@ -7169,7 +7169,7 @@ function RestockAlertsPanel(){
         lead time + 30 days of cover.
       </div>
       {editLead && (<div className="card" style={{background:'var(--bg-app)',marginBottom:10,padding:'10px 12px'}}>
-        <div style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',marginBottom:8}}>Supplier lead times <span className="muted" style={{fontWeight:'var(--weight-normal)'}}>— days from reorder to stock landing. Defaults are estimates; set your real ones.</span></div>
+        <div style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',marginBottom:8}}>Supplier lead times <span className="muted" style={{fontWeight:'var(--weight-normal)'}}>days from reorder to stock landing. Defaults are estimates; set your real ones.</span></div>
         <div style={{display:'flex',alignItems:'center',gap:14,flexWrap:'wrap'}}>
           <label style={{display:'flex',alignItems:'center',gap:6,fontSize:'var(--text-sm)'}}>Default {leadInput(lead.default, setDefault)} days</label>
           {data.typesPresent.map(t=>(
@@ -7182,7 +7182,7 @@ function RestockAlertsPanel(){
         <div className="card kpi" style={{}}>
           <div className="label">Reorder now</div>
           <div className="val">{data.nowCount}</div>
-          <div className="sub">must order today — cover ≤ lead time</div>
+          <div className="sub">must order today, cover ≤ lead time</div>
         </div>
         <div className="card kpi" style={{}}>
           <div className="label">Reorder soon</div>
@@ -7192,7 +7192,7 @@ function RestockAlertsPanel(){
         <div className="card kpi" style={{}}>
           <div className="label">At risk if you don't reorder</div>
           <div className="val">{GBP(data.atRiskMonthly)}<span style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)'}}>/mo</span></div>
-          <div className="sub">{data.nowCount+data.soonCount} best-sellers · order this week to keep it</div>
+          <div className="sub">{data.nowCount+data.soonCount} best-sellers, order this week to keep it</div>
         </div>
       </div>
       <div style={{overflowX:'auto'}}>
@@ -7210,7 +7210,7 @@ function RestockAlertsPanel(){
             <td><span className="pill" style={{background:u.bg,color:u.fg,fontSize:'var(--text-xs)',padding:'2px 7px',borderRadius:'var(--radius-md)',fontWeight:'var(--weight-bold)',whiteSpace:'nowrap'}}>{r.urgency==='now' ? `Restock or lose ${GBP(r.monthlyRev)}/mo` : u.lbl}</span></td>
             <td className="tl" style={{fontSize:'var(--text-sm)',maxWidth:260}}>
               <b>{r.title}</b>
-              {(r.type||r.sku) && <div className="muted" style={{fontSize:'var(--text-xs)'}}>{r.type||''}{r.type&&r.sku?' · ':''}{r.sku?<code>{r.sku}</code>:''} · {r.leadDays}d lead</div>}
+              {(r.type||r.sku) && <div className="muted" style={{fontSize:'var(--text-xs)'}}>{r.type||''}{r.type&&r.sku?', ':''}{r.sku?<code>{r.sku}</code>:''}, {r.leadDays}d lead</div>}
             </td>
             <td style={{whiteSpace:'nowrap',fontWeight:'var(--weight-bold)',textAlign:'right',color:rb.overdue?'var(--bad)':'var(--text-secondary)'}}>{rb.txt}</td>
             <td style={{whiteSpace:'nowrap',textAlign:'right',color:u.fg}}>{Math.round(r.daysOfCover)}d</td>
@@ -7226,8 +7226,8 @@ function RestockAlertsPanel(){
       </button>}
       <div className="note" style={{marginTop:14}}>
         {data.nowCount+data.soonCount>0
-          ? <><b>Greta's read:</b> <b>{GBP(data.atRiskMonthly)}/mo</b> of revenue rides on {data.nowCount+data.soonCount} best-sellers you need to reorder within the week to land before they run out. {top ? <>Biggest: <b>{top.title}</b> — {reorderByLabel(top.slack).overdue?'order today':`order by ${reorderByLabel(top.slack).txt}`} or lose <b>{GBP(top.monthlyRev)}/mo</b> ({top.leadDays}d lead). </> : null}Place these before chasing new-item launches. Adjust lead times above if these don't match your suppliers.</>
-          : <><b>Greta's read:</b> no good sellers need an order placed right now — the watch list shows the next ones so you stay ahead of a stock-out.</>}
+          ? <><b>Greta's read:</b> <b>{GBP(data.atRiskMonthly)}/mo</b> of revenue rides on {data.nowCount+data.soonCount} best-sellers you need to reorder within the week to land before they run out. {top ? <>Biggest: <b>{top.title}</b>, {reorderByLabel(top.slack).overdue?'order today':`order by ${reorderByLabel(top.slack).txt}`} or lose <b>{GBP(top.monthlyRev)}/mo</b> ({top.leadDays}d lead). </> : null}Place these before chasing new-item launches. Adjust lead times above if these don't match your suppliers.</>
+          : <><b>Greta's read:</b> no good sellers need an order placed right now, the watch list shows the next ones so you stay ahead of a stock-out.</>}
       </div>
     </div>
   );
@@ -7252,23 +7252,23 @@ function Products(){
   return (
     <div>
       <div className="row" style={{marginBottom:14}}>
-        <KPI label="Products sold · last 28 days" val={NUM(products.length)} sub={`${NUM(totalUnits)} units · ${GBP(totalRev)} net, ex-VAT`}
+        <KPI label="Products sold, last 28 days" val={NUM(products.length)} sub={`${NUM(totalUnits)} units, ${GBP(totalRev)} net, ex-VAT`}
           agent="Atlas" />
-        <KPI label="Top seller" val={sorted[0]?.title?.slice(0,28)||'—'} sub={`${sorted[0]?.units||0} units · ${curSym()}${NUM(sorted[0]?.netSales)} · ${PCT(sorted[0]?.marginPct)} margin`}
+        <KPI label="Top seller" val={sorted[0]?.title?.slice(0,28)||'—'} sub={`${sorted[0]?.units||0} units, ${curSym()}${NUM(sorted[0]?.netSales)}, ${PCT(sorted[0]?.marginPct)} margin`}
           agent="Frame" observation={DEMO ? `The mega necklace gold is the hero (117 units, ${curSym()}8.7k) but has the lowest margin (~58%) and 8.5% returns.` : undefined}
-          implication={DEMO ? "Heavy reliance on one item = concentration risk. Find the next hero — and root-cause why this one returns." : undefined} />
-        <KPI label="Gross margin, products with a cost" val={PCT(blendedMargin)} sub={`${GBP(totalProfit)} gross profit on ${GBP(_costedRev)} · ${totalRev>0?Math.round(_costedRev/totalRev*100):0}% of sales have a cost`}
-          agent="Atlas" observation={DEMO ? "78% blended GM is excellent for jewellery — the charms (80–93% margin) are the cash cow." : undefined}
-          implication="Discounts and sale-price markdowns come off this — see Promotions for the full load." />
+          implication={DEMO ? "Heavy reliance on one item = concentration risk. Find the next hero, and root-cause why this one returns." : undefined} />
+        <KPI label="Gross margin, products with a cost" val={PCT(blendedMargin)} sub={`${GBP(totalProfit)} gross profit on ${GBP(_costedRev)}, ${totalRev>0?Math.round(_costedRev/totalRev*100):0}% of sales have a cost`}
+          agent="Atlas" observation={DEMO ? "78% blended GM is excellent for jewellery, the charms (80–93% margin) are the cash cow." : undefined}
+          implication="Discounts and sale-price markdowns come off this, see Promotions for the full load." />
         <KPI label="Return-rate hotspots" val={_hasReturns?returnHotspots.length:'—'} sub={_hasReturns?`items with ≥10% returns (sold ≥10)`:'returns are not recorded per product yet'}
-          agent="Lux" observation={DEMO ? "12 items have ≥10% return rates — 'love is pain charm' hits 22% — that's a CX signal, not a quality fluke." : undefined}
+          agent="Lux" observation={DEMO ? "12 items have ≥10% return rates, 'love is pain charm' hits 22%, that's a CX signal, not a quality fluke." : undefined}
           implication="Add a post-purchase survey + product page sizing/expectation copy to the top 3 hotspots before adding any new items." />
       </div>
       {/* Three jobs split into subtabs — Stock (ops) · Performance (analytics) · Bundles (merch) */}
       <div className="seg" style={{marginBottom:14}}>
         {[['stock','Stock'],['performance','Performance'],['bundles','Bundles']].filter(([k])=>!(UI_V3 && k==='stock')).map(([k,l])=>(<button key={k} className={pview===k?'on':''} onClick={()=>setPview(k)}>{l}</button>))}
       </div>
-      {UI_V3 && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('stock')}>What runs out and what to reorder <span className="v3-xref-go">on Stock &amp; orders →</span></button>}
+      {UI_V3 && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('stock')}>What runs out and what to reorder <span className="v3-xref-go">on Stock &amp; orders</span></button>}
       {!UI_V3 && pview==='stock' && (<div>
         <RestockAlertsPanel/>
         <StockThrottlePanel/>
@@ -7280,7 +7280,7 @@ function Products(){
         <CollectionsPanel/>
         {returnHotspots.length>0&&(<div className="card" style={{marginBottom:14}}>
           <h2>Return-rate hotspots</h2>
-          <div className="muted" style={{marginBottom:8}}>items returning ≥10% of units sold — likely sizing/quality/expectation issues.</div>
+          <div className="muted" style={{marginBottom:8}}>items returning ≥10% of units sold, likely sizing/quality/expectation issues.</div>
           <table><thead><tr><th>Product</th><th>Sold</th><th>Returns</th><th>Rate</th></tr></thead><tbody>
             {returnHotspots.map((p,i)=>(<tr key={i}><td>{p.title}</td><td>{p.units}</td><td>{p.returns}</td><td><span className="pill red">{PCT(p.returnRate)}</span></td></tr>))}
           </tbody></table>
@@ -7297,7 +7297,7 @@ function Products(){
           ]}
           defaultMetric="grossProfit" defaultSplit="title" defaultChart="bar" defaultTopN={10}/>
         <div className="card" style={{marginBottom:14,display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:10}}>
-          <h2 style={{margin:0}}>Top items — sortable</h2>
+          <h2 style={{margin:0}}>Top items, sortable</h2>
           <div className="seg">{['units','netSales','grossProfit','marginPct','returnRate'].map(s=>(<button key={s} className={sort===s?'on':''} onClick={()=>setSort(s)}>{ {units:'Units',netSales:'Revenue',grossProfit:'Gross profit',marginPct:'Margin %',returnRate:'Return %'}[s] }</button>))}</div>
         </div>
         <div className="card">
@@ -7314,7 +7314,7 @@ function Products(){
           </tr>))}
           </tbody></table>
         </div>
-        {DEMO && <div className="note" style={{marginTop:14}}>The <b>mega necklace gold</b> drives volume but has the lowest margin (~58%) and an 8.5% return rate. <b>Charms are the cash cow</b> — punk pearl choker (93% margin), candy bead necklace (91%), pixelated heart (84%). The <b>love is pain charm</b> has a 22% return rate — investigate immediately.</div>}
+        {DEMO && <div className="note" style={{marginTop:14}}>The <b>mega necklace gold</b> drives volume but has the lowest margin (~58%) and an 8.5% return rate. <b>Charms are the cash cow</b>, punk pearl choker (93% margin), candy bead necklace (91%), pixelated heart (84%). The <b>love is pain charm</b> has a 22% return rate, investigate immediately.</div>}
       </div>)}
       {pview==='bundles' && (<div>
         <BundlesPanel/>
@@ -7339,17 +7339,17 @@ function Organic(){
     <div>
       <div className="row" style={{marginBottom:14}}>
         <KPI label="Organic+direct revenue share" val={PCT(orgRev/total)} sub={`${curSym()}${NUM(orgRev)} of ${curSym()}${NUM(total)} (GA4-attributed)`}
-          agent="Sage" observation={DEMO ? "74% of attributed revenue is organic+direct — frkl is NOT a paid-acquisition business." : undefined}
-          implication="Defend organic search rankings + brand search aggressively. That's the moat — paid is a top-up." />
-        <KPI label="Top channel" val={sortedCh[0]?.channel||'—'} sub={`${curSym()}${NUM(sortedCh[0]?.revenue)} · ${sortedCh[0]?.purchases} purchases`}
-          agent="Lux" observation="Email drives 32% of attributed revenue — more than every paid channel combined."
+          agent="Sage" observation={DEMO ? "74% of attributed revenue is organic+direct, frkl is NOT a paid-acquisition business." : undefined}
+          implication="Defend organic search rankings + brand search aggressively. That's the moat, paid is a top-up." />
+        <KPI label="Top channel" val={sortedCh[0]?.channel||'—'} sub={`${curSym()}${NUM(sortedCh[0]?.revenue)}, ${sortedCh[0]?.purchases} purchases`}
+          agent="Lux" observation="Email drives 32% of attributed revenue, more than every paid channel combined."
           implication={DEMO ? "Klaviyo is the highest-leverage marketing surface frkl has. Fix attributed reporting + abandoned-cart flow first." : undefined} />
         <KPI label="Paid social GA4 vs Meta claim" val="≈10×" sub={`Meta claims ${curSym()}12.5k; GA4 attributes ${curSym()}1.1k`}
           agent="Atlas" observation="A 10× gap between platform-claimed and GA4-attributed Meta revenue is normal but startling at first."
-          implication="For investor materials, lead with contribution-net return on ad spend — neither claimed nor last-click is the right answer alone." />
+          implication="For investor materials, lead with contribution-net return on ad spend, neither claimed nor last-click is the right answer alone." />
         <KPI label="Channels active" val={ch.length} sub="GA4 default channel grouping"
-          agent="Scout" observation="12 channels active with no single-channel >32% — healthy diversification, no single-point-of-failure."
-          implication={DEMO ? "This is a real strength to lead with in the fundraise — frkl isn't a one-channel pony." : undefined} />
+          agent="Scout" observation="12 channels active with no single-channel >32%, healthy diversification, no single-point-of-failure."
+          implication={DEMO ? "This is a real strength to lead with in the fundraise, frkl isn't a one-channel pony." : undefined} />
       </div>
       <div className="row">
         <div className="card" style={{flex:'1 1 340px'}}>
@@ -7375,7 +7375,7 @@ function Organic(){
           </tbody></table>
         </div>
       </div>
-      <div className="note" style={{marginTop:14}}><b>Email is the #1 revenue channel</b>{` (${curSym()}18.5k, 32% of attributed revenue) — the Klaviyo flows are doing more for the business than any paid channel. `}<b>{`Organic Search drives ${curSym()}10k (17.3%)`}</b> — bigger than Paid Search. The <b>Paid Social attribution gap</b> (Meta claims 10× what GA4 measures) is the headline reconciliation problem for the investor view.</div>
+      <div className="note" style={{marginTop:14}}><b>Email is the #1 revenue channel</b>{` (${curSym()}18.5k, 32% of attributed revenue), the Klaviyo flows are doing more for the business than any paid channel. `}<b>{`Organic Search drives ${curSym()}10k (17.3%)`}</b>, bigger than Paid Search. The <b>Paid Social attribution gap</b> (Meta claims 10× what GA4 measures) is the headline reconciliation problem for the investor view.</div>
       <InstagramPanel/>
       <ContentCalendar/>
       <StoriesPanel/>
@@ -7397,7 +7397,7 @@ function EmailAttributionPanel(){
     <div className="card" style={{marginBottom:14}}>
       <h2>True email attribution (Klaviyo Attributed report types)</h2>
       <div className="muted" style={{marginBottom:10,fontSize:'var(--text-sm)'}}>
-        Pulled from <code>MetricExportAttributedFlow</code> + <code>MetricExportAttributedCampaign</code>. These are TRUE email-attributed orders within Klaviyo's attribution window (default: 5 days post-click). <b>This is the correct figure for "email channel revenue contribution".</b> The previous "gross Klaviyo-tracked" was every Shopify order Klaviyo's profiles touched — including orders the customer would have made anyway. {a.interpretation}
+        Pulled from <code>MetricExportAttributedFlow</code> + <code>MetricExportAttributedCampaign</code>. These are TRUE email-attributed orders within Klaviyo's attribution window (default: 5 days post-click). <b>This is the correct figure for "email channel revenue contribution".</b> The previous "gross Klaviyo-tracked" was every Shopify order Klaviyo's profiles touched, including orders the customer would have made anyway. {a.interpretation}
       </div>
       <div className="row" style={{marginBottom:10}}>
         <div className="card kpi" style={{}}>
@@ -7446,7 +7446,7 @@ function EmailAttributionPanel(){
           <div className="muted" style={{fontSize:'var(--text-xs)', marginTop:6}}>Showing top {Math.min(15, campaigns30.length)} of {campaigns30.length} attributed campaigns.</div>
         </div>
       </div>
-      {DEMO && <div className="note" style={{marginTop:14}}><b>Greta's read:</b>{` for frkl, the gross-vs-attributed flow gap is ${curSym()}`}{Math.abs(gap)} ({(gapPct*100).toFixed(0)}{`%) — Klaviyo's flow tracking is precise. So the ${curSym()}28k flow revenue claim that drives the "flows = 19× lift over campaigns" finding holds up. The Welcome Flow alone attributes ${curSym()}`}{NUM(flows[0]?.orderValue)} from {flows[0]?.orders} orders over 90d — the highest-leverage owned-audience surface frkl has.</div>}
+      {DEMO && <div className="note" style={{marginTop:14}}><b>Greta's read:</b>{` for frkl, the gross-vs-attributed flow gap is ${curSym()}`}{Math.abs(gap)} ({(gapPct*100).toFixed(0)}{`%), Klaviyo's flow tracking is precise. So the ${curSym()}28k flow revenue claim that drives the "flows = 19× lift over campaigns" finding holds up. The Welcome Flow alone attributes ${curSym()}`}{NUM(flows[0]?.orderValue)} from {flows[0]?.orders} orders over 90d, the highest-leverage owned-audience surface frkl has.</div>}
     </div>
   );
 }
@@ -7479,11 +7479,11 @@ function EmailHealthPanel(){
   const has = (kw) => flowNames.some(n => kw.some(k => n.includes(k)));
   // What a present flow actually earned in the last 30 days (live, from Klaviyo).
   const earned = (kw) => { const f = flows.find(x => kw.some(k => (x.name || '').toLowerCase().includes(k))); return f ? f.revenue : null; };
-  const earnedTxt = (kw) => { const r = earned(kw); return r == null ? 'Live.' : r > 0 ? `Live · ${GBP(r)} in the last 30 days.` : `Live but earned ${curSym()}0 in the last 30 days — check its trigger and call to action.`; };
+  const earnedTxt = (kw) => { const r = earned(kw); return r == null ? 'Live.' : r > 0 ? `Live, ${GBP(r)} in the last 30 days.` : `Live but earned ${curSym()}0 in the last 30 days, check its trigger and call to action.`; };
   const noKlaviyo = !camps.length && !flows.length;
   const flowChecklist = [
     {label: "Welcome (per-category)", present: has(['welcome']), critical: true,
-     present_detail: flows.filter(f => /welcome/i.test(f.name || '')).length > 1 ? 'More than one welcome flow — per-category welcomes are best practice.' : 'Single welcome flow — consider one per product category.'},
+     present_detail: flows.filter(f => /welcome/i.test(f.name || '')).length > 1 ? 'More than one welcome flow, per-category welcomes are best practice.' : 'Single welcome flow, consider one per product category.'},
     {label: "Browse abandonment", present: has(['browse abandon']), critical: true},
     {label: "Cart abandonment", present: has(['abandoned cart','cart abandon']), critical: true},
     {label: "Back-in-stock", present: has(['back in stock','back-in-stock']), critical: true},
@@ -7494,9 +7494,9 @@ function EmailHealthPanel(){
     {label: "Replenishment / repurchase nudge", present: has(['replenish','repurchase','time to restock']), critical: false,
      gap_text: "Missing. Most useful for products people run out of; for others, a 'complete the set' nudge to past buyers does the same job."},
     {label: "VIP / 2nd+ purchaser", present: has(['vip','loyalty','existing customer']) || flowNames.some(n=>n.includes('existing customer')), critical: false,
-     present_detail: "Existing Customer welcome variant present — partial VIP coverage."},
+     present_detail: "Existing Customer welcome variant present, partial VIP coverage."},
     {label: "Review request (post-shipping)", present: has(['review','rating','judge']), critical: true,
-     gap_text: "Not found in Klaviyo. If a reviews app (Judge.me, Okendo, Yotpo) sends these, that is fine — it just is not visible here."},
+     gap_text: "Not found in Klaviyo. If a reviews app (Judge.me, Okendo, Yotpo) sends these, that is fine, it just is not visible here."},
     {label: "Anniversary (first-purchase 12mo)", present: has(['anniversary']), critical: false,
      gap_text: "Missing. Trigger 12 months after the first purchase to re-engage first-time buyers who went quiet."},
   ];
@@ -7516,17 +7516,17 @@ function EmailHealthPanel(){
         <div className="card kpi" style={{}}>
           <div className="label">Open rates {mppFlag && <span style={{color:PAL.warn,fontSize:'var(--text-xs)'}}>MPP inflated</span>}</div>
           <div className="val">{(campOpenW*100).toFixed(0)}% / {(flowOpenW*100).toFixed(0)}%</div>
-          <div className="sub">campaigns / flows. {mppFlag ? 'Apple Mail Privacy Protection auto-fetches emails since iOS 15 — anything >50% is inflated. Click rate is the true engagement signal.' : 'Open rates look natural.'}</div>
+          <div className="sub">campaigns / flows. {mppFlag ? 'Apple Mail Privacy Protection auto-fetches emails since iOS 15, anything >50% is inflated. Click rate is the true engagement signal.' : 'Open rates look natural.'}</div>
         </div>
         <div className="card kpi" style={{}}>
           <div className="label">Click rates (truth)</div>
           <div className="val">{(campClickW*100).toFixed(1)}% / {(flowClickW*100).toFixed(1)}%</div>
-          <div className="sub">campaigns / flows · vs DTC benchmarks 2.5% campaigns / 5%+ flows</div>
+          <div className="sub">campaigns / flows, vs DTC benchmarks 2.5% campaigns / 5%+ flows</div>
         </div>
         <div className="card kpi" style={{}}>
           <div className="label">List net growth (60d)</div>
           <div className="val">{list.length ? (netGrowth >= 0 ? '+' : '−') + NUM(Math.abs(netGrowth)) : '—'}</div>
-          <div className="sub">{list.length ? `${NUM(subs)} subs · ${NUM(unsubs)} unsubs · churn ~${(dailyChurnRate*1000).toFixed(2)}‰/day proxy` : 'subscriber counts are not synced from Klaviyo yet'}</div>
+          <div className="sub">{list.length ? `${NUM(subs)} subs, ${NUM(unsubs)} unsubs, churn ~${(dailyChurnRate*1000).toFixed(2)}‰/day proxy` : 'subscriber counts are not synced from Klaviyo yet'}</div>
         </div>
         <div className="card kpi" style={{}}>
           <div className="label">Critical flow gaps</div>
@@ -7558,7 +7558,7 @@ function EmailHealthPanel(){
             </div>
             <div style={{padding:10,background:'var(--bg-app)',borderRadius:'var(--radius-none) var(--radius-md) var(--radius-md) var(--radius-none)'}}>
               <div style={{fontWeight:'var(--weight-semi)',marginBottom:3,color:PAL.bad}}>Bounce/spam complaint rate not tracked</div>
-              <div className="muted">Greta does not receive bounce or spam-complaint rates from Klaviyo. <b>Manual check needed:</b> log into Klaviyo → Analytics → Deliverability. Bounce rate should be &lt;2%, spam complaints &lt;0.1%. Higher = deliverability is at risk.</div>
+              <div className="muted">Klaviyo does not share bounce or spam-complaint rates. <b>Manual check needed:</b> in Klaviyo, open Analytics, then Deliverability. Bounce rate should be &lt;2%, spam complaints &lt;0.1%. Higher = deliverability is at risk.</div>
             </div>
             <div style={{padding:10,background:'var(--bg-app)',borderRadius:'var(--radius-none) var(--radius-md) var(--radius-md) var(--radius-none)'}}>
               <div style={{fontWeight:'var(--weight-semi)',marginBottom:3}}>Top opportunity: win-back flow</div>
@@ -7569,7 +7569,7 @@ function EmailHealthPanel(){
           </div>
         </div>
       </div>
-      {DEMO && <div className="note" style={{marginTop:14}}><b>Greta's read:</b> the flow programme is fundamentally healthy (5 critical flows present, per-category welcomes is best-practice). The two missing critical flows are <b>win-back</b> and <b>review request</b> — both are 1-time builds with ongoing revenue. The MPP open-rate inflation isn't a problem per se, but means anyone optimising on opens (subject-line testing) is optimising for noise. Click-rate-as-truth is the right rule.</div>}
+      {DEMO && <div className="note" style={{marginTop:14}}><b>Greta's read:</b> the flow programme is fundamentally healthy (5 critical flows present, per-category welcomes is best-practice). The two missing critical flows are <b>win-back</b> and <b>review request</b>, both are 1-time builds with ongoing revenue. The MPP open-rate inflation isn't a problem per se, but means anyone optimising on opens (subject-line testing) is optimising for noise. Click-rate-as-truth is the right rule.</div>}
     </div>
   );
 }
@@ -7611,13 +7611,13 @@ function EmailHub(){
       <EmailHealthPanel/>
       {_codes.length>0 && (<div className="card" style={{marginBottom:14}}>
         <h2>How discount-dependent is email-driven demand?</h2>
-        <div className="muted" style={{marginBottom:10, fontSize:'var(--text-sm)'}}>Promo/campaign codes — the kind pushed in broadcasts &amp; flows — vs standing affiliate codes. <i>(A precise email-attributed split needs the Klaviyo↔Shopify order-code join; this is the code-level proxy.)</i></div>
+        <div className="muted" style={{marginBottom:10, fontSize:'var(--text-sm)'}}>Promo/campaign codes, the kind pushed in broadcasts &amp; flows, vs standing affiliate codes. <i>(A precise email-attributed split needs the Klaviyo↔Shopify order-code join; this is the code-level proxy.)</i></div>
         <div className="row">
           <KPI label="Revenue on promo codes" val={GBP(promoRev)} sub={`${_promo.length} campaign/promo codes`}/>
           <KPI label="Discount given (promo)" val={GBP(promoDisc)} sub={promoRate!=null?`${PCT(promoRate)} blended off`:''} goodDirection="down"/>
-          <KPI label="Always-on affiliate leak" val={GBP(alwaysOnDisc)} sub="standing codes — margin given away regardless of channel" goodDirection="down"/>
+          <KPI label="Always-on affiliate leak" val={GBP(alwaysOnDisc)} sub="standing codes, margin given away regardless of channel" goodDirection="down"/>
         </div>
-        <div className="note" style={{marginTop:6}}>If broadcast revenue mostly rides on a code, that demand is <b>rented, not owned</b> — a margin risk. Build full-price email angles (new-in, restock, editorial, UGC) so campaigns aren't only "here's a discount", and reserve codes for genuine win-back.</div>
+        <div className="note" style={{marginTop:6}}>If broadcast revenue mostly rides on a code, that demand is <b>rented, not owned</b>, a margin risk. Build full-price email angles (new-in, restock, editorial, UGC) so campaigns aren't only "here's a discount", and reserve codes for genuine win-back.</div>
       </div>)}
       {/* The cards below read the per-campaign / per-flow snapshot, which is retired for every
           brand (and was frkl's own). Their heading claimed "Email is the #1 revenue channel" whatever
@@ -7625,19 +7625,19 @@ function EmailHub(){
       {(camps.length > 0 || flows.length > 0) ? (<>
       <div className="card" style={{marginBottom:14}}>
         <h2>Email: flows and campaigns</h2>
-        <div className="muted" style={{marginBottom:10,fontSize:'var(--text-sm)'}}>Last 90 days · Klaviyo via Supermetrics. Campaigns = broadcasts. Flows = automated triggers (welcome, abandoned cart, browse abandonment, back-in-stock, birthday).</div>
+        <div className="muted" style={{marginBottom:10,fontSize:'var(--text-sm)'}}>Last 90 days, Klaviyo via Supermetrics. Campaigns = broadcasts. Flows = automated triggers (welcome, abandoned cart, browse abandonment, back-in-stock, birthday).</div>
         <div className="row">
-          <KPI label="Flow revenue (30d)" val={GBP(summary.flows.orderValue)} sub={summary.flows.messages ? `${summary.flows.messages} live flows · ${NUM(summary.flows.recipients)} recipients` : 'no flow results from Klaviyo yet'}
+          <KPI label="Flow revenue (30d)" val={GBP(summary.flows.orderValue)} sub={summary.flows.messages ? `${summary.flows.messages} live flows, ${NUM(summary.flows.recipients)} recipients` : 'no flow results from Klaviyo yet'}
             agent="Lux" observation={summary.flows.messages ? `Flows bring in ${PCT(flowShare)} of email revenue from ${summary.flows.messages} live flows.` : undefined}
             implication={DEMO ? "This is the highest-margin marketing activity frkl runs. Investment in flow optimisation = direct revenue." : undefined} />
-          <KPI label="Campaign revenue (90d)" val={GBP(summary.campaigns.orderValue)} sub={summary.campaigns.messages ? `${summary.campaigns.messages} sends · ${NUM(summary.campaigns.recipients)} total recipients` : 'no campaigns sent in the last 90 days'} series={sendChart.map(w=>({d:w.date, v:Math.round(w.revenue)}))} seriesLabel="Campaign revenue · by send date"
+          <KPI label="Campaign revenue (90d)" val={GBP(summary.campaigns.orderValue)} sub={summary.campaigns.messages ? `${summary.campaigns.messages} sends, ${NUM(summary.campaigns.recipients)} total recipients` : 'no campaigns sent in the last 90 days'} series={sendChart.map(w=>({d:w.date, v:Math.round(w.revenue)}))} seriesLabel="Campaign revenue, by send date"
             agent="Lux" observation={summary.campaigns.messages ? `${summary.campaigns.messages} campaigns brought in ${GBP(summary.campaigns.orderValue)}, against ${GBP(summary.flows.orderValue)} from flows in 30 days.` : undefined}
             implication={DEMO ? "Send cadence is high; revenue per send isn't. Either cut the 50% lowest-performing or differentiate angles." : undefined} />
-          <KPI label="Flow rev per recipient" val={fmtMoney(summary.flows.revPerRecip||0, 2)} sub={`vs ${curSym()}${(summary.campaigns.revPerRecip||0).toFixed(2)} for campaigns — ${lift}× lift`}
+          <KPI label="Flow rev per recipient" val={fmtMoney(summary.flows.revPerRecip||0, 2)} sub={`vs ${curSym()}${(summary.campaigns.revPerRecip||0).toFixed(2)} for campaigns, ${lift}× lift`}
             agent="Atlas" observation={`Each flow recipient is worth ${lift}× more than a campaign recipient.`}
             implication="The action: get more profiles INTO flows (sign-up forms, browse, cart, post-purchase) before sending another broadcast." />
-          <KPI label="Avg open rate (camp.)" val={PCT(summary.campaigns.avgOpenRate)} sub={`Click ${PCT(summary.campaigns.avgClickRate)} — flows avg ${PCT(summary.flows.avgOpenRate)} open`}
-            agent="Lux" observation={DEMO ? "58% campaign open rate is excellent — list hygiene + brand affinity are strong. Click-through is the weak link." : undefined}
+          <KPI label="Avg open rate (camp.)" val={PCT(summary.campaigns.avgOpenRate)} sub={`Click ${PCT(summary.campaigns.avgClickRate)}, flows avg ${PCT(summary.flows.avgOpenRate)} open`}
+            agent="Lux" observation={DEMO ? "58% campaign open rate is excellent, list hygiene + brand affinity are strong. Click-through is the weak link." : undefined}
             implication={DEMO ? "Subject lines work; CTAs and content layout don't. A/B test single-CTA emails next." : undefined} />
         </div>
       </div>
@@ -7678,7 +7678,7 @@ function EmailHub(){
             <R.XAxis dataKey="date" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} interval={Math.ceil(sendChart.length/12)} label={{value:'Date', position:'insideBottom', offset:-6, fill:PAL.muted, fontSize:'var(--text-xs)'}} />
             <R.YAxis tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={fmtMoneyK} label={{value:`Revenue (${curSym()})`, angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:'var(--text-xs)'}} />
             <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)'}} />
-            <R.Line type="monotone" dataKey="revenue" name="Revenue" stroke={svgCol(COL.revenue)} strokeWidth={2} dot={false} />
+            <R.Line type="linear" dataKey="revenue" name="Revenue" stroke={svgCol(COL.revenue)} strokeWidth={2} dot={false} />
           </R.ComposedChart>
         </R.ResponsiveContainer>
         <ChartFooter note="Are we over-emailing? Watch revenue-per-send falling as send volume climbs."
@@ -7686,7 +7686,7 @@ function EmailHub(){
           rows={sendChart} columns={[{key:'date',label:'Date'},{key:'sends',label:'Sends',right:true,fmt:v=>NUM(v)},{key:'revenue',label:'Revenue',right:true,fmt:v=>GBP(v)}]}/>
       </div>
       <div className="card" style={{marginTop:14}}>
-        <h2>All campaigns — sorted by recent</h2>
+        <h2>All campaigns, sorted by recent</h2>
         <table><thead><tr><th>Date</th><th>Name</th><th>Subject</th><th>Recip</th><th>Open</th><th>Click</th><th>Orders</th><th>Revenue</th><th>{`${curSym()}/recip`}</th></tr></thead><tbody>
         {campByDate.slice(0,30).map((c,i)=>(<tr key={i}>
           <td style={{whiteSpace:'nowrap'}}>{c.sendDate}</td>
@@ -7702,8 +7702,8 @@ function EmailHub(){
         </tbody></table>
         <div className="muted" style={{fontSize:'var(--text-xs)',marginTop:8}}>Showing 30 most recent of {camps.length} campaigns.</div>
       </div>
-      </>) : (<p className="v3-empty">Campaign and flow detail — revenue per recipient, open and click rates, send cadence — appears here once Klaviyo has synced your campaigns and flows. The email channel's results on this page come from your orders in the meantime.</p>)}
-      {DEMO && <div className="note" style={{marginTop:14}}><b>Greta's read:</b> the 19× revenue lift of flows over campaigns is the single biggest leverage finding in this dashboard. Every pound spent making flows smarter (segmentation, dynamic content, more triggers) returns multiples of any pound spent on the next broadcast. Three immediate moves: (1) audit Back-in-Stock — expand triggers to more items; (2) replicate the NECKLACES per-category welcome flow for charms/bracelets/pre-styled (already exists for those — confirm performance match); (3) fix the Happy Birthday flow — open rate proves attention, offer must be stronger to convert.</div>}
+      </>) : (<p className="v3-empty">Campaign and flow detail, revenue per recipient, open and click rates, send cadence, appears here once Klaviyo has synced your campaigns and flows. The email channel's results on this page come from your orders in the meantime.</p>)}
+      {DEMO && <div className="note" style={{marginTop:14}}><b>Greta's read:</b> the 19× revenue lift of flows over campaigns is the single biggest leverage finding in this dashboard. Every pound spent making flows smarter (segmentation, dynamic content, more triggers) returns multiples of any pound spent on the next broadcast. Three immediate moves: (1) audit Back-in-Stock, expand triggers to more items; (2) replicate the NECKLACES per-category welcome flow for charms/bracelets/pre-styled (already exists for those, confirm performance match); (3) fix the Happy Birthday flow, open rate proves attention, offer must be stronger to convert.</div>}
     </div>
   );
 }
@@ -7743,10 +7743,10 @@ function ContentCalendar(){
   const storyCount = stories.length;
   const avgEngRate = posts.length ? posts.reduce((a,p)=>a+(p.engRate||0),0)/posts.length : 0;
   return (<div className="card" style={{marginTop:14}}>
-    <h2>Content calendar — last 8 weeks</h2>
+    <h2>Content calendar, last 8 weeks</h2>
     <div className="muted" style={{marginBottom:10,fontSize:'var(--text-sm)'}}>Posting cadence + topic mix at a glance. Click any cell for the post; colour indicates engagement rate (reach-weighted).</div>
     <div className="row" style={{marginBottom:14}}>
-      <div className="card kpi"><div className="label">Posts (60d)</div><div className="val">{posts.length}</div><div className="sub">{reelCount} reels · {feedCount} feed · {storyCount} stories</div></div>
+      <div className="card kpi"><div className="label">Posts (60d)</div><div className="val">{posts.length}</div><div className="sub">{reelCount} reels, {feedCount} feed, {storyCount} stories</div></div>
       <div className="card kpi"><div className="label">Avg per week</div><div className="val">{avgPerWeek.toFixed(1)}</div><div className="sub">vs benchmark 4-5 for active DTC</div></div>
       <div className="card kpi"><div className="label">Posting days</div><div className="val">{days}/{8*7}</div><div className="sub">{PCT(days/56)} of days had content</div></div>
       <div className="card kpi"><div className="label">Avg engagement rate</div><div className="val">{PCT(avgEngRate)}</div><div className="sub">Of reach. Strong if &gt;3%, breakout &gt;6%.</div></div>
@@ -7765,7 +7765,7 @@ function ContentCalendar(){
               const stories = items.filter(i=>i._kind==='story');
               const maxEng = items.reduce((a,i)=>Math.max(a,i.engRate||0),0);
               const colour = !hasContent ? 'var(--heat-empty)' : maxEng>0.06 ? 'var(--heat-high)' : maxEng>0.03 ? 'var(--heat-mid)' : maxEng>0.01 ? 'var(--heat-low)' : 'var(--heat-none)';
-              const tooltip = items.map(i=>`${i._kind==='story'?'STORY':i.type} · ${(i.caption||'').slice(0,40)}`).join('\n');
+              const tooltip = items.map(i=>`${i._kind==='story'?'STORY':i.type}, ${(i.caption||'').slice(0,40)}`).join('\n');
               return (<td key={di} style={{width:50,height:48,background:colour,borderRadius:'var(--radius-md)',verticalAlign:'top',padding:4,cursor:hasContent?'pointer':'default',position:'relative'}} title={tooltip} onClick={()=>{ if(items[0]?.permalink) window.open(items[0].permalink,'_blank'); }}>
                 <div style={{fontSize:'var(--text-xs)',color:'var(--heat-ink)',fontWeight:'var(--weight-semi)'}}>{parseInt(date.slice(8,10))}</div>
                 {hasContent && (<div style={{position:'absolute',bottom:2,right:2,display:'flex',gap:2}}>
@@ -7786,18 +7786,18 @@ function ContentCalendar(){
       <span><span style={{display:'inline-block',width:10,height:10,background:'var(--heat-none)',borderRadius:'var(--radius-sm)',marginRight:4,verticalAlign:'middle',border:'1px solid var(--border-subtle)'}}/>Posted, no reach data</span>
       <span><span style={{display:'inline-block',width:10,height:10,background:'var(--heat-empty)',borderRadius:'var(--radius-sm)',marginRight:4,verticalAlign:'middle',border:'1px solid var(--border-subtle)'}}/>No content</span>
     </div>
-    <div className="note" style={{marginTop:14}}><b>Greta's read:</b> {avgPerWeek.toFixed(1)} posts/week is on the low side for a DTC brand fighting for organic reach — 4-5/week is the active competitor benchmark. The {storyCount === 0 ? 'complete absence of Stories' : storyCount + ' story in 60 days'} is the biggest organic blind spot — Stories are the daily-cadence touchpoint that competitors (Astrid &amp; Miyu, Abbott Lyon) use for behind-the-scenes, drops, and link-to-product. Brief Angela on a weekly Story cadence (3-5/week minimum).</div>
+    <div className="note" style={{marginTop:14}}><b>Greta's read:</b> {avgPerWeek.toFixed(1)} posts/week is on the low side for a DTC brand fighting for organic reach, 4-5/week is the active competitor benchmark. The {storyCount === 0 ? 'complete absence of Stories' : storyCount + ' story in 60 days'} is the biggest organic blind spot, Stories are the daily-cadence touchpoint that competitors (Astrid &amp; Miyu, Abbott Lyon) use for behind-the-scenes, drops, and link-to-product. Brief Angela on a weekly Story cadence (3-5/week minimum).</div>
   </div>);
 }
 
 function StoriesPanel(){
   const stories = B.igStories || [];
   return (<div className="card" style={{marginTop:14}}>
-    <h2>Instagram Stories — last 60 days</h2>
+    <h2>Instagram Stories, last 60 days</h2>
     {DEMO && <div className="muted" style={{marginBottom:10,fontSize:'var(--text-sm)'}}>Stories are the daily-cadence organic surface. Competitors post 5-15/week; frkl posted {stories.length} in 60 days.</div>}
     {stories.length === 0 ? (<EmptyState icon="image"
       title="No Instagram Stories in the last 60 days"
-      body="Stories are the daily-cadence organic touchpoint — they outperform Feed for product link-outs and live-feel community signals. Competitors post 5–15 a week; a consistent Stories habit is one of the cheapest reach levers you have."
+      body="Stories are the daily-cadence organic touchpoint, they outperform Feed for product link-outs and live-feel community signals. Competitors post 5–15 a week; a consistent Stories habit is one of the cheapest reach levers you have."
       cta="Ask Greta for a Stories plan" ctaOnClick={()=>window.__oiAsk && window.__oiAsk('I post no Instagram Stories. Give me a simple weekly Stories cadence and content plan to lift organic reach.')}/>) : (
       <table><thead><tr><th>Date</th><th>Type</th><th>Views</th><th>Reach</th><th>Exits</th><th>Replies</th><th>Shares</th><th>Tap fwd</th><th>Tap back</th><th>Completion</th></tr></thead><tbody>
       {stories.map((s,i)=>{
@@ -7817,7 +7817,7 @@ function StoriesPanel(){
       })}
       </tbody></table>
     )}
-    {DEMO && <div className="note" style={{marginTop:14}}><b>Greta's read:</b> the one Story posted on 2026-05-26 had 161 views, 122 reach, 93% completion (only 11 exits of 161 views) — strong signal that when frkl posts Stories, the audience watches. The opportunity: 0.5 stories/month is essentially "Stories are off". Move to 3-5/week. Use as: behind-the-scenes (campaign shoots, packing), new-product reveals, polls/quizzes, link-stickers to bestsellers. Each Story is essentially a free push notification to ~30% of your 37k followers.</div>}
+    {DEMO && <div className="note" style={{marginTop:14}}><b>Greta's read:</b> the one Story posted on 2026-05-26 had 161 views, 122 reach, 93% completion (only 11 exits of 161 views), strong signal that when frkl posts Stories, the audience watches. The opportunity: 0.5 stories/month is essentially "Stories are off". Move to 3-5/week. Use as: behind-the-scenes (campaign shoots, packing), new-product reveals, polls/quizzes, link-stickers to bestsellers. Each Story is essentially a free push notification to ~30% of your 37k followers.</div>}
   </div>);
 }
 
@@ -7847,26 +7847,26 @@ function InstagramPanel(){
   return (
     <div style={{marginTop:14}}>
       <div className="card" style={{marginBottom:14}}>
-        <h2>Instagram organic — {OI_BRAND.name||'frkl'}</h2>
+        <h2>Instagram organic, {OI_BRAND.name||'frkl'}</h2>
         <div className="muted" style={{marginBottom:10}}>Live from Instagram Insights via Supermetrics. Profile snapshot + last-30-days growth + top-20 posts (last 90 days).</div>
         <div className="row">
-          <KPI label="Followers" val={NUM(snap.followers)} sub={`${NUM(snap.mediaCount)} posts · following ${NUM(snap.follows)}`} series={igFollowerSeries} seriesLabel="Total followers · by day"
-            agent="Lux" observation="37.8k followers, 974 posts — a substantial owned audience that converts at the highest return on ad spend when reached."
-            implication="Treat this list with the same intent as your email list — content cadence, IG-native creator collabs." />
-          <KPI label="New followers (30d)" val={'+'+NUM(totalNew)} sub={`~${Math.round(totalNew/30)} /day avg`} series={igNewSeries} seriesLabel="New followers · by day"
-            agent="Sage" observation="+613 in 30d with a May 17 outlier (+86) — proves content can break out when the topic lands."
+          <KPI label="Followers" val={NUM(snap.followers)} sub={`${NUM(snap.mediaCount)} posts, following ${NUM(snap.follows)}`} series={igFollowerSeries} seriesLabel="Total followers, by day"
+            agent="Lux" observation="37.8k followers, 974 posts, a substantial owned audience that converts at the highest return on ad spend when reached."
+            implication="Treat this list with the same intent as your email list, content cadence, IG-native creator collabs." />
+          <KPI label="New followers (30d)" val={'+'+NUM(totalNew)} sub={`~${Math.round(totalNew/30)} /day avg`} series={igNewSeries} seriesLabel="New followers, by day"
+            agent="Sage" observation="+613 in 30d with a May 17 outlier (+86), proves content can break out when the topic lands."
             implication="Study what drove May 17. If repeatable, it's a recurring lever for organic acquisition." />
-          <KPI label="Avg daily reach" val={NUM(avgReach)} sub={`Profile views ${NUM(avgViews)}/day`} series={igReachSeries} seriesLabel="Daily reach · by day"
-            agent="Frame" observation={`~9.5k people reached organically every day — roughly what ${curSym()}100/day of paid would buy you.`}
+          <KPI label="Avg daily reach" val={NUM(avgReach)} sub={`Profile views ${NUM(avgViews)}/day`} series={igReachSeries} seriesLabel="Daily reach, by day"
+            agent="Frame" observation={`~9.5k people reached organically every day, roughly what ${curSym()}100/day of paid would buy you.`}
             implication="Organic IG is paid-equivalent reach for free. Brief 2 content pillars per week, not occasional one-offs." />
-          <KPI label="Top post (90d)" val={NUM(topPosts[0]?.views)} sub={`${topPosts[0]?.likes} likes — ${(topPosts[0]?.caption||'').slice(0,32)}…`}
-            agent="Frame" observation={DEMO ? "The ADHD reel (79k views) is the breakout outlier — non-jewellery, relatable hook, broad appeal." : "Your most-viewed post in the last 90 days."}
+          <KPI label="Top post (90d)" val={NUM(topPosts[0]?.views)} sub={`${topPosts[0]?.likes} likes, ${(topPosts[0]?.caption||'').slice(0,32)}…`}
+            agent="Frame" observation={DEMO ? "The ADHD reel (79k views) is the breakout outlier, non-jewellery, relatable hook, broad appeal." : "Your most-viewed post in the last 90 days."}
             implication="Test more lifestyle/relatable content alongside product posts. Not every Reel needs to sell directly." />
         </div>
       </div>
       <div className="row">
         <div className="card" style={{flex:'2 1 420px'}}>
-          <h2>Daily growth — new followers + reach</h2>
+          <h2>Daily growth, new followers + reach</h2>
           <R.ResponsiveContainer width="100%" height={160}>
             <R.ComposedChart syncId="ig-reach" data={dailyChart} margin={{top:6,right:10,left:14,bottom:18}}>
               <R.CartesianGrid stroke={PAL.panel} vertical={false} />
@@ -7884,12 +7884,12 @@ function InstagramPanel(){
               <R.YAxis yAxisId="l" orientation="left" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>(v/1000).toFixed(0)+'k'} label={{value:'Reach', angle:-90, position:'insideLeft', style:{textAnchor:'middle'}, fill:PAL.muted, fontSize:'var(--text-xs)'}} />
               <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)'}} />
               <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:'var(--text-xs)', paddingBottom:8}}/>
-              <R.Line yAxisId="l" type="monotone" dataKey="reach" name="Reach" stroke={svgCol(COL.sessions)} strokeWidth={2} dot={false} />
+              <R.Line yAxisId="l" type="linear" dataKey="reach" name="Reach" stroke={svgCol(COL.sessions)} strokeWidth={2} dot={false} />
             </R.ComposedChart>
           </R.ResponsiveContainer>        </div>
         <div className="card" style={{flex:'1 1 320px'}}>
           <h2>Follower audience (age × gender)</h2>
-          <div className="muted" style={{marginBottom:8,fontSize:'var(--text-sm)'}}>{PCT(totalFemale/totalAudience)} female · {NUM(totalAudience)} followers with reported demographics</div>
+          <div className="muted" style={{marginBottom:8,fontSize:'var(--text-sm)'}}>{PCT(totalFemale/totalAudience)} female, {NUM(totalAudience)} followers with reported demographics</div>
           <table><thead><tr><th>Age</th><th>Female</th><th>Other</th><th>% of total</th></tr></thead><tbody>
           {ageRows.map((r,i)=>(<tr key={i}>
             <td>{r.age}</td>
@@ -7901,8 +7901,8 @@ function InstagramPanel(){
         </div>
       </div>
       <div className="card" style={{marginTop:14}}>
-        <h2>Top posts — last 90 days</h2>
-        <div className="muted" style={{marginBottom:10}}>Sorted by likes. Click any title to open the original post. Thumbnails are Instagram CDN URLs — they may expire after ~24h; regenerate the data file for fresh images.</div>
+        <h2>Top posts, last 90 days</h2>
+        <div className="muted" style={{marginBottom:10}}>Sorted by likes. Click any title to open the original post. Thumbnails are Instagram CDN URLs, they may expire after ~24h; regenerate the data file for fresh images.</div>
         <div className="grid cg">
         {topPosts.slice(0,20).map((p,i)=>{
           const eng=(p.likes||0)+(p.comments||0)+(p.saves||0)+(p.shares||0);
@@ -7910,14 +7910,14 @@ function InstagramPanel(){
             {p.thumb?(<img className="thumb" src={p.thumb} alt={p.caption?.slice(0,30)} referrerPolicy="no-referrer" onError={e=>{e.target.style.opacity=.2;}} />):(<div className="thumb" style={{display:'flex',alignItems:'center',justifyContent:'center',color:PAL.muted,fontSize:'var(--text-xs)',letterSpacing:'var(--tracking-wide)'}}>{p.type==='CAROUSEL_ALBUM'?'CAROUSEL':p.type}</div>)}
             <div className="body">
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'start',gap:8}}>
-                <a href={p.permalink} target="_blank" rel="noreferrer" className="name" style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)',color:'var(--text-primary)'}}>{p.date} · {p.product||p.type}</a>
+                <a href={p.permalink} target="_blank" rel="noreferrer" className="name" style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-semi)',color:'var(--text-primary)'}}>{p.date}, {p.product||p.type}</a>
                 <span className="pill grey" style={{fontSize:'var(--text-xs)'}}>#{i+1}</span>
               </div>
               <div className="copy">{p.caption}</div>
               <div style={{marginTop:'auto',display:'flex',flexDirection:'column',gap:3}}>
                 <div className="mrow"><span className="k">Views / reach</span><span className="v">{NUM(p.views)} / {NUM(p.reach)}</span></div>
-                <div className="mrow"><span className="k">Likes / comments</span><span className="v">{p.likes} · {p.comments}</span></div>
-                <div className="mrow"><span className="k">Saves / shares</span><span className="v">{p.saves} · {p.shares}</span></div>
+                <div className="mrow"><span className="k">Likes / comments</span><span className="v">{p.likes}, {p.comments}</span></div>
+                <div className="mrow"><span className="k">Saves / shares</span><span className="v">{p.saves}, {p.shares}</span></div>
                 <div className="mrow"><span className="k">Eng. rate (reach)</span><span className="v">{PCT((p.reach>0)?eng/p.reach:0)}</span></div>
               </div>
             </div>
@@ -7925,7 +7925,7 @@ function InstagramPanel(){
         })}
         </div>
       </div>
-      {DEMO && <div className="note" style={{marginTop:14}}><b>Audience confirmation:</b> the IG follower base independently confirms the Meta Ads finding — frkl is genuinely a <b>35–54 female brand</b> (35–44 ≈ 44%, 45–54 ≈ 31%), with 25–34 a meaningful secondary (~15%). 18–24 is essentially absent (1.4%). The <b>ADHD reel</b> (79k views) is the breakout outlier — non-jewellery content with high relatable hook; worth studying. The <b>#myfrkl UGC mechanic</b>{` (${curSym()}250 monthly) is generating reliable engagement on community posts.`}</div>}
+      {DEMO && <div className="note" style={{marginTop:14}}><b>Audience confirmation:</b> the IG follower base independently confirms the Meta Ads finding, frkl is genuinely a <b>35–54 female brand</b> (35–44 ≈ 44%, 45–54 ≈ 31%), with 25–34 a meaningful secondary (~15%). 18–24 is essentially absent (1.4%). The <b>ADHD reel</b> (79k views) is the breakout outlier, non-jewellery content with high relatable hook; worth studying. The <b>#myfrkl UGC mechanic</b>{` (${curSym()}250 monthly) is generating reliable engagement on community posts.`}</div>}
     </div>
   );
 }
@@ -7935,7 +7935,7 @@ function Competitors(){
   return (<div>
     <div className="card" style={{marginBottom:14}}>
       <h2>Competitor matrix</h2>
-      <div className="muted" style={{marginBottom:10}}>Category positioning for the {DEMO ? 'demi-fine / customisable jewellery' : (v3VerticalWords(OI_BRAND.vertical) || 'category')} space. Greta flags changes here; it does not watch competitors’ shops live.</div>
+      <div className="muted" style={{marginBottom:10}}>Category positioning for the {DEMO ? 'demi-fine / customisable jewellery' : (v3VerticalWords(OI_BRAND.vertical) || 'category')} space. Changes are flagged here; competitors’ shops are not watched live.</div>
       <table><thead><tr><th>Brand</th><th className="tl">Position</th><th>Average order</th><th>Meta intensity</th><th>Threat</th><th className="tl">vs {OI_BRAND.name}</th></tr></thead><tbody>
       {comps.map((c,i)=>(<tr key={i}>
         <td><b>{c.name}</b><br/><span className="muted" style={{fontSize:'var(--text-xs)'}}>{c.url}</span></td>
@@ -7976,10 +7976,10 @@ function SiteStructure({start}){
           <div className="mrow"><span className="k">{s.stage}</span><span className="v">{NUM(s.v)} ({PCT(s.v/fmax)})</span></div>
           <div style={{height:9,background:PAL.panel,borderRadius:'var(--radius-none)',marginTop:4}}><div style={{height:9,width:(100*s.v/fmax)+'%',background:COL.sessions,borderRadius:'var(--radius-none)'}}/></div>
         </div>))}
-        {DEMO && <div className="note" style={{marginTop:10,fontSize:'var(--text-sm)'}}>Clarity confirms the killers: <b>basket→checkout −67.8%</b> (vs 40–50% normal) and <b>checkout→complete −90%</b> (vs 50–60%).</div>}
+        {DEMO && <div className="note" style={{marginTop:10,fontSize:'var(--text-sm)'}}>Clarity confirms the killers: <b>basket to checkout −67.8%</b> (vs 40–50% normal) and <b>checkout to complete −90%</b> (vs 50–60%).</div>}
       </div>}
     </div>
-    {!DEMO && !UI_V3 && <p className="v3-empty">A step-by-step walk through your site — what shoppers see at each step and where they stall — appears here after Greta’s site audit. The funnel above is live from your site analytics.</p>}
+    {!DEMO && !UI_V3 && <p className="v3-empty">A step-by-step walk through your site, what shoppers see at each step and where they stall, appears here after Greta’s site audit. The funnel above is live from your site analytics.</p>}
     {DEMO && <div className="row" style={{marginTop:14}}>
       <div className="card" style={{flex:'1 1 360px'}}>
         <h2>Clarity behaviour vs benchmark <span className="v3-muted" style={{fontWeight:'var(--weight-normal)',fontSize:'var(--text-sm)'}}>site audit, July 2026</span></h2>
@@ -8031,7 +8031,7 @@ function IntelligencePanel(){
   if (!P || !Array.isArray(P.patterns)) {
     return (<div className="card"><EmptyState icon="spark"
       title="Intelligence is still warming up"
-      body="No patterns have been detected yet. The intelligence engine surfaces trends, step-changes and anomalies once a few days of synced data are in — check back after the next daily refresh, or ask the analyst directly in the meantime."
+      body="No patterns have been detected yet. The intelligence engine surfaces trends, step-changes and anomalies once a few days of synced data are in, check back after the next daily refresh, or ask the analyst directly in the meantime."
       cta="Ask Greta" ctaOnClick={()=>window.__oiAsk && window.__oiAsk('What are the most important things happening in my business right now?')}/></div>);
   }
   const metrics = P.metrics || {};
@@ -8159,14 +8159,14 @@ function IntelligencePanel(){
               />
             </div>);
           })}
-        </>) : (<div className="card"><div className="muted">First engine run — pattern diff will appear next week.</div></div>)}
+        </>) : (<div className="card"><div className="muted">First engine run, pattern diff will appear next week.</div></div>)}
       </section>
       {/* ZONE 2 — WHY (the diagnostic layer) */}
       <section>
         <ZoneHeader
           number="02"
           title="Why it's happening"
-          meta={`${topLevelPatterns.length} patterns · ${diagnosisCount} auto-diagnoses`}
+          meta={`${topLevelPatterns.length} patterns, ${diagnosisCount} auto-diagnoses`}
         />
         <div className="toolbar">
           <label>Kind</label>
@@ -8212,14 +8212,14 @@ function IntelligencePanel(){
       {/* Advanced detail — collapsible by default, for reference */}
       <section>
         <button className="show-more" onClick={()=>setShowAdvanced(!showAdvanced)}>
-          {showAdvanced ? '↑ Hide advanced' : '↓ Advanced: synergy matrix · attribution ledger'}
+          {showAdvanced ? '↑ Hide advanced' : '↓ Advanced: synergy matrix, attribution ledger'}
         </button>
         {showAdvanced && (<div style={{display:'flex', flexDirection:'column', gap:'var(--s-4)', marginTop:'var(--s-4)'}}>
           <SynergyMatrix/>
           {(P.scorecard || []).length > 0 && (<div className="card">
             <div className="card-section-title">
               <h2 style={{margin:0}}>Agent scorecard</h2>
-              <span className="meta">3-7 closed = medium confidence · 8+ = high</span>
+              <span className="meta">3-7 closed = medium confidence, 8+ = high</span>
             </div>
             <table><thead><tr><th>Agent</th><th>Category</th><th>Closed</th><th>Hits</th><th>Misses</th><th>Inconc.</th><th>Hit rate</th><th>Avg lift</th><th>Confidence</th></tr></thead><tbody>
             {P.scorecard.map((s, i) => {
@@ -8228,7 +8228,7 @@ function IntelligencePanel(){
               const isRollup = s.category === 'ALL';
               return (<tr key={i} style={{background: isRollup ? 'var(--color-sunken)' : undefined, fontWeight: isRollup ? 'var(--weight-semi)' : 'var(--weight-normal)'}}>
                 <td><b>{agentLabel(s.agent)}</b></td>
-                <td>{isRollup ? <span style={{color:'var(--text-muted)'}}>— all —</span> : s.category}</td>
+                <td>{isRollup ? <span style={{color:'var(--text-muted)'}}>All</span> : s.category}</td>
                 <td>{s.total_closed}</td>
                 <td style={{color:'var(--good)'}}>{s.hits}</td>
                 <td style={{color:'var(--bad)'}}>{s.misses}</td>
@@ -8243,7 +8243,7 @@ function IntelligencePanel(){
           {attribActions.length > 0 && (<div className="card">
             <div className="card-section-title">
               <h2 style={{margin:0}}>Attribution ledger</h2>
-              <span className="meta">{hits} hits · {misses} misses · {openCount} open</span>
+              <span className="meta">{hits} hits, {misses} misses, {openCount} open</span>
             </div>
             <table><thead><tr><th>Agent</th><th className="tl">Action</th><th>Status</th><th>Baseline → Observed</th><th>Counterfactual Δ</th><th>Attributed lift</th><th>Verdict</th></tr></thead><tbody>
             {attribActions.map((a, i) => {
@@ -8253,7 +8253,7 @@ function IntelligencePanel(){
               const goodLift = m.direction==='higher_better' ? lift>0 : m.direction==='lower_better' ? lift<0 : null;
               const liftColor = goodLift==null ? 'var(--text-muted)' : goodLift ? 'var(--good)' : 'var(--bad)';
               return (<tr key={i}>
-                <td><b>{agentLabel(a.agent)}</b><br/><span className="meta" style={{fontSize:'var(--text-xs)'}}>{a.category} · {priorityWord(a.priority)}</span></td>
+                <td><b>{agentLabel(a.agent)}</b><br/><span className="meta" style={{fontSize:'var(--text-xs)'}}>{a.category}, {priorityWord(a.priority)}</span></td>
                 <td style={{fontSize:'var(--text-sm)', maxWidth:280}}>{scrubTag(a.description)}</td>
                 <td><span className="pill grey" style={{fontSize:'var(--text-xs)'}}>{a.status}</span></td>
                 <td>{fmt(a.baseline_value)} → {fmt(a.observed_value)}</td>
@@ -8358,7 +8358,7 @@ function ForecastPanel(){
       <div>
         <div className="card-section-title">
           <h2 style={{margin:0}}>Forecast</h2>
-          <span className="meta">Operator-input-driven · no baseline extrapolation</span>
+          <span className="meta">Operator-input-driven, no baseline extrapolation</span>
         </div>
         <div className="meta" style={{lineHeight:1.6}}>
           Most analytics tools extrapolate forward from the last 30 days as if the next 30 will look the same. They won't. Enter your planning assumptions below, or pick a scenario to pre-fill the form.
@@ -8369,7 +8369,7 @@ function ForecastPanel(){
         <div className="forecast-empty-icon">∅</div>
         <div className="forecast-empty-title">Pick a scenario to start</div>
         <div className="forecast-empty-body">
-          Each scenario pre-fills the form with your historical baseline × a multiplier. You can then tune any value before computing. This is the platform's "what-if" mode — it never assumes the future will look like the past without you saying so.
+          Each scenario pre-fills the form with your historical baseline × a multiplier. You can then tune any value before computing. This is the platform's "what-if" mode, it never assumes the future will look like the past without you saying so.
         </div>
         <div className="forecast-empty-cta">
           <button className="btn-ghost" onClick={()=>applyScenario('worst')}>Worst case (×0.8)</button>
@@ -8387,7 +8387,7 @@ function ForecastPanel(){
         <div className="card-section-title">
           <h2 style={{margin:0}}>Planning inputs</h2>
           <span className="meta">{`
-          Reference: Meta ${curSym()}`}{historicalMetaSpend30d ?? '—'}/d @ {historicalMetaRoas != null ? historicalMetaRoas.toFixed(2) + '×' : '—'}{` · Google ${curSym()}`}{historicalGoogleSpend30d ?? '—'}/d @ {historicalGoogleRoas != null ? historicalGoogleRoas.toFixed(2) + '×' : '—'}
+          Reference: Meta ${curSym()}`}{historicalMetaSpend30d ?? '—'}/d @ {historicalMetaRoas != null ? historicalMetaRoas.toFixed(2) + '×' : '—'}{`, Google ${curSym()}`}{historicalGoogleSpend30d ?? '—'}/d @ {historicalGoogleRoas != null ? historicalGoogleRoas.toFixed(2) + '×' : '—'}
           </span>
         </div>
         <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:'var(--s-3)'}}>
@@ -8410,7 +8410,7 @@ function ForecastPanel(){
       {/* Refusal panel */}
       {submitted && !allRequiredFilled && (<div className="card alert-bad">
         <div className="card-section-title">
-          <h2 style={{margin:0, color:'var(--bad)'}}>Refusing to forecast — required inputs missing</h2>
+          <h2 style={{margin:0, color:'var(--bad)'}}>Refusing to forecast, required inputs missing</h2>
         </div>
         <div style={{fontSize:'var(--text-sm)', lineHeight:1.6, color:'var(--text-secondary)'}}>
           At least one of Meta spend, Meta ROAS, Google spend, or Google ROAS is empty or non-numeric. Extrapolating the missing channel would just re-project the last 30 days, which:
@@ -8424,8 +8424,8 @@ function ForecastPanel(){
       {/* Forecast results */}
       {submitted && calc && (<div className="card alert-good">
         <div className="card-section-title">
-          <h2 style={{margin:0}}>Forecast — next {horizon} days</h2>
-          <span className="meta">spend × return on ad spend × horizon · no baseline extrapolation</span>
+          <h2 style={{margin:0}}>Forecast, next {horizon} days</h2>
+          <span className="meta">spend × return on ad spend × horizon, no baseline extrapolation</span>
         </div>
         <table>
           <thead><tr><th>Channel</th><th className="tl">Inputs</th><th>Forecast revenue</th></tr></thead>
@@ -8450,7 +8450,7 @@ function ForecastPanel(){
           <div style={{padding:'var(--s-3)', background:'var(--bg-elevated)', borderRadius:'var(--radius-none) var(--r-sm) var(--r-sm) var(--radius-none)'}}>
             <div className="micro" style={{color:'var(--accent)', marginBottom:'var(--s-2)'}}>Stress-test this</div>
             <div style={{fontSize:'var(--text-sm)', color:'var(--text-secondary)', lineHeight:1.6}}>
-              Re-run with ROAS at your <b>worst</b> 30-day rate, then your <b>best</b>. The gap between those two forecasts is the planning range — not the central case. Use the scenario buttons at the top to swap quickly.
+              Re-run with ROAS at your <b>worst</b> 30-day rate, then your <b>best</b>. The gap between those two forecasts is the planning range, not the central case. Use the scenario buttons at the top to swap quickly.
             </div>
           </div>
         </div>
@@ -8552,7 +8552,7 @@ function SynergyMatrix(){
   return (<div className="card" style={{marginBottom:14}}>
     <h2>Channel synergy matrix</h2>
     <div className="muted" style={{marginBottom:10, fontSize:'var(--text-sm)'}}>
-      Pearson correlation between daily series across 5 channels (Meta · Google · Email · Site · Shopify). Each cell = correlation between row (today) and column (today + best lag). Green = positive, red = negative. Same-channel pairs are blank (internal identities). Synergies persist to <code>patterns_brand</code> as kind="synergy".
+      Pearson correlation between daily series across 5 channels (Meta, Google, Email, Site, Shopify). Each cell = correlation between row (today) and column (today + best lag). Green = positive, red = negative. Same-channel pairs are blank (internal identities). Synergies persist to <code>patterns_brand</code> as kind="synergy".
     </div>
     {/* Matrix */}
     <div style={{overflowX:'auto', marginBottom:14}}>
@@ -8610,7 +8610,7 @@ function SynergyMatrix(){
       </tr>);
     })}
     </tbody></table>
-    <div className="note" style={{marginTop:14}}><b>How to read this:</b> r=1.0 means perfect positive correlation, r=0 means none, r=-1.0 perfect inverse. The <b>"+Nd"</b> superscript means the target metric peaks N days <i>after</i> the source — a leading indicator. {topPairs.filter(p=>p.lag>0).length === 0 ? <span><b>Notable: every cross-channel pair's strongest correlation is at lag 0 (same day).</b> {OI_BRAND.name||'Your brand'}'s channels move in lockstep — there's no measurable "Channel X today predicts Channel Y in N days" structure. Likely cause: all channels respond to the same external drivers (campaign launches, news cycles, weather, day-of-week). To detect true lead-lag would need either intraday granularity, or longer history with more isolated channel pushes.</span> : <span>Look for lag &gt; 0 patterns — those are leading indicators worth treating as early-warning signals.</span>}</div>
+    <div className="note" style={{marginTop:14}}><b>How to read this:</b> r=1.0 means perfect positive correlation, r=0 means none, r=-1.0 perfect inverse. The <b>"+Nd"</b> superscript means the target metric peaks N days <i>after</i> the source, a leading indicator. {topPairs.filter(p=>p.lag>0).length === 0 ? <span><b>Notable: every cross-channel pair's strongest correlation is at lag 0 (same day).</b> {OI_BRAND.name||'Your brand'}'s channels move in lockstep, there's no measurable "Channel X today predicts Channel Y in N days" structure. Likely cause: all channels respond to the same external drivers (campaign launches, news cycles, weather, day-of-week). To detect true lead-lag would need either intraday granularity, or longer history with more isolated channel pushes.</span> : <span>Look for lag &gt; 0 patterns, those are leading indicators worth treating as early-warning signals.</span>}</div>
   </div>);
 }
 
@@ -8800,7 +8800,7 @@ async function v3AskFacts(question) {
     average_cost_per_new_customer_basis: (P.breakdown && P.breakdown.cost_per_new_customer_basis)
       || 'the plan’s ad budget over the new customers it expects across its whole period; not what a new customer costs now, which is customers.cost_to_win_a_new_customer_last_30_days',
     months: (P.months || []).map(m => ({ month: String(m.month).slice(0, 7), sales: R(m.sales), ad_spend: R(m.spend), new_customers: R(m.new_customers) })),
-    note: 'Greta’s quarter plan: own seasonality, returning customers at their recent rate, new-customer sales rising with ad spend along the measured curve (each extra pound buys less). It spreads the budget by season, so a peak month gets more and an ordinary month less.' };
+    note: 'The quarter plan: own seasonality, returning customers at their recent rate, new-customer sales rising with ad spend along the measured curve (each extra pound buys less). It spreads the budget by season, so a peak month gets more and an ordinary month less.' };
   const U = r0(ueR);
   // the last 30 days decide whether a new customer pays back (as Today, Customers and Growth say it)
   const SU = (r0(stateR) && r0(stateR).state && r0(stateR).state.unit) || {};
@@ -9682,7 +9682,7 @@ function AskPanel(){
       // Anything that fails before the request goes out (building the figures) lands here, so the button
       // never stays on "Thinking…" (16 Oct: a dropped part was read later and Ask hung with no message).
       console.warn('ask: could not build the question', e);
-      setError("Greta couldn't put your figures together for that question. Try again, or ask it another way.");
+      setError("Your figures could not be put together for that question. Try again, or ask it another way.");
       setLoading(false); setAskStage('');
     }
   };
@@ -9787,7 +9787,7 @@ ${dataStr}`;
       });
       // The relay returns an owner-readable `message` on failure; a raw status/JSON blob is
       // never shown (it used to print the provider's 404 straight onto the page).
-      const ASK_FAIL = "Greta couldn't answer just now. Your data is fine — try again in a minute.";
+      const ASK_FAIL = "No answer just now. Your data is fine, so try again in a minute.";
       if (!resp.ok) { let m = ''; try { m = (await resp.json()).message || ''; } catch(_){} throw new Error(m || ASK_FAIL); }
       const data = await resp.json();
       if (data.error) throw new Error(data.message || ASK_FAIL);
@@ -9842,7 +9842,7 @@ ${dataStr}`;
   return (<div>
     <div className="card" style={{marginBottom:14}}>
       {!UI_V3 && <h2>Ask Greta</h2>}
-      <p className="v3-note v3-measure" style={{marginTop:0}}>Greta answers from the same figures your pages show, which are sent to her AI model to write the reply. Your questions and her answers are kept in your workspace, private to your team, so you can come back to them on any device.</p>
+      <p className="v3-note v3-measure" style={{marginTop:0}}>Answers come from the same figures your pages show, which are sent to an AI model to write the reply. Your questions and the answers are kept in your workspace, private to your team, so you can come back to them on any device.</p>
       {!ASK && (<div style={{padding:12, background:'var(--bg-app)', borderRadius:'var(--radius-none)', marginBottom:10, border:'1px solid var(--border-default)'}}>
         <div style={{fontSize:'var(--text-sm)', color:'var(--text-primary)', lineHeight:1.5}}>Ask runs inside your authenticated workspace, where the model key is held server-side (never in the browser). It isn't enabled in this public demo. The examples below show the questions it answers from your live data.</div>
       </div>)}
@@ -9857,7 +9857,7 @@ ${dataStr}`;
           {ASK && history.length>0 && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={clearHistory}>Clear the conversation</button>}
           <button type="button" className="v3-btn v3-btn-p" onClick={send} disabled={!ASK||loading||!question.trim()}>{loading?'Thinking…':'Ask Greta'}</button>
         </div>
-        {loading && <p className="micro muted v3-measure" role="status" aria-live="polite">{askStage || 'Working'}… {askSecs > 0 ? askSecs + 's' : ''}{askSecs >= 20 ? ' — answers usually take under a minute' : ''}</p>}
+        {loading && <p className="micro muted v3-measure" role="status" aria-live="polite">{askStage || 'Working'}… {askSecs > 0 ? askSecs + 's' : ''}{askSecs >= 20 ? ', answers usually take under a minute' : ''}</p>}
       </div>
       <div className="v3-prompts" aria-label="Questions to start with">
         {whyPrompts.map((q,i)=>(<button type="button" key={'why'+i} className="v3-prompt v3-prompt-why" onClick={()=>{ if (ASK) { setQuestion(q); send(q); } }} disabled={!ASK||loading} title={ASK?'':'Available in your workspace'}>{q}</button>))}
@@ -9877,7 +9877,7 @@ ${dataStr}`;
           return pairs.reverse().flat(); })().map((m,i)=>(<div key={i} style={{padding:12, background: m.role==='user'?PAL.panel:PAL.panel, borderRadius:'var(--radius-none)'}}>
           <div style={{fontSize:'var(--text-xs)',color:PAL.muted,marginBottom:6,textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',fontWeight:'var(--weight-semi)',display:'flex',justifyContent:'space-between'}}>
             <span>{m.role==='user'?'You':'Greta'}</span>
-            <span>{new Date(m.time).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}{!UI_V3 && m.usage?` · ${m.usage.input_tokens||0} in / ${m.usage.output_tokens||0} out${m.usage.cache_read_input_tokens?` · cached ${m.usage.cache_read_input_tokens}`:''}`:''}</span>
+            <span>{new Date(m.time).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}{!UI_V3 && m.usage?`, ${m.usage.input_tokens||0} in / ${m.usage.output_tokens||0} out${m.usage.cache_read_input_tokens?`, cached ${m.usage.cache_read_input_tokens}`:''}`:''}</span>
           </div>
           {/* Answers from ask_log or an older browser history were never checked (8 Oct: the stored "£445 a
               week" for Meta came back on another device). Checked once on arrival, or here on show. */}
@@ -9909,7 +9909,7 @@ function BrandAgeBanner(){
   const bgVar = sev === 'critical' ? 'var(--bad-bg)' : sev === 'high' ? 'var(--warn-bg)' : 'var(--bg-card)';
   return (
     <div className="status-banner" style={{background: bgVar, borderColor: colorVar + '40', marginBottom: 'var(--s-3)'}}>
-      <span className="status-banner-tag" style={{color: colorVar}}>Thin data · {days}d</span>
+      <span className="status-banner-tag" style={{color: colorVar}}>Thin data, {days}d</span>
       <span className="status-banner-body">{`
       Fewer than 60 days of trading history. Trends, diffs and ${curSym()} quantifications are `}<b>directional only</b>. Forecasts not meaningful at this scale.
       </span>
@@ -9958,7 +9958,7 @@ function FreshnessChip(){
   const stale=sources.filter(s=>s.broken||s.n==null||s.n>4), ageing=sources.filter(s=>s.n==null||s.n>1);
   const color=stale.length?'var(--bad)':ageing.length?'var(--warn)':'var(--good)';
   const label=stale.length?`${stale.length} stale`:ageing.length?`${ageing.length} ageing`:'Live';
-  const tip='Sync freshness (connected sources)\n'+sources.map(s=>`${s.name}: ${ageStr(s.n)}${s.broken?' (sync failing)':''}`).join('   ·   ')+'\n(click to manage connections)';
+  const tip='Sync freshness (connected sources)\n'+sources.map(s=>`${s.name}: ${ageStr(s.n)}${s.broken?' (sync failing)':''}`).join('  ,   ')+'\n(click to manage connections)';
   return (<button onClick={()=>window.__oiNav&&window.__oiNav('settings','connections')} title={tip} aria-label={`Data freshness: ${label}`}
     style={{display:'inline-flex',alignItems:'center',gap:6,height:30,padding:'0 10px',flexShrink:0,borderRadius:'var(--radius-md)',background:'var(--bg-card)',border:'1px solid var(--border-default)',color:'var(--text-secondary)',cursor:'pointer',fontSize:'var(--text-sm)',whiteSpace:'nowrap'}}>
     <span style={{width:7,height:7,borderRadius:'50%',background:color,display:'inline-block'}}/>
@@ -10010,7 +10010,7 @@ function ConnectionHealthStrip(){
       })}
     </div>
     {critical.length > 0 && (<span style={{color:'var(--bad)', fontSize:'var(--text-xs)'}}>
-      {critical.map(s=>s.name).join(', ')} hasn't updated in &gt;4d — reconnect in <GoLink sec="settings" sub="connections">Connections &amp; data</GoLink>
+      {critical.map(s=>s.name).join(', ')} hasn't updated in &gt;4d, reconnect in <GoLink sec="settings" sub="connections">Connections &amp; data</GoLink>
     </span>)}
   </div>);
 }
@@ -10029,25 +10029,25 @@ function ConnectionHealthStrip(){
 const BOARD_METRICS = [
   {key:'revenue',       label:'Net revenue',    fmt:GBP, better:'up'},
   {key:'paid',          label:'Paid spend',     fmt:GBP, better:'flat'},
-  {key:'mer',           label:'Sales per £ of ads',            fmt:v=>v==null?'—':v.toFixed(2)+'×', better:'up',   get bench(){ return v3MerBreakEven(); }, get benchTip(){ const b = v3MerBreakEven(); return b ? 'Break-even ' + b.toFixed(2) + '× — below it, ads cost more than the profit they bring' : 'Break-even needs your costs'; }},
+  {key:'mer',           label:'Sales per £ of ads',            fmt:v=>v==null?'—':v.toFixed(2)+'×', better:'up',   get bench(){ return v3MerBreakEven(); }, get benchTip(){ const b = v3MerBreakEven(); return b ? 'Break-even ' + b.toFixed(2) + '×, below it, ads cost more than the profit they bring' : 'Break-even needs your costs'; }},
   {key:'orders',        label:'Orders',         fmt:NUM, better:'up'},
   {key:'aov',           label:'Average order',            fmt:GBP, better:'up'},
   {key:'sessions',      label:'Sessions',       fmt:NUM, better:'up'},
   {key:'cvr',           label:'Visitors who buy',            fmt:PCT, better:'up',   bench:CVR_BENCH, benchTip:'Benchmark ' + CVR_BENCH_LABEL},
-  {key:'discountDepth', label:'Discount depth', fmt:PCT, better:'down', bench:0.10, benchTip:'Lower is better · watch > 10%'},
-  {key:'emailOpenRate', label:'Email open rate', fmt:PCT, better:'up', note:'Klaviyo opens ÷ recipients — list-engagement signal. (Attributed email revenue is shown in Channels → Email; it over-counts vs net because Klaviyo credits the same order to multiple emails/flows, so it is deliberately kept off this scorecard.)'},
+  {key:'discountDepth', label:'Discount depth', fmt:PCT, better:'down', bench:0.10, benchTip:'Lower is better, watch > 10%'},
+  {key:'emailOpenRate', label:'Email open rate', fmt:PCT, better:'up', note:'Klaviyo opens ÷ recipients, list-engagement signal. (Attributed email revenue is shown in Channels → Email; it over-counts vs net because Klaviyo credits the same order to multiple emails/flows, so it is deliberately kept off this scorecard.)'},
 ];
 
 // Supporting metrics — a second, lighter tier for the board. Channel-level and
 // funnel detail that explains the headline KPIs above.
 const _xRoas = v => v==null ? '—' : v.toFixed(1)+'×';
 const BOARD_METRICS2 = [
-  {key:'returnRate',   label:'Return rate',     fmt:PCT, better:'down', bench:0.08, benchTip:'Watch > 8%', note:'90-day blended return rate (returns ÷ units). Returns post asynchronously so can\'t be reliably dated to a single week — shown as a stable blend rather than a misleading weekly 0%.'},
+  {key:'returnRate',   label:'Return rate',     fmt:PCT, better:'down', bench:0.08, benchTip:'Watch > 8%', note:'90-day blended return rate (returns ÷ units). Returns post asynchronously so can\'t be reliably dated to a single week, shown as a stable blend rather than a misleading weekly 0%.'},
   {key:'metaRoas',     label:'Meta’s claimed return',       fmt:_xRoas, better:'up', bench:2, note:'Meta-claimed purchase value ÷ Meta spend. Platform-claimed (overlaps other channels), not incremental.'},
   {key:'googleRoas',   label:'Google’s claimed return',     fmt:_xRoas, better:'up', bench:2, note:'Google-claimed conversion value ÷ Google spend. Platform-claimed, not incremental.'},
-  {key:'atcRate',      label:'Add-to-cart rate',fmt:PCT, better:'up', note:'GA4 add-to-carts ÷ sessions — top-of-funnel intent.'},
-  {key:'checkoutRate', label:'Reached checkout',fmt:PCT, better:'up', note:'GA4 checkouts ÷ sessions — mid-funnel progression.'},
-  {key:'emailClickRate',label:'Email click rate',fmt:PCT, better:'up', note:'Klaviyo clicks ÷ recipients — content/offer resonance.'},
+  {key:'atcRate',      label:'Add-to-cart rate',fmt:PCT, better:'up', note:'GA4 add-to-carts ÷ sessions, top-of-funnel intent.'},
+  {key:'checkoutRate', label:'Reached checkout',fmt:PCT, better:'up', note:'GA4 checkouts ÷ sessions, mid-funnel progression.'},
+  {key:'emailClickRate',label:'Email click rate',fmt:PCT, better:'up', note:'Klaviyo clicks ÷ recipients, content/offer resonance.'},
 ];
 
 // Auto-generated board commentary: turns the week's numbers (vs prior week +
@@ -10069,31 +10069,31 @@ function weekCommentary(W, prev){
   // Spend efficiency (MER) + diminishing-return check
   if(m.mer!=null){
     if(m.mer>=2){ const mCh = p?ch(m.mer,p.mer):null;
-      worked.push({sev:2.2+(mCh&&mCh>0?Math.min(mCh,1):0), text:`Paid stayed efficient — sales per £ of ads ${m.mer.toFixed(2)}× (above the 2× line)${mCh&&mCh>=0.05?`, up ${fp(mCh)} WoW`:''}.`}); }
-    else watch.push({sev:2.6, text:`Paid efficiency thin — sales per £ of ads ${m.mer.toFixed(2)}×, under the 2× line.`});
+      worked.push({sev:2.2+(mCh&&mCh>0?Math.min(mCh,1):0), text:`Paid stayed efficient, sales per £ of ads ${m.mer.toFixed(2)}× (above the 2× line)${mCh&&mCh>=0.05?`, up ${fp(mCh)} WoW`:''}.`}); }
+    else watch.push({sev:2.6, text:`Paid efficiency thin, sales per £ of ads ${m.mer.toFixed(2)}×, under the 2× line.`});
   }
   if(p){ const sCh=ch(m.paid,p.paid), rc=ch(m.revenue,p.revenue);
     if(sCh!=null && rc!=null && sCh>=0.15 && rc < sCh*0.5)
-      watch.push({sev:2.8, text:`Spend rose ${fp(sCh)} but revenue ${rc>=0?'only rose '+fp(rc):'fell '+fp(rc)} — diminishing return on the extra budget.`}); }
+      watch.push({sev:2.8, text:`Spend rose ${fp(sCh)} but revenue ${rc>=0?'only rose '+fp(rc):'fell '+fp(rc)}, diminishing return on the extra budget.`}); }
 
   // Conversion vs the single CVR benchmark
   if(m.cvr!=null){
     if(m.cvr>=CVR_BENCH){ const cCh=p?ch(m.cvr,p.cvr):null;
       worked.push({sev:2+(cCh&&cCh>0?Math.min(cCh,1):0), text:`Conversion healthy at ${PCT(m.cvr)} (at/above the ${CVR_BENCH_LABEL} target).`}); }
     else { const cCh=p?ch(m.cvr,p.cvr):null;
-      watch.push({sev:2.2, text:`Conversion ${PCT(m.cvr)} — still under the ${CVR_BENCH_LABEL} target${cCh&&cCh>=0.05?`, though improving (${fp(cCh)} WoW)`:''}.`}); }
+      watch.push({sev:2.2, text:`Conversion ${PCT(m.cvr)}, still under the ${CVR_BENCH_LABEL} target${cCh&&cCh>=0.05?`, though improving (${fp(cCh)} WoW)`:''}.`}); }
   }
 
   // Funnel leak: strong add-to-cart but weak checkout follow-through
   if(m.atcRate!=null && m.checkoutRate!=null && m.atcRate>0){
     const carry = m.checkoutRate/m.atcRate;
-    if(carry<0.45 && m.atcRate>=0.03) watch.push({sev:1.6, text:`Funnel leak — ${PCT(m.atcRate)} add to cart but only ${PCT(m.checkoutRate)} reach checkout (${fp(carry)} carry-through).`});
+    if(carry<0.45 && m.atcRate>=0.03) watch.push({sev:1.6, text:`Funnel leak, ${PCT(m.atcRate)} add to cart but only ${PCT(m.checkoutRate)} reach checkout (${fp(carry)} carry-through).`});
   }
 
   // AOV / basket
   if(p){ const aCh=ch(m.aov,p.aov);
-    if(aCh!=null && aCh>=0.06) worked.push({sev:1.2+Math.min(Math.abs(aCh),1), text:`Basket size up — average order value ${GBP(m.aov)} (${fp(aCh)} WoW).`});
-    else if(aCh!=null && aCh<=-0.08) watch.push({sev:1.3+Math.min(Math.abs(aCh),1), text:`Basket size slipped — average order value ${GBP(m.aov)} (${fp(aCh)} WoW).`}); }
+    if(aCh!=null && aCh>=0.06) worked.push({sev:1.2+Math.min(Math.abs(aCh),1), text:`Basket size up, average order value ${GBP(m.aov)} (${fp(aCh)} WoW).`});
+    else if(aCh!=null && aCh<=-0.08) watch.push({sev:1.3+Math.min(Math.abs(aCh),1), text:`Basket size slipped, average order value ${GBP(m.aov)} (${fp(aCh)} WoW).`}); }
 
   // Traffic
   if(p){ const tCh=ch(m.sessions,p.sessions);
@@ -10102,25 +10102,25 @@ function weekCommentary(W, prev){
 
   // Discounting & margin
   if(m.discountDepth!=null){
-    if(m.discountDepth>0.12) watch.push({sev:1.5, text:`Discounting ran deep — ${PCT(m.discountDepth)} of sales given away, squeezing margin.`});
-    else if(p){ const dCh=ch(m.discountDepth,p.discountDepth); if(dCh!=null && dCh<=-0.2) worked.push({sev:0.9, text:`Less reliance on discounting — depth down to ${PCT(m.discountDepth)}.`}); }
+    if(m.discountDepth>0.12) watch.push({sev:1.5, text:`Discounting ran deep, ${PCT(m.discountDepth)} of sales given away, squeezing margin.`});
+    else if(p){ const dCh=ch(m.discountDepth,p.discountDepth); if(dCh!=null && dCh<=-0.2) worked.push({sev:0.9, text:`Less reliance on discounting, depth down to ${PCT(m.discountDepth)}.`}); }
   }
-  if(m.returnRate!=null && m.returnRate>0.08) watch.push({sev:1.2, text:`Returns elevated — ${PCT(m.returnRate)} of sales refunded.`});
+  if(m.returnRate!=null && m.returnRate>0.08) watch.push({sev:1.2, text:`Returns elevated, ${PCT(m.returnRate)} of sales refunded.`});
 
   // Channel ROAS
-  if(m.metaRoas!=null && W.metaSpend>=40){ if(m.metaRoas>=2.5) worked.push({sev:0.8, text:`Meta pulled its weight — ${m.metaRoas.toFixed(1)}× claimed return on ad spend on ${GBP(W.metaSpend)}.`}); else if(m.metaRoas<1.5) watch.push({sev:1.2, text:`Meta soft — ${m.metaRoas.toFixed(1)}× claimed return on ad spend on ${GBP(W.metaSpend)} spend.`}); }
-  if(m.googleRoas!=null && W.googleSpend>=40){ if(m.googleRoas>=3) worked.push({sev:0.8, text:`Google pulled its weight — ${m.googleRoas.toFixed(1)}× claimed return on ad spend on ${GBP(W.googleSpend)}.`}); else if(m.googleRoas<1.5) watch.push({sev:1.2, text:`Google soft — ${m.googleRoas.toFixed(1)}× claimed return on ad spend on ${GBP(W.googleSpend)} spend.`}); }
+  if(m.metaRoas!=null && W.metaSpend>=40){ if(m.metaRoas>=2.5) worked.push({sev:0.8, text:`Meta pulled its weight, ${m.metaRoas.toFixed(1)}× claimed return on ad spend on ${GBP(W.metaSpend)}.`}); else if(m.metaRoas<1.5) watch.push({sev:1.2, text:`Meta soft, ${m.metaRoas.toFixed(1)}× claimed return on ad spend on ${GBP(W.metaSpend)} spend.`}); }
+  if(m.googleRoas!=null && W.googleSpend>=40){ if(m.googleRoas>=3) worked.push({sev:0.8, text:`Google pulled its weight, ${m.googleRoas.toFixed(1)}× claimed return on ad spend on ${GBP(W.googleSpend)}.`}); else if(m.googleRoas<1.5) watch.push({sev:1.2, text:`Google soft, ${m.googleRoas.toFixed(1)}× claimed return on ad spend on ${GBP(W.googleSpend)} spend.`}); }
 
   // Email engagement
   if(p){ const eCh=ch(m.emailOpenRate,p.emailOpenRate); if(eCh!=null && eCh<=-0.15) watch.push({sev:0.6, text:`Email open rate softened to ${PCT(m.emailOpenRate)} (${fp(eCh)} WoW).`});
-    else if(eCh!=null && eCh>=0.15) worked.push({sev:0.6, text:`Email engagement up — open rate ${PCT(m.emailOpenRate)} (${fp(eCh)} WoW).`}); }
+    else if(eCh!=null && eCh>=0.15) worked.push({sev:0.6, text:`Email engagement up, open rate ${PCT(m.emailOpenRate)} (${fp(eCh)} WoW).`}); }
 
   // Context: events, sales, data caveats
   loadBrandEvents().forEach(e=>{ if(e.startsOn>=W.weekStart && e.startsOn<=W.weekEnding){ const mt=EVENT_META[e.type]||EVENT_META.other; context.push({sev:2, text:`${e.title||mt.label} ran (${(e.startsOn||'').slice(5)}).`}); }});
-  ((window.FRKL_DISCOUNT_CODES && window.FRKL_DISCOUNT_CODES.codes)||[]).filter(c=>c && c.pattern!=='always-on' && (c.discount||0)>=120).forEach(c=>{ let pk=null;(c.series||[]).forEach(x=>{if(!pk||x.d>pk.d)pk=x;}); if(pk && pk.w>=W.weekStart && pk.w<=W.weekEnding) context.push({sev:1.8, text:`🏷️ ${c.code} sale ran — ${c.discountRate!=null?Math.round(c.discountRate*100)+'% off':'sale'}, ${curSym()}${Math.round(c.discount)} given.`}); });
-  if(W.partial) context.push({sev:3, text:`Week still in progress — ${W.days}/7 days captured so far.`});
+  ((window.FRKL_DISCOUNT_CODES && window.FRKL_DISCOUNT_CODES.codes)||[]).filter(c=>c && c.pattern!=='always-on' && (c.discount||0)>=120).forEach(c=>{ let pk=null;(c.series||[]).forEach(x=>{if(!pk||x.d>pk.d)pk=x;}); if(pk && pk.w>=W.weekStart && pk.w<=W.weekEnding) context.push({sev:1.8, text:`🏷️ ${c.code} sale ran, ${c.discountRate!=null?Math.round(c.discountRate*100)+'% off':'sale'}, ${curSym()}${Math.round(c.discount)} given.`}); });
+  if(W.partial) context.push({sev:3, text:`Week still in progress, ${W.days}/7 days captured so far.`});
   else if(prev && prev.partial) context.push({sev:1, text:`Prior week was partial, so week-on-week comparisons are muted.`});
-  if(!p && !W.partial) context.push({sev:1, text:`No comparable prior week — first full week in range.`});
+  if(!p && !W.partial) context.push({sev:1, text:`No comparable prior week, first full week in range.`});
 
   // "WoW" is analyst shorthand; an owner reads "on last week".
   const plainWk = t => String(t).replace(/\bWoW\b/g, 'on last week');
@@ -10143,7 +10143,7 @@ function weekCommentary(W, prev){
   // The watch-out must add something: when the biggest worry is the revenue move the headline
   // has just stated, take the next one ("revenue down 53% … Main watch-out — revenue fell 53%").
   const topWatch = watch.slice().sort((a,b)=>b.sev-a.sev).find(x => !(rCh!=null && /^revenue\b/i.test(x.text)));
-  const headline = verdict + (hp.length ? ': ' + hp.join(', ') : '') + '.' + (topWatch ? ` Main watch-out — ${lc(plainWk(topWatch.text))}` : '');
+  const headline = verdict + (hp.length ? ': ' + hp.join(', ') : '') + '.' + (topWatch ? ` Main watch-out, ${lc(plainWk(topWatch.text))}` : '');
 
   return {headline, verdict, worked:top(worked,5), watch:top(watch,5), context:top(context,4)};
 }
@@ -10288,7 +10288,7 @@ function WeeklyBoard(){
     // "Connect a source" is only right when nothing is connected; a failed load is not that.
     const L = window.FRKL_LIVE || {};
     const why = (L.session && /^(error|static-only)$/.test(L.status || '')) ? v3NoBrand('the weekly board')
-      : 'No weeks yet — they start once Shopify has a full week of orders.';
+      : 'No weeks yet, they start once Shopify has a full week of orders.';
     return (<div className="card"><h2>Weekly board</h2><div className="muted">{why}</div></div>);
   }
 
@@ -10324,11 +10324,11 @@ function WeeklyBoard(){
       {/* Header + week selector */}
       <div className="card" style={{marginBottom:14, display:'flex', alignItems:'center', justifyContent:'space-between', gap:12, flexWrap:'wrap'}}>
         <div>
-          <div className="v3-kick">Weekly board · report card</div>
+          <div className="v3-kick">Weekly board, report card</div>
           <h1 style={{margin:'4px 0 2px', fontSize:'var(--text-xl)'}}>Week of {v3Day(W.weekStart)} <span style={{color:'var(--text-muted)', fontWeight:'var(--weight-medium)', fontSize:'var(--text-base)'}}>– {v3Day(W.weekEnding, true)}</span></h1>
           <div className="fine" style={{color:'var(--text-faint)'}}>
-            {W.inProgress ? <span style={{color:'var(--warn)'}}>● In progress — {W.days} of 7 days so far</span>
-              : W.partial ? <span>Part week — your data starts {v3Day(W.weekStart)}</span>
+            {W.inProgress ? <span style={{color:'var(--warn)'}}>● In progress, {W.days} of 7 days so far</span>
+              : W.partial ? <span>Part week, your data starts {v3Day(W.weekStart)}</span>
               : <span>Completed week</span>}
           </div>
         </div>
@@ -10359,11 +10359,11 @@ function WeeklyBoard(){
                 return (
                   <div key={i} style={{display:'flex', gap:8, alignItems:'baseline', fontSize:'var(--text-sm)'}}>
                     <span className="pill" style={{background:col+'22', color:col, fontSize:'var(--text-xs)', fontWeight:'var(--weight-bold)', padding:'2px 7px', borderRadius:'var(--r-full)', textTransform:'uppercase', flexShrink:0}}>{f.verdict}</span>
-                    <span style={{color:'var(--text-secondary)'}}><b style={{color:'var(--text-primary)'}}>{plainWords(f.metric)}{f.gbp!=null?` (${curSym()}${NUM(f.gbp)})`:''}</b> — {plainWords(f.recommendation)}</span>
+                    <span style={{color:'var(--text-secondary)'}}><b style={{color:'var(--text-primary)'}}>{plainWords(f.metric)}{f.gbp!=null?` (${curSym()}${NUM(f.gbp)})`:''}</b>, {plainWords(f.recommendation)}</span>
                   </div>
                 ); })}
             </div>}
-            {(r.blindspots||[]).length>0 && <div className="fine" style={{color:'var(--text-faint)', marginTop:10}}>Blind spots: {r.blindspots.join(' · ')}</div>}
+            {(r.blindspots||[]).length>0 && <div className="fine" style={{color:'var(--text-faint)', marginTop:10}}>Blind spots: {r.blindspots.join(', ')}</div>}
             <div className="fine" style={{color:'var(--text-faint)', marginTop:8, fontStyle:'italic'}}>{`Written from your own data. Every ${curSym()} figure is checked against it.`}</div>
           </div>
         );
@@ -10417,7 +10417,7 @@ function WeeklyBoard(){
         </>);
       })()}
       {/* Trend: the thirteen weeks up to the one being reviewed. This used to plot every week
-          since 2024 — 120-odd bars squeezed into a barcode — across four stacked strips with
+          since 2024, 120-odd bars squeezed into a barcode, across four stacked strips with
           their own scales. A weekly review needs the quarter around the week, on one scale. */}
       {(() => {
         const t13 = trend.slice(Math.max(0, idx - 12), idx + 1);
@@ -10440,13 +10440,13 @@ function WeeklyBoard(){
                 <R.YAxis tickFormatter={fmtMoneyK}/>
                 <R.Tooltip content={tip}/>
                 <R.Bar dataKey="revenue" name="Sales" fill={PAL.sales} radius={[2, 2, 0, 0]}/>
-                <R.Line type="monotone" dataKey="paid" name="Ad spend" stroke={PAL.ads}/>
+                <R.Line type="linear" dataKey="paid" name="Ad spend" stroke={PAL.ads}/>
               </R.ComposedChart>
             </R.ResponsiveContainer>
           </figure>
           <figure className="v3-chart">
             <figcaption><span className="v3-chart-title">Sales per £ of ads</span>
-              <span className="v3-legend"><i className="dash"/>2× — where most brands break even</span></figcaption>
+              <span className="v3-legend"><i className="dash"/>2×, where most brands break even</span></figcaption>
             <R.ResponsiveContainer width="100%" height={240}>
               <R.ComposedChart data={t13} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
                 <R.CartesianGrid/>
@@ -10454,7 +10454,7 @@ function WeeklyBoard(){
                 <R.YAxis tickFormatter={v => v + '×'} domain={[0, 'auto']}/>
                 <R.Tooltip content={tip}/>
                 <R.ReferenceLine y={2} stroke={PAL.muted} strokeDasharray="4 4"/>
-                <R.Line type="monotone" dataKey="mer" name="Sales per £ of ads" stroke={PAL.ads}/>
+                <R.Line type="linear" dataKey="mer" name="Sales per £ of ads" stroke={PAL.ads}/>
               </R.ComposedChart>
             </R.ResponsiveContainer>
           </figure>
@@ -10464,15 +10464,15 @@ function WeeklyBoard(){
       <div className="row" style={{marginTop:14}}>
         <div className="card" style={{flex:'1 1 420px'}}>
           <h2 style={{marginTop:0}}>Meeting notes</h2>
-          <div className="fine" style={{color:'var(--text-faint)', marginBottom:8}}>Week of {v3Day(W.weekStart)} – {v3Day(W.weekEnding)} · decisions, context, anything to remember</div>
-          <textarea value={notes[W.weekEnding]||''} onChange={e=>setNote(e.target.value)} placeholder={`What did we decide? e.g. 'Pausing the 22% sitewide code — margin too thin. Brief on mobile checkout fix by Friday. Test free-ship threshold at ${curSym()}75.'`}
+          <div className="fine" style={{color:'var(--text-faint)', marginBottom:8}}>Week of {v3Day(W.weekStart)} – {v3Day(W.weekEnding)}, decisions, context, anything to remember</div>
+          <textarea value={notes[W.weekEnding]||''} onChange={e=>setNote(e.target.value)} placeholder={`What did we decide? e.g. 'Pausing the 22% sitewide code, margin too thin. Brief on mobile checkout fix by Friday. Test free-ship threshold at ${curSym()}75.'`}
             style={{width:'100%', minHeight:150, background:'var(--bg-app)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--r-sm)', padding:10, fontSize:'var(--text-sm)', fontFamily:'inherit', resize:'vertical'}}/>
         </div>
 
         <div className="card" style={{flex:'1 1 420px'}}>
           <div style={{display:'flex', justifyContent:'space-between', alignItems:'baseline'}}>
             <h2 style={{marginTop:0}}>Actions</h2>
-            <span className="micro" style={{color:'var(--text-faint)'}}>{openCount} open · carried week to week</span>
+            <span className="micro" style={{color:'var(--text-faint)'}}>{openCount} open, carried week to week</span>
           </div>
           <div style={{display:'flex', flexDirection:'column', gap:6, marginBottom:10}}>
             {visibleActions.length===0 && <div className="muted" style={{fontSize:'var(--text-sm)'}}>No open actions. Add one below as the meeting decides.</div>}
@@ -10511,12 +10511,12 @@ function CohortsPanel(){
   const verified = useCostTick();   // re-render + reflect verified margin
   const C = (typeof window!=='undefined' && window.FRKL_COHORTS) || null;
   if(!C || !C.totalCustomers){
-    return (<div className="card"><h2>Acquisition cohorts</h2><div className="muted">No customer-level order history yet — connect Shopify to build cohorts.</div></div>);
+    return (<div className="card"><h2>Acquisition cohorts</h2><div className="muted">No customer-level order history yet, connect Shopify to build cohorts.</div></div>);
   }
   const gm = oiCmRatio();
   if(gm == null){
     return (<div className="card"><h2>Acquisition cohorts</h2><div className="muted">
-      Greta can show what each customer is worth once it knows what your products and orders cost you — lifetime value is revenue × your margin, and guessing the margin would make every figure here wrong.
+      Add what your products and orders cost you to see what each customer is worth, lifetime value is revenue × your margin, and guessing the margin would make every figure here wrong.
       <button type="button" className="v3-btn v3-btn-sm" style={{marginLeft:8}} onClick={()=>window.__oiNav && window.__oiNav('settings','costs')}>Enter your costs</button>
     </div></div>);
   }
@@ -10536,17 +10536,17 @@ function CohortsPanel(){
     <div>
       <div className="card" style={{marginBottom:14}}>
         <div className="card-section-title">
-          <h2 style={{margin:0}}>Acquisition cohorts — what a customer is really worth</h2>
-          <span className="meta">{C.totalCustomers} DTC customers · {C.windowFirst}→{C.windowLast} · real first-order cohorts</span>
+          <h2 style={{margin:0}}>Acquisition cohorts, what a customer is really worth</h2>
+          <span className="meta">{fmtCount(C.totalCustomers)} customers, first orders {C.windowFirst} to {C.windowLast}</span>
         </div>
         <div className="micro" style={{color:'var(--text-secondary)', lineHeight:1.55}}>
-          Each customer is bucketed by the month of their <b>first order</b>, then we track what they go on to spend. {firstShare!=null && <><b style={{color:'var(--text-primary)'}}>{PCT(firstShare)}</b> of what a customer has spent with {OI_BRAND.name||'you'} so far came with their <b>first order</b> — so the first order has to pay for winning a customer; repeat buying adds the rest.</>}
+          Each customer is bucketed by the month of their <b>first order</b>, then we track what they go on to spend. {firstShare!=null && <><b style={{color:'var(--text-primary)'}}>{PCT(firstShare)}</b> of what a customer has spent with {OI_BRAND.name||'you'} so far came with their <b>first order</b>, so the first order has to pay for winning a customer; repeat buying adds the rest.</>}
         </div>
       </div>
       {!UI_V3 && <div className="row" style={{marginBottom:14}}>
-        <CohortStat label="Customer value" val={GBP(contribLTV)} sub={`${GBP(lifetimeRev)} revenue × ${PCT(gm)} margin · observed to date`} badge={badge} accent="var(--good)"/>
-        <CohortStat label="New-customer cost (paid ads)" val={paidCac!=null?GBP(paidCac):'—'} sub={`spend ÷ new customers · ${C.cac.paidMonths||0} paid month(s) · blended ${blendedCac!=null?GBP(blendedCac):'—'} understates (incl. ${curSym()}0-spend cohorts)`} accent="var(--accent)"/>
-        <CohortStat label="Customer value vs cost (paid ads)" val={ltvCacPaid!=null?ltvCacPaid.toFixed(1)+'×':'—'} sub="contribution customer lifetime value ÷ paid cost per new customer · target 3×+" badge={badge} accent={ragRatio}/>
+        <CohortStat label="Customer value" val={GBP(contribLTV)} sub={`${GBP(lifetimeRev)} revenue × ${PCT(gm)} margin, observed to date`} badge={badge} accent="var(--good)"/>
+        <CohortStat label="New-customer cost (paid ads)" val={paidCac!=null?GBP(paidCac):'—'} sub={`spend ÷ new customers, ${C.cac.paidMonths||0} paid month(s), blended ${blendedCac!=null?GBP(blendedCac):'—'} understates (incl. ${curSym()}0-spend cohorts)`} accent="var(--accent)"/>
+        <CohortStat label="Customer value vs cost (paid ads)" val={ltvCacPaid!=null?ltvCacPaid.toFixed(1)+'×':'—'} sub="contribution customer lifetime value ÷ paid cost per new customer, target 3×+" badge={badge} accent={ragRatio}/>
         <CohortStat label="First-order payback" val={paybackOrders!=null?(paybackOrders<=1?'1st order':paybackOrders.toFixed(1)+' orders'):'—'} sub="orders to recover paid cost per new customer" badge={badge}/>
         <CohortStat label="Repeat rate" val={PCT(C.repeatRate)} sub={`${C.ordersPerCustomer} orders / customer`}/>
       </div>}
@@ -10559,17 +10559,17 @@ function CohortsPanel(){
               <R.XAxis dataKey="m" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}}/>
               <R.YAxis tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>curSym()+v}/>
               <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',boxShadow:'var(--shadow-md)'}} formatter={(v,n)=>[GBP(v), n==='contrib'?'Contribution':'Revenue']}
-                labelFormatter={(l,p)=> l + (p&&p[0]&&p[0].payload? ' · '+p[0].payload.n+' customers observed':'')}/>
+                labelFormatter={(l,p)=> l + (p&&p[0]&&p[0].payload? ', '+p[0].payload.n+' customers observed':'')}/>
               <R.Legend verticalAlign="top" align="center" wrapperStyle={{fontSize:'var(--text-sm)', paddingBottom:8}}/>
               {paidCac!=null && <R.ReferenceLine y={paidCac} stroke={PAL.ads} strokeDasharray="5 4" strokeOpacity={0.8} label={{value:'paid New-customer cost', position:'insideTopRight', fill:PAL.muted, fontSize:'var(--text-xs)'}}/>}
-              <R.Area type="monotone" dataKey="rev" name="Revenue" stroke={svgCol(COL.revenue)} fill={COL.revenue+'22'} strokeWidth={2}/>
-              <R.Line type="monotone" dataKey="contrib" name="Contribution" stroke={PAL.kept} strokeWidth={2.4} dot={false}/>
+              <R.Area type="linear" dataKey="rev" name="Revenue" stroke={svgCol(COL.revenue)} fill={COL.revenue+'22'} strokeWidth={2}/>
+              <R.Line type="linear" dataKey="contrib" name="Contribution" stroke={PAL.kept} strokeWidth={2.4} dot={false}/>
               <R.Brush {...brushProps('m')} />
             </R.ComposedChart>
           </R.ResponsiveContainer>
           <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{BRUSH_HINT}</div>
-          <div className="fine" style={{color:'var(--text-faint)', marginTop:4}}>Later months average fewer, older customers (shown on hover) — the curve is observed value to date, not a projection.</div>
-          <ChartFooter note="What a customer is worth over time — and when they pay back cost per new customer."
+          <div className="fine" style={{color:'var(--text-faint)', marginTop:4}}>Later months average fewer, older customers (shown on hover), the curve is observed value to date, not a projection.</div>
+          <ChartFooter note="What a customer is worth over time, and when they pay back cost per new customer."
             ask="From the lifetime-value curve, how long until an average customer pays back paid cost per new customer, and what does that mean for how aggressively I can acquire?"
             rows={curve} columns={[{key:'m',label:'Months since 1st order'},{key:'rev',label:'Cumulative rev/cust',right:true,fmt:v=>GBP(v)},{key:'contrib',label:'Cumulative contribution/cust',right:true,fmt:v=>GBP(v)}]}/>
         </div>
@@ -10590,7 +10590,7 @@ function CohortsPanel(){
               <R.XAxis dataKey="month" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}}/>
               <R.YAxis yAxisId="l" orientation="left" tick={{fill:PAL.muted,fontSize:'var(--text-xs)'}} tickFormatter={v=>curSym()+v}/>
               <R.Tooltip contentStyle={{background:'var(--bg-elevated)',border:'1px solid var(--border-default)',borderRadius:'var(--radius-md)',boxShadow:'var(--shadow-md)'}} formatter={(v,n)=> n==='cac'?[v!=null?GBP(v):'no paid spend','Paid cost per new customer']:[NUM(v),'New customers']}/>
-              <R.Line yAxisId="l" type="monotone" dataKey="cac" name="cac" stroke={PAL.ads} strokeWidth={2.2} dot={{r:2.5}} connectNulls/>
+              <R.Line yAxisId="l" type="linear" dataKey="cac" name="cac" stroke={PAL.ads} strokeWidth={2.2} dot={{r:2.5}} connectNulls/>
               <R.Brush {...brushProps('month')} />
             </R.ComposedChart>
           </R.ResponsiveContainer>          <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',textAlign:'right',marginTop:2}}>{BRUSH_HINT}</div>
@@ -10612,10 +10612,10 @@ function CohortsPanel(){
             if(!d||!f) return null; const better = d.repeatRate>=f.repeatRate;
             const habit = d.nextDiscounted != null && f.nextDiscounted != null && d.nextDiscounted - f.nextDiscounted >= 0.1;
             return <div className="note" style={{marginTop:10}}>{better && habit
-              ? `Discount-acquired customers come back about as often (${PCT(d.repeatRate)} vs ${PCT(f.repeatRate)}), but ${PCT(d.nextDiscounted)} of their next orders are discounted too, against ${PCT(f.nextDiscounted)} for full-price starters — the code they joined on sets the price they come back at. Win them back with something other than a deeper code.`
+              ? `Discount-acquired customers come back about as often (${PCT(d.repeatRate)} vs ${PCT(f.repeatRate)}), but ${PCT(d.nextDiscounted)} of their next orders are discounted too, against ${PCT(f.nextDiscounted)} for full-price starters, the code they joined on sets the price they come back at. Win them back with something other than a deeper code.`
               : better
-              ? `Discount-acquired customers repeat at least as well (${PCT(d.repeatRate)} vs ${PCT(f.repeatRate)}) — the usual "discount buyers churn" worry doesn't hold here, so first-order codes look like a fair acquisition cost.`
-              : `Discount-acquired customers repeat less (${PCT(d.repeatRate)} vs ${PCT(f.repeatRate)}) — those codes are buying lower-quality customers; tighten first-order discounting.`}</div>; })()}
+              ? `Discount-acquired customers repeat at least as well (${PCT(d.repeatRate)} vs ${PCT(f.repeatRate)}), the usual "discount buyers churn" worry doesn't hold here, so first-order codes look like a fair acquisition cost.`
+              : `Discount-acquired customers repeat less (${PCT(d.repeatRate)} vs ${PCT(f.repeatRate)}), those codes are buying lower-quality customers; tighten first-order discounting.`}</div>; })()}
         </div>
         {(C.byProduct||[]).length > 0 && <div className="card" style={{flex:'1 1 380px'}}>
           <h2 style={{marginTop:0}}>Which products acquire customers that come back</h2>
@@ -10652,8 +10652,8 @@ function AdviceLedgerPanel(){
   return (
     <div className="card" style={{marginBottom:14}}>
       <div className="card-section-title">
-        <h2 style={{margin:0}}>Track record — advice acted on</h2>
-        <span className="meta">{done.length} actioned · {openN} open</span>
+        <h2 style={{margin:0}}>Track record, advice acted on</h2>
+        <span className="meta">{done.length} actioned, {openN} open</span>
       </div>
       <div className="micro" style={{color:'var(--text-secondary)', marginBottom:10, lineHeight:1.5}}>{`
       Closing the loop: the recommendations you've marked done and what then moved on the metrics each one watches. (Impact is measured per watched metric; ${curSym()}-tagged impact lands once findings carry a ${curSym()} value.)
@@ -10662,7 +10662,7 @@ function AdviceLedgerPanel(){
         // Only entries with a real recommendation are a "story". Without text there's
         // nothing to show — drop them rather than render an empty row.
         const rows = done.filter(a => (a.text||'').trim()).slice(0,12);
-        if(!rows.length) return <div className="muted" style={{fontSize:'var(--text-sm)'}}>No recommendations marked done yet — mark one from the action board and its measured impact appears here.</div>;
+        if(!rows.length) return <div className="muted" style={{fontSize:'var(--text-sm)'}}>No recommendations marked done yet, mark one from the action board and its measured impact appears here.</div>;
         const niceMetric = k => String(k||'').replace(/_/g,' ').replace(/\b30d\b/,'(30d)')
           .replace(/\broas\b/ig,'ROAS').replace(/\bmer\b/ig,'MER').replace(/\baov\b/ig,'AOV').replace(/\bcvr\b/ig,'CVR')
           // …then say them in words, like everywhere else.
@@ -10683,8 +10683,8 @@ function AdviceLedgerPanel(){
                 {when && <span className="micro" style={{color:'var(--text-faint)'}}>{when}</span>}
               </div>
               {moves.length
-                ? <div className="micro" style={{color:'var(--text-secondary)', marginTop:3, marginLeft:18}}>Since done: {moves.map(([k,v])=>`${niceMetric(k)} ${fmtP(v.deltaPct)}`).join(' · ')}</div>
-                : (watched.length ? <div className="micro" style={{color:'var(--text-faint)', marginTop:3, marginLeft:18}}>Measuring — watching {watched.slice(0,2).map(niceMetric).join(', ')}; no clear move yet</div> : null)}
+                ? <div className="micro" style={{color:'var(--text-secondary)', marginTop:3, marginLeft:18}}>Since done: {moves.map(([k,v])=>`${niceMetric(k)} ${fmtP(v.deltaPct)}`).join(', ')}</div>
+                : (watched.length ? <div className="micro" style={{color:'var(--text-faint)', marginTop:3, marginLeft:18}}>Measuring, watching {watched.slice(0,2).map(niceMetric).join(', ')}; no clear move yet</div> : null)}
             </div>); })}
         </div>);
       })()}
@@ -10708,11 +10708,11 @@ function StockThrottlePanel(){
     <div className="card-section-title">
       <h2 style={{margin:0, display:'inline-flex', alignItems:'center', gap:7}}><Icon name="alert" size={16} style={{color:'var(--bad)'}}/> Stock-out spend risk</h2>
       <StatusBadge kind={critical.length ? 'critical' : 'stock'} label={critical.length ? 'Critical' : 'Stock-constrained'}/>
-      <span className="meta">top sellers running low — don't scale paid behind these</span>
+      <span className="meta">top sellers running low, don't scale paid behind these</span>
     </div>
     <div style={{fontSize:'var(--text-base)', lineHeight:1.5, color:'var(--text-primary)', fontWeight:'var(--weight-medium)', marginBottom:10}}>
       {critical.length>0
-        ? `${critical.length} top-selling item${critical.length>1?'s':''} will sell out within ~2 weeks at the current pace. Pull ${critical.length>1?'them':'it'} from featured ads & creative now — paying cost per new customer for orders you can't fulfil burns cash and goodwill.`
+        ? `${critical.length} top-selling item${critical.length>1?'s':''} will sell out within ~2 weeks at the current pace. Pull ${critical.length>1?'them':'it'} from featured ads & creative now, paying cost per new customer for orders you can't fulfil burns cash and goodwill.`
         : `${risk.length} fast-moving item${risk.length>1?'s are':' is'} getting low on cover. Watch before scaling paid demand behind ${risk.length>1?'them':'it'}.`}
     </div>
     <table><thead><tr><th>Item</th><th>Stock</th><th>Sold 90d</th><th>Days cover</th><th>Action</th></tr></thead><tbody>
@@ -10721,7 +10721,7 @@ function StockThrottlePanel(){
         <td>{NUM(r.inventoryQty)}</td>
         <td>{NUM(r.units90d)}</td>
         <td><span style={{color: r.coverTier==='critical'?PAL.bad:'var(--warn)', fontWeight:'var(--weight-bold)'}}>{r.daysOfCover==null||r.daysOfCover===999?'∞':r.daysOfCover+'d'}</span></td>
-        <td className="micro" style={{color:'var(--text-secondary)'}}>{r.coverTier==='critical'?'Pull from paid · reorder now':'Reorder + watch spend'}</td>
+        <td className="micro" style={{color:'var(--text-secondary)'}}>{r.coverTier==='critical'?'Pull from paid, reorder now':'Reorder + watch spend'}</td>
       </tr>))}
     </tbody></table>
   </div>);
@@ -10749,13 +10749,13 @@ function CreativeFatiguePanel(){
   let headline, tone;
   if(ctrDrop!=null && ctrDrop>=0.10 && cpaUp!=null && cpaUp>0){
     tone='bad';
-    headline = `Fatigue signal: ads past ${FREQ}× frequency run ${(ctrDrop*100).toFixed(0)}% lower CTR and ${(cpaUp*100).toFixed(0)}% higher CPA than fresh ones${convSimilar?' — but convert checkout-to-purchase about the same':''}. The CPA gap is ${convSimilar?'creative fatigue, not the offer':'driven by fatigue'} — refresh the hook before cutting budget.`;
+    headline = `Fatigue signal: ads past ${FREQ}× frequency run ${(ctrDrop*100).toFixed(0)}% lower CTR and ${(cpaUp*100).toFixed(0)}% higher CPA than fresh ones${convSimilar?', but convert checkout-to-purchase about the same':''}. The CPA gap is ${convSimilar?'creative fatigue, not the offer':'driven by fatigue'}, refresh the hook before cutting budget.`;
   } else if(ctrDrop!=null && ctrDrop<=-0.05){
     tone='good';
-    headline = `No fatigue signal yet — your highest-frequency ads actually hold the strongest CTR (${F.ctr!=null?(F.ctr*100).toFixed(2):'—'}% vs ${R.ctr!=null?(R.ctr*100).toFixed(2):'—'}% fresh): they're scaled because they work${cpaUp!=null&&cpaUp>0.1?`, though CPA is ${(cpaUp*100).toFixed(0)}% higher (a bidding/audience-cost effect, not creative)`:''}. Keep refreshing the rotation before frequency climbs past ~8×.`;
+    headline = `No fatigue signal yet, your highest-frequency ads actually hold the strongest CTR (${F.ctr!=null?(F.ctr*100).toFixed(2):'—'}% vs ${R.ctr!=null?(R.ctr*100).toFixed(2):'—'}% fresh): they're scaled because they work${cpaUp!=null&&cpaUp>0.1?`, though CPA is ${(cpaUp*100).toFixed(0)}% higher (a bidding/audience-cost effect, not creative)`:''}. Keep refreshing the rotation before frequency climbs past ~8×.`;
   } else {
     tone='neutral';
-    headline = `${F.n} ad${F.n>1?'s are':' is'} above ${FREQ}× frequency. CTR and CPA are broadly in line with fresh ads — no clear fatigue signal, but queue new variants so the rotation stays fresh.`;
+    headline = `${F.n} ad${F.n>1?'s are':' is'} above ${FREQ}× frequency. CTR and CPA are broadly in line with fresh ads, no clear fatigue signal, but queue new variants so the rotation stays fresh.`;
   }
   const Stat = ({label, fat, fresh, fmt}) => (
     <div className="card kpi" style={{flex:'1 1 200px'}}>
@@ -10767,14 +10767,14 @@ function CreativeFatiguePanel(){
     </div>);
   const toneCol = tone==='bad'?PAL.bad:tone==='good'?'var(--good)':'var(--warn)';
   return (<div className="card" style={{marginBottom:14}}>
-    <div className="card-section-title"><h2 style={{margin:0}}>Creative fatigue → CPA</h2><span className="meta">{F.n} above {FREQ}× · {R.n} fresh ads</span></div>
+    <div className="card-section-title"><h2 style={{margin:0}}>Creative fatigue → CPA</h2><span className="meta">{F.n} above {FREQ}×, {R.n} fresh ads</span></div>
     <div style={{fontSize:'var(--text-base)', lineHeight:1.5, color:'var(--text-primary)', fontWeight:'var(--weight-medium)', marginBottom:10}}>{headline}</div>
     <div className="row" style={{marginBottom:6}}>
       <Stat label="CTR (link)" fat={F.ctr} fresh={R.ctr} fmt={v=>v!=null?(v*100).toFixed(2)+'%':'—'}/>
       <Stat label="CPA" fat={F.cpa} fresh={R.cpa} fmt={v=>v!=null?GBP(v):'—'}/>
-      <Stat label="Cart→purchase" fat={F.atcToP} fresh={R.atcToP} fmt={v=>v!=null?PCT(v):'—'}/>
+      <Stat label="Cart to purchase" fat={F.atcToP} fresh={R.atcToP} fmt={v=>v!=null?PCT(v):'—'}/>
     </div>
-    {fatList.length>0 && <div className="micro" style={{color:'var(--text-secondary)', marginTop:6}}>Refresh first (highest spend at high frequency): {fatList.map(c=>`${(c.name||'ad').slice(0,26)} (${(c.frequency||0).toFixed(1)}×)`).join(' · ')}</div>}
+    {fatList.length>0 && <div className="micro" style={{color:'var(--text-secondary)', marginTop:6}}>Refresh first (highest spend at high frequency): {fatList.map(c=>`${(c.name||'ad').slice(0,26)} (${(c.frequency||0).toFixed(1)}×)`).join(', ')}</div>}
   </div>);
 }
 
@@ -10832,19 +10832,19 @@ function parseClarityCsv(text){
     excessiveScroll:{pct:M.excessiveScroll??null},
   };
   const flags=[];
-  if(M.scriptError!=null && M.scriptError>=10) flags.push({sev:'high', text:`${M.scriptError.toFixed(0)}% of sessions hit a JavaScript error — a likely conversion blocker. Reproduce the top error before scaling spend.`});
-  if(M.pps!=null && M.pps<1.5) flags.push({sev:'high', text:`Only ${M.pps.toFixed(2)} pages per session — visitors land and leave without browsing. A landing/product page problem, not a traffic one.`});
-  if(M.scroll!=null && M.scroll<50) flags.push({sev:'med', text:`Average scroll depth is ${M.scroll.toFixed(0)}% — content + product below that point is essentially unseen.`});
-  if(M.errorClick!=null && M.errorClick>=2) flags.push({sev:'med', text:`${M.errorClick.toFixed(1)}% of sessions click something broken (error clicks) — usually a dead button or failing widget.`});
-  if(M.deadClick!=null && M.deadClick>=3) flags.push({sev:'med', text:`${M.deadClick.toFixed(1)}% of sessions register dead clicks — taps that do nothing, a sign of confusing or broken UI.`});
-  if(activeFrac!=null && activeFrac<0.5) flags.push({sev:'low', text:`Active engagement is ${(activeFrac*100).toFixed(0)}% of time on site — attention drops fast; tighten above-the-fold.`});
+  if(M.scriptError!=null && M.scriptError>=10) flags.push({sev:'high', text:`${M.scriptError.toFixed(0)}% of sessions hit a JavaScript error, a likely conversion blocker. Reproduce the top error before scaling spend.`});
+  if(M.pps!=null && M.pps<1.5) flags.push({sev:'high', text:`Only ${M.pps.toFixed(2)} pages per session, visitors land and leave without browsing. A landing/product page problem, not a traffic one.`});
+  if(M.scroll!=null && M.scroll<50) flags.push({sev:'med', text:`Average scroll depth is ${M.scroll.toFixed(0)}%, content + product below that point is essentially unseen.`});
+  if(M.errorClick!=null && M.errorClick>=2) flags.push({sev:'med', text:`${M.errorClick.toFixed(1)}% of sessions click something broken (error clicks), usually a dead button or failing widget.`});
+  if(M.deadClick!=null && M.deadClick>=3) flags.push({sev:'med', text:`${M.deadClick.toFixed(1)}% of sessions register dead clicks, taps that do nothing, a sign of confusing or broken UI.`});
+  if(activeFrac!=null && activeFrac<0.5) flags.push({sev:'low', text:`Active engagement is ${(activeFrac*100).toFixed(0)}% of time on site, attention drops fast; tighten above-the-fold.`});
   const today = (()=>{ try{ return new Date().toISOString().slice(0,10); }catch(e){ return ''; } })();
   return {ok:true, matched, bundle:{
     available:true, source:'manual', asOf:today, uploadedAt:today,
     sessions:M.sessions??null, botSessions:M.bots??0, distinctUsers:M.users??null,
     pagesPerSession:M.pps??null, scrollDepth:M.scroll??null,
     engagement:{activePct:activeFrac}, friction, flags,
-    notes:{window:'Manually uploaded — re-upload a newer Clarity export to refresh.'},
+    notes:{window:'Manually uploaded, re-upload a newer Clarity export to refresh.'},
   }};
 }
 function clarityManualGet(){ try{ const s=JSON.parse(localStorage.getItem('oi_clarity_manual')||'null'); return (s&&s.available)?s:null; }catch(e){ return null; } }
@@ -10887,7 +10887,7 @@ function ClarityUploadModal({onClose, onSaved}){
       </div>
       {res && !res.ok && <div className="note" style={{marginBottom:10, fontSize:'var(--text-sm)'}}>{res.error}</div>}
       {res && res.ok && <div className="note" style={{marginBottom:10, fontSize:'var(--text-sm)'}}>
-        Mapped {res.matched.length} metric{res.matched.length===1?'':'s'}: {res.matched.join(' · ')}</div>}
+        Mapped {res.matched.length} metric{res.matched.length===1?'':'s'}: {res.matched.join(', ')}</div>}
       <div className="row">
         <button className="primary" disabled={!(res&&res.ok)} onClick={save} style={{opacity:(res&&res.ok)?1:0.5}}>Save &amp; show</button>
         {clarityManualGet() && <button className="btn-ghost" onClick={()=>{ clarityManualClear(); toast('Manual Clarity data cleared'); onSaved&&onSaved(); onClose(); }}>Clear uploaded data</button>}
@@ -10908,7 +10908,7 @@ function ClarityFrictionPanel(){
   if(!C || !C.available) return (<div className="card" style={{marginBottom:14}}>
     <EmptyState icon="info"
       title="No Microsoft Clarity data yet"
-      body="Clarity shows whether the site itself is the conversion bottleneck — JavaScript errors, dead/rage clicks, scroll depth and engagement. Connect Clarity in Connections and the daily sync fills this in, or upload a CSV of the headline numbers."
+      body="Clarity shows whether the site itself is the conversion bottleneck, JavaScript errors, dead/rage clicks, scroll depth and engagement. Connect Clarity in Connections and the daily sync fills this in, or upload a CSV of the headline numbers."
       cta="Upload Clarity CSV" ctaOnClick={()=>setUpload(true)}/>
     {uploader}
   </div>);
@@ -10926,14 +10926,14 @@ function ClarityFrictionPanel(){
   return (<div className="card" style={{marginBottom:14}}>
     {uploader}
     <div className="card-section-title">
-      <h2 style={{margin:0}}>Site friction — is the site the bottleneck?</h2>
+      <h2 style={{margin:0}}>Site friction, is the site the bottleneck?</h2>
       <span className="meta" style={{display:'inline-flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-        <span>Microsoft Clarity · {C.sessions!=null?NUM(C.sessions)+' sessions · ':''}{manual?`manual upload · ${C.asOf}`:`${C.windowDays||C.days}d window · as of ${C.asOf}`}</span>
+        <span>Microsoft Clarity, {C.sessions!=null?NUM(C.sessions)+' sessions, ':''}{manual?`manual upload, ${C.asOf}`:`${C.windowDays||C.days}d window, as of ${C.asOf}`}</span>
         <button className="cf-btn" onClick={()=>setUpload(true)}><Icon name="clipboard" size={12}/>{manual?'Replace data':'Upload CSV'}</button>
       </span>
     </div>
     {!manual && C.thinData && (<div className="note" style={{marginBottom:10}}>
-      Only {C.windowDays||C.days} days of Clarity data — these are <b>medium-confidence, directional</b> signals (capped: none shown as high). Reproduce a flagged issue before committing dev time; the picture firms up as the window grows past a week.
+      Only {C.windowDays||C.days} days of Clarity data, these are <b>medium-confidence, directional</b> signals (capped: none shown as high). Reproduce a flagged issue before committing dev time; the picture firms up as the window grows past a week.
     </div>)}
     {C.flags && C.flags.length>0 && (<div style={{display:'flex', flexDirection:'column', gap:6, marginBottom:10}}>
       {C.flags.map((fl,i)=>(<div key={i} style={{display:'flex', gap:8, alignItems:'baseline', fontSize:'var(--text-sm)'}}>
@@ -10962,35 +10962,35 @@ function RetentionPanel(){
   const seg = R.segments || {};
   const med = R.medianIntervalDays;
   const SEG = [
-    {k:'due',     label:'Due now',  col:'var(--good)',  desc:'in the reorder window — nudge now'},
-    {k:'overdue', label:'Overdue',  col:'var(--warn)',  desc:'past their window — slipping, win back'},
-    {k:'lapsed',  label:'Lapsed',   col:PAL.bad,      desc:'>150 days — deep win-back'},
+    {k:'due',     label:'Due now',  col:'var(--good)',  desc:'in the reorder window, nudge now'},
+    {k:'overdue', label:'Overdue',  col:'var(--warn)',  desc:'past their window, slipping, win back'},
+    {k:'lapsed',  label:'Lapsed',   col:PAL.bad,      desc:'>150 days, deep win-back'},
   ];
   return (<div className="card" style={{marginBottom:14}}>
     <div className="card-section-title">
-      <h2 style={{margin:0}}>Retention worklist — who to nudge, and when</h2>
-      <span className="meta">median reorder interval {med} days · ~{R.repeatCustomers} repeat customers</span>
+      <h2 style={{margin:0}}>Retention worklist, who to nudge, and when</h2>
+      <span className="meta">median reorder interval {med} days, ~{R.repeatCustomers} repeat customers</span>
     </div>
     <div className="fine" style={{color:'var(--text-secondary)', marginBottom:10, lineHeight:1.55}}>
-      Repeat customers reorder about every <b>{med} days</b> (a quarter within {R.p25} days, three quarters within {R.p75}). That's your replenishment trigger — a flow firing around day {med} catches customers at peak intent. <b style={{color:'var(--text-primary)'}}>{GBP(R.atStake)}</b> of <b>realistically recoverable</b> reorder value is in the due + overdue pools{R.atStakeGross?<span> (the {GBP(R.atStakeGross)} gross × your {Math.round((R.repeatRate||0)*100)}% repeat rate — most overdue customers won't return)</span>:null}.
+      Repeat customers reorder about every <b>{med} days</b> (a quarter within {R.p25} days, three quarters within {R.p75}). That's your replenishment trigger, a flow firing around day {med} catches customers at peak intent. <b style={{color:'var(--text-primary)'}}>{GBP(R.atStake)}</b> of <b>realistically recoverable</b> reorder value is in the due + overdue pools{R.atStakeGross?<span> (the {GBP(R.atStakeGross)} gross × your {Math.round((R.repeatRate||0)*100)}% repeat rate, most overdue customers won't return)</span>:null}.
     </div>
     <div className="row" style={{marginBottom:10}}>
       <div className="card kpi" style={{}}>
         <div className="label">This week's nudge list</div>
         <div className="val" style={{fontSize:'var(--text-xl)'}}>{NUM(R.worklist.count)}</div>
-        <div className="sub">customers entering their reorder window · {GBP(R.worklist.recoverable!=null?R.worklist.recoverable:R.worklist.value)} recoverable</div>
+        <div className="sub">customers entering their reorder window, {GBP(R.worklist.recoverable!=null?R.worklist.recoverable:R.worklist.value)} recoverable</div>
       </div>
       {SEG.map(s=>{ const v=seg[s.k]||{count:0,value:0}; return (
         <div key={s.k} className="card kpi" style={{}}>
           <div className="label">{s.label}</div>
           <div className="val" style={{fontSize:'var(--text-xl)'}}>{NUM(v.count)}</div>
-          <div className="sub">{GBP(v.recoverable!=null?v.recoverable:v.value)} recoverable{v.recoverable!=null&&v.value?<span style={{color:'var(--text-faint)'}}> of {GBP(v.value)} gross</span>:null} · {s.desc}</div>
+          <div className="sub">{GBP(v.recoverable!=null?v.recoverable:v.value)} recoverable{v.recoverable!=null&&v.value?<span style={{color:'var(--text-faint)'}}> of {GBP(v.value)} gross</span>:null}, {s.desc}</div>
         </div>); })}
     </div>
     {(R.byProduct||[]).length>0 && (<div>
-      <h3 style={{margin:'4px 0 6px', fontSize:'var(--text-sm)', color:'var(--text-muted)'}}>Products that drive the fastest repeat <span style={{fontWeight:'var(--weight-normal)',color:'var(--text-faint)'}}>— build replenishment around these</span></h3>
+      <h3 style={{margin:'4px 0 6px', fontSize:'var(--text-sm)', color:'var(--text-muted)'}}>Products that drive the fastest repeat <span style={{fontWeight:'var(--weight-normal)',color:'var(--text-faint)'}}>build replenishment around these</span></h3>
       <div style={{display:'flex', flexWrap:'wrap', gap:8}}>
-        {R.byProduct.slice(0,6).map((p,i)=>(<span key={i} className="pill" style={{background:'var(--accent-bg)', color:'var(--accent)', fontSize:'var(--text-xs)', padding:'4px 10px', borderRadius:'var(--r-full)'}}>{p.name} · {p.medianInterval}d</span>))}
+        {R.byProduct.slice(0,6).map((p,i)=>(<span key={i} className="pill" style={{background:'var(--accent-bg)', color:'var(--accent)', fontSize:'var(--text-xs)', padding:'4px 10px', borderRadius:'var(--r-full)'}}>{p.name}, {p.medianInterval}d</span>))}
       </div>
     </div>)}
     <div className="note" style={{marginTop:12}}>Action: set a Klaviyo replenishment flow to fire at ~day {Math.max(7, med-3)} post-purchase, and a win-back flow at day {Math.round(med*2)} for the overdue pool. {R.notes && R.notes.thin}</div>
@@ -11045,7 +11045,7 @@ function MarginBridge({cur, pri, gmNow, gmPri, tile, perOrderFixed, payPct}){
   return (
     <div className="card" style={{marginBottom:14}}>
       <div className="card-section-title">
-        <h2 style={{margin:0}}>What moved your profit after ads <span style={{fontWeight:'var(--weight-normal)',color:'var(--text-faint)',fontSize:'var(--text-sm)'}}>— against the period before</span></h2>
+        <h2 style={{margin:0}}>What moved your profit after ads <span style={{fontWeight:'var(--weight-normal)',color:'var(--text-faint)',fontSize:'var(--text-sm)'}}>against the period before</span></h2>
         <span className="meta" style={{display:'inline-flex',alignItems:'center',gap:6}}><MarginBadge/> {delta>=0?'+':'−'}{GBP(Math.abs(delta))}{dpct!=null?` (${(dpct>=0?'+':'')}${(dpct*100).toFixed(0)}%)`:''}</span>
       </div>
       <R.ResponsiveContainer width="100%" height={240}>
@@ -11059,8 +11059,8 @@ function MarginBridge({cur, pri, gmNow, gmPri, tile, perOrderFixed, payPct}){
           <R.Bar dataKey="neg" stackId="s" fill={PAL.bad} isAnimationActive={false} radius={[2,2,0,0]}><R.LabelList content={segLabel('neg')}/></R.Bar>
         </R.BarChart>
       </R.ResponsiveContainer>
-      <p className="v3-note" style={{marginTop:'var(--space-2)'}}>Profit after ads is sales × what is left after product and order costs ({PCT(gmPri)} before, {PCT(gmNow)} now) minus ad spend. The bars add up exactly to the change: green helped, red hurt.{tile != null && Cc - tile > Math.max(1, Math.abs(tile) * 0.01) ? <> The {GBP(tile)} on this page also takes off {GBP(Cc - tile)} of other marketing costs, which Greta has no figure for in the period before.</> : null}</p>
-      <ChartFooter note="Which lever moved contribution most this period — and was it volume, margin, or spend?"
+      <p className="v3-note" style={{marginTop:'var(--space-2)'}}>Profit after ads is sales × what is left after product and order costs ({PCT(gmPri)} before, {PCT(gmNow)} now) minus ad spend. The bars add up exactly to the change: green helped, red hurt.{tile != null && Cc - tile > Math.max(1, Math.abs(tile) * 0.01) ? <> The {GBP(tile)} on this page also takes off {GBP(Cc - tile)} of other marketing costs, with no figure for the period before.</> : null}</p>
+      <ChartFooter note="Which lever moved contribution most this period, and was it volume, margin, or spend?"
         ask="From the contribution bridge, what drove the change in contribution most, and is it something I can act on?"
         rows={rows} columns={[{key:'name',label:'Driver'},{key:'delta',label:'Δ contribution',right:true,fmt:(v,r)=>r.total!=null?GBP(r.total):(v>=0?'+':'−')+GBP(Math.abs(v))}]}/>
     </div>
@@ -11075,8 +11075,8 @@ function MatrixTip({active, payload}){
   const d = payload[0].payload;
   return (<div style={{background:'var(--bg-elevated)', border:'1px solid var(--border-default)', borderRadius:'var(--radius-none)', padding:'8px 10px', fontSize:'var(--text-sm)', boxShadow:'var(--shadow-md)', color:'var(--text-primary)'}}>
     <div style={{fontWeight:'var(--weight-bold)', marginBottom:3}}>{d.name}</div>
-    <div style={{color:'var(--text-secondary)'}}>{NUM(d.buyers)} buyers · {NUM(d.y)} acquired on 1st order</div>
-    <div style={{color:'var(--text-secondary)'}}>Repeat {(d.repeat*100).toFixed(0)}% · customer lifetime value {GBP(d.ltv)}/cust</div>
+    <div style={{color:'var(--text-secondary)'}}>{NUM(d.buyers)} buyers, {NUM(d.y)} acquired on 1st order</div>
+    <div style={{color:'var(--text-secondary)'}}>Repeat {(d.repeat*100).toFixed(0)}%, customer lifetime value {GBP(d.ltv)}/cust</div>
   </div>);
 }
 function ProductRetentionMatrix(){
@@ -11097,17 +11097,17 @@ function ProductRetentionMatrix(){
   const pts = M.map(p=>({ x:+(p.retentionRate*100).toFixed(1), y:p.acquired, z:Math.max(1,Math.round(p.lifetimeRevPerCust*gm)),
     name:p.name, repeat:p.retentionRate, ltv:p.lifetimeRevPerCust, buyers:p.buyers }));
   const QMETA = {
-    hero:  {label:'Heroes',          col:PAL.good, action:'acquire AND retain — advertise & feature these'},
-    gem:   {label:'Hidden gems',     col:PAL.data3, action:'retain but few find them — scale acquisition'},
-    leaky: {label:'Leaky acquirers', col:PAL.warn, action:"bring customers who don't return — add a post-purchase / cross-sell flow, not more spend"},
-    tail:  {label:'Long tail',       col:PAL.muted, action:'low volume + low retention — deprioritise'},
+    hero:  {label:'Heroes',          col:PAL.good, action:'acquire AND retain, advertise & feature these'},
+    gem:   {label:'Hidden gems',     col:PAL.data3, action:'retain but few find them, scale acquisition'},
+    leaky: {label:'Leaky acquirers', col:PAL.warn, action:"bring customers who don't return, add a post-purchase / cross-sell flow, not more spend"},
+    tail:  {label:'Long tail',       col:PAL.muted, action:'low volume + low retention, deprioritise'},
   };
   const groups = {hero:[], gem:[], leaky:[], tail:[]};
   pts.forEach(p=>{ const hiR=p.x>=brandRep, hiV=p.y>=medAcq; groups[hiR&&hiV?'hero':hiR&&!hiV?'gem':!hiR&&hiV?'leaky':'tail'].push(p); });
   return (<div className="card" style={{marginBottom:14}}>
     <div className="card-section-title">
       <h2 style={{margin:0}}>Which products acquire vs retain</h2>
-      <span className="meta">repeat rate × customers acquired · bubble = contribution customer lifetime value/customer</span>
+      <span className="meta">repeat rate × customers acquired, bubble = contribution customer lifetime value/customer</span>
     </div>
     <div className="micro" style={{color:'var(--text-secondary)', marginBottom:8, lineHeight:1.5}}>
       {DEMO && <>Almost every frkl product is bought on a customer's <b>first</b> order, so the catalogue is acquisition-led across the board and <b>retention is the gap</b>. </>}Below: which first products bring customers who come <i>back</i> (right) vs once-and-done (left). Dashed lines = brand-average repeat ({brandRep.toFixed(0)}%) and median acquisition volume.
@@ -11135,7 +11135,7 @@ function ProductRetentionMatrix(){
         <div key={k} style={{flex:'1 1 200px', fontSize:'var(--text-xs)', lineHeight:1.45}}>
           <div style={{fontWeight:'var(--weight-bold)', color:QMETA[k].col}}>● {QMETA[k].label} ({groups[k].length})</div>
           <div style={{color:'var(--text-faint)', marginBottom:3}}>{QMETA[k].action}</div>
-          <div style={{color:'var(--text-secondary)'}}>{groups[k].slice().sort((a,b)=>b.y-a.y).slice(0,3).map(p=>p.name).join(' · ')}</div>
+          <div style={{color:'var(--text-secondary)'}}>{groups[k].slice().sort((a,b)=>b.y-a.y).slice(0,3).map(p=>p.name).join(', ')}</div>
         </div>) : null)}
     </div>
   </div>);
@@ -11155,18 +11155,18 @@ function RestockActionQueue(){
   const R = planReorder();
   const {toOrder, awaiting, oosNow, ackPending} = R;
   const ackKeys = Object.keys(ackPending||{});
-  React.useEffect(()=>{ if(ackKeys.length){ ackKeys.forEach(key=>clearPoStatus(key)); toast('Stock landed', {kind:'good', body:`${ackKeys.length} PO${ackKeys.length>1?'s':''} closed — stock is back in Shopify.`}); } }, [ackKeys.join(',')]);
+  React.useEffect(()=>{ if(ackKeys.length){ ackKeys.forEach(key=>clearPoStatus(key)); toast('Stock landed', {kind:'good', body:`${ackKeys.length} PO${ackKeys.length>1?'s':''} closed, stock is back in Shopify.`}); } }, [ackKeys.join(',')]);
   if(!toOrder.length && !awaiting.length) return null;
 
   const k = v3Amount;
   const btn = {display:'inline-flex',alignItems:'center',gap:5,fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',padding:'5px 11px',borderRadius:'var(--radius-md)',border:'1px solid var(--border-default)',background:'var(--bg-elevated)',color:'var(--text-primary)',cursor:'pointer',whiteSpace:'nowrap'};
-  const raise = (l)=>{ setPoStatus(l.key, {status:'ordered', qty:l.qty, raisedAt:oiToday(), baselineQty:l.p.inventoryQty||0, lead:l.lead, supplier:l.supplier, title:l.p.title}); toast('PO marked raised', {kind:'good', body:l.p.title+' · awaiting stock'}); };
+  const raise = (l)=>{ setPoStatus(l.key, {status:'ordered', qty:l.qty, raisedAt:oiToday(), baselineQty:l.p.inventoryQty||0, lead:l.lead, supplier:l.supplier, title:l.p.title}); toast('PO marked raised', {kind:'good', body:l.p.title+', awaiting stock'}); };
 
   return (
     <div className="card" style={{marginBottom:14}}>
       <div className="card-section-title" style={{marginBottom:6}}>
         <h2 style={{margin:0}}>Stock &amp; purchasing</h2>
-        <span className="meta">{oosNow>0?<b style={{color:'var(--bad)'}}>{oosNow} order today</b>:null}{oosNow>0?' · ':''}{toOrder.length} to order{awaiting.length?` · ${awaiting.length} awaiting stock`:''} · finance &amp; commercial</span>
+        <span className="meta">{oosNow>0?<b style={{color:'var(--bad)'}}>{oosNow} order today</b>:null}{oosNow>0?', ':''}{toOrder.length} to order{awaiting.length?`, ${awaiting.length} awaiting stock`:''}, finance &amp; commercial</span>
       </div>
       {toOrder.length>0 ? (<div style={{display:'flex',flexDirection:'column',gap:7}}>
         {/* Urgent (OOS-before-lead) rows always show; the non-urgent tail collapses to keep the queue scannable. */}
@@ -11175,29 +11175,29 @@ function RestockActionQueue(){
             <div key={idx} style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',padding:'8px 0',borderTop:idx?'1px solid var(--border-subtle)':'none'}}>
               <span style={{width:8,height:8,borderRadius:'50%',background:urgent?'var(--bad)':'var(--warn)',flexShrink:0}}/>
               <div style={{flex:1,minWidth:200}}>
-                <div style={{fontSize:'var(--text-sm)',color:'var(--text-primary)'}}>{l.basis==='forecast'?'Order for forecast':'Raise PO'} — <b>{NUM(l.qty)} units</b> of {l.p.title}{urgent && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',color:PAL.panel,background:'var(--bad)',padding:'1px 7px',borderRadius:'var(--radius-full)'}}>ORDER TODAY</span>}</div>
-                <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:1}}>{l.supplier} · {urgent?`OOS in ~${Math.round(l.cover)}d — ${l.oosGap}d short of the ${l.lead}d lead`:(l.basis==='forecast'?`plan needs ${NUM(l.forecastUnits)}, have ${NUM(l.stock)}`:`runs out in ~${Math.round(l.cover)}d (lead ${l.lead}d)`)}{l.lineCost!=null?` · ${curSym()}${k(l.lineCost)}`:''}{l.moqBumped?` · minimum order quantity ${l.moq}`:''}</div>
+                <div style={{fontSize:'var(--text-sm)',color:'var(--text-primary)'}}>{l.basis==='forecast'?'Order for forecast':'Raise PO'}, <b>{NUM(l.qty)} units</b> of {l.p.title}{urgent && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',color:PAL.panel,background:'var(--bad)',padding:'1px 7px',borderRadius:'var(--radius-full)'}}>ORDER TODAY</span>}</div>
+                <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:1}}>{l.supplier}, {urgent?`OOS in ~${Math.round(l.cover)}d, ${l.oosGap}d short of the ${l.lead}d lead`:(l.basis==='forecast'?`plan needs ${NUM(l.forecastUnits)}, have ${NUM(l.stock)}`:`runs out in ~${Math.round(l.cover)}d (lead ${l.lead}d)`)}{l.lineCost!=null?`, ${curSym()}${k(l.lineCost)}`:''}{l.moqBumped?`, minimum order quantity ${l.moq}`:''}</div>
               </div>
               <button style={{...btn,background:'var(--accent)',color:PAL.panel,borderColor:'var(--accent)'}} onClick={()=>raise(l)}><Icon name="check" size={12}/> Mark PO raised</button>
               <button style={btn} onClick={()=>window.__oiNav&&window.__oiNav('planning','plan')}>Open planner</button>
             </div>
           ); })}
         {(()=>{ const rest=toOrder.filter(l=>!l.oosBeforeLead); if(!rest.length) return null;
-          if(!showAllToOrder){ const restVal=rest.reduce((a,l)=>a+(l.lineCost||0),0); return (<button onClick={()=>setShowAllToOrder(true)} style={{...btn,alignSelf:'flex-start',marginTop:4}}>Show {rest.length}more to order{restVal>0?` · ${curSym()}${k(restVal)}`:''}</button>); }
+          if(!showAllToOrder){ const restVal=rest.reduce((a,l)=>a+(l.lineCost||0),0); return (<button onClick={()=>setShowAllToOrder(true)} style={{...btn,alignSelf:'flex-start',marginTop:4}}>Show {rest.length}more to order{restVal>0?`, ${curSym()}${k(restVal)}`:''}</button>); }
           return (<a className="txt-link" onClick={()=>setShowAllToOrder(false)} style={{cursor:'pointer',fontSize:'var(--text-xs)',marginTop:4,alignSelf:'flex-start'}}>Show less</a>); })()}
         {showAllToOrder && toOrder.length>12 && <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',paddingTop:6}}><a className="txt-link" onClick={()=>window.__oiNav&&window.__oiNav('planning','plan')} style={{cursor:'pointer'}}>+ {toOrder.length-12} more in the planner</a></div>}
-      </div>) : <div className="muted" style={{fontSize:'var(--text-sm)',padding:'2px 0'}}>Nothing to order right now — {awaiting.length} PO{awaiting.length===1?'':'s'} awaiting stock below.</div>}
+      </div>) : <div className="muted" style={{fontSize:'var(--text-sm)',padding:'2px 0'}}>Nothing to order right now, {awaiting.length} PO{awaiting.length===1?'':'s'} awaiting stock below.</div>}
       {awaiting.length>0 && (<div style={{marginTop:12,paddingTop:10,borderTop:'1px solid var(--border-subtle)'}}>
-        <div style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:6}}>Awaiting stock · already ordered</div>
+        <div style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:6}}>Awaiting stock, already ordered</div>
         <div style={{display:'flex',flexDirection:'column',gap:6}}>
           {awaiting.map((l,idx)=>(<div key={idx} style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',fontSize:'var(--text-sm)'}}>
             <Icon name="check" size={13} style={{color:'var(--accent)',flexShrink:0}}/>
-            <span style={{flex:1,minWidth:180,color:'var(--text-secondary)'}}>{NUM((l.po&&l.po.qty)||l.qty)} × {l.p.title} <span style={{color:'var(--text-faint)'}}>· expected ~{l.expected||'?'}{l.overdue?' · overdue, chase supplier':''}</span></span>
+            <span style={{flex:1,minWidth:180,color:'var(--text-secondary)'}}>{NUM((l.po&&l.po.qty)||l.qty)} × {l.p.title} <span style={{color:'var(--text-faint)'}}>expected ~{l.expected||'?'}{l.overdue?', overdue, chase supplier':''}</span></span>
             <button style={{...btn,padding:'3px 9px'}} onClick={()=>{ setPoStatus(l.key,{status:'received', baselineQty:l.p.inventoryQty||0, receivedAt:oiToday()}); toast('Marked received', {kind:'good', body:l.p.title}); }}>Received</button>
             <button style={{...btn,padding:'3px 9px',background:'transparent',color:'var(--text-muted)'}} onClick={()=>{ clearPoStatus(l.key); toast('PO cancelled', {body:l.p.title}); }}>Cancel</button>
           </div>))}
         </div>
-        <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:8,lineHeight:1.5}}>You won't be reminded about these again. Each auto-closes when its stock comes back up — Shopify inventory for products, your on-hand figure for packaging.</div>
+        <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:8,lineHeight:1.5}}>You won't be reminded about these again. Each auto-closes when its stock comes back up, Shopify inventory for products, your on-hand figure for packaging.</div>
       </div>)}
     </div>
   );
@@ -11370,7 +11370,7 @@ function v3MoneyConf(row){
 // 60% (£259→£415/day)" were detector shorthand on Today (7 Oct).
 function v3EventWords(label) {
   const t = String(label || ''); let m;
-  if ((m = t.match(/^Discount rate spike to (\d+)% \(baseline (\d+)%\)/i))) return 'Discounts jumped to ' + m[1] + '% of sales (usually ' + m[2] + '%) — probably a sale';
+  if ((m = t.match(/^Discount rate spike to (\d+)% \(baseline (\d+)%\)/i))) return 'Discounts jumped to ' + m[1] + '% of sales (usually ' + m[2] + '%), probably a sale';
   if ((m = t.match(/^(\w+) spend (up|down) (\d+)% \(£([\d,.]+)\s*→\s*£([\d,.]+)\/day\)/i))) return m[1] + ' spend ' + (m[2].toLowerCase() === 'up' ? 'rose' : 'fell') + ' ' + m[3] + '%, from £' + m[4] + ' to £' + m[5] + ' a day';
   return t.replace(/\bpromo\b/gi, 'sale').replace(/\bbaseline\b/gi, 'usual');
 }
@@ -11439,7 +11439,7 @@ function v3BoardSpendTargets(figRows) {
 }
 // "This month’s ad budget: £3,508 · Ad budget a week: £800 · Next month’s ad budget a week: £1,200", in the registry's words.
 function v3AdBudgetWords(bs, fmt) {
-  return [bs.month, bs.week, bs.next].filter(x => x && x.value != null && x.label).map(x => x.label + ': ' + fmt(x.value)).join(' · ');
+  return [bs.month, bs.week, bs.next].filter(x => x && x.value != null && x.label).map(x => x.label + ': ' + fmt(x.value)).join(', ');
 }
 function v3AndList(xs) { return xs.length <= 1 ? (xs[0] || '') : xs.slice(0, -1).join(', ') + ' and ' + xs[xs.length - 1]; }
 
@@ -11497,7 +11497,7 @@ function v3DueWords(r, short) {
   if (r.days_to_due != null && isFinite(n) && n < 0)
     return short ? 'was due ' + day : 'was due ' + day + ' (' + (n === -1 ? '1 day ago' : (-n) + ' days ago') + ')';
   const left = r.days_to_due == null || !isFinite(n) ? '' : n === 0 ? 'today' : n === 1 ? '1 day' : n + ' days';
-  return short ? (left ? day + ' · ' + left : day) : 'due by ' + day + (left ? ' (' + left + ')' : '');
+  return short ? (left ? day + ', ' + left : day) : 'due by ' + day + (left ? ' (' + left + ')' : '');
 }
 function V3UnpricedLane({ compact }) {
   const { unpriced } = useV3Board();
@@ -11538,9 +11538,9 @@ function V3UnpricedLane({ compact }) {
                 {pa.why && <span className={'v3-rank-plain' + (isOpen ? '' : ' clamp')}>{pa.why}</span>}
                 <span className="v3-rank-meta">
                   {v3Tidy(r.lane_said)}
-                  {r.due_on ? ' · ' + v3DueWords(r) : ''}
-                  {r.category ? ' · ' + v3CategoryWords(r.category) : ''}
-                  {conf ? ' · ' + V3_CONF[conf].label.toLowerCase() : ''}
+                  {r.due_on ? ', ' + v3DueWords(r) : ''}
+                  {r.category ? ', ' + v3CategoryWords(r.category) : ''}
+                  {conf ? ', ' + V3_CONF[conf].label.toLowerCase() : ''}
                 </span>
               </span>
               <span className="v3-rank-gbp"><span className="v3-rank-per">{r.due_on ? v3DueWords(r, true) : 'no figure'}</span></span>
@@ -11551,7 +11551,7 @@ function V3UnpricedLane({ compact }) {
               <div className="v3-rank-why">
                 {play.length
                   ? <ol className="v3-rank-steps">{play.map((s, j) => <li key={j}>{v3Tidy(s)}</li>)}</ol>
-                  : <p className="v3-rank-nosteps">{v3Tidy(r.step1) || 'Greta has no further detail on this one yet.'}</p>}
+                  : <p className="v3-rank-nosteps">{v3Tidy(r.step1) || 'No further detail yet.'}</p>}
                 {Array.isArray(r.evidence_reasons) && r.evidence_reasons.some(x => x && x.text) && (
                   <div className="v3-rank-raw"><span className="v3-kick">Why {conf ? V3_CONF[conf].label.toLowerCase() : 'this steer'}</span>
                     <ul className="v3-rank-steps">{r.evidence_reasons.filter(x => x && x.text).map((x, j) => <li key={j}>{v3Tidy(x.text)}</li>)}</ul>
@@ -11672,7 +11672,7 @@ function V3PlanSteps({ plan, rank }) {
         {rank == null && <span className="v3-rank-n">{j + 1}</span>}
         <span className="v3-rank-body">
           <span className="v3-rank-desc">{rank != null ? 'Goes with it: ' : ''}{pa.title}</span>
-          <span className="v3-rank-meta">{st.lane === 'test' ? 'Worth testing' : 'Do this'}{st.origin === 'order_cost' ? ' · ad spend saved' : ''}</span>
+          <span className="v3-rank-meta">{st.lane === 'test' ? 'Worth testing' : 'Do this'}{st.origin === 'order_cost' ? ', ad spend saved' : ''}</span>
         </span>
         <span className="v3-rank-gbp">{v3Gbp(gbp)}<span className="v3-rank-per">{v3Per(st, true)}</span></span>
       </button>
@@ -11810,14 +11810,14 @@ function V3ChannelScoreboard(){
     return () => { dead = true; };
   }, []);
 
-  if (err) return <div className="v3-empty">Greta could not load your channel scoreboard just now — refreshing usually sorts it.</div>;
+  if (err) return <div className="v3-empty">Greta could not load your channel scoreboard just now, refreshing usually sorts it.</div>;
   if (rows === null) return <V3SkeletonRows n={4}/>;
   if (!rows.length) return (
     <div className="v3-score v3-enter">
       <div className="v3-score-head"><h2 className="v3-score-title">Which ad channels pay for themselves?</h2></div>
       <p className="v3-note">No channel has spent anything in the last 30 days, so there is nothing to rank yet.
         Once a channel is running, this compares what each one returns against what it needs to return to
-        break even on your margin — and that comparison is the fastest read on this page.</p>
+        break even on your margin, and that comparison is the fastest read on this page.</p>
     </div>);
 
   // Channel names an owner recognises ("Meta prospecting", "Google Performance Max"), not the
@@ -11832,13 +11832,13 @@ function V3ChannelScoreboard(){
     : !under.length ? 'Every channel is earning back what it costs you.'
     : (judged.length - under.length) + ' of ' + judged.length + ' channels earn back what they cost. '
       + under.map(r => nice(r.platform, r.channel_type)).join(' and ') + (under.length === 1 ? ' does not' : ' do not')
-      + ' — that is ' + v3Gbp(underSpend) + ' of your last 30 days’ ad spend going on sales that lose money once the products are paid for.';
+      + ', that is ' + v3Gbp(underSpend) + ' of your last 30 days’ ad spend going on sales that lose money once the products are paid for.';
 
   return (
     <div className="v3-score v3-enter">
       <div className="v3-score-head">
         <h2 className="v3-score-title">Which ad channels pay for themselves?</h2>
-        <span className="v3-score-key">bar is what it returns · tick is what it needs</span>
+        <span className="v3-score-key">bar is what it returns, tick is what it needs</span>
       </div>
       {verdict && <p className="v3-score-verdict">{verdict}</p>}
       <ul className="v3-score-list">
@@ -11875,7 +11875,7 @@ function ActionsView(){
       {/* V3: the browser planner's stock list (28 to order, sized to its own demand plan, against the
           board's 21) and the 137-day-old specialist review (a £4.8k "act now" from a browser rule that
           the board never raised) are gone. Stock & orders is the one order list; the stock row opens it. */}
-      {!UI_V3 && <V3More id="act-restock" label="Stock and purchasing — what to order, by date"><RestockActionQueue/></V3More>}
+      {!UI_V3 && <V3More id="act-restock" label="Stock and purchasing, what to order, by date"><RestockActionQueue/></V3More>}
       {!UI_V3 && <V3More id="act-legacy" label="Earlier specialist review"><ActionBoard/><AdviceLedgerPanel/></V3More>}
     </div>
   );
@@ -12015,7 +12015,7 @@ function BusinessReview(){
   // A stale feed makes every row 'unknown', which would count as nothing at risk; show it as unknown.
   const spStale = !!(stockQ.rows && stockQ.rows.some(r => r.inventory_stale));
   const sp = spStale ? null : stockQ.rows;   // null while loading or when the counts are out of date
-  const spWait = spStale ? 'Stock counts are out of date' : stockQ.err ? 'Greta couldn’t load the stock plan just now' : 'Loading the stock plan…';
+  const spWait = spStale ? 'Stock counts are out of date' : stockQ.err ? 'The stock plan could not load just now' : 'Loading the stock plan…';
   const spCount = st => sp ? sp.filter(r => r.stock_status === st).length : 0;
   const sk = t => t === 'critical' ? spCount('stockout') : t === 'low' ? spCount('low_cover')
     : t === 'overstock' ? (sp ? sp.filter(r => r.stock_status === 'overstock' && Number(r.trapped_cash) > 0).length : 0) : 0;
@@ -12056,12 +12056,12 @@ function BusinessReview(){
     { label:'Customer value ÷ new-customer cost', value: ltvCac!=null?ltvCac.toFixed(1)+'×':'—',
       status: ltvCac==null?'missing':(ltvCac>=3?'healthy':ltvCac>=2?'watch':'action'),
       statusLabel: ltvCac==null?'Needs data':(ltvCac>=3?'Healthy':ltvCac>=2?'Watch':'Below 2×'),
-      sub: ltvCac!=null?`What a customer is worth ${contribLTV!=null?curSym()+NUM(Math.round(contribLTV)):'—'} ÷ what one costs to win ${paidCac!=null?curSym()+NUM(Math.round(paidCac)):'—'} · aim for 3× or more`:(ueQ.rows ? 'Not measured yet — needs a few months of repeat orders' : 'Loading…'),
+      sub: ltvCac!=null?`What a customer is worth ${contribLTV!=null?curSym()+NUM(Math.round(contribLTV)):'—'} ÷ what one costs to win ${paidCac!=null?curSym()+NUM(Math.round(paidCac)):'—'}, aim for 3× or more`:(ueQ.rows ? 'Not measured yet, needs a few months of repeat orders' : 'Loading…'),
       read:`Customer value ÷ new-customer cost ${ltvCac!=null?ltvCac.toFixed(1)+'×':'—'} (aim ≥3×)` },
     { label:'Repeat purchase rate', value: repeat!=null?pct1(repeat):'—',
       status: repeat==null?'missing':(repeat>=0.25?'healthy':repeat>=0.12?'watch':'action'),
       statusLabel: repeat==null?'—':(repeat>=0.25?'Healthy':repeat>=0.12?'Building':'Low'),
-      sub:`${opc?opc.toFixed(2):'—'} orders per customer · ${custBase!=null?NUM(custBase):'—'} customers ever`,
+      sub:`${opc?opc.toFixed(2):'—'} orders per customer, ${custBase!=null?NUM(custBase):'—'} customers ever`,
       read:`Repeat rate ${repeat!=null?pct1(repeat):'—'}, ${opc?opc.toFixed(2):'—'} orders/customer` },
     { label:'Average order value', value: W&&W.m.aov!=null?GBP(W.m.aov):'—',
       status:'info', statusLabel:'Order value',
@@ -12069,11 +12069,11 @@ function BusinessReview(){
       read:`average order value ${W&&W.m.aov!=null?GBP(W.m.aov):'—'} (8-week trend)` },
     stockSum ? { label:'Stock to reorder', value: NUM(stockN) + (stockN === 1 ? ' product' : ' products'),
       status: stockN > 0 ? 'action' : 'healthy', statusLabel: stockN > 0 ? 'Order now' : 'Covered',
-      sub: stockN > 0 ? `${NUM(stockSum.out_of_stock)} already out · ${NUM(stockSum.products_runs_out)} run out before a restock can land · ${NUM(stockSum.products_peak_only)} more only for the peak` : 'Nothing runs out before a restock could land',
+      sub: stockN > 0 ? `${NUM(stockSum.out_of_stock)} already out, ${NUM(stockSum.products_runs_out)} run out before a restock can land, ${NUM(stockSum.products_peak_only)} more only for the peak` : 'Nothing runs out before a restock could land',
       read:`${NUM(stockN)} products on the stock list: ${NUM(stockSum.products_runs_out)} run out before a restock can land, ${NUM(stockSum.products_peak_only)} more only for the peak, ${NUM(stockSum.out_of_stock)} already out` } :
     { label:'Stock cover risk', value: sp ? lowCover+(lowCover===1?' item':' items') : '—',
       status: !sp ? 'missing' : lowCover>0?'watch':'healthy', statusLabel: !sp ? '—' : lowCover>0?'Restock needed':'Covered',
-      sub: sp ? `${sk('critical')} out of stock · ${sk('low')} run out before a restock` : spWait,
+      sub: sp ? `${sk('critical')} out of stock, ${sk('low')} run out before a restock` : spWait,
       read:`${lowCover} items at low/critical stock cover (${sk('critical')} critical)` },
   ];
 
@@ -12093,11 +12093,11 @@ function BusinessReview(){
       // a channel that could be switched off; a big Direct share is not a concentration risk.
       status: topShare==null?'missing':(topChan && /direct/i.test(topChan.channel) ? 'info' : topShare>0.45?'watch':'healthy'),
       statusLabel: topShare==null?'—':(topChan && /direct/i.test(topChan.channel) ? 'Mostly untracked' : topShare>0.45?'Concentrated':'Diversified'),
-      sub: topChan?`${topChan.channel} is the largest revenue channel${paidShare!=null?` · paid = ${pct0(paidShare)} of revenue`:''}`:'—',
+      sub: topChan?`${topChan.channel} is the largest revenue channel${paidShare!=null?`, paid = ${pct0(paidShare)} of revenue`:''}`:'—',
       read:`Revenue concentration: ${topChan?topChan.channel:'—'} ${topShare!=null?pct0(topShare):''}${paidShare!=null?`, paid ${pct0(paidShare)} of revenue`:''}` },
     { label: slowF.label || 'Cash tied up in slow stock', value: slowCapital!=null ? GBP(Math.round(slowCapital)) : '—',
       status: slowCapital==null ? 'missing' : slowCapital>5000?'watch':(overUnvalued ? 'info' : 'healthy'), statusLabel: slowCapital==null ? '—' : slowCapital>5000?'Cash tied up':(overUnvalued ? 'Part-valued' : 'Lean'),
-      sub: (sp && overRows.length && !overValued.length) ? `${overRows.length} products with months of stock — enter product costs to value them`
+      sub: (sp && overRows.length && !overValued.length) ? `${overRows.length} products with months of stock, enter product costs to value them`
          : slowCapital!=null ? `${sk('overstock')} products with months of stock, valued at cost` + (overUnvalued ? ` (${overUnvalued} without a cost not counted)` : '') : spWait,
       read:`${slowCapital!=null ? curSym()+k(slowCapital) : '—'} capital tied in slow-moving stock (${sk('overstock')} overstocked products)` },
   ];
@@ -12126,7 +12126,7 @@ function BusinessReview(){
       sub:'Not enough weekly revenue history to estimate burn', onClick:editCash, read:'Cash runway: insufficient data' };
   } else if(moNet>=0){
     runwayCard = { label:'Cash runway', value:'Cash-flow positive', status:'healthy', statusLabel:'Self-funding',
-      sub:`Net +${curSym()}${k(moNet)}/mo run-rate · ${curSym()}${k(cashBal)} on hand`, onClick:editCash,
+      sub:`Net +${curSym()}${k(moNet)}/mo run-rate, ${curSym()}${k(cashBal)} on hand`, onClick:editCash,
       read:`Cash runway: cash-flow positive (net +${curSym()}${k(moNet)}/mo, ${curSym()}${k(cashBal)} on hand)` };
   } else {
     const months = cashBal/(-moNet);
@@ -12154,10 +12154,10 @@ function BusinessReview(){
 
   const copyBriefing = ()=>{
     const L=[];
-    L.push(`BUSINESS REVIEW — ${OI_BRAND.name||'frkl'}${W?` · week of ${W.label}`:''}`);
+    L.push(`BUSINESS REVIEW, ${OI_BRAND.name||'frkl'}${W?`, week of ${W.label}`:''}`);
     L.push(`Posture: ${overall.label}. ${verdictSentence}`);
     L.push('');
-    L.push('NOW — trading (this week vs last):');   nowD.forEach(d=>L.push('  • '+d.read));
+    L.push('NOW, trading (this week vs last):');   nowD.forEach(d=>L.push('  • '+d.read));
     L.push('THE ENGINE:');                           engineD.forEach(d=>L.push('  • '+d.read));
     L.push('DURABILITY:');                           durD.forEach(d=>L.push('  • '+d.read));
     L.push('');
@@ -12200,14 +12200,14 @@ function BusinessReview(){
     <div>
       <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:6}}>
         <h2 style={{margin:0,fontSize:'var(--text-lg)'}}>Business review</h2>
-        <span className="muted" style={{fontSize:'var(--text-sm)'}}>Management overview · week of {W.label} + trailing trend · independent of the date picker</span>
+        <span className="muted" style={{fontSize:'var(--text-sm)'}}>Management overview, week of {W.label}</span>
       </div>
       {/* TL;DR — the main points across the business, in five lines */}
       {(()=>{ const tl=[];
-        tl.push({t: UI_V3 && board && board.rows && v3BoardSplitText(board.rows) ? `${overall.label}: ${v3BoardSplitText(board.rows)}.` : `${overall.label}: ${curSym()}${k(atRisk)}/mo to act on now, ${curSym()}${k(upside)}/mo worth testing · ${openActions} actions open.`, c: overall.kind==='action'?'var(--bad)':overall.kind==='watch'?'var(--warn)':'var(--good)'});
-        if(risks[0]) tl.push({t:`First on the board — ${risks[0].description} (${curSym()}${k(Math.abs(risks[0].monthly_impact_gbp))}/mo).`, c:'var(--bad)'});
-        if(opps[0]) tl.push({t:`First to test — ${opps[0].description} (${curSym()}${k(Math.abs(opps[0].monthly_impact_gbp))}/mo).`, c:'var(--good)'});
-        tl.push({t:`${ltvCac!=null?'A new customer is worth '+ltvCac.toFixed(1)+'× what they cost to win':'What a customer is worth against their cost needs cost data'}, repeat rate ${repeat!=null?pct1(repeat):'—'}${ltvCac!=null?` — ${ltvCac>=3?'healthy':'below the 3× target'}`:''}.`, c: (ltvCac!=null&&ltvCac>=3)?'var(--good)':'var(--warn)'});
+        tl.push({t: UI_V3 && board && board.rows && v3BoardSplitText(board.rows) ? `${overall.label}: ${v3BoardSplitText(board.rows)}.` : `${overall.label}: ${curSym()}${k(atRisk)}/mo to act on now, ${curSym()}${k(upside)}/mo worth testing, ${openActions} actions open.`, c: overall.kind==='action'?'var(--bad)':overall.kind==='watch'?'var(--warn)':'var(--good)'});
+        if(risks[0]) tl.push({t:`First on the board, ${risks[0].description} (${curSym()}${k(Math.abs(risks[0].monthly_impact_gbp))}/mo).`, c:'var(--bad)'});
+        if(opps[0]) tl.push({t:`First to test, ${opps[0].description} (${curSym()}${k(Math.abs(opps[0].monthly_impact_gbp))}/mo).`, c:'var(--good)'});
+        tl.push({t:`${ltvCac!=null?'A new customer is worth '+ltvCac.toFixed(1)+'× what they cost to win':'What a customer is worth against their cost needs cost data'}, repeat rate ${repeat!=null?pct1(repeat):'—'}${ltvCac!=null?`, ${ltvCac>=3?'healthy':'below the 3× target'}`:''}.`, c: (ltvCac!=null&&ltvCac>=3)?'var(--good)':'var(--warn)'});
         if(slowCapital>50000) tl.push({t:`${curSym()}${k(slowCapital)} of capital tied up in slow-moving stock${topChan&&topShare!=null?`; ${topChan.channel} drives ${pct0(topShare)} of revenue`:''}.`, c:'var(--warn)'});
         return (<div className="card" style={{}}>
           <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:8}}>
@@ -12225,14 +12225,14 @@ function BusinessReview(){
           <button style={{...btn,marginLeft:'auto'}} onClick={copyBriefing}><Icon name="clipboard" size={13}/> Copy as briefing</button>
         </div>
         <div style={{fontSize:'var(--text-base)',marginTop:11,lineHeight:1.55,color:'var(--text-primary)'}}>{verdictSentence}</div>
-        <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:9,lineHeight:1.4}}>Built from live Shopify, GA4, Meta, Google Ads, Klaviyo and cohort data. Every figure is a factual read of synced data — not a projection.</div>
+        <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:9,lineHeight:1.4}}>Built from live Shopify, GA4, Meta, Google Ads, Klaviyo and cohort data. Every figure is a factual read of synced data, not a projection.</div>
       </div>
       {/* Three-horizon scorecard */}
-      {!UI_V3 && <Eyebrow>Now · trading — this week vs last</Eyebrow>}
+      {!UI_V3 && <Eyebrow>Now, trading, this week vs last</Eyebrow>}
       {!UI_V3 && <div className="card"><div className="wc-grid">{nowD.map((d,idx)=>RvCard({label:d.sp.label, value:d.sp.fmt(d.val), change:`${d.up?'↑':'↓'}${Math.abs(d.ch*100).toFixed(0)}%`, changeColor:d.good==null?'var(--text-muted)':(d.good?'var(--good)':'var(--bad)'), status:d.badge.kind, statusLabel:d.badge.label, series:trail(d.sp.key), color:RAG_COL[d.rag]||'var(--text-faint)', fmt:d.sp.fmt, axisFmt:d.sp.axisFmt}, idx))}</div></div>}
-      <Eyebrow>The engine · is the machine strengthening (trailing)</Eyebrow>
+      <Eyebrow>The engine, is the machine strengthening (trailing)</Eyebrow>
       <div className="card"><div className="wc-grid">{engineD.map(RvCard)}</div></div>
-      <Eyebrow>Durability · will it compound — and what could break it</Eyebrow>
+      <Eyebrow>Durability, will it compound, and what could break it</Eyebrow>
       <div className="card"><div className="wc-grid">{durD.map(RvCard)}</div></div>
       {cashOpen && (<div className="card" style={{marginTop:10}}>
         <div style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)',marginBottom:9}}>Cash position</div>
@@ -12242,17 +12242,17 @@ function BusinessReview(){
           <button style={btn} onClick={saveCash}>Save</button>
           <button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setCashOpen(false)}>Cancel</button>
         </div>
-        <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:10,lineHeight:1.5}}>Overheads = salaries, rent, software — costs <b>not</b> already in ad spend or product cost. Runway = cash ÷ (monthly gross profit − ad spend − overheads), using your last {recentW.length||4} complete weeks as the run-rate. A factual estimate; it ignores one-off inventory purchases and working-capital timing.</div>
+        <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:10,lineHeight:1.5}}>Overheads = salaries, rent, software, costs <b>not</b> already in ad spend or product cost. Runway = cash ÷ (monthly gross profit − ad spend − overheads), using your last {recentW.length||4} complete weeks as the run-rate. A factual estimate; it ignores one-off inventory purchases and working-capital timing.</div>
       </div>)}
       {/* Risk & opportunity registers */}
-      <Eyebrow>The action board · quantified</Eyebrow>
+      <Eyebrow>The action board, quantified</Eyebrow>
       <div className="row">
         <div className="card" style={{flex:'1 1 340px', minWidth:0, borderTop:'3px solid var(--bad)'}}>
           <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:8,marginBottom:4}}>
             <span style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>Act on now</span>
             {!UI_V3 && <span style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',color:'var(--bad)',whiteSpace:'nowrap'}}>{`${curSym()}`}{k(atRisk)}/mo</span>}
           </div>
-          {risks.length ? risks.slice(0,6).map(regRow('var(--bad)')) : <div className="muted" style={{fontSize:'var(--text-sm)',padding:'8px 0'}}>{moneyKnown ? 'Nothing Greta has checked needs acting on right now.' : 'Loading the action board…'}</div>}
+          {risks.length ? risks.slice(0,6).map(regRow('var(--bad)')) : <div className="muted" style={{fontSize:'var(--text-sm)',padding:'8px 0'}}>{moneyKnown ? 'Nothing needs acting on right now.' : 'Loading the action board…'}</div>}
         </div>
         <div className="card" style={{flex:'1 1 340px', minWidth:0, borderTop:'3px solid var(--good)'}}>
           <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:8,marginBottom:4}}>
@@ -12269,7 +12269,7 @@ function BusinessReview(){
           <span className="muted" style={{fontSize:'var(--text-sm)'}}>{openActions} open in the queue</span>
           <button style={{...btn,marginLeft:'auto'}} onClick={()=>window.__oiNav&&window.__oiNav('actions','queue')}>Open action queue <Icon name="chevron" size={13}/></button>
         </div>
-        {topMoves.length>0 && <div className="muted" style={{fontSize:'var(--text-sm)',marginTop:9,lineHeight:1.55}}>First on the board: {topMoves.map(m=>`${scrubTag(m.description)} (${curSym()}${k(Math.abs(m.monthly_impact_gbp))}/mo)`).join(' · ')}.</div>}
+        {topMoves.length>0 && <div className="muted" style={{fontSize:'var(--text-sm)',marginTop:9,lineHeight:1.55}}>First on the board: {topMoves.map(m=>`${scrubTag(m.description)} (${curSym()}${k(Math.abs(m.monthly_impact_gbp))}/mo)`).join(', ')}.</div>}
       </div>
     </div>
   );
@@ -12294,8 +12294,8 @@ function PlanningHeader({active, embedded}){
   // in the merged tab, chips scroll to sections; otherwise they cross-navigate
   const onForecast = embedded ? ()=>jump('plan-forecast') : (active==='forecast'?undefined:()=>go('forecast'));
   const onPOs = embedded ? ()=>jump('plan-pos') : (active==='production'?undefined:()=>go('production'));
-  const fHint = embedded ? ' · open' : (active!=='forecast'?' · edit':'');
-  const pHint = embedded ? ' · open' : (active!=='production'?' · open':'');
+  const fHint = embedded ? ', open' : (active!=='forecast'?', edit':'');
+  const pHint = embedded ? ', open' : (active!=='production'?', open':'');
   const chip = (on)=>({flex:'1 1 190px',minWidth:172,padding:'10px 13px',borderRadius:'var(--radius-md)',background:on?'var(--accent-bg)':'var(--bg-elevated)',border:'1px solid '+(on?'var(--accent)':'var(--border-subtle)')});
   const lab = {fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:4};
   const sbtn = (id)=>({fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',padding:'5px 9px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1.5px solid '+(strat===id?'var(--accent)':'var(--border-default)'),background:strat===id?'var(--accent)':'transparent',color:strat===id?PAL.panel:'var(--text-secondary)'});
@@ -12310,7 +12310,7 @@ function PlanningHeader({active, embedded}){
         </div>
         {arrow}
         <div style={{...chip(false), flex:'1 1 250px'}}>
-          <div style={lab}>2. Strategy — how to commit</div>
+          <div style={lab}>2. Strategy, how to commit</div>
           <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:3}}>
             {['jit','bulk','staged'].map(id=>(<button key={id} title={STRAT[id]} style={sbtn(id)} onClick={()=>saveReorderConfig({...rc,strategy:id})}>{STRAT[id]}</button>))}
           </div>
@@ -12318,7 +12318,7 @@ function PlanningHeader({active, embedded}){
         {arrow}
         <div style={{...chip(active==='production'), cursor:onPOs?'pointer':'default'}} onClick={onPOs}>
           <div style={lab}>3. Purchase orders{pHint&&<span style={{color:'var(--accent)'}}>{pHint}</span>}</div>
-          <div style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',color:R.toOrder.length?'var(--warn)':'var(--good)'}}>{R.toOrder.length} to order{orderVal>0?` · ${curSym()}${k(orderVal)}`:''}</div>
+          <div style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',color:R.toOrder.length?'var(--warn)':'var(--good)'}}>{R.toOrder.length} to order{orderVal>0?`, ${curSym()}${k(orderVal)}`:''}</div>
           <div style={{fontSize:'var(--text-xs)',color:'var(--text-muted)',marginTop:2}}>{R.awaiting.length} awaiting stock</div>
         </div>
       </div>
@@ -12363,7 +12363,7 @@ function ProductionPlanner({embedded}={}){
   const totalValue = pos.reduce((t,p)=>t+p.total,0);
   const missingCost = toOrder.some(l=>l.unitCost==null);
   const today = (()=>{ try{ return new Date().toLocaleDateString('en-GB'); }catch(e){ return ''; } })();
-  const raisePO = (po)=>{ const u={}; po.lines.forEach(l=>{ u[l.key]={status:'ordered', qty:l.qty, raisedAt:oiToday(), baselineQty:l.p.inventoryQty||0, lead:l.lead, supplier:l.supplier, title:l.p.title}; }); setPoStatusMany(u); toast('PO marked raised', {kind:'good', body:po.supplier+' · now awaiting stock'}); };
+  const raisePO = (po)=>{ const u={}; po.lines.forEach(l=>{ u[l.key]={status:'ordered', qty:l.qty, raisedAt:oiToday(), baselineQty:l.p.inventoryQty||0, lead:l.lead, supplier:l.supplier, title:l.p.title}; }); setPoStatusMany(u); toast('PO marked raised', {kind:'good', body:po.supplier+', now awaiting stock'}); };
 
   const csvFor = (po)=>{
     const rows=[['SKU','Product','Type','Order qty','Unit cost','Line total','Current stock','Days cover','Lead days']];
@@ -12374,16 +12374,16 @@ function ProductionPlanner({embedded}={}){
   const download = (po)=>{ try{
     const blob=new Blob([csvFor(po)],{type:'text/csv'}); const url=URL.createObjectURL(blob);
     const a=document.createElement('a'); a.href=url; a.download='PO_'+po.supplier.replace(/[^a-z0-9]+/gi,'_')+'.csv'; document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url),1000); toast('PO exported', {kind:'good', body:po.supplier+' · '+po.lines.length+' lines'});
+    setTimeout(()=>URL.revokeObjectURL(url),1000); toast('PO exported', {kind:'good', body:po.supplier+', '+po.lines.length+' lines'});
   }catch(e){ toast('Export failed', {kind:'bad'}); } };
   const copyPO = (po)=>{
     const firstLine=po.lines[0]||{};
-    const L=['PURCHASE ORDER (DRAFT)', 'To: '+po.supplier+(po.email?' <'+po.email+'>':''), ...(firstLine.supPhone?['Tel: '+firstLine.supPhone]:[]), ...(firstLine.supAddress?[firstLine.supAddress]:[]), ...(po.notes?[po.notes]:[]), 'From: '+(OI_BRAND.name||'frkl')+(today?'  ·  '+today:''), ''];
-    po.lines.forEach(l=>L.push(l.qty+' × '+l.p.title+' ['+(l.p.sku||'no SKU')+']'+(l.unitCost!=null?(` @ ${curSym()}`+l.unitCost+` = ${curSym()}`+l.lineCost.toFixed(2)):'  — PRICE TBC (please quote)')+(l.moqBumped?(' (MOQ '+l.moq+')'):'')));
-    L.push('', po.hasCost?(`TOTAL: ${curSym()}`+po.total.toFixed(2)+' · '+po.units+' units'):(po.units+' units · PRICING TBC — please quote against this PO'));
+    const L=['PURCHASE ORDER (DRAFT)', 'To: '+po.supplier+(po.email?' <'+po.email+'>':''), ...(firstLine.supPhone?['Tel: '+firstLine.supPhone]:[]), ...(firstLine.supAddress?[firstLine.supAddress]:[]), ...(po.notes?[po.notes]:[]), 'From: '+(OI_BRAND.name||'frkl')+(today?' ,  '+today:''), ''];
+    po.lines.forEach(l=>L.push(l.qty+' × '+l.p.title+' ['+(l.p.sku||'no SKU')+']'+(l.unitCost!=null?(` @ ${curSym()}`+l.unitCost+` = ${curSym()}`+l.lineCost.toFixed(2)):' , PRICE TBC (please quote)')+(l.moqBumped?(' (MOQ '+l.moq+')'):'')));
+    L.push('', po.hasCost?(`TOTAL: ${curSym()}`+po.total.toFixed(2)+', '+po.units+' units'):(po.units+' units, PRICING TBC, please quote against this PO'));
     if(po.hasCost){ const fd=iso=>{ try{ return new Date((iso||'')+'T00:00:00').toLocaleDateString('en-GB'); }catch(e){ return iso; } };
       if(po.hasDeposit) L.push(`Terms: ${curSym()}`+po.deposit.toFixed(2)+' deposit'+(po.depPct!=null?(' ('+po.depPct+'%)'):'')+` on order, ${curSym()}`+po.balance.toFixed(2)+' balance on shipment');
-      L.push('Lead: '+po.leadTotalMax+' days from order — ships ~'+fd(po.ships)+', lands ~'+fd(po.lands)); }
+      L.push('Lead: '+po.leadTotalMax+' days from order, ships ~'+fd(po.ships)+', lands ~'+fd(po.lands)); }
     try{ navigator.clipboard&&navigator.clipboard.writeText(L.join('\n')); }catch(e){}
     toast('PO copied', {kind:'good', body:po.supplier});
   };
@@ -12417,13 +12417,13 @@ function ProductionPlanner({embedded}={}){
     <div>
       {!embedded && (<><div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:6}}>
         <h2 style={{margin:0,fontSize:'var(--text-lg)'}}>Production &amp; purchase orders</h2>
-        <span className="muted" style={{fontSize:'var(--text-sm)'}}>Reorder engine on live stock + velocity · independent of the date picker</span>
+        <span className="muted" style={{fontSize:'var(--text-sm)'}}>Reorder plan from live stock and sales</span>
       </div>
       <PlanningHeader active="production"/></>)}
       {/* summary + controls */}
       <div className="card">
         <div style={{display:'flex',gap:22,flexWrap:'wrap',alignItems:'flex-end'}}>
-          <div title="Run out before a reorder placed today could land — order these now"><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color: oosNow?'var(--bad)':'var(--good)'}}>{oosNow}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>order today (OOS risk)</div></div>
+          <div title="Run out before a reorder placed today could land, order these now"><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color: oosNow?'var(--bad)':'var(--good)'}}>{oosNow}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>order today (OOS risk)</div></div>
           <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color: toOrder.length?'var(--warn)':'var(--good)'}}>{toOrder.length}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>items to reorder now</div></div>
           <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{NUM(toOrder.reduce((t,l)=>t+l.qty,0))}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>units across all POs</div></div>
           <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{totalValue>0?curSym()+k(totalValue):'—'}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>draft order value{missingCost?' (partial)':''}</div></div>
@@ -12434,15 +12434,15 @@ function ProductionPlanner({embedded}={}){
           </div>
         </div>
         <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:11,lineHeight:1.5}}>
-          Strategy: <b style={{color:'var(--text-secondary)'}}>{STRAT[strategy]}</b> · <button type="button" className="txt-link v3-linkbtn" onClick={()=>setSetOpen(o=>!o)}>change</button>. {strategy==='bulk'
-            ? <>Provisioning the full <b>{Math.round((horizonDays/30.4))}-month</b> demand plan upfront — each product's order is its planned demand (split by historic mix) net of stock, then rounded to minimum order quantity.</>
+          Strategy: <b style={{color:'var(--text-secondary)'}}>{STRAT[strategy]}</b>, <button type="button" className="txt-link v3-linkbtn" onClick={()=>setSetOpen(o=>!o)}>change</button>. {strategy==='bulk'
+            ? <>Provisioning the full <b>{Math.round((horizonDays/30.4))}-month</b> demand plan upfront, each product's order is its planned demand (split by historic mix) net of stock, then rounded to minimum order quantity.</>
             : strategy==='staged'
             ? <>Ordering the forecast in <b>{waves} waves</b>; each order covers lead + one wave, and the next wave's order-by date is shown per line.</>
-            : <>Lean / just-in-time — reorder triggers when cover falls within <b>lead + {safety}d safety</b>, ordering up to <b>{coverDays}d beyond lead</b>, rounded to minimum order quantity.</>}
-          {approaching>0?` ${approaching} more will cross the trigger soon.`:''} Drafts only — nothing is sent to suppliers automatically.</div>
+            : <>Lean / just-in-time, reorder triggers when cover falls within <b>lead + {safety}d safety</b>, ordering up to <b>{coverDays}d beyond lead</b>, rounded to minimum order quantity.</>}
+          {approaching>0?` ${approaching} more will cross the trigger soon.`:''} Drafts only, nothing is sent to suppliers automatically.</div>
         {plan.active && (<div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginTop:10,padding:'8px 12px',borderRadius:'var(--radius-none)',background:'var(--accent-bg)',border:'1px solid var(--border-subtle)'}}>
           <Icon name="trendUp" size={14} style={{color:'var(--accent)'}}/>
-          <span style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)'}}>Orders are sized to your demand plan — <b style={{color:'var(--text-primary)'}}>{plan.growthPct>=0?'+':''}{plan.growthPct.toFixed(0)}% vs run-rate</b> ({plan.mode==='growth'?'growth target':plan.mode==='units'?'units target':'revenue target'}), not flat velocity.</span>
+          <span style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)'}}>Orders are sized to your demand plan, <b style={{color:'var(--text-primary)'}}>{plan.growthPct>=0?'+':''}{plan.growthPct.toFixed(0)}% vs run-rate</b> ({plan.mode==='growth'?'growth target':plan.mode==='units'?'units target':'revenue target'}), not flat velocity.</span>
           <button style={{...btn,fontSize:'var(--text-xs)',padding:'4px 10px',marginLeft:'auto'}} onClick={()=>{ if(window.__oiOpenForecast){ window.__oiOpenForecast(); return; } const el=document.getElementById('plan-forecast'); if(el) el.scrollIntoView({behavior:'smooth'}); else if(window.__oiNav) window.__oiNav('planning','plan'); }}>Adjust plan <Icon name="chevron" size={12}/></button>
         </div>)}
       </div>
@@ -12459,52 +12459,52 @@ function ProductionPlanner({embedded}={}){
         return (
           <div className="card" style={{}}>
             <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:6}}>
-              <div style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)'}}>Supplier master <span className="muted" style={{fontWeight:'var(--weight-normal)',fontSize:'var(--text-xs)'}}>· per item · fill in as you order — production lead = days from order to stock landing</span></div>
+              <div style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)'}}>Supplier master <span className="muted" style={{fontWeight:'var(--weight-normal)',fontSize:'var(--text-xs)'}}>per item, fill in as you order, production lead = days from order to stock landing</span></div>
               <input value={supSearch} onChange={e=>setSupSearch(e.target.value)} placeholder="Search any product to assign…" style={{...inp,width:240}}/>
             </div>
             <datalist id="oi-supplier-names">{supplierNamesInUse().map(n=><option key={n} value={n}/>)}</datalist>
             <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:680}}><thead><tr><th style={th}>Product</th><th style={th}>Supplier / manufacturer</th><th style={th}>Minimum order</th><th style={th}>{`Unit ${curSym()} `}<span style={{fontWeight:'var(--weight-normal)',textTransform:'none'}}>(blank = quote)</span></th><th style={th}>Lead (days)</th></tr></thead><tbody>
               {visible.map(p=>{ const key=skuKeyOf(p); const d=supDraft[key]||{supplier:'',moq:'',unitCost:'',lead:''}; const set=!!(d.supplier&&d.supplier.trim()); return (<tr key={key}>
-                <td style={{...td,color:'var(--text-primary)'}}>{set?'':<span className="v3-dot" style={{background:'var(--color-warning)'}}/>}{p.title}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{p.sku||'no SKU'} · {p.type}</div></td>
+                <td style={{...td,color:'var(--text-primary)'}}>{set?'':<span className="v3-dot" style={{background:'var(--color-warning)'}}/>}{p.title}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{p.sku||'no SKU'}, {p.type}</div></td>
                 <td style={td}><input list="oi-supplier-names" style={{...inp,width:190}} value={d.supplier} onChange={e=>setSup(key,'supplier',e.target.value)} placeholder="Pick or type a new supplier"/></td>
                 <td style={td}><input type="number" style={{...inp,width:64}} value={d.moq} onChange={e=>setSup(key,'moq',e.target.value)} placeholder="0"/></td>
                 <td style={td}><input type="number" style={{...inp,width:72}} value={d.unitCost} onChange={e=>setSup(key,'unitCost',e.target.value)} placeholder="quote"/></td>
                 <td style={td}><input type="number" style={{...inp,width:64}} value={d.lead} onChange={e=>setSup(key,'lead',e.target.value)} placeholder={String(leadDaysForType(p.type))}/></td>
               </tr>); })}
-              {!visible.length && <tr><td colSpan={5} style={{...td,color:'var(--text-faint)'}}>{q?'No products match.':'Nothing to assign right now — search for a product above.'}</td></tr>}
+              {!visible.length && <tr><td colSpan={5} style={{...td,color:'var(--text-faint)'}}>{q?'No products match.':'Nothing to assign right now, search for a product above.'}</td></tr>}
             </tbody></table></div>
             <div style={{marginTop:10,display:'flex',gap:8}}><button style={btn} onClick={saveSuppliers}>Save supplier master</button><button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setSupOpen(false)}>Cancel</button></div>
-            <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:8}}>Per-item — set the supplier the first time you order a product; it sticks. Type a new name to add a supplier (manage full contact details on the <a className="txt-link" style={{cursor:'pointer'}} onClick={()=>window.__oiNav&&window.__oiNav('planning','suppliers')}>Suppliers tab</a>). Leave <b>{`Unit ${curSym()}`}</b> blank to raise the PO for a quote and add the price later; lead defaults to the type's.</div>
+            <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:8}}>Per-item, set the supplier the first time you order a product; it sticks. Type a new name to add a supplier (manage full contact details on the <a className="txt-link" style={{cursor:'pointer'}} onClick={()=>window.__oiNav&&window.__oiNav('planning','suppliers')}>Suppliers tab</a>). Leave <b>{`Unit ${curSym()}`}</b> blank to raise the PO for a quote and add the price later; lead defaults to the type's.</div>
           </div>
         ); })()}
       {/* reorder policy editor */}
       {setOpen && (<div className="card" style={{}}>
-        <div style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',marginBottom:3}}>Reorder policy <span className="muted" style={{fontWeight:'var(--weight-normal)',fontSize:'var(--text-xs)'}}>· strategy: {STRAT[strategy]} — set in the band above</span></div>
+        <div style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',marginBottom:3}}>Reorder policy <span className="muted" style={{fontWeight:'var(--weight-normal)',fontSize:'var(--text-xs)'}}>strategy: {STRAT[strategy]}, set in the band above</span></div>
         <div style={{display:'flex',gap:18,flexWrap:'wrap',alignItems:'flex-end',marginTop:10}}>
           <label style={{display:'flex',flexDirection:'column',fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',color:'var(--text-secondary)',gap:4}}>Safety stock (days)<input type="number" style={{...inp,width:90}} value={safDraft} onChange={e=>setSafDraft(e.target.value)}/></label>
           {strategy==='jit' && <label style={{display:'flex',flexDirection:'column',fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',color:'var(--text-secondary)',gap:4}}>Order-up-to cover beyond lead (days)<input type="number" style={{...inp,width:90}} value={covDraft} onChange={e=>setCovDraft(e.target.value)}/></label>}
           {strategy==='staged' && <label style={{display:'flex',flexDirection:'column',fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',color:'var(--text-secondary)',gap:4}}>Number of waves<input type="number" style={{...inp,width:90}} value={wavesDraft} onChange={e=>setWavesDraft(e.target.value)}/></label>}
           <label style={{display:'flex',flexDirection:'column',fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',color:'var(--text-secondary)',gap:4}} title="Default % paid upfront at order; the balance falls due at shipment. Override per supplier on the Suppliers tab.">Deposit % at order<input type="number" style={{...inp,width:90}} value={depDraft} onChange={e=>setDepDraft(e.target.value)}/></label>
-          <label style={{display:'flex',flexDirection:'column',fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',color:'var(--text-secondary)',gap:4}} title="Default shipping transit days from shipment to landing, added on top of each product's production lead. Override per supplier on the Suppliers tab.">Transit days (ship→land)<input type="number" style={{...inp,width:90}} value={shipDraft} onChange={e=>setShipDraft(e.target.value)}/></label>
+          <label style={{display:'flex',flexDirection:'column',fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',color:'var(--text-secondary)',gap:4}} title="Default shipping transit days from shipment to landing, added on top of each product's production lead. Override per supplier on the Suppliers tab.">Transit days (ship to land)<input type="number" style={{...inp,width:90}} value={shipDraft} onChange={e=>setShipDraft(e.target.value)}/></label>
         </div>
         {/* default production lead by type — used when a SKU has no specific lead */}
         <div style={{marginTop:14,paddingTop:12,borderTop:'1px solid var(--border-subtle)'}}>
-          <div style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',marginBottom:2}}>Default production lead by type <span className="muted" style={{fontWeight:'var(--weight-normal)',fontSize:'var(--text-xs)'}}>· days from order to shipment — used when a item has no specific lead set in the demand table / Supplier master</span></div>
+          <div style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',marginBottom:2}}>Default production lead by type <span className="muted" style={{fontWeight:'var(--weight-normal)',fontSize:'var(--text-xs)'}}>days from order to shipment, used when a item has no specific lead set in the demand table / Supplier master</span></div>
           <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'flex-end',marginTop:9}}>
             <label style={{display:'flex',flexDirection:'column',fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',color:'var(--text-secondary)',gap:4}}>All types (default)<input type="number" min="0" style={{...inp,width:80}} value={leadDraft.def} onChange={e=>setLeadDraft(d=>({...d,def:e.target.value}))}/></label>
             {leadTypes.map(t=>(<label key={t} style={{display:'flex',flexDirection:'column',fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',color:'var(--text-secondary)',gap:4}}>{t}<input type="number" min="0" placeholder={String(leadDraft.def||30)} style={{...inp,width:72}} value={leadDraft.byType[t]||''} onChange={e=>setLeadType(t,e.target.value)}/></label>))}
           </div>
         </div>
         <div style={{display:'flex',gap:8,marginTop:14}}><button style={btn} onClick={saveSettings}>Save policy</button><button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setSetOpen(false)}>Cancel</button></div>
-        <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:9,lineHeight:1.5}}>Lead = <b>production</b> (this section / per item) <b>+ transit</b> (per supplier, or the default above). Deposit % and transit are <b>defaults</b> — override per supplier on the <a className="txt-link" style={{cursor:'pointer'}} onClick={()=>window.__oiNav&&window.__oiNav('planning','suppliers')}>Suppliers tab</a>. All feed the stock landing plan.</div>
+        <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:9,lineHeight:1.5}}>Lead = <b>production</b> (this section / per item) <b>+ transit</b> (per supplier, or the default above). Deposit % and transit are <b>defaults</b>, override per supplier on the <a className="txt-link" style={{cursor:'pointer'}} onClick={()=>window.__oiNav&&window.__oiNav('planning','suppliers')}>Suppliers tab</a>. All feed the stock landing plan.</div>
       </div>)}
       {/* draft POs */}
       {pos.map(po=>(<div key={po.supplier} className="card">
         <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:8}}>
-          <div><span style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{po.supplier}</span> <span className="muted" style={{fontSize:'var(--text-sm)'}}>· {po.lines.length} line{po.lines.length===1?'':'s'} · {NUM(po.units)} units</span>{(po.email||po.notes) && <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:2}}>{po.email}{po.email&&po.notes?' · ':''}{po.notes}</div>}</div>
+          <div><span style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{po.supplier}</span> <span className="muted" style={{fontSize:'var(--text-sm)'}}>{po.lines.length} line{po.lines.length===1?'':'s'}, {NUM(po.units)} units</span>{(po.email||po.notes) && <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:2}}>{po.email}{po.email&&po.notes?', ':''}{po.notes}</div>}</div>
           <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
             {po.hasCost ? <span style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{`${curSym()}`}{po.total.toFixed(2)}</span>
-              : <span style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',color:'var(--warn)',background:'var(--warn-bg)',padding:'2px 9px',borderRadius:'var(--radius-full)'}}>Pricing pending{po.total>0?` · ${curSym()}${po.total.toFixed(0)} so far`:''}</span>}
+              : <span style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',color:'var(--warn)',background:'var(--warn-bg)',padding:'2px 9px',borderRadius:'var(--radius-full)'}}>Pricing pending{po.total>0?`, ${curSym()}${po.total.toFixed(0)} so far`:''}</span>}
             <button style={smbtn} onClick={()=>copyPO(po)}><Icon name="clipboard" size={12}/> Copy</button>
             <button style={smbtn} onClick={()=>download(po)}><Icon name="report" size={12}/> CSV</button>
             <button style={{...smbtn, background:'var(--accent)', color:PAL.panel, borderColor:'var(--accent)'}} onClick={()=>raisePO(po)}><Icon name="check" size={12}/> Mark PO raised</button>
@@ -12513,9 +12513,9 @@ function ProductionPlanner({embedded}={}){
         {po.hasCost && (()=>{ const fd=iso=>{ try{ return new Date((iso||'')+'T00:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'}); }catch(e){ return iso; } }; return (
           <div style={{display:'flex',gap:14,flexWrap:'wrap',alignItems:'center',fontSize:'var(--text-xs)',color:'var(--text-muted)',margin:'0 0 10px',padding:'7px 11px',borderRadius:'var(--radius-none)',background:'var(--bg-elevated)'}}>
             {po.hasDeposit
-              ? <span><b style={{color:'var(--text-primary)'}}>{`${curSym()}`}{k(po.deposit)} deposit now</b>{po.depPct!=null?` (${po.depPct}%)`:''} · <b style={{color:'var(--text-primary)'}}>{`${curSym()}`}{k(po.balance)}</b> on shipment</span>
+              ? <span><b style={{color:'var(--text-primary)'}}>{`${curSym()}`}{k(po.deposit)} deposit now</b>{po.depPct!=null?` (${po.depPct}%)`:''}, <b style={{color:'var(--text-primary)'}}>{`${curSym()}`}{k(po.balance)}</b> on shipment</span>
               : <span><b style={{color:'var(--text-primary)'}}>{`${curSym()}`}{k(po.total)}</b> due now</span>}
-            <span style={{color:'var(--text-faint)'}}>Ships ~{fd(po.ships)}{po.hasDeposit?' · balance due then':''}</span>
+            <span style={{color:'var(--text-faint)'}}>Ships ~{fd(po.ships)}{po.hasDeposit?', balance due then':''}</span>
             <span style={{color:'var(--text-faint)'}}>Lands ~{fd(po.lands)} ({po.leadTotalMax}d lead)</span>
           </div>
         ); })()}
@@ -12523,7 +12523,7 @@ function ProductionPlanner({embedded}={}){
           <th style={th}>Product</th><th style={{...th,textAlign:'right'}}>Stock</th><th style={{...th,textAlign:'right'}}>Cover</th><th style={{...th,textAlign:'right'}}>Order qty</th><th style={{...th,textAlign:'right'}}>{`Unit ${curSym()}`}</th><th style={{...th,textAlign:'right'}}>{`Line ${curSym()}`}</th>
         </tr></thead><tbody>
           {po.lines.map((l,idx)=>(<tr key={idx}>
-            <td style={{...td,color:'var(--text-primary)'}}>{l.p.title}{l.oosBeforeLead && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',color:PAL.panel,background:'var(--bad)',padding:'1px 7px',borderRadius:'var(--radius-full)'}}>ORDER TODAY</span>}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{l.p.sku||'no SKU'} · {l.p.type}{l.oosBeforeLead?` · OOS gap ${l.oosGap}d`:''}{l.basis==='forecast'?` · plan needs ${NUM(l.forecastUnits)}`:''}{l.basis==='wave'&&l.nextWaveBy?` · next wave by ${l.nextWaveBy}`:''}{l.moqBumped?' · MOQ '+l.moq:''}</div></td>
+            <td style={{...td,color:'var(--text-primary)'}}>{l.p.title}{l.oosBeforeLead && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',color:PAL.panel,background:'var(--bad)',padding:'1px 7px',borderRadius:'var(--radius-full)'}}>ORDER TODAY</span>}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{l.p.sku||'no SKU'}, {l.p.type}{l.oosBeforeLead?`, OOS gap ${l.oosGap}d`:''}{l.basis==='forecast'?`, plan needs ${NUM(l.forecastUnits)}`:''}{l.basis==='wave'&&l.nextWaveBy?`, next wave by ${l.nextWaveBy}`:''}{l.moqBumped?', MOQ '+l.moq:''}</div></td>
             <td style={{...td,textAlign:'right'}}>{NUM(l.p.inventoryQty)}</td>
             <td style={{...td,textAlign:'right',color:l.cover<=l.lead?'var(--bad)':'var(--warn)'}}>{Math.round(l.cover)}d</td>
             <td style={{...td,textAlign:'right',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{NUM(l.qty)}</td>
@@ -12534,12 +12534,12 @@ function ProductionPlanner({embedded}={}){
       </div>))}
       {/* awaiting stock — POs already raised; informational, NOT a reminder */}
       {awaiting.length>0 && (<div className="card" style={{}}>
-        <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:8}}><Icon name="check" size={14} style={{color:'var(--accent)'}}/><span style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>Awaiting stock</span><span className="muted" style={{fontSize:'var(--text-sm)'}}>· {awaiting.length} PO line{awaiting.length===1?'':'s'} raised — waiting for stock to land in Shopify</span></div>
+        <div style={{display:'flex',alignItems:'baseline',gap:8,marginBottom:8}}><Icon name="check" size={14} style={{color:'var(--accent)'}}/><span style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>Awaiting stock</span><span className="muted" style={{fontSize:'var(--text-sm)'}}>{awaiting.length} PO line{awaiting.length===1?'':'s'} raised, waiting for stock to land in Shopify</span></div>
         <div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:520}}><thead><tr>
           <th style={th}>Product</th><th style={{...th,textAlign:'right'}}>Ordered</th><th style={th}>Raised</th><th style={th}>Expected</th><th style={{...th,textAlign:'right'}}></th>
         </tr></thead><tbody>
           {awaiting.map((l,idx)=>(<tr key={idx}>
-            <td style={{...td,color:'var(--text-primary)'}}>{l.p.title}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{l.supplier}{l.overdue?' · overdue — chase supplier':''}</div></td>
+            <td style={{...td,color:'var(--text-primary)'}}>{l.p.title}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{l.supplier}{l.overdue?', overdue, chase supplier':''}</div></td>
             <td style={{...td,textAlign:'right',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{NUM((l.po&&l.po.qty)||l.qty)}</td>
             <td style={td}>{(l.po&&l.po.raisedAt)||'—'}</td>
             <td style={{...td,color:l.overdue?'var(--warn)':'var(--text-secondary)'}}>{l.expected||'—'}</td>
@@ -12549,9 +12549,9 @@ function ProductionPlanner({embedded}={}){
             </td>
           </tr>))}
         </tbody></table></div>
-        <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:9,lineHeight:1.5}}>These won't show as reminders. Each auto-closes when its Shopify stock rises on the next data sync — or mark it received manually.</div>
+        <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:9,lineHeight:1.5}}>These won't show as reminders. Each auto-closes when its Shopify stock rises on the next data sync, or mark it received manually.</div>
       </div>)}
-      {pos.length===0 && awaiting.length===0 && R.lines.some(l=>!l.isPackaging) && (<div className="card"><div style={{display:'flex',alignItems:'center',gap:10}}><StatusBadge kind="healthy" label="Stock healthy"/><span className="muted" style={{fontSize:'var(--text-sm)'}}>No products are within their reorder window right now. {approaching>0?`${approaching} will cross it soon — check back, or tighten the safety days.`:'Good sellers all have enough cover for their lead times.'}</span></div></div>)}
+      {pos.length===0 && awaiting.length===0 && R.lines.some(l=>!l.isPackaging) && (<div className="card"><div style={{display:'flex',alignItems:'center',gap:10}}><StatusBadge kind="healthy" label="Stock healthy"/><span className="muted" style={{fontSize:'var(--text-sm)'}}>No products are within their reorder window right now. {approaching>0?`${approaching} will cross it soon, check back, or tighten the safety days.`:'Good sellers all have enough cover for their lead times.'}</span></div></div>)}
     </div>
   );
 }
@@ -12678,7 +12678,7 @@ function DemandPlanner({embedded}={}){
     <div>
       {!embedded && (<><div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:6}}>
         <h2 style={{margin:0,fontSize:'var(--text-lg)'}}>Forecast &amp; demand plan</h2>
-        <span className="muted" style={{fontSize:'var(--text-sm)'}}>Per-product demand + packaging from live velocity · independent of the date picker</span>
+        <span className="muted" style={{fontSize:'var(--text-sm)'}}>Demand and packaging by product</span>
       </div>
       <PlanningHeader active="forecast"/></>)}
       {/* plan controls */}
@@ -12708,27 +12708,27 @@ function DemandPlanner({embedded}={}){
         </div>
 
         {byMonth && (<div style={{marginTop:14}}>
-          <div style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-muted)',marginBottom:8}}>Monthly plan — set each month ({targetMode==='units'?'units':`${curSym()} revenue`}); blank = run-rate</div>
+          <div style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-muted)',marginBottom:8}}>Monthly plan, set each month ({targetMode==='units'?'units':`${curSym()} revenue`}); blank = run-rate</div>
           <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
             {monthlyPlan.map((m,i)=>(<div key={i} style={{minWidth:118,flex:'1 1 118px',maxWidth:170,border:'1px solid var(--border-subtle)',borderRadius:'var(--radius-none)',padding:'9px 11px',background:'var(--bg-elevated)'}}>
               <div style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)',marginBottom:5}}>{m.label}</div>
               <input type="number" style={{...inp,width:'100%',boxSizing:'border-box'}} value={monthly[i]!=null?monthly[i]:''} onChange={e=>setMonth(i,e.target.value)} placeholder={(targetMode==='units'?'':curSym())+NUM(Math.round(baseMo))}/>
               <div style={{height:30,display:'flex',alignItems:'flex-end',marginTop:7}}><div style={{width:'100%',height:Math.max(3,Math.round(28*m.rev/maxMonthRev)),background:m.set?'var(--accent)':'var(--border-default)',borderRadius:'var(--radius-sm) var(--radius-sm) var(--radius-none) var(--radius-none)'}}/></div>
-              <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:4}}>{NUM(Math.ceil(m.units))}{` u · ${curSym()}`}{k(m.rev)}</div>
+              <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:4}}>{NUM(Math.ceil(m.units))}{` u, ${curSym()}`}{k(m.rev)}</div>
             </div>))}
           </div>
         </div>)}
 
-        <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:11,lineHeight:1.5}}>Baseline is each product's 90-day sales velocity over {months} month{months===1?'':'s'} ({sellers.length} active sellers). {byMonth ? `Month-by-month plan totals ${targetMode==='units'?NUM(Math.ceil(monthlySum))+' units':curSym()+k(monthlySum)} — ${impliedGrowth>=0?'+':''}${impliedGrowth.toFixed(0)}% vs run-rate, allocated across products by historic mix.` : (targetMode!=='growth' && Number(targetValue)>0 ? `Your target implies ${impliedGrowth>=0?'+':''}${impliedGrowth.toFixed(0)}% vs the run-rate, allocated by historic mix.` : 'Growth is applied evenly on top of each run-rate.')} The order timing follows your strategy in Production / POs.</div>
+        <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:11,lineHeight:1.5}}>Baseline is each product's 90-day sales velocity over {months} month{months===1?'':'s'} ({sellers.length} active sellers). {byMonth ? `Month-by-month plan totals ${targetMode==='units'?NUM(Math.ceil(monthlySum))+' units':curSym()+k(monthlySum)}, ${impliedGrowth>=0?'+':''}${impliedGrowth.toFixed(0)}% vs run-rate, allocated across products by historic mix.` : (targetMode!=='growth' && Number(targetValue)>0 ? `Your target implies ${impliedGrowth>=0?'+':''}${impliedGrowth.toFixed(0)}% vs the run-rate, allocated by historic mix.` : 'Growth is applied evenly on top of each run-rate.')} The order timing follows your strategy in Production / POs.</div>
       </div>
       {/* product focus & promotions */}
       <div className="card">
         <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom: focus.length?10:0}}>
-          <div><span style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>Product focus &amp; promotions</span> <span className="muted" style={{fontSize:'var(--text-xs)'}}>· push specific products or types — re-weights the plan{targetMode!=='growth'?' within your target':' on top of growth'}</span></div>
+          <div><span style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>Product focus &amp; promotions</span> <span className="muted" style={{fontSize:'var(--text-xs)'}}>push specific products or types, re-weights the plan{targetMode!=='growth'?' within your target':' on top of growth'}</span></div>
           <button style={{...btn,fontSize:'var(--text-xs)',padding:'5px 11px'}} onClick={addFocus}>+ Add focus</button>
         </div>
         {focus.length===0
-          ? <div className="muted" style={{fontSize:'var(--text-sm)'}}>None — the plan follows historic product mix. Add a focus to push a product or type (e.g. a Q4 promo on one range).</div>
+          ? <div className="muted" style={{fontSize:'var(--text-sm)'}}>None, the plan follows historic product mix. Add a focus to push a product or type (e.g. a Q4 promo on one range).</div>
           : <div style={{display:'flex',flexDirection:'column',gap:8}}>
               {focus.map((e,i)=>{ const matched = sellers.filter(p=>{ const pid='product:'+(p.sku||p.title), tid='type:'+(p.type||''); return e.key===pid||e.key===tid||e.key==='all'; });
                 return (<div key={i} style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
@@ -12753,7 +12753,7 @@ function DemandPlanner({embedded}={}){
       {/* summary */}
       <div className="card">
         <div style={{display:'flex',gap:24,flexWrap:'wrap',alignItems:'flex-end'}}>
-          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{NUM(Math.ceil(totalUnits))}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>units planned · {months}mo</div></div>
+          <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{NUM(Math.ceil(totalUnits))}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>units planned, {months}mo</div></div>
           <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{`${curSym()}`}{k(totalRev)}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>projected revenue</div></div>
           <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color: impliedGrowth>=0?'var(--good)':'var(--bad)'}}>{impliedGrowth>=0?'+':''}{impliedGrowth.toFixed(0)}%</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>vs run-rate</div></div>
           <div><div style={{fontSize:'var(--text-xl)',fontWeight:'var(--weight-bold)',color: stockouts?'var(--warn)':'var(--good)'}}>{stockouts}</div><div className="muted" style={{fontSize:'var(--text-xs)'}}>will stock out</div></div>
@@ -12776,24 +12776,24 @@ function DemandPlanner({embedded}={}){
             <td style={{...td,color:'var(--text-primary)'}}>{r.p.title}{r.oosBeforeLead && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',color:PAL.panel,background:'var(--bad)',padding:'1px 7px',borderRadius:'var(--radius-full)'}}>ORDER TODAY</span>}{focusM(r.p)!==1 && <span style={{marginLeft:6,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',color:'var(--accent)',background:'var(--accent-bg)',padding:'1px 6px',borderRadius:'var(--radius-full)'}}>↑{(focusM(r.p)%1?focusM(r.p).toFixed(2):focusM(r.p))}×</span>}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{r.p.type}</div></td>
             <td style={{...td,textAlign:'right'}}>{NUM(Math.round(r.runMo))}</td>
             <td style={{...td,textAlign:'right'}}>{NUM(r.stock)}</td>
-            <td style={{...td,textAlign:'right'}}>{r.daysToOOS===Infinity ? <span style={{color:'var(--text-faint)'}}>—</span> : <span style={{fontWeight:'var(--weight-semi)',color: r.oosBeforeLead?'var(--bad)':(r.daysToOOS<r.lead*1.5?'var(--warn)':'var(--text-secondary)')}}>{Math.round(r.daysToOOS)}d{r.oosBeforeLead?` · gap ${r.oosGap}d`:''}</span>}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',display:'flex',alignItems:'center',gap:3,justifyContent:'flex-end',marginTop:2}}>{!r.leadSet && <span title={`Estimate — using the ${r.p.type||'type'} default of ${r.leadDefault}d. Set this item's real supplier lead.`} className="v3-dot v3-dot-tight" style={{background:'var(--color-warning)'}}/>}<input type="number" min="0" defaultValue={r.leadSet?r.leadMake:''} key={'ld'+(r.leadSet?r.leadMake:'d')} placeholder={String(r.leadDefault)} title={`Production lead — days from order to shipment (per item). Blank uses the ${r.p.type||'type'} default of ${r.leadDefault}d. Set defaults in Reorder policy.`} onBlur={e=>{ if(e.target.value!=='') setSkuLead(skuKeyOf(r.p), e.target.value); }} style={{width:38,padding:'1px 4px',borderRadius:'var(--radius-md)',border:'1px solid '+(r.leadSet?'var(--border-default)':'var(--warn)'),background:'var(--bg-base)',color:'var(--text-secondary)',fontSize:'var(--text-xs)',textAlign:'right'}}/><span>d make{r.leadShip>0?` +${r.leadShip} ship = ${r.lead}`:' lead'}</span></div></td>
+            <td style={{...td,textAlign:'right'}}>{r.daysToOOS===Infinity ? <span style={{color:'var(--text-faint)'}}>—</span> : <span style={{fontWeight:'var(--weight-semi)',color: r.oosBeforeLead?'var(--bad)':(r.daysToOOS<r.lead*1.5?'var(--warn)':'var(--text-secondary)')}}>{Math.round(r.daysToOOS)}d{r.oosBeforeLead?`, gap ${r.oosGap}d`:''}</span>}<div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',display:'flex',alignItems:'center',gap:3,justifyContent:'flex-end',marginTop:2}}>{!r.leadSet && <span title={`Estimate, using the ${r.p.type||'type'} default of ${r.leadDefault}d. Set this item's real supplier lead.`} className="v3-dot v3-dot-tight" style={{background:'var(--color-warning)'}}/>}<input type="number" min="0" defaultValue={r.leadSet?r.leadMake:''} key={'ld'+(r.leadSet?r.leadMake:'d')} placeholder={String(r.leadDefault)} title={`Production lead, days from order to shipment (per item). Blank uses the ${r.p.type||'type'} default of ${r.leadDefault}d. Set defaults in Reorder policy.`} onBlur={e=>{ if(e.target.value!=='') setSkuLead(skuKeyOf(r.p), e.target.value); }} style={{width:38,padding:'1px 4px',borderRadius:'var(--radius-md)',border:'1px solid '+(r.leadSet?'var(--border-default)':'var(--warn)'),background:'var(--bg-base)',color:'var(--text-secondary)',fontSize:'var(--text-xs)',textAlign:'right'}}/><span>d make{r.leadShip>0?` +${r.leadShip} ship = ${r.lead}`:' lead'}</span></div></td>
             <td style={{...td,textAlign:'right',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{NUM(Math.ceil(r.plan))}</td>
             <td style={{...td,textAlign:'right',fontWeight:'var(--weight-semi)',color: r.short?'var(--bad)':'var(--good)'}}>{r.short?'−'+NUM(Math.ceil(-r.end)):NUM(Math.floor(r.end))}</td>
             <td style={{...td,textAlign:'right'}}>{oCell}</td>
-            <td style={{...td,textAlign:'right'}}><button title="Delist — won't be reordered, hide from the plan" style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',background:'none',border:'none',cursor:'pointer',padding:'2px 4px'}} onClick={()=>{ setDelisted(skuKeyOf(r.p), true); toast('Delisted', {body:r.p.title+' — hidden from the plan'}); }}>Delist</button></td>
+            <td style={{...td,textAlign:'right'}}><button title="Delist, won't be reordered, hide from the plan" style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',background:'none',border:'none',cursor:'pointer',padding:'2px 4px'}} onClick={()=>{ setDelisted(skuKeyOf(r.p), true); toast('Delisted', {body:r.p.title+', hidden from the plan'}); }}>Delist</button></td>
           </tr>); })}
         </tbody></table></div>
         <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap',marginTop:10}}>
           {rows.length>12 && <button style={btn} onClick={()=>setShowAll(s=>!s)}>{showAll?'Show top 12':`Show all ${rows.length}`}</button>}
           <button style={{...btn,background:'var(--accent)',color:PAL.panel,borderColor:'var(--accent)'}} onClick={()=>{ const el=document.getElementById('plan-pos'); if(el) el.scrollIntoView({behavior:'smooth'}); else if(window.__oiNav) window.__oiNav('planning','plan'); }}>Review &amp; raise POs ({RR.toOrder.length}) <Icon name="chevron" size={13}/></button>
           {delistedCount>0 && <button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setShowDelisted(s=>!s)}>{showDelisted?'Hide delisted':`${delistedCount} delisted`}</button>}
-          {rows.filter(r=>!r.leadSet).length>0 && <span style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:'var(--text-xs)',color:'var(--text-faint)'}} title="These products use the type's default lead — set each item's real supplier lead (the input in the Stockout-vs-lead column) for accurate order-by dates."><span className="v3-dot v3-dot-tight" style={{background:'var(--color-warning)'}}/>{rows.filter(r=>!r.leadSet).length} on an estimated lead</span>}
+          {rows.filter(r=>!r.leadSet).length>0 && <span style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:'var(--text-xs)',color:'var(--text-faint)'}} title="These products use the type's default lead, set each item's real supplier lead (the input in the Stockout-vs-lead column) for accurate order-by dates."><span className="v3-dot v3-dot-tight" style={{background:'var(--color-warning)'}}/>{rows.filter(r=>!r.leadSet).length} on an estimated lead</span>}
         </div>
         {showDelisted && delistedCount>0 && <div style={{marginTop:10,paddingTop:10,borderTop:'1px solid var(--border-subtle)'}}>
-          <div style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:6}}>Delisted — excluded from the plan &amp; POs</div>
+          <div style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:6}}>Delisted, excluded from the plan &amp; POs</div>
           <div style={{display:'flex',flexWrap:'wrap',gap:8}}>{inv.filter(p=>(p.dailyVelocity||0)>0 && del[p.sku||p.title]).map((p,i)=>(<span key={i} style={{display:'inline-flex',alignItems:'center',gap:6,fontSize:'var(--text-sm)',color:'var(--text-secondary)',background:'var(--bg-elevated)',border:'1px solid var(--border-subtle)',borderRadius:'var(--radius-full)',padding:'3px 6px 3px 11px'}}>{p.title}<button style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-semi)',color:'var(--accent)',background:'none',border:'none',cursor:'pointer'}} onClick={()=>{ setDelisted(skuKeyOf(p), false); toast('Relisted', {kind:'good', body:p.title}); }}>Relist</button></span>))}</div>
         </div>}
-        {(stockouts>0||oosRisk>0) && <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:9,lineHeight:1.5}}><b>Stockout vs lead</b> is days of cover at the planned rate against production lead time — <span style={{color:'var(--bad)'}}>red</span> means it runs out <b>before</b> a reorder placed today could land ({oosRisk} product{oosRisk===1?'':'s'} · ~{Math.round(rows.filter(r=>r.oosBeforeLead).reduce((t,r)=>t+r.oosGap,0)/Math.max(1,oosRisk))}d avg gap), so it needs ordering now or it'll go OOS. Edit each product's <b>make lead</b> inline in this column (blank = the type default, set in Reorder policy); transit is per-supplier. The <b>Order</b> column is what each triggers under your <b>{STRAT_SHORT[RR.strategy]||'JIT'}</b> strategy. Stock is consumed <b>FIFO</b> — current stock first, on-order isn't counted as available until it lands, so the OOS gap is the real shortfall window.</div>}
+        {(stockouts>0||oosRisk>0) && <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:9,lineHeight:1.5}}><b>Stockout vs lead</b> is days of cover at the planned rate against production lead time, <span style={{color:'var(--bad)'}}>red</span> means it runs out <b>before</b> a reorder placed today could land ({oosRisk} product{oosRisk===1?'':'s'}, ~{Math.round(rows.filter(r=>r.oosBeforeLead).reduce((t,r)=>t+r.oosGap,0)/Math.max(1,oosRisk))}d avg gap), so it needs ordering now or it'll go OOS. Edit each product's <b>make lead</b> inline in this column (blank = the type default, set in Reorder policy); transit is per-supplier. The <b>Order</b> column is what each triggers under your <b>{STRAT_SHORT[RR.strategy]||'JIT'}</b> strategy. Stock is consumed <b>FIFO</b>, current stock first, on-order isn't counted as available until it lands, so the OOS gap is the real shortfall window.</div>}
       </div>
       {/* packaging requirements */}
       <div className="card">
@@ -12804,7 +12804,7 @@ function DemandPlanner({embedded}={}){
         <div className="wc-grid">{compNeeds.map((c,idx)=>(<div key={idx} className="wc-item">
           <div className="wc-top"><span className="wc-label">{c.name}</span></div>
           <div className="wc-val">{NUM(Math.ceil(c.qty))}</div>
-          <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:6,lineHeight:1.4}}>{c.perItem>0?`${c.perItem}/item`:''}{c.perItem>0&&c.perOrder>0?' · ':''}{c.perOrder>0?`${c.perOrder}/order`:''}{!c.perItem&&!c.perOrder?'not used':''}</div>
+          <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:6,lineHeight:1.4}}>{c.perItem>0?`${c.perItem}/item`:''}{c.perItem>0&&c.perOrder>0?', ':''}{c.perOrder>0?`${c.perOrder}/order`:''}{!c.perItem&&!c.perOrder?'not used':''}</div>
         </div>))}</div>
         <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:10,lineHeight:1.5}}>Based on {NUM(Math.ceil(totalUnits))} units across ≈{NUM(Math.ceil(orders))} orders (at {aipo} items/order). Per-item components scale with units; per-order components scale with orders.</div>
         {packOpen && (<div style={{marginTop:12,borderTop:'1px solid var(--border-subtle)',paddingTop:12}}>
@@ -12824,7 +12824,7 @@ function DemandPlanner({embedded}={}){
               <td style={td}><button style={{...btn,fontSize:'var(--text-xs)',padding:'4px 9px',color:'var(--text-muted)'}} onClick={()=>rmComp(idx)}>Remove</button></td>
             </tr>))}
           </tbody></table></div>
-          <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:8,lineHeight:1.5}}>Set <b>On hand</b> to enable packaging reorder POs — they appear in Production / POs and the Actions queue under your chosen ordering strategy. Leave it blank to track the requirement only.</div>
+          <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:8,lineHeight:1.5}}>Set <b>On hand</b> to enable packaging reorder POs, they appear in Production / POs and the Actions queue under your chosen ordering strategy. Leave it blank to track the requirement only.</div>
           <div style={{marginTop:10,display:'flex',gap:8}}><button style={btn} onClick={savePack}>Save packaging plan</button><button style={btn} onClick={addComp}>+ Add component</button><button style={{...btn,background:'transparent',color:'var(--text-muted)'}} onClick={()=>setPackOpen(false)}>Cancel</button></div>
         </div>)}
       </div>
@@ -12852,7 +12852,7 @@ function SuppliersDirectory(){
   return (<div>
     <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:6}}>
       <h2 style={{margin:0,fontSize:'var(--text-lg)'}}>Suppliers</h2>
-      <span className="muted" style={{fontSize:'var(--text-sm)'}}>Your manufacturer directory — contact details flow onto every PO</span>
+      <span className="muted" style={{fontSize:'var(--text-sm)'}}>Your manufacturer directory, contact details flow onto every PO</span>
     </div>
     <div className="card">
       <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginBottom:12}}>
@@ -12860,7 +12860,7 @@ function SuppliersDirectory(){
         <button style={btn} onClick={add}><Icon name="check" size={13}/> Add supplier</button>
         <button style={{...btn,marginLeft:'auto',background:'var(--accent)',color:PAL.panel,borderColor:'var(--accent)'}} onClick={save}>Save all</button>
       </div>
-      {rows.length ? (<div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:980}}><thead><tr><th style={th}>Supplier</th><th style={{...th,textAlign:'right'}}>items</th><th style={th}>Email</th><th style={th}>Phone</th><th style={th}>Address</th><th style={th} title="Deposit paid at order; the balance falls due at shipment">Deposit&nbsp;%</th><th style={th} title="Transit days from shipment to stock landing — added on top of the production lead">Transit&nbsp;d</th><th style={th}>Notes / terms</th></tr></thead><tbody>
+      {rows.length ? (<div style={{overflowX:'auto'}}><table style={{borderCollapse:'collapse',width:'100%',minWidth:980}}><thead><tr><th style={th}>Supplier</th><th style={{...th,textAlign:'right'}}>items</th><th style={th}>Email</th><th style={th}>Phone</th><th style={th}>Address</th><th style={th} title="Deposit paid at order; the balance falls due at shipment">Deposit&nbsp;%</th><th style={th} title="Transit days from shipment to stock landing, added on top of the production lead">Transit&nbsp;d</th><th style={th}>Notes / terms</th></tr></thead><tbody>
         {rows.map(n=>{ const d=draft[n]||_blank; return (<tr key={n}>
           <td style={{...td,color:'var(--text-primary)',fontWeight:'var(--weight-semi)'}}>{n}</td>
           <td style={{...td,textAlign:'right',color:'var(--text-faint)'}}>{skuCount[n]||0}</td>
@@ -12869,10 +12869,10 @@ function SuppliersDirectory(){
           <td style={td}><input style={{...inp,width:160}} value={d.address} onChange={e=>set(n,'address',e.target.value)} placeholder="address"/></td>
           <td style={td}><input type="number" style={{...inp,width:62}} value={d.depositPct} onChange={e=>set(n,'depositPct',e.target.value)} placeholder="100"/></td>
           <td style={td}><input type="number" style={{...inp,width:56}} value={d.shipDays} onChange={e=>set(n,'shipDays',e.target.value)} placeholder="0"/></td>
-          <td style={td}><input style={{...inp,width:160}} value={d.notes} onChange={e=>set(n,'notes',e.target.value)} placeholder="terms · ref · minimum order quantity notes"/></td>
+          <td style={td}><input style={{...inp,width:160}} value={d.notes} onChange={e=>set(n,'notes',e.target.value)} placeholder="terms, ref, minimum order quantity notes"/></td>
         </tr>); })}
-      </tbody></table></div>) : <div className="muted" style={{fontSize:'var(--text-sm)'}}>No suppliers yet. Add one above, or assign a supplier to a product in the planning Supplier master — it'll appear here to flesh out.</div>}
-      <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:10,lineHeight:1.5}}>Suppliers are referenced by name from each item. item-specific minimum order quantity, unit cost &amp; production lead live in the planning Supplier master. <b>Deposit %</b> is what's payable upfront (balance on shipment) and <b>Transit d</b> is the shipping time added after production — both flow into the stock landing plan. Blank = the global default in Reorder policy. Contact details here are shared across every item that supplier makes and appear on the draft PO.</div>
+      </tbody></table></div>) : <div className="muted" style={{fontSize:'var(--text-sm)'}}>No suppliers yet. Add one above, or assign a supplier to a product in the planning Supplier master, it'll appear here to flesh out.</div>}
+      <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:10,lineHeight:1.5}}>Suppliers are referenced by name from each item. item-specific minimum order quantity, unit cost &amp; production lead live in the planning Supplier master. <b>Deposit %</b> is what's payable upfront (balance on shipment) and <b>Transit d</b> is the shipping time added after production, both flow into the stock landing plan. Blank = the global default in Reorder policy. Contact details here are shared across every item that supplier makes and appear on the draft PO.</div>
     </div>
   </div>);
 }
@@ -12920,14 +12920,14 @@ function CashFlowPlan({tranches, plan, months}){
   const tone = !cashKnown ? 'var(--text-secondary)' : trough.bal<0 ? 'var(--bad)' : trough.bal < Math.max(overM*1.5, (cashKnown?startCash*0.2:0)) ? 'var(--warn)' : 'var(--good)';
   const verdict = !cashKnown
     ? <>Add your <b>cash on hand</b> for a real balance. From today, committing this plan swings cash to a low of <b>{k(trough.bal)}</b> around <b>{trough.label}</b>.</>
-    : trough.bal<0 ? <>This plan takes cash <b style={{color:'var(--bad)'}}>negative — down to {k(trough.bal)}</b> in <b>{trough.label}</b>. Stagger the orders (Staged / front-load less), renegotiate deposit terms, or raise funding before committing.</>
-    : trough.bal < Math.max(overM*1.5, startCash*0.2) ? <>Cash dips to a <b style={{color:'var(--warn)'}}>tight {k(trough.bal)}</b> in <b>{trough.label}</b> — under ~{(trough.bal/Math.max(1,overM)).toFixed(1)} months of overheads. Workable, but little headroom.</>
-    : <>Cash stays healthy — the low point is <b style={{color:'var(--good)'}}>{k(trough.bal)}</b> in <b>{trough.label}</b>. This plan is affordable.</>;
+    : trough.bal<0 ? <>This plan takes cash <b style={{color:'var(--bad)'}}>negative, down to {k(trough.bal)}</b> in <b>{trough.label}</b>. Stagger the orders (Staged / front-load less), renegotiate deposit terms, or raise funding before committing.</>
+    : trough.bal < Math.max(overM*1.5, startCash*0.2) ? <>Cash dips to a <b style={{color:'var(--warn)'}}>tight {k(trough.bal)}</b> in <b>{trough.label}</b>, under ~{(trough.bal/Math.max(1,overM)).toFixed(1)} months of overheads. Workable, but little headroom.</>
+    : <>Cash stays healthy, the low point is <b style={{color:'var(--good)'}}>{k(trough.bal)}</b> in <b>{trough.label}</b>. This plan is affordable.</>;
   return (
     <div className="card" style={{marginBottom:14}}>
       <div style={{display:'flex',alignItems:'baseline',gap:10,flexWrap:'wrap',marginBottom:6}}>
         <div style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>Cash impact of this plan</div>
-        <span className="muted" style={{fontSize:'var(--text-xs)'}}>projected balance over {projLen} months · stock payments on their due dates</span>
+        <span className="muted" style={{fontSize:'var(--text-xs)'}}>projected balance over {projLen} months, stock payments on their due dates</span>
       </div>
       <div style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)',marginBottom:12,lineHeight:1.5}}>{verdict}</div>
       {/* assumptions */}
@@ -12955,7 +12955,7 @@ function CashFlowPlan({tranches, plan, months}){
           <text x={X(trough.i)} y={Y(trough.bal)+ (trough.bal< (lo+hi)/2 ? 18 : -12)} textAnchor="middle" fontSize="11" fontWeight="700" fill={svgCol(tone)}>{k(trough.bal)}</text>
         </svg>
       </div>
-      <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:10,lineHeight:1.5}}>Revenue in from your demand plan ({plan&&plan.revenue>0?k(plan.revenue):'—'} over {months}mo, spread evenly, gross); stock paid via the landing plan (deposit on order, balance on shipment); opex = overheads + ad spend. Cash basis — product cost is the stock payments, not double-counted. Excludes tax, refunds &amp; one-offs. {!cashKnown && <span style={{color:'var(--warn)'}}>Set cash on hand above for an absolute balance.</span>}</div>
+      <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:10,lineHeight:1.5}}>Revenue in from your demand plan ({plan&&plan.revenue>0?k(plan.revenue):'—'} over {months}mo, spread evenly, gross); stock paid via the landing plan (deposit on order, balance on shipment); opex = overheads + ad spend. Cash basis, product cost is the stock payments, not double-counted. Excludes tax, refunds &amp; one-offs. {!cashKnown && <span style={{color:'var(--warn)'}}>Set cash on hand above for an absolute balance.</span>}</div>
     </div>
   );
 }
@@ -12977,20 +12977,20 @@ function PlanningView(){
   const orderVal = R.toOrder.reduce((t,l)=>t+(l.lineCost||0),0);
   const stockoutsUnderPlan = R.lines.filter(l=>l.forecastUnits>l.stock).length;
   const growthPct = R.plan?R.plan.growthPct:0;
-  const fLabel = dc.targetMode==='growth' ? `${(Number(dc.growth)||0)>=0?'+':''}${Number(dc.growth)||0}% on run-rate · ${months}mo`
+  const fLabel = dc.targetMode==='growth' ? `${(Number(dc.growth)||0)>=0?'+':''}${Number(dc.growth)||0}% on run-rate, ${months}mo`
     : dc.shape==='month' ? `${months}-mo, shaped by month (${growthPct>=0?'+':''}${Math.round(growthPct)}%)`
-    : (Number(dc.targetValue)>0 ? (dc.targetMode==='revenue'?`${curSym()}${k(dc.targetValue)} revenue · ${months}mo`:`${NUM(Number(dc.targetValue))} units · ${months}mo`) : `${months}-mo run-rate (no target set)`);
+    : (Number(dc.targetValue)>0 ? (dc.targetMode==='revenue'?`${curSym()}${k(dc.targetValue)} revenue, ${months}mo`:`${NUM(Number(dc.targetValue))} units, ${months}mo`) : `${months}-mo run-rate (no target set)`);
   const STRAT = {jit:'Just-in-time', bulk:'Bulk upfront', staged:'Staged waves'};
   // Cost each strategy (without switching) so the trade-off is visible at the point of choice.
   // dep = cash due now (deposits); val = total committed — they differ when suppliers take a deposit.
   const stratCmp = {}; ['jit','bulk','staged'].forEach(s=>{ const r=(s===rc.strategy)?R:planReorder({strategy:s}); const v=r.toOrder.reduce((t,l)=>t+(l.lineCost||0),0); const dp=r.toOrder.reduce((t,l)=>t+(l.depositCost!=null?l.depositCost:(l.lineCost||0)),0); stratCmp[s]={count:r.toOrder.length, val:v, dep:dp}; });
   const wavesN = Math.max(1, Math.round(Number(rc.waves)||3));
-  const stratDesc = {jit:'lean · rolling cover', bulk:'all upfront', staged:`${wavesN} waves`};
-  const stratExplain = {jit:'Lean — order small rolling batches to cover lead time + a buffer. Least cash tied up, but you reorder often.', bulk:'Commit the whole forecast now, net of stock. Maximises availability and minimum order quantity economics; ties up the most cash upfront.', staged:'Split the forecast into scheduled waves — spreads the cash and the supply risk across the horizon.'};
+  const stratDesc = {jit:'lean, rolling cover', bulk:'all upfront', staged:`${wavesN} waves`};
+  const stratExplain = {jit:'Lean, order small rolling batches to cover lead time + a buffer. Least cash tied up, but you reorder often.', bulk:'Commit the whole forecast now, net of stock. Maximises availability and minimum order quantity economics; ties up the most cash upfront.', staged:'Split the forecast into scheduled waves, spreads the cash and the supply risk across the horizon.'};
   // Recommendation from the situation
-  let recStrat='jit', recWhy='steady demand — keep cash free and reorder as stock depletes';
-  if(oosNow>=3){ recStrat='bulk'; recWhy=`${oosNow} product${oosNow===1?'':'s'} will run out before a reorder can land — commit the stock now`; }
-  else if(growthPct>=40){ recStrat='staged'; recWhy=`a big +${Math.round(growthPct)}% ramp — spread the commitment across waves`; }
+  let recStrat='jit', recWhy='steady demand, keep cash free and reorder as stock depletes';
+  if(oosNow>=3){ recStrat='bulk'; recWhy=`${oosNow} product${oosNow===1?'':'s'} will run out before a reorder can land, commit the stock now`; }
+  else if(growthPct>=40){ recStrat='staged'; recWhy=`a big +${Math.round(growthPct)}% ramp, spread the commitment across waves`; }
   // ── Stock landing plan — when to order each tranche, what's payable, when it lands ──
   // Order-by dates are back-calculated from total lead (production + transit) so each
   // tranche lands before the previous depletes; any tranche whose order-by has passed is flagged.
@@ -13022,11 +13022,11 @@ function PlanningView(){
         const needBy = oiAddDays(today, needDays);
         const orderISO = kk===1 ? today : oiAddDays(today, needDays - leadTotalRep);   // lead-adjusted order-by
         const val = kk===1 ? orderTotal : Math.round(horizonVal*weights[kk-1]);
-        tranches.push( mkTranche(kk, `Wave ${kk}`, orderISO, kk===1, val, `covers from ~${fmtD(needBy)} · ${Math.round(weights[kk-1]*100)}% of demand`) );
+        tranches.push( mkTranche(kk, `Wave ${kk}`, orderISO, kk===1, val, `covers from ~${fmtD(needBy)}, ${Math.round(weights[kk-1]*100)}% of demand`) );
         cum += weights[kk-1];
       }
     } else {
-      tranches=[ mkTranche(1,'Reorder now',today,true,orderTotal,'rolling — reorder as stock depletes') ];
+      tranches=[ mkTranche(1,'Reorder now',today,true,orderTotal,'rolling, reorder as stock depletes') ];
     }
   }
   const lateWaves = tranches.filter(t=>t.late).length;
@@ -13035,10 +13035,10 @@ function PlanningView(){
   // plan at the top of the page lists products that have already run out.
   const noVel = !R.lines.some(l=>!l.isPackaging);
   const heroColor = noVel ? 'var(--color-muted)' : oosNow ? 'var(--bad)' : toOrderN ? 'var(--warn)' : 'var(--good)';
-  const headline = noVel ? 'Nothing to plan orders from yet' : oosNow ? `Order today — ${oosNow} product${oosNow===1?'':'s'} at risk of running out` : toOrderN ? `${toOrderN} product${toOrderN===1?'':'s'} to reorder` : 'Stock is on track for your plan';
-  const sub = noVel ? 'This planner sizes purchase orders from each product’s recent sales rate, which it does not have for your shop yet. The list at the top of the page is Greta’s stock plan — use that for what to order.'
-    : toOrderN ? `${toOrderN} item${toOrderN===1?'':'s'} to order · ${curSym()}${k(orderVal)} to commit${stockoutsUnderPlan?` · ${stockoutsUnderPlan} forecast to run out under the plan`:''}${awaiting?` · ${awaiting} awaiting stock`:''}`
-    : (awaiting?`${awaiting} PO${awaiting===1?'':'s'} awaiting stock`:'Nothing to order right now — good sellers have cover for their lead times.');
+  const headline = noVel ? 'Nothing to plan orders from yet' : oosNow ? `Order today, ${oosNow} product${oosNow===1?'':'s'} at risk of running out` : toOrderN ? `${toOrderN} product${toOrderN===1?'':'s'} to reorder` : 'Stock is on track for your plan';
+  const sub = noVel ? 'This planner sizes purchase orders from each product’s recent sales rate, which it does not have for your shop yet. The list at the top of the page is Greta’s stock plan, use that for what to order.'
+    : toOrderN ? `${toOrderN} item${toOrderN===1?'':'s'} to order, ${curSym()}${k(orderVal)} to commit${stockoutsUnderPlan?`, ${stockoutsUnderPlan} forecast to run out under the plan`:''}${awaiting?`, ${awaiting} awaiting stock`:''}`
+    : (awaiting?`${awaiting} PO${awaiting===1?'':'s'} awaiting stock`:'Nothing to order right now, good sellers have cover for their lead times.');
   const btn = {display:'inline-flex',alignItems:'center',gap:6,fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',padding:'9px 15px',borderRadius:'var(--radius-md)',border:'none',background:'var(--accent)',color:PAL.panel,cursor:'pointer',whiteSpace:'nowrap'};
   const sbtn = (id)=>({fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',padding:'5px 11px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1.5px solid '+(rc.strategy===id?'var(--accent)':'var(--border-default)'),background:rc.strategy===id?'var(--accent)':'transparent',color:rc.strategy===id?PAL.panel:'var(--text-secondary)'});
   const lab = {fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-faint)',marginBottom:5};
@@ -13047,7 +13047,7 @@ function PlanningView(){
     <div>
       <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:10,flexWrap:'wrap',marginBottom:8}}>
         <h2 style={{margin:0,fontSize:'var(--text-lg)'}}>Planning</h2>
-        <span className="muted" style={{fontSize:'var(--text-sm)'}}>Forecast → strategy → purchase orders · independent of the date picker</span>
+        <span className="muted" style={{fontSize:'var(--text-sm)'}}>Forecast, strategy and purchase orders</span>
       </div>
       {/* HERO — what to do now + the two levers (forecast + strategy) in one band */}
       <div className="card" style={{marginBottom:14}}>
@@ -13060,25 +13060,25 @@ function PlanningView(){
           {toOrderN>0 && <button style={btn} onClick={goPOs}>Review &amp; raise POs <Icon name="chevron" size={14}/></button>}
         </div>
         <div style={{marginTop:14,paddingTop:12,borderTop:'1px solid var(--border-subtle)'}}>
-          <div style={lab}>1. Forecast <button type="button" className="txt-link v3-linkbtn" style={{textTransform:'none',letterSpacing:0,fontWeight:'var(--weight-semi)'}} onClick={()=>window.__oiOpenForecast&&window.__oiOpenForecast()}>· {showForecast?'editing below':'edit'}</button></div>
+          <div style={lab}>1. Forecast <button type="button" className="txt-link v3-linkbtn" style={{textTransform:'none',letterSpacing:0,fontWeight:'var(--weight-semi)'}} onClick={()=>window.__oiOpenForecast&&window.__oiOpenForecast()}>{showForecast?'editing below':'edit'}</button></div>
           <div style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{fLabel}</div>
         </div>
         {/* 2. Strategy — compare the trade-off, pick, see the recommendation */}
         <div style={{marginTop:14}}>
-          <div style={lab}>2. Strategy<span style={{textTransform:'none',letterSpacing:'var(--tracking-snug)',fontWeight:'var(--weight-normal)',color:'var(--text-muted)'}}> — how to commit against the forecast</span></div>
+          <div style={lab}>2. Strategy<span style={{textTransform:'none',letterSpacing:'var(--tracking-snug)',fontWeight:'var(--weight-normal)',color:'var(--text-muted)'}}>, how to commit against the forecast</span></div>
           <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
             {['jit','bulk','staged'].map(id=>{ const on=rc.strategy===id; const c=stratCmp[id]; const dep=hasDeposit&&c.dep<c.val-0.5;
               return (
                 <button key={id} onClick={()=>saveReorderConfig({...rc,strategy:id})} style={{textAlign:'left',flex:'1 1 160px',minWidth:148,padding:'9px 12px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1.5px solid '+(on?'var(--accent)':'var(--border-default)'),background:on?'var(--accent-bg)':'var(--bg-elevated)'}}>
                   <div style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',color:on?'var(--accent)':'var(--text-primary)'}}>{''}{STRAT[id]}</div>
-                  <div style={{fontSize:'var(--text-xs)',color:'var(--text-muted)',marginTop:2}}>{c.count?(dep?`${curSym()}${k(c.dep)} deposit now · ${curSym()}${k(c.val)} total`:`${curSym()}${k(c.val)} to commit now`):'nothing to order'} · {stratDesc[id]}</div>
+                  <div style={{fontSize:'var(--text-xs)',color:'var(--text-muted)',marginTop:2}}>{c.count?(dep?`${curSym()}${k(c.dep)} deposit now, ${curSym()}${k(c.val)} total`:`${curSym()}${k(c.val)} to commit now`):'nothing to order'}, {stratDesc[id]}</div>
                 </button>
               ); })}
           </div>
           <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:8,lineHeight:1.5}}>{stratExplain[rc.strategy]}</div>
           {recStrat!==rc.strategy && <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginTop:8,padding:'7px 11px',borderRadius:'var(--radius-none)',background:'var(--accent-bg)',border:'1px solid var(--border-subtle)'}}>
             <Icon name="spark" size={13} style={{color:'var(--accent)'}}/>
-            <span style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)'}}>Suggested: <b style={{color:'var(--text-primary)'}}>{STRAT[recStrat]}</b> — {recWhy}.</span>
+            <span style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)'}}>Suggested: <b style={{color:'var(--text-primary)'}}>{STRAT[recStrat]}</b>, {recWhy}.</span>
             <button style={{...btn,fontSize:'var(--text-xs)',padding:'5px 11px',marginLeft:'auto'}} onClick={()=>saveReorderConfig({...rc,strategy:recStrat})}>Use {STRAT[recStrat]}</button>
           </div>}
         </div>
@@ -13097,24 +13097,24 @@ function PlanningView(){
           <div className="card" style={{marginBottom:14}}>
             <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',marginBottom:4}}>
               <div style={{fontSize:'var(--text-base)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>Stock landing plan</div>
-              <span className="muted" style={{fontSize:'var(--text-xs)'}}>{STRAT[rc.strategy]} · lead {leadTotalRep}d ({leadMakeRep}d make + {leadTotalRep-leadMakeRep}d transit)</span>
+              <span className="muted" style={{fontSize:'var(--text-xs)'}}>{STRAT[rc.strategy]}, lead {leadTotalRep}d ({leadMakeRep}d make + {leadTotalRep-leadMakeRep}d transit)</span>
               <div style={{marginLeft:'auto',display:'flex',gap:3,background:'var(--bg-elevated)',borderRadius:'var(--radius-none)',padding:3}}>{toggle('timeline','Timeline')}{toggle('table','Table')}</div>
             </div>
             <div style={{fontSize:'var(--text-sm)',color:'var(--text-muted)',marginBottom:10,lineHeight:1.5}}>
               {hasDeposit
-                ? <>To start, pay a <b style={{color:'var(--text-primary)'}}>{`${curSym()}`}{k(depNow)} deposit now</b>, with <b style={{color:'var(--text-primary)'}}>{`${curSym()}`}{k(balLater)} balance on shipment</b> — <b>{`${curSym()}`}{k(orderTotal)}</b> committed in total.</>
+                ? <>To start, pay a <b style={{color:'var(--text-primary)'}}>{`${curSym()}`}{k(depNow)} deposit now</b>, with <b style={{color:'var(--text-primary)'}}>{`${curSym()}`}{k(balLater)} balance on shipment</b>, <b>{`${curSym()}`}{k(orderTotal)}</b> committed in total.</>
                 : <><b style={{color:'var(--text-primary)'}}>{`${curSym()}`}{k(orderTotal)}</b> to commit now. Add a deposit % per supplier (Suppliers tab) to split this into deposit-now vs balance-on-shipment.</>}
               {rc.strategy==='staged' && <> Each wave must be <b>ordered</b> early enough to <b>land</b> before the previous runs out.</>}
             </div>
             {rc.strategy==='staged' && wavesN>1 && <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',marginBottom:12}}>
               <span style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase'}}>Wave split</span>
               {[['even','Even'],['front','Front-load'],['back','Back-load']].map(([kind,lbl])=>{ const on=splitName===kind;
-                return <button key={kind} onClick={()=>saveReorderConfig({...rc, waveSplit: wavePreset(kind, wavesN)})} title={kind==='front'?'Bigger first wave — buy into peak early':kind==='back'?'Smaller first wave, ramp later':'Equal waves'} style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',padding:'4px 11px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1.5px solid '+(on?'var(--accent)':'var(--border-default)'),background:on?'var(--accent)':'transparent',color:on?PAL.panel:'var(--text-secondary)'}}>{lbl}</button>; })}
-              <span style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{weights.map(w=>Math.round(w*100)+'%').join(' / ')}{splitName==='custom'?' · custom':''}</span>
+                return <button key={kind} onClick={()=>saveReorderConfig({...rc, waveSplit: wavePreset(kind, wavesN)})} title={kind==='front'?'Bigger first wave, buy into peak early':kind==='back'?'Smaller first wave, ramp later':'Equal waves'} style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',padding:'4px 11px',borderRadius:'var(--radius-md)',cursor:'pointer',border:'1.5px solid '+(on?'var(--accent)':'var(--border-default)'),background:on?'var(--accent)':'transparent',color:on?PAL.panel:'var(--text-secondary)'}}>{lbl}</button>; })}
+              <span style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{weights.map(w=>Math.round(w*100)+'%').join(' / ')}{splitName==='custom'?', custom':''}</span>
             </div>}
             {lateWaves>0 && <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12,padding:'7px 11px',borderRadius:'var(--radius-none)',background:'var(--color-danger-wash)',border:'1px solid var(--bad)'}}>
               <Icon name="alert" size={13} style={{color:'var(--bad)'}}/>
-              <span style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)'}}>{lateWaves} wave{lateWaves===1?'':'s'} should already be on order — the {leadTotalRep}d lead is longer than the gap between waves. Order {lateWaves===1?'it':'them'} now, front-load Wave 1, or widen the wave count.</span>
+              <span style={{fontSize:'var(--text-sm)',color:'var(--text-secondary)'}}>{lateWaves} wave{lateWaves===1?'':'s'} should already be on order, the {leadTotalRep}d lead is longer than the gap between waves. Order {lateWaves===1?'it':'them'} now, front-load Wave 1, or widen the wave count.</span>
             </div>}
             {planView==='timeline' ? (<div>
               {/* axis */}
@@ -13126,12 +13126,12 @@ function PlanningView(){
                 <div key={t.n} style={{display:'flex',alignItems:'center',gap:10,marginBottom:7}}>
                   <div style={{width:132,flexShrink:0}}>
                     <div style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',color:'var(--text-primary)'}}>{t.name} {t.late&&<span style={{fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',color:PAL.panel,background:'var(--bad)',padding:'1px 5px',borderRadius:'var(--radius-full)'}}>LATE</span>}</div>
-                    <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{hasDeposit?`${curSym()}${k(t.dep)} now · ${curSym()}${k(t.bal)} on ship`:`${curSym()}${k(t.val)}`}</div>
+                    <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)'}}>{hasDeposit?`${curSym()}${k(t.dep)} now, ${curSym()}${k(t.bal)} on ship`:`${curSym()}${k(t.val)}`}</div>
                   </div>
                   <div style={{position:'relative',flex:1,height:28,borderRadius:'var(--radius-none)',background:'var(--bg-elevated)'}}>
                     <div style={{position:'absolute',left:ox+'%',width:Math.max(0,lx-ox)+'%',top:'50%',height:3,transform:'translateY(-50%)',background:t.late?'var(--bad)':'var(--accent)',opacity:.45,borderRadius:'var(--radius-sm)'}}/>
                     {dot(ox, t.late?'var(--bad)':'var(--text-muted)',12,false,'Order '+(t.isNow?'now':t.late?'now (was due '+fmtD(t.orderISO)+')':fmtD(t.orderISO)))}
-                    {dot(sx,'var(--warn)',10,true,'Ships '+fmtD(t.shipISO)+(hasDeposit?` · balance ${curSym()}`+k(t.bal)+' due':''))}
+                    {dot(sx,'var(--warn)',10,true,'Ships '+fmtD(t.shipISO)+(hasDeposit?`, balance ${curSym()}`+k(t.bal)+' due':''))}
                     {dot(lx,'var(--good)',15,true,'Lands '+fmtD(t.landISO))}
                   </div>
                 </div>
@@ -13146,7 +13146,7 @@ function PlanningView(){
             </tr></thead><tbody>
               {tranches.map(t=>(<tr key={t.n}>
                 <td style={{...tdL,color:'var(--text-primary)',fontWeight:'var(--weight-semi)'}}>{t.name}</td>
-                <td style={{...tdL,color:t.isNow?'var(--accent)':t.late?'var(--bad)':'var(--text-secondary)',fontWeight:t.isNow||t.late?'var(--weight-bold)':'var(--weight-normal)'}}>{t.isNow?'now':t.late?`${fmtD(t.orderISO)} · now (late)`:fmtD(t.orderISO)}</td>
+                <td style={{...tdL,color:t.isNow?'var(--accent)':t.late?'var(--bad)':'var(--text-secondary)',fontWeight:t.isNow||t.late?'var(--weight-bold)':'var(--weight-normal)'}}>{t.isNow?'now':t.late?`${fmtD(t.orderISO)}, now (late)`:fmtD(t.orderISO)}</td>
                 <td style={{...tdL,textAlign:'right',color:'var(--text-primary)'}}>{t.val>0?`${curSym()}${k(t.dep)}`:'—'}</td>
                 {hasDeposit&&<td style={{...tdL,textAlign:'right',color:'var(--text-muted)'}}>{t.bal>0?`${curSym()}${k(t.bal)}`:'—'}</td>}
                 <td style={tdL}>{fmtD(t.shipISO)}</td>
@@ -13155,9 +13155,9 @@ function PlanningView(){
               </tr>))}
             </tbody></table></div>)}
             <div style={{fontSize:'var(--text-xs)',color:'var(--text-faint)',marginTop:10,lineHeight:1.5}}>{rc.strategy==='staged'
-              ? <>Wave 1 is the order below — re-run the plan on each order-by date to size the next wave on the latest stock. Dates use the slowest item's lead so nothing stocks out.</>
+              ? <>Wave 1 is the order below, re-run the plan on each order-by date to size the next wave on the latest stock. Dates use the slowest item's lead so nothing stocks out.</>
               : rc.strategy==='bulk' ? <>One order now covers the whole plan. Balance (if any) falls due when the supplier ships, ~{leadMakeRep}d after order.</>
-              : <>just-in-time reorders roll as stock depletes — this is the order due now; the next triggers when cover next falls within lead + safety.</>}</div>
+              : <>just-in-time reorders roll as stock depletes, this is the order due now; the next triggers when cover next falls within lead + safety.</>}</div>
           </div>
         ); })()}
       {/* Cash impact — forward balance projection from the plan's commitments */}
@@ -13166,7 +13166,7 @@ function PlanningView(){
       <button onClick={()=>setShowForecast(s=>!s)} style={{display:'flex',alignItems:'center',gap:10,width:'100%',background:'transparent',border:'1px solid var(--border-subtle)',borderRadius:'var(--radius-md)',padding:'11px 14px',cursor:'pointer',textAlign:'left',marginBottom:showForecast?12:14}}>
         <span style={{color:'var(--text-faint)',display:'inline-flex',transform:showForecast?'rotate(90deg)':'none',transition:'transform 120ms'}}><Icon name="chevron" size={13}/></span>
         <span style={{fontWeight:'var(--weight-bold)',color:'var(--text-primary)',fontSize:'var(--text-sm)'}}>Forecast &amp; demand plan</span>
-        <span className="muted" style={{fontSize:'var(--text-xs)'}}>{fLabel} · per-product demand, focus/promotions, by-month shaping &amp; packaging</span>
+        <span className="muted" style={{fontSize:'var(--text-xs)'}}>{fLabel}, per-product demand, focus/promotions, by-month shaping &amp; packaging</span>
         <span style={{marginLeft:'auto',fontSize:'var(--text-xs)',color:'var(--accent)',fontWeight:'var(--weight-semi)'}}>{showForecast?'Hide':'Open'}</span>
       </button>
       {showForecast && <div id="plan-forecast"><DemandPlanner embedded/></div>}
@@ -13223,40 +13223,40 @@ const GO_TIMEFRAMES = ['daily','weekly','monthly','quarterly','yearly'];
 const GO_EXPLAIN = {
   'Revenue':'Net revenue from this customer segment over the selected timeframe.',
   'Orders':'Number of orders placed by this segment.',
-  'AOV':'Average order value — revenue ÷ orders for this segment.',
-  'Repeat rate':'Share of orders from returning customers — your core retention signal.',
+  'AOV':'Average order value, revenue ÷ orders for this segment.',
+  'Repeat rate':'Share of orders from returning customers, your core retention signal.',
   'Weighted cost per new customer':'Blended cost to acquire one new customer (ad spend ÷ new customers).',
-  'aMER':'Acquisition sales per £ of ads — new-customer revenue ÷ ad spend. The efficiency of acquisition on its own.',
+  'aMER':'Acquisition sales per £ of ads, new-customer revenue ÷ ad spend. The efficiency of acquisition on its own.',
   'iRevenue':'Sales the ads really added: the extra sales paid ads caused, not the sales the ad platforms claim.',
   'iOrders':'Incremental orders paid actually caused, after removing the organic baseline.',
   'iAOV':'Average value of one incremental (paid-caused) order.',
-  'iCAC':'Incremental cost per new customer — spend ÷ incremental orders. The true cost of a paid-caused customer.',
-  'ipaMER':'Incremental paid sales per £ of ads for new customers — incremental revenue ÷ spend. Paid efficiency on a causal basis.',
-  'Average order':'Average order value — revenue ÷ orders for this segment.',
+  'iCAC':'Incremental cost per new customer, spend ÷ incremental orders. The true cost of a paid-caused customer.',
+  'ipaMER':'Incremental paid sales per £ of ads for new customers, incremental revenue ÷ spend. Paid efficiency on a causal basis.',
+  'Average order':'Average order value, revenue ÷ orders for this segment.',
   'New-customer cost (weighted)':'Blended cost to acquire one new customer (ad spend ÷ new customers).',
-  'Sales per £ of ads (new)':'Acquisition sales per £ of ads — new-customer revenue ÷ ad spend. The efficiency of acquisition on its own.',
+  'Sales per £ of ads (new)':'Acquisition sales per £ of ads, new-customer revenue ÷ ad spend. The efficiency of acquisition on its own.',
   'Revenue caused by ads':'The extra sales paid ads really caused, not the sales the ad platforms claim.',
   'Orders caused by ads':'The orders paid advertising actually caused, after removing the organic baseline.',
   'Cost per new customer':'Spend ÷ the orders ads actually caused. The true cost of a paid-caused customer.',
   'Sales per £ of ads':'Revenue ads actually caused ÷ spend. Paid efficiency on a causal basis.',
   'cost per new customer:Actual cost per new customer (paid)':'What you actually pay per new customer right now (spend ÷ new customers).',
-  'cost per new customer:Break-even · 1st order':'The most you can pay per customer and still be CM-positive on their first order.',
-  'cost per new customer:Break-even · lifetime':'The most you can pay and still break even over the customer’s whole lifetime (customer lifetime value-adjusted).',
+  'cost per new customer:Break-even, 1st order':'The most you can pay per customer and still be CM-positive on their first order.',
+  'cost per new customer:Break-even, lifetime':'The most you can pay and still break even over the customer’s whole lifetime (customer lifetime value-adjusted).',
   'cost per new customer:Most the next new customer should cost':'What the next new customer can cost at your plan\u2019s budget. While returning customers do not cover your running costs, that is what their first order keeps.',
-  'return on ad spend:Actual return on ad spend (sales per £ of ads for new customers)':'Your actual acquisition return on ad spend — new-customer revenue ÷ spend.',
-  'return on ad spend:Break-even · 1st order':'Minimum return on ad spend to be CM-positive on order one (= 1 ÷ contribution margin).',
-  'return on ad spend:Break-even · lifetime':'Minimum return on ad spend once repeat purchases are counted — the customer lifetime value-adjusted floor.',
+  'return on ad spend:Actual return on ad spend (sales per £ of ads for new customers)':'Your actual acquisition return on ad spend, new-customer revenue ÷ spend.',
+  'return on ad spend:Break-even, 1st order':'Minimum return on ad spend to be CM-positive on order one (= 1 ÷ contribution margin).',
+  'return on ad spend:Break-even, lifetime':'Minimum return on ad spend once repeat purchases are counted, the customer lifetime value-adjusted floor.',
   'return on ad spend:What the next £ of ads should bring':'The sales the next \u00a31 of ads should bring a new customer\u2019s first order, at that cost.'
 };
 
 const GO_FALLBACK = { monthly: {
   periodLabel:'14 Jun – 14 Jul 2026', compareLabel:'vs previous 30 days',
   hero:{ cmAfterMkt:6343, cm:12817, cmPct:59.9, spend:6474, targetEstimated:true,
-    action:{ value:'£6.3k/mo profit', title:'Restore site conversion to 1.5%', why:'conversion rate is 0.92% on 39k sessions — a conversion problem, not demand.' } },
+    action:{ value:'£6.3k/mo profit', title:'Restore site conversion to 1.5%', why:'conversion rate is 0.92% on 39k sessions, a conversion problem, not demand.' } },
   business:[
     { k:'Revenue', v:21398, fmt:'gbp', d:-15.3, cmp:'vs £25,260', rag:'a', tgt:'target ~£24k' },
     { k:'Contribution margin', v:12817, fmt:'gbp', d:-15.3, cmp:'59.9% ratio', rag:'a', tgt:'fit-engine' },
-    { k:'Ad spend', v:6474, fmt:'gbp', d:null, cmp:'Meta £5,122 · Google £1,353', rag:'a', tgt:'3.17× sales per £ of ads · 2.23× on new customers' },
+    { k:'Ad spend', v:6474, fmt:'gbp', d:null, cmp:'Meta £5,122, Google £1,353', rag:'a', tgt:'3.17× sales per £ of ads, 2.23× on new customers' },
     { k:'Conversion rate', v:0.92, fmt:'pct1', d:-1, cmp:'vs 0.93%', rag:'r', tgt:'benchmark 1.5%' },
     { k:'Sessions', v:39039, fmt:'int', d:-10.1, cmp:'vs 43,405', rag:'a', tgt:'traffic softening' },
     { k:'Average order', v:60, fmt:'gbp', d:-3.2, cmp:'vs £62', rag:'g', tgt:'steady' },
@@ -13266,7 +13266,7 @@ const GO_FALLBACK = { monthly: {
   ],
   bestSellers:[ {name:'the mega necklace gold',rev:2236},{name:'lower case initial charm',rev:1556},{name:'link up necklace',rev:1516} ],
   customer:{ splitNew:64.8, splitRet:35.2, newRev:14939, retRev:8133, tiles:[
-    { k:'New customers', v:167, fmt:'int', cmp:'acquired · 30d', rag:'g' },
+    { k:'New customers', v:167, fmt:'int', cmp:'acquired, 30d', rag:'g' },
     { k:'New-customer cost', v:40.08, fmt:'gbp2', cmp:'per new customer acquired', rag:'g' },
     { k:'Repeat rate', v:24.3, fmt:'pct1', cmp:'retention thin', rag:'a', tgt:'target 30%+' },
     { k:'customer lifetime value : cost per new customer', v:5.4, fmt:'x', cmp:'contribution basis', rag:'g' },
@@ -13278,9 +13278,9 @@ const GO_FALLBACK = { monthly: {
     { name:'Google non-brand', phi:null, spend:0, rep:null, iroas:null, tgt:1.23, rag:'n', verdict:'untapped' },
   ],
   insights:{
-    business:{ text:'Revenue is down 15% MoM, but so are sessions (−10%) and conversion rate sits at 0.92% vs a 1.5% benchmark — a traffic-and-conversion problem, not weak demand. Discounts eat 31% of revenue.', action:'Fix the mobile checkout drop before scaling spend.', value:'+£6.3k/mo CM' },
+    business:{ text:'Revenue is down 15% MoM, but so are sessions (−10%) and conversion rate sits at 0.92% vs a 1.5% benchmark, a traffic-and-conversion problem, not weak demand. Discounts eat 31% of revenue.', action:'Fix the mobile checkout drop before scaling spend.', value:'+£6.3k/mo CM' },
     customer:{ text:'65% of revenue is from new customers at £40 cost per new customer, but repeat rate is only 24%. You acquire efficiently (5.4× customer lifetime value:cost per new customer) yet under-retain.', action:'Turn on the 30-day post-purchase & winback flows.', value:'≈ +£4–6k/mo CM' },
-    channel:{ text:'Facebook acquisition returns 2.19× per £ against a 1.23× break-even — over-efficient, i.e. underspending. PMax is underwater at 0.20; google_nonbrand isn\'t running.', action:'Cut PMax → FB acquisition + open non-brand bids.', value:'≈ +£26k/mo CM' },
+    channel:{ text:'Facebook acquisition returns 2.19× per £ against a 1.23× break-even, over-efficient, i.e. underspending. PMax is underwater at 0.20; google_nonbrand isn\'t running.', action:'Cut PMax → FB acquisition + open non-brand bids.', value:'≈ +£26k/mo CM' },
   },
 }};
 
@@ -13297,21 +13297,21 @@ function GO_Tile(p){ const t=p.t; const _sr=(t.series&&t.series.length>1)?t.seri
     <div style={{fontFamily:GO_T.mono,fontSize:'var(--text-xs)',color:t.d>0?GO_T.green:t.d<0?GO_T.red:GO_T.mut}}>{t.d!=null?GO_arrow(t.d)+GO_pctv(Math.abs(t.d)).replace('+','')+' ':''}<span style={{color:GO_T.dim}}>{t.cmp}</span></div>
     {t.tgt && <div style={{fontSize:'var(--text-xs)',color:GO_T.dim,marginTop:5}}>{t.tgt}</div>}
     <div className="go-pop">
-      <div className="go-head">{_sr?(t.k+' · trend over selected timeframe'):(t.k+' · detail')}</div>
+      <div className="go-head">{_sr?(t.k+', trend over selected timeframe'):(t.k+', detail')}</div>
       {_sr && <R.ResponsiveContainer width="100%" height={64}>
         <R.LineChart data={t.series} margin={{top:4,right:6,left:-6,bottom:0}}>
           <R.CartesianGrid stroke={PAL.line} vertical={false}/>
           <R.XAxis dataKey="d" tick={{fill:GO_T.dim,fontSize:'var(--text-xs)'}} interval="preserveStartEnd" tickLine={false} axisLine={false}/>
           <R.YAxis tick={{fill:GO_T.dim,fontSize:'var(--text-xs)'}} width={30} tickFormatter={function(v){return Math.abs(v)>=1000?(v/1000).toFixed(0)+'k':Math.round(v);}}/>
           <R.Tooltip contentStyle={{fontSize:'var(--text-xs)',background:'var(--color-panel)',border:'1px solid '+GO_T.line,borderRadius:'var(--radius-md)',padding:'2px 6px'}} labelStyle={{color:GO_T.dim}} formatter={function(v){return [GO_fmt(v,t.fmt),t.k];}}/>
-          <R.Line type="monotone" dataKey="v" stroke={svgCol(_stroke)} strokeWidth={2} dot={false} isAnimationActive={false}/>
+          <R.Line type="linear" dataKey="v" stroke={svgCol(_stroke)} strokeWidth={2} dot={false} isAnimationActive={false}/>
         </R.LineChart>
       </R.ResponsiveContainer>}
       {t.d!=null && <div className="go-row"><span>Change vs prior</span><b style={{color:t.d>0?GO_T.green:t.d<0?GO_T.red:GO_T.mut}}>{GO_pctv(t.d).replace('-','−')}</b></div>}
       {t.cmp && <div className="go-row"><span>Detail</span><b>{t.cmp}</b></div>}
       {t.tgt && <div className="go-row"><span>Target</span><b>{t.tgt}</b></div>}
       <div className="go-row"><span>Status</span><b style={{color:GO_rag(t.rag)}}>{_statusTxt}</b></div>
-      <div className="go-ask" onClick={function(e){e.stopPropagation(); if(window.__oiAsk) window.__oiAsk('About "'+t.k+'" (currently '+GO_fmt(t.v,t.fmt)+'): what is driving this over the selected timeframe, and what should I do?');}}>Ask Greta about {t.k} →</div>
+      <div className="go-ask" onClick={function(e){e.stopPropagation(); if(window.__oiAsk) window.__oiAsk('About "'+t.k+'" (currently '+GO_fmt(t.v,t.fmt)+'): what is driving this over the selected timeframe, and what should I do?');}}>Ask Greta about {t.k}</div>
     </div>
   </div>); }
 
@@ -13388,12 +13388,12 @@ function OverviewSummary({d, tf}){
         var jwt=''; if(typeof ASK.getJwt==='function'){ try{ jwt=await ASK.getJwt(); }catch(e){} } else if(ASK.jwt){ jwt=ASK.jwt; }
         var headers = jwt ? {'content-type':'application/json','authorization':'Bearer '+jwt} : {'content-type':'application/json','x-internal-secret':ASK.token||''};
         var cur = (typeof curSym==='function') ? curSym() : '£';
-        var system = 'You are a senior D2C growth operator for '+(brand.name||'the brand')+' ('+((brand.markets||'')+' '+(brand.vertical||'')).trim()+') working the CTC "hierarchy of metrics". All monetary values are in '+cur+' — always use '+cur+', never $. '
-          + 'You are given the current Overview snapshot: Business (contribution-after-marketing = the arbiter, contribution margin, revenue vs plan + the '+cur+' shortfall); Customer (new-vs-returning mix, per-segment metrics, and acquisitionEconomics = CAC actual vs break-even vs target, ROAS/aMER actual vs target, repeat rate); Channels (per channel: role, spend, incremental revenue, contribution, iROAS vs targetIroas, marginalIroas, verdict — read a POSITIVE iROAS-minus-target gap as over-efficient / UNDER-spending, and a NEGATIVE gap as inefficient / OVER-spending); when present, metaCampaigns and metaTopAds give the ACTUAL Meta campaign- and ad-level performance (name, spend, ROAS, CVR %, frequency, roas_change_pct vs the prior period, fatigue_flag); googleCampaigns give Google Search/PMax performance including impression_share_pct and lost_to_budget_pct (a HIGH lost_to_budget_pct on a profitable campaign is the CLEAN PROOF of under-spending / a volume problem — quote it), and googleWasteTerms are search queries with spend but zero conversions; plus pre-computed insights per tier and the single highest-priority action. '
-          + 'Write a SPECIFIC diagnostic read of 3-4 sentences (~70-100 words), plain prose — no lists, no headings, no markdown, no greeting. Follow the CTC logic and NAME NAMES: '
-          + '(1) Lead with the business result for this '+(tf||'')+' window — contribution-after-marketing and whether it is ahead or behind PLAN, with the '+cur+' gap. '
-          + '(2) DECOMPOSE the gap: state whether it is a VOLUME problem (too little profitable spend / too few new customers) or an EFFICIENCY problem (cost per new customer or real return on ad spend off target) — say which. '
-          + '(3) PINPOINT the driver by NAME, preferring the actual campaign/ad over the generic channel: quote the specific Meta campaign or ad/creative from metaCampaigns/metaTopAds, or the Google campaign from googleCampaigns. When a Google campaign is the culprit, ALSO cite its impression-share signal from googleCampaigns — a high lost_to_rank_pct means it is uncompetitive (efficiency: fix creative/bids or cut), a high lost_to_budget_pct on a profitable campaign means under-spend (volume: fund it) — and, if any exist, name one googleWasteTerms query bleeding spend at zero conversions. Quote the real numbers (ROAS, CVR, frequency, roas_change_pct, impression share). Also weigh the customer segment (new vs returning, CAC vs target); lean on computedInsights. '
+        var system = 'You are a senior D2C growth operator for '+(brand.name||'the brand')+' ('+((brand.markets||'')+' '+(brand.vertical||'')).trim()+') working the CTC "hierarchy of metrics". All monetary values are in '+cur+', always use '+cur+', never $. '
+          + 'You are given the current Overview snapshot: Business (contribution-after-marketing = the arbiter, contribution margin, revenue vs plan + the '+cur+' shortfall); Customer (new-vs-returning mix, per-segment metrics, and acquisitionEconomics = CAC actual vs break-even vs target, ROAS/aMER actual vs target, repeat rate); Channels (per channel: role, spend, incremental revenue, contribution, iROAS vs targetIroas, marginalIroas, verdict, read a POSITIVE iROAS-minus-target gap as over-efficient / UNDER-spending, and a NEGATIVE gap as inefficient / OVER-spending); when present, metaCampaigns and metaTopAds give the ACTUAL Meta campaign- and ad-level performance (name, spend, ROAS, CVR %, frequency, roas_change_pct vs the prior period, fatigue_flag); googleCampaigns give Google Search/PMax performance including impression_share_pct and lost_to_budget_pct (a HIGH lost_to_budget_pct on a profitable campaign is the CLEAN PROOF of under-spending / a volume problem, quote it), and googleWasteTerms are search queries with spend but zero conversions; plus pre-computed insights per tier and the single highest-priority action. '
+          + 'Write a SPECIFIC diagnostic read of 3-4 sentences (~70-100 words), plain prose, no lists, no headings, no markdown, no greeting. Follow the CTC logic and NAME NAMES: '
+          + '(1) Lead with the business result for this '+(tf||'')+' window, contribution-after-marketing and whether it is ahead or behind PLAN, with the '+cur+' gap. '
+          + '(2) DECOMPOSE the gap: state whether it is a VOLUME problem (too little profitable spend / too few new customers) or an EFFICIENCY problem (cost per new customer or real return on ad spend off target), say which. '
+          + '(3) PINPOINT the driver by NAME, preferring the actual campaign/ad over the generic channel: quote the specific Meta campaign or ad/creative from metaCampaigns/metaTopAds, or the Google campaign from googleCampaigns. When a Google campaign is the culprit, ALSO cite its impression-share signal from googleCampaigns, a high lost_to_rank_pct means it is uncompetitive (efficiency: fix creative/bids or cut), a high lost_to_budget_pct on a profitable campaign means under-spend (volume: fund it), and, if any exist, name one googleWasteTerms query bleeding spend at zero conversions. Quote the real numbers (ROAS, CVR, frequency, roas_change_pct, impression share). Also weigh the customer segment (new vs returning, CAC vs target); lean on computedInsights. '
           + '(4) End on ONE specific lever: the precise reallocation or creative/campaign move, with the '+cur+' contribution impact if available. '
           + 'Never say "hold course" if any channel or campaign is off target or the business is behind plan. Be concrete, quantitative, operator-to-operator. Output only the read.';
         var user = 'Snapshot JSON:\n'+JSON.stringify(compact)+'\n\nWrite the diagnostic read now.';
@@ -13445,12 +13445,12 @@ function MetaAdDrilldown(){
   var tdL={textAlign:'left',fontSize:'var(--text-sm)',padding:'6px 8px',borderBottom:'1px solid '+GO_T.line};
   return (<div style={{marginTop:10}}>
     <div onClick={function(){ var n=!open; setOpen(n); try{sessionStorage.setItem('oi_dd_meta', n?'1':'0');}catch(e){} }} style={{cursor:'pointer',fontSize:'var(--text-xs)',color:GO_T.accent2,textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',margin:'0 2px 6px',userSelect:'none'}}>
-      <Icon name="chevron" size={12} style={{transform:open?'rotate(90deg)':'none', transition:'transform .15s', verticalAlign:'-1px', marginRight:'var(--space-2)'}}/>Meta campaign &amp; ad detail — where the paid-social spend actually goes
+      <Icon name="chevron" size={12} style={{transform:open?'rotate(90deg)':'none', transition:'transform .15s', verticalAlign:'-1px', marginRight:'var(--space-2)'}}/>Meta campaign &amp; ad detail, where the paid-social spend actually goes
     </div>
     {open && <div>
       <div style={{fontSize:'var(--text-xs)',color:GO_T.dim,margin:'0 2px 8px',fontStyle:'italic'}}>return on ad spend below is raw / platform-reported; the Channel tier above uses incrementality-adjusted real return on ad spend, so the numbers differ.</div>
       {camps && <div style={{marginBottom:12}}>
-        <div style={{fontSize:'var(--text-xs)',color:GO_T.mut,margin:'0 2px 4px'}}>Campaigns · last 30 days</div>
+        <div style={{fontSize:'var(--text-xs)',color:GO_T.mut,margin:'0 2px 4px'}}>Campaigns, last 30 days</div>
         <table style={{width:'100%',borderCollapse:'collapse'}}>
           <thead><tr><th style={thL}>Campaign</th><th style={th}>Spend</th><th style={th}>Claimed return</th><th style={th}>Visitors who buy</th><th style={th}>Freq</th></tr></thead>
           <tbody>{camps.map(function(c,i){return (<tr key={i}>
@@ -13463,7 +13463,7 @@ function MetaAdDrilldown(){
         </table>
       </div>}
       {ads && <div>
-        <div style={{fontSize:'var(--text-xs)',color:GO_T.mut,margin:'0 2px 4px'}}>Top ads by spend · return on ad spend vs prior 30d</div>
+        <div style={{fontSize:'var(--text-xs)',color:GO_T.mut,margin:'0 2px 4px'}}>Top ads by spend, return on ad spend vs prior 30d</div>
         <table style={{width:'100%',borderCollapse:'collapse'}}>
           <thead><tr><th style={thL}>Ad</th><th style={th}>Spend</th><th style={th}>Claimed return</th><th style={th}>{'Δ'} vs prior</th><th style={th}>Visitors who buy</th><th style={th}>Freq</th></tr></thead>
           <tbody>{ads.map(function(a,i){return (<tr key={i}>
@@ -13502,12 +13502,12 @@ function GoogleAdDrilldown(){
   var tdL={textAlign:'left',fontSize:'var(--text-sm)',padding:'6px 8px',borderBottom:'1px solid '+GO_T.line};
   return (<div style={{marginTop:8}}>
     <div onClick={function(){ var n=!open; setOpen(n); try{sessionStorage.setItem('oi_dd_google', n?'1':'0');}catch(e){} }} style={{cursor:'pointer',fontSize:'var(--text-xs)',color:GO_T.accent2,textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',margin:'0 2px 6px',userSelect:'none'}}>
-      <Icon name="chevron" size={12} style={{transform:open?'rotate(90deg)':'none', transition:'transform .15s', verticalAlign:'-1px', marginRight:'var(--space-2)'}}/>Google campaign &amp; search-term detail — impression share &amp; wasted spend
+      <Icon name="chevron" size={12} style={{transform:open?'rotate(90deg)':'none', transition:'transform .15s', verticalAlign:'-1px', marginRight:'var(--space-2)'}}/>Google campaign &amp; search-term detail, impression share &amp; wasted spend
     </div>
     {open && <div>
       <div style={{fontSize:'var(--text-xs)',color:GO_T.dim,margin:'0 2px 8px',fontStyle:'italic'}}>return on ad spend below is raw / platform-reported; the Channel tier above uses incrementality-adjusted real return on ad spend, so the numbers differ.</div>
       {camps && <div style={{marginBottom:12}}>
-        <div style={{fontSize:'var(--text-xs)',color:GO_T.mut,margin:'0 2px 4px'}}>Campaigns · last 30 days · lost-to-budget = under-spend on demand you could capture</div>
+        <div style={{fontSize:'var(--text-xs)',color:GO_T.mut,margin:'0 2px 4px'}}>Campaigns, last 30 days, lost-to-budget = under-spend on demand you could capture</div>
         <table style={{width:'100%',borderCollapse:'collapse'}}>
           <thead><tr><th style={thL}>Campaign</th><th style={th}>Spend</th><th style={th}>Claimed return</th><th style={th}>Visitors who buy</th><th style={th}>Impr share</th><th style={th}>Lost {'→'} budget</th></tr></thead>
           <tbody>{camps.map(function(c,i){return (<tr key={i}>
@@ -13521,7 +13521,7 @@ function GoogleAdDrilldown(){
         </table>
       </div>}
       {waste && <div>
-        <div style={{fontSize:'var(--text-xs)',color:GO_T.mut,margin:'0 2px 4px'}}>Wasteful search terms · spend, zero conversions (30d)</div>
+        <div style={{fontSize:'var(--text-xs)',color:GO_T.mut,margin:'0 2px 4px'}}>Wasteful search terms, spend, zero conversions (30d)</div>
         <table style={{width:'100%',borderCollapse:'collapse'}}>
           <thead><tr><th style={thL}>Search term</th><th style={thL}>Campaign</th><th style={th}>Spend</th></tr></thead>
           <tbody>{waste.map(function(t,i){return (<tr key={i}>
@@ -13552,7 +13552,7 @@ function GretaOverviewTiers(){
   const wrap = { maxWidth:1180, margin:'0 auto', padding:'8px 4px 60px', background:GO_T.bg, color:GO_T.ink };
   const toggle = (
     <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:6,marginBottom:6}}>
-      <div style={{fontSize:'var(--text-sm)',color:GO_T.dim}}>{d?('Snapshot · '):''}{d && <span style={{fontFamily:GO_T.mono}}>{d.periodLabel}</span>} {d?d.compareLabel:''}</div>
+      <div style={{fontSize:'var(--text-sm)',color:GO_T.dim}}>{d?('Snapshot, '):''}{d && <span style={{fontFamily:GO_T.mono}}>{d.periodLabel}</span>} {d?d.compareLabel:''}</div>
       <div className="go-tf" style={{display:'inline-flex',background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:'var(--radius-none)',padding:3}}>
         {GO_TIMEFRAMES.map(x=> <button key={x} onClick={()=>setTf(x)} style={{background:x===tf?GO_T.accent:'none',color:x===tf?PAL.panel:GO_T.mut,fontWeight:x===tf?'var(--weight-semi)':'var(--weight-normal)',border:0,fontSize:'var(--text-sm)',padding:'6px 12px',borderRadius:'var(--radius-md)',cursor:'pointer',textTransform:'capitalize'}}>{x}</button>)}
       </div>
@@ -13571,10 +13571,10 @@ function GretaOverviewTiers(){
       <TrackRecord/>
       <div style={{background:'linear-gradient(180deg,'+GO_T.panel+','+GO_T.panel2+')',border:'1px solid '+GO_T.line,borderRadius:'var(--radius-none)',padding:'20px 24px',margin:'8px 0 6px',display:'flex',justifyContent:'space-between',gap:24,flexWrap:'wrap'}}>
         <div>
-          <div style={{fontSize:'var(--text-xs)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:GO_T.dim}}>Profit after ads · this period</div>
+          <div style={{fontSize:'var(--text-xs)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:GO_T.dim}}>Profit after ads, this period</div>
           <div style={{fontFamily:GO_T.mono,fontSize:'var(--text-data)',fontWeight:'var(--weight-semi)',margin:'4px 0 2px',letterSpacing:'var(--tracking-tight)'}}>{GO_gbp(d.hero.cmAfterMkt)}</div>
-          <div style={{fontSize:'var(--text-sm)',color:GO_T.mut}}>CM {GO_gbp(d.hero.cm)} ({d.hero.cmPct}%) − ad spend {GO_gbp(d.hero.spend)}{d.hero.targetEstimated && <span style={{color:GO_T.amber}}> · target auto-estimated — not yet confirmed</span>}</div>
-        {d.hero.opProfit!=null && d.hero.fixedMonthly>0 && <div style={{fontSize:'var(--text-sm)',marginTop:2,color:(d.hero.opProfit>=0?GO_T.green:GO_T.red)}}>{'Operating profit '+GO_gbp(d.hero.opProfit)+' · after '+GO_gbp(d.hero.fixedMonthly)+'/mo fixed costs'}</div>}
+          <div style={{fontSize:'var(--text-sm)',color:GO_T.mut}}>CM {GO_gbp(d.hero.cm)} ({d.hero.cmPct}%) − ad spend {GO_gbp(d.hero.spend)}{d.hero.targetEstimated && <span style={{color:GO_T.amber}}>, target auto-estimated, not yet confirmed</span>}</div>
+        {d.hero.opProfit!=null && d.hero.fixedMonthly>0 && <div style={{fontSize:'var(--text-sm)',marginTop:2,color:(d.hero.opProfit>=0?GO_T.green:GO_T.red)}}>{'Operating profit '+GO_gbp(d.hero.opProfit)+', after '+GO_gbp(d.hero.fixedMonthly)+'/mo fixed costs'}</div>}
         {d.pacing && (function(){
           var pct=d.pacing.pacePct;
           var col = pct==null?GO_T.mut : pct>=-5?GO_T.green : pct>=-15?GO_T.amber : GO_T.red;
@@ -13584,13 +13584,13 @@ function GretaOverviewTiers(){
           <div style={{marginTop:10, maxWidth:470}}>
             <div style={{display:'flex',alignItems:'center',gap:9,marginBottom:5,flexWrap:'wrap'}}>
               <span style={{display:'inline-flex',alignItems:'center',background:col,color:PAL.panel,fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',padding:'2px 10px',borderRadius:'var(--radius-md)'}}>{lab.toUpperCase()}</span>
-              <span style={{fontSize:'var(--text-sm)',color:GO_T.mut}}>{GO_gbp(d.pacing.revActual)+' of '+GO_gbp(d.pacing.revTarget)+' expected to date'+(pct!=null?(' · '+(pct>=0?'+':'')+pct+'%'):'')}</span>
+              <span style={{fontSize:'var(--text-sm)',color:GO_T.mut}}>{GO_gbp(d.pacing.revActual)+' of '+GO_gbp(d.pacing.revTarget)+' expected to date'+(pct!=null?(', '+(pct>=0?'+':'')+pct+'%'):'')}</span>
             </div>
             <div style={{position:'relative',height:8,borderRadius:'var(--radius-none)',background:'var(--color-surface)',overflow:'hidden'}}>
               <div style={{position:'absolute',left:0,top:0,bottom:0,width:(fill/140*100)+'%',background:col,opacity:.9}}/>
               <div style={{position:'absolute',left:(100/140*100)+'%',top:-1,bottom:-1,width:2,background:GO_T.dim}}/>
             </div>
-            <div style={{fontSize:'var(--text-xs)',color:GO_T.dim,marginTop:4}}>{d.pacing.goalConfirmed ? 'vs your confirmed plan · the mark is exactly on pace' : <>vs auto-estimated target — <GoLink sec="home" sub="plansetup">confirm it in Goal &amp; costs</GoLink> · the mark is exactly on pace</>}</div>
+            <div style={{fontSize:'var(--text-xs)',color:GO_T.dim,marginTop:4}}>{d.pacing.goalConfirmed ? 'vs your confirmed plan, the mark is exactly on pace' : <>vs auto-estimated target, <GoLink sec="home" sub="plansetup">confirm it in Goal &amp; costs</GoLink>, the mark is exactly on pace</>}</div>
           </div>);
         })()}
         </div>
@@ -13600,7 +13600,7 @@ function GretaOverviewTiers(){
           <p style={{margin:0,color:GO_T.mut,fontSize:'var(--text-sm)'}}>{d.hero.action.why}</p>
         </div>
       </div>
-      <div style={{fontSize:'var(--text-xs)',color:GO_T.dim,margin:'4px 2px 0'}}>Factual read of synced Shopify · GA4 · Meta · Google · Klaviyo — not a projection. RAG is vs target; arrows vs previous period.</div>
+      <div style={{fontSize:'var(--text-xs)',color:GO_T.dim,margin:'4px 2px 0'}}>Factual read of synced Shopify, GA4, Meta, Google, Klaviyo, not a projection. RAG is vs target; arrows vs previous period.</div>
 
       <OverviewSummary d={d} tf={tf}/>
 
@@ -13611,8 +13611,8 @@ function GretaOverviewTiers(){
         <div className="go-tile-grid" data-cols={GO_cols(d.business.length+1)} style={{display:'grid',gap:12,gridTemplateColumns:'repeat('+GO_cols(d.business.length+1)+',minmax(0,1fr))'}}>
           {d.business.map((t,i)=><GO_Tile key={i} t={t}/>)}
           <div style={{background:'var(--color-surface)',border:`1px solid ${PAL.panel}`,borderRadius:'var(--radius-none)',padding:'14px 15px'}}>
-            <div style={{fontSize:'var(--text-xs)',color:GO_T.mut}}>Best sellers →</div>
-            <div style={{fontSize:'var(--text-sm)',color:GO_T.mut,marginTop:6,lineHeight:1.7}}>{d.bestSellers.map((s,i)=><div key={i}>{s.name} · {GO_gbp(s.rev)}</div>)}</div>
+            <div style={{fontSize:'var(--text-xs)',color:GO_T.mut}}>Best sellers</div>
+            <div style={{fontSize:'var(--text-sm)',color:GO_T.mut,marginTop:6,lineHeight:1.7}}>{d.bestSellers.map((s,i)=><div key={i}>{s.name}, {GO_gbp(s.rev)}</div>)}</div>
           </div>
         </div>
         {d.pacing && d.pacing.days && d.pacing.days.length>0 && <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:'var(--radius-none)',padding:'10px 12px 4px',boxShadow:'var(--shadow-panel)',marginTop:10}}><div style={{fontSize:'var(--text-xs)',color:GO_T.dim,textTransform:'uppercase',letterSpacing:'var(--tracking-wide)',marginBottom:6}}>Sales &amp; spend vs target</div><R.ResponsiveContainer width="100%" height={160}><R.ComposedChart data={d.pacing.days} margin={{top:5,right:8,left:0,bottom:0}}><R.CartesianGrid strokeDasharray="2 4" stroke={PAL.line}/><R.XAxis dataKey="date" tick={{fontSize:'var(--text-xs)',fill:'var(--color-muted)'}} interval="preserveStartEnd"/><R.YAxis tick={{fontSize:'var(--text-xs)',fill:'var(--color-muted)'}} width={44} tickFormatter={function(v){return '£'+Math.round(v/1000)+'k';}}/><R.Tooltip formatter={function(v){return '£'+Number(v).toLocaleString('en-GB');}}/><R.Bar dataKey="sales" name="Sales" fill={PAL.good} radius={[2,2,0,0]}/><R.Bar dataKey="spend" name="Spend" fill={PAL.accent} radius={[2,2,0,0]}/><R.Line dataKey="tSales" name="Target sales" stroke="var(--color-success)" strokeDasharray="4 3" dot={false} strokeWidth={1.5}/><R.Line dataKey="tSpend" name="Target spend" stroke={PAL.accent} strokeDasharray="4 3" dot={false} strokeWidth={1.5}/></R.ComposedChart></R.ResponsiveContainer></div>}
@@ -13620,17 +13620,17 @@ function GretaOverviewTiers(){
       </div>
 
       <div style={{margin:'28px 0 10px'}}>
-        <GO_TierHead n="02" title="Customer" sub="returning · new · new customers the ads really added"/>
+        <GO_TierHead n="02" title="Customer" sub="returning, new, new customers the ads really added"/>
         <div style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:'var(--radius-none)',padding:'13px 15px',boxShadow:'var(--shadow-panel)',marginBottom:10}}>
           <div style={{fontSize:'var(--text-xs)',color:GO_T.mut,marginBottom:6}}>New vs returning revenue</div>
           <div style={{display:'flex',height:9,borderRadius:'var(--radius-md)',overflow:'hidden',marginBottom:6}}><div style={{width:d.customer.splitNew+'%',background:GO_T.accent}}/><div style={{width:d.customer.splitRet+'%',background:PAL.data3}}/></div>
-          <div style={{fontFamily:GO_T.mono,fontSize:'var(--text-xs)'}}><span style={{color:GO_T.accent}}>New {d.customer.splitNew}% · {GO_gbp(d.customer.newRev)}</span> &nbsp; <span style={{color:PAL.data3}}>Ret {d.customer.splitRet}% · {GO_gbp(d.customer.retRev)}</span></div>
+          <div style={{fontFamily:GO_T.mono,fontSize:'var(--text-xs)'}}><span style={{color:GO_T.accent}}>New {d.customer.splitNew}%, {GO_gbp(d.customer.newRev)}</span> &nbsp; <span style={{color:PAL.data3}}>Ret {d.customer.splitRet}%, {GO_gbp(d.customer.retRev)}</span></div>
         </div>
         {(d.customer.rows||[]).map(function(row,ri){return (
           <div key={ri} style={{marginTop:ri>0?20:2,marginBottom:6}}>
             <div style={{display:'flex',alignItems:'center',gap:8,margin:'0 0 10px',paddingBottom:7,borderBottom:'1px solid '+GO_T.line}}><GO_Dot r={row.rag}/> <span style={{fontSize:'var(--text-sm)',fontWeight:'var(--weight-bold)',color:GO_T.ink,letterSpacing:'var(--tracking-wide)'}}>{row.label}</span></div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:12}}>
-              {row.cells.map(function(c,ci){var ex=GO_EXPLAIN[c.k];return <div key={ci} className="go-tile" style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:'var(--radius-none)',padding:'14px 15px',boxShadow:'var(--shadow-panel)'}}><div style={{fontSize:'var(--text-xs)',color:GO_T.mut}}>{c.k}</div><div style={{fontFamily:GO_T.mono,fontSize:'var(--text-xl)',fontWeight:'var(--weight-semi)',margin:'8px 0 4px'}}>{c.v}</div>{ex&&<div className="go-pop"><div className="go-head">{row.label} · {c.k}</div><div style={{fontSize:'var(--text-xs)',color:GO_T.mut,lineHeight:1.5}}>{ex}</div></div>}</div>;})}
+              {row.cells.map(function(c,ci){var ex=GO_EXPLAIN[c.k];return <div key={ci} className="go-tile" style={{background:GO_T.panel,border:'1px solid '+GO_T.line,borderRadius:'var(--radius-none)',padding:'14px 15px',boxShadow:'var(--shadow-panel)'}}><div style={{fontSize:'var(--text-xs)',color:GO_T.mut}}>{c.k}</div><div style={{fontFamily:GO_T.mono,fontSize:'var(--text-xl)',fontWeight:'var(--weight-semi)',margin:'8px 0 4px'}}>{c.v}</div>{ex&&<div className="go-pop"><div className="go-head">{row.label}, {c.k}</div><div style={{fontSize:'var(--text-xs)',color:GO_T.mut,lineHeight:1.5}}>{ex}</div></div>}</div>;})}
             </div>
           </div>);})}
                 {d.cacBlock && (function(){ var C=d.cacBlock;
@@ -13638,24 +13638,24 @@ function GretaOverviewTiers(){
           var rx=function(x){return x==null?"—":Number(x).toFixed(2)+"×";};
           var col=C.rag==="g"?GO_T.green:C.rag==="a"?GO_T.amber:C.rag==="r"?GO_T.red:GO_T.dim;
           var cell=function(k,v,sub,hi){var ex=GO_EXPLAIN[(String(v).indexOf("×")>=0?"return on ad spend:":"cost per new customer:")+k]||GO_EXPLAIN[k]||"";return <div className="go-tile" style={{background:GO_T.panel,border:"1px solid "+(hi||GO_T.line),borderRadius:'var(--radius-none)',padding:"14px 15px",boxShadow:"var(--shadow-panel)"}}><div style={{fontSize:'var(--text-xs)',color:GO_T.mut}}>{k}</div><div style={{fontFamily:GO_T.mono,fontSize:'var(--text-xl)',fontWeight:'var(--weight-semi)',margin:"8px 0 4px"}}>{v}</div><div style={{fontSize:'var(--text-xs)',color:GO_T.dim}}>{sub}</div>{ex&&<div className="go-pop"><div className="go-head">{k}</div><div style={{fontSize:'var(--text-xs)',color:GO_T.mut,lineHeight:1.5}}>{ex}</div></div>}</div>;};
-          var ltvSub=C.opc.toFixed(2)+" orders/cust"+(C.repeatPct!=null?" · "+C.repeatPct+"% repeat":"");
+          var ltvSub=C.opc.toFixed(2)+" orders/cust"+(C.repeatPct!=null?", "+C.repeatPct+"% repeat":"");
           var tgtSub=C.goalConfirmed?"at your plan\u2019s budget":"what a first order keeps";
           // 0397: while repeat profit does not cover running costs the lifetime ceiling is the first order's
           if (C.cac.ltv!=null && C.cac.first!=null && Math.abs(C.cac.ltv-C.cac.first)<0.01) ltvSub="first order only, until repeat profit covers your running costs";
           return <div style={{marginTop:2,marginBottom:6}}>
-            <div style={{fontSize:'var(--text-xs)',color:GO_T.dim,textTransform:"uppercase",letterSpacing:'var(--tracking-wide)',margin:"0 2px 6px"}}>Acquisition efficiency · break-even &amp; optimal</div>
-            <div style={{fontSize:'var(--text-xs)',color:GO_T.mut,margin:"0 2px 4px"}}>cost per new customer — most you can pay per new customer</div>
+            <div style={{fontSize:'var(--text-xs)',color:GO_T.dim,textTransform:"uppercase",letterSpacing:'var(--tracking-wide)',margin:"0 2px 6px"}}>Acquisition efficiency, break-even &amp; optimal</div>
+            <div style={{fontSize:'var(--text-xs)',color:GO_T.mut,margin:"0 2px 4px"}}>cost per new customer, most you can pay per new customer</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:12,marginBottom:9}}>
               {cell("New-customer cost (paid)",g2(C.cac.actual),"spend ÷ new custs",col)}
-              {cell("Break-even · 1st order",g2(C.cac.first),"CM-positive on order 1")}
-              {cell("Break-even · lifetime",g2(C.cac.ltv),ltvSub)}
+              {cell("Break-even, 1st order",g2(C.cac.first),"CM-positive on order 1")}
+              {cell("Break-even, lifetime",g2(C.cac.ltv),ltvSub)}
               {cell("Most the next new customer should cost",g2(C.cac.target),tgtSub)}
             </div>
-            <div style={{fontSize:'var(--text-xs)',color:GO_T.mut,margin:"0 2px 4px"}}>return on ad spend — least you can accept (sales per £ of ads for new customers)</div>
+            <div style={{fontSize:'var(--text-xs)',color:GO_T.mut,margin:"0 2px 4px"}}>return on ad spend, least you can accept (sales per £ of ads for new customers)</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:12}}>
               {cell("Actual return on ad spend (sales per £ of ads for new customers)",rx(C.roas.actual),"new rev ÷ spend",col)}
-              {cell("Break-even · 1st order",rx(C.roas.first),"= 1 ÷ contribution")}
-              {cell("Break-even · lifetime",rx(C.roas.ltv),"customer lifetime value-adjusted floor")}
+              {cell("Break-even, 1st order",rx(C.roas.first),"= 1 ÷ contribution")}
+              {cell("Break-even, lifetime",rx(C.roas.ltv),"customer lifetime value-adjusted floor")}
               {cell("What the next £ of ads should bring",rx(C.roas.target),tgtSub)}
             </div>
             <div style={{fontSize:'var(--text-xs)',color:col,marginTop:7,display:"flex",gap:6,alignItems:"baseline"}}><GO_Dot r={C.rag} style={{marginTop:4}}/> <span>{C.verdict}</span></div>
@@ -13680,7 +13680,7 @@ function GretaOverviewTiers(){
               </tr>))}</tbody>
           </table>
         </div>
-        {d.emailBlock && (function () { var E = d.emailBlock; var cell = function (k, v, sub) { return <div style={{ background: GO_T.panel, border: '1px solid ' + GO_T.line, borderRadius:'var(--radius-none)', padding: '9px 11px', boxShadow: 'var(--shadow-panel)' }}><div style={{ fontSize: 'var(--text-xs)', color: GO_T.mut }}>{k}</div><div style={{ fontFamily: GO_T.mono, fontSize: 'var(--text-base)', fontWeight:'var(--weight-semi)', marginTop: 2 }}>{v}</div><div style={{ fontSize: 'var(--text-xs)', color: GO_T.dim }}>{sub}</div></div>; }; return <div style={{ marginTop: 10 }}><div style={{ fontSize: 'var(--text-xs)', color: GO_T.dim, textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)', margin: '0 2px 6px' }}>Email breakdown · Klaviyo</div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(130px,1fr))', gap: 8 }}>{cell('Email revenue', GO_gbp(E.total_rev), E.total_orders + ' orders')}{cell('Campaign rev', GO_gbp(E.campaign_rev), E.campaign_orders + ' orders')}{cell('Flow rev', GO_gbp(E.flow_rev), E.flow_orders + ' orders')}{cell('Rev / 1k sent', GO_gbp(E.rev_per_1k_sent), Math.round(E.total_sends / 1000) + 'k sent')}</div></div>; })()}
+        {d.emailBlock && (function () { var E = d.emailBlock; var cell = function (k, v, sub) { return <div style={{ background: GO_T.panel, border: '1px solid ' + GO_T.line, borderRadius:'var(--radius-none)', padding: '9px 11px', boxShadow: 'var(--shadow-panel)' }}><div style={{ fontSize: 'var(--text-xs)', color: GO_T.mut }}>{k}</div><div style={{ fontFamily: GO_T.mono, fontSize: 'var(--text-base)', fontWeight:'var(--weight-semi)', marginTop: 2 }}>{v}</div><div style={{ fontSize: 'var(--text-xs)', color: GO_T.dim }}>{sub}</div></div>; }; return <div style={{ marginTop: 10 }}><div style={{ fontSize: 'var(--text-xs)', color: GO_T.dim, textTransform: 'uppercase', letterSpacing: 'var(--tracking-wide)', margin: '0 2px 6px' }}>Email breakdown, Klaviyo</div><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(130px,1fr))', gap: 8 }}>{cell('Email revenue', GO_gbp(E.total_rev), E.total_orders + ' orders')}{cell('Campaign rev', GO_gbp(E.campaign_rev), E.campaign_orders + ' orders')}{cell('Flow rev', GO_gbp(E.flow_rev), E.flow_orders + ' orders')}{cell('Rev / 1k sent', GO_gbp(E.rev_per_1k_sent), Math.round(E.total_sends / 1000) + 'k sent')}</div></div>; })()}
         <GO_Insight i={d.insights.channel}/>
         <MetaAdDrilldown/>
         <GoogleAdDrilldown/>
@@ -13758,9 +13758,9 @@ function GP_Metric(p) {
 // "−£163 ÷ 60% + £25,865 ≈ £150,000" on the sales basis.
 const GP_FLAG_TEXT = {
   beyond_spend_seen: 'At least one month asks for more than 1.5× the most you have ever spent on ads in a month. Greta extends your spend curve to get there, so treat that month as a stretch, not a forecast.',
-  below_spend_seen: 'At least one month plans less than half the least you have ever spent in a month — below anything the curve has seen.',
+  below_spend_seen: 'At least one month plans less than half the least you have ever spent in a month, below anything the curve has seen.',
   capped_at_spend_seen: 'Greta stopped the growth at three times your biggest month of ad spend: beyond that the curve is guesswork, not evidence.',
-  goal_above_max: 'That profit is beyond what Greta can see a way to this quarter, so the plan below is the most profitable one instead.',
+  goal_above_max: 'That profit is out of reach this quarter, so the plan below is the most profitable one instead.',
   met_by_returning: 'Returning customers alone are on course to reach this, so no ad budget is needed for it.',
   // 0353: the golden rule. While returning customers do not cover the running costs, each new customer
   // has to pay for themselves on the first order; past the best spend the last ones this budget buys do not.
@@ -13771,7 +13771,7 @@ const GP_FLAG_TEXT = {
       + 'Past it, the last customers this budget buys cost '
       + (b.marginal_cost_per_new_customer ? 'about ' + GP_gbp(b.marginal_cost_per_new_customer) : 'more')
       + ' each, against ' + (b.first_order_profit ? GP_gbp(b.first_order_profit) : 'what')
-      + ' their first order keeps. Greta will not suggest spending past it, so reaching this goal needs more from returning customers, or a lower goal.';
+      + ' their first order keeps. The plan does not spend past it, so reaching this goal needs more from returning customers, or a lower goal.';
   },
   // 0378: the plan now stops at the best spend while the rule fails, and says what it held back
   held_at_first_order_profit: d => {
@@ -13811,14 +13811,14 @@ function GP_PlanBreakdown({ d }) {
   const hi = Math.max(1, ...idx);
   const held = (d.flags || []).indexOf('held_at_first_order_profit') >= 0;
   const basisLine = d.basis === 'revenue' && held
-    ? <>You asked for <b>{GP_gbp(d.goal)}</b> of sales. Returning customers bring <b>{GP_gbp(b.returning_sales)}</b> on their own — their recent rate, adjusted for the season. New customers bought with a budget that still pays for itself on their first order bring <b>{GP_gbp(b.new_sales)}</b> more, so this plan reaches about <b>{GP_gbp(d.revenue_target)}</b>.</>
+    ? <>You asked for <b>{GP_gbp(d.goal)}</b> of sales. Returning customers bring <b>{GP_gbp(b.returning_sales)}</b> on their own, their recent rate, adjusted for the season. New customers bought with a budget that still pays for itself on their first order bring <b>{GP_gbp(b.new_sales)}</b> more, so this plan reaches about <b>{GP_gbp(d.revenue_target)}</b>.</>
     : d.basis === 'revenue'
-    ? <>You asked for <b>{GP_gbp(d.goal)}</b> of sales. Returning customers bring <b>{GP_gbp(b.returning_sales)}</b> on their own — their recent rate, adjusted for the season. The other <b>{GP_gbp(b.new_sales)}</b> has to come from new customers, and Greta found the ad budget that buys it, given how your new-customer sales respond to spend and when demand peaks.</>
+    ? <>You asked for <b>{GP_gbp(d.goal)}</b> of sales. Returning customers bring <b>{GP_gbp(b.returning_sales)}</b> on their own, their recent rate, adjusted for the season. The other <b>{GP_gbp(b.new_sales)}</b> has to come from new customers, and this is the ad budget that buys it, given how your new-customer sales respond to spend and when demand peaks.</>
     : d.basis === 'cam' && (d.flags || []).indexOf('goal_above_max') >= 0
-    ? <>You asked for <b>{GP_gbp(d.goal)}</b> of profit after ads. That is more than any budget reaches this quarter, so Greta planned the budget that makes the most: past it, each extra pound of ads brings back less than a pound of profit.</>
+    ? <>You asked for <b>{GP_gbp(d.goal)}</b> of profit after ads. That is more than any budget reaches this quarter, so this is the budget that makes the most: past it, each extra pound of ads brings back less than a pound of profit.</>
     : d.basis === 'cam'
-    ? <>You asked for <b>{GP_gbp(d.goal)}</b> of profit after ads, and Greta treats it as a floor: this is the most growth that still clears it — the biggest budget at which profit after ads stays at your goal{(d.flags || []).indexOf('capped_at_spend_seen') >= 0 ? ', stopped at three times your biggest month of spend' : ''}.</>
-    : <>No goal set, so this carries your recent ad spend — about <b>{GP_gbp(inp.base_monthly_spend)}</b> a month — through the quarter, spread toward the months where it buys most.</>;
+    ? <>You asked for <b>{GP_gbp(d.goal)}</b> of profit after ads, treated as a floor: this is the most growth that still clears it, the biggest budget at which profit after ads stays at your goal{(d.flags || []).indexOf('capped_at_spend_seen') >= 0 ? ', stopped at three times your biggest month of spend' : ''}.</>
+    : <>No goal set, so this carries your recent ad spend, about <b>{GP_gbp(inp.base_monthly_spend)}</b> a month, through the quarter, spread toward the months where it buys most.</>;
 
   const td = d.to_date;
   return (<div className="gp-plan">
@@ -13841,7 +13841,7 @@ function GP_PlanBreakdown({ d }) {
       <p className="gp-plan-say">{retShare != null ? 'Returning customers bring ' + fmtPctN(retShare) + ' of the sales and ' + GP_gbp(b.returning_profit) + ' of profit at no ad cost. ' : ''}
         {b.ads > 0 ? (newPays
           ? 'New customers cover their own ads with ' + GP_gbp(b.new_profit_after_ads) + ' to spare.'
-          : 'New customers cost ' + GP_gbp(-b.new_profit_after_ads) + ' more in ads than their first orders earn this quarter — the return comes when they buy again.') : ''}</p>
+          : 'New customers cost ' + GP_gbp(-b.new_profit_after_ads) + ' more in ads than their first orders earn this quarter, the return comes when they buy again.') : ''}</p>
     </section>
 
     {b.cost_per_new_customer != null && (<section className="gp-plan-sec">
@@ -13855,7 +13855,7 @@ function GP_PlanBreakdown({ d }) {
         ? 'On average a new customer pays for themselves on the first order. '
         : 'On average a new customer costs more than their first order earns, so the plan relies on them coming back. '}
         {b.marginal_cost_per_new_customer > b.first_order_profit
-          ? 'The last customers the budget buys cost ' + fmtMoney(b.marginal_cost_per_new_customer, 2) + ' each — more than the ' + fmtMoney(b.first_order_profit, 2) + ' their first order earns. That is the edge of what is worth buying.'
+          ? 'The last customers the budget buys cost ' + fmtMoney(b.marginal_cost_per_new_customer, 2) + ' each, more than the ' + fmtMoney(b.first_order_profit, 2) + ' their first order earns. That is the edge of what is worth buying.'
           : 'Even the last customers the budget buys earn back their cost on the first order, so there is room to spend more.'}</p>
     </section>)}
 
@@ -13892,16 +13892,16 @@ function GP_PlanBreakdown({ d }) {
             return <rect key={i} x={i * 20 + 2} y={64 - h} width="16" height={h} fill={on ? PAL.sales : PAL.quiet}><title>{GP_MONTH_NAME[i] + ': ' + v3WalkDp(v, 2) + '× an average month'}</title></rect>;
           })}
         </svg>
-        <figcaption><span>Jan</span><span>Sales against an average month · this quarter highlighted</span><span>Dec</span></figcaption>
+        <figcaption><span>Jan</span><span>Sales against an average month, this quarter highlighted</span><span>Dec</span></figcaption>
       </figure>)}
       <p className="gp-plan-say">{s.source === 'own'
         ? 'Worked out from your own ' + (s.years || '') + ' years of trading, with your growth taken out so a good year does not read as a busy season.'
         : s.source === 'blended'
           ? 'Worked out from your first year of trading, blended with a typical UK online-retail pattern because one year is thin evidence. It sharpens as your history builds.'
-          : 'Greta does not have a full year of your trading yet, so this uses a typical UK online-retail pattern — soft spring and summer, a lift into October, a November and December peak. It is replaced by your own pattern once you have a year.'}
-        {' '}How far to lean on it: <b>{(V3_CONF[s.confidence] && V3_CONF[s.confidence].label) || s.confidence}</b>{s.year_to_year_spread != null && Number(s.year_to_year_spread) > 0.35 ? ' — your years differ quite a lot from each other' : ''}.</p>
-      {doubling != null && <p className="gp-plan-say">Doubling the ad budget buys about {v3WalkDp(doubling, 2)}× the new-customer sales, not 2× — {inp.beta_source === 'measured' ? 'measured from your own spend history' : 'a standard assumption until Greta can measure yours'}. The starting point is your last {inp.base_months} full month{inp.base_months === 1 ? '' : 's'} ({inp.base_from ? gpMonthName(inp.base_from) : ''} to {inp.base_to ? gpMonthName(inp.base_to) : ''}) with the season taken out.</p>}
-      {ceil && ceil.best_cam != null && <p className="gp-plan-say">The most profit after ads Greta can see this quarter is about <b>{GP_gbp(ceil.best_cam)}</b>, at about {GP_gbp(ceil.best_spend)} of ads and {GP_gbp(ceil.best_sales)} of sales. Spending past that buys sales but costs profit.</p>}
+          : 'There is no full year of your trading yet, so this uses a typical UK online-retail pattern, soft spring and summer, a lift into October, a November and December peak. It is replaced by your own pattern once you have a year.'}
+        {' '}How far to lean on it: <b>{(V3_CONF[s.confidence] && V3_CONF[s.confidence].label) || s.confidence}</b>{s.year_to_year_spread != null && Number(s.year_to_year_spread) > 0.35 ? ', your years differ quite a lot from each other' : ''}.</p>
+      {doubling != null && <p className="gp-plan-say">Doubling the ad budget buys about {v3WalkDp(doubling, 2)}× the new-customer sales, not 2×, {inp.beta_source === 'measured' ? 'measured from your own spend history' : 'a standard assumption until yours can be measured'}. The starting point is your last {inp.base_months} full month{inp.base_months === 1 ? '' : 's'} ({inp.base_from ? gpMonthName(inp.base_from) : ''} to {inp.base_to ? gpMonthName(inp.base_to) : ''}) with the season taken out.</p>}
+      {ceil && ceil.best_cam != null && <p className="gp-plan-say">The most profit after ads in reach this quarter is about <b>{GP_gbp(ceil.best_cam)}</b>, at about {GP_gbp(ceil.best_spend)} of ads and {GP_gbp(ceil.best_sales)} of sales. Spending past that buys sales but costs profit.</p>}
     </section>
 
     <button type="button" className="gp-plan-more" aria-expanded={open} onClick={() => setOpen(!open)}>
@@ -13909,7 +13909,7 @@ function GP_PlanBreakdown({ d }) {
     </button>
     {open && (<div className="gp-plan-how">
       <p className="gp-plan-say">{basisLine}</p>
-      <p className="gp-plan-say">Every pound of sales keeps {fmtPctN(d.cm_ratio_used)} after product and order costs — that is profit before ads. Profit after ads is that, less the ad budget. New customers are counted at a new customer’s order value ({fmtMoney(b.new_aov, 2)}), not the average across all orders.</p>
+      <p className="gp-plan-say">Every pound of sales keeps {fmtPctN(d.cm_ratio_used)} after product and order costs, that is profit before ads. Profit after ads is that, less the ad budget. New customers are counted at a new customer’s order value ({fmtMoney(b.new_aov, 2)}), not the average across all orders.</p>
     </div>)}
   </div>);
 }
@@ -13940,7 +13940,7 @@ function GP_ChannelHealth(p){
     <div style={{ background: GP_T.panel, border:'1px solid '+GP_T.line, borderRadius:'var(--radius-none)', padding:'14px 16px', marginBottom:16 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
         <h2 className="v3-sec-title gp-h">Retention balance <span className="v3-muted">new vs returning</span></h2>
-        <span style={{ fontSize:'var(--text-xs)', color:GP_T.dim }}>{h.category} &middot; {h.band_source==='brand_override'?'custom band':'category default'}{!edit ? <button onClick={openEdit} style={{ marginLeft:8, fontSize:'var(--text-xs)', color:GP_T.mut, background:'none', border:'1px solid '+GP_T.line, borderRadius:'var(--radius-md)', padding:'2px 7px', cursor:'pointer' }}>Edit band</button> : null}</span>
+        <span style={{ fontSize:'var(--text-xs)', color:GP_T.dim }}>{h.category}, {h.band_source==='brand_override'?'custom band':'category default'}{!edit ? <button onClick={openEdit} style={{ marginLeft:8, fontSize:'var(--text-xs)', color:GP_T.mut, background:'none', border:'1px solid '+GP_T.line, borderRadius:'var(--radius-md)', padding:'2px 7px', cursor:'pointer' }}>Edit band</button> : null}</span>
       </div>
       {edit && f ? (
         <div style={{ marginTop:8 }}>
@@ -13969,17 +13969,17 @@ function GP_ChannelHealth(p){
             <span>0%</span><span>healthy {Math.round(lo)}&ndash;{Math.round(hi)}% returning</span><span>{SCALE}%</span>
           </div>
           <div style={{ fontSize:'var(--text-sm)', color:ragCol, fontWeight:'var(--weight-semi)', margin:'11px 0 5px' }}>
-            {ret.toFixed(0)}% returning / {(100-ret).toFixed(0)}% new{d!=null ? <span style={{ fontSize:'var(--text-xs)', color:GP_T.dim, fontWeight:'var(--weight-normal)' }}> &middot; {(d>=0?'+':'−')+Math.abs(d).toFixed(0)+' pts on the 30 days before'}</span> : null}
+            {ret.toFixed(0)}% returning / {(100-ret).toFixed(0)}% new{d!=null ? <span style={{ fontSize:'var(--text-xs)', color:GP_T.dim, fontWeight:'var(--weight-normal)' }}>, {(d>=0?'+':'−')+Math.abs(d).toFixed(0)+' pts on the 30 days before'}</span> : null}
           </div>
           <div style={{ fontSize:'var(--text-sm)', color:GP_T.mut, lineHeight:1.55 }}>{h.guidance}</div>
           <div style={{ display:'flex', gap:20, marginTop:11, paddingTop:10, borderTop:'1px solid '+GP_T.line, flexWrap:'wrap' }}>
             <div>
-              <div style={{ fontSize:'var(--text-xs)', color:GP_T.dim }}>Email &middot; last-click</div>
+              <div style={{ fontSize:'var(--text-xs)', color:GP_T.dim }}>Email, last-click</div>
               <div style={{ fontFamily:GP_T.mono, fontSize:'var(--text-base)' }}>{emailLc!=null?emailLc.toFixed(1)+'%':'—'}{ed!=null ? <span style={{ fontSize:'var(--text-xs)', color:ed>=0?GP_T.green:GP_T.red, marginLeft:5 }}>{(ed>=0?'+':'−')+Math.abs(ed).toFixed(1)}</span> : null}</div>
               <div style={{ fontSize:'var(--text-xs)', color:GP_T.dim }}>target {Math.round(Number(h.email_low))}&ndash;{Math.round(Number(h.email_high))}%</div>
             </div>
             <div>
-              <div style={{ fontSize:'var(--text-xs)', color:GP_T.dim }}>Email &middot; Klaviyo</div>
+              <div style={{ fontSize:'var(--text-xs)', color:GP_T.dim }}>Email, Klaviyo</div>
               <div style={{ fontFamily:GP_T.mono, fontSize:'var(--text-base)' }}>{h.email_share_klaviyo_pct!=null?Number(h.email_share_klaviyo_pct).toFixed(0)+'%':'—'}</div>
               <div style={{ fontSize:'var(--text-xs)', color:GP_T.dim }}>over-counts &mdash; context</div>
             </div>
@@ -14005,7 +14005,7 @@ function GP_ChannelMix(p){
     <div style={{ background: GP_T.panel, border:'1px solid '+GP_T.line, borderRadius:'var(--radius-none)', padding:'14px 16px', marginBottom:16 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
         <h2 className="v3-sec-title gp-h">Where revenue comes from <span className="v3-muted">last 30 days</span></h2>
-        <span style={{ fontSize:'var(--text-xs)', color:GP_T.dim }}>paid {Math.round(100*paidRev/total)}% &middot; non-paid {Math.round(100*(1-paidRev/total))}%</span>
+        <span style={{ fontSize:'var(--text-xs)', color:GP_T.dim }}>paid {Math.round(100*paidRev/total)}%, non-paid {Math.round(100*(1-paidRev/total))}%</span>
       </div>
       <div style={{ fontSize:'var(--text-sm)', color:GP_T.dim, marginBottom:10 }}>Shopify last-click attribution, reconciled to your total Shopify sales &mdash; the basis for each channel's target.</div>
       {cur.map(function(r,i){
@@ -14016,13 +14016,13 @@ function GP_ChannelMix(p){
         return (
           <div key={i} style={{ padding:'7px 0', borderTop:'1px solid '+GP_T.line }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8, fontSize:'var(--text-sm)' }}>
-              <span style={{ fontWeight:'var(--weight-semi)' }}>{LBL[r.channel]||r.channel}{r.channel==='referral' && Number(r.orders_with_discount)>0 ? <span style={{ color:GP_T.dim, fontWeight:'var(--weight-normal)' }}> &middot; {r.orders_with_discount} coded</span> : null}</span>
+              <span style={{ fontWeight:'var(--weight-semi)' }}>{LBL[r.channel]||r.channel}{r.channel==='referral' && Number(r.orders_with_discount)>0 ? <span style={{ color:GP_T.dim, fontWeight:'var(--weight-normal)' }}>, {r.orders_with_discount} coded</span> : null}</span>
               <span style={{ fontFamily:GP_T.mono }}>{GP_gbp(rev)} <span style={{ color:GP_T.dim }}>({pct.toFixed(0)}%)</span>{d!=null ? <span style={{ color:d>=0?GP_T.green:GP_T.red, marginLeft:6 }}>{(d>=0?'+':'−')+Math.abs(d).toFixed(0)+'%'}</span> : null}</span>
             </div>
             <div style={{ position:'relative', height:5, borderRadius:'var(--radius-sm)', background:'var(--color-surface)', margin:'5px 0 3px', overflow:'hidden' }}>
               <div style={{ position:'absolute', left:0, top:0, bottom:0, width:pct+'%', background:col, opacity:0.8 }}/>
             </div>
-            <div style={{ fontSize:'var(--text-xs)', color:GP_T.dim }}>{r.new_orders} new &middot; {r.returning_orders} returning ({ret}% ret) &middot; average order value {GP_gbp(r.aov)}</div>
+            <div style={{ fontSize:'var(--text-xs)', color:GP_T.dim }}>{r.new_orders} new, {r.returning_orders} returning ({ret}% ret), average order value {GP_gbp(r.aov)}</div>
           </div>
         );
       })}
@@ -14115,7 +14115,7 @@ function GP_SpendCurve(p) {
       {recentAbove > 0 && (
         <div style={{ fontSize: 'var(--text-sm)', color: GP_T.red, lineHeight: 1.6, marginBottom: 14 }}>
           {recentAbove} of your last {recent.length} months cost more to acquire a customer than an average
-          order returns. That is measured, not modelled — it holds whatever the curve turns out to be.
+          order returns. That is measured, not modelled, it holds whatever the curve turns out to be.
         </div>
       )}
 
@@ -14138,20 +14138,20 @@ function GP_SpendCurve(p) {
           var bad = !!d.cac_above_contribution;
           return <circle key={i} cx={X(Number(d.spend))} cy={Y(Number(d.cac))} r="4"
             fill={svgCol(bad ? GP_T.red : GP_T.accent)} opacity={bad ? 0.95 : 0.7}>
-            <title>{String(d.month).slice(0, 7) + ' · ' + GP_gbp(d.spend) + ' spend · £' + Number(d.cac).toFixed(2) + ' per customer'}</title>
+            <title>{String(d.month).slice(0, 7) + ', ' + GP_gbp(d.spend) + ' spend, £' + Number(d.cac).toFixed(2) + ' per customer'}</title>
           </circle>;
         })}
         <line x1={ML} x2={W - MR} y1={MT + ph} y2={MT + ph} stroke={svgCol(GP_T.line)} strokeWidth="1" />
         {[0.25, 0.5, 0.75, 1].map(function (f, i) {
           return <text key={i} x={X(x1 * f)} y={H - 10} textAnchor="middle" fontSize="11" fill={svgCol(GP_T.dim)} fontFamily={GP_T.mono}>{tick(x1 * f)}</text>;
         })}
-        <text x={ML} y={H - 10} textAnchor="start" fontSize="11" fill={svgCol(GP_T.dim)}>monthly spend →</text>
+        <text x={ML} y={H - 10} textAnchor="start" fontSize="11" fill={svgCol(GP_T.dim)}>monthly spend</text>
       </svg>
 
       {/* MODELLED — carries the band */}
       <div style={{ fontSize: 'var(--text-xs)', letterSpacing: 'var(--tracking-wide)', textTransform: 'uppercase', color: GP_T.dim, margin: '14px 0 8px' }}>What the curve models</div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10 }}>
-        <GP_Metric k="How fast customers get dearer" v={beta.toFixed(2)} sub={'0 = no rise · 1 = costs rise as fast as spend · range ' + bLo.toFixed(2) + '–' + bHi.toFixed(2)} />
+        <GP_Metric k="How fast customers get dearer" v={beta.toFixed(2)} sub={'0 = no rise, 1 = costs rise as fast as spend, range ' + bLo.toFixed(2) + '–' + bHi.toFixed(2)} />
         <GP_Metric k="The next customer costs you" v={fmtMoney(c.marginal_cac_now, 2)}
           hi={c.marginal_cac_now != null && Number(c.marginal_cac_now) > cm} sub={'at ' + GP_gbp(cur) + '/mo'} />
         <GP_Metric k="Most you can spend and still profit" hi={!indet}
@@ -14232,7 +14232,7 @@ function GP_CurveConstraint(p) {
       <h2 className="v3-sec-title gp-h">Why the curve bends</h2>
       <div style={{ fontSize: 'var(--text-sm)', color: GP_T.mut, lineHeight: 1.6, maxWidth: 620, marginBottom: 12 }}>
         Rising cost per customer has exactly two causes, and they have opposite fixes. Your CAC alone
-        cannot tell them apart — this splits it.
+        cannot tell them apart, this splits it.
       </div>
 
       <svg viewBox={'0 0 ' + W + ' ' + H} width="100%" role="img"
@@ -14251,7 +14251,7 @@ function GP_CurveConstraint(p) {
             identified</b>. More months at distinct spend levels will separate them.</span>
         ) : auction < 0 ? (
           <span>
-            Your cost per click <b style={{ color: GP_T.green }}>falls</b> as you spend more — there is no
+            Your cost per click <b style={{ color: GP_T.green }}>falls</b> as you spend more, there is no
             auction penalty at all. <b style={{ color: GP_T.ink }}>All</b> of your saturation is conversion:
             the traffic you buy at the margin converts worse. Cheaper media will not raise your ceiling.
           </span>
@@ -14296,8 +14296,8 @@ function GP_CurveHistory(p) {
       padding: '16px 18px', marginTop: 12 }}>
       <h2 className="v3-sec-title gp-h">How the read has changed</h2>
       <div style={{ fontSize: 'var(--text-sm)', color: GP_T.mut, lineHeight: 1.6, maxWidth: 620, marginBottom: 12 }}>
-        What Greta could have told you at each month-end, on the data it had then. The shaded band is
-        the 95% interval — watch it narrow as evidence accumulates.
+        What the data showed at each month-end, using only what was known then. The shaded band is
+        the 95% interval, watch it narrow as evidence accumulates.
       </div>
 
       <svg viewBox={'0 0 ' + W + ' ' + H} width="100%" role="img"
@@ -14313,13 +14313,13 @@ function GP_CurveHistory(p) {
         })}
         {/* above beta = 1 there is no finite ceiling at all */}
         <text x={W - MR} y={Y(1) - 5} textAnchor="end" fontSize="11" fill={GP_T.dim}>
-          β ≥ 1 · no ceiling exists
+          β ≥ 1, no ceiling exists
         </text>
         <polygon points={band} fill={GP_T.accent} opacity="0.13" />
         <path d={line} fill="none" stroke={GP_T.accent} strokeWidth="2" />
         {rows.map(function (r, i) {
           return <circle key={i} cx={X(i)} cy={Y(Number(r.beta))} r="2.6" fill={GP_T.accent}>
-            <title>{String(r.month).slice(0, 7) + ' · β ' + Number(r.beta).toFixed(2) +
+            <title>{String(r.month).slice(0, 7) + ', β ' + Number(r.beta).toFixed(2) +
               ' (95% ' + Number(r.ci_low).toFixed(2) + '–' + Number(r.ci_high).toFixed(2) +
               ') on ' + r.n + ' months'}</title>
           </circle>;
@@ -14344,12 +14344,12 @@ function GP_CurveHistory(p) {
       {/* The distinction this whole panel turns on. Do not soften it. */}
       <div style={{ fontSize: 'var(--text-sm)', color: GP_T.mut, lineHeight: 1.65, marginTop: 12 }}>
         {narrowed
-          ? <span>The interval is <b style={{ color: GP_T.ink }}>narrowing</b> — the estimate is getting
-              sharper as months accumulate. That is a statement about what Greta knows, <b
+          ? <span>The interval is <b style={{ color: GP_T.ink }}>narrowing</b>, the estimate is getting
+              sharper as months accumulate. That is a statement about the estimate, <b
               style={{ color: GP_T.ink }}>not</b> evidence that your curve itself has moved; a formal
               test for that is not significant on this data.</span>
           : <span>The interval has <b style={{ color: GP_T.ink }}>stopped narrowing</b>. More months of
-              the same spending pattern will not sharpen this — it needs deliberate variation in spend,
+              the same spending pattern will not sharpen this, it needs deliberate variation in spend,
               or a geo-holdout.</span>}
       </div>
     </div>
@@ -14417,7 +14417,7 @@ function GP_CurveLevers(p) {
       })}
 
       <div style={{ fontSize: 'var(--text-xs)', color: GP_T.dim, lineHeight: 1.6, marginTop: 12 }}>
-        <b style={{ color: GP_T.mut }}>Certain effect</b> is arithmetic — it holds whatever your curve
+        <b style={{ color: GP_T.mut }}>Certain effect</b> is arithmetic, it holds whatever your curve
         turns out to be. <b style={{ color: GP_T.mut }}>Affordable spend</b> is modelled through β and
         carries its full interval{p.ciAdmitsNoCeiling ? ', which here is open at the flat end' : ''}.
         These are not independent dials: bundling that lifts order value often costs conversion.
@@ -14481,8 +14481,8 @@ function GretaPlanPanel({ show } = {}) {
   var cac90P = v3Fig('cac_90d', figPl.rows);
   var canon = {
     'Contribution margin %': oiCmRatio() != null ? fmtPctN(oiCmRatio()) : null,
-    'New-customer CAC': cac90P.value > 0 ? fmtMoney(cac90P.value) + ' · ' + V3_FIG_PER[cac90P.per] : null,
-    'Cohort LTV': UE && Number(UE.ltv_contribution) > 0 ? fmtMoney(UE.ltv_contribution) + ' · first year' : null
+    'New-customer CAC': cac90P.value > 0 ? fmtMoney(cac90P.value) + ', ' + V3_FIG_PER[cac90P.per] : null,
+    'Cohort LTV': UE && Number(UE.ltv_contribution) > 0 ? fmtMoney(UE.ltv_contribution) + ', first year' : null
   };
   var P = (typeof window !== 'undefined' && window.FRKL_PLAN) || { readiness: [], goal: null, period: { start: '', end: '' } };
   // The Growth feeds are fetched here rather than on page load: two of them take 26s and 10s,
@@ -14597,7 +14597,7 @@ function GretaPlanPanel({ show } = {}) {
   return (
     <div style={wrap} className="gp-wrap">
       {/* The page head already names the page and asks its question; this only says which period. */}
-      {!(UI_V3 && SHOW !== 'growth') && <div className="v3-kick">This quarter · {v3Day(P.period.start)} – {v3Day(P.period.end, true)}</div>}
+      {!(UI_V3 && SHOW !== 'growth') && <div className="v3-kick">This quarter, {v3Day(P.period.start)} – {v3Day(P.period.end, true)}</div>}
 
       {/* readiness gate */}
       {isReady && (<div style={{ borderTop: '1px solid ' + GP_T.line, padding: 'var(--space-6) 0', marginBottom: 16 }}>
@@ -14605,7 +14605,7 @@ function GretaPlanPanel({ show } = {}) {
           <h2 className="v3-sec-title gp-h">Is there enough data to plan?</h2>
           {/* "0 of 0 ready · ready to plan" was what a failed read looked like. */}
           {readiness.length
-            ? <div style={{ fontSize: 'var(--text-sm)', color: blocking.length ? GP_T.amber : GP_T.green }}>{readyCount} of {readiness.length} ready{blocking.length ? ' · ' + blocking.length + ' still needed before Greta can set targets' : ' · ready to plan'}</div>
+            ? <div style={{ fontSize: 'var(--text-sm)', color: blocking.length ? GP_T.amber : GP_T.green }}>{readyCount} of {readiness.length} ready{blocking.length ? ', ' + blocking.length + ' still needed before targets can be set' : ', ready to plan'}</div>
             : <div style={{ fontSize: 'var(--text-sm)', color: GP_T.dim }}>{gpLiveDown ? 'Couldn’t check your data' : (window.FRKL_PLAN && window.FRKL_PLAN.readinessErr) ? 'Couldn’t check your data just now' : 'Checking your data…'}</div>}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: '6px 22px' }}>
@@ -14639,7 +14639,7 @@ function GretaPlanPanel({ show } = {}) {
           <span style={{ fontSize: 'var(--text-xs)', color: GP_T.dim }}>used in every profit figure</span>
         </div>
         <GP_BrowserCosts econ={econ} setEcon={setEcon} />
-        <div style={{ fontSize: 'var(--text-sm)', color: GP_T.dim, marginBottom: 'var(--space-3)' }}>Overheads are what you pay every month whatever you sell — rent, wages, software. Operating profit is your profit after ads, less these.</div>
+        <div style={{ fontSize: 'var(--text-sm)', color: GP_T.dim, marginBottom: 'var(--space-3)' }}>Overheads are what you pay every month whatever you sell, rent, wages, software. Operating profit is your profit after ads, less these.</div>
         {econ ? (
           <div>
             {/* One place for what the business and each order cost (0221). Units sit inside the box:
@@ -14659,7 +14659,7 @@ function GretaPlanPanel({ show } = {}) {
             <p className="v3-note v3-measure">Product costs come from Shopify, one product at a time, under “Product costs” below. The margin here only fills in for products that have no cost yet.</p>
 
             <h3 className="v3-sub v3-gap-top">Each order</h3>
-            <p className="v3-note v3-measure">Enter each one the way your invoices show it — a fixed amount per order, or a share of sales.</p>
+            <p className="v3-note v3-measure">Enter each one the way your invoices show it, a fixed amount per order, or a share of sales.</p>
             <div className="v3-form-grid">
               {GP_LINES.map(function (k) {
                 var pct = econ[k + 'U'] === 'pct';
@@ -14692,13 +14692,13 @@ function GretaPlanPanel({ show } = {}) {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginTop: 'var(--space-4)', flexWrap: 'wrap' }}>
               <button className="v3-btn v3-btn-p" onClick={saveEcon} disabled={busy}>{busy ? 'Saving…' : 'Save costs'}</button>
-              {ecMsg === 'ok' && <span style={{ color: GP_T.green, fontSize: 'var(--text-sm)' }}>Saved — every profit figure now uses these costs.</span>}
+              {ecMsg === 'ok' && <span style={{ color: GP_T.green, fontSize: 'var(--text-sm)' }}>Saved. Every profit figure now uses these costs.</span>}
               {ecMsg && ecMsg.indexOf('err') === 0 && <span style={{ color: GP_T.red, fontSize: 'var(--text-sm)' }}>{ecMsg.slice(4)}</span>}
               
             </div>
           </div>
         ) : (
-          <div style={{ fontSize: 'var(--text-sm)', color: GP_T.dim }}>{gpLiveDown ? v3NoBrand('your costs') : (window.FRKL_PLAN && window.FRKL_PLAN.configErr) ? 'Greta couldn’t load your costs just now. Refreshing the page usually sorts it.' : 'Loading your costs…'}</div>
+          <div style={{ fontSize: 'var(--text-sm)', color: GP_T.dim }}>{gpLiveDown ? v3NoBrand('your costs') : (window.FRKL_PLAN && window.FRKL_PLAN.configErr) ? 'Your costs could not load just now. Refreshing the page usually sorts it.' : 'Loading your costs…'}</div>
         )}
       </div>)}
 
@@ -14746,8 +14746,8 @@ function GretaPlanPanel({ show } = {}) {
             </tbody>
           </table>
           <div style={{ fontSize: 'var(--text-xs)', color: GP_T.dim, marginTop: 8 }}>
-            Focus: <b style={{ color: GP_T.ink }}>{String(P.channels[0].channel_type).replace(/_/g, ' ')}</b> — {P.channels[0].action}
-            {P.channels[0].phi_is_assumed ? <span> · real return on ad spend uses a <b>typical brand’s</b> share of sales the ads really cause, not yet measured: pause ads in one area for a few weeks to confirm.</span> : null}
+            Focus: <b style={{ color: GP_T.ink }}>{String(P.channels[0].channel_type).replace(/_/g, ' ')}</b>, {P.channels[0].action}
+            {P.channels[0].phi_is_assumed ? <span>, real return on ad spend uses a <b>typical brand’s</b> share of sales the ads really cause, not yet measured: pause ads in one area for a few weeks to confirm.</span> : null}
           </div>
         </div>
       ) : null}
@@ -14763,7 +14763,7 @@ function GretaPlanPanel({ show } = {}) {
       {isGoal && (<div className="v3-raised" style={{ padding: 'var(--space-6)' }}>
         <V3Anchor id="goal-set"/>
         <h2 style={{ margin: '0 0 var(--space-1)' }}>{UI_V3 && g ? 'Change this quarter’s goal' : 'Set this quarter’s goal'}</h2>
-        <p className="micro muted" style={{ margin: '0 0 var(--space-4)' }}>Pick what you want to aim for. Greta works out the sales, ad budget and new customers it takes.</p>
+        <p className="micro muted" style={{ margin: '0 0 var(--space-4)' }}>Pick the goal. The sales, ad budget and new customers it takes are worked out for you.</p>
         <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div className="v3-seg" role="group" aria-label="Goal basis">
             <button aria-pressed={basis === 'cam'} onClick={function () { setBasis('cam'); }}>Profit after ads</button>
@@ -14778,9 +14778,9 @@ function GretaPlanPanel({ show } = {}) {
         </div>
 
         {/* Only render targets Greta actually derived. When the derivation returns nothing the tiles
-            used to print "NaN", "MER undefined" and "aMER undefined" — a new brand saw that first. */}
+            used to print "NaN", "MER undefined" and "aMER undefined", a new brand saw that first. */}
         {derived && derived.revenue_target == null && (
-          <p className="v3-note" style={{ marginTop: 'var(--space-4)' }}>{derived.message || 'Greta could not work a goal out from your trading yet — it needs a full month of sales.'} You can still type the goal you have in mind above.</p>
+          <p className="v3-note" style={{ marginTop: 'var(--space-4)' }}>{derived.message || 'Greta could not work a goal out from your trading yet, it needs a full month of sales.'} You can still type the goal you have in mind above.</p>
         )}
         {derived && derived.revenue_target != null && (
           <div style={{ marginTop: 'var(--space-5)' }}>
@@ -14797,12 +14797,12 @@ function GretaPlanPanel({ show } = {}) {
             <GP_PlanBreakdown d={derived}/>
             {g && !UI_V3 && (
               <div style={{ fontSize: 'var(--text-xs)', color: GP_T.dim, marginTop: 'var(--space-2)' }}>
-                Current goal ({g.confirmed ? 'confirmed' : 'not yet confirmed'}): sales {GP_gbp(g.revenue_target)} · profit before ads {GP_gbp(g.contribution_margin_target)} · ad budget {GP_gbp(g.spend_cap)}
+                Current goal ({g.confirmed ? 'confirmed' : 'not yet confirmed'}): sales {GP_gbp(g.revenue_target)}, profit before ads {GP_gbp(g.contribution_margin_target)}, ad budget {GP_gbp(g.spend_cap)}
               </div>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginTop: 'var(--space-4)', flexWrap: 'wrap' }}>
               <button className="v3-btn v3-btn-p" onClick={confirm} disabled={busy}>Make this my plan</button>
-              {msg === 'ok' && <span style={{ color: GP_T.green, fontSize: 'var(--text-sm)' }}>Done — Today now tracks your pace against this plan.</span>}
+              {msg === 'ok' && <span style={{ color: GP_T.green, fontSize: 'var(--text-sm)' }}>Done. Home now tracks your pace against this plan.</span>}
               {msg && msg.indexOf('err') === 0 && <span style={{ color: GP_T.red, fontSize: 'var(--text-sm)' }}>{msg.slice(4)}</span>}
               <span style={{ fontSize: 'var(--text-xs)', color: GP_T.dim }}>{derived.months ? 'Confirming stores the month-by-month plan, and Today paces against it.' : 'Worked out from what you keep after product and order costs (' + fmtPctN(derived.cm_ratio_used) + ').'}</span>
             </div>
@@ -14999,7 +14999,7 @@ async function startConnect(provider, opts) {
   if (!ASK || !ASK.endpoint || typeof ASK.getJwt !== 'function') throw new Error('Sign in to reconnect this source.');
   let jwt = '';
   try { jwt = await ASK.getJwt(); } catch (e) { jwt = ''; }
-  if (!jwt) throw new Error('Your session expired — refresh the page and sign in again.');
+  if (!jwt) throw new Error('Your session expired. Refresh the page and sign in again.');
   let r, data;
   try {
     r = await fetch(String(ASK.endpoint).replace(/\/[^/]*$/, '') + '/connect-start', {
@@ -15103,7 +15103,7 @@ async function actionVerb(verb, externalId, extra) {
   }
   let jwt = '';
   try { jwt = await ASK.getJwt(); } catch (e) { jwt = ''; }
-  if (!jwt) throw new Error('Your session expired — refresh the page and sign in again.');
+  if (!jwt) throw new Error('Your session expired. Refresh the page and sign in again.');
   let r, out;
   try {
     r = await fetch(String(ASK.endpoint).replace(/\/[^/]*$/, '') + '/marketing-os', {
@@ -15153,7 +15153,7 @@ function V3Decide({ ext, verb, event, label, confirmLabel, small, onDone, tone }
 }
 function V3Done({ ext, small, onDone, tone }) {
   return <V3Decide ext={ext} verb="action_done" event="action_done"
-                   label="Mark done" confirmLabel="Yes — mark it done" small={small} onDone={onDone} tone={tone}/>;
+                   label="Mark done" confirmLabel="Yes, mark it done" small={small} onDone={onDone} tone={tone}/>;
 }
 // Not done. Declined — and the difference is the whole point of having two verbs rather
 // than one: done says the work happened and invites Greta to check whether it worked,
@@ -15165,7 +15165,7 @@ function V3Done({ ext, small, onDone, tone }) {
 // autoclose paths. No surface has ever been able to write one. This is the missing half.
 function V3Skip({ ext, small, onDone, tone }) {
   return <V3Decide ext={ext} verb="action_skip" event="action_skipped"
-                   label="Skip" confirmLabel="Yes — skip it" small={small} onDone={onDone} tone={tone}/>;
+                   label="Skip" confirmLabel="Yes, skip it" small={small} onDone={onDone} tone={tone}/>;
 }
 
 // What action_start actually returns is the playbook — it changes no state, and never
@@ -15191,7 +15191,7 @@ function V3Steps({ ext, step1 }) {
     const rest = steps.filter(s => String(s || '').trim() !== String(step1 || '').trim());
     return rest.length
       ? <ol className="v3-steps">{rest.map((s, i) => <li key={i}>{v3Tidy(s)}</li>)}</ol>
-      : <p className="v3-sub">That is the only step Greta has recorded for this one.</p>;
+      : <p className="v3-sub">That is the only step recorded for this one.</p>;
   }
   return (<>
     <button type="button" className="v3-btn v3-btn-p" disabled={busy} onClick={go}>
@@ -15240,7 +15240,7 @@ function ConnectionsPanel(){
     },
     {
       id: 'meta', name: 'Meta Ads', icon: 'M', provider: 'meta',
-      description: 'Campaign performance, creative-level data, audience health · includes Instagram',
+      description: 'Campaign performance, creative-level data, audience health, includes Instagram',
       last: lastDate(D.metaDaily),
       installable: false,
     },
@@ -15274,7 +15274,7 @@ function ConnectionsPanel(){
       description: 'Organic posts, reels, stories, follower growth',
       last: lastDate(B.igDaily),
       installable: false,
-      comingSoon: 'Included with Meta Ads · organic API coming soon',
+      comingSoon: 'Included with Meta Ads, organic API coming soon',
     },
   ].filter(src => !(UI_V3 && src.comingSoon));
 
@@ -15347,7 +15347,7 @@ function ConnectionsPanel(){
                 <span className="v3-conn-state" style={{color:c}}><i style={{background:c}}/>{lbl}</span>
               </div>
               {(conn || s.last != null) && <div className="v3-conn-meta">
-                {conn ? 'Connected' + (conn.account_label ? ' · ' + v3AccountWords(conn.account_label) : '') + (syncStr ? ' · synced ' + syncStr : '') + ' · ' : ''}
+                {conn ? 'Connected' + (conn.account_label ? ', ' + v3AccountWords(conn.account_label) : '') + (syncStr ? ', synced ' + syncStr : '') + ', ' : ''}
                 {s.id === 'shopify' ? 'last order' : 'last data'} {ageStr}
               </div>}
               <div className="v3-conn-desc">{s.description}</div>
@@ -15369,9 +15369,9 @@ function ConnectionsPanel(){
               ) : CONN_OAUTH[s.provider] ? (
                 <V3Fix provider={s.provider} small quiet={fresh} label={conn ? 'Reconnect' : 'Connect'}/>
               ) : conn ? (
-                <a href="/auth/workspace.html" target="_top" className="meta" style={{fontSize:'var(--text-sm)', textDecoration:'none'}}>Manage →</a>
+                <a href="/auth/workspace.html" target="_top" className="meta" style={{fontSize:'var(--text-sm)', textDecoration:'none'}}>Manage</a>
               ) : (
-                <a href="/auth/workspace.html" target="_top" className="btn-primary" style={{padding:'7px 14px', fontSize:'var(--text-sm)', borderRadius:'var(--r-sm)', textDecoration:'none', fontWeight:'var(--weight-semi)', display:'inline-block'}}>Set up →</a>
+                <a href="/auth/workspace.html" target="_top" className="btn-primary" style={{padding:'7px 14px', fontSize:'var(--text-sm)', borderRadius:'var(--r-sm)', textDecoration:'none', fontWeight:'var(--weight-semi)', display:'inline-block'}}>Set up</a>
               )}
             </div>
           </div>);
@@ -15421,7 +15421,7 @@ function ConnectionsPanel(){
           <div>
             <div className="micro" style={{color:'var(--accent)', marginBottom:'var(--s-2)'}}>Step 01</div>
             <div style={{fontSize:'var(--text-base)', fontWeight:'var(--weight-semi)', marginBottom:'var(--s-2)'}}>You authorise</div>
-            <div className="meta" style={{lineHeight:1.6}}>Click Connect → Shopify (or Meta etc) shows you the requested scopes → you approve. Read-only by default.</div>
+            <div className="meta" style={{lineHeight:1.6}}>Click Connect, and Shopify (or Meta) shows you the requested scopes to approve. Read-only by default.</div>
           </div>
           <div>
             <div className="micro" style={{color:'var(--accent)', marginBottom:'var(--s-2)'}}>Step 02</div>
@@ -15474,10 +15474,10 @@ const ECON_FUNDING = [
 // 0.0375 → "3.75%": rates are entered to two decimals, so show what was entered.
 function econRatePct(r) { return r == null ? '—' : (Math.round(Number(r) * 10000) / 100) + '%'; }
 const ECON_INV_WHY = {
-  stale_feed: 'Greta measures this once your Shopify products are syncing.',
-  no_costs: 'Add your product costs and Greta measures this from your stock.',
-  low_cost_coverage: 'Too few products have a cost to measure this yet. Add costs and Greta measures it.',
-  too_little_history: 'Greta measures this after four weeks of sales.',
+  stale_feed: 'Measured once your Shopify products are syncing.',
+  no_costs: 'Add your product costs to measure this from your stock.',
+  low_cost_coverage: 'Too few products have a cost to measure this yet.',
+  too_little_history: 'Measured after four weeks of sales.',
   no_stock: 'Average days stock is held before it sells.',
 };
 
@@ -15510,7 +15510,7 @@ function V3ProductCosts(){
   const [prof, setProf] = React.useState(null);           // returns restocked, agency fee, shipping income
   const call = async (method, body) => {
     const jwt = await ASK.getJwt();
-    if (!jwt) return { ok: false, data: { message: 'Your session expired — refresh and sign in again.' } };
+    if (!jwt) return { ok: false, data: { message: 'Your session expired. Refresh and sign in again.' } };
     const r = await fetch(method === 'GET' ? cfgUrl + '?brand_id=' + encodeURIComponent(ASK.brand_id) : cfgUrl, method === 'GET'
       ? { headers: { Authorization: 'Bearer ' + jwt } }
       : { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jwt }, body: JSON.stringify({ brand_id: ASK.brand_id, ...body }) });
@@ -15531,7 +15531,7 @@ function V3ProductCosts(){
 
   if (!authed) return <div className="v3-empty">{v3NoBrand('your product costs')}</div>;
   if (d === undefined) return <V3SkeletonRows n={4}/>;
-  if (d === false) return <div className="v3-empty">Greta couldn’t load your product costs just now. Refreshing the page usually sorts it.</div>;
+  if (d === false) return <div className="v3-empty">Your product costs could not load just now. Refreshing the page usually sorts it.</div>;
 
   // Rows arrive newest first; keep the first per key. (Before 0221 the server sent every day's row
   // per SKU, and keeping the last meant showing the oldest cost.)
@@ -15552,7 +15552,7 @@ function V3ProductCosts(){
     .filter(r => !needle || [r.product_title, r.variant_title, r.sku].some(x => String(x || '').toLowerCase().includes(needle)))
     .sort((a, b) => (a.status === 'missing') - (b.status === 'missing') || String(a.product_title).localeCompare(String(b.product_title)));
   const num = s => { const x = parseFloat(String(s).trim()); return isFinite(x) ? x : null; };
-  const label = r => v3Sentence(r.product_title || 'Untitled') + (r.variant_title && r.variant_title !== 'Default Title' ? ' — ' + r.variant_title : '');
+  const label = r => v3Sentence(r.product_title || 'Untitled') + (r.variant_title && r.variant_title !== 'Default Title' ? ', ' + r.variant_title : '');
 
   const save = async (r) => {
     const unit = num(edit.unit);
@@ -15570,7 +15570,7 @@ function V3ProductCosts(){
     const { ok, data } = await call('POST', { revert_costs: [{ variant_id: r.variant_id, sku: r.sku || undefined }] });
     setBusy(false);
     if (!ok) { setMsg({ kind: 'err', text: data.message || data.error || 'Could not change that cost.' }); return; }
-    setEdit(null); setMsg({ kind: 'ok', text: r.shop ? 'Back to Shopify’s cost.' : 'Cost removed — this product uses your margin again.' }); load();
+    setEdit(null); setMsg({ kind: 'ok', text: r.shop ? 'Back to Shopify’s cost.' : 'Cost removed. This product uses your margin again.' }); load();
   };
   const saveProf = async () => {
     const restock = prof.restock === '' ? 0 : num(prof.restock), agency = prof.agency === '' ? null : num(prof.agency);
@@ -15732,7 +15732,7 @@ function BusinessEconomicsPanel(){
     if(!authed) return;
     setLoading(true); setLoadErr('');
     const jwt = await ASK.getJwt();
-    if(!jwt){ setLoadErr('Your session expired — refresh the page and sign in again.'); setLoading(false); return; }
+    if(!jwt){ setLoadErr('Your session expired. Refresh the page and sign in again.'); setLoading(false); return; }
     try{
       const r = await fetch(cfgUrl + '?brand_id=' + encodeURIComponent(ASK.brand_id), {
         headers:{ 'Authorization':'Bearer '+jwt },
@@ -15749,7 +15749,7 @@ function BusinessEconomicsPanel(){
   // POST a patch (only the keys present are written; omitted keys keep their stored value / prior).
   const save = async (patch) => {
     const jwt = await ASK.getJwt();
-    if(!jwt) return { ok:false, data:{ message:'Your session expired — refresh and sign in again.' } };
+    if(!jwt) return { ok:false, data:{ message:'Your session expired. Refresh and sign in again.' } };
     const r = await fetch(cfgUrl, {
       method:'POST',
       headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+jwt },
@@ -15773,7 +15773,7 @@ function BusinessEconomicsPanel(){
     if(!ok){ setGmMsg({ text:data.message||data.detail||data.error||'Save failed.', kind:'err' }); return; }
     setConfig(data.config); seed(data.config);
     try { window.dispatchEvent(new Event('oi-config-updated')); } catch(e){}
-    setGmMsg({ text:'Gross margin saved — your numbers switch on at the next engine run.', kind:'ok' });
+    setGmMsg({ text:'Gross margin saved. Your numbers switch on at the next update.', kind:'ok' });
   };
 
   const saveCostStack = async (e) => {
@@ -15817,7 +15817,7 @@ function BusinessEconomicsPanel(){
     setGenome(g => ({ ...g, discount_rate_annual: String(round2(res.rate * 100)) }));
     await loadGen();
     try { window.dispatchEvent(new Event('oi-config-updated')); } catch (e) {}
-    setFundMsg({ text: 'Saved. Greta uses it from its next update.', kind: 'ok' });
+    setFundMsg({ text: 'Saved. It applies from the next update.', kind: 'ok' });
   };
   // Back to the measured stock days (it then follows the stock nightly).
   const useMeasuredDays = async () => {
@@ -15909,7 +15909,7 @@ function BusinessEconomicsPanel(){
     investors: ((ref.investors && ref.investors.label) || 'a typical return investors expect') + '. Use a different rate if yours expect more or less' }[dSrc];
   const dSay = dSrc && dRate != null
     ? <>Repeat orders that come later count as worth <span className="v3-econ-fig">{econRatePct(dRate)}</span> a year less: {dWhy}.</>
-    : <>Greta uses <span className="v3-econ-fig">{priors.discountRatePct}%</span> for now, an estimate for {priors.label} brands. Pick how you are funded and it uses what money really costs you. It only lowers the value of repeat orders that come later, so it moves profit per customer a little.</>;
+    : <>Using <span className="v3-econ-fig">{priors.discountRatePct}%</span> for now, an estimate for {priors.label} brands. Pick how you are funded and it uses what money really costs you. It only lowers the value of repeat orders that come later, so it moves profit per customer a little.</>;
 
   // Provenance chip: 'your number' when the config has a stored value, else the fallback the engine uses.
   const Tag = ({ saved, fallback }) => (
@@ -15942,12 +15942,12 @@ function BusinessEconomicsPanel(){
       {!loading && !loadErr && (<>
 
         {/* Gross margin, overheads and per-order costs live in "What things cost you" at the top of
-            Goal & costs — the one place for them (0221). This panel keeps cash, stock and terms. */}
+            Goal & costs, the one place for them (0221). This panel keeps cash, stock and terms. */}
         {/* ── Step 2 — Cost stack + cash cycle (optional, sharpens the model) ── */}
         <div className="v3-econ-step">
           <h3 className="v3-econ-title" style={{marginBottom:'var(--s-1)'}}>Stock and funding</h3>
           <div className="meta" style={{fontSize:'var(--text-sm)', marginBottom:'var(--s-5)', lineHeight:1.6, maxWidth:640}}>
-            Optional. Each number you enter replaces Greta’s {priors.label} estimate with your own, which sharpens your cash figures and what a customer is worth. Leave a field blank and the estimate stands.
+            Optional. Each number you enter replaces the {priors.label} estimate with your own, which sharpens your cash figures and what a customer is worth. Leave a field blank and the estimate stands.
           </div>
 
           <form onSubmit={saveCostStack} style={{display:'flex', flexDirection:'column', gap:'var(--s-6)'}}>
@@ -15994,7 +15994,7 @@ function BusinessEconomicsPanel(){
                 style={{padding:'9px 16px', fontSize:'var(--text-sm)', border:0, borderRadius:'var(--r-md)', cursor:csBusy?'default':'pointer', fontFamily:'inherit', fontWeight:'var(--weight-semi)', opacity:csBusy?0.6:1}}>
                 {csBusy ? 'Saving…' : 'Save timing'}
               </button>
-              <span className="meta" style={{fontSize:'var(--text-xs)'}}>Blank fields keep the category estimate — nothing is overwritten.</span>
+              <span className="meta" style={{fontSize:'var(--text-xs)'}}>Blank fields keep the category estimate. Nothing is overwritten.</span>
             </div>
           </form>
           {msgBox(csMsg)}
@@ -16008,12 +16008,12 @@ function BusinessEconomicsPanel(){
           <div style={{display:'flex', alignItems:'baseline', gap:'var(--s-2)', flexWrap:'wrap', marginBottom:4}}>
             <h3 className="v3-econ-title">Cash: what you can afford</h3>
             <span className="v3-econ-tag" data-tone={cashReady ? 'good' : undefined}>
-              {cashReady ? 'Spend is capped at what your cash allows' : 'Not set — spend is not limited by cash'}
+              {cashReady ? 'Spend is capped at what your cash allows' : 'Not set, spend is not limited by cash'}
             </span>
           </div>
           <div className="meta" style={{fontSize:'var(--text-sm)', marginBottom:'var(--s-5)', lineHeight:1.6, maxWidth:660}}>
             Your forecast says what spend is <em>profitable</em>. These say what is <em>affordable</em>.
-            Greta recommends the lower of the two. Until the fields marked required and days stock is held
+            The lower of the two is recommended. Until the fields marked required and days stock is held
             are set, nothing is capped and no cash figure appears anywhere. A cash figure built on guesses is worse than none.
           </div>
 
@@ -16024,16 +16024,16 @@ function BusinessEconomicsPanel(){
               <div className="v3-form-grid v3-form-grid--n">
                 <Field label="Cash in bank" unit={curSym()} value={cash.opening_cash||''} onChange={v=>setCash(s=>({...s, opening_cash:v}))}
                   saved={config?.opening_cash != null} fallback={{ label:'required', warn:true }}
-                  hint="The actual balance. Never estimated from Shopify — only you know this."/>
+                  hint="The actual balance. Never estimated from Shopify. Only you know this."/>
                 <div className="v3-econ-field">
                   <div className="v3-econ-head"><span>Balance as at</span><Tag saved={config?.opening_cash_as_of != null} fallback={{ label:'required', warn:true }}/></div>
                   <input type="date" value={cash.opening_cash_as_of||''} max={todayISO()}
                     onChange={e=>setCash(s=>({...s, opening_cash_as_of:e.target.value}))} style={inputStyle}/>
-                  <div className="v3-econ-hint">After 45 days, Greta stops showing cash rather than trust an old balance.</div>
+                  <div className="v3-econ-hint">After 45 days, cash is hidden rather than relying on an old balance.</div>
                 </div>
                 <Field label="Minimum balance" unit={curSym()} value={cash.cash_floor||''} onChange={v=>setCash(s=>({...s, cash_floor:v}))}
                   saved={config?.cash_floor != null} fallback={{ label:'required', warn:true }}
-                  hint="The lowest you will let cash fall to. Greta caps spend so cash stays above it for the next 13 weeks."/>
+                  hint="The lowest you will let cash fall to. Spend is capped so cash stays above it for the next 13 weeks."/>
                 <Field label="Facility available" unit={curSym()} value={cash.facility_available||''} onChange={v=>setCash(s=>({...s, facility_available:v}))}
                   saved={config?.facility_available != null} fallback={{ label:'assumes none' }}
                   hint="An overdraft or loan you could use but haven’t. Shown as spare room, never used automatically."/>
@@ -16090,7 +16090,7 @@ function BusinessEconomicsPanel(){
                 style={{padding:'9px 16px', fontSize:'var(--text-sm)', border:0, borderRadius:'var(--r-md)', cursor:cashBusy?'default':'pointer', fontFamily:'inherit', fontWeight:'var(--weight-semi)', opacity:cashBusy?0.6:1}}>
                 {cashBusy ? 'Saving…' : 'Save cash settings'}
               </button>
-              <span className="meta" style={{fontSize:'var(--text-xs)'}}>Blank fields stay empty. Greta shows no cash figure rather than guess.</span>
+              <span className="meta" style={{fontSize:'var(--text-xs)'}}>Blank fields stay empty, and no cash figure shows rather than a guess.</span>
             </div>
           </form>
           {msgBox(cashMsg)}
@@ -16182,7 +16182,7 @@ function TeamPanel(){
 
   const call = async (action, extra) => {
     const jwt = await ASK.getJwt();
-    if(!jwt) return { ok:false, data:{ detail:'Your session expired — refresh the page and sign in again.' } };
+    if(!jwt) return { ok:false, data:{ detail:'Your session expired. Refresh the page and sign in again.' } };
     const r = await fetch(inviteUrl, {
       method:'POST',
       headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+jwt },
@@ -16241,7 +16241,7 @@ function TeamPanel(){
     <div className="card" style={{padding:'var(--s-7)'}}>
       {!UI_V3 && <div style={{fontSize:'var(--text-base)', fontWeight:'var(--weight-bold)', marginBottom:4}}>Team</div>}
       <div className="meta" style={{fontSize:'var(--text-sm)', marginBottom:'var(--s-5)'}}>
-        Everyone with access to this workspace. {canManage ? 'Invite a teammate by email — they get a magic-link and land straight here.' : 'Only an owner or admin can change the team.'}
+        Everyone with access to this workspace. {canManage ? 'Invite a teammate by email. They get a sign-in link and land straight here.' : 'Only an owner or admin can change the team.'}
       </div>
 
       {canManage && (<form onSubmit={submitInvite} style={{display:'flex', gap:'var(--s-2)', flexWrap:'wrap', alignItems:'center', paddingTop:'var(--s-4)', borderTop:'1px solid var(--color-line, var(--border-subtle))'}}>
@@ -16250,9 +16250,9 @@ function TeamPanel(){
           style={{flex:'1 1 240px', minWidth:0, padding:'9px 12px', fontSize:'var(--text-sm)', fontFamily:'inherit', color:'var(--text-primary)', background:'var(--bg-input)', border:'1px solid var(--border-default)', borderRadius:'var(--r-md)'}}/>
         <select value={role} onChange={e=>setRole(e.target.value)} aria-label="Role"
           style={{padding:'9px 12px', fontSize:'var(--text-sm)', fontFamily:'inherit', color:'var(--text-primary)', backgroundColor: 'var(--bg-input)', border:'1px solid var(--border-default)', borderRadius:'var(--r-md)'}}>
-          <option value="member">Member — full access</option>
-          <option value="viewer">Viewer — read only</option>
-          {isOwner && <option value="admin">Admin — can manage team</option>}
+          <option value="member">Member, full access</option>
+          <option value="viewer">Viewer, read only</option>
+          {isOwner && <option value="admin">Admin, can manage team</option>}
         </select>
         <button type="submit" className="btn-primary" disabled={busy}
           style={{padding:'9px 16px', fontSize:'var(--text-sm)', border:0, borderRadius:'var(--r-md)', cursor:busy?'default':'pointer', fontFamily:'inherit', fontWeight:'var(--weight-semi)', opacity:busy?0.6:1}}>
@@ -16335,7 +16335,7 @@ function PR_Bar({ pct }){
 function PR_Row({ label, value, sub, hi }){
   return (
     <div style={{display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:8, padding:'5px 0', borderTop:'1px solid '+PR_T.line}}>
-      <span style={{fontSize:'var(--text-xs)', color:PR_T.mut}}>{label}{sub && <span style={{color:PR_T.dim, fontSize:'var(--text-xs)'}}> · {sub}</span>}</span>
+      <span style={{fontSize:'var(--text-xs)', color:PR_T.mut}}>{label}{sub && <span style={{color:PR_T.dim, fontSize:'var(--text-xs)'}}>, {sub}</span>}</span>
       <span style={{fontFamily:PR_T.mono, fontSize:'var(--text-sm)', fontWeight:hi?'var(--weight-bold)':'var(--weight-medium)', color:hi?PR_T.accent:PR_T.ink}}>{value}</span>
     </div>
   );
@@ -16393,9 +16393,9 @@ function GretaPlanRail(){
         <div style={{...card, borderColor:'var(--color-warning)'}}>
           <div style={{fontSize:'var(--text-sm)', fontWeight:'var(--weight-bold)', marginBottom:4}}>No goal set for this quarter</div>
           <div style={{fontSize:'var(--text-sm)', color:PR_T.mut, lineHeight:1.5, marginBottom:11}}>
-            Greta needs a target to tell you whether you’re on track. Set one and this panel tracks your pace every day.
+            Set a target and this panel tracks your pace every day.
           </div>
-          <button onClick={openPlan} style={{width:'100%', padding:'9px 12px', fontSize:'var(--text-sm)', fontWeight:'var(--weight-bold)', border:0, borderRadius:'var(--radius-md)', background:PR_T.accent, color:PAL.panel, cursor:'pointer'}}>Set your goal →</button>
+          <button onClick={openPlan} style={{width:'100%', padding:'9px 12px', fontSize:'var(--text-sm)', fontWeight:'var(--weight-bold)', border:0, borderRadius:'var(--radius-md)', background:PR_T.accent, color:PAL.panel, cursor:'pointer'}}>Set your goal</button>
         </div>
       </div>
     );
@@ -16423,7 +16423,7 @@ function GretaPlanRail(){
       <div style={card}>
         <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:8}}>
           <div>
-            <div style={{fontSize:'var(--text-xs)', color:PR_T.dim, textTransform:'uppercase', letterSpacing:'var(--tracking-wide)'}}>{qLabel} · {ended?'ended':daysLeft+' days left'}</div>
+            <div style={{fontSize:'var(--text-xs)', color:PR_T.dim, textTransform:'uppercase', letterSpacing:'var(--tracking-wide)'}}>{qLabel}, {ended?'ended':daysLeft+' days left'}</div>
             <div style={{display:'flex', alignItems:'center', gap:7, marginTop:3}}>
               <span style={{width:9, height:9, borderRadius:'50%', background:rag.col, display:'inline-block'}}/>
               <span style={{fontSize:'var(--text-base)', fontWeight:'var(--weight-bold)', color:rag.col}}>{rag.label}</span>
@@ -16434,13 +16434,13 @@ function GretaPlanRail(){
         {pacing && <React.Fragment>
           <PR_Bar pct={pacing.pacePct}/>
           <div style={{fontSize:'var(--text-xs)', color:PR_T.dim, marginTop:5}}>
-            Revenue {PR_gbpk(pacing.revActual)} of {PR_gbpk(pacing.revTarget)} expected so far{pacing.pacePct!=null ? ' · '+(pacing.pacePct>=0?'+':'')+pacing.pacePct+'%' : ''}
+            Revenue {PR_gbpk(pacing.revActual)} of {PR_gbpk(pacing.revTarget)} expected so far{pacing.pacePct!=null ? ', '+(pacing.pacePct>=0?'+':'')+pacing.pacePct+'%' : ''}
           </div>
         </React.Fragment>}
         {!pacing && <div style={{fontSize:'var(--text-xs)', color:PR_T.dim, marginTop:6}}>Pace appears once this period has live sales data.</div>}
       </div>
       <div style={card}>
-        <div style={{fontSize:'var(--text-xs)', letterSpacing:'var(--tracking-wide)', textTransform:'uppercase', color:PR_T.accent, marginBottom:2}}>Targets · this quarter</div>
+        <div style={{fontSize:'var(--text-xs)', letterSpacing:'var(--tracking-wide)', textTransform:'uppercase', color:PR_T.accent, marginBottom:2}}>Targets, this quarter</div>
         <PR_Row label="Profit after ads" value={PR_gbp(camTgt)} hi={true}/>
         <PR_Row label="Revenue" value={PR_gbp(rev)}/>
         <PR_Row label="Ad spend cap" value={PR_gbp(spend)} sub={mer!=null?('sales per £ of ads '+mer):null}/>
@@ -16471,8 +16471,8 @@ function GretaPlanRail(){
       {(ended || (daysLeft!=null && daysLeft<=10)) && (
         <div style={{...card, borderColor:'var(--color-warning)'}}>
           <div style={{fontSize:'var(--text-sm)', fontWeight:'var(--weight-bold)', marginBottom:3}}>{ended?'This quarter has ended':'Quarter ends in '+daysLeft+' days'}</div>
-          <div style={{fontSize:'var(--text-xs)', color:PR_T.mut, lineHeight:1.5, marginBottom:9}}>Set next quarter’s goal so Greta keeps tracking your pace without a gap.</div>
-          <button onClick={openPlan} style={{width:'100%', padding:'8px 12px', fontSize:'var(--text-sm)', fontWeight:'var(--weight-bold)', border:0, borderRadius:'var(--radius-md)', background:'var(--color-warning)', color:PAL.panel, cursor:'pointer'}}>Set next quarter’s goal →</button>
+          <div style={{fontSize:'var(--text-xs)', color:PR_T.mut, lineHeight:1.5, marginBottom:9}}>Set next quarter’s goal to keep tracking your pace without a gap.</div>
+          <button onClick={openPlan} style={{width:'100%', padding:'8px 12px', fontSize:'var(--text-sm)', fontWeight:'var(--weight-bold)', border:0, borderRadius:'var(--radius-md)', background:'var(--color-warning)', color:PAL.panel, cursor:'pointer'}}>Set next quarter’s goal</button>
         </div>
       )}
     </div>
@@ -16558,7 +16558,7 @@ const V3_GLOSSARY = {
   profit_before_ads: { label: 'Profit before ads', tech: 'product contribution',
     what: 'What your sales earned after product and order costs, before paying for ads.',
     why: 'It shows whether the products themselves make money, separately from how you market them.',
-    good: 'A steady share of sales — if it falls, costs or discounts are rising.' },
+    good: 'A steady share of sales, if it falls, costs or discounts are rising.' },
   ad_spend: { label: 'Ad spend', tech: 'paid spend',
     what: 'What you spent on Meta and Google ads in the period.',
     why: 'It is the cost you control day to day, and the one that eats profit fastest.',
@@ -16676,7 +16676,7 @@ function V3Info({ k }) {
       <span><b>What good looks like:</b> {g.good}</span>
       <span className="v3-sheet-tech">Also called: {g.tech}</span>
       <span className="v3-sheet-btns">
-        <button type="button" className="v3-btn v3-btn-sm" onClick={() => { setOpen(false); if (window.__oiAsk) window.__oiAsk('Explain my ' + g.label.toLowerCase() + ' — what is driving it right now?'); }}>Ask Greta about this</button>
+        <button type="button" className="v3-btn v3-btn-sm" onClick={() => { setOpen(false); if (window.__oiAsk) window.__oiAsk('Explain my ' + g.label.toLowerCase() + ', what is driving it right now?'); }}>Ask Greta about this</button>
         <button type="button" className="v3-btn v3-btn-sm" onClick={() => setOpen(false)}>Close</button>
       </span>
     </span>)}
@@ -16692,13 +16692,13 @@ function V3Info({ k }) {
 const V3_CONF = {
   direct:   { label: 'Direct',          why: 'Counted straight from your own data. Lean on it.' },
   likely:   { label: 'Likely',          why: 'Mostly your own data, with one part filled in. Safe to act on.' },
-  probably: { label: 'Probably',        why: 'Part your data, part the figures you gave us. Right in direction — check before a big bet.' },
+  probably: { label: 'Probably',        why: 'Part your data, part the figures you gave us. Right in direction. Check before a big bet.' },
   possible: { label: 'Possible',        why: 'Mostly an assumption. Worth knowing, not worth betting on.' },
   outside:  { label: 'Outside chance',  why: 'A long shot until something tests it.' },
-  held:     { label: 'Not yet',         why: 'Greta would rather say nothing than guess.' },
+  held:     { label: 'Not yet',         why: 'Not enough evidence to say.' },
   // aliases from the previous vocabulary
   measured:  { label: 'Direct',         why: 'Counted straight from your own data. Lean on it.' },
-  estimated: { label: 'Probably',       why: 'Part your data, part the figures you gave us. Right in direction — check before a big bet.' },
+  estimated: { label: 'Probably',       why: 'Part your data, part the figures you gave us. Right in direction. Check before a big bet.' },
   benchmark: { label: 'Possible',       why: 'An industry figure, not your brand’s. Worth knowing, not worth betting on.' },
 };
 // Why the steer is where it is, in the brand's own numbers and in plain words. Two things can pull
@@ -16720,7 +16720,7 @@ function v3TrustWhy(d) {
     if (!bits.length) bits.push('Counted from your own product and order costs.');
   } else {
     bits.push(d.cogs_gap_reason
-      ? d.cogs_gap_reason + ' Until then Greta uses the margin in your settings.'
+      ? d.cogs_gap_reason + ' Until then this uses the margin in your settings.'
       : 'Your margin comes from the figure in your settings, not from your own product costs.');
   }
   return bits.join(' ');
@@ -16811,10 +16811,10 @@ function V3MoneyFlow({ d, note }) {
     return (
       <div className="v3-flow">
         <div className="v3-flow-top">
-          <span className="v3-flow-top-lab">Where each £1 of sales goes{note ? ' · ' + note : ''}</span>
+          <span className="v3-flow-top-lab">Where each £1 of sales goes{note ? ', ' + note : ''}</span>
           <span className="v3-flow-top-val">{v3Gbp(sales)} of sales</span>
         </div>
-        <p className="v3-note">{v3Gbp(spend)} of that went on ads. Greta cannot yet show what you keep,
+        <p className="v3-note">{v3Gbp(spend)} of that went on ads. What you keep cannot be shown yet,
           because it does not know what your products and orders cost you. A guess here could be far off.</p>
         <div className="v3-btns">
           <button type="button" className="v3-btn v3-btn-p v3-btn-sm"
@@ -16839,7 +16839,7 @@ function V3MoneyFlow({ d, note }) {
   return (
     <div className="v3-flow">
       <button type="button" className="v3-flow-top" onClick={go('home', 'overview')}>
-        <span className="v3-flow-top-lab">Where each £1 of sales goes{note ? ' · ' + note : ''}</span>
+        <span className="v3-flow-top-lab">Where each £1 of sales goes{note ? ', ' + note : ''}</span>
         <span className="v3-flow-top-val">{v3Gbp(sales)} of sales</span>
       </button>
       <div className="v3-flow-track" role="img"
@@ -16855,7 +16855,7 @@ function V3MoneyFlow({ d, note }) {
           <button key={s.key} type="button" className="v3-flow-item" onClick={s.onGo}>
             <span className={'v3-flow-dot v3-flow-' + s.tone + (s.soft ? ' v3-flow-soft' : '')} aria-hidden="true"/>
             <span className="v3-flow-val">{v3Gbp(s.value)}</span>
-            <span className="v3-flow-lab">{s.label}{s.soft ? ' · missing days' : ''}</span>
+            <span className="v3-flow-lab">{s.label}{s.soft ? ', missing days' : ''}</span>
             <span className="v3-flow-pct">{Math.round(pct(s.value))}p in every £1</span>
           </button>
         ))}
@@ -17002,7 +17002,7 @@ const V3_CATS = ['total','site','finance','ops','product','paid','creative','ret
 // because uncertainty is the confidence ladder's job and hedging every number says nothing.
 function v3Tidy(s) {
   if (s == null) return s;
-  return v3Money(String(s)).replace(/~\s*(?=[£$€]?\d)/g, '');
+  return v3Money(String(s)).replace(/~\s*(?=[£$€]?\d)/g, '').replace(/\s+[—·]\s+/g, ', ');
 }
 function v3Money(s) {
   // The engine writes amounts unformatted inside its own sentences; group them so a
@@ -17020,7 +17020,7 @@ function v3ActionText(raw) {
   const b = s.indexOf(' (');
   if (b > 0 && s.trim().endsWith(')')) { detail = s.slice(b + 2, s.length - 1); s = s.slice(0, b); }
   const d = s.indexOf(' — ');
-  if (d > 0) { detail = (detail ? s.slice(d + 3) + ' · ' + detail : s.slice(d + 3)); s = s.slice(0, d); }
+  if (d > 0) { detail = (detail ? s.slice(d + 3) + ', ' + detail : s.slice(d + 3)); s = s.slice(0, d); }
   s = s.charAt(0).toUpperCase() + s.slice(1);
   return { main: s.replace(/\.$/, ''), detail: v3Money(detail) };
 }
@@ -17175,12 +17175,12 @@ function v3PlainAction(row){
   // What this emitter measures is share of revenue, not demand — so the why says that and
   // tells the owner to check for demand before investing, which is the playbook's own first step.
   if ((x = id.match(/^synth-(.+)-collection-gap$/))) return P('See whether a bigger ' + x[1].replace(/-/g, ' ') + ' range would sell',
-    x[1].charAt(0).toUpperCase() + x[1].slice(1).replace(/-/g, ' ') + ' are a small slice of what you sell, from very few products. Look for signs people want more — searches, product views — before adding to the range.');
+    x[1].charAt(0).toUpperCase() + x[1].slice(1).replace(/-/g, ' ') + ' are a small slice of what you sell, from very few products. Look for signs people want more, searches, product views, before adding to the range.');
   // Matched on the figures, not the words: plainWords has already turned "CAC" into
   // "cost per new customer" by the time this runs.
   if (id === 'discount-depth-inversion' && (x = m(/(\d+)% or more below list carry £([\d,.]+).*?of £([\d,.]+).*?they are (\d+)%/i))) {
     return P('Cut back on discounts of ' + x[1] + '% or more',
-      'An order sold that cheaply leaves about £' + x[2] + ' once the product and order costs are paid, but winning a new customer costs you about £' + x[3] + ' — and ' + x[4] + '% of your orders are sold that way.');
+      'An order sold that cheaply leaves about £' + x[2] + ' once the product and order costs are paid, but winning a new customer costs you about £' + x[3] + ', and ' + x[4] + '% of your orders are sold that way.');
   }
   if (id === 'discount-dependency') return P('Get customers who first bought in a sale to buy at full price',
     'Customers whose first order was marked down mostly buy marked-down items again. Offer them something other than a deeper discount next time.');
@@ -17249,11 +17249,11 @@ function V3Setup({ s }) {
       hint: !conns && s.connected > 0 ? 'Your sources are connected'
         : nConn > 0
         ? nConn + (nConn === 1 ? ' source' : ' sources') + ' connected'
-          + (brokenSrc.length ? ' · ' + brokenSrc.map(p => CONN_LABEL[p] || p).join(', ') + ' needs reconnecting' : '')
-        : 'Start with Shopify — everything else builds on it',
+          + (brokenSrc.length ? ', ' + brokenSrc.map(p => CONN_LABEL[p] || p).join(', ') + ' needs reconnecting' : '')
+        : 'Start with Shopify: everything else builds on it',
       go: ['settings'], cta: 'Connect' },
     { done: s.has_economics, label: 'Confirm what things cost you',
-      hint: 'Product cost, shipping, packaging and fees — this turns sales into profit',
+      hint: 'Product cost, shipping, packaging and fees: this turns sales into profit',
       go: ['goal'], cta: 'Enter costs' },
     { done: s.goal_confirmed, label: 'Confirm your goal',
       hint: 'Greta suggests one from your sales so far. You adjust it rather than start from nothing',
@@ -17270,12 +17270,12 @@ function V3Setup({ s }) {
     const x = steps[next];
     return (<section className="v3-setup-slim" aria-label="Setup progress">
       <span className="v3-setup-meter" aria-hidden="true">{steps.map((st, i) => <i key={i} className={st.done ? 'on' : ''}/>)}</span>
-      <span className="v3-setup-txt"><b>Setup {steps.length - left} of {steps.length}</b><span className="v3-muted"> · Last step: {x.label.toLowerCase()} — {x.hint.charAt(0).toLowerCase() + x.hint.slice(1)}</span></span>
+      <span className="v3-setup-txt"><b>Setup {steps.length - left} of {steps.length}</b><span className="v3-muted">, Last step: {x.label.toLowerCase()}, {x.hint.charAt(0).toLowerCase() + x.hint.slice(1)}</span></span>
       <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo(x.go[0], x.go[1])}>{x.cta}</button>
     </section>);
   }
   return (<section className="v3-setup">
-    <div className="v3-kick">Getting started · {steps.length - left} of {steps.length} done</div>
+    <div className="v3-kick">Getting started, {steps.length - left} of {steps.length} done</div>
     <ol className="v3-steps">
       {steps.map((x, i) => (
         <li key={i} className={'v3-step' + (x.done ? ' done' : '') + (i === next ? ' next' : '')}>
@@ -17357,7 +17357,7 @@ function CustomerSegments(){
       .then(p => setPreview(p)).catch(e => setPreview({ error: String(e.message || e) })).finally(() => setBusy(''));
   };
   const stage = () => {
-    if (!window.confirm('Create a Klaviyo list of these ' + seg + ' customers?\n\nNothing is sent — you build and send the campaign in Klaviyo.')) return;
+    if (!window.confirm('Create a Klaviyo list of these ' + seg + ' customers?\n\nNothing is sent. You build and send the campaign in Klaviyo.')) return;
     setBusy('stage');
     ciFetch('stage-reward', Object.assign({ segment: seg, requireConsent: consent, confirm: true }, loyalty ? { loyalty } : {}))
       .then(r => setStaged({ ok: true, t: 'Created “' + r.listName + '” in Klaviyo with ' + r.profilesSubmitted + ' people. Build the campaign there.' }))
@@ -17371,14 +17371,14 @@ function CustomerSegments(){
   const noneYet = /no customers in scope/i.test(err);
   if (err && !segs.length) return (<div className="card"><h2>Your customers</h2><div className="v3-empty">{noneYet
     ? 'No customers to group yet. Segments appear once your first orders have synced from Shopify.'
-    : 'Greta couldn’t group your customers just now. Refreshing the page usually sorts it.'}</div></div>);
+    : 'Your customers could not be grouped just now. Refreshing the page usually sorts it.'}</div></div>);
   if (!ov) return (<div className="card"><h2>Your customers</h2><div className="muted" style={{fontSize:'var(--text-sm)'}}>Loading your customers…</div></div>);
-  if (!segs.length) return (<div className="card"><h2>Your customers</h2><div className="v3-empty">Greta couldn’t group your customers just now. Refreshing the page usually sorts it.</div></div>);
+  if (!segs.length) return (<div className="card"><h2>Your customers</h2><div className="v3-empty">Your customers could not be grouped just now. Refreshing the page usually sorts it.</div></div>);
 
   const t = ov.totals || {};
   return (<div className="card">
     <div className="card-section-title"><h2 style={{margin:0}}>Your customers</h2>
-      <span className="meta">{(t.customers||0).toLocaleString('en-GB')} customers · {GBP(t.netRevenue)} spent in total · grouped by how recently and how often they buy</span></div>
+      <span className="meta">{(t.customers||0).toLocaleString('en-GB')} customers, {GBP(t.netRevenue)} spent in total, grouped by how recently and how often they buy</span></div>
 
     <div style={{display:'flex', gap:8, flexWrap:'wrap', marginTop:10}}>
       {segs.map(s => {
@@ -17392,7 +17392,7 @@ function CustomerSegments(){
             <span style={{width:8, height:8, borderRadius:'50%', background:CTONE[m.tone], display:'inline-block'}}/>{s.segment}
           </div>
           <div style={{fontSize:'var(--text-xl)', fontWeight:'var(--weight-bold)', marginTop:4, fontFamily:'var(--font-mono)'}}>{(s.customers||0).toLocaleString('en-GB')}</div>
-          <div className="meta" style={{fontSize:'var(--text-xs)'}}>{GBP(s.netRevenue)} · {s.revSharePct}% of sales · avg {GBP(s.avgValue)}</div>
+          <div className="meta" style={{fontSize:'var(--text-xs)'}}>{GBP(s.netRevenue)}, {s.revSharePct}% of sales, avg {GBP(s.avgValue)}</div>
         </button>);
       })}
     </div>
@@ -17411,7 +17411,7 @@ function CustomerSegments(){
 
     {seg && (<div style={{marginTop:14}}>
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:10, marginBottom:8}}>
-        <div style={{fontSize:'var(--text-sm)', fontWeight:'var(--weight-bold)'}}>{seg} <span className="muted" style={{fontWeight:'var(--weight-normal)'}}>— {(CSEG[seg]||{}).blurb}</span></div>
+        <div style={{fontSize:'var(--text-sm)', fontWeight:'var(--weight-bold)'}}>{seg} <span className="muted" style={{fontWeight:'var(--weight-normal)'}}>{(CSEG[seg]||{}).blurb}</span></div>
         <div style={{display:'flex', gap:8, alignItems:'center', flexWrap:'wrap'}}>
           <select value={loyalty} onChange={e=>setLoyalty(e.target.value)} style={{minHeight:36, fontFamily:'inherit', fontSize:'var(--text-sm)', padding:'0 8px', backgroundColor: 'var(--bg-card)', color:'var(--text-primary)', border:'1px solid var(--border-default)', borderRadius:'var(--radius-md)'}}>
             <option value="">Every loyalty type</option>
@@ -17432,12 +17432,12 @@ function CustomerSegments(){
         ? <div className="note" style={{color:'var(--bad)'}}>{preview.error}</div>
         : (<div className="note" style={{marginBottom:8}}>
             Would reach <b>{preview.audienceReachable}</b> of {preview.audienceTotal} {String(seg).toLowerCase()} customers, worth <b>{GBP(preview.audienceValue)}</b>
-            {preview.excludedNoConsent ? <span className="muted"> · {preview.excludedNoConsent} excluded for not agreeing to email</span> : null}
+            {preview.excludedNoConsent ? <span className="muted">, {preview.excludedNoConsent} excluded for not agreeing to email</span> : null}
             <div style={{display:'flex', gap:10, alignItems:'center', flexWrap:'wrap', marginTop:8}}>
               <button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={stage} disabled={busy==='stage'}>
                 {busy==='stage' ? 'Creating…' : 'Create the list in Klaviyo'}
               </button>
-              <span className="micro muted">This only creates the list. Nothing is sent — you write and send the campaign in Klaviyo.</span>
+              <span className="micro muted">This only creates the list. Nothing is sent. You write and send the campaign in Klaviyo.</span>
             </div>
             {staged && <div className="micro" style={{marginTop:6, color: staged.ok ? 'var(--good)' : 'var(--warn)'}}>{staged.t}</div>}
           </div>))}
@@ -17527,7 +17527,7 @@ function DataHealth(){
 
   return (<div className="card">
     <div className="card-section-title"><h2 style={{margin:0}}>Where your numbers come from</h2>
-      <span className="meta">Every feed Greta reads, whether it is current, and whether they agree with each other</span></div>
+      <span className="meta">Every connected feed, whether it is current, and whether they agree</span></div>
 
     <table className="v3-rw v3-feeds">
       <thead><tr><th className="t-text">Feed</th><th className="t-text">Status</th><th>Latest data</th></tr></thead>
@@ -17539,7 +17539,7 @@ function DataHealth(){
         const tone = ok ? 'var(--color-success)' : (behind > 4 ? 'var(--color-danger)' : 'var(--color-warning)');
         return (<tr key={r.source}>
           <td className="t-text v3-rw-name">{srcName(r.source)}</td>
-          <td className="t-text"><span className="v3-conn-state" style={{color: ok && g4hold && /^ga4/.test(r.source) ? 'var(--color-warning)' : tone}}><i style={{background: ok && g4hold && /^ga4/.test(r.source) ? 'var(--color-warning)' : tone}}/>{ok ? (g4hold && /^ga4/.test(r.source) ? 'Current · held for comparisons until ' + v3Day(String(g4hold.comparisons_clean_from).slice(0, 10)) : 'Up to date') : (behind === 1 ? 'A day behind' : Math.round(behind) + ' days behind')}</span></td>
+          <td className="t-text"><span className="v3-conn-state" style={{color: ok && g4hold && /^ga4/.test(r.source) ? 'var(--color-warning)' : tone}}><i style={{background: ok && g4hold && /^ga4/.test(r.source) ? 'var(--color-warning)' : tone}}/>{ok ? (g4hold && /^ga4/.test(r.source) ? 'Current, held for comparisons until ' + v3Day(String(g4hold.comparisons_clean_from).slice(0, 10)) : 'Up to date') : (behind === 1 ? 'A day behind' : Math.round(behind) + ' days behind')}</span></td>
           <td className="v3-muted">{r.last_date ? v3Day(String(r.last_date).slice(0, 10), true) : FMT_NONE}</td>
         </tr>);
       })}</tbody>
@@ -17550,7 +17550,7 @@ function DataHealth(){
         ? <><b>Several feeds stopped on the same day.</b> That usually means one connection dropped rather than {stale.length} separate problems.</>
         : <><b>{stale.length} {stale.length === 1 ? 'source is' : 'sources are'} behind.</b> Numbers that use {stale.length === 1 ? 'it' : 'them'} will be understated until {stale.length === 1 ? 'it catches' : 'they catch'} up.</>}
       {/* This panel already knows exactly WHICH feeds stopped, and offered "Reconnect a
-          source" pointing at the Settings root — the vaguest CTA in the product, one
+          source" pointing at the Settings root, the vaguest CTA in the product, one
           level above the screen that could even have helped. Name them and start them. */}
       <div style={{marginTop:8, display:'flex', flexWrap:'wrap', gap:8, alignItems:'center'}}>
         {(() => {
@@ -17566,7 +17566,7 @@ function DataHealth(){
       <b>Two sources that normally agree have stopped agreeing.</b>{' '}
       {agree.broken_detail ? String(agree.broken_detail) : ''}
       <div className="micro muted" style={{marginTop:4}}>
-        One of them is probably mis-reporting. Until it is fixed, prefer the Shopify figure — it is the money that actually arrived.
+        One of them is probably mis-reporting. Until it is fixed, prefer the Shopify figure: it is the money that actually arrived.
       </div>
     </div>)}
 
@@ -17627,7 +17627,7 @@ function CreativeReallocation(){
   const total = live.reduce((t, r) => t + n(r.spend_28d), 0);
   const go = () => { try { window.__oiGo && window.__oiGo('marketing', 'creative'); } catch (e) {} };
   const head = (<div className="card-section-title"><h2 style={{margin:0}}>Which ads should I switch off?</h2>
-    <span className="meta">Last 28 days · purchases as Meta counts them · profit after product costs</span></div>);
+    <span className="meta">Last 28 days, purchases as Meta counts them, profit after product costs</span></div>);
   if (!weak.length) return (<div className="card">{head}
     <div style={{fontSize:'var(--text-sm)', lineHeight:1.6, marginTop:8}}>
       None of the ads you are paying for has broken down in the last 28 days.{tiring.length ? ' ' + NUM(tiring.length) + (tiring.length === 1 ? ' is' : ' are') + ' tiring: fewer people click, though purchases have held so far.' : ''}
@@ -17681,7 +17681,7 @@ function ProductTrafficMisallocation(){
   // undefined is still loading; a clean result is a real finding and gets said out loud,
   // because "we checked and found nothing" and "we never looked" must not look the same.
   if (d === undefined) return <V3SkeletonRows n={2}/>;
-  if (d === false) return <div className="v3-empty">Greta couldn’t check where your visitors land just now. Refreshing the page usually sorts it.</div>;
+  if (d === false) return <div className="v3-empty">Landing pages could not load just now. Refreshing the page usually sorts it.</div>;
   if (!d || !Number(d.worse_views)) return (
     <div className="card">
       <div className="card-section-title"><h2 style={{margin:0}}>Where your visitors land</h2></div>
@@ -17698,7 +17698,7 @@ function ProductTrafficMisallocation(){
     : step ? 'shoppers drop out at ' + step : '';
   return (<div className="card">
     <div className="card-section-title"><h2 style={{margin:0}}>Traffic going to products that cannot convert it</h2>
-      <span className="meta">Where your existing visitors land — an upper bound, not a forecast</span></div>
+      <span className="meta">Where your existing visitors land, an upper bound, not a forecast</span></div>
     <div style={{fontSize:'var(--text-sm)', lineHeight:1.6, marginTop:8}}>
       <b>{Math.round(Number(d.worse_traffic_share || 0) * 100)}%</b> of product views
       {' '}({Math.round(Number(d.worse_views)).toLocaleString('en-GB')} visits) go to <b>{d.n_worse}</b> products converting at {pct(d.worse_cvr)},
@@ -17709,8 +17709,8 @@ function ProductTrafficMisallocation(){
       Pointing that traffic at products that convert would be worth up to <b>{GBP(d.implied_contribution_upper)}</b>
       {d.implied_extra_purchases_upper ? ' (about ' + Math.round(Number(d.implied_extra_purchases_upper)) + ' more orders)' : ''}.
       <div className="micro muted" style={{marginTop:4}}>
-        A ceiling, not a promise. The cheapest version is a merchandising change — what the home page,
-        navigation and ads point at — before touching the product pages themselves.
+        A ceiling, not a promise. The cheapest version is a merchandising change, what the home page,
+        navigation and ads point at, before touching the product pages themselves.
       </div>
     </div>)}
   </div>);
@@ -17762,7 +17762,7 @@ function CostDrift(){
     <div className="card-section-title"><h2 style={{margin:0}}>Do these match what actually happened?</h2>
       <span className="meta">{checked} of {rows.length} can be checked against your own data</span></div>
     {off.length === 0
-      ? <div className="fine" style={{color:'var(--text-secondary)', marginTop:8}}>Everything Greta can check lines up with what you entered.</div>
+      ? <div className="fine" style={{color:'var(--text-secondary)', marginTop:8}}>Everything that can be checked lines up with what you entered.</div>
       : (<div style={{marginTop:8}}>
           <div style={{overflowX:'auto'}}>
             <table><thead><tr><th>Cost</th><th>You entered</th><th>Your data shows</th><th className="t-text">Based on</th></tr></thead>
@@ -17779,7 +17779,7 @@ function CostDrift(){
           </div>
         </div>)}
     {rows.some(r => !r.verifiable) && (<div className="micro muted" style={{marginTop:'var(--space-2)'}}>
-      Greta can’t check {rows.filter(r=>!r.verifiable).map(r => name(r.input_key).toLowerCase()).join(', ')} yet:
+      Can’t check {rows.filter(r=>!r.verifiable).map(r => name(r.input_key).toLowerCase()).join(', ')} yet:
       nothing connected records what you actually pay for these, so your figures are used as entered.
     </div>)}
   </div>);
@@ -17845,7 +17845,7 @@ function ChannelDetail({ channel, breakEven }){
         You appear in {pct(head.impression_share)} of the auctions you could. You miss {pct(budget)} for being
         out of budget and {pct(rank)} for rank.
         {' '}{rank > budget * 3
-          ? <b>More money buys almost nothing here — the gap is rank, which is bids, quality and relevance.</b>
+          ? <b>More money buys almost nothing here: the gap is rank, which is bids, quality and relevance.</b>
           : budget > 0.1 ? <b>There is real headroom: you are capped by budget, not by rank.</b> : null}
       </div>
     </div>);
@@ -17860,7 +17860,7 @@ function ChannelDetail({ channel, breakEven }){
         Across {ev.n_weeks} weeks the return lands somewhere between <b>{lo.toFixed(2)}×</b> and <b>{hi.toFixed(2)}×</b>
         {be != null ? <> against a break-even of {be.toFixed(2)}×</> : null}.
         {straddles
-          ? <> That range includes break-even, so <b>Greta cannot yet say whether this channel pays.</b> A holdout test settles it; more months of the same trading will not.</>
+          ? <> That range includes break-even, so <b>Whether this channel pays is not yet known.</b> A holdout test settles it; more months of the same trading will not.</>
           : hi < (be || 0) ? <> The whole range sits below break-even.</> : <> The whole range clears break-even.</>}
         {isFinite(mde) && mde > 0 ? <> The smallest effect this much data could detect is {mde.toFixed(2)}×.</> : null}
       </div>
@@ -17884,7 +17884,7 @@ function ChannelDetailList({ channels }){
   if (!rows.length) return null;
   return (<div className="card" style={{marginTop:14}}>
     <div className="card-section-title"><h2 style={{margin:0}}>Why each channel behaves the way it does</h2>
-      <span className="meta">The evidence behind the verdict — tap a channel</span></div>
+      <span className="meta">The evidence behind the verdict, tap a channel</span></div>
     <div style={{marginTop:6}}>
       {rows.map((c, i) => {
         const name = String(c.channel_type || c.channel);
@@ -17948,7 +17948,7 @@ function CashCeiling(){
       <span className="meta">You pay for stock before the sales come in, so a profitable plan can still run out of cash</span></div>
     {(!gate || missing) ? (<div style={{marginTop:8}}>
       <div className="fine" style={{color:'var(--text-secondary)', lineHeight:1.55}}>
-        Greta won’t guess this one. Add the cash you have now, the lowest balance you are willing to reach,
+        Not enough to read this yet. Add the cash you have now, the lowest balance you are willing to reach,
         and your supplier’s payment terms. Greta then works out the most you can spend a week without running
         out of cash. That is often less than the most you could spend at a profit.
         {gate && gate.missing_inputs ? <><br/><span className="muted">Still needed: {v3CashInputs(gate.missing_inputs)}</span></> : null}
@@ -18042,11 +18042,11 @@ function V3TrackingNote() {
     const stillDirty = clean && new Date(String(clean).slice(0, 10) + 'T00:00:00Z') > new Date();
     if (covOpen) return (<p className="v3-why-p v3-muted">
       Google Analytics has been recording visits again since {dm(st.fixed_on)}, but your shop still does not
-      record where many orders came from — that is the tracking check under Fix first.
+      record where many orders came from, that is the tracking check under Fix first.
       {stillDirty ? ' Comparisons that reach back into the gap stay unreliable until ' + dm(clean) + '.' : ''}
     </p>);
     return (<p className="v3-why-p v3-muted">
-      Your site tracking was broken until {dm(st.fixed_on)} and has been recording since — there is
+      Your site tracking was broken until {dm(st.fixed_on)} and has been recording since, there is
       nothing to fix.{stillDirty ? ' Comparisons that still reach back into those days stay unreliable until ' + dm(clean) + '.' : ''}
     </p>);
   }
@@ -18055,7 +18055,7 @@ function V3TrackingNote() {
     return (<p className="v3-why-p v3-muted">
       Your site tracking is not recording every visit{st.broke_on ? ', and has not since ' + dm(st.broke_on) : ''}. Until it does,
       visits and the share of visitors who buy are left out rather than guessed. The tracking code sits on your
-      own site, so Greta cannot fix this from here. {coverage}
+      own site, so it cannot be fixed from here. {coverage}
     </p>);
   }
 
@@ -18081,7 +18081,7 @@ function V3Why({ why, period, typical, now }){
       const sChg = T.sales > 0 ? Number(now.sales) / T.sales - 1 : null, pX = T.spend > 0 ? Number(now.spend) / T.spend : null;
       const bigger = Math.abs(pEff) >= Math.abs(sEff) ? 'spend' : 'sales';
       return (<div className="v3-why">
-        <div className="v3-kick">What moved your profit · last 30 days against a typical month</div>
+        <div className="v3-kick">What moved your profit, last 30 days against a typical month</div>
         <div className="v3-moves" role="img" aria-label={'Profit after ads is ' + fmtMoney(tot) + ' against a typical month: ' + moves.map(m => m.lab + ' ' + fmtMoney(m.v)).join(', ')}>
           {moves.map((m, i) => (<div key={i} className="v3-move">
             <span className="v3-move-lab">{m.lab}</span>
@@ -18098,7 +18098,7 @@ function V3Why({ why, period, typical, now }){
           {' '}{bigger === 'spend'
             ? <>{pX != null && pX >= 1.15 ? 'Ad spend at ' + fmtTimes(pX, 1) + ' a typical month' : 'The change in ad spend'} moved your profit most.{sChg != null ? <> Sales are {Math.abs(sChg) < 0.05 ? 'about normal' : (sChg > 0 ? 'up ' : 'down ') + fmtPctN(Math.abs(sChg))}.</> : null}</>
             : <>{sChg != null ? 'Sales ' + (sChg > 0 ? 'up ' : 'down ') + fmtPctN(Math.abs(sChg)) + ' on a typical month' : 'The change in sales'} moved your profit most.</>}
-          {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('profit')}>The detail <span className="v3-xref-go">on Profit &amp; sales →</span></button></p>
+          {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('profit')}>The detail <span className="v3-xref-go">on Profit &amp; sales</span></button></p>
         {why.data_integrity_flag && <V3TrackingNote/>}
         {(why.change_events || []).length > 0 && (<ul className="v3-why-list">
           {(why.change_events || []).slice(0, 3).map((e, i) => (<li key={i}><span className="v3-num">{v3Day(e.date)}</span> {v3EventWords(e.label)}</li>))}
@@ -18132,7 +18132,7 @@ function V3Why({ why, period, typical, now }){
   const total = moves.reduce((t, m) => t + m.v, 0);
   const mx = Math.max(1, ...moves.map(m => Math.abs(m.v)), Math.abs(total));
   return (<div className="v3-why">
-    <div className="v3-kick">What moved your profit{period && period.label ? ' · ' + period.label + ' vs the 30 days before' : ''}</div>
+    <div className="v3-kick">What moved your profit{period && period.label ? ', ' + period.label + ' vs the 30 days before' : ''}</div>
     {moves.length > 0 && (<div className="v3-moves" role="img" aria-label={'Profit after ads changed by ' + fmtMoney(total) + ': ' + moves.map(m => m.lab + ' ' + fmtMoney(m.v)).join(', ')}>
       {moves.map((m, i) => (<div key={i} className="v3-move">
         <span className="v3-move-lab">{m.lab}</span>
@@ -18147,7 +18147,7 @@ function V3Why({ why, period, typical, now }){
     </div>)}
     <p className="v3-why-p">
       {bits.length ? bits.join(', and ') : 'Profit held broadly steady'}
-      {what ? <>. The driver was <b>{what}</b>{who ? (who === 'new and returning' ? <> — <b>new and returning</b> customers alike</> : <> — mostly <b>{who}</b> customers</>) : null}</> : null}.
+      {what ? <>. The driver was <b>{what}</b>{who ? (who === 'new and returning' ? <>, <b>new and returning</b> customers alike</> : <>, mostly <b>{who}</b> customers</>) : null}</> : null}.
       {(() => { const mv = moves.find(m => /baskets/.test(m.lab)); return mv ? <> The size of the average order {mv.v > 0 ? 'added' : 'took off'} {money(mv.v)} of profit.</> : null; })()}
     </p>
     {why.data_integrity_flag && <V3TrackingNote/>}
@@ -18257,7 +18257,7 @@ function V3HeroTrend({ sales, prod }) {
       <span>Ad spend <em>{fmtMoney(p.spend)}</em></span></div>);
   };
   return (<figure className="v3-hero-trend" aria-label={'Profit after ads by week, last ' + data.length + ' weeks'}>
-    <figcaption><span className="v3-kick">By week</span><span className="v3-muted">last {data.length} weeks · latest <b className="oi-num">{fmtMoney(last.v)}</b></span></figcaption>
+    <figcaption><span className="v3-kick">By week</span><span className="v3-muted">last {data.length} weeks, latest <b className="oi-num">{fmtMoney(last.v)}</b></span></figcaption>
     <R.ResponsiveContainer width="100%" height={160}>
       <R.AreaChart data={data} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
         <defs><linearGradient id="v3HeroFill" x1="0" y1="0" x2="0" y2="1">
@@ -18267,7 +18267,7 @@ function V3HeroTrend({ sales, prod }) {
         <R.YAxis hide domain={['auto', 'auto']}/>
         <R.ReferenceLine y={0} stroke={PAL.line}/>
         <R.Tooltip content={tip} cursor={{ stroke: PAL.line }}/>
-        <R.Area type="monotone" dataKey="v" stroke={PAL.kept} fill="url(#v3HeroFill)"
+        <R.Area type="linear" dataKey="v" stroke={PAL.kept} fill="url(#v3HeroFill)"
                 dot={(pr) => pr.index === data.length - 1 ? <circle key="last" cx={pr.cx} cy={pr.cy} r={3.5} fill={PAL.kept}/> : null}/>
       </R.AreaChart>
     </R.ResponsiveContainer>
@@ -18340,12 +18340,12 @@ function V3MoveRunway({ peakOn, lead: leadWords }) {
         {pk != null && <em className={pk < lead ? 'r' : ''} style={{ left: (pk / span * 100) + '%' }}>Peak {v3Day(peakOn)}</em>}
         <em className={pk != null && pk > lead ? 'r' : ''} style={{ left: (lead / span * 100) + '%' }}>Order lands {v3Day(landOn)}</em>
       </span><span/></div></>
-    : <figcaption>Days of stock left <span>· the line is {v3Day(landOn)}, when an order placed today lands</span></figcaption>}
+    : <figcaption>Days of stock left <span>the line is {v3Day(landOn)}, when an order placed today lands</span></figcaption>}
     {rows.map(r => { const d = Number(r.days_left) || 0;
       return (<div className="v3-mvrun-row" key={r.sku || r.product_title}>
         <span className="v3-mvrun-k">{r.product_title}</span>
         <span className="v3-mvrun-track"><i className={d < lead ? 'short' : ''} style={{ width: Math.max(1, Math.min(100, d / span * 100)) + '%' }}/><b style={{ left: (lead / span * 100) + '%' }}/>{pk != null && <b style={{ left: (pk / span * 100) + '%' }}/>}</span>
-        <span className="v3-mvrun-v">{Number(r.out_of_stock) || r.out_of_stock === true ? 'Out' : fmtCount(d) + ' days'}</span>
+        <span className="v3-mvrun-v">{Number(r.out_of_stock) || r.out_of_stock === true ? 'Out' : fmtCount(d) + (Math.round(Number(d)) === 1 ? ' day' : ' days')}</span>
       </div>); })}
   </figure>);
 }
@@ -18728,7 +18728,7 @@ function V3MoveCard({ row, rank, closes, closesTo, meta, dense, viz, onDecided, 
         <button type="button" className="v3-mv-toggle" aria-expanded={show === 'sure'} onClick={() => setShow(s => s === 'sure' ? null : 'sure')}>How sure?</button>
         {knock.length > 0 && <button type="button" className="v3-mv-toggle" aria-expanded={show === 'else'} onClick={() => setShow(s => s === 'else' ? null : 'else')}>What it does elsewhere</button>}
         {/* the agent's promise, on the move it is about */}
-        {ex && Number(ex.win) > 0 && <span className="v3-mv-check">Greta checks it {fmtCount(Number(ex.win))} days after you mark it done</span>}
+        {ex && Number(ex.win) > 0 && <span className="v3-mv-check">Checked {fmtCount(Number(ex.win))} days after you mark it done</span>}
       </div>
     </div>
     {show === 'else' && <p className="v3-mv-open">On its way to your profit it also moves {v3AndList(knock)}.</p>}
@@ -18832,17 +18832,17 @@ function V3GoalStrip({ q, gc, unreported }) {
   useV3Rows('brand-state', V3_STATE_Q);   // the verdict reads the ad answer
   const [how, setHow] = React.useState(false);
   const g = q.rows && q.rows[0];
-  if (q.err) return (<section className="v3-goal-strip"><p className="v3-muted">Greta couldn’t load your goal just now.</p>
+  if (q.err) return (<section className="v3-goal-strip"><p className="v3-muted">Your goal could not load just now.</p>
     <button type="button" className="v3-btn v3-btn-sm" onClick={q.retry}>Try again</button></section>);
   if (!g) return <section className="v3-goal-strip" aria-busy="true"><V3SkeletonRows n={1}/></section>;
   if (!g.confirmed) return (<section className="v3-goal-strip">
     <p className="v3-goal-lab">Your goal</p>
-    <p className="v3-muted">Your goal is still an estimate, so Greta doesn’t show progress against it yet.</p>
+    <p className="v3-muted">Your goal is still an estimate, so progress against it is not shown yet.</p>
     <button type="button" className="v3-btn v3-btn-sm v3-btn-p" onClick={() => window.__oiNav && window.__oiNav('home', 'plansetup')}>Set your goal</button>
   </section>);
   if (g.forecast == null) return (<section className="v3-goal-strip">
     <p className="v3-goal-lab">Your goal{g.target != null ? ': ' + v3Gbp(g.target) + ' after ads' : ''}</p>
-    <p className="v3-muted">Greta can’t work out a pace for it yet, so she won’t guess whether you are on track.</p>
+    <p className="v3-muted">No pace can be worked out for it yet.</p>
   </section>);
   const V = v3GoalVerdict(g, unreported);
   const short = V ? V.gap > 0 : Number(g.gap) > 0;
@@ -18852,7 +18852,7 @@ function V3GoalStrip({ q, gc, unreported }) {
   const ahead = V.ahead;
   return (<section className="v3-goal-strip">
     <div className="v3-goal-top">
-      <p className="v3-goal-lab">{g.confirmed_on ? 'The goal you confirmed on ' + v3Day(g.confirmed_on) : 'Goal'} for {v3Day(g.period_start)} to {v3Day(g.period_end)} · profit after ads · day {g.day} of {g.days}</p>
+      <p className="v3-goal-lab">{g.confirmed_on ? 'The goal you confirmed on ' + v3Day(g.confirmed_on) : 'Goal'} for {v3Day(g.period_start)} to {v3Day(g.period_end)}, profit after ads, day {g.day} of {g.days}</p>
       <span className={'v3-goal-chip ' + chip.cls}>{chip.word}</span>
     </div>
     <dl className="v3-goal-figs">
@@ -18871,7 +18871,7 @@ function V3GoalStrip({ q, gc, unreported }) {
     {how && <p className="v3-goal-note v3-muted">The forecast is {g.forecast_basis || 'what you have kept so far plus your recent pace for each day left'}. It does not count the moves below yet, so each one you make moves it up.</p>}
     {unreliable && <p className="v3-muted">About {v3Gbp(unreported)} of ad spend has not come through yet, enough to move the forecast either way.</p>}
     {/* 1123: the strip reads against the goal as confirmed, so a changed plan no longer hides it; it asks for a re-plan */}
-    {gc && gc.stale && <p className="v3-goal-note v3-muted">Greta’s plan has changed since you confirmed this goal.{' '}
+    {gc && gc.stale && <p className="v3-goal-note v3-muted">The plan has changed since you confirmed this goal.{' '}
       <button type="button" className="v3-mv-toggle" onClick={() => window.__oiGo && window.__oiGo('goal')}>Re-plan the quarter</button></p>}
   </section>);
 }
@@ -18925,7 +18925,7 @@ function V3TodayRow({ row, rank, isOpen, onToggle, closes, closesTo, why }) {
       <div className="v3-mv-more">
         <button type="button" className="v3-mv-toggle" aria-expanded={show === 'sure'} onClick={() => setShow(s => s === 'sure' ? null : 'sure')}>How sure?</button>
         {knock.length > 0 && <button type="button" className="v3-mv-toggle" aria-expanded={show === 'else'} onClick={() => setShow(s => s === 'else' ? null : 'else')}>What it does elsewhere</button>}
-        {ex && Number(ex.win) > 0 && <span className="v3-mv-check">Greta checks it {fmtCount(Number(ex.win))} days after you mark it done</span>}
+        {ex && Number(ex.win) > 0 && <span className="v3-mv-check">Checked {fmtCount(Number(ex.win))} days after you mark it done</span>}
       </div>
       {show === 'else' && <p className="v3-mv-open">On its way to your profit it also moves {v3AndList(knock)}.</p>}
       {show === 'sure' && <V3MoveSureOpen row={row} raw={pa.raw} noSteps/>}
@@ -18954,11 +18954,11 @@ function V3TodayMoves({ q, board, gc }) {
   const back = (done.length > 0 || due.length > 0) && (<p className="v3-row-back"><span><b>Did it work?</b>{' '}
     {done.length > 0 ? done.map((r, i) => { const lab = V3_RESULT[r.label] || V3_RESULT.checking, soon = r.due_on && String(r.due_on).slice(0, 10) >= todayIso;
         return <React.Fragment key={r.external_id}>{i ? ', ' : ''}{v3MoveShort(r)} <span className={'v3-row-fig ' + lab.cls}>{soon ? 'checks ' + v3Day(String(r.due_on).slice(0, 10)) : r.measured_gbp != null ? v3Gbp(r.measured_gbp) : lab.label}</span></React.Fragment>; })
-      : <>Nothing checked yet. Greta reads back:{' '}{due.map((x, i) => <React.Fragment key={x.id}>{i ? ', ' : ''}{x.k} <span className="v3-row-fig">{v3Day(x.on)}</span></React.Fragment>)}.</>}</span>
+      : <>Nothing checked yet. Due back:{' '}{due.map((x, i) => <React.Fragment key={x.id}>{i ? ', ' : ''}{x.k} <span className="v3-row-fig">{v3Day(x.on)}</span></React.Fragment>)}.</>}</span>
     <button type="button" className="v3-xref" onClick={() => go('results')}>Results</button></p>);
   if (!moves.length) return (<section className="v3-mvlist">
     <p className="v3-goal-lab">Your moves</p>
-    <p className="v3-muted">{Array.isArray(board.unpriced) && board.unpriced.some(r => r.due_on) ? 'Nothing with a £ figure needs you today.' : 'Nothing needs you today. Greta checks again as new data arrives.'}</p>
+    <p className="v3-muted">{Array.isArray(board.unpriced) && board.unpriced.some(r => r.due_on) ? 'Nothing with a £ figure needs you today.' : 'Nothing needs you today.'}</p>
     <V3UnpricedLane compact/>
     {done.length > 0 && back}
   </section>);
@@ -19273,7 +19273,7 @@ function V3AgentLead({ q, gc, board, unreported }) {
   const since = useV3SinceLook(g, board.rows ? v3LiveRows(board.rows) : null);
   // no confirmed goal, no forecast, or a failed read: the plain strip says what is missing and asks for it
   if (!g || !V) {
-    return (<>{!g && !q.err ? <section className="v3-al" aria-busy="true"><p className="v3-al-live"><i aria-hidden="true"/>Greta is reading your business…</p></section>
+    return (<>{!g && !q.err ? <section className="v3-al" aria-busy="true"><p className="v3-al-live"><i aria-hidden="true"/>Loading…</p></section>
       : <V3GoalStrip q={q} gc={gc} unreported={unreported}/>}
       <V3AskBar dest="today"/></>);
   }
@@ -19290,8 +19290,8 @@ function V3AgentLead({ q, gc, board, unreported }) {
   const M = v3GoalMessage(g, V), F = V.F;
   return (<section className="v3-al" aria-label="Greta's read of the quarter">
     <div className="v3-al-top">
-      <p className="v3-al-live" title="Greta works the figures out again every hour. Shopify orders arrive every 30 minutes and ad spend every 2 hours."><i aria-hidden="true"/>
-        Greta is watching{src.length ? ' ' + src.length + ' sources' : ''}{at ? ' · last read ' + at : ''}</p>
+      <p className="v3-al-live" title="Figures are worked out again every hour. Shopify orders arrive every 30 minutes and ad spend every 2 hours."><i aria-hidden="true"/>
+        {src.length ? src.length + ' sources' : 'Sources'}{at ? ', last read ' + at : ''}</p>
       <V3AskBar dest="today"/>
     </div>
     <div className="v3-al-grid">
@@ -19304,8 +19304,8 @@ function V3AgentLead({ q, gc, board, unreported }) {
         {M.note && <p className="v3-al-sofar">{M.note}{' '}
           <button type="button" className="v3-al-link" onClick={() => go('goal')}>See the answer on ad spend</button></p>}
         <p className="v3-al-sofar"><button type="button" className="v3-al-link" aria-expanded={how} onClick={() => setHow(h => !h)}>How Greta worked this out</button></p>
-        {how && <p className="v3-al-how">{M.evidence} {g.confirmed_on ? 'The goal is the one you confirmed on ' + v3Day(g.confirmed_on) + '. ' : ''}{V.F ? <>{Number(AD.hold_week) > 0 ? <>This line is Greta’s plan at about {v3Gbp(AD.hold_week)} of ads a week over the days left, more in the busiest weeks, counting the season ahead.</> : <>This line is Greta’s plan at the ads you run now, counting the season ahead.</>} Worked from {AD.basis}. </> : <>The forecast is {g.forecast_basis || 'what you have kept so far plus your recent pace for each day left'}. </>}{V.F && v3AdCutInPlan(AD).share >= 0.5 ? 'It already counts most of the ad cut in your moves, so the other moves are what add to it.' : V.F && v3AdCutInPlan(AD).share > 0 ? 'It counts part of the ad cut in your moves; the other moves add to it.' : 'It does not count the moves below yet, so each one you make moves it up.'}</p>}
-        {gc && gc.stale && <p className="v3-al-how">Greta’s plan has changed since you confirmed this goal.{' '}
+        {how && <p className="v3-al-how">{M.evidence} {g.confirmed_on ? 'The goal is the one you confirmed on ' + v3Day(g.confirmed_on) + '. ' : ''}{V.F ? <>{Number(AD.hold_week) > 0 ? <>This line is the plan at about {v3Gbp(AD.hold_week)} of ads a week over the days left, more in the busiest weeks, counting the season ahead.</> : <>This line is the plan at the ads you run now, counting the season ahead.</>} Worked from {AD.basis}. </> : <>The forecast is {g.forecast_basis || 'what you have kept so far plus your recent pace for each day left'}. </>}{V.F && v3AdCutInPlan(AD).share >= 0.5 ? 'It already counts most of the ad cut in your moves, so the other moves are what add to it.' : V.F && v3AdCutInPlan(AD).share > 0 ? 'It counts part of the ad cut in your moves; the other moves add to it.' : 'It does not count the moves below yet, so each one you make moves it up.'}</p>}
+        {gc && gc.stale && <p className="v3-al-how">The plan has changed since you confirmed this goal.{' '}
           <button type="button" className="v3-al-link" onClick={() => go('goal')}>Re-plan the quarter</button></p>}
       </div>
       {F ? <V3FuturesChart F={F} g={g} P={P}/> : <V3GoalChart P={P} g={g}/>}
@@ -19710,7 +19710,7 @@ function V3CostGapLine({ compact }) {
   return (<p className={(compact ? 'v3-src-gap' : 'micro muted v3-measure') + ''}>
     Cost missing on <b>{fmtPctN(pct)}</b> of what you sold in the last 90 days ({fmtCount(g.uncosted_lines_90d)} of {fmtCount(g.lines_90d)} order lines).
     {' '}Those take your average margin, so profit is an estimate there.
-    {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs')}>Add the missing costs <span className="v3-xref-go">on Goal &amp; costs →</span></button>
+    {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs')}>Add the missing costs <span className="v3-xref-go">on Goal &amp; costs</span></button>
   </p>);
 }
 // The five setup steps on Today until they are all done; "3 of 5 done", each with the place to do it. Dismissed,
@@ -19805,10 +19805,10 @@ function V3Today(p) {
   const liveDown = typeof window !== 'undefined' && window.FRKL_LIVE && /^(error|static-only)$/.test(window.FRKL_LIVE.status || '');
   const onProfit = p.page === 'profit';
   if (!d && (onProfit || !(hErr || liveDown))) return null;   // Home's panels show their own loading state
-  if (!d) return (<div className="v3-hero"><div className="v3-hero-lab">Profit after ads · last 30 days</div>
+  if (!d) return (<div className="v3-hero"><div className="v3-hero-lab">Profit after ads, last 30 days</div>
     <div className="v3-big">—</div>
     {(hErr || liveDown)
-      ? <><div className="v3-sub">{liveDown ? v3NoBrand('your numbers') : 'Greta couldn’t load your numbers just now.'}</div>
+      ? <><div className="v3-sub">{liveDown ? v3NoBrand('your numbers') : 'Your numbers could not load just now.'}</div>
           {!(window.FRKL_LIVE && window.FRKL_LIVE.lastError === 'no membership') && <button type="button" className="v3-btn v3-btn-sm v3-gap-top" onClick={() => location.reload()}>Try again</button>}</>
       : <div className="v3-sub">Loading your live numbers…</div>}</div>);
 
@@ -19878,14 +19878,14 @@ function V3Today(p) {
       if (d.setup && d.setup.young) return <V3YoungHero setup={d.setup}/>;
       return (
       <div className="v3-hero">
-        <div className="v3-hero-lab">Profit after ads · last 30 days <V3Info k="profit_after_ads"/></div>
+        <div className="v3-hero-lab">Profit after ads, last 30 days <V3Info k="profit_after_ads"/></div>
         <div className="v3-big v3-big-muted">—</div>
         <div className="v3-sub">{noSales
-          ? 'Greta cannot see any sales in the last 30 days. If you have been trading, the link to your shop has probably dropped. Reconnecting takes about a minute, and your history comes back with it.'
-          : 'Enter what your products and orders cost you. Greta can then show your profit and rank your actions by what each is worth.'}</div>
+          ? 'No sales in the last 30 days. If you have been trading, the link to your shop has probably dropped. Reconnecting takes about a minute, and your history comes back with it.'
+          : 'Enter what your products and orders cost you to see your profit and rank your actions by what each is worth.'}</div>
         {/* The sentence above says reconnecting takes about a minute, and then the button
             used to offer a screen. It is the shop that is missing, so it is the shop the
-            button connects — worded for whether there has ever been one. V3Fix falls back
+            button connects, worded for whether there has ever been one. V3Fix falls back
             to Settings by itself when no stored domain exists to start Shopify with. */}
         <div className="v3-btns">{noSales
           ? <V3Fix provider="shopify" label={connExists('shopify') ? 'Reconnect Shopify' : 'Connect Shopify'}/>
@@ -19911,12 +19911,12 @@ function V3Today(p) {
       <div className="v3-hero">
        <div className="v3-hero-grid">
         <div className="v3-hero-main">
-        <div className="v3-hero-lab">Profit after ads, before running costs · last 30 days <V3Info k="profit_after_ads"/>
+        <div className="v3-hero-lab">Profit after ads, before running costs, last 30 days <V3Info k="profit_after_ads"/>
           {/* The basis comes from the server (0192), not from cm_source. This chip used to read
-              cm_source === 'fit_engine' as "Measured — calculated from your own product and order
+              cm_source === 'fit_engine' as "Measured, calculated from your own product and order
               costs", which was exactly backwards: fit_engine means the engine derived margin from
               the CONFIGURED gross margin and never touched the cost tables. Measured is now earned
-              — 80% of revenue costed AND those costs carrying freight or duty — and when it is not
+             , 80% of revenue costed AND those costs carrying freight or duty, and when it is not
               earned Today says so in the brand's own numbers rather than in the abstract. */}
           {/* A confidence badge on an em-dash is worse than no badge: it says Greta is
               fairly sure of a number it has not got. 0202 makes this unreachable through
@@ -19955,7 +19955,7 @@ function V3Today(p) {
        </div>
         {/* the lead draws where the sales went; the flow stays only when the lead could not load */}
         {!stateLead && <V3MoneyFlow d={d}/>}
-        {stale && <button type="button" className="v3-refresh" onClick={refresh}>New numbers are available — show them</button>}
+        {stale && <button type="button" className="v3-refresh" onClick={refresh}>New numbers are available. Show them</button>}
         {/* The live read failed and the figures above are the last ones this browser saw. Say
             when they are from, rather than let a day-old number read as this morning's. */}
         {d.refresh_failed && (() => {
@@ -19965,7 +19965,7 @@ function V3Today(p) {
               + t.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
             : null;
           return (<div className="v3-pace">
-            <span className="v3-muted">Couldn’t refresh — {when ? 'these figures are from ' + when : 'these are the last figures Greta had'}.</span>
+            <span className="v3-muted">Couldn’t refresh, {when ? 'these figures are from ' + when : 'these are the last figures Greta had'}.</span>
             <button type="button" className="v3-btn v3-btn-sm" onClick={() => location.reload()}>Try again</button>
           </div>);
         })()}
@@ -19980,7 +19980,7 @@ function V3Today(p) {
         customer and channel numbers" (GretaOverviewTiers) recomputed everything in the browser on
         its own window: profit after ads £3,124 under a hero saying £3,350, ad spend £10,249 vs
         £10,022, and conversion 6.59% "On track" over a week of sessions after a tracking gap (the
-        server's honest figure is 1.09%). Every part of it lives on its own page — channels on
+        server's honest figure is 1.09%). Every part of it lives on its own page, channels on
         Marketing, customers on Customers, the track record on Profit & sales. Removed 2026-10-02. */}
   </div>);
 }
@@ -20133,7 +20133,7 @@ function V3FcErr() {
   const w = r.wape != null && isFinite(Number(r.wape)) ? Number(r.wape) : null;
   // too few days to judge on: the view's own sentence says so
   const text = w != null && Number(r.days) >= 14
-    ? 'Greta’s daily sales forecast was off by about ' + fmtPctN(w) + ' over the last ' + fmtCount(Number(r.days)) + ' days' + (Number(r.bias) > 0 ? ' (low on average).' : Number(r.bias) < 0 ? ' (high on average).' : '.')
+    ? 'Daily sales forecast off by about ' + fmtPctN(w) + ' over the last ' + fmtCount(Number(r.days)) + ' days' + (Number(r.bias) > 0 ? ' (low on average).' : Number(r.bias) < 0 ? ' (high on average).' : '.')
     : (r.label || null);
   return text ? <p className="micro muted v3-measure">{text}</p> : null;
 }
@@ -20320,13 +20320,13 @@ function V3Growth() {
       {/* Two short paragraphs, not one of 104 words: last year's month, then the plan (7 Oct). */}
       {lyCost != null && <p className="v3-note v3-measure">Last {gpMonthName(pk.month)} a new customer cost {fmtMoney(lyCost, 2)} to win: {fmtCount(ly.new_customers)} of them, on {fmtMoney(ly.spend)} of ads. That compares with {c30v != null ? fmtMoney(c30v, 2) + ' in the last 30 days' : fmtMoney(last ? last.cac : null, 2) + ' last month'}. The sale brings them in.</p>}
       <V3Brief>
-        Greta’s plan spends {fmtMoney(pk.spend)} on ads in {gpMonthName(pk.month)} for about {fmtCount(pk.new_customers)} new customers, {fmtMoney(per1(pk), 2)} each.
+        The plan spends {fmtMoney(pk.spend)} on ads in {gpMonthName(pk.month)} for about {fmtCount(pk.new_customers)} new customers, {fmtMoney(per1(pk), 2)} each.
         {gk ? <> Your goal would spend {fmtMoney(gk.spend)} for about {fmtCount(gk.new_customers)}, {fmtMoney(per1(gk), 2)} each.</> : null}
         {' '}If you add budget this quarter, put it here rather than in an ordinary month. Each extra pound still buys less than the one before.
         {beyond && ' You have never spent this much on ads in a month, so these figures are Greta’s estimate, not results you have seen.'}
-        {' '}<V3Conf state="probably" detail="From Greta’s plan for the quarter: your own busy and quiet months, returning customers at their recent rate, and new-customer sales that rise with spend as your own months show. Last year’s figures are what you actually spent and the new customers you won."/></V3Brief>
+        {' '}<V3Conf state="probably" detail="From the plan for the quarter: your own busy and quiet months, returning customers at their recent rate, and new-customer sales that rise with spend as your own months show. Last year’s figures are what you actually spent and the new customers you won."/></V3Brief>
       <div className="v3-btn-row">
-        <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('goal')}>{g ? 'See what the goal takes' : 'Set a goal'} <span className="v3-xref-go">on Goal &amp; costs →</span></button>
+        <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('goal')}>{g ? 'See what the goal takes' : 'Set a goal'} <span className="v3-xref-go">on Goal &amp; costs</span></button>
       </div>
     </section>)}
 
@@ -20343,7 +20343,7 @@ function V3Growth() {
             <R.YAxis tickFormatter={v => fmtMoney(v)} domain={[0, dataMax => Math.ceil(Math.max(dataMax, fop) * 1.15 / 10) * 10]}/>
             <R.Tooltip content={cacTip}/>
             <R.ReferenceLine y={fop} stroke={PAL.muted} strokeDasharray="4 4"/>
-            <R.Area type="monotone" dataKey="cac" stroke={PAL.ads} fill="url(#v3CacFill)"/>
+            <R.Area type="linear" dataKey="cac" stroke={PAL.ads} fill="url(#v3CacFill)"/>
           </R.ComposedChart>
         </R.ResponsiveContainer>
       </figure>
@@ -20376,7 +20376,7 @@ function V3Growth() {
         })}
       </ul>)}
       {levers.length >= 2 && <p className="micro muted v3-measure">That is, spend more before a new customer costs more than an order earns, with everything else unchanged. It is worked out from your own months, so treat it as a ranking, not a promise.</p>}
-      <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('marketing')}>Which ad channels pay for themselves <span className="v3-xref-go">on Marketing →</span></button>
+      <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('marketing')}>Which ad channels pay for themselves <span className="v3-xref-go">on Marketing</span></button>
     </section>)}
 
     {planMo && mtd != null && daysDone >= 3 && (<section className="v3-sec">
@@ -20432,10 +20432,10 @@ function V3Stock() {
   if (SM0.held) return (<div className="v3-page-stack">
     <section>
       <div className="v3-kick">What to order</div>
-      <p className="v3-verdict">Greta can’t tell what to order right now.</p>
+      <p className="v3-verdict">Order list unavailable.</p>
       <p className="v3-note v3-measure">{SM0.held_because || 'The stock list is held until your stock counts are current.'}</p>
       <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('settings')}>
-        Check the Shopify connection <span className="v3-xref-go">on Connections &amp; data →</span></button>
+        Check the Shopify connection <span className="v3-xref-go">on Connections &amp; data</span></button>
     </section>
   </div>);
   // The view marks the whole brand stale after 48h without a products sync, and every row then
@@ -20443,10 +20443,10 @@ function V3Stock() {
   if (rows.some(r => r.inventory_stale)) return (<div className="v3-page-stack">
     <section>
       <div className="v3-kick">What to order</div>
-      <p className="v3-verdict">Greta can’t tell what runs out right now.</p>
+      <p className="v3-verdict">Run-out dates unavailable.</p>
       <p className="v3-note v3-measure">Stock counts have not refreshed from Shopify in over two days. A plan built on old counts could tell you to reorder something you have just restocked, or miss something that sold out yesterday, so the plan is held until the counts are current.</p>
       <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('settings')}>
-        Check the Shopify connection <span className="v3-xref-go">on Connections &amp; data →</span></button>
+        Check the Shopify connection <span className="v3-xref-go">on Connections &amp; data</span></button>
     </section>
   </div>);
 
@@ -20505,7 +20505,7 @@ function V3Stock() {
   const shown = allRisk ? order : order.slice(0, 10);
   // one listing with many variants (frkl's initial charms: a letter each) shows as one title per row
   const dupT = {}; order.forEach(r => { const t = String(r.product_title || '').trim().toLowerCase(); dupT[t] = (dupT[t] || 0) + 1; });
-  const nameOf = r => v3Sentence(r.product_title || r.sku) + (dupT[String(r.product_title || '').trim().toLowerCase()] > 1 ? ' · ' + (r.noSku ? 'no product code' : r.sku) : '');
+  const nameOf = r => v3Sentence(r.product_title || r.sku) + (dupT[String(r.product_title || '').trim().toLowerCase()] > 1 ? ', ' + (r.noSku ? 'no product code' : r.sku) : '');
   const span = Math.max(14, ...order.map(r => (r.days || 0) + r.gap)) || 14;
   const stat = (lab, val, foot) => (<div className="v3-stat" key={lab}>
     <div className="v3-stat-lab"><span>{lab}</span></div>
@@ -20553,7 +20553,7 @@ function V3Stock() {
         {pk && land > pk.end && <p className="v3-note v3-measure">An order placed today arrives after {pkName} ends. What you have in stock now is all you can sell in it; what to feature is below.</p>}
       </>) : null}
       {order.length > 0 && <div className="v3-stat-grid v3-gap-top">
-        {stat('To order', fmtCount(order.length) + ' products', [outNow > 0 ? fmtCount(outNow) + ' already out' : preN > 0 ? '' : 'none out yet', preN > 0 ? fmtCount(preN) + ' on pre-order' : ''].filter(Boolean).join(', '))}
+        {stat('To order', fmtCount(order.length) + (order.length === 1 ? ' product' : ' products'), [outNow > 0 ? fmtCount(outNow) + ' already out' : preN > 0 ? '' : 'none out yet', preN > 0 ? fmtCount(preN) + ' on pre-order' : ''].filter(Boolean).join(', '))}
         {stat('Order cost', fmtMoney(cost), fmtCount(SM.units) + ' units at landed cost')}
         {protect != null && stat('Profit it protects', fmtMoney(protect) + ' a month', 'from ' + v3Day(land))}
         {peakAt != null && stat('Peak sales it protects', fmtMoney(peakAt), 'once, over ' + pkName)}
@@ -20598,7 +20598,7 @@ function V3Stock() {
     {(longOut.length > 0 || noSku.length > 0) && <V3More id="stock-tidy" label={'Tidy-up in Shopify: ' + [longOut.length > 0 ? fmtCount(longOut.length) + ' out of stock for over four weeks' : null, noSku.length > 0 ? fmtCount(noSkuTitles) + ' without a product code' : null].filter(Boolean).join(', ')}>
     {longOut.length > 0 && (<section className="v3-sec">
       <h2 className="v3-sec-title">Out of stock for over four weeks: keep or drop?</h2>
-      <p className="v3-note v3-measure">{longOut.length === 1 ? 'One product has' : fmtCount(longOut.length) + ' products have'} been out of stock for over four weeks. None sold in that time, so Greta can’t work out how many to order. Decide each one: restock a small batch if you still want to sell it, or archive it in Shopify so it stops counting as out of stock.</p>
+      <p className="v3-note v3-measure">{longOut.length === 1 ? 'One product has' : fmtCount(longOut.length) + ' products have'} been out of stock for over four weeks. None sold in that time, so there is no way to work out how many to order. Decide each one: restock a small batch if you still want to sell it, or archive it in Shopify so it stops counting as out of stock.</p>
       <ul className="v3-rank-steps">{longOut.slice(0, 8).map(r => (<li key={r.sku}><span className="v3-rank-desc">{v3Sentence(r.product_title || r.sku)}</span>
         <span className="v3-sub"> {r.last_sold_on ? 'last sold ' + v3Day(r.last_sold_on, true) : 'no sale in six months'}</span></li>))}</ul>
       {longOut.length > 8 && <p className="micro muted">And {fmtCount(longOut.length - 8)} more.</p>}
@@ -20659,14 +20659,14 @@ function V3StockOffer() {
   const tbl = (list, last) => (<table className="v3-rw">
     <thead><tr><th className="t-text">Product</th><th>Sold in last year’s peak</th><th>Left when it starts</th>{last && <th className="t-text">Restock arrives</th>}</tr></thead>
     <tbody>{list.map(x => (<tr key={x.title}>
-      <td className="t-text v3-rw-name">{x.title}{x.renamed ? <span className="v3-sub"> · was “{x.renamed}”</span> : null}</td>
+      <td className="t-text v3-rw-name">{x.title}{x.renamed ? <span className="v3-sub">, was “{x.renamed}”</span> : null}</td>
       <td>{fmtCount(x.ly)}</td>
       <td className={x.left < x.ly ? 'v3-down' : ''}>{fmtCount(x.left)}</td>
-      {last && <td className="t-text v3-muted">{x.onOrder ? v3Day(land) : 'Not on order — out for weeks'}</td>}
+      {last && <td className="t-text v3-muted">{x.onOrder ? v3Day(land) : 'Not on order, out for weeks'}</td>}
     </tr>))}</tbody>
   </table>);
   return (<div className="v3-page-stack"><section className="v3-sec">
-    <div className="v3-kick">Your next busy period · {pkName} · {v3Day(pk.start)} – {v3Day(pk.end, true)}</div>
+    <div className="v3-kick">Your next busy period, {pkName}, {v3Day(pk.start)} – {v3Day(pk.end, true)}</div>
     <p className="v3-verdict">For {pkName}, feature what you have plenty of. Keep products that will run short out of your ads.</p>
     {/* How deep to go (review, 9 Oct: Greta said run a peak offer but never how much off). From the brand's
         own margin after product and order costs: at d off full price, £100 of full-price sales keeps
@@ -20683,7 +20683,7 @@ function V3StockOffer() {
     {plenty.length > 0 && <><h2 className="v3-sec-title">Feature these in the offer</h2>{tbl(plenty, false)}</>}
     {short.length > 0 && <><h2 className="v3-sec-title">Keep these out of your ads until the order arrives</h2>{tbl(short, true)}</>}
     {gone.length > 0 && <p className="micro muted v3-measure">{gone.length === 1 ? 'One of last year’s peak sellers is' : fmtCount(gone.length) + ' of last year’s peak sellers are'} no longer sold: {gone.slice(0, 4).map(p => v3Sentence(p.from)).join(', ')}{gone.length > 4 ? ' and others' : ''}.</p>}
-    <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('calendar')}>Plan the offer <span className="v3-xref-go">on Calendar →</span></button>
+    <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('calendar')}>Plan the offer <span className="v3-xref-go">on Calendar</span></button>
   </section></div>);
 }
 
@@ -20845,7 +20845,7 @@ function V3Website() {
   const tip = ({ active, payload }) => {
     if (!active || !payload || !payload.length) return null;
     const p = payload[0].payload;
-    return (<div className="v3-tip"><b>{p.name}{p.metric ? ' · ' + v3Step(p.metric) : ''}</b>
+    return (<div className="v3-tip"><b>{p.name}{p.metric ? ', ' + v3Step(p.metric) : ''}</b>
       <span>{p.kind === 'total' ? 'Profit before ads' : 'Effect on profit'} <em>{p.kind === 'total' ? fmtMoney(p.val) : (p.delta >= 0 ? '+' : '−') + fmtMoney(Math.abs(p.delta))}</em></span></div>);
   };
   const ctip = ({ active, payload }) => {
@@ -20861,11 +20861,11 @@ function V3Website() {
 
   const ST = (shopTrk.rows || [])[0] || null, STm = (ST && ST.metadata) || {}, STd = STm.month_to_date || null;
   const shopLine = ST ? <>{ga4Bad ? 'That was Google Analytics. A second break is still open: your' : 'Your'} shop has not recorded where many orders came from since {STm.broke_month ? gpMonthName(String(STm.broke_month).slice(0, 10)) : 'the summer'}.{STd && STd.visit_recorded != null ? <> It recorded the visit behind only {fmtPctN(Number(STd.visit_recorded))} of {gpMonthName(String(STd.month).slice(0, 10))}’s orders so far{STm.visit_before != null ? <>, against {fmtPctN(Number(STm.visit_before))} before</> : null}.</> : null} This one is not fixed yet. It is the tracking check under Fix first on Today. Until it is fixed, the orders your shop credits to each channel, such as ads or email, read low.{' '}
-    <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('today')}>Fix first <span className="v3-xref-go">on Today →</span></button></> : null;
+    <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('today')}>Fix first <span className="v3-xref-go">on Home</span></button></> : null;
   return (<div className="v3-page-stack">
     {(ga4Bad || ST) && (<section className="v3-sec">
-      <div className="v3-kick">Can Greta read your site right now?</div>
-      {ga4Bad ? <p className="v3-verdict">Your site analytics stopped recording properly{T.broke_on ? ' on ' + v3Day(T.broke_on, true) : ''}{T.fixed_on ? ' and were fixed on ' + v3Day(T.fixed_on, true) : ', and are not fixed yet'}{ST ? ' — and a second break is still open' : ''}.</p>
+      <div className="v3-kick">Site tracking</div>
+      {ga4Bad ? <p className="v3-verdict">Your site analytics stopped recording properly{T.broke_on ? ' on ' + v3Day(T.broke_on, true) : ''}{T.fixed_on ? ' and were fixed on ' + v3Day(T.fixed_on, true) : ', and are not fixed yet'}{ST ? ', and a second break is still open' : ''}.</p>
         : <p className="v3-verdict">Your shop is not recording where many orders came from.</p>}
       {shopLine && <p className="v3-note v3-measure">{shopLine}</p>}
       {ga4Bad && <p className="v3-note v3-measure">{T.fixed_on
@@ -20875,7 +20875,7 @@ function V3Website() {
     </section>)}
 
     {C && (<section className="v3-sec">
-      <div className="v3-kick">Your site now · last 30 days · Clarity visits and Shopify orders</div>
+      <div className="v3-kick">Your site now, last 30 days, Clarity visits and Shopify orders</div>
       <div className={now.ws.length >= 2 ? 'v3-lead2' : ''}><div>
       <p className="v3-verdict">{head}</p>
       {(() => {
@@ -20885,7 +20885,7 @@ function V3Website() {
         const i = live.findIndex(r => r.external_id === 'site-funnel-weakstep');
         const g = i < 0 ? null : String(live[i].description || '').match(/(\d+)% fewer of your visits end in an order than on your full-price weeks \(([\d.]+%) against ([\d.]+%)/);
         return (<><V3Brief>{fmtCount(C.visits)} visits and {fmtCount(C.orders)} orders{now.mobile != null ? '; ' + fmtPctN(now.mobile) + ' of visits on a phone' : ''}. Clarity counts visits that Google Analytics misses, so this rate is lower than the one Google Analytics gives. It is only ever compared with itself.{g ? <> The checkout move on Today measures something else: counting visits with Google Analytics, {g[1]}% fewer visits end in an order than on your full-price weeks ({g[2]} against {g[3]}). This page compares Clarity’s count with a typical month, sale weeks included, so the two can differ.</> : null}</V3Brief>
-          {g && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('today')}>The checkout move counts visits another way <span className="v3-xref-go">on Today →</span></button>}</>);
+          {g && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('today')}>The checkout move counts visits another way <span className="v3-xref-go">on Home</span></button>}</>);
       })()}
       </div>
       {now.ws.length >= 2 && (<figure className="v3-chart">
@@ -20899,7 +20899,7 @@ function V3Website() {
             <R.YAxis yAxisId="c" orientation="right" allowDecimals domain={[0, Math.ceil(now.cMax * 12) / 10]} ticks={[0, Math.ceil(now.cMax * 12) / 20, Math.ceil(now.cMax * 12) / 10]} tickFormatter={v3Fix2}/>
             <R.Tooltip content={ctip} cursor={false}/>
             <R.Bar yAxisId="v" dataKey="visits" fill={palAlpha(PAL.site, 0.35)} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
-            <R.Line yAxisId="c" dataKey="c100" type="monotone" stroke={PAL.site} strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false}/>
+            <R.Line yAxisId="c" dataKey="c100" type="linear" stroke={PAL.site} strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false}/>
           </R.ComposedChart>
         </R.ResponsiveContainer>
       </figure>)}
@@ -20920,7 +20920,7 @@ function V3Website() {
     </section>)}
 
     {stages.length >= 3 && (<section className="v3-sec">
-      <div className="v3-kick">Last month with reliable site tracking · {monthName}{ageM != null && ageM >= 2 ? ' · ' + ageM + ' months ago' : ''}</div>
+      <div className="v3-kick">Last month with reliable site tracking, {monthName}{ageM != null && ageM >= 2 ? ', ' + ageM + ' months ago' : ''}</div>
       <p className="v3-verdict">{worst
         ? (odd && odd === worst && worst.fmt === 'rate' ? 'In ' + monthName + ', fewer shoppers than usual got past ' + v3Step(worst.metric) + '.' : 'In ' + monthName + ', the step that lost most was ' + v3Step(worst.metric) + '.')
         : 'Every step of the site ran at or above its normal in ' + monthName + '.'}</p>
@@ -21055,13 +21055,13 @@ function V3Customers() {
             <R.XAxis dataKey="m" tickFormatter={m => m === 0 ? '1st' : 'M' + m} interval="preserveStartEnd"/>
             <R.YAxis tickFormatter={fmtMoneyK}/>
             <R.Tooltip content={cvTip}/>
-            <R.Area type="monotone" dataKey="v" stroke={PAL.ret} fill="url(#v3CvFill)"/>
+            <R.Area type="linear" dataKey="v" stroke={PAL.ret} fill="url(#v3CvFill)"/>
           </R.AreaChart>
         </R.ResponsiveContainer>
       </figure>
       <div className="v3-facts">
         {r && r.repeat_rate != null && <div><span className="v3-facts-v">{fmtPctN(r.repeat_rate)}</span><span className="v3-facts-l">of customers have ordered more than once</span></div>}
-        {r && r.median_days_between_orders != null && <div><span className="v3-facts-v">{fmtCount(r.median_days_between_orders)} days</span><span className="v3-facts-l">is the usual gap before a repeat order — a good moment for a reminder email</span></div>}
+        {r && r.median_days_between_orders != null && <div><span className="v3-facts-v">{fmtCount(r.median_days_between_orders)} days</span><span className="v3-facts-l">is the usual gap before a repeat order, a good moment for a reminder email</span></div>}
         {r && r.orders_per_customer != null && <div><span className="v3-facts-v">{Number(r.orders_per_customer).toFixed(2)}</span><span className="v3-facts-l">orders per customer so far</span></div>}
         {cv.length > 1 && <div><span className="v3-facts-v">{fmtMoney(cv[cv.length - 1].v)}</span><span className="v3-facts-l">sales per customer by {cv[cv.length - 1].label.toLowerCase()}, from {fmtMoney(cv[0].v)} on the first order</span></div>}
       </div>
@@ -21074,7 +21074,7 @@ function V3Customers() {
 // Shopify sync made the Products table say "Greta has not seen enough product sales yet" — false —
 // and the sections below it vanish without a word.
 function V3LoadFailed({ what, onRetry }) {
-  return (<div className="v3-empty">Greta couldn’t load {what} just now — the database was busy.{' '}
+  return (<div className="v3-empty">{what} could not load just now because the database was busy.{' '}
     {onRetry && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={onRetry}>Try again</button>}</div>);
 }
 // 1156: the one answer on ad spend. Worked out once (fn_brand_ad_decision) and quoted; no page makes its own.
@@ -21108,14 +21108,14 @@ function V3AdAnswer({ action, g }) {
   return (<div className="v3-ad-answer">
     <h3 className="v3-ad-answer-t">Ad spend: one answer</h3>
     <p className="v3-measure">{A.said}</p>
-    {A.owner_question && <p className="v3-measure"><b>{A.owner_question}</b> It is your call: a lower sales goal lets Greta plan on what keeps the most profit.{action ? <> {action}</> : null}</p>}
+    {A.owner_question && <p className="v3-measure"><b>{A.owner_question}</b> It is your call: a lower sales goal lets the plan follow what keeps the most profit.{action ? <> {action}</> : null}</p>}
   </div>);
 }
 // The same answer where a page works out what a goal would take in ads: the sum stays, and it is not read as advice.
 function V3GoalAdsNote({ times, seasonal }) {
   const st = useV3Rows('brand-state', V3_STATE_Q);
   const A = st.rows && st.rows[0] && st.rows[0].ad_decision;
-  if (A && A.lead && A.decision !== 'up') return <>Reaching it on ads alone takes {times} your current ad spend, and that is not Greta’s advice: {String(A.lead).replace(/^./, c => c.toLowerCase()).replace(/\.$/, '')} (Goal & costs says why). Three things close that gap more cheaply than ad spend: </>;
+  if (A && A.lead && A.decision !== 'up') return <>Reaching it on ads alone takes {times} your current ad spend, which is not advised: {String(A.lead).replace(/^./, c => c.toLowerCase()).replace(/\.$/, '')} (Goal & costs says why). Three things close that gap more cheaply than ad spend: </>;
   return <>{seasonal ? 'The quarter plan puts ' : 'At today’s order value and cost of a new customer, the goal needs '}{times} your current ad spend{seasonal ? ' into the rest of the goal' : ''}. Three things close that gap more cheaply than ad spend: </>;
 }
 // 2 Nov eval: what each day kept before ads, for the Profit fold. Its own read: the first-paint bundle answers 'profit-ladder' without it.
@@ -21207,7 +21207,7 @@ function V3Products() {
 
   if (perf.err) return <V3LoadFailed what="your product sales" onRetry={perf.retry}/>;
   if (!perf.rows) return <V3SkeletonRows n={6}/>;
-  if (!d || !d.list.length) return <div className="v3-empty">Greta has not seen any product sales in the last eight weeks yet.</div>;
+  if (!d || !d.list.length) return <div className="v3-empty">No product sales in the last eight weeks.</div>;
   const top = d.list.filter(x => x.now > 0);
   const shown = showAll ? top : top.slice(0, 12);
   const mx = Math.max(1, ...top.map(x => x.now));
@@ -21227,7 +21227,7 @@ function V3Products() {
   leaks.push(<li key="aov"><b>Best sellers often leave in an order on their own.</b> An order that adds a second product makes more profit. “Your hero products” below names which products, and what it is worth.</li>);
   return (<div className="v3-page-stack">
     <section className="v3-sec">
-      <div className="v3-kick">Last 28 days · which products make money, and where money is lost</div>
+      <div className="v3-kick">Last 28 days, which products make money, and where money is lost</div>
       <div className="v3-lead2"><div>
       <p className="v3-verdict">{margin != null
         ? (d.losers.length ? fmtCount(d.losers.length) + (d.losers.length === 1 ? ' product sold at a loss. ' : ' products sold at a loss. ') + 'Overall, your products kept ' + fmtPctN(margin) + ' of their sales after their own cost only, before delivery, packing and card fees.'
@@ -21257,8 +21257,8 @@ function V3Products() {
       {top.length > 12 && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => setShowAll(s => !s)}>{showAll ? 'Show top 12' : 'Show all ' + top.length + ' products'}</button>}
     </section>
     {(up.length > 0 || down.length > 0) && (<div className="v3-movers">
-      <section><div className="v3-kick">Rising</div>{up.map((x, i) => <div key={i} className="v3-mover"><span>{x.title}{reason(x) && <span className="v3-muted"> · {reason(x)}</span>}</span><b className="v3-up">+{fmtMoney(x.d)}</b></div>)}</section>
-      <section><div className="v3-kick">Falling</div>{down.map((x, i) => <div key={i} className="v3-mover"><span>{x.title}{reason(x) && <span className="v3-muted"> · {reason(x)}</span>}</span><b className="v3-down">{fmtMoney(x.d)}</b></div>)}</section>
+      <section><div className="v3-kick">Rising</div>{up.map((x, i) => <div key={i} className="v3-mover"><span>{x.title}{reason(x) && <span className="v3-muted">, {reason(x)}</span>}</span><b className="v3-up">+{fmtMoney(x.d)}</b></div>)}</section>
+      <section><div className="v3-kick">Falling</div>{down.map((x, i) => <div key={i} className="v3-mover"><span>{x.title}{reason(x) && <span className="v3-muted">, {reason(x)}</span>}</span><b className="v3-down">{fmtMoney(x.d)}</b></div>)}</section>
     </div>)}
   </div>);
 }
@@ -21372,7 +21372,7 @@ function V3Heroes() {
     return FMT_NONE;
   };
   return (<div className="v3-page-stack"><section className="v3-sec">
-    <div className="v3-kick">Your hero products · last 12 months</div>
+    <div className="v3-kick">Your hero products, last 12 months</div>
     <p className="v3-verdict">{fmtCount(d.n50)} of your {fmtCount(d.sell.length)} selling products make half your sales. {top.title} alone makes {fmtPctN(top.share)}.</p>
     <p className="v3-note v3-measure">{fmtCount(d.n80)} make 80%. {d.allFirsts > 0 && top.firsts > 0 && top.firsts >= Math.max(...d.sell.map(x => x.firsts)) ? 'More new customers start with ' + top.title + ' than with any other product (' + fmtPctN(top.firsts / d.allFirsts) + ' of first orders). ' : ''}
       These few best sellers are your heroes. Each can earn more in two ways: what else goes in the basket with it, and whether its buyers come back.</p>
@@ -21384,7 +21384,7 @@ function V3Heroes() {
     </tbody></table>
 
     <div className="v3-hero-wrap"><table className="v3-hero-table">
-      <thead><tr><th className="t-text">Product</th><th>Share of sales</th>{d.hasHero && <th>Sold alone</th>}{d.hasHero && <th>Profit per order, alone → with more</th>}{d.hasHero && <th>Buyers back in 6 months</th>}{showMove && <th className="t-text">What to do</th>}</tr></thead>
+      <thead><tr><th className="t-text">Product</th><th>Share of sales</th>{d.hasHero && <th>Sold alone</th>}{d.hasHero && <th>Profit per order, alone and with more</th>}{d.hasHero && <th>Buyers back in 6 months</th>}{showMove && <th className="t-text">What to do</th>}</tr></thead>
       <tbody>{d.heroes.map(x => { const h = x.h; return (<tr key={x.id}>
         <td className="t-text">{x.title}</td>
         <td>{fmtPctN(x.share)}</td>
@@ -21491,7 +21491,7 @@ function V3ProductAttention() {
   };
   const kinds = Object.keys(V3_ATTN_KIND);
   return (<div className="v3-page-stack"><section className="v3-sec">
-    <div className="v3-kick">Which products get seen, and whether they sell · {v3Day(d.from)} to {v3Day(d.to)}</div>
+    <div className="v3-kick">Which products get seen, and whether they sell, {v3Day(d.from)} to {v3Day(d.to)}</div>
     <p className="v3-verdict">{head}</p>
     <p className="v3-note v3-measure">
       {d.drags.length > 0 && <>If those views had earned their type’s usual sales per view they would have made up to <b>{fmtMoney(d.prize)} a month</b> more. </>}
@@ -21515,10 +21515,10 @@ function V3ProductAttention() {
     </figure>
   </section>
   {(d.gems.length > 0 || d.drags.length > 0) && (<div className="v3-movers">
-    <section><div className="v3-kick">Give more room to · sales per view against type</div>
+    <section><div className="v3-kick">Give more room to, sales per view against type</div>
       {d.gems.length ? d.gems.slice(0, 5).map((p, i) => <div key={i} className="v3-mover"><span>{p.name}</span><b className="v3-up">{fmtTimes(p.y, 1)}</b></div>)
         : <div className="v3-mover"><span className="v3-muted">None clearly</span></div>}</section>
-    <section><div className="v3-kick">Give less room to, or fix the page · share of views it gets</div>
+    <section><div className="v3-kick">Give less room to, or fix the page, share of views it gets</div>
       {d.drags.length ? d.drags.slice(0, 5).map((p, i) => <div key={i} className="v3-mover"><span>{p.name}</span><b className="v3-down">{fmtPctN(p.x)}</b></div>)
         : <div className="v3-mover"><span className="v3-muted">None clearly</span></div>}</section>
   </div>)}
@@ -21619,7 +21619,7 @@ function V3ReturningBaseline() {
   };
   const goalRange = P ? v3Month(P.start) + '–' + v3Month(P.end, 'long') : '';
   return (<div className="v3-page-stack"><section className="v3-sec">
-    <div className="v3-kick">The customers you already have · next six months</div>
+    <div className="v3-kick">The customers you already have, next six months</div>
     <p className="v3-verdict">Customers you have already won are expected to spend {fmtMoney(d.next6)} over the next six months.</p>
     <p className="v3-note v3-measure">That is what each month starts with before anyone new buys: {fmtMoney(Math.min(first, last))} to {fmtMoney(Math.max(first, last))} a month,
       {last < first ? ' easing as older customers buy less often.' : ' rising as recent customers come back.'}
@@ -21637,7 +21637,7 @@ function V3ReturningBaseline() {
           <R.Tooltip content={tip} cursor={false}/>
           <R.Bar dataKey="act" stackId="m" fill={PAL.ret} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
           <R.Bar dataKey="fc" stackId="m" fill={palAlpha(PAL.ret, 0.3)} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
-          <R.Line dataKey="exp" type="monotone" stroke={PAL.muted} strokeWidth={1.5} strokeDasharray="4 3" dot={false} isAnimationActive={false}/>
+          <R.Line dataKey="exp" type="linear" stroke={PAL.muted} strokeWidth={1.5} strokeDasharray="4 3" dot={false} isAnimationActive={false}/>
         </R.ComposedChart>
       </R.ResponsiveContainer>
       <p className="micro muted v3-measure">Sales from customers on their second order or later, after discounts and refunds. Customers you win from now on come on top of this.</p>
@@ -21724,7 +21724,7 @@ function V3Incrementality() {
       : o && o.status === 'ease' && r.mg != null && r.mg < r.be ? 'ease'
       : lo >= r.be && room >= 0.1 ? 'pays' : r.spend >= floor ? 'test' : 'small';
   });
-  const CALL = { cut: 'Loses money either way', ease: 'Pays on average, not at the margin — spend less', pays: 'Pays either way', test: 'Too close to call — test it', small: 'Too small to test', unclear: 'The test’s range is too wide to call — test it again' };  // 1097: a tested channel judged on its range
+  const CALL = { cut: 'Loses money either way', ease: 'Pays on average, not at the margin, spend less', pays: 'Pays either way', test: 'Too close to call, test it', small: 'Too small to test', unclear: 'The test’s range is too wide to call, test it again' };  // 1097: a tested channel judged on its range
   const cut = rows.filter(r => r.call === 'cut'), pays = rows.filter(r => r.call === 'pays'), test = rows.filter(r => r.call === 'test').sort((a, b) => b.spend - a.spend);
   const ease = rows.filter(r => r.call === 'ease').sort((a, b) => b.spend - a.spend);
   const tgts = rows.filter(r => r.tgt != null && r.call !== 'small');
@@ -21735,7 +21735,7 @@ function V3Incrementality() {
   return (<div className="v3-score v3-enter">
     <div className="v3-score-head">
       <h2 className="v3-score-title">Which ad channels pay for themselves?</h2>
-      <span className="v3-score-key">ring: sales the platform claims per £1 · dot: sales the ads likely caused · tick: what it needs to break even</span>
+      <span className="v3-score-key">ring: sales the platform claims per £1, dot: sales the ads likely caused, tick: what it needs to break even</span>
     </div>
     <p className="v3-score-verdict">
       {cut.length > 0 && <>Cut back {v3Names(cut.map(r => r.name))}: {cut.length === 1 ? 'it loses' : 'they lose'} money however you count the sales. That is {fmtMoney(cutSpend)} of spend in the last 30 days. </>}
@@ -21822,7 +21822,7 @@ function V3MarketingLead() {
       <span>New customers <em>{fmtCount(p.nc)}</em></span><span>Cost each <em>{p.nc > 0 ? fmtMoney(p.spend / p.nc) : FMT_NONE}</em></span></div>);
   };
   return (<div className="v3-page-stack"><section className="v3-sec">
-    <div className="v3-kick">What your ads are buying · {d.lastLab} against {d.prevLab}</div>
+    <div className="v3-kick">What your ads are buying, {d.lastLab} against {d.prevLab}</div>
     <p className="v3-verdict">{head}</p>
     <V3Brief>
       {moved ? <>In {d.lastLab}, a typical month was {fmtMoney(d.L.spend)} of ads for {fmtCount(d.L.nc)} new customers. In {d.prevLab}, it was {fmtMoney(d.P.spend)} for {fmtCount(d.P.nc)}. </> : null}
@@ -21833,20 +21833,29 @@ function V3MarketingLead() {
       {ceil != null && <>A new customer is worth at most {fmtMoney(ceil)} to you: the profit on their first order plus a year of repeat orders{per != null ? (per > ceil ? '. So the extra customers cost more than they are worth.' : '. So the extra customers still pay their way.') : (moved && d.dSpend > 0 && d.dNc <= 0 ? '. The extra spend won none.' : '.')}</>}
       {' '}<V3Conf state="likely" detail="Spend comes from your ad accounts and new customers from your Shopify orders, by calendar month. Each figure is the middle of three months, so one sale month cannot decide it. Season and offers changed too, so the ads did not do this alone."/></V3Brief>
     <figure className="v3-chart">
-      <figcaption><span className="v3-chart-title">Ad spend by channel, and new customers, by month</span>
-        <span className="v3-legend">{d.ps.map((k, i) => <React.Fragment key={k}><i style={{ background: adCol(k) }}/>{nice(k)} </React.Fragment>)}<i style={{ background: PAL.nw }}/>New customers</span></figcaption>
-      <R.ResponsiveContainer width="100%" height={240}>
-        <R.ComposedChart data={d.rows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+      <figcaption><span className="v3-chart-title">Ad spend by channel</span>
+        <span className="v3-legend">{d.ps.map((k, i) => <React.Fragment key={k}><i style={{ background: adCol(k) }}/>{nice(k)} </React.Fragment>)}</span></figcaption>
+      <R.ResponsiveContainer width="100%" height={160}>
+        <R.BarChart data={d.rows} syncId="v3-ads-buying" margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <R.CartesianGrid/>
           <R.XAxis dataKey="label" interval="preserveStartEnd"/>
-          <R.YAxis yAxisId="s" tickFormatter={fmtMoneyK}/>
-          <R.YAxis yAxisId="c" orientation="right" tickFormatter={v => fmtCount(v)}/>
+          <R.YAxis tickFormatter={fmtMoneyK}/>
           <R.Tooltip content={tip} cursor={false}/>
-          {d.ps.map((k, i) => <R.Bar key={k} yAxisId="s" dataKey={'p_' + k} stackId="sp" fill={adCol(k)} isAnimationActive={false}/>)}
-          <R.Line yAxisId="c" dataKey="nc" type="monotone" stroke={PAL.nw} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
+          {d.ps.map(k => <R.Bar key={k} dataKey={'p_' + k} stackId="sp" fill={adCol(k)} isAnimationActive={false}/>)}
+        </R.BarChart>
+      </R.ResponsiveContainer>
+      <figcaption><span className="v3-chart-title">New customers</span></figcaption>
+      <R.ResponsiveContainer width="100%" height={160}>
+        <R.ComposedChart data={d.rows} syncId="v3-ads-buying" margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <R.CartesianGrid/>
+          <R.XAxis dataKey="label" interval="preserveStartEnd"/>
+          <R.YAxis tickFormatter={v => fmtCount(v)}/>
+          <R.Tooltip content={tip} cursor={false}/>
+          <R.Bar dataKey="nc" fill="transparent" legendType="none" isAnimationActive={false}/>
+          <R.Line dataKey="nc" type="linear" stroke={PAL.nw} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
         </R.ComposedChart>
       </R.ResponsiveContainer>
-      <p className="micro muted v3-measure">Bars are ad spend (left scale), the line is first-time customers (right scale). A new customer is anyone whose first order fell in that month, however they found you.</p>
+      <p className="micro muted v3-measure">A new customer is anyone whose first order fell in that month, however they found you.</p>
     </figure>
   </section></div>);
 }
@@ -21885,7 +21894,7 @@ function V3ChannelMap() {
       + (estTop.length ? ' Google Analytics’ own split of the sales it saw puts most with ' + v3Names(estTop.map(c => c.label)) + '.' : '')
     : 'Most web sales came through ' + (traced[0] ? traced[0].label : 'your own channels') + '.';
   return (<div className="v3-page-stack"><section className="v3-sec">
-    <div className="v3-kick">Where sales came from · the 30 days to {v3Day(M.window && M.window.to, true)}</div>
+    <div className="v3-kick">Where sales came from, the 30 days to {v3Day(M.window && M.window.to, true)}</div>
     <p className="v3-verdict">{head}</p>
     <table className="v3-rw">
       <thead><tr><th className="t-text">Channel</th><th>Sales</th><th>Share</th><th className="v3-rw-opt">The 30 days before</th><th className="v3-rw-opt">New customers</th><th className="v3-rw-wrap">Google Analytics’ split</th></tr></thead>
@@ -21896,10 +21905,10 @@ function V3ChannelMap() {
     {rows.length > 6 && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => setAll(v => !v)}>{all ? 'Show the biggest 6' : 'Show all ' + rows.length + ' channels'}</button>}
     <p className="micro muted v3-measure">Web sales as on Home ({fmtMoney(M.web_sales)}): after discounts and refunds, before VAT, each order placed by the shop’s own record of its last click. Compare shares rather than sales when the 30 days before held a sale.
       {estTop.length ? <> Google Analytics’ split is how it shares out all the sales it saw, by its own rules{cover ? <> ({cover}% of orders, the visitors who accept cookies)</> : null}: a second opinion on the mix, not where the untraced sales came from.</> : null}
-      {Number(M.other_stores_sales) > 0 ? <> {fmtMoney(M.other_stores_sales)} sold through other stores is left out: Greta reads your own shop only.</> : null}</p>
+      {Number(M.other_stores_sales) > 0 ? <> {fmtMoney(M.other_stores_sales)} sold through other stores is left out: only your own shop is counted.</> : null}</p>
     {unt >= 40 && Number(ux.with_a_code) > 0 && uCodes.length > 0 && (<p className="micro muted v3-measure">Of the {fmtCount(ux.untraced_orders)} orders with no source, {fmtCount(ux.with_a_code)} used a discount code, which says more about where they came from than Google Analytics can:{' '}
       {uCodes.map((c, i) => <React.Fragment key={c.code}>{i ? ', ' : ''}{c.code} {fmtMoney(c.sales)}{kindSay[c.kind] ? ' (' + kindSay[c.kind] + ')' : ''}</React.Fragment>)}.</p>)}
-    {codes.length > 0 && (<p className="v3-note v3-measure">{v3Names(codes.map(c => c.code))} brought {fmtMoney(codes.reduce((s, c) => s + Number(c.sales), 0))} of these sales, and Greta cannot tell whether {codes.length > 1 ? 'they are' : 'it is'} a creator’s code, your sign-up offer or a promotion.{' '}
+    {codes.length > 0 && (<p className="v3-note v3-measure">{v3Names(codes.map(c => c.code))} brought {fmtMoney(codes.reduce((s, c) => s + Number(c.sales), 0))} of these sales, and nothing shows whether {codes.length > 1 ? 'they are' : 'it is'} a creator’s code, your sign-up offer or a promotion.{' '}
       <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('settings')}>Say which in Settings</button></p>)}
   </section></div>);
 }
@@ -21965,7 +21974,7 @@ function V3EmailRead() {
     : weakPost ? 'Your post-purchase email reaches people just when a second order is won, yet it earns almost nothing.'
     : 'Your automatic emails cover the main moments. The gains now are in making each one earn more.';
   return (<div className="v3-page-stack"><section className="v3-sec">
-    <div className="v3-kick">Email, the channel you own · last 30 days</div>
+    <div className="v3-kick">Email, the channel you own, last 30 days</div>
     <p className="v3-verdict">{head}</p>
     {claimShare != null && claimShare > 0.5 && <p className="v3-note v3-measure">Klaviyo credits email with {fmtMoney(claimed)} of sales, {fmtPctN(claimShare)} of everything you sold. But it counts anyone who opened an email before buying, so this is not what email caused. Greta leaves it out of every total. Below is what is switched on, and what each automatic email earns per person it reaches.</p>}
     <ol className="v3-moves">
@@ -21982,7 +21991,7 @@ function V3EmailRead() {
     {showFlows && <table className="v3-rw v3-email-table">
       <thead><tr><th className="t-text">Automatic email, switched on</th><th>People reached</th><th>Sales Klaviyo credits</th><th>Per person</th></tr></thead>
       <tbody>{ppl.sort((a, b) => b.rev - a.rev).slice(0, 8).map((f, i) => (<tr key={i}>
-        <td className="t-text">{label(f.t) === 'other' ? f.name : label(f.t)}<span className="v3-muted"> · {String(f.name).replace(/^[A-Z]{1,3}\s*\|\s*/, '')}</span></td>
+        <td className="t-text">{label(f.t) === 'other' ? f.name : label(f.t)}<span className="v3-muted">, {String(f.name).replace(/^[A-Z]{1,3}\s*\|\s*/, '')}</span></td>
         <td>{fmtCount(f.reach)}</td><td>{fmtMoney(f.rev)}</td><td className={f === post && weakPost ? 'v3-down' : ''}>{fmtMoney(f.per, 2)}</td>
       </tr>))}</tbody>
     </table>}
@@ -22052,7 +22061,7 @@ function V3CustomerValue() {
       {X && X.moved && X.dSpend > 0 && X.dNc <= 0 && <>The extra ad spend since {X.prevLab} has won no extra customers. </>}
       <V3Conf state="likely" detail="Customer value is a year of profit after product and order costs, from your own customers. The cost is all ad spend divided by new customers over the last 30 days. Both are counted from your records, not predicted."/></V3Brief>
     {X && (X.per != null || (X.moved && X.dSpend > 0)) && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('marketing')}>
-      Where the extra spend went <span className="v3-xref-go">on Marketing →</span></button>}
+      Where the extra spend went <span className="v3-xref-go">on Marketing</span></button>}
   </section></div>);
 }
 
@@ -22337,9 +22346,9 @@ function V3GoalLead() {
   const range = v3Day(per.start) + ' – ' + v3Day(per.end, true);
   const setGoal = <button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={() => { const el = document.getElementById('v3a-goal-set'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>{g ? 'Change the goal' : 'Set a goal'}</button>;
   if (!P) return (<section>
-    <div className="v3-kick">This quarter · {range}</div>
+    <div className="v3-kick">This quarter, {range}</div>
     <p className="v3-verdict">{g ? 'Your goal is ' + fmtMoney(tgt) + ' of sales this quarter.' : 'There is no goal for this quarter yet.'}</p>
-    <p className="v3-note v3-measure">Greta needs a full month of sales before it can say where the quarter will end up.{done != null ? <> You have sold {fmtMoney(done)} so far this quarter.</> : null}</p>
+    <p className="v3-note v3-measure">A full month of sales is needed to read where the quarter will end up.{done != null ? <> You have sold {fmtMoney(done)} so far this quarter.</> : null}</p>
     <div className="v3-btn-row">{setGoal}</div>
   </section>);
 
@@ -22408,9 +22417,9 @@ function V3GoalLead() {
   const GM = GV ? v3GoalMessage(TGG, GV) : null;
 
   return (<div className="v3-page-stack"><section>
-    <div className="v3-kick">This quarter · {range}{GV ? <>{' '}<span className={'v3-goal-chip ' + GV.cls}>{GV.word}</span></> : null}</div>
+    <div className="v3-kick">This quarter, {range}{GV ? <>{' '}<span className={'v3-goal-chip ' + GV.cls}>{GV.word}</span></> : null}</div>
     {stale && (<div className="v3-alert">
-      <p className="v3-measure"><b>Greta’s plan has changed since you confirmed this goal.</b> {fmtMoney(tgt)} of sales now takes about {fmtMoney(G.spend_cap)} of ads, not {fmtMoney(g.spend_cap)}.
+      <p className="v3-measure"><b>The plan has changed since you confirmed this goal.</b> {fmtMoney(tgt)} of sales now takes about {fmtMoney(G.spend_cap)} of ads, not {fmtMoney(g.spend_cap)}.
         {dCam != null ? <> That leaves {fmtMoney(gCam)} of profit after ads, {dCam < 0 ? fmtMoney(-dCam) + ' less than' : fmtMoney(dCam) + ' more than'} keeping {adsNear}.</> : null}
         {' '}The plan you confirmed expected more from extra ads than your own sales history shows. Re-plan the quarter to see the corrected figures.</p>
       <div className="v3-btn-row"><button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={replan}>Re-plan the quarter</button></div>
@@ -22421,7 +22430,7 @@ function V3GoalLead() {
     <div className={GV && GV.F ? 'v3-lead2' : ''}><div>
     {GV && GV.F ? <p className="v3-verdict">{GM.lead} {GM.line}</p>
     : GV ? <p className="v3-verdict">Your goal is {v3Gbp(TGG.target)} of profit after ads this quarter{Number(TGG.goal_sales) > 0 ? <>, with {fmtMoney(TGG.goal_sales)} of sales</> : null}.
-        {' '}Greta’s forecast is {v3Gbp(TGG.forecast)}{GV.gap > 0 ? <>, {v3Gbp(GV.gap)} short</> : GV.gap < 0 ? <>, {v3Gbp(-GV.gap)} ahead</> : null}.</p>
+        {' '}The forecast is {v3Gbp(TGG.forecast)}{GV.gap > 0 ? <>, {v3Gbp(GV.gap)} short</> : GV.gap < 0 ? <>, {v3Gbp(-GV.gap)} ahead</> : null}.</p>
     : <p className="v3-verdict">{g
       ? <>Your goal is {fmtMoney(tgt)} of sales this quarter. {short > 0
           ? <>{atWords} you land at about {fmtMoney(P.revenue_target)}, {fmtMoney(short)} short.</>
@@ -22434,13 +22443,13 @@ function V3GoalLead() {
             : <>{atWords} too, sales reach the goal’s: about {fmtMoney(P.revenue_target)}.</>}
           {done != null && exp != null ? <> You have sold {fmtMoney(done)} so far; the plan expected {fmtMoney(exp)} by now.</> : null}</>
       : done != null && exp != null && st
-        ? <>You have sold {fmtMoney(done)} so far. Greta’s plan expects {fmtMoney(exp)} by now, so you are {onTrack ? V3_PLAN_WORD[st].toLowerCase() : V3_PLAN_WORD[st].toLowerCase() + ', ' + fmtMoney(Math.abs(Number(QS.gap))) + ' short'}.{QS.pace_finish != null ? <> At today’s pace the quarter ends at about {fmtMoney(QS.pace_finish)}.</> : null}</>
+        ? <>You have sold {fmtMoney(done)} so far. The plan expects {fmtMoney(exp)} by now, so you are {onTrack ? V3_PLAN_WORD[st].toLowerCase() : V3_PLAN_WORD[st].toLowerCase() + ', ' + fmtMoney(Math.abs(Number(QS.gap))) + ' short'}.{QS.pace_finish != null ? <> At today’s pace the quarter ends at about {fmtMoney(QS.pace_finish)}.</> : null}</>
         : done != null ? <>You have sold {fmtMoney(done)} so far.</> : null}
-      {g && unreach && <> No ad spend Greta can see gets there: the most the plan lands is about {fmtMoney(reachBest)}{best ? <>, at about {fmtMoney(best)} of ads; past that, extra ads cost more profit than they bring</> : null}.{lySales ? <> Last year this quarter sold {fmtMoney(lySales)}.</> : null}{reachGoal ? <> A goal near {fmtMoney(reachGoal)} is one the plan can reach.</> : null}</>}
+      {g && unreach && <> No ad spend gets there: the most the plan lands is about {fmtMoney(reachBest)}{best ? <>, at about {fmtMoney(best)} of ads; past that, extra ads cost more profit than they bring</> : null}.{lySales ? <> Last year this quarter sold {fmtMoney(lySales)}.</> : null}{reachGoal ? <> A goal near {fmtMoney(reachGoal)} is one the plan can reach.</> : null}</>}
       {g && short > 0 && !unreach && <> {GV ? 'The sales gap is ad spend.' : 'The gap is ad spend.'} The goal takes {fmtMoney(gSpend)} of ads, {fmtMoney(gSpend - Number(P.spend_cap))} more than the plan.{peakShare != null ? <> {fmtPctN(peakShare)} of the goal’s ads go in {gpMonthName(peak.iso)}.</> : null}</>}
-      {g && short > 0 && !unreach && dCam != null && <> Those extra ads bring about {fmtMoney(short)} more sales but {dCam > 0 ? 'only ' + fmtMoney(dCam) + ' more' : fmtMoney(-dCam) + ' less'} profit after ads.{dCam < 0 ? ' Past a point, extra ads cost more profit than they bring in.' : atBest === 'at' ? ' The goal sits at the most profitable ad spend Greta can see.' : atBest === 'past' ? ' The goal is past the most profitable ad spend Greta can see (' + fmtMoney(best) + ').' : ''}</>}
-      {!(g && short > 0) && best && <> The most profitable ad spend Greta can see is {fmtMoney(best)}, for about {fmtMoney(P.ceiling.best_sales)} of sales.</>}
-      {' '}<V3Conf state="probably" detail={'How Greta plans the quarter: your own busy and quiet months from your sales history, returning customers at their last three months’ rate, and new-customer sales that rise with ad spend, each extra £1 buying a little less. Its average new customer costs ' + (v3Fig('plan_cost_per_new_customer', figG.rows).value != null ? fmtMoney(v3Fig('plan_cost_per_new_customer', figG.rows).value, 2) + ' (' + v3Fig('plan_cost_per_new_customer', figG.rows).label.toLowerCase() + ')' : B.cost_per_new_customer ? fmtMoney(B.cost_per_new_customer, 2) : 'less') + (B.cost_per_new_customer_basis ? ': ' + B.cost_per_new_customer_basis + '.' : ' because the quarter includes Black Friday, when new customers come cheaper.') + ' The Customers page shows the last 90 days.' + (PQ && PQ.basis_note ? ' ' + PQ.basis_note : '')}/></V3Brief>
+      {g && short > 0 && !unreach && dCam != null && <> Those extra ads bring about {fmtMoney(short)} more sales but {dCam > 0 ? 'only ' + fmtMoney(dCam) + ' more' : fmtMoney(-dCam) + ' less'} profit after ads.{dCam < 0 ? ' Past a point, extra ads cost more profit than they bring in.' : atBest === 'at' ? ' The goal sits at the most profitable ad spend found.' : atBest === 'past' ? ' The goal is past the most profitable ad spend found (' + fmtMoney(best) + ').' : ''}</>}
+      {!(g && short > 0) && best && <> The most profitable ad spend found is {fmtMoney(best)}, for about {fmtMoney(P.ceiling.best_sales)} of sales.</>}
+      {' '}<V3Conf state="probably" detail={'How the quarter is planned: your own busy and quiet months from your sales history, returning customers at their last three months’ rate, and new-customer sales that rise with ad spend, each extra £1 buying a little less. Its average new customer costs ' + (v3Fig('plan_cost_per_new_customer', figG.rows).value != null ? fmtMoney(v3Fig('plan_cost_per_new_customer', figG.rows).value, 2) + ' (' + v3Fig('plan_cost_per_new_customer', figG.rows).label.toLowerCase() + ')' : B.cost_per_new_customer ? fmtMoney(B.cost_per_new_customer, 2) : 'less') + (B.cost_per_new_customer_basis ? ': ' + B.cost_per_new_customer_basis + '.' : ' because the quarter includes Black Friday, when new customers come cheaper.') + ' The Customers page shows the last 90 days.' + (PQ && PQ.basis_note ? ' ' + PQ.basis_note : '')}/></V3Brief>
     </div>{GV && GV.F && <V3AdAnswer action={setGoal} g={TGG}/>}</div>
     {!(GV && GV.F) && <V3AdAnswer action={setGoal} g={TGG}/>}
     {exp != null && <V3FcErr/>}
@@ -22469,7 +22478,7 @@ function V3GoalLead() {
   <section className="v3-sec">
     <h2 className="v3-sec-title">Month by month</h2>
     <table className="v3-rw">
-      <thead><tr><th className="t-text">Month</th>{ph && <th>Goal</th>}<th>At today’s pace</th>{ph && <th>Ads in the goal</th>}<th>Ads in Greta’s plan</th>{ph && maxSeen && <th>Against your biggest month</th>}</tr></thead>
+      <thead><tr><th className="t-text">Month</th>{ph && <th>Goal</th>}<th>At today’s pace</th>{ph && <th>Ads in the goal</th>}<th>Ads in the plan</th>{ph && maxSeen && <th>Against your biggest month</th>}</tr></thead>
       <tbody>{rows.map(r => (<tr key={r.iso}>
         <td className="t-text">{gpMonthName(r.iso)}</td>
         {ph && <td>{fmtMoney(r.goal)}</td>}
@@ -22480,7 +22489,7 @@ function V3GoalLead() {
       </tr>))}</tbody>
     </table>
     {ppd != null && <p className="micro muted v3-measure">At today’s pace is what each month has sold so far plus your average day over the last 30 days ({fmtMoney(ppd)}) for each day left in it.</p>}
-    {ph && maxSeen && <p className="micro muted v3-measure">Your biggest month of ads so far was {fmtMoney(maxSeen)}. Past 1.5× that, Greta is estimating beyond any level of spend it has seen from you.</p>}
+    {ph && maxSeen && <p className="micro muted v3-measure">Your biggest month of ads so far was {fmtMoney(maxSeen)}. Past 1.5× that, the estimate goes beyond any spend seen so far.</p>}
     {(() => {
       const bs = v3BoardSpendTargets(figG.rows);
       return bs
@@ -22502,15 +22511,15 @@ function V3GoalLead() {
           {lands > pEnd ? <> The order arrives after it ends, so all of it sells from the stock you hold now.</>
             : lands > PDG.deadline ? <> The order arrives after that: most of it sells from the stock you hold now. Check that stock covers last year’s peak, and ask suppliers what can arrive sooner.</>
             : <> That is in time if the order goes in by {v3Day(PDG.orderBy)}.</>}
-        {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('stock')}>What to order <span className="v3-xref-go">on Stock &amp; orders →</span></button></li>); })()
+        {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('stock')}>What to order <span className="v3-xref-go">on Stock &amp; orders</span></button></li>); })()
       : (<li><b>Stock for it.</b> {L.entered ? <>With your {L.weeks}-week wait from order to arrival</> : <>At Greta’s guess of {L.days} days from order to arrival (add yours below)</>}, an order placed today arrives around {v3Day(arrive)}
-          {arrive > peakEnd ? <> — after {gpMonthName(peak.iso)} ends, so all of it sells from the stock you hold now.</>
-            : arrive > peak.iso ? <> — most of {gpMonthName(peak.iso)} sells from the stock you hold now.</>
-            : <> — in time, if it goes in by {v3Day(v3IsoAdd(peak.iso, -L.days))}.</>}
+          {arrive > peakEnd ? <>, after {gpMonthName(peak.iso)} ends, so all of it sells from the stock you hold now.</>
+            : arrive > peak.iso ? <>, most of {gpMonthName(peak.iso)} sells from the stock you hold now.</>
+            : <>, in time, if it goes in by {v3Day(v3IsoAdd(peak.iso, -L.days))}.</>}
           {arrive > peak.iso && ' Check it covers last year’s peak, and ask suppliers what can arrive sooner.'}
-        {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('stock')}>What to order <span className="v3-xref-go">on Stock &amp; orders →</span></button></li>)}
-      {cashOff && <li><b>Check you can fund it.</b> The ads and the stock are paid for before the sales arrive. Greta can’t check that until you add the lowest balance you’ll let cash fall to.
-        {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'economics')}>Add it <span className="v3-xref-go">under Cash, stock and supplier terms →</span></button></li>}
+        {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('stock')}>What to order <span className="v3-xref-go">on Stock &amp; orders</span></button></li>)}
+      {cashOff && <li><b>Check you can fund it.</b> The ads and the stock are paid for before the sales arrive. That can’t be checked until you add the lowest balance you’ll let cash fall to.
+        {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'economics')}>Add it <span className="v3-xref-go">under Cash, stock and supplier terms</span></button></li>}
     </ol>
   </section>)}
   <div className="v3-btn-row">{setGoal}</div>
@@ -22541,7 +22550,7 @@ function V3CostsOff() {
       const vc = Object.assign({}, C.variable_costs || {}, { refundPct: is });
       const r = window.FRKL_PLAN && window.FRKL_PLAN.saveEconomics ? await window.FRKL_PLAN.saveEconomics({ variable_costs: vc }) : { ok: false, error: 'not signed in' };
       setBusy(false);
-      if (r.ok) { drift.retry(); cfg.retry(); setMsg({ ok: true, text: 'Saved — every profit figure now uses ' + fmtPctN(is / 100) + ' refunds.' }); }
+      if (r.ok) { drift.retry(); cfg.retry(); setMsg({ ok: true, text: 'Saved. Every profit figure now uses ' + fmtPctN(is / 100) + ' refunds.' }); }
       else setMsg({ ok: false, text: r.error || 'Could not save.' });
     };
     items.push(<li key="rf"><b>Refunds are {fmtPctN(is / 100)} of sales, but you entered {fmtPctN(was / 100)}.</b>
@@ -22552,21 +22561,21 @@ function V3CostsOff() {
   const gm = drift.rows.find(r => r.input_key === 'gross_margin' && r.verifiable && r.status === 'drift');
   if (gm) items.push(<li key="gm"><b>Products without a cost are counted at a {fmtPctN(Number(gm.config_value))} margin, but products with a cost make {fmtPctN(Number(gm.realised_value))}.</b> Update it under “What things cost you” below, or add the missing costs.</li>);
   if (Q && Number(Q.cogs_coverage_90d) < 0.8) items.push(<li key="cov"><b>Only {fmtPctN(Number(Q.cogs_coverage_90d))} of your sales have a product cost.</b> The rest use your margin, so profit is an estimate until more products have one.
-    {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs')}>Add costs <span className="v3-xref-go">under Product costs →</span></button></li>);
+    {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs')}>Add costs <span className="v3-xref-go">under Product costs</span></button></li>);
   else if (Q && Q.cogs_landed_complete === false) {
     const per10 = Q.freight_per_10pct_month != null ? Number(Q.freight_per_10pct_month) : null;   // 1109: the view's own figure
     items.push(<li key="fr"><b>None of your product costs include freight or duty.</b> Until they do, your margins read too high.
-      {per10 ? <> Every 10% that freight and duty add to your product costs means about {fmtMoney(per10)} a month less profit than Greta shows.</> : null} Greta can’t call your profit measured until they are added.
-      {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs')}>Add freight and duty <span className="v3-xref-go">under Product costs →</span></button></li>);
+      {per10 ? <> Every 10% that freight and duty add to your product costs means about {fmtMoney(per10)} a month less profit than shown.</> : null} Your profit can’t count as measured until they are added.
+      {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs')}>Add freight and duty <span className="v3-xref-go">under Product costs</span></button></li>);
   }
   if (!L.entered) items.push(<li key="lt"><b>No supplier lead time.</b> That is how long stock takes to arrive after you order it. Stock & orders assumes {L.days} days for every product, so its order-by dates may be late.
-    {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'economics')}>Add it <span className="v3-xref-go">under Cash, stock and supplier terms →</span></button></li>);
-  if (C.cash_floor == null) items.push(<li key="cf"><b>No minimum cash balance.</b> Without it, Greta can’t check whether you can afford the plan. The ads and stock are paid for before the sales arrive.
-    {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'economics')}>Add it <span className="v3-xref-go">under Cash, stock and supplier terms →</span></button></li>);
+    {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'economics')}>Add it <span className="v3-xref-go">under Cash, stock and supplier terms</span></button></li>);
+  if (C.cash_floor == null) items.push(<li key="cf"><b>No minimum cash balance.</b> Without it, there is no check on whether you can afford the plan. The ads and stock are paid for before the sales arrive.
+    {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'economics')}>Add it <span className="v3-xref-go">under Cash, stock and supplier terms</span></button></li>);
   if (C.opening_cash != null && C.opening_cash_as_of) {
     const as = String(C.opening_cash_as_of).slice(0, 10), stale = v3IsoAdd(as, 45);
-    if (stale <= v3IsoAdd(today, 14)) items.push(<li key="cb"><b>Your cash balance is from {v3Day(as, true)}.</b> {stale < today ? 'Greta stopped using it on ' : 'Greta stops using it on '}{v3Day(stale)}{stale < today ? '.' : ', 45 days on.'} Update it with today’s balance.
-      {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'economics')}>Update it <span className="v3-xref-go">under Cash, stock and supplier terms →</span></button></li>);
+    if (stale <= v3IsoAdd(today, 14)) items.push(<li key="cb"><b>Your cash balance is from {v3Day(as, true)}.</b> {stale < today ? 'It stopped being used on ' : 'It stops being used on '}{v3Day(stale)}{stale < today ? '.' : ', 45 days on.'} Update it with today’s balance.
+      {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'economics')}>Update it <span className="v3-xref-go">under Cash, stock and supplier terms</span></button></li>);
   }
   const unchecked = drift.rows.filter(r => !r.verifiable).map(r => ({ fixed_costs_monthly: 'overheads', payPct: 'payment fees', payFixed: null, shipping: 'shipping', packaging: 'packaging', fulfilment: 'pick and pack' })[r.input_key]).filter(Boolean);
   return (<section className="v3-sec">
@@ -22574,10 +22583,10 @@ function V3CostsOff() {
     <h2 className="v3-sec-title">Are the costs behind your profit right?</h2>
     <p className="v3-verdict">{items.length
       ? (items.length === 1 ? 'One thing in your costs needs a look' : fmtCount(items.length) + ' things in your costs need a look') + (total > 0 ? ': profit reads about ' + fmtMoney(total) + ' a month too high.' : '.')
-      : 'Every cost Greta can check matches your trading.'}</p>
+      : 'Every cost that can be checked matches your trading.'}</p>
     {items.length > 0 && <ol className="v3-moves">{items}</ol>}
     {msg && <p className={'v3-note ' + (msg.ok ? 'v3-up' : 'v3-down')}>{msg.text}</p>}
-    {unchecked.length > 0 && <p className="micro muted v3-measure">Greta can’t check your {v3Names(unchecked)} yet, because nothing connected records what you pay for them. It uses them as you entered them.</p>}
+    {unchecked.length > 0 && <p className="micro muted v3-measure">Your {v3Names(unchecked)} can’t be checked yet, because nothing connected records what you pay for them. They are used as you entered them.</p>}
   </section>);
 }
 
@@ -22630,12 +22639,12 @@ function V3TrackRecord() {
   const auto = own.filter(r => (r.auto && r.status === 'done') || (r.sup && r.status === 'skipped'));
   const done = own.filter(r => !r.auto && (r.status === 'done' || r.status === 'partial')), skipped = own.filter(r => r.status === 'skipped' && !r.sup);
   const autoList = auto.length > 0 && (<>
-      {' '}<button type="button" className="v3-btn v3-btn-q v3-btn-sm" aria-expanded={showAuto} onClick={() => setShowAuto(s => !s)}>{showAuto ? 'Hide' : 'Show'} {auto.length} Greta closed itself</button>
-      {showAuto && (<><p className="micro muted v3-measure">Greta closes an action itself when what raised it is no longer there. These are not graded as things you did.</p>
+      {' '}<button type="button" className="v3-btn v3-btn-q v3-btn-sm" aria-expanded={showAuto} onClick={() => setShowAuto(s => !s)}>{showAuto ? 'Hide' : 'Show'} {auto.length} closed automatically</button>
+      {showAuto && (<><p className="micro muted v3-measure">An action closes automatically when what raised it is no longer there. These are not graded as things you did.</p>
         <ul className="v3-rank-steps">{auto.slice(0, 30).map((r, i) => (<li key={r.external_id + i}><span className="v3-rank-desc">{v3PlainAction(r).title}</span>
-          <span className="v3-sub"> Closed by Greta {r.disposition_at ? v3Day(r.disposition_at, true) : ''}</span></li>))}</ul></>)}
+          <span className="v3-sub"> Closed automatically {r.disposition_at ? v3Day(r.disposition_at, true) : ''}</span></li>))}</ul></>)}
     </>);
-  if (!done.length && !skipped.length) return (<div className="v3-empty">Nothing marked done or skipped yet. Mark an action done, and once enough time has passed Greta checks whether it worked.{autoList}</div>);
+  if (!done.length && !skipped.length) return (<div className="v3-empty">Nothing marked done or skipped yet. Mark an action done, and the result shows here once enough time has passed.{autoList}</div>);
   const judged = done.filter(r => ['hit', 'miss', 'partial', 'flat'].includes(r.verdict));
   const worked = judged.filter(r => r.verdict === 'hit').length, failed = judged.filter(r => r.verdict === 'miss').length;
   const cant = done.filter(r => r.verdict === 'ungradeable' || r.verdict === 'no_data').length;
@@ -22646,27 +22655,27 @@ function V3TrackRecord() {
     const v = V3_VERDICT[r.verdict] || null, g = r.grade || {}, d = due(r);
     return (<li key={r.external_id + i}>
       <span className="v3-rank-desc">{v3PlainAction(r).title}</span>
-      <span className="v3-sub"> {r.status === 'skipped' ? 'Skipped' : 'Done'} {when(r)} · <span className={v ? v.cls : 'v3-muted'}>{v ? v.label : (d ? 'Judged after ' + v3Day(d, true) : 'Not judged yet')}</span>
-        {g.reason ? <> — {v3Tidy(g.reason)}</> : (v && r.predicted_metric_id ? <> — {v3MetricWords(r.predicted_metric_id)} {r.verdict === 'miss' ? 'did not move ' : 'moved '}{r.predicted_direction === 'down' ? 'down' : 'up'} as promised, comparing before with after (an older check)</> : null)}</span>
+      <span className="v3-sub"> {r.status === 'skipped' ? 'Skipped' : 'Done'} {when(r)}, <span className={v ? v.cls : 'v3-muted'}>{v ? v.label : (d ? 'Judged after ' + v3Day(d, true) : 'Not judged yet')}</span>
+        {g.reason ? <>, {v3Tidy(g.reason)}</> : (v && r.predicted_metric_id ? <>, {v3MetricWords(r.predicted_metric_id)} {r.verdict === 'miss' ? 'did not move ' : 'moved '}{r.predicted_direction === 'down' ? 'down' : 'up'} as promised, comparing before with after (an older check)</> : null)}</span>
     </li>);
   };
   const shown = showAll ? done : done.slice(0, 8);
   const S = (ts.rows || [])[0] || null;
   const sumLine = S && Number(S.marked_done) > 0 ? (<>
-    <p className="v3-verdict">Of {fmtCount(S.marked_done)} actions you marked done, Greta has judged {fmtCount(S.judged)}: {fmtCount(S.worked)} worked
+    <p className="v3-verdict">Of {fmtCount(S.marked_done)} actions you marked done, {fmtCount(S.judged)} have been judged: {fmtCount(S.worked)} worked
       {Number(S.did_not_work) ? ', ' + fmtCount(S.did_not_work) + ' didn’t' : ''}{Number(S.inconclusive) ? ', ' + fmtCount(S.inconclusive) + ' showed no clear change' : ''}.
       {Number(S.cannot_judge_yet) ? ' ' + fmtCount(S.cannot_judge_yet) + ' can’t be judged yet.' : ''}</p>
     {Array.isArray(S.reasons) && S.reasons.length > 0 && <ul className="v3-rank-steps">{S.reasons.map((x, i) => (<li key={'why' + i}><span className="v3-rank-desc">{x.reason}</span><span className="v3-sub"> {fmtCount(x.actions)}</span></li>))}</ul>}
-    <p className="v3-note v3-measure">Every new action says what it should change and by how much, and Greta checks once enough time has passed. A grade compares what happened with what was expected without the action. It shows the promise held, not that the action alone caused it.{Number(S.imported_before_greta) > 0 ? ' ' + fmtCount(S.imported_before_greta) + ' task' + (Number(S.imported_before_greta) === 1 ? '' : 's') + ' from before you joined Greta are left out: Greta did not raise them.' : ''}</p>
+    <p className="v3-note v3-measure">Every new action says what it should change and by how much, and it is checked once enough time has passed. A grade compares what happened with what was expected without the action. It shows the promise held, not that the action alone caused it.{Number(S.imported_before_greta) > 0 ? ' ' + fmtCount(S.imported_before_greta) + ' task' + (Number(S.imported_before_greta) === 1 ? '' : 's') + ' from before you joined are left out.' : ''}</p>
   </>) : null;
   return (<section className="v3-sec">
     {sumLine || <><p className="v3-verdict">{judged.length
       ? <>Of {fmtCount(done.length)} actions you marked done, Greta could judge {fmtCount(judged.length)}: {fmtCount(worked)} worked{failed ? ', ' + fmtCount(failed) + ' didn’t' : ''}.</>
-      : <>You have marked {fmtCount(done.length)} action{done.length === 1 ? '' : 's'} done, and Greta has not yet been able to say whether any of them worked.</>}</p>
+      : <>You have marked {fmtCount(done.length)} action{done.length === 1 ? '' : 's'} done, and it is too early to say whether any of them worked.</>}</p>
     <p className="v3-note v3-measure">
       {cant > 0 && <>{fmtCount(cant)} can’t be judged. Most were raised before each action said what it should change, such as spend that should fall, products back in stock, or a price that should keep its sales. </>}
       {waiting > 0 && <>{fmtCount(waiting)} {waiting === 1 ? 'is' : 'are'} too recent to judge yet. </>}
-      Every new action says what it should change, and Greta checks once enough time has passed. A grade compares before with after. It shows the promise held, not that the action alone caused it.</p></>}
+      Every new action says what it should change, and it is checked once enough time has passed. A grade compares before with after. It shows the promise held, not that the action alone caused it.</p></>}
     <ul className="v3-rank-steps">{shown.map(row)}</ul>
     {done.length > 8 && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => setShowAll(s => !s)}>{showAll ? 'Show the latest 8' : 'Show all ' + done.length}</button>}
     {skipped.length > 0 && (<>
@@ -22735,7 +22744,7 @@ function V3Results() {
   if (!rows.length) return (<section className="v3-sec v3-res">
     <div className="v3-kick">The moves you marked done</div>
     <p className="v3-verdict">No results yet</p>
-    <p className="v3-note v3-measure">Take an action on Home and mark it done once it is. Greta checks each one when its window has passed, against what would have happened anyway, and shows here whether it worked.</p>
+    <p className="v3-note v3-measure">Mark an action done on Home or Actions. Each one is checked when its window has passed, against what would have happened anyway, and the result shows here.</p>
     <button type="button" className="v3-btn v3-btn-sm v3-btn-p" onClick={() => window.__oiGo && window.__oiGo('today')}>Go to Home</button>
   </section>);
   const counts = ['worked', 'pointing', 'did_not_work', 'checking', 'too_early', 'cant_tell'].filter(k => Number(T[k]) > 0);
@@ -22755,7 +22764,7 @@ function V3Results() {
 function v3FindingTitle(f) {
   const raw = v3Tidy(scrubTag(String((f && f.description) || ''))).trim();
   let x;
-  if ((x = raw.match(/^Why (.+?) moved(?:, ranked by evidence:|\. Likeliest causes first:)\s*1\.\s*([^(;]+?)\s*\(/i))) return v3Sentence(x[1]) + ' moved — most likely: ' + x[2].charAt(0).toLowerCase() + x[2].slice(1);
+  if ((x = raw.match(/^Why (.+?) moved(?:, ranked by evidence:|\. Likeliest causes first:)\s*1\.\s*([^(;]+?)\s*\(/i))) return v3Sentence(x[1]) + ' moved, most likely: ' + x[2].charAt(0).toLowerCase() + x[2].slice(1);
   if (f.external_id === 'discount-depth-inversion' && (x = raw.match(/they are (\d+)% of the last 90 days/i))) {
     const y = raw.match(/from £([\d,.]+) to £([\d,.]+)/);
     return x[1] + '% of orders sell at 45% or more off and don’t pay for a new customer' + (y ? '; capping discounts at 30% would take profit per order from £' + Math.round(Number(y[1].replace(/,/g, ''))) + ' to £' + Math.round(Number(y[2].replace(/,/g, ''))) : '');
@@ -22798,7 +22807,7 @@ function v3BoardSplitText(rows) {
   const bits = [];
   if (stock.length) bits.push(v3Gbp(sum(stock)) + ' a month of profit at stake in stock');
   if (save.length) bits.push(v3Gbp(sum(save)) + ' a month of ad spend you can save');
-  if (rest.length) bits.push(v3Gbp(sum(rest)) + ' a month from ' + (rest.length === 1 ? 'one more change' : rest.length + ' more changes') + ' Greta is fairly sure of');
+  if (rest.length) bits.push(v3Gbp(sum(rest)) + ' a month from ' + (rest.length === 1 ? 'one more change' : rest.length + ' more changes') + ' with good evidence');
   if (once.length) bits.push(v3Gbp(sum(once)) + ' once from ' + (once.length === 1 ? 'one move before the peak' : once.length + ' moves before the peak'));
   if (tests.length) bits.push((tests.length === 1 ? 'one test' : tests.length + ' tests') + ' worth running');
   return bits.length ? bits.slice(0, -1).join(', ') + (bits.length > 1 ? ', and ' : '') + bits[bits.length - 1] : null;
@@ -22901,15 +22910,15 @@ function V3Review() {
   const peakDays = pk ? Math.round((new Date(pk.from) - new Date(today)) / 864e5) : null;
   return (<div className="v3-page-stack">
     <section>
-      <div className="v3-kick-row"><div className="v3-kick">The week · {range}{back === 0 ? ' · the last full week' : ''} · against a typical week</div>
+      <div className="v3-kick-row"><div className="v3-kick">The week, {range}{back === 0 ? ', the last full week' : ''}, against a typical week</div>
       <div className="v3-btn-row">
-        <button type="button" className="v3-btn v3-btn-q v3-btn-sm" disabled={i <= 9} onClick={() => setBack(b => b + 1)}>← Week before</button>
-        <button type="button" className="v3-btn v3-btn-q v3-btn-sm" disabled={back === 0} onClick={() => setBack(b => Math.max(0, b - 1))}>Week after →</button>
+        <button type="button" className="v3-btn v3-btn-q v3-btn-sm" disabled={i <= 9} onClick={() => setBack(b => b + 1)}>Previous week</button>
+        <button type="button" className="v3-btn v3-btn-q v3-btn-sm" disabled={back === 0} onClick={() => setBack(b => Math.max(0, b - 1))}>Next week</button>
       </div></div>
       <div className="v3-lead2"><div>
       <p className="v3-verdict">{lead}</p>
       <V3Brief>{fmtMoney(sD(W))} of sales on {fmtMoney(W.spend)} of ads, keeping {fmtMoney(W.kept)} after ads. A typical week is {fmtMoney(sD(T))} of sales on {fmtMoney(T.spend)} of ads, keeping {fmtMoney(T.kept)}. That is the middle of the {prev8.length === 8 ? 'eight' : prev8.length} weeks before{leftOut ? ', leaving out ' + (leftOut === 1 ? 'one sale week' : leftOut + ' sale weeks') : ''}.
-        {priorSale ? <> The week before held a sale, which would make this week look worse than it was. So Greta compares it with a typical week instead.</> : null}
+        {priorSale ? <> The week before held a sale, which would make this week look worse than it was. So it is compared with a typical week instead.</> : null}
         {held ? <> Visits, the share of visitors who buy and the checkout steps are left out until {v3Day(g4.comparisons_clean_from, true)}. Google Analytics was not recording properly{g4.broke_on ? ' from ' + v3Day(g4.broke_on) : ''}{g4.fixed_on ? ' to ' + v3Day(g4.fixed_on) : ''}, so a jump in visits now is the repair, not more visitors.</> : null}</V3Brief>
       </div>
       <figure className="v3-chart">
@@ -22921,7 +22930,7 @@ function V3Review() {
             <R.Tooltip content={tip} cursor={false}/>
             <R.Bar dataKey="sales" fill={PAL.sales} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
             <R.Bar dataKey="spend" fill={PAL.ads} radius={[2, 2, 0, 0]} isAnimationActive={false}/>
-            <R.Line dataKey="kept" type="monotone" stroke={PAL.kept} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
+            <R.Line dataKey="kept" type="linear" stroke={PAL.kept} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
             <R.ReferenceLine y={0} stroke={PAL.line}/>
           </R.ComposedChart>
         </R.ResponsiveContainer>
@@ -22939,13 +22948,13 @@ function V3Review() {
     <div className="v3-chart-pair">
       <figure className="v3-chart">
         <figcaption><span className="v3-chart-title">Sales per £ of ads, by week</span>
-          {be && <span className="v3-legend"><i className="dash"/>{fmtTimes(be, 2)} — where you break even</span>}</figcaption>
+          {be && <span className="v3-legend"><i className="dash"/>{fmtTimes(be, 2)}, where you break even</span>}</figcaption>
         <R.ResponsiveContainer width="100%" height={240}>
           <R.ComposedChart data={t12} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
             <R.CartesianGrid/><R.XAxis dataKey="label" interval="preserveStartEnd"/><R.YAxis tickFormatter={v => v + '×'} domain={[0, 'auto']}/>
             <R.Tooltip content={tip} cursor={false}/>
             {be && <R.ReferenceLine y={be} stroke={PAL.muted} strokeDasharray="4 4"/>}
-            <R.Line type="monotone" dataKey="mer" stroke={PAL.ads} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
+            <R.Line type="linear" dataKey="mer" stroke={PAL.ads} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
           </R.ComposedChart>
         </R.ResponsiveContainer>
       </figure>
@@ -22953,9 +22962,9 @@ function V3Review() {
 
     <section className="v3-sec">
       <h2 className="v3-sec-title">For this week’s meeting</h2>
-      <div className="v3-kick">Your actions{split ? ' · ' + split : ''}</div>
+      <div className="v3-kick">Your actions{split ? ', ' + split : ''}</div>
       {board.err ? <div className="v3-empty">Greta could not load your actions just now.</div> : !board.rows ? <V3SkeletonRows n={3}/> : (<ol className="v3-moves">
-        {top.map(r => (<li key={r.external_id}><b>{v3PlainAction(r).title}</b>{r.cm_gbp ? ' — ' + v3Gbp(r.cm_gbp) + v3Per(r) : ''}.
+        {top.map(r => (<li key={r.external_id}><b>{v3PlainAction(r).title}</b>{r.cm_gbp ? ', ' + v3Gbp(r.cm_gbp) + v3Per(r) : ''}.
           <V3MoveDecide row={r} small/></li>))}
       </ol>)}
       <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>Every action, and why <span className="v3-xref-go">on Actions</span></button>
@@ -22963,17 +22972,17 @@ function V3Review() {
         <div className="v3-kick v3-gap-top">Coming up</div>
         <ul className="v3-moves">
           {pk && <li><b>{v3PlainWords(pk.name)} starts in {peakDays} days.</b> {pk.same_days_last_year_sales ? 'The same days last year sold ' + fmtMoney(pk.same_days_last_year_sales) + '. ' : ''}{pk.promotions_planned && pk.promotions_planned.length ? pk.promotions_planned.length + ' promotion' + (pk.promotions_planned.length === 1 ? '' : 's') + ' planned.' : 'Nothing is planned in it yet.'}{pk.stock_order_by && pk.stock_order_by < today ? ' Stock for it had to be ordered by ' + v3Day(pk.stock_order_by) + '.' : ''}
-            {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('calendar')}>Plan it <span className="v3-xref-go">on Calendar →</span></button></li>}
-          {goal && goal.needs_replanning && <li><b>Your quarter goal needs re-planning.</b> Greta’s plan changed after it was confirmed.{' '}
-            <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal')}>Re-plan <span className="v3-xref-go">on Goal &amp; costs →</span></button></li>}
-          {F.calendar && F.calendar.past_sales_not_on_the_calendar > 0 && <li><b>{F.calendar.past_sales_not_on_the_calendar} past sales are not on the calendar.</b> Adding them lets Greta learn what your promotions really do.</li>}
+            {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('calendar')}>Plan it <span className="v3-xref-go">on Calendar</span></button></li>}
+          {goal && goal.needs_replanning && <li><b>Your quarter goal needs re-planning.</b> The plan changed after it was confirmed.{' '}
+            <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal')}>Re-plan <span className="v3-xref-go">on Goal &amp; costs</span></button></li>}
+          {F.calendar && F.calendar.past_sales_not_on_the_calendar > 0 && <li><b>{F.calendar.past_sales_not_on_the_calendar} past sales are not on the calendar.</b> Adding them shows what your promotions really do.</li>}
         </ul>
       </>)}
       {/* Greta's own closes (auto-closed, or the second row on one lever, 1064) are not the owner's decisions */}
       {done.rows && done.rows.some(r => !r.auto && !r.sup) && (<>
         <div className="v3-kick v3-gap-top">Decided in the last three weeks</div>
         <ul className="v3-rank-steps">{done.rows.filter(r => !r.auto && !r.sup).slice(0, 6).map((r, k) => (<li key={r.external_id + k}><span className="v3-rank-desc">{v3PlainAction(r).title}</span>
-          <span className="v3-sub"> {r.status === 'skipped' ? 'Skipped' : 'Done'} {v3Day(r.disposition_at)}{r.verdict ? ' · ' + ((V3_VERDICT[r.verdict] || {}).label || r.verdict) : ' · Not judged yet'}</span></li>))}</ul>
+          <span className="v3-sub"> {r.status === 'skipped' ? 'Skipped' : 'Done'} {v3Day(r.disposition_at)}{r.verdict ? ', ' + ((V3_VERDICT[r.verdict] || {}).label || r.verdict) : ', Not judged yet'}</span></li>))}</ul>
         {done.rows.filter(r => !r.auto && !r.sup).length > 6 && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>{done.rows.filter(r => !r.auto && !r.sup).length - 6} more decided <span className="v3-xref-go">on Actions</span></button>}
       </>)}
     </section>
@@ -22995,7 +23004,7 @@ function V3ReviewNotes({ weekStart, range }) {
     setBusy(true); setMsg(null);
     const r = await sb.from('review_note').insert({ brand_id: b, week_start: weekStart, kind, body: t.slice(0, 4000) });
     setBusy(false);
-    if (r.error) { setMsg('Could not save that just now — try again.'); return; }
+    if (r.error) { setMsg('Could not save that just now. Try again.'); return; }
     setText(''); q.retry();
   };
   const remove = async (id) => { if (!sb) return; const r = await sb.from('review_note').delete().eq('id', id); if (!r.error) q.retry(); };
@@ -23011,10 +23020,10 @@ function V3ReviewNotes({ weekStart, range }) {
   };
   return (<section className="v3-sec">
     <h2 className="v3-sec-title">Notes and decisions <span className="v3-muted">{range}</span></h2>
-    <p className="v3-note v3-measure">Saved to your workspace, so everyone on your team sees the same notes. To act on an item in the list above, mark it done or skip it there. That is what Greta checks later.</p>
+    <p className="v3-note v3-measure">Saved to your workspace, so everyone on your team sees the same notes. To act on an item in the list above, mark it done or skip it there.</p>
     {q.err ? <div className="v3-empty">Notes could not load just now.</div> : !q.rows ? <V3SkeletonRows n={2}/> : q.rows.length === 0 ? <div className="v3-empty">Nothing written for this week yet.</div> : (
       <ul className="v3-rank-steps">{q.rows.map(r => (<li key={r.id}><span className="v3-rank-desc">{r.kind === 'decision' ? 'Decision: ' : ''}{r.body}</span>
-        <span className="v3-sub"> {v3Day(r.created_at)}{r.author_id === uid ? ' · you' : ''}</span>
+        <span className="v3-sub"> {v3Day(r.created_at)}{r.author_id === uid ? ', you' : ''}</span>
         {r.author_id === uid && <> <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => remove(r.id)}>Remove</button></>}</li>))}</ul>)}
     <div className="v3-ask-box v3-gap-top">
       <textarea value={text} onChange={e => setText(e.target.value)} rows={3} placeholder="What did you decide, and what should everyone remember about this week?"/>
@@ -23164,7 +23173,7 @@ function V3Competitors() {
       <div className="v3-kick">Where you meet competitors</div>
       {gads.err && gsc.err && meta.err ? <V3LoadFailed what="your ad and search accounts" onRetry={() => { gads.retry(); gsc.retry(); meta.retry(); }}/>
         : !gads.rows || !gsc.rows || !meta.rows ? <V3SkeletonRows n={4}/>
-        : !reads.length ? <div className="v3-empty">Greta reads where you meet competitors from your Google Ads, Search Console and Meta accounts. Connect them on Connections &amp; data and this fills in.</div>
+        : !reads.length ? <div className="v3-empty">Where you meet competitors comes from your Google Ads, Search Console and Meta accounts. Connect them on Connections &amp; data and this fills in.</div>
         : (<>
           <div className="v3-lead2"><p className="v3-verdict">{verdict}</p><div>
           <ol className="v3-moves">{reads.map(r => (<li key={r.k}><b>{r.head}</b>{showReads ? <> {r.body} <V3Conf state={r.conf} detail={r.k === 'shop' ? 'From your own account’s auction data. The return is Google’s own count, which usually runs above your real orders.' : 'Counted straight from your own account.'}/></> : null}</li>))}</ol>
@@ -23195,7 +23204,7 @@ function V3Competitors() {
           <R.ComposedChart data={M.list} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
             <R.CartesianGrid/><R.XAxis dataKey="label" interval="preserveStartEnd"/><R.YAxis tickFormatter={v => curSym() + v} domain={[0, 'auto']}/>
             <R.Tooltip content={tipM} cursor={false}/>
-            <R.Line type="monotone" dataKey="cpm" stroke={PAL.ads} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
+            <R.Line type="linear" dataKey="cpm" stroke={PAL.ads} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
           </R.ComposedChart>
         </R.ResponsiveContainer>
         <p className="micro muted">What your Meta account paid for every 1,000 times an ad was shown. It rises when more brands bid for the same people.</p>
@@ -23229,31 +23238,31 @@ function V3CompetitorList({ q, loading }) {
   const research = async (row) => {
     setBusy(row.id); setMsg(null);
     try { await ciFetch('competitor-intel', { action: 'refresh', id: row.id }); setOpen(o => ({ ...o, [row.id]: true })); q.retry(); }
-    catch (e) { const t = String(e && e.message || ''); setMsg(/not_authorized/.test(t) ? 'Only an owner or admin can run research.' : 'Research on ' + row.name + ' did not complete — try again in a minute.'); }
+    catch (e) { const t = String(e && e.message || ''); setMsg(/not_authorized/.test(t) ? 'Only an owner or admin can run research.' : 'Research on ' + row.name + ' did not complete. Try again in a minute.'); }
     setBusy(null);
   };
   const researched = r => r.profile && !v3NotFound(r.profile.positioning) && r.profile._meta;
   const confState = c => (c === 'high' ? 'likely' : c === 'medium' ? 'probably' : 'possible');
   return (<section className="v3-sec">
     <h2 className="v3-sec-title">Who you’re up against</h2>
-    <p className="v3-note v3-measure">Your own list of competitors. Ask Greta to research one and she reads the open web: what they sell and charge, their ads, and what customers say. She keeps only sources she actually opened. Treat it as a briefing to check, not a fact sheet.</p>
+    <p className="v3-note v3-measure">Your own list of competitors. Ask Greta to research one: it reads the open web for what they sell and charge, their ads, and what customers say, and keeps only sources it actually opened. Treat it as a briefing to check, not a fact sheet.</p>
     {q.err ? <div className="v3-empty">Your competitor list could not load just now.</div> : loading ? <V3SkeletonRows n={3}/> : rows.length === 0
-      ? <div className="v3-empty">No competitors listed yet. Add the brands your customers compare you with — Greta researches each one.</div>
+      ? <div className="v3-empty">No competitors listed yet. Add the brands your customers compare you with.</div>
       : (<ul className="v3-rank-steps">{rows.map(r => { const p = r.profile || {}, done = researched(r), m = p._meta || {};
         const found = V3_COMP_FIELDS.filter(([f]) => !v3NotFound(p[f])), missing = V3_COMP_FIELDS.filter(([f]) => v3NotFound(p[f]));
         return (<li key={r.id}>
-          <span className="v3-rank-desc"><b>{r.name}</b>{r.domain ? <> · <a href={'https://' + v3Host(r.domain)} target="_blank" rel="noreferrer">{v3Host(r.domain)}</a></> : null}</span>
+          <span className="v3-rank-desc"><b>{r.name}</b>{r.domain ? <>, <a href={'https://' + v3Host(r.domain)} target="_blank" rel="noreferrer">{v3Host(r.domain)}</a></> : null}</span>
           <span className="v3-sub"> {done ? 'researched ' + v3Day(m.researched_at, true) : 'not researched yet'}</span>
-          {done && <> <V3Conf state={confState(r.confidence)} detail={fmtCount(m.independent_sources || 0) + ' independent source' + (m.independent_sources === 1 ? '' : 's') + ' besides their own site. From the open web — check anything you act on.'}/></>}
+          {done && <> <V3Conf state={confState(r.confidence)} detail={fmtCount(m.independent_sources || 0) + ' independent source' + (m.independent_sources === 1 ? '' : 's') + ' besides their own site. From the open web. Check anything you act on.'}/></>}
           <div className="v3-btn-row">
             <button type="button" className="v3-btn v3-btn-sm" disabled={!!busy} onClick={() => research(r)}>{busy === r.id ? 'Researching… (up to a minute)' : done ? 'Research again' : 'Research'}</button>
-            {done && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => setOpen(o => ({ ...o, [r.id]: !o[r.id] }))}>{open[r.id] ? 'Hide' : 'Show what Greta found'}</button>}
+            {done && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => setOpen(o => ({ ...o, [r.id]: !o[r.id] }))}>{open[r.id] ? 'Hide' : 'Show findings'}</button>}
             <button type="button" className="v3-btn v3-btn-q v3-btn-sm" disabled={!!busy} onClick={() => remove(r)}>Remove</button>
           </div>
           {done && open[r.id] && (<div className="v3-gap-top">
-            <dl className="v3-defs">{found.map(([f, lab]) => (<React.Fragment key={f}><dt>{lab}</dt><dd>{p[f]}{f === 'price_range' && aov ? <span className="v3-sub"> · your average order is {fmtMoney(aov)}</span> : null}</dd></React.Fragment>))}</dl>
+            <dl className="v3-defs">{found.map(([f, lab]) => (<React.Fragment key={f}><dt>{lab}</dt><dd>{p[f]}{f === 'price_range' && aov ? <span className="v3-sub">, your average order is {fmtMoney(aov)}</span> : null}</dd></React.Fragment>))}</dl>
             {missing.length > 0 && <p className="micro muted">Not found: {missing.map(([, lab]) => lab.replace(/ \(.*\)$/, '').toLowerCase()).join(', ')}.</p>}
-            {(r.sources || []).length > 0 && <p className="micro muted">Sources: {(r.sources || []).slice(0, 8).map((u, i) => (<React.Fragment key={i}>{i ? ', ' : ''}<a href={u} target="_blank" rel="noreferrer">{v3Host(u)}</a></React.Fragment>))}{m.unverified_sources_dropped > 0 ? <> · {fmtCount(m.unverified_sources_dropped)} link{m.unverified_sources_dropped === 1 ? '' : 's'} the research named but never opened left out</> : null}</p>}
+            {(r.sources || []).length > 0 && <p className="micro muted">Sources: {(r.sources || []).slice(0, 8).map((u, i) => (<React.Fragment key={i}>{i ? ', ' : ''}<a href={u} target="_blank" rel="noreferrer">{v3Host(u)}</a></React.Fragment>))}{m.unverified_sources_dropped > 0 ? <>, {fmtCount(m.unverified_sources_dropped)} link{m.unverified_sources_dropped === 1 ? '' : 's'} the research named but never opened left out</> : null}</p>}
           </div>)}
         </li>); })}</ul>)}
     <div className="v3-comp-add v3-gap-top">
@@ -23349,20 +23358,20 @@ function V3DataTrust() {
     // no coverage factor: the same figure Goal & costs gives (this said £343 there £372, 6 Oct).
     const cost30 = num(H.net_revenue_30d) * num(Q.realized_cogs_pct);
     items.push({ k: 'fd', short: 'product costs leave out freight and duty', head: 'None of your product costs include freight or duty, so every margin and profit figure reads high.',
-      body: <>Your product costs come to about {fmtMoney(cost30)} a month; every 10% that freight and duty add is about {fmtMoney(cost30 * 0.1)} a month of profit Greta is showing you that you don’t have. Set one rate for every product:</>,
+      body: <>Your product costs come to about {fmtMoney(cost30)} a month; every 10% that freight and duty add is about {fmtMoney(cost30 * 0.1)} a month of profit shown that you don’t have. Set one rate for every product:</>,
       extra: <V3FreightRate compact/> });
   }
   // 2. products with no cost
   if (Q && num(Q.lines_total) > 0 && num(Q.lines_costed) < num(Q.lines_total) * 0.97) {
     const miss = num(Q.lines_total) - num(Q.lines_costed);
     items.push({ k: 'nocost', short: fmtPctN(miss / num(Q.lines_total)) + ' of order lines have no product cost', head: fmtCount(miss) + ' of your last 90 days’ ' + fmtCount(Q.lines_total) + ' order lines have no product cost.',
-      body: <>Greta fills them in from your average margin, so profit on those products is a guess. Add their costs in Shopify (“Cost per item”) or here. <button type="button" className="v3-xref" onClick={go('goal', 'costs')}>Products with no cost yet <span className="v3-xref-go">on Goal &amp; costs →</span></button></> });
+      body: <>Greta fills them in from your average margin, so profit on those products is a guess. Add their costs in Shopify (“Cost per item”) or here. <button type="button" className="v3-xref" onClick={go('goal', 'costs')}>Products with no cost yet <span className="v3-xref-go">on Goal &amp; costs</span></button></> });
   }
   // 3. cash
   const C = cfg.rows[0] || {}, asOf = C.opening_cash_as_of ? v3Iso10(C.opening_cash_as_of) : null;
   const cashAge = asOf ? Math.round((new Date(today) - new Date(asOf)) / 864e5) : null;
   if (C.opening_cash != null && cashAge != null && cashAge > 21) items.push({ k: 'cash', short: 'your cash figure is ' + (cashAge >= 35 ? Math.round(cashAge / 7) + ' weeks' : cashAge + ' days') + ' old',
-    head: 'Your cash balance is from ' + v3Day(asOf, true) + '.', body: <>{fmtMoney(num(C.opening_cash))} as at then is what the runway on Review and the cash plan on Stock &amp; orders start from. Update it with today’s bank balance. <button type="button" className="v3-xref" onClick={go('goal')}>Update your cash <span className="v3-xref-go">on Goal &amp; costs →</span></button></> });
+    head: 'Your cash balance is from ' + v3Day(asOf, true) + '.', body: <>{fmtMoney(num(C.opening_cash))} as at then is what the runway on Review and the cash plan on Stock &amp; orders start from. Update it with today’s bank balance. <button type="button" className="v3-xref" onClick={go('goal')}>Update your cash <span className="v3-xref-go">on Goal &amp; costs</span></button></> });
   // 4. Google Analytics recovering
   const g4 = (trk.rows || []).find(r => r.source === 'ga4' && r.state && r.state !== 'ok' && r.comparisons_clean_from && v3Iso10(r.comparisons_clean_from) > today);
   const cv = (cov.rows || []).filter(r => r.order_coverage != null), cavg = cv.length ? cv.reduce((a, r) => a + num(r.order_coverage), 0) / cv.length : null;
@@ -23371,7 +23380,7 @@ function V3DataTrust() {
   const ga4Low = cavg != null && (usualG != null ? cavg < usualG - 0.10 : cavg < 0.9);
   const ga4Usual = usualG != null ? <>, against your usual {fmtPctN(usualG)}</> : null;
   if (g4) items.push({ k: 'ga4', short: 'Google Analytics is still recovering', head: 'Google Analytics is recovering, so comparisons of visits and of the share of visitors who buy are paused until ' + v3Day(g4.comparisons_clean_from, true) + '.',
-    body: <>It wasn’t recording properly from {v3Day(g4.broke_on)} to {v3Day(g4.fixed_on, true)}. Any comparison that reaches back into those weeks would read the repair as growth. Greta uses your Shopify orders meanwhile.{ga4Low ? <> It also sees only {fmtPctN(cavg)} of your orders now{ga4Usual}. Check that it records a purchase on every order, including express checkouts.</> : null}</> });
+    body: <>It wasn’t recording properly from {v3Day(g4.broke_on)} to {v3Day(g4.fixed_on, true)}. Any comparison that reaches back into those weeks would read the repair as growth. Your Shopify orders are used meanwhile.{ga4Low ? <> It also sees only {fmtPctN(cavg)} of your orders now{ga4Usual}. Check that it records a purchase on every order, including express checkouts.</> : null}</> });
   else if (ga4Low) items.push({ k: 'ga4cov', short: 'Google Analytics misses orders', head: 'Google Analytics sees ' + fmtPctN(cavg) + ' of your orders' + (usualG != null ? ', against your usual ' + fmtPctN(usualG) : '') + '.',
     body: <>So on Website, the share of visitors who buy reads lower than it is. Check that Google Analytics records a purchase on every order, including express checkouts.</> });
   // 4b. the shop no longer recording where orders came from (the tracking check Today leads with under
@@ -23390,11 +23399,11 @@ function V3DataTrust() {
   const orders30 = web.rows && web.rows[0] ? num(web.rows[0].n) : 0;
   if (orders30 > 0 && mP + gP + tP >= orders30 * 0.3) items.push({ k: 'claims', short: 'the ad platforms claim ' + fmtPctN((mP + gP + tP) / orders30) + ' of your orders',
     head: plats + ' claim ' + fmtCount(Math.round(mP + gP + tP)) + ' of the ' + fmtCount(orders30) + ' orders your website took in the last 30 days.',
-    body: <>Meta counts {fmtCount(mP)} purchases worth {fmtMoney(mV)}{tP > 0 ? ',' : ' and'} Google {fmtCount(gP)} conversions worth {fmtMoney(gV)}{tP > 0 ? <> and TikTok {fmtCount(tP)} conversions worth {fmtMoney(tV)}</> : null}, by their own measures — each counts any order that saw or clicked an ad, and {tP > 0 ? 'they' : 'both'} can count the same one. That is why Greta judges ads on your Shopify orders, not on the return their dashboards show. <button type="button" className="v3-xref" onClick={go('marketing')}>What each channel really returns <span className="v3-xref-go">on Marketing →</span></button></> });
+    body: <>Meta counts {fmtCount(mP)} purchases worth {fmtMoney(mV)}{tP > 0 ? ',' : ' and'} Google {fmtCount(gP)} conversions worth {fmtMoney(gV)}{tP > 0 ? <> and TikTok {fmtCount(tP)} conversions worth {fmtMoney(tV)}</> : null}, by their own measures, each counts any order that saw or clicked an ad, and {tP > 0 ? 'they' : 'both'} can count the same one. That is why Greta judges ads on your Shopify orders, not on the return their dashboards show. <button type="button" className="v3-xref" onClick={go('marketing')}>What each channel really returns <span className="v3-xref-go">on Marketing</span></button></> });
   // 6. products without a SKU
   const noSku = new Set((stock.rows || []).filter(r => String(r.sku || '').startsWith('v:') && num(r.weekly_velocity) > 0).map(r => String(r.product_title || '').toLowerCase())).size;
   if (noSku > 0) items.push({ k: 'sku', short: fmtCount(noSku) + ' selling products have no product code', head: fmtCount(noSku) + ' products that sell have no product code (SKU) in Shopify.',
-    body: <>Greta tracks them by Shopify’s own id, so stock and profit include them, but a supplier order can’t carry a product code for them. Add one to each in Shopify. <button type="button" className="v3-xref" onClick={go('stock')}>Which products <span className="v3-xref-go">on Stock &amp; orders →</span></button></> });
+    body: <>Greta tracks them by Shopify’s own id, so stock and profit include them, but a supplier order can’t carry a product code for them. Add one to each in Shopify. <button type="button" className="v3-xref" onClick={go('stock')}>Which products <span className="v3-xref-go">on Stock &amp; orders</span></button></> });
 
   const shortList = items.slice(0, 3).map(i => i.short);
   const jobLate = !!(jh.rows && jh.rows.length);
@@ -23404,7 +23413,7 @@ function V3DataTrust() {
   const feeds = FR && FR.stale && FR.said ? (FR.core_stale ? 'Your data is out of date (see the note at the top).' : 'Some of your data is out of date (see the note at the top).')
     : jobLate ? 'Your data is arriving, but a refresh that works it out has failed (see the note above), so some figures may lag.'
     : 'Your feeds are current.';
-  const verdict = !items.length ? (jobLate ? feeds + ' Nothing else Greta checks is reading wrong.' : 'Your feeds are current and nothing Greta checks is reading wrong.')
+  const verdict = !items.length ? (jobLate ? feeds + ' Nothing else is reading wrong.' : 'Your feeds are current and nothing is reading wrong.')
     : feeds + ' ' + (items.length === 1 ? 'One thing makes' : v3Sentence(['', 'one', 'two', 'three', 'four', 'five', 'six'][items.length] || String(items.length)) + ' things make') + ' numbers read wrong: ' + shortList.join('; ') + (items.length > 3 ? '; and ' + (items.length - 3) + ' more below' : '') + '.';
   return (<div className="v3-page-stack"><section>
     <div className="v3-kick">Can you trust your numbers?</div>
@@ -23444,7 +23453,7 @@ function V3Team() {
   const [busy, setBusy] = React.useState(false), [msg, setMsg] = React.useState(null);
   const call = async (action, extra) => {
     const jwt = await ASK.getJwt();
-    if (!jwt) return { ok: false, data: { detail: 'Your session expired — refresh the page and sign in again.' } };
+    if (!jwt) return { ok: false, data: { detail: 'Your session expired. Refresh the page and sign in again.' } };
     const r = await fetch(inviteUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jwt },
       body: JSON.stringify({ brand_id: ASK.brand_id, action, ...(extra || {}) }) });
     return { ok: r.ok, data: await r.json().catch(() => ({})) };
@@ -23474,9 +23483,9 @@ function V3Team() {
   const pending = rows.filter(r => r.activity && !r.is_self && !r.last_sign_in_at && Date.now() - Date.parse(r.added) > 7 * 864e5);
   const verdict = rows.length <= 1 ? 'Only you can see ' + brandName + '.'
     : fmtCount(rows.length) + ' people can see ' + brandName + '.' + (stale.length
-      ? ' ' + (stale.length === 1 ? stale[0].email + ' hasn’t signed in since ' + v3Day(String(stale[0].last_sign_in_at).slice(0, 10), true) : fmtCount(stale.length) + ' people haven’t signed in for over a month') + ' — remove access that is no longer needed.'
+      ? ' ' + (stale.length === 1 ? stale[0].email + ' hasn’t signed in since ' + v3Day(String(stale[0].last_sign_in_at).slice(0, 10), true) : fmtCount(stale.length) + ' people haven’t signed in for over a month') + ', remove access that is no longer needed.'
       : rows.every(r => r.activity) && !pending.length ? ' Everyone has signed in within the last month.' : '')
-    + (pending.length ? ' ' + (pending.length === 1 ? pending[0].email + ' hasn’t accepted their invite' : fmtCount(pending.length) + ' invites haven’t been accepted') + ' — send it again, or remove it.' : '');
+    + (pending.length ? ' ' + (pending.length === 1 ? pending[0].email + ' hasn’t accepted their invite' : fmtCount(pending.length) + ' invites haven’t been accepted') + ', send it again, or remove it.' : '');
 
   const invite = async (e) => {
     e.preventDefault(); if (busy) return;
@@ -23508,7 +23517,7 @@ function V3Team() {
     if (m.decisions_30d) bits.push(fmtCount(m.decisions_30d) + (m.decisions_30d === 1 ? ' decision' : ' decisions'));
     if (m.notes) bits.push(fmtCount(m.notes) + (m.notes === 1 ? ' note' : ' notes'));
     if (m.questions_30d) bits.push(fmtCount(m.questions_30d) + (m.questions_30d === 1 ? ' question' : ' questions'));
-    return bits.length ? bits.join(' · ') : 'nothing yet';
+    return bits.length ? bits.join(', ') : 'nothing yet';
   };
 
   return (<div className="v3-page-stack">
@@ -23525,7 +23534,7 @@ function V3Team() {
                 {V3_ROLE_HELP.filter(r => r[0] !== 'admin' || me.role === 'owner').map(r => <option key={r[0]} value={r[0]}>{r[1]}</option>)}
               </select>
             : v3Sentence(m.role)}</td>
-          <td className="t-text">{m.activity ? ((m.last_active_at || m.last_sign_in_at) ? v3Ago(m.last_active_at || m.last_sign_in_at) : <span className="v3-down">never — invite not accepted</span>) : FMT_NONE}</td>
+          <td className="t-text">{m.activity ? ((m.last_active_at || m.last_sign_in_at) ? v3Ago(m.last_active_at || m.last_sign_in_at) : <span className="v3-down">never, invite not accepted</span>) : FMT_NONE}</td>
           <td className="t-text v3-muted">{did(m)}</td>
           <td>{(canTarget(m) || (m.is_self && m.role !== 'owner')) && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => remove(m)}>{m.is_self ? 'Leave' : 'Remove'}</button>}</td>
         </tr>))}</tbody>
@@ -23542,7 +23551,7 @@ function V3Team() {
         </select>
         <button type="submit" className="v3-btn v3-btn-p" disabled={busy || !email.trim()}>{busy ? 'Sending…' : 'Send invite'}</button>
       </form>
-      <ul className="v3-rank-steps">{V3_ROLE_HELP.map(r => (<li key={r[0]}><span className="v3-rank-desc"><b>{r[1]}</b> — {r[2]}.</span></li>))}</ul>
+      <ul className="v3-rank-steps">{V3_ROLE_HELP.map(r => (<li key={r[0]}><span className="v3-rank-desc"><b>{r[1]}</b>, {r[2]}.</span></li>))}</ul>
       <p className="micro muted v3-measure">They get an email with a sign-in link that opens this workspace. Only an owner can make someone an admin.</p>
     </section>)}
     {msg && <p className={msg.kind === 'ok' ? 'v3-note v3-ok' : 'v3-note v3-bad'} role="status">{msg.text}</p>}
@@ -23858,7 +23867,7 @@ function V3RankedDrivers({ D, plain }) {
   todo.sort((a, b) => (Number(a.row.board_rank) || 999) - (Number(b.row.board_rank) || 999));
   const sub = r => [V3_DRIVER_SURE[r.evidence] || '',
     (r.holds || []).filter(h => V3_DRIVER_ALSO[h]).length && r.evidence !== 'usual' ? 'also against ' + (r.holds || []).filter(h => V3_DRIVER_ALSO[h]).map(h => V3_DRIVER_ALSO[h]).join(' and ') : '',
-    r.evidence !== 'usual' && r.expected === 'season' ? 'partly the season' : r.evidence !== 'usual' && r.expected === 'sale_ended' ? 'a sale ended' : ''].filter(Boolean).join(' · ');
+    r.evidence !== 'usual' && r.expected === 'season' ? 'partly the season' : r.evidence !== 'usual' && r.expected === 'sale_ended' ? 'a sale ended' : ''].filter(Boolean).join(', ');
   // One total and one "typical" on Today (20 Oct, O4): the hero's 30 days against a typical month. The drivers' own
   // 28-day total read as a second answer beside it ("-£1,336 ... a typical 28 days (£6,592)" against "-£436 ... a
   // typical month (£8,773)"), so here they are the breakdown, named by their weeks, and the total sits in the fold.
@@ -23950,7 +23959,7 @@ function V3BusinessState({ part }) {
     .map(w => ({ label: v3Day(String(w.wk)), sale: !!w.sale, v: num(w.after_ads), sales: num(w.sales), ads: num(w.ads),
       off: Math.max(num(w.markdown) || 0, num(w.code_depth) || 0) }));
   const rhTip = ({ active, payload }) => { if (!active || !payload || !payload.length) return null; const d = payload[0].payload;
-    return (<div className="v3-tip"><b>Week of {d.label}{d.sale ? ' · a sale' : ''}</b>
+    return (<div className="v3-tip"><b>Week of {d.label}{d.sale ? ', a sale' : ''}</b>
       <span>Sales <em>{fmtMoney(d.sales)}</em></span><span>Ads <em>{fmtMoney(d.ads)}</em></span>
       <span>After product, order and ad costs <em>{fmtMoney(d.v)}</em></span><span>Below usual prices <em>{fmtPctN(d.off)}</em></span></div>); };
   if (U.cac != null && U.first_order_contribution != null) {
@@ -24032,10 +24041,10 @@ function V3BusinessState({ part }) {
   // written read, the points, the weekly chart and the benchmarks follow the actions, in one fold.
   if (part === 'detail') {
     if (!(story || facts || chart || bench)) return null;
-    return (<V3More id="today-read" label="Greta’s read of the month, and the figures behind it">
+    return (<V3More id="today-read" label="The month’s figures">
       {story && <><p className="v3-note v3-measure">{v3PlainWords(NS.story)}</p>
         <p className="micro muted v3-measure">{V3_NARR.data.summary_stale && V3_NARR.data.written_at
-          ? <>Written by Greta on {v3Day(String(V3_NARR.data.written_at).slice(0, 10), true)}. Today’s figures are in the points below.</>
+          ? <>Written on {v3Day(String(V3_NARR.data.written_at).slice(0, 10), true)}. Today’s figures are in the points below.</>
           : <>Written by Greta. Every figure in it is checked against your data.</>}</p></>}
       {facts}{terms}{chart}{bench}
     </V3More>);
@@ -24152,7 +24161,7 @@ function v3ModelGoalSoFar(act, plan, info) {
   parts.push({ amt: aR - pR, k: v3UpDown(pR, aR, 'Returning customers bought more', 'Returning customers bought less'), sub: fmtMoney(pR) + ' planned, ' + fmtMoney(aR) + ' so far',
     cause: <>returning customers bought {v3UpDown(pR, aR, 'more', 'less')} than planned ({fmtMoney(pR)} planned, {fmtMoney(aR)} so far)</>,
     against: <>Returning customers buying {v3UpDown(pR, aR, 'more', 'less')} than planned ({fmtMoney(pR)} to {fmtMoney(aR)})</> });
-  if (Math.abs(other) >= 1) parts.push({ amt: other, k: 'Buyers Greta cannot match', sub: 'orders without a customer record', cause: <>orders without a customer record came in {v3UpDown(0, other, 'above', 'below')} plan</>, against: <>Orders without a customer record</> });
+  if (Math.abs(other) >= 1) parts.push({ amt: other, k: 'Unmatched buyers', sub: 'orders without a customer record', cause: <>orders without a customer record came in {v3UpDown(0, other, 'above', 'below')} plan</>, against: <>Orders without a customer record</> });
   return {
     title: act.done >= info.exp ? 'Why sales are ahead of the plan so far' : 'Why sales are behind the plan so far',
     from: info.exp, to: act.done, better: 'higher', fmtV: v => fmtMoney(v), fmtAmt: v => fmtMoney(Math.abs(v)),
@@ -24190,7 +24199,7 @@ function v3ModelGoalGap(goalMonths, paceMonths, goal, pace, info) {
     opening: <>{info.held ? 'At the ad budget that still pays on a first order' : 'With ' + info.adsNear} the quarter lands at about {fmtMoney(pace)}; your goal is {fmtMoney(goal)}, {fmtMoney(goal - pace)} more.</>,
     closing: info.dCam != null ? <> The extra ads bring that much more in sales but {info.dCam >= 0 ? fmtMoney(info.dCam) + ' more' : fmtMoney(-info.dCam) + ' less'} profit after ads{info.dCam < 0 ? ': past a point, each extra £1 of ads costs more than the sales it brings keep' : ''}.</> : null,
     rows: rows.map(r => [gpMonthName(r.iso), r.ps, r.gs, v => fmtMoney(v), null]),
-    note: 'Both are Greta’s plan for the quarter: your own busy and quiet months, returning customers at their recent rate, and new-customer sales that rise with ad spend. ' + (info.held ? 'The plan holds ads where a first order still pays for the new customer it buys' : 'The plan holds ' + info.adsNear) + '; the goal spends what it takes to reach the target.',
+    note: 'Both are the plan for the quarter: your own busy and quiet months, returning customers at their recent rate, and new-customer sales that rise with ad spend. ' + (info.held ? 'The plan holds ads where a first order still pays for the new customer it buys' : 'The plan holds ' + info.adsNear) + '; the goal spends what it takes to reach the target.',
   };
 }
 const V3_GOAL_NR_Q = (start, today) => (sb, b) => sb.from('vw_daily_new_vs_returning').select('order_date,customer_type,orders,net_revenue')
@@ -24402,7 +24411,7 @@ function V3CalendarDrivers() {
     {profOff && salesOk && overAds ? <>, because ads ran over plan (<b className="v3-num">{fmtMoney(A.spend)}</b> spent against <b className="v3-num">{fmtMoney(P.spend)}</b>)</> : null}{'. '}
   </>) : null;
   return (<section className="v3-sec v3-strip">
-    <div className="v3-kick">{gpMonthName(M.start)} so far · {range} · against the month’s plan</div>
+    <div className="v3-kick">{gpMonthName(M.start)} so far, {range}, against the month’s plan</div>
     <div className="v3-lead2"><div>
     <p className="v3-verdict">{salesWords}.</p>
     <V3Brief>{both}{S.plan_total != null ? <>The plan for {gpMonthName(M.start)} is {fmtMoney(S.plan_total)}. </> : null}{S.pace_finish != null ? <>At today’s pace the month ends at about {fmtMoney(S.pace_finish)}. </> : null}<V3Conf state="probably" detail={[M.basis_note, S.pace_basis ? 'At today’s pace: ' + S.pace_basis + '.' : null].filter(Boolean).join(' ')}/></V3Brief>
@@ -24491,11 +24500,11 @@ function v3ModelStock(order, lead, land, sooner) {
     colA: 'Already out', colB: 'Run out before it lands',
     todo: [{ amt: A, ids: ['stock-reorder'] }, { amt: B, ids: ['stock-reorder', 'promo-peak-plan'] }],
     parts: [
-      ...(out.length ? [{ amt: A, k: 'Already out of stock', sub: fmtCount(out.length) + ' products, ' + fmtCount(lead) + ' days with nothing to sell',
-        cause: <>{fmtCount(out.length)} products are already out and sell nothing for the {fmtCount(lead)} days until an order placed today lands ({v3Names(top(out).map(name))} lose most)</>,
+      ...(out.length ? [{ amt: A, k: 'Already out of stock', sub: fmtCount(out.length) + (out.length === 1 ? ' product, ' : ' products, ') + fmtCount(lead) + ' days with nothing to sell',
+        cause: <>{fmtCount(out.length)} {out.length === 1 ? 'product is already out and sells' : 'products are already out and sell'} nothing for the {fmtCount(lead)} days until an order placed today lands ({v3Names(top(out).map(name))} lose most)</>,
         against: <>Products already out</> }] : []),
-      ...(soon.length ? [{ amt: B, k: 'Run out before it lands', sub: fmtCount(soon.length) + ' products, out in about ' + fmtCount(avgDays) + ' days',
-        cause: <>{fmtCount(soon.length)} more run out before then, in about {fmtCount(avgDays)} days on average ({v3Names(top(soon).map(name))} lose most)</>,
+      ...(soon.length ? [{ amt: B, k: 'Run out before it lands', sub: fmtCount(soon.length) + (soon.length === 1 ? ' product, out in about ' : ' products, out in about ') + fmtCount(avgDays) + (avgDays === 1 ? ' day' : ' days'),
+        cause: <>{fmtCount(soon.length)} more run out before then, in about {fmtCount(avgDays)} {avgDays === 1 ? 'day' : 'days'} on average ({v3Names(top(soon).map(name))} lose most)</>,
         against: <>Products that run out before it lands</> }] : []),
     ],
     opening: <>At today’s pace, the products on the order list lose about {fmtMoney(tot)} of profit before an order placed today can land on {v3Day(land, true)}, {fmtCount(lead)} days away.</>,
@@ -24505,7 +24514,7 @@ function v3ModelStock(order, lead, land, sooner) {
       ['Profit lost a day, once out', perDayA, perDayB, v => fmtMoney(v), null],
       ['Profit lost before the order lands', A, B, v => fmtMoney(v), null],
     ],
-    note: 'From the stock list on this page (the same list the board orders from): each product’s profit lost on the days it has nothing to sell before an order placed today could arrive. Shopify keeps only today’s stock; since 9 October Greta also keeps a copy each night (0315), so in a few weeks this can say which products ran out, which were restocked and which are still out.',
+    note: 'From the stock list on this page (the same list the board orders from): each product’s profit lost on the days it has nothing to sell before an order placed today could arrive. Shopify keeps only today’s stock; a copy has been kept each night since 9 October, so in a few weeks this can say which products ran out, which were restocked and which are still out.',
   };
 }
 function V3StockDrivers({ order, lead, land, sooner }) {
@@ -24540,7 +24549,7 @@ function v3ModelProducts(list, sale) {
   const big = a => a.slice().sort((p, q) => Math.abs(q.now - q.was) - Math.abs(p.now - p.was))[0];
   const outD = out.reduce((t, x) => t + x.now - x.was, 0), newD = sum(nw, 'now') - sum(nw, 'was'), backD = back.reduce((t, x) => t + x.now - x.was, 0);
   const parts = [];
-  if (out.length) parts.push({ amt: outD, k: 'Ran out of stock', sub: fmtCount(out.length) + ' products, ' + big(out).title + ' the biggest',
+  if (out.length) parts.push({ amt: outD, k: 'Ran out of stock', sub: fmtCount(out.length) + (out.length === 1 ? ' product, ' : ' products, ') + big(out).title + ' the biggest',
     cause: <>{out.length === 1 ? 'a product' : fmtCount(out.length) + ' products'} that sold before ran out of stock ({big(out).title} the biggest, {fmtMoney(big(out).was)} in the 28 days before)</>,
     against: <>Products that ran out of stock</> });
   if (cont.length) parts.push({ amt: units, k: v3UpDown(U0, U1, 'Sold more units', 'Sold fewer units'), sub: fmtCount(U0) + ' to ' + fmtCount(U1) + ' units, products still selling',
@@ -24596,8 +24605,8 @@ function V3AnatomyCoverage() {
   const rest = all.length - covered - est - na - you - test - sync;
   const pages = { profit: 'profit', marketing: 'marketing', website: 'website', customers: 'customers', products: 'products', stock: 'stock', competitors: 'competitors', goal: 'goal', settings: 'settings', review: 'review', actions: 'actions' };
   return (<section className="v3-sec">
-    <h2 className="v3-sec-title">What Greta can see <span className="v3-muted">every part of the business</span></h2>
-    <p className="v3-note v3-measure">Greta measures {fmtCount(covered)} of the {fmtCount(all.length)} things worth knowing about a business like yours{est ? <> and estimates {fmtCount(est)} more</> : null}{na ? <>, and {fmtCount(na)} do not apply to you</> : null}.
+    <h2 className="v3-sec-title">Data coverage <span className="v3-muted">every part of the business</span></h2>
+    <p className="v3-note v3-measure">{fmtCount(covered)} of the {fmtCount(all.length)} things worth knowing about a business like yours{est ? <> and estimates {fmtCount(est)} more</> : null}{na ? <>, and {fmtCount(na)} do not apply to you</> : null}.
       {you + test + sync + rest > 0 ? <> Of the rest, {[sync ? fmtCount(sync) + ' fill after their first sync' : null, you ? fmtCount(you) + ' need a figure from you (below)' : null,
         test ? fmtCount(test) + ' need a test to measure' : null, rest ? fmtCount(rest) + ' cannot be measured yet' : null].filter(Boolean).join(', ')}.</> : null} Open a part to see each figure.</p>
     <table className="v3-rw v3-cov">
@@ -24621,7 +24630,7 @@ function V3AnatomyCoverage() {
           </td></tr>}
         </React.Fragment>); })}</tbody>
     </table>
-    <p className="micro muted v3-measure">Measured counts the measures Greta works out from your connected accounts, or from figures you entered. Why it moves is a panel that splits a change into its parts. Actions are the open ones on your board for that part.</p>
+    <p className="micro muted v3-measure">Measured counts what is worked out from your connected accounts, or from figures you entered. Why it moves is a panel that splits a change into its parts. Actions are the open ones on your board for that part.</p>
   </section>);
 }
 
@@ -24646,8 +24655,8 @@ function V3LearningStatus() {
   // An empty brand saw "0 of 0" and a refit date from July: say once what is true instead.
   const sales30 = Number(((typeof window !== 'undefined' && window.GRETA_HEADLINE) || {}).net_revenue_30d) || 0;
   if (!(sales30 > 0)) return (<section className="v3-sec">
-    <h2 className="v3-sec-title">What Greta has learned about you</h2>
-    <p className="v3-note v3-measure">Nothing yet: Greta has no orders from your shop in the last 30 days, so every estimate it makes is a typical brand’s. Each piece becomes yours as your orders and ad spend build up.</p>
+    <h2 className="v3-sec-title">Learned from your data</h2>
+    <p className="v3-note v3-measure">Nothing yet: no orders from your shop in the last 30 days, so every estimate is a typical brand’s. Each piece becomes yours as your orders and ad spend build up.</p>
   </section>);
   const rows = [
     ['What each ' + curSym() + '1 of ads brings in new customers',
@@ -24661,14 +24670,14 @@ function V3LearningStatus() {
       s.ltv_status === 'measured' ? 'Your own customers' : 'A typical brand’s, until your customers have a year behind them', s.ltv_status === 'measured'],
     ['How much each ad channel really causes',
       Number(s.channel_tests) ? 'Your own holdout tests' : 'A published estimate, until you run a holdout test (on the board)', Number(s.channel_tests) > 0],
-    ['How often Greta’s actions worked',
-      graded ? fmtCount(hits) + ' of ' + fmtCount(graded) + ' checked actions moved the number they promised' : 'Nothing checked yet: mark actions done on the board and Greta checks each one when its window ends', graded >= 5],
+    ['How often actions worked',
+      graded ? fmtCount(hits) + ' of ' + fmtCount(graded) + ' checked actions moved the number they promised' : 'Nothing checked yet: each action done is checked when its window ends', graded >= 5],
   ];
   return (<section className="v3-sec">
-    <h2 className="v3-sec-title">What Greta has learned about you <span className="v3-muted">your own data, or a typical brand’s</span></h2>
-    <p className="v3-note v3-measure">Greta starts every brand on what is typical for a business like yours, then replaces each piece with your own data as it builds up. {s.last_fit_problem ? 'The last weekly refit did not finish: ' + s.last_fit_problem + '.' : s.profile_as_of ? 'Last refitted on ' + v3Day(s.profile_as_of) + '.' : ''}</p>
+    <h2 className="v3-sec-title">Learned from your data <span className="v3-muted">your own data, or a typical brand’s</span></h2>
+    <p className="v3-note v3-measure">Every brand starts on what is typical for a business like it. Each piece is replaced with your own data as it builds up. {s.last_fit_problem ? 'The last weekly refit did not finish: ' + s.last_fit_problem + '.' : s.profile_as_of ? 'Last refitted on ' + v3Day(s.profile_as_of) + '.' : ''}</p>
     <table className="v3-rw">
-      <thead><tr><th className="t-text">What Greta needs to know</th><th className="t-text">Where it comes from now</th><th className="t-text">Yours yet?</th></tr></thead>
+      <thead><tr><th className="t-text">Figure</th><th className="t-text">Where it comes from now</th><th className="t-text">Yours yet?</th></tr></thead>
       <tbody>{rows.map(([k, v, mine]) => (<tr key={k}><td className="t-text">{k}</td><td className="t-text">{v}</td><td className={'t-text' + (mine ? '' : ' v3-muted')}>{mine ? 'Yours' : 'Partly typical'}</td></tr>))}</tbody>
     </table>
   </section>);
@@ -24707,7 +24716,7 @@ function V3AnatomyInputs() {
     if (!draft.name.trim()) return;
     const row = { brand_id: b, name: draft.name.trim(), lead_time_days: num(draft.lead), moq_units: num(draft.moq), has_alternative: !!draft.alt, product_match: draft.match.trim() || null };
     const r = await sb.from('brand_supplier').insert(row).select('id,name,lead_time_days,moq_units,has_alternative,product_match');
-    done(r, 'Saved. Greta uses it the next time she works out your figures.');
+    done(r, 'Saved. It is used the next time your figures are worked out.');
     if (!r.error) { setSup(s => s.concat(r.data || [])); setDraft({ name: '', lead: '', moq: '', alt: false, match: '' }); }
   };
   const dropSupplier = async id => { const r = await sb.from('brand_supplier').delete().eq('id', id); done(r, 'Removed.'); if (!r.error) setSup(s => s.filter(x => x.id !== id)); };
@@ -24715,15 +24724,15 @@ function V3AnatomyInputs() {
     const keep = codes.filter(c => c.kind), drop = codes.filter(c => !c.kind).map(c => c.code);
     let r = keep.length ? await sb.from('brand_code_kind').upsert(keep.map(c => ({ brand_id: b, code: c.code, kind: c.kind, commission_pct: num(c.commission_pct), updated_at: new Date().toISOString() })), { onConflict: 'brand_id,code' }) : null;
     if (!(r && r.error) && drop.length) r = await sb.from('brand_code_kind').delete().eq('brand_id', b).in('code', drop);
-    done(r, 'Saved. Greta uses them the next time she works out your figures.');
+    done(r, 'Saved. They are used the next time your figures are worked out.');
   };
   return (<section className="v3-sec">
-    <h2 className="v3-sec-title">What Greta needs from you <span className="v3-muted">{needs.length ? fmtCount(needs.length) + (needs.length === 1 ? ' figure' : ' figures') : 'all filled in'}</span></h2>
-    <p className="v3-note v3-measure">Some things only you know. Each one below closes a gap above; Greta reads them every time she works out your figures.</p>
+    <h2 className="v3-sec-title">Figures needed <span className="v3-muted">{needs.length ? fmtCount(needs.length) + (needs.length === 1 ? ' figure' : ' figures') : 'all filled in'}</span></h2>
+    <p className="v3-note v3-measure">Some things only you know. Each one below closes a gap above.</p>
     {msg && <p className="micro v3-measure">{msg}</p>}
 
     <h3 className="v3-drivers-h">Your suppliers</h3>
-    <p className="micro muted v3-measure">Lead time and minimum order for each, and whether anyone else could make the same things. Greta uses one lead time for everything until you add them.</p>
+    <p className="micro muted v3-measure">Lead time and minimum order for each, and whether anyone else could make the same things. One lead time applies to everything until you add them.</p>
     {sup.length > 0 && <table className="v3-rw"><thead><tr><th className="t-text">Supplier</th><th>Lead time</th><th>Minimum order</th><th className="t-text">Another could make it</th><th className="t-text">Makes</th><th></th></tr></thead>
       <tbody>{sup.map(s => (<tr key={s.id}><td className="t-text">{s.name}</td><td>{s.lead_time_days != null ? fmtCount(s.lead_time_days) + ' days' : ''}</td><td>{s.moq_units != null ? fmtCount(s.moq_units) + ' units' : ''}</td>
         <td className="t-text">{s.has_alternative ? 'Yes' : 'No'}</td><td className="t-text">{s.product_match || ''}</td>
@@ -24739,9 +24748,9 @@ function V3AnatomyInputs() {
 
     {codes.length > 0 && <>
       <h3 className="v3-drivers-h">Whose discount codes are whose</h3>
-      <p className="micro muted v3-measure">Mark the codes that belong to creators or affiliates, and what commission they earn, so their cost counts as marketing. Greta has guessed the ones marked “looks like a creator’s” from their shape.</p>
+      <p className="micro muted v3-measure">Mark the codes that belong to creators or affiliates, and what commission they earn, so their cost counts as marketing. The ones marked “looks like a creator’s” are guesses from their shape.</p>
       <table className="v3-rw"><thead><tr><th className="t-text">Code</th><th>Orders, 90 days</th><th className="t-text">Whose</th><th>Commission, %</th></tr></thead>
-        <tbody>{codes.map((c, i) => (<tr key={c.code}><td className="t-text">{c.code}{c.guess ? <span className="v3-muted"> · looks like a creator’s</span> : null}</td><td>{c.orders != null ? fmtCount(c.orders) : ''}</td>
+        <tbody>{codes.map((c, i) => (<tr key={c.code}><td className="t-text">{c.code}{c.guess ? <span className="v3-muted">, looks like a creator’s</span> : null}</td><td>{c.orders != null ? fmtCount(c.orders) : ''}</td>
           <td className="t-text"><select aria-label={c.code + ' kind'} value={c.kind} onChange={e => { const v = e.target.value; setCodes(cs => cs.map((x, j) => j === i ? { ...x, kind: v } : x)); }}>
             <option value="">Not set</option><option value="creator">A creator’s</option><option value="affiliate">An affiliate’s</option><option value="promotion">A promotion</option>
             <option value="staff">Staff or friends</option><option value="service">Customer service</option><option value="gifting">Gifting</option></select></td>
@@ -24902,7 +24911,7 @@ function V3Sign({ k, v, tone, bar, n, series, fmt, better, line, act, trendAs })
   const refV = line && line.v != null && isFinite(Number(line.v)) ? Number(line.v) : null;
   const yOf = (v, lo, r) => 22 - (v - lo) / r * 20;
   const chart = open && pts.length >= 4 && (<span className="v3-sign-pop" role="dialog" aria-label={k + ', last ' + pts.length + ' weeks'}>
-    <span className="v3-sign-pop-h"><b>{k}</b><span>Last {pts.length} weeks · each point is the 30 days to that date</span></span>
+    <span className="v3-sign-pop-h"><b>{k}</b><span>Last {pts.length} weeks, each point is the 30 days to that date</span></span>
     <R.ResponsiveContainer width="100%" height={160}>
       <R.LineChart data={pts} margin={{ top: 8, right: 8, left: 8, bottom: 0 }}>
         <R.XAxis dataKey="d" tickFormatter={d => v3Day(d)} interval="preserveStartEnd" minTickGap={40}/>
@@ -24910,7 +24919,7 @@ function V3Sign({ k, v, tone, bar, n, series, fmt, better, line, act, trendAs })
         {line && line.v != null && <R.ReferenceLine y={line.v} stroke={PAL.muted} strokeDasharray="3 3" ifOverflow="extendDomain"/>}
         <R.Tooltip content={({ active, payload }) => (active && payload && payload.length)
           ? <div className="v3-tip"><b>30 days to {v3Day(payload[0].payload.d, true)}</b><span>{k} <em>{fmt(payload[0].payload.v)}</em></span></div> : null}/>
-        <R.Line type="monotone" dataKey="v" stroke={PAL.muted} strokeWidth={2} isAnimationActive={false}
+        <R.Line type="linear" dataKey="v" stroke={PAL.muted} strokeWidth={2} isAnimationActive={false}
                 dot={pr => pr.index === pts.length - 1 ? <circle key="last" cx={pr.cx} cy={pr.cy} r={3.5} fill={PAL.muted}/> : null}/>
       </R.LineChart>
     </R.ResponsiveContainer>
@@ -24923,7 +24932,7 @@ function V3Sign({ k, v, tone, bar, n, series, fmt, better, line, act, trendAs })
     <div className="v3-sign-row"><span className="v3-sign-v">{v}</span>
       <span className={'v3-sign-s v3-sign-' + (tone || 'typical')}>{V3_SIG_WORD[tone] || V3_SIG_WORD.typical}</span></div>
     {trend && <div className={'v3-sign-trend ' + trend.cls}>
-      {trend.dir === 'flat' ? <span aria-hidden="true">→</span> : <Icon name={trend.dir === 'up' ? 'arrowUp' : 'arrowDown'} size={12} stroke={2.2}/>}
+      {trend.dir === 'flat' ? null : <Icon name={trend.dir === 'up' ? 'arrowUp' : 'arrowDown'} size={12} stroke={2.2}/>}
       <span>{trend.text || <>{trend.dir === 'flat' ? 'About the same as' : trend.dir === 'up' ? 'Up from' : 'Down from'} {trend.from} {trend.when || 'four weeks ago'}</>}</span></div>}
     {chart}
     {pts.length >= 4 && (() => { const vs = pts.map(p => Number(p.v)).concat(refV != null ? [refV] : []), lo = Math.min(...vs), hi = Math.max(...vs), r = hi - lo || 1;
@@ -25035,7 +25044,7 @@ function v3ModelCac(a, b, ctx) {
       <table className="v3-rw">
         <thead><tr><th className="t-text">Campaign</th><th>Spend then</th><th>Spend now</th><th>Change</th><th>Cost per click now</th><th>Sales the platform claims, now</th></tr></thead>
         <tbody>{camps.map(c => (<tr key={c.platform + c.name}>
-          <td className="t-text v3-rw-name">{c.name} <span className="v3-muted">· {c.platform}</span></td>
+          <td className="t-text v3-rw-name">{c.name} <span className="v3-muted">{c.platform}</span></td>
           <td>{fmtMoney(c.then)}</td><td>{fmtMoney(c.now)}</td>
           <td className={c.now - c.then > 0 ? 'v3-down' : c.now - c.then < 0 ? 'v3-up' : ''}>{(c.now - c.then >= 0 ? '+' : '−') + fmtMoney(Math.abs(c.now - c.then))}</td>
           <td>{c.cpc != null ? v3Pence2(c.cpc) : '—'}</td><td>{c.buys != null && !isNaN(c.buys) ? fmtCount(c.buys) : '—'}</td></tr>))}</tbody>
@@ -25093,7 +25102,7 @@ function v3ModelLastYear(a, _b, ctx) {
     title: 'Sales against last year, 30 days to ' + v3Day(String(a.d), true), from: sl, to: s, better: 'higher', fmtV: v => fmtMoney(v), fmtAmt: v => fmtMoney(Math.abs(v)),
     startK: 'Last year', endK: 'This year', chartK: 'Sales against last year', colA: 'Same 30 days last year', colB: '30 days to ' + v3Day(String(a.d), true),
     parts: ok ? [
-      { amt: pNew, k: 'New customers', sub: fmtMoney(nwl) + ' to ' + fmtMoney(nw) + ' · ' + fmtCount(nl) + ' to ' + fmtCount(n) + ' people',
+      { amt: pNew, k: 'New customers', sub: fmtMoney(nwl) + ' to ' + fmtMoney(nw) + ', ' + fmtCount(nl) + ' to ' + fmtCount(n) + ' people',
         cause: <>new customers spent {v3UpDown(nwl, nw, 'more', 'less')} ({fmtMoney(nwl)} to {fmtMoney(nw)}; {fmtCount(nl)} to {fmtCount(n)} first-time buyers)</>,
         against: <>{v3UpDown(nwl, nw, 'More', 'Less')} spent by new customers ({fmtMoney(nwl)} to {fmtMoney(nw)})</> },
       { amt: pRet, k: 'Returning customers', sub: fmtMoney(sl - nwl) + ' to ' + fmtMoney(s - nw),
@@ -25359,10 +25368,10 @@ function v3ModelSpend(a, b, ctx) {
     todo: shown.filter(c => c.d >= 200).map(c => ({ amt: c.d, force: true, ids: ids(c) })),
     title: 'Where the ' + fmtMoney(B) + ' of ad spend went', from: A, to: B, better: 'lower', fmtV: v => fmtMoney(v), fmtAmt: v => fmtMoney(Math.abs(v)),
     startK: 'Ad spend', endK: 'Ad spend now', chartK: 'Ad spend', of: B >= A ? 'the rise' : 'the fall',
-    parts: shown.map(c => ({ amt: c.d, k: c.name, sub: c.platform + ' · ' + fmtMoney(c.then) + ' to ' + fmtMoney(c.now),
+    parts: shown.map(c => ({ amt: c.d, k: c.name, sub: c.platform + ', ' + fmtMoney(c.then) + ' to ' + fmtMoney(c.now),
       cause: <>“{c.name}” on {c.platform} went from {fmtMoney(c.then)} to {fmtMoney(c.now)}</>,
       against: <>{c.d < 0 ? 'Less' : 'More'} on “{c.name}” ({fmtMoney(c.then)} to {fmtMoney(c.now)})</> }))
-      .concat(Math.abs(tB - tA) >= 1 ? [{ amt: tB - tA, k: 'TikTok', sub: 'TikTok · ' + fmtMoney(tA) + ' to ' + fmtMoney(tB),
+      .concat(Math.abs(tB - tA) >= 1 ? [{ amt: tB - tA, k: 'TikTok', sub: 'TikTok, ' + fmtMoney(tA) + ' to ' + fmtMoney(tB),
         cause: <>TikTok went from {fmtMoney(tA)} to {fmtMoney(tB)}</>, against: <>{tB < tA ? 'Less' : 'More'} on TikTok ({fmtMoney(tA)} to {fmtMoney(tB)})</> }] : [])
       .concat(Math.abs(rest) >= 1 ? [{ amt: rest, k: 'Other campaigns', sub: 'under £50 each, and rounding', cause: <>smaller campaigns moved</>, against: <>Smaller campaigns</> }] : []),
     opening: <>Since the 30 days to {v3Day(String(a.d), true)}, ad spend went from {fmtMoney(A)} to {fmtMoney(B)}{na > 0 && nb > 0 ? <>, while new customers went from {fmtCount(na)} to {fmtCount(nb)}</> : null}.</>,
@@ -25708,7 +25717,7 @@ function V3MoneyBridge({ L, share }) {
   const rows = [
     { k: 'Sales', a: 0, b: sales, tone: 'sales', v: sales, fig: 'sales_30d' },
     { k: 'Products and delivery', a: sales - goods, b: sales, tone: 'cost', v: -goods, fig: 'costs_before_ads_30d' },
-    { k: share != null ? 'Ads · ' + v3Pence(share) + ' of each £1' : 'Ads', a: pa + other, b: sales - goods, tone: 'ads', v: -ads, fig: 'ads_30d' },
+    { k: share != null ? 'Ads, ' + v3Pence(share) + ' of each £1' : 'Ads', a: pa + other, b: sales - goods, tone: 'ads', v: -ads, fig: 'ads_30d' },
   ];
   if (other >= 1) rows.push({ k: 'Other marketing', a: pa, b: pa + other, tone: 'cost', v: -other, fig: 'other_marketing_30d' });
   // 30 Oct eval: profit after ads is the figure on every other page's strip (£61,844); Today showed it as a separate
@@ -25859,7 +25868,7 @@ function V3StaleSuggestions() {
   });
   const item = r => (<li key={r.external_id}>
     <span className="v3-rank-desc">{v3Sentence(String(r.description || r.external_id))}</span>
-    <span className="v3-sub"> · suggested {v3Day(String(r.raised_at).slice(0, 10), true)}</span>
+    <span className="v3-sub">, suggested {v3Day(String(r.raised_at).slice(0, 10), true)}</span>
     <V3MoveDecide row={r} small onDecided={q.retry}/>
   </li>);
   return (<V3More id="act-stale" label={'Older suggestions (' + rows.length + ')'}>
@@ -25871,7 +25880,7 @@ function V3StaleSuggestions() {
       const covered = i >= 0 ? <>Greta’s board covers this now: “{head(v3PlainAction(live[i]).title)}” (#{i + 1}). These can be skipped.</> : (t && t.note) || null;
       if (!t || (g.rows.length === 1 && !covered)) return g.rows.map(item);
       return (<li key={'g-' + t.k}>
-        <span className="v3-rank-desc"><b>{t.label}</b>{g.rows.length > 1 ? ' · ' + g.rows.length + ' similar suggestions' : ''}</span>
+        <span className="v3-rank-desc"><b>{t.label}</b>{g.rows.length > 1 ? ', ' + g.rows.length + ' similar suggestions' : ''}</span>
         {covered && <p className="micro muted v3-measure">{covered}</p>}
         <ul className="v3-rank-steps">{g.rows.map(item)}</ul>
       </li>);
@@ -26054,7 +26063,7 @@ function V3Congruency() {
   // "No: they moved apart … went from — to 2.73×" (Halden, 23 Oct): a verdict with nothing to compare.
   if (c.congruency === 'insufficient_history' || n(c.iroas_prior) == null || n(c.cm_prior) == null) {
     return (<p className="v3-note v3-measure v3-cong"><b>Do the ad figures and your profit agree?</b>{' '}
-      Not known yet. Greta compares them against a reading from at least 10 days earlier{c.latest_date ? ', and the first one is from ' + v3Day(String(c.latest_date)) : ''}.</p>);
+      Not known yet. They are compared against a reading from at least 10 days earlier{c.latest_date ? ', and the first one is from ' + v3Day(String(c.latest_date)) : ''}.</p>);
   }
   const ok = c.congruency === 'congruent';
   // The change, not the two levels: the snapshot's profit is worked on its own day and basis, and printed
@@ -26084,9 +26093,9 @@ const V3_PAGES = {
     <V3Anchor id="week"/><V3Review/>
     <V3DriverStrip keys={['profit', 'ly']}/>
     <V3Congruency/>
-    <V3More id="rev-quarter" label="This quarter — a summary to share with your board or investors"><V3Anchor id="quarter"/><BusinessReview/></V3More>
+    <V3More id="rev-quarter" label="This quarter, a summary to share with your board or investors"><V3Anchor id="quarter"/><BusinessReview/></V3More>
     <V3More id="rev-alerts" label="Findings"><V3Anchor id="alerts"/><V3Findings/>
-      <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('results')}>What was done, and whether it worked <span className="v3-xref-go">on Results →</span></button>
+      <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('results')}>What was done, and whether it worked <span className="v3-xref-go">on Results</span></button>
     </V3More>
   </>),
   actions: (p) => (<>
@@ -26101,7 +26110,7 @@ const V3_PAGES = {
   // 1113: the moves you took, what Greta expected and what happened; the older list folds underneath
   results: (p) => (<>
     <V3Results/>
-    <V3More id="res-all" label="Everything closed, with Greta’s older checks"><V3Anchor id="decisions"/><V3TrackRecord/></V3More>
+    <V3More id="res-all" label="All closed actions"><V3Anchor id="decisions"/><V3TrackRecord/></V3More>
   </>),
   calendar: (p) => (<><V3CalendarDrivers/>{mosView('Calendar')}</>),
   ask: (p) => <AskPanel/>,
@@ -26123,7 +26132,7 @@ const V3_PAGES = {
       <V3Anchor id="costs"/><V3ProductCosts/>
     </V3More>
     <V3More id="goal-econ" label="Cash, stock and supplier terms"><V3Anchor id="economics"/><BusinessEconomicsPanel/></V3More>
-    <V3More id="goal-ready" label="What Greta checks before planning"><GretaPlanPanel show="readiness"/></V3More>
+    <V3More id="goal-ready" label="Planning checks"><GretaPlanPanel show="readiness"/></V3More>
   </>),
   growth: (p) => (<>
     <V3Growth/>
@@ -26138,16 +26147,16 @@ const V3_PAGES = {
   stock: (p) => (<>
     {/* The server-side stock plan (vw_stock_demand_plan / fn_stock_gate): what runs out,
         when to reorder, how many, what it costs a day. Built into the embed and never
-        mounted until now — the page below still runs its own browser-side estimate. */}
+        mounted until now, the page below still runs its own browser-side estimate. */}
     {/* The server stock plan leads (V3Stock): what runs out before a restock could land, and
         where cash is sitting. The browser-side planner and the full table sit behind it. */}
     <V3Stock/>
     <V3StockOffer/>
     {/* The planner reads live stock (vw_sku_stock_cover) for every brand since 2026-10-02. A third
-        per-product list — the marketing-os "Every product" table, with its own status bands — sat
+        per-product list, the marketing-os "Every product" table, with its own status bands, sat
         here too and could disagree with both; removed. */}
     <V3More id="stock-plan" label="Advanced: plan orders to your own sales forecast">
-      <p className="v3-note v3-measure">The order list above is the one Greta prices and checks, and the one on your action board. This planner sizes orders to a sales forecast you set inside it, so its quantities differ. Purchase orders you mark as raised here are saved in this browser only, so other people and devices won’t see them. To send the list above to your supplier, use “Copy as a purchase order”.</p>
+      <p className="v3-note v3-measure">The order list above is the one that is priced and checked, and the one on Actions. This planner sizes orders to a sales forecast you set inside it, so its quantities differ. Purchase orders you mark as raised here are saved in this browser only, so other people and devices won’t see them. To send the list above to your supplier, use “Copy as a purchase order”.</p>
       <PlanningView/>
     </V3More>
     <V3More id="stock-suppliers" label="Suppliers"><V3Anchor id="suppliers"/><SuppliersDirectory/></V3More>
@@ -26498,7 +26507,7 @@ function v3WalkVs(X, key) {
   const b = P.ly.has_history ? v3WalkMove(v3WalkChg(P.cur[key], P.ly[key])) : null;
   if (a) bits.push(a + ' on ' + N.prev);
   if (b) bits.push(b + ' on ' + N.ly);
-  return bits.length ? ' — ' + bits.join(', and ') : '';
+  return bits.length ? ', ' + bits.join(', and ') : '';
 }
 // Is the move from last period normal for the time of year? Set it against the same move a year ago.
 function v3WalkSeason(X, key) {
@@ -26555,7 +26564,7 @@ const V3_WALK_STEP = {
     const sp = v3WalkChg(c.paid_spend, P.prev.paid_spend), sa = v3WalkChg(c.net_revenue, P.prev.net_revenue);
     if (sp != null && sa != null) {
       say.push('Ad spend went ' + v3WalkMove(sp) + ' while sales went ' + v3WalkMove(sa) + '.');
-      if (sp - sa > 0.1) say.push('Spend grew faster than the sales it brought in — that gap is what came off profit.');
+      if (sp - sa > 0.1) say.push('Spend grew faster than the sales it brought in: that gap came off profit.');
       else if (sa - sp > 0.1) say.push('Sales outgrew spend, which is the shape you want.');
     }
     const gaps = v3WalkGaps(X);
@@ -26568,7 +26577,7 @@ const V3_WALK_STEP = {
     const say = [fmtCount(c.new_orders) + ' new customers ordered in ' + X.N.cur + v3WalkVs(X, 'new_orders') + '.'];
     const s = v3WalkSeason(X, 'new_orders'); if (s) say.push(s);
     const tot = Number(c.new_revenue) + Number(c.returning_revenue);
-    if (tot > 0) say.push('Customers who had bought before brought in ' + v3Gbp(c.returning_revenue) + ' — ' + fmtPctN(c.returning_revenue / tot) + ' of sales' + v3WalkVs(X, 'returning_revenue') + '.');
+    if (tot > 0) say.push('Customers who had bought before brought in ' + v3Gbp(c.returning_revenue) + ', ' + fmtPctN(c.returning_revenue / tot) + ' of sales' + v3WalkVs(X, 'returning_revenue') + '.');
     return { say, tbl: [['New customers', 'new_orders', fmtCount, 'up'], ['Repeat orders', 'returning_orders', fmtCount, 'up'],
                         ['Sales from repeat customers', 'returning_revenue', v3Gbp, 'up']] };
   } },
@@ -26607,7 +26616,7 @@ const V3_WALK_STEP = {
     if (!sc.length) return { say: ['Greta has no ad channel with spend in the last 30 days to score.'] };
     const under = sc.filter(r => r.avg_iroas != null && r.break_even_iroas != null && Number(r.avg_iroas) < Number(r.break_even_iroas));
     const say = [under.length
-      ? under.length + ' of your ' + sc.length + ' ad channels are returning less than they need to break even — ' + under.map(r => v3ChanName(r.platform, r.channel_type)).join(', ') + '.'
+      ? under.length + ' of your ' + sc.length + ' ad channels are returning less than they need to break even, ' + under.map(r => v3ChanName(r.platform, r.channel_type)).join(', ') + '.'
       : 'All ' + sc.length + ' of your ad channels are returning at least what they need to break even.'];
     return { say, list: { head: ['Channel', 'Returns', 'Needs', 'Spend'], rows: sc.map(r => [v3ChanName(r.platform, r.channel_type),
       r.avg_iroas != null ? Number(r.avg_iroas).toFixed(2) + '×' : '—', r.break_even_iroas != null ? Number(r.break_even_iroas).toFixed(2) + '×' : '—',
@@ -26650,7 +26659,7 @@ const V3_WALK_STEP = {
       ? S.label + ': ' + v3Gbp(tot) + ', in stock that will not sell through soon.'
       : slow.length ? 'Some cash is sitting in stock that will not sell through soon, across ' + slow.length + ' products.' : 'No cash is tied up in slow stock.'];
     // not a registered figure: the top five's share of the list
-    if (slow.length) say.push('The top five hold ' + v3Gbp(slow.slice(0, 5).reduce((s, r) => s + Number(r.trapped_cash), 0)) + ' of it — a bundle, a feature or a gentle markdown frees it faster than waiting.');
+    if (slow.length) say.push('The top five hold ' + v3Gbp(slow.slice(0, 5).reduce((s, r) => s + Number(r.trapped_cash), 0)) + ' of it, a bundle, a feature or a gentle markdown frees it faster than waiting.');
     return { say, list: slow.length ? { head: ['Product', 'Weeks of cover', 'Cash held'], rows: slow.slice(0, 5).map(r => [v3WalkTitle(r.product_title),
       r.weeks_of_cover != null ? fmtCount(r.weeks_of_cover) : '—', v3Gbp(r.trapped_cash), null]) } : null };
   } },
@@ -26671,7 +26680,7 @@ const V3_WALK_STEP = {
     if (!pr.length) return { say: ['No product sales were recorded in ' + X.N.cur + '.'] };
     const top = pr.reduce((s, p) => s + Number(p.cur_rev), 0), all = Number(X.P.cur.net_revenue) || 0;
     const lead = pr[0], lm = v3WalkMove(v3WalkChg(lead.cur_rev, lead.prev_rev));
-    const say = ['Your five best sellers made ' + v3Gbp(top) + ' in ' + X.N.cur + (all > 0 ? ' — about ' + fmtPctN(Math.min(top / all, 1)) + ' of sales' : '') + '.',
+    const say = ['Your five best sellers made ' + v3Gbp(top) + ' in ' + X.N.cur + (all > 0 ? ', about ' + fmtPctN(Math.min(top / all, 1)) + ' of sales' : '') + '.',
       v3WalkTitle(lead.title) + ' led with ' + v3Gbp(lead.cur_rev) + (lm ? ', ' + lm + ' on ' + X.N.prev : '') + '.'];
     return { say, ptbl: pr };
   } },
@@ -26700,7 +26709,7 @@ const V3_WALK_STEP = {
     if (!r) return { loading: true };
     if (r.repeat_rate == null) return { say: ['Greta does not have enough order history to measure repeat buying yet.'] };
     const say = [fmtPctN(r.repeat_rate) + ' of your ' + fmtCount(r.customers) + ' customers have ordered more than once.'];
-    if (r.median_days_between_orders != null) say.push('The typical gap before a second order is ' + fmtCount(r.median_days_between_orders) + ' days — the window for a nudge.');
+    if (r.median_days_between_orders != null) say.push('The typical gap before a second order is ' + fmtCount(r.median_days_between_orders) + ' days, the window for a nudge.');
     if (r.repeat_rate_90d != null) say.push(fmtPctN(r.repeat_rate_90d) + ' come back within 90 days.');
     return { say, note: 'Across every customer you have had, not just ' + X.N.cur + ': repeat buying takes months to show.' };
   } },
@@ -26709,10 +26718,10 @@ const V3_WALK_STEP = {
     if (!X.P.ly.has_history) return { say: ['Greta needs a year of sales to tell new products from old ones.'] };
     if (!pr.length) return { say: ['None of your best sellers in ' + X.N.cur + ' is new since ' + X.N.ly + '.'] };
     const tot = pr.reduce((s, p) => s + Number(p.cur_rev), 0), all = Number(X.P.cur.net_revenue) || 0;
-    const say = [pr.length + ' of your best sellers in ' + X.N.cur + ' did not sell at all in ' + X.N.ly + ' — together ' + v3Gbp(tot)
+    const say = [pr.length + ' of your best sellers in ' + X.N.cur + ' did not sell at all in ' + X.N.ly + ', together ' + v3Gbp(tot)
       + (all > 0 ? ', ' + fmtPctN(Math.min(tot / all, 1)) + ' of sales' : '') + '.'];
     const slip = pr.filter(p => v3WalkChg(p.cur_rev, p.prev_rev) != null && v3WalkChg(p.cur_rev, p.prev_rev) < -0.2);
-    if (slip.length) say.push(slip.length + ' of them sold less than in ' + X.N.prev + ' — early fade, or stock running thin.');
+    if (slip.length) say.push(slip.length + ' of them sold less than in ' + X.N.prev + ', early fade, or stock running thin.');
     return { say, ptbl: pr.slice(0, 6) };
   } },
   adFit: { q: 'Which products can carry ad spend?', dest: 'products', cat: 'product', build: X => {
@@ -26723,7 +26732,7 @@ const V3_WALK_STEP = {
     if (!yes.length && !test.length && !no.length) return { say: ['Greta has not yet checked which products can pay back an ad on their own.'] };
     const say = ['Greta checked which products can pay back an ad on their own first order: ' + yes.length + ' can, '
       + test.length + (test.length === 1 ? ' is' : ' are') + ' worth a test with a holdout, and ' + no.length + ' cannot.',
-      'The ones that cannot still earn — as add-ons to a basket or as repeat buys — so sell them to customers you already have, not to cold audiences.'];
+      'The ones that cannot still earn, as add-ons to a basket or as repeat buys, so sell them to customers you already have, not to cold audiences.'];
     return { say, list: { head: ['Product', 'Ads', 'Sales'], rows: yes.slice(0, 3).map(r => [v3WalkTitle(r.title), 'Can carry ads', v3Gbp(r.revenue), 'good'])
       .concat(no.slice(0, 3).map(r => [v3WalkTitle(r.title), 'Not on ads', v3Gbp(r.revenue), 'bad'])) } };
   } },
@@ -26828,7 +26837,7 @@ function v3WalkMeansSales(X) {
     const top = br.slice().sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))[0];
     out.push('Split by where it came from: ' + br.map(x => x[0] + ' ' + v3WalkSigned(x[1])).join(', ') + '. The biggest part was ' + top[0] + '.');
   } else if (!c.ga_ok || !p.ga_ok) {
-    out.push('Greta cannot split this into visits and conversion for these periods — website tracking (GA4) was broken in part of them — so the orders and order value split is the one to trust.');
+    out.push('Greta cannot split this into visits and conversion for these periods, website tracking (GA4) was broken in part of them, so the orders and order value split is the one to trust.');
   }
   return out;
 }
@@ -26837,11 +26846,11 @@ function v3WalkMeansProfit(X) {
   if (!(c.net_revenue > 0) || X.cm == null) return out;
   const adShare = c.paid_spend / c.net_revenue, keep = c.cm_after_marketing / c.net_revenue;
   out.push('Out of every £1 of sales in ' + X.N.cur + ', your products kept ' + Math.round(X.cm * 100) + 'p, ads took ' + Math.round(adShare * 100)
-    + 'p, and the business kept ' + Math.round(keep * 100) + 'p — ' + v3Gbp(c.cm_after_marketing) + '.');
+    + 'p, and the business kept ' + Math.round(keep * 100) + 'p, ' + v3Gbp(c.cm_after_marketing) + '.');
   if (be && c.sales_per_ad_pound != null) out.push('Taking all sales against all ad spend, the business covers its ads while each £1 of ads is matched by at least £' + v3WalkDp(be, 2) + ' of sales. In ' + X.N.cur + ' it was £'
     + v3WalkDp(c.sales_per_ad_pound, 2) + (c.sales_per_ad_pound >= be
-      ? ' — covered, but that includes repeat and organic sales, so it does not show that every channel earns its spend.'
-      : ' — not covered: ad spend is costing more than all the sales it sits against.'));
+      ? ', covered, but that includes repeat and organic sales, so it does not show that every channel earns its spend.'
+      : ', not covered: ad spend is costing more than all the sales it sits against.'));
   if (p.has_history && p.cm_after_marketing != null) {
     // sales priced at the earlier period's margin; what is left over is the change in what each sale kept
     const rp = p.cm_ratio_window != null ? Number(p.cm_ratio_window) : X.cm;
@@ -26860,13 +26869,13 @@ function v3WalkMeansCustomers(X) {
       + v3Gbp(foc) + ' of profit before ads, so ' + (foc >= cac ? 'they pay for themselves on the first order.' : 'it takes about ' + v3WalkDp(cac / foc, 1) + ' orders to earn back what they cost.'));
   }
   if (ue && ue.ltv_contribution != null && ue.ltv_cac != null) out.push('Over ' + (ue.ltv_horizon_months || 12) + ' months the average customer earns you about ' + v3Gbp(ue.ltv_contribution)
-    + ' of profit — ' + v3WalkDp(ue.ltv_cac, 1) + '× what one costs to win today. ' + (ue.ltv_cac >= 3 ? 'That is healthy room to spend on growth.' : ue.ltv_cac >= 2 ? 'Workable, but there is little room to pay more for customers.' : 'That is thin: growth bought on ads barely pays back.'));
+    + ' of profit, ' + v3WalkDp(ue.ltv_cac, 1) + '× what one costs to win today. ' + (ue.ltv_cac >= 3 ? 'That is healthy room to spend on growth.' : ue.ltv_cac >= 2 ? 'Workable, but there is little room to pay more for customers.' : 'That is thin: growth bought on ads barely pays back.'));
   return out;
 }
 function v3WalkMeansEfficiency(X) {
   const c = X.P.cur, p = X.P.prev, out = [], be = v3WalkBreakEven(X);
   if (be && c.sales_per_ad_pound != null) out.push('At your margin the business needs £' + v3WalkDp(be, 2) + ' of sales for every £1 of ads just to cover them; ' + X.N.cur + ' ran at £' + v3WalkDp(c.sales_per_ad_pound, 2)
-    + (c.sales_per_ad_pound >= be ? '. That is all sales, repeat and organic included — whether each channel earns its own spend is the scoreboard\u2019s job.' : ', so ads cost more than all the sales they sit against.'));
+    + (c.sales_per_ad_pound >= be ? '. That is all sales, repeat and organic included, whether each channel earns its own spend is the scoreboard\u2019s job.' : ', so ads cost more than all the sales they sit against.'));
   if (p.has_history && c.paid_spend > 0 && p.paid_spend > 0) {
     const mc = c.new_revenue / c.paid_spend, mp = p.new_revenue / p.paid_spend;
     const vol = (c.paid_spend - p.paid_spend) * mp, eff = c.paid_spend * (mc - mp);
@@ -26880,7 +26889,7 @@ function v3WalkMeansStock(X) {
   const risk = rows.reduce((s, r) => s + (Number(r.cm_at_risk_before_resupply) || 0), 0);
   const perDay = rows.filter(r => Number(r.cm_at_risk_before_resupply) > 0).reduce((s, r) => s + (Number(r.lost_cm_per_day) || 0), 0);
   if (risk > 0 && c.cm_after_marketing > 0) out.push('The ' + v3Gbp(risk) + ' at risk is about ' + fmtPctN(risk / (c.cm_after_marketing * 30 / c.days)) + ' of a month’s profit after ads at ' + X.N.cur + '’s rate.');
-  if (perDay > 0) out.push('While they are out, each day costs about ' + v3Gbp(perDay) + ' of profit — and ad spend pointed at them keeps running.');
+  if (perDay > 0) out.push('While they are out, each day costs about ' + v3Gbp(perDay) + ' of profit, and ad spend pointed at them keeps running.');
   return out;
 }
 function v3WalkMeansCash(X) {
@@ -26896,7 +26905,7 @@ function v3WalkMeansLeaks(X) {
   out.push('A discount comes straight off profit. On ' + v3Gbp(gross) + ' of sales before codes in ' + X.N.cur + ', each point of discount is about ' + v3Gbp(gross * 0.01) + '.');
   if (p.has_history && p.discount_rate != null) {
     const d = c.discount_rate - p.discount_rate;
-    if (Math.abs(d) >= 0.005) out.push('Against ' + X.N.prev + ' the share taken by discount codes moved ' + (d > 0 ? 'up' : 'down') + ' ' + v3WalkDp(Math.abs(d) * 100, 1) + ' points — about ' + v3Gbp(Math.abs(d) * gross)
+    if (Math.abs(d) >= 0.005) out.push('Against ' + X.N.prev + ' the share taken by discount codes moved ' + (d > 0 ? 'up' : 'down') + ' ' + v3WalkDp(Math.abs(d) * 100, 1) + ' points, about ' + v3Gbp(Math.abs(d) * gross)
       + (d > 0 ? ' of profit given away.' : ' of profit kept.'));
   }
   if (c.return_rate != null && c.return_rate > 0) out.push('Refunds took ' + v3Gbp(c.return_rate * c.net_revenue) + ' back out of sales in ' + X.N.cur + '.');
@@ -26913,14 +26922,14 @@ function v3WalkMeansProducts(X) {
 function v3WalkMeansRetention(X) {
   const c = X.P.cur, ue = X.ue, out = [];
   const tot = Number(c.new_revenue) + Number(c.returning_revenue);
-  if (tot > 0) out.push('Repeat customers made ' + fmtPctN(c.returning_revenue / tot) + ' of sales in ' + X.N.cur + ' at no ad cost — every point of that is profit that did not have to be bought.');
-  if (ue && ue.payback_orders != null) out.push('A new customer pays back after about ' + v3WalkDp(ue.payback_orders, 1) + ' orders (today’s figure)' + (ue.payback_orders <= 2 ? ', so the second order is where the profit starts.' : ' — a slow payback, so retention is where the money is.'));
+  if (tot > 0) out.push('Repeat customers made ' + fmtPctN(c.returning_revenue / tot) + ' of sales in ' + X.N.cur + ' at no ad cost, every point of that is profit that did not have to be bought.');
+  if (ue && ue.payback_orders != null) out.push('A new customer pays back after about ' + v3WalkDp(ue.payback_orders, 1) + ' orders (today’s figure)' + (ue.payback_orders <= 2 ? ', so the second order is where the profit starts.' : ', a slow payback, so retention is where the money is.'));
   return out;
 }
 function v3WalkMeansAdFit(X) {
   const ue = X.ue, out = [];
   const c30 = X.cac30 && X.cac30.value;   // cac_30d: the figure Greta decides on (ue.cac is the 90-day one)
-  if (c30 != null) out.push('To win a customer on an ad, a product’s first order has to bring in at least ' + v3Gbp(c30) + ' of profit — the cost of a new customer, last 30 days. Below that, it belongs in baskets and emails, not in cold ads.');
+  if (c30 != null) out.push('To win a customer on an ad, a product’s first order has to bring in at least ' + v3Gbp(c30) + ' of profit, the cost of a new customer, last 30 days. Below that, it belongs in baskets and emails, not in cold ads.');
   return out;
 }
 // The chart each stop draws from the series, and what the panel it lights always shows.
@@ -27044,18 +27053,18 @@ function V3WalkWhy({ X, diag, focus }) {
     else if (d.spend_growth > 0.2 && d.value_growth < d.spend_growth / 2) checks.push('Spend went up ' + fmtPctN(d.spend_growth) + ' but the sales ' + plat + ' credits went up only ' + fmtPctN(d.value_growth)
       + ': the extra ' + v3Gbp(d.extra_spend) + ' brought in ' + v3Gbp(d.extra_value) + '. The extra budget bought pricier, less ready-to-buy clicks.');
     if (c.lost_to_rank != null && c.lost_to_budget != null) checks.push(c.lost_to_rank > c.lost_to_budget
-      ? 'It showed in ' + fmtPctN(c.impression_share) + ' of the auctions it could enter, losing ' + fmtPctN(c.lost_to_rank) + ' to ad rank and only ' + fmtPctN(c.lost_to_budget) + ' to budget — so more money will not buy more reach. Better bids, a sharper product feed and stronger assets would.'
-      : 'It lost ' + fmtPctN(c.lost_to_budget) + ' of its auctions to budget — reach is limited by spend, not by ad quality.');
+      ? 'It showed in ' + fmtPctN(c.impression_share) + ' of the auctions it could enter, losing ' + fmtPctN(c.lost_to_rank) + ' to ad rank and only ' + fmtPctN(c.lost_to_budget) + ' to budget, so more money will not buy more reach. Better bids, a sharper product feed and stronger assets would.'
+      : 'It lost ' + fmtPctN(c.lost_to_budget) + ' of its auctions to budget, reach is limited by spend, not by ad quality.');
     if (k.indexOf('facebook') === 0 && c.frequency != null && p.frequency != null && c.frequency > p.frequency * 1.15 && d.ctr < 0)
-      checks.push('The same people saw the ads ' + v3WalkDp(c.frequency, 1) + ' times on average, up from ' + v3WalkDp(p.frequency, 1) + ', while click-through fell — the creative is wearing out.');
+      checks.push('The same people saw the ads ' + v3WalkDp(c.frequency, 1) + ' times on average, up from ' + v3WalkDp(p.frequency, 1) + ', while click-through fell, the creative is wearing out.');
     if (c.atc_rate != null && p.atc_rate != null && c.atc_rate < p.atc_rate * 0.8)
-      checks.push('Fewer people who clicked added to basket (' + v3WalkPct(p.atc_rate) + ' → ' + v3WalkPct(c.atc_rate) + ') — the landing page or the offer is not landing.');
+      checks.push('Fewer people who clicked added to basket (' + v3WalkPct(p.atc_rate) + ' → ' + v3WalkPct(c.atc_rate) + '), the landing page or the offer is not landing.');
     if (k !== 'google_brand' && brand && brand.cur && brand.prev && brand.cur.has_detail && brand.prev.has_detail && brand.cur.cvr != null && brand.prev.cvr != null && brand.cur.cvr < brand.prev.cvr * 0.75)
-      checks.push('Even people searching for you by name converted less (' + v3WalkPct(brand.prev.cvr) + ' → ' + v3WalkPct(brand.cur.cvr) + '). They are the most ready-to-buy visitors you have, so part of this is the site, not the channel — check the open site fixes first.');
+      checks.push('Even people searching for you by name converted less (' + v3WalkPct(brand.prev.cvr) + ' → ' + v3WalkPct(brand.cur.cvr) + '). They are the most ready-to-buy visitors you have, so part of this is the site, not the channel, check the open site fixes first.');
     if (x.phi != null && x.phi_source !== 'measured') checks.push((Number(x.phi) < 1
-        ? 'Greta counts about ' + fmtPctN(x.phi) + ' of the sales ' + plat + ' claims as truly caused by these ads'
-        : 'Greta reckons these ads cause about ' + fmtPctN(x.phi - 1) + ' more sales than ' + plat + ' reports, because it misses some (other devices, later orders)')
-      + ' — a standard figure for this kind of campaign, not yet measured for you. So it needs about '
+        ? 'About ' + fmtPctN(x.phi) + ' of the sales ' + plat + ' claims are truly caused by these ads'
+        : 'These ads likely cause about ' + fmtPctN(x.phi - 1) + ' more sales than ' + plat + ' reports, because it misses some (other devices, later orders)')
+      + ', a standard figure for this kind of campaign, not yet measured for you. So it needs about '
       + v3WalkX(x.break_even_reported_roas) + ' in ' + plat + '’s own numbers to break even. A two-week holdout would measure it.');
     if (x.saturation_read === 'still scaling efficiently' && d.spend_growth > 0.2) checks.push('Over the longer run this platform has scaled well for you, so this looks like a recent problem with this campaign rather than a ceiling.');
     return (<div key={k} className="v3-why-ch">
@@ -27070,10 +27079,10 @@ function V3WalkWhy({ X, diag, focus }) {
           <span className={'v3-why-gbp ' + (t.gbp < 0 ? 'neg' : 'pos')}>{v3WalkSigned(t.gbp)}</span>
         </li>))}
       </ul>
-      {help.length > 0 && hurt.length > 0 && <p className="v3-note">{help.map(fromTo).join('; ').replace(/^./, s => s.toUpperCase())}, which helped — but not enough to cover the rest.</p>}
+      {help.length > 0 && hurt.length > 0 && <p className="v3-note">{help.map(fromTo).join('; ').replace(/^./, s => s.toUpperCase())}, which helped, but not enough to cover the rest.</p>}
       {checks.length > 0 && <ul className="v3-why-checks">{checks.map((s, i) => <li key={i}>{s}</li>)}</ul>}
       <p className="v3-note">{countChanged
-        ? 'The drivers are counted by ' + plat + ', and ' + plat + '’s count moved differently from your real orders this time — read them with the first point above in mind.'
+        ? 'The drivers are counted by ' + plat + ', and ' + plat + '’s count moved differently from your real orders this time, read them with the first point above in mind.'
         : 'The drivers are counted by ' + plat + '; the reasons are Greta’s reading of them.'}</p>
     </div>);
   })}</>);
@@ -27104,7 +27113,7 @@ const V3_WALK_TOUR = {
   channels: { dest: 'marketing', target: { sel: '.v3-score' },
     what: 'Read the tick before the bar: it is the return each channel needs to break even. Rows are ordered by spend, because falling short at £300 is not the same as at £6,000.' },
   creative: { dest: 'marketing', target: { sel: '.card', has: 'Which ads should I switch off?' }, fallback: { sel: '.v3-score' },
-    what: 'Ads whose last 28 days have broken down, against their own past or against your other ads, and what that money cost you — and whether moving it to the ads that are holding up would actually help.' },
+    what: 'Ads whose last 28 days have broken down, against their own past or against your other ads, and what that money cost you, and whether moving it to the ads that are holding up would actually help.' },
   stock: { dest: 'stock', target: { sel: '.v3-sec', has: 'What to order, product by product' }, fallback: { sel: '.v3-verdict' },
     what: 'Each row is a product: the solid bar is the days of stock left, the hatched part is days you would have nothing to sell before a new order could land. The longer the hatching, the more it costs you.' },
   reorder: { dest: 'stock', target: { sel: '.v3-sec', has: 'What to order, product by product' }, fallback: { sel: '.v3-verdict' },
@@ -27116,15 +27125,15 @@ const V3_WALK_TOUR = {
   topProducts: { dest: 'products', target: { sel: '.v3-ptable' },
     what: 'Your products ranked by sales over the last 28 days. The bar is size, the change column is against the 28 days before, and a "Low stock" tag means sales may be held back by stock rather than demand.' },
   movers: { dest: 'products', target: { sel: '.v3-movers' }, fallback: { sel: '.v3-ptable' },
-    what: 'What gained and lost the most in pounds. Before acting on a faller, check it against stock — a product that ran out looks exactly like one that stopped selling.' },
+    what: 'What gained and lost the most in pounds. Before acting on a faller, check it against stock, a product that ran out looks exactly like one that stopped selling.' },
   traffic: { dest: 'website', target: { sel: 'figure.v3-chart' }, fallback: { sel: '.v3-verdict' },
-    what: 'Your shop as a funnel — visits, product views, baskets, checkouts, orders — against a normal month. The stage that has slipped furthest is where buyers are being lost.' },
+    what: 'Your shop as a funnel, visits, product views, baskets, checkouts, orders, against a normal month. The stage that has slipped furthest is where buyers are being lost.' },
   retention: { dest: 'customers', target: { sel: 'figure.v3-chart', has: 'What a customer spends over time' }, fallback: { sel: '.v3-stat-grid' },
     what: 'How much the average customer has spent with you as the months go by after their first order. The steeper the early climb, the more a new customer is really worth.' },
   newProducts: { dest: 'products', target: { sel: '.v3-ptable' },
-    what: 'Your products ranked by sales. A change marked "New" had no sales in the period before — that is where launches show up first.' },
+    what: 'Your products ranked by sales. A change marked "New" had no sales in the period before, that is where launches show up first.' },
   adFit: { dest: 'products', target: { sel: '.v3-ptable' },
-    what: 'Not every product can win a new customer on an ad by itself. Greta checks each one: can its first order pay back what an ad costs, or does it earn its place as an add-on or a repeat buy?' },
+    what: 'Not every product can win a new customer on an ad by itself. Each one is checked: can its first order pay back what an ad costs, or does it earn its place as an add-on or a repeat buy?' },
 };
 Object.keys(V3_WALK_TOUR).forEach(k => { if (V3_WALK_STEP[k]) Object.assign(V3_WALK_STEP[k], V3_WALK_TOUR[k]); });
 // Stops that read today's state rather than the chosen periods, and stops whose lit panel already
@@ -27292,7 +27301,7 @@ function V3WalkRun({ w }) {
   const go = k => v3WalkSet({ step: k });
 
   if (w.min) return (<button type="button" className="v3-tour-resume" onClick={() => v3WalkSet({ min: false })}>
-    Resume walkthrough · stop {i + 1} of {steps.length}</button>);
+    Resume walkthrough, stop {i + 1} of {steps.length}</button>);
 
   const data = cmp.rows && !Array.isArray(cmp.rows) ? cmp.rows : null;
   const P = data && data.periods;
@@ -27316,7 +27325,7 @@ function V3WalkRun({ w }) {
   if (cmp.err) {
     says = <p className="v3-walk-say">{/fn_brand_period_compare|schema cache|does not exist/i.test(cmp.err)
       ? 'The comparisons for this walkthrough need a server update that has not been switched on yet. The tour of the page still works.'
-      : 'Greta couldn’t load the comparison just now.'}</p>;
+      : 'The comparison could not load just now.'}</p>;
   } else if (!X || (out && out.loading)) {
     says = <V3SkeletonRows n={2}/>;
   } else if (sid === 'end') {
@@ -27328,7 +27337,7 @@ function V3WalkRun({ w }) {
       <ul className="v3-walk-take">{take.map((t, k) => (<li key={k}><button type="button" className="v3-walk-link" onClick={() => go(k)}>{t[0]}</button><span>{t[1]}</span></li>))}</ul>
       {acts.length
         ? <V3WalkActs rows={acts} head="Do these, biggest £ first"/>
-        : <><p className="v3-note">{walk.cats && walk.cats.length === 0 ? 'Greta has no open actions about customers. The biggest ones overall:' : 'Nothing on the board belongs to this area right now. The biggest ones overall:'}</p>
+        : <><p className="v3-note">{walk.cats && walk.cats.length === 0 ? 'No open actions about customers. The biggest ones overall:' : 'Nothing on the board belongs to this area right now. The biggest ones overall:'}</p>
             <V3WalkActs rows={live.slice(0, 3)} head="The biggest actions overall"/></>}
       <div className="v3-btns">
         <button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={end}>Finish here</button>
@@ -27367,9 +27376,9 @@ function V3WalkRun({ w }) {
       style={pos.card ? { top: pos.card.top, left: pos.card.left, maxHeight: pos.card.max } : undefined}>
       {pos.card && pos.arrow != null && <i className={'v3-tour-arrow ' + (pos.mode === 'above' ? 'down' : 'up')} style={{ left: pos.arrow }} aria-hidden="true"/>}
       <div className="v3-tour-top">
-        <span className="v3-kick">{walk.label} · {i + 1} of {steps.length}</span>
+        <span className="v3-kick">{walk.label}, {i + 1} of {steps.length}</span>
         <div className="v3-seg v3-walk-h" role="group" aria-label="Compare over">
-          {V3_WALK_H.map(o => <button key={o.id} type="button" aria-pressed={o.id === h} title={o.label + ' — ' + o.sub + ', and against last year'}
+          {V3_WALK_H.map(o => <button key={o.id} type="button" aria-pressed={o.id === h} title={o.label + ', ' + o.sub + ', and against last year'}
             onClick={() => v3WalkSetHorizon(o.id)}>{o.short}</button>)}
         </div>
         <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => v3WalkSet({ min: true })}>Hide</button>
@@ -27377,15 +27386,15 @@ function V3WalkRun({ w }) {
       </div>
       <div className="v3-tour-body">
         <h2 className="v3-walk-q">{sid === 'end' ? 'What you learned, and what to do' : def.q}</h2>
-        {page && <p className="v3-tour-where">You are on <b>{page.label}</b> — it lives in the menu under {page.group}.</p>}
+        {page && <p className="v3-tour-where">You are on <b>{page.label}</b>, it lives in the menu under {page.group}.</p>}
         {pos.found === false
-          ? <p className="v3-note">This part of {page ? page.label : 'the page'} is not showing for your data yet, so there is nothing to point at — here is what Greta can tell you.</p>
+          ? <p className="v3-note">This part of {page ? page.label : 'the page'} is not showing for your data yet, so there is nothing to point at yet.</p>
           : def.what && <div className="v3-tour-sec"><div className="v3-tour-h">What you are looking at</div><p className="v3-walk-say">{def.what}</p>
               {X && sid !== 'end' && <p className="v3-tour-view">{follows
                 ? <>The page is now set to {X.N.cur}{V3_WALK_PANEL[sid] ? <>; this panel always shows {V3_WALK_PANEL[sid]}</> : null}.</>
                 : V3_WALK_PANEL[sid] ? <>This panel always shows {V3_WALK_PANEL[sid]}{view.chart ? '; the chart below follows your choice.' : '.'}</> : null}</p>}</div>}
         <div className="v3-tour-sec">
-          {sid !== 'end' && <div className="v3-tour-h">What it says{def.now ? ' · right now' : X ? ' · ' + X.N.line : ''}</div>}
+          {sid !== 'end' && <div className="v3-tour-h">What it says{def.now ? ', right now' : X ? ', ' + X.N.line : ''}</div>}
           {X && view.chart && !cmp.err && <V3WalkChart X={X} metric={view.chart}/>}
           {says}
         </div>
@@ -27393,7 +27402,7 @@ function V3WalkRun({ w }) {
           {means.map((m, k) => <p key={k} className="v3-walk-say">{m}</p>)}</div>}
         {X && view.why && <div className="v3-tour-sec">
           {h === 'year'
-            ? <p className="v3-walk-say">Campaign-level ad detail does not go back a full two years yet, so Greta can explain why a channel moved for a week, month or quarter, not a year.</p>
+            ? <p className="v3-walk-say">Campaign-level ad detail does not go back a full two years yet, so this can explain why a channel moved for a week, month or quarter, not a year.</p>
             : diag.err ? <p className="v3-note">Greta could not load the channel detail just now.</p>
             : <V3WalkWhy X={X} diag={diag.rows && !Array.isArray(diag.rows) ? diag.rows : null} focus={sid === 'efficiency'}/>}</div>}
         {stepActs.length > 0 && <V3WalkActs rows={stepActs} head="What to do about it"/>}
@@ -27532,7 +27541,7 @@ function V3YoungHero({ setup }) {
   const days = Number(setup.sales_days) || null;
   const noAds = !(Number(L.ads) > 0);
   return (<div className="v3-hero">
-    <div className="v3-hero-lab">Your first {days ? days + ' days' : 'days'} of sales{setup.sales_since ? ' · since ' + v3Day(setup.sales_since) : ''}</div>
+    <div className="v3-hero-lab">Your first {days ? days + ' days' : 'days'} of sales{setup.sales_since ? ', since ' + v3Day(setup.sales_since) : ''}</div>
     {L.profit_after_ads != null
       ? <div className="v3-big">{v3Gbp(L.profit_after_ads)}</div>
       : <div className="v3-big v3-big-muted">—</div>}
@@ -27803,7 +27812,7 @@ function App(){
               </div>
             ))}
             <div style={{flex:1}}/>
-            <div className="meta" style={{fontSize:'var(--text-xs)'}} title={D.meta.source}>{(D.meta.source||'').split('—')[0].trim()||'Live data'} · updated {D.meta.captured}</div>
+            <div className="meta" style={{fontSize:'var(--text-xs)'}} title={D.meta.source}>{(D.meta.source||'').split('—')[0].trim()||'Live data'}, updated {D.meta.captured}</div>
           </div>
         )}
 
@@ -27836,7 +27845,7 @@ function App(){
           <span>greta</span>
         </div>
         <span className="app-footer-dot"/>
-        <span title={D.meta.source}>{(OI_BRAND.name||'frkl')} workspace · {(D.meta.source||'').split('—')[0].trim()||'Live data'}</span>
+        <span title={D.meta.source}>{(OI_BRAND.name||'frkl')} workspace, {(D.meta.source||'').split('—')[0].trim()||'Live data'}</span>
         <span className="app-footer-dot"/>
         {D.meta.captured && <span>Updated {v3Stamp(D.meta.captured)}</span>}
         <div style={{flex:1}}/>
