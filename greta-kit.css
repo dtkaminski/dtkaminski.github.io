@@ -2279,3 +2279,24 @@ div:has(> .v3-profit) ~ .v3-today { gap: 0; }
   .v3-main .v3-review table.v3-profit-rows th.v3-mk-opt, .v3-main .v3-review table.v3-profit-rows td.v3-mk-opt { display: none; }
   .v3-review-sale { display: inline-block; margin-left: 0; }
 }
+/* Competitors */
+/* keeps a table's screen-reader labels inside its scroller, so they cannot widen the page */
+.v3-profit-scroll { position: relative; }
+.v3-comp-link { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; text-decoration: underline; text-decoration-color: var(--color-faint); cursor: pointer; }
+.v3-comp-link:hover, .v3-comp-link[aria-expanded="true"] { text-decoration-color: currentColor; }
+@media (max-width: 1199px) {
+  .v3-main .v3-competitors table.v3-profit-rows th.v3-comp-wide, .v3-main .v3-competitors table.v3-profit-rows td.v3-comp-wide { display: none; }
+  .v3-main .v3-competitors table.v3-profit-rows td:first-child { white-space: normal; }
+}
+.v3-competitors .v3-home-tile-k { min-height: 2lh; }
+.v3-mk-charts.v3-comp-one { grid-template-columns: 1fr; }
+.v3-comp-acts { display: flex; justify-content: flex-end; gap: var(--space-2); }
+.v3-main .v3-competitors table.v3-profit-rows td.v3-comp-found { white-space: normal; padding-top: var(--space-3); padding-bottom: var(--space-3); }
+.v3-comp-foot { border-top: 1px solid var(--color-line); }
+.v3-competitors .v3-panel-note + .v3-panel-note { border-top: 0; padding-top: 0; }
+@media (max-width: 767px) {
+  .v3-main .v3-competitors table.v3-profit-rows th:first-child, .v3-main .v3-competitors table.v3-profit-rows td:first-child { white-space: normal; min-width: 0; }
+  .v3-main .v3-competitors table.v3-profit-rows th.v3-mk-opt, .v3-main .v3-competitors table.v3-profit-rows td.v3-mk-opt { display: none; }
+  .v3-main .v3-competitors .v3-comp-add .v3-search { max-width: none; }
+  .v3-comp-acts { flex-wrap: wrap; }
+}
