@@ -2417,3 +2417,11 @@ div:has(> .v3-profit) ~ .v3-today { gap: 0; }
   .v3-main .v3-goal-page.v3-marketing table.v3-profit-rows { width: 100%; }
   .v3-main .v3-goal-page table.v3-goal-checks.v3-mk-off td:first-child { white-space: normal; font-weight: var(--weight-medium); }
 }
+
+/* Website's tabs (5 Nov) */
+.v3-web-tools { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2); margin-left: auto; }
+.v3-web-pick .recharts-wrapper { cursor: pointer; }
+.v3-flag.v3-flag-plain { background: var(--color-sunken); color: var(--color-muted); }
+.v3-website .v3-mk-ad-name { white-space: nowrap; }
+.v3-website .v3-mk-ad-name[aria-pressed="true"] { font-weight: var(--weight-semi); }
+.v3-website table.v3-profit-rows .v3-flag { margin-left: var(--space-2); }

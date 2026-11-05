@@ -20712,9 +20712,10 @@ const V3_FRICTION_NOUN = { ScriptErrorCount: 'JavaScript errors', ErrorClickCoun
 const V3_SITE_ACTS = ['site-', 'pulse-cro-fix-', 'diagnosis-cart_to_checkout', 'causal-revenue-move', 'tracking-'];   // anatomy_category_map, Site and conversion
 function V3Website({ start, period, customActive }) {
   const today = new Date().toISOString().slice(0, 10);
-  const loop = useV3Rows('web-loop-13', (sb, b) => sb.from('cache_funnel_loop')
-    .select('mo,stage_no,stage,metric,fmt,v,mu,sigma,potential,actual,leak')
-    .eq('brand_id', b).order('mo', { ascending: false }).order('stage_no', { ascending: true }).limit(80));
+  const loop = useV3Rows('web-loop-13', V3_WEB_LOOP_Q);
+  useV3SnapshotTick();   // scroll depth and active time come from the Clarity snapshot
+  const [upload, setUpload] = React.useState(false);
+  const [, setUploaded] = React.useState(0);
   const trk = useV3Rows('web-tracking', (sb, b) => sb.from('vw_brand_tracking_state')
     .select('source,state,broke_on,fixed_on,comparisons_clean_from,severity').eq('brand_id', b));
   // the shop's record of where orders came from: a separate break from Google Analytics'
@@ -20733,7 +20734,7 @@ function V3Website({ start, period, customActive }) {
   const mo = rows.length ? rows[0].mo : null;
   const raw = rows.filter(r => r.mo === mo).sort((a, b) => a.stage_no - b.stage_no);
   const cut = useV3Rows('web-cut-' + (mo || 'none'), (sb, b) => mo ? sb.from('cache_funnel_cut')
-    .select('dim,value,ctc_chg,is_thin,cut_rank').eq('brand_id', b).eq('mo', mo).eq('cut_rank', 1)
+    .select('dim,value,sessions,ctc_chg,is_thin,cut_rank').eq('brand_id', b).eq('mo', mo).eq('cut_rank', 1)
     .order('ctc_chg', { ascending: true, nullsFirst: false }).limit(5) : Promise.resolve({ data: [] }));
   const bd = useV3Board();
   const bm = useV3Rows('board-moves', V3_BOARD_MOVES_Q);
@@ -20800,9 +20801,12 @@ function V3Website({ start, period, customActive }) {
   const inSwing = !!(worst && !worst.merged && worst.fmt === 'rate' && Math.abs(Number(worst.sigma)) < 2);
   const lowestOf = s => { if (s.merged) return false; const vs = rows.filter(r => r.stage_no === s.stage_no).map(r => Number(r.v)); return vs.length >= 6 && Number(s.v) <= Math.min(...vs); };
   const shift = stages.find(s => s.merged);
-  const top = worst && worst.metric === 'cart to checkout' && !worst.merged ? ((cut.rows || []).filter(c => !c.is_thin && c.ctc_chg != null)[0] || null) : null;
+  // A group can rank first on spread and hold a sliver of the month's visits (Halden: 198 visits from one referrer of 361,000).
+  const monthVisits = Number((raw.find(r => /sessions/i.test(String(r.metric))) || {}).v) || 0;
+  const top = worst && worst.metric === 'cart to checkout' && !worst.merged ? ((cut.rows || []).filter(c => !c.is_thin && c.ctc_chg != null && Number(c.sessions) >= monthVisits * 0.05)[0] || null) : null;
 
   const C = now && now.cur, Pv = now && now.prev;
+  const CLS = (typeof window !== 'undefined' && window.FRKL_CLARITY) || null;
   const se = C ? C.fr.ScriptErrorCount : null;
   const rising = C && Pv ? V3_FRICTION.filter(([m]) => C.fr[m] != null && Pv.fr[m] != null && C.fr[m] >= Pv.fr[m] * 1.25 && C.fr[m] - Pv.fr[m] >= 0.005) : [];
 
@@ -20978,14 +20982,19 @@ function V3Website({ start, period, customActive }) {
         </>}
     </section>)}
 
-    {C && (<section className="v3-panel" aria-label="Site friction">
+    {upload && <ClarityUploadModal onClose={() => setUpload(false)} onSaved={() => setUploaded(t => t + 1)}/>}
+    {!C && !allFailed && !allWait && !cl.err && <V3ClarityNoSync onUpload={() => setUpload(true)}/>}
+    {C && (<section id="v3-friction" className="v3-panel" aria-label="Site friction">
       <div className="v3-panel-head"><h2>Site friction</h2><span className="v3-muted">Share of visits</span></div>
       <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
         <thead><tr><th>Measure</th><th className="r">{whenLabel}</th>{Pv && <th className="r">{!now.whole ? 'Period before' : Pv.n >= 2 ? 'Typical' : 'Before'}</th>}</tr></thead>
         <tbody>{V3_FRICTION.map(([m]) => { const up = rising.some(r => r[0] === m); return (<tr key={m}>
           <td>{V3_FRICTION_NOUN[m]}{up && <span className="v3-flag">Up</span>}</td>
           <td className={'r' + (up ? ' v3-down' : '')}>{C.fr[m] != null ? fmtPctN(C.fr[m]) : FMT_NONE}</td>
-          {Pv && <td className="r">{Pv.fr[m] != null ? fmtPctN(Pv.fr[m]) : FMT_NONE}</td>}</tr>); })}</tbody></table></div>
+          {Pv && <td className="r">{Pv.fr[m] != null ? fmtPctN(Pv.fr[m]) : FMT_NONE}</td>}</tr>); })}
+          {onFig && CLS && CLS.scrollDepth != null && <tr><td>Average scroll depth</td><td className="r">{fmtCount(CLS.scrollDepth)}%</td>{Pv && <td className="r">{FMT_NONE}</td>}</tr>}
+          {onFig && CLS && CLS.engagement && CLS.engagement.activePct != null && <tr><td>Time spent active</td><td className="r">{fmtPctN(CLS.engagement.activePct)}</td>{Pv && <td className="r">{FMT_NONE}</td>}</tr>}
+        </tbody></table></div>
     </section>)}
 
     {now && now.ws.length >= 2 && (<section className="v3-panel" aria-label="By period">
@@ -20995,6 +21004,261 @@ function V3Website({ start, period, customActive }) {
         <tbody>{now.ws.slice().reverse().map(w => (<tr key={w.e}><td>{v3Day(w.e, true)}</td><td className="r">{fmtCount(w.visits)}</td><td className="r">{fmtCount(w.orders)}</td><td className="r">{v3Per100(w.conv)}</td><td className="r v3-mk-opt">{w.mobile == null ? FMT_NONE : fmtPctN(w.mobile)}</td></tr>))}</tbody></table></div>
     </section>)}
   </div>);
+}
+
+// ── Website's tabs (5 Nov) ─────────────────────────────────────────────────────────────────────
+// Three folds became two tabs beside the overview. The date control only moves the overview: Conversion reads the
+// newest run of clean Google Analytics days, Visitor groups reads the last month with reliable tracking.
+const V3_WEB_TAB = { overview: 'overview', friction: 'overview', cvr: 'conversion', loop: 'groups' };
+const V3_WEB_FOLLOWS = { overview: true };
+const V3_WEB_LOOP_Q = (sb, b) => sb.from('cache_funnel_loop')
+  .select('mo,stage_no,stage,metric,fmt,v,mu,sigma,potential,actual,leak')
+  .eq('brand_id', b).order('mo', { ascending: false }).order('stage_no', { ascending: true }).limit(80);
+function V3WebsiteTabs({ start, period, customActive }) {
+  const [tab, pick, seen] = useV3PageTabs(V3_WEB_TAB, V3_WEB_FOLLOWS);
+  const TABS = [['overview', 'Overview'], ['conversion', 'Conversion'], ['groups', 'Visitor groups']];
+  return (<div className="v3-home v3-profit v3-marketing v3-website v3-goal-page">
+    <div className="v3-tabs v3-goal-tabs" role="tablist" aria-label="Website">
+      {TABS.map(t => <button key={t[0]} type="button" role="tab" aria-selected={tab === t[0]} className={'v3-tab' + (tab === t[0] ? ' on' : '')} onClick={() => pick(t[0])}>{t[1]}</button>)}
+    </div>
+    {seen.overview && <div role="tabpanel" hidden={tab !== 'overview'}><V3Website start={start} period={period} customActive={customActive}/></div>}
+    {seen.conversion && <div className="v3-home" role="tabpanel" hidden={tab !== 'conversion'}><V3WebConversion/></div>}
+    {seen.groups && <div className="v3-home" role="tabpanel" hidden={tab !== 'groups'}><V3WebGroups/></div>}
+  </div>);
+}
+// The snapshots (window.FRKL_*) land after first paint and announce themselves.
+function useV3SnapshotTick() {
+  const [, set] = React.useState(0);
+  React.useEffect(() => { const on = () => set(t => t + 1); window.addEventListener('frkl-data-updated', on); return () => window.removeEventListener('frkl-data-updated', on); }, []);
+}
+// No Clarity sync: the way to connect it, the way to upload its headline figures, and those figures once uploaded.
+function V3ClarityNoSync({ onUpload }) {
+  const M = clarityManualGet(), f = (M && M.friction) || {};
+  const rows = !M ? [] : [
+    ['JavaScript errors', f.scriptError && f.scriptError.pct], ['Clicks on something broken', f.errorClick && f.errorClick.pct], ['Clicks that did nothing', f.deadClick && f.deadClick.pct],
+    ['Average scroll depth', M.scrollDepth], ['Time spent active', M.engagement && M.engagement.activePct != null ? M.engagement.activePct * 100 : null],
+  ].filter(r => r[1] != null);
+  return (<section id="v3-friction" className="v3-panel" aria-label="Site friction">
+    <div className="v3-panel-head"><h2>Site friction</h2>{M && <span className="v3-muted">Uploaded {M.asOf ? v3Day(M.asOf, true) : ''}</span>}
+      <button type="button" className="v3-panel-link" onClick={onUpload}>{M ? 'Replace upload' : 'Upload figures'}</button></div>
+    {rows.length > 0 && <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+      <thead><tr><th>Measure</th><th className="r">Share of visits</th></tr></thead>
+      <tbody>{rows.map(r => <tr key={r[0]}><td>{r[0]}</td><td className="r">{v3Dp1Num(r[1])}%</td></tr>)}</tbody></table></div>}
+    <p className="v3-panel-note">{M ? 'Uploaded figures stay in this browser.' : 'Microsoft Clarity is not connected. Connect it on Connections & data, or upload its headline figures. Uploaded figures stay in this browser.'}</p>
+  </section>);
+}
+
+const v3PctD1 = v => (fmtOk(v) ? v3Dp1Num(Number(v) * 100) + '%' : FMT_NONE);
+const v3Signed = (d, txt) => (d >= 0 ? '+' : '−') + txt;
+function v3WeekOf(iso) { const d = new Date(iso + 'T00:00:00Z'), wd = (d.getUTCDay() + 6) % 7; d.setUTCDate(d.getUTCDate() - wd); return d.toISOString().slice(0, 10); }
+// One stretch of days. Finishing checkout is the shop's orders against checkouts started, the basis Site steps uses:
+// Google Analytics counts fewer purchases than the shop, so its own rate ran lower under the same name.
+function v3CvrAgg(list, w) {
+  const sum = k => list.reduce((a, d) => a + (Number(d[k]) || 0), 0);
+  const s = sum('sessions'), o = sum('orders'), a = sum('atc'), c = sum('checkouts');
+  const wavg = k => { let n = 0, t = 0; list.forEach(d => { if (d[k] != null && d.sessions) { n += d.sessions; t += d.sessions * Number(d[k]); } }); return n ? t / n / 100 : null; };
+  let aovN = 0, aovT = 0; list.forEach(d => { if (d.aov != null && d.orders) { aovN += d.orders; aovT += d.orders * Number(d.aov); } });
+  return { w, sessions: s, orders: o, cvr: s ? o / s : null, add: s ? a / s : null, start: a ? c / a : null, finish: c && o <= c ? o / c : null,
+    aov: aovN ? aovT / aovN : null, newS: wavg('newShare'), paid: wavg('paidShare'), email: wavg('emailShare'), organic: wavg('organicShare'), bounce: wavg('bounce') };
+}
+const V3_CMP_ROWS = [['Visits', 'sessions', 'n'], ['Orders', 'orders', 'n'], ['Orders per 100 visits', 'cvr', 'r'], ['Adding to the basket', 'add', 'p'], ['Starting checkout', 'start', 'p'], ['Finishing checkout', 'finish', 'p'],
+  ['Average order', 'aov', 'g'], ['New visitors', 'newS', 'p'], ['Paid visits', 'paid', 'p'], ['Email visits', 'email', 'p'], ['Organic visits', 'organic', 'p'], ['Left straight away', 'bounce', 'p']];
+const v3CmpVal = (t, v) => (v == null ? FMT_NONE : t === 'n' ? fmtCount(v) : t === 'r' ? v3Per100(v) : t === 'p' ? v3PctD1(v) : v3AdGbp2(v));
+function v3CmpGap(t, a, b) {
+  if (a == null || b == null) return FMT_NONE;
+  const d = b - a, abs = Math.abs(d);
+  if (t === 'n') return a ? v3Signed(d, v3Dp1Num(abs / a * 100) + '%') : FMT_NONE;
+  if (t === 'r') { const x = Math.round(b * 10000) - Math.round(a * 10000); return x === 0 ? '0.00' : v3Signed(x, v3Fix2(Math.abs(x) / 100)); }
+  if (t === 'p') { const x = Math.round(b * 1000) - Math.round(a * 1000); return x === 0 ? '0.0 pts' : v3Signed(x, v3Dp1Num(Math.abs(x) / 10) + ' pts'); }
+  return v3Signed(d, v3AdGbp2(abs));
+}
+// The clearest pair: similar traffic, the biggest gap in the rate.
+function v3CmpDefault(rows) {
+  let best = null;
+  for (let i = 0; i < rows.length; i++) for (let j = i + 1; j < rows.length; j++) { const A = rows[i], B = rows[j], lo = Math.min(A.sessions, B.sessions), hi = Math.max(A.sessions, B.sessions);
+    if (hi <= 0 || lo / hi < 0.75 || A.cvr == null || B.cvr == null) continue; const gap = Math.abs(A.cvr - B.cvr); if (!best || gap > best.gap) best = { a: A.w, b: B.w, gap }; }
+  if (!best && rows.length >= 2) best = { a: rows[rows.length - 2].w, b: rows[rows.length - 1].w };
+  return best ? { a: best.a, b: best.b } : { a: null, b: null };
+}
+
+function V3WebConversion() {
+  useV3SnapshotTick();
+  const [late, setLate] = React.useState(false);
+  React.useEffect(() => { const t = setTimeout(() => setLate(true), 25000); return () => clearTimeout(t); }, []);
+  const [grain, setGrain] = React.useState('week');
+  const [sel, setSel] = React.useState(null);   // null is the clearest pair; a click replaces it
+  const [allRows, setAllRows] = React.useState(false);
+  const D = (typeof window !== 'undefined' && window.FRKL_CVR) || null;
+  const M = D && D.meta;
+  const ok = !!(M && !M.insufficient);
+  const days = ok ? (D.seriesDaily || []) : null;
+  const R_ = React.useMemo(() => {
+    if (!days || days.length < 2) return null;
+    const n = Math.min(28, Math.floor(days.length / 2));
+    const now = v3CvrAgg(days.slice(-n)), prev = v3CvrAgg(days.slice(-2 * n, -n));
+    const by = {}; days.forEach(d => { const w = v3WeekOf(d.w); (by[w] = by[w] || []).push(d); });
+    const weeks = Object.keys(by).sort().filter(w => by[w].length === 7).map(w => v3CvrAgg(by[w], w));
+    const daily = days.map(d => v3CvrAgg([d], d.w));
+    return { n, now, prev, weeks, daily };
+  }, [days]);
+  const rows = R_ ? (grain === 'week' ? R_.weeks : R_.daily) : [];
+  const pair = sel || v3CmpDefault(rows);
+  const pick = w => setSel(() => { const p = pair; return p.a === w ? { a: null, b: p.b } : p.b === w ? { a: p.a, b: null } : !p.a ? { a: w, b: p.b } : !p.b ? { a: p.a, b: w } : { a: w, b: null }; });
+  const setG = g => { setGrain(g); setSel(null); setAllRows(false); };
+
+  if (!D) return (<section className="v3-panel" aria-label="Conversion">
+    {late || (window.FRKL_LIVE && window.FRKL_LIVE.liveSnapshots) ? <p className="v3-panel-note">Conversion figures could not load. Refresh the page to try again.</p> : <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={3}/></div>}
+  </section>);
+  if (!ok || !R_) return (<section className="v3-panel" aria-label="Conversion">
+    <p className="v3-panel-note">{M && M.days ? 'This needs 21 days of reliable Google Analytics. There are ' + fmtCount(M.days) + ' so far' + (M.lo ? ', since ' + v3Day(M.lo, true) : '') + '.' : 'These figures come from Google Analytics. Connect it on Connections & data.'}</p>
+  </section>);
+
+  const { n, now, prev, weeks } = R_;
+  const stepTile = (k, key, pts) => { const a = now[key], b = prev[key], ch = a != null && b != null ? a - b : null, dir = ch == null || Math.abs(ch) < 0.0005 ? 'flat' : ch > 0 ? 'up' : 'down';
+    return <V3HomeTile key={k} k={k} v={v3PctD1(a)} dir={dir} cls={dir === 'flat' ? '' : dir === 'up' ? 'v3-up' : 'v3-down'} delta={ch == null ? '' : v3PtsAmt(ch)} pts={pts}/>; };
+  const steps = [['Adding to the basket', 'add'], ['Starting checkout', 'start'], ['Finishing checkout', 'finish']].map(([k, key]) => ({ k, ln: now[key] > 0 && prev[key] > 0 ? Math.abs(Math.log(now[key] / prev[key])) : 0 }));
+  const lnT = steps.reduce((a, x) => a + x.ln, 0), lead = steps.slice().sort((x, y) => y.ln - x.ln)[0];
+  const wser = k => weeks.map(w => w[k]);
+
+  const A = rows.find(r => r.w === pair.a) || null, B = rows.find(r => r.w === pair.b) || null;
+  const unit = grain === 'week' ? 'week' : 'day';
+  const sig = A && B ? twoPropZ(A.orders, A.sessions, B.orders, B.sessions) : null;
+  const cmpRows = !(A && B) ? [] : V3_CMP_ROWS.filter(c => A[c[1]] != null || B[c[1]] != null);
+  const relOf = c => { const a = A[c[1]], b = B[c[1]]; if (a == null || b == null) return 0; const m = (Math.abs(a) + Math.abs(b)) / 2; return m ? Math.abs(b - a) / m : 0; };
+  const big = new Set(cmpRows.filter(c => relOf(c) >= 0.12).sort((x, y) => relOf(y) - relOf(x)).slice(0, 3).map(c => c[1]));
+  const data = rows.map(r => ({ ...r, c100: r.cvr != null ? Math.round(r.cvr * 10000) / 100 : null }));
+  const ctip = ({ active, payload }) => { if (!active || !payload || !payload.length) return null; const p = payload[0].payload;
+    return (<div className="v3-tip"><b>{(grain === 'week' ? 'Week of ' : '') + v3Day(p.w, true)}</b><span>Visits <em>{fmtCount(p.sessions)}</em></span><span>Orders <em>{fmtCount(p.orders)}</em></span><span>Orders per 100 visits <em>{v3Per100(p.cvr)}</em></span></div>); };
+  const onChart = st => { if (st && st.activeLabel != null) pick(st.activeLabel); };
+  const mark = (w, l) => (w && rows.some(r => r.w === w) ? <R.ReferenceLine x={w} stroke={PAL.ink || PAL.muted} strokeWidth={2} label={{ value: l, position: 'top', fill: PAL.muted, className: 'v3-bar-label' }}/> : null);
+  const pins = grain === 'week' ? buildChartPins(rows.map(r => r.w)) : [];
+  const list = rows.slice().reverse();
+  const shown = allRows || grain === 'week' ? list : list.slice(0, 14);
+  const chs = D.channels || [];
+  const chgCls = d => (Math.abs(d) < 0.005 ? '' : d < 0 ? 'v3-down' : 'v3-up');
+
+  return (<>
+    <section className="v3-panel v3-home-strip v3-mk-strip" aria-label="Conversion figures">
+      <div className="v3-home-group" style={{ '--n': 5 }}>
+        <div className="v3-home-group-h">Last {n} days<span>against the {n} before</span></div>
+        <div className="v3-home-tiles">
+          {v3TileAgainst('Orders per 100 visits', now.cvr, prev.cvr, true, wser('cvr'), v3Per100)}
+          {stepTile('Adding to the basket', 'add', wser('add'))}
+          {stepTile('Starting checkout', 'start', wser('start'))}
+          {stepTile('Finishing checkout', 'finish', wser('finish'))}
+          {lnT > 0 && <V3HomeTile key="lead" k="Biggest change" v={fmtPctN(lead.ln / lnT)} delta={lead.k} title="This step's share of the movement across the three steps"/>}
+        </div></div>
+    </section>
+
+    <section className="v3-panel" aria-label={'Compare two ' + unit + 's'}>
+      <div className="v3-panel-head"><h2>Compare two {unit}s</h2>
+        <div className="v3-web-tools">
+          <div className="v3-seg" role="group" aria-label="Weeks or days">
+            <button type="button" aria-pressed={grain === 'week'} onClick={() => setG('week')}>Weeks</button>
+            <button type="button" aria-pressed={grain === 'day'} onClick={() => setG('day')}>Days</button></div>
+          <button type="button" className="v3-btn v3-btn-sm" onClick={() => setSel(null)}>Biggest gap</button>
+        </div></div>
+      {rows.length < 2 ? <p className="v3-panel-note">Comparing needs two whole weeks of clean tracking. Days are available above.</p> : <>
+        <div className="v3-panel-pad v3-mk-charts v3-web-pick">
+          <figure className="v3-chart" aria-label="Orders per 100 visits"><figcaption><span className="v3-chart-title">Orders per 100 visits</span></figcaption>
+            <R.ResponsiveContainer width="100%" height={240}>
+              <R.ComposedChart data={data} margin={{ top: 20, right: 8, left: 0, bottom: 0 }} onClick={onChart}>
+                <R.CartesianGrid/><R.XAxis dataKey="w" tickFormatter={w => v3Day(w)} interval="preserveStartEnd"/><R.YAxis domain={[0, 'auto']} tickFormatter={v3Fix2}/>
+                <R.Tooltip content={ctip} cursor={false}/>
+                {pins.map((p, i) => <R.ReferenceLine key={'pin' + i} x={p.x} stroke={PAL.muted} strokeDasharray="3 3" strokeOpacity={0.55} label={<PinMarker tone={p.tone} n={p.n} tip={p.tip}/>}/>)}
+                <R.Line dataKey="c100" type="linear" stroke={PAL.site} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
+                {mark(pair.a, 'A')}{mark(pair.b, 'B')}
+              </R.ComposedChart>
+            </R.ResponsiveContainer></figure>
+          <figure className="v3-chart" aria-label="Visits"><figcaption><span className="v3-chart-title">Visits</span></figcaption>
+            <R.ResponsiveContainer width="100%" height={240}>
+              <R.BarChart data={data} margin={{ top: 20, right: 8, left: 0, bottom: 0 }} onClick={onChart}>
+                <R.CartesianGrid/><R.XAxis dataKey="w" tickFormatter={w => v3Day(w)} interval="preserveStartEnd"/><R.YAxis tickFormatter={v3CountK}/>
+                <R.Tooltip content={ctip} cursor={false}/>
+                <R.Bar dataKey="sessions" isAnimationActive={false}>{data.map(d => <R.Cell key={d.w} fill={d.w === pair.a || d.w === pair.b ? PAL.site : PAL.neutral}/>)}</R.Bar>
+              </R.BarChart>
+            </R.ResponsiveContainer></figure>
+        </div>
+        {A && B ? <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+          <thead><tr><th>Measure</th><th className="r">A, {v3Day(A.w)}</th><th className="r">B, {v3Day(B.w)}</th><th className="r">B against A</th></tr></thead>
+          <tbody>{cmpRows.map(c => (<tr key={c[1]}><td>{c[0]}{big.has(c[1]) && <span className="v3-flag v3-flag-plain">Big gap</span>}</td><td className="r">{v3CmpVal(c[2], A[c[1]])}</td><td className="r">{v3CmpVal(c[2], B[c[1]])}</td><td className="r">{v3CmpGap(c[2], A[c[1]], B[c[1]])}</td></tr>))}</tbody>
+        </table></div> : <p className="v3-panel-note">Pick two {unit}s on a chart or in the table below.</p>}
+        <p className="v3-panel-note">{sig ? (sig.p < 0.05 ? 'The gap in orders per 100 visits is unlikely to be chance. ' : 'The gap in orders per 100 visits could be chance. ') : ''}Visits here are Google Analytics’ count, so this rate differs from the overview’s, which uses Microsoft Clarity’s.</p>
+      </>}
+    </section>
+
+    {chs.length > 0 && <section className="v3-panel" aria-label="Channels">
+      <div className="v3-panel-head"><h2>Channels</h2><span className="v3-count">{chs.length}</span><span className="v3-muted">Last {n} days against the {n} before</span></div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+        <thead><tr><th>Channel</th><th className="r">Visits</th><th className="r">Share before</th><th className="r">Share now</th><th className="r">Purchases per 100 before</th><th className="r">Now</th><th className="r">Change</th></tr></thead>
+        <tbody>{chs.map(c => { const d = Number(c.cvrNow) - Number(c.cvrPrev); return (<tr key={c.name}><td>{c.name}</td><td className="r">{fmtCount(c.sessions)}</td><td className="r">{v3Dp1Num(c.sharePrev)}%</td><td className="r">{v3Dp1Num(c.shareNow)}%</td>
+          <td className="r">{v3Fix2(c.cvrPrev)}</td><td className="r">{v3Fix2(c.cvrNow)}</td><td className={'r ' + chgCls(d)}>{v3Signed(d, v3Fix2(Math.abs(d)))}</td></tr>); })}
+          <tr className="tot"><td>All channels</td><td className="r"/><td className="r"/><td className="r"/><td className="r">{v3Fix2(M.cvrPrev)}</td><td className="r">{v3Fix2(M.cvrNow)}</td><td className={'r ' + chgCls(Number(M.deltaCVR))}>{v3Signed(Number(M.deltaCVR), v3Fix2(Math.abs(Number(M.deltaCVR))))}</td></tr>
+        </tbody></table></div>
+      <p className="v3-panel-note">Purchases here are Google Analytics’ count, the only one split by channel, and it runs lower than your shop’s orders. The mix of visitors moved the rate by {v3Signed(Number(M.mixEffect), v3Fix2(Math.abs(Number(M.mixEffect))))} and each channel’s own rate by {v3Signed(Number(M.rateEffect), v3Fix2(Math.abs(Number(M.rateEffect))))}.{(now.cvr - prev.cvr) * Number(M.deltaCVR) < 0 ? ' Over these days your shop’s rate went ' + (now.cvr > prev.cvr ? 'up' : 'down') + ' while this one went ' + (Number(M.deltaCVR) < 0 ? 'down' : 'up') + ', so the two counts have drifted apart.' : ''}</p>
+    </section>}
+
+    {list.length > 0 && <section className="v3-panel" aria-label={grain === 'week' ? 'By week' : 'By day'}>
+      <div className="v3-panel-head"><h2>{grain === 'week' ? 'By week' : 'By day'}</h2><span className="v3-count">{list.length}</span><span className="v3-muted">{grain === 'week' ? 'Whole weeks, newest first' : 'Newest first'}</span>
+        {grain === 'day' && list.length > 14 && <button type="button" className="v3-panel-link" onClick={() => setAllRows(v => !v)}>{allRows ? 'Show fewer' : 'Show all ' + list.length}</button>}</div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+        <thead><tr><th>{grain === 'week' ? 'Week of' : 'Day'}</th><th className="r">Visits</th><th className="r">Orders</th><th className="r">Orders per 100 visits</th><th className="r">Adding to the basket</th><th className="r">Starting checkout</th><th className="r">Finishing checkout</th></tr></thead>
+        <tbody>{shown.map(r => (<tr key={r.w}><td><button type="button" className="v3-mk-ad-name" aria-pressed={r.w === pair.a || r.w === pair.b} onClick={() => pick(r.w)}>{v3Day(r.w)}</button>{r.w === pair.a && <span className="v3-flag v3-flag-plain">A</span>}{r.w === pair.b && <span className="v3-flag v3-flag-plain">B</span>}</td>
+          <td className="r">{fmtCount(r.sessions)}</td><td className="r">{fmtCount(r.orders)}</td><td className="r">{v3Per100(r.cvr)}</td><td className="r">{v3PctD1(r.add)}</td><td className="r">{v3PctD1(r.start)}</td><td className="r">{v3PctD1(r.finish)}</td></tr>))}</tbody>
+      </table></div>
+    </section>}
+  </>);
+}
+
+const V3_GROUP_DIMS = [['landing', 'Landing page'], ['device', 'Device'], ['country', 'Country'], ['source_medium', 'Source']];
+function V3WebGroups() {
+  const loop = useV3Rows('web-loop-13', V3_WEB_LOOP_Q);
+  const mo = loop.rows && loop.rows.length ? loop.rows[0].mo : null;
+  const cuts = useV3Rows('web-cuts-' + (mo || 'none'), (sb, b) => mo ? sb.from('cache_funnel_cut')
+    .select('dim,value,sessions,prev_ctc,cur_ctc,ctc_chg,prev_atc,cur_atc,is_thin,ctc_dispersion').eq('brand_id', b).eq('mo', mo).order('sessions', { ascending: false }).limit(200) : Promise.resolve({ data: [] }));
+  const waiting = (!loop.rows && !loop.err) || (mo && !cuts.rows && !cuts.err);
+  const failed = loop.err || cuts.err;
+  const all = cuts.rows || [];
+  if (waiting || failed || !all.length) return (<section className="v3-panel" aria-label="Visitor groups">
+    {failed ? <div className="v3-panel-pad"><V3LoadFailed what="Visitor groups" onRetry={() => { loop.retry(); cuts.retry(); }}/></div>
+      : waiting ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={3}/></div>
+      : <p className="v3-panel-note">Groups show once two months of site tracking are on file.</p>}
+  </section>);
+  const prevMo = (() => { const d = new Date(String(mo).slice(0, 7) + '-01T00:00:00Z'); d.setUTCMonth(d.getUTCMonth() - 1); return d.toISOString().slice(0, 10); })();
+  const curN = v3Month(mo), prevN = v3Month(prevMo);
+  const of = dim => all.filter(r => r.dim === dim).sort((a, b) => Number(b.sessions) - Number(a.sessions));
+  const split = (of('device').length ? of('device') : of('country')).reduce((a, r) => a + (Number(r.sessions) || 0), 0);
+  const stageVisits = Number(((loop.rows || []).find(r => r.mo === mo && /sessions/i.test(String(r.metric))) || {}).v) || 0;
+  const total = stageVisits || split;
+  const name = r => (r.value === '/' ? 'Home page' : r.dim === 'device' ? v3Sentence(r.value) : r.value);
+  const tiles = [];
+  if (total) tiles.push(<V3HomeTile key="v" k="Visits" v={fmtCount(total)}/>);
+  [['device', 'Main device'], ['country', 'Main country'], ['landing', 'Main landing page']].forEach(([d, k]) => { const r = of(d)[0]; if (r && total) tiles.push(<V3HomeTile key={d} k={k} v={fmtPctN(Number(r.sessions) / (split || total))} delta={name(r)}/>); });
+  return (<>
+    {tiles.length > 0 && <section className="v3-panel v3-home-strip v3-mk-strip" aria-label="Visitor group figures">
+      <div className="v3-home-group" style={{ '--n': tiles.length }}>
+        <div className="v3-home-group-h">{v3Month(mo, 'long')}<span>last month with reliable tracking</span></div>
+        <div className="v3-home-tiles">{tiles}</div></div>
+    </section>}
+    {V3_GROUP_DIMS.map(([dim, label]) => { const rows = of(dim); if (!rows.length) return null;
+      const disp = Number(rows[0].ctc_dispersion), uneven = fmtOk(rows[0].ctc_dispersion) && disp >= 0.05;
+      const sum = rows.reduce((a, r) => a + (Number(r.sessions) || 0), 0), part = total > 0 && sum < total * 0.5;
+      return (<section key={dim} className="v3-panel" aria-label={label}>
+        <div className="v3-panel-head"><h2>{label}</h2><span className="v3-count">{rows.length}</span>
+          {!part && fmtOk(rows[0].ctc_dispersion) && <span className={'v3-pill ' + (uneven ? 'v3-pill-warn' : '')} title="How far the groups' change in starting checkout sits apart">{uneven ? 'Uneven' : 'Even'}</span>}</div>
+        <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+          <thead><tr><th>Group</th><th className="r">Visits</th><th className="r">Basket, {prevN}</th><th className="r">Basket, {curN}</th><th className="r">Checkout, {prevN}</th><th className="r">Checkout, {curN}</th><th className="r">Checkout change</th></tr></thead>
+          <tbody>{rows.map(r => { const c = fmtOk(r.ctc_chg) ? Number(r.ctc_chg) : null; return (<tr key={r.value}>
+            <td className="v3-web-wrap">{name(r)}{r.is_thin && <span className="v3-flag v3-flag-plain">Small</span>}</td><td className="r">{fmtCount(r.sessions)}</td>
+            <td className="r">{v3PctD1(r.prev_atc)}</td><td className="r">{v3PctD1(r.cur_atc)}</td><td className="r">{v3PctD1(r.prev_ctc)}</td><td className="r">{v3PctD1(r.cur_ctc)}</td>
+            <td className={'r' + (c != null && !part && !r.is_thin && c <= -0.1 ? ' v3-down' : '')}>{c == null ? FMT_NONE : v3Signed(c, v3Dp1Num(Math.abs(c) * 100) + '%')}</td></tr>); })}</tbody>
+        </table></div>
+        {part && <p className="v3-panel-note">These hold {fmtCount(sum)} of {v3Month(mo, 'long')}’s {fmtCount(total)} visits, so they say little about the site as a whole.</p>}
+      </section>); })}
+    <section className="v3-panel" aria-label="Reading the groups">
+      <p className="v3-panel-note">Basket is the share of visits adding to the basket. Checkout is the share of baskets starting checkout. A change in every group points at the site as a whole; a change in one group points at that group. Small groups hold under 5% of their list.</p>
+    </section>
+  </>);
 }
 
 // ── Customers (V3, live) ─────────────────────────────────────────────────────
@@ -22223,12 +22487,15 @@ function V3ChannelMap() {
 // shows on the tabs that follow it: Ads, Email and Discount codes read fixed windows, named on each panel.
 const V3_MK_TAB = { overview: 'overview', creative: 'ads', email: 'email', codes: 'codes', detail: 'platforms', organic: 'platforms' };
 const V3_MK_FOLLOWS = { overview: true, platforms: true };
-function V3MarketingTabs({ start, period, customActive }) {
-  const [tab, setTab] = React.useState(() => (typeof window !== 'undefined' && V3_MK_TAB[window.__oiV3Anchor]) || 'overview');
+// A page's tabs: a tab loads the first time it is opened and then stays mounted, an anchor opens the tab that holds it
+// (and scrolls to `v3-<anchor>` if the tab has one), and the date control hides on tabs that do not follow it.
+function useV3PageTabs(map, follows) {
+  const [tab, setTab] = React.useState(() => (typeof window !== 'undefined' && map[window.__oiV3Anchor]) || 'overview');
   const [seen, setSeen] = React.useState(() => ({ [tab]: true }));
   const pick = t => { setTab(t); setSeen(o => (o[t] ? o : Object.assign({}, o, { [t]: true }))); };
   React.useEffect(() => {
-    const on = () => { const t = V3_MK_TAB[window.__oiV3Anchor]; if (t) { pick(t); window.__oiV3Anchor = null; try { window.scrollTo(0, 0); } catch (e) {} } };
+    const on = () => { const a = window.__oiV3Anchor, t = map[a]; if (!t) return; pick(t); window.__oiV3Anchor = null;
+      setTimeout(() => { try { const el = document.getElementById('v3-' + a); if (el) el.scrollIntoView({ block: 'start' }); else window.scrollTo(0, 0); } catch (e) {} }, 60); };
     on();
     window.addEventListener('oi-v3-anchor', on);
     return () => window.removeEventListener('oi-v3-anchor', on);
@@ -22236,10 +22503,14 @@ function V3MarketingTabs({ start, period, customActive }) {
   React.useEffect(() => {
     const h = document.querySelector('.v3-page-head');
     if (!h) return undefined;
-    if (V3_MK_FOLLOWS[tab]) h.removeAttribute('data-fixed-period'); else h.setAttribute('data-fixed-period', '1');
+    if (follows[tab]) h.removeAttribute('data-fixed-period'); else h.setAttribute('data-fixed-period', '1');
     try { const on = document.querySelector('.v3-goal-tabs .v3-tab.on'); if (on) on.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) {}
     return () => h.removeAttribute('data-fixed-period');
   }, [tab]);
+  return [tab, pick, seen];
+}
+function V3MarketingTabs({ start, period, customActive }) {
+  const [tab, pick, seen] = useV3PageTabs(V3_MK_TAB, V3_MK_FOLLOWS);
   const TABS = [['overview', 'Overview'], ['ads', 'Ads'], ['email', 'Email'], ['codes', 'Discount codes'], ['platforms', 'Platforms']];
   return (<div className="v3-home v3-profit v3-marketing v3-goal-page">
     <div className="v3-tabs v3-goal-tabs" role="tablist" aria-label="Marketing">
@@ -26929,13 +27200,7 @@ const V3_PAGES = {
   </>),
   profit: (p) => <><Overview start={p.start} period={p.period} customActive={p.customActive}/><V3Today page="profit"/></>,
   marketing: (p) => <V3MarketingTabs start={p.start} period={p.period} customActive={p.customActive}/>,
-  website: (p) => (<>
-    {/* 4 Nov: the Home pattern. The folds are the older detail, under nouns. */}
-    <V3Website start={p.start} period={p.period} customActive={p.customActive}/>
-    <V3More id="web-loop" label="Steps by visitor group">{mosView('LoopView')}</V3More>
-    <V3More id="web-cvr" label="Conversion drivers"><V3Anchor id="cvr"/><CvrDrivers/></V3More>
-    <V3More id="web-friction" label="Site structure"><V3Anchor id="friction"/><SiteStructure start={p.start}/></V3More>
-  </>),
+  website: (p) => <V3WebsiteTabs start={p.start} period={p.period} customActive={p.customActive}/>,
   // Products leads with a live view (V3Products). The panels below it were built on static snapshots,
   // weeks old for frkl and empty for every other brand, so they sit behind a disclosure.
   customers: (p) => (<>
@@ -27854,7 +28119,7 @@ const V3_WALK_TOUR = {
     what: 'Your products ranked by sales over the last 28 days. The change column is against the 28 days before, and a "Low stock" tag means sales may be held back by stock rather than demand.' },
   movers: { dest: 'products', target: { sel: 'figure.v3-chart', has: 'Change in sales' }, fallback: { sel: '.v3-prod-table' },
     what: 'What gained and lost the most in pounds. Before acting on a faller, check it against stock, a product that ran out looks exactly like one that stopped selling.' },
-  traffic: { dest: 'website', target: { sel: 'figure.v3-chart' }, fallback: { sel: '.v3-verdict' },
+  traffic: { dest: 'website', anchor: 'overview', target: { sel: 'figure.v3-chart' }, fallback: { sel: '.v3-verdict' },
     what: 'Your shop as a funnel, visits, product views, baskets, checkouts, orders, against a normal month. The stage that has slipped furthest is where buyers are being lost.' },
   retention: { dest: 'customers', target: { sel: 'figure.v3-chart', has: 'Sales per customer over time' }, fallback: { sel: '.v3-home-strip' },
     what: 'How much the average customer has spent with you as the months go by after their first order. The steeper the early climb, the more a new customer is really worth.' },
