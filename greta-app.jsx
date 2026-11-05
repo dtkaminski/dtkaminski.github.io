@@ -21510,17 +21510,36 @@ const v3SumBetween = (rows, dayKey, valKey) => (a, b) => (rows || []).reduce((t,
 const v3LadderK = rows => (rows && rows.length ? v3DeliveryK(v3SumBetween(rows, 'day', 'net_sales')) : null);
 
 // ── Products (V3, live) — which products earn, and which leak (anatomy Stage 3) ─────────────────
+// 5 Nov 2026, on Home's pattern. No date control: every read here is a fixed window (a daily read per product
+// would hit the server's 1,000-row cap), so the strip says its own periods.
 // Per brand, last 28 days against the 28 before:
 //   vw_product_performance    sales and units per product, both windows
-//   vw_product_contribution   per SKU: sales, what the product cost, payment fees → kept; list price
-//                             (summed to the product). Shipping and packing are per order, not per
-//                             product, so "kept" here is higher than the profit on Profit & sales.
+//   vw_product_contribution   per SKU: sales, less what the product cost and payment fees, is kept; list price
+//                             (summed to the product). Delivery and packing are per order, not per product,
+//                             so "kept" here is higher than the profit on Profit & sales.
 //   stock plan (shared key)   on hand and weekly sales per product, all variants together
 //   tenant_shopify_products   when the product was created, so "New" means new
 //   cache_daily_cm_ladder     whether the 28 days before were a sale: total sales against the median
 //                             of the six 28-day windows before them
-// The leaks are named with their money: products that sold and are now out of stock, products sold at
-// a loss, and discounting landing on the best sellers. Movers carry their reason.
+// Last 12 months:
+//   vw_product_npd_facts      every active product, its type and sales (Shopify order lines, ex VAT)
+//   vw_product_hero_economics how often a hero leaves on its own, what an order makes with something beside it,
+//                             and whether the customers whose first order it led come back. The solo target is
+//                             the range's own: the rate of the quarter of heroes that sell alone least. A return
+//                             rate is named only two standard errors from the brand's, either way.
+// vw_ga4_product_funnel: each product judged only against its own type on sales per view, because a £25 charm
+// and a £140 necklace are not comparable. Flagged only when its purchase rate is two standard errors from its
+// type's. The prize is a ceiling: what the views a weak product holds would earn at its type's usual rate.
+const V3_FACTS_Q = (sb, b) => sb.from('vw_product_npd_facts')
+  .select('shopify_product_id,title,product_type,units,revenue,led_orders,led_first_orders,led_first_order_cm2')
+  .eq('brand_id', b).eq('status', 'active').limit(3000);
+const v3Title = s => { const t = String(s || '').trim(); return t ? t.charAt(0).toUpperCase() + t.slice(1) : 'Unnamed product'; };
+const v3Names = a => a.join(', ').replace(/, ([^,]*)$/, ' and $1');
+// Two proportions, one test: is a against b more than two standard errors apart (b's own spread)?
+const v3Z = (p, base, n) => (n > 0 && base > 0 && base < 1) ? (p - base) / Math.sqrt(base * (1 - base) / n) : 0;
+// anatomy_category_map, Range and price, less stock-reorder: those rows live on Stock & orders, and a check here opens it.
+const V3_PROD_ACTS = ['product-', 'returns-', 'discount-reference-price', 'discount-depth-inversion', 'basket-pair'];
+const v3DayCount = n => fmtCount(n) + (Math.round(n) === 1 ? ' day' : ' days');
 function V3Products() {
   const perf = useV3Rows('prod-perf', (sb, b) => sb.from('vw_product_performance')
     .select('shopify_product_id,product_title,rev_28d,rev_prior_28d,units_now,units_prior,share_now,stock_constrained,inventory_stale,performance_flag')
@@ -21528,9 +21547,26 @@ function V3Products() {
   const pc = useV3Rows('prod-contrib', (sb, b) => sb.from('vw_product_contribution')
     .select('shopify_product_id,product_title,units,realized_rev,contribution_gbp,ref_price,cost_is_actual').eq('brand_id', b).limit(1000));
   const stock = useV3Rows('stock-plan', V3_STOCK_Q);
+  const slist = useV3Rows('stock-list', V3_STOCK_LIST_Q);   // the one stock list: "Reorder" only for what is on it
   const made = useV3Rows('prod-created', (sb, b) => sb.from('tenant_shopify_products').select('shopify_product_id,created_at_shopify').eq('brand_id', b).limit(3000));
   const lad = useV3Rows('profit-ladder', V3_LADDER_Q);
+  const facts = useV3Rows('prod-facts', V3_FACTS_Q);
+  const hero = useV3Rows('prod-hero', (sb, b) => sb.from('vw_product_hero_economics')
+    .select('shopify_product_id,title,led_orders,led_first_orders,solo_orders,solo_share,solo_cm2,multi_cm2,solo_paid,multi_paid,addon_title,addon_orders,first_cohort,back_180d,brand_back_180d,median_days_to_second')
+    .eq('brand_id', b).limit(500));
+  const attn = useV3Rows('prod-attn', (sb, b) => sb.from('vw_ga4_product_funnel')
+    .select('item_name,period_start,period_end,views,purchases,revenue,traffic_share')
+    .eq('brand_id', b).gte('views', 150).order('views', { ascending: false, nullsFirst: false }).limit(400));
+  const refunds = useV3Rows('product-refunds', V3_REFUNDS_Q);
+  const drift = useV3Rows('goal-drift', V3_DRIFT_Q);
+  const bd = useV3Board();
+  const bm = useV3Rows('board-moves', V3_BOARD_MOVES_Q);
+  useV3Rows('move-extras', V3_MOVE_EXTRAS_Q);
+  const [drv, setDrv] = React.useState(null);
+  const [drawer, setDrawer] = React.useState(null);   // { id, mode }
   const [showAll, setShowAll] = React.useState(false);
+  const [viewsAll, setViewsAll] = React.useState(false);
+
   const d = React.useMemo(() => {
     if (!perf.rows) return null;
     const rows = perf.rows.filter(x => Number(x.rev_28d) > 0 || Number(x.rev_prior_28d) > 0);
@@ -21541,7 +21577,7 @@ function V3Products() {
     // stock per product: all variants together, stale feeds say nothing
     const S = {}; (stock.rows || []).forEach(s => { const k = String(s.product_title || '').trim().toLowerCase(); if (!k || s.inventory_stale) return;
       const o = S[k] || (S[k] = { oh: 0, v: 0 }); o.oh += Math.max(0, Number(s.on_hand) || 0); o.v += Number(s.weekly_velocity) || 0; });
-    const born = {}; (made.rows || []).forEach(r => { if (r.created_at_shopify) born[String(r.shopify_product_id)] = String(r.created_at_shopify).slice(0, 10); });
+    const born = {}; (made.rows || []).forEach(r => { if (r.created_at_shopify) born[String(r.shopify_product_id)] = v3Iso10(r.created_at_shopify); });
     const today = new Date().toISOString().slice(0, 10), recent = v3IsoAdd(today, -56);
     const list = rows.map(x => {
       const k = String(x.shopify_product_id || x.product_title), c = C[k] || null, st = S[String(x.product_title || '').trim().toLowerCase()] || null;
@@ -21552,11 +21588,12 @@ function V3Products() {
         kept: c ? c.kept : null, margin: c && c.rev > 0 ? c.kept / c.rev : null, off: c && c.list > 0 ? 1 - c.listed / c.list : null,
         out, low: !out && !!x.stock_constrained, isNew, back: !isNew && was <= 0 && now > 0 };
     });
-    const total = list.reduce((a, x) => a + x.now, 0), keptTot = list.reduce((a, x) => a + (x.kept || 0), 0), keptRev = list.filter(x => x.kept != null).reduce((a, x) => a + x.now, 0);
+    const total = list.reduce((a, x) => a + x.now, 0), was = list.reduce((a, x) => a + x.was, 0), units = list.reduce((a, x) => a + x.units, 0);
+    const keptTot = list.reduce((a, x) => a + (x.kept || 0), 0), keptRev = list.filter(x => x.kept != null).reduce((a, x) => a + x.now, 0);
     // Was the 28 days before a sale? Its total against the median of the six 28-day windows before it.
     let sale = null;
     if (lad.rows && lad.rows.length > 200) {
-      const by = {}; lad.rows.forEach(r => { by[String(r.day).slice(0, 10)] = Number(r.net_sales) || 0; });
+      const by = {}; lad.rows.forEach(r => { by[v3Iso10(r.day)] = Number(r.net_sales) || 0; });
       const sumW = e => { let s = 0, n = 0; for (let i = 0; i < 28; i++) { const v = by[v3IsoAdd(e, -i)]; if (v != null) { s += v; n++; } } return n >= 24 ? s : null; };
       const end = v3IsoAdd(today, -1), prevEnd = v3IsoAdd(end, -28);
       const prior = sumW(prevEnd), base = v3Med([1, 2, 3, 4, 5, 6].map(i => sumW(v3IsoAdd(prevEnd, -28 * i))));
@@ -21568,256 +21605,67 @@ function V3Products() {
     // The discounted best seller that keeps least, against the median of the other four.
     const disc = top5.filter(x => x.off != null && x.off >= 0.05).sort((a, b) => a.margin - b.margin)[0] || null;
     const restMed = disc ? v3Med(top5.filter(x => x !== disc).map(x => x.margin)) : null;
-    return { list, total, keptTot, keptRev, sale, outSold, losers, disc, restMed,
+    return { list, total, was, units, keptTot, keptRev, sale, outSold, losers, disc, restMed,
       top5share: total > 0 ? list.slice(0, 5).reduce((a, x) => a + x.now, 0) / total : null };
   }, [perf.rows, pc.rows, stock.rows, made.rows, lad.rows]);
 
-  if (perf.err) return <V3LoadFailed what="your product sales" onRetry={perf.retry}/>;
-  if (!perf.rows) return <V3SkeletonRows n={6}/>;
-  if (!d || !d.list.length) return <div className="v3-empty">No product sales in the last eight weeks.</div>;
-  const top = d.list.filter(x => x.now > 0);
-  const shown = showAll ? top : top.slice(0, 12);
-  const mx = Math.max(1, ...top.map(x => x.now));
-  const margin = d.keptRev > 0 ? d.keptTot / d.keptRev : null;
-  const reason = x => x.out ? 'out of stock' : x.isNew ? 'new' : x.back ? 'no sales the 28 days before' : (d.sale != null && x.d < 0) ? 'against a sale' : '';
-  const movers = top.concat(d.list.filter(x => x.now <= 0)).filter(x => Math.abs(x.d) > 50);
-  const up = movers.filter(x => x.d > 0).sort((a, b) => b.d - a.d).slice(0, 4);
-  const down = movers.filter(x => x.d < 0).sort((a, b) => a.d - b.d).slice(0, 4);
-  const leaks = [];
-  // "Out of stock: … and 9 more" read as the whole count (12) beside the board's 25 already out (7 Oct):
-  // say it is the ones that sold in the 28 days before
-  if (d.outSold.length) leaks.push(<li key="out"><b>{d.outSold.length === 1 ? 'One product that sold in the 28 days before is' : fmtCount(d.outSold.length) + ' products that sold in the 28 days before are'} out of stock now: {d.outSold.slice(0, 3).map(x => x.title).join(', ')}{d.outSold.length > 3 ? ' and ' + fmtCount(d.outSold.length - 3) + ' more' : ''}.</b>{' '}
-    {d.outSold.length === 1 ? 'It' : 'They'} sold {fmtMoney(d.outSold.reduce((a, x) => a + x.was, 0))} in the 28 days before{d.sale != null ? ' (a sale period)' : ''} and {d.outSold.length === 1 ? 'has' : 'have'} nothing to sell now.{' '}
-    <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('stock')}>Open Stock &amp; orders</button></li>);
-  if (d.losers.length) leaks.push(<li key="loss"><b>Sold at a loss: {v3Names(d.losers.slice(0, 3).map(x => x.title))}.</b> After what {d.losers.length === 1 ? 'it costs' : 'they cost'}, {d.losers.length === 1 ? 'it' : 'they'} lost {fmtMoney(Math.abs(d.losers.reduce((a, x) => a + x.kept, 0)))} in 28 days. Check the price, and the cost you entered.</li>);
-  if (d.disc && d.restMed != null && d.disc.margin < d.restMed) leaks.push(<li key="disc"><b>Discounts eat into {d.disc.title}.</b> On average it sells {fmtPctN(d.disc.off)} below its full price and keeps {fmtPctN(d.disc.margin)} of its sales, against {fmtPctN(d.restMed)} for the rest of your top five. Discount codes tend to land on what people would buy anyway. “Promotions and discount codes” below shows which codes.</li>);
-  leaks.push(<li key="aov"><b>Best sellers often leave in an order on their own.</b> An order that adds a second product makes more profit. “Your hero products” below names which products, and what it is worth.</li>);
-  return (<div className="v3-page-stack">
-    <section className="v3-sec">
-      <div className="v3-kick">Last 28 days, which products make money, and where money is lost</div>
-      <div className="v3-lead2"><div>
-      <p className="v3-verdict">{margin != null
-        ? (d.losers.length ? fmtCount(d.losers.length) + (d.losers.length === 1 ? ' product sold at a loss. ' : ' products sold at a loss. ') + 'Overall, your products kept ' + fmtPctN(margin) + ' of their sales after their own cost only, before delivery, packing and card fees.'
-          : 'No product sells at a loss. Your products kept ' + fmtPctN(margin) + ' of their sales after their own cost only, before delivery, packing and card fees.')
-        : fmtMoney(d.total) + ' of product sales across ' + fmtCount(top.length) + ' products.'}</p>
-      {/* With no margin the headline above is already this sentence: it read twice (9 Oct). */}
-      <V3Brief>{margin != null
-        ? <>{fmtMoney(d.total)} of product sales across {fmtCount(top.length)} products{d.top5share != null ? '. Your top five bring in ' + fmtPctN(d.top5share) + ' of it' : ''}. </>
-        : (d.top5share != null ? 'Your top five bring in ' + fmtPctN(d.top5share) + ' of it. ' : '')}“Kept” is what is left after the product’s own cost and payment fees. Shipping and packing are paid per order, not per product, so profit on Profit &amp; sales is lower.</V3Brief>
-      </div>
-      <ol className="v3-moves">{leaks}</ol>
-      </div>
-    </section>
-    <V3ProductStrip d={d}/>
-    <section className="v3-sec">
-      {d.sale != null && <p className="v3-note v3-measure">The 28 days before included a sale: sales ran {fmtPctN(d.sale)} above a typical 28 days. So most products are down against them. A change marked “against a sale” is the sale ending, not the product.</p>}
-      <table className="v3-ptable">
-        <thead><tr><th>Product</th><th className="t-text">Sales</th><th>Kept</th><th>Change</th><th>Units</th></tr></thead>
-        <tbody>{shown.map((x, i) => (<tr key={i}>
-          <td><span className="v3-ptitle">{x.title}</span>{x.out ? <span className="sbadge bad">Out of stock</span> : x.low ? <span className="sbadge warn">Low stock</span> : null}</td>
-          <td className="t-text"><span className="v3-pbar"><i style={{ width: (x.now / mx * 100) + '%' }}/></span><span className="v3-pval">{fmtMoney(x.now)}</span></td>
-          <td className={x.kept != null && x.kept < 0 ? 'v3-down' : ''}>{x.kept != null ? fmtMoney(x.kept) : FMT_NONE}</td>
-          <td className={x.ch == null ? 'v3-muted' : x.ch >= 0 ? 'v3-up' : 'v3-down'}>{x.ch != null ? (x.ch >= 0 ? '+' : '−') + fmtPctN(Math.abs(x.ch)) : x.isNew ? 'New' : 'None before'}</td>
-          <td>{fmtCount(x.units)}</td>
-        </tr>))}</tbody>
-      </table>
-      {top.length > 12 && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => setShowAll(s => !s)}>{showAll ? 'Show top 12' : 'Show all ' + top.length + ' products'}</button>}
-    </section>
-    {(up.length > 0 || down.length > 0) && (<div className="v3-movers">
-      <section><div className="v3-kick">Rising</div>{up.map((x, i) => <div key={i} className="v3-mover"><span>{x.title}{reason(x) && <span className="v3-muted">, {reason(x)}</span>}</span><b className="v3-up">+{fmtMoney(x.d)}</b></div>)}</section>
-      <section><div className="v3-kick">Falling</div>{down.map((x, i) => <div key={i} className="v3-mover"><span>{x.title}{reason(x) && <span className="v3-muted">, {reason(x)}</span>}</span><b className="v3-down">{fmtMoney(x.d)}</b></div>)}</section>
-    </div>)}
-  </div>);
-}
-
-// ── Shared reads for the Products leads ──────────────────────────────────────
-// vw_product_npd_facts: every active product, its type and its last 365 days of sales (Shopify
-// order lines, ex VAT). Read once, used by the hero section and to give GA4 items a type.
-const V3_FACTS_Q = (sb, b) => sb.from('vw_product_npd_facts')
-  .select('shopify_product_id,title,product_type,units,revenue,led_orders,led_first_orders,led_first_order_cm2')
-  .eq('brand_id', b).eq('status', 'active').limit(3000);
-const v3Title = s => { const t = String(s || '').trim(); return t ? t.charAt(0).toUpperCase() + t.slice(1) : 'Unnamed product'; };
-const v3Names = a => a.join(', ').replace(/, ([^,]*)$/, ' and $1');
-// Two proportions, one test: is a against b more than two standard errors apart (b's own spread)?
-const v3Z = (p, base, n) => (n > 0 && base > 0 && base < 1) ? (p - base) / Math.sqrt(base * (1 - base) / n) : 0;
-
-// ── Hero products (Products) — anatomy Stage 3 range roles, with the Stage 5 read ─────────────
-// Which few products carry the range, and for each of them the two levers a hero actually has:
-//   AOV  how often it leaves on its own, and what an order makes when something rides along with it
-//        (vw_product_hero_economics, 0257). The target is the range's own best: the solo rate of the
-//        quarter of heroes that sell alone least, so the ask is something this brand already does.
-//   LTV  whether customers whose first order it led come back within six months more or less than
-//        the brand's customers do (two standard errors either way, or no claim).
-// Before 0257 is applied the view 404s and the section shows concentration only, saying nothing it
-// cannot back. Stock cover comes from the stock plan already loaded for Stock & orders (same key).
-function V3Heroes() {
-  const facts = useV3Rows('prod-facts', V3_FACTS_Q);
-  const hero = useV3Rows('prod-hero', (sb, b) => sb.from('vw_product_hero_economics')
-    .select('shopify_product_id,title,led_orders,led_first_orders,solo_orders,solo_share,solo_cm2,multi_cm2,solo_paid,multi_paid,addon_title,addon_orders,first_cohort,back_180d,brand_back_180d,median_days_to_second')
-    .eq('brand_id', b).limit(500));
-  // vw_ltv_dual times out for a signed-in user (it recomputes cohorts); vw_brand_unit_economics is the
-  // cached read of the same figures since 0252, and Customers already loads it under this key.
-  const ue = useV3Rows('cust-ue', V3_UE_Q);
-  const stock = useV3Rows('stock-plan', V3_STOCK_Q);
-  const slist = useV3Rows('stock-list', V3_STOCK_LIST_Q);   // the one stock list: "Reorder" only for what is on it
-  const d = React.useMemo(() => {
+  const h = React.useMemo(() => {
     const sell = (facts.rows || []).filter(x => Number(x.revenue) > 0 && !/gift ?card/i.test(String(x.product_type || '') + ' ' + String(x.title || '')))
-      .map(x => ({ id: String(x.shopify_product_id), title: v3Title(x.title), rev: Number(x.revenue), firsts: Number(x.led_first_orders) || 0,
-        firstCm2: x.led_first_order_cm2 != null ? Number(x.led_first_order_cm2) : null }))
+      .map(x => ({ id: String(x.shopify_product_id), title: v3Title(x.title), rev: Number(x.revenue), firsts: Number(x.led_first_orders) || 0 }))
       .sort((a, b) => b.rev - a.rev);
     if (sell.length < 5) return null;
     const total = sell.reduce((a, x) => a + x.rev, 0), allFirsts = sell.reduce((a, x) => a + x.firsts, 0);
     let run = 0, n50 = 0, n80 = 0;
     sell.forEach((x, i) => { run += x.rev; x.share = x.rev / total; if (!n50 && run >= total * 0.5) n50 = i + 1; if (!n80 && run >= total * 0.8) n80 = i + 1; });
     const sum = (a, b) => sell.slice(a, b).reduce((s, x) => s + x.rev, 0) / total;
-    const strip = [{ k: 'top', n: 1, s: sum(0, 1) }, { k: 'half', n: n50 - 1, s: sum(1, n50) }, { k: 'eighty', n: n80 - n50, s: sum(n50, n80) }, { k: 'rest', n: sell.length - n80, s: sum(n80, sell.length) }].filter(b => b.n > 0);
-    const H = {}; (hero.rows || []).forEach(h => { H[String(h.shopify_product_id)] = h; });
+    const range = [{ k: 'Best seller', n: 1, s: sum(0, 1) }, { k: 'Up to half of sales', n: n50 - 1, s: sum(1, n50) }, { k: 'Up to 80% of sales', n: n80 - n50, s: sum(n50, n80) }, { k: 'The rest', n: sell.length - n80, s: sum(n80, sell.length) }].filter(b => b.n > 0);
+    const H = {}; (hero.rows || []).forEach(x => { H[String(x.shopify_product_id)] = x; });
     const hasHero = !!(hero.rows && hero.rows.length);
-    // Stock cover per product: all its variants together (one sold-out initial letter is not the
-    // charm running out). Stale feeds say nothing rather than something false.
-    const inv = {}; (stock.rows || []).forEach(s => { const k = String(s.product_title || '').trim().toLowerCase(); if (!k || s.inventory_stale) return;
-      const o = inv[k] || (inv[k] = { oh: 0, v: 0 }); o.oh += Math.max(0, Number(s.on_hand) || 0); o.v += Number(s.weekly_velocity) || 0; });
-    const cover = {}; Object.keys(inv).forEach(k => { if (inv[k].v > 0) cover[k] = inv[k].oh / inv[k].v; });
     // On the stock list (fn_stock_reorder), by title: why it is there and whether any of it is out now.
     const onList = {}; (slist.rows || []).forEach(r => { const k = String(r.product_title || '').trim().toLowerCase(); if (!k) return;
       const o = onList[k] || (onList[k] = { out: false, run: false, peak: false, days: null });
       if (r.out_of_stock) o.out = true; if (r.reason !== 'peak_top_up') o.run = true; if (r.reason !== 'runs_out') o.peak = true;
       // the list's own days left (full-price pace), the figure Stock & orders shows, soonest variant first
       if (r.days_left != null && isFinite(Number(r.days_left))) o.days = o.days == null ? Number(r.days_left) : Math.min(o.days, Number(r.days_left)); });
-    const big = (hero.rows || []).filter(h => Number(h.led_orders) >= 50).map(h => Number(h.solo_share)).filter(isFinite).sort((a, b) => a - b);
+    const bigRows = (hero.rows || []).filter(x => Number(x.led_orders) >= 50);
+    const big = bigRows.map(x => Number(x.solo_share)).filter(isFinite).sort((a, b) => a - b);
     const target = big.length >= 4 ? big[Math.floor(big.length / 4)] : null;
-    const best = target != null ? (hero.rows || []).filter(h => Number(h.led_orders) >= 50).sort((a, b) => Number(a.solo_share) - Number(b.solo_share))[0] : null;
-    // The add-on shoppers choose most across all the heroes: the fallback suggestion for a hero
-    // whose own baskets are too few to name one.
-    const addonVotes = {}; (hero.rows || []).forEach(h => { if (h.addon_title) addonVotes[h.addon_title] = (addonVotes[h.addon_title] || 0) + Number(h.addon_orders || 0); });
+    // The add-on shoppers choose most across all the heroes: the fallback for a hero whose own baskets are too few to name one.
+    const addonVotes = {}; (hero.rows || []).forEach(x => { if (x.addon_title) addonVotes[x.addon_title] = (addonVotes[x.addon_title] || 0) + Number(x.addon_orders || 0); });
     const topAddon = Object.keys(addonVotes).sort((a, b) => addonVotes[b] - addonVotes[a])[0] || null;
     const heroes = sell.slice(0, Math.min(Math.max(n50, 4), 8)).map(x => {
-      const h = H[x.id] || null, o = { ...x, h, moves: [] };
-      if (h) {
-        const solo = Number(h.solo_share), dcm = Number(h.multi_cm2) - Number(h.solo_cm2), led = Number(h.led_orders);
-        if (target != null && solo - target >= 0.15 && dcm >= 5 && Number(h.solo_orders) >= 15) {
-          const gain = (solo - target) * led / 12 * dcm;
-          const own = Number(h.addon_orders) >= 8 ? h.addon_title : null, fall = topAddon && topAddon.trim().toLowerCase() !== x.title.toLowerCase() ? topAddon : null;
-          o.aov = { gain, dcm, solo, addon: own ? v3Title(own) : fall ? v3Title(fall) : null };
+      const r = H[x.id] || null, o = { ...x, h: r, moves: [] };
+      if (r) {
+        const solo = Number(r.solo_share), dcm = Number(r.multi_cm2) - Number(r.solo_cm2), led = Number(r.led_orders);
+        if (target != null && solo - target >= 0.15 && dcm >= 5 && Number(r.solo_orders) >= 15) {
+          const own = Number(r.addon_orders) >= 8 ? r.addon_title : null, fall = topAddon && topAddon.trim().toLowerCase() !== x.title.toLowerCase() ? topAddon : null;
+          o.aov = { gain: (solo - target) * led / 12 * dcm, dcm, solo, addon: own ? v3Title(own) : fall ? v3Title(fall) : null };
           o.moves.push('aov');
         }
-        const n = Number(h.first_cohort), back = Number(h.back_180d), base = Number(h.brand_back_180d);
+        const n = Number(r.first_cohort), back = Number(r.back_180d), base = Number(r.brand_back_180d);
         if (n >= 40 && isFinite(back) && isFinite(base)) {
           const z = v3Z(back, base, n);
           if (z >= 2) { o.ltv = 'up'; o.moves.push('ltv-up'); } else if (z <= -2) { o.ltv = 'down'; o.moves.push('ltv-down'); }
         }
       }
-      const w = cover[x.title.toLowerCase()], ol = onList[x.title.toLowerCase()];
-      // 26 Oct walk, item 7: this used all-weeks cover (on hand / weekly velocity, sale weeks in), "5 weeks left"
-      // beside Stock & orders' 26 days. A product on the list takes the list's days left.
-      if (ol) { o.stock = ol; o.weeks = ol.out ? 0 : ol.days != null ? ol.days / 7 : w; o.days = ol.out ? 0 : ol.days; o.moves.unshift('stock'); }
+      // A product on the stock list takes the list's days left, the figure Stock & orders shows (26 Oct walk, item 7).
+      const ol = onList[x.title.toLowerCase()];
+      if (ol) { o.stock = ol; o.days = ol.out ? 0 : ol.days; o.moves.unshift('stock'); }
       return o;
     });
-    const short = heroes.filter(x => x.stock && x.weeks != null);
     const aovHeroes = heroes.filter(x => x.aov).sort((a, b) => b.aov.gain - a.aov.gain);
     const ltvUp = heroes.filter(x => x.ltv === 'up').sort((a, b) => Number(b.h.back_180d) - Number(a.h.back_180d));
     const ltvDown = heroes.filter(x => x.ltv === 'down');
+    const short = heroes.filter(x => x.stock && !x.stock.out);
     const brandBack = (hero.rows || []).length ? Number(hero.rows[0].brand_back_180d) : null;
-    return { short, sell, total, n50, n80, strip, heroes, hasHero, target, best, aovHeroes, ltvUp, ltvDown, brandBack, allFirsts };
-  }, [facts.rows, hero.rows, stock.rows, slist.rows]);
+    const best = bigRows.length && target != null ? bigRows.slice().sort((a, b) => Number(a.solo_share) - Number(b.solo_share))[0] : null;
+    return { sell, n50, n80, range, heroes, hasHero, target, best, aovHeroes, ltvUp, ltvDown, short, brandBack, allFirsts };
+  }, [facts.rows, hero.rows, slist.rows]);
 
-  if (facts.err) return <V3LoadFailed what="your hero products" onRetry={facts.retry}/>;
-  if (!facts.rows || (!hero.rows && !hero.err)) return <V3SkeletonRows n={4}/>;
-  if (!d) return null;
-  const top = d.sell[0], L = (ue.rows || [])[0] || null;
-  const stripCol = { top: PAL.sales, half: palAlpha(PAL.sales, 0.6), eighty: palAlpha(PAL.sales, 0.3), rest: PAL.quiet };
-  const stripLab = b => b.k === 'top' ? top.title : b.k === 'half' ? 'Next ' + fmtCount(b.n) : b.k === 'eighty' ? 'Next ' + fmtCount(b.n) : 'Other ' + fmtCount(b.n);
-  const aovSum = d.aovHeroes.reduce((a, x) => a + x.aov.gain, 0);
-  const showMove = d.hasHero || d.heroes.some(x => x.moves.length);
-  const moveText = x => {
-    if (x.moves[0] === 'stock') return x.stock.out ? 'Out of stock: reorder' : !x.stock.run ? 'Reorder: short for the peak'
-      : 'Reorder: runs out before a restock lands' + (x.days != null ? ' (' + fmtCount(x.days) + (Math.round(x.days) === 1 ? ' day' : ' days') + ' left)'
-        : x.weeks != null ? ' (' + fmtCount(x.weeks) + (Math.round(x.weeks) === 1 ? ' week' : ' weeks') + ' left)' : '');
-    if (x.moves[0] === 'aov') return x.aov.addon ? 'Offer ' + x.aov.addon + ' with it' : 'Offer an add-on with it';
-    if (x.moves[0] === 'ltv-up') return 'Feature it in ads for new customers';
-    if (x.moves[0] === 'ltv-down') return 'Leave it out of ads for new customers';
-    return FMT_NONE;
-  };
-  return (<div className="v3-page-stack"><section className="v3-sec">
-    <div className="v3-kick">Your hero products, last 12 months</div>
-    <p className="v3-verdict">{fmtCount(d.n50)} of your {fmtCount(d.sell.length)} selling products make half your sales. {top.title} alone makes {fmtPctN(top.share)}.</p>
-    <p className="v3-note v3-measure">{fmtCount(d.n80)} make 80%. {d.allFirsts > 0 && top.firsts > 0 && top.firsts >= Math.max(...d.sell.map(x => x.firsts)) ? 'More new customers start with ' + top.title + ' than with any other product (' + fmtPctN(top.firsts / d.allFirsts) + ' of first orders). ' : ''}
-      These few best sellers are your heroes. Each can earn more in two ways: what else goes in the basket with it, and whether its buyers come back.</p>
-    <div className="v3-share" role="img" aria-label="Share of sales by product group">
-      {d.strip.map(b => <i key={b.k} style={{ width: (b.s * 100) + '%', background: stripCol[b.k] }}/>)}
-    </div>
-    <table className="v3-share-table"><tbody>
-      {d.strip.map(b => (<tr key={b.k}><td className="t-text"><i className="v3-dot" style={{ background: stripCol[b.k] }}/>{stripLab(b)}{b.k !== 'top' ? (b.n === 1 ? ' product' : ' products') : ''}</td><td>{fmtPctN(b.s)}</td></tr>))}
-    </tbody></table>
-
-    <div className="v3-hero-wrap"><table className="v3-hero-table">
-      <thead><tr><th className="t-text">Product</th><th>Share of sales</th>{d.hasHero && <th>Sold alone</th>}{d.hasHero && <th>Profit per order, alone and with more</th>}{d.hasHero && <th>Buyers back in 6 months</th>}{showMove && <th className="t-text">What to do</th>}</tr></thead>
-      <tbody>{d.heroes.map(x => { const h = x.h; return (<tr key={x.id}>
-        <td className="t-text">{x.title}</td>
-        <td>{fmtPctN(x.share)}</td>
-        {d.hasHero && <td className={x.aov ? 'v3-down' : ''}>{h ? fmtPctN(Number(h.solo_share)) : FMT_NONE}</td>}
-        {d.hasHero && <td>{h && h.solo_cm2 != null && h.multi_cm2 != null ? fmtMoney(h.solo_cm2) + ' → ' + fmtMoney(h.multi_cm2) : FMT_NONE}</td>}
-        {d.hasHero && <td className={x.ltv === 'up' ? 'v3-up' : x.ltv === 'down' ? 'v3-down' : ''}>{h && Number(h.first_cohort) >= 40 ? fmtPctN(Number(h.back_180d)) : FMT_NONE}</td>}
-        {showMove && <td className={'t-text v3-hero-move' + (x.moves[0] === 'stock' ? ' urgent' : '')}>{moveText(x)}</td>}
-      </tr>); })}</tbody>
-    </table></div>
-    {d.hasHero && d.brandBack != null && <p className="micro muted v3-measure">Profit per order is after product and order costs, before ads, for orders this product led. Buyers back in 6 months counts customers whose first order it led, against {fmtPctN(d.brandBack)} for all your new customers. A dash means too few to say.</p>}
-  </section>
-
-  {(d.short.length > 0 || (d.hasHero && (d.aovHeroes.length > 0 || d.ltvUp.length > 0))) && (<section className="v3-sec">
-    <h2 className="v3-sec-title">What to do with them</h2>
-    <ol className="v3-moves">
-      {d.short.length > 0 && (<li>
-        <b>Protect the sales you have: reorder {v3Names(d.short.map(x => x.title))}.</b>
-        {' '}{v3Names(d.short.map(x => x.title + (x.weeks < 0.5 && !(x.days > 0) ? ' is out of stock'
-          : x.days != null ? ' has ' + fmtCount(x.days) + (Math.round(x.days) === 1 ? ' day' : ' days') + ' left at the rate it sells at full price'
-          : ' has ' + fmtCount(x.weeks) + (Math.round(x.weeks) === 1 ? ' week' : ' weeks') + ' left at the rate it sells')))}, and {d.short.length === 1 ? 'it makes' : 'together they make'} {fmtPctN(d.short.reduce((a, x) => a + x.share, 0))} of your sales. A hero that runs out also loses the add-ons and first orders that come with it.
-        {' '}<button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('stock')}>Open Stock &amp; orders</button>
-      </li>)}
-      {d.hasHero && d.aovHeroes.length > 0 && (<li>
-        <b>Make orders bigger: sell something with {v3Names(d.aovHeroes.slice(0, 3).map(x => x.title))}.</b>
-        {' '}{d.aovHeroes.length === 1 ? 'It is' : 'They are'} bought on {d.aovHeroes.length === 1 ? 'its' : 'their'} own {v3Names(d.aovHeroes.slice(0, 3).map(x => fmtPctN(x.aov.solo)))} of the time
-        {d.best ? ', against ' + fmtPctN(Number(d.best.solo_share)) + ' for ' + v3Title(d.best.title) : ''}. An order of {d.aovHeroes[0].title} with one more product in it has made
-        {' '}{fmtMoney(d.aovHeroes[0].aov.dcm)} more profit{d.aovHeroes[0].aov.addon ? '. Shoppers add ' + d.aovHeroes[0].aov.addon + ' most often' : ''}.
-        {' '}Getting {d.aovHeroes.length === 1 ? 'it' : 'them'} down to {fmtPctN(d.target)}, which a quarter of your heroes already manage, would be worth up to <b>{fmtMoney(aovSum)} a month</b>. Suggest the add-on on the product page and in the basket. If you bundle it, keep the discount below the extra profit.
-        {' '}<V3Conf state="probably" detail="Counted from your orders over the last year. The extra profit is what orders with an add-on made against orders without one. Part of that gap is a different kind of shopper, so read it as the most you could gain, not a promise."/>
-      </li>)}
-      {d.hasHero && d.ltvUp.length > 0 && (<li>
-        <b>Win customers who come back: feature {v3Names(d.ltvUp.slice(0, 2).map(x => x.title))} in ads for new customers.</b>
-        {' '}{fmtPctN(Number(d.ltvUp[0].h.back_180d))} of the people whose first order it led ordered again within six months, against {fmtPctN(d.brandBack)} across your new customers
-        {d.ltvUp[0].h.median_days_to_second != null ? '. They usually ordered again ' + fmtCount(d.ltvUp[0].h.median_days_to_second) + ' days after the first, so time the follow-up email for then' : ''}.
-        {L && d.ltvUp[0].firstCm2 != null && L.cac != null ? <> A first order it leads makes {fmtMoney(d.ltvUp[0].firstCm2)} before ads. A new customer costs you {fmtMoney(L.cac)} to win today.</> : null}
-        {' '}<V3Conf state="likely" detail="Counted from your own customers: first orders at least six months old, and whether that customer ordered again within six months. Only differences too big to be chance are named."/>
-      </li>)}
-      {d.hasHero && d.ltvDown.length > 0 && (<li>
-        <b>Don’t build your ads for new customers around {v3Names(d.ltvDown.slice(0, 2).map(x => x.title))}.</b>
-        {' '}Fewer of {d.ltvDown.length === 1 ? 'its' : 'their'} first-time buyers come back ({v3Names(d.ltvDown.slice(0, 2).map(x => fmtPctN(Number(x.h.back_180d))))} against {fmtPctN(d.brandBack)}), so each new customer {d.ltvDown.length === 1 ? 'it brings' : 'they bring'} is worth less over the year.
-      </li>)}
-    </ol>
-  </section>)}
-  </div>);
-}
-
-// ── Attention against sale (Products) — anatomy Stage 3 "the attention against sale test" ──────
-// vw_ga4_product_funnel over 90 days. Each product is judged only against products of its own type
-// (from vw_product_npd_facts by title), on sales per view: a £25 charm and a £140 necklace are not
-// compared, which is what made the first version say "show more charms". Coloured only when its
-// purchase rate is two standard errors from its type's. The prize is a ceiling: what the views a
-// weak product holds would have earned at its type's usual rate.
-const V3_ATTN_KIND = {
-  quiet: { label: 'In line with its type', col: () => PAL.quiet },
-  drag:  { label: 'Shown a lot, earns less than its type', col: () => PAL.bad },
-  gem:   { label: 'Earns more than its type, rarely shown', col: () => PAL.good },
-};
-function V3ProductAttention() {
-  const f = useV3Rows('prod-attn', (sb, b) => sb.from('vw_ga4_product_funnel')
-    .select('item_name,period_start,period_end,views,purchases,revenue,traffic_share')
-    .eq('brand_id', b).gte('views', 150).order('views', { ascending: false, nullsFirst: false }).limit(400));
-  const facts = useV3Rows('prod-facts', V3_FACTS_Q);
-  const d = React.useMemo(() => {
-    if (!f.rows || !facts.rows) return null;
+  const v = React.useMemo(() => {
+    if (!attn.rows || !facts.rows) return null;
     const typeOf = {}; facts.rows.forEach(x => { const k = String(x.title || '').trim().toLowerCase(); if (k && !typeOf[k]) typeOf[k] = String(x.product_type || '').trim(); });
-    const rows = f.rows.filter(x => Number(x.views) > 0 && Number(x.traffic_share) > 0)
+    const rows = attn.rows.filter(x => Number(x.views) > 0 && Number(x.traffic_share) > 0)
       .map(x => ({ name: v3Title(x.item_name), type: typeOf[String(x.item_name || '').trim().toLowerCase()] || '', views: Number(x.views),
         buys: Number(x.purchases) || 0, rev: Number(x.revenue) || 0, x: Number(x.traffic_share) }))
       .filter(x => x.type);
@@ -21828,67 +21676,207 @@ function V3ProductAttention() {
       return { ...r, y, z, typeRpv: t.rpv, kind: (y >= 1.25 && z >= 2 && r.x < t.med) ? 'gem' : (y <= 0.8 && z <= -2 && r.x >= t.med) ? 'drag' : 'quiet' };
     });
     if (pts.length < 8) return null;
-    const days = Math.max(1, (new Date(f.rows[0].period_end) - new Date(f.rows[0].period_start)) / 864e5 + 1);
-    const drags = pts.filter(p => p.kind === 'drag').map(p => ({ ...p, prize: p.views * (p.typeRpv - p.rev / p.views) * 30 / days })).sort((a, b) => b.prize - a.prize);
-    const gems = pts.filter(p => p.kind === 'gem').sort((a, b) => b.y - a.y);
-    const monthRev = facts.rows.reduce((a, x) => a + (Number(x.revenue) || 0), 0) / 12;   // Shopify, last 12 months
-    const xs = pts.map(p => p.x).sort((a, b) => a - b), lo = xs[0] * 0.85, hi = xs[xs.length - 1] * 1.15;
-    const yMax = Math.min(4, Math.ceil(Math.max(...pts.map(p => p.y)) * 2) / 2 || 2);
-    const yTicks = []; for (let t = 0; t <= yMax + 1e-9; t += yMax > 2 ? 1 : 0.5) yTicks.push(t);
-    return { pts, drags, gems, prize: drags.reduce((a, p) => a + p.prize, 0), monthRev, lo, hi, yMax, yTicks,
-      ticks: [0.0005, 0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5].filter(t => t >= lo && t <= hi),
-      from: f.rows[0].period_start, to: f.rows[0].period_end };
-  }, [f.rows, facts.rows]);
+    const days = Math.max(1, (new Date(attn.rows[0].period_end) - new Date(attn.rows[0].period_start)) / 864e5 + 1);
+    const drags = pts.filter(p => p.kind === 'drag');
+    const rank = p => (p.kind === 'quiet' ? 1 : 0);
+    return { pts: pts.slice().sort((a, b) => rank(a) - rank(b) || b.x - a.x), flagged: pts.length - pts.filter(p => p.kind === 'quiet').length,
+      prize: drags.reduce((a, p) => a + p.views * (p.typeRpv - p.rev / p.views) * 30 / days, 0), hasDrags: drags.length > 0, from: attn.rows[0].period_start, to: attn.rows[0].period_end };
+  }, [attn.rows, facts.rows]);
 
-  if (f.err || facts.err) return <V3LoadFailed what="which products get seen" onRetry={() => { if (f.err) f.retry(); if (facts.err) facts.retry(); }}/>;
-  if (!f.rows || !facts.rows) return <V3SkeletonRows n={3}/>;
-  if (!d) return null;
-  const small = d.monthRev > 0 && d.prize < d.monthRev * 0.03;
-  const head = !d.drags.length ? 'Your product views go where your sales are.'
-    : d.drags.length === 1 ? 'One product gets many views but turns far fewer of them into sales than others of its type.'
-    : fmtCount(d.drags.length) + ' products get many views but turn far fewer of them into sales than others of their type.';
-  const tip = ({ active, payload }) => {
-    if (!active || !payload || !payload.length) return null;
-    const p = payload[0].payload;
-    return (<div className="v3-tip"><b>{p.name}</b>
-      <span>Type <em>{p.type}</em></span>
-      <span>Share of product views <em>{fmtPctN(p.x)}</em></span>
-      <span>Sales per view against its type <em>{fmtTimes(p.y)}</em></span>
-      <span>Views <em>{fmtCount(p.views)}</em></span></div>);
+  const top = d ? d.list.filter(x => x.now > 0) : [];
+  const shownRows = showAll ? top : top.slice(0, 12);
+  const margin = d && d.keptRev > 0 ? d.keptTot / d.keptRev : null;
+  const ch = d && d.was > 0 ? d.total / d.was - 1 : null;
+  const haveKept = !!(pc.rows && pc.rows.length);
+  const best = h ? h.sell[0] : null;
+  const rr = v3RefundRead(refunds.rows, drift.rows);
+  const toggle = w => ({ open: drv === w, on: () => setDrv(o => (o === w ? null : w)) });
+
+  // Charts: the biggest sellers, and what moved most each way.
+  const movers = d ? top.concat(d.list.filter(x => x.now <= 0)).filter(x => Math.abs(x.d) > 50) : [];
+  const moved = movers.filter(x => x.d > 0).sort((a, b) => b.d - a.d).slice(0, 4).concat(movers.filter(x => x.d < 0).sort((a, b) => a.d - b.d).slice(0, 4).reverse());
+  const phone = !!(window.matchMedia && window.matchMedia('(max-width: 767px)').matches);
+  const nameW = phone ? 88 : 152;
+  const nameTick = phone ? { tickFormatter: t => (String(t).length > 14 ? String(t).slice(0, 13) + '…' : t) } : { tick: { width: nameW } };
+  const why = x => (x.out ? 'Out of stock' : x.isNew ? 'New' : x.back ? 'No sales the 28 days before' : d && d.sale != null && x.d < 0 ? 'Against a sale' : '');
+  const tip = ({ active, payload }) => { if (!active || !payload || !payload.length) return null; const p = payload[0].payload;
+    return (<div className="v3-tip"><b>{p.title}</b><span>Last 28 days <em>{fmtMoney(p.now)}</em></span><span>The 28 days before <em>{fmtMoney(p.was)}</em></span>
+      {why(p) && <span>Note <em>{why(p)}</em></span>}</div>); };
+
+  // The actions this page works: the board's own, in its order.
+  const boardLive = v3FoldPlans(v3LiveRows(bd.rows || []));
+  const live = boardLive.filter(r => (V3_HOME_WORK[r.category] || [])[0] === 'products' || V3_PROD_ACTS.some(p => String(r.external_id || '').startsWith(p)));
+  const shown = live.slice(0, 5);
+  const bmRows = bm.rows && bm.rows[0] && Array.isArray(bm.rows[0].rows) ? bm.rows[0].rows : [];
+  const open = drawer && shown.find(r => r.external_id === drawer.id);
+  const onBoard = p => boardLive.some(r => String(r.external_id || '').startsWith(p));
+
+  // Checks the board does not hold: each with the figure behind it
+  const checks = [];
+  if (d && d.outSold.length) checks.push({ k: 'out', t: 'Restock what sold and has run out',
+    sub: v3Names(d.outSold.slice(0, 3).map(x => x.title)) + (d.outSold.length > 3 ? ' and ' + fmtCount(d.outSold.length - 3) + ' more' : ''),
+    fig: fmtCount(d.outSold.length) + (d.outSold.length === 1 ? ' product, ' : ' products, ') + fmtMoney(d.outSold.reduce((a, x) => a + x.was, 0)) + ' in the 28 days before', go: ['stock', 'Open Stock & orders'] });
+  if (d && d.losers.length) checks.push({ k: 'loss', t: 'Check the price and cost of products sold at a loss', sub: v3Names(d.losers.slice(0, 3).map(x => x.title)) + (d.losers.length > 3 ? ' and ' + fmtCount(d.losers.length - 3) + ' more' : ''),
+    fig: fmtMoney(Math.abs(d.losers.reduce((a, x) => a + x.kept, 0))) + ' lost in 28 days' });
+  if (d && d.disc && d.restMed != null && d.disc.margin < d.restMed) checks.push({ k: 'disc', t: 'Check the discounts on ' + d.disc.title, sub: 'It sells ' + fmtPctN(d.disc.off) + ' below its full price. Codes tend to land on what people would buy anyway.',
+    fig: 'Keeps ' + fmtPctN(d.disc.margin) + ' against ' + fmtPctN(d.restMed) + ' for the rest of your top five', go: ['products', 'See the codes', 'promos'] });
+  if (h && h.short.length && !onBoard('stock-reorder')) checks.push({ k: 'stock', t: 'Reorder ' + v3Names(h.short.map(x => x.title)), sub: 'A best seller that runs out also loses the add-ons and first orders that come with it.',
+    fig: fmtPctN(h.short.reduce((a, x) => a + x.share, 0)) + ' of sales', go: ['stock', 'Open Stock & orders'] });
+  if (h && h.hasHero && h.aovHeroes.length) { const a0 = h.aovHeroes[0], gain = h.aovHeroes.reduce((a, x) => a + x.aov.gain, 0);
+    // One move has one price: with a basket action open, its Worth column carries the money.
+    checks.push({ k: 'aov', t: 'Sell something with ' + v3Names(h.aovHeroes.slice(0, 3).map(x => x.title)),
+      sub: (a0.aov.addon ? 'Shoppers add ' + a0.aov.addon + ' most often. ' : '') + 'An order of ' + a0.title + ' with one more product has made ' + fmtMoney(a0.aov.dcm) + ' more profit.',
+      fig: 'Sold alone ' + fmtPctN(a0.aov.solo) + (h.best ? ' against ' + fmtPctN(Number(h.best.solo_share)) + ' for ' + v3Title(h.best.title) : '') + (onBoard('basket-pair') ? '' : ', worth up to ' + v3GbpRound(gain) + ' a month') }); }
+  if (h && h.hasHero && h.ltvUp.length) { const u0 = h.ltvUp[0]; checks.push({ k: 'ltvup', t: 'Feature ' + v3Names(h.ltvUp.slice(0, 2).map(x => x.title)) + ' in ads for new customers',
+    sub: u0.h.median_days_to_second != null ? 'Buyers of ' + u0.title + ' usually order again after ' + fmtCount(u0.h.median_days_to_second) + ' days, so time the follow-up email for then.' : '',
+    fig: fmtPctN(Number(u0.h.back_180d)) + ' back in 6 months against ' + fmtPctN(h.brandBack) }); }
+  if (h && h.hasHero && h.ltvDown.length) checks.push({ k: 'ltvdown', t: 'Leave ' + v3Names(h.ltvDown.slice(0, 2).map(x => x.title)) + ' out of ads for new customers', sub: 'Fewer of their first-time buyers come back, so each new customer is worth less over the year.',
+    fig: v3Names(h.ltvDown.slice(0, 2).map(x => fmtPctN(Number(x.h.back_180d)))) + ' back in 6 months against ' + fmtPctN(h.brandBack) });
+
+  const moveText = x => {
+    if (x.moves[0] === 'stock') return x.stock.out ? 'Reorder, out of stock' : !x.stock.run ? 'Reorder for the peak' : x.days != null ? 'Reorder, ' + v3DayCount(x.days) + ' left' : 'Reorder';
+    if (x.moves[0] === 'aov') return x.aov.addon ? 'Offer ' + x.aov.addon + ' with it' : 'Offer an add-on with it';
+    if (x.moves[0] === 'ltv-up') return 'Feature it in ads for new customers';
+    if (x.moves[0] === 'ltv-down') return 'Leave it out of ads for new customers';
+    return FMT_NONE;
   };
-  const kinds = Object.keys(V3_ATTN_KIND);
-  return (<div className="v3-page-stack"><section className="v3-sec">
-    <div className="v3-kick">Which products get seen, and whether they sell, {v3Day(d.from)} to {v3Day(d.to)}</div>
-    <p className="v3-verdict">{head}</p>
-    <p className="v3-note v3-measure">
-      {d.drags.length > 0 && <>If those views had earned their type’s usual sales per view they would have made up to <b>{fmtMoney(d.prize)} a month</b> more. </>}
-      {small ? 'That is small next to your product sales, so your shop already shows the right products. Treat this as a tidy-up. Selling more alongside your hero products is the bigger win.' : d.drags.length ? 'Move the home page slots, collection positions and ad spend they hold to the stronger products of the same type.' : 'No product is clearly over- or under-shown for what it earns against others of its type.'}
-    </p>
-    <figure className="v3-chart">
-      <figcaption><span className="v3-chart-title">How much each product is shown, against what a view of it earns next to its type</span>
-        <span className="v3-legend">{kinds.slice().reverse().map(k => <React.Fragment key={k}><i style={{ background: V3_ATTN_KIND[k].col() }}/>{V3_ATTN_KIND[k].label} </React.Fragment>)}</span></figcaption>
-      <R.ResponsiveContainer width="100%" height={240}>
-        <R.ScatterChart margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-          <R.CartesianGrid/>
-          <R.XAxis type="number" dataKey="x" scale="log" domain={[d.lo, d.hi]} allowDataOverflow ticks={d.ticks} tickFormatter={fmtPctN}/>
-          <R.YAxis type="number" dataKey="y" domain={[0, d.yMax]} ticks={d.yTicks} allowDataOverflow tickFormatter={v => fmtTimes(v, 1)}/>
-          <R.ZAxis range={[36, 36]}/>
-          <R.ReferenceLine y={1} stroke={PAL.muted} strokeDasharray="4 3"/>
-          <R.Tooltip content={tip} cursor={false}/>
-          {kinds.map(k => <R.Scatter key={k} data={d.pts.filter(p => p.kind === k)} fill={V3_ATTN_KIND[k].col()} isAnimationActive={false}/>)}
-        </R.ScatterChart>
-      </R.ResponsiveContainer>
-      <p className="micro muted v3-measure">Across: share of all product views, spaced so small shares can be read. Up: sales per view against the average for products of the same type; the dashed line is that average. A dot is coloured only when the share of its viewers who buy is clearly different from its type’s. Products with fewer than 150 views are left out.</p>
-    </figure>
-  </section>
-  {(d.gems.length > 0 || d.drags.length > 0) && (<div className="v3-movers">
-    <section><div className="v3-kick">Give more room to, sales per view against type</div>
-      {d.gems.length ? d.gems.slice(0, 5).map((p, i) => <div key={i} className="v3-mover"><span>{p.name}</span><b className="v3-up">{fmtTimes(p.y, 1)}</b></div>)
-        : <div className="v3-mover"><span className="v3-muted">None clearly</span></div>}</section>
-    <section><div className="v3-kick">Give less room to, or fix the page, share of views it gets</div>
-      {d.drags.length ? d.drags.slice(0, 5).map((p, i) => <div key={i} className="v3-mover"><span>{p.name}</span><b className="v3-down">{fmtPctN(p.x)}</b></div>)
-        : <div className="v3-mover"><span className="v3-muted">None clearly</span></div>}</section>
-  </div>)}
+  const viewNext = p => (p.kind === 'gem' ? 'Give it more room' : p.kind === 'drag' ? 'Give it less room, or fix the page' : FMT_NONE);
+  const viewRows = v ? (viewsAll ? v.pts : v.pts.slice(0, 10)) : [];
+  const empty = perf.rows && d && !d.list.length;
+
+  return (<div className="v3-home v3-profit v3-marketing v3-products">
+    <section className="v3-panel v3-home-strip v3-mk-strip" aria-label="Key figures">
+      {perf.err ? <div className="v3-panel-pad"><V3LoadFailed what="Your product sales" onRetry={perf.retry}/></div>
+        : !perf.rows ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={2}/></div>
+        : empty ? <p className="v3-panel-note">No product sales in the last eight weeks.</p>
+        : <>
+          <div className="v3-home-group" style={{ '--n': 4 }}>
+            <div className="v3-home-group-h">Last 28 days<span>{d.was > 0 ? 'against the 28 days before' : ''}</span></div>
+            <div className="v3-home-tiles">
+              <V3HomeTile key="sales" k="Product sales" v={fmtMoney(d.total)} dir={ch == null || Math.abs(ch) < 0.0005 ? 'flat' : ch > 0 ? 'up' : 'down'} cls={ch == null || Math.abs(ch) < 0.0005 ? '' : ch > 0 ? 'v3-up' : 'v3-down'}
+                delta={ch == null ? '' : v3Dp1Num(Math.abs(ch) * 100) + '%'} weak={ch != null && ch < -0.15 && d.sale == null} act={d.was > 0 ? toggle('products') : null} title="Shopify order lines, after discounts and before VAT"/>
+              <V3HomeTile key="kept" k="Kept after product cost" v={haveKept ? fmtMoney(d.keptTot) : FMT_NONE} delta={haveKept && margin != null ? fmtPctN(margin) + ' of sales' : ''} title="After each product’s own cost and payment fees, before delivery and packing"/>
+              <V3HomeTile key="loss" k="Sold at a loss" v={haveKept ? fmtCount(d.losers.length) : FMT_NONE} weak={d.losers.length > 0} delta={!haveKept ? '' : d.losers.length ? fmtMoney(Math.abs(d.losers.reduce((a, x) => a + x.kept, 0))) + ' lost' : d.losers.length === 1 ? 'product' : 'products'}/>
+              <V3HomeTile key="top5" k="Top five’s share" v={d.top5share == null ? FMT_NONE : fmtPctN(d.top5share)} delta={'of ' + fmtCount(top.length) + ' products'}/>
+            </div></div>
+          {(h || rr) && <div className="v3-home-group" style={{ '--n': (h ? 2 : 0) + (rr ? 1 : 0) }}>
+            <div className="v3-home-group-h">Last 12 months<span>the whole range</span></div>
+            <div className="v3-home-tiles">
+              {h && <V3HomeTile key="half" k="Products making half your sales" v={fmtCount(h.n50) + ' of ' + fmtCount(h.sell.length)} delta={fmtCount(h.n80) + ' make 80%'}/>}
+              {h && <V3HomeTile key="best" k="Best seller’s share" v={fmtPctN(best.share)} delta={best.title} title={best.title}/>}
+              {rr && <V3HomeTile key="ref" k="Sales refunded" v={fmtPctN(rr.rate != null ? rr.rate : rr.share)} delta={rr.rate != null ? 'as on Goal & costs' : 'last three months'} weak={false} act={rr.high.length ? toggle('refunds') : null}
+                title={rr.rate != null ? 'Money refunded over web sales, last 12 months' : fmtMoney(rr.G) + ' of ' + fmtMoney(rr.S) + ' given back over three months'}/>}
+            </div></div>}
+          {drv === 'products' && d.was > 0 && <div className="v3-home-drv"><V3DriverPanel key="products" fixed={v3ModelProducts(d.list, d.sale)}/></div>}
+          {drv === 'refunds' && <div className="v3-home-drv"><V3RefundPanel/></div>}
+        </>}
+    </section>
+
+    {perf.rows && !empty && (<section className="v3-panel" aria-label="Sales by product">
+      <div className="v3-panel-head"><h2>Sales by product</h2><span className="v3-muted">Last 28 days against the 28 days before</span></div>
+      <div className="v3-panel-pad v3-mk-charts">
+        <figure className="v3-chart" aria-label="Best sellers"><figcaption><span className="v3-chart-title">Best sellers</span></figcaption>
+          <R.ResponsiveContainer width="100%" height={240}>
+            <R.BarChart layout="vertical" data={top.slice(0, 8)} margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
+              <R.CartesianGrid horizontal={false}/><R.XAxis type="number" tickFormatter={fmtMoneyK}/><R.YAxis type="category" dataKey="title" width={nameW} interval={0} {...nameTick}/>
+              <R.Tooltip content={tip} cursor={false}/>
+              <R.Bar dataKey="now" fill={PAL.sales} isAnimationActive={false}/>
+            </R.BarChart>
+          </R.ResponsiveContainer></figure>
+        {moved.length > 0 && <figure className="v3-chart" aria-label="Change in sales"><figcaption><span className="v3-chart-title">Change in sales</span>
+          <span className="v3-legend"><i style={{ background: PAL.good }}/>Up <i style={{ background: PAL.bad }}/>Down</span></figcaption>
+          <R.ResponsiveContainer width="100%" height={240}>
+            <R.BarChart layout="vertical" data={moved} margin={{ top: 0, right: 8, left: 0, bottom: 0 }}>
+              <R.CartesianGrid horizontal={false}/><R.XAxis type="number" tickFormatter={fmtMoneyK}/><R.YAxis type="category" dataKey="title" width={nameW} interval={0} {...nameTick}/>
+              <R.Tooltip content={tip} cursor={false}/>
+              <R.ReferenceLine x={0} stroke={PAL.muted}/>
+              <R.Bar dataKey="d" isAnimationActive={false}>{moved.map(x => <R.Cell key={x.title} fill={x.d >= 0 ? PAL.good : PAL.bad}/>)}</R.Bar>
+            </R.BarChart>
+          </R.ResponsiveContainer></figure>}
+      </div>
+      {d.sale != null && <p className="v3-panel-note">The 28 days before included a sale, {fmtPctN(d.sale)} above a typical 28 days, so most products are down against them.</p>}
+    </section>)}
+
+    <section className="v3-panel" aria-label="Actions">
+      <div className="v3-panel-head"><h2>Actions</h2>{live.length > 0 && <span className="v3-count">{live.length}</span>}<span className="v3-muted">Products, returns and discounts</span>
+        <button type="button" className="v3-panel-link" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>View all</button></div>
+      {bd.err ? <p className="v3-panel-note">Actions could not load. Refresh the page to try again.</p>
+        : !bd.rows ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={3}/></div>
+        : !shown.length ? <p className="v3-panel-note">No open actions on products, returns or discounts.</p>
+        : <table className="v3-home-table">
+          <thead><tr><th>Action</th><th>Area</th><th className="r">Worth</th><th>Basis</th><th>Status</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
+          <tbody>{shown.map(r => <V3HomeRow key={r.external_id} row={r} onPage={(V3_HOME_WORK[r.category] || [])[0] || 'products'} bmRow={bmRows.find(x => x.external_id === r.external_id)} onOpen={mode => setDrawer({ id: r.external_id, mode })}/>)}</tbody>
+        </table>}
+      {open && <V3HomeDrawer key={open.external_id} row={open} startMode={drawer.mode} onClose={() => setDrawer(null)}/>}
+    </section>
+
+    {checks.length > 0 && (<section className="v3-panel" aria-label="Checks">
+      <div className="v3-panel-head"><h2>Checks</h2><span className="v3-count">{checks.length}</span></div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-prod-checks">
+        <thead><tr><th>Check</th><th>Figure</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
+        <tbody>{checks.map(c => (<tr key={c.k}>
+          <td className="v3-web-wrap">{c.t}{c.sub && <span className="v3-home-sub">{c.sub}</span>}</td>
+          <td className="v3-web-wrap">{c.fig}</td>
+          <td className="r">{c.go && <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo(c.go[0], c.go[2])}>{c.go[1]}</button>}</td>
+        </tr>))}</tbody></table></div>
+    </section>)}
+
+    {perf.rows && !empty && (<section className="v3-panel" aria-label="Products">
+      <div className="v3-panel-head"><h2>Products</h2><span className="v3-count">{top.length}</span><span className="v3-muted">Last 28 days</span></div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-prod-table">
+        <thead><tr><th>Product</th><th className="r">Sales</th><th className="r v3-mk-opt">Kept</th><th className="r">Kept %</th><th className="r">Change</th><th className="r v3-mk-opt">Units</th></tr></thead>
+        <tbody>{shownRows.map(x => (<tr key={x.title}>
+          <td>{x.title}{x.out ? <span className="v3-flag">Out of stock</span> : x.low ? <span className="v3-flag">Low stock</span> : null}</td>
+          <td className="r">{fmtMoney(x.now)}</td>
+          <td className={'r v3-mk-opt' + (x.kept != null && x.kept < 0 ? ' v3-down' : '')}>{x.kept != null ? fmtMoney(x.kept) : FMT_NONE}</td>
+          <td className={'r' + (x.margin != null && x.margin < 0 ? ' v3-down' : '')}>{x.margin != null ? fmtPctN(x.margin) : FMT_NONE}</td>
+          <td className={'r ' + (x.ch == null ? 'v3-muted' : x.ch >= 0 ? 'v3-up' : 'v3-down')}>{x.ch != null ? (x.ch >= 0 ? '+' : '−') + fmtPctN(Math.abs(x.ch)) : x.isNew ? 'New' : 'None before'}</td>
+          <td className="r v3-mk-opt">{fmtCount(x.units)}</td>
+        </tr>))}
+          {(showAll || top.length <= 12) && <tr className="tot"><td>All products</td><td className="r">{fmtMoney(d.total)}</td><td className="r v3-mk-opt">{haveKept ? fmtMoney(d.keptTot) : FMT_NONE}</td><td className="r">{margin != null ? fmtPctN(margin) : FMT_NONE}</td>
+            <td className={'r ' + (ch == null ? 'v3-muted' : ch >= 0 ? 'v3-up' : 'v3-down')}>{ch != null ? (ch >= 0 ? '+' : '−') + fmtPctN(Math.abs(ch)) : FMT_NONE}</td><td className="r v3-mk-opt">{fmtCount(d.units)}</td></tr>}
+        </tbody></table></div>
+      {top.length > 12 && <div className="v3-panel-pad"><button type="button" className="v3-btn v3-btn-sm" onClick={() => setShowAll(o => !o)}>{showAll ? 'Show top 12' : 'Show all ' + fmtCount(top.length) + ' products'}</button></div>}
+      <p className="v3-panel-note">Kept is after the product’s own cost and payment fees, before delivery and packing, so profit on Profit &amp; sales is lower.{pc.err ? ' Kept could not load. Refresh the page to try again.' : ''}{stock.err ? ' Stock could not load, so out-of-stock flags are missing.' : ''}</p>
+    </section>)}
+
+    {facts.err ? <section className="v3-panel" aria-label="Hero products"><div className="v3-panel-head"><h2>Hero products</h2></div><p className="v3-panel-note">Hero products could not load. Refresh the page to try again.</p></section>
+      : !facts.rows ? null
+      : h && (<section className="v3-panel" aria-label="Hero products">
+      <div className="v3-panel-head"><h2>Hero products</h2><span className="v3-count">{h.heroes.length}</span><span className="v3-muted">Last 12 months</span></div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-prod-heroes">
+        <thead><tr><th>Product</th><th className="r v3-mk-opt">Share</th>{h.hasHero && <th className="r">Sold alone</th>}{h.hasHero && <th className="r v3-mk-opt">Profit alone</th>}{h.hasHero && <th className="r v3-mk-opt">With more</th>}{h.hasHero && <th className="r">Back in 6 months</th>}{h.hasHero && <th>Next step</th>}</tr></thead>
+        <tbody>{h.heroes.map(x => { const r = x.h; return (<tr key={x.id}>
+          <td>{x.title}</td>
+          <td className="r v3-mk-opt">{fmtPctN(x.share)}</td>
+          {h.hasHero && <td className={'r' + (x.aov ? ' v3-down' : '')}>{r ? fmtPctN(Number(r.solo_share)) : FMT_NONE}</td>}
+          {h.hasHero && <td className="r v3-mk-opt">{r && r.solo_cm2 != null ? fmtMoney(r.solo_cm2) : FMT_NONE}</td>}
+          {h.hasHero && <td className="r v3-mk-opt">{r && r.multi_cm2 != null ? fmtMoney(r.multi_cm2) : FMT_NONE}</td>}
+          {h.hasHero && <td className={'r' + (x.ltv === 'up' ? ' v3-up' : x.ltv === 'down' ? ' v3-down' : '')}>{r && Number(r.first_cohort) >= 40 ? fmtPctN(Number(r.back_180d)) : FMT_NONE}</td>}
+          {h.hasHero && <td className="v3-web-wrap">{moveText(x)}</td>}
+        </tr>); })}</tbody></table></div>
+      {h.hasHero && h.brandBack != null && <p className="v3-panel-note">Share is of sales. Profit alone and with more are per order, after product and order costs and before ads, on orders this product led. Back in 6 months counts customers whose first order it led, against {fmtPctN(h.brandBack)} for all new customers. A dash means too few to say.</p>}
+      {hero.err && <p className="v3-panel-note">Basket and repeat figures could not load. Refresh the page to try again.</p>}
+    </section>)}
+
+    {h && (<section className="v3-panel" aria-label="Range">
+      <div className="v3-panel-head"><h2>Range</h2><span className="v3-muted">Last 12 months</span></div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+        <thead><tr><th>Group</th><th className="r">Products</th><th className="r">Share of sales</th></tr></thead>
+        <tbody>{h.range.map(b => (<tr key={b.k}><td>{b.k}</td><td className="r">{fmtCount(b.n)}</td><td className="r">{fmtPctN(b.s)}</td></tr>))}</tbody></table></div>
+      {h.allFirsts > 0 && best.firsts > 0 && best.firsts >= Math.max(...h.sell.map(x => x.firsts)) && <p className="v3-panel-note">{best.title} starts more new customers than any other product: {fmtPctN(best.firsts / h.allFirsts)} of first orders.</p>}
+    </section>)}
+
+    {attn.err ? <section className="v3-panel" aria-label="Product views"><div className="v3-panel-head"><h2>Product views</h2></div><p className="v3-panel-note">Product views could not load. Refresh the page to try again.</p></section>
+      : v && (<section className="v3-panel" aria-label="Product views">
+      <div className="v3-panel-head"><h2>Product views</h2><span className="v3-muted">{v3Day(v.from)} to {v3Day(v.to)}</span></div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+        <thead><tr><th>Product</th><th className="v3-mk-opt">Type</th><th className="r">Share of views</th><th className="r">Sales per view against type</th>{v.flagged > 0 && <th>Next step</th>}</tr></thead>
+        <tbody>{viewRows.map(p => (<tr key={p.name}><td>{p.name}</td><td className="v3-mk-opt">{p.type}</td><td className="r">{fmtPctN(p.x)}</td>
+          <td className={'r' + (p.kind === 'gem' ? ' v3-up' : p.kind === 'drag' ? ' v3-down' : '')}>{fmtTimes(p.y, 1)}</td>{v.flagged > 0 && <td className="v3-web-wrap">{viewNext(p)}</td>}</tr>))}</tbody></table></div>
+      {v.pts.length > 10 && <div className="v3-panel-pad"><button type="button" className="v3-btn v3-btn-sm" onClick={() => setViewsAll(o => !o)}>{viewsAll ? 'Show top 10' : 'Show all ' + fmtCount(v.pts.length) + ' products'}</button></div>}
+      <p className="v3-panel-note">{v.flagged > 0 ? '' : 'No product is clearly over or under shown for what it earns. '}Each product is compared with others of its type. Types with fewer than four products, and products with fewer than 150 views, are left out.{v.hasDrags ? ' Worth up to ' + v3GbpRound(v.prize) + ' a month if the weak products’ views earned their type’s usual sales per view.' : ''}</p>
+    </section>)}
   </div>);
 }
 
@@ -25203,31 +25191,31 @@ const V3_REFUNDS_Q = (sb, b) => {
   const q = t => sb.from(t).select('title,orders,refunded_orders,refunded_gbp,sales_gbp').eq('brand_id', b).order('refunded_gbp', { ascending: false }).limit(200);
   return q('cache_product_refunds_90d').then(r => r && r.error ? q('vw_product_refunds_90d') : r);
 };
-function V3RefundSign({ part, open, setOpen }) {
-  const q = useV3Rows('product-refunds', V3_REFUNDS_Q), board = useV3Board();
-  const drift = useV3Rows('goal-drift', V3_DRIFT_Q);
-  const R = q.rows || [];
+// One refund rate (23 Oct): the sign once said "Orders refunded 4.4%" (refunded orders over orders, summed over
+// product rows, so an order with three products counted three times) beside "£41,734 of £1,133,818" (3.7%), while
+// Goal & costs and Profit & sales said refunds are 4.0% of sales. The tile shows that 4.0% (vw_brand_config_drift:
+// money refunded over web sales, last 12 months). Products are compared with the shop on the same money basis and
+// the same orders: refunded £ over sales £.
+function v3RefundRead(rows, driftRows) {
+  const R = rows || [];
   if (!R.length) return null;
   const G = R.reduce((t, r) => t + Number(r.refunded_gbp), 0), S = R.reduce((t, r) => t + Number(r.sales_gbp), 0);
   if (!(S > 0)) return null;
-  // One refund rate (23 Oct): this sign said "Orders refunded 4.4%" (refunded orders over orders, summed
-  // over product rows, so an order with three products counted three times) beside "£41,734 of £1,133,818"
-  // (3.7%), while Goal & costs and Profit & sales said refunds are 4.0% of sales. The sign now shows that
-  // 4.0% (vw_brand_config_drift: money refunded over web sales, last 12 months). Products are compared
-  // with the shop on the same money basis and the same orders: refunded £ over sales £.
-  const rf = (drift.rows || []).find(r => r.input_key === 'refundPct' && r.verifiable && r.realised_value != null);
-  const share = G / S, rateY = rf ? Number(rf.realised_value) / 100 : null;
-  const pShare = r => Number(r.sales_gbp) > 0 ? Number(r.refunded_gbp) / Number(r.sales_gbp) : 0;
+  const rf = (driftRows || []).find(r => r.input_key === 'refundPct' && r.verifiable && r.realised_value != null);
+  const share = G / S, pShare = r => (Number(r.sales_gbp) > 0 ? Number(r.refunded_gbp) / Number(r.sales_gbp) : 0);
   const high = R.filter(r => Number(r.orders) >= 10 && pShare(r) >= share * 1.5).sort((a, b) => pShare(b) - pShare(a)).slice(0, 6);
+  return { G, S, share, rate: rf ? Number(rf.realised_value) / 100 : null, pShare, high };
+}
+function V3RefundPanel() {
+  const q = useV3Rows('product-refunds', V3_REFUNDS_Q), board = useV3Board();
+  const drift = useV3Rows('goal-drift', V3_DRIFT_Q);
+  const X = v3RefundRead(q.rows, drift.rows);
+  if (!X || !X.high.length) return null;
+  const { G, S, pShare, high } = X;
   const live = board.rows ? v3LiveRows(board.rows) : [];
   const acts = live.filter(r => /^returns-product-/.test(r.external_id));
-  if (part === 'sign') return (
-    <V3Sign k="Sales refunded" v={fmtPctN(rateY != null ? rateY : share)} tone={high.length ? 'ok' : 'typical'}
-      n={<>{rateY != null ? 'of sales over the last 12 months, as Goal & costs reads it' : <>{fmtMoney(G)} of {fmtMoney(S)} given back over three months</>}{high.length ? <>; {high.length === 1 ? 'one product has' : fmtCount(high.length) + ' products have'} 1.5 times the shop’s share of sales refunded or more</> : null}</>}
-      act={high.length ? { label: open ? 'Hide which products' : 'Which products?', open, on: () => setOpen(o => !o) } : null}/>);
-  if (!open || !high.length) return null;
   return (<div className="v3-drivers">
-      <h3 className="v3-sec-title">Products refunded more than the rest of your shop</h3>
+      <h3 className="v3-sec-title">Products refunded most</h3>
       <p className="v3-note v3-measure">On orders placed between 104 and 14 days ago, the shop gave back {fmtMoney(G)} of {fmtMoney(S)}. {high.length === 1 ? 'This product had' : 'These products had'} 1.5 times that share of sales refunded or more. A product that keeps coming back usually has one reason: the size, the photos, the quality, or the description. Find it before you spend more selling it.</p>
       {acts.length > 0 && <div className="v3-drivers-todo">
         <div className="v3-kick">What to do</div>
@@ -25242,27 +25230,6 @@ function V3RefundSign({ part, open, setOpen }) {
       </table>
       <p className="micro muted v3-measure">Website orders placed between 104 and 14 days ago, so each has had two weeks to come back. A refund on an order with several products is shared between them by price. Products with fewer than ten orders are left out.</p>
     </div>);
-}
-function V3ProductStrip({ d }) {
-  const [open, setOpen] = React.useState(false);
-  const [rOpen, setROpen] = React.useState(false);
-  if (!d || !d.list || !d.list.length) return null;
-  const now = d.list.reduce((t, x) => t + x.now, 0), was = d.list.reduce((t, x) => t + x.was, 0);
-  if (!(was > 0)) return null;
-  const ch = now / was - 1;
-  const M = v3ModelProducts(d.list, d.sale);
-  return (<section className="v3-sec v3-strip">
-    <h2 className="v3-sec-title">What is moving it <span className="v3-muted">last 28 days</span></h2>
-    <div className="v3-signs">
-      <V3Sign k="Product sales" v={fmtMoney(now)} tone={ch >= 0 ? 'good' : d.sale != null ? 'ok' : ch < -0.15 ? 'weak' : 'ok'}
-        n={<>{fmtCount(d.list.filter(x => x.now > 0).length)} products sold{d.top5share != null ? <>; your top five bring {fmtPctN(d.top5share)}</> : null}</>}
-        trendAs={{ dir: Math.abs(ch) < 0.03 ? 'flat' : ch > 0 ? 'up' : 'down', cls: Math.abs(ch) < 0.03 ? 'flat' : ch > 0 ? 'good' : 'bad', from: fmtMoney(was), when: 'the 28 days before' }}
-        act={{ label: open ? 'Hide what is driving it' : 'What is driving this?', open, on: () => setOpen(o => !o) }}/>
-      <V3RefundSign part="sign" open={rOpen} setOpen={setROpen}/>
-    </div>
-    {open && <V3DriverPanel fixed={M}/>}
-    <V3RefundSign part="panel" open={rOpen}/>
-  </section>);
 }
 // What the board is working on (Actions, 9 Oct): every sign going the wrong way that a board row moves,
 // with those rows by rank; the sign opens its drivers panel. Signs going the right way, or that no row
@@ -26631,13 +26598,9 @@ const V3_PAGES = {
     <V3More id="cust-more" label="Cohorts"><Customers/><V3Anchor id="cohorts"/><CohortsPanel/></V3More>
   </>),
   products: (p) => (<>
+    {/* 5 Nov: the Home pattern. The folds are the older detail, under nouns. */}
     <V3Products/>
-    {/* Heroes lead: AOV and LTV levers per hero product. Attention follows, judged within each type —
-        it replaces ProductTrafficMisallocation, whose cross-type comparison put a £25 charm against a
-        £140 necklace and claimed up to £66k from it (review 2026-10-05). */}
-    <V3Heroes/>
-    <V3ProductAttention/>
-    <V3More id="prod-more" label="More product detail"><Products/></V3More>
+    <V3More id="prod-more" label="Product detail"><Products/></V3More>
     <V3More id="prod-promos" label="Promotions and discount codes"><V3Anchor id="promos"/><DiscountCodeTracker/></V3More>
   </>),
   competitors: (p) => (<>
@@ -27538,17 +27501,17 @@ const V3_WALK_TOUR = {
     what: 'Money tied up in stock that will not sell through soon. It is cash you have already spent and cannot use for ads or new lines until it sells.' },
   leaks: { dest: 'products', target: { sel: '.v3-more', has: 'Promotions and discount codes' },
     what: 'Every discount code, what it was used for and what it cost you, sits behind this heading. Open it to see which codes earn their keep.' },
-  topProducts: { dest: 'products', target: { sel: '.v3-ptable' },
-    what: 'Your products ranked by sales over the last 28 days. The bar is size, the change column is against the 28 days before, and a "Low stock" tag means sales may be held back by stock rather than demand.' },
-  movers: { dest: 'products', target: { sel: '.v3-movers' }, fallback: { sel: '.v3-ptable' },
+  topProducts: { dest: 'products', target: { sel: '.v3-prod-table' },
+    what: 'Your products ranked by sales over the last 28 days. The change column is against the 28 days before, and a "Low stock" tag means sales may be held back by stock rather than demand.' },
+  movers: { dest: 'products', target: { sel: 'figure.v3-chart', has: 'Change in sales' }, fallback: { sel: '.v3-prod-table' },
     what: 'What gained and lost the most in pounds. Before acting on a faller, check it against stock, a product that ran out looks exactly like one that stopped selling.' },
   traffic: { dest: 'website', target: { sel: 'figure.v3-chart' }, fallback: { sel: '.v3-verdict' },
     what: 'Your shop as a funnel, visits, product views, baskets, checkouts, orders, against a normal month. The stage that has slipped furthest is where buyers are being lost.' },
   retention: { dest: 'customers', target: { sel: 'figure.v3-chart', has: 'Sales per customer over time' }, fallback: { sel: '.v3-home-strip' },
     what: 'How much the average customer has spent with you as the months go by after their first order. The steeper the early climb, the more a new customer is really worth.' },
-  newProducts: { dest: 'products', target: { sel: '.v3-ptable' },
+  newProducts: { dest: 'products', target: { sel: '.v3-prod-table' },
     what: 'Your products ranked by sales. A change marked "New" had no sales in the period before, that is where launches show up first.' },
-  adFit: { dest: 'products', target: { sel: '.v3-ptable' },
+  adFit: { dest: 'products', target: { sel: '.v3-prod-table' },
     what: 'Not every product can win a new customer on an ad by itself. Each one is checked: can its first order pay back what an ad costs, or does it earn its place as an add-on or a repeat buy?' },
 };
 Object.keys(V3_WALK_TOUR).forEach(k => { if (V3_WALK_STEP[k]) Object.assign(V3_WALK_STEP[k], V3_WALK_TOUR[k]); });

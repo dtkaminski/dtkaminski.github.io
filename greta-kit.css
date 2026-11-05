@@ -2320,3 +2320,21 @@ div:has(> .v3-profit) ~ .v3-today { gap: 0; }
   .v3-main .v3-customers table.v3-profit-rows th.v3-mk-opt, .v3-main .v3-customers table.v3-profit-rows td.v3-mk-opt { display: none; }
   .v3-main .v3-customers table.v3-cust-dates td:first-child { white-space: nowrap; }
 }
+
+/* Products */
+.v3-products .v3-home-tile-k { min-height: 2lh; }
+.v3-products .v3-flag { white-space: nowrap; }
+.v3-main .v3-products table.v3-prod-heroes td:first-child { white-space: normal; }
+.v3-main .v3-products table.v3-prod-heroes td:last-child { min-width: 22ch; }
+.v3-main .v3-products table.v3-profit-rows td.v3-web-wrap { white-space: normal; }
+.v3-main .v3-products table.v3-profit-rows td.v3-web-wrap .v3-home-sub { display: block; overflow: visible; -webkit-line-clamp: unset; }
+@media (max-width: 767px) {
+  .v3-main .v3-products table.v3-profit-rows th:first-child, .v3-main .v3-products table.v3-profit-rows td:first-child { white-space: normal; min-width: 0; }
+  .v3-main .v3-products table.v3-profit-rows th.v3-mk-opt, .v3-main .v3-products table.v3-profit-rows td.v3-mk-opt { display: none; }
+  .v3-main .v3-products table.v3-prod-checks, .v3-main .v3-products table.v3-prod-checks tbody, .v3-main .v3-products table.v3-prod-checks tr, .v3-main .v3-products table.v3-prod-checks td { display: block; }
+  .v3-main .v3-products table.v3-prod-checks thead { display: none; }
+  .v3-main .v3-products table.v3-prod-checks tr { padding-block: var(--space-2); border-top: 1px solid var(--color-line); }
+  .v3-main .v3-products table.v3-prod-checks tr:first-child { border-top: 0; }
+  .v3-main .v3-products table.v3-prod-checks td { border: 0; padding-block: var(--space-1); text-align: left; white-space: normal; }
+  .v3-main .v3-products table.v3-prod-checks td:empty { display: none; }
+}
