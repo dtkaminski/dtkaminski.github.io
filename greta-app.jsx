@@ -24971,65 +24971,66 @@ function v3ModelCalendar(A, P, info) {
       ['Ad spend', P.spend, A.spend, v => fmtMoney(v), null],
       ['Sales from each £1 of ads', mP, mA, v => fmtMoney(v, 2), 'higher'],
     ].concat(info.goal ? [] : [['Profit after ads', P.cm, A.cm, v => (v < 0 ? '−' : '') + fmtMoney(Math.abs(v)), 'higher']]),
-    note: 'The month’s plan, the same one Today, Goal & costs and Growth compare with, spread evenly over the month’s days, against what came in. The calendar below draws its own day-by-day projection, which can differ.',
+    note: 'The month’s plan, the same one Home, Goal & costs and Growth compare with, spread evenly over the month’s days, against what came in. The calendar below draws its own day-by-day projection, which can differ.',
   };
 }
-// The month so far against the month's plan (fn_plan_progress, the same answer Today, Goal and Growth
-// give): A is what came in, P is what the plan expects by now. No 30-day fallback: before the month has
-// a complete day there is nothing to compare.
-function V3CalendarDrivers() {
-  useV3Rows('brand-state', V3_STATE_Q);   // the verdict reads the ad answer
+// Calendar's figure strip. The month so far against the month's plan (fn_plan_progress, the same answer Home, Goal and Growth give):
+// A is what came in, P is what the plan expects by now. No 30-day fallback: before the month has a complete day there is nothing to
+// compare. Profit against plan is the goal's figure once there is a goal (fn_today_goal, 30 Oct eval); the month plan's only without one.
+// The next peak is the brand state's (the same window the board and Stock & orders read).
+function V3CalendarStrip() {
+  const stQ = useV3Rows('brand-state', V3_STATE_Q);
   const q = useV3Rows('plan-progress-month', V3_PP_MONTH_Q);
   const tg = useV3Rows('today-goal', V3_TODAY_GOAL_Q);
+  const fe = useV3Rows('fc-err', V3_FC_ERR_Q);
   const [open, setOpen] = React.useState(false);
   const M = q.rows && q.rows[0] ? q.rows[0] : null;
-  // 30 Oct eval: profit after ads against plan is the goal's figure, once, from fn_today_goal. Calendar said
-  // "£69,790 against £70,178 planned" (Greta's re-worked month plan) while Today said "£959 behind what your goal
-  // expected" for the same days. Sales stay on the month's plan: that is what the calendar is laid out on.
   const TG = tg.rows && tg.rows[0];
   const GV = v3GoalVerdict(TG, ((typeof window !== 'undefined' && window.GRETA_HEADLINE) || {}).unreported_spend);
   const S = M && M.sales, Pa = M && M.profit_after_ads, Ad = M && M.ad_spend;
-  if (!S || !S.status || !(Number(S.expected_by_now) > 0) || !(Number(M.days_done) > 0)) return null;
-  const A = { rev: Number(S.actual_so_far) || 0, spend: Number(Ad && Ad.actual_so_far) || 0, cm: Number(Pa && Pa.actual_so_far) || 0 };
-  const P = { rev: Number(S.expected_by_now), spend: Number(Ad && Ad.expected_by_now) || 0, cm: Number(Pa && Pa.expected_by_now) || 0 };
-  const range = v3Day(String(M.start).slice(0, 10)) + ' – ' + v3Day(String(M.counted_through).slice(0, 10), true);
-  const tone = v3PlanTone(S.status);
-  // Sales on plan with profit off it (20 Oct, O5): "Healthy, ahead of plan" on £7,138 of sales while Today said the
-  // month was £509 down after ads against £1,270 planned. One line says both, and the sign drops to Watch.
-  const salesOk = S.status === 'ahead' || S.status === 'on_plan';
-  const goalOff = GV && GV.ahead != null ? GV.ahead < 0 : null;
-  const profOff = goalOff != null ? goalOff === salesOk
-    : Pa && Pa.status && Pa.status !== S.status && (salesOk ? !(Pa.status === 'ahead' || Pa.status === 'on_plan') : (Pa.status === 'ahead' || Pa.status === 'on_plan'));
-  const overAds = P.spend > 0 && A.spend > P.spend * 1.1;
-  const salesWords = salesOk ? 'Sales are ' + (S.status === 'ahead' ? fmtMoney(A.rev - P.rev) + ' ahead of' : 'on') + ' ' + gpMonthName(M.start) + '’s plan'
-                             : 'Sales are ' + fmtMoney(P.rev - A.rev) + ' behind ' + gpMonthName(M.start) + '’s plan';
-  const both = goalOff != null ? (<>
-    Against your goal, {Number(TG.so_far) < 0 ? 'you have lost ' : 'you have kept '}<b className="v3-num">{v3Gbp(Math.abs(Number(TG.so_far)))}</b> after ads
-    {String(TG.period_start).slice(0, 7) !== String(M.start).slice(0, 7) ? ' this quarter' : ''}, {GV.toDate}
-    {GV.close ? ', too close to call' : GV.on ? (goalOff ? '; the forecast makes it up by ' + v3Day(TG.period_end) : '; on track') : '; the forecast falls short by ' + v3Day(TG.period_end)}
-    {goalOff && salesOk && overAds ? <>, with ads over the month’s plan (<b className="v3-num">{fmtMoney(A.spend)}</b> spent against <b className="v3-num">{fmtMoney(P.spend)}</b>)</> : null}{'. '}
-  </>) : Pa && Pa.status ? (<>
-    {profOff ? (salesOk ? 'Profit after ads is behind plan: ' : 'Profit after ads is on plan: ') : 'Profit after ads is ' + (salesOk ? 'on plan too: ' : 'behind plan too: ')}
-    {A.cm < 0 ? 'you have lost ' : 'you have kept '}<b className="v3-num">{fmtMoney(Math.abs(A.cm))}</b> so far, against{P.cm < 0 ? ' a planned loss of ' : ' '}<b className="v3-num">{fmtMoney(Math.abs(P.cm))}</b>{P.cm < 0 ? ' by now' : ' planned by now'}
-    {profOff && salesOk && overAds ? <>, because ads ran over plan (<b className="v3-num">{fmtMoney(A.spend)}</b> spent against <b className="v3-num">{fmtMoney(P.spend)}</b>)</> : null}{'. '}
-  </>) : null;
-  return (<section className="v3-sec v3-strip">
-    <div className="v3-kick">{gpMonthName(M.start)} so far, {range}, against the month’s plan</div>
-    <div className="v3-lead2"><div>
-    <p className="v3-verdict">{salesWords}.</p>
-    <V3Brief>{both}{S.plan_total != null ? <>The plan for {gpMonthName(M.start)} is {fmtMoney(S.plan_total)}. </> : null}{S.pace_finish != null ? <>At today’s pace the month ends at about {fmtMoney(S.pace_finish)}. </> : null}<V3Conf state="probably" detail={[M.basis_note, S.pace_basis ? 'At today’s pace: ' + S.pace_basis + '.' : null].filter(Boolean).join(' ')}/></V3Brief>
-    </div>
-    <div className="v3-signs">
-      <V3Sign k={'Sales against ' + gpMonthName(M.start) + '’s plan'} v={fmtMoney(A.rev)} tone={tone === 'bad' ? 'weak' : profOff && salesOk ? 'ok' : S.status === 'ahead' ? 'good' : 'typical'}
-        bar={{ fill: Math.min(1, A.rev / (Math.max(A.rev, P.rev) * 1.25)), mark: P.rev / (Math.max(A.rev, P.rev) * 1.25) }}
-        n={<>{fmtMoney(P.rev)} expected by now; the mark is the plan</>}
-        trendAs={{ dir: S.status === 'on_plan' ? 'flat' : S.status === 'ahead' ? 'up' : 'down', cls: S.status === 'on_plan' ? 'flat' : tone === 'good' ? 'good' : 'bad',
-          // the Watch chip is for profit (the line below); say so beside it, not a bare "On plan" (30 Oct eval)
-          text: profOff && salesOk ? V3_PLAN_WORD[S.status] + ' for sales; profit behind' : V3_PLAN_WORD[S.status] }}
-        act={{ label: open ? 'Hide what is driving it' : 'What is driving this?', open, on: () => setOpen(o => !o) }}/>
-    </div></div>
-    <V3FcErr/>
-    {open && <V3DriverPanel fixed={v3ModelCalendar(A, P, { range, month: gpMonthName(M.start), goal: goalOff != null })}/>}
+  const hasMonth = !!(S && S.status && Number(S.expected_by_now) > 0 && Number(M.days_done) > 0);
+  const A = hasMonth ? { rev: Number(S.actual_so_far) || 0, spend: Number(Ad && Ad.actual_so_far) || 0, cm: Number(Pa && Pa.actual_so_far) || 0 } : null;
+  const P = hasMonth ? { rev: Number(S.expected_by_now), spend: Number(Ad && Ad.expected_by_now) || 0, cm: Number(Pa && Pa.expected_by_now) || 0 } : null;
+  const range = hasMonth ? v3Day(String(M.start).slice(0, 10)) + ' – ' + v3Day(String(M.counted_through).slice(0, 10)) : '';
+  const tone = hasMonth ? v3PlanTone(S.status) : '';
+  const overAds = hasMonth && P.spend > 0 && A.spend > P.spend * 1.1;
+  const goalOn = !!(GV && GV.ahead != null);
+  const signed = v => (v < 0 ? '−' : '') + fmtMoney(Math.abs(v));
+  // the record behind the forward figures, kept beside them (vw_forecast_error_30d); too few days and there is no figure to show
+  const Fe = fe.rows && fe.rows[0];
+  const wape = Fe && Fe.wape != null && isFinite(Number(Fe.wape)) && Number(Fe.days) >= 14 ? Number(Fe.wape) : null;
+  const Pk = stQ.rows && stQ.rows[0] && stQ.rows[0].peak;
+  const pkDays = Pk && Pk.days_away != null ? Number(Pk.days_away) : null;
+  const pkLy = Pk && Number(Pk.ly_sales) > 0 ? Number(Pk.ly_sales) : null;
+  const nMonth = hasMonth ? 2 + (S.plan_total != null ? 1 : 0) + (wape != null ? 1 : 0) + (!goalOn && Pa && Pa.status ? 1 : 0) : 0;
+  const loading = !q.rows && !q.err && !Pk && !TG;
+  if (loading) return <section className="v3-panel v3-home-strip v3-mk-strip" aria-label="Key figures"><div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={2}/></div></section>;
+  if (!hasMonth && !goalOn && !Pk && !q.err) return null;
+  return (<section className="v3-panel v3-home-strip v3-mk-strip" aria-label="Key figures">
+    {q.err && <p className="v3-panel-note v3-goal-full">This month’s figures did not load.</p>}
+    {hasMonth && <div className="v3-home-group" style={{ '--n': nMonth }}>
+      <div className="v3-home-group-h">{gpMonthName(M.start)} so far<span>{range}</span><b className={'v3-pill ' + (tone === 'bad' ? 'v3-pill-bad' : tone === 'good' ? 'v3-pill-good' : 'v3-pill-warn')}>{V3_PLAN_WORD[S.status]}</b></div>
+      <div className="v3-home-tiles">
+        <V3HomeTile k="Sales" v={fmtMoney(A.rev)} dir={S.status === 'on_plan' ? 'flat' : S.status === 'ahead' ? 'up' : 'down'} cls={tone === 'bad' ? 'v3-down' : tone === 'good' && S.status === 'ahead' ? 'v3-up' : ''}
+          delta={S.status === 'on_plan' ? fmtMoney(P.rev) + ' by now' : fmtMoney(Math.abs(A.rev - P.rev)) + (A.rev >= P.rev ? ' over plan' : ' under plan')} title={fmtMoney(P.rev) + ' expected by now. ' + (M.basis_note || '')} act={{ open, on: () => setOpen(o => !o) }}/>
+        <V3HomeTile k="Ad spend" v={fmtMoney(A.spend)} dir={overAds ? 'up' : null} cls={overAds ? 'v3-down' : ''} delta={fmtMoney(P.spend) + ' planned by now'}/>
+        {!goalOn && Pa && Pa.status && <V3HomeTile k="Profit after ads" v={signed(A.cm)} cls={v3PlanTone(Pa.status) === 'bad' ? 'v3-down' : ''} delta={signed(P.cm) + ' planned by now'}/>}
+        {S.plan_total != null && <V3HomeTile k={gpMonthName(M.start) + ' plan'} v={v3GbpRound(S.plan_total)} delta={S.pace_finish != null ? v3GbpRound(S.pace_finish) + ' at today’s pace' : ''} title={[goalOn && Number(TG.goal_sales) > 0 ? 'The plan for your sales goal.' : null, S.pace_basis ? 'At today’s pace: ' + S.pace_basis + '.' : null].filter(Boolean).join(' ') || undefined}/>}
+        {wape != null && <V3HomeTile k="Daily forecast error" v={fmtPctN(wape)} delta={'last ' + fmtCount(Number(Fe.days)) + ' days' + (Number(Fe.bias) > 0 ? ', low on average' : Number(Fe.bias) < 0 ? ', high on average' : '')}/>}
+      </div></div>}
+    {goalOn && <div className="v3-home-group" style={{ '--n': TG.target != null ? 2 : 1 }}>
+      <div className="v3-home-group-h">Goal<span>To {v3Day(TG.counted_through)}</span><b className={'v3-pill ' + (GV.cls === 'good' ? 'v3-pill-good' : GV.cls === 'bad' ? 'v3-pill-bad' : GV.cls === 'warn' ? 'v3-pill-warn' : 'v3-pill-none')}>{GV.word}</b></div>
+      <div className="v3-home-tiles">
+        <V3HomeTile k="Kept after ads" v={(Number(TG.so_far) < 0 ? '−' : '') + v3Gbp(Math.abs(Number(TG.so_far)))} dir={GV.ahead >= 0 ? 'up' : 'down'} cls={GV.ahead >= 0 ? 'v3-up' : 'v3-down'} delta={v3Gbp(Math.abs(GV.ahead)) + (GV.ahead >= 0 ? ' ahead of goal' : ' behind goal')}/>
+        {TG.target != null && <V3HomeTile k="Target" v={v3GbpRound(TG.target)} delta={'by ' + v3Day(TG.period_end)}/>}
+      </div></div>}
+    {Pk && <div className="v3-home-group" style={{ '--n': pkLy != null ? 2 : 1 }}>
+      <div className="v3-home-group-h">{Pk.title || 'Next peak'}<span>{v3Day(String(Pk.start).slice(0, 10))} – {v3Day(String(Pk.end).slice(0, 10))}</span></div>
+      <div className="v3-home-tiles">
+        <V3HomeTile k="Starts in" v={pkDays > 0 ? fmtCount(pkDays) + (pkDays === 1 ? ' day' : ' days') : 'Under way'} delta={v3Day(String(Pk.start).slice(0, 10))}/>
+        {pkLy != null && <V3HomeTile k="Same days last year" v={fmtMoney(pkLy)} delta={Number(Pk.ratio) > 0 ? v3Dp1Num(Number(Pk.ratio)) + '× a normal pace' : ''}/>}
+      </div></div>}
+    {open && hasMonth && <div className="v3-home-drv v3-goal-full"><V3DriverPanel fixed={v3ModelCalendar(A, P, { range, month: gpMonthName(M.start), goal: goalOn })}/></div>}
   </section>);
 }
 // Review (9 Oct): the week against a typical week, on the Review page's own figures. Kept after ads is
@@ -26690,7 +26691,7 @@ const V3_PAGES = {
     <V3Results/>
     <V3More id="res-all" label="All closed actions"><V3Anchor id="decisions"/><V3TrackRecord/></V3More>
   </>),
-  calendar: (p) => (<><V3CalendarDrivers/>{mosView('Calendar')}</>),
+  calendar: (p) => (<div className="v3-home v3-profit v3-marketing v3-goal-page v3-calendar"><V3CalendarStrip/>{mosView('Calendar')}</div>),
   ask: (p) => <AskPanel/>,
   // 5 Nov: the Home pattern, on three tabs. Links to costs, margin and economics pick their own tab.
   goal: (p) => <V3GoalPage/>,

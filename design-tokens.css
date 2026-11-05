@@ -327,6 +327,8 @@ html[data-frame="product"] {
   --size-rail: 212px;
   --size-content: 1280px;
   --size-home-status: 112px;
+  --size-cg-part: 112px;
+  --size-cg-state: 112px;
   --size-home-open: 132px;
   --size-home-area: 112px;
   --size-home-worth: 112px;

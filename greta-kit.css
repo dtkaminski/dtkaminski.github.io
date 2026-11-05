@@ -2106,8 +2106,7 @@ button.v3-home-tile:hover, button.v3-home-tile.open { background: var(--color-pa
 .v3-main > .v3-score, .v3-main .v3-rank,
 .v3-main .card, .v3-main .v3-raised,
 .v3-main .gp-wrap > div,
-.v3-main .v3-more, .v3-main .v3-res,
-.v3-main .cg-peak, .v3-main .cg-tray {
+.v3-main .v3-more, .v3-main .v3-res {
   background: var(--color-panel); border: 1px solid var(--color-line); border-radius: var(--radius-panel); box-shadow: none; padding: var(--space-4) var(--space-5); margin-top: 0;
 }
 .v3-main .v3-more { margin-bottom: var(--space-2); padding: 0 var(--space-5); }
@@ -2376,3 +2375,22 @@ div:has(> .v3-profit) ~ .v3-today { gap: 0; }
 
 /* Growth plan */
 .v3-growth-levers td:first-child { white-space: nowrap; }
+
+/* Calendar: figure strip, next peak and the grid as panels; reminders and proposals as tables */
+.v3-main .v3-calendar { grid-template-columns: minmax(0, 1fr); }
+.v3-main .v3-calendar .cg-main.tg-view { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); min-width: 0; }
+.v3-calendar .mos-embed-scope { min-width: 0; }
+.v3-main .v3-calendar .mc-top { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-2) var(--space-4); margin: 0; padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-line); }
+.v3-main .v3-calendar .mc-month { font-size: var(--text-base); }
+.v3-main .v3-calendar .tg-scroll { border: 0; border-radius: var(--radius-none); }
+.v3-main .v3-calendar .cg-foot { max-width: none; margin: 0; padding: var(--space-3) var(--space-4); border-top: 1px solid var(--color-line); }
+.v3-main .v3-goal-page table.v3-goal-checks.cg-table td:first-child { width: var(--size-cg-part); white-space: nowrap; }
+.v3-main .v3-goal-page table.v3-goal-checks.cg-table td { vertical-align: top; }
+.v3-main .v3-goal-page table.v3-goal-checks.cg-table td.cg-state { width: var(--size-cg-state); white-space: nowrap; }
+.v3-main .v3-goal-page table.v3-goal-checks.cg-table td.r { width: 1%; white-space: nowrap; }
+.v3-main table.cg-table td.cg-day { font-family: var(--font-figure); white-space: nowrap; }
+.v3-main table.cg-table .v3-btn + .v3-btn { margin-left: var(--space-2); }
+@media (max-width: 760px) {
+  .v3-main .v3-goal-page table.v3-goal-checks.cg-table td:first-child, .v3-main .v3-goal-page table.v3-goal-checks.cg-table td.cg-state, .v3-main .v3-goal-page table.v3-goal-checks.cg-table td.r { width: auto; white-space: normal; }
+  .v3-main .v3-goal-page table.v3-goal-checks.cg-table td:first-child { font-weight: var(--weight-medium); }
+}
