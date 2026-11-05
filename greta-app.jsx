@@ -14293,9 +14293,6 @@ function GP_SpendCurve(p) {
           </span>
         )}
       </div>
-      {c.reason && (
-        <div style={{ fontSize: 'var(--text-xs)', color: GP_T.dim, marginTop: 8, lineHeight: 1.5 }}>Model gate: {c.reason}</div>
-      )}
     </div>
   );
 }
@@ -18037,63 +18034,54 @@ const v3CashInputs = m => String(m || '').replace(/[{}"]/g, '').split(',').map(s
   .map(s => V3_CASH_FIELD[s] || s.replace(/_/g, ' ')).join(', ');
 function CashCeiling(){
   const [gate, setGate] = React.useState(undefined);
-  const [weeks, setWeeks] = React.useState([]);
   // The cash the brand entered, as Goal & costs reads it (cache_brand_state.state.cash_to_peak). The
   // week-by-week gate has no rows for any brand (23 Oct: brand_cash_ceiling and brand_cash_week are empty),
   // so this card asked Halden to "add the cash you have now" under the £640,000 it entered on 15 Oct.
   const stc = useV3Rows('brand-state', V3_STATE_Q);
   const CP = stc.rows && stc.rows[0] && stc.rows[0].cash_to_peak;
+  const goalC = useV3Rows('goal-active', V3_GOAL_Q);
+  const onGoal = !!(goalC.rows && goalC.rows[0] && Number(goalC.rows[0].revenue_target) > 0);
   React.useEffect(() => {
     let alive = true;
     const sb = (typeof window !== 'undefined' && window.FRKL_LIVE && window.FRKL_LIVE.sb) || window.sb;
     const brand = (window.FRKL_LIVE && window.FRKL_LIVE.brandId) || (window.OI_ASK && window.OI_ASK.brand_id);
     if (!sb || !brand) { setGate(null); return; }
     sb.from('vw_brand_cash_gate')
-      .select('readiness, binding, missing_inputs, s_profit_weekly, s_cash_weekly, s_recommended, min_cash, min_cash_week, funding_gap, first_breach_week_start, cash_floor, reason')
+      .select('readiness, binding, missing_inputs, s_profit_weekly, s_cash_weekly, min_cash, min_cash_week_start, funding_gap, first_breach_week_start, cash_floor')
       .eq('brand_id', brand).limit(1)
-      .then(r => { if (alive) setGate((r && r.data && r.data[0]) || null); })
-      .catch(() => alive && setGate(null));
-    sb.from('vw_brand_cash_13w').select('week_start, closing_cash, breach, headroom').eq('brand_id', brand).order('w', { ascending: true })
-      .then(r => { if (alive) setWeeks((r && r.data) || []); }).catch(() => {});
+      .then(r => { if (alive) setGate(!r || r.error ? false : (r.data && r.data[0]) || null); })
+      .catch(() => alive && setGate(false));
     return () => { alive = false; };
   }, []);
 
-  if (gate === undefined) return <V3SkeletonRows n={3}/>;   // pending, not empty
-  const missing = gate && gate.readiness !== 'ready';
-  if ((!gate || missing) && CP && CP.said && CP.cash_entered != null) return <V3CashToPeak/>;
-  return (<div className="card" style={{marginTop:14}}>
-    <div className="card-section-title"><h2 style={{margin:0}}>Can you afford the plan?</h2>
-      <span className="meta">You pay for stock before the sales come in, so a profitable plan can still run out of cash</span></div>
-    {(!gate || missing) ? (<div style={{marginTop:8}}>
-      <div className="fine" style={{color:'var(--text-secondary)', lineHeight:1.55}}>
-        Not enough to read this yet. Add the cash you have now, the lowest balance you are willing to reach,
-        and your supplier’s payment terms. Greta then works out the most you can spend a week without running
-        out of cash. That is often less than the most you could spend at a profit.
-        {gate && gate.missing_inputs ? <><br/><span className="muted">Still needed: {v3CashInputs(gate.missing_inputs)}</span></> : null}
-      </div>
-      <div style={{marginTop:8}}>
-        <button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={()=>window.__oiGo && window.__oiGo('goal','economics')}>Add your cash figures</button>
-      </div>
-    </div>) : (<div style={{marginTop:8}}>
-      <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:10}}>
-        <GP_Metric k="Most you can spend a week" v={GP_gbp(gate.s_recommended)} hi={true}
-          sub={gate.binding === 'cash' ? 'limited by cash, not profit' : 'limited by profit'} />
-        <GP_Metric k="If only profit mattered" v={GP_gbp(gate.s_profit_weekly)} />
-        <GP_Metric k="If only cash mattered" v={GP_gbp(gate.s_cash_weekly)} />
-        <GP_Metric k="Your lowest cash balance" v={GP_gbp(gate.min_cash)}
-          sub={gate.min_cash_week ? 'week of ' + v3Day(String(gate.min_cash_week).slice(0,10), true) : null} />
-      </div>
-      {Number(gate.funding_gap) > 0 && (<div className="note" style={{marginTop:10}}>
-        <b>You would need {GP_gbp(gate.funding_gap)} more cash</b> to pay for the stock this plan needs.
-        {gate.first_breach_week_start ? ' You would first run short in the week of ' + v3Day(String(gate.first_breach_week_start).slice(0,10), true) + '.' : ''}
-        {' '}Raise the cash, spend more slowly, or place the stock order later.
-      </div>)}
-      {weeks.length > 0 && (<div className="micro muted" style={{marginTop:8}}>
-        Based on the money expected in and out over the next {weeks.length} weeks.
-        {weeks.some(w => w.breach) ? ' Weeks below your lowest balance are counted in the gap above.' : ' No week falls below your lowest balance.'}
-      </div>)}
-    </div>)}
-  </div>);
+  // s_profit_weekly is the plan's own ad spend this week (1074), not a most: it was labelled "Most you can spend a week"
+  // and "If only profit mattered", beside an answer to spend less.
+  const head = pill => (<div className="v3-panel-head"><h2>Cash</h2><span className="v3-muted">Next 13 weeks</span>{pill}</div>);
+  if (gate === undefined) return <section className="v3-panel" aria-label="Cash" aria-busy="true">{head(null)}<div className="v3-panel-pad"><V3SkeletonRows n={3}/></div></section>;
+  if (gate === false) return <section className="v3-panel" aria-label="Cash">{head(null)}<p className="v3-panel-note">Cash could not load. Refresh the page to try again.</p></section>;
+  const missing = !gate || gate.readiness !== 'ready';
+  const toCash = label => <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('goal', 'economics')}>{label}</button>;
+  if (missing) {
+    const has = CP && CP.said && CP.cash_entered != null;
+    return (<section className="v3-panel" aria-label="Cash">{head(null)}
+      <div className="v3-panel-note v3-goal-call"><span>{has ? 'Weekly check not available yet.' : 'Weekly check needs your cash figures.'}{gate && gate.missing_inputs ? ' Still needed: ' + v3CashInputs(gate.missing_inputs) + '.' : ''}</span>{toCash(has ? 'Open Cash' : 'Add your cash figures')}</div>
+    </section>);
+  }
+  const gap = Number(gate.funding_gap) > 0 ? Number(gate.funding_gap) : 0;
+  const pill = gap > 0 ? <span className="v3-pill v3-pill-bad">{v3GbpRound(gap) + ' short'}</span>
+    : gate.binding === 'cash' || gate.binding === 'both' ? <span className="v3-pill v3-pill-warn">Cash is the limit</span> : <span className="v3-pill v3-pill-good">Cash is not the limit</span>;
+  const rows = [
+    gate.s_profit_weekly != null && { k: 'Ads on the plan this week', v: v3GbpRound(gate.s_profit_weekly), b: onGoal ? 'On the plan for your sales goal' : 'On the plan' },
+    gate.s_cash_weekly != null && { k: 'Most cash allows a week', v: v3GbpRound(gate.s_cash_weekly), b: 'Money expected in and out, stock included' },
+    gate.min_cash != null && { k: 'Lowest balance', v: v3GbpRound(gate.min_cash), b: [gate.cash_floor != null ? 'Your minimum ' + v3GbpRound(gate.cash_floor) : null, gate.min_cash_week_start ? 'Week of ' + v3Day(String(gate.min_cash_week_start).slice(0, 10), true) : null].filter(Boolean).join('. ') },
+    gap > 0 && { k: 'Extra cash needed', v: v3GbpRound(gap), b: gate.first_breach_week_start ? 'First short in the week of ' + v3Day(String(gate.first_breach_week_start).slice(0, 10), true) : '', cls: 'v3-down' },
+  ].filter(Boolean);
+  return (<section className="v3-panel" aria-label="Cash">{head(pill)}
+    <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-goal-checks">
+      <thead><tr><th>Measure</th><th className="r">Figure</th><th>Basis</th></tr></thead>
+      <tbody>{rows.map(r => <tr key={r.k}><td>{r.k}</td><td className={'r ' + (r.cls || '')}>{r.v}</td><td className="v3-web-wrap v3-muted">{r.b}</td></tr>)}</tbody>
+    </table></div>
+  </section>);
 }
 
 // What is happening, and why — built from fn_today_v2's structured fields rather than
@@ -20314,69 +20302,72 @@ function useV3Plan() {
   }, []);
   return (typeof window !== 'undefined' && window.FRKL_PLAN) || {};
 }
+// 5 Nov 2026, on Home's pattern. Every read is a fixed window, so no date control: the strip says its own periods.
+// The answer on ad spend is fn_brand_ad_decision's (V3AdAnswer), not one worked out here. The actions are the ones that
+// change how much to spend: Plan and control's two (as Goal & costs), plus Acquisition's that move the level of spend, and the
+// customer-cost check from Retention. No anatomy part has this as its page; update the list if anatomy_category_map changes.
+const V3_GROWTH_ACTS = ['ad-budget', 'promo-peak-plan', 'golden-rule', 'optim-ease-', 'order-cost-', 'test-holdout-', 'cust-cac-ltv'];
+const V3_AD_PILL = { down: ['Spend less', 'v3-pill-bad'], up: ['Room to spend more', 'v3-pill-good'], hold: ['Hold', 'v3-pill-none'] };
 function V3Growth() {
-  useV3Rows('brand-state', V3_STATE_Q);   // the month's plan names its ad level
-  // Rebuilt 2026-10-05. One answer to "should I spend more?", split by season: not now (measured on
-  // your own months against what a first order and a year of a customer earn), and the peak month,
-  // where the quarter plan (fn_plan_quarter, corrected in 0261) and last year's same month say what
-  // extra budget buys. Channel verdicts and where sales came from live on Marketing; retention balance
-  // on Customers. The short-term forecast is shown only when it agrees with the plan.
   const P = useV3Plan();
+  const stQ = useV3Rows('brand-state', V3_STATE_Q);
+  const hq = useV3Rows('sign-history', V3_SIGN_HIST_Q);
+  const lad = useV3Rows('profit-ladder', V3_LADDER_Q);
   const ue = useV3Rows('cust-ue', V3_UE_Q);
   const mo = useV3Rows('mk-months', V3_MONTHS_Q);
   const tierG = useV3Rows('tier-30', V3_TIER_Q);
   const figGr = useV3Figures();   // cac_30d and first_order_profit (1080)
-  const { g, per, pace, atGoal, today } = useV3Goal();
-  const ppG = useV3Rows('plan-progress-month', V3_PP_MONTH_Q);   // the month so far, as Today and Goal say it
+  const tgG = useV3Rows('today-goal', V3_TODAY_GOAL_Q);
+  const { g, tgt, pace, atGoal, today } = useV3Goal();
+  const ppG = useV3Rows('plan-progress-month', V3_PP_MONTH_Q);   // the month so far, as Home and Goal & costs say it
+  const [drv, setDrv] = React.useState(null);
+  // The curve's reads have no failure of their own: they come back empty. Give them time, then say so.
+  const [waiting, setWaiting] = React.useState(true);
+  React.useEffect(() => { const t = setTimeout(() => setWaiting(false), 25000); return () => clearTimeout(t); }, []);
+
   const sc = P.spendCurve || null;
   const pts = (P.spendCurvePoints || []).filter(p => Number(p.spend) > 0 && p.cac != null);
   const U = (ue.rows || [])[0] || null;
   // What a first order earns: the canonical first-order figure (Customers), not the average order.
-  // first_order_profit (1080); the curve's profit per average order is another figure, so no fallback to it
   const fopR = v3Fig('first_order_profit', figGr.rows).value, fop = fopR > 0 ? fopR : null;
   const c30R = v3Fig('cac_30d', figGr.rows), c30v = c30R.value > 0 ? c30R.value : null;
   const ltv = U && Number(U.ltv_contribution) > 0 ? Number(U.ltv_contribution) : null;
   const marg = sc && Number(sc.marginal_cac_now) > 0 ? Number(sc.marginal_cac_now) : null;
-  const last = pts.length ? pts[pts.length - 1] : null;
-  const back = pts.length > 6 ? pts[pts.length - 6] : (pts.length > 1 ? pts[0] : null);
+  const S0 = stQ.rows && stQ.rows[0], A = S0 && S0.ad_decision;
+  const T30 = tierG.rows && tierG.rows[0], nc = T30 && T30.new_customers != null ? Number(T30.new_customers) : null;
 
-  let head = null, sub = null;
-  if (last && fop && c30v != null) {
-    // the verdict on the last 30 days (cac_30d), as Today and Customers say it; the months below are the trend.
-    // No fallback to last month's cost: one window.
-    const cac = c30v, edge = cac < fop && fop - cac < fop * 0.15;
-    const inMonth = 'In the last 30 days ';
-    head = cac >= fop ? 'Not now. ' + inMonth + 'a new customer cost ' + fmtMoney(cac, 2) + ' to win, more than the ' + fmtMoney(fop, 2) + ' their first order earns.'
-      : edge ? 'Carefully. ' + inMonth + 'a new customer cost about what their first order earns.'
-      : 'Yes, in steps. ' + inMonth + 'a new customer cost well under what their first order earns.';
-    const rose = back && Number(last.spend) > Number(back.spend) * 1.3 && Number(last.cac) > Number(back.cac) * 1.2;
-    sub = (rose ? 'Since ' + v3Month(back.month, 'long') + ' your monthly ad spend went from ' + fmtMoney(back.spend) + ' to ' + fmtMoney(last.spend)
-          + '. Over the same months, the cost of each new customer went from ' + fmtMoney(back.cac, 2) + ' to ' + fmtMoney(Number(last.cac), 2) + '. ' : '')
-      + (marg ? 'At ' + fmtMoney(sc.current_spend) + ' a month of ads, one more customer would cost about ' + fmtMoney(marg) + '. ' + (ltv ? 'Their first order earns ' + fmtMoney(fop) + ', and a year of their orders ' + fmtMoney(ltv) + '. ' : '') : '')
-      + (cac >= fop ? (ltv && marg && marg > ltv ? 'In an ordinary month, extra spend loses money even after their repeat orders. Get more of your visitors buying before you add budget.'
-          : 'In an ordinary month, extra spend only pays for itself if those customers order again. Get more of your visitors buying before you add budget.')
-        : edge ? 'More budget now buys customers who only pay for themselves if they order again. Raise it slowly and watch what each new customer costs.'
-        : 'Each extra customer still pays for themselves on their first order. Raise spend in steps and watch what each new customer costs.');
-  }
+  // The strip's movers open their drivers, as on Marketing.
+  const SG = S0 && S0.last_30 && hq.rows ? v3BuildSigns(S0, hq.rows[0] && hq.rows[0].history, { lad }) : null;
+  const signOf = w => { const sg = SG && SG.signs.find(x => x.which === w); if (!sg) return null;
+    return Object.assign({}, sg, { act: !sg.noDrivers && v3HasDrivers(sg.which, SG.HP) ? { open: drv === sg.which, on: () => setDrv(o => (o === sg.which ? null : sg.which)) } : null }); };
+  const cacSign = signOf('cac'), spendSign = signOf('spend'), newSign = signOf('newsales');
+  const openSign = drv ? [cacSign, spendSign, newSign].find(x => x && x.which === drv) : null;
+  const signTile = (sg, label, value) => { const t = v3SignTrend(sg);
+    return <V3HomeTile key={sg.which} k={label} v={value != null ? value : sg.v} dir={t && t.dir} cls={t && t.cls} delta={t ? t.delta : ''} pts={(sg.series || []).map(p => p.v)} act={sg.act} title={sg.k}/>; };
+  const ncSeries = SG && SG.HP ? SG.HP.filter(p => p.new_customers != null).map(p => ({ d: String(p.d), v: Number(p.new_customers) })) : null;
+  const ncTrend = ncSeries ? v3SignTrend({ series: ncSeries, fmt: v => fmtCount(v), better: 'higher' }) : null;
+  const over = c30v != null && fop ? c30v - fop : null;
+  const adPill = A && V3_AD_PILL[A.decision];
+  const hasStrip = c30v != null || fop || ltv != null || marg != null;
 
-  // Why it bends, in one sentence, only when the split is actually identified.
+  // Why the cost rises, when the split is identified. Shares only mean something when both sides push the same way.
   const dec = P.curveDecomposition;
   let why = null;
   if (dec && dec.dominant_constraint && dec.dominant_constraint !== 'indeterminate' && dec.dominant_constraint !== 'no_saturation') {
-    const auction = Number(dec.beta_cpc), conversion = -Number(dec.beta_cvr);
-    why = conversion > auction
-      ? 'The cost is rising because fewer of the extra visitors you pay for go on to buy' + (auction <= 0 ? '. Your ad prices have not gone up at all' : '') + '. Better product pages and offers will do more than cheaper ads.'
-      : 'The cost is rising because ads get dearer the more of them you buy. New audiences and new ads will do more than changes to your site.';
+    const au = Number(dec.auction_share), co = Number(dec.conversion_share);
+    if (au > 0 && co > 0 && au < 1 && co < 1) why = 'Cost rises with spend: ' + Math.round(au * 100) + '% from dearer clicks, ' + (100 - Math.round(au * 100)) + '% from fewer visitors buying.';
+    else why = -Number(dec.beta_cvr) > Number(dec.beta_cpc) ? 'Cost rises with spend because fewer of the extra visitors buy.' : 'Cost rises with spend because clicks get dearer.';
   }
-  const LEV = { aov: 'Raise the average order', gross_margin: 'Make more on each product', refund_rate: 'Cut refunds',
-    per_order_costs: 'Cut the cost of each order', cvr: 'Get more visitors to buy', cpc: 'Pay less per click' };
+  const LEV = { aov: 'Average order', gross_margin: 'Margin on each product', refund_rate: 'Refunds', per_order_costs: 'Cost of each order', cvr: 'Visitors who buy', cpc: 'Cost per click' };
   const levers = (P.curveLevers || []).filter(l => l.ceiling_multiplier_mid != null)
     .sort((a, b) => Number(b.ceiling_multiplier_mid) - Number(a.ceiling_multiplier_mid)).slice(0, 4);
   const levMax = levers.length ? Number(levers[0].ceiling_multiplier_mid) - 1 : 0;
 
-  // The peak month: the plan's busiest month for new customers, against the same month last year.
+  // The peak month: the plan's busiest for new customers, against the same month last year. The month under way
+  // carries no season_new, and a sort on it left that month first, so this table never showed once a quarter began.
   const PL = (pace.rows || [])[0] || null, GL = (atGoal.rows || [])[0] || null;
-  const pk = PL && Array.isArray(PL.months) && PL.months.length ? PL.months.slice().sort((a, b) => Number(b.season_new) - Number(a.season_new))[0] : null;
+  const seasoned = PL && Array.isArray(PL.months) ? PL.months.filter(m => isFinite(parseFloat(m.season_new))) : [];
+  const pk = seasoned.length ? seasoned.slice().sort((a, b) => Number(b.season_new) - Number(a.season_new))[0] : null;
   const pkIso = pk ? String(pk.month).slice(0, 7) : null;
   const gk = GL && pkIso ? (GL.months || []).find(m => String(m.month).slice(0, 7) === pkIso) : null;
   const lyIso = pk ? v3MonthAdd(String(pk.month), -12).slice(0, 7) : null;
@@ -20385,130 +20376,144 @@ function V3Growth() {
   const peakOn = pk && Number(pk.season_new) >= 1.3 && Number(pk.new_customers) > 0;
   const per1 = m => m && Number(m.new_customers) > 0 ? Number(m.spend) / Number(m.new_customers) : null;
   const beyond = (GL || PL) && ((GL || PL).flags || []).indexOf('beyond_spend_seen') >= 0;
+  const round10 = n => fmtCount(Math.round(Number(n) / 10) * 10);
+  const peakName = pk ? gpMonthName(pk.month) : '';
+  const peakRows = peakOn ? [
+    { k: 'Ad spend', ly: ly ? fmtMoney(ly.spend) : null, pl: v3GbpRound(pk.spend), go: gk ? v3GbpRound(gk.spend) : null },
+    { k: 'New customers', ly: ly ? fmtCount(ly.new_customers) : null, pl: round10(pk.new_customers), go: gk ? round10(gk.new_customers) : null },
+    { k: 'Cost of each', ly: lyCost != null ? fmtMoney(lyCost, 2) : null, pl: v3GbpRound(per1(pk)), go: gk ? v3GbpRound(per1(gk)) : null },
+  ] : [];
 
-  // This month so far against the plan's month, and the short-term forecast only when it agrees with
-  // the plan over the same days (frkl, 5 Oct: forecast GBP 28.5k for 1 Oct-2 Nov, plan about 16k,
-  // October running at about 16k).
-  const fc = P.forecast || null;
   // The month so far, its plan and "at today's pace" all come from fn_plan_progress.
   const MP = ppG.rows && ppG.rows[0] ? ppG.rows[0] : null, MS = MP && MP.sales ? MP.sales : null;
   const mStart = MP ? String(MP.start).slice(0, 10) : today.slice(0, 8) + '01';
-  const dim = MP ? Number(MP.days_total) : 0, daysDone = MP ? Number(MP.days_done) : 0;
+  const daysDone = MP ? Number(MP.days_done) : 0;
   const mtd = MS && MS.actual_so_far != null ? Number(MS.actual_so_far) : null;
   const planMo = MS && Number(MS.plan_total) > 0 && MS.status ? MS : null;
   const ppdG = MS && MS.pace_per_day != null ? Number(MS.pace_per_day) : null;
+  // The short-term forecast shows only when it agrees with the plan over the same days and with how the month is running.
+  const fc = P.forecast || null;
   const planWin = (PL && fc && fc.forecast_covers_from && fc.forecast_covers_to) ? (PL.months || []).reduce((a, m) => {
     const ms = String(m.month).slice(0, 10), me = v3IsoAdd(v3MonthAdd(ms, 1), -1);
     const lo = fc.forecast_covers_from > ms ? fc.forecast_covers_from : ms, hi = fc.forecast_covers_to < me ? fc.forecast_covers_to : me;
     const n = Math.round((new Date(hi) - new Date(lo)) / 864e5) + 1, all = Math.round((new Date(me) - new Date(ms)) / 864e5) + 1;
     return a + (n > 0 ? Number(m.sales) * n / all : 0);
   }, 0) : null;
-  // ...and with how the month is actually running (6 Oct: £27,736 for 1 Oct-3 Nov beside "on course for
-  // £14,967" for October, within 30% of the plan but 69% above the pace). Needs a week of the month.
   const paceWin = (fc && fc.forecast_covers_from && fc.forecast_covers_to && ppdG != null && daysDone >= 7)
     ? ppdG * (Math.round((new Date(fc.forecast_covers_to) - new Date(fc.forecast_covers_from)) / 864e5) + 1) : null;
   const fcOk = fc && Number(fc.forecast_revenue_period) > 0 && planWin > 0 && Math.abs(Number(fc.forecast_revenue_period) / planWin - 1) <= 0.3
     && (paceWin == null ? daysDone >= 7 : Math.abs(Number(fc.forecast_revenue_period) / paceWin - 1) <= 0.3);
+  // With a sales goal the month's plan is the goal's, on the goal's ads, not the ads the plan would hold.
+  const gkMo = GL ? (GL.months || []).find(m => String(m.month).slice(0, 7) === mStart.slice(0, 7)) : null;
+  const planBasis = tgt ? 'On the plan for your sales goal' + (gkMo ? ', with ' + v3GbpRound(gkMo.spend) + ' of ads' : '')
+    : (PL && (PL.flags || []).indexOf('held_at_first_order_profit') >= 0) ? 'At the plan’s budget' : A ? 'With ' + v3AdsNear(A) : '';
+  const monthRows = planMo && mtd != null && daysDone >= 3 ? [
+    { k: 'Sales so far', v: fmtMoney(mtd), b: V3_PLAN_WORD[planMo.status] + ': ' + v3GbpRound(planMo.expected_by_now) + ' expected by now', cls: v3PlanTone(planMo.status) === 'bad' ? 'v3-down' : '' },
+    planMo.pace_finish != null && { k: 'At today’s pace', v: v3GbpRound(planMo.pace_finish), b: 'Your average day over the last 30 days (' + fmtMoney(planMo.pace_per_day) + ') for the ' + fmtCount(MP.days_left) + ' days left' },
+    { k: 'Plan', v: v3GbpRound(planMo.plan_total), b: planBasis },
+    fcOk && { k: 'Forecast, ' + v3Day(fc.forecast_covers_from) + ' to ' + v3Day(fc.forecast_covers_to), v: v3GbpRound(fc.forecast_revenue_period), b: 'The plan says ' + v3GbpRound(planWin) + ' for those days' },
+  ].filter(Boolean) : [];
 
-  const stat = (lab, val, foot, cls) => (<div className="v3-stat" key={lab}>
-    <div className="v3-stat-lab"><span>{lab}</span></div>
-    <div className="v3-stat-val">{val}</div>
-    <div className="v3-stat-foot"><span className={cls || 'v3-muted'}>{foot}</span></div>
-  </div>);
   const cacTip = ({ active, payload }) => (!active || !payload || !payload.length) ? null : (<div className="v3-tip"><b>{v3Month(payload[0].payload.month, 'long')}</b>
-    <span>New-customer cost <em>{fmtMoney(payload[0].payload.cac, 2)}</em></span>
+    <span>Cost of a new customer <em>{fmtMoney(payload[0].payload.cac, 2)}</em></span>
     <span>New customers <em>{fmtCount(payload[0].payload.new_customers)}</em></span>
     <span>Ad spend <em>{fmtMoney(payload[0].payload.spend)}</em></span></div>);
 
-  if (!sc && !pts.length && !PL) return <V3SkeletonRows n={4}/>;
-  return (<div className="v3-page-stack">
-    {head && (<section>
-      <div className="v3-kick">Should you spend more on ads?</div>
-      <p className="v3-verdict">{head}</p>
-      {sub && <V3Brief>{sub}</V3Brief>}
-      <div className="v3-stat-grid v3-gap-top">
-        {/* cac_30d in the registry's words; the months after it are history, said as such */}
-        {c30v != null && stat(c30R.label, fmtMoney(c30v, 2), fmtMoney(last.cac, 2) + ' in ' + v3Month(last.month, 'long') + (back ? ', ' + fmtMoney(back.cac, 2) + ' in ' + v3Month(back.month) : ''))}
-        {stat('A first order earns you', fmtMoney(fop, 2), 'after product and delivery costs')}
-        {ltv != null && stat('A customer earns you over a year', fmtMoney(ltv), 'first order and repeats')}
-        {marg != null && stat('One more customer would cost', fmtMoney(marg), 'at ' + fmtMoney(sc.current_spend) + ' a month of ads', marg > fop ? 'v3-down' : 'v3-muted')}
-      </div>
+  const toGoal = <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('goal')}>Open Goal &amp; costs</button>;
+  const TGG = tgG.rows && tgG.rows[0];
+
+  return (<div className="v3-home v3-profit v3-marketing v3-goal-page v3-growth">
+    <section className="v3-panel v3-home-strip v3-mk-strip" aria-label="Key figures">
+      {!hasStrip && !S0 ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={2}/></div> : <>
+        {hasStrip && <div className="v3-home-group" style={{ '--n': [c30v != null, !!fop, ltv != null, marg != null].filter(Boolean).length }}>
+          <div className="v3-home-group-h">A new customer<span>Last 30 days</span>{over != null && <b className={'v3-pill ' + (over > 0 ? 'v3-pill-bad' : 'v3-pill-good')}>{over > 0 ? fmtMoney(over, 2) + ' over first order' : 'Under first order'}</b>}</div>
+          <div className="v3-home-tiles">
+            {c30v != null && (cacSign ? signTile(cacSign, 'Cost to win', fmtMoney(c30v, 2)) : <V3HomeTile k="Cost to win" v={fmtMoney(c30v, 2)} delta=""/>)}
+            {fop && <V3HomeTile k="First order earns" v={fmtMoney(fop, 2)} delta="after product and delivery costs"/>}
+            {ltv != null && <V3HomeTile k="A year earns" v={fmtMoney(ltv)} delta="first order and repeats"/>}
+            {marg != null && <V3HomeTile k="Next customer costs" v={fmtMoney(marg)} cls={fop && marg > fop ? 'v3-down' : ''} delta={'at ' + fmtMoney(sc.current_spend) + ' a month'} title="An estimate from your cost curve"/>}
+          </div></div>}
+        {(spendSign || (A && Number(A.hold_week) > 0)) && <div className="v3-home-group" style={{ '--n': [spendSign, A && Number(A.hold_week) > 0].filter(Boolean).length }}>
+          <div className="v3-home-group-h">Ad spend{adPill && <b className={'v3-pill ' + adPill[1]}>{adPill[0]}</b>}</div>
+          <div className="v3-home-tiles">
+            {spendSign && signTile(spendSign, 'Last 30 days')}
+            {A && Number(A.hold_week) > 0 && <V3HomeTile k="On the plan" v={v3GbpRound(A.hold_week)} delta={'a week, ' + fmtMoney(A.last_7_days) + ' last 7 days'}/>}
+          </div></div>}
+        {(newSign || nc != null) && <div className="v3-home-group" style={{ '--n': [newSign, nc != null].filter(Boolean).length }}>
+          <div className="v3-home-group-h">First orders<span>Last 30 days</span></div>
+          <div className="v3-home-tiles">
+            {newSign && signTile(newSign, 'Sales')}
+            {nc != null && <V3HomeTile k="New customers" v={fmtCount(nc)} dir={ncTrend && ncTrend.dir} cls={ncTrend && ncTrend.cls} delta={ncTrend ? ncTrend.delta : ''} pts={(ncSeries || []).map(p => p.v)}/>}
+          </div></div>}
+        {openSign && <div className="v3-home-drv v3-goal-full"><V3DriverPanel key={drv} which={drv} points={openSign.points || SG.HP} ctx={openSign.ctx} line={openSign.dline}/></div>}
+        {!hasStrip && !waiting && !A && <p className="v3-panel-note v3-goal-full">Figures show once there is a month of ad spend and first orders.</p>}
+      </>}
+    </section>
+
+    <section className="v3-panel" aria-label="Cost of a new customer and ad spend">
+      <div className="v3-panel-head"><h2>By month</h2>{pts.length > 0 && <span className="v3-muted">{v3Month(pts[0].month, 'long')} to {v3Month(pts[pts.length - 1].month, 'long')}</span>}</div>
+      {pts.length >= 4 ? <div className="v3-panel-pad v3-mk-charts">
+        <figure className="v3-chart" aria-label="Cost of a new customer by month"><figcaption><span className="v3-chart-title">Cost of a new customer</span>
+          {fop && <span className="v3-legend"><i style={{ background: PAL.ads }}/>Cost <i className="dash"/>First order earns</span>}</figcaption>
+          <R.ResponsiveContainer width="100%" height={240}>
+            <R.LineChart data={pts} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <R.CartesianGrid vertical={false}/>
+              <R.XAxis dataKey="month" tickFormatter={m => v3Month(m, true)} interval="preserveStartEnd"/>
+              <R.YAxis tickFormatter={v => fmtMoney(v)} domain={[0, dataMax => Math.ceil(Math.max(dataMax, fop || 0) * 1.15 / 10) * 10]}/>
+              <R.Tooltip content={cacTip}/>
+              {fop && <R.ReferenceLine y={fop} stroke={PAL.muted} strokeDasharray="4 4"/>}
+              <R.Line type="linear" dataKey="cac" stroke={PAL.ads} strokeWidth={2} dot={false} isAnimationActive={false}/>
+            </R.LineChart>
+          </R.ResponsiveContainer></figure>
+        <figure className="v3-chart" aria-label="Ad spend by month"><figcaption><span className="v3-chart-title">Ad spend</span></figcaption>
+          <R.ResponsiveContainer width="100%" height={240}>
+            <R.BarChart data={pts} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+              <R.CartesianGrid vertical={false}/>
+              <R.XAxis dataKey="month" tickFormatter={m => v3Month(m, true)} interval="preserveStartEnd"/>
+              <R.YAxis tickFormatter={fmtMoneyK}/>
+              <R.Tooltip content={cacTip} cursor={false}/>
+              <R.Bar dataKey="spend" fill={PAL.ads} isAnimationActive={false}/>
+            </R.BarChart>
+          </R.ResponsiveContainer></figure>
+      </div> : waiting ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={3}/></div>
+        : <p className="v3-panel-note">{pts.length ? 'Charts show once there are four months of ad spend.' : 'Monthly figures did not load. Refresh the page, or check back once there are four months of ad spend.'}</p>}
+    </section>
+
+    {TGG && <V3AdAnswer panel action={toGoal} g={TGG}/>}
+    <V3GoalActions prefixes={V3_GROWTH_ACTS} words="ad spend" sub="Ad spend"/>
+
+    {levers.length >= 2 && (<section className="v3-panel" aria-label="Levers on ad spend">
+      <div className="v3-panel-head"><h2>Levers on ad spend</h2><span className="v3-muted">A 10% improvement in one thing</span></div>
+      <table className="v3-home-pl v3-growth-levers">
+        <thead><tr><th>Lever</th><th><span className="v3-sr-only">Size</span></th><th className="r">Spend it allows</th></tr></thead>
+        <tbody>{levers.map(l => { const gain = Number(l.ceiling_multiplier_mid) - 1;
+          return (<tr key={l.lever}><td>{LEV[l.lever] || v3Sentence(String(l.lever).replace(/_/g, ' '))}</td>
+            <td className="bar"><i className="v3-home-pl-kept" style={{ width: Math.max(2, levMax > 0 ? (gain / levMax) * 100 : 0) + '%' }}/></td>
+            <td className="r">+{Math.round(gain * 100)}%</td></tr>); })}</tbody>
+      </table>
+      <p className="v3-panel-note">{why ? why + ' ' : ''}Worked out from your own months, so a ranking, not a promise.</p>
     </section>)}
 
-    {peakOn && (<section className="v3-sec">
-      <h2 className="v3-sec-title">Where extra budget belongs: {gpMonthName(pk.month)}</h2>
-      {/* Two short paragraphs, not one of 104 words: last year's month, then the plan (7 Oct). */}
-      {lyCost != null && <p className="v3-note v3-measure">Last {gpMonthName(pk.month)} a new customer cost {fmtMoney(lyCost, 2)} to win: {fmtCount(ly.new_customers)} of them, on {fmtMoney(ly.spend)} of ads. That compares with {c30v != null ? fmtMoney(c30v, 2) + ' in the last 30 days' : fmtMoney(last ? last.cac : null, 2) + ' last month'}. The sale brings them in.</p>}
-      <V3Brief>
-        The plan spends {fmtMoney(pk.spend)} on ads in {gpMonthName(pk.month)} for about {fmtCount(pk.new_customers)} new customers, {fmtMoney(per1(pk), 2)} each.
-        {gk ? <> Your goal would spend {fmtMoney(gk.spend)} for about {fmtCount(gk.new_customers)}, {fmtMoney(per1(gk), 2)} each.</> : null}
-        {' '}If you add budget this quarter, put it here rather than in an ordinary month. Each extra pound still buys less than the one before.
-        {beyond && ' You have never spent this much on ads in a month, so these figures are Greta’s estimate, not results you have seen.'}
-        {' '}<V3Conf state="probably" detail="From the plan for the quarter: your own busy and quiet months, returning customers at their recent rate, and new-customer sales that rise with spend as your own months show. Last year’s figures are what you actually spent and the new customers you won."/></V3Brief>
-      <div className="v3-btn-row">
-        <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('goal')}>{g ? 'See what the goal takes' : 'Set a goal'} <span className="v3-xref-go">on Goal &amp; costs</span></button>
-      </div>
+    {peakOn && (<section className="v3-panel" aria-label="Peak month">
+      <div className="v3-panel-head"><h2>Peak month</h2><span className="v3-muted">{peakName}</span>
+        <V3Conf state="probably" detail="From the plan for the quarter: your own busy and quiet months, returning customers at their recent rate, and new-customer sales that rise with spend as your own months show. Last year’s figures are what you actually spent and the new customers you won."/></div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+        <thead><tr><th><span className="v3-sr-only">Figure</span></th>{ly && <th className="r">Last {peakName}</th>}<th className="r">Plan</th>{gk && <th className="r">Goal</th>}</tr></thead>
+        <tbody>{peakRows.map(r => (<tr key={r.k}><td>{r.k}</td>{ly && <td className="r">{r.ly != null ? r.ly : FMT_NONE}</td>}<td className="r">{r.pl}</td>{gk && <td className="r">{r.go}</td>}</tr>))}</tbody>
+      </table></div>
+      {beyond && <p className="v3-panel-note">{gk ? 'The goal spends' : 'The plan spends'} more than any month so far, so these are estimates.</p>}
     </section>)}
 
-    {pts.length >= 4 && fop && (<div className="v3-chart-pair">
-      <figure className="v3-chart">
-        <figcaption><span className="v3-chart-title">What a new customer costs, by month</span>
-          <span className="v3-legend"><i style={{ background: PAL.ads }}/>New-customer cost <i className="dash"/>What a first order earns</span></figcaption>
-        <R.ResponsiveContainer width="100%" height={240}>
-          <R.ComposedChart data={pts} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-            <defs><linearGradient id="v3CacFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={PAL.ads} stopOpacity={0.14}/><stop offset="100%" stopColor={PAL.ads} stopOpacity={0}/></linearGradient></defs>
-            <R.CartesianGrid/>
-            <R.XAxis dataKey="month" tickFormatter={m => v3Month(m, true)} interval="preserveStartEnd"/>
-            <R.YAxis tickFormatter={v => fmtMoney(v)} domain={[0, dataMax => Math.ceil(Math.max(dataMax, fop) * 1.15 / 10) * 10]}/>
-            <R.Tooltip content={cacTip}/>
-            <R.ReferenceLine y={fop} stroke={PAL.muted} strokeDasharray="4 4"/>
-            <R.Area type="linear" dataKey="cac" stroke={PAL.ads} fill="url(#v3CacFill)"/>
-          </R.ComposedChart>
-        </R.ResponsiveContainer>
-      </figure>
-      <figure className="v3-chart">
-        <figcaption><span className="v3-chart-title">Ad spend, by month</span></figcaption>
-        <R.ResponsiveContainer width="100%" height={240}>
-          <R.BarChart data={pts} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
-            <R.CartesianGrid/>
-            <R.XAxis dataKey="month" tickFormatter={m => v3Month(m, true)} interval="preserveStartEnd"/>
-            <R.YAxis tickFormatter={fmtMoneyK}/>
-            <R.Tooltip content={cacTip}/>
-            <R.Bar dataKey="spend" fill={PAL.ads} radius={[2, 2, 0, 0]}/>
-          </R.BarChart>
-        </R.ResponsiveContainer>
-      </figure>
-    </div>)}
-
-    {(why || levers.length >= 2) && (<section className="v3-sec">
-      <h2 className="v3-sec-title">What would let you spend more on ads?</h2>
-      {why && <p className="v3-note v3-measure">{why}</p>}
-      {levers.length >= 2 && <p className="v3-levers-head"><span>Improve one thing by 10%</span><span>and you could spend</span></p>}
-      {levers.length >= 2 && (<ul className="v3-levers">
-        {levers.map(l => {
-          const gain = Number(l.ceiling_multiplier_mid) - 1;
-          return (<li key={l.lever}>
-            <span className="v3-levers-name">{LEV[l.lever] || String(l.lever).replace(/_/g, ' ')}</span>
-            <span className="v3-levers-track"><i style={{ width: Math.max(2, levMax > 0 ? (gain / levMax) * 100 : 0) + '%' }}/></span>
-            <span className="v3-levers-v">+{Math.round(gain * 100)}% more</span>
-          </li>);
-        })}
-      </ul>)}
-      {levers.length >= 2 && <p className="micro muted v3-measure">That is, spend more before a new customer costs more than an order earns, with everything else unchanged. It is worked out from your own months, so treat it as a ranking, not a promise.</p>}
-      <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('marketing')}>Which ad channels pay for themselves <span className="v3-xref-go">on Marketing</span></button>
+    {monthRows.length > 0 && (<section className="v3-panel" aria-label={gpMonthName(mStart) + ' so far'}>
+      <div className="v3-panel-head"><h2>{gpMonthName(mStart)} so far</h2><span className="v3-muted">Sales</span></div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-goal-checks">
+        <thead><tr><th>Measure</th><th className="r">Figure</th><th>Basis</th></tr></thead>
+        <tbody>{monthRows.map(r => (<tr key={r.k}><td>{r.k}</td><td className="r">{r.v}</td><td className={'v3-web-wrap ' + (r.cls || 'v3-muted')}>{r.b}</td></tr>))}</tbody>
+      </table></div>
     </section>)}
 
-    {planMo && mtd != null && daysDone >= 3 && (<section className="v3-sec">
-      <h2 className="v3-sec-title">{gpMonthName(mStart)} so far</h2>
-      <div className="v3-stat-grid">
-        {stat('Sales so far', fmtMoney(mtd), V3_PLAN_WORD[planMo.status] + ': ' + fmtMoney(planMo.expected_by_now) + ' expected by now', 'v3-' + (v3PlanTone(planMo.status) === 'bad' ? 'down' : 'muted'))}
-        {planMo.pace_finish != null && stat('At today’s pace', fmtMoney(planMo.pace_finish), 'your last 30 days’ average day (' + fmtMoney(planMo.pace_per_day) + ') for each of the ' + fmtCount(MP.days_left) + ' days left')}
-        {stat('The plan for ' + gpMonthName(mStart), fmtMoney(planMo.plan_total), ((PL && PL.flags) || []).indexOf('held_at_first_order_profit') >= 0 ? 'at the plan’s budget' : 'with ' + v3AdsNear(V3_Q['brand-state'] && V3_Q['brand-state'].rows && V3_Q['brand-state'].rows[0] && V3_Q['brand-state'].rows[0].ad_decision))}
-        {fcOk && stat('Forecast, ' + v3Day(fc.forecast_covers_from) + ' – ' + v3Day(fc.forecast_covers_to), fmtMoney(fc.forecast_revenue_period), 'the plan says ' + fmtMoney(planWin))}
-      </div>
-      {fc && !fcOk && Number(fc.forecast_revenue_period) > 0 && planWin > 0 && paceWin != null && <p className="micro muted v3-measure">Greta’s short-term forecast ({fmtMoney(fc.forecast_revenue_period)} for {v3Day(fc.forecast_covers_from)} – {v3Day(fc.forecast_covers_to)}) is far from {Math.abs(Number(fc.forecast_revenue_period) / planWin - 1) > 0.3 ? 'the plan for the same days (' + fmtMoney(planWin) + ')' : 'how the month is running (' + fmtMoney(paceWin) + ' at this pace)'}, so it isn’t shown as a forecast here.</p>}
-    </section>)}
+    <V3AcquisitionChecks/>
+    <CashCeiling/>
   </div>);
 }
 
@@ -24782,39 +24787,6 @@ function V3BusinessState({ part }) {
     <div className="v3-panel-pad"><V3RankedDrivers D={S.drivers} plain/></div>
   </section>);
 }
-// Cash to the plan's end (0453, owner-seat eval 12 Oct): "can I afford the peak?" had every piece on some
-// page and no answer. fn_brand_cash_to_peak adds them up; one slow-stock figure, the anatomy's one cash cycle.
-function V3CashToPeak() {
-  const q = useV3Rows('brand-state', V3_STATE_Q);
-  const figQ = useV3Figures();   // peak_cash_need and slow_stock from their owners (1080)
-  const C = q.rows && q.rows[0] && q.rows[0].cash_to_peak;
-  if (!C || !C.said) return null;
-  const n = v => (v == null || !isFinite(Number(v)) ? null : Number(v));
-  const rows = [
-    ['Sales the plan expects', n(C.sales_expected)],
-    ['Ads in the plan', n(C.ads_left)],
-    ['Kept after product, order and ad costs', n(C.profit_after_ads_expected)],
-    ['Your overheads', n(C.overheads) ? -n(C.overheads) : null],
-    ['Trading result', n(C.after_overheads)],
-    // 1092: the plan's profit has had the product cost of its sales taken off; stock is paid for when it is ordered,
-    // so that cost is added back once. Without this row the table did not add up (frkl: 3,713 - 6,721 shown as 10,302).
-    ['Product cost of those sales, paid when the stock is ordered', n(C.stock_to_order) > 0 && n(C.product_cost_added_back) > 0 ? n(C.product_cost_added_back) : null],
-    ['Stock to order now, paid before it sells', n(C.stock_to_order) > 0 ? -n(C.stock_to_order) : null],
-    ['After overheads and the stock orders', n(C.stock_to_order) > 0 ? n(C.after_overheads_and_stock) : null],
-    ['Most cash the plan needs at once', (() => { const v = v3Fig('peak_cash_need', figQ.rows).value; const x = v != null ? v : n(C.peak_cash_need); return x > 0 ? x : null; })()],
-    // slow_stock from its owner, the Stock & orders list (1072), not the state's copy, which refreshes on another
-    // clock (23 Oct: 40 minutes behind the list). In the registry's words.
-    [v3Fig('slow_stock', figQ.rows).label || 'Cash tied up in slow stock', v3Fig('slow_stock', figQ.rows).value],
-  ].filter(r => r[1] != null);
-  return (<section className="v3-sec v3-cash">
-    <h2 className="v3-sec-title">Cash to {v3Day(String(C.to))} <span className="v3-muted">what ads, stock and overheads need, against what the plan brings back</span></h2>
-    <p className="v3-note v3-measure">{C.said}</p>
-    <table className="v3-rw">
-      <tbody>{rows.map(([k, v]) => (<tr key={k}><td className="t-text">{k}</td><td>{fmtMoney(v)}</td></tr>))}</tbody>
-    </table>
-    <p className="micro muted v3-measure">{v3Sentence(C.basis)}</p>
-  </section>);
-}
 // Goal & costs (9 Oct), on the page's own figures:
 //  1. sales so far against what the plan expected by now, split into new customers (how many, and the
 //     size of their first order) and returning customers, each against the plan's own figure to date
@@ -26581,22 +26553,26 @@ const V3_AM_ACQ_Q = (sb, b) => sb.from('anatomy_metric_value').select('metric_ke
   .eq('brand_id', b).in('metric_key', ['weighted_ncac', 'spending_power', 'pct_over_model', 'new_customer_layers']).limit(4);
 function V3AcquisitionChecks() {
   const q = useV3Rows('acq-checks', V3_AM_ACQ_Q);
-  if (q.err || !q.rows || !q.rows.length) return null;
+  if (q.err) return <section className="v3-panel" aria-label="Cost checks"><div className="v3-panel-head"><h2>Cost checks</h2></div><p className="v3-panel-note">Cost checks could not load. Refresh the page to try again.</p></section>;
+  if (!q.rows || !q.rows.length) return null;
   const am = {}; q.rows.forEach(r => { if (r.value != null && r.display) am[r.metric_key] = r; });
+  const W = am.weighted_ncac && am.weighted_ncac.detail, O = am.pct_over_model && am.pct_over_model.detail, M0 = O && Array.isArray(O.months) ? O.months[0] : null;
+  const est = r => (r.state === 'estimated' ? 'An estimate. ' : '');
   const rows = [
-    am.weighted_ncac && ['Cost of a new customer, gifts and creator codes included', fmtMoney(Number(am.weighted_ncac.value), 2), am.weighted_ncac],
-    am.spending_power && ['Ad spend that adds £1 to that cost', fmtMoney(Math.round(Number(am.spending_power.value) / 10) * 10) + ' a month', am.spending_power],
-    am.pct_over_model && ['Last month against your cost curve', (Number(am.pct_over_model.value) >= 0 ? '+' : '−') + fmtPctN(Math.abs(Number(am.pct_over_model.value))), am.pct_over_model],
-    am.new_customer_layers && ['Sales from returning customers, last 90 days', fmtPctN(Number(am.new_customer_layers.value)), am.new_customer_layers],
+    am.weighted_ncac && { k: 'Cost of a new customer, gifts and creator codes included', v: fmtMoney(Number(am.weighted_ncac.value), 2),
+      b: W && W.seeding != null && W.creator != null ? 'Gifts ' + fmtMoney(W.seeding) + ', creator codes ' + fmtMoney(W.creator) : am.weighted_ncac.display },
+    am.spending_power && { k: 'Ad spend that adds £1 to that cost', v: v3GbpRound(Number(am.spending_power.value)) + ' a month', b: est(am.spending_power) + 'From your cost curve' },
+    am.pct_over_model && { k: (M0 ? gpMonthName(M0.month) : 'Last month') + ' against your cost curve', v: (Number(am.pct_over_model.value) >= 0 ? '+' : '−') + fmtPctN(Math.abs(Number(am.pct_over_model.value))),
+      b: M0 ? est(am.pct_over_model) + fmtMoney(M0.cac, 2) + ' against ' + fmtMoney(M0.model, 2) + ' expected. Sale months read low' : am.pct_over_model.display },
+    am.new_customer_layers && { k: 'Sales from returning customers, last 90 days', v: fmtPctN(Number(am.new_customer_layers.value)), b: est(am.new_customer_layers) + v3Sentence(String(am.new_customer_layers.display).replace(/^Last 90 days:\s*/, '')) },
   ].filter(Boolean);
   if (!rows.length) return null;
-  return (<section className="v3-sec">
-    <h2 className="v3-sec-title">How growth is costing you</h2>
-    <table className="v3-rw">
-      <thead><tr><th className="t-text">Measure</th><th>You</th><th className="t-text">What it means</th></tr></thead>
-      <tbody>{rows.map(([k, v, r]) => <tr key={k}><td className="t-text">{k}</td><td>{v}</td>
-        <td className="t-text v3-muted">{v3FigSpans(r.display)}{r.state === 'estimated' ? ' (an estimate)' : ''}</td></tr>)}</tbody>
-    </table>
+  return (<section className="v3-panel" aria-label="Cost checks">
+    <div className="v3-panel-head"><h2>Cost checks</h2></div>
+    <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-goal-checks">
+      <thead><tr><th>Measure</th><th className="r">Figure</th><th>Basis</th></tr></thead>
+      <tbody>{rows.map(r => <tr key={r.k}><td className="v3-web-wrap">{r.k}</td><td className="r">{r.v}</td><td className="v3-web-wrap v3-muted">{r.b}</td></tr>)}</tbody>
+    </table></div>
   </section>);
 }
 // Goal & costs: the golden rule (0335, 0341). While returning customers' profit does not cover running costs,
@@ -26718,15 +26694,13 @@ const V3_PAGES = {
   ask: (p) => <AskPanel/>,
   // 5 Nov: the Home pattern, on three tabs. Links to costs, margin and economics pick their own tab.
   goal: (p) => <V3GoalPage/>,
+  // 5 Nov: the Home pattern. The two folds are the older analyst detail, under nouns.
   growth: (p) => (<>
     <V3Growth/>
-    <V3DriverStrip keys={['newsales', 'cac', 'spend']}/>
-    <V3AcquisitionChecks/>
-    <CashCeiling/>
-    <V3More id="growth-detail" label="The detail: how a new customer’s cost rises with spend, and what changes it">
+    <V3More id="growth-detail" label="Spend curve">
       <V3Anchor id="forecast"/><GretaPlanPanel show="growth"/>
     </V3More>
-    <V3More id="growth-fit" label="More checks: how well your offer and products sell, cash, and early signs"><FitCard start={p.start} end={ACTIVE_END}/><GenomePanel/></V3More>
+    <V3More id="growth-fit" label="Offer and product fit"><FitCard start={p.start} end={ACTIVE_END}/><GenomePanel/></V3More>
   </>),
   stock: (p) => (<>
     {/* The server-side stock plan (vw_stock_demand_plan / fn_stock_gate): what runs out,

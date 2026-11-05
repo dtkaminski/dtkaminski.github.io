@@ -2355,7 +2355,7 @@ div:has(> .v3-profit) ~ .v3-today { gap: 0; }
 .v3-fut-lab.still { cursor: default; }
 .v3-fut-lab.still:hover .v3-fut-t { text-decoration: none; }
 .v3-goal-page .v3-home-group-h { align-items: center; }
-.v3-goal-page .v3-home-group-h .v3-pill { margin-left: auto; }
+.v3-goal-page .v3-home-group-h .v3-pill { margin-left: auto; margin-block: calc(var(--space-1) / -4); }
 .v3-goal-page .v3-panel-note .micro { margin: 0; max-width: none; }
 .v3-main .v3-goal-page table.v3-profit-rows td.v3-web-wrap { white-space: normal; }
 .v3-main .v3-goal-page table.v3-profit-rows td.v3-web-wrap .v3-home-sub { display: block; overflow: visible; -webkit-line-clamp: unset; }
@@ -2373,3 +2373,6 @@ div:has(> .v3-profit) ~ .v3-today { gap: 0; }
   .v3-main .v3-goal-page table.v3-goal-checks td, .v3-main .v3-goal-page table.v3-goal-checks td:first-child { border: 0; width: auto; padding: var(--space-1) var(--space-4); text-align: left; white-space: normal; }
   .v3-main .v3-goal-page table.v3-goal-checks td:empty { display: none; }
 }
+
+/* Growth plan */
+.v3-growth-levers td:first-child { white-space: nowrap; }
