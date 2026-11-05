@@ -16702,9 +16702,9 @@ const V3_ASK_PROMPTS = [
 ];
 // The pages that read a window get a control to set it. Before this the app held
 // period state that nothing could change, so every one of them was stuck on 30 days.
-// Customers and Products lead with fixed live windows (last 30 / 28 days, cohorts), so a period
-// picker there would change nothing on screen; it shows only where it drives the figures.
-const V3_PERIOD_PAGES = ['profit', 'marketing', 'website'];
+// Products leads with fixed live windows (last 28 days, cohorts), so a period picker there would
+// change nothing on screen; it shows only where it drives the figures.
+const V3_PERIOD_PAGES = ['profit', 'marketing', 'website', 'customers'];
 function V3Period({ period, setPeriod, rangeStart, rangeEnd, setRangeStart, setRangeEnd, customActive }) {
   const [openCustom, setOpenCustom] = React.useState(!!customActive);
   return (<div className="v3-period">
@@ -21149,106 +21149,290 @@ function V3Website({ start, period, customActive }) {
 }
 
 // ── Customers (V3, live) ─────────────────────────────────────────────────────
-function V3Customers() {
-  const tier = useV3Rows('cust-tier', (sb, b) => sb.from('vw_customer_tier_periods')
-    .select('window_label,new_customers,returning_customers,new_net,returning_net,net_sales,ncac,returning_rev_share')
-    .eq('brand_id', b).eq('window_label', 'current_30d').limit(1));
+// 4 Nov 2026, on Home's pattern, and the date control now moves the page. The last 30 days are the registered
+// figures, and the newest window takes them. Windows run on the ladder Profit & sales and Marketing read, so a
+// period's cost of a new customer is the same on both pages. What a customer is worth is a year's figure: it stays
+// in its own group and does not follow the date control. Sales here are before the delivery customers pay, as
+// vw_customer_tier_periods and vw_daily_new_vs_returning count them.
+const V3_CUST_ACTS = ['cust-', 'crm-flows', 'discount-dependency', 'customer-file-', 'diagnosis-repeat_rate', 'cohort-', 'source-repeat-'];   // anatomy_category_map, Retention and cohorts
+const V3_SEG_ORDER = ['Champion', 'Loyal', 'Promising (new)', 'At risk', 'Dormant (one-time)'];
+const v3Dp1Num = v => (fmtOk(v) ? Number(v).toFixed(1) : FMT_NONE);
+function V3Customers({ start, period, customActive }) {
+  const H = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || null;
+  const tierQ = useV3Rows('cust-tier', V3_TIER_Q);
   const ue = useV3Rows('cust-ue', V3_UE_Q);
   const ret = useV3Rows('cust-ret', V3_RET_Q);
-  const nvr = useV3Rows('cust-nvr', (sb, b) => sb.from('vw_daily_new_vs_returning')
-    .select('order_date,customer_type,net_revenue').eq('brand_id', b).eq('ledger', 'dtc')
-    .gte('order_date', v3IsoAdd(new Date().toISOString().slice(0, 10), -98)).order('order_date', { ascending: true }).limit(1000));
+  // Two rows a day: stretches stay under the server's 1,000-row cap.
+  const nvr = useV3Rows('cust-nvr-long', (sb, b) => { const t = new Date().toISOString().slice(0, 10);
+    const part = c => sb.from('vw_daily_new_vs_returning').select('order_date,customer_type,orders,net_revenue').eq('brand_id', b).eq('ledger', 'dtc').in('customer_type', ['new', 'returning'])
+      .gte('order_date', v3IsoAdd(t, c[0])).lt('order_date', v3IsoAdd(t, c[1])).order('order_date', { ascending: true }).limit(1000);
+    return Promise.all([[-1800, -1350], [-1350, -900], [-900, -450], [-450, 1]].map(part)).then(rs => ({ data: rs.reduce((all, r) => all.concat(r.data || []), []), error: (rs.find(r => r.error) || {}).error || null })); });
   const curve = useV3Rows('cust-curve', (sb, b) => sb.from('v_tenant_cohort_curve')
     .select('offset_m,customers_observed,cum_rev_per_cust').eq('brand_id', b).order('offset_m', { ascending: true }));
-  const figQ = useV3Figures();   // new_customers_30d, cac_30d, cac_90d, first_order_profit (1080)
-
-  const t = (tier.rows || [])[0] || null, u = (ue.rows || [])[0] || null, r = (ret.rows || [])[0] || null;
-  const ncF = v3Fig('new_customers_30d', figQ.rows), c30F = v3Fig('cac_30d', figQ.rows), c90F = v3Fig('cac_90d', figQ.rows), foF = v3Fig('first_order_profit', figQ.rows);
-  const loading = !tier.rows && !tier.err;
-
-  // New vs returning sales, by complete week (last 13).
-  const weeks = React.useMemo(() => {
+  const front = useV3Rows('cust-front', (sb, b) => sb.from('vw_cohort_frontload')
+    .select('in_standard_basis,bucket,pct_of_12m_value').eq('brand_id', b));
+  const moQ = useV3Rows('mk-months', V3_MONTHS_Q);
+  const seg = useV3Rows('cust-segstats', (sb, b) => sb.from('v_tenant_customer_segment_stats')
+    .select('segment,loyalty,customers,emailable,net_revenue').eq('brand_id', b));
+  const dep = useV3Rows('cust-discdep', (sb, b) => sb.from('vw_discount_dependency')
+    .select('first_on_markdown,customers,repeat_rate_180d,next_order_on_markdown_share').eq('brand_id', b));
+  const fl = useV3Rows('mk-flows', V3_FLOWS_Q);
+  const aov = useV3Rows('cust-aov-ret', (sb, b) => sb.from('vw_brand_aov').select('window_label,returning_aov').eq('brand_id', b));
+  const lad = useV3Rows('profit-ladder', V3_LADDER_Q);
+  const ttQ = useV3Rows('ov-tiktok-daily', V3_TT_DAILY_Q);
+  const figQ = useV3Figures();
+  const stQ = useV3Rows('brand-state', V3_STATE_Q);
+  const hq = useV3Rows('sign-history', V3_SIGN_HIST_Q);
+  const bd = useV3Board();
+  const bm = useV3Rows('board-moves', V3_BOARD_MOVES_Q);
+  useV3Rows('move-extras', V3_MOVE_EXTRAS_Q);
+  const [drv, setDrv] = React.useState(null);
+  const [drawer, setDrawer] = React.useState(null);   // { id, mode }
+  const nvrBy = React.useMemo(() => {
+    if (!nvr.rows) return null;
     const m = {};
-    (nvr.rows || []).forEach(x => { const w = v3Monday(x.order_date); const o = m[w] || (m[w] = { wk: w, nw: 0, rt: 0 });
-      if (x.customer_type === 'returning') o.rt += Number(x.net_revenue) || 0; else if (x.customer_type === 'new') o.nw += Number(x.net_revenue) || 0; });
-    // Today, not REAL_END: REAL_END is the snapshot date until the live data swaps in, and this memo
-    // only re-runs when its rows change, so it froze on a June week for frkl.
-    const thisWk = v3Monday(new Date().toISOString().slice(0, 10));
-    return Object.values(m).filter(o => o.wk < thisWk).sort((a, b) => a.wk < b.wk ? -1 : 1).slice(-13)
-      .map(o => ({ ...o, label: v3Day(o.wk), nw: Math.round(o.nw), rt: Math.round(o.rt) }));
+    nvr.rows.forEach(r => { const d = v3Iso10(r.order_date), o = m[d] || (m[d] = { nw: 0, rt: 0, no: 0 });
+      if (r.customer_type === 'new') { o.nw += Number(r.net_revenue) || 0; o.no += Number(r.orders) || 0; } else o.rt += Number(r.net_revenue) || 0; });
+    return m;
   }, [nvr.rows]);
-  // Cohort curve: keep months that still observe at least half the starting cohort.
   const cv = React.useMemo(() => {
+    // months that still observe at least half the starting customers
     const rows = (curve.rows || []).map(x => ({ m: Number(x.offset_m), n: Number(x.customers_observed), v: Number(x.cum_rev_per_cust) }));
     const n0 = rows.length ? rows[0].n : 0;
     return rows.filter(x => n0 > 0 && x.n >= n0 * 0.5 && x.m <= 12).map(x => ({ ...x, label: x.m === 0 ? 'First order' : 'Month ' + x.m, v: Math.round(x.v) }));
   }, [curve.rows]);
+  if (!H) return <V3SkeletonRows n={4}/>;
 
-  const stat = (lab, val, foot, tip) => (<div className="v3-stat" key={lab}>
-    <div className="v3-stat-lab"><span>{lab}</span>{tip && <span title={tip} className="v3-stat-info"><Icon name="info" size={12}/></span>}</div>
-    <div className="v3-stat-val">{val}</div>
-    <div className="v3-stat-foot"><span className="v3-muted">{foot}</span></div>
-  </div>);
-  const wkTip = ({ active, payload, label }) => (!active || !payload || !payload.length) ? null : (<div className="v3-tip"><b>Week of {label}</b>
-    <span>New customers <em>{fmtMoney(payload[0].payload.nw)}</em></span><span>Returning <em>{fmtMoney(payload[0].payload.rt)}</em></span></div>);
-  const cvTip = ({ active, payload }) => (!active || !payload || !payload.length) ? null : (<div className="v3-tip"><b>{payload[0].payload.label}</b>
-    <span>Sales per customer so far <em>{fmtMoney(payload[0].payload.v)}</em></span><span>Customers still tracked <em>{fmtCount(payload[0].payload.n)}</em></span></div>);
+  const t30 = (tierQ.rows || [])[0] || null, u = (ue.rows || [])[0] || null, R0 = (ret.rows || [])[0] || null;
+  const ncF = v3Fig('new_customers_30d', figQ.rows), c30F = v3Fig('cac_30d', figQ.rows), c90F = v3Fig('cac_90d', figQ.rows), foF = v3Fig('first_order_profit', figQ.rows);
+  const ltv = v3Fig('customer_value', figQ.rows).value, ratio = v3Fig('value_to_cost_30d', figQ.rows).value;
 
-  if (loading) return <V3SkeletonRows n={4}/>;
-  return (<div className="v3-page-stack">
-    <section>
-      <div className="v3-kick">Last 30 days</div>
-      <div className="v3-stat-grid">
-        {t && stat('New customers', fmtCount(ncF.value != null ? ncF.value : t.new_customers), fmtMoney(t.new_net) + ' of sales')}
-        {t && stat('Returning customers', fmtCount(t.returning_customers), fmtMoney(t.returning_net) + ' of sales')}
-        {c30F.value != null && stat(c30F.label, fmtMoney(c30F.value),
-          'all ad spend over new customers' + (c90F.value != null ? ' (' + c90F.label.toLowerCase() + ': ' + fmtMoney(c90F.value) + ')' : ''))}
-        {u && u.ltv_contribution != null && stat('What a customer is worth', fmtMoney(u.ltv_contribution),
-          'profit over ' + (u.ltv_horizon_months || 12) + ' months', 'Profit after product and order costs that a typical new customer brings in over their first ' + (u.ltv_horizon_months || 12) + ' months, from your own customers.')}
-        {/* On the 30 days' cost beside it, not the 90-day one (0.9 orders sat next to a £53 tile it did not use). */}
-        {/* not a registered figure: the ratio of two that are (cac_30d over first_order_profit) */}
-        {c30F.value != null && foF.value > 0
-          ? stat('Orders to earn back their cost', (c30F.value / foF.value).toFixed(1), 'before a new customer makes you money, at what one cost to win in the last 30 days')
-          : (u && u.payback_orders != null && stat('Orders to earn back their cost', Number(u.payback_orders).toFixed(1), 'before a new customer makes you money, at what one cost to win over 90 days'))}
-      </div>
+  const onFig = !customActive && period === '30d';
+  const end = dataEndOf(), prior = priorPeriod(start, end);
+  const viewLen = Math.max(1, Math.round((Date.parse(end) - Date.parse(start)) / 86400000) + 1);
+  const len = onFig ? 30 : v3WindowStep(viewLen);
+  const whole = onFig || len === viewLen;
+  const ttReady = !!(ttQ.rows || ttQ.err || !(typeof window !== 'undefined' && window.FRKL_LIVE && window.FRKL_LIVE.sb));
+  const ttSum = v3SumBetween(ttQ.rows, 'date', 'spend');
+  const spendOf = (a, b) => sum(inRangeBounded(D.metaDaily, a, b), 'cost') + sum(inRangeBounded(D.googleAds, a, b), 'cost') + ttSum(a, b);
+  const between = (a, b) => { if (!nvrBy) return null; const o = { nw: 0, rt: 0, no: 0 }; Object.keys(nvrBy).forEach(d => { if (d >= a && d <= b) { o.nw += nvrBy[d].nw; o.rt += nvrBy[d].rt; o.no += nvrBy[d].no; } }); return o; };
+  const cur = between(start, end), was = between(prior.start, prior.end);
+  const havePrior = ttReady && was && was.nw + was.rt > 0;
+  const paid = onFig ? Number(H.paid_spend_30d) : spendOf(start, end);
+  const nc = onFig && ncF.value != null ? Number(ncF.value) : onFig && t30 && t30.new_customers != null ? Number(t30.new_customers) : cur ? cur.no : null;
+  const nw = onFig && t30 && t30.new_net != null ? Number(t30.new_net) : cur ? cur.nw : null;
+  const rt = onFig && t30 && t30.returning_net != null ? Number(t30.returning_net) : cur ? cur.rt : null;
+  const cac = onFig && c30F.value != null ? Number(c30F.value) : nc > 0 ? paid / nc : null;
+  const pSpend = havePrior ? spendOf(prior.start, prior.end) : null, pCac = havePrior && was.no > 0 ? pSpend / was.no : null;
+
+  // Windows of the picked length, as Marketing's
+  const nowDay = new Date().toISOString().slice(0, 10);
+  const ladLast = (lad.rows || []).reduce((m, r) => { const x = v3Iso10(r.day); return x < nowDay && x > m ? x : m; }, '');
+  const on30 = onFig || (len === 30 && !whole && !!ladLast && end >= ladLast);
+  const wins = nvrBy ? (v3ProfitWindows(lad.rows, null, null, len, on30 ? null : end, 1, 0) || []).map(w => { const o = between(w.s, w.e); return { ...w, nc: o.no, nw: Math.round(o.nw), rt: Math.round(o.rt) }; }).filter(w => w.nw + w.rt > 0) : null;
+  if (wins && wins.length) {
+    const l = wins[wins.length - 1];
+    if (on30) { l.spend = Number(H.paid_spend_30d); if (t30) { if (t30.new_net != null) l.nw = Number(t30.new_net); if (t30.returning_net != null) l.rt = Number(t30.returning_net); } if (ncF.value != null) l.nc = Number(ncF.value); else if (t30 && t30.new_customers != null) l.nc = Number(t30.new_customers); }
+    else if (whole) { l.spend = paid; if (nc != null) l.nc = nc; if (nw != null) l.nw = nw; if (rt != null) l.rt = rt; }
+    wins.forEach(w => { w.cac = w.nc > 0 ? w.spend / w.nc : null; w.share = w.nw + w.rt > 0 ? w.rt / (w.nw + w.rt) : null; });
+    if (on30 && c30F.value != null) l.cac = Number(c30F.value);
+    else if (whole && cac != null) l.cac = cac;
+  }
+  const pts = k => (wins || []).map(w => w[k]);
+  const when = e => (len === 1 ? v3Day(e, true) : len + ' days to ' + v3Day(e, true));
+  const tip = ({ active, payload }) => { if (!active || !payload || !payload.length) return null; const p = payload[0].payload;
+    return (<div className="v3-tip"><b>{when(p.e)}</b><span>New customers’ sales <em>{fmtMoney(p.nw)}</em></span><span>Returning customers’ sales <em>{fmtMoney(p.rt)}</em></span>
+      <span>Returning share <em>{p.share == null ? FMT_NONE : fmtPctN(p.share)}</em></span><span>New customers <em>{fmtCount(p.nc)}</em></span><span>Cost each <em>{p.cac == null ? FMT_NONE : fmtMoney(p.cac)}</em></span></div>); };
+  const cvTip = ({ active, payload }) => { if (!active || !payload || !payload.length) return null; const p = payload[0].payload;
+    return (<div className="v3-tip"><b>{p.label}</b><span>Sales per customer so far <em>{fmtMoney(p.v)}</em></span><span>Customers still tracked <em>{fmtCount(p.n)}</em></span></div>); };
+
+  // The strip on the last 30 days: the signs, with their drivers.
+  const S0 = stQ.rows && stQ.rows[0];
+  const SG = S0 && S0.last_30 && hq.rows ? v3BuildSigns(S0, hq.rows[0] && hq.rows[0].history, { lad }) : null;
+  const signOf = w => { const sg = SG ? SG.signs.find(x => x.which === w) : null; if (!sg) return null;
+    return Object.assign({}, sg, { act: !sg.noDrivers && v3HasDrivers(w, SG.HP) ? { open: drv === w, on: () => setDrv(o => (o === w ? null : w)) } : null }); };
+  const signTile = (sg, label, value) => { const tr = v3SignTrend(sg);
+    return <V3HomeTile key={sg.which} k={label} v={value != null ? value : sg.v} dir={tr && tr.dir} cls={tr && tr.cls} delta={tr ? tr.delta : ''} weak={sg.tone === 'weak'} pts={(sg.series || []).map(p => p.v)} act={sg.act} title={sg.k}/>; };
+  const sNew = signOf('newc'), sCac = signOf('cac'), sNs = signOf('newsales'), sRs = signOf('retsales');
+  const signsOn = onFig && SG;
+  const whenLabel = onFig ? 'Last 30 days' : customActive ? v3Day(start) + ' to ' + v3Day(end) : ((PERIODS.find(p => p.key === period) || {}).label || 'This period');
+  const openSign = drv && onFig ? [sNew, sCac, sNs, sRs].find(x => x && x.which === drv) : null;
+  const repF = v3Fig('repeat_90d', figQ.rows), repeat90 = repF.value != null ? Number(repF.value) : null;
+  const repTyp = S0 && S0.benchmarks && S0.benchmarks.repeat_90d ? S0.benchmarks.repeat_90d.typical : null;
+
+  // The actions this page works: the board's own, in its order.
+  const boardLive = v3FoldPlans(v3LiveRows(bd.rows || []));
+  const live = boardLive.filter(r => (V3_HOME_WORK[r.category] || [])[0] === 'customers' || V3_CUST_ACTS.some(p => String(r.external_id || '').startsWith(p)));
+  const shown = live.slice(0, 5);
+  const bmRows = bm.rows && bm.rows[0] && Array.isArray(bm.rows[0].rows) ? bm.rows[0].rows : [];
+  const open = drawer && shown.find(r => r.external_id === drawer.id);
+  const onBoard = id => live.some(r => r.external_id === id);
+
+  // Checks the board does not hold: each with the figure behind it
+  const sumOf = (rows, k) => rows.reduce((a, r) => a + (Number(r[k]) || 0), 0);
+  const segRows = seg.rows || [];
+  const atRows = segRows.filter(r => r.segment === 'At risk');
+  const at = atRows.length ? { n: sumOf(atRows, 'customers'), mail: sumOf(atRows, 'emailable') } : null;
+  const champ = segRows.filter(r => r.segment === 'Champion'), champFull = champ.filter(r => r.loyalty === 'full_price');
+  const gap = R0 && R0.median_days_between_orders != null ? Number(R0.median_days_between_orders) : null;
+  const A = (aov.rows || []).find(r => r.window_label === 'current_90d') || (aov.rows || [])[0] || null, retAov = A && Number(A.returning_aov) > 0 ? Number(A.returning_aov) : null;
+  const flows = fl.rows || [];
+  const isLive = f => String(f.status).toLowerCase() === 'live';
+  const winLive = flows.some(f => isLive(f) && v3FlowType(f.name, f.trigger_type) === 'winback');
+  const winBuilt = !winLive && flows.some(f => v3FlowType(f.name, f.trigger_type) === 'winback');
+  const liveFlows = flows.filter(f => isLive(f) && Number(f.recipients_30d) >= 50).map(f => ({ t: v3FlowType(f.name, f.trigger_type), per: (Number(f.attributed_revenue_30d) || 0) / Number(f.recipients_30d) }));
+  const medPer = v3TypicalFlowPer(liveFlows), post = liveFlows.find(f => f.t === 'post');
+  const dOn = (dep.rows || []).find(r => r.first_on_markdown === true), dOff = (dep.rows || []).find(r => r.first_on_markdown === false);
+  const habit = dOn && dOff && Number(dOn.next_order_on_markdown_share) - Number(dOff.next_order_on_markdown_share) >= 0.1;
+  const checks = [];
+  if (at && at.n > 0 && !onBoard('cust-winback-atrisk')) checks.push({ k: 'win', t: 'Win back customers who bought well and have gone quiet',
+    sub: (winBuilt ? 'A win-back email is built in Klaviyo but switched off. ' : !winLive && flows.length ? 'No win-back email is set up. ' : '') + (retAov ? 'Your typical repeat order is ' + fmtMoney(retAov) + '.' : ''),
+    fig: fmtCount(at.n) + ' customers, ' + fmtCount(at.mail) + ' can be emailed', go: ['customers', 'Build the list', 'segments'] });
+  if (gap != null) checks.push({ k: 'second', t: 'Ask for the second order before day ' + fmtCount(gap), sub: 'Time the follow-up email to land before then, with the add-on that goes with what they bought.',
+    fig: !onBoard('crm-flows') && post && medPer != null && post.per < medPer * 0.2 ? 'After-purchase email ' + fmtMoney(post.per, 2) + ' a person against ' + fmtMoney(medPer, 2)
+      : R0 && R0.repeat_rate != null ? fmtPctN(Number(R0.repeat_rate)) + ' have ordered more than once' : FMT_NONE, go: ['products', 'Open Products'] });
+  if (habit && !onBoard('discount-dependency')) checks.push({ k: 'disc', t: 'Reward full-price customers with perks, not codes',
+    sub: champFull.length && champ.length ? fmtCount(sumOf(champFull, 'customers')) + ' of your ' + fmtCount(sumOf(champ, 'customers')) + ' best customers buy at full price.' : 'The discount they joined on sets the price they come back at.',
+    fig: 'Next order discounted ' + fmtPctN(Number(dOn.next_order_on_markdown_share)) + ' against ' + fmtPctN(Number(dOff.next_order_on_markdown_share)) });
+
+  // Customer groups
+  const groups = (() => { const m = {}; segRows.forEach(r => { const o = m[r.segment] || (m[r.segment] = { name: r.segment, n: 0, mail: 0, net: 0 }); o.n += Number(r.customers) || 0; o.mail += Number(r.emailable) || 0; o.net += Number(r.net_revenue) || 0; });
+    const rank = x => { const i = V3_SEG_ORDER.indexOf(x.name); return i < 0 ? 99 : i; };
+    return Object.values(m).sort((a, b) => rank(a) - rank(b)); })();
+
+  // What a customer is worth
+  const day0 = (() => { const r = (front.rows || []).find(x => x.in_standard_basis && /day 0/.test(String(x.bucket))); return r ? Number(r.pct_of_12m_value) / 100 : null; })();
+  const X = v3ExtraCustomers(moQ.rows);
+  const payback = c30F.value != null && foF.value > 0 ? Number(c30F.value) / Number(foF.value) : u && u.payback_orders != null ? Number(u.payback_orders) : null;
+  const firstCv = cv.length ? cv[0] : null, lastCv = cv.length > 1 ? cv[cv.length - 1] : null;
+  const measures = [
+    ltv > 0 && ['What a customer is worth', fmtMoney(ltv), 'A year of profit after product and order costs'],
+    c30F.value > 0 && ['Cost of a new customer, last 30 days', fmtMoney(c30F.value), 'All ad spend over new customers'],
+    c90F.value > 0 && ['Cost of a new customer, last 90 days', fmtMoney(c90F.value), ''],
+    ratio != null && ['Worth against cost', fmtTimes(ratio, 1), 'Brands aim for 3×'],
+    foF.value != null && ['Profit on the first order', fmtMoney(foF.value), c30F.value > foF.value ? 'Less than a new customer costs' : ''],
+    payback != null && ['Orders to earn back their cost', v3Dp1Num(payback), ''],
+    day0 != null && ['Share of a year’s profit from the first order', fmtPctN(day0), ''],
+    X && X.per != null && ['Cost of each extra customer', fmtMoney(X.per), 'Extra ad spend since ' + X.prevLab + (ltv > 0 && X.per > ltv ? ', more than a customer is worth' : '')],
+    X && X.moved && X.dSpend > 0 && X.dNc <= 0 && ['Extra customers from extra ad spend', '0', 'Since ' + X.prevLab],
+    R0 && R0.repeat_rate != null && ['Customers who ordered more than once', fmtPctN(Number(R0.repeat_rate)), ''],
+    gap != null && ['Usual gap between orders', fmtCount(gap) + ' days', ''],
+    R0 && R0.orders_per_customer != null && ['Orders per customer', v3Fix2(R0.orders_per_customer), ''],
+    lastCv && firstCv && ['Sales per customer by ' + lastCv.label.toLowerCase(), fmtMoney(lastCv.v), fmtMoney(firstCv.v) + ' on the first order'],
+  ].filter(Boolean);
+
+  const allWait = (!tierQ.rows && !tierQ.err) || (!nvr.rows && !nvr.err);
+  const allFailed = tierQ.err && nvr.err && ue.err;
+  const empty = !allWait && !allFailed && !nc && !nw && !rt && !(ltv > 0);
+
+  return (<div className="v3-home v3-profit v3-marketing v3-customers">
+    <section className="v3-panel v3-home-strip v3-mk-strip" aria-label="Key figures">
+      {allFailed ? <div className="v3-panel-pad"><V3LoadFailed what="Your customer figures" onRetry={() => { tierQ.retry(); nvr.retry(); ue.retry(); }}/></div>
+        : allWait ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={2}/></div>
+        : empty ? <p className="v3-panel-note">These figures come from your shop’s orders. Connect your shop on Connections &amp; data.</p>
+        : <>
+          <div className="v3-home-group" style={{ '--n': 4 }}>
+            <div className="v3-home-group-h">{whenLabel}<span>{signsOn ? 'against 4 weeks ago' : !onFig && havePrior ? 'against the period before' : ''}</span></div>
+            <div className="v3-home-tiles">
+              {signsOn && sNew ? signTile(sNew, 'New customers', nc == null ? FMT_NONE : fmtCount(nc)) : v3TileAgainst('New customers', nc, onFig || !havePrior ? null : was.no, true, pts('nc'), v => fmtCount(v))}
+              {signsOn && sCac ? signTile(sCac, 'Cost of a new customer') : v3TileAgainst('Cost of a new customer', cac, onFig ? null : pCac, false, pts('cac'))}
+              {signsOn && sNs ? signTile(sNs, 'New customers’ sales', nw == null ? null : fmtMoney(nw)) : v3TileAgainst('New customers’ sales', nw, onFig || !havePrior ? null : was.nw, true, pts('nw'))}
+              {signsOn && sRs ? signTile(sRs, 'Returning customers’ sales', rt == null ? null : fmtMoney(rt)) : v3TileAgainst('Returning customers’ sales', rt, onFig || !havePrior ? null : was.rt, true, pts('rt'))}
+            </div></div>
+          {(ltv > 0 || ratio != null || repeat90 != null) && <div className="v3-home-group" style={{ '--n': (ltv > 0 ? 1 : 0) + (ratio != null ? 1 : 0) + (repeat90 != null ? 1 : 0) }}>
+            <div className="v3-home-group-h">Customer value<span>your own customers</span></div>
+            <div className="v3-home-tiles">
+              {ltv > 0 && <V3HomeTile key="ltv" k="What a customer is worth" v={fmtMoney(ltv)} delta="a year of profit" title="Profit after product and order costs that a typical new customer brings in over their first 12 months"/>}
+              {ratio != null && <V3HomeTile key="ratio" k="Worth against cost" v={fmtTimes(ratio, 1)} weak={ratio < 1} delta="brands aim for 3×" title="What a customer is worth over the cost of a new customer in the last 30 days"/>}
+              {repeat90 != null && <V3HomeTile key="rep" k="Repeat in 90 days" v={fmtPctN(repeat90)} delta={repTyp != null ? fmtPctN(repTyp) + ' is typical' : ''} title="Customers whose first order was 91 to 180 days ago who reordered within 90 days"/>}
+            </div></div>}
+          {openSign && <div className="v3-home-drv"><V3DriverPanel key={drv} which={drv} points={openSign.points || SG.HP} ctx={openSign.ctx} line={openSign.dline}/></div>}
+        </>}
     </section>
-    {weeks.length >= 4 && (<figure className="v3-chart v3-chart-solo">
-      <figcaption><span className="v3-chart-title">New and returning customers' sales, by week</span>
-        <span className="v3-legend"><i style={{ background: PAL.nw }}/>New <i style={{ background: PAL.ret }}/>Returning</span></figcaption>
-      <R.ResponsiveContainer width="100%" height={240}>
-        <R.BarChart data={weeks} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
-          <R.CartesianGrid/>
-          <R.XAxis dataKey="label" interval="preserveStartEnd"/>
-          <R.YAxis tickFormatter={fmtMoneyK}/>
-          <R.Tooltip content={wkTip}/>
-          <R.Bar dataKey="nw" stackId="s" fill={PAL.nw}/>
-          <R.Bar dataKey="rt" stackId="s" fill={PAL.ret} radius={[2, 2, 0, 0]}/>
-        </R.BarChart>
-      </R.ResponsiveContainer>
-    </figure>)}
-    {cv.length >= 3 && (<div className="v3-chart-pair">
-      <figure className="v3-chart">
-        <figcaption><span className="v3-chart-title">What a customer spends over time</span>
-          <span className="v3-muted">average sales per customer, from their first order</span></figcaption>
+
+    {!allFailed && !allWait && !empty && (<section className="v3-panel" aria-label="New and returning customers">
+      <div className="v3-panel-head"><h2>New and returning customers</h2><span className="v3-muted">{len === 1 ? 'By day' : len + ' days at a time'}</span></div>
+      {nvr.err ? <p className="v3-panel-note">Customer sales could not load. Refresh the page to try again.</p>
+        : !wins || wins.length < 2 ? <p className="v3-panel-note">Charts show once two periods of orders are on file.</p>
+        : <><div className="v3-panel-pad v3-mk-charts">
+          <figure className="v3-chart" aria-label="Sales"><figcaption><span className="v3-chart-title">Sales</span>
+            <span className="v3-legend"><i style={{ background: PAL.nw }}/>New <i style={{ background: PAL.ret }}/>Returning</span></figcaption>
+            <R.ResponsiveContainer width="100%" height={240}>
+              <R.BarChart data={wins} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <R.CartesianGrid/><R.XAxis dataKey="label" interval="preserveStartEnd"/><R.YAxis tickFormatter={fmtMoneyK}/>
+                <R.Tooltip content={tip} cursor={false}/>
+                <R.Bar dataKey="nw" stackId="s" fill={PAL.nw} isAnimationActive={false}/>
+                <R.Bar dataKey="rt" stackId="s" fill={PAL.ret} isAnimationActive={false}/>
+              </R.BarChart>
+            </R.ResponsiveContainer></figure>
+          <figure className="v3-chart" aria-label="Returning customers’ share of sales"><figcaption><span className="v3-chart-title">Returning customers’ share of sales</span></figcaption>
+            <R.ResponsiveContainer width="100%" height={240}>
+              <R.ComposedChart data={wins} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                <R.CartesianGrid/><R.XAxis dataKey="label" interval="preserveStartEnd"/><R.YAxis domain={[0, 1]} ticks={[0, 0.25, 0.5, 0.75, 1]} tickFormatter={v => fmtPctN(v)}/>
+                <R.Tooltip content={tip} cursor={false}/>
+                <R.Line dataKey="share" type="linear" stroke={PAL.ret} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
+              </R.ComposedChart>
+            </R.ResponsiveContainer></figure>
+        </div>
+        <p className="v3-panel-note">Sales here are before the delivery customers pay.</p></>}
+    </section>)}
+
+    <section className="v3-panel" aria-label="Actions">
+      <div className="v3-panel-head"><h2>Actions</h2>{live.length > 0 && <span className="v3-count">{live.length}</span>}<span className="v3-muted">Repeat orders and customer value</span>
+        <button type="button" className="v3-panel-link" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>View all</button></div>
+      {bd.err ? <p className="v3-panel-note">Actions could not load. Refresh the page to try again.</p>
+        : !bd.rows ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={3}/></div>
+        : !shown.length ? <p className="v3-panel-note">No open actions on repeat orders or customer value.</p>
+        : <table className="v3-home-table">
+          <thead><tr><th>Action</th><th>Area</th><th className="r">Worth</th><th>Basis</th><th>Status</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
+          <tbody>{shown.map(r => <V3HomeRow key={r.external_id} row={r} onPage={(V3_HOME_WORK[r.category] || [])[0] || 'customers'} bmRow={bmRows.find(x => x.external_id === r.external_id)} onOpen={mode => setDrawer({ id: r.external_id, mode })}/>)}</tbody>
+        </table>}
+      {open && <V3HomeDrawer key={open.external_id} row={open} startMode={drawer.mode} onClose={() => setDrawer(null)}/>}
+    </section>
+
+    {checks.length > 0 && (<section className="v3-panel" aria-label="Checks">
+      <div className="v3-panel-head"><h2>Checks</h2><span className="v3-count">{checks.length}</span></div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+        <thead><tr><th>Check</th><th>Figure</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
+        <tbody>{checks.map(c => (<tr key={c.k}>
+          <td className="v3-web-wrap">{c.t}<span className="v3-home-sub">{c.sub}</span></td>
+          <td className="v3-web-wrap">{c.fig}</td>
+          <td className="r">{c.go && <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo(c.go[0], c.go[2])}>{c.go[1]}</button>}</td>
+        </tr>))}</tbody></table></div>
+    </section>)}
+
+    {seg.err ? <section className="v3-panel" aria-label="Customer groups"><div className="v3-panel-head"><h2>Customer groups</h2></div><p className="v3-panel-note">Customer groups could not load. Refresh the page to try again.</p></section>
+      : groups.length > 0 && (<section className="v3-panel" aria-label="Customer groups">
+      <div className="v3-panel-head"><h2>Customer groups</h2><span className="v3-muted">All customers to date</span>
+        <button type="button" className="v3-panel-link" onClick={() => window.__oiGo && window.__oiGo('customers', 'segments')}>Build a list</button></div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+        <thead><tr><th>Group</th><th className="r">Customers</th><th className="r">Can be emailed</th><th className="r">Sales to date</th><th className="r v3-mk-opt">Sales each</th></tr></thead>
+        <tbody>{groups.map(g => (<tr key={g.name}><td>{g.name}</td><td className="r">{fmtCount(g.n)}</td><td className="r">{fmtCount(g.mail)}</td><td className="r">{fmtMoney(g.net)}</td><td className="r v3-mk-opt">{g.n > 0 ? fmtMoney(g.net / g.n) : FMT_NONE}</td></tr>))}
+          <tr className="tot"><td>All groups</td><td className="r">{fmtCount(sumOf(groups, 'n'))}</td><td className="r">{fmtCount(sumOf(groups, 'mail'))}</td><td className="r">{fmtMoney(sumOf(groups, 'net'))}</td><td className="r v3-mk-opt">{sumOf(groups, 'n') > 0 ? fmtMoney(sumOf(groups, 'net') / sumOf(groups, 'n')) : FMT_NONE}</td></tr>
+        </tbody></table></div>
+    </section>)}
+
+    {(cv.length >= 3 || measures.length > 0) && (<section className="v3-panel" aria-label="Customer value">
+      <div className="v3-panel-head"><h2>Customer value</h2><span className="v3-muted">Your own customers, first 12 months</span></div>
+      {cv.length >= 3 && <div className="v3-panel-pad"><figure className="v3-chart" aria-label="Sales per customer over time"><figcaption><span className="v3-chart-title">Sales per customer over time</span><span className="v3-legend">Months since the first order</span></figcaption>
         <R.ResponsiveContainer width="100%" height={240}>
-          <R.AreaChart data={cv} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-            <defs><linearGradient id="v3CvFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={PAL.ret} stopOpacity={0.16}/><stop offset="100%" stopColor={PAL.ret} stopOpacity={0}/></linearGradient></defs>
-            <R.CartesianGrid/>
-            <R.XAxis dataKey="m" tickFormatter={m => m === 0 ? '1st' : 'M' + m} interval="preserveStartEnd"/>
-            <R.YAxis tickFormatter={fmtMoneyK}/>
-            <R.Tooltip content={cvTip}/>
-            <R.Area type="linear" dataKey="v" stroke={PAL.ret} fill="url(#v3CvFill)"/>
-          </R.AreaChart>
-        </R.ResponsiveContainer>
-      </figure>
-      <div className="v3-facts">
-        {r && r.repeat_rate != null && <div><span className="v3-facts-v">{fmtPctN(r.repeat_rate)}</span><span className="v3-facts-l">of customers have ordered more than once</span></div>}
-        {r && r.median_days_between_orders != null && <div><span className="v3-facts-v">{fmtCount(r.median_days_between_orders)} days</span><span className="v3-facts-l">is the usual gap before a repeat order, a good moment for a reminder email</span></div>}
-        {r && r.orders_per_customer != null && <div><span className="v3-facts-v">{Number(r.orders_per_customer).toFixed(2)}</span><span className="v3-facts-l">orders per customer so far</span></div>}
-        {cv.length > 1 && <div><span className="v3-facts-v">{fmtMoney(cv[cv.length - 1].v)}</span><span className="v3-facts-l">sales per customer by {cv[cv.length - 1].label.toLowerCase()}, from {fmtMoney(cv[0].v)} on the first order</span></div>}
-      </div>
-    </div>)}
+          <R.ComposedChart data={cv} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <R.CartesianGrid/><R.XAxis dataKey="m" interval={0} tickFormatter={m => (m === 0 ? 'First' : m)}/><R.YAxis tickFormatter={fmtMoneyK}/>
+            <R.Tooltip content={cvTip} cursor={false}/>
+            <R.Line dataKey="v" type="linear" stroke={PAL.ret} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false}/>
+          </R.ComposedChart>
+        </R.ResponsiveContainer></figure></div>}
+      {measures.length > 0 && <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+        <thead><tr><th>Measure</th><th className="r">Figure</th><th>Note</th></tr></thead>
+        <tbody>{measures.map(m => (<tr key={m[0]}><td className="v3-web-wrap">{m[0]}</td><td className="r">{m[1]}</td><td className="v3-web-wrap v3-muted">{m[2]}</td></tr>))}</tbody></table></div>}
+    </section>)}
+
+    {wins && wins.length >= 2 && (<section className="v3-panel" aria-label="By period">
+      <div className="v3-panel-head"><h2>By period</h2><span className="v3-muted">{len === 1 ? 'Newest first' : len + ' days to each date, newest first'}</span></div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-cust-dates">
+        <thead><tr><th>Period to</th><th className="r">New customers</th><th className="r">Cost each</th><th className="r v3-mk-opt">New sales</th><th className="r v3-mk-opt">Returning sales</th><th className="r">Returning share</th></tr></thead>
+        <tbody>{wins.slice().reverse().map(w => (<tr key={w.e}><td>{v3Day(w.e, true)}</td><td className="r">{fmtCount(w.nc)}</td><td className="r">{w.cac == null ? FMT_NONE : fmtMoney(w.cac)}</td><td className="r v3-mk-opt">{fmtMoney(w.nw)}</td><td className="r v3-mk-opt">{fmtMoney(w.rt)}</td><td className="r">{w.share == null ? FMT_NONE : fmtPctN(w.share)}</td></tr>))}</tbody></table></div>
+    </section>)}
   </div>);
 }
 
@@ -22279,101 +22463,6 @@ function v3ExtraCustomers(rows) {
   const dSpend = L.spend - P.spend, dNc = L.nc - P.nc, moved = P.spend > 0 && Math.abs(dSpend) > P.spend * 0.15;
   return { months, last, prev, L, P, dSpend, dNc, moved, per: moved && dSpend > 0 && dNc > 0 ? dSpend / dNc : null,
     lastLab: v3Month(last[0].m + '-01') + '–' + v3Month(last[2].m + '-01'), prevLab: v3Month(prev[0].m + '-01') + '–' + v3Month(prev[2].m + '-01') };
-}
-
-// ── Customers lead: what a customer is worth against what one costs (anatomy Stage 5) ───────────
-// One customer value (vw_brand_unit_economics.ltv_contribution — profit over a year, 0252's figure),
-// the average cost of a new customer (90 days) and this month's, how front-loaded the value is
-// (vw_cohort_frontload, standard basis: share of 12-month contribution on day 0), and the cost of the
-// extra customers the extra spend bought. The front-load share decides what retention can carry: it
-// is the cap on how much repeat buying can add, said as such.
-function V3CustomerValue() {
-  const ue = useV3Rows('cust-ue', V3_UE_Q);
-  const tier = useV3Rows('cust-tier', (sb, b) => sb.from('vw_customer_tier_periods')
-    .select('window_label,new_customers,returning_customers,new_net,returning_net,net_sales,ncac,returning_rev_share')
-    .eq('brand_id', b).eq('window_label', 'current_30d').limit(1));
-  const front = useV3Rows('cust-front', (sb, b) => sb.from('vw_cohort_frontload')
-    .select('in_standard_basis,bucket,pct_of_12m_value').eq('brand_id', b));
-  const mo = useV3Rows('mk-months', V3_MONTHS_Q);
-  const figQ = useV3Figures();   // customer_value, cac_30d, cac_90d and value_to_cost_30d (1080)
-  if (ue.err) return null;
-  if (!ue.rows) return <V3SkeletonRows n={2}/>;
-  const u = ue.rows[0] || null;
-  // the last 30 days decide (as on Today and Growth): cac_30d, with the 90-day cost as context. No fallback to
-  // the 90-day cost when the 30-day one is missing (one window), and the ratio is the registered one.
-  const cac30 = v3Fig('cac_30d', figQ.rows).value, cac90 = v3Fig('cac_90d', figQ.rows).value;
-  const ltvR = v3Fig('customer_value', figQ.rows).value, ratio = v3Fig('value_to_cost_30d', figQ.rows).value;
-  if (!u || !(ltvR > 0) || !(cac30 > 0) || ratio == null) return null;
-  const ltv = ltvR, cac = cac30;
-  const day0 = (() => { const r = (front.rows || []).find(x => x.in_standard_basis && /day 0/.test(String(x.bucket))); return r ? Number(r.pct_of_12m_value) / 100 : null; })();
-  const X = v3ExtraCustomers(mo.rows);
-  const head = ratio >= 3 ? 'Over a year, a new customer earns you ' + fmtTimes(ratio, 1) + ' what they cost to win. There is room to spend more.'
-    : ratio >= 1 ? 'Over a year, a new customer earns you ' + fmtTimes(ratio, 1) + ' what they cost to win. Brands aim for about 3×, which leaves room to grow.'
-    : 'A new customer costs more to win than they earn you in a year.';
-  return (<div className="v3-page-stack"><section className="v3-sec">
-    <div className="v3-kick">What a customer is worth against what one costs</div>
-    <p className="v3-verdict">{head}</p>
-    <V3Brief>
-      A new customer is worth {fmtMoney(ltv)} in profit over a year. {cac30 != null ? <>One cost {fmtMoney(cac)} to win in the last 30 days. </> : <>One costs {fmtMoney(cac)} to win. </>}
-      {day0 != null && <>{fmtPctN(day0)} of that profit comes with the first order, so the first order has to pay for winning the customer. Repeat orders add the other {fmtPctN(1 - day0)} at most. </>}
-      {cac90 > 0 && Math.abs(cac30 / cac90 - 1) > 0.1 && <>Over 90 days a new customer cost {fmtMoney(cac90)}. </>}
-      {X && X.per != null && <>The extra ad spend since {X.prevLab} won extra customers at {fmtMoney(X.per)} each{X.per > ltv ? ', more than a customer is worth.' : ', still less than a customer is worth.'} </>}
-      {X && X.moved && X.dSpend > 0 && X.dNc <= 0 && <>The extra ad spend since {X.prevLab} has won no extra customers. </>}
-      <V3Conf state="likely" detail="Customer value is a year of profit after product and order costs, from your own customers. The cost is all ad spend divided by new customers over the last 30 days. Both are counted from your records, not predicted."/></V3Brief>
-    {X && (X.per != null || (X.moved && X.dSpend > 0)) && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('marketing')}>
-      Where the extra spend went <span className="v3-xref-go">on Marketing</span></button>}
-  </section></div>);
-}
-
-// ── Keep them coming back (Customers) — the retention moves, each with its evidence ────────────
-//   win back    the At risk segment (v_tenant_customer_segment_stats, every loyalty split added up),
-//               how many can be emailed, and whether a winback flow is live, built or missing
-//   second order the usual gap between orders (v_tenant_retention_summary) and how the post-purchase
-//               flow earns per person reached against the brand's typical live flow
-//   discounts   vw_discount_dependency: how often the next order is discounted for customers who
-//               joined on a discount against those who paid full price, and the full-price Champions
-// A move shows only when its evidence is there.
-function V3Retention() {
-  const seg = useV3Rows('cust-segstats', (sb, b) => sb.from('v_tenant_customer_segment_stats')
-    .select('segment,loyalty,customers,emailable,net_revenue').eq('brand_id', b));
-  const ret = useV3Rows('cust-ret', V3_RET_Q);
-  const dep = useV3Rows('cust-discdep', (sb, b) => sb.from('vw_discount_dependency')
-    .select('first_on_markdown,customers,repeat_rate_180d,next_order_on_markdown_share').eq('brand_id', b));
-  const fl = useV3Rows('mk-flows', V3_FLOWS_Q);
-  const aov = useV3Rows('cust-aov-ret', (sb, b) => sb.from('vw_brand_aov').select('window_label,returning_aov').eq('brand_id', b));
-  if (!seg.rows && !seg.err) return <V3SkeletonRows n={3}/>;
-  const sum = (rows, k) => rows.reduce((a, r) => a + (Number(r[k]) || 0), 0);
-  const atRows = (seg.rows || []).filter(r => r.segment === 'At risk');
-  const at = atRows.length ? { n: sum(atRows, 'customers'), mail: sum(atRows, 'emailable') } : null;
-  const champFull = (seg.rows || []).filter(r => r.segment === 'Champion' && r.loyalty === 'full_price');
-  const champ = (seg.rows || []).filter(r => r.segment === 'Champion');
-  const R0 = (ret.rows || [])[0] || null, gap = R0 && R0.median_days_between_orders != null ? Number(R0.median_days_between_orders) : null;
-  const A = (aov.rows || []).find(r => r.window_label === 'current_90d') || (aov.rows || [])[0] || null, retAov = A && Number(A.returning_aov) > 0 ? Number(A.returning_aov) : null;
-  const flows = fl.rows || [];
-  const isLive = f => String(f.status).toLowerCase() === 'live';
-  const winLive = flows.some(f => isLive(f) && v3FlowType(f.name, f.trigger_type) === 'winback');
-  const winBuilt = !winLive && flows.some(f => v3FlowType(f.name, f.trigger_type) === 'winback');
-  const live = flows.filter(f => isLive(f) && Number(f.recipients_30d) >= 50).map(f => ({ t: v3FlowType(f.name, f.trigger_type), per: (Number(f.attributed_revenue_30d) || 0) / Number(f.recipients_30d), reach: Number(f.recipients_30d) }));
-  const medPer = v3TypicalFlowPer(live), post = live.find(f => f.t === 'post');
-  const d = (dep.rows || []).find(r => r.first_on_markdown === true), f0 = (dep.rows || []).find(r => r.first_on_markdown === false);
-  const habit = d && f0 && Number(d.next_order_on_markdown_share) - Number(f0.next_order_on_markdown_share) >= 0.1;
-  const moves = [];
-  if (at && at.n > 0) moves.push(<li key="win"><b>Win back {fmtCount(at.n)} customers who bought well and have gone quiet.</b>{' '}
-    {fmtCount(at.mail)} of them can be emailed{winBuilt ? '. A win-back email is built in Klaviyo but switched off' : !winLive && flows.length ? '. No win-back email is set up' : ''}.
-    {retAov ? ' Each one who orders again is worth about ' + fmtMoney(retAov) + ' in sales, your typical repeat order.' : ''}{' '}
-    <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('customers', 'segments')}>Build the list below</button></li>);
-  if (gap != null) moves.push(<li key="second"><b>Ask for the second order before day {fmtCount(gap)}.</b>{' '}
-    That is the usual gap between a customer’s orders{R0 && R0.repeat_rate != null ? ', and ' + fmtPctN(Number(R0.repeat_rate)) + ' of customers have ordered more than once' : ''}.
-    {post && medPer != null && post.per < medPer * 0.2 ? <> Your after-purchase email reaches {fmtCount(post.reach)} people a month and earns {fmtMoney(post.per, 2)} a person. Your typical automated email earns {fmtMoney(medPer, 2)}. Give buyers a reason to come back, such as the add-on that goes with what they bought.</> : ' Time the follow-up email to land before then, with the add-on that goes with what they bought.'}{' '}
-    <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('products')}>See the add-ons on Products</button></li>);
-  if (habit) moves.push(<li key="disc"><b>Reward full-price customers with perks, not codes.</b>{' '}
-    Customers whose first order was discounted come back about as often ({fmtPctN(Number(d.repeat_rate_180d))} within six months, against {fmtPctN(Number(f0.repeat_rate_180d))}). But {fmtPctN(Number(d.next_order_on_markdown_share))} of their next orders are discounted too, against {fmtPctN(Number(f0.next_order_on_markdown_share))} for those who paid full price. The discount they joined on sets the price they come back at.
-    {champFull.length && champ.length ? ' ' + fmtCount(sum(champFull, 'customers')) + ' of your ' + fmtCount(sum(champ, 'customers')) + ' best customers buy at full price. A code gives them money off they did not need.' : ''}</li>);
-  if (!moves.length) return null;
-  return (<div className="v3-page-stack"><section className="v3-sec">
-    <h2 className="v3-sec-title">How do I bring customers back?</h2>
-    <ol className="v3-moves">{moves}</ol>
-  </section></div>);
 }
 
 // ── Stock & orders: the next peak (V3) ───────────────────────────────────────────────────────────
@@ -26531,22 +26620,15 @@ const V3_PAGES = {
     <V3More id="web-cvr" label="Conversion drivers"><V3Anchor id="cvr"/><CvrDrivers/></V3More>
     <V3More id="web-friction" label="Site structure"><V3Anchor id="friction"/><SiteStructure start={p.start}/></V3More>
   </>),
-  // Customers and Products lead with live views (V3Customers / V3Products). The panels below
-  // them were built on static snapshots — weeks old for frkl, empty for every other brand —
-  // so they sit behind a disclosure rather than leading the page.
+  // Products leads with a live view (V3Products). The panels below it were built on static snapshots,
+  // weeks old for frkl and empty for every other brand, so they sit behind a disclosure.
   customers: (p) => (<>
-    {/* Rebuilt 2026-10-05: a verdict on what a customer is worth against what one costs, then the
-        numbers, then the retention moves, then the segments panel that stages them, then the plan. */}
-    {/* 13 Oct (gap 22): seven sections stood open. The verdict, the last 30 days and the retention
-        moves stay open; the rest fold. */}
-    <V3CustomerValue/>
-    <V3Customers/>
-    <V3Retention/>
-    <V3More id="cust-moving" label="What is moving new customers and repeat sales"><V3DriverStrip keys={['newc', 'cac', 'retsales', 'repeat']}/></V3More>
-    <V3More id="cust-file" label="Your customer file: how many buy, and when they stop"><V3CustomerFile/></V3More>
-    <V3More id="cust-segments" label="Your customers, group by group"><V3Anchor id="segments"/><CustomerSegments/></V3More>
-    <V3More id="cust-baseline" label="The customers you already have: the next six months"><V3ReturningBaseline/></V3More>
-    <V3More id="cust-more" label="More customer detail"><Customers/><V3Anchor id="cohorts"/><CohortsPanel/></V3More>
+    {/* 4 Nov: the Home pattern. The folds are the older detail, under nouns. */}
+    <V3Customers start={p.start} period={p.period} customActive={p.customActive}/>
+    <V3More id="cust-file" label="Customer file"><V3CustomerFile/></V3More>
+    <V3More id="cust-segments" label="Customer lists"><V3Anchor id="segments"/><CustomerSegments/></V3More>
+    <V3More id="cust-baseline" label="Existing customers, next six months"><V3ReturningBaseline/></V3More>
+    <V3More id="cust-more" label="Cohorts"><Customers/><V3Anchor id="cohorts"/><CohortsPanel/></V3More>
   </>),
   products: (p) => (<>
     <V3Products/>
@@ -27438,8 +27520,8 @@ const V3_WALK_TOUR = {
     what: 'Where the last 30 days’ sales went: products and delivery, ads and running costs come out, and what is left is what you keep. Profit after ads is the line before running costs.' },
   sales: { dest: 'profit', target: { sel: '.v3-profit-strip' },
     what: 'Sales, ad spend and profit for the last 30 days, each against a typical month. The Profit table further down shows where each £1 of sales went.' },
-  customers: { dest: 'customers', target: { sel: 'figure.v3-chart', has: 'New and returning' }, fallback: { sel: '.v3-stat-grid' },
-    what: 'Sales split by who placed them, week by week: first-time customers against people who have bought before. A healthy shop grows both; a business living on new customers alone has to keep paying to replace them.' },
+  customers: { dest: 'customers', target: { sel: 'figure.v3-chart', has: 'Sales' }, fallback: { sel: '.v3-home-strip' },
+    what: 'Sales split by who placed them, period by period: first-time customers against people who have bought before. A healthy shop grows both; a business living on new customers alone has to keep paying to replace them.' },
   efficiency: { dest: 'marketing', target: { sel: '.v3-mk-channels' },
     what: 'Every ad channel in one table. Likely caused per £1 is what each £1 of spend really brings back, and break-even is what it has to bring back at your margins. Below break-even is losing money, whatever the platform claims.' },
   spend: { dest: 'profit', target: { sel: '.v3-profit-strip' },
@@ -27462,7 +27544,7 @@ const V3_WALK_TOUR = {
     what: 'What gained and lost the most in pounds. Before acting on a faller, check it against stock, a product that ran out looks exactly like one that stopped selling.' },
   traffic: { dest: 'website', target: { sel: 'figure.v3-chart' }, fallback: { sel: '.v3-verdict' },
     what: 'Your shop as a funnel, visits, product views, baskets, checkouts, orders, against a normal month. The stage that has slipped furthest is where buyers are being lost.' },
-  retention: { dest: 'customers', target: { sel: 'figure.v3-chart', has: 'What a customer spends over time' }, fallback: { sel: '.v3-stat-grid' },
+  retention: { dest: 'customers', target: { sel: 'figure.v3-chart', has: 'Sales per customer over time' }, fallback: { sel: '.v3-home-strip' },
     what: 'How much the average customer has spent with you as the months go by after their first order. The steeper the early climb, the more a new customer is really worth.' },
   newProducts: { dest: 'products', target: { sel: '.v3-ptable' },
     what: 'Your products ranked by sales. A change marked "New" had no sales in the period before, that is where launches show up first.' },
