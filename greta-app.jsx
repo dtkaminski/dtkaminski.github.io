@@ -17731,62 +17731,6 @@ function useOneRow(view, cols){
 // takes every figure from the read: weak = breaking down against its own past or behind the
 // rest; healthy = holding, earning more or ahead. Profit and shortfall are the read's own (Meta's
 // count of purchases, after product costs). The move estimate is still a ceiling, and says so.
-function CreativeReallocation(){
-  const q = useV3Rows('ad-read', V3_AD_READ_Q);
-  if (!q.rows || !q.rows.length) return null;
-  const n = x => Number(x) || 0;
-  const live = q.rows.filter(r => r.state !== 'stopped' && n(r.spend_28d) > 0);
-  const weak = live.filter(r => r.state === 'breaking_down' || r.state === 'behind').sort((x, y) => v3AdStake(y) - v3AdStake(x));
-  const tiring = live.filter(r => r.state === 'tiring');
-  const healthy = live.filter(r => r.state === 'holding' || r.state === 'improving' || r.state === 'ahead');
-  const total = live.reduce((t, r) => t + n(r.spend_28d), 0);
-  const go = () => { try { window.__oiGo && window.__oiGo('marketing', 'creative'); } catch (e) {} };
-  const head = (<div className="card-section-title"><h2 style={{margin:0}}>Which ads should I switch off?</h2>
-    <span className="meta">Last 28 days, purchases as Meta counts them, profit after product costs</span></div>);
-  if (!weak.length) return (<div className="card">{head}
-    <div style={{fontSize:'var(--text-sm)', lineHeight:1.6, marginTop:8}}>
-      None of the ads you are paying for has broken down in the last 28 days.{tiring.length ? ' ' + NUM(tiring.length) + (tiring.length === 1 ? ' is' : ' are') + ' tiring: fewer people click, though purchases have held so far.' : ''}
-    </div></div>);
-  const wSpend = weak.reduce((t, r) => t + n(r.spend_28d), 0);
-  const wPurch = weak.reduce((t, r) => t + n(r.purchases_28d), 0);
-  const wProfit = weak.reduce((t, r) => t + n(r.profit_28d), 0);
-  const wShort = weak.reduce((t, r) => t + Math.max(0, n(r.shortfall_28d)), 0);
-  const hSpend = healthy.reduce((t, r) => t + n(r.spend_28d), 0);
-  const hPurch = healthy.reduce((t, r) => t + n(r.purchases_28d), 0);
-  const cm = n((weak.find(r => fmtOk(r.cm_per_order)) || {}).cm_per_order);
-  // At the healthy ads' purchases per pound, what the weak ads' money would have bought instead.
-  // Needs a healthy pool worth comparing with (20+ purchases), else it is left unsaid.
-  const hCpp = hPurch >= 20 && hSpend > 0 ? hSpend / hPurch : null;
-  const extra = hCpp ? Math.max(0, wSpend / hCpp - wPurch) : 0;
-  const names = weak.slice(0, 3).map(r => r.ad_name);
-  const nameList = names.length === 1 ? names[0] : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
-  return (<div className="card">{head}
-    <div style={{fontSize:'var(--text-sm)', lineHeight:1.6, marginTop:8}}>
-      <b className="oi-num">{v3AdGbp(wSpend)}</b> of your ad spend{total > 0 ? ' (' + fmtPctN(wSpend / total) + ' of it)' : ''} went on
-      {' '}<b>{NUM(weak.length)}</b> {weak.length === 1 ? 'ad that has' : 'ads that have'} broken down: {nameList}{weak.length > 3 ? ' and ' + NUM(weak.length - 3) + ' more' : ''}.
-      {' '}{wProfit < 0 ? <>Together they lost <b className="oi-num">{curSym() + v3Amount(wProfit)}</b></> : <>Together they made <b className="oi-num">{curSym() + v3Amount(wProfit)}</b></>}
-      {wShort > 0 ? <>. At their own earlier rates they would have made <span className="oi-num">{curSym() + v3Amount(wShort)}</span> more</> : null}.
-      {tiring.length > 0 && <> {NUM(tiring.length)} more {tiring.length === 1 ? 'is' : 'are'} tiring: fewer people click, though purchases have held so far.</>}
-    </div>
-    {/* When the ads holding up also pay more for a purchase than a purchase earns, moving money
-        between ads cannot fix it, and a ceiling would point the operator at the wrong lever. */}
-    {hCpp && cm > 0 && hCpp > cm && (<div className="note" style={{marginTop:10}}>
-      Moving the money to your other ads would not fix this. They also pay <span className="oi-num">{v3AdGbp2(hCpp)}</span> to win a
-      {' '}purchase, more than the <span className="oi-num">{v3AdGbp2(cm)}</span> a purchase earns after product costs. Make new
-      ads or spend less instead.
-    </div>)}
-    {hCpp && extra >= 1 && cm > 0 && hCpp <= cm && (<div className="note" style={{marginTop:10}}>
-      Your ads that are holding up won a purchase for every <span className="oi-num">{v3AdGbp2(hCpp)}</span>. At that rate the same
-      {' '}<span className="oi-num">{v3AdGbp(wSpend)}</span> would have won about <b className="oi-num">{NUM(extra)}</b> more purchases,
-      worth up to <b className="oi-num">{curSym() + v3Amount(extra * cm)}</b> after product costs.
-      <div className="micro muted" style={{marginTop:4}}>
-        That is the most it could be, not a promise. More budget shows the stronger ads to new people,
-        so expect part of it. Switch off the weakest first, and watch what each purchase costs before moving the rest.
-      </div>
-    </div>)}
-    <div style={{marginTop:10}}><button type="button" className="v3-btn v3-btn-sm" onClick={go}>See each ad</button></div>
-  </div>);
-}
 
 function ProductTrafficMisallocation(){
   const d = useOneRow('vw_product_traffic_misallocation',
@@ -17914,112 +17858,9 @@ function CostDrift(){
 //                                  across specifications against the smallest effect the
 //                                  data could detect. A range spanning break-even means
 //                                  "we cannot tell yet", which is a finding, not a gap.
-function ChannelDetail({ channel, breakEven }){
-  const [legs, setLegs] = React.useState(undefined);
-  const [head, setHead] = React.useState(undefined);
-  const [ev, setEv] = React.useState(undefined);
-  React.useEffect(() => {
-    let alive = true;
-    const sb = (typeof window !== 'undefined' && window.FRKL_LIVE && window.FRKL_LIVE.sb) || window.sb;
-    const brand = (window.FRKL_LIVE && window.FRKL_LIVE.brandId) || (window.OI_ASK && window.OI_ASK.brand_id);
-    if (!sb || !brand || !channel) { setLegs(null); setHead(null); setEv(null); return; }
-    const one = (view, cols, set) => sb.from(view).select(cols).eq('brand_id', brand).eq('channel', channel).limit(1)
-      .then(r => { if (alive) set((r && r.data && r.data[0]) || null); })
-      .catch(() => alive && set(null));
-    one('vw_channel_saturation_legs', 'n_weeks, beta_cpm, beta_ctr, beta_atc, se_atc, beta_chk, beta_pur, beta_cac, beta_frequency, se_frequency', setLegs);
-    one('vw_channel_auction_headroom', 'impression_share, lost_to_budget, lost_to_rank', setHead);
-    one('vw_channel_roas_evidence', 'n_weeks, roas_low, roas_high, minimum_detectable_roas, se_best_spec', setEv);
-    return () => { alive = false; };
-  }, [channel]);
-
-  if (legs === undefined && head === undefined && ev === undefined) return <div className="micro muted">Loading…</div>;
-  const pct = v => v == null ? '—' : Math.round(Number(v) * (Math.abs(Number(v)) <= 1 ? 100 : 1)) + '%';
-  const sig = (b, se) => b != null && se ? Math.abs(Number(b) / Number(se)) >= 2 : false;
-  const out = [];
-
-  if (legs && legs.beta_atc != null) {
-    const exhausted = Number(legs.beta_atc) < 0 && sig(legs.beta_atc, legs.se_atc) && Number(legs.beta_frequency) > 0;
-    out.push(<div key="legs" style={{marginBottom:10}}>
-      <div style={{fontSize:'var(--text-sm)', fontWeight:'var(--weight-semi)', marginBottom:2}}>Why it gets dearer as you spend</div>
-      <div className="micro" style={{color:'var(--text-secondary)', lineHeight:1.55}}>
-        {exhausted
-          ? <>The same people are seeing the ads more often ({'frequency rises'}), and fewer of them add to the basket.
-             That is audience exhaustion: <b>widen who you target</b> rather than bidding harder or rewriting the ad.</>
-          : Number(legs.beta_cpm) > 0
-            ? <>Ad prices rise as you spend more, while the funnel holds up. That is auction pressure:
-               look at bidding and timing rather than the creative.</>
-            : <>No single leg stands out yet over {legs.n_weeks} weeks of data, so the cause is not settled.</>}
-      </div>
-    </div>);
-  }
-  if (head && head.lost_to_budget != null) {
-    const budget = Number(head.lost_to_budget), rank = Number(head.lost_to_rank);
-    out.push(<div key="head" style={{marginBottom:10}}>
-      <div style={{fontSize:'var(--text-sm)', fontWeight:'var(--weight-semi)', marginBottom:2}}>Would more budget buy anything?</div>
-      <div className="micro" style={{color:'var(--text-secondary)', lineHeight:1.55}}>
-        You appear in {pct(head.impression_share)} of the auctions you could. You miss {pct(budget)} for being
-        out of budget and {pct(rank)} for rank.
-        {' '}{rank > budget * 3
-          ? <b>More money buys almost nothing here: the gap is rank, which is bids, quality and relevance.</b>
-          : budget > 0.1 ? <b>There is real headroom: you are capped by budget, not by rank.</b> : null}
-      </div>
-    </div>);
-  }
-  if (ev && ev.roas_low != null) {
-    const lo = Number(ev.roas_low), hi = Number(ev.roas_high), mde = Number(ev.minimum_detectable_roas);
-    const be = breakEven != null ? Number(breakEven) : null;
-    const straddles = be != null && lo <= be && hi >= be;
-    out.push(<div key="ev" style={{marginBottom:2}}>
-      <div style={{fontSize:'var(--text-sm)', fontWeight:'var(--weight-semi)', marginBottom:2}}>Can its return be measured yet?</div>
-      <div className="micro" style={{color:'var(--text-secondary)', lineHeight:1.55}}>
-        Across {ev.n_weeks} weeks the return lands somewhere between <b>{lo.toFixed(2)}×</b> and <b>{hi.toFixed(2)}×</b>
-        {be != null ? <> against a break-even of {be.toFixed(2)}×</> : null}.
-        {straddles
-          ? <> That range includes break-even, so <b>Whether this channel pays is not yet known.</b> A holdout test settles it; more months of the same trading will not.</>
-          : hi < (be || 0) ? <> The whole range sits below break-even.</> : <> The whole range clears break-even.</>}
-        {isFinite(mde) && mde > 0 ? <> The smallest effect this much data could detect is {mde.toFixed(2)}×.</> : null}
-      </div>
-      {straddles && (<div style={{marginTop:6}}>
-        <button type="button" className="v3-btn v3-btn-sm" onClick={()=>window.__oiGo && window.__oiGo('calendar')}>Plan a test</button>
-      </div>)}
-    </div>);
-  }
-  if (!out.length) return <div className="micro muted">Not enough history on this channel yet.</div>;
-  return <div>{out}</div>;
-}
 
 // The channel table rows become expandable: the summary stays one line, the evidence
 // is one tap away rather than on a screen nobody opens.
-function ChannelDetailList({ channels }){
-  const [open, setOpen] = React.useState(null);
-  // Loads the plan detail itself (it was only ever loaded by Growth plan, so on Marketing this list
-  // stayed empty unless Growth plan had been opened first) and re-renders when it lands.
-  const P = useV3Plan();
-  const rows = ((P.channels && P.channels.length ? P.channels : channels) || []).filter(c => c && (c.channel_type || c.channel));
-  if (!rows.length) return null;
-  return (<div className="card" style={{marginTop:14}}>
-    <div className="card-section-title"><h2 style={{margin:0}}>Why each channel behaves the way it does</h2>
-      <span className="meta">The evidence behind the verdict, tap a channel</span></div>
-    <div style={{marginTop:6}}>
-      {rows.map((c, i) => {
-        const name = String(c.channel_type || c.channel);
-        const isOpen = open === name;
-        return (<div key={i} style={{borderTop: i ? '1px solid var(--border-subtle)' : 'none'}}>
-          <button type="button" onClick={()=>setOpen(isOpen ? null : name)} aria-expanded={isOpen}
-            style={{display:'flex', alignItems:'center', gap:9, width:'100%', minHeight:44, padding:'10px 0',
-                    background:'none', border:0, color:'var(--text-primary)', fontFamily:'inherit', fontSize:'var(--text-sm)', fontWeight:'var(--weight-semi)', textAlign:'left', cursor:'pointer'}}>
-            <span style={{color:'var(--color-muted)'}}><Icon name="chevron" size={12} style={{transform:isOpen?'rotate(90deg)':'none', transition:'transform .15s', verticalAlign:'-1px', marginRight:'var(--space-2)'}}/></span>
-            {UI_V3 ? v3ChanName(c.platform, name) : name.replace(/_/g, ' ')}
-            {/* The status came from cache_channel_optimum, priced against an older break-even ("ease" beside
-                a channel the table above sends to test). The table above carries the verdict now. */}
-            {!UI_V3 && c.status ? <span className="micro muted" style={{marginLeft:'auto', textTransform:'uppercase', letterSpacing:'var(--tracking-wide)'}}>{c.status}</span> : null}
-          </button>
-          {isOpen && <div style={{paddingBottom:10}}><ChannelDetail channel={name} breakEven={c.break_even_iroas}/></div>}
-        </div>);
-      })}
-    </div>
-  </div>);
-}
 
 // ── Cash ceiling (first render, 2026-09-25) ──────────────────────────────────
 // vw_brand_cash_gate and vw_brand_cash_13w have been live for months with nothing
@@ -19469,8 +19310,8 @@ function v3SignTrend(s) {
 const v3SignShort = s => s.amer ? 'New sales per £1 of ads' : s.which === 'ret' ? 'Sales per £1 of ads' : s.which === 'repeat' ? 'Repeat in 90 days'
   : s.which === 'ly' ? 'Sales vs last year' : String(s.k).replace(/,\s*last 30 days$/i, '');
 // The page each kind of action is worked from.
-const V3_HOME_WORK = { stock: ['stock', 'Open order list'], site: ['website', 'Open Website'], paid: ['marketing', 'Open Marketing'], creative: ['marketing', 'Open Marketing'],
-  email: ['marketing', 'Open Marketing'], acquisition: ['marketing', 'Open Marketing'], product: ['products', 'Open Products'], retention: ['customers', 'Open Customers'], finance: ['profit', 'Open Profit & sales'],
+const V3_HOME_WORK = { stock: ['stock', 'Open order list'], site: ['website', 'Open Website'], paid: ['marketing', 'Open Marketing'], creative: ['marketing', 'Open Marketing', 'creative'],
+  email: ['marketing', 'Open Marketing', 'email'], acquisition: ['marketing', 'Open Marketing'], product: ['products', 'Open Products'], retention: ['customers', 'Open Customers'], finance: ['profit', 'Open Profit & sales'],
   cash: ['stock', 'Open Stock & orders'], seo: ['website', 'Open Website'], organic: ['website', 'Open Website'], returns: ['products', 'Open Products'], pricing: ['products', 'Open Products'], discount: ['products', 'Open Products'] };
 const V3_HOME_BASIS = { measured: 'v3-pill-good', estimated: 'v3-pill-none', assumed: 'v3-pill-warn' };
 function v3SplitTitle(t) {
@@ -19596,7 +19437,7 @@ function V3HomeRow({ row, first, bmRow, onOpen, rank, wide, owners, onPage }) {
     <td className="v3-home-open">{conn ? <V3Fix provider={conn} small/>
       : place ? <a className={'v3-btn v3-btn-sm' + (first ? ' v3-btn-p' : '')} href={place.url} target="_blank" rel="noopener noreferrer">Open {place.label}</a>
       : here ? <button type="button" className="v3-btn v3-btn-sm" onClick={() => onOpen(null)}>View</button>
-      : <button type="button" className={'v3-btn v3-btn-sm' + (first ? ' v3-btn-p' : '')} onClick={() => window.__oiGo && window.__oiGo(work[0])}>{work[1]}</button>}</td>
+      : <button type="button" className={'v3-btn v3-btn-sm' + (first ? ' v3-btn-p' : '')} onClick={() => window.__oiGo && window.__oiGo(work[0], work[2] || null)}>{work[1]}</button>}</td>
   </tr>);
 }
 function v3CutWhy(figRows) {
@@ -22376,6 +22217,477 @@ function V3ChannelMap() {
   </section>);
 }
 
+// ── Marketing's tabs (5 Nov) ───────────────────────────────────────────────────────────────────
+// Nine folds became four tabs beside the overview, on Goal & costs' pattern: a tab loads the first time it is
+// opened and then stays mounted, and an old deep link opens the tab that now holds it. The date control only
+// shows on the tabs that follow it: Ads, Email and Discount codes read fixed windows, named on each panel.
+const V3_MK_TAB = { overview: 'overview', creative: 'ads', email: 'email', codes: 'codes', detail: 'platforms', organic: 'platforms' };
+const V3_MK_FOLLOWS = { overview: true, platforms: true };
+function V3MarketingTabs({ start, period, customActive }) {
+  const [tab, setTab] = React.useState(() => (typeof window !== 'undefined' && V3_MK_TAB[window.__oiV3Anchor]) || 'overview');
+  const [seen, setSeen] = React.useState(() => ({ [tab]: true }));
+  const pick = t => { setTab(t); setSeen(o => (o[t] ? o : Object.assign({}, o, { [t]: true }))); };
+  React.useEffect(() => {
+    const on = () => { const t = V3_MK_TAB[window.__oiV3Anchor]; if (t) { pick(t); window.__oiV3Anchor = null; try { window.scrollTo(0, 0); } catch (e) {} } };
+    on();
+    window.addEventListener('oi-v3-anchor', on);
+    return () => window.removeEventListener('oi-v3-anchor', on);
+  }, []);
+  React.useEffect(() => {
+    const h = document.querySelector('.v3-page-head');
+    if (!h) return undefined;
+    if (V3_MK_FOLLOWS[tab]) h.removeAttribute('data-fixed-period'); else h.setAttribute('data-fixed-period', '1');
+    try { const on = document.querySelector('.v3-goal-tabs .v3-tab.on'); if (on) on.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (e) {}
+    return () => h.removeAttribute('data-fixed-period');
+  }, [tab]);
+  const TABS = [['overview', 'Overview'], ['ads', 'Ads'], ['email', 'Email'], ['codes', 'Discount codes'], ['platforms', 'Platforms']];
+  return (<div className="v3-home v3-profit v3-marketing v3-goal-page">
+    <div className="v3-tabs v3-goal-tabs" role="tablist" aria-label="Marketing">
+      {TABS.map(t => <button key={t[0]} type="button" role="tab" aria-selected={tab === t[0]} className={'v3-tab' + (tab === t[0] ? ' on' : '')} onClick={() => pick(t[0])}>{t[1]}</button>)}
+    </div>
+    {seen.overview && <div role="tabpanel" hidden={tab !== 'overview'}><V3MarketingPage start={start} period={period} customActive={customActive}/></div>}
+    {seen.ads && <div className="v3-home" role="tabpanel" hidden={tab !== 'ads'}><V3MarketingAds/></div>}
+    {seen.email && <div className="v3-home" role="tabpanel" hidden={tab !== 'email'}><V3MarketingEmail/></div>}
+    {seen.codes && <div className="v3-home" role="tabpanel" hidden={tab !== 'codes'}><V3MarketingCodes/></div>}
+    {seen.platforms && <div className="v3-home" role="tabpanel" hidden={tab !== 'platforms'}><V3MarketingPlatforms start={start} period={period} customActive={customActive}/></div>}
+  </div>);
+}
+// Copies of anatomy_category_map's action prefixes (Creative, Email and owned, Acquisition): update if the map changes.
+const V3_MK_ACTS_ADS = ['creative-', 'driver-meta-ads', 'synth-weak-conv', 'order-cost-meta'];
+const V3_MK_ACTS_EMAIL = ['channel-trend-email', 'crm-flows', 'cust-winback-atrisk', 'email-'];
+const V3_MK_ACTS_CODES = ['code-kind-', 'discount-dependency'];
+const V3_MK_ACTS_PLATFORMS = ['optim-ease-', 'test-holdout-', 'ad-budget'];
+const V3_MK_AD_TONE = { bad: 'v3-pill-bad', warn: 'v3-pill-warn', good: 'v3-pill-good' };
+
+// What moved an ad, in one short line. The figures sit beside it.
+function v3AdCause(r) {
+  const up = fmtOk(r.return_28d) && fmtOk(r.return_prior_56d) && Number(r.return_28d) > Number(r.return_prior_56d);
+  if (r.state === 'tiring') return 'Fewer of the people who see it click, though purchases have held so far.';
+  if (r.state === 'behind' || r.state === 'ahead') return 'Each purchase costs ' + v3AdGbp2(r.cost_per_purchase_28d) + ' here, against ' + v3AdGbp2(r.rest_cost_per_purchase_28d) + ' across your other ads.';
+  if (r.state === 'holding') return r.has_baseline ? 'In line with its own previous 8 weeks and with your other ads.' : 'Too new to compare with its own past. In line with your other ads.';
+  if (r.state === 'too_little') return fmtCount(r.purchases_28d) + (Number(r.purchases_28d) === 1 ? ' purchase is' : ' purchases are') + ' too few to tell a change from chance.';
+  return ({
+    conversion: up ? 'More of the people who click go on to buy.' : 'Fewer of the people who click go on to buy.',
+    clicks: up ? 'More of the people who see it click.' : 'Fewer of the people who see it click.',
+    cost: up ? 'Each 1,000 views costs less.' : 'Each 1,000 views costs more.',
+    basket: up ? 'Each purchase is worth more.' : 'Each purchase is worth less.',
+  })[r.driver] || '';
+}
+function V3MkAdDetail({ r }) {
+  const n = Number, compare = r.state === 'behind' || r.state === 'ahead' ? 'your other ads’ rate' : 'its own earlier rate';
+  const short = fmtOk(r.shortfall_28d) ? Math.round(n(r.shortfall_28d)) : 0;
+  const facts = [
+    fmtOk(r.profit_28d) && ['Profit after product costs', v3AdGbp(r.profit_28d)],
+    short !== 0 && [(short > 0 ? 'Below ' : 'Above ') + compare, curSym() + v3Amount(short)],
+    fmtOk(r.frequency_7d) && ['Times seen per person, last week', fmtTimes(r.frequency_7d, 1)],
+    r.attribution_measured && fmtOk(r.view_share_28d) && n(r.view_share_28d) >= 0.25 && ['Claimed from people who never clicked', PCT(r.view_share_28d)],
+  ].filter(Boolean);
+  const steps = [
+    ['Cost per 1,000 views', v3AdGbp2(r.cpm_prior), v3AdGbp2(r.cpm_28d)],
+    ['Click rate', PCT(r.ctr_prior), PCT(r.ctr_28d)],
+    ['Clicks that buy', PCT(r.cvr_prior), PCT(r.cvr_28d)],
+    ['Value per purchase', v3AdGbp2(r.value_per_purchase_prior), v3AdGbp2(r.value_per_purchase_28d)],
+    ['Cost per purchase', v3AdGbp2(r.cost_per_purchase_prior_56d), v3AdGbp2(r.cost_per_purchase_28d)],
+  ];
+  const cause = v3AdCause(r);
+  return (<div className="v3-mk-ad-why">
+    {cause && <p className="v3-mk-ad-cause">{cause}</p>}
+    {r.has_baseline && <div className="v3-mk-ad-grid">
+      <span className="h">Measure</span><span className="h r">8 weeks before</span><span className="h r">Last 28 days</span>
+      {steps.map(x => <React.Fragment key={x[0]}><span>{x[0]}</span><span className="r">{x[1]}</span><span className="r">{x[2]}</span></React.Fragment>)}
+    </div>}
+    {facts.length > 0 && <div className="v3-mk-ad-grid v3-mk-ad-facts">
+      <span className="h">Last 28 days</span><span className="h r"/>
+      {facts.map(x => <React.Fragment key={x[0]}><span>{x[0]}</span><span className="r">{x[1]}</span></React.Fragment>)}
+    </div>}
+    <p className="v3-mk-ad-cause">Meta counted {NUM(r.purchases_28d)} purchases for this ad in the last 28 days and {NUM(r.purchases_prior_56d)} in the 8 weeks before.{r.mostly_view_through ? ' More than half of what it claims is people who only saw the ad, so the basis sits a step lower.' : ''}</p>
+  </div>);
+}
+function V3MarketingAds() {
+  const [tries, setTries] = React.useState(0);
+  const q = useV3Rows('ad-read' + (tries ? ':' + tries : ''), V3_AD_READ_Q);
+  const cd = useV3Rows('creative-demand', V3_CDEM_Q);
+  const [open, setOpen] = React.useState(null);
+  const n = x => Number(x) || 0;
+  const head = <div className="v3-panel-head"><h2>Ads</h2><span className="v3-muted">Meta, last 28 days</span></div>;
+  if (q.err && /cache_ad_read|PGRST205|does not exist|Could not find/i.test(q.err)) return <section className="v3-panel">{head}<div className="v3-panel-pad"><V3AdTable/></div></section>;
+  if (q.err) return <section className="v3-panel">{head}<div className="v3-panel-pad"><V3AdRetry why={/timed out/.test(q.err) ? ', the data service is slow at the moment' : ''} onRetry={() => setTries(t => t + 1)}/></div></section>;
+  if (!q.rows) return <section className="v3-panel" aria-busy="true">{head}<div className="v3-panel-pad"><V3SkeletonRows n={5}/></div></section>;
+  const all = q.rows;
+  if (!all.length) return <section className="v3-panel">{head}<p className="v3-panel-note">No Meta ads have spent in the last 28 days.</p></section>;
+  const live = all.filter(r => r.state !== 'stopped'), stopped = all.length - live.length;
+  const sorted = live.slice().sort((a, b) => {
+    const ra = (V3_AD_STATE[a.state] || V3_AD_STATE.holding).rank, rb = (V3_AD_STATE[b.state] || V3_AD_STATE.holding).rank;
+    if (ra !== rb) return ra - rb;
+    if (ra === 0) return v3AdStake(b) - v3AdStake(a);
+    return n(b.spend_28d) - n(a.spend_28d);
+  });
+  const spending = live.filter(r => n(r.spend_28d) > 0);
+  const weak = spending.filter(r => r.state === 'breaking_down' || r.state === 'behind');
+  const healthy = spending.filter(r => r.state === 'holding' || r.state === 'improving' || r.state === 'ahead');
+  const tot = (rows, k) => rows.reduce((t, r) => t + n(r[k]), 0);
+  const total = tot(all, 'spend_28d'), wSpend = tot(weak, 'spend_28d'), wProfit = tot(weak, 'profit_28d');
+  const wShort = weak.reduce((t, r) => t + Math.max(0, n(r.shortfall_28d)), 0);
+  const hSpend = tot(healthy, 'spend_28d'), hPurch = tot(healthy, 'purchases_28d'), wPurch = tot(weak, 'purchases_28d');
+  const cm = n((weak.find(r => fmtOk(r.cm_per_order)) || {}).cm_per_order);
+  // What the weak ads' money would have bought at the healthy ads' rate, once there is a healthy pool worth comparing with.
+  const hCpp = hPurch >= 20 && hSpend > 0 ? hSpend / hPurch : null;
+  const extra = hCpp ? Math.max(0, wSpend / hCpp - wPurch) : 0;
+  const costNow = tot(all, 'purchases_28d') > 0 ? tot(all, 'spend_28d') / tot(all, 'purchases_28d') : null;
+  const costWas = tot(all, 'purchases_prior_56d') > 0 ? tot(all, 'spend_prior_56d') / tot(all, 'purchases_prior_56d') : null;
+  const moved = costNow != null && costWas ? costNow / costWas - 1 : null;
+  const asOf = all[0] && all[0].refreshed_at, stale = asOf && (Date.now() - new Date(asOf).getTime()) > 36 * 3600e3;
+  const when = 'Last 28 days' + (stale ? ', to ' + v3Day(String(asOf).slice(0, 10)) : '');
+  const C = cd.rows && cd.rows[0], cn = v => (v == null ? null : Number(v));
+  const showNew = C && cn(C.active_ads) > 0;
+  const newRows = showNew ? [
+    ['Spend in your top 5 ads', cn(C.ad_concentration), 'Under 33% to 50%', v => (v > 0.5 ? 'bad' : v > 0.33 ? 'warn' : 'good')],
+    ['Ads that earned nothing', cn(C.zero_rev_rate), 'Some while testing', v => (v > 0.5 ? 'bad' : 'warn')],
+    ['Spend on ads running over a month', cn(C.evergreen_share), 'The best brands: 61%', v => (v >= 0.5 ? 'good' : v >= 0.3 ? 'warn' : 'bad')],
+    ['New ads that became winners', cn(C.win_rate != null ? C.win_rate : C.activation_rate), 'Typical: 21%', v => (v >= 0.18 ? 'good' : v >= 0.1 ? 'warn' : 'bad')],
+  ].filter(r => r[1] != null) : [];
+  const TONE = { good: 'v3-up', warn: 'v3-warn', bad: 'v3-down' };
+  return (<>
+    <section className="v3-panel v3-home-strip v3-mk-strip v3-mk-ads-strip" aria-label="Key figures">
+      <div className="v3-home-group" style={{ '--n': 3 }}>
+        <div className="v3-home-group-h">Meta ads<span>{when}</span></div>
+        <div className="v3-home-tiles">
+          <V3HomeTile k="Ads running" v={fmtCount(live.length)} delta={stopped > 0 ? stopped + ' stopped this week' : ''}/>
+          <V3HomeTile k="Ad spend" v={fmtMoney(total)} delta=""/>
+          <V3HomeTile k="Cost per purchase" v={fmtMoney(costNow, 2)} dir={moved == null || Math.abs(moved) < 0.03 ? null : moved > 0 ? 'up' : 'down'} cls={moved == null || Math.abs(moved) < 0.03 ? '' : moved > 0 ? 'v3-down' : 'v3-up'} delta={costWas ? 'from ' + fmtMoney(costWas, 2) + ' before' : ''}/>
+        </div></div>
+      {weak.length > 0 && <div className="v3-home-group" style={{ '--n': 3 }}>
+        <div className="v3-home-group-h">Weak ads<b className="v3-pill v3-pill-bad">{weak.length}</b></div>
+        <div className="v3-home-tiles">
+          <V3HomeTile k="Spend on them" v={fmtMoney(wSpend)} delta={total > 0 ? fmtPctN(wSpend / total) + ' of ad spend' : ''}/>
+          <V3HomeTile k="Profit on them" v={v3AdGbp(wProfit)} cls={wProfit < 0 ? 'v3-down' : ''} delta="after product costs"/>
+          <V3HomeTile k="Below earlier rate" v={fmtMoney(wShort)} delta="their own past, or your other ads"/>
+        </div></div>}
+      {showNew && <div className="v3-home-group" style={{ '--n': 2 }}>
+        <div className="v3-home-group-h">New ads<span>a month</span></div>
+        <div className="v3-home-tiles">
+          <V3HomeTile k="New ads needed" v={fmtCount(cn(C.ads_needed_month))} delta={'to keep ' + fmtCount(cn(C.winners_needed)) + ' winners running'}/>
+          <V3HomeTile k="Winners short" v={cn(C.net_winner_gap) > 0.5 ? String(Math.round(cn(C.net_winner_gap) * 10) / 10) : '0'} delta={'each carries ' + fmtMoney(cn(C.spend_per_winner))}/>
+        </div></div>}
+    </section>
+
+    <V3GoalActions prefixes={V3_MK_ACTS_ADS} words="ads" sub="Ads and creative"/>
+
+    <section className="v3-panel" aria-label="Ads">
+      <div className="v3-panel-head"><h2>Ads</h2><span className="v3-count">{live.length}</span><span className="v3-muted">{when}, against the 8 weeks before</span></div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-mk-ads">
+        <thead><tr><th>Ad</th><th>Status</th><th className="v3-mk-opt">Basis</th><th className="r">Spend</th><th className="r v3-mk-opt">Share</th><th className="r v3-mk-opt">Purchases</th><th className="r v3-mk-opt">Return before</th><th className="r">Return now</th><th className="v3-mk-opt">12 weeks</th></tr></thead>
+        <tbody>{sorted.map(r => {
+          const st = V3_AD_STATE[r.state] || V3_AD_STATE.holding, isOpen = open === r.ad_id;
+          const weekly = Array.isArray(r.weekly) ? r.weekly : [];
+          const trend = weekly.map(w => (Number(w.spend) > 0 ? Number(w.value) / Number(w.spend) : null));
+          return (<React.Fragment key={r.ad_id}>
+            <tr>
+              <td><button type="button" className="v3-mk-ad-name" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : r.ad_id)}>{r.ad_name}</button></td>
+              <td><span className={'v3-pill ' + (V3_MK_AD_TONE[st.tone] || 'v3-pill-none')}>{st.label}</span></td>
+              <td className="v3-mk-opt"><span className={'v3-conf v3-conf-' + (V3_AD_CONF[r.confidence] || 'held')}><i aria-hidden="true"/>{(V3_CONF[V3_AD_CONF[r.confidence] || 'held'] || {}).label}</span></td>
+              <td className="r">{v3AdGbp(r.spend_28d)}</td>
+              <td className="r v3-mk-opt">{fmtPctN(r.spend_share_28d)}</td>
+              <td className="r v3-mk-opt">{NUM(r.purchases_28d)}</td>
+              <td className="r v3-mk-opt">{r.has_baseline ? fmtTimes(r.return_prior_56d) : FMT_NONE}</td>
+              <td className="r">{fmtTimes(r.return_28d)}</td>
+              <td className="v3-mk-opt v3-mk-spark"><V3HomeSpark pts={trend} weak={st.tone === 'bad'}/></td>
+            </tr>
+            {isOpen && <tr className="v3-mk-ad-open"><td colSpan={9}><V3MkAdDetail r={r}/></td></tr>}
+          </React.Fragment>);
+        })}</tbody>
+      </table></div>
+      {hCpp && cm > 0 && hCpp > cm && weak.length > 0 && <p className="v3-panel-note">Moving the weak ads’ money to your other ads would not fix this: they pay {v3AdGbp2(hCpp)} to win a purchase, more than the {v3AdGbp2(cm)} a purchase earns after product costs. New ads or less spend would.</p>}
+      {hCpp && cm > 0 && hCpp <= cm && extra >= 1 && <p className="v3-panel-note">At the {v3AdGbp2(hCpp)} a purchase your other ads pay, the weak ads’ money could win up to {fmtCount(extra)} more purchases, worth up to {v3GbpRound(extra * cm)} after product costs. Expect part of it: more budget shows those ads to new people.</p>}
+      <p className="v3-panel-note">Return is what Meta claims. Profit is after product costs, on Meta’s count of purchases.{stopped > 0 ? ' ' + stopped + (stopped === 1 ? ' ad that stopped this week is' : ' ads that stopped this week are') + ' left out of the table.' : ''}</p>
+    </section>
+
+    {newRows.length > 0 && <section className="v3-panel" aria-label="New ads">
+      <div className="v3-panel-head"><h2>New ads</h2><span className="v3-muted">Last 30 days</span></div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+        <thead><tr><th>Measure</th><th className="r">Yours</th><th className="r">Rule of thumb</th></tr></thead>
+        <tbody>{newRows.map(([k, v, band, tone]) => <tr key={k}><td>{k}</td><td className={'r ' + (TONE[tone(v)] || '')}>{fmtPctN(v)}</td><td className="r v3-muted">{band}</td></tr>)}</tbody>
+      </table></div>
+      <p className="v3-panel-note">From {fmtCount(cn(C.active_ads))} Meta ads, on Meta’s own sales count.</p>
+    </section>}
+  </>);
+}
+
+const V3_CAMPS90_Q = (sb, b) => sb.from('tenant_klaviyo_campaigns')
+  .select('name,channel,send_time,recipients,open_rate,click_rate,attributed_revenue,attributed_orders').eq('brand_id', b)
+  .gte('send_time', v3IsoAdd(new Date().toISOString().slice(0, 10), -90)).order('send_time', { ascending: false }).limit(500);
+const V3_FLOW_GAP = {
+  winback: 'Goes out 60 to 90 days after the last purchase. Usually the most valuable one to add.',
+  upsell: 'Follows an order with the product people usually buy with it.',
+  replenish: 'For products people run out of.',
+  review: 'If a reviews app sends these, this one is not needed.',
+  post: 'Reaches people just when a second order is won.',
+};
+const V3_FLOW_CORE = ['winback', 'post', 'welcome', 'cart', 'checkout', 'browse', 'stock', 'review', 'upsell', 'replenish', 'birthday', 'loyalty'];
+function V3MarketingEmail() {
+  const fl = useV3Rows('mk-flows', V3_FLOWS_Q);
+  const ca = useV3Rows('mk-camps-90', V3_CAMPS90_Q);
+  const seg = useV3Rows('mk-atrisk', (sb, b) => sb.from('v_tenant_customer_segment_stats')
+    .select('segment,customers,emailable').eq('brand_id', b).eq('segment', 'At risk'));
+  const ret = useV3Rows('cust-ret', V3_RET_Q);
+  const [allCamps, setAllCamps] = React.useState(false);
+  const head = <div className="v3-panel-head"><h2>Email</h2><span className="v3-muted">Klaviyo</span></div>;
+  if (fl.err || ca.err) return <section className="v3-panel">{head}<p className="v3-panel-note">Email could not load. Refresh the page to try again.</p></section>;
+  if (!fl.rows || !ca.rows) return <section className="v3-panel" aria-busy="true">{head}<div className="v3-panel-pad"><V3SkeletonRows n={5}/></div></section>;
+  if (!fl.rows.length && !ca.rows.length) return (<section className="v3-panel">{head}<div className="v3-panel-note v3-mk-test"><span>No Klaviyo emails have synced for this brand.</span>
+    <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('settings')}>Connections</button></div></section>);
+  const H = window.GRETA_HEADLINE || {}, shop = Number(H.net_revenue_30d) || 0;
+  const num = x => Number(x) || 0;
+  const live = fl.rows.filter(f => String(f.status).toLowerCase() === 'live').map(f => ({ ...f, t: v3FlowType(f.name, f.trigger_type), reach: num(f.recipients_30d), rev: num(f.attributed_revenue_30d),
+    per: num(f.recipients_30d) > 0 ? num(f.attributed_revenue_30d) / num(f.recipients_30d) : null }));
+  const liveTypes = new Set(live.map(f => f.t));
+  const draftTypes = new Set(fl.rows.filter(f => String(f.status).toLowerCase() !== 'live').map(f => v3FlowType(f.name, f.trigger_type)));
+  const medPer = v3TypicalFlowPer(live);
+  const post = live.find(f => f.t === 'post' && f.reach >= 50);
+  const weakPost = post && medPer != null && post.per < medPer * 0.2;
+  const atRisk = (seg.rows || []).length ? (seg.rows || []).reduce((a, r) => ({ customers: a.customers + num(r.customers), emailable: a.emailable + num(r.emailable) }), { customers: 0, emailable: 0 }) : null;
+  const R0 = (ret.rows || [])[0] || null, gap = R0 && R0.median_days_between_orders != null ? Number(R0.median_days_between_orders) : null;
+  const flowName = t => (V3_FLOW_TYPES.find(x => x[0] === t) || [, , t])[2];
+  const off = V3_FLOW_CORE.filter(t => !liveTypes.has(t)).map(t => ({ t, built: draftTypes.has(t) })).sort((a, b) => (b.built ? 1 : 0) - (a.built ? 1 : 0));
+
+  const today = new Date().toISOString().slice(0, 10), from30 = v3IsoAdd(today, -30);
+  const camps = ca.rows.filter(c => num(c.recipients) > 0).map(c => ({ ...c, day: String(c.send_time).slice(0, 10), reach: num(c.recipients), rev: num(c.attributed_revenue), sms: String(c.channel).toLowerCase() === 'sms' }));
+  const c30 = camps.filter(c => c.day >= from30);
+  const reachOf = rows => rows.reduce((a, r) => a + r.reach, 0), revOf = rows => rows.reduce((a, r) => a + r.rev, 0);
+  const flowRev = revOf(live), flowReach = reachOf(live), campRev = revOf(c30), campReach = reachOf(c30);
+  const claimShare = shop > 0 ? (flowRev + campRev) / shop : null;
+  const clickOf = (rows, k) => { const w = rows.filter(r => r[k] != null && r.reach > 0), d = reachOf(w); return d > 0 ? w.reduce((a, r) => a + Number(r[k]) * r.reach, 0) / d : null; };
+  const clickCamp = clickOf(c30.filter(c => !c.sms), 'click_rate'), clickFlow = clickOf(live, 'click_rate_30d');
+
+  // Whole weeks only, Monday to Sunday: the first and last week of the read are part-weeks.
+  const monday = d => v3IsoAdd(d, -((new Date(d + 'T00:00:00Z').getUTCDay() + 6) % 7));
+  const thisWeek = monday(today), firstWeek = monday(v3IsoAdd(today, -83));
+  const byWeek = {};
+  camps.forEach(c => { const w = monday(c.day); if (w < firstWeek || w >= thisWeek) return; const e = byWeek[w] = byWeek[w] || { w, label: v3Day(w), sends: 0, rev: 0 }; e.sends += 1; e.rev += c.rev; });
+  const weeks = Object.keys(byWeek).sort().map(k => byWeek[k]);
+  const tip = ({ active, payload }) => { if (!active || !payload || !payload.length) return null; const p = payload[0].payload;
+    return <div className="v3-tip"><b>Week of {p.label}</b><span>Sends <em>{fmtCount(p.sends)}</em></span><span>Sales Klaviyo credits <em>{fmtMoney(p.rev)}</em></span></div>; };
+
+  const flowRows = live.filter(f => f.reach > 0).sort((a, b) => b.rev - a.rev);
+  const campRows = allCamps ? camps : camps.slice(0, 12);
+  const checks = [
+    ['Click rate, one-off emails', clickCamp, 0.025, 'Typical 2.5%'],
+    ['Click rate, automatic emails', clickFlow, 0.05, 'Typical 5%'],
+  ].filter(x => x[1] != null);
+  return (<>
+    <section className="v3-panel v3-home-strip v3-mk-strip" aria-label="Key figures">
+      <div className="v3-home-group" style={{ '--n': 3 }}>
+        <div className="v3-home-group-h">Automatic emails<span>Last 30 days</span></div>
+        <div className="v3-home-tiles">
+          <V3HomeTile k="Switched on" v={fmtCount(live.length)} delta={off.some(o => o.built) ? off.filter(o => o.built).length + ' more built, not on' : ''}/>
+          <V3HomeTile k="Sales Klaviyo credits" v={fmtMoney(flowRev)} delta=""/>
+          <V3HomeTile k="Per person" v={flowReach > 0 ? fmtMoney(flowRev / flowReach, 2) : FMT_NONE} delta={flowReach > 0 ? fmtCount(flowReach) + ' people' : ''}/>
+        </div></div>
+      <div className="v3-home-group" style={{ '--n': 3 }}>
+        <div className="v3-home-group-h">One-off emails<span>Last 30 days</span></div>
+        <div className="v3-home-tiles">
+          <V3HomeTile k="Sent" v={fmtCount(c30.length)} delta={fmtCount(campReach) + ' inboxes'}/>
+          <V3HomeTile k="Sales Klaviyo credits" v={fmtMoney(campRev)} delta=""/>
+          <V3HomeTile k="Per person" v={campReach > 0 ? fmtMoney(campRev / campReach, 2) : FMT_NONE} delta=""/>
+        </div></div>
+      {claimShare != null && <div className="v3-home-group" style={{ '--n': 1 }}>
+        <div className="v3-home-group-h">All email<span>Last 30 days</span></div>
+        <div className="v3-home-tiles">
+          <V3HomeTile k="Credited share of sales" v={fmtPctN(claimShare)} delta="not in any total"/>
+        </div></div>}
+    </section>
+
+    <V3GoalActions prefixes={V3_MK_ACTS_EMAIL} words="email" sub="Email and owned"/>
+
+    {flowRows.length > 0 && <section className="v3-panel" aria-label="Automatic emails">
+      <div className="v3-panel-head"><h2>Automatic emails</h2><span className="v3-count">{flowRows.length}</span><span className="v3-muted">Switched on, last 30 days</span></div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+        <thead><tr><th>Email</th><th className="r">People</th><th className="r v3-mk-opt">Open</th><th className="r v3-mk-opt">Click</th><th className="r v3-mk-opt">Orders</th><th className="r">Sales Klaviyo credits</th><th className="r">Per person</th></tr></thead>
+        <tbody>{flowRows.map(f => (<tr key={f.name}>
+          <td>{String(f.name).replace(/^[A-Z]{1,3}\s*\|\s*/, '')}</td><td className="r">{fmtCount(f.reach)}</td>
+          <td className="r v3-mk-opt">{fmtOk(f.open_rate_30d) ? PCT(f.open_rate_30d) : FMT_NONE}</td><td className="r v3-mk-opt">{fmtOk(f.click_rate_30d) ? PCT(f.click_rate_30d) : FMT_NONE}</td>
+          <td className="r v3-mk-opt">{fmtCount(f.attributed_orders_30d)}</td><td className="r">{fmtMoney(f.rev)}</td>
+          <td className={'r' + (f === post && weakPost ? ' v3-down' : '')}>{f.per == null ? FMT_NONE : fmtMoney(f.per, 2)}</td>
+        </tr>))}</tbody></table></div>
+      {weakPost && <p className="v3-panel-note">Post-purchase earns {fmtMoney(post.per, 2)} a person, against {fmtMoney(medPer, 2)} for your typical automatic email.{gap != null ? ' Second orders usually come ' + fmtCount(gap) + ' days after the first.' : ''}</p>}
+      <p className="v3-panel-note">Klaviyo credits anyone who opened an email before buying, so these sales are more than email caused. They are left out of every total.</p>
+    </section>}
+
+    {off.length > 0 && <section className="v3-panel" aria-label="Automatic emails not switched on">
+      <div className="v3-panel-head"><h2>Not switched on</h2><span className="v3-count">{off.length}</span><span className="v3-muted">Automatic emails</span></div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-goal-checks v3-mk-off">
+        <thead><tr><th>Email</th><th>Status</th><th>Note</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
+        <tbody>{off.map(o => (<tr key={o.t}>
+          <td>{flowName(o.t)}</td>
+          <td><span className={'v3-pill ' + (o.built ? 'v3-pill-warn' : 'v3-pill-none')}>{o.built ? 'Built, off' : 'Not built'}</span></td>
+          <td className="v3-web-wrap">{o.t === 'winback' && atRisk ? fmtCount(atRisk.customers) + ' good customers have stopped buying, and ' + fmtCount(atRisk.emailable) + ' can be emailed.' : (V3_FLOW_GAP[o.t] || '')}</td>
+          <td className="r">{o.t === 'winback' ? <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('customers')}>Customers</button>
+            : o.t === 'upsell' ? <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('products')}>Products</button> : null}</td>
+        </tr>))}</tbody></table></div>
+    </section>}
+
+    {camps.length > 0 && <section className="v3-panel" aria-label="One-off emails">
+      <div className="v3-panel-head"><h2>One-off emails</h2><span className="v3-count">{camps.length}</span><span className="v3-muted">Last 90 days</span>
+        {camps.length > 12 && <button type="button" className="v3-panel-link" onClick={() => setAllCamps(v => !v)}>{allCamps ? 'Show latest 12' : 'Show all ' + camps.length}</button>}</div>
+      {weeks.length > 1 && <div className="v3-panel-pad v3-mk-charts">
+        <figure className="v3-chart" aria-label="Sends a week">
+          <figcaption><span className="v3-chart-title">Sends a week</span></figcaption>
+          <R.ResponsiveContainer width="100%" height={160}>
+            <R.BarChart data={weeks} syncId="v3-mk-email" margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <R.CartesianGrid/><R.XAxis dataKey="label" interval="preserveStartEnd"/><R.YAxis allowDecimals={false}/>
+              <R.Tooltip content={tip} cursor={false}/><R.Bar dataKey="sends" fill={PAL.neutral} isAnimationActive={false}/>
+            </R.BarChart>
+          </R.ResponsiveContainer>
+        </figure>
+        <figure className="v3-chart" aria-label="Sales Klaviyo credits a week">
+          <figcaption><span className="v3-chart-title">Sales Klaviyo credits a week</span></figcaption>
+          <R.ResponsiveContainer width="100%" height={160}>
+            <R.BarChart data={weeks} syncId="v3-mk-email" margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <R.CartesianGrid/><R.XAxis dataKey="label" interval="preserveStartEnd"/><R.YAxis tickFormatter={fmtMoneyK}/>
+              <R.Tooltip content={tip} cursor={false}/><R.Bar dataKey="rev" fill={PAL.sales} isAnimationActive={false}/>
+            </R.BarChart>
+          </R.ResponsiveContainer>
+        </figure>
+      </div>}
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+        <thead><tr><th>Sent</th><th>Name</th><th className="v3-mk-opt">Type</th><th className="r v3-mk-opt">People</th><th className="r v3-mk-opt">Open</th><th className="r v3-mk-opt">Click</th><th className="r v3-mk-opt">Orders</th><th className="r">Sales</th><th className="r v3-mk-opt">Per person</th></tr></thead>
+        <tbody>{campRows.map((c, i) => (<tr key={c.day + c.name + i}>
+          <td>{v3Day(c.day)}</td><td className="v3-web-wrap">{c.name}</td><td className="v3-mk-opt">{c.sms ? 'Text' : 'Email'}</td>
+          <td className="r v3-mk-opt">{fmtCount(c.reach)}</td><td className="r v3-mk-opt">{c.sms || !fmtOk(c.open_rate) ? FMT_NONE : PCT(c.open_rate)}</td><td className="r v3-mk-opt">{fmtOk(c.click_rate) ? PCT(c.click_rate) : FMT_NONE}</td>
+          <td className="r v3-mk-opt">{fmtCount(c.attributed_orders)}</td><td className="r">{fmtMoney(c.rev)}</td><td className="r v3-mk-opt">{fmtMoney(c.rev / c.reach, 2)}</td>
+        </tr>))}</tbody></table></div>
+    </section>}
+
+    <section className="v3-panel" aria-label="Email checks">
+      <div className="v3-panel-head"><h2>Checks</h2><span className="v3-muted">Last 30 days</span></div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+        <thead><tr><th>Check</th><th className="r">Yours</th><th className="r">Rule of thumb</th><th>Status</th></tr></thead>
+        <tbody>
+          {checks.map(x => <tr key={x[0]}><td>{x[0]}</td><td className="r">{v3Dp1Num(x[1] * 100)}%</td><td className="r v3-muted">{x[3]}</td><td><span className={'v3-pill ' + (x[1] >= x[2] ? 'v3-pill-good' : 'v3-pill-warn')}>{x[1] >= x[2] ? 'Good' : 'Low'}</span></td></tr>)}
+          <tr><td>Emails that bounce</td><td className="r">{FMT_NONE}</td><td className="r v3-muted">Under 2%</td><td><span className="v3-pill v3-pill-none">Not synced</span></td></tr>
+          <tr><td>Spam complaints</td><td className="r">{FMT_NONE}</td><td className="r v3-muted">Under 0.1%</td><td><span className="v3-pill v3-pill-none">Not synced</span></td></tr>
+        </tbody></table></div>
+      <p className="v3-panel-note">Klaviyo does not share bounces or spam complaints. They are in Klaviyo under Analytics, Deliverability.</p>
+    </section>
+  </>);
+}
+
+function V3MarketingCodes() {
+  const q = useV3Rows('brand-codes', V3_CODES_Q);
+  const head = <div className="v3-panel-head"><h2>Discount codes</h2><span className="v3-muted">Last year</span></div>;
+  if (q.err) return <section className="v3-panel">{head}<p className="v3-panel-note">Discount codes could not load. Refresh the page to try again.</p></section>;
+  if (!q.rows) return <section className="v3-panel" aria-busy="true">{head}<div className="v3-panel-pad"><V3SkeletonRows n={5}/></div></section>;
+  const rows = q.rows.filter(r => Number(r.orders_365d) >= 10);
+  if (!rows.length) return <section className="v3-panel">{head}<p className="v3-panel-note">No discount code has 10 or more orders in the last year.</p></section>;
+  const orders = rows.reduce((t, r) => t + Number(r.orders_365d), 0), sales = rows.reduce((t, r) => t + (Number(r.net_sales_365d) || 0), 0);
+  const recent = rows.reduce((t, r) => t + (Number(r.orders_90d) || 0), 0);
+  const weighted = k => rows.reduce((t, r) => t + (Number(r[k]) || 0) * Number(r.orders_365d), 0) / orders;
+  const top = rows[0];
+  return (<>
+    <section className="v3-panel v3-home-strip v3-mk-strip" aria-label="Key figures">
+      <div className="v3-home-group" style={{ '--n': 5 }}>
+        <div className="v3-home-group-h">Codes with 10 or more orders<span>Last year</span></div>
+        <div className="v3-home-tiles">
+          <V3HomeTile k="Codes" v={fmtCount(rows.length)} delta=""/>
+          <V3HomeTile k="Orders" v={fmtCount(orders)} delta={fmtCount(recent) + ' in the last 90 days'}/>
+          <V3HomeTile k="Sales" v={fmtMoney(sales)} delta="after discounts, before VAT"/>
+          <V3HomeTile k="From new customers" v={fmtPctN(weighted('first_order_share'))} delta="share of orders"/>
+          <V3HomeTile k="Average discount" v={fmtPctN(weighted('avg_depth'))} delta=""/>
+        </div></div>
+    </section>
+
+    <V3GoalActions prefixes={V3_MK_ACTS_CODES} words="discount codes" sub="Discount codes"/>
+
+    <section className="v3-panel" aria-label="Discount codes">
+      <div className="v3-panel-head"><h2>Discount codes</h2><span className="v3-count">{rows.length}</span><span className="v3-muted">Website orders, last year</span></div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+        <thead><tr><th>Code</th><th className="r">Orders</th><th className="r v3-mk-opt">Last 90 days</th><th className="r">New customers</th><th className="r v3-mk-opt">Average discount</th><th className="r">Sales</th><th className="r v3-mk-opt">Last used</th></tr></thead>
+        <tbody>{rows.map(r => (<tr key={r.code}>
+          <td>{r.code}</td><td className="r">{fmtCount(r.orders_365d)}</td><td className="r v3-mk-opt">{fmtCount(r.orders_90d)}</td>
+          <td className="r">{fmtPctN(Number(r.first_order_share))}</td><td className="r v3-mk-opt">{fmtPctN(Number(r.avg_depth))}</td><td className="r">{fmtMoney(Number(r.net_sales_365d))}</td>
+          <td className="r v3-muted v3-mk-opt">{v3Day(String(r.last_used).slice(0, 10), true)}</td></tr>))}</tbody>
+      </table></div>
+      {Number(top.first_order_share) >= 0.6 && <p className="v3-panel-note">{top.code} wins new customers: {fmtPctN(Number(top.first_order_share))} of its orders. It is worth planning and budgeting for like an ad channel.</p>}
+      <p className="v3-panel-note">Some of these customers would have bought without the code, so this shows who brought them, not what the code alone earned.</p>
+    </section>
+  </>);
+}
+
+function V3MarketingPlatforms({ start, period, customActive }) {
+  const H = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || {};
+  const ttQ = useV3Rows('ov-tiktok-daily', V3_TT_DAILY_Q);
+  const legs = useV3Rows('mk-legs', (sb, b) => sb.from('vw_channel_saturation_legs').select('channel,n_weeks,beta_cpm,beta_atc,se_atc,beta_frequency').eq('brand_id', b));
+  const room = useV3Rows('mk-room', (sb, b) => sb.from('vw_channel_auction_headroom').select('channel,impression_share,lost_to_budget,lost_to_rank').eq('brand_id', b));
+  const ev = useV3Rows('mk-roas-range', (sb, b) => sb.from('vw_channel_roas_evidence').select('channel,n_weeks,roas_low,roas_high,minimum_detectable_roas').eq('brand_id', b));
+  const end = dataEndOf(), onFig = !customActive && period === '30d';
+  const meta = inRangeBounded(D.metaDaily, start, end), gads = inRangeBounded(D.googleAds, start, end);
+  const tt = v3SumBetween(ttQ.rows, 'date', 'spend')(start, end);
+  const shopNow = inRangeBounded(D.shopify, start, end);
+  const platforms = [
+    { key: 'meta', name: 'Meta', spend: sum(meta, 'cost'), views: sum(meta, 'impressions'), clicks: sum(meta, 'clicks') || null, buys: sum(meta, 'purchases'), claimed: sum(meta, 'purchaseValue') },
+    { key: 'google_ads', name: 'Google', spend: sum(gads, 'cost'), views: sum(gads, 'impressions'), clicks: sum(gads, 'clicks'), buys: sum(gads, 'conversions'), claimed: sum(gads, 'convValue') },
+    { key: 'tiktok', name: 'TikTok', spend: tt, views: null, clicks: null, buys: null, claimed: null },
+  ].filter(p => p.spend > 0);
+  const paid = onFig && H.paid_spend_30d != null ? Number(H.paid_spend_30d) : platforms.reduce((t, p) => t + p.spend, 0);
+  const rev = onFig && H.net_revenue_30d != null ? Number(H.net_revenue_30d) : sum(shopNow, 'netSales');
+  const claimed = platforms.reduce((t, p) => t + (p.claimed || 0), 0);
+  const claimSpend = platforms.filter(p => p.claimed != null).reduce((t, p) => t + p.spend, 0);
+  const label = onFig ? 'Last 30 days' : customActive ? v3Day(start) + ' to ' + v3Day(end) : ((PERIODS.find(p => p.key === period) || {}).label || 'This period');
+  const pct = v => (v == null ? FMT_NONE : fmtPctN(Number(v)));
+  const by = (q, k) => (q.rows || []).find(r => r.channel === k) || null;
+  const evRows = platforms.map(p => ({ p, L: by(legs, p.key), A: by(room, p.key), E: by(ev, p.key) })).filter(x => x.L || x.A || x.E);
+  const dearer = L => { if (!L || L.beta_cpm == null) return FMT_NONE;
+    const sig = L.beta_atc != null && L.se_atc && Math.abs(Number(L.beta_atc) / Number(L.se_atc)) >= 2;
+    if (L.beta_atc != null && Number(L.beta_atc) < 0 && sig && Number(L.beta_frequency) > 0) return 'Same people, fewer baskets';
+    return Number(L.beta_cpm) > 0 ? 'Ad prices rising' : 'Not settled'; };
+  const weeks = evRows.reduce((m, x) => Math.max(m, Number((x.E || x.L || {}).n_weeks) || 0), 0);
+  return (<>
+    <section className="v3-panel v3-home-strip v3-mk-strip" aria-label="Key figures">
+      <div className="v3-home-group" style={{ '--n': 3 }}>
+        <div className="v3-home-group-h">What the platforms claim<span>{label}</span></div>
+        <div className="v3-home-tiles">
+          <V3HomeTile k="Ad spend" v={fmtMoney(paid)} delta=""/>
+          <V3HomeTile k="Sales claimed" v={fmtMoney(claimed)} delta=""/>
+          <V3HomeTile k="Claimed per £1" v={claimSpend > 0 ? fmtMoney(claimed / claimSpend, 2) : FMT_NONE} delta={platforms.some(p => p.claimed == null) ? 'platforms that report it' : ''}/>
+        </div></div>
+      <div className="v3-home-group" style={{ '--n': 3 }}>
+        <div className="v3-home-group-h">What your shop shows<span>{label}</span></div>
+        <div className="v3-home-tiles">
+          <V3HomeTile k="Sales" v={fmtMoney(rev)} delta=""/>
+          <V3HomeTile k="Sales per £1 of ads" v={paid > 0 ? fmtMoney(rev / paid, 2) : FMT_NONE} delta=""/>
+          <V3HomeTile k="Claims against sales" v={rev > 0 ? fmtPctN(claimed / rev) : FMT_NONE} delta=""/>
+        </div></div>
+    </section>
+
+    <V3GoalActions prefixes={V3_MK_ACTS_PLATFORMS} words="ad platforms" sub="Spend and tests"/>
+
+    {platforms.length > 0 && <section className="v3-panel" aria-label="Ad platforms">
+      <div className="v3-panel-head"><h2>Ad platforms</h2><span className="v3-muted">{label}</span></div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+        <thead><tr><th>Platform</th><th className="r">Spend</th><th className="r v3-mk-opt">Views</th><th className="r v3-mk-opt">Clicks</th><th className="r v3-mk-opt">Purchases</th><th className="r">Sales claimed</th><th className="r">Claimed per £1</th><th className="r v3-mk-opt">Against shop sales</th></tr></thead>
+        <tbody>{platforms.map(p => (<tr key={p.key}>
+          <td>{p.name}</td><td className="r">{fmtMoney(p.spend)}</td><td className="r v3-mk-opt">{p.views == null ? FMT_NONE : fmtCount(p.views)}</td><td className="r v3-mk-opt">{p.clicks == null ? FMT_NONE : fmtCount(p.clicks)}</td>
+          <td className="r v3-mk-opt">{p.buys == null ? FMT_NONE : fmtCount(p.buys)}</td><td className="r">{p.claimed == null ? FMT_NONE : fmtMoney(p.claimed)}</td>
+          <td className="r">{p.claimed == null ? FMT_NONE : fmtMoney(p.claimed / p.spend, 2)}</td><td className="r v3-mk-opt">{p.claimed == null || !(rev > 0) ? FMT_NONE : fmtPctN(p.claimed / rev)}</td>
+        </tr>))}</tbody></table></div>
+      <p className="v3-panel-note">Each platform counts sales the others also touched, so claims can add up to more than the shop sold. Rows are each platform’s own daily figures, so they can add up slightly differently from Ad spend above.</p>
+    </section>}
+
+    {evRows.length === 0 && legs.err && room.err && ev.err && <section className="v3-panel" aria-label="Spend and return">
+      <div className="v3-panel-head"><h2>Spend and return</h2></div><p className="v3-panel-note">Spend and return could not load. Refresh the page to try again.</p></section>}
+    {evRows.length > 0 && <section className="v3-panel" aria-label="Spend and return">
+      <div className="v3-panel-head"><h2>Spend and return</h2>{weeks > 0 && <span className="v3-muted">{fmtCount(weeks)} weeks</span>}</div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+        <thead><tr><th>Platform</th><th className="r">Return, low</th><th className="r">Return, high</th><th className="r v3-mk-opt">Smallest it can detect</th><th className="v3-mk-opt">Cost as spend rises</th><th className="r v3-mk-opt">Auctions shown in</th><th className="r v3-mk-opt">Missed on budget</th><th className="r v3-mk-opt">Missed on rank</th></tr></thead>
+        <tbody>{evRows.map(({ p, L, A, E }) => (<tr key={p.key}>
+          <td>{p.name}</td><td className="r">{E ? fmtTimes(E.roas_low) : FMT_NONE}</td><td className="r">{E ? fmtTimes(E.roas_high) : FMT_NONE}</td><td className="r v3-mk-opt">{E ? fmtTimes(E.minimum_detectable_roas) : FMT_NONE}</td>
+          <td className="v3-mk-opt">{dearer(L)}</td><td className="r v3-mk-opt">{A ? pct(A.impression_share) : FMT_NONE}</td><td className="r v3-mk-opt">{A ? pct(A.lost_to_budget) : FMT_NONE}</td><td className="r v3-mk-opt">{A ? pct(A.lost_to_rank) : FMT_NONE}</td>
+        </tr>))}</tbody></table></div>
+      <p className="v3-panel-note">Return here is worked from weekly sales against weekly spend. Whether each channel pays is in Channels on Overview.</p>
+    </section>}
+  </>);
+}
+
 // ── Email, the channel you own (Marketing) ─────────────────────────────────────────────────
 // Klaviyo's own figures, read for what they can honestly say. Its attributed sales count anyone who
 // opened or clicked an email before buying, so set against Shopify sales they over-claim; that is
@@ -22400,67 +22712,6 @@ const V3_FLOW_TYPES = [
   ['birthday', /birthday/i, 'Birthday'], ['loyalty', /loyalty|referral|vip/i, 'Loyalty and referral'],
 ];
 function v3FlowType(name, trig) { const s = String(name || '') + ' ' + String(trig || ''); const t = V3_FLOW_TYPES.find(x => x[1].test(s)); return t ? t[0] : 'other'; }
-function V3EmailRead() {
-  const fl = useV3Rows('mk-flows', V3_FLOWS_Q);
-  const ca = useV3Rows('mk-camps', (sb, b) => sb.from('tenant_klaviyo_campaigns')
-    .select('name,send_time,recipients,attributed_revenue,attributed_orders').eq('brand_id', b)
-    .gte('send_time', v3IsoAdd(new Date().toISOString().slice(0, 10), -30)).order('send_time', { ascending: false }).limit(200));
-  const seg = useV3Rows('mk-atrisk', (sb, b) => sb.from('v_tenant_customer_segment_stats')
-    .select('segment,customers,emailable').eq('brand_id', b).eq('segment', 'At risk'));
-  const ret = useV3Rows('cust-ret', V3_RET_Q);
-  // phones: the flow table folds (Marketing ran to 9 screens); wider screens show it open
-  const fst = React.useState(() => typeof window === 'undefined' || window.innerWidth > 640), showFlows = fst[0], setShowFlows = fst[1];
-  if (fl.err) return null;
-  if (!fl.rows || !ca.rows) return <V3SkeletonRows n={3}/>;
-  if (!fl.rows.length) return null;    // no Klaviyo connected: the Email section below says so
-  const H = window.GRETA_HEADLINE || {}, shop = Number(H.net_revenue_30d) || 0;
-  const live = fl.rows.filter(f => String(f.status).toLowerCase() === 'live').map(f => ({ ...f, t: v3FlowType(f.name, f.trigger_type),
-    reach: Number(f.recipients_30d) || 0, rev: Number(f.attributed_revenue_30d) || 0 }));
-  const liveTypes = new Set(live.map(f => f.t));
-  const draftOnly = [...new Set(fl.rows.filter(f => String(f.status).toLowerCase() !== 'live').map(f => v3FlowType(f.name, f.trigger_type)))]
-    .filter(t => t !== 'other' && !liveTypes.has(t));
-  const label = t => (V3_FLOW_TYPES.find(x => x[0] === t) || [, , t])[2];
-  const camps = ca.rows.filter(c => Number(c.recipients) > 0);
-  const campRev = camps.reduce((a, c) => a + (Number(c.attributed_revenue) || 0), 0), flowRev = live.reduce((a, f) => a + f.rev, 0);
-  const claimed = campRev + flowRev, claimShare = shop > 0 ? claimed / shop : null;
-  const ppl = live.filter(f => f.reach >= 50).map(f => ({ ...f, per: f.rev / f.reach }));
-  const medPer = v3TypicalFlowPer(ppl);   // the same median Customers and the board use
-  const post = ppl.find(f => f.t === 'post');
-  const weakPost = post && medPer != null && post.per < medPer * 0.2;
-  // The segment comes back split by loyalty type: add the parts.
-  const atRisk = (seg.rows || []).length ? (seg.rows || []).reduce((a, r) => ({ customers: a.customers + (Number(r.customers) || 0), emailable: a.emailable + (Number(r.emailable) || 0) }), { customers: 0, emailable: 0 }) : null;
-  const R0 = (ret.rows || [])[0] || null, gap = R0 && R0.median_days_between_orders != null ? Number(R0.median_days_between_orders) : null;
-  const priority = ['winback', 'upsell', 'post', 'replenish', 'cart', 'checkout', 'browse', 'welcome'];
-  const missing = draftOnly.filter(t => priority.includes(t)).sort((a, b) => priority.indexOf(a) - priority.indexOf(b));
-  const head = missing.length
-    ? 'You have automatic emails built for ' + v3Names(missing.slice(0, 3).map(t => label(t).toLowerCase())) + ', but none of them is switched on.'
-    : weakPost ? 'Your post-purchase email reaches people just when a second order is won, yet it earns almost nothing.'
-    : 'Your automatic emails cover the main moments. The gains now are in making each one earn more.';
-  return (<div className="v3-page-stack"><section className="v3-sec">
-    <div className="v3-kick">Email, the channel you own, last 30 days</div>
-    <p className="v3-verdict">{head}</p>
-    {claimShare != null && claimShare > 0.5 && <p className="v3-note v3-measure">Klaviyo credits email with {fmtMoney(claimed)} of sales, {fmtPctN(claimShare)} of everything you sold. But it counts anyone who opened an email before buying, so this is not what email caused. Greta leaves it out of every total. Below is what is switched on, and what each automatic email earns per person it reaches.</p>}
-    <ol className="v3-moves">
-      {missing.includes('winback') && (<li><b>Switch on the email that wins back quiet customers.</b>{' '}
-        {atRisk ? <>{fmtCount(atRisk.customers)} good customers have stopped buying, and {fmtCount(atRisk.emailable)} of them can be emailed. Nothing writes to them automatically.</> : 'Customers who stop buying get nothing automatically.'}
-        {' '}<button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('customers')}>See them on Customers</button></li>)}
-      {missing.includes('upsell') && (<li><b>Switch on the emails that suggest an add-on.</b>{' '}They follow an order with the product people usually buy with it. Products shows the same add-ons for your best sellers; these emails offer them after the order instead of before.
-        {' '}<button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('products')}>See the add-ons on Products</button></li>)}
-      {weakPost && (<li><b>Rework the post-purchase email.</b>{' '}It reached {fmtCount(post.reach)} people and earned {fmtMoney(post.rev)}. That is {fmtMoney(post.per, 2)} a person, against {fmtMoney(medPer, 2)} for your typical automatic email.
-        {gap != null ? <> Second orders usually come {fmtCount(gap)} days after the first, so that is when it should give a reason to buy again.</> : null}</li>)}
-      {missing.filter(t => !['winback', 'upsell'].includes(t)).length > 0 && (<li><b>Also built but switched off:</b> {v3Names(missing.filter(t => !['winback', 'upsell'].includes(t)).map(t => label(t).toLowerCase()))}.</li>)}
-    </ol>
-    {!showFlows && ppl.length > 0 && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => setShowFlows(true)}>Show the {fmtCount(Math.min(ppl.length, 8))} automatic emails switched on</button>}
-    {showFlows && <table className="v3-rw v3-email-table">
-      <thead><tr><th className="t-text">Automatic email, switched on</th><th>People reached</th><th>Sales Klaviyo credits</th><th>Per person</th></tr></thead>
-      <tbody>{ppl.sort((a, b) => b.rev - a.rev).slice(0, 8).map((f, i) => (<tr key={i}>
-        <td className="t-text">{label(f.t) === 'other' ? f.name : label(f.t)}<span className="v3-muted">, {String(f.name).replace(/^[A-Z]{1,3}\s*\|\s*/, '')}</span></td>
-        <td>{fmtCount(f.reach)}</td><td>{fmtMoney(f.rev)}</td><td className={f === post && weakPost ? 'v3-down' : ''}>{fmtMoney(f.per, 2)}</td>
-      </tr>))}</tbody>
-    </table>}
-    {camps.length > 0 && <p className="micro muted v3-measure">You sent {fmtCount(camps.length)} one-off emails (campaigns) in the last 30 days, to {fmtCount(camps.reduce((a, c) => a + Number(c.recipients), 0))} inboxes in total. Klaviyo credits them with {fmtMoney(campRev)}. Each one is in the Email section below.</p>}
-  </section></div>);
-}
 
 // ── Shared: what the extra ad spend bought, one rule for Marketing and Customers ───────────────
 // Spend and new customers by calendar month (vw_cac_elasticity_fit_input), the current partial month
@@ -22469,7 +22720,7 @@ function V3EmailRead() {
 const V3_MONTHS_Q = (sb, b) => sb.from('vw_cac_elasticity_fit_input')
   .select('month,spend,new_customers').eq('brand_id', b).order('month', { ascending: false }).limit(24);
 const V3_FLOWS_Q = (sb, b) => sb.from('tenant_klaviyo_flows')
-  .select('name,status,trigger_type,recipients_30d,attributed_revenue_30d,attributed_orders_30d').eq('brand_id', b).limit(300);
+  .select('name,status,trigger_type,recipients_30d,open_rate_30d,click_rate_30d,attributed_revenue_30d,attributed_orders_30d').eq('brand_id', b).limit(300);
 function v3Med(a) { const s = a.filter(v => v != null && isFinite(v)).sort((p, q) => p - q), k = Math.floor(s.length / 2); return !s.length ? null : s.length % 2 ? s[k] : (s[k - 1] + s[k]) / 2; }
 function v3ExtraCustomers(rows) {
   if (!rows) return null;
@@ -26312,28 +26563,6 @@ function V3MoneyBridge({ L, share }) {
 }
 
 // Promotion and creator attribution: what each discount code brought over the last year.
-function V3CodePerformance() {
-  const q = useV3Rows('brand-codes', V3_CODES_Q);
-  // the six biggest codes show, the rest fold (Marketing ran to 9 phone screens)
-  const ast = React.useState(false), allCodes = ast[0], setAllCodes = ast[1];
-  if (q.err || !q.rows) return null;
-  const rows = q.rows.filter(r => Number(r.orders_365d) >= 10);
-  if (!rows.length) return null;
-  const top = rows[0];
-  return (<section className="v3-sec">
-    <h2 className="v3-sec-title">Which discount codes bring you customers?</h2>
-    <p className="v3-note v3-measure">A discount code is the one sure record of who brought an order: whoever holds the code. <b>{top.code}</b> brought {fmtCount(top.orders_365d)} orders in the last year, {fmtPctN(Number(top.first_order_share))} of them from new customers.{Number(top.first_order_share) >= 0.6 ? ' That makes it a source of new customers in its own right: plan and budget for it like an ad channel.' : ''}</p>
-    <table className="v3-rw">
-      <thead><tr><th className="t-text">Code</th><th>Orders, last year</th><th className="v3-rw-opt">Last 90 days</th><th>New customers</th><th className="v3-rw-opt">Average discount</th><th>Sales</th><th className="t-text v3-rw-opt">Last used</th></tr></thead>
-      <tbody>{(allCodes ? rows : rows.slice(0, 6)).map(r => (<tr key={r.code}>
-        <td className="t-text v3-rw-name">{r.code}</td><td>{fmtCount(r.orders_365d)}</td><td className="v3-rw-opt">{fmtCount(r.orders_90d)}</td>
-        <td>{fmtPctN(Number(r.first_order_share))}</td><td className="v3-rw-opt">{fmtPctN(Number(r.avg_depth))}</td><td>{fmtMoney(Number(r.net_sales_365d))}</td>
-        <td className="t-text v3-muted v3-rw-opt">{v3Day(String(r.last_used).slice(0, 10), true)}</td></tr>))}</tbody>
-    </table>
-    {rows.length > 6 && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => setAllCodes(v => !v)}>{allCodes ? 'Show the biggest 6' : 'Show all ' + rows.length + ' codes'}</button>}
-    <p className="micro muted v3-measure">Website orders only. Sales are after discounts and before VAT. Some of these customers would have bought without the code, so read this as who brought them, not what the code alone earned.</p>
-  </section>);
-}
 
 // Suggested tasks the agents raised long ago that nothing has re-checked. The board does not rank them
 // (it cannot say they are still true); they are listed here so the owner can mark each done or skip it,
@@ -26605,28 +26834,6 @@ function V3GoldenRule() {
 // Marketing: creative demand (vw_creative_demand, 0330), on CTC's measures with CTC's bands. Before this
 // the front end read none of it.
 const V3_CDEM_Q = (sb, b) => sb.from('vw_creative_demand').select('*').eq('brand_id', b).limit(1);
-function V3CreativeDemand() {
-  const q = useV3Rows('creative-demand', V3_CDEM_Q);
-  if (q.err || !q.rows || !q.rows.length) return null;
-  const c = q.rows[0], n = v => (v == null ? null : Number(v));
-  if (!(n(c.active_ads) > 0)) return null;
-  const rows = [
-    ['Spend in your top 5 ads', n(c.ad_concentration), 'most brands see ads tire once the top 5 take more than a third to a half of spend', v => v > 0.5 ? 'weak' : v > 0.33 ? 'ok' : 'good'],
-    ['Ads that earned nothing', n(c.zero_rev_rate), 'some is normal while testing', v => v > 0.5 ? 'weak' : 'ok'],
-    ['Spend on ads still running after a month', n(c.evergreen_share), 'the best brands hold about 61%', v => v >= 0.5 ? 'good' : v >= 0.3 ? 'ok' : 'weak'],
-    ['New ads that became winners', n(c.win_rate != null ? c.win_rate : c.activation_rate), 'about 21% is typical', v => v >= 0.18 ? 'good' : v >= 0.1 ? 'ok' : 'weak'],
-  ].filter(r => r[1] != null);
-  const TONE = { good: 'v3-up', ok: 'v3-warn', weak: 'v3-down' };
-  return (<section className="v3-sec">
-    <h2 className="v3-sec-title">Are you making enough new ads?</h2>
-    <p className="v3-note v3-measure">At your Meta spend (<span>{fmtMoney(n(c.meta_spend_30d))}</span> a month) and win rate, you need about <b className="oi-num">{fmtCount(n(c.ads_needed_month))}</b> new ads a month to keep <span>{fmtCount(n(c.winners_needed))}</span> winners running{n(c.net_winner_gap) > 0.5 ? <>; you are short by about <span>{Math.round(n(c.net_winner_gap) * 10) / 10}</span> winners</> : null}. Each winner carries about <span>{fmtMoney(n(c.spend_per_winner))}</span> of spend.</p>
-    <table className="v3-rw">
-      <thead><tr><th className="t-text">Measure, last 30 days</th><th>You</th><th className="t-text">Rule of thumb</th></tr></thead>
-      <tbody>{rows.map(([k, v, band, tone]) => <tr key={k}><td className="t-text v3-rw-wrap">{k}</td><td className={TONE[tone(v)] || ''}>{fmtPctN(v)}</td><td className="t-text v3-muted v3-rw-wrap">{band}</td></tr>)}</tbody>
-    </table>
-    <p className="micro muted v3-measure">From {fmtCount(n(c.active_ads))} Meta ads, on Meta’s own sales count. A high share of spend on ads that keep running is good: it means winners last.</p>
-  </section>);
-}
 // Review: congruency (vw_brand_congruency). When the ad platforms' return and the shop's profit move apart,
 // one of them is wrong; when they move together, the reading can be trusted.
 const V3_CONG_Q = (sb, b) => sb.from('vw_brand_congruency').select('*').eq('brand_id', b).limit(1);
@@ -26721,22 +26928,7 @@ const V3_PAGES = {
     <V3More id="stock-suppliers" label="Suppliers"><V3Anchor id="suppliers"/><SuppliersDirectory/></V3More>
   </>),
   profit: (p) => <><Overview start={p.start} period={p.period} customActive={p.customActive}/><V3Today page="profit"/></>,
-  marketing: (p) => (<>
-    {/* 4 Nov: the Home pattern. Figures, chart, actions, channels, sales by channel and periods stand open; the rest fold, under nouns. */}
-    <V3MarketingPage start={p.start} period={p.period} customActive={p.customActive}/>
-    <V3More id="mk-codes" label="Discount codes"><V3CodePerformance/></V3More>
-    <V3More id="mk-ads-needed" label="New ads needed"><V3CreativeDemand/></V3More>
-    <V3More id="mk-switch-off" label="Ads to switch off"><CreativeReallocation/></V3More>
-    <V3More id="mk-email-read" label="Email"><V3EmailRead/></V3More>
-    <V3More id="mk-why" label="Ad platform claims, by channel">
-      <CrossChannel start={p.start}/>
-      <ChannelDetailList channels={(typeof window!=='undefined' && window.FRKL_PLAN && window.FRKL_PLAN.channels) || []}/>
-    </V3More>
-    <V3More id="mk-detail" label="Channel figures and platform totals"><V3Anchor id="detail"/><Channels start={p.start}/></V3More>
-    <V3More id="mk-creative" label="Ads, one by one"><V3Anchor id="creative"/><Creatives/></V3More>
-    <V3More id="mk-email" label="Email sends"><V3Anchor id="email"/><EmailHub/></V3More>
-    <V3More id="mk-organic" label="Unpaid visits and social media"><V3Anchor id="organic"/><Organic/></V3More>
-  </>),
+  marketing: (p) => <V3MarketingTabs start={p.start} period={p.period} customActive={p.customActive}/>,
   website: (p) => (<>
     {/* 4 Nov: the Home pattern. The folds are the older detail, under nouns. */}
     <V3Website start={p.start} period={p.period} customActive={p.customActive}/>
@@ -27642,13 +27834,13 @@ const V3_WALK_TOUR = {
     what: 'Sales, ad spend and profit for the last 30 days, each against a typical month. The Profit table further down shows where each £1 of sales went.' },
   customers: { dest: 'customers', target: { sel: 'figure.v3-chart', has: 'Sales' }, fallback: { sel: '.v3-home-strip' },
     what: 'Sales split by who placed them, period by period: first-time customers against people who have bought before. A healthy shop grows both; a business living on new customers alone has to keep paying to replace them.' },
-  efficiency: { dest: 'marketing', target: { sel: '.v3-mk-channels' },
+  efficiency: { dest: 'marketing', anchor: 'overview', target: { sel: '.v3-mk-channels' },
     what: 'Every ad channel in one table. Likely caused per £1 is what each £1 of spend really brings back, and break-even is what it has to bring back at your margins. Below break-even is losing money, whatever the platform claims.' },
   spend: { dest: 'profit', target: { sel: '.v3-profit-strip' },
     what: 'Ad spend for the last 30 days, against a typical month. The Profit table further down shows how many pence of every £1 of sales went on ads, and Marketing splits the spend by channel.' },
-  channels: { dest: 'marketing', target: { sel: '.v3-mk-channels' },
+  channels: { dest: 'marketing', anchor: 'overview', target: { sel: '.v3-mk-channels' },
     what: 'Read Break-even first: it is the return each channel needs. Rows are ordered by spend, because falling short at £300 is not the same as at £6,000.' },
-  creative: { dest: 'marketing', target: { sel: '.card', has: 'Which ads should I switch off?' }, fallback: { sel: '.v3-mk-channels' },
+  creative: { dest: 'marketing', anchor: 'creative', target: { sel: '.v3-mk-ads-strip' }, fallback: { sel: '.v3-main .v3-page-head' },
     what: 'Ads whose last 28 days have broken down, against their own past or against your other ads, and what that money cost you, and whether moving it to the ads that are holding up would actually help.' },
   stock: { dest: 'stock', target: { sel: '.v3-sec', has: 'What to order, product by product' }, fallback: { sel: '.v3-verdict' },
     what: 'Each row is a product: the solid bar is the days of stock left, the hatched part is days you would have nothing to sell before a new order could land. The longer the hatching, the more it costs you.' },
@@ -27767,7 +27959,7 @@ function V3WalkRun({ w }) {
     const tNow = document.querySelector('.v3-page-title');
     const samePage = lastDest.current === def.dest && !!tNow && !!V3_BY_ID[def.dest] && tNow.textContent === V3_BY_ID[def.dest].label;
     lastDest.current = def.dest;
-    if (window.__oiGo && !samePage) window.__oiGo(def.dest, null);
+    if (window.__oiGo && (!samePage || def.anchor)) window.__oiGo(def.dest, def.anchor || null);
     v3TourNav(def.dest);
     let dead = false, tries = 0;
     // The caption pops out beside the lit panel — under it when there is room, over it when there

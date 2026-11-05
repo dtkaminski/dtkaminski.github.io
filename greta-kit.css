@@ -2394,3 +2394,26 @@ div:has(> .v3-profit) ~ .v3-today { gap: 0; }
   .v3-main .v3-goal-page table.v3-goal-checks.cg-table td:first-child, .v3-main .v3-goal-page table.v3-goal-checks.cg-table td.cg-state, .v3-main .v3-goal-page table.v3-goal-checks.cg-table td.r { width: auto; white-space: normal; }
   .v3-main .v3-goal-page table.v3-goal-checks.cg-table td:first-child { font-weight: var(--weight-medium); }
 }
+
+/* Marketing's tabs: the date control shows only on the tabs that follow it */
+.v3-page-head[data-fixed-period] .v3-period { visibility: hidden; }
+@media (max-width: 767px) { .v3-page-head[data-fixed-period] .v3-period { display: none; } }
+.v3-mk-ad-name { padding: 0; background: none; border: 0; font: inherit; color: var(--color-ink); text-align: left; cursor: pointer; }
+.v3-mk-ad-name:hover { text-decoration: underline; }
+.v3-main .v3-marketing table.v3-mk-ads td { vertical-align: middle; }
+.v3-main .v3-marketing table.v3-mk-ads td:first-child { white-space: normal; }
+.v3-mk-spark { width: var(--size-mk-spark); min-width: var(--size-mk-spark); }
+.v3-main .v3-goal-page table.v3-goal-checks.v3-mk-off td:first-child { width: auto; white-space: nowrap; }
+.v3-main .v3-marketing table.v3-profit-rows tr.v3-mk-ad-open td { white-space: normal; }
+.v3-mk-ad-why { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-2) var(--space-6); padding-block: var(--space-2); position: sticky; left: 0; }
+.v3-mk-ad-cause { grid-column: 1 / -1; margin: 0; color: var(--color-muted); }
+.v3-mk-ad-grid { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: var(--space-1) var(--space-4); align-content: start; }
+.v3-mk-ad-facts { grid-template-columns: minmax(0, 1fr) auto; }
+.v3-mk-ad-grid .h { color: var(--color-muted); font-size: var(--text-xs); }
+.v3-mk-ad-grid .r { font-family: var(--font-figure); font-variant-numeric: tabular-nums; text-align: right; }
+.v3-mk-ad-grid .h.r { font-family: var(--font-sans); }
+@media (max-width: 767px) {
+  .v3-mk-ad-why { grid-template-columns: minmax(0, 1fr); }
+  .v3-main .v3-goal-page.v3-marketing table.v3-profit-rows { width: 100%; }
+  .v3-main .v3-goal-page table.v3-goal-checks.v3-mk-off td:first-child { white-space: normal; font-weight: var(--weight-medium); }
+}
