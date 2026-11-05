@@ -14584,6 +14584,7 @@ function GP_BrowserCosts({ econ, setEcon }) {
 function GretaPlanPanel({ show } = {}) {
   var SHOW = show || 'all';
   var isGoal = SHOW === 'all' || SHOW === 'goal';
+  var isCosts = isGoal || SHOW === 'costs', isSetter = isGoal || SHOW === 'setter';
   var isGrowth = SHOW === 'all' || SHOW === 'growth';
   // V3 shows readiness on its own at the foot of Goal & costs (show="readiness"); the goal half no
   // longer opens on a checklist.
@@ -14627,7 +14628,7 @@ function GretaPlanPanel({ show } = {}) {
 
   // Goal & costs' "Re-plan the quarter" fills the setter and works the plan out on the current model.
   React.useEffect(function () {
-    if (!(SHOW === 'goal' || SHOW === 'all')) return;
+    if (!isSetter) return;
     var h = function (e) {
       var q = (e && e.detail) || {};
       setBasis(q.basis || 'revenue'); setAmount(q.amount != null ? String(q.amount) : ''); setBusy(true); setMsg(null);
@@ -14710,14 +14711,14 @@ function GretaPlanPanel({ show } = {}) {
   var g = P.goal;
 
   return (
-    <div style={wrap} className="gp-wrap">
+    <div style={wrap} className={'gp-wrap' + (SHOW === 'costs' || SHOW === 'setter' ? ' v3-home' : '')}>
       {/* The page head already names the page and asks its question; this only says which period. */}
       {!(UI_V3 && SHOW !== 'growth') && <div className="v3-kick">This quarter, {v3Day(P.period.start)} – {v3Day(P.period.end, true)}</div>}
 
       {/* readiness gate */}
       {isReady && (<div style={{ borderTop: '1px solid ' + GP_T.line, padding: 'var(--space-6) 0', marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-          <h2 className="v3-sec-title gp-h">Is there enough data to plan?</h2>
+          <h2 className="v3-sec-title gp-h">Data for planning</h2>
           {/* "0 of 0 ready · ready to plan" was what a failed read looked like. */}
           {readiness.length
             ? <div style={{ fontSize: 'var(--text-sm)', color: blocking.length ? GP_T.amber : GP_T.green }}>{readyCount} of {readiness.length} ready{blocking.length ? ', ' + blocking.length + ' still needed before targets can be set' : ', ready to plan'}</div>
@@ -14747,14 +14748,11 @@ function GretaPlanPanel({ show } = {}) {
       {/* "Where revenue comes from" repeated the lead section's "Where your sales came from" (same view). */}
 
       {/* economics editor — operating costs feed Operating Profit on the Overview */}
-      {isGoal && SHOW !== 'readiness' && (<div style={{ borderTop: '1px solid ' + GP_T.line, padding: 'var(--space-6) 0', marginBottom: 16 }}>
+      {isCosts && (<section className="v3-panel" aria-label="Your costs">
         <V3Anchor id="margin"/>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-          <h2 className="v3-sec-title gp-h">What things cost you</h2>
-          <span style={{ fontSize: 'var(--text-xs)', color: GP_T.dim }}>used in every profit figure</span>
-        </div>
+        <div className="v3-panel-head"><h2>Your costs</h2><span className="v3-muted">Used in every profit figure</span></div>
+        <div className="v3-panel-pad">
         <GP_BrowserCosts econ={econ} setEcon={setEcon} />
-        <div style={{ fontSize: 'var(--text-sm)', color: GP_T.dim, marginBottom: 'var(--space-3)' }}>Overheads are what you pay every month whatever you sell, rent, wages, software. Operating profit is your profit after ads, less these.</div>
         {econ ? (
           <div>
             {/* One place for what the business and each order cost (0221). Units sit inside the box:
@@ -14771,10 +14769,9 @@ function GretaPlanPanel({ show } = {}) {
                 );
               })}
             </div>
-            <p className="v3-note v3-measure">Product costs come from Shopify, one product at a time, under “Product costs” below. The margin here only fills in for products that have no cost yet.</p>
+            <p className="v3-note v3-measure">The margin only fills in for products with no cost yet. Overheads are what you pay every month whatever you sell: rent, wages, software.</p>
 
             <h3 className="v3-sub v3-gap-top">Each order</h3>
-            <p className="v3-note v3-measure">Enter each one the way your invoices show it, a fixed amount per order, or a share of sales.</p>
             <div className="v3-form-grid">
               {GP_LINES.map(function (k) {
                 var pct = econ[k + 'U'] === 'pct';
@@ -14815,7 +14812,8 @@ function GretaPlanPanel({ show } = {}) {
         ) : (
           <div style={{ fontSize: 'var(--text-sm)', color: GP_T.dim }}>{gpLiveDown ? v3NoBrand('your costs') : (window.FRKL_PLAN && window.FRKL_PLAN.configErr) ? 'Your costs could not load just now. Refreshing the page usually sorts it.' : 'Loading your costs…'}</div>
         )}
-      </div>)}
+        </div>
+      </section>)}
 
       {/* "Forecast vs goal" used to repeat here, comparing the after-ads forecast with the BEFORE-ads
           target (contribution_margin_target). The lead section of Growth plan shows it once, against
@@ -14875,10 +14873,10 @@ function GretaPlanPanel({ show } = {}) {
                                     ciAdmitsNoCeiling={!!(P.spendCurve && P.spendCurve.band_admits_no_ceiling)} />)}
 
       {/* goal setter */}
-      {isGoal && (<div className="v3-raised" style={{ padding: 'var(--space-6)' }}>
+      {isSetter && (<section className="v3-panel" aria-label="This quarter’s goal">
         <V3Anchor id="goal-set"/>
-        <h2 style={{ margin: '0 0 var(--space-1)' }}>{UI_V3 && g ? 'Change this quarter’s goal' : 'Set this quarter’s goal'}</h2>
-        <p className="micro muted" style={{ margin: '0 0 var(--space-4)' }}>Pick the goal. The sales, ad budget and new customers it takes are worked out for you.</p>
+        <div className="v3-panel-head"><h2>{UI_V3 && g ? 'Change the goal' : 'Set a goal'}</h2><span className="v3-muted">This quarter</span></div>
+        <div className="v3-panel-pad">
         <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div className="v3-seg" role="group" aria-label="Goal basis">
             <button aria-pressed={basis === 'cam'} onClick={function () { setBasis('cam'); }}>Profit after ads</button>
@@ -14895,14 +14893,14 @@ function GretaPlanPanel({ show } = {}) {
         {/* Only render targets Greta actually derived. When the derivation returns nothing the tiles
             used to print "NaN", "MER undefined" and "aMER undefined", a new brand saw that first. */}
         {derived && derived.revenue_target == null && (
-          <p className="v3-note" style={{ marginTop: 'var(--space-4)' }}>{derived.message || 'Greta could not work a goal out from your trading yet, it needs a full month of sales.'} You can still type the goal you have in mind above.</p>
+          <p className="v3-note" style={{ marginTop: 'var(--space-4)' }}>{derived.message || 'A goal cannot be worked out from your trading yet: it needs a full month of sales.'} You can still type the goal you have in mind above.</p>
         )}
         {derived && derived.revenue_target != null && (
           <div style={{ marginTop: 'var(--space-5)' }}>
             <div className="v3-stat-grid">
               <GP_Metric k="Sales" v={GP_gbp(derived.revenue_target)} sub="for the quarter" />
               <GP_Metric k="Profit before ads" v={GP_gbp(derived.product_cm_target)} sub={derived.cm_ratio_used != null ? fmtPctN(derived.cm_ratio_used) + ' of sales' : ''} />
-              <GP_Metric k="Profit after ads" v={GP_gbp(derived.cam_target)} hi={true} sub="the number Today paces against" />
+              <GP_Metric k="Profit after ads" v={GP_gbp(derived.cam_target)} hi={true} sub="the number Home paces against" />
               <GP_Metric k="Ad budget" v={GP_gbp(derived.spend_cap)} sub={derived.mer_target != null ? Number(derived.mer_target).toFixed(1) + '× sales per £ of ads' : ''} />
               <GP_Metric k="New customers" v={fmtCount(derived.new_customer_target)} sub={derived.amer_used != null ? Number(derived.amer_used).toFixed(1) + '× new-customer sales per £ of ads' : ''} />
               <GP_Metric k="Sales from returning customers" v={GP_gbp(derived.returning_revenue_target)} sub="at your current rate" />
@@ -14919,11 +14917,12 @@ function GretaPlanPanel({ show } = {}) {
               <button className="v3-btn v3-btn-p" onClick={confirm} disabled={busy}>Make this my plan</button>
               {msg === 'ok' && <span style={{ color: GP_T.green, fontSize: 'var(--text-sm)' }}>Done. Home now tracks your pace against this plan.</span>}
               {msg && msg.indexOf('err') === 0 && <span style={{ color: GP_T.red, fontSize: 'var(--text-sm)' }}>{msg.slice(4)}</span>}
-              <span style={{ fontSize: 'var(--text-xs)', color: GP_T.dim }}>{derived.months ? 'Confirming stores the month-by-month plan, and Today paces against it.' : 'Worked out from what you keep after product and order costs (' + fmtPctN(derived.cm_ratio_used) + ').'}</span>
+              <span style={{ fontSize: 'var(--text-xs)', color: GP_T.dim }}>{derived.months ? 'Confirming stores the month-by-month plan, and Home paces against it.' : 'Worked out from what you keep after product and order costs (' + fmtPctN(derived.cm_ratio_used) + ').'}</span>
             </div>
           </div>
         )}
-      </div>)}
+        </div>
+      </section>)}
     </div>
   );
 }
@@ -15644,9 +15643,10 @@ function V3ProductCosts(){
   };
   React.useEffect(() => { if (authed) load(); else setD(false); }, []);   // eslint-disable-line
 
-  if (!authed) return <div className="v3-empty">{v3NoBrand('your product costs')}</div>;
-  if (d === undefined) return <V3SkeletonRows n={4}/>;
-  if (d === false) return <div className="v3-empty">Your product costs could not load just now. Refreshing the page usually sorts it.</div>;
+  const costHead = n => (<div className="v3-panel-head"><h2>Product costs</h2>{n != null && <span className="v3-count">{n}</span>}<span className="v3-muted">From “Cost per item” in Shopify, refreshed every half hour</span></div>);
+  if (!authed) return <section className="v3-panel"><V3Anchor id="costs"/>{costHead()}<p className="v3-panel-note">{v3NoBrand('your product costs')}</p></section>;
+  if (d === undefined) return <section className="v3-panel" aria-busy="true"><V3Anchor id="costs"/>{costHead()}<div className="v3-panel-pad"><V3SkeletonRows n={4}/></div></section>;
+  if (d === false) return <section className="v3-panel"><V3Anchor id="costs"/>{costHead()}<p className="v3-panel-note">Your product costs could not load just now. Refreshing the page usually sorts it.</p></section>;
 
   // Rows arrive newest first; keep the first per key. (Before 0221 the server sent every day's row
   // per SKU, and keeping the last meant showing the oldest cost.)
@@ -15699,38 +15699,35 @@ function V3ProductCosts(){
   };
   const money = x => x == null ? FMT_NONE : fmtMoney(x, 2);
 
-  return (<div className="v3-page-stack">
-    <section>
-      <p className="v3-lede">Shopify gives a cost for <b>{fmtCount(n('shopify') + n('yours'))}</b> of your {fmtCount(rows.length)} products
-        {cov != null && <>, covering <b>{fmtPctN(cov / 100)}</b> of the last 90 days’ sales</>}.
-        {n('missing') > 0 && <> The other {fmtCount(n('missing'))} use your margin{gm != null ? ' of ' + gm + '%' : ''} until they have one.</>}</p>
-      <p className="v3-note v3-measure">Costs come from “Cost per item” in Shopify and refresh every half hour. Change one here if Shopify’s is wrong, or add freight and duty on top. Your figure stays until you switch back to Shopify’s.</p>
-      <V3FreightRate/>
-      <div className="v3-chips v3-chips-plain" role="tablist" aria-label="Show products">
+  return (<>
+    <section className="v3-panel" aria-label="Product costs">
+      <V3Anchor id="costs"/>
+      {costHead(rows.length)}
+      <div className="v3-tabs v3-goal-filter" role="tablist" aria-label="Show products">
         {[['all', 'All', rows.length], ['missing', 'No cost yet', n('missing')], ['yours', 'Your costs', n('yours')]].map(f => (
-          <button key={f[0]} type="button" role="tab" aria-selected={filter === f[0]} className={'v3-chip' + (filter === f[0] ? ' on' : '')}
-            onClick={() => { setFilter(f[0]); setLimit(25); }}>{f[1]} <span className="v3-chip-n">{f[2]}</span></button>))}
+          <button key={f[0]} type="button" role="tab" aria-selected={filter === f[0]} className={'v3-tab' + (filter === f[0] ? ' on' : '')}
+            onClick={() => { setFilter(f[0]); setLimit(25); }}>{f[1]} <span className="v3-tab-n">{f[2]}</span></button>))}
+        <input className="v3-search" type="search" placeholder="Find a product" aria-label="Find a product" value={q} onChange={e => { setQ(e.target.value); setLimit(25); }}/>
       </div>
-      <input className="v3-search" type="search" placeholder="Find a product" aria-label="Find a product" value={q} onChange={e => { setQ(e.target.value); setLimit(25); }}/>
-      {msg && <p className={msg.kind === 'ok' ? 'v3-note v3-ok' : 'v3-note v3-bad'} role="status">{msg.text}</p>}
-      {!shown.length ? <div className="v3-empty">{needle ? 'No products match “' + q.trim() + '”.' : filter === 'yours' ? 'You haven’t changed any of Shopify’s costs.' : 'Every product has a cost.'}</div> : (
-      <table className="v3-ptable v3-costs">
-        <thead><tr><th className="t-text">Product</th><th>Price</th><th>Cost</th><th>Freight + duty</th><th>Total cost</th><th/></tr></thead>
+      {msg && <p className={'v3-panel-note ' + (msg.kind === 'ok' ? 'v3-ok' : 'v3-bad')} role="status">{msg.text}</p>}
+      {!shown.length ? <p className="v3-panel-note">{needle ? 'No products match “' + q.trim() + '”.' : filter === 'yours' ? 'You haven’t changed any of Shopify’s costs.' : 'Every product has a cost.'}</p> : (
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-goal-costs">
+        <thead><tr><th>Product</th><th>Source</th><th className="r v3-mk-opt">Price</th><th className="r v3-mk-opt">Cost</th><th className="r v3-mk-opt">Freight and duty</th><th className="r">Total cost</th><th><span className="v3-sr-only">Edit</span></th></tr></thead>
         <tbody>{shown.slice(0, limit).map(r => {
           const c = r.cur, open = edit && edit.variant_id === r.variant_id;
           return (<React.Fragment key={r.variant_id}>
             <tr>
-              <td className="t-text"><span className="v3-ptitle">{label(r)}</span>
-                <span className="v3-muted v3-cost-src">{r.status === 'yours' ? 'Your cost' : r.status === 'shopify' ? 'From Shopify' : 'No cost yet'}</span></td>
-              <td>{money(r.price)}</td>
-              <td>{c ? money(c.unit_cost) : FMT_NONE}</td>
-              <td>{c && (Number(c.freight) || Number(c.duty)) ? money((Number(c.freight) || 0) + (Number(c.duty) || 0)) : FMT_NONE}</td>
-              <td>{c ? money(c.landed_cost != null ? c.landed_cost : Number(c.unit_cost) + (Number(c.freight) || 0) + (Number(c.duty) || 0)) : FMT_NONE}</td>
-              <td><button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => setEdit(open ? null : { variant_id: r.variant_id,
+              <td className="v3-web-wrap">{label(r)}</td>
+              <td>{r.status === 'yours' ? 'You' : r.status === 'shopify' ? 'Shopify' : <span className="v3-flag">No cost yet</span>}</td>
+              <td className="r v3-mk-opt">{money(r.price)}</td>
+              <td className="r v3-mk-opt">{c ? money(c.unit_cost) : FMT_NONE}</td>
+              <td className="r v3-mk-opt">{c && (Number(c.freight) || Number(c.duty)) ? money((Number(c.freight) || 0) + (Number(c.duty) || 0)) : FMT_NONE}</td>
+              <td className="r">{c ? money(c.landed_cost != null ? c.landed_cost : Number(c.unit_cost) + (Number(c.freight) || 0) + (Number(c.duty) || 0)) : FMT_NONE}</td>
+              <td className="r"><button type="button" className="v3-btn v3-btn-sm" onClick={() => setEdit(open ? null : { variant_id: r.variant_id,
                 unit: c ? String(c.unit_cost) : '', freight: c && c.freight ? String(c.freight) : '', duty: c && c.duty ? String(c.duty) : '' })}>
                 {open ? 'Close' : c ? 'Edit' : 'Add cost'}</button></td>
             </tr>
-            {open && (<tr className="v3-cost-edit"><td colSpan={6}>
+            {open && (<tr className="v3-cost-edit"><td colSpan={7}>
               <div className="v3-form-grid">
                 {[['unit', 'Cost of one unit'], ['freight', 'Freight per unit'], ['duty', 'Duty per unit']].map(f => (
                   <label key={f[0]} className="v3-field"><span>{f[1]}</span>
@@ -15744,12 +15741,19 @@ function V3ProductCosts(){
             </td></tr>)}
           </React.Fragment>);
         })}</tbody>
-      </table>)}
-      {shown.length > limit && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => setLimit(l => l + 50)}>Show {Math.min(50, shown.length - limit)} more of {shown.length}</button>}
+      </table></div>)}
+      {shown.length > limit && <p className="v3-panel-note"><button type="button" className="v3-btn v3-btn-sm" onClick={() => setLimit(l => l + 50)}>Show {Math.min(50, shown.length - limit)} more of {shown.length}</button></p>}
+      <p className="v3-panel-note">Your figure stays until you switch back to Shopify’s.{n('missing') > 0 ? <> Products with no cost use your margin{gm != null ? ' of ' + gm + '%' : ''}.</> : null}</p>
     </section>
 
-    {prof && (<section className="v3-sec">
-      <h2 className="v3-sec-title">Returns and agency</h2>
+    <section className="v3-panel" aria-label="Freight and duty">
+      <div className="v3-panel-head"><h2>Freight and duty</h2><span className="v3-muted">One rate for every product</span></div>
+      <div className="v3-panel-pad"><V3FreightRate compact/></div>
+    </section>
+
+    {prof && (<section className="v3-panel" aria-label="Returns and agency">
+      <div className="v3-panel-head"><h2>Returns and agency</h2></div>
+      <div className="v3-panel-pad">
       <div className="v3-form-grid">
         <label className="v3-field"><span>Returns put back into stock</span>
           <span className="v3-affix" data-post="%"><input className="oi-num" inputMode="decimal" value={prof.restock}
@@ -15762,8 +15766,9 @@ function V3ProductCosts(){
         <span>Shipping you charge customers counts as sales</span></label>
       <p className="v3-note v3-measure">Returned items that go back into stock are added back at cost. The agency fee counts towards what a new customer costs you.</p>
       <button type="button" className="v3-btn v3-btn-p v3-gap-top" disabled={busy} onClick={saveProf}>{busy ? 'Saving…' : 'Save'}</button>
+      </div>
     </section>)}
-  </div>);
+  </>);
 }
 
 function BusinessEconomicsPanel(){
@@ -16099,7 +16104,7 @@ function BusinessEconomicsPanel(){
                   <span className="v3-affix" data-post="%"><input className="oi-num" type="number" inputMode="decimal" step="any" min="0"
                     aria-label="Annual discount rate" placeholder={String(dRate != null ? round2(dRate * 100) : priors.discountRatePct)}
                     value={genome.discount_rate_annual||''} onChange={e => { const v = e.target.value; setGenome(s => ({ ...s, discount_rate_annual: v })); }}/></span>
-                  <span className="v3-econ-hint">Saved with Save timing below.</span>
+                  <span className="v3-econ-hint">Saved with Save below.</span>
                 </div>)}
               </div>
             </div>
@@ -16107,7 +16112,7 @@ function BusinessEconomicsPanel(){
             <div style={{display:'flex', alignItems:'center', gap:'var(--s-3)', paddingTop:'var(--s-4)', borderTop:'1px solid var(--color-line, var(--border-subtle))'}}>
               <button type="submit" className="btn-primary" disabled={csBusy}
                 style={{padding:'9px 16px', fontSize:'var(--text-sm)', border:0, borderRadius:'var(--r-md)', cursor:csBusy?'default':'pointer', fontFamily:'inherit', fontWeight:'var(--weight-semi)', opacity:csBusy?0.6:1}}>
-                {csBusy ? 'Saving…' : 'Save timing'}
+                {csBusy ? 'Saving…' : 'Save'}
               </button>
               <span className="meta" style={{fontSize:'var(--text-xs)'}}>Blank fields keep the category estimate. Nothing is overwritten.</span>
             </div>
@@ -16127,9 +16132,7 @@ function BusinessEconomicsPanel(){
             </span>
           </div>
           <div className="meta" style={{fontSize:'var(--text-sm)', marginBottom:'var(--s-5)', lineHeight:1.6, maxWidth:660}}>
-            Your forecast says what spend is <em>profitable</em>. These say what is <em>affordable</em>.
-            The lower of the two is recommended. Until the fields marked required and days stock is held
-            are set, nothing is capped and no cash figure appears anywhere. A cash figure built on guesses is worse than none.
+            Until the fields marked required and days stock is held are set, nothing is capped and no cash figure appears anywhere.
           </div>
 
           <form onSubmit={saveCash} style={{display:'flex', flexDirection:'column', gap:'var(--s-6)'}}>
@@ -16637,7 +16640,7 @@ const V3_MOBILE = [
 // Old (section, sub) → new destination [, section anchor]. Keeps 16 deep-link
 // call sites, the ⌘K palette and every "open X" button working unchanged.
 const V3_ROUTE = {
-  'home/overview-tiers': ['today'], 'home/plansetup': ['goal'], 'home/owner-today': ['today'],
+  'home/overview-tiers': ['today'], 'home/plansetup': ['goal', 'goal-set'], 'home/owner-today': ['today'],
   'home/overview': ['profit'], 'home/ask': ['ask'],
   'board/weekly': ['review', 'week'], 'review/review': ['review', 'quarter'], 'intel/intel': ['review', 'alerts'],
   'actions/queue': ['actions'],
@@ -19261,7 +19264,7 @@ function V3GoalChart({ P, g }) {
 // zero line here, so the gap is the picture, and the futures answer the ad question without a sentence: spending more lands
 // lower. After today the lines run straight to where each plan ends; those ends are the server's, nothing is worked out but
 // the distance from the goal. Before today, kept against the goal's path, eased onto the server's figure so far.
-function V3FuturesChart({ F, g, P }) {
+function V3FuturesChart({ F, g, P, onPage }) {
   const ref = React.useRef(null);
   const [w, setW] = React.useState(640);
   const [hover, setHover] = React.useState(null);
@@ -19300,7 +19303,7 @@ function V3FuturesChart({ F, g, P }) {
   const over = labs[labs.length - 1].at - (H - bottom - (small ? 14 : 24));
   if (over > 0) labs.forEach(l => { l.at -= over; });
   const go = () => window.__oiGo && window.__oiGo('goal');
-  const word = v => (v >= 0 ? '+' : '−') + v3Gbp(Math.abs(v));
+  const word = v => (v >= 0 ? '+' : '−') + (onPage ? v3GbpRound : v3Gbp)(Math.abs(v));
   const move = e => { const r = ref.current.getBoundingClientRect();
     setHover(x0 + Math.max(0, Math.min(1, (e.clientX - r.left - left) / (w - left - right))) * (x1 - x0)); };
   const lx = w - right + 8, isPast = hover != null && hover <= today;
@@ -19317,7 +19320,7 @@ function V3FuturesChart({ F, g, P }) {
       <path className="v3-fut-past" d={path(past)}/>
       <circle className="v3-al-dot" cx={X(today)} cy={Y(now)} r="4"/>
       <text className="v3-fut-now" x={X(today) - 8} y={Y(now) - 10} textAnchor="end">{word(now)} so far</text>
-      {labs.map(l => <g key={l.k} className={'v3-fut-lab v3-fut-lab-' + l.k} role="link" tabIndex="0" onClick={go} onKeyDown={e => { if (e.key === 'Enter') go(); }}>
+      {labs.map(l => <g key={l.k} className={'v3-fut-lab v3-fut-lab-' + l.k + (onPage ? ' still' : '')} {...(onPage ? {} : { role: 'link', tabIndex: '0', onClick: go, onKeyDown: e => { if (e.key === 'Enter') go(); } })}>
         <text x={lx} y={l.at} className="v3-fut-v">{word(l.v)}</text>
         <text x={lx} y={l.at + 14} className="v3-fut-t">{l.t}</text>
         {!small && <text x={lx} y={l.at + 28} className="v3-fut-s">{l.s}</text>}
@@ -21445,14 +21448,37 @@ function V3LoadFailed({ what, onRetry }) {
     {onRetry && <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={onRetry}>Try again</button>}</div>);
 }
 // 1156: the one answer on ad spend. Worked out once (fn_brand_ad_decision) and quoted; no page makes its own.
-function V3AdAnswer({ action, g }) {
+function V3AdAnswer({ action, g, panel }) {
   const st = useV3Rows('brand-state', V3_STATE_Q);
   const [why, setWhy] = React.useState(false);
   const A = st.rows && st.rows[0] && st.rows[0].ad_decision;
   if (!A || !A.said) return null;
   // 3 Nov, storytelling review: eight sentences and eleven figures, for a choice between two futures. Each row to its own
   // scale, from zero; the sentences are one click away.
-  const F = v3Futures(g);
+  const F = panel && g && !g.confirmed ? null : v3Futures(g);
+  if (panel && !F) return (<section className="v3-panel" aria-label="Ad spend">
+    <div className="v3-panel-head"><h2>Ad spend</h2></div>
+    <p className="v3-panel-note">{A.said}</p>
+    {A.owner_question && <p className="v3-panel-note"><b>{A.owner_question}</b> {action}</p>}
+  </section>);
+  if (panel) {
+    const T = A.at_today, G = A.at_goal, tgt = Number(g.target);
+    const keepWord = Number(A.hold_week) > 0 ? 'Ads near ' + v3Gbp(A.hold_week) + ' a week' : 'Ads on the plan';
+    const row = (k, a, b, good) => { const dv = Number(b) - Number(a);
+      return (<tr key={k}><td>{k}</td><td className="r">{v3GbpRound(a)}</td><td className="r">{v3GbpRound(b)}</td>
+        <td className={'r ' + (good == null ? '' : (dv >= 0) === good ? 'v3-up' : 'v3-down')}>{dv >= 0 ? '+' : '−'}{v3GbpRound(Math.abs(dv))}</td></tr>); };
+    return (<section className="v3-panel" aria-label="Your call">
+      <div className="v3-panel-head"><h2>Your call</h2><span className="v3-muted">Two futures for the quarter</span></div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+        <thead><tr><th><span className="v3-sr-only">Figure</span></th><th className="r">{keepWord}</th><th className="r">Chase the sales goal</th><th className="r">Difference</th></tr></thead>
+        <tbody>{row('Sales', T.sales, G.sales, true)}{row('Ads', T.ads, G.ads, null)}{row('Profit after ads', T.profit_after_ads, G.profit_after_ads, true)}</tbody>
+      </table></div>
+      {A.owner_question && <div className="v3-panel-note v3-goal-call"><b>{A.owner_question}</b>{action}</div>}
+      <p className="v3-panel-note">{Number(G.profit_after_ads) >= tgt && Number(T.profit_after_ads) >= tgt ? <>Either future beats your profit goal of {v3GbpRound(tgt)}. </> : null}
+        <button type="button" className="v3-mv-toggle" aria-expanded={why} onClick={() => setWhy(o => !o)}>{why ? 'Hide basis' : 'Basis'}</button></p>
+      {why && <p className="v3-panel-note">{A.said}</p>}
+    </section>);
+  }
   if (F) {
     const T = A.at_today, G = A.at_goal, tgt = Number(g.target);
     const row = (k, a, b, c) => { const top = Math.max(Number(a), Number(b)) || 1;
@@ -22672,21 +22698,26 @@ function V3GoalLead() {
     window.addEventListener('greta-goal-updated', on);
     return () => window.removeEventListener('greta-goal-updated', on);
   });
-  if (goal.err || pace.err) return <V3LoadFailed what="your goal and plan" onRetry={() => { if (goal.err) goal.retry(); if (pace.err) pace.retry(); }}/>;
-  if (!goal.rows || !pace.rows || (!ppq.rows && !ppq.err)) return <V3SkeletonRows n={4}/>;
+  const [drv, setDrv] = React.useState(null);
+  const [goalBasis, setGoalBasis] = React.useState(false);
+  const nr = useV3Rows('goal-nr-' + per.start, V3_GOAL_NR_Q(per.start, today));
+  const ph0 = useV3Rows('goal-phasing', V3_GOAL_PHASING_Q);
+  const lad = useV3Rows('profit-ladder', V3_LADDER_Q);
+  if (goal.err || pace.err) return <section className="v3-panel"><div className="v3-panel-pad"><V3LoadFailed what="Your goal and plan" onRetry={() => { if (goal.err) goal.retry(); if (pace.err) pace.retry(); }}/></div></section>;
+  if (!goal.rows || !pace.rows || (!ppq.rows && !ppq.err)) return <section className="v3-panel" aria-busy="true"><div className="v3-panel-pad"><V3SkeletonRows n={4}/></div></section>;
   // A plan read that comes back without its figures is no plan: "you reach it: about —" otherwise (eval 14 Oct)
   const P0 = pace.rows[0] || null, P = P0 && Number.isFinite(Number(P0.revenue_target)) && P0.revenue_target != null ? P0 : null;
   const G = (atGoal.rows || [])[0] || null;
   const L = v3Lead(cfg.rows), C = (cfg.rows || [])[0] || {}, U = (ue.rows || [])[0] || null;
   const PQ = ppq.rows && ppq.rows[0] ? ppq.rows[0] : null, QS = PQ && PQ.sales ? PQ.sales : null;
   const done = QS && QS.actual_so_far != null ? Number(QS.actual_so_far) : null;
-  const range = v3Day(per.start) + ' – ' + v3Day(per.end, true);
-  const setGoal = <button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={() => { const el = document.getElementById('v3a-goal-set'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}>{g ? 'Change the goal' : 'Set a goal'}</button>;
-  if (!P) return (<section>
-    <div className="v3-kick">This quarter, {range}</div>
-    <p className="v3-verdict">{g ? 'Your goal is ' + fmtMoney(tgt) + ' of sales this quarter.' : 'There is no goal for this quarter yet.'}</p>
-    <p className="v3-note v3-measure">A full month of sales is needed to read where the quarter will end up.{done != null ? <> You have sold {fmtMoney(done)} so far this quarter.</> : null}</p>
-    <div className="v3-btn-row">{setGoal}</div>
+  if (!P) return (<section className="v3-panel v3-home-strip v3-mk-strip" aria-label="Key figures">
+    <div className="v3-home-group" style={{ '--n': 2 }}><div className="v3-home-group-h">Sales<span>This quarter</span></div>
+      <div className="v3-home-tiles">
+        <V3HomeTile k="Goal" v={tgt ? v3GbpRound(tgt) : FMT_NONE} delta={g ? '' : 'None set yet'}/>
+        <V3HomeTile k="So far" v={done != null ? fmtMoney(done) : FMT_NONE} delta=""/>
+      </div></div>
+    <p className="v3-panel-note v3-goal-full">A full month of sales is needed to read where the quarter will end up.</p>
   </section>);
 
   const ph = G && Array.isArray(G.months) && G.months.length && g && Array.isArray(g.phasing) && g.phasing.length && Math.abs(Number(G.spend_cap) / Number(g.spend_cap) - 1) > 0.05
@@ -22694,7 +22725,6 @@ function V3GoalLead() {
   // What the plan expects by now and whether the quarter is on it come from fn_plan_progress, not a
   // second spread of the months here.
   const exp = QS && QS.expected_by_now != null ? Number(QS.expected_by_now) : null;
-  const st = QS && QS.status ? QS.status : null;
   // "At today's pace" is the last 30 days' average day for each day left (fn_plan_progress), per month.
   const ppd = QS && QS.pace_per_day != null ? Number(QS.pace_per_day) : null;
   const ppMo = {}; ((PQ && PQ.series) || []).forEach(s => { ppMo[String(s.month).slice(0, 7)] = s; });
@@ -22703,7 +22733,6 @@ function V3GoalLead() {
   // 0396: when the plan holds ads where a first order still pays for itself, it is not "today's ad spend"
   const held = (P.flags || []).indexOf('held_at_first_order_profit') >= 0;
   const adsNear = v3AdsNear(((stG.rows || [])[0] || {}).ad_decision);
-  const atWords = held ? 'At the ad budget that still pays on a first order' : 'With ' + adsNear;
   const maxSeen = P.inputs && Number(P.inputs.max_monthly_spend_seen) > 0 ? Number(P.inputs.max_monthly_spend_seen) : null;
   const paceMo = {}; (P.months || []).forEach(m => { paceMo[String(m.month).slice(0, 7)] = m; });
   const rows = (ph || P.months || []).map(m => { const k = String(m.month).slice(0, 7), p = paceMo[k] || {};
@@ -22714,19 +22743,15 @@ function V3GoalLead() {
   // Without a registered plan the goal row's own stored figures stand (read, not worked out).
   const regPlan = !!(g && tgt);
   const fq = k => v3Fig(k, figG.rows).value;
-  const gSpendNow = regPlan && fq('plan_quarter_ad_spend') != null ? fq('plan_quarter_ad_spend') : G ? Number(G.spend_cap) : (g ? Number(g.spend_cap) : null);
-  const peakShare = ph && gSpendNow > 0 ? peak.gSpend / gSpendNow : null;
+  const gSpend = regPlan && fq('plan_quarter_ad_spend') != null ? fq('plan_quarter_ad_spend') : G ? Number(G.spend_cap) : (g ? Number(g.spend_cap) : null);
   const B = (G || P).breakdown || {};
   const mc = Number(B.marginal_cost_per_new_customer), fop = Number(B.first_order_profit);
   const ltv = U && Number(U.ltv_contribution) > 0 ? Number(U.ltv_contribution) : null;
-  const onTrack = st === 'ahead' || st === 'on_plan';
   // The goal's profit on today's figures (the stored one used the margin of the day it was confirmed),
   // against today's pace: what the extra ads buy in profit, not just in sales.
   const gCam = regPlan && fq('plan_quarter_profit_after_ads') != null ? fq('plan_quarter_profit_after_ads') : G ? Number(G.cam_target) : (g ? Number(g.cam_target) : null);
   const dCam = gCam != null ? gCam - Number(P.cam_target) : null;
-  // 16 Oct (eval F8): when even the plan at the goal lands well short of it, no ad spend gets there. The page
-  // said "The gap is ad spend. The goal takes £14,460 of ads, £0 more than the plan ... £78,696 more sales but
-  // £0 less profit" for a £150,000 goal the plan tops out at about £70,000 (last year's quarter: £91,235).
+  // 16 Oct (eval F8): when even the plan at the goal lands well short of it, no ad spend gets there.
   const gLand = regPlan && fq('plan_quarter_sales') != null ? fq('plan_quarter_sales') : G && Number.isFinite(Number(G.revenue_target)) ? Number(G.revenue_target) : null;
   const unreach = !!(tgt && short > 0 && gLand != null && gLand < tgt * 0.95);
   const reachBest = Math.max(Number(P.revenue_target) || 0, Number(P.ceiling && P.ceiling.best_sales) || 0, gLand || 0);
@@ -22739,192 +22764,375 @@ function V3GoalLead() {
   // The confirmed goal was worked out on the plan of the day it was confirmed. When the same goal now
   // takes noticeably different ads (0261 corrected the spend curve), say so and ask for a re-plan.
   const stale = g && G && Number(g.spend_cap) > 0 && Math.abs(Number(G.spend_cap) / Number(g.spend_cap) - 1) > 0.05;
-  const replan = () => {
-    window.dispatchEvent(new CustomEvent('greta-replan', { detail: { amount: tgt, basis: 'revenue' } }));
-    const el = document.getElementById('v3a-goal-set'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-  const gSpend = gSpendNow;
-  const atBest = best && gSpend ? (gSpend > best * 1.05 ? 'past' : gSpend >= best * 0.95 ? 'at' : 'below') : null;
+  const toSetter = () => { const el = document.getElementById('v3-goal-set'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+  const replan = () => { window.dispatchEvent(new CustomEvent('greta-replan', { detail: { amount: tgt, basis: 'revenue' } })); toSetter(); };
+  const setGoal = <button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={toSetter}>{g ? 'Change the goal' : 'Set a goal'}</button>;
   // An order placed today lands L days on; how much of the peak month it misses.
   const arrive = v3IsoAdd(today, L.days), peakEnd = v3IsoAdd(v3MonthAdd(peak.iso, 1), -1);
-  const cashOff = C.cash_floor == null;
   const TGG = tgG.rows && tgG.rows[0];
   const GV = TGG && String(TGG.period_start).slice(0, 10) === String(per.start).slice(0, 10)
     ? v3GoalVerdict(TGG, ((typeof window !== 'undefined' && window.GRETA_HEADLINE) || {}).unreported_spend) : null;
-  const GM = GV ? v3GoalMessage(TGG, GV) : null;
+  const F = GV && GV.F, A = F && F.A;
+  const M = v3GoalDriverModels(nr.rows, { today, exp: exp || 0, done: done || 0, months: ph || P.months, paceMonths: P.months, goal: g && ph ? tgt : null, pace: Number(P.revenue_target), dCam, held, adsNear, basis: g ? 'goal' : 'plan', range: v3Day(per.start) + ' – ' + v3Day(v3IsoAdd(today, -1), true) });
+  const act = (id, model) => (model ? { open: drv === id, on: () => setDrv(o => (o === id ? null : id)) } : null);
+  const pillOf = { good: 'v3-pill-good', warn: 'v3-pill-warn', bad: 'v3-pill-bad', '': 'v3-pill-none' };
 
-  return (<div className="v3-page-stack"><section>
-    <div className="v3-kick">This quarter, {range}{GV ? <>{' '}<span className={'v3-goal-chip ' + GV.cls}>{GV.word}</span></> : null}</div>
-    {stale && (<div className="v3-alert">
-      <p className="v3-measure"><b>The plan has changed since you confirmed this goal.</b> {fmtMoney(tgt)} of sales now takes about {fmtMoney(G.spend_cap)} of ads, not {fmtMoney(g.spend_cap)}.
-        {dCam != null ? <> That leaves {fmtMoney(gCam)} of profit after ads, {dCam < 0 ? fmtMoney(-dCam) + ' less than' : fmtMoney(dCam) + ' more than'} keeping {adsNear}.</> : null}
-        {' '}The plan you confirmed expected more from extra ads than your own sales history shows. Re-plan the quarter to see the corrected figures.</p>
-      <div className="v3-btn-row"><button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={replan}>Re-plan the quarter</button></div>
+  // Profit after ads: the one verdict, as Home says it
+  const fc = GV ? (F ? F.keep : Number(TGG.forecast)) : null, pGap = GV ? fc - Number(TGG.target) : null;
+  const pSo = GV ? Number(TGG.so_far) : null, pExp = GV && TGG.expected_by_now != null ? Number(TGG.expected_by_now) : null;
+  // Sales: the goal, where the plan lands, today's pace
+  const landed = A && A.at_today ? Number(A.at_today.sales) : Number(P.revenue_target);
+  const sShort = tgt ? tgt - landed : null;
+  const adsPlan = A && A.at_today ? Number(A.at_today.ads) : Number(P.spend_cap);
+  const adsGoal = A && A.at_goal ? Number(A.at_goal.ads) : gSpend;
+  const planAdsDelta = held ? 'the most a first order pays for' : Number(A && A.hold_week) > 0 ? adsNear.replace(/^ads /, '') : '';
+
+  // The chart: the goal as the zero line when the two futures are in, otherwise the path to the goal
+  const phasing = ph0.rows && ph0.rows[0] && ph0.rows[0].confirmed_phasing;
+  const Pth = GV && Array.isArray(TGG.series) ? v3GoalPaths(TGG, TGG.series, phasing, lad.rows) : null;
+  const monthChart = rows.map(r => ({ m: gpMonthName(r.iso).slice(0, 3), name: gpMonthName(r.iso), goal: r.goal, plan: r.pace, atPace: r.atPace, sold: ppMo[r.iso.slice(0, 7)] ? Number(ppMo[r.iso.slice(0, 7)].actual) || 0 : null }));
+  const monthTip = ({ active, payload }) => { if (!active || !payload || !payload.length) return null; const p = payload[0].payload;
+    return (<div className="v3-tip"><b>{p.name}</b>{p.goal != null && <span>Goal <em>{v3GbpRound(p.goal)}</em></span>}<span>Plan <em>{v3GbpRound(p.plan)}</em></span>
+      {p.atPace != null && <span>At today’s pace <em>{v3GbpRound(p.atPace)}</em></span>}{p.sold != null && <span>Sold so far <em>{fmtMoney(p.sold)}</em></span>}</div>); };
+
+  // What reaching it takes, each with its figure
+  const checks = [];
+  if (g && unreach) checks.push({ k: 'reach', t: 'Goal past what the plan reaches', sub: reachGoal ? 'A goal near ' + v3GbpRound(reachGoal) + ' is one the plan can reach.' : '',
+    fig: 'Most the plan lands ' + v3GbpRound(reachBest) + (best ? ', at ' + v3GbpRound(best) + ' of ads' : '') + (lySales ? '. Last year ' + fmtMoney(lySales) : '') });
+  if (g && ph) checks.push({ k: 'ads', t: 'Plan ' + gpMonthName(peak.iso) + '’s ads',
+    sub: mc > 0 && fop > 0 ? 'At that spend the last new customers cost ' + v3GbpRound(mc) + ' each. A first order makes ' + v3GbpRound(fop) + (ltv ? ', ' + v3GbpRound(ltv) + ' over a year' : '') + '.' : '',
+    fig: v3GbpRound(peak.gSpend) + (peak.x != null ? ', ' + fmtTimes(peak.x, 1) + ' your biggest month' : '') });
+  if (g) {
+    const wait = L.entered ? L.weeks + ' weeks from order to arrival' : L.days + ' days from order to arrival, assumed until you add yours';
+    if (PDG && SQG.peak) {
+      const pn = v3PlainWords(SQG.peak.title || 'the peak'), pEnd = String(SQG.peak.end || PDG.start).slice(0, 10);
+      const lands = SQG.lands_on ? String(SQG.lands_on).slice(0, 10) : arrive;
+      checks.push({ k: 'stock', t: 'Stock for ' + pn, sub: wait + '.', go: ['stock', 'Open Stock & orders'],
+        fig: 'In by ' + v3Day(PDG.deadline) + '. An order today arrives ' + v3Day(lands) + (lands > pEnd ? ', after it ends, so it all sells from stock you hold' : lands > PDG.deadline ? ', so most of it sells from stock you hold' : ', in time if ordered by ' + v3Day(PDG.orderBy)) });
+    } else checks.push({ k: 'stock', t: 'Stock for ' + gpMonthName(peak.iso), sub: wait + '.', go: ['stock', 'Open Stock & orders'],
+      fig: 'An order today arrives ' + v3Day(arrive) + (arrive > peakEnd ? ', after the month ends' : arrive > peak.iso ? ', part way through the month' : ', in time if ordered by ' + v3Day(v3IsoAdd(peak.iso, -L.days))) });
+    if (C.cash_floor == null) checks.push({ k: 'cash', t: 'Add a minimum cash balance', sub: 'The ads and the stock are paid for before the sales arrive.', fig: 'Not entered', go: ['goal', 'Add it', 'economics'] });
+  }
+  const sum = k => rows.reduce((t, r) => t + (Number(r[k]) || 0), 0);
+  const bs = v3BoardSpendTargets(figG.rows);
+  const costWord = v3Fig('plan_cost_per_new_customer', figG.rows);
+
+  return (<>
+    {stale && (<div className="v3-alert v3-goal-alert">
+      <p><b>Plan changed since this goal was confirmed.</b> {v3GbpRound(tgt)} of sales now takes {v3GbpRound(G.spend_cap)} of ads, not {v3GbpRound(g.spend_cap)}.</p>
+      <button type="button" className="v3-btn v3-btn-p v3-btn-sm" onClick={replan}>Re-plan the quarter</button>
     </div>)}
-    {/* 30 Oct eval: the page led "£232,152 short" (sales, at today's ad spend) under a Today that said "On track"
-        (profit after ads, on the plan for the goal), then gave a third quarter-end figure. With a confirmed goal it
-        leads with Today's verdict and says what the sales figures below it assume. */}
-    <div className={GV && GV.F ? 'v3-lead2' : ''}><div>
-    {GV && GV.F ? <p className="v3-verdict">{GM.lead} {GM.line}</p>
-    : GV ? <p className="v3-verdict">Your goal is {v3Gbp(TGG.target)} of profit after ads this quarter{Number(TGG.goal_sales) > 0 ? <>, with {fmtMoney(TGG.goal_sales)} of sales</> : null}.
-        {' '}The forecast is {v3Gbp(TGG.forecast)}{GV.gap > 0 ? <>, {v3Gbp(GV.gap)} short</> : GV.gap < 0 ? <>, {v3Gbp(-GV.gap)} ahead</> : null}.</p>
-    : <p className="v3-verdict">{g
-      ? <>Your goal is {fmtMoney(tgt)} of sales this quarter. {short > 0
-          ? <>{atWords} you land at about {fmtMoney(P.revenue_target)}, {fmtMoney(short)} short.</>
-          : <>{atWords} you reach it: about {fmtMoney(P.revenue_target)}.</>}</>
-      : <>There is no goal for this quarter yet. {atWords} you land at about {fmtMoney(P.revenue_target)} of sales.</>}</p>}
-    <V3Brief>
-      {GV ? <>{GV.F ? <>{GM.evidence} </> : GV.toDate ? <>So far you are {GV.toDate}, the same figure as Today. </> : null}{GV.F ? <>If the last 30 days simply carry on, you keep about {v3Gbp(TGG.pace_finish)}. The plan for your goal keeps {v3Gbp(TGG.forecast)}. </> : <>The forecast assumes you spend what the plan for your goal puts into ads. </>}
-          {' '}{short > 0
-            ? <>{atWords} instead, sales land at about {fmtMoney(P.revenue_target)}, {fmtMoney(short)} short of the goal’s sales.</>
-            : <>{atWords} too, sales reach the goal’s: about {fmtMoney(P.revenue_target)}.</>}
-          {done != null && exp != null ? <> You have sold {fmtMoney(done)} so far; the plan expected {fmtMoney(exp)} by now.</> : null}</>
-      : done != null && exp != null && st
-        ? <>You have sold {fmtMoney(done)} so far. The plan expects {fmtMoney(exp)} by now, so you are {onTrack ? V3_PLAN_WORD[st].toLowerCase() : V3_PLAN_WORD[st].toLowerCase() + ', ' + fmtMoney(Math.abs(Number(QS.gap))) + ' short'}.{QS.pace_finish != null ? <> At today’s pace the quarter ends at about {fmtMoney(QS.pace_finish)}.</> : null}</>
-        : done != null ? <>You have sold {fmtMoney(done)} so far.</> : null}
-      {g && unreach && <> No ad spend gets there: the most the plan lands is about {fmtMoney(reachBest)}{best ? <>, at about {fmtMoney(best)} of ads; past that, extra ads cost more profit than they bring</> : null}.{lySales ? <> Last year this quarter sold {fmtMoney(lySales)}.</> : null}{reachGoal ? <> A goal near {fmtMoney(reachGoal)} is one the plan can reach.</> : null}</>}
-      {g && short > 0 && !unreach && <> {GV ? 'The sales gap is ad spend.' : 'The gap is ad spend.'} The goal takes {fmtMoney(gSpend)} of ads, {fmtMoney(gSpend - Number(P.spend_cap))} more than the plan.{peakShare != null ? <> {fmtPctN(peakShare)} of the goal’s ads go in {gpMonthName(peak.iso)}.</> : null}</>}
-      {g && short > 0 && !unreach && dCam != null && <> Those extra ads bring about {fmtMoney(short)} more sales but {dCam > 0 ? 'only ' + fmtMoney(dCam) + ' more' : fmtMoney(-dCam) + ' less'} profit after ads.{dCam < 0 ? ' Past a point, extra ads cost more profit than they bring in.' : atBest === 'at' ? ' The goal sits at the most profitable ad spend found.' : atBest === 'past' ? ' The goal is past the most profitable ad spend found (' + fmtMoney(best) + ').' : ''}</>}
-      {!(g && short > 0) && best && <> The most profitable ad spend found is {fmtMoney(best)}, for about {fmtMoney(P.ceiling.best_sales)} of sales.</>}
-      {' '}<V3Conf state="probably" detail={'How the quarter is planned: your own busy and quiet months from your sales history, returning customers at their last three months’ rate, and new-customer sales that rise with ad spend, each extra £1 buying a little less. Its average new customer costs ' + (v3Fig('plan_cost_per_new_customer', figG.rows).value != null ? fmtMoney(v3Fig('plan_cost_per_new_customer', figG.rows).value, 2) + ' (' + v3Fig('plan_cost_per_new_customer', figG.rows).label.toLowerCase() + ')' : B.cost_per_new_customer ? fmtMoney(B.cost_per_new_customer, 2) : 'less') + (B.cost_per_new_customer_basis ? ': ' + B.cost_per_new_customer_basis + '.' : ' because the quarter includes Black Friday, when new customers come cheaper.') + ' The Customers page shows the last 90 days.' + (PQ && PQ.basis_note ? ' ' + PQ.basis_note : '')}/></V3Brief>
-    </div>{GV && GV.F && <V3AdAnswer action={setGoal} g={TGG}/>}</div>
-    {!(GV && GV.F) && <V3AdAnswer action={setGoal} g={TGG}/>}
-    {exp != null && <V3FcErr/>}
-    <div className="v3-stat-grid v3-gap-top">
-      {done != null && <div className="v3-stat"><div className="v3-stat-lab"><span>Sales so far</span></div><div className="v3-stat-val">{fmtMoney(done)}</div>
-        <div className="v3-stat-foot"><span className={!st || onTrack ? 'v3-muted' : 'v3-down'}>{exp != null ? fmtMoney(exp) + ' expected by now' : 'no plan to compare with yet'}</span></div></div>}
-      {QS && QS.pace_finish != null && <div className="v3-stat"><div className="v3-stat-lab"><span>At today’s pace</span></div><div className="v3-stat-val">{fmtMoney(QS.pace_finish)}</div>
-        <div className="v3-stat-foot"><span className="v3-muted">sales so far, then your last 30 days’ average day ({fmtMoney(QS.pace_per_day)}) for each day left</span></div></div>}
-      <div className="v3-stat"><div className="v3-stat-lab"><span>Where the plan lands</span></div><div className="v3-stat-val">{fmtMoney(P.revenue_target)}</div>
-        <div className="v3-stat-foot"><span className="v3-muted">{held
-          ? <>{fmtMoney(P.spend_cap)} of ads, the most a first order pays for{Number(P.spend_wanted) > 0 ? <> (your recent ad spend would come to {fmtMoney(P.spend_wanted)})</> : null}</>
-          : <>ads held at {fmtMoney(P.inputs && P.inputs.base_monthly_spend)} a month{P.inputs && P.inputs.base_from && P.inputs.base_to
-          ? <>, your average {gpMonthName(String(P.inputs.base_from).slice(0, 7) + '-01').slice(0, 3)}–{gpMonthName(String(P.inputs.base_to).slice(0, 7) + '-01').slice(0, 3)}</> : null}</>}</span></div></div>
-      {g && unreach && <div className="v3-stat"><div className="v3-stat-lab"><span>The most the plan reaches</span></div><div className="v3-stat-val">{fmtMoney(reachBest)}</div>
-        <div className="v3-stat-foot"><span className="v3-muted">{fmtMoney(tgt - reachBest)} short of the goal{lySales ? <>; last year {fmtMoney(lySales)}</> : null}</span></div></div>}
-      {g && !unreach && <div className="v3-stat"><div className="v3-stat-lab"><span>Ads the goal takes</span></div><div className="v3-stat-val">{fmtMoney(gSpend)}</div>
-        <div className="v3-stat-foot"><span className="v3-muted">{fmtMoney(peak.gSpend)} of it in {gpMonthName(peak.iso)}</span></div></div>}
-      {g && !unreach && <div className="v3-stat"><div className="v3-stat-lab"><span>Profit after ads, on today’s plan for the goal</span></div><div className="v3-stat-val">{fmtMoney(gCam)}</div>
-        <div className="v3-stat-foot"><span className="v3-muted">{fmtMoney(P.cam_target)} on the plan{g.confirmed_cam_target != null && g.confirmed_at ? <>; you confirmed {fmtMoney(g.confirmed_cam_target)} on {v3Day(g.confirmed_at)}</> : null}</span></div></div>}
-    </div>
-    <V3GoalDrivers per={per} today={today} exp={exp || 0} done={done || 0} months={ph || P.months} paceMonths={P.months}
-      goal={g && ph ? tgt : null} pace={Number(P.revenue_target)} dCam={dCam} held={held} adsNear={adsNear} basis={g ? 'goal' : 'plan'}
-      range={v3Day(per.start) + ' – ' + v3Day(v3IsoAdd(today, -1), true)}/>
-  </section>
+    <section className="v3-panel v3-home-strip v3-mk-strip" aria-label="Key figures">
+      {GV && <div className="v3-home-group" style={{ '--n': 2 }}>
+        <div className="v3-home-group-h">Profit after ads<span>Goal {v3GbpRound(TGG.target)}</span><b className={'v3-pill ' + pillOf[GV.cls || '']}>{GV.word}</b></div>
+        <div className="v3-home-tiles">
+          <V3HomeTile k="Forecast" v={v3GbpRound(fc)} cls={pGap >= 0 ? 'v3-up' : 'v3-down'} delta={v3GbpRound(Math.abs(pGap)) + (pGap >= 0 ? ' above goal' : ' short')} title={F ? 'With ' + v3AdsNear(A) : TGG.forecast_basis || undefined}/>
+          <V3HomeTile k="So far" v={pSo < 0 ? '−' + fmtMoney(Math.abs(pSo)) : fmtMoney(pSo)} cls={pExp != null && pSo < pExp ? 'v3-down' : ''} delta={pExp != null ? v3GbpRound(pExp) + ' expected by now' : ''}/>
+        </div></div>}
+      <div className="v3-home-group" style={{ '--n': QS && QS.pace_finish != null ? 3 : 2 }}>
+        <div className="v3-home-group-h">Sales{tgt ? <span>Goal {v3GbpRound(tgt)}</span> : null}{tgt && F ? <b className={'v3-pill ' + (sShort > 0 ? 'v3-pill-bad' : 'v3-pill-good')}>{sShort > 0 ? v3GbpRound(sShort) + ' short' : 'On track'}</b> : null}</div>
+        <div className="v3-home-tiles">
+          <V3HomeTile k="Forecast" v={v3GbpRound(landed)} delta={held ? 'at the ads a first order pays for' : 'with ' + adsNear} act={act('gap', M.gap)} title={M.gap ? 'What the goal adds to the plan' : undefined}/>
+          <V3HomeTile k="So far" v={done != null ? fmtMoney(done) : FMT_NONE} cls={exp != null && done < exp ? 'v3-down' : ''} delta={exp != null ? v3GbpRound(exp) + ' expected by now' : ''} act={act('sofar', M.sofar)} title={M.sofar ? 'Why sales differ from the plan so far' : undefined}/>
+          {QS && QS.pace_finish != null && <V3HomeTile k="At today’s pace" v={v3GbpRound(QS.pace_finish)} delta="ignores the season" title={'Sales so far, then your last 30 days’ average day (' + fmtMoney(QS.pace_per_day) + ') for each day left'}/>}
+        </div></div>
+      <div className="v3-home-group" style={{ '--n': g && (unreach || adsGoal != null) ? 2 : 1 }}>
+        <div className="v3-home-group-h">Ads<span>This quarter</span></div>
+        <div className="v3-home-tiles">
+          <V3HomeTile k="On the plan" v={v3GbpRound(adsPlan)} delta={planAdsDelta}/>
+          {g && unreach ? <V3HomeTile k="Most the plan reaches" v={v3GbpRound(reachBest)} delta={v3GbpRound(tgt - reachBest) + ' short of the goal'}/>
+            : g && adsGoal != null ? <V3HomeTile k="The goal takes" v={v3GbpRound(adsGoal)} delta={ph ? v3GbpRound(peak.gSpend) + ' in ' + gpMonthName(peak.iso) : ''}/> : null}
+        </div></div>
+      {!g && <div className="v3-panel-note v3-goal-call v3-goal-full"><span>No goal confirmed yet.</span>{setGoal}</div>}
+      {drv === 'gap' && M.gap && <div className="v3-home-drv v3-goal-full"><V3DriverPanel key="gap" fixed={M.gap}/></div>}
+      {drv === 'sofar' && M.sofar && <div className="v3-home-drv v3-goal-full"><V3DriverPanel key="sofar" fixed={M.sofar}/></div>}
+    </section>
 
-  <section className="v3-sec">
-    <h2 className="v3-sec-title">Month by month</h2>
-    <table className="v3-rw">
-      <thead><tr><th className="t-text">Month</th>{ph && <th>Goal</th>}<th>At today’s pace</th>{ph && <th>Ads in the goal</th>}<th>Ads in the plan</th>{ph && maxSeen && <th>Against your biggest month</th>}</tr></thead>
-      <tbody>{rows.map(r => (<tr key={r.iso}>
-        <td className="t-text">{gpMonthName(r.iso)}</td>
-        {ph && <td>{fmtMoney(r.goal)}</td>}
-        <td className={ph && r.atPace != null && r.atPace < r.goal ? 'v3-down' : ''}>{fmtMoney(r.atPace)}</td>
-        {ph && <td>{fmtMoney(r.gSpend)}</td>}
-        <td className="v3-muted">{fmtMoney(r.pSpend)}</td>
-        {ph && maxSeen && <td className={r.x > 1.5 ? 'v3-down' : 'v3-muted'}>{fmtTimes(r.x, 1)}</td>}
-      </tr>))}</tbody>
-    </table>
-    {ppd != null && <p className="micro muted v3-measure">At today’s pace is what each month has sold so far plus your average day over the last 30 days ({fmtMoney(ppd)}) for each day left in it.</p>}
-    {ph && maxSeen && <p className="micro muted v3-measure">Your biggest month of ads so far was {fmtMoney(maxSeen)}. Past 1.5× that, the estimate goes beyond any spend seen so far.</p>}
-    {(() => {
-      const bs = v3BoardSpendTargets(figG.rows);
-      return bs
-        ? <p className="micro muted v3-measure">{v3AdBudgetWords(bs, fmtMoney)}. A channel’s own ceiling on the board is a most while spend comes down to that, not the month’s budget.</p> : null;
-    })()}
-  </section>
+    <section className="v3-panel" aria-label="The quarter against the goal">
+      <div className="v3-panel-head"><h2>The quarter</h2><span className="v3-muted">{v3Day(per.start)} to {v3Day(per.end)}</span></div>
+      <div className="v3-panel-pad v3-mk-charts">
+        {GV && Pth && <div className="v3-goal-chart"><div className="v3-goal-cap"><span className="v3-chart-title">Profit against the goal</span></div>
+          {F ? <V3FuturesChart F={F} g={TGG} P={Pth} onPage/> : <V3GoalChart P={Pth} g={TGG}/>}</div>}
+        <figure className="v3-chart" aria-label="Sales by month"><figcaption><span className="v3-chart-title">Sales by month</span>
+          <span className="v3-legend">{ph && <><i style={{ background: PAL.muted }}/>Goal </>}<i style={{ background: PAL.sales }}/>Plan</span></figcaption>
+          <R.ResponsiveContainer width="100%" height={240}>
+            <R.BarChart data={monthChart} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <R.CartesianGrid vertical={false}/><R.XAxis dataKey="m"/><R.YAxis tickFormatter={fmtMoneyK}/>
+              <R.Tooltip content={monthTip} cursor={false}/>
+              {ph && <R.Bar dataKey="goal" fill={PAL.muted} isAnimationActive={false}/>}
+              <R.Bar dataKey="plan" fill={PAL.sales} isAnimationActive={false}/>
+            </R.BarChart>
+          </R.ResponsiveContainer></figure>
+      </div>
+    </section>
 
-  {g && (<section className="v3-sec">
-    <h2 className="v3-sec-title">What reaching it takes</h2>
-    <ol className="v3-moves">
-      <li><b>Plan {gpMonthName(peak.iso)}’s ads now.</b> The goal puts {fmtMoney(peak.gSpend)} of ads into {gpMonthName(peak.iso)}
-        {peak.x != null ? <>, {fmtTimes(peak.x, 1)} the most you have spent in a month</> : null}.
-        {mc > 0 && fop > 0 && <> At that spend, the last new customers cost about {fmtMoney(mc)} each. Their first order makes {fmtMoney(fop)} profit{ltv ? <>, and {fmtMoney(ltv)} over a year</> : null}.
-          {mc > fop ? ' That is past the point where the first order pays for them, so check what a new customer costs each week as spend climbs.' : mc >= fop * 0.9 ? ' The first order only just pays for them; the profit is in their next orders.' : ' The first order still pays for them.'}</>}</li>
-      {PDG && SQG.peak ? (() => { const pn = v3PlainWords(SQG.peak.title || 'the peak'), pEnd = String(SQG.peak.end || PDG.start).slice(0, 10);
-        const lands = SQG.lands_on ? String(SQG.lands_on).slice(0, 10) : arrive;
-        return (<li><b>Stock for {pn}.</b> {L.entered ? <>With your {L.weeks}-week wait from order to arrival</> : <>At Greta’s guess of {L.days} days from order to arrival (add yours below)</>}, an order placed today arrives around {v3Day(lands)}.
-          {' '}{pn} starts on {v3Day(PDG.start)}, so its stock needs to be in by {v3Day(PDG.deadline)}, a week before.
-          {lands > pEnd ? <> The order arrives after it ends, so all of it sells from the stock you hold now.</>
-            : lands > PDG.deadline ? <> The order arrives after that: most of it sells from the stock you hold now. Check that stock covers last year’s peak, and ask suppliers what can arrive sooner.</>
-            : <> That is in time if the order goes in by {v3Day(PDG.orderBy)}.</>}
-        {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('stock')}>What to order <span className="v3-xref-go">on Stock &amp; orders</span></button></li>); })()
-      : (<li><b>Stock for it.</b> {L.entered ? <>With your {L.weeks}-week wait from order to arrival</> : <>At Greta’s guess of {L.days} days from order to arrival (add yours below)</>}, an order placed today arrives around {v3Day(arrive)}
-          {arrive > peakEnd ? <>, after {gpMonthName(peak.iso)} ends, so all of it sells from the stock you hold now.</>
-            : arrive > peak.iso ? <>, most of {gpMonthName(peak.iso)} sells from the stock you hold now.</>
-            : <>, in time, if it goes in by {v3Day(v3IsoAdd(peak.iso, -L.days))}.</>}
-          {arrive > peak.iso && ' Check it covers last year’s peak, and ask suppliers what can arrive sooner.'}
-        {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('stock')}>What to order <span className="v3-xref-go">on Stock &amp; orders</span></button></li>)}
-      {cashOff && <li><b>Check you can fund it.</b> The ads and the stock are paid for before the sales arrive. That can’t be checked until you add the lowest balance you’ll let cash fall to.
-        {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'economics')}>Add it <span className="v3-xref-go">under Cash, stock and supplier terms</span></button></li>}
-    </ol>
-  </section>)}
-  <div className="v3-btn-row">{setGoal}</div>
-  </div>);
+    {TGG && <V3AdAnswer panel action={setGoal} g={TGG}/>}
+    <V3GoalActions prefixes={V3_GOAL_PLAN_ACTS} words="the plan" sub="The plan and ad budget"/>
+
+    {checks.length > 0 && (<section className="v3-panel" aria-label="What reaching the goal takes">
+      <div className="v3-panel-head"><h2>What reaching the goal takes</h2><span className="v3-count">{checks.length}</span></div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-goal-checks">
+        <thead><tr><th>Check</th><th>Figure</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
+        <tbody>{checks.map(c => (<tr key={c.k}>
+          <td className="v3-web-wrap">{c.t}{c.sub && <span className="v3-home-sub">{c.sub}</span>}</td>
+          <td className="v3-web-wrap">{c.fig}</td>
+          <td className="r">{c.go && <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo(c.go[0], c.go[2])}>{c.go[1]}</button>}</td>
+        </tr>))}</tbody></table></div>
+    </section>)}
+
+    <section className="v3-panel" aria-label="Month by month">
+      <div className="v3-panel-head"><h2>Month by month</h2><span className="v3-muted">Forecasts, rounded</span>
+        <V3Conf state="probably" detail={'How the quarter is planned: your own busy and quiet months from your sales history, returning customers at their last three months’ rate, and new-customer sales that rise with ad spend, each extra £1 buying a little less. Its average new customer costs ' + (costWord.value != null ? fmtMoney(costWord.value, 2) + ' (' + costWord.label.toLowerCase() + ')' : B.cost_per_new_customer ? fmtMoney(B.cost_per_new_customer, 2) : 'less') + (B.cost_per_new_customer_basis ? ': ' + B.cost_per_new_customer_basis + '.' : ' because the quarter includes Black Friday, when new customers come cheaper.') + ' The Customers page shows the last 90 days.' + (PQ && PQ.basis_note ? ' ' + PQ.basis_note : '')}/></div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+        <thead><tr><th>Month</th>{ph && <th className="r">Goal</th>}<th className="r">Plan</th><th className="r" title={ppd != null ? 'What each month has sold so far, plus your average day over the last 30 days (' + fmtMoney(ppd) + ') for each day left' : undefined}>At today’s pace</th>{ph && <th className="r">Ads in the goal</th>}<th className="r v3-mk-opt">Ads in the plan</th>{ph && maxSeen && <th className="r v3-mk-opt" title={'Your biggest month of ads so far was ' + fmtMoney(maxSeen)}>× biggest month</th>}</tr></thead>
+        <tbody>{rows.map(r => (<tr key={r.iso}>
+          <td>{gpMonthName(r.iso)}</td>
+          {ph && <td className="r">{v3GbpRound(r.goal)}</td>}
+          <td className="r">{v3GbpRound(r.pace)}</td>
+          <td className={'r' + (ph && r.atPace != null && r.atPace < r.goal ? ' v3-down' : '')}>{r.atPace != null ? v3GbpRound(r.atPace) : FMT_NONE}</td>
+          {ph && <td className="r">{v3GbpRound(r.gSpend)}</td>}
+          <td className="r v3-mk-opt">{v3GbpRound(r.pSpend)}</td>
+          {ph && maxSeen && <td className={'r v3-mk-opt' + (r.x > 1.5 ? ' v3-down' : '')}>{fmtTimes(r.x, 1)}</td>}
+        </tr>))}
+        <tr className="tot"><td>Quarter</td>{ph && <td className="r">{v3GbpRound(sum('goal'))}</td>}<td className="r">{v3GbpRound(sum('pace'))}</td><td className="r">{QS && QS.pace_finish != null ? v3GbpRound(QS.pace_finish) : FMT_NONE}</td>{ph && <td className="r">{v3GbpRound(sum('gSpend'))}</td>}<td className="r v3-mk-opt">{v3GbpRound(sum('pSpend'))}</td>{ph && maxSeen && <td className="r v3-mk-opt"/>}</tr>
+        </tbody>
+      </table></div>
+      {ph && maxSeen && rows.some(r => r.x > 1.5) && <p className="v3-panel-note">Past 1.5× your biggest month, the estimate goes beyond any spend seen so far.</p>}
+      {bs && ph && <p className="v3-panel-note">In the goal: {v3AdBudgetWords(bs, v3GbpRound).replace(/(^|, )([A-Z])/g, (m, a, c) => a + c.toLowerCase())}. A channel’s own ceiling on the board is a most while spend comes down to that, not the month’s budget.</p>}
+      {exp != null && <div className="v3-panel-note"><V3FcErr/></div>}
+    </section>
+  </>);
 }
 
-// The costs every profit figure leans on, checked against trading where Greta can: each one says what
-// it does to profit and how to fix it. Replaces CostDrift on this page (V3), which listed "you entered /
-// your data shows" with no £ and no button.
-function V3CostsOff() {
+// Actions this page works: the board's own, in its order. The prefixes copy anatomy_category_map's two parts whose page is goal,
+// Plan and control (promo-peak-plan, ad-budget) and Cash (cash-); update them if the map changes.
+const V3_GOAL_PLAN_ACTS = ['promo-peak-plan', 'ad-budget'], V3_GOAL_CASH_ACTS = ['cash-'];
+function V3GoalActions({ prefixes, words, sub }) {
+  const bd = useV3Board();
+  const bm = useV3Rows('board-moves', V3_BOARD_MOVES_Q);
+  useV3Rows('move-extras', V3_MOVE_EXTRAS_Q);
+  const [drawer, setDrawer] = React.useState(null);
+  const live = v3FoldPlans(v3LiveRows(bd.rows || [])).filter(r => prefixes.some(p => String(r.external_id || '').startsWith(p)));
+  const shown = live.slice(0, 5);
+  const bmRows = bm.rows && bm.rows[0] && Array.isArray(bm.rows[0].rows) ? bm.rows[0].rows : [];
+  const open = drawer && shown.find(r => r.external_id === drawer.id);
+  return (<section className="v3-panel" aria-label="Actions">
+    <div className="v3-panel-head"><h2>Actions</h2>{live.length > 0 && <span className="v3-count">{live.length}</span>}<span className="v3-muted">{sub}</span>
+      <button type="button" className="v3-panel-link" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>View all</button></div>
+    {bd.err ? <p className="v3-panel-note">Actions could not load. Refresh the page to try again.</p>
+      : !bd.rows ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={2}/></div>
+      : !shown.length ? <p className="v3-panel-note">No open actions on {words}.</p>
+      : <table className="v3-home-table">
+        <thead><tr><th>Action</th><th>Area</th><th className="r">Worth</th><th>Basis</th><th>Status</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
+        <tbody>{shown.map(r => <V3HomeRow key={r.external_id} row={r} onPage={(V3_HOME_WORK[r.category] || [])[0] || 'goal'} bmRow={bmRows.find(x => x.external_id === r.external_id)} onOpen={mode => setDrawer({ id: r.external_id, mode })}/>)}</tbody>
+      </table>}
+    {open && <V3HomeDrawer key={open.external_id} row={open} startMode={drawer.mode} onClose={() => setDrawer(null)}/>}
+  </section>);
+}
+
+// The costs every profit figure leans on, checked against trading where they can be: each with what it does to
+// profit and how to fix it. The tab shows how many there are, so moving them off the first screen hides nothing.
+function v3CostChecks(driftRows, Q, C, L) {
+  const today = new Date().toISOString().slice(0, 10);
+  const items = [];
+  const rf = driftRows.find(r => r.input_key === 'refundPct' && r.verifiable && r.status === 'drift');
+  if (rf) {
+    // 1109: the pounds a month are the check's own (gbp_month, at the last 30 days' sales), not worked out here
+    const was = Number(rf.config_value), is = Math.round(Number(rf.realised_value) * 10) / 10, gbp = rf.gbp_month != null ? Number(rf.gbp_month) : null;
+    items.push({ k: 'rf', t: 'Refunds above what you entered', sub: 'Measured over the last 12 months of orders.', use: is,
+      fig: fmtPctN(is / 100) + ' of sales, ' + fmtPctN(was / 100) + ' entered' + (gbp != null ? '. Profit reads ' + fmtMoney(Math.abs(gbp)) + ' a month too ' + (gbp > 0 ? 'high' : 'low') : '') });
+  }
+  const gm = driftRows.find(r => r.input_key === 'gross_margin' && r.verifiable && r.status === 'drift');
+  if (gm) items.push({ k: 'gm', t: 'Margin on products without a cost', sub: 'Update it under Your costs, or add the missing costs.',
+    fig: fmtPctN(Number(gm.config_value)) + ' used, ' + fmtPctN(Number(gm.realised_value)) + ' on products with a cost', go: ['goal', 'Edit it', 'margin'] });
+  if (Q && Number(Q.cogs_coverage_90d) < 0.8) items.push({ k: 'cov', t: 'Sales with no product cost', sub: 'They use your margin, so profit is an estimate until more products have one.',
+    fig: fmtPctN(Number(Q.cogs_coverage_90d)) + ' of sales have a cost', go: ['goal', 'Add costs', 'costs'] });
+  else if (Q && Q.cogs_landed_complete === false) {
+    const per10 = Q.freight_per_10pct_month != null ? Number(Q.freight_per_10pct_month) : null;   // 1109: the view's own figure
+    items.push({ k: 'fr', t: 'Freight and duty missing from product costs', sub: 'Margins read too high until they are in, and profit can’t count as measured.',
+      fig: per10 ? 'Each 10% they add takes ' + v3GbpRound(per10) + ' a month off profit' : 'Not entered', go: ['goal', 'Add them', 'costs'] });
+  }
+  if (!L.entered) items.push({ k: 'lt', t: 'Supplier lead time missing', sub: 'How long stock takes to arrive after you order it. Order-by dates may be late.',
+    fig: L.days + ' days assumed for every product', go: ['goal', 'Add it', 'economics'] });
+  if (C.cash_floor == null) items.push({ k: 'cf', t: 'Minimum cash balance missing', sub: 'The ads and stock are paid for before the sales arrive.',
+    fig: 'No check on whether you can afford the plan', go: ['goal', 'Add it', 'economics'] });
+  if (C.opening_cash != null && C.opening_cash_as_of) {
+    const as = String(C.opening_cash_as_of).slice(0, 10), stale = v3IsoAdd(as, 45);
+    if (stale <= v3IsoAdd(today, 14)) items.push({ k: 'cb', t: 'Cash balance out of date', sub: 'Update it with today’s balance.',
+      fig: 'From ' + v3Day(as, true) + '. ' + (stale < today ? 'Stopped being used on ' : 'Stops being used on ') + v3Day(stale), go: ['goal', 'Update it', 'economics'] });
+  }
+  return items;
+}
+function V3GoalCosts() {
   const drift = useV3Rows('goal-drift', V3_DRIFT_Q);
   const cq = useV3Rows('goal-cogs', V3_COGSQ_Q);
   const cfg = useV3Rows('brand-cfg', V3_BCFG_Q);
   const [busy, setBusy] = React.useState(false), [msg, setMsg] = React.useState(null);
-  if (drift.err || cfg.err) return <V3LoadFailed what="your cost checks" onRetry={() => { if (drift.err) drift.retry(); if (cfg.err) cfg.retry(); }}/>;
-  if (!drift.rows || !cq.rows || !cfg.rows) return <V3SkeletonRows n={3}/>;
-  const C = cfg.rows[0] || {}, Q = cq.rows[0] || null, L = v3Lead(cfg.rows);
-  const today = new Date().toISOString().slice(0, 10);
-  const items = [];
-  let total = 0;
-  const rf = drift.rows.find(r => r.input_key === 'refundPct' && r.verifiable && r.status === 'drift');
-  if (rf) {
-    // 1109: the pounds a month are the check's own (gbp_month, at the last 30 days' sales), not worked out here
-    const was = Number(rf.config_value), is = Math.round(Number(rf.realised_value) * 10) / 10, gbp = rf.gbp_month != null ? Number(rf.gbp_month) : null;
-    if (gbp > 0) total += gbp;
-    const use = async () => {
-      setBusy(true); setMsg(null);
-      const vc = Object.assign({}, C.variable_costs || {}, { refundPct: is });
-      const r = window.FRKL_PLAN && window.FRKL_PLAN.saveEconomics ? await window.FRKL_PLAN.saveEconomics({ variable_costs: vc }) : { ok: false, error: 'not signed in' };
-      setBusy(false);
-      if (r.ok) { drift.retry(); cfg.retry(); setMsg({ ok: true, text: 'Saved. Every profit figure now uses ' + fmtPctN(is / 100) + ' refunds.' }); }
-      else setMsg({ ok: false, text: r.error || 'Could not save.' });
-    };
-    items.push(<li key="rf"><b>Refunds are {fmtPctN(is / 100)} of sales, but you entered {fmtPctN(was / 100)}.</b>
-      {' '}{gbp != null ? <>So every profit figure reads {fmtMoney(Math.abs(gbp))} a month too {gbp > 0 ? 'high' : 'low'}, at your last 30 days’ sales.</> : null}
-      {' '}Measured over the last 12 months of orders.
-      <div className="v3-btn-row"><button type="button" className="v3-btn v3-btn-p v3-btn-sm" disabled={busy} onClick={use}>{busy ? 'Saving…' : 'Use ' + fmtPctN(is / 100)}</button></div></li>);
-  }
-  const gm = drift.rows.find(r => r.input_key === 'gross_margin' && r.verifiable && r.status === 'drift');
-  if (gm) items.push(<li key="gm"><b>Products without a cost are counted at a {fmtPctN(Number(gm.config_value))} margin, but products with a cost make {fmtPctN(Number(gm.realised_value))}.</b> Update it under “What things cost you” below, or add the missing costs.</li>);
-  if (Q && Number(Q.cogs_coverage_90d) < 0.8) items.push(<li key="cov"><b>Only {fmtPctN(Number(Q.cogs_coverage_90d))} of your sales have a product cost.</b> The rest use your margin, so profit is an estimate until more products have one.
-    {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs')}>Add costs <span className="v3-xref-go">under Product costs</span></button></li>);
-  else if (Q && Q.cogs_landed_complete === false) {
-    const per10 = Q.freight_per_10pct_month != null ? Number(Q.freight_per_10pct_month) : null;   // 1109: the view's own figure
-    items.push(<li key="fr"><b>None of your product costs include freight or duty.</b> Until they do, your margins read too high.
-      {per10 ? <> Every 10% that freight and duty add to your product costs means about {fmtMoney(per10)} a month less profit than shown.</> : null} Your profit can’t count as measured until they are added.
-      {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'costs')}>Add freight and duty <span className="v3-xref-go">under Product costs</span></button></li>);
-  }
-  if (!L.entered) items.push(<li key="lt"><b>No supplier lead time.</b> That is how long stock takes to arrive after you order it. Stock & orders assumes {L.days} days for every product, so its order-by dates may be late.
-    {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'economics')}>Add it <span className="v3-xref-go">under Cash, stock and supplier terms</span></button></li>);
-  if (C.cash_floor == null) items.push(<li key="cf"><b>No minimum cash balance.</b> Without it, there is no check on whether you can afford the plan. The ads and stock are paid for before the sales arrive.
-    {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'economics')}>Add it <span className="v3-xref-go">under Cash, stock and supplier terms</span></button></li>);
-  if (C.opening_cash != null && C.opening_cash_as_of) {
-    const as = String(C.opening_cash_as_of).slice(0, 10), stale = v3IsoAdd(as, 45);
-    if (stale <= v3IsoAdd(today, 14)) items.push(<li key="cb"><b>Your cash balance is from {v3Day(as, true)}.</b> {stale < today ? 'It stopped being used on ' : 'It stops being used on '}{v3Day(stale)}{stale < today ? '.' : ', 45 days on.'} Update it with today’s balance.
-      {' '}<button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('goal', 'economics')}>Update it <span className="v3-xref-go">under Cash, stock and supplier terms</span></button></li>);
-  }
-  const unchecked = drift.rows.filter(r => !r.verifiable).map(r => ({ fixed_costs_monthly: 'overheads', payPct: 'payment fees', payFixed: null, shipping: 'shipping', packaging: 'packaging', fulfilment: 'pick and pack' })[r.input_key]).filter(Boolean);
-  return (<section className="v3-sec">
-    <V3Anchor id="costs-off"/>
-    <h2 className="v3-sec-title">Are the costs behind your profit right?</h2>
-    <p className="v3-verdict">{items.length
-      ? (items.length === 1 ? 'One thing in your costs needs a look' : fmtCount(items.length) + ' things in your costs need a look') + (total > 0 ? ': profit reads about ' + fmtMoney(total) + ' a month too high.' : '.')
-      : 'Every cost that can be checked matches your trading.'}</p>
-    {items.length > 0 && <ol className="v3-moves">{items}</ol>}
-    {msg && <p className={'v3-note ' + (msg.ok ? 'v3-up' : 'v3-down')}>{msg.text}</p>}
-    {unchecked.length > 0 && <p className="micro muted v3-measure">Your {v3Names(unchecked)} can’t be checked yet, because nothing connected records what you pay for them. They are used as you entered them.</p>}
-  </section>);
+  const failed = drift.err || cfg.err, ready = drift.rows && cq.rows && cfg.rows;
+  const C = (cfg.rows || [])[0] || {}, Q = (cq.rows || [])[0] || null, L = v3Lead(cfg.rows);
+  const dr = drift.rows || [], at = k => dr.find(r => r.input_key === k);
+  const items = ready ? v3CostChecks(dr, Q, C, L) : [];
+  const use = async is => {
+    setBusy(true); setMsg(null);
+    const vc = Object.assign({}, C.variable_costs || {}, { refundPct: is });
+    const r = window.FRKL_PLAN && window.FRKL_PLAN.saveEconomics ? await window.FRKL_PLAN.saveEconomics({ variable_costs: vc }) : { ok: false, error: 'not signed in' };
+    setBusy(false);
+    if (r.ok) { drift.retry(); cfg.retry(); setMsg({ ok: true, text: 'Saved. Every profit figure now uses ' + fmtPctN(is / 100) + ' refunds.' }); }
+    else setMsg({ ok: false, text: r.error || 'Could not save.' });
+  };
+  const rf = at('refundPct'), gm = at('gross_margin'), oh = at('fixed_costs_monthly'), pay = at('payPct'), payF = at('payFixed');
+  const vc = C.variable_costs || {};
+  const lines = ['shipping', 'packaging', 'fulfilment'];
+  // a line entered as a share of sales has no pounds to add up, so the tile says only what it can
+  const eachOrder = lines.some(k => vc[k + 'Pct'] != null) ? null : lines.reduce((t, k) => t + (Number((at(k) || {}).config_value) || 0), 0);
+  const unchecked = dr.filter(r => !r.verifiable).map(r => ({ fixed_costs_monthly: 'overheads', payPct: 'payment fees', payFixed: null, shipping: 'shipping', packaging: 'packaging', fulfilment: 'pick and pack' })[r.input_key]).filter(Boolean);
+  const measuredTiles = [
+    rf && rf.realised_value != null && <V3HomeTile key="rf" k="Refunds" v={fmtPctN(Number(rf.realised_value) / 100)} weak={rf.status === 'drift'} cls={rf.status === 'drift' ? 'v3-down' : ''} delta={fmtPctN(Number(rf.config_value) / 100) + ' entered'} title="Share of sales refunded, last 12 months of orders"/>,
+    gm && gm.realised_value != null && <V3HomeTile key="gm" k="Margin on costed products" v={v3Dp1Num(Number(gm.realised_value) * 100) + '%'} weak={gm.status === 'drift'} delta={v3Dp1Num(Number(gm.config_value) * 100) + '% for products with no cost'}/>,
+    Q && Q.cogs_coverage_90d != null && <V3HomeTile key="cov" k="Sales with a product cost" v={v3Dp1Num(Number(Q.cogs_coverage_90d) * 100) + '%'} weak={Number(Q.cogs_coverage_90d) < 0.8} delta="last 90 days"/>,
+  ].filter(Boolean);
+  const enteredTiles = [
+    oh && oh.config_value != null && <V3HomeTile key="oh" k="Overheads a month" v={fmtMoney(Number(oh.config_value))} delta="rent, wages, software"/>,
+    eachOrder > 0 && <V3HomeTile key="ord" k="Each order" v={fmtMoney(eachOrder, 2)} delta="shipping, packing, pick and pack"/>,
+    pay && pay.config_value != null && <V3HomeTile key="pay" k="Payment fee" v={fmtPctN(Number(pay.config_value) / 100)} delta={payF && payF.config_value != null ? 'plus ' + fmtMoney(Number(payF.config_value), 2) + ' an order' : ''}/>,
+  ].filter(Boolean);
+  return (<>
+    <section className="v3-panel v3-home-strip v3-mk-strip" aria-label="Key figures">
+      {failed ? <div className="v3-panel-pad"><V3LoadFailed what="Your cost checks" onRetry={() => { if (drift.err) drift.retry(); if (cfg.err) cfg.retry(); }}/></div>
+        : !ready ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={2}/></div>
+        : !measuredTiles.length && !enteredTiles.length ? <p className="v3-panel-note">No costs entered yet.</p>
+        : <>
+          {measuredTiles.length > 0 && <div className="v3-home-group" style={{ '--n': measuredTiles.length }}>
+            <div className="v3-home-group-h">Measured<span>against what you entered</span></div>
+            <div className="v3-home-tiles">{measuredTiles}</div></div>}
+          {enteredTiles.length > 0 && <div className="v3-home-group" style={{ '--n': enteredTiles.length }}>
+            <div className="v3-home-group-h">Entered<span>not checked against trading</span></div>
+            <div className="v3-home-tiles">{enteredTiles}</div></div>}
+        </>}
+    </section>
+
+    <section className="v3-panel" aria-label="Checks">
+      <V3Anchor id="costs-off"/>
+      <div className="v3-panel-head"><h2>Checks</h2>{items.length > 0 && <span className="v3-count">{items.length}</span>}<span className="v3-muted">The costs behind your profit</span></div>
+      {failed ? <p className="v3-panel-note">Checks could not load.</p>
+        : !ready ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={2}/></div>
+        : !items.length ? <p className="v3-panel-note">Every cost that can be checked matches your trading.</p>
+        : <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-goal-checks">
+          <thead><tr><th>Check</th><th>Figure</th><th><span className="v3-sr-only">Fix</span></th></tr></thead>
+          <tbody>{items.map(c => (<tr key={c.k}>
+            <td className="v3-web-wrap">{c.t}{c.sub && <span className="v3-home-sub">{c.sub}</span>}</td>
+            <td className="v3-web-wrap">{c.fig}</td>
+            <td className="r">{c.use != null ? <button type="button" className="v3-btn v3-btn-p v3-btn-sm" disabled={busy} onClick={() => use(c.use)}>{busy ? 'Saving…' : 'Use ' + fmtPctN(c.use / 100)}</button>
+              : c.go && <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo(c.go[0], c.go[2])}>{c.go[1]}</button>}</td>
+          </tr>))}</tbody></table></div>}
+      {msg && <p className={'v3-panel-note ' + (msg.ok ? 'v3-up' : 'v3-down')} role="status">{msg.text}</p>}
+      {unchecked.length > 0 && <p className="v3-panel-note">Used as you entered them, because nothing connected records what you pay: {v3Names(unchecked)}.</p>}
+    </section>
+
+    <V3GoldenRule/>
+    <GretaPlanPanel show="costs"/>
+    <V3ProductCosts/>
+  </>);
+}
+
+// Cash to the end of the plan: what ads, stock and overheads need against what the plan brings back. Plan figures are rounded;
+// a balance or a stock figure is what it is.
+function V3GoalCash() {
+  const q = useV3Rows('brand-state', V3_STATE_Q);
+  const figQ = useV3Figures();   // peak_cash_need and slow_stock from their owners (1080)
+  const goalQ = useV3Rows('goal-active', V3_GOAL_Q);
+  const [basis, setBasis] = React.useState(false);
+  const onGoal = !!(goalQ.rows && goalQ.rows[0] && Number(goalQ.rows[0].revenue_target) > 0), planWords = onGoal ? 'on the plan for your sales goal' : 'on the plan';
+  const C = q.rows && q.rows[0] && q.rows[0].cash_to_peak;
+  const has = !!(C && C.said);
+  const n = v => (v == null || !isFinite(Number(v)) ? null : Number(v));
+  const peakV = v3Fig('peak_cash_need', figQ.rows).value, peakX = peakV != null ? peakV : has ? n(C.peak_cash_need) : null;
+  const slow = v3Fig('slow_stock', figQ.rows);
+  const toOrder = has ? n(C.stock_to_order) : null;
+  const rows = has ? [
+    { k: 'Sales the plan expects', v: n(C.sales_expected) },
+    { k: 'Ads in the plan', v: n(C.ads_left) },
+    { k: 'Kept after product, order and ad costs', v: n(C.profit_after_ads_expected) },
+    { k: 'Your overheads', v: n(C.overheads) ? -n(C.overheads) : null },
+    { k: 'Trading result', v: n(C.after_overheads), tot: true },
+    // 1092: the plan's profit has had the product cost of its sales taken off; stock is paid for when it is ordered,
+    // so that cost is added back once. Without this row the table did not add up.
+    { k: 'Product cost of those sales, paid when the stock is ordered', v: toOrder > 0 && n(C.product_cost_added_back) > 0 ? n(C.product_cost_added_back) : null },
+    { k: 'Stock to order now, paid before it sells', v: toOrder > 0 ? -toOrder : null,
+      sub: n(C.reorder) > 0 || n(C.peak_top_up) > 0 ? v3Names([n(C.reorder) > 0 ? 'Reorder ' + v3GbpRound(n(C.reorder)) : null, n(C.peak_top_up) > 0 ? 'Peak top-up ' + v3GbpRound(n(C.peak_top_up)) : null].filter(Boolean)) : '' },
+    { k: 'After overheads and the stock orders', v: toOrder > 0 ? n(C.after_overheads_and_stock) : null, tot: true },
+  ].filter(r => r.v != null) : [];
+  return (<>
+    <section className="v3-panel v3-home-strip v3-mk-strip" aria-label="Key figures">
+      {q.err ? <div className="v3-panel-pad"><V3LoadFailed what="Your cash figures" onRetry={q.retry}/></div>
+        : !q.rows ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={2}/></div>
+        : !has ? <p className="v3-panel-note">Cash to the peak shows once there is a plan and a cash balance.</p>
+        : <>
+          <div className="v3-home-group" style={{ '--n': [n(C.after_overheads) != null, toOrder > 0 && n(C.after_overheads_and_stock) != null, peakX > 0].filter(Boolean).length || 1 }}>
+            <div className="v3-home-group-h">To {v3Day(String(C.to))}<span>{planWords}</span></div>
+            <div className="v3-home-tiles">
+              {n(C.after_overheads) != null && <V3HomeTile k="Trading result" v={v3GbpRound(n(C.after_overheads))} cls={n(C.after_overheads) < 0 ? 'v3-down' : ''} delta="after overheads"/>}
+              {toOrder > 0 && n(C.after_overheads_and_stock) != null && <V3HomeTile k="After stock orders" v={v3GbpRound(n(C.after_overheads_and_stock))} cls={n(C.after_overheads_and_stock) < 0 ? 'v3-down' : ''} delta={v3GbpRound(toOrder) + ' of stock to order'}/>}
+              {peakX > 0 && <V3HomeTile k="Most cash needed at once" v={v3GbpRound(peakX)} delta=""/>}
+            </div></div>
+          <div className="v3-home-group" style={{ '--n': [n(C.cash_entered), slow.value, n(C.cash_cycle_days)].filter(v => v != null).length || 1 }}>
+            <div className="v3-home-group-h">Now<span>held and entered</span></div>
+            <div className="v3-home-tiles">
+              {n(C.cash_entered) != null && <V3HomeTile k="Cash balance" v={fmtMoney(n(C.cash_entered))} delta={C.cash_entered_on ? 'entered ' + v3Day(String(C.cash_entered_on).slice(0, 10)) : 'entered'}/>}
+              {slow.value != null && <V3HomeTile k="Slow stock" v={fmtMoney(slow.value)} delta="at cost" title={slow.label || undefined}/>}
+              {n(C.cash_cycle_days) != null && <V3HomeTile k="Cash back from stock" v={v3DayCount(n(C.cash_cycle_days))} delta="from paying for it to selling it"/>}
+            </div></div>
+        </>}
+    </section>
+    <V3GoalActions prefixes={V3_GOAL_CASH_ACTS} words="cash" sub="Cash"/>
+    {has && <section className="v3-panel" aria-label={'Cash to ' + v3Day(String(C.to))}>
+      <div className="v3-panel-head"><h2>Cash to {v3Day(String(C.to))}</h2><span className="v3-muted">{v3Sentence(planWords)}, rounded</span>
+        {C.basis && <button type="button" className="v3-panel-link" aria-expanded={basis} onClick={() => setBasis(o => !o)}>{basis ? 'Hide basis' : 'Basis'}</button>}</div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+        <tbody>{rows.map(r => (<tr key={r.k} className={r.tot ? 'tot' : ''}>
+          <td className="v3-web-wrap">{r.k}{r.sub && <span className="v3-home-sub">{r.sub}</span>}</td>
+          <td className={'r' + (r.tot && r.v < 0 ? ' v3-down' : '')}>{v3GbpRound(r.v)}</td>
+        </tr>))}</tbody></table></div>
+      {basis && <p className="v3-panel-note">{v3Sentence(C.basis)}</p>}
+    </section>}
+    <section className="v3-panel" aria-label="Cash, stock and supplier terms">
+      <V3Anchor id="economics"/>
+      <div className="v3-panel-head"><h2>Cash, stock and supplier terms</h2></div>
+      <div className="v3-panel-pad"><BusinessEconomicsPanel/></div>
+    </section>
+  </>);
+}
+
+const V3_GOAL_TAB = { costs: 'costs', 'costs-off': 'costs', margin: 'costs', economics: 'cash', 'goal-set': 'goal' };
+function V3GoalPage() {
+  const [tab, setTab] = React.useState(() => (typeof window !== 'undefined' && V3_GOAL_TAB[window.__oiV3Anchor]) || 'goal');
+  // A tab loads the first time it is opened and then stays mounted, so a half-typed cost survives a look at another tab.
+  const [seen, setSeen] = React.useState(() => ({ [tab]: true }));
+  const pick = t => { setTab(t); setSeen(o => (o[t] ? o : Object.assign({}, o, { [t]: true }))); };
+  React.useEffect(() => {
+    const on = () => { const t = V3_GOAL_TAB[window.__oiV3Anchor]; if (t) pick(t); };
+    window.addEventListener('oi-v3-anchor', on);
+    return () => window.removeEventListener('oi-v3-anchor', on);
+  }, []);
+  const drift = useV3Rows('goal-drift', V3_DRIFT_Q);
+  const cq = useV3Rows('goal-cogs', V3_COGSQ_Q);
+  const cfg = useV3Rows('brand-cfg', V3_BCFG_Q);
+  const nCost = drift.rows && cq.rows && cfg.rows ? v3CostChecks(drift.rows, (cq.rows || [])[0] || null, (cfg.rows || [])[0] || {}, v3Lead(cfg.rows)).length : 0;
+  const TABS = [['goal', 'Goal'], ['costs', 'Costs', nCost], ['cash', 'Cash']];
+  return (<div className="v3-home v3-profit v3-marketing v3-goal-page">
+    <div className="v3-tabs v3-goal-tabs" role="tablist" aria-label="Goal and costs">
+      {TABS.map(t => <button key={t[0]} type="button" role="tab" aria-selected={tab === t[0]} className={'v3-tab' + (tab === t[0] ? ' on' : '')} onClick={() => pick(t[0])}>
+        {t[1]}{t[2] > 0 && <span className="v3-tab-n" aria-label={t[2] + ' to check'}>{t[2]}</span>}</button>)}
+    </div>
+    <div className="v3-home" role="tabpanel" hidden={tab !== 'goal'}>
+      <V3GoalLead/>
+      <GretaPlanPanel show="setter"/>
+      <V3More id="goal-moving" label="What moved profit"><V3DriverStrip keys={['profit']}/></V3More>
+      <V3More id="goal-ready" label="Planning checks"><GretaPlanPanel show="readiness"/></V3More>
+    </div>
+    {seen.costs && <div className="v3-home" role="tabpanel" hidden={tab !== 'costs'}><V3GoalCosts/></div>}
+    {seen.cash && <div className="v3-home" role="tabpanel" hidden={tab !== 'cash'}><V3GoalCash/></div>}
+  </div>);
 }
 
 // ── What you did, and whether it worked (Actions) ──────────────────────────────────────────────────
@@ -23772,7 +23980,7 @@ function V3FreightRate({ compact }) {
     if (r.error) { setMsg(/not_authorized/.test(r.error.message || '') ? 'Only an owner or admin can change this.' : 'Could not save that just now.'); return; }
     const d = r.data || {};
     setVal(null); q.retry();
-    setMsg(p > 0 ? 'Saved. ' + fmtCount((d.sku_rows || 0) + (d.variant_rows || 0)) + ' cost records now carry ' + p + '% for freight and duty; products where you entered your own keep theirs. Profit figures across Greta pick it up overnight.'
+    setMsg(p > 0 ? 'Saved. ' + fmtCount((d.sku_rows || 0) + (d.variant_rows || 0)) + ' cost records now carry ' + p + '% for freight and duty; products where you entered your own keep theirs. Profit figures pick it up overnight.'
       : 'Cleared. Product costs no longer include freight and duty, except where you entered your own.');
   };
   return (<div className={compact ? '' : 'v3-gap-top'}>
@@ -23784,7 +23992,7 @@ function V3FreightRate({ compact }) {
       <button type="button" className="v3-btn v3-btn-p v3-btn-sm" disabled={busy || val == null} onClick={save}>{busy ? 'Saving…' : 'Save'}</button>
     </div>
     {msg && <p className="v3-note">{msg}</p>}
-    {!msg && <p className="micro muted v3-measure">One rate for every product: shipping it to you, import duty, anything you pay before it is on your shelf, as a share of what the product itself costs. A product where you entered its own freight or duty keeps that.</p>}
+    {!msg && <p className="micro muted v3-measure">Shipping to you, import duty, anything paid before it is on your shelf, as a share of what the product costs. A product with its own freight or duty keeps that.</p>}
   </div>);
 }
 
@@ -24675,31 +24883,21 @@ function v3ModelGoalGap(goalMonths, paceMonths, goal, pace, info) {
 }
 const V3_GOAL_NR_Q = (start, today) => (sb, b) => sb.from('vw_daily_new_vs_returning').select('order_date,customer_type,orders,net_revenue')
   .eq('brand_id', b).eq('ledger', 'dtc').gte('order_date', start).lt('order_date', today).limit(3000);
-function V3GoalDrivers({ per, today, exp, done, months, paceMonths, goal, pace, dCam, held, adsNear, basis, range }) {
-  const nr = useV3Rows('goal-nr-' + per.start, V3_GOAL_NR_Q(per.start, today));
-  const [open, setOpen] = React.useState(null);
-  const rows = nr.rows || [];
+function v3GoalDriverModels(nrRows, { today, exp, done, months, paceMonths, goal, pace, dCam, held, adsNear, basis, range }) {
   const act = { done, new: 0, ret: 0, newCust: 0 };
-  rows.forEach(r => { const v = Number(r.net_revenue) || 0; if (r.customer_type === 'new') { act.new += v; act.newCust += Number(r.orders) || 0; } else if (r.customer_type === 'returning') act.ret += v; });
+  (nrRows || []).forEach(r => { const v = Number(r.net_revenue) || 0; if (r.customer_type === 'new') { act.new += v; act.newCust += Number(r.orders) || 0; } else if (r.customer_type === 'returning') act.ret += v; });
   const has = k => (months || []).some(m => m[k] != null);
   const pTo = (ms, k) => v3PlanToDate(ms, k, today);
   const shareN = pTo(paceMonths, 'sales') > 0 ? pTo(paceMonths, 'new') / pTo(paceMonths, 'sales') : null;
   const plan = has('new') && has('returning')
     ? { new: pTo(months, 'new'), ret: pTo(months, 'returning'), newCust: has('new_customers') ? pTo(months, 'new_customers') : 0 }
     : shareN != null ? { new: exp * shareN, ret: exp * (1 - shareN), newCust: pTo(paceMonths, 'new_customers') * (exp / Math.max(1, pTo(paceMonths, 'sales'))) } : null;
-  const canSoFar = nr.rows && plan && exp > 0;
+  const canSoFar = nrRows && plan && exp > 0;
   const canGap = goal != null && pace != null && goal > pace && Array.isArray(months) && months.some(m => m.spend != null);
-  if (!canSoFar && !canGap) return null;
-  const btn = (id, label) => (<button type="button" className="v3-xref v3-sign-act" aria-expanded={open === id} onClick={() => setOpen(o => (o === id ? null : id))}>
-    {open === id ? 'Hide what is driving it' : label} <span className="v3-xref-go">{open === id ? '↑' : '↓'}</span></button>);
-  return (<div className="v3-strip-act">
-    <div className="v3-btn-row">
-      {canSoFar && btn('sofar', done >= exp ? 'Why sales are ahead so far?' : 'Why sales are behind so far?')}
-      {canGap && btn('gap', 'What would the goal take?')}
-    </div>
-    {open === 'sofar' && canSoFar && <V3DriverPanel fixed={v3ModelGoalSoFar(act, plan, { exp, basis, range })}/>}
-    {open === 'gap' && canGap && <V3DriverPanel fixed={v3ModelGoalGap(months, paceMonths, goal, pace, { dCam, held, adsNear })}/>}
-  </div>);
+  return {
+    sofar: canSoFar ? v3ModelGoalSoFar(act, plan, { exp, basis, range }) : null,
+    gap: canGap ? v3ModelGoalGap(months, paceMonths, goal, pace, { dCam, held, adsNear }) : null,
+  };
 }
 // Competitors (9 Oct): how often a Google campaign shows in the auctions it could enter, the last 30
 // days against the 30 before, from the rows the page already reads. Google splits what it misses into
@@ -26413,16 +26611,18 @@ function V3GoldenRule() {
   if (!(opex > 0) || r.returning_cm_month == null) return null;
   const met = !!r.golden_rule_met, tr = t.rows && t.rows[0], amer = tr && tr.amer != null ? Number(tr.amer) : null;
   const st = s.rows && s.rows[0], be = st && st.ads && st.ads.break_even_return != null ? Number(st.ads.break_even_return) : null;
-  const top = Math.max(ret, opex) * 1.1;
-  return (<section className="v3-sec">
-    <h2 className="v3-sec-title">The golden rule: do returning customers pay the running costs?</h2>
-    <p className="v3-note v3-measure"><b className={met ? 'v3-up' : 'v3-down'}>{met ? 'Yes.' : 'Not yet.'}</b> Returning customers bring <span>{fmtMoney(ret)}</span> a month of profit after product and delivery costs, against <span>{fmtMoney(opex)}</span> of running costs.{' '}
-      {met ? <>So a new customer can be bought for more than their first order earns: what they buy later pays it back.</>
-        : <>So every new customer has to pay for themselves on the first order{be != null ? <>: each £1 of ads needs to bring <span>{fmtMoney(be, 2)}</span> of new-customer sales</> : null}{amer != null && be != null ? <>, and it brought <span>{fmtMoney(amer, 2)}</span> in the last 30 days{amer < be ? ', so new customers cost more than their first order makes' : ''}</> : null}. The rule holds once returning customers bring <span>{fmtMoney(opex - ret)}</span> a month more, or running costs fall by that much.</>}</p>
-    <div className="v3-gr" role="img" aria-label={'Returning profit ' + fmtMoney(ret) + ' a month against running costs ' + fmtMoney(opex)}>
-      <div className="v3-gr-row"><span>Returning customers’ profit</span><i className={'v3-gr-bar' + (met ? '' : ' short')} style={{ width: (ret / top * 100) + '%' }}/><b>{fmtMoney(ret)}</b></div>
-      <div className="v3-gr-row"><span>Running costs</span><i className="v3-gr-bar cost" style={{ width: (opex / top * 100) + '%' }}/><b>{fmtMoney(opex)}</b></div>
-    </div>
+  const top = Math.max(ret, opex) || 1;
+  const row = (k, v, c) => (<tr key={k}><td>{k}</td><td className="bar"><i className={'v3-home-pl-' + c} style={{ width: Math.max(0.6, v / top * 100) + '%' }}/></td><td className="r">{fmtMoney(v)}</td></tr>);
+  return (<section className="v3-panel" aria-label="Returning customers and running costs">
+    <div className="v3-panel-head"><h2>Returning customers and running costs</h2><span className="v3-muted">A month</span>
+      <span className={'v3-pill ' + (met ? 'v3-pill-good' : 'v3-pill-warn')}>{met ? 'Covered' : 'Not covered'}</span></div>
+    <table className="v3-home-pl"><tbody>
+      {row('Returning customers’ profit', ret, 'kept')}
+      {row('Running costs', opex, 'cost')}
+      {!met && <tr className="tot"><td>Short by</td><td className="bar"/><td className="r v3-down">{fmtMoney(opex - ret)}</td></tr>}
+    </tbody></table>
+    <p className="v3-panel-note">{met ? 'A new customer can cost more than their first order earns: what they buy later pays it back.'
+      : <>Each new customer has to pay for themselves on the first order{be != null ? <>: each £1 of ads needs {fmtMoney(be, 2)} of new-customer sales{amer != null ? <>, and brought {fmtMoney(amer, 2)} in the last 30 days</> : null}</> : null}.</>}</p>
   </section>);
 }
 // Marketing: creative demand (vw_creative_demand, 0330), on CTC's measures with CTC's bands. Before this
@@ -26516,26 +26716,8 @@ const V3_PAGES = {
   </>),
   calendar: (p) => (<><V3CalendarDrivers/>{mosView('Calendar')}</>),
   ask: (p) => <AskPanel/>,
-  goal: (p) => (<>
-    {/* Rebuilt 2026-10-05: the goal and where today's pace lands, the costs that are off with their £
-        and a fix, then the forms. Readiness moved to the foot and reads the app's own figures. */}
-    <V3GoalLead/>
-    <V3CashToPeak/>
-    <V3CostsOff/>
-    <GretaPlanPanel show="goal"/>
-    {/* 13 Oct (gap 22): the "why" panels fold under the goal, the cash and the costs that are off. */}
-    <V3More id="goal-moving" label="What is moving profit"><V3DriverStrip keys={['profit']}/></V3More>
-    <V3More id="goal-golden" label="Do returning customers pay the running costs?"><V3GoldenRule/></V3More>
-    {/* The only place a brand can enter per-variant landed cost. Business economics below sets the
-        BLENDED margin; this sets what things actually cost, which is what moves the profit number
-        from Estimated to Measured (0192). Open by default, because the confidence chip on Today
-        sends people straight here and a collapsed section would strand them one click short. */}
-    <V3More id="goal-costs" label="Product costs" defaultOpen>
-      <V3Anchor id="costs"/><V3ProductCosts/>
-    </V3More>
-    <V3More id="goal-econ" label="Cash, stock and supplier terms"><V3Anchor id="economics"/><BusinessEconomicsPanel/></V3More>
-    <V3More id="goal-ready" label="Planning checks"><GretaPlanPanel show="readiness"/></V3More>
-  </>),
+  // 5 Nov: the Home pattern, on three tabs. Links to costs, margin and economics pick their own tab.
+  goal: (p) => <V3GoalPage/>,
   growth: (p) => (<>
     <V3Growth/>
     <V3DriverStrip keys={['newsales', 'cac', 'spend']}/>

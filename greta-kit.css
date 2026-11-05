@@ -2338,3 +2338,38 @@ div:has(> .v3-profit) ~ .v3-today { gap: 0; }
   .v3-main .v3-products table.v3-prod-checks td { border: 0; padding-block: var(--space-1); text-align: left; white-space: normal; }
   .v3-main .v3-products table.v3-prod-checks td:empty { display: none; }
 }
+
+/* Goal & costs */
+.v3-goal-page > [hidden] { display: none; }
+.v3-goal-page > .v3-home { margin-bottom: 0; }
+.v3-goal-tabs { padding: 0; }
+.v3-goal-tabs .v3-tab { padding-inline: var(--space-1); }
+.v3-goal-filter { align-items: center; }
+.v3-main .v3-goal-filter .v3-search { margin: 0 0 0 auto; }
+.v3-goal-full { flex: 0 0 100%; width: 100%; border-top: 1px solid var(--color-line); }
+.v3-goal-alert { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); margin: 0; border: 1px solid var(--color-warning); border-radius: var(--radius-panel); }
+.v3-goal-alert p { margin: 0; }
+.v3-goal-call { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.v3-goal-chart { min-width: 0; }
+.v3-goal-cap { margin-bottom: var(--space-2); }
+.v3-fut-lab.still { cursor: default; }
+.v3-fut-lab.still:hover .v3-fut-t { text-decoration: none; }
+.v3-goal-page .v3-home-group-h { align-items: center; }
+.v3-goal-page .v3-home-group-h .v3-pill { margin-left: auto; }
+.v3-goal-page .v3-panel-note .micro { margin: 0; max-width: none; }
+.v3-main .v3-goal-page table.v3-profit-rows td.v3-web-wrap { white-space: normal; }
+.v3-main .v3-goal-page table.v3-profit-rows td.v3-web-wrap .v3-home-sub { display: block; overflow: visible; -webkit-line-clamp: unset; }
+.v3-main .v3-goal-page table.v3-goal-checks td:first-child { width: 45%; }
+.v3-goal-page .v3-cost-edit td { padding-block: var(--space-3); white-space: normal; }
+@media (max-width: 767px) {
+  .v3-goal-filter { flex-wrap: wrap; }
+  .v3-main .v3-goal-filter .v3-search { margin: var(--space-2) 0; flex: 1 1 100%; max-width: none; }
+  .v3-main .v3-goal-page table.v3-profit-rows th:first-child, .v3-main .v3-goal-page table.v3-profit-rows td:first-child { white-space: normal; min-width: 0; }
+  .v3-main .v3-goal-page table.v3-profit-rows th.v3-mk-opt, .v3-main .v3-goal-page table.v3-profit-rows td.v3-mk-opt { display: none; }
+  .v3-main .v3-goal-page table.v3-goal-checks, .v3-main .v3-goal-page table.v3-goal-checks tbody, .v3-main .v3-goal-page table.v3-goal-checks tr, .v3-main .v3-goal-page table.v3-goal-checks td { display: block; width: auto; }
+  .v3-main .v3-goal-page table.v3-goal-checks thead { display: none; }
+  .v3-main .v3-goal-page table.v3-goal-checks tr { padding-block: var(--space-2); border-top: 1px solid var(--color-line); }
+  .v3-main .v3-goal-page table.v3-goal-checks tr:first-child { border-top: 0; }
+  .v3-main .v3-goal-page table.v3-goal-checks td, .v3-main .v3-goal-page table.v3-goal-checks td:first-child { border: 0; width: auto; padding: var(--space-1) var(--space-4); text-align: left; white-space: normal; }
+  .v3-main .v3-goal-page table.v3-goal-checks td:empty { display: none; }
+}
