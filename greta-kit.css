@@ -2435,3 +2435,12 @@ div:has(> .v3-profit) ~ .v3-today { gap: 0; }
 .v3-products .v3-prod-key { display: inline-flex; align-items: center; gap: inherit; white-space: nowrap; }
 /* Weekly review: the week control belongs to This week */
 .v3-page-head[data-fixed-period] #v3-page-control { visibility: hidden; }
+/* What moved profit (Profit & sales, Weekly review): on a phone the before-to-now column sits under each cause, so the effect stays on screen */
+.v3-main .v3-home-sub.v3-moved-sub { display: none; }
+@media (max-width: 767px) {
+  .v3-main table.v3-profit-rows.v3-moved th:last-child, .v3-main table.v3-profit-rows.v3-moved td:last-child { display: table-cell; }
+}
+@media (max-width: 640px) {
+  .v3-main .v3-moved-mid { display: none; }
+  .v3-main .v3-home-sub.v3-moved-sub { display: block; overflow: visible; -webkit-line-clamp: unset; }
+}

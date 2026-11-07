@@ -3675,6 +3675,8 @@ function V3VisitsKPI({ fallback }) {
 // kept (keptShare, as Overview values the period before): one margin for every window read Halden's September
 // sale as its best month (£103,164) when its own days kept £51,744. A window with too few days stops the run,
 // as v3TypicalMonth's does. k is the delivery basis, other the other marketing taken off. Not registered figures.
+const V3_LADDER_ORD_Q = (sb, b) => sb.from('cache_daily_cm_ladder')
+  .select('day,orders').eq('brand_id', b).gte('day', v3IsoAdd(new Date().toISOString().slice(0, 10), -400)).order('day', { ascending: true }).limit(1000);
 function v3ProfitWindows(rows, keptShare, fallback, len, end, k, other) {
   if (!rows || !(len > 0)) return null;
   const today = new Date().toISOString().slice(0, 10), byDay = {};
@@ -3706,6 +3708,7 @@ function v3TileAgainst(k, v, was, up, ser, fmt) {
 function V3ProfitLead({ view, costsVerified }) {
   const H = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || null;
   const lad = useV3Rows('profit-ladder', V3_LADDER_Q);
+  const ladO = useV3Rows('profit-ladder-orders', V3_LADDER_ORD_Q);
   // The quarter plan at today's ad budget (shared with Goal & costs and Growth plan), last year's
   // months and the cost checks: the lead's first move and the caveat under the figure.
   const { pace } = useV3Goal({ goalPlan: false });
@@ -3862,6 +3865,24 @@ function V3ProfitLead({ view, costsVerified }) {
     act: !sg.noDrivers && v3HasDrivers(sg.which, SG.HP) ? { open: drv === sg.which, on: () => setDrv(o => (o === sg.which ? null : sg.which)) } : null }));
   const openSign = onFig && drv ? signs.find(sg => sg.which === drv) : null;
 
+  // What moved profit after ads: the period shown against the one before (the By period table's two newest rows),
+  // split as Weekly review splits a week. 7 Nov: replaces four folds that read the same profit four ways.
+  const mvW = wins && wins.length >= 2 ? wins[wins.length - 1] : null, mvT = mvW ? wins[wins.length - 2] : null;
+  const mvOrd = w => { if (!ladO.rows || !w) return 0; let o = 0; ladO.rows.forEach(r => { const d = String(r.day).slice(0, 10); if (d >= w.s && d <= w.e) o += Number(r.orders) || 0; }); return o; };
+  const mvOth = onFig ? other : 0, mvRate = w => (w && w.sales > 0 && w.kept != null ? (w.kept + w.spend + mvOth) / w.sales : null);
+  // Each period on its own margin, or no split: one margin on both read a sale month as a fall in profit (2 Nov)
+  const mvOwn = w => !!(view && view.keptShare && view.keptShare(w.s, w.e) != null);
+  const mvM = ladO.rows && mvW && mvT && mvOwn(mvT) && mvT.kept != null && mvT.sales > 0 && mvRate(mvW) != null
+    ? v3ModelWeek({ sales: mvW.sales, orders: mvOrd(mvW), spend: mvW.spend, kept: mvW.kept }, { sales: mvT.sales, orders: mvOrd(mvT), spend: mvT.spend, kept: mvT.kept }, mvRate(mvW), { range: '', n: 0 }) : null;
+  const mvSigned = v => (v < 0 ? '−' : '+') + fmtMoney(Math.abs(v));
+  const mvParts = mvM ? mvM.parts.map(x => ({ k: x.k, sub: x.sub, amt: Math.round(x.amt) })) : [];
+  const mvD = mvM ? Math.round(mvW.kept) - Math.round(mvT.kept) : 0, mvRest = mvD - mvParts.reduce((t, x) => t + x.amt, 0);
+  // Sale weeks (the server's own flag) in each period: a sale before reads as fewer, smaller-margin orders now
+  const mvWeeks = S0 && S0.rhythm && Array.isArray(S0.rhythm.weeks) ? S0.rhythm.weeks : null;
+  const mvSale = w => (mvWeeks && w ? mvWeeks.filter(x => x.sale && String(x.wk) >= w.s && String(x.wk) <= w.e).length : 0);
+  const mvSaleT = mvM && len >= 7 ? mvSale(mvT) : 0, mvSaleW = mvM && len >= 7 ? mvSale(mvW) : 0;
+  const mvWk = n => (n === 1 ? 'a sale week' : fmtCount(n) + ' sale weeks');
+
   // The profit lines: the registered 30 days, or the picked period worked out from its own sales and spend.
   const pl = onFig ? chain : (view.contrib == null ? [] : [
     { k: 'Sales', v: view.rev, kind: 'in' },
@@ -3983,6 +4004,18 @@ function V3ProfitLead({ view, costsVerified }) {
       </section>}
     </div>
 
+    {mvM && <section className="v3-panel" aria-label="What moved profit">
+      <div className="v3-panel-head"><h2>What moved profit</h2><span className="v3-muted">{len === 1 ? v3Day(mvW.e, true) + ', against the day before' : len + ' days to ' + v3Day(mvW.e, true) + ', against the ' + len + ' days before'}</span></div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-moved">
+        <thead><tr><th>Cause</th><th className="r v3-moved-mid">Before to now</th><th className="r">Effect on profit</th></tr></thead>
+        <tbody>
+          {mvParts.map(x => <tr key={x.k}><td>{x.k}<span className="v3-home-sub v3-moved-sub">{x.sub}</span></td><td className="r v3-moved-mid">{x.sub}</td><td className="r">{mvSigned(x.amt)}</td></tr>)}
+          {mvRest !== 0 && (() => { const t = Math.round(mvRate(mvT) * 100) + 'p to ' + Math.round(mvRate(mvW) * 100) + 'p kept per £1';
+            return <tr><td>Margin and other costs<span className="v3-home-sub v3-moved-sub">{t}</span></td><td className="r v3-moved-mid">{t}</td><td className="r">{mvSigned(mvRest)}</td></tr>; })()}
+          <tr className="tot"><td>Profit after ads<span className="v3-home-sub v3-moved-sub">{fmtMoney(mvT.kept)} to {fmtMoney(mvW.kept)}</span></td><td className="r v3-moved-mid">{fmtMoney(mvT.kept)} to {fmtMoney(mvW.kept)}</td><td className={'r' + (mvD < 0 ? ' v3-down' : '')}>{mvSigned(mvD)}</td></tr>
+        </tbody></table></div>
+      {mvSaleT !== mvSaleW && <p className="v3-panel-note">The {len} days before had {mvSaleT ? mvWk(mvSaleT) : 'no sale weeks'}, and these have {mvSaleW ? mvWk(mvSaleW) : 'none'}.</p>}
+    </section>}
     <section className="v3-panel" aria-label="Actions">
       <div className="v3-panel-head"><h2>Actions</h2>{moves.length > 0 && <span className="v3-count">{moves.length}</span>}<span className="v3-muted">From these figures, last 30 days</span>
         <button type="button" className="v3-panel-link" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>View all</button></div>
@@ -4376,7 +4409,8 @@ function Overview({start, period, customActive}){
           this page's own answer into third place. A one-line pointer instead: it teaches where
           things live rather than duplicating them. */}
       {/* Everything driven by the period picker sits behind one disclosure: the lead above is the answer. */}
-      <V3More id="profit-detail" label="All figures, day by day">
+      {/* 7 Nov: the old page (KPI cards, a bridge, the last day, a two-scale daily chart). On V3 the lead above is the page. */}
+      {!UI_V3 && <V3More id="profit-detail" label="All figures, day by day">
       {priorSpike && <p className="v3-note v3-measure">The period before this one sold {fmtMoney(pRev)}, against about {fmtMoney(priorSpike.typ)} usually for that many days: it had a sale. So the changes below look worse than they are.</p>}
       {/* COMMERCIAL HEALTH */}
       <div className="section-eyebrow" style={{display:'flex',alignItems:'center',gap:8,margin:'8px 0 -4px',fontSize:'var(--text-xs)',fontWeight:'var(--weight-bold)',letterSpacing:'var(--tracking-wide)',textTransform:'uppercase',color:'var(--text-muted)'}}>
@@ -4541,7 +4575,7 @@ function Overview({start, period, customActive}){
             {key:'revenue', label:'Net revenue', right:true, fmt:v=>GBP(v)},
           ]}/>
       </div></LazyMount>
-      </V3More>
+      </V3More>}
       {/* PLANNING & DEEP-DIVE — forecast + unit-economics-over-time are board/planning
           artifacts, not "what's happening this week", so they live behind a toggle. */}
       {/* V3: no Year 1 forecast here. It was a fourth forecast beside the quarter plan, the short-term
@@ -24224,12 +24258,13 @@ function V3Review() {
 
     {weekM && <section className="v3-panel" aria-label="What moved profit">
       <div className="v3-panel-head"><h2>What moved profit</h2><span className="v3-muted">{range}, against a typical week</span></div>
-      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
-        <thead><tr><th>Cause</th><th className="r">Typical week to this week</th><th className="r">Effect on profit</th></tr></thead>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-moved">
+        <thead><tr><th>Cause</th><th className="r v3-moved-mid">Typical week to this week</th><th className="r">Effect on profit</th></tr></thead>
         <tbody>
-          {parts.map(p => <tr key={p.k}><td>{p.k}</td><td className="r">{p.sub}</td><td className="r">{signed(p.amt)}</td></tr>)}
-          {rest !== 0 && <tr><td>Margin and other costs</td><td className="r">{rateW != null && rateT != null ? pence(rateT) + ' to ' + pence(rateW) + ' kept per £1' : ''}</td><td className="r">{signed(rest)}</td></tr>}
-          <tr className="v3-review-total"><td>Profit after ads</td><td className="r">{fmtMoney(T.kept)} to {fmtMoney(W.kept)}</td><td className="r">{signed(dKept)}</td></tr>
+          {parts.map(p => <tr key={p.k}><td>{p.k}<span className="v3-home-sub v3-moved-sub">{p.sub}</span></td><td className="r v3-moved-mid">{p.sub}</td><td className="r">{signed(p.amt)}</td></tr>)}
+          {rest !== 0 && (() => { const t = rateW != null && rateT != null ? pence(rateT) + ' to ' + pence(rateW) + ' kept per £1' : '';
+            return <tr><td>Margin and other costs{t && <span className="v3-home-sub v3-moved-sub">{t}</span>}</td><td className="r v3-moved-mid">{t}</td><td className="r">{signed(rest)}</td></tr>; })()}
+          <tr className="v3-review-total"><td>Profit after ads<span className="v3-home-sub v3-moved-sub">{fmtMoney(T.kept)} to {fmtMoney(W.kept)}</span></td><td className="r v3-moved-mid">{fmtMoney(T.kept)} to {fmtMoney(W.kept)}</td><td className="r">{signed(dKept)}</td></tr>
         </tbody></table></div>
       <p className="v3-panel-note">A typical week is the middle of the {prev8.length} weeks before{leftOut ? ', leaving out ' + leftOut + (leftOut === 1 ? ' sale week' : ' sale weeks') : ''}.</p>
     </section>}
@@ -27439,7 +27474,9 @@ const V3_PAGES = {
     </V3More>
     <V3More id="stock-suppliers" label="Suppliers"><V3Anchor id="suppliers"/><SuppliersDirectory/></V3More>
   </>),
-  profit: (p) => <><Overview start={p.start} period={p.period} customActive={p.customActive}/><V3Today page="profit"/></>,
+  // 7 Nov: V3Today's three folds (profit by week, the month's figures, what moved profit in pounds) read the same
+  // profit three more ways (£87,493 typical, −£27,591, 1.8× worth against cost); the lead's own tables replace them.
+  profit: (p) => <><Overview start={p.start} period={p.period} customActive={p.customActive}/></>,
   marketing: (p) => <V3MarketingTabs start={p.start} period={p.period} customActive={p.customActive}/>,
   website: (p) => <V3WebsiteTabs start={p.start} period={p.period} customActive={p.customActive}/>,
   // Products leads with a live view (V3Products). The panels below it were built on static snapshots,
