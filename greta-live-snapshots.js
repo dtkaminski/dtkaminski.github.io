@@ -83,20 +83,30 @@
   // ── Discount codes: 26 weeks of orders, ex-VAT, drafts and exchanges excluded ─────────────
   async function discountCodes(s, b) {
     var since = addDays(TODAY(), -182);
-    var rows = await qAll(function () { return s.from('v_shopify_orders_ex_vat').select('processed_at,channel,discount_codes,subtotal_price,total_discounts')
-      .eq('brand_id', b).gte('processed_at', since).order('processed_at', { ascending: true }); }, 40000);
+    // 5 Nov: discounted orders only, and the other web orders counted. Reading every order oldest first
+    // stopped at the 40,000 limit (Halden has 43,767 in six months), so the newest weeks went missing.
+    // Website orders with money left on them, the basis of vw_brand_code_performance (Marketing's codes).
+    var rows = await qAll(function () { return s.from('v_shopify_orders_ex_vat').select('processed_at,channel,discount_codes,subtotal_price,current_subtotal_price,total_discounts')
+      .eq('brand_id', b).gte('processed_at', since).gt('total_discounts', 0).in('channel', ['online_store', 'shopify_draft_order']).order('processed_at', { ascending: true }); }, 40000);
     if (!rows) return null;
+    var webOrders = null;
+    try {
+      var cnt = await s.from('v_shopify_orders_ex_vat').select('id', { count: 'exact', head: true }).eq('brand_id', b).gte('processed_at', since).eq('channel', 'online_store')
+        .or('current_subtotal_price.gt.0,and(current_subtotal_price.is.null,subtotal_price.gt.0)');
+      if (cnt && !cnt.error && cnt.count != null) webOrders = cnt.count;
+    } catch (e) {}
     var axis = []; for (var w = weekOf(since); w <= weekOf(TODAY()); w = addDays(w, 7)) axis.push(w);
     var M = { axis: axis, weeks: axis.length, days: 182, fullPriceOrders: 0, fullPriceRevenue: 0, discountedOrders: 0, discountedRevenue: 0,
       marketingDiscount: 0, automaticDiscount: 0, automaticOrders: 0, draftOrdersExcluded: 0, draftDiscountExcluded: 0, codedOrders: 0, markdownEstimate: 0 };
     var codes = {}, weekly = {}; axis.forEach(function (a) { weekly[a] = { w: a }; });
     rows.forEach(function (o) {
-      var day = String(o.processed_at).slice(0, 10), wk = weekOf(day), rev = num(o.subtotal_price) || 0, disc = num(o.total_discounts) || 0;
+      var day = String(o.processed_at).slice(0, 10), wk = weekOf(day), cur = num(o.current_subtotal_price), rev = (cur != null ? cur : num(o.subtotal_price)) || 0, disc = num(o.total_discounts) || 0;
       var cs = (o.discount_codes || []).map(function (c) { return String(c).trim(); }).filter(Boolean);
       var service = cs.length && cs.every(function (c) { return SERVICE.test(c); });
       if (o.channel === 'shopify_draft_order' || service) { M.draftOrdersExcluded++; M.draftDiscountExcluded += disc; }
       if (o.channel === 'shopify_draft_order') return;
-      if (!(disc > 0)) { M.fullPriceOrders++; M.fullPriceRevenue += rev; } else { M.discountedOrders++; M.discountedRevenue += rev; }
+      if (!(rev > 0)) return;
+      M.discountedOrders++; M.discountedRevenue += rev;
       if (!cs.length && disc > 0) { M.automaticDiscount += disc; M.automaticOrders++; }
       if (cs.length) M.codedOrders++;
       cs.forEach(function (c) {
@@ -106,10 +116,11 @@
         if (k === 'marketing') M.marketingDiscount += share;
       });
     });
-    var total = M.fullPriceOrders + M.discountedOrders;
-    M.fullPriceShare = total ? M.fullPriceOrders / total : null;
-    M.codedShare = total ? M.codedOrders / total : null;
-    M.fullPriceRevenueShare = (M.fullPriceRevenue + M.discountedRevenue) ? M.fullPriceRevenue / (M.fullPriceRevenue + M.discountedRevenue) : null;
+    M.fullPriceOrders = webOrders == null ? null : Math.max(0, webOrders - M.discountedOrders);
+    M.webOrders = webOrders;
+    M.fullPriceShare = webOrders ? M.fullPriceOrders / webOrders : null;
+    M.codedShare = webOrders ? M.codedOrders / webOrders : null;
+    M.fullPriceRevenue = null; M.fullPriceRevenueShare = null;
     var list = Object.keys(codes).map(function (c) {
       var e = codes[c], active = axis.filter(function (a) { return e.perWeek[a]; }).length, span = axis.filter(function (a) { return a >= weekOf(e.firstSeen) && a <= weekOf(e.lastSeen); }).length || 1;
       e.series = axis.map(function (a) { return e.perWeek[a] || 0; });
@@ -127,7 +138,7 @@
     });
     var always = mkt.filter(function (c) { return c.pattern === 'always-on'; }).sort(function (a, b2) { return b2.discount - a.discount; });
     M.alwaysOnCount = always.length; M.alwaysOnLeak = always[0] ? { code: always[0].code, discount: always[0].discount, orders: always[0].orders } : null;
-    ['fullPriceRevenue', 'discountedRevenue', 'marketingDiscount', 'automaticDiscount', 'draftDiscountExcluded'].forEach(function (k) { M[k] = Math.round(M[k]); });
+    ['discountedRevenue', 'marketingDiscount', 'automaticDiscount', 'draftDiscountExcluded'].forEach(function (k) { M[k] = Math.round(M[k]); });
     return { _source: 'live', as_of: TODAY(), meta: M, codes: list, weekly: axis.map(function (a) { return weekly[a]; }) };
   }
 

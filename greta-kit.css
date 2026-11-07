@@ -2425,3 +2425,11 @@ div:has(> .v3-profit) ~ .v3-today { gap: 0; }
 .v3-website .v3-mk-ad-name { white-space: nowrap; }
 .v3-website .v3-mk-ad-name[aria-pressed="true"] { font-weight: var(--weight-semi); }
 .v3-website table.v3-profit-rows .v3-flag { margin-left: var(--space-2); }
+
+/* Products: sortable heads on the Products table */
+.v3-main table.v3-profit-rows th[aria-sort] .v3-th-sort { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: var(--space-1); }
+.v3-main table.v3-profit-rows th[aria-sort] .v3-th-sort:hover, .v3-main table.v3-profit-rows th[aria-sort] .v3-th-sort.on { color: var(--color-ink); }
+.v3-main table.v3-profit-rows th[aria-sort] .v3-th-sort:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.v3-products .v3-chart figcaption { flex-wrap: wrap; }
+.v3-products .v3-chart .v3-legend { flex-wrap: wrap; white-space: normal; }
+.v3-products .v3-prod-key { display: inline-flex; align-items: center; gap: inherit; white-space: nowrap; }

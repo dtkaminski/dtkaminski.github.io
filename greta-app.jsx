@@ -21674,6 +21674,166 @@ const v3Names = a => a.join(', ').replace(/, ([^,]*)$/, ' and $1');
 // Two proportions, one test: is a against b more than two standard errors apart (b's own spread)?
 const v3Z = (p, base, n) => (n > 0 && base > 0 && base < 1) ? (p - base) / Math.sqrt(base * (1 - base) / n) : 0;
 // anatomy_category_map, Range and price, less stock-reorder: those rows live on Stock & orders, and a check here opens it.
+const V3_PROD_TAB = { overview: 'overview', promos: 'discounts' };
+const V3_PROD_FOLLOWS = {};
+function V3ProductsTabs() {
+  const [tab, pick, seen] = useV3PageTabs(V3_PROD_TAB, V3_PROD_FOLLOWS);
+  const TABS = [['overview', 'Overview'], ['discounts', 'Discounts']];
+  return (<div className="v3-home v3-profit v3-marketing v3-products v3-goal-page">
+    <div className="v3-tabs v3-goal-tabs" role="tablist" aria-label="Products">
+      {TABS.map(t => <button key={t[0]} type="button" role="tab" aria-selected={tab === t[0]} className={'v3-tab' + (tab === t[0] ? ' on' : '')} onClick={() => pick(t[0])}>{t[1]}</button>)}
+    </div>
+    {seen.overview && <div role="tabpanel" hidden={tab !== 'overview'}><V3Products/></div>}
+    {seen.discounts && <div className="v3-home" role="tabpanel" hidden={tab !== 'discounts'}><V3ProductDiscounts/></div>}
+  </div>);
+}
+// The shop's own read of every order, code and markdown together, the one the discount actions use.
+const V3_PROMO_WEEKS_Q = (sb, b) => sb.from('vw_metric_promo_weekly').select('wk,orders,markdown_share,code_share,deep_share,avg_depth,promo_events')
+  .eq('brand_id', b).gte('wk', v3IsoAdd(new Date().toISOString().slice(0, 10), -196)).order('wk', { ascending: true });
+const V3_DISC_MONTHS_Q = (sb, b) => sb.from('vw_discount_monthly').select('month,orders,share_under_30,share_30_to_45,share_45_plus,cm2_under_30,cm2_30_to_45,cm2_45_plus')
+  .eq('brand_id', b).order('month', { ascending: false }).limit(7);
+const V3_CODE_PATTERN = { 'always-on': 'Always on', recurring: 'Recurring', spike: 'One sale', 'one-off': 'One order' };
+function V3ProductDiscounts() {
+  useV3SnapshotTick();
+  const [late, setLate] = React.useState(false);
+  React.useEffect(() => { const t = setTimeout(() => setLate(true), 25000); return () => clearTimeout(t); }, []);
+  const [allCodes, setAllCodes] = React.useState(false);
+  const wq = useV3Rows('promo-weeks', V3_PROMO_WEEKS_Q);
+  const mq = useV3Rows('discount-months', V3_DISC_MONTHS_Q);
+  const D = (typeof window !== 'undefined' && window.FRKL_DISCOUNT_CODES) || null, M = (D && D.meta) || null;
+
+  // Whole weeks only: this week's share rests on a few days' orders.
+  const thisWeek = v3WeekOf(new Date().toISOString().slice(0, 10));
+  const weeks = (wq.rows || []).filter(r => String(r.wk).slice(0, 10) < thisWeek && Number(r.orders) > 0)
+    .map(r => ({ wk: String(r.wk).slice(0, 10), orders: Number(r.orders), code: Number(r.code_share), mark: Number(r.markdown_share), deep: Number(r.deep_share), depth: Number(r.avg_depth), events: r.promo_events || '' }));
+  const chartWeeks = weeks.slice(-26);
+  const avg = (rows, k) => { const n = rows.reduce((t, r) => t + r.orders, 0); return n ? rows.reduce((t, r) => t + r[k] * r.orders, 0) / n : null; };
+  const now13 = weeks.slice(-13), was13 = weeks.length >= 26 ? weeks.slice(-26, -13) : [];
+  const ser = k => now13.map(r => r[k]);
+  const tile = (k, key) => { const a = avg(now13, key), b = was13.length ? avg(was13, key) : null, same = b == null || fmtPctN(a) === fmtPctN(b);
+    return <V3HomeTile key={k} k={k} v={fmtPctN(a)} dir={same ? 'flat' : a > b ? 'up' : 'down'} cls={same ? '' : a > b ? 'v3-down' : 'v3-up'} delta={b == null ? '' : 'from ' + fmtPctN(b)} pts={ser(key)}/>; };
+
+  // Depth, whole months: the last six finished.
+  const thisMonth = new Date().toISOString().slice(0, 7);
+  const months = (mq.rows || []).filter(r => String(r.month).slice(0, 7) < thisMonth).slice(0, 6);
+  const bandRow = (label, sh, cm) => { const n = months.reduce((t, r) => t + Number(r.orders) * Number(r[sh] || 0), 0);
+    const paid = months.filter(r => r[cm] != null).reduce((t, r) => t + Number(r.orders) * Number(r[sh] || 0), 0);
+    const cash = months.filter(r => r[cm] != null).reduce((t, r) => t + Number(r.orders) * Number(r[sh] || 0) * Number(r[cm]), 0);
+    return { label, n, profit: paid > 0 ? cash / paid : null }; };
+  const bands = months.length ? [bandRow('Full price or under 30% off', 'share_under_30', 'cm2_under_30'), bandRow('30% to 45% off', 'share_30_to_45', 'cm2_30_to_45'), bandRow('45% off or more', 'share_45_plus', 'cm2_45_plus')] : [];
+  const bandAll = bands.reduce((t, b) => t + b.n, 0);
+  const bandSpan = months.length ? v3Month(String(months[months.length - 1].month).slice(0, 10)) + ' to ' + v3Month(String(months[0].month).slice(0, 10)) : '';
+
+  // Codes, from the six-month read of discounted web orders
+  const codes = D ? (D.codes || []).filter(c => c.kind === 'marketing') : [];
+  const listed = codes.filter(c => c.orders >= 2).sort((a, b) => b.orders - a.orders);
+  const oneOff = codes.length - listed.length;
+  const always = listed.filter(c => c.pattern === 'always-on');
+  const alwaysOrders = always.reduce((t, c) => t + c.orders, 0);
+  const given = M ? codes.reduce((t, c) => t + c.discount, 0) + Number(M.automaticDiscount || 0) : null;
+  const shownCodes = allCodes ? listed : listed.slice(0, 12);
+  const totals = listed.reduce((t, c) => ({ orders: t.orders + c.orders, revenue: t.revenue + c.revenue, discount: t.discount + c.discount }), { orders: 0, revenue: 0, discount: 0 });
+
+  // Orders by code, the top five and the rest, whole weeks
+  const axis = D && D.weekly ? D.weekly.filter(w => String(w.w).slice(0, 10) < thisWeek) : [];
+  const keys = ((M && M.topCodes) || []).slice(0, 5).map((c, i) => ({ k: c, col: SERIES[i] }));
+  const anyOther = axis.some(w => w.Other > 0);
+  const stack = keys.concat(anyOther ? [{ k: 'Other', col: PAL.quiet }] : []);
+  const stackMax = axis.reduce((m, w) => Math.max(m, stack.reduce((t, s) => t + (Number(w[s.k]) || 0), 0)), 0);
+  const stackMag = stackMax > 0 ? Math.pow(10, Math.floor(Math.log10(stackMax / 4))) : 1;
+  const stackStep = [1, 2, 2.5, 5, 10].map(m => m * stackMag).find(x => x * 4 >= stackMax) || stackMag;
+  const stackTicks = Array.from({ length: Math.max(1, Math.ceil(stackMax / stackStep)) + 1 }, (_, i) => i * stackStep);
+  const stackTip = ({ active, payload }) => { if (!active || !payload || !payload.length) return null; const p = payload[0].payload;
+    const on = stack.filter(s => p[s.k] > 0).sort((a, b) => p[b.k] - p[a.k]);
+    return (<div className="v3-tip"><b>Week of {v3Day(String(p.w).slice(0, 10))}</b>{on.length ? on.map(s => <span key={s.k}>{s.k} <em>{fmtCount(p[s.k])}</em></span>) : <span>No codes used</span>}</div>); };
+  const shareTip = ({ active, payload }) => { if (!active || !payload || !payload.length) return null; const p = payload[0].payload;
+    return (<div className="v3-tip"><b>Week of {v3Day(p.wk)}</b><span>With a code <em>{fmtPctN(p.code)}</em></span><span>30% off or more <em>{fmtPctN(p.deep)}</em></span>
+      {p.events && <span>On the calendar <em>{p.events.split('; ')[0]}</em></span>}</div>); };
+
+  return (<>
+    <section className="v3-panel v3-home-strip v3-mk-strip" aria-label="Key figures">
+      {wq.err ? <div className="v3-panel-pad"><V3LoadFailed what="Your discount figures" onRetry={wq.retry}/></div>
+        : !wq.rows ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={2}/></div>
+        : !now13.length ? <p className="v3-panel-note">No orders in the last 13 weeks.</p>
+        : <div className="v3-home-group" style={{ '--n': 4 }}>
+          <div className="v3-home-group-h">Last 13 weeks<span>{was13.length ? 'against the 13 weeks before' : ''}</span></div>
+          <div className="v3-home-tiles">
+            {tile('Orders with a code', 'code')}
+            {tile('Orders on a markdown', 'mark')}
+            {tile('Orders at 30% off or more', 'deep')}
+            {tile('Average discount', 'depth')}
+          </div></div>}
+      {M && listed.length > 0 && <div className="v3-home-group" style={{ '--n': 3 }}>
+        <div className="v3-home-group-h">Codes<span>Last 6 months</span></div>
+        <div className="v3-home-tiles">
+          <V3HomeTile k="Discount given" v={fmtMoney(given)} delta={fmtCount(M.discountedOrders) + ' web orders'}/>
+          <V3HomeTile k="Codes in use" v={fmtCount(listed.length)} delta=""/>
+          <V3HomeTile k="Always on" v={fmtCount(always.length)} delta={M.webOrders ? fmtPctN(alwaysOrders / M.webOrders) + ' of web orders' : ''}/>
+        </div></div>}
+    </section>
+
+    {(chartWeeks.length > 1 || axis.length > 1) && <section className="v3-panel" aria-label="Discounts by week">
+      <div className="v3-panel-head"><h2>Discounts by week</h2><span className="v3-muted">Last 6 months</span></div>
+      <div className="v3-panel-pad v3-mk-charts">
+        {chartWeeks.length > 1 && <figure className="v3-chart" aria-label="Share of orders on a discount"><figcaption><span className="v3-chart-title">Share of orders on a discount</span>
+          <span className="v3-legend"><i style={{ background: PAL.kept }}/>With a code <i style={{ background: PAL.neutral }}/>30% off or more</span></figcaption>
+          <R.ResponsiveContainer width="100%" height={240}>
+            <R.LineChart data={chartWeeks} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <R.CartesianGrid vertical={false}/>
+              <R.XAxis dataKey="wk" tickFormatter={d => v3Day(d)} interval="preserveStartEnd" minTickGap={48}/>
+              <R.YAxis domain={[0, 1]} ticks={[0, 0.25, 0.5, 0.75, 1]} tickFormatter={v => Math.round(v * 100) + '%'} width={44}/>
+              <R.Tooltip content={shareTip}/>
+              <R.Line type="linear" dataKey="code" stroke={PAL.kept} strokeWidth={2} dot={false} isAnimationActive={false}/>
+              <R.Line type="linear" dataKey="deep" stroke={PAL.neutral} strokeWidth={2} dot={false} isAnimationActive={false}/>
+            </R.LineChart>
+          </R.ResponsiveContainer></figure>}
+        {axis.length > 1 && keys.length > 0 && <figure className="v3-chart" aria-label="Orders by code"><figcaption><span className="v3-chart-title">Orders by code</span>
+          <span className="v3-legend">{stack.map(s => <span key={s.k} className="v3-prod-key"><i style={{ background: s.col }}/>{s.k}</span>)}</span></figcaption>
+          <R.ResponsiveContainer width="100%" height={240}>
+            <R.BarChart data={axis} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+              <R.CartesianGrid vertical={false}/>
+              <R.XAxis dataKey="w" tickFormatter={d => v3Day(String(d).slice(0, 10))} interval="preserveStartEnd" minTickGap={48}/>
+              <R.YAxis domain={[0, stackTicks[stackTicks.length - 1]]} ticks={stackTicks} tickFormatter={v => fmtCount(v)} width={44}/>
+              <R.Tooltip content={stackTip} cursor={false}/>
+              {stack.map(s => <R.Bar key={s.k} dataKey={s.k} stackId="a" fill={s.col} isAnimationActive={false}/>)}
+            </R.BarChart>
+          </R.ResponsiveContainer></figure>}
+      </div>
+    </section>}
+
+    <V3GoalActions prefixes={V3_PROD_DISC_ACTS} words="discounts" sub="Discounts"/>
+
+    <section className="v3-panel v3-prod-depth" aria-label="Discount depth">
+      <div className="v3-panel-head"><h2>Discount depth</h2>{bandSpan && <span className="v3-muted">{bandSpan}</span>}</div>
+      {mq.err ? <p className="v3-panel-note">Discount depth could not load. Refresh the page to try again.</p>
+        : !mq.rows ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={3}/></div>
+        : !bandAll ? <p className="v3-panel-note">No finished month of orders yet.</p>
+        : <><div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+          <thead><tr><th>Discount</th><th className="r">Orders</th><th className="r">Share of orders</th><th className="r">Profit per order</th></tr></thead>
+          <tbody>{bands.map(b => (<tr key={b.label}><td>{b.label}</td><td className="r">{fmtCount(Math.round(b.n))}</td><td className="r">{fmtPctN(b.n / bandAll)}</td><td className="r">{b.profit == null ? FMT_NONE : fmtMoney(b.profit, 2)}</td></tr>))}</tbody>
+        </table></div>
+        <p className="v3-panel-note">Depth counts a code and a markdown together, against the full price each product has regularly sold at. Profit per order is after product and order costs, before ads.</p></>}
+    </section>
+
+    <section className="v3-panel" aria-label="Codes">
+      <div className="v3-panel-head"><h2>Codes</h2>{listed.length > 0 && <span className="v3-count">{listed.length}</span>}<span className="v3-muted">Website orders, last 6 months</span>
+        <button type="button" className="v3-panel-link" onClick={() => window.__oiGo && window.__oiGo('marketing', 'codes')}>New customers by code</button></div>
+      {!D ? (late ? <p className="v3-panel-note">Discount codes could not load. Refresh the page to try again.</p> : <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={4}/></div>)
+        : !listed.length ? <p className="v3-panel-note">No discount code was used on more than one order in the last 6 months.</p>
+        : <><div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+          <thead><tr><th>Code</th><th className="v3-mk-opt">Pattern</th><th className="r">Orders</th><th className="r v3-mk-opt">Sales</th><th className="r">Discount</th><th className="r">Average</th><th className="r v3-mk-opt">Last used</th></tr></thead>
+          <tbody>{shownCodes.map(c => (<tr key={c.code}>
+            <td>{c.code}</td><td className="v3-mk-opt">{V3_CODE_PATTERN[c.pattern] || FMT_NONE}</td><td className="r">{fmtCount(c.orders)}</td><td className="r v3-mk-opt">{fmtMoney(c.revenue)}</td>
+            <td className="r">{fmtMoney(c.discount)}</td><td className="r">{fmtPctN(c.discountRate)}</td><td className="r v3-muted v3-mk-opt">{v3Day(String(c.lastSeen).slice(0, 10))}</td></tr>))}
+            {(allCodes || listed.length <= 12) && <tr className="tot"><td>All codes</td><td className="v3-mk-opt"/><td className="r">{fmtCount(totals.orders)}</td><td className="r v3-mk-opt">{fmtMoney(totals.revenue)}</td><td className="r">{fmtMoney(totals.discount)}</td>
+              <td className="r">{totals.revenue + totals.discount > 0 ? fmtPctN(totals.discount / (totals.revenue + totals.discount)) : FMT_NONE}</td><td className="v3-mk-opt"/></tr>}
+          </tbody></table></div>
+        {listed.length > 12 && <div className="v3-panel-pad"><button type="button" className="v3-btn v3-btn-sm" onClick={() => setAllCodes(o => !o)}>{allCodes ? 'Show top 12' : 'Show all ' + fmtCount(listed.length) + ' codes'}</button></div>}
+        <p className="v3-panel-note">Refunded orders, replacements and exchanges are left out{M && M.draftOrdersExcluded > 0 ? ': ' + fmtCount(M.draftOrdersExcluded) + ' replacement and exchange orders, ' + fmtMoney(M.draftDiscountExcluded) + ' in credits' : ''}.{oneOff > 0 ? ' ' + fmtCount(oneOff) + (oneOff === 1 ? ' code' : ' codes') + ' used once are not listed.' : ''}{M && Number(M.automaticDiscount) > 0 ? ' Discount given includes ' + fmtMoney(M.automaticDiscount) + ' from automatic discounts with no code.' : ''}</p></>}
+    </section>
+  </>);
+}
+const V3_PROD_DISC_ACTS = ['discount-'];
 const V3_PROD_ACTS = ['product-', 'returns-', 'discount-reference-price', 'discount-depth-inversion', 'basket-pair'];
 const v3DayCount = n => fmtCount(n) + (Math.round(n) === 1 ? ' day' : ' days');
 function V3Products() {
@@ -21702,6 +21862,7 @@ function V3Products() {
   const [drawer, setDrawer] = React.useState(null);   // { id, mode }
   const [showAll, setShowAll] = React.useState(false);
   const [viewsAll, setViewsAll] = React.useState(false);
+  const [sort, setSort] = React.useState({ k: 'now', up: false });
 
   const d = React.useMemo(() => {
     if (!perf.rows) return null;
@@ -21820,7 +21981,12 @@ function V3Products() {
   }, [attn.rows, facts.rows]);
 
   const top = d ? d.list.filter(x => x.now > 0) : [];
-  const shownRows = showAll ? top : top.slice(0, 12);
+  const sortedTop = top.slice().sort((a, b) => { const x = a[sort.k], y = b[sort.k];
+    if (x == null || y == null) return x == null ? (y == null ? 0 : 1) : -1;   // no figure goes last either way
+    return sort.up ? x - y : y - x; });
+  const shownRows = showAll ? sortedTop : sortedTop.slice(0, 12);
+  const sortTh = (k, label, cls) => (<th className={'r' + (cls ? ' ' + cls : '')} aria-sort={sort.k === k ? (sort.up ? 'ascending' : 'descending') : 'none'}>
+    <button type="button" className={'v3-th-sort' + (sort.k === k ? ' on' : '')} onClick={() => setSort(o => (o.k === k ? { k, up: !o.up } : { k, up: false }))}>{label}{sort.k === k && <Icon name={sort.up ? 'arrowUp' : 'arrowDown'} size={12}/>}</button></th>);
   const margin = d && d.keptRev > 0 ? d.keptTot / d.keptRev : null;
   const ch = d && d.was > 0 ? d.total / d.was - 1 : null;
   const haveKept = !!(pc.rows && pc.rows.length);
@@ -21960,7 +22126,7 @@ function V3Products() {
     {perf.rows && !empty && (<section className="v3-panel" aria-label="Products">
       <div className="v3-panel-head"><h2>Products</h2><span className="v3-count">{top.length}</span><span className="v3-muted">Last 28 days</span></div>
       <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-prod-table">
-        <thead><tr><th>Product</th><th className="r">Sales</th><th className="r v3-mk-opt">Kept</th><th className="r">Kept %</th><th className="r">Change</th><th className="r v3-mk-opt">Units</th></tr></thead>
+        <thead><tr><th>Product</th>{sortTh('now', 'Sales')}{sortTh('kept', 'Kept', 'v3-mk-opt')}{sortTh('margin', 'Kept %')}{sortTh('ch', 'Change')}{sortTh('units', 'Units', 'v3-mk-opt')}</tr></thead>
         <tbody>{shownRows.map(x => (<tr key={x.title}>
           <td>{x.title}{x.out ? <span className="v3-flag">Out of stock</span> : x.low ? <span className="v3-flag">Low stock</span> : null}</td>
           <td className="r">{fmtMoney(x.now)}</td>
@@ -22870,7 +23036,8 @@ function V3MarketingCodes() {
     <V3GoalActions prefixes={V3_MK_ACTS_CODES} words="discount codes" sub="Discount codes"/>
 
     <section className="v3-panel" aria-label="Discount codes">
-      <div className="v3-panel-head"><h2>Discount codes</h2><span className="v3-count">{rows.length}</span><span className="v3-muted">Website orders, last year</span></div>
+      <div className="v3-panel-head"><h2>Discount codes</h2><span className="v3-count">{rows.length}</span><span className="v3-muted">Website orders, last year</span>
+        <button type="button" className="v3-panel-link" onClick={() => window.__oiGo && window.__oiGo('products', 'promos')}>Discount given and depth</button></div>
       <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
         <thead><tr><th>Code</th><th className="r">Orders</th><th className="r v3-mk-opt">Last 90 days</th><th className="r">New customers</th><th className="r v3-mk-opt">Average discount</th><th className="r">Sales</th><th className="r v3-mk-opt">Last used</th></tr></thead>
         <tbody>{rows.map(r => (<tr key={r.code}>
@@ -27211,12 +27378,8 @@ const V3_PAGES = {
     <V3More id="cust-baseline" label="Existing customers, next six months"><V3ReturningBaseline/></V3More>
     <V3More id="cust-more" label="Cohorts"><Customers/><V3Anchor id="cohorts"/><CohortsPanel/></V3More>
   </>),
-  products: (p) => (<>
-    {/* 5 Nov: the Home pattern. The folds are the older detail, under nouns. */}
-    <V3Products/>
-    <V3More id="prod-more" label="Product detail"><Products/></V3More>
-    <V3More id="prod-promos" label="Promotions and discount codes"><V3Anchor id="promos"/><DiscountCodeTracker/></V3More>
-  </>),
+  // 5 Nov: tabs. Product detail held nothing the Products table does not (its panels read retired snapshots).
+  products: () => <V3ProductsTabs/>,
   competitors: (p) => (<>
     {/* 4 Nov: the Home pattern. Figures from the brand's own accounts, trends, actions, tables, then its own list. */}
     <V3Competitors/>
@@ -28113,19 +28276,19 @@ const V3_WALK_TOUR = {
     what: 'The same table, read for ordering: the tick on each row is when an order placed today would arrive. Anything whose bar ends before its tick needs ordering now.' },
   cash: { dest: 'stock', target: { sel: '.v3-sec', has: 'Where is cash tied up in stock?' }, fallback: { sel: '.v3-stat-grid' },
     what: 'Money tied up in stock that will not sell through soon. It is cash you have already spent and cannot use for ads or new lines until it sells.' },
-  leaks: { dest: 'products', target: { sel: '.v3-more', has: 'Promotions and discount codes' },
-    what: 'Every discount code, what it was used for and what it cost you, sits behind this heading. Open it to see which codes earn their keep.' },
-  topProducts: { dest: 'products', target: { sel: '.v3-prod-table' },
+  leaks: { dest: 'products', anchor: 'promos', target: { sel: '.v3-prod-depth' }, fallback: { sel: '.v3-home-strip' },
+    what: 'How deep your discounts go and what each depth leaves you per order. Below it, every code, how many orders it was on and what it gave away.' },
+  topProducts: { dest: 'products', anchor: 'overview', target: { sel: '.v3-prod-table' },
     what: 'Your products ranked by sales over the last 28 days. The change column is against the 28 days before, and a "Low stock" tag means sales may be held back by stock rather than demand.' },
-  movers: { dest: 'products', target: { sel: 'figure.v3-chart', has: 'Change in sales' }, fallback: { sel: '.v3-prod-table' },
+  movers: { dest: 'products', anchor: 'overview', target: { sel: 'figure.v3-chart', has: 'Change in sales' }, fallback: { sel: '.v3-prod-table' },
     what: 'What gained and lost the most in pounds. Before acting on a faller, check it against stock, a product that ran out looks exactly like one that stopped selling.' },
   traffic: { dest: 'website', anchor: 'overview', target: { sel: 'figure.v3-chart' }, fallback: { sel: '.v3-verdict' },
     what: 'Your shop as a funnel, visits, product views, baskets, checkouts, orders, against a normal month. The stage that has slipped furthest is where buyers are being lost.' },
   retention: { dest: 'customers', target: { sel: 'figure.v3-chart', has: 'Sales per customer over time' }, fallback: { sel: '.v3-home-strip' },
     what: 'How much the average customer has spent with you as the months go by after their first order. The steeper the early climb, the more a new customer is really worth.' },
-  newProducts: { dest: 'products', target: { sel: '.v3-prod-table' },
+  newProducts: { dest: 'products', anchor: 'overview', target: { sel: '.v3-prod-table' },
     what: 'Your products ranked by sales. A change marked "New" had no sales in the period before, that is where launches show up first.' },
-  adFit: { dest: 'products', target: { sel: '.v3-prod-table' },
+  adFit: { dest: 'products', anchor: 'overview', target: { sel: '.v3-prod-table' },
     what: 'Not every product can win a new customer on an ad by itself. Each one is checked: can its first order pay back what an ad costs, or does it earn its place as an add-on or a repeat buy?' },
 };
 Object.keys(V3_WALK_TOUR).forEach(k => { if (V3_WALK_STEP[k]) Object.assign(V3_WALK_STEP[k], V3_WALK_TOUR[k]); });
