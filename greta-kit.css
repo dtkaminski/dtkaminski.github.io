@@ -2433,3 +2433,5 @@ div:has(> .v3-profit) ~ .v3-today { gap: 0; }
 .v3-products .v3-chart figcaption { flex-wrap: wrap; }
 .v3-products .v3-chart .v3-legend { flex-wrap: wrap; white-space: normal; }
 .v3-products .v3-prod-key { display: inline-flex; align-items: center; gap: inherit; white-space: nowrap; }
+/* Weekly review: the week control belongs to This week */
+.v3-page-head[data-fixed-period] #v3-page-control { visibility: hidden; }

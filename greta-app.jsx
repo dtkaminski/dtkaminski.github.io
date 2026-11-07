@@ -16639,7 +16639,7 @@ const V3_MOBILE = [
 const V3_ROUTE = {
   'home/overview-tiers': ['today'], 'home/plansetup': ['goal', 'goal-set'], 'home/owner-today': ['today'],
   'home/overview': ['profit'], 'home/ask': ['ask'],
-  'board/weekly': ['review', 'week'], 'review/review': ['review', 'quarter'], 'intel/intel': ['review', 'alerts'],
+  'board/weekly': ['review', 'week'], 'review/review': ['review', 'quarter'], 'intel/intel': ['actions'],
   'actions/queue': ['actions'],
   'channels/cross': ['marketing'], 'channels/channels': ['marketing', 'detail'], 'channels/creatives': ['marketing', 'creative'],
   'channels/email': ['marketing', 'email'], 'channels/organic': ['marketing', 'organic'],
@@ -27272,6 +27272,75 @@ function V3GoldenRule() {
 // Marketing: creative demand (vw_creative_demand, 0330), on CTC's measures with CTC's bands. Before this
 // the front end read none of it.
 const V3_CDEM_Q = (sb, b) => sb.from('vw_creative_demand').select('*').eq('brand_id', b).limit(1);
+const V3_REV_TAB = { overview: 'overview', week: 'overview', quarter: 'health', alerts: 'overview', health: 'health' };
+const V3_REV_FOLLOWS = { overview: true };
+function V3ReviewTabs() {
+  const [tab, pick, seen] = useV3PageTabs(V3_REV_TAB, V3_REV_FOLLOWS);
+  const TABS = [['overview', 'This week'], ['health', 'Health']];
+  return (<div className="v3-home v3-profit v3-marketing v3-goal-page">
+    <div className="v3-tabs v3-goal-tabs" role="tablist" aria-label="Weekly review">
+      {TABS.map(t => <button key={t[0]} type="button" role="tab" aria-selected={tab === t[0]} className={'v3-tab' + (tab === t[0] ? ' on' : '')} onClick={() => pick(t[0])}>{t[1]}</button>)}
+    </div>
+    {seen.overview && <div role="tabpanel" hidden={tab !== 'overview'}><V3Review/></div>}
+    {seen.health && <div className="v3-home" role="tabpanel" hidden={tab !== 'health'}><V3ReviewHealth/></div>}
+  </div>);
+}
+// The figures that move over months, not weeks: the same reads Customers, Stock & orders and Growth plan use.
+function V3ReviewHealth() {
+  useCostTick();
+  const retQ = useV3Rows('cust-ret', V3_RET_Q), mixQ = useV3Rows('rev-mix', V3_MIX_Q);
+  const stockQ = useV3Rows('stock-plan', V3_STOCK_Q), stockSumQ = useV3Rows('stock-sum', V3_STOCK_SUM_Q);
+  const figQ = useV3Figures();
+  const R0 = retQ.rows && retQ.rows[0];
+  const opc = R0 && R0.orders_per_customer != null ? Number(R0.orders_per_customer) : null;
+  const base = R0 && R0.customers != null ? Number(R0.customers) : null;
+  const value = v3Fig('customer_value', figQ.rows).value, cac = v3Fig('cac_30d', figQ.rows).value, ratio = v3Fig('value_to_cost_30d', figQ.rows).value;
+  const repF = v3Fig('repeat_90d', figQ.rows), repeat90 = repF.value != null ? Number(repF.value) : null;
+  const chans = (mixQ.rows || []).map(c => ({ name: v3Sentence(String(c.channel || '').replace(/_/g, ' ')), rev: Number(c.net_revenue) || 0 })).filter(c => c.rev > 0).sort((a, b) => b.rev - a.rev);
+  const chanTot = chans.reduce((t, c) => t + c.rev, 0), top = chans[0] || null;
+  const stale = !!(stockQ.rows && stockQ.rows.some(r => r.inventory_stale));
+  const over = stockQ.rows && !stale ? stockQ.rows.filter(r => r.stock_status === 'overstock' && Number(r.trapped_cash) > 0).length : null;
+  const slow = v3Fig('slow_stock', figQ.rows).value;
+  const SS = stockSumQ.rows && stockSumQ.rows[0] && !stockSumQ.rows[0].held ? stockSumQ.rows[0] : null;
+  // Cash runway: cash in the bank over the last 30 days after all costs, the figure This week shows
+  const cc = cashConfig(), cash = parseFloat(cc.cash);
+  const haveCash = cc.cash !== '' && isFinite(cash) && cash > 0;
+  const moNet = v3Fig('after_overheads_30d', figQ.rows).value;
+  const runway = !haveCash ? { v: 'Not set', d: 'cash balance on Goal & costs' }
+    : moNet == null ? { v: FMT_NONE, d: 'running costs not set' }
+    : moNet >= 0 ? { v: 'Positive', d: '+' + v3GbpRound(moNet) + ' a month' }
+    : { v: cash / -moNet >= 24 ? 'Over 2 years' : v3Dp1Num(cash / -moNet) + ' months', d: v3GbpRound(-moNet) + ' a month out', weak: cash / -moNet < 6 };
+  const loading = (!retQ.rows && !retQ.err) || (!figQ.rows && !figQ.err);
+  const failed = retQ.err && figQ.err && stockSumQ.err;
+  return (<>
+    <section className="v3-panel v3-home-strip v3-mk-strip" aria-label="Key figures">
+      {failed ? <div className="v3-panel-pad"><V3LoadFailed what="Your business figures" onRetry={() => { retQ.retry(); stockSumQ.retry(); if (figQ.retry) figQ.retry(); }}/></div>
+        : loading ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={2}/></div>
+        : <>
+          <div className="v3-home-group" style={{ '--n': 4 }}>
+            <div className="v3-home-group-h">Customers<span>to date</span></div>
+            <div className="v3-home-tiles">
+              <V3HomeTile key="ratio" k="Worth against cost" v={ratio != null ? fmtTimes(ratio, 1) : FMT_NONE} weak={ratio != null && ratio < 1}
+                delta={ratio != null && value > 0 && cac > 0 ? fmtMoney(value) + ' against ' + fmtMoney(cac) : 'not measured yet'}
+                title="What a customer is worth over the cost of a new customer in the last 30 days"/>
+              <V3HomeTile key="rep" k="Repeat in 90 days" v={repeat90 != null ? fmtPctN(repeat90) : FMT_NONE} title="Customers whose first order was 91 to 180 days ago who reordered within 90 days"/>
+              <V3HomeTile key="opc" k="Orders per customer" v={opc != null ? v3Fix2(opc) : FMT_NONE}/>
+              <V3HomeTile key="base" k="Customers" v={base != null ? fmtCount(base) : FMT_NONE} delta="have ever ordered"/>
+            </div></div>
+          <div className="v3-home-group" style={{ '--n': 4 }}>
+            <div className="v3-home-group-h">Stock and cash<span>now</span></div>
+            <div className="v3-home-tiles">
+              <V3HomeTile key="re" k="To order" v={SS ? fmtCount(Number(SS.products) || 0) + (Number(SS.products) === 1 ? ' product' : ' products') : FMT_NONE} weak={!!(SS && Number(SS.out_of_stock) > 0)}
+                delta={SS ? fmtCount(Number(SS.out_of_stock) || 0) + ' already out' : stockSumQ.err ? 'could not load' : ''}/>
+              <V3HomeTile key="slow" k="Cash in slow stock" v={slow != null ? fmtMoney(slow) : FMT_NONE} delta={slow == null ? '' : over != null ? fmtCount(over) + (over === 1 ? ' product, at cost' : ' products, at cost') : stale ? 'stock counts out of date' : ''}/>
+              <V3HomeTile key="run" k="Cash runway" v={runway.v} delta={runway.d} weak={!!runway.weak}/>
+              <V3HomeTile key="chan" k="Largest channel" v={top && chanTot ? fmtPctN(top.rev / chanTot) : FMT_NONE} delta={top ? top.name + ', last 30 days' : ''}/>
+            </div></div>
+        </>}
+    </section>
+    <V3Congruency/>
+  </>);
+}
 // Review: congruency (vw_brand_congruency). When the ad platforms' return and the shop's profit move apart,
 // one of them is wrong; when they move together, the reading can be trusted.
 const V3_CONG_Q = (sb, b) => sb.from('vw_brand_congruency').select('*').eq('brand_id', b).limit(1);
@@ -27286,18 +27355,26 @@ function V3Congruency() {
   if (n(c.iroas_now) == null || n(c.cm_now) == null) return null;
   // The view says 'insufficient_history' until there is a reading 10 or more days old. That was printed as
   // "No: they moved apart … went from — to 2.73×" (Halden, 23 Oct): a verdict with nothing to compare.
+  const head = <div className="v3-panel-head"><h2>Ad figures against profit</h2>{c.prior_date && c.latest_date && <span className="v3-muted">{v3Day(String(c.prior_date))} to {v3Day(String(c.latest_date))}</span>}</div>;
   if (c.congruency === 'insufficient_history' || n(c.iroas_prior) == null || n(c.cm_prior) == null) {
-    return (<V3More id="rev-cong" label="Ad figures against profit"><p className="v3-note v3-measure v3-cong">
-      Not known yet. They are compared against a reading from at least 10 days earlier{c.latest_date ? ', and the first one is from ' + v3Day(String(c.latest_date)) : ''}.</p></V3More>);
+    return (<section className="v3-panel" aria-label="Ad figures against profit">{head}<p className="v3-panel-note">
+      Not known yet. They are compared against a reading from at least 10 days earlier{c.latest_date ? ', and the first one is from ' + v3Day(String(c.latest_date)) : ''}.</p></section>);
   }
   const ok = c.congruency === 'congruent';
   // The change, not the two levels: the snapshot's profit is worked on its own day and basis, and printed
   // as a level it sat beside the header's profit after ads as a second figure for the same thing.
   const dCm = n(c.cm_change);   // 1109: the view's own change, not worked out here
-  return (<V3More id="rev-cong" label="Ad figures against profit"><p className="v3-note v3-measure v3-cong">
-    {ok ? 'They moved the same way.' : 'They moved apart, so one of them is misreading.'}{' '}
-    Return on ads after the share they really cause went from <span>{fmtTimes(n(c.iroas_prior), 2)}</span> to <span>{fmtTimes(n(c.iroas_now), 2)}</span>{dCm != null ? <>; profit after ads {dCm >= 0 ? 'rose' : 'fell'} by <span>{fmtMoney(Math.abs(dCm))}</span> over the same days</> : null}{v3CongDays(c.prior_date, c.latest_date)}.
-    {ok ? '' : ' Check the tracking on Settings before acting on the ad figures.'}</p></V3More>);
+  return (<section className="v3-panel" aria-label="Ad figures against profit">{head}
+    <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+      <thead><tr><th>Figure</th><th className="r">Before</th><th className="r">Now</th><th className="r">Change</th></tr></thead>
+      <tbody>
+        <tr><td>Return on ads, the share they really cause</td><td className="r">{fmtTimes(n(c.iroas_prior), 2)}</td><td className="r">{fmtTimes(n(c.iroas_now), 2)}</td>
+          <td className={'r ' + (n(c.iroas_now) >= n(c.iroas_prior) ? 'v3-up' : 'v3-down')}>{v3Signed(n(c.iroas_now) - n(c.iroas_prior), fmtTimes(Math.abs(n(c.iroas_now) - n(c.iroas_prior)), 2))}</td></tr>
+        {dCm != null && <tr><td>Profit after ads</td><td className="r"></td><td className="r"></td>
+          <td className={'r ' + (dCm >= 0 ? 'v3-up' : 'v3-down')}>{(dCm >= 0 ? '+' : '−') + fmtMoney(Math.abs(dCm))}</td></tr>}
+      </tbody></table></div>
+    <p className="v3-panel-note">{ok ? 'They moved the same way, so the ad figures can be read as they are.' : <>They moved apart, so one of them is misreading. Check the tracking before acting on the ad figures.<button type="button" className="v3-panel-link" onClick={() => window.__oiGo && window.__oiGo('settings')}>Connections &amp; data</button></>}</p>
+  </section>);
 }
 // A scheduled refresh that failed twice or stopped (0383, 0398): one line, in the notice's own words.
 const V3_JOBHEALTH_Q = (sb, b) => sb.from('actions').select('description,updated_at').eq('brand_id', b)
@@ -27310,17 +27387,14 @@ function V3JobHealth() {
 const V3_PAGES = {
   // 1110: the goal strip and the moves first, above everything else
   today: (p) => (<><V3TodayLead/><V3JobHealth/><V3Today {...p}/></>),
+  // 7 Nov: tabs. The Quarter summary repeated the board (with its own, older worths) and Findings sit on
+  // Actions; its trailing figures and the ad-figures check are the Health tab.
   review: (p) => (<>
     {/* Rebuilt 2026-10-05: the week against a typical week, the meeting agenda off the board, notes in
         the workspace. The old weekly board (week-on-week only, GA4 repair read as growth, notes in one
         browser) and the alerts panel (forecast patterns the board holds back, a track record that said
         nothing was done) are gone; findings that pass the evidence check are below. */}
-    <V3Anchor id="week"/><V3Review/>
-    <V3Congruency/>
-    <V3More id="rev-quarter" label="Quarter summary"><V3Anchor id="quarter"/><BusinessReview/></V3More>
-    <V3More id="rev-alerts" label="Findings"><V3Anchor id="alerts"/><V3Findings/>
-      <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('results')}>Open Results</button>
-    </V3More>
+    <V3ReviewTabs/>
   </>),
   actions: (p) => (<>
     <V3FixFirst/>
