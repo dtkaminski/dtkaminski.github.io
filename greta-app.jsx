@@ -11841,8 +11841,11 @@ function V3PlanSteps({ plan, rank }) {
 // biggest stage is impressions per click, not clicks per conversion") was only in Ask Greta. They
 // are listed here, strongest evidence first, each opening onto Greta's reasons for its steer.
 const V3_RUNG_ORDER = { direct: 0, likely: 1, probably: 2, possible: 3, outside_chance: 4 };
+// 8 Nov: a table under the board, not a fold. Rows the board already lists under "No figure yet" are left out (6 of
+// Halden's 15 were), so each finding shows once. Details opens the finding and its reasons under its row.
 function V3Findings(){
   const [rows, setRows] = React.useState(null);
+  const [err, setErr] = React.useState(false);
   const [open, setOpen] = React.useState(null);
   const board = useV3Board();
   React.useEffect(() => {
@@ -11850,50 +11853,55 @@ function V3Findings(){
     const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb, b = window.FRKL_LIVE && window.FRKL_LIVE.brandId;
     if (!sb || !b) return;
     sb.from('vw_brand_findings').select('external_id,description,category,rung,evidence_reasons,days_open').eq('brand_id', b)
-      .then(r => { if (alive) setRows((r && !r.error && r.data) || []); }, () => { if (alive) setRows([]); });
+      .then(r => { if (!alive) return; if (!r || r.error) { setErr(true); setRows([]); } else setRows(r.data || []); },
+            () => { if (alive) { setErr(true); setRows([]); } });
     return () => { alive = false; };
   }, []);
-  if (!rows || !rows.length) return null;
-  const sorted = rows.slice().sort((x, y) => ((V3_RUNG_ORDER[x.rung] ?? 9) - (V3_RUNG_ORDER[y.rung] ?? 9)) || String(x.external_id).localeCompare(String(y.external_id)));
-  return (
-    <div className="v3-rank-why">
-      <ul className="v3-rank-steps">
-        {sorted.map(f => {
-          const pa = { title: v3FindingTitle(f), why: v3Tidy(scrubTag(String(f.description || ''))) };
-          // A diagnosis of a channel the board is already acting on is the why behind that action.
-          const diag = /^(diagnosis|metric-tree)-/.test(String(f.external_id));
-          const ch = !diag ? null : /meta/i.test(f.external_id) ? 'meta' : /google/i.test(f.external_id) ? 'google' : null;
-          const live = board.rows ? v3LiveRows(board.rows) : [];
-          const behind = ch ? live.findIndex(r => r.external_id === 'order-cost-' + ch) : -1;
-          const bN = behind >= 0 ? v3BoardRank(live, live[behind].external_id) : null;
-          // A diagnosis whose leading cause is a counting or tracking change does not explain a cost rise
-          // that holds on the platform's own count and on weeks without a sale: "a tracking change hides
-          // visits from every tool · explains #3" (7 Oct) read as if the Meta cut were a measuring error.
-          const counting = /^diagnosis-/.test(String(f.external_id)) && /\b1\.\s*(?:[^.;]{0,40}\b(?:tracking change|own count|counts? (?:fell|changed|rose))\b)/i.test(String(f.description || ''));
-          const conf = v3MoneyConf(f);
-          const isOpen = open === f.external_id;
-          const reasons = Array.isArray(f.evidence_reasons) ? f.evidence_reasons.filter(x => x && x.text) : [];
-          return (<li key={f.external_id}>
-            <button type="button" className="v3-rank-hit" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : f.external_id)}>
-              <span className="v3-rank-body">
-                <span className="v3-rank-desc">{pa.title}</span>
-                <span className="v3-rank-meta">{v3CategoryWords(f.category)}{conf ? ', ' + V3_CONF[conf].label.toLowerCase() : ''}{bN ? (counting ? ', a change in how sales are counted, not the cause of action #' + bN : ', explains action #' + bN) : ''}</span>
-              </span>
-            </button>
-            {isOpen && (<div className="v3-rank-why">
-              {pa.why && <p className="v3-rank-plain">{pa.why}</p>}
-              {/* One verdict per platform: this cost is on the platform's own purchase count, the board's
-                  is on the shop's orders, and the two read differently. Say which to judge it on. */}
-              {bN && /^metric-tree-/.test(String(f.external_id)) && (<p className="v3-note v3-measure">
-                This cost uses {ch === 'meta' ? 'Meta' : 'Google'}’s own count of purchases, not your shop’s orders, so it differs from the cost per order in action #{bN}. Judge {ch === 'meta' ? 'Meta' : 'Google'} on the figure in #{bN}. Use this to see which step changed.</p>)}
-              {reasons.length > 0 && (<div className="v3-rank-raw"><span className="v3-kick">Why {conf ? V3_CONF[conf].label.toLowerCase() : 'this steer'}</span>
-                <ul className="v3-rank-steps">{reasons.map((x, j) => <li key={j}>{v3Tidy(x.text)}</li>)}</ul></div>)}
-            </div>)}
-          </li>);
-        })}
-      </ul>
-    </div>
-  );
+  const head = n => (<div className="v3-panel-head"><h2>Findings</h2>{n > 0 && <span className="v3-count">{fmtCount(n)}</span>}{n > 0 && <span className="v3-muted">No figure</span>}</div>);
+  if (err) return (<section className="v3-panel" aria-label="Findings">{head(0)}<p className="v3-panel-note">Findings could not load. Refresh the page to try again.</p></section>);
+  if (!rows || (!board.rows && !board.err)) return null;
+  const onBoard = new Set((Array.isArray(board.unpriced) ? board.unpriced : []).map(r => r.external_id));
+  const live = board.rows ? v3LiveRows(board.rows) : [];
+  const sorted = rows.filter(f => !onBoard.has(f.external_id))
+    .sort((x, y) => ((V3_RUNG_ORDER[x.rung] ?? 9) - (V3_RUNG_ORDER[y.rung] ?? 9)) || String(x.external_id).localeCompare(String(y.external_id)));
+  if (!sorted.length) return null;
+  return (<section className="v3-panel" aria-label="Findings">{head(sorted.length)}
+    <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-find-rows">
+      <thead><tr><th>Finding</th><th className="v3-mk-opt">Area</th><th className="v3-mk-opt">Confidence</th><th>Action</th><th><span className="v3-sr-only">Details</span></th></tr></thead>
+      <tbody>{sorted.map(f => {
+        const why = v3Tidy(scrubTag(String(f.description || '')));
+        // A diagnosis of a channel the board is already acting on is the why behind that action.
+        const diag = /^(diagnosis|metric-tree)-/.test(String(f.external_id));
+        const ch = !diag ? null : /meta/i.test(f.external_id) ? 'meta' : /google/i.test(f.external_id) ? 'google' : null;
+        const behind = ch ? live.findIndex(r => r.external_id === 'order-cost-' + ch) : -1;
+        const bN = behind >= 0 ? v3BoardRank(live, live[behind].external_id) : null;
+        // A diagnosis whose leading cause is a counting or tracking change does not explain a cost rise
+        // that holds on the platform's own count and on weeks without a sale (7 Oct).
+        const counting = /^diagnosis-/.test(String(f.external_id)) && /\b1\.\s*(?:[^.;]{0,40}\b(?:tracking change|own count|counts? (?:fell|changed|rose))\b)/i.test(String(f.description || ''));
+        const conf = v3MoneyConf(f);
+        const isOpen = open === f.external_id;
+        const reasons = Array.isArray(f.evidence_reasons) ? f.evidence_reasons.filter(x => x && x.text) : [];
+        return (<React.Fragment key={f.external_id}>
+          <tr className={isOpen ? 'on' : ''}>
+            <td className="v3-web-wrap">{v3FindingTitle(f)}</td>
+            <td className="v3-mk-opt">{v3CategoryWords(f.category)}</td>
+            <td className="v3-mk-opt">{conf ? V3_CONF[conf].label : FMT_NONE}</td>
+            <td>{bN ? (counting ? 'Not the cause of ' + bN : 'Explains ' + bN) : FMT_NONE}</td>
+            <td className="r"><button type="button" className="v3-btn v3-btn-sm" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : f.external_id)}>{isOpen ? 'Hide' : 'Details'}</button></td>
+          </tr>
+          {isOpen && (<tr className="v3-find-detail"><td colSpan={5}>
+            {why && <p className="v3-rank-plain v3-measure">{why}</p>}
+            {/* One verdict per platform: this cost is on the platform's own purchase count, the board's
+                is on the shop's orders, and the two read differently. Say which to judge it on. */}
+            {bN && /^metric-tree-/.test(String(f.external_id)) && (<p className="v3-note v3-measure">
+              This cost uses {ch === 'meta' ? 'Meta' : 'Google'}’s own count of purchases, not your shop’s orders, so it differs from the cost per order in action {bN}. Judge {ch === 'meta' ? 'Meta' : 'Google'} on the figure in action {bN}. Use this to see which step changed.</p>)}
+            {reasons.length > 0 && (<div className="v3-rank-raw"><span className="v3-kick">{conf ? V3_CONF[conf].label + ' because' : 'Reasons'}</span>
+              <ul className="v3-rank-steps">{reasons.map((x, j) => <li key={j}>{v3Tidy(x.text)}</li>)}</ul></div>)}
+          </td></tr>)}
+        </React.Fragment>);
+      })}</tbody>
+    </table></div>
+  </section>);
 }
 
 // ── Held back, and why ───────────────────────────────────────────────────
@@ -11913,10 +11921,11 @@ function V3HeldActions(){
     return () => { alive = false; };
   }, []);
   if (!rows || !rows.length) return null;
-  return (<V3More id="act-held" label={'Held back (' + rows.length + ')'}>
-    <table className="v3-home-pl"><thead><tr><th>Action</th><th>Why it is held</th></tr></thead>
-      <tbody>{rows.map(h => (<tr key={h.external_id}><td>{v3PlainAction(h).title}</td><td>{(Array.isArray(h.held_because) ? h.held_because : []).map(v3Tidy).join(' ')}</td></tr>))}</tbody></table>
-  </V3More>);
+  return (<section className="v3-panel" aria-label="Held back">
+    <div className="v3-panel-head"><h2>Held back</h2><span className="v3-count">{fmtCount(rows.length)}</span></div>
+    <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-held-rows"><thead><tr><th>Action</th><th>Reason</th></tr></thead>
+      <tbody>{rows.map(h => (<tr key={h.external_id}><td className="v3-web-wrap">{v3PlainAction(h).title}</td><td className="v3-web-wrap">{(Array.isArray(h.held_because) ? h.held_because : []).map(v3Tidy).join(' ')}</td></tr>))}</tbody></table></div>
+  </section>);
 }
 
 // ── Channel scoreboard ───────────────────────────────────────────────────
@@ -22844,7 +22853,7 @@ function V3ChannelMap() {
 // Nine folds became four tabs beside the overview, on Goal & costs' pattern: a tab loads the first time it is
 // opened and then stays mounted, and an old deep link opens the tab that now holds it. The date control only
 // shows on the tabs that follow it: Ads, Email and Discount codes read fixed windows, named on each panel.
-const V3_MK_TAB = { overview: 'overview', creative: 'ads', email: 'email', codes: 'codes', detail: 'platforms', organic: 'platforms' };
+const V3_MK_TAB = { overview: 'overview', creative: 'ads', email: 'email', codes: 'codes', detail: 'platforms', organic: 'platforms', incremental: 'platforms' };
 const V3_MK_FOLLOWS = { overview: true, platforms: true };
 // A page's tabs: a tab loads the first time it is opened and then stays mounted, an anchor opens the tab that holds it
 // (and scrolls to `v3-<anchor>` if the tab has one), and the date control hides on tabs that do not follow it.
@@ -22879,7 +22888,7 @@ function V3MarketingTabs({ start, period, customActive }) {
     {seen.ads && <div className="v3-home" role="tabpanel" hidden={tab !== 'ads'}><V3MarketingAds/></div>}
     {seen.email && <div className="v3-home" role="tabpanel" hidden={tab !== 'email'}><V3MarketingEmail/></div>}
     {seen.codes && <div className="v3-home" role="tabpanel" hidden={tab !== 'codes'}><V3MarketingCodes/></div>}
-    {seen.platforms && <div className="v3-home" role="tabpanel" hidden={tab !== 'platforms'}><V3MarketingPlatforms start={start} period={period} customActive={customActive}/></div>}
+    {seen.platforms && <div className="v3-home" role="tabpanel" hidden={tab !== 'platforms'}><V3MarketingPlatforms start={start} period={period} customActive={customActive}/><V3IncrementalPanel/></div>}
   </div>);
 }
 // Copies of anatomy_category_map's action prefixes (Creative, Email and owned, Acquisition): update if the map changes.
@@ -24006,7 +24015,7 @@ function V3PlanGaps() {
   const need = gaps.filter(r => r.blocks_targets);
   const rows = need.concat(gaps.filter(r => !r.blocks_targets));
   return (<section className="v3-panel" aria-label="Planning data">{head(need.length, all.length - gaps.length, all.length)}
-    <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+    <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-plan-gaps">
       <thead><tr><th>Item</th><th className="v3-mk-opt">Area</th><th>Now</th><th>Needed</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
       <tbody>{rows.map((r, i) => { const go = V3_PLAN_GO[String(r.section || '').toLowerCase()];
         return (<tr key={r.item + i}><td className="v3-web-wrap">{GP_PLAIN_ITEM[r.item] || r.item}</td><td className="v3-mk-opt">{v3Sentence(String(r.section || ''))}</td>
@@ -27295,7 +27304,7 @@ function V3Incremental() {
       <div className="v3-kick">The test that settles the most</div>
       <button type="button" className="v3-drivers-todo-row" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>
         <span className="v3-num">{sRank ? '#' + sRank : ''}</span><span>{sRow ? v3PlainAction(sRow).title : v3Sentence(S.test)}</span>
-        <span className="v3-num">{fmtMoney(S.gbp)}{sRow ? v3Per(sRow, true) : '/mo'}</span><Icon name="arrowRight" size={13}/></button>
+        <span className="v3-num">{fmtMoney(S.gbp)}{sRow ? v3Per(sRow, true) : '/mo'}</span></button>
       <p className="micro muted v3-measure">{v3Sentence(S.test)}: {String(S.how || '').charAt(0).toLowerCase() + String(S.how || '').slice(1)}</p>
     </div>}
     <p className="micro muted v3-measure">Tests: <span className="v3-num">{num(T.finished) || 0}</span> finished, <span className="v3-num">{num(T.running) || 0}</span> running.
@@ -27306,11 +27315,14 @@ function V3Incremental() {
     <p className="micro muted v3-measure">{D.basis}</p>
   </section>);
 }
-function V3IncrementalFold() {
+// 8 Nov: on Marketing's Platforms tab, beside what the platforms claim, instead of a fold on Actions.
+function V3IncrementalPanel() {
   const q = useV3Rows('incremental-read', V3_INCR_Q);
   const D = q.rows && q.rows[0];
+  const head = (<div className="v3-panel-head"><h2>True return by channel</h2><span className="v3-muted">Last 30 days</span></div>);
+  if (q.err) return (<section className="v3-panel" id="v3-incremental" aria-label="True return by channel">{head}<p className="v3-panel-note">True return could not load. Refresh the page to try again.</p></section>);
   if (!D || D.state !== 'ok') return null;
-  return <V3More id="act-true" label="True effect of ads and email"><V3Incremental/></V3More>;
+  return (<section className="v3-panel" id="v3-incremental" aria-label="True return by channel">{head}<div className="v3-panel-pad"><V3Incremental/></div></section>);
 }
 function V3StaleSuggestions() {
   const q = useV3Rows('stale-suggestions', V3_STALE_Q);
@@ -27641,9 +27653,8 @@ const V3_PAGES = {
     <V3FixFirst/>
     <ActionsView/>
     <V3BoardDrivers/>
+    <V3Findings/>
     <V3HeldActions/>
-    <V3More id="act-findings" label="Findings with no figure"><V3Findings/></V3More>
-    <V3IncrementalFold/>
     <V3StaleSuggestions/>
   </>),
   // 1113: the moves you took, what Greta expected and what happened; the older list folds underneath
