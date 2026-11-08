@@ -23990,6 +23990,32 @@ function V3GoalCash() {
   </>);
 }
 
+// Goal & costs (8 Nov): the planning data the goal leans on, as a table of what is missing; nothing when all of it is
+// in. It was a fold of 13 dots beside "What moved profit", a single profit tile that Home and Profit & sales carry.
+const V3_PLAN_GO = { economics: ['goal', 'costs', 'Open Costs'], data: ['settings', null, 'Open Connections'], channels: ['settings', null, 'Open Connections'] };
+function V3PlanGaps() {
+  useV3Plan();
+  const P = (typeof window !== 'undefined' && window.FRKL_PLAN) || null;
+  if (!P) return null;
+  const head = (n, ready, all) => (<div className="v3-panel-head"><h2>Planning data</h2>{n > 0 && <span className="v3-count">{n}</span>}
+    {all > 0 && <span className="v3-muted">{fmtCount(ready)} of {fmtCount(all)} ready</span>}</div>);
+  if (P.readinessErr) return (<section className="v3-panel" aria-label="Planning data">{head(0, 0, 0)}
+    <p className="v3-panel-note">Your planning data could not be checked. Refresh the page to try again.</p></section>);
+  const all = P.readiness || [], gaps = all.filter(r => r.status !== 'ready');
+  if (!all.length || !gaps.length) return null;
+  const need = gaps.filter(r => r.blocks_targets);
+  const rows = need.concat(gaps.filter(r => !r.blocks_targets));
+  return (<section className="v3-panel" aria-label="Planning data">{head(need.length, all.length - gaps.length, all.length)}
+    <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+      <thead><tr><th>Item</th><th className="v3-mk-opt">Area</th><th>Now</th><th>Needed</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
+      <tbody>{rows.map((r, i) => { const go = V3_PLAN_GO[String(r.section || '').toLowerCase()];
+        return (<tr key={r.item + i}><td className="v3-web-wrap">{GP_PLAIN_ITEM[r.item] || r.item}</td><td className="v3-mk-opt">{v3Sentence(String(r.section || ''))}</td>
+          <td>{r.blocks_targets ? GP_plainDetail(r) : FMT_NONE}</td>
+          <td>{r.blocks_targets ? <span className="v3-down">Before targets</span> : <span className="v3-muted">Optional</span>}</td>
+          <td className="r">{go && <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo(go[0], go[1] || undefined)}>{go[2]}</button>}</td></tr>); })}</tbody>
+    </table></div>
+  </section>);
+}
 const V3_GOAL_TAB = { costs: 'costs', 'costs-off': 'costs', margin: 'costs', economics: 'cash', 'goal-set': 'goal' };
 function V3GoalPage() {
   const [tab, setTab] = React.useState(() => (typeof window !== 'undefined' && V3_GOAL_TAB[window.__oiV3Anchor]) || 'goal');
@@ -24014,8 +24040,7 @@ function V3GoalPage() {
     <div className="v3-home" role="tabpanel" hidden={tab !== 'goal'}>
       <V3GoalLead/>
       <GretaPlanPanel show="setter"/>
-      <V3More id="goal-moving" label="What moved profit"><V3DriverStrip keys={['profit']}/></V3More>
-      <V3More id="goal-ready" label="Planning checks"><GretaPlanPanel show="readiness"/></V3More>
+      <V3PlanGaps/>
     </div>
     {seen.costs && <div className="v3-home" role="tabpanel" hidden={tab !== 'costs'}><V3GoalCosts/></div>}
     {seen.cash && <div className="v3-home" role="tabpanel" hidden={tab !== 'cash'}><V3GoalCash/></div>}
