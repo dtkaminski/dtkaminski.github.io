@@ -3949,7 +3949,7 @@ function V3ProfitLead({ view, costsVerified }) {
         <div className="v3-home-group-h">Last 30 days<span>against 4 weeks ago</span></div>
         <div className="v3-home-tiles">{signs.map(sg => { const t = v3SignTrend(sg);
           return <V3HomeTile key={sg.k} k={sg.which === 'profit' ? 'Net profit' : v3SignShort(sg)} v={sg.v} dir={t && t.dir} cls={t && t.cls} delta={t ? t.delta : ''} weak={sg.tone === 'weak'}
-            pts={(sg.series || []).map(p => p.v)} act={sg.act} title={sg.k}/>; })}</div></div>}
+            pts={(sg.series || []).map(p => p.v)} act={sg.act} title={sg.k} m={sg.m}/>; })}</div></div>}
       {openSign && <div className="v3-home-drv"><V3DriverPanel key={drv} which={drv} points={openSign.points || SG.HP} ctx={openSign.ctx} line={openSign.dline}/></div>}
       {!onFig && view.priorSpike && <p className="v3-panel-note v3-profit-spike">The period before had a sale: {fmtMoney(view.pRev)}, against {fmtMoney(view.priorSpike.typ)} usually.</p>}
     </section>
@@ -19317,19 +19317,163 @@ function V3HomeSpark({ pts, weak }) {
   const line = vs.map((v, i) => (i / (vs.length - 1) * 100).toFixed(1) + ',' + (18 - (v - lo) / r * 16).toFixed(1)).join(' ');
   return (<svg className={'v3-home-spark' + (weak ? ' weak' : '')} viewBox="0 0 100 20" preserveAspectRatio="none" aria-hidden="true"><polyline points={line}/></svg>);
 }
-function V3HomeTile({ k, v, dir, cls, delta, weak, pts, act, title }) {
+function V3HomeTile({ k, v, dir, cls, delta, weak, pts, act, title, m }) {
+  // m (Part F): [lights key, the figure shown]; the tile carries that light only when the figures agree
+  const lights = useV3Lights(!!m);
+  const lt = m ? v3LightMatch(lights.L, m) : null;
   const body = (<>
-    <span className="v3-home-tile-k">{weak && <i className="v3-home-dot" aria-label="Needs attention"/>}{k}</span>
+    <span className="v3-home-tile-k">{lt ? <V3LightDot light={lt.light}/> : weak && <i className="v3-home-dot" aria-label="Needs attention"/>}{k}</span>
     <span className="v3-home-tile-v">{v}</span>
     <span className="v3-home-tile-d">
       {dir && dir !== 'flat' && <span className={cls || ''}><Icon name={dir === 'up' ? 'arrowUp' : 'arrowDown'} size={11} stroke={2.4}/></span>}
       <span className={cls || ''}>{delta}</span></span>
     <V3HomeSpark pts={pts} weak={weak}/>
   </>);
+  if (lt) return (<div className="v3-home-tile has-light" title={title}>
+    {act ? <button type="button" className={'v3-home-tile-btn' + (act.open ? ' open' : '')} aria-expanded={act.open} onClick={act.on}>{body}</button> : body}
+    <V3LightLine e={lt}/>
+  </div>);
   return act
     ? <button type="button" className={'v3-home-tile' + (act.open ? ' open' : '')} aria-expanded={act.open} title={title} onClick={act.on}>{body}</button>
     : <div className="v3-home-tile" title={title}>{body}</div>;
 }
+// ── Lights (CTC brief Part F, 1179/1180) ─────────────────────────────────────────────────────────────────────
+// fn_anatomy_lights: every measure's light (green, amber, red, grey), its line, the walk from it and the strategy and
+// action at the end, in the server's words and figures. One read a page load, shared by every tile and the Today tree.
+// It computes nothing here: a tile carries a light only when it shows the light's own figure, so one tile never holds
+// two numbers.
+const V3_LIGHTS_Q = v3AfterToday((sb, b) => sb.rpc('fn_anatomy_lights', { p_brand: b })
+  .then(r => ({ data: r && r.data ? [r.data] : [], error: r ? r.error : null })));
+function useV3Lights(on) {
+  const q = useV3Rows(on === false ? 'anatomy-lights-off' : 'anatomy-lights', on === false ? V3_NO_READ : V3_LIGHTS_Q);
+  return { L: on === false ? null : (q.rows && q.rows[0]) || null, err: on === false ? null : q.err };
+}
+// m = [lights key, the figure the tile shows]: the light, when the figures agree to the penny or half a per cent
+function v3LightMatch(L, m) {
+  if (!L || !L.metrics || !m) return null;
+  const e = L.metrics[m[0]];
+  if (!e) return null;
+  if (m.length < 2) return e;
+  const a = Number(m[1]), b = Number(e.value);
+  if (m[1] == null || !isFinite(a) || !isFinite(b)) return null;
+  return Math.abs(a - b) <= Math.max(0.01, Math.abs(b) * 0.005) ? e : null;
+}
+const V3_LIGHT_WORD = { green: 'On track', amber: 'A real gap', red: 'A bigger gap', grey: 'Not judged yet' };
+const V3_LIGHT_SURE = { high: 'Likely', medium: 'Probably', low: 'Possible', low_untested: 'Possible, other causes untested' };
+const V3_LIGHT_FIX = { settings: 'Open Connections', goal: 'Open Goal & costs', marketing: 'Open Marketing', stock: 'Open Stock & orders',
+  customers: 'Open Customers', website: 'Open Website', products: 'Open Products', profit: 'Open Profit & sales', actions: 'Open Actions' };
+function V3LightDot({ light }) {
+  const l = V3_LIGHT_WORD[light] ? light : 'grey';
+  return (<i className={'v3-light v3-light-' + l} role="img" aria-label={V3_LIGHT_WORD[l]}/>);
+}
+function V3LightLegend() {
+  return (<details className="v3-light-legend">
+    <summary>Light colours</summary>
+    <ul>
+      <li><V3LightDot light="green"/><span>Green: on track, or the gap is normal day-to-day noise.</span></li>
+      <li><V3LightDot light="amber"/><span>Amber: a real gap, one change should close it.</span></li>
+      <li><V3LightDot light="red"/><span>Red: a bigger gap, a bigger change or a rethink of the offer.</span></li>
+      <li><V3LightDot light="grey"/><span>Grey: Greta can't judge this yet, and says why.</span></li>
+    </ul>
+  </details>);
+}
+// The Why panel: the walk as its steps with their pounds, what was ruled out in grey, then the cause, how sure, the
+// strategy and the linked action's own Do it. A grey measure says why and where to fix it. Never empty.
+function V3WhyPanel({ e, onClose }) {
+  const panel = React.useRef(null);
+  const board = useV3Board();
+  React.useEffect(() => {
+    const onKey = ev => { if (ev.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    if (panel.current) panel.current.focus();
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  const W = e.walk || null, grey = e.light === 'grey';
+  const steps = W && Array.isArray(W.steps) ? W.steps : [];
+  const out = W && Array.isArray(W.ruled_out) ? W.ruled_out : [];
+  const tested = out.filter(x => !x.untested), untested = out.filter(x => x.untested);
+  const [more, setMore] = React.useState(false);
+  const row = e.action ? (board.rows || []).concat(board.unpriced || []).find(r => r.external_id === e.action.external_id) || null : null;
+  const go = p => { onClose(); if (window.__oiGo) window.__oiGo(p); };
+  const showExp = e.expected_text && e.expected_source !== 'line' && !grey;
+  return ReactDOM.createPortal(<div className="v3-drawer-wrap">
+    <div className="v3-drawer-scrim" onClick={onClose}/>
+    <aside className="v3-drawer" role="dialog" aria-modal="true" aria-label={e.label} tabIndex={-1} ref={panel}>
+      <header className="v3-drawer-head">
+        <span className="v3-light-word"><V3LightDot light={e.light}/>{V3_LIGHT_WORD[e.light] || V3_LIGHT_WORD.grey}</span>
+        <button type="button" className="v3-btn v3-btn-sm" onClick={onClose}>Close</button>
+      </header>
+      <h2 className="v3-drawer-t">{e.label}</h2>
+      {e.measure && <p className="v3-why-measure">{e.measure}</p>}
+      {(e.value_text || showExp) && <dl className="v3-drawer-facts">
+        {e.value_text && <div><dt>Now</dt><dd>{e.value_text}</dd></div>}
+        {showExp && <div><dt>Expected</dt><dd>{e.expected_text}</dd></div>}
+      </dl>}
+      {e.reason && <p className="v3-drawer-p">{e.reason}</p>}
+      {grey ? (<>
+        {!e.reason && <p className="v3-drawer-p">There is not enough data to judge this yet.</p>}
+        {e.fix_page && V3_LIGHT_FIX[e.fix_page] && <p><button type="button" className="v3-btn v3-btn-sm" onClick={() => go(e.fix_page)}>{V3_LIGHT_FIX[e.fix_page]}</button></p>}
+      </>) : (<>
+        {steps.length > 0 && <section className="v3-drawer-sec"><h3>Path</h3>
+          <ol className="v3-why-steps">{steps.map((s, i) => (<li key={i}>
+            <V3LightDot light={s.light}/><span>{s.label}</span><b>{s.gbp_text || ''}</b>
+            {s.why && <small>{s.why}</small>}</li>))}</ol></section>}
+        {out.length > 0 && <section className="v3-drawer-sec"><h3>Ruled out</h3>
+          <ul className="v3-why-out">{tested.map((x, i) => <li key={i}><span>{x.label}</span>{x.why && <small>{x.why}</small>}</li>)}
+            {more && untested.map((x, i) => <li key={'u' + i}><span>{x.label}</span><small>Could not be tested yet</small></li>)}</ul>
+          {untested.length > 0 && !more && <button type="button" className="v3-linkbtn v3-why-more" onClick={() => setMore(true)}>
+            {untested.length === 1 ? '1 more could not be tested yet' : fmtCount(untested.length) + ' more could not be tested yet'}</button>}</section>}
+        {W && (W.cause || W.strategy) && <section className="v3-drawer-sec"><h3>Cause</h3>
+          {W.cause && <p className="v3-drawer-p">{W.cause}</p>}
+          <dl className="v3-drawer-facts">
+            {W.confidence && <div><dt>Confidence</dt><dd>{V3_LIGHT_SURE[W.confidence] || v3Sentence(String(W.confidence).replace(/_/g, ' '))}</dd></div>}
+            {W.strategy && <div><dt>Strategy</dt><dd>{W.strategy}</dd></div>}
+          </dl>
+          {W.settle_test && <p className="v3-drawer-p">{W.settle_test}</p>}</section>}
+        {row ? <section className="v3-drawer-sec v3-drawer-decide"><V3MoveDecide row={row} onDecided={onClose}/></section>
+          : e.action ? <section className="v3-drawer-sec"><button type="button" className="v3-btn v3-btn-sm" onClick={() => go('actions')}>Open Actions</button></section> : null}
+      </>)}
+      {e.term && e.term !== e.label && <p className="v3-why-term">Measure: {e.term}</p>}
+      <V3LightLegend/>
+    </aside>
+  </div>, document.body);
+}
+// What a tile shows under its figure when it carries a light: the line it is judged against, and Why?
+function V3LightLine({ e }) {
+  const [open, setOpen] = React.useState(false);
+  return (<span className="v3-light-line">
+    <span>{e.line || V3_LIGHT_WORD[e.light] || ''}</span>
+    <button type="button" className="v3-linkbtn" onClick={() => setOpen(true)}>Why?</button>
+    {open && <V3WhyPanel e={e} onClose={() => setOpen(false)}/>}
+  </span>);
+}
+// Today, under the goal strip: the goal's profit line, what makes it, the customers behind it, then each channel's
+// return against its target. The walk's path is drawn darker; any chip opens the Why panel.
+function V3NumbersConnect() {
+  const { L, err } = useV3Lights();
+  const [open, setOpen] = React.useState(null);
+  const head = <div className="v3-panel-head"><h2>How the numbers connect</h2></div>;
+  if (err) return (<section className="v3-panel" aria-label="How the numbers connect">{head}<p className="v3-panel-note">Lights not available. Refresh the page to try again.</p></section>);
+  if (!L) return null;
+  const T = L.tree, M = L.metrics || {};
+  if (!T || !Array.isArray(T.rows)) return null;
+  const path = new Set(T.path || []);
+  const rows = T.rows.map(r => (r || []).map(k => (M[k] ? Object.assign({ id: k }, M[k]) : null)).filter(Boolean)).filter(r => r.length);
+  if (!rows.length) return null;
+  const onPath = x => x.scope_kind === 'brand' && path.has(x.key);
+  return (<section className="v3-panel v3-tree-panel" aria-label="How the numbers connect">{head}
+    <ol className="v3-tree">{rows.map((r, i) => (<li key={i} className={'v3-tree-row' + (r.some(onPath) ? ' v3-tree-on' : '')} style={{ '--d': i }}>
+      {r.map(x => (<button type="button" key={x.id} className={'v3-node' + (onPath(x) ? ' v3-node-on' : '')} onClick={() => setOpen(x)}>
+        <V3LightDot light={x.light}/>
+        <span className="v3-node-l">{x.label}</span>
+        <span className="v3-node-x">{x.line || ((x.value_text ? x.value_text + ', ' : '') + V3_LIGHT_WORD.grey.toLowerCase())}</span>
+      </button>))}</li>))}</ol>
+    <V3LightLegend/>
+    {open && <V3WhyPanel e={open} onClose={() => setOpen(null)}/>}
+  </section>);
+}
+// The legend once on a page whose tiles carry lights, when the lights came back.
+function V3PageLegend() { const { L } = useV3Lights(); return L ? <V3LightLegend/> : null; }
 // The figure a sign moved from four weeks ago, by the same rule the sign has always used.
 function v3SignTrend(s) {
   const pts = (s.series || []).filter(p => p.v != null);
@@ -19341,6 +19485,8 @@ function v3SignTrend(s) {
   const cls = dir === 'flat' || !s.better || (s.tone === 'good' && !good) ? '' : good ? 'v3-up' : 'v3-down';
   return { dir, cls, delta: 'from ' + s.fmt(then.v) + ' in 4 weeks' };
 }
+// the light a sign's tile carries (Part F): the sign's own figure, or the figure the page shows in its place (n)
+const v3SignLight = (sg, value, n) => !sg || !sg.m ? null : value == null ? sg.m : n != null ? [sg.m[0], n] : null;
 const v3SignShort = s => s.amer ? 'New sales per £1 of ads' : s.which === 'ret' ? 'Sales per £1 of ads' : s.which === 'repeat' ? 'Repeat in 90 days'
   : s.which === 'ly' ? 'Sales vs last year' : String(s.k).replace(/,\s*last 30 days$/i, '');
 // The page each kind of action is worked from.
@@ -19654,6 +19800,7 @@ function V3TodayLead() {
       <V3HomeGoals q={q} gc={gc} unreported={d.unreported_spend}/>
       <V3BusinessState part="profit"/>
     </div>
+    <V3NumbersConnect/>
     <div className="v3-home-two">
       <V3BusinessState part="moved"/>
       <V3HomeResults q={q} board={board}/>
@@ -20217,8 +20364,8 @@ function V3Growth() {
     return Object.assign({}, sg, { act: !sg.noDrivers && v3HasDrivers(sg.which, SG.HP) ? { open: drv === sg.which, on: () => setDrv(o => (o === sg.which ? null : sg.which)) } : null }); };
   const cacSign = signOf('cac'), spendSign = signOf('spend'), newSign = signOf('newsales');
   const openSign = drv ? [cacSign, spendSign, newSign].find(x => x && x.which === drv) : null;
-  const signTile = (sg, label, value) => { const t = v3SignTrend(sg);
-    return <V3HomeTile key={sg.which} k={label} v={value != null ? value : sg.v} dir={t && t.dir} cls={t && t.cls} delta={t ? t.delta : ''} pts={(sg.series || []).map(p => p.v)} act={sg.act} title={sg.k}/>; };
+  const signTile = (sg, label, value, n) => { const t = v3SignTrend(sg);
+    return <V3HomeTile key={sg.which} k={label} v={value != null ? value : sg.v} dir={t && t.dir} cls={t && t.cls} delta={t ? t.delta : ''} pts={(sg.series || []).map(p => p.v)} act={sg.act} title={sg.k} m={v3SignLight(sg, value, n)}/>; };
   const ncSeries = SG && SG.HP ? SG.HP.filter(p => p.new_customers != null).map(p => ({ d: String(p.d), v: Number(p.new_customers) })) : null;
   const ncTrend = ncSeries ? v3SignTrend({ series: ncSeries, fmt: v => fmtCount(v), better: 'higher' }) : null;
   const over = c30v != null && fop ? c30v - fop : null;
@@ -20303,7 +20450,7 @@ function V3Growth() {
         {hasStrip && <div className="v3-home-group" style={{ '--n': [c30v != null, !!fop, ltv != null, marg != null].filter(Boolean).length }}>
           <div className="v3-home-group-h">A new customer<span>Last 30 days</span>{over != null && <b className={'v3-pill ' + (over > 0 ? 'v3-pill-bad' : 'v3-pill-good')}>{over > 0 ? fmtMoney(over, 2) + ' over first order' : 'Under first order'}</b>}</div>
           <div className="v3-home-tiles">
-            {c30v != null && (cacSign ? signTile(cacSign, 'Cost to win', fmtMoney(c30v, 2)) : <V3HomeTile k="Cost to win" v={fmtMoney(c30v, 2)} delta=""/>)}
+            {c30v != null && (cacSign ? signTile(cacSign, 'Cost to win', fmtMoney(c30v, 2), c30v) : <V3HomeTile k="Cost to win" v={fmtMoney(c30v, 2)} delta="" m={['cac', c30v]}/>)}
             {fop && <V3HomeTile k="First order earns" v={fmtMoney(fop, 2)} delta="after product and delivery costs"/>}
             {ltv != null && <V3HomeTile k="A year earns" v={fmtMoney(ltv)} delta="first order and repeats"/>}
             {marg != null && <V3HomeTile k="Next customer costs" v={fmtMoney(marg)} cls={fop && marg > fop ? 'v3-down' : ''} delta={'at ' + fmtMoney(sc.current_spend) + ' a month'} title="An estimate from your cost curve"/>}
@@ -20318,11 +20465,12 @@ function V3Growth() {
           <div className="v3-home-group-h">First orders<span>Last 30 days</span></div>
           <div className="v3-home-tiles">
             {newSign && signTile(newSign, 'Sales')}
-            {nc != null && <V3HomeTile k="New customers" v={fmtCount(nc)} dir={ncTrend && ncTrend.dir} cls={ncTrend && ncTrend.cls} delta={ncTrend ? ncTrend.delta : ''} pts={(ncSeries || []).map(p => p.v)}/>}
+            {nc != null && <V3HomeTile k="New customers" v={fmtCount(nc)} m={['new_customers', nc]} dir={ncTrend && ncTrend.dir} cls={ncTrend && ncTrend.cls} delta={ncTrend ? ncTrend.delta : ''} pts={(ncSeries || []).map(p => p.v)}/>}
           </div></div>}
         {openSign && <div className="v3-home-drv v3-goal-full"><V3DriverPanel key={drv} which={drv} points={openSign.points || SG.HP} ctx={openSign.ctx} line={openSign.dline}/></div>}
         {!hasStrip && !waiting && !A && <p className="v3-panel-note v3-goal-full">Figures show once there is a month of ad spend and first orders.</p>}
       </>}
+      <V3PageLegend/>
     </section>
 
     <section className="v3-panel" aria-label="Cost of a new customer and ad spend">
@@ -21464,8 +21612,8 @@ function V3Customers({ start, period, customActive }) {
   const SG = S0 && S0.last_30 && hq.rows ? v3BuildSigns(S0, hq.rows[0] && hq.rows[0].history, { lad }) : null;
   const signOf = w => { const sg = SG ? SG.signs.find(x => x.which === w) : null; if (!sg) return null;
     return Object.assign({}, sg, { act: !sg.noDrivers && v3HasDrivers(w, SG.HP) ? { open: drv === w, on: () => setDrv(o => (o === w ? null : w)) } : null }); };
-  const signTile = (sg, label, value) => { const tr = v3SignTrend(sg);
-    return <V3HomeTile key={sg.which} k={label} v={value != null ? value : sg.v} dir={tr && tr.dir} cls={tr && tr.cls} delta={tr ? tr.delta : ''} weak={sg.tone === 'weak'} pts={(sg.series || []).map(p => p.v)} act={sg.act} title={sg.k}/>; };
+  const signTile = (sg, label, value, n) => { const tr = v3SignTrend(sg);
+    return <V3HomeTile key={sg.which} k={label} v={value != null ? value : sg.v} dir={tr && tr.dir} cls={tr && tr.cls} delta={tr ? tr.delta : ''} weak={sg.tone === 'weak'} pts={(sg.series || []).map(p => p.v)} act={sg.act} title={sg.k} m={v3SignLight(sg, value, n)}/>; };
   const sNew = signOf('newc'), sCac = signOf('cac'), sNs = signOf('newsales'), sRs = signOf('retsales');
   const signsOn = onFig && SG;
   const whenLabel = onFig ? 'Last 30 days' : customActive ? v3Day(start) + ' to ' + v3Day(end) : ((PERIODS.find(p => p.key === period) || {}).label || 'This period');
@@ -21547,10 +21695,10 @@ function V3Customers({ start, period, customActive }) {
           <div className="v3-home-group" style={{ '--n': 4 }}>
             <div className="v3-home-group-h">{whenLabel}<span>{signsOn ? 'against 4 weeks ago' : !onFig && havePrior ? 'against the period before' : ''}</span></div>
             <div className="v3-home-tiles">
-              {signsOn && sNew ? signTile(sNew, 'New customers', nc == null ? FMT_NONE : fmtCount(nc)) : v3TileAgainst('New customers', nc, onFig || !havePrior ? null : was.no, true, pts('nc'), v => fmtCount(v))}
+              {signsOn && sNew ? signTile(sNew, 'New customers', nc == null ? FMT_NONE : fmtCount(nc), nc) : v3TileAgainst('New customers', nc, onFig || !havePrior ? null : was.no, true, pts('nc'), v => fmtCount(v))}
               {signsOn && sCac ? signTile(sCac, 'Cost of a new customer') : v3TileAgainst('Cost of a new customer', cac, onFig ? null : pCac, false, pts('cac'))}
-              {signsOn && sNs ? signTile(sNs, 'New customers’ sales', nw == null ? null : fmtMoney(nw)) : v3TileAgainst('New customers’ sales', nw, onFig || !havePrior ? null : was.nw, true, pts('nw'))}
-              {signsOn && sRs ? signTile(sRs, 'Returning customers’ sales', rt == null ? null : fmtMoney(rt)) : v3TileAgainst('Returning customers’ sales', rt, onFig || !havePrior ? null : was.rt, true, pts('rt'))}
+              {signsOn && sNs ? signTile(sNs, 'New customers’ sales', nw == null ? null : fmtMoney(nw), nw) : v3TileAgainst('New customers’ sales', nw, onFig || !havePrior ? null : was.nw, true, pts('nw'))}
+              {signsOn && sRs ? signTile(sRs, 'Returning customers’ sales', rt == null ? null : fmtMoney(rt), rt) : v3TileAgainst('Returning customers’ sales', rt, onFig || !havePrior ? null : was.rt, true, pts('rt'))}
             </div></div>
           {(ltv > 0 || ratio != null || repeat90 != null) && <div className="v3-home-group" style={{ '--n': (ltv > 0 ? 1 : 0) + (ratio != null ? 1 : 0) + (repeat90 != null ? 1 : 0) }}>
             <div className="v3-home-group-h">Customer value<span>your own customers</span></div>
@@ -21561,6 +21709,7 @@ function V3Customers({ start, period, customActive }) {
             </div></div>}
           {openSign && <div className="v3-home-drv"><V3DriverPanel key={drv} which={drv} points={openSign.points || SG.HP} ctx={openSign.ctx} line={openSign.dline}/></div>}
         </>}
+      <V3PageLegend/>
     </section>
 
     {!allFailed && !allWait && !empty && (<section className="v3-panel" aria-label="New and returning customers">
@@ -22542,9 +22691,9 @@ function V3MarketingPage({ start, period, customActive }) {
   const SG = S0 && S0.last_30 && hq.rows ? v3BuildSigns(S0, hq.rows[0] && hq.rows[0].history, { lad }) : null;
   const signAct = sg => Object.assign({}, sg, { act: sg.which && !sg.noDrivers && v3HasDrivers(sg.which, SG.HP) ? { open: drv === sg.which, on: () => setDrv(o => (o === sg.which ? null : sg.which)) } : null });
   const pick = list => (SG ? list.map(w => SG.signs.find(sg => sg.which === w)).filter(Boolean).map(signAct) : []);
-  const signTile = (sg, label, value) => { const t = v3SignTrend(sg);
+  const signTile = (sg, label, value, n) => { const t = v3SignTrend(sg);
     return <V3HomeTile key={sg.which} k={label || v3SignShort(sg)} v={value != null ? value : sg.v} dir={t && t.dir} cls={t && t.cls} delta={t ? t.delta : ''} weak={sg.tone === 'weak'}
-      pts={(sg.series || []).map(p => p.v)} act={sg.act} title={sg.k}/>; };
+      pts={(sg.series || []).map(p => p.v)} act={sg.act} title={sg.k} m={v3SignLight(sg, value, n)}/>; };
   const mainSigns = pick(['spend', 'cac', 'ret']), ownSigns = pick(['metacpa', 'googcpa', 'email']);
   const spendSign = mainSigns.find(sg => sg.which === 'spend'), cacSign = mainSigns.find(sg => sg.which === 'cac'), retSign = mainSigns.find(sg => sg.which === 'ret');
   const ncSeries = SG && SG.HP ? SG.HP.filter(p => p.new_customers != null).map(p => ({ d: String(p.d), v: Number(p.new_customers) })) : null;
@@ -22565,8 +22714,8 @@ function V3MarketingPage({ start, period, customActive }) {
         <div className="v3-home-group" style={{ '--n': mainSigns.length + 1 }}>
           <div className="v3-home-group-h">Last 30 days<span>against 4 weeks ago</span></div>
           <div className="v3-home-tiles">
-            {spendSign && signTile(spendSign, 'Ad spend', fmtMoney(paid))}
-            <V3HomeTile key="nc" k="New customers" v={nc == null ? FMT_NONE : fmtCount(nc)} dir={ncTrend && ncTrend.dir} cls={ncTrend && ncTrend.cls} delta={ncTrend ? ncTrend.delta : ''} pts={(ncSeries || []).map(p => p.v)}/>
+            {spendSign && signTile(spendSign, 'Ad spend', fmtMoney(paid), paid)}
+            <V3HomeTile key="nc" k="New customers" v={nc == null ? FMT_NONE : fmtCount(nc)} m={onFig ? ['new_customers', nc] : null} dir={ncTrend && ncTrend.dir} cls={ncTrend && ncTrend.cls} delta={ncTrend ? ncTrend.delta : ''} pts={(ncSeries || []).map(p => p.v)}/>
             {cacSign && signTile(cacSign, 'Cost of a new customer')}
             {retSign && signTile(retSign, 'Sales per £1 of ads')}
           </div></div>
@@ -22582,6 +22731,7 @@ function V3MarketingPage({ start, period, customActive }) {
           {v3TileAgainst('Cost of a new customer', cac, onFig ? null : pCac, false, pts('cac'))}
           {v3TileAgainst('Sales per £1 of ads', mer, onFig ? null : pMer, true, pts('mer'), v => fmtMoney(v, 2))}
         </div></div>}
+      <V3PageLegend/>
     </section>
 
     {wins && (<section className="v3-panel" aria-label="Ad spend and new customers">
@@ -24187,7 +24337,7 @@ function V3Review() {
   const signs = ['profit', 'ly'].map(w => signAll.find(sg => sg.which === w)).filter(Boolean).map(sg => Object.assign({}, sg, { act: !sg.noDrivers && v3HasDrivers(sg.which, SG.HP) ? { open: drv === sg.which, on: () => setDrv(o => (o === sg.which ? null : sg.which)) } : null }));
   const openSign = drv ? signs.find(sg => sg.which === drv) : null;
   const signTile = sg => { const t = v3SignTrend(sg);
-    return <V3HomeTile key={sg.which} k={v3SignShort(sg)} v={sg.v} dir={t && t.dir} cls={t && t.cls} delta={t ? t.delta : ''} weak={sg.tone === 'weak'} pts={(sg.series || []).map(p => p.v)} act={sg.act} title={sg.k}/>; };
+    return <V3HomeTile key={sg.which} k={v3SignShort(sg)} v={sg.v} dir={t && t.dir} cls={t && t.cls} delta={t ? t.delta : ''} weak={sg.tone === 'weak'} pts={(sg.series || []).map(p => p.v)} act={sg.act} title={sg.k} m={sg.m}/>; };
 
   // What moved profit: the same parts the driver panel draws, and what they leave.
   const signed = v => (v < 0 ? '−' : '+') + fmtMoney(Math.abs(v));
@@ -25078,7 +25228,7 @@ function v3BuildSigns(S, hist, opts) {
     signs.push({ k: 'Sales from each £1 of ads', v: fmtMoney(ret, 2), tone: ret < be ? 'weak' : ret < be * 1.3 ? 'ok' : 'good',
       bar: { fill: ret / top, mark: be / top }, n: <>{fmtMoney(be, 2)} only covers the ads, products and delivery</>,
       series: dk != null ? ser('return') : null, fmt: v => fmtMoney(v, 2), better: 'higher', line: { v: be, label: 'Break-even ' + fmtMoney(be, 2) },
-      which: 'ret', noDrivers: dk == null, ctx: { weeks: H && Array.isArray(H.weeks) ? H.weeks : [], be, lineLabel: 'the ' + fmtMoney(be, 2) + ' that only covers the ads, products and delivery' }, dline: be });
+      which: 'ret', m: ['mer', ret], noDrivers: dk == null, ctx: { weeks: H && Array.isArray(H.weeks) ? H.weeks : [], be, lineLabel: 'the ' + fmtMoney(be, 2) + ' that only covers the ads, products and delivery' }, dline: be });
   }
   // 10 Oct eval: the governor is new-customer sales from each £1 of ads (aMER), not all sales per £1. The
   // blended figure counts returning customers the ads did not win, so it read "ok" (£1.94) while the ads
@@ -25094,7 +25244,7 @@ function v3BuildSigns(S, hist, opts) {
       bar: { fill: am / top, mark: be / top },
       n: <>{fmtMoney(be, 2)} pays for the ads and a first order’s products and delivery{ret != null ? <>; all sales per £1, returning customers included: {fmtMoney(ret, 2)}</> : null}</>,
       series: AP.length >= 4 ? AP : null, fmt: v => fmtMoney(v, 2), better: 'higher', line: { v: be, label: 'First-order break-even ' + fmtMoney(be, 2) },
-      which: null, amer: true, ctx: {}, dline: be });
+      which: null, amer: true, m: ['amer', am], ctx: {}, dline: be });
   }
   // cac_30d against first_order_profit (1080). No fallback to the 90-day figure: one window.
   const cF = v3Fig('cac_30d'), c30 = cF.value, foReg = v3Fig('first_order_profit').value;
@@ -25103,7 +25253,7 @@ function v3BuildSigns(S, hist, opts) {
     signs.push({ k: cF.label || 'Cost of a new customer, last 30 days', v: fmtMoney(use), tone: use > fo ? 'weak' : 'good',
       bar: { fill: use / top, mark: fo / top }, n: <>Their first order earns {fmtMoney(fo)}{use > fo ? ', so each one starts at a loss' : ''}</>,
       series: c30 > 0 ? ser('cac') : null, fmt: v => fmtMoney(v), better: 'lower', line: { v: fo, label: 'First order earns ' + fmtMoney(fo) },
-      which: c30 > 0 ? 'cac' : null, ctx: { weeks: H && Array.isArray(H.weeks) ? H.weeks : [], fo, lineLabel: 'the ' + fmtMoney(fo) + ' a first order earns after product and delivery costs' }, dline: fo });
+      which: c30 > 0 ? 'cac' : null, m: ['cac', c30], ctx: { weeks: H && Array.isArray(H.weeks) ? H.weeks : [], fo, lineLabel: 'the ' + fmtMoney(fo) + ' a first order earns after product and delivery costs' }, dline: fo });
   }
   if (yoySales != null && yoyAds != null)
     signs.push({ k: 'Sales against last year', v: (yoySales >= 0 ? '+' : '−') + fmtPctN(Math.abs(yoySales)),
@@ -25146,7 +25296,7 @@ function v3BuildSigns(S, hist, opts) {
     signs.push({ k: 'New customers', v: fmtCount(nv), tone: nv < typ * 0.9 ? 'weak' : nv > typ * 1.1 ? 'good' : 'typical',
       bar: { fill: nv / top, mark: typ / top }, n: <>Each cost {fmtMoney(c)} to win; about {fmtCount(Math.round(typ))} is usual for you</>,
       series: ser('new_customers'), fmt: v => fmtCount(v), better: 'higher', line: { v: typ, label: 'Usual ' + fmtCount(Math.round(typ)) },
-      which: 'newc', ctx: { weeks: H && Array.isArray(H.weeks) ? H.weeks : [], lineLabel: 'about ' + fmtCount(Math.round(typ)) + ', your usual number' }, dline: typ });
+      which: 'newc', m: ['new_customers', nv], ctx: { weeks: H && Array.isArray(H.weeks) ? H.weeks : [], lineLabel: 'about ' + fmtCount(Math.round(typ)) + ', your usual number' }, dline: typ });
   }
   const RP = HP ? HP.filter(p => p.ret_net != null && Number(p.ret_customers) > 0) : [];
   if (RP.length >= 4) {
@@ -25154,7 +25304,7 @@ function v3BuildSigns(S, hist, opts) {
     signs.push({ k: 'Returning customers’ sales', v: fmtMoney(rv), tone: rv < typ * 0.9 ? 'weak' : rv > typ * 1.1 ? 'good' : 'typical',
       bar: { fill: rv / top, mark: typ / top }, n: <>From {fmtCount(Number(RP[RP.length - 1].ret_customers))} returning buyers; about {fmtMoney(typ)} is usual for you</>,
       series: ser('ret_net'), fmt: v => fmtMoney(v), better: 'higher', line: { v: typ, label: 'Usual ' + fmtMoney(typ) },
-      which: 'retsales', ctx: { weeks: H && Array.isArray(H.weeks) ? H.weeks : [], lineLabel: 'about ' + fmtMoney(typ) + ', your usual month' }, dline: typ });
+      which: 'retsales', m: ['returning_revenue', rv], ctx: { weeks: H && Array.isArray(H.weeks) ? H.weeks : [], lineLabel: 'about ' + fmtMoney(typ) + ', your usual month' }, dline: typ });
   }
   // growth plan: new customers' sales, against the middle of the earlier weeks
   const NSP = HP ? HP.filter(p => Number(p.new_net) > 0 && Number(p.new_customers) > 0) : [];
@@ -25163,7 +25313,7 @@ function v3BuildSigns(S, hist, opts) {
     signs.push({ k: 'New customers’ sales', v: fmtMoney(nv), tone: nv < typ * 0.9 ? 'weak' : nv > typ * 1.1 ? 'good' : 'typical',
       bar: { fill: nv / top, mark: typ / top }, n: <>{fmtCount(Number(l.new_customers))} first orders at {fmtMoney(nv / Number(l.new_customers), 2)}; about {fmtMoney(typ)} is usual for you</>,
       series: ser('new_net'), fmt: v => fmtMoney(v), better: 'higher', line: { v: typ, label: 'Usual ' + fmtMoney(typ) },
-      which: 'newsales', ctx: { weeks: H && Array.isArray(H.weeks) ? H.weeks : [], lineLabel: 'about ' + fmtMoney(typ) + ', your usual month' }, dline: typ });
+      which: 'newsales', m: ['new_customer_revenue', nv], ctx: { weeks: H && Array.isArray(H.weeks) ? H.weeks : [], lineLabel: 'about ' + fmtMoney(typ) + ', your usual month' }, dline: typ });
   }
   // marketing (0317): ad spend, and each platform's cost per sale on its own count
   const SPP = HP ? HP.filter(p => Number(p.cac_spend) > 0) : [];
@@ -25173,7 +25323,7 @@ function v3BuildSigns(S, hist, opts) {
     signs.push({ k: 'Ad spend', v: fmtMoney(Number(l.cac_spend)), tone: worse ? 'weak' : 'typical',
       n: <>Meta {fmtMoney(Number(l.meta_spend))}, Google {fmtMoney(Number(l.google_spend))}{Number(l.tiktok_spend) >= 1 ? <>, TikTok {fmtMoney(Number(l.tiktok_spend))}</> : null}{worse ? '; up while new customers fell' : ''}</>,
       series: ser('cac_spend'), fmt: v => fmtMoney(v), better: worse ? 'lower' : null, line: null,
-      which: 'spend', ctx: {}, dline: null });
+      which: 'spend', m: ['paid_spend', Number(l.cac_spend)], ctx: {}, dline: null });
   }
   const cpaSign = (key, k, spendK, salesK, who) => {
     const PP = HP ? HP.filter(p => Number(p[salesK]) > 0 && Number(p[spendK]) > 0).map(p => ({ d: String(p.d), v: Number(p[spendK]) / Number(p[salesK]) })) : [];
@@ -25505,7 +25655,7 @@ function V3BusinessState({ part }) {
         <div className="v3-home-group-h">Last 30 days</div>
         <div className="v3-home-tiles">{signs.slice(0, 4).map(sg => { const t = v3SignTrend(sg);
           return <V3HomeTile key={sg.k} k={v3SignShort(sg)} v={sg.v} dir={t && t.dir} cls={t && t.cls} delta={t ? t.delta : ''} weak={sg.tone === 'weak'}
-            pts={(sg.series || []).map(p => p.v)} act={sg.act} title={sg.k}/>; })}</div></div>}
+            pts={(sg.series || []).map(p => p.v)} act={sg.act} title={sg.k} m={sg.m}/>; })}</div></div>}
       {TW && !hasStats && <p className="v3-panel-note">{TW.said}</p>}
       {openSign && HP && <div className="v3-home-drv"><V3DriverPanel key={drv} which={drv} points={HP} ctx={openSign.ctx} line={openSign.dline}/></div>}
     </section>);
