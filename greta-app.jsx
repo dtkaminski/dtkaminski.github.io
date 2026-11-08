@@ -16682,7 +16682,7 @@ const V3_ROUTE = {
   'audience/customers': ['customers'], 'audience/cohorts': ['customers', 'cohorts'],
   'market/competitors': ['competitors'],
   'commerce/products': ['products'], 'commerce/promos': ['products', 'promos'],
-  'planning/plan': ['stock'], 'planning/suppliers': ['stock', 'suppliers'],
+  'planning/plan': ['stock'], 'planning/suppliers': ['stock'],
   'operate/calendar': ['calendar'], 'operate/command': ['actions'], 'operate/decisions': ['results', 'decisions'],
   'settings/connections': ['settings'], 'settings/economics': ['goal'], 'settings/team': ['team'],
   // V3 has no Settings group with subtabs, so an unmapped key silently falls through to the first
@@ -20424,7 +20424,7 @@ function V3Stock() {
   const PD = useV3PeakDeadline((SQ0.peak && SQ0.peak.start) || (P.peak && P.peak.start) || null, SQ0.lead_days != null ? Number(SQ0.lead_days) : L.days);
   const [allRisk, setAllRisk] = React.useState(false);
   const [copied, setCopied] = React.useState(false);
-  if (q.err || lq2.err || sq.err) return <div className="v3-empty">Greta could not load your stock plan just now. Refreshing usually sorts it.</div>;
+  if (q.err || lq2.err || sq.err) return <V3LoadFailed what="Your stock plan" onRetry={() => { [q, lq2, sq].forEach(x => { if (x.err && x.retry) x.retry(); }); }}/>;
   if (!q.rows || !lq2.rows || !sq.rows) return <V3SkeletonRows n={5}/>;
   const rows = q.rows;
   if (!rows.length) return (<div className="v3-empty">No products with stock counts yet. Once your Shopify stock counts come in, this shows what runs out first and where cash is tied up.</div>);
@@ -20611,7 +20611,7 @@ function V3Stock() {
     </V3More>}
 
     {slow.length > 0 && (<section className="v3-sec">
-      <h2 className="v3-sec-title">Where is cash tied up in stock?</h2>
+      <h2 className="v3-sec-title">Cash in slow stock</h2>
       <p className="v3-note v3-measure">{trapped != null ? <>{trappedF.label}: {fmtMoney(trapped)}, in more stock than you will sell in the next few months. </> : null}A bundle, a free gift with orders or a small price test can free it without a discount across the whole shop{pk && pk.start > todayIso ? '. Or feature it in ' + pkName + ' (see below)' : ''}.</p>
       <table className="v3-rw v3-slow">
         <thead><tr><th className="t-text">Product</th><th>In stock</th><th>Sells a week</th><th>Lasts</th><th>Cash tied up</th></tr></thead>
@@ -27499,11 +27499,9 @@ const V3_PAGES = {
     {/* The planner reads live stock (vw_sku_stock_cover) for every brand since 2026-10-02. A third
         per-product list, the marketing-os "Every product" table, with its own status bands, sat
         here too and could disagree with both; removed. */}
-    <V3More id="stock-plan" label="Advanced: plan orders to your own sales forecast">
-      <p className="v3-note v3-measure">The order list above is the one that is priced and checked, and the one on Actions. This planner sizes orders to a sales forecast you set inside it, so its quantities differ. Purchase orders you mark as raised here are saved in this browser only, so other people and devices won’t see them. To send the list above to your supplier, use “Copy as a purchase order”.</p>
-      <PlanningView/>
-    </V3More>
-    <V3More id="stock-suppliers" label="Suppliers"><V3Anchor id="suppliers"/><SuppliersDirectory/></V3More>
+    {/* 8 Nov: the two folds go. The older planner sized orders to its own forecast (5 products and £64,453
+        against this page's 3 and £62,331) and kept its purchase orders and supplier directory in this browser
+        only; nothing on the page or the server read either. */}
   </>),
   // 7 Nov: V3Today's three folds (profit by week, the month's figures, what moved profit in pounds) read the same
   // profit three more ways (£87,493 typical, −£27,591, 1.8× worth against cost); the lead's own tables replace them.
@@ -28409,7 +28407,7 @@ const V3_WALK_TOUR = {
     what: 'Each row is a product: the solid bar is the days of stock left, the hatched part is days you would have nothing to sell before a new order could land. The longer the hatching, the more it costs you.' },
   reorder: { dest: 'stock', target: { sel: '.v3-sec', has: 'What to order, product by product' }, fallback: { sel: '.v3-verdict' },
     what: 'The same table, read for ordering: the tick on each row is when an order placed today would arrive. Anything whose bar ends before its tick needs ordering now.' },
-  cash: { dest: 'stock', target: { sel: '.v3-sec', has: 'Where is cash tied up in stock?' }, fallback: { sel: '.v3-stat-grid' },
+  cash: { dest: 'stock', target: { sel: '.v3-sec', has: 'Cash in slow stock' }, fallback: { sel: '.v3-stat-grid' },
     what: 'Money tied up in stock that will not sell through soon. It is cash you have already spent and cannot use for ads or new lines until it sells.' },
   leaks: { dest: 'products', anchor: 'promos', target: { sel: '.v3-prod-depth' }, fallback: { sel: '.v3-home-strip' },
     what: 'How deep your discounts go and what each depth leaves you per order. Below it, every code, how many orders it was on and what it gave away.' },
