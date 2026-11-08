@@ -2437,6 +2437,16 @@ div:has(> .v3-profit) ~ .v3-today { gap: 0; }
 .v3-page-head[data-fixed-period] #v3-page-control { visibility: hidden; }
 /* What moved profit (Profit & sales, Weekly review): on a phone the before-to-now column sits under each cause, so the effect stays on screen */
 .v3-main .v3-home-sub.v3-moved-sub { display: none; }
+/* Customers (7 Nov): a group's list opens under Customer groups */
+.v3-main .v3-cust-groups tr.on td { background: var(--color-surface); }
+.v3-main .v3-cust-list .v3-home-group { border-top: 1px solid var(--color-line); }
+.v3-main .v3-cust-list-bar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-3) var(--space-4); border-top: 1px solid var(--color-line); }
+.v3-main .v3-cust-list-bar .v3-field { width: auto; }
+.v3-main .v3-cust-list-bar .v3-select { width: auto; min-width: 12rem; }
+.v3-main .v3-cust-list-bar .v3-field-check { flex-direction: row; align-items: center; gap: var(--space-2); min-height: var(--tap-min); }
+.v3-main .v3-cust-list-bar .v3-field-check > span:first-child, .v3-main .v3-cust-list-bar .v3-field-check > span { color: var(--color-ink); }
+.v3-main .v3-cust-list-hint { font-size: var(--text-xs); align-self: center; }
+@media (max-width: 767px) { .v3-main table.v3-profit-rows.v3-cust-months { display: table; width: 100%; } }
 @media (max-width: 767px) {
   .v3-main table.v3-profit-rows.v3-moved th:last-child, .v3-main table.v3-profit-rows.v3-moved td:last-child { display: table-cell; }
 }

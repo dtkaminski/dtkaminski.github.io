@@ -21302,6 +21302,64 @@ function V3WebGroups() {
 // in its own group and does not follow the date control. Sales here are before the delivery customers pay, as
 // vw_customer_tier_periods and vw_daily_new_vs_returning count them.
 const V3_CUST_ACTS = ['cust-', 'crm-flows', 'discount-dependency', 'customer-file-', 'diagnosis-repeat_rate', 'cohort-', 'source-repeat-'];   // anatomy_category_map, Retention and cohorts
+// Customers (7 Nov): one group's people and the Klaviyo list built from them, opened from Customer groups.
+// The counts come from the same segment table as the groups; the people are the function's top 200 by spend.
+const V3_LOY = [['', 'Every buying habit'], ['full_price', 'Full-price loyal'], ['mixed', 'Mixed'], ['discount_driven', 'Discount-driven']];
+function V3CustomerList({ name, rows, onClose }) {
+  const [loy, setLoy] = React.useState('');
+  const [consent, setConsent] = React.useState(true);
+  const [ppl, setPpl] = React.useState(null);
+  const [busy, setBusy] = React.useState(false);
+  const [staged, setStaged] = React.useState(null);
+  const [tick, setTick] = React.useState(0);
+  React.useEffect(() => {
+    let alive = true; setPpl(null);
+    ciFetch('customer-intelligence', { action: 'segment', segment: name, limit: 200 })
+      .then(d => { if (alive) setPpl(d && Array.isArray(d.people) ? d : { err: true }); }, () => { if (alive) setPpl({ err: true }); });
+    return () => { alive = false; };
+  }, [name, tick]);
+  const add = (a, k) => a.reduce((t, r) => t + (Number(r[k]) || 0), 0);
+  const mine = rows.filter(r => r.segment === name && (!loy || r.loyalty === loy));
+  const n = add(mine, 'customers'), mail = add(mine, 'emailable'), net = add(mine, 'net_revenue'), reach = consent ? mail : n;
+  const people = ppl && ppl.people ? ppl.people.filter(p => (!loy || p.loyalty === loy) && (!consent || p.emailable)) : [];
+  const stage = () => {
+    if (!window.confirm('Create a Klaviyo list of ' + fmtCount(reach) + ' ' + name + ' customers?\n\nNothing is sent. You build and send the campaign in Klaviyo.')) return;
+    setBusy(true); setStaged(null);
+    ciFetch('stage-reward', Object.assign({ segment: name, requireConsent: consent, confirm: true }, loy ? { loyalty: loy } : {}))
+      .then(r => setStaged(r && r.listName ? { ok: true, t: 'Created ' + r.listName + ' in Klaviyo with ' + fmtCount(Number(r.profilesSubmitted) || 0) + ' people.' } : { ok: false, t: 'The list could not be created. Try again.' }))
+      .catch(e => setStaged({ ok: false, t: 'The list could not be created: ' + String(e.message || e) }))
+      .finally(() => setBusy(false));
+  };
+  const chan = c => c && c !== '-' ? v3Sentence(String(c).replace(/_/g, ' ')) : FMT_NONE;
+  return (<section className="v3-panel v3-cust-list" aria-label={name + ' customers'}>
+    <div className="v3-panel-head"><h2>{name}</h2><span className="v3-muted">{(CSEG[name] || {}).blurb || ''}</span>
+      <button type="button" className="v3-panel-link" onClick={onClose}>Close</button></div>
+    <div className="v3-home-group" style={{ '--n': 4 }}><div className="v3-home-tiles">
+      <V3HomeTile k="Customers" v={fmtCount(n)} delta={loy ? (V3_LOY.find(o => o[0] === loy) || [])[1] : 'every buying habit'}/>
+      <V3HomeTile k="Can be emailed" v={fmtCount(mail)} delta="agreed to email"/>
+      <V3HomeTile k="Sales to date" v={fmtMoney(net)} delta={n > 0 ? fmtMoney(net / n) + ' each' : ''}/>
+      <V3HomeTile k="In the list" v={fmtCount(reach)} delta={consent ? 'agreed to email only' : 'everyone in the group'}/>
+    </div></div>
+    <div className="v3-panel-pad v3-cust-list-bar">
+      <label className="v3-field"><span>Buying habit</span>
+        <select className="v3-select" value={loy} onChange={e => setLoy(e.target.value)}>{V3_LOY.map(o => <option key={o[0]} value={o[0]}>{o[1]}</option>)}</select></label>
+      <label className="v3-field v3-field-check"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)}/><span>Agreed to email only</span></label>
+      <button type="button" className="v3-btn v3-btn-p v3-btn-sm" disabled={busy || !(reach > 0)} onClick={stage}>{busy ? 'Creating…' : 'Create Klaviyo list'}</button>
+      <span className="v3-muted v3-cust-list-hint">Creates the list only. Nothing is sent.</span>
+    </div>
+    {staged && <p className={'v3-panel-note ' + (staged.ok ? 'v3-up' : 'v3-down')} role="status">{staged.t}</p>}
+    {!ppl ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={4}/></div>
+      : ppl.err ? <div className="v3-panel-pad"><V3LoadFailed what="The people in this group" onRetry={() => setTick(t => t + 1)}/></div>
+      : !people.length ? <p className="v3-panel-note">No one in this group matches.</p>
+      : <><div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+          <thead><tr><th>Customer</th><th className="r">Orders</th><th className="r">Spent</th><th className="r">Last order</th><th className="v3-mk-opt">Came from</th><th className="r v3-mk-opt">Average discount</th><th className="r">Can email</th></tr></thead>
+          <tbody>{people.slice(0, 25).map((p, i) => (<tr key={i}><td>{p.name && p.name !== '-' ? p.name : <span className="v3-muted">No name on file</span>}</td><td className="r">{fmtCount(Number(p.orders) || 0)}</td><td className="r">{fmtMoney(Number(p.netRevenue) || 0)}</td>
+            <td className="r">{fmtCount(Number(p.recencyDays) || 0)} days ago</td><td className="v3-mk-opt">{chan(p.acquisitionChannel)}</td>
+            <td className="r v3-mk-opt">{p.discountPct == null ? FMT_NONE : fmtCount(Number(p.discountPct)) + '%'}</td><td className="r">{p.emailable ? 'Yes' : 'No'}</td></tr>))}</tbody>
+        </table></div>
+        {people.length > 25 && <p className="v3-panel-note">The 25 who spent most.</p>}</>}
+  </section>);
+}
 const V3_SEG_ORDER = ['Champion', 'Loyal', 'Promising (new)', 'At risk', 'Dormant (one-time)'];
 const v3Dp1Num = v => (fmtOk(v) ? Number(v).toFixed(1) : FMT_NONE);
 function V3Customers({ start, period, customActive }) {
@@ -21335,6 +21393,14 @@ function V3Customers({ start, period, customActive }) {
   useV3Rows('move-extras', V3_MOVE_EXTRAS_Q);
   const [drv, setDrv] = React.useState(null);
   const [drawer, setDrawer] = React.useState(null);   // { id, mode }
+  // A link to the lists (the win-back check, Ask) opens At risk, the group it names. Read while rendering:
+  // the anchor inside Customer groups clears the jump in its own effect, before this component's effects run.
+  const [grp, setGrp] = React.useState(() => (typeof window !== 'undefined' && window.__oiV3Anchor === 'segments' ? 'At risk' : null));   // the group whose people are open
+  React.useEffect(() => {
+    const on = () => { if (window.__oiV3Anchor === 'segments') setGrp(g => g || 'At risk'); };
+    on(); window.addEventListener('oi-v3-anchor', on);
+    return () => window.removeEventListener('oi-v3-anchor', on);
+  }, []);
   const nvrBy = React.useMemo(() => {
     if (!nvr.rows) return null;
     const m = {};
@@ -21550,14 +21616,16 @@ function V3Customers({ start, period, customActive }) {
 
     {seg.err ? <section className="v3-panel" aria-label="Customer groups"><div className="v3-panel-head"><h2>Customer groups</h2></div><p className="v3-panel-note">Customer groups could not load. Refresh the page to try again.</p></section>
       : groups.length > 0 && (<section className="v3-panel" aria-label="Customer groups">
-      <div className="v3-panel-head"><h2>Customer groups</h2><span className="v3-muted">All customers to date</span>
-        <button type="button" className="v3-panel-link" onClick={() => window.__oiGo && window.__oiGo('customers', 'segments')}>Build a list</button></div>
-      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
-        <thead><tr><th>Group</th><th className="r">Customers</th><th className="r">Can be emailed</th><th className="r">Sales to date</th><th className="r v3-mk-opt">Sales each</th></tr></thead>
-        <tbody>{groups.map(g => (<tr key={g.name}><td>{g.name}</td><td className="r">{fmtCount(g.n)}</td><td className="r">{fmtCount(g.mail)}</td><td className="r">{fmtMoney(g.net)}</td><td className="r v3-mk-opt">{g.n > 0 ? fmtMoney(g.net / g.n) : FMT_NONE}</td></tr>))}
-          <tr className="tot"><td>All groups</td><td className="r">{fmtCount(sumOf(groups, 'n'))}</td><td className="r">{fmtCount(sumOf(groups, 'mail'))}</td><td className="r">{fmtMoney(sumOf(groups, 'net'))}</td><td className="r v3-mk-opt">{sumOf(groups, 'n') > 0 ? fmtMoney(sumOf(groups, 'net') / sumOf(groups, 'n')) : FMT_NONE}</td></tr>
+      <div className="v3-panel-head"><h2>Customer groups</h2><span className="v3-muted">All customers to date</span></div>
+      <V3Anchor id="segments"/>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-cust-groups">
+        <thead><tr><th>Group</th><th className="r">Customers</th><th className="r">Can be emailed</th><th className="r">Sales to date</th><th className="r v3-mk-opt">Sales each</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
+        <tbody>{groups.map(g => (<tr key={g.name} className={grp === g.name ? 'on' : ''}><td>{g.name}</td><td className="r">{fmtCount(g.n)}</td><td className="r">{fmtCount(g.mail)}</td><td className="r">{fmtMoney(g.net)}</td><td className="r v3-mk-opt">{g.n > 0 ? fmtMoney(g.net / g.n) : FMT_NONE}</td>
+          <td className="r"><button type="button" className="v3-btn v3-btn-sm" aria-expanded={grp === g.name} onClick={() => setGrp(grp === g.name ? null : g.name)}>{grp === g.name ? 'Hide' : 'View'}</button></td></tr>))}
+          <tr className="tot"><td>All groups</td><td className="r">{fmtCount(sumOf(groups, 'n'))}</td><td className="r">{fmtCount(sumOf(groups, 'mail'))}</td><td className="r">{fmtMoney(sumOf(groups, 'net'))}</td><td className="r v3-mk-opt">{sumOf(groups, 'n') > 0 ? fmtMoney(sumOf(groups, 'net') / sumOf(groups, 'n')) : FMT_NONE}</td><td/></tr>
         </tbody></table></div>
     </section>)}
+    {grp && !seg.err && groups.some(g => g.name === grp) && <V3CustomerList key={grp} name={grp} rows={segRows} onClose={() => setGrp(null)}/>}
 
     {(cv.length >= 3 || measures.length > 0) && (<section className="v3-panel" aria-label="Customer value">
       <div className="v3-panel-head"><h2>Customer value</h2><span className="v3-muted">Your own customers, first 12 months</span></div>
@@ -22237,17 +22305,6 @@ function V3ReturningBaseline() {
   const act = useV3Rows('cust-ret-monthly', (sb, b) => sb.from('vw_daily_new_vs_returning')
     .select('order_date,net_revenue').eq('brand_id', b).eq('ledger', 'dtc').eq('customer_type', 'returning')
     .gte('order_date', v3MonthAdd(cur, -12)).order('order_date', { ascending: true }).limit(1000));
-  const goal = useV3Rows('cust-goal', (sb, b) => sb.from('vw_forecast_vs_goal_net')
-    .select('period_start,period_end,revenue_target').eq('brand_id', b).lte('period_start', today).gte('period_end', today).limit(1));
-  const ue = useV3Rows('cust-ue', V3_UE_Q);
-  const aov = useV3Rows('cust-aov', (sb, b) => sb.from('vw_brand_aov').select('window_label,new_aov').eq('brand_id', b));
-  const figB = useV3Figures();   // plan_cost_per_new_customer and cac_30d (1080)
-  const g0 = (goal.rows || [])[0] || null;
-  // The quarter plan at the goal (shared with Goal & costs): its spend carries the season.
-  const gp = useV3Rows(g0 && Number(g0.revenue_target) > 0 ? 'goal-plan-' + String(g0.period_start).slice(0, 10) + '-' + Number(g0.revenue_target) : 'goal-plan-none',
-    g0 && Number(g0.revenue_target) > 0 ? v3PlanQ(String(g0.period_start).slice(0, 10), String(g0.period_end).slice(0, 10), Number(g0.revenue_target)) : () => Promise.resolve({ data: [] }));
-  const soFar = useV3Rows('cust-goal-sofar-' + (g0 ? g0.period_start : 'none'), (sb, b) => g0 ? sb.from('vw_daily_new_vs_returning')
-    .select('net_revenue').eq('brand_id', b).eq('ledger', 'dtc').gte('order_date', g0.period_start).lt('order_date', today).limit(1000) : Promise.resolve({ data: [] }));
   const d = React.useMemo(() => {
     const r = {}; (decay.rows || []).forEach(x => { r[Number(x.month_offset)] = Number(x.rev_per_customer) || 0; });
     if (!base.rows || !act.rows || [10, 11, 12].some(k => r[k] == null)) return null;
@@ -22266,58 +22323,32 @@ function V3ReturningBaseline() {
     const past = months.filter(m => m.past), ahead = months.filter(m => !m.past);
     const sum = (a, k) => a.reduce((s, m) => s + (m[k] || 0), 0);
     const peaks = past.filter(m => m.exp > 0 && m.act >= m.exp * 1.5).sort((a, b) => b.act / b.exp - a.act / a.exp).slice(0, 3);
-    // Existing customers' share of the rest of the goal period: whole months ahead inside it, the
-    // current month prorated to the days left.
-    let plan = null;
-    if (g0 && Number(g0.revenue_target) > 0 && soFar.rows) {
-      const end = String(g0.period_end).slice(0, 10), dim = new Date(Date.UTC(Number(cur.slice(0, 4)), Number(cur.slice(5, 7)), 0)).getUTCDate();
-      const left = (dim - Number(today.slice(8, 10)) + 1) / dim;
-      const existing = ahead.filter(m => m.iso <= end).reduce((s, m, i) => s + m.exp * (i === 0 ? left : 1), 0);
-      const done = soFar.rows.reduce((a, x) => a + (Number(x.net_revenue) || 0), 0);
-      const remaining = Number(g0.revenue_target) - done, fromNew = remaining - existing;
-      const L = (ue.rows || [])[0] || null, A = (aov.rows || []).find(x => x.window_label === 'current_90d') || (aov.rows || [])[0] || null;
-      // not a registered figure: the 90-day order value of a first order (aov_30d is every order's)
-      const firstValue = A && Number(A.new_aov) > 0 ? Number(A.new_aov) : null;
-      const c30 = v3Fig('cac_30d', figB.rows).value, ncac = c30 > 0 ? c30 : null;   // cac_30d, not the 90-day cost
-      const daysLeft = Math.max(1, (new Date(end) - new Date(today)) / 864e5 + 1);
-      const spendNow = window.GRETA_HEADLINE && Number(window.GRETA_HEADLINE.paid_spend_30d) > 0 ? Number(window.GRETA_HEADLINE.paid_spend_30d) : null;
-      const customers = firstValue && fromNew > 0 ? fromNew / firstValue : null;
-      // Ad spend still to come in the goal plan: months ahead, the current one pro rata. The plan's
-      // spend follows the season (Black Friday's customers come cheaper); a flat 90-day cost per
-      // customer here read £25k a month against the plan's £13k.
-      const GP = (gp.rows || [])[0] || null;
-      const spend = GP && Array.isArray(GP.months) ? Math.max(0, Number(GP.spend_cap) - v3PlanToDate(GP.months, 'spend', today)) : null;
-      // plan_cost_per_new_customer (1080) is the goal plan's, which fn_plan_for picks for a goal with a sales target
-      const pc = v3Fig('plan_cost_per_new_customer', figB.rows).value;
-      const avgCac = pc > 0 ? pc : GP && GP.breakdown && Number(GP.breakdown.cost_per_new_customer) > 0 ? Number(GP.breakdown.cost_per_new_customer) : null;
-      plan = { target: Number(g0.revenue_target), start: g0.period_start, end, done, remaining, existing, fromNew, firstValue, ncac: avgCac || ncac, customers, spend,
-        spendMonth: spend ? spend / daysLeft * 30 : null, spendNow, seasonal: !!avgCac };
-    }
     return { months, ahead, next6: sum(ahead, 'exp'), a12: sum(past, 'act'), e12: sum(past, 'exp'), peaks,
-      peakLift: peaks.reduce((a, m) => a + (m.act - m.exp), 0), plan };
-  }, [base.rows, decay.rows, act.rows, goal.rows, soFar.rows, ue.rows, aov.rows, gp.rows, figB.rows, cur, today]);
-
-  if (base.err || decay.err || act.err) return null;
-  if (!base.rows || !decay.rows || !act.rows) return <V3SkeletonRows n={3}/>;
+      peakLift: peaks.reduce((a, m) => a + (m.act - m.exp), 0) };
+  }, [base.rows, decay.rows, act.rows, cur]);
+  // 7 Nov: a panel on Customers' Customer file tab. The goal split that sat under it is Growth plan's to make;
+  // the forecast reads rounded, as every forecast does.
+  const head = <div className="v3-panel-head"><h2>Returning customers, next six months</h2><span className="v3-muted">Customers already won</span>
+    <V3Conf state="likely" detail="Built from your own customers: how many you won each month, and what customers like them spent in each month after their first order. Beyond a customer’s first year it assumes they keep spending at their month 10 to 12 rate."/></div>;
+  if (base.err || decay.err || act.err) return <section className="v3-panel" aria-label="Returning customers, next six months">{head}<p className="v3-panel-note">The returning-customer forecast could not load. Refresh the page to try again.</p></section>;
+  if (!base.rows || !decay.rows || !act.rows) return <section className="v3-panel" aria-busy="true">{head}<div className="v3-panel-pad"><V3SkeletonRows n={3}/></div></section>;
   if (!d || d.next6 <= 0) return null;   // under a year of history: no curve to project from
-  const first = d.ahead[0].exp, last = d.ahead[d.ahead.length - 1].exp, P = d.plan;
+  const first = d.ahead[0].exp, last = d.ahead[d.ahead.length - 1].exp;
   const tip = ({ active, payload }) => {
     if (!active || !payload || !payload.length) return null;
     const p = payload[0].payload;
     return (<div className="v3-tip"><b>{v3Month(p.iso, 'long')}</b>
       {p.past && <span>Returning customers spent <em>{fmtMoney(p.act)}</em></span>}
-      <span>Expected from customers already won <em>{fmtMoney(p.exp)}</em></span></div>);
+      <span>Expected from customers already won <em>{p.past ? fmtMoney(p.exp) : v3GbpRound(p.exp)}</em></span></div>);
   };
-  const goalRange = P ? v3Month(P.start) + '–' + v3Month(P.end, 'long') : '';
-  return (<div className="v3-page-stack"><section className="v3-sec">
-    <div className="v3-kick">The customers you already have, next six months</div>
-    <p className="v3-verdict">Customers you have already won are expected to spend {fmtMoney(d.next6)} over the next six months.</p>
-    <p className="v3-note v3-measure">That is what each month starts with before anyone new buys: {fmtMoney(Math.min(first, last))} to {fmtMoney(Math.max(first, last))} a month,
-      {last < first ? ' easing as older customers buy less often.' : ' rising as recent customers come back.'}
-      {' '}Run over the last twelve months, the same sum expected {fmtMoney(d.e12)}. They actually spent {fmtMoney(d.a12)}.
-      {d.peaks.length > 0 && <> The gap came in {v3Names(d.peaks.map(m => v3Month(m.iso, 'long')))}, when sale events lifted their spending {fmtMoney(d.peakLift)} above what was expected.</>}
-      {' '}<V3Conf state="likely" detail="Built from your own customers: how many you won each month, and what customers like them spent in each month after their first order. Beyond a customer’s first year it assumes they keep spending at their month 10 to 12 rate."/></p>
-    <figure className="v3-chart">
+  const rows = [
+    ['Next six months', v3GbpRound(d.next6), 'Before anyone new buys'],
+    ['Each month', v3GbpRound(Math.min(first, last)) + ' to ' + v3GbpRound(Math.max(first, last)), last < first ? 'Easing as older customers buy less often' : 'Rising as recent customers come back'],
+    ['Last 12 months, expected', v3GbpRound(d.e12), 'The same method run on the past year'],
+    ['Last 12 months, spent', fmtMoney(d.a12), d.peaks.length ? 'Sale months ' + v3Names(d.peaks.map(m => v3Month(m.iso, 'long'))) + ' lifted it ' + v3GbpRound(d.peakLift) + ' above expected' : ''],
+  ];
+  return (<section className="v3-panel" aria-label="Returning customers, next six months">{head}
+    <div className="v3-panel-pad"><figure className="v3-chart" aria-label="Returning customers’ sales by month">
       <figcaption><span className="v3-chart-title">Returning customers’ sales by month</span>
         <span className="v3-legend"><i style={{ background: PAL.ret }}/>What they spent <i style={{ background: palAlpha(PAL.ret, 0.3) }}/>Expected ahead <i className="dash"/>Expected from customers already won</span></figcaption>
       <R.ResponsiveContainer width="100%" height={240}>
@@ -22331,35 +22362,13 @@ function V3ReturningBaseline() {
           <R.Line dataKey="exp" type="linear" stroke={PAL.muted} strokeWidth={1.5} strokeDasharray="4 3" dot={false} isAnimationActive={false}/>
         </R.ComposedChart>
       </R.ResponsiveContainer>
-      <p className="micro muted v3-measure">Sales from customers on their second order or later, after discounts and refunds. Customers you win from now on come on top of this.</p>
-    </figure>
-  </section>
-
-  {P && P.fromNew > 0 && (<section className="v3-sec">
-    <h2 className="v3-sec-title">What that means for your goal <span className="v3-muted">{goalRange}</span></h2>
-    <div className="v3-stat-grid">
-      <div className="v3-stat"><div className="v3-stat-lab"><span>Sales goal still to make</span></div><div className="v3-stat-val">{fmtMoney(P.remaining)}</div>
-        <div className="v3-stat-foot"><span className="v3-muted">of {fmtMoney(P.target)}; {fmtMoney(P.done)} made so far</span></div></div>
-      <div className="v3-stat"><div className="v3-stat-lab"><span>From customers you already have</span></div><div className="v3-stat-val">{fmtMoney(P.existing)}</div>
-        <div className="v3-stat-foot"><span className="v3-muted">{fmtPctN(P.existing / P.remaining)} of it, in an ordinary month</span></div></div>
-      <div className="v3-stat"><div className="v3-stat-lab"><span>Has to come from new customers</span></div><div className="v3-stat-val">{fmtMoney(P.fromNew)}</div>
-        <div className="v3-stat-foot"><span className="v3-muted">{P.customers ? 'about ' + fmtCount(P.customers) + ' first orders at ' + fmtMoney(P.firstValue) : 'first orders and their early repeats'}</span></div></div>
-      {P.spendMonth != null && <div className="v3-stat"><div className="v3-stat-lab"><span>Ad spend the goal would take a month</span></div><div className="v3-stat-val">{fmtMoney(P.spendMonth)}</div>
-        <div className="v3-stat-foot"><span className="v3-muted">{P.seasonal ? 'from the quarter plan, at ' + fmtMoney(P.ncac) + ' per new customer on average, Black Friday included' : 'at ' + fmtMoney(P.ncac) + ' to win each new customer (the cost of a new customer, last 30 days)'}{P.spendNow ? '; you spend ' + fmtMoney(P.spendNow) + ' now' : ''}</span></div></div>}
-    </div>
-    <p className="v3-note v3-measure">
-      {P.spendNow && P.spendMonth > P.spendNow * 1.2
-        ? <V3GoalAdsNote times={fmtTimes(P.spendMonth / P.spendNow, 1)} seasonal={P.seasonal}/>
-        : <>Three things make the goal cheaper to reach: </>}
-      a bigger first order, so you need fewer new customers; a reason for existing customers to come back
-      {d.peakLift > 0 ? ' (your sale months brought ' + fmtMoney(d.peakLift) + ' extra from them alone)' : ''}; and a second order sooner.
-    </p>
-    <div className="v3-btn-row">
-      <button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('products')}>Raise order value on Products</button>
-      <button type="button" className="v3-btn v3-btn-q v3-btn-sm" onClick={() => window.__oiGo && window.__oiGo('calendar')}>Plan an event for existing customers</button>
-    </div>
-  </section>)}
-  </div>);
+    </figure></div>
+    <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
+      <thead><tr><th>Measure</th><th className="r">Figure</th><th>Note</th></tr></thead>
+      <tbody>{rows.map(m => (<tr key={m[0]}><td className="v3-web-wrap">{m[0]}</td><td className="r">{m[1]}</td><td className="v3-web-wrap v3-muted">{m[2]}</td></tr>))}</tbody>
+    </table></div>
+    <p className="v3-panel-note">Second and later orders, after discounts and refunds. Customers won from now on come on top.</p>
+  </section>);
 }
 
 // ── Which channel verdicts survive a test (Marketing) — anatomy Stage 5A ─────────────────────
@@ -27205,50 +27214,57 @@ const V3_AM_CUST_Q = (sb, b) => sb.from('anatomy_metric_value').select('metric_k
 function V3CustomerFile() {
   const f = useV3Rows('cust-file', V3_CFILE_Q);
   const a = useV3Rows('cust-file-am', V3_AM_CUST_Q);
-  if (f.err) return <V3LoadFailed what="your customer file" onRetry={f.retry}/>;
-  if (!f.rows) return <V3SkeletonRows n={2}/>;
-  if (!f.rows.length) return null;
+  if (f.err) return <section className="v3-panel" aria-label="Customer file"><div className="v3-panel-pad"><V3LoadFailed what="Your customer file" onRetry={f.retry}/></div></section>;
+  if (!f.rows) return <section className="v3-panel" aria-busy="true"><div className="v3-panel-pad"><V3SkeletonRows n={2}/></div></section>;
+  if (!f.rows.length) return <section className="v3-panel" aria-label="Customer file"><p className="v3-panel-note">The customer file shows once a full month of orders is on file.</p></section>;
   const am = {}; (a.rows || []).forEach(r => { am[r.metric_key] = r; });
   const now = f.rows[0], yoy = am.active_file && am.active_file.detail ? Number(am.active_file.detail.yoy_pct) : null;
   const lapse = am.lapse_window ? Number(am.lapse_window.value) : null, p50 = am.lapse_window && am.lapse_window.detail ? Number(am.lapse_window.detail.p50_days) : null;
-  const odds = am.active_file && am.active_file.detail ? am.active_file.detail.peak_odds : null;
-  const months = f.rows.filter(r => r.complete).slice(0, 12).reverse()
+  const full = f.rows.filter(r => r.complete).slice(0, 12);
+  const months = full.slice().reverse()
     .map(r => ({ label: gpMonthName(String(r.month_start).slice(0, 10)).slice(0, 3), gained: Number(r.new_customers) + Number(r.reactivated), lapsed: -Number(r.lapsed), net: Number(r.net_change) }));
   const last = months.length ? months[months.length - 1] : null;
-  return (<section className="v3-sec">
-    <h2 className="v3-sec-title">Your customer file</h2>
-    <div className="v3-stat-grid">
-      <div className="v3-stat"><div className="v3-stat-lab"><span>Customers who bought in the last 12 months</span></div>
-        <div className="v3-stat-val">{fmtCount(Number(now.active_end))}</div>
-        <div className="v3-stat-foot">{yoy != null ? <span className={yoy >= 0 ? 'v3-up' : 'v3-down'}>{(yoy >= 0 ? '+' : '−') + Math.abs(Math.round(yoy)) + '%'} on a year ago</span> : <span className="v3-muted">an order in the last 12 months</span>}</div></div>
-      {last && <div className="v3-stat"><div className="v3-stat-lab"><span>Change last month</span></div>
-        <div className="v3-stat-val">{(last.net >= 0 ? '+' : '−') + fmtCount(Math.abs(last.net))}</div>
-        <div className="v3-stat-foot"><span className="v3-muted">{fmtCount(last.gained)} new or back, {fmtCount(-last.lapsed)} lapsed</span></div></div>}
-      {lapse != null && <div className="v3-stat"><div className="v3-stat-lab"><span>When customers stop coming back</span></div>
-        <div className="v3-stat-val">{fmtCount(lapse)} days</div>
-        <div className="v3-stat-foot"><span className="v3-muted">80% of second orders arrive by then{p50 != null ? '; half within ' + fmtCount(p50) + ' days' : ''}</span></div></div>}
-      {am.heavy_buyer_share && am.heavy_buyer_share.value != null && (() => { const hv = Number(am.heavy_buyer_share.value); return (<div className="v3-stat"><div className="v3-stat-lab"><span>Customers with three or more orders</span></div>
-        <div className="v3-stat-val">{fmtPctN(hv)}</div>
-        <div className="v3-stat-foot"><span className={hv < 0.2 ? 'v3-down' : 'v3-muted'}>healthy brands hold 20–30%</span></div></div>); })()}
-      {am.ltv_60d && am.ltv_60d.value != null && (<div className="v3-stat"><div className="v3-stat-lab"><span>Repeat sales in a customer’s first 60 days</span></div>
-        <div className="v3-stat-val">+{fmtPctN(Number(am.ltv_60d.value))}</div>
-        <div className="v3-stat-foot"><span className="v3-muted">on top of the first order</span></div></div>)}
-    </div>
-    {months.length >= 4 && <figure className="v3-chart">
-      <figcaption><span className="v3-chart-title">Customers gained and lapsed, by month</span>
-        <span className="v3-legend"><i style={{ background: PAL.good }}/>New or back <i style={{ background: PAL.bad }}/>Lapsed</span></figcaption>
-      <Recharts.ResponsiveContainer width="100%" height={160}>
-        <Recharts.BarChart data={months} stackOffset="sign" margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
-          <Recharts.CartesianGrid/><Recharts.XAxis dataKey="label"/><Recharts.YAxis/>
-          <Recharts.ReferenceLine y={0} stroke={PAL.muted}/>
-          <Recharts.Tooltip formatter={(v, k) => [fmtCount(Math.abs(v)), k === 'gained' ? 'New or back' : 'Lapsed']}/>
-          <Recharts.Bar dataKey="gained" stackId="a" fill={PAL.good}/><Recharts.Bar dataKey="lapsed" stackId="a" fill={PAL.bad}/>
-        </Recharts.BarChart>
-      </Recharts.ResponsiveContainer>
-    </figure>}
-    <p className="v3-note v3-measure">{yoy != null && odds ? <>A file that grows 10% or more in a year beat the previous Black Friday {odds} across other brands; yours is {yoy >= 0 ? 'up' : 'down'} {Math.abs(Math.round(yoy))}%. That is a pattern, not a forecast. </> : null}
-      {lapse != null ? <>A customer who has not bought again within {fmtCount(lapse)} days is unlikely to come back unprompted, so that is when win-back should start, not later.</> : null}</p>
-  </section>);
+  const hv = am.heavy_buyer_share && am.heavy_buyer_share.value != null ? Number(am.heavy_buyer_share.value) : null;
+  const l60 = am.ltv_60d && am.ltv_60d.value != null ? Number(am.ltv_60d.value) : null;
+  const n = 1 + (last ? 1 : 0) + (lapse != null ? 1 : 0) + (hv != null ? 1 : 0) + (l60 != null ? 1 : 0);
+  const sg = v => (v >= 0 ? '+' : '−') + fmtCount(Math.abs(v));
+  return (<>
+    <section className="v3-panel v3-home-strip v3-mk-strip" aria-label="Customer file">
+      <div className="v3-home-group" style={{ '--n': n }}>
+        <div className="v3-home-group-h">Customer file<span>last 12 months</span></div>
+        <div className="v3-home-tiles">
+          <V3HomeTile k="Active customers" v={fmtCount(Number(now.active_end))} cls={yoy == null ? '' : yoy >= 0 ? 'v3-up' : 'v3-down'}
+            delta={yoy != null ? (yoy >= 0 ? '+' : '−') + Math.abs(Math.round(yoy)) + '% on a year ago' : 'an order in the last 12 months'} title="Customers with an order in the last 12 months"/>
+          {last && <V3HomeTile k="Change last month" v={sg(last.net)} delta={fmtCount(last.gained) + ' new or back, ' + fmtCount(-last.lapsed) + ' lapsed'}/>}
+          {lapse != null && <V3HomeTile k="Lapse point" v={fmtCount(lapse) + ' days'} delta={p50 != null ? 'half reorder within ' + fmtCount(p50) + ' days' : '80% of second orders by then'}
+            title="80% of second orders arrive by then"/>}
+          {hv != null && <V3HomeTile k="Three or more orders" v={fmtPctN(hv)} weak={hv < 0.2} delta="healthy brands hold 20–30%"/>}
+          {l60 != null && <V3HomeTile k="Repeat sales by day 60" v={'+' + fmtPctN(l60)} delta="on top of the first order"/>}
+        </div></div>
+    </section>
+    {months.length >= 4 && (<section className="v3-panel" aria-label="Gained and lapsed">
+      <div className="v3-panel-head"><h2>Gained and lapsed</h2><span className="v3-muted">By month</span></div>
+      <div className="v3-panel-pad"><figure className="v3-chart" aria-label="Customers gained and lapsed by month">
+        <figcaption><span className="v3-chart-title">Customers</span>
+          <span className="v3-legend"><i style={{ background: PAL.nw }}/>New or back <i style={{ background: PAL.neutral }}/>Lapsed</span></figcaption>
+        <Recharts.ResponsiveContainer width="100%" height={240}>
+          <Recharts.BarChart data={months} stackOffset="sign" margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+            <Recharts.CartesianGrid/><Recharts.XAxis dataKey="label"/><Recharts.YAxis tickFormatter={v => fmtCount(v)}/>
+            <Recharts.ReferenceLine y={0} stroke={PAL.muted}/>
+            <Recharts.Tooltip cursor={false} formatter={(v, k) => [fmtCount(Math.abs(v)), k === 'gained' ? 'New or back' : 'Lapsed']}/>
+            <Recharts.Bar dataKey="gained" stackId="a" fill={PAL.nw} isAnimationActive={false}/><Recharts.Bar dataKey="lapsed" stackId="a" fill={PAL.neutral} isAnimationActive={false}/>
+          </Recharts.BarChart>
+        </Recharts.ResponsiveContainer>
+      </figure></div>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-cust-months">
+        <thead><tr><th>Month</th><th className="r">New</th><th className="r v3-mk-opt">Back</th><th className="r">Lapsed</th><th className="r">Change</th><th className="r v3-mk-opt">Active at month end</th></tr></thead>
+        <tbody>{full.map(r => (<tr key={r.month_start}><td>{v3Month(String(r.month_start).slice(0, 10), 'long')}</td>
+          <td className="r">{fmtCount(Number(r.new_customers))}</td><td className="r v3-mk-opt">{fmtCount(Number(r.reactivated))}</td>
+          <td className="r">{fmtCount(Number(r.lapsed))}</td><td className="r">{sg(Number(r.net_change))}</td><td className="r v3-mk-opt">{fmtCount(Number(r.active_end))}</td></tr>))}</tbody>
+      </table></div>
+      {lapse != null && <p className="v3-panel-note">A customer with no order in {fmtCount(lapse)} days rarely comes back unprompted: start win-back then.</p>}
+    </section>)}
+  </>);
 }
 // Growth plan: CTC's acquisition checks (0350), one figure each from anatomy_metric_value, worded on the
 // server. The CAC-curve figures are estimates while the curve's range is wide; the tile says so.
@@ -27307,6 +27323,21 @@ function V3GoldenRule() {
 // Marketing: creative demand (vw_creative_demand, 0330), on CTC's measures with CTC's bands. Before this
 // the front end read none of it.
 const V3_CDEM_Q = (sb, b) => sb.from('vw_creative_demand').select('*').eq('brand_id', b).limit(1);
+// Customers (7 Nov): the page, and the customer file over twelve months. Cohorts repeated the page's
+// Customer value and By period; the lists fold became View on Customer groups.
+const V3_CUST_TAB = { overview: 'overview', segments: 'overview', cohorts: 'overview', file: 'file', baseline: 'file' };
+const V3_CUST_FOLLOWS = { overview: true };
+function V3CustomersTabs({ start, period, customActive }) {
+  const [tab, pick, seen] = useV3PageTabs(V3_CUST_TAB, V3_CUST_FOLLOWS);
+  const TABS = [['overview', 'Overview'], ['file', 'Customer file']];
+  return (<div className="v3-home v3-profit v3-marketing v3-customers v3-goal-page">
+    <div className="v3-tabs v3-goal-tabs" role="tablist" aria-label="Customers">
+      {TABS.map(t => <button key={t[0]} type="button" role="tab" aria-selected={tab === t[0]} className={'v3-tab' + (tab === t[0] ? ' on' : '')} onClick={() => pick(t[0])}>{t[1]}</button>)}
+    </div>
+    {seen.overview && <div role="tabpanel" hidden={tab !== 'overview'}><V3Customers start={start} period={period} customActive={customActive}/></div>}
+    {seen.file && <div className="v3-home" role="tabpanel" hidden={tab !== 'file'}><V3CustomerFile/><V3ReturningBaseline/></div>}
+  </div>);
+}
 const V3_REV_TAB = { overview: 'overview', week: 'overview', quarter: 'health', alerts: 'overview', health: 'health' };
 const V3_REV_FOLLOWS = { overview: true };
 function V3ReviewTabs() {
@@ -27481,14 +27512,7 @@ const V3_PAGES = {
   website: (p) => <V3WebsiteTabs start={p.start} period={p.period} customActive={p.customActive}/>,
   // Products leads with a live view (V3Products). The panels below it were built on static snapshots,
   // weeks old for frkl and empty for every other brand, so they sit behind a disclosure.
-  customers: (p) => (<>
-    {/* 4 Nov: the Home pattern. The folds are the older detail, under nouns. */}
-    <V3Customers start={p.start} period={p.period} customActive={p.customActive}/>
-    <V3More id="cust-file" label="Customer file"><V3CustomerFile/></V3More>
-    <V3More id="cust-segments" label="Customer lists"><V3Anchor id="segments"/><CustomerSegments/></V3More>
-    <V3More id="cust-baseline" label="Existing customers, next six months"><V3ReturningBaseline/></V3More>
-    <V3More id="cust-more" label="Cohorts"><Customers/><V3Anchor id="cohorts"/><CohortsPanel/></V3More>
-  </>),
+  customers: (p) => <V3CustomersTabs start={p.start} period={p.period} customActive={p.customActive}/>,
   // 5 Nov: tabs. Product detail held nothing the Products table does not (its panels read retired snapshots).
   products: () => <V3ProductsTabs/>,
   competitors: (p) => (<>
