@@ -19442,6 +19442,7 @@ function V3WhyPanel({ e, onClose }) {
         {e.channel && !grey && <V3ChannelFacts e={e}/>}
       </dl>}
       {e.reason && <p className="v3-drawer-p">{e.reason}</p>}
+      {e.channel && !grey && e.channel.elasticity > 0 && <V3SpendCurve key={e.id} c={e.channel}/>}
       {grey ? (<>
         {!e.reason && <p className="v3-drawer-p">There is not enough data to judge this yet.</p>}
         {e.fix_page && V3_LIGHT_FIX[e.fix_page] && <p><button type="button" className="v3-btn v3-btn-sm" onClick={() => go(e.fix_page)}>{V3_LIGHT_FIX[e.fix_page]}</button></p>}
@@ -19496,6 +19497,77 @@ function V3ChannelFacts({ e }) {
     {c.decision && <div><dt>Decision</dt><dd><V3ChanPill d={c.decision}/></dd></div>}
     {c.pace_pct != null && <div><dt>Spend vs plan</dt><dd>{Math.round(c.pace_pct)}%</dd></div>}
   </>);
+}
+// The channel's spend curve (1197): what the next £1 brings back at any 30-day spend on this channel, from the brand's
+// own fit on the whole ad platform. next(S) = m0 (S/S0)^(e-1); first-order sales from S0 to S = m0 S0 / e ((S/S0)^e - 1),
+// where S is the platform's spend with this channel moved and the rest held. Drag on the chart or the slider.
+const V3_PLATFORM_NAME = { google: 'Google', meta: 'Meta', tiktok: 'TikTok', microsoft: 'Microsoft', pinterest: 'Pinterest' };
+const v3RoundSales = v => { const a = Math.abs(v), s = a >= 1000 ? 100 : 10; return Math.round(v / s) * s; };
+function V3SpendCurve({ c }) {
+  const e = Number(c.elasticity), S0 = Number(c.curve_spend_30d), s0 = Number(c.spend_30d), m0 = Number(c.next_pound);
+  const lo0 = Number(c.next_pound_lo), hi0 = Number(c.next_pound_hi), need = Number(c.next_pound_line);
+  const plan = c.plan_30d != null ? Number(c.plan_30d) : null;
+  const ok = e > 0 && S0 > 0 && s0 > 0 && isFinite(m0) && isFinite(need);
+  // Read near what the fit saw: the platform from a quarter of today's spend up to double it
+  const sMin = Math.max(0, s0 - 0.75 * S0), sMax = s0 + S0;
+  const step = sMax > 20000 ? 100 : sMax > 4000 ? 50 : 10;
+  const snap = v => Math.max(sMin, Math.min(sMax, Math.round(v / step) * step));
+  const [s, setS] = React.useState(s0);   // now is exact; a drag snaps to the step
+  const plot = React.useRef(null);
+  if (!ok) return null;
+  const f = x => Math.pow(Math.max(1e-6, S0 + (x - s0)) / S0, e - 1);
+  const gain = (m, x) => m * S0 / e * (Math.pow(Math.max(1e-6, S0 + (x - s0)) / S0, e) - 1);
+  const hiAt = x => (isFinite(hi0) ? hi0 : m0) * f(x);
+  const yMax = Math.min(Math.max(hiAt(sMin), need * 1.4), Math.max(need, isFinite(hi0) ? hi0 : m0) * 2.5);
+  const W = 1000, H = 400, X = x => (x - sMin) / (sMax - sMin) * W, Y = v => H - Math.max(0, Math.min(1, v / yMax)) * H;
+  const pts = Array.from({ length: 61 }, (_, i) => sMin + (sMax - sMin) * i / 60);
+  const line = pts.map((x, i) => (i ? 'L' : 'M') + X(x).toFixed(1) + ' ' + Y(m0 * f(x)).toFixed(1)).join(' ');
+  const band = isFinite(lo0) && isFinite(hi0) ? pts.map((x, i) => (i ? 'L' : 'M') + X(x).toFixed(1) + ' ' + Y(hi0 * f(x)).toFixed(1)).join(' ')
+    + ' ' + pts.slice().reverse().map(x => 'L' + X(x).toFixed(1) + ' ' + Y(lo0 * f(x)).toFixed(1)).join(' ') + ' Z' : null;
+  const pct = v => (Math.max(0, Math.min(1, v)) * 100).toFixed(2) + '%';
+  const at = x => { const r = plot.current && plot.current.getBoundingClientRect(); if (r && r.width) setS(snap(sMin + (x - r.left) / r.width * (sMax - sMin))); };
+  const onDown = ev => { ev.currentTarget.setPointerCapture(ev.pointerId); at(ev.clientX); };
+  const onMove = ev => { if (ev.currentTarget.hasPointerCapture(ev.pointerId)) at(ev.clientX); };
+  const nx = m0 * f(s), nlo = isFinite(lo0) ? lo0 * f(s) : null, nhi = isFinite(hi0) ? hi0 * f(s) : null;
+  const st = nlo != null && nlo >= need ? ['Above the line', 'good'] : nhi != null && nhi < need ? ['Below the line', 'bad'] : ['Either side', 'warn'];
+  const dS = Math.abs(s - s0) < step ? 0 : s - s0, dR = v3RoundSales(gain(m0, s));
+  const dLo = isFinite(lo0) ? v3RoundSales(gain(lo0, s)) : null, dHi = isFinite(hi0) ? v3RoundSales(gain(hi0, s)) : null;
+  const sign = v => (v > 0 ? '+' : '') + fmtMoney(v);
+  const plat = V3_PLATFORM_NAME[c.curve_platform] || 'this platform', shared = S0 > s0 * 1.05;
+  const inPlan = plan != null && plan >= sMin && plan <= sMax;
+  return (<section className="v3-drawer-sec v3-curve">
+    <h3>Spend curve</h3>
+    <div className="v3-curve-plot" ref={plot} onPointerDown={onDown} onPointerMove={onMove}>
+      <svg viewBox={'0 0 ' + W + ' ' + H} preserveAspectRatio="none" aria-hidden="true">
+        {band && <path className="v3-curve-band" d={band}/>}
+        <line className="v3-curve-need" x1="0" x2={W} y1={Y(need)} y2={Y(need)}/>
+        {inPlan && <line className="v3-curve-mark" x1={X(plan)} x2={X(plan)} y1="0" y2={H}/>}
+        <line className="v3-curve-mark" x1={X(s0)} x2={X(s0)} y1="0" y2={H}/>
+        <path className="v3-curve-line" d={line}/>
+        <line className="v3-curve-sel" x1={X(s)} x2={X(s)} y1="0" y2={H}/>
+      </svg>
+      <span className="v3-curve-y">{v3Per1(yMax)}</span>
+      <span className="v3-curve-needlab" style={{ top: pct(1 - need / yMax) }}>Pays within a year {v3Per1(need)}</span>
+      <span className="v3-curve-tag" style={{ left: pct((s0 - sMin) / (sMax - sMin)) }}>Now</span>
+      {inPlan && <span className="v3-curve-tag v3-curve-tag-b" style={{ left: pct((plan - sMin) / (sMax - sMin)) }}>Plan</span>}
+      <i className="v3-curve-dot" style={{ left: pct((s - sMin) / (sMax - sMin)), top: pct(1 - nx / yMax) }}/>
+    </div>
+    <div className="v3-curve-x"><span>{fmtMoneyK(sMin)}</span><span>Spend on this channel, 30 days</span><span>{fmtMoneyK(sMax)}</span></div>
+    <input type="range" className="v3-curve-range" min={sMin} max={sMax} step={step} value={s} onChange={ev => setS(snap(Number(ev.target.value)))}
+      aria-label="Spend on this channel, 30 days" aria-valuetext={fmtMoney(s)}/>
+    <div className="v3-curve-btns">
+      <button type="button" className="v3-btn v3-btn-sm" onClick={() => setS(s0)}>Now</button>
+      {inPlan && <button type="button" className="v3-btn v3-btn-sm" onClick={() => setS(snap(plan))}>Plan</button>}
+    </div>
+    <dl className="v3-drawer-facts">
+      <div><dt>Spend, 30 days</dt><dd>{fmtMoney(s)}{dS !== 0 && <small className="v3-why-range">{sign(dS)} on now</small>}</dd></div>
+      <div><dt>Next £1</dt><dd>{v3Per1(nx)}{nlo != null && nhi != null && <small className="v3-why-range">{v3Per1(nlo)} to {v3Per1(nhi)}</small>}</dd></div>
+      <div><dt>First-order sales, 30 days</dt><dd>{dS === 0 ? FMT_NONE : sign(dR)}{dS !== 0 && dLo != null && dHi != null && <small className="v3-why-range">{sign(Math.min(dLo, dHi))} to {sign(Math.max(dLo, dHi))}</small>}</dd></div>
+      <div><dt>Against the line</dt><dd><span className={'v3-pill v3-pill-' + st[1]}>{st[0]}</span></dd></div>
+    </dl>
+    <p className="v3-why-term">{c.curve_source === 'archetype_prior' ? 'Curve from similar brands; this brand has too few weeks of its own.'
+      : 'Curve fitted on ' + fmtCount(c.curve_weeks) + ' weeks of ' + plat + ' spend' + (shared ? ', shared by every ' + plat + ' campaign.' : '.')}</p>
+  </section>);
 }
 // One channel's return per £1 on the shared scale: the dot is the 30-day average, the bar the next £1 with its range,
 // the dashed lines break-even and the line the next £1 needs (pays within a year).

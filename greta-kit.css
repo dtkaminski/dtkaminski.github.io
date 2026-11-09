@@ -2541,6 +2541,24 @@ div:has(> .v3-profit) ~ .v3-today { gap: 0; }
 .v3-strip-key-next { width: var(--space-4); height: var(--size-strip-dot); border-radius: var(--radius-sm); background: var(--color-strip-range); border-left: 2px solid var(--color-strip-next); }
 .v3-strip-key-tick { height: var(--size-strip); border-left: 1px dashed var(--color-strip-line); }
 .v3-why-range { display: block; font-size: var(--text-xs); color: var(--color-faint); }
+.v3-curve-plot { position: relative; height: var(--size-curve-h); margin-top: var(--space-3); border-bottom: 1px solid var(--color-line); touch-action: none; cursor: ew-resize; user-select: none; }
+.v3-curve-plot svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: hidden; }
+.v3-curve-band { fill: var(--color-strip-range); }
+.v3-curve-line { fill: none; stroke: var(--color-strip-next); stroke-width: var(--size-curve-stroke); vector-effect: non-scaling-stroke; }
+.v3-curve-need { stroke: var(--color-strip-line); stroke-width: var(--size-curve-hair); stroke-dasharray: var(--size-curve-dash); vector-effect: non-scaling-stroke; }
+.v3-curve-mark { stroke: var(--color-line); stroke-width: var(--size-curve-hair); vector-effect: non-scaling-stroke; }
+.v3-curve-sel { stroke: var(--color-ink); stroke-width: var(--size-curve-hair); vector-effect: non-scaling-stroke; }
+.v3-curve-dot { position: absolute; width: var(--size-strip-dot); height: var(--size-strip-dot); border-radius: var(--radius-full); background: var(--color-strip-next); border: var(--size-curve-stroke) solid var(--color-panel); box-sizing: content-box; transform: translate(-50%, -50%); pointer-events: none; }
+.v3-curve-y, .v3-curve-needlab, .v3-curve-tag { position: absolute; font-size: var(--text-xs); color: var(--color-faint); pointer-events: none; }
+.v3-curve-y { left: 0; top: 0; padding-right: var(--space-1); background: var(--color-panel); font-family: var(--font-figure); }
+.v3-curve-needlab { right: 0; transform: translateY(-100%); padding-left: var(--space-1); background: var(--color-panel); font-family: var(--font-figure); }
+.v3-curve-tag { top: 0; transform: translateX(-50%); padding: 0 var(--space-1); background: var(--color-panel); }
+.v3-curve-tag-b { top: auto; bottom: 0; }
+.v3-curve-x { display: flex; justify-content: space-between; gap: var(--space-2); margin-top: var(--space-1); font-size: var(--text-xs); color: var(--color-faint); }
+.v3-curve-x span:first-child, .v3-curve-x span:last-child { font-family: var(--font-figure); }
+.v3-curve-range { display: block; width: 100%; margin: var(--space-3) 0 var(--space-2); accent-color: var(--color-ink); }
+.v3-curve-btns { display: flex; gap: var(--space-2); margin-bottom: var(--space-3); }
+.v3-curve .v3-drawer-facts { margin-bottom: var(--space-2); }
 @media (max-width: 767px) {
   .v3-ch-name { white-space: normal; }
   .v3-ch-table td, .v3-ch-table th { padding-left: var(--space-2); padding-right: var(--space-2); }

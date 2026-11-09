@@ -347,6 +347,11 @@ html[data-frame="product"] {
   --color-strip-next: var(--color-data-2);
   --color-strip-range: color-mix(in srgb, var(--color-data-2) 24%, transparent);
   --color-strip-line: var(--color-faint);
+  /* Spend curve in a channel's Why panel (1197): next £1 against 30-day spend, drawn in the strip's colours */
+  --size-curve-h: 160px;
+  --size-curve-stroke: 2px;
+  --size-curve-hair: 1px;
+  --size-curve-dash: 4 3;
 
   --shadow-panel: none;
   --shadow-raised: 0 8px 24px -6px rgba(26, 31, 36, 0.18), 0 2px 6px rgba(26, 31, 36, 0.06);
