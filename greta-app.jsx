@@ -24151,6 +24151,62 @@ function V3TrackRecord() {
     {autoList}
   </section>);
 }
+// Results (9 Nov): the actions that closed without a row in the list above, as a table on three tabs. Done holds only
+// moves the results list does not (it reads the same done actions through fn_brand_results); Skipped is the owner's;
+// Closed automatically is Greta's own closes (auto_closed_at, or 1064's one-row-per-lever skip), never graded.
+// It replaced the "All closed actions" fold, V3TrackRecord, whose done list repeated the results above it.
+function V3ClosedActions() {
+  const q = useV3Rows('act-track', (sb, b) => sb.from('actions')
+    .select('external_id,description,category,status,disposition_at,raised_at,verdict,predicted_window_days,predicted_metric_id,predicted_direction,grade:metadata->grade,auto:metadata->auto_closed_at,sup:metadata->suppressed_at')
+    .eq('brand_id', b).in('status', ['done', 'skipped', 'partial']).order('disposition_at', { ascending: false, nullsFirst: false }).limit(200));
+  const bj = useV3Rows('brand-joined', (sb, b) => sb.from('brands').select('created_at').eq('id', b).limit(1));
+  const res = useV3Rows('brand-results', V3_RESULTS_Q);
+  const [tab, setTab] = React.useState(null);
+  const [all, setAll] = React.useState(false);
+  const head = (n, only) => (<div className="v3-panel-head"><h2>Closed actions</h2>{n > 0 && <span className="v3-count">{fmtCount(n)}</span>}{only && <span className="v3-muted">{only}</span>}</div>);
+  if (q.err) return (<section className="v3-panel" aria-label="Closed actions">{head(0)}<p className="v3-panel-note">Closed actions could not load. Refresh the page to try again.</p></section>);
+  if (!q.rows || !(bj.rows || bj.err) || !(res.rows || res.err)) return null;
+  const joined = bj.rows && bj.rows[0] && bj.rows[0].created_at ? String(bj.rows[0].created_at) : null;
+  // tasks imported from before the brand joined Greta are not its record (0958)
+  const own = joined ? q.rows.filter(r => !r.raised_at || String(r.raised_at) >= joined) : q.rows;
+  const R0 = res.rows && res.rows[0], inResults = new Set((R0 && Array.isArray(R0.rows) ? R0.rows : []).map(r => r.external_id));
+  const isAuto = r => (r.auto && r.status === 'done') || (r.sup && r.status === 'skipped');
+  const groups = [
+    ['done', 'Done', own.filter(r => !isAuto(r) && (r.status === 'done' || r.status === 'partial') && !inResults.has(r.external_id))],
+    ['skipped', 'Skipped', own.filter(r => !isAuto(r) && r.status === 'skipped')],
+    ['auto', 'Closed automatically', own.filter(isAuto)],
+  ].filter(g => g[2].length > 0);
+  if (!groups.length) return null;
+  const cur = groups.find(g => g[0] === tab) || groups[0];
+  // An action Greta raises again each day and closes again shows once, with how many times (newest first already).
+  const byTitle = [], seen = {};
+  if (cur[0] === 'auto') cur[2].forEach(r => { const t = v3PlainAction(r).title; if (seen[t]) seen[t].n++; else { seen[t] = { r, n: 1 }; byTitle.push(seen[t]); } });
+  const list = cur[0] === 'auto' ? byTitle : cur[2].map(r => ({ r, n: 1 }));
+  const many = list.some(x => x.n > 1);
+  const rows = all ? list : list.slice(0, 25);
+  const total = groups.reduce((t, g) => t + g[2].length, 0);
+  const due = r => r.disposition_at && r.predicted_window_days ? v3IsoAdd(v3Iso10(r.disposition_at), Number(r.predicted_window_days) + 1) : null;
+  const result = r => { const v = V3_VERDICT[r.verdict] || null, d = due(r);
+    return v ? <span className={v.cls}>{v.label}</span> : <span className="v3-muted">{d ? 'Judged after ' + v3Day(d, true) : 'Not judged yet'}</span>; };
+  return (<section className="v3-panel" aria-label="Closed actions">{head(total, groups.length === 1 ? cur[1] : null)}
+    {groups.length > 1 && <div className="v3-tabs v3-closed-tabs" role="tablist" aria-label="Closed actions">
+      {groups.map(g => (<button key={g[0]} type="button" role="tab" aria-selected={cur[0] === g[0]} className={'v3-tab' + (cur[0] === g[0] ? ' on' : '')}
+        onClick={() => { setTab(g[0]); setAll(false); }}>{g[1]} <span className="v3-tab-n">{fmtCount(g[2].length)}</span></button>))}
+    </div>}
+    {cur[0] === 'auto' && <p className="v3-panel-note">Closed when what raised the action was no longer there. Not graded as things you did.</p>}
+    <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-closed-rows">
+      <thead><tr><th>Action</th><th className="v3-mk-opt">Area</th>{cur[0] === 'done' && <th>Result</th>}{many && <th className="r">Times</th>}<th className="r">{many ? 'Last closed' : 'Closed'}</th></tr></thead>
+      <tbody>{rows.map(({ r, n }, i) => (<tr key={r.external_id + i}>
+        <td className="v3-web-wrap">{v3PlainAction(r).title}</td>
+        <td className="v3-mk-opt">{r.category ? v3CategoryWords(r.category) : FMT_NONE}</td>
+        {cur[0] === 'done' && <td>{result(r)}</td>}
+        {many && <td className="r">{fmtCount(n)}</td>}
+        <td className="r">{r.disposition_at ? v3Day(r.disposition_at, true) : FMT_NONE}</td>
+      </tr>))}</tbody>
+    </table></div>
+    {list.length > 25 && <div className="v3-panel-pad"><button type="button" className="v3-btn v3-btn-sm" onClick={() => setAll(a => !a)}>{all ? 'Show the latest 25' : 'Show all ' + fmtCount(list.length)}</button></div>}
+  </section>);
+}
 // ── Results (UX brief Phase 4, 1113) ─────────────────────────────────────────────────────────────────────────
 // Every move the owner marked done, through the one scorer (vw_action_outcome) via fn_brand_results: what Greta
 // expected when it was taken, what happened, and a label. The labels and every £ are the server's; the page only
@@ -27657,10 +27713,10 @@ const V3_PAGES = {
     <V3HeldActions/>
     <V3StaleSuggestions/>
   </>),
-  // 1113: the moves you took, what Greta expected and what happened; the older list folds underneath
+  // 1113: the moves you took, what Greta expected and what happened; 9 Nov: the closed actions it does not list, as a table
   results: (p) => (<>
     <V3Results/>
-    <V3More id="res-all" label="All closed actions"><V3Anchor id="decisions"/><V3TrackRecord/></V3More>
+    <V3Anchor id="decisions"/><V3ClosedActions/>
   </>),
   calendar: (p) => (<div className="v3-home v3-profit v3-marketing v3-goal-page v3-calendar"><V3CalendarStrip/>{mosView('Calendar')}</div>),
   ask: (p) => <AskPanel/>,

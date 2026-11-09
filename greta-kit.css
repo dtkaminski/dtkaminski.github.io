@@ -2444,10 +2444,12 @@ div:has(> .v3-profit) ~ .v3-today { gap: 0; }
 .v3-find-detail .v3-rank-raw { margin-top: var(--space-2); }
 .v3-find-rows td:nth-child(4) { white-space: nowrap; }
 .v3-main .v3-find-rows tr.v3-find-detail td { white-space: normal; }
-.v3-main table.v3-find-rows td.v3-web-wrap, .v3-main table.v3-held-rows td.v3-web-wrap { white-space: normal; }
+.v3-main table.v3-find-rows td.v3-web-wrap, .v3-main table.v3-held-rows td.v3-web-wrap, .v3-main table.v3-closed-rows td.v3-web-wrap { white-space: normal; }
+.v3-closed-tabs { padding-inline: var(--space-4); }
 .v3-find-detail .v3-rank-plain + .v3-note { margin-top: var(--space-2); }
 @media (max-width: 767px) {
-  .v3-main table.v3-profit-rows.v3-find-rows, .v3-main table.v3-profit-rows.v3-held-rows { display: table; width: 100%; }
+  .v3-main table.v3-profit-rows.v3-find-rows, .v3-main table.v3-profit-rows.v3-held-rows, .v3-main table.v3-profit-rows.v3-closed-rows { display: table; width: 100%; }
+  .v3-main table.v3-closed-rows th:last-child, .v3-main table.v3-closed-rows td:last-child { display: table-cell; }
   /* these tables keep their last column on a phone: the Details and Open buttons, the reason a row is held */
   .v3-main table.v3-find-rows th:last-child, .v3-main table.v3-find-rows td:last-child,
   .v3-main table.v3-held-rows th:last-child, .v3-main table.v3-held-rows td:last-child,
