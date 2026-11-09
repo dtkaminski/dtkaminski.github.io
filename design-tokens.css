@@ -352,6 +352,12 @@ html[data-frame="product"] {
   --size-curve-stroke: 2px;
   --size-curve-hair: 1px;
   --size-curve-dash: 4 3;
+  /* Links on Today's tree (1199): resting lines in the strong rule colour, the chip in hand's links in ink */
+  --size-edge-on: 1.5px;
+  --color-edge: var(--color-line-strong);
+  --color-edge-on: var(--color-ink);
+  --opacity-tree-dim: 0.4;
+  --duration-tree: 120ms;
 
   --shadow-panel: none;
   --shadow-raised: 0 8px 24px -6px rgba(26, 31, 36, 0.18), 0 2px 6px rgba(26, 31, 36, 0.06);

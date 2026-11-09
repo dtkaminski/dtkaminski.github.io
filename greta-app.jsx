@@ -19611,6 +19611,70 @@ function V3ChannelRows({ rows, onOpen }) {
     </p>
   </div>);
 }
+// The tree's chips with their links (1199: tree.edges from the metric graph). Lines run behind the chips: solid where
+// the upper measure is worked out from the lower, dashed where one drives the other. Hover, focus or open a chip and
+// its links darken, the rest fade, and the strip under the tree names what it is made from and what it feeds.
+function V3Tree({ rows, edges, onPath, onOpen, goal }) {
+  const wrap = React.useRef(null), nodes = React.useRef({});
+  const [hi, setHi] = React.useState(null), [sel, setSel] = React.useState(null), [geo, setGeo] = React.useState(null);
+  const byId = {}; rows.flat().forEach(x => { byId[x.id] = x; });
+  const E = (edges || []).filter(x => byId[x.from] && byId[x.to]);
+  const rowOf = {}; rows.forEach((r, i) => r.forEach(x => { rowOf[x.id] = i; }));
+  const measure = React.useCallback(() => {
+    const w = wrap.current; if (!w || !E.length) { setGeo(null); return; }
+    const o = w.getBoundingClientRect(), ol = w.querySelector('.v3-tree');
+    const g = { w: o.width, h: o.height, n: {}, gap: ol ? parseFloat(getComputedStyle(ol).rowGap) || 0 : 0 };
+    Object.keys(nodes.current).forEach(k => { const el = nodes.current[k]; if (!el) return;
+      const r = el.getBoundingClientRect(); g.n[k] = { x: r.left - o.left + r.width / 2, t: r.top - o.top, b: r.bottom - o.top }; });
+    setGeo(g);
+  }, [E.length, rows.length]);
+  React.useLayoutEffect(() => {
+    measure();
+    if (!window.ResizeObserver || !wrap.current) return;
+    const ro = new ResizeObserver(() => measure()); ro.observe(wrap.current); return () => ro.disconnect();
+  }, [measure]);
+  const act = hi || sel;
+  const near = new Set(act ? [act].concat(E.filter(x => x.from === act || x.to === act).map(x => (x.from === act ? x.to : x.from))) : []);
+  const path = x => { const a = geo && geo.n[x.from], b = geo && geo.n[x.to]; if (!a || !b) return null;
+    const ra = rowOf[x.from], rb = rowOf[x.to];
+    if (ra === rb) { const dip = Math.max(a.b, b.b) + geo.gap * 0.9; return 'M' + a.x + ' ' + a.b + ' C' + a.x + ' ' + dip + ' ' + b.x + ' ' + dip + ' ' + b.x + ' ' + b.b; }
+    const [u, l] = ra < rb ? [a, b] : [b, a], m = (u.b + l.t) / 2;
+    return 'M' + u.x + ' ' + u.b + ' C' + u.x + ' ' + m + ' ' + l.x + ' ' + m + ' ' + l.x + ' ' + l.t; };
+  const on = x => act && (x.from === act || x.to === act);
+  // same-row links only show for the chip in hand: drawn all the time they cross the row below
+  const shown = E.filter(x => rowOf[x.from] !== rowOf[x.to] || on(x));
+  const focus = act || goal, F = focus && byId[focus];
+  const madeFrom = F ? E.filter(x => x.to === focus && x.type === 'identity') : [];
+  const drivenBy = F ? E.filter(x => x.to === focus && x.type !== 'identity' && !madeFrom.some(y => y.from === x.from)) : [];
+  const feeds = F ? E.filter(x => x.from === focus).filter((x, i, a) => a.findIndex(y => y.to === x.to) === i) : [];
+  const nm = k => (byId[k] ? byId[k].label : k), sg = s => (s === '-' ? '−' : s === '+' ? '+' : '');
+  const open = x => { setSel(x.id); onOpen(x); };
+  return (<>
+    <div className={'v3-tree-wrap' + (act ? ' v3-tree-act' : '')} ref={wrap} onMouseLeave={() => setHi(null)}>
+      {geo && <svg className="v3-tree-edges" width={geo.w} height={geo.h} aria-hidden="true">
+        {shown.map((x, i) => { const d = path(x); return d && <path key={i} d={d}
+          className={'v3-edge' + (x.type === 'identity' ? '' : ' v3-edge-cause') + (on(x) ? ' v3-edge-on' : act ? ' v3-edge-dim' : '')}/>; })}
+      </svg>}
+      <ol className={'v3-tree' + (E.length ? ' v3-tree-has-links' : '')}>{rows.map((r, i) => (<li key={i} className={'v3-tree-row' + (r.some(onPath) ? ' v3-tree-on' : '') + (E.length ? ' v3-tree-linked' : '')} style={{ '--d': i }}>
+        {r.map(x => (<button type="button" key={x.id} ref={el => { nodes.current[x.id] = el; }}
+          className={'v3-node' + (onPath(x) ? ' v3-node-on' : '') + (act && !near.has(x.id) ? ' v3-node-dim' : '') + (act === x.id ? ' v3-node-act' : '')}
+          onClick={() => open(x)} onMouseEnter={() => setHi(x.id)} onFocus={() => setHi(x.id)} onBlur={() => setHi(null)}>
+          <V3LightDot light={x.light}/>
+          <span className="v3-node-l">{x.label}</span>
+          <span className="v3-node-x">{x.line || ((x.value_text ? x.value_text + ', ' : '') + V3_LIGHT_WORD.grey.toLowerCase())}</span>
+        </button>))}</li>))}</ol>
+    </div>
+    {F && (madeFrom.length + drivenBy.length + feeds.length) > 0 && <div className="v3-tree-links" aria-live="polite">
+      <b className="v3-tree-links-h">{F.label}</b>
+      <dl>
+        {madeFrom.length > 0 && <div><dt>Made from</dt><dd>{madeFrom.map(x => <span key={x.from}><i>{sg(x.sign)}</i>{nm(x.from)}</span>)}</dd></div>}
+        {drivenBy.length > 0 && <div><dt>Driven by</dt><dd>{drivenBy.map(x => <span key={x.from}><i>{sg(x.sign)}</i>{nm(x.from)}</span>)}</dd></div>}
+        {feeds.length > 0 && <div><dt>Feeds</dt><dd>{feeds.map(x => <span key={x.to}><i>{sg(x.sign)}</i>{nm(x.to)}</span>)}</dd></div>}
+      </dl>
+      {sel && <button type="button" className="v3-linkbtn" onClick={() => setSel(null)}>Clear</button>}
+    </div>}
+  </>);
+}
 // Today, under the goal strip: the goal's profit line, what makes it, the customers behind it, then each channel's
 // return and decision as a table. The walk's path is drawn darker; any chip or channel opens the Why panel.
 function V3NumbersConnect() {
@@ -19629,12 +19693,7 @@ function V3NumbersConnect() {
   if (!rows.length && !chRows.length) return null;
   const onPath = x => x.scope_kind === 'brand' && path.has(x.key);
   return (<section className="v3-panel v3-tree-panel" aria-label="How the numbers connect">{head}
-    {rows.length > 0 && <ol className="v3-tree">{rows.map((r, i) => (<li key={i} className={'v3-tree-row' + (r.some(onPath) ? ' v3-tree-on' : '')} style={{ '--d': i }}>
-      {r.map(x => (<button type="button" key={x.id} className={'v3-node' + (onPath(x) ? ' v3-node-on' : '')} onClick={() => setOpen(x)}>
-        <V3LightDot light={x.light}/>
-        <span className="v3-node-l">{x.label}</span>
-        <span className="v3-node-x">{x.line || ((x.value_text ? x.value_text + ', ' : '') + V3_LIGHT_WORD.grey.toLowerCase())}</span>
-      </button>))}</li>))}</ol>}
+    {rows.length > 0 && <V3Tree rows={rows} edges={T.edges} onPath={onPath} onOpen={setOpen} goal={T.goal}/>}
     {chRows.length > 0 && <V3ChannelRows rows={chRows} onOpen={setOpen}/>}
     <V3LightLegend/>
     {open && <V3WhyPanel e={open} onClose={() => setOpen(null)}/>}

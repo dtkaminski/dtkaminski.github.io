@@ -2521,6 +2521,27 @@ div:has(> .v3-profit) ~ .v3-today { gap: 0; }
 .v3-node-x { grid-column: 2; font-family: var(--font-figure); font-size: var(--text-xs); color: var(--color-faint); }
 .v3-node.v3-node-on .v3-node-x { color: var(--color-muted); }
 /* 1195 step 2: the tree's channel row as a table, divided from the tree inside the same panel */
+.v3-tree-wrap { position: relative; }
+.v3-tree-wrap .v3-tree { position: relative; z-index: 1; }
+@media (min-width: 768px) { .v3-tree.v3-tree-has-links { gap: var(--space-8); } }
+@media (max-width: 767px) { .v3-tree-edges { display: none; } }
+.v3-tree-edges { position: absolute; top: 0; left: 0; overflow: visible; pointer-events: none; }
+.v3-tree-linked + .v3-tree-linked::before { display: none; }
+.v3-edge { fill: none; stroke: var(--color-edge); stroke-width: var(--size-curve-hair); transition: stroke var(--duration-tree), opacity var(--duration-tree); }
+.v3-edge-cause { stroke-dasharray: var(--size-curve-dash); }
+.v3-edge-on { stroke: var(--color-edge-on); stroke-width: var(--size-edge-on); }
+.v3-edge-dim { opacity: var(--opacity-tree-dim); }
+.v3-node { transition: opacity var(--duration-tree); }
+.v3-node-dim { opacity: var(--opacity-tree-dim); }
+.v3-node.v3-node-act { border-color: var(--color-ink); color: var(--color-ink); }
+.v3-tree-links { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-5); padding: 0 var(--space-4) var(--space-4); font-size: var(--text-sm); }
+.v3-tree-links-h { font-weight: var(--weight-medium); color: var(--color-ink); }
+.v3-tree-links dl { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); margin: 0; }
+.v3-tree-links dl > div { display: flex; align-items: baseline; gap: var(--space-2); }
+.v3-tree-links dt { font-size: var(--text-xs); color: var(--color-muted); }
+.v3-tree-links dd { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); margin: 0; color: var(--color-ink); }
+.v3-tree-links dd i { margin-right: var(--space-1); font-style: normal; font-family: var(--font-figure); color: var(--color-muted); }
+@media (prefers-reduced-motion: reduce) { .v3-edge, .v3-node { transition: none; } }
 .v3-tree-ch { border-top: 1px solid var(--color-line); padding-bottom: var(--space-2); }
 .v3-tree-ch-h { margin: 0; padding: var(--space-3) var(--space-4) 0; font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--color-ink); }
 .v3-ch-table td { vertical-align: middle; }
