@@ -9026,9 +9026,16 @@ async function v3AskFacts(question) {
       // the stock list's own totals, the counts the board's stock action gives
       const SS = r0(reorderR);
       if (SS && SS.held) return { stock_list_held: SS.held_because || 'stock counts are out of date' };
+      // 9 Nov eval: when the order lands after the peak ends, the board orders the restock only and the peak's units
+      // are a separate order "only if a supplier can deliver them by" the peak deadline; Ask quotes the same split
+      const pAfter = !!(SS && SS.peak && SS.peak.end && SS.lands_on && String(SS.lands_on).slice(0, 10) > String(SS.peak.end).slice(0, 10)
+                        && Number(SS.products_peak) > 0 && Number(SS.units_peak) > 0);
       return SS && SS.products != null ? { products_on_stock_list: Number(SS.products), of_them_run_out_before_a_restock_lands: Number(SS.products_runs_out),
                     of_them_only_short_for_the_peak: Number(SS.products_peak_only), of_them_out_of_stock_now: Number(SS.out_of_stock),
-                    units_to_order: Number(SS.units), order_cost_at_landed_cost: R(SS.order_cost_gbp), profit_a_month_it_protects: R(SS.gbp_at_stake),
+                    units_to_order: Number(pAfter ? SS.units_restock : SS.units), order_cost_at_landed_cost: R(pAfter ? SS.order_cost_restock_gbp : SS.order_cost_gbp),
+                    ...(pAfter ? { peak_units_only_if_a_supplier_delivers_before_the_peak: Number(SS.units_peak), their_cost_at_landed_cost: R(SS.order_cost_peak_gbp),
+                                   peak_stock_deadline: SS.peak.start ? v3IsoAdd(String(SS.peak.start).slice(0, 10), -7) : null } : {}),
+                    profit_a_month_it_protects: R(SS.gbp_at_stake),
                     profit_lost_before_the_order_lands: R(SS.lost_before_landing_gbp), order_lands_on: SS.lands_on || null,
                     out_of_stock_now_examples: (Array.isArray(SS.top) ? SS.top : []).filter(p => p.out_now).map(p => p.title).slice(0, 12) }
         : { products_out_of_stock_now: SP.filter(r => r.stock_status === 'stockout' && Number(r.weekly_velocity) > 0 && !v3IsBundle(r.product_title)).length,
@@ -17955,8 +17962,10 @@ function CashCeiling(){
   const pill = gap > 0 ? <span className="v3-pill v3-pill-bad">{v3GbpRound(gap) + ' short'}</span>
     : gate.binding === 'cash' || gate.binding === 'both' ? <span className="v3-pill v3-pill-warn">Cash is the limit</span> : <span className="v3-pill v3-pill-good">Cash is not the limit</span>;
   const rows = [
-    gate.s_profit_weekly != null && { k: 'Ads on the plan this week', v: v3GbpRound(gate.s_profit_weekly), b: onGoal ? 'On the plan for your sales goal' : 'On the plan' },
-    gate.s_cash_weekly != null && { k: 'Most cash allows a week', v: v3GbpRound(gate.s_cash_weekly), b: 'Money expected in and out, stock included' },
+    // 9 Nov eval: "Ads on the plan this week" (the goal plan's month a week, £36k on Halden) was a fourth weekly ad
+    // figure beside Greta's answer (ads near £21k) and the budget's most (£39k). It is the check's input, not an
+    // answer, so it goes; the basis below says what the check spends.
+    gate.s_cash_weekly != null && { k: 'Most cash allows a week', v: v3GbpRound(gate.s_cash_weekly), b: 'Money expected in and out at the goal’s ad budget, stock included' },
     gate.min_cash != null && { k: 'Lowest balance', v: v3GbpRound(gate.min_cash), b: [gate.cash_floor != null ? 'Your minimum ' + v3GbpRound(gate.cash_floor) : null, gate.min_cash_week_start ? 'Week of ' + v3Day(String(gate.min_cash_week_start).slice(0, 10), true) : null].filter(Boolean).join('. ') },
     gap > 0 && { k: 'Extra cash needed', v: v3GbpRound(gap), b: gate.first_breach_week_start ? 'First short in the week of ' + v3Day(String(gate.first_breach_week_start).slice(0, 10), true) : '', cls: 'v3-down' },
   ].filter(Boolean);
@@ -18769,7 +18778,7 @@ function v3GoalVerdict(g, unreported) {
 }
 // 1159: what the plan with no sales goal spends a week. "Today's" was a label on that plan, not a measure of today. Until the
 // figure reaches a brand's state, the plain words.
-const v3AdsNear = A => Number(A && A.hold_week) > 0 ? 'ads near ' + v3Gbp(A.hold_week) + ' a week' : 'ads on the plan';
+const v3AdsNear = A => Number(A && A.hold_week) > 0 ? 'ads near ' + v3GbpRound(A.hold_week) + ' a week' : 'ads on the plan';   // 9 Nov: a plan figure, rounded (no exact pounds on a forecast)
 // How far the plan already reaches into the ad cut on the board. On Halden it runs £21,381 a week, the last 7 days ran £23,705
 // and the cut takes them to £20,248, so about two thirds of the cut is inside the line. Its worth is not on top of the line.
 function v3AdCutInPlan(A) {
@@ -19154,8 +19163,8 @@ function V3FuturesChart({ F, g, P, onPage }) {
   const lastRaw = raw[raw.length - 1].v, now = g.ahead_gbp != null ? Number(g.ahead_gbp) : lastRaw;
   const past = raw.map(p => ({ d: p.d, v: p.v + (now - lastRaw) * (v3Ms(p.d) - x0) / ((today - x0) || 1) }));
   const holdW = Number(F.A.hold_week), chaseW = Number(F.A.chase_week);
-  const ends = [{ k: 'keep', v: F.keep - tgt, t: holdW > 0 ? (small ? 'Ads ' : 'Ads near ') + v3Gbp(holdW) + ' a week' : 'Ads on the plan', s: 'counts the season ahead' },
-    { k: 'chase', v: F.chase - tgt, t: small ? 'Chase sales goal' : 'Chase the sales goal', s: chaseW > 0 ? 'ads near ' + v3Gbp(chaseW) + ' a week' : v3Gbp(Number(F.A.extra_ads)) + ' more ads' }]
+  const ends = [{ k: 'keep', v: F.keep - tgt, t: holdW > 0 ? (small ? 'Ads ' : 'Ads near ') + v3GbpRound(holdW) + ' a week' : 'Ads on the plan', s: 'counts the season ahead' },
+    { k: 'chase', v: F.chase - tgt, t: small ? 'Chase sales goal' : 'Chase the sales goal', s: chaseW > 0 ? 'ads near ' + v3GbpRound(chaseW) + ' a week' : v3GbpRound(Number(F.A.extra_ads)) + ' more ads' }]
     .concat(g.pace_finish != null ? [{ k: 'pace', v: Number(g.pace_finish) - tgt, t: small ? 'Last 30 days' : 'Last 30 days carry on', s: 'ignores the season' }] : []);
   const all = past.map(p => p.v).concat(ends.map(e => e.v), [0]);
   const lo = Math.min(...all), hi = Math.max(...all, 1);
@@ -19984,7 +19993,7 @@ function V3Today(p) {
   const boardSpend = v3BoardSpendTargets(todayFig.rows);
   // the month's ad figures are the registered ones; a channel's own ceiling on the board is a most, not a budget
   const monthLine = seasonNote && boardSpend
-    ? <> {v3AdBudgetWords(boardSpend, v3Gbp)}. A channel’s own ceiling on the board is a most, not the month’s budget.</> : null;
+    ? <> {v3AdBudgetWords(boardSpend, v3GbpRound)}.</> : null;
   const isCut = (r) => !!r && /^order-cost-/.test(String(r.external_id || ''));
   const boardCount = board.rows ? v3LiveRows(board.rows).length : (d.board_actions != null ? d.board_actions : d.open_actions);
   // The profit figure and its confidence badge describe the same broken state and used to
@@ -20622,6 +20631,13 @@ function V3Stock() {
   // the peak's name as the list names it; the calendar's when the list has none
   const pkName = SM.peak && SM.peak.title ? v3PlainWords(SM.peak.title) : pk ? v3PlainWords(pk.title).replace(/\s*(?:peak\s*)?window$|\s*peak$/i, '') : 'the peak';
   const REASON = { runs_out: 'Runs out before a restock lands', peak_top_up: 'Short for the peak', both: 'Both: runs out first, and short for the peak' };
+  // 9 Nov eval: an order placed today that lands after the peak ends cannot sell in it. The board's stock action
+  // (fn_emit_stock_actions, 0959) then orders the restock only and names the peak's units as a separate step "only
+  // if a supplier can deliver them by" the one peak deadline; this page added them into one total (3,539 against
+  // 5,032 units). Same rule here, so the order and its cost are the action's.
+  const SMp = SM.peak || null;
+  const afterPk = !!(SMp && SMp.end && land > String(SMp.end).slice(0, 10) && num(SM.products_peak) > 0 && num(SM.units_peak) > 0);
+  const pkBy = afterPk ? (PD && PD.deadline) || (SMp.start ? v3IsoAdd(String(SMp.start).slice(0, 10), -7) : null) : null;
   // 1149: a product Shopify keeps selling when out is on pre-order: it loses no sales, and what sits below zero is owed
   const plan = {}; (rows || []).forEach(x => { if (x && x.sku) plan[x.sku] = x; });
   const order = (lq2.rows || []).slice().sort((a, b) => num(a.rank) - num(b.rank)).map(r => {
@@ -20629,14 +20645,18 @@ function V3Stock() {
     const dl = r.days_left != null ? Math.max(0, Math.round(num(r.days_left))) : null;
     const gap = !pre && r.reason !== 'peak_top_up' && dl != null ? Math.max(0, num(r.lead_days || lead) - dl) : 0;
     const risk = num(r.lost_before_landing_gbp);
-    return { ...r, units: num(r.order_units), forPeak: num(r.peak_units), run: r.reason !== 'peak_top_up', days: dl, gap, risk,
-      perDay: gap > 0 ? risk / gap : 0, cost: r.order_cost_gbp != null ? num(r.order_cost_gbp) : null, unit: r.unit_cost != null ? num(r.unit_cost) : null,
+    // after the peak: the restock units and their cost; the peak's units stay in their own column
+    const units = afterPk ? num(r.reorder_units) : num(r.order_units);
+    const lineCost = afterPk ? (r.unit_cost != null ? units * num(r.unit_cost) : null) : r.order_cost_gbp != null ? num(r.order_cost_gbp) : null;
+    return { ...r, units, forPeak: num(r.peak_units), run: r.reason !== 'peak_top_up', days: dl, gap, risk,
+      perDay: gap > 0 ? risk / gap : 0, cost: lineCost, unit: r.unit_cost != null ? num(r.unit_cost) : null,
       stock_status: pre ? 'preorder' : r.out_of_stock ? 'stockout' : 'ok', pre, owed, noSku: String(r.sku || '').startsWith('v:') };
   });
   const nRun = num(SM.products_runs_out), nPeak = num(SM.products_peak_only);
   const outNow = num(SM.out_of_stock), outRun = num(SM.out_of_stock_runs_out);
   const preN = num(SM.products_preorder), owedN = num(SM.units_owed);   // 1149
-  const cost = num(SM.order_cost_gbp), unpriced = num(SM.unpriced);
+  const cost = afterPk ? num(SM.order_cost_restock_gbp) : num(SM.order_cost_gbp), unpriced = num(SM.unpriced);
+  const unitsAll = afterPk ? num(SM.units_restock) : num(SM.units);
   const lost = num(SM.lost_before_landing_gbp);
   // each week sooner: the lost-before-landing figure per day out, for up to seven of those days
   const sooner = order.reduce((a, r) => a + r.perDay * Math.min(7, r.gap), 0);
@@ -20697,7 +20717,8 @@ function V3Stock() {
         {/* 1149: products on pre-order are already below zero and still selling: they are not "run out", the sentence after the cost says what they are */}
         <V3Brief>{nRun - preN > 0 ? <>{fmtCount(nRun - preN)} will run out before new stock could arrive{outRun > 0 ? <> ({fmtCount(outRun)} already out)</> : null}{nPeak > 0 ? <>, and {fmtCount(nPeak)} more won’t last through {pkName}</> : null}. </> : nPeak > 0 ? <>{fmtCount(nPeak)} won’t last through {pkName}. </> : null}
           Stock takes {L.entered ? L.weeks + ' weeks' : lead + ' days'} to arrive after you order, so an order placed today arrives around <b>{v3Day(land)}</b>.{protect ? <> From then it protects about <b>{fmtMoney(protect)} a month</b> of profit</> : null}{protect && peakAt ? <>, and the peak’s extra units about <b>{fmtMoney(peakAt)}</b> once, over {pkName}.</> : protect ? '.' : null}
-          {' '}{nRun > 0 && nPeak > 0 ? <>With the peak’s extra units, ordering all {fmtCount(order.length)} ({fmtCount(SM.units)} units) costs </> : <>Ordering all of them ({fmtCount(SM.units)} units) costs </>}{fmtMoney(cost)} at landed cost, meaning what each unit costs once it reaches you{unpriced > 0 ? <> ({fmtCount(unpriced)} without a cost yet)</> : null}.
+          {' '}{afterPk ? <>Ordering them ({fmtCount(unitsAll)} units) costs </> : nRun > 0 && nPeak > 0 ? <>With the peak’s extra units, ordering all {fmtCount(order.length)} ({fmtCount(unitsAll)} units) costs </> : <>Ordering all of them ({fmtCount(unitsAll)} units) costs </>}{fmtMoney(cost)} at landed cost, meaning what each unit costs once it reaches you{unpriced > 0 ? <> ({fmtCount(unpriced)} without a cost yet)</> : null}.
+          {afterPk ? <>{' '}For {pkName}, {fmtCount(SM.units_peak)} more units{num(SM.order_cost_peak_gbp) > 0 ? <> (about {fmtMoney(SM.order_cost_peak_gbp)})</> : null} would help, but stock ordered today lands after it: order those only if a supplier can deliver them{pkBy ? <> by <b>{v3Day(pkBy)}</b></> : null}.</> : null}
           {preN > 0 && owedN > 0 ? <>{' '}{preN === order.length ? 'All of them sell' : fmtCount(preN) + ' of them sell'} on pre-order: Shopify keeps selling them when out, so they lose no sales, and customers have already bought <b>{fmtCount(owedN)} units</b> you do not hold yet. The order includes them.</> : null}
           {' '}{SM.at_stake_basis && <V3Conf state="probably" detail={SM.at_stake_basis + (SM.rule ? ' ' + SM.rule : '')}/>}</V3Brief>
       </>) : <p className="v3-note v3-measure">Every product that sells has enough stock to last until a new order could arrive{pk ? ', and through ' + pkName + ' at last year’s sales' : ''}.</p>}
@@ -20707,13 +20728,14 @@ function V3Stock() {
           {protect != null && <button type="button" className="v3-xref" onClick={() => window.__oiGo && window.__oiGo('actions')}>The order protects {fmtMoney(protect)} a month <span className="v3-xref-go">on Actions</span></button>}</div>}
         {pkLate && <p className="v3-note v3-measure">{pkName} runs {v3Day(pk.start)} – {v3Day(pk.end, true)}. An order arriving on {v3Day(land)} is in time for its last {fmtCount(daysCaught)} {daysCaught === 1 ? 'day' : 'days'}. Those days sold {fmtMoney(catchNow)} last year, {fmtPctN(catchNow / pk.lySales)} of the peak’s sales. {v3IsoAdd(land, -7) <= pk.start ? 'A week sooner would catch all of it (' + fmtMoney(pk.lySales) + ').' : 'A week sooner would catch ' + fmtMoney(catchWeek) + ' (' + fmtPctN(catchWeek / pk.lySales) + ').'} So ask your supplier to send the peak’s products first.</p>}
         {pkAfter && anyPeak && <p className="v3-note v3-measure">{pkName} starts on {v3Day(pk.start)}, after the order arrives, so the quantities include what last year’s peak sold. {PD ? <> Peak stock needs to be in by {v3Day(PD.deadline)}, a week before it starts, so the order needs to go in by {v3Day(PD.orderBy)}.</> : null}</p>}
-        {pk && land > pk.end && <p className="v3-note v3-measure">An order placed today arrives after {pkName} ends. What you have in stock now is all you can sell in it; what to feature is below.</p>}
+        {pk && land > pk.end && <p className="v3-note v3-measure">An order placed today arrives after {pkName} ends. {afterPk ? 'Unless a supplier can deliver the peak’s units sooner, what' : 'What'} you have in stock now is all you can sell in it; what to feature is below.</p>}
       </>) : null}
       {order.length > 0 && <div className="v3-stat-grid v3-gap-top">
         {stat('To order', fmtCount(order.length) + (order.length === 1 ? ' product' : ' products'), [outNow > 0 ? fmtCount(outNow) + ' already out' : preN > 0 ? '' : 'none out yet', preN > 0 ? fmtCount(preN) + ' on pre-order' : ''].filter(Boolean).join(', '))}
-        {stat('Order cost', fmtMoney(cost), fmtCount(SM.units) + ' units at landed cost')}
+        {stat('Order cost', fmtMoney(cost), fmtCount(unitsAll) + ' units at landed cost')}
         {protect != null && stat('Profit it protects', fmtMoney(protect) + ' a month', 'from ' + v3Day(land))}
-        {peakAt != null && stat('Peak sales it protects', fmtMoney(peakAt), 'once, over ' + pkName)}
+        {afterPk && stat('Peak units', fmtCount(SM.units_peak), (num(SM.order_cost_peak_gbp) > 0 ? fmtMoney(SM.order_cost_peak_gbp) + ', ' : '') + (pkBy ? 'only if delivered by ' + v3Day(pkBy) : 'only if delivered before the peak'))}
+        {peakAt != null && !afterPk && stat('Peak sales it protects', fmtMoney(peakAt), 'once, over ' + pkName)}
       </div>}
       {order.length > 0 && <V3StockDrivers order={order} lead={lead} land={land} sooner={sooner}/>}
     </section>
@@ -20722,7 +20744,7 @@ function V3Stock() {
       <h2 className="v3-sec-title">What to order, product by product</h2>
       <p className="v3-legend v3-rw-key"><i className="v3-rw-key-bar"/>Days of stock left <i className="v3-rw-key-gap"/>Days with nothing to sell before the order arrives</p>
       <table className="v3-rw">
-        <thead><tr><th className="t-text">Product</th><th className="t-text">Why</th><th className="t-text v3-rw-trackh">Stock left</th><th>Order</th>{anyPeak && <th>For the peak</th>}<th>Cost</th><th>Profit lost before it arrives</th></tr></thead>
+        <thead><tr><th className="t-text">Product</th><th className="t-text">Why</th><th className="t-text v3-rw-trackh">Stock left</th><th>Order</th>{anyPeak && <th>{afterPk && pkBy ? 'Peak, if by ' + v3Day(pkBy) : 'For the peak'}</th>}<th>Cost</th><th>Profit lost before it arrives</th></tr></thead>
         <tbody>{shown.map(r => (<tr key={r.sku}>
           <td className="t-text v3-rw-name" title={r.noSku ? 'No product code (SKU) in Shopify' : r.sku}>{nameOf(r)}</td>
           <td className="t-text v3-muted">{r.pre ? 'On pre-order' + (r.owed > 0 ? ': ' + fmtCount(r.owed) + ' already bought' : '') : REASON[r.reason] || ''}</td>
@@ -20747,7 +20769,7 @@ function V3Stock() {
       <p className="micro muted v3-measure">{L.entered
         ? <>Uses your supplier lead time, the time from order to stock arriving: {L.weeks} weeks ({lead} days), as set under Goal &amp; costs.</>
         : <>Greta assumes {lead} days from order to stock arriving, for every product. Add your supplier lead time under Goal &amp; costs to make the dates yours.</>}
-        {' '}{SM.rule ? SM.rule + ' ' : ''}{anyPeak ? '“For the peak” is the part of the order the peak adds. ' : ''}Cost is your landed cost per unit. “Profit lost before it arrives” is what these products would have earned between running out and the order arriving.</p>
+        {' '}{SM.rule ? SM.rule + ' ' : ''}{anyPeak ? (afterPk ? 'The peak column is not in the order or its cost: stock ordered today lands after the peak, so those units are a separate order, only if a supplier can deliver them in time. ' : '“For the peak” is the part of the order the peak adds. ') : ''}Cost is your landed cost per unit. “Profit lost before it arrives” is what these products would have earned between running out and the order arriving.</p>
     </section>)}
 
     {/* Housekeeping folds away: the page read 6.1 screens, and an owner deciding what to order today does
@@ -21833,7 +21855,7 @@ function V3AdAnswer({ action, g, panel }) {
   </section>);
   if (panel) {
     const T = A.at_today, G = A.at_goal, tgt = Number(g.target);
-    const keepWord = Number(A.hold_week) > 0 ? 'Ads near ' + v3Gbp(A.hold_week) + ' a week' : 'Ads on the plan';
+    const keepWord = Number(A.hold_week) > 0 ? 'Ads near ' + v3GbpRound(A.hold_week) + ' a week' : 'Ads on the plan';
     const row = (k, a, b, good) => { const dv = Number(b) - Number(a);
       return (<tr key={k}><td>{k}</td><td className="r">{v3GbpRound(a)}</td><td className="r">{v3GbpRound(b)}</td>
         <td className={'r ' + (good == null ? '' : (dv >= 0) === good ? 'v3-up' : 'v3-down')}>{dv >= 0 ? '+' : '−'}{v3GbpRound(Math.abs(dv))}</td></tr>); };
@@ -21854,7 +21876,7 @@ function V3AdAnswer({ action, g, panel }) {
     const row = (k, a, b, c) => { const top = Math.max(Number(a), Number(b)) || 1;
       const cell = v => <span className="v3-adf-bar"><i className={c} style={{ width: Math.max(0, Number(v)) / top * 100 + '%' }}/><b>{fmtMoney(Number(v))}</b></span>;
       return <React.Fragment key={k}><span className="v3-adf-k">{k}</span>{cell(a)}{cell(b)}</React.Fragment>; };
-    const keepWord = Number(A.hold_week) > 0 ? 'Ads near ' + v3Gbp(A.hold_week) + ' a week' : 'Ads on the plan';
+    const keepWord = Number(A.hold_week) > 0 ? 'Ads near ' + v3GbpRound(A.hold_week) + ' a week' : 'Ads on the plan';
     return (<figure className="v3-adf" aria-label={'Two futures for the quarter. ' + keepWord + ': sales ' + fmtMoney(T.sales) + ', ads ' + fmtMoney(T.ads) + ', profit ' + fmtMoney(T.profit_after_ads) + '. Chase the sales goal: sales ' + fmtMoney(G.sales) + ', ads ' + fmtMoney(G.ads) + ', profit ' + fmtMoney(G.profit_after_ads) + '.'}>
       {A.owner_question && <p className="v3-kick">Your call</p>}
       <h3 className="v3-adf-t">Chasing the sales goal costs {fmtMoney(Math.abs(Number(A.profit_change)))} of profit.</h3>
@@ -23599,6 +23621,7 @@ function V3GoalLead() {
   const nr = useV3Rows('goal-nr-' + per.start, V3_GOAL_NR_Q(per.start, today));
   const ph0 = useV3Rows('goal-phasing', V3_GOAL_PHASING_Q);
   const lad = useV3Rows('profit-ladder', V3_LADDER_Q);
+  const stAD = useV3Rows('brand-state', V3_STATE_Q);   // 9 Nov: the weekly answer beside the budget's most
   if (goal.err || pace.err) return <section className="v3-panel"><div className="v3-panel-pad"><V3LoadFailed what="Your goal and plan" onRetry={() => { if (goal.err) goal.retry(); if (pace.err) pace.retry(); }}/></div></section>;
   if (!goal.rows || !pace.rows || (!ppq.rows && !ppq.err)) return <section className="v3-panel" aria-busy="true"><div className="v3-panel-pad"><V3SkeletonRows n={4}/></div></section>;
   // A plan read that comes back without its figures is no plan: "you reach it: about —" otherwise (eval 14 Oct)
@@ -23794,7 +23817,7 @@ function V3GoalLead() {
         </tbody>
       </table></div>
       {ph && maxSeen && rows.some(r => r.x > 1.5) && <p className="v3-panel-note">Past 1.5× your biggest month, the estimate goes beyond any spend seen so far.</p>}
-      {bs && ph && <p className="v3-panel-note">In the goal: {v3AdBudgetWords(bs, v3GbpRound).replace(/(^|, )([A-Z])/g, (m, a, c) => a + c.toLowerCase())}. A channel’s own ceiling on the board is a most while spend comes down to that, not the month’s budget.</p>}
+      {bs && ph && <p className="v3-panel-note">In the goal: {v3AdBudgetWords(bs, v3GbpRound).replace(/(^|, )([A-Z])/g, (m, a, c) => a + c.toLowerCase())}.{(() => { const AD = stAD.rows && stAD.rows[0] && stAD.rows[0].ad_decision; return AD && AD.decision === 'down' && Number(AD.hold_week) > 0 ? ' Spend near ' + v3GbpRound(AD.hold_week) + ' a week: the budget is a most, not a target.' : null; })()}</p>}
       {exp != null && <div className="v3-panel-note"><V3FcErr/></div>}
     </section>
   </>);
