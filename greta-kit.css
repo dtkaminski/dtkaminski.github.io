@@ -2520,6 +2520,32 @@ div:has(> .v3-profit) ~ .v3-today { gap: 0; }
 .v3-node-l { font-size: var(--text-sm); }
 .v3-node-x { grid-column: 2; font-family: var(--font-figure); font-size: var(--text-xs); color: var(--color-faint); }
 .v3-node.v3-node-on .v3-node-x { color: var(--color-muted); }
+/* 1195 step 2: the tree's channel row as a table, divided from the tree inside the same panel */
+.v3-tree-ch { border-top: 1px solid var(--color-line); padding-bottom: var(--space-2); }
+.v3-tree-ch-h { margin: 0; padding: var(--space-3) var(--space-4) 0; font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--color-ink); }
+.v3-ch-table td { vertical-align: middle; }
+.v3-ch-table td.r small { display: block; font-size: var(--text-xs); color: var(--color-faint); }
+.v3-ch-name { display: inline-flex; align-items: center; gap: var(--space-2); text-align: left; white-space: nowrap; color: var(--color-ink); }
+.v3-ch-table .v3-ch-strip { width: var(--size-strip-col); min-width: var(--size-strip-col); }
+.v3-strip { position: relative; display: block; height: var(--size-strip); }
+.v3-strip::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid var(--color-line); }
+.v3-strip > i { position: absolute; }
+.v3-strip-tick { top: 0; bottom: 0; border-left: 1px dashed var(--color-strip-line); }
+.v3-strip-range { top: 25%; height: 50%; min-width: 1px; background: var(--color-strip-range); border-radius: var(--radius-sm); }
+.v3-strip-next { top: 10%; bottom: 10%; border-left: 2px solid var(--color-strip-next); }
+.v3-strip-avg { top: 50%; width: var(--size-strip-dot); height: var(--size-strip-dot); border-radius: var(--radius-full); background: var(--color-strip-avg); transform: translate(-50%, -50%); }
+.v3-ch-key { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); margin: var(--space-1) 0 0; padding: 0 var(--space-4); font-size: var(--text-xs); color: var(--color-muted); }
+.v3-ch-key span { display: inline-flex; align-items: center; gap: var(--space-1); }
+.v3-ch-key i { display: inline-block; flex: none; }
+.v3-strip-key-avg { width: var(--size-strip-dot); height: var(--size-strip-dot); border-radius: var(--radius-full); background: var(--color-strip-avg); }
+.v3-strip-key-next { width: var(--space-4); height: var(--size-strip-dot); border-radius: var(--radius-sm); background: var(--color-strip-range); border-left: 2px solid var(--color-strip-next); }
+.v3-strip-key-tick { height: var(--size-strip); border-left: 1px dashed var(--color-strip-line); }
+.v3-why-range { display: block; font-size: var(--text-xs); color: var(--color-faint); }
+@media (max-width: 767px) {
+  .v3-ch-name { white-space: normal; }
+  .v3-ch-table td, .v3-ch-table th { padding-left: var(--space-2); padding-right: var(--space-2); }
+  .v3-ch-key { display: none; }   /* the strip it explains is hidden here too (v3-mk-opt) */
+}
 @media (max-width: 640px) {
   .v3-tree { gap: var(--space-2); }
   .v3-tree-row { flex-direction: column; align-items: stretch; padding-left: calc(var(--space-4) * var(--d, 0)); }

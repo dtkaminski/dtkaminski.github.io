@@ -19437,8 +19437,9 @@ function V3WhyPanel({ e, onClose }) {
       <h2 className="v3-drawer-t">{e.label}</h2>
       {e.measure && <p className="v3-why-measure">{e.measure}</p>}
       {(e.value_text || showExp) && <dl className="v3-drawer-facts">
-        {e.value_text && <div><dt>Now</dt><dd>{e.value_text}</dd></div>}
+        {e.value_text && <div><dt>{e.channel ? 'Average, 30 days' : 'Now'}</dt><dd>{e.value_text}</dd></div>}
         {showExp && <div><dt>Expected</dt><dd>{e.expected_text}</dd></div>}
+        {e.channel && !grey && <V3ChannelFacts e={e}/>}
       </dl>}
       {e.reason && <p className="v3-drawer-p">{e.reason}</p>}
       {grey ? (<>
@@ -19478,8 +19479,68 @@ function V3LightLine({ e }) {
     {open && <V3WhyPanel e={e} onClose={() => setOpen(false)}/>}
   </span>);
 }
+// The channel decision (1195): vw_channel_verdict's call, in the words Marketing's Decision column uses.
+const V3_CHAN_PILL = { cut: ['Cut', 'bad'], ease: ['Spend less', 'warn'], pays: ['Pays', 'good'], test: ['Test', 'warn'], small: ['Too small', 'none'],
+  unclear: ['Test again', 'warn'], scale: ['Spend more', 'good'], step_up: ['Step up', 'good'] };
+const v3Per1 = v => (v == null || !isFinite(Number(v)) ? FMT_NONE : Number(v).toFixed(2));
+function V3ChanPill({ d }) {
+  const p = V3_CHAN_PILL[d];
+  return p ? <span className={'v3-pill v3-pill-' + p[1]}>{p[0]}</span> : <span className="v3-muted">{FMT_NONE}</span>;
+}
+// The Why panel's facts for a channel light: break-even, the next £1 with its range, the decision and spend against plan.
+function V3ChannelFacts({ e }) {
+  const c = e.channel || {};
+  return (<>
+    {e.expected != null && <div><dt>Break-even</dt><dd>{v3Per1(e.expected)}</dd></div>}
+    {c.next_pound != null && <div><dt>Next £1</dt><dd>{v3Per1(c.next_pound)}<small className="v3-why-range">{v3Per1(c.next_pound_lo)} to {v3Per1(c.next_pound_hi)}, needs {v3Per1(c.next_pound_line)}</small></dd></div>}
+    {c.decision && <div><dt>Decision</dt><dd><V3ChanPill d={c.decision}/></dd></div>}
+    {c.pace_pct != null && <div><dt>Spend vs plan</dt><dd>{Math.round(c.pace_pct)}%</dd></div>}
+  </>);
+}
+// One channel's return per £1 on the shared scale: the dot is the 30-day average, the bar the next £1 with its range,
+// the dashed lines break-even and the line the next £1 needs (pays within a year).
+function V3ChannelStrip({ x, max }) {
+  const c = x.channel || {}, P = v => (Math.max(0, Math.min(1, Number(v) / max)) * 100).toFixed(2) + '%';
+  const has = c.next_pound != null && c.next_pound_lo != null && c.next_pound_hi != null;
+  return (<span className="v3-strip" aria-hidden="true">
+    {c.next_pound_line != null && <i className="v3-strip-tick" style={{ left: P(c.next_pound_line) }}/>}
+    {x.expected != null && <i className="v3-strip-tick" style={{ left: P(x.expected) }}/>}
+    {has && <i className="v3-strip-range" style={{ left: P(c.next_pound_lo), width: 'calc(' + P(c.next_pound_hi) + ' - ' + P(c.next_pound_lo) + ')' }}/>}
+    {has && <i className="v3-strip-next" style={{ left: P(c.next_pound) }}/>}
+    {x.value != null && <i className="v3-strip-avg" style={{ left: P(x.value) }}/>}
+  </span>);
+}
+// The tree's channel row as a table: does the channel pay (the average against break-even), and should it get the next
+// £1 (the curve against the line it needs). Both in one strip, then the figures and the decision in their own columns.
+function V3ChannelRows({ rows, onOpen }) {
+  const vals = rows.flatMap(x => [x.value, x.expected, x.channel && x.channel.next_pound_hi]).map(Number).filter(v => isFinite(v));
+  const max = Math.max(3, Math.ceil(Math.max(0, ...vals)));
+  const be = rows.map(x => x.expected).find(v => v != null), line = rows.map(x => x.channel && x.channel.next_pound_line).find(v => v != null);
+  return (<div className="v3-tree-ch">
+    <h3 className="v3-tree-ch-h">Channels</h3>
+    <div className="v3-profit-scroll"><table className="v3-home-pl v3-ch-table">
+      <thead><tr><th>Channel</th><th className="v3-ch-strip v3-mk-opt">Return per £1, 0 to {max}</th><th className="r v3-mk-opt">Average</th><th className="r v3-mk-opt">Break-even</th>
+        <th className="r">Next £1</th><th>Decision</th><th className="r v3-mk-opt">Spend vs plan</th></tr></thead>
+      <tbody>{rows.map(x => { const c = x.channel || {}, grey = x.light === 'grey';
+        return (<tr key={x.id}>
+          <td><button type="button" className="v3-linkbtn v3-ch-name" onClick={() => onOpen(x)}><V3LightDot light={x.light}/>{x.label}</button></td>
+          <td className="v3-ch-strip v3-mk-opt">{!grey && <V3ChannelStrip x={x} max={max}/>}</td>
+          <td className="r v3-mk-opt">{v3Per1(x.value)}</td>
+          <td className="r v3-mk-opt">{v3Per1(x.expected)}</td>
+          <td className="r">{c.next_pound != null ? <>{v3Per1(c.next_pound)}<small>{v3Per1(c.next_pound_lo)} to {v3Per1(c.next_pound_hi)}</small></> : FMT_NONE}</td>
+          <td>{grey ? <span className="v3-muted">{V3_LIGHT_WORD.grey}</span> : <V3ChanPill d={c.decision}/>}</td>
+          <td className="r v3-mk-opt">{c.pace_pct != null ? Math.round(c.pace_pct) + '%' : FMT_NONE}</td>
+        </tr>); })}</tbody></table></div>
+    <p className="v3-ch-key v3-mk-opt">
+      <span><i className="v3-strip-key-avg"/>Average, 30 days</span>
+      <span><i className="v3-strip-key-next"/>Next £1, with its range</span>
+      {be != null && <span><i className="v3-strip-key-tick"/>Break-even {v3Per1(be)}</span>}
+      {line != null && <span><i className="v3-strip-key-tick"/>Pays within a year {v3Per1(line)}</span>}
+    </p>
+  </div>);
+}
 // Today, under the goal strip: the goal's profit line, what makes it, the customers behind it, then each channel's
-// return against its target. The walk's path is drawn darker; any chip opens the Why panel.
+// return and decision as a table. The walk's path is drawn darker; any chip or channel opens the Why panel.
 function V3NumbersConnect() {
   const { L, err } = useV3Lights();
   const [open, setOpen] = React.useState(null);
@@ -19489,16 +19550,20 @@ function V3NumbersConnect() {
   const T = L.tree, M = L.metrics || {};
   if (!T || !Array.isArray(T.rows)) return null;
   const path = new Set(T.path || []);
-  const rows = T.rows.map(r => (r || []).map(k => (M[k] ? Object.assign({ id: k }, M[k]) : null)).filter(Boolean)).filter(r => r.length);
-  if (!rows.length) return null;
+  const all = T.rows.map(r => (r || []).map(k => (M[k] ? Object.assign({ id: k }, M[k]) : null)).filter(Boolean)).filter(r => r.length);
+  // 1195 step 2: the channel returns leave the chips for their own table under the tree
+  const isCh = x => x.key === 'iroas' && x.scope_kind === 'channel';
+  const rows = all.filter(r => !r.every(isCh)), chRows = all.filter(r => r.every(isCh)).flat();
+  if (!rows.length && !chRows.length) return null;
   const onPath = x => x.scope_kind === 'brand' && path.has(x.key);
   return (<section className="v3-panel v3-tree-panel" aria-label="How the numbers connect">{head}
-    <ol className="v3-tree">{rows.map((r, i) => (<li key={i} className={'v3-tree-row' + (r.some(onPath) ? ' v3-tree-on' : '')} style={{ '--d': i }}>
+    {rows.length > 0 && <ol className="v3-tree">{rows.map((r, i) => (<li key={i} className={'v3-tree-row' + (r.some(onPath) ? ' v3-tree-on' : '')} style={{ '--d': i }}>
       {r.map(x => (<button type="button" key={x.id} className={'v3-node' + (onPath(x) ? ' v3-node-on' : '')} onClick={() => setOpen(x)}>
         <V3LightDot light={x.light}/>
         <span className="v3-node-l">{x.label}</span>
         <span className="v3-node-x">{x.line || ((x.value_text ? x.value_text + ', ' : '') + V3_LIGHT_WORD.grey.toLowerCase())}</span>
-      </button>))}</li>))}</ol>
+      </button>))}</li>))}</ol>}
+    {chRows.length > 0 && <V3ChannelRows rows={chRows} onOpen={setOpen}/>}
     <V3LightLegend/>
     {open && <V3WhyPanel e={open} onClose={() => setOpen(null)}/>}
   </section>);
@@ -22631,7 +22696,7 @@ function V3Incrementality() {
     scale: 'Pays, and the next £1 clears the line too, spend more', step_up: 'Pays; the next £1 sits either side of the line and spend is under plan, step back up toward the plan' };  // 1097: a tested channel judged on its range
   const test = rows.filter(r => r.call === 'test').sort((a, b) => b.spend - a.spend);
   const allTested = rows.every(r => r.tested);
-  const PILL = { cut: ['Cut', 'bad'], ease: ['Spend less', 'warn'], pays: ['Pays', 'good'], test: ['Test', 'warn'], small: ['Too small', 'none'], unclear: ['Test again', 'warn'], scale: ['Spend more', 'good'], step_up: ['Step up', 'good'] };
+  const PILL = V3_CHAN_PILL;   // 1195: one set of words for the channel decision, here and on Today's tree
   const anyNext = rows.some(r => r.mg != null), anyTgt = rows.some(r => r.tgt != null && r.call !== 'small');
   const per1 = v => (v == null ? FMT_NONE : fmtMoney(v, 2));
   return (<section className="v3-panel v3-mk-channels" aria-label="Channels">

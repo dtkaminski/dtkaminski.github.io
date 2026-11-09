@@ -338,6 +338,15 @@ html[data-frame="product"] {
   --size-spark: 20px;
   --size-bar: 8px;
   --size-drawer: 520px;
+  /* Channel return strip on Today's tree (1195 step 2): the dot is the 30-day average, the bar the next £1 with its
+     range, the dashed lines break-even and the line the next £1 needs. Data colours, not status colours. */
+  --size-strip: 16px;
+  --size-strip-col: 200px;
+  --size-strip-dot: 8px;
+  --color-strip-avg: var(--color-ink);
+  --color-strip-next: var(--color-data-2);
+  --color-strip-range: color-mix(in srgb, var(--color-data-2) 24%, transparent);
+  --color-strip-line: var(--color-faint);
 
   --shadow-panel: none;
   --shadow-raised: 0 8px 24px -6px rgba(26, 31, 36, 0.18), 0 2px 6px rgba(26, 31, 36, 0.06);
