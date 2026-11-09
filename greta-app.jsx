@@ -19633,7 +19633,7 @@ function V3Tree({ rows, edges, onPath, onOpen, goal }) {
     if (!window.ResizeObserver || !wrap.current) return;
     const ro = new ResizeObserver(() => measure()); ro.observe(wrap.current); return () => ro.disconnect();
   }, [measure]);
-  const act = hi || sel;
+  const act = E.length ? hi || sel : null;   // no links, no highlight: fading alone would say nothing
   const near = new Set(act ? [act].concat(E.filter(x => x.from === act || x.to === act).map(x => (x.from === act ? x.to : x.from))) : []);
   const path = x => { const a = geo && geo.n[x.from], b = geo && geo.n[x.to]; if (!a || !b) return null;
     const ra = rowOf[x.from], rb = rowOf[x.to];
