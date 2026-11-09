@@ -29257,7 +29257,7 @@ function App(){
       setV3dest(dest);
       track('page_view', { dest: dest }, dest);
       window.__oiV3Anchor = anchor || null;
-      window.scrollTo({top: 0, behavior: 'smooth'});
+      window.scrollTo(0, 0);   // 9 Nov: instant, a new page opens at its top (smooth did not finish in a background tab)
       if (anchor) setTimeout(() => { try { window.dispatchEvent(new Event('oi-v3-anchor')); } catch (e) {} }, 0);
     };
     window.__oiNav = (sec, sub) => {
@@ -29275,9 +29275,10 @@ function App(){
     };
   }, []);
 
-  // Scroll to top whenever section or sub-tab changes — premium-feel small touch
+  // A new page or sub-tab opens at its top. Instant, not smooth (9 Nov eval: a smooth scroll left Actions at the
+  // last page's 800px in a tab that was not in front, and a page change does not need an animation).
   React.useEffect(() => {
-    window.scrollTo({top: 0, behavior: 'smooth'});
+    window.scrollTo(0, 0);
   }, [section, activeSubId, v3dest]);
 
   // Re-render whenever the live-data loader fetches fresh data from Supabase.
