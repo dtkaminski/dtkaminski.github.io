@@ -16687,7 +16687,7 @@ const V3_ROUTE = {
   'channels/cross': ['marketing'], 'channels/channels': ['marketing', 'detail'], 'channels/creatives': ['marketing', 'creative'],
   'channels/email': ['marketing', 'email'], 'channels/organic': ['marketing', 'organic'],
   'conversion/cvr': ['website', 'cvr'], 'conversion/site': ['website', 'friction'], 'conversion/loop': ['website'],
-  'forecast/forecast': ['growth', 'forecast'],
+  'forecast/forecast': ['growth'],
   'audience/customers': ['customers'], 'audience/cohorts': ['customers', 'cohorts'],
   'market/competitors': ['competitors'],
   'commerce/products': ['products'], 'commerce/promos': ['products', 'promos'],
@@ -27666,14 +27666,11 @@ const V3_PAGES = {
   ask: (p) => <AskPanel/>,
   // 5 Nov: the Home pattern, on three tabs. Links to costs, margin and economics pick their own tab.
   goal: (p) => <V3GoalPage/>,
-  // 5 Nov: the Home pattern. The two folds are the older analyst detail, under nouns.
-  growth: (p) => (<>
-    <V3Growth/>
-    <V3More id="growth-detail" label="Spend curve">
-      <V3Anchor id="forecast"/><GretaPlanPanel show="growth"/>
-    </V3More>
-    <V3More id="growth-fit" label="Offer and product fit"><FitCard start={p.start} end={ACTIVE_END}/><GenomePanel/></V3More>
-  </>),
+  // 5 Nov: the Home pattern. 9 Nov: the two folds went. Spend curve's levers, next-customer cost and cost-curve checks
+  // are on the page (Levers on ad spend, the strip, Cost checks); the rest was the model's internals, and its spend
+  // ceiling disagreed with the plan above it. Offer and product fit read the older fit engine, which said "connect
+  // Meta, Shopify and GA4" to a brand with all three. GretaPlanPanel, FitCard and GenomePanel stay for the old nav.
+  growth: (p) => <V3Growth/>,
   stock: (p) => (<>
     {/* The server-side stock plan (vw_stock_demand_plan / fn_stock_gate): what runs out,
         when to reorder, how many, what it costs a day. Built into the embed and never
