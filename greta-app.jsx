@@ -19219,40 +19219,53 @@ function V3FuturesChart({ F, g, P, onPage }) {
 // starts after 6 hours, so reloading in one morning keeps the same handover. Before there is a last look, the moves raised
 // today. Facts only: nothing here says why. (A server read of regression_snapshot.board would carry this across devices.)
 const V3_LOOK_GAP = 6 * 3600 * 1000;
+// 9 Nov (1194): the looks are kept per person on the server (fn_last_look), so a phone and a laptop share them; the browser's
+// own storage is the fallback before 1194 or when the read fails. The forecast is compared only when the goal is confirmed.
 function useV3SinceLook(g, live) {
-  const ready = !!(g && g.confirmed && g.forecast != null && live && live.length);
+  const ready = !!(live && live.length);
+  const fc = g && g.confirmed && g.forecast != null ? Number(g.forecast) : null;
   const b = (typeof window !== 'undefined' && window.FRKL_LIVE && window.FRKL_LIVE.brandId) || null;
   const key = b ? 'greta_seen_' + b : null;
-  const [prev, setPrev] = React.useState(null);
+  const [look, setLook] = React.useState(null);   // { prev } once read
   React.useEffect(() => {
     if (!ready || !key) return;
-    try {
-      const st = JSON.parse(localStorage.getItem(key) || 'null') || {};
-      const now = Date.now();
-      const fresh = { at: now, forecast: Number(g.forecast), ranks: {} };
-      live.forEach((r, i) => { fresh.ranks[r.external_id] = i + 1; });
-      const before = st.cur && now - st.cur.at > V3_LOOK_GAP ? st.cur : (st.prev || null);
-      setPrev(before);
-      localStorage.setItem(key, JSON.stringify({ prev: before, cur: st.cur && now - st.cur.at <= V3_LOOK_GAP ? st.cur : fresh }));
-    } catch (e) {}
+    let dead = false;
+    const ranks = {}; live.forEach((r, i) => { ranks[r.external_id] = i + 1; });
+    const local = () => {
+      let before = null;
+      try {
+        const st = JSON.parse(localStorage.getItem(key) || 'null') || {};
+        const now = Date.now();
+        before = st.cur && now - st.cur.at > V3_LOOK_GAP ? st.cur : (st.prev || null);
+        localStorage.setItem(key, JSON.stringify({ prev: before, cur: st.cur && now - st.cur.at <= V3_LOOK_GAP ? st.cur : { at: now, forecast: fc, ranks } }));
+      } catch (e) {}
+      if (!dead) setLook({ prev: before });
+    };
+    const sb = window.FRKL_LIVE && window.FRKL_LIVE.sb;
+    if (!sb) { local(); return; }
+    sb.rpc('fn_last_look', { p_brand: b, p_now: { forecast: fc, ranks } })
+      .then(r => { if (r && !r.error && r.data) { if (!dead) setLook({ prev: r.data.before || null }); } else local(); }, local);
+    return () => { dead = true; };
   }, [ready, key]);
-  if (!ready) return null;
+  if (!ready || !look) return null;
+  const prev = look.prev;
   const title = r => v3PlainAction(Object.assign({}, r, { plan: null })).title;
   const items = [];
   if (prev && prev.ranks) {
     const days = (Date.now() - prev.at) / 864e5;
-    const dF = Number(g.forecast) - Number(prev.forecast);
-    if (Math.abs(dF) >= Math.max(1, Math.abs(Number(prev.forecast)) * 0.01)) items.push({ k: 'fc', up: dF > 0, t: 'Forecast ' + (dF > 0 ? 'up ' : 'down ') + v3Gbp(Math.abs(dF)) });
+    const dF = fc != null && prev.forecast != null ? fc - Number(prev.forecast) : null;
+    // a forecast moves in rounded pounds, never exact ones
+    if (dF != null && Math.abs(dF) >= Math.max(1, Math.abs(Number(prev.forecast)) * 0.01)) items.push({ k: 'fc', up: dF > 0, t: 'Forecast ' + (dF > 0 ? 'up ' : 'down ') + v3GbpRound(Math.abs(dF)) });
     const fresh = live.filter(r => prev.ranks[r.external_id] == null);
-    if (fresh.length) items.push({ k: 'new', t: fresh.length === 1 ? '1 new move' : fresh.length + ' new moves', rows: fresh.map(r => 'New: ' + title(r)) });
+    if (fresh.length) items.push({ k: 'new', t: fresh.length === 1 ? '1 new action' : fresh.length + ' new actions', rows: fresh.map(r => 'New: ' + title(r)) });
     const up = live.map((r, i) => ({ r, was: prev.ranks[r.external_id], now: i + 1 })).filter(x => x.was != null && x.was - x.now >= 2).sort((p, q) => p.now - q.now);
-    if (up.length) items.push({ k: 'up', t: up.length === 1 ? '1 move climbed' : up.length + ' moves climbed', rows: up.map(x => 'Up to #' + x.now + ': ' + title(x.r)) });
+    if (up.length) items.push({ k: 'up', t: up.length === 1 ? '1 action climbed' : up.length + ' actions climbed', rows: up.map(x => 'Up to #' + x.now + ': ' + title(x.r)) });
     const gone = Object.keys(prev.ranks).filter(id => !live.some(r => r.external_id === id)).length;
     if (gone) items.push({ k: 'gone', t: gone + ' left the list' });
     return { when: days >= 1.5 ? Math.round(days) + ' days ago' : days >= 0.9 ? 'yesterday' : 'earlier today', items, first: false };
   }
   const today = live.filter(r => r.days_open != null && Number(r.days_open) <= 0);
-  if (today.length) items.push({ k: 'new', t: today.length === 1 ? '1 new move' : today.length + ' new moves', rows: today.map(r => 'New: ' + title(r)) });
+  if (today.length) items.push({ k: 'new', t: today.length === 1 ? '1 new action' : today.length + ' new actions', rows: today.map(r => 'New: ' + title(r)) });
   return { when: null, items, first: true };
 }
 function V3AgentLead({ q, gc, board, unreported }) {
@@ -19655,6 +19668,9 @@ function V3HomeActions({ q, board }) {
   useV3Rows('move-extras', V3_MOVE_EXTRAS_Q);
   useV3Rows('brand-state', V3_STATE_Q);   // the gap reads the ad answer
   const [drawer, setDrawer] = React.useState(null);   // { id, mode }
+  const [sinceOpen, setSinceOpen] = React.useState(false);
+  // 9 Nov eval: what changed since this person's last visit, on any device (1194); before, nothing rendered it
+  const since = useV3SinceLook(g, board.rows ? v3LiveRows(board.rows) : null);
   const bmRows = bm.rows && bm.rows[0] && Array.isArray(bm.rows[0].rows) ? bm.rows[0].rows : [];
   const head = (n) => (<div className="v3-panel-head">
     <h2>Actions</h2>{n > 0 && <span className="v3-count">{n}</span>}
@@ -19674,6 +19690,11 @@ function V3HomeActions({ q, board }) {
   const open = drawer && moves.find(m => m.row.external_id === drawer.id);
   return (<section className="v3-panel v3-home-actions" id="v3-queue" aria-label="Actions">
     {head(total)}
+    {since && (since.items.length > 0 || !since.first) && <div className="v3-home-since">
+      <span className="v3-home-since-k">{since.first ? 'New today' : 'Since your last visit'}{since.when && <em>{since.when}</em>}</span>
+      {since.items.length ? since.items.map(x => <b key={x.k} className={x.k === 'fc' ? (x.up ? 'v3-up' : 'v3-down') : ''}>{x.t}</b>) : <b>No change</b>}
+      {since.items.some(x => x.rows) && <button type="button" className="v3-panel-link" aria-expanded={sinceOpen} onClick={() => setSinceOpen(o => !o)}>{sinceOpen ? 'Hide' : 'Which'}</button>}
+      {sinceOpen && <ul>{since.items.flatMap(x => x.rows || []).map((t, i) => <li key={i}>{t}</li>)}</ul>}</div>}
     <table className="v3-home-table">
       <thead><tr><th>Action</th><th>Area</th><th className="r">Worth</th><th>Basis</th><th>Status</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
       <tbody>
@@ -25314,6 +25335,10 @@ function V3Signals({ items }) {
 const v3Pence = v => (v >= 1 ? fmtMoney(v, 2) : Math.round(v * 100) + 'p');
 // 0310: each sign's 30-day figure at 13 weekly points (cache_brand_sign_history, hourly). Before 0310
 // the read fails at once and the signs show as a snapshot, as they did.
+// 1194 (9 Nov eval, daily pulse): the latest closed day against the middle value of the same weekday over the 8 weeks
+// before, costed as Last week is, so a week's days add up to it. Before 1194 the read fails and the strip is left out.
+const V3_YESTERDAY_Q = (sb, b) => sb.rpc('fn_brand_yesterday', { p_brand: b })
+  .then(r => ({ data: r && r.data ? [r.data] : [], error: r ? r.error : null }));
 const V3_SIGN_HIST_Q = (sb, b) => sb.from('cache_brand_sign_history').select('history,refreshed_at').eq('brand_id', b).limit(1);
 // The signs and the headline, built once for every page that shows them (Today, and since 9 Oct Profit &
 // sales, Marketing, Customers, Growth plan, Review and Goal & costs), so a figure, its arrow and its
@@ -25598,6 +25623,7 @@ function V3BusinessState({ part }) {
   const ladQ = useV3Rows('profit-ladder', V3_LADDER_Q);   // the sales-per-£ basis (v3DeliveryK) for the signs' history
   const tq = useV3Rows('tier-30', V3_TIER_Q);   // aMER, from the same hourly snapshot as Customers
   const figQ = useV3Figures();   // the registered figures the signals and signs show (1080)
+  const yq = useV3Rows(part === 'figs' ? 'brand-yesterday' : 'brand-yesterday-none', part === 'figs' ? V3_YESTERDAY_Q : V3_NO_READ);
   const [drv, setDrv] = React.useState(null);   // which sign's drivers are open: 'cac', 'ret', 'ly', 'repeat'
   if (q.err) return null;                                   // before 0269, or unreadable: Today carries on without it
   // 1144: a brand with less than the month the read needs gets V3YoungHero instead; "a month after all costs" would set
@@ -25770,7 +25796,22 @@ function V3BusinessState({ part }) {
   if (part === 'figs') {
     const wkSer = k => wk.map(w => w[k]);
     const weekly = hasStats ? [['Sales', TW.sales, TW.prev_sales, true, 'sales'], ['Ad spend', TW.ads, TW.prev_ads, null, 'ads'], ['Profit after ads', TW.profit_after_ads, TW.prev_profit_after_ads, true, 'v']] : [];
+    // 9 Nov eval: a reason to open Home each morning. The latest closed day, each figure against a typical same weekday.
+    const Y = yq.rows && yq.rows[0], YT = Y && Y.typical;
+    const daily = Y && Y.sales != null ? [['Sales', Y.sales, YT && YT.sales, true, 'sales', fmtMoney],
+      ['Orders', Y.orders, YT && YT.orders, true, 'orders', fmtCount],
+      ...(Number(Y.ads) > 0 || (YT && Number(YT.ads) > 0) ? [['Ad spend', Y.ads, YT && YT.ads, null, 'ads', fmtMoney]] : []),
+      ...(Y.profit_after_ads != null ? [['Profit after ads', Y.profit_after_ads, YT && YT.profit_after_ads, true, 'profit_after_ads', fmtMoney]] : [])] : [];
+    const daySer = k => (Y && Array.isArray(Y.series) ? Y.series : []).map(d => d[k]).filter(x => x != null);
     return (<section className="v3-panel v3-home-strip" aria-label="Key figures">
+      {daily.length > 0 && <div className="v3-home-group v3-home-day" style={{ '--n': daily.length }}>
+        <div className="v3-home-group-h">{Y.is_yesterday ? 'Yesterday' : Y.weekday}<span>{v3Day(Y.day)}{Y.is_yesterday ? '' : ', the latest day with data'}{YT ? ', against a typical ' + Y.weekday : ''}</span></div>
+        <div className="v3-home-tiles">{daily.map(([k, v, was, up, key, fmt]) => {
+          const ch = was != null && Number(was) !== 0 ? (Number(v) - Number(was)) / Math.abs(Number(was)) : null;
+          const dir = ch == null || Math.abs(ch) < 0.0005 ? 'flat' : ch > 0 ? 'up' : 'down';
+          return <V3HomeTile key={k} k={k} v={fmt(v)} dir={ch == null ? null : dir} cls={up == null || dir === 'flat' ? '' : (dir === 'up') === up ? 'v3-up' : 'v3-down'}
+            delta={ch == null ? '' : (Math.abs(ch) * 100).toFixed(1) + '%'} pts={daySer(key)}/>;
+        })}</div></div>}
       {weekly.length > 0 && <div className="v3-home-group" style={{ '--n': weekly.length }}>
         <div className="v3-home-group-h">Last week{TW.week_from ? <span>{v3Day(TW.week_from)} to {v3Day(TW.week_to)}, against the week before</span> : <span>against the week before</span>}</div>
         <div className="v3-home-tiles">{weekly.map(([k, v, was, up, key]) => {
