@@ -22620,7 +22620,7 @@ function V3Incrementality() {
         <th className="r" title="Sales the ads likely caused for each £1 spent">Likely caused per £1</th>
         <th className="r" title="What each £1 has to bring in for the channel to break even">Break-even per £1</th>
         {anyNext && <th className="r v3-mk-opt" title="First-order sales the next £1 brings back, on your own Shopify orders">Next £1 brings</th>}
-        {anyTgt && <th className="r v3-mk-opt" title="The return each platform must report for the channel to break even. Set this as the target return in Ads Manager and Google Ads.">Target to set</th>}
+        {anyTgt && <th className="r v3-mk-opt" title="The same break-even, in the return each platform reports: what the platform must show for the channel to break even. Set this as the target return in Ads Manager and Google Ads.">Break-even, platform’s count</th>}
         <th>Decision</th></tr></thead>
       <tbody>{rows.map(r => { const c = PILL[r.call] || ['Unclear', 'none'];
         return (<tr key={r.platform + r.channel_type}>
@@ -22752,7 +22752,7 @@ function V3MarketingPage({ start, period, customActive }) {
           </div></div>
         {ownSigns.length > 0 && <div className="v3-home-group" style={{ '--n': ownSigns.length }}>
           <div className="v3-home-group-h">Platforms’ own count<span>against 4 weeks ago</span></div>
-          <div className="v3-home-tiles">{ownSigns.map(sg => signTile(sg, sg.which === 'metacpa' ? 'Meta cost per sale' : sg.which === 'googcpa' ? 'Google cost per sale' : 'Email sales'))}</div></div>}
+          <div className="v3-home-tiles">{ownSigns.map(sg => signTile(sg, sg.which === 'metacpa' ? 'Meta cost per sale' : sg.which === 'googcpa' ? 'Google cost per sale' : 'One-off email sales'))}</div></div>}
         {openSign && <div className="v3-home-drv"><V3DriverPanel key={drv} which={drv} points={openSign.points || SG.HP} ctx={openSign.ctx} line={openSign.dline}/></div>}
       </> : <div className="v3-home-group" style={{ '--n': 4 }}>
         <div className="v3-home-group-h">{onFig ? 'Last 30 days' : customActive ? v3Day(start) + ' to ' + v3Day(end) : ((PERIODS.find(p => p.key === period) || {}).label || 'This period')}<span>{pPaid != null ? 'against the period before' : ''}</span></div>
@@ -23091,6 +23091,7 @@ function V3MarketingEmail() {
   const seg = useV3Rows('mk-atrisk', (sb, b) => sb.from('v_tenant_customer_segment_stats')
     .select('segment,customers,emailable').eq('brand_id', b).eq('segment', 'At risk'));
   const ret = useV3Rows('cust-ret', V3_RET_Q);
+  const cmap = useV3Rows('channel-map', V3_CHANNEL_MAP_Q);   // 9 Nov: the shop's own count of email sales, as Sales by channel
   const [allCamps, setAllCamps] = React.useState(false);
   const head = <div className="v3-panel-head"><h2>Email</h2><span className="v3-muted">Klaviyo</span></div>;
   if (fl.err || ca.err) return <section className="v3-panel">{head}<p className="v3-panel-note">Email could not load. Refresh the page to try again.</p></section>;
@@ -23113,9 +23114,13 @@ function V3MarketingEmail() {
 
   const today = new Date().toISOString().slice(0, 10), from30 = v3IsoAdd(today, -30);
   const camps = ca.rows.filter(c => num(c.recipients) > 0).map(c => ({ ...c, day: String(c.send_time).slice(0, 10), reach: num(c.recipients), rev: num(c.attributed_revenue), sms: String(c.channel).toLowerCase() === 'sms' }));
-  const c30 = camps.filter(c => c.day >= from30);
+  // 9 Nov eval: "One-off emails" added texts in (£24,164 on Halden = £19,793 of emails + £4,371 of texts) and read
+  // against the Overview's £19,793. Emails only, on the Overview's window (the 30 days to yesterday); texts apart.
+  const c30all = camps.filter(c => c.day >= from30 && c.day < today);
+  const c30 = c30all.filter(c => !c.sms), t30 = c30all.filter(c => c.sms);
   const reachOf = rows => rows.reduce((a, r) => a + r.reach, 0), revOf = rows => rows.reduce((a, r) => a + r.rev, 0);
-  const flowRev = revOf(live), flowReach = reachOf(live), campRev = revOf(c30), campReach = reachOf(c30);
+  const flowRev = revOf(live), flowReach = reachOf(live), campRev = revOf(c30), campReach = reachOf(c30), textRev = revOf(t30);
+  const CM = ((cmap.rows || [])[0] || {}).map, shopEmail = CM && Array.isArray(CM.channels) ? (CM.channels.find(c => c.key === 'email') || null) : null;
   const claimShare = shop > 0 ? (flowRev + campRev) / shop : null;
   const clickOf = (rows, k) => { const w = rows.filter(r => r[k] != null && r.reach > 0), d = reachOf(w); return d > 0 ? w.reduce((a, r) => a + Number(r[k]) * r.reach, 0) / d : null; };
   const clickCamp = clickOf(c30.filter(c => !c.sms), 'click_rate'), clickFlow = clickOf(live, 'click_rate_30d');
@@ -23148,13 +23153,14 @@ function V3MarketingEmail() {
         <div className="v3-home-group-h">One-off emails<span>Last 30 days</span></div>
         <div className="v3-home-tiles">
           <V3HomeTile k="Sent" v={fmtCount(c30.length)} delta={fmtCount(campReach) + ' inboxes'}/>
-          <V3HomeTile k="Sales Klaviyo credits" v={fmtMoney(campRev)} delta=""/>
+          <V3HomeTile k="Sales Klaviyo credits" v={fmtMoney(campRev)} delta={textRev > 0 ? 'plus ' + fmtMoney(textRev) + ' from ' + fmtCount(t30.length) + (t30.length === 1 ? ' text' : ' texts') : ''}/>
           <V3HomeTile k="Per person" v={campReach > 0 ? fmtMoney(campRev / campReach, 2) : FMT_NONE} delta=""/>
         </div></div>
-      {claimShare != null && <div className="v3-home-group" style={{ '--n': 1 }}>
+      {(claimShare != null || shopEmail) && <div className="v3-home-group" style={{ '--n': (claimShare != null ? 1 : 0) + (shopEmail ? 1 : 0) }}>
         <div className="v3-home-group-h">All email<span>Last 30 days</span></div>
         <div className="v3-home-tiles">
-          <V3HomeTile k="Credited share of sales" v={fmtPctN(claimShare)} delta="not in any total"/>
+          {claimShare != null && <V3HomeTile k="Credited share of sales" v={fmtPctN(claimShare)} delta="Klaviyo’s count, not in any total"/>}
+          {shopEmail && <V3HomeTile k="Sales your shop credits" v={fmtMoney(shopEmail.sales)} delta="Last click, as Sales by channel"/>}
         </div></div>}
     </section>
 
