@@ -24246,7 +24246,11 @@ const V3_RESULT = {
   worked: { label: 'Worked', cls: 'good' }, pointing: { label: 'Pointing the right way', cls: 'good' },
   did_not_work: { label: 'Didn’t work', cls: 'bad' }, too_early: { label: 'Too early to tell', cls: '' },
   checking: { label: 'Being checked', cls: '' }, cant_tell: { label: 'Can’t tell', cls: '' },
+  // 1192: a done move is followed until the change shows (stock in, spend down); only then is it checked
+  waiting: { label: 'Not in place yet', cls: '' }, not_in_place: { label: 'Never in place', cls: '' },
 };
+// the follow-up's own sentence, without the full stop the line adds
+const v3ResNow = s => v3Tidy(String(s || '')).replace(/\.\s*$/, '');
 // a change in the checked number, in its own unit
 function v3ResultAmt(v, unit) {
   const n = Math.abs(Number(v));
@@ -24275,12 +24279,17 @@ function V3ResultRow({ r }) {
           : null}
         {r.metric ? <>{what} {Number(r.gbp) > 0 ? 'going' : 'to go'} {way}{hasExp ? <> by about <b className="v3-res-fig">{v3ResultAmt(r.expect_p50, r.unit)}</b>{range ? <> ({v3ResultAmt(r.expect_p10, r.unit)} to {v3ResultAmt(r.expect_p90, r.unit)})</> : null}</> : null}</> : (Number(r.gbp) > 0 ? null : 'no figure it could be checked on')}.
       </p>
-      <p className="v3-res-line">
-        <span className="v3-res-k">What happened</span>
-        {seen != null
-          ? <>{what} went {seen < 0 ? 'down' : 'up'} by <b className="v3-res-fig">{v3ResultAmt(seen, r.unit)}</b> against what would have happened anyway{r.measured_gbp != null ? <>: <b className="v3-res-fig">{v3Gbp(r.measured_gbp)}</b> measured</> : null}.</>
-          : <>{r.reason ? v3Tidy(r.reason) : 'Not checked yet'}.</>}
-      </p>
+      {(r.stage === 'waiting' || r.stage === 'not_in_place')
+        ? <p className="v3-res-line"><span className="v3-res-k">So far</span>{v3ResNow(r.now || r.reason)}.</p>
+        : <>
+          {r.now && <p className="v3-res-line"><span className="v3-res-k">In place</span>{v3ResNow(r.now)}.</p>}
+          <p className="v3-res-line">
+            <span className="v3-res-k">What happened</span>
+            {seen != null
+              ? <>{what} went {seen < 0 ? 'down' : 'up'} by <b className="v3-res-fig">{v3ResultAmt(seen, r.unit)}</b> against what would have happened anyway{r.measured_gbp != null ? <>: <b className="v3-res-fig">{v3Gbp(r.measured_gbp)}</b> measured</> : null}.</>
+              : <>{r.reason ? v3Tidy(r.reason) : 'Not checked yet'}.</>}
+          </p>
+        </>}
     </div>
     <span className={'v3-goal-chip v3-res-chip ' + L.cls}>{L.label}{r.label === 'too_early' && r.days_left != null ? ': about ' + r.days_left + (r.days_left === 1 ? ' more day' : ' more days') : ''}</span>
   </li>);
@@ -24295,10 +24304,10 @@ function V3Results() {
   if (!rows.length) return (<section className="v3-sec v3-res">
     <div className="v3-kick">The moves you marked done</div>
     <p className="v3-verdict">No results yet</p>
-    <p className="v3-note v3-measure">Mark an action done on Home or Actions. Each one is checked when its window has passed, against what would have happened anyway, and the result shows here.</p>
+    <p className="v3-note v3-measure">Mark an action done on Home or Actions. Each one is followed from that day: first until the change shows (stock in, spend down), then over its window against what would have happened anyway. The result shows here.</p>
     <button type="button" className="v3-btn v3-btn-sm v3-btn-p" onClick={() => window.__oiGo && window.__oiGo('today')}>Go to Home</button>
   </section>);
-  const counts = ['worked', 'pointing', 'did_not_work', 'checking', 'too_early', 'cant_tell'].filter(k => Number(T[k]) > 0);
+  const counts = ['worked', 'pointing', 'did_not_work', 'checking', 'too_early', 'waiting', 'not_in_place', 'cant_tell'].filter(k => Number(T[k]) > 0);
   return (<section className="v3-sec v3-res">
     <div className="v3-kick">The moves you marked done</div>
     <p className="v3-verdict">Moves you took: <span className="v3-res-fig">{v3Gbp(T.predicted_month)}</span> a month predicted{Number(T.predicted_once) > 0 ? <>, and <span className="v3-res-fig">{v3Gbp(T.predicted_once)}</span> once</> : null}, <span className="v3-res-fig">{v3Gbp(T.measured_gbp)}</span> measured so far.</p>
@@ -24306,7 +24315,7 @@ function V3Results() {
     <p className="v3-note v3-measure">
       {Number(T.measured_moves) > 0 ? 'Measured counts the ' + fmtCount(T.measured_moves) + (Number(T.measured_moves) === 1 ? ' move' : ' moves') + ' whose check reads profit in pounds. ' : 'Nothing is measured in pounds yet: a £ figure counts only once a check reads profit itself. '}
       {T.next_check ? 'The next check is due ' + v3Day(T.next_check, true) + '. ' : ''}
-      Each check compares what happened with what would have happened anyway. It shows the promise held, not that the move alone caused it.
+      Each check starts once the change has shown, and compares what happened with what would have happened anyway. It shows the promise held, not that the move alone caused it.
     </p>
     <ul className="v3-res-list">{rows.map(r => <V3ResultRow key={r.external_id} r={r}/>)}</ul>
   </section>);
