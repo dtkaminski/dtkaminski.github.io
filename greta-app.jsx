@@ -22626,10 +22626,12 @@ function V3Incrementality() {
       : o && o.status === 'ease' && r.mg != null && r.mg < r.be ? 'ease'
       : lo >= r.be && room >= 0.1 ? 'pays' : r.spend >= floor ? 'test' : 'small';
   });
-  const CALL = { cut: 'Loses money either way', ease: 'Pays on average, not at the margin, spend less', pays: 'Pays either way', test: 'Too close to call, test it', small: 'Too small to test', unclear: 'The test’s range is too wide to call, test it again' };  // 1097: a tested channel judged on its range
+  const CALL = { cut: 'Loses money either way', ease: 'Pays on average, not at the margin, spend less', pays: 'Pays either way', test: 'Too close to call, test it', small: 'Too small to test', unclear: 'The test’s range is too wide to call, test it again',
+    // 1195: the next £1 as well as the average
+    scale: 'Pays, and the next £1 clears the line too, spend more', step_up: 'Pays; the next £1 sits either side of the line and spend is under plan, step back up toward the plan' };  // 1097: a tested channel judged on its range
   const test = rows.filter(r => r.call === 'test').sort((a, b) => b.spend - a.spend);
   const allTested = rows.every(r => r.tested);
-  const PILL = { cut: ['Cut', 'bad'], ease: ['Spend less', 'warn'], pays: ['Pays', 'good'], test: ['Test', 'warn'], small: ['Too small', 'none'], unclear: ['Test again', 'warn'] };
+  const PILL = { cut: ['Cut', 'bad'], ease: ['Spend less', 'warn'], pays: ['Pays', 'good'], test: ['Test', 'warn'], small: ['Too small', 'none'], unclear: ['Test again', 'warn'], scale: ['Spend more', 'good'], step_up: ['Step up', 'good'] };
   const anyNext = rows.some(r => r.mg != null), anyTgt = rows.some(r => r.tgt != null && r.call !== 'small');
   const per1 = v => (v == null ? FMT_NONE : fmtMoney(v, 2));
   return (<section className="v3-panel v3-mk-channels" aria-label="Channels">
