@@ -361,6 +361,9 @@ html[data-frame="product"] {
   --color-edge-on: var(--color-ink);
   --opacity-tree-dim: 0.4;
   --duration-tree: 120ms;
+  /* Growth plan, year view (1204): the own-figure inputs, and the panel while its next answer loads */
+  --width-input-short: 9ch;
+  --opacity-busy: 0.55;
 
   --shadow-panel: none;
   --shadow-raised: 0 8px 24px -6px rgba(26, 31, 36, 0.18), 0 2px 6px rgba(26, 31, 36, 0.06);
