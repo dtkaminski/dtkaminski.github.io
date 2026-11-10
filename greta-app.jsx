@@ -19445,6 +19445,44 @@ const v3WhyFind = (why, label) => {
   const w = String(why || ''), l = String(label || '');
   return l && w.toLowerCase().startsWith(l.toLowerCase() + ' ') ? v3Sentence(w.slice(l.length + 1)) : w;
 };
+// 1208: what an ad angle's flag means, as a pill under its name
+const V3_LEAF_FLAG = { paused: ['Paused', 'warn'], weak: ['Below half the average', 'bad'] };
+const v3LeafChange = (now, before) => (Number(before) > 0 && now != null ? fmtPct(Number(now) / Number(before) - 1) : FMT_NONE);
+// One leaf set under the causes (1208): the code, the ad angle or the first-order product, 30 days before against
+// the 30 days to the latest day, with the cause it drills and its status. A short finding only where the rows cannot
+// say it (one leaf holds the fall, or the fall is broad).
+function V3WhyDrill({ d, n }) {
+  const rows = Array.isArray(d.rows) ? d.rows : [];
+  if (!rows.length) return null;
+  const st = V3_CHECK[d.cause_status] || null;
+  const name = (r, flag) => (<div className="v3-why-item"><span className="v3-why-ix">{r.i}</span><span>{r.label}</span>
+    {flag && <small className="v3-why-find"><span className={'v3-pill v3-pill-' + flag[1]}>{flag[0]}</span></small>}</div>);
+  const R = rows.map((r, i) => Object.assign({ i: i + 1 }, r));
+  let head, body, foot = null;
+  if (d.set === 'code') {
+    head = ['Code', 'Before', 'Now', 'Depth', 'Repeat'];
+    body = R.map(r => [name(r), fmtCount(r.before), fmtCount(r.now),
+      fmtPctN(r.rate_before != null ? r.rate_before : r.rate_now), r.repeat_before != null ? fmtPctN(r.repeat_before) : FMT_NONE]);
+    foot = 'Depth and Repeat read the customers of the 30 days before. Repeat: a second order within 30 days of the first.';
+  } else if (d.set === 'ad_angle') {
+    head = ['Angle', 'Spend before', 'Spend now', 'Per click before', 'Per click now'];
+    body = R.map(r => [name(r, V3_LEAF_FLAG[r.flag]), fmtMoney(r.spend_before), fmtMoney(r.spend_now),
+      fmtPctN(r.rate_before), fmtPctN(r.rate_now)]);
+    foot = 'Per click: sales Meta reports per link click.';
+  } else {
+    head = ['Product', 'Before', 'Now', 'Change'];
+    body = R.map(r => [name(r), fmtCount(r.before), fmtCount(r.now), v3LeafChange(r.now, r.before)]);
+  }
+  return (<section className="v3-drawer-sec">
+    <V3StepH n={n}>{d.title}</V3StepH>
+    {d.cause && <p className="v3-why-under"><span>{d.cause}</span>{st && <span className={'v3-pill v3-pill-' + st[1]}>{st[0]}</span>}</p>}
+    {d.finding && <p className="v3-drawer-p">{v3Sentence(d.finding)}</p>}
+    <div className="v3-profit-scroll"><table className="v3-home-pl v3-ad-mini v3-why-tbl">
+      <thead><tr>{head.map((h, i) => <th key={i} className={i ? 'r' : ''}>{h}</th>)}</tr></thead>
+      <tbody>{body.map((c, i) => <tr key={i}>{c.map((v, j) => <td key={j} className={j ? 'r' : ''}>{v}</td>)}</tr>)}</tbody></table></div>
+    {foot && <p className="v3-why-term">{foot}</p>}
+  </section>);
+}
 // The Why panel: the measure's figures in one row, then numbered steps from top to bottom: where its gap sits (the
 // walk's parts, in tables), every cause the walk checked with what it found, the likeliest cause with how sure, the
 // test, and the decision on the linked action. The measure's links on the tree follow, unnumbered, and open the next
@@ -19553,6 +19591,7 @@ function V3WhyPanel({ e, onClose, links, onGo }) {
             {checked && checked.length > 0 && <div><dt>Causes checked</dt><dd>{fmtCount(nChecked)} of {fmtCount(checked.length)}</dd></div>}
             {W.strategy && <div><dt>Strategy</dt><dd>{W.strategy}</dd></div>}
           </dl></section>}
+        {W && Array.isArray(W.drill) && W.drill.map(d => <V3WhyDrill key={d.set} d={d} n={d.rows && d.rows.length ? nx() : 0}/>)}
         {W && W.cause_kind !== 'on_track' && W.settle_test && <section className="v3-drawer-sec"><V3StepH n={nx()}>Test</V3StepH>
           <p className="v3-drawer-p">{W.settle_test}</p></section>}
         {row ? <section className="v3-drawer-sec v3-drawer-decide"><V3StepH n={nx()}>Decision</V3StepH><V3MoveDecide row={row} onDecided={onClose}/></section>
