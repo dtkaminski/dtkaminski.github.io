@@ -811,15 +811,10 @@ function MarginBadge({onSetup}){
     ? (H.cm_source === 'none' ? 'held' : (V3_CONF[H.trust_level] ? H.trust_level : 'probably'))
     : (verified ? 'direct' : 'probably');
   const conf = V3_CONF[rung];
-  const good = rung === 'direct' || rung === 'likely', faint = rung === 'outside' || rung === 'held';
-  const canFix = !good && onSetup;
+  const canFix = !(rung === 'direct' || rung === 'likely') && onSetup;
+  // Step 4 (10 Nov): the ladder's chip, not a second uppercase pill for the same rung
   return (<span title={conf.label + ', ' + conf.why} onClick={canFix ? (e=>{e.stopPropagation(); onSetup();}) : undefined}
-    style={{display:'inline-flex', alignItems:'center', gap:3, fontSize:'var(--text-xs)', fontWeight:'var(--weight-bold)', letterSpacing:'var(--tracking-wide)', textTransform:'uppercase',
-            padding:'1px 6px', borderRadius:'var(--r-full)', cursor:canFix?'pointer':'help', whiteSpace:'nowrap',
-            background: good?'var(--good-bg)':faint?'transparent':'var(--warn-bg)', color: good?'var(--good)':faint?'var(--text-faint)':'var(--warn)',
-            border:'1px solid '+(good?'var(--color-success-line)':faint?'var(--border-default)':'var(--color-warning-wash)')}}>
-    {conf.label}
-  </span>);
+    className={'v3-conf v3-conf-' + rung} style={{cursor:canFix?'pointer':'help'}}><i aria-hidden="true"/>{conf.label}</span>);
 }
 
 // Guided cost setup — makes contribution/CAC/LTV trustworthy. Pre-fills the
@@ -3799,7 +3794,7 @@ function V3ProfitLead({ view, costsVerified }) {
   ];
   if (other >= 1) chain.push({ k: 'Other marketing', v: -other, kind: 'out', fig: 'other_marketing_30d' });
   chain.push({ k: 'Profit after ads', v: kept, kind: 'sub', fig: 'profit_after_ads_30d' });
-  if (oh30 != null) { chain.push({ k: 'Running costs', v: -oh30, kind: 'out', fig: 'overheads_30d' }); if (op != null) chain.push({ k: 'Net profit', v: op, kind: 'total', fig: 'after_overheads_30d' }); }
+  if (oh30 != null) { chain.push({ k: 'Running costs', v: -oh30, kind: 'out', fig: 'overheads_30d' }); if (op != null) chain.push({ k: 'Profit after running costs', v: op, kind: 'total', fig: 'after_overheads_30d' }); }
   const per = v => sales > 0 ? Math.round(Math.abs(v) / sales * 100) + 'p in every £1' : '';
 
   // Move this month's budget into the peak: the plan spreads the quarter's ad budget by season (it
@@ -3889,7 +3884,7 @@ function V3ProfitLead({ view, costsVerified }) {
     { k: 'Products and delivery', v: -(view.rev - view.contrib - view.paid), kind: 'out' },
     { k: 'Ad spend', v: -view.paid, kind: 'out', ads: true },
     { k: 'Profit after ads', v: view.contrib, kind: 'sub' },
-    ...(view.ohWin != null ? [{ k: 'Running costs', v: -view.ohWin, kind: 'out' }, { k: 'Net profit', v: view.contrib - view.ohWin, kind: 'total' }] : []),
+    ...(view.ohWin != null ? [{ k: 'Running costs', v: -view.ohWin, kind: 'out' }, { k: 'Profit after running costs', v: view.contrib - view.ohWin, kind: 'total' }] : []),
   ]);
   const plSales = onFig ? sales : view.rev;
   const plEst = onFig ? chain.map(r => ({ r, s: v3Source(r.fig) })).filter(x => x.s && x.s.state === 'estimated') : [];
@@ -3948,7 +3943,7 @@ function V3ProfitLead({ view, costsVerified }) {
       {onFig && signs.length > 0 && <div className="v3-home-group" style={{ '--n': signs.length }}>
         <div className="v3-home-group-h">Last 30 days<span>against 4 weeks ago</span></div>
         <div className="v3-home-tiles">{signs.map(sg => { const t = v3SignTrend(sg);
-          return <V3HomeTile key={sg.k} k={sg.which === 'profit' ? 'Net profit' : v3SignShort(sg)} v={sg.v} dir={t && t.dir} cls={t && t.cls} delta={t ? t.delta : ''} weak={sg.tone === 'weak'}
+          return <V3HomeTile key={sg.k} k={sg.which === 'profit' ? 'Profit after running costs' : v3SignShort(sg)} v={sg.v} dir={t && t.dir} cls={t && t.cls} delta={t ? t.delta : ''} weak={sg.tone === 'weak'}
             pts={(sg.series || []).map(p => p.v)} act={sg.act} title={sg.k} m={sg.m}/>; })}</div></div>}
       {openSign && <div className="v3-home-drv"><V3DriverPanel key={drv} which={drv} points={openSign.points || SG.HP} ctx={openSign.ctx} line={openSign.dline}/></div>}
       {!onFig && view.priorSpike && <p className="v3-panel-note v3-profit-spike">The period before had a sale: {fmtMoney(view.pRev)}, against {fmtMoney(view.priorSpike.typ)} usually.</p>}
@@ -3979,7 +3974,7 @@ function V3ProfitLead({ view, costsVerified }) {
     <div className="v3-home-two">
       {pl.length > 0 && <section className="v3-panel v3-profit-pl" aria-label="Where each pound of sales went">
         <div className="v3-panel-head"><h2>Profit</h2><span className="v3-muted">{periodWords}</span>
-          {plEstWords && <span className="v3-pill v3-pill-none" title={plEstWords}>Estimated</span>}
+          <V3ProfitConf detail={plEstWords} down={!onFig}/>
           <button type="button" className="v3-panel-link" onClick={() => window.__oiGo && window.__oiGo('goal')}>Quarter plan</button></div>
         <table className="v3-home-pl"><thead><tr><th>Line</th><th className="bar"><span className="v3-sr-only">Share of sales</span></th><th className="r">Amount</th><th className="r">In every £1</th></tr></thead>
           <tbody>{pl.map(r => (<tr key={r.k} className={r.kind === 'sub' || r.kind === 'total' ? 'tot' : ''}>
@@ -4020,7 +4015,7 @@ function V3ProfitLead({ view, costsVerified }) {
       <div className="v3-panel-head"><h2>Actions</h2>{moves.length > 0 && <span className="v3-count">{moves.length}</span>}<span className="v3-muted">From these figures, last 30 days</span>
         <button type="button" className="v3-panel-link" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>View all</button></div>
       {moves.length ? <table className="v3-home-table">
-        <thead><tr><th>Action</th>{moves.some(m => m.worth) && <th className="r">Worth</th>}<th>Basis</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
+        <thead><tr><th>Action</th>{moves.some(m => m.worth) && <th className="r">Worth</th>}<th>Confidence</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
         <tbody>{moves.map(m => (<tr key={m.key}>
           <td className="v3-home-act"><span className="v3-home-title-static">{m.t}</span><span className="v3-home-sub">{m.sub}</span></td>
           {moves.some(x => x.worth) && <td className="v3-home-worth" data-k="Worth">{m.worth && <><b>{m.worth}</b><small>{m.worthSub}</small></>}</td>}
@@ -11632,7 +11627,7 @@ const V3_MOVES = [
   ['returns-product-', ['profit', 'prodsales']], ['seo-nonbrand', ['organic']],
   ['email-list-health', ['email']], ['email-list-growth', ['email']], ['email-holdout', ['email']], ['site-speed', ['conv']], ['returns-faults', ['profit']],
 ];
-const V3_MOVE_LABEL = { cac: 'cost to win a new customer', ret: 'sales from each £1 of ads', profit: 'profit after all costs', ly: 'sales against last year',
+const V3_MOVE_LABEL = { cac: 'cost to win a new customer', ret: 'sales from each £1 of ads', profit: 'profit after ads', ly: 'sales against last year',
   repeat: 'customers who order again', conv: 'orders per 100 visits', newc: 'new customers', retsales: 'returning customers’ sales', spend: 'ad spend',
   metacpa: 'Meta’s cost per sale', googcpa: 'Google’s cost per sale', newsales: 'new customers’ sales', prodsales: 'product sales', aov: 'the average order',
   brandshare: 'searches for your name', email: 'sales from email campaigns', organic: 'visits from unpaid search' };
@@ -11793,7 +11788,7 @@ function V3ActionBoard(){
           No figure <span className="v3-tab-n">{laneAll.length}</span></button>}
       </div>
       <table className="v3-home-table v3-acts-table">
-        <thead><tr><th>Action</th><th>Area</th><th className="r">Worth</th><th>Basis</th>{owners && <th>Owner</th>}<th>Status</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
+        <thead><tr><th>Action</th><th>Area</th><th className="r">Worth</th><th>Confidence</th>{owners && <th>Owner</th>}<th>Status</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
         <tbody>
           {act.length > 0 && others > 0 && group('Do now', act.length)}
           {act.map(line)}
@@ -15765,7 +15760,7 @@ function V3ProductCosts(){
           return (<React.Fragment key={r.variant_id}>
             <tr>
               <td className="v3-web-wrap">{label(r)}</td>
-              <td>{r.status === 'yours' ? 'You' : r.status === 'shopify' ? 'Shopify' : <span className="v3-flag">No cost yet</span>}</td>
+              <td>{r.status === 'yours' ? 'You' : r.status === 'shopify' ? 'Shopify' : <span className="v3-pill v3-pill-warn">No cost yet</span>}</td>
               <td className="r v3-mk-opt">{money(r.price)}</td>
               <td className="r v3-mk-opt">{c ? money(c.unit_cost) : FMT_NONE}</td>
               <td className="r v3-mk-opt">{c && (Number(c.freight) || Number(c.duty)) ? money((Number(c.freight) || 0) + (Number(c.duty) || 0)) : FMT_NONE}</td>
@@ -16124,7 +16119,7 @@ function BusinessEconomicsPanel(){
               <div className="v3-form-grid v3-form-grid--n">
                 <Field label="Days stock is held" unit="days" int value={genome.inventory_days||''} onChange={v=>setGenome(s=>({...s, inventory_days:v}))}
                   placeholder={invOk ? String(invM.days) : '~'+priors.inventoryDays} saved={invSrc === 'entered'}
-                  fallback={{ label: invSrc === 'measured' || invOk ? 'Measured' : 'est. '+priors.inventoryDays+'d' }} hint={invHint}/>
+                  fallback={{ label: invSrc === 'measured' || invOk ? 'Measured' : 'Typical, '+priors.inventoryDays+' days' }} hint={invHint}/>
                 {/* Supplier payment terms are asked once, as "Balance terms" under Stock & suppliers below —
                     this field saved the same column from a second form with a second button. */}
               </div>
@@ -18306,19 +18301,22 @@ function v3MoveExtra(ext) {
   const q = V3_Q['move-extras'];
   return (q && Array.isArray(q.rows) && q.rows.find(r => r.external_id === ext)) || null;
 }
-// The card's confidence word (UX brief, 26 Oct): from the one ladder. A figure that rests on a stated assumption is Assumed;
-// the ladder's top two rungs are From your data; the rest are Estimated. 2 Nov eval: this word was "Measured", beside what a
-// move is expected to bring. The inputs are measured; the GBP is a forecast until Results checks it.
-const V3_MOVE_SURE = {
-  measured: { label: 'From your data', why: 'Worked from your own orders and spend. The figure is what it is expected to bring; Results checks it once you have done it.' },
-  estimated: { label: 'Estimated', why: 'Partly your own figures and partly a rule of thumb. Right in direction; check before a big bet.' },
-  assumed: { label: 'Assumed', why: 'It rests on an assumption, set out below. Worth knowing; try it where it is cheap to undo.' },
-};
+// Step 4 (10 Nov): one confidence scale. A move shows its rung, the word Actions and Today show for it; an assumption
+// already moves the rung down on the server (0990), and the why says it rests on one.
 function v3MoveSure(row) {
   if (!row) return null;
-  if (row.money_assumption) return 'assumed';
   const r = v3MoneyConf(row);
-  return r === 'direct' || r === 'likely' ? 'measured' : r ? 'estimated' : null;
+  return r && V3_CONF[r] ? r : null;
+}
+const v3SureWhy = (row, sure) => V3_CONF[sure].why + (row && row.money_assumption ? ' It rests on an assumption, set out below.' : '');
+// The profit panels' chip: the rung Today's chip shows for the same profit (the headline's trust level), not a second
+// word. A period worked out in the browser at the usual margin sits one rung lower.
+function V3ProfitConf({ detail, down }) {
+  const H = useV3Headline();
+  if (!H) return null;
+  let r = H.cm_source === 'none' ? 'held' : (V3_CONF[H.trust_level] ? H.trust_level : 'probably');
+  if (down) r = r === 'direct' ? 'likely' : r === 'likely' ? 'probably' : r;
+  return <V3Conf state={r} detail={detail || v3TrustWhy(H)}/>;
 }
 // 2 Nov eval: "the queue is still a text report". A move's evidence as a picture: the products it orders against the
 // day an order would land, or the rate or cost it wants back, then and now. Figures are the move's own (its text, or the
@@ -18676,7 +18674,7 @@ function V3MoveSureOpen({ row, raw, noSteps }) {
   const sure = v3MoveSure(row), gbp = Number(row.cm_gbp) || 0, conf = v3MoneyConf(row);
   const play = Array.isArray(row.playbook) && !noSteps ? row.playbook : [];
   return (<div className="v3-mv-open">
-    {sure && <p><b>{V3_MOVE_SURE[sure].label}.</b> {V3_MOVE_SURE[sure].why}</p>}
+    {sure && <p><b>{V3_CONF[sure].label}.</b> {v3SureWhy(row, sure)}</p>}
     {row.money_assumption && <p><b>The assumption:</b> {v3Tidy(scrubTag(row.money_assumption)).replace(/^./, c => c.toUpperCase())}.</p>}
     {row.money_basis && <p><b>How the figure is worked out:</b> {v3Tidy(scrubTag(row.money_basis))}.</p>}
     {Array.isArray(row.evidence_reasons) && row.evidence_reasons.some(x => x && x.text) && (
@@ -18712,7 +18710,7 @@ function V3MoveCard({ row, rank, closes, closesTo, meta, dense, viz, onDecided, 
       {gbp > 0 && <div className="v3-mv-worth">
         <span className="v3-mv-gbp">{v3Gbp(gbp)}</span>
         <span className="v3-mv-per">{isStock ? 'protected ' : ''}{v3Per(row)}{row.money_is_sales ? ', in sales' : ''}</span>
-        {sure && <span className={'v3-mv-sure v3-mv-sure-' + sure}>{V3_MOVE_SURE[sure].label}</span>}
+        {sure && <span className={'v3-mv-sure v3-mv-sure-' + sure}>{V3_CONF[sure].label}</span>}
         {/* size is seen, not read: this move against the biggest on the list */}
         {maxGbp > 0 && <span className="v3-mv-size" aria-hidden="true"><i style={{ width: Math.max(3, gbp / maxGbp * 100) + '%' }}/></span>}
       </div>}
@@ -18808,14 +18806,14 @@ function v3GoalMessage(g, V, move) {
   const call = salesShort ? 'Sales land about ' + v3Gbp(A.sales_short) + ' short.' + (A.owner_question ? ' ' + A.owner_question : '') : null;
   const note = !F && A && A.sales_line ? A.sales_line : null;
   const kept = Number(g.so_far);
-  const evidence = (kept < 0 ? 'Lost so far: ' : 'Kept so far: ') + v3Gbp(Math.abs(kept))
+  const evidence = 'Profit after ads so far: ' + (kept < 0 ? '−' : '') + v3Gbp(Math.abs(kept))
     + (g.expected_by_now != null ? ', against ' + v3Gbp(g.expected_by_now) + ' your goal expected by ' + v3Day(g.counted_through) : '') + '. Day ' + g.day + ' of ' + g.days + '.';
   let doFirst = null;
   if (move) {
     const title = String(v3PlainAction(Object.assign({}, move, { plan: null })).title || '').replace(/[.\s]+$/, ''), gbp = Number(move.cm_gbp) || 0;
     const stock = move.category === 'stock' || move.external_id === 'stock-reorder', sure = v3MoveSure(move);
     doFirst = title + '.' + (gbp > 0 ? (stock ? ' It protects about ' : ' Worth about ') + v3Gbp(gbp) + v3Per(move) + (move.money_is_sales ? ', in sales' : '')
-      + (sure ? ' (' + String(V3_MOVE_SURE[sure].label).toLowerCase() + ')' : '') + '.' : '');
+      + (sure ? ' (' + String(V3_CONF[sure].label).toLowerCase() + ')' : '') + '.' : '');
   }
   const lead = salesShort ? 'On track for profit, not for sales.' : V.word + '.';
   const bridge = F && !V.close ? v3AdCutInPlan(A).bridge : null;
@@ -18852,7 +18850,7 @@ function V3GoalStrip({ q, gc, unreported }) {
   return (<section className="v3-goal-strip">
     <div className="v3-goal-top">
       <p className="v3-goal-lab">{g.confirmed_on ? 'The goal you confirmed on ' + v3Day(g.confirmed_on) : 'Goal'} for {v3Day(g.period_start)} to {v3Day(g.period_end)}, profit after ads, day {g.day} of {g.days}</p>
-      <span className={'v3-goal-chip ' + chip.cls}>{chip.word}</span>
+      <span className={'v3-pill v3-pill-' + (chip.cls || 'none')}>{chip.word}</span>
     </div>
     <dl className="v3-goal-figs">
       <div><dt>Goal</dt><dd>{v3Gbp(g.target)}</dd></div>
@@ -18911,7 +18909,7 @@ function V3TodayRow({ row, rank, isOpen, onToggle, closes, closesTo, why }) {
     {gbp > 0 && <div className="v3-row-worth">
       <b>{v3Gbp(gbp)}</b>
       <small>{isStock ? 'protected ' : ''}{v3Per(row)}{row.money_is_sales ? ', in sales' : ''}</small>
-      {sure && <small>{V3_MOVE_SURE[sure].label}</small>}
+      {sure && <small>{V3_CONF[sure].label}</small>}
     </div>}
     <V3MoveDecide row={row}/>
     {isOpen && <div className="v3-row-open">
@@ -19137,7 +19135,7 @@ function V3GoalChart({ P, g }) {
     </svg>
     {hover && hv != null && <figcaption className={'v3-al-tip' + (X(hover.ms) > w * 0.6 ? ' left' : '')} style={{ left: (X(hover.ms) / w * 100) + '%' }}>
       <b>{v3Day(new Date(hover.ms).toISOString().slice(0, 10))}</b>
-      <span>{hover.past ? 'Kept' : 'Forecast'} <em>{v3Gbp(Math.round(hv))}</em></span>
+      <span>{hover.past ? 'So far' : 'Forecast'} <em>{v3Gbp(Math.round(hv))}</em></span>
       <span>Goal by then <em>{v3Gbp(Math.round(hg))}</em></span></figcaption>}
   </figure>);
 }
@@ -19949,7 +19947,6 @@ const v3SignShort = s => s.amer ? 'New sales per £1 of ads' : s.which === 'ret'
 const V3_HOME_WORK = { stock: ['stock', 'Open order list'], site: ['website', 'Open Website'], paid: ['marketing', 'Open Marketing'], creative: ['marketing', 'Open Marketing', 'creative'],
   email: ['marketing', 'Open Marketing', 'email'], acquisition: ['marketing', 'Open Marketing'], product: ['products', 'Open Products'], retention: ['customers', 'Open Customers'], finance: ['profit', 'Open Profit & sales'],
   cash: ['stock', 'Open Stock & orders'], seo: ['website', 'Open Website'], organic: ['website', 'Open Website'], returns: ['products', 'Open Products'], pricing: ['products', 'Open Products'], discount: ['products', 'Open Products'] };
-const V3_HOME_BASIS = { measured: 'v3-pill-good', estimated: 'v3-pill-none', assumed: 'v3-pill-warn' };
 function v3SplitTitle(t) {
   const m = String(t || '').match(/^(.{20,}?[.!?])\s+(?=[A-Z0-9£])(.+)$/s);
   return m && String(t).length > 110 ? [m[1].replace(/\.$/, ''), m[2]] : [t, ''];
@@ -19980,7 +19977,7 @@ function V3HomeDrawer({ row, why, closes, closesTo, startMode, onClose }) {
       <h2 className="v3-drawer-t">{v3SplitTitle(pa.title)[0]}</h2>
       <dl className="v3-drawer-facts">
         {gbp > 0 && <div><dt>{isStock ? 'Protects' : row.money_is_sales ? 'Worth, in sales' : 'Worth'}</dt><dd>{v3GbpRound(gbp)}{v3Per(row)}</dd></div>}
-        {sure && <div title={V3_MOVE_SURE[sure].why}><dt>Basis</dt><dd><span className={'v3-pill ' + V3_HOME_BASIS[sure]}>{V3_MOVE_SURE[sure].label}</span></dd></div>}
+        {sure && <div><dt>Confidence</dt><dd><V3Conf state={sure} detail={v3SureWhy(row, sure)}/></dd></div>}
         {ex && Number(ex.win) > 0 && <div><dt>Result checked</dt><dd>{fmtCount(Number(ex.win))} days after done</dd></div>}
         {row.due_on && <div><dt>Due</dt><dd>{v3Day(String(row.due_on).slice(0, 10))}</dd></div>}
         {Number(row.days_open) > 0 && <div><dt>Raised</dt><dd>{Number(row.days_open) === 1 ? '1 day ago' : fmtCount(row.days_open) + ' days ago'}</dd></div>}
@@ -20065,7 +20062,7 @@ function V3HomeRow({ row, first, bmRow, onOpen, rank, wide, owners, onPage }) {
     <td className="v3-home-area" data-k="Area">{v3CategoryWords(row.category)}</td>
     <td className="v3-home-worth" data-k="Worth">{gbp > 0 ? <><b>{v3GbpRound(gbp)}{v3Per(row)}</b>{isStock ? <small>protected</small> : row.money_is_sales ? <small>in sales</small> : null}</>
       : wide && due ? <><b>{v3Day(due)}</b><small>due</small></> : wide ? <small>No figure</small> : '–'}</td>
-    <td className="v3-home-basis" data-k="Basis">{sure ? <span className={'v3-pill ' + V3_HOME_BASIS[sure]} title={V3_MOVE_SURE[sure].why}>{V3_MOVE_SURE[sure].label}</span> : '–'}</td>
+    <td className="v3-home-basis" data-k="Confidence">{sure ? <V3Conf state={sure} detail={v3SureWhy(row, sure)}/> : '–'}</td>
     {wide && owners && <td className="v3-home-owner" data-k="Owner">{who && <><b>{who}</b>{bmRow && bmRow.due_on && <small className={late ? 'v3-down' : ''}>{late ? fmtCount(bmRow.overdue_days) + (Number(bmRow.overdue_days) === 1 ? ' day late' : ' days late') : 'Due ' + v3Day(bmRow.due_on)}</small>}</>}</td>}
     <td className="v3-home-status" data-k="Status">{conn ? null : <select className="v3-select" aria-label={'Status of ' + pa.title} value={status} disabled={busy || status === 'done'} onChange={change}>
       <option value="todo">To do</option><option value="doing">Doing</option><option value="done">Done</option><option value="later">Not now…</option><option value="dismiss">Dismiss…</option>
@@ -20121,7 +20118,7 @@ function V3HomeActions({ q, board }) {
       {since.items.some(x => x.rows) && <button type="button" className="v3-panel-link" aria-expanded={sinceOpen} onClick={() => setSinceOpen(o => !o)}>{sinceOpen ? 'Hide' : 'Which'}</button>}
       {sinceOpen && <ul>{since.items.flatMap(x => x.rows || []).map((t, i) => <li key={i}>{t}</li>)}</ul>}</div>}
     <table className="v3-home-table">
-      <thead><tr><th>Action</th><th>Area</th><th className="r">Worth</th><th>Basis</th><th>Status</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
+      <thead><tr><th>Action</th><th>Area</th><th className="r">Worth</th><th>Confidence</th><th>Status</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
       <tbody>
         {moves.map((m, i) => <V3HomeRow key={m.row.external_id} row={m.row} first={i === 0} bmRow={bmRows.find(x => x.external_id === m.row.external_id)}
           onOpen={mode => setDrawer({ id: m.row.external_id, mode })}/>)}
@@ -20129,7 +20126,7 @@ function V3HomeActions({ q, board }) {
           <td className="v3-home-act"><span className="v3-home-title-static">{v3PlainAction(a).title}</span></td>
           <td className="v3-home-area" data-k="Area">{v3CategoryWords(a.category)}</td>
           <td className="v3-home-worth" data-k="Due"><b>{v3DueWords(a, true)}</b></td>
-          <td className="v3-home-basis" data-k="Basis"><span className="v3-pill v3-pill-none">No figure yet</span></td>
+          <td className="v3-home-basis" data-k="Confidence"><V3Conf state="held" detail="There is no figure for this yet."/></td>
           <td className="v3-home-status"/>
           <td className="v3-home-open"><button type="button" className="v3-btn v3-btn-sm" onClick={() => window.__oiNav && window.__oiNav('actions', 'queue')}>Open Actions</button></td>
         </tr>))}
@@ -20193,9 +20190,9 @@ function V3HomeProfit({ L }) {
   const sales = num(L.sales), ads = num(L.ads), pa = num(L.profit_after_ads), ao = num(L.after_overheads);
   const goodsF = F('costs_before_ads_30d'), otherF = F('other_marketing_30d'), ohF = F('overheads_30d');
   const head = est => (<div className="v3-panel-head"><h2>Profit</h2><span className="v3-muted">Last 30 days</span>
-    {est && <span className="v3-pill v3-pill-none" title={est}>Estimated</span>}
+    {est !== false && <V3ProfitConf detail={est}/>}
     <button type="button" className="v3-panel-link" onClick={() => window.__oiGo && window.__oiGo('profit')}>View report</button></div>);
-  if (!(sales > 0) || pa == null || ads == null || goodsF == null) return <section className="v3-panel v3-home-profit">{head(null)}<p className="v3-panel-note">Profit shows once sales and costs have come through.</p></section>;
+  if (!(sales > 0) || pa == null || ads == null || goodsF == null) return <section className="v3-panel v3-home-profit">{head(false)}<p className="v3-panel-note">Profit shows once sales and costs have come through.</p></section>;
   const other = otherF != null && otherF >= 1 ? Math.round(otherF) : 0;
   const end = ao != null ? ao : pa, hasOh = ao != null && ohF != null;
   const rows = [
@@ -20206,7 +20203,7 @@ function V3HomeProfit({ L }) {
   if (other >= 1) rows.push({ k: 'Other marketing', v: -other, c: 'cost', fig: 'other_marketing_30d' });
   if (hasOh) rows.push({ k: 'Profit after ads', v: pa, c: 'kept', tot: true, fig: 'profit_after_ads_30d' });
   if (hasOh) rows.push({ k: 'Running costs', v: -ohF, c: 'cost', fig: 'overheads_30d' });
-  rows.push({ k: hasOh ? 'Net profit' : 'Profit after ads', v: end, c: end < 0 ? 'loss' : 'kept', tot: true, fig: hasOh ? 'after_overheads_30d' : 'profit_after_ads_30d' });
+  rows.push({ k: hasOh ? 'Profit after running costs' : 'Profit after ads', v: end, c: end < 0 ? 'loss' : 'kept', tot: true, fig: hasOh ? 'after_overheads_30d' : 'profit_after_ads_30d' });
   // one tag for the panel: what is estimated, in the tag's tooltip, not a tag on every row
   const est = rows.map(r => ({ r, s: v3Source(r.fig) })).filter(x => x.s && x.s.state === 'estimated');
   const estWords = est.length ? 'Estimated: ' + v3AndList(est.map(x => x.r.k.toLowerCase())) + (est[0].s.needs ? '. ' + est[0].s.needs : '') : null;
@@ -20819,9 +20816,10 @@ const V3_GY_EMPTY = {
 };
 const V3_GY_OPTS = [0.2, 0.5, 1.0];
 // CM1, CM2 and CM3 as any e-commerce P&L reads them; the descriptor is what each level is after
-const V3_GY_LEVELS = [['cm1', 'CM1', 'After product cost'], ['cm2', 'CM2', 'After order costs'], ['cm3', 'CM3', 'After marketing']];
+const V3_GY_LEVELS = [['cm1', 'CM1', 'Gross profit'], ['cm2', 'CM2', 'Profit before ads'], ['cm3', 'CM3', 'Profit after ads']];
 const V3_GY_LEVEL = { cm1: 'CM1', cm2: 'CM2', cm3: 'CM3' };
-const V3_GY_STATE = { measured: 'Measured', estimated: 'Estimated', partial: 'Partial' };
+// Step 4: last year's basis on the one ladder. Part measured is mostly your data with one part filled in.
+const V3_GY_RUNG = { measured: 'direct', partial: 'likely', estimated: 'probably' };
 const v3GyPct = x => (x == null || !isFinite(Number(x))) ? FMT_NONE
   : (Number(x) > 0.0005 ? '+' : Number(x) < -0.0005 ? '−' : '') + Math.round(Math.abs(Number(x)) * 100) + '%';
 const v3GyPts = d => (d == null || !isFinite(Number(d))) ? FMT_NONE
@@ -20964,7 +20962,7 @@ function V3GrowthYear() {
     <span>Sales <em>{v3GbpRound(payload[0].payload.sales)}</em></span>
     {LY && <span>On last year <em>{v3GyPct(payload[0].payload.growth)}</em></span>}
     <span>Ad spend <em>{v3GbpRound(payload[0].payload.spend)}</em></span>
-    <span>CM3 <em>{v3GbpRound(payload[0].payload.cm3)}</em></span></div>);
+    <span>Profit after ads <em>{v3GbpRound(payload[0].payload.cm3)}</em></span></div>);
 
   const M = (P.months || []).map(r => Object.assign({}, r, { ly: r.ly_sales }));
   const moTip = ({ active, payload }) => (!active || !payload || !payload.length) ? null : (<div className="v3-tip">
@@ -20972,7 +20970,7 @@ function V3GrowthYear() {
     <span>Plan <em>{v3GbpRound(payload[0].payload.sales)}</em></span>
     {payload[0].payload.ly != null && <span>Last year <em>{fmtMoney(payload[0].payload.ly)}</em>{payload[0].payload.ly_sale_month ? ' (sale month)' : ''}</span>}
     <span>Ad spend <em>{v3GbpRound(payload[0].payload.spend)}</em></span>
-    <span>CM3 <em>{v3GbpRound(payload[0].payload.cm3)}</em></span></div>);
+    <span>Profit after ads <em>{v3GbpRound(payload[0].payload.cm3)}</em></span></div>);
 
   const chg = (a, b) => (LY && a != null && Number(a) > 0 && b != null) ? Number(b) / Number(a) - 1 : null;
   // What it takes: last year (actual, exact) against the plan (a forecast, round pounds)
@@ -20989,11 +20987,11 @@ function V3GrowthYear() {
   const st = (LY && LY.states) || {};
   const ladder = [
     ['Sales', 'sales', null, null],
-    ['CM1', 'cm1', 'cm1_margin', st.cm1],
-    ['CM2', 'cm2', 'cm2_margin', st.cm2],
+    ['Gross profit (CM1)', 'cm1', 'cm1_margin', st.cm1],
+    ['Profit before ads (CM2)', 'cm2', 'cm2_margin', st.cm2],
     ['Ad spend', 'spend', null, null],
     ['Other marketing', 'other_marketing', null, st.other_marketing],
-    ['CM3', 'cm3', 'cm3_margin', st.cm3],
+    ['Profit after ads (CM3)', 'cm3', 'cm3_margin', st.cm3],
   ].filter(r => PL[r[1]] != null || (LY && LY[r[1]] != null));
   const saleMonths = LY && (LY.sale_months || []).map(s => v3Month(s, 'long'));
   const onBasis = P.value_basis === '12m' && PL.margin_on_basis != null && isFinite(Number(PL.margin)) && Math.abs(Number(PL.margin_on_basis) - Number(PL.margin)) >= 0.005;
@@ -21129,8 +21127,8 @@ function V3GrowthYear() {
     </div>
 
     <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-gy-tbl">
-      <thead><tr><th>Contribution</th>{LY && <th className="r">Last year</th>}{LY && <th className="r">Share</th>}<th className="r">Plan</th><th className="r">Share</th>
-        {LY && <th className="r">Change</th>}{LY && <th>Last year basis</th>}</tr></thead>
+      <thead><tr><th>Line</th>{LY && <th className="r">Last year</th>}{LY && <th className="r">Share</th>}<th className="r">Plan</th><th className="r">Share</th>
+        {LY && <th className="r">Change</th>}{LY && <th>Last year confidence</th>}</tr></thead>
       <tbody>{ladder.map(r => { const cm = r[2] != null, cur = r[1] === pLv; return (<tr key={r[1]} className={cm ? 'v3-gy-cm' + (cur ? ' v3-gy-cur' : '') : undefined}>
           <td>{r[0]}</td>
           {LY && <td className="r">{LY[r[1]] != null ? fmtMoney(LY[r[1]]) : FMT_NONE}</td>}
@@ -21139,7 +21137,7 @@ function V3GrowthYear() {
           <td className="r">{cm && PL[r[2]] != null ? fmtPctN(PL[r[2]]) : ''}</td>
           {LY && <td className="r">{cm ? v3GyPts(PL[r[2]] != null && LY[r[2]] != null ? Number(PL[r[2]]) - Number(LY[r[2]]) : null)
             : (() => { const c = chg(LY[r[1]], PL[r[1]]); return c == null || !isFinite(c) ? FMT_NONE : v3GyPct(c); })()}</td>}
-          {LY && <td>{V3_GY_STATE[r[3]] || ''}</td>}</tr>); })}
+          {LY && <td>{V3_GY_RUNG[r[3]] ? <V3Conf state={V3_GY_RUNG[r[3]]}/> : ''}</td>}</tr>); })}
       </tbody></table></div>
 
     <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-gy-tbl">
@@ -21987,7 +21985,7 @@ function V3Website({ start, period, customActive }) {
         : !bd.rows ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={3}/></div>
         : !shown.length ? <p className="v3-panel-note">No open actions on the site or search.</p>
         : <table className="v3-home-table">
-          <thead><tr><th>Action</th><th>Area</th><th className="r">Worth</th><th>Basis</th><th>Status</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
+          <thead><tr><th>Action</th><th>Area</th><th className="r">Worth</th><th>Confidence</th><th>Status</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
           <tbody>{shown.map(r => <V3HomeRow key={r.external_id} row={r} onPage={(V3_HOME_WORK[r.category] || [])[0] || 'website'} bmRow={bmRows.find(x => x.external_id === r.external_id)} onOpen={mode => setDrawer({ id: r.external_id, mode })}/>)}</tbody>
         </table>}
       {open && <V3HomeDrawer key={open.external_id} row={open} startMode={drawer.mode} onClose={() => setDrawer(null)}/>}
@@ -22031,7 +22029,7 @@ function V3Website({ start, period, customActive }) {
             <thead><tr><th>Step</th><th className="r">{monthName.split(' ')[0]}</th><th className="r">Normal</th><th className="r">Effect on profit</th></tr></thead>
             <tbody>{stages.map((s, i) => { const d = -Number(s.leak), o = !s.merged && Math.abs(Number(s.sigma)) >= 2, low = lowestOf(s);
               return (<tr key={i}>
-                <td>{stepName(s)}{low ? <span className="v3-flag">Lowest on file</span> : o && <span className={'v3-flag' + (d >= 0 ? ' good' : '')}>{Number(s.sigma) < 0 ? 'Unusually low' : 'Unusually high'}</span>}{s.merged && <span className="v3-flag good">Read together</span>}</td>
+                <td>{stepName(s)}{low ? <span className="v3-pill v3-pill-bad">Lowest on file</span> : o && <span className={'v3-pill ' + (d >= 0 ? 'v3-pill-good' : 'v3-pill-bad')}>{Number(s.sigma) < 0 ? 'Unusually low' : 'Unusually high'}</span>}{s.merged && <span className="v3-flag good">Read together</span>}</td>
                 <td className="r">{v3StageVal(s.fmt, s.v)}</td><td className="r">{v3StageVal(s.fmt, s.mu)}</td>
                 <td className={'r ' + (d < 0 ? 'v3-down' : 'v3-up')}>{(d >= 0 ? '+' : '−') + fmtMoney(Math.abs(d))}</td>
               </tr>); })}
@@ -22048,7 +22046,7 @@ function V3Website({ start, period, customActive }) {
       <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
         <thead><tr><th>Measure</th><th className="r">{whenLabel}</th>{Pv && <th className="r">{!now.whole ? 'Period before' : Pv.n >= 2 ? 'Typical' : 'Before'}</th>}</tr></thead>
         <tbody>{V3_FRICTION.map(([m]) => { const up = rising.some(r => r[0] === m); return (<tr key={m}>
-          <td>{V3_FRICTION_NOUN[m]}{up && <span className="v3-flag">Up</span>}</td>
+          <td>{V3_FRICTION_NOUN[m]}{up && <span className="v3-pill v3-pill-bad">Up</span>}</td>
           <td className={'r' + (up ? ' v3-down' : '')}>{C.fr[m] != null ? fmtPctN(C.fr[m]) : FMT_NONE}</td>
           {Pv && <td className="r">{Pv.fr[m] != null ? fmtPctN(Pv.fr[m]) : FMT_NONE}</td>}</tr>); })}
           {onFig && CLS && CLS.scrollDepth != null && <tr><td>Average scroll depth</td><td className="r">{fmtCount(CLS.scrollDepth)}%</td>{Pv && <td className="r">{FMT_NONE}</td>}</tr>}
@@ -22240,7 +22238,7 @@ function V3WebConversion() {
         </div>
         {A && B ? <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
           <thead><tr><th>Measure</th><th className="r">A, {v3Day(A.w)}</th><th className="r">B, {v3Day(B.w)}</th><th className="r">B against A</th></tr></thead>
-          <tbody>{cmpRows.map(c => (<tr key={c[1]}><td>{c[0]}{big.has(c[1]) && <span className="v3-flag v3-flag-plain">Big gap</span>}</td><td className="r">{v3CmpVal(c[2], A[c[1]])}</td><td className="r">{v3CmpVal(c[2], B[c[1]])}</td><td className="r">{v3CmpGap(c[2], A[c[1]], B[c[1]])}</td></tr>))}</tbody>
+          <tbody>{cmpRows.map(c => (<tr key={c[1]}><td>{c[0]}{big.has(c[1]) && <span className="v3-pill v3-pill-none">Big gap</span>}</td><td className="r">{v3CmpVal(c[2], A[c[1]])}</td><td className="r">{v3CmpVal(c[2], B[c[1]])}</td><td className="r">{v3CmpGap(c[2], A[c[1]], B[c[1]])}</td></tr>))}</tbody>
         </table></div> : <p className="v3-panel-note">Pick two {unit}s on a chart or in the table below.</p>}
         <p className="v3-panel-note">{sig ? (sig.p < 0.05 ? 'The gap in orders per 100 visits is unlikely to be chance. ' : 'The gap in orders per 100 visits could be chance. ') : ''}Visits here are Google Analytics’ count, so this rate differs from the overview’s, which uses Microsoft Clarity’s.</p>
       </>}
@@ -22262,7 +22260,7 @@ function V3WebConversion() {
         {grain === 'day' && list.length > 14 && <button type="button" className="v3-panel-link" onClick={() => setAllRows(v => !v)}>{allRows ? 'Show fewer' : 'Show all ' + list.length}</button>}</div>
       <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
         <thead><tr><th>{grain === 'week' ? 'Week of' : 'Day'}</th><th className="r">Visits</th><th className="r">Orders</th><th className="r">Orders per 100 visits</th><th className="r">Adding to the basket</th><th className="r">Starting checkout</th><th className="r">Finishing checkout</th></tr></thead>
-        <tbody>{shown.map(r => (<tr key={r.w}><td><button type="button" className="v3-mk-ad-name" aria-pressed={r.w === pair.a || r.w === pair.b} onClick={() => pick(r.w)}>{v3Day(r.w)}</button>{r.w === pair.a && <span className="v3-flag v3-flag-plain">A</span>}{r.w === pair.b && <span className="v3-flag v3-flag-plain">B</span>}</td>
+        <tbody>{shown.map(r => (<tr key={r.w}><td><button type="button" className="v3-mk-ad-name" aria-pressed={r.w === pair.a || r.w === pair.b} onClick={() => pick(r.w)}>{v3Day(r.w)}</button>{r.w === pair.a && <span className="v3-pill v3-pill-none">A</span>}{r.w === pair.b && <span className="v3-pill v3-pill-none">B</span>}</td>
           <td className="r">{fmtCount(r.sessions)}</td><td className="r">{fmtCount(r.orders)}</td><td className="r">{v3Per100(r.cvr)}</td><td className="r">{v3PctD1(r.add)}</td><td className="r">{v3PctD1(r.start)}</td><td className="r">{v3PctD1(r.finish)}</td></tr>))}</tbody>
       </table></div>
     </section>}
@@ -22308,7 +22306,7 @@ function V3WebGroups() {
         <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows">
           <thead><tr><th>Group</th><th className="r">Visits</th><th className="r">Basket, {prevN}</th><th className="r">Basket, {curN}</th><th className="r">Checkout, {prevN}</th><th className="r">Checkout, {curN}</th><th className="r">Checkout change</th></tr></thead>
           <tbody>{rows.map(r => { const c = fmtOk(r.ctc_chg) ? Number(r.ctc_chg) : null; return (<tr key={r.value}>
-            <td className="v3-web-wrap">{name(r)}{r.is_thin && <span className="v3-flag v3-flag-plain">Small</span>}</td><td className="r">{fmtCount(r.sessions)}</td>
+            <td className="v3-web-wrap">{name(r)}{r.is_thin && <span className="v3-pill v3-pill-none">Small</span>}</td><td className="r">{fmtCount(r.sessions)}</td>
             <td className="r">{v3PctD1(r.prev_atc)}</td><td className="r">{v3PctD1(r.cur_atc)}</td><td className="r">{v3PctD1(r.prev_ctc)}</td><td className="r">{v3PctD1(r.cur_ctc)}</td>
             <td className={'r' + (c != null && !part && !r.is_thin && c <= -0.1 ? ' v3-down' : '')}>{c == null ? FMT_NONE : v3Signed(c, v3Dp1Num(Math.abs(c) * 100) + '%')}</td></tr>); })}</tbody>
         </table></div>
@@ -22623,7 +22621,7 @@ function V3Customers({ start, period, customActive }) {
         : !bd.rows ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={3}/></div>
         : !shown.length ? <p className="v3-panel-note">No open actions on repeat orders or customer value.</p>
         : <table className="v3-home-table">
-          <thead><tr><th>Action</th><th>Area</th><th className="r">Worth</th><th>Basis</th><th>Status</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
+          <thead><tr><th>Action</th><th>Area</th><th className="r">Worth</th><th>Confidence</th><th>Status</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
           <tbody>{shown.map(r => <V3HomeRow key={r.external_id} row={r} onPage={(V3_HOME_WORK[r.category] || [])[0] || 'customers'} bmRow={bmRows.find(x => x.external_id === r.external_id)} onOpen={mode => setDrawer({ id: r.external_id, mode })}/>)}</tbody>
         </table>}
       {open && <V3HomeDrawer key={open.external_id} row={open} startMode={drawer.mode} onClose={() => setDrawer(null)}/>}
@@ -23185,7 +23183,7 @@ function V3Products() {
             <div className="v3-home-tiles">
               <V3HomeTile key="sales" k="Product sales" v={fmtMoney(d.total)} dir={ch == null || Math.abs(ch) < 0.0005 ? 'flat' : ch > 0 ? 'up' : 'down'} cls={ch == null || Math.abs(ch) < 0.0005 ? '' : ch > 0 ? 'v3-up' : 'v3-down'}
                 delta={ch == null ? '' : v3Dp1Num(Math.abs(ch) * 100) + '%'} weak={ch != null && ch < -0.15 && d.sale == null} act={d.was > 0 ? toggle('products') : null} title="Shopify order lines, after discounts and before VAT"/>
-              <V3HomeTile key="kept" k="Kept after product cost" v={haveKept ? fmtMoney(d.keptTot) : FMT_NONE} delta={haveKept && margin != null ? fmtPctN(margin) + ' of sales' : ''} title="After each product’s own cost and payment fees, before delivery and packing"/>
+              <V3HomeTile key="kept" k="Gross profit" v={haveKept ? fmtMoney(d.keptTot) : FMT_NONE} delta={haveKept && margin != null ? fmtPctN(margin) + ' of sales' : ''} title="After each product’s own cost and payment fees, before delivery and packing"/>
               <V3HomeTile key="loss" k="Sold at a loss" v={haveKept ? fmtCount(d.losers.length) : FMT_NONE} weak={d.losers.length > 0} delta={!haveKept ? '' : d.losers.length ? fmtMoney(Math.abs(d.losers.reduce((a, x) => a + x.kept, 0))) + ' lost' : d.losers.length === 1 ? 'product' : 'products'}/>
               <V3HomeTile key="top5" k="Top five’s share" v={d.top5share == null ? FMT_NONE : fmtPctN(d.top5share)} delta={'of ' + fmtCount(top.length) + ' products'}/>
             </div></div>
@@ -23234,7 +23232,7 @@ function V3Products() {
         : !bd.rows ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={3}/></div>
         : !shown.length ? <p className="v3-panel-note">No open actions on products, returns or discounts.</p>
         : <table className="v3-home-table">
-          <thead><tr><th>Action</th><th>Area</th><th className="r">Worth</th><th>Basis</th><th>Status</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
+          <thead><tr><th>Action</th><th>Area</th><th className="r">Worth</th><th>Confidence</th><th>Status</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
           <tbody>{shown.map(r => <V3HomeRow key={r.external_id} row={r} onPage={(V3_HOME_WORK[r.category] || [])[0] || 'products'} bmRow={bmRows.find(x => x.external_id === r.external_id)} onOpen={mode => setDrawer({ id: r.external_id, mode })}/>)}</tbody>
         </table>}
       {open && <V3HomeDrawer key={open.external_id} row={open} startMode={drawer.mode} onClose={() => setDrawer(null)}/>}
@@ -23254,9 +23252,9 @@ function V3Products() {
     {perf.rows && !empty && (<section className="v3-panel" aria-label="Products">
       <div className="v3-panel-head"><h2>Products</h2><span className="v3-count">{top.length}</span><span className="v3-muted">Last 28 days</span></div>
       <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-prod-table">
-        <thead><tr><th>Product</th>{sortTh('now', 'Sales')}{sortTh('kept', 'Kept', 'v3-mk-opt')}{sortTh('margin', 'Kept %')}{sortTh('ch', 'Change')}{sortTh('units', 'Units', 'v3-mk-opt')}</tr></thead>
+        <thead><tr><th>Product</th>{sortTh('now', 'Sales')}{sortTh('kept', 'Gross profit', 'v3-mk-opt')}{sortTh('margin', 'Gross margin')}{sortTh('ch', 'Change')}{sortTh('units', 'Units', 'v3-mk-opt')}</tr></thead>
         <tbody>{shownRows.map(x => (<tr key={x.title}>
-          <td>{x.title}{x.out ? <span className="v3-flag">Out of stock</span> : x.low ? <span className="v3-flag">Low stock</span> : null}</td>
+          <td>{x.title}{x.out ? <span className="v3-pill v3-pill-bad">Out of stock</span> : x.low ? <span className="v3-pill v3-pill-warn">Low stock</span> : null}</td>
           <td className="r">{fmtMoney(x.now)}</td>
           <td className={'r v3-mk-opt' + (x.kept != null && x.kept < 0 ? ' v3-down' : '')}>{x.kept != null ? fmtMoney(x.kept) : FMT_NONE}</td>
           <td className={'r' + (x.margin != null && x.margin < 0 ? ' v3-down' : '')}>{x.margin != null ? fmtPctN(x.margin) : FMT_NONE}</td>
@@ -23267,7 +23265,7 @@ function V3Products() {
             <td className={'r ' + (ch == null ? 'v3-muted' : ch >= 0 ? 'v3-up' : 'v3-down')}>{ch != null ? (ch >= 0 ? '+' : '−') + fmtPctN(Math.abs(ch)) : FMT_NONE}</td><td className="r v3-mk-opt">{fmtCount(d.units)}</td></tr>}
         </tbody></table></div>
       {top.length > 12 && <div className="v3-panel-pad"><button type="button" className="v3-btn v3-btn-sm" onClick={() => setShowAll(o => !o)}>{showAll ? 'Show top 12' : 'Show all ' + fmtCount(top.length) + ' products'}</button></div>}
-      <p className="v3-panel-note">Kept is after the product’s own cost and payment fees, before delivery and packing, so profit on Profit &amp; sales is lower.{pc.err ? ' Kept could not load. Refresh the page to try again.' : ''}{stock.err ? ' Stock could not load, so out-of-stock flags are missing.' : ''}</p>
+      <p className="v3-panel-note">Gross profit is after the product’s own cost and payment fees, before delivery and packing, so profit on Profit &amp; sales is lower.{pc.err ? ' Gross profit could not load. Refresh the page to try again.' : ''}{stock.err ? ' Stock could not load, so out-of-stock flags are missing.' : ''}</p>
     </section>)}
 
     {facts.err ? <section className="v3-panel" aria-label="Hero products"><div className="v3-panel-head"><h2>Hero products</h2></div><p className="v3-panel-note">Hero products could not load. Refresh the page to try again.</p></section>
@@ -23653,7 +23651,7 @@ function V3MarketingPage({ start, period, customActive }) {
         : !bd.rows ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={3}/></div>
         : !shown.length ? <p className="v3-panel-note">No open actions on ads, email or new customers.</p>
         : <table className="v3-home-table">
-          <thead><tr><th>Action</th><th>Area</th><th className="r">Worth</th><th>Basis</th><th>Status</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
+          <thead><tr><th>Action</th><th>Area</th><th className="r">Worth</th><th>Confidence</th><th>Status</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
           <tbody>{shown.map(r => <V3HomeRow key={r.external_id} row={r} onPage="marketing" bmRow={bmRows.find(x => x.external_id === r.external_id)} onOpen={mode => setDrawer({ id: r.external_id, mode })}/>)}</tbody>
         </table>}
       {open && <V3HomeDrawer key={open.external_id} row={open} startMode={drawer.mode} onClose={() => setDrawer(null)}/>}
@@ -24696,7 +24694,7 @@ function V3GoalActions({ prefixes, words, sub }) {
       : !bd.rows ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={2}/></div>
       : !shown.length ? <p className="v3-panel-note">No open actions on {words}.</p>
       : <table className="v3-home-table">
-        <thead><tr><th>Action</th><th>Area</th><th className="r">Worth</th><th>Basis</th><th>Status</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
+        <thead><tr><th>Action</th><th>Area</th><th className="r">Worth</th><th>Confidence</th><th>Status</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
         <tbody>{shown.map(r => <V3HomeRow key={r.external_id} row={r} onPage={(V3_HOME_WORK[r.category] || [])[0] || 'goal'} bmRow={bmRows.find(x => x.external_id === r.external_id)} onOpen={mode => setDrawer({ id: r.external_id, mode })}/>)}</tbody>
       </table>}
     {open && <V3HomeDrawer key={open.external_id} row={open} startMode={drawer.mode} onClose={() => setDrawer(null)}/>}
@@ -24825,9 +24823,9 @@ function V3GoalCash() {
   const rows = has ? [
     { k: 'Sales the plan expects', v: n(C.sales_expected) },
     { k: 'Ads in the plan', v: n(C.ads_left) },
-    { k: 'Kept after product, order and ad costs', v: n(C.profit_after_ads_expected) },
-    { k: 'Your overheads', v: n(C.overheads) ? -n(C.overheads) : null },
-    { k: 'Trading result', v: n(C.after_overheads), tot: true },
+    { k: 'Profit after ads', v: n(C.profit_after_ads_expected) },
+    { k: 'Running costs', v: n(C.overheads) ? -n(C.overheads) : null },
+    { k: 'Profit after running costs', v: n(C.after_overheads), tot: true },
     // 1092: the plan's profit has had the product cost of its sales taken off; stock is paid for when it is ordered,
     // so that cost is added back once. Without this row the table did not add up.
     { k: 'Product cost of those sales, paid when the stock is ordered', v: toOrder > 0 && n(C.product_cost_added_back) > 0 ? n(C.product_cost_added_back) : null },
@@ -25139,7 +25137,7 @@ function V3ResultRow({ r }) {
           </p>
         </>}
     </div>
-    <span className={'v3-goal-chip v3-res-chip ' + L.cls}>{L.label}{r.label === 'too_early' && r.days_left != null ? ': about ' + r.days_left + (r.days_left === 1 ? ' more day' : ' more days') : ''}</span>
+    <span className={'v3-pill v3-res-chip v3-pill-' + (L.cls || 'none')}>{L.label}{r.label === 'too_early' && r.days_left != null ? ': about ' + r.days_left + (r.days_left === 1 ? ' more day' : ' more days') : ''}</span>
   </li>);
 }
 function V3Results() {
@@ -25411,7 +25409,7 @@ function V3Review() {
         : !board.rows ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={3}/></div>
         : !top.length ? <p className="v3-panel-note">No open actions.</p>
         : <table className="v3-home-table">
-          <thead><tr><th>Action</th><th>Area</th><th className="r">Worth</th><th>Basis</th><th>Status</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
+          <thead><tr><th>Action</th><th>Area</th><th className="r">Worth</th><th>Confidence</th><th>Status</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
           <tbody>{top.map(r => <V3HomeRow key={r.external_id} row={r} bmRow={bmRows.find(x => x.external_id === r.external_id)} onOpen={mode => setDrawer({ id: r.external_id, mode })}/>)}</tbody>
         </table>}
       {openRow && <V3HomeDrawer key={openRow.external_id} row={openRow} startMode={drawer.mode} onClose={() => setDrawer(null)}/>}
@@ -25710,7 +25708,7 @@ function V3Competitors() {
         : !bd.rows ? <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={3}/></div>
         : !shown.length ? <p className="v3-panel-note">No open actions on Google ads or search.</p>
         : <table className="v3-home-table">
-          <thead><tr><th>Action</th><th>Area</th><th className="r">Worth</th><th>Basis</th><th>Status</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
+          <thead><tr><th>Action</th><th>Area</th><th className="r">Worth</th><th>Confidence</th><th>Status</th><th><span className="v3-sr-only">Open</span></th></tr></thead>
           <tbody>{shown.map(r => <V3HomeRow key={r.external_id} row={r} onPage={(V3_HOME_WORK[r.category] || [])[0]} bmRow={bmRows.find(x => x.external_id === r.external_id)} onOpen={mode => setDrawer({ id: r.external_id, mode })}/>)}</tbody>
         </table>}
       {open && <V3HomeDrawer key={open.external_id} row={open} startMode={drawer.mode} onClose={() => setDrawer(null)}/>}
@@ -26900,7 +26898,7 @@ function V3CalendarStrip() {
     {goalOn && <div className="v3-home-group" style={{ '--n': TG.target != null ? 2 : 1 }}>
       <div className="v3-home-group-h">Goal<span>To {v3Day(TG.counted_through)}</span><b className={'v3-pill ' + (GV.cls === 'good' ? 'v3-pill-good' : GV.cls === 'bad' ? 'v3-pill-bad' : GV.cls === 'warn' ? 'v3-pill-warn' : 'v3-pill-none')}>{GV.word}</b></div>
       <div className="v3-home-tiles">
-        <V3HomeTile k="Kept after ads" v={(Number(TG.so_far) < 0 ? '−' : '') + v3Gbp(Math.abs(Number(TG.so_far)))} dir={GV.ahead >= 0 ? 'up' : 'down'} cls={GV.ahead >= 0 ? 'v3-up' : 'v3-down'} delta={v3Gbp(Math.abs(GV.ahead)) + (GV.ahead >= 0 ? ' ahead of goal' : ' behind goal')}/>
+        <V3HomeTile k="Profit after ads" v={(Number(TG.so_far) < 0 ? '−' : '') + v3Gbp(Math.abs(Number(TG.so_far)))} dir={GV.ahead >= 0 ? 'up' : 'down'} cls={GV.ahead >= 0 ? 'v3-up' : 'v3-down'} delta={v3Gbp(Math.abs(GV.ahead)) + (GV.ahead >= 0 ? ' ahead of goal' : ' behind goal')}/>
         {TG.target != null && <V3HomeTile k="Target" v={v3GbpRound(TG.target)} delta={'by ' + v3Day(TG.period_end)}/>}
       </div></div>}
     {Pk && <div className="v3-home-group" style={{ '--n': pkLy != null ? 2 : 1 }}>
@@ -26950,7 +26948,7 @@ function v3ModelWeek(W, T, cmr, info) {
       ['Sales', T.sales, W.sales, v => fmtMoney(v), 'higher'],
       ...(okO ? [['Orders', T.orders, W.orders, v => fmtCount(Math.round(v)), 'higher'], ['Average order', aT, aW, v => fmtMoney(v, 2), 'higher']] : []),
       ['Ad spend', T.spend, W.spend, v => fmtMoney(v), 'lower'],
-      ['Kept after ads', T.kept, W.kept, sgn, 'higher'],
+      ['Profit after ads', T.kept, W.kept, sgn, 'higher'],
     ],
     note: 'The figures above on this page: Monday to Sunday, sales after discounts and before VAT, Meta and Google spend. A typical week is the middle of the eight before, leaving out sale weeks, so a sale does not set the bar.',
   };
@@ -27675,8 +27673,8 @@ function v3ModelProfit(a, b, ctx) {
       ['Sales', A.s, B.s, v => fmtMoney(v), 'higher'],
       ['Orders', A.o, B.o, v => fmtCount(v), 'higher'],
       ['Average order', A.aov, B.aov, v => fmtMoney(v, 2), 'higher'],
-      ...(ctx.mAt ? [['Kept from each £1', A.mp, B.mp, pence, 'higher']] : []),
-      ['Kept after products and delivery', A.kept, B.kept, v => fmtMoney(v), 'higher'],
+      ...(ctx.mAt ? [['Profit before ads per £1', A.mp, B.mp, pence, 'higher']] : []),
+      ['Profit before ads', A.kept, B.kept, v => fmtMoney(v), 'higher'],
       ['Ad spend: Meta', A.ms, B.ms, v => fmtMoney(v), 'lower'],
       ['Ad spend: Google and other', A.ad - A.ms, B.ad - B.ms, v => fmtMoney(v), 'lower'],
       ...(O ? [['Running costs', O, O, v => fmtMoney(v), null]] : []),
@@ -28254,7 +28252,7 @@ function V3Incremental() {
           <td className={tr != null && be != null ? (tr >= be ? 'v3-up' : 'v3-down') : ''}>{ret(c.true_return)}</td>
           <td className="v3-rw-opt">{ret(c.break_even)}</td>
           <td className="t-text v3-rw-wrap">{c.basis === 'known'
-            ? <span className="v3-flag good">Measured{num(c.n_tests) ? ', ' + c.n_tests + (num(c.n_tests) === 1 ? ' test' : ' tests') : ''}</span>
+            ? <span className="v3-pill v3-pill-good">Measured{num(c.n_tests) ? ', ' + c.n_tests + (num(c.n_tests) === 1 ? ' test' : ' tests') : ''}</span>
             : <span className="v3-muted">Assumed{V3_INCR_CALL[c.call] ? ': ' + V3_INCR_CALL[c.call] : ''}</span>}</td>
         </tr>); })}</tbody>
     </table>}
