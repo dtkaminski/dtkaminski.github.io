@@ -2643,3 +2643,5 @@ table.v3-home-pl.v3-ad-mini.v3-why-tbl .v3-why-exp { color: var(--color-muted); 
 .v3-gy-opt[aria-pressed="true"] { background: var(--color-ink); border-color: var(--color-ink); color: var(--color-panel); }
 .v3-gy-notes { border-top: 1px solid var(--color-line); padding-block: var(--space-1); }
 .v3-gy-notes:empty { display: none; }
+.v3-gy-tbl tr.v3-gy-cm td { border-top: 1px solid var(--color-line); }
+.v3-gy-tbl tr.v3-gy-cur td { font-weight: var(--weight-semi); }

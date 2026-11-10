@@ -20692,13 +20692,14 @@ function useV3Plan() {
   }, []);
   return (typeof window !== 'undefined' && window.FRKL_PLAN) || {};
 }
-// ── The year plan (1204, docs/DESIGN-growth-planner-2026-11-10.md, phase 1) ─────────────────────────────────────────────
-// The owner picks growth on last year and the margin to keep (profit after ads as a share of sales; last year's by default).
-// fn_plan_growth answers from the quarter plan's own fitted inputs: the most sales that margin allows on ads, what the target
-// needs, a verdict, the margin-against-growth line for the chart and the twelve months. Phase 1 is ads only; the gap is
-// what the other levers (order value, conversion, email, new products and offers) are left to find. Clicking the chart
-// picks the point on the line under the cursor: growth and margin together.
-const V3_GY_Q = (g, m) => (sb, b) => sb.rpc('fn_plan_growth', { p_brand: b, p_growth: g, p_margin: m })
+// ── The year plan (1204 + 1205, docs/DESIGN-growth-planner-2026-11-10.md, phase 1) ───────────────────────────────────────
+// The owner picks growth on last year, the margin level (CM1 after product cost, CM2 after order costs, CM3 after ads and
+// other marketing) and the margin to keep at that level (last year's by default). New customers are judged on their
+// 12-month value where the brand has learned it (1205), or on the first order. fn_plan_growth answers from the quarter
+// plan's fitted inputs and last year's money ladder (cache_growth_base): the most sales that margin allows on ads, what the
+// target needs, a verdict, the margin-against-growth line for the chart and the twelve months. Phase 1 is ads only; the
+// gap is what the other levers are left to find. Clicking the chart picks growth and margin together.
+const V3_GY_Q = (g, m, lv, vb) => (sb, b) => sb.rpc('fn_plan_growth', { p_brand: b, p_growth: g, p_margin: m, p_level: lv, p_value: vb })
   .then(r => ({ data: r && r.data ? [r.data] : [], error: r ? r.error : null }));
 const V3_GY_VERDICT = {
   reachable: ['Reachable with ads', 'v3-pill-good'],
@@ -20710,25 +20711,37 @@ const V3_GY_EMPTY = {
   no_history: 'The year plan shows once there is a full month of sales.',
   no_ad_history: 'The year plan shows once there are months with ad spend.',
   no_curve: 'The year plan shows once there is enough ad history to read how sales answer to spend.',
+  no_margin: 'The year plan shows once product costs are in Goal & costs.',
+  no_cm1: 'CM1 shows once last year’s product costs are worked out. CM2 and CM3 are available.',
 };
 const V3_GY_OPTS = [0.2, 0.5, 1.0];
+// CM1, CM2 and CM3 as any e-commerce P&L reads them; the descriptor is what each level is after
+const V3_GY_LEVELS = [['cm1', 'CM1', 'After product cost'], ['cm2', 'CM2', 'After order costs'], ['cm3', 'CM3', 'After marketing']];
+const V3_GY_LEVEL = { cm1: 'CM1', cm2: 'CM2', cm3: 'CM3' };
+const V3_GY_STATE = { measured: 'Measured', estimated: 'Estimated', partial: 'Partial' };
 const v3GyPct = x => (x == null || !isFinite(Number(x))) ? FMT_NONE
   : (Number(x) > 0.0005 ? '+' : Number(x) < -0.0005 ? '−' : '') + Math.round(Math.abs(Number(x)) * 100) + '%';
+const v3GyPts = d => (d == null || !isFinite(Number(d))) ? FMT_NONE
+  : Math.abs(d) < 0.0005 ? '0.0 pts' : (d > 0 ? '+' : '−') + (Math.abs(d) * 100).toFixed(1) + ' pts';
 const v3GyNum = s => { const n = parseFloat(String(s).replace(/[^0-9.\-]/g, '')); return isFinite(n) ? n : null; };
 function V3GrowthYear() {
   const [g, setG] = React.useState(null);         // growth on last year (0.2 = +20%); null: the most the margin allows
-  const [m, setM] = React.useState(null);         // margin to keep (0.3 = 30%); null: last year's
+  const [m, setM] = React.useState(null);         // margin to keep (0.3 = 30%) at the chosen level; null: last year's
+  const [lv, setLv] = React.useState('cm3');      // margin level
+  const [vb, setVb] = React.useState('12m');      // new customers judged on 12-month value or the first order
   const [gTxt, setGTxt] = React.useState('');
   const [mTxt, setMTxt] = React.useState('');
-  const q = useV3Rows('growth-year:' + (g == null ? '' : g) + ':' + (m == null ? '' : m), V3_GY_Q(g, m));
+  const q = useV3Rows('growth-year:' + (g == null ? '' : g) + ':' + (m == null ? '' : m) + ':' + lv + ':' + vb, V3_GY_Q(g, m, lv, vb));
   const P0 = q.rows && q.rows[0] ? q.rows[0] : null;
   const [last, setLast] = React.useState(null);   // the last answer stays on screen while the next one loads
   React.useEffect(() => { if (P0 && P0.ok) setLast(P0); }, [P0]);
   const P = P0 && P0.ok ? P0 : last, busy = !P0 && !q.err;
+  const failed = P0 && !P0.ok && last ? P0 : null;  // a level this brand can't read yet, with the last answer still shown
 
   const pick = (gv, mv) => { setG(gv); setGTxt(gv == null ? '' : String(Math.round(gv * 100))); if (mv !== undefined) { setM(mv); setMTxt(mv == null ? '' : String(Math.round(mv * 1000) / 10)); } };
+  const pickLevel = l => { if (l === lv) return; setLv(l); setM(null); setMTxt(''); };   // a margin means a different thing at each level
   const applyG = () => { const n = v3GyNum(gTxt); setG(n == null ? null : Math.max(-50, Math.min(500, n)) / 100); };
-  const applyM = () => { const n = v3GyNum(mTxt); setM(n == null ? null : Math.max(-50, Math.min(90, n)) / 100); };
+  const applyM = () => { const n = v3GyNum(mTxt); setM(n == null ? null : Math.max(-50, Math.min(95, n)) / 100); };
   const onKey = f => e => { if (e.key === 'Enter') f(); };
 
   const head = (pill) => (<div className="v3-panel-head"><h2>Next 12 months</h2>
@@ -20738,11 +20751,13 @@ function V3GrowthYear() {
   if (q.err && !last) return (<section className="v3-panel" aria-label="Year plan">{head()}
     <div className="v3-panel-pad"><V3LoadFailed what="The year plan" onRetry={q.retry}/></div></section>);
   if (!P && P0 && !P0.ok) return (<section className="v3-panel" aria-label="Year plan">{head()}
-    <p className="v3-panel-note">{V3_GY_EMPTY[P0.reason] || P0.message || 'The year plan is not available for this brand yet.'}</p></section>);
+    <p className="v3-panel-note">{V3_GY_EMPTY[P0.reason] || 'The year plan is not available for this brand yet.'}</p></section>);
   if (!P) return (<section className="v3-panel" aria-label="Year plan">{head()}
     <div className="v3-panel-pad" aria-busy="true"><V3SkeletonRows n={4}/></div></section>);
 
-  const LY = P.last_year || null, PL = P.plan || {}, flags = P.flags || [];
+  const LY = P.last_year || null, PL = P.plan || {}, CV = P.customer_value || null, IN = P.inputs || {}, flags = P.flags || [];
+  const has = f => flags.indexOf(f) >= 0;
+  const LV = V3_GY_LEVEL[P.margin_level] || 'CM3', pLv = P.margin_level || 'cm3';
   const pill = V3_GY_VERDICT[P.verdict] || null;
   const xKey = LY ? 'growth' : 'sales';
   const F = (P.frontier || []).filter(p => p[xKey] != null).slice().sort((a, b) => Number(a[xKey]) - Number(b[xKey]));
@@ -20764,33 +20779,45 @@ function V3GrowthYear() {
     pick(Math.floor(Number(pt.growth) * 100 + 1e-9) / 100, Math.floor(Number(pt.margin) * 1000 + 1e-9) / 1000);
   };
   const frTip = ({ active, payload }) => (!active || !payload || !payload.length) ? null : (<div className="v3-tip">
-    <b>{fmtPctN(payload[0].payload.margin)} margin</b>
+    <b>{fmtPctN(payload[0].payload.margin)} {LV}</b>
     <span>Sales <em>{v3GbpRound(payload[0].payload.sales)}</em></span>
     {LY && <span>On last year <em>{v3GyPct(payload[0].payload.growth)}</em></span>}
     <span>Ad spend <em>{v3GbpRound(payload[0].payload.spend)}</em></span>
-    <span>Profit after ads <em>{v3GbpRound(payload[0].payload.cam)}</em></span></div>);
+    <span>CM3 <em>{v3GbpRound(payload[0].payload.cm3)}</em></span></div>);
 
   const M = (P.months || []).map(r => Object.assign({}, r, { ly: r.ly_sales }));
   const moTip = ({ active, payload }) => (!active || !payload || !payload.length) ? null : (<div className="v3-tip">
     <b>{v3Month(payload[0].payload.month, 'long')}</b>
     <span>Plan <em>{v3GbpRound(payload[0].payload.sales)}</em></span>
     {payload[0].payload.ly != null && <span>Last year <em>{fmtMoney(payload[0].payload.ly)}</em>{payload[0].payload.ly_sale_month ? ' (sale month)' : ''}</span>}
-    <span>Ad spend <em>{v3GbpRound(payload[0].payload.spend)}</em></span></div>);
+    <span>Ad spend <em>{v3GbpRound(payload[0].payload.spend)}</em></span>
+    <span>CM3 <em>{v3GbpRound(payload[0].payload.cm3)}</em></span></div>);
 
+  const chg = (a, b) => (LY && a != null && Number(a) > 0 && b != null) ? Number(b) / Number(a) - 1 : null;
   // What it takes: last year (actual, exact) against the plan (a forecast, round pounds)
   const rows = [
-    ['Sales', LY && fmtMoney(LY.sales), v3GbpRound(PL.sales), LY && PL.sales / LY.sales - 1],
-    ['From new customers', LY && fmtMoney(LY.new), v3GbpRound(PL.new), LY && LY.new > 0 && PL.new / LY.new - 1],
-    ['From returning customers', LY && fmtMoney(LY.returning), v3GbpRound(PL.returning), LY && LY.returning > 0 && PL.returning / LY.returning - 1],
-    ['Ad spend', LY && fmtMoney(LY.spend), v3GbpRound(PL.spend), LY && LY.spend > 0 && PL.spend / LY.spend - 1],
-    ['New customers', LY && fmtCount(LY.new_customers), fmtCount(Math.round(Number(PL.new_customers) / 10) * 10), LY && LY.new_customers > 0 && PL.new_customers / LY.new_customers - 1],
-    ['Cost per new customer', LY && fmtMoney(LY.cost_per_new_customer, 2), v3GbpRound(PL.cost_per_new_customer), LY && LY.cost_per_new_customer > 0 && PL.cost_per_new_customer / LY.cost_per_new_customer - 1],
-    ['Sales per £1 of ads', LY && fmtTimes(LY.mer), fmtTimes(PL.mer), LY && LY.mer > 0 && PL.mer / LY.mer - 1],
-    ['Profit after ads', LY && fmtMoney(LY.cam), v3GbpRound(PL.cam), LY && LY.cam > 0 && PL.cam / LY.cam - 1],
-    ['Margin', LY && fmtPctN(LY.margin), fmtPctN(PL.margin), null],
+    ['Sales', LY && fmtMoney(LY.sales), v3GbpRound(PL.sales), chg(LY && LY.sales, PL.sales)],
+    ['From new customers', LY && fmtMoney(LY.new), v3GbpRound(PL.new), chg(LY && LY.new, PL.new)],
+    ['From returning customers', LY && fmtMoney(LY.returning), v3GbpRound(PL.returning), chg(LY && LY.returning, PL.returning)],
+    ['Ad spend', LY && fmtMoney(LY.spend), v3GbpRound(PL.spend), chg(LY && LY.spend, PL.spend)],
+    ['New customers', LY && fmtCount(LY.new_customers), fmtCount(Math.round(Number(PL.new_customers) / 10) * 10), chg(LY && LY.new_customers, PL.new_customers)],
+    ['Cost per new customer', LY && fmtMoney(LY.cost_per_new_customer, 2), v3GbpRound(PL.cost_per_new_customer), chg(LY && LY.cost_per_new_customer, PL.cost_per_new_customer)],
+    ['Sales per £1 of ads', LY && fmtTimes(LY.mer), fmtTimes(PL.mer), chg(LY && LY.mer, PL.mer)],
   ];
+  // The contribution ladder: each level is the one above less a cost (CM3 = CM2 − ad spend − other marketing)
+  const st = (LY && LY.states) || {};
+  const ladder = [
+    ['Sales', 'sales', null, null],
+    ['CM1', 'cm1', 'cm1_margin', st.cm1],
+    ['CM2', 'cm2', 'cm2_margin', st.cm2],
+    ['Ad spend', 'spend', null, null],
+    ['Other marketing', 'other_marketing', null, st.other_marketing],
+    ['CM3', 'cm3', 'cm3_margin', st.cm3],
+  ].filter(r => PL[r[1]] != null || (LY && LY[r[1]] != null));
   const saleMonths = LY && (LY.sale_months || []).map(s => v3Month(s, 'long'));
   const tgt = P.target || null;
+  const onBasis = P.value_basis === '12m' && PL.margin_on_basis != null && isFinite(Number(PL.margin)) && Math.abs(Number(PL.margin_on_basis) - Number(PL.margin)) >= 0.005;
+  const lyLv = LY && LY[pLv + '_margin'] != null ? Number(LY[pLv + '_margin']) : (LY ? Number(LY.margin) : null);
 
   return (<section className="v3-panel v3-gy" aria-label="Year plan" aria-busy={busy}>
     {head(pill)}
@@ -20804,26 +20831,36 @@ function V3GrowthYear() {
           <span className="v3-affix" data-post="%"><input className="oi-num" inputMode="decimal" aria-label="Own growth on last year"
             value={V3_GY_OPTS.indexOf(g) >= 0 ? '' : gTxt} placeholder="Own" onChange={e => setGTxt(e.target.value)} onBlur={applyG} onKeyDown={onKey(applyG)}/></span>
         </div></div>
-      <div className="v3-field"><span>Margin to keep</span>
+      <div className="v3-field"><span>Margin level</span>
+        <div className="v3-seg" role="group" aria-label="Margin level">
+          {V3_GY_LEVELS.map(l => <button type="button" key={l[0]} aria-pressed={lv === l[0]} title={l[2]} onClick={() => pickLevel(l[0])}>{l[1]}</button>)}
+        </div></div>
+      <div className="v3-field"><span>{V3_GY_LEVEL[lv]} to keep</span>
         <div className="v3-gy-row">
-          <span className="v3-affix" data-post="%"><input className="oi-num" inputMode="decimal" aria-label="Margin to keep"
-            value={mTxt} placeholder={LY ? String(Math.round(LY.margin * 1000) / 10) : ''} onChange={e => setMTxt(e.target.value)} onBlur={applyM} onKeyDown={onKey(applyM)}/></span>
+          <span className="v3-affix" data-post="%"><input className="oi-num" inputMode="decimal" aria-label={V3_GY_LEVEL[lv] + ' margin to keep'}
+            value={mTxt} placeholder={lyLv != null && pLv === lv ? String(Math.round(lyLv * 1000) / 10) : ''} onChange={e => setMTxt(e.target.value)} onBlur={applyM} onKeyDown={onKey(applyM)}/></span>
           {m != null && <button type="button" className="v3-btn v3-btn-sm" onClick={() => { setM(null); setMTxt(''); }}>Last year's</button>}
         </div></div>
+      <div className="v3-field"><span>New customer value</span>
+        <div className="v3-seg" role="group" aria-label="New customer value">
+          <button type="button" aria-pressed={vb === '12m'} onClick={() => setVb('12m')}>12 months</button>
+          <button type="button" aria-pressed={vb === 'first_order'} onClick={() => setVb('first_order')}>First order</button>
+        </div></div>
     </div>
+    {failed && <p className="v3-panel-note">{V3_GY_EMPTY[failed.reason] || 'This choice is not available for this brand yet.'}</p>}
 
     <div className="v3-home-group" style={{ '--n': tgt ? 4 : 3 }}>
-      <div className="v3-home-group-h">Year<span>Profit after ads as a share of sales</span></div>
+      <div className="v3-home-group-h">Year<span>{LV} as a share of sales</span></div>
       <div className="v3-home-tiles">
-        {LY && <V3HomeTile k="Last year" v={fmtMoney(LY.sales)} delta={fmtPctN(LY.margin) + ' margin'}/>}
-        {tgt && <V3HomeTile k="Target" v={v3GbpRound(tgt.sales)} delta={fmtPctN(P.margin_target) + ' margin'}/>}
-        <V3HomeTile k="Plan" v={v3GbpRound(PL.sales)} delta={(LY ? v3GyPct(PL.growth) + ' on last year, ' : '') + fmtPctN(PL.margin) + ' margin'}/>
+        {LY && <V3HomeTile k="Last year" v={fmtMoney(LY.sales)} delta={fmtPctN(lyLv) + ' ' + LV}/>}
+        {tgt && <V3HomeTile k="Target" v={v3GbpRound(tgt.sales)} delta={fmtPctN(P.margin_target) + ' ' + LV}/>}
+        <V3HomeTile k="Plan" v={v3GbpRound(PL.sales)} delta={(LY ? v3GyPct(PL.growth) + ' on last year, ' : '') + fmtPctN(PL.margin) + ' ' + LV}/>
         {tgt ? <V3HomeTile k="Gap" v={Number(P.gap) > 0 ? v3GbpRound(P.gap) : FMT_NONE} cls={Number(P.gap) > 0 ? 'v3-down' : ''} delta={Number(P.gap) > 0 ? 'beyond ads at this margin' : 'none'}/>
           : <V3HomeTile k="Ad spend" v={v3GbpRound(PL.spend)} delta={LY ? fmtMoney(LY.spend) + ' last year' : ''}/>}
       </div></div>
 
     <div className="v3-panel-pad v3-mk-charts">
-      <figure className="v3-chart" aria-label="Growth against margin"><figcaption><span className="v3-chart-title">Growth against margin</span>
+      <figure className="v3-chart" aria-label={'Growth against ' + LV}><figcaption><span className="v3-chart-title">Growth against {LV}</span>
         <span className="v3-legend"><i style={{ background: PAL.sales }}/>Most with ads <i className="v3-gy-dot"/>Your point</span></figcaption>
         <R.ResponsiveContainer width="100%" height={240}>
           <R.ComposedChart data={F} margin={{ top: 8, right: 12, left: 0, bottom: 0 }} onClick={chartPick} className={LY ? "v3-gy-pick" : undefined}>
@@ -20852,14 +20889,38 @@ function V3GrowthYear() {
     </div>
 
     <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-gy-tbl">
-      <thead><tr><th>What it takes</th>{LY && <th className="r">Last year</th>}<th className="r">Plan</th>{LY && <th className="r">Change</th>}</tr></thead>
-      <tbody>{rows.map(r => (<tr key={r[0]}><td>{r[0]}</td>{LY && <td className="r">{r[1] || FMT_NONE}</td>}<td className="r">{r[2] || FMT_NONE}</td>
-          {LY && <td className="r">{r[3] === false || r[3] == null || !isFinite(r[3]) ? FMT_NONE : v3GyPct(r[3])}</td>}</tr>))}
-        {tgt && Number(P.gap) > 0 && <tr className="tot"><td>Gap to target</td>{LY && <td/>}<td className="r">{v3GbpRound(P.gap)}</td>{LY && <td/>}</tr>}
+      <thead><tr><th>Contribution</th>{LY && <th className="r">Last year</th>}{LY && <th className="r">Share</th>}<th className="r">Plan</th><th className="r">Share</th>
+        {LY && <th className="r">Change</th>}{LY && <th>Last year basis</th>}</tr></thead>
+      <tbody>{ladder.map(r => { const cm = r[2] != null, cur = r[1] === pLv; return (<tr key={r[1]} className={cm ? 'v3-gy-cm' + (cur ? ' v3-gy-cur' : '') : undefined}>
+          <td>{r[0]}</td>
+          {LY && <td className="r">{LY[r[1]] != null ? fmtMoney(LY[r[1]]) : FMT_NONE}</td>}
+          {LY && <td className="r">{cm && LY[r[2]] != null ? fmtPctN(LY[r[2]]) : ''}</td>}
+          <td className="r">{PL[r[1]] != null ? v3GbpRound(PL[r[1]]) : FMT_NONE}</td>
+          <td className="r">{cm && PL[r[2]] != null ? fmtPctN(PL[r[2]]) : ''}</td>
+          {LY && <td className="r">{cm ? v3GyPts(PL[r[2]] != null && LY[r[2]] != null ? Number(PL[r[2]]) - Number(LY[r[2]]) : null)
+            : (() => { const c = chg(LY[r[1]], PL[r[1]]); return c == null || !isFinite(c) ? FMT_NONE : v3GyPct(c); })()}</td>}
+          {LY && <td>{V3_GY_STATE[r[3]] || ''}</td>}</tr>); })}
       </tbody></table></div>
 
     <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-gy-tbl">
-      <thead><tr><th>Growth options</th><th className="r">Sales</th><th className="r">Ad spend it needs</th><th className="r">Margin it leaves</th><th className="r">At {fmtPctN(P.margin_target)} margin</th></tr></thead>
+      <thead><tr><th>What it takes</th>{LY && <th className="r">Last year</th>}<th className="r">Plan</th>{LY && <th className="r">Change</th>}</tr></thead>
+      <tbody>{rows.map(r => (<tr key={r[0]}><td>{r[0]}</td>{LY && <td className="r">{r[1] || FMT_NONE}</td>}<td className="r">{r[2] || FMT_NONE}</td>
+          {LY && <td className="r">{r[3] == null || !isFinite(r[3]) ? FMT_NONE : v3GyPct(r[3])}</td>}</tr>))}
+        {tgt && Number(P.gap) > 0 && <tr className="tot"><td>Gap to target</td>{LY && <td/>}<td className="r">{v3GbpRound(P.gap)}</td>{LY && <td/>}</tr>}
+      </tbody></table></div>
+
+    {CV && <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-gy-tbl">
+      <thead><tr><th>New customer value</th><th className="r">First order</th><th className="r">Repeat in 12 months</th><th className="r">12-month value</th>
+        <th className="r">Customers measured</th><th>Confidence</th></tr></thead>
+      <tbody><tr><td>Per new customer</td>
+        <td className="r">{CV.first_order != null ? fmtMoney(CV.first_order, 2) : FMT_NONE}</td>
+        <td className="r">{CV.repeat_12m != null ? fmtMoney(CV.repeat_12m, 2) : FMT_NONE}</td>
+        <td className="r">{CV.value_12m != null ? fmtMoney(CV.value_12m, 2) : FMT_NONE}</td>
+        <td className="r">{CV.customers != null ? fmtCount(CV.customers) : FMT_NONE}</td>
+        <td>{(V3_CONF[CV.rung] || V3_CONF.held).label}</td></tr></tbody></table></div>}
+
+    <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-gy-tbl">
+      <thead><tr><th>Growth options</th><th className="r">Sales</th><th className="r">Ad spend it needs</th><th className="r">{LV} it leaves</th><th className="r">At {fmtPctN(P.margin_target)} {LV}</th></tr></thead>
       <tbody>{(P.options || []).map(o => (<tr key={o.growth}>
           <td><button type="button" className="v3-gy-opt" aria-pressed={g === Number(o.growth)} onClick={() => pick(Number(o.growth))}>{v3GyPct(o.growth)}</button></td>
           <td className="r">{v3GbpRound(o.sales)}</td>
@@ -20869,10 +20930,16 @@ function V3GrowthYear() {
       </tbody></table></div>
 
     <div className="v3-gy-notes">
+      {pLv !== 'cm3' && <p className="v3-panel-note">{LV} comes before ad spend, so it does not limit ads: spend runs to its cap, and CM3 shows what is left.</p>}
+      {onBasis && <p className="v3-panel-note">Counting new customers' repeat orders in their first 12 months, the plan keeps {fmtPctN(PL.margin_on_basis)} {LV}.</p>}
+      {has('twelve_month_value_not_learned') && <p className="v3-panel-note">12-month value is not measured for this brand yet, so new customers count at their first order.</p>}
+      {has('other_marketing_partial') && <p className="v3-panel-note">Other marketing costs cover only part of last year. Add them in Goal & costs.</p>}
+      {has('no_ladder') && <p className="v3-panel-note">CM2 uses the quarter plan's order costs until last year's figures are worked out.</p>}
+      {has('last_year_cache_stale') && IN.ladder_refreshed_at && <p className="v3-panel-note">Last year's contribution figures date from {v3Month(IN.ladder_refreshed_at, 'long')}.</p>}
+      {has('last_year_incomplete') && <p className="v3-panel-note">Last year has fewer than 12 months of sales, so growth compares with the months there are.</p>}
       {saleMonths && saleMonths.length > 0 && <p className="v3-panel-note">Last year included a sale in {saleMonths.join(', ')}. The plan holds no sales.</p>}
-      {flags.indexOf('returning_held_at_base') >= 0 && <p className="v3-panel-note">Returning sales stay at today's rate: customers won during the year are not yet counted coming back.</p>}
-      {(flags.indexOf('capped_at_spend_seen') >= 0 || (tgt && !tgt.within_spend_seen)) && <p className="v3-panel-note">Ad spend is held at 3× your biggest month so far.</p>}
-      {flags.indexOf('beyond_spend_seen') >= 0 && <p className="v3-panel-note">Some months spend more than any month so far, so those months are estimates.</p>}
+      {(has('capped_at_spend_seen') || (tgt && !tgt.within_spend_seen)) && <p className="v3-panel-note">Ad spend is held at 3× your biggest month so far.</p>}
+      {has('beyond_spend_seen') && <p className="v3-panel-note">Some months spend more than any month so far, so those months are estimates.</p>}
     </div>
   </section>);
 }
