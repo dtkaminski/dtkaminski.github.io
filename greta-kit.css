@@ -2655,3 +2655,19 @@ table.v3-home-pl.v3-ad-mini.v3-why-tbl td small.v3-why-find { display: block; gr
 .v3-gy-notes:empty { display: none; }
 .v3-gy-tbl tr.v3-gy-cm td { border-top: 1px solid var(--color-line); }
 .v3-gy-tbl tr.v3-gy-cur td { font-weight: var(--weight-semi); }
+/* 1211: the year plan by lever */
+.v3-gy-set { padding-top: var(--space-3); padding-bottom: var(--space-3); }
+.v3-gy-set .v3-field > span { font-size: var(--text-xs); }
+.v3-gy-levers td { vertical-align: middle; }
+.v3-gy-lname { white-space: nowrap; }
+.v3-gy-lname small { display: block; font-size: var(--text-xs); color: var(--color-muted); }
+.v3-gy-by { font-size: var(--text-xs); color: var(--color-muted); min-width: var(--width-gy-by); }
+.v3-gy-slide { display: flex; align-items: center; gap: var(--space-2); white-space: nowrap; }
+.v3-gy-slide input[type="range"] { width: var(--width-slider); accent-color: var(--color-ink); margin: 0; }
+.v3-gy-slide b { font-family: var(--font-figure); font-weight: var(--weight-semi); min-width: var(--width-input-short); }
+.v3-gy-levers .v3-pill { white-space: nowrap; }
+.v3-gy-btns { margin-bottom: 0; flex-wrap: wrap; }
+.v3-gy-btns .v3-btn[aria-pressed="true"] { background: var(--color-ink); border-color: var(--color-ink); color: var(--color-panel); }
+.v3-gy .v3-gy-bridge { border-top: 0; padding-top: 0; }
+.v3-gy-bridge-tgt .v3-bridge-k, .v3-gy-bridge-tgt .v3-bridge-v { color: var(--color-muted); }
+.v3-gy-one { grid-template-columns: minmax(0, 1fr); border-top: 1px solid var(--color-line); }

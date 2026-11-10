@@ -20788,20 +20788,25 @@ function useV3Plan() {
   }, []);
   return (typeof window !== 'undefined' && window.FRKL_PLAN) || {};
 }
-// ── The year plan (1204 + 1205, docs/DESIGN-growth-planner-2026-11-10.md, phase 1) ───────────────────────────────────────
-// The owner picks growth on last year, the margin level (CM1 after product cost, CM2 after order costs, CM3 after ads and
-// other marketing) and the margin to keep at that level (last year's by default). New customers are judged on their
-// 12-month value where the brand has learned it (1205), or on the first order. fn_plan_growth answers from the quarter
-// plan's fitted inputs and last year's money ladder (cache_growth_base): the most sales that margin allows on ads, what the
-// target needs, a verdict, the margin-against-growth line for the chart and the twelve months. Phase 1 is ads only; the
-// gap is what the other levers are left to find. Clicking the chart picks growth and margin together.
-const V3_GY_Q = (g, m, lv, vb) => (sb, b) => sb.rpc('fn_plan_growth', { p_brand: b, p_growth: g, p_margin: m, p_level: lv, p_value: vb })
+// ── The year plan (1204, 1205, 1211; docs/DESIGN-growth-planner-2026-11-10.md) ───────────────────────────────────────────
+// The owner picks growth on last year, then sets the levers they control: non-paid new customers, the returning order
+// rate, conversion, items an order and discount depth. Ads cover what the levers leave. fn_plan_growth answers from the
+// quarter plan's fitted inputs, last year's money ladder and each lever's record (cache_growth_base): the plan, a bridge
+// from today's trend to it, each lever's grade against the brand's own record and the plan's realism. The margin level
+// (CM1 after product cost, CM2 after order costs, CM3 after ads and other marketing), the margin to keep and how new
+// customers are valued sit in a settings row. Clicking the growth chart picks growth and margin together.
+const V3_GY_Q = (g, m, lv, vb, lev) => (sb, b) => sb.rpc('fn_plan_growth', { p_brand: b, p_growth: g, p_margin: m, p_level: lv, p_value: vb, p_levers: lev })
   .then(r => ({ data: r && r.data ? [r.data] : [], error: r ? r.error : null }));
-const V3_GY_VERDICT = {
-  reachable: ['Reachable with ads', 'v3-pill-good'],
-  needs_more_than_ads: ['Beyond ads alone', 'v3-pill-warn'],
-  margin_unreachable: ['Margin out of reach', 'v3-pill-bad'],
-  most_at_margin: ['Most at this margin', 'v3-pill-none'],
+// realism: how hard the plan is for this brand to deliver, against its own record (not how sure the figures are)
+const V3_GY_REAL = {
+  within_record: ['Within your record', 'v3-pill-good'],
+  stretch: ['Stretch', 'v3-pill-warn'],
+  step_change: ['Needs a step change', 'v3-pill-bad'],
+  out_of_reach: ['Out of reach', 'v3-pill-bad'],
+};
+const V3_GY_GRADE = {
+  as_last_year: ['As last year', 'v3-pill-none'], done_before: ['Done before', 'v3-pill-good'],
+  stretch: ['Stretch', 'v3-pill-warn'], step_change: ['Step change', 'v3-pill-bad'],
 };
 const V3_GY_EMPTY = {
   no_history: 'The year plan shows once there is a full month of sales.',
@@ -20809,6 +20814,7 @@ const V3_GY_EMPTY = {
   no_curve: 'The year plan shows once there is enough ad history to read how sales answer to spend.',
   no_margin: 'The year plan shows once product costs are in Goal & costs.',
   no_cm1: 'CM1 shows once last year’s product costs are worked out. CM2 and CM3 are available.',
+  bad_levers: 'One of the lever values is outside what the plan can read.',
 };
 const V3_GY_OPTS = [0.2, 0.5, 1.0];
 // CM1, CM2 and CM3 as any e-commerce P&L reads them; the descriptor is what each level is after
@@ -20820,6 +20826,36 @@ const v3GyPct = x => (x == null || !isFinite(Number(x))) ? FMT_NONE
 const v3GyPts = d => (d == null || !isFinite(Number(d))) ? FMT_NONE
   : Math.abs(d) < 0.0005 ? '0.0 pts' : (d > 0 ? '+' : '−') + (Math.abs(d) * 100).toFixed(1) + ' pts';
 const v3GyNum = s => { const n = parseFloat(String(s).replace(/[^0-9.\-]/g, '')); return isFinite(n) ? n : null; };
+const v3GyAdd = v => (v == null || !isFinite(Number(v))) ? FMT_NONE
+  : Math.abs(Number(v)) < 0.5 ? FMT_NONE : (Number(v) > 0 ? '+' : '') + v3GbpRound(v);
+// The levers, in the order the bridge adds them. Each is a part sales are made of, so their effects do not overlap;
+// email and organic search deliver them rather than sit beside them (Klaviyo's claimed sales overlap both).
+const V3_GY_LEVERS = {
+  np: { name: 'Non-paid new customers', unit: 'a month', by: 'Organic search, email sign-ups, social, referrals',
+        fmt: v => fmtCount(Math.round(Number(v))), step: 1 },
+  rr: { name: 'Returning order rate', unit: 'per 100 customers a month', by: 'Email campaigns and flows, win-back',
+        fmt: v => (Number(v) * 100).toFixed(2), step: 0.0005 },
+  cv: { name: 'Conversion', unit: 'change on last year', by: 'Product pages, checkout, site speed',
+        fmt: v => v3GyPct(Number(v) - 1), step: 0.005 },
+  up: { name: 'Items an order', unit: 'items', by: 'Bundles, sets, free-delivery threshold',
+        fmt: v => Number(v).toFixed(2), step: 0.01 },
+  dc: { name: 'Discount depth', unit: 'off list', by: 'Fewer, shallower codes and markdowns',
+        fmt: v => (Number(v) * 100).toFixed(1) + '%', step: 0.001 },
+};
+const V3_GY_KEYS = ['np', 'rr', 'cv', 'up', 'dc'];
+const V3_GY_MIX = [['unpaid_search', 'Organic search'], ['email', 'Email'], ['social_untagged', 'Social, untagged'],
+  ['ai_assistant', 'AI assistants'], ['other', 'Other referrers'], ['untraced', 'Untraced']];
+// a slider's ends: from a little under last year to a little past the best the brand has done
+function v3GyRange(k, l) {
+  const b = Number(l.last_year), y = l.yoy != null ? Number(l.yoy) : null, t = l.best_90 != null ? Number(l.best_90) : null;
+  const p = Number(l.plan);
+  if (k === 'dc') return [0, Math.max(b * 1.5, b + 0.05, p)];
+  const top = Math.max(b, y || 0, t || 0, p);
+  if (k === 'np') return [0, Math.max(Math.ceil(top * 1.4), 10)];
+  if (k === 'cv') return [Math.min(0.8, p), Math.max(1.2, top * 1.15)];
+  return [Math.min(b * 0.8, p), top * 1.25];
+}
+const v3GyList = a => a.length <= 1 ? (a[0] || '') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
 function V3GrowthYear() {
   const [g, setG] = React.useState(null);         // growth on last year (0.2 = +20%); null: the most the margin allows
   const [m, setM] = React.useState(null);         // margin to keep (0.3 = 30%) at the chosen level; null: last year's
@@ -20827,18 +20863,25 @@ function V3GrowthYear() {
   const [vb, setVb] = React.useState('12m');      // new customers judged on 12-month value or the first order
   const [gTxt, setGTxt] = React.useState('');
   const [mTxt, setMTxt] = React.useState('');
-  const q = useV3Rows('growth-year:' + (g == null ? '' : g) + ':' + (m == null ? '' : m) + ':' + lv + ':' + vb, V3_GY_Q(g, m, lv, vb));
+  const [lev, setLev] = React.useState({});       // the owner's lever values; a lever left out stays at last year's
+  const [levQ, setLevQ] = React.useState({});     // the same once a slider stops moving, which is what is asked for
+  React.useEffect(() => { const t = setTimeout(() => setLevQ(lev), 450); return () => clearTimeout(t); }, [lev]);
+  const levJ = Object.keys(levQ).length ? levQ : null;
+  const q = useV3Rows('growth-year:' + (g == null ? '' : g) + ':' + (m == null ? '' : m) + ':' + lv + ':' + vb + ':' + JSON.stringify(levJ || {}),
+    V3_GY_Q(g, m, lv, vb, levJ));
   const P0 = q.rows && q.rows[0] ? q.rows[0] : null;
   const [last, setLast] = React.useState(null);   // the last answer stays on screen while the next one loads
   React.useEffect(() => { if (P0 && P0.ok) setLast(P0); }, [P0]);
   const P = P0 && P0.ok ? P0 : last, busy = !P0 && !q.err;
-  const failed = P0 && !P0.ok && last ? P0 : null;  // a level this brand can't read yet, with the last answer still shown
+  const failed = P0 && !P0.ok && last ? P0 : null;  // a choice this brand can't read yet, with the last answer still shown
 
   const pick = (gv, mv) => { setG(gv); setGTxt(gv == null ? '' : String(Math.round(gv * 100))); if (mv !== undefined) { setM(mv); setMTxt(mv == null ? '' : String(Math.round(mv * 1000) / 10)); } };
   const pickLevel = l => { if (l === lv) return; setLv(l); setM(null); setMTxt(''); };   // a margin means a different thing at each level
   const applyG = () => { const n = v3GyNum(gTxt); setG(n == null ? null : Math.max(-50, Math.min(500, n)) / 100); };
   const applyM = () => { const n = v3GyNum(mTxt); setM(n == null ? null : Math.max(-50, Math.min(95, n)) / 100); };
   const onKey = f => e => { if (e.key === 'Enter') f(); };
+  const setLever = (k, v) => setLev(o => Object.assign({}, o, { [k]: v }));
+  const setAll = o => { setLev(o); setLevQ(o); };
 
   const head = (pill) => (<div className="v3-panel-head"><h2>Next 12 months</h2>
     {P && <span className="v3-muted">{v3Month(P.period_start, 'long')} to {v3Month(P.period_end, 'long')}</span>}
@@ -20854,7 +20897,48 @@ function V3GrowthYear() {
   const LY = P.last_year || null, PL = P.plan || {}, CV = P.customer_value || null, IN = P.inputs || {}, flags = P.flags || [];
   const has = f => flags.indexOf(f) >= 0;
   const LV = V3_GY_LEVEL[P.margin_level] || 'CM3', pLv = P.margin_level || 'cm3';
-  const pill = V3_GY_VERDICT[P.verdict] || null;
+  const RL = P.realism || {}, ADS = P.ads || {};
+  const real = V3_GY_REAL[RL.grade] || null;
+  const LVR = (P.levers || []).filter(l => l.available && V3_GY_LEVERS[l.key]);
+  const LVk = {}; LVR.forEach(l => { LVk[l.key] = l; });
+  const BR = P.bridge || [], brK = {}; BR.forEach(r => { brK[r.key] = r; });
+  const levAdd = V3_GY_KEYS.reduce((s, k) => s + (brK[k] ? Number(brK[k].sales) || 0 : 0), 0);
+  const tgt = P.target || null;
+  const lyLv = LY && LY[pLv + '_margin'] != null ? Number(LY[pLv + '_margin']) : (LY ? Number(LY.margin) : null);
+
+  // the levers' preset values: Greta's suggestion (each lever's best year-on-year move where it grows sales), every
+  // growth lever at the most its record supports, or last year
+  const fillSug = () => { const o = {}; LVR.forEach(l => { if (Number(l.suggested) !== Number(l.last_year)) o[l.key] = Number(l.suggested); }); setAll(o); };
+  const fillBest = () => { const o = {}; LVR.forEach(l => {
+    const v = l.key === 'dc' ? Number(l.suggested) : Math.max(Number(l.last_year), Number(l.best_90 || 0), Number(l.yoy || 0));
+    if (v !== Number(l.last_year)) o[l.key] = v; }); setAll(o); };
+  const sugOn = LVR.length > 0 && LVR.every(l => Math.abs(Number(l.plan) - Number(l.suggested)) < 1e-6)
+    && LVR.some(l => Number(l.suggested) !== Number(l.last_year));
+  const lyOn = LVR.every(l => Math.abs(Number(l.plan) - Number(l.last_year)) < 1e-6);
+
+  // the realism note: only where the grade alone cannot say what is needed
+  const stepNames = (RL.steps || []).map(k => k === 'ads' ? 'ad spend' : V3_GY_LEVERS[k] ? V3_GY_LEVERS[k].name.toLowerCase() : k);
+  const cap1 = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+  const rNote = RL.grade === 'out_of_reach'
+      ? (Number(RL.short_at_best) > 0
+        ? v3GbpRound(RL.short) + ' short at ' + fmtPctN(P.margin_target) + ' ' + LV + '. Every lever at its best still leaves ' + v3GbpRound(RL.short_at_best) + ' short, so it needs something new: a range, a channel or a price move.'
+        : v3GbpRound(RL.short) + ' short at ' + fmtPctN(P.margin_target) + ' ' + LV + '. Your levers have the room to close it.')
+    : RL.grade === 'step_change' ? cap1(v3GyList(stepNames)) + (stepNames.length > 1 ? ' go' : ' goes') + ' past anything you have done. Name the change that makes it happen, or lower the target.'
+    : RL.grade === 'stretch' ? fmtPctN(RL.hard_share) + ' of what the plan adds rests on moves bigger than any year so far.'
+    : null;
+  const shortH = LVR.filter(l => l.history === 'short').map(l => V3_GY_LEVERS[l.key].name.toLowerCase());
+
+  // the bridge: today's trend, each lever, ads, the plan; the target as a mark
+  const bRows = [{ k: 'Trend', a: 0, b: Number(brK.trend ? brK.trend.sales : 0), tone: 'cost', v: brK.trend ? brK.trend.sales : null, abs: true }];
+  let cum = bRows[0].b;
+  V3_GY_KEYS.forEach(k => { const r = brK[k]; if (!r || !LVk[k] || Math.abs(Number(r.sales)) < 0.5) return;
+    const nx = cum + Number(r.sales); bRows.push({ k: V3_GY_LEVERS[k].name, a: Math.min(cum, nx), b: Math.max(cum, nx), tone: Number(r.sales) >= 0 ? 'sales' : 'cost', v: r.sales }); cum = nx; });
+  if (brK.ads && Math.abs(Number(brK.ads.sales)) >= 0.5) { const nx = cum + Number(brK.ads.sales);
+    bRows.push({ k: 'Ads', a: Math.min(cum, nx), b: Math.max(cum, nx), tone: 'ads', v: brK.ads.sales }); cum = nx; }
+  bRows.push({ k: 'Plan', a: 0, b: Number(PL.sales), tone: 'keep', v: PL.sales, abs: true, total: true });
+  const bHi = Math.max.apply(null, bRows.map(r => r.b).concat(tgt ? [Number(tgt.sales)] : [])) || 1;
+  const bx = v => Math.max(0, Math.min(100, (v / bHi) * 100));
+
   const xKey = LY ? 'growth' : 'sales';
   const F = (P.frontier || []).filter(p => p[xKey] != null).slice().sort((a, b) => Number(a[xKey]) - Number(b[xKey]));
   const tx = LY ? (P.growth != null ? Number(P.growth) : Number(PL.growth)) : Number(P.target_sales || PL.sales);
@@ -20911,12 +20995,11 @@ function V3GrowthYear() {
     ['CM3', 'cm3', 'cm3_margin', st.cm3],
   ].filter(r => PL[r[1]] != null || (LY && LY[r[1]] != null));
   const saleMonths = LY && (LY.sale_months || []).map(s => v3Month(s, 'long'));
-  const tgt = P.target || null;
   const onBasis = P.value_basis === '12m' && PL.margin_on_basis != null && isFinite(Number(PL.margin)) && Math.abs(Number(PL.margin_on_basis) - Number(PL.margin)) >= 0.005;
-  const lyLv = LY && LY[pLv + '_margin'] != null ? Number(LY[pLv + '_margin']) : (LY ? Number(LY.margin) : null);
+  const mix = LVk.np && LVk.np.mix ? V3_GY_MIX.filter(x => LVk.np.mix[x[0]] != null) : [];
 
   return (<section className="v3-panel v3-gy" aria-label="Year plan" aria-busy={busy}>
-    {head(pill)}
+    {head(real)}
     <div className="v3-panel-pad v3-gy-ctl">
       <div className="v3-field"><span>Growth on last year</span>
         <div className="v3-gy-row">
@@ -20927,6 +21010,8 @@ function V3GrowthYear() {
           <span className="v3-affix" data-post="%"><input className="oi-num" inputMode="decimal" aria-label="Own growth on last year"
             value={V3_GY_OPTS.indexOf(g) >= 0 ? '' : gTxt} placeholder="Own" onChange={e => setGTxt(e.target.value)} onBlur={applyG} onKeyDown={onKey(applyG)}/></span>
         </div></div>
+    </div>
+    <div className="v3-panel-pad v3-gy-ctl v3-gy-set">
       <div className="v3-field"><span>Margin level</span>
         <div className="v3-seg" role="group" aria-label="Margin level">
           {V3_GY_LEVELS.map(l => <button type="button" key={l[0]} aria-pressed={lv === l[0]} title={l[2]} onClick={() => pickLevel(l[0])}>{l[1]}</button>)}
@@ -20945,19 +21030,70 @@ function V3GrowthYear() {
     </div>
     {failed && <p className="v3-panel-note">{V3_GY_EMPTY[failed.reason] || 'This choice is not available for this brand yet.'}</p>}
 
-    <div className="v3-home-group" style={{ '--n': tgt ? 4 : 3 }}>
+    <div className="v3-home-group" style={{ '--n': 5 }}>
       <div className="v3-home-group-h">Year<span>{LV} as a share of sales</span></div>
       <div className="v3-home-tiles">
-        {LY && <V3HomeTile k="Last year" v={fmtMoney(LY.sales)} delta={fmtPctN(lyLv) + ' ' + LV}/>}
-        {tgt && <V3HomeTile k="Target" v={v3GbpRound(tgt.sales)} delta={fmtPctN(P.margin_target) + ' ' + LV}/>}
-        <V3HomeTile k="Plan" v={v3GbpRound(PL.sales)} delta={(LY ? v3GyPct(PL.growth) + ' on last year, ' : '') + fmtPctN(PL.margin) + ' ' + LV}/>
-        {tgt ? <V3HomeTile k="Gap" v={Number(P.gap) > 0 ? v3GbpRound(P.gap) : FMT_NONE} cls={Number(P.gap) > 0 ? 'v3-down' : ''} delta={Number(P.gap) > 0 ? 'beyond ads at this margin' : 'none'}/>
-          : <V3HomeTile k="Ad spend" v={v3GbpRound(PL.spend)} delta={LY ? fmtMoney(LY.spend) + ' last year' : ''}/>}
+        {LY ? <V3HomeTile k="Last year" v={fmtMoney(LY.sales)} delta={fmtPctN(lyLv) + ' ' + LV}/>
+          : <V3HomeTile k="Trend" v={v3GbpRound(P.trend && P.trend.sales)} delta="at today's spend"/>}
+        {tgt ? <V3HomeTile k="Target" v={v3GbpRound(tgt.sales)} delta={fmtPctN(P.margin_target) + ' ' + LV}/>
+          : <V3HomeTile k="Plan" v={v3GbpRound(PL.sales)} delta={(LY ? v3GyPct(PL.growth) + ' on last year, ' : '') + fmtPctN(PL.margin) + ' ' + LV}/>}
+        <V3HomeTile k="Levers" v={v3GyAdd(levAdd)} delta="on top of trend"/>
+        <V3HomeTile k="Ads" v={v3GyAdd(ADS.adds_sales)} delta={v3GbpRound(PL.spend) + ' of ad spend'}/>
+        {tgt ? <V3HomeTile k="Gap" v={Number(P.gap) > 0 ? v3GbpRound(P.gap) : FMT_NONE} cls={Number(P.gap) > 0 ? 'v3-down' : ''} delta={Number(P.gap) > 0 ? 'at this margin' : 'none'}/>
+          : <V3HomeTile k={LV} v={v3GbpRound(pLv === 'cm1' ? PL.cm1 : pLv === 'cm2' ? PL.cm2 : PL.cm3)} delta={fmtPctN(PL.margin) + ' of sales'}/>}
       </div></div>
+    {rNote && <p className="v3-panel-note">{rNote}</p>}
+
+    {LVR.length > 0 && <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-gy-tbl v3-gy-levers">
+      <thead><tr><th>Lever</th><th>Delivered by</th><th className="r">Last year</th><th>Plan</th><th className="r">Done before to</th>
+        <th className="r">Best 3 months</th><th className="r">Lands in</th><th className="r">Adds to sales</th><th className="r">Adds to {LV}</th>
+        <th>Realism</th></tr></thead>
+      <tbody>{V3_GY_KEYS.filter(k => LVk[k]).map(k => { const l = LVk[k], d = V3_GY_LEVERS[k], rg = v3GyRange(k, l);
+          const val = lev[k] != null ? Number(lev[k]) : Number(l.plan), gr = V3_GY_GRADE[l.grade] || V3_GY_GRADE.as_last_year;
+          return (<tr key={k}>
+            <td className="v3-gy-lname">{d.name}<small>{d.unit}</small></td>
+            <td className="v3-gy-by">{d.by}</td>
+            <td className="r">{k === 'cv' ? v3GyPct(0) : d.fmt(l.last_year)}</td>
+            <td><span className="v3-gy-slide">
+              <input type="range" min={rg[0]} max={rg[1]} step={d.step} value={Math.min(rg[1], Math.max(rg[0], val))} aria-label={d.name + ' in the plan'}
+                aria-valuetext={d.fmt(val)} onChange={e => setLever(k, Number(e.target.value))}/>
+              <b>{d.fmt(val)}</b></span></td>
+            <td className="r">{l.yoy != null ? d.fmt(l.yoy) : FMT_NONE}</td>
+            <td className="r">{l.best_90 != null ? d.fmt(l.best_90) : FMT_NONE}</td>
+            <td className="r">{l.lands_months === 1 ? '1 month' : l.lands_months + ' months'}</td>
+            <td className="r">{v3GyAdd(l.adds_sales)}</td>
+            <td className="r">{v3GyAdd(l.adds_level)}</td>
+            <td><b className={'v3-pill ' + gr[1]}>{gr[0]}</b></td></tr>); })}
+        <tr className="v3-gy-cm">
+          <td className="v3-gy-lname">Ad spend<small>the rest</small></td>
+          <td className="v3-gy-by">Meta, Google, TikTok</td>
+          <td className="r">{LY ? fmtMoney(LY.spend) : FMT_NONE}</td>
+          <td><span className="v3-gy-slide"><b>{v3GbpRound(PL.spend)}</b></span></td>
+          <td className="r">{FMT_NONE}</td><td className="r">{FMT_NONE}</td><td className="r">1 month</td>
+          <td className="r">{v3GyAdd(ADS.adds_sales)}</td><td className="r">{v3GyAdd(ADS.adds_level)}</td>
+          <td><b className={'v3-pill ' + (V3_GY_GRADE[ADS.grade] || V3_GY_GRADE.as_last_year)[1]}>{(V3_GY_GRADE[ADS.grade] || V3_GY_GRADE.as_last_year)[0]}</b></td></tr>
+      </tbody></table></div>}
+    {LVR.length > 0 && <div className="v3-panel-pad v3-curve-btns v3-gy-btns">
+      <button type="button" className="v3-btn v3-btn-sm" aria-pressed={sugOn} onClick={fillSug}>Suggested plan</button>
+      <button type="button" className="v3-btn v3-btn-sm" onClick={fillBest}>Every lever at its best</button>
+      <button type="button" className="v3-btn v3-btn-sm" aria-pressed={lyOn} onClick={() => setAll({})}>Last year</button>
+    </div>}
 
     <div className="v3-panel-pad v3-mk-charts">
+      <figure className="v3-bridge v3-bridge-wide v3-gy-bridge" role="img" aria-label={bRows.map(r => r.k + ' ' + (r.abs ? v3GbpRound(r.v) : v3GyAdd(r.v))).join(', ')}>
+        <figcaption className="v3-bridge-cap">From trend to plan{tgt ? ', against the target' : ''}</figcaption>
+        {bRows.map(r => (<div key={r.k} className={'v3-bridge-row' + (r.total ? ' v3-bridge-total' : '')}>
+          <span className="v3-bridge-k">{r.k}</span>
+          <span className="v3-bridge-track">{tgt && <b className="v3-bridge-mark" style={{ left: bx(Number(tgt.sales)) + '%' }}/>}
+            <i className={'v3-bridge-' + r.tone} style={{ left: bx(r.a) + '%', width: Math.max(0.6, bx(r.b) - bx(r.a)) + '%' }}/></span>
+          <span className="v3-bridge-v">{r.abs ? v3GbpRound(r.v) : v3GyAdd(r.v)}</span>
+        </div>))}
+        {tgt && <div className="v3-bridge-row v3-gy-bridge-tgt"><span className="v3-bridge-k">Target</span>
+          <span className="v3-bridge-track"><b className="v3-bridge-mark" style={{ left: bx(Number(tgt.sales)) + '%' }}/></span>
+          <span className="v3-bridge-v">{v3GbpRound(tgt.sales)}</span></div>}
+      </figure>
       <figure className="v3-chart" aria-label={'Growth against ' + LV}><figcaption><span className="v3-chart-title">Growth against {LV}</span>
-        <span className="v3-legend"><i style={{ background: PAL.sales }}/>Most with ads <i className="v3-gy-dot"/>Your point</span></figcaption>
+        <span className="v3-legend"><i style={{ background: PAL.sales }}/>Most with these levers and ads <i className="v3-gy-dot"/>Your point</span></figcaption>
         <R.ResponsiveContainer width="100%" height={240}>
           <R.ComposedChart data={F} margin={{ top: 8, right: 12, left: 0, bottom: 0 }} onClick={chartPick} className={LY ? "v3-gy-pick" : undefined}>
             <R.CartesianGrid vertical={false}/>
@@ -20970,9 +21106,16 @@ function V3GrowthYear() {
             {isFinite(tx) && isFinite(ty) && <R.ReferenceDot x={tx} y={ty} r={5} fill={PAL.ink} stroke={PAL.panel}/>}
           </R.ComposedChart>
         </R.ResponsiveContainer></figure>
+    </div>
+
+    {mix.length > 0 && <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-gy-tbl">
+      <thead><tr><th>Non-paid new customers last year</th>{mix.map(x => <th key={x[0]} className="r">{x[1]}</th>)}</tr></thead>
+      <tbody><tr><td>A month</td>{mix.map(x => <td key={x[0]} className="r">{fmtCount(Math.round(Number(LVk.np.mix[x[0]])))}</td>)}</tr></tbody></table></div>}
+
+    <div className="v3-panel-pad v3-mk-charts v3-gy-one">
       <figure className="v3-chart" aria-label="Sales by month"><figcaption><span className="v3-chart-title">Sales by month</span>
         <span className="v3-legend"><i style={{ background: PAL.quiet }}/>Last year <i style={{ background: PAL.sales }}/>Plan</span></figcaption>
-        <R.ResponsiveContainer width="100%" height={240}>
+        <R.ResponsiveContainer width="100%" height={220}>
           <R.BarChart data={M} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
             <R.CartesianGrid vertical={false}/>
             <R.XAxis dataKey="month" tickFormatter={mo => v3Month(mo)} interval="preserveStartEnd"/>
@@ -21026,6 +21169,10 @@ function V3GrowthYear() {
       </tbody></table></div>
 
     <div className="v3-gy-notes">
+      {LVR.length > 0 && <p className="v3-panel-note">Realism grades each lever against your own record: done before is within your best year-on-year move, stretch is within your best three months, a step change is past both. Slow levers give less inside the year.</p>}
+      {shortH.length > 0 && <p className="v3-panel-note">{cap1(v3GyList(shortH))} {shortH.length > 1 ? 'have' : 'has'} under two years of history, so any rise counts as stretch at best.</p>}
+      {has('discount_response_not_identified') && <p className="v3-panel-note">How your orders answer to discount depth is not well measured yet, so the discount row assumes at least 1% fewer orders for each point taken off, and its effect is Possible.</p>}
+      {ADS.grade === 'stretch' || ADS.grade === 'step_change' ? <p className="v3-panel-note">The plan's busiest month of ads is {fmtTimes(ADS.peak_vs_max_month, 1)} your biggest month so far.</p> : null}
       {pLv !== 'cm3' && <p className="v3-panel-note">{LV} comes before ad spend, so it does not limit ads: spend runs to its cap, and CM3 shows what is left.</p>}
       {onBasis && <p className="v3-panel-note">Counting new customers' repeat orders in their first 12 months, the plan keeps {fmtPctN(PL.margin_on_basis)} {LV}.</p>}
       {has('twelve_month_value_not_learned') && <p className="v3-panel-note">12-month value is not measured for this brand yet, so new customers count at their first order.</p>}

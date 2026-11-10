@@ -363,6 +363,8 @@ html[data-frame="product"] {
   --duration-tree: 120ms;
   /* Growth plan, year view (1204): the own-figure inputs, and the panel while its next answer loads */
   --width-input-short: 9ch;
+  --width-slider: 7rem;
+  --width-gy-by: 10rem;
   --opacity-busy: 0.55;
 
   --shadow-panel: none;
