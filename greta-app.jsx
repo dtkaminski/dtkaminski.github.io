@@ -19636,9 +19636,9 @@ function V3Tree({ rows, edges, onPath, onOpen, goal }) {
   const act = E.length ? hi || sel : null;   // no links, no highlight: fading alone would say nothing
   const near = new Set(act ? [act].concat(E.filter(x => x.from === act || x.to === act).map(x => (x.from === act ? x.to : x.from))) : []);
   const path = x => { const a = geo && geo.n[x.from], b = geo && geo.n[x.to]; if (!a || !b) return null;
-    const ra = rowOf[x.from], rb = rowOf[x.to];
-    if (ra === rb) { const dip = Math.max(a.b, b.b) + geo.gap * 0.9; return 'M' + a.x + ' ' + a.b + ' C' + a.x + ' ' + dip + ' ' + b.x + ' ' + dip + ' ' + b.x + ' ' + b.b; }
-    const [u, l] = ra < rb ? [a, b] : [b, a], m = (u.b + l.t) / 2;
+    // a row can wrap onto a second line: shape the curve by where the chips sit, not by their row
+    if (Math.abs(a.t - b.t) < 2) { const dip = Math.max(a.b, b.b) + geo.gap * 0.9; return 'M' + a.x + ' ' + a.b + ' C' + a.x + ' ' + dip + ' ' + b.x + ' ' + dip + ' ' + b.x + ' ' + b.b; }
+    const [u, l] = a.t < b.t ? [a, b] : [b, a], m = (u.b + l.t) / 2;
     return 'M' + u.x + ' ' + u.b + ' C' + u.x + ' ' + m + ' ' + l.x + ' ' + m + ' ' + l.x + ' ' + l.t; };
   const on = x => act && (x.from === act || x.to === act);
   // same-row links only show for the chip in hand: drawn all the time they cross the row below
