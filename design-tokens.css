@@ -343,6 +343,8 @@ html[data-frame="product"] {
   --size-strip: 16px;
   --size-strip-col: 200px;
   --size-ad-name: 140px;
+  /* The Why panel's part tables (1203): the column the pounds bar sits in */
+  --size-why-bar-col: 96px;
   --size-strip-dot: 8px;
   --color-strip-avg: var(--color-ink);
   --color-strip-next: var(--color-data-2);

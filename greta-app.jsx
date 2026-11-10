@@ -19408,9 +19408,36 @@ function V3LightLegend() {
     </ul>
   </details>);
 }
-// The Why panel: the walk as its steps with their pounds, what was ruled out in grey, then the cause, how sure, the
-// strategy and the linked action's own Do it. A grey measure says why and where to fix it. Never empty.
-function V3WhyPanel({ e, onClose }) {
+// What the expected figure is called in the Why panel, by where it came from.
+const V3_EXP_NAME = { goal: 'Plan', projection: 'Forecast', line: 'Line', last_year: 'Last year' };
+// Pounds of the gap: the walk's sign is the shortfall, so a positive amount is money behind and shows as a minus.
+const v3GapGbp = g => (g == null || !isFinite(Number(g)) ? FMT_NONE : (Number(g) > 0 ? '−' : Number(g) < 0 ? '+' : '') + fmtMoney(Math.abs(Number(g))));
+// One step of the walk as a table: the parts its gap splits into, each with now, the plan and the pounds, a bar sized
+// on the biggest part (red where it lost, green where it made some back). The five biggest, then the rest summed.
+function V3WhyParts({ s, title, expName }) {
+  const parts = s.parts || [], top = parts.slice(0, 5), rest = parts.slice(5);
+  const max = Math.max(1, ...parts.map(p => Math.abs(Number(p.gbp) || 0)));
+  const restGbp = rest.reduce((a, p) => a + (Number(p.gbp) || 0), 0);
+  const bar = g => { const v = Number(g) || 0; if (!v) return null;
+    return <i className={'v3-why-bar ' + (v > 0 ? 'v3-why-bar-bad' : 'v3-why-bar-good')} style={{ width: (Math.abs(v) / max * 100).toFixed(1) + '%' }}/>; };
+  return (<section className="v3-drawer-sec">
+    <h3>{title}</h3>
+    <div className="v3-profit-scroll"><table className="v3-home-pl v3-ad-mini v3-why-tbl">
+      <thead><tr><th>{s.parts.some(p => p.scope) ? 'Channel' : 'Part'}</th><th className="r">Now</th><th className="r">{expName}</th><th className="v3-why-barcol"/><th className="r">Worth</th></tr></thead>
+      <tbody>{top.map((p, i) => (<tr key={i}>
+          <td><V3LightDot light={p.light || 'grey'}/>{p.label}</td>
+          <td className="r">{p.value_text || FMT_NONE}</td><td className="r v3-why-exp">{p.expected_text || FMT_NONE}</td>
+          <td className="v3-why-barcol">{bar(p.gbp)}</td><td className="r">{v3GapGbp(p.gbp)}</td></tr>))}
+        {rest.length > 0 && <tr><td className="v3-why-exp">{fmtCount(rest.length)} more</td><td/><td/>
+          <td className="v3-why-barcol">{bar(restGbp)}</td><td className="r">{v3GapGbp(restGbp)}</td></tr>}</tbody></table></div>
+    {s.broad && <p className="v3-why-term">Every channel is down by a similar share: a shared cause, not one channel.</p>}
+  </section>);
+}
+const V3_CHECK = { points: ['Points here', 'bad'], ruled_out: ['Ruled out', 'none'], untested: ['Not checked', 'warn'] };
+// The Why panel: the measure's figures in one row, where its gap sits (the walk's parts, in tables), every cause the
+// walk checked with what it found, the likeliest cause with how sure and the test, the linked action, and the
+// measure's links on the tree, which open the next measure in place. A grey measure says why and where to fix it.
+function V3WhyPanel({ e, onClose, links, onGo }) {
   const panel = React.useRef(null);
   const board = useV3Board();
   React.useEffect(() => {
@@ -19422,11 +19449,30 @@ function V3WhyPanel({ e, onClose }) {
   const W = e.walk || null, grey = e.light === 'grey';
   const steps = W && Array.isArray(W.steps) ? W.steps : [];
   const out = W && Array.isArray(W.ruled_out) ? W.ruled_out : [];
+  const checked = W && Array.isArray(W.checked) ? W.checked : null;
   const tested = out.filter(x => !x.untested), untested = out.filter(x => x.untested);
   const [more, setMore] = React.useState(false);
   const row = e.action ? (board.rows || []).concat(board.unpriced || []).find(r => r.external_id === e.action.external_id) || null : null;
   const go = p => { onClose(); if (window.__oiGo) window.__oiGo(p); };
-  const showExp = e.expected_text && e.expected_source !== 'line' && !grey;
+  const expName = V3_EXP_NAME[e.expected_source] || 'Before';
+  const strip = !e.channel && !grey && e.value_text && e.expected_text;
+  const first = steps[0] && steps[0].node === e.key && !e.scope ? steps[0] : null;
+  const money = /[£€$]/.test(e.value_text || '');
+  // the reason sentence only where the figures cannot say it: a line, a grey light, or a flag that holds the colour
+  // (and a green light behind its plan: the sentence says it is inside the usual swing)
+  const flagged = (e.flags || []).some(f => f === 'within_noise' || f === 'event_window' || f === 'estimated');
+  const showReason = e.reason && (grey || !strip || e.expected_source === 'line' || flagged || (e.light === 'green' && e.gap_bad > 0));
+  const showExp = !strip && e.expected_text && e.expected_source !== 'line' && !grey;
+  // every cause that was tested, then the first three not checked; the rest behind a button
+  const nChecked = checked ? checked.filter(c => c.status !== 'untested').length : 0;
+  const shownChecks = checked ? checked.filter((c, i) => c.status !== 'untested' || more || i < nChecked + 3) : [];
+  const hidden = checked ? checked.length - shownChecks.length : 0;
+  const L = links && e.key && !e.scope ? links(e.key) : null;
+  // no walk split to show: the parts the tree makes this measure from, each with its own figures, open in place
+  const treeParts = !grey && L && L.madeFrom.length > 0 && !steps.some(s => s.parts && s.parts.length) ? L.madeFrom : null;
+  const chips = L ? [['Made from', treeParts ? [] : L.madeFrom], ['Driven by', L.drivenBy], ['Feeds', L.feeds]].filter(x => x[1].length) : [];
+  // the walk's parts are read against the plan even where the measure itself is judged against a line
+  const partsExp = e.expected_source === 'line' ? 'Expected' : expName;
   return ReactDOM.createPortal(<div className="v3-drawer-wrap">
     <div className="v3-drawer-scrim" onClick={onClose}/>
     <aside className="v3-drawer" role="dialog" aria-modal="true" aria-label={e.label} tabIndex={-1} ref={panel}>
@@ -19436,37 +19482,70 @@ function V3WhyPanel({ e, onClose }) {
       </header>
       <h2 className="v3-drawer-t">{e.label}</h2>
       {e.measure && <p className="v3-why-measure">{e.measure}</p>}
-      {(e.value_text || showExp) && <dl className="v3-drawer-facts">
+      {strip ? <dl className="v3-drawer-facts v3-why-strip">
+        <div><dt>Now</dt><dd>{e.value_text}</dd></div>
+        <div><dt>{expName}</dt><dd>{e.expected_text}</dd></div>
+        {e.gap_text && e.expected_source !== 'line' && <div><dt>Gap</dt><dd>{e.gap_text}
+          {e.gap_pct != null && <small className="v3-why-range">{(e.gap_pct > 0 ? '+' : e.gap_pct < 0 ? '−' : '') + Math.abs(Math.round(e.gap_pct * 100)) + '%'}</small>}</dd></div>}
+        {first && first.gbp != null && !money && <div><dt>Worth</dt><dd>{v3GapGbp(first.gbp)}</dd></div>}
+      </dl> : (e.value_text || showExp) && <dl className="v3-drawer-facts">
         {e.value_text && <div><dt>{e.channel ? 'Average, 30 days' : 'Now'}</dt><dd>{e.value_text}</dd></div>}
         {showExp && <div><dt>Expected</dt><dd>{e.expected_text}</dd></div>}
         {e.channel && !grey && <V3ChannelFacts e={e}/>}
       </dl>}
-      {e.reason && <p className="v3-drawer-p">{e.reason}</p>}
+      {showReason && <p className="v3-drawer-p">{e.reason}</p>}
       {e.channel && !grey && e.channel.elasticity > 0 && <V3SpendCurve key={e.id} c={e.channel}/>}
       {/^iroas:(facebook|meta)/.test(e.id || '') && <V3ChannelAds onAll={() => go('marketing')}/>}
       {grey ? (<>
         {!e.reason && <p className="v3-drawer-p">There is not enough data to judge this yet.</p>}
         {e.fix_page && V3_LIGHT_FIX[e.fix_page] && <p><button type="button" className="v3-btn v3-btn-sm" onClick={() => go(e.fix_page)}>{V3_LIGHT_FIX[e.fix_page]}</button></p>}
       </>) : (<>
-        {steps.length > 0 && <section className="v3-drawer-sec"><h3>Path</h3>
-          <ol className="v3-why-steps">{steps.map((s, i) => (<li key={i}>
-            <V3LightDot light={s.light}/><span>{s.label}</span><b>{s.gbp_text || ''}</b>
-            {s.why && <small>{s.why}</small>}</li>))}</ol></section>}
-        {out.length > 0 && <section className="v3-drawer-sec"><h3>Ruled out</h3>
+        {treeParts && <section className="v3-drawer-sec"><h3>Made from</h3>
+          <div className="v3-profit-scroll"><table className="v3-home-pl v3-ad-mini v3-why-tbl">
+            <thead><tr><th>Part</th><th className="r">Now</th><th className="r">Expected</th><th className="r">Gap</th></tr></thead>
+            <tbody>{treeParts.map(n => (<tr key={n.id}>
+              <td><button type="button" className="v3-linkbtn v3-ch-name" onClick={() => onGo(n.id)}><V3LightDot light={n.light}/>{n.label}</button></td>
+              <td className="r">{n.value_text || FMT_NONE}</td><td className="r v3-why-exp">{n.expected_text || FMT_NONE}</td>
+              <td className="r">{n.gap_text || FMT_NONE}</td></tr>))}</tbody></table></div></section>}
+        {steps.map((s, i) => (s.parts && s.parts.length
+          ? <V3WhyParts key={i} s={s} expName={partsExp}
+              title={s === first ? 'Where the gap sits' : s.label + (s.parts.some(p => p.scope) ? ' by channel' : ' by part')}/>
+          : s === first ? null
+          : <section key={i} className="v3-drawer-sec"><ol className="v3-why-steps"><li>
+              <V3LightDot light={s.light}/><span>{s.label}</span><b>{s.gbp != null ? v3GapGbp(s.gbp) : ''}</b>
+              {s.why && <small>{s.why}</small>}</li></ol></section>))}
+        {checked && checked.length > 0 ? <section className="v3-drawer-sec"><h3>Causes checked</h3>
+          <div className="v3-profit-scroll"><table className="v3-home-pl v3-ad-mini v3-why-tbl">
+            <tbody>{shownChecks.map((c, i) => { const p = V3_CHECK[c.status] || V3_CHECK.untested;
+              return (<tr key={i}><td>{c.label}</td><td><span className={'v3-pill v3-pill-' + p[1]}>{p[0]}</span></td>
+                <td className="r">{c.value_text || FMT_NONE}{c.status === 'ruled_out' && c.why && <small>{c.why}</small>}</td></tr>); })}</tbody></table></div>
+          {hidden > 0 && <button type="button" className="v3-linkbtn v3-why-more" onClick={() => setMore(true)}>{fmtCount(hidden)} more not checked</button>}
+        </section>
+        : out.length > 0 && <section className="v3-drawer-sec"><h3>Ruled out</h3>
           <ul className="v3-why-out">{tested.map((x, i) => <li key={i}><span>{x.label}</span>{x.why && <small>{x.why}</small>}</li>)}
             {more && untested.map((x, i) => <li key={'u' + i}><span>{x.label}</span><small>Could not be tested yet</small></li>)}</ul>
           {untested.length > 0 && !more && <button type="button" className="v3-linkbtn v3-why-more" onClick={() => setMore(true)}>
             {untested.length === 1 ? '1 more could not be tested yet' : fmtCount(untested.length) + ' more could not be tested yet'}</button>}</section>}
-        {W && (W.cause || W.strategy) && <section className="v3-drawer-sec"><h3>Cause</h3>
-          {W.cause && <p className="v3-drawer-p">{W.cause}</p>}
+        {W && W.cause_kind !== 'on_track' && (W.cause || W.strategy || W.cause_label) && <section className="v3-drawer-sec"><h3>{W.cause_label ? 'Likeliest cause' : 'Cause'}</h3>
+          {W.cause_label && <p className="v3-why-cause">{W.cause_label}</p>}
+          {W.cause_label ? W.cause_finding && <p className="v3-drawer-p">{v3Sentence(W.cause_finding.replace(/\.?$/, '.'))}</p>
+            : W.cause && <p className="v3-drawer-p">{W.cause}</p>}
           <dl className="v3-drawer-facts">
+            {W.cause_label && W.cause_node && <div><dt>Gap sits in</dt><dd>{W.cause_node}</dd></div>}
             {W.confidence && <div><dt>Confidence</dt><dd>{V3_LIGHT_SURE[W.confidence] || v3Sentence(String(W.confidence).replace(/_/g, ' '))}</dd></div>}
+            {checked && checked.length > 0 && <div><dt>Causes checked</dt><dd>{fmtCount(nChecked)} of {fmtCount(checked.length)}</dd></div>}
             {W.strategy && <div><dt>Strategy</dt><dd>{W.strategy}</dd></div>}
           </dl>
-          {W.settle_test && <p className="v3-drawer-p">{W.settle_test}</p>}</section>}
+          {W.settle_test && <p className="v3-drawer-p"><span className="v3-why-lab">Test</span>{W.settle_test}</p>}</section>}
         {row ? <section className="v3-drawer-sec v3-drawer-decide"><V3MoveDecide row={row} onDecided={onClose}/></section>
           : e.action ? <section className="v3-drawer-sec"><button type="button" className="v3-btn v3-btn-sm" onClick={() => go('actions')}>Open Actions</button></section> : null}
       </>)}
+      {chips.length > 0 && <section className="v3-drawer-sec"><h3>On the tree</h3>
+        <dl className="v3-why-links">
+          {chips.map(x => (<div key={x[0]}><dt>{x[0]}</dt>
+            <dd>{x[1].map(n => <button key={n.id} type="button" className="v3-btn v3-btn-sm" onClick={() => onGo(n.id)}>
+              {n.sign && <i>{n.sign}</i>}<V3LightDot light={n.light}/>{n.label}</button>)}</dd></div>))}
+        </dl></section>}
       {e.term && e.term !== e.label && <p className="v3-why-term">Measure: {e.term}</p>}
       <V3LightLegend/>
     </aside>
@@ -19642,19 +19721,33 @@ function V3ChannelRows({ rows, onOpen }) {
 // The tree's chips with their links (1199: tree.edges from the metric graph). Lines run behind the chips: solid where
 // the upper measure is worked out from the lower, dashed where one drives the other. Hover, focus or open a chip and
 // its links darken, the rest fade, and the strip under the tree names what it is made from and what it feeds.
-function V3Tree({ rows, edges, onPath, onOpen, goal }) {
-  const wrap = React.useRef(null), nodes = React.useRef({});
-  const [hi, setHi] = React.useState(null), [sel, setSel] = React.useState(null), [geo, setGeo] = React.useState(null);
+// The tree's links as drawn: both ends on the tree, an identity held both ways kept only as the parts making the box
+// above (Sales before refunds = Orders x Average order, not Average order = Sales / Orders), and no line between two
+// parts of one box, which would read as a cause. The tree and the Why panel's "On the tree" read the same list.
+function v3TreeEdges(rows, edges) {
   const byId = {}; rows.flat().forEach(x => { byId[x.id] = x; });
   const rowOf = {}; rows.forEach((r, i) => r.forEach(x => { rowOf[x.id] = i; }));
   const E0 = (edges || []).filter(x => byId[x.from] && byId[x.to]);
   const idn = (f, t) => E0.some(y => y.type === 'identity' && y.from === f && y.to === t);
   const E = E0.filter(x => x.type !== 'identity' || !(
-    // an identity held both ways (Sales before refunds = Orders x Average order, Average order = Sales / Orders):
-    // the tree keeps the parts making the box above
     (idn(x.to, x.from) && rowOf[x.to] > rowOf[x.from])
-    // two parts of one box: a line between them reads as a cause
     || (rowOf[x.from] === rowOf[x.to] && E0.some(y => y.type === 'identity' && y.from === x.from && idn(x.to, y.to)))));
+  return { E, byId, rowOf };
+}
+// One measure's links on the tree: what it is made from, what drives it and what it feeds.
+function v3TreeLinksOf(T, focus) {
+  const { E } = T;
+  const madeFrom = E.filter(x => x.to === focus && x.type === 'identity');
+  const drivenBy = E.filter(x => x.to === focus && x.type !== 'identity' && !madeFrom.some(y => y.from === x.from));
+  const feeds = E.filter(x => x.from === focus).filter((x, i, a) => a.findIndex(y => y.to === x.to) === i);
+  return { madeFrom, drivenBy, feeds };
+}
+function V3Tree({ rows, edges, onPath, onOpen, goal, openId }) {
+  const wrap = React.useRef(null), nodes = React.useRef({});
+  const [hi, setHi] = React.useState(null), [sel, setSel] = React.useState(null), [geo, setGeo] = React.useState(null);
+  // a measure opened from the Why panel's links is the one in hand on the tree
+  React.useEffect(() => { if (openId) setSel(openId); }, [openId]);
+  const { E, byId, rowOf } = v3TreeEdges(rows, edges);
   const measure = React.useCallback(() => {
     const w = wrap.current; if (!w || !E.length) { setGeo(null); return; }
     const o = w.getBoundingClientRect(), ol = w.querySelector('.v3-tree');
@@ -19679,9 +19772,7 @@ function V3Tree({ rows, edges, onPath, onOpen, goal }) {
   // same-row links only show for the chip in hand: drawn all the time they cross the row below
   const shown = E.filter(x => rowOf[x.from] !== rowOf[x.to] || on(x));
   const focus = act || goal, F = focus && byId[focus];
-  const madeFrom = F ? E.filter(x => x.to === focus && x.type === 'identity') : [];
-  const drivenBy = F ? E.filter(x => x.to === focus && x.type !== 'identity' && !madeFrom.some(y => y.from === x.from)) : [];
-  const feeds = F ? E.filter(x => x.from === focus).filter((x, i, a) => a.findIndex(y => y.to === x.to) === i) : [];
+  const { madeFrom, drivenBy, feeds } = F ? v3TreeLinksOf({ E }, focus) : { madeFrom: [], drivenBy: [], feeds: [] };
   const nm = k => (byId[k] ? byId[k].label : k), sg = s => (s === '-' ? '−' : s === '+' ? '+' : '');
   const open = x => { setSel(x.id); onOpen(x); };
   return (<>
@@ -19727,11 +19818,18 @@ function V3NumbersConnect() {
   const rows = all.filter(r => !r.every(isCh)), chRows = all.filter(r => r.every(isCh)).flat();
   if (!rows.length && !chRows.length) return null;
   const onPath = x => x.scope_kind === 'brand' && path.has(x.key);
+  // the Why panel's "On the tree": the same links the tree draws, each opening its measure in the panel
+  const TE = v3TreeEdges(rows, T.edges);
+  const sgn = s => (s === '-' ? '−' : s === '+' ? '+' : '');
+  const node = (k, s) => { const n = TE.byId[k];
+    return { id: k, sign: sgn(s), label: n.label, light: n.light, value_text: n.value_text, expected_text: n.expected_text, gap_text: n.gap_text }; };
+  const links = k => { if (!TE.byId[k]) return null; const l = v3TreeLinksOf(TE, k);
+    return { madeFrom: l.madeFrom.map(x => node(x.from, x.sign)), drivenBy: l.drivenBy.map(x => node(x.from, x.sign)), feeds: l.feeds.map(x => node(x.to, x.sign)) }; };
   return (<section className="v3-panel v3-tree-panel" aria-label="How the numbers connect">{head}
-    {rows.length > 0 && <V3Tree rows={rows} edges={T.edges} onPath={onPath} onOpen={setOpen} goal={T.goal}/>}
+    {rows.length > 0 && <V3Tree rows={rows} edges={T.edges} onPath={onPath} onOpen={setOpen} goal={T.goal} openId={open && open.id}/>}
     {chRows.length > 0 && <V3ChannelRows rows={chRows} onOpen={setOpen}/>}
     <V3LightLegend/>
-    {open && <V3WhyPanel e={open} onClose={() => setOpen(null)}/>}
+    {open && <V3WhyPanel key={open.id} e={open} onClose={() => setOpen(null)} links={links} onGo={k => { if (TE.byId[k]) setOpen(TE.byId[k]); }}/>}
   </section>);
 }
 // The legend once on a page whose tiles carry lights, when the lights came back.
