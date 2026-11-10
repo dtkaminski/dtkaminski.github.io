@@ -19452,19 +19452,37 @@ const V3_LEAF_FLAG = { paused: ['Paused', 'warn'], weak: ['Below half the averag
 // action, the ids or code it acts on, the check that settles it) for an agent to run; the panel does not show it.
 const v3OptWorth = o => (o.low == null || o.high == null ? FMT_NONE
   : Number(o.low) === Number(o.high) ? fmtMoney(o.high) : fmtMoney(o.low) + ' to ' + fmtMoney(o.high));
-function V3WhyOptions({ drill, n }) {
+// 1210: where each option stands on the board. An option raised as an action shows its place (#n), or the place of
+// the action that already counts it (the Meta cut's first step pauses the same ads); a decided one shows the decision;
+// a held one says why under its name. The place opens Actions.
+const V3_OPT_DECIDED = { done: 'Done', skipped: 'Skipped', dismissed: 'Dismissed', snoozed: 'Not now', in_progress: 'Taken on' };
+function v3OptBoard(o, live) {
+  if (o.held) return { pill: 'Held' };
+  if (!o.action) return null;
+  if (o.action_status && o.action_status !== 'open') return { text: V3_OPT_DECIDED[o.action_status] || v3Sentence(String(o.action_status).replace(/_/g, ' ')) };
+  const at = id => { const r = live.find(x => x.external_id === id); return r ? (v3BoardRank(live, id) || r.board_rank) : null; };
+  const own = at(o.action), via = o.counted_in ? at(o.counted_in) : null;
+  return own ? { rank: '#' + own } : via ? { rank: 'In #' + via } : { text: 'Open' };
+}
+function V3WhyOptions({ drill, n, board, go }) {
   const opts = [].concat(...drill.map(d => (Array.isArray(d.options) ? d.options : [])))
     .sort((a, b) => (Number(b.high) || 0) - (Number(a.high) || 0));
   if (!opts.length) return null;
+  const live = board && board.rows ? v3LiveRows(board.rows) : [];
+  const held = s => v3Sentence(String(s).replace(/^Held:\s*/, '')).replace(/\.?$/, '.');
   return (<section className="v3-drawer-sec">
     <V3StepH n={n}>Options</V3StepH>
     <div className="v3-profit-scroll"><table className="v3-home-pl v3-ad-mini v3-why-tbl">
-      <thead><tr><th>Option</th><th className="r">Worth, 30 days</th><th className="r">Confidence</th></tr></thead>
-      <tbody>{opts.map((o, i) => (<tr key={o.key || i}>
+      <thead><tr><th>Option</th><th className="r">Worth, 30 days</th><th className="r">Confidence</th><th className="r">Board</th></tr></thead>
+      <tbody>{opts.map((o, i) => { const s = v3OptBoard(o, live);
+        return (<tr key={o.key || i}>
         <td><div className="v3-why-item"><span className="v3-why-ix">{i + 1}</span><span>{o.title}</span>
-          {o.basis && <small className="v3-why-find">{o.basis}</small>}</div></td>
+          {o.basis && <small className="v3-why-find">{o.basis}</small>}
+          {o.held && <small className="v3-why-find">{held(o.held)}</small>}</div></td>
         <td className="r v3-why-worth">{v3OptWorth(o)}</td>
-        <td className="r">{V3_LIGHT_SURE[o.confidence] || FMT_NONE}</td></tr>))}</tbody></table></div>
+        <td className="r">{V3_LIGHT_SURE[o.confidence] || FMT_NONE}</td>
+        <td className="r">{!s ? FMT_NONE : s.pill ? <span className="v3-pill v3-pill-none">{s.pill}</span>
+          : s.rank ? <button type="button" className="v3-linkbtn" onClick={() => go('actions')}>{s.rank}</button> : s.text}</td></tr>); })}</tbody></table></div>
   </section>);
 }
 const v3LeafChange = (now, before) => (Number(before) > 0 && now != null ? fmtPct(Number(now) / Number(before) - 1) : FMT_NONE);
@@ -19612,7 +19630,7 @@ function V3WhyPanel({ e, onClose, links, onGo }) {
             {W.strategy && <div><dt>Strategy</dt><dd>{W.strategy}</dd></div>}
           </dl></section>}
         {W && Array.isArray(W.drill) && W.drill.map(d => <V3WhyDrill key={d.set} d={d} n={d.rows && d.rows.length ? nx() : 0}/>)}
-        {W && Array.isArray(W.drill) && W.drill.some(d => Array.isArray(d.options) && d.options.length) && <V3WhyOptions drill={W.drill} n={nx()}/>}
+        {W && Array.isArray(W.drill) && W.drill.some(d => Array.isArray(d.options) && d.options.length) && <V3WhyOptions drill={W.drill} n={nx()} board={board} go={go}/>}
         {W && W.cause_kind !== 'on_track' && W.settle_test && <section className="v3-drawer-sec"><V3StepH n={nx()}>Test</V3StepH>
           <p className="v3-drawer-p">{W.settle_test}</p></section>}
         {row ? <section className="v3-drawer-sec v3-drawer-decide"><V3StepH n={nx()}>Decision</V3StepH><V3MoveDecide row={row} onDecided={onClose}/></section>
