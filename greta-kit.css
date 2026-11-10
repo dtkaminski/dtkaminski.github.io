@@ -2546,15 +2546,18 @@ div:has(> .v3-profit) ~ .v3-today { gap: 0; }
 .v3-tree-ch-h { margin: 0; padding: var(--space-3) var(--space-4) 0; font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--color-ink); }
 .v3-ch-table td { vertical-align: middle; }
 .v3-ch-table td.r small { display: block; font-size: var(--text-xs); color: var(--color-faint); }
-.v3-ad-mini td { vertical-align: top; }
-.v3-main table.v3-home-pl.v3-ad-mini td, .v3-main table.v3-home-pl.v3-ad-mini th { padding-left: var(--space-2); padding-right: var(--space-2); }
-.v3-main table.v3-home-pl.v3-ad-mini td:first-child, .v3-main table.v3-home-pl.v3-ad-mini th:first-child { padding-left: 0; }
-.v3-main table.v3-home-pl.v3-ad-mini td:last-child, .v3-main table.v3-home-pl.v3-ad-mini th:last-child { padding-right: 0; }
-.v3-main table.v3-home-pl.v3-ad-mini th.r { white-space: normal; vertical-align: bottom; }
-.v3-ad-mini td small { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); font-size: var(--text-xs); color: var(--color-faint); }
+/* The Why drawer sits outside .v3-main, so these rules stand alone and outrank the dashboard's bare th/td rules. */
+table.v3-home-pl.v3-ad-mini th, table.v3-home-pl.v3-ad-mini td { padding: var(--space-1) var(--space-2); border-bottom: 0; text-align: left; letter-spacing: 0; text-transform: none; }
+table.v3-home-pl.v3-ad-mini th { padding-top: var(--space-2); font-size: var(--text-xs); font-weight: var(--weight-medium); color: var(--color-faint); white-space: normal; vertical-align: bottom; }
+table.v3-home-pl.v3-ad-mini td { vertical-align: top; font-family: var(--font-sans); font-weight: var(--weight-normal); color: var(--color-ink); }
+table.v3-home-pl.v3-ad-mini th.r, table.v3-home-pl.v3-ad-mini td.r { text-align: right; }
+table.v3-home-pl.v3-ad-mini td.r { white-space: nowrap; font-family: var(--font-figure); }
+table.v3-home-pl.v3-ad-mini th:first-child, table.v3-home-pl.v3-ad-mini td:first-child { padding-left: 0; }
+table.v3-home-pl.v3-ad-mini th:last-child, table.v3-home-pl.v3-ad-mini td:last-child { padding-right: 0; }
+table.v3-home-pl.v3-ad-mini td.v3-ad-driver { font-weight: var(--weight-semi); }
+.v3-ad-mini td small { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); font-size: var(--text-xs); font-weight: var(--weight-normal); color: var(--color-faint); }
 .v3-ad-mini td.r small { display: block; }
 .v3-ad-mini-n { display: block; max-width: var(--size-ad-name); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink); }
-.v3-main table.v3-home-pl.v3-ad-mini td.v3-ad-driver { font-weight: var(--weight-semi); color: var(--color-ink); }
 .v3-ch-name { display: inline-flex; align-items: center; gap: var(--space-2); text-align: left; white-space: nowrap; color: var(--color-ink); }
 .v3-ch-table .v3-ch-strip { width: var(--size-strip-col); min-width: var(--size-strip-col); }
 .v3-strip { position: relative; display: block; height: var(--size-strip); }
