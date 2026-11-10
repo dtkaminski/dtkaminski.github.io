@@ -19646,8 +19646,15 @@ function V3Tree({ rows, edges, onPath, onOpen, goal }) {
   const wrap = React.useRef(null), nodes = React.useRef({});
   const [hi, setHi] = React.useState(null), [sel, setSel] = React.useState(null), [geo, setGeo] = React.useState(null);
   const byId = {}; rows.flat().forEach(x => { byId[x.id] = x; });
-  const E = (edges || []).filter(x => byId[x.from] && byId[x.to]);
   const rowOf = {}; rows.forEach((r, i) => r.forEach(x => { rowOf[x.id] = i; }));
+  const E0 = (edges || []).filter(x => byId[x.from] && byId[x.to]);
+  const idn = (f, t) => E0.some(y => y.type === 'identity' && y.from === f && y.to === t);
+  const E = E0.filter(x => x.type !== 'identity' || !(
+    // an identity held both ways (Sales before refunds = Orders x Average order, Average order = Sales / Orders):
+    // the tree keeps the parts making the box above
+    (idn(x.to, x.from) && rowOf[x.to] > rowOf[x.from])
+    // two parts of one box: a line between them reads as a cause
+    || (rowOf[x.from] === rowOf[x.to] && E0.some(y => y.type === 'identity' && y.from === x.from && idn(x.to, y.to)))));
   const measure = React.useCallback(() => {
     const w = wrap.current; if (!w || !E.length) { setGeo(null); return; }
     const o = w.getBoundingClientRect(), ol = w.querySelector('.v3-tree');
