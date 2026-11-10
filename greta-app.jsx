@@ -12052,7 +12052,7 @@ function CommandMenu(){
     const list = [];
     if (UI_V3) {
       // One entry per destination — the palette can only offer places that exist.
-      V3_NAV.forEach(d => list.push({label: d.label, sub: d.group, v3: d.id, icon: d.icon}));
+      V3_NAV.filter(d => v3NavShows(d)).forEach(d => list.push({label: d.label, sub: d.group, v3: d.id, icon: d.icon}));
       list.push({label:'Ask Greta a question', sub:'Act', v3:'ask', icon:'spark'});
       return list;
     }
@@ -16667,11 +16667,15 @@ const V3_NAV = [
   { group: 'Planning',    id: 'goal',        label: 'Goal & costs',       icon: 'sliders',   q: 'What am I aiming for, and what do things cost me?' },
   { group: 'Planning',    id: 'growth',      label: 'Growth plan',        icon: 'trendUp',   q: 'How much can I grow, and what would it take?' },
   { group: 'Planning',    id: 'stock',       label: 'Stock & orders',     icon: 'truck',     q: 'What runs out, what do I reorder, and what is on order?' },
+  // 10 Nov: preview, sample invoices; in the nav on sample brands or with ?preview=3pl (v3NavShows)
+  { group: 'Planning',    id: 'fulfilment',  label: '3PL invoices',       icon: 'truck',     q: 'Is my 3PL billing me what we agreed?', preview: '3pl' },
   { group: 'Planning',    id: 'calendar',    label: 'Calendar',          icon: 'calendar',  q: 'What is planned, and what did past events do?' },
   { group: 'Settings',    id: 'settings',    label: 'Connections & data', icon: 'sliders',   q: 'Is my data connected, and can I trust it?' },
   { group: 'Settings',    id: 'team',        label: 'Team',               icon: 'users',     q: 'Who else can see this workspace?' },
 ];
 const V3_BY_ID = Object.fromEntries(V3_NAV.map(d => [d.id, d]));
+// a preview destination is listed on sample brands (set by V3App from state.freshness.demo) or when its flag is on
+function v3NavShows(d, dest) { return !d.preview || d.id === dest || !!window.__v3SampleBrand || v3PreviewOn(d.preview); }
 // Mobile: five places. Ask sits in the middle; "More" opens the palette.
 const V3_MOBILE = [
   { id: 'today', label: 'Home', icon: 'home' },
@@ -28601,6 +28605,261 @@ function V3JobHealth() {
   if (q.err || !q.rows || !q.rows.length) return null;
   return (<p className="v3-note v3-measure v3-jobhealth"><b>Some figures may be out of date.</b> {String(q.rows[0].description || '')}</p>);
 }
+// ── 3PL invoices (preview, 10 Nov 2026) ─────────────────────────────────────────────────────────────────────
+// Shows what invoice reconciliation will do before it is built: a 3PL invoice is read line by line, each line is
+// checked against the rate card and against Shopify (orders sent, refunds, stock on hand, parcels refunded as lost),
+// and the invoiced cost replaces the per-order estimate in past weeks. Everything here is SAMPLE data made in the
+// browser: no invoice is stored, nothing reaches the server, no figure is registered. To build it properly: an
+// invoice table + parser (edge fn), a rate card per 3PL in brand_config, a match against orders/refunds/stock, a
+// figure for invoiced fulfilment cost that the weekly ladder reads in place of variable_costs, and an anatomy map
+// entry (fulfilment cost part) in the same migration.
+// Shown in the nav on sample brands, or with ?preview=3pl (remembered in this browser; ?preview=off clears it).
+const V3_TPL_RATES = { pick: 0.95, extra: 0.25, pack: 0.30, post: 3.20, ret: 1.50, store: 2.50 };
+const V3_TPL_EST = 4.20;         // the sample per-order estimate used before an invoice arrives
+const V3_TPL_PALLETS = 120;      // pallets the sample stock count fills
+const V3_TPL_CHECK = { sendout: 'Send-outs', returns: 'Returns', rates: 'Rates', storage: 'Storage', credits: 'Credits' };
+const v3TplP = v => Math.round(v * 100) / 100;
+const v3Gbp2 = v => fmtMoney(v, 2);
+function v3PreviewOn(key) {
+  try {
+    const qs = [window.location.search];
+    try { if (window.parent !== window) qs.push(window.parent.location.search); } catch (e) {}
+    qs.forEach(s => { const q = new URLSearchParams(s || '').get('preview');
+      if (q === key) localStorage.setItem('greta_preview_' + key, '1');
+      if (q === 'off') localStorage.removeItem('greta_preview_' + key); });
+    return localStorage.getItem('greta_preview_' + key) === '1';
+  } catch (e) { return false; }
+}
+// The last eight full weeks of the shop's own orders, or a sample run when there are not eight.
+function v3TplWeeks() {
+  const shop = window.FRKL_DATA && Array.isArray(window.FRKL_DATA.shopify) ? window.FRKL_DATA.shopify : [];
+  const by = {};
+  shop.forEach(r => { if (!r || !r.date) return; const k = v3Monday(String(r.date).slice(0, 10));
+    const o = by[k] || (by[k] = { start: k, orders: 0, days: 0 }); o.orders += Number(r.orders) || 0; o.days++; });
+  let list = Object.values(by).filter(w => w.days === 7 && w.orders >= 50).sort((a, b) => (a.start < b.start ? -1 : 1)).slice(-8), own = true;
+  if (list.length < 8) {
+    own = false;
+    const last = v3IsoAdd(v3Monday(new Date().toISOString().slice(0, 10)), -7);
+    list = [1180, 1215, 1090, 1240, 1310, 1275, 1350, 1420].map((n, i) => ({ start: v3IsoAdd(last, (i - 7) * 7), orders: n }));
+  }
+  return { own, weeks: list.map(w => ({ start: w.start, end: v3IsoAdd(w.start, 6), orders: Math.round(w.orders) })) };
+}
+// Each week's invoice at the rate card, and the charges a check would raise on it.
+function v3TplBook(src) {
+  const R = V3_TPL_RATES, parcel = R.pick + R.pack + R.post;
+  const faults = {
+    0: [['rates', 'Pick and pack at ' + v3Gbp2(1.05) + ' an order', w => w.orders * 1.05, w => w.orders * R.pick, 'Rate card ' + v3Gbp2(R.pick)]],
+    1: [['sendout', '14 orders billed twice', () => 14 * parcel, () => 0, 'Same order numbers on two lines']],
+    2: [['sendout', '9 parcels with no Shopify order', () => 9 * parcel, () => 0, 'No matching order in Shopify']],
+    3: [['storage', 'Storage on 138 pallets', () => 138 * R.store, () => V3_TPL_PALLETS * R.store, 'Stock on hand fills ' + V3_TPL_PALLETS],
+        ['returns', '16 returns with no Shopify refund', () => 16 * R.ret, () => 0, 'No refund or restock in Shopify']],
+    4: [['credits', '11 parcels lost in transit', () => 0, () => -11 * 18, 'Refunded as lost, no credit on the invoice'],
+        ['rates', 'Fuel surcharge at 4% of postage', w => w.orders * R.post * 0.04, () => 0, 'Not in the rate card']],
+    6: [['rates', '23 parcels billed in the 2kg band', () => 23 * (4.10 - R.post), () => 0, 'Shopify weights under 1kg'],
+        ['sendout', '3 replacement parcels', () => 3 * parcel, () => 0, 'Sent from the 3PL portal, not in Shopify']],
+  };
+  const weeks = src.weeks.map((w, i) => {
+    const items = Math.round(w.orders * 0.4), ret = Math.round(w.orders * 0.045);
+    const lines = [['Pick and pack, first item', w.orders, R.pick], ['Pick and pack, extra items', items, R.extra], ['Packaging', w.orders, R.pack],
+      ['Postage, tracked 48', w.orders, R.post], ['Returns processing', ret, R.ret], ['Storage, pallets a week', V3_TPL_PALLETS, R.store]]
+      .map(([label, qty, rate]) => ({ label, qty, rate, amt: v3TplP(qty * rate) }));
+    const rate = v3TplP(lines.reduce((t, l) => t + l.amt, 0));
+    const inv = 'INV-' + (20418 + i);
+    const checks = (faults[i] || []).map((f, j) => { const billed = v3TplP(f[2](w)), expected = v3TplP(f[3](w));
+      return { id: inv + '-' + j, wi: i, inv, cat: f[0], label: f[1], billed, expected, owed: v3TplP(billed - expected), note: f[4] }; });
+    const total = v3TplP(rate + checks.filter(c => c.cat !== 'credits').reduce((t, c) => t + c.owed, 0));
+    return Object.assign({}, w, { i, inv, lines, rate, total, checks, estimate: v3TplP(w.orders * V3_TPL_EST), nLines: lines.length + checks.filter(c => c.billed > 0 && c.expected === 0).length });
+  });
+  return { own: src.own, weeks };
+}
+function V3TplChart({ weeks }) {
+  const top0 = Math.max.apply(null, weeks.map(w => Math.max(w.has ? w.total : 0, w.estimate))) || 1;
+  const mag = Math.pow(10, Math.floor(Math.log10(top0 / 2))), top = Math.ceil(top0 * 1.08 / (2 * mag)) * 2 * mag;
+  const P = v => (Math.max(0, v) / top * 100) + '%';
+  return (<div className="v3-tpl-chart">
+    <div className="v3-tpl-plot" role="img" aria-label={'Fulfilment cost by week, last ' + weeks.length + ' weeks'}>
+      {[0, top / 2, top].map(g => <i key={g} className="v3-tpl-grid" style={{ bottom: P(g) }}><span>{fmtMoneyK(g)}</span></i>)}
+      <div className="v3-tpl-cols">{weeks.map(w => {
+        const over = w.has ? Math.max(0, w.total - w.rate) : 0;
+        return (<div key={w.start} className="v3-tpl-col" title={w.has ? w.inv + ': invoiced ' + v3Gbp(w.total) + ', estimate ' + v3Gbp(w.estimate) : 'No invoice yet: estimate ' + v3Gbp(w.estimate)}>
+          <div className="v3-tpl-stack" style={{ height: P(w.has ? w.total : w.estimate) }}>
+            {w.has ? <>{over > 0 && <i className="v3-tpl-over" style={{ flex: over + ' 0 0' }}/>}<i className="v3-tpl-base" style={{ flex: w.rate + ' 0 0' }}/></>
+              : <i className="v3-tpl-est"/>}
+          </div>
+          {w.has && <i className="v3-tpl-tick" style={{ bottom: P(w.estimate) }}/>}
+        </div>);
+      })}</div>
+    </div>
+    <div className="v3-tpl-xlab" aria-hidden="true">{weeks.map(w => <span key={w.start}>{v3Day(w.start)}</span>)}</div>
+    <div className="v3-tpl-key">
+      <span><i className="v3-tpl-sw base"/>Invoiced at the rate card</span>
+      <span><i className="v3-tpl-sw over"/>Over the rate card</span>
+      <span><i className="v3-tpl-sw est"/>Estimate, no invoice yet</span>
+      <span><i className="v3-tpl-sw tick"/>Estimate before the invoice</span>
+    </div>
+  </div>);
+}
+function V3Fulfilment() {
+  const [src, setSrc] = React.useState(() => v3TplWeeks());
+  React.useEffect(() => {   // the shop's weeks can arrive after the page opens
+    const on = () => setSrc(s => (s.own ? s : v3TplWeeks()));
+    window.addEventListener('frkl-data-updated', on);
+    return () => window.removeEventListener('frkl-data-updated', on);
+  }, []);
+  const book = React.useMemo(() => v3TplBook(src), [src]);
+  const stq = useV3Rows('brand-state', V3_STATE_Q);
+  const [upload, setUpload] = React.useState(null);     // { phase: 'reading' | 'done', name }
+  const [dec, setDec] = React.useState({});             // check id → 'disputed' | 'accepted'
+  const [tab, setTab] = React.useState('checks');
+  const [cat, setCat] = React.useState('all');
+  const [applied, setApplied] = React.useState(false);
+  const [drag, setDrag] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
+  const fileRef = React.useRef(null), timer = React.useRef(null);
+  React.useEffect(() => () => clearTimeout(timer.current), []);
+  const read = name => {
+    if (upload) return;
+    setUpload({ phase: 'reading', name });
+    timer.current = setTimeout(() => { setUpload({ phase: 'done', name }); setTab('checks'); setCat('all'); }, 1400);
+  };
+  const onFile = e => { const f = e.target.files && e.target.files[0]; if (f) read(f.name); e.target.value = ''; };
+  const onDrop = e => { e.preventDefault(); setDrag(false); const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) read(f.name); };
+
+  const weeks = book.weeks.map(w => Object.assign({}, w, { has: w.i <= 5 || (w.i === 6 && !!upload && upload.phase === 'done') }));
+  const inv = weeks.filter(w => w.has), next = weeks.find(w => !w.has);
+  const checks = [].concat.apply([], inv.map(w => w.checks));
+  const live = c => dec[c.id] !== 'accepted';
+  const sum = (a, f) => v3TplP(a.reduce((t, x) => t + f(x), 0));
+  const F = {
+    invoiced: sum(inv, w => w.total), rate: sum(inv, w => w.rate), orders: sum(inv, w => w.orders),
+    over: sum(checks.filter(c => c.cat !== 'credits' && live(c)), c => c.owed),
+    credits: sum(checks.filter(c => c.cat === 'credits' && live(c)), c => c.owed),
+  };
+  const open = checks.filter(c => !dec[c.id]);
+  const disputed = checks.filter(c => dec[c.id] === 'disputed');
+  const shown = cat === 'all' ? checks : checks.filter(c => c.cat === cat);
+  const cats = Object.keys(V3_TPL_CHECK).filter(k => checks.some(c => c.cat === k));
+  const wkOf = c => weeks[c.wi];
+  const range = w => v3Day(w.start) + ' – ' + v3Day(w.end, true);
+  const decide = (id, v) => setDec(d => Object.assign({}, d, { [id]: v }));
+  const copy = () => {
+    const txt = disputed.map(c => c.inv + ', week of ' + v3Day(wkOf(c).start, true) + ': ' + c.label + '. Billed ' + v3Gbp2(c.billed) + ', rate card ' + v3Gbp2(c.expected) + ', owed ' + v3Gbp2(c.owed) + '.').join('\n')
+      + '\nTotal owed: ' + v3Gbp2(sum(disputed, c => c.owed));
+    try { navigator.clipboard.writeText(txt).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }, () => {}); } catch (e) {}
+  };
+  // past weeks: profit after ads as Today's rhythm has it, and with the invoiced cost in place of the estimate
+  const RW = {};
+  ((((stq.rows || [])[0] || {}).rhythm || {}).weeks || []).forEach(x => { if (x && x.wk != null && x.after_ads != null) RW[String(x.wk).slice(0, 10)] = Number(x.after_ads); });
+  const withProfit = book.own && inv.length > 0 && inv.every(w => RW[w.start] != null);
+  const moved = sum(inv, w => w.total - w.estimate);
+  const lastUp = upload && upload.phase === 'done' ? weeks[6] : null;
+
+  const tabs = [['checks', 'Charges to check', open.length], ['invoices', 'Invoices', inv.length], ['weeks', 'Past weeks', null]];
+  return (<div className={'v3-home v3-tpl' + (drag ? ' drag' : '')}
+      onDragOver={e => { e.preventDefault(); if (!drag) setDrag(true); }} onDragLeave={e => { if (e.currentTarget === e.target) setDrag(false); }} onDrop={onDrop}>
+    <p className="v3-note v3-measure v3-sample" role="note">Preview with sample invoices{book.own ? ' built on your weekly orders' : ''}. A file you upload is not read or saved; it adds the next sample invoice.</p>
+    <section className="v3-panel v3-tpl-sum" aria-label="Fulfilment costs">
+      <div className="v3-panel-head">
+        <h2>Fulfilment costs</h2><span className="v3-muted">Last {weeks.length} weeks</span>
+        <div className="v3-tpl-btns">
+          <input ref={fileRef} type="file" accept=".pdf,.csv,.xlsx,.xls" hidden onChange={onFile}/>
+          {next && next.i === 6 && !upload && <button type="button" className="v3-btn v3-btn-sm" onClick={() => read('sample-invoice.pdf')}>Use a sample invoice</button>}
+          <button type="button" className="v3-btn v3-btn-sm v3-btn-p" disabled={!!upload} onClick={() => fileRef.current && fileRef.current.click()}>
+            {upload && upload.phase === 'reading' ? 'Reading invoice' : 'Upload invoice'}</button>
+        </div>
+      </div>
+      {upload && upload.phase === 'reading' && <p className="v3-panel-note v3-tpl-reading">Reading {upload.name}</p>}
+      {lastUp && <p className="v3-panel-note">{lastUp.inv} read from {upload.name}: {fmtCount(lastUp.nLines)} lines matched to {fmtCount(lastUp.orders)} orders, {fmtCount(lastUp.checks.length)} charges to check.</p>}
+      {drag && <p className="v3-panel-note v3-tpl-dropnote">Drop the invoice to read it</p>}
+      <div className="v3-figs v3-tpl-figs">
+        <div className="v3-stat"><span className="v3-stat-lab">Invoiced</span><div className="v3-stat-val">{v3Gbp(F.invoiced)}</div><span className="v3-stat-foot v3-muted">{fmtCount(inv.length)} invoices</span></div>
+        <div className="v3-stat"><span className="v3-stat-lab">At the rate card</span><div className="v3-stat-val">{v3Gbp(F.rate)}</div><span className="v3-stat-foot v3-muted">{fmtCount(F.orders)} orders</span></div>
+        <div className="v3-stat"><span className="v3-stat-lab">Overcharged</span><div className={'v3-stat-val' + (F.over > 0 ? ' v3-down' : '')}>{v3Gbp(F.over)}</div><span className="v3-stat-foot v3-muted">{fmtCount(checks.filter(c => c.cat !== 'credits' && live(c)).length)} charges</span></div>
+        <div className="v3-stat"><span className="v3-stat-lab">Credits owed</span><div className="v3-stat-val">{v3Gbp(F.credits)}</div><span className="v3-stat-foot v3-muted">Lost or damaged parcels</span></div>
+        <div className="v3-stat"><span className="v3-stat-lab">Cost per order</span><div className="v3-stat-val">{v3Gbp2(F.orders > 0 ? F.invoiced / F.orders : null)}</div><span className="v3-stat-foot v3-muted">Estimate {v3Gbp2(V3_TPL_EST)}</span></div>
+      </div>
+      <V3TplChart weeks={weeks}/>
+    </section>
+
+    <section className="v3-panel" aria-label="Invoice checks">
+      <div className="v3-tabs" role="tablist" aria-label="Invoice checks">
+        {tabs.map(t => <button key={t[0]} type="button" role="tab" aria-selected={tab === t[0]} className={'v3-tab' + (tab === t[0] ? ' on' : '')} onClick={() => setTab(t[0])}>
+          {t[1]}{t[2] > 0 && <span className="v3-tab-n">{fmtCount(t[2])}</span>}</button>)}
+      </div>
+
+      {tab === 'checks' && <div role="tabpanel">
+        <div className="v3-panel-pad v3-tpl-chips">
+          <div className="v3-chips">{[['all', 'All']].concat(cats.map(k => [k, V3_TPL_CHECK[k]])).map(([k, l]) => (
+            <button key={k} type="button" className={'v3-chip' + (cat === k ? ' on' : '')} aria-pressed={cat === k} onClick={() => setCat(k)}>
+              {l} <span className="v3-chip-n">{fmtCount(k === 'all' ? checks.length : checks.filter(c => c.cat === k).length)}</span></button>))}
+          </div>
+        </div>
+        <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-tpl-table">
+          <thead><tr><th>Charge</th><th>Check</th><th className="v3-tpl-wide">Invoice</th><th className="r">Billed</th><th className="r v3-mk-opt">Rate card</th><th className="r">Owed to you</th><th className="r">Decision</th></tr></thead>
+          <tbody>{shown.map(c => (<tr key={c.id} className={dec[c.id] === 'accepted' ? 'v3-home-done' : ''}>
+            <td>{c.label}<span className="v3-tpl-why">{c.note}</span></td>
+            <td className="v3-tpl-nowrap">{V3_TPL_CHECK[c.cat]}</td>
+            <td className="v3-tpl-wide v3-tpl-fig">{c.inv}</td>
+            <td className="r">{v3Gbp2(c.billed)}</td>
+            <td className="r v3-mk-opt">{v3Gbp2(c.expected)}</td>
+            <td className="r">{v3Gbp2(c.owed)}</td>
+            <td className="r"><span className="v3-tpl-dec">{dec[c.id]
+              ? <><span className={'v3-pill ' + (dec[c.id] === 'disputed' ? 'v3-pill-warn' : 'v3-pill-none')}>{dec[c.id] === 'disputed' ? 'Disputed' : 'Accepted'}</span>
+                  <button type="button" className="v3-linkbtn" onClick={() => setDec(d => { const o = Object.assign({}, d); delete o[c.id]; return o; })}>Undo</button></>
+              : <><button type="button" className="v3-btn v3-btn-sm" onClick={() => decide(c.id, 'disputed')}>Dispute</button>
+                  <button type="button" className="v3-btn v3-btn-sm" onClick={() => decide(c.id, 'accepted')}>Accept</button></>}</span></td>
+          </tr>))}</tbody>
+        </table></div>
+        {disputed.length > 0 && <div className="v3-panel-pad v3-tpl-foot">
+          <span><span className="v3-muted">Disputed</span> <b className="v3-tpl-fig">{v3Gbp2(sum(disputed, c => c.owed))}</b> <span className="v3-muted">on</span> <b className="v3-tpl-fig">{fmtCount(disputed.length)}</b> <span className="v3-muted">{disputed.length === 1 ? 'charge' : 'charges'}</span></span>
+          <button type="button" className="v3-btn v3-btn-sm" onClick={copy}>{copied ? 'Copied' : 'Copy dispute list'}</button>
+        </div>}
+      </div>}
+
+      {tab === 'invoices' && <div role="tabpanel" className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-tpl-table">
+        <thead><tr><th>Invoice</th><th>Week</th><th className="r v3-mk-opt">Lines</th><th className="r">Invoiced</th><th className="r v3-mk-opt">Rate card</th><th className="r">Owed to you</th><th>Status</th></tr></thead>
+        <tbody>{weeks.slice().reverse().map(w => {
+          const n = w.checks.filter(c => !dec[c.id]).length;
+          const owed = sum(w.checks.filter(c => live(c)), c => c.owed);
+          if (!w.has) return (<tr key={w.start} className="v3-home-done">
+            <td className="v3-tpl-fig">{FMT_NONE}</td><td>{range(w)}</td><td className="r v3-mk-opt">{FMT_NONE}</td><td className="r">{FMT_NONE}</td><td className="r v3-mk-opt">{FMT_NONE}</td><td className="r">{FMT_NONE}</td>
+            <td><span className="v3-pill v3-pill-none">{w.i === 6 && upload && upload.phase === 'reading' ? 'Reading' : w.i === 6 ? 'Not uploaded' : 'Not due'}</span></td></tr>);
+          return (<tr key={w.start}>
+            <td className="v3-tpl-fig">{w.inv}</td><td>{range(w)}</td><td className="r v3-mk-opt">{fmtCount(w.nLines)}</td>
+            <td className="r">{v3Gbp2(w.total)}</td><td className="r v3-mk-opt">{v3Gbp2(w.rate)}</td><td className="r">{owed > 0 ? v3Gbp2(owed) : FMT_NONE}</td>
+            <td><span className={'v3-pill ' + (n > 0 ? 'v3-pill-warn' : 'v3-pill-good')}>{n > 0 ? fmtCount(n) + ' to check' : w.checks.length ? 'Checked' : 'Matches'}</span></td>
+          </tr>);
+        })}</tbody>
+      </table></div>}
+
+      {tab === 'weeks' && <div role="tabpanel">
+        <div className="v3-panel-pad v3-tpl-foot">
+          <span><span className="v3-muted">Invoiced against the estimate</span> <b className={'v3-tpl-fig' + (moved > 0 ? ' v3-down' : '')}>{(moved > 0 ? '+' : '') + v3Gbp(moved)}</b> <span className="v3-muted">over</span> <b className="v3-tpl-fig">{fmtCount(inv.length)}</b> <span className="v3-muted">weeks</span></span>
+          {applied ? <span className="v3-tpl-applied"><span className="v3-pill v3-pill-good">Invoiced costs in use</span>
+              <button type="button" className="v3-linkbtn" onClick={() => setApplied(false)}>Undo</button></span>
+            : <button type="button" className="v3-btn v3-btn-sm v3-btn-p" onClick={() => setApplied(true)}>Use invoiced costs in past weeks</button>}
+        </div>
+        <div className="v3-profit-scroll"><table className="v3-home-pl v3-profit-rows v3-tpl-table">
+          <thead><tr><th>Week</th><th className="r v3-mk-opt">Orders</th><th className="r">Estimate</th><th className="r">Invoiced</th><th className="r">Difference</th>
+            {withProfit && <th className="r v3-mk-opt">Profit after ads, estimated</th>}{withProfit && <th className="r">Profit after ads{applied ? ', invoiced' : ''}</th>}
+            {!withProfit && <th>Cost used</th>}</tr></thead>
+          <tbody>{weeks.slice().reverse().map(w => {
+            const d = w.has ? v3TplP(w.total - w.estimate) : null, use = applied && w.has;
+            return (<tr key={w.start}>
+              <td>{range(w)}</td><td className="r v3-mk-opt">{fmtCount(w.orders)}</td><td className="r">{v3Gbp(w.estimate)}</td>
+              <td className="r">{w.has ? v3Gbp(w.total) : FMT_NONE}</td>
+              <td className={'r' + (d > 0 ? ' v3-down' : '')}>{d == null ? FMT_NONE : (d > 0 ? '+' : '') + v3Gbp(d)}</td>
+              {withProfit && <td className="r v3-mk-opt">{v3Gbp(RW[w.start])}</td>}
+              {withProfit && <td className="r">{v3Gbp(use ? RW[w.start] - d : RW[w.start])}</td>}
+              {!withProfit && <td>{use ? 'Invoiced' : 'Estimate'}</td>}
+            </tr>);
+          })}</tbody>
+        </table></div>
+      </div>}
+    </section>
+  </div>);
+}
+
 const V3_PAGES = {
   // 1110: the goal strip and the moves first, above everything else
   today: (p) => (<><V3TodayLead/><V3JobHealth/><V3Today {...p}/></>),
@@ -28635,6 +28894,8 @@ const V3_PAGES = {
   // ceiling disagreed with the plan above it. Offer and product fit read the older fit engine, which said "connect
   // Meta, Shopify and GA4" to a brand with all three. GretaPlanPanel, FitCard and GenomePanel stay for the old nav.
   growth: (p) => <V3Growth/>,
+  // 10 Nov: preview with sample invoices (V3Fulfilment)
+  fulfilment: (p) => <V3Fulfilment/>,
   stock: (p) => (<>
     {/* The server-side stock plan (vw_stock_demand_plan / fn_stock_gate): what runs out,
         when to reorder, how many, what it costs a day. Built into the embed and never
@@ -30001,6 +30262,8 @@ function V3App({ dest, go, children, start, periodCtl }) {
   const sig = useV3NavSignals();
   useFigureTypography(dest);
   useV3Figures();   // the figure registry (1080), read once per page load; every page shares the cached rows
+  const stq = useV3Rows('brand-state', V3_STATE_Q);
+  if (stq.rows && stq.rows[0] && stq.rows[0].freshness && stq.rows[0].freshness.demo) window.__v3SampleBrand = true;
   const inShell = !!v3ShellEl('bar-ask');   // the shell's bar holds the box; on its own the dashboard keeps it in the nav
   return (<div className={'v3-root' + (inShell ? ' v3-in-shell' : '')}>
     {/* First thing in the tab order on every page: the nav has 16 items and a keyboard
@@ -30011,7 +30274,7 @@ function V3App({ dest, go, children, start, periodCtl }) {
         {!inShell && <button type="button" className="v3-nav-search" onClick={() => window.__oiCommandOpen && window.__oiCommandOpen()}>
           Ask or search <kbd>{V3_KBD}</kbd>
         </button>}
-        {(() => { let prev = null; return V3_NAV.map(e => {
+        {(() => { let prev = null; return V3_NAV.filter(e => v3NavShows(e, dest)).map(e => {
           // a group led by an item of its own name (Today, Moves, Results) takes a gap, not a heading
           const head = e.group === prev ? null : e.group === e.label
             ? (prev ? <div key={'h' + e.group} className="v3-nav-gap" aria-hidden="true"/> : null)
@@ -30022,6 +30285,7 @@ function V3App({ dest, go, children, start, periodCtl }) {
           return (<React.Fragment key={e.id}>{head}
             <button type="button" className={'v3-nav-item' + (e.id === dest ? ' active' : '')} onClick={() => go(e.id)} aria-current={e.id === dest ? 'page' : undefined}>
               {e.label}
+              {e.preview && <span className="v3-nav-tag">Preview</span>}
               {n > 0 && <span className="v3-nav-n" aria-label={n + ' actions open'}>{n}</span>}
               {alert && <span className="v3-nav-alert" aria-label="A data source has stopped reporting"/>}
             </button>
