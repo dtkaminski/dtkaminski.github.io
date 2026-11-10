@@ -19443,6 +19443,7 @@ function V3WhyPanel({ e, onClose }) {
       </dl>}
       {e.reason && <p className="v3-drawer-p">{e.reason}</p>}
       {e.channel && !grey && e.channel.elasticity > 0 && <V3SpendCurve key={e.id} c={e.channel}/>}
+      {/^iroas:(facebook|meta)/.test(e.id || '') && <V3ChannelAds onAll={() => go('marketing')}/>}
       {grey ? (<>
         {!e.reason && <p className="v3-drawer-p">There is not enough data to judge this yet.</p>}
         {e.fix_page && V3_LIGHT_FIX[e.fix_page] && <p><button type="button" className="v3-btn v3-btn-sm" onClick={() => go(e.fix_page)}>{V3_LIGHT_FIX[e.fix_page]}</button></p>}
@@ -19567,6 +19568,33 @@ function V3SpendCurve({ c }) {
     </dl>
     <p className="v3-why-term">{c.curve_source === 'archetype_prior' ? 'Curve from similar brands; this brand has too few weeks of its own.'
       : 'Curve fitted on ' + fmtCount(c.curve_weeks) + ' weeks of ' + plat + ' spend' + (shared ? ', shared by every ' + plat + ' campaign.' : '.')}</p>
+  </section>);
+}
+// The ad level under a Meta channel (1200): the account's live ads from the same read Marketing uses (cache_ad_read,
+// refreshed nightly by the chain since 1200), each with cost per sale and the three steps behind it, now against its
+// own previous 8 weeks. The step the read names as the driver is set in bold. The read is per ad, not per campaign
+// type, so both Meta channels show the whole account.
+const V3_AD_DRIVER_COL = { cost: 'cpm', clicks: 'ctr', conversion: 'cvr' };
+function V3ChannelAds({ onAll }) {
+  const q = useV3Rows('ad-read', V3_AD_READ_Q);
+  if (q.err || !q.rows) return null;
+  const live = q.rows.filter(r => r.state !== 'stopped').slice(0, 6);
+  if (!live.length) return null;
+  const cell = (r, k, f) => { const on = V3_AD_DRIVER_COL[r.driver] === k;
+    return <td className={'r' + (on ? ' v3-ad-driver' : '')}>{f(r[k + '_28d'])}<small>{fmtOk(r[k + '_prior']) ? 'was ' + f(r[k + '_prior']) : FMT_NONE}</small></td>; };
+  return (<section className="v3-drawer-sec">
+    <h3>Meta ads, 28 days</h3>
+    <div className="v3-profit-scroll"><table className="v3-home-pl v3-ad-mini">
+      <thead><tr><th>Ad</th><th className="r">Cost per sale</th><th className="r">CPM</th><th className="r">Click-through</th><th className="r">Conversion</th></tr></thead>
+      <tbody>{live.map(r => { const st = V3_AD_STATE[r.state];
+        return (<tr key={r.ad_id}>
+          <td><span className="v3-ad-mini-n">{r.ad_name}</span>
+            <small>{v3AdGbp(r.spend_28d)} spent{st && st.tone ? <span className={'v3-pill v3-pill-' + st.tone}>{st.label}</span> : null}</small></td>
+          <td className="r">{v3AdGbp2(r.cost_per_purchase_28d)}<small>{fmtOk(r.cost_per_purchase_prior_56d) ? 'was ' + v3AdGbp2(r.cost_per_purchase_prior_56d) : FMT_NONE}</small></td>
+          {cell(r, 'cpm', v3AdGbp2)}{cell(r, 'ctr', PCT)}{cell(r, 'cvr', PCT)}
+        </tr>); })}</tbody></table></div>
+    <p className="v3-why-term">Bold: the step that moved most. The whole Meta account; ads are not split by prospecting and retargeting.</p>
+    <button type="button" className="v3-btn v3-btn-sm" onClick={onAll}>All ads</button>
   </section>);
 }
 // One channel's return per £1 on the shared scale: the dot is the 30-day average, the bar the next £1 with its range,

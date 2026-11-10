@@ -342,6 +342,7 @@ html[data-frame="product"] {
      range, the dashed lines break-even and the line the next £1 needs. Data colours, not status colours. */
   --size-strip: 16px;
   --size-strip-col: 200px;
+  --size-ad-name: 140px;
   --size-strip-dot: 8px;
   --color-strip-avg: var(--color-ink);
   --color-strip-next: var(--color-data-2);
