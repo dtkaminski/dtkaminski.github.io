@@ -2571,6 +2571,12 @@ table.v3-home-pl.v3-ad-mini.v3-why-tbl .v3-why-exp { color: var(--color-muted); 
 .v3-why-bar-good { background: var(--color-success); }
 .v3-why-strip dd { font-size: var(--text-lg); }
 .v3-why-cause { margin: 0 0 var(--space-2); font-weight: var(--weight-medium); color: var(--color-ink); }
+/* the panel's numbered steps, and the numbered causes inside step "Causes checked" */
+.v3-why-h { display: flex; align-items: baseline; gap: var(--space-2); }
+.v3-why-n { font-family: var(--font-figure); font-weight: var(--weight-semi); color: var(--color-ink); }
+.v3-why-item { display: grid; grid-template-columns: var(--space-4) minmax(0, 1fr); align-items: baseline; }
+.v3-why-ix { font-family: var(--font-figure); color: var(--color-muted); }
+table.v3-home-pl.v3-ad-mini.v3-why-tbl td small.v3-why-find { display: block; grid-column: 2; white-space: normal; margin-top: var(--space-1); }
 .v3-why-lab { display: block; font-size: var(--text-xs); color: var(--color-muted); }
 .v3-why-links { display: grid; gap: var(--space-2); margin: 0; }
 .v3-why-links > div { display: grid; grid-template-columns: var(--size-why-bar-col) minmax(0, 1fr); align-items: baseline; gap: var(--space-2); }
