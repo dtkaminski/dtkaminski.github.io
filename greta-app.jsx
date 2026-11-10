@@ -20802,6 +20802,7 @@ const V3_GY_REAL = {
   within_record: ['Within your record', 'v3-pill-good'],
   stretch: ['Stretch', 'v3-pill-warn'],
   step_change: ['Needs a step change', 'v3-pill-bad'],
+  short: ['Short of target', 'v3-pill-warn'],      // short as set, but the levers at their best close it
   out_of_reach: ['Out of reach', 'v3-pill-bad'],
 };
 const V3_GY_GRADE = {
@@ -20898,7 +20899,7 @@ function V3GrowthYear() {
   const has = f => flags.indexOf(f) >= 0;
   const LV = V3_GY_LEVEL[P.margin_level] || 'CM3', pLv = P.margin_level || 'cm3';
   const RL = P.realism || {}, ADS = P.ads || {};
-  const real = V3_GY_REAL[RL.grade] || null;
+  const real = V3_GY_REAL[RL.grade === 'out_of_reach' && !(Number(RL.short_at_best) > 0) ? 'short' : RL.grade] || null;
   const LVR = (P.levers || []).filter(l => l.available && V3_GY_LEVERS[l.key]);
   const LVk = {}; LVR.forEach(l => { LVk[l.key] = l; });
   const BR = P.bridge || [], brK = {}; BR.forEach(r => { brK[r.key] = r; });
