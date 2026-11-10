@@ -19447,6 +19447,26 @@ const v3WhyFind = (why, label) => {
 };
 // 1208: what an ad angle's flag means, as a pill under its name
 const V3_LEAF_FLAG = { paused: ['Paused', 'warn'], weak: ['Below half the average', 'bad'] };
+// 1209: the options priced at the leaves, best first, across every set the walk drilled. Worth is a forecast for 30
+// days, rounded to two figures by the engine; low and high show as a range. Each option also carries a spec (agent,
+// action, the ids or code it acts on, the check that settles it) for an agent to run; the panel does not show it.
+const v3OptWorth = o => (o.low == null || o.high == null ? FMT_NONE
+  : Number(o.low) === Number(o.high) ? fmtMoney(o.high) : fmtMoney(o.low) + ' to ' + fmtMoney(o.high));
+function V3WhyOptions({ drill, n }) {
+  const opts = [].concat(...drill.map(d => (Array.isArray(d.options) ? d.options : [])))
+    .sort((a, b) => (Number(b.high) || 0) - (Number(a.high) || 0));
+  if (!opts.length) return null;
+  return (<section className="v3-drawer-sec">
+    <V3StepH n={n}>Options</V3StepH>
+    <div className="v3-profit-scroll"><table className="v3-home-pl v3-ad-mini v3-why-tbl">
+      <thead><tr><th>Option</th><th className="r">Worth, 30 days</th><th className="r">Confidence</th></tr></thead>
+      <tbody>{opts.map((o, i) => (<tr key={o.key || i}>
+        <td><div className="v3-why-item"><span className="v3-why-ix">{i + 1}</span><span>{o.title}</span>
+          {o.basis && <small className="v3-why-find">{o.basis}</small>}</div></td>
+        <td className="r v3-why-worth">{v3OptWorth(o)}</td>
+        <td className="r">{V3_LIGHT_SURE[o.confidence] || FMT_NONE}</td></tr>))}</tbody></table></div>
+  </section>);
+}
 const v3LeafChange = (now, before) => (Number(before) > 0 && now != null ? fmtPct(Number(now) / Number(before) - 1) : FMT_NONE);
 // One leaf set under the causes (1208): the code, the ad angle or the first-order product, 30 days before against
 // the 30 days to the latest day, with the cause it drills and its status. A short finding only where the rows cannot
@@ -19592,6 +19612,7 @@ function V3WhyPanel({ e, onClose, links, onGo }) {
             {W.strategy && <div><dt>Strategy</dt><dd>{W.strategy}</dd></div>}
           </dl></section>}
         {W && Array.isArray(W.drill) && W.drill.map(d => <V3WhyDrill key={d.set} d={d} n={d.rows && d.rows.length ? nx() : 0}/>)}
+        {W && Array.isArray(W.drill) && W.drill.some(d => Array.isArray(d.options) && d.options.length) && <V3WhyOptions drill={W.drill} n={nx()}/>}
         {W && W.cause_kind !== 'on_track' && W.settle_test && <section className="v3-drawer-sec"><V3StepH n={nx()}>Test</V3StepH>
           <p className="v3-drawer-p">{W.settle_test}</p></section>}
         {row ? <section className="v3-drawer-sec v3-drawer-decide"><V3StepH n={nx()}>Decision</V3StepH><V3MoveDecide row={row} onDecided={onClose}/></section>
