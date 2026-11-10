@@ -21217,7 +21217,9 @@ function V3Growth() {
   const ltv = U && Number(U.ltv_contribution) > 0 ? Number(U.ltv_contribution) : null;
   const marg = sc && Number(sc.marginal_cac_now) > 0 ? Number(sc.marginal_cac_now) : null;
   const S0 = stQ.rows && stQ.rows[0], A = S0 && S0.ad_decision;
-  const T30 = tierG.rows && tierG.rows[0], nc = T30 && T30.new_customers != null ? Number(T30.new_customers) : null;
+  // 1220: the registry's 30-day count, the one Today and Marketing show; the tiers only while it loads
+  const T30 = tierG.rows && tierG.rows[0], ncR = v3Fig('new_customers_30d', figGr.rows).value;
+  const nc = ncR != null ? Number(ncR) : T30 && T30.new_customers != null ? Number(T30.new_customers) : null;
 
   // The strip's movers open their drivers, as on Marketing.
   const SG = S0 && S0.last_30 && hq.rows ? v3BuildSigns(S0, hq.rows[0] && hq.rows[0].history, { lad }) : null;
@@ -23524,7 +23526,9 @@ function V3MarketingPage({ start, period, customActive }) {
   const paid = onFig ? Number(H.paid_spend_30d) : spendOf(start, end);
   const rev = onFig ? Number(H.net_revenue_30d) : sum(shopNow, 'netSales');
   const t30 = tierQ.rows && tierQ.rows[0];
-  const nc = onFig && t30 && t30.new_customers != null ? Number(t30.new_customers) : newOf(start, end);
+  // 1220: on the 30 days the count is the registry's (the anatomy's, Today's); the tiers are the fallback while it loads
+  const ncFig = v3Fig('new_customers_30d', figQ.rows).value;
+  const nc = onFig && ncFig != null ? Number(ncFig) : onFig && t30 && t30.new_customers != null ? Number(t30.new_customers) : newOf(start, end);
   const cacFig = v3Fig('cac_30d', figQ.rows).value;
   const cac = onFig && cacFig != null ? Number(cacFig) : (nc > 0 ? paid / nc : null);
   const mer = paid > 0 ? rev / paid : null;
@@ -23543,7 +23547,7 @@ function V3MarketingPage({ start, period, customActive }) {
   if (wins) {
     wins.forEach(w => { w.nc = newOf(w.s, w.e); (act.rows || []).forEach(r => { const x = String(r.day).slice(0, 10); if (x >= w.s && x <= w.e) { const k = 'p_' + String(r.platform || 'other').toLowerCase(); w[k] = (w[k] || 0) + (Number(r.spend) || 0); } }); });
     const l = wins[wins.length - 1];
-    const nc30 = t30 && t30.new_customers != null ? Number(t30.new_customers) : null;
+    const nc30 = ncFig != null ? Number(ncFig) : t30 && t30.new_customers != null ? Number(t30.new_customers) : null;
     if (on30) { l.sales = Number(H.net_revenue_30d); l.spend = Number(H.paid_spend_30d); if (nc30 != null) l.nc = nc30; }
     else if (whole) { l.sales = rev; l.spend = paid; if (nc != null) l.nc = nc; }
     wins.forEach(w => { w.cac = w.nc > 0 ? w.spend / w.nc : null; w.mer = w.spend > 0 ? w.sales / w.spend : null; });
