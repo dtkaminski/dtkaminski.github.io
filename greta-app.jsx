@@ -3941,10 +3941,10 @@ function V3ProfitLead({ view, costsVerified }) {
           {tile('Sales per £1 of ads', view.mer, view.pMer, true, (wins || []).map(w => w.spend > 0 ? w.sales / w.spend : null), money2)}
         </div></div>}
       {onFig && signs.length > 0 && <div className="v3-home-group" style={{ '--n': signs.length }}>
-        <div className="v3-home-group-h">Last 30 days<span>against 4 weeks ago</span></div>
+        <div className="v3-home-group-h">Last 30 days<span>{v3TrendHead(signs)}</span></div>
         <div className="v3-home-tiles">{signs.map(sg => { const t = v3SignTrend(sg);
           return <V3HomeTile key={sg.k} k={sg.which === 'profit' ? 'Profit after running costs' : v3SignShort(sg)} v={sg.v} dir={t && t.dir} cls={t && t.cls} delta={t ? t.delta : ''} weak={sg.tone === 'weak'}
-            pts={(sg.series || []).map(p => p.v)} act={sg.act} title={sg.k} m={sg.m}/>; })}</div></div>}
+            pts={(sg.series || []).map(p => p.v)} act={sg.act} title={(t && t.title) || sg.k} m={sg.m}/>; })}</div></div>}
       {openSign && <div className="v3-home-drv"><V3DriverPanel key={drv} which={drv} points={openSign.points || SG.HP} ctx={openSign.ctx} line={openSign.dline}/></div>}
       {!onFig && view.priorSpike && <p className="v3-panel-note v3-profit-spike">The period before had a sale: {fmtMoney(view.pRev)}, against {fmtMoney(view.priorSpike.typ)} usually.</p>}
     </section>
@@ -19943,20 +19943,35 @@ function V3NumbersConnect() {
 // The legend once on a page whose tiles carry lights, when the lights came back.
 function V3PageLegend() { const { L } = useV3Lights(); return L ? <V3LightLegend/> : null; }
 // The figure a sign moved from four weeks ago, by the same rule the sign has always used.
+// 11 Nov walk-through: on Halden the 30 days four weeks back held the September sale, so Home read "Cost of a new
+// customer £34, from £17" and "New sales per £1 £1.71, from £2.35" in red: mostly the sale ending, not a fault.
+// When that base covers a sale week and the latest 30 days do not, the base is the latest earlier 30 days without
+// one, and the tile says so. Profit & sales and Weekly review already leave sale weeks out of their typical.
+const v3WindowHasSale = (d, saleWeeks) => { const from = v3IsoAdd(d, -29);
+  return saleWeeks.some(wk => wk <= d && v3IsoAdd(wk, 6) >= from); };
 function v3SignTrend(s) {
   const pts = (s.series || []).filter(p => p.v != null);
   if (pts.length < 5 || !s.fmt) return null;
-  const last = pts[pts.length - 1], then = pts[pts.length - 5];
+  const last = pts[pts.length - 1];
+  let then = pts[pts.length - 5], beforeSale = false;
+  const SW = Array.isArray(s.saleWeeks) ? s.saleWeeks : [];
+  if (SW.length && then.d && last.d && v3WindowHasSale(String(then.d).slice(0, 10), SW) && !v3WindowHasSale(String(last.d).slice(0, 10), SW)) {
+    const clean = pts.slice(0, -5).reverse().find(p => p.d && !v3WindowHasSale(String(p.d).slice(0, 10), SW));
+    if (clean) { then = clean; beforeSale = true; }
+  }
   const ch = last.v - then.v, rel = Math.abs(then.v) > 0.0001 ? Math.abs(ch) / Math.abs(then.v) : Math.abs(ch);
   const dir = rel < 0.03 ? 'flat' : ch > 0 ? 'up' : 'down';
   const good = dir === 'flat' ? null : (dir === 'up') === (s.better === 'higher');
   const cls = dir === 'flat' || !s.better || (s.tone === 'good' && !good) ? '' : good ? 'v3-up' : 'v3-down';
-  return { dir, cls, delta: 'from ' + s.fmt(then.v) + ' in 4 weeks' };
+  return { dir, cls, beforeSale, delta: 'from ' + s.fmt(then.v) + (beforeSale ? ' before the sale' : ' in 4 weeks'),
+    title: beforeSale ? 'The 30 days to ' + v3Day(String(then.d).slice(0, 10)) + ', the latest without a sale week' : undefined };
 }
 // the light a sign's tile carries (Part F): the sign's own figure, or the figure the page shows in its place (n)
 const v3SignLight = (sg, value, n) => !sg || !sg.m ? null : value == null ? sg.m : n != null ? [sg.m[0], n] : null;
 const v3SignShort = s => s.amer ? 'New sales per £1 of ads' : s.which === 'ret' ? 'Sales per £1 of ads' : s.which === 'repeat' ? 'Repeat in 90 days'
   : s.which === 'ly' ? 'Sales vs last year' : String(s.k).replace(/,\s*last 30 days$/i, '');
+// A strip header for tiles read by v3SignTrend: names the sale when any tile stepped past it.
+const v3TrendHead = list => (list || []).some(s => { const t = s && v3SignTrend(s); return t && t.beforeSale; }) ? 'against 4 weeks ago, or before the sale' : 'against 4 weeks ago';
 // The page each kind of action is worked from.
 const V3_HOME_WORK = { stock: ['stock', 'Open order list'], site: ['website', 'Open Website'], paid: ['marketing', 'Open Marketing'], creative: ['marketing', 'Open Marketing', 'creative'],
   email: ['marketing', 'Open Marketing', 'email'], acquisition: ['marketing', 'Open Marketing'], product: ['products', 'Open Products'], retention: ['customers', 'Open Customers'], finance: ['profit', 'Open Profit & sales'],
@@ -20023,6 +20038,30 @@ function V3HomeRow({ row, first, bmRow, onOpen, rank, wide, owners, onPage }) {
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState('');
   React.useEffect(() => { setMine(null); }, [taken]);
+  // 11 Nov walk-through: every "Open …" button landed at the top of its page, not on the action it was about. The button
+  // passes the action's id; the same action's row on the page it opens (Website, Marketing, Products, Customers, Goal)
+  // scrolls into view and is marked for a moment. A page without the row stays at its top, as before.
+  // The page keeps loading after the row appears (charts, other panels), which pushes the row back down, so it is
+  // brought back into view a few times over the first 4.5 seconds unless the owner scrolls or types first. The timers
+  // live in a ref: a re-render must not cancel them; only leaving the page does.
+  const trRef = React.useRef(null);
+  const foundRef = React.useRef(null);
+  React.useEffect(() => {
+    const el = trRef.current;
+    if (foundRef.current || !el || window.__oiV3Row !== ext || !onPage || el.offsetParent === null) return;
+    window.__oiV3Row = null;
+    const st = foundRef.current = { touched: false, timers: [] };
+    const stop = () => { st.touched = true; };
+    ['wheel', 'touchmove', 'keydown', 'mousedown'].forEach(ev => window.addEventListener(ev, stop, { once: true, passive: true }));
+    st.timers = [80, 600, 1200, 2000, 3000, 4500].map((ms, i) => setTimeout(() => {
+      if (st.touched || !el.isConnected) return;
+      const r = el.getBoundingClientRect();
+      if (i === 0 || r.top < 0 || r.bottom > window.innerHeight) { try { el.scrollIntoView({ block: 'center' }); } catch (e) {} }
+    }, ms));
+    el.classList.add('v3-row-found');
+    st.timers.push(setTimeout(() => el.classList.remove('v3-row-found'), 6000));
+  });
+  React.useEffect(() => () => { const st = foundRef.current; if (st) st.timers.forEach(clearTimeout); }, []);
   const status = mine || (taken ? 'doing' : 'todo');
   const pa = v3PlainAction(Object.assign({}, row, { plan: null }));
   const cause = v3CauseLine(pa.why, pa.title);
@@ -20061,7 +20100,7 @@ function V3HomeRow({ row, first, bmRow, onOpen, rank, wide, owners, onPage }) {
     } catch (x) { setErr(String((x && x.message) || x)); }
     setBusy(false);
   };
-  return (<tr className={status === 'done' ? 'v3-home-done' : ''}>
+  return (<tr ref={trRef} className={status === 'done' ? 'v3-home-done' : ''}>
     <td className="v3-home-act"><div className="v3-home-act-in">
       {wide && <span className="v3-home-n">{rank != null ? rank : ''}</span>}
       <div className="v3-home-act-b">
@@ -20084,7 +20123,7 @@ function V3HomeRow({ row, first, bmRow, onOpen, rank, wide, owners, onPage }) {
     <td className="v3-home-open">{conn ? <V3Fix provider={conn} small/>
       : place ? <a className={'v3-btn v3-btn-sm' + (first ? ' v3-btn-p' : '')} href={place.url} target="_blank" rel="noopener noreferrer">Open {place.label}</a>
       : here ? <button type="button" className="v3-btn v3-btn-sm" onClick={() => onOpen(null)}>View</button>
-      : <button type="button" className={'v3-btn v3-btn-sm' + (first ? ' v3-btn-p' : '')} onClick={() => window.__oiGo && window.__oiGo(work[0], work[2] || null)}>{work[1]}</button>}</td>
+      : <button type="button" className={'v3-btn v3-btn-sm' + (first ? ' v3-btn-p' : '')} onClick={() => window.__oiGo && window.__oiGo(work[0], work[2] || null, ext)}>{work[1]}</button>}</td>
   </tr>);
 }
 function v3CutWhy(figRows) {
@@ -21244,7 +21283,7 @@ function V3Growth() {
   const signTile = (sg, label, value, n) => { const t = v3SignTrend(sg);
     return <V3HomeTile key={sg.which} k={label} v={value != null ? value : sg.v} dir={t && t.dir} cls={t && t.cls} delta={t ? t.delta : ''} pts={(sg.series || []).map(p => p.v)} act={sg.act} title={sg.k} m={v3SignLight(sg, value, n)}/>; };
   const ncSeries = SG && SG.HP ? SG.HP.filter(p => p.new_customers != null).map(p => ({ d: String(p.d), v: Number(p.new_customers) })) : null;
-  const ncTrend = ncSeries ? v3SignTrend({ series: ncSeries, fmt: v => fmtCount(v), better: 'higher' }) : null;
+  const ncTrend = ncSeries ? v3SignTrend({ series: ncSeries, fmt: v => fmtCount(v), better: 'higher', saleWeeks: SG.saleWeeks }) : null;
   const over = c30v != null && fop ? c30v - fop : null;
   const adPill = A && V3_AD_PILL[A.decision];
   const hasStrip = c30v != null || fop || ltv != null || marg != null;
@@ -22584,7 +22623,7 @@ function V3Customers({ start, period, customActive }) {
         : empty ? <p className="v3-panel-note">These figures come from your shop’s orders. Connect your shop on Connections &amp; data.</p>
         : <>
           <div className="v3-home-group" style={{ '--n': 4 }}>
-            <div className="v3-home-group-h">{whenLabel}<span>{signsOn ? 'against 4 weeks ago' : !onFig && havePrior ? 'against the period before' : ''}</span></div>
+            <div className="v3-home-group-h">{whenLabel}<span>{signsOn ? v3TrendHead([sNew, sCac, sNs, sRs]) : !onFig && havePrior ? 'against the period before' : ''}</span></div>
             <div className="v3-home-tiles">
               {signsOn && sNew ? signTile(sNew, 'New customers', nc == null ? FMT_NONE : fmtCount(nc), nc) : v3TileAgainst('New customers', nc, onFig || !havePrior ? null : was.no, true, pts('nc'), v => fmtCount(v))}
               {signsOn && sCac ? signTile(sCac, 'Cost of a new customer') : v3TileAgainst('Cost of a new customer', cac, onFig ? null : pCac, false, pts('cac'))}
@@ -23592,7 +23631,7 @@ function V3MarketingPage({ start, period, customActive }) {
   const mainSigns = pick(['spend', 'cac', 'ret']), ownSigns = pick(['metacpa', 'googcpa', 'email']);
   const spendSign = mainSigns.find(sg => sg.which === 'spend'), cacSign = mainSigns.find(sg => sg.which === 'cac'), retSign = mainSigns.find(sg => sg.which === 'ret');
   const ncSeries = SG && SG.HP ? SG.HP.filter(p => p.new_customers != null).map(p => ({ d: String(p.d), v: Number(p.new_customers) })) : null;
-  const ncTrend = ncSeries ? v3SignTrend({ series: ncSeries, fmt: v => fmtCount(v), better: 'higher' }) : null;
+  const ncTrend = ncSeries ? v3SignTrend({ series: ncSeries, fmt: v => fmtCount(v), better: 'higher', saleWeeks: SG.saleWeeks }) : null;
   const openSign = onFig && drv ? [...mainSigns, ...ownSigns].find(sg => sg.which === drv) : null;
   const signsReady = onFig && SG;
 
@@ -23607,7 +23646,7 @@ function V3MarketingPage({ start, period, customActive }) {
     <section className="v3-panel v3-home-strip v3-mk-strip" aria-label="Key figures">
       {signsReady ? <>
         <div className="v3-home-group" style={{ '--n': mainSigns.length + 1 }}>
-          <div className="v3-home-group-h">Last 30 days<span>against 4 weeks ago</span></div>
+          <div className="v3-home-group-h">Last 30 days<span>{v3TrendHead([spendSign, cacSign, retSign, ncSeries && { series: ncSeries, fmt: String, saleWeeks: SG.saleWeeks }])}</span></div>
           <div className="v3-home-tiles">
             {spendSign && signTile(spendSign, 'Ad spend', fmtMoney(paid), paid)}
             <V3HomeTile key="nc" k="New customers" v={nc == null ? FMT_NONE : fmtCount(nc)} m={onFig ? ['new_customers', nc] : null} dir={ncTrend && ncTrend.dir} cls={ncTrend && ncTrend.cls} delta={ncTrend ? ncTrend.delta : ''} pts={(ncSeries || []).map(p => p.v)}/>
@@ -23615,7 +23654,7 @@ function V3MarketingPage({ start, period, customActive }) {
             {retSign && signTile(retSign, 'Sales per £1 of ads')}
           </div></div>
         {ownSigns.length > 0 && <div className="v3-home-group" style={{ '--n': ownSigns.length }}>
-          <div className="v3-home-group-h">Platforms’ own count<span>against 4 weeks ago</span></div>
+          <div className="v3-home-group-h">Platforms’ own count<span>{v3TrendHead(ownSigns)}</span></div>
           <div className="v3-home-tiles">{ownSigns.map(sg => signTile(sg, sg.which === 'metacpa' ? 'Meta cost per sale' : sg.which === 'googcpa' ? 'Google cost per sale' : 'One-off email sales'))}</div></div>}
         {openSign && <div className="v3-home-drv"><V3DriverPanel key={drv} which={drv} points={openSign.points || SG.HP} ctx={openSign.ctx} line={openSign.dline}/></div>}
       </> : <div className="v3-home-group" style={{ '--n': 4 }}>
@@ -25329,7 +25368,7 @@ function V3Review() {
   const signs = ['profit', 'ly'].map(w => signAll.find(sg => sg.which === w)).filter(Boolean).map(sg => Object.assign({}, sg, { act: !sg.noDrivers && v3HasDrivers(sg.which, SG.HP) ? { open: drv === sg.which, on: () => setDrv(o => (o === sg.which ? null : sg.which)) } : null }));
   const openSign = drv ? signs.find(sg => sg.which === drv) : null;
   const signTile = sg => { const t = v3SignTrend(sg);
-    return <V3HomeTile key={sg.which} k={v3SignShort(sg)} v={sg.v} dir={t && t.dir} cls={t && t.cls} delta={t ? t.delta : ''} weak={sg.tone === 'weak'} pts={(sg.series || []).map(p => p.v)} act={sg.act} title={sg.k} m={sg.m}/>; };
+    return <V3HomeTile key={sg.which} k={v3SignShort(sg)} v={sg.v} dir={t && t.dir} cls={t && t.cls} delta={t ? t.delta : ''} weak={sg.tone === 'weak'} pts={(sg.series || []).map(p => p.v)} act={sg.act} title={(t && t.title) || sg.k} m={sg.m}/>; };
 
   // What moved profit: the same parts the driver panel draws, and what they leave.
   const signed = v => (v < 0 ? '−' : '+') + fmtMoney(Math.abs(v));
@@ -25369,7 +25408,7 @@ function V3Review() {
           {orders > 0 && tile('Orders', orders, T.orders, true, 'orders', count)}
         </div></div>
       {signs.length > 0 && <div className="v3-home-group" style={{ '--n': signs.length }}>
-        <div className="v3-home-group-h">Last 30 days<span>against 4 weeks ago</span></div>
+        <div className="v3-home-group-h">Last 30 days<span>{v3TrendHead(signs)}</span></div>
         <div className="v3-home-tiles">{signs.map(signTile)}</div></div>}
       {drv === 'week' && weekM && <div className="v3-home-drv"><V3DriverPanel key="week" fixed={weekM}/></div>}
       {openSign && <div className="v3-home-drv"><V3DriverPanel key={drv} which={drv} points={openSign.points || SG.HP} ctx={openSign.ctx} line={openSign.dline}/></div>}
@@ -26364,7 +26403,10 @@ function v3BuildSigns(S, hist, opts) {
     n: ao != null ? <>Sales less products, delivery, ads and {fmtMoney(num(L.overheads))} of running costs</> : <>Sales less products, delivery and ads</>,
     series: HP ? V3_DRIVER_MODELS.profit.prep(HP, profitCfg.ctx).map(p => ({ d: String(p.d), v: p.profit })) : null,
     fmt: v3SignedGbp, better: 'higher', line: { v: 0, label: 'Break-even' } }, profitCfg) : null;
-  return { signs, profitCfg, profitSign, HP };
+  // 11 Nov walk-through: every sign carries the weeks with a sale, so its "from" figure can step past them
+  const saleWeeks = H && Array.isArray(H.weeks) ? H.weeks.filter(w => w && w.sale && w.wk).map(w => String(w.wk)) : [];
+  signs.concat(profitSign ? [profitSign] : []).forEach(s => { s.saleWeeks = saleWeeks; });
+  return { signs, profitCfg, profitSign, HP, saleWeeks };
 }
 // 10 Oct eval, fix 6: the morning-after read. fn_sales_move (0340, cache_sales_move, 07:45 daily) splits a
 // change in sales into what sold (marked down, full price to new and to returning customers, which add up
@@ -26667,7 +26709,7 @@ function V3BusinessState({ part }) {
         <div className="v3-home-group-h">Last 30 days</div>
         <div className="v3-home-tiles">{signs.slice(0, 4).map(sg => { const t = v3SignTrend(sg);
           return <V3HomeTile key={sg.k} k={v3SignShort(sg)} v={sg.v} dir={t && t.dir} cls={t && t.cls} delta={t ? t.delta : ''} weak={sg.tone === 'weak'}
-            pts={(sg.series || []).map(p => p.v)} act={sg.act} title={sg.k} m={sg.m}/>; })}</div></div>}
+            pts={(sg.series || []).map(p => p.v)} act={sg.act} title={(t && t.title) || sg.k} m={sg.m}/>; })}</div></div>}
       {TW && !hasStats && <p className="v3-panel-note">{TW.said}</p>}
       {openSign && HP && <div className="v3-home-drv"><V3DriverPanel key={drv} which={drv} points={HP} ctx={openSign.ctx} line={openSign.dline}/></div>}
     </section>);
@@ -30437,10 +30479,11 @@ function App(){
 
   // Global deep-link helper so findings can jump to their evidence tab (clickable cross-refs).
   React.useEffect(() => {
-    window.__oiGo = (dest, anchor) => {
+    window.__oiGo = (dest, anchor, row) => {
       setV3dest(dest);
       track('page_view', { dest: dest }, dest);
       window.__oiV3Anchor = anchor || null;
+      window.__oiV3Row = row || null;   // 11 Nov: the action an "Open …" button came from; its row on this page scrolls into view
       window.scrollTo(0, 0);   // 9 Nov: instant, a new page opens at its top (smooth did not finish in a background tab)
       if (anchor) setTimeout(() => { try { window.dispatchEvent(new Event('oi-v3-anchor')); } catch (e) {} }, 0);
     };
