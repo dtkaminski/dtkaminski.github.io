@@ -18887,18 +18887,20 @@ function V3MoveRange({ lo, hi, at }) {
     <span className="v3-mv-range-lab">Between {v3Gbp(l)} and {v3Gbp(h)}</span>
   </div>);
 }
-function V3MoveSureOpen({ row, raw, noSteps }) {
-  const sure = v3MoveSure(row), gbp = Number(row.cm_gbp) || 0, conf = v3MoneyConf(row);
+// `inDrawer` (11 Nov eval, item 8): the drawer already shows the confidence beside the figure and the paragraph above
+// this, so here it gives only the reason, without the label, the "Confidence:" line or the "Working:" repeat.
+function V3MoveSureOpen({ row, raw, noSteps, inDrawer }) {
+  const sure = v3MoveSure(row), gbp = Number(row.cm_gbp) || 0, conf = inDrawer ? null : v3MoneyConf(row);
   const play = Array.isArray(row.playbook) && !noSteps ? row.playbook : [];
   return (<div className="v3-mv-open">
-    {sure && <p><b>{V3_CONF[sure].label}.</b> {v3SureWhy(row, sure)}</p>}
+    {sure && (inDrawer ? <p>{v3SureWhy(row, sure)}</p> : <p><b>{V3_CONF[sure].label}.</b> {v3SureWhy(row, sure)}</p>)}
     {row.money_assumption && <p><b>The assumption:</b> {v3Tidy(scrubTag(row.money_assumption)).replace(/^./, c => c.toUpperCase())}.</p>}
     {row.money_basis && <p><b>How the figure is worked out:</b> {v3Tidy(scrubTag(row.money_basis))}.</p>}
     {Array.isArray(row.evidence_reasons) && row.evidence_reasons.some(x => x && x.text) && (
       <ul>{row.evidence_reasons.filter(x => x && x.text).map((x, j) => <li key={j}>{v3Tidy(x.text)}</li>)}</ul>)}
     {conf && <p className="v3-muted">Confidence: {String(V3_CONF[conf].label).toLowerCase()}.</p>}
     {play.length > 0 && <><p><b>The steps</b></p><ol className="v3-mv-steps">{play.map((s, j) => <li key={j}>{v3Tidy(s)}</li>)}</ol></>}
-    <p className="v3-mv-raw"><b>Working:</b> {raw}</p>
+    {!inDrawer && <p className="v3-mv-raw"><b>Working:</b> {raw}</p>}
   </div>);
 }
 // One card for every move. `rank` numbers it; `closes` is its share of the goal gap (Today only); `meta` is the
@@ -20213,6 +20215,12 @@ function V3HomeDrawer({ row, why, closes, closesTo, startMode, onClose }) {
   const play = Array.isArray(row.playbook) ? row.playbook : [];
   const others = row.plan ? row.plan.steps.filter(st => st.external_id !== row.external_id) : [];
   const isStock = row.category === 'stock' || row.external_id === 'stock-reorder';
+  // 11 Nov eval, item 8: four parts, in order (title, the figure, numbered steps, the button), and everything that
+  // says why behind "How sure", closed until asked for. The stock drawer printed its 110-word paragraph twice, said
+  // Likely three times and put Start after about 350 words.
+  const [open, setOpen] = React.useState(false);
+  const rest = v3SplitTitle(pa.title)[1];
+  const steps = play.length ? play : row.step1 ? [row.step1] : [];
   return (<div className="v3-drawer-wrap">
     <div className="v3-drawer-scrim" onClick={onClose}/>
     <aside className="v3-drawer" role="dialog" aria-modal="true" aria-label={pa.title} tabIndex={-1} ref={panel}>
@@ -20223,27 +20231,33 @@ function V3HomeDrawer({ row, why, closes, closesTo, startMode, onClose }) {
       <h2 className="v3-drawer-t">{v3SplitTitle(pa.title)[0]}</h2>
       <dl className="v3-drawer-facts">
         {gbp > 0 && <div><dt>{isStock ? 'Protects' : row.money_is_sales ? 'Worth, in sales' : 'Worth'}</dt><dd>{v3GbpRound(gbp)}{v3Per(row)}</dd></div>}
-        {sure && <div><dt>Confidence</dt><dd><V3Conf state={sure} detail={v3SureWhy(row, sure)}/></dd></div>}
-        {ex && Number(ex.win) > 0 && <div><dt>Result checked</dt><dd>{fmtCount(Number(ex.win))} days after done</dd></div>}
+        {sure && <div><dt>Confidence</dt><dd><V3Conf state={sure}/></dd></div>}
         {row.due_on && <div><dt>Due</dt><dd>{v3Day(String(row.due_on).slice(0, 10))}</dd></div>}
-        {Number(row.days_open) > 0 && <div><dt>Raised</dt><dd>{Number(row.days_open) === 1 ? '1 day ago' : fmtCount(row.days_open) + ' days ago'}</dd></div>}
-        {row.days_since_refresh != null && <div><dt>Figures checked</dt><dd>{Number(row.days_since_refresh) <= 0 ? 'Today' : Number(row.days_since_refresh) === 1 ? '1 day ago' : fmtCount(row.days_since_refresh) + ' days ago'}</dd></div>}
-        {v3Moves(row.external_id).length > 0 && <div><dt>Moves</dt><dd>{V3_MOVE_LABEL[v3Moves(row.external_id)[0]]}</dd></div>}
       </dl>
-      {v3SplitTitle(pa.title)[1] && <p className="v3-drawer-p">{v3SplitTitle(pa.title)[1]}</p>}
       {row.lane_said && <p className="v3-drawer-p">{v3Tidy(row.lane_said)}</p>}
-      {row.unverified_reason && <p className="v3-drawer-p">Open {fmtCount(row.days_open)} days. No test tells when it is fixed, so it sits below the ranked list.</p>}
-      {pa.why && <p className="v3-drawer-p">{v3Money(pa.why)}</p>}
-      <V3MoveViz row={row}/>
-      {why}
-      {play.length > 0 && <section className="v3-drawer-sec"><h3>Steps</h3><ol className="v3-mv-steps">{play.map((s, j) => <li key={j}>{v3Tidy(s)}</li>)}</ol></section>}
-      {!play.length && row.step1 && <section className="v3-drawer-sec"><h3>Steps</h3><p className="v3-drawer-p">{v3Tidy(row.step1)}</p></section>}
+      {steps.length > 0 && <section className="v3-drawer-sec"><h3>Steps</h3><ol className="v3-mv-steps">{steps.map((s, j) => <li key={j}>{v3Tidy(s)}</li>)}</ol></section>}
       {others.length > 0 && <section className="v3-drawer-sec"><V3PlanSteps plan={Object.assign({}, row.plan, { steps: others })} rank={1}/></section>}
-      {gbp > 0 && <section className="v3-drawer-sec"><V3MoveRange lo={ex && ex.lo} hi={ex && ex.hi} at={gbp}/>
-        {closes != null && <p className="v3-mv-closes">Closes about <b>{v3GbpRound(closes)}</b> of the gap {closesTo}.</p>}</section>}
-      <section className="v3-drawer-sec"><h3>How sure</h3><V3MoveSureOpen row={row} raw={pa.raw} noSteps/>
-        {knock.length > 0 && <p className="v3-mv-open">Also moves {v3AndList(knock)}.</p>}</section>
       <section className="v3-drawer-sec v3-drawer-decide"><V3MoveDecide row={row} startMode={startMode} onDecided={onClose}/></section>
+      <section className="v3-drawer-sec">
+        <button type="button" className="v3-btn v3-btn-sm" aria-expanded={open} onClick={() => setOpen(o => !o)}>{open ? 'Hide how sure' : 'How sure'}</button>
+        {open && <div className="v3-drawer-sure">
+          {rest && <p className="v3-drawer-p">{rest}</p>}
+          {pa.why && <p className="v3-drawer-p">{v3Money(pa.why)}</p>}
+          <V3MoveSureOpen row={row} raw={pa.raw} noSteps inDrawer/>
+          {row.unverified_reason && <p className="v3-drawer-p">Open {fmtCount(row.days_open)} days. No test tells when it is fixed, so it sits below the ranked list.</p>}
+          {gbp > 0 && <V3MoveRange lo={ex && ex.lo} hi={ex && ex.hi} at={gbp}/>}
+          {gbp > 0 && closes != null && <p className="v3-mv-closes">Closes about <b>{v3GbpRound(closes)}</b> of the gap {closesTo}.</p>}
+          {knock.length > 0 && <p className="v3-mv-open">Also moves {v3AndList(knock)}.</p>}
+          <V3MoveViz row={row}/>
+          {why}
+          <dl className="v3-drawer-facts">
+            {ex && Number(ex.win) > 0 && <div><dt>Result checked</dt><dd>{fmtCount(Number(ex.win))} days after done</dd></div>}
+            {Number(row.days_open) > 0 && <div><dt>Raised</dt><dd>{Number(row.days_open) === 1 ? '1 day ago' : fmtCount(row.days_open) + ' days ago'}</dd></div>}
+            {row.days_since_refresh != null && <div><dt>Figures checked</dt><dd>{Number(row.days_since_refresh) <= 0 ? 'Today' : Number(row.days_since_refresh) === 1 ? '1 day ago' : fmtCount(row.days_since_refresh) + ' days ago'}</dd></div>}
+            {v3Moves(row.external_id).length > 0 && <div><dt>Moves</dt><dd>{V3_MOVE_LABEL[v3Moves(row.external_id)[0]]}</dd></div>}
+          </dl>
+        </div>}
+      </section>
     </aside>
   </div>);
 }
@@ -25380,9 +25394,11 @@ function v3ResultAmt(v, unit) {
   if (unit === 'ratio') return n.toFixed(2);
   return fmtCount(Math.round(n));
 }
-function V3ResultRow({ r }) {
+// 1229: a graded move reads on the measure its grade read ("Share of Meta spend on the top 5 ads"), not the old
+// promise's metric; `earlier` is a move from before the brand joined, which Greta did not price.
+function V3ResultRow({ r, earlier }) {
   const L = V3_RESULT[r.label] || V3_RESULT.cant_tell;
-  const what = v3MetricWords(r.metric);
+  const what = r.measure ? (/^[A-Z][a-z]/.test(r.measure) ? r.measure.charAt(0).toLowerCase() + r.measure.slice(1) : r.measure) : v3MetricWords(r.metric);
   const way = r.direction === 'down' ? 'down' : 'up';
   const hasExp = r.expect_p50 != null && Number(r.expect_p50) !== 0;
   const range = r.expect_p10 != null && r.expect_p90 != null && Number(r.expect_p10) !== Number(r.expect_p90);
@@ -25393,7 +25409,7 @@ function V3ResultRow({ r }) {
       <p className="v3-res-t">{v3PlainAction({ external_id: r.external_id, description: r.description }).title}</p>
       <p className="v3-res-sub">Done {v3Day(r.done_on, true)}{a && a.kind === 'agency' && a.name ? ' by ' + a.name : ''}</p>
       <p className="v3-res-line">
-        <span className="v3-res-k">Greta expected</span>
+        <span className="v3-res-k">{earlier ? 'Expected' : 'Greta expected'}</span>
         {Number(r.gbp) > 0
           ? <>about <b className="v3-res-fig">{v3Gbp(r.gbp)}</b> {r.per === 'once' ? 'once' : 'a month'}{r.low_gbp != null && r.high_gbp != null && Number(r.high_gbp) > Number(r.low_gbp) ? <> (between {v3Gbp(r.low_gbp)} and {v3Gbp(r.high_gbp)})</> : null}{r.metric ? ', checked on ' : ''}</>
           : null}
@@ -25407,7 +25423,7 @@ function V3ResultRow({ r }) {
             <span className="v3-res-k">What happened</span>
             {seen != null
               ? <>{what} went {seen < 0 ? 'down' : 'up'} by <b className="v3-res-fig">{v3ResultAmt(seen, r.unit)}</b> against what would have happened anyway{r.measured_gbp != null ? <>: <b className="v3-res-fig">{v3Gbp(r.measured_gbp)}</b> measured</> : null}.</>
-              : <>{r.reason ? v3Tidy(r.reason) : 'Not checked yet'}.</>}
+              : <>{r.reason ? v3ResNow(r.reason) : 'Not checked yet'}.</>}
           </p>
         </>}
     </div>
@@ -25421,14 +25437,21 @@ function V3Results() {
   const R = q.rows[0] || { rows: [], totals: {} };
   const T = R.totals || {};
   const rows = Array.isArray(R.rows) ? R.rows : [];
-  if (!rows.length) return (<section className="v3-sec v3-res">
+  // 1229: moves done before the brand joined, graded since on their own measure; kept out of the counts above
+  const earlier = Array.isArray(R.earlier) ? R.earlier : [];
+  const earlierSec = earlier.length > 0 && (<section className="v3-sec v3-res">
+    <div className="v3-kick">Earlier moves</div>
+    <p className="v3-note v3-measure">Done before your first day on Greta, and checked the same way since: each on its own measure, against what it would have done anyway. They are not in the counts above.</p>
+    <ul className="v3-res-list">{earlier.map(r => <V3ResultRow key={r.external_id} r={r} earlier/>)}</ul>
+  </section>);
+  if (!rows.length) return (<><section className="v3-sec v3-res">
     <div className="v3-kick">The moves you marked done</div>
     <p className="v3-verdict">No results yet</p>
     <p className="v3-note v3-measure">Mark an action done on Home or Actions. Each one is followed from that day: first until the change shows (stock in, spend down), then over its window against what would have happened anyway. The result shows here.</p>
     <button type="button" className="v3-btn v3-btn-sm v3-btn-p" onClick={() => window.__oiGo && window.__oiGo('today')}>Go to Home</button>
-  </section>);
+  </section>{earlierSec}</>);
   const counts = ['worked', 'pointing', 'did_not_work', 'checking', 'too_early', 'waiting', 'not_in_place', 'cant_tell'].filter(k => Number(T[k]) > 0);
-  return (<section className="v3-sec v3-res">
+  return (<><section className="v3-sec v3-res">
     <div className="v3-kick">The moves you marked done</div>
     <p className="v3-verdict">Moves you took: <span className="v3-res-fig">{v3Gbp(T.predicted_month)}</span> a month predicted{Number(T.predicted_once) > 0 ? <>, and <span className="v3-res-fig">{v3Gbp(T.predicted_once)}</span> once</> : null}, <span className="v3-res-fig">{v3Gbp(T.measured_gbp)}</span> measured so far.</p>
     <p className="v3-res-counts">{counts.map(k => <span key={k}><b className="v3-res-fig">{fmtCount(T[k])}</b> {V3_RESULT[k].label.toLowerCase()}</span>)}</p>
@@ -25438,7 +25461,7 @@ function V3Results() {
       Each check starts once the change has shown, and compares what happened with what would have happened anyway. It shows the promise held, not that the move alone caused it.
     </p>
     <ul className="v3-res-list">{rows.map(r => <V3ResultRow key={r.external_id} r={r}/>)}</ul>
-  </section>);
+  </section>{earlierSec}</>);
 }
 // A finding's title is its own first line, not "Why X changed": the finding is in the text.
 function v3FindingTitle(f) {

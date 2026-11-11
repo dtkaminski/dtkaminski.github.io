@@ -2062,6 +2062,8 @@ button.v3-home-tile:hover, button.v3-home-tile.open { background: var(--color-pa
 .v3-drawer-facts dd { margin: var(--space-1) 0 0; font-size: var(--text-sm); font-family: var(--font-figure); font-weight: var(--weight-medium); }
 .v3-drawer-p { margin: 0 0 var(--space-3); font-size: var(--text-sm); line-height: var(--leading-body); color: var(--color-secondary); }
 .v3-drawer-sec { border-top: 1px solid var(--color-line); padding-top: var(--space-3); margin-top: var(--space-3); font-size: var(--text-sm); }
+.v3-drawer-sure { margin-top: var(--space-3); }
+.v3-drawer-sure .v3-drawer-facts { margin-top: var(--space-3); border-bottom: 0; }
 .v3-drawer-sec h3 { font-size: var(--text-xs); font-weight: var(--weight-medium); color: var(--color-muted); margin: 0 0 var(--space-2); letter-spacing: 0; text-transform: none; }
 .v3-drawer .v3-mvviz { max-width: none; }
 
