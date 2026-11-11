@@ -3693,12 +3693,24 @@ function v3ProfitWindows(rows, keptShare, fallback, len, end, k, other) {
 // Whole weeks, months and quarters repeat back like for like. Anything else runs on the nearest plain step:
 // "34 days at a time" says nothing, and nor does one bar a year.
 const v3WindowStep = n => n < 7 ? 1 : n < 28 ? 7 : n <= 31 ? n : n < 90 ? 30 : n <= 92 ? n : 30;
+// A tile's change against an earlier figure. 11 Nov eval: on a small base a percent says nothing ("+2722.2%" on £254
+// of profit against a typical £9), so the change reads in the figure's own unit (£ or orders) once it is as big as the
+// base, when the base is zero or below, or when the sign flips. A percent only while the base is positive and the
+// change is smaller than it. dir follows the change itself; null when there is nothing to compare.
+function v3TileDelta(v, was, fmt) {
+  const a = v == null ? NaN : Number(v), b = was == null ? NaN : Number(was);
+  if (!isFinite(a) || !isFinite(b)) return { dir: null, delta: '', title: undefined };
+  const d = a - b, ch = b > 0 ? d / b : null;
+  const dir = (ch != null ? Math.abs(ch) < 0.0005 : Math.abs(d) < 0.5) ? 'flat' : d > 0 ? 'up' : 'down';
+  const pct = ch != null && a >= 0 && Math.abs(ch) < 1;
+  return { dir, delta: dir === 'flat' && ch == null ? '' : pct ? (Math.abs(ch) * 100).toFixed(1) + '%' : (fmt || fmtMoney)(Math.abs(d)),
+           title: 'Against ' + (fmt || fmtMoney)(b) };
+}
 // A strip tile against an earlier figure: up says which way is good, null when neither is.
 function v3TileAgainst(k, v, was, up, ser, fmt) {
-  const ch = was != null && Number(was) !== 0 && v != null ? (Number(v) - Number(was)) / Math.abs(Number(was)) : null;
-  const dir = ch == null || Math.abs(ch) < 0.0005 ? 'flat' : ch > 0 ? 'up' : 'down';
+  const t = v3TileDelta(v, was, fmt), dir = t.dir || 'flat';
   return <V3HomeTile key={k} k={k} v={v == null ? FMT_NONE : (fmt || fmtMoney)(v)} dir={dir} cls={up == null || dir === 'flat' ? '' : (dir === 'up') === up ? 'v3-up' : 'v3-down'}
-    delta={ch == null ? '' : (Math.abs(ch) * 100).toFixed(1) + '%'} pts={ser}/>;
+    delta={t.delta} title={t.title} pts={ser}/>;
 }
 function V3ProfitLead({ view, costsVerified }) {
   const H = (typeof window !== 'undefined' && window.GRETA_HEADLINE) || null;
@@ -26946,18 +26958,16 @@ function V3BusinessState({ part }) {
       {daily.length > 0 && <div className="v3-home-group v3-home-day" style={{ '--n': daily.length }}>
         <div className="v3-home-group-h">{Y.is_yesterday ? 'Yesterday' : Y.weekday}<span>{v3Day(Y.day)}{Y.is_yesterday ? '' : ', the latest day with data'}{YT ? ', against a typical ' + Y.weekday : ''}</span></div>
         <div className="v3-home-tiles">{daily.map(([k, v, was, up, key, fmt]) => {
-          const ch = was != null && Number(was) !== 0 ? (Number(v) - Number(was)) / Math.abs(Number(was)) : null;
-          const dir = ch == null || Math.abs(ch) < 0.0005 ? 'flat' : ch > 0 ? 'up' : 'down';
-          return <V3HomeTile key={k} k={k} v={fmt(v)} dir={ch == null ? null : dir} cls={up == null || dir === 'flat' ? '' : (dir === 'up') === up ? 'v3-up' : 'v3-down'}
-            delta={ch == null ? '' : (Math.abs(ch) * 100).toFixed(1) + '%'} pts={daySer(key)}/>;
+          const { dir, delta, title } = v3TileDelta(v, was, fmt);
+          return <V3HomeTile key={k} k={k} v={fmt(v)} dir={dir} cls={up == null || !dir || dir === 'flat' ? '' : (dir === 'up') === up ? 'v3-up' : 'v3-down'}
+            delta={delta} title={title} pts={daySer(key)}/>;
         })}</div></div>}
       {weekly.length > 0 && <div className="v3-home-group" style={{ '--n': weekly.length }}>
         <div className="v3-home-group-h">Last week{TW.week_from ? <span>{v3Day(TW.week_from)} to {v3Day(TW.week_to)}, against the week before</span> : <span>against the week before</span>}</div>
         <div className="v3-home-tiles">{weekly.map(([k, v, was, up, key]) => {
-          const ch = was != null && Number(was) !== 0 ? (Number(v) - Number(was)) / Math.abs(Number(was)) : null;
-          const dir = ch == null || Math.abs(ch) < 0.0005 ? 'flat' : ch > 0 ? 'up' : 'down';
+          const t = v3TileDelta(v, was, fmtMoney), dir = t.dir || 'flat';
           return <V3HomeTile key={k} k={k} v={fmtMoney(v)} dir={dir} cls={up == null || dir === 'flat' ? '' : (dir === 'up') === up ? 'v3-up' : 'v3-down'}
-            delta={ch == null ? '' : (Math.abs(ch) * 100).toFixed(1) + '%'} pts={wkSer(key)}/>;
+            delta={t.delta} title={t.title} pts={wkSer(key)}/>;
         })}</div></div>}
       {signs.length > 0 && <div className="v3-home-group" style={{ '--n': Math.min(signs.length, 4) }}>
         <div className="v3-home-group-h">Last 30 days</div>
