@@ -1397,6 +1397,10 @@ body { font-family: var(--font-sans); font-size: var(--text-sm); color: var(--co
 .v3-mv-decide .v3-mv-said { margin-left: 0; }   /* the decide block is already indented */
 /* 11 Nov: the decision named where the block sits apart from its row (the Why panel), and where it stands */
 .v3-mv-name { margin: 0; font-size: var(--text-base); font-weight: var(--weight-semi); color: var(--color-ink); }
+/* 1225: Greta's confirm sheet and its result read top to bottom in one column, divided by a rule from the block above */
+.v3-mv-form.v3-run { grid-template-columns: minmax(0, 1fr); align-items: start; gap: var(--space-2);
+                     padding-top: var(--space-3); border-top: 1px solid var(--color-line); }
+.v3-greta-runs { margin-top: var(--space-4); }
 .v3-mv-state { row-gap: var(--space-1); }
 .v3-drawer-decide .v3-mv-decide { margin-left: 0; }
 /* 1141: reason chips span the form; "Tell us" sits under a rule at the foot of each page, never in a card */

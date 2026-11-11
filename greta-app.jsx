@@ -12038,6 +12038,7 @@ function ActionsView(){
       {/* No heading here: the page head one line above already reads "Actions / What should I do
           first?". Saying it twice is the kind of thing that makes a product feel unedited. */}
       <V3ActionBoard/>
+      <V3GretaRuns/>
       {/* V3: the browser planner's stock list (28 to order, sized to its own demand plan, against the
           board's 21) and the 137-day-old specialist review (a £4.8k "act now" from a browser rule that
           the board never raised) are gone. Stock & orders is the one order list; the stock row opens it. */}
@@ -18458,6 +18459,167 @@ function V3WhyChips({ list, pick, setPick, label }) {
       onClick={() => setPick(pick === c ? '' : c)}>{c}</button>)}
   </div>);
 }
+// 1225: Greta does it, on approval. fn_action_runs says, per action with a spec, whether Greta can run it (Meta ad pauses,
+// live or on a demo account) and its last run; fn_action_run_plan lists the ads for the confirm sheet; the edge function
+// run-action approves as the caller, pauses the ads, and marks the action done as the approver. Before 1225 is applied
+// the read fails and nothing shows.
+const V3_RUNS_Q = (sb, b) => sb.rpc('fn_action_runs', { p_brand: b })
+  .then(r => ({ data: r && r.data && !r.error ? [r.data] : [], error: null }));
+function v3Runs() { const q = V3_Q['action-runs']; return (q && q.rows && q.rows[0]) || null; }
+// The run for an action, or for a step it carries: the ad pauses are counted inside the Meta cut, and the cut can itself
+// be a step of a plan row (frkl's ad budget). A row offers Greta's run when the run is its own, its step's, or its
+// plan's step's.
+function v3RunFor(ext, row) {
+  const R = v3Runs();
+  const L = R && Array.isArray(R.actions) ? R.actions : [];
+  const steps = row && row.plan && Array.isArray(row.plan.steps) ? row.plan.steps.map(st => st.external_id) : [];
+  return L.find(x => x.external_id === ext) || L.find(x => x.shown_on === ext)
+    || L.find(x => steps.includes(x.shown_on) || steps.includes(x.external_id)) || null;
+}
+async function v3RunAction(payload) {
+  const A = window.OI_ASK, L = window.FRKL_LIVE;
+  if (!A || !A.endpoint || !A.getJwt || !L || !L.brandId) throw new Error('Your session expired. Refresh the page and sign in again.');
+  const base = String(A.endpoint).replace(/\/functions\/v1\/[^/]*$/, '/functions/v1');
+  const jwt = await A.getJwt();
+  const r = await fetch(base + '/run-action', { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jwt },
+    body: JSON.stringify(Object.assign({ brand_id: L.brandId }, payload)) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || !d || !d.ok) throw new Error((d && d.detail) || 'Could not finish. Try again.');
+  try { track('greta_run', { op: payload.op, external_id: payload.external_id || null }, 'moves'); } catch (e) {}
+  return d.run;
+}
+const V3_RUN_STATUS = { done: ['Done', 'good'], partial: ['Partly done', 'warn'], failed: ['Failed', 'bad'], approved: ['Running', 'none'],
+  running: ['Running', 'none'], undoing: ['Undoing', 'none'], undone: ['Undone', 'none'], undo_failed: ['Undo failed', 'bad'] };
+const v3RunCount = (n, one, many) => fmtCount(n) + ' ' + (Number(n) === 1 ? one : many);
+// What a run did, ad by ad: the ad, what it was, what it is now, and Meta's words where it failed.
+function V3RunResult({ run, undo }) {
+  const res = Array.isArray(undo ? run.undo_result : run.result) ? (undo ? run.undo_result : run.result) : [];
+  const steps = Array.isArray(run.steps) ? run.steps : [];
+  if (!res.length) return null;
+  const name = id => { const s = steps.find(x => String(x.ad_id) === String(id)); return s ? s.ad_name : id; };
+  const word = s => (s ? v3Sentence(String(s).toLowerCase()) : FMT_NONE);
+  // the account (demo or live) is in the facts above; a Note column only when a row has something of its own
+  const noted = res.some(x => x.error || x.note);
+  return (<div className="v3-profit-scroll"><table className="v3-home-pl v3-ad-mini v3-why-tbl">
+    <thead><tr><th>Ad</th><th>Before</th><th>Now</th>{noted && <th>Note</th>}</tr></thead>
+    <tbody>{res.map((x, i) => (<tr key={i}><td className="v3-review-wrap">{name(x.ad_id)}</td><td>{word(x.before)}</td>
+      <td>{x.ok ? word(x.after) : <span className="v3-pill v3-pill-bad">Not changed</span>}</td>
+      {noted && <td className="v3-review-wrap">{x.error || x.note || ''}</td>}</tr>))}</tbody></table></div>);
+}
+// The confirm sheet: exactly what changes, where, and how to take it back. Nothing runs until Approve.
+function V3GretaRun({ row, runExt, small, onClose, onFinished }) {
+  const ext = runExt || (row && row.external_id);
+  const step = !!(runExt && row && runExt !== row.external_id);   // a step inside this action, not the action itself
+  const [plan, setPlan] = React.useState(null);
+  const [err, setErr] = React.useState('');
+  const [busy, setBusy] = React.useState(false);
+  const [run, setRun] = React.useState(null);
+  const [undone, setUndone] = React.useState(null);
+  React.useEffect(() => {
+    const L = window.FRKL_LIVE, sb = L && L.sb, b = L && L.brandId;
+    if (!sb || !b) { setErr('Your session expired. Refresh the page and sign in again.'); return; }
+    sb.rpc('fn_action_run_plan', { p_brand: b, p_external_id: ext })
+      .then(r => { if (r && r.error) setErr('The changes could not load. Try again.'); else setPlan((r && r.data) || null); });
+  }, [ext]);
+  const cls = 'v3-btn' + (small ? ' v3-btn-sm' : '');
+  const steps = plan && Array.isArray(plan.steps) ? plan.steps : [];
+  const approve = async () => {
+    setBusy(true); setErr('');
+    try { const r = await v3RunAction({ op: 'run', external_id: ext, steps: steps.length }); setRun(r); v3QRefresh(V3_MOVE_KEYS); }
+    catch (e) { setErr(String((e && e.message) || e)); }
+    setBusy(false);
+  };
+  const undo = async () => {
+    setBusy(true); setErr('');
+    try { const r = await v3RunAction({ op: 'undo', run_id: run.id }); setUndone(r); v3QRefresh(V3_MOVE_KEYS); }
+    catch (e) { setErr(String((e && e.message) || e)); }
+    setBusy(false);
+  };
+  if (undone) {
+    const st = V3_RUN_STATUS[undone.status] || V3_RUN_STATUS.undone;
+    return (<div className="v3-mv-form v3-run">
+      <p className="v3-mv-who v3-mv-state"><span><span className="v3-mv-who-k">Change</span><span className={'v3-pill v3-pill-' + st[1]}>{st[0]}</span></span></p>
+      <V3RunResult run={undone} undo/>
+      {undone.undo_error && <p className="v3-mv-late">{undone.undo_error}</p>}
+      {undone.status === 'undone' && <p className="v3-mv-note">The ads are back as they were and the action is open again.</p>}
+      <div className="v3-mv-btns"><button type="button" className={cls} onClick={() => onFinished(false)}>Close</button></div>
+    </div>);
+  }
+  if (run) {
+    const st = V3_RUN_STATUS[run.status] || V3_RUN_STATUS.failed;
+    return (<div className="v3-mv-form v3-run" role="status">
+      <p className="v3-mv-who v3-mv-state">
+        <span><span className="v3-mv-who-k">Change</span><span className={'v3-pill v3-pill-' + st[1]}>{st[0]}</span></span>
+        <span><span className="v3-mv-who-k">Paused</span>{fmtCount(run.n_ok) + ' of ' + fmtCount(run.n_steps)}</span>
+        {run.mode === 'demo' && <span><span className="v3-mv-who-k">Account</span>Demo</span>}
+      </p>
+      <V3RunResult run={run}/>
+      {run.error && <p className="v3-mv-late">{run.error}</p>}
+      {run.closed_action && step ? <p className="v3-mv-note">This step is marked done and its check counts from today. The rest of this action stays with you. Undo stays open for 30 days on Actions.</p>
+        : run.closed_action ? <p className="v3-mv-note">Marked done. The check on Results counts from today. Undo stays open for 30 days on Actions.</p>
+        : <p className="v3-mv-note">Not marked done: the action stays open with Greta until every ad is paused.</p>}
+      <div className="v3-mv-btns">
+        <button type="button" className={cls + ' v3-btn-p'} disabled={busy} onClick={() => onFinished(!!run.closed_action)}>Close</button>
+        {run.can_undo && <button type="button" className={cls} disabled={busy} onClick={undo}>{busy ? 'Undoing…' : 'Undo'}</button>}
+      </div>
+      {err && <span className="v3-fix-err" role="alert">{err}</span>}
+    </div>);
+  }
+  return (<div className="v3-mv-form v3-run">
+    <p className="v3-mv-name">Changes for approval</p>
+    {!plan && !err && <V3SkeletonRows n={2}/>}
+    {plan && !plan.mode && <p className="v3-mv-late">{plan.reason || 'Nothing on this action Greta can run.'}</p>}
+    {plan && plan.mode && <>
+      <div className="v3-profit-scroll"><table className="v3-home-pl v3-ad-mini v3-why-tbl">
+        <thead><tr><th>Ad to pause</th><th>Angle</th><th className="r">Spend, 28 days</th></tr></thead>
+        <tbody>{steps.map(s => <tr key={s.ad_id}><td>{s.ad_name}</td><td>{s.angle || FMT_NONE}</td><td className="r">{fmtMoney(s.spend_28d)}</td></tr>)}</tbody>
+      </table></div>
+      <p className="v3-mv-who v3-mv-state">
+        <span><span className="v3-mv-who-k">Where</span>{plan.mode === 'demo' ? 'Meta, demo account' : 'Meta Ads Manager'}</span>
+        <span><span className="v3-mv-who-k">Spend, 28 days</span>{fmtMoney(plan.spend_28d)}</span>
+        {plan.window_end && <span><span className="v3-mv-who-k">To</span>{v3Day(plan.window_end)}</span>}
+      </p>
+      {Array.isArray(plan.blocked) && plan.blocked.map((x, i) => <p key={i} className="v3-mv-note">{x.title}: {x.reason}</p>)}
+      <p className="v3-mv-note">{plan.mode === 'demo' ? 'A demo account: nothing changes in Meta. ' : ''}{step
+        ? 'This is the first step of this action. Approve pauses these ads now and marks that step done; the rest stays with you.'
+        : 'Approve pauses these ads now and marks this done.'} Undo turns them back on within 30 days.</p>
+    </>}
+    <div className="v3-mv-btns">
+      {plan && plan.mode && <button type="button" className={cls + ' v3-btn-p'} disabled={busy || !steps.length} onClick={approve}>
+        {busy ? 'Pausing…' : 'Approve: pause ' + v3RunCount(steps.length, 'ad', 'ads')}</button>}
+      <button type="button" className={cls + ' v3-btn-q'} disabled={busy} onClick={onClose}>Cancel</button>
+    </div>
+    {err && <span className="v3-fix-err" role="alert">{err}</span>}
+  </div>);
+}
+// Every change Greta made in the last 30 days, on the Actions page: who approved it, what it did, and Undo.
+function V3GretaRuns() {
+  const q = useV3Rows('action-runs', V3_RUNS_Q);
+  const [busy, setBusy] = React.useState(null);
+  const [err, setErr] = React.useState('');
+  const R = q.rows && q.rows[0];
+  const runs = R && Array.isArray(R.runs) ? R.runs : [];
+  if (!runs.length) return null;
+  const undo = async id => {
+    setBusy(id); setErr('');
+    try { await v3RunAction({ op: 'undo', run_id: id }); v3QRefresh(V3_MOVE_KEYS); } catch (e) { setErr(String((e && e.message) || e)); }
+    setBusy(null);
+  };
+  return (<section className="v3-panel v3-greta-runs">
+    <div className="v3-panel-head"><h2>Changes by Greta</h2><span className="v3-muted">Last 30 days</span></div>
+    <div className="v3-profit-scroll"><table className="v3-home-pl v3-why-tbl">
+      <thead><tr><th>Approved</th><th>By</th><th>Action</th><th className="r">Ads</th><th>Status</th><th/></tr></thead>
+      <tbody>{runs.map(r => { const st = V3_RUN_STATUS[r.status] || V3_RUN_STATUS.failed;
+        return (<tr key={r.id}><td>{v3Day(String(r.approved_at).slice(0, 10))}</td><td>{r.approved_by_me ? 'You' : (r.approved_by || 'A team member')}</td>
+          <td className="v3-review-wrap">{v3PlainAction({ external_id: r.external_id, description: r.title || '' }).title}</td>
+          <td className="r">{fmtCount(r.n_ok) + ' of ' + fmtCount(r.n_steps)}</td>
+          <td><span className={'v3-pill v3-pill-' + st[1]}>{st[0]}</span>{r.mode === 'demo' && <span className="v3-pill v3-pill-none">Demo</span>}</td>
+          <td className="r">{r.can_undo && <button type="button" className="v3-btn v3-btn-sm" disabled={busy === r.id} onClick={() => undo(r.id)}>{busy === r.id ? 'Undoing…' : 'Undo'}</button>}</td></tr>); })}</tbody>
+    </table></div>
+    {err && <p className="v3-panel-note v3-fix-err" role="alert">{err}</p>}
+  </section>);
+}
 // Do it, Not now (to a date) and Dismiss, each with an optional reason. Taking a move on keeps it on the list and
 // offers Mark done; the other three close it everywhere at once.
 // 11 Nov (Dan): a team reading the block must see which decision it is and where it stands. The block shows Status
@@ -18469,11 +18631,13 @@ function V3MoveDecide({ row, small, onDecided, startMode, named, covers, rank })
   // actions), not once when the card mounts; the card drew "Do it" again for a move taken on, after a page change.
   const bmQ = useV3Rows('board-moves', V3_BOARD_MOVES_Q);
   useV3Rows('move-extras', V3_MOVE_EXTRAS_Q);
+  useV3Rows('action-runs', V3_RUNS_Q);                           // 1225: whether Greta can do it, and her last run
   const ex = v3MoveExtra(ext);
+  const gr = v3RunFor(ext, row);
   const bmRow = bmQ.rows && bmQ.rows[0] && Array.isArray(bmQ.rows[0].rows) ? bmQ.rows[0].rows.find(x => x.external_id === ext) : null;
   const [mine, setMine] = React.useState(null);   // what this card just did, until the server's rows catch up
   const accepted = mine != null ? mine : !!((bmRow && bmRow.taken_on) || (ex && ex.accepted_at));
-  const [mode, setMode] = React.useState(startMode || null);   // null | 'later' | 'dismiss'
+  const [mode, setMode] = React.useState(startMode || null);   // null | 'later' | 'dismiss' | 'wrong' | 'greta'
   const today = new Date().toISOString().slice(0, 10);
   const [until, setUntil] = React.useState(v3IsoAdd(today, 7));
   const [reason, setReason] = React.useState('');
@@ -18530,7 +18694,7 @@ function V3MoveDecide({ row, small, onDecided, startMode, named, covers, rank })
     {named && <p className="v3-mv-name">{title}</p>}
     <p className="v3-mv-said" role="status">{said}</p></div>);
   return (<div className="v3-mv-decide">
-    {named && !mode && <p className="v3-mv-name">{title}</p>}
+    {named && (!mode || mode === 'greta') && <p className="v3-mv-name">{title}</p>}
     {(named || accepted) && !mode && <p className="v3-mv-who v3-mv-state">
       <span><span className="v3-mv-who-k">Status</span><span className={'v3-pill v3-pill-' + (accepted ? 'warn' : 'none')}>{accepted ? 'Doing' : 'To do'}</span></span>
       {started && <span><span className="v3-mv-who-k">Started</span>{v3Day(started)}</span>}
@@ -18542,16 +18706,29 @@ function V3MoveDecide({ row, small, onDecided, startMode, named, covers, rank })
       {accepted
         ? <button type="button" className={cls + ' v3-btn-p'} disabled={busy} onClick={() => go('done')}>{busy ? 'Saving…' : 'Mark done'}</button>
         : <button type="button" className={cls + ' v3-btn-p'} disabled={busy} onClick={() => go('do')}>{busy ? 'Saving…' : 'Start'}</button>}
+      {gr && gr.runnable && <button type="button" className={cls} disabled={busy} onClick={() => { setMode('greta'); setErr(''); }}>
+        {gr.external_id === ext ? 'Let Greta do it' : 'Let Greta pause ' + v3RunCount(gr.n_steps, 'ad', 'ads')}</button>}
       <button type="button" className={cls} disabled={busy} onClick={() => { setMode('later'); setErr(''); }}>Not now</button>
       {!moreOpen && <button type="button" className={cls + ' v3-btn-q v3-mv-quiet'} aria-label="More choices" onClick={() => setMoreOpen(true)}>More</button>}
       {moreOpen && <button type="button" className={cls + ' v3-btn-q v3-mv-quiet'} disabled={busy} onClick={() => { setMode('dismiss'); setErr(''); }}>Dismiss</button>}
       {moreOpen && <button type="button" className={cls + ' v3-btn-q v3-mv-quiet'} disabled={busy} onClick={() => { setMode('wrong'); setErr(''); setSent(false); }}>Something looks wrong?</button>}
     </div>}
     {sent && !mode && <p className="v3-mv-said" role="status">Sent to the Greta team. Thank you.</p>}
+    {!mode && gr && gr.last_run && V3_RUN_STATUS[gr.last_run.status] && (gr.external_id !== ext ? gr.last_run.status !== 'undone' : !['done', 'undone'].includes(gr.last_run.status)) && <>
+      <p className="v3-mv-who v3-mv-state"><span><span className="v3-mv-who-k">Greta</span>
+        <span className={'v3-pill v3-pill-' + V3_RUN_STATUS[gr.last_run.status][1]}>{V3_RUN_STATUS[gr.last_run.status][0]}</span></span>
+        <span><span className="v3-mv-who-k">Paused</span>{fmtCount(gr.last_run.n_ok) + ' of ' + fmtCount(gr.last_run.n_steps)}</span></p>
+      {(gr.last_run.error || gr.last_run.undo_error) && <p className="v3-mv-late">{gr.last_run.undo_error || gr.last_run.error}</p>}
+    </>}
     {!accepted && !mode && place && <p className="v3-mv-note">This opens {place.label} in a new tab, with the steps here.</p>}
     {accepted && !mode && <p className="v3-mv-note">Mark done once the change is live: the check on Results counts from that day.</p>}
     {accepted && !mode && <V3MovePlaces ext={ext}/>}
-    {mode && <div className="v3-mv-form">
+    {mode === 'greta' && <V3GretaRun row={row} runExt={gr ? gr.external_id : ext} small={small} onClose={close} onFinished={closed => {
+      if (!closed || (gr && gr.external_id !== ext)) { setMode(null); v3QRefresh(V3_MOVE_KEYS); return; }
+      setSaid('Done by Greta. The check on Results counts from today; Undo is on Actions for 30 days.');
+      setTimeout(() => { v3BoardDrop(ext); v3QRefresh(V3_MOVE_KEYS); if (onDecided) onDecided('done'); }, 1600);
+    }}/>}
+    {mode && mode !== 'greta' && <div className="v3-mv-form">
       <V3WhyChips list={V3_WHY[mode]} pick={pick} setPick={setPick} label={mode === 'wrong' ? 'What looks wrong?' : 'Why?'}/>
       {mode === 'later' && <label className="v3-mv-field"><span>Bring it back on</span>
         <input type="date" value={until} min={v3IsoAdd(today, 1)} max={v3IsoAdd(today, 183)} onChange={e => setUntil(e.target.value)}/></label>}
@@ -20073,6 +20250,8 @@ function V3HomeDrawer({ row, why, closes, closesTo, startMode, onClose }) {
 function V3HomeRow({ row, first, bmRow, onOpen, rank, wide, owners, onPage }) {
   const ext = row.external_id;
   const ex = v3MoveExtra(ext);
+  useV3Rows('action-runs', V3_RUNS_Q);   // 1225: the menu offers Greta where she can run it
+  const gr = v3RunFor(ext, row);
   const taken = !!((bmRow && bmRow.taken_on) || (ex && ex.accepted_at));
   const [mine, setMine] = React.useState(null);   // what this row just did, until the server's rows catch up
   const [busy, setBusy] = React.useState(false);
@@ -20120,7 +20299,7 @@ function V3HomeRow({ row, first, bmRow, onOpen, rank, wide, owners, onPage }) {
   // The status writes through the one decision path (fn_action_decide), so Done still starts the check of whether it worked.
   const change = async e => {
     const to = e.target.value;
-    if (to === 'later' || to === 'dismiss') { onOpen(to); return; }
+    if (to === 'later' || to === 'dismiss' || to === 'greta') { onOpen(to); return; }
     if (to === status) return;
     setBusy(true); setErr('');
     try {
@@ -20158,7 +20337,7 @@ function V3HomeRow({ row, first, bmRow, onOpen, rank, wide, owners, onPage }) {
     <td className="v3-home-basis" data-k="Confidence">{sure ? <V3Conf state={sure} detail={v3SureWhy(row, sure)}/> : '–'}</td>
     {wide && owners && <td className="v3-home-owner" data-k="Owner">{who && <><b>{who}</b>{bmRow && bmRow.due_on && <small className={late ? 'v3-down' : ''}>{late ? fmtCount(bmRow.overdue_days) + (Number(bmRow.overdue_days) === 1 ? ' day late' : ' days late') : 'Due ' + v3Day(bmRow.due_on)}</small>}</>}</td>}
     <td className="v3-home-status" data-k="Status">{conn ? null : <select className="v3-select" aria-label={'Status of ' + pa.title} value={status} disabled={busy || status === 'done'} onChange={change}>
-      <option value="todo">To do</option><option value="doing">Doing</option><option value="done">Done</option><option value="later">Not now…</option><option value="dismiss">Dismiss…</option>
+      <option value="todo">To do</option><option value="doing">Doing</option><option value="done">Done</option>{gr && gr.runnable && <option value="greta">{gr.external_id === ext ? 'Let Greta do it…' : 'Let Greta pause ' + v3RunCount(gr.n_steps, 'ad', 'ads') + '…'}</option>}<option value="later">Not now…</option><option value="dismiss">Dismiss…</option>
     </select>}</td>
     <td className="v3-home-open">{conn ? <V3Fix provider={conn} small/>
       : place ? <a className={'v3-btn v3-btn-sm' + (first ? ' v3-btn-p' : '')} href={place.url} target="_blank" rel="noopener noreferrer">Open {place.label}</a>
@@ -20725,7 +20904,7 @@ function v3QRefresh(keys) {
 }
 // What a decision on a move can change: the goal's shares, the folded moves, who and when, this morning's alerts,
 // Results and the older track record.
-const V3_MOVE_KEYS = ['today-goal', 'board-moves', 'move-extras', 'morning-alerts', 'brand-results', 'act-track', 'act-track-sum', 'fix-first'];
+const V3_MOVE_KEYS = ['today-goal', 'board-moves', 'move-extras', 'action-runs', 'morning-alerts', 'brand-results', 'act-track', 'act-track-sum', 'fix-first'];
 function useV3Rows(key, build) {
   const [, bump] = React.useState(0);
   const [tries, setTries] = React.useState(0);
