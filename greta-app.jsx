@@ -24845,11 +24845,18 @@ function V3GoalLead() {
   const fc = GV ? (F ? F.keep : Number(TGG.forecast)) : null, pGap = GV ? fc - Number(TGG.target) : null;
   const pSo = GV ? Number(TGG.so_far) : null, pExp = GV && TGG.expected_by_now != null ? Number(TGG.expected_by_now) : null;
   // Sales: the goal, where the plan lands, today's pace
-  const landed = A && A.at_today ? Number(A.at_today.sales) : Number(P.revenue_target);
+  // 1231 follow-up: once the goal reads the plan the owner confirmed (fn_plan_progress plan_source 'confirmed'), sales
+  // land where profit does: sold so far plus what that plan expects for the days left, at that plan's ads. It read the
+  // plan at today's ads (Halden: 1.2m beside a profit forecast on the confirmed plan's 464k of ads).
+  const onConf = !!(PQ && PQ.plan_source === 'confirmed' && QS && QS.plan_total != null && QS.expected_by_now != null && done != null);
+  const landed = onConf ? done + Number(QS.plan_total) - Number(QS.expected_by_now)
+    : A && A.at_today ? Number(A.at_today.sales) : Number(P.revenue_target);
   const sShort = tgt ? tgt - landed : null;
-  const adsPlan = A && A.at_today ? Number(A.at_today.ads) : Number(P.spend_cap);
+  const sTone = onConf ? (QS.status === 'behind' ? 'bad' : QS.status === 'just_behind' ? 'warn' : 'good') : sShort > 0 ? 'bad' : 'good';
+  const adsPlan = onConf && PQ.plan && PQ.plan.quarter_ad_spend != null ? Number(PQ.plan.quarter_ad_spend)
+    : A && A.at_today ? Number(A.at_today.ads) : Number(P.spend_cap);
   const adsGoal = A && A.at_goal ? Number(A.at_goal.ads) : gSpend;
-  const planAdsDelta = held ? 'the most a first order pays for' : Number(A && A.hold_week) > 0 ? adsNear.replace(/^ads /, '') : '';
+  const planAdsDelta = onConf ? 'the plan you confirmed' : held ? 'the most a first order pays for' : Number(A && A.hold_week) > 0 ? adsNear.replace(/^ads /, '') : '';
 
   // The chart: the goal as the zero line when the two futures are in, otherwise the path to the goal
   const phasing = ph0.rows && ph0.rows[0] && ph0.rows[0].confirmed_phasing;
@@ -24894,9 +24901,10 @@ function V3GoalLead() {
           <V3HomeTile k="So far" v={pSo < 0 ? '−' + fmtMoney(Math.abs(pSo)) : fmtMoney(pSo)} cls={pExp != null && pSo < pExp ? 'v3-down' : ''} delta={pExp != null ? v3GbpRound(pExp) + ' expected by now' : ''}/>
         </div></div>}
       <div className="v3-home-group" style={{ '--n': QS && QS.pace_finish != null ? 3 : 2 }}>
-        <div className="v3-home-group-h">Sales{tgt ? <span>Goal {v3GbpRound(tgt)}</span> : null}{tgt && F ? <b className={'v3-pill ' + (sShort > 0 ? 'v3-pill-bad' : 'v3-pill-good')}>{sShort > 0 ? v3GbpRound(sShort) + ' short' : 'On track'}</b> : null}</div>
+        <div className="v3-home-group-h">Sales{tgt ? <span>Goal {v3GbpRound(tgt)}</span> : null}{tgt && (F || onConf) ? <b className={'v3-pill ' + pillOf[sTone]}>{sShort > 0 ? v3GbpRound(sShort) + ' short' : 'On track'}</b> : null}</div>
         <div className="v3-home-tiles">
-          <V3HomeTile k="Forecast" v={v3GbpRound(landed)} delta={held ? 'at the ads a first order pays for' : 'with ' + adsNear} act={act('gap', M.gap)} title={M.gap ? 'What the goal adds to the plan' : undefined}/>
+          <V3HomeTile k="Forecast" v={v3GbpRound(landed)} delta={onConf ? 'on the plan you confirmed' : held ? 'at the ads a first order pays for' : 'with ' + adsNear} act={act('gap', M.gap)}
+            title={onConf ? 'Sales so far plus what the plan you confirmed expects for the days left; within 2% of the plan counts as on track' : M.gap ? 'What the goal adds to the plan' : undefined}/>
           <V3HomeTile k="So far" v={done != null ? fmtMoney(done) : FMT_NONE} cls={exp != null && done < exp ? 'v3-down' : ''} delta={exp != null ? v3GbpRound(exp) + ' expected by now' : ''} act={act('sofar', M.sofar)} title={M.sofar ? 'Why sales differ from the plan so far' : undefined}/>
           {QS && QS.pace_finish != null && <V3HomeTile k="At today’s pace" v={v3GbpRound(QS.pace_finish)} delta="ignores the season" title={'Sales so far, then your last 30 days’ average day (' + fmtMoney(QS.pace_per_day) + ') for each day left'}/>}
         </div></div>
@@ -24904,8 +24912,9 @@ function V3GoalLead() {
         <div className="v3-home-group-h">Ads<span>This quarter</span></div>
         <div className="v3-home-tiles">
           <V3HomeTile k="On the plan" v={v3GbpRound(adsPlan)} delta={planAdsDelta}/>
-          {g && unreach ? <V3HomeTile k="Most the plan reaches" v={v3GbpRound(reachBest)} delta={v3GbpRound(tgt - reachBest) + ' short of the goal'}/>
-            : g && adsGoal != null ? <V3HomeTile k="The goal takes" v={v3GbpRound(adsGoal)} delta={ph ? v3GbpRound(peak.gSpend) + ' in ' + gpMonthName(peak.iso) : ''}/> : null}
+          {/* 1231 follow-up: beside the confirmed plan, these two are today's re-plan, so they say so */}
+          {g && unreach ? <V3HomeTile k={onConf ? 'Re-plan reach' : 'Most the plan reaches'} v={v3GbpRound(reachBest)} delta={v3GbpRound(tgt - reachBest) + ' short of the goal' + (onConf ? ', on today’s figures' : '')}/>
+            : g && adsGoal != null ? <V3HomeTile k={onConf ? 'Re-plan ads' : 'The goal takes'} v={v3GbpRound(adsGoal)} delta={onConf ? 'for the goal, on today’s figures' : ph ? v3GbpRound(peak.gSpend) + ' in ' + gpMonthName(peak.iso) : ''}/> : null}
         </div></div>
       {!g && <div className="v3-panel-note v3-goal-call v3-goal-full"><span>No goal confirmed yet.</span>{setGoal}</div>}
       {drv === 'gap' && M.gap && <div className="v3-home-drv v3-goal-full"><V3DriverPanel key="gap" fixed={M.gap}/></div>}
