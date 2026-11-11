@@ -23012,11 +23012,14 @@ function V3AdAnswer({ action, g, panel }) {
   // 3 Nov, storytelling review: eight sentences and eleven figures, for a choice between two futures. Each row to its own
   // scale, from zero; the sentences are one click away.
   const F = panel && g && !g.confirmed ? null : v3Futures(g);
-  if (panel && !F) return (<section className="v3-panel" aria-label="Ad spend">
+  // 11 Nov: on a confirmed plan this printed all 130 words. The answer and the board's cut lead; the working folds.
+  if (panel && !F) { const lead = v3FirstSentences(A.said, 3), rest = String(A.said).slice(lead.length).trim();
+    return (<section className="v3-panel" aria-label="Ad spend">
     <div className="v3-panel-head"><h2>Ad spend</h2></div>
-    <p className="v3-panel-note">{A.said}</p>
+    <p className="v3-panel-note">{lead}{rest ? <> <button type="button" className="v3-mv-toggle" aria-expanded={why} onClick={() => setWhy(o => !o)}>{why ? 'Hide basis' : 'Basis'}</button></> : null}</p>
+    {why && rest && <p className="v3-panel-note">{rest}</p>}
     {A.owner_question && <p className="v3-panel-note"><b>{A.owner_question}</b> {action}</p>}
-  </section>);
+  </section>); }
   if (panel) {
     const T = A.at_today, G = A.at_goal, tgt = Number(g.target);
     const keepWord = Number(A.hold_week) > 0 ? 'Ads near ' + v3GbpRound(A.hold_week) + ' a week' : 'Ads on the plan';
