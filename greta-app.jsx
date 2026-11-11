@@ -11627,7 +11627,7 @@ const V3_MOVES = [
   ['returns-product-', ['profit', 'prodsales']], ['seo-nonbrand', ['organic']],
   ['email-list-health', ['email']], ['email-list-growth', ['email']], ['email-holdout', ['email']], ['site-speed', ['conv']], ['returns-faults', ['profit']],
 ];
-const V3_MOVE_LABEL = { cac: 'cost to win a new customer', ret: 'sales from each £1 of ads', profit: 'profit after ads', ly: 'sales against last year',
+const V3_MOVE_LABEL = { cac: 'cost of a new customer', ret: 'sales from each £1 of ads', profit: 'profit after ads', ly: 'sales against last year',
   repeat: 'customers who order again', conv: 'orders per 100 visits', newc: 'new customers', retsales: 'returning customers’ sales', spend: 'ad spend',
   metacpa: 'Meta’s cost per sale', googcpa: 'Google’s cost per sale', newsales: 'new customers’ sales', prodsales: 'product sales', aov: 'the average order',
   brandshare: 'searches for your name', email: 'sales from email campaigns', organic: 'visits from unpaid search' };
@@ -21033,7 +21033,7 @@ function V3GrowthYear() {
     ['From returning customers', LY && fmtMoney(LY.returning), v3GbpRound(PL.returning), chg(LY && LY.returning, PL.returning)],
     ['Ad spend', LY && fmtMoney(LY.spend), v3GbpRound(PL.spend), chg(LY && LY.spend, PL.spend)],
     ['New customers', LY && fmtCount(LY.new_customers), fmtCount(Math.round(Number(PL.new_customers) / 10) * 10), chg(LY && LY.new_customers, PL.new_customers)],
-    ['Cost per new customer', LY && fmtMoney(LY.cost_per_new_customer, 2), v3GbpRound(PL.cost_per_new_customer), chg(LY && LY.cost_per_new_customer, PL.cost_per_new_customer)],
+    ['Cost of a new customer', LY && fmtMoney(LY.cost_per_new_customer, 2), v3GbpRound(PL.cost_per_new_customer), chg(LY && LY.cost_per_new_customer, PL.cost_per_new_customer)],
     ['Sales per £1 of ads', LY && fmtTimes(LY.mer), fmtTimes(PL.mer), chg(LY && LY.mer, PL.mer)],
   ];
   // The contribution ladder: each level is the one above less a cost (CM3 = CM2 − ad spend − other marketing)
