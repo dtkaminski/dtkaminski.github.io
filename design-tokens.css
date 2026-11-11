@@ -141,10 +141,17 @@
   --color-brand-purple:     #8B6FAE;
   --color-brand-terracotta: #D67A5B;
   --color-brand-stone:      #D8CFC4;
+  /* The light end of each lobe's gradient (the kit's digital mark): top left to bottom right */
+  --color-brand-forest-hi:     #547267;
+  --color-brand-purple-hi:     #B398CF;
+  --color-brand-terracotta-hi: #EE9A77;
+  --color-brand-stone-hi:      #EEE8E1;
+  /* The small square where the four lobes meet */
+  --color-brand-ink:           #0B1412;
   --color-wordmark:         var(--color-ink);
   --color-wordmark-on-dark: #F8F6F2;
-  /* The face the approved logo artwork is set in. */
-  --font-wordmark: Arial, Helvetica, 'Liberation Sans', sans-serif;
+  /* 11 Nov 2026: the wordmark is outlined artwork (Inter Display 600, from the approved board),
+     not live text, so it needs no font token. See brand/README.md. */
 
   /* ── Type ───────────────────────────────────────────────────────────────
      DM Sans for language, DM Mono for anything countable. Numbers in mono is a

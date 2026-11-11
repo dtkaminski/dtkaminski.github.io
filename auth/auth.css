@@ -1,7 +1,7 @@
 /* Shared styling for signup/login/workspace pages and the product shell.
    Every value resolves to design-tokens.css (imported below) — Phase 3, 2026-09-24. */
-@import url("../design-tokens.css?v=20261104finish");
-@import url("../greta-logo.css?v=20261001a");
+@import url("../design-tokens.css?v=20261111logo");
+@import url("../greta-logo.css?v=20261111logo");
 
 :root {
   --s-1: var(--space-1); --s-2: var(--space-2); --s-3: var(--space-3); --s-4: var(--space-4);
@@ -75,7 +75,7 @@ code {
   display: flex; align-items: center; gap: var(--s-3);
   margin-bottom: var(--s-7); color: var(--text-primary) !important;
 }
-.brand { --logo-height: var(--space-8); }
+.brand { --logo-height: var(--space-10); }
 
 /* ── Workspace bar ───────────────────────────────────────────────────── */
 .workspace-bar {

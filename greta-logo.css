@@ -1,5 +1,9 @@
-/* The Greta logo (Route 3, approved 2026-10-01) — mark + wordmark, drawn inline as one SVG.
-   Source masters: brand/greta-logo-horizontal-{light,dark}.svg.
+/* The Greta logo (Route 3) — mark + wordmark, drawn inline as one SVG.
+   Master: brand/greta-logo.inline.svg, written into every page by `node brand/sync-logo.mjs`.
+   Geometry and how it was measured: brand/README.md.
+
+   The mark is four equal discs in a pinwheel, each tucked under the next, with a small ink
+   square where they meet. The wordmark is outlined artwork, so it looks the same everywhere.
 
    The four lobes keep their brand colours on every surface. Only the wordmark changes:
    it follows `color`, which is --color-wordmark (ink) by default and
@@ -9,12 +13,17 @@
    artwork's aspect ratio. */
 .greta-logo {
   display: block; flex-shrink: 0;
-  height: var(--logo-height, var(--space-6)); width: auto;
+  height: var(--logo-height, var(--space-8)); width: auto;
   color: var(--color-wordmark);
 }
 .on-dark .greta-logo, .greta-logo.on-dark { color: var(--color-wordmark-on-dark); }
-.greta-logo .gl-purple     { stroke: var(--color-brand-purple); }
-.greta-logo .gl-forest     { stroke: var(--color-brand-forest); }
-.greta-logo .gl-terracotta { stroke: var(--color-brand-terracotta); }
-.greta-logo .gl-stone      { stroke: var(--color-brand-stone); }
-.greta-logo .gl-word       { fill: currentColor; font-family: var(--font-wordmark); }
+.greta-logo .gl-purple-hi     { stop-color: var(--color-brand-purple-hi); }
+.greta-logo .gl-purple        { stop-color: var(--color-brand-purple); }
+.greta-logo .gl-forest-hi     { stop-color: var(--color-brand-forest-hi); }
+.greta-logo .gl-forest        { stop-color: var(--color-brand-forest); }
+.greta-logo .gl-terra-hi      { stop-color: var(--color-brand-terracotta-hi); }
+.greta-logo .gl-terra         { stop-color: var(--color-brand-terracotta); }
+.greta-logo .gl-stone-hi      { stop-color: var(--color-brand-stone-hi); }
+.greta-logo .gl-stone         { stop-color: var(--color-brand-stone); }
+.greta-logo .gl-hole          { fill: var(--color-brand-ink); }
+.greta-logo .gl-word          { fill: currentColor; }

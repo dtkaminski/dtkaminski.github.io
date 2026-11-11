@@ -2725,3 +2725,19 @@ td.v3-tpl-fig { font-weight: var(--weight-normal); white-space: nowrap; }
   .v3-tpl-cols, .v3-tpl-xlab { gap: var(--space-1); }
   .v3-tpl-xlab span:nth-child(even) { visibility: hidden; }
 }
+
+/* 11 Nov (brand pass): at 1400px and wider a tile label was one line with an ellipsis, so a narrow tile cut it
+   mid-word ("Cost of a new custome" on Home at 1440). It wraps at every width now, and a tile too narrow for
+   the longest label keeps two lines, so the figures across a row stay level. Breakpoints are px, like the rest.
+   Desktop only: container-type makes the tile a containing block, and phones open popovers fixed (.v3-sheet). */
+@media (min-width: 1400px) {
+  .v3-home-tile { container-type: inline-size; }
+  .v3-home-tile-k { white-space: normal; overflow: visible; text-overflow: clip; }
+  @container (max-width: 150px) { .v3-home-tile-k { min-height: 2lh; } }
+}
+
+/* 11 Nov (brand pass): a product name in the stock runway was cut with an ellipsis ("Vitamin C Brightening Se…"
+   at 1440). The lead takes the same name column as the other runways, and a name too long for it wraps to a
+   second line instead of losing its end. */
+@media (min-width: 768px) { .v3-mvrun-lead .v3-mvrun-row { grid-template-columns: minmax(0, 11rem) minmax(0, 1fr) 3.5rem; } }
+.v3-mvrun-k { white-space: normal; text-overflow: clip; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; }
