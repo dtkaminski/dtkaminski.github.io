@@ -17259,7 +17259,7 @@ function v3PlainAction(row){
   }
   // site-funnel-weakstep led with its evidence and no instruction ("About 13% fewer of your visits end in an order")
   if (id === 'site-funnel-weakstep') {
-    const step = (m(/The step losing most is ([^.]+)\./) || [])[1], gap = m(/^(About \d+% fewer of your visits end in an order than on your full-price weeks) \(([\d.]+%) against ([\d.]+%)/);
+    const step = (m(/The step losing most is ([^.]+)\./) || [])[1], gap = m(/^((?:About )?\d+% fewer of your visits end in an order than on your full-price weeks) \(([\d.]+%) against ([\d.]+%)/);
     // 30 Oct eval: the rewrite dropped the emitter's basis, so this read as contradicting Website's "about the usual
     // rate". Keep it: the move's rates are Google Analytics', on full-price weeks.
     return P(step ? 'Improve ' + v3Step(step) + ' so more visits end in an order' : 'Find the step where visits stop turning into orders',
@@ -21645,7 +21645,9 @@ function V3Growth() {
         {(newSign || nc != null) && <div className="v3-home-group" style={{ '--n': [newSign, nc != null].filter(Boolean).length }}>
           <div className="v3-home-group-h">First orders<span>Last 30 days</span></div>
           <div className="v3-home-tiles">
-            {newSign && signTile(newSign, 'Sales')}
+            {/* 11 Nov: the sign's own value is the history's last point, a day behind; Customers shows the current
+                30 days (£177,156 against £179,364 on Halden). Same figure here. */}
+            {newSign && signTile(newSign, 'Sales', T30 && T30.new_net != null ? fmtMoney(Number(T30.new_net)) : null, T30 && T30.new_net != null ? Number(T30.new_net) : null)}
             {nc != null && <V3HomeTile k="New customers" v={fmtCount(nc)} m={['new_customers', nc]} dir={ncTrend && ncTrend.dir} cls={ncTrend && ncTrend.cls} delta={ncTrend ? ncTrend.delta : ''} pts={(ncSeries || []).map(p => p.v)}/>}
           </div></div>}
         {openSign && <div className="v3-home-drv v3-goal-full"><V3DriverPanel key={drv} which={drv} points={openSign.points || SG.HP} ctx={openSign.ctx} line={openSign.dline}/></div>}
@@ -29295,7 +29297,8 @@ const V3_PAGES = {
         the feed table follow. Duplicate and dead connections for frkl were removed by hand the same day. */}
     {UI_V3 && <V3DataTrust/>}
     <ConnectionsPanel/>
-    <DataHealth/>
+    {/* 11 Nov: the page ran to 5,700 px; the feed-by-feed table is reference, so it folds */}
+    {UI_V3 ? <V3More id="settings-feeds" label="Each feed, table by table"><DataHealth/></V3More> : <DataHealth/>}
   </>),
   team: (p) => (UI_V3 ? <V3Team/> : <TeamPanel/>),
 };
