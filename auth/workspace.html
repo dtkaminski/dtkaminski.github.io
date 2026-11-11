@@ -360,18 +360,29 @@
 <div id="shopify-modal" class="modal-bg" hidden>
   <div class="modal">
     <h3>Connect Shopify</h3>
-    <p class="lead" style="font-size:13px; margin:8px 0 16px;">
-      Enter your <code>.myshopify.com</code> domain (not your custom domain). You'll be redirected to Shopify to approve read-only access.
-    </p>
-    <label>Shop domain
-      <input type="text" id="shop-input" placeholder="e.g. aurora.myshopify.com" autofocus style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 13px;"/>
-    </label>
-    <p class="meta" style="margin-top:var(--s-2); font-size:11px;">
-      Read-only scopes: orders, products, inventory, customers, analytics, discounts.
-    </p>
-    <div class="row" style="margin-top: 16px;">
-      <a id="shop-approve-link" class="btn-primary" target="_top">Approve on Shopify</a>
-      <button id="shop-cancel" class="btn-ghost" style="margin-left:auto;">Cancel</button>
+    <p class="lead">Greta reads your store through a private app you make in your own Shopify account. It takes ten minutes, once, and the app can only read.</p>
+    <ol class="connect-steps">
+      <li>Sign in at <a href="https://dev.shopify.com" target="_blank" rel="noopener">dev.shopify.com</a> with the account that owns your store, and create an app called Greta.</li>
+      <li>Create a version. Set the app URL to <code>https://dtkaminski.github.io</code> and add these access scopes: <code>read_orders, read_all_orders, read_products, read_inventory, read_customers, read_discounts, read_price_rules</code>. Release it.</li>
+      <li>Install the app on your store and approve it. If Shopify refuses read_all_orders, install without it: Greta then reads the last 60 days.</li>
+      <li>Copy the client ID and client secret from the app's Settings, and paste them below.</li>
+    </ol>
+    <div class="connect-fields">
+      <label>Store address
+        <input type="text" id="shop-input" placeholder="your-store.myshopify.com" autocomplete="off" spellcheck="false"/>
+      </label>
+      <label>Client ID
+        <input type="text" id="shop-client-id" autocomplete="off" spellcheck="false"/>
+      </label>
+      <label>Client secret
+        <input type="password" id="shop-client-secret" autocomplete="new-password" spellcheck="false"/>
+      </label>
+    </div>
+    <p class="meta">Greta checks the keys with Shopify before saving them. They stay on Greta's server and are never shown again. To stop access, uninstall the app in Shopify.</p>
+    <div id="shop-error" class="error-box" hidden></div>
+    <div class="row">
+      <button id="shop-submit" class="btn-primary" disabled>Connect</button>
+      <button id="shop-cancel" class="btn-ghost">Cancel</button>
     </div>
   </div>
 </div>
@@ -746,7 +757,7 @@
       // Step 1: Connect Shopify
       cta.hidden = false;
       document.getElementById('next-step-tag').textContent = 'Required next step';
-      document.getElementById('next-step-title').textContent = 'Connect Shopify (~30 seconds)';
+      document.getElementById('next-step-title').textContent = 'Connect Shopify';
       document.getElementById('next-step-btn').textContent = 'Connect Shopify';
       document.getElementById('next-step-btn').onclick = openShopifyModal;
     } else {
@@ -776,27 +787,49 @@
   // ── Shopify modal ──────────────────────────────────────────────────────
   const shopifyModal = document.getElementById('shopify-modal');
   const shopInput = document.getElementById('shop-input');
-  const shopApproveLink = document.getElementById('shop-approve-link');
+  const shopIdInput = document.getElementById('shop-client-id');
+  const shopSecretInput = document.getElementById('shop-client-secret');
+  const shopSubmit = document.getElementById('shop-submit');
+  const shopError = document.getElementById('shop-error');
 
+  // 11 Nov (eval fix 4): a store connects with its own custom app's keys through shopify-connect, which
+  // checks them with Shopify before saving. Greta's App Store app is not approved, so the OAuth route this
+  // modal used (connect-start) refused every store outside Dan's own organisation.
   function openShopifyModal() {
     shopifyModal.hidden = false;
-    shopInput.value = '';
-    shopApproveLink.removeAttribute('href');
+    shopInput.value = ''; shopIdInput.value = ''; shopSecretInput.value = '';
+    shopError.hidden = true; shopSubmit.disabled = true; shopSubmit.textContent = 'Connect';
     setTimeout(() => shopInput.focus(), 50);
   }
-  shopInput.addEventListener('input', () => {
+  function shopFormReady() {
     const v = shopInput.value.trim().toLowerCase();
-    const valid = /^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(v) && !!currentBrand;
-    // href is just a visual affordance; the real action goes through connect-start.
-    if (valid) shopApproveLink.setAttribute('href', '#'); else shopApproveLink.removeAttribute('href');
-  });
-  // Route Shopify connect through the authenticated connect-start endpoint.
-  shopApproveLink.addEventListener('click', (e) => {
-    e.preventDefault();
-    const v = shopInput.value.trim().toLowerCase();
-    if (!/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(v)) return;
-    shopifyModal.hidden = true;
-    startConnect('shopify', { shop: v });
+    return /^[a-z0-9][a-z0-9-]*(\.myshopify\.com)?$/.test(v) && shopIdInput.value.trim().length >= 16
+      && shopSecretInput.value.trim().length >= 16 && !!currentBrand;
+  }
+  [shopInput, shopIdInput, shopSecretInput].forEach(el => el.addEventListener('input', () => { shopSubmit.disabled = !shopFormReady(); }));
+  shopSubmit.addEventListener('click', async () => {
+    if (!shopFormReady()) return;
+    if (!currentSession?.access_token) { shopError.textContent = 'Please sign in again.'; shopError.hidden = false; return; }
+    shopSubmit.disabled = true; shopSubmit.textContent = 'Checking with Shopify…'; shopError.hidden = true;
+    try {
+      const resp = await fetch(`${SUPABASE_FNS}/shopify-connect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentSession.access_token}` },
+        body: JSON.stringify({ brand: currentBrand.slug, shop: shopInput.value.trim(), client_id: shopIdInput.value.trim(), client_secret: shopSecretInput.value.trim() }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        shopError.textContent = data.message || data.error || 'Shopify did not connect.';
+        shopError.hidden = false; shopSubmit.disabled = false; shopSubmit.textContent = 'Connect';
+        return;
+      }
+      shopSecretInput.value = '';
+      shopifyModal.hidden = true;
+      window.location.reload();
+    } catch (err) {
+      shopError.textContent = 'Could not reach Greta: ' + (err?.message || err);
+      shopError.hidden = false; shopSubmit.disabled = false; shopSubmit.textContent = 'Connect';
+    }
   });
 
   // Authenticated connection kickoff: validates ownership server-side + stamps

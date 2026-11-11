@@ -257,6 +257,12 @@ input::placeholder { color: var(--text-faint); }
   max-width: 480px; width: 100%; box-shadow: var(--shadow-lg);
 }
 .modal h3 { font-size: var(--text-base); font-weight: var(--weight-bold); margin-bottom: var(--s-2); }
+/* 11 Nov: the Shopify keys form (a numbered guide, then three fields) */
+.modal .connect-steps { margin: 0 0 var(--s-4); padding-left: var(--s-5); font-size: var(--text-sm); color: var(--text-secondary); line-height: 1.6; }
+.modal .connect-steps code { font-size: var(--text-xs); word-break: break-word; }
+.modal .connect-fields label + label { display: block; margin-top: var(--s-3); }
+.modal .connect-fields input { font-family: var(--font-mono); font-size: var(--text-sm); }
+.modal .connect-fields ~ .meta, .modal .connect-fields ~ .error-box, .modal .connect-fields ~ .row { margin-top: var(--s-3); }
 
 /* ── Advanced details (signup form collapsible) ──────────────────────── */
 .advanced-details {

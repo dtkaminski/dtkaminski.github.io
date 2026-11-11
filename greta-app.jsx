@@ -15156,6 +15156,8 @@ function connShopDomain() {
   const row = rows.find(r => r.provider === 'shopify' && /\.myshopify\.com$/i.test(String(r.account_identifier || '')));
   return row ? String(row.account_identifier).toLowerCase() : '';
 }
+// The seven scopes a Shopify app for Greta asks for (connect-start and the runbook use the same list).
+const V3_SHOPIFY_SCOPES = 'read_orders, read_all_orders, read_products, read_inventory, read_customers, read_discounts, read_price_rules';
 async function startConnect(provider, opts) {
   const ASK = getOIAsk();
   if (!ASK || !ASK.endpoint || typeof ASK.getJwt !== 'function') throw new Error('Sign in to reconnect this source.');
@@ -15196,17 +15198,13 @@ function V3Fix({ provider, label, small, quiet }) {
   const go = async () => {
     setBusy(true); setErr('');
     const opts = {};
+    // 11 Nov (eval fix 4): Greta's App Store app is not approved, so Shopify's OAuth refuses every store
+    // outside Dan's organisation. A store connects with its own app's keys, pasted in Settings.
     if (provider === 'shopify') {
-      const shop = connShopDomain();
-      // No stored domain means this shop was never connected through OAuth, and
-      // connect-start cannot build an authorize URL without one. Send the operator to
-      // the screen that can ask for it rather than failing in place.
-      if (!shop) {
-        setBusy(false);
-        if (window.__oiNav) window.__oiNav('settings', 'connections');
-        return;
-      }
-      opts.shop = shop;
+      setBusy(false);
+      try { window.GRETA_OPEN_SHOPIFY_FORM = true; } catch (_) {}
+      if (window.__oiNav) window.__oiNav('settings', 'connections');
+      return;
     }
     track('reconnect_started', { provider }, 'action');
     try { await startConnect(provider, opts); }          // navigates away on success
@@ -15451,23 +15449,41 @@ function ConnectionsPanel(){
   // Prefilled from the stored domain when there is one: a reconnect should not make
   // anyone retype the shop they are already connected to.
   const [shopDomain, setShopDomain] = useState(() => connShopDomain());
-  const [showShopifyForm, setShowShopifyForm] = useState(false);
+  // 11 Nov (eval fix 4): a store connects with its own custom app's keys (shopify-connect). Greta's App
+  // Store app is not approved, so the OAuth route this form used refused every store outside Dan's own.
+  // The form opens by itself when there is no working Shopify connection, or when a Reconnect sent us here.
+  const [showShopifyForm, setShowShopifyForm] = useState(() => { try { const o = !!window.GRETA_OPEN_SHOPIFY_FORM; window.GRETA_OPEN_SHOPIFY_FORM = false; return o; } catch (_) { return false; } });
+  const [clientId, setClientId] = useState(''), [clientSecret, setClientSecret] = useState('');
   const [connecting, setConnecting] = useState(false);
-  const [connectErr, setConnectErr] = useState('');
-  const shopValid = /^[a-zA-Z0-9][a-zA-Z0-9-]*\.myshopify\.com$/.test(shopDomain.trim());
+  const [connectMsg, setConnectMsg] = useState(null);
+  const [justConnected, setJustConnected] = useState(null);
+  const shopOk = /^[a-z0-9][a-z0-9-]*(\.myshopify\.com)?$/i.test(shopDomain.trim());
+  const keysOk = clientId.trim().length >= 16 && clientSecret.trim().length >= 16;
+  const shopActive = LIVE_CONNS.some(x => x.provider === 'shopify' && x.status === 'active') || !!justConnected;
+  const formOpen = authed && (showShopifyForm || (!checking && !shopActive));
 
-  // Start the OAuth flow through the authenticated connect-start endpoint, then send the
-  // TOP window (this dashboard is a same-origin iframe) to Shopify's consent screen. The
-  // callback refuses to activate any connection whose initiator isn't an authorized owner.
-  // Shares startConnect with the action-board buttons, so the return path is remembered
-  // the same way here as it is there.
-  const startShopifyConnect = async () => {
-    if (!authed) { setConnectErr('Sign in to connect a store.'); return; }
-    if (!shopValid) { setConnectErr('Enter a valid *.myshopify.com domain.'); return; }
-    setConnecting(true); setConnectErr('');
-    track('reconnect_started', { provider: 'shopify' }, 'settings');
-    try { await startConnect('shopify', { shop: shopDomain.trim().toLowerCase() }); }  // leaves the page on success
-    catch (e) { setConnectErr(String((e && e.message) || e)); setConnecting(false); }
+  const submitShopify = async (e) => {
+    e.preventDefault(); if (connecting) return;
+    const ASK = getOIAsk();
+    if (!ASK || !ASK.endpoint || typeof ASK.getJwt !== 'function') { setConnectMsg({ kind: 'err', text: 'Sign in to connect a store.' }); return; }
+    setConnecting(true); setConnectMsg(null);
+    track('shopify_connect_submitted', {}, 'settings');
+    let ok = false, data = {};
+    try {
+      const jwt = await ASK.getJwt();
+      if (!jwt) throw new Error('Your session expired. Refresh the page and sign in again.');
+      const r = await fetch(String(ASK.endpoint).replace(/\/[^/]*$/, '') + '/shopify-connect', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jwt },
+        body: JSON.stringify({ brand: (OI_BRAND && OI_BRAND.slug) || '', shop: shopDomain.trim(), client_id: clientId.trim(), client_secret: clientSecret.trim() }),
+      });
+      ok = r.ok; data = await r.json().catch(() => ({}));
+    } catch (err) { data = { message: String((err && err.message) || 'Could not reach the server. Try again.') }; }
+    setConnecting(false);
+    if (!ok) { setConnectMsg({ kind: 'err', text: data.message || data.error || 'Shopify did not connect.' }); return; }
+    setClientSecret(''); setClientId(''); setShowShopifyForm(false);
+    setJustConnected({ shop: data.shop, label: data.account_label });
+    setConnectMsg({ kind: 'ok', text: data.message || 'Connected.' });
+    track('shopify_connected', { history: data.history || '' }, 'settings');
   };
 
   return (<div style={{display:'flex', flexDirection:'column', gap:'var(--s-7)'}}>
@@ -15481,7 +15497,8 @@ function ConnectionsPanel(){
           // exists; falls back to data recency for unconnected/static sources. A quiet
           // store with no orders for a few days is NOT a stale connection.
           const dataN = s.last == null ? null : daysAgo(s.last);
-          const conn = s.provider ? LIVE_CONNS.find(x => x.provider === s.provider && x.status === 'active') : null;
+          const conn = s.provider ? (LIVE_CONNS.find(x => x.provider === s.provider && x.status === 'active')
+            || (s.id === 'shopify' && justConnected ? { provider: 'shopify', status: 'active', account_label: justConnected.label, last_sync_at: null } : null)) : null;
           const syncMs = conn && conn.last_sync_at ? (today - new Date(conn.last_sync_at)) : null;
           const syncN = syncMs == null ? null : Math.floor(syncMs / 86400000);
           const n = conn ? syncN : dataN;
@@ -15521,9 +15538,9 @@ function ConnectionsPanel(){
                 page to press a button connect-start could have been given directly.
                 That detour is most of what made a dead feed expensive to fix. */}
             <div style={{flexShrink:0}}>
-              {s.installable ? (
-                <button type="button" className={'v3-btn v3-btn-sm' + (fresh ? '' : ' v3-btn-p')}
-                  onClick={() => setShowShopifyForm(true)}>
+              {s.installable ? (formOpen ? null :
+                <button type="button" className={'v3-btn v3-btn-sm' + (fresh || justConnected ? '' : ' v3-btn-p')}
+                  onClick={() => { setConnectMsg(null); setShowShopifyForm(true); }}>
                   {conn ? 'Reconnect' : 'Connect'}
                 </button>
               ) : !s.provider ? (
@@ -15541,36 +15558,34 @@ function ConnectionsPanel(){
       </div>
     </section>
 
-    {showShopifyForm && (<div className="modal-bg" onClick={()=>setShowShopifyForm(false)}>
-      <div className="modal" onClick={e=>e.stopPropagation()}>
-        <h3>Connect Shopify via OAuth</h3>
-        <div style={{fontSize:'var(--text-sm)', color:'var(--text-muted)', marginTop:6, marginBottom:'var(--s-4)', lineHeight:1.5}}>
-          Enter your full shop domain (the <code style={{background:'var(--bg-input)',padding:'1px 5px',borderRadius:'var(--radius-sm)',fontSize:'var(--text-xs)'}}>.myshopify.com</code> one, not your custom domain).
-          You'll be redirected to Shopify to approve read-only access to orders, products, inventory and discounts.
+    {connectMsg && !formOpen && <p className={connectMsg.kind === 'ok' ? 'v3-note v3-ok' : 'v3-note v3-bad'} role="status">{connectMsg.text}</p>}
+
+    {formOpen && (<section className="v3-sec" id="v3-shopify-connect">
+      <h2 className="v3-sec-title">Connect Shopify</h2>
+      <p className="v3-note v3-measure">Greta reads your store through a private app you make in your own Shopify account. It takes ten minutes, once, and the app can only read.</p>
+      <ol className="v3-rank-steps">
+        <li>Sign in at <b>dev.shopify.com</b> with the account that owns your store, and create an app called Greta.</li>
+        <li>Create a version. Set the app URL to <code>https://dtkaminski.github.io</code> and add these access scopes: <code>{V3_SHOPIFY_SCOPES}</code>. Release it.</li>
+        <li>Install the app on your store and approve it. If Shopify refuses read_all_orders, install without it: Greta then reads the last 60 days.</li>
+        <li>Copy the client ID and client secret from the app's Settings, and paste them here.</li>
+      </ol>
+      <form className="v3-gap-top" onSubmit={submitShopify}>
+        <div className="v3-form-grid">
+          <label className="v3-field"><span>Store address</span>
+            <input type="text" value={shopDomain} onChange={e => setShopDomain(e.target.value)} placeholder="your-store.myshopify.com" autoComplete="off" spellCheck={false}/></label>
+          <label className="v3-field"><span>Client ID</span>
+            <input type="text" value={clientId} onChange={e => setClientId(e.target.value)} autoComplete="off" spellCheck={false}/></label>
+          <label className="v3-field"><span>Client secret</span>
+            <input type="password" value={clientSecret} onChange={e => setClientSecret(e.target.value)} autoComplete="new-password" spellCheck={false}/></label>
         </div>
-        <label>Shop domain</label>
-        <input type="text" value={shopDomain} onChange={e=>setShopDomain(e.target.value)}
-          placeholder="e.g. your-store.myshopify.com" autoFocus
-          style={{fontFamily:'JetBrains Mono, ui-monospace, monospace', fontSize:'var(--text-sm)'}}/>
-        <div className="row">
-          <button onClick={startShopifyConnect}
-            disabled={!shopValid || !authed || connecting}
-            style={{
-              padding:'8px 14px', borderRadius:'var(--r-sm)', fontSize:'var(--text-sm)', fontWeight:'var(--weight-semi)', fontFamily:'inherit',
-              cursor:(shopValid && authed && !connecting) ? 'pointer' : 'not-allowed',
-              background:(shopValid && authed) ? 'var(--accent)' : 'var(--border-default)',
-              color:(shopValid && authed) ? 'white' : 'var(--text-muted)',
-              border:0,
-            }}>{connecting ? 'Starting…' : 'Approve on Shopify →'}</button>
-          <button onClick={()=>setShowShopifyForm(false)} style={{marginLeft:'auto'}}>Cancel</button>
+        <div className="v3-btns v3-gap-top">
+          <button type="submit" className="v3-btn v3-btn-p" disabled={connecting || !shopOk || !keysOk}>{connecting ? 'Checking with Shopify…' : 'Connect'}</button>
+          {shopActive && <button type="button" className="v3-btn v3-btn-q" onClick={() => { setShowShopifyForm(false); setConnectMsg(null); }}>Cancel</button>}
         </div>
-        {connectErr && <div style={{marginTop:'var(--s-3)', fontSize:'var(--text-sm)', color:'var(--bad)'}}>{connectErr}</div>}
-        {!authed && <div style={{marginTop:'var(--s-3)', fontSize:'var(--text-xs)', color:'var(--text-muted)'}}>You need to be signed in to connect a store.</div>}
-        <div className="hint">
-          <b>What happens next:</b> Shopify shows you the requested scopes. After approving, you'll land back here with a "Connected" confirmation. The first data sync runs immediately and Monday-morning refreshes from then on.
-        </div>
-      </div>
-    </div>)}
+      </form>
+      {connectMsg && <p className={connectMsg.kind === 'ok' ? 'v3-note v3-ok' : 'v3-note v3-bad'} role="status">{connectMsg.text}</p>}
+      <p className="micro muted v3-measure">Greta checks the keys with Shopify before saving them. They stay on Greta's server and are never shown again. To stop access, uninstall the app in Shopify.</p>
+    </section>)}
 
     {!UI_V3 && (    <section>
       <ZoneHeader
@@ -20548,12 +20563,10 @@ function V3Today(p) {
         <div className="v3-hero-lab">Profit after ads, last 30 days <V3Info k="profit_after_ads"/></div>
         <div className="v3-big v3-big-muted">—</div>
         <div className="v3-sub">{noSales
-          ? 'No sales in the last 30 days. If you have been trading, the link to your shop has probably dropped. Reconnecting takes about a minute, and your history comes back with it.'
+          ? 'No sales in the last 30 days. If you have been trading, the link to your shop has probably dropped. Reconnecting it brings your history back.'
           : 'Enter what your products and orders cost you to see your profit and rank your actions by what each is worth.'}</div>
-        {/* The sentence above says reconnecting takes about a minute, and then the button
-            used to offer a screen. It is the shop that is missing, so it is the shop the
-            button connects, worded for whether there has ever been one. V3Fix falls back
-            to Settings by itself when no stored domain exists to start Shopify with. */}
+        {/* It is the shop that is missing, so it is the shop the button connects, worded for
+            whether there has ever been one. V3Fix opens the Shopify form in Settings. */}
         <div className="v3-btns">{noSales
           ? <V3Fix provider="shopify" label={connExists('shopify') ? 'Reconnect Shopify' : 'Connect Shopify'}/>
           : <button type="button" className="v3-btn v3-btn-p" onClick={() => window.__oiNav && window.__oiNav('settings', 'economics')}>Enter your costs</button>}</div>
