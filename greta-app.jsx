@@ -3993,7 +3993,7 @@ function V3ProfitLead({ view, costsVerified }) {
             <td>{r.k}</td>
             <td className="bar"><i className={'v3-home-pl-' + plClass(r)} style={{ width: Math.max(0.6, Math.min(100, plSales > 0 ? Math.abs(r.v) / plSales * 100 : 0)) + '%' }}/></td>
             <td className={'r' + (r.kind !== 'out' && r.v < 0 ? ' v3-down' : '')}>{r.fig && v3Waiting(r.fig) ? 'Waiting for data' : fmtMoney(r.v)}</td>
-            <td className="r v3-muted">{r.kind === 'in' || !(plSales > 0) ? '' : Math.round(Math.abs(r.v) / plSales * 100) + 'p'}</td>
+            <td className="r v3-muted">{r.kind === 'in' || !(plSales > 0) ? '' : ((r.kind === 'sub' || r.kind === 'total') && r.v < 0 ? '−' : '') + Math.round(Math.abs(r.v) / plSales * 100) + 'p'}</td>
           </tr>))}</tbody></table>
       </section>}
       {mixTot > 0 && <section className="v3-panel v3-profit-mix" aria-label="Sales from new and returning customers">
@@ -17313,6 +17313,9 @@ function v3PlainAction(row){
     return P(/were in sale weeks/.test(raw)
       ? (cap ? 'Cap your next sale at ' + cap + '% off, markdown and code together' : 'Cap how deep your next sale goes, markdown and code together')
       : (cap ? 'Cap markdown and code together at ' + cap + '% off' : 'Cap markdown and code together'), raw); }
+  // 11 Nov: "Spend less on TikTok. On your own Shopify sales, the next £1 ..." ran to 60 words as a title on
+  // Marketing and Weekly review, where rows are narrow. The instruction is the title; the rest is the why.
+  if (/^optim-ease-/.test(id) && (x = m(/^(Spend less on [^.]+)\.\s+([\s\S]+)$/))) return P(x[1], x[2]);
   if (/^paid-brand-share/.test(id)) return P('Raise the bid on searches for your name', raw);
   if (/^test-holdout-/.test(id) && (x = m(/^(Test whether .+?)\.\s+([\s\S]+)$/))) return P(x[1], x[2]);
   if ((x = id.match(/^paid-landing-(\w+)/))) return P('Send ' + v3Ch(x[1]) + ' ads to products that earn back what a new customer costs', raw);
@@ -23433,6 +23436,8 @@ function V3Products() {
   const margin = d && d.keptRev > 0 ? d.keptTot / d.keptRev : null;
   const ch = d && d.was > 0 ? d.total / d.was - 1 : null;
   const haveKept = !!(pc.rows && pc.rows.length);
+  // 11 Nov: the margin read lands 2 to 4 seconds after the page, and its tiles showed the dash that means "no data"
+  const keptWait = !pc.rows && !pc.err ? 'Loading' : FMT_NONE;
   const best = h ? h.sell[0] : null;
   const rr = v3RefundRead(refunds.rows, drift.rows);
   const toggle = w => ({ open: drv === w, on: () => setDrv(o => (o === w ? null : w)) });
@@ -23500,8 +23505,8 @@ function V3Products() {
             <div className="v3-home-tiles">
               <V3HomeTile key="sales" k="Product sales" v={fmtMoney(d.total)} dir={ch == null || Math.abs(ch) < 0.0005 ? 'flat' : ch > 0 ? 'up' : 'down'} cls={ch == null || Math.abs(ch) < 0.0005 ? '' : ch > 0 ? 'v3-up' : 'v3-down'}
                 delta={ch == null ? '' : v3Dp1Num(Math.abs(ch) * 100) + '%'} weak={ch != null && ch < -0.15 && d.sale == null} act={d.was > 0 ? toggle('products') : null} title="Shopify order lines, after discounts and before VAT"/>
-              <V3HomeTile key="kept" k="Gross profit" v={haveKept ? fmtMoney(d.keptTot) : FMT_NONE} delta={haveKept && margin != null ? fmtPctN(margin) + ' of sales' : ''} title="After each product’s own cost and payment fees, before delivery and packing"/>
-              <V3HomeTile key="loss" k="Sold at a loss" v={haveKept ? fmtCount(d.losers.length) : FMT_NONE} weak={d.losers.length > 0} delta={!haveKept ? '' : d.losers.length ? fmtMoney(Math.abs(d.losers.reduce((a, x) => a + x.kept, 0))) + ' lost' : d.losers.length === 1 ? 'product' : 'products'}/>
+              <V3HomeTile key="kept" k="Gross profit" v={haveKept ? fmtMoney(d.keptTot) : keptWait} delta={haveKept && margin != null ? fmtPctN(margin) + ' of sales' : ''} title="After each product’s own cost and payment fees, before delivery and packing"/>
+              <V3HomeTile key="loss" k="Sold at a loss" v={haveKept ? fmtCount(d.losers.length) : keptWait} weak={d.losers.length > 0} delta={!haveKept ? '' : d.losers.length ? fmtMoney(Math.abs(d.losers.reduce((a, x) => a + x.kept, 0))) + ' lost' : d.losers.length === 1 ? 'product' : 'products'}/>
               <V3HomeTile key="top5" k="Top five’s share" v={d.top5share == null ? FMT_NONE : fmtPctN(d.top5share)} delta={'of ' + fmtCount(top.length) + ' products'}/>
             </div></div>
           {(h || rr) && <div className="v3-home-group" style={{ '--n': (h ? 2 : 0) + (rr ? 1 : 0) }}>
@@ -26280,7 +26285,7 @@ function V3DataTrust() {
   const orders30 = web.rows && web.rows[0] ? num(web.rows[0].n) : 0;
   if (orders30 > 0 && mP + gP + tP >= orders30 * 0.3) items.push({ k: 'claims', short: 'the ad platforms claim ' + fmtPctN((mP + gP + tP) / orders30) + ' of your orders',
     head: plats + ' claim ' + fmtCount(Math.round(mP + gP + tP)) + ' of the ' + fmtCount(orders30) + ' orders your website took in the last 30 days.',
-    body: <>Meta counts {fmtCount(mP)} purchases worth {fmtMoney(mV)}{tP > 0 ? ',' : ' and'} Google {fmtCount(gP)} conversions worth {fmtMoney(gV)}{tP > 0 ? <> and TikTok {fmtCount(tP)} conversions worth {fmtMoney(tV)}</> : null}, by their own measures, each counts any order that saw or clicked an ad, and {tP > 0 ? 'they' : 'both'} can count the same one. That is why Greta judges ads on your Shopify orders, not on the return their dashboards show. <button type="button" className="v3-xref" onClick={go('marketing')}>What each channel really returns <span className="v3-xref-go">on Marketing</span></button></> });
+    body: <>Meta counts {fmtCount(mP)} purchases worth {fmtMoney(mV)}{tP > 0 ? ',' : ' and'} Google {fmtCount(gP)} conversions worth {fmtMoney(gV)}{tP > 0 ? <> and TikTok {fmtCount(tP)} conversions worth {fmtMoney(tV)}</> : null}, by their own measures, each counts any order that saw or clicked an ad, and {tP > 0 ? 'they' : 'both'} can count the same one. Ads here are judged on your Shopify orders, not on the return their dashboards show. <button type="button" className="v3-xref" onClick={go('marketing')}>What each channel really returns <span className="v3-xref-go">on Marketing</span></button></> });
   // 6. products without a SKU
   const noSku = new Set((stock.rows || []).filter(r => String(r.sku || '').startsWith('v:') && num(r.weekly_velocity) > 0).map(r => String(r.product_title || '').toLowerCase())).size;
   if (noSku > 0) items.push({ k: 'sku', short: fmtCount(noSku) + ' selling products have no product code', head: fmtCount(noSku) + ' products that sell have no product code (SKU) in Shopify.',
@@ -26673,7 +26678,7 @@ function v3BuildSigns(S, hist, opts) {
     // the history has no TikTok claims: with TikTok in the latest figure, its 13 weeks and drivers would read
     // TikTok as a jump, so they show only where every point counts it
     const tk = Number(l.tiktok_conversions) > 0, histOk = !tk || CLP.every(p => p.tiktok_conversions != null);
-    signs.push({ k: 'Orders the ad platforms claim', v: fmtPctN(v), tone: v > 1 ? 'weak' : 'typical',
+    /* 11 Nov: a shop with no ads showed this tile at 0.0% */ if (v > 0) signs.push({ k: 'Orders the ad platforms claim', v: fmtPctN(v), tone: v > 1 ? 'weak' : 'typical',
       n: <>Meta {fmtCount(Math.round(Number(l.meta_purchases)))}, Google {fmtCount(Math.round(Number(l.google_conversions)))}{tk ? <>, TikTok {fmtCount(Math.round(Number(l.tiktok_conversions)))}</> : null}, of {fmtCount(Number(l.web_orders))} website orders</>,
       series: histOk ? CLP.map(p => ({ d: String(p.d), v: cl(p) / Number(p.web_orders) })) : null,
       fmt: x => fmtPctN(x), better: null, line: { v: 1, label: 'Every order claimed' },
