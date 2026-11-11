@@ -11764,13 +11764,19 @@ function V3ActionBoard(){
   // 1110: the totals are the server's (fn_board_moves), one figure per lever, so rows that act on one budget are not added
   // together and a one-off before the peak is not "a month". They are never summed into one number nobody can bank.
   const T = bmQ.rows && bmQ.rows[0] && bmQ.rows[0].totals;
+  // 11 Nov: In progress counts every row this page shows as Doing, by the rows' own rule (taken on in the server's
+  // moves, or started on the action itself). The server's count left out a no-figure row the table showed as Doing.
+  const exQ = V3_Q['move-extras'];
+  const shownIds = new Set([...liveAll, ...lane, ...unverRows].map(r => r.external_id));
+  const nDoing = new Set([...bmRows.filter(x => x.taken_on).map(x => x.external_id),
+    ...((exQ && Array.isArray(exQ.rows)) ? exQ.rows : []).filter(x => x.accepted_at).map(x => x.external_id)].filter(id => shownIds.has(id))).size;
   const tiles = !T ? [] : [
     Number(T.stock_month) > 0 && { k: 'Profit at stake in stock', v: v3GbpRound(T.stock_month), d: 'a month' },
     Number(T.save_month) > 0 && { k: 'Ad spend to save', v: v3GbpRound(T.save_month), d: 'a month' },
     Number(T.other_month) > 0 && { k: 'Other changes', v: v3GbpRound(T.other_month), d: 'a month, ' + (Number(T.other_n) === 1 ? '1 change' : T.other_n + ' changes') },
     Number(T.once_gbp) > 0 && { k: 'Before the peak', v: v3GbpRound(T.once_gbp), d: 'once, ' + (Number(T.once_n) === 1 ? '1 change' : T.once_n + ' changes') },
     Number(T.tests) > 0 && { k: 'Tests to run', v: fmtCount(T.tests), d: '' },
-    { k: 'In progress', v: fmtCount(T.taken_on || 0), d: Number(T.overdue) > 0 ? fmtCount(T.overdue) + ' late' : '', cls: Number(T.overdue) > 0 ? 'v3-down' : '' },
+    { k: 'In progress', v: fmtCount(nDoing), d: Number(T.overdue) > 0 ? fmtCount(T.overdue) + ' late' : '', cls: Number(T.overdue) > 0 ? 'v3-down' : '' },
   ].filter(Boolean);
 
   return (<div className="v3-board v3-acts">
@@ -18439,7 +18445,10 @@ function V3WhyChips({ list, pick, setPick, label }) {
 }
 // Do it, Not now (to a date) and Dismiss, each with an optional reason. Taking a move on keeps it on the list and
 // offers Mark done; the other three close it everywhere at once.
-function V3MoveDecide({ row, small, onDecided, startMode }) {
+// 11 Nov (Dan): a team reading the block must see which decision it is and where it stands. The block shows Status
+// in the Actions table's words (To do / Doing) and Started; a surface that does not already show the move's title above it passes
+// `named`, and the Why panel passes `covers`, the option numbers this move carries.
+function V3MoveDecide({ row, small, onDecided, startMode, named, covers, rank }) {
   const ext = row && row.external_id;
   // 26 Oct eval: whether the move is taken on is read on every render from the server's moves (and the open
   // actions), not once when the card mounts; the card drew "Do it" again for a move taken on, after a page change.
@@ -18499,9 +18508,20 @@ function V3MoveDecide({ row, small, onDecided, startMode }) {
   };
   const close = () => { setMode(null); setErr(''); setPick(''); };
   const cls = 'v3-btn' + (small ? ' v3-btn-sm' : '');
-  if (said) return <p className="v3-mv-said" role="status">{said}</p>;
+  const title = v3PlainAction(Object.assign({}, row, { plan: null })).title;
+  const started = accepted && ex && ex.accepted_at ? String(ex.accepted_at).slice(0, 10) : null;
+  const cov = Array.isArray(covers) ? covers : [];
+  if (said) return (<div className="v3-mv-decide">
+    {named && <p className="v3-mv-name">{title}</p>}
+    <p className="v3-mv-said" role="status">{said}</p></div>);
   return (<div className="v3-mv-decide">
-    {accepted && !mode && <p className="v3-mv-said">In progress. Mark it done when finished, so the result can be checked.</p>}
+    {named && !mode && <p className="v3-mv-name">{title}</p>}
+    {(named || accepted) && !mode && <p className="v3-mv-who v3-mv-state">
+      <span><span className="v3-mv-who-k">Status</span><span className={'v3-pill v3-pill-' + (accepted ? 'warn' : 'none')}>{accepted ? 'Doing' : 'To do'}</span></span>
+      {started && <span><span className="v3-mv-who-k">Started</span>{v3Day(started)}</span>}
+      {rank && <span><span className="v3-mv-who-k">Board</span>{'#' + rank}</span>}
+      {cov.length > 0 && <span><span className="v3-mv-who-k">Covers</span>{(cov.length === 1 ? 'Option ' : 'Options ') + cov.join(', ')}</span>}
+    </p>}
     {!mode && <V3MoveWho ext={ext}/>}
     {!mode && <div className="v3-mv-btns">
       {accepted
@@ -18514,6 +18534,7 @@ function V3MoveDecide({ row, small, onDecided, startMode }) {
     </div>}
     {sent && !mode && <p className="v3-mv-said" role="status">Sent to the Greta team. Thank you.</p>}
     {!accepted && !mode && place && <p className="v3-mv-note">This opens {place.label} in a new tab, with the steps here.</p>}
+    {accepted && !mode && <p className="v3-mv-note">Mark done once the change is live: the check on Results counts from that day.</p>}
     {accepted && !mode && <V3MovePlaces ext={ext}/>}
     {mode && <div className="v3-mv-form">
       <V3WhyChips list={V3_WHY[mode]} pick={pick} setPick={setPick} label={mode === 'wrong' ? 'What looks wrong?' : 'Why?'}/>
@@ -19476,9 +19497,11 @@ function v3OptBoard(o, live) {
   const own = at(o.action), via = o.counted_in ? at(o.counted_in) : null;
   return own ? { rank: '#' + own } : via ? { rank: 'In #' + via } : { text: 'Open' };
 }
+// The panel's options in the order it numbers them; the Decision step names its option numbers from the same list.
+const v3WhyOpts = drill => [].concat(...(Array.isArray(drill) ? drill : []).map(d => (Array.isArray(d.options) ? d.options : [])))
+  .sort((a, b) => (Number(b.high) || 0) - (Number(a.high) || 0));
 function V3WhyOptions({ drill, n, board, go }) {
-  const opts = [].concat(...drill.map(d => (Array.isArray(d.options) ? d.options : [])))
-    .sort((a, b) => (Number(b.high) || 0) - (Number(a.high) || 0));
+  const opts = v3WhyOpts(drill);
   if (!opts.length) return null;
   const live = board && board.rows ? v3LiveRows(board.rows) : [];
   const held = s => v3Sentence(String(s).replace(/^Held:\s*/, '')).replace(/\.?$/, '.');
@@ -19645,7 +19668,9 @@ function V3WhyPanel({ e, onClose, links, onGo }) {
         {W && Array.isArray(W.drill) && W.drill.some(d => Array.isArray(d.options) && d.options.length) && <V3WhyOptions drill={W.drill} n={nx()} board={board} go={go}/>}
         {W && W.cause_kind !== 'on_track' && W.settle_test && <section className="v3-drawer-sec"><V3StepH n={nx()}>Test</V3StepH>
           <p className="v3-drawer-p">{W.settle_test}</p></section>}
-        {row ? <section className="v3-drawer-sec v3-drawer-decide"><V3StepH n={nx()}>Decision</V3StepH><V3MoveDecide row={row} onDecided={onClose}/></section>
+        {row ? <section className="v3-drawer-sec v3-drawer-decide"><V3StepH n={nx()}>Decision</V3StepH><V3MoveDecide row={row} onDecided={onClose} named
+            rank={board.rows ? (v3BoardRank(v3LiveRows(board.rows), row.external_id) || row.board_rank || null) : null}
+            covers={W ? v3WhyOpts(W.drill).map((o, i) => (o.action === row.external_id || o.counted_in === row.external_id ? i + 1 : 0)).filter(Boolean) : []}/></section>
           : e.action ? <section className="v3-drawer-sec"><V3StepH n={nx()}>Decision</V3StepH><button type="button" className="v3-btn v3-btn-sm" onClick={() => go('actions')}>Open Actions</button></section> : null}
       </>)}
       {chips.length > 0 && <section className="v3-drawer-sec"><h3>On the tree</h3>
