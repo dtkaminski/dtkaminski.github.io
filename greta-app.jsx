@@ -18968,9 +18968,12 @@ function v3SpendCouldSwing(unreported, gap) {
 // 3 Nov, storytelling review: the forecast (fn_today_goal) is the plan at the goal's ads, the spend the ad answer (1156) tells
 // the owner not to follow. Where the two plans differ and the extra ads cost profit, the verdict reads the one Greta advises.
 // frkl's two plans are the same plan, so it keeps the forecast. Null means the forecast stands.
+// 1231 (eval 11 Nov, one goal verdict): once the goal is measured against the plan the owner confirmed
+// (forecast_kind 'confirmed_plan'), the verdict and the forecast are the server's alone; the plan worked out again
+// is its re-plan offer (g.replan), not a second forecast here.
 function v3Futures(g) {
   const sq = V3_Q['brand-state'], A = sq && sq.rows && sq.rows[0] && sq.rows[0].ad_decision;
-  if (!g || !A || A.decision === 'up' || !A.at_today || !A.at_goal) return null;
+  if (!g || g.forecast_kind === 'confirmed_plan' || !A || A.decision === 'up' || !A.at_today || !A.at_goal) return null;
   const keep = Number(A.at_today.profit_after_ads), chase = Number(A.at_goal.profit_after_ads), tgt = Number(g.target);
   const adsKeep = Number(A.at_today.ads), adsChase = Number(A.at_goal.ads);
   if (![keep, chase, tgt, adsKeep, adsChase].every(Number.isFinite) || !(adsChase > adsKeep * 1.01) || !(keep > chase)) return null;
@@ -18986,7 +18989,9 @@ function v3GoalVerdict(g, unreported) {
   // 2 Nov eval: "On track" read the same at GBP 47,670 ahead as it did with today's pace only GBP 785 over the goal. The status
   // is the server's; the word says how much it rests on: the plan alone, or a pace within 2% of the goal.
   const pace = g.pace_finish != null ? Number(g.pace_finish) : null, tgt = Number(g.target) || 0;
-  const planOnly = on && pace != null && pace < tgt, narrow = !F && on && pace != null && pace >= tgt && pace - tgt < Math.abs(tgt) * 0.02;
+  // 1231: just behind the plan, inside the server's tolerance, is on track narrowly too
+  const planOnly = on && pace != null && pace < tgt,
+    narrow = !F && on && (g.verdict === 'just_behind' || (pace != null && pace >= tgt && pace - tgt < Math.abs(tgt) * 0.02));
   const soft = planOnly || narrow;
   return { F, on, close, gap, ahead, soft, word: close ? 'Too close to call' : planOnly ? 'On track if the plan holds' : narrow ? 'On track, narrowly' : on ? 'On track' : 'Off track',
     cls: close ? '' : soft ? 'warn' : on ? 'good' : 'bad', tone: close ? '' : soft ? 'warn' : on ? 'good' : 'bad',
