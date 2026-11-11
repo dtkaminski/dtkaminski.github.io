@@ -90,8 +90,16 @@
     // Spend curve (the k curve). Two feeds on purpose: the POINTS are measurement and stay
     // plottable even when the fit is not identified; the CURVE is inference and carries its own
     // band + verdict. A surface must honour `verdict` - see 0141/0142.
-    var sc = await withTimeout(s.from('vw_brand_spend_curve').select('*').eq('brand_id', b).limit(1), 10000);
-    if (sc && sc.data) window.FRKL_PLAN.spendCurve = sc.data[0] || null;
+    // 11 Nov: the cached row first (cache_brand_state.spend_curve: the same columns, rebuilt each hour). The live
+    // view ran past the signed-in time limit five times in a day on Halden. It stays the fallback for a brand
+    // with no cached curve.
+    var scc = await withTimeout(s.from('cache_brand_state').select('spend_curve').eq('brand_id', b).limit(1), 10000);
+    var scRow = scc && scc.data && scc.data[0] && scc.data[0].spend_curve;
+    if (scRow) window.FRKL_PLAN.spendCurve = Object.assign({ brand_id: b }, scRow);
+    else {
+      var sc = await withTimeout(s.from('vw_brand_spend_curve').select('*').eq('brand_id', b).limit(1), 10000);
+      if (sc && sc.data) window.FRKL_PLAN.spendCurve = sc.data[0] || null;
+    }
     var sp = await withTimeout(s.from('vw_brand_spend_curve_points')
       .select('month,spend,cac,new_customers,cm_per_order,cac_above_contribution,recency_rank')
       .eq('brand_id', b).order('month', { ascending: true }), 10000);
