@@ -9529,8 +9529,10 @@ function v3WhyPrompt(d) {
   const T = { cac: 'Why does a new customer cost ' + v + ' to win?', ret: 'Why does each £1 of ads bring only ' + v + '?',
     profit: /^[−-]/.test(String(v)) ? 'Why am I losing ' + pos + ' a month?' : 'What is driving my ' + v + ' a month after all costs?',
     repeat: 'Why do only ' + v + ' of customers order again?', conv: 'Why do only ' + v + ' of every 100 visits turn into an order?',
-    newc: 'Why did I win only ' + v + ' new customers?', retsales: 'Why did returning customers spend only ' + v + '?',
-    newsales: 'Why did new customers buy only ' + v + '?', spend: 'Where did the ' + v + ' of ad spend go?',
+    // 11 Nov: these three read the history's last point, which can sit a day behind the page (3,176 against 3,157
+    // new customers on Halden), so the question names the figure without quoting it
+    newc: 'Why did I win fewer new customers than usual?', retsales: 'Why did returning customers spend less than usual?',
+    newsales: 'Why did new customers buy less than usual?', spend: 'Where did the ' + v + ' of ad spend go?',
     metacpa: 'Why does a sale on Meta cost ' + v + '?', googcpa: 'Why does a sale on Google cost ' + v + '?', ly: 'What is driving sales against last year?',
     email: 'Why did my email campaigns bring in only ' + v + '?' };
   return T[d.key] || 'What is driving ' + String(d.figure).toLowerCase() + '?';
