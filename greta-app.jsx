@@ -17308,8 +17308,11 @@ function v3PlainAction(row){
   if (id === 'crm-flows') return P(/switched off/i.test(raw) ? 'Fix the email sent after an order, and switch on the emails that suggest more products' : 'Fix the automatic emails that earn least', raw);
   if (id === 'basket-free-shipping') return P('Show shoppers how close they are to free shipping', raw);
   // 0453: the cap now carries its £ for the next sale; the paragraph is the why, not the title
-  if (id === 'discount-depth-inversion') return P(/were in sale weeks/.test(raw)
-    ? 'Cap your next sale at 30% off, markdown and code together' : 'Cap markdown and code together at 30% off', raw);
+  // The cap is the row's own figure (25% on one brand, 35% on another); the title printed 30% on both (11 Nov).
+  if (id === 'discount-depth-inversion') { const cap = (raw.match(/combined at (\d+)% off/) || [])[1];
+    return P(/were in sale weeks/.test(raw)
+      ? (cap ? 'Cap your next sale at ' + cap + '% off, markdown and code together' : 'Cap how deep your next sale goes, markdown and code together')
+      : (cap ? 'Cap markdown and code together at ' + cap + '% off' : 'Cap markdown and code together'), raw); }
   if (/^paid-brand-share/.test(id)) return P('Raise the bid on searches for your name', raw);
   if (/^test-holdout-/.test(id) && (x = m(/^(Test whether .+?)\.\s+([\s\S]+)$/))) return P(x[1], x[2]);
   if ((x = id.match(/^paid-landing-(\w+)/))) return P('Send ' + v3Ch(x[1]) + ' ads to products that earn back what a new customer costs', raw);
