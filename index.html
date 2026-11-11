@@ -7,8 +7,8 @@
 <meta name="description" content="Greta reads your Shopify, Meta, Google Ads, Google Analytics and Klaviyo, tells you in plain English where your profit goes, and ranks what to do this week with the £ on each. Free during early access, or done-for-you with the Managed tier.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Geist:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="./design-tokens.css?v=20261111logo">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Geist:wght@400;500;600;700&family=DM+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./design-tokens.css?v=20261111mock">
 <link rel="stylesheet" href="./greta-logo.css?v=20261111logo">
 <style>
   /* Every name here used to carry its own value: a slate canvas, navy ink, a violet
@@ -79,6 +79,10 @@
   }
   .nav-links a:hover { color: var(--text-primary); }
   .nav-cta { margin-left: auto; display: flex; gap: var(--s-2); align-items: center; }
+  .nav-links a { white-space: nowrap; }
+  /* Logo, four links and three buttons need about 900px. Below that the links went one word a line and pushed
+     "Get started" 21px off a tablet, so they go here, as they do on a phone; every link is also on the page. */
+  @media (max-width: 960px) { .nav-links { display: none; } }
   @media (max-width: 720px) {
     .nav-links { display: none; }
     /* Hiding the links is not enough: brand + "See live demo" + "Log in" + "Get started"
@@ -159,115 +163,168 @@
   }
   .hero-trust b { color: var(--text-secondary); font-weight: var(--weight-semi); }
 
-  /* ── Product mockup (the hero screenshot) ────────────────────────────── */
+  /* ── Product mockup: the Home page as it ships ────────────────────────
+     The block carries data-frame="product", so inside it the product tokens apply (IBM Plex, grey
+     canvas, white bordered panels, cool neutrals, a dark primary) while the page around it stays in
+     the marketing frame. Real size on a desktop; on a phone the rail and the quieter columns drop.
+     Sample figures, labelled as such in the app bar, as the live demo does. */
   .mockup-wrap {
     margin-top: var(--s-9); position: relative; z-index: 1;
-    max-width: 1080px; margin-left: auto; margin-right: auto;
+    max-width: var(--size-mock-width); margin-left: auto; margin-right: auto;
   }
   .mockup {
-    background: var(--bg-card);
-    border: 1px solid var(--border-default);
-    border-radius: var(--r-xl);
-    overflow: hidden;
-    box-shadow:
-      var(--shadow-raised);
+    background: var(--color-surface); color: var(--color-ink);
+    font-family: var(--font-sans); font-variant-numeric: tabular-nums;
+    border: 1px solid var(--color-line-strong); border-radius: var(--radius-panel);
+    overflow: hidden; text-align: left; line-height: var(--leading-snug);
   }
   .mockup-chrome {
-    display: flex; align-items: center; gap: var(--s-3);
-    padding: 10px var(--s-4);
-    border-bottom: 1px solid var(--border-subtle);
-    background: var(--bg-elevated);
+    display: flex; align-items: center; gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    background: var(--color-sunken); border-bottom: 1px solid var(--color-line);
   }
-  .mockup-dot { width: 11px; height: 11px; border-radius: var(--r-full); background: var(--border-default); }
-  .mockup-dot.r { background: var(--color-danger-wash); }
-  .mockup-dot.y { background: var(--color-warning-wash); }
-  .mockup-dot.g { background: var(--color-success-wash); }
+  .mockup-dot { width: var(--size-mock-dot); height: var(--size-mock-dot); border-radius: var(--radius-full); background: var(--color-line-strong); }
   .mockup-url {
-    margin-left: var(--s-3); padding: 4px 10px;
-    background: var(--bg-card); border-radius: var(--r-sm);
-    font-size: var(--text-xs); color: var(--text-muted); font-family: var(--font-mono);
-    flex: 1; text-align: center; max-width: 420px;
+    flex: 0 1 var(--size-mock-url); margin: 0 auto; padding: var(--space-1) var(--space-3);
+    background: var(--color-panel); border-radius: var(--radius-md);
+    font-size: var(--text-xs); color: var(--color-faint); text-align: center;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .mockup-body { padding: var(--s-6); }
-  .mockup-toolbar {
-    display: flex; align-items: center; gap: var(--s-3);
-    padding-bottom: var(--s-4); border-bottom: 1px solid var(--border-subtle);
-    margin-bottom: var(--s-5);
-  }
-  .mockup-toolbar { --logo-height: var(--space-6); }
-  .mockup-divider { width: 1px; height: 18px; background: var(--border-subtle); }
-  .mockup-workspace {
-    display: inline-flex; align-items: center; gap: var(--s-2);
-    padding: 4px 10px; border-radius: var(--r-md);
-    background: var(--bg-elevated); border: 1px solid var(--border-default);
-    font-size: var(--text-xs); color: var(--text-secondary);
-  }
-  .mockup-workspace .dot {
-    width: 5px; height: 5px; border-radius: var(--r-full); background: var(--good);
-    box-shadow: 0 0 6px var(--color-success);
-  }
-  .mockup-tabs { margin-left: auto; display: flex; gap: var(--s-1); min-width: 0; overflow: hidden; }   /* clipped, not scrolled: on a phone the row ran 20px off-screen */
-  .mockup-tab {
-    padding: 4px 10px; font-size: var(--text-sm); color: var(--text-muted);
-    border-radius: var(--r-sm);
-  }
-  .mockup-tab.active { background: var(--bg-elevated); color: var(--text-primary); }
 
-  /* The hero card inside the mockup */
-  .mk-hero {
-    padding: var(--s-6) var(--s-7); border-radius: var(--r-lg);
-    background: var(--bg-card); border: 1px solid var(--border-subtle);
-    position: relative; overflow: hidden;
+  /* App bar: logo over the rail, the workspace, search, the account */
+  .mk-bar {
+    display: flex; align-items: center; gap: var(--space-4);
+    height: var(--space-12); padding: 0 var(--space-4);
+    background: var(--color-chrome); border-bottom: 1px solid var(--color-line);
+    --logo-height: var(--space-8);
   }
-  .mk-hero-bg {
-    position: absolute; inset: 0; pointer-events: none;
-    background:
-      radial-gradient(600px 250px at 0% 0%, var(--color-accent-wash), transparent 60%);
+  .mk-bar-brand { flex: 0 0 calc(var(--size-mock-rail) - var(--space-8)); }
+  .mk-ws { font-size: var(--text-sm); font-weight: var(--weight-semi); white-space: nowrap; }
+  .mk-ws-note { font-size: var(--text-sm); color: var(--color-muted); white-space: nowrap; }
+  .mk-search {
+    margin-left: auto; flex: 0 1 var(--size-mock-search);
+    display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
+    height: var(--space-8); padding: 0 var(--space-3);
+    border: 1px solid var(--color-line-strong); border-radius: var(--radius-md);
+    font-size: var(--text-sm); color: var(--color-faint);
   }
-  .mk-meta { position: relative; font-size: var(--text-xs); font-weight: var(--weight-bold); letter-spacing: var(--tracking-wide); text-transform: uppercase; color: var(--accent); }
-  .mk-headline {
-    position: relative; font-size: var(--text-2xl); font-weight: var(--weight-bold); letter-spacing: var(--tracking-snug);
-    margin: var(--s-2) 0 var(--s-2);
+  .mk-search kbd { font-family: var(--font-sans); font-size: var(--text-xs); }
+  .mk-avatar {
+    flex: none; width: var(--space-8); height: var(--space-8); border-radius: var(--radius-full);
+    display: grid; place-items: center;
+    background: var(--color-ink); color: var(--color-panel);
+    font-size: var(--text-sm); font-weight: var(--weight-semi);
   }
-  .mk-headline .accent { color: var(--accent); }
-  .mk-sub { position: relative; font-size: var(--text-sm); color: var(--text-secondary); margin-bottom: var(--s-5); max-width: 540px; }
-  .mk-stats {
-    position: relative; display: flex; align-items: center; gap: var(--s-5);
-    padding: var(--s-4) 0; border-top: 1px solid var(--border-subtle);
-    border-bottom: 1px solid var(--border-subtle);
-    margin-bottom: var(--s-5); flex-wrap: wrap;
+
+  /* Rail */
+  .mk-shell { display: grid; grid-template-columns: var(--size-mock-rail) minmax(0, 1fr); }
+  .mk-rail {
+    display: flex; flex-direction: column; padding: var(--space-3) var(--space-2);
+    background: var(--color-chrome); border-right: 1px solid var(--color-line);
   }
-  .mk-stat-val { font-size: var(--text-xl); font-weight: var(--weight-bold); letter-spacing: var(--tracking-snug); line-height: 1; }
-  .mk-stat-label { font-size: var(--text-xs); font-weight: var(--weight-semi); letter-spacing: var(--tracking-wide); text-transform: uppercase; color: var(--text-muted); margin-top: 3px; }
-  .mk-stat-divider { width: 1px; height: 24px; background: var(--border-subtle); }
-  .mk-grid {
-    position: relative; display: grid; grid-template-columns: 1fr 1.4fr; gap: var(--s-6);
+  .mk-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    height: var(--space-8); padding: 0 var(--space-2); border-radius: var(--radius-md);
+    font-size: var(--text-sm); color: var(--color-secondary);
   }
-  .mk-col-label { font-size: var(--text-xs); font-weight: var(--weight-bold); letter-spacing: var(--tracking-wide); text-transform: uppercase; color: var(--text-faint); margin-bottom: var(--s-3); }
-  .mk-change-row { display: flex; align-items: baseline; gap: var(--s-3); margin-bottom: var(--s-2); }
-  .mk-change-val { font-size: var(--text-base); font-weight: var(--weight-semi); min-width: 24px; }
-  .mk-change-label { font-size: var(--text-xs); color: var(--text-secondary); }
-  .mk-action {
-    display: flex; gap: var(--s-3); padding: var(--s-3) 0;
-    border-bottom: 1px solid var(--border-subtle);
+  .mk-nav.on { background: var(--color-sunken); color: var(--color-ink); font-weight: var(--weight-medium); }
+  .mk-nav-n { font-family: var(--font-figure); font-size: var(--text-xs); color: var(--color-muted); }
+  .mk-nav-group { padding: var(--space-5) var(--space-2) var(--space-1); font-size: var(--text-xs); color: var(--color-faint); }
+
+  /* Page: title and update time, the figure strip, the actions table */
+  .mk-main { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; padding: var(--space-5) var(--space-6) var(--space-6); }
+  .mk-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); }
+  .mk-title { margin: 0; font-size: var(--text-xl); font-weight: var(--weight-semi); letter-spacing: var(--tracking-tight); line-height: var(--leading-tight); }
+  .mk-updated { font-size: var(--text-sm); color: var(--color-muted); }
+  .mk-panel { background: var(--color-panel); border: 1px solid var(--color-line); border-radius: var(--radius-panel); overflow: hidden; }
+
+  .mk-strip-head {
+    display: flex; align-items: baseline; gap: var(--space-2);
+    padding: var(--space-2) var(--space-4); border-top: 1px solid var(--color-line);
+    font-size: var(--text-xs); color: var(--color-muted);
   }
-  .mk-action:last-child { border-bottom: 0; }
-  .mk-action-rank {
-    width: 20px; height: 20px; border-radius: var(--r-full);
-    background: var(--accent-bg); color: var(--accent);
-    display: flex; align-items: center; justify-content: center;
-    font-size: var(--text-xs); font-weight: var(--weight-bold); flex-shrink: 0;
+  .mk-strip-head:first-child { border-top: 0; }
+  .mk-strip-head b { color: var(--color-ink); font-weight: var(--weight-semi); }
+  .mk-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--color-line); }
+  .mk-strip-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .mk-tile { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-3) var(--space-4); border-left: 1px solid var(--color-line); min-width: 0; }
+  .mk-tile:first-child { border-left: 0; }
+  .mk-tile-k { font-size: var(--text-xs); color: var(--color-muted); }
+  .mk-tile-v { font-family: var(--font-figure); font-size: var(--text-2xl); font-weight: var(--weight-semi); line-height: var(--leading-tight); }
+  .mk-tile-d { font-family: var(--font-figure); font-size: var(--text-xs); color: var(--color-muted); }
+  .mk-tile-d.up { color: var(--color-success); }
+  .mk-spark { display: block; width: 100%; height: var(--size-spark); }
+  .mk-spark polyline {
+    fill: none; stroke: var(--color-series-neutral); stroke-width: var(--size-edge-on);
+    stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke;
   }
-  .mk-action-text { font-size: var(--text-sm); color: var(--text-primary); line-height: 1.4; margin-bottom: 3px; }
-  .mk-action-meta { display: flex; gap: var(--s-2); align-items: center; font-size: var(--text-xs); }
-  .mk-pill {
-    font-size: var(--text-xs); font-weight: var(--weight-bold); padding: 1px 6px; border-radius: var(--r-full);
+  .mk-spark.up polyline { stroke: var(--color-success); }
+
+  .mk-panel-head {
+    display: flex; align-items: center; gap: var(--space-2);
+    padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-line);
+    font-size: var(--text-sm);
   }
-  .mk-pill.red { background: var(--bad-bg); color: var(--bad); }
-  .mk-pill.amber { background: var(--warn-bg); color: var(--warn); }
-  .mk-money { font-size: var(--text-xs); font-weight: var(--weight-bold); }
-  .mk-money.bad { color: var(--bad); }
-  .mk-money.good { color: var(--good); }
+  .mk-panel-title { font-size: var(--text-lg); font-weight: var(--weight-semi); }
+  .mk-count {
+    padding: 0 var(--space-2); border-radius: var(--radius-sm);
+    background: var(--color-sunken); color: var(--color-muted);
+    font-family: var(--font-figure); font-size: var(--text-xs);
+  }
+  .mk-note { color: var(--color-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .mk-viewall { margin-left: auto; font-weight: var(--weight-medium); white-space: nowrap; }
+
+  .mk-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+  .mk-table th {
+    padding: var(--space-2) var(--space-4); border-bottom: 1px solid var(--color-line);
+    text-align: left; font-size: var(--text-xs); font-weight: var(--weight-semi); color: var(--color-muted);
+  }
+  .mk-table td { padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-line); vertical-align: middle; }
+  .mk-table tr:last-child td { border-bottom: 0; }
+  .mk-table .mk-c-area { width: var(--size-home-area); }
+  .mk-table .mk-c-worth { width: var(--size-home-worth); text-align: right; }
+  .mk-table .mk-c-conf { width: var(--size-home-basis); }
+  .mk-table .mk-c-open { width: var(--size-home-open); text-align: right; }
+  .mk-act-t { font-weight: var(--weight-medium); }
+  .mk-act-s { margin-top: var(--space-1); font-size: var(--text-xs); color: var(--color-muted); }
+  .mk-worth { font-family: var(--font-figure); white-space: nowrap; }
+  .mk-worth small { display: block; font-size: var(--text-xs); color: var(--color-muted); }
+  .mk-conf {
+    display: inline-flex; align-items: center; gap: var(--space-1);
+    height: var(--space-5); padding: 0 var(--space-2); border-radius: var(--radius-sm);
+    background: var(--color-sunken); color: var(--color-muted);
+    font-size: var(--text-xs); font-weight: var(--weight-medium); white-space: nowrap;
+  }
+  .mk-conf i { width: var(--size-conf-dot); height: var(--size-conf-dot); background: var(--color-success); }
+  .mk-conf.likely i { opacity: var(--opacity-conf-soft); }
+  .mk-conf.probably i { background: var(--color-warning); }
+  .mk-btn {
+    display: inline-flex; align-items: center; height: var(--space-8); padding: 0 var(--space-3);
+    border: 1px solid var(--color-line-strong); border-radius: var(--radius-md);
+    background: var(--color-panel); color: var(--color-ink);
+    font-size: var(--text-sm); font-weight: var(--weight-medium); white-space: nowrap;
+  }
+  .mk-btn.primary { background: var(--color-ink); border-color: var(--color-ink); color: var(--color-panel); }
+
+  /* Tablet: the rail goes, as it does in the app */
+  @media (max-width: 920px) {
+    .mk-shell { grid-template-columns: minmax(0, 1fr); }
+    .mk-rail { display: none; }
+    .mk-bar-brand { flex-basis: auto; }
+  }
+  /* Phone: yesterday's four figures two by two, each action with what it is worth */
+  @media (max-width: 720px) {
+    .mockup-chrome { padding: var(--space-2) var(--space-3); }
+    .mk-bar { gap: var(--space-3); padding: 0 var(--space-3); --logo-height: var(--space-6); }
+    .mk-ws-note, .mk-search, .mk-note, .mk-later, .mk-act-s,
+    .mk-table .mk-c-area, .mk-table .mk-c-conf, .mk-table .mk-c-open { display: none; }
+    .mk-avatar { margin-left: auto; }
+    .mk-main { padding: var(--space-4) var(--space-3); gap: var(--space-3); }
+    .mk-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .mk-tile:nth-child(odd) { border-left: 0; }
+    .mk-tile:nth-child(n+3) { border-top: 1px solid var(--color-line); }
+    .mk-table td, .mk-table th { padding-left: var(--space-3); padding-right: var(--space-3); }
+  }
 
   /* ── Trusted by / proof bar ──────────────────────────────────────────── */
   .proof-bar {
@@ -745,100 +802,152 @@
     </div>
   </div>
 
-  <!-- PRODUCT MOCKUP -->
+  <!-- PRODUCT MOCKUP: the Home page as it ships, at real size in the product frame. Sample figures. -->
   <div class="container mockup-wrap">
-    <div class="mockup">
-      <div class="mockup-chrome">
-        <span class="mockup-dot r"></span>
-        <span class="mockup-dot y"></span>
-        <span class="mockup-dot g"></span>
-        <div class="mockup-url">greta.app/workspace/your-brand</div>
+    <div class="mockup" data-frame="product" role="img" aria-label="Greta's Home page: yesterday's and last week's sales, orders, ad spend and profit after ads, then the week's actions ranked by what each is worth">
+      <div class="mockup-chrome" aria-hidden="true">
+        <span class="mockup-dot"></span>
+        <span class="mockup-dot"></span>
+        <span class="mockup-dot"></span>
+        <div class="mockup-url">greta.app/home</div>
       </div>
-      <div class="mockup-body">
-        <div class="mockup-toolbar">
-          <svg class="greta-logo" viewBox="56 101 436 152" role="img" aria-label="Greta" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="glpindexh2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="gl-purple-hi"/><stop offset="1" class="gl-purple"/></linearGradient><linearGradient id="glsindexh2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="gl-stone-hi"/><stop offset="1" class="gl-stone"/></linearGradient><linearGradient id="gltindexh2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="gl-terra-hi"/><stop offset="1" class="gl-terra"/></linearGradient><linearGradient id="glfindexh2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="gl-forest-hi"/><stop offset="1" class="gl-forest"/></linearGradient></defs><path class="gl-hole" d="M127.35 181.57L128.8 181.93L130.26 182.23L131.73 182.47L133.21 182.66L134.69 182.8L136.18 182.88L136.7 181.77L137.03 180.32L137.31 178.85L137.54 177.38L137.72 175.9L137.83 174.41L137.73 173.16L136.29 172.79L134.83 172.47L133.36 172.2L131.89 171.99L130.4 171.84L128.92 171.74L128.03 172.35L127.67 173.8L127.37 175.26L127.13 176.73L126.94 178.21L126.8 179.69L126.72 181.18Z"/><path fill="url(#glpindexh2)" d="M98.68 131.45A40.5 40.5 0 1 1 136.4 182.89A40.5 40.5 0 0 0 98.68 131.45Z"/><path fill="url(#glsindexh2)" d="M178.15 143.68A40.5 40.5 0 1 1 126.71 181.4A40.5 40.5 0 0 0 178.15 143.68Z"/><path fill="url(#gltindexh2)" d="M165.92 223.15A40.5 40.5 0 1 1 128.2 171.71A40.5 40.5 0 0 0 165.92 223.15Z"/><path fill="url(#glfindexh2)" d="M86.45 210.92A40.5 40.5 0 1 1 137.89 173.2A40.5 40.5 0 0 0 86.45 210.92Z"/><path class="gl-word" d="M259.5 216.3Q248.7 216.3 240.5 211.2Q232.3 206.1 227.6 197.1Q223 188 223 176.1Q223 163.9 227.7 154.9Q232.4 145.8 240.7 140.9Q248.9 135.9 259.3 135.9Q265.9 135.9 271.6 137.9Q277.3 139.8 281.8 143.4Q286.3 147 289.2 152Q292.1 156.9 293 163H278.9Q278.2 159.6 276.5 156.9Q274.8 154.2 272.3 152.3Q269.8 150.4 266.6 149.3Q263.5 148.3 259.7 148.3Q252.7 148.3 247.6 151.7Q242.4 155.2 239.7 161.4Q236.9 167.7 236.9 176.1Q236.9 184.5 239.7 190.8Q242.5 197 247.6 200.4Q252.8 203.9 259.8 203.9Q265.6 203.9 270.1 201.5Q274.6 199.1 277.3 194.9Q279.9 190.7 279.9 185.1L283.5 185.4H261.8V174.5H293.5V183.9Q293.5 193.3 289.1 200.6Q284.7 207.9 277 212.1Q269.4 216.3 259.5 216.3ZM305.1 215V159.8H317.8V169H317.9Q319.4 164.2 322.7 161.8Q326 159.3 331.3 159.3Q332.7 159.3 333.7 159.4Q334.8 159.4 335.6 159.5V171.2Q334.9 171.1 333.1 171Q331.4 170.8 329.4 170.8Q326.3 170.8 323.8 172.2Q321.2 173.7 319.7 176.5Q318.2 179.4 318.2 183.8V215ZM368.3 216.3Q360.1 216.3 354 212.5Q348 208.8 344.7 202.3Q341.4 195.8 341.4 187.5Q341.4 179.1 344.8 172.5Q348.2 166 354.1 162.3Q360.1 158.6 367.8 158.6Q373.8 158.6 378.6 160.7Q383.5 162.8 387 166.6Q390.5 170.4 392.4 175.7Q394.2 180.9 394.2 187.3V190.9H346.7V181.8H387.7L381.8 184.2Q381.8 179.5 380.1 176.1Q378.4 172.7 375.3 170.9Q372.3 169 368 169Q363.8 169 360.8 170.9Q357.7 172.7 356 176.1Q354.3 179.5 354.3 184.2V189.9Q354.3 194.7 356 198.3Q357.7 201.9 360.9 203.9Q364.1 205.9 368.6 205.9Q371.9 205.9 374.5 204.9Q377.1 203.9 378.8 202.1Q380.5 200.3 381.2 198H393.6Q392.5 203.3 389 207.5Q385.5 211.6 380.1 213.9Q374.8 216.3 368.3 216.3ZM433.8 159.8V170.4H399.7V159.8ZM409.3 144.8H422.5V199.2Q422.5 202.1 423.8 203.2Q425 204.4 428.1 204.4Q429.4 204.4 431.1 204.4Q432.8 204.4 433.8 204.4V215Q432.4 215 430.2 215Q428 215 425.8 215Q417.4 215 413.4 211.6Q409.3 208.2 409.3 201.1ZM461.6 215.9Q456.1 215.9 451.8 214.1Q447.5 212.2 445 208.5Q442.5 204.8 442.5 199.3Q442.5 194.6 444.3 191.6Q446.1 188.5 449.1 186.7Q452.2 184.9 456.1 183.9Q460 182.9 464.2 182.5Q469.3 181.9 472.4 181.5Q475.4 181 476.7 180.2Q478 179.3 478 177.4V177Q478 174.6 476.8 172.8Q475.6 171 473.3 170Q471 169 467.9 169Q464.7 169 462.3 170Q459.8 171 458.4 172.8Q457 174.6 456.8 177H444.1Q444.5 171.5 447.4 167.4Q450.4 163.3 455.7 161Q460.9 158.7 468.1 158.7Q473.5 158.7 477.8 160Q482 161.3 485 163.7Q487.9 166.2 489.5 169.7Q491 173.1 491 177.4V215H478.1V207.2H477.9Q476.6 209.7 474.5 211.6Q472.4 213.6 469.2 214.7Q466.1 215.9 461.6 215.9ZM464.9 206.1Q469.2 206.1 472.1 204.6Q475 203 476.5 200.4Q478 197.8 478 194.6V188.6Q477.4 189 476.2 189.3Q475 189.7 473.3 190.1Q471.7 190.4 469.8 190.7Q467.9 191 465.8 191.3Q463 191.7 460.6 192.6Q458.3 193.5 456.8 195.1Q455.4 196.7 455.4 199.2Q455.4 201.4 456.6 202.9Q457.7 204.5 459.9 205.3Q462 206.1 464.9 206.1Z"/></svg>
-          <div class="mockup-divider"></div>
-          <div class="mockup-workspace">
-            <span class="dot"></span>
-            <span>Your workspace</span>
-          </div>
-          <div class="mockup-tabs">
-            <span class="mockup-tab active">Today</span>
-            <span class="mockup-tab">Actions</span>
-            <span class="mockup-tab">Ask</span>
-            <span class="mockup-tab">Numbers</span>
-            <span class="mockup-tab">More</span>
-          </div>
+      <div aria-hidden="true">
+        <div class="mk-bar">
+          <div class="mk-bar-brand"><svg class="greta-logo" viewBox="56 101 436 152" role="img" aria-label="Greta" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="glpindexh2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="gl-purple-hi"/><stop offset="1" class="gl-purple"/></linearGradient><linearGradient id="glsindexh2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="gl-stone-hi"/><stop offset="1" class="gl-stone"/></linearGradient><linearGradient id="gltindexh2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="gl-terra-hi"/><stop offset="1" class="gl-terra"/></linearGradient><linearGradient id="glfindexh2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="gl-forest-hi"/><stop offset="1" class="gl-forest"/></linearGradient></defs><path class="gl-hole" d="M127.35 181.57L128.8 181.93L130.26 182.23L131.73 182.47L133.21 182.66L134.69 182.8L136.18 182.88L136.7 181.77L137.03 180.32L137.31 178.85L137.54 177.38L137.72 175.9L137.83 174.41L137.73 173.16L136.29 172.79L134.83 172.47L133.36 172.2L131.89 171.99L130.4 171.84L128.92 171.74L128.03 172.35L127.67 173.8L127.37 175.26L127.13 176.73L126.94 178.21L126.8 179.69L126.72 181.18Z"/><path fill="url(#glpindexh2)" d="M98.68 131.45A40.5 40.5 0 1 1 136.4 182.89A40.5 40.5 0 0 0 98.68 131.45Z"/><path fill="url(#glsindexh2)" d="M178.15 143.68A40.5 40.5 0 1 1 126.71 181.4A40.5 40.5 0 0 0 178.15 143.68Z"/><path fill="url(#gltindexh2)" d="M165.92 223.15A40.5 40.5 0 1 1 128.2 171.71A40.5 40.5 0 0 0 165.92 223.15Z"/><path fill="url(#glfindexh2)" d="M86.45 210.92A40.5 40.5 0 1 1 137.89 173.2A40.5 40.5 0 0 0 86.45 210.92Z"/><path class="gl-word" d="M259.5 216.3Q248.7 216.3 240.5 211.2Q232.3 206.1 227.6 197.1Q223 188 223 176.1Q223 163.9 227.7 154.9Q232.4 145.8 240.7 140.9Q248.9 135.9 259.3 135.9Q265.9 135.9 271.6 137.9Q277.3 139.8 281.8 143.4Q286.3 147 289.2 152Q292.1 156.9 293 163H278.9Q278.2 159.6 276.5 156.9Q274.8 154.2 272.3 152.3Q269.8 150.4 266.6 149.3Q263.5 148.3 259.7 148.3Q252.7 148.3 247.6 151.7Q242.4 155.2 239.7 161.4Q236.9 167.7 236.9 176.1Q236.9 184.5 239.7 190.8Q242.5 197 247.6 200.4Q252.8 203.9 259.8 203.9Q265.6 203.9 270.1 201.5Q274.6 199.1 277.3 194.9Q279.9 190.7 279.9 185.1L283.5 185.4H261.8V174.5H293.5V183.9Q293.5 193.3 289.1 200.6Q284.7 207.9 277 212.1Q269.4 216.3 259.5 216.3ZM305.1 215V159.8H317.8V169H317.9Q319.4 164.2 322.7 161.8Q326 159.3 331.3 159.3Q332.7 159.3 333.7 159.4Q334.8 159.4 335.6 159.5V171.2Q334.9 171.1 333.1 171Q331.4 170.8 329.4 170.8Q326.3 170.8 323.8 172.2Q321.2 173.7 319.7 176.5Q318.2 179.4 318.2 183.8V215ZM368.3 216.3Q360.1 216.3 354 212.5Q348 208.8 344.7 202.3Q341.4 195.8 341.4 187.5Q341.4 179.1 344.8 172.5Q348.2 166 354.1 162.3Q360.1 158.6 367.8 158.6Q373.8 158.6 378.6 160.7Q383.5 162.8 387 166.6Q390.5 170.4 392.4 175.7Q394.2 180.9 394.2 187.3V190.9H346.7V181.8H387.7L381.8 184.2Q381.8 179.5 380.1 176.1Q378.4 172.7 375.3 170.9Q372.3 169 368 169Q363.8 169 360.8 170.9Q357.7 172.7 356 176.1Q354.3 179.5 354.3 184.2V189.9Q354.3 194.7 356 198.3Q357.7 201.9 360.9 203.9Q364.1 205.9 368.6 205.9Q371.9 205.9 374.5 204.9Q377.1 203.9 378.8 202.1Q380.5 200.3 381.2 198H393.6Q392.5 203.3 389 207.5Q385.5 211.6 380.1 213.9Q374.8 216.3 368.3 216.3ZM433.8 159.8V170.4H399.7V159.8ZM409.3 144.8H422.5V199.2Q422.5 202.1 423.8 203.2Q425 204.4 428.1 204.4Q429.4 204.4 431.1 204.4Q432.8 204.4 433.8 204.4V215Q432.4 215 430.2 215Q428 215 425.8 215Q417.4 215 413.4 211.6Q409.3 208.2 409.3 201.1ZM461.6 215.9Q456.1 215.9 451.8 214.1Q447.5 212.2 445 208.5Q442.5 204.8 442.5 199.3Q442.5 194.6 444.3 191.6Q446.1 188.5 449.1 186.7Q452.2 184.9 456.1 183.9Q460 182.9 464.2 182.5Q469.3 181.9 472.4 181.5Q475.4 181 476.7 180.2Q478 179.3 478 177.4V177Q478 174.6 476.8 172.8Q475.6 171 473.3 170Q471 169 467.9 169Q464.7 169 462.3 170Q459.8 171 458.4 172.8Q457 174.6 456.8 177H444.1Q444.5 171.5 447.4 167.4Q450.4 163.3 455.7 161Q460.9 158.7 468.1 158.7Q473.5 158.7 477.8 160Q482 161.3 485 163.7Q487.9 166.2 489.5 169.7Q491 173.1 491 177.4V215H478.1V207.2H477.9Q476.6 209.7 474.5 211.6Q472.4 213.6 469.2 214.7Q466.1 215.9 461.6 215.9ZM464.9 206.1Q469.2 206.1 472.1 204.6Q475 203 476.5 200.4Q478 197.8 478 194.6V188.6Q477.4 189 476.2 189.3Q475 189.7 473.3 190.1Q471.7 190.4 469.8 190.7Q467.9 191 465.8 191.3Q463 191.7 460.6 192.6Q458.3 193.5 456.8 195.1Q455.4 196.7 455.4 199.2Q455.4 201.4 456.6 202.9Q457.7 204.5 459.9 205.3Q462 206.1 464.9 206.1Z"/></svg></div>
+          <span class="mk-ws">Example brand</span>
+          <span class="mk-ws-note">Sample figures</span>
+          <div class="mk-search"><span>Ask or search</span><kbd>Ctrl K</kbd></div>
+          <span class="mk-avatar">E</span>
         </div>
-
-        <div class="mk-hero">
-          <div class="mk-hero-bg"></div>
-          <div class="mk-meta">Example brand · where the business stands · last 30 days</div>
-          <h2 class="mk-headline">You kept <span class="accent">£3,240</span> after ads, £1,900 less than a typical month.</h2>
-          <p class="mk-sub">Ad spend rose faster than sales. Each £1 of ads now brings back <b style="color: var(--text-primary);">£2.10</b>, against the £1.60 you need to cover products, delivery and the ads.</p>
-
-          <div class="mk-stats">
-            <div>
-              <div class="mk-stat-val" style="color: var(--text-primary);">£21,400</div>
-              <div class="mk-stat-label">Sales</div>
-            </div>
-            <div class="mk-stat-divider"></div>
-            <div>
-              <div class="mk-stat-val" style="color: var(--warn);">£10,200</div>
-              <div class="mk-stat-label">Ad spend</div>
-            </div>
-            <div class="mk-stat-divider"></div>
-            <div>
-              <div class="mk-stat-val" style="color: var(--text-primary);">£3,240</div>
-              <div class="mk-stat-label">Kept after ads</div>
-            </div>
+        <div class="mk-shell">
+          <div class="mk-rail">
+            <span class="mk-nav on">Home</span>
+            <span class="mk-nav">Actions <span class="mk-nav-n">15</span></span>
+            <span class="mk-nav">Results</span>
+            <span class="mk-nav">Weekly review</span>
+            <span class="mk-nav">Ask Greta</span>
+            <span class="mk-nav-group">Analytics</span>
+            <span class="mk-nav">Profit &amp; sales</span>
+            <span class="mk-nav">Marketing</span>
+            <span class="mk-nav">Website</span>
+            <span class="mk-nav">Customers</span>
+            <span class="mk-nav">Products</span>
+            <span class="mk-nav-group">Planning</span>
+            <span class="mk-nav">Goal &amp; costs</span>
+            <span class="mk-nav">Growth plan</span>
+            <span class="mk-nav">Stock &amp; orders</span>
           </div>
+          <div class="mk-main">
+            <div class="mk-head">
+              <div class="mk-title">Home</div>
+              <span class="mk-updated">Updated 09:12</span>
+            </div>
 
-          <div class="mk-grid">
-            <div>
-              <div class="mk-col-label">Fix first</div>
-              <div class="mk-change-row">
-                <div class="mk-change-label">Your shop stopped recording where half its orders came from in August. Until it is fixed, each ad channel's orders read low.</div>
+            <div class="mk-panel">
+              <div class="mk-strip-head"><b>Yesterday</b><span id="mk-yday">10 Nov, against a typical Tuesday</span></div>
+              <div class="mk-strip">
+                <div class="mk-tile">
+                  <span class="mk-tile-k">Sales</span>
+                  <span class="mk-tile-v">£4,812</span>
+                  <span class="mk-tile-d up">↑ 9.6%</span>
+                  <svg class="mk-spark up" viewBox="0 0 120 20" preserveAspectRatio="none"><polyline points="0,13 10,11 20,14 30,12 40,15 50,12 60,10 70,12 80,9 90,10 100,7 110,8 120,5"/></svg>
+                </div>
+                <div class="mk-tile">
+                  <span class="mk-tile-k">Orders</span>
+                  <span class="mk-tile-v">96</span>
+                  <span class="mk-tile-d up">↑ 4.3%</span>
+                  <svg class="mk-spark up" viewBox="0 0 120 20" preserveAspectRatio="none"><polyline points="0,11 10,12 20,10 30,13 40,11 50,10 60,12 70,9 80,10 90,8 100,9 110,7 120,7"/></svg>
+                </div>
+                <div class="mk-tile">
+                  <span class="mk-tile-k">Ad spend</span>
+                  <span class="mk-tile-v">£1,402</span>
+                  <span class="mk-tile-d">↑ 2.1%</span>
+                  <svg class="mk-spark" viewBox="0 0 120 20" preserveAspectRatio="none"><polyline points="0,10 10,11 20,10 30,9 40,10 50,11 60,10 70,9 80,10 90,9 100,10 110,9 120,9"/></svg>
+                </div>
+                <div class="mk-tile">
+                  <span class="mk-tile-k">Profit after ads</span>
+                  <span class="mk-tile-v">£1,236</span>
+                  <span class="mk-tile-d up">↑ 14.8%</span>
+                  <svg class="mk-spark up" viewBox="0 0 120 20" preserveAspectRatio="none"><polyline points="0,15 10,12 20,15 30,12 40,13 50,10 60,12 70,9 80,11 90,8 100,9 110,6 120,5"/></svg>
+                </div>
+              </div>
+              <div class="mk-strip-head mk-later"><b>Last week</b><span id="mk-week">2 Nov to 8 Nov, against the week before</span></div>
+              <div class="mk-strip mk-strip-3 mk-later">
+                <div class="mk-tile">
+                  <span class="mk-tile-k">Sales</span>
+                  <span class="mk-tile-v">£31,640</span>
+                  <span class="mk-tile-d up">↑ 6.2%</span>
+                  <svg class="mk-spark up" viewBox="0 0 120 20" preserveAspectRatio="none"><polyline points="0,12 10,13 20,11 30,12 40,14 50,11 60,12 70,10 80,11 90,9 100,10 110,8 120,7"/></svg>
+                </div>
+                <div class="mk-tile">
+                  <span class="mk-tile-k">Ad spend</span>
+                  <span class="mk-tile-v">£9,870</span>
+                  <span class="mk-tile-d">↓ 3.4%</span>
+                  <svg class="mk-spark" viewBox="0 0 120 20" preserveAspectRatio="none"><polyline points="0,8 10,9 20,8 30,9 40,10 50,9 60,10 70,11 80,10 90,11 100,10 110,11 120,11"/></svg>
+                </div>
+                <div class="mk-tile">
+                  <span class="mk-tile-k">Profit after ads</span>
+                  <span class="mk-tile-v">£8,120</span>
+                  <span class="mk-tile-d up">↑ 11.5%</span>
+                  <svg class="mk-spark up" viewBox="0 0 120 20" preserveAspectRatio="none"><polyline points="0,14 10,13 20,14 30,11 40,12 50,10 60,11 70,9 80,10 90,8 100,9 110,7 120,6"/></svg>
+                </div>
               </div>
             </div>
-            <div>
-              <div class="mk-col-label">Do this week</div>
-              <div class="mk-action">
-                <div class="mk-action-rank">1</div>
-                <div style="flex:1;">
-                  <div class="mk-action-text">Order the 12 products that run out before a restock can land</div>
-                  <div class="mk-action-meta">
-                    <span style="color: var(--text-muted);">Stock · likely</span>
-                    <span class="mk-money">protects £3,100/mo</span>
-                  </div>
-                </div>
+
+            <div class="mk-panel">
+              <div class="mk-panel-head">
+                <span class="mk-panel-title">Actions</span>
+                <span class="mk-count">15</span>
+                <span class="mk-note">Ranked by what each is worth and how sure the figure is</span>
+                <span class="mk-viewall">View all</span>
               </div>
-              <div class="mk-action">
-                <div class="mk-action-rank">2</div>
-                <div style="flex:1;">
-                  <div class="mk-action-text">Bring Meta back toward £1,200 a week and judge it on your Shopify orders</div>
-                  <div class="mk-action-meta">
-                    <span style="color: var(--text-muted);">Ads · probably</span>
-                    <span class="mk-money">£1,400/mo</span>
-                  </div>
-                </div>
-              </div>
-              <div class="mk-action">
-                <div class="mk-action-rank">3</div>
-                <div style="flex:1;">
-                  <div class="mk-action-text">Switch on the win-back email you already built in Klaviyo</div>
-                  <div class="mk-action-meta">
-                    <span style="color: var(--text-muted);">Email · possible</span>
-                    <span class="mk-money">£520/mo</span>
-                  </div>
-                </div>
-              </div>
+              <table class="mk-table">
+                <thead>
+                  <tr><th>Action</th><th class="mk-c-area">Area</th><th class="mk-c-worth">Worth</th><th class="mk-c-conf">Confidence</th><th class="mk-c-open"></th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><div class="mk-act-t">Order the 6 products that run out before a restock can land</div><div class="mk-act-s">2 are already out.</div></td>
+                    <td class="mk-c-area">Stock</td>
+                    <td class="mk-c-worth"><span class="mk-worth">£12k a month<small>protected</small></span></td>
+                    <td class="mk-c-conf"><span class="mk-conf likely"><i></i>Likely</span></td>
+                    <td class="mk-c-open"><span class="mk-btn primary">Open order list</span></td>
+                  </tr>
+                  <tr>
+                    <td><div class="mk-act-t">Cut Meta from £3,400 a week back toward £2,600 a week</div><div class="mk-act-s">Meta now costs £31 for each order your shop credits to it, up from £24.</div></td>
+                    <td class="mk-c-area">Ads</td>
+                    <td class="mk-c-worth"><span class="mk-worth">£2.1k a month</span></td>
+                    <td class="mk-c-conf"><span class="mk-conf likely"><i></i>Likely</span></td>
+                    <td class="mk-c-open"><span class="mk-btn">Open Marketing</span></td>
+                  </tr>
+                  <tr>
+                    <td><div class="mk-act-t">Switch on the win-back email you already built in Klaviyo</div><div class="mk-act-s">1,840 customers bought once, 60 to 120 days ago.</div></td>
+                    <td class="mk-c-area">Email</td>
+                    <td class="mk-c-worth"><span class="mk-worth">£900 a month</span></td>
+                    <td class="mk-c-conf"><span class="mk-conf probably"><i></i>Probably</span></td>
+                    <td class="mk-c-open"><span class="mk-btn">Open Customers</span></td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
       </div>
     </div>
   </div>
+  <script>
+    /* The sample page's dates follow today, so the picture never reads as old. */
+    (function () {
+      var now = new Date(), y = new Date(now), mon = new Date(now), sun;
+      y.setDate(now.getDate() - 1);
+      mon.setDate(now.getDate() - ((now.getDay() + 6) % 7) - 7);
+      sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+      function f(d) { return d.getDate() + ' ' + d.toLocaleString('en-GB', { month: 'short' }); }
+      var a = document.getElementById('mk-yday'), b = document.getElementById('mk-week');
+      if (a) a.textContent = f(y) + ', against a typical ' + y.toLocaleString('en-GB', { weekday: 'long' });
+      if (b) b.textContent = f(mon) + ' to ' + f(sun) + ', against the week before';
+    })();
+  </script>
 </section>
 
 <!-- PROOF BAR -->
