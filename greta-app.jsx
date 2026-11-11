@@ -30184,6 +30184,8 @@ function V3FreshnessBanner() {
   const bar = v3ShellEl('bar-note');
   React.useEffect(() => { if (bar) bar.textContent = sample || ''; }, [bar, sample]);
   if (sample) return bar ? null : <p className="v3-note v3-measure v3-sample" role="note">{sample}</p>;
+  // 1223: a small shop with a quiet spell and a working sync gets one plain line, not a reconnect
+  if (F && !F.stale && F.shop_quiet && F.shop_quiet.said) return <p className="v3-note v3-measure" role="note">{F.shop_quiet.said}</p>;
   if (!F || !F.stale || !F.said) return null;
   return (<div className={'v3-alert v3-measure' + (F.level === 'problem' ? ' problem' : '')} role="status">
     <p><b>{F.core_stale ? 'Your data is out of date.' : 'Some of your data is out of date.'}</b> {F.said}</p>
