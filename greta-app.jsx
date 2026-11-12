@@ -24692,7 +24692,7 @@ function v3PeakUnits(ly, stockTitles, prods) {
 // against £39 for the last 90 days), so it is lower than the 90-day figure on Customers — both are
 // right, for different windows, and the page says which it is using.
 const V3_BCFG_Q = (sb, b) => sb.from('brand_config')
-  .select('supplier_lead_time_weeks,cash_floor,opening_cash,opening_cash_as_of,variable_costs').eq('brand_id', b).limit(1);
+  .select('supplier_lead_time_weeks,cash_floor,opening_cash,opening_cash_as_of,variable_costs,other_marketing_none,creator_commission_pct,creator_commission_per_order,creator_agency_fees_monthly,seeding_cost_monthly').eq('brand_id', b).limit(1);
 // The brand's own order-to-arrival time (Cash, stock and supplier terms). 0259 puts the same figure in
 // vw_stock_demand_plan.lead_days; before it, and for a brand that has not entered one, the stock plan's
 // fixed 28 days.
@@ -24805,6 +24805,8 @@ function V3GoalLead() {
   });
   const [drv, setDrv] = React.useState(null);
   const [goalBasis, setGoalBasis] = React.useState(false);
+  // the media agency fee in the cost profile is an other marketing cost too (0505)
+  const feeG = useV3Rows('cost-profile-fee', (sb, b) => sb.from('brand_cost_profile').select('agency_fee_per_month').eq('brand_id', b).order('effective_from', { ascending: false }).limit(1));
   const nr = useV3Rows('goal-nr-' + per.start, V3_GOAL_NR_Q(per.start, today));
   const ph0 = useV3Rows('goal-phasing', V3_GOAL_PHASING_Q);
   const lad = useV3Rows('profit-ladder', V3_LADDER_Q);
@@ -24959,6 +24961,9 @@ function V3GoalLead() {
             : g && adsGoal != null ? <V3HomeTile k={onConf ? 'Re-plan ads' : 'The goal takes'} v={v3GbpRound(adsGoal)} delta={onConf ? 'for the goal, on today’s figures' : ph ? v3GbpRound(peak.gSpend) + ' in ' + gpMonthName(peak.iso) : ''}/> : null}
         </div></div>
       {!g && <div className="v3-panel-note v3-goal-call v3-goal-full"><span>No goal confirmed yet.</span>{setGoal}</div>}
+      {/* 12 Nov re-eval: the goal and its plan are both before other marketing costs; Home's profit after ads takes them off (Halden 79,516 against 90,576 for the same 30 days) */}
+      {GV && ((C.other_marketing_none !== true && [C.creator_commission_pct, C.creator_commission_per_order, C.creator_agency_fees_monthly, C.seeding_cost_monthly].some(x => Number(x) > 0)) || Number(((feeG.rows || [])[0] || {}).agency_fee_per_month) > 0)
+        && <p className="v3-panel-note v3-goal-full">The goal and its plan count profit after ads and before your other marketing costs (agency and creator fees, creator commission, seeding). Home takes those off as well, so its 30-day figure is lower.</p>}
       {drv === 'gap' && M.gap && <div className="v3-home-drv v3-goal-full"><V3DriverPanel key="gap" fixed={M.gap}/></div>}
       {drv === 'sofar' && M.sofar && <div className="v3-home-drv v3-goal-full"><V3DriverPanel key="sofar" fixed={M.sofar}/></div>}
     </section>
